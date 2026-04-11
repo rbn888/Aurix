@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ISA Wealth</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=36">
+</head>
+<body>
+
+  <div class="app">
+
+    <header class="header">
+      <div class="header-left">
+        <div class="logo-block">
+          <span class="logo-wordmark">ISA</span>
+          <span class="logo-tagline">WEALTH</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="lang-switcher">
+          <button class="lang-btn" data-lang="es" title="Español">🇪🇸</button>
+          <button class="lang-btn" data-lang="en" title="English">🇺🇸</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+
+      <div class="dashboard-top">
+
+        <section class="summary-panel">
+          <div class="summary-label card-title" data-i18n="totalValue">Valor total de cartera</div>
+          <div class="summary-total" id="totalValue">$0.00</div>
+          <div class="summary-perf" id="summaryPerf" style="display:none"></div>
+          <div class="summary-meta">
+            <span id="assetCount">0 activos</span>
+            <span class="summary-divider">·</span>
+            <span class="update-indicator">
+              <span class="update-dot" id="updateDot"></span>
+              <span id="updateText" data-i18n="noPrices">precios no cargados</span>
+            </span>
+          </div>
+          <div class="summary-footer">
+            <div class="summary-currency">
+              <div class="currency-toggle" id="baseCurrencyToggle">
+                <button class="currency-btn" data-currency="USD">$ USD</button>
+                <button class="currency-btn" data-currency="EUR">€ EUR</button>
+              </div>
+            </div>
+            <div class="summary-actions">
+              <button class="btn-summary-action btn-primary" id="btnAdd" data-i18n="addAsset">+ Añadir activo</button>
+              <button class="btn-summary-action btn-secondary" id="btnAddLiquidity" data-i18n="addLiquidity">+ Añadir liquidez</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="distribution-section" id="distributionSection" style="display:none">
+          <div class="distribution-header">
+            <span class="chart-title card-title" data-i18n="distribution">Distribución del patrimonio</span>
+          </div>
+          <div class="distribution-inner">
+            <div class="donut-wrap">
+              <canvas id="donutChart"></canvas>
+              <div class="donut-center-label">
+                <div class="donut-center-val" id="donutCenterVal"></div>
+                <div class="donut-center-sub" id="donutCenterSub">total</div>
+              </div>
+            </div>
+            <div class="distribution-legend" id="distributionLegend"></div>
+          </div>
+        </section>
+
+      </div>
+
+      <section class="chart-section">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title card-title" data-i18n="evolution">Evolución del patrimonio</div>
+            <span class="chart-change" id="chartChange"></span>
+          </div>
+          <div class="range-toggle">
+            <button class="range-btn active" data-range="24h">24H</button>
+            <button class="range-btn" data-range="7d">7D</button>
+            <button class="range-btn" data-range="30d">30D</button>
+            <button class="range-btn" data-range="1y" data-i18n="range1y">1A</button>
+            <button class="range-btn" data-range="all" data-i18n="rangeAll">TOTAL</button>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="portfolioChart"></canvas>
+          <div class="chart-no-data" id="chartNoData" data-i18n="chartNoData">Añade activos para ver la evolución</div>
+        </div>
+      </section>
+
+      <section class="categories-section" id="categoriesSection" style="display:none">
+        <div class="categories-grid" id="categoriesGrid"></div>
+      </section>
+
+      <section class="assets-section" id="assetsSection">
+        <div class="section-header">
+          <h2 data-i18n="myAssets" id="assetsSectionTitle">Mis activos</h2>
+          <div class="section-filter-indicator" id="sectionFilterIndicator" style="display:none">
+            <button class="assets-back-btn" id="assetsBackBtn">
+              <span>←</span>
+              <span data-i18n="backAll">Todos</span>
+            </button>
+            <span class="section-filter-name" id="sectionFilterName"></span>
+          </div>
+        </div>
+
+        <div class="assets-list" id="assetsList">
+          <div class="empty-state" id="emptyState">
+            <div class="empty-icon">◇</div>
+            <p data-i18n="emptyTitle">No tienes activos todavía.</p>
+            <p class="empty-sub" data-i18n="emptySub">Pulsa "Añadir activo" para comenzar.</p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- Modal: Añadir activo -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 data-i18n="modalAddTitle">Añadir activo</h3>
+        <button class="modal-close" id="modalClose">✕</button>
+      </div>
+
+      <form id="assetForm" class="modal-body">
+
+        <!-- Buscador -->
+        <div id="searchWrap">
+          <div id="searchInputWrap" class="search-form-group">
+            <div class="search-field-wrap">
+              <input type="text" id="assetSearch" placeholder="Buscar activo..." autocomplete="off" spellcheck="false">
+              <button type="button" class="search-clear" id="searchClear" style="display:none" tabindex="-1">✕</button>
+            </div>
+            <div class="asset-suggestions" id="assetSuggestions"></div>
+          </div>
+          <div class="search-filters" id="searchFilters">
+            <button type="button" class="filter-btn active" data-filter="all"         data-i18n="filterAll">Todos</button>
+            <button type="button" class="filter-btn" data-filter="crypto"            data-i18n="filterCrypto">Cripto</button>
+            <button type="button" class="filter-btn" data-filter="stock"             data-i18n="filterStock">Acciones</button>
+            <button type="button" class="filter-btn" data-filter="etf"              data-i18n="filterEtf">ETF / Fondos</button>
+            <button type="button" class="filter-btn" data-filter="metal"            data-i18n="filterMetal">Metales</button>
+            <button type="button" class="filter-btn" data-filter="real_estate"      data-i18n="filterRE">Inmuebles</button>
+          </div>
+          <div class="selected-chip" id="selectedChip" style="display:none">
+            <span class="chip-badge" id="chipBadge"></span>
+            <div class="chip-info">
+              <div class="chip-name" id="chipName"></div>
+              <div class="chip-sub"  id="chipSub"></div>
+            </div>
+            <span class="chip-price" id="chipPrice"></span>
+            <button type="button" class="chip-clear" id="chipClear">✕</button>
+          </div>
+          <span class="lookup-status" id="lookupStatus"></span>
+        </div>
+
+        <!-- Real estate: name (visible solo en modo inmueble) -->
+        <div class="form-group" id="reNameGroup" style="display:none">
+          <label for="reName" data-i18n="reName">Nombre del inmueble</label>
+          <input type="text" id="reName" placeholder="ej. Apartamento Madrid" autocomplete="off">
+        </div>
+
+        <!-- Real estate: currency (visible solo en modo inmueble) -->
+        <div class="form-group" id="reCurrGroup" style="display:none">
+          <label data-i18n="currency">Moneda</label>
+          <div class="type-toggle">
+            <button type="button" class="re-curr-btn active" data-curr="EUR">€ EUR</button>
+            <button type="button" class="re-curr-btn" data-curr="USD">$ USD</button>
+          </div>
+        </div>
+
+        <!-- Real estate: monthly rent (visible solo en modo inmueble) -->
+        <div class="form-group" id="reRentGroup" style="display:none">
+          <label for="reRent" data-i18n="reRentLabel">Renta mensual</label>
+          <input type="text" inputmode="decimal" id="reRent" placeholder="0" autocomplete="off">
+          <span class="input-hint" data-i18n="reRentHint">Opcional</span>
+        </div>
+
+        <!-- Gold: Quilates (visible solo para XAU) -->
+        <div class="form-group" id="karatGroup" style="display:none">
+          <label data-i18n="karat">Quilates</label>
+          <div class="type-toggle" id="karatToggle">
+            <button type="button" class="type-btn" data-karat="14">14K</button>
+            <button type="button" class="type-btn active" data-karat="18">18K</button>
+            <button type="button" class="type-btn" data-karat="24">24K</button>
+          </div>
+        </div>
+
+        <!-- Gold: Unidad (visible solo para XAU) -->
+        <div class="form-group" id="goldUnitGroup" style="display:none">
+          <label data-i18n="goldUnit">Unidad</label>
+          <div class="type-toggle" id="goldUnitToggle">
+            <button type="button" class="type-btn active" data-unit="g" data-i18n="gramUnit">g (gramos)</button>
+            <button type="button" class="type-btn" data-unit="oz" data-i18n="ozUnit">oz troy</button>
+          </div>
+        </div>
+
+        <!-- Cantidad (visible tras seleccionar activo) -->
+        <div class="form-group" id="qtyGroup" style="display:none">
+          <label for="assetQty" id="qtyLabel" data-i18n="qty">Cantidad</label>
+          <input type="text" inputmode="decimal" id="assetQty" placeholder="0" autocomplete="off">
+        </div>
+
+        <div class="form-preview" id="formPreview" style="display:none">
+          <span data-i18n="estimatedVal">Valor estimado:</span> <strong id="previewTotal">$0.00</strong>
+        </div>
+
+        <button type="submit" class="btn-submit" id="btnSubmitAsset" style="display:none" data-i18n="addToPortfolio">Añadir a cartera</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Reducir cantidad -->
+  <div class="modal-overlay" id="reduceOverlay">
+    <div class="modal modal--sm">
+      <div class="modal-header">
+        <h3 data-i18n="modalReduceTitle">Reducir posición</h3>
+        <button class="modal-close" id="reduceClose">✕</button>
+      </div>
+
+      <form id="reduceForm" class="modal-body">
+
+        <div class="reduce-asset-info" id="reduceAssetInfo"></div>
+
+        <div class="form-group">
+          <label for="reduceQty" data-i18n="reduceQtyLabel">Cantidad a restar</label>
+          <input type="text" inputmode="decimal" id="reduceQty" placeholder="0" autocomplete="off">
+          <span class="input-hint" id="reduceMax"></span>
+        </div>
+
+        <div class="reduce-preview" id="reducePreview">
+          <div class="reduce-preview-row">
+            <span data-i18n="qtyRemaining">Cantidad restante</span>
+            <strong id="previewQtyLeft">—</strong>
+          </div>
+          <div class="reduce-preview-row">
+            <span data-i18n="valueRemaining">Valor restante</span>
+            <strong id="previewValueLeft">—</strong>
+          </div>
+        </div>
+
+        <div class="reduce-warning" id="reduceWarning" data-i18n="removeWarning">
+          El activo se eliminará al llegar a 0.
+        </div>
+
+        <div class="reduce-error" id="reduceError"></div>
+
+        <button type="submit" class="btn-submit btn-submit--orange" data-i18n="confirmReduce">Confirmar reducción</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Añadir a posición -->
+  <div class="modal-overlay" id="addOverlay">
+    <div class="modal modal--sm">
+      <div class="modal-header">
+        <h3 data-i18n="modalAddPosTitle">Añadir a posición</h3>
+        <button class="modal-close" id="addClose">✕</button>
+      </div>
+
+      <form id="addForm" class="modal-body">
+
+        <div class="reduce-asset-info" id="addAssetInfo"></div>
+
+        <div class="form-group">
+          <label for="addQty" id="addQtyLabel">Cantidad a añadir</label>
+          <input type="text" inputmode="decimal" id="addQty" placeholder="0" autocomplete="off">
+        </div>
+
+        <div class="reduce-preview" id="addPreview">
+          <div class="reduce-preview-row">
+            <span data-i18n="newTotalQty">Nueva cantidad total</span>
+            <strong id="previewAddQtyTotal">—</strong>
+          </div>
+          <div class="reduce-preview-row">
+            <span data-i18n="newTotalValue">Nuevo valor total</span>
+            <strong id="previewAddValueTotal">—</strong>
+          </div>
+        </div>
+
+        <div class="reduce-error" id="addError"></div>
+
+        <button type="submit" class="btn-submit btn-submit--green" data-i18n="confirm">Confirmar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Añadir liquidez -->
+  <div class="modal-overlay" id="liquidityOverlay">
+    <div class="modal modal--sm">
+      <div class="modal-header">
+        <h3 data-i18n="modalLiqTitle">Añadir liquidez</h3>
+        <button class="modal-close" id="liquidityClose">✕</button>
+      </div>
+      <form id="liquidityForm" class="modal-body">
+        <div class="form-group">
+          <label data-i18n="currency">Moneda</label>
+          <div class="type-toggle">
+            <button type="button" class="liq-btn active" data-curr="EUR">€ EUR</button>
+            <button type="button" class="liq-btn" data-curr="USD">$ USD</button>
+          </div>
+          <input type="hidden" id="liquidityCurrency" value="EUR">
+        </div>
+        <div class="form-group">
+          <label for="liquidityQty" data-i18n="amount">Importe</label>
+          <input type="text" inputmode="decimal" id="liquidityQty" placeholder="0" autocomplete="off">
+        </div>
+        <button type="submit" class="btn-submit btn-submit--green" data-i18n="addLiqBtn">Añadir liquidez</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script src="app.js?v=31"></script>
+</body>
+</html>

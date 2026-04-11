@@ -1,0 +1,2937 @@
+'use strict';
+
+// ── Internationalisation ───────────────────────────────────
+const LANG_KEY = 'portfolio_lang';
+let lang = localStorage.getItem(LANG_KEY) || 'es';
+
+const T = {
+  es: {
+    // Summary
+    totalValue:      'Valor total de cartera',
+    addAsset:        '+ Añadir activo',
+    addLiquidity:    '+ Añadir liquidez',
+    noPrices:        'precios no cargados',
+    assetCount:      n => n === 1 ? '1 activo' : `${n} activos`,
+    // Sections
+    distribution:    'Distribución del patrimonio',
+    evolution:       'Evolución del patrimonio',
+    myAssets:        'Mis activos',
+    chartNoData:     'Añade activos para ver la evolución',
+    donutTotal:      'total',
+    // Empty state
+    emptyTitle:      'No tienes activos todavía.',
+    emptySub:        'Pulsa "Añadir activo" para comenzar.',
+    // Update status
+    refreshing:      'actualizando...',
+    updated:         t => `actualizado ${t}`,
+    updateError:     'error al actualizar',
+    rateLimit:       'límite API — reintentando pronto',
+    // Market status
+    live24:          'Live · 24/7',
+    liveMarket:      'Live · Mercado abierto',
+    closed:          'Mercado cerrado',
+    estimatedPrice:  'Precio estimado',
+    updatedNow:      'Actualizado ahora',
+    updatedMins:     n => `Actualizado hace ${n} min`,
+    // Gold status
+    goldLive:        'Live · ',
+    goldEstimated:   'Precio estimado',
+    goldUpdNow:      'actualizado ahora',
+    goldUpdMins:     n => `actualizado hace ${n} min`,
+    goldUpdHours:    n => `actualizado hace ${n}h`,
+    // Card type labels
+    typeCard: {
+      crypto:      t => `Criptomoneda · ${t}`,
+      stock:       t => `Acción · ${t}`,
+      etf:         t => `Fondo/ETF · ${t}`,
+      metalGold:   (t, p) => `Metal · XAU · ${p}% pureza`,
+      metal:       t => `Metal · ${t}`,
+      cash:        c => `Liquidez · ${c}`,
+      real_estate: () => 'Inmobiliario',
+      other:       () => 'Otro activo',
+    },
+    // Subline
+    cashLabel:   'efectivo',
+    units:       'ud.',
+    perUnit:     '/ud.',
+    perTrOz:     '/tr.oz',
+    // TYPE_META labels (donut + chip)
+    typeMeta: {
+      crypto: 'Cripto', stock: 'Acciones', etf: 'Fondos/ETF',
+      metal: 'Metales', cash: 'Liquidez', real_estate: 'Inmuebles', other: 'Otros',
+    },
+    // Shorter labels used only in the donut center (narrow space)
+    donutMeta: { etf: 'Fondos', real_estate: 'Inmob.' },
+    // Suggestion type badges
+    typeLabel: { crypto: 'Cripto', stock: 'Acción', etf: 'ETF', metal: 'Metal' },
+    // Search
+    searchPH: {
+      all: 'Buscar activo...', crypto: 'Buscar criptomoneda...',
+      stock: 'Buscar acción...', etf: 'Buscar ETF o fondo...', metal: 'Buscar metal...',
+    },
+    noResults:       q => `Sin resultados para "${q}"`,
+    // Price lookup
+    noPrice:         'sin precio',
+    priceUnavail:    'Precio no disponible — inténtalo de nuevo más tarde.',
+    priceNoConn:     'Sin conexión. Precio no disponible.',
+    // Card button titles
+    btnAdd:          'Añadir',
+    btnReduce:       'Reducir',
+    btnDelete:       'Eliminar',
+    btnEdit:         'Editar',
+    // Modal: Add asset
+    modalAddTitle:   'Añadir activo',
+    modalEditRETitle: 'Editar inmueble',
+    karat:           'Quilates',
+    goldUnit:        'Unidad',
+    gramUnit:        'g (gramos)',
+    ozUnit:          'oz troy',
+    qty:             'Cantidad',
+    qtyGold:         u => `Cantidad (${u})`,
+    estimatedVal:    'Valor estimado:',
+    addToPortfolio:  'Añadir a cartera',
+    // Modal: Reduce
+    modalReduceTitle: 'Reducir posición',
+    reduceQtyLabel:   'Cantidad a restar',
+    qtyRemaining:     'Cantidad restante',
+    valueRemaining:   'Valor restante',
+    removeWarning:    'El activo se eliminará al llegar a 0.',
+    confirmReduce:    'Confirmar reducción',
+    maxLabel:         (q, u) => u ? `Máximo: ${q} ${u}` : `Máximo: ${q}`,
+    cantExceed:       m => `No puedes restar más de ${m}.`,
+    unidades:         'unidades',
+    // Modal: Add position
+    modalAddPosTitle: 'Añadir a posición',
+    addQtyLabel:      u => u ? `Cantidad a añadir (${u})` : 'Cantidad a añadir',
+    addQtyLabelCash:  'Importe a añadir',
+    newTotalQty:      'Nueva cantidad total',
+    newTotalValue:    'Nuevo valor total',
+    confirm:          'Confirmar',
+    // Modal: Liquidity
+    modalLiqTitle:   'Añadir liquidez',
+    currency:        'Moneda',
+    amount:          'Importe',
+    addLiqBtn:       'Añadir liquidez',
+    // Filters
+    filterAll: 'Todos', filterCrypto: 'Cripto', filterStock: 'Acciones',
+    filterEtf: 'ETF / Fondos', filterMetal: 'Metales', filterRE: 'Inmuebles',
+    reName: 'Nombre del inmueble', reValueLabel: 'Valor (en moneda base)',
+    reRentLabel: 'Renta mensual', reRentHint: 'Opcional — dejar en 0 si no aplica',
+    rentPerMonth: '/mes',
+    // Chart range labels
+    range1y:  '1A',
+    rangeAll: 'TOTAL',
+    backAll:  'Todos',
+    viewHint: 'Ver activos →',
+    // Benchmark comparison
+    bmPortfolio: 'Cartera',
+    bmMarket:    'Mercado',
+    bmDiff:      'Diferencia',
+    // Metal asset names (single language, no parenthetical mixing)
+    metalNames: { XAU: 'Oro', XAG: 'Plata' },
+  },
+  en: {
+    // Summary
+    totalValue:      'Total portfolio value',
+    addAsset:        '+ Add asset',
+    addLiquidity:    '+ Add liquidity',
+    noPrices:        'prices not loaded',
+    assetCount:      n => n === 1 ? '1 asset' : `${n} assets`,
+    // Sections
+    distribution:    'Portfolio distribution',
+    evolution:       'Portfolio evolution',
+    myAssets:        'My assets',
+    chartNoData:     'Add assets to see the evolution',
+    donutTotal:      'total',
+    // Empty state
+    emptyTitle:      'You have no assets yet.',
+    emptySub:        'Press "Add asset" to get started.',
+    // Update status
+    refreshing:      'refreshing...',
+    updated:         t => `updated ${t}`,
+    updateError:     'update error',
+    rateLimit:       'API limit — retrying soon',
+    // Market status
+    live24:          'Live · 24/7',
+    liveMarket:      'Live · Market open',
+    closed:          'Market closed',
+    estimatedPrice:  'Estimated price',
+    updatedNow:      'Updated just now',
+    updatedMins:     n => `Updated ${n} min ago`,
+    // Gold status
+    goldLive:        'Live · ',
+    goldEstimated:   'Estimated price',
+    goldUpdNow:      'updated just now',
+    goldUpdMins:     n => `updated ${n} min ago`,
+    goldUpdHours:    n => `updated ${n}h ago`,
+    // Card type labels
+    typeCard: {
+      crypto:      t => `Cryptocurrency · ${t}`,
+      stock:       t => `Stock · ${t}`,
+      etf:         t => `Fund/ETF · ${t}`,
+      metalGold:   (t, p) => `Metal · XAU · ${p}% purity`,
+      metal:       t => `Metal · ${t}`,
+      cash:        c => `Cash · ${c}`,
+      real_estate: () => 'Real estate',
+      other:       () => 'Other asset',
+    },
+    // Subline
+    cashLabel:   'cash',
+    units:       'units',
+    perUnit:     '/unit',
+    perTrOz:     '/tr.oz',
+    // TYPE_META labels
+    typeMeta: {
+      crypto: 'Crypto', stock: 'Stocks', etf: 'ETF / Funds',
+      metal: 'Metals', cash: 'Cash', real_estate: 'Real Estate', other: 'Other',
+    },
+    // Shorter labels used only in the donut center (narrow space)
+    donutMeta: { etf: 'Funds', real_estate: 'Real Est.' },
+    // Suggestion type badges
+    typeLabel: { crypto: 'Crypto', stock: 'Stock', etf: 'ETF', metal: 'Metal' },
+    // Search
+    searchPH: {
+      all: 'Search asset...', crypto: 'Search cryptocurrency...',
+      stock: 'Search stock...', etf: 'Search ETF or fund...', metal: 'Search metal...',
+    },
+    noResults:       q => `No results for "${q}"`,
+    // Price lookup
+    noPrice:         'no price',
+    priceUnavail:    'Price not available — try again later.',
+    priceNoConn:     'No connection. Price unavailable.',
+    // Card button titles
+    btnAdd:          'Add',
+    btnReduce:       'Reduce',
+    btnDelete:       'Delete',
+    btnEdit:         'Edit',
+    // Modal: Add asset
+    modalAddTitle:   'Add asset',
+    modalEditRETitle: 'Edit property',
+    karat:           'Carats',
+    goldUnit:        'Unit',
+    gramUnit:        'g (grams)',
+    ozUnit:          'troy oz',
+    qty:             'Quantity',
+    qtyGold:         u => `Quantity (${u})`,
+    estimatedVal:    'Estimated value:',
+    addToPortfolio:  'Add to portfolio',
+    // Modal: Reduce
+    modalReduceTitle: 'Reduce position',
+    reduceQtyLabel:   'Amount to subtract',
+    qtyRemaining:     'Remaining quantity',
+    valueRemaining:   'Remaining value',
+    removeWarning:    'The asset will be removed when it reaches 0.',
+    confirmReduce:    'Confirm reduction',
+    maxLabel:         (q, u) => u ? `Max: ${q} ${u}` : `Max: ${q}`,
+    cantExceed:       m => `Cannot subtract more than ${m}.`,
+    unidades:         'units',
+    // Modal: Add position
+    modalAddPosTitle: 'Add to position',
+    addQtyLabel:      u => u ? `Quantity to add (${u})` : 'Quantity to add',
+    addQtyLabelCash:  'Amount to add',
+    newTotalQty:      'New total quantity',
+    newTotalValue:    'New total value',
+    confirm:          'Confirm',
+    // Modal: Liquidity
+    modalLiqTitle:   'Add liquidity',
+    currency:        'Currency',
+    amount:          'Amount',
+    addLiqBtn:       'Add liquidity',
+    // Filters
+    // Chart range labels
+    range1y:  '1Y',
+    rangeAll: 'ALL',
+    backAll:  'All',
+    viewHint: 'View assets →',
+    // Benchmark comparison
+    bmPortfolio: 'Portfolio',
+    bmMarket:    'Market',
+    bmDiff:      'Difference',
+    // Metal asset names (single language, no parenthetical mixing)
+    metalNames: { XAU: 'Gold', XAG: 'Silver' },
+    filterAll: 'All', filterCrypto: 'Crypto', filterStock: 'Stocks',
+    filterEtf: 'ETF / Funds', filterMetal: 'Metals', filterRE: 'Real Estate',
+    reName: 'Property name', reValueLabel: 'Value (in base currency)',
+    reRentLabel: 'Monthly rent', reRentHint: 'Optional — leave 0 if not applicable',
+    rentPerMonth: '/mo',
+  },
+};
+
+function t(key) { return T[lang][key]; }
+
+// Apply data-i18n attributes to static HTML
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const v = T[lang][el.dataset.i18n];
+    if (typeof v === 'string') el.textContent = v;
+  });
+}
+
+// Sync TYPE_META labels to current language (used by donut legend + suggestions)
+function applyTypeMetaLabels() {
+  const meta  = T[lang].typeMeta;
+  const donut = T[lang].donutMeta || {};
+  Object.keys(meta).forEach(k => {
+    if (!TYPE_META[k]) return;
+    TYPE_META[k].label = meta[k];
+    if (donut[k]) TYPE_META[k].donutLabel = donut[k];
+  });
+}
+
+function switchLang(newLang) {
+  if (newLang === lang) return;
+  lang = newLang;
+  localStorage.setItem(LANG_KEY, lang);
+  document.querySelectorAll('.lang-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.lang === lang);
+  });
+  applyI18n();
+  applyTypeMetaLabels();
+  render();
+  updateDonut();
+  if (_lastUpdateState) setUpdateStatus(_lastUpdateState);
+  const af = document.querySelector('.filter-btn.active')?.dataset.filter || 'all';
+  searchInput.placeholder = T[lang].searchPH[af] || T[lang].searchPH.all;
+}
+
+// ── State ──────────────────────────────────────────────────
+const STORAGE_KEY = 'portfolio_assets';
+const COINGECKO   = 'https://api.coingecko.com/api/v3';
+
+// ── Fallback prices (used when APIs are unavailable) ──────
+const FALLBACK_PRICES = {
+  // Stocks
+  AAPL: 213, TSLA: 248, MSFT: 388, MSTR: 320, META: 515,
+  NVDA: 880, AMZN: 192, GOOGL: 163, NFLX: 625, JPM: 242,
+  V: 308, WMT: 98, NVO: 82, SAP: 232, ASML: 745,
+  // ETFs
+  SPY: 548, QQQ: 470, VTI: 258, VOO: 498, URTH: 118,
+  VEA: 49, 'IWDA.L': 92, 'VWCE.DE': 118, 'CSPX.L': 532, 'EQQQ.L': 448,
+  // Metals (USD per troy oz)
+  'GC=F': 2320, 'SI=F': 27,
+};
+
+function getFallbackData(marketSymbol) {
+  const base = FALLBACK_PRICES[marketSymbol];
+  if (!base) return null;
+  // Apply tiny random variation (±0.4%) so it feels alive
+  const jitter  = 1 + (Math.random() - 0.5) * 0.008;
+  const price   = +(base * jitter).toFixed(base < 10 ? 3 : 2);
+  // Simulate a realistic-looking daily change
+  const change24h = +((Math.random() - 0.48) * 3.2).toFixed(2);
+  return { price, change24h, simulated: true };
+}
+
+
+// ── Default suggestions per filter (shown on focus when input is empty) ─
+const DEFAULTS = {
+  crypto: [
+    { ticker: 'BTC',  name: 'Bitcoin',   type: 'crypto', coinId: 'bitcoin' },
+    { ticker: 'ETH',  name: 'Ethereum',  type: 'crypto', coinId: 'ethereum' },
+    { ticker: 'SOL',  name: 'Solana',    type: 'crypto', coinId: 'solana' },
+    { ticker: 'USDC', name: 'USD Coin',  type: 'crypto', coinId: 'usd-coin' },
+    { ticker: 'USDT', name: 'Tether',    type: 'crypto', coinId: 'tether' },
+  ],
+  stock: [
+    { ticker: 'AAPL', name: 'Apple',     type: 'stock', marketSymbol: 'AAPL' },
+    { ticker: 'TSLA', name: 'Tesla',     type: 'stock', marketSymbol: 'TSLA' },
+    { ticker: 'MSFT', name: 'Microsoft', type: 'stock', marketSymbol: 'MSFT' },
+    { ticker: 'AMZN', name: 'Amazon',    type: 'stock', marketSymbol: 'AMZN' },
+    { ticker: 'NVDA', name: 'NVIDIA',    type: 'stock', marketSymbol: 'NVDA' },
+  ],
+  etf: [
+    { ticker: 'SPY',  name: 'SPDR S&P 500 ETF',          type: 'etf', marketSymbol: 'SPY' },
+    { ticker: 'VOO',  name: 'Vanguard S&P 500 ETF',      type: 'etf', marketSymbol: 'VOO' },
+    { ticker: 'QQQ',  name: 'Invesco QQQ Trust',          type: 'etf', marketSymbol: 'QQQ' },
+    { ticker: 'VWCE', name: 'Vanguard FTSE All-World Acc', type: 'etf', marketSymbol: 'VWCE.DE' },
+    { ticker: 'URTH', name: 'iShares MSCI World ETF',     type: 'etf', marketSymbol: 'URTH' },
+  ],
+  metal: [
+    { ticker: 'XAU', name: 'Gold', type: 'metal', marketSymbol: 'GC=F' },
+    { ticker: 'XAG', name: 'Silver', type: 'metal', marketSymbol: 'SI=F' },
+  ],
+};
+
+const PLACEHOLDERS = {
+  all:    'Buscar activo...',
+  crypto: 'Buscar criptomoneda...',
+  stock:  'Buscar acción...',
+  etf:    'Buscar ETF o fondo...',
+  metal:  'Buscar metal...',
+};
+
+// Metal ticker → Yahoo Finance futures symbol
+const METAL_MAP = {
+  XAU:    { yahoo: 'GC=F', name: 'Oro' },
+  GOLD:   { yahoo: 'GC=F', name: 'Oro' },
+  ORO:    { yahoo: 'GC=F', name: 'Oro' },
+  GC:     { yahoo: 'GC=F', name: 'Oro' },
+  XAG:    { yahoo: 'SI=F', name: 'Plata' },
+  SILVER: { yahoo: 'SI=F', name: 'Plata' },
+  PLATA:  { yahoo: 'SI=F', name: 'Plata' },
+  SI:     { yahoo: 'SI=F', name: 'Plata' },
+};
+
+// ── Asset database (for smart search) ─────────────────────
+const ASSET_DB = [
+  // Stocks
+  { ticker: 'AAPL',  name: 'Apple',             type: 'stock',  marketSymbol: 'AAPL' },
+  { ticker: 'TSLA',  name: 'Tesla',             type: 'stock',  marketSymbol: 'TSLA' },
+  { ticker: 'MSFT',  name: 'Microsoft',         type: 'stock',  marketSymbol: 'MSFT' },
+  { ticker: 'MSTR',  name: 'MicroStrategy',     type: 'stock',  marketSymbol: 'MSTR' },
+  { ticker: 'META',  name: 'Meta',              type: 'stock',  marketSymbol: 'META' },
+  { ticker: 'NVDA',  name: 'NVIDIA',            type: 'stock',  marketSymbol: 'NVDA' },
+  { ticker: 'AMZN',  name: 'Amazon',            type: 'stock',  marketSymbol: 'AMZN' },
+  { ticker: 'GOOGL', name: 'Alphabet',          type: 'stock',  marketSymbol: 'GOOGL' },
+  { ticker: 'NFLX',  name: 'Netflix',           type: 'stock',  marketSymbol: 'NFLX' },
+  { ticker: 'JPM',   name: 'JPMorgan Chase',    type: 'stock',  marketSymbol: 'JPM' },
+  { ticker: 'V',     name: 'Visa',              type: 'stock',  marketSymbol: 'V' },
+  { ticker: 'WMT',   name: 'Walmart',           type: 'stock',  marketSymbol: 'WMT' },
+  { ticker: 'NOVO',  name: 'Novo Nordisk',      type: 'stock',  marketSymbol: 'NVO' },
+  { ticker: 'SAP',   name: 'SAP SE',            type: 'stock',  marketSymbol: 'SAP' },
+  { ticker: 'ASML',  name: 'ASML Holding',      type: 'stock',  marketSymbol: 'ASML' },
+  // ETFs
+  { ticker: 'SPY',   name: 'SPDR S&P 500 ETF',                   type: 'etf', marketSymbol: 'SPY' },
+  { ticker: 'QQQ',   name: 'Invesco QQQ Trust',                   type: 'etf', marketSymbol: 'QQQ' },
+  { ticker: 'VTI',   name: 'Vanguard Total Stock Market ETF',      type: 'etf', marketSymbol: 'VTI' },
+  { ticker: 'VOO',   name: 'Vanguard S&P 500 ETF',                type: 'etf', marketSymbol: 'VOO' },
+  { ticker: 'URTH',  name: 'iShares MSCI World ETF',              type: 'etf', marketSymbol: 'URTH' },
+  { ticker: 'VEA',   name: 'Vanguard FTSE Developed World ETF',   type: 'etf', marketSymbol: 'VEA' },
+  { ticker: 'IWDA',  name: 'iShares Core MSCI World (London)',    type: 'etf', marketSymbol: 'IWDA.L' },
+  { ticker: 'VWCE',  name: 'Vanguard FTSE All-World Acc (Xetra)', type: 'etf', marketSymbol: 'VWCE.DE' },
+  { ticker: 'CSPX',  name: 'iShares Core S&P 500 UCITS (London)', type: 'etf', marketSymbol: 'CSPX.L' },
+  { ticker: 'EQQQ',  name: 'Invesco EQQQ NASDAQ-100 (London)',    type: 'etf', marketSymbol: 'EQQQ.L' },
+  // Metals
+  { ticker: 'XAU',   name: 'Gold',   type: 'metal', marketSymbol: 'GC=F' },
+  { ticker: 'XAG',   name: 'Silver', type: 'metal', marketSymbol: 'SI=F' },
+];
+
+let assets              = load();
+let pendingCoinId       = null;
+let pendingMarketSymbol = null; // Yahoo Finance symbol for stock/etf/metal
+let pendingPrice        = null; // fetched price for selected asset
+let pendingKarat        = 18;   // karat for pending gold asset
+let pendingGoldUnit     = 'g';  // unit for pending gold asset ('g' | 'oz')
+let goldPriceUpdatedAt  = null; // timestamp of last successful live gold price fetch
+let goldChangePct       = null; // daily % change for XAU — shared across all gold assets
+let isRealEstateMode    = false; // true when modal is in manual real-estate entry mode
+let rePendingCurrency   = 'EUR'; // currency selected in RE modal
+let rePendingRent       = 0;     // monthly rent input in RE modal
+let reEditTargetId      = null;  // when set, submit updates this asset instead of creating
+
+// ── Search state ───────────────────────────────────────────
+let selectedDbAsset     = null;     // currently selected ASSET_DB entry
+let currentSuggestions  = [];       // full (unfiltered) results from API
+let renderedSuggestions = [];       // filtered results currently shown in dropdown
+let activeSearchFilter   = 'all';    // 'all' | 'crypto' | 'stock' | 'etf' | 'metal'
+let focusedSuggIdx       = -1;
+let searchDebounceTimer  = null;
+let searchAbortCtrl      = null;
+let suppressFocusDefaults = false;  // true when focus is programmatic (openModal/enterSearchMode)
+
+// ── Asset type metadata ────────────────────────────────────
+const TYPE_META = {
+  crypto:      { label: 'Cripto',       color: '#5b9cf6' },  // soft blue
+  stock:       { label: 'Acciones',     color: '#c0c8d8' },  // silver-gray
+  etf:         { label: 'Fondos/ETF',   donutLabel: 'Fondos',  color: '#8f9dba' },  // blue-gray
+  metal:       { label: 'Metales',      color: '#d4a843' },  // warm gold
+  cash:        { label: 'Liquidez',     color: '#4ade80' },  // soft green
+  real_estate: { label: 'Inmuebles',   donutLabel: 'Inmob.', color: '#a78bfa' },  // soft purple
+  other:       { label: 'Otros',        color: '#6b7280' },  // muted gray
+};
+
+const HISTORY_KEY  = 'portfolio_history';
+let portfolioHistory = loadHistory();
+let lastSnapshotMs   = 0;
+let lastRefreshAt    = null;   // timestamp of last successful price refresh
+let activeRange      = '24h';
+let portfolioChart   = null;
+
+const BASE_KEY   = 'portfolio_base_currency';
+let baseCurrency = localStorage.getItem(BASE_KEY) || 'USD';
+let usdToEur     = 0.92; // updated from API
+
+// ── DOM ────────────────────────────────────────────────────
+const totalValueEl  = document.getElementById('totalValue');
+const summaryPerfEl = document.getElementById('summaryPerf');
+const assetCountEl  = document.getElementById('assetCount');
+const assetsListEl  = document.getElementById('assetsList');
+const emptyStateEl  = document.getElementById('emptyState');
+const modalOverlay  = document.getElementById('modalOverlay');
+const btnAdd        = document.getElementById('btnAdd');
+const modalClose    = document.getElementById('modalClose');
+const assetForm     = document.getElementById('assetForm');
+const previewTotal  = document.getElementById('previewTotal');
+
+// Search UI
+const searchWrapEl      = document.getElementById('searchWrap');
+const searchInputWrapEl = document.getElementById('searchInputWrap');
+const searchInput       = document.getElementById('assetSearch');
+const searchClearBtn    = document.getElementById('searchClear');
+const assetSuggestionsEl= document.getElementById('assetSuggestions');
+const selectedChipEl    = document.getElementById('selectedChip');
+const chipBadgeEl       = document.getElementById('chipBadge');
+const chipNameEl        = document.getElementById('chipName');
+const chipSubEl         = document.getElementById('chipSub');
+const chipPriceEl       = document.getElementById('chipPrice');
+const chipClearBtn      = document.getElementById('chipClear');
+const searchFiltersEl   = document.getElementById('searchFilters');
+const filterBtns        = document.querySelectorAll('.filter-btn');
+
+// Form inputs
+const qtyInput      = document.getElementById('assetQty');
+const qtyGroup      = document.getElementById('qtyGroup');
+const formPreviewEl = document.getElementById('formPreview');
+const btnSubmitEl   = document.getElementById('btnSubmitAsset');
+
+// Reduce modal
+const reduceOverlay    = document.getElementById('reduceOverlay');
+const reduceClose      = document.getElementById('reduceClose');
+const reduceForm       = document.getElementById('reduceForm');
+const reduceAssetInfo  = document.getElementById('reduceAssetInfo');
+const reduceQtyInput   = document.getElementById('reduceQty');
+const reduceMaxEl      = document.getElementById('reduceMax');
+const previewQtyLeft   = document.getElementById('previewQtyLeft');
+const previewValueLeft = document.getElementById('previewValueLeft');
+const reduceWarning    = document.getElementById('reduceWarning');
+const reduceError      = document.getElementById('reduceError');
+
+let reduceTargetId = null;
+
+// Price update UI
+const lookupStatusEl = document.getElementById('lookupStatus');
+const updateDotEl    = document.getElementById('updateDot');
+const updateTextEl   = document.getElementById('updateText');
+
+// Show skeleton on total value while initial prices load
+if (assets.length > 0) totalValueEl.classList.add('skeleton');
+
+// Gold form groups
+const karatGroupEl    = document.getElementById('karatGroup');
+const goldUnitGroupEl = document.getElementById('goldUnitGroup');
+const qtyLabelEl      = document.getElementById('qtyLabel');
+
+// ── Storage ────────────────────────────────────────────────
+function load() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (!raw) return [];
+    // Support legacy format (plain array) and current envelope format
+    if (Array.isArray(raw)) return raw;
+    if (raw && Array.isArray(raw.assets)) return raw.assets;
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      assets,
+      lastUpdated: Date.now(),
+    }));
+  } catch (e) {
+    console.warn('[portfolio] save failed (localStorage full or unavailable):', e);
+  }
+}
+
+// ── Input number formatting ────────────────────────────────
+// Parse an es-ES formatted string ("1.234,56") back to a JS float
+function parseLocalFloat(str) {
+  if (typeof str !== 'string' || str === '') return NaN;
+  return parseFloat(str.replace(/\./g, '').replace(',', '.'));
+}
+
+// Attach live thousand-separator formatting to a text input
+function attachFormatter(input, allowDecimals) {
+  input.addEventListener('input', () => {
+    const start  = input.selectionStart;
+    const oldLen = input.value.length;
+
+    // Strip invalid chars; allow one comma as decimal separator
+    let raw = input.value.replace(/[^\d,]/g, '');
+    if (!allowDecimals) raw = raw.replace(/,/g, '');
+    const ci = raw.indexOf(',');
+    if (ci !== -1) {
+      raw = raw.slice(0, ci + 1) + raw.slice(ci + 1).replace(/,/g, '');
+    }
+
+    const [intStr = '', decStr] = raw.split(',');
+    const intVal = intStr === '' ? '' : parseInt(intStr, 10);
+    const fmtInt = intStr === '' || isNaN(intVal) ? ''
+      : new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(intVal);
+
+    const formatted = decStr !== undefined ? fmtInt + ',' + decStr : fmtInt;
+    input.value = formatted;
+
+    // Restore cursor accounting for added/removed separators
+    const delta  = formatted.length - oldLen;
+    const newPos = Math.max(0, Math.min(start + delta, formatted.length));
+    input.setSelectionRange(newPos, newPos);
+  });
+}
+
+// ── Formatting ─────────────────────────────────────────────
+function formatCurrency(amount, currency) {
+  return new Intl.NumberFormat('es-ES', {
+    style: 'currency', currency,
+    minimumFractionDigits: 2, maximumFractionDigits: 2
+  }).format(amount);
+}
+function formatBase(amount) { return formatCurrency(amount, baseCurrency); }
+function formatUSD(n)       { return formatCurrency(n, 'USD'); }
+function formatShort(amount) {
+  const sym = baseCurrency === 'EUR' ? '€' : '$';
+  const abs = Math.abs(amount);
+  if (abs >= 1_000_000) return sym + (amount / 1_000_000).toFixed(2) + 'M';
+  if (abs >= 1_000)     return sym + (amount / 1_000).toFixed(1) + 'K';
+  return formatBase(amount);
+}
+
+// ── Currency conversion ─────────────────────────────────────
+async function fetchExchangeRate() {
+  try {
+    const res  = await fetch('https://api.frankfurter.app/latest?from=USD&to=EUR');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.rates?.EUR) usdToEur = data.rates.EUR;
+  } catch { /* keep default */ }
+}
+
+function toBase(amount, fromCurrency) {
+  const from = (fromCurrency || 'USD').toUpperCase();
+  if (from === baseCurrency) return amount;
+  if (from === 'USD') return amount * usdToEur;   // USD → EUR
+  return amount / usdToEur;                        // EUR → USD
+}
+
+// Gold-aware value in assetCurrency: applies karat purity for XAU assets
+function assetNativeValue(asset) {
+  if (asset.ticker === 'XAU' && asset.karat) {
+    const grams = asset.goldUnit === 'oz' ? asset.qty * 31.1035 : asset.qty;
+    return grams * (asset.karat / 24) * (asset.price / 31.1035);
+  }
+  return asset.qty * asset.price;
+}
+
+function totalValueUSD() {
+  return assets.reduce((sum, a) => {
+    const curr   = (a.assetCurrency || 'USD').toUpperCase();
+    const native = assetNativeValue(a);
+    return sum + (curr === 'USD' ? native : native / usdToEur);
+  }, 0);
+}
+
+function totalValueBase() { return toBase(totalValueUSD(), 'USD'); }
+
+function formatQty(n) {
+  const abs = Math.abs(n);
+  if (abs >= 1000) return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 }).format(n);
+  if (abs >= 1)    return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 4 }).format(n);
+  return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 8 }).format(n);
+}
+
+// Formats a gram quantity: auto-promotes to kg at ≥ 1 000 g (max 2 decimal places).
+function gramsToDisplay(g) {
+  if (g >= 1000) {
+    const kg = +(g / 1000).toFixed(2);
+    return `${new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 }).format(kg)} kg`;
+  }
+  return `${formatQty(g)} g`;
+}
+
+// ── History storage ────────────────────────────────────────
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+  catch { return []; }
+}
+
+function saveHistory() {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(portfolioHistory));
+}
+
+function generateSimulatedHistory(currentVal) {
+  if (currentVal <= 0) return [];
+  const now  = Date.now();
+  const DAY  = 86_400_000;
+  const HOUR = 3_600_000;
+  let val = currentVal;
+
+  // 30 daily points (30→1 days ago) — used by 7d and 30d views
+  const daily = [];
+  for (let i = 30; i >= 1; i--) {
+    const d = (Math.random() - 0.47) * 0.035;
+    val = val * (1 - d);
+    daily.push({ ts: now - i * DAY, value: +(Math.max(0, val).toFixed(2)) });
+  }
+
+  // 24 hourly points (last day) — used by 24h view
+  val = currentVal;
+  const hourly = [];
+  for (let i = 24; i >= 1; i--) {
+    const d = (Math.random() - 0.48) * 0.009;
+    val = val * (1 - d);
+    hourly.push({ ts: now - i * HOUR, value: +(Math.max(0, val).toFixed(2)) });
+  }
+
+  return [...daily, ...hourly, { ts: now, value: +(currentVal.toFixed(2)) }];
+}
+
+function recordSnapshot(force = false) {
+  const now = Date.now();
+  const val = totalValueUSD(); // always store in USD for consistent history
+  if (val <= 0) return;
+  if (!force && now - lastSnapshotMs < 60_000) return;
+  lastSnapshotMs = now;
+
+  const last = portfolioHistory[portfolioHistory.length - 1];
+  if (last && now - last.ts < 60_000) {
+    last.value = +(val.toFixed(2));
+    last.ts    = now;
+  } else {
+    portfolioHistory.push({ ts: now, value: +(val.toFixed(2)) });
+  }
+
+  // Keep only last 365 days
+  const cutoff = now - 365 * 86_400_000;
+  portfolioHistory = portfolioHistory.filter(p => p.ts >= cutoff);
+  saveHistory();
+}
+
+// ── Distribution donut ─────────────────────────────────────
+let donutChart = null;
+const distributionSectionEl = document.getElementById('distributionSection');
+const distributionLegendEl  = document.getElementById('distributionLegend');
+const donutCenterValEl      = document.getElementById('donutCenterVal');
+const donutCenterSubEl      = document.getElementById('donutCenterSub');
+
+let _donutHoverIdx = -1;   // ephemeral hover (index into _donutDist)
+let _donutDist     = [];
+let activeCategory = null; // persistent category filter ('crypto', 'metal', …, or null)
+
+function getDistribution() {
+  const totUSD = totalValueUSD();
+  if (totUSD <= 0) return null;
+
+  const groups = {};
+  assets.forEach(a => {
+    const curr   = (a.assetCurrency || 'USD').toUpperCase();
+    const native = assetNativeValue(a);
+    const valUSD = curr === 'USD' ? native : native / usdToEur;
+    const key    = TYPE_META[a.type] ? a.type : 'other';
+    groups[key]  = (groups[key] || 0) + valUSD;
+  });
+
+  return Object.entries(groups)
+    .filter(([, v]) => v > 0)
+    .sort(([, a], [, b]) => b - a)
+    .map(([type, valueUSD]) => ({
+      type,
+      valueBase: toBase(valueUSD, 'USD'),
+      pct:       (valueUSD / totUSD) * 100,
+    }));
+}
+
+// Lighten a hex color by a multiplier (e.g. 1.18 = 18% brighter)
+function lightenHex(hex, f) {
+  const n = parseInt(hex.replace('#', ''), 16);
+  const r = Math.min(255, ((n >> 16 & 0xff) * f) | 0);
+  const g = Math.min(255, ((n >>  8 & 0xff) * f) | 0);
+  const b = Math.min(255, ((n       & 0xff) * f) | 0);
+  return '#' + r.toString(16).padStart(2, '0')
+             + g.toString(16).padStart(2, '0')
+             + b.toString(16).padStart(2, '0');
+}
+
+function resetDonutCenter() {
+  donutCenterValEl.textContent = formatShort(totalValueBase());
+  if (donutCenterSubEl) donutCenterSubEl.textContent = t('donutTotal');
+}
+
+function setDonutCenter(item) {
+  const m     = TYPE_META[item.type] || TYPE_META.other;
+  const label = m.donutLabel || m.label;
+  donutCenterValEl.textContent = formatShort(item.valueBase);
+  if (donutCenterSubEl) {
+    donutCenterSubEl.innerHTML = `<span style="color:${m.color}">${label}</span>`;
+  }
+}
+
+// Applies current hover + active-category state to the donut visuals only.
+// Card filtering is handled by render() via activeCategory.
+function _applyDonutState() {
+  const filterIdx = activeCategory
+    ? _donutDist.findIndex(d => d.type === activeCategory)
+    : -1;
+  // Hover takes visual priority for center label + chart highlight
+  const visIdx = _donutHoverIdx !== -1 ? _donutHoverIdx : filterIdx;
+
+  // Center label
+  if (visIdx === -1) resetDonutCenter();
+  else { const item = _donutDist[visIdx]; if (item) setDonutCenter(item); }
+
+  // Legend — hover highlight and category-pinned are separate classes
+  distributionLegendEl.querySelectorAll('.legend-item').forEach((el, i) => {
+    el.classList.toggle('legend-item--active', i === visIdx);
+    el.classList.toggle('legend-item--pinned', activeCategory !== null && _donutDist[i]?.type === activeCategory);
+  });
+
+  // Chart.js highlight
+  if (donutChart) {
+    donutChart.setActiveElements(visIdx === -1 ? [] : [{ datasetIndex: 0, index: visIdx }]);
+    donutChart.update('none');
+  }
+}
+
+// Hover: ephemeral highlight only, never changes the persistent filter.
+function donutHandleHover(idx) {
+  if (_donutHoverIdx === idx) return;
+  _donutHoverIdx = idx;
+  _applyDonutState();
+}
+
+// Click: toggle category navigation. Clicking the same category clears it.
+function donutHandleClick(idx) {
+  setActiveCategory(_donutDist[idx]?.type ?? null);
+}
+
+function initDonut() {
+  const canvas = document.getElementById('donutChart');
+  if (!canvas || donutChart) return;
+
+  donutChart = new Chart(canvas.getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels:   [],
+      datasets: [{
+        data:                [],
+        backgroundColor:     [],
+        hoverBackgroundColor:[],
+        borderColor:         '#11141c',
+        borderWidth:         2,
+        hoverBorderColor:    '#11141c',
+        hoverBorderWidth:    2,
+        hoverOffset:         12,
+      }]
+    },
+    options: {
+      responsive:          true,
+      maintainAspectRatio: true,
+      cutout:              '70%',
+      rotation:            -90,
+      // Padding inside the canvas so hoverOffset arcs never reach the edge and get clipped
+      layout: { padding: 14 },
+      interaction: {
+        mode:      'nearest',
+        intersect: true,
+      },
+      plugins: {
+        legend:  { display: false },
+        tooltip: { enabled: false },
+      },
+      animation: {
+        animateRotate: true,
+        animateScale:  false,
+        duration:      900,
+        easing:        'easeOutQuart',
+      },
+      onHover(evt, elements) {
+        donutHandleHover(elements.length ? elements[0].index : -1);
+      },
+      onClick(evt, elements) {
+        if (!elements.length) return;
+        donutHandleClick(elements[0].index);
+      },
+    },
+  });
+
+  // Reset when mouse leaves the chart
+  canvas.addEventListener('mouseleave', () => donutHandleHover(-1), { passive: true });
+
+  // Mobile: tap outside donut/legend resets hover highlight only
+  document.addEventListener('touchstart', e => {
+    if (!e.target.closest('#donutChart') && !e.target.closest('.distribution-legend')) {
+      _donutHoverIdx = -1;
+      _applyDonutState();
+    }
+  }, { passive: true });
+}
+
+let _donutHasData = false;   // track whether donut has been populated before
+
+function updateDonut() {
+  const dist   = getDistribution();
+  _donutDist     = dist || [];
+  _donutHoverIdx = -1;
+
+  if (!dist || dist.length === 0) {
+    distributionSectionEl.style.display = 'none';
+    updateCategoryCards();
+    return;
+  }
+
+  distributionSectionEl.style.display = '';
+  resetDonutCenter();
+
+  // Legend
+  distributionLegendEl.innerHTML = dist.map(({ type, valueBase, pct }, i) => {
+    const m = TYPE_META[type] || TYPE_META.other;
+    return `<div class="legend-item" data-idx="${i}">
+      <span class="legend-dot" style="background:${m.color}"></span>
+      <span class="legend-name">${m.label}</span>
+      <span class="legend-pct">${pct.toFixed(1)}%</span>
+      <span class="legend-value">${formatBase(valueBase)}</span>
+    </div>`;
+  }).join('');
+
+  // Legend interaction: hover highlights segment + center label
+  distributionLegendEl.querySelectorAll('.legend-item').forEach(el => {
+    const i = +el.dataset.idx;
+    el.addEventListener('mouseenter', () => donutHandleHover(i));
+    el.addEventListener('mouseleave', () => donutHandleHover(-1));
+    el.addEventListener('click',      () => donutHandleClick(i));
+  });
+
+  // Chart
+  if (donutChart) {
+    donutChart.data.labels                            = dist.map(d => (TYPE_META[d.type] || TYPE_META.other).label);
+    donutChart.data.datasets[0].data                 = dist.map(d => d.pct);
+    donutChart.data.datasets[0].backgroundColor      = dist.map(d => (TYPE_META[d.type] || TYPE_META.other).color);
+    donutChart.data.datasets[0].hoverBackgroundColor = dist.map(d => lightenHex((TYPE_META[d.type] || TYPE_META.other).color, 1.18));
+    donutChart.update(_donutHasData ? 'none' : undefined);
+    _donutHasData = true;
+  }
+
+  // Sync donut visual state and rebuild category cards
+  _applyDonutState();
+  updateCategoryCards();
+}
+
+// ── Chart ──────────────────────────────────────────────────
+const chartChangeEl = document.getElementById('chartChange');
+const chartNoDataEl = document.getElementById('chartNoData');
+
+const fillGradientPlugin = {
+  id: 'fillGradient',
+  beforeDraw(chart) {
+    if (!chart.chartArea) return;
+    const { ctx, chartArea: { top, bottom } } = chart;
+    const grad = ctx.createLinearGradient(0, top, 0, bottom);
+    grad.addColorStop(0, 'rgba(79,142,247,0.20)');
+    grad.addColorStop(1, 'rgba(79,142,247,0.00)');
+    chart.data.datasets.forEach(ds => { ds.backgroundColor = grad; });
+  }
+};
+
+function initChart() {
+  const canvas = document.getElementById('portfolioChart');
+  if (!canvas || portfolioChart) return;
+
+  portfolioChart = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [],
+        borderColor: '#4f8ef7',
+        backgroundColor: 'transparent',
+        fill: true,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        pointHoverBackgroundColor: '#4f8ef7',
+        pointHoverBorderColor: '#fff',
+        pointHoverBorderWidth: 2,
+        borderWidth: 2.5,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          backgroundColor: '#1a1e2a',
+          borderColor: '#2e3450',
+          borderWidth: 1,
+          titleColor: '#6b7494',
+          bodyColor: '#e8eaf0',
+          padding: 10,
+          displayColors: false,
+          callbacks: {
+            label: ctx => ' ' + formatUSD(ctx.raw),
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          border: { display: false },
+          ticks: { color: '#6b7494', maxTicksLimit: 6, maxRotation: 0 },
+        },
+        y: {
+          position: 'right',
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          border: { display: false },
+          ticks: {
+            color: '#6b7494',
+            maxTicksLimit: 5,
+            callback: v => {
+              const sym = baseCurrency === 'EUR' ? '€' : '$';
+              if (v >= 1_000_000) return sym + (v / 1_000_000).toFixed(2) + 'M';
+              if (v >= 1_000)     return sym + (v / 1_000).toFixed(1) + 'K';
+              return formatBase(v);
+            },
+          },
+        }
+      },
+      interaction: { mode: 'index', intersect: false },
+      animation: { duration: 700, easing: 'easeInOutQuart' },
+    },
+    plugins: [fillGradientPlugin],
+  });
+}
+
+function getChartData(range) {
+  const now = Date.now();
+  const ms  = { '24h': 86_400_000, '7d': 7 * 86_400_000, '30d': 30 * 86_400_000, '1y': 365 * 86_400_000 };
+  const pts = range === 'all' ? [...portfolioHistory] : portfolioHistory.filter(p => p.ts >= now - ms[range]);
+  if (pts.length < 2) return null;
+
+  const fmt = ts => {
+    const d = new Date(ts);
+    if (range === '24h') return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    if (range === '7d')  return d.toLocaleDateString('es-ES',  { weekday: 'short', day: 'numeric' });
+    if (range === 'all') return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: '2-digit' });
+    return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+  };
+
+  return { labels: pts.map(p => fmt(p.ts)), values: pts.map(p => toBase(p.value, 'USD')) };
+}
+
+function updateChart(animate = false) {
+  if (!portfolioChart) return;
+  const data = getChartData(activeRange);
+
+  if (!data) {
+    chartChangeEl.textContent = '';
+    chartNoDataEl.style.display = '';
+    portfolioChart.data.labels = [];
+    portfolioChart.data.datasets[0].data = [];
+    portfolioChart.update('none');
+    return;
+  }
+
+  chartNoDataEl.style.display = 'none';
+
+  const first = data.values[0];
+  const last  = data.values[data.values.length - 1];
+  const pct   = first > 0 ? ((last - first) / first) * 100 : 0;
+  const sign  = pct >= 0 ? '+' : '';
+  const cls   = pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat';
+  chartChangeEl.textContent = `${sign}${pct.toFixed(2)}%`;
+  chartChangeEl.className   = `chart-change ${cls}`;
+
+  portfolioChart.data.labels = data.labels;
+  portfolioChart.data.datasets[0].data = data.values;
+  portfolioChart.update(animate ? undefined : 'none');
+}
+
+function onPortfolioChange(force = false) {
+  recordSnapshot(force);
+  updateChart();
+  updateDonut();
+}
+
+document.querySelectorAll('.range-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeRange = btn.dataset.range;
+    updateChart(true);
+  });
+});
+
+// ── CoinGecko API ──────────────────────────────────────────
+async function fetchLivePrices(coinIds) {
+  const ids = [...new Set(coinIds)].join(',');
+  const res = await fetch(
+    `${COINGECKO}/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`,
+    { headers: { 'Accept': 'application/json' } }
+  );
+  if (res.status === 429) throw new Error('rate_limit');
+  if (!res.ok) throw new Error(`http_${res.status}`);
+  return res.json();
+}
+
+// Fall back to search API only for unknown symbols
+async function searchCoinFallback(query) {
+  const res = await fetch(
+    `${COINGECKO}/search?query=${encodeURIComponent(query)}`,
+    { headers: { 'Accept': 'application/json' } }
+  );
+  if (!res.ok) throw new Error('search failed');
+  const { coins } = await res.json();
+  const q = query.toLowerCase().trim();
+  return coins.find(c => c.symbol.toLowerCase() === q)
+      || coins.find(c => c.id.toLowerCase() === q)
+      || coins[0]
+      || null;
+}
+
+// ── Yahoo Finance API (stocks / ETFs / metals) ─────────────
+async function fetchYahooData(symbol) {
+  const yUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
+  const proxies = [
+    yUrl,
+    `https://corsproxy.io/?url=${encodeURIComponent(yUrl)}`,
+    `https://api.allorigins.win/get?url=${encodeURIComponent(yUrl)}`,
+  ];
+
+  for (const url of proxies) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(1000) }); // 1s max
+      if (!res.ok) continue;
+      let json = await res.json();
+      if (typeof json.contents === 'string') json = JSON.parse(json.contents);
+      const result = json?.chart?.result?.[0];
+      if (!result) continue;
+      const price = result.meta?.regularMarketPrice;
+      if (!price) continue;
+      const name          = result.meta?.shortName || result.meta?.longName || symbol;
+      const previousClose = result.meta?.chartPreviousClose
+                         || result.meta?.previousClose
+                         || null;
+      return { price, name, previousClose };
+    } catch { /* try next proxy */ }
+  }
+  return null;
+}
+
+// ── Gold spot price: exchangerate.host → Yahoo GC=F → fallback ──
+async function fetchGoldSpotPrice() {
+  // Primary: exchangerate.host — XAU/USD spot (free, no key, CORS-friendly)
+  try {
+    const res = await fetch(
+      'https://api.exchangerate.host/convert?from=XAU&to=USD&amount=1',
+      { signal: AbortSignal.timeout(4000) }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.result > 0) {
+        goldPriceUpdatedAt = Date.now();
+        return data.result;
+      }
+    }
+  } catch { /* fall through */ }
+
+  // Secondary: Yahoo Finance GC=F (futures ≈ spot)
+  try {
+    const data = await fetchYahooData('GC=F');
+    if (data?.price > 0) {
+      goldPriceUpdatedAt = Date.now();
+      return data.price;
+    }
+  } catch { /* fall through */ }
+
+  // Tertiary: hardcoded fallback — no timestamp update (not a live price)
+  const fb = getFallbackData('GC=F');
+  return fb?.price ?? FALLBACK_PRICES['GC=F'];
+}
+
+// ── Gold timestamp helpers ─────────────────────────────────
+function formatGoldTs() {
+  if (!goldPriceUpdatedAt) return null;
+  const mins = Math.floor((Date.now() - goldPriceUpdatedAt) / 60_000);
+  if (mins < 1)  return t('goldUpdNow');
+  if (mins < 60) return t('goldUpdMins')(mins);
+  return t('goldUpdHours')(Math.floor(mins / 60));
+}
+
+function formatGoldChange(pct) {
+  if (pct === null || pct === undefined) return null;
+  const sign = pct >= 0 ? '+' : '';
+  return `${sign}${pct.toFixed(2)}% today`;
+}
+
+function goldChangeCls(pct) {
+  if (pct === null || pct === undefined) return 'neutral';
+  if (pct >  0.005) return 'positive';
+  if (pct < -0.005) return 'negative';
+  return 'neutral';
+}
+
+function updateGoldTimestamps() {
+  const tsText     = formatGoldTs();
+  const changeText = formatGoldChange(goldChangePct);
+  const isLive     = goldPriceUpdatedAt !== null && (Date.now() - goldPriceUpdatedAt) < 600_000;
+  const cls        = goldChangeCls(goldChangePct);
+
+  document.querySelectorAll('.gold-price-ts').forEach(container => {
+    const dot      = container.querySelector('.gold-live-dot');
+    const liveEl   = container.querySelector('.js-gold-live');
+    const changeEl = container.querySelector('.js-gold-change');
+    const updEl    = container.querySelector('.js-gold-updated');
+
+    if (dot)      dot.className      = `gold-live-dot${isLive ? '' : ' stale'}`;
+    if (liveEl)   liveEl.textContent = tsText ? t('goldLive') : t('goldEstimated');
+    if (changeEl) {
+      changeEl.textContent = changeText ? `${changeText} · ` : '';
+      changeEl.className   = `js-gold-change gold-change ${cls}`;
+    }
+    if (updEl)    updEl.textContent  = tsText || '';
+  });
+}
+
+// ── Lookup UI helpers ──────────────────────────────────────
+function setLookupStatus(state, msg = '') {
+  lookupStatusEl.className = `lookup-status ${state}`;
+  lookupStatusEl.textContent = msg;
+}
+
+// ── Update status ──────────────────────────────────────────
+let _lastUpdateState = null;
+
+function setUpdateStatus(state) {
+  _lastUpdateState = state;
+  updateDotEl.className = `update-dot ${state === 'rate_limit' ? 'error' : state}`;
+  const time = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  const msg = {
+    refreshing: t('refreshing'),
+    ok:         t('updated')(time),
+    error:      t('updateError'),
+    rate_limit: t('rateLimit'),
+  };
+  updateTextEl.textContent = msg[state] ?? '';
+}
+
+async function refreshMarketPrices() {
+  const marketAssets = assets.filter(a =>
+    (a.type === 'stock' || a.type === 'etf' || a.type === 'metal') && a.marketSymbol
+  );
+  if (!marketAssets.length) return;
+
+  await Promise.allSettled(
+    marketAssets.map(async a => {
+      try {
+        let price         = null;
+        let previousClose = null;
+
+        if (a.marketSymbol === 'GC=F') {
+          // Gold: dedicated source chain (exchangerate.host → Yahoo → fallback)
+          price = await fetchGoldSpotPrice();
+        } else {
+          const data = await fetchYahooData(a.marketSymbol);
+          price         = data?.price         ?? null;
+          previousClose = data?.previousClose ?? null;
+        }
+
+        if (price) {
+          if (price !== a.price) { a.prevPrice = a.price; a.price = price; }
+          if (previousClose && previousClose > 0) {
+            a.change24h = ((price - previousClose) / previousClose) * 100;
+          } else if (a.change24h === null) {
+            const fb = getFallbackData(a.marketSymbol);
+            if (fb) a.change24h = fb.change24h;
+          }
+        } else if (a.change24h === null) {
+          const fb = getFallbackData(a.marketSymbol);
+          if (fb) a.change24h = fb.change24h;
+        }
+        // Sync gold change % to global so live indicator can read it without DOM queries
+        if (a.marketSymbol === 'GC=F' && a.change24h !== null) goldChangePct = a.change24h;
+        // If all sources fail: keep existing stored price — no change, no error
+      } catch { /* skip */ }
+    })
+  );
+}
+
+async function refreshPrices() {
+  // Migrate assets
+  let migrated = false;
+  assets.forEach(a => {
+    // Migrate stock/etf/metal assets without marketSymbol
+    if ((a.type === 'stock' || a.type === 'etf') && !a.marketSymbol && a.ticker) {
+      a.marketSymbol = a.ticker.toUpperCase();
+      migrated = true;
+    }
+    if (a.type === 'metal' && !a.marketSymbol && a.ticker) {
+      const m = METAL_MAP[a.ticker.toUpperCase()];
+      if (m) { a.marketSymbol = m.yahoo; migrated = true; }
+    }
+  });
+  if (migrated) save();
+
+  const cryptos = assets.filter(a => a.type === 'crypto' && a.coinId);
+  const hasMarket = assets.some(a =>
+    (a.type === 'stock' || a.type === 'etf' || a.type === 'metal') && a.marketSymbol
+  );
+
+  if (!cryptos.length && !hasMarket) return;
+
+  setUpdateStatus('refreshing');
+  try {
+    const results = await Promise.allSettled([
+      cryptos.length ? fetchLivePrices([...new Set(cryptos.map(a => a.coinId))]) : Promise.resolve({}),
+      hasMarket ? refreshMarketPrices() : Promise.resolve(),
+    ]);
+
+    // Apply crypto prices
+    const priceData = results[0].status === 'fulfilled' ? results[0].value : {};
+    cryptos.forEach(a => {
+      const data = priceData[a.coinId];
+      if (!data) return;
+      if (data.usd !== a.price) {
+        a.prevPrice = a.price;
+        a.price     = data.usd;
+      }
+      a.change24h = data.usd_24h_change ?? null;
+    });
+
+    save();
+    lastRefreshAt = Date.now();
+    render();
+    setUpdateStatus('ok');
+    onPortfolioChange();
+  } catch (err) {
+    setUpdateStatus(err.message === 'rate_limit' ? 'rate_limit' : 'error');
+  }
+}
+
+// ── Animated count-up for total value ─────────────────────
+let _countUpRaf      = null;
+let _countUpCurrent  = null;   // last value we displayed (in base currency)
+
+function countUpTotalValue(targetBase) {
+  // Skip animation on first render (no previous value)
+  if (_countUpCurrent === null) {
+    _countUpCurrent = targetBase;
+    totalValueEl.classList.remove('skeleton');
+    totalValueEl.textContent = formatBase(targetBase);
+    return;
+  }
+  // Skip if value hasn't changed
+  if (_countUpCurrent === targetBase) return;
+
+  if (_countUpRaf) cancelAnimationFrame(_countUpRaf);
+
+  // Flash (color) + lift (transform) feedback
+  const flashEl = totalValueEl;
+  flashEl.classList.remove('value-flash-up', 'value-flash-down', 'value-lift');
+  void flashEl.offsetWidth; // force reflow to restart animations on consecutive updates
+  flashEl.classList.add(targetBase > _countUpCurrent ? 'value-flash-up' : 'value-flash-down');
+  flashEl.classList.add('value-lift');
+
+  const start     = _countUpCurrent;
+  const end       = targetBase;
+  const duration  = 500; // ms
+  const startTime = performance.now();
+
+  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function step(now) {
+    const elapsed  = now - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const value    = start + (end - start) * easeOut(progress);
+    totalValueEl.textContent = formatBase(value);
+    if (progress < 1) {
+      _countUpRaf = requestAnimationFrame(step);
+    } else {
+      _countUpCurrent = end;
+      _countUpRaf     = null;
+    }
+  }
+
+  _countUpCurrent = end;  // store immediately so rapid calls use correct start
+  _countUpRaf = requestAnimationFrame(step);
+}
+
+// Animates individual asset value elements that carried data-from/data-to
+// attributes set during render() when prices changed.
+function animateCardValues() {
+  const dur = 500;
+  function easeOut(t) { return 1 - (1 - t) ** 3; }
+  assetsListEl.querySelectorAll('.asset-value-amount[data-from]').forEach(el => {
+    const from = +el.dataset.from;
+    const to   = +el.dataset.to;
+    if (!isFinite(from) || !isFinite(to) || Math.abs(from - to) < 0.001) return;
+    const t0 = performance.now();
+    (function step(now) {
+      const p = Math.min((now - t0) / dur, 1);
+      el.textContent = formatBase(from + (to - from) * easeOut(p));
+      if (p < 1) requestAnimationFrame(step);
+    })(t0);
+  });
+}
+
+// ── Market status ──────────────────────────────────────────
+function isStockMarketOpen() {
+  const now = new Date();
+  const day = now.getUTCDay(); // 0 = Sun, 6 = Sat
+  if (day === 0 || day === 6) return false;
+  const mins = now.getUTCHours() * 60 + now.getUTCMinutes();
+  // NYSE 9:30–16:00 ET (EST = UTC−5) → 14:30–21:00 UTC ≈ CET 15:30–22:00
+  return mins >= 14 * 60 + 30 && mins < 21 * 60;
+}
+
+function getMarketStatus(asset) {
+  if (asset.type === 'cash') return null;
+
+  if (asset.type === 'crypto') {
+    return { dot: 'live', label: t('live24') };
+  }
+
+  if (asset.type === 'metal') {
+    // Gold has its own precise updatedAt; other metals share lastRefreshAt
+    const updatedAt = (asset.ticker === 'XAU') ? goldPriceUpdatedAt : lastRefreshAt;
+    if (updatedAt === null) return { dot: 'delayed', label: t('estimatedPrice') };
+    const ageMins = Math.floor((Date.now() - updatedAt) / 60_000);
+    if (ageMins < 1)  return { dot: 'live',    label: t('updatedNow') };
+    if (ageMins < 10) return { dot: 'live',    label: t('updatedMins')(ageMins) };
+    return                   { dot: 'delayed', label: t('updatedMins')(ageMins) };
+  }
+
+  if (asset.type === 'stock' || asset.type === 'etf') {
+    return isStockMarketOpen()
+      ? { dot: 'live',   label: t('liveMarket') }
+      : { dot: 'closed', label: t('closed') };
+  }
+
+  return null;
+}
+
+// Builds the status HTML snippet for a card.
+// Gold keeps its dynamic .gold-price-ts structure so updateGoldTimestamps() still works.
+// All other types get a simple .status-dot + .status-label line.
+function getStatusHtml(asset) {
+  if (asset.type === 'cash') return '';
+
+  // Gold: dynamic inner elements (updated every 30 s by updateGoldTimestamps)
+  if (asset.ticker === 'XAU' && asset.karat) {
+    const tsText     = formatGoldTs();
+    const isLive     = goldPriceUpdatedAt !== null && (Date.now() - goldPriceUpdatedAt) < 600_000;
+    const changeText = formatGoldChange(goldChangePct);
+    const cls        = goldChangeCls(goldChangePct);
+    return `<div class="market-status gold-price-ts">` +
+      `<span class="gold-live-dot${isLive ? '' : ' stale'}"></span>` +
+      `<span class="js-gold-live">${tsText ? t('goldLive') : t('goldEstimated')}</span>` +
+      (changeText ? `<span class="js-gold-change gold-change ${cls}">${changeText} · </span>` : '') +
+      `<span class="js-gold-updated">${tsText || ''}</span>` +
+      `</div>`;
+  }
+
+  const status = getMarketStatus(asset);
+  if (!status) return '';
+
+  return `<div class="market-status">` +
+    `<span class="status-dot ${status.dot}"></span>` +
+    `<span class="status-label">${escHtml(status.label)}</span>` +
+    `</div>`;
+}
+
+// ── Category navigation ─────────────────────────────────────
+// type = null always clears; same type as active toggles off; different type activates.
+function setActiveCategory(type) {
+  const next = (type === null || activeCategory === type) ? null : type;
+  if (next === activeCategory) return;
+  activeCategory = next;
+  updateCategoryCards();
+  render(true);
+  _applyDonutState();
+  if (activeCategory) {
+    document.getElementById('assetsSection')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+// ── Category card visual builder ───────────────────────────
+// Returns decorative HTML for each asset type. All animations
+// use only transform/opacity — GPU-accelerated, low CPU cost.
+function buildCardVisual(type, typeAssets, pct) {
+  // Top assets by native value (for ticker labels)
+  const top = [...typeAssets]
+    .sort((a, b) => assetNativeValue(b) - assetNativeValue(a))
+    .slice(0, 3);
+
+  if (type === 'crypto') {
+    const GLYPHS = {
+      BTC: '₿', ETH: 'Ξ', SOL: '◎', XRP: '✦', USDT: '₮',
+      BNB: '⬡', DOGE: 'Ð', ADA: '₳', DOT: '●', LTC: 'Ł', AVAX: '▲',
+    };
+    const src = top.length ? top : [{ ticker: 'BTC' }, { ticker: 'ETH' }];
+    const chips = src.map((a, i) => {
+      const g = GLYPHS[a.ticker] || a.ticker.slice(0, 3);
+      return `<span class="cc-coin" style="animation-delay:${(i * 0.65).toFixed(2)}s">${g}</span>`;
+    }).join('');
+    return `<div class="cat-card-visual cc-vis--crypto">${chips}</div>`;
+  }
+
+  if (type === 'metal') {
+    const barCount = Math.min(5, Math.max(2, Math.floor(pct / 12) + 1));
+    const hasSilverOnly = top.length > 0 && top.every(a => a.ticker === 'XAG');
+    const cls = hasSilverOnly ? 'cc-bar--silver' : 'cc-bar--gold';
+    const bars = Array.from({ length: barCount }, (_, i) =>
+      `<div class="cc-bar ${cls}" style="animation-delay:${(i * 0.5).toFixed(1)}s"></div>`
+    ).join('');
+    return `<div class="cat-card-visual cc-vis--metal">${bars}</div>`;
+  }
+
+  if (type === 'stock' || type === 'etf') {
+    const src = top.length ? top : [{ ticker: type === 'etf' ? 'ETF' : 'STK' }];
+    const chips = src.map((a, i) =>
+      `<span class="cc-ticker" style="animation-delay:${(i * 1.4).toFixed(1)}s">${a.ticker.slice(0, 5)}</span>`
+    ).join('');
+    return `<div class="cat-card-visual cc-vis--${type}">${chips}</div>`;
+  }
+
+  if (type === 'cash') {
+    const blocks = [0, 1, 2].map(i =>
+      `<div class="cc-block" style="animation-delay:${(i * 0.6).toFixed(1)}s"></div>`
+    ).join('');
+    return `<div class="cat-card-visual cc-vis--cash">${blocks}</div>`;
+  }
+
+  if (type === 'real_estate') {
+    // Number of buildings scales with portfolio percentage weight
+    const bldgCount = Math.min(5, Math.max(2, Math.floor(pct / 12) + 2));
+    // Heights in px — varied to create a skyline silhouette
+    const HEIGHTS = [52, 32, 70, 22, 44];
+    const blocks = Array.from({ length: bldgCount }, (_, i) =>
+      `<div class="cc-bldg" style="height:${HEIGHTS[i % HEIGHTS.length]}px;animation-delay:${(i * 0.5).toFixed(1)}s"></div>`
+    ).join('');
+    return `<div class="cat-card-visual cc-vis--realestate">${blocks}</div>`;
+  }
+
+  return '';
+}
+
+function updateCategoryCards() {
+  const section = document.getElementById('categoriesSection');
+  const grid    = document.getElementById('categoriesGrid');
+  if (!section || !grid) return;
+
+  // In category drill-down, this section is replaced by the filtered asset list
+  if (activeCategory !== null) {
+    section.style.display = 'none';
+    return;
+  }
+
+  // Fixed ordered list — all 6 categories always rendered, even when empty
+  const ALL_CATEGORIES = ['crypto', 'stock', 'etf', 'metal', 'cash', 'real_estate'];
+
+  // Build a lookup from _donutDist so we can fill in live values where available
+  const distMap = Object.fromEntries((_donutDist || []).map(d => [d.type, d]));
+
+  console.log('[categories] rendering:', ALL_CATEGORIES, '| live dist:', Object.keys(distMap));
+
+  section.style.display = '';
+  const hint = `<span class="cat-card-hint">${t('viewHint')}</span>`;
+  grid.innerHTML = ALL_CATEGORIES.map(type => {
+    const dist       = distMap[type] || { type, valueBase: 0, pct: 0 };
+    const m          = TYPE_META[type] || TYPE_META.other;
+    const typeAssets = assets.filter(a => (TYPE_META[a.type] ? a.type : 'other') === type);
+    const visual     = buildCardVisual(type, typeAssets, dist.pct);
+    const isEmpty    = dist.valueBase === 0;
+
+    // Real estate: compute total monthly rent across all RE assets
+    let rentLineHtml = '';
+    if (type === 'real_estate') {
+      const totalRentEur = typeAssets
+        .filter(a => a.rent > 0 && (a.assetCurrency || 'EUR') === 'EUR')
+        .reduce((s, a) => s + a.rent, 0);
+      const totalRentUsd = typeAssets
+        .filter(a => a.rent > 0 && (a.assetCurrency || 'EUR') === 'USD')
+        .reduce((s, a) => s + a.rent, 0);
+      const totalRentBase = toBase(totalRentEur, 'EUR') + toBase(totalRentUsd, 'USD');
+      if (totalRentBase > 0) {
+        const rentLabel = lang === 'es' ? '/mes' : '/mo';
+        rentLineHtml = `<span class="cat-card-rent">+${formatBase(totalRentBase)}${rentLabel}</span>`;
+      }
+    }
+
+    return `<button class="cat-card${isEmpty ? ' cat-card--empty' : ''}" data-type="${type}">
+      ${visual}
+      <div class="cat-card-content">
+        <div class="cat-card-header">
+          <span class="cat-card-dot" style="background:${m.color}"></span>
+          <span class="cat-card-name">${m.label}</span>
+        </div>
+        <span class="cat-card-value">${isEmpty ? '—' : formatBase(dist.valueBase)}</span>
+        <span class="cat-card-pct">${isEmpty ? '0.0%' : dist.pct.toFixed(1) + '%'}</span>
+        ${rentLineHtml}
+        ${hint}
+      </div>
+    </button>`;
+  }).join('');
+
+  grid.querySelectorAll('.cat-card').forEach(btn => {
+    btn.addEventListener('click', () => setActiveCategory(btn.dataset.type));
+  });
+}
+
+// ── Performance display ─────────────────────────────────────
+function updatePerformance() {
+  if (!summaryPerfEl) return;
+  if (portfolioHistory.length < 2 || assets.length === 0) {
+    summaryPerfEl.style.display = 'none';
+    return;
+  }
+  const currentBase  = totalValueBase();
+  const initialBase  = toBase(portfolioHistory[0].value, 'USD');
+  if (initialBase <= 0) { summaryPerfEl.style.display = 'none'; return; }
+
+  const absChange = currentBase - initialBase;
+  const pctChange = (absChange / initialBase) * 100;
+
+  const locale = lang === 'es' ? 'es-ES' : 'en-US';
+  const pctStr = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(Math.abs(pctChange));
+
+  const sign   = absChange >= 0 ? '+' : '−';
+  const absStr = formatBase(Math.abs(absChange));
+
+  summaryPerfEl.textContent = `${sign}${pctStr}% (${sign}${absStr})`;
+  summaryPerfEl.className   = `summary-perf ${absChange >= 0 ? 'positive' : 'negative'}`;
+  summaryPerfEl.style.display = '';
+}
+
+// ── Render ─────────────────────────────────────────────────
+function render(animate = false) {
+  countUpTotalValue(totalValueBase());
+  updatePerformance();
+  assetCountEl.textContent = t('assetCount')(assets.length);
+
+  // Update section header: show category name + back button, or the normal title
+  const assetsTitleEl    = document.getElementById('assetsSectionTitle');
+  const filterIndicator  = document.getElementById('sectionFilterIndicator');
+  const filterNameEl     = document.getElementById('sectionFilterName');
+  if (activeCategory) {
+    const m = TYPE_META[activeCategory] || TYPE_META.other;
+    if (assetsTitleEl)   assetsTitleEl.style.display   = 'none';
+    if (filterNameEl)    { filterNameEl.textContent = m.label; filterNameEl.style.color = m.color; }
+    if (filterIndicator) filterIndicator.style.display = '';
+  } else {
+    if (assetsTitleEl)   assetsTitleEl.style.display   = '';
+    if (filterIndicator) filterIndicator.style.display = 'none';
+  }
+
+  // Section visibility: dashboard shows category cards; category view shows asset list
+  const assetsSectionEl = document.getElementById('assetsSection');
+  if (activeCategory) {
+    // Category drill-down — asset list is the main view
+    if (assetsSectionEl) assetsSectionEl.style.display = '';
+    // categoriesSection already hidden by updateCategoryCards() short-circuit
+  } else {
+    // Dashboard — category cards are primary navigation; raw list always hidden here
+    // (categories show all 6 types even when empty, so empty-state lives inside category drill-down)
+    if (assetsSectionEl) assetsSectionEl.style.display = 'none';
+  }
+
+  // Clear list (keep empty state node)
+  while (assetsListEl.firstChild) {
+    assetsListEl.removeChild(assetsListEl.firstChild);
+  }
+
+  if (assets.length === 0) {
+    assetsListEl.appendChild(emptyStateEl);
+    return;
+  }
+
+  // Sort by value descending, then filter to active category if set
+  const sorted   = [...assets].sort((a, b) => assetNativeValue(b) - assetNativeValue(a));
+  const filtered = activeCategory
+    ? sorted.filter(a => (TYPE_META[a.type] ? a.type : 'other') === activeCategory)
+    : sorted;
+
+  if (filtered.length === 0) {
+    assetsListEl.appendChild(emptyStateEl);
+    return;
+  }
+
+  // Real estate view: show total monthly rental income banner
+  if (activeCategory === 'real_estate') {
+    const totalRentBase = filtered
+      .filter(a => a.rent > 0)
+      .reduce((sum, a) => sum + toBase(a.rent, (a.assetCurrency || 'EUR').toUpperCase()), 0);
+    const rentLabel = lang === 'es' ? '/mes' : '/mo';
+    const bannerEl = document.createElement('div');
+    bannerEl.className = 'rent-banner' + (totalRentBase > 0 ? '' : ' rent-banner--zero');
+    bannerEl.innerHTML = totalRentBase > 0
+      ? `<span class="rent-banner-label">${lang === 'es' ? 'Ingresos mensuales' : 'Monthly income'}</span>
+         <span class="rent-banner-value">+${formatBase(totalRentBase)}${rentLabel}</span>`
+      : `<span class="rent-banner-label">${lang === 'es' ? 'Ingresos mensuales' : 'Monthly income'}</span>
+         <span class="rent-banner-zero">${lang === 'es' ? 'Sin ingresos' : 'No income'}</span>`;
+    assetsListEl.appendChild(bannerEl);
+  }
+
+  filtered.forEach((asset, cardIndex) => {
+    const assetCurr  = (asset.assetCurrency || 'USD').toUpperCase();
+    const isCash     = asset.type === 'cash';
+    const isGold     = asset.ticker === 'XAU' && asset.karat;
+    const valueOrig  = assetNativeValue(asset);              // in assetCurr
+    const valueBase  = toBase(valueOrig, assetCurr);         // in baseCurrency
+    const showOrig   = assetCurr !== baseCurrency;
+
+    const change24   = asset.change24h;
+    const changeHtml = (!isCash && typeof change24 === 'number')
+      ? `<span class="change ${change24 >= 0 ? 'up' : 'down'}">${change24 >= 0 ? '▲' : '▼'} ${Math.abs(change24).toFixed(2)}%</span>`
+      : '';
+    const flashClass = (asset.prevPrice != null && asset.prevPrice !== asset.price)
+      ? (asset.price > asset.prevPrice ? 'flash-up' : 'flash-down')
+      : '';
+    // Derive previous base value via price ratio (works for all asset types including gold)
+    const prevValueBase = (flashClass && asset.price > 0 && asset.prevPrice > 0)
+      ? valueBase * (asset.prevPrice / asset.price)
+      : null;
+
+    const badgeText = isGold
+      ? `${asset.karat}K`
+      : escHtml(asset.ticker.toUpperCase().slice(0, 4));
+
+    // Type label (translated)
+    const tc = T[lang].typeCard;
+    const ticker = escHtml(asset.ticker.toUpperCase());
+    const typeLabelMap = {
+      crypto:      tc.crypto(ticker),
+      stock:       tc.stock(ticker),
+      etf:         tc.etf(ticker),
+      metal:       isGold
+        ? tc.metalGold(ticker, Math.round(asset.karat / 24 * 100))
+        : tc.metal(ticker),
+      cash:        tc.cash(assetCurr),
+      real_estate: tc.real_estate(),
+      other:       tc.other(),
+    };
+    const typeLabel = typeLabelMap[asset.type] ?? `${escHtml(asset.type)} · ${ticker}`;
+
+    // Sub-line under total value: qty + price/unit + change
+    const origHtml = (showOrig && !isCash)
+      ? `<span class="orig-price">${formatCurrency(valueOrig, assetCurr)}</span>`
+      : '';
+
+    // Context-aware quantity + unit string
+    const qtyUnitStr = (() => {
+      if (isGold) {
+        // Gold in grams → auto-promote to kg; oz stays as-is
+        const unit = asset.goldUnit || 'g';
+        return unit === 'g' ? gramsToDisplay(asset.qty) : `${formatQty(asset.qty)} ${unit}`;
+      }
+      if (asset.type === 'crypto') return `${formatQty(asset.qty)} ${asset.ticker.toUpperCase()}`;
+      if (asset.type === 'metal')  return gramsToDisplay(asset.qty);
+      return `${formatQty(asset.qty)} ${t('units')}`;  // stocks, ETF, other
+    })();
+
+    const isRE = asset.type === 'real_estate';
+
+    const rentHtml = (isRE && asset.rent > 0)
+      ? `<span class="asset-rent">+${formatCurrency(asset.rent, assetCurr)}${lang === 'es' ? '/mes' : '/mo'}</span>`
+      : '';
+
+    const subLineHtml = isCash
+      ? `<span class="units">${formatCurrency(asset.qty, assetCurr)} ${t('cashLabel')}</span>`
+      : isRE
+        ? `<span class="units">${assetCurr === 'EUR' ? '€' : '$'} ${assetCurr}</span>
+           ${rentHtml}`
+        : isGold
+          ? `<span class="units">${qtyUnitStr}</span>
+             <span class="price">${formatCurrency(asset.price, assetCurr)}${t('perTrOz')}${origHtml ? ` · ${origHtml}` : ''}</span>
+             ${changeHtml}`
+          : `<span class="units">${qtyUnitStr}</span>
+             <span class="price">${formatCurrency(asset.price, assetCurr)}${t('perUnit')}${origHtml ? ` · ${origHtml}` : ''}</span>
+             ${changeHtml}`;
+
+    const statusHtml = getStatusHtml(asset);
+
+    const actionsHtml = isRE
+      ? `<button class="btn-edit-re" title="${t('btnEdit')}" data-id="${asset.id}">✎</button>
+         <button class="btn-delete"  title="${t('btnDelete')}" data-id="${asset.id}">✕</button>`
+      : `<button class="btn-add-pos" title="${t('btnAdd')}" data-id="${asset.id}">+</button>
+         <button class="btn-reduce"  title="${t('btnReduce')}" data-id="${asset.id}">−</button>
+         <button class="btn-delete"  title="${t('btnDelete')}" data-id="${asset.id}">✕</button>`;
+
+    const card = document.createElement('div');
+    card.className = 'asset-card';
+    card.dataset.type = asset.type;
+    card.innerHTML = `
+      <div class="asset-badge ${asset.type}">${badgeText}</div>
+      <div class="asset-info">
+        <div class="asset-name">${escHtml(getDisplayName(asset))}</div>
+        <div class="asset-meta">${typeLabel}</div>
+        ${statusHtml}
+      </div>
+      <div class="asset-value">
+        <div class="asset-value-amount ${flashClass}"${prevValueBase != null ? ` data-from="${prevValueBase.toFixed(6)}" data-to="${valueBase.toFixed(6)}"` : ''}>${formatBase(valueBase)}</div>
+        <div class="asset-value-sub">${subLineHtml}</div>
+      </div>
+      <div class="asset-actions">
+        ${actionsHtml}
+      </div>
+    `;
+    if (animate) card.style.setProperty('--card-i', cardIndex);
+    assetsListEl.appendChild(card);
+  });
+
+  // Animate card values that changed during this render (prices updated)
+  animateCardValues();
+}
+
+function escHtml(str) {
+  return str.replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+// Always resolve the display name through the translation system for known assets.
+// Handles legacy saved assets that may have stored mixed-language names (e.g. "Oro (Gold)").
+function getDisplayName(a) {
+  if (a.type === 'metal') {
+    const translated = T[lang]?.metalNames?.[a.ticker?.toUpperCase()];
+    if (translated) return translated;
+  }
+  // Fallback: use stored name as-is (already English for all non-metal assets)
+  return a.name;
+}
+
+// ── Local search (instant phase-1, from ASSET_DB, filter-aware) ──
+function getLocalResults(query, filter) {
+  const q = query.toLowerCase().trim();
+  if (!q) return [];
+  const pool = (filter === 'all' || filter === 'crypto')
+    ? ASSET_DB  // stocks + ETFs + metals (crypto comes from API only)
+    : ASSET_DB.filter(a => a.type === filter);
+  return pool
+    .filter(a => a.ticker.toLowerCase().startsWith(q) || a.name.toLowerCase().includes(q))
+    .sort((a, b) => {
+      const at = a.ticker.toLowerCase().startsWith(q) ? 0 : 1;
+      const bt = b.ticker.toLowerCase().startsWith(q) ? 0 : 1;
+      return at - bt;
+    })
+    .slice(0, 8);
+}
+
+// ── Real-time API search ───────────────────────────────────
+async function searchYahooFinance(query, signal) {
+  const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=8&newsCount=0&listsCount=0`;
+  const proxies = [
+    url,
+    `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+    `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+  ];
+  for (const proxyUrl of proxies) {
+    try {
+      const res = await fetch(proxyUrl, { signal, headers: { Accept: 'application/json' } });
+      if (!res.ok) continue;
+      let json = await res.json();
+      if (typeof json.contents === 'string') json = JSON.parse(json.contents);
+      const quotes = json?.quotes ?? [];
+      return quotes
+        .filter(q => q.quoteType === 'EQUITY' || q.quoteType === 'ETF')
+        .slice(0, 7)
+        .map(q => ({
+          ticker:       q.symbol,
+          name:         q.longname || q.shortname || q.symbol,
+          type:         q.quoteType === 'ETF' ? 'etf' : 'stock',
+          marketSymbol: q.symbol,
+        }));
+    } catch (err) {
+      if (err.name === 'AbortError') throw err;
+    }
+  }
+  return null; // all proxies failed
+}
+
+async function searchCoinGeckoAPI(query, signal) {
+  const res = await fetch(
+    `${COINGECKO}/search?query=${encodeURIComponent(query)}`,
+    { signal, headers: { Accept: 'application/json' } }
+  );
+  if (!res.ok) throw new Error('CG search failed');
+  const data = await res.json();
+  return (data.coins || []).slice(0, 8).map(c => ({
+    ticker: c.symbol.toUpperCase(),
+    name:   c.name,
+    type:   'crypto',
+    coinId: c.id,
+  }));
+}
+
+function searchMetalsLocal(query) {
+  const q = query.toLowerCase();
+  return [
+    { ticker: 'XAU', name: 'Oro (Gold)',     type: 'metal', marketSymbol: 'GC=F', kw: ['oro','gold','xau','gc','xauusd'] },
+    { ticker: 'XAG', name: 'Plata (Silver)', type: 'metal', marketSymbol: 'SI=F', kw: ['plata','silver','xag','si','xagusd'] },
+  ].filter(m => m.kw.some(k => k.startsWith(q)));
+}
+
+async function searchAllAssets(query, signal) {
+  const metals = searchMetalsLocal(query);
+
+  const [yahooRes, cryptoRes] = await Promise.allSettled([
+    searchYahooFinance(query, signal),
+    searchCoinGeckoAPI(query, signal),
+  ]);
+
+  if (signal?.aborted) return null;
+
+  const q = query.toLowerCase();
+  const yahooItems = (yahooRes.status === 'fulfilled' && yahooRes.value)
+    ? yahooRes.value
+    : ASSET_DB.filter(a =>
+        (a.type === 'stock' || a.type === 'etf') &&
+        (a.ticker.toLowerCase().startsWith(q) || a.name.toLowerCase().includes(q))
+      ).slice(0, 5);
+
+  const cryptoItems = (cryptoRes.status === 'fulfilled' && cryptoRes.value)
+    ? cryptoRes.value
+    : [];
+
+  const seen = new Set();
+  const merged = [];
+  for (const item of [...metals, ...yahooItems, ...cryptoItems]) {
+    const key = item.ticker.toUpperCase();
+    if (!seen.has(key)) { seen.add(key); merged.push(item); }
+  }
+  return merged.slice(0, 10);
+}
+
+// Filter-aware search: only queries the relevant API source
+async function searchByFilter(query, filter, signal) {
+  if (filter === 'metal') {
+    return searchMetalsLocal(query);
+  }
+  if (filter === 'crypto') {
+    const results = await searchCoinGeckoAPI(query, signal);
+    return results || [];
+  }
+  if (filter === 'stock' || filter === 'etf') {
+    const yahooResults = await searchYahooFinance(query, signal);
+    if (yahooResults) return yahooResults.filter(a => a.type === filter);
+    const q = query.toLowerCase();
+    return ASSET_DB
+      .filter(a => a.type === filter && (
+        a.ticker.toLowerCase().startsWith(q) || a.name.toLowerCase().includes(q)
+      ))
+      .slice(0, 8);
+  }
+  return searchAllAssets(query, signal);
+}
+
+// ── Render suggestions ────────────────────────────────────
+// TYPE_LABEL is derived from translations at render time — no static const needed
+
+function showDefaultSuggestions() {
+  const defaults = DEFAULTS[activeSearchFilter] || [];
+  if (!defaults.length) { closeSuggestions(); return; }
+  renderedSuggestions = defaults;
+
+  assetSuggestionsEl.innerHTML = `
+    <div class="sugg-section-label">Populares</div>
+    ${defaults.map((a, i) => `
+      <div class="suggestion-item" data-idx="${i}">
+        <div class="sugg-badge ${a.type}">${escHtml(a.ticker.slice(0, 5))}</div>
+        <div class="sugg-info">
+          <div class="sugg-name">${escHtml(getDisplayName(a))}</div>
+          <div class="sugg-ticker">${escHtml(a.ticker)}</div>
+        </div>
+        <span class="sugg-type ${a.type}">${T[lang].typeLabel[a.type] || a.type}</span>
+      </div>`).join('')}`;
+
+  assetSuggestionsEl.classList.add('open');
+  assetSuggestionsEl.querySelectorAll('.suggestion-item[data-idx]').forEach((item, i) => {
+    item.addEventListener('click',      () => { closeSuggestions(); selectAsset(defaults[i]); });
+    item.addEventListener('mouseenter', () => setFocusedSugg(i));
+  });
+}
+
+function renderSuggestions(results, query, loading = false) {
+  renderedSuggestions = results;
+
+  const loadingHtml = loading
+    ? `<div class="suggestion-loading"><span class="sugg-dot-anim">···</span> Buscando…</div>`
+    : '';
+
+  if (!results.length) {
+    assetSuggestionsEl.innerHTML = loadingHtml ||
+      `<div class="suggestion-empty">${t('noResults')(escHtml(query))}</div>`;
+    assetSuggestionsEl.classList.add('open');
+    return;
+  }
+
+  assetSuggestionsEl.innerHTML = results.map((a, i) => `
+    <div class="suggestion-item" data-idx="${i}">
+      <div class="sugg-badge ${a.type}">${escHtml(a.ticker.slice(0, 5))}</div>
+      <div class="sugg-info">
+        <div class="sugg-name">${escHtml(getDisplayName(a))}</div>
+        <div class="sugg-ticker">${escHtml(a.ticker)}</div>
+      </div>
+      <span class="sugg-type ${a.type}">${T[lang].typeLabel[a.type] || a.type}</span>
+    </div>`).join('') + loadingHtml;
+
+  assetSuggestionsEl.classList.add('open');
+  assetSuggestionsEl.querySelectorAll('.suggestion-item[data-idx]').forEach((item, i) => {
+    item.addEventListener('click',      () => { closeSuggestions(); selectAsset(results[i]); });
+    item.addEventListener('mouseenter', () => setFocusedSugg(i));
+  });
+}
+
+function closeSuggestions() {
+  assetSuggestionsEl.classList.remove('open');
+  focusedSuggIdx = -1;
+}
+
+function setFocusedSugg(idx) {
+  focusedSuggIdx = idx;
+  assetSuggestionsEl.querySelectorAll('.suggestion-item[data-idx]').forEach((el, i) => {
+    el.classList.toggle('focused', i === idx);
+  });
+}
+
+async function selectAsset(entry) {
+  selectedDbAsset     = entry;
+  pendingCoinId       = null;
+  pendingMarketSymbol = null;
+  pendingPrice        = null;
+
+  // Show chip, hide search
+  chipBadgeEl.textContent         = entry.ticker.slice(0, 4);
+  chipBadgeEl.className           = `chip-badge ${entry.type}`;
+  chipNameEl.textContent          = getDisplayName(entry);
+  chipSubEl.textContent           = `${entry.ticker} · ${T[lang].typeLabel[entry.type] || entry.type}`;
+  chipPriceEl.textContent         = '⋯';
+  selectedChipEl.style.display    = '';
+  searchInputWrapEl.style.display = 'none';
+  if (searchFiltersEl) searchFiltersEl.style.display = 'none';
+
+  // Reveal qty + submit
+  qtyGroup.style.display    = '';
+  formPreviewEl.style.display = '';
+  btnSubmitEl.style.display  = '';
+
+  // Gold: show karat/unit selectors
+  const isGoldEntry = entry.ticker === 'XAU';
+  if (karatGroupEl)    karatGroupEl.style.display    = isGoldEntry ? '' : 'none';
+  if (goldUnitGroupEl) goldUnitGroupEl.style.display = isGoldEntry ? '' : 'none';
+  if (qtyLabelEl)      qtyLabelEl.textContent        = isGoldEntry ? t('qtyGold')(pendingGoldUnit) : t('qty');
+
+  setLookupStatus('loading', 'Obteniendo precio...');
+
+  try {
+    let price = null;
+
+    if (entry.type === 'crypto' && entry.coinId) {
+      pendingCoinId = entry.coinId;
+      const data    = await fetchLivePrices([entry.coinId]);
+      price         = data[entry.coinId]?.usd ?? null;
+      // Some coins return 0 as price (stablecoin edge cases) — treat as valid
+      if (price === null || price === undefined) price = null;
+    } else if (entry.marketSymbol) {
+      pendingMarketSymbol = entry.marketSymbol;
+      if (entry.ticker === 'XAU') {
+        // Gold: dedicated source chain (exchangerate.host → Yahoo → fallback)
+        price = await fetchGoldSpotPrice();
+      } else {
+        const data = await fetchYahooData(entry.marketSymbol);
+        price      = data?.price ?? null;
+        if (!price) {
+          const fb = getFallbackData(entry.marketSymbol);
+          price    = fb?.price ?? null;
+        }
+      }
+    }
+
+    if (price) {
+      pendingPrice            = price;
+      chipPriceEl.textContent = formatUSD(price);
+      setLookupStatus('ok', '');
+    } else {
+      chipPriceEl.textContent = t('noPrice');
+      setLookupStatus('error', t('priceUnavail'));
+    }
+  } catch (err) {
+    // Network error: try local fallback for non-crypto
+    const fb = entry.marketSymbol ? getFallbackData(entry.marketSymbol) : null;
+    if (fb) {
+      pendingPrice            = fb.price;
+      chipPriceEl.textContent = formatUSD(fb.price);
+      setLookupStatus('ok', '');
+    } else {
+      chipPriceEl.textContent = t('noPrice');
+      setLookupStatus('error', t('priceNoConn'));
+    }
+  }
+
+  updatePreview();
+  qtyInput.focus();
+}
+
+function clearSelectedAsset() {
+  selectedDbAsset      = null;
+  pendingCoinId        = null;
+  pendingMarketSymbol  = null;
+  pendingPrice         = null;
+  pendingKarat         = 18;
+  pendingGoldUnit      = 'g';
+  selectedChipEl.style.display = 'none';
+  if (karatGroupEl)    karatGroupEl.style.display    = 'none';
+  if (goldUnitGroupEl) goldUnitGroupEl.style.display = 'none';
+  if (qtyLabelEl)      qtyLabelEl.textContent        = t('qty');
+  setLookupStatus('');
+  updatePreview();
+}
+
+function enterSearchMode() {
+  isRealEstateMode = false;
+  const reNameGroupEl = document.getElementById('reNameGroup');
+  const reCurrGroupEl = document.getElementById('reCurrGroup');
+  const reRentGroupEl = document.getElementById('reRentGroup');
+  if (reNameGroupEl) reNameGroupEl.style.display = 'none';
+  if (reCurrGroupEl) reCurrGroupEl.style.display = 'none';
+  if (reRentGroupEl) reRentGroupEl.style.display = 'none';
+
+  clearSelectedAsset();
+  searchInputWrapEl.style.display = '';
+  if (searchFiltersEl) searchFiltersEl.style.display = '';
+  searchInput.value            = '';
+  searchClearBtn.style.display = 'none';
+  qtyGroup.style.display       = 'none';
+  formPreviewEl.style.display  = 'none';
+  btnSubmitEl.style.display    = 'none';
+  closeSuggestions();
+  searchInput.placeholder = T[lang].searchPH[activeSearchFilter] || T[lang].searchPH.all;
+  suppressFocusDefaults = true;
+  setTimeout(() => searchInput.focus(), 0);
+}
+
+function enterRealEstateMode() {
+  isRealEstateMode   = true;
+  rePendingCurrency  = 'EUR';
+  rePendingRent      = 0;
+  clearSelectedAsset();
+  closeSuggestions();
+
+  searchInputWrapEl.style.display = 'none';
+
+  const reNameGroupEl = document.getElementById('reNameGroup');
+  const reCurrGroupEl = document.getElementById('reCurrGroup');
+  const reRentGroupEl = document.getElementById('reRentGroup');
+  if (reNameGroupEl) reNameGroupEl.style.display = '';
+  if (reCurrGroupEl) reCurrGroupEl.style.display = '';
+  if (reRentGroupEl) reRentGroupEl.style.display = '';
+
+  // Reset currency toggle to EUR
+  document.querySelectorAll('.re-curr-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.curr === 'EUR'));
+
+  // Clear rent input
+  const reRentInput = document.getElementById('reRent');
+  if (reRentInput) reRentInput.value = '';
+
+  if (qtyLabelEl) qtyLabelEl.textContent = t('reValueLabel');
+  qtyGroup.style.display      = '';
+  formPreviewEl.style.display = '';
+  btnSubmitEl.style.display   = '';
+  setLookupStatus('');
+
+  const reNameInput = document.getElementById('reName');
+  if (reNameInput) { reNameInput.value = ''; reNameInput.focus(); }
+}
+
+// ── Search event listeners (two-phase: instant local + debounced API) ──
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.trim();
+  searchClearBtn.style.display = q ? '' : 'none';
+
+  clearTimeout(searchDebounceTimer);
+  if (searchAbortCtrl) { searchAbortCtrl.abort(); searchAbortCtrl = null; }
+
+  if (!q) {
+    closeSuggestions();
+    return;
+  }
+
+  // Phase 1 — instant local results (skip for 'all' to avoid partial-results flash)
+  const localResults = getLocalResults(q, activeSearchFilter);
+  currentSuggestions = localResults;
+  if (activeSearchFilter === 'all') {
+    // Show loading only — wait for complete combined results in Phase 2
+    renderSuggestions([], q, true);
+  } else {
+    renderSuggestions(localResults, q, activeSearchFilter !== 'metal');
+  }
+
+  // Phase 2 — API results after 300ms (skip for metals, they're local only)
+  if (activeSearchFilter === 'metal') return;
+
+  searchDebounceTimer = setTimeout(async () => {
+    searchAbortCtrl = new AbortController();
+    const { signal } = searchAbortCtrl;
+    try {
+      const results = await searchByFilter(q, activeSearchFilter, signal);
+      if (signal.aborted || searchInput.value.trim() !== q) return;
+      if (results && results.length) currentSuggestions = results;
+      renderSuggestions(currentSuggestions, q, false);
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      renderSuggestions(currentSuggestions, q, false);
+    }
+  }, 300);
+});
+
+searchInput.addEventListener('keydown', e => {
+  if (!assetSuggestionsEl.classList.contains('open')) return;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    setFocusedSugg(Math.min(focusedSuggIdx + 1, renderedSuggestions.length - 1));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    setFocusedSugg(Math.max(focusedSuggIdx - 1, 0));
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (focusedSuggIdx >= 0 && renderedSuggestions[focusedSuggIdx]) {
+      closeSuggestions();
+      selectAsset(renderedSuggestions[focusedSuggIdx]);
+    }
+  } else if (e.key === 'Escape') {
+    closeSuggestions();
+  }
+});
+
+searchClearBtn.addEventListener('click', () => {
+  searchInput.value = '';
+  searchClearBtn.style.display = 'none';
+  clearTimeout(searchDebounceTimer);
+  if (searchAbortCtrl) { searchAbortCtrl.abort(); searchAbortCtrl = null; }
+  closeSuggestions();
+  suppressFocusDefaults = true;
+  searchInput.focus();
+});
+
+// Show popular defaults on manual focus when a specific filter is active and input is empty
+searchInput.addEventListener('focus', () => {
+  if (suppressFocusDefaults) { suppressFocusDefaults = false; return; }
+  if (!searchInput.value.trim() && activeSearchFilter !== 'all') {
+    showDefaultSuggestions();
+  }
+});
+
+
+chipClearBtn.addEventListener('click', () => enterSearchMode());
+
+// Close dropdown on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('#searchWrap')) closeSuggestions();
+}, true);
+
+// ── Modal ──────────────────────────────────────────────────
+function openModal() {
+  assetForm.reset();
+  previewTotal.textContent = formatBase(0);
+
+  // Reset state
+  selectedDbAsset      = null;
+  pendingCoinId        = null;
+  pendingMarketSymbol  = null;
+  pendingPrice         = null;
+  pendingKarat         = 18;
+  pendingGoldUnit      = 'g';
+  currentSuggestions   = [];
+  renderedSuggestions  = [];
+  activeSearchFilter   = 'all';
+  focusedSuggIdx       = -1;
+  if (karatGroupEl)    karatGroupEl.style.display    = 'none';
+  if (goldUnitGroupEl) goldUnitGroupEl.style.display = 'none';
+  if (qtyLabelEl)      qtyLabelEl.textContent        = t('qty');
+  isRealEstateMode  = false;
+  rePendingCurrency = 'EUR';
+  rePendingRent     = 0;
+  reEditTargetId    = null;
+  const reNameGroupEl = document.getElementById('reNameGroup');
+  const reCurrGroupEl = document.getElementById('reCurrGroup');
+  const reRentGroupEl = document.getElementById('reRentGroup');
+  if (reNameGroupEl) reNameGroupEl.style.display = 'none';
+  if (reCurrGroupEl) reCurrGroupEl.style.display = 'none';
+  if (reRentGroupEl) reRentGroupEl.style.display = 'none';
+
+  searchInput.value               = '';
+  searchClearBtn.style.display    = 'none';
+  selectedChipEl.style.display    = 'none';
+  searchInputWrapEl.style.display = '';
+  chipPriceEl.textContent         = '';
+  qtyGroup.style.display          = 'none';
+  formPreviewEl.style.display     = 'none';
+  btnSubmitEl.style.display       = 'none';
+
+  closeSuggestions();
+  setLookupStatus('');
+
+  if (searchFiltersEl) searchFiltersEl.style.display = '';
+  filterBtns.forEach(b => b.classList.toggle('active', b.dataset.filter === 'all'));
+
+  searchInput.placeholder = T[lang].searchPH.all;
+  // Reset modal title in case it was changed for edit mode
+  const modalTitle = document.querySelector('#modalOverlay .modal-header h3');
+  if (modalTitle) modalTitle.textContent = t('modalAddTitle');
+  modalOverlay.classList.add('open');
+  suppressFocusDefaults = true;
+  setTimeout(() => searchInput.focus(), 50);
+}
+
+function closeModal() {
+  modalOverlay.classList.remove('open');
+  clearTimeout(searchDebounceTimer);
+  if (searchAbortCtrl) { searchAbortCtrl.abort(); searchAbortCtrl = null; }
+  closeSuggestions();
+}
+
+// ── Filter bar ─────────────────────────────────────────────
+filterBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const newFilter = btn.dataset.filter;
+    filterBtns.forEach(b => b.classList.toggle('active', b === btn));
+    focusedSuggIdx = -1;
+
+    // Real estate: switch to manual form — no live search needed
+    if (newFilter === 'real_estate') {
+      activeSearchFilter = 'real_estate';
+      enterRealEstateMode();
+      return;
+    }
+
+    // Switching away from RE mode: restore search UI
+    if (isRealEstateMode) enterSearchMode();
+
+    activeSearchFilter = newFilter;
+
+    // Update placeholder
+    searchInput.placeholder = T[lang].searchPH[activeSearchFilter] || T[lang].searchPH.all;
+
+    // Cancel any pending search
+    clearTimeout(searchDebounceTimer);
+    if (searchAbortCtrl) { searchAbortCtrl.abort(); searchAbortCtrl = null; }
+
+    const q = searchInput.value.trim();
+    if (!q) {
+      closeSuggestions();
+      return;
+    }
+
+    // Re-run search with new filter
+    const localResults = getLocalResults(q, activeSearchFilter);
+    currentSuggestions = localResults;
+    renderSuggestions(localResults, q, activeSearchFilter !== 'metal');
+
+    if (activeSearchFilter === 'metal') return;
+
+    searchDebounceTimer = setTimeout(async () => {
+      searchAbortCtrl = new AbortController();
+      const { signal } = searchAbortCtrl;
+      try {
+        const results = await searchByFilter(q, activeSearchFilter, signal);
+        if (signal.aborted || searchInput.value.trim() !== q) return;
+        if (results && results.length) currentSuggestions = results;
+        renderSuggestions(currentSuggestions, q, false);
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        renderSuggestions(currentSuggestions, q, false);
+      }
+    }, 300);
+  });
+});
+
+// ── Live Preview ───────────────────────────────────────────
+function updatePreview() {
+  const qty = parseLocalFloat(qtyInput.value) || 0;
+  // Real estate: qty IS the value, already in rePendingCurrency
+  if (isRealEstateMode) {
+    previewTotal.textContent = formatBase(toBase(qty, rePendingCurrency));
+    return;
+  }
+  const price = pendingPrice || 0;
+  let value;
+  if (selectedDbAsset?.ticker === 'XAU' && pendingKarat) {
+    const grams = pendingGoldUnit === 'oz' ? qty * 31.1035 : qty;
+    value = grams * (pendingKarat / 24) * (price / 31.1035);
+  } else {
+    value = qty * price;
+  }
+  previewTotal.textContent = formatBase(toBase(value, 'USD'));
+}
+qtyInput.addEventListener('input', updatePreview);
+
+// ── Add Asset ──────────────────────────────────────────────
+assetForm.addEventListener('submit', e => {
+  e.preventDefault();
+
+  // ── Real estate branch: manual value entry, no live price ──
+  if (isRealEstateMode) {
+    const reNameInput = document.getElementById('reName');
+    const name = (reNameInput?.value || '').trim();
+    if (!name) { reNameInput?.focus(); return; }
+
+    const value = parseLocalFloat(qtyInput.value);
+    if (isNaN(value) || value <= 0) { qtyInput.focus(); return; }
+
+    const rent = parseLocalFloat(document.getElementById('reRent')?.value) || 0;
+    const ticker = name.replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase() || 'INMU';
+
+    if (reEditTargetId) {
+      // Edit existing real estate asset
+      const existing = assets.find(a => a.id === reEditTargetId);
+      if (existing) {
+        existing.name          = name;
+        existing.ticker        = ticker;
+        existing.qty           = value;
+        existing.rent          = rent;
+        existing.assetCurrency = rePendingCurrency;
+      }
+    } else {
+      assets.push({
+        id:            Date.now().toString(36) + Math.random().toString(36).slice(2),
+        name,
+        ticker,
+        type:          'real_estate',
+        qty:           value,
+        price:         1,                  // qty × price = value; price never changes
+        coinId:        null,
+        marketSymbol:  null,
+        assetCurrency: rePendingCurrency,
+        change24h:     null,
+        prevPrice:     null,
+        rent,
+      });
+    }
+    save();
+    render(true);
+    closeModal();
+    onPortfolioChange(true);
+    return;
+  }
+
+  if (!selectedDbAsset) return;
+  if (!pendingPrice) {
+    setLookupStatus('error', 'Precio no disponible. Selecciona el activo de nuevo para reintentar.');
+    return;
+  }
+
+  const qty = parseLocalFloat(qtyInput.value);
+  if (isNaN(qty) || qty <= 0) { qtyInput.focus(); return; }
+
+  const { ticker, type, coinId = null, marketSymbol = null } = selectedDbAsset;
+  const isGoldAsset = ticker === 'XAU';
+  const karat       = isGoldAsset ? pendingKarat    : undefined;
+  const goldUnit    = isGoldAsset ? pendingGoldUnit : undefined;
+  const name        = isGoldAsset ? `Gold ${karat}K` : selectedDbAsset.name;
+
+  // Merge into existing position
+  // Gold: always isolated by karat + unit — never merged across combinations
+  const existing = assets.find(a => {
+    if (coinId && a.coinId) return a.coinId === coinId;
+    if (isGoldAsset)        return a.ticker === 'XAU' && a.karat === karat && a.goldUnit === goldUnit;
+    if (marketSymbol && a.marketSymbol) return a.marketSymbol === marketSymbol;
+    return a.ticker.toUpperCase() === ticker.toUpperCase() && a.type === type;
+  });
+
+  if (existing) {
+    existing.qty    = +(existing.qty + qty).toFixed(8);
+    existing.price  = pendingPrice;
+  } else {
+    let initialChange24h = null;
+    if (marketSymbol && type !== 'crypto') {
+      const fb = getFallbackData(marketSymbol);
+      if (fb) initialChange24h = fb.change24h;
+    }
+    assets.push({
+      id:            Date.now().toString(36) + Math.random().toString(36).slice(2),
+      name, ticker, type, qty,
+      price:         pendingPrice,
+      coinId, marketSymbol,
+      assetCurrency: 'USD',
+      change24h:     initialChange24h,
+      prevPrice:     null,
+      ...(isGoldAsset ? { karat, goldUnit } : {}),
+    });
+  }
+
+  save();
+  render(true);
+  closeModal();
+  onPortfolioChange(true);
+});
+
+// ── Reduce Modal ───────────────────────────────────────────
+function openReduceModal(id) {
+  const asset = assets.find(a => a.id === id);
+  if (!asset) return;
+  reduceTargetId = id;
+
+  const assetCurr  = (asset.assetCurrency || 'USD').toUpperCase();
+  const isCash     = asset.type === 'cash';
+  const isGold     = asset.ticker === 'XAU' && asset.karat;
+  const totalBase  = toBase(assetNativeValue(asset), assetCurr);
+  const badgeText  = isGold ? `${asset.karat}K` : escHtml(asset.ticker.toUpperCase().slice(0, 4));
+  const qtyLabel   = isCash
+    ? formatCurrency(asset.qty, assetCurr)
+    : isGold
+      ? `${formatQty(asset.qty)} ${asset.goldUnit || 'g'}`
+      : `${formatQty(asset.qty)} ${t('unidades')}`;
+
+  reduceAssetInfo.innerHTML = `
+    <div class="asset-badge ${asset.type}">${badgeText}</div>
+    <div>
+      <div class="reduce-info-name">${escHtml(getDisplayName(asset))}</div>
+      <div class="reduce-info-qty">${qtyLabel} · ${formatBase(totalBase)}</div>
+    </div>
+  `;
+
+  reduceMaxEl.textContent = isGold
+    ? t('maxLabel')(formatQty(asset.qty), asset.goldUnit || 'g')
+    : t('maxLabel')(formatQty(asset.qty), null);
+  reduceQtyInput.value = '';
+  previewQtyLeft.textContent   = isGold
+    ? `${formatQty(asset.qty)} ${asset.goldUnit || 'g'}`
+    : formatQty(asset.qty);
+  previewValueLeft.textContent = formatBase(totalBase);
+  reduceWarning.classList.remove('visible');
+  reduceError.textContent = '';
+
+  reduceOverlay.classList.add('open');
+  reduceQtyInput.focus();
+}
+
+function closeReduceModal() {
+  reduceOverlay.classList.remove('open');
+  reduceTargetId = null;
+}
+
+function updateReducePreview() {
+  const asset  = assets.find(a => a.id === reduceTargetId);
+  if (!asset) return;
+
+  const amount  = parseLocalFloat(reduceQtyInput.value) || 0;
+  const cur     = (asset.assetCurrency || 'USD').toUpperCase();
+  const isGold  = asset.ticker === 'XAU' && asset.karat;
+  reduceError.textContent = '';
+
+  if (amount > asset.qty) {
+    const maxLabel = isGold ? `${formatQty(asset.qty)} ${asset.goldUnit || 'g'}` : formatQty(asset.qty);
+    reduceError.textContent = t('cantExceed')(maxLabel);
+    previewQtyLeft.textContent   = '—';
+    previewValueLeft.textContent = '—';
+    reduceWarning.classList.remove('visible');
+    return;
+  }
+
+  const remaining      = asset.qty - amount;
+  const remainingAsset = { ...asset, qty: remaining };
+  previewQtyLeft.textContent   = asset.type === 'cash'
+    ? formatCurrency(remaining, cur)
+    : isGold
+      ? `${formatQty(remaining)} ${asset.goldUnit || 'g'}`
+      : formatQty(remaining);
+  previewValueLeft.textContent = formatBase(toBase(assetNativeValue(remainingAsset), cur));
+  reduceWarning.classList.toggle('visible', remaining === 0 && amount > 0);
+}
+
+reduceQtyInput.addEventListener('input', updateReducePreview);
+
+reduceForm.addEventListener('submit', e => {
+  e.preventDefault();
+  const asset  = assets.find(a => a.id === reduceTargetId);
+  if (!asset) return;
+
+  const amount = parseLocalFloat(reduceQtyInput.value);
+  if (isNaN(amount) || amount <= 0) {
+    reduceError.textContent = 'Introduce una cantidad válida mayor que 0.';
+    return;
+  }
+  if (amount > asset.qty) {
+    reduceError.textContent = t('cantExceed')(formatQty(asset.qty));
+    return;
+  }
+
+  const remaining = asset.qty - amount;
+  if (remaining === 0) {
+    assets = assets.filter(a => a.id !== reduceTargetId);
+  } else {
+    asset.qty = remaining;
+  }
+
+  save();
+  render(true);
+  closeReduceModal();
+  onPortfolioChange(true);
+});
+
+reduceClose.addEventListener('click', closeReduceModal);
+reduceOverlay.addEventListener('click', e => {
+  if (e.target === reduceOverlay) closeReduceModal();
+});
+
+// ── Add position modal ─────────────────────────────────────
+const addOverlay          = document.getElementById('addOverlay');
+const addClose            = document.getElementById('addClose');
+const addForm             = document.getElementById('addForm');
+const addAssetInfo        = document.getElementById('addAssetInfo');
+const addQtyInput         = document.getElementById('addQty');
+const addQtyLabelEl       = document.getElementById('addQtyLabel');
+const previewAddQtyTotal  = document.getElementById('previewAddQtyTotal');
+const previewAddValueTotal= document.getElementById('previewAddValueTotal');
+const addError            = document.getElementById('addError');
+
+let addTargetId = null;
+
+function openAddModal(id) {
+  const asset = assets.find(a => a.id === id);
+  if (!asset) return;
+  addTargetId = id;
+
+  const assetCurr  = (asset.assetCurrency || 'USD').toUpperCase();
+  const isCash     = asset.type === 'cash';
+  const isGold     = asset.ticker === 'XAU' && asset.karat;
+  const totalBase  = toBase(assetNativeValue(asset), assetCurr);
+  const badgeText  = isGold ? `${asset.karat}K` : escHtml(asset.ticker.toUpperCase().slice(0, 4));
+  const qtyLabel   = isCash
+    ? formatCurrency(asset.qty, assetCurr)
+    : isGold
+      ? `${formatQty(asset.qty)} ${asset.goldUnit || 'g'}`
+      : `${formatQty(asset.qty)} ${t('unidades')}`;
+
+  addAssetInfo.innerHTML = `
+    <div class="asset-badge ${asset.type}">${badgeText}</div>
+    <div>
+      <div class="reduce-info-name">${escHtml(getDisplayName(asset))}</div>
+      <div class="reduce-info-qty">${qtyLabel} · ${formatBase(totalBase)}</div>
+    </div>
+  `;
+
+  addQtyLabelEl.textContent = isCash ? t('addQtyLabelCash') : t('addQtyLabel')(isGold ? asset.goldUnit || 'g' : null);
+  addQtyInput.value         = '';
+  addError.textContent      = '';
+  previewAddQtyTotal.textContent   = isCash
+    ? formatCurrency(asset.qty, assetCurr)
+    : isGold ? `${formatQty(asset.qty)} ${asset.goldUnit || 'g'}` : formatQty(asset.qty);
+  previewAddValueTotal.textContent = formatBase(totalBase);
+
+  addOverlay.classList.add('open');
+  addQtyInput.focus();
+}
+
+function closeAddModal() {
+  addOverlay.classList.remove('open');
+  addTargetId = null;
+}
+
+function updateAddPreview() {
+  const asset = assets.find(a => a.id === addTargetId);
+  if (!asset) return;
+
+  const amount    = parseLocalFloat(addQtyInput.value) || 0;
+  const assetCurr = (asset.assetCurrency || 'USD').toUpperCase();
+  const isCash    = asset.type === 'cash';
+  const isGold    = asset.ticker === 'XAU' && asset.karat;
+  addError.textContent = '';
+
+  if (amount < 0) {
+    addError.textContent = 'La cantidad debe ser positiva.';
+    previewAddQtyTotal.textContent    = '—';
+    previewAddValueTotal.textContent  = '—';
+    return;
+  }
+
+  const newQty   = asset.qty + amount;
+  const newAsset = { ...asset, qty: newQty };
+  previewAddQtyTotal.textContent   = isCash
+    ? formatCurrency(newQty, assetCurr)
+    : isGold ? `${formatQty(newQty)} ${asset.goldUnit || 'g'}` : formatQty(newQty);
+  previewAddValueTotal.textContent = formatBase(toBase(assetNativeValue(newAsset), assetCurr));
+}
+
+addQtyInput.addEventListener('input', updateAddPreview);
+
+addForm.addEventListener('submit', e => {
+  e.preventDefault();
+  const asset = assets.find(a => a.id === addTargetId);
+  if (!asset) return;
+
+  const amount = parseLocalFloat(addQtyInput.value);
+  if (isNaN(amount) || amount <= 0) {
+    addError.textContent = 'Introduce una cantidad válida mayor que 0.';
+    return;
+  }
+
+  asset.qty = +(asset.qty + amount).toFixed(8);
+  save();
+  render(true);
+  closeAddModal();
+  onPortfolioChange(true);
+});
+
+addClose.addEventListener('click', closeAddModal);
+addOverlay.addEventListener('click', e => {
+  if (e.target === addOverlay) closeAddModal();
+});
+
+// ── Edit Real Estate Modal ──────────────────────────────────
+function openEditRealEstateModal(id) {
+  const asset = assets.find(a => a.id === id);
+  if (!asset || asset.type !== 'real_estate') return;
+
+  // Open modal (resets state), then enter RE mode, then prefill
+  openModal();
+  // Activate the RE filter button visually
+  filterBtns.forEach(b => b.classList.toggle('active', b.dataset.filter === 'real_estate'));
+  enterRealEstateMode();
+
+  // Set edit target
+  reEditTargetId    = id;
+  rePendingCurrency = (asset.assetCurrency || 'EUR').toUpperCase();
+
+  // Prefill name
+  const reNameInput = document.getElementById('reName');
+  if (reNameInput) reNameInput.value = asset.name || '';
+
+  // Prefill value
+  const locale = lang === 'es' ? 'es-ES' : 'en-US';
+  qtyInput.value = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(asset.qty);
+
+  // Prefill rent
+  const reRentInput = document.getElementById('reRent');
+  if (reRentInput) reRentInput.value = asset.rent > 0
+    ? new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(asset.rent)
+    : '';
+
+  // Set currency toggle
+  document.querySelectorAll('.re-curr-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.curr === rePendingCurrency));
+
+  // Update modal title
+  const modalTitle = document.querySelector('#modalOverlay .modal-header h3');
+  if (modalTitle) modalTitle.textContent = t('modalEditRETitle');
+
+  // Trigger qty preview update
+  qtyInput.dispatchEvent(new Event('input'));
+}
+
+// ── Delete / Reduce / Add click dispatcher ─────────────────
+assetsListEl.addEventListener('click', e => {
+  const editREBtn = e.target.closest('.btn-edit-re');
+  if (editREBtn) { openEditRealEstateModal(editREBtn.dataset.id); return; }
+
+  const addBtn = e.target.closest('.btn-add-pos');
+  if (addBtn) { openAddModal(addBtn.dataset.id); return; }
+
+  const reduceBtn = e.target.closest('.btn-reduce');
+  if (reduceBtn) { openReduceModal(reduceBtn.dataset.id); return; }
+
+  const deleteBtn = e.target.closest('.btn-delete');
+  if (deleteBtn) {
+    assets = assets.filter(a => a.id !== deleteBtn.dataset.id);
+    save();
+    render(true);
+    onPortfolioChange(true);
+  }
+});
+
+// ── Base currency toggle ────────────────────────────────────
+document.querySelectorAll('.currency-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    baseCurrency = btn.dataset.currency;
+    localStorage.setItem(BASE_KEY, baseCurrency);
+    document.querySelectorAll('.currency-btn')
+      .forEach(b => b.classList.toggle('active', b.dataset.currency === baseCurrency));
+    render(true);
+    updateChart(true);
+    updateDonut();
+  });
+});
+
+
+// ── Liquidity Modal ────────────────────────────────────────
+const liquidityOverlay  = document.getElementById('liquidityOverlay');
+const liquidityClose    = document.getElementById('liquidityClose');
+const liquidityForm     = document.getElementById('liquidityForm');
+const liquidityQtyInput = document.getElementById('liquidityQty');
+const liquidityCurrIn   = document.getElementById('liquidityCurrency');
+const liqBtns           = document.querySelectorAll('.liq-btn');
+
+// Attach live formatters
+attachFormatter(qtyInput,       true);   // asset qty — allow decimals (e.g. 0.0015 BTC)
+attachFormatter(reduceQtyInput, true);   // reduce qty
+attachFormatter(addQtyInput,    true);   // add to position qty
+
+// Liquidity: direct integer formatter (no decimals, no cursor complexity)
+liquidityQtyInput.addEventListener('input', e => {
+  const digits = e.target.value.replace(/\D/g, '');
+  if (!digits) { e.target.value = ''; return; }
+  e.target.value = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(parseInt(digits, 10));
+});
+
+function openLiquidityModal() {
+  liquidityForm.reset();
+  liquidityCurrIn.value = 'EUR';
+  liqBtns.forEach(b => b.classList.toggle('active', b.dataset.curr === 'EUR'));
+  liquidityOverlay.classList.add('open');
+  setTimeout(() => liquidityQtyInput.focus(), 50);
+}
+
+function closeLiquidityModal() {
+  liquidityOverlay.classList.remove('open');
+}
+
+liqBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    liquidityCurrIn.value = btn.dataset.curr;
+    liqBtns.forEach(b => b.classList.toggle('active', b === btn));
+  });
+});
+
+// ── Real estate currency toggle ─────────────────────────────
+document.querySelectorAll('.re-curr-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    rePendingCurrency = btn.dataset.curr;
+    document.querySelectorAll('.re-curr-btn')
+      .forEach(b => b.classList.toggle('active', b === btn));
+    updatePreview();
+  });
+});
+
+liquidityForm.addEventListener('submit', e => {
+  e.preventDefault();
+  const curr = liquidityCurrIn.value || 'EUR';
+  const qty  = parseLocalFloat(liquidityQtyInput.value);
+  if (isNaN(qty) || qty <= 0) { liquidityQtyInput.focus(); return; }
+
+  const priceInUSD = curr === 'EUR' ? 1 / usdToEur : 1;
+
+  const existingCash = assets.find(a => a.type === 'cash' && a.assetCurrency === curr);
+  if (existingCash) {
+    existingCash.qty   = +(existingCash.qty + qty).toFixed(2);
+    existingCash.price = priceInUSD;
+  } else {
+    assets.push({
+      id:            Date.now().toString(36) + Math.random().toString(36).slice(2),
+      name:          curr === 'EUR' ? 'Euros' : 'Dólares',
+      ticker:        curr === 'EUR' ? '€' : '$',
+      type:          'cash',
+      qty,
+      price:         priceInUSD,
+      coinId:        null,
+      marketSymbol:  null,
+      assetCurrency: curr,
+      change24h:     null,
+      prevPrice:     null,
+    });
+  }
+
+  save();
+  render(true);
+  closeLiquidityModal();
+  onPortfolioChange(true);
+});
+
+liquidityClose.addEventListener('click', closeLiquidityModal);
+liquidityOverlay.addEventListener('click', e => {
+  if (e.target === liquidityOverlay) closeLiquidityModal();
+});
+document.getElementById('btnAddLiquidity').addEventListener('click', openLiquidityModal);
+
+// ── Gold: karat & unit selectors ───────────────────────────
+if (karatGroupEl) {
+  karatGroupEl.querySelectorAll('[data-karat]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pendingKarat = parseInt(btn.dataset.karat, 10);
+      karatGroupEl.querySelectorAll('[data-karat]').forEach(b =>
+        b.classList.toggle('active', b === btn)
+      );
+      updatePreview();
+    });
+  });
+}
+
+if (goldUnitGroupEl) {
+  goldUnitGroupEl.querySelectorAll('[data-unit]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pendingGoldUnit = btn.dataset.unit;
+      goldUnitGroupEl.querySelectorAll('[data-unit]').forEach(b =>
+        b.classList.toggle('active', b === btn)
+      );
+      if (qtyLabelEl) qtyLabelEl.textContent = t('qtyGold')(pendingGoldUnit);
+      updatePreview();
+    });
+  });
+}
+
+// ── Event Listeners ────────────────────────────────────────
+document.getElementById('assetsBackBtn')
+  ?.addEventListener('click', () => setActiveCategory(null));
+btnAdd.addEventListener('click', openModal);
+modalClose.addEventListener('click', closeModal);
+modalOverlay.addEventListener('click', e => {
+  if (e.target === modalOverlay) closeModal();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeModal();
+    closeReduceModal();
+    closeAddModal();
+    closeLiquidityModal();
+  }
+});
+
+// ── Init ───────────────────────────────────────────────────
+// Apply saved base currency to toggle
+document.querySelectorAll('.currency-btn')
+  .forEach(b => b.classList.toggle('active', b.dataset.currency === baseCurrency));
+
+render(true);
+
+// Bootstrap simulated history if this is the first session
+(function bootstrapHistory() {
+  const val = totalValueUSD();
+  if (portfolioHistory.length === 0 && val > 0) {
+    portfolioHistory = generateSimulatedHistory(val);
+    saveHistory();
+  }
+  recordSnapshot(true);
+})();
+
+initChart();
+updateChart();
+initDonut();
+updateDonut();
+
+fetchExchangeRate().then(() => {
+  render();
+  updateChart();
+  updateDonut();
+});
+
+refreshPrices();
+setInterval(refreshPrices, 300_000);        // 5 min — suitable cadence for metals
+setInterval(fetchExchangeRate, 3_600_000);  // 1 h — EUR/USD rate
+setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only update
+
+// ── Sticky header scroll elevation ────────────────────────
+(function initScrollHeader() {
+  const headerEl = document.querySelector('.header');
+  if (!headerEl) return;
+  window.addEventListener('scroll', () => {
+    headerEl.classList.toggle('header--scrolled', window.scrollY > 8);
+  }, { passive: true });
+})();
+
+// ── Language switcher ──────────────────────────────────────
+(function initLangSwitcher() {
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === lang);
+    btn.addEventListener('click', () => switchLang(btn.dataset.lang));
+  });
+  // Apply TYPE_META labels for current lang (HTML is already in ES, only override for EN)
+  applyTypeMetaLabels();
+  if (lang !== 'es') applyI18n();
+})();
