@@ -922,9 +922,23 @@ const fillGradientPlugin = {
     if (!chart.chartArea) return;
     const { ctx, chartArea: { top, bottom } } = chart;
     const grad = ctx.createLinearGradient(0, top, 0, bottom);
-    grad.addColorStop(0, 'rgba(79,142,247,0.20)');
-    grad.addColorStop(1, 'rgba(79,142,247,0.00)');
+    grad.addColorStop(0,   'rgba(79,142,247,0.28)');
+    grad.addColorStop(0.4, 'rgba(79,142,247,0.10)');
+    grad.addColorStop(1,   'rgba(79,142,247,0.00)');
     chart.data.datasets.forEach(ds => { ds.backgroundColor = grad; });
+  }
+};
+
+// Adds a subtle canvas-level glow behind the chart line (GPU accelerated, no DOM overhead)
+const lineGlowPlugin = {
+  id: 'lineGlow',
+  beforeDatasetsDraw(chart) {
+    chart.ctx.save();
+    chart.ctx.shadowColor = 'rgba(79,142,247,0.35)';
+    chart.ctx.shadowBlur  = 6;
+  },
+  afterDatasetsDraw(chart) {
+    chart.ctx.restore();
   }
 };
 
@@ -965,6 +979,7 @@ function initChart() {
           bodyColor: '#e8eaf0',
           padding: 10,
           displayColors: false,
+          animation: { duration: 150 },
           callbacks: {
             label: ctx => ' ' + formatUSD(ctx.raw),
           }
@@ -993,9 +1008,9 @@ function initChart() {
         }
       },
       interaction: { mode: 'index', intersect: false },
-      animation: { duration: 700, easing: 'easeInOutQuart' },
+      animation: { duration: 300, easing: 'easeInOutQuart' },
     },
-    plugins: [fillGradientPlugin],
+    plugins: [fillGradientPlugin, lineGlowPlugin],
   });
 }
 
@@ -1438,16 +1453,88 @@ function getStatusHtml(asset) {
 
 // ── Category navigation ─────────────────────────────────────
 // type = null always clears; same type as active toggles off; different type activates.
+// Orchestrates a cross-fade transition between the category grid and asset list views.
+
+let _catTransitioning = false;
+
+function _animateSectionIn(el) {
+  if (!el || reducedMotion) return;
+  const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+  el.style.opacity   = '0';
+  el.style.transform = 'translateY(10px)';
+  el.style.transition = 'none';
+  void el.getBoundingClientRect(); // force layout before re-enabling transition
+  el.style.transition = `opacity 300ms ${EASE}, transform 300ms ${EASE}`;
+  el.style.opacity   = '1';
+  el.style.transform = 'translateY(0)';
+  setTimeout(() => {
+    el.style.transition = el.style.opacity = el.style.transform = '';
+  }, 360);
+}
+
 function setActiveCategory(type) {
   const next = (type === null || activeCategory === type) ? null : type;
   if (next === activeCategory) return;
-  activeCategory = next;
-  updateCategoryCards();
-  render(true);
-  _applyDonutState();
-  if (activeCategory) {
-    document.getElementById('assetsSection')
+  if (_catTransitioning && !reducedMotion) return; // ignore clicks mid-transition
+
+  const EASE       = 'cubic-bezier(0.22, 1, 0.36, 1)';
+  const isDrilling = next !== null;
+
+  function _commit() {
+    activeCategory = next;
+    updateCategoryCards();
+    render(true);
+    _applyDonutState();
+  }
+
+  // Reduced-motion: instant swap, no animations
+  if (reducedMotion) {
+    _commit();
+    if (next) document.getElementById('assetsSection')
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+
+  _catTransitioning = true;
+
+  if (isDrilling) {
+    // Fade categories out, then show asset list
+    const catSection = document.getElementById('categoriesSection');
+    if (catSection && catSection.style.display !== 'none') {
+      catSection.style.transition = `opacity 200ms ${EASE}, transform 200ms ${EASE}`;
+      catSection.style.opacity    = '0';
+      catSection.style.transform  = 'translateY(-6px) scale(0.98)';
+      setTimeout(() => {
+        catSection.style.transition = catSection.style.opacity = catSection.style.transform = '';
+        _commit();
+        _animateSectionIn(document.getElementById('assetsSection'));
+        document.getElementById('assetsSection')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => { _catTransitioning = false; }, 320);
+      }, 210);
+    } else {
+      _commit();
+      _animateSectionIn(document.getElementById('assetsSection'));
+      setTimeout(() => { _catTransitioning = false; }, 320);
+    }
+  } else {
+    // Fade asset list out, then show category grid
+    const assetsSection = document.getElementById('assetsSection');
+    if (assetsSection && assetsSection.style.display !== 'none') {
+      assetsSection.style.transition = `opacity 180ms ${EASE}, transform 180ms ${EASE}`;
+      assetsSection.style.opacity    = '0';
+      assetsSection.style.transform  = 'translateY(8px)';
+      setTimeout(() => {
+        assetsSection.style.transition = assetsSection.style.opacity = assetsSection.style.transform = '';
+        _commit();
+        _animateSectionIn(document.getElementById('categoriesSection'));
+        setTimeout(() => { _catTransitioning = false; }, 320);
+      }, 190);
+    } else {
+      _commit();
+      _animateSectionIn(document.getElementById('categoriesSection'));
+      setTimeout(() => { _catTransitioning = false; }, 320);
+    }
   }
 }
 
@@ -1524,7 +1611,8 @@ function updateCategoryCards() {
   }
 
   // Fixed ordered list — all 6 categories always rendered, even when empty
-  const ALL_CATEGORIES = ['crypto', 'stock', 'etf', 'metal', 'cash', 'real_estate'];
+  // Row 1: Acciones, Fondos/ETF, Cripto  |  Row 2: Metales, Inmuebles, Liquidez
+  const ALL_CATEGORIES = ['stock', 'etf', 'crypto', 'metal', 'real_estate', 'cash'];
 
   // Build a lookup from _donutDist so we can fill in live values where available
   const distMap = Object.fromEntries((_donutDist || []).map(d => [d.type, d]));
@@ -2871,6 +2959,8 @@ if (goldUnitGroupEl) {
 }
 
 // ── Event Listeners ────────────────────────────────────────
+document.getElementById('logoHome')
+  ?.addEventListener('click', () => setActiveCategory(null));
 document.getElementById('assetsBackBtn')
   ?.addEventListener('click', () => setActiveCategory(null));
 btnAdd.addEventListener('click', openModal);
@@ -3005,8 +3095,8 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   // ── Entrance animation ──────────────────────────────────
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isMobile      = window.innerWidth <= 640;
-  const STEP          = reducedMotion ? 0  : (isMobile ? 50  : 90);
-  const REVEAL_DUR    = reducedMotion ? 0  : (isMobile ? 280 : 500);
+  const STEP          = reducedMotion ? 0  : (isMobile ? 50  : 100);
+  const REVEAL_DUR    = reducedMotion ? 0  : (isMobile ? 280 : 400);
   const appEl         = document.querySelector('.app');
 
   function getDashTargets() {
@@ -3126,7 +3216,7 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
     }
 
     // Categories: section visible instantly, cards stagger in 120ms after chart starts
-    const CARD_EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+    const CARD_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
     setTimeout(() => {
       const catSection = document.getElementById('categoriesSection');
       const grid       = document.getElementById('categoriesGrid');
@@ -3145,15 +3235,15 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
       // Set initial hidden state on all cards before first paint
       cards.forEach(card => {
         card.style.opacity    = '0';
-        card.style.transform  = 'translateY(14px) scale(0.98)';
+        card.style.transform  = 'translateY(12px) scale(0.98)';
         card.style.transition = 'none';
       });
       void grid.getBoundingClientRect();
 
-      // Stagger each card in, then animate its internal visual
+      // Stagger each card in (40ms apart), then animate its internal visual
       cards.forEach((card, i) => {
         setTimeout(() => {
-          card.style.transition = `opacity 420ms ${CARD_EASE}, transform 420ms ${CARD_EASE}`;
+          card.style.transition = `opacity 320ms ${CARD_EASE}, transform 320ms ${CARD_EASE}`;
           card.style.opacity    = '1';
           card.style.transform  = 'translateY(0) scale(1)';
 
@@ -3165,19 +3255,19 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
               visual.style.transform  = 'translateY(8px)';
               visual.style.transition = 'none';
               void visual.getBoundingClientRect();
-              visual.style.transition = `opacity 400ms ${CARD_EASE}, transform 400ms ${CARD_EASE}`;
-              visual.style.opacity    = '0.18';
+              visual.style.transition = `opacity 300ms ${CARD_EASE}, transform 300ms ${CARD_EASE}`;
+              visual.style.opacity    = '0.28';
               visual.style.transform  = 'translateY(0)';
               setTimeout(() => {
                 visual.style.opacity = visual.style.transform = visual.style.transition = '';
-              }, 460);
+              }, 360);
             }
             // Clean up card inline styles so CSS hover can take over
             setTimeout(() => {
               card.style.opacity = card.style.transform = card.style.transition = '';
-            }, 460);
+            }, 360);
           }, 150);
-        }, i * 70);
+        }, i * 40);
       });
     }, 2 * STEP + 120);
   }
