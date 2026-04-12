@@ -3833,3 +3833,60 @@ body.modal-open {
   .asset-card:hover,
   .cat-card:hover { transform: none; border-color: var(--border); }
 }
+
+/* ── Card highlight on add / edit ──────────────────────── */
+@keyframes card-updated-flash {
+  0%   { border-color: rgba(79,142,247,.50); background: rgba(79,142,247,.07); }
+  55%  { border-color: rgba(79,142,247,.20); background: rgba(79,142,247,.03); }
+  100% { border-color: var(--border);        background: var(--bg-card); }
+}
+.asset-card.card--just-updated,
+.detail-asset-row.card--just-updated {
+  animation: card-updated-flash 600ms var(--ease-out) forwards;
+}
+.cat-card.cat-card--just-updated {
+  animation: card-updated-flash 600ms var(--ease-out) forwards;
+}
+
+/* ── Card exit animation on delete ─────────────────────── */
+@keyframes card-exit {
+  0%   { opacity: 1; transform: translateX(0) scale(1); }
+  100% { opacity: 0; transform: translateX(24px) scale(0.97); }
+}
+.asset-card.card--exiting,
+.detail-asset-row.card--exiting {
+  animation: card-exit 200ms var(--ease-premium) forwards;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card--just-updated { animation: none !important; }
+  .card--exiting      { animation: none !important; opacity: 0; }
+}
+
+/* ── Per-asset P&L ──────────────────────────────────────── */
+/* Row 3 of the asset-value grid (desktop); flex child on mobile */
+.asset-pnl {
+  grid-column: 2;
+  grid-row: 3;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  letter-spacing: -.01em;
+}
+.asset-pnl.up   { color: var(--green); }
+.asset-pnl.down { color: var(--red); }
+
+/* Detail row P&L */
+.dar-pnl {
+  font-size: 11px;
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  letter-spacing: -.01em;
+}
+.dar-pnl.up   { color: var(--green); }
+.dar-pnl.down { color: var(--red); }

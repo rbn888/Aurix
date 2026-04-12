@@ -463,6 +463,25 @@ const ASSET_DB = [
 ];
 
 let assets              = load();
+
+// One-time migration: backfill costBasis for existing assets that predate this field.
+// Sets costBasis = qty × price at migration time — P&L starts at 0 and grows honestly.
+(function migrateCostBasis() {
+  let dirty = false;
+  assets.forEach(a => {
+    if (Object.prototype.hasOwnProperty.call(a, 'costBasis')) return;
+    const qty = a.qty || 0, price = a.price || 0;
+    if (a.ticker === 'XAU' && a.karat) {
+      const grams = a.goldUnit === 'oz' ? qty * 31.1035 : qty;
+      a.costBasis = grams * (a.karat / 24) * (price / 31.1035);
+    } else {
+      a.costBasis = qty * price;
+    }
+    dirty = true;
+  });
+  if (dirty) save();
+})();
+
 let pendingCoinId       = null;
 let pendingMarketSymbol = null; // Yahoo Finance symbol for stock/etf/metal
 let pendingPrice        = null; // fetched price for selected asset
@@ -694,6 +713,40 @@ function totalValueUSD() {
 }
 
 function totalValueBase() { return toBase(totalValueUSD(), 'USD'); }
+
+// ── P&L calculations ────────────────────────────────────────
+function assetPnLBase(asset) {
+  if (asset.type === 'cash' || asset.type === 'real_estate') return null;
+  const costBasis = asset.costBasis;
+  if (costBasis == null || costBasis <= 0) return null;
+  const curr = (asset.assetCurrency || 'USD').toUpperCase();
+  const currentNative = assetNativeValue(asset);
+  const pnlNative = currentNative - costBasis;
+  return { abs: toBase(pnlNative, curr), pct: (pnlNative / costBasis) * 100 };
+}
+
+function totalCostBasisBase() {
+  return assets.reduce((sum, a) => {
+    if (a.type === 'cash' || a.type === 'real_estate') return sum;
+    const curr = (a.assetCurrency || 'USD').toUpperCase();
+    return sum + toBase(a.costBasis || 0, curr);
+  }, 0);
+}
+
+function computeRangePnL(range) {
+  const currentBase = totalValueBase();
+  if (currentBase <= 0 || assets.length === 0) return null;
+  if (range === 'all') {
+    const invested = totalCostBasisBase();
+    if (invested <= 0) return null;
+    return { abs: currentBase - invested, pct: ((currentBase - invested) / invested) * 100 };
+  }
+  const data = getChartData(range);
+  if (!data || data.values.length < 2) return null;
+  const past = data.values[0];
+  if (past <= 0) return null;
+  return { abs: currentBase - past, pct: ((currentBase - past) / past) * 100 };
+}
 
 function formatQty(n) {
   const abs = Math.abs(n);
@@ -1206,7 +1259,7 @@ function updateChart(animate = false) {
 
 function onPortfolioChange(force = false) {
   recordSnapshot(force);
-  updateChart();
+  updateChart(force);   // animate chart when user makes a change
   updateDonut();
 }
 
@@ -1216,6 +1269,7 @@ document.querySelectorAll('.range-btn').forEach(btn => {
     btn.classList.add('active');
     activeRange = btn.dataset.range;
     updateChart(true);
+    updatePerformance();
   });
 });
 
@@ -1762,6 +1816,32 @@ function _animateSectionIn(el) {
   }, 360);
 }
 
+// Brief border+background flash on the card that was just added or edited
+function _flashAssetCard(id) {
+  if (!id || reducedMotion) return;
+  requestAnimationFrame(() => {
+    const card = assetsListEl.querySelector(`[data-asset-id="${id}"]`);
+    if (!card) return;
+    card.classList.remove('card--just-updated');
+    void card.offsetWidth; // restart if called twice rapidly
+    card.classList.add('card--just-updated');
+    setTimeout(() => card.classList.remove('card--just-updated'), 650);
+  });
+}
+
+// Brief flash on the matching category card (only when on the dashboard)
+function _flashCategoryCard(type) {
+  if (!type || reducedMotion || activeCategory) return;
+  requestAnimationFrame(() => {
+    const catCard = document.querySelector(`.cat-card[data-type="${type}"]`);
+    if (!catCard) return;
+    catCard.classList.remove('cat-card--just-updated');
+    void catCard.offsetWidth;
+    catCard.classList.add('cat-card--just-updated');
+    setTimeout(() => catCard.classList.remove('cat-card--just-updated'), 650);
+  });
+}
+
 function setActiveCategory(type) {
   const next = (type === null || activeCategory === type) ? null : type;
   if (next === activeCategory) return;
@@ -2065,28 +2145,22 @@ function updateCategoryCards() {
 // ── Performance display ─────────────────────────────────────
 function updatePerformance() {
   if (!summaryPerfEl) return;
-  if (portfolioHistory.length < 2 || assets.length === 0) {
-    summaryPerfEl.style.display = 'none';
-    return;
-  }
-  const currentBase  = totalValueBase();
-  const initialBase  = toBase(portfolioHistory[0].value, 'USD');
-  if (initialBase <= 0) { summaryPerfEl.style.display = 'none'; return; }
+  if (assets.length === 0) { summaryPerfEl.style.display = 'none'; return; }
 
-  const absChange = currentBase - initialBase;
-  const pctChange = (absChange / initialBase) * 100;
+  let result = computeRangePnL(activeRange);
+  if (!result && activeRange !== 'all') result = computeRangePnL('all'); // fallback to cost basis
+  if (!result) { summaryPerfEl.style.display = 'none'; return; }
 
+  const { abs, pct } = result;
+  const isPos  = abs >= 0;
+  const sign   = isPos ? '+' : '−';
   const locale = lang === 'es' ? 'es-ES' : 'en-US';
   const pctStr = new Intl.NumberFormat(locale, {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  }).format(Math.abs(pctChange));
+    minimumFractionDigits: 1, maximumFractionDigits: 1,
+  }).format(Math.abs(pct));
 
-  const sign   = absChange >= 0 ? '+' : '−';
-  const absStr = formatBase(Math.abs(absChange));
-
-  summaryPerfEl.textContent = `${sign}${pctStr}% (${sign}${absStr})`;
-  summaryPerfEl.className   = `summary-perf ${absChange >= 0 ? 'positive' : 'negative'}`;
+  summaryPerfEl.textContent = `${sign}${formatBase(Math.abs(abs))} (${sign}${pctStr}%)`;
+  summaryPerfEl.className   = `summary-perf ${isPos ? 'positive' : 'negative'}`;
   summaryPerfEl.style.display = '';
 }
 
@@ -2422,6 +2496,15 @@ function render(animate = false) {
 
     const statusHtml = getStatusHtml(asset);
 
+    // Per-asset P&L
+    const pnlData = assetPnLBase(asset);
+    let pnlHtml = '';
+    if (pnlData) {
+      const pSign = pnlData.abs >= 0 ? '+' : '−';
+      const pCls  = pnlData.abs >= 0 ? 'up' : 'down';
+      pnlHtml = `<span class="asset-pnl ${pCls}">${pSign}${formatBase(Math.abs(pnlData.abs))} (${pSign}${Math.abs(pnlData.pct).toFixed(1)}%)</span>`;
+    }
+
     const actionsHtml = isRE
       ? `<button class="btn-edit-re" title="${t('btnEdit')}" data-id="${asset.id}">✎</button>
          <button class="btn-delete"  title="${t('btnDelete')}" data-id="${asset.id}">✕</button>`
@@ -2455,8 +2538,9 @@ function render(animate = false) {
       const darSubHtml = `<span class="dar-qty">${escHtml(subParts.join(' · '))}</span>${darRentHtml}`;
 
       const row = document.createElement('div');
-      row.className = 'detail-asset-row';
-      row.dataset.type = asset.type;
+      row.className    = 'detail-asset-row';
+      row.dataset.type    = asset.type;
+      row.dataset.assetId = asset.id;
       row.innerHTML = `
         <div class="dar-badge ${asset.type}">${badgeText}</div>
         <div class="dar-info">
@@ -2466,6 +2550,7 @@ function render(animate = false) {
         <div class="dar-right">
           <div class="dar-value ${flashClass}"${prevValueBase != null ? ` data-from="${prevValueBase.toFixed(6)}" data-to="${valueBase.toFixed(6)}"` : ''}>${formatBase(valueBase)}</div>
           ${darChangeHtml}
+          ${pnlData ? `<span class="dar-pnl ${pnlData.abs >= 0 ? 'up' : 'down'}">${pnlData.abs >= 0 ? '+' : '−'}${formatBase(Math.abs(pnlData.abs))} (${pnlData.abs >= 0 ? '+' : '−'}${Math.abs(pnlData.pct).toFixed(1)}%)</span>` : ''}
           <div class="dar-actions">${actionsHtml}</div>
         </div>
         <div class="asset-edit-strip dar-strip" id="aes-${asset.id}">
@@ -2490,8 +2575,9 @@ function render(animate = false) {
 
     // ── Standard asset card (dashboard / all-assets view) ────
     const card = document.createElement('div');
-    card.className = 'asset-card';
-    card.dataset.type = asset.type;
+    card.className    = 'asset-card';
+    card.dataset.type    = asset.type;
+    card.dataset.assetId = asset.id;
     card.innerHTML = `
       <div class="asset-badge ${asset.type}">${badgeText}</div>
       <div class="asset-info">
@@ -2502,6 +2588,7 @@ function render(animate = false) {
       <div class="asset-value">
         <div class="asset-value-amount ${flashClass}"${prevValueBase != null ? ` data-from="${prevValueBase.toFixed(6)}" data-to="${valueBase.toFixed(6)}"` : ''}>${formatBase(valueBase)}</div>
         <div class="asset-value-sub">${subLineHtml}</div>
+        ${pnlHtml}
       </div>
       <div class="asset-actions">
         ${actionsHtml}
@@ -3370,6 +3457,7 @@ assetForm.addEventListener('submit', e => {
     const rent = parseLocalFloat(document.getElementById('reRent')?.value) || 0;
     const ticker = name.replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase() || 'INMU';
 
+    let reFlashId = reEditTargetId;
     if (reEditTargetId) {
       // Edit existing real estate asset
       const existing = assets.find(a => a.id === reEditTargetId);
@@ -3379,10 +3467,12 @@ assetForm.addEventListener('submit', e => {
         existing.qty           = value;
         existing.rent          = rent;
         existing.assetCurrency = rePendingCurrency;
+        existing.costBasis     = value;
       }
     } else {
+      reFlashId = Date.now().toString(36) + Math.random().toString(36).slice(2);
       assets.push({
-        id:            Date.now().toString(36) + Math.random().toString(36).slice(2),
+        id:            reFlashId,
         name,
         ticker,
         type:          'real_estate',
@@ -3394,11 +3484,14 @@ assetForm.addEventListener('submit', e => {
         change24h:     null,
         prevPrice:     null,
         rent,
+        costBasis:     value,
       });
     }
     save();
     render(true);
     closeModal();
+    _flashAssetCard(reFlashId);
+    _flashCategoryCard('real_estate');
     onPortfolioChange(true);
     return;
   }
@@ -3420,15 +3513,19 @@ assetForm.addEventListener('submit', e => {
       ? assets.find(a => a.isin === isinVal)
       : assets.find(a => a.ticker.toUpperCase() === ticker && a.type === manualAssetType);
 
+    let manualFlashId = existing?.id;
     if (existing) {
+      const manualAddedCost = qty * (price > 0 ? price : existing.price || 0);
+      existing.costBasis = (existing.costBasis || existing.qty * (existing.price || 0)) + manualAddedCost;
       existing.qty = +(existing.qty + qty).toFixed(8);
       if (price > 0) existing.price = price;
       // Backfill symbols if a lookup ran after the original save
       if (manualPendingSymbol  && !existing.marketSymbol) existing.marketSymbol = manualPendingSymbol;
       if (manualPendingCoinId  && !existing.coinId)       existing.coinId       = manualPendingCoinId;
     } else {
+      manualFlashId = Date.now().toString(36) + Math.random().toString(36).slice(2);
       assets.push({
-        id:            Date.now().toString(36) + Math.random().toString(36).slice(2),
+        id:            manualFlashId,
         name:          nameVal,
         ticker,
         type:          manualAssetType,
@@ -3440,11 +3537,14 @@ assetForm.addEventListener('submit', e => {
         assetCurrency: manualCurrency,
         change24h:     null,
         prevPrice:     null,
+        costBasis:     qty * (price > 0 ? price : 1),
       });
     }
     save();
     render(true);
     closeModal();
+    _flashAssetCard(manualFlashId);
+    _flashCategoryCard(manualAssetType);
     onPortfolioChange(true);
     return;
   }
@@ -3473,7 +3573,14 @@ assetForm.addEventListener('submit', e => {
     return a.ticker.toUpperCase() === ticker.toUpperCase() && a.type === type;
   });
 
+  // Cost basis for this purchase (in asset's native USD)
+  const newPurchaseCost = isGoldAsset
+    ? (() => { const g = pendingGoldUnit === 'oz' ? qty * 31.1035 : qty; return g * (pendingKarat / 24) * (pendingPrice / 31.1035); })()
+    : qty * pendingPrice;
+
+  let normalFlashId = existing?.id;
   if (existing) {
+    existing.costBasis = (existing.costBasis || assetNativeValue(existing)) + newPurchaseCost;
     existing.qty    = +(existing.qty + qty).toFixed(8);
     existing.price  = pendingPrice;
   } else {
@@ -3482,14 +3589,16 @@ assetForm.addEventListener('submit', e => {
       const fb = getFallbackData(marketSymbol);
       if (fb) initialChange24h = fb.change24h;
     }
+    normalFlashId = Date.now().toString(36) + Math.random().toString(36).slice(2);
     assets.push({
-      id:            Date.now().toString(36) + Math.random().toString(36).slice(2),
+      id:            normalFlashId,
       name, ticker, type, qty,
       price:         pendingPrice,
       coinId, marketSymbol,
       assetCurrency: 'USD',
       change24h:     initialChange24h,
       prevPrice:     null,
+      costBasis:     newPurchaseCost,
       ...(isGoldAsset ? { karat, goldUnit } : {}),
     });
   }
@@ -3497,6 +3606,8 @@ assetForm.addEventListener('submit', e => {
   save();
   render(true);
   closeModal();
+  _flashAssetCard(normalFlashId);
+  _flashCategoryCard(type);
   onPortfolioChange(true);
 });
 
@@ -3593,16 +3704,21 @@ reduceForm.addEventListener('submit', e => {
     return;
   }
 
-  const remaining = asset.qty - amount;
-  if (remaining === 0) {
+  const remaining  = asset.qty - amount;
+  const wasRemoved = remaining === 0;
+  const reduceType = asset.type;
+  if (wasRemoved) {
     assets = assets.filter(a => a.id !== reduceTargetId);
   } else {
+    if (asset.costBasis && asset.qty > 0) asset.costBasis *= remaining / asset.qty;
     asset.qty = remaining;
   }
 
   save();
   render(true);
   closeReduceModal();
+  if (!wasRemoved) _flashAssetCard(reduceTargetId);
+  _flashCategoryCard(reduceType);
   onPortfolioChange(true);
 });
 
@@ -3705,10 +3821,16 @@ addForm.addEventListener('submit', e => {
     return;
   }
 
+  const addedCostNative = assetNativeValue({ ...asset, qty: amount });
+  asset.costBasis = (asset.costBasis || assetNativeValue(asset)) + addedCostNative;
   asset.qty = +(asset.qty + amount).toFixed(8);
+  const addFlashId   = asset.id;
+  const addFlashType = asset.type;
   save();
   render(true);
   closeAddModal();
+  _flashAssetCard(addFlashId);
+  _flashCategoryCard(addFlashType);
   onPortfolioChange(true);
 });
 
@@ -3870,6 +3992,7 @@ function applyInlineEdit(id) {
     return;
   }
 
+  let inlineWasRemoved = false;
   if (_inlineEditMode === 'reduce') {
     const isGold = asset.ticker === 'XAU' && asset.karat;
     if (amount > asset.qty) {
@@ -3880,17 +4003,24 @@ function applyInlineEdit(id) {
     }
     const remaining = asset.qty - amount;
     if (remaining === 0) {
+      inlineWasRemoved = true;
       assets = assets.filter(a => a.id !== id);
     } else {
+      if (asset.costBasis && asset.qty > 0) asset.costBasis *= remaining / asset.qty;
       asset.qty = remaining;
     }
   } else {
+    const inlineAddedCost = assetNativeValue({ ...asset, qty: amount });
+    asset.costBasis = (asset.costBasis || assetNativeValue(asset)) + inlineAddedCost;
     asset.qty += amount;
   }
 
+  const inlineType = asset.type;
   closeInlineEdit();
   save();
   render(true);
+  if (!inlineWasRemoved) _flashAssetCard(id);
+  _flashCategoryCard(inlineType);
   onPortfolioChange(true);
 }
 
@@ -3923,11 +4053,27 @@ assetsListEl.addEventListener('click', e => {
 
   const deleteBtn = e.target.closest('.btn-delete');
   if (deleteBtn) {
-    if (_inlineEditId === deleteBtn.dataset.id) closeInlineEdit();
-    assets = assets.filter(a => a.id !== deleteBtn.dataset.id);
-    save();
-    render(true);
-    onPortfolioChange(true);
+    const delId   = deleteBtn.dataset.id;
+    const delType = assets.find(a => a.id === delId)?.type;
+    if (_inlineEditId === delId) closeInlineEdit();
+
+    const delCard = assetsListEl.querySelector(`[data-asset-id="${delId}"]`);
+    if (delCard && !reducedMotion) {
+      delCard.classList.add('card--exiting');
+      setTimeout(() => {
+        assets = assets.filter(a => a.id !== delId);
+        save();
+        render(true);
+        _flashCategoryCard(delType);
+        onPortfolioChange(true);
+      }, 200);
+    } else {
+      assets = assets.filter(a => a.id !== delId);
+      save();
+      render(true);
+      _flashCategoryCard(delType);
+      onPortfolioChange(true);
+    }
   }
 });
 
