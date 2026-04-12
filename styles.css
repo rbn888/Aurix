@@ -3584,3 +3584,139 @@ body.modal-open {
   .cat-card::before               { animation: none; }
   .cc-glyph--primary              { animation: none; }
 }
+
+/* ── Inline Asset Edit Strip ───────────────────────────── */
+.asset-edit-strip {
+  grid-column: 1 / -1;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 240ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.asset-edit-strip.aes-open {
+  max-height: 80px;
+}
+
+/* Compact version inside detail-asset-row */
+.asset-edit-strip.dar-strip {
+  grid-column: 1 / -1;
+}
+
+.aes-body {
+  padding: 10px 0 2px;
+  border-top: 1px solid rgba(255,255,255,.07);
+  margin-top: 10px;
+}
+
+.aes-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.aes-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.aes-qty-input {
+  width: 100px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 7px;
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-bright);
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease-premium),
+              background var(--dur-fast) var(--ease-premium);
+  flex-shrink: 0;
+}
+.aes-qty-input:focus {
+  border-color: rgba(79,142,247,.55);
+  background: rgba(79,142,247,.07);
+}
+
+.aes-preview {
+  flex: 1;
+  font-size: 12px;
+  color: var(--green);
+  font-weight: 500;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.aes-preview.aes-preview--remove {
+  color: var(--red);
+}
+
+.aes-confirm-btn,
+.aes-cancel-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.05);
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--dur-fast) var(--ease-premium),
+              color var(--dur-fast) var(--ease-premium),
+              border-color var(--dur-fast) var(--ease-premium),
+              transform var(--dur-tap) var(--ease-premium);
+  flex-shrink: 0;
+}
+.aes-confirm-btn:hover {
+  background: rgba(39,199,104,.12);
+  color: var(--green);
+  border-color: rgba(39,199,104,.30);
+}
+.aes-cancel-btn:hover {
+  background: rgba(232,69,69,.08);
+  color: var(--red);
+  border-color: rgba(232,69,69,.25);
+}
+.aes-confirm-btn:active,
+.aes-cancel-btn:active {
+  transform: scale(.88);
+}
+
+.aes-error {
+  font-size: 11px;
+  color: var(--red);
+  margin-top: 5px;
+  min-height: 0;
+}
+.aes-error:empty { margin-top: 0; }
+
+/* Shake animation for validation errors */
+@keyframes aes-shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-5px); }
+  40%       { transform: translateX(5px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
+}
+.aes-shake { animation: aes-shake 420ms var(--ease-premium) both; }
+
+/* Card state when edit strip is open */
+.card--editing {
+  border-color: rgba(79,142,247,.25) !important;
+  box-shadow: 0 0 0 1px rgba(79,142,247,.12), 0 8px 28px rgba(0,0,0,.45) !important;
+}
+
+@media (max-width: 520px) {
+  .aes-qty-input { width: 90px; }
+  .aes-label     { font-size: 10px; }
+  .aes-preview   { font-size: 11px; }
+}
