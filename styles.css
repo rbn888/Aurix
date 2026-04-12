@@ -1635,6 +1635,33 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
 .cat-card:hover .cc-vis--cash       { opacity: 0.66; transform: scale(1.02); }
 .cat-card:hover .cc-vis--realestate { opacity: 0.70; filter: brightness(1.2); }
 
+/* ── Card ambient glow: breathing radial per category ────── */
+/* Each card has a category-colored gradient that pulses slowly.
+   --vi (set by JS) offsets the phase so cards don't breathe in sync. */
+@keyframes cc-card-glow {
+  0%, 100% { opacity: 0.28; }
+  50%       { opacity: 1.00; }
+}
+.cat-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  animation: cc-card-glow 5s ease-in-out infinite;
+  animation-delay: calc(var(--vi, 0) * -0.85s);
+  will-change: opacity;
+}
+.cat-card[data-type="crypto"]::before      { background: radial-gradient(ellipse at 80% 48%, rgba(79,142,247,.10)  0%, transparent 65%); }
+.cat-card[data-type="stock"]::before       { background: radial-gradient(ellipse at 80% 48%, rgba(192,200,216,.07) 0%, transparent 65%); }
+.cat-card[data-type="etf"]::before         { background: radial-gradient(ellipse at 80% 48%, rgba(143,157,186,.07) 0%, transparent 65%); }
+.cat-card[data-type="metal"]::before       { background: radial-gradient(ellipse at 80% 48%, rgba(212,168,67,.10)  0%, transparent 65%); }
+.cat-card[data-type="real_estate"]::before { background: radial-gradient(ellipse at 80% 48%, rgba(167,139,250,.10) 0%, transparent 65%); }
+.cat-card[data-type="cash"]::before        { background: radial-gradient(ellipse at 80% 48%, rgba(74,222,128,.08)  0%, transparent 65%); }
+/* Empty cards: suppress the glow — no assets, no signal */
+.cat-card--empty::before { animation: none; opacity: 0.08; }
+
 /* ── Crypto: signal ring ────────────────────────────────── */
 @keyframes crypto-signal {
   0%   { transform: translate(-50%,-50%) scale(.4); opacity: .7; }
@@ -1684,6 +1711,11 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
   user-select: none;
   color: #5b9cf6;
 }
+/* Primary glyph breathe */
+@keyframes cc-glyph-breathe {
+  0%, 100% { opacity: 0.06; transform: translateY(-50%) scale(1);    }
+  50%       { opacity: 0.11; transform: translateY(-50%) scale(1.04); }
+}
 /* Primary: large centered watermark, right column */
 .cc-glyph--primary {
   top: 44%;
@@ -1691,6 +1723,8 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
   font-size: 52px;
   opacity: 0.08;
   transform: translateY(-50%);
+  animation: cc-glyph-breathe 4.5s ease-in-out infinite;
+  will-change: opacity, transform;
 }
 /* Secondary: smaller, upper-left of visual zone */
 .cc-glyph--secondary {
@@ -1795,6 +1829,7 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
   height: var(--bh, 40px);
   border-radius: 2px 2px 0 0;
   background: linear-gradient(180deg, #c4b5fd 0%, #7c3aed 60%, #5b21b6 100%);
+  transform-origin: bottom center;
   animation: cc-bldg-pulse 3.2s ease-in-out infinite;
   will-change: opacity, filter;
 }
@@ -3389,4 +3424,6 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
 
 @media (prefers-reduced-motion: reduce) {
   .detail-asset-row.dar-entering { animation: none; }
+  .cat-card::before               { animation: none; }
+  .cc-glyph--primary              { animation: none; }
 }

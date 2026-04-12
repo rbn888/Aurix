@@ -1809,6 +1809,11 @@ function updateCategoryCards() {
     </button>`;
   }).join('');
 
+  // Phase-offset each card's ambient glow so they don't pulse in sync
+  grid.querySelectorAll('.cat-card').forEach((btn, i) => {
+    btn.style.setProperty('--vi', i);
+  });
+
   grid.querySelectorAll('.cat-card').forEach(btn => {
     let _tapOk = false;
 
