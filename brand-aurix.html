@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AURIX — Brand Identity System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    /* ── Tokens ────────────────────────────────────────────── */
+    :root {
+      --black:       #0B0B0B;
+      --white:       #FFFFFF;
+      --gold:        #C6A85B;
+      --gold-dim:    rgba(198,168,91,0.12);
+      --surface:     #141414;
+      --surface-2:   #1C1C1C;
+      --border:      #242424;
+      --border-hi:   #303030;
+      --muted:       #6A6A6A;
+      --dim:         #3A3A3A;
+      --font:        'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+    }
+
+    /* ── Base ──────────────────────────────────────────────── */
+    html, body {
+      font-family: var(--font);
+      background: var(--black);
+      color: var(--white);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      font-feature-settings: 'cv11', 'ss01';
+    }
+
+    /* ── Section Shell ─────────────────────────────────────── */
+    .section {
+      padding: 100px 80px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    .section--light {
+      background: var(--white);
+      color: var(--black);
+      border-bottom: 1px solid #E0E0E0;
+    }
+    .section--surface {
+      background: var(--surface);
+    }
+
+    /* ── Section Label ─────────────────────────────────────── */
+    .section-label {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 72px;
+    }
+    .label-num {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      color: var(--gold);
+      text-transform: uppercase;
+    }
+    .label-rule {
+      flex: 0 0 32px;
+      height: 1px;
+      background: var(--border-hi);
+    }
+    .label-text {
+      font-size: 10px;
+      font-weight: 400;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .section--light .label-rule  { background: #D0D0D0; }
+    .section--light .label-text  { color: #909090; }
+
+    /* ── AURIX WORDMARK SVG ────────────────────────────────── */
+    /*
+       X geometry:
+       • ViewBox  88 × 108  (width × height in design units)
+       • Two parallelograms, each representing one diagonal arm
+       • Terminals are precision-cut at 38° — matching the arm angle
+       • Stroke weight: 13 design units (~12% of cap height)
+       • Form is 15% wider than a standard geometric X for authority
+
+       D1 (top-right → bottom-left):  78,0  88,8  10,108  0,100
+       D2 (top-left  → bottom-right):  0,8  10,0  88,100  78,108
+    */
+
+    /* ── Wordmark sizing & alignment ──────────────────────── */
+    .wm-wrap {
+      display: inline-flex;
+      align-items: baseline;
+      line-height: 1;
+    }
+    .wm-text {
+      font-family: var(--font);
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      line-height: 1;
+      font-feature-settings: 'ss01', 'cv11';
+      display: inline-block;
+    }
+    /* The X SVG — sized to cap-height, margin matches letter-spacing */
+    .wm-x {
+      display: inline-block;
+      height: 0.727em;   /* Inter cap-height / em ratio */
+      width: auto;
+      margin-left: 0.07em; /* optical gap to match tracking */
+      flex-shrink: 0;
+    }
+    /* Version modifiers */
+    .wm--hero   { font-size: 96px; }
+    .wm--large  { font-size: 64px; }
+    .wm--medium { font-size: 48px; }
+    .wm--small  { font-size: 32px; }
+    .wm--xs     { font-size: 20px; }
+
+    /* ── Hero section ──────────────────────────────────────── */
+    .hero {
+      min-height: 520px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 120px 80px;
+    }
+    .hero-sup {
+      font-size: 11px;
+      font-weight: 400;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 52px;
+    }
+    .hero-sub {
+      margin-top: 48px;
+      font-size: 13px;
+      font-weight: 300;
+      letter-spacing: 0.08em;
+      color: var(--dim);
+      line-height: 1.6;
+      max-width: 480px;
+    }
+    .hero-sub em {
+      font-style: normal;
+      color: var(--gold);
+    }
+
+    /* ── Construction / anatomy section ───────────────────── */
+    .anatomy-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+    }
+    .anatomy-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 48px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 28px;
+    }
+    .anatomy-card--full {
+      grid-column: 1 / -1;
+    }
+    .anatomy-card-label {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    /* Construction: the X with annotation guides */
+    .x-construction {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 40px 0;
+    }
+    .x-construction svg { overflow: visible; }
+
+    /* Spec table */
+    .spec-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .spec-table td {
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .spec-table td:first-child {
+      color: var(--muted);
+      font-weight: 400;
+      letter-spacing: 0.04em;
+      width: 40%;
+    }
+    .spec-table td:last-child {
+      color: var(--white);
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+    .spec-table tr:last-child td { border-bottom: none; }
+
+    /* ── Color system ──────────────────────────────────────── */
+    .colors-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+    }
+    .color-card {
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .color-swatch {
+      height: 120px;
+    }
+    .color-info {
+      padding: 16px;
+      background: var(--surface);
+    }
+    .color-name {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+    .color-hex {
+      font-size: 11px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.06em;
+    }
+    .color-role {
+      font-size: 10px;
+      color: var(--dim);
+      margin-top: 6px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    /* ── App Icon ──────────────────────────────────────────── */
+    .icon-grid {
+      display: flex;
+      align-items: flex-end;
+      gap: 32px;
+      flex-wrap: wrap;
+    }
+    .icon-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .icon-item-label {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    /* App icon container */
+    .app-icon {
+      background: var(--black);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .app-icon--1024 { width: 160px; height: 160px; border-radius: 36px; }
+    .app-icon--512  { width: 96px;  height: 96px;  border-radius: 22px; }
+    .app-icon--256  { width: 64px;  height: 64px;  border-radius: 14px; }
+    .app-icon--64   { width: 40px;  height: 40px;  border-radius: 9px;  }
+    .app-icon--32   { width: 24px;  height: 24px;  border-radius: 5px;  }
+    .app-icon--16   { width: 16px;  height: 16px;  border-radius: 3px;  }
+    /* Light bg icon version */
+    .app-icon--light { background: var(--white); border: 1px solid #E8E8E8; }
+
+    /* Gold accent icon */
+    .app-icon--gold { background: var(--gold); }
+
+    /* ── Typography system ─────────────────────────────────── */
+    .type-scale {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .type-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 28px 0;
+      border-bottom: 1px solid var(--border);
+      gap: 24px;
+    }
+    .type-row:last-child { border-bottom: none; }
+    .type-sample {
+      font-family: var(--font);
+      color: var(--white);
+      flex: 1;
+      line-height: 1.1;
+    }
+    .type-meta {
+      flex-shrink: 0;
+      text-align: right;
+    }
+    .type-meta-name {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .type-meta-spec {
+      font-size: 11px;
+      color: var(--dim);
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Usage examples ────────────────────────────────────── */
+    .usage-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .mockup {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    /* Card mockup */
+    .mockup-card {
+      padding: 36px;
+      min-height: 220px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .mockup-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .mockup-card-chip {
+      width: 32px;
+      height: 24px;
+      background: var(--gold);
+      border-radius: 4px;
+      opacity: 0.7;
+    }
+    .mockup-card-balance {
+      margin-top: 32px;
+    }
+    .mockup-card-label {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .mockup-card-value {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+    }
+    .mockup-card-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    /* Header mockup */
+    .mockup-header {
+      padding: 0 28px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .mockup-nav {
+      display: flex;
+      gap: 28px;
+    }
+    .mockup-nav span {
+      font-size: 12px;
+      color: var(--muted);
+      cursor: default;
+      letter-spacing: 0.04em;
+    }
+    .mockup-nav span.active {
+      color: var(--white);
+      font-weight: 500;
+    }
+    .mockup-body {
+      padding: 32px 28px;
+    }
+    .mockup-stat-row {
+      display: flex;
+      gap: 24px;
+      margin-top: 20px;
+    }
+    .mockup-stat {
+      flex: 1;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .mockup-stat-label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+    }
+    .mockup-stat-val {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      font-variant-numeric: tabular-nums;
+    }
+    .mockup-stat-chg {
+      font-size: 11px;
+      color: #4AC97E;
+      margin-top: 3px;
+    }
+
+    /* ── Utility ────────────────────────────────────────────── */
+    .tag {
+      display: inline-block;
+      padding: 5px 10px;
+      border: 1px solid var(--border-hi);
+      border-radius: 100px;
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .tag--gold { border-color: rgba(198,168,91,0.3); color: var(--gold); }
+
+    .note {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+      letter-spacing: 0.02em;
+    }
+    .gold { color: var(--gold); }
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 40px 0;
+    }
+    .flex-row  { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .flex-col  { display: flex; flex-direction: column; gap: 16px; }
+    .spacer-sm { height: 24px; }
+    .spacer    { height: 40px; }
+
+    /* ── Footer ────────────────────────────────────────────── */
+    .brand-footer {
+      padding: 48px 80px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: none;
+    }
+    .brand-footer .note { color: var(--dim); }
+
+    /* ── RESPONSIVE ─────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .section, .hero, .brand-footer { padding-left: 32px; padding-right: 32px; }
+      .anatomy-grid, .colors-grid, .usage-grid { grid-template-columns: 1fr; }
+      .anatomy-card--full { grid-column: 1; }
+      .wm--hero   { font-size: 56px; }
+      .wm--large  { font-size: 40px; }
+    }
+    @media (max-width: 600px) {
+      .section, .hero, .brand-footer { padding-left: 24px; padding-right: 24px; }
+      .wm--hero   { font-size: 36px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════════════════════════
+       HERO — Primary wordmark, dark
+  ═══════════════════════════════════════════════════════════ -->
+  <section class="hero">
+    <p class="hero-sup">Brand Identity System · 2025</p>
+
+    <div class="wm-wrap wm--hero" style="color:#fff;">
+      <span class="wm-text">AURI</span>
+      <!-- Custom X — precise 38° geometry, 13-unit stroke weight -->
+      <svg class="wm-x" viewBox="0 0 88 108" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <polygon points="78,0 88,8 10,108 0,100"  fill="currentColor"/>
+        <polygon points="0,8  10,0 88,100 78,108" fill="currentColor"/>
+      </svg>
+    </div>
+
+    <p class="hero-sub">
+      Next-generation financial operating system.<br>
+      <em>Wealth. Control. Long-term value.</em>
+    </p>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════
+       01 — WORDMARK ANATOMY
+  ═══════════════════════════════════════════════════════════ -->
+  <section class="section">
+    <div class="section-label">
+      <span class="label-num">01</span>
+      <div class="label-rule"></div>
+      <span class="label-text">Wordmark Anatomy</span>
+    </div>
+
+    <div class="anatomy-grid">
+
+      <!-- X Construction diagram -->
+      <div class="anatomy-card anatomy-card--full">
+        <span class="anatomy-card-label">Custom X — Construction</span>
+        <div class="x-construction">
+          <svg viewBox="-60 -30 260 170" width="420" height="210"
+               xmlns="http://www.w3.org/2000/svg" style="overflow:visible;">
+
+            <!-- Bounding box guide -->
+            <rect x="0" y="0" width="88" height="108"
+                  fill="none" stroke="#282828" stroke-width="0.6" stroke-dasharray="3,3"/>
+
+            <!-- Center point guides -->
+            <line x1="44" y1="-18" x2="44" y2="126"
+                  stroke="#282828" stroke-width="0.5" stroke-dasharray="2,3"/>
+            <line x1="-18" y1="54" x2="106" y2="54"
+                  stroke="#282828" stroke-width="0.5" stroke-dasharray="2,3"/>
+
+            <!-- Angle arc at top-right -->
+            <path d="M 68,0 A 20,20 0 0 0 78,10"
+                  fill="none" stroke="#3A3A3A" stroke-width="0.7"/>
+            <text x="69" y="-4" font-family="Inter,system-ui" font-size="7"
+                  fill="#6A6A6A" letter-spacing="0">38°</text>
+
+            <!-- The X polygons -->
+            <polygon points="78,0 88,8 10,108 0,100"  fill="white"/>
+            <polygon points="0,8  10,0 88,100 78,108" fill="white"/>
+
+            <!-- Stroke-weight annotation -->
+            <line x1="106" y1="46" x2="106" y2="62"
+                  stroke="#C6A85B" stroke-width="0.7"/>
+            <line x1="104" y1="46" x2="108" y2="46" stroke="#C6A85B" stroke-width="0.7"/>
+            <line x1="104" y1="62" x2="108" y2="62" stroke="#C6A85B" stroke-width="0.7"/>
+            <text x="110" y="57" font-family="Inter,system-ui" font-size="7"
+                  fill="#C6A85B" letter-spacing="0">13 u</text>
+
+            <!-- Width annotation -->
+            <line x1="0" y1="126" x2="88" y2="126"
+                  stroke="#C6A85B" stroke-width="0.7"/>
+            <line x1="0"  y1="123" x2="0"  y2="129" stroke="#C6A85B" stroke-width="0.7"/>
+            <line x1="88" y1="123" x2="88" y2="129" stroke="#C6A85B" stroke-width="0.7"/>
+            <text x="28" y="138" font-family="Inter,system-ui" font-size="7"
+                  fill="#C6A85B" letter-spacing="0">88 × 108 units</text>
+
+            <!-- Corner detail: terminal cut -->
+            <circle cx="78" cy="0"  r="2.5" fill="none" stroke="#3A3A3A" stroke-width="0.6"/>
+            <circle cx="10" cy="0"  r="2.5" fill="none" stroke="#3A3A3A" stroke-width="0.6"/>
+
+          </svg>
+        </div>
+      </div>
+
+      <!-- Spec table -->
+      <div class="anatomy-card">
+        <span class="anatomy-card-label">X Specifications</span>
+        <table class="spec-table">
+          <tr><td>Form</td>       <td>Two precision parallelograms</td></tr>
+          <tr><td>Angle</td>      <td>38° from vertical axis</td></tr>
+          <tr><td>Stroke</td>     <td>13 design units (≈ 12% cap-height)</td></tr>
+          <tr><td>Terminals</td>  <td>Flat cut, 38° + 90° = 128° from horizontal</td></tr>
+          <tr><td>Proportions</td><td>88 × 108 units (0.815 aspect ratio)</td></tr>
+          <tr><td>vs. standard</td><td>15% wider than geometric baseline</td></tr>
+        </table>
+      </div>
+
+      <!-- Design rationale -->
+      <div class="anatomy-card">
+        <span class="anatomy-card-label">Design Intent</span>
+        <div class="flex-col" style="gap:14px;">
+          <div>
+            <p style="font-size:12px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.08em;">Intersection</p>
+            <p class="note">The X center is the most precise point in geometry — two forces crossing with full control.</p>
+          </div>
+          <div>
+            <p style="font-size:12px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.08em;">Precision Cuts</p>
+            <p class="note">Terminal angles are not horizontal — they follow the arm direction exactly, creating a disciplined geometric language.</p>
+          </div>
+          <div>
+            <p style="font-size:12px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.08em;">Width</p>
+            <p class="note">Slightly wider than standard to assert presence and visual authority at all sizes.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════
+       02 — WORDMARK SCALE
+  ═══════════════════════════════════════════════════════════ -->
+  <section class="section">
+    <div class="section-label">
+      <span class="label-num">02</span>
+      <div class="label-rule"></div>
+      <span class="label-text">Scale & Hierarchy</span>
+    </div>
+
+    <div class="type-scale">
+      <div class="type-row">
+        <div class="wm-wrap wm--large" style="color:#fff;">
+          <span class="wm-text">AURI</span>
+          <svg class="wm-x" viewBox="0 0 88 108" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <polygon points="78,0 88,8 10,108 0,100"  fill="currentColor"/>
+            <polygon points="0,8  10,0 88,100 78,108" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="type-meta">
+          <p class="type-meta-name">Display</p>
+          <p class="type-meta-spec">Inter 600 · 64px · LS 0.14em</p>
+        </div>
+      </div>
+      <div class="type-row">
+        <div class="wm-wrap wm--medium" style="color:#fff;">
+          <span class="wm-text">AURI</span>
+          <svg class="wm-x" viewBox="0 0 88 108" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <polygon points="78,0 88,8 10,108 0,100"  fill="currentColor"/>
+            <polygon points="0,8  10,0 88,100 78,108" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="type-meta">
+          <p class="type-meta-name">Header</p>
+          <p class="type-meta-spec">Inter 600 · 48px · LS 0.14em</p>
+        </div>
+      </div>
+      <div class="type-row">
+        <div class="wm-wrap wm--small" style="color:#fff;">
+          <span class="wm-text">AURI</span>
+          <svg class="wm-x" viewBox="0 0 88 108" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <polygon points="78,0 88,8 10,108 0,100"  fill="currentColor"/>
+            <polygon points="0,8  10,0 88,100 78,108" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="type-meta">
+          <p class="type-meta-name">Navigation</p>
+          <p class="type-meta-spec">Inter 600 · 32px · LS 0.14em</p>
+        </div>
+      </div>
+      <div class="type-row">
+        <div class="wm-wrap wm--xs" style="color:#fff;">
+          <span class="wm-text">AURI</span>
+          <svg class="wm-x" viewBox="0 0 88 108" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <polygon points="78,0 88,8 10,108 0,100"  fill="currentColor"/>
+            <polygon points="0,8  10,0 88,100 78,108" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="type-meta">
+          <p class="type-meta-name">Compact</p>
+          <p class="type-meta-spec">Inter 600 · 20px · LS 0.14em</p>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════
+       03 — COLOR SYSTEM
+  ═══════════════════════════════════════════════════════════ -->
+  <section class="section">
+    <div class="section-label">
+      <span class="label-num">03</span>
+      <div class="label-rule"></div>
+      <span class="label-text">Color System</span>
+    </div>
+
+    <div class="colors-grid">
+
+      <div class="color-card">
+        <div class="color-swatch" style="background:#0B0B0B; border-bottom:1px solid #1A1A1A;"></div>
+        <div class="color-info">
+          <p class="color-name">Black</p>
+          <p class="color-hex">#0B0B0B</p>
+          <p class="color-role">Primary · Background</p>
+        </div>
+      </div>
+
+      <div class="color-card">
+        <div class="color-swatch" style="background:#FFFFFF;"></div>
+        <div class="color-info">
+          <p class="color-name">White</p>
+          <p class="color-hex">#FFFFFF</p>
+          <p class="color-role">Primary · Wordmark</p>
+        </div>
+      </div>
+
+      <div class="color-card">
+        <div class="color-swatch" style="background:#C6A85B;"></div>
+        <div class="color-info">
+          <p class="color-name">Gold</p>
+          <p class="color-hex">#C6A85B</p>
+          <p class="color-role">Accent · Sparingly</p>
+        </div>
+      </div>
+
+      <div class="color-card">
+        <div class="color-swatch"
+             style="background: linear-gradient(180deg,#141414 0%,#0B0B0B 100%); border-bottom:1px solid #242424;"></div>
+        <div class="color-info">
+          <p class="color-name">Surface</p>
+          <p class="color-hex">#141414 — #0B0B0B</p>
+          <p class="color-role">Cards · Panels</p>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="spacer"></div>
+
+    <!-- Color rules -->
+    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:20px;">
+      <div>
+        <p style="font-size:10px;color:var(--gold);letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;">Rule 1</p>
+        <p class="note">No gradients on the wordmark. Pure black or pure white only.</p>
+      </div>
+      <div>
+        <p style="font-size:10px;color:var(--gold);letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;">Rule 2</p>
+        <p class="note">Gold appears only on key indicators, accent lines, or premium tier signals — never in the logo itself.</p>
+      </div>
+      <div>
+        <p style="font-size:10px;color:var(--gold);letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;">Rule 3</p>
+        <p class="note">All surfaces must pass WCAG AA contrast (4.5:1 minimum) for accessible typography.</p>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════
+       04 — REVERSED (LIGHT MODE)
+  ═══════════════════════════════════════════════════════════ -->
+  <section class="section section--light">
+    <div class="section-label">
+      <span class="label-num">04</span>
+      <div class="label-rule" style="background:#D0D0D0;"></div>
+      <span class="label-text" style="color:#909090;">Reversed — Light Background</span>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:48px;">
+      <div class="wm-wrap wm--large" style="color:#0B0B0B;">
+        <span class="wm-text">AURI</span>
+        <svg class="wm-x" viewBox="0 0 88 108" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <polygon points="78,0 88,8 10,108 0,100"  fill="currentColor"/>
+          <polygon points="0,8  10,0 88,100 78,108" fill="currentColor"/>
+        </svg>
+      </div>
+
+      <p class="note" style="color:#909090; max-width:480px;">
+        On light backgrounds, the wordmark uses <strong style="color:#0B0B0B; font-weight:600;">#0B0B0B</strong> only.
+        No shadows, no outlines, no intermediate grey values. The form must hold its own weight in pure black.
+      </p>
+    </div>
+
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════
+       05 — APP ICON
+  ═══════════════════════════════════════════════════════════ -->
+  <section class="section">
+    <div class="section-label">
+      <span class="label-num">05</span>
+      <div class="label-rule"></div>
+      <span class="label-text">App Icon & Mark</span>
+    </div>
+
+    <!-- Primary icon sizes -->
+    <div class="icon-grid" style="margin-bottom:56px;">
+
+      <!-- 1024 / large -->
+      <div class="icon-item">
+        <div class="app-icon app-icon--1024">
+          <svg viewBox="0 0 88 108" width="72" height="88" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="78,0 88,8 10,108 0,100"  fill="white"/>
+            <polygon points="0,8  10,0 88,100 78,108" fill="white"/>
+          </svg>
+        </div>
+        <span class="icon-item-label">1024 px</span>
+      </div>
+
+      <!-- 512 -->
+      <div class="icon-item">
+        <div class="app-icon app-icon--512">
+          <svg viewBox="0 0 88 108" width="43" height="53" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="78,0 88,8 10,108 0,100"  fill="white"/>
+            <polygon points="0,8  10,0 88,100 78,108" fill="white"/>
+          </svg>
+        </div>
+        <span class="icon-item-label">512 px</span>
+      </div>
+
+      <!-- 256 -->
+      <div class="icon-item">
+        <div class="app-icon app-icon--256">
+          <svg viewBox="0 0 88 108" width="29" height="36" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="78,0 88,8 10,108 0,100"  fill="white"/>
+            <polygon points="0,8  10,0 88,100 78,108" fill="white"/>
+          </svg>
+        </div>
+        <span class="icon-item-label">256 px</span>
+      </div>
+
+      <!-- 64 -->
+      <div class="icon-item">
+        <div class="app-icon app-icon--64">
+          <svg viewBox="0 0 88 108" width="18" height="22" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="78,0 88,8 10,108 0,100"  fill="white"/>
+            <polygon points="0,8  10,0 88,100 78,108" fill="white"/>
+          </svg>
+        </div>
+        <span class="icon-item-label">64 px</span>
+      </div>
+
+      <!-- 32 (favicon) -->
+      <div class="icon-item">
+        <div class="app-icon app-icon--32">
+          <svg viewBox="0 0 88 108" width="12" height="14" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="78,0 88,8 10,108 0,100"  fill="white"/>
+            <polygon points="0,8  10,0 88,100 78,108" fill="white"/>
+          </svg>
+        </div>
+        <span class="icon-item-label">Favicon</span>
+      </div>
+
+    </div>
+
+    <!-- Icon variants -->
+    <p style="font-size:10px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:24px;">Colour Variants</p>
+    <div class="icon-grid">
+
+      <div class="icon-item">
+        <div class="app-icon app-icon--512" style="background:#0B0B0B;">
+          <svg viewBox="0 0 88 108" width="43" height="53" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="78,0 88,8 10,108 0,100"  fill="white"/>
+            <polygon points="0,8  10,0 88,100 78,108" fill="white"/>
+          </svg>
+        </div>
+        <span class="icon-item-label">Default</span>
+      </div>
+
+      <div class="icon-item">
+        <div class="app-icon app-icon--512 app-icon--light">
+          <svg viewBox="0 0 88 108" width="43" height="53" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="78,0 88,8 10,108 0,100"  fill="#0B0B0B"/>
+            <polygon points="0,8  10,0 88,100 78,108" fill="#0B0B0B"/>
+          </svg>
+        </div>
+        <span class="icon-item-label">Light</span>
+      </div>
+
+      <div class="icon-item">
+        <div class="app-icon app-icon--512 app-icon--gold">
+          <svg viewBox="0 0 88 108" width="43" height="53" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="78,0 88,8 10,108 0,100"  fill="#0B0B0B"/>
+            <polygon points="0,8  10,0 88,100 78,108" fill="#0B0B0B"/>
+          </svg>
+        </div>
+        <span class="icon-item-label">Premium</span>
+      </div>
+
+      <div class="icon-item">
+        <div class="app-icon app-icon--512" style="background:var(--surface); border:1px solid var(--border);">
+          <svg viewBox="0 0 88 108" width="43" height="53" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="78,0 88,8 10,108 0,100"  fill="white" opacity="0.85"/>
+            <polygon points="0,8  10,0 88,100 78,108" fill="white" opacity="0.85"/>
+          </svg>
+        </div>
+        <span class="icon-item-label">Surface</span>
+      </div>
+
+    </div>
+
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════
+       06 — TYPOGRAPHY SYSTEM
+  ═══════════════════════════════════════════════════════════ -->
+  <section class="section">
+    <div class="section-label">
+      <span class="label-num">06</span>
+      <div class="label-rule"></div>
+      <span class="label-text">Typography System</span>
+    </div>
+
+    <div class="type-scale">
+
+      <div class="type-row">
+        <p class="type-sample" style="font-size:48px; font-weight:700; letter-spacing:-0.02em;">
+          $148,302.50
+        </p>
+        <div class="type-meta">
+          <p class="type-meta-name">Display Figure</p>
+          <p class="type-meta-spec">Inter 700 · 48px · LS −0.02em</p>
+        </div>
+      </div>
+
+      <div class="type-row">
+        <p class="type-sample" style="font-size:28px; font-weight:600; letter-spacing:-0.01em;">
+          Portfolio Overview
+        </p>
+        <div class="type-meta">
+          <p class="type-meta-name">Section Title</p>
+          <p class="type-meta-spec">Inter 600 · 28px · LS −0.01em</p>
+        </div>
+      </div>
+
+      <div class="type-row">
+        <p class="type-sample" style="font-size:16px; font-weight:500; letter-spacing:0em;">
+          Equity allocation adjusted for market exposure
+        </p>
+        <div class="type-meta">
+          <p class="type-meta-name">Body Prominent</p>
+          <p class="type-meta-spec">Inter 500 · 16px · LS 0</p>
+        </div>
+      </div>
+
+      <div class="type-row">
+        <p class="type-sample" style="font-size:14px; font-weight:400; letter-spacing:0em; color:#A8A8A8;">
+          Last updated 2 minutes ago · All prices in USD
+        </p>
+        <div class="type-meta">
+          <p class="type-meta-name">Body Secondary</p>
+          <p class="type-meta-spec">Inter 400 · 14px · #A8A8A8</p>
+        </div>
+      </div>
+
+      <div class="type-row">
+        <p class="type-sample" style="font-size:11px; font-weight:500; letter-spacing:0.1em; color:#6A6A6A; text-transform:uppercase;">
+          Allocation · Year-to-date · Risk profile
+        </p>
+        <div class="type-meta">
+          <p class="type-meta-name">Label / Meta</p>
+          <p class="type-meta-spec">Inter 500 · 11px · LS 0.10em · UC</p>
+        </div>
+      </div>
+
+      <div class="type-row">
+        <p class="type-sample"
+           style="font-size:22px; font-weight:600; letter-spacing:0.01em; font-variant-numeric:tabular-nums;">
+          +14.7%&nbsp;&nbsp;
+          <span style="color:#4AC97E; font-size:14px; font-weight:500;">▲ 2.3%</span>
+        </p>
+        <div class="type-meta">
+          <p class="type-meta-name">Performance Figure</p>
+          <p class="type-meta-spec">Inter 600 · tabular-nums · semantic colour</p>
+        </div>
+      </div>
+
+    </div>
+
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════
+       07 — USAGE — Product Mockups
+  ═══════════════════════════════════════════════════════════ -->
+  <section class="section">
+    <div class="section-label">
+      <span class="label-num">07</span>
+      <div class="label-rule"></div>
+      <span class="label-text">Usage — Product Context</span>
+    </div>
+
+    <div class="usage-grid">
+
+      <!-- Card mockup -->
+      <div class="mockup">
+        <div class="mockup-card">
+          <div class="mockup-card-top">
+            <div class="wm-wrap" style="font-size:18px; color:#fff;">
+              <span class="wm-text">AURI</span>
+              <svg class="wm-x" viewBox="0 0 88 108" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <polygon points="78,0 88,8 10,108 0,100"  fill="currentColor"/>
+                <polygon points="0,8  10,0 88,100 78,108" fill="currentColor"/>
+              </svg>
+            </div>
+            <div class="mockup-card-chip"></div>
+          </div>
+          <div class="mockup-card-balance">
+            <p class="mockup-card-label">Total Portfolio</p>
+            <p class="mockup-card-value">$148,302</p>
+            <p class="mockup-card-sub">+$2,140 today &nbsp;<span style="color:#4AC97E;">▲ 1.46%</span></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard header mockup -->
+      <div class="mockup">
+        <div class="mockup-header">
+          <div class="wm-wrap" style="font-size:16px; color:#fff;">
+            <span class="wm-text">AURI</span>
+            <svg class="wm-x" viewBox="0 0 88 108" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <polygon points="78,0 88,8 10,108 0,100"  fill="currentColor"/>
+              <polygon points="0,8  10,0 88,100 78,108" fill="currentColor"/>
+            </svg>
+          </div>
+          <div class="mockup-nav">
+            <span class="active">Portfolio</span>
+            <span>Markets</span>
+            <span>Reports</span>
+          </div>
+        </div>
+        <div class="mockup-body">
+          <p style="font-size:11px; color:var(--muted); letter-spacing:.1em; text-transform:uppercase; margin-bottom:6px;">Net Worth</p>
+          <p style="font-size:32px; font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums;">$148,302</p>
+          <div class="mockup-stat-row">
+            <div class="mockup-stat">
+              <p class="mockup-stat-label">Equities</p>
+              <p class="mockup-stat-val">$84,210</p>
+              <p class="mockup-stat-chg">▲ 2.1%</p>
+            </div>
+            <div class="mockup-stat">
+              <p class="mockup-stat-label">Fixed Income</p>
+              <p class="mockup-stat-val">$41,090</p>
+              <p class="mockup-stat-chg" style="color:var(--muted);">— 0.0%</p>
+            </div>
+            <div class="mockup-stat">
+              <p class="mockup-stat-label">Alternatives</p>
+              <p class="mockup-stat-val">$23,002</p>
+              <p class="mockup-stat-chg">▲ 0.8%</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Monochrome: white on black card -->
+      <div class="mockup" style="display:flex; align-items:center; justify-content:center; min-height:180px; gap:0; padding:40px;">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:20px;">
+          <div style="background:#0B0B0B; padding:24px 40px; border-radius:8px; border:1px solid #1C1C1C;">
+            <div class="wm-wrap wm--medium" style="color:#fff;">
+              <span class="wm-text">AURI</span>
+              <svg class="wm-x" viewBox="0 0 88 108" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <polygon points="78,0 88,8 10,108 0,100"  fill="currentColor"/>
+                <polygon points="0,8  10,0 88,100 78,108" fill="currentColor"/>
+              </svg>
+            </div>
+          </div>
+          <span class="tag">White on Black</span>
+        </div>
+      </div>
+
+      <!-- Monochrome: black on white card -->
+      <div class="mockup" style="display:flex; align-items:center; justify-content:center; min-height:180px; padding:40px; background:#F8F8F8;">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:20px;">
+          <div style="background:#FFFFFF; padding:24px 40px; border-radius:8px; border:1px solid #E0E0E0;">
+            <div class="wm-wrap wm--medium" style="color:#0B0B0B;">
+              <span class="wm-text">AURI</span>
+              <svg class="wm-x" viewBox="0 0 88 108" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <polygon points="78,0 88,8 10,108 0,100"  fill="currentColor"/>
+                <polygon points="0,8  10,0 88,100 78,108" fill="currentColor"/>
+              </svg>
+            </div>
+          </div>
+          <span class="tag" style="color:#909090; border-color:#D0D0D0;">Black on White</span>
+        </div>
+      </div>
+
+    </div>
+
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════
+       08 — GOLDEN RATIO CLEARSPACE RULES
+  ═══════════════════════════════════════════════════════════ -->
+  <section class="section">
+    <div class="section-label">
+      <span class="label-num">08</span>
+      <div class="label-rule"></div>
+      <span class="label-text">Clearspace &amp; Minimum Size</span>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:start;">
+
+      <!-- Clearspace diagram -->
+      <div style="display:flex; justify-content:center; padding:20px 0;">
+        <svg viewBox="0 0 320 120" width="320" height="120" xmlns="http://www.w3.org/2000/svg">
+          <!-- Outer clearspace boundary -->
+          <rect x="20" y="10" width="280" height="100"
+                fill="none" stroke="#282828" stroke-width="0.8" stroke-dasharray="4,3"/>
+          <!-- X spacing guides (dashed arrows) -->
+          <line x1="20" y1="60" x2="55" y2="60"
+                stroke="#C6A85B" stroke-width="0.6" stroke-dasharray="2,2"/>
+          <line x1="265" y1="60" x2="300" y2="60"
+                stroke="#C6A85B" stroke-width="0.6" stroke-dasharray="2,2"/>
+          <line x1="120" y1="10" x2="120" y2="22"
+                stroke="#C6A85B" stroke-width="0.6" stroke-dasharray="2,2"/>
+          <line x1="200" y1="10" x2="200" y2="22"
+                stroke="#C6A85B" stroke-width="0.6" stroke-dasharray="2,2"/>
+          <!-- Label "X" for clearspace -->
+          <text x="35" y="56" font-family="Inter,system-ui" font-size="8"
+                fill="#C6A85B" text-anchor="middle">X</text>
+          <text x="283" y="56" font-family="Inter,system-ui" font-size="8"
+                fill="#C6A85B" text-anchor="middle">X</text>
+          <text x="160" y="8" font-family="Inter,system-ui" font-size="8"
+                fill="#C6A85B" text-anchor="middle">X</text>
+          <!-- Wordmark centered -->
+          <text x="160" y="72" font-family="Inter,system-ui" font-weight="600"
+                font-size="28" fill="white" text-anchor="middle" letter-spacing="4">AURIX</text>
+        </svg>
+      </div>
+
+      <!-- Rules -->
+      <div class="flex-col" style="gap:16px; padding-top:8px;">
+        <div>
+          <p style="font-size:10px;color:var(--gold);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px;">Clearspace</p>
+          <p class="note">Minimum clearspace on all sides = cap-height of the wordmark (X). Never place competing elements within this zone.</p>
+        </div>
+        <div class="divider" style="margin:0;"></div>
+        <div>
+          <p style="font-size:10px;color:var(--gold);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px;">Minimum Wordmark Size</p>
+          <p class="note">80px wide on digital. 20mm wide in print. Below these thresholds, use the X icon mark only.</p>
+        </div>
+        <div class="divider" style="margin:0;"></div>
+        <div>
+          <p style="font-size:10px;color:var(--gold);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px;">Never Do</p>
+          <ul class="note" style="list-style:none;display:flex;flex-direction:column;gap:5px;">
+            <li>— Stretch, condense, or skew the wordmark</li>
+            <li>— Apply colour fills, gradients, or shadows</li>
+            <li>— Use weights other than SemiBold (600)</li>
+            <li>— Alter the letter-spacing</li>
+            <li>— Place on mid-tone backgrounds without testing contrast</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════
+       FOOTER
+  ═══════════════════════════════════════════════════════════ -->
+  <footer class="brand-footer section">
+    <div class="wm-wrap" style="font-size:14px; color:#3A3A3A;">
+      <span class="wm-text">AURI</span>
+      <svg class="wm-x" viewBox="0 0 88 108" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <polygon points="78,0 88,8 10,108 0,100"  fill="currentColor"/>
+        <polygon points="0,8  10,0 88,100 78,108" fill="currentColor"/>
+      </svg>
+    </div>
+    <p class="note" style="color:var(--dim); font-size:11px; letter-spacing:0.04em;">
+      Brand Identity System · Version 1.0 · Confidential
+    </p>
+  </footer>
+
+</body>
+</html>
