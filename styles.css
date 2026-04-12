@@ -2901,7 +2901,22 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
   letter-spacing: -.03em;
   line-height: 1;
   margin-bottom: 8px;
+  transition: color 150ms;
 }
+
+/* Flash colors on value update (JS-driven classes) */
+@keyframes hero-flash-up {
+  0%   { color: var(--green); filter: brightness(1.15); }
+  55%  { color: var(--green); filter: brightness(1.08); }
+  100% { color: var(--text-bright); filter: brightness(1); }
+}
+@keyframes hero-flash-down {
+  0%   { color: var(--red); opacity: .88; }
+  55%  { color: var(--red); opacity: 1;   }
+  100% { color: var(--text-bright); opacity: 1; }
+}
+.detail-hero-value.hero-flash-up   { animation: hero-flash-up   650ms var(--ease-out) forwards; }
+.detail-hero-value.hero-flash-down { animation: hero-flash-down 650ms var(--ease-out) forwards; }
 
 .detail-hero-change {
   display: inline-block;

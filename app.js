@@ -1326,6 +1326,10 @@ async function refreshPrices() {
 let _countUpRaf      = null;
 let _countUpCurrent  = null;   // last value we displayed (in base currency)
 
+// ── Animated count-up for the detail view hero value ──────
+let _heroRaf         = null;
+let _heroValueShown  = null;   // last value rendered in detail hero (null = not shown yet)
+
 function countUpTotalValue(targetBase) {
   // Skip animation on first render (no previous value)
   if (_countUpCurrent === null) {
@@ -1368,6 +1372,47 @@ function countUpTotalValue(targetBase) {
 
   _countUpCurrent = end;  // store immediately so rapid calls use correct start
   _countUpRaf = requestAnimationFrame(step);
+}
+
+// Animates the detail-hero value element.
+// - First entry into a category  → count up from 0 (900ms)
+// - Subsequent price tick        → smooth interpolation (450ms) + color flash
+// Cancelled and reset whenever the user leaves the category view.
+function _animateHeroValue(el, target) {
+  if (_heroRaf) { cancelAnimationFrame(_heroRaf); _heroRaf = null; }
+
+  const isFirstEntry = (_heroValueShown === null);
+  if (!isFirstEntry && Math.abs((_heroValueShown || 0) - target) < 0.005) return;
+
+  const start = isFirstEntry ? 0 : (_heroValueShown || 0);
+  const dur   = isFirstEntry
+    ? (reducedMotion ? 0 : 900)
+    : (reducedMotion ? 0 : 450);
+
+  // Flash color on update (not on first entry — count-up communicates gain already)
+  if (!isFirstEntry) {
+    el.classList.remove('hero-flash-up', 'hero-flash-down');
+    void el.offsetWidth;  // force reflow so the animation restarts
+    el.classList.add(target > (_heroValueShown || 0) ? 'hero-flash-up' : 'hero-flash-down');
+  }
+
+  _heroValueShown = target;
+
+  if (dur === 0) { el.textContent = formatBase(target); return; }
+
+  function ease(t) { return 1 - Math.pow(1 - t, 3); }
+  const t0 = performance.now();
+
+  (function step(now) {
+    const p = Math.min((now - t0) / dur, 1);
+    el.textContent = formatBase(start + (target - start) * ease(p));
+    if (p < 1) {
+      _heroRaf = requestAnimationFrame(step);
+    } else {
+      _heroRaf = null;
+      el.textContent = formatBase(target);
+    }
+  })(t0);
 }
 
 // Animates individual asset value elements that carried data-from/data-to
@@ -1671,7 +1716,7 @@ function updateCategoryCards() {
           <span class="cat-card-dot" style="background:${m.color}"></span>
           <span class="cat-card-name">${m.label}</span>
         </div>
-        <span class="cat-card-value">${isEmpty ? '—' : formatBase(dist.valueBase)}</span>
+        <span class="cat-card-value" data-target="${isEmpty ? '' : dist.valueBase}">${isEmpty ? '—' : formatBase(dist.valueBase)}</span>
         <span class="cat-card-pct">${isEmpty ? '0.0%' : dist.pct.toFixed(1) + '%'}</span>
         ${rentLineHtml}
         ${hint}
@@ -1870,10 +1915,18 @@ function renderDetailHero(type, typeAssets) {
     if (hdr) hdr.after(heroEl);
   }
 
-  // Update live values
+  // Update static fields
   heroEl.querySelector('.detail-hero-dot').style.background = m.color;
   heroEl.querySelector('.detail-hero-type').textContent     = m.label.toUpperCase();
-  heroEl.querySelector('.detail-hero-value').textContent    = formatBase(totalValue);
+
+  // On category switch: reset hero animation so it counts up from 0 for new category
+  if (_detailChartType !== type) {
+    if (_heroRaf) { cancelAnimationFrame(_heroRaf); _heroRaf = null; }
+    _heroValueShown = null;
+  }
+
+  // Animated value: count-up from 0 on first entry, smooth interpolation on update
+  _animateHeroValue(heroEl.querySelector('.detail-hero-value'), totalValue);
 
   const changeEl = heroEl.querySelector('.detail-hero-change');
   if (change24h !== null) {
@@ -1931,11 +1984,13 @@ function render(animate = false) {
     if (assetsSectionEl) assetsSectionEl.style.display = 'none';
     if (dashTopEl)        dashTopEl.style.display        = '';
     if (chartSecEl)       chartSecEl.style.display       = '';
-    // Clean up detail hero and sparkline when returning to dashboard
+    // Clean up detail hero, sparkline and hero animation when returning to dashboard
     const heroEl = document.getElementById('detailHero');
     if (heroEl) heroEl.remove();
     if (_detailChart) { _detailChart.destroy(); _detailChart = null; }
     _detailChartType = null;
+    if (_heroRaf) { cancelAnimationFrame(_heroRaf); _heroRaf = null; }
+    _heroValueShown = null;
   }
 
   // Clear list (keep empty state node)
@@ -3476,6 +3531,25 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
                 visual.style.opacity = visual.style.transform = visual.style.transition = '';
               }, 360);
             }
+
+            // Count-up the card value from 0 (staggered with card reveal)
+            const valueEl = card.querySelector('.cat-card-value[data-target]');
+            if (valueEl && !reducedMotion) {
+              const target = parseFloat(valueEl.dataset.target);
+              if (isFinite(target) && target > 0) {
+                const dur = 650;
+                const t0  = performance.now();
+                const ease = t => 1 - Math.pow(1 - t, 3);
+                valueEl.textContent = formatBase(0);
+                (function step(now) {
+                  const p = Math.min((now - t0) / dur, 1);
+                  valueEl.textContent = formatBase(target * ease(p));
+                  if (p < 1) requestAnimationFrame(step);
+                  else valueEl.textContent = formatBase(target);
+                })(t0);
+              }
+            }
+
             // Clean up card inline styles so CSS hover can take over
             setTimeout(() => {
               card.style.opacity = card.style.transform = card.style.transition = '';
