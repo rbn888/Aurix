@@ -878,7 +878,7 @@ function initDonut() {
         data:                [],
         backgroundColor:     [],
         hoverBackgroundColor:[],
-        borderColor:         '#11141c',
+        borderColor:         '#1a1a1a',
         borderWidth:         2,
         hoverBorderColor:    '#11141c',
         hoverBorderWidth:    2,
@@ -988,24 +988,18 @@ const fillGradientPlugin = {
     if (!chart.chartArea) return;
     const { ctx, chartArea: { top, bottom } } = chart;
     const grad = ctx.createLinearGradient(0, top, 0, bottom);
-    grad.addColorStop(0,   'rgba(79,142,247,0.28)');
-    grad.addColorStop(0.4, 'rgba(79,142,247,0.10)');
-    grad.addColorStop(1,   'rgba(79,142,247,0.00)');
+    grad.addColorStop(0,   'rgba(100,137,196,0.18)');
+    grad.addColorStop(0.4, 'rgba(100,137,196,0.06)');
+    grad.addColorStop(1,   'rgba(100,137,196,0.00)');
     chart.data.datasets.forEach(ds => { ds.backgroundColor = grad; });
   }
 };
 
-// Adds a subtle canvas-level glow behind the chart line (GPU accelerated, no DOM overhead)
+// Line glow removed — clean chart line only
 const lineGlowPlugin = {
   id: 'lineGlow',
-  beforeDatasetsDraw(chart) {
-    chart.ctx.save();
-    chart.ctx.shadowColor = 'rgba(79,142,247,0.40)';
-    chart.ctx.shadowBlur  = 8;
-  },
-  afterDatasetsDraw(chart) {
-    chart.ctx.restore();
-  }
+  beforeDatasetsDraw() {},
+  afterDatasetsDraw()  {}
 };
 
 // Draws a vertical dashed crosshair line at the hovered data point
@@ -1087,16 +1081,16 @@ function initChart() {
       labels: [],
       datasets: [{
         data: [],
-        borderColor: '#4f8ef7',
+        borderColor: '#6489c4',
         backgroundColor: 'transparent',
         fill: true,
         tension: 0.4,
         pointRadius: 0,
-        pointHoverRadius: 5,
-        pointHoverBackgroundColor: '#4f8ef7',
+        pointHoverRadius: 4,
+        pointHoverBackgroundColor: '#6489c4',
         pointHoverBorderColor: '#fff',
         pointHoverBorderWidth: 2,
-        borderWidth: 2.5,
+        borderWidth: 2,
       }]
     },
     options: {
@@ -1113,16 +1107,16 @@ function initChart() {
       },
       scales: {
         x: {
-          grid: { color: 'rgba(255,255,255,0.04)' },
+          grid: { color: 'rgba(255,255,255,0.03)' },
           border: { display: false },
-          ticks: { color: '#6b7494', maxTicksLimit: 6, maxRotation: 0 },
+          ticks: { color: '#686868', maxTicksLimit: 6, maxRotation: 0 },
         },
         y: {
           position: 'right',
-          grid: { color: 'rgba(255,255,255,0.04)' },
+          grid: { color: 'rgba(255,255,255,0.03)' },
           border: { display: false },
           ticks: {
-            color: '#6b7494',
+            color: '#686868',
             maxTicksLimit: 5,
             callback: v => {
               const sym = baseCurrency === 'EUR' ? '€' : '$';
@@ -2145,7 +2139,7 @@ function buildDetailSparkline(totalValue, change24h, color) {
   });
 
   const isUp        = (change24h || 0) >= 0;
-  const lineColor   = isUp ? color : '#f87171';
+  const lineColor   = isUp ? color : '#c87070';
   const [lr, lg, lb] = _hexToRgb(lineColor);
 
   const fillPlugin = {
@@ -2161,15 +2155,8 @@ function buildDetailSparkline(totalValue, change24h, color) {
     }
   };
 
-  const glowPlugin = {
-    id: 'detailGlow',
-    beforeDatasetsDraw(chart) {
-      chart.ctx.save();
-      chart.ctx.shadowColor = `rgba(${lr},${lg},${lb},0.4)`;
-      chart.ctx.shadowBlur  = 9;
-    },
-    afterDatasetsDraw(chart) { chart.ctx.restore(); }
-  };
+  // Glow removed — clean sparkline
+  const glowPlugin = { id: 'detailGlow', beforeDatasetsDraw() {}, afterDatasetsDraw() {} };
 
   _detailChart = new Chart(canvas.getContext('2d'), {
     type: 'line',
