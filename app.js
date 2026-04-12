@@ -453,6 +453,8 @@ let portfolioChart   = null;
 let _detailChart     = null;  // Chart.js instance for category detail sparkline
 let _detailChartType = null;  // which category the sparkline was last rendered for
 
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 const BASE_KEY   = 'portfolio_base_currency';
 let baseCurrency = localStorage.getItem(BASE_KEY) || 'USD';
 let usdToEur     = 0.92; // updated from API
@@ -3362,7 +3364,6 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   const btnExit   = document.getElementById('btnExit');
 
   // ── Entrance animation ──────────────────────────────────
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isMobile      = window.innerWidth <= 640;
   const STEP          = reducedMotion ? 0  : (isMobile ? 50  : 100);
   const REVEAL_DUR    = reducedMotion ? 0  : (isMobile ? 280 : 400);
