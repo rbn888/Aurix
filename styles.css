@@ -1383,6 +1383,10 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
   gap: 5px;
   cursor: pointer;
   text-align: left;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.09), inset 0 0 0 0 transparent, 0 2px 8px rgba(0,0,0,.22);
   transition: border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out),
               transform 180ms var(--ease-out), background 180ms var(--ease-out),
@@ -1396,7 +1400,12 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
               0 0 0 1px rgba(79,142,247,.15), inset 0 1px 0 rgba(255,255,255,.06);
   background: linear-gradient(160deg, rgba(255,255,255,.04) 0%, transparent 55%), #141820;
 }
-.cat-card:active { transform: scale(.97); transition-duration: 80ms; }
+.cat-card:active,
+.cat-card.is-pressing {
+  transform: scale(.95);
+  opacity: 0.82;
+  transition-duration: 60ms;
+}
 
 /* Dim siblings when one card is hovered — focus effect */
 @media (hover: hover) {

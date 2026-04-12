@@ -1660,6 +1660,36 @@ function updateCategoryCards() {
   }).join('');
 
   grid.querySelectorAll('.cat-card').forEach(btn => {
+    let _tapOk = false;
+
+    // touchstart: visual press feedback immediately
+    btn.addEventListener('touchstart', () => {
+      _tapOk = true;
+      btn.classList.add('is-pressing');
+    }, { passive: true });
+
+    // touchmove: user is scrolling, cancel tap
+    btn.addEventListener('touchmove', () => {
+      _tapOk = false;
+      btn.classList.remove('is-pressing');
+    }, { passive: true });
+
+    // touchend: fire action if finger didn't scroll away
+    btn.addEventListener('touchend', (e) => {
+      btn.classList.remove('is-pressing');
+      if (_tapOk) {
+        _tapOk = false;
+        e.preventDefault(); // prevent ghost click
+        setActiveCategory(btn.dataset.type);
+      }
+    });
+
+    btn.addEventListener('touchcancel', () => {
+      _tapOk = false;
+      btn.classList.remove('is-pressing');
+    });
+
+    // click: fallback for desktop / non-touch
     btn.addEventListener('click', () => setActiveCategory(btn.dataset.type));
   });
 }
