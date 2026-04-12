@@ -49,10 +49,10 @@ select:focus-visible {
   --dur-fast: 120ms;
   --dur-med:  220ms;
   --dur-slow: 360ms;
-  /* Glow system (3 levels) */
-  --glow-soft:   0 0 0 1px rgba(79,140,255,.10), 0 0 14px rgba(79,140,255,.08);
-  --glow-medium: 0 0 0 1px rgba(79,140,255,.18), 0 0 22px rgba(79,140,255,.16);
-  --glow-strong: 0 0 0 2px rgba(79,140,255,.32), 0 0 30px rgba(79,140,255,.26);
+  /* Glow system (3 levels) — intentionally diffused/soft */
+  --glow-soft:   0 0 0 1px rgba(79,140,255,.09), 0 0 14px rgba(79,140,255,.07);
+  --glow-medium: 0 0 0 1px rgba(79,140,255,.15), 0 0 22px rgba(79,140,255,.13);
+  --glow-strong: 0 0 0 2px rgba(79,140,255,.28), 0 0 30px rgba(79,140,255,.22);
   /* Brand */
   --aurex-blue:       #2FD3FF;
   --aurex-blue-light: #4F8CFF;
@@ -394,7 +394,7 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
   position: absolute;
   top: -80px; right: -80px;
   width: 260px; height: 260px;
-  background: radial-gradient(circle, rgba(79,142,247,.12) 0%, transparent 68%);
+  background: radial-gradient(circle, rgba(79,142,247,.09) 0%, transparent 68%);
   pointer-events: none;
   animation: panel-breathe 6s ease-in-out infinite;
 }
@@ -669,7 +669,7 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
   white-space: nowrap;
   text-align: right;
   font-variant-numeric: tabular-nums;
-  animation: re-rent-pulse 3s ease-in-out infinite;
+  animation: re-rent-pulse 5s ease-in-out infinite;
   will-change: opacity;
 }
 
@@ -679,7 +679,7 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
   font-weight: 600;
   color: var(--green);
   font-variant-numeric: tabular-nums;
-  animation: re-rent-pulse 3s ease-in-out infinite;
+  animation: re-rent-pulse 5s ease-in-out infinite;
   will-change: opacity;
 }
 
@@ -706,7 +706,7 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
   font-weight: 700;
   color: var(--green);
   font-variant-numeric: tabular-nums;
-  animation: re-rent-pulse 3s ease-in-out infinite;
+  animation: re-rent-pulse 5s ease-in-out infinite;
   will-change: opacity;
   text-shadow: 0 0 18px rgba(74,222,128,.35);
 }
@@ -1398,8 +1398,8 @@ body.modal-open {
 /* Moving energy glow that sweeps along the chart — pure CSS, no JS RAF */
 @keyframes chart-energy-sweep {
   0%   { transform: translateX(-120%) scaleX(0.6); opacity: 0; }
-  8%   { opacity: 1; }
-  92%  { opacity: 1; }
+  8%   { opacity: 0.55; }
+  92%  { opacity: 0.55; }
   100% { transform: translateX(120%) scaleX(1.4); opacity: 0; }
 }
 .chart-wrap::after {
@@ -1660,12 +1660,12 @@ body.modal-open {
   animation-delay: calc(var(--vi, 0) * -1.35s);
   will-change: opacity;
 }
-.cat-card[data-type="crypto"]::before      { background: radial-gradient(ellipse at 80% 48%, rgba(79,142,247,.10)  0%, transparent 65%); }
-.cat-card[data-type="stock"]::before       { background: radial-gradient(ellipse at 80% 48%, rgba(192,200,216,.07) 0%, transparent 65%); }
-.cat-card[data-type="etf"]::before         { background: radial-gradient(ellipse at 80% 48%, rgba(143,157,186,.07) 0%, transparent 65%); }
-.cat-card[data-type="metal"]::before       { background: radial-gradient(ellipse at 80% 48%, rgba(212,168,67,.10)  0%, transparent 65%); }
-.cat-card[data-type="real_estate"]::before { background: radial-gradient(ellipse at 80% 48%, rgba(167,139,250,.10) 0%, transparent 65%); }
-.cat-card[data-type="cash"]::before        { background: radial-gradient(ellipse at 80% 48%, rgba(74,222,128,.08)  0%, transparent 65%); }
+.cat-card[data-type="crypto"]::before      { background: radial-gradient(ellipse at 80% 48%, rgba(79,142,247,.08)  0%, transparent 65%); }
+.cat-card[data-type="stock"]::before       { background: radial-gradient(ellipse at 80% 48%, rgba(192,200,216,.05) 0%, transparent 65%); }
+.cat-card[data-type="etf"]::before         { background: radial-gradient(ellipse at 80% 48%, rgba(143,157,186,.05) 0%, transparent 65%); }
+.cat-card[data-type="metal"]::before       { background: radial-gradient(ellipse at 80% 48%, rgba(212,168,67,.08)  0%, transparent 65%); }
+.cat-card[data-type="real_estate"]::before { background: radial-gradient(ellipse at 80% 48%, rgba(167,139,250,.08) 0%, transparent 65%); }
+.cat-card[data-type="cash"]::before        { background: radial-gradient(ellipse at 80% 48%, rgba(74,222,128,.06)  0%, transparent 65%); }
 /* Empty cards: suppress the glow — no assets, no signal */
 .cat-card--empty::before { animation: none; opacity: 0.08; }
 
@@ -2490,6 +2490,14 @@ body.modal-open {
     font-size: 11px;
     font-weight: 600;
     padding: 6px 12px;
+  }
+  /* On mobile, action buttons step back — numbers stay the focus */
+  .btn-primary,
+  .btn-secondary {
+    background: rgba(79,142,247,.05);
+    border-color: rgba(79,142,247,.14);
+    color: rgba(79,142,247,.70);
+    font-weight: 500;
   }
 
   /* Distribution — stack donut + legend vertically */
