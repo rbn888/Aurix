@@ -139,6 +139,10 @@ const T = {
     isinOk:           '✓ ISIN válido',
     isinError:        'ISIN inválido — 12 caracteres alfanuméricos',
     isinHint:         n => `${n}/12`,
+    isinLooking:      'Buscando activo...',
+    isinFound:        name => `✓ ${name}`,
+    isinNotFound:     'No encontrado — introduce manualmente',
+    isinLookupError:  'Sin conexión — introduce manualmente',
     manualNameLabel:  'Nombre del activo',
     manualNamePH:     'Ej: iShares Core MSCI World',
     manualTypeLabel:  'Tipo de activo',
@@ -281,6 +285,10 @@ const T = {
     isinOk:           '✓ Valid ISIN',
     isinError:        'Invalid ISIN — 12 alphanumeric characters',
     isinHint:         n => `${n}/12`,
+    isinLooking:      'Looking up asset...',
+    isinFound:        name => `✓ ${name}`,
+    isinNotFound:     'Not found — enter manually',
+    isinLookupError:  'Offline — enter manually',
     manualNameLabel:  'Asset name',
     manualNamePH:     'E.g.: iShares Core MSCI World',
     manualTypeLabel:  'Asset type',
@@ -466,6 +474,10 @@ let isRealEstateMode    = false; // true when modal is in manual real-estate ent
 let isManualMode        = false; // true when modal is in ISIN manual-entry mode
 let manualAssetType     = 'etf'; // type selected in manual mode
 let manualCurrency      = 'USD'; // currency selected in manual mode
+let manualPendingSymbol = null;  // market symbol resolved via OpenFIGI lookup
+let manualPendingCoinId = null;  // CoinGecko coin ID for crypto ISIN assets
+let isinLookupAbortCtrl = null;  // abort controller for in-flight ISIN lookup
+const _isinCache        = new Map(); // ISIN → lookup result (memory cache)
 let rePendingCurrency   = 'EUR'; // currency selected in RE modal
 let rePendingRent       = 0;     // monthly rent input in RE modal
 let reEditTargetId      = null;  // when set, submit updates this asset instead of creating
@@ -1309,6 +1321,80 @@ async function fetchGoldSpotPrice() {
   return fb?.price ?? FALLBACK_PRICES['GC=F'];
 }
 
+// ── OpenFIGI: ISIN → ticker / name / type ──────────────────
+
+// Exchange code → Yahoo Finance symbol suffix
+const FIGI_EXCH_SUFFIX = {
+  LN: '.L',   GY: '.DE', GX: '.DE', GF: '.DE',
+  FP: '.PA',  NA: '.AS', IM: '.MI', SM: '.MC',
+  SW: '.SW',  SS: '.ST', NO: '.OL', DC: '.CO',
+  HE: '.HE',  AV: '.VI', BB: '.BR', PL: '.LS',
+  AU: '.AX',  JP: '.T',
+  US: '',  UW: '',  UN: '',  UA: '',  UP: '',
+};
+
+function _toTitleCase(str) {
+  return str.toLowerCase().replace(/(?:^|\s)\S/g, c => c.toUpperCase());
+}
+
+function _figiToAssetType(secType, secType2) {
+  const t1 = (secType  || '').toLowerCase();
+  const t2 = (secType2 || '').toLowerCase();
+  if (t1 === 'etp' || t2.includes('etf') || t1.includes('fund') || t2.includes('fund')) return 'etf';
+  if (t1 === 'common stock' || t1 === 'equity' || t1.includes('share')) return 'stock';
+  return 'other';
+}
+
+async function getAssetFromISIN(isin, signal) {
+  if (_isinCache.has(isin)) return _isinCache.get(isin);
+  try {
+    const res = await fetch('https://api.openfigi.com/v3/mapping', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body:    JSON.stringify([{ idType: 'ID_ISIN', idValue: isin }]),
+      signal,
+    });
+    if (!res.ok) { _isinCache.set(isin, null); return null; }
+    const json  = await res.json();
+    const items = json?.[0]?.data;
+    if (!items?.length) { _isinCache.set(isin, null); return null; }
+
+    // Prefer US-listed ticker; else take first result
+    const item   = items.find(i => ['US','UW','UN','UA','UP'].includes(i.exchCode)) || items[0];
+    const ticker = item.ticker || '';
+    const exch   = item.exchCode || 'US';
+    const suffix = FIGI_EXCH_SUFFIX[exch] ?? '';
+    const result = {
+      name:   item.name ? _toTitleCase(item.name) : null,
+      type:   _figiToAssetType(item.securityType, item.securityType2),
+      symbol: ticker + suffix,
+      exch,
+    };
+    _isinCache.set(isin, result);
+    return result;
+  } catch (err) {
+    if (err.name !== 'AbortError') _isinCache.set(isin, null);
+    return null;
+  }
+}
+
+// Thin wrapper used by ISIN modal to get a live price before saving
+async function fetchStockPrice(symbol) {
+  const data = await fetchYahooData(symbol);
+  return data?.price ?? null;
+}
+
+// Thin wrapper: find crypto by name/symbol and return price + coinId
+async function fetchCryptoPrice(query) {
+  try {
+    const coin = await searchCoinFallback(query);
+    if (!coin?.id) return null;
+    const prices = await fetchLivePrices([coin.id]);
+    const usd    = prices[coin.id]?.usd ?? null;
+    return usd ? { price: usd, coinId: coin.id } : null;
+  } catch { return null; }
+}
+
 // ── Gold timestamp helpers ─────────────────────────────────
 function formatGoldTs() {
   if (!goldPriceUpdatedAt) return null;
@@ -1377,7 +1463,7 @@ function setUpdateStatus(state) {
 
 async function refreshMarketPrices() {
   const marketAssets = assets.filter(a =>
-    (a.type === 'stock' || a.type === 'etf' || a.type === 'metal') && a.marketSymbol
+    (a.type === 'stock' || a.type === 'etf' || a.type === 'metal' || a.type === 'other') && a.marketSymbol
   );
   if (!marketAssets.length) return;
 
@@ -1434,7 +1520,7 @@ async function refreshPrices() {
 
   const cryptos = assets.filter(a => a.type === 'crypto' && a.coinId);
   const hasMarket = assets.some(a =>
-    (a.type === 'stock' || a.type === 'etf' || a.type === 'metal') && a.marketSymbol
+    (a.type === 'stock' || a.type === 'etf' || a.type === 'metal' || a.type === 'other') && a.marketSymbol
   );
 
   if (!cryptos.length && !hasMarket) return;
@@ -2931,10 +3017,12 @@ function detectTypeFromISIN(isin) {
   return 'other';
 }
 
-function enterManualMode(isin) {
-  isManualMode    = true;
-  manualAssetType = detectTypeFromISIN(isin);
-  manualCurrency  = 'USD';
+function enterManualMode(isin, prefill = {}) {
+  isManualMode         = true;
+  manualAssetType      = prefill.type     || detectTypeFromISIN(isin);
+  manualCurrency       = prefill.currency || 'USD';
+  manualPendingSymbol  = prefill.symbol   || null;
+  manualPendingCoinId  = prefill.coinId   || null;
 
   // Hide search UI
   searchInputWrapEl.style.display = 'none';
@@ -2947,7 +3035,11 @@ function enterManualMode(isin) {
   const mf = document.getElementById('manualFields');
   if (mf) mf.style.display = '';
 
-  // Activate detected type
+  // Auto-fill name if resolved
+  const nameEl = document.getElementById('manualName');
+  if (nameEl && prefill.name) nameEl.value = prefill.name;
+
+  // Activate detected/resolved type
   document.querySelectorAll('#manualTypeToggle [data-mtype]').forEach(btn =>
     btn.classList.toggle('active', btn.dataset.mtype === manualAssetType));
 
@@ -2961,11 +3053,28 @@ function enterManualMode(isin) {
   formPreviewEl.style.display = '';
   btnSubmitEl.style.display   = '';
 
-  setTimeout(() => document.getElementById('manualName')?.focus(), 50);
+  // Auto-fill price if resolved (optional — user can override)
+  if (prefill.price != null && prefill.price > 0) {
+    const priceEl = document.getElementById('manualPrice');
+    if (priceEl) {
+      priceEl.value = prefill.price < 100
+        ? prefill.price.toFixed(4)
+        : prefill.price.toFixed(2);
+      updatePreview();
+    }
+  }
+
+  // Focus: if name was auto-filled, go straight to quantity
+  setTimeout(() => {
+    if (prefill.name) qtyInput.focus();
+    else nameEl?.focus();
+  }, 50);
 }
 
 function exitManualMode() {
-  isManualMode = false;
+  isManualMode        = false;
+  manualPendingSymbol = null;
+  manualPendingCoinId = null;
   const mf = document.getElementById('manualFields');
   if (mf) mf.style.display = 'none';
   searchInputWrapEl.style.display = '';
@@ -2978,6 +3087,8 @@ function exitManualMode() {
 }
 
 function resetISINInput() {
+  // Cancel any in-flight lookup
+  if (isinLookupAbortCtrl) { isinLookupAbortCtrl.abort(); isinLookupAbortCtrl = null; }
   const isinInput  = document.getElementById('isinInput');
   const isinStatus = document.getElementById('isinStatus');
   if (isinInput)  { isinInput.value = ''; }
@@ -3109,13 +3220,16 @@ filterBtns.forEach(btn => {
   });
 });
 
-// ── ISIN input real-time validation ────────────────────────
+// ── ISIN input: real-time validation + async API lookup ─────
 const isinInputEl = document.getElementById('isinInput');
 if (isinInputEl) {
   isinInputEl.addEventListener('input', () => {
     // Force uppercase + strip non-alphanumeric
     const raw = isinInputEl.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (isinInputEl.value !== raw) isinInputEl.value = raw;
+
+    // Cancel any in-flight lookup whenever the user types
+    if (isinLookupAbortCtrl) { isinLookupAbortCtrl.abort(); isinLookupAbortCtrl = null; }
 
     const statusEl = document.getElementById('isinStatus');
     const n = raw.length;
@@ -3135,7 +3249,7 @@ if (isinInputEl) {
       return;
     }
 
-    // Exactly 12 chars — validate: 2 letters + 9 alphanumeric + 1 digit
+    // 12 chars — validate format: 2 letters + 9 alphanumeric + 1 digit
     const valid = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(raw);
     if (!valid) {
       if (isManualMode) exitManualMode();
@@ -3148,12 +3262,62 @@ if (isinInputEl) {
       return;
     }
 
-    // Valid ISIN
+    // Valid ISIN → show loading, then look up asynchronously
     if (statusEl) {
-      statusEl.textContent = t('isinOk');
-      statusEl.className   = 'isin-status isin-status--ok';
+      statusEl.textContent = t('isinLooking');
+      statusEl.className   = 'isin-status isin-status--loading';
     }
-    if (!isManualMode) enterManualMode(raw);
+    if (isManualMode) exitManualMode(); // reset if user edited to a new ISIN
+
+    isinLookupAbortCtrl = new AbortController();
+    const { signal }    = isinLookupAbortCtrl;
+    const isinSnap      = raw;
+
+    (async () => {
+      try {
+        // Step 1: ISIN → ticker/name/type via OpenFIGI
+        const figiResult = await getAssetFromISIN(isinSnap, signal);
+        if (signal.aborted) return;
+
+        const prefill = {};
+        if (figiResult) {
+          prefill.type   = figiResult.type;
+          prefill.name   = figiResult.name;
+          prefill.symbol = figiResult.symbol;
+
+          // Step 2: fetch current price using the resolved symbol
+          if (figiResult.type === 'crypto') {
+            const cp = await fetchCryptoPrice(figiResult.symbol);
+            if (!signal.aborted && cp) { prefill.price = cp.price; prefill.coinId = cp.coinId; }
+          } else if (figiResult.symbol) {
+            const price = await fetchStockPrice(figiResult.symbol);
+            if (!signal.aborted && price) prefill.price = price;
+          }
+        }
+        if (signal.aborted) return;
+
+        // Step 3: update status + enter manual mode with prefilled data
+        if (statusEl) {
+          if (figiResult?.name) {
+            statusEl.textContent = t('isinFound')(figiResult.name);
+            statusEl.className   = 'isin-status isin-status--ok';
+          } else {
+            statusEl.textContent = t('isinNotFound');
+            statusEl.className   = 'isin-status isin-status--warn';
+          }
+        }
+        enterManualMode(isinSnap, prefill);
+
+      } catch (err) {
+        if (err.name === 'AbortError' || signal.aborted) return;
+        if (statusEl) {
+          statusEl.textContent = t('isinLookupError');
+          statusEl.className   = 'isin-status isin-status--warn';
+        }
+        // Fallback: enter manual mode with heuristic type detection only
+        enterManualMode(isinSnap);
+      }
+    })();
   });
 }
 
@@ -3272,6 +3436,9 @@ assetForm.addEventListener('submit', e => {
     if (existing) {
       existing.qty = +(existing.qty + qty).toFixed(8);
       if (price > 0) existing.price = price;
+      // Backfill symbols if a lookup ran after the original save
+      if (manualPendingSymbol  && !existing.marketSymbol) existing.marketSymbol = manualPendingSymbol;
+      if (manualPendingCoinId  && !existing.coinId)       existing.coinId       = manualPendingCoinId;
     } else {
       assets.push({
         id:            Date.now().toString(36) + Math.random().toString(36).slice(2),
@@ -3281,8 +3448,8 @@ assetForm.addEventListener('submit', e => {
         qty,
         price:         price > 0 ? price : 1,
         isin:          isinVal || null,
-        coinId:        null,
-        marketSymbol:  null,
+        coinId:        manualPendingCoinId || null,
+        marketSymbol:  manualPendingSymbol || null,
         assetCurrency: manualCurrency,
         change24h:     null,
         prevPrice:     null,
@@ -3990,7 +4157,7 @@ fetchExchangeRate().then(() => {
 });
 
 refreshPrices();
-setInterval(refreshPrices, 300_000);        // 5 min — suitable cadence for metals
+setInterval(refreshPrices, 60_000);         // 60 s — real-time price updates
 setInterval(fetchExchangeRate, 3_600_000);  // 1 h — EUR/USD rate
 setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only update
 

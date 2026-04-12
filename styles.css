@@ -3857,3 +3857,26 @@ body.modal-open {
 .isin-status--hint  { color: var(--text-muted); }
 .isin-status--ok    { color: var(--green); }
 .isin-status--error { color: var(--red); }
+.isin-status--warn  { color: var(--orange); }
+
+/* Loading spinner for ISIN lookup */
+.isin-status--loading {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.isin-status--loading::before {
+  content: '';
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid rgba(106,115,144,.4);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: isin-spin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes isin-spin {
+  to { transform: rotate(360deg); }
+}
