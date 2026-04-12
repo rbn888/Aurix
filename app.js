@@ -1676,16 +1676,22 @@ function buildCardVisual(type, typeAssets, pct) {
       BTC: '₿', ETH: 'Ξ', SOL: '◎', XRP: '✦', USDT: '₮',
       BNB: '⬡', DOGE: 'Ð', ADA: '₳', DOT: '●', LTC: 'Ł', AVAX: '▲',
     };
-    // Primary glyph from top holding; deterministic bar heights for sparkline
-    const glyph    = (top[0] && GLYPHS[top[0].ticker]) || '◈';
-    const HEIGHTS  = [38, 52, 44, 68, 55, 82, 62, 100];
-    const bars     = HEIGHTS.map((h, i) =>
+    const HEIGHTS = [38, 52, 44, 68, 55, 82, 62, 100];
+    const bars    = HEIGHTS.map((h, i) =>
       `<div class="cc-wave-bar" style="--wh:${h}%;animation-delay:${(i * 0.18).toFixed(2)}s"></div>`
     ).join('');
+    // Stacked glyphs: up to 3 largest holdings, layered as subtle watermarks
+    const GLYPH_TIERS = ['primary', 'secondary', 'tertiary'];
+    const glyphHtml = top.length
+      ? top.slice(0, 3).map((a, i) => {
+          const g = GLYPHS[a.ticker] || '◈';
+          return `<span class="cc-glyph cc-glyph--${GLYPH_TIERS[i]}">${g}</span>`;
+        }).join('')
+      : `<span class="cc-glyph cc-glyph--primary">◈</span>`;
     return `<div class="cat-card-visual cc-vis--crypto">
       <div class="cc-signal-ring"></div>
       <div class="cc-signal-ring"></div>
-      <span class="cc-glyph">${glyph}</span>
+      ${glyphHtml}
       <div class="cc-wave-wrap">${bars}</div>
     </div>`;
   }
@@ -1694,7 +1700,9 @@ function buildCardVisual(type, typeAssets, pct) {
     const hasSilverOnly = top.length > 0 && top.every(a => a.ticker === 'XAG');
     const shineCls = hasSilverOnly ? 'cc-metal-shine--silver' : 'cc-metal-shine--gold';
     const labelCls = hasSilverOnly ? 'cc-metal-label--silver' : 'cc-metal-label--gold';
-    const symbol   = hasSilverOnly ? 'Ag' : 'Au';
+    const symbol   = hasSilverOnly
+      ? (lang === 'es' ? 'Plata' : 'Silver')
+      : (lang === 'es' ? 'Oro'   : 'Gold');
     return `<div class="cat-card-visual cc-vis--metal">
       <div class="cc-metal-shine ${shineCls}"></div>
       <span class="cc-metal-label ${labelCls}">${symbol}</span>
