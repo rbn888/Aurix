@@ -54,8 +54,8 @@ select:focus-visible {
   --glow-medium: 0 0 0 1px rgba(79,140,255,.15), 0 0 22px rgba(79,140,255,.13);
   --glow-strong: 0 0 0 2px rgba(79,140,255,.28), 0 0 30px rgba(79,140,255,.22);
   /* Brand */
-  --aurex-blue:       #2FD3FF;
-  --aurex-blue-light: #4F8CFF;
+  --aurix-blue:       #2FD3FF;
+  --aurix-blue-light: #4F8CFF;
 }
 
 body {
@@ -171,15 +171,15 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ── AUREX brand mark — shared base ───────────────────── */
-.logo-aurex {
+/* ── AURIX brand mark — shared base ───────────────────── */
+.logo-aurix {
   font-family: 'Inter', -apple-system, system-ui, sans-serif;
   font-weight: 600;
   letter-spacing: .60em;
   text-transform: uppercase;
   line-height: 1;
   display: block;
-  background: linear-gradient(90deg, var(--aurex-blue-light) 0%, var(--aurex-blue) 100%);
+  background: linear-gradient(90deg, var(--aurix-blue-light) 0%, var(--aurix-blue) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -188,7 +188,7 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
 }
 
 /* Dashboard header variant — stretched brand mark */
-.logo-block .logo-aurex {
+.logo-block .logo-aurix {
   font-size: 25px;
   transform: scaleX(1.35) scaleY(0.8);
   transform-origin: center center;
@@ -196,17 +196,17 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
   animation: logo-enter .3s .05s var(--ease-out) both;
   transition: filter .20s var(--ease-out), opacity .15s;
 }
-#logoHome:hover .logo-aurex {
+#logoHome:hover .logo-aurix {
   filter: drop-shadow(0 0 12px rgba(79,140,255,.28)) drop-shadow(0 0 26px rgba(79,140,255,.10));
 }
-#logoHome:active .logo-aurex {
+#logoHome:active .logo-aurix {
   opacity: .72;
   filter: drop-shadow(0 0 6px rgba(79,140,255,.16));
   transition-duration: 70ms;
 }
 
 /* Login hero variant — larger, stronger glow */
-.beta-logo-above .logo-aurex {
+.beta-logo-above .logo-aurix {
   font-size: 32px;
   filter: drop-shadow(0 0 18px rgba(79,140,255,.35)) drop-shadow(0 0 40px rgba(79,140,255,.12));
 }
@@ -2545,7 +2545,7 @@ body.modal-open {
     padding: 18px 0 18px;
     margin-bottom: 0;
   }
-  .logo-block .logo-aurex { font-size: 28px; }
+  .logo-block .logo-aurix { font-size: 28px; }
 
   /* Dashboard top — single column, tighter gaps */
   .dashboard-top {
@@ -2847,7 +2847,7 @@ body.modal-open {
   .cc-signal-ring { opacity: 0; }
   .summary-panel::before { animation: none; }
   .chart-wrap::after { animation: none; opacity: 0; }
-  .logo-block .logo-aurex { animation: none; }
+  .logo-block .logo-aurix { animation: none; }
   /* Strip transitions for reduced-motion users */
   .summary-panel,
   .distribution-section,
@@ -2942,7 +2942,7 @@ body.modal-open {
   user-select: none;
 }
 
-/* Login logo sizing handled by .beta-logo-above .logo-aurex above */
+/* Login logo sizing handled by .beta-logo-above .logo-aurix above */
 
 /* ── Main card — glassmorphism ── */
 .beta-card {
@@ -3283,7 +3283,7 @@ body.modal-open {
 @media (max-width: 480px) {
   .beta-card      { padding: 40px 28px 36px; }
   .beta-container { gap: 18px; }
-  .beta-logo-above .logo-aurex { font-size: 26px; }
+  .beta-logo-above .logo-aurix { font-size: 26px; }
 }
 
 /* ── Detail View Hero ──────────────────────────────────────
