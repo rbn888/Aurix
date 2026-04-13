@@ -4841,78 +4841,111 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   }
 
   // ── Core drag state ───────────────────────────────────────
-  let _drag = null; // { card, ph, offX, offY }
+  let _drag = null; // { card, ph, offX, offY, curX, curY, tgtX, tgtY, rafId, lastTarget, lastSide }
 
   function beginDrag(card, clientX, clientY) {
     const rect = card.getBoundingClientRect();
 
-    // Placeholder — holds the space in the grid
+    // Placeholder — holds the grid space
     const ph = document.createElement('div');
     ph.className = 'cat-drag-ph';
     ph.style.height = rect.height + 'px';
     card.after(ph);
 
-    // Lift card out of flow
+    // Lift card out of flow, lock exact size
     Object.assign(card.style, {
-      position: 'fixed',
-      left: rect.left + 'px',
-      top:  rect.top  + 'px',
-      width: rect.width + 'px',
-      margin: '0',
-      zIndex: '1000',
+      position:      'fixed',
+      left:          rect.left   + 'px',
+      top:           rect.top    + 'px',
+      width:         rect.width  + 'px',
+      height:        rect.height + 'px',
+      margin:        '0',
+      zIndex:        '1000',
       pointerEvents: 'none',
-      transition: 'transform 150ms var(--ease-out), opacity 150ms var(--ease-out)',
     });
-    // Animate scale in next frame so transition fires
+
+    // Animate lift in next frame so transitions fire against the resting state
     requestAnimationFrame(() => {
-      card.style.transform = 'scale(1.05)';
-      card.style.opacity   = '0.9';
+      Object.assign(card.style, {
+        transition: 'transform 150ms var(--ease-out), opacity 150ms var(--ease-out), box-shadow 150ms var(--ease-out)',
+        transform:  'scale(1.05)',
+        opacity:    '0.9',
+        boxShadow:  '0 10px 30px rgba(0,0,0,0.4)',
+      });
     });
 
     if (navigator.vibrate) navigator.vibrate(22);
 
-    _drag = { card, ph, offX: clientX - rect.left, offY: clientY - rect.top };
+    _drag = {
+      card, ph,
+      offX: clientX - rect.left,
+      offY: clientY - rect.top,
+      curX: rect.left,  curY: rect.top,   // lerped position
+      tgtX: rect.left,  tgtY: rect.top,   // pointer target position
+      lastTarget: null, lastSide: null,
+      rafId: null,
+    };
+
+    // rAF loop — lerp card position toward pointer (factor 0.18 = smooth trail)
+    function loop() {
+      if (!_drag) return;
+      _drag.curX += (_drag.tgtX - _drag.curX) * 0.18;
+      _drag.curY += (_drag.tgtY - _drag.curY) * 0.18;
+      card.style.left = _drag.curX + 'px';
+      card.style.top  = _drag.curY + 'px';
+      _drag.rafId = requestAnimationFrame(loop);
+    }
+    _drag.rafId = requestAnimationFrame(loop);
   }
 
   function moveDrag(clientX, clientY) {
     if (!_drag) return;
-    const { card, ph, offX, offY } = _drag;
+    // Update lerp target — position is applied by the rAF loop
+    _drag.tgtX = clientX - _drag.offX;
+    _drag.tgtY = clientY - _drag.offY;
 
-    // Card follows pointer
-    card.style.left = (clientX - offX) + 'px';
-    card.style.top  = (clientY - offY) + 'px';
-
-    // pointer-events:none lets elementFromPoint see through the floating card
+    // Detect which grid card the pointer is over (pointer-events:none lets us see through)
     const el     = document.elementFromPoint(clientX, clientY);
     const target = el ? el.closest('.cat-card[data-type]') : null;
-    if (!target || target === card) return;
+    if (!target || target === _drag.card) return;
 
-    // Move placeholder before or after target based on midpoint
-    const r = target.getBoundingClientRect();
-    if (clientY < r.top + r.height / 2) {
-      target.before(ph);
-    } else {
-      target.after(ph);
-    }
+    const r    = target.getBoundingClientRect();
+    const side = clientY < r.top + r.height / 2 ? 'before' : 'after';
+
+    // Only touch the DOM when target or side actually changes (prevents jitter)
+    if (target === _drag.lastTarget && side === _drag.lastSide) return;
+    _drag.lastTarget = target;
+    _drag.lastSide   = side;
+
+    if (side === 'before') target.before(_drag.ph);
+    else                   target.after(_drag.ph);
   }
 
   function endDrag() {
     if (!_drag) return;
-    const { card, ph } = _drag;
+    const { card, ph, rafId } = _drag;
+    cancelAnimationFrame(rafId);  // stop lerp loop
     _drag = null;
 
-    // Kill transition so snap-back is instant
-    card.style.transition = 'none';
-    card.style.transform  = '';
-    card.style.opacity    = '';
+    // Animate card sliding to the placeholder's position
+    const phRect = ph.getBoundingClientRect();
+    Object.assign(card.style, {
+      transition: 'left 160ms var(--ease-out), top 160ms var(--ease-out), transform 160ms var(--ease-out), opacity 160ms var(--ease-out), box-shadow 160ms var(--ease-out)',
+      left:       phRect.left + 'px',
+      top:        phRect.top  + 'px',
+      transform:  'scale(1)',
+      opacity:    '1',
+      boxShadow:  'none',
+    });
 
-    // Drop card into placeholder position
-    ph.replaceWith(card);
-    card.style.cssText = ''; // clear all inline styles
-
-    saveCatOrder();
-    // Suppress the click that would otherwise open the category
-    card.addEventListener('click', e => e.stopPropagation(), { once: true, capture: true });
+    // After animation: put card in DOM, clear all inline styles
+    card.addEventListener('transitionend', () => {
+      ph.replaceWith(card);
+      card.style.cssText = '';
+      saveCatOrder();
+      // Suppress post-drag click from opening the category
+      card.addEventListener('click', e => e.stopPropagation(), { once: true, capture: true });
+    }, { once: true });
   }
 
   function startWith(card, clientX, clientY) {
