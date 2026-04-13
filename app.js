@@ -4928,8 +4928,21 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
     }
     if (!target || target === ph) return;
 
-    const r = target.getBoundingClientRect();
-    const before = clientY < r.top + r.height / 2;
+    const r         = target.getBoundingClientRect();
+    const middle    = r.top + r.height / 2;
+    const threshold = r.height * 0.25;
+
+    let before;
+    if      (clientY < middle - threshold) before = true;
+    else if (clientY > middle + threshold) before = false;
+    else    return; // dead zone — do nothing
+
+    // Skip if placeholder is already in the correct position
+    if (
+      ( before && target.previousSibling === ph) ||
+      (!before && target.nextSibling     === ph)
+    ) return;
+
     ph.parentNode.insertBefore(ph, before ? target : target.nextSibling);
   }
 
