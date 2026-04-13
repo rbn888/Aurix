@@ -4958,16 +4958,17 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   }
 
   function startWith(card, clientX, clientY) {
-    const startX = clientX, startY = clientY;
+    let curX = clientX, curY = clientY; // tracks latest pointer position
     let active = false;
 
     const timer = setTimeout(() => {
       active = true;
-      beginDrag(card, startX, startY);
+      beginDrag(card, curX, curY); // use position at the moment drag fires, not mousedown
     }, 250);
 
     return {
       move(x, y) {
+        curX = x; curY = y; // always track, even before active
         if (!active) return false; // not yet dragging
         moveDrag(x, y);
         return true;
@@ -5017,6 +5018,7 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
       const { clientX: x, clientY: y } = mv.touches[0];
       if (!session.isActive()) {
         if (Math.hypot(x - sx, y - sy) > 8) { session.cancel(); cleanup(); }
+        else session.move(x, y); // track position during long-press hold (returns false, no drag yet)
         return;
       }
       mv.preventDefault();
