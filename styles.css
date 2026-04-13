@@ -766,15 +766,19 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
 /* ── Assets Section top spacing ────────────────────────── */
 .assets-section { margin-top: 24px; }
 
-/* ── Market status badge (cat-card header) ─────────── */
+/* ── Market status badge — top-right corner of cat-card ─── */
 .market-status {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  z-index: 2;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   font-size: 11px;
   font-weight: 500;
-  opacity: 0.8;
-  margin-left: auto;
+  opacity: 0.75;
+  pointer-events: none; /* let clicks pass through to the card */
 }
 .market-status .dot {
   width: 6px;

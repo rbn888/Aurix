@@ -2170,11 +2170,11 @@ function updateCategoryCards() {
 
     return `<button class="cat-card${isEmpty ? ' cat-card--empty' : ''}" data-type="${type}">
       ${visual}
+      ${catStatusHtml}
       <div class="cat-card-content">
         <div class="cat-card-header">
           <span class="cat-card-dot" style="background:${m.color}"></span>
           <span class="cat-card-name">${m.label}</span>
-          ${catStatusHtml}
         </div>
         <span class="cat-card-value" data-target="${isEmpty ? '' : dist.valueBase}">${isEmpty ? '—' : formatBase(dist.valueBase)}</span>
         <span class="cat-card-pct">${isEmpty ? '0.0%' : dist.pct.toFixed(1) + '%'}</span>
