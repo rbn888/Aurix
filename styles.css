@@ -3928,18 +3928,18 @@ body.modal-open {
   .card--exiting      { animation: none !important; opacity: 0; }
 }
 
-/* ── Cat-card drag & drop ───────────────────────────────── */
-.cat-card.cat-dragging {
-  opacity: 0.7;
-  transform: scale(1.02) !important;
-  cursor: grabbing;
-  transition: opacity 100ms, transform 100ms !important;
+/* ── Cat-card drag & drop (floating) ───────────────────── */
+
+/* Placeholder that holds space in the grid while card floats */
+.cat-drag-ph {
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(79, 142, 247, 0.2);
+  pointer-events: none;
+  /* width is managed by grid; height is set inline */
 }
-.cat-card.cat-drag-over {
-  outline: 1px dashed rgba(255, 255, 255, 0.2);
-  transform: none !important;
-  transition: outline 80ms !important;
-}
+
+/* (transitions already defined on .cat-card above) */
 
 /* ── Asset-card Drag & Drop ─────────────────────────────── */
 .asset-card.card--dragging {
