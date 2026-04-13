@@ -795,7 +795,14 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
 .status-dot.delayed {
   background: rgba(243,156,18,.7); /* amber — not aggressive */
 }
-/* .status-dot.closed → inherits var(--text-dim) */
+/* Cripto: soft purple, always-on */
+.status-dot.crypto247 {
+  background: rgba(148, 100, 216, .80);
+}
+/* Mercado cerrado: soft red (informativo, no alarmante) */
+.status-dot.closed {
+  background: rgba(200, 80, 80, .60);
+}
 
 .status-label {
   color: var(--text-muted);
@@ -806,8 +813,11 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
   text-overflow: ellipsis;
   transition: opacity .3s var(--ease-out);
 }
-/* Closed/unknown market: dim the label slightly */
-.status-dot:not(.live):not(.delayed) ~ .status-label {
+/* Cerrado / cripto: ajuste de color del label */
+.status-dot.closed ~ .status-label    { opacity: .60; }
+.status-dot.crypto247 ~ .status-label { color: rgba(148, 100, 216, .70); }
+/* Otros estados desconocidos: atenuar label */
+.status-dot:not(.live):not(.delayed):not(.closed):not(.crypto247) ~ .status-label {
   opacity: 0.55;
 }
 
@@ -2502,20 +2512,20 @@ body.modal-open {
     border-radius: 16px;
   }
   .hero-left {
-    padding: 24px 20px 18px 20px;
+    padding: 18px 20px 12px 20px;
     border-right: none;
     border-bottom: 1px solid rgba(255,255,255,.055);
   }
   .hero-right {
-    padding: 20px 20px 24px;
+    padding: 16px 20px 20px;
   }
   .summary-label {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
   .summary-total {
-    font-size: clamp(30px, 9vw, 44px);
+    font-size: clamp(26px, 8vw, 38px);
     color: #ffffff;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
   .summary-meta {
     font-size: 12px;
@@ -2578,7 +2588,7 @@ body.modal-open {
 
   /* Chart — dominant on mobile */
   .chart-header {
-    margin-bottom: 14px;
+    margin-bottom: 12px;
     flex-wrap: wrap;
     gap: 10px;
   }
@@ -2588,7 +2598,9 @@ body.modal-open {
     justify-content: flex-start;
   }
   .chart-wrap {
-    height: 220px;
+    height: 240px;
+    min-height: 220px;
+    margin-top: 16px;
   }
   .chart-change { font-size: 13px; }
   .range-btn {
@@ -2705,15 +2717,15 @@ body.modal-open {
   /* Suggestions list: tighter max-height on small screens */
   .asset-suggestions { max-height: 42vh; }
 
-  .hero-left     { padding: 20px 16px 16px; }
-  .hero-right    { padding: 18px 16px 20px; }
+  .hero-left     { padding: 16px 14px 10px; }
+  .hero-right    { padding: 14px 14px 18px; }
   .form-row      { grid-template-columns: 1fr; }
 }
 
 /* ── Very small phones (≤ 375px) ───────────────────────── */
 @media (max-width: 375px) {
   .app            { padding: 0 12px 40px; }
-  .summary-total  { font-size: 26px; }
+  .summary-total  { font-size: 24px; }
   .asset-card     { padding: 12px 10px; gap: 0 10px; }
   .btn-add-pos,
   .btn-reduce,
@@ -3890,6 +3902,23 @@ body.modal-open {
 @media (prefers-reduced-motion: reduce) {
   .card--just-updated { animation: none !important; }
   .card--exiting      { animation: none !important; opacity: 0; }
+}
+
+/* ── Card Drag & Drop ───────────────────────────────────── */
+.asset-card.card--dragging {
+  box-shadow: 0 14px 44px rgba(0,0,0,.55), 0 4px 12px rgba(0,0,0,.28);
+  border-color: var(--border-hi);
+  opacity: .96;
+  will-change: top;
+  /* Don't override the animation; just lift visually */
+  transition: box-shadow 150ms var(--ease-out), border-color 150ms var(--ease-out) !important;
+}
+.card--drag-ph {
+  border: 1px dashed rgba(79,142,247,.18);
+  border-radius: var(--radius);
+  pointer-events: none;
+  flex-shrink: 0;
+  transition: height 100ms var(--ease-out);
 }
 
 /* ── Per-asset P&L ──────────────────────────────────────── */

@@ -27,8 +27,8 @@ const T = {
     updateError:     'error al actualizar',
     rateLimit:       'límite API — reintentando pronto',
     // Market status
-    live24:          'Live · 24/7',
-    liveMarket:      'Live · Mercado abierto',
+    live24:          '24/7',
+    liveMarket:      'Mercado abierto',
     closed:          'Mercado cerrado',
     estimatedPrice:  'Precio estimado',
     updatedNow:      'Actualizado ahora',
@@ -178,8 +178,8 @@ const T = {
     updateError:     'update error',
     rateLimit:       'API limit — retrying soon',
     // Market status
-    live24:          'Live · 24/7',
-    liveMarket:      'Live · Market open',
+    live24:          '24/7',
+    liveMarket:      'Market open',
     closed:          'Market closed',
     estimatedPrice:  'Estimated price',
     updatedNow:      'Updated just now',
@@ -591,6 +591,11 @@ let reduceTargetId = null;
 const lookupStatusEl = document.getElementById('lookupStatus');
 const updateDotEl    = document.getElementById('updateDot');
 const updateTextEl   = document.getElementById('updateText');
+
+// ── Card drag & drop order ──────────────────────────────────
+const CARD_ORDER_KEY = 'portfolio_card_order';
+let _cardOrder = JSON.parse(localStorage.getItem(CARD_ORDER_KEY) || 'null') || [];
+let _dd = null; // active drag state
 
 // Show skeleton on total value while initial prices load
 if (assets.length > 0) totalValueEl.classList.add('skeleton');
@@ -1744,7 +1749,7 @@ function getMarketStatus(asset) {
   if (asset.type === 'cash') return null;
 
   if (asset.type === 'crypto') {
-    return { dot: 'live', label: t('live24') };
+    return { dot: 'crypto247', label: t('live24') };
   }
 
   if (asset.type === 'metal') {
@@ -1793,6 +1798,90 @@ function getStatusHtml(asset) {
     `<span class="status-dot ${status.dot}"></span>` +
     `<span class="status-label">${escHtml(status.label)}</span>` +
     `</div>`;
+}
+
+// ── Card drag & drop functions ──────────────────────────────
+function _ddSaveOrder() {
+  const ids = [...assetsListEl.querySelectorAll('.asset-card[data-asset-id]')]
+    .map(c => c.dataset.assetId);
+  _cardOrder = ids;
+  localStorage.setItem(CARD_ORDER_KEY, JSON.stringify(ids));
+}
+
+function applyCustomOrder(assetList) {
+  if (!_cardOrder.length) return assetList;
+  const map = new Map(assetList.map(a => [a.id, a]));
+  const out = [];
+  _cardOrder.forEach(id => { if (map.has(id)) { out.push(map.get(id)); map.delete(id); } });
+  map.forEach(a => out.push(a)); // newly added assets go to the end
+  return out;
+}
+
+function _ddBeginDrag(card, touch) {
+  if (_dd) return;
+  const rect = card.getBoundingClientRect();
+  if (navigator.vibrate) navigator.vibrate(28);
+
+  // Placeholder keeps the gap while card is lifted
+  const ph = document.createElement('div');
+  ph.className  = 'card--drag-ph';
+  ph.style.height = rect.height + 'px';
+  card.after(ph);
+
+  card.classList.add('card--dragging');
+  card.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;margin:0;z-index:500;`;
+
+  _dd = { card, ph, startY: touch.clientY, origTop: rect.top };
+}
+
+function _ddMove(e) {
+  if (!_dd || !e.touches[0]) return;
+  e.preventDefault();
+  const dy  = e.touches[0].clientY - _dd.startY;
+  const top = _dd.origTop + dy;
+  _dd.card.style.top = top + 'px';
+
+  // Move placeholder to the slot where the card would land
+  const center  = top + _dd.card.offsetHeight / 2;
+  const sibs    = [...assetsListEl.querySelectorAll('.asset-card[data-asset-id]:not(.card--dragging)')];
+  let insertBefore = null;
+  for (const s of sibs) {
+    const sr = s.getBoundingClientRect();
+    if (center < sr.top + sr.height / 2) { insertBefore = s; break; }
+  }
+  if (insertBefore) {
+    if (_dd.ph.nextElementSibling !== insertBefore) assetsListEl.insertBefore(_dd.ph, insertBefore);
+  } else if (_dd.ph !== assetsListEl.lastElementChild) {
+    assetsListEl.appendChild(_dd.ph);
+  }
+}
+
+function _ddEnd() {
+  if (!_dd) return;
+  const { card, ph } = _dd;
+  _dd = null;
+
+  // FLIP: record where card is right now (fixed position)
+  const fromTop = parseFloat(card.style.top) || 0;
+
+  // Reset card to normal flow at placeholder's position
+  card.removeAttribute('style');
+  card.classList.remove('card--dragging');
+  ph.replaceWith(card);
+
+  // FLIP invert: measure the jump and counteract it with transform
+  const toRect = card.getBoundingClientRect();
+  const dy     = fromTop - toRect.top;
+  card.style.transform  = `translateY(${dy}px)`;
+  card.style.transition = 'none';
+  card.getBoundingClientRect(); // force layout
+
+  // FLIP play: animate to zero
+  card.style.transition = 'transform 200ms cubic-bezier(.22,1,.36,1)';
+  card.style.transform  = '';
+  setTimeout(() => { card.style.transition = ''; }, 220);
+
+  _ddSaveOrder();
 }
 
 // ── Category navigation ─────────────────────────────────────
@@ -2401,11 +2490,12 @@ function render(animate = false) {
     return;
   }
 
-  // Sort by value descending, then filter to active category if set
+  // Sort by value descending; apply custom drag-drop order in main list view
   const sorted   = [...assets].sort((a, b) => assetNativeValue(b) - assetNativeValue(a));
+  const display  = activeCategory ? sorted : applyCustomOrder(sorted);
   const filtered = activeCategory
-    ? sorted.filter(a => (TYPE_META[a.type] ? a.type : 'other') === activeCategory)
-    : sorted;
+    ? display.filter(a => (TYPE_META[a.type] ? a.type : 'other') === activeCategory)
+    : display;
 
   if (filtered.length === 0) {
     assetsListEl.appendChild(emptyStateEl);
@@ -4698,4 +4788,43 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
 
   // ── Logout ─────────────────────────────────────────────
   btnExit.addEventListener('click', revokeAccess);
+})();
+
+// ── Card drag & drop — single delegated listener ────────────
+(function initCardDragDrop() {
+  assetsListEl.addEventListener('touchstart', e => {
+    if (activeCategory) return;                      // disabled in category detail view
+    const card = e.target.closest('.asset-card[data-asset-id]');
+    if (!card || e.touches.length !== 1) return;
+
+    const t0     = e.touches[0];
+    const startY = t0.clientY;
+    let fired    = false;
+
+    const timer = setTimeout(() => {
+      fired = true;
+      _ddBeginDrag(card, t0);
+    }, 300);
+
+    const onMove = ev => {
+      if (fired) {
+        _ddMove(ev);
+      } else if (Math.abs(ev.touches[0].clientY - startY) > 8) {
+        cancel(); // moved too early — treat as scroll, not long press
+      }
+    };
+
+    const onEnd = () => { cancel(); if (fired) _ddEnd(); };
+
+    function cancel() {
+      clearTimeout(timer);
+      document.removeEventListener('touchmove',   onMove);
+      document.removeEventListener('touchend',    onEnd);
+      document.removeEventListener('touchcancel', onEnd);
+    }
+
+    document.addEventListener('touchmove',   onMove, { passive: false });
+    document.addEventListener('touchend',    onEnd,  { passive: true });
+    document.addEventListener('touchcancel', onEnd,  { passive: true });
+  }, { passive: true });
 })();
