@@ -4841,7 +4841,20 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   }
 
   // ── Core drag state ───────────────────────────────────────
-  let _drag = null; // { card, ph, offX, offY, lastTarget, lastSide }
+  let _drag = null; // { card, ph, offX, offY, lastTarget }
+
+  function getClosestCard(clientX, clientY) {
+    let closest = null;
+    let minDist = Infinity;
+    [...grid.querySelectorAll('.cat-card')].filter(c => c !== _drag.card).forEach(c => {
+      const r = c.getBoundingClientRect();
+      const dx = clientX - (r.left + r.width  / 2);
+      const dy = clientY - (r.top  + r.height / 2);
+      const dist = dx * dx + dy * dy;
+      if (dist < minDist) { minDist = dist; closest = c; }
+    });
+    return closest;
+  }
 
   function beginDrag(card, clientX, clientY) {
     // Read rect before any style changes — used only for placeholder size
@@ -4889,7 +4902,7 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
 
     if (navigator.vibrate) navigator.vibrate(22);
 
-    _drag = { card, ph, offX, offY, lastTarget: null, lastSide: null };
+    _drag = { card, ph, offX, offY, lastTarget: null };
   }
 
   function moveDrag(clientX, clientY) {
@@ -4900,42 +4913,12 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
     card.style.left = (clientX - offX) + 'px';
     card.style.top  = (clientY - offY) + 'px';
 
-    // ── Target detection — rect-based, no elementFromPoint ambiguity ──
-    const allCards = [...grid.querySelectorAll('.cat-card[data-type]')].filter(c => c !== card);
-    let target = allCards.find(c => {
-      const r = c.getBoundingClientRect();
-      return clientY >= r.top && clientY <= r.bottom &&
-             clientX >= r.left - 20 && clientX <= r.right + 20;
-    }) || null;
-
-    // Proximity fallback — closest card by vertical distance (up to 64px)
-    if (!target) {
-      let minDist = 64;
-      allCards.forEach(c => {
-        const r = c.getBoundingClientRect();
-        if (clientX < r.left - 20 || clientX > r.right + 20) return;
-        const dist = clientY < r.top ? r.top - clientY : clientY > r.bottom ? clientY - r.bottom : 0;
-        if (dist < minDist) { minDist = dist; target = c; }
-      });
-    }
-
-    if (!target) return;
-
-    // ── Side detection — 35% threshold zones ─────────────────
-    const r = target.getBoundingClientRect();
-    const threshold = r.height * 0.35;
-    let side;
-    if      (clientY < r.top    + threshold) side = 'before';
-    else if (clientY > r.bottom - threshold) side = 'after';
-    else    side = _drag.lastTarget === target ? _drag.lastSide : 'after';
-
-    // Only mutate DOM when target or side actually changes
-    if (target === _drag.lastTarget && side === _drag.lastSide) return;
+    // ── Target detection — closest card by distance to center ───
+    const target = getClosestCard(clientX, clientY);
+    if (!target || target === _drag.lastTarget) return;
     _drag.lastTarget = target;
-    _drag.lastSide   = side;
 
-    if (side === 'before') target.before(ph);
-    else                   target.after(ph);
+    target.after(_drag.ph);
   }
 
   function endDrag() {
