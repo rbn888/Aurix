@@ -4844,28 +4844,35 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   let _drag = null; // { card, ph, offX, offY, lastTarget, lastSide }
 
   function beginDrag(card, clientX, clientY) {
-    const rect = card.getBoundingClientRect();
+    // Read rect before any style changes — used only for placeholder size
+    const initRect = card.getBoundingClientRect();
 
     // Placeholder — holds the exact grid space
     const ph = document.createElement('div');
     ph.className = 'cat-drag-ph';
-    ph.style.width  = rect.width  + 'px';
-    ph.style.height = rect.height + 'px';
+    ph.style.width  = initRect.width  + 'px';
+    ph.style.height = initRect.height + 'px';
     card.after(ph);
 
-    // offX/offY = pointer position inside card — never recalculated
+    // Step 1: set position:fixed FIRST so the next getBoundingClientRect
+    // reflects the fixed coordinate system (no scroll offset, no ancestor transforms)
+    card.style.position = 'fixed';
+    card.style.zIndex   = '9999';
+
+    // Step 2: recompute rect AFTER position:fixed — this is the authoritative position
+    const rect = card.getBoundingClientRect();
+
+    // Step 3: offsets computed from the post-fixed rect — pointer stays exactly here
     const offX = clientX - rect.left;
     const offY = clientY - rect.top;
 
-    // Lift card — lock exact size, pointer-events:none so elementFromPoint sees through
+    // Lock size and apply remaining lift styles
     Object.assign(card.style, {
-      position:      'fixed',
-      left:          rect.left   + 'px',
-      top:           rect.top    + 'px',
-      width:         rect.width  + 'px',
-      height:        rect.height + 'px',
+      left:          (clientX - offX) + 'px',
+      top:           (clientY - offY) + 'px',
+      width:         initRect.width  + 'px',
+      height:        initRect.height + 'px',
       margin:        '0',
-      zIndex:        '9999',
       pointerEvents: 'none',
       transform:     'translateZ(0)',
     });
