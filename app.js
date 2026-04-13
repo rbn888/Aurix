@@ -4857,9 +4857,20 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   }
 
   function beginDrag(card, clientX, clientY) {
-    // Capture layout size BEFORE any style changes (offsetWidth excludes transforms)
+    // Capture layout size BEFORE any style changes
     const cardW = card.offsetWidth;
     const cardH = card.offsetHeight;
+
+    // Read rects before any DOM/style changes
+    const container      = card.parentNode;
+    const containerRect  = container.getBoundingClientRect();
+    const rect           = card.getBoundingClientRect();
+
+    // Position relative to container and pointer offset (both in viewport coords)
+    const absLeft = rect.left - containerRect.left;
+    const absTop  = rect.top  - containerRect.top;
+    const offX    = clientX   - rect.left;
+    const offY    = clientY   - rect.top;
 
     // Insert placeholder BEFORE card so it occupies the card's exact grid slot
     const ph = document.createElement('div');
@@ -4868,27 +4879,18 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
     ph.style.height = cardH + 'px';
     card.parentNode.insertBefore(ph, card);
 
-    // Step 1: position:fixed + z-index FIRST — establishes the correct coordinate system
-    card.style.position = 'fixed';
-    card.style.zIndex   = '9999';
-
-    // Step 2: rect read AFTER position:fixed — no pre-fixed rect used anywhere
-    const rect = card.getBoundingClientRect();
-
-    // Step 3: offsets from post-fixed rect only
-    const offX = clientX - rect.left;
-    const offY = clientY - rect.top;
-
-    // Lock card at exact pointer-relative position — visually independent from grid
+    // Absolute positioning relative to container — no viewport drift
     Object.assign(card.style, {
-      left:          (clientX - offX) + 'px',
-      top:           (clientY - offY) + 'px',
-      width:         cardW + 'px',
-      height:        cardH + 'px',
+      position:      'absolute',
+      left:          absLeft + 'px',
+      top:           absTop  + 'px',
+      width:         cardW   + 'px',
+      height:        cardH   + 'px',
       margin:        '0',
       transform:     'none',
       pointerEvents: 'none',
       willChange:    'left, top',
+      zIndex:        '9999',
     });
 
     // Animate lift in next frame
@@ -4904,7 +4906,7 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
     card.classList.add('dragging');
     if (navigator.vibrate) navigator.vibrate(22);
 
-    _drag = { card, ph, offX, offY };
+    _drag = { card, ph, offX, offY, container };
   }
 
   function moveDrag(clientX, clientY) {
@@ -4912,9 +4914,10 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
     const card = _drag.card;
     const ph   = _drag.ph;
 
-    // Card tracks pointer 1:1 — offsets from post-fixed rect, never recomputed
-    card.style.left = (clientX - _drag.offX) + 'px';
-    card.style.top  = (clientY - _drag.offY) + 'px';
+    // Card tracks pointer 1:1 — container-relative absolute positioning
+    const containerRect = _drag.container.getBoundingClientRect();
+    card.style.left = (clientX - containerRect.left - _drag.offX) + 'px';
+    card.style.top  = (clientY - containerRect.top  - _drag.offY) + 'px';
 
     // ── Target detection — element under pointer (card has pointer-events:none) ───
     const target = document.elementFromPoint(clientX, clientY)?.closest('.cat-card');
@@ -4922,7 +4925,7 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
 
     // Bounding check with tolerance — forgiving hit area
     const r      = target.getBoundingClientRect();
-    const margin = 40;
+    const margin = 60;
     if (clientX < r.left - margin || clientX > r.right  + margin ||
         clientY < r.top  - margin || clientY > r.bottom + margin) return;
 
