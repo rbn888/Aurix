@@ -1735,23 +1735,16 @@ function animateCardValues() {
 }
 
 // ── Market status ──────────────────────────────────────────
-// ── Market status helpers ───────────────────────────────────
-function isStockMarketOpen() {
-  const now  = new Date();
-  const day  = now.getDay();   // local day: 0 = Sun, 6 = Sat
-  const hour = now.getHours(); // local hour
-  if (day === 0 || day === 6) return false;
-  return hour >= 9 && hour < 17;
-}
-
-// Returns the status string for a given asset type:
-//   'crypto'  → '24/7'
-//   'stock' / 'etf'  → 'open' | 'closed'
-//   anything else  → null (no badge)
 function getMarketStatus(type) {
+  const now = new Date();
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+  // NYSE hours in Spain time: 15:30 – 22:00
+  const open  = 15 * 60 + 30;
+  const close = 22 * 60;
+
   if (type === 'crypto') return '24/7';
   if (type === 'stock' || type === 'etf') {
-    return isStockMarketOpen() ? 'open' : 'closed';
+    return (currentTime >= open && currentTime < close) ? 'open' : 'closed';
   }
   return null;
 }
@@ -2159,12 +2152,19 @@ function updateCategoryCards() {
       }
     }
 
+    const catStatus = getMarketStatus(type);
+    let catStatusHtml = '';
+    if (catStatus === 'open')   catStatusHtml = '<span class="market-status open">● Open</span>';
+    else if (catStatus === 'closed') catStatusHtml = '<span class="market-status closed">● Closed</span>';
+    else if (catStatus === '24/7')   catStatusHtml = '<span class="market-status crypto">● 24/7</span>';
+
     return `<button class="cat-card${isEmpty ? ' cat-card--empty' : ''}" data-type="${type}">
       ${visual}
       <div class="cat-card-content">
         <div class="cat-card-header">
           <span class="cat-card-dot" style="background:${m.color}"></span>
           <span class="cat-card-name">${m.label}</span>
+          ${catStatusHtml}
         </div>
         <span class="cat-card-value" data-target="${isEmpty ? '' : dist.valueBase}">${isEmpty ? '—' : formatBase(dist.valueBase)}</span>
         <span class="cat-card-pct">${isEmpty ? '0.0%' : dist.pct.toFixed(1) + '%'}</span>
@@ -2623,7 +2623,6 @@ function render(animate = false) {
         <div class="dar-info">
           <div class="dar-name">${escHtml(getDisplayName(asset))}</div>
           <div class="dar-sub">${darSubHtml}</div>
-          ${statusHtml}
         </div>
         <div class="dar-right">
           <div class="dar-value ${flashClass}"${prevValueBase != null ? ` data-from="${prevValueBase.toFixed(6)}" data-to="${valueBase.toFixed(6)}"` : ''}>${formatBase(valueBase)}</div>
