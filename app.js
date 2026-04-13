@@ -4846,13 +4846,18 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   function beginDrag(card, clientX, clientY) {
     const rect = card.getBoundingClientRect();
 
-    // Placeholder — holds the grid space
+    // Placeholder — holds the exact grid space
     const ph = document.createElement('div');
     ph.className = 'cat-drag-ph';
     ph.style.height = rect.height + 'px';
     card.after(ph);
 
-    // Lift card out of flow, lock exact size
+    // offX/offY = where the pointer hit inside the card
+    // card.left = clientX - offX → card stays exactly under pointer, zero jump
+    const offX = clientX - rect.left;
+    const offY = clientY - rect.top;
+
+    // Lift card — lock exact size, force GPU layer above everything
     Object.assign(card.style, {
       position:      'fixed',
       left:          rect.left   + 'px',
@@ -4860,15 +4865,16 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
       width:         rect.width  + 'px',
       height:        rect.height + 'px',
       margin:        '0',
-      zIndex:        '1000',
+      zIndex:        '9999',
       pointerEvents: 'none',
+      transform:     'translateZ(0)',   // promote to composite layer immediately
     });
 
-    // Animate lift in next frame so transitions fire against the resting state
+    // Animate lift in next frame (transition fires from resting state above)
     requestAnimationFrame(() => {
       Object.assign(card.style, {
         transition: 'transform 150ms var(--ease-out), opacity 150ms var(--ease-out), box-shadow 150ms var(--ease-out)',
-        transform:  'scale(1.05)',
+        transform:  'translateZ(0) scale(1.05)',
         opacity:    '0.9',
         boxShadow:  '0 10px 30px rgba(0,0,0,0.4)',
       });
@@ -4877,16 +4883,14 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
     if (navigator.vibrate) navigator.vibrate(22);
 
     _drag = {
-      card, ph,
-      offX: clientX - rect.left,
-      offY: clientY - rect.top,
-      curX: rect.left,  curY: rect.top,   // lerped position
-      tgtX: rect.left,  tgtY: rect.top,   // pointer target position
+      card, ph, offX, offY,
+      curX: rect.left,  curY: rect.top,
+      tgtX: rect.left,  tgtY: rect.top,
       lastTarget: null, lastSide: null,
       rafId: null,
     };
 
-    // rAF loop — lerp card position toward pointer (factor 0.18 = smooth trail)
+    // rAF lerp loop — smooth trailing feel
     function loop() {
       if (!_drag) return;
       _drag.curX += (_drag.tgtX - _drag.curX) * 0.18;
@@ -4900,19 +4904,40 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
 
   function moveDrag(clientX, clientY) {
     if (!_drag) return;
-    // Update lerp target — position is applied by the rAF loop
+
+    // Pointer keeps the same relative position inside the card (no re-centering)
     _drag.tgtX = clientX - _drag.offX;
     _drag.tgtY = clientY - _drag.offY;
 
-    // Detect which grid card the pointer is over (pointer-events:none lets us see through)
-    const el     = document.elementFromPoint(clientX, clientY);
-    const target = el ? el.closest('.cat-card[data-type]') : null;
-    if (!target || target === _drag.card) return;
+    // ── Target detection ─────────────────────────────────────
+    // 1. Direct hit (pointer-events:none lets elementFromPoint see through)
+    const el = document.elementFromPoint(clientX, clientY);
+    let target = el ? el.closest('.cat-card[data-type]') : null;
+    if (target === _drag.card) target = null;
 
-    const r    = target.getBoundingClientRect();
-    const side = clientY < r.top + r.height / 2 ? 'before' : 'after';
+    // 2. Proximity fallback — find closest card within 48px when no direct hit
+    if (!target) {
+      const cards = [...grid.querySelectorAll('.cat-card[data-type]')].filter(c => c !== _drag.card);
+      let minDist = 48;
+      cards.forEach(c => {
+        const r = c.getBoundingClientRect();
+        if (clientX < r.left - 12 || clientX > r.right + 12) return; // outside column
+        const dist = clientY < r.top ? r.top - clientY : clientY > r.bottom ? clientY - r.bottom : 0;
+        if (dist < minDist) { minDist = dist; target = c; }
+      });
+    }
 
-    // Only touch the DOM when target or side actually changes (prevents jitter)
+    if (!target) return;
+
+    // ── Side detection with 35% threshold zones ──────────────
+    const r = target.getBoundingClientRect();
+    const threshold = r.height * 0.35;
+    let side;
+    if      (clientY < r.top    + threshold) side = 'before';
+    else if (clientY > r.bottom - threshold) side = 'after';
+    else    side = _drag.lastTarget === target ? _drag.lastSide : 'after'; // sticky middle zone
+
+    // Only touch the DOM when something actually changes
     if (target === _drag.lastTarget && side === _drag.lastSide) return;
     _drag.lastTarget = target;
     _drag.lastSide   = side;
@@ -4924,21 +4949,21 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   function endDrag() {
     if (!_drag) return;
     const { card, ph, rafId } = _drag;
-    cancelAnimationFrame(rafId);  // stop lerp loop
+    cancelAnimationFrame(rafId);
     _drag = null;
 
-    // Animate card sliding to the placeholder's position
+    // Animate card gliding to the placeholder's exact position
     const phRect = ph.getBoundingClientRect();
     Object.assign(card.style, {
       transition: 'left 160ms var(--ease-out), top 160ms var(--ease-out), transform 160ms var(--ease-out), opacity 160ms var(--ease-out), box-shadow 160ms var(--ease-out)',
       left:       phRect.left + 'px',
       top:        phRect.top  + 'px',
-      transform:  'scale(1)',
+      transform:  'translateZ(0) scale(1)',
       opacity:    '1',
       boxShadow:  'none',
     });
 
-    // After animation: put card in DOM, clear all inline styles
+    // After animation: restore card to normal DOM flow
     card.addEventListener('transitionend', () => {
       ph.replaceWith(card);
       card.style.cssText = '';
