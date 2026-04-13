@@ -4857,34 +4857,32 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   }
 
   function beginDrag(card, clientX, clientY) {
-    // Read rect before any style changes — used only for placeholder size
-    const initRect = card.getBoundingClientRect();
-
-    // Placeholder — holds the exact grid space
+    // Insert placeholder first (keeps grid space), but size it AFTER fixed rect is known
     const ph = document.createElement('div');
     ph.className = 'cat-drag-ph';
-    ph.style.width  = initRect.width  + 'px';
-    ph.style.height = initRect.height + 'px';
     card.after(ph);
 
-    // Step 1: set position:fixed FIRST so the next getBoundingClientRect
-    // reflects the fixed coordinate system (no scroll offset, no ancestor transforms)
+    // Step 1: position:fixed + z-index FIRST — establishes the correct coordinate system
     card.style.position = 'fixed';
     card.style.zIndex   = '9999';
 
-    // Step 2: recompute rect AFTER position:fixed — this is the authoritative position
+    // Step 2: rect read AFTER position:fixed — no pre-fixed rect used anywhere
     const rect = card.getBoundingClientRect();
 
-    // Step 3: offsets computed from the post-fixed rect — pointer stays exactly here
+    // Size placeholder from the authoritative rect
+    ph.style.width  = rect.width  + 'px';
+    ph.style.height = rect.height + 'px';
+
+    // Step 3: offsets from post-fixed rect only
     const offX = clientX - rect.left;
     const offY = clientY - rect.top;
 
-    // Lock size and apply remaining lift styles
+    // Lock card at exact pointer-relative position
     Object.assign(card.style, {
       left:          (clientX - offX) + 'px',
       top:           (clientY - offY) + 'px',
-      width:         initRect.width  + 'px',
-      height:        initRect.height + 'px',
+      width:         rect.width  + 'px',
+      height:        rect.height + 'px',
       margin:        '0',
       pointerEvents: 'none',
       transform:     'translateZ(0)',
@@ -4907,11 +4905,10 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
 
   function moveDrag(clientX, clientY) {
     if (!_drag) return;
-    const { card, ph, offX, offY } = _drag;
 
-    // Card tracks pointer 1:1 — no lerp, no lag
-    card.style.left = (clientX - offX) + 'px';
-    card.style.top  = (clientY - offY) + 'px';
+    // Card tracks pointer 1:1 — offsets from post-fixed rect, never recomputed
+    _drag.card.style.left = (clientX - _drag.offX) + 'px';
+    _drag.card.style.top  = (clientY - _drag.offY) + 'px';
 
     // ── Target detection — closest card by distance to center ───
     const target = getClosestCard(clientX, clientY);
