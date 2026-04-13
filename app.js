@@ -2567,7 +2567,11 @@ function render(animate = false) {
              <span class="price">${formatCurrency(asset.price, assetCurr)}${t('perUnit')}${origHtml ? ` · ${origHtml}` : ''}</span>
              ${changeHtml}`;
 
-    const statusHtml = getStatusHtml(asset);
+    const _mStatus = getMarketStatus(asset.type);
+    let statusHtml = '';
+    if (_mStatus === 'open')   statusHtml = '<div class="market-status open">🟢 Open</div>';
+    else if (_mStatus === 'closed') statusHtml = '<div class="market-status closed">🔴 Closed</div>';
+    else if (_mStatus === '24/7')   statusHtml = '<div class="market-status crypto">🟣 24/7</div>';
 
     // Per-asset P&L
     const pnlData = assetPnLBase(asset);
