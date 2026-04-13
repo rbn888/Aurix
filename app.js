@@ -4846,22 +4846,11 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
     const card = e.target.closest('.cat-card');
     if (!card) return;
 
-    const rect          = card.getBoundingClientRect();
-    const container     = card.parentNode;
-    const containerRect = container.getBoundingClientRect();
+    drag = { card, startX: e.clientX, startY: e.clientY, dx: 0, dy: 0 };
 
-    drag = {
-      card,
-      container,
-      offsetX: e.clientX - rect.left,
-      offsetY: e.clientY - rect.top,
-    };
-
-    card.style.position      = 'absolute';
+    card.style.transition    = 'none';
     card.style.zIndex        = '9999';
     card.style.pointerEvents = 'none';
-    card.style.left          = (rect.left - containerRect.left) + 'px';
-    card.style.top           = (rect.top  - containerRect.top)  + 'px';
 
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup',   onPointerUp);
@@ -4869,10 +4858,9 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
 
   function onPointerMove(e) {
     if (!drag) return;
-    const { card, container, offsetX, offsetY } = drag;
-    const containerRect = container.getBoundingClientRect();
-    card.style.left = (e.clientX - containerRect.left - offsetX) + 'px';
-    card.style.top  = (e.clientY - containerRect.top  - offsetY) + 'px';
+    drag.dx = e.clientX - drag.startX;
+    drag.dy = e.clientY - drag.startY;
+    drag.card.style.transform = `translate(${drag.dx}px, ${drag.dy}px) scale(1.02)`;
   }
 
   function onPointerUp(e) {
@@ -4891,9 +4879,8 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
       saveCatOrder();
     }
 
-    card.style.position      = '';
-    card.style.left          = '';
-    card.style.top           = '';
+    card.style.transform     = '';
+    card.style.transition    = '';
     card.style.zIndex        = '';
     card.style.pointerEvents = '';
 
