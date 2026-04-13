@@ -4841,7 +4841,7 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   }
 
   // ── Core drag state ───────────────────────────────────────
-  let _drag = null; // { card, startX, startY, active, lastTarget, container, offX, offY }
+  let _drag = null; // { card, startX, startY, active, lastX, lastY, container, offX, offY }
 
   function getClosestCard(clientX, clientY) {
     let closest = null;
@@ -4858,7 +4858,7 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
 
   function initDrag(card, clientX, clientY) {
     card.style.pointerEvents = 'none';
-    _drag = { card, startX: clientX, startY: clientY, active: false, lastTarget: null, container: card.parentNode, offX: 0, offY: 0 };
+    _drag = { card, startX: clientX, startY: clientY, active: false, lastX: clientX, lastY: clientY, container: card.parentNode, offX: 0, offY: 0 };
   }
 
   function startDraggingVisuals(card, clientX, clientY) {
@@ -4921,44 +4921,43 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
     card.style.left = (clientX - containerRect.left - _drag.offX) + 'px';
     card.style.top  = (clientY - containerRect.top  - _drag.offY) + 'px';
 
-    // ── Target detection — element directly under pointer ───
-    const el     = document.elementFromPoint(clientX, clientY);
-    const target = el?.closest('.cat-card');
-    if (!target || target === card) return;
-
-    if (_drag.lastTarget === target) return;
-    _drag.lastTarget = target;
-
-    // Direct swap: A ↔ B
-    const parent     = card.parentNode;
-    const nextCard   = card.nextSibling;
-    const nextTarget = target.nextSibling;
-    parent.insertBefore(card,   nextTarget);
-    parent.insertBefore(target, nextCard);
+    _drag.lastX = clientX;
+    _drag.lastY = clientY;
   }
 
   function endDrag() {
     if (!_drag) return;
-    const { card, active } = _drag;
+    const { card, active, lastX, lastY } = _drag;
     _drag = null;
 
-    card.style.pointerEvents = '';
-
     if (active) {
-      card.style.position  = '';
-      card.style.left      = '';
-      card.style.top       = '';
-      card.style.width     = '';
-      card.style.height    = '';
-      card.style.margin    = '';
-      card.style.transform = '';
-      card.style.zIndex    = '';
+      // Hit-test while card is still pointer-events:none (transparent to elementFromPoint)
+      const el     = document.elementFromPoint(lastX, lastY);
+      const target = el?.closest('.cat-card');
+      if (target && target !== card) {
+        const parent     = card.parentNode;
+        const nextCard   = card.nextSibling;
+        const nextTarget = target.nextSibling;
+        parent.insertBefore(card,   nextTarget);
+        parent.insertBefore(target, nextCard);
+      }
+
+      card.style.position   = '';
+      card.style.left       = '';
+      card.style.top        = '';
+      card.style.width      = '';
+      card.style.height     = '';
+      card.style.margin     = '';
+      card.style.transform  = '';
+      card.style.zIndex     = '';
       card.style.willChange = '';
       card.classList.remove('dragging');
       saveCatOrder();
       // Block the click that fires after pointerup from triggering card actions
       card.addEventListener('click', e => e.stopPropagation(), { once: true, capture: true });
     }
+
+    card.style.pointerEvents = '';
   }
 
   function startWith(card, clientX, clientY) {
