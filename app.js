@@ -5000,7 +5000,7 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
       card.style.pointerEvents        = 'none';
       card.classList.add('dragging');
       if (navigator.vibrate) navigator.vibrate(15); // stronger pulse = drag armed
-    }, 900); // 900 ms hold — intentional but not exhausting
+    }, 1500); // 1.5 s hold — optimal balance of speed and intent
   }
 
   function onTouchMove(e) {
