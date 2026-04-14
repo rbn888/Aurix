@@ -4950,6 +4950,70 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
     setTimeout(() => { document.body.style.touchAction = 'auto'; }, 50);
   }
 
+  const isMobile = 'ontouchstart' in window;
+
+  // ── Touch path (mobile) — all listeners passive so scroll is never blocked ──
+
+  function onTouchStart(e) {
+    if (activeCategory) return;
+    const card = e.target.closest('.cat-card');
+    if (!card || drag.card) return;
+    const touch = e.touches[0];
+    drag.card    = card;
+    drag.startX  = touch.clientX;
+    drag.startY  = touch.clientY;
+    drag.active  = false;
+    drag.started = false;
+    drag.pressTimer = setTimeout(() => {
+      if (!drag.card) return;
+      drag.active                     = true;
+      document.body.style.touchAction = 'none';
+      card.style.zIndex               = '9999';
+      card.style.transition           = 'none';
+      card.style.pointerEvents        = 'none';
+      card.classList.add('dragging');
+      if (navigator.vibrate) navigator.vibrate(10);
+    }, 220);
+  }
+
+  function onTouchMove(e) {
+    if (!drag.card) return;
+    const touch = e.touches[0];
+    if (!drag.active) {
+      // Timer hasn't fired yet — cancel drag if finger moved, let browser scroll
+      const dx = Math.abs(touch.clientX - drag.startX);
+      const dy = Math.abs(touch.clientY - drag.startY);
+      if (dx > 6 || dy > 6) { clearTimeout(drag.pressTimer); drag.card = null; }
+      return;
+    }
+    drag.started = true;
+    drag.card.style.transform =
+      `translate(${touch.clientX - drag.startX}px, ${touch.clientY - drag.startY}px) scale(1.05)`;
+  }
+
+  function onTouchEnd(e) {
+    clearTimeout(drag.pressTimer);
+    if (!drag.card) return;
+    if (drag.started) {
+      const touch  = e.changedTouches[0];
+      const el     = document.elementFromPoint(touch.clientX, touch.clientY);
+      const target = el?.closest('.cat-card[data-type]');
+      if (target && target !== drag.card) {
+        const parent = drag.card.parentNode;
+        const nextA  = drag.card.nextSibling;
+        const nextB  = target.nextSibling;
+        parent.insertBefore(drag.card, nextB);
+        parent.insertBefore(target,    nextA);
+        saveCatOrder();
+      }
+      justDragged = true;
+      setTimeout(() => { justDragged = false; }, 150);
+    }
+    cleanup();
+  }
+
+  // ── Pointer path (desktop) ──────────────────────────────────────────────────
+
   function onPointerDown(e) {
     if (activeCategory) return;        // disabled in category detail view
     if (drag.card) return;             // interaction already in progress
@@ -4983,7 +5047,14 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
     window.addEventListener('pointercancel', onPointerCancel);
   }
 
-  document.addEventListener('pointerdown', onPointerDown);
+  // ── Register whichever event set matches the device ────────────────────────
+  if (isMobile) {
+    document.addEventListener('touchstart', onTouchStart, { passive: true });
+    document.addEventListener('touchmove',  onTouchMove,  { passive: true });
+    document.addEventListener('touchend',   onTouchEnd);
+  } else {
+    document.addEventListener('pointerdown', onPointerDown);
+  }
 
   // Per-card click guard — blocks any synthetic click on a cat-card
   // that the browser fires within 150 ms of a drag gesture ending
