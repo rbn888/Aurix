@@ -533,6 +533,8 @@ let _inlineEditMode  = null;   // 'add' | 'reduce'
 let portfolioChart   = null;
 let _detailChart     = null;  // Chart.js instance for category detail sparkline
 let _detailChartType = null;  // which category the sparkline was last rendered for
+let _chartRevealProgress = 1; // 0–1 clip for left-to-right line reveal
+let _chartColdDraw   = true;  // true until first successful data draw
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -1054,18 +1056,41 @@ const fillGradientPlugin = {
     if (!chart.chartArea) return;
     const { ctx, chartArea: { top, bottom } } = chart;
     const grad = ctx.createLinearGradient(0, top, 0, bottom);
-    grad.addColorStop(0,   'rgba(100,137,196,0.18)');
-    grad.addColorStop(0.4, 'rgba(100,137,196,0.06)');
-    grad.addColorStop(1,   'rgba(100,137,196,0.00)');
+    grad.addColorStop(0,   'rgba(255,255,255,0.07)');
+    grad.addColorStop(0.5, 'rgba(255,255,255,0.02)');
+    grad.addColorStop(1,   'rgba(255,255,255,0.00)');
     chart.data.datasets.forEach(ds => { ds.backgroundColor = grad; });
   }
 };
 
-// Line glow removed — clean chart line only
+// Subtle glow behind the chart line
 const lineGlowPlugin = {
   id: 'lineGlow',
-  beforeDatasetsDraw() {},
-  afterDatasetsDraw()  {}
+  beforeDatasetsDraw(chart) {
+    chart.ctx.save();
+    chart.ctx.shadowColor = 'rgba(255,255,255,0.10)';
+    chart.ctx.shadowBlur  = 8;
+  },
+  afterDatasetsDraw(chart) {
+    chart.ctx.restore();
+  }
+};
+
+// Clips the canvas to a rect that expands left→right during animation
+const lineRevealPlugin = {
+  id: 'lineReveal',
+  beforeDatasetsDraw(chart) {
+    if (_chartRevealProgress >= 1) return;
+    const { ctx, chartArea } = chart;
+    if (!chartArea) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(chartArea.left, chartArea.top - 5, chartArea.width * _chartRevealProgress, chartArea.height + 10);
+    ctx.clip();
+  },
+  afterDatasetsDraw(chart) {
+    if (_chartRevealProgress < 1) chart.ctx.restore();
+  }
 };
 
 // Draws a vertical dashed crosshair line at the hovered data point
@@ -1147,14 +1172,14 @@ function initChart() {
       labels: [],
       datasets: [{
         data: [],
-        borderColor: '#6489c4',
+        borderColor: 'rgba(255,255,255,0.85)',
         backgroundColor: 'transparent',
         fill: true,
         tension: 0.4,
         pointRadius: 0,
         pointHoverRadius: 4,
-        pointHoverBackgroundColor: '#6489c4',
-        pointHoverBorderColor: '#fff',
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: 'rgba(255,255,255,0.3)',
         pointHoverBorderWidth: 2,
         borderWidth: 2,
       }]
@@ -1173,13 +1198,13 @@ function initChart() {
       },
       scales: {
         x: {
-          grid: { color: 'rgba(255,255,255,0.03)' },
+          grid: { color: 'rgba(255,255,255,0.06)' },
           border: { display: false },
           ticks: { color: '#686868', maxTicksLimit: 6, maxRotation: 0 },
         },
         y: {
           position: 'right',
-          grid: { color: 'rgba(255,255,255,0.03)' },
+          grid: { color: 'rgba(255,255,255,0.06)' },
           border: { display: false },
           ticks: {
             color: '#686868',
@@ -1194,9 +1219,16 @@ function initChart() {
         }
       },
       interaction: { mode: 'index', intersect: false },
-      animation: { duration: 1200, easing: 'easeOutQuart' },
+      animation: {
+        duration: 1200,
+        easing: 'easeOutQuart',
+        onProgress(anim) {
+          _chartRevealProgress = anim.numSteps > 0 ? anim.currentStep / anim.numSteps : 1;
+        },
+        onComplete() { _chartRevealProgress = 1; }
+      },
     },
-    plugins: [fillGradientPlugin, lineGlowPlugin, crosshairPlugin],
+    plugins: [fillGradientPlugin, lineGlowPlugin, lineRevealPlugin, crosshairPlugin],
   });
 
   // Prevent page scroll while dragging on mobile
@@ -1260,11 +1292,17 @@ function updateChart(animate = false) {
 
   portfolioChart.data.labels = data.labels;
   portfolioChart.data.datasets[0].data = data.values;
-  if (animate) {
-    // Range-switch: fast crossfade, not full 1200ms draw
+  if (_chartColdDraw) {
+    // First successful draw — full left-to-right reveal at 1200ms
+    _chartColdDraw = false;
+    _chartRevealProgress = 0;
+    portfolioChart.update();
+  } else if (animate) {
+    // Range-switch or data update — fast 280ms reveal
+    _chartRevealProgress = 0;
     portfolioChart.options.animation.duration = 280;
     portfolioChart.update();
-    portfolioChart.options.animation.duration = 1200; // restore for next cold draw
+    portfolioChart.options.animation.duration = 1200;
   } else {
     portfolioChart.update('none');
   }
