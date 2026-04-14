@@ -4875,37 +4875,32 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
 
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup',   onPointerUp);
+    window.removeEventListener('pointercancel', onPointerCancel);
 
     // Restore scroll immediately after any drag interaction ends
     document.body.style.touchAction = 'auto';
   }
 
+  // pointercancel fires when the browser takes over the gesture (e.g. scroll).
+  // Clear the timer so drag never activates after a scroll starts.
+  function onPointerCancel() {
+    clearTimeout(drag.pressTimer);
+    drag.card = null;
+    window.removeEventListener('pointermove',   onPointerMove);
+    window.removeEventListener('pointerup',     onPointerUp);
+    window.removeEventListener('pointercancel', onPointerCancel);
+  }
+
   function onPointerMove(e) {
-    if (!drag.card) return;
-
-    const dx = Math.abs(e.clientX - drag.startX);
-    const dy = Math.abs(e.clientY - drag.startY);
-
-    if (!drag.active) {
-      // Moved before hold completed → treat as scroll/tap, cancel drag
-      if (dx > 6 || dy > 6) {
-        clearTimeout(drag.pressTimer);
-        drag.card = null;
-        // Remove listeners now — pointerup will fire but drag.card is null
-        // so without this the listeners would stay on window indefinitely
-        window.removeEventListener('pointermove', onPointerMove);
-        window.removeEventListener('pointerup',   onPointerUp);
-        // No touchAction restore needed here — scroll was never locked
-        // (the 180ms timer hadn't fired yet)
-      }
-      return;
-    }
+    if (!drag.active) return;  // pointermove is only attached after hold, but guard anyway
 
     // Block scroll only while the card is actually being dragged
     e.preventDefault();
 
     drag.started = true;
-    drag.card.style.transform =
+    const card = drag.card;
+    if (!card) return;
+    card.style.transform =
       `translate(${e.clientX - drag.startX}px, ${e.clientY - drag.startY}px) scale(1.05)`;
   }
 
@@ -4967,20 +4962,25 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
     drag.started = false;
     drag.active  = false;
 
-    // Arm drag after 180 ms hold — short taps never trigger drag.
-    // Scroll lock is deferred to here so normal card touches don't
-    // block a scroll frame before the cancel path can restore it.
+    // Arm drag after 220 ms hold. pointermove is intentionally NOT attached
+    // here — adding it on pointerdown would make window non-passive and block
+    // scroll even for taps. The browser scrolls freely until hold confirms drag.
     drag.pressTimer = setTimeout(() => {
+      if (!drag.card) return; // cancelled by pointercancel before timer fired
       drag.active                     = true;
-      document.body.style.touchAction = 'none'; // lock scroll only once drag is confirmed
+      document.body.style.touchAction = 'none';
       card.style.zIndex               = '9999';
       card.style.transition           = 'none';
       card.style.pointerEvents        = 'none';
       card.classList.add('dragging');
-    }, 180);
+      // Only now attach pointermove — the non-passive listener no longer
+      // blocks scroll because drag is already confirmed
+      window.addEventListener('pointermove', onPointerMove);
+    }, 220);
 
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup',   onPointerUp);
+    // pointerup handles tap/drop; pointercancel handles browser-scroll takeover
+    window.addEventListener('pointerup',     onPointerUp);
+    window.addEventListener('pointercancel', onPointerCancel);
   }
 
   document.addEventListener('pointerdown', onPointerDown);
