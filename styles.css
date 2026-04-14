@@ -419,7 +419,7 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
 }
 
 .summary-total {
-  font-size: clamp(28px, 3.2vw, 42px);
+  font-size: clamp(28px, 4vw, 42px);
   font-weight: 500;
   color: rgba(255,255,255,0.95);
   letter-spacing: -0.5px;
@@ -428,6 +428,14 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
   font-variant-numeric: tabular-nums;
   text-shadow: 0 0 12px rgba(255,255,255,0.08);
   animation: summaryFadeUp 0.6s ease forwards;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: keep-all;
+}
+/* Compact size when value string exceeds ~12 characters */
+.summary-total--compact {
+  font-size: 32px;
 }
 
 @keyframes summaryFadeUp {
@@ -1149,8 +1157,8 @@ body.modal-open {
   position: relative;
   overflow: hidden;
   display: grid;
-  grid-template-columns: minmax(240px, 380px) 1fr;
-  align-items: center;
+  grid-template-columns: 1fr 1.2fr;
+  align-items: stretch;   /* both columns fill full height — keeps divider intact */
   transition: border-color var(--dur-med) var(--ease-premium);
 }
 
@@ -1161,21 +1169,29 @@ body.modal-open {
 
 /* ── Hero left (total value + actions) ─────────────────── */
 .hero-left {
-  padding: 32px 24px 28px 36px;
+  padding: 24px 20px 28px 36px; /* top matches hero-right so titles align */
   position: relative;
   z-index: 1;
   border-right: 1px solid rgba(255,255,255,.055);
   height: 100%;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
   box-sizing: border-box;
+  overflow: hidden;       /* prevent value from bleeding into chart */
+  max-width: 100%;
+  min-width: 0;
 }
 
 /* ── Hero right (chart) ────────────────────────────────── */
 .hero-right {
-  padding: 22px 24px 18px 20px;
+  padding: 24px 24px 18px 20px; /* top matches hero-left */
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  min-width: 0;
 }
 
 /* ── Distribution Section ─────────────────────────────── */

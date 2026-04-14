@@ -1661,6 +1661,11 @@ let _countUpCurrent  = null;   // last value we displayed (in base currency)
 let _heroRaf         = null;
 let _heroValueShown  = null;   // last value rendered in detail hero (null = not shown yet)
 
+// Apply compact class when formatted value is long (> 12 chars)
+function _applyValueSizeClass() {
+  totalValueEl.classList.toggle('summary-total--compact', totalValueEl.textContent.length > 12);
+}
+
 function countUpTotalValue(targetBase) {
   totalValueEl.classList.remove('skeleton');
 
@@ -1670,6 +1675,7 @@ function countUpTotalValue(targetBase) {
     if (reducedMotion) {
       _countUpCurrent = targetBase;
       totalValueEl.textContent = formatBase(targetBase);
+      _applyValueSizeClass();
       return;
     }
     const end      = targetBase;
@@ -1681,7 +1687,7 @@ function countUpTotalValue(targetBase) {
       const p = Math.min((now - t0) / dur, 1);
       totalValueEl.textContent = formatBase(end * easeOutFirst(p));
       if (p < 1) { _countUpRaf = requestAnimationFrame(step); }
-      else        { _countUpRaf = null; totalValueEl.textContent = formatBase(end); }
+      else        { _countUpRaf = null; totalValueEl.textContent = formatBase(end); _applyValueSizeClass(); }
     })(t0);
     return;
   }
@@ -1715,6 +1721,7 @@ function countUpTotalValue(targetBase) {
     } else {
       _countUpCurrent = end;
       _countUpRaf     = null;
+      _applyValueSizeClass();
     }
   }
 
