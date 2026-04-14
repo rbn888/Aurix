@@ -4895,10 +4895,14 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
         // so without this the listeners would stay on window indefinitely
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup',   onPointerUp);
-        document.body.style.touchAction = 'auto';
+        // No touchAction restore needed here — scroll was never locked
+        // (the 180ms timer hadn't fired yet)
       }
       return;
     }
+
+    // Block scroll only while the card is actually being dragged
+    e.preventDefault();
 
     drag.started = true;
     drag.card.style.transform =
@@ -4957,21 +4961,21 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
     const card = e.target.closest('.cat-card');
     if (!card) return;
 
-    // Lock body scroll for the duration of the potential drag
-    document.body.style.touchAction = 'none';
-
     drag.card    = card;
     drag.startX  = e.clientX;
     drag.startY  = e.clientY;
     drag.started = false;
     drag.active  = false;
 
-    // Arm drag after 180 ms hold — short taps never trigger drag
+    // Arm drag after 180 ms hold — short taps never trigger drag.
+    // Scroll lock is deferred to here so normal card touches don't
+    // block a scroll frame before the cancel path can restore it.
     drag.pressTimer = setTimeout(() => {
-      drag.active               = true;
-      card.style.zIndex         = '9999';
-      card.style.transition     = 'none';
-      card.style.pointerEvents  = 'none';
+      drag.active                     = true;
+      document.body.style.touchAction = 'none'; // lock scroll only once drag is confirmed
+      card.style.zIndex               = '9999';
+      card.style.transition           = 'none';
+      card.style.pointerEvents        = 'none';
       card.classList.add('dragging');
     }, 180);
 
