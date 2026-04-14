@@ -2620,22 +2620,15 @@ body.modal-open {
     gap: 6px;
   }
   .summary-actions  { flex-direction: row; flex-wrap: wrap; gap: 6px; width: auto; }
-  /* Action buttons: text-style, low visual weight */
+  /* Action buttons: keep same style as desktop — only size/padding adjusted */
   .btn-summary-action {
     width: auto;
-    min-height: 26px;
-    font-size: 10.5px;
-    font-weight: 500;
-    padding: 3px 10px;
+    min-height: 30px;
+    font-size: 11px;
+    padding: 5px 12px;
     border-radius: 6px;
   }
-  .btn-primary,
-  .btn-secondary {
-    background: transparent;
-    border-color: rgba(79,142,247,.16);
-    color: rgba(79,142,247,.58);
-    font-weight: 500;
-  }
+  /* btn-primary / btn-secondary: NO colour overrides — desktop values apply unchanged */
 
   /* Distribution — stack donut + legend vertically */
   .distribution-section {
