@@ -4922,10 +4922,17 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
       saveCatOrder();
     }
 
-    // Suppress the synthetic click that fires after a drag
+    // Block the pointerup from propagating and prevent any default click action
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Suppress the synthetic click that fires after a drag (belt-and-suspenders)
     card.addEventListener('click', ev => ev.stopPropagation(), { once: true, capture: true });
 
     cleanup();
+
+    // Extra safety: keep started=true briefly so any late-firing event sees it
+    setTimeout(() => { drag.started = false; }, 50);
   }
 
   function onPointerDown(e) {
