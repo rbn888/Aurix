@@ -559,6 +559,15 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
 .asset-badge.real_estate { background: rgba(167,139,250,.15); color: #a78bfa; }
 .asset-badge.other       { background: rgba(107,114,128,.15); color: #6b7280; }
 
+.asset-badge-logo {
+  width: 28px; height: 28px;
+  object-fit: contain;
+  border-radius: 50%;
+  display: block;
+}
+.badge--has-logo .asset-badge-text { display: none; }
+.dar-badge .asset-badge-logo { width: 22px; height: 22px; }
+
 .asset-info { min-width: 0; }
 
 .asset-name {

@@ -2698,7 +2698,7 @@ function render(animate = false) {
       row.dataset.type    = asset.type;
       row.dataset.assetId = asset.id;
       row.innerHTML = `
-        <div class="dar-badge ${asset.type}">${badgeText}</div>
+        ${buildBadgeHtml(asset, badgeText, 'dar-badge')}
         <div class="dar-info">
           <div class="dar-name">${escHtml(getDisplayName(asset))}</div>
           <div class="dar-sub">${darSubHtml}</div>
@@ -2735,7 +2735,7 @@ function render(animate = false) {
     card.dataset.type    = asset.type;
     card.dataset.assetId = asset.id;
     card.innerHTML = `
-      <div class="asset-badge ${asset.type}">${badgeText}</div>
+      ${buildBadgeHtml(asset, badgeText)}
       <div class="asset-info">
         <div class="asset-name">${escHtml(getDisplayName(asset))}</div>
         <div class="asset-meta">${typeLabel}</div>
@@ -2774,6 +2774,28 @@ function escHtml(str) {
   return str.replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]));
+}
+
+function getAssetLogoUrl(asset) {
+  if (asset.type === 'crypto') {
+    return `https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@d5c68edec1f5eaec59ac77ff2b48144679cc1317/32/color/${asset.ticker.toLowerCase()}.png`;
+  }
+  if (asset.type === 'stock' || asset.type === 'etf') {
+    return `https://financialmodelingprep.com/image-stock/${asset.ticker.toUpperCase()}.png`;
+  }
+  return null;
+}
+
+function buildBadgeHtml(asset, badgeText, cls = 'asset-badge') {
+  const logoUrl = getAssetLogoUrl(asset);
+  if (logoUrl) {
+    return `<div class="${cls} ${asset.type} badge--has-logo">` +
+      `<img class="asset-badge-logo" src="${logoUrl}" alt="" loading="lazy" aria-hidden="true"` +
+      ` onerror="this.parentElement.classList.remove('badge--has-logo')">` +
+      `<span class="asset-badge-text">${badgeText}</span>` +
+      `</div>`;
+  }
+  return `<div class="${cls} ${asset.type}">${badgeText}</div>`;
 }
 
 // Always resolve the display name through the translation system for known assets.
@@ -3785,7 +3807,7 @@ function openReduceModal(id) {
       : `${formatQty(asset.qty)} ${t('unidades')}`;
 
   reduceAssetInfo.innerHTML = `
-    <div class="asset-badge ${asset.type}">${badgeText}</div>
+    ${buildBadgeHtml(asset, badgeText)}
     <div>
       <div class="reduce-info-name">${escHtml(getDisplayName(asset))}</div>
       <div class="reduce-info-qty">${qtyLabel} · ${formatBase(totalBase)}</div>
@@ -3913,7 +3935,7 @@ function openAddModal(id) {
       : `${formatQty(asset.qty)} ${t('unidades')}`;
 
   addAssetInfo.innerHTML = `
-    <div class="asset-badge ${asset.type}">${badgeText}</div>
+    ${buildBadgeHtml(asset, badgeText)}
     <div>
       <div class="reduce-info-name">${escHtml(getDisplayName(asset))}</div>
       <div class="reduce-info-qty">${qtyLabel} · ${formatBase(totalBase)}</div>
