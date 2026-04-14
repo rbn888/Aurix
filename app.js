@@ -513,12 +513,12 @@ let suppressFocusDefaults = false;  // true when focus is programmatic (openModa
 
 // ── Asset type metadata ────────────────────────────────────
 const TYPE_META = {
-  crypto:      { label: 'Cripto',       color: '#5b9cf6' },  // soft blue
-  stock:       { label: 'Acciones',     color: '#c0c8d8' },  // silver-gray
-  etf:         { label: 'Fondos/ETF',   donutLabel: 'Fondos',  color: '#8f9dba' },  // blue-gray
+  crypto:      { label: 'Cripto',       color: '#3b82f6' },  // blue
+  stock:       { label: 'Acciones',     color: '#a0a0a0' },  // neutral gray
+  etf:         { label: 'Fondos/ETF',   donutLabel: 'Fondos',  color: '#a78bfa' },  // soft purple
   metal:       { label: 'Metales',      color: '#d4a843' },  // warm gold
-  cash:        { label: 'Liquidez',     color: '#4ade80' },  // soft green
-  real_estate: { label: 'Inmuebles',   donutLabel: 'Inmob.', color: '#a78bfa' },  // soft purple
+  cash:        { label: 'Liquidez',     color: '#22c55e' },  // green
+  real_estate: { label: 'Inmuebles',   donutLabel: 'Inmob.', color: '#c084fc' },  // lighter purple
   other:       { label: 'Otros',        color: '#6b7280' },  // muted gray
 };
 
