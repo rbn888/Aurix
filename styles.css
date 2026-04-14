@@ -1536,8 +1536,6 @@ body.modal-open {
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   -webkit-user-select: none;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   box-shadow:
     0 4px 12px rgba(0,0,0,0.15),
     inset 0 1px 0 rgba(255,255,255,0.05);
@@ -1654,6 +1652,16 @@ body.modal-open {
 @media (max-width: 480px) {
   .categories-grid { grid-template-columns: 1fr; gap: 10px; }
   .cat-card { min-height: 100px; }
+}
+/* Blur only on desktop — skip on mobile to avoid GPU lag */
+@media (min-width: 768px) {
+  .cat-card {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+}
+@media (max-width: 767px) {
+  .cat-card { background: rgba(255,255,255,0.03); }
 }
 
 /* ── Category card content wrapper (sits above visual) ──── */
