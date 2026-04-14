@@ -4978,17 +4978,16 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
 
   function onTouchMove(e) {
     if (!drag.card) return;
-    const touch = e.touches[0];
-    if (!drag.active) {
-      // Timer hasn't fired yet — cancel drag if finger moved, let browser scroll
-      const dx = Math.abs(touch.clientX - drag.startX);
-      const dy = Math.abs(touch.clientY - drag.startY);
-      if (dx > 6 || dy > 6) { clearTimeout(drag.pressTimer); drag.card = null; }
-      return;
-    }
+    if (!drag.active) return;   // still in hold-timer window — let browser scroll
+
+    clearTimeout(drag.pressTimer);
     drag.started = true;
-    drag.card.style.transform =
-      `translate(${touch.clientX - drag.startX}px, ${touch.clientY - drag.startY}px) scale(1.05)`;
+    e.preventDefault();         // block scroll while card is being dragged
+
+    const touch = e.touches[0];
+    const dx = touch.clientX - drag.startX;
+    const dy = touch.clientY - drag.startY;
+    drag.card.style.transform = `translate(${dx}px, ${dy}px) scale(1.05)`;
   }
 
   function onTouchEnd(e) {
@@ -5050,7 +5049,7 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   // ── Register whichever event set matches the device ────────────────────────
   if (isMobile) {
     document.addEventListener('touchstart', onTouchStart, { passive: true });
-    document.addEventListener('touchmove',  onTouchMove,  { passive: true });
+    document.addEventListener('touchmove',  onTouchMove,  { passive: false });
     document.addEventListener('touchend',   onTouchEnd);
   } else {
     document.addEventListener('pointerdown', onPointerDown);
