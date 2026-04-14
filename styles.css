@@ -1157,7 +1157,7 @@ body.modal-open {
   position: relative;
   overflow: hidden;
   display: grid;
-  grid-template-columns: 1fr 1.2fr;
+  grid-template-columns: 1fr 1.5fr;
   align-items: stretch;   /* both columns fill full height — keeps divider intact */
   transition: border-color var(--dur-med) var(--ease-premium);
 }
