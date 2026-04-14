@@ -4983,16 +4983,24 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
     drag.startY  = touch.clientY;
     drag.active  = false;
     drag.started = false;
+
+    // Instant press feedback — user feels the touch immediately
+    card.style.transition = 'transform 0.08s ease';
+    card.style.transform  = 'scale(0.96)';
+    if (navigator.vibrate) navigator.vibrate(5);
+
     drag.pressTimer = setTimeout(() => {
       if (!drag.card) return;
       drag.active                     = true;
       document.body.style.touchAction = 'none';
+      card.style.transition           = 'all 0.15s ease';
+      card.style.transform            = 'scale(1.05)';
+      card.style.boxShadow            = '0 12px 30px rgba(0,0,0,0.25)';
       card.style.zIndex               = '9999';
-      card.style.transition           = 'none';
       card.style.pointerEvents        = 'none';
       card.classList.add('dragging');
-      if (navigator.vibrate) navigator.vibrate(10);
-    }, 2000); // 2 s hold required — prevents accidental drag during scroll
+      if (navigator.vibrate) navigator.vibrate(15); // stronger pulse = drag armed
+    }, 900); // 900 ms hold — intentional but not exhausting
   }
 
   function onTouchMove(e) {
@@ -5006,6 +5014,8 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
     if (!drag.active) {
       if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
         clearTimeout(drag.pressTimer);
+        drag.card.style.transform = '';
+        drag.card.style.transition = '';
         drag.card = null;
       }
       return;
@@ -5020,6 +5030,13 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   function onTouchEnd(e) {
     clearTimeout(drag.pressTimer);
     if (!drag.card) return;
+    // Released before hold completed — snap scale back
+    if (!drag.active) {
+      drag.card.style.transform  = '';
+      drag.card.style.transition = '';
+      drag.card = null;
+      return;
+    }
     if (drag.started) {
       const touch  = e.changedTouches[0];
       const el     = document.elementFromPoint(touch.clientX, touch.clientY);
