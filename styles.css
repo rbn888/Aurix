@@ -1735,17 +1735,21 @@ body.modal-open {
   bottom: 10px;
   right: 10px;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
-  max-width: 45%;
+  width: auto !important;
+  max-width: none !important;
   pointer-events: none;
-  background: none;
-  box-shadow: none;
+  background: none !important;
+  box-shadow: none !important;
 }
 
 .cat-card-visual img {
+  display: inline-block !important;
+  flex: 0 0 auto !important;
   width: 24px;
   height: 24px;
   border-radius: 50%;
@@ -1765,17 +1769,17 @@ body.modal-open {
 .cat-card-visual img:hover { transform: scale(1.1); opacity: 1; }
 
 .logo-fallback {
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
   width: 24px;
   height: 24px;
   border-radius: 50%;
   background: rgba(255,255,255,0.08);
-  display: flex;
   align-items: center;
   justify-content: center;
   font-size: 11px;
   font-weight: 600;
   color: rgba(255,255,255,0.6);
-  flex-shrink: 0;
 }
 
 @media (max-width: 768px) {
