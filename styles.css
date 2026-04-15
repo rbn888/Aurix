@@ -1634,7 +1634,7 @@ body.modal-open {
 }
 .cat-card--empty .cat-card-value { color: var(--text-muted); }
 .cat-card--empty:hover { border-color: var(--border-hi); }
-.cat-card--empty .cat-card-visual { opacity: 0.12 !important; }
+.cat-card--empty .cat-card-visual { opacity: 0.25; }
 
 .cat-card-header {
   display: flex;
@@ -1725,273 +1725,43 @@ body.modal-open {
 
 /* ── Category card visual system ────────────────────────── */
 
-/* Keyframes */
-@keyframes cc-drift-up {
-  0%, 100% { transform: translateY(0);    opacity: 0.55; }
-  45%, 55%  { transform: translateY(-4px); opacity: 0.85; }
-}
-@keyframes cc-breathe {
-  0%, 100% { opacity: 0.48; transform: scaleY(1);    }
-  50%       { opacity: 0.82; transform: scaleY(1.06); }
-}
-@keyframes cc-metal-sweep {
-  0%   { background-position: 170% 0; opacity: 0.35; }
-  50%  { background-position: -20% 0; opacity: 0.80; }
-  100% { background-position: -170% 0; opacity: 0.35; }
-}
-@keyframes cc-bldg-pulse {
-  0%, 100% { opacity: 0.55; filter: brightness(1); }
-  50%       { opacity: 0.85; filter: brightness(1.12) drop-shadow(0 0 4px rgba(167,139,250,.22)); }
-}
-@keyframes cc-flow-run {
-  0%   { background-position: 160% 0; opacity: 0.28; }
-  45%  { opacity: 0.68; }
-  55%  { opacity: 0.68; }
-  100% { background-position: -160% 0; opacity: 0.28; }
-}
-
-/* Base visual container */
-.cat-card-visual {
-  position: absolute;
-  right: 14px;
-  bottom: 0;
-  width: 96px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-end;
-  padding: 0 0 14px;
-  gap: 5px;
-  pointer-events: none;
-  overflow: hidden;
-  transition: opacity .25s ease, filter .25s ease, transform .25s ease;
-}
-
-/* Resting opacities per category */
-.cc-vis--crypto     { opacity: 0.46; overflow: visible; }
-.cc-vis--stock,
-.cc-vis--etf        { opacity: 0.52; }
-.cc-vis--metal      { opacity: 0.56; overflow: visible; }
-.cc-vis--cash       { opacity: 0.48; }
-.cc-vis--realestate { opacity: 0.50; }
-
-/* Hover reveals */
-.cat-card:hover .cc-vis--crypto     { opacity: 0.62; transform: scale(1.03); filter: brightness(1.15); }
-.cat-card:hover .cc-vis--stock,
-.cat-card:hover .cc-vis--etf        { opacity: 0.74; transform: scale(1.02); }
-.cat-card:hover .cc-vis--metal      { opacity: 0.78; filter: brightness(1.15); }
-.cat-card:hover .cc-vis--cash       { opacity: 0.66; transform: scale(1.02); }
-.cat-card:hover .cc-vis--realestate { opacity: 0.70; filter: brightness(1.2); }
-
 /* Category card: no ambient glow — clean surface */
 .cat-card::before { display: none; }
 .cat-card--empty::before { display: none; }
 
-/* ── Crypto: signal ring ────────────────────────────────── */
-@keyframes crypto-signal {
-  0%   { transform: translate(-50%,-50%) scale(.4); opacity: .7; }
-  70%  { transform: translate(-50%,-50%) scale(2.4); opacity: 0;  }
-  100% { transform: translate(-50%,-50%) scale(2.4); opacity: 0;  }
-}
-
-.cc-signal-ring {
+/* Visual container — bottom-right logo zone */
+.cat-card-visual {
   position: absolute;
-  top: 52%; left: 26%;
-  width: 16px; height: 16px;
-  border: 1.5px solid rgba(91,156,246,.35);
-  border-radius: 50%;
-  pointer-events: none;
-  animation: crypto-signal 4.5s ease-in-out infinite;
-  will-change: transform, opacity;
-}
-.cc-signal-ring:nth-child(2) { animation-delay: 2.25s; }
-
-/* ── Stock / ETF: micro sparkline chart ─────────────────── */
-.cc-micro-chart {
+  bottom: 10px;
+  right: 10px;
   display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  width: 72px;
-  height: 24px;
-  flex-shrink: 0;
-}
-.cc-micro-bar {
-  flex: 1;
-  border-radius: 1px 1px 0 0;
-  transform-origin: bottom center;
-  animation: cc-breathe 3.8s ease-in-out infinite;
-  will-change: transform, opacity;
-}
-.cc-vis--stock .cc-micro-bar { background: linear-gradient(to top, rgba(192,200,216,.9), rgba(192,200,216,.18)); }
-.cc-vis--etf   .cc-micro-bar { background: linear-gradient(to top, rgba(143,157,186,.9), rgba(143,157,186,.18)); }
-
-/* ── CRYPTO: glyph watermark + animated bar chart ──────── */
-.cc-vis--crypto { flex-direction: column; justify-content: flex-end; align-items: flex-end; }
-
-/* Shared glyph base */
-.cc-glyph {
-  position: absolute;
-  font-weight: 900;
-  line-height: 1;
-  user-select: none;
-  color: #5b9cf6;
-}
-/* Primary glyph breathe */
-@keyframes cc-glyph-breathe {
-  0%, 100% { opacity: 0.06; transform: translateY(-50%) scale(1);    }
-  50%       { opacity: 0.09; transform: translateY(-50%) scale(1.03); }
-}
-/* Primary: large centered watermark, right column */
-.cc-glyph--primary {
-  top: 44%;
-  right: 4px;
-  font-size: 52px;
-  opacity: 0.07;
-  transform: translateY(-50%);
-  animation: cc-glyph-breathe 6.5s ease-in-out infinite;
-  will-change: opacity, transform;
-}
-/* Secondary: smaller, upper-left of visual zone */
-.cc-glyph--secondary {
-  top: 8px;
-  right: 54px;
-  font-size: 22px;
-  opacity: 0.06;
-}
-/* Tertiary: smallest, tucked in mid-area to avoid wave overlap */
-.cc-glyph--tertiary {
-  top: 30px;
-  right: 6px;
-  font-size: 15px;
-  opacity: 0.05;
-}
-
-.cc-wave-wrap {
-  position: relative;
-  width: 82px;
-  height: 44px;
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  flex-shrink: 0;
-}
-.cc-wave-bar {
-  flex: 1;
-  height: var(--wh, 50%);
-  background: linear-gradient(to top, rgba(91,156,246,.80), rgba(91,156,246,.16));
-  border-radius: 2px 2px 0 0;
-  transform-origin: bottom center;
-  animation: cc-breathe 4s ease-in-out infinite;
-  will-change: transform, opacity;
-}
-
-/* ── STOCK / ETF: ticker + micro sparkline ──────────────── */
-.cc-vis--stock,
-.cc-vis--etf { flex-direction: column; justify-content: flex-end; align-items: flex-end; gap: 4px; }
-
-.cc-ticker-big {
-  font-size: 20px;
-  font-weight: 900;
-  letter-spacing: -.04em;
-  line-height: 1;
-  text-align: right;
-  white-space: nowrap;
-  animation: cc-drift-up 7s ease-in-out infinite;
-  will-change: transform, opacity;
-}
-.cc-vis--stock .cc-ticker-big { color: #c0c8d8; }
-.cc-vis--etf   .cc-ticker-big { color: #8f9dba; }
-
-/* Secondary ticker — smaller, faded, staggered drift */
-.cc-ticker-secondary {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: -.02em;
-  line-height: 1;
-  text-align: right;
-  white-space: nowrap;
-  opacity: .45;
-  animation: cc-drift-up 7s ease-in-out 1.8s infinite;
-  will-change: transform, opacity;
-}
-.cc-vis--stock .cc-ticker-secondary { color: #c0c8d8; }
-.cc-vis--etf   .cc-ticker-secondary { color: #8f9dba; }
-
-/* ── METAL: horizontal shimmer sweep (gold / silver) ────── */
-.cc-vis--metal { flex-direction: column; justify-content: center; align-items: center; padding: 0; }
-
-.cc-metal-shine {
-  position: absolute;
-  left: -24px; right: -24px;
-  height: 14px;
-  border-radius: 7px;
-  background-size: 300% 100%;
-  animation: cc-metal-sweep 5.5s ease-in-out infinite;
-  will-change: background-position, opacity;
-}
-.cc-metal-shine--gold {
-  background: linear-gradient(90deg,
-    transparent 0%, rgba(212,168,67,.0) 18%,
-    rgba(245,210,80,.85) 42%, rgba(255,238,140,1) 50%,
-    rgba(245,210,80,.85) 58%, rgba(212,168,67,.0) 82%, transparent 100%);
-  background-size: 300% 100%;
-}
-.cc-metal-shine--silver {
-  background: linear-gradient(90deg,
-    transparent 0%, rgba(140,160,175,.0) 18%,
-    rgba(210,226,238,.85) 42%, rgba(245,252,255,1) 50%,
-    rgba(210,226,238,.85) 58%, rgba(140,160,175,.0) 82%, transparent 100%);
-  background-size: 300% 100%;
-}
-.cc-metal-label {
-  position: absolute;
-  bottom: 8px; right: 4px;
-  font-size: 20px;
-  font-weight: 900;
-  opacity: 0.18;
-  letter-spacing: -.02em;
-  line-height: 1;
-  user-select: none;
-}
-.cc-metal-label--gold   { color: #d4a843; }
-.cc-metal-label--silver { color: #aec6d8; }
-
-/* ── REAL ESTATE: skyline with glow pulse ───────────────── */
-.cc-vis--realestate {
-  flex-direction: row;
-  align-items: flex-end;
+  flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 4px;
-  padding-bottom: 10px;
-}
-.cc-bldg {
-  width: 11px;
-  height: var(--bh, 40px);
-  border-radius: 2px 2px 0 0;
-  background: linear-gradient(180deg, #c4b5fd 0%, #7c3aed 60%, #5b21b6 100%);
-  transform-origin: bottom center;
-  animation: cc-bldg-pulse 5.5s ease-in-out infinite;
-  will-change: opacity, filter;
+  align-content: flex-end;
+  gap: 8px;
+  max-width: 45%;
+  pointer-events: none;
 }
 
-/* ── CASH: flowing left-to-right ribbon ─────────────────── */
-.cc-vis--cash { gap: 5px; }
-.cc-flow {
-  width: var(--fw, 100%);
-  height: 5px;
-  border-radius: 3px;
-  background-size: 300% 100%;
-  animation: cc-flow-run 5.5s ease-in-out infinite;
-  will-change: background-position, opacity;
+@keyframes logoIn {
+  to { opacity: 1; transform: scale(1); }
 }
-.cc-flow--green {
-  background: linear-gradient(90deg,
-    transparent 0%, rgba(74,222,128,.0) 15%,
-    rgba(74,222,128,.55) 38%, rgba(134,239,172,.70) 50%,
-    rgba(74,222,128,.55) 62%, rgba(74,222,128,.0) 85%, transparent 100%);
-  background-size: 300% 100%;
+
+.cat-card-visual img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.08);
+  padding: 3px;
+  opacity: 0;
+  transform: scale(0.8);
+  animation: logoIn 0.25s ease forwards;
+  transition: transform 0.2s ease, opacity 0.2s ease;
 }
+
+.cat-card-visual img:hover { transform: scale(1.15); }
 
 /* ── Section filter nav bar (category view) ─────────────── */
 .section-header {
@@ -2910,10 +2680,8 @@ body.modal-open {
   .categories-grid .cat-card          { opacity: 1; transform: none; }
   .categories-grid .cat-card.cat-card--visible { transition: none; }
   .chart-wrap--drawing::after { animation: none; opacity: 0; }
-  .cc-wave-bar, .cc-metal-shine, .cc-bldg, .cc-flow, .cc-ticker-big,
-  .cc-ticker-secondary, .cc-micro-bar, .cc-signal-ring { animation: none; }
-  .cc-signal-ring { opacity: 0; }
   .hero-card::before { animation: none; }
+  .cat-card-visual img { animation: none; opacity: 1; transform: none; }
   .chart-wrap::after { animation: none; opacity: 0; }
   .logo-block .logo-aurix { animation: none; }
   /* Strip transitions for reduced-motion users */
@@ -3689,7 +3457,6 @@ body.modal-open {
 @media (prefers-reduced-motion: reduce) {
   .detail-asset-row.dar-entering { animation: none; }
   .cat-card::before               { animation: none; }
-  .cc-glyph--primary              { animation: none; }
 }
 
 /* ── Inline Asset Edit Strip ───────────────────────────── */

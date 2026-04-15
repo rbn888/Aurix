@@ -463,6 +463,8 @@ const ASSET_DB = [
 ];
 
 let assets              = load();
+const LOGO_CACHE        = {};   // sym → resolved url | null  (in-memory)
+let   _cgMap            = null; // sym → coingecko id  (in-memory, backed by localStorage)
 
 // One-time migration: backfill costBasis for existing assets that predate this field.
 // Sets costBasis = qty × price at migration time — P&L starts at 0 and grows honestly.
@@ -2077,91 +2079,28 @@ function setActiveCategory(type) {
 }
 
 // ── Category card visual builder ───────────────────────────
-// Returns decorative HTML for each asset type. Animations use
-// only transform / opacity / background-position — GPU-only.
-function buildCardVisual(type, typeAssets, pct) {
-  const top = [...typeAssets]
-    .sort((a, b) => assetNativeValue(b) - assetNativeValue(a))
-    .slice(0, 3);
+// Renders logos in the bottom-right visual zone.
+// Size scales down automatically as asset count grows.
+// Crypto tries spothq CDN first, falls back to atomiclabs via _logoFallback.
+function buildCardVisual(type, typeAssets) {
+  const validAssets = typeAssets
+    .map(a => ({ symbol: a.ticker, url: getAssetLogo(a.ticker, a.type), type: a.type }))
+    .filter(a => a.url);
 
-  if (type === 'crypto') {
-    const GLYPHS = {
-      BTC: '₿', ETH: 'Ξ', SOL: '◎', XRP: '✦', USDT: '₮',
-      BNB: '⬡', DOGE: 'Ð', ADA: '₳', DOT: '●', LTC: 'Ł', AVAX: '▲',
-    };
-    const HEIGHTS = [38, 52, 44, 68, 55, 82, 62, 100];
-    const bars    = HEIGHTS.map((h, i) =>
-      `<div class="cc-wave-bar" style="--wh:${h}%;animation-delay:${(i * 0.18).toFixed(2)}s"></div>`
-    ).join('');
-    // Stacked glyphs: up to 3 largest holdings, layered as subtle watermarks
-    const GLYPH_TIERS = ['primary', 'secondary', 'tertiary'];
-    const glyphHtml = top.length
-      ? top.slice(0, 3).map((a, i) => {
-          const g = GLYPHS[a.ticker] || '◈';
-          return `<span class="cc-glyph cc-glyph--${GLYPH_TIERS[i]}">${g}</span>`;
-        }).join('')
-      : `<span class="cc-glyph cc-glyph--primary">◈</span>`;
-    return `<div class="cat-card-visual cc-vis--crypto">
-      <div class="cc-signal-ring"></div>
-      <div class="cc-signal-ring"></div>
-      ${glyphHtml}
-      <div class="cc-wave-wrap">${bars}</div>
-    </div>`;
-  }
+  if (!validAssets.length) return '';
 
-  if (type === 'metal') {
-    const hasSilverOnly = top.length > 0 && top.every(a => a.ticker === 'XAG');
-    const shineCls = hasSilverOnly ? 'cc-metal-shine--silver' : 'cc-metal-shine--gold';
-    const labelCls = hasSilverOnly ? 'cc-metal-label--silver' : 'cc-metal-label--gold';
-    const symbol   = hasSilverOnly
-      ? (lang === 'es' ? 'Plata' : 'Silver')
-      : (lang === 'es' ? 'Oro'   : 'Gold');
-    return `<div class="cat-card-visual cc-vis--metal">
-      <div class="cc-metal-shine ${shineCls}"></div>
-      <span class="cc-metal-label ${labelCls}">${symbol}</span>
-    </div>`;
-  }
+  const count = validAssets.length;
+  const size  = count > 4 ? 22 : 26;
 
-  if (type === 'stock' || type === 'etf') {
-    const fallback = type === 'etf'
-      ? [{ ticker: 'SPY' }, { ticker: 'QQQ' }]
-      : [{ ticker: 'TSLA' }, { ticker: 'AAPL' }];
-    const src  = top.length ? top : fallback;
-    const chip = src.slice(0, 2).map((a, i) =>
-      i === 0
-        ? `<span class="cc-ticker-big">${escHtml(a.ticker.slice(0, 5))}</span>`
-        : `<span class="cc-ticker-secondary">${escHtml(a.ticker.slice(0, 5))}</span>`
-    ).join('');
-    // Micro sparkline — deterministic heights give a realistic chart silhouette
-    const SPARK_H = type === 'etf'
-      ? [42, 38, 55, 48, 62, 58, 72, 66, 80, 74]
-      : [38, 50, 44, 60, 52, 78, 64, 55, 88, 70];
-    const sparkBars = SPARK_H.map((h, i) =>
-      `<div class="cc-micro-bar" style="height:${h}%;animation-delay:${(i * 0.20).toFixed(2)}s"></div>`
-    ).join('');
-    return `<div class="cat-card-visual cc-vis--${type}">
-      ${chip}
-      <div class="cc-micro-chart">${sparkBars}</div>
-    </div>`;
-  }
+  const imgs = validAssets.map(a => {
+    const sym   = escHtml(a.symbol);
+    const onErr = a.type === 'crypto' ? '_logoFallback(this)' : 'this.style.display=\'none\'';
+    const extra = a.type === 'crypto' ? ' data-step="0"' : '';
+    return `<img src="${a.url}" width="${size}" height="${size}" alt="${sym} logo" ` +
+      `data-key="${sym}"${extra} onerror="${onErr}">`;
+  }).join('');
 
-  if (type === 'cash') {
-    const bars = [100, 80, 62].map((fw, i) =>
-      `<div class="cc-flow cc-flow--green" style="--fw:${fw}%;animation-delay:${(i * 0.9).toFixed(2)}s"></div>`
-    ).join('');
-    return `<div class="cat-card-visual cc-vis--cash">${bars}</div>`;
-  }
-
-  if (type === 'real_estate') {
-    const bldgCount = Math.min(5, Math.max(3, Math.floor(pct / 12) + 2));
-    const HEIGHTS   = [55, 32, 72, 22, 46];
-    const blocks    = Array.from({ length: bldgCount }, (_, i) =>
-      `<div class="cc-bldg" style="--bh:${HEIGHTS[i % HEIGHTS.length]}px;animation-delay:${(i * 0.7).toFixed(1)}s"></div>`
-    ).join('');
-    return `<div class="cat-card-visual cc-vis--realestate">${blocks}</div>`;
-  }
-
-  return '';
+  return `<div class="cat-card-visual size-${count}">${imgs}</div>`;
 }
 
 function updateCategoryCards() {
@@ -2776,22 +2715,93 @@ function escHtml(str) {
   }[c]));
 }
 
-function getAssetLogoUrl(asset) {
-  if (asset.type === 'crypto') {
-    return `https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@d5c68edec1f5eaec59ac77ff2b48144679cc1317/32/color/${asset.ticker.toLowerCase()}.png`;
+function getAssetLogo(symbol, type) {
+  const sym = symbol.toLowerCase().trim();
+  if (type === 'crypto') {
+    return `https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/32/color/${sym}.png`;
   }
-  if (asset.type === 'stock' || asset.type === 'etf') {
-    return `https://financialmodelingprep.com/image-stock/${asset.ticker.toUpperCase()}.png`;
+  if (type === 'stock' || type === 'etf') {
+    return `https://financialmodelingprep.com/image-stock/${symbol.toUpperCase().trim()}.png`;
   }
   return null;
+}
+
+// ── Logo resolution helpers ─────────────────────────────────
+
+async function _loadCgMap() {
+  if (_cgMap) return _cgMap;
+  try {
+    const raw = localStorage.getItem('_cg_map');
+    if (raw) { _cgMap = JSON.parse(raw); return _cgMap; }
+    const data = await (await fetch('https://api.coingecko.com/api/v3/coins/list')).json();
+    _cgMap = {};
+    data.forEach(c => { if (c.symbol) _cgMap[c.symbol.toLowerCase()] = c.id; });
+    try { localStorage.setItem('_cg_map', JSON.stringify(_cgMap)); } catch {}
+  } catch { _cgMap = {}; }
+  return _cgMap;
+}
+
+async function _fetchLogoFromCG(sym) {
+  if (sym in LOGO_CACHE) return LOGO_CACHE[sym];
+  const lsKey  = `_logo_${sym}`;
+  const cached = localStorage.getItem(lsKey);
+  if (cached !== null) { LOGO_CACHE[sym] = cached || null; return LOGO_CACHE[sym]; }
+  try {
+    const id = (await _loadCgMap())[sym];
+    if (!id) { LOGO_CACHE[sym] = null; try { localStorage.setItem(lsKey, ''); } catch {} return null; }
+    const data = await (await fetch(`https://api.coingecko.com/api/v3/coins/${id}`)).json();
+    const url  = data?.image?.small || null;
+    LOGO_CACHE[sym] = url;
+    try { localStorage.setItem(lsKey, url || ''); } catch {}
+    return url;
+  } catch { LOGO_CACHE[sym] = null; return null; }
+}
+
+function _logoFallback(img) {
+  const step = parseInt(img.dataset.step || '0', 10);
+  const sym  = (img.dataset.key || '').toLowerCase().trim();
+  if (step === 0) {
+    // spothq failed → atomiclabs
+    img.dataset.step = '1';
+    img.src = `https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@master/32/color/${sym}.png`;
+  } else if (step === 1) {
+    // atomiclabs failed → CoinGecko (async, cached)
+    img.dataset.step = '2';
+    img.onerror = null;
+    _fetchLogoFromCG(sym).then(url => {
+      if (url) {
+        img.src = url;
+        img.onerror = () => _logoFinalHide(img);
+      } else {
+        _logoFinalHide(img);
+      }
+    });
+  } else {
+    _logoFinalHide(img);
+  }
+}
+
+function _logoFinalHide(img) {
+  img.style.display = 'none';
+  if (img.parentElement) img.parentElement.classList.remove('badge--has-logo');
+}
+
+function getAssetLogoUrl(asset) {
+  return getAssetLogo(asset.ticker, asset.type);
 }
 
 function buildBadgeHtml(asset, badgeText, cls = 'asset-badge') {
   const logoUrl = getAssetLogoUrl(asset);
   if (logoUrl) {
+    const isCrypto = asset.type === 'crypto';
+    const sym      = escHtml(asset.ticker.toLowerCase().trim());
+    const extra    = isCrypto ? ` data-key="${sym}" data-step="0"` : '';
+    const onErr    = isCrypto
+      ? `_logoFallback(this)`
+      : `this.parentElement.classList.remove('badge--has-logo')`;
     return `<div class="${cls} ${asset.type} badge--has-logo">` +
       `<img class="asset-badge-logo" src="${logoUrl}" alt="" loading="lazy" aria-hidden="true"` +
-      ` onerror="this.parentElement.classList.remove('badge--has-logo')">` +
+      `${extra} onerror="${onErr}">` +
       `<span class="asset-badge-text">${badgeText}</span>` +
       `</div>`;
   }
