@@ -2080,8 +2080,8 @@ function setActiveCategory(type) {
 
 // ── Category card visual builder ───────────────────────────
 // Renders logos in the bottom-right visual zone.
-// Size scales down automatically as asset count grows.
-// Crypto tries spothq CDN first, falls back to atomiclabs via _logoFallback.
+// Renders logos in the bottom-right visual zone.
+// Crypto tries spothq CDN first, falls back via _logoFallback.
 function buildCardVisual(type, typeAssets) {
   const validAssets = typeAssets
     .map(a => ({ symbol: a.ticker, url: getAssetLogo(a.ticker, a.type), type: a.type }))
@@ -2089,18 +2089,15 @@ function buildCardVisual(type, typeAssets) {
 
   if (!validAssets.length) return '';
 
-  const count = validAssets.length;
-  const size  = count > 4 ? 22 : 26;
-
   const imgs = validAssets.map(a => {
     const sym   = escHtml(a.symbol);
     const onErr = a.type === 'crypto' ? '_logoFallback(this)' : 'this.style.display=\'none\'';
-    const extra = a.type === 'crypto' ? ' data-step="0"' : '';
-    return `<img src="${a.url}" width="${size}" height="${size}" alt="${sym} logo" ` +
-      `data-key="${sym}"${extra} onerror="${onErr}">`;
+    const extra = a.type === 'crypto' ? ' data-fallback-step="0"' : '';
+    return `<img src="${a.url}" width="24" height="24" alt="${sym} logo" ` +
+      `data-key="${sym}"${extra} onload="this.classList.add('loaded')" onerror="${onErr}">`;
   }).join('');
 
-  return `<div class="cat-card-visual size-${count}">${imgs}</div>`;
+  return `<div class="cat-card-visual">${imgs}</div>`;
 }
 
 function updateCategoryCards() {
@@ -2758,19 +2755,20 @@ async function _fetchLogoFromCG(sym) {
 }
 
 function _logoFallback(img) {
-  const step = parseInt(img.dataset.step || '0', 10);
+  const step = parseInt(img.dataset.fallbackStep || '0', 10);
   const sym  = (img.dataset.key || '').toLowerCase().trim();
   if (step === 0) {
     // spothq failed → atomiclabs
-    img.dataset.step = '1';
+    img.dataset.fallbackStep = '1';
     img.src = `https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@master/32/color/${sym}.png`;
   } else if (step === 1) {
     // atomiclabs failed → CoinGecko (async, cached)
-    img.dataset.step = '2';
+    img.dataset.fallbackStep = '2';
     img.onerror = null;
     _fetchLogoFromCG(sym).then(url => {
       if (url) {
         img.src = url;
+        img.onload  = () => img.classList.add('loaded');
         img.onerror = () => _logoFinalHide(img);
       } else {
         _logoFinalHide(img);
@@ -2781,9 +2779,22 @@ function _logoFallback(img) {
   }
 }
 
+function createFallback(sym) {
+  const div = document.createElement('div');
+  div.className = 'logo-fallback';
+  div.textContent = (sym[0] || '?').toUpperCase();
+  return div;
+}
+
 function _logoFinalHide(img) {
-  img.style.display = 'none';
-  if (img.parentElement) img.parentElement.classList.remove('badge--has-logo');
+  const sym = (img.dataset.key || '').trim();
+  if (sym && img.closest('.cat-card-visual')) {
+    img.style.display = 'none';
+    img.parentElement.appendChild(createFallback(sym));
+  } else {
+    img.style.display = 'none';
+    if (img.parentElement) img.parentElement.classList.remove('badge--has-logo');
+  }
 }
 
 function getAssetLogoUrl(asset) {

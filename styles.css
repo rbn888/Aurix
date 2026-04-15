@@ -1737,31 +1737,51 @@ body.modal-open {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  align-content: flex-end;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
   max-width: 45%;
   pointer-events: none;
-}
-
-@keyframes logoIn {
-  to { opacity: 1; transform: scale(1); }
+  background: none;
+  box-shadow: none;
 }
 
 .cat-card-visual img {
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: contain;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: rgba(255,255,255,0.06);
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.08);
   padding: 3px;
+  object-fit: contain;
   opacity: 0;
-  transform: scale(0.8);
-  animation: logoIn 0.25s ease forwards;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  transform: scale(0.85);
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.cat-card-visual img:hover { transform: scale(1.15); }
+.cat-card-visual img.loaded {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.cat-card-visual img:hover { transform: scale(1.1); opacity: 1; }
+
+.logo-fallback {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.6);
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .cat-card-visual img { width: 22px; height: 22px; }
+  .logo-fallback        { width: 22px; height: 22px; }
+}
 
 /* ── Section filter nav bar (category view) ─────────────── */
 .section-header {
@@ -2681,7 +2701,7 @@ body.modal-open {
   .categories-grid .cat-card.cat-card--visible { transition: none; }
   .chart-wrap--drawing::after { animation: none; opacity: 0; }
   .hero-card::before { animation: none; }
-  .cat-card-visual img { animation: none; opacity: 1; transform: none; }
+  .cat-card-visual img { opacity: 1 !important; transform: scale(1) !important; transition: none !important; }
   .chart-wrap::after { animation: none; opacity: 0; }
   .logo-block .logo-aurix { animation: none; }
   /* Strip transitions for reduced-motion users */
@@ -3836,3 +3856,4 @@ body.modal-open {
 }
 .dar-pnl.up   { color: var(--green); }
 .dar-pnl.down { color: var(--red); }
+
