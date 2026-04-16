@@ -1270,7 +1270,9 @@ function initChart() {
 function getChartData(range) {
   const now = Date.now();
   const ms  = { '24h': 86_400_000, '7d': 7 * 86_400_000, '30d': 30 * 86_400_000, '1y': 365 * 86_400_000 };
-  const pts = range === 'all' ? [...portfolioHistory] : portfolioHistory.filter(p => p.ts >= now - ms[range]);
+  // Prefer live CoinGecko data (set by services/history.js) when available.
+  const src = (window._liveHistory && window._liveHistory[range]) || portfolioHistory;
+  const pts = range === 'all' ? [...src] : src.filter(p => p.ts >= now - ms[range]);
   if (pts.length < 2) return null;
 
   const fmt = ts => {
