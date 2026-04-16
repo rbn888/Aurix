@@ -801,8 +801,29 @@ function gramsToDisplay(g) {
 
 // ── History storage ────────────────────────────────────────
 function loadHistory() {
-  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
-  catch { return []; }
+  try {
+    const raw = JSON.parse(localStorage.getItem(HISTORY_KEY));
+    if (!Array.isArray(raw)) return [];
+
+    // Sanitize on load: discard malformed entries, dedupe by timestamp
+    // (keep last occurrence), then sort ascending.  This ensures the
+    // in-memory array is always clean regardless of what was stored.
+    const valid = raw.filter(p =>
+      p &&
+      typeof p.ts    === 'number' &&
+      typeof p.value === 'number' &&
+      isFinite(p.value) &&
+      p.value > 0
+    );
+
+    const deduped = Object.values(
+      valid.reduce((acc, p) => { acc[p.ts] = p; return acc; }, {})
+    );
+
+    return deduped.sort((a, b) => a.ts - b.ts);
+  } catch {
+    return [];
+  }
 }
 
 function saveHistory() {
@@ -843,17 +864,18 @@ function recordSnapshot(force = false) {
   if (!force && now - lastSnapshotMs < 60_000) return;
   lastSnapshotMs = now;
 
-  const last = portfolioHistory[portfolioHistory.length - 1];
-  if (last && now - last.ts < 60_000) {
-    last.value = +(val.toFixed(2));
-    last.ts    = now;
-  } else {
-    portfolioHistory.push({ ts: now, value: +(val.toFixed(2)) });
-  }
+  const last    = portfolioHistory[portfolioHistory.length - 1];
+  const newPoint = { ts: now, value: +(val.toFixed(2)) };
 
-  // Keep only last 365 days
+  // Build a new array — never mutate existing entries.
+  // If the last snapshot is within the same 60-second window, replace it
+  // (upsert) so we don't accumulate sub-minute duplicates.  Otherwise append.
+  const base = (last && now - last.ts < 60_000)
+    ? portfolioHistory.slice(0, -1)
+    : portfolioHistory;
+
   const cutoff = now - 365 * 86_400_000;
-  portfolioHistory = portfolioHistory.filter(p => p.ts >= cutoff);
+  portfolioHistory = [...base, newPoint].filter(p => p.ts >= cutoff);
   saveHistory();
 }
 
