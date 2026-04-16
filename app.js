@@ -1574,6 +1574,7 @@ async function fetchYahooData(symbol) {
   for (const url of proxies) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(1000) }); // 1s max
+      console.log('[yahoo]', url, 'status:', res.status);
       if (!res.ok) continue;
       let json = await res.json();
       if (typeof json.contents === 'string') json = JSON.parse(json.contents);
@@ -1586,7 +1587,7 @@ async function fetchYahooData(symbol) {
                          || result.meta?.previousClose
                          || null;
       return { price, name, previousClose };
-    } catch { /* try next proxy */ }
+    } catch (err) { console.log('[yahoo]', url, 'error:', err.message); }
   }
   return null;
 }
