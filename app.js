@@ -1856,6 +1856,7 @@ async function refreshPrices() {
     setUpdateStatus('ok');
 
   } catch (err) {
+    console.error('[refreshPrices] catch:', err);
     // ── 5. Rollback — restore exact previous state ────────────────────
     // DO NOT call onPortfolioChange — no history point is written.
     assets.forEach((a, i) => {
