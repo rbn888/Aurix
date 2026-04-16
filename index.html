@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=57">
+  <link rel="stylesheet" href="styles.css?v=58">
 </head>
 <body>
 
@@ -420,8 +420,38 @@
     </div>
   </div>
 
+  <!-- Modal: Añadir transacción -->
+  <div class="modal-overlay" id="txOverlay">
+    <div class="modal modal--sm">
+      <div class="modal-header">
+        <h3>Añadir transacción</h3>
+        <button class="modal-close" id="txClose">✕</button>
+      </div>
+      <form id="txForm" class="modal-body">
+        <div class="form-group">
+          <label>Tipo</label>
+          <div class="type-toggle" id="txTypeToggle">
+            <button type="button" class="type-btn active" data-txtype="buy">Compra</button>
+            <button type="button" class="type-btn" data-txtype="sell">Venta</button>
+          </div>
+          <input type="hidden" id="txTypeHidden" value="buy">
+        </div>
+        <div class="form-group">
+          <label for="txQty">Cantidad</label>
+          <input type="text" inputmode="decimal" id="txQty" placeholder="0" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="txPrice">Precio por unidad</label>
+          <input type="text" inputmode="decimal" id="txPrice" placeholder="0,00" autocomplete="off">
+        </div>
+        <div class="reduce-error" id="txError"></div>
+        <button type="submit" class="btn-submit btn-submit--green">Añadir transacción</button>
+      </form>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-  <script src="app.js?v=73"></script>
+  <script src="app.js?v=74"></script>
   <script src="services/prices.js"></script>
   <script src="services/history.js"></script>
 </body>

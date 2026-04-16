@@ -760,6 +760,14 @@ function assetPnLBase(asset) {
   return { abs: toBase(pnlNative, curr), pct: (pnlNative / costBasis) * 100 };
 }
 
+function avgBuyPrice(asset) {
+  const buys = (asset.transactions || []).filter(tx => tx.type === 'buy');
+  if (!buys.length) return null;
+  const totalQty  = buys.reduce((s, tx) => s + tx.qty,         0);
+  const totalCost = buys.reduce((s, tx) => s + tx.qty * tx.price, 0);
+  return totalQty > 0 ? totalCost / totalQty : null;
+}
+
 function totalCostBasisBase() {
   return assets.reduce((sum, a) => {
     if (a.type === 'cash' || a.type === 'real_estate') return sum;
@@ -2806,6 +2814,20 @@ function render(animate = false) {
          <button class="btn-reduce"  title="${t('btnReduce')}" data-id="${asset.id}">−</button>
          <button class="btn-delete"  title="${t('btnDelete')}" data-id="${asset.id}">✕</button>`;
 
+    // Detail row: extend actions with transaction button; compute avg buy summary
+    const darActionsHtml = (!isRE && !isCash)
+      ? actionsHtml + `<button class="btn-add-tx" title="${lang === 'es' ? 'Añadir transacción' : 'Add transaction'}" data-id="${asset.id}">↗</button>`
+      : actionsHtml;
+
+    const txInfo = (() => {
+      const buys = (asset.transactions || []).filter(tx => tx.type === 'buy');
+      if (!buys.length) return '';
+      const avg         = avgBuyPrice(asset);
+      const totalBought = buys.reduce((s, tx) => s + tx.qty, 0);
+      const avgFmt      = avg != null ? formatCurrency(avg, assetCurr) : '—';
+      return `<div class="dar-tx-info">∅ ${avgFmt} · ${formatQty(totalBought)} ${lang === 'es' ? 'comprado' : 'bought'}</div>`;
+    })();
+
     // ── Premium detail row (category drill-down view) ────────
     if (activeCategory) {
       const darChangeCls  = typeof change24 === 'number'
@@ -2840,12 +2862,13 @@ function render(animate = false) {
         <div class="dar-info">
           <div class="dar-name">${escHtml(getDisplayName(asset))}</div>
           <div class="dar-sub">${darSubHtml}</div>
+          ${txInfo}
         </div>
         <div class="dar-right">
           <div class="dar-value ${flashClass}"${prevValueBase != null ? ` data-from="${prevValueBase.toFixed(6)}" data-to="${valueBase.toFixed(6)}"` : ''}>${formatBase(valueBase)}</div>
           ${darChangeHtml}
           ${pnlData ? `<span class="dar-pnl ${pnlData.abs >= 0 ? 'up' : 'down'}">${pnlData.abs >= 0 ? '+' : '−'}${formatBase(Math.abs(pnlData.abs))} (${pnlData.abs >= 0 ? '+' : '−'}${Math.abs(pnlData.pct).toFixed(1)}%)</span>` : ''}
-          <div class="dar-actions">${actionsHtml}</div>
+          <div class="dar-actions">${darActionsHtml}</div>
         </div>
         <div class="asset-edit-strip dar-strip" id="aes-${asset.id}">
           <div class="aes-body">
@@ -4432,6 +4455,9 @@ assetsListEl.addEventListener('click', e => {
   const editREBtn = e.target.closest('.btn-edit-re');
   if (editREBtn) { openEditRealEstateModal(editREBtn.dataset.id); return; }
 
+  const txBtn = e.target.closest('.btn-add-tx');
+  if (txBtn) { openTxModal(txBtn.dataset.id); return; }
+
   const addBtn = e.target.closest('.btn-add-pos');
   if (addBtn) {
     const id = addBtn.dataset.id;
@@ -4632,6 +4658,64 @@ if (goldUnitGroupEl) {
     });
   });
 }
+
+// ── Transaction system ─────────────────────────────────────
+function addTransaction(assetId, type, qty, price) {
+  const asset = assets.find(a => a.id === assetId);
+  if (!asset) return;
+  if (!asset.transactions) asset.transactions = [];
+  asset.transactions.push({ type, qty, price, ts: Date.now() });
+  save();
+}
+
+let _txAssetId  = null;
+const txOverlay    = document.getElementById('txOverlay');
+const txForm       = document.getElementById('txForm');
+const txQtyInput   = document.getElementById('txQty');
+const txPriceInput = document.getElementById('txPrice');
+const txErrorEl    = document.getElementById('txError');
+const txTypeHidden = document.getElementById('txTypeHidden');
+
+function openTxModal(assetId) {
+  _txAssetId = assetId;
+  txForm.reset();
+  txTypeHidden.value = 'buy';
+  document.querySelectorAll('#txTypeToggle [data-txtype]')
+    .forEach(b => b.classList.toggle('active', b.dataset.txtype === 'buy'));
+  txErrorEl.textContent = '';
+  txOverlay.classList.add('open');
+  document.body.classList.add('modal-open');
+  setTimeout(() => txQtyInput.focus(), 50);
+}
+
+function closeTxModal() {
+  txOverlay.classList.remove('open');
+  document.body.classList.remove('modal-open');
+  _txAssetId = null;
+}
+
+document.getElementById('txClose').addEventListener('click', closeTxModal);
+txOverlay.addEventListener('click', e => { if (e.target === txOverlay) closeTxModal(); });
+
+document.querySelectorAll('#txTypeToggle [data-txtype]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    txTypeHidden.value = btn.dataset.txtype;
+    document.querySelectorAll('#txTypeToggle [data-txtype]')
+      .forEach(b => b.classList.toggle('active', b === btn));
+  });
+});
+
+txForm.addEventListener('submit', e => {
+  e.preventDefault();
+  if (!_txAssetId) return;
+  const qty   = parseLocalFloat(txQtyInput.value);
+  const price = parseLocalFloat(txPriceInput.value);
+  if (isNaN(qty)   || qty   <= 0) { txQtyInput.focus();   return; }
+  if (isNaN(price) || price <= 0) { txPriceInput.focus(); return; }
+  addTransaction(_txAssetId, txTypeHidden.value, qty, price);
+  render();
+  closeTxModal();
+});
 
 // ── Event Listeners ────────────────────────────────────────
 document.getElementById('logoHome')

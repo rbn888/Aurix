@@ -3877,3 +3877,18 @@ img {
   filter: none !important;
 }
 
+
+/* ── Transaction system ───────────────────────────────────── */
+.dar-actions .btn-add-tx:hover {
+  color: var(--accent);
+  border-color: rgba(79,142,247,.30);
+  background: rgba(79,142,247,.08);
+}
+
+.dar-tx-info {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+}
