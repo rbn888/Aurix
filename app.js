@@ -857,26 +857,26 @@ function generateSimulatedHistory(currentVal) {
   return [...daily, ...hourly, { ts: now, value: +(currentVal.toFixed(2)) }];
 }
 
-function recordSnapshot(force = false) {
+function recordSnapshot() {
   const now = Date.now();
   const val = totalValueUSD(); // always store in USD for consistent history
   if (val <= 0) return;
-  if (!force && now - lastSnapshotMs < 60_000) return;
-  lastSnapshotMs = now;
 
-  const last    = portfolioHistory[portfolioHistory.length - 1];
+  const last     = portfolioHistory[portfolioHistory.length - 1];
   const newPoint = { ts: now, value: +(val.toFixed(2)) };
 
-  // Build a new array — never mutate existing entries.
-  // If the last snapshot is within the same 60-second window, replace it
-  // (upsert) so we don't accumulate sub-minute duplicates.  Otherwise append.
-  const base = (last && now - last.ts < 60_000)
+  // Dedup: upsert only if called within 5 s of the last point (same moment).
+  // Otherwise strictly append so historyLength grows on every price refresh.
+  const base = (last && now - last.ts < 5_000)
     ? portfolioHistory.slice(0, -1)
     : portfolioHistory;
 
   const cutoff = now - 365 * 86_400_000;
   portfolioHistory = [...base, newPoint].filter(p => p.ts >= cutoff);
+  lastSnapshotMs = now;
   saveHistory();
+
+  console.log('[snapshot]', { ts: now, total: totalValueBase(), historyLength: portfolioHistory.length });
 }
 
 // ── Distribution donut ─────────────────────────────────────
@@ -1438,9 +1438,6 @@ function getChartData(range) {
 
 function updateChart(animate = false) {
   if (!portfolioChart) return;
-  // Guarantee the last history point reflects the current portfolio value
-  // before we read chart data — satisfies the "last value = live total" rule.
-  recordSnapshot(true); // force-sync last history point to current prices before reading
   const data = getChartData(activeRange);
 
   if (!data.values.length) {
@@ -1490,9 +1487,9 @@ function updateChart(animate = false) {
   }
 }
 
-function onPortfolioChange(force = false) {
-  recordSnapshot(force);
-  updateChart(force);   // animate chart when user makes a change
+function onPortfolioChange(animate = false) {
+  recordSnapshot();
+  updateChart(animate);
   updateDonut();
 }
 
@@ -4681,7 +4678,7 @@ render(true);
     portfolioHistory = generateSimulatedHistory(val);
     saveHistory();
   }
-  recordSnapshot(true);
+  recordSnapshot();
 })();
 
 initChart();
