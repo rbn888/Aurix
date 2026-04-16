@@ -1289,45 +1289,50 @@ function downsample(data, maxPoints = 120) {
 }
 
 // ── Single unified data pipeline ─────────────────────────────────────────
-// Validate → dedupe → sort → hard outlier filter (drop ±50% spikes).
+// Pure, stateless, deterministic.  Same input always produces same output.
+// Steps: validate → dedupe → sort → hard outlier filter.
 // Downsampling and time-filtering are done by the caller (getChartData).
-// Returns [{ts, value}] or null.
+// NEVER returns null — falls back to the input dataset if processing fails.
 function processSeries(data) {
-  try {
-    if (!Array.isArray(data) || data.length < 2) return null;
+  if (!Array.isArray(data) || data.length < 2) return data || [];
 
-    // 1. Validate
+  try {
+    // 1. Validate — keep only well-formed, positive points
     const valid = data.filter(p =>
       p &&
       typeof p.ts    === 'number' &&
       typeof p.value === 'number' &&
-      isFinite(p.value)
+      isFinite(p.value) &&
+      p.value > 0
     );
-    if (valid.length < 2) return null;
 
-    // 2. Dedupe (keep last write per timestamp)
+    if (valid.length < 2) return data;
+
+    // 2. Dedupe by timestamp (keep last write); input is not mutated
     const deduped = Object.values(
       valid.reduce((acc, p) => { acc[p.ts] = p; return acc; }, {})
     );
 
-    // 3. Sort ascending
-    const sorted = deduped.sort((a, b) => a.ts - b.ts);
+    // 3. Sort ascending — explicit copy so no intermediate array is mutated
+    const sorted = [...deduped].sort((a, b) => a.ts - b.ts);
 
-    // 4. Hard outlier filter — drop any point that is more than 2× or less
-    //    than 0.5× the previous accepted value.  Unlike a soft clamp this
-    //    discards the bad point entirely rather than dragging the series.
+    // 4. Hard outlier filter — drop any point whose value is more than 3×
+    //    or less than 0.33× the last accepted value.  The corrupt point is
+    //    discarded entirely; the series continues from the previous good point.
     const cleaned = [sorted[0]];
     for (let i = 1; i < sorted.length; i++) {
-      const prev  = cleaned[cleaned.length - 1];
-      const ratio = sorted[i].value / prev.value;
-      if (ratio > 3 || ratio < 0.3) continue; // drop spike
+      const ratio = sorted[i].value / cleaned[cleaned.length - 1].value;
+      if (ratio > 3 || ratio < 0.3) continue; // discard spike
       cleaned.push(sorted[i]);
     }
-    if (cleaned.length < 2) return sorted;
 
-    return cleaned;
+    // Fallback: if the filter removed too many points, return the sorted
+    // (validated, deduped) series rather than an unusably short result.
+    return cleaned.length >= 2 ? cleaned : sorted;
+
   } catch {
-    return null;
+    // Pipeline error — return original data so the chart always renders.
+    return data;
   }
 }
 
