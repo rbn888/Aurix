@@ -466,6 +466,28 @@ let assets              = load();
 const LOGO_CACHE        = {};   // sym → resolved url | null  (in-memory)
 let   _cgMap            = null; // sym → coingecko id  (in-memory, backed by localStorage)
 
+// Logos whose spothq/atomiclabs "color" variant bakes in a coloured circle background.
+// Values point to the CoinGecko CDN which serves the original brand mark on a transparent
+// background — the same source _fetchLogoFromCG() would eventually resolve to.
+// If a URL fails, the existing onerror → _logoFallback chain takes over transparently.
+// To use local files instead: place PNGs in /public/logos/ and update the paths below.
+const CLEAN_LOGO_OVERRIDE = {
+  BTC:   'https://assets.coingecko.com/coins/images/1/small/bitcoin.png',
+  ETH:   'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
+  USDC:  'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
+  USDT:  'https://assets.coingecko.com/coins/images/325/small/Tether.png',
+  BNB:   'https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png',
+  SOL:   'https://assets.coingecko.com/coins/images/4128/small/solana.png',
+  ADA:   'https://assets.coingecko.com/coins/images/975/small/cardano.png',
+  XRP:   'https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png',
+  DOGE:  'https://assets.coingecko.com/coins/images/5/small/dogecoin.png',
+  DOT:   'https://assets.coingecko.com/coins/images/12171/small/polkadot.png',
+  MATIC: 'https://assets.coingecko.com/coins/images/4713/small/matic-token-icon.png',
+  LINK:  'https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png',
+  AVAX:  'https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png',
+  LTC:   'https://assets.coingecko.com/coins/images/2/small/litecoin.png',
+};
+
 // One-time migration: backfill costBasis for existing assets that predate this field.
 // Sets costBasis = qty × price at migration time — P&L starts at 0 and grows honestly.
 (function migrateCostBasis() {
@@ -2715,6 +2737,8 @@ function escHtml(str) {
 function getAssetLogo(symbol, type) {
   const sym = symbol.toLowerCase().trim();
   if (type === 'crypto') {
+    const clean = CLEAN_LOGO_OVERRIDE[symbol.toUpperCase().trim()];
+    if (clean) return clean;
     return `https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/32/color/${sym}.png`;
   }
   if (type === 'stock' || type === 'etf') {
