@@ -3964,6 +3964,7 @@ assetForm.addEventListener('submit', e => {
         change24h:     null,
         prevPrice:     null,
         costBasis:     qty * (price > 0 ? price : 1),
+        transactions:  [{ type: 'buy', qty, price: price > 0 ? price : 1, ts: Date.now() }],
       });
     }
     save();
@@ -4026,6 +4027,7 @@ assetForm.addEventListener('submit', e => {
       prevPrice:     null,
       costBasis:     newPurchaseCost,
       ...(isGoldAsset ? { karat, goldUnit } : {}),
+      transactions:  [{ type: 'buy', qty, price: pendingPrice, ts: Date.now() }],
     });
   }
 
