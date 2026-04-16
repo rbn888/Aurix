@@ -1270,10 +1270,9 @@ function initChart() {
 // ── Per-range display-point limits ───────────────────────────────────────
 const MAX_POINTS = { '24h': 80, '7d': 120, '30d': 150, '1y': 200, 'all': 250 };
 
-// ── Downsample to at most maxPoints via bucket-averaging ──────────────────
-// Groups consecutive data into equal-sized buckets and averages ts + value
-// within each bucket.  Reduces visual noise while preserving trend shape.
-// A 288-point 24h series becomes 80 evenly-spaced averaged candles.
+// ── Downsample via bucket-averaging ──────────────────────────────────────
+// Groups data into equal-sized buckets and averages ts + value within each.
+// Returns the input unchanged when it is already at or below maxPoints.
 function downsample(data, maxPoints = 120) {
   if (!data || data.length <= maxPoints) return data;
   const bucketSize = Math.floor(data.length / maxPoints);
@@ -1289,6 +1288,57 @@ function downsample(data, maxPoints = 120) {
   return result;
 }
 
+// ── Single unified data pipeline ─────────────────────────────────────────
+// Applied identically to EVERY data source (live CoinGecko OR local history).
+// Returns a clean [{ts, value}] array ready for filterPts → toResult,
+// or null if the input is invalid or the pipeline throws.
+//
+// Steps: validate → dedupe → sort → normalize → smooth → downsample
+function processSeries(data, range) {
+  try {
+    if (!Array.isArray(data) || data.length < 2) return null;
+
+    // 1. Dedupe by ts (keep last write) and drop entries with invalid shapes.
+    const deduped = Object.values(
+      data
+        .filter(p => p && typeof p.ts === 'number' && typeof p.value === 'number' && isFinite(p.value))
+        .reduce((acc, p) => { acc[p.ts] = p; return acc; }, {})
+    );
+    if (deduped.length < 2) return null;
+
+    // 2. Sort ascending so normalization sees points in time order.
+    const sorted = deduped.sort((a, b) => a.ts - b.ts);
+
+    // 3. Normalize — cap each consecutive step at ±5% of the PREVIOUS
+    //    accepted (already-clamped) value, not the raw original.
+    //    This ensures the cap propagates correctly across the whole series.
+    const normalized = [];
+    for (let i = 0; i < sorted.length; i++) {
+      if (i === 0) { normalized.push(sorted[i]); continue; }
+      const prev     = normalized[i - 1];
+      const maxDelta = prev.value * 0.05;
+      const delta    = sorted[i].value - prev.value;
+      const value    = Math.abs(delta) > maxDelta
+        ? prev.value + Math.sign(delta) * maxDelta
+        : sorted[i].value;
+      normalized.push({ ...sorted[i], value });
+    }
+
+    // 4. Smooth — 3-point moving average.  First and last points are kept
+    //    as-is so that PnL calculations (first vs last value) stay accurate.
+    const smoothed = normalized.map((p, i, arr) => {
+      if (i === 0 || i === arr.length - 1) return p;
+      return { ...p, value: (arr[i - 1].value + p.value + arr[i + 1].value) / 3 };
+    });
+
+    // 5. Downsample to the range-specific point budget.
+    const result = downsample(smoothed, MAX_POINTS[range] || 120);
+    return result.length >= 2 ? result : null;
+  } catch {
+    return null;
+  }
+}
+
 function getChartData(range) {
   const now = Date.now();
   const ms  = { '24h': 86_400_000, '7d': 7 * 86_400_000, '30d': 30 * 86_400_000, '1y': 365 * 86_400_000 };
@@ -1301,67 +1351,27 @@ function getChartData(range) {
     return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
   };
 
-  // Build a {labels, values} result from a pre-sorted, pre-filtered point array.
   const toResult  = arr => ({ labels: arr.map(p => fmt(p.ts)), values: arr.map(p => toBase(p.value, 'USD')) });
-  // Filter to the active time window; 'all' keeps every point.
   const filterPts = arr => range === 'all' ? arr : arr.filter(p => p.ts >= now - ms[range]);
 
-  // ── Live data path ──────────────────────────────────────────────────────
-  // Only trust window._liveHistory[range] when it is a well-formed, dense
-  // array.  An empty array, a partially-filled stub, or entries missing ts/
-  // value all silently fall through to local history below.
+  // ── Live source — process then filter ─────────────────────────────────
   const live = window._liveHistory && window._liveHistory[range];
-  const isValidLive = Array.isArray(live) &&
-                      live.length > 20 &&
-                      live.every(p => p && p.ts && p.value !== undefined);
-
-  if (isValidLive) {
-    try {
-      // 1. Dedupe — if the same timestamp appears more than once, keep the last write.
-      const deduped = Object.values(
-        [...live].reduce((acc, p) => { acc[p.ts] = p; return acc; }, {})
-      );
-
-      // 2. Sort ascending by timestamp.
-      const sorted = deduped.sort((a, b) => a.ts - b.ts);
-
-      // 3. Normalize — cap each step at ±5% of the previous accepted value.
-      //    Carries state via `prev` so that clamped values propagate correctly
-      //    (a plain .map over the original array would only see unclamped neighbours).
-      const normalized = [];
-      for (let i = 0; i < sorted.length; i++) {
-        if (i === 0) { normalized.push(sorted[i]); continue; }
-        const prev     = normalized[i - 1];
-        const maxDelta = prev.value * 0.05;
-        const delta    = sorted[i].value - prev.value;
-        const value    = Math.abs(delta) > maxDelta
-          ? prev.value + Math.sign(delta) * maxDelta
-          : sorted[i].value;
-        normalized.push({ ...sorted[i], value });
-      }
-
-      // 4. Smooth — 3-point moving average; endpoints kept as-is to preserve
-      //    the true start/end values that drive PnL calculations.
-      const smoothed = normalized.map((p, i, arr) => {
-        if (i === 0 || i === arr.length - 1) return p;
-        return { ...p, value: (arr[i - 1].value + p.value + arr[i + 1].value) / 3 };
-      });
-
-      // 5. Downsample — reduce to range-specific max points after smoothing.
-      const pts = filterPts(downsample(smoothed, MAX_POINTS[range] || 120));
+  if (Array.isArray(live) && live.length > 20) {
+    const processed = processSeries([...live], range);
+    if (processed) {
+      const pts = filterPts(processed);
       if (pts.length >= 2) return toResult(pts);
-      // Valid but too sparse for this range window — fall through below.
-    } catch {
-      // Any processing error falls through to local history.
     }
   }
 
-  // ── Local history fallback ──────────────────────────────────────────────
-  // Sort a copy here too — portfolioHistory is a shared mutable array and
-  // callers must not see unexpected reordering as a side-effect.
-  const pts = filterPts(downsample([...portfolioHistory].sort((a, b) => a.ts - b.ts), MAX_POINTS[range] || 120));
-  if (pts.length < 2) return null;
-  return toResult(pts);
+  // ── Fallback source — same pipeline, same filter ───────────────────────
+  const processed = processSeries([...portfolioHistory], range);
+  if (processed) {
+    const pts = filterPts(processed);
+    if (pts.length >= 2) return toResult(pts);
+  }
+
+  return null;
 }
 
 function updateChart(animate = false) {
