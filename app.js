@@ -351,8 +351,9 @@ function switchLang(newLang) {
 }
 
 // ── State ──────────────────────────────────────────────────
-const STORAGE_KEY = 'portfolio_assets';
-const COINGECKO   = 'https://api.coingecko.com/api/v3';
+const STORAGE_KEY    = 'portfolio_assets';
+const COINGECKO      = 'https://api.coingecko.com/api/v3';
+const TWELVE_API_KEY = 'f0f3f9deb5b947d8a6ce5e16b51d5bfc';
 
 // ── Fallback prices (used when APIs are unavailable) ──────
 const FALLBACK_PRICES = {
@@ -1562,35 +1563,24 @@ async function searchCoinFallback(query) {
       || null;
 }
 
-// ── Yahoo Finance API (stocks / ETFs / metals) ─────────────
-async function fetchYahooData(symbol) {
-  const yUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
-  const proxies = [
-    yUrl,
-    `https://corsproxy.io/?url=${encodeURIComponent(yUrl)}`,
-    `https://api.allorigins.win/get?url=${encodeURIComponent(yUrl)}`,
-  ];
-
-  for (const url of proxies) {
-    try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(1000) }); // 1s max
-      console.log('[yahoo]', url, 'status:', res.status);
-      if (!res.ok) continue;
-      let json = await res.json();
-      if (typeof json.contents === 'string') json = JSON.parse(json.contents);
-      const result = json?.chart?.result?.[0];
-      if (!result) continue;
-      const price = result.meta?.regularMarketPrice;
-      if (!price) continue;
-      const name          = result.meta?.shortName || result.meta?.longName || symbol;
-      const previousClose = result.meta?.chartPreviousClose
-                         || result.meta?.previousClose
-                         || null;
-      return { price, name, previousClose };
-    } catch (err) { console.log('[yahoo]', url, 'error:', err.message); }
+// ── Twelve Data API (stocks / ETFs / metals) ───────────────
+async function fetchTwelveData(symbol) {
+  const url = `https://api.twelvedata.com/price?symbol=${encodeURIComponent(symbol)}&apikey=${TWELVE_API_KEY}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    console.log('[twelve]', symbol, 'status:', res.status);
+    if (!res.ok) return null;
+    const json = await res.json();
+    const price = parseFloat(json.price);
+    if (!price || isNaN(price)) return null;
+    return { price, previousClose: null };
+  } catch (err) {
+    console.log('[twelve]', symbol, 'error:', err.message);
+    return null;
   }
-  return null;
 }
+
+const fetchYahooData = fetchTwelveData;
 
 // ── Gold spot price: exchangerate.host → Yahoo GC=F → fallback ──
 async function fetchGoldSpotPrice() {
