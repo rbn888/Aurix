@@ -1740,8 +1740,8 @@ body.modal-open {
   align-items: center;
   gap: 6px;
   pointer-events: none;
-  background: none;
-  box-shadow: none;
+  background: none !important;
+  box-shadow: none !important;
 }
 
 .cat-card-visual img {
@@ -1749,8 +1749,14 @@ body.modal-open {
   height: 24px;
   object-fit: contain;
   border-radius: 50%;
-  opacity: 1;
-  transform: none;
+  background: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  padding: 0 !important;
+  margin: 0;
+  opacity: 1 !important;
+  transform: none !important;
 }
 
 .logo-fallback {
@@ -3844,4 +3850,11 @@ body.modal-open {
 }
 .dar-pnl.up   { color: var(--green); }
 .dar-pnl.down { color: var(--red); }
+
+/* ── Logo artifact safety override (highest specificity) ── */
+.cat-card-visual img {
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
 
