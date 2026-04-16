@@ -559,11 +559,21 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
 .asset-badge.real_estate { background: rgba(167,139,250,.15); color: #a78bfa; }
 .asset-badge.other       { background: rgba(107,114,128,.15); color: #6b7280; }
 
+/* When a real logo is showing, remove the coloured pill — show only the icon */
+.badge--has-logo {
+  background: none !important;
+  box-shadow: none !important;
+}
+
 .asset-badge-logo {
   width: 28px; height: 28px;
   object-fit: contain;
   border-radius: 50%;
   display: block;
+  background: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  padding: 0 !important;
 }
 .badge--has-logo .asset-badge-text { display: none; }
 .dar-badge .asset-badge-logo { width: 22px; height: 22px; }
@@ -3341,6 +3351,8 @@ body.modal-open {
 .dar-badge.metal       { background: rgba(212,168,67,.15);  color: #d4a843; }
 .dar-badge.cash        { background: rgba(74,222,128,.12);  color: #4ade80; }
 .dar-badge.real_estate { background: rgba(167,139,250,.14); color: #a78bfa; }
+/* Badge with logo — no coloured background in list view either */
+.dar-badge.badge--has-logo { background: none !important; box-shadow: none !important; }
 
 /* Name + sub-info column */
 .dar-info { min-width: 0; }
@@ -3853,6 +3865,13 @@ body.modal-open {
 
 /* ── Logo artifact safety override (highest specificity) ── */
 .cat-card-visual img {
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+/* ── Global image safety override — no background on any img ── */
+img {
   background: transparent !important;
   box-shadow: none !important;
   filter: none !important;
