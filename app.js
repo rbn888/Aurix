@@ -1289,51 +1289,36 @@ function downsample(data, maxPoints = 120) {
 }
 
 // ── Single unified data pipeline ─────────────────────────────────────────
-// Applied identically to EVERY data source (live CoinGecko OR local history).
-// Input values are ALWAYS in USD; output values are in base currency.
-// Returns a clean [{ts, value}] array or null on invalid input / API garbage.
-//
-// Steps: unit-normalise → validate+dedupe → sort → anti-spike → smooth → downsample
-function processSeries(data, range) {
+// Validate → dedupe → sort → normalize (±10%) → smooth (3-pt MA).
+// Downsampling and time-filtering are done by the caller (getChartData).
+// Returns [{ts, value}] or null.
+function processSeries(data) {
   try {
     if (!Array.isArray(data) || data.length < 2) return null;
 
-    // 1. Convert all values to base currency up-front so every subsequent step
-    //    works in one consistent unit.  Input is always USD (portfolioHistory
-    //    and _liveHistory both store USD).
-    const normalizedInput = data.map(p => ({ ts: p.ts, value: toBase(p.value, 'USD') }));
-
-    // 2. Validate, drop zeros / absurd values, dedupe by ts (keep last write).
-    const deduped = Object.values(
-      normalizedInput
-        .filter(p =>
-          p &&
-          typeof p.ts    === 'number' &&
-          typeof p.value === 'number' &&
-          isFinite(p.value) &&
-          p.value > 0 &&
-          p.value < 1e9
-        )
-        .reduce((acc, p) => { acc[p.ts] = p; return acc; }, {})
+    // 1. Validate
+    const valid = data.filter(p =>
+      p &&
+      typeof p.ts    === 'number' &&
+      typeof p.value === 'number' &&
+      isFinite(p.value)
     );
-    if (deduped.length < 2) return null;
+    if (valid.length < 2) return null;
 
-    // 3. Sort ascending.
+    // 2. Dedupe (keep last write per timestamp)
+    const deduped = Object.values(
+      valid.reduce((acc, p) => { acc[p.ts] = p; return acc; }, {})
+    );
+
+    // 3. Sort ascending
     const sorted = deduped.sort((a, b) => a.ts - b.ts);
 
-    // Anchor points: saved BEFORE normalization so smoothing / downsampling
-    // cannot drift the endpoints away from real values.
-    const firstReal = sorted[0];
-    const lastReal  = sorted[sorted.length - 1];
-
-    // 4. Normalize — cap each consecutive step at ±5% of the PREVIOUS
-    //    accepted value.  Uses a for-loop (carried state) so the cap
-    //    propagates correctly across the whole series.
+    // 4. Normalize — soft-clamp each step to ±10% of the previous accepted value
     const normalized = [];
     for (let i = 0; i < sorted.length; i++) {
       if (i === 0) { normalized.push(sorted[i]); continue; }
       const prev     = normalized[i - 1];
-      const maxDelta = prev.value * 0.05;
+      const maxDelta = prev.value * 0.1;
       const delta    = sorted[i].value - prev.value;
       const value    = Math.abs(delta) > maxDelta
         ? prev.value + Math.sign(delta) * maxDelta
@@ -1341,30 +1326,13 @@ function processSeries(data, range) {
       normalized.push({ ...sorted[i], value });
     }
 
-    // 5. Smooth — 3-point moving average.  Endpoints are restored to the
-    //    real anchor values so PnL and the last chart tick stay accurate.
+    // 5. Smooth — 3-point moving average; endpoints are preserved
     const smoothed = normalized.map((p, i, arr) => {
-      if (i === 0)              return firstReal;
-      if (i === arr.length - 1) return lastReal;
+      if (i === 0 || i === arr.length - 1) return p;
       return { ...p, value: (arr[i - 1].value + p.value + arr[i + 1].value) / 3 };
     });
 
-    // 6. Downsample to the range-specific point budget, then pin the last
-    //    point back to lastReal so bucket-averaging can't change the endpoint.
-    const final = downsample(smoothed, MAX_POINTS[range] || 120);
-    if (final.length > 0) final[final.length - 1] = lastReal;
-
-    // 7. Anti-crash safety: if the tail of the series still contains a >30%
-    //    single-step jump after everything above, the source data is too
-    //    corrupt to display reliably — return null and let the caller fall back.
-    if (!final || final.length < 2) return null;
-    const tailLast = final[final.length - 1];
-    const tailPrev = final[final.length - 2];
-    if (tailPrev.value > 0 && Math.abs(tailLast.value - tailPrev.value) / tailPrev.value > 0.3) {
-      return null;
-    }
-
-    return final;
+    return smoothed;
   } catch {
     return null;
   }
@@ -1389,25 +1357,30 @@ function getChartData(range) {
   };
 
   // 1. Choose source
-  const rawSource =
-    (window._liveHistory && Array.isArray(window._liveHistory[range]))
+  const source =
+    (window._liveHistory && Array.isArray(window._liveHistory[range]) && window._liveHistory[range].length > 0)
       ? window._liveHistory[range]
       : portfolioHistory;
 
-  // 2. Filter to time window BEFORE processing so the pipeline (normalization,
-  //    downsampling) operates only on the data that will actually be shown.
-  const rawFiltered = range === 'all'
-    ? [...rawSource]
-    : rawSource.filter(p => p.ts >= now - ms[range]);
+  if (!Array.isArray(source) || source.length < 2) return null;
 
-  // 3. Run the unified pipeline (USD → base currency conversion happens inside).
-  const processed = processSeries(rawFiltered, range);
+  // 2. Process the FULL dataset first (normalization works best on full history)
+  const processed = processSeries([...source]);
   if (!processed || processed.length < 2) return null;
 
-  // 4. Build chart result — values are already in base currency; no toBase() here.
+  // 3. Filter to the requested time window AFTER processing
+  const filtered = range === 'all'
+    ? processed
+    : processed.filter(p => p.ts >= now - ms[range]);
+
+  if (filtered.length < 2) return null;
+
+  // 4. Downsample after filtering
+  const final = downsample(filtered, MAX_POINTS[range] || 120);
+
   return {
-    labels: processed.map(p => fmt(p.ts)),
-    values: processed.map(p => p.value),
+    labels: final.map(p => fmt(p.ts)),
+    values: final.map(p => p.value),
   };
 }
 
