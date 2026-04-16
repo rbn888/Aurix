@@ -1845,55 +1845,29 @@ async function refreshPrices() {
   });
   if (migrated) save();
 
-  const cryptos = assets.filter(a => a.type === 'crypto' && a.coinId);
+  // Crypto is handled exclusively by prices.js (15 s polling).
+  // This function only refreshes market assets (stocks, ETFs, metals, other)
+  // to avoid duplicate CoinGecko calls that exhaust the free-tier rate limit.
   const hasMarket = assets.some(a =>
     (a.type === 'stock' || a.type === 'etf' || a.type === 'metal' || a.type === 'other') && a.marketSymbol
   );
 
-  if (!cryptos.length && !hasMarket) return;
+  if (!hasMarket) return;
 
   setUpdateStatus('refreshing');
   try {
-    const results = await Promise.allSettled([
-      cryptos.length ? fetchLivePrices([...new Set(cryptos.map(a => a.coinId))]) : Promise.resolve({}),
-      hasMarket ? refreshMarketPrices() : Promise.resolve(),
-    ]);
+    // refreshMarketPrices handles per-asset errors internally — it never
+    // throws, so this await always settles.
+    await refreshMarketPrices();
 
-    // Apply crypto prices only when the fetch actually succeeded.
-    // A rejected result means stale prices stay in memory — do not overwrite.
-    const cryptoResult = results[0];
-    const cryptoFailed = cryptos.length > 0 && cryptoResult.status === 'rejected';
-
-    if (cryptoResult.status === 'fulfilled') {
-      const priceData = cryptoResult.value || {};
-      cryptos.forEach(a => {
-        const data = priceData[a.coinId];
-        if (!data) return;
-        if (data.usd !== a.price) {
-          a.prevPrice = a.price;
-          a.price     = data.usd;
-        }
-        a.change24h = data.usd_24h_change ?? null;
-      });
-    }
-
-    // Always persist and re-render so market-price updates (handled inside
-    // refreshMarketPrices) are reflected even when crypto fails.
     save();
     lastRefreshAt = Date.now();
     render();
-
-    if (cryptoFailed) {
-      // Error is VISUAL ONLY — history is not touched, existing values kept.
-      const reason = cryptoResult.reason;
-      setUpdateStatus(reason?.message === 'rate_limit' ? 'rate_limit' : 'error');
-    } else {
-      // All prices are fresh — record snapshot and update chart.
-      setUpdateStatus('ok');
-      onPortfolioChange();
-    }
+    setUpdateStatus('ok');
+    onPortfolioChange();
   } catch (err) {
-    setUpdateStatus(err.message === 'rate_limit' ? 'rate_limit' : 'error');
+    // Defensive — refreshMarketPrices shouldn't throw, but guard anyway.
+    setUpdateStatus('error');
   }
 }
 
