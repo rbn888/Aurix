@@ -1341,7 +1341,13 @@ function processSeries(data, range) {
 
 function getChartData(range) {
   const now = Date.now();
-  const ms  = { '24h': 86_400_000, '7d': 7 * 86_400_000, '30d': 30 * 86_400_000, '1y': 365 * 86_400_000 };
+
+  const ms = {
+    '24h': 24 * 60 * 60 * 1000,
+    '7d':  7  * 24 * 60 * 60 * 1000,
+    '30d': 30 * 24 * 60 * 60 * 1000,
+    '1y':  365 * 24 * 60 * 60 * 1000,
+  };
 
   const fmt = ts => {
     const d = new Date(ts);
@@ -1351,27 +1357,28 @@ function getChartData(range) {
     return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
   };
 
-  const toResult  = arr => ({ labels: arr.map(p => fmt(p.ts)), values: arr.map(p => toBase(p.value, 'USD')) });
-  const filterPts = arr => range === 'all' ? arr : arr.filter(p => p.ts >= now - ms[range]);
+  const filterRange = arr =>
+    range === 'all' ? arr : arr.filter(p => p.ts >= now - ms[range]);
 
-  // ── Live source — process then filter ─────────────────────────────────
-  const live = window._liveHistory && window._liveHistory[range];
-  if (Array.isArray(live) && live.length > 20) {
-    const processed = processSeries([...live], range);
-    if (processed) {
-      const pts = filterPts(processed);
-      if (pts.length >= 2) return toResult(pts);
-    }
-  }
+  // 1. Choose source — NO processing at this step
+  const raw =
+    (window._liveHistory && Array.isArray(window._liveHistory[range]))
+      ? window._liveHistory[range]
+      : portfolioHistory;
 
-  // ── Fallback source — same pipeline, same filter ───────────────────────
-  const processed = processSeries([...portfolioHistory], range);
-  if (processed) {
-    const pts = filterPts(processed);
-    if (pts.length >= 2) return toResult(pts);
-  }
+  // 2. Run the SAME pipeline regardless of source
+  const processed = processSeries([...raw], range);
+  if (!processed) return null;
 
-  return null;
+  // 3. Apply time filter AFTER processing
+  const pts = filterRange(processed);
+  if (pts.length < 2) return null;
+
+  // 4. Build chart result
+  return {
+    labels: pts.map(p => fmt(p.ts)),
+    values: pts.map(p => toBase(p.value, 'USD')),
+  };
 }
 
 function updateChart(animate = false) {
