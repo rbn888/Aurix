@@ -42,19 +42,49 @@ async function fetchHistory(id, days) {
   return data.prices; // [[ts_ms, usd_price], ...]
 }
 
+// ── Time-grid normalisation ───────────────────────────────────────────────
+// CoinGecko returns slightly different timestamps per coin (e.g. one coin at
+// 14:02:07, another at 14:03:54 for the same nominal 5-min candle).  Rounding
+// to the nearest 5-minute bucket ensures cross-coin timestamps align so the
+// additive merge doesn't create phantom spikes.
+const INTERVAL = 5 * 60 * 1000; // 5 minutes in ms
+
+function normalizeTime(ts) {
+  return Math.floor(ts / INTERVAL) * INTERVAL;
+}
+
 // ── Merge per-coin value timelines into a single portfolio timeline ────────
-// CoinGecko uses a consistent time grid per request so timestamps align
-// across coins.  Simple additive merge by exact timestamp is reliable.
 function mergeHistories(histories) {
-  const merged = {};
+  const buckets = {};
+
   histories.forEach(h => {
     h.forEach(({ time, value }) => {
-      merged[time] = (merged[time] || 0) + value;
+      const t = normalizeTime(time);
+      buckets[t] = (buckets[t] || 0) + value;
     });
   });
-  return Object.entries(merged)
+
+  return Object.entries(buckets)
     .map(([time, value]) => ({ ts: Number(time), value: +value.toFixed(2) }))
     .sort((a, b) => a.ts - b.ts);
+}
+
+// ── Spike / outlier removal ────────────────────────────────────────────────
+// Drops any point where the portfolio value jumps by more than 50% relative
+// to the previous accepted point.  This removes artefacts from missing data
+// or misaligned merges without touching genuine large-but-real moves.
+function removeOutliers(data) {
+  if (data.length < 2) return data;
+  const cleaned = [data[0]];
+  for (let i = 1; i < data.length; i++) {
+    const prev   = cleaned[cleaned.length - 1];
+    const curr   = data[i];
+    const change = prev.value > 0
+      ? Math.abs(curr.value - prev.value) / prev.value
+      : 0;
+    if (change < 0.5) cleaned.push(curr);
+  }
+  return cleaned;
 }
 
 // ── Compute absolute and % PnL over a data series ─────────────────────────
@@ -82,6 +112,8 @@ async function fetchPortfolioHistory(range) {
   const results = await Promise.allSettled(
     cryptos.map(async a => {
       const prices = await fetchHistory(a.coinId, days);
+      // Sort ascending before mapping so normalizeTime buckets fill correctly.
+      prices.sort((a, b) => a[0] - b[0]);
       return prices.map(([time, price]) => ({ time, value: price * a.qty }));
     })
   );
@@ -91,7 +123,11 @@ async function fetchPortfolioHistory(range) {
     .map(r => r.value);
 
   if (!fulfilled.length) return null;
-  return mergeHistories(fulfilled);
+
+  const merged  = mergeHistories(fulfilled);
+  const cleaned = removeOutliers(merged);
+  // Safety fallback: if spike removal discarded too many points, use raw merge.
+  return cleaned.length >= 10 ? cleaned : merged;
 }
 
 // ── Load history for a range, cache it, and refresh the chart ─────────────
