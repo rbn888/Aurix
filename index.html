@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=58">
+  <link rel="stylesheet" href="styles.css?v=59">
 </head>
 <body>
 
@@ -450,8 +450,41 @@
     </div>
   </div>
 
+  <!-- Modal: Detalle de activo -->
+  <div class="modal-overlay" id="assetDetailOverlay">
+    <div class="modal modal--detail">
+      <div class="modal-header">
+        <h3 id="adName">—</h3>
+        <button class="modal-close" id="adClose">✕</button>
+      </div>
+      <div class="modal-body" id="adBody">
+        <div class="ad-summary">
+          <div class="ad-row">
+            <span class="ad-label" id="adPriceLabel">Precio</span>
+            <span class="ad-value" id="adPrice">—</span>
+          </div>
+          <div class="ad-row">
+            <span class="ad-label" id="adValueLabel">Valor total</span>
+            <span class="ad-value" id="adValue">—</span>
+          </div>
+          <div class="ad-row ad-row--pnl" id="adPnLRow">
+            <span class="ad-label">P&amp;L</span>
+            <span class="ad-value" id="adPnL">—</span>
+          </div>
+        </div>
+        <div class="ad-tx-section" id="adTxSection">
+          <div class="ad-tx-header">
+            <span id="adTxTitle">Transacciones</span>
+            <button class="btn-add-tx-detail" id="adAddTx">+ Añadir</button>
+          </div>
+          <div class="ad-tx-list" id="adTxList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
-  <script src="app.js?v=74"></script>
+  <script src="app.js?v=75"></script>
   <script src="services/prices.js"></script>
   <script src="services/history.js"></script>
 </body>

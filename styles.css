@@ -3892,3 +3892,105 @@ img {
   font-variant-numeric: tabular-nums;
   letter-spacing: .01em;
 }
+
+/* ── Asset detail modal ────────────────────────────────────── */
+.modal--detail { max-width: 420px; }
+
+.ad-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.ad-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.ad-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.ad-value {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.ad-value--pos { color: var(--green); }
+.ad-value--neg { color: var(--red); }
+
+.ad-tx-section { display: flex; flex-direction: column; gap: 8px; }
+
+.ad-tx-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ad-tx-header span {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.btn-add-tx-detail {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(79,142,247,.10);
+  border: 1px solid rgba(79,142,247,.25);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.btn-add-tx-detail:hover {
+  background: rgba(79,142,247,.18);
+  border-color: rgba(79,142,247,.40);
+}
+
+.ad-tx-list { display: flex; flex-direction: column; gap: 6px; }
+
+.ad-tx-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 12px 0;
+}
+
+.ad-tx-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--card-bg, rgba(255,255,255,.03));
+}
+
+.ad-tx-badge {
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 2px 6px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  flex-shrink: 0;
+}
+.tx-buy  { background: rgba(52,199,89,.15);  color: var(--green); }
+.tx-sell { background: rgba(255,59,48,.15);  color: var(--red); }
+
+.ad-tx-qty   { font-weight: 600; flex-shrink: 0; }
+.ad-tx-price { color: var(--text-muted); flex: 1; }
+.ad-tx-date  { color: var(--text-muted); flex-shrink: 0; }

@@ -2103,6 +2103,8 @@ function _ddEnd() {
   if (!_dd) return;
   const { card, ph } = _dd;
   _dd = null;
+  justDragged = true;
+  setTimeout(() => { justDragged = false; }, 150);
 
   // FLIP: record where card is right now (fixed position)
   const fromTop = parseFloat(card.style.top) || 0;
@@ -4719,6 +4721,109 @@ txForm.addEventListener('submit', e => {
   closeTxModal();
 });
 
+// ── Asset detail modal ─────────────────────────────────────
+const assetDetailOverlay = document.getElementById('assetDetailOverlay');
+
+function openAssetDetailModal(assetId) {
+  const asset = assets.find(a => a.id === assetId);
+  if (!asset) return;
+
+  const isRE   = asset.type === 'real_estate';
+  const isCash = asset.type === 'cash';
+  const assetCurr = (asset.assetCurrency || 'USD').toUpperCase();
+
+  document.getElementById('adName').textContent = getDisplayName(asset);
+
+  // Price row (hide for real estate / cash where price isn't meaningful)
+  const priceRow = document.getElementById('adPrice').closest('.ad-row');
+  if (isRE || isCash) {
+    priceRow.style.display = 'none';
+  } else {
+    priceRow.style.display = '';
+    document.getElementById('adPrice').textContent =
+      asset.price != null ? formatCurrency(asset.price, assetCurr) : '—';
+  }
+
+  // Total value
+  const valueBase = assetNativeValue(asset);
+  document.getElementById('adValue').textContent =
+    valueBase != null ? formatBase(toBase(valueBase, assetCurr)) : '—';
+  document.getElementById('adValueLabel').textContent =
+    lang === 'es' ? 'Valor total' : 'Total value';
+
+  // PnL
+  const pnl = assetPnLBase(asset);
+  const pnlEl  = document.getElementById('adPnL');
+  const pnlRow = document.getElementById('adPnLRow');
+  if (pnl) {
+    const sign = pnl.abs >= 0 ? '+' : '';
+    pnlEl.textContent = `${sign}${formatBase(pnl.abs)} (${sign}${pnl.pct.toFixed(2)}%)`;
+    pnlEl.className = 'ad-value ' + (pnl.abs >= 0 ? 'ad-value--pos' : 'ad-value--neg');
+    pnlRow.style.display = '';
+  } else {
+    pnlRow.style.display = 'none';
+  }
+
+  // Transactions section
+  const txSection = document.getElementById('adTxSection');
+  const txList    = document.getElementById('adTxList');
+  const addTxBtn  = document.getElementById('adAddTx');
+  document.getElementById('adTxTitle').textContent =
+    lang === 'es' ? 'Transacciones' : 'Transactions';
+  addTxBtn.textContent = lang === 'es' ? '+ Añadir' : '+ Add';
+
+  if (isRE || isCash) {
+    txSection.style.display = 'none';
+  } else {
+    txSection.style.display = '';
+    const txs = asset.transactions || [];
+    if (!txs.length) {
+      txList.innerHTML = `<div class="ad-tx-empty">${lang === 'es' ? 'Sin transacciones' : 'No transactions'}</div>`;
+    } else {
+      txList.innerHTML = [...txs].reverse().map(tx => {
+        const date  = new Date(tx.ts).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' });
+        const label = tx.type === 'buy'
+          ? (lang === 'es' ? 'Compra' : 'Buy')
+          : (lang === 'es' ? 'Venta' : 'Sell');
+        const cls   = tx.type === 'buy' ? 'tx-buy' : 'tx-sell';
+        return `<div class="ad-tx-row">
+          <span class="ad-tx-badge ${cls}">${label}</span>
+          <span class="ad-tx-qty">${formatQty(tx.qty)}</span>
+          <span class="ad-tx-price">@ ${formatCurrency(tx.price, assetCurr)}</span>
+          <span class="ad-tx-date">${date}</span>
+        </div>`;
+      }).join('');
+    }
+    addTxBtn.dataset.id = assetId;
+  }
+
+  assetDetailOverlay.classList.add('open');
+  document.body.classList.add('modal-open');
+}
+
+function closeAssetDetailModal() {
+  assetDetailOverlay.classList.remove('open');
+  document.body.classList.remove('modal-open');
+}
+
+document.getElementById('adClose').addEventListener('click', closeAssetDetailModal);
+assetDetailOverlay.addEventListener('click', e => {
+  if (e.target === assetDetailOverlay) closeAssetDetailModal();
+});
+document.getElementById('adAddTx').addEventListener('click', function () {
+  const id = this.dataset.id;
+  closeAssetDetailModal();
+  if (id) openTxModal(id);
+});
+
+// Delegate clicks on asset cards / detail rows → detail modal
+assetsListEl.addEventListener('click', e => {
+  if (justDragged) return;
+  if (e.target.closest('button') || e.target.closest('.asset-edit-strip')) return;
+  const card = e.target.closest('.asset-card, .detail-asset-row');
+  if (card) openAssetDetailModal(card.dataset.assetId);
+});
+
 // ── Event Listeners ────────────────────────────────────────
 document.getElementById('logoHome')
   ?.addEventListener('click', () => setActiveCategory(null));
@@ -4743,6 +4848,7 @@ document.addEventListener('keydown', e => {
     closeReduceModal();
     closeAddModal();
     closeLiquidityModal();
+    closeAssetDetailModal();
   }
 });
 
