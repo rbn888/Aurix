@@ -1486,7 +1486,7 @@ function updateChart(animate = false) {
   if (!portfolioChart) return;
   // Guarantee the last history point reflects the current portfolio value
   // before we read chart data — satisfies the "last value = live total" rule.
-  recordSnapshot(false);
+  recordSnapshot(true); // force-sync last history point to current prices before reading
   const data = getChartData(activeRange);
 
   if (!data) {
@@ -1829,14 +1829,52 @@ async function refreshMarketPrices() {
   );
 }
 
+// ── Collect market prices WITHOUT mutating assets ────────────────────────
+// Returns { [marketSymbol]: { price, change24h } } for all assets that
+// returned a valid price.  Per-asset failures are silently skipped so one
+// delisted ticker can't block the whole update.
+async function collectMarketPriceData(marketAssets) {
+  const results = await Promise.allSettled(
+    marketAssets.map(async a => {
+      let price = null, change24h = null;
+      try {
+        if (a.marketSymbol === 'GC=F') {
+          price = await fetchGoldSpotPrice();
+        } else {
+          const data  = await fetchYahooData(a.marketSymbol);
+          price       = data?.price         ?? null;
+          const prev  = data?.previousClose ?? null;
+          if (price && prev > 0) change24h = ((price - prev) / prev) * 100;
+        }
+        if (change24h === null) {
+          const fb = getFallbackData(a.marketSymbol);
+          if (fb) change24h = fb.change24h;
+        }
+      } catch { /* skip this asset */ }
+      return { symbol: a.marketSymbol, price, change24h };
+    })
+  );
+
+  const map = {};
+  results.forEach(r => {
+    if (r.status === 'fulfilled' && r.value.price != null) {
+      map[r.value.symbol] = { price: r.value.price, change24h: r.value.change24h };
+    }
+  });
+  return map;
+}
+
+// ── Single atomic portfolio update ───────────────────────────────────────
+// ONE function owns the entire update cycle:
+//   collect all prices → apply atomically → record snapshot → render
+// If any batch-level fetch fails (network, rate-limit) the rollback snapshot
+// is restored and NO history point is written.
 async function refreshPrices() {
-  // Migrate assets
+  // ── Legacy migration (one-time data fix) ──────────────────────────────
   let migrated = false;
   assets.forEach(a => {
-    // Migrate stock/etf/metal assets without marketSymbol
     if ((a.type === 'stock' || a.type === 'etf') && !a.marketSymbol && a.ticker) {
-      a.marketSymbol = a.ticker.toUpperCase();
-      migrated = true;
+      a.marketSymbol = a.ticker.toUpperCase(); migrated = true;
     }
     if (a.type === 'metal' && !a.marketSymbol && a.ticker) {
       const m = METAL_MAP[a.ticker.toUpperCase()];
@@ -1845,29 +1883,63 @@ async function refreshPrices() {
   });
   if (migrated) save();
 
-  // Crypto is handled exclusively by prices.js (15 s polling).
-  // This function only refreshes market assets (stocks, ETFs, metals, other)
-  // to avoid duplicate CoinGecko calls that exhaust the free-tier rate limit.
-  const hasMarket = assets.some(a =>
+  const cryptos      = assets.filter(a => a.type === 'crypto' && a.coinId);
+  const marketAssets = assets.filter(a =>
     (a.type === 'stock' || a.type === 'etf' || a.type === 'metal' || a.type === 'other') && a.marketSymbol
   );
-
-  if (!hasMarket) return;
+  if (!cryptos.length && !marketAssets.length) return;
 
   setUpdateStatus('refreshing');
-  try {
-    // refreshMarketPrices handles per-asset errors internally — it never
-    // throws, so this await always settles.
-    await refreshMarketPrices();
 
+  // ── 1. Save rollback snapshot ─────────────────────────────────────────
+  const rollback = assets.map(a => ({ price: a.price, prevPrice: a.prevPrice, change24h: a.change24h }));
+
+  try {
+    // ── 2. Fetch all prices WITHOUT touching assets ────────────────────
+    // Promise.all: if CoinGecko throws (rate-limit / network), the whole
+    // update is aborted and the catch restores the rollback state.
+    const [cryptoPrices, marketPrices] = await Promise.all([
+      cryptos.length
+        ? fetchLivePrices([...new Set(cryptos.map(a => a.coinId))])
+        : Promise.resolve({}),
+      marketAssets.length
+        ? collectMarketPriceData(marketAssets)
+        : Promise.resolve({}),
+    ]);
+
+    // ── 3. Apply atomically ───────────────────────────────────────────
+    assets.forEach(a => {
+      if (a.type === 'crypto' && a.coinId) {
+        const d = cryptoPrices[a.coinId];
+        if (!d) return;
+        if (d.usd !== a.price) { a.prevPrice = a.price; a.price = d.usd; }
+        a.change24h = d.usd_24h_change ?? a.change24h;
+      } else if (a.marketSymbol && marketPrices[a.marketSymbol]) {
+        const m = marketPrices[a.marketSymbol];
+        if (m.price !== a.price) { a.prevPrice = a.price; a.price = m.price; }
+        if (m.change24h != null) {
+          a.change24h = m.change24h;
+          if (a.marketSymbol === 'GC=F') goldChangePct = m.change24h;
+        }
+      }
+    });
+
+    // ── 4. Persist, render, record snapshot ───────────────────────────
     save();
     lastRefreshAt = Date.now();
     render();
     setUpdateStatus('ok');
     onPortfolioChange();
+
   } catch (err) {
-    // Defensive — refreshMarketPrices shouldn't throw, but guard anyway.
-    setUpdateStatus('error');
+    // ── 5. Rollback — restore exact previous state ────────────────────
+    // DO NOT call onPortfolioChange — no history point is written.
+    assets.forEach((a, i) => {
+      a.price     = rollback[i].price;
+      a.prevPrice = rollback[i].prevPrice;
+      a.change24h = rollback[i].change24h;
+    });
+    setUpdateStatus(err.message === 'rate_limit' ? 'rate_limit' : 'error');
   }
 }
 
@@ -4707,7 +4779,7 @@ fetchExchangeRate().then(() => {
 });
 
 refreshPrices();
-setInterval(refreshPrices, 60_000);         // 60 s — real-time price updates
+setInterval(refreshPrices, 30_000);         // 30 s — unified atomic price update
 setInterval(fetchExchangeRate, 3_600_000);  // 1 h — EUR/USD rate
 setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only update
 
