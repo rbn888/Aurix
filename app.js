@@ -2816,10 +2816,7 @@ function render(animate = false) {
          <button class="btn-reduce"  title="${t('btnReduce')}" data-id="${asset.id}">−</button>
          <button class="btn-delete"  title="${t('btnDelete')}" data-id="${asset.id}">✕</button>`;
 
-    // Detail row: extend actions with transaction button; compute avg buy summary
-    const darActionsHtml = (!isRE && !isCash)
-      ? actionsHtml + `<button class="btn-add-tx" title="${lang === 'es' ? 'Añadir transacción' : 'Add transaction'}" data-id="${asset.id}">↗</button>`
-      : actionsHtml;
+    const darActionsHtml = actionsHtml;
 
     const txInfo = (() => {
       const buys = (asset.transactions || []).filter(tx => tx.type === 'buy');
@@ -4458,9 +4455,6 @@ function applyInlineEdit(id) {
 assetsListEl.addEventListener('click', e => {
   const editREBtn = e.target.closest('.btn-edit-re');
   if (editREBtn) { openEditRealEstateModal(editREBtn.dataset.id); return; }
-
-  const txBtn = e.target.closest('.btn-add-tx');
-  if (txBtn) { openTxModal(txBtn.dataset.id); return; }
 
   const addBtn = e.target.closest('.btn-add-pos');
   if (addBtn) {
