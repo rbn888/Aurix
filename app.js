@@ -1320,10 +1320,10 @@ function processSeries(data) {
     for (let i = 1; i < sorted.length; i++) {
       const prev  = cleaned[cleaned.length - 1];
       const ratio = sorted[i].value / prev.value;
-      if (ratio > 1.5 || ratio < 0.5) continue; // drop spike
+      if (ratio > 3 || ratio < 0.3) continue; // drop spike
       cleaned.push(sorted[i]);
     }
-    if (cleaned.length < 2) return null;
+    if (cleaned.length < 2) return sorted;
 
     return cleaned;
   } catch {
