@@ -4238,7 +4238,16 @@ main { padding-bottom: 72px; }
   100% { filter: hue-rotate(0deg);  }
 }
 .monster-message { max-width: 320px; }
-.monster-line { font-size: 15px; color: #fff; font-weight: 500; margin: 6px 0; }
+.monster-line {
+  font-size: 15px;
+  color: #fff;
+  font-weight: 500;
+  margin: 6px 0;
+  opacity: 1;
+  transition: opacity 0.8s ease;
+}
+.monster-line.fade-out { opacity: 0; }
+.monster-line.fade-in  { opacity: 1; }
 
 .insights-history { padding: 0 16px 80px; opacity: .75; }
 .insights-history-header {

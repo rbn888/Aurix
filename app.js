@@ -3102,10 +3102,24 @@ function getNextInsight() {
   return insight.text;
 }
 
-function startInsightRotation(updateFn) {
+function updateMonsterText(el, newText) {
+  if (!el) return;
+  const line = el.querySelector('.monster-line');
+  if (!line) return;
+  line.classList.add('fade-out');
+  setTimeout(() => {
+    line.textContent = newText;
+    line.classList.remove('fade-out');
+    line.classList.add('fade-in');
+    setTimeout(() => { line.classList.remove('fade-in'); }, 800);
+  }, 600);
+}
+
+function startInsightRotation() {
   if (_insightInterval) { clearInterval(_insightInterval); _insightInterval = null; }
-  updateFn(getNextInsight());
-  _insightInterval = setInterval(() => { updateFn(getNextInsight()); }, 6000);
+  const el = document.getElementById('monsterMsg');
+  setTimeout(() => { updateMonsterText(el, getNextInsight()); }, 800);
+  _insightInterval = setInterval(() => { updateMonsterText(el, getNextInsight()); }, 7000);
 }
 
 function getTopAssetExposure() {
@@ -3149,9 +3163,8 @@ function toggleAllTx() {
 }
 
 function renderInsights() {
-  const insights = generateInsights();
-  const state    = getMonsterState();
-  const first    = insights[0] ? insights[0].text : '';
+  generateInsights();
+  const state = getMonsterState();
   return `
     <div class="insights-screen">
       <div class="insights-hero">
@@ -3159,7 +3172,7 @@ function renderInsights() {
           <div class="monster-orb ${state}"></div>
         </div>
         <div class="monster-message" id="monsterMsg">
-          <div class="monster-line">${first}</div>
+          <div class="monster-line"></div>
         </div>
       </div>
     </div>`;
@@ -3192,10 +3205,7 @@ function switchTab(tab) {
       : `<p class="placeholder-label">${tab.charAt(0).toUpperCase() + tab.slice(1)}</p>`;
     placeholder.style.display = '';
     if (tab === 'insights') {
-      startInsightRotation(text => {
-        const el = document.getElementById('monsterMsg');
-        if (el) el.innerHTML = `<div class="monster-line">${text}</div>`;
-      });
+      startInsightRotation();
     }
     updateBottomNavActive();
   }
