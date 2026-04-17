@@ -3251,18 +3251,83 @@ function generateNarrativeInsight() {
   return null;
 }
 
+const IDENTITY_KEY = 'aurix_identity';
+
+function getIdentity() {
+  try { return JSON.parse(localStorage.getItem(IDENTITY_KEY)) || {}; } catch { return {}; }
+}
+
+function saveIdentity(data) {
+  try { localStorage.setItem(IDENTITY_KEY, JSON.stringify(data)); } catch {}
+}
+
+function buildIdentityProfile() {
+  const txs    = getAllTransactions();
+  const profile = { style: 'balanced' };
+  if (txs.length > 20)    profile.style = 'active';
+  if (assets.length <= 2) profile.style = 'concentrated';
+  saveIdentity(profile);
+  return profile;
+}
+
+function applyIdentityTone(text) {
+  const es       = lang === 'es';
+  const identity = getIdentity();
+  if (identity.style === 'active') {
+    return es
+      ? text.replace('puede valer la pena', 'puede valer la pena ocasionalmente')
+      : text.replace('may be worth', 'it may be worth occasionally');
+  }
+  if (identity.style === 'concentrated') {
+    return text + (es
+      ? ' Una estructura más diversificada podría considerarse a lo largo del tiempo.'
+      : ' A more diversified structure could be considered over time.');
+  }
+  return text;
+}
+
+function generateSignatureInsight() {
+  const es       = lang === 'es';
+  const identity = getIdentity();
+  if (identity.style === 'active') {
+    return {
+      text: es
+        ? 'Tu enfoque muestra un alto nivel de actividad, lo que puede beneficiarse de una reflexión periódica.'
+        : 'Your approach shows a high level of activity, which may benefit from periodic reflection.',
+      priority: 3,
+    };
+  }
+  if (identity.style === 'concentrated') {
+    return {
+      text: es
+        ? 'Tu cartera parece enfocada en un número limitado de posiciones, lo que influye en su comportamiento general.'
+        : 'Your portfolio appears focused on a limited number of positions, shaping its overall behavior.',
+      priority: 3,
+    };
+  }
+  return {
+    text: es
+      ? 'Tu cartera refleja un enfoque equilibrado a lo largo del tiempo.'
+      : 'Your portfolio reflects a balanced approach over time.',
+    priority: 3,
+  };
+}
+
 function generateInsights() {
   const profile   = buildUserProfile();
+  buildIdentityProfile();
   analyzeBehavior();
   const base      = generateBaseInsights();
   const temporal  = generateTemporalInsights();
   const behavior  = generateBehaviorInsights();
   const decision  = generateDecisionInsight();
   const narrative = generateNarrativeInsight();
+  const signature = generateSignatureInsight();
   const all       = [
     ...base, ...temporal, ...behavior,
     ...(decision  ? [decision]  : []),
     ...(narrative ? [narrative] : []),
+    signature,
   ];
   all.sort((a, b) => a.priority - b.priority);
 
@@ -3270,7 +3335,7 @@ function generateInsights() {
   const pool     = filtered.length ? filtered : all;
   insightCache   = pool.slice(0, 5).map(i => ({
     ...i,
-    text: adaptInsight(adaptMessage(i.text, profile)),
+    text: applyIdentityTone(adaptInsight(adaptMessage(i.text, profile))),
   }));
   return insightCache;
 }
