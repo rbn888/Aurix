@@ -2773,7 +2773,9 @@ function generateInsights() {
   const es = lang === 'es';
 
   if (!assets.length) {
-    return [es ? 'Empieza añadiendo activos para obtener insights' : 'Start adding assets to get insights'];
+    return [es
+      ? 'Añade activos para comenzar el análisis de tu cartera.'
+      : 'Add assets to begin your portfolio analysis.'];
   }
 
   const totalValue = assets.reduce((s, a) => s + a.qty * a.price, 0);
@@ -2790,8 +2792,8 @@ function generateInsights() {
     const pct   = ((topVal / totalValue) * 100).toFixed(0);
     const label = (T[lang].typeMeta && T[lang].typeMeta[topType]) || topType;
     if (pct > 60) results.push(es
-      ? `Estás muy expuesto a ${label} (${pct}%)`
-      : `You are heavily exposed to ${label} (${pct}%)`);
+      ? `Tu cartera parece concentrada en ${label} (${pct}%). Podría valer la pena revisar la diversificación.`
+      : `Your portfolio seems concentrated in ${label} (${pct}%). It might be worth reviewing diversification.`);
   }
 
   // 2. Top asset by value
@@ -2801,16 +2803,19 @@ function generateInsights() {
     if (val > topAssetVal) { topAssetVal = val; topAsset = a; }
   });
   if (topAsset) results.push(es
-    ? `La mayor parte está en ${escHtml(topAsset.name)}`
-    : `Most of your portfolio is in ${escHtml(topAsset.name)}`);
+    ? `${escHtml(topAsset.name)} representa la mayor parte de tu cartera en este momento.`
+    : `${escHtml(topAsset.name)} represents the largest share of your portfolio at the moment.`);
 
   // 3. Recent activity
   const txs = getAllTransactions();
   if (txs.length) {
-    const last = txs[0];
+    const last   = txs[0];
+    const action = last.type === 'buy'
+      ? (es ? 'una compra en' : 'a purchase in')
+      : (es ? 'una venta en'  : 'a sale in');
     results.push(es
-      ? `Recientemente ${last.type === 'buy' ? 'compraste' : 'vendiste'} ${escHtml(last.assetName)}`
-      : `You recently ${last.type === 'buy' ? 'bought' : 'sold'} ${escHtml(last.assetName)}`);
+      ? `Tu actividad más reciente incluye ${action} ${escHtml(last.assetName)}.`
+      : `Your most recent activity includes ${action} ${escHtml(last.assetName)}.`);
   }
 
   return results.slice(0, 3);
