@@ -783,6 +783,14 @@ function avgBuyPrice(asset) {
 }
 
 // Derives costBasis from buy transactions (sum of qty × price).
+function sanitizeTransactionPrices(asset) {
+  if (!asset.transactions || !asset.transactions.length) return;
+  asset.transactions.forEach(tx => {
+    if (!tx.price) return;
+    if (tx.price > 100000) tx.price = tx.price / 100;
+  });
+}
+
 // Returns null when no transactions exist so legacy costBasis is preserved.
 function computeCostBasisFromTransactions(asset) {
   const buys = (asset.transactions || []).filter(tx => tx.type === 'buy');
@@ -2695,6 +2703,7 @@ function renderDetailHero(type, typeAssets) {
 function render(animate = false) {
   assets.forEach(asset => {
     migrateLegacyAssetToTransactions(asset);
+    sanitizeTransactionPrices(asset);
     syncQtyFromTransactions(asset);
     syncCostBasisFromTransactions(asset);
   });
