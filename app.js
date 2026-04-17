@@ -3183,14 +3183,87 @@ function generateDecisionInsight() {
   return null;
 }
 
+const NARRATIVE_KEY = 'aurix_narrative';
+
+function getNarrativeMemory() {
+  try { return JSON.parse(localStorage.getItem(NARRATIVE_KEY)) || []; } catch { return []; }
+}
+
+function saveNarrativeMemory(data) {
+  try { localStorage.setItem(NARRATIVE_KEY, JSON.stringify(data)); } catch {}
+}
+
+function buildUserStory() {
+  const story = {};
+  getAllTransactions().forEach(tx => {
+    if (!story[tx.assetName]) story[tx.assetName] = [];
+    story[tx.assetName].push(tx);
+  });
+  return story;
+}
+
+function detectNarrativePatterns() {
+  const es      = lang === 'es';
+  const story   = buildUserStory();
+  const insights = [];
+  for (const asset in story) {
+    const txs  = story[asset];
+    if (txs.length < 3) continue;
+    const buys = txs.filter(tx => tx.type === 'buy');
+    if (buys.length >= 3) insights.push({
+      text: es
+        ? `Has ido incrementando gradualmente tu posición en ${escHtml(asset)} a lo largo del tiempo.`
+        : `You have been gradually increasing your position in ${escHtml(asset)} over time.`,
+      priority: 2,
+    });
+    const days = (txs[txs.length - 1].ts - txs[0].ts) / (1000 * 60 * 60 * 24);
+    if (days > 30) insights.push({
+      text: es
+        ? `Tu posición en ${escHtml(asset)} se ha desarrollado a lo largo de un período prolongado.`
+        : `Your position in ${escHtml(asset)} has developed over a longer period of time.`,
+      priority: 3,
+    });
+  }
+  return insights;
+}
+
+function shouldShowNarrative(text) {
+  const memory = getNarrativeMemory();
+  const limit  = 5 * 24 * 60 * 60 * 1000;
+  const now    = Date.now();
+  return !memory.find(m => m.text === text && (now - m.ts < limit));
+}
+
+function storeNarrative(text) {
+  const memory = getNarrativeMemory();
+  memory.push({ text, ts: Date.now() });
+  saveNarrativeMemory(memory.slice(-20));
+}
+
+function generateNarrativeInsight() {
+  const patterns = detectNarrativePatterns();
+  for (const p of patterns) {
+    if (shouldShowNarrative(p.text)) {
+      storeNarrative(p.text);
+      return p;
+    }
+  }
+  return null;
+}
+
 function generateInsights() {
-  const profile  = buildUserProfile();
+  const profile   = buildUserProfile();
   analyzeBehavior();
-  const base     = generateBaseInsights();
-  const temporal = generateTemporalInsights();
-  const behavior = generateBehaviorInsights();
-  const decision = generateDecisionInsight();
-  const all      = [...base, ...temporal, ...behavior, ...(decision ? [decision] : [])];
+  const base      = generateBaseInsights();
+  const temporal  = generateTemporalInsights();
+  const behavior  = generateBehaviorInsights();
+  const decision  = generateDecisionInsight();
+  const narrative = generateNarrativeInsight();
+  const all       = [
+    ...base, ...temporal, ...behavior,
+    ...(decision  ? [decision]  : []),
+    ...(narrative ? [narrative] : []),
+  ];
   all.sort((a, b) => a.priority - b.priority);
 
   const filtered = all.filter(i => !wasRecentlyShown(i.text));
