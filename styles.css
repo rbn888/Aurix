@@ -4217,3 +4217,12 @@ main { padding-bottom: 72px; }
 .tx-main       { font-size: 13px; font-weight: 600; color: #fff; }
 .tx-sub        { font-size: 11px; color: #555; }
 .tx-total      { font-size: 13px; color: #aaa; }
+
+.tx-view-all {
+  margin-top: 12px;
+  padding: 8px 0;
+  font-size: 13px;
+  color: #5b8cff;
+  cursor: pointer;
+  text-align: center;
+}

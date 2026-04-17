@@ -968,6 +968,7 @@ let _donutHoverIdx = -1;   // ephemeral hover (index into _donutDist)
 let _donutDist     = [];
 let activeCategory = null; // persistent category filter ('crypto', 'metal', …, or null)
 let currentTab     = 'home';
+let showAllTx      = false;
 
 function getDistribution() {
   const totUSD = totalValueUSD();
@@ -2768,12 +2769,33 @@ function renderInsightsHistory(txs) {
     </div>`;
 }
 
+function toggleAllTx() {
+  showAllTx = !showAllTx;
+  switchTab('insights');
+}
+
 function renderInsights() {
-  const txs = getAllTransactions();
+  const txs        = getAllTransactions();
+  const visible    = showAllTx ? txs : txs.slice(0, 5);
+  const label      = showAllTx ? 'Show less' : `View all (${txs.length})`;
+  const historyHtml = txs.length
+    ? `<div class="ins-tx-list">${visible.map(renderTxRow).join('')}</div>
+       ${txs.length > 5 ? `<div class="tx-view-all" onclick="toggleAllTx()">${label}</div>` : ''}`
+    : `<div class="insights-history-empty">No transactions yet</div>`;
+
   return `
     <div class="insights-screen">
-      ${renderInsightsHero()}
-      ${renderInsightsHistory(txs)}
+      <div class="insights-hero">
+        <div class="insights-orb"></div>
+        <div class="insights-text">
+          <h2>Insights</h2>
+          <p>Preparing your analysis...</p>
+        </div>
+      </div>
+      <div class="insights-history">
+        <div class="insights-history-header">Transactions</div>
+        ${historyHtml}
+      </div>
     </div>`;
 }
 
