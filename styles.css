@@ -4161,11 +4161,13 @@ main { padding-bottom: 72px; }
 }
 
 .insights-hero {
-  padding: 60px 20px 40px;
+  min-height: 70vh;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   align-items: center;
   text-align: center;
+  padding: 20px;
 }
 .monster-container { margin-bottom: 20px; }
 .monster-orb {

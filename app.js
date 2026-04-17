@@ -2770,25 +2770,28 @@ function renderInsightsHistory(txs) {
 }
 
 function generateInsights() {
-  if (!assets.length) return ['Start adding assets to get insights'];
+  const es = lang === 'es';
+
+  if (!assets.length) {
+    return [es ? 'Empieza añadiendo activos para obtener insights' : 'Start adding assets to get insights'];
+  }
 
   const totalValue = assets.reduce((s, a) => s + a.qty * a.price, 0);
   const results    = [];
 
   // 1. Category concentration
   const byType = {};
-  assets.forEach(a => {
-    const val = a.qty * a.price;
-    byType[a.type] = (byType[a.type] || 0) + val;
-  });
+  assets.forEach(a => { byType[a.type] = (byType[a.type] || 0) + a.qty * a.price; });
   let topType = null, topVal = 0;
   for (const type in byType) {
     if (byType[type] > topVal) { topVal = byType[type]; topType = type; }
   }
   if (topType && totalValue > 0) {
-    const pct = ((topVal / totalValue) * 100).toFixed(0);
-    const label = (TYPE_META[topType] && T[lang].typeMeta[topType]) || topType;
-    if (pct > 60) results.push(`You are heavily exposed to ${label} (${pct}%)`);
+    const pct   = ((topVal / totalValue) * 100).toFixed(0);
+    const label = (T[lang].typeMeta && T[lang].typeMeta[topType]) || topType;
+    if (pct > 60) results.push(es
+      ? `Estás muy expuesto a ${label} (${pct}%)`
+      : `You are heavily exposed to ${label} (${pct}%)`);
   }
 
   // 2. Top asset by value
@@ -2797,14 +2800,17 @@ function generateInsights() {
     const val = a.qty * a.price;
     if (val > topAssetVal) { topAssetVal = val; topAsset = a; }
   });
-  if (topAsset) results.push(`Most of your portfolio is in ${escHtml(topAsset.name)}`);
+  if (topAsset) results.push(es
+    ? `La mayor parte está en ${escHtml(topAsset.name)}`
+    : `Most of your portfolio is in ${escHtml(topAsset.name)}`);
 
   // 3. Recent activity
   const txs = getAllTransactions();
   if (txs.length) {
     const last = txs[0];
-    const verb = last.type === 'buy' ? 'bought' : 'sold';
-    results.push(`You recently ${verb} ${escHtml(last.assetName)}`);
+    results.push(es
+      ? `Recientemente ${last.type === 'buy' ? 'compraste' : 'vendiste'} ${escHtml(last.assetName)}`
+      : `You recently ${last.type === 'buy' ? 'bought' : 'sold'} ${escHtml(last.assetName)}`);
   }
 
   return results.slice(0, 3);
@@ -2816,14 +2822,6 @@ function toggleAllTx() {
 }
 
 function renderInsights() {
-  const txs        = getAllTransactions();
-  const visible    = showAllTx ? txs : txs.slice(0, 5);
-  const label      = showAllTx ? 'Show less' : `View all (${txs.length})`;
-  const historyHtml = txs.length
-    ? `<div class="ins-tx-list">${visible.map(renderTxRow).join('')}</div>
-       ${txs.length > 5 ? `<div class="tx-view-all" onclick="toggleAllTx()">${label}</div>` : ''}`
-    : `<div class="insights-history-empty">No transactions yet</div>`;
-
   const insights = generateInsights();
   return `
     <div class="insights-screen">
@@ -2834,10 +2832,6 @@ function renderInsights() {
         <div class="monster-message">
           ${insights.map(i => `<div class="monster-line">${i}</div>`).join('')}
         </div>
-      </div>
-      <div class="insights-history">
-        <div class="insights-history-header">Transactions</div>
-        ${historyHtml}
       </div>
     </div>`;
 }
