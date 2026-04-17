@@ -4019,6 +4019,8 @@ assetForm.addEventListener('submit', e => {
     existing.costBasis = (existing.costBasis || assetNativeValue(existing)) + newPurchaseCost;
     existing.qty    = +(existing.qty + qty).toFixed(8);
     existing.price  = pendingPrice;
+    if (!existing.transactions) existing.transactions = [];
+    existing.transactions.push({ type: 'buy', qty, price: pendingPrice, ts: Date.now() });
   } else {
     let initialChange24h = null;
     if (marketSymbol && type !== 'crypto') {
