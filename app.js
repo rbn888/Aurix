@@ -3646,35 +3646,56 @@ function startIntuitiveLoop() {
 
 startIntuitiveLoop();
 
-(function startAmbientTextLayer() {
+const ambientPhrases = {
+  en: [
+    'Markets move in cycles.',
+    'Stability often goes unnoticed.',
+    'Growth is not always immediate.',
+    'Time reveals structure.',
+    'Small changes accumulate.',
+    'Risk is rarely obvious.',
+    'Movement does not imply direction.',
+    'Patience compounds silently.',
+    'Every position tells a story.',
+    'Structure precedes returns.',
+  ],
+  es: [
+    'Los mercados se mueven en ciclos.',
+    'La estabilidad suele pasar desapercibida.',
+    'El crecimiento no siempre es inmediato.',
+    'El tiempo revela la estructura.',
+    'Los pequeños cambios se acumulan.',
+    'El riesgo rara vez es obvio.',
+    'El movimiento no implica dirección.',
+    'La paciencia compone en silencio.',
+    'Cada posición cuenta una historia.',
+    'La estructura precede a los retornos.',
+  ],
+};
+
+function initAmbientLayer() {
+  if (document.querySelector('.ambient-text-layer')) return;
   const layer = document.createElement('div');
   layer.className = 'ambient-text-layer';
   document.body.appendChild(layer);
+}
 
-  const WORDS = [
-    'portfolio', 'balance', 'growth', 'diversify', 'allocation',
-    'returns', 'value', 'position', 'insight', 'trend',
-    'stability', 'compound', 'equity', 'exposure', 'horizon',
-  ];
+function spawnAmbientText() {
+  const layer = document.querySelector('.ambient-text-layer');
+  if (!layer) return;
+  const pool   = ambientPhrases[lang] || ambientPhrases.en;
+  const phrase = pool[Math.floor(Math.random() * pool.length)];
+  const el     = document.createElement('div');
+  el.className   = 'ambient-text';
+  el.textContent = phrase;
+  el.style.left  = Math.random() * 80 + '%';
+  el.style.top   = Math.random() * 80 + '%';
+  layer.appendChild(el);
+  setTimeout(() => { el.remove(); }, 12000);
+}
 
-  function spawnWord() {
-    const pool = [
-      ...WORDS,
-      ...assets.map(a => a.name).filter(Boolean),
-    ];
-    const text = pool[Math.floor(Math.random() * pool.length)];
-    const el   = document.createElement('span');
-    el.className   = 'ambient-text';
-    el.textContent = text;
-    el.style.left  = Math.random() * 85 + '%';
-    el.style.top   = Math.random() * 80 + 10 + '%';
-    layer.appendChild(el);
-    setTimeout(() => { el.remove(); }, 12000);
-  }
-
-  spawnWord();
-  setInterval(spawnWord, 4000);
-})();
+initAmbientLayer();
+setInterval(() => { if (Math.random() > 0.6) spawnAmbientText(); }, 4000);
 
 function animateGel() {
   _currentX += (_targetX - _currentX) * 0.1;
