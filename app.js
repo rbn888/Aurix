@@ -3498,7 +3498,7 @@ function animateMonster(elOrb, elText) {
   if (!elOrb || !elText) return;
   const next = getNextInsight();
   const tone = getInsightTone(next);
-  microPulse(elOrb);
+  anticipationEffect(elOrb);
   setMonsterTone(elOrb, tone);
   elOrb.classList.add('active');
   setTimeout(() => {
@@ -3579,6 +3579,64 @@ function startMarketAwareness() {
 }
 
 startMarketAwareness();
+
+let _lastMarketMood = null;
+
+function detectMarketShift() {
+  const current = getMarketMood();
+  if (_lastMarketMood && _lastMarketMood !== current) {
+    _lastMarketMood = current;
+    return true;
+  }
+  _lastMarketMood = current;
+  return false;
+}
+
+function anticipationEffect(el) {
+  if (!el) return;
+  _pulseScale = 1.03;
+  el.style.filter = 'brightness(1.1)';
+  setTimeout(() => {
+    _pulseScale = 1;
+    el.style.filter = '';
+  }, 800);
+}
+
+function getHeartbeatSpeed() {
+  return Math.min(Math.max(1.5 - getVolatility() / 10, 0.6), 1.5);
+}
+
+function applyMarketTension(el) {
+  const mood = getMarketMood();
+  if (mood === 'bearish')      el.style.filter = 'brightness(0.95) contrast(1.05)';
+  else if (mood === 'bullish') el.style.filter = 'brightness(1.05)';
+  else                         el.style.filter = 'brightness(1)';
+}
+
+function startHeartbeat() {
+  function beat() {
+    const el    = document.querySelector('.monster-orb');
+    const speed = getHeartbeatSpeed();
+    if (el && !el.classList.contains('active')) {
+      _pulseScale = 1.015;
+      setTimeout(() => { _pulseScale = 1; }, Math.round(400 * speed));
+    }
+    setTimeout(beat, Math.round(2000 * speed));
+  }
+  beat();
+}
+
+function startIntuitiveLoop() {
+  startHeartbeat();
+  setInterval(() => {
+    const el = document.querySelector('.monster-orb');
+    if (!el) return;
+    applyMarketTension(el);
+    if (detectMarketShift()) anticipationEffect(el);
+  }, 4000);
+}
+
+startIntuitiveLoop();
 
 function applyOrbInteraction() {
   const orb = document.querySelector('.monster-orb');
