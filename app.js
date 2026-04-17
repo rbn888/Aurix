@@ -4754,13 +4754,14 @@ if (goldUnitGroupEl) {
 }
 
 function validateTransaction(asset, tx) {
+  syncQtyFromTransactions(asset);
   const qty   = Number(tx.qty)   || 0;
   const price = Number(tx.price) || 0;
   if (qty   <= 0) { alert('Cantidad inválida');  return false; }
   if (price <= 0) { alert('Precio inválido');    return false; }
   if (tx.type === 'sell') {
     const currentQty = asset.qty || 0;
-    if (qty > currentQty) { alert('No puedes vender más de lo que tienes'); return false; }
+    if (qty > currentQty) { alert(`No puedes vender más de lo que tienes (${currentQty})`); return false; }
   }
   return true;
 }
