@@ -3313,6 +3313,42 @@ function generateSignatureInsight() {
   };
 }
 
+const SILENCE_KEY = 'aurix_silence';
+
+function getSilenceMemory() {
+  try { return JSON.parse(localStorage.getItem(SILENCE_KEY)) || {}; } catch { return {}; }
+}
+
+function saveSilenceMemory(data) {
+  try { localStorage.setItem(SILENCE_KEY, JSON.stringify(data)); } catch {}
+}
+
+function shouldSpeak(insights) {
+  const memory     = getSilenceMemory();
+  const hoursSince = (Date.now() - (memory.lastSpoken || 0)) / (1000 * 60 * 60);
+  if (hoursSince < 6)                          return false;
+  if (!insights.length)                        return false;
+  if (!insights.some(i => i.priority <= 2))    return false;
+  return true;
+}
+
+function markSpoken() {
+  const memory = getSilenceMemory();
+  memory.lastSpoken = Date.now();
+  saveSilenceMemory(memory);
+}
+
+function getSilentMessage() {
+  const es = lang === 'es';
+  return {
+    text: es
+      ? 'Todo parece estable. Puedes revisar tu cartera cuando lo consideres oportuno.'
+      : 'Everything appears stable. You may revisit your portfolio when needed.',
+    priority: 4,
+    silent: true,
+  };
+}
+
 function generateInsights() {
   const profile   = buildUserProfile();
   buildIdentityProfile();
@@ -3332,11 +3368,18 @@ function generateInsights() {
   all.sort((a, b) => a.priority - b.priority);
 
   const filtered = all.filter(i => !wasRecentlyShown(i.text));
-  const pool     = filtered.length ? filtered : all;
-  insightCache   = pool.slice(0, 5).map(i => ({
+  const pool     = (filtered.length ? filtered : all).slice(0, 5).map(i => ({
     ...i,
     text: applyIdentityTone(adaptInsight(adaptMessage(i.text, profile))),
   }));
+
+  if (!shouldSpeak(pool)) {
+    insightCache = [getSilentMessage()];
+    return insightCache;
+  }
+
+  markSpoken();
+  insightCache = pool;
   return insightCache;
 }
 
