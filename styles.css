@@ -3912,10 +3912,37 @@ img {
 .ad-summary {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding-bottom: 16px;
+  gap: 16px;
+  padding-bottom: 20px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 16px;
+}
+
+.ad-hero {
+  text-align: center;
+  padding: 8px 0 4px;
+}
+.ad-hero-value {
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--text-bright);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.03em;
+  line-height: 1;
+  margin-bottom: 5px;
+}
+.ad-hero-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.ad-secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .ad-row {
@@ -3957,13 +3984,17 @@ img {
 }
 
 .btn-add-tx-detail {
-  font-size: 11px;
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  font-size: 13px;
   font-weight: 600;
+  text-align: center;
   color: var(--accent);
   background: rgba(79,142,247,.10);
   border: 1px solid rgba(79,142,247,.25);
-  border-radius: 6px;
-  padding: 3px 10px;
+  border-radius: 8px;
+  padding: 9px 0;
   cursor: pointer;
   transition: background .15s, border-color .15s;
 }
@@ -3984,12 +4015,25 @@ img {
 .ad-tx-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-  padding: 6px 8px;
-  border-radius: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
   background: var(--card-bg, rgba(255,255,255,.03));
+}
+
+.ad-tx-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ad-tx-sub {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .ad-tx-badge {

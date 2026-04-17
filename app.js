@@ -4813,9 +4813,10 @@ function openAssetDetailModal(assetId) {
         const cls   = tx.type === 'buy' ? 'tx-buy' : 'tx-sell';
         return `<div class="ad-tx-row">
           <span class="ad-tx-badge ${cls}">${label}</span>
-          <span class="ad-tx-qty">${formatQty(tx.qty)}</span>
-          <span class="ad-tx-price">@ ${formatCurrency(tx.price, assetCurr)}</span>
-          <span class="ad-tx-date">${date}</span>
+          <div class="ad-tx-detail">
+            <span class="ad-tx-qty">${formatQty(tx.qty)}</span>
+            <span class="ad-tx-sub">@ ${formatCurrency(tx.price, assetCurr)} · ${date}</span>
+          </div>
         </div>`;
       }).join('');
     }
