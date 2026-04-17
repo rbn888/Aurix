@@ -2770,69 +2770,67 @@ function renderInsightsHistory(txs) {
 }
 
 function generateInsights() {
-  const es = lang === 'es';
+  const es       = lang === 'es';
+  const messages = [];
 
-  if (!assets.length) {
-    return [es
-      ? 'Añade activos para comenzar el análisis de tu cartera.'
-      : 'Add assets to begin your portfolio analysis.'];
-  }
+  const concentration   = getTopAssetExposure();
+  const diversification = getDiversificationScore();
+  const pnl             = getPortfolioPnL();
+  const recentActivity  = getRecentTransactions().length;
 
-  const totalValue = assets.reduce((s, a) => s + a.qty * a.price, 0);
-  const results    = [];
+  if (concentration > 50) messages.push(es
+    ? 'Pareces tener una exposición significativa a un solo activo. Puede valer la pena considerar cómo esto afecta tu riesgo global.'
+    : 'You seem to be significantly exposed to a single asset. You may want to consider how this affects your overall risk.');
 
-  // 1. Category concentration
-  const byType = {};
-  assets.forEach(a => { byType[a.type] = (byType[a.type] || 0) + a.qty * a.price; });
-  let topType = null, topVal = 0;
-  for (const type in byType) {
-    if (byType[type] > topVal) { topVal = byType[type]; topType = type; }
-  }
-  if (topType && totalValue > 0) {
-    const pct   = ((topVal / totalValue) * 100).toFixed(0);
-    const label = (T[lang].typeMeta && T[lang].typeMeta[topType]) || topType;
-    if (pct > 60) results.push(es
-      ? `Tu cartera parece concentrada en ${label} (${pct}%). Podría valer la pena revisar la diversificación.`
-      : `Your portfolio seems concentrated in ${label} (${pct}%). It might be worth reviewing diversification.`);
-  }
+  if (diversification <= 2) messages.push(es
+    ? 'Tu cartera está relativamente concentrada. Una diversificación más amplia podría ayudar a equilibrar el riesgo con el tiempo.'
+    : 'Your portfolio is relatively concentrated. A broader diversification could help balance risk over time.');
 
-  // 2. Top asset by value
-  let topAsset = null, topAssetVal = 0;
-  assets.forEach(a => {
-    const val = a.qty * a.price;
-    if (val > topAssetVal) { topAssetVal = val; topAsset = a; }
-  });
-  if (topAsset) results.push(es
-    ? `${escHtml(topAsset.name)} representa la mayor parte de tu cartera en este momento.`
-    : `${escHtml(topAsset.name)} represents the largest share of your portfolio at the moment.`);
+  if (pnl < -20) messages.push(es
+    ? 'Tu cartera ha experimentado un descenso notable. Podría valer la pena revisar tu exposición y horizonte temporal.'
+    : 'Your portfolio has experienced a noticeable decline. It might be worth reviewing your exposure and time horizon.');
 
-  // 3. Recent activity
-  const txs = getAllTransactions();
-  if (txs.length) {
-    const last   = txs[0];
-    const action = last.type === 'buy'
-      ? (es ? 'una compra en' : 'a purchase in')
-      : (es ? 'una venta en'  : 'a sale in');
-    results.push(es
-      ? `Tu actividad más reciente incluye ${action} ${escHtml(last.assetName)}.`
-      : `Your most recent activity includes ${action} ${escHtml(last.assetName)}.`);
-  }
+  if (recentActivity > 5) messages.push(es
+    ? 'Has estado bastante activo recientemente. Puede ser útil asegurarte de que tus decisiones siguen alineadas con una estrategia a largo plazo.'
+    : 'You\'ve been quite active recently. You may want to ensure your decisions remain aligned with a long-term strategy.');
 
-  return results.slice(0, 3);
+  if (!messages.length) messages.push(es
+    ? 'Tu cartera parece estable. Puede ser conveniente revisarla periódicamente para asegurarte de que sigue alineada con tus objetivos.'
+    : 'Your portfolio appears stable. It may be worth reviewing it periodically to ensure it remains aligned with your objectives.');
+
+  return messages.slice(0, 3);
 }
 
-function getPortfolioPerformance() {
-  let totalValue = 0, totalCost = 0;
+function getTopAssetExposure() {
+  let total = 0, max = 0;
   assets.forEach(a => {
-    totalValue += a.qty * a.price;
-    totalCost  += a.costBasis || 0;
+    const v = a.qty * a.price;
+    total += v;
+    if (v > max) max = v;
   });
-  if (!totalCost) return 0;
-  return ((totalValue - totalCost) / totalCost) * 100;
+  return total ? (max / total) * 100 : 0;
+}
+
+function getDiversificationScore() {
+  return assets.length;
+}
+
+function getPortfolioPnL() {
+  let value = 0, cost = 0;
+  assets.forEach(a => {
+    value += a.qty * a.price;
+    cost  += a.costBasis || 0;
+  });
+  return cost ? ((value - cost) / cost) * 100 : 0;
+}
+
+function getRecentTransactions(days = 7) {
+  const limit = days * 24 * 60 * 60 * 1000;
+  return getAllTransactions().filter(tx => Date.now() - tx.ts < limit);
 }
 
 function getMonsterState() {
-  const pnl = getPortfolioPerformance();
+  const pnl = getPortfolioPnL();
   if (pnl < -20) return 'bad';
   if (pnl <   5) return 'neutral';
   return 'good';
