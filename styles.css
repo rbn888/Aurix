@@ -4299,6 +4299,27 @@ main { padding-bottom: 72px; }
 .monster-orb.ctx-insights { opacity: 1; }
 .monster-orb.ctx-asset    { filter: brightness(1.05); }
 .monster-orb.ctx-market   { opacity: 0.85; }
+.monster-orb.evo-1 {
+  box-shadow:
+    0 0 40px rgba(0,120,255,0.25),
+    0 0 80px rgba(0,255,180,0.08),
+    inset 0 0 30px rgba(255,255,255,0.04);
+}
+.monster-orb.evo-2 {
+  box-shadow:
+    0 0 55px rgba(0,140,255,0.4),
+    0 0 100px rgba(0,255,180,0.15),
+    inset 0 0 40px rgba(255,255,255,0.07);
+  filter: brightness(1.08);
+}
+.monster-orb.evo-3 {
+  box-shadow:
+    0 0 70px rgba(80,160,255,0.55),
+    0 0 130px rgba(0,255,200,0.22),
+    inset 0 0 50px rgba(255,255,255,0.1);
+  filter: brightness(1.18);
+  animation-duration: 7s;
+}
 @keyframes idleLuxury {
   0%   { transform: scale(1);     }
   50%  { transform: scale(1.015); }

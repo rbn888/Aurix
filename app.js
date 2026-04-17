@@ -3783,6 +3783,25 @@ function startAmbientIntelligence() {
 initAmbientLayer();
 startAmbientIntelligence();
 
+function getVisualLevel() {
+  try { return (JSON.parse(localStorage.getItem(EVOLUTION_KEY)) || { level: 1 }).level || 1; }
+  catch { return 1; }
+}
+
+function applyVisualEvolution(el) {
+  const level = getVisualLevel();
+  el.classList.remove('evo-1', 'evo-2', 'evo-3');
+  el.classList.add(`evo-${level}`);
+}
+
+function initVisualEvolution() {
+  const orb = document.querySelector('.monster-orb');
+  if (!orb) return;
+  applyVisualEvolution(orb);
+}
+
+initVisualEvolution();
+
 function animateGel() {
   _currentX += (_targetX - _currentX) * 0.1;
   _currentY += (_targetY - _currentY) * 0.1;
