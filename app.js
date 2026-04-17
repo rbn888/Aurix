@@ -3802,6 +3802,59 @@ function initVisualEvolution() {
 
 initVisualEvolution();
 
+const CHAOS_KEY = 'aurix_chaos';
+
+function getChaosMemory() {
+  try { return JSON.parse(localStorage.getItem(CHAOS_KEY)) || []; } catch { return []; }
+}
+
+function storeChaos(event) {
+  const mem = getChaosMemory();
+  mem.push(event);
+  localStorage.setItem(CHAOS_KEY, JSON.stringify(mem.slice(-10)));
+}
+
+function subtleFlash(el) {
+  el.classList.add('chaos-flash');
+  setTimeout(() => el.classList.remove('chaos-flash'), 200);
+}
+
+function slightDrift(el) {
+  const wrap = el.closest('.monster-wrap') || el.parentElement;
+  if (!wrap) return;
+  wrap.classList.add('chaos-drift');
+  setTimeout(() => wrap.classList.remove('chaos-drift'), 600);
+}
+
+function deepPulse() {
+  _pulseScale = 1.04;
+  setTimeout(() => { _pulseScale = 1; }, 500);
+}
+
+function innerGlow(el) {
+  el.style.boxShadow += ', 0 0 120px rgba(120,160,255,0.2)';
+  setTimeout(() => {
+    el.style.boxShadow = el.style.boxShadow.replace(', 0 0 120px rgba(120,160,255,0.2)', '');
+  }, 800);
+}
+
+function triggerRareEvent(el) {
+  const events = [subtleFlash, slightDrift, deepPulse, innerGlow];
+  const chosen = events[Math.floor(Math.random() * events.length)];
+  chosen(el);
+  storeChaos(chosen.name);
+}
+
+function startUnpredictableSystem() {
+  setInterval(() => {
+    const el = document.querySelector('.monster-orb');
+    if (!el) return;
+    if (Math.random() > 0.9) triggerRareEvent(el);
+  }, 8000);
+}
+
+startUnpredictableSystem();
+
 function animateGel() {
   _currentX += (_targetX - _currentX) * 0.1;
   _currentY += (_targetY - _currentY) * 0.1;
