@@ -4753,6 +4753,18 @@ if (goldUnitGroupEl) {
   });
 }
 
+function validateTransaction(asset, tx) {
+  const qty   = Number(tx.qty)   || 0;
+  const price = Number(tx.price) || 0;
+  if (qty   <= 0) { alert('Cantidad inválida');  return false; }
+  if (price <= 0) { alert('Precio inválido');    return false; }
+  if (tx.type === 'sell') {
+    const currentQty = asset.qty || 0;
+    if (qty > currentQty) { alert('No puedes vender más de lo que tienes'); return false; }
+  }
+  return true;
+}
+
 // ── Transaction system ─────────────────────────────────────
 function addTransaction(assetId, type, qty, price) {
   const asset = assets.find(a => a.id === assetId);
@@ -4813,9 +4825,12 @@ txForm.addEventListener('submit', e => {
   if (isNaN(qty)   || qty   <= 0) { txQtyInput.focus();   return; }
   if (isNaN(price) || price <= 0) { txPriceInput.focus(); return; }
 
+  const asset = assets.find(a => a.id === _txAssetId);
+  if (!asset) return;
+  if (!validateTransaction(asset, { type: txTypeHidden.value, qty, price })) return;
+
   if (_editingTxIndex !== null) {
-    const asset = assets.find(a => a.id === _txAssetId);
-    if (asset && asset.transactions && asset.transactions[_editingTxIndex]) {
+    if (asset.transactions && asset.transactions[_editingTxIndex]) {
       const originalTs = asset.transactions[_editingTxIndex].ts;
       asset.transactions[_editingTxIndex] = {
         type:  txTypeHidden.value,
