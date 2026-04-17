@@ -957,6 +957,7 @@ const donutCenterSubEl      = document.getElementById('donutCenterSub');
 let _donutHoverIdx = -1;   // ephemeral hover (index into _donutDist)
 let _donutDist     = [];
 let activeCategory = null; // persistent category filter ('crypto', 'metal', …, or null)
+let currentTab     = 'home';
 
 function getDistribution() {
   const totUSD = totalValueUSD();
@@ -2699,6 +2700,29 @@ function renderDetailHero(type, typeAssets) {
   }
 }
 
+// ── Bottom nav ─────────────────────────────────────────────
+function updateBottomNavActive() {
+  document.querySelectorAll('#bottomNav .bn-tab[data-tab]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === currentTab);
+  });
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  const mainEl      = document.querySelector('main');
+  const placeholder = document.getElementById('tabPlaceholder');
+  if (tab === 'home') {
+    mainEl.style.display      = '';
+    placeholder.style.display = 'none';
+    render();
+  } else {
+    mainEl.style.display      = 'none';
+    placeholder.innerHTML     = `<p class="placeholder-label">${tab.charAt(0).toUpperCase() + tab.slice(1)}</p>`;
+    placeholder.style.display = '';
+    updateBottomNavActive();
+  }
+}
+
 // ── Render ─────────────────────────────────────────────────
 function render(animate = false) {
   assets.forEach(asset => {
@@ -3022,6 +3046,7 @@ function render(animate = false) {
 
   // Animate card values that changed during this render (prices updated)
   animateCardValues();
+  updateBottomNavActive();
 }
 
 function escHtml(str) {

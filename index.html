@@ -146,6 +146,16 @@
 
     </main>
 
+    <div class="tab-placeholder" id="tabPlaceholder" style="display:none"></div>
+
+    <nav class="bottom-nav" id="bottomNav">
+      <button class="bn-tab active" data-tab="home" onclick="switchTab('home')">🏠<span>Home</span></button>
+      <button class="bn-tab" data-tab="insights" onclick="switchTab('insights')">💡<span>Insights</span></button>
+      <button class="bn-tab bn-tab--add" onclick="openModal()">＋</button>
+      <button class="bn-tab" data-tab="market" onclick="switchTab('market')">📈<span>Market</span></button>
+      <button class="bn-tab" data-tab="profile" onclick="switchTab('profile')">👤<span>Profile</span></button>
+    </nav>
+
   </div>
 
   <!-- Modal: Añadir activo -->
