@@ -2587,6 +2587,7 @@ function renderDetailHero(type, typeAssets) {
         </div>
         <div class="detail-hero-value"></div>
         <span class="detail-hero-change"></span>
+        <span class="detail-hero-pct"></span>
       </div>
       <div class="detail-chart-wrap"><canvas id="detailChartCanvas"></canvas></div>`;
     const hdr = document.querySelector('#assetsSection .section-header');
@@ -2616,6 +2617,14 @@ function renderDetailHero(type, typeAssets) {
     changeEl.style.display = '';
   } else {
     changeEl.style.display = 'none';
+  }
+
+  const portfolioTotal = totalValueBase();
+  const pctEl = heroEl.querySelector('.detail-hero-pct');
+  if (portfolioTotal > 0) {
+    pctEl.textContent = `${((totalValue / portfolioTotal) * 100).toFixed(1)}% of portfolio`;
+  } else {
+    pctEl.textContent = '';
   }
 
   // Re-build sparkline only when the category changes (not on every price tick)

@@ -3261,6 +3261,15 @@ body.modal-open {
 .detail-hero-change.down { background: rgba(232,69,69,.12);  color: var(--red);   }
 .detail-hero-change.flat { background: rgba(107,116,148,.14); color: var(--text-muted); }
 
+.detail-hero-pct {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: .02em;
+  margin-top: 6px;
+}
+
 /* Chart container — canvas fills the full height */
 .detail-chart-wrap {
   height: 82px;
