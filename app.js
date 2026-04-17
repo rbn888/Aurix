@@ -3079,8 +3079,67 @@ function adaptMessage(text, profile) {
   return result;
 }
 
+const BEHAVIOR_KEY = 'aurix_behavior';
+
+function getBehavior() {
+  try { return JSON.parse(localStorage.getItem(BEHAVIOR_KEY)) || {}; } catch { return {}; }
+}
+
+function saveBehavior(data) {
+  try { localStorage.setItem(BEHAVIOR_KEY, JSON.stringify(data)); } catch {}
+}
+
+function analyzeBehavior() {
+  const txs    = getAllTransactions();
+  const now    = Date.now();
+  const recent = txs.filter(tx => now - tx.ts < 7 * 24 * 60 * 60 * 1000);
+  const beh    = { frequency: 'low', impulsive: false, longTerm: false };
+
+  if (recent.length > 5)      beh.frequency = 'high';
+  else if (recent.length > 2) beh.frequency = 'medium';
+
+  if (recent.length >= 3) {
+    const intervals = recent.map(tx => tx.ts).sort((a, b) => a - b)
+      .map((t, i, arr) => i > 0 ? t - arr[i - 1] : null).filter(Boolean);
+    const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    if (avg < 2 * 60 * 60 * 1000) beh.impulsive = true;
+  }
+
+  const sells = txs.filter(tx => tx.type === 'sell');
+  if (sells.length === 0 && txs.length > 5) beh.longTerm = true;
+
+  saveBehavior(beh);
+  return beh;
+}
+
+function adaptInsight(text) {
+  const es = lang === 'es';
+  const b  = getBehavior();
+
+  if (b.frequency === 'high') {
+    return text + (es
+      ? ' Tomarse un momento para reflexionar puede ayudar a mantener el equilibrio.'
+      : ' Taking time to reflect can help maintain balance.');
+  }
+
+  if (b.impulsive) {
+    return es
+      ? text.replace('ha incrementado', 'ha incrementado de forma progresiva')
+      : text.replace('has increased', 'has increased steadily over time');
+  }
+
+  if (b.longTerm) {
+    return text + (es
+      ? ' Mantener la consistencia a lo largo del tiempo puede ser valioso.'
+      : ' Maintaining consistency over time can be valuable.');
+  }
+
+  return text;
+}
+
 function generateInsights() {
   const profile  = buildUserProfile();
+  analyzeBehavior();
   const base     = generateBaseInsights();
   const temporal = generateTemporalInsights();
   const behavior = generateBehaviorInsights();
@@ -3089,7 +3148,10 @@ function generateInsights() {
 
   const filtered = all.filter(i => !wasRecentlyShown(i.text));
   const pool     = filtered.length ? filtered : all;
-  insightCache   = pool.slice(0, 5).map(i => ({ ...i, text: adaptMessage(i.text, profile) }));
+  insightCache   = pool.slice(0, 5).map(i => ({
+    ...i,
+    text: adaptInsight(adaptMessage(i.text, profile)),
+  }));
   return insightCache;
 }
 
