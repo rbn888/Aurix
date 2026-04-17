@@ -2737,6 +2737,10 @@ function render(animate = false) {
     assetsListEl.appendChild(bannerEl);
   }
 
+  const categoryValue = activeCategory
+    ? filtered.reduce((s, a) => s + toBase(assetNativeValue(a), (a.assetCurrency || 'USD').toUpperCase()), 0)
+    : 0;
+
   filtered.forEach((asset, cardIndex) => {
     const assetCurr  = (asset.assetCurrency || 'USD').toUpperCase();
     const isCash     = asset.type === 'cash';
@@ -2884,6 +2888,7 @@ function render(animate = false) {
         </div>
         <div class="dar-right">
           <div class="dar-value ${flashClass}"${prevValueBase != null ? ` data-from="${prevValueBase.toFixed(6)}" data-to="${valueBase.toFixed(6)}"` : ''}>${formatBase(valueBase)}</div>
+          ${categoryValue > 0 ? `<span class="dar-cat-pct">${((valueBase / categoryValue) * 100).toFixed(1)}%</span>` : ''}
           ${darChangeHtml}
           ${pnlData ? `<span class="dar-pnl ${pnlData.abs >= 0 ? 'up' : 'down'}">${pnlData.abs >= 0 ? '+' : '−'}${formatBase(Math.abs(pnlData.abs))} (${pnlData.abs >= 0 ? '+' : '−'}${Math.abs(pnlData.pct).toFixed(1)}%)</span>` : ''}
           <div class="dar-actions">${darActionsHtml}</div>

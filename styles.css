@@ -3423,6 +3423,14 @@ body.modal-open {
 .dar-change.down { background: rgba(232,69,69,.10);  color: var(--red);   }
 .dar-change.flat { background: rgba(107,116,148,.12); color: var(--text-muted); }
 
+.dar-cat-pct {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+}
+
 .dar-actions { display: flex; gap: 4px; margin-top: 2px; }
 .dar-actions button {
   width: 28px;
