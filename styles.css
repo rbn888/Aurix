@@ -4048,6 +4048,28 @@ img {
   color: var(--text-muted);
 }
 
+.ad-tx-delete {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.45;
+  transition: opacity .15s, background .15s, color .15s;
+}
+.ad-tx-delete:hover {
+  opacity: 1;
+  background: rgba(232,69,69,.12);
+  color: var(--red);
+}
+
 .ad-tx-badge {
   font-size: 10px;
   font-weight: 700;

@@ -4823,10 +4823,11 @@ function openAssetDetailModal(assetId) {
   } else {
     txSection.style.display = '';
     const txs = asset.transactions || [];
+    txList.dataset.assetId = assetId;
     if (!txs.length) {
       txList.innerHTML = `<div class="ad-tx-empty">${lang === 'es' ? 'Sin transacciones' : 'No transactions'}</div>`;
     } else {
-      txList.innerHTML = [...txs].reverse().map(tx => {
+      txList.innerHTML = txs.map((tx, i) => {
         const date  = new Date(tx.ts).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' });
         const label = tx.type === 'buy'
           ? (lang === 'es' ? 'Compra' : 'Buy')
@@ -4838,8 +4839,9 @@ function openAssetDetailModal(assetId) {
             <span class="ad-tx-qty">${formatQty(tx.qty)}</span>
             <span class="ad-tx-sub">@ ${formatCurrency(tx.price, assetCurr)} · ${date}</span>
           </div>
+          <button class="ad-tx-delete" data-index="${i}" title="${lang === 'es' ? 'Eliminar' : 'Delete'}">✕</button>
         </div>`;
-      }).join('');
+      }).reverse().join('');
     }
     addTxBtn.dataset.id = assetId;
   }
@@ -4861,6 +4863,21 @@ document.getElementById('adAddTx').addEventListener('click', function () {
   const id = this.dataset.id;
   closeAssetDetailModal();
   if (id) openTxModal(id);
+});
+
+document.getElementById('adTxList').addEventListener('click', e => {
+  const btn = e.target.closest('.ad-tx-delete');
+  if (!btn) return;
+  const assetId = document.getElementById('adTxList').dataset.assetId;
+  const asset = assets.find(a => a.id === assetId);
+  if (!asset || !asset.transactions) return;
+  const idx = parseInt(btn.dataset.index, 10);
+  if (isNaN(idx) || idx < 0 || idx >= asset.transactions.length) return;
+  asset.transactions.splice(idx, 1);
+  syncCostBasisFromTransactions(asset);
+  save();
+  render();
+  openAssetDetailModal(assetId);
 });
 
 // Delegate clicks on asset cards / detail rows → detail modal
