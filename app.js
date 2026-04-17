@@ -3113,34 +3113,34 @@ function updateMonsterText(lineEl, newText) {
   }, 600);
 }
 
-function getInsightType(text) {
+function getInsightTone(text) {
   const t = text.toLowerCase();
-  if (t.includes('large part') || t.includes('concentrated') ||
-      t.includes('exposed')    || t.includes('liquidity')    ||
-      t.includes('risk')       || t.includes('riesgo')       ||
-      t.includes('concentrad') || t.includes('liquidez')) return 'risk';
-  if (t.includes('increased')  || t.includes('growth')      ||
-      t.includes('strong')     || t.includes('recently')    ||
-      t.includes('incrementad') || t.includes('crecimiento') ||
-      t.includes('notable')    || t.includes('recientemente')) return 'growth';
-  return 'neutral';
+  if (t.includes('large part')  || t.includes('concentrated') ||
+      t.includes('liquidity')   || t.includes('concentrad')   ||
+      t.includes('liquidez')    || t.includes('gran parte')) return 'soft-caution';
+  if (t.includes('increased')   || t.includes('strong')       ||
+      t.includes('recent')      || t.includes('incrementad')  ||
+      t.includes('crecimiento') || t.includes('notable')      ||
+      t.includes('recientemente')) return 'soft-positive';
+  return 'default';
 }
 
-function setMonsterState(el, type) {
-  el.classList.remove('neutral', 'growth', 'risk');
-  el.classList.add(type);
+function setMonsterTone(el, tone) {
+  el.classList.remove('soft-caution', 'soft-positive');
+  if (tone !== 'default') el.classList.add(tone);
 }
 
 function animateMonster(elOrb, elText) {
   if (!elOrb || !elText) return;
   const next = getNextInsight();
-  const type = getInsightType(next);
-  setMonsterState(elOrb, type);
+  const tone = getInsightTone(next);
+  setMonsterTone(elOrb, tone);
   elOrb.classList.add('active');
   setTimeout(() => {
     updateMonsterText(elText, next);
     setTimeout(() => { elOrb.classList.remove('active'); }, 1200);
   }, 600);
+  setTimeout(() => { setMonsterTone(elOrb, 'default'); }, 4000);
 }
 
 function startInsightRotation() {
@@ -3197,7 +3197,7 @@ function renderInsights() {
     <div class="insights-screen">
       <div class="insights-hero">
         <div class="monster-container">
-          <div class="monster-orb neutral"></div>
+          <div class="monster-orb"></div>
         </div>
         <div class="monster-message" id="monsterMsg">
           <div class="monster-line"></div>
