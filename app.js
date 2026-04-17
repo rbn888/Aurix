@@ -3520,11 +3520,19 @@ setInterval(() => { applySubtleVariation(document.querySelector('.monster-orb'))
 let _mouseX    = 0.5;
 let _mouseY    = 0.5;
 let _pulseScale = 1;
+let _targetX   = 0;
+let _targetY   = 0;
+let _currentX  = 0;
+let _currentY  = 0;
 
 document.addEventListener('mousemove', e => {
-  _mouseX = e.clientX / window.innerWidth;
-  _mouseY = e.clientY / window.innerHeight;
+  _mouseX  = e.clientX / window.innerWidth;
+  _mouseY  = e.clientY / window.innerHeight;
+  _targetX = (_mouseX - 0.5) * 30;
+  _targetY = (_mouseY - 0.5) * 30;
 });
+
+document.addEventListener('mouseleave', () => { _targetX = 0; _targetY = 0; });
 
 function microPulse(el) {
   if (!el) return;
@@ -3638,27 +3646,33 @@ function startIntuitiveLoop() {
 
 startIntuitiveLoop();
 
-function applyOrbInteraction() {
+function animateGel() {
+  _currentX += (_targetX - _currentX) * 0.1;
+  _currentY += (_targetY - _currentY) * 0.1;
   const orb = document.querySelector('.monster-orb');
-  if (!orb || orb.classList.contains('active')) return;
-  const moveX  = (_mouseX - 0.5) * 10;
-  const moveY  = (_mouseY - 0.5) * 10;
-  const lightX = 20 + _mouseX * 60;
-  const lightY = 20 + _mouseY * 60;
-  orb.style.transform = `translate(${moveX}px, ${moveY}px) scale(${(1.015 * _pulseScale).toFixed(4)})`;
-  orb.style.background = `
-    radial-gradient(circle at ${lightX}% ${lightY}%, rgba(255,255,255,0.15), transparent 40%),
-    radial-gradient(circle at 30% 30%, rgba(120,160,255,0.6), transparent 40%),
-    radial-gradient(circle at center, #05070f, #000)
-  `;
+  if (orb && !orb.classList.contains('active')) {
+    const scaleX = (_pulseScale * (1 + Math.abs(_currentX) * 0.01)).toFixed(4);
+    const scaleY = (_pulseScale * (1 + Math.abs(_currentY) * 0.01)).toFixed(4);
+    const lightX = 20 + _mouseX * 60;
+    const lightY = 20 + _mouseY * 60;
+    orb.style.transform  = `translate(${_currentX.toFixed(2)}px, ${_currentY.toFixed(2)}px) scale(${scaleX}, ${scaleY})`;
+    orb.style.background = `
+      radial-gradient(circle at ${lightX}% ${lightY}%, rgba(255,255,255,0.15), transparent 40%),
+      radial-gradient(circle at 30% 30%, rgba(120,160,255,0.6), transparent 40%),
+      radial-gradient(circle at center, #05070f, #000)
+    `;
+  }
+  requestAnimationFrame(animateGel);
 }
 
-function startAmbientLoop() {
-  function loop() { applyOrbInteraction(); requestAnimationFrame(loop); }
-  loop();
-}
+animateGel();
 
-startAmbientLoop();
+setInterval(() => {
+  const el = document.querySelector('.monster-orb');
+  if (!el || el.classList.contains('active')) return;
+  _pulseScale = 1.02;
+  setTimeout(() => { _pulseScale = 1; }, 300);
+}, 4000);
 
 function getCurrentContext() {
   return currentTab || 'home';
@@ -3743,7 +3757,11 @@ function renderInsights() {
     <div class="insights-screen">
       <div class="insights-hero">
         <div class="monster-container">
-          <div class="monster-orb"></div>
+          <div class="monster-wrap">
+            <div class="monster-orb">
+              <div class="monster-core"></div>
+            </div>
+          </div>
         </div>
         <div class="monster-message" id="monsterMsg">
           <div class="monster-line"></div>
