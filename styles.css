@@ -4048,6 +4048,7 @@ img {
   color: var(--text-muted);
 }
 
+.ad-tx-edit,
 .ad-tx-delete {
   flex-shrink: 0;
   width: 22px;
@@ -4063,6 +4064,11 @@ img {
   justify-content: center;
   opacity: 0.45;
   transition: opacity .15s, background .15s, color .15s;
+}
+.ad-tx-edit:hover {
+  opacity: 1;
+  background: rgba(79,142,247,.12);
+  color: var(--accent);
 }
 .ad-tx-delete:hover {
   opacity: 1;

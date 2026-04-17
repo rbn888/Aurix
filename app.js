@@ -4713,7 +4713,8 @@ function addTransaction(assetId, type, qty, price) {
   save();
 }
 
-let _txAssetId  = null;
+let _txAssetId       = null;
+let _editingTxIndex  = null;
 const txOverlay    = document.getElementById('txOverlay');
 const txForm       = document.getElementById('txForm');
 const txQtyInput   = document.getElementById('txQty');
@@ -4740,7 +4741,8 @@ function openTxModal(assetId) {
 function closeTxModal() {
   txOverlay.classList.remove('open');
   document.body.classList.remove('modal-open');
-  _txAssetId = null;
+  _txAssetId      = null;
+  _editingTxIndex = null;
 }
 
 document.getElementById('txClose').addEventListener('click', closeTxModal);
@@ -4761,9 +4763,29 @@ txForm.addEventListener('submit', e => {
   const price = parseLocalFloat(txPriceInput.value);
   if (isNaN(qty)   || qty   <= 0) { txQtyInput.focus();   return; }
   if (isNaN(price) || price <= 0) { txPriceInput.focus(); return; }
-  addTransaction(_txAssetId, txTypeHidden.value, qty, price);
-  render();
-  closeTxModal();
+
+  if (_editingTxIndex !== null) {
+    const asset = assets.find(a => a.id === _txAssetId);
+    if (asset && asset.transactions && asset.transactions[_editingTxIndex]) {
+      const originalTs = asset.transactions[_editingTxIndex].ts;
+      asset.transactions[_editingTxIndex] = {
+        type:  txTypeHidden.value,
+        qty,
+        price,
+        ts:    originalTs,
+      };
+      syncCostBasisFromTransactions(asset);
+      save();
+      render();
+      const editedAssetId = _txAssetId;
+      closeTxModal();
+      openAssetDetailModal(editedAssetId);
+    }
+  } else {
+    addTransaction(_txAssetId, txTypeHidden.value, qty, price);
+    render();
+    closeTxModal();
+  }
 });
 
 // ── Asset detail modal ─────────────────────────────────────
@@ -4839,6 +4861,7 @@ function openAssetDetailModal(assetId) {
             <span class="ad-tx-qty">${formatQty(tx.qty)}</span>
             <span class="ad-tx-sub">@ ${formatCurrency(tx.price, assetCurr)} · ${date}</span>
           </div>
+          <button class="ad-tx-edit"   data-index="${i}" title="${lang === 'es' ? 'Editar' : 'Edit'}">✎</button>
           <button class="ad-tx-delete" data-index="${i}" title="${lang === 'es' ? 'Eliminar' : 'Delete'}">✕</button>
         </div>`;
       }).reverse().join('');
@@ -4866,18 +4889,37 @@ document.getElementById('adAddTx').addEventListener('click', function () {
 });
 
 document.getElementById('adTxList').addEventListener('click', e => {
-  const btn = e.target.closest('.ad-tx-delete');
-  if (!btn) return;
   const assetId = document.getElementById('adTxList').dataset.assetId;
-  const asset = assets.find(a => a.id === assetId);
-  if (!asset || !asset.transactions) return;
-  const idx = parseInt(btn.dataset.index, 10);
-  if (isNaN(idx) || idx < 0 || idx >= asset.transactions.length) return;
-  asset.transactions.splice(idx, 1);
-  syncCostBasisFromTransactions(asset);
-  save();
-  render();
-  openAssetDetailModal(assetId);
+  const asset   = assets.find(a => a.id === assetId);
+
+  const editBtn = e.target.closest('.ad-tx-edit');
+  if (editBtn) {
+    if (!asset || !asset.transactions) return;
+    const idx = parseInt(editBtn.dataset.index, 10);
+    if (isNaN(idx) || idx < 0 || idx >= asset.transactions.length) return;
+    const tx = asset.transactions[idx];
+    _editingTxIndex = idx;
+    closeAssetDetailModal();
+    openTxModal(assetId);
+    txQtyInput.value   = tx.qty;
+    txPriceInput.value = tx.price;
+    txTypeHidden.value = tx.type;
+    document.querySelectorAll('#txTypeToggle [data-txtype]')
+      .forEach(b => b.classList.toggle('active', b.dataset.txtype === tx.type));
+    return;
+  }
+
+  const delBtn = e.target.closest('.ad-tx-delete');
+  if (delBtn) {
+    if (!asset || !asset.transactions) return;
+    const idx = parseInt(delBtn.dataset.index, 10);
+    if (isNaN(idx) || idx < 0 || idx >= asset.transactions.length) return;
+    asset.transactions.splice(idx, 1);
+    syncCostBasisFromTransactions(asset);
+    save();
+    render();
+    openAssetDetailModal(assetId);
+  }
 });
 
 // Delegate clicks on asset cards / detail rows → detail modal
