@@ -4177,7 +4177,12 @@ main { padding-bottom: 72px; }
   position: relative;
   transform: scale(1);
   filter: brightness(1);
-  transition: transform 0.8s ease, filter 0.8s ease;
+  transition: transform 0.8s ease, filter 0.8s ease, box-shadow 0.8s ease;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(120,160,255,0.9), transparent 40%),
+    radial-gradient(circle at 70% 70%, rgba(0,200,255,0.4), transparent 50%),
+    radial-gradient(circle, #0a0f2a, #000);
+  box-shadow: 0 0 30px rgba(80,120,255,0.4);
 }
 .monster-orb::before {
   content: "";
@@ -4209,24 +4214,20 @@ main { padding-bottom: 72px; }
     inset 0 0 60px rgba(255,0,80,0.08);
 }
 .monster-orb.neutral {
-  background:
-    radial-gradient(circle at 30% 30%, rgba(120,160,255,0.9), transparent 40%),
-    radial-gradient(circle at 70% 70%, rgba(0,200,255,0.4), transparent 50%),
-    radial-gradient(circle, #0a0f2a, #000);
-  box-shadow:
-    0 0 40px rgba(80,120,255,0.6),
-    inset 0 0 30px rgba(255,255,255,0.05),
-    inset 0 0 60px rgba(0,180,255,0.08);
+  filter: brightness(1);
+  box-shadow: 0 0 30px rgba(80,120,255,0.4);
 }
-.monster-orb.good {
-  background:
-    radial-gradient(circle at 30% 30%, rgba(120,255,180,0.9), transparent 40%),
-    radial-gradient(circle at 70% 70%, rgba(0,255,180,0.4), transparent 50%),
-    radial-gradient(circle, #0a1a12, #000);
+.monster-orb.growth {
+  filter: brightness(1.25);
   box-shadow:
-    0 0 40px rgba(0,255,150,0.6),
-    inset 0 0 30px rgba(255,255,255,0.05),
-    inset 0 0 60px rgba(0,255,180,0.08);
+    0 0 50px rgba(0,255,180,0.7),
+    0 0 80px rgba(0,255,180,0.3);
+}
+.monster-orb.risk {
+  filter: brightness(0.9);
+  box-shadow:
+    0 0 40px rgba(255,120,120,0.6),
+    inset 0 0 30px rgba(255,80,80,0.2);
 }
 .monster-orb.active {
   transform: scale(1.08);

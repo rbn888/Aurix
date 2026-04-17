@@ -3113,11 +3113,32 @@ function updateMonsterText(lineEl, newText) {
   }, 600);
 }
 
+function getInsightType(text) {
+  const t = text.toLowerCase();
+  if (t.includes('large part') || t.includes('concentrated') ||
+      t.includes('exposed')    || t.includes('liquidity')    ||
+      t.includes('risk')       || t.includes('riesgo')       ||
+      t.includes('concentrad') || t.includes('liquidez')) return 'risk';
+  if (t.includes('increased')  || t.includes('growth')      ||
+      t.includes('strong')     || t.includes('recently')    ||
+      t.includes('incrementad') || t.includes('crecimiento') ||
+      t.includes('notable')    || t.includes('recientemente')) return 'growth';
+  return 'neutral';
+}
+
+function setMonsterState(el, type) {
+  el.classList.remove('neutral', 'growth', 'risk');
+  el.classList.add(type);
+}
+
 function animateMonster(elOrb, elText) {
   if (!elOrb || !elText) return;
+  const next = getNextInsight();
+  const type = getInsightType(next);
+  setMonsterState(elOrb, type);
   elOrb.classList.add('active');
   setTimeout(() => {
-    updateMonsterText(elText, getNextInsight());
+    updateMonsterText(elText, next);
     setTimeout(() => { elOrb.classList.remove('active'); }, 1200);
   }, 600);
 }
@@ -3172,12 +3193,11 @@ function toggleAllTx() {
 
 function renderInsights() {
   generateInsights();
-  const state = getMonsterState();
   return `
     <div class="insights-screen">
       <div class="insights-hero">
         <div class="monster-container">
-          <div class="monster-orb ${state}"></div>
+          <div class="monster-orb neutral"></div>
         </div>
         <div class="monster-message" id="monsterMsg">
           <div class="monster-line"></div>
