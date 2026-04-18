@@ -1107,6 +1107,22 @@ body.modal-open {
 .form-preview strong { color: var(--text); font-size: 15px; }
 
 /* ── Submit Button ─────────────────────────────────────── */
+.modal-cta {
+  position: sticky;
+  bottom: 0;
+  padding: 16px;
+  z-index: 2;
+  background: linear-gradient(
+    to top,
+    rgba(5,7,13,0.95),
+    rgba(5,7,13,0.7),
+    rgba(5,7,13,0)
+  );
+}
+.modal-cta button {
+  width: 100%;
+}
+
 .btn-submit {
   width: 100%;
   background: var(--accent);
