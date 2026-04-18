@@ -2815,6 +2815,10 @@ function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+function own(asset) {
+  return `Tu ${asset}`;
+}
+
 function generateBaseInsights() {
   const es         = lang === 'es';
   const insights   = [];
@@ -2859,10 +2863,27 @@ function generateBaseInsights() {
     if (!a.costBasis || a.costBasis <= 0) return;
     if (((a.qty * a.price - a.costBasis) / a.costBasis) * 100 > 50) strongPerformer = a;
   });
-  if (strongPerformer) insights.push({
-    text: es ? `${escHtml(strongPerformer.name)} sube más del 50% desde tu entrada.` : `${escHtml(strongPerformer.name)} up over 50% from entry.`,
-    priority: 2, topic: 'performance',
-  });
+  if (strongPerformer) {
+    const sn    = escHtml(strongPerformer.name);
+    const pct   = ((strongPerformer.qty * strongPerformer.price - strongPerformer.costBasis) / strongPerformer.costBasis * 100).toFixed(0);
+    const heavy = totalValue > 0 && (strongPerformer.qty * strongPerformer.price / totalValue) > 0.2;
+    insights.push({
+      text: es ? (heavy ? pick([
+        `Tu posición en ${sn} sube más del 50% desde tu entrada.`,
+        `${own(sn)} lleva una subida superior al 50%.`,
+      ]) : pick([
+        `Tienes exposición a ${sn} que ha subido un ${pct}%.`,
+        `Tu ${sn} acumula más del 50% desde que entraste.`,
+      ])) : (heavy ? pick([
+        `Your ${sn} position is up over 50% from entry.`,
+        `You hold ${sn} with gains above 50%.`,
+      ]) : pick([
+        `Your exposure to ${sn} is up ${pct}%.`,
+        `${sn} represents a gain of over 50% in your portfolio.`,
+      ])),
+      priority: 2, topic: 'performance',
+    });
+  }
 
   // 4. Low liquidity — priority 2
   const liquidity = assets.filter(a => a.type === 'cash').reduce((s, a) => s + a.qty, 0);
@@ -2882,8 +2903,20 @@ function generateBaseInsights() {
     const last = txs[0];
     insights.push({
       text: last.type === 'buy'
-        ? (es ? `Última operación: compra en ${escHtml(last.assetName)}.` : `Last trade: buy in ${escHtml(last.assetName)}.`)
-        : (es ? `Última operación: venta en ${escHtml(last.assetName)}.`  : `Last trade: sell in ${escHtml(last.assetName)}.`),
+        ? (es ? pick([
+            `Compraste ${escHtml(last.assetName)} recientemente.`,
+            `Tu última operación fue una compra en ${escHtml(last.assetName)}.`,
+          ]) : pick([
+            `You recently bought ${escHtml(last.assetName)}.`,
+            `Your last trade was a buy in ${escHtml(last.assetName)}.`,
+          ]))
+        : (es ? pick([
+            `Vendiste ${escHtml(last.assetName)} recientemente.`,
+            `Tu última operación fue una venta en ${escHtml(last.assetName)}.`,
+          ]) : pick([
+            `You recently sold ${escHtml(last.assetName)}.`,
+            `Your last trade was a sell in ${escHtml(last.assetName)}.`,
+          ])),
       priority: 3, topic: 'activity',
     });
   }
@@ -2925,9 +2958,16 @@ function detectRunUp(asset) {
   const growth = ((timeline.currentPrice - timeline.avgEntry) / timeline.avgEntry) * 100;
   const days   = getDaysSince(timeline.firstTs);
   if (growth > 80 && days < 60) {
+    const n = escHtml(asset.name);
     return es
-      ? `${escHtml(asset.name)} sube más del 80% en menos de 60 días.`
-      : `${escHtml(asset.name)} up over 80% in under 60 days.`;
+      ? pick([
+          `Tu posición en ${n} sube más del 80% en menos de 60 días.`,
+          `${own(n)} acumula más del 80% en menos de dos meses.`,
+        ])
+      : pick([
+          `Your ${n} position is up over 80% in under 60 days.`,
+          `You hold ${n} with over 80% gain in under 2 months.`,
+        ]);
   }
   return null;
 }
@@ -2939,9 +2979,17 @@ function detectStabilization(asset) {
   const growth       = ((timeline.currentPrice - timeline.avgEntry) / timeline.avgEntry) * 100;
   const daysSinceLast = getDaysSince(timeline.lastTs);
   if (growth > 50 && daysSinceLast > 7) {
+    const n    = escHtml(asset.name);
+    const dRnd = Math.round(daysSinceLast);
     return es
-      ? `${escHtml(asset.name)} +50%. Sin actividad en ${Math.round(daysSinceLast)} días.`
-      : `${escHtml(asset.name)} +50%. No activity in ${Math.round(daysSinceLast)} days.`;
+      ? pick([
+          `Tu posición en ${n} lleva +50% sin que hayas operado en ${dRnd} días.`,
+          `${own(n)} está en +50% y llevas ${dRnd} días sin tocarla.`,
+        ])
+      : pick([
+          `Your ${n} is up +50% and you haven't traded it in ${dRnd} days.`,
+          `You hold ${n} at +50% with no activity for ${dRnd} days.`,
+        ]);
   }
   return null;
 }
@@ -2951,9 +2999,16 @@ function detectAccumulation(asset) {
   if (!asset.transactions) return null;
   const buys = asset.transactions.filter(tx => tx.type === 'buy');
   if (buys.length >= 3) {
+    const n = escHtml(asset.name);
     return es
-      ? `${escHtml(asset.name)}: acumulado en al menos 3 compras.`
-      : `${escHtml(asset.name)}: built across at least 3 buys.`;
+      ? pick([
+          `Has acumulado ${n} en ${buys.length} compras distintas.`,
+          `Tu posición en ${n} se construyó en ${buys.length} entradas.`,
+        ])
+      : pick([
+          `You built your ${n} position across ${buys.length} separate buys.`,
+          `Your ${n} was accumulated over ${buys.length} purchases.`,
+        ]);
   }
   return null;
 }
@@ -3230,8 +3285,14 @@ function detectNarrativePatterns() {
     const days = (txs[txs.length - 1].ts - txs[0].ts) / (1000 * 60 * 60 * 24);
     if (days > 30) insights.push({
       text: es
-        ? `Posición en ${escHtml(asset)} construida en ${Math.round(days)} días.`
-        : `${escHtml(asset)} position built over ${Math.round(days)} days.`,
+        ? pick([
+            `Tu posición en ${escHtml(asset)} lleva construyéndose ${Math.round(days)} días.`,
+            `Llevas ${Math.round(days)} días acumulando ${escHtml(asset)}.`,
+          ])
+        : pick([
+            `You've been building your ${escHtml(asset)} position for ${Math.round(days)} days.`,
+            `Your ${escHtml(asset)} has been accumulated over ${Math.round(days)} days.`,
+          ]),
       priority: 3, topic: 'activity',
     });
   }
