@@ -3635,15 +3635,13 @@ function startInsightRotation() {
   const orb = () => document.querySelector('.monster-orb');
   const o = orb();
   if (o) applyContext(o);
-  setTimeout(() => { if (_rotationActive) animateMonster(); }, 1000);
   function loop() {
     if (!_rotationActive) return;
-    _insightInterval = setTimeout(() => {
-      const priority = animateMonster();
-      if (_rotationActive) loop();
-    }, getMessageDelay(_lastInsightPriority, _lastInsightText.length));
+    animateMonster();
+    const delay = getMessageDelay(_lastInsightPriority, _lastInsightText.length);
+    _insightInterval = setTimeout(loop, delay);
   }
-  loop();
+  setTimeout(loop, 1000);
 }
 
 function getTopAssetExposure() {
