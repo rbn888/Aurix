@@ -4135,6 +4135,12 @@ img {
 /* ── Bottom navigation ─────────────────────────────────── */
 main { padding-bottom: 72px; }
 
+@keyframes navBreath {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
 .bottom-nav {
   position: fixed;
   bottom: 0; left: 0; right: 0;
@@ -4142,19 +4148,24 @@ main { padding-bottom: 72px; }
   display: flex;
   justify-content: space-around;
   align-items: center;
-  background: #0b0f1a;
+  background: rgba(5,7,13,0.6);
+  backdrop-filter: blur(10px);
   border-top: 1px solid rgba(255,255,255,0.06);
   z-index: 200;
 }
 
 .bottom-nav .item {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 8px 14px;
   opacity: 0.6;
-  transition: opacity 0.25s ease;
+  transition: opacity 0.25s ease, transform 0.2s ease;
+}
+.bottom-nav .item:active {
+  transform: scale(0.92);
 }
 .bottom-nav .item svg {
   width: 22px;
@@ -4162,7 +4173,11 @@ main { padding-bottom: 72px; }
   stroke: rgba(180,220,255,0.6);
   stroke-width: 1.8;
   fill: none;
-  transition: stroke 0.25s ease, filter 0.25s ease, transform 0.25s ease;
+  transition: transform 0.25s ease, stroke 0.25s ease, filter 0.25s ease;
+}
+.bottom-nav .item:hover svg {
+  transform: scale(1.08);
+  stroke: rgba(180,255,220,0.9);
 }
 .bottom-nav .item.active {
   opacity: 1;
@@ -4170,7 +4185,17 @@ main { padding-bottom: 72px; }
 .bottom-nav .item.active svg {
   stroke: #6BFFB8;
   filter: drop-shadow(0 0 6px rgba(107,255,184,0.4));
-  transform: scale(1.05);
+  animation: navBreath 2.8s ease-in-out infinite;
+}
+.bottom-nav .item.active::after {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 4px;
+  margin: 4px auto 0;
+  border-radius: 50%;
+  background: #6BFFB8;
+  box-shadow: 0 0 6px rgba(107,255,184,0.6);
 }
 .bottom-nav .item[data-tab="add"] {
   background: rgba(255,255,255,0.08);
@@ -4183,6 +4208,9 @@ main { padding-bottom: 72px; }
 .bottom-nav .item[data-tab="add"] svg {
   stroke: rgba(255,255,255,0.8);
   stroke-width: 2;
+}
+.bottom-nav .item[data-tab="add"]::after {
+  display: none;
 }
 
 #aurora-bg {
