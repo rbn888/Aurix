@@ -969,9 +969,10 @@ let _donutDist     = [];
 let activeCategory = null; // persistent category filter ('crypto', 'metal', …, or null)
 let currentTab       = 'home';
 let showAllTx        = false;
-let insightIndex     = 0;
-let insightCache     = [];
-let _lastInsightText = '';
+let insightIndex        = 0;
+let insightCache        = [];
+let _lastInsightText    = '';
+let _lastInsightPriority = 4;
 let _insightInterval = null;
 
 const MEMORY_KEY = 'aurix_insights_memory';
@@ -3512,7 +3513,8 @@ function getNextInsight() {
     insightCache.push(insightCache.shift());
   }
   const item = insightCache.shift();
-  _lastInsightText = item.text;
+  _lastInsightText     = item.text;
+  _lastInsightPriority = item.priority || 4;
   storeInsight(item.text);
   return item.text;
 }
@@ -3582,15 +3584,24 @@ function updateMonsterTextSmooth(el, text) {
 
   el.style.opacity = 0;
 
+  // variable micro-pause: text swaps somewhere between fade nearly-gone and fully-gone
+  const pause = 900 + Math.random() * 300;
   setTimeout(() => {
     el.textContent = text;
     el.style.opacity = 1;
-  }, 1000);
+  }, pause);
+}
+
+function getMessageDelay(priority) {
+  if (priority === 1) return 7000 + Math.random() * 2000;
+  if (priority === 2) return 6000 + Math.random() * 2000;
+  if (priority === 3) return 5000 + Math.random() * 2000;
+  return 4000 + Math.random() * 2000; // ambient (priority 4)
 }
 
 function animateMonster() {
   const elText = document.querySelector(".monster-line");
-  if (!elText) return;
+  if (!elText) return _lastInsightPriority;
 
   const next = getNextInsight();
 
@@ -3599,16 +3610,16 @@ function animateMonster() {
   setTimeout(() => {
     updateMonsterTextSmooth(elText, next);
   }, 300);
+
+  return _lastInsightPriority;
 }
 
 function startMonsterCycle() {
   function loop() {
-    const delay = 6000 + Math.random() * 3000;
+    const priority = animateMonster();
+    const delay    = getMessageDelay(priority);
 
-    setTimeout(() => {
-      animateMonster();
-      loop();
-    }, delay);
+    setTimeout(loop, delay);
   }
 
   loop();
@@ -3645,9 +3656,9 @@ function startInsightRotation() {
   function loop() {
     if (!_rotationActive) return;
     _insightInterval = setTimeout(() => {
-      animateMonster();
-      loop();
-    }, getContextTiming());
+      const priority = animateMonster();
+      if (_rotationActive) loop();
+    }, getMessageDelay(_lastInsightPriority));
   }
   loop();
 }
