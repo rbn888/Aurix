@@ -969,9 +969,10 @@ let _donutDist     = [];
 let activeCategory = null; // persistent category filter ('crypto', 'metal', …, or null)
 let currentTab       = 'home';
 let showAllTx        = false;
-let insightIndex = 0;
-let insightCache = [];
-let _insightInterval  = null;
+let insightIndex     = 0;
+let insightCache     = [];
+let _lastInsightText = '';
+let _insightInterval = null;
 
 const MEMORY_KEY = 'aurix_insights_memory';
 
@@ -3338,15 +3339,42 @@ function markSpoken() {
   saveSilenceMemory(memory);
 }
 
-function getSilentMessage() {
-  const es = lang === 'es';
-  return {
-    text: es
-      ? 'Todo parece estable. Puedes revisar tu cartera cuando lo consideres oportuno.'
-      : 'Everything appears stable. You may revisit your portfolio when needed.',
-    priority: 4,
-    silent: true,
-  };
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function getAmbientMessages() {
+  const es   = lang === 'es';
+  const pool = es ? [
+    'Los mercados se mueven en ciclos.',
+    'La paciencia compone en silencio.',
+    'El tiempo revela la estructura.',
+    'El riesgo rara vez es obvio.',
+    'La estabilidad también es una señal.',
+    'Cada posición cuenta una historia.',
+    'La diversificación es una forma de escuchar.',
+    'Lo que no cambia también comunica algo.',
+  ] : [
+    'Markets move in cycles.',
+    'Patience compounds silently.',
+    'Time reveals structure.',
+    'Risk is rarely obvious.',
+    'Stability is also a signal.',
+    'Every position tells a story.',
+    'Diversification is a form of listening.',
+    'What stays unchanged also says something.',
+  ];
+  const result = shuffle(pool);
+  // ensure the first item in the new batch isn't the same as the last shown
+  if (_lastInsightText && result[0] === _lastInsightText && result.length > 1) {
+    result.push(result.shift());
+  }
+  return result.map(text => ({ text, priority: 4, ambient: true }));
 }
 
 const WOW_KEY = 'aurix_wow';
@@ -3467,7 +3495,7 @@ function generateInsights() {
   }));
 
   if (!shouldSpeak(pool)) {
-    insightCache = [getSilentMessage()];
+    insightCache = getAmbientMessages();
     return insightCache;
   }
 
@@ -3477,12 +3505,16 @@ function generateInsights() {
 }
 
 function getNextInsight() {
-  const pool = insightCache.length ? insightCache : generateInsights();
-  if (!pool.length) return '';
-  const insight = pool[insightIndex % pool.length];
-  insightIndex++;
-  storeInsight(insight.text);
-  return insight.text;
+  if (insightCache.length < 2) generateInsights();
+  if (!insightCache.length) return '';
+  // rotate a back-to-back repeat to the end of the queue
+  if (insightCache[0].text === _lastInsightText && insightCache.length > 1) {
+    insightCache.push(insightCache.shift());
+  }
+  const item = insightCache.shift();
+  _lastInsightText = item.text;
+  storeInsight(item.text);
+  return item.text;
 }
 
 // =====================================
