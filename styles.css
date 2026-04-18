@@ -4170,9 +4170,11 @@ main { padding-bottom: 72px; }
 .bottom-nav .item svg {
   width: 22px;
   height: 22px;
-  stroke: rgba(180,220,255,0.6);
-  stroke-width: 1.8;
+  stroke: rgba(180,220,255,0.55);
+  stroke-width: 1.7;
   fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   transition: transform 0.25s ease, stroke 0.25s ease, filter 0.25s ease;
 }
 .bottom-nav .item:hover svg {
