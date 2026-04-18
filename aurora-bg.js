@@ -46,8 +46,8 @@
   }, { passive: true });
 
   // ── Particles ────────────────────────────────────────────────
-  const FAR_COUNT = window.innerWidth <= 768 ? 60 : 90;
-  const MID_COUNT = window.innerWidth <= 768 ? 30 : 50;
+  const FAR_COUNT = window.innerWidth <= 768 ? 60 : 110;
+  const MID_COUNT = window.innerWidth <= 768 ? 30 :  50;
   const COUNT     = FAR_COUNT + MID_COUNT;
   const particles = new Array(COUNT);
 
@@ -55,11 +55,13 @@
     const isFar       = layer === 'far';
     const depth       = isFar ? 0.3 + Math.random() * 0.3 : 0.6 + Math.random() * 0.4;
     const baseOpacity = isFar ? 0.2 + Math.random() * 0.3  : 0.4 + Math.random() * 0.4;
-    const size        = isFar ? 0.5 + Math.random() * 1.0  : 1.0 + Math.random() * 1.5;
+    const size        = isFar
+      ? Math.pow(Math.random(), 2) * 2.2 + 0.4
+      : Math.pow(Math.random(), 2) * 2.2 + 0.4;
 
-    const radius   = Math.min(W || window.innerWidth, H || window.innerHeight) * 0.35;
+    const radius   = Math.min(W || window.innerWidth, H || window.innerHeight) * 0.65;
     const angle    = Math.random() * Math.PI * 2;
-    const distance = Math.pow(Math.random(), 1.5) * radius;
+    const distance = Math.pow(Math.random(), 1.2) * radius;
     const cx       = (W || window.innerWidth)  / 2;
     const cy       = (H || window.innerHeight) / 2;
 
@@ -193,7 +195,7 @@
 
     const cx = centerX();
     const cy = centerY();
-    const maxDist = Math.min(W, H) * 0.5;
+    const maxDist = Math.min(W, H) * 0.75;
 
     // ── Aurora blobs ──
     for (let i = 0; i < BLOB_COUNT; i++) {
@@ -250,8 +252,8 @@
       p.vy += Math.cos(ts * 0.001 * p.freq * 0.68 + p.phase) * 0.0007;
 
       // Center attraction
-      p.vx += (cx - p.x) * 0.00002;
-      p.vy += (cy - p.y) * 0.00002;
+      p.vx += (cx - p.x) * 0.00001;
+      p.vy += (cy - p.y) * 0.00001;
 
       // Pointer repel
       const pdx  = p.x - pointerX;
