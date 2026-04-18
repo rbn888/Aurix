@@ -2644,6 +2644,7 @@ body.modal-open {
     overscroll-behavior-y: contain;
     flex: 1;
     min-height: 0; /* required for flex child to shrink below content height */
+    padding-bottom: 120px;
   }
   /* Suggestions list: tighter max-height on small screens */
   .asset-suggestions { max-height: 42vh; }
