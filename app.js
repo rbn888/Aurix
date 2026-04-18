@@ -974,9 +974,12 @@ let insightCache        = [];
 let _lastInsightText    = '';
 let _lastInsightPriority = 4;
 let _insightInterval = null;
-let currentTopic  = null;
-let lastTopics    = [];
-let lastMessages  = [];
+let currentTopic   = null;
+let lastTopics     = [];
+let topicHistory   = [];
+let lastMessages   = [];
+let currentMessage = null;
+let isDisplaying   = false;
 
 const MEMORY_KEY = 'aurix_insights_memory';
 
@@ -2808,6 +2811,10 @@ function getTotalPortfolioValue() {
   return assets.reduce((sum, a) => sum + a.qty * a.price, 0);
 }
 
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 function generateBaseInsights() {
   const es         = lang === 'es';
   const insights   = [];
@@ -2822,7 +2829,13 @@ function generateBaseInsights() {
   let maxValue = 0;
   assets.forEach(a => { const v = a.qty * a.price; if (v > maxValue) maxValue = v; });
   if (totalValue > 0 && (maxValue / totalValue) * 100 > 50) insights.push({
-    text: es ? 'Una gran parte de tu cartera depende de un único activo.' : 'A large part of your portfolio depends on a single asset.',
+    text: es ? pick([
+      'Más del 50% en un solo activo.',
+      'Un activo concentra más del 50% de cartera.',
+    ]) : pick([
+      'Over 50% in a single asset.',
+      'One asset holds over 50% of portfolio.',
+    ]),
     priority: 1, topic: 'concentration',
   });
 
@@ -2833,7 +2846,7 @@ function generateBaseInsights() {
     if (totalValue > 0 && (byType[type] / totalValue) * 100 > 60) {
       const label = (T[lang].typeMeta && T[lang].typeMeta[type]) || type;
       insights.push({
-        text: es ? `Una parte importante de tu cartera está concentrada en ${label}.` : `A large part of your portfolio is concentrated in ${label}.`,
+        text: es ? `Más del 60% de tu cartera está en ${label}.` : `Over 60% of your portfolio is in ${label}.`,
         priority: 1, topic: 'distribution',
       });
       break;
@@ -2847,14 +2860,20 @@ function generateBaseInsights() {
     if (((a.qty * a.price - a.costBasis) / a.costBasis) * 100 > 50) strongPerformer = a;
   });
   if (strongPerformer) insights.push({
-    text: es ? `${escHtml(strongPerformer.name)} ha tenido un crecimiento notable respecto a tu precio de entrada.` : `${escHtml(strongPerformer.name)} has seen strong growth compared to your entry price.`,
+    text: es ? `${escHtml(strongPerformer.name)} sube más del 50% desde tu entrada.` : `${escHtml(strongPerformer.name)} up over 50% from entry.`,
     priority: 2, topic: 'performance',
   });
 
   // 4. Low liquidity — priority 2
   const liquidity = assets.filter(a => a.type === 'cash').reduce((s, a) => s + a.qty, 0);
   if (totalValue > 0 && liquidity / totalValue < 0.1) insights.push({
-    text: es ? 'Una parte relativamente pequeña de tu cartera está en liquidez.' : 'A relatively small portion of your portfolio is held in liquidity.',
+    text: es ? pick([
+      'Menos del 10% en liquidez.',
+      'Menos del 10% de cartera en efectivo.',
+    ]) : pick([
+      'Under 10% in liquidity.',
+      'Less than 10% of portfolio in cash.',
+    ]),
     priority: 2, topic: 'liquidity',
   });
 
@@ -2863,20 +2882,20 @@ function generateBaseInsights() {
     const last = txs[0];
     insights.push({
       text: last.type === 'buy'
-        ? (es ? `Recientemente aumentaste tu posición en ${escHtml(last.assetName)}.` : `You recently increased your position in ${escHtml(last.assetName)}.`)
-        : (es ? `Recientemente redujiste tu posición en ${escHtml(last.assetName)}.`  : `You recently reduced your position in ${escHtml(last.assetName)}.`),
+        ? (es ? `Última operación: compra en ${escHtml(last.assetName)}.` : `Last trade: buy in ${escHtml(last.assetName)}.`)
+        : (es ? `Última operación: venta en ${escHtml(last.assetName)}.`  : `Last trade: sell in ${escHtml(last.assetName)}.`),
       priority: 3, topic: 'activity',
     });
   }
 
-  // 6. Enough transaction history — priority 3
-  if (hasEnoughHistory()) insights.push({
-    text: es ? 'Ya tienes suficiente historial para obtener insights más precisos.' : 'You now have enough history for more accurate insights.',
-    priority: 3,
-  });
-
   if (!insights.length) insights.push({
-    text: es ? 'Tu cartera parece equilibrada.' : 'Your portfolio looks balanced.',
+    text: es ? pick([
+      'Sin activo dominante en cartera.',
+      'Ningún activo supera el 50%.',
+    ]) : pick([
+      'No dominant asset in portfolio.',
+      'No asset over 50% of portfolio.',
+    ]),
     priority: 4, topic: 'distribution',
   });
 
@@ -2907,8 +2926,8 @@ function detectRunUp(asset) {
   const days   = getDaysSince(timeline.firstTs);
   if (growth > 80 && days < 60) {
     return es
-      ? `${escHtml(asset.name)} ha subido más del 80% en menos de dos meses.`
-      : `${escHtml(asset.name)} is up over 80% in less than two months.`;
+      ? `${escHtml(asset.name)} sube más del 80% en menos de 60 días.`
+      : `${escHtml(asset.name)} up over 80% in under 60 days.`;
   }
   return null;
 }
@@ -2921,8 +2940,8 @@ function detectStabilization(asset) {
   const daysSinceLast = getDaysSince(timeline.lastTs);
   if (growth > 50 && daysSinceLast > 7) {
     return es
-      ? `${escHtml(asset.name)} creció con fuerza y lleva días sin grandes movimientos.`
-      : `${escHtml(asset.name)} grew strongly and has been stable for over a week.`;
+      ? `${escHtml(asset.name)} +50%. Sin actividad en ${Math.round(daysSinceLast)} días.`
+      : `${escHtml(asset.name)} +50%. No activity in ${Math.round(daysSinceLast)} days.`;
   }
   return null;
 }
@@ -2933,8 +2952,8 @@ function detectAccumulation(asset) {
   const buys = asset.transactions.filter(tx => tx.type === 'buy');
   if (buys.length >= 3) {
     return es
-      ? `Has incrementado tu posición en ${escHtml(asset.name)} varias veces.`
-      : `You have increased your position in ${escHtml(asset.name)} multiple times.`;
+      ? `${escHtml(asset.name)}: acumulado en al menos 3 compras.`
+      : `${escHtml(asset.name)}: built across at least 3 buys.`;
   }
   return null;
 }
@@ -2951,7 +2970,18 @@ function generateTemporalInsights() {
     const acc = detectAccumulation(asset);
     if (acc) insights.push({ text: acc, priority: 3, topic: 'activity' });
   });
-  return insights;
+
+  const byTopic = new Map();
+
+  for (const i of insights) {
+    const existing = byTopic.get(i.topic);
+
+    if (!existing || i.priority < existing.priority) {
+      byTopic.set(i.topic, i);
+    }
+  }
+
+  return Array.from(byTopic.values()).slice(0, 5);
 }
 
 function detectRepetition() {
@@ -2963,8 +2993,8 @@ function detectRepetition() {
     if (count[name] >= 3) {
       return {
         text: es
-          ? `Has incrementado tu posición en ${escHtml(name)} varias veces.`
-          : `You have increased your position in ${escHtml(name)} multiple times.`,
+          ? `Aumentaste tu posición en ${escHtml(name)} al menos 3 veces.`
+          : `You increased your position in ${escHtml(name)} at least 3 times.`,
         priority: 2, topic: 'activity',
       };
     }
@@ -2978,9 +3008,13 @@ function detectOveractivity() {
   const recent = txs.filter(tx => Date.now() - tx.ts < 3 * 24 * 60 * 60 * 1000);
   if (recent.length >= 5) {
     return {
-      text: es
-        ? 'Has realizado muchas operaciones en los últimos 3 días.'
-        : 'You made many trades in the last 3 days.',
+      text: es ? pick([
+        '5 o más operaciones en los últimos 3 días.',
+        '5+ operaciones en los últimos 3 días.',
+      ]) : pick([
+        '5 or more trades in the last 3 days.',
+        '5+ trades in the last 3 days.',
+      ]),
       priority: 2, topic: 'activity',
     };
   }
@@ -2993,9 +3027,13 @@ function detectConfidenceRisk() {
   const concentration = getTopAssetExposure();
   if (pnl > 40 && concentration > 50) {
     return {
-      text: es
-        ? 'Tu cartera rinde bien pero está muy concentrada.'
-        : 'Your portfolio is performing well but highly concentrated.',
+      text: es ? pick([
+        'Rentabilidad alta y más del 50% concentrado.',
+        'Sube con más del 50% en pocos activos.',
+      ]) : pick([
+        'High returns with over 50% concentrated.',
+        'Rising with 50%+ in few assets.',
+      ]),
       priority: 1, topic: 'concentration',
     };
   }
@@ -3011,8 +3049,8 @@ function detectInactivityAfterGrowth() {
   if (pnl > 30 && days > 10) {
     return {
       text: es
-        ? 'Tu cartera ha crecido pero llevas días sin actividad.'
-        : 'Your portfolio grew while your activity remained low.',
+        ? `+30% en cartera. Sin operar en ${Math.round(days)} días.`
+        : `Portfolio +30%. No trades in ${Math.round(days)} days.`,
       priority: 2, topic: 'activity',
     };
   }
@@ -3143,9 +3181,13 @@ function generateDecisionInsight() {
   if (!pattern) return null;
   if (pattern.type === 'buying_high') {
     return {
-      text: es
-        ? 'Varias compras recientes ocurrieron durante subidas de precio.'
-        : 'Several recent purchases happened during price upswings.',
+      text: es ? pick([
+        'Mayoría de compras recientes en subidas.',
+        '70%+ de compras en tendencia alcista.',
+      ]) : pick([
+        'Most recent buys during price rallies.',
+        '70%+ of buys during uptrends.',
+      ]),
       priority: 2, topic: 'activity',
     };
   }
@@ -3181,15 +3223,15 @@ function detectNarrativePatterns() {
     const buys = txs.filter(tx => tx.type === 'buy');
     if (buys.length >= 3) insights.push({
       text: es
-        ? `Has ido añadiendo posición en ${escHtml(asset)} con el tiempo.`
-        : `You have been building your position in ${escHtml(asset)} over time.`,
+        ? `Tienes ${buys.length} compras registradas en ${escHtml(asset)}.`
+        : `You have ${buys.length} recorded purchases of ${escHtml(asset)}.`,
       priority: 2, topic: 'activity',
     });
     const days = (txs[txs.length - 1].ts - txs[0].ts) / (1000 * 60 * 60 * 24);
     if (days > 30) insights.push({
       text: es
-        ? `Tu posición en ${escHtml(asset)} la construiste a lo largo de varios meses.`
-        : `Your position in ${escHtml(asset)} was built over several months.`,
+        ? `Posición en ${escHtml(asset)} construida en ${Math.round(days)} días.`
+        : `${escHtml(asset)} position built over ${Math.round(days)} days.`,
       priority: 3, topic: 'activity',
     });
   }
@@ -3248,24 +3290,32 @@ function generateSignatureInsight() {
   const identity = getIdentity();
   if (identity.style === 'active') {
     return {
-      text: es
-        ? 'Tu cartera muestra un ritmo de actividad elevado.'
-        : 'Your portfolio shows a high level of trading activity.',
+      text: es ? pick([
+        'Has registrado más de 20 operaciones en total.',
+        'Llevas más de 20 operaciones registradas.',
+      ]) : pick([
+        'You have recorded over 20 trades in total.',
+        'You have logged more than 20 trades.',
+      ]),
       priority: 3, topic: 'activity',
     };
   }
   if (identity.style === 'concentrated') {
     return {
-      text: es
-        ? 'Tu cartera está concentrada en pocas posiciones.'
-        : 'Your portfolio is concentrated in a few positions.',
+      text: es ? pick([
+        'Tienes 2 o menos activos en cartera.',
+        'Menos de 3 activos en tu cartera.',
+      ]) : pick([
+        'You hold 2 or fewer assets.',
+        'Fewer than 3 assets in portfolio.',
+      ]),
       priority: 3, topic: 'concentration',
     };
   }
   return {
     text: es
-      ? 'Tu cartera refleja un enfoque equilibrado a lo largo del tiempo.'
-      : 'Your portfolio reflects a balanced approach over time.',
+      ? `Tu cartera tiene ${assets.length} posiciones sin activo dominante.`
+      : `Your portfolio holds ${assets.length} positions with no dominant asset.`,
     priority: 3, topic: 'distribution',
   };
 }
@@ -3372,8 +3422,8 @@ function detectWowInsights() {
     if (repeatedBuys[name] >= 4) {
       insights.push({
         text: es
-          ? `Has comprado ${escHtml(name)} de forma consistente mientras subía.`
-          : `You kept buying ${escHtml(name)} consistently as its value rose.`,
+          ? `Compraste ${escHtml(name)} más de 4 veces mientras subía.`
+          : `You bought ${escHtml(name)} over 4 times while it rose.`,
         priority: 1, topic: 'activity',
       });
       break;
@@ -3383,8 +3433,8 @@ function detectWowInsights() {
   // 3. Structure stability — priority 2
   if (assets.length >= 3) insights.push({
     text: es
-      ? 'La estructura de tu cartera se ha mantenido relativamente estable a lo largo del tiempo.'
-      : 'Your portfolio structure has remained relatively stable over time.',
+      ? `Tu cartera está distribuida entre ${assets.length} activos.`
+      : `Your portfolio is spread across ${assets.length} assets.`,
     priority: 2, topic: 'distribution',
   });
 
@@ -3420,10 +3470,18 @@ function generateInsights() {
   ].filter(i => VALID_TOPICS.has(i.topic));
   all.sort((a, b) => a.priority - b.priority);
 
+  const ACTION_MAP = {
+    performance:   { label: 'Ver rendimiento', type: 'view_performance'  },
+    concentration: { label: 'Ver distribución', type: 'view_distribution' },
+    activity:      { label: 'Ver operaciones', type: 'view_activity'     },
+    liquidity:     { label: 'Ver liquidez',    type: 'view_liquidity'    },
+  };
+
   const filtered = all.filter(i => !wasRecentlyShown(i.text));
   const pool     = (filtered.length ? filtered : all).slice(0, 5).map(i => ({
     ...i,
-    text: applyIdentityTone(adaptInsight(adaptMessage(i.text))),
+    text:   applyIdentityTone(adaptInsight(adaptMessage(i.text))),
+    action: i.priority === 1 && ACTION_MAP[i.topic] ? ACTION_MAP[i.topic] : undefined,
   }));
 
   const ambient = getAmbientMessages().slice(0, 2).map(i => ({ ...i, topic: 'ambient' }));
@@ -3433,17 +3491,18 @@ function generateInsights() {
 
 function getNextInsight() {
   if (insightCache.length < 3) generateInsights();
-  if (!insightCache.length) return '';
+  if (!insightCache.length) return null;
 
-  const available     = insightCache.filter(i => !lastMessages.includes(i.text));
-  const pool          = available.length ? available : insightCache;
+  const available = insightCache.filter(i => !lastMessages.includes(i.text));
+  const pool      = available.length ? available : insightCache;
 
-  const preferred     = pool.filter(i => i.topic === currentTopic);
-  const deprioritized = pool.filter(i => lastTopics.includes(i.topic) && i.topic !== currentTopic);
-  const neutral       = pool.filter(i => !lastTopics.includes(i.topic) && i.topic !== currentTopic);
+  const recentTopics = topicHistory.slice(-2);
+  const cooled       = pool.filter(i => i.priority === 1 || !recentTopics.includes(i.topic));
+  const candidates   = cooled.length ? cooled : pool;
 
-  const ordered = [...preferred, ...neutral, ...deprioritized];
-  const item    = ordered.length ? ordered[0] : insightCache[0];
+  candidates.sort((a, b) => (a.priority || 4) - (b.priority || 4));
+  const top2 = candidates.slice(0, 2);
+  const item = top2[Math.floor(Math.random() * top2.length)];
 
   const idx = insightCache.indexOf(item);
   if (idx !== -1) insightCache.splice(idx, 1);
@@ -3456,23 +3515,26 @@ function getNextInsight() {
   lastTopics.push(currentTopic);
   if (lastTopics.length > 3) lastTopics.shift();
 
-  lastMessages.push(item.text);
-  if (lastMessages.length > 5) lastMessages.shift();
+  topicHistory.push(item.topic);
+  if (topicHistory.length > 3) topicHistory.shift();
 
-  return item.text;
+  return item;
 }
 
 // =====================================
 // AURIX — FINAL MONSTER ENGINE (CLEAN)
 // =====================================
 
+let orbColor    = { r: 147, g: 112, b: 219 };
+let targetColor = { r: 147, g: 112, b: 219 };
+
 const monsterState = {
-  x: 0,
-  y: 0,
-  tx: 0,
-  ty: 0,
-  scale: 1,
-  targetScale: 1
+  x: 0, y: 0, tx: 0, ty: 0,
+  scale: 1, targetScale: 1,
+  glow: 0.5, targetGlow: 0.5,
+  wobbleAmp: 1, targetWobbleAmp: 1,
+  pulseFreq: 1, targetPulseFreq: 1,
+  hovered: false,
 };
 
 function updateTarget(x, y) {
@@ -3489,6 +3551,8 @@ window.addEventListener("touchmove", (e) => {
   updateTarget(e.touches[0].clientX, e.touches[0].clientY);
 }, { passive: true });
 
+let _hoverListenerAdded = false;
+
 function monsterLoop() {
   const orb = document.querySelector(".monster-orb");
 
@@ -3497,21 +3561,47 @@ function monsterLoop() {
     return;
   }
 
-  const t     = Date.now() / 1000;
-  const idleX = Math.sin(t * 0.42) * 3.5 + Math.cos(t * 0.27) * 1.8;
-  const idleY = Math.cos(t * 0.35) * 3.0 + Math.sin(t * 0.19) * 2.0;
+  if (!_hoverListenerAdded) {
+    orb.addEventListener('mouseenter', () => { monsterState.hovered = true; });
+    orb.addEventListener('mouseleave', () => { monsterState.hovered = false; });
+    _hoverListenerAdded = true;
+  }
 
-  monsterState.x += ((monsterState.tx + idleX) - monsterState.x) * 0.06;
-  monsterState.y += ((monsterState.ty + idleY) - monsterState.y) * 0.06;
+  const t  = Date.now() / 1000;
+  const lf = 0.025;
+
+  monsterState.glow      += (monsterState.targetGlow      - monsterState.glow)      * lf;
+  monsterState.wobbleAmp += (monsterState.targetWobbleAmp - monsterState.wobbleAmp) * lf;
+  monsterState.pulseFreq += (monsterState.targetPulseFreq - monsterState.pulseFreq) * lf;
+
+  orbColor.r += (targetColor.r - orbColor.r) * 0.05;
+  orbColor.g += (targetColor.g - orbColor.g) * 0.05;
+  orbColor.b += (targetColor.b - orbColor.b) * 0.05;
+
+  const w     = monsterState.wobbleAmp;
+  const f     = monsterState.pulseFreq;
+  const idleX = (Math.sin(t * 0.42 * f) * 3.5 + Math.cos(t * 0.27 * f) * 1.8) * w;
+  const idleY = (Math.cos(t * 0.35 * f) * 3.0 + Math.sin(t * 0.19 * f) * 2.0) * w;
+
+  monsterState.x     += ((monsterState.tx + idleX) - monsterState.x) * 0.06;
+  monsterState.y     += ((monsterState.ty + idleY) - monsterState.y) * 0.06;
   monsterState.scale += (monsterState.targetScale - monsterState.scale) * 0.08;
 
   const deformX = 1 + Math.abs(monsterState.x) * 0.015;
   const deformY = 1 + Math.abs(monsterState.y) * 0.015;
 
-  orb.style.transform = `
-    translate(${monsterState.x}px, ${monsterState.y}px)
-    scale(${deformX}, ${deformY})
-  `;
+  orb.style.transform = `translate(${monsterState.x}px, ${monsterState.y}px) scale(${deformX}, ${deformY})`;
+
+  const color = `${Math.round(orbColor.r)},${Math.round(orbColor.g)},${Math.round(orbColor.b)}`;
+  const hMult = monsterState.hovered ? 1.4 : 1;
+  const g     = monsterState.glow * hMult;
+  const r1    = Math.round(40 + g * 40);
+  const r2    = Math.round(80 + g * 80);
+  const ri    = Math.round(30 + g * 20);
+  const a1    = +(0.4 + g * 0.5).toFixed(2);
+  const a2    = +(0.2 + g * 0.3).toFixed(2);
+  const ai    = +(0.2 + g * 0.2).toFixed(2);
+  orb.style.boxShadow = `0 0 ${r1}px rgba(${color},${a1}), 0 0 ${r2}px rgba(${color},${a2}), inset 0 0 ${ri}px rgba(${color},${ai})`;
 
   requestAnimationFrame(monsterLoop);
 }
@@ -3545,11 +3635,34 @@ function getMessageDelay(priority, textLength = 120) {
   return base * lengthFactor * priorityFactor;
 }
 
+function updateOrbState() {
+  if (!currentMessage) return;
+  const p = currentMessage.priority || 4;
+  const t = currentMessage.topic   || '';
+
+  const topicMap = {
+    performance:   { glow: 0.6, wobble: 1.0, freq: 1.0 },
+    concentration: { glow: 0.8, wobble: 0.6, freq: 1.1 },
+    activity:      { glow: 0.5, wobble: 1.6, freq: 1.3 },
+    liquidity:     { glow: 0.3, wobble: 0.8, freq: 0.8 },
+    distribution:  { glow: 0.5, wobble: 1.0, freq: 1.0 },
+    ambient:       { glow: 0.3, wobble: 1.0, freq: 0.9 },
+  };
+  const base = topicMap[t] || { glow: 0.5, wobble: 1.0, freq: 1.0 };
+
+  const pMod = p === 1 ? 1.5 : p === 3 ? 0.7 : 1;
+
+  monsterState.targetGlow      = Math.min(base.glow * pMod, 1);
+  monsterState.targetWobbleAmp = base.wobble * (p === 1 ? 1.1 : p === 3 ? 0.85 : 1);
+  monsterState.targetPulseFreq = base.freq   * (p === 1 ? 1.2 : p === 3 ? 0.80 : 1);
+}
+
 function animateMonster() {
   const elText = document.querySelector(".monster-line");
   if (!elText) return _lastInsightPriority;
 
   const next = getNextInsight();
+  updateOrbState();
 
   monsterReact();
 
@@ -3570,13 +3683,7 @@ function applyContext(el) {
   el.classList.add(`ctx-${getCurrentContext()}`);
 }
 
-function applyPnlToOrb(orb) {
-  if (!orb) return;
-  orb.classList.remove('pnl-positive', 'pnl-negative');
-  const pnl = getPortfolioPnL();
-  if (pnl > 0)      orb.classList.add('pnl-positive');
-  else if (pnl < 0) orb.classList.add('pnl-negative');
-}
+function applyPnlToOrb() {}
 
 function getContextTiming() {
   const ctx = getCurrentContext();
@@ -3586,21 +3693,83 @@ function getContextTiming() {
   return 8000;
 }
 
+function handleMonsterAction(type) {
+  const tabMap = {
+    view_performance:  'home',
+    view_distribution: 'home',
+    view_activity:     'insights',
+    view_liquidity:    'home',
+  };
+  const tab = tabMap[type];
+  if (tab) switchTab(tab);
+}
+
+function getReadingTime(text) {
+  const words = text.split(' ').length;
+  return Math.max(4000, words * 450);
+}
+
+function displayMessage(msg) {
+  const el       = document.querySelector('.monster-line');
+  const actionEl = document.getElementById('monsterAction');
+  if (!el) return;
+
+  el.classList.remove('visible');
+  if (actionEl) {
+    actionEl.classList.remove('visible');
+    actionEl.textContent = '';
+    actionEl.onclick = null;
+  }
+
+  setTimeout(() => {
+    el.textContent = msg.text;
+    void el.offsetWidth;
+    el.classList.add('visible');
+    updateOrbState();
+    monsterReact();
+
+    if (msg.action && actionEl) {
+      setTimeout(() => {
+        actionEl.textContent = msg.action.label;
+        actionEl.onclick = () => handleMonsterAction(msg.action.type);
+        void actionEl.offsetWidth;
+        actionEl.classList.add('visible');
+      }, 800);
+    }
+  }, 300);
+}
+
+function showNextMessage() {
+  if (!_rotationActive || isDisplaying) return;
+  const next = getNextInsight();
+  if (!next) return;
+  isDisplaying = true;
+  const thinkDelay = 800 + Math.random() * 1200;
+  setTimeout(() => {
+    if (!_rotationActive) { isDisplaying = false; return; }
+    currentMessage = next;
+    displayMessage(next);
+    const readTime = getReadingTime(next.text);
+    setTimeout(() => {
+      lastMessages.push(next.text);
+      if (lastMessages.length > 5) lastMessages.shift();
+      const restDelay = 1500 + Math.random() * 2500;
+      setTimeout(() => {
+        isDisplaying = false;
+        showNextMessage();
+      }, restDelay);
+    }, readTime);
+  }, thinkDelay);
+}
+
 let _rotationActive = false;
 
 function startInsightRotation() {
-  if (_insightInterval) { clearTimeout(_insightInterval); _insightInterval = null; }
   _rotationActive = true;
-  const orb = () => document.querySelector('.monster-orb');
-  const o = orb();
+  isDisplaying    = false;
+  const o = document.querySelector('.monster-orb');
   if (o) { applyContext(o); applyPnlToOrb(o); }
-  function loop() {
-    if (!_rotationActive) return;
-    animateMonster();
-    const delay = getMessageDelay(_lastInsightPriority, _lastInsightText.length);
-    _insightInterval = setTimeout(loop, delay);
-  }
-  setTimeout(loop, 1000);
+  setTimeout(showNextMessage, 1000);
 }
 
 function getTopAssetExposure() {
@@ -3656,6 +3825,7 @@ function renderInsights() {
         </div>
         <div class="monster-message" id="monsterMsg">
           <div class="monster-line"></div>
+          <div class="monster-action" id="monsterAction"></div>
         </div>
       </div>
     </div>`;
@@ -3675,6 +3845,7 @@ function updateBottomNavActive() {
 function switchTab(tab) {
   currentTab = tab;
   _rotationActive = false;
+  isDisplaying    = false;
   if (_insightInterval) { clearTimeout(_insightInterval); _insightInterval = null; }
   const mainEl      = document.querySelector('main');
   const placeholder = document.getElementById('tabPlaceholder');

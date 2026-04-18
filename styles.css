@@ -4287,18 +4287,6 @@ main { padding-bottom: 72px; }
     inset 0 0 30px rgba(255,255,255,0.05),
     inset 0 0 60px rgba(255,0,80,0.08);
 }
-.monster-orb.pnl-positive {
-  box-shadow:
-    0 0 60px rgba(0,255,120,0.8),
-    0 0 120px rgba(0,255,120,0.4),
-    inset 0 0 50px rgba(0,255,120,0.3);
-}
-.monster-orb.pnl-negative {
-  box-shadow:
-    0 0 60px rgba(255,60,60,0.8),
-    0 0 120px rgba(255,60,60,0.4),
-    inset 0 0 50px rgba(255,60,60,0.3);
-}
 .monster-orb.soft-caution {
   filter: brightness(0.95);
   box-shadow: 0 0 35px rgba(255,160,120,0.25);
@@ -4363,8 +4351,33 @@ main { padding-bottom: 72px; }
   margin: 10px 0 0;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  opacity: 0;
+  transform: translateY(10px);
+  filter: blur(4px);
+  transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
+}
+.monster-line.visible {
   opacity: 1;
-  transition: opacity 0.3s ease;
+  transform: translateY(0);
+  filter: blur(0);
+}
+.monster-action {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.38);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  margin-top: 10px;
+  opacity: 0;
+  transition: opacity 0.4s ease, color 0.2s ease;
+  text-align: center;
+  user-select: none;
+}
+.monster-action.visible {
+  opacity: 1;
+}
+.monster-action:hover {
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .insights-history { padding: 0 16px 80px; opacity: .75; }
