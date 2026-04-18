@@ -2823,7 +2823,7 @@ function generateBaseInsights() {
   assets.forEach(a => { const v = a.qty * a.price; if (v > maxValue) maxValue = v; });
   if (totalValue > 0 && (maxValue / totalValue) * 100 > 50) insights.push({
     text: es ? 'Una gran parte de tu cartera depende de un único activo.' : 'A large part of your portfolio depends on a single asset.',
-    priority: 1,
+    priority: 1, topic: 'concentration',
   });
 
   // 2. Category exposure (priority 1)
@@ -2834,7 +2834,7 @@ function generateBaseInsights() {
       const label = (T[lang].typeMeta && T[lang].typeMeta[type]) || type;
       insights.push({
         text: es ? `Una parte importante de tu cartera está concentrada en ${label}.` : `A large part of your portfolio is concentrated in ${label}.`,
-        priority: 1,
+        priority: 1, topic: 'distribution',
       });
       break;
     }
@@ -2848,14 +2848,14 @@ function generateBaseInsights() {
   });
   if (strongPerformer) insights.push({
     text: es ? `${escHtml(strongPerformer.name)} ha tenido un crecimiento notable respecto a tu precio de entrada.` : `${escHtml(strongPerformer.name)} has seen strong growth compared to your entry price.`,
-    priority: 2,
+    priority: 2, topic: 'performance',
   });
 
   // 4. Low liquidity — priority 2
   const liquidity = assets.filter(a => a.type === 'cash').reduce((s, a) => s + a.qty, 0);
   if (totalValue > 0 && liquidity / totalValue < 0.1) insights.push({
     text: es ? 'Una parte relativamente pequeña de tu cartera está en liquidez.' : 'A relatively small portion of your portfolio is held in liquidity.',
-    priority: 2,
+    priority: 2, topic: 'liquidity',
   });
 
   // 5. Recent activity — priority 3
@@ -2865,7 +2865,7 @@ function generateBaseInsights() {
       text: last.type === 'buy'
         ? (es ? `Recientemente aumentaste tu posición en ${escHtml(last.assetName)}.` : `You recently increased your position in ${escHtml(last.assetName)}.`)
         : (es ? `Recientemente redujiste tu posición en ${escHtml(last.assetName)}.`  : `You recently reduced your position in ${escHtml(last.assetName)}.`),
-      priority: 3,
+      priority: 3, topic: 'activity',
     });
   }
 
@@ -2877,7 +2877,7 @@ function generateBaseInsights() {
 
   if (!insights.length) insights.push({
     text: es ? 'Tu cartera parece equilibrada.' : 'Your portfolio looks balanced.',
-    priority: 4,
+    priority: 4, topic: 'distribution',
   });
 
   return insights;
@@ -2943,13 +2943,13 @@ function generateTemporalInsights() {
   const insights = [];
   assets.forEach(asset => {
     const runUp = detectRunUp(asset);
-    if (runUp) insights.push({ text: runUp, priority: 2 });
+    if (runUp) insights.push({ text: runUp, priority: 2, topic: 'performance' });
 
     const stable = detectStabilization(asset);
-    if (stable) insights.push({ text: stable, priority: 3 });
+    if (stable) insights.push({ text: stable, priority: 3, topic: 'performance' });
 
     const acc = detectAccumulation(asset);
-    if (acc) insights.push({ text: acc, priority: 3 });
+    if (acc) insights.push({ text: acc, priority: 3, topic: 'activity' });
   });
   return insights;
 }
@@ -2965,7 +2965,7 @@ function detectRepetition() {
         text: es
           ? `Has incrementado tu posición en ${escHtml(name)} varias veces.`
           : `You have increased your position in ${escHtml(name)} multiple times.`,
-        priority: 2,
+        priority: 2, topic: 'activity',
       };
     }
   }
@@ -2981,7 +2981,7 @@ function detectOveractivity() {
       text: es
         ? 'Has realizado muchas operaciones en los últimos 3 días.'
         : 'You made many trades in the last 3 days.',
-      priority: 2,
+      priority: 2, topic: 'activity',
     };
   }
   return null;
@@ -2996,7 +2996,7 @@ function detectConfidenceRisk() {
       text: es
         ? 'Tu cartera rinde bien pero está muy concentrada.'
         : 'Your portfolio is performing well but highly concentrated.',
-      priority: 1,
+      priority: 1, topic: 'concentration',
     };
   }
   return null;
@@ -3013,7 +3013,7 @@ function detectInactivityAfterGrowth() {
       text: es
         ? 'Tu cartera ha crecido pero llevas días sin actividad.'
         : 'Your portfolio grew while your activity remained low.',
-      priority: 2,
+      priority: 2, topic: 'activity',
     };
   }
   return null;
@@ -3176,7 +3176,7 @@ function generateDecisionInsight() {
       text: es
         ? 'Varias compras recientes ocurrieron durante subidas de precio.'
         : 'Several recent purchases happened during price upswings.',
-      priority: 2,
+      priority: 2, topic: 'activity',
     };
   }
   return null;
@@ -3213,14 +3213,14 @@ function detectNarrativePatterns() {
       text: es
         ? `Has ido añadiendo posición en ${escHtml(asset)} con el tiempo.`
         : `You have been building your position in ${escHtml(asset)} over time.`,
-      priority: 2,
+      priority: 2, topic: 'activity',
     });
     const days = (txs[txs.length - 1].ts - txs[0].ts) / (1000 * 60 * 60 * 24);
     if (days > 30) insights.push({
       text: es
         ? `Tu posición en ${escHtml(asset)} la construiste a lo largo de varios meses.`
         : `Your position in ${escHtml(asset)} was built over several months.`,
-      priority: 3,
+      priority: 3, topic: 'activity',
     });
   }
   return insights;
@@ -3291,7 +3291,7 @@ function generateSignatureInsight() {
       text: es
         ? 'Tu cartera muestra un ritmo de actividad elevado.'
         : 'Your portfolio shows a high level of trading activity.',
-      priority: 3,
+      priority: 3, topic: 'activity',
     };
   }
   if (identity.style === 'concentrated') {
@@ -3299,14 +3299,14 @@ function generateSignatureInsight() {
       text: es
         ? 'Tu cartera está concentrada en pocas posiciones.'
         : 'Your portfolio is concentrated in a few positions.',
-      priority: 3,
+      priority: 3, topic: 'concentration',
     };
   }
   return {
     text: es
       ? 'Tu cartera refleja un enfoque equilibrado a lo largo del tiempo.'
       : 'Your portfolio reflects a balanced approach over time.',
-    priority: 3,
+    priority: 3, topic: 'distribution',
   };
 }
 
@@ -3402,7 +3402,7 @@ function detectWowInsights() {
     text: es
       ? `El mayor impulso a tu cartera viene de ${escHtml(topGain.name)}.`
       : `Most of your portfolio growth is coming from ${escHtml(topGain.name)}.`,
-    priority: 1,
+    priority: 1, topic: 'performance',
   });
 
   // 2. Buying into strength — priority 1
@@ -3414,7 +3414,7 @@ function detectWowInsights() {
         text: es
           ? `Has comprado ${escHtml(name)} de forma consistente mientras subía.`
           : `You kept buying ${escHtml(name)} consistently as its value rose.`,
-        priority: 1,
+        priority: 1, topic: 'activity',
       });
       break;
     }
@@ -3425,7 +3425,7 @@ function detectWowInsights() {
     text: es
       ? 'La estructura de tu cartera se ha mantenido relativamente estable a lo largo del tiempo.'
       : 'Your portfolio structure has remained relatively stable over time.',
-    priority: 2,
+    priority: 2, topic: 'distribution',
   });
 
   return insights;
@@ -3450,15 +3450,14 @@ function generateInsights() {
   const decision  = generateDecisionInsight();
   const narrative = generateNarrativeInsight();
   const signature = generateSignatureInsight();
-  const all       = [
-    ...(wow ? [{ ...wow, topic: 'portfolio' }] : []),
-    ...base.map(i => ({ ...i, topic: 'portfolio' })),
-    ...temporal.map(i => ({ ...i, topic: 'temporal' })),
-    ...behavior.map(i => ({ ...i, topic: 'behavior' })),
-    ...(decision  ? [{ ...decision,  topic: 'decision'  }] : []),
-    ...(narrative ? [{ ...narrative, topic: 'narrative' }] : []),
-    { ...signature, topic: 'signature' },
-  ];
+  const VALID_TOPICS = new Set(['concentration', 'performance', 'activity', 'distribution', 'liquidity']);
+  const all = [
+    ...(wow ? [wow] : []),
+    ...base, ...temporal, ...behavior,
+    ...(decision  ? [decision]  : []),
+    ...(narrative ? [narrative] : []),
+    signature,
+  ].filter(i => VALID_TOPICS.has(i.topic));
   all.sort((a, b) => a.priority - b.priority);
 
   const filtered = all.filter(i => !wasRecentlyShown(i.text));
