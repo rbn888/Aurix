@@ -3592,15 +3592,29 @@ function monsterLoop() {
 
   orb.style.transform = `translate(${monsterState.x}px, ${monsterState.y}px) scale(${deformX}, ${deformY})`;
 
-  const color = `${Math.round(orbColor.r)},${Math.round(orbColor.g)},${Math.round(orbColor.b)}`;
-  const hMult = monsterState.hovered ? 1.4 : 1;
-  const g     = monsterState.glow * hMult;
-  const r1    = Math.round(40 + g * 40);
-  const r2    = Math.round(80 + g * 80);
-  const ri    = Math.round(30 + g * 20);
-  const a1    = +(0.4 + g * 0.5).toFixed(2);
-  const a2    = +(0.2 + g * 0.3).toFixed(2);
-  const ai    = +(0.2 + g * 0.2).toFixed(2);
+  // Dynamic color from PnL
+  const pnl = getPortfolioPnL();
+  if (pnl > 0) {
+    targetColor.r = 80;  targetColor.g = 200; targetColor.b = 120;
+  } else if (pnl < 0) {
+    targetColor.r = 220; targetColor.g = 90;  targetColor.b = 60;
+  } else {
+    targetColor.r = 147; targetColor.g = 112; targetColor.b = 219;
+  }
+
+  const color      = `${Math.round(orbColor.r)},${Math.round(orbColor.g)},${Math.round(orbColor.b)}`;
+  const hMult      = monsterState.hovered ? 1.4 : 1;
+  const g          = monsterState.glow * hMult;
+  const volatility = Math.min(Math.abs(pnl) / 50, 1);
+  const intensity  = 0.15 + volatility * 0.2;
+  const pulse      = Math.sin(t * 2) * 12;
+
+  const r1 = Math.round(40 + g * 40 + pulse);
+  const r2 = Math.round(80 + g * 80 + pulse * 1.5);
+  const ri = Math.round(30 + g * 20);
+  const a1 = +Math.min(intensity + g * 0.3, 0.9).toFixed(2);
+  const a2 = +Math.min(intensity * 0.7 + g * 0.15, 0.6).toFixed(2);
+  const ai = +(0.2 + g * 0.2).toFixed(2);
   orb.style.boxShadow = `0 0 ${r1}px rgba(${color},${a1}), 0 0 ${r2}px rgba(${color},${a2}), inset 0 0 ${ri}px rgba(${color},${ai})`;
 
   requestAnimationFrame(monsterLoop);

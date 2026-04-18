@@ -42,28 +42,60 @@
   }, { passive: true });
 
   // ── Particles ────────────────────────────────────────────────
-  const COUNT = window.innerWidth <= 768 ? 50 : 100;
+  const FAR_COUNT = window.innerWidth <= 768 ? 60 : 90;
+  const MID_COUNT = window.innerWidth <= 768 ? 30 : 50;
+  const COUNT     = FAR_COUNT + MID_COUNT;
   const particles = new Array(COUNT);
 
-  function makeParticle() {
-    const depth = Math.random();
-    const speed = 0.10 + depth * 0.22;
+  function makeParticle(layer) {
+    const isFar      = layer === 'far';
+    const depth      = isFar ? 0.3 + Math.random() * 0.3 : 0.6 + Math.random() * 0.4;
+    const speed      = 0.05 + depth * 0.15;
+    const baseOpacity = isFar
+      ? 0.2 + Math.random() * 0.3
+      : 0.4 + Math.random() * 0.4;
+    const size = isFar
+      ? 0.5 + Math.random() * 1.0
+      : 1.0 + Math.random() * 1.5;
     return {
-      x:           Math.random() * window.innerWidth,
-      y:           Math.random() * window.innerHeight,
-      vx:          (Math.random() - 0.5) * speed,
-      vy:          (Math.random() - 0.5) * speed * 0.5,
-      size:        0.4 + depth * 1.8,
-      baseOpacity: 0.07 + depth * 0.32,
-      opacity:     0.07 + depth * 0.32,
+      x:            Math.random() * window.innerWidth,
+      y:            Math.random() * window.innerHeight,
+      vx:           (Math.random() - 0.5) * speed,
+      vy:           (Math.random() - 0.5) * speed * 0.5,
+      size,
+      baseOpacity,
+      opacity:      baseOpacity,
       depth,
-      phase:       Math.random() * Math.PI * 2,
-      freq:        0.22 + Math.random() * 0.38,
+      phase:        Math.random() * Math.PI * 2,
+      freq:         0.22 + Math.random() * 0.38,
+      seed:         Math.random() * 1000,
     };
   }
 
   function initParticles() {
-    for (let i = 0; i < COUNT; i++) particles[i] = makeParticle();
+    let idx = 0;
+    for (let i = 0; i < FAR_COUNT; i++) particles[idx++] = makeParticle('far');
+    for (let i = 0; i < MID_COUNT; i++) particles[idx++] = makeParticle('mid');
+  }
+
+  // ── Aurora bands ─────────────────────────────────────────────
+  const BAND_COUNT  = 4;
+  const auroraBands = [];
+
+  function makeBand() {
+    return {
+      x:      -window.innerWidth * 0.1,
+      y:      Math.random() * window.innerHeight * 0.75,
+      width:  window.innerWidth * 1.2,
+      height: 80 + Math.random() * 120,
+      seed:   Math.random() * 1000,
+      speed:  0.0003 + Math.random() * 0.0002,
+      hue:    Math.random() < 0.5 ? 185 : 155,
+    };
+  }
+
+  function initBands() {
+    for (let i = 0; i < BAND_COUNT; i++) auroraBands.push(makeBand());
   }
 
   // ── Glow pulses ──────────────────────────────────────────────
@@ -90,6 +122,23 @@
 
   function initGlows() {
     for (let i = 0; i < GLOW_N; i++) glows[i] = makeGlow(true);
+  }
+
+  // ── Micro sparkles ───────────────────────────────────────────
+  const SPARKLE_COUNT = 15;
+  const sparkles      = [];
+
+  function makeSparkle() {
+    return {
+      x:    Math.random() * window.innerWidth,
+      y:    Math.random() * window.innerHeight,
+      seed: Math.random() * 1000,
+      size: 0.5 + Math.random() * 1.0,
+    };
+  }
+
+  function initSparkles() {
+    for (let i = 0; i < SPARKLE_COUNT; i++) sparkles.push(makeSparkle());
   }
 
   // ── Visibility state ─────────────────────────────────────────
@@ -136,7 +185,18 @@
 
     ctx.clearRect(0, 0, W, H);
 
-    const t = ts / 1000;
+    // ── Aurora bands ──
+    for (let i = 0; i < BAND_COUNT; i++) {
+      const band = auroraBands[i];
+      const yOff = Math.sin(ts * band.speed + band.seed) * 30;
+      const gy   = band.y + yOff;
+      const gr   = ctx.createLinearGradient(band.x, gy, band.x, gy + band.height);
+      gr.addColorStop(0,   `hsla(${band.hue},80%,65%,0.05)`);
+      gr.addColorStop(0.5, `hsla(${band.hue},70%,55%,0.03)`);
+      gr.addColorStop(1,   `hsla(${band.hue},60%,45%,0)`);
+      ctx.fillStyle = gr;
+      ctx.fillRect(band.x, gy, band.width, band.height);
+    }
 
     // ── Glow pulses ──
     for (let i = 0; i < GLOW_N; i++) {
@@ -175,8 +235,8 @@
       const p = particles[i];
 
       // Organic drift
-      p.vx += Math.sin(t * p.freq + p.phase) * 0.0007;
-      p.vy += Math.cos(t * p.freq * 0.68 + p.phase) * 0.0007;
+      p.vx += Math.sin(ts * 0.001 * p.freq + p.phase) * 0.0007;
+      p.vy += Math.cos(ts * 0.001 * p.freq * 0.68 + p.phase) * 0.0007;
 
       // Pointer interaction
       const dx   = p.x - pointerX;
@@ -194,12 +254,15 @@
       p.x  += p.vx;
       p.y  += p.vy;
 
-      // Opacity boost near pointer, decay back to base
+      // Twinkle
+      p.opacity = p.baseOpacity + Math.sin(ts * 0.002 + p.seed) * 0.2;
+
+      // Boost near pointer
       if (dist < 100) {
-        p.opacity = Math.min(p.baseOpacity + 0.05, 0.99);
-      } else {
-        p.opacity += (p.baseOpacity - p.opacity) * 0.05;
+        p.opacity = Math.min(p.opacity + 0.05, 0.99);
       }
+
+      p.opacity = Math.max(0, p.opacity);
 
       // Wrap edges
       if (p.x < -8)    p.x = W + 8;
@@ -213,16 +276,19 @@
 
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      ctx.fillStyle = `hsla(${hue},72%,${lit}%,${p.opacity})`;
+      ctx.fillStyle = `hsla(${hue},72%,${lit}%,${p.opacity.toFixed(3)})`;
       ctx.fill();
+    }
 
-      // Soft sparkle on near-layer particles
-      if (p.depth > 0.78 && Math.sin(t * 1.75 + p.phase * 2.8) > 0.92) {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * 1.7, 0, Math.PI * 2);
-        ctx.fillStyle = `hsla(192,100%,92%,${(p.opacity * 0.65).toFixed(3)})`;
-        ctx.fill();
-      }
+    // ── Micro sparkles ──
+    for (let i = 0; i < SPARKLE_COUNT; i++) {
+      const sp    = sparkles[i];
+      const alpha = Math.max(0, Math.sin(ts * 0.01 + sp.seed) * 0.5);
+      if (alpha < 0.01) continue;
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, sp.size, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(200,230,255,${alpha.toFixed(3)})`;
+      ctx.fill();
     }
   }
 
@@ -232,7 +298,9 @@
     pointerX = W / 2;
     pointerY = H / 2;
     initParticles();
+    initBands();
     initGlows();
+    initSparkles();
     initObserver();
     setActive(isInsightsActive());
     requestAnimationFrame(animateBackground);
