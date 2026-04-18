@@ -78,24 +78,23 @@
     for (let i = 0; i < MID_COUNT; i++) particles[idx++] = makeParticle('mid');
   }
 
-  // ── Aurora bands ─────────────────────────────────────────────
-  const BAND_COUNT  = 4;
-  const auroraBands = [];
+  // ── Aurora blobs ─────────────────────────────────────────────
+  const BLOB_COUNT  = 6;
+  const auroraBlobs = [];
 
-  function makeBand() {
+  function makeBlob() {
     return {
-      x:      -window.innerWidth * 0.1,
-      y:      Math.random() * window.innerHeight * 0.75,
-      width:  window.innerWidth * 1.2,
-      height: 80 + Math.random() * 120,
+      x:      Math.random() * window.innerWidth,
+      y:      Math.random() * window.innerHeight,
+      radius: 200 + Math.random() * 250,
       seed:   Math.random() * 1000,
-      speed:  0.0003 + Math.random() * 0.0002,
+      alpha:  0.04 + Math.random() * 0.04,
       hue:    Math.random() < 0.5 ? 185 : 155,
     };
   }
 
-  function initBands() {
-    for (let i = 0; i < BAND_COUNT; i++) auroraBands.push(makeBand());
+  function initBlobs() {
+    for (let i = 0; i < BLOB_COUNT; i++) auroraBlobs.push(makeBlob());
   }
 
   // ── Glow pulses ──────────────────────────────────────────────
@@ -185,17 +184,18 @@
 
     ctx.clearRect(0, 0, W, H);
 
-    // ── Aurora bands ──
-    for (let i = 0; i < BAND_COUNT; i++) {
-      const band = auroraBands[i];
-      const yOff = Math.sin(ts * band.speed + band.seed) * 30;
-      const gy   = band.y + yOff;
-      const gr   = ctx.createLinearGradient(band.x, gy, band.x, gy + band.height);
-      gr.addColorStop(0,   `hsla(${band.hue},80%,65%,0.05)`);
-      gr.addColorStop(0.5, `hsla(${band.hue},70%,55%,0.03)`);
-      gr.addColorStop(1,   `hsla(${band.hue},60%,45%,0)`);
+    // ── Aurora blobs ──
+    for (let i = 0; i < BLOB_COUNT; i++) {
+      const b = auroraBlobs[i];
+      b.x += Math.sin(ts * 0.0003 + b.seed) * 0.2;
+      b.y += Math.cos(ts * 0.0003 + b.seed) * 0.2;
+      const gr = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.radius);
+      gr.addColorStop(0, `hsla(${b.hue},80%,65%,${b.alpha})`);
+      gr.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = gr;
-      ctx.fillRect(band.x, gy, band.width, band.height);
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     // ── Glow pulses ──
@@ -298,7 +298,7 @@
     pointerX = W / 2;
     pointerY = H / 2;
     initParticles();
-    initBands();
+    initBlobs();
     initGlows();
     initSparkles();
     initObserver();
