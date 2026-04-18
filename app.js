@@ -974,6 +974,9 @@ let insightCache        = [];
 let _lastInsightText    = '';
 let _lastInsightPriority = 4;
 let _insightInterval = null;
+let currentTopic  = null;
+let lastTopics    = [];
+let lastMessages  = [];
 
 const MEMORY_KEY = 'aurix_insights_memory';
 
@@ -3456,11 +3459,13 @@ function generateInsights() {
   const narrative = generateNarrativeInsight();
   const signature = generateSignatureInsight();
   const all       = [
-    ...(wow ? [wow] : []),
-    ...base, ...temporal, ...behavior,
-    ...(decision  ? [decision]  : []),
-    ...(narrative ? [narrative] : []),
-    signature,
+    ...(wow ? [{ ...wow, topic: 'portfolio' }] : []),
+    ...base.map(i => ({ ...i, topic: 'portfolio' })),
+    ...temporal.map(i => ({ ...i, topic: 'temporal' })),
+    ...behavior.map(i => ({ ...i, topic: 'behavior' })),
+    ...(decision  ? [{ ...decision,  topic: 'decision'  }] : []),
+    ...(narrative ? [{ ...narrative, topic: 'narrative' }] : []),
+    { ...signature, topic: 'signature' },
   ];
   all.sort((a, b) => a.priority - b.priority);
 
@@ -3470,22 +3475,39 @@ function generateInsights() {
     text: applyIdentityTone(adaptInsight(adaptMessage(i.text, profile))),
   }));
 
-  const ambient = getAmbientMessages().slice(0, 2);
-  insightCache  = pool.length ? [...pool, ...ambient] : getAmbientMessages();
+  const ambient = getAmbientMessages().slice(0, 2).map(i => ({ ...i, topic: 'ambient' }));
+  insightCache  = pool.length ? [...pool, ...ambient] : getAmbientMessages().map(i => ({ ...i, topic: 'ambient' }));
   return insightCache;
 }
 
 function getNextInsight() {
   if (insightCache.length < 3) generateInsights();
   if (!insightCache.length) return '';
-  // rotate a back-to-back repeat to the end of the queue
-  if (insightCache[0].text === _lastInsightText && insightCache.length > 1) {
-    insightCache.push(insightCache.shift());
-  }
-  const item = insightCache.shift();
+
+  const available     = insightCache.filter(i => !lastMessages.includes(i.text));
+  const pool          = available.length ? available : insightCache;
+
+  const preferred     = pool.filter(i => i.topic === currentTopic);
+  const deprioritized = pool.filter(i => lastTopics.includes(i.topic) && i.topic !== currentTopic);
+  const neutral       = pool.filter(i => !lastTopics.includes(i.topic) && i.topic !== currentTopic);
+
+  const ordered = [...preferred, ...neutral, ...deprioritized];
+  const item    = ordered.length ? ordered[0] : insightCache[0];
+
+  const idx = insightCache.indexOf(item);
+  if (idx !== -1) insightCache.splice(idx, 1);
+
   _lastInsightText     = item.text;
   _lastInsightPriority = item.priority || 4;
   storeInsight(item.text);
+
+  currentTopic = item.topic || null;
+  lastTopics.push(currentTopic);
+  if (lastTopics.length > 3) lastTopics.shift();
+
+  lastMessages.push(item.text);
+  if (lastMessages.length > 5) lastMessages.shift();
+
   return item.text;
 }
 
