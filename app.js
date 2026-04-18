@@ -2876,7 +2876,7 @@ function generateBaseInsights() {
   });
 
   if (!insights.length) insights.push({
-    text: es ? 'Tu cartera parece equilibrada. Puede ser conveniente revisarla periódicamente.' : 'Your portfolio appears balanced. It may be worth reviewing it periodically.',
+    text: es ? 'Tu cartera parece equilibrada.' : 'Your portfolio looks balanced.',
     priority: 4,
   });
 
@@ -2907,8 +2907,8 @@ function detectRunUp(asset) {
   const days   = getDaysSince(timeline.firstTs);
   if (growth > 80 && days < 60) {
     return es
-      ? `${escHtml(asset.name)} ha subido significativamente en un período relativamente corto.`
-      : `${escHtml(asset.name)} has increased significantly over a relatively short period.`;
+      ? `${escHtml(asset.name)} ha subido más del 80% en menos de dos meses.`
+      : `${escHtml(asset.name)} is up over 80% in less than two months.`;
   }
   return null;
 }
@@ -2921,8 +2921,8 @@ function detectStabilization(asset) {
   const daysSinceLast = getDaysSince(timeline.lastTs);
   if (growth > 50 && daysSinceLast > 7) {
     return es
-      ? `${escHtml(asset.name)} mostró un fuerte crecimiento pasado, aunque el movimiento reciente parece más estable.`
-      : `${escHtml(asset.name)} has shown strong past growth, although recent movement appears more stable.`;
+      ? `${escHtml(asset.name)} creció con fuerza y lleva días sin grandes movimientos.`
+      : `${escHtml(asset.name)} grew strongly and has been stable for over a week.`;
   }
   return null;
 }
@@ -2933,8 +2933,8 @@ function detectAccumulation(asset) {
   const buys = asset.transactions.filter(tx => tx.type === 'buy');
   if (buys.length >= 3) {
     return es
-      ? `Has incrementado tu posición en ${escHtml(asset.name)} en varias ocasiones.`
-      : `You have increased your position in ${escHtml(asset.name)} multiple times over time.`;
+      ? `Has incrementado tu posición en ${escHtml(asset.name)} varias veces.`
+      : `You have increased your position in ${escHtml(asset.name)} multiple times.`;
   }
   return null;
 }
@@ -2963,8 +2963,8 @@ function detectRepetition() {
     if (count[name] >= 3) {
       return {
         text: es
-          ? `Has incrementado tu posición en ${escHtml(name)} en varias ocasiones.`
-          : `You have increased your position in ${escHtml(name)} multiple times over time.`,
+          ? `Has incrementado tu posición en ${escHtml(name)} varias veces.`
+          : `You have increased your position in ${escHtml(name)} multiple times.`,
         priority: 2,
       };
     }
@@ -2979,8 +2979,8 @@ function detectOveractivity() {
   if (recent.length >= 5) {
     return {
       text: es
-        ? 'Has sido bastante activo recientemente. Puede valer la pena asegurarte de que tus decisiones sigan alineadas con tu estrategia general.'
-        : 'You have been quite active recently. It might be worth ensuring your decisions remain aligned with your broader strategy.',
+        ? 'Has realizado muchas operaciones en los últimos 3 días.'
+        : 'You made many trades in the last 3 days.',
       priority: 2,
     };
   }
@@ -2994,8 +2994,8 @@ function detectConfidenceRisk() {
   if (pnl > 40 && concentration > 50) {
     return {
       text: es
-        ? 'Una parte significativa de tu cartera ha rendido bien y está concentrada. Puede valer la pena considerar cómo esto afecta el riesgo general.'
-        : 'A significant portion of your portfolio has performed well and is concentrated. It may be worth considering how this affects overall risk.',
+        ? 'Tu cartera rinde bien pero está muy concentrada.'
+        : 'Your portfolio is performing well but highly concentrated.',
       priority: 1,
     };
   }
@@ -3011,8 +3011,8 @@ function detectInactivityAfterGrowth() {
   if (pnl > 30 && days > 10) {
     return {
       text: es
-        ? 'Tu cartera ha tenido un buen rendimiento, mientras que la actividad ha sido limitada. Puede valer la pena revisar tu posicionamiento actual.'
-        : 'Your portfolio has seen strong performance, while activity has remained limited. It may be worth reviewing your current positioning.',
+        ? 'Tu cartera ha crecido pero llevas días sin actividad.'
+        : 'Your portfolio grew while your activity remained low.',
       priority: 2,
     };
   }
@@ -3073,12 +3073,6 @@ function adaptMessage(text, profile) {
     result = es
       ? result.replace('puede valer la pena considerar', 'puede valer la pena considerar cuidadosamente')
       : result.replace('may want to consider', 'may want to carefully consider');
-  }
-
-  if (profile.diversification === 'low') {
-    result += es
-      ? ' Una estructura más equilibrada podría ser beneficiosa a largo plazo.'
-      : ' A more balanced structure could be beneficial over time.';
   }
 
   return result;
@@ -3180,8 +3174,8 @@ function generateDecisionInsight() {
   if (pattern.type === 'buying_high') {
     return {
       text: es
-        ? 'Algunas de tus compras recientes se realizaron durante movimientos alcistas. Observar el timing a lo largo del tiempo puede aportar una perspectiva útil.'
-        : 'Some of your recent purchases were made during upward price movements. Observing timing over time can provide useful perspective.',
+        ? 'Varias compras recientes ocurrieron durante subidas de precio.'
+        : 'Several recent purchases happened during price upswings.',
       priority: 2,
     };
   }
@@ -3217,15 +3211,15 @@ function detectNarrativePatterns() {
     const buys = txs.filter(tx => tx.type === 'buy');
     if (buys.length >= 3) insights.push({
       text: es
-        ? `Has ido incrementando gradualmente tu posición en ${escHtml(asset)} a lo largo del tiempo.`
-        : `You have been gradually increasing your position in ${escHtml(asset)} over time.`,
+        ? `Has ido añadiendo posición en ${escHtml(asset)} con el tiempo.`
+        : `You have been building your position in ${escHtml(asset)} over time.`,
       priority: 2,
     });
     const days = (txs[txs.length - 1].ts - txs[0].ts) / (1000 * 60 * 60 * 24);
     if (days > 30) insights.push({
       text: es
-        ? `Tu posición en ${escHtml(asset)} se ha desarrollado a lo largo de un período prolongado.`
-        : `Your position in ${escHtml(asset)} has developed over a longer period of time.`,
+        ? `Tu posición en ${escHtml(asset)} la construiste a lo largo de varios meses.`
+        : `Your position in ${escHtml(asset)} was built over several months.`,
       priority: 3,
     });
   }
@@ -3284,9 +3278,7 @@ function applyIdentityTone(text) {
       : text.replace('may be worth', 'it may be worth occasionally');
   }
   if (identity.style === 'concentrated') {
-    return text + (es
-      ? ' Una estructura más diversificada podría considerarse a lo largo del tiempo.'
-      : ' A more diversified structure could be considered over time.');
+    return text;
   }
   return text;
 }
@@ -3297,16 +3289,16 @@ function generateSignatureInsight() {
   if (identity.style === 'active') {
     return {
       text: es
-        ? 'Tu enfoque muestra un alto nivel de actividad, lo que puede beneficiarse de una reflexión periódica.'
-        : 'Your approach shows a high level of activity, which may benefit from periodic reflection.',
+        ? 'Tu cartera muestra un ritmo de actividad elevado.'
+        : 'Your portfolio shows a high level of trading activity.',
       priority: 3,
     };
   }
   if (identity.style === 'concentrated') {
     return {
       text: es
-        ? 'Tu cartera parece enfocada en un número limitado de posiciones, lo que influye en su comportamiento general.'
-        : 'Your portfolio appears focused on a limited number of positions, shaping its overall behavior.',
+        ? 'Tu cartera está concentrada en pocas posiciones.'
+        : 'Your portfolio is concentrated in a few positions.',
       priority: 3,
     };
   }
@@ -3408,8 +3400,8 @@ function detectWowInsights() {
   });
   if (topGain && total > 0 && topValue > total * 0.3) insights.push({
     text: es
-      ? `Una parte significativa del crecimiento de tu cartera parece provenir de ${escHtml(topGain.name)}.`
-      : `A significant portion of your portfolio growth appears to come from ${escHtml(topGain.name)}.`,
+      ? `El mayor impulso a tu cartera viene de ${escHtml(topGain.name)}.`
+      : `Most of your portfolio growth is coming from ${escHtml(topGain.name)}.`,
     priority: 1,
   });
 
@@ -3420,8 +3412,8 @@ function detectWowInsights() {
     if (repeatedBuys[name] >= 4) {
       insights.push({
         text: es
-          ? `Has incrementado tu posición en ${escHtml(name)} de forma consistente, incluso a medida que su valor evolucionaba.`
-          : `You have consistently increased your position in ${escHtml(name)}, even as its value evolved.`,
+          ? `Has comprado ${escHtml(name)} de forma consistente mientras subía.`
+          : `You kept buying ${escHtml(name)} consistently as its value rose.`,
         priority: 1,
       });
       break;
