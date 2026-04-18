@@ -995,8 +995,8 @@ body.modal-open {
   max-width: 480px;
   box-shadow: var(--shadow);
   opacity: 0;
-  transform: translateY(24px) scale(0.96);
-  transition: opacity .3s var(--ease-out), transform .38s var(--ease-out);
+  transform: translateY(40px) scale(0.98);
+  transition: opacity 0.25s ease, transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: transform, opacity;
   overscroll-behavior: none;
 }
@@ -2624,9 +2624,9 @@ body.modal-open {
   .modal {
     max-width: 100%;
     border-radius: 20px 20px 0 0;
-    transform: translateY(56px) scale(1);
-    transition: opacity .3s var(--ease-out), transform .4s var(--ease-out);
-    will-change: auto;
+    transform: translateY(60px) scale(0.98);
+    transition: opacity 0.25s ease, transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+    will-change: transform, opacity;
     /* Constrain height so body can scroll independently */
     max-height: 88svh;
     max-height: 88vh; /* fallback for older Safari */
@@ -2645,6 +2645,7 @@ body.modal-open {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     touch-action: pan-y;
+    will-change: transform;
     flex: 1;
     min-height: 0; /* required for flex child to shrink below content height */
     padding-bottom: 140px;
