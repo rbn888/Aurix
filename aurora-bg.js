@@ -102,7 +102,11 @@
 
   // ── Visibility state ─────────────────────────────────────────
   let _active = false;
-  let _alpha  = 0;
+
+  function setActive(val) {
+    _active = val;
+    canvas.style.opacity = val ? '1' : '0';
+  }
 
   function isInsightsActive() {
     const el = document.getElementById('tabPlaceholder');
@@ -115,7 +119,7 @@
     const el = document.getElementById('tabPlaceholder');
     if (!el) return;
     const obs = new MutationObserver(() => {
-      _active = isInsightsActive();
+      setActive(isInsightsActive());
     });
     obs.observe(el, {
       childList: true,
@@ -132,15 +136,6 @@
 
     const dt = Math.min(ts - _lastTs, 50);
     _lastTs = ts;
-
-    // Lerp alpha in/out
-    _alpha += ((_active ? 1 : 0) - _alpha) * 0.04;
-
-    if (_alpha < 0.005) {
-      canvas.style.opacity = '0';
-      return;
-    }
-    canvas.style.opacity = _alpha.toFixed(3);
 
     ctx.clearRect(0, 0, W, H);
 
@@ -248,7 +243,7 @@
     initParticles();
     initGlows();
     initObserver();
-    _active = isInsightsActive();
+    setActive(isInsightsActive());
     requestAnimationFrame(animateBackground);
   }
 
