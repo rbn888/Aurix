@@ -101,11 +101,11 @@
   }, { passive: true });
 
   // ── Visibility state ─────────────────────────────────────────
-  let _active = false;
+  let _active         = false;
+  let lastActiveState = null;
 
   function setActive(val) {
     _active = val;
-    canvas.style.opacity = val ? '1' : '0';
   }
 
   function isInsightsActive() {
@@ -136,6 +136,11 @@
 
     const dt = Math.min(ts - _lastTs, 50);
     _lastTs = ts;
+
+    if (lastActiveState !== _active) {
+      canvas.style.opacity = _active ? '1' : '0';
+      lastActiveState = _active;
+    }
 
     ctx.clearRect(0, 0, W, H);
 
