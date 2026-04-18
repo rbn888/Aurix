@@ -4151,14 +4151,14 @@ main { padding-bottom: 72px; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   background: none;
   border: none;
-  color: #555;
-  font-size: 18px;
+  color: rgba(180,220,255,0.5);
   cursor: pointer;
   padding: 6px 12px;
-  transition: color .15s;
+  opacity: 0.6;
+  transition: opacity .2s ease, color .2s ease;
   line-height: 1;
 }
 .bn-tab span {
@@ -4166,10 +4166,24 @@ main { padding-bottom: 72px; }
   letter-spacing: .04em;
   text-transform: uppercase;
 }
-.bn-tab.active { color: #fff; }
+.bn-tab svg {
+  width: 22px;
+  height: 22px;
+  stroke: rgba(180,220,255,0.6);
+  stroke-width: 1.8;
+  fill: none;
+  transition: stroke .25s ease, filter .25s ease, transform .25s ease;
+}
+.bn-tab.active {
+  opacity: 1;
+  color: #6BFFB8;
+}
+.bn-tab.active svg {
+  stroke: #6BFFB8;
+  filter: drop-shadow(0 0 6px rgba(107,255,184,0.4));
+  transform: scale(1.05);
+}
 .bn-tab--add {
-  font-size: 26px;
-  color: #fff;
   background: rgba(255,255,255,0.08);
   border-radius: 50%;
   width: 44px;
@@ -4178,6 +4192,13 @@ main { padding-bottom: 72px; }
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 1;
+}
+.bn-tab--add svg {
+  width: 20px;
+  height: 20px;
+  stroke: rgba(255,255,255,0.8);
+  stroke-width: 2;
 }
 
 #aurora-bg {

@@ -6247,7 +6247,7 @@ assetsListEl.addEventListener('click', e => {
 
 // ── Event Listeners ────────────────────────────────────────
 document.getElementById('logoHome')
-  ?.addEventListener('click', () => setActiveCategory(null));
+  ?.addEventListener('click', () => { switchTab('home'); setActiveCategory(null); });
 document.getElementById('assetsBackBtn')
   ?.addEventListener('click', () => setActiveCategory(null));
 btnAdd.addEventListener('click', openModal);
