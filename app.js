@@ -3610,6 +3610,14 @@ function applyContext(el) {
   el.classList.add(`ctx-${getCurrentContext()}`);
 }
 
+function applyPnlToOrb(orb) {
+  if (!orb) return;
+  orb.classList.remove('pnl-positive', 'pnl-negative');
+  const pnl = getPortfolioPnL();
+  if (pnl > 0)      orb.classList.add('pnl-positive');
+  else if (pnl < 0) orb.classList.add('pnl-negative');
+}
+
 function getContextTiming() {
   const ctx = getCurrentContext();
   if (ctx === 'insights') return 5000;
@@ -3625,7 +3633,7 @@ function startInsightRotation() {
   _rotationActive = true;
   const orb = () => document.querySelector('.monster-orb');
   const o = orb();
-  if (o) applyContext(o);
+  if (o) { applyContext(o); applyPnlToOrb(o); }
   function loop() {
     if (!_rotationActive) return;
     animateMonster();
