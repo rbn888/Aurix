@@ -7148,14 +7148,14 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
 
   function renderWatchlist() {
     const top = [...assets]
-      .filter(a => a.qty > 0 && a.price > 0)
-      .sort((a, b) => (b.qty * b.price) - (a.qty * a.price))
+      .filter(a => a.price > 0)
+      .sort((a, b) => b.price - a.price)
       .slice(0, 5);
 
     const rows = top.map(a =>
       '<div class="watchlist-row">' +
         '<span class="watchlist-sym">' + (a.sym || a.name) + '</span>' +
-        '<span class="watchlist-val">' + formatBase(a.price) + '</span>' +
+        '<span class="watchlist-val">' + (a.price ? formatBase(a.price) : '--') + '</span>' +
       '</div>'
     ).join('');
     content.innerHTML = '<div class="watchlist-preview">' + rows + '</div>';
