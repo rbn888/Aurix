@@ -2954,18 +2954,19 @@ body.modal-open {
 }
 
 .beta-dot {
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background: white;
+  background: rgba(255, 255, 255, 0.95);
   opacity: 0;
-  transform: scale(0.5);
-  transition: opacity 160ms ease, transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform: scale(0.6);
+  transition: opacity 160ms ease-out, transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .beta-dot.visible {
-  opacity: 0.92;
+  opacity: 1;
   transform: scale(1);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.22);
 }
 
 /* Animated underline (left → right on focus) */
@@ -3009,6 +3010,34 @@ body.modal-open {
 /* Ready + focused: brightest underline */
 .beta-input-wrap.ready.focused .beta-underline::after {
   background: linear-gradient(90deg, #80bfff, #4aedd4);
+}
+
+/* Ready: dots shift to accent tint */
+.beta-input-wrap.ready .beta-dot.visible {
+  background: rgba(160, 210, 255, 0.97);
+  box-shadow: 0 0 8px rgba(79, 142, 247, 0.40);
+}
+
+/* Shake: underline flashes warning */
+.beta-input-wrap.shake .beta-underline {
+  box-shadow: 0 0 12px rgba(255, 80, 80, 0.30);
+}
+
+/* Error state (CSS prep — toggled via .error class) */
+.beta-input-wrap.error .beta-dot.visible {
+  background: rgba(255, 100, 90, 0.92);
+  box-shadow: 0 0 8px rgba(255, 70, 60, 0.32);
+  transition: background 180ms ease-out, box-shadow 180ms ease-out;
+}
+
+.beta-input-wrap.error .beta-underline {
+  background: rgba(255, 80, 70, 0.12);
+  box-shadow: 0 0 12px rgba(255, 70, 60, 0.28);
+}
+
+.beta-input-wrap.error .beta-underline::after {
+  background: linear-gradient(90deg, #ff6060, #ff9060);
+  transform: scaleX(1);
 }
 
 /* Error */
@@ -3060,9 +3089,10 @@ body.modal-open {
 }
 
 .beta-btn:disabled {
-  opacity: .22;
+  opacity: .20;
   cursor: default;
   box-shadow: none;
+  pointer-events: none;
 }
 
 /* Version microcopy */
