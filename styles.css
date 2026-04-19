@@ -4697,11 +4697,11 @@ main { padding-bottom: 72px; }
   /* Distribution section: header full-width, inner + tracking-card side by side */
   .distribution-section {
     display: grid !important;
-    grid-template-columns: 1fr 300px;
+    grid-template-columns: auto 320px;
     grid-template-rows: auto 1fr;
     column-gap: 24px;
     row-gap: 16px;
-    align-items: stretch;
+    align-items: start;
     flex-direction: unset;
   }
 
@@ -4714,8 +4714,9 @@ main { padding-bottom: 72px; }
     grid-column: 1;
     grid-row: 2;
     display: grid !important;
-    grid-template-columns: 200px 1fr;
-    gap: 24px;
+    grid-template-columns: auto auto;
+    justify-content: start;
+    gap: 16px;
     align-items: center;
   }
 
@@ -4733,8 +4734,8 @@ main { padding-bottom: 72px; }
     display: flex;
     flex-direction: column;
     gap: 8px;
-    font-size: 13px;
-    justify-content: flex-start;
+    min-width: 160px;
+    max-width: 220px;
   }
 
   .tracking-card {
@@ -4750,6 +4751,8 @@ main { padding-bottom: 72px; }
     overflow: hidden;
     height: 100%;
     min-height: 260px;
+    width: 100%;
+    min-width: 300px;
   }
 
   .tracking-title {
