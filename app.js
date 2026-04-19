@@ -7097,15 +7097,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const pinInput  = document.getElementById('betaPin');
   const btnSubmit = document.getElementById('betaSubmit');
   const dotsEl    = document.getElementById('betaDots');
+  const MAX_DIGITS = 4;
 
   if (!pinInput) return;
 
   pinInput.addEventListener('input', () => {
-    const length = pinInput.value.length;
+    const value  = pinInput.value;
+    const length = value.length;
+
+    if (length > MAX_DIGITS) {
+      pinInput.value = value.slice(0, MAX_DIGITS);
+    }
 
     if (dotsEl) {
       dotsEl.innerHTML = '';
-      for (let i = 0; i < length; i++) {
+      for (let i = 0; i < pinInput.value.length; i++) {
         const dot = document.createElement('span');
         dot.className = 'beta-dot visible';
         dotsEl.appendChild(dot);
@@ -7113,7 +7119,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (btnSubmit) {
-      btnSubmit.disabled = length === 0;
+      btnSubmit.disabled = pinInput.value.length === 0;
+      btnSubmit.classList.toggle('ready', pinInput.value.length === MAX_DIGITS);
     }
   });
 });
