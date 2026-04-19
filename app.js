@@ -6742,26 +6742,10 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   }
 
   // ── Input events ───────────────────────────────────────
-  document.addEventListener('DOMContentLoaded', () => {
-    const pinInput  = document.getElementById('betaPin');
-    const btnSubmit = document.getElementById('betaSubmit');
-    const inputWrap = document.querySelector('.beta-input-wrap');
-
-    if (!pinInput) { console.error('[ACCESS] betaPin not found'); return; }
-
-    pinInput.addEventListener('input', () => {
-      const length = pinInput.value.length;
-      if (length > MAX_DIGITS) { pinInput.value = pinInput.value.slice(0, MAX_DIGITS); }
-      renderDots(pinInput.value.length);
-      btnSubmit.disabled = pinInput.value.length === 0;
-      inputWrap.classList.toggle('has-input', pinInput.value.length > 0);
-      inputWrap.classList.toggle('ready', pinInput.value.length === MAX_DIGITS);
-      btnSubmit.classList.toggle('ready', pinInput.value.length === MAX_DIGITS);
-      if (pinInput.value.length > 0) errorEl.classList.remove('show');
-    });
+  if (inputWrap) {
     pinInput.addEventListener('focus', () => inputWrap.classList.add('focused'));
     pinInput.addEventListener('blur',  () => inputWrap.classList.remove('focused'));
-  });
+  }
 
   // ── On load ────────────────────────────────────────────
   if (isAuthed()) {
@@ -7108,24 +7092,15 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   });
 })();
 
-// ── ACCESS INPUT HARD FIX ──────────────────────────────────
+// ── PIN input listener ─────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('[ACCESS] INIT');
-
   const pinInput  = document.getElementById('betaPin');
   const btnSubmit = document.getElementById('betaSubmit');
   const dotsEl    = document.getElementById('betaDots');
 
-  if (!pinInput) {
-    console.error('[ACCESS] betaPin NOT FOUND');
-    return;
-  }
-
-  console.log('[ACCESS] betaPin OK');
+  if (!pinInput) return;
 
   pinInput.addEventListener('input', () => {
-    console.log('[ACCESS] INPUT EVENT', pinInput.value);
-
     const length = pinInput.value.length;
 
     if (dotsEl) {
