@@ -1199,9 +1199,11 @@ function updateDonut() {
   distributionLegendEl.innerHTML = dist.map(({ type, pct }, i) => {
     const m = TYPE_META[type] || TYPE_META.other;
     return `<div class="legend-item" data-idx="${i}">
-      <span class="legend-dot" style="background:${m.color}"></span>
-      <span class="legend-name">${m.label}</span>
-      <span class="legend-pct">${pct.toFixed(1)}%</span>
+      <span class="legend-left">
+        <span class="legend-dot" style="background:${m.color}"></span>
+        <span class="legend-label">${m.label}</span>
+      </span>
+      <span class="legend-percent">${pct.toFixed(1)}%</span>
     </div>`;
   }).join('');
 
