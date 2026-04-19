@@ -7096,3 +7096,87 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   });
 })();
 
+// ── Tracking Card ──────────────────────────────────────────
+(function initTrackingCard() {
+  if (!window.matchMedia('(min-width: 1024px)').matches) return;
+
+  const content   = document.getElementById('trackingContent');
+  const footerBtn = document.getElementById('trackingFooterBtn');
+  if (!content) return;
+
+  const TICKER_ASSETS = [
+    { sym: 'BTC',  id: 'bitcoin' },
+    { sym: 'ETH',  id: 'ethereum' },
+    { sym: 'ORO',  price: '—', change: '—', positive: null },
+    { sym: 'NVDA', price: '—', change: '—', positive: null },
+    { sym: 'S&P',  price: '—', change: '—', positive: null },
+  ];
+
+  async function fetchTickerPrices() {
+    const ids = TICKER_ASSETS.filter(a => a.id).map(a => a.id).join(',');
+    try {
+      const data = await (await fetch(
+        'https://api.coingecko.com/api/v3/simple/price?ids=' + ids +
+        '&vs_currencies=usd&include_24hr_change=true'
+      )).json();
+      TICKER_ASSETS.forEach(a => {
+        if (!a.id || !data[a.id]) return;
+        const usd = data[a.id].usd;
+        const ch  = data[a.id].usd_24h_change;
+        a.price    = usd != null ? '$' + usd.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '—';
+        a.change   = ch  != null ? (ch >= 0 ? '+' : '') + ch.toFixed(2) + '%' : '—';
+        a.positive = ch  != null ? ch >= 0 : null;
+      });
+    } catch {}
+  }
+
+  function renderTicker() {
+    const items = TICKER_ASSETS.map(a =>
+      '<div class="ticker-item">' +
+        '<span class="ticker-sym">' + a.sym + '</span>' +
+        '<span class="ticker-price">' + (a.price || '—') + '</span>' +
+        '<span class="ticker-change' + (a.positive == null ? '' : a.positive ? ' positive' : ' negative') + '">' +
+          (a.change || '—') +
+        '</span>' +
+      '</div>'
+    ).join('');
+    content.innerHTML =
+      '<div class="tracking-ticker-wrap">' +
+        '<div class="tracking-ticker">' + items + items + '</div>' +
+      '</div>';
+  }
+
+  function renderWatchlist() {
+    const top = [...assets]
+      .filter(a => a.qty > 0 && a.price > 0)
+      .sort((a, b) => (b.qty * b.price) - (a.qty * a.price))
+      .slice(0, 5);
+
+    const rows = top.map(a =>
+      '<div class="watchlist-row">' +
+        '<span class="watchlist-sym">' + (a.sym || a.name) + '</span>' +
+        '<span class="watchlist-val">' + formatBase(a.qty * a.price) + '</span>' +
+      '</div>'
+    ).join('');
+    content.innerHTML = '<div class="watchlist-preview">' + rows + '</div>';
+  }
+
+  async function render() {
+    const hasAssets = Array.isArray(assets) && assets.some(a => a.qty > 0);
+    if (hasAssets) {
+      renderWatchlist();
+    } else {
+      await fetchTickerPrices();
+      renderTicker();
+    }
+  }
+
+  if (footerBtn) {
+    footerBtn.addEventListener('click', () => {
+      if (typeof openModal === 'function') openModal();
+    });
+  }
+
+  render();
+})();
+
