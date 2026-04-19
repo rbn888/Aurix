@@ -7102,16 +7102,18 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!pinInput) return;
 
   pinInput.addEventListener('input', () => {
-    const value  = pinInput.value;
-    const length = value.length;
+    let value = pinInput.value;
 
-    if (length > MAX_DIGITS) {
-      pinInput.value = value.slice(0, MAX_DIGITS);
+    if (value.length > MAX_DIGITS) {
+      value = value.slice(0, MAX_DIGITS);
+      pinInput.value = value;
     }
+
+    const length = value.length;
 
     if (dotsEl) {
       dotsEl.innerHTML = '';
-      for (let i = 0; i < pinInput.value.length; i++) {
+      for (let i = 0; i < length; i++) {
         const dot = document.createElement('span');
         dot.className = 'beta-dot visible';
         dotsEl.appendChild(dot);
@@ -7119,8 +7121,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (btnSubmit) {
-      btnSubmit.disabled = pinInput.value.length === 0;
-      btnSubmit.classList.toggle('ready', pinInput.value.length === MAX_DIGITS);
+      btnSubmit.disabled = length === 0;
+      btnSubmit.classList.toggle('ready', length === MAX_DIGITS);
     }
   });
 });
