@@ -3622,33 +3622,6 @@ async function getNextInsight() {
   const next = pool[Math.floor(Math.random() * pool.length)];
   lastInsightSignature = createInsightSignature(next);
   return next;
-
-  const available      = insightCache.filter(i => !lastMessages.includes(i.text));
-  const selectionPool  = available.length ? available : insightCache;
-
-  const recentTopics = topicHistory.slice(-2);
-  const cooled             = selectionPool.filter(i => i.priority === 1 || !recentTopics.includes(i.topic));
-  const cooledCandidates   = cooled.length ? cooled : selectionPool;
-
-  cooledCandidates.sort((a, b) => (a.priority || 4) - (b.priority || 4));
-  const top2 = cooledCandidates.slice(0, 2);
-  const item = top2[Math.floor(Math.random() * top2.length)];
-
-  const idx = insightCache.indexOf(item);
-  if (idx !== -1) insightCache.splice(idx, 1);
-
-  _lastInsightText     = item.text;
-  _lastInsightPriority = item.priority || 4;
-  storeInsight(item.text);
-
-  currentTopic = item.topic || null;
-  lastTopics.push(currentTopic);
-  if (lastTopics.length > 3) lastTopics.shift();
-
-  topicHistory.push(item.topic);
-  if (topicHistory.length > 3) topicHistory.shift();
-
-  return item;
 }
 
 // =====================================
