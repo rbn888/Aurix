@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
-    return res.status(204).end();
+    return res.status(200).end();
   }
 
   if (req.method !== 'POST') {
@@ -41,10 +41,23 @@ export default async function handler(req, res) {
     attempts[ip] = { count: 1, firstAttempt: now };
   }
 
+  const PIN_HASH = process.env.PIN_HASH;
+
   try {
-    const { pin } = req.body;
-    const PIN_HASH = process.env.PIN_HASH;
-    return res.status(200).json({ success: hashPin(pin) === PIN_HASH });
+    const { pin } = req.body || {};
+
+    if (typeof pin !== 'string') {
+      return res.status(200).json({ success: false });
+    }
+
+    const incomingHash = hashPin(pin.trim());
+
+    if (incomingHash === PIN_HASH) {
+      return res.status(200).json({ success: true });
+    } else {
+      return res.status(200).json({ success: false });
+    }
+
   } catch {
     return res.status(200).json({ success: false });
   }
