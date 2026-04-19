@@ -3623,12 +3623,12 @@ async function getNextInsight() {
   lastInsightSignature = createInsightSignature(next);
   return next;
 
-  const available = insightCache.filter(i => !lastMessages.includes(i.text));
-  const pool      = available.length ? available : insightCache;
+  const available      = insightCache.filter(i => !lastMessages.includes(i.text));
+  const selectionPool  = available.length ? available : insightCache;
 
   const recentTopics = topicHistory.slice(-2);
-  const cooled       = pool.filter(i => i.priority === 1 || !recentTopics.includes(i.topic));
-  const candidates   = cooled.length ? cooled : pool;
+  const cooled       = selectionPool.filter(i => i.priority === 1 || !recentTopics.includes(i.topic));
+  const candidates   = cooled.length ? cooled : selectionPool;
 
   candidates.sort((a, b) => (a.priority || 4) - (b.priority || 4));
   const top2 = candidates.slice(0, 2);
