@@ -4714,15 +4714,15 @@ main { padding-bottom: 72px; }
     grid-column: 1;
     grid-row: 2;
     display: grid !important;
-    grid-template-columns: auto auto;
+    grid-template-columns: auto max-content;
     justify-content: start;
-    gap: 16px;
+    gap: 12px;
     align-items: center;
   }
 
   .donut-wrap {
-    width: 180px;
-    height: 180px;
+    width: 170px;
+    height: 170px;
   }
 
   #donutChart {
@@ -4733,9 +4733,9 @@ main { padding-bottom: 72px; }
   .distribution-legend {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    min-width: 160px;
-    max-width: 220px;
+    gap: 6px;
+    min-width: unset;
+    max-width: unset;
   }
 
   .tracking-card {
@@ -4752,7 +4752,7 @@ main { padding-bottom: 72px; }
     height: 100%;
     min-height: 260px;
     width: 100%;
-    min-width: 300px;
+    min-width: 320px;
   }
 
   .tracking-title {
