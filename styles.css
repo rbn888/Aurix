@@ -4725,10 +4725,11 @@ main { padding-bottom: 72px; }
   /* Distribution section: header full-width, inner + tracking-card side by side */
   .distribution-section {
     display: grid !important;
-    grid-template-columns: 1fr 260px;
+    grid-template-columns: 1fr 300px;
     grid-template-rows: auto 1fr;
     column-gap: 24px;
     row-gap: 16px;
+    align-items: stretch;
     flex-direction: unset;
   }
 
@@ -4747,8 +4748,8 @@ main { padding-bottom: 72px; }
   }
 
   .donut-wrap {
-    width: 200px;
-    height: 200px;
+    width: 180px;
+    height: 180px;
   }
 
   #donutChart {
@@ -4759,7 +4760,8 @@ main { padding-bottom: 72px; }
   .distribution-legend {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
+    font-size: 13px;
     justify-content: flex-start;
   }
 
@@ -4769,11 +4771,23 @@ main { padding-bottom: 72px; }
     display: flex;
     flex-direction: column;
     gap: 10px;
-    background: rgba(255,255,255,.025);
+    background: rgba(255,255,255,0.025);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 16px;
     overflow: hidden;
+    height: 100%;
+    min-height: 260px;
+  }
+
+  .tracking-title {
+    font-size: 12px;
+    opacity: 0.8;
+    letter-spacing: 0.08em;
+  }
+
+  .ticker-item {
+    font-size: 12px;
   }
 
   .assets-grid {
