@@ -1370,11 +1370,11 @@ body.modal-open {
 
 .legend-item {
   display: grid;
-  grid-template-columns: 10px 1fr 42px auto;
+  grid-template-columns: 10px 1fr auto;
   align-items: center;
   cursor: pointer;
   gap: 9px;
-  padding: 6px 8px;
+  padding: 4px 8px;
   margin: 0 -8px;
   border-radius: 7px;
   transition: background .2s var(--ease-out), transform .2s var(--ease-out);
@@ -1414,8 +1414,8 @@ body.modal-open {
 .distribution-legend span { white-space: nowrap; }
 
 .legend-name {
-  font-size: 13px;
-  color: var(--text);
+  font-size: 12px;
+  color: var(--text-muted);
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -1424,18 +1424,10 @@ body.modal-open {
 
 .legend-pct {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--text);
+  color: var(--text-bright);
   text-align: right;
-}
-
-.legend-value {
-  font-size: 12px;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  white-space: nowrap;
 }
 
 /* ── Chart Section (legacy selector kept for compatibility) */
@@ -2522,9 +2514,9 @@ body.modal-open {
     gap: 2px;
   }
   .legend-item {
-    grid-template-columns: 10px 1fr 36px auto;
+    grid-template-columns: 10px 1fr auto;
     gap: 8px;
-    padding: 5px 7px;
+    padding: 4px 7px;
     margin: 0 -7px;
   }
 

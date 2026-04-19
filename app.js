@@ -1196,13 +1196,12 @@ function updateDonut() {
   resetDonutCenter();
 
   // Legend
-  distributionLegendEl.innerHTML = dist.map(({ type, valueBase, pct }, i) => {
+  distributionLegendEl.innerHTML = dist.map(({ type, pct }, i) => {
     const m = TYPE_META[type] || TYPE_META.other;
     return `<div class="legend-item" data-idx="${i}">
       <span class="legend-dot" style="background:${m.color}"></span>
       <span class="legend-name">${m.label}</span>
       <span class="legend-pct">${pct.toFixed(1)}%</span>
-      <span class="legend-value">${formatBase(valueBase)}</span>
     </div>`;
   }).join('');
 
