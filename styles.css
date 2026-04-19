@@ -4723,6 +4723,7 @@ main { padding-bottom: 72px; }
   .donut-wrap {
     width: 165px;
     height: 165px;
+    margin-top: 2px;
   }
 
   #donutChart {
@@ -4734,6 +4735,7 @@ main { padding-bottom: 72px; }
     display: flex;
     flex-direction: column;
     gap: 6px;
+    margin-top: 6px;
   }
 
   .distribution-legend-item {
