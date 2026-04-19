@@ -4716,13 +4716,13 @@ main { padding-bottom: 72px; }
     display: grid !important;
     grid-template-columns: auto max-content;
     justify-content: start;
-    gap: 12px;
+    gap: 10px;
     align-items: center;
   }
 
   .donut-wrap {
-    width: 170px;
-    height: 170px;
+    width: 165px;
+    height: 165px;
   }
 
   #donutChart {
@@ -4734,8 +4734,25 @@ main { padding-bottom: 72px; }
     display: flex;
     flex-direction: column;
     gap: 6px;
-    min-width: unset;
-    max-width: unset;
+  }
+
+  .distribution-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: auto;
+    max-width: none;
+  }
+
+  .distribution-legend-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .distribution-legend-value {
+    margin-left: 2px;
+    opacity: 0.85;
   }
 
   .tracking-card {
@@ -4752,7 +4769,7 @@ main { padding-bottom: 72px; }
     height: 100%;
     min-height: 260px;
     width: 100%;
-    min-width: 320px;
+    min-width: 340px;
   }
 
   .tracking-title {
