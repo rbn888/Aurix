@@ -2941,28 +2941,20 @@ body.modal-open {
   caret-color: transparent;
 }
 
-/* Dot overlay — only live dots live here, so justify-content:center is accurate */
 .beta-dots {
-  position: absolute;
-  inset: 0;
-  bottom: 18px; /* keep dots above the underline */
   display: flex;
-  align-items: center;
+  gap: 8px;
   justify-content: center;
-  gap: 16px;
-  pointer-events: none;
+  align-items: center;
 }
 
 .beta-dot {
-  flex-shrink: 0;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: var(--text-bright);
-  opacity: 0;
-  transform: scale(0.6);
-  /* ~120ms as spec, ease-spring gives the tactile pop */
-  transition: opacity .12s ease, transform .14s var(--ease-premium);
+  background: white;
+  display: inline-block;
+  opacity: 0.9;
 }
 
 .beta-dot.visible {
