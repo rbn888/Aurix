@@ -3888,7 +3888,7 @@ function displayMessage(msg) {
 function showNextMessage() {
   if (!_rotationActive || isDisplaying) return;
   const next = getNextInsight();
-  if (!next) return;
+  if (!next) { setTimeout(showNextMessage, 2000); return; }
   isDisplaying = true;
   const thinkDelay = 800 + Math.random() * 1200;
   setTimeout(() => {
