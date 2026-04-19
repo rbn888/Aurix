@@ -4599,24 +4599,16 @@ main { padding-bottom: 72px; }
     padding: 16px;
   }
 
-  .distribution-section {
-    margin-top: 24px;
+  .distribution-inner {
     display: grid;
-    grid-template-columns: 360px 1fr;
-    gap: 20px;
+    grid-template-columns: 280px 1fr;
+    gap: 32px;
     align-items: start;
-    padding: 20px 24px;
   }
 
-  .donut-wrapper {
-    display: flex;
-    align-items: flex-start;
-    justify-content: flex-start;
-  }
-
-  .donut-chart {
-    width: 280px;
-    height: 280px;
+  .donut-wrap {
+    width: 220px;
+    height: 220px;
   }
 
   .distribution-legend {
