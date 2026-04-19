@@ -3888,7 +3888,7 @@ function displayMessage(msg) {
 async function showNextMessage() {
   if (!_rotationActive || isDisplaying) return;
   const next = await getNextInsight();
-  if (!next) { setTimeout(showNextMessage, 2000); return; }
+  if (!next) { isDisplaying = false; setTimeout(showNextMessage, 2000); return; }
   isDisplaying = true;
   const thinkDelay = 800 + Math.random() * 1200;
   setTimeout(() => {
@@ -3897,7 +3897,7 @@ async function showNextMessage() {
     try {
       if (!next) return;
       const signature = createInsightSignature(next);
-      if (signature === lastDisplayedInsightSignature) { isDisplaying = false; return; }
+      if (signature === lastDisplayedInsightSignature) { isDisplaying = false; setTimeout(showNextMessage, 4000); return; }
       displayMessage(next);
       lastDisplayedInsightSignature = signature;
     } catch (err) { console.error('[MonsterRender]', err); }
@@ -3911,6 +3911,7 @@ async function showNextMessage() {
         showNextMessage();
       }, restDelay);
     }, readTime);
+    setTimeout(showNextMessage, 4000);
   }, thinkDelay);
 }
 
