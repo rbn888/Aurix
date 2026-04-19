@@ -7135,9 +7135,6 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
       '<div class="ticker-item">' +
         '<span class="ticker-sym">' + a.sym + '</span>' +
         '<span class="ticker-price">' + (a.price || '—') + '</span>' +
-        '<span class="ticker-change' + (a.positive == null ? '' : a.positive ? ' positive' : ' negative') + '">' +
-          (a.change || '—') +
-        '</span>' +
       '</div>'
     ).join('');
     content.innerHTML =

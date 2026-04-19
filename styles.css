@@ -4589,10 +4589,10 @@ main { padding-bottom: 72px; }
 .tracking-ticker {
   display: flex;
   flex-direction: column;
-  animation: ticker-scroll-v 22s linear infinite;
+  animation: ticker-scroll 20s linear infinite;
 }
 
-@keyframes ticker-scroll-v {
+@keyframes ticker-scroll {
   from { transform: translateY(0); }
   to   { transform: translateY(-50%); }
 }
