@@ -4697,8 +4697,8 @@ main { padding-bottom: 72px; }
   /* Distribution section: left block + right tracking block */
   .distribution-section {
     display: grid !important;
-    grid-template-columns: 1fr 330px;
-    column-gap: 18px;
+    grid-template-columns: 1fr 360px;
+    column-gap: 20px;
     align-items: start;
   }
 
@@ -4729,8 +4729,8 @@ main { padding-bottom: 72px; }
   }
 
   .donut-wrap {
-    width: 180px;
-    height: 180px;
+    width: 170px;
+    height: 170px;
   }
 
   #donutChart {
@@ -4775,11 +4775,11 @@ main { padding-bottom: 72px; }
   .tracking-card {
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    padding: 12px;
+    justify-content: flex-start;
+    padding: 14px;
     overflow: hidden;
     height: fit-content;
-    max-height: 180px;
+    max-height: 170px;
     align-self: start;
   }
 
@@ -4792,7 +4792,7 @@ main { padding-bottom: 72px; }
   .watchlist-row {
     display: flex;
     justify-content: space-between;
-    font-size: 12.5px;
+    font-size: 13px;
     line-height: 1.2;
   }
 
