@@ -6672,10 +6672,18 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
 
   // ── Auth utils ─────────────────────────────────────────
   function isAuthed() {
-    try { return localStorage.getItem(AUTH_KEY) === 'true'; }
-    catch (e) { return true; } // localStorage unavailable → grant access
+    try {
+      const session = localStorage.getItem(AUTH_KEY);
+      if (!session) return false;
+      const parsed = JSON.parse(session);
+      const now = Date.now();
+      const maxAge = 24 * 60 * 60 * 1000;
+      if (parsed.granted && (now - parsed.timestamp) < maxAge) return true;
+      localStorage.removeItem(AUTH_KEY);
+      return false;
+    } catch { localStorage.removeItem(AUTH_KEY); return false; }
   }
-  function saveAuth()  { try { localStorage.setItem(AUTH_KEY, 'true'); } catch (e) {} }
+  function saveAuth()  { try { localStorage.setItem(AUTH_KEY, JSON.stringify({ granted: true, timestamp: Date.now() })); } catch (e) {} }
   function clearAuth() { try { localStorage.removeItem(AUTH_KEY); }      catch (e) {} }
 
   // Card shrinks + blurs → screen fades → dashboard reveals in sequence
