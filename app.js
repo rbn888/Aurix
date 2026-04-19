@@ -6746,12 +6746,24 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   form.addEventListener('submit', e => {
     e.preventDefault();
     const pin = pinInput.value.trim();
-    if (pin === APP_PIN || pin === EMERGENCY_PIN) {
-      errorEl.classList.remove('show');
-      grantAccess();
-    } else {
+
+    fetch('https://isa-portfolio-ten.vercel.app/api/verify-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        errorEl.classList.remove('show');
+        grantAccess();
+      } else {
+        showError();
+      }
+    })
+    .catch(() => {
       showError();
-    }
+    });
   });
 
   // ── Logout ─────────────────────────────────────────────
