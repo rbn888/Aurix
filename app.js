@@ -7107,3 +7107,38 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
     });
   });
 })();
+
+// ── ACCESS INPUT HARD FIX ──────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('[ACCESS] INIT');
+
+  const pinInput  = document.getElementById('betaPin');
+  const btnSubmit = document.getElementById('betaSubmit');
+  const dotsEl    = document.getElementById('betaDots');
+
+  if (!pinInput) {
+    console.error('[ACCESS] betaPin NOT FOUND');
+    return;
+  }
+
+  console.log('[ACCESS] betaPin OK');
+
+  pinInput.addEventListener('input', () => {
+    console.log('[ACCESS] INPUT EVENT', pinInput.value);
+
+    const length = pinInput.value.length;
+
+    if (dotsEl) {
+      dotsEl.innerHTML = '';
+      for (let i = 0; i < length; i++) {
+        const dot = document.createElement('span');
+        dot.className = 'beta-dot visible';
+        dotsEl.appendChild(dot);
+      }
+    }
+
+    if (btnSubmit) {
+      btnSubmit.disabled = length === 0;
+    }
+  });
+});
