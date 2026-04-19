@@ -4560,3 +4560,34 @@ main { padding-bottom: 72px; }
   cursor: pointer;
   text-align: center;
 }
+
+/* ── Desktop layout enhancements ── */
+@media (min-width: 1024px) {
+  .container {
+    max-width: 1500px;
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  .top-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1.9fr;
+    gap: 20px;
+  }
+
+  .chart-container {
+    height: 280px;
+  }
+
+  .distribution-section {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .donut-chart {
+    width: 240px;
+    height: 240px;
+  }
+}
