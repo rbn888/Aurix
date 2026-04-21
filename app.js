@@ -7330,6 +7330,23 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   });
 })();
 
+// ── Watchlist State (single source of truth) ───────────────
+const watchlistState = (() => {
+  const _hidden    = new Set(JSON.parse(localStorage.getItem('wlHidden') || '[]'));
+  const _listeners = [];
+
+  function _persist() { localStorage.setItem('wlHidden', JSON.stringify([..._hidden])); }
+  function _notify()  { _listeners.forEach(fn => fn()); }
+
+  return {
+    isHidden:  key => _hidden.has(key),
+    hide(key)       { _hidden.add(key);    _persist(); _notify(); },
+    show(key)       { _hidden.delete(key); _persist(); _notify(); },
+    hiddenKeys:     () => new Set(_hidden),
+    subscribe: fn   => _listeners.push(fn),
+  };
+})();
+
 // ── Tracking Card ──────────────────────────────────────────
 (function initTrackingCard() {
   if (!window.matchMedia('(min-width: 1024px)').matches) return;
@@ -7378,9 +7395,14 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
 
   function renderWatchlist() {
     const top = [...assets]
-      .filter(a => a.price > 0)
+      .filter(a => a.price > 0 && !watchlistState.isHidden(a.sym || a.name))
       .sort((a, b) => b.price - a.price)
       .slice(0, 5);
+
+    if (top.length === 0) {
+      content.innerHTML = '<div class="watchlist-row" style="opacity:.45;font-size:12px">Sin activos en seguimiento</div>';
+      return;
+    }
 
     const rows = top.map(a =>
       '<div class="watchlist-row">' +
@@ -7401,17 +7423,13 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
     }
   }
 
+  watchlistState.subscribe(render);
   render();
 })();
 
 // ── Watchlist Modal ─────────────────────────────────────────
-const _wlHidden    = new Set(JSON.parse(localStorage.getItem('wlHidden') || '[]'));
-let   _wlEditing   = false;
-let   _wlLastAdded = null;
-
-function _wlSaveHidden() {
-  localStorage.setItem('wlHidden', JSON.stringify([..._wlHidden]));
-}
+let _wlEditing   = false;
+let _wlLastAdded = null;
 
 function _wlRenderBody() {
   const body = document.getElementById('watchlistModalBody');
@@ -7419,7 +7437,7 @@ function _wlRenderBody() {
 
   const tracked = Array.isArray(assets)
     ? assets
-        .filter(a => a.qty > 0 && !_wlHidden.has(a.sym || a.name))
+        .filter(a => a.qty > 0 && !watchlistState.isHidden(a.sym || a.name))
         .sort((a, b) => (b.price * b.qty) - (a.price * a.qty))
     : [];
 
@@ -7459,8 +7477,7 @@ function _wlRenderBody() {
         const row = btn.closest('.watchlist-modal-row');
         row.classList.add('removing');
         setTimeout(() => {
-          _wlHidden.add(btn.dataset.key);
-          _wlSaveHidden();
+          watchlistState.hide(btn.dataset.key);
           _wlRenderBody();
           _wlRenderPanel();
         }, 180);
@@ -7485,7 +7502,7 @@ function _wlRenderPanel() {
 
   const query  = (document.getElementById('addAssetInput')?.value || '').toLowerCase();
   const hidden = Array.isArray(assets)
-    ? assets.filter(a => a.qty > 0 && _wlHidden.has(a.sym || a.name))
+    ? assets.filter(a => a.qty > 0 && watchlistState.isHidden(a.sym || a.name))
     : [];
   const filtered = hidden.filter(a =>
     !query ||
@@ -7507,8 +7524,7 @@ function _wlRenderPanel() {
     results.querySelectorAll('.add-asset-result').forEach(el => {
       el.addEventListener('click', () => {
         _wlLastAdded = el.dataset.key;
-        _wlHidden.delete(el.dataset.key);
-        _wlSaveHidden();
+        watchlistState.show(el.dataset.key);
         _wlRenderBody();
         _wlRenderPanel();
       });
