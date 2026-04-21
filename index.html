@@ -524,5 +524,19 @@
   <script src="services/prices.js"></script>
   <script src="services/history.js"></script>
   <script src="aurora-bg.js"></script>
+
+  <!-- Watchlist Modal -->
+  <div id="watchlist-modal" class="watchlist-modal hidden">
+    <div class="watchlist-modal-content">
+      <div class="watchlist-modal-header">
+        <h2>Lista de seguimiento</h2>
+        <button class="watchlist-modal-close" onclick="closeWatchlistModal()">✕</button>
+      </div>
+      <div class="watchlist-modal-body" id="watchlistModalBody"></div>
+      <div class="watchlist-modal-footer">
+        <button class="watchlist-modal-add" id="watchlistModalAddBtn">+ Añadir activo</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

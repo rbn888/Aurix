@@ -7404,3 +7404,53 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   render();
 })();
 
+// ── Watchlist Modal ─────────────────────────────────────────
+function openWatchlistModal() {
+  const modal = document.getElementById('watchlist-modal');
+  const body  = document.getElementById('watchlistModalBody');
+  if (!modal || !body) return;
+
+  const tracked = Array.isArray(assets)
+    ? assets.filter(a => a.qty > 0).sort((a, b) => (b.price * b.qty) - (a.price * a.qty))
+    : [];
+
+  if (tracked.length === 0) {
+    body.innerHTML = '<div class="watchlist-modal-empty">No hay activos en seguimiento</div>';
+  } else {
+    body.innerHTML = tracked.map(a => {
+      const price = a.price ? formatBase(a.price) : '—';
+      return '<div class="watchlist-modal-row">' +
+        '<span class="watchlist-modal-sym">' + (a.sym || '') + '</span>' +
+        '<span class="watchlist-modal-name">' + (a.name || '') + '</span>' +
+        '<span class="watchlist-modal-price">' + price + '</span>' +
+      '</div>';
+    }).join('');
+  }
+
+  modal.classList.remove('hidden');
+}
+
+function closeWatchlistModal() {
+  const modal = document.getElementById('watchlist-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+// Close on backdrop click
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = document.getElementById('watchlist-modal');
+  if (modal) {
+    modal.addEventListener('click', e => {
+      if (e.target === modal) closeWatchlistModal();
+    });
+  }
+
+  const card = document.querySelector('.watchlist-inner-card');
+  if (card) card.addEventListener('click', openWatchlistModal);
+
+  const addBtn = document.getElementById('watchlistModalAddBtn');
+  if (addBtn) addBtn.addEventListener('click', () => {
+    closeWatchlistModal();
+    document.getElementById('btnAdd')?.click();
+  });
+});
+

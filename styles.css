@@ -1400,7 +1400,7 @@ body.modal-open {
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   cursor: pointer;
   padding: 4px 8px;
   margin: 0 -8px;
@@ -1411,8 +1411,7 @@ body.modal-open {
 .legend-left {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-width: 120px;
+  gap: 6px;
 }
 
 .legend-item:hover {
@@ -1461,7 +1460,7 @@ body.modal-open {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: rgba(255,255,255,0.75);
-  margin-left: auto;
+  margin-left: 2px;
 }
 
 /* ── Chart Section (legacy selector kept for compatibility) */
@@ -4916,4 +4915,137 @@ main { padding-bottom: 72px; }
       transparent      100%
     );
   }
+}
+
+/* ── Watchlist Modal ──────────────────────────────────────── */
+.watchlist-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.watchlist-modal.hidden {
+  display: none;
+}
+
+.watchlist-modal-content {
+  width: 420px;
+  max-width: 90vw;
+  max-height: 80vh;
+  border-radius: 20px;
+  padding: 24px;
+  background: rgba(20,24,32,0.97);
+  border: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.watchlist-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.watchlist-modal-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin: 0;
+}
+
+.watchlist-modal-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .2s ease;
+}
+
+.watchlist-modal-close:hover {
+  background: rgba(255,255,255,0.12);
+}
+
+.watchlist-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.watchlist-modal-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 8px;
+  border-radius: 8px;
+  transition: background .15s ease;
+}
+
+.watchlist-modal-row:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.watchlist-modal-sym {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-bright);
+  min-width: 52px;
+}
+
+.watchlist-modal-name {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex: 1;
+  padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watchlist-modal-price {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.watchlist-modal-empty {
+  text-align: center;
+  padding: 24px 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.watchlist-modal-footer {
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.watchlist-modal-add {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .2s ease;
+}
+
+.watchlist-modal-add:hover {
+  background: rgba(255,255,255,0.1);
 }
