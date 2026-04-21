@@ -4308,6 +4308,7 @@ main { padding-bottom: 72px; }
   align-items: center;
   justify-content: center;
   height: calc(100vh - 60px - 56px);
+  background: transparent;
 }
 .placeholder-label {
   color: #444;
@@ -4321,6 +4322,7 @@ main { padding-bottom: 72px; }
   max-width: 600px;
   margin: 0 auto;
   width: 100%;
+  background: transparent;
 }
 
 .insights-hero {
@@ -4331,7 +4333,7 @@ main { padding-bottom: 72px; }
   background: radial-gradient(
     circle at center,
     rgba(0,255,180,0.12),
-    rgba(0,0,0,1) 70%
+    transparent 70%
   );
 }
 
@@ -4378,6 +4380,7 @@ main { padding-bottom: 72px; }
   overflow: visible;
   width: 100%;
   max-width: none;
+  z-index: 2;
 }
 .monster-wrap {
   display: flex;
