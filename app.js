@@ -7360,104 +7360,130 @@ const watchlistStore = (() => {
 // ── Market Store (live prices + smooth interpolation) ──────
 const marketStore = (() => {
   const POLL_MS = 5000;
-  let _prices      = {};   // key → { price, prev, display, target, history }
-  let _rafMap      = {};   // key → rAF id (cancel mid-flight on new price)
-  let _drawThrottle = {};  // key → last draw timestamp
-  let _timer       = null;
+  let _prices       = {};  // key → { price, prev, display, target, history, isReal }
+  let _rafMap       = {};
+  let _drawThrottle = {};
+  let _timer        = null;
+
+  // Random walk with momentum — 32 pts, organic, no straight segments
+  function _genInitialHistory(base) {
+    let v = base;
+    const out = [];
+    for (let i = 0; i < 32; i++) {
+      const drift    = (Math.random() - 0.5) * base * 0.002;
+      const momentum = i > 1 ? (out[i - 1] - out[i - 2]) * 0.35 : 0;
+      v += drift + momentum;
+      out.push(v);
+    }
+    return out;
+  }
+
+  function _smooth(data) {
+    return data.map((curr, i, a) =>
+      ((a[i - 1] ?? curr) + curr + (a[i + 1] ?? curr)) / 3
+    );
+  }
+
+  // Best seed for a key — uses assets[] if available
+  function _seedFor(key) {
+    if (Array.isArray(assets)) {
+      const a = assets.find(x => (x.sym || x.name) === key);
+      if (a?.price > 0) return a.price;
+    }
+    return _prices[key]?.display ?? _prices[key]?.price ?? 100;
+  }
 
   // ── Sparkline ────────────────────────────────────────────
   function _drawSpark(key, force) {
     const canvas = document.querySelector('.watchlist-spark[data-key="' + key + '"]');
     if (!canvas) return;
 
-    const raw = _prices[key]?.history;
-    const hasReal = raw?.length >= 2;
+    // Lazy-init entry with fake history if it doesn't exist yet
+    if (!_prices[key]) {
+      const seed = _seedFor(key);
+      _prices[key] = { price: null, prev: null, display: null, target: null,
+                       history: _genInitialHistory(seed), isReal: false };
+    }
 
-    // Throttle real-data redraws to 120ms (skip if already drew recently)
-    if (!force && hasReal) {
+    const { history, isReal } = _prices[key];
+
+    // Throttle — only on real-data redraws; force bypasses
+    if (!force && isReal) {
       const now = Date.now();
       if (now - (_drawThrottle[key] ?? 0) < 120) return;
       _drawThrottle[key] = now;
     }
 
+    if (isReal) {
+      canvas.classList.remove('placeholder');
+      canvas.classList.add('ready');
+    } else {
+      canvas.classList.add('placeholder');
+      canvas.classList.remove('ready');
+    }
+
     const dpr = window.devicePixelRatio || 1;
-    const W = 64, H = 20;
+    const W = 70, H = 22;
     canvas.width  = W * dpr;
     canvas.height = H * dpr;
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
 
-    // Build dataset — random-walk placeholder looks like real market data
-    let base, isReal;
-    if (hasReal) {
-      base   = raw;
-      isReal = true;
-      canvas.classList.remove('placeholder');
-      canvas.classList.add('ready');
-    } else {
-      const seed = _prices[key]?.display ?? _prices[key]?.price ?? 100;
-      let v = seed;
-      base = Array.from({length: 20}, () => {
-        v += (Math.random() - 0.5) * seed * 0.002;  // ±0.1% random step
-        return v;
-      });
-      isReal = false;
-      canvas.classList.add('placeholder');
-      canvas.classList.remove('ready');
+    // Smooth → midpoint interpolation (32 → ~60 pts)
+    const smoothed = _smooth(history);
+    const pts = [];
+    for (let i = 0; i < smoothed.length - 1; i++) {
+      pts.push(smoothed[i]);
+      pts.push((smoothed[i] + smoothed[i + 1]) / 2);
     }
+    pts.push(smoothed[smoothed.length - 1]);
 
-    // Triple-pass smoothing: removes dents, produces organic curve
-    const tripled = base.map((curr, i, a) =>
-      ((a[i - 1] ?? curr) + curr + (a[i + 1] ?? curr)) / 3
-    );
-
-    // Midpoint interpolation: doubles density, eliminates visible segments
-    const h = [];
-    for (let i = 0; i < tripled.length - 1; i++) {
-      h.push(tripled[i]);
-      h.push((tripled[i] + tripled[i + 1]) / 2);
-    }
-    h.push(tripled[tripled.length - 1]);
-
-    const min       = Math.min(...h);
-    const max       = Math.max(...h);
-    const range     = max - min || 1;
-    const delta     = h[h.length - 1] - h[0];
-    const threshold = Math.max(max * 0.001, 0.01);
-    const isUp   = delta >  threshold;
-    const isDown = delta < -threshold;
-    const endColor = isReal
-      ? (isUp ? '#00ff9c' : isDown ? '#ff4d4f' : '#888888')
-      : 'rgba(255,255,255,0.3)';
+    const min      = Math.min(...pts);
+    const max      = Math.max(...pts);
+    const price    = _prices[key].price ?? _prices[key].display ?? _seedFor(key);
+    const range    = Math.max(max - min, price * 0.002) || 1;
+    const delta    = pts[pts.length - 1] - pts[0];
+    const isUp     = delta >  Math.max(Math.abs(max) * 0.001, 0.01);
+    const isDown   = delta < -Math.max(Math.abs(max) * 0.001, 0.01);
+    const color    = isReal
+      ? (isUp ? '#22c55e' : isDown ? '#ef4444' : '#9ca3af')
+      : '#9ca3af';
 
     const grad = ctx.createLinearGradient(0, 0, W, 0);
-    grad.addColorStop(0, 'rgba(255,255,255,0.05)');
-    grad.addColorStop(1, endColor);
+    grad.addColorStop(0, color + '55');
+    grad.addColorStop(1, color + 'ff');
 
-    ctx.globalAlpha = 0.9;
-    ctx.beginPath();
-    h.forEach((v, i) => {
-      const x = (i / (h.length - 1)) * W;
-      const y = H - ((v - min) / range) * (H - 2) - 1;
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    });
+    const xs = pts.map((_, i) => (i / (pts.length - 1)) * W);
+    const ys = pts.map(v => H - ((v - min) / range) * (H - 2) - 1);
+
+    ctx.globalAlpha = 0.95;
     ctx.strokeStyle = grad;
-    ctx.lineWidth   = 1.5;
+    ctx.lineWidth   = 1.2;
     ctx.lineJoin    = 'round';
     ctx.lineCap     = 'round';
+
+    ctx.beginPath();
+    ctx.moveTo(xs[0], ys[0]);
+    for (let i = 0; i < xs.length - 1; i++) {
+      const xc = (xs[i] + xs[i + 1]) / 2;
+      const yc = (ys[i] + ys[i + 1]) / 2;
+      ctx.quadraticCurveTo(xs[i], ys[i], xc, yc);
+    }
+    ctx.lineTo(xs[xs.length - 1], ys[ys.length - 1]);
     ctx.stroke();
 
-    // Live dot — only when real data is present
+    // Live dot — only with real data
     if (isReal) {
-      const lastY = H - ((h[h.length - 1] - min) / range) * (H - 2) - 1;
-      ctx.shadowBlur  = 4;
-      ctx.shadowColor = endColor;
-      ctx.globalAlpha = 1;
+      const lastY = ys[ys.length - 1];
+      ctx.shadowBlur  = 3;
+      ctx.shadowColor = color;
+      ctx.globalAlpha = 0.9;
       ctx.beginPath();
-      ctx.arc(W, lastY, 1.6, 0, Math.PI * 2);
-      ctx.fillStyle = endColor;
+      ctx.arc(W, lastY, 1.4, 0, Math.PI * 2);
+      ctx.fillStyle = color;
       ctx.fill();
-      ctx.shadowBlur = 0;
+      ctx.shadowBlur  = 0;
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -7519,20 +7545,33 @@ const marketStore = (() => {
 
   // ── Price setter ─────────────────────────────────────────
   function _set(key, newPrice) {
-    const entry   = _prices[key];
+    const entry = _prices[key];
     if (entry?.price === newPrice) return;
-    // Skip sub-noise updates (< 0.05% change) to avoid micro-jitter
-    if (entry?.price && Math.abs(newPrice - entry.price) / entry.price < 0.0005) return;
+    // Skip sub-noise (< 0.03% change)
+    if (entry?.price && Math.abs(newPrice - entry.price) / entry.price < 0.0003) return;
+
     const display = entry?.display ?? null;
-    const history = entry?.history ?? [];
+
+    // Preserve existing history — continue, never reset
+    let history = entry?.history;
+    if (!history || history.length < 2) {
+      history = _genInitialHistory(newPrice);
+    } else if (!entry.isReal) {
+      // Rescale fake history to real price range before first real push
+      const center = history.reduce((s, v) => s + v, 0) / history.length;
+      if (center > 0) history = history.map(v => v * (newPrice / center));
+    }
+
     history.push(newPrice);
-    if (history.length > 20) history.shift();
-    _prices[key]  = {
+    if (history.length > 40) history.shift();
+
+    _prices[key] = {
       price:   newPrice,
       prev:    display ?? entry?.price ?? newPrice,
       display: display ?? newPrice,
       target:  newPrice,
       history,
+      isReal:  true,
     };
     _animatePrice(key);
     _drawSpark(key);
@@ -7825,5 +7864,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const input = document.getElementById('addAssetInput');
   if (input) input.addEventListener('input', _wlRenderPanel);
+
+  // Hero CTA — scroll to dashboard
+  const heroCta = document.getElementById('heroCtaBtn');
+  if (heroCta) {
+    heroCta.addEventListener('click', () => {
+      const dash = document.querySelector('.dashboard-top');
+      if (dash) dash.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
 });
 
