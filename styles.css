@@ -5178,3 +5178,9 @@ main { padding-bottom: 72px; }
 .add-asset-result:hover {
   background: rgba(255,255,255,0.06);
 }
+
+/* ── Watchlist price-change flash ── */
+@keyframes wl-price-up   { 0%,100%{ color:inherit } 40%{ color:#00ff9c } }
+@keyframes wl-price-down { 0%,100%{ color:inherit } 40%{ color:#ff4d4f } }
+.price-up   { animation: wl-price-up   700ms ease; }
+.price-down { animation: wl-price-down 700ms ease; }

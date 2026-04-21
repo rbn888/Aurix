@@ -6601,8 +6601,8 @@ fetchExchangeRate().then(() => {
   updateDonut();
 });
 
-refreshPrices();
-setInterval(refreshPrices, 30_000);         // 30 s — unified atomic price update
+refreshPrices().then(() => marketStore.start());
+setInterval(() => refreshPrices().then(() => marketStore.syncFromRefresh()), 30_000);  // 30 s
 setInterval(fetchExchangeRate, 3_600_000);  // 1 h — EUR/USD rate
 setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only update
 
@@ -7357,6 +7357,74 @@ const watchlistStore = (() => {
   };
 })();
 
+// ── Market Store (live price layer, 5 s crypto polling) ────
+const marketStore = (() => {
+  const POLL_MS = 5000;
+  const _subs   = [];
+  let _prices   = {};   // key → { price, prev }
+  let _timer    = null;
+
+  function _notify() { _subs.forEach(fn => fn()); }
+
+  function _set(key, price) {
+    const prev = _prices[key]?.price ?? null;
+    if (_prices[key]?.price === price) return false;
+    _prices[key] = { price, prev };
+    return true;
+  }
+
+  // Mirror current a.price from assets[] — no extra API call
+  function syncFromRefresh() {
+    if (!Array.isArray(assets)) return;
+    let changed = false;
+    watchlistStore.getWatchlist().forEach(key => {
+      const a = assets.find(x => (x.sym || x.name) === key);
+      if (a?.price > 0) changed = _set(key, a.price) || changed;
+    });
+    if (changed) _notify();
+  }
+
+  // Batch-fetch CoinGecko only for crypto assets in the watchlist
+  async function _pollCrypto() {
+    if (!Array.isArray(assets)) return;
+    const cryptos = watchlistStore.getWatchlist()
+      .map(key => assets.find(a => (a.sym || a.name) === key && a.type === 'crypto' && a.coinId))
+      .filter(Boolean);
+    if (!cryptos.length) return;
+    try {
+      const ids = [...new Set(cryptos.map(a => a.coinId))].join(',');
+      const res = await fetch(
+        `${COINGECKO}/simple/price?ids=${ids}&vs_currencies=usd`,
+        { headers: { Accept: 'application/json' } }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      let changed = false;
+      cryptos.forEach(a => {
+        const usd = data[a.coinId]?.usd;
+        if (usd > 0) changed = _set(a.sym || a.name, usd) || changed;
+      });
+      if (changed) _notify();
+    } catch {}
+  }
+
+  function _restartPolling() {
+    if (_timer) clearInterval(_timer);
+    syncFromRefresh();
+    _pollCrypto();
+    _timer = setInterval(_pollCrypto, POLL_MS);
+  }
+
+  watchlistStore.subscribe(_restartPolling);
+
+  return {
+    getPrice:       key => _prices[key] ?? null,
+    subscribe:      fn  => _subs.push(fn),
+    syncFromRefresh,
+    start:          _restartPolling,
+  };
+})();
+
 // ── Tracking Card ──────────────────────────────────────────
 (function initTrackingCard() {
   if (!window.matchMedia('(min-width: 1024px)').matches) return;
@@ -7414,13 +7482,42 @@ const watchlistStore = (() => {
       return;
     }
 
-    const rows = top.map(a =>
-      '<div class="watchlist-row">' +
-        '<span class="watchlist-sym">' + (a.sym || a.name) + '</span>' +
-        '<span class="watchlist-val">' + (a.price ? formatBase(a.price) : '--') + '</span>' +
-      '</div>'
-    ).join('');
-    content.innerHTML = '<div class="watchlist-preview">' + rows + '</div>';
+    const keys         = top.map(a => a.sym || a.name);
+    const existingRows = [...content.querySelectorAll('.watchlist-row[data-key]')];
+    const sameLayout   = existingRows.length === top.length &&
+                         keys.every((k, i) => k === existingRows[i]?.dataset.key);
+
+    if (sameLayout) {
+      // In-place: only touch price text nodes — no flicker
+      top.forEach(a => {
+        const key   = a.sym || a.name;
+        const pd    = marketStore.getPrice(key);
+        const price = pd?.price ?? a.price;
+        const prev  = pd?.prev  ?? null;
+        const el    = content.querySelector('.watchlist-val[data-key="' + key + '"]');
+        if (!el) return;
+        const text = price ? formatBase(price) : '--';
+        if (el.textContent === text) return;
+        el.textContent = text;
+        if (prev !== null && price !== prev) {
+          el.classList.remove('price-up', 'price-down');
+          void el.offsetWidth;
+          el.classList.add(price > prev ? 'price-up' : 'price-down');
+        }
+      });
+    } else {
+      // Structure changed — full rebuild
+      const html = top.map(a => {
+        const key   = a.sym || a.name;
+        const pd    = marketStore.getPrice(key);
+        const price = pd?.price ?? a.price;
+        return '<div class="watchlist-row" data-key="' + key + '">' +
+          '<span class="watchlist-sym">' + key + '</span>' +
+          '<span class="watchlist-val" data-key="' + key + '">' + (price ? formatBase(price) : '--') + '</span>' +
+        '</div>';
+      }).join('');
+      content.innerHTML = '<div class="watchlist-preview">' + html + '</div>';
+    }
   }
 
   async function render() {
@@ -7434,6 +7531,7 @@ const watchlistStore = (() => {
   }
 
   watchlistStore.subscribe(render);
+  marketStore.subscribe(renderWatchlist);
   render();
 })();
 
@@ -7566,6 +7664,32 @@ function closeWatchlistModal() {
   setTimeout(() => modal.classList.add('hidden'), 200);
   _wlEditing = false;
 }
+
+// In-place price update for the open modal — no full re-render
+function _wlPriceUpdate() {
+  const body = document.getElementById('watchlistModalBody');
+  if (!body) return;
+  body.querySelectorAll('.watchlist-modal-row[data-key]').forEach(row => {
+    const key = row.dataset.key;
+    const a   = Array.isArray(assets) ? assets.find(x => (x.sym || x.name) === key) : null;
+    if (!a) return;
+    const pd    = marketStore.getPrice(key);
+    const price = pd?.price ?? a.price;
+    const prev  = pd?.prev  ?? null;
+    const el    = row.querySelector('.watchlist-modal-price');
+    if (!el) return;
+    const text = price ? formatBase(price) : '—';
+    if (el.textContent === text) return;
+    el.textContent = text;
+    if (prev !== null && price !== prev) {
+      el.classList.remove('price-up', 'price-down');
+      void el.offsetWidth;
+      el.classList.add(price > prev ? 'price-up' : 'price-down');
+    }
+  });
+}
+
+marketStore.subscribe(_wlPriceUpdate);
 
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('watchlist-modal');
