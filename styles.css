@@ -5029,23 +5029,121 @@ main { padding-bottom: 72px; }
   color: var(--text-dim);
 }
 
-.watchlist-modal-footer {
-  padding-top: 8px;
-  border-top: 1px solid rgba(255,255,255,0.06);
+/* Header actions */
+.modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.watchlist-modal-add {
+.add-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.06);
+  border: none;
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background .2s ease, color .2s ease;
+  backdrop-filter: blur(6px);
+}
+
+.add-button:hover {
+  background: rgba(255,255,255,0.12);
+}
+
+.add-button--active {
+  background: rgba(100,220,160,0.12);
+  color: rgba(100,220,160,1);
+}
+
+/* Edit mode row */
+.watchlist-modal-row.editing {
+  position: relative;
+  padding-right: 28px;
+}
+
+/* Remove button */
+.remove-btn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255,80,80,0.9);
+  color: white;
+  font-size: 10px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform .2s ease, background .2s ease;
+}
+
+.remove-btn:hover {
+  transform: translateY(-50%) scale(1.15);
+  background: rgba(255,50,50,1);
+}
+
+/* Add asset panel */
+.add-asset-panel {
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.add-asset-panel.hidden {
+  display: none;
+}
+
+.add-asset-input {
   width: 100%;
-  padding: 12px;
-  border-radius: 12px;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border-radius: 10px;
   background: rgba(255,255,255,0.05);
   border: 1px solid rgba(255,255,255,0.08);
   color: var(--text);
   font-size: 13px;
-  cursor: pointer;
-  transition: background .2s ease;
+  outline: none;
+  font-family: inherit;
+  transition: border-color .2s ease;
 }
 
-.watchlist-modal-add:hover {
-  background: rgba(255,255,255,0.1);
+.add-asset-input:focus {
+  border-color: rgba(255,255,255,0.18);
+}
+
+.add-asset-input::placeholder {
+  color: var(--text-dim);
+}
+
+.add-asset-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.add-asset-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+
+.add-asset-result:hover {
+  background: rgba(255,255,255,0.06);
 }

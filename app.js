@@ -7405,52 +7405,127 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
 })();
 
 // ── Watchlist Modal ─────────────────────────────────────────
-function openWatchlistModal() {
-  const modal = document.getElementById('watchlist-modal');
-  const body  = document.getElementById('watchlistModalBody');
-  if (!modal || !body) return;
+const _wlHidden = new Set(JSON.parse(localStorage.getItem('wlHidden') || '[]'));
+let _wlEditing = false;
+
+function _wlSaveHidden() {
+  localStorage.setItem('wlHidden', JSON.stringify([..._wlHidden]));
+}
+
+function _wlRenderBody() {
+  const body = document.getElementById('watchlistModalBody');
+  if (!body) return;
 
   const tracked = Array.isArray(assets)
-    ? assets.filter(a => a.qty > 0).sort((a, b) => (b.price * b.qty) - (a.price * a.qty))
+    ? assets
+        .filter(a => a.qty > 0 && !_wlHidden.has(a.sym || a.name))
+        .sort((a, b) => (b.price * b.qty) - (a.price * a.qty))
     : [];
 
   if (tracked.length === 0) {
     body.innerHTML = '<div class="watchlist-modal-empty">No hay activos en seguimiento</div>';
   } else {
     body.innerHTML = tracked.map(a => {
-      const price = a.price ? formatBase(a.price) : '—';
-      return '<div class="watchlist-modal-row">' +
-        '<span class="watchlist-modal-sym">' + (a.sym || '') + '</span>' +
-        '<span class="watchlist-modal-name">' + (a.name || '') + '</span>' +
-        '<span class="watchlist-modal-price">' + price + '</span>' +
+      const price     = a.price ? formatBase(a.price) : '—';
+      const editClass = _wlEditing ? ' editing' : '';
+      const removeBtn = _wlEditing
+        ? '<button class="remove-btn" data-key="' + (a.sym || a.name) + '">✕</button>'
+        : '';
+      return '<div class="watchlist-modal-row' + editClass + '">' +
+        '<span class="watchlist-modal-sym">'   + (a.sym   || '') + '</span>' +
+        '<span class="watchlist-modal-name">'  + (a.name  || '') + '</span>' +
+        '<span class="watchlist-modal-price">' + price           + '</span>' +
+        removeBtn +
       '</div>';
     }).join('');
+
+    body.querySelectorAll('.remove-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        _wlHidden.add(btn.dataset.key);
+        _wlSaveHidden();
+        _wlRenderBody();
+        _wlRenderPanel();
+      });
+    });
   }
 
+  const addBtn = document.getElementById('watchlistAddBtn');
+  if (addBtn) {
+    addBtn.textContent = _wlEditing ? '✓' : '+';
+    addBtn.classList.toggle('add-button--active', _wlEditing);
+  }
+}
+
+function _wlRenderPanel() {
+  const panel   = document.getElementById('addAssetPanel');
+  const results = document.getElementById('addAssetResults');
+  if (!panel || !results) return;
+
+  panel.classList.toggle('hidden', !_wlEditing);
+  if (!_wlEditing) return;
+
+  const query  = (document.getElementById('addAssetInput')?.value || '').toLowerCase();
+  const hidden = Array.isArray(assets)
+    ? assets.filter(a => a.qty > 0 && _wlHidden.has(a.sym || a.name))
+    : [];
+  const filtered = hidden.filter(a =>
+    !query ||
+    (a.sym  || '').toLowerCase().includes(query) ||
+    (a.name || '').toLowerCase().includes(query)
+  );
+
+  if (filtered.length === 0) {
+    results.innerHTML = '<div class="watchlist-modal-empty" style="padding:8px 0 0">' +
+      (hidden.length === 0 ? 'No hay activos ocultos' : 'Sin resultados') + '</div>';
+  } else {
+    results.innerHTML = filtered.map(a =>
+      '<div class="add-asset-result" data-key="' + (a.sym || a.name) + '">' +
+        '<span class="watchlist-modal-sym">'  + (a.sym  || '') + '</span>' +
+        '<span class="watchlist-modal-name">' + (a.name || '') + '</span>' +
+      '</div>'
+    ).join('');
+
+    results.querySelectorAll('.add-asset-result').forEach(el => {
+      el.addEventListener('click', () => {
+        _wlHidden.delete(el.dataset.key);
+        _wlSaveHidden();
+        _wlRenderBody();
+        _wlRenderPanel();
+      });
+    });
+  }
+}
+
+function toggleWatchlistEditMode() {
+  _wlEditing = !_wlEditing;
+  _wlRenderBody();
+  _wlRenderPanel();
+}
+
+function openWatchlistModal() {
+  const modal = document.getElementById('watchlist-modal');
+  if (!modal) return;
+  _wlEditing = false;
   modal.classList.remove('hidden');
+  _wlRenderBody();
+  _wlRenderPanel();
 }
 
 function closeWatchlistModal() {
   const modal = document.getElementById('watchlist-modal');
   if (modal) modal.classList.add('hidden');
+  _wlEditing = false;
 }
 
-// Close on backdrop click
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('watchlist-modal');
-  if (modal) {
-    modal.addEventListener('click', e => {
-      if (e.target === modal) closeWatchlistModal();
-    });
-  }
+  if (modal) modal.addEventListener('click', e => { if (e.target === modal) closeWatchlistModal(); });
 
   const card = document.querySelector('.watchlist-inner-card');
   if (card) card.addEventListener('click', openWatchlistModal);
 
-  const addBtn = document.getElementById('watchlistModalAddBtn');
-  if (addBtn) addBtn.addEventListener('click', () => {
-    closeWatchlistModal();
-    document.getElementById('btnAdd')?.click();
-  });
+  const input = document.getElementById('addAssetInput');
+  if (input) input.addEventListener('input', _wlRenderPanel);
 });
 

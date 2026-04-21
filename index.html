@@ -530,11 +530,15 @@
     <div class="watchlist-modal-content">
       <div class="watchlist-modal-header">
         <h2>Lista de seguimiento</h2>
-        <button class="watchlist-modal-close" onclick="closeWatchlistModal()">✕</button>
+        <div class="modal-actions">
+          <button class="add-button" id="watchlistAddBtn" onclick="toggleWatchlistEditMode()">+</button>
+          <button class="watchlist-modal-close" onclick="closeWatchlistModal()">✕</button>
+        </div>
       </div>
       <div class="watchlist-modal-body" id="watchlistModalBody"></div>
-      <div class="watchlist-modal-footer">
-        <button class="watchlist-modal-add" id="watchlistModalAddBtn">+ Añadir activo</button>
+      <div class="add-asset-panel hidden" id="addAssetPanel">
+        <input class="add-asset-input" id="addAssetInput" placeholder="Buscar activo..." autocomplete="off" />
+        <div class="add-asset-results" id="addAssetResults"></div>
       </div>
     </div>
   </div>
