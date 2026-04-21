@@ -7368,29 +7368,52 @@ const marketStore = (() => {
   function _drawSpark(key) {
     const canvas = document.querySelector('.watchlist-spark[data-key="' + key + '"]');
     if (!canvas) return;
-    const h = _prices[key]?.history;
-    if (!h || h.length < 2) return;
+    const raw = _prices[key]?.history;
+    if (!raw || raw.length < 2) return;
+
+    // Light one-pass smoothing
+    const h = raw.length < 3 ? raw.slice() :
+      raw.map((v, i) => i === 0 ? v : (v + raw[i - 1]) / 2);
+
     const dpr = window.devicePixelRatio || 1;
-    const W = 52, H = 14;
+    const W = 52, H = 16;
     canvas.width  = W * dpr;
     canvas.height = H * dpr;
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
-    const min   = Math.min(...h);
-    const max   = Math.max(...h);
-    const range = max - min || 1;
-    const trend = h[h.length - 1] - h[0];
+
+    const min       = Math.min(...h);
+    const max       = Math.max(...h);
+    const range     = max - min || 1;
+    const delta     = h[h.length - 1] - h[0];
+    const threshold = Math.max(max * 0.001, 0.01);  // 0.1% of max, min $0.01
+    const isUp   = delta >  threshold;
+    const isDown = delta < -threshold;
+    const endColor = isUp ? '#00ff9c' : isDown ? '#ff4d4f' : '#888888';
+
+    // Horizontal gradient: faded past → vivid present
+    const grad = ctx.createLinearGradient(0, 0, W, 0);
+    grad.addColorStop(0, 'rgba(255,255,255,0.05)');
+    grad.addColorStop(1, endColor);
+
     ctx.beginPath();
     h.forEach((v, i) => {
       const x = (i / (h.length - 1)) * W;
       const y = H - ((v - min) / range) * (H - 2) - 1;
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     });
-    ctx.strokeStyle = trend > 0 ? '#00ff9c' : trend < 0 ? '#ff4d4f' : 'rgba(255,255,255,0.35)';
+    ctx.strokeStyle = grad;
     ctx.lineWidth   = 1.5;
     ctx.lineJoin    = 'round';
     ctx.lineCap     = 'round';
     ctx.stroke();
+
+    // Live dot at current price
+    const lastY = H - ((h[h.length - 1] - min) / range) * (H - 2) - 1;
+    ctx.beginPath();
+    ctx.arc(W, lastY, 1.8, 0, Math.PI * 2);
+    ctx.fillStyle = endColor;
+    ctx.fill();
   }
 
   // ── DOM helpers ──────────────────────────────────────────

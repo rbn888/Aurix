@@ -4723,7 +4723,7 @@ main { padding-bottom: 72px; }
   display: grid;
   grid-template-columns: 1fr 52px auto;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 7px 4px;
   border-bottom: 1px solid rgba(255,255,255,.06);
   font-size: 12px;
@@ -4733,9 +4733,15 @@ main { padding-bottom: 72px; }
 
 .watchlist-spark {
   width: 52px;
-  height: 14px;
-  opacity: 0.7;
+  height: 16px;
+  opacity: 0.55;
   flex-shrink: 0;
+  filter: blur(0.2px);
+  transition: opacity 0.25s ease;
+}
+
+.watchlist-row:hover .watchlist-spark {
+  opacity: 0.95;
 }
 
 .watchlist-row:last-child { border-bottom: none; }
@@ -4751,6 +4757,7 @@ main { padding-bottom: 72px; }
   font-size: 12px;
   font-weight: 600;
   text-align: right;
+  min-width: 90px;
   animation: subtleDrift 4s ease-in-out infinite;
 }
 
@@ -4891,7 +4898,7 @@ main { padding-bottom: 72px; }
     display: grid;
     grid-template-columns: 1fr 52px auto;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     padding: 8px 6px;
     font-size: 13px;
     line-height: 1.3;
@@ -4909,6 +4916,7 @@ main { padding-bottom: 72px; }
 
   .watchlist-price {
     font-size: 13px;
+    min-width: 90px;
   }
 
   .ticker-item {
@@ -5234,12 +5242,12 @@ main { padding-bottom: 72px; }
 
 /* ── Price-change flash (glow + movement) ── */
 @keyframes wl-price-up {
-  0%   { color: #00ff9c; text-shadow: 0 0 8px rgba(0,255,156,0.5); transform: translateY(3px); }
+  0%   { color: #00ff9c; text-shadow: 0 0 8px rgba(0,255,156,0.5); transform: translateY(-2px); }
   100% { color: inherit; text-shadow: none; transform: translateY(0); }
 }
 
 @keyframes wl-price-down {
-  0%   { color: #ff4d4f; text-shadow: 0 0 8px rgba(255,77,79,0.5); transform: translateY(-3px); }
+  0%   { color: #ff4d4f; text-shadow: 0 0 8px rgba(255,77,79,0.5); transform: translateY(2px); }
   100% { color: inherit; text-shadow: none; transform: translateY(0); }
 }
 
