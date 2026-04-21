@@ -4723,8 +4723,8 @@ main { padding-bottom: 72px; }
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 8px;
-  padding: 7px 4px;
+  gap: 10px;
+  padding: 6px 4px;
   border-bottom: 1px solid rgba(255,255,255,.06);
   font-size: 12px;
   position: relative;
@@ -4789,6 +4789,7 @@ main { padding-bottom: 72px; }
   letter-spacing: 0.2px;
   opacity: 0.85;
   transition: opacity 0.2s ease;
+  margin-left: 6px;
 }
 
 .watchlist-row:hover .watchlist-sym {
@@ -4801,6 +4802,7 @@ main { padding-bottom: 72px; }
   font-weight: 600;
   text-align: right;
   min-width: 100px;
+  margin-right: 6px;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   animation: subtleDrift 4s ease-in-out infinite;
@@ -4918,7 +4920,7 @@ main { padding-bottom: 72px; }
 
   .watchlist-inner-card {
     flex: 1;
-    padding: 16px;
+    padding: 20px 18px;
     border-radius: 14px;
     background: rgba(20,25,35,0.6);
     backdrop-filter: blur(8px);
@@ -4946,8 +4948,8 @@ main { padding-bottom: 72px; }
     display: grid;
     grid-template-columns: auto 1fr auto;
     align-items: center;
-    gap: 8px;
-    padding: 8px 6px;
+    gap: 10px;
+    padding: 6px 4px;
     font-size: 13px;
     line-height: 1.3;
     border-radius: 6px;
@@ -5275,23 +5277,6 @@ main { padding-bottom: 72px; }
   50%     { opacity: 0.7;  transform: translateY(-50%) scale(1.15); }
 }
 
-.watchlist-section .card-title {
-  position: relative;
-  padding-right: 18px;
-}
-
-.watchlist-section .card-title::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #00ff9c;
-  animation: pulseLive 2s ease-in-out infinite;
-}
 
 /* ── Price-change flash (glow + movement) ── */
 @keyframes wl-price-up {

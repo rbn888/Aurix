@@ -7360,14 +7360,25 @@ const watchlistStore = (() => {
 // ── Market Store (live prices + smooth interpolation) ──────
 const marketStore = (() => {
   const POLL_MS = 5000;
-  let _prices   = {};   // key → { price, prev, display, target }
-  let _rafMap   = {};   // key → rAF id (cancel mid-flight on new price)
-  let _timer    = null;
+  let _prices      = {};   // key → { price, prev, display, target, history }
+  let _rafMap      = {};   // key → rAF id (cancel mid-flight on new price)
+  let _drawThrottle = {};  // key → last draw timestamp
+  let _timer       = null;
 
   // ── Sparkline ────────────────────────────────────────────
-  function _drawSpark(key) {
+  function _drawSpark(key, force) {
     const canvas = document.querySelector('.watchlist-spark[data-key="' + key + '"]');
     if (!canvas) return;
+
+    const raw = _prices[key]?.history;
+    const hasReal = raw?.length >= 2;
+
+    // Throttle real-data redraws to 120ms (skip if already drew recently)
+    if (!force && hasReal) {
+      const now = Date.now();
+      if (now - (_drawThrottle[key] ?? 0) < 120) return;
+      _drawThrottle[key] = now;
+    }
 
     const dpr = window.devicePixelRatio || 1;
     const W = 64, H = 20;
@@ -7376,27 +7387,31 @@ const marketStore = (() => {
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
 
-    const raw = _prices[key]?.history;
-    if (!raw || raw.length < 2) {
-      // Placeholder: flat centered line — always something visible immediately
+    // Build dataset — sine-wave placeholder when real history not available yet
+    let base, isReal;
+    if (hasReal) {
+      base   = raw;
+      isReal = true;
+      canvas.classList.remove('placeholder');
+      canvas.classList.add('ready');
+    } else {
+      const seed = _prices[key]?.display ?? _prices[key]?.price ?? 100;
+      base = Array.from({length: 12}, (_, i) =>
+        seed + Math.sin(i / 2) * seed * 0.001   // ±0.1% sine wave
+      );
+      isReal = false;
       canvas.classList.add('placeholder');
       canvas.classList.remove('ready');
-      ctx.beginPath();
-      ctx.moveTo(4,      H / 2);
-      ctx.lineTo(W - 4, H / 2);
-      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-      ctx.lineWidth   = 1;
-      ctx.lineCap     = 'round';
-      ctx.stroke();
-      return;
     }
 
-    canvas.classList.remove('placeholder');
-    canvas.classList.add('ready');
-
-    // Light one-pass smoothing
-    const h = raw.length < 3 ? raw.slice() :
-      raw.map((v, i) => i === 0 ? v : (v + raw[i - 1]) / 2);
+    // Midpoint smoothing: insert interpolated point between each pair
+    const smooth = [];
+    for (let i = 0; i < base.length - 1; i++) {
+      smooth.push(base[i]);
+      smooth.push((base[i] + base[i + 1]) / 2);
+    }
+    smooth.push(base[base.length - 1]);
+    const h = smooth;
 
     const min       = Math.min(...h);
     const max       = Math.max(...h);
@@ -7405,9 +7420,10 @@ const marketStore = (() => {
     const threshold = Math.max(max * 0.001, 0.01);
     const isUp   = delta >  threshold;
     const isDown = delta < -threshold;
-    const endColor = isUp ? '#00ff9c' : isDown ? '#ff4d4f' : '#888888';
+    const endColor = isReal
+      ? (isUp ? '#00ff9c' : isDown ? '#ff4d4f' : '#888888')
+      : 'rgba(255,255,255,0.3)';
 
-    // Gradient: faded past → vivid present
     const grad = ctx.createLinearGradient(0, 0, W, 0);
     grad.addColorStop(0, 'rgba(255,255,255,0.05)');
     grad.addColorStop(1, endColor);
@@ -7425,16 +7441,18 @@ const marketStore = (() => {
     ctx.lineCap     = 'round';
     ctx.stroke();
 
-    // Live dot — glowing at current price
-    const lastY = H - ((h[h.length - 1] - min) / range) * (H - 2) - 1;
-    ctx.shadowBlur  = 6;
-    ctx.shadowColor = endColor;
-    ctx.globalAlpha = 1;
-    ctx.beginPath();
-    ctx.arc(W, lastY, 1.8, 0, Math.PI * 2);
-    ctx.fillStyle = endColor;
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    // Live dot — only when real data is present
+    if (isReal) {
+      const lastY = H - ((h[h.length - 1] - min) / range) * (H - 2) - 1;
+      ctx.shadowBlur  = 6;
+      ctx.shadowColor = endColor;
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(W, lastY, 1.8, 0, Math.PI * 2);
+      ctx.fillStyle = endColor;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
   }
 
   // ── DOM helpers ──────────────────────────────────────────
@@ -7558,7 +7576,7 @@ const marketStore = (() => {
 
   return {
     getPrice:   key => _prices[key] ?? null,
-    redrawAll:  ()  => watchlistStore.getWatchlist().forEach(k => _drawSpark(k)),
+    redrawAll:  ()  => watchlistStore.getWatchlist().forEach(k => _drawSpark(k, true)),
     syncFromRefresh,
     start:      _restartPolling,
   };
