@@ -7357,34 +7357,93 @@ const watchlistStore = (() => {
   };
 })();
 
-// ── Market Store (live price layer, 5 s crypto polling) ────
+// ── Market Store (live prices + smooth interpolation) ──────
 const marketStore = (() => {
   const POLL_MS = 5000;
-  const _subs   = [];
-  let _prices   = {};   // key → { price, prev }
+  let _prices   = {};   // key → { price, prev, display, target }
+  let _rafMap   = {};   // key → rAF id (cancel mid-flight on new price)
   let _timer    = null;
 
-  function _notify() { _subs.forEach(fn => fn()); }
-
-  function _set(key, price) {
-    const prev = _prices[key]?.price ?? null;
-    if (_prices[key]?.price === price) return false;
-    _prices[key] = { price, prev };
-    return true;
+  // ── DOM helpers ──────────────────────────────────────────
+  function _updateDOM(key, value) {
+    const text = value ? formatBase(value) : '--';
+    const dash = document.querySelector('.watchlist-price[data-key="' + key + '"]');
+    if (dash) dash.textContent = text;
+    const modal = document.querySelector('.watchlist-modal-row[data-key="' + key + '"] .watchlist-modal-price');
+    if (modal) modal.textContent = text;
   }
 
-  // Mirror current a.price from assets[] — no extra API call
+  function _triggerFlash(key, from, to) {
+    if (from === to) return;
+    const cls = to > from ? 'price-up' : 'price-down';
+    [
+      document.querySelector('.watchlist-price[data-key="' + key + '"]'),
+      document.querySelector('.watchlist-modal-row[data-key="' + key + '"] .watchlist-modal-price'),
+    ].forEach(el => {
+      if (!el) return;
+      el.classList.remove('price-up', 'price-down');
+      void el.offsetWidth;
+      el.classList.add(cls);
+    });
+  }
+
+  // ── Interpolation ────────────────────────────────────────
+  function _animatePrice(key) {
+    const item = _prices[key];
+    if (!item) return;
+    const from  = item.display;
+    const to    = item.target;
+    const delta = Math.abs(to - from);
+    if (delta < 0.001) { item.display = to; _updateDOM(key, to); return; }
+
+    if (_rafMap[key]) cancelAnimationFrame(_rafMap[key]);
+
+    const duration = Math.min(500, Math.max(200, delta * 5));
+    const start    = performance.now();
+
+    function frame(now) {
+      const t     = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3);           // cubic ease-out
+      const value = from + (to - from) * eased;
+      item.display = value;
+      _updateDOM(key, value);
+
+      if (t < 1) {
+        _rafMap[key] = requestAnimationFrame(frame);
+      } else {
+        item.display = to;
+        delete _rafMap[key];
+        _updateDOM(key, to);
+        _triggerFlash(key, from, to);
+      }
+    }
+    _rafMap[key] = requestAnimationFrame(frame);
+  }
+
+  // ── Price setter ─────────────────────────────────────────
+  function _set(key, newPrice) {
+    const entry = _prices[key];
+    if (entry?.price === newPrice) return;
+    const display = entry?.display ?? null;
+    _prices[key]  = {
+      price:   newPrice,
+      prev:    display ?? entry?.price ?? newPrice,
+      display: display ?? newPrice,
+      target:  newPrice,
+    };
+    _animatePrice(key);
+  }
+
+  // Mirror non-crypto prices from main 30 s refresh cycle
   function syncFromRefresh() {
     if (!Array.isArray(assets)) return;
-    let changed = false;
     watchlistStore.getWatchlist().forEach(key => {
       const a = assets.find(x => (x.sym || x.name) === key);
-      if (a?.price > 0) changed = _set(key, a.price) || changed;
+      if (a?.price > 0) _set(key, a.price);
     });
-    if (changed) _notify();
   }
 
-  // Batch-fetch CoinGecko only for crypto assets in the watchlist
+  // Batch CoinGecko poll — crypto only, single request
   async function _pollCrypto() {
     if (!Array.isArray(assets)) return;
     const cryptos = watchlistStore.getWatchlist()
@@ -7399,12 +7458,10 @@ const marketStore = (() => {
       );
       if (!res.ok) return;
       const data = await res.json();
-      let changed = false;
       cryptos.forEach(a => {
         const usd = data[a.coinId]?.usd;
-        if (usd > 0) changed = _set(a.sym || a.name, usd) || changed;
+        if (usd > 0) _set(a.sym || a.name, usd);
       });
-      if (changed) _notify();
     } catch {}
   }
 
@@ -7419,7 +7476,6 @@ const marketStore = (() => {
 
   return {
     getPrice:       key => _prices[key] ?? null,
-    subscribe:      fn  => _subs.push(fn),
     syncFromRefresh,
     start:          _restartPolling,
   };
@@ -7482,42 +7538,21 @@ const marketStore = (() => {
       return;
     }
 
-    const keys         = top.map(a => a.sym || a.name);
-    const existingRows = [...content.querySelectorAll('.watchlist-row[data-key]')];
-    const sameLayout   = existingRows.length === top.length &&
-                         keys.every((k, i) => k === existingRows[i]?.dataset.key);
+    // Skip rebuild if structure is identical — animation loop keeps prices live
+    const keys = top.map(a => a.sym || a.name);
+    const rows = [...content.querySelectorAll('.watchlist-row[data-key]')];
+    if (rows.length === top.length && keys.every((k, i) => k === rows[i]?.dataset.key)) return;
 
-    if (sameLayout) {
-      // In-place: only touch price text nodes — no flicker
-      top.forEach(a => {
-        const key   = a.sym || a.name;
-        const pd    = marketStore.getPrice(key);
-        const price = pd?.price ?? a.price;
-        const prev  = pd?.prev  ?? null;
-        const el    = content.querySelector('.watchlist-price[data-key="' + key + '"]');
-        if (!el) return;
-        const text = price ? formatBase(price) : '--';
-        if (el.textContent === text) return;
-        el.textContent = text;
-        if (prev !== null && price !== prev) {
-          el.classList.remove('price-up', 'price-down');
-          void el.offsetWidth;
-          el.classList.add(price > prev ? 'price-up' : 'price-down');
-        }
-      });
-    } else {
-      // Structure changed — full rebuild
-      const html = top.map(a => {
-        const key   = a.sym || a.name;
-        const pd    = marketStore.getPrice(key);
-        const price = pd?.price ?? a.price;
-        return '<div class="watchlist-row" data-key="' + key + '">' +
-          '<span class="watchlist-sym">' + key + '</span>' +
-          '<span class="watchlist-price" data-key="' + key + '">' + (price ? formatBase(price) : '--') + '</span>' +
-        '</div>';
-      }).join('');
-      content.innerHTML = '<div class="watchlist-preview">' + html + '</div>';
-    }
+    const html = top.map(a => {
+      const key   = a.sym || a.name;
+      const pd    = marketStore.getPrice(key);
+      const price = pd?.display ?? pd?.price ?? a.price;
+      return '<div class="watchlist-row" data-key="' + key + '">' +
+        '<span class="watchlist-sym">' + key + '</span>' +
+        '<span class="watchlist-price" data-key="' + key + '">' + (price ? formatBase(price) : '--') + '</span>' +
+      '</div>';
+    }).join('');
+    content.innerHTML = '<div class="watchlist-preview">' + html + '</div>';
   }
 
   async function render() {
@@ -7531,7 +7566,6 @@ const marketStore = (() => {
   }
 
   watchlistStore.subscribe(render);
-  marketStore.subscribe(renderWatchlist);
   render();
 })();
 
@@ -7553,8 +7587,10 @@ function _wlRenderBody() {
     body.innerHTML = '<div class="watchlist-modal-empty">No hay activos en seguimiento</div>';
   } else {
     body.innerHTML = tracked.map(a => {
-      const price     = a.price ? formatBase(a.price) : '—';
       const key       = a.sym || a.name;
+      const pd        = marketStore.getPrice(key);
+      const rawPrice  = pd?.display ?? pd?.price ?? a.price;
+      const price     = rawPrice ? formatBase(rawPrice) : '—';
       const editClass = _wlEditing ? ' editing' : '';
       const removeBtn = _wlEditing
         ? '<button class="remove-btn" data-key="' + key + '">✕</button>'
@@ -7664,32 +7700,6 @@ function closeWatchlistModal() {
   setTimeout(() => modal.classList.add('hidden'), 200);
   _wlEditing = false;
 }
-
-// In-place price update for the open modal — no full re-render
-function _wlPriceUpdate() {
-  const body = document.getElementById('watchlistModalBody');
-  if (!body) return;
-  body.querySelectorAll('.watchlist-modal-row[data-key]').forEach(row => {
-    const key = row.dataset.key;
-    const a   = Array.isArray(assets) ? assets.find(x => (x.sym || x.name) === key) : null;
-    if (!a) return;
-    const pd    = marketStore.getPrice(key);
-    const price = pd?.price ?? a.price;
-    const prev  = pd?.prev  ?? null;
-    const el    = row.querySelector('.watchlist-modal-price');
-    if (!el) return;
-    const text = price ? formatBase(price) : '—';
-    if (el.textContent === text) return;
-    el.textContent = text;
-    if (prev !== null && price !== prev) {
-      el.classList.remove('price-up', 'price-down');
-      void el.offsetWidth;
-      el.classList.add(price > prev ? 'price-up' : 'price-down');
-    }
-  });
-}
-
-marketStore.subscribe(_wlPriceUpdate);
 
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('watchlist-modal');
