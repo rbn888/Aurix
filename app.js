@@ -7494,7 +7494,7 @@ const marketStore = (() => {
         const pd    = marketStore.getPrice(key);
         const price = pd?.price ?? a.price;
         const prev  = pd?.prev  ?? null;
-        const el    = content.querySelector('.watchlist-val[data-key="' + key + '"]');
+        const el    = content.querySelector('.watchlist-price[data-key="' + key + '"]');
         if (!el) return;
         const text = price ? formatBase(price) : '--';
         if (el.textContent === text) return;
@@ -7513,7 +7513,7 @@ const marketStore = (() => {
         const price = pd?.price ?? a.price;
         return '<div class="watchlist-row" data-key="' + key + '">' +
           '<span class="watchlist-sym">' + key + '</span>' +
-          '<span class="watchlist-val" data-key="' + key + '">' + (price ? formatBase(price) : '--') + '</span>' +
+          '<span class="watchlist-price" data-key="' + key + '">' + (price ? formatBase(price) : '--') + '</span>' +
         '</div>';
       }).join('');
       content.innerHTML = '<div class="watchlist-preview">' + html + '</div>';

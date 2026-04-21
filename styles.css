@@ -4720,25 +4720,31 @@ main { padding-bottom: 72px; }
 }
 
 .watchlist-row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  padding: 6px 0;
-  border-bottom: 1px solid rgba(255,255,255,.04);
+  gap: 12px;
+  padding: 7px 4px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
   font-size: 12px;
+  position: relative;
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
 .watchlist-row:last-child { border-bottom: none; }
 
 .watchlist-sym {
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-bright);
+  letter-spacing: 0.2px;
 }
 
-.watchlist-val {
-  color: var(--text-muted);
+.watchlist-price {
+  color: var(--text-bright);
   font-size: 12px;
-  opacity: 0.8;
+  font-weight: 600;
+  text-align: right;
+  animation: subtleDrift 4s ease-in-out infinite;
 }
 
 /* ── Desktop layout enhancements ── */
@@ -4875,16 +4881,27 @@ main { padding-bottom: 72px; }
   }
 
   .watchlist-row {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr auto;
     align-items: center;
-    padding: 6px 0;
+    gap: 12px;
+    padding: 8px 6px;
     font-size: 13px;
     line-height: 1.3;
+    border-radius: 6px;
   }
 
   .watchlist-row:not(:last-child) {
-    border-bottom: 1px solid rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .watchlist-row:hover {
+    background: rgba(255,255,255,0.04);
+    transform: translateX(2px);
+  }
+
+  .watchlist-price {
+    font-size: 13px;
   }
 
   .ticker-item {
@@ -5179,8 +5196,45 @@ main { padding-bottom: 72px; }
   background: rgba(255,255,255,0.06);
 }
 
-/* ── Watchlist price-change flash ── */
-@keyframes wl-price-up   { 0%,100%{ color:inherit } 40%{ color:#00ff9c } }
-@keyframes wl-price-down { 0%,100%{ color:inherit } 40%{ color:#ff4d4f } }
-.price-up   { animation: wl-price-up   700ms ease; }
-.price-down { animation: wl-price-down 700ms ease; }
+/* ── Watchlist live feel ── */
+@keyframes subtleDrift {
+  0%,100% { opacity: 0.82; }
+  50%     { opacity: 1; }
+}
+
+@keyframes pulseLive {
+  0%,100% { opacity: 0.2; transform: translateY(-50%) scale(0.8); }
+  50%     { opacity: 0.9; transform: translateY(-50%) scale(1.25); }
+}
+
+.watchlist-section .card-title {
+  position: relative;
+  padding-right: 18px;
+}
+
+.watchlist-section .card-title::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #00ff9c;
+  animation: pulseLive 2.5s ease-in-out infinite;
+}
+
+/* ── Price-change flash (glow + movement) ── */
+@keyframes wl-price-up {
+  0%   { color: #00ff9c; text-shadow: 0 0 8px rgba(0,255,156,0.5); transform: translateY(3px); }
+  100% { color: inherit; text-shadow: none; transform: translateY(0); }
+}
+
+@keyframes wl-price-down {
+  0%   { color: #ff4d4f; text-shadow: 0 0 8px rgba(255,77,79,0.5); transform: translateY(-3px); }
+  100% { color: inherit; text-shadow: none; transform: translateY(0); }
+}
+
+.price-up   { animation: wl-price-up   700ms ease-out; }
+.price-down { animation: wl-price-down 700ms ease-out; }
