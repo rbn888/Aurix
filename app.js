@@ -4205,7 +4205,13 @@ function updateBottomNavActive() {
   });
 }
 
+function switchView(view) {
+  const hv = document.getElementById('hero-view');
+  if (hv) hv.hidden = (view !== 'hero');
+}
+
 function switchTab(tab) {
+  switchView('dashboard'); // always collapse hero when navigating
   currentTab = tab;
   if (_loopInterval) { clearInterval(_loopInterval); _loopInterval = null; }
   const mainEl      = document.querySelector('main');
@@ -6534,7 +6540,7 @@ assetsListEl.addEventListener('click', e => {
 
 // ── Event Listeners ────────────────────────────────────────
 document.querySelector('.header-title')
-  ?.addEventListener('click', () => { switchTab('home'); setActiveCategory(null); });
+  ?.addEventListener('click', () => { switchView('hero'); });
 
 document.querySelectorAll('#bottomNav .item[data-tab]').forEach(el => {
   el.addEventListener('click', () => {
@@ -7865,12 +7871,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const input = document.getElementById('addAssetInput');
   if (input) input.addEventListener('input', _wlRenderPanel);
 
-  // Hero CTA — scroll to dashboard
+  // Hero CTA — dismiss hero, show dashboard
   const heroCta = document.getElementById('heroCtaBtn');
   if (heroCta) {
     heroCta.addEventListener('click', () => {
-      const dash = document.querySelector('.dashboard-top');
-      if (dash) dash.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      switchView('dashboard');
+      switchTab('home');
     });
   }
 });

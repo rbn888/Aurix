@@ -1232,6 +1232,19 @@ body.modal-open {
 }
 .btn-submit--green:hover { opacity: .93; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(74,222,128,.25); }
 
+/* ── Hero view — full-screen overlay ───────────────────── */
+#hero-view {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: #000;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+#hero-view[hidden] { display: none; }
+#hero-view .hero   { flex: 1; min-height: 0; height: 100%; }
+
 /* ── Hero Landing ───────────────────────────────────────── */
 .hero {
   position: relative;

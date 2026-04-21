@@ -45,24 +45,6 @@
 
     <main>
 
-      <section class="hero" id="heroSection">
-        <div class="hero-fade"></div>
-        <div class="hero-core">
-          <div class="orb-wrapper">
-            <div class="hero-glow"></div>
-            <canvas id="orb-canvas" class="orb-canvas"></canvas>
-          </div>
-          <div class="hero-copy">
-            <p class="hero-text" id="heroText">
-              Tu patrimonio, bajo control.
-            </p>
-            <button class="hero-cta" id="heroCtaBtn">
-              VER RENDIMIENTO
-            </button>
-          </div>
-        </div>
-      </section>
-
       <section class="dashboard-top hero-card">
 
         <div class="hero-left">
@@ -171,6 +153,27 @@
       </section>
 
     </main>
+
+    <!-- Hero view — full-screen overlay, shown on demand -->
+    <div id="hero-view" hidden>
+      <section class="hero" id="heroSection">
+        <div class="hero-fade"></div>
+        <div class="hero-core">
+          <div class="orb-wrapper">
+            <div class="hero-glow"></div>
+            <canvas id="orb-canvas" class="orb-canvas"></canvas>
+          </div>
+          <div class="hero-copy">
+            <p class="hero-text" id="heroText">
+              Tu patrimonio, bajo control.
+            </p>
+            <button class="hero-cta" id="heroCtaBtn">
+              VER RENDIMIENTO
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
 
     <canvas id="aurora-bg"></canvas>
     <div class="top-fade"></div>
