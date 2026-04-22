@@ -4272,7 +4272,10 @@ function renderMyAssetsBlock() {
   const container = document.getElementById('marketMyAssets');
   if (!container) return;
   const watchlist = getWatchlist();
-  const filtered  = MARKET_DATA.filter(item => watchlist.includes(_normalizeWLSymbol(item.symbol)));
+  const filtered  = MARKET_DATA.filter(item => watchlist.includes(normalizeSymbol(item.symbol)));
+  console.log('[watchlist]', watchlist);
+  console.log('[market symbols]', MARKET_DATA.map(i => i.symbol));
+  console.log('[filtered]', filtered.map(i => i.symbol));
   if (!filtered.length) {
     container.innerHTML = `<div class="empty-watchlist">Añade activos ⭐ para seguirlos aquí</div>`;
     return;
@@ -4480,15 +4483,16 @@ function renderSparkline(points, isUp = true) {
 }
 
 function normalizeMarketData(raw, type, symbol) {
+  const sym = normalizeSymbol(symbol);
   if (!raw) {
-    return { symbol, name: symbol, price: null, change: null, change24h: null, type, fallback: true };
+    return { symbol: sym, name: sym, price: null, change: null, change24h: null, type, fallback: true };
   }
   const change = raw.percent_change_24h ?? raw.change24h ?? raw.change ?? null;
   return {
-    symbol,
-    name:     raw.name    || symbol,
+    symbol:   sym,
+    name:     raw.name    || sym,
     price:    raw.price   ?? raw.close ?? null,
-    change,              // alias kept for renderStockItem compatibility
+    change,
     change24h: change,
     type,
     fallback: raw.fallback || false
@@ -7831,10 +7835,12 @@ const watchlistStore = (() => {
 // ── Global Watchlist API (thin wrappers over watchlistStore) ─
 const WATCHLIST_KEY = 'aurix_watchlist'; // same key as watchlistStore
 
-function _normalizeWLSymbol(symbol) {
-  // Strip slashes so XAU/USD → XAUUSD, keep everything else as-is
-  return String(symbol).toUpperCase().replace(/\//g, '');
+function normalizeSymbol(symbol) {
+  if (!symbol) return '';
+  return String(symbol).toUpperCase().replace(/\//g, '').replace(/-/g, '').trim();
 }
+
+function _normalizeWLSymbol(symbol) { return normalizeSymbol(symbol); }
 
 function getWatchlist() {
   return watchlistStore.getWatchlist();
