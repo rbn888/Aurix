@@ -4221,6 +4221,8 @@ function renderMarket() {
         <button class="market-tab active" data-market="crypto">Cripto</button>
         <button class="market-tab" data-market="stocks">Acciones</button>
         <button class="market-tab" data-market="etfs">ETFs</button>
+        <button class="market-tab" data-market="indices">Índices</button>
+        <button class="market-tab" data-market="commodities">Materias</button>
       </div>
       <div class="market-featured" id="marketFeatured">
         <div class="featured-card">
@@ -4309,9 +4311,11 @@ function renderMarketByType(type) {
   const container = document.getElementById('marketList');
   if (!container) return;
   container.innerHTML = '';
-  if (type === 'crypto')  { loadCrypto(); return; }
-  if (type === 'stocks')  { loadStocks(); return; }
-  if (type === 'etfs')    { renderETFsPlaceholder(container); return; }
+  if (type === 'crypto')      { loadCrypto();      return; }
+  if (type === 'stocks')      { loadStocks();      return; }
+  if (type === 'etfs')        { loadETFs();        return; }
+  if (type === 'indices')     { loadIndices();     return; }
+  if (type === 'commodities') { loadCommodities(); return; }
 }
 
 function renderStocksPlaceholder(container) {
@@ -4320,6 +4324,78 @@ function renderStocksPlaceholder(container) {
 
 function renderETFsPlaceholder(container) {
   container.innerHTML = `<div class="market-empty">ETFs disponibles próximamente</div>`;
+}
+
+const MARKET_ETFS        = ['SPY','QQQ','VOO','VTI','URTH'];
+const MARKET_INDICES     = ['^GSPC','^IXIC','^DJI'];
+const MARKET_COMMODITIES = ['XAU/USD','XAG/USD','WTI'];
+const INDEX_FALLBACKS    = { '^GSPC': 5300, '^IXIC': 18500, '^DJI': 42000 };
+const COMMODITY_FALLBACKS = { 'XAU/USD': 2320, 'XAG/USD': 27, 'WTI': 80 };
+const INDEX_NAMES        = { '^GSPC': 'S&P 500', '^IXIC': 'NASDAQ', '^DJI': 'Dow Jones' };
+const COMMODITY_NAMES    = { 'XAU/USD': 'Gold', 'XAG/USD': 'Silver', 'WTI': 'Oil (WTI)' };
+
+function _buildItem(symbol, data, fallbackMap) {
+  const price = data?.price ?? null;
+  if (price) return { symbol, name: INDEX_NAMES[symbol] ?? COMMODITY_NAMES[symbol] ?? symbol, price, change: 0, fallback: false };
+  const fb  = getFallbackData(symbol) ?? { price: fallbackMap?.[symbol] ?? null, change24h: 0 };
+  return { symbol, name: INDEX_NAMES[symbol] ?? COMMODITY_NAMES[symbol] ?? symbol, price: fb.price, change: fb.change24h ?? 0, fallback: true };
+}
+
+async function _loadGeneric(title, symbols, fallbackMap, searchType) {
+  const container = document.getElementById('marketList');
+  if (!container) return;
+  container.innerHTML = `<div class="market-loading">Cargando ${title.toLowerCase()}...</div>`;
+  try {
+    const results = await Promise.all(
+      symbols.map(async symbol => {
+        try {
+          const data = await fetchTwelveData(symbol);
+          return _buildItem(symbol, data, fallbackMap);
+        } catch {
+          return _buildItem(symbol, null, fallbackMap);
+        }
+      })
+    );
+    renderGenericList(title, results);
+    marketSearchData = [
+      ...marketSearchData.filter(a => a.type !== searchType),
+      ...results.map(s => ({ symbol: s.symbol, name: s.name, price: s.price, type: searchType }))
+    ];
+  } catch (err) {
+    console.error(`[market] ${title} error:`, err);
+    renderFallbackList(title, symbols);
+  }
+}
+
+async function loadETFs()        { await _loadGeneric('ETFs',       MARKET_ETFS,        FALLBACK_PRICES,  'etf');       }
+async function loadIndices()     { await _loadGeneric('Índices',    MARKET_INDICES,     INDEX_FALLBACKS,  'index');     }
+async function loadCommodities() { await _loadGeneric('Materias',   MARKET_COMMODITIES, COMMODITY_FALLBACKS, 'commodity'); }
+
+function renderGenericList(title, data) {
+  const container = document.getElementById('marketList');
+  if (!container) return;
+  const hasFallback = data.some(d => d.fallback);
+  const badge = hasFallback ? '<span class="market-badge">sin actualizar</span>' : '';
+  container.innerHTML = `
+    <div class="market-section-header">${title} ${badge}</div>
+    ${data.map(item => renderStockItem({ ...item, symbol: item.name || item.symbol })).join('')}
+  `;
+}
+
+function renderFallbackList(title, symbols) {
+  const container = document.getElementById('marketList');
+  if (!container) return;
+  container.innerHTML = `
+    <div class="market-section-header">${title} <span class="market-badge">sin actualizar</span></div>
+    ${symbols.map(s => `
+      <div class="market-row">
+        <div class="market-left">
+          <div class="market-symbol">${INDEX_NAMES[s] ?? COMMODITY_NAMES[s] ?? s}</div>
+        </div>
+        <div class="market-right"><div class="market-price">—</div></div>
+      </div>
+    `).join('')}
+  `;
 }
 
 async function loadMarketData() {
