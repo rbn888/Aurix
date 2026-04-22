@@ -969,6 +969,7 @@ let _donutDist     = [];
 let activeCategory = null; // persistent category filter ('crypto', 'metal', …, or null)
 let currentTab       = 'home';
 let currentMarketTab = 'crypto';
+let marketSearchData = [];
 let showAllTx        = false;
 let insightIndex        = 0;
 let insightCache            = [];
@@ -4243,7 +4244,47 @@ function renderMarket() {
   `;
   currentMarketTab = 'crypto';
   initMarketTabs();
+  initMarketSearch();
   loadMarketData();
+}
+
+function initMarketSearch() {
+  const input = document.getElementById('marketSearchInput');
+  if (!input) return;
+  input.addEventListener('input', e => {
+    const query = e.target.value.trim().toLowerCase();
+    if (!query) { renderMarketByType(currentMarketTab); return; }
+    const results = marketSearchData.filter(item =>
+      item.symbol.toLowerCase().includes(query) ||
+      item.name.toLowerCase().includes(query)
+    ).slice(0, 15);
+    renderSearchResults(results);
+  });
+}
+
+function renderSearchResults(results) {
+  const container = document.getElementById('marketList');
+  if (!container) return;
+  if (!results.length) {
+    container.innerHTML = '<div class="market-empty">Sin resultados</div>';
+    return;
+  }
+  container.innerHTML = results.map(item => {
+    const price = typeof item.price === 'number' && item.price > 0
+      ? `$${fmtMktPrice(item.price)}`
+      : '—';
+    return `
+      <div class="market-row">
+        <div class="market-left">
+          <div class="market-symbol">${item.symbol}</div>
+          <div class="market-type">${item.type}</div>
+        </div>
+        <div class="market-right">
+          <div class="market-price">${price}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function initMarketTabs() {
@@ -4338,6 +4379,10 @@ async function loadCrypto() {
     if (!res.ok) throw new Error(`http_${res.status}`);
     const data = await res.json();
     console.log('[market] CRYPTO RAW sample:', data[0]);
+    marketSearchData = [
+      ...marketSearchData.filter(a => a.type !== 'crypto'),
+      ...data.map(c => ({ symbol: c.symbol?.toUpperCase(), name: c.name, price: c.current_price, type: 'crypto' }))
+    ];
     renderCryptoList(data);
   } catch (e) {
     console.error('[market] Crypto fetch failed:', e.message);
@@ -4366,6 +4411,10 @@ async function loadStocks() {
       })
     );
     renderStocks(results, results.every(r => r.fallback));
+    marketSearchData = [
+      ...marketSearchData.filter(a => a.type !== 'stock'),
+      ...results.map(s => ({ symbol: s.symbol, name: s.symbol, price: s.price, type: 'stock' }))
+    ];
   } catch (err) {
     console.error('[market] stocks load error:', err);
     renderStocks(
