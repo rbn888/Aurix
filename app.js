@@ -970,6 +970,7 @@ let activeCategory = null; // persistent category filter ('crypto', 'metal', …
 let currentTab       = 'home';
 let currentMarketTab = 'crypto';
 let marketSearchData = [];
+let MARKET_DATA      = [];
 let showAllTx        = false;
 let insightIndex        = 0;
 let insightCache            = [];
@@ -4241,13 +4242,47 @@ function renderMarket() {
           <div class="red">-0.2%</div>
         </div>
       </div>
+      <div id="marketMyAssets"></div>
       <div id="marketList" class="market-section"></div>
     </div>
   `;
   currentMarketTab = 'crypto';
   initMarketTabs();
   initMarketSearch();
+  // Event delegation for star toggles — set once, covers all dynamic rows
+  const screen = container.querySelector('.market-screen');
+  if (screen) {
+    screen.addEventListener('click', e => {
+      const btn = e.target.closest('.watchlist-btn');
+      if (!btn) return;
+      e.stopPropagation();
+      const sym     = btn.dataset.symbol;
+      const isAdded = toggleWatchlist(sym);
+      document.querySelectorAll(`.watchlist-btn[data-symbol="${sym}"]`).forEach(b => {
+        b.textContent = isAdded ? '★' : '☆';
+        b.classList.toggle('active', isAdded);
+      });
+      renderMyAssetsBlock();
+    });
+  }
   loadMarketData();
+}
+
+function renderMyAssetsBlock() {
+  const container = document.getElementById('marketMyAssets');
+  if (!container) return;
+  const watchlist = getWatchlist();
+  const filtered  = MARKET_DATA.filter(item => watchlist.includes(_normalizeWLSymbol(item.symbol)));
+  if (!filtered.length) {
+    container.innerHTML = `<div class="empty-watchlist">Añade activos ⭐ para seguirlos aquí</div>`;
+    return;
+  }
+  container.innerHTML = `
+    <div class="market-section">
+      <div class="market-section-title">My Assets</div>
+      ${filtered.map(renderStockItem).join('')}
+    </div>
+  `;
 }
 
 function initMarketSearch() {
@@ -4363,10 +4398,12 @@ async function _loadGeneric(title, symbols, fallbackMap, searchType) {
     );
     console.log(`[market] normalized sample (${searchType}):`, results[0]);
     renderGenericList(title, results);
+    MARKET_DATA = [...MARKET_DATA.filter(d => d.type !== searchType), ...results];
     marketSearchData = [
       ...marketSearchData.filter(a => a.type !== searchType),
       ...results.map(s => ({ symbol: s.symbol, name: s.name, price: s.price, type: searchType }))
     ];
+    renderMyAssetsBlock();
   } catch (err) {
     console.error(`[market] ${title} error:`, err);
     renderFallbackList(title, symbols);
@@ -4464,13 +4501,15 @@ function renderCryptoList(data, stale = false) {
   el.innerHTML = `
     <div class="market-section-title">Cripto${stale ? ' <span class="market-stale">sin actualizar</span>' : ''}</div>
     ${data.map(c => {
-      const chg   = c.price_change_percentage_24h ?? 0;
-      const chart = renderSparkline(generateSparkline(chg), chg >= 0);
-      return `<div class="market-row" data-symbol="${c.symbol.toUpperCase()}">
+      const chg     = c.price_change_percentage_24h ?? 0;
+      const chart   = renderSparkline(generateSparkline(chg), chg >= 0);
+      const sym     = c.symbol.toUpperCase();
+      const watched = isInWatchlist(sym);
+      return `<div class="market-row" data-symbol="${sym}">
         <div class="market-row-left">
           <img class="market-coin-img" src="${c.image}" alt="" loading="lazy">
           <div>
-            <span class="market-sym">${c.symbol.toUpperCase()}</span>
+            <span class="market-sym">${sym}</span>
             <span class="market-name">${c.name}</span>
           </div>
         </div>
@@ -4478,6 +4517,7 @@ function renderCryptoList(data, stale = false) {
         <div class="market-row-right">
           <span class="market-price">$${fmtMktPrice(c.current_price)}</span>
           <span class="market-chg ${chg >= 0 ? 'up' : 'down'}">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</span>
+          <button class="watchlist-btn ${watched ? 'active' : ''}" data-symbol="${sym}">${watched ? '★' : '☆'}</button>
         </div>
       </div>`;
     }).join('')}
@@ -4500,11 +4540,17 @@ async function loadCrypto() {
     if (!res.ok) throw new Error(`http_${res.status}`);
     const data = await res.json();
     console.log('[market] CRYPTO RAW sample:', data[0]);
+    const cryptoItems = data.map(c => ({
+      symbol: c.symbol.toUpperCase(), name: c.name,
+      price: c.current_price, change: c.price_change_percentage_24h ?? 0, type: 'crypto'
+    }));
     marketSearchData = [
       ...marketSearchData.filter(a => a.type !== 'crypto'),
-      ...data.map(c => ({ symbol: c.symbol?.toUpperCase(), name: c.name, price: c.current_price, type: 'crypto' }))
+      ...cryptoItems.map(c => ({ symbol: c.symbol, name: c.name, price: c.price, type: 'crypto' }))
     ];
+    MARKET_DATA = [...MARKET_DATA.filter(d => d.type !== 'crypto'), ...cryptoItems];
     renderCryptoList(data);
+    renderMyAssetsBlock();
   } catch (e) {
     console.error('[market] Crypto fetch failed:', e.message);
     renderCryptoList(CRYPTO_FALLBACK, true);
@@ -4535,10 +4581,12 @@ async function loadStocks() {
     );
     console.log('[market] normalized sample (stock):', results[0]);
     renderStocks(results, results.every(r => r.fallback));
+    MARKET_DATA = [...MARKET_DATA.filter(d => d.type !== 'stock'), ...results];
     marketSearchData = [
       ...marketSearchData.filter(a => a.type !== 'stock'),
       ...results.map(s => ({ symbol: s.symbol, name: s.name, price: s.price, type: 'stock' }))
     ];
+    renderMyAssetsBlock();
   } catch (err) {
     console.error('[market] stocks load error:', err);
     renderStocks(
@@ -4565,12 +4613,12 @@ function renderStocks(data, isFallback = false) {
 }
 
 function renderStockItem(item) {
-  const price = typeof item.price === 'number' && item.price > 0
-    ? `$${fmtMktPrice(item.price)}`
-    : '—';
-  const chart = renderSparkline(generateSparkline(item.change ?? 0), (item.change ?? 0) >= 0);
+  const price     = typeof item.price === 'number' && item.price > 0 ? `$${fmtMktPrice(item.price)}` : '—';
+  const chart     = renderSparkline(generateSparkline(item.change ?? 0), (item.change ?? 0) >= 0);
+  const normSym   = _normalizeWLSymbol(item.symbol);
+  const watched   = isInWatchlist(normSym);
   return `
-    <div class="market-row" data-symbol="${_normalizeWLSymbol(item.symbol)}">
+    <div class="market-row" data-symbol="${normSym}">
       <div class="market-left">
         <div class="market-icon">${item.symbol.charAt(0)}</div>
         <div class="market-symbol">${item.symbol}</div>
@@ -4578,6 +4626,7 @@ function renderStockItem(item) {
       <div class="market-chart">${chart}</div>
       <div class="market-right">
         <div class="market-price">${price}</div>
+        <button class="watchlist-btn ${watched ? 'active' : ''}" data-symbol="${normSym}">${watched ? '★' : '☆'}</button>
       </div>
     </div>
   `;

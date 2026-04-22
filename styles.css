@@ -5721,3 +5721,22 @@ main { padding-bottom: 72px; }
   color: var(--orange);
   margin-left: 6px;
 }
+
+.watchlist-btn {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.3);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  transition: color 0.15s;
+  line-height: 1;
+}
+.watchlist-btn.active { color: #FFD700; }
+
+.empty-watchlist {
+  padding: 20px 0;
+  text-align: center;
+  color: rgba(255,255,255,0.4);
+  font-size: 13px;
+}
