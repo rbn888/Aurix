@@ -4196,6 +4196,90 @@ function renderInsights() {
     </div>`;
 }
 
+// ── Market tab ─────────────────────────────────────────────
+function renderMarket() {
+  const container = document.getElementById('tabPlaceholder');
+  if (!container) return;
+  container.innerHTML = `
+    <div class="market-screen">
+      <div class="market-header">Market</div>
+      <div class="market-section" id="market-crypto"></div>
+      <div class="market-section" id="market-stocks"></div>
+    </div>
+  `;
+  loadMarketData();
+}
+
+async function loadMarketData() {
+  loadCrypto();
+  loadStocks();
+}
+
+async function loadCrypto() {
+  const el = document.getElementById('market-crypto');
+  if (!el) return;
+  try {
+    const res  = await fetch(
+      'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10',
+      { headers: { Accept: 'application/json' } }
+    );
+    if (!res.ok) throw new Error(`http_${res.status}`);
+    const data = await res.json();
+    el.innerHTML = `
+      <div class="market-title">Cripto</div>
+      ${data.map(c => {
+        const chg = c.price_change_percentage_24h ?? 0;
+        return `<div class="market-row">
+          <div class="market-row-left">
+            <img class="market-coin-img" src="${c.image}" alt="" loading="lazy">
+            <div>
+              <span class="market-sym">${c.symbol.toUpperCase()}</span>
+              <span class="market-name">${c.name}</span>
+            </div>
+          </div>
+          <div class="market-row-right">
+            <span class="market-price">$${fmtMktPrice(c.current_price)}</span>
+            <span class="market-chg ${chg >= 0 ? 'up' : 'down'}">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</span>
+          </div>
+        </div>`;
+      }).join('')}
+    `;
+  } catch (e) {
+    el.innerHTML = `<div class="market-title">Cripto</div><p class="market-err">No disponible</p>`;
+  }
+}
+
+async function loadStocks() {
+  const symbols = ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'AMZN', 'META'];
+  const el = document.getElementById('market-stocks');
+  if (!el) return;
+  el.innerHTML = `<div class="market-title">Acciones</div>`;
+  for (const s of symbols) {
+    const result = await fetchTwelveData(s);
+    const price  = result?.price ?? getFallbackData(s)?.price;
+    el.innerHTML += `
+      <div class="market-row">
+        <div class="market-row-left">
+          <div class="market-icon">${s.charAt(0)}</div>
+          <div>
+            <span class="market-sym">${s}</span>
+          </div>
+        </div>
+        <div class="market-row-right">
+          <span class="market-price">${price ? '$' + fmtMktPrice(price) : '—'}</span>
+        </div>
+      </div>
+    `;
+  }
+}
+
+function fmtMktPrice(p) {
+  if (!p || isNaN(p)) return '—';
+  if (p < 1)    return p.toFixed(4);
+  if (p < 1000) return p.toFixed(2);
+  return p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 // ── Bottom nav ─────────────────────────────────────────────
 const TAB_KEYS = { home: 'tabHome', insights: 'tabInsights', market: 'tabMarket', profile: 'tabProfile' };
 const NAV_ORDER = ['home', 'market', 'add', 'insights', 'profile'];
@@ -4242,13 +4326,15 @@ function switchTab(tab) {
     render();
     updateBottomNavActive();
   } else {
-    mainEl.style.display  = 'none';
-    placeholder.innerHTML = tab === 'insights'
-      ? renderInsights()
-      : `<p class="placeholder-label">${tab.charAt(0).toUpperCase() + tab.slice(1)}</p>`;
-    placeholder.style.display = '';
+    mainEl.style.display       = 'none';
+    placeholder.style.display  = '';
     if (tab === 'insights') {
+      placeholder.innerHTML = renderInsights();
       startInsightRotation();
+    } else if (tab === 'market') {
+      renderMarket();
+    } else {
+      placeholder.innerHTML = `<p class="placeholder-label">${tab.charAt(0).toUpperCase() + tab.slice(1)}</p>`;
     }
     updateBottomNavActive();
   }
