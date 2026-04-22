@@ -968,6 +968,7 @@ let _donutHoverIdx = -1;   // ephemeral hover (index into _donutDist)
 let _donutDist     = [];
 let activeCategory = null; // persistent category filter ('crypto', 'metal', …, or null)
 let currentTab       = 'home';
+let currentMarketTab = 'crypto';
 let showAllTx        = false;
 let insightIndex        = 0;
 let insightCache            = [];
@@ -4237,11 +4238,47 @@ function renderMarket() {
           <div class="red">-0.2%</div>
         </div>
       </div>
-      <div class="market-section" id="market-crypto"></div>
-      <div class="market-section" id="market-stocks"></div>
+      <div id="marketList" class="market-section"></div>
     </div>
   `;
+  currentMarketTab = 'crypto';
+  initMarketTabs();
   loadMarketData();
+}
+
+function initMarketTabs() {
+  document.querySelectorAll('.market-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const type = tab.dataset.market;
+      if (!type || type === currentMarketTab) return;
+      currentMarketTab = type;
+      updateMarketTabUI();
+      renderMarketByType(type);
+    });
+  });
+}
+
+function updateMarketTabUI() {
+  document.querySelectorAll('.market-tab').forEach(t => t.classList.remove('active'));
+  const active = document.querySelector(`.market-tab[data-market="${currentMarketTab}"]`);
+  if (active) active.classList.add('active');
+}
+
+function renderMarketByType(type) {
+  const container = document.getElementById('marketList');
+  if (!container) return;
+  container.innerHTML = '';
+  if (type === 'crypto')  { loadCrypto(); return; }
+  if (type === 'stocks')  { renderStocksPlaceholder(container); return; }
+  if (type === 'etfs')    { renderETFsPlaceholder(container); return; }
+}
+
+function renderStocksPlaceholder(container) {
+  container.innerHTML = `<div class="market-empty">Acciones disponibles próximamente</div>`;
+}
+
+function renderETFsPlaceholder(container) {
+  container.innerHTML = `<div class="market-empty">ETFs disponibles próximamente</div>`;
 }
 
 async function loadMarketData() {
@@ -4263,7 +4300,7 @@ const CRYPTO_FALLBACK = [
 ];
 
 function renderCryptoList(data, stale = false) {
-  const el = document.getElementById('market-crypto');
+  const el = document.getElementById('marketList');
   if (!el) return;
   el.innerHTML = `
     <div class="market-section-title">Cripto${stale ? ' <span class="market-stale">sin actualizar</span>' : ''}</div>
@@ -4287,7 +4324,7 @@ function renderCryptoList(data, stale = false) {
 }
 
 async function loadCrypto() {
-  const el = document.getElementById('market-crypto');
+  const el = document.getElementById('marketList');
   if (!el) return;
   try {
     const res = await fetch(
@@ -4311,7 +4348,7 @@ async function loadCrypto() {
 
 async function loadStocks() {
   const symbols = ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'AMZN', 'META'];
-  const el = document.getElementById('market-stocks');
+  const el = document.getElementById('marketList');
   if (!el) return;
   el.innerHTML = `<div class="market-section-title">Acciones</div>`;
   for (const s of symbols) {

@@ -5570,6 +5570,13 @@ main { padding-bottom: 72px; }
 .green { color: #00ff88; }
 .red   { color: #ff4d4d; }
 
+.market-empty {
+  padding: 40px;
+  text-align: center;
+  color: rgba(255,255,255,0.5);
+  font-size: 14px;
+}
+
 .market-row {
   display: flex;
   justify-content: space-between;
