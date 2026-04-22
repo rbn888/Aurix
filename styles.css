@@ -5604,12 +5604,22 @@ main { padding-bottom: 72px; }
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: 1;
+}
+
+.market-chart {
+  width: 80px;
+  margin: 0 10px;
+  opacity: 0.8;
+  flex-shrink: 0;
+  line-height: 0;
 }
 
 .market-right {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  text-align: right;
 }
 
 .market-symbol {
@@ -5636,6 +5646,7 @@ main { padding-bottom: 72px; }
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: 1;
 }
 
 .market-row-right {

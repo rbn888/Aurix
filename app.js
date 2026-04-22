@@ -4339,13 +4339,35 @@ const CRYPTO_FALLBACK = [
   { symbol: 'DOGE', name: 'Dogecoin',  current_price: 0.19,   price_change_percentage_24h: 0.6,  image: 'https://assets.coingecko.com/coins/images/5/thumb/dogecoin.png' },
 ];
 
+function generateSparkline(change) {
+  const points = [];
+  let value = 50;
+  for (let i = 0; i < 20; i++) {
+    value += (Math.random() - 0.5) * 5 + (change || 0) * 0.2;
+    points.push(Math.max(5, Math.min(95, value)));
+  }
+  return points;
+}
+
+function renderSparkline(points, isUp = true) {
+  const width = 80, height = 30;
+  const path = points.map((p, i) => {
+    const x = (i / (points.length - 1)) * width;
+    const y = height - (p / 100) * height;
+    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const color = isUp ? '#00ff88' : '#ff4d4d';
+  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><path d="${path}" stroke="${color}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
 function renderCryptoList(data, stale = false) {
   const el = document.getElementById('marketList');
   if (!el) return;
   el.innerHTML = `
     <div class="market-section-title">Cripto${stale ? ' <span class="market-stale">sin actualizar</span>' : ''}</div>
     ${data.map(c => {
-      const chg = c.price_change_percentage_24h ?? 0;
+      const chg   = c.price_change_percentage_24h ?? 0;
+      const chart = renderSparkline(generateSparkline(chg), chg >= 0);
       return `<div class="market-row">
         <div class="market-row-left">
           <img class="market-coin-img" src="${c.image}" alt="" loading="lazy">
@@ -4354,6 +4376,7 @@ function renderCryptoList(data, stale = false) {
             <span class="market-name">${c.name}</span>
           </div>
         </div>
+        <div class="market-chart">${chart}</div>
         <div class="market-row-right">
           <span class="market-price">$${fmtMktPrice(c.current_price)}</span>
           <span class="market-chg ${chg >= 0 ? 'up' : 'down'}">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</span>
@@ -4441,12 +4464,14 @@ function renderStockItem(item) {
   const price = typeof item.price === 'number' && item.price > 0
     ? `$${fmtMktPrice(item.price)}`
     : '—';
+  const chart = renderSparkline(generateSparkline(item.change ?? 0), (item.change ?? 0) >= 0);
   return `
     <div class="market-row">
       <div class="market-left">
         <div class="market-icon">${item.symbol.charAt(0)}</div>
         <div class="market-symbol">${item.symbol}</div>
       </div>
+      <div class="market-chart">${chart}</div>
       <div class="market-right">
         <div class="market-price">${price}</div>
       </div>
