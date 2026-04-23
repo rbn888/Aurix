@@ -4218,6 +4218,26 @@ function renderMarket() {
           spellcheck="false"
         />
       </div>
+      <div class="market-metrics-header">
+        <div class="market-metrics-scroll">
+          <div class="market-metric-card">
+            <div class="label">Market Cap</div>
+            <div class="value" id="metricMarketCap">—</div>
+          </div>
+          <div class="market-metric-card">
+            <div class="label">Fear &amp; Greed</div>
+            <div class="value" id="metricFearGreed">—</div>
+          </div>
+          <div class="market-metric-card">
+            <div class="label">BTC Dominance</div>
+            <div class="value" id="metricBTCdom">—</div>
+          </div>
+          <div class="market-metric-card">
+            <div class="label">Liquidations</div>
+            <div class="value" id="metricLiquidations">—</div>
+          </div>
+        </div>
+      </div>
       <div class="market-tabs">
         <button class="market-tab active" data-market="crypto">Cripto</button>
         <button class="market-tab" data-market="stocks">Acciones</button>
@@ -4246,6 +4266,10 @@ function renderMarket() {
       <div id="marketList" class="market-section"></div>
     </div>
   `;
+  document.getElementById('metricMarketCap').textContent = '$2.5T';
+  document.getElementById('metricFearGreed').textContent = '59';
+  document.getElementById('metricBTCdom').textContent = '52%';
+  document.getElementById('metricLiquidations').textContent = '$120M';
   currentMarketTab = 'crypto';
   initMarketTabs();
   initMarketSearch();

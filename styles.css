@@ -5740,3 +5740,35 @@ main { padding-bottom: 72px; }
   color: rgba(255,255,255,0.4);
   font-size: 13px;
 }
+
+/* Market metrics header */
+.market-metrics-scroll {
+  display: flex;
+  overflow-x: auto;
+  gap: 12px;
+  padding: 12px 16px;
+  scrollbar-width: none;
+}
+
+.market-metrics-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.market-metric-card {
+  min-width: 140px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 12px;
+  padding: 12px;
+  backdrop-filter: blur(8px);
+}
+
+.market-metric-card .label {
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+}
+
+.market-metric-card .value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
