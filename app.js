@@ -4273,6 +4273,7 @@ function renderMarket() {
   if (!container) return;
   container.innerHTML = `
     <div class="market-screen">
+      <div class="market-ticker-strip" id="marketTickerStrip"></div>
       <div class="market-header">
         <div class="market-title">${t('tabMarket')}</div>
         <div class="market-subtitle">${t('market_subtitle')}</div>
@@ -4349,8 +4350,25 @@ function renderMarket() {
   ensureMarketData();
 }
 
+function renderMarketTickerStrip() {
+  const el = document.getElementById('marketTickerStrip');
+  if (!el || !MARKET_DATA.length) return;
+  const picks = ['BTC', 'ETH', 'SPY', 'XAUUSD']
+    .map(sym => MARKET_DATA.find(d => normalizeSymbol(d.symbol) === normalizeSymbol(sym)))
+    .filter(Boolean);
+  if (!picks.length) return;
+  el.innerHTML = picks.map(item => {
+    const chg = item.change24h ?? item.change ?? null;
+    if (chg === null) return `<span>${item.symbol}</span>`;
+    const cls  = chg >= 0 ? 't-up' : 't-down';
+    const sign = chg >= 0 ? '+' : '';
+    return `${item.symbol}&nbsp;<span class="${cls}">${sign}${chg.toFixed(1)}%</span>`;
+  }).join('&ensp;·&ensp;');
+}
+
 function renderMyAssetsBlock() {
   renderFeaturedBlock();
+  renderMarketTickerStrip();
   const container = document.getElementById('marketMyAssets');
   if (!container) return;
   const watchedSet = new Set(getWatchlist().map(normalizeSymbol));
@@ -4405,7 +4423,13 @@ function updateMarketHeader() {
   if (!config) return;
   Object.entries(config).forEach(([id, fn]) => {
     const el = document.getElementById(id);
-    if (el) el.textContent = fn();
+    if (!el) return;
+    const newVal = fn();
+    if (el.textContent === newVal) return;
+    el.textContent = newVal;
+    el.classList.remove('value-flash-up', 'value-flash-down');
+    void el.offsetWidth; // force reflow
+    el.classList.add('value-flash-up');
   });
 }
 
