@@ -5879,25 +5879,34 @@ main { padding-bottom: 72px; }
 
 @media (min-width: 1024px) {
   .market-screen {
-    max-width: 1400px;
+    max-width: 1600px;
     margin: 0 auto;
-    padding: 0 24px;
+    padding: 0 32px;
   }
 
   .market-body {
     display: grid;
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: 2fr 1fr;
     gap: 24px;
+    align-items: start;
   }
 
   .market-main {
     width: 100%;
   }
 
+  .market-main > * {
+    margin-bottom: 24px;
+  }
+
   .market-sidebar {
     position: sticky;
     top: 80px;
     height: fit-content;
+  }
+
+  .market-sidebar > * {
+    margin-bottom: 24px;
   }
 
   .market-featured {

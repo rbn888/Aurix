@@ -4316,11 +4316,11 @@ function renderMarket() {
       </div>
       <div class="market-body">
         <div class="market-main">
-          <div id="marketInsights"></div>
           <div class="market-featured" id="marketFeatured"></div>
           <div id="marketList" class="market-section"></div>
         </div>
         <div class="market-sidebar">
+          <div id="marketInsights"></div>
           <div id="marketMyAssets"></div>
         </div>
       </div>
