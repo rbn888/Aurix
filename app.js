@@ -4278,25 +4278,31 @@ function renderMarket() {
         <button class="market-tab" data-market="indices">Índices</button>
         <button class="market-tab" data-market="commodities">Materias</button>
       </div>
-      <div class="market-featured" id="marketFeatured">
-        <div class="featured-card">
-          <div>BTC</div>
-          <div>$97,000</div>
-          <div class="green">+1.2%</div>
+      <div class="market-body">
+        <div class="market-main">
+          <div class="market-featured" id="marketFeatured">
+            <div class="featured-card">
+              <div>BTC</div>
+              <div>$97,000</div>
+              <div class="green">+1.2%</div>
+            </div>
+            <div class="featured-card">
+              <div>SPY</div>
+              <div>$520</div>
+              <div class="green">+0.4%</div>
+            </div>
+            <div class="featured-card">
+              <div>Gold</div>
+              <div>$2,350</div>
+              <div class="red">-0.2%</div>
+            </div>
+          </div>
+          <div id="marketList" class="market-section"></div>
         </div>
-        <div class="featured-card">
-          <div>SPY</div>
-          <div>$520</div>
-          <div class="green">+0.4%</div>
-        </div>
-        <div class="featured-card">
-          <div>Gold</div>
-          <div>$2,350</div>
-          <div class="red">-0.2%</div>
+        <div class="market-sidebar">
+          <div id="marketMyAssets"></div>
         </div>
       </div>
-      <div id="marketMyAssets"></div>
-      <div id="marketList" class="market-section"></div>
     </div>
   `;
   currentMarketTab = 'crypto';
