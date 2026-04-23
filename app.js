@@ -4301,6 +4301,56 @@ function renderMarketMetrics() {
   });
 }
 
+// ── Market snapshot helpers ────────────────────────────────
+function findAsset(symbol) {
+  try {
+    if (!MARKET_DATA) return null;
+    if (Array.isArray(MARKET_DATA)) return MARKET_DATA.find(x => x.symbol === symbol);
+    return MARKET_DATA[symbol] || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function formatPrice(val) {
+  if (typeof val !== 'number') return '--';
+  if (val > 1000) return '$' + val.toLocaleString();
+  return '$' + val.toFixed(2);
+}
+
+function formatChange(val) {
+  if (typeof val !== 'number') return '--';
+  return val.toFixed(2) + '%';
+}
+
+function getChangeClass(val) {
+  if (typeof val !== 'number') return '';
+  return val >= 0 ? 'pos' : 'neg';
+}
+
+function renderMarketSnapshot() {
+  const snapshotAssets = [
+    { symbol: 'BTC',    label: 'Bitcoin'  },
+    { symbol: 'ETH',    label: 'Ethereum' },
+    { symbol: 'SPY',    label: 'S&P 500'  },
+    { symbol: 'XAUUSD', label: 'Gold'     }
+  ];
+
+  const html = snapshotAssets.map(a => {
+    const item   = findAsset(a.symbol);
+    const price  = formatPrice(item?.price);
+    const change = item?.change24h;
+    return `
+      <div class="snapshot-card">
+        <div class="name">${a.label}</div>
+        <div class="price">${price}</div>
+        <div class="change ${getChangeClass(change)}">${formatChange(change)}</div>
+      </div>`;
+  }).join('');
+
+  return `<div class="snapshot-scroll">${html}</div>`;
+}
+
 // ── Market tab ─────────────────────────────────────────────
 function renderMarket() {
   const container = document.getElementById('tabPlaceholder');
@@ -4347,29 +4397,17 @@ function renderMarket() {
         <button class="market-tab" data-market="indices">Índices</button>
         <button class="market-tab" data-market="commodities">Materias</button>
       </div>
-      <div class="market-featured" id="marketFeatured">
-        <div class="featured-card">
-          <div>BTC</div>
-          <div>$97,000</div>
-          <div class="green">+1.2%</div>
-        </div>
-        <div class="featured-card">
-          <div>SPY</div>
-          <div>$520</div>
-          <div class="green">+0.4%</div>
-        </div>
-        <div class="featured-card">
-          <div>Gold</div>
-          <div>$2,350</div>
-          <div class="red">-0.2%</div>
-        </div>
-      </div>
+      <div id="marketSnapshot"></div>
       <div id="marketMyAssets"></div>
       <div id="marketList" class="market-section"></div>
     </div>
   `;
   currentMarketTab = 'crypto';
   renderMarketMetrics();
+  requestAnimationFrame(() => {
+    const el = document.getElementById('marketSnapshot');
+    if (el) el.innerHTML = renderMarketSnapshot();
+  });
   initMarketTabs();
   initMarketSearch();
   // Event delegation for star toggles — set once, covers all dynamic rows
@@ -4468,6 +4506,8 @@ function initMarketTabs() {
       currentMarketTab = type;
       updateMarketTabUI();
       renderMarketMetrics();
+      const snap = document.getElementById('marketSnapshot');
+      if (snap) snap.innerHTML = renderMarketSnapshot();
       renderMarketByType(type);
     });
   });
