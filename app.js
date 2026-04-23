@@ -4438,8 +4438,11 @@ function renderMarket() {
         <button class="market-tab" data-market="indices">Índices</button>
         <button class="market-tab" data-market="commodities">Materias</button>
       </div>
-      <div id="marketSnapshot"></div>
-      <div id="marketMovers"></div>
+      <div class="market-intelligence">
+        <div class="market-intelligence-title">Market Overview</div>
+        <div id="marketSnapshot"></div>
+        <div id="marketMovers"></div>
+      </div>
       <div id="marketMyAssets"></div>
       <div id="marketList" class="market-section"></div>
     </div>
