@@ -158,6 +158,21 @@ const T = {
     tabInsights: 'Insights',
     tabMarket:   'Mercado',
     tabProfile:  'Perfil',
+    // Market screen
+    market_subtitle:   'Activos en tiempo real',
+    market_search_ph:  'Buscar BTC, Apple, SPY...',
+    market_cap:        'Capitalización',
+    fear_greed:        'Miedo y Codicia',
+    btc_dom:           'Dominancia BTC',
+    liquidations:      'Liquidaciones',
+    tab_crypto:        'Cripto',
+    tab_stocks:        'Acciones',
+    tab_etfs:          'ETFs',
+    tab_indices:       'Índices',
+    tab_commodities:   'Materias',
+    empty_watchlist:   'Añade activos ⭐ para seguirlos aquí',
+    market_no_results: 'Sin resultados',
+    stale:             'sin actualizar',
     // Beta screen
     exit: 'Salir',
   },
@@ -314,6 +329,21 @@ const T = {
     tabInsights: 'Insights',
     tabMarket:   'Market',
     tabProfile:  'Profile',
+    // Market screen
+    market_subtitle:   'Real-time assets',
+    market_search_ph:  'Search BTC, Apple, SPY...',
+    market_cap:        'Market Cap',
+    fear_greed:        'Fear & Greed',
+    btc_dom:           'BTC Dominance',
+    liquidations:      'Liquidations',
+    tab_crypto:        'Crypto',
+    tab_stocks:        'Stocks',
+    tab_etfs:          'ETFs',
+    tab_indices:       'Indices',
+    tab_commodities:   'Commodities',
+    empty_watchlist:   'Add assets ⭐ to track them here',
+    market_no_results: 'No results',
+    stale:             'stale data',
     // Beta screen
     exit: 'Exit',
   },
@@ -348,16 +378,21 @@ function switchLang(newLang) {
   if (newLang === lang) return;
   lang = newLang;
   localStorage.setItem(LANG_KEY, lang);
+  document.documentElement.lang = lang;
   document.querySelectorAll('[data-lang]').forEach(b => {
     b.classList.toggle('active', b.dataset.lang === lang);
   });
   applyI18n();
   applyTypeMetaLabels();
-  render();
-  updateDonut();
-  if (_lastUpdateState) setUpdateStatus(_lastUpdateState);
-  const af = document.querySelector('.filter-btn.active')?.dataset.filter || 'all';
-  searchInput.placeholder = T[lang].searchPH[af] || T[lang].searchPH.all;
+  if (currentTab === 'market') {
+    renderMarket();
+  } else {
+    render();
+    updateDonut();
+    if (_lastUpdateState) setUpdateStatus(_lastUpdateState);
+    const af = document.querySelector('.filter-btn.active')?.dataset.filter || 'all';
+    searchInput.placeholder = T[lang].searchPH[af] || T[lang].searchPH.all;
+  }
 }
 
 // ── State ──────────────────────────────────────────────────
@@ -4239,14 +4274,14 @@ function renderMarket() {
   container.innerHTML = `
     <div class="market-screen">
       <div class="market-header">
-        <div class="market-title">Mercado</div>
-        <div class="market-subtitle">Activos en tiempo real</div>
+        <div class="market-title">${t('tabMarket')}</div>
+        <div class="market-subtitle">${t('market_subtitle')}</div>
       </div>
       <div class="market-search-wrap">
         <input
           type="text"
           id="marketSearchInput"
-          placeholder="Buscar BTC, Apple, SPY..."
+          placeholder="${t('market_search_ph')}"
           autocomplete="off"
           spellcheck="false"
         />
@@ -4254,29 +4289,29 @@ function renderMarket() {
       <div class="market-metrics-header">
         <div class="market-metrics-scroll">
           <div class="market-metric-card">
-            <div class="label">Market Cap</div>
+            <div class="label">${t('market_cap')}</div>
             <div class="value" id="metricMarketCap">—</div>
           </div>
           <div class="market-metric-card">
-            <div class="label">Fear &amp; Greed</div>
+            <div class="label">${t('fear_greed')}</div>
             <div class="value" id="metricFearGreed">—</div>
           </div>
           <div class="market-metric-card">
-            <div class="label">BTC Dominance</div>
+            <div class="label">${t('btc_dom')}</div>
             <div class="value" id="metricBTCdom">—</div>
           </div>
           <div class="market-metric-card">
-            <div class="label">Liquidations</div>
+            <div class="label">${t('liquidations')}</div>
             <div class="value" id="metricLiquidations">—</div>
           </div>
         </div>
       </div>
       <div class="market-tabs">
-        <button class="market-tab active" data-market="crypto">Cripto</button>
-        <button class="market-tab" data-market="stocks">Acciones</button>
-        <button class="market-tab" data-market="etfs">ETFs</button>
-        <button class="market-tab" data-market="indices">Índices</button>
-        <button class="market-tab" data-market="commodities">Materias</button>
+        <button class="market-tab active" data-market="crypto">${t('tab_crypto')}</button>
+        <button class="market-tab" data-market="stocks">${t('tab_stocks')}</button>
+        <button class="market-tab" data-market="etfs">${t('tab_etfs')}</button>
+        <button class="market-tab" data-market="indices">${t('tab_indices')}</button>
+        <button class="market-tab" data-market="commodities">${t('tab_commodities')}</button>
       </div>
       <div class="market-body">
         <div class="market-main">
@@ -4334,7 +4369,7 @@ function renderMyAssetsBlock() {
   const watchedSet = new Set(getWatchlist().map(normalizeSymbol));
   const filtered   = MARKET_DATA.filter(item => watchedSet.has(normalizeSymbol(item.symbol)));
   if (!filtered.length) {
-    container.innerHTML = `<div class="empty-watchlist">Añade activos ⭐ para seguirlos aquí</div>`;
+    container.innerHTML = `<div class="empty-watchlist">${t('empty_watchlist')}</div>`;
     return;
   }
   const sorted = [...filtered].sort((a, b) => {
@@ -4348,7 +4383,7 @@ function renderMyAssetsBlock() {
   });
   container.innerHTML = `
     <div class="market-section">
-      <div class="market-section-title">My Assets</div>
+      <div class="market-section-title">${t('myAssets')}</div>
       ${sorted.map(renderStockItem).join('')}
     </div>
   `;
@@ -4372,7 +4407,7 @@ function renderSearchResults(results) {
   const container = document.getElementById('marketList');
   if (!container) return;
   if (!results.length) {
-    container.innerHTML = '<div class="market-empty">Sin resultados</div>';
+    container.innerHTML = `<div class="market-empty">${t('market_no_results')}</div>`;
     return;
   }
   container.innerHTML = results.map(item => {
@@ -4497,7 +4532,7 @@ function renderGenericList(title, data) {
   const container = document.getElementById('marketList');
   if (!container) return;
   const hasFallback = data.some(d => d.fallback);
-  const badge = hasFallback ? '<span class="market-badge">sin actualizar</span>' : '';
+  const badge = hasFallback ? `<span class="market-badge">${t('stale')}</span>` : '';
   container.innerHTML = `
     <div class="market-section-header">${title} ${badge}</div>
     ${data.map(item => renderStockItem(item)).join('')}
@@ -4508,7 +4543,7 @@ function renderFallbackList(title, symbols) {
   const container = document.getElementById('marketList');
   if (!container) return;
   container.innerHTML = `
-    <div class="market-section-header">${title} <span class="market-badge">sin actualizar</span></div>
+    <div class="market-section-header">${title} <span class="market-badge">${t('stale')}</span></div>
     ${symbols.map(s => `
       <div class="market-row">
         <div class="market-left">
@@ -4579,7 +4614,7 @@ function renderCryptoList(data, stale = false) {
   const el = document.getElementById('marketList');
   if (!el) return;
   el.innerHTML = `
-    <div class="market-section-title">Cripto${stale ? ' <span class="market-stale">sin actualizar</span>' : ''}</div>
+    <div class="market-section-title">${t('tab_crypto')}${stale ? ` <span class="market-stale">${t('stale')}</span>` : ''}</div>
     ${data.map(c => {
       const chg     = c.price_change_percentage_24h ?? 0;
       const chart   = renderSparkline(generateSparkline(chg), chg >= 0);
@@ -4685,9 +4720,9 @@ async function loadStocks() {
 function renderStocks(data, isFallback = false) {
   const container = document.getElementById('marketList');
   if (!container) return;
-  const badge = isFallback ? '<span class="market-badge">sin actualizar</span>' : '';
+  const badge = isFallback ? `<span class="market-badge">${t('stale')}</span>` : '';
   container.innerHTML = `
-    <div class="market-section-header">ACCIONES ${badge}</div>
+    <div class="market-section-header">${t('tab_stocks').toUpperCase()} ${badge}</div>
     ${data.map(renderStockItem).join('')}
   `;
 }
