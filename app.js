@@ -5671,6 +5671,11 @@ document.addEventListener('click', e => {
 
 document.addEventListener('click', trackInteraction);
 
+// Logo → home
+document.getElementById('logoHome')?.addEventListener('click', () => {
+  if (typeof switchTab === 'function') switchTab('home');
+});
+
 // ── Modal ──────────────────────────────────────────────────
 
 // Opens the add-asset modal pre-filtered to the given category type.
