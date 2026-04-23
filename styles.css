@@ -5852,3 +5852,62 @@ main { padding-bottom: 72px; }
   padding: 0 16px;
   margin-bottom: 6px;
 }
+
+/* ── Market Layout Expansion ───────────────────────────── */
+
+/* Step 1+2 — max-width + center via .market-screen (= market-container) */
+.market-screen {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Step 3 — snapshot grid */
+.snapshot-scroll {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  overflow: visible;
+  scroll-snap-type: none;
+}
+
+/* Step 4 — movers grid (already flex side-by-side; enforce grid) */
+.market-movers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Step 5 — header emphasis */
+.market-metrics-scroll {
+  gap: 16px;
+  padding: 16px;
+}
+
+.market-metric-card {
+  min-width: 160px;
+  padding: 16px;
+}
+
+/* Step 6 — search prominence */
+.market-search-wrap {
+  margin: 16px 0;
+}
+
+.market-search-wrap input {
+  height: 44px;
+  font-size: 15px;
+}
+
+/* Step 7 — consistent spacing */
+.market-section {
+  margin-bottom: 20px;
+}
+
+/* Responsive: restore horizontal scroll on narrow screens */
+@media (max-width: 600px) {
+  .snapshot-scroll {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+}
