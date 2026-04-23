@@ -4446,6 +4446,9 @@ function renderMarketTickerStrip() {
 }
 
 function renderMyAssetsBlock() {
+  if (!document.getElementById('marketList')) return;
+  const _listType = _TAB_TO_TYPE[currentMarketTab];
+  if (_listType) renderFromCache(_listType);
   renderFeaturedBlock();
   renderMarketTickerStrip();
   requestAnimationFrame(renderMarketInsights);
@@ -4469,7 +4472,7 @@ function renderMyAssetsBlock() {
   container.innerHTML = `
     <div class="market-section">
       <div class="market-section-title">${t('myAssets')}</div>
-      ${sorted.map(renderStockItem).join('')}
+      ${sorted.map(renderMarketItem).join('')}
     </div>
   `;
 }
@@ -4495,7 +4498,7 @@ function renderSearchResults(results) {
     container.innerHTML = `<div class="market-empty">${t('market_no_results')}</div>`;
     return;
   }
-  container.innerHTML = results.map(renderStockItem).join('');
+  container.innerHTML = results.map(renderMarketItem).join('');
 }
 
 function updateMarketHeader() {
@@ -4514,33 +4517,42 @@ function updateMarketHeader() {
 }
 
 const _TYPE_LABEL = {
-  crypto: () => t('tab_crypto'), stock: () => t('tab_stocks'),
-  etf: () => t('tab_etfs'), index: () => t('tab_indices'), commodity: () => t('tab_commodities'),
+  crypto: () => t('tab_crypto'), stocks: () => t('tab_stocks'),
+  etfs: () => t('tab_etfs'), indices: () => t('tab_indices'), commodities: () => t('tab_commodities'),
 };
-const _TAB_TO_TYPE = { crypto: 'crypto', stocks: 'stock', etfs: 'etf', indices: 'index', commodities: 'commodity' };
+const _TAB_TO_TYPE = { crypto: 'crypto', stocks: 'stocks', etfs: 'etfs', indices: 'indices', commodities: 'commodities' };
 
 function renderFromCache(type) {
-  const cached = MARKET_DATA.filter(d => d.type === type);
-  if (!cached.length) return false;
-  const container = document.getElementById('marketList');
-  if (!container) return false;
+  console.log('[market] FILTER TYPE:', type);
+  console.log('[market] MARKET_DATA FULL:', MARKET_DATA);
+  const items = MARKET_DATA.filter(d => d.type?.toLowerCase() === type?.toLowerCase());
+  console.log('[market] CACHE ITEMS:', type, items);
+  const el = document.getElementById('marketList');
+  if (!el) return false;
+  if (!items.length) return false;
   const label = _TYPE_LABEL[type]?.() ?? type;
-  container.innerHTML = `
-    <div class="market-section-header">${label}</div>
-    ${cached.map(renderStockItem).join('')}
-  `;
+  el.innerHTML = `<div class="market-section-header">${label}</div>${items.map(renderMarketItem).join('')}`;
   return true;
 }
 
 function ensureMarketData() {
+  if (!document.getElementById('marketList')) return;
+  console.log('[market] ensureMarketData start', currentMarketTab);
   const type = _TAB_TO_TYPE[currentMarketTab];
-  if (type && renderFromCache(type)) return; // cache hit — no fetch needed
-  switch (currentMarketTab) {
-    case 'crypto':      loadCrypto();      break;
-    case 'stocks':      loadStocks();      break;
-    case 'etfs':        loadETFs();        break;
-    case 'indices':     loadIndices();     break;
-    case 'commodities': loadCommodities(); break;
+  const cacheHit = type
+    ? MARKET_DATA.some(d => d.type?.toLowerCase() === type.toLowerCase())
+    : false;
+  console.log('[market] cacheHit:', cacheHit);
+  if (!cacheHit) {
+    switch (currentMarketTab) {
+      case 'crypto':      loadCrypto();      break;
+      case 'stocks':      loadStocks();      break;
+      case 'etfs':        loadETFs();        break;
+      case 'indices':     loadIndices();     break;
+      case 'commodities': loadCommodities(); break;
+    }
+  } else {
+    renderMyAssetsBlock();
   }
 }
 
@@ -4635,22 +4647,22 @@ async function _loadGeneric(title, symbols, fallbackMap, searchType) {
       })
     );
     console.log(`[market] normalized sample (${searchType}):`, results[0]);
-    renderGenericList(title, results);
     MARKET_DATA = [...MARKET_DATA.filter(d => d.type !== searchType), ...results];
     marketSearchData = [
       ...marketSearchData.filter(a => a.type !== searchType),
       ...results.map(s => ({ symbol: s.symbol, name: s.name, price: s.price, type: searchType }))
     ];
+    console.log('[market] AFTER LOAD:', currentMarketTab, MARKET_DATA);
     renderMyAssetsBlock();
   } catch (err) {
     console.error(`[market] ${title} error:`, err);
-    renderFallbackList(title, symbols);
+    renderMyAssetsBlock();
   }
 }
 
-async function loadETFs()        { await _loadGeneric('ETFs',       MARKET_ETFS,        FALLBACK_PRICES,  'etf');       }
-async function loadIndices()     { await _loadGeneric('Índices',    MARKET_INDICES,     INDEX_FALLBACKS,  'index');     }
-async function loadCommodities() { await _loadGeneric('Materias',   MARKET_COMMODITIES, COMMODITY_FALLBACKS, 'commodity'); }
+async function loadETFs()        { await _loadGeneric('ETFs',       MARKET_ETFS,        FALLBACK_PRICES,  'etfs');       }
+async function loadIndices()     { await _loadGeneric('Índices',    MARKET_INDICES,     INDEX_FALLBACKS,  'indices');     }
+async function loadCommodities() { await _loadGeneric('Materias',   MARKET_COMMODITIES, COMMODITY_FALLBACKS, 'commodities'); }
 
 function renderGenericList(title, data) {
   const container = document.getElementById('marketList');
@@ -4659,7 +4671,7 @@ function renderGenericList(title, data) {
   const badge = hasFallback ? `<span class="market-badge">${t('stale')}</span>` : '';
   container.innerHTML = `
     <div class="market-section-header">${title} ${badge}</div>
-    ${data.map(item => renderStockItem(item)).join('')}
+    ${data.map(item => renderMarketItem(item)).join('')}
   `;
 }
 
@@ -4772,37 +4784,47 @@ function renderCryptoList(data, stale = false) {
   `;
 }
 
+function _setCryptoData(raw) {
+  const cryptoItems = raw.map(c => {
+    const chg = c.price_change_percentage_24h ?? 0;
+    return { symbol: c.symbol.toUpperCase(), name: c.name,
+      price: c.current_price, change: chg, change24h: chg, type: 'crypto' };
+  });
+  marketSearchData = [
+    ...marketSearchData.filter(a => a.type !== 'crypto'),
+    ...cryptoItems.map(c => ({ symbol: c.symbol, name: c.name, price: c.price, type: 'crypto' }))
+  ];
+  MARKET_DATA = [...MARKET_DATA.filter(d => d.type !== 'crypto'), ...cryptoItems];
+  console.log('[market] AFTER LOAD:', currentMarketTab, MARKET_DATA);
+  renderMyAssetsBlock();
+}
+
 async function loadCrypto() {
   const el = document.getElementById('marketList');
   if (!el) return;
+  el.innerHTML = '<div class="market-loading">Cargando crypto...</div>';
   try {
+    console.log('[market] fetching crypto...');
     const res = await fetch(
-      'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10',
-      { signal: AbortSignal.timeout(8000), headers: { Accept: 'application/json' } }
+      'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10'
     );
+    console.log('[market] fetch status:', res.status);
     if (res.status === 429) {
       console.warn('[market] CoinGecko rate limit — using fallback');
-      renderCryptoList(CRYPTO_FALLBACK, true);
+      _setCryptoData(CRYPTO_FALLBACK);
       return;
     }
     if (!res.ok) throw new Error(`http_${res.status}`);
-    const data = await res.json();
-    console.log('[market] CRYPTO RAW sample:', data[0]);
-    const cryptoItems = data.map(c => {
-      const chg = c.price_change_percentage_24h ?? 0;
-      return { symbol: c.symbol.toUpperCase(), name: c.name,
-        price: c.current_price, change: chg, change24h: chg, type: 'crypto' };
-    });
-    marketSearchData = [
-      ...marketSearchData.filter(a => a.type !== 'crypto'),
-      ...cryptoItems.map(c => ({ symbol: c.symbol, name: c.name, price: c.price, type: 'crypto' }))
-    ];
-    MARKET_DATA = [...MARKET_DATA.filter(d => d.type !== 'crypto'), ...cryptoItems];
-    renderCryptoList(data);
-    renderMyAssetsBlock();
+    let data = await res.json();
+    console.log('[market] API response sample:', data?.[0]);
+    if (!data || !data.length) {
+      console.warn('[market] API empty, using fallback');
+      data = CRYPTO_FALLBACK;
+    }
+    _setCryptoData(data);
   } catch (e) {
     console.error('[market] Crypto fetch failed:', e.message);
-    renderCryptoList(CRYPTO_FALLBACK, true);
+    _setCryptoData(CRYPTO_FALLBACK);
   }
 }
 
@@ -4818,36 +4840,35 @@ async function loadStocks() {
         try {
           const data = await fetchTwelveData(symbol);
           if (!data?.price) throw new Error('no price');
-          return normalizeMarketData({ price: data.price }, 'stock', symbol);
+          return normalizeMarketData({ price: data.price }, 'stocks', symbol);
         } catch {
           const fb = getFallbackData(symbol);
           return normalizeMarketData(
             fb ? { price: fb.price, percent_change_24h: fb.change24h, fallback: true } : null,
-            'stock', symbol
+            'stocks', symbol
           );
         }
       })
     );
-    console.log('[market] normalized sample (stock):', results[0]);
-    renderStocks(results, results.every(r => r.fallback));
-    MARKET_DATA = [...MARKET_DATA.filter(d => d.type !== 'stock'), ...results];
+    console.log('[market] normalized sample (stocks):', results[0]);
+    MARKET_DATA = [...MARKET_DATA.filter(d => d.type !== 'stocks'), ...results];
     marketSearchData = [
-      ...marketSearchData.filter(a => a.type !== 'stock'),
-      ...results.map(s => ({ symbol: s.symbol, name: s.name, price: s.price, type: 'stock' }))
+      ...marketSearchData.filter(a => a.type !== 'stocks'),
+      ...results.map(s => ({ symbol: s.symbol, name: s.name, price: s.price, type: 'stocks' }))
     ];
+    console.log('[market] AFTER LOAD:', currentMarketTab, MARKET_DATA);
     renderMyAssetsBlock();
   } catch (err) {
     console.error('[market] stocks load error:', err);
-    renderStocks(
-      MARKET_STOCKS.map(symbol => {
-        const fb = getFallbackData(symbol);
-        return normalizeMarketData(
-          fb ? { price: fb.price, percent_change_24h: fb.change24h, fallback: true } : null,
-          'stock', symbol
-        );
-      }),
-      true
-    );
+    const fallback = MARKET_STOCKS.map(symbol => {
+      const fb = getFallbackData(symbol);
+      return normalizeMarketData(
+        fb ? { price: fb.price, percent_change_24h: fb.change24h, fallback: true } : null,
+        'stocks', symbol
+      );
+    });
+    MARKET_DATA = [...MARKET_DATA.filter(d => d.type !== 'stocks'), ...fallback];
+    renderMyAssetsBlock();
   }
 }
 
@@ -4857,11 +4878,11 @@ function renderStocks(data, isFallback = false) {
   const badge = isFallback ? `<span class="market-badge">${t('stale')}</span>` : '';
   container.innerHTML = `
     <div class="market-section-header">${t('tab_stocks').toUpperCase()} ${badge}</div>
-    ${data.map(renderStockItem).join('')}
+    ${data.map(renderMarketItem).join('')}
   `;
 }
 
-function renderStockItem(item) {
+function renderMarketItem(item) {
   const price    = safePrice(item.price);
   const chg      = item.change24h ?? item.change ?? null;
   const chgStr   = chg !== null ? `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%` : '—';
