@@ -5672,7 +5672,9 @@ document.addEventListener('click', e => {
 document.addEventListener('click', trackInteraction);
 
 // Logo → home
-document.getElementById('logoHome')?.addEventListener('click', () => {
+document.addEventListener('click', (e) => {
+  const logo = e.target.closest('#logoHome');
+  if (!logo) return;
   if (typeof switchTab === 'function') switchTab('home');
 });
 
