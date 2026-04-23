@@ -971,6 +971,39 @@ let currentTab       = 'home';
 let currentMarketTab = 'crypto';
 let marketSearchData = [];
 let MARKET_DATA      = [];
+
+const MARKET_HEADER_CONFIG = {
+  crypto: {
+    metricMarketCap:    () => MARKET_METRICS_CACHE?.marketCap    || '$2.5T',
+    metricFearGreed:    () => MARKET_METRICS_CACHE?.fearGreed    || '59',
+    metricBTCdom:       () => MARKET_METRICS_CACHE?.btcDom       || '52%',
+    metricLiquidations: () => MARKET_METRICS_CACHE?.liquidations || '$120M',
+  },
+  stocks: {
+    metricMarketCap:    () => '5,200',
+    metricFearGreed:    () => '16,400',
+    metricBTCdom:       () => '18.2',
+    metricLiquidations: () => '62%',
+  },
+  etfs: {
+    metricMarketCap:    () => '$520',
+    metricFearGreed:    () => '$1.2B',
+    metricBTCdom:       () => 'QQQ',
+    metricLiquidations: () => '$80B',
+  },
+  indices: {
+    metricMarketCap:    () => '5,200',
+    metricFearGreed:    () => '39,400',
+    metricBTCdom:       () => '18.2',
+    metricLiquidations: () => '8,200',
+  },
+  commodities: {
+    metricMarketCap:    () => '$2,300',
+    metricFearGreed:    () => '$78',
+    metricBTCdom:       () => '104',
+    metricLiquidations: () => '3.1%',
+  },
+};
 let showAllTx        = false;
 let insightIndex        = 0;
 let insightCache            = [];
@@ -4266,11 +4299,8 @@ function renderMarket() {
       <div id="marketList" class="market-section"></div>
     </div>
   `;
-  document.getElementById('metricMarketCap').textContent = '$2.5T';
-  document.getElementById('metricFearGreed').textContent = '59';
-  document.getElementById('metricBTCdom').textContent = '52%';
-  document.getElementById('metricLiquidations').textContent = '$120M';
   currentMarketTab = 'crypto';
+  updateMarketHeader();
   initMarketTabs();
   initMarketSearch();
   // Event delegation for star toggles — set once, covers all dynamic rows
@@ -4361,6 +4391,15 @@ function renderSearchResults(results) {
   }).join('');
 }
 
+function updateMarketHeader() {
+  const config = MARKET_HEADER_CONFIG[currentMarketTab];
+  if (!config) return;
+  Object.entries(config).forEach(([id, fn]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = fn();
+  });
+}
+
 function initMarketTabs() {
   document.querySelectorAll('.market-tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -4368,6 +4407,7 @@ function initMarketTabs() {
       if (!type || type === currentMarketTab) return;
       currentMarketTab = type;
       updateMarketTabUI();
+      updateMarketHeader();
       renderMarketByType(type);
     });
   });
