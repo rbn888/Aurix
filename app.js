@@ -4363,31 +4363,48 @@ function generateMarketInsights() {
   if (tab === 'crypto' || tab === 'indices' || !tab) {
     const btc = _findMktItem('BTC');
     const eth = _findMktItem('ETH');
-    if (btc?.change24h > 2)  insights.push({ type: 'bullish', text: 'Crypto showing strength' });
-    if (btc?.change24h < -2) insights.push({ type: 'bearish', text: 'Crypto under pressure' });
+    if (btc?.change24h > 2)
+      insights.push({ type: 'bullish', text: 'Crypto showing strength',
+        signal: 'Momentum building — watch BTC breakout' });
+    if (btc?.change24h < -2)
+      insights.push({ type: 'bearish', text: 'Crypto under pressure',
+        signal: 'Watch for support levels — volatility elevated' });
     if (eth && btc && Math.abs((eth.change24h ?? 0) - (btc.change24h ?? 0)) > 3)
-      insights.push({ type: 'neutral', text: 'Altcoin divergence detected' });
+      insights.push({ type: 'neutral', text: 'Altcoin divergence detected',
+        signal: 'ETH moving independently from BTC — watch spreads' });
   }
 
   if (tab === 'stocks' || tab === 'indices' || !tab) {
     const spy = _findMktItem('SPY');
-    if (spy?.change24h > 1)  insights.push({ type: 'bullish', text: 'Equities rallying' });
-    if (spy?.change24h < -1) insights.push({ type: 'bearish', text: 'Equities under pressure' });
+    if (spy?.change24h > 1)
+      insights.push({ type: 'bullish', text: 'Equities rallying',
+        signal: 'Broad market strength — risk-on momentum' });
+    if (spy?.change24h < -1)
+      insights.push({ type: 'bearish', text: 'Equities under pressure',
+        signal: 'Risk-off sentiment — watch defensive assets' });
   }
 
   if (tab === 'commodities' || !tab) {
     const gold = _findMktItem('XAUUSD');
-    if (gold?.change24h > 1)  insights.push({ type: 'neutral', text: 'Gold rising — risk-off signal' });
-    if (gold?.change24h < -1) insights.push({ type: 'neutral', text: 'Gold falling — risk-on mood' });
+    if (gold?.change24h > 1)
+      insights.push({ type: 'neutral', text: 'Gold rising',
+        signal: 'Possible hedge demand increasing — risk-off signal' });
+    if (gold?.change24h < -1)
+      insights.push({ type: 'neutral', text: 'Gold falling',
+        signal: 'Risk-on mood — capital rotating to equities' });
   }
 
   if (tab === 'etfs') {
     const qqq = _findMktItem('QQQ');
-    if (qqq?.change24h > 1.5) insights.push({ type: 'bullish', text: 'Tech ETFs outperforming' });
-    if (qqq?.change24h < -1)  insights.push({ type: 'bearish', text: 'Tech ETFs selling off' });
+    if (qqq?.change24h > 1.5)
+      insights.push({ type: 'bullish', text: 'Tech ETFs outperforming',
+        signal: 'Growth momentum — watch mega-cap tech' });
+    if (qqq?.change24h < -1)
+      insights.push({ type: 'bearish', text: 'Tech ETFs selling off',
+        signal: 'Tech rotation underway — watch value vs growth' });
   }
 
-  return insights.slice(0, 4);
+  return insights.slice(0, 3);
 }
 
 function renderMarketInsights() {
@@ -4396,8 +4413,15 @@ function renderMarketInsights() {
   const data = generateMarketInsights();
   if (!data.length) { el.innerHTML = ''; return; }
   el.innerHTML = `<div class="insight-row">${
-    data.map(i => `<div class="insight ${i.type}">${i.text}</div>`).join('')
+    data.map(i => `
+      <div class="insight ${i.type}">
+        <span class="insight-text">${i.text}</span>
+        ${i.signal ? `<span class="insight-signal">${i.signal}</span>` : ''}
+      </div>`).join('')
   }</div>`;
+  el.querySelectorAll('.insight').forEach(pill => {
+    pill.addEventListener('click', () => pill.classList.toggle('active'));
+  });
 }
 
 function renderMarketTickerStrip() {
