@@ -4392,6 +4392,37 @@ function renderMarketMovers() {
     </div>`;
 }
 
+// ── Market signals ─────────────────────────────────────────
+function buildSignalCards() {
+  if (!Array.isArray(MARKET_DATA)) return [];
+  const valid = MARKET_DATA.filter(x => typeof x.change24h === 'number');
+  const sorted = [...valid].sort((a, b) => b.change24h - a.change24h);
+  const signals = [];
+  if (sorted[0]) signals.push({
+    type: 'bullish',
+    text: `${sorted[0].symbol} leading gains (+${sorted[0].change24h.toFixed(2)}%)`
+  });
+  if (sorted[sorted.length - 1]) {
+    const loser = sorted[sorted.length - 1];
+    signals.push({
+      type: 'bearish',
+      text: `${loser.symbol} under pressure (${loser.change24h.toFixed(2)}%)`
+    });
+  }
+  return signals;
+}
+
+function renderMarketSignals() {
+  const signals = buildSignalCards();
+  if (!signals.length) return '';
+  return `
+    <div class="signals-scroll">
+      ${signals.map(s => `
+        <div class="signal-card ${s.type}">${s.text}</div>
+      `).join('')}
+    </div>`;
+}
+
 // ── Market tab ─────────────────────────────────────────────
 function renderMarket() {
   const container = document.getElementById('tabPlaceholder');
@@ -4443,6 +4474,7 @@ function renderMarket() {
         <div id="marketSnapshot"></div>
         <div id="marketMovers"></div>
       </div>
+      <div id="marketSignals" class="market-signals"></div>
       <div id="marketMyAssets"></div>
       <div id="marketList" class="market-section"></div>
     </div>
@@ -4454,6 +4486,8 @@ function renderMarket() {
     if (el) el.innerHTML = renderMarketSnapshot();
     const mv = document.getElementById('marketMovers');
     if (mv) mv.innerHTML = renderMarketMovers();
+    const sg = document.getElementById('marketSignals');
+    if (sg) sg.innerHTML = renderMarketSignals();
   });
   initMarketTabs();
   initMarketSearch();
@@ -4557,6 +4591,8 @@ function initMarketTabs() {
       if (snap) snap.innerHTML = renderMarketSnapshot();
       const mv = document.getElementById('marketMovers');
       if (mv) mv.innerHTML = renderMarketMovers();
+      const sg = document.getElementById('marketSignals');
+      if (sg) sg.innerHTML = renderMarketSignals();
       renderMarketByType(type);
     });
   });

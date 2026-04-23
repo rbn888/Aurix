@@ -5972,3 +5972,32 @@ main { padding-bottom: 72px; }
     background: rgba(255,255,255,0.07);
   }
 }
+
+/* Market Signals */
+.market-signals { padding: 8px 16px; }
+
+.signals-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.signals-scroll::-webkit-scrollbar { display: none; }
+
+.signal-card {
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.signal-card.bullish {
+  background: rgba(34,197,94,0.1);
+  color: #22c55e;
+}
+
+.signal-card.bearish {
+  background: rgba(239,68,68,0.1);
+  color: #ef4444;
+}
