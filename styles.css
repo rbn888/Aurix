@@ -5952,6 +5952,26 @@ main { padding-bottom: 72px; }
   .market-row-change { font-size: 12px; }
 }
 
+/* ── Market intelligence layer ── */
+.insight-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 20px 4px;
+}
+
+.insight {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.05);
+  white-space: nowrap;
+}
+
+.insight.bullish { color: #22c55e; border: 1px solid rgba(34,197,94,0.2); }
+.insight.bearish { color: #ef4444; border: 1px solid rgba(239,68,68,0.2); }
+.insight.neutral { color: #eab308; border: 1px solid rgba(234,179,8,0.2); }
+
 /* ── Market wow layer ── */
 
 /* Step 1–2: value transitions + flash */

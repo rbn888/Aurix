@@ -4316,6 +4316,7 @@ function renderMarket() {
       </div>
       <div class="market-body">
         <div class="market-main">
+          <div id="marketInsights"></div>
           <div class="market-featured" id="marketFeatured"></div>
           <div id="marketList" class="market-section"></div>
         </div>
@@ -4350,6 +4351,55 @@ function renderMarket() {
   ensureMarketData();
 }
 
+function _findMktItem(sym) {
+  const norm = normalizeSymbol(sym);
+  return MARKET_DATA.find(d => normalizeSymbol(d.symbol) === norm) || null;
+}
+
+function generateMarketInsights() {
+  const insights = [];
+  const tab = currentMarketTab;
+
+  if (tab === 'crypto' || tab === 'indices' || !tab) {
+    const btc = _findMktItem('BTC');
+    const eth = _findMktItem('ETH');
+    if (btc?.change24h > 2)  insights.push({ type: 'bullish', text: 'Crypto showing strength' });
+    if (btc?.change24h < -2) insights.push({ type: 'bearish', text: 'Crypto under pressure' });
+    if (eth && btc && Math.abs((eth.change24h ?? 0) - (btc.change24h ?? 0)) > 3)
+      insights.push({ type: 'neutral', text: 'Altcoin divergence detected' });
+  }
+
+  if (tab === 'stocks' || tab === 'indices' || !tab) {
+    const spy = _findMktItem('SPY');
+    if (spy?.change24h > 1)  insights.push({ type: 'bullish', text: 'Equities rallying' });
+    if (spy?.change24h < -1) insights.push({ type: 'bearish', text: 'Equities under pressure' });
+  }
+
+  if (tab === 'commodities' || !tab) {
+    const gold = _findMktItem('XAUUSD');
+    if (gold?.change24h > 1)  insights.push({ type: 'neutral', text: 'Gold rising — risk-off signal' });
+    if (gold?.change24h < -1) insights.push({ type: 'neutral', text: 'Gold falling — risk-on mood' });
+  }
+
+  if (tab === 'etfs') {
+    const qqq = _findMktItem('QQQ');
+    if (qqq?.change24h > 1.5) insights.push({ type: 'bullish', text: 'Tech ETFs outperforming' });
+    if (qqq?.change24h < -1)  insights.push({ type: 'bearish', text: 'Tech ETFs selling off' });
+  }
+
+  return insights.slice(0, 4);
+}
+
+function renderMarketInsights() {
+  const el = document.getElementById('marketInsights');
+  if (!el) return;
+  const data = generateMarketInsights();
+  if (!data.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="insight-row">${
+    data.map(i => `<div class="insight ${i.type}">${i.text}</div>`).join('')
+  }</div>`;
+}
+
 function renderMarketTickerStrip() {
   const el = document.getElementById('marketTickerStrip');
   if (!el || !MARKET_DATA.length) return;
@@ -4369,6 +4419,7 @@ function renderMarketTickerStrip() {
 function renderMyAssetsBlock() {
   renderFeaturedBlock();
   renderMarketTickerStrip();
+  requestAnimationFrame(renderMarketInsights);
   const container = document.getElementById('marketMyAssets');
   if (!container) return;
   const watchedSet = new Set(getWatchlist().map(normalizeSymbol));
