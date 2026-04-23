@@ -1,4 +1,5 @@
 'use strict';
+console.log('APP JS LOADED');
 
 // ── Internationalisation ───────────────────────────────────
 const LANG_KEY = 'portfolio_lang';
@@ -1006,6 +1007,7 @@ let currentTab       = 'home';
 let currentMarketTab = 'crypto';
 let marketSearchData = [];
 let MARKET_DATA      = [];
+const MARKET_METRICS_CACHE = {};
 
 const MARKET_HEADER_CONFIG = {
   crypto: {
@@ -4447,6 +4449,7 @@ function renderMarketTickerStrip() {
 
 function renderMyAssetsBlock() {
   if (!document.getElementById('marketList')) return;
+  console.log('[market] renderMyAssetsBlock', currentMarketTab, MARKET_DATA.length);
   const _listType = _TAB_TO_TYPE[currentMarketTab];
   if (_listType) renderFromCache(_listType);
   renderFeaturedBlock();
@@ -4502,18 +4505,22 @@ function renderSearchResults(results) {
 }
 
 function updateMarketHeader() {
-  const config = MARKET_HEADER_CONFIG[currentMarketTab];
-  if (!config) return;
-  Object.entries(config).forEach(([id, fn]) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const newVal = fn();
-    if (el.textContent === newVal) return;
-    el.textContent = newVal;
-    el.classList.remove('value-flash-up', 'value-flash-down');
-    void el.offsetWidth; // force reflow
-    el.classList.add('value-flash-up');
-  });
+  try {
+    const config = MARKET_HEADER_CONFIG[currentMarketTab];
+    if (!config) return;
+    Object.entries(config).forEach(([id, fn]) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      try {
+        const newVal = fn();
+        if (el.textContent === newVal) return;
+        el.textContent = newVal;
+        el.classList.remove('value-flash-up', 'value-flash-down');
+        void el.offsetWidth;
+        el.classList.add('value-flash-up');
+      } catch (_) {}
+    });
+  } catch (_) {}
 }
 
 const _TYPE_LABEL = {
@@ -4523,14 +4530,23 @@ const _TYPE_LABEL = {
 const _TAB_TO_TYPE = { crypto: 'crypto', stocks: 'stocks', etfs: 'etfs', indices: 'indices', commodities: 'commodities' };
 
 function renderFromCache(type) {
-  console.log('[market] FILTER TYPE:', type);
-  console.log('[market] MARKET_DATA FULL:', MARKET_DATA);
-  const items = MARKET_DATA.filter(d => d.type?.toLowerCase() === type?.toLowerCase());
-  console.log('[market] CACHE ITEMS:', type, items);
+  const normalizedType = String(type).toLowerCase().trim();
+  let items = MARKET_DATA.filter(d => String(d.type).toLowerCase().trim() === normalizedType);
+  console.log('[market][FILTER]',
+    'requested:', type,
+    'normalized:', normalizedType,
+    'available:', MARKET_DATA.map(d => d.type),
+    'len:', MARKET_DATA.length
+  );
+  console.log('[market] renderFromCache', type, items.length);
+  if (!items.length) {
+    console.warn('[market] EMPTY FILTER → using all MARKET_DATA');
+    items = MARKET_DATA;
+  }
   const el = document.getElementById('marketList');
   if (!el) return false;
   if (!items.length) return false;
-  const label = _TYPE_LABEL[type]?.() ?? type;
+  const label = _TYPE_LABEL[normalizedType]?.() ?? normalizedType;
   el.innerHTML = `<div class="market-section-header">${label}</div>${items.map(renderMarketItem).join('')}`;
   return true;
 }
@@ -4632,6 +4648,7 @@ function _buildItem(symbol, data, fallbackMap, type) {
 }
 
 async function _loadGeneric(title, symbols, fallbackMap, searchType) {
+  searchType = String(searchType).toLowerCase();
   const container = document.getElementById('marketList');
   if (!container) return;
   container.innerHTML = `<div class="market-loading">Cargando ${title.toLowerCase()}...</div>`;
@@ -4736,9 +4753,10 @@ function renderSparkline(points, isUp = true) {
 }
 
 function normalizeMarketData(raw, type, symbol) {
-  const sym = normalizeSymbol(symbol);
+  const sym      = normalizeSymbol(symbol);
+  const normType = String(type).toLowerCase();
   if (!raw) {
-    return { symbol: sym, name: sym, price: null, change: null, change24h: null, type, fallback: true };
+    return { symbol: sym, name: sym, price: null, change: null, change24h: null, type: normType, fallback: true };
   }
   const change = raw.percent_change_24h ?? raw.change24h ?? raw.change ?? null;
   return {
@@ -4747,7 +4765,7 @@ function normalizeMarketData(raw, type, symbol) {
     price:    raw.price   ?? raw.close ?? null,
     change,
     change24h: change,
-    type,
+    type: normType,
     fallback: raw.fallback || false
   };
 }
@@ -4796,7 +4814,6 @@ function _setCryptoData(raw) {
   ];
   MARKET_DATA = [...MARKET_DATA.filter(d => d.type !== 'crypto'), ...cryptoItems];
   console.log('[market] AFTER LOAD:', currentMarketTab, MARKET_DATA);
-  renderMyAssetsBlock();
 }
 
 async function loadCrypto() {
@@ -4809,23 +4826,15 @@ async function loadCrypto() {
       'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10'
     );
     console.log('[market] fetch status:', res.status);
-    if (res.status === 429) {
-      console.warn('[market] CoinGecko rate limit — using fallback');
-      _setCryptoData(CRYPTO_FALLBACK);
-      return;
-    }
     if (!res.ok) throw new Error(`http_${res.status}`);
-    let data = await res.json();
-    console.log('[market] API response sample:', data?.[0]);
-    if (!data || !data.length) {
-      console.warn('[market] API empty, using fallback');
-      data = CRYPTO_FALLBACK;
-    }
-    _setCryptoData(data);
+    const raw = await res.json();
+    console.log('[market] API response sample:', raw?.[0]);
+    _setCryptoData(raw?.length ? raw : CRYPTO_FALLBACK);
   } catch (e) {
-    console.error('[market] Crypto fetch failed:', e.message);
+    console.warn('[market] using fallback —', e.message);
     _setCryptoData(CRYPTO_FALLBACK);
   }
+  renderMyAssetsBlock();
 }
 
 const MARKET_STOCKS = ['AAPL','MSFT','NVDA','TSLA','AMZN','META','GOOGL','JPM','V','WMT'];
