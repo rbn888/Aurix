@@ -971,36 +971,6 @@ let currentTab       = 'home';
 let currentMarketTab = 'crypto';
 let marketSearchData = [];
 let MARKET_DATA      = [];
-
-const MARKET_METRICS_CACHE = { ts: 0, data: null };
-const METRICS_TTL = 60 * 1000;
-
-const MARKET_HEADER_CONFIG = {
-  crypto: [
-    { key: 'marketCap',  label: 'Market Cap'   },
-    { key: 'btcDom',     label: 'BTC Dom'       },
-    { key: 'fearGreed',  label: 'Fear & Greed'  },
-    { key: 'volume24h',  label: '24h Volume'    }
-  ],
-  stocks: [
-    { key: 'marketCap',  label: 'Market Cap'   },
-    { key: 'sp500',      label: 'S&P 500'       },
-    { key: 'vix',        label: 'VIX'           },
-    { key: 'topMovers',  label: 'Top Movers'    }
-  ],
-  etfs: [
-    { key: 'marketCap',  label: 'Total AUM'    },
-    { key: 'spy',        label: 'SPY'           },
-    { key: 'qqq',        label: 'QQQ'           },
-    { key: 'flows',      label: 'Flows'         }
-  ],
-  commodities: [
-    { key: 'gold',            label: 'Gold'      },
-    { key: 'oil',             label: 'Oil'       },
-    { key: 'commodityIndex',  label: 'Index'     },
-    { key: 'inflation',       label: 'Inflation' }
-  ]
-};
 let showAllTx        = false;
 let insightIndex        = 0;
 let insightCache            = [];
@@ -4229,200 +4199,6 @@ function renderInsights() {
     </div>`;
 }
 
-// ── Market metrics ─────────────────────────────────────────
-function formatNumber(num) {
-  if (num > 1e12) return (num / 1e12).toFixed(2) + 'T';
-  if (num > 1e9)  return (num / 1e9).toFixed(2) + 'B';
-  if (num > 1e6)  return (num / 1e6).toFixed(2) + 'M';
-  return num.toFixed(0);
-}
-
-async function fetchMarketMetrics() {
-  const now = Date.now();
-  if (MARKET_METRICS_CACHE.data && (now - MARKET_METRICS_CACHE.ts) < METRICS_TTL) {
-    return MARKET_METRICS_CACHE.data;
-  }
-  try {
-    const res  = await fetch('https://api.coingecko.com/api/v3/global');
-    const json = await res.json();
-    const data = {
-      marketCap: json.data.total_market_cap.usd,
-      btcDom:    json.data.market_cap_percentage.btc
-    };
-    MARKET_METRICS_CACHE.data = data;
-    MARKET_METRICS_CACHE.ts   = now;
-    return data;
-  } catch (e) {
-    console.error('[market] metrics fetch failed', e);
-    return null;
-  }
-}
-
-function safeValue(value, fallback) {
-  return (value === undefined || value === null || value === '') ? fallback : value;
-}
-
-function getMetricValue(key) {
-  const cache = MARKET_METRICS_CACHE.data || {};
-  switch (key) {
-    case 'marketCap':  return cache.marketCap ? '$' + formatNumber(cache.marketCap) : '$2.5T';
-    case 'btcDom':     return cache.btcDom    != null ? cache.btcDom.toFixed(1) + '%' : '52%';
-    case 'fearGreed':  return safeValue(cache.fearGreed,  '—');
-    case 'volume24h':  return safeValue(cache.volume24h,  '—');
-    case 'sp500':      return safeValue(cache.sp500,      '—');
-    case 'vix':        return safeValue(cache.vix,        '—');
-    case 'spy':        return safeValue(cache.spy,        '—');
-    case 'qqq':        return safeValue(cache.qqq,        '—');
-    case 'gold':       return safeValue(cache.gold,       '—');
-    case 'oil':        return safeValue(cache.oil,        '—');
-    default:           return 'N/A';
-  }
-}
-
-function renderMarketMetrics() {
-  const config = MARKET_HEADER_CONFIG[currentMarketTab] || MARKET_HEADER_CONFIG.crypto;
-  const container = document.querySelector('.market-metrics-scroll');
-  if (!container) return;
-  container.innerHTML = config.map(metric => `
-    <div class="market-metric-card">
-      <div class="label">${metric.label}</div>
-      <div class="value">${getMetricValue(metric.key)}</div>
-    </div>
-  `).join('');
-  fetchMarketMetrics().then(data => {
-    if (data && container.isConnected) {
-      container.innerHTML = config.map(metric => `
-        <div class="market-metric-card">
-          <div class="label">${metric.label}</div>
-          <div class="value">${getMetricValue(metric.key)}</div>
-        </div>
-      `).join('');
-    }
-  });
-}
-
-// ── Market snapshot helpers ────────────────────────────────
-function findAsset(symbol) {
-  try {
-    if (!MARKET_DATA) return null;
-    if (Array.isArray(MARKET_DATA)) return MARKET_DATA.find(x => x.symbol === symbol);
-    return MARKET_DATA[symbol] || null;
-  } catch (e) {
-    return null;
-  }
-}
-
-function formatPrice(val) {
-  if (typeof val !== 'number') return '--';
-  if (val > 1000) return '$' + val.toLocaleString();
-  return '$' + val.toFixed(2);
-}
-
-function formatChange(val) {
-  if (typeof val !== 'number') return '--';
-  return val.toFixed(2) + '%';
-}
-
-function getChangeClass(val) {
-  if (typeof val !== 'number') return '';
-  return val >= 0 ? 'pos' : 'neg';
-}
-
-function renderMarketSnapshot() {
-  const snapshotAssets = [
-    { symbol: 'BTC',    label: 'Bitcoin'  },
-    { symbol: 'ETH',    label: 'Ethereum' },
-    { symbol: 'SPY',    label: 'S&P 500'  },
-    { symbol: 'XAUUSD', label: 'Gold'     }
-  ];
-
-  const html = snapshotAssets.map(a => {
-    const item   = findAsset(a.symbol);
-    const price  = formatPrice(item?.price);
-    const change = item?.change24h;
-    return `
-      <div class="snapshot-card">
-        <div class="name">${a.label}</div>
-        <div class="price">${price}</div>
-        <div class="change ${getChangeClass(change)}">${formatChange(change)}</div>
-      </div>`;
-  }).join('');
-
-  return `<div class="snapshot-scroll">${html}</div>`;
-}
-
-// ── Market top movers ──────────────────────────────────────
-function getTopMovers(data, limit = 3) {
-  try {
-    if (!Array.isArray(data)) return { gainers: [], losers: [] };
-    const valid  = data.filter(x => typeof x.change24h === 'number');
-    const sorted = [...valid].sort((a, b) => b.change24h - a.change24h);
-    return {
-      gainers: sorted.slice(0, limit),
-      losers:  sorted.slice(-limit).reverse()
-    };
-  } catch (e) {
-    return { gainers: [], losers: [] };
-  }
-}
-
-function renderMarketMovers() {
-  const { gainers, losers } = getTopMovers(MARKET_DATA, 3);
-
-  const renderRow = item => {
-    const symbol = item?.symbol ?? '--';
-    const change = item?.change24h;
-    return `
-      <div class="mover-item">
-        <span class="symbol">${symbol}</span>
-        <span class="change ${getChangeClass(change)}">${formatChange(change)}</span>
-      </div>`;
-  };
-
-  return `
-    <div class="market-movers">
-      <div class="movers-block">
-        <div class="title">Top Gainers</div>
-        ${gainers.map(renderRow).join('') || '<div class="empty">No data</div>'}
-      </div>
-      <div class="movers-block">
-        <div class="title">Top Losers</div>
-        ${losers.map(renderRow).join('') || '<div class="empty">No data</div>'}
-      </div>
-    </div>`;
-}
-
-// ── Market signals ─────────────────────────────────────────
-function buildSignalCards() {
-  if (!Array.isArray(MARKET_DATA)) return [];
-  const valid = MARKET_DATA.filter(x => typeof x.change24h === 'number');
-  const sorted = [...valid].sort((a, b) => b.change24h - a.change24h);
-  const signals = [];
-  if (sorted[0]) signals.push({
-    type: 'bullish',
-    text: `${sorted[0].symbol} leading gains (+${sorted[0].change24h.toFixed(2)}%)`
-  });
-  if (sorted[sorted.length - 1]) {
-    const loser = sorted[sorted.length - 1];
-    signals.push({
-      type: 'bearish',
-      text: `${loser.symbol} under pressure (${loser.change24h.toFixed(2)}%)`
-    });
-  }
-  return signals;
-}
-
-function renderMarketSignals() {
-  const signals = buildSignalCards();
-  if (!signals.length) return '';
-  return `
-    <div class="signals-scroll">
-      ${signals.map(s => `
-        <div class="signal-card ${s.type}">${s.text}</div>
-      `).join('')}
-    </div>`;
-}
-
 // ── Market tab ─────────────────────────────────────────────
 function renderMarket() {
   const container = document.getElementById('tabPlaceholder');
@@ -4469,26 +4245,32 @@ function renderMarket() {
         <button class="market-tab" data-market="indices">Índices</button>
         <button class="market-tab" data-market="commodities">Materias</button>
       </div>
-      <div class="market-intelligence">
-        <div class="market-intelligence-title">Market Overview</div>
-        <div id="marketSnapshot"></div>
-        <div id="marketMovers"></div>
+      <div class="market-featured" id="marketFeatured">
+        <div class="featured-card">
+          <div>BTC</div>
+          <div>$97,000</div>
+          <div class="green">+1.2%</div>
+        </div>
+        <div class="featured-card">
+          <div>SPY</div>
+          <div>$520</div>
+          <div class="green">+0.4%</div>
+        </div>
+        <div class="featured-card">
+          <div>Gold</div>
+          <div>$2,350</div>
+          <div class="red">-0.2%</div>
+        </div>
       </div>
-      <div id="marketSignals" class="market-signals"></div>
       <div id="marketMyAssets"></div>
       <div id="marketList" class="market-section"></div>
     </div>
   `;
+  document.getElementById('metricMarketCap').textContent = '$2.5T';
+  document.getElementById('metricFearGreed').textContent = '59';
+  document.getElementById('metricBTCdom').textContent = '52%';
+  document.getElementById('metricLiquidations').textContent = '$120M';
   currentMarketTab = 'crypto';
-  renderMarketMetrics();
-  requestAnimationFrame(() => {
-    const el = document.getElementById('marketSnapshot');
-    if (el) el.innerHTML = renderMarketSnapshot();
-    const mv = document.getElementById('marketMovers');
-    if (mv) mv.innerHTML = renderMarketMovers();
-    const sg = document.getElementById('marketSignals');
-    if (sg) sg.innerHTML = renderMarketSignals();
-  });
   initMarketTabs();
   initMarketSearch();
   // Event delegation for star toggles — set once, covers all dynamic rows
@@ -4586,13 +4368,6 @@ function initMarketTabs() {
       if (!type || type === currentMarketTab) return;
       currentMarketTab = type;
       updateMarketTabUI();
-      renderMarketMetrics();
-      const snap = document.getElementById('marketSnapshot');
-      if (snap) snap.innerHTML = renderMarketSnapshot();
-      const mv = document.getElementById('marketMovers');
-      if (mv) mv.innerHTML = renderMarketMovers();
-      const sg = document.getElementById('marketSignals');
-      if (sg) sg.innerHTML = renderMarketSignals();
       renderMarketByType(type);
     });
   });
