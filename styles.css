@@ -6071,3 +6071,90 @@ main { padding-bottom: 72px; }
 .market-screen {
   scroll-behavior: smooth;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   MOBILE PORTFOLIO SLIDER — additive, isolated, desktop-safe
+   ═══════════════════════════════════════════════════════════ */
+
+/* Hidden by default — desktop never sees it */
+.portfolio-mobile-slider { display: none; }
+
+@media (max-width: 768px) {
+  /* Hide desktop chart and distribution so slider takes over */
+  .hero-right           { display: none; }
+  .distribution-section { display: none; }
+
+  /* Show slider */
+  .portfolio-mobile-slider {
+    display: block;
+    overflow: hidden;
+    width: 100%;
+    margin-bottom: 24px;
+  }
+
+  /* Track: 200% wide so each 50%-wide slide = 100% of container */
+  .mobile-slider-track {
+    display: flex;
+    width: 200%;
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+  }
+
+  /* Each slide fills the visible container */
+  .mobile-slide {
+    width: 50%;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    padding: 16px 20px 20px;
+  }
+
+  /* Chart slide: chart-wrap height */
+  .mobile-slide .chart-wrap {
+    height: 180px;
+    position: relative;
+    margin-top: 10px;
+    overflow: hidden;
+  }
+
+  /* Donut slide: stack donut + legend vertically */
+  .mobile-distribution-inner {
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    margin-top: 12px;
+  }
+
+  .mobile-donut-wrap {
+    position: relative;
+    flex-shrink: 0;
+    width: min(180px, 50vw);
+    height: min(180px, 50vw);
+    overflow: visible;
+  }
+
+  /* Dots navigation */
+  .mobile-slider-dots {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 0 12px;
+  }
+
+  .m-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    transition: background 0.2s ease;
+    cursor: pointer;
+  }
+
+  .m-dot.active {
+    background: rgba(255, 255, 255, 0.75);
+  }
+}
+
+/* Explicit desktop guard — slider never visible at ≥769px */
+@media (min-width: 769px) {
+  .portfolio-mobile-slider { display: none; }
+}

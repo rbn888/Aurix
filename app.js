@@ -602,6 +602,7 @@ let activePerfMode   = '%';    // '%' = percentage change | 'curr' = absolute ga
 let _inlineEditId    = null;   // id of asset currently open in inline edit strip
 let _inlineEditMode  = null;   // 'add' | 'reduce'
 let portfolioChart   = null;
+let portfolioChartMobile = null;  // mobile slider instance — null on desktop
 let _detailChart     = null;  // Chart.js instance for category detail sparkline
 let _detailChartType = null;  // which category the sparkline was last rendered for
 let _chartRevealProgress = 1; // 0–1 clip for left-to-right line reveal
@@ -995,6 +996,7 @@ function recordSnapshot() {
 
 // ── Distribution donut ─────────────────────────────────────
 let donutChart = null;
+let donutChartMobile = null;  // mobile slider instance — null on desktop
 const distributionSectionEl = document.getElementById('distributionSection');
 const distributionLegendEl  = document.getElementById('distributionLegend');
 const donutCenterValEl      = document.getElementById('donutCenterVal');
@@ -1304,6 +1306,21 @@ function updateDonut() {
     donutChart.update(_donutHasData ? 'none' : undefined);
     _donutHasData = true;
   }
+
+  // Mobile sync — mirror donut data + legend + center
+  if (donutChartMobile) {
+    donutChartMobile.data.labels                            = dist.map(d => (TYPE_META[d.type] || TYPE_META.other).label);
+    donutChartMobile.data.datasets[0].data                 = dist.map(d => d.pct);
+    donutChartMobile.data.datasets[0].backgroundColor      = dist.map(d => (TYPE_META[d.type] || TYPE_META.other).color);
+    donutChartMobile.data.datasets[0].hoverBackgroundColor = dist.map(d => lightenHex((TYPE_META[d.type] || TYPE_META.other).color, 1.18));
+    donutChartMobile.update(_donutHasData ? 'none' : undefined);
+  }
+  const _mLegend = document.getElementById('distributionLegendMobile');
+  if (_mLegend) _mLegend.innerHTML = distributionLegendEl.innerHTML;
+  const _mCenterVal = document.getElementById('donutCenterValMobile');
+  const _mCenterSub = document.getElementById('donutCenterSubMobile');
+  if (_mCenterVal) _mCenterVal.textContent = donutCenterValEl.textContent;
+  if (_mCenterSub) _mCenterSub.textContent = donutCenterSubEl.textContent;
 
   // Sync donut visual state and rebuild category cards
   _applyDonutState();
@@ -1664,6 +1681,16 @@ function updateChart(animate = false) {
     portfolioChart.data.labels = [];
     portfolioChart.data.datasets[0].data = [];
     portfolioChart.update('none');
+    // Mobile sync — clear
+    const _mnd = document.getElementById('chartNoDataMobile');
+    const _mch = document.getElementById('chartChangeMobile');
+    if (_mnd) _mnd.style.display = '';
+    if (_mch) _mch.textContent = '';
+    if (portfolioChartMobile) {
+      portfolioChartMobile.data.labels = [];
+      portfolioChartMobile.data.datasets[0].data = [];
+      portfolioChartMobile.update('none');
+    }
     return;
   }
 
@@ -1702,6 +1729,17 @@ function updateChart(animate = false) {
     portfolioChart.options.animation.duration = 1200;
   } else {
     portfolioChart.update('none');
+  }
+
+  // Mobile sync — mirror data and change indicator
+  const _mnd = document.getElementById('chartNoDataMobile');
+  const _mch = document.getElementById('chartChangeMobile');
+  if (_mnd) _mnd.style.display = 'none';
+  if (_mch) { _mch.textContent = chartChangeEl.textContent; _mch.className = chartChangeEl.className; }
+  if (portfolioChartMobile) {
+    portfolioChartMobile.data.labels = data.labels;
+    portfolioChartMobile.data.datasets[0].data = data.values;
+    portfolioChartMobile.update('none');
   }
 }
 
@@ -7401,6 +7439,113 @@ document.addEventListener('keydown', e => {
   }
 });
 
+// ── Mobile portfolio slider ────────────────────────────────
+
+function initMobileCharts() {
+  const mCanvas = document.getElementById('portfolioChartMobile');
+  if (mCanvas && !portfolioChartMobile) {
+    portfolioChartMobile = new Chart(mCanvas.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          data: [],
+          borderColor: 'rgba(255,255,255,0.85)',
+          backgroundColor: 'transparent',
+          fill: true,
+          tension: 0.4,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointHoverBackgroundColor: '#fff',
+          borderWidth: 2,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        scales: {
+          x: {
+            grid: { color: 'rgba(255,255,255,0.06)' },
+            border: { display: false },
+            ticks: { color: '#686868', maxTicksLimit: 6, maxRotation: 0 },
+          },
+          y: {
+            position: 'right',
+            grid: { color: 'rgba(255,255,255,0.06)' },
+            border: { display: false },
+            ticks: {
+              color: '#686868',
+              maxTicksLimit: 5,
+              callback: v => {
+                const sym = baseCurrency === 'EUR' ? '€' : '$';
+                if (v >= 1_000_000) return sym + (v / 1_000_000).toFixed(2) + 'M';
+                if (v >= 1_000)     return sym + (v / 1_000).toFixed(1) + 'K';
+                return formatBase(v);
+              },
+            },
+          },
+        },
+        animation: { duration: 800, easing: 'easeOutQuart' },
+      },
+    });
+  }
+
+  const dCanvas = document.getElementById('donutChartMobile');
+  if (dCanvas && !donutChartMobile) {
+    donutChartMobile = new Chart(dCanvas.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: [],
+        datasets: [{
+          data: [],
+          backgroundColor: [],
+          hoverBackgroundColor: [],
+          borderColor: '#1a1a1a',
+          borderWidth: 2,
+          hoverOffset: 12,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '70%',
+        rotation: -90,
+        layout: { padding: 6 },
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        animation: { animateRotate: true, animateScale: false, duration: 900, easing: 'easeOutQuart' },
+      },
+    });
+  }
+}
+
+function initMobileSlider() {
+  const track = document.getElementById('mobileSliderTrack');
+  if (!track) return;
+
+  const container = document.getElementById('portfolioMobileSlider');
+  const dots = document.querySelectorAll('.m-dot');
+  let current = 0;
+  let startX = 0;
+  const THRESHOLD = 40;
+
+  function goTo(idx) {
+    current = idx;
+    track.style.transform = `translateX(-${idx * 50}%)`;
+    dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+  }
+
+  container.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+  }, { passive: true });
+
+  container.addEventListener('touchend', e => {
+    const diff = startX - e.changedTouches[0].clientX;
+    if (diff > THRESHOLD && current < 1) goTo(1);
+    if (diff < -THRESHOLD && current > 0) goTo(0);
+  }, { passive: true });
+}
+
 // ── Init ───────────────────────────────────────────────────
 // Apply saved base currency to menu toggle
 document.querySelectorAll('.menu-curr-btn')
@@ -7425,6 +7570,13 @@ initChart();
 updateChart();
 initDonut();
 updateDonut();
+
+if (window.innerWidth <= 768) {
+  initMobileCharts();
+  updateChart();   // sync mobile chart after instance created
+  updateDonut();   // sync mobile donut after instance created
+  initMobileSlider();
+}
 
 fetchExchangeRate().then(() => {
   render();

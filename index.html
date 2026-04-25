@@ -126,6 +126,59 @@
         </div>
       </section>
 
+      <!-- ── Mobile-only portfolio slider (hidden on desktop via CSS) ── -->
+      <div class="portfolio-mobile-slider" id="portfolioMobileSlider">
+        <div class="mobile-slider-track" id="mobileSliderTrack">
+
+          <!-- Slide 1: chart -->
+          <div class="mobile-slide mobile-slide-chart">
+            <div class="chart-header">
+              <div>
+                <div class="chart-title card-title" data-i18n="evolution">Evolución del patrimonio</div>
+                <span class="chart-change" id="chartChangeMobile"></span>
+              </div>
+              <div class="chart-controls">
+                <div class="perf-toggle">
+                  <button class="perf-btn active" data-perf="%">%</button>
+                  <button class="perf-btn" data-perf="curr">€</button>
+                </div>
+                <div class="range-toggle">
+                  <button class="range-btn active" data-range="24h">24H</button>
+                  <button class="range-btn" data-range="7d">7D</button>
+                  <button class="range-btn" data-range="30d">30D</button>
+                  <button class="range-btn" data-range="1y" data-i18n="range1y">1A</button>
+                  <button class="range-btn" data-range="all" data-i18n="rangeAll">TOTAL</button>
+                </div>
+              </div>
+            </div>
+            <div class="chart-wrap mobile-chart-wrap">
+              <canvas id="portfolioChartMobile"></canvas>
+              <div class="chart-no-data" id="chartNoDataMobile" data-i18n="chartNoData">Añade activos para ver la evolución</div>
+            </div>
+          </div>
+
+          <!-- Slide 2: donut distribution -->
+          <div class="mobile-slide mobile-slide-donut">
+            <div class="section-title card-title" data-i18n="distribution">Distribución del patrimonio</div>
+            <div class="distribution-inner mobile-distribution-inner">
+              <div class="donut-wrap mobile-donut-wrap">
+                <canvas id="donutChartMobile"></canvas>
+                <div class="donut-center-label">
+                  <div class="donut-center-val" id="donutCenterValMobile"></div>
+                  <div class="donut-center-sub" id="donutCenterSubMobile">total</div>
+                </div>
+              </div>
+              <div class="distribution-legend" id="distributionLegendMobile"></div>
+            </div>
+          </div>
+
+        </div>
+        <div class="mobile-slider-dots">
+          <span class="m-dot active"></span>
+          <span class="m-dot"></span>
+        </div>
+      </div>
+
       <section class="categories-section" id="categoriesSection" style="display:none">
         <div class="categories-grid" id="categoriesGrid"></div>
       </section>
