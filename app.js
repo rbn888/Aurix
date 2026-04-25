@@ -8955,3 +8955,24 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// ── Mobile FAB ─────────────────────────────────────────────
+(function initFab() {
+  const fab  = document.getElementById('portfolioFab');
+  const menu = document.getElementById('fabMenu');
+  if (!fab || !menu) return;
+
+  fab.addEventListener('click', e => {
+    e.stopPropagation();
+    menu.classList.toggle('open');
+  });
+
+  document.addEventListener('click', e => {
+    if (!fab.contains(e.target) && !menu.contains(e.target)) {
+      menu.classList.remove('open');
+    }
+  });
+
+  document.querySelector('[data-action="asset"]').onclick    = openModal;
+  document.querySelector('[data-action="liquidity"]').onclick = openLiquidityModal;
+})();
+

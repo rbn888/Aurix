@@ -6199,6 +6199,77 @@ main { padding-bottom: 72px; }
 
 /* Explicit desktop guard — slider and card never visible at ≥769px */
 @media (min-width: 769px) {
-  .portfolio-mobile-slider { display: none; }
-  .portfolio-slider-card   { display: none; }
+  .portfolio-mobile-slider  { display: none; }
+  .portfolio-slider-card    { display: none; }
+  .portfolio-actions-mobile { display: none; }
+}
+
+/* ═══════════════════════════════════════════════
+   MOBILE FAB — additive, isolated, desktop-safe
+   ═══════════════════════════════════════════════ */
+
+/* Hidden by default — shown only on mobile */
+.portfolio-actions-mobile { display: none; }
+
+@media (max-width: 768px) {
+  /* Hide large action buttons — FAB replaces them */
+  #btnAdd, #btnAddLiquidity { display: none; }
+
+  /* Hide bottom-nav add tab — action moved into FAB */
+  .bottom-nav [data-tab="add"] { display: none; }
+
+  /* FAB container — absolute top-right of hero-left (position:relative) */
+  .portfolio-actions-mobile {
+    display: block;
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    z-index: 6;
+  }
+
+  .fab-trigger {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    font-size: 20px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+  }
+
+  .fab-trigger:active { opacity: 0.8; }
+
+  /* Dropdown menu */
+  .fab-menu {
+    position: absolute;
+    top: 44px;
+    right: 0;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 7;
+  }
+
+  .fab-menu.open { display: flex; }
+
+  .fab-option {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: 8px;
+    white-space: nowrap;
+    font-size: 14px;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s ease;
+  }
+
+  .fab-option:hover { border-color: var(--border-hi); }
 }
