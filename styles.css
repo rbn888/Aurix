@@ -6078,27 +6078,34 @@ main { padding-bottom: 72px; }
 
 /* Hidden by default — desktop never sees it */
 .portfolio-mobile-slider { display: none; }
-.portfolio-mobile-card   { display: none; }
+.portfolio-slider-card   { display: none; }
 
 @media (max-width: 768px) {
   /* Hide desktop chart and distribution so slider takes over */
   .hero-right           { display: none; }
   .distribution-section { display: none; }
 
-  /* Card container — consistent UI with rest of dashboard */
-  .portfolio-mobile-card {
+  /* Card container — same visual hierarchy as hero-card */
+  .portfolio-slider-card {
     display: block;
-    padding: 0;
-    overflow: hidden;
     margin: 16px 0;
+    padding: 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    transition: border-color var(--dur-med) var(--ease-premium);
   }
 
-  /* Slider: adaptive height with minimum, no rigid block */
+  .portfolio-slider-card:hover { border-color: var(--border-hi); }
+
+  /* Slider: adaptive height, no padding (card handles it) */
   .portfolio-mobile-slider {
     display: block;
     overflow: hidden;
     width: 100%;
-    min-height: 300px;
+    min-height: 280px;
     height: auto;
     position: relative;
     touch-action: pan-y;
@@ -6115,13 +6122,18 @@ main { padding-bottom: 72px; }
     will-change: transform;
   }
 
-  /* Each slide: fills half the track = 100% of the container */
+  /* Each slide: no padding — card provides it */
   .mobile-slide {
     width: 50%;
-    min-height: 300px;
+    min-height: 280px;
     flex-shrink: 0;
     box-sizing: border-box;
-    padding: 20px 16px 24px;
+    padding: 0;
+  }
+
+  /* Chart header: consistent spacing */
+  .portfolio-mobile-slider .chart-header {
+    margin-bottom: 12px;
   }
 
   /* Chart slide: flex column so chart-wrap fills remaining space */
@@ -6134,7 +6146,6 @@ main { padding-bottom: 72px; }
     flex: 1;
     min-height: 0;
     position: relative;
-    margin-top: 10px;
     overflow: hidden;
   }
 
@@ -6160,7 +6171,7 @@ main { padding-bottom: 72px; }
     overflow: visible;
   }
 
-  /* Dots: absolute inside slider, stable position regardless of content */
+  /* Dots: absolute inside slider, stable regardless of content */
   .mobile-slider-dots {
     position: absolute;
     bottom: 8px;
@@ -6189,5 +6200,5 @@ main { padding-bottom: 72px; }
 /* Explicit desktop guard — slider and card never visible at ≥769px */
 @media (min-width: 769px) {
   .portfolio-mobile-slider { display: none; }
-  .portfolio-mobile-card   { display: none; }
+  .portfolio-slider-card   { display: none; }
 }
