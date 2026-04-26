@@ -6277,12 +6277,31 @@ main { padding-bottom: 72px; }
   .fab-option:hover { border-color: var(--border-hi); }
 }
 
-/* ─── FAB position override — anchored to bottom, no dynamic-height dependency ─── */
+/* ─── FAB position override — aligned with "activos · actualizado" text ─── */
 @media (max-width: 768px) {
   .portfolio-actions-mobile {
     right: 20px !important;
-    top: auto !important;
-    bottom: 16px !important;
-    transform: none !important;
+    top: 58% !important;
+    bottom: auto !important;
+    transform: translateY(-50%) !important;
+  }
+}
+
+/* ─── Donut legend — 2-column grid on mobile ─── */
+@media (max-width: 768px) {
+  .distribution-legend {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px 12px;
+  }
+
+  .distribution-legend > * {
+    width: 100%;
+  }
+
+  .distribution-legend .legend-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
