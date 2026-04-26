@@ -488,8 +488,8 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
 
 /* ── Summary Panel ─────────────────────────────────────── */
 .summary-panel {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
   border-radius: 20px;
   padding: var(--space-6) 40px;
   position: relative;
@@ -611,8 +611,8 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
 
 /* ── Asset Card ────────────────────────────────────────── */
 .asset-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   cursor: pointer;
   padding: 18px var(--space-4) 18px 18px;
@@ -625,7 +625,7 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
               opacity 200ms var(--ease-out);
 }
 .asset-card:hover {
-  border-color: var(--border-hi);
+  border-color: var(--border-strong);
   transform: translateY(-1px);
 }
 .asset-card:active {
@@ -1562,15 +1562,15 @@ body:not(.hero-active) #orb-canvas {
 .watchlist-inner-card {
   padding: var(--space-2);
   border-radius: 12px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid var(--color-border-subtle);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
   cursor: pointer;
   transition: background .2s ease, border-color .2s ease;
 }
 
 .watchlist-inner-card:hover {
-  background: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.12);
+  background: var(--surface-3);
+  border-color: var(--border-strong);
 }
 
 .distribution-header { margin-bottom: var(--space-3); }
@@ -1908,8 +1908,8 @@ body:not(.hero-active) #orb-canvas {
 .cat-card {
   position: relative;
   overflow: hidden;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.05);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
   border-radius: 18px;
   padding: var(--space-4) 22px 18px;
   min-height: 130px;
@@ -1941,7 +1941,7 @@ body:not(.hero-active) #orb-canvas {
   cursor: grabbing;
 }
 .cat-card:hover {
-  border-color: var(--color-border-default);
+  border-color: var(--border-strong);
   transform: translateY(-3px) scale(1.01);
   box-shadow: 0 10px 30px rgba(0,0,0,0.25),
               0 0 10px rgba(255,255,255,0.05),
@@ -2051,7 +2051,7 @@ body:not(.hero-active) #orb-canvas {
   }
 }
 @media (max-width: 767px) {
-  .cat-card { background: rgba(255,255,255,0.03); }
+  .cat-card { background: var(--surface-2); }
 }
 
 /* ── Category card content wrapper (sits above visual) ──── */
@@ -2609,8 +2609,8 @@ body:not(.hero-active) #orb-canvas {
 
 /* ── Asset skeleton (loading placeholder) ──────────────── */
 .asset-skeleton {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   height: 82px;
   background-image: linear-gradient(
@@ -3688,8 +3688,8 @@ body:not(.hero-active) #orb-canvas {
 .assets-list.assets-list--detail {
   display: flex;
   flex-direction: column;
-  background: var(--bg-card);
-  border: 1px solid var(--border-hi);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   overflow: hidden;
   margin-top: 6px;
@@ -5098,16 +5098,15 @@ main { padding-bottom: 72px; }
     gap: var(--space-6);
     padding: var(--space-5) 28px;
     border-radius: 20px;
-    background: rgba(20, 24, 32, 0.6);
-    backdrop-filter: blur(20px);
-    border: 1px solid var(--color-border-subtle);
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
     transition: border-color 0.25s, transform 0.25s;
     align-items: stretch;
   }
 
   .portfolio-combined-card:hover {
     transform: translateY(-2px);
-    border-color: rgba(255,255,255,0.12);
+    border-color: var(--border-strong);
   }
 
   .distribution-panel {
@@ -5168,11 +5167,8 @@ main { padding-bottom: 72px; }
     flex: 1;
     padding: 22px var(--space-4);
     border-radius: 14px;
-    background: rgba(20,25,35,0.6);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--color-border-subtle);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
     cursor: pointer;
     transition: background .25s ease, border-color .25s ease, transform .25s ease;
     display: flex;
@@ -5180,8 +5176,8 @@ main { padding-bottom: 72px; }
   }
 
   .watchlist-inner-card:hover {
-    background: rgba(255,255,255,0.06);
-    border-color: rgba(255,255,255,0.12);
+    background: var(--surface-3);
+    border-color: var(--border-strong);
     transform: translateY(-1px);
   }
 
@@ -5280,8 +5276,10 @@ main { padding-bottom: 72px; }
   max-height: 80vh;
   border-radius: 20px;
   padding: var(--space-5);
-  background: rgba(20,24,32,0.97);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(20,20,25,0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -5892,10 +5890,10 @@ main { padding-bottom: 72px; }
 
 .market-metric-card {
   min-width: 140px;
-  background: rgba(255,255,255,0.04);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
   border-radius: 12px;
   padding: var(--space-2);
-  backdrop-filter: blur(8px);
 }
 
 .market-metric-card .label {
