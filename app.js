@@ -6094,6 +6094,11 @@ function openModal() {
   assetForm.reset();
   previewTotal.textContent = formatBase(0);
 
+  // Reset type toggle to "Activo"
+  document.querySelectorAll('.type-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.type === 'asset')
+  );
+
   // Reset state
   selectedDbAsset      = null;
   pendingCoinId        = null;
@@ -7428,6 +7433,16 @@ document.getElementById('btnAddContext')?.addEventListener('click', () => {
 modalClose.addEventListener('click', closeModal);
 modalOverlay.addEventListener('click', e => {
   if (e.target === modalOverlay) closeModal();
+});
+
+// ── Modal type toggle (Activo / Liquidez) ──────────────────
+document.querySelectorAll('.type-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.type === 'liquidity') {
+      closeModal();
+      openLiquidityModal();
+    }
+  });
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
