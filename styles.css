@@ -6382,11 +6382,12 @@ main { padding-bottom: 72px; }
   .fab-trigger:active { transform: scale(0.96); }
 }
 
-/* ── Category drill-down: collapse donut slide entirely (no gap) ── */
-body.is-detail-view .mobile-slide-donut    { display: none !important; }
+/* ── Category drill-down: hide entire mobile slider, show only detail view ── */
+body.is-detail-view .portfolio-slider-card   { display: none !important; }
+body.is-detail-view .mobile-slide-donut      { display: none !important; }
 body.is-detail-view .portfolio-mobile-slider { height: auto !important; }
-body.is-detail-view .mobile-slider-track   { height: auto !important; }
-body.is-detail-view .mobile-slide          { height: auto !important; }
+body.is-detail-view .mobile-slider-track     { height: auto !important; }
+body.is-detail-view .mobile-slide            { height: auto !important; }
 
 /* ── Modal type toggle (Activo / Liquidez) ── */
 .add-type-toggle {
