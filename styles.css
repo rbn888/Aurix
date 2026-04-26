@@ -2658,7 +2658,7 @@ body:not(.hero-active) #orb-canvas {
     height: auto;           /* reset the desktop height:100% */
     padding: 18px 20px 12px 20px;
     border-right: none;
-    border-bottom: 1px solid rgba(255,255,255,.055);
+    border-bottom: none;
   }
   .hero-right {
     display: flex;
@@ -2684,6 +2684,7 @@ body:not(.hero-active) #orb-canvas {
   .summary-footer {
     margin-top: 14px;
     padding-top: 12px;
+    border-top: none;
     gap: 6px;
   }
   .summary-actions  { flex-direction: row; flex-wrap: wrap; gap: 6px; width: auto; }
