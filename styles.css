@@ -6280,7 +6280,7 @@ main { padding-bottom: 72px; }
 /* ─── FAB position override — fixed px, aligned with "activos · actualizado" ─── */
 @media (max-width: 768px) {
   .portfolio-actions-mobile {
-    top: 56px !important;
+    top: 68px !important;
     right: 20px !important;
     bottom: auto !important;
     transform: none !important;
@@ -6297,6 +6297,7 @@ main { padding-bottom: 72px; }
     row-gap: 10px;
     width: fit-content;
     margin: 0 auto;
+    margin-top: 12px;
   }
 
   .distribution-legend .legend-item {
@@ -6308,4 +6309,10 @@ main { padding-bottom: 72px; }
   .distribution-legend .legend-label {
     white-space: nowrap;
   }
+}
+
+/* ─── Donut card spacing micro-polish ─── */
+@media (max-width: 768px) {
+  .distribution-title { margin-bottom: 16px; }
+  .mobile-slide-donut { padding-top: 8px; }
 }
