@@ -6328,7 +6328,7 @@ main { padding-bottom: 72px; }
   }
 
   /* ── Donut card spacing ── */
-  .distribution-title { margin-bottom: 28px; }
+  .distribution-title { position: relative; top: -10px; margin-bottom: 32px; }
   .mobile-slide-donut { padding-top: 4px; }
 }
 
@@ -6406,6 +6406,6 @@ body.is-detail-view .mobile-slide          { height: auto !important; }
 
 /* ── Donut spacing override ── */
 @media (max-width: 768px) {
-  .distribution-title  { margin-bottom: 36px !important; }
+  .distribution-title  { position: relative !important; top: -10px !important; margin-bottom: 32px !important; }
   .mobile-slide-donut  { padding-top: 24px !important; }
 }
