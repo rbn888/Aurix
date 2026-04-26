@@ -95,6 +95,25 @@ select:focus-visible {
   --font-weight-regular:   400;
   --font-weight-medium:    500;
   --font-weight-semibold:  600;
+
+  /* ── Color tokens (additive — existing --bg-* vars untouched) ── */
+  /* Backgrounds — map to existing vars; #121212/#181818 not in codebase yet */
+  --color-bg-primary:   var(--bg);
+  --color-bg-surface:   var(--bg-card);
+  --color-bg-elevated:  var(--bg-card-2);
+
+  /* Borders — exact matches present in CSS */
+  --color-border-subtle:  rgba(255, 255, 255, 0.06);
+  --color-border-default: rgba(255, 255, 255, 0.10);
+
+  /* Text */
+  --color-text-primary:   #FFFFFF;
+  --color-text-secondary: rgba(255, 255, 255, 0.7);
+  --color-text-tertiary:  rgba(255, 255, 255, 0.5);
+
+  /* States */
+  --color-positive: #4CAF50;
+  --color-negative: #F44336;
 }
 
 body {
@@ -354,7 +373,7 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
   appearance: none;
   -webkit-appearance: none;
   background: transparent;
-  border: 1px solid rgba(255,255,255,.10);
+  border: 1px solid var(--color-border-default);
   border-radius: var(--radius-xs);
   padding: 4px 9px;
   font-size: 11px;
@@ -556,7 +575,7 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
 .summary-footer {
   margin-top: var(--space-3);
   padding-top: 14px;
-  border-top: 1px solid rgba(255,255,255,.06);
+  border-top: 1px solid var(--color-border-subtle);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -667,7 +686,7 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
   text-transform: uppercase;
   color: var(--text-muted);
   background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.10);
+  border: 1px solid var(--color-border-default);
   border-radius: 4px;
   padding: 2px 6px;
 }
@@ -854,7 +873,7 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
 .btn-delete,
 .btn-edit-re {
   background: rgba(255,255,255,.05);
-  border: 1px solid rgba(255,255,255,.10);
+  border: 1px solid var(--color-border-default);
   border-radius: var(--radius-xs);
   color: rgba(255,255,255,.52);
   width: 34px; height: 34px;
@@ -1511,7 +1530,7 @@ body:not(.hero-active) #orb-canvas {
   padding: var(--space-2);
   border-radius: 12px;
   background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid var(--color-border-subtle);
   cursor: pointer;
   transition: background .2s ease, border-color .2s ease;
 }
@@ -1693,7 +1712,7 @@ body:not(.hero-active) #orb-canvas {
   appearance: none;
   -webkit-appearance: none;
   background: transparent;
-  border: 1px solid rgba(255,255,255,.10);
+  border: 1px solid var(--color-border-default);
   border-radius: var(--radius-xs);
   padding: 4px 9px;
   font-size: 11px;
@@ -1805,7 +1824,7 @@ body:not(.hero-active) #orb-canvas {
   top: 0;
   left: 0;
   background: rgba(8, 10, 18, 0.88);
-  border: 1px solid rgba(255,255,255,0.10);
+  border: 1px solid var(--color-border-default);
   border-radius: 8px;
   padding: 6px 10px;
   pointer-events: none;
@@ -1889,7 +1908,7 @@ body:not(.hero-active) #orb-canvas {
   cursor: grabbing;
 }
 .cat-card:hover {
-  border-color: rgba(255,255,255,0.10);
+  border-color: var(--color-border-default);
   transform: translateY(-3px) scale(1.01);
   box-shadow: 0 10px 30px rgba(0,0,0,0.25),
               0 0 10px rgba(255,255,255,0.05),
@@ -3658,7 +3677,7 @@ body:not(.hero-active) #orb-canvas {
   cursor: pointer;
   gap: 0 14px;
   padding: 13px 18px;
-  border-bottom: 1px solid rgba(255,255,255,.06);
+  border-bottom: 1px solid var(--color-border-subtle);
   transition: background var(--dur-fast) var(--ease-premium);
 }
 .detail-asset-row:last-child { border-bottom: none; }
@@ -3906,7 +3925,7 @@ body:not(.hero-active) #orb-canvas {
   width: 30px;
   height: 30px;
   border-radius: 7px;
-  border: 1px solid rgba(255,255,255,.10);
+  border: 1px solid var(--color-border-default);
   background: rgba(255,255,255,.05);
   color: var(--text-muted);
   font-size: var(--font-size-sm);
@@ -4084,7 +4103,7 @@ body:not(.hero-active) #orb-canvas {
 
 /* ── Cleaner chart tooltip ───────────────────────────────── */
 .chart-tooltip {
-  border-color: rgba(255,255,255,0.10);
+  border-color: var(--color-border-default);
   box-shadow: 0 4px 16px rgba(0,0,0,.5), 0 0 12px rgba(255,255,255,0.04);
 }
 
@@ -4424,7 +4443,7 @@ main { padding-bottom: 72px; }
   align-items: center;
   background: rgba(5,7,13,0.6);
   backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid var(--color-border-subtle);
   z-index: 200;
 }
 
@@ -4921,7 +4940,7 @@ main { padding-bottom: 72px; }
   align-items: center;
   gap: 10px;
   padding: var(--space-1) 6px;
-  border-bottom: 1px solid rgba(255,255,255,.06);
+  border-bottom: 1px solid var(--color-border-subtle);
   font-size: 12px;
   position: relative;
   transition: background 0.12s ease, transform 0.12s ease;
@@ -5048,7 +5067,7 @@ main { padding-bottom: 72px; }
     border-radius: 20px;
     background: rgba(20, 24, 32, 0.6);
     backdrop-filter: blur(20px);
-    border: 1px solid rgba(255,255,255,0.06);
+    border: 1px solid var(--color-border-subtle);
     transition: border-color 0.25s, transform 0.25s;
     align-items: stretch;
   }
@@ -5070,7 +5089,7 @@ main { padding-bottom: 72px; }
     flex: 1;
     flex-direction: column;
     justify-content: space-between;
-    border-left: 1px solid rgba(255,255,255,0.06);
+    border-left: 1px solid var(--color-border-subtle);
     padding-left: 28px;
   }
 
@@ -5119,7 +5138,7 @@ main { padding-bottom: 72px; }
     background: rgba(20,25,35,0.6);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    border: 1px solid rgba(255,255,255,0.06);
+    border: 1px solid var(--color-border-subtle);
     box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
     cursor: pointer;
     transition: background .25s ease, border-color .25s ease, transform .25s ease;
@@ -5150,7 +5169,7 @@ main { padding-bottom: 72px; }
   }
 
   .watchlist-row:not(:last-child) {
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid var(--color-border-subtle);
   }
 
   .watchlist-row:hover {
@@ -5407,7 +5426,7 @@ main { padding-bottom: 72px; }
 
 /* Add asset panel */
 .add-asset-panel {
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid var(--color-border-subtle);
   padding-top: var(--space-2);
   display: flex;
   flex-direction: column;
