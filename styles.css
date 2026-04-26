@@ -6154,6 +6154,9 @@ main { padding-bottom: 72px; }
   .mobile-slide-donut {
     display: flex;
     flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    padding-top: 0 !important;
   }
 
   /* Donut slide: stack donut + legend vertically */
@@ -6403,5 +6406,12 @@ body.is-detail-view .mobile-slide          { height: auto !important; }
 
 /* ── Donut spacing override ── */
 @media (max-width: 768px) {
-  .mobile-slide-donut .section-title { margin-bottom: 28px !important; }
+  .mobile-slide-donut {
+    justify-content: flex-start !important;
+    padding-top: 0 !important;
+  }
+
+  .mobile-slide-donut .section-title {
+    margin-bottom: 28px !important;
+  }
 }
