@@ -6156,20 +6156,6 @@ main { padding-bottom: 72px; }
     flex-direction: column;
     justify-content: flex-start;
     align-items: stretch;
-    align-content: flex-start !important;
-    padding-top: 0 !important;
-  }
-
-  .mobile-slide-donut * {
-    align-content: flex-start !important;
-  }
-
-  .mobile-slide-donut > * {
-    margin-top: 0 !important;
-  }
-
-  .mobile-slide-donut > *:first-child {
-    padding-top: 0 !important;
   }
 
   /* Donut slide: stack donut + legend vertically */
@@ -6341,8 +6327,12 @@ main { padding-bottom: 72px; }
     white-space: nowrap;
   }
 
-  /* ── Donut card spacing ── */
-  .mobile-slide-donut .section-title { margin-top: 0 !important; margin-bottom: 28px; }
+  /* ── Donut title alignment ── */
+  .mobile-slide-donut .section-title.card-title {
+    margin-top: 0 !important;
+    margin-bottom: 28px !important;
+    transform: translateY(-6px);
+  }
 }
 
 /* ── Global FAB menu — position: fixed, never clipped by any container ── */
@@ -6419,18 +6409,9 @@ body.is-detail-view .mobile-slide          { height: auto !important; }
 
 /* ── Donut spacing override ── */
 @media (max-width: 768px) {
-  .mobile-slide-donut,
-  .mobile-slide-donut * {
-    align-content: flex-start !important;
-  }
-
-  .mobile-slide-donut > * {
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-  }
-
-  .mobile-slide-donut .section-title {
+  .mobile-slide-donut .section-title.card-title {
     margin-top: 0 !important;
     margin-bottom: 28px !important;
+    transform: translateY(-6px);
   }
 }
