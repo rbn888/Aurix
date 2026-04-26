@@ -2656,7 +2656,7 @@ body:not(.hero-active) #orb-canvas {
   .hero-left {
     flex-shrink: 0;         /* never compress the value block */
     height: auto;           /* reset the desktop height:100% */
-    padding: 18px 20px 12px 20px;
+    padding: 18px 20px 10px 20px;
     border-right: none;
     border-bottom: none;
   }
@@ -2682,7 +2682,7 @@ body:not(.hero-active) #orb-canvas {
     gap: 10px;
   }
   .summary-footer {
-    margin-top: 14px;
+    margin-top: 10px;
     padding-top: 12px;
     border-top: none;
     gap: 6px;
@@ -6090,7 +6090,7 @@ main { padding-bottom: 72px; }
   .portfolio-slider-card {
     display: block;
     margin: 8px 0;
-    padding: 16px;
+    padding: 16px 16px 14px;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 20px;
