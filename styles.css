@@ -6276,3 +6276,13 @@ main { padding-bottom: 72px; }
 
   .fab-option:hover { border-color: var(--border-hi); }
 }
+
+/* ─── FAB position override — anchored to bottom, no dynamic-height dependency ─── */
+@media (max-width: 768px) {
+  .portfolio-actions-mobile {
+    right: 20px !important;
+    top: auto !important;
+    bottom: 16px !important;
+    transform: none !important;
+  }
+}
