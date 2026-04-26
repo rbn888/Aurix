@@ -6277,86 +6277,58 @@ main { padding-bottom: 72px; }
   .fab-option:hover { border-color: var(--border-hi); }
 }
 
-/* ─── FAB layout override — flex child of summary-meta-row, not absolute ─── */
-@media (max-width: 768px) {
-  .portfolio-actions-mobile {
-    position: relative !important;
-    top: auto !important;
-    right: auto !important;
-    bottom: auto !important;
-    transform: none !important;
-    flex-shrink: 0;
-  }
-}
-
-/* ─── Donut legend — compact auto-column grid on mobile ─── */
-@media (max-width: 768px) {
-  .distribution-legend {
-    display: grid !important;
-    grid-template-columns: auto auto !important;
-    justify-content: start;
-    column-gap: 24px;
-    row-gap: 10px;
-    width: fit-content;
-    margin: 0 auto;
-    margin-top: 12px;
-  }
-
-  .distribution-legend .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .distribution-legend .legend-label {
-    white-space: nowrap;
-  }
-}
-
-/* ─── Donut card spacing ─── */
-@media (max-width: 768px) {
-  .distribution-title { margin-bottom: 20px; }
-  .mobile-slide-donut { padding-top: 12px; }
-}
-
-/* ─── FAB UX — overflow unclip + tap feedback + floating menu premium ─── */
+/* ══════════════════════════════════════════════════════════
+   MOBILE OVERRIDES — CONSOLIDATED (FAB + DONUT)
+   ══════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
 
-  /* Unclip ALL ancestors that could cut the menu */
+  /* ── Unclip ancestors so menu floats freely ── */
   .hero-left,
   .summary-meta-row,
   .portfolio-actions-mobile {
     overflow: visible !important;
   }
 
-  /* FAB vertical micro-adjustment */
+  /* ── FAB container — flex child of summary-meta-row ── */
   .portfolio-actions-mobile {
-    align-self: center;
-    margin-top: 2px;
+    position: relative !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    display: flex !important;
+    align-items: center;
+    flex-shrink: 0;
   }
 
-  /* Tap feedback on trigger */
+  /* ── FAB trigger ── */
+  .fab-trigger {
+    position: relative;
+    z-index: 2;
+    transition: transform 0.15s ease;
+  }
+
   .fab-trigger:active {
-    transform: scale(0.92) !important;
+    transform: scale(0.95) !important;
     opacity: 0.85 !important;
   }
 
-  /* Opacity-based visibility — replaces display:none so transitions work */
+  /* ── FAB menu — absolute, anchored below trigger ── */
   .fab-menu {
     position: absolute !important;
-    top: calc(100% + 12px) !important;
-    right: 4px !important;
+    top: calc(100% + 10px) !important;
+    right: 0 !important;
     display: flex !important;
     flex-direction: column;
     gap: 10px;
     padding: 10px;
     min-width: 180px;
+    transform-origin: top right;
     opacity: 0;
     transform: translateY(-6px) scale(0.98);
     pointer-events: none;
     transition: opacity 0.18s ease, transform 0.18s ease;
-    z-index: 99999 !important;
-    overflow: visible !important;
+    z-index: 9999 !important;
     background: rgba(18, 20, 28, 0.98);
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 14px;
@@ -6373,7 +6345,7 @@ main { padding-bottom: 72px; }
     pointer-events: auto !important;
   }
 
-  /* Menu buttons */
+  /* ── Menu buttons ── */
   .fab-option {
     background: rgba(100, 150, 255, 0.05);
     border: 1px solid rgba(100, 150, 255, 0.25);
@@ -6391,9 +6363,35 @@ main { padding-bottom: 72px; }
     background: rgba(100, 150, 255, 0.15) !important;
     transform: scale(0.97);
   }
+
+  /* ── Donut legend — 2-column compact grid ── */
+  .distribution-legend {
+    display: grid !important;
+    grid-template-columns: auto auto !important;
+    justify-content: start;
+    column-gap: 24px;
+    row-gap: 10px;
+    width: fit-content;
+    margin: 12px auto 0;
+  }
+
+  .distribution-legend .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .distribution-legend .legend-label {
+    white-space: nowrap;
+  }
+
+  /* ── Donut card spacing ── */
+  .distribution-title { margin-bottom: 20px; }
+  .mobile-slide-donut { padding-top: 12px; }
 }
 
-/* ─── Hide donut slide when drilling into a category (body.is-detail-view already set by JS) ─── */
-body.is-detail-view .mobile-slide-donut {
-  display: none !important;
-}
+/* ── Category drill-down: collapse donut slide entirely (no gap) ── */
+body.is-detail-view .mobile-slide-donut    { display: none !important; }
+body.is-detail-view .portfolio-mobile-slider { height: auto !important; }
+body.is-detail-view .mobile-slider-track   { height: auto !important; }
+body.is-detail-view .mobile-slide          { height: auto !important; }
