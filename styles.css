@@ -6392,3 +6392,8 @@ main { padding-bottom: 72px; }
     transform: scale(0.97);
   }
 }
+
+/* ─── Hide donut slide when drilling into a category (body.is-detail-view already set by JS) ─── */
+body.is-detail-view .mobile-slide-donut {
+  display: none !important;
+}
