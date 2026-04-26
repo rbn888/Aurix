@@ -1435,7 +1435,7 @@ body:not(.hero-active) #orb-canvas {
 .hero-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   position: relative;
   overflow: hidden;
   display: grid;
@@ -1485,7 +1485,7 @@ body:not(.hero-active) #orb-canvas {
 .portfolio-combined-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -2674,7 +2674,7 @@ body:not(.hero-active) #orb-canvas {
     flex-direction: column;
     align-items: stretch;   /* reset desktop align-items:center so children fill full width */
     grid-template-columns: 1fr; /* no-op on flex, kept for clarity */
-    border-radius: 16px;
+    border-radius: var(--radius-md);
   }
   .hero-left {
     flex-shrink: 0;         /* never compress the value block */
@@ -6116,7 +6116,7 @@ main { padding-bottom: 72px; }
     padding: var(--space-3) var(--space-3) var(--space-2) !important;
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 20px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
     box-shadow: var(--shadow);
     transition: border-color var(--dur-med) var(--ease-premium);
@@ -6262,7 +6262,7 @@ main { padding-bottom: 72px; }
     background: rgba(59, 130, 246, 0.15);
     border: 1px solid rgba(59, 130, 246, 0.35);
     color: #60a5fa;
-    font-size: 20px;
+    font-size: var(--font-size-lg);
     line-height: 1;
     display: flex;
     align-items: center;
@@ -6294,7 +6294,7 @@ main { padding-bottom: 72px; }
     padding: 10px 14px;
     border-radius: 8px;
     white-space: nowrap;
-    font-size: 14px;
+    font-size: var(--font-size-sm);
     cursor: pointer;
     text-align: left;
     transition: border-color 0.15s ease;
