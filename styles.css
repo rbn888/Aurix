@@ -72,6 +72,13 @@ select:focus-visible {
   --color-stocks:      #EA580C;
   --color-cash:        #16A34A;
   --color-metals:      #CA8A04;
+
+  /* ── Spacing tokens (mobile-first, extend to desktop later) ── */
+  --space-1: 8px;
+  --space-2: 12px;
+  --space-3: 16px;
+  --space-4: 20px;
+  --space-5: 24px;
 }
 
 body {
@@ -2656,7 +2663,7 @@ body:not(.hero-active) #orb-canvas {
   .hero-left {
     flex-shrink: 0;         /* never compress the value block */
     height: auto;           /* reset the desktop height:100% */
-    padding: 18px 20px 6px 20px !important;
+    padding: 18px 20px var(--space-1) 20px !important;
     border-right: none;
     border-bottom: none;
   }
@@ -2682,7 +2689,7 @@ body:not(.hero-active) #orb-canvas {
     gap: 10px;
   }
   .summary-footer {
-    margin-top: 6px !important;
+    margin-top: var(--space-1) !important;
     padding-top: 12px;
     border-top: none;
     gap: 6px;
@@ -6090,7 +6097,7 @@ main { padding-bottom: 72px; }
   .portfolio-slider-card {
     display: block;
     margin: 8px 0;
-    padding: 16px 16px 10px !important;
+    padding: 16px 16px var(--space-2) !important;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 20px;
