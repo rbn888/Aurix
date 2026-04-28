@@ -553,18 +553,45 @@ const CLEAN_LOGO_OVERRIDE = {
   if (dirty) save();
 })();
 
-// One-time migration: populate aurix_assets + aurix_holdings from existing portfolio_assets.
-(function migrateV2() {
-  if (localStorage.getItem('aurix_migrated_v2')) return;
-  save();
-  localStorage.setItem('aurix_migrated_v2', 'true');
-})();
+// Versioned migration system — replaces migrateV2 + migrateSpecB.
+(function runMigrations() {
+  const VERSION_KEY = 'aurix_data_version';
+  const BACKUP_KEY  = 'aurix_data_backup';
 
-// SPEC B: backfill price_source + provider_id on all existing aurix_assets.
-(function migrateSpecB() {
-  if (localStorage.getItem('aurix_migrated_spec_b')) return;
-  save();
-  localStorage.setItem('aurix_migrated_spec_b', 'true');
+  const currentVersion = parseInt(localStorage.getItem(VERSION_KEY) || '0', 10);
+  if (currentVersion >= 2) return;
+
+  // Backup before any changes
+  try {
+    localStorage.setItem(BACKUP_KEY, JSON.stringify({
+      portfolio_assets: localStorage.getItem('portfolio_assets'),
+      aurix_assets:     localStorage.getItem('aurix_assets'),
+      aurix_holdings:   localStorage.getItem('aurix_holdings'),
+    }));
+  } catch (e) {
+    console.warn('[MIGRATE] Backup failed:', e.message);
+  }
+
+  // v1 → v2: ensure aurix_assets + aurix_holdings with price_source + provider_id
+  try {
+    const rawAssets = localStorage.getItem('aurix_assets');
+    if (rawAssets) {
+      // New model already exists — backfill SPEC B fields where missing
+      const catalogAssets = JSON.parse(rawAssets).map(a => ({
+        ...a,
+        price_source: a.price_source ?? inferPriceSource(a),
+        provider_id:  a.provider_id  ?? inferProviderId(a),
+      }));
+      localStorage.setItem('aurix_assets', JSON.stringify(catalogAssets));
+    } else {
+      // Legacy path: build aurix_assets + aurix_holdings from in-memory assets
+      save();
+    }
+    localStorage.setItem(VERSION_KEY, '2');
+  } catch (e) {
+    console.error('[MIGRATE] FAILED — full error:', e);
+    console.error('[MIGRATE] Stack:', e.stack);
+  }
 })();
 
 let pendingCoinId       = null;
