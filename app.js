@@ -1,6 +1,10 @@
 'use strict';
 console.log('APP JS LOADED');
 
+const IS_DEV =
+  location.hostname === 'localhost' ||
+  location.hostname === '127.0.0.1';
+
 // ── Internationalisation ───────────────────────────────────
 const LANG_KEY = 'portfolio_lang';
 let lang = localStorage.getItem(LANG_KEY) || 'es';
@@ -561,6 +565,8 @@ const CLEAN_LOGO_OVERRIDE = {
   const currentVersion = parseInt(localStorage.getItem(VERSION_KEY) || '0', 10);
   if (currentVersion >= 2) return;
 
+  if (IS_DEV) console.log('[DATA] migration start');
+
   // Backup before any changes
   try {
     localStorage.setItem(BACKUP_KEY, JSON.stringify({
@@ -577,20 +583,25 @@ const CLEAN_LOGO_OVERRIDE = {
     const rawAssets = localStorage.getItem('aurix_assets');
     if (rawAssets) {
       // New model already exists — backfill SPEC B fields where missing
-      const catalogAssets = JSON.parse(rawAssets).map(a => ({
-        ...a,
-        price_source: a.price_source ?? inferPriceSource(a),
-        provider_id:  a.provider_id  ?? inferProviderId(a),
-      }));
+      const catalogAssets = JSON.parse(rawAssets).map(a => {
+        if (IS_DEV && !a.provider_id) console.warn('[DATA] missing provider_id → inferred:', a.id);
+        return {
+          ...a,
+          price_source: a.price_source ?? inferPriceSource(a),
+          provider_id:  a.provider_id  ?? inferProviderId(a),
+        };
+      });
       localStorage.setItem('aurix_assets', JSON.stringify(catalogAssets));
     } else {
       // Legacy path: build aurix_assets + aurix_holdings from in-memory assets
       save();
     }
     localStorage.setItem(VERSION_KEY, '2');
+    if (IS_DEV) console.log('[DATA] migration success → version 2');
   } catch (e) {
     console.error('[MIGRATE] FAILED — full error:', e);
     console.error('[MIGRATE] Stack:', e.stack);
+    if (IS_DEV) console.error('[DATA] migration failed:', e);
   }
 })();
 
@@ -822,9 +833,13 @@ function convertToNewModel(flatAssets) {
 }
 
 function convertFromNewToFlat(catalogAssets, holdings) {
+  const assetMap = new Map(catalogAssets.map(a => [a.id, a]));
   return holdings.map(h => {
-    const asset = catalogAssets.find(a => a.id === h.asset_id);
-    if (!asset) return null;
+    const asset = assetMap.get(h.asset_id);
+    if (!asset) {
+      if (IS_DEV) console.warn('[DATA] Missing asset for holding:', h.asset_id);
+      return null;
+    }
     return {
       id:            h.id,
       name:          asset.name,
@@ -2160,7 +2175,9 @@ async function collectMarketPriceData(marketAssets) {
           const fb = getFallbackData(a.marketSymbol);
           if (fb) change24h = fb.change24h;
         }
-      } catch { /* skip this asset */ }
+      } catch {
+        if (IS_DEV) console.error('[DATA] price fetch error:', a.id);
+      }
       return { symbol: a.marketSymbol, price, change24h };
     })
   );
