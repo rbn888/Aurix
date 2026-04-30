@@ -20,15 +20,25 @@ if (typeof SUPABASE_URL !== 'undefined' && typeof SUPABASE_ANON_KEY !== 'undefin
   console.warn('[SUPABASE] client NOT initialized (missing config)');
 }
 
-const SUPABASE_USER_ID = '00000000-0000-0000-0000-000000000001';
+async function getUserId() {
+  if (!supabaseClient) return null;
+  try {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    return user?.id || null;
+  } catch {
+    return null;
+  }
+}
 
 async function supabaseLoadPortfolio() {
   if (!supabaseClient) return null;
+  const userId = await getUserId();
+  if (!userId) return null;
   try {
     const { data, error } = await supabaseClient
       .from('portfolio')
       .select('*')
-      .eq('user_id', SUPABASE_USER_ID)
+      .eq('user_id', userId)
       .single();
     if (error) {
       if (IS_DEV) console.warn('[SUPABASE] load error', error);
@@ -43,11 +53,13 @@ async function supabaseLoadPortfolio() {
 
 async function supabaseSavePortfolio(catalogAssets, holdings) {
   if (!supabaseClient) return;
+  const userId = await getUserId();
+  if (!userId) return;
   try {
     const { error } = await supabaseClient
       .from('portfolio')
       .upsert({
-        user_id: SUPABASE_USER_ID,
+        user_id: userId,
         assets:  catalogAssets,
         holdings,
         updated_at: new Date().toISOString()
@@ -56,6 +68,42 @@ async function supabaseSavePortfolio(catalogAssets, holdings) {
   } catch (err) {
     if (IS_DEV) console.warn('[SUPABASE] save exception', err);
   }
+}
+
+async function signUp(email, password) {
+  const { data, error } = await supabaseClient.auth.signUp({ email, password });
+  if (error) console.error('[AUTH] signup error', error);
+  return data;
+}
+
+async function signIn(email, password) {
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) console.error('[AUTH] login error', error);
+  return data;
+}
+
+async function signOut() {
+  await supabaseClient.auth.signOut();
+}
+
+if (supabaseClient) {
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (IS_DEV) console.log('[AUTH]', event);
+    if (session?.user) {
+      if (IS_DEV) console.log('[AUTH] logged in', session.user.id);
+    } else {
+      if (IS_DEV) console.log('[AUTH] logged out');
+    }
+    if (event === 'SIGNED_IN') {
+      supabaseLoadPortfolio().then(remote => {
+        if (remote?.assets && remote?.holdings) {
+          assets = convertFromNewToFlat(remote.assets, remote.holdings);
+          saveData({ assets: remote.assets, holdings: remote.holdings });
+          render(true);
+        }
+      });
+    }
+  });
 }
 
 // ── Internationalisation ───────────────────────────────────
@@ -9191,6 +9239,18 @@ document.addEventListener('DOMContentLoaded', () => {
       switchView('dashboard');
       switchTab('home');
     });
+  }
+
+  // Temporary auth UI
+  const emailEl    = document.getElementById('email');
+  const passwordEl = document.getElementById('password');
+  const signupBtn  = document.getElementById('signup');
+  const loginBtn   = document.getElementById('login');
+  const logoutBtn  = document.getElementById('logout');
+  if (emailEl && signupBtn && supabaseClient) {
+    signupBtn.onclick = () => signUp(emailEl.value, passwordEl.value);
+    loginBtn.onclick  = () => signIn(emailEl.value, passwordEl.value);
+    logoutBtn.onclick = () => signOut();
   }
 });
 
