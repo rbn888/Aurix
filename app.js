@@ -5,12 +5,20 @@ const IS_DEV =
   location.hostname === 'localhost' ||
   location.hostname === '127.0.0.1';
 
-const supabaseClient = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY
-);
+if (typeof SUPABASE_URL === 'undefined') {
+  console.error('[SUPABASE ERROR] config.js not loaded');
+}
+if (typeof window.supabase === 'undefined') {
+  console.error('[SUPABASE ERROR] CDN not loaded');
+}
 
-if (IS_DEV) console.log('[SUPABASE] client initialized');
+let supabaseClient = null;
+if (typeof SUPABASE_URL !== 'undefined' && typeof SUPABASE_ANON_KEY !== 'undefined' && window.supabase) {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  if (IS_DEV) console.log('[SUPABASE] client initialized');
+} else {
+  console.warn('[SUPABASE] client NOT initialized (missing config)');
+}
 
 // ── Internationalisation ───────────────────────────────────
 const LANG_KEY = 'portfolio_lang';
@@ -9167,4 +9175,9 @@ document.addEventListener('DOMContentLoaded', () => {
     menu.querySelector('[data-action="liquidity"]').onclick = openLiquidityModal;
   }
 })();
+
+if (IS_DEV) {
+  console.log('[DEBUG] SUPABASE_URL:', typeof SUPABASE_URL);
+  console.log('[DEBUG] supabase object:', typeof window.supabase);
+}
 
