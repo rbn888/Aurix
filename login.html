@@ -364,7 +364,7 @@
     // ── Password reset ─────────────────────────────────────────
     async function resetPassword(email) {
       return client.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + '/login.html',
+        redirectTo: window.location.origin + '/reset.html',
       });
     }
 

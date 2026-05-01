@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AURIX — Nueva contraseña</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-5);
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: -30%;
+      background:
+        radial-gradient(circle 750px at 22% 32%, rgba(79,142,247,.10) 0%, transparent 60%),
+        radial-gradient(circle 600px at 80% 74%, rgba(39,199,104,.06) 0%, transparent 60%);
+      animation: beta-bg-drift 26s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+
+    .auth-input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      border-radius: var(--radius-sm);
+      padding: 11px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 200ms ease, background 200ms ease;
+    }
+
+    .auth-input:focus {
+      border-color: rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .auth-input::placeholder { color: var(--text-dim); }
+    .auth-input:disabled     { opacity: 0.35; }
+
+    .auth-btn {
+      width: 100%;
+      margin-top: 2px;
+      padding: 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(79, 142, 247, 0.25);
+      background: rgba(79, 142, 247, 0.14);
+      color: #7fb8ff;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+      transition: opacity 160ms ease, transform 120ms ease;
+    }
+
+    .auth-btn:hover:not(:disabled) { opacity: 0.82; }
+    .auth-btn:active:not(:disabled) { transform: scale(0.97); }
+    .auth-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .auth-form {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #auth-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-bright);
+      letter-spacing: -0.01em;
+      margin-bottom: 2px;
+    }
+
+    .auth-message {
+      font-size: 12px;
+      text-align: center;
+      min-height: 16px;
+      letter-spacing: 0.01em;
+    }
+
+    .auth-link {
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      letter-spacing: 0.01em;
+      transition: color 160ms ease;
+      margin-top: 2px;
+    }
+
+    .auth-link:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+
+  <div class="beta-container">
+
+    <div class="beta-logo-above">
+      <span class="logo-aurix">AURIX</span>
+    </div>
+
+    <div class="beta-card">
+      <div class="beta-access-label">Nueva contraseña</div>
+      <p class="beta-hint">Elige una contraseña segura</p>
+
+      <div class="auth-form">
+        <h2 id="auth-title">Establecer contraseña</h2>
+        <input id="newPassword" type="password" class="auth-input"
+               placeholder="Nueva contraseña"
+               autocomplete="new-password">
+        <button id="updatePassword" class="auth-btn" disabled>Guardar contraseña</button>
+        <p id="message" class="auth-message"></p>
+        <p class="auth-link" id="backToLogin" onclick="window.location.href='login.html'">
+          Volver al inicio de sesión
+        </p>
+      </div>
+
+      <p class="beta-version">Private Beta &bull; v0.1</p>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script>
+    'use strict';
+
+    const msgEl  = document.getElementById('message');
+    const btn    = document.getElementById('updatePassword');
+    const passEl = document.getElementById('newPassword');
+
+    function setMsg(text, type) {
+      msgEl.textContent = text;
+      msgEl.style.color = type === 'error' ? 'var(--red)' : type === 'success' ? 'var(--green)' : 'var(--text-muted)';
+    }
+
+    // ── Supabase client ────────────────────────────────────────
+    let client = null;
+    if (typeof SUPABASE_URL !== 'undefined' && typeof SUPABASE_ANON_KEY !== 'undefined' && window.supabase) {
+      client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+
+    if (!client) {
+      setMsg('Supabase no disponible.', 'error');
+    } else {
+      // Supabase exchanges the recovery token from the URL hash automatically.
+      // Enable the button only once a PASSWORD_RECOVERY session is confirmed.
+      client.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          btn.disabled = false;
+          setMsg('Introduce tu nueva contraseña.', '');
+        }
+      });
+    }
+
+    btn.addEventListener('click', async () => {
+      const password = passEl.value;
+
+      if (!password || password.length < 6) {
+        setMsg('La contraseña debe tener al menos 6 caracteres.', 'error');
+        return;
+      }
+
+      btn.disabled    = true;
+      btn.textContent = 'Guardando…';
+
+      const { error } = await client.auth.updateUser({ password });
+
+      if (error) {
+        setMsg(error.message, 'error');
+        btn.disabled    = false;
+        btn.textContent = 'Guardar contraseña';
+      } else {
+        setMsg('Contraseña actualizada. Ya puedes iniciar sesión.', 'success');
+        btn.textContent = '¡Listo!';
+        setTimeout(() => { window.location.href = 'login.html'; }, 2000);
+      }
+    });
+
+    passEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !btn.disabled) btn.click();
+    });
+  </script>
+
+</body>
+</html>
