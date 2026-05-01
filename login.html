@@ -211,11 +211,11 @@
     }
 
     // Redirect if already authenticated
-    if (client) {
-      client.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) window.location.href = 'index.html';
-      });
-    }
+    (async () => {
+      if (!client) return;
+      const { data: { user } } = await client.auth.getUser();
+      if (user) window.location.href = 'index.html';
+    })();
 
     // ── Auth functions ─────────────────────────────────────────
     async function signIn(email, password) {
