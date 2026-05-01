@@ -315,21 +315,18 @@
     // ---------- HANDLER ----------
 
     let cooldown = false;
-    let waitDuration = 90; // increases on repeated rate limits, max 180
+    let waitDuration = 90;
     let rateLimitHits = 0;
 
     function startCooldown(seconds) {
       cooldown = true;
       submitBtn.disabled = true;
       errorEl.style.color = 'orange';
-
       let wait = seconds;
       errorEl.innerText = `Demasiados intentos. Espera ${wait}s`;
-
       const interval = setInterval(() => {
         wait--;
         errorEl.innerText = `Demasiados intentos. Espera ${wait}s`;
-
         if (wait <= 0) {
           clearInterval(interval);
           cooldown = false;
@@ -341,80 +338,76 @@
       }, 1000);
     }
 
-    submitBtn.addEventListener('click', async () => {
+    function handleSuccess() {
+      waitDuration = 90;
+      rateLimitHits = 0;
+      cooldown = false;
+      localStorage.removeItem('cooldown_until');
+    }
 
-      // Anti double submit + rate-limit cooldown
+    function handleRateLimit() {
+      rateLimitHits++;
+      localStorage.setItem('cooldown_until', Date.now() + waitDuration * 1000);
+      startCooldown(waitDuration);
+      errorEl.style.color = 'orange';
+      errorEl.innerText = rateLimitHits >= 2
+        ? 'Tu red está temporalmente limitada. Cambia de red o inténtalo más tarde.'
+        : `Demasiados intentos. Espera ${waitDuration}s.`;
+      waitDuration = Math.min(waitDuration + 30, 180);
+      submitBtn.innerText = 'Enviar enlace';
+    }
+
+    function handleError(err) {
+      const msg = (err?.message || '').toLowerCase();
+      const isRateLimit = msg.includes('rate') || msg.includes('too many') ||
+                          msg.includes('over') || msg.includes('limit');
+      if (isRateLimit) {
+        handleRateLimit();
+        return;
+      }
+      errorEl.style.color = 'var(--red)';
+      errorEl.innerText = 'Ha ocurrido un error. Inténtalo de nuevo.';
+      submitBtn.disabled = false;
+      submitBtn.innerText = 'Enviar enlace';
+    }
+
+    submitBtn.addEventListener('click', async () => {
       if (submitBtn.disabled || cooldown) return;
 
       const email = emailEl.value.trim();
-
-      // Validación básica UX
       if (!email || !email.includes('@')) {
         errorEl.style.color = 'var(--red)';
         errorEl.innerText = 'Introduce un email válido';
         return;
       }
 
-      // Reset UI
       errorEl.innerText = '';
       errorEl.style.color = 'var(--red)';
-
-      // Loading UX
       submitBtn.disabled = true;
       submitBtn.innerText = 'Enviando enlace...';
 
-      try {
-        if (mode === 'reset') {
-          const { error } = await client.auth.resetPasswordForEmail(email, {
-            redirectTo: 'https://rbn888.github.io/Aurix/reset-password.html'
-          });
-          if (error) throw error;
+      if (mode === 'reset') {
+        const { error } = await client.auth.resetPasswordForEmail(email, {
+          redirectTo: 'https://rbn888.github.io/Aurix/reset-password.html'
+        });
+        if (error) { handleError(error); return; }
+        handleSuccess();
+        submitBtn.innerText = 'Revisa tu email ✉️';
+        errorEl.style.color = 'var(--green)';
+        errorEl.innerText = 'Te hemos enviado un enlace para restablecer tu contraseña';
 
-          waitDuration = 90; rateLimitHits = 0;
-          cooldown = false;
-          localStorage.removeItem('cooldown_until');
-          submitBtn.innerText = 'Revisa tu email ✉️';
-          errorEl.style.color = 'var(--green)';
-          errorEl.innerText   = 'Te hemos enviado un enlace para restablecer tu contraseña';
-
-        } else {
-          const { error } = await client.auth.signInWithOtp({
-            email,
-            options: { emailRedirectTo: 'https://rbn888.github.io/Aurix/' }
-          });
-          if (error) throw error;
-
-          waitDuration = 90; rateLimitHits = 0;
-          cooldown = false;
-          localStorage.removeItem('cooldown_until');
-          localStorage.setItem('last_email', email);
-          sessionStorage.setItem('otp_sent', '1');
-
-          submitBtn.innerText = 'Revisa tu email ✉️';
-          errorEl.style.color = 'var(--green)';
-          errorEl.innerText   = 'Te hemos enviado un enlace de acceso';
-        }
-
-      } catch (err) {
-        const msg = (err?.message || '').toLowerCase();
-        const isRateLimit = msg.includes('rate') || msg.includes('too many') ||
-                            msg.includes('over') || msg.includes('limit');
-
-        if (isRateLimit) {
-          rateLimitHits++;
-          localStorage.setItem('cooldown_until', Date.now() + waitDuration * 1000);
-          startCooldown(waitDuration);
-          waitDuration = Math.min(waitDuration + 30, 180);
-          submitBtn.innerText = 'Enviar enlace';
-          if (rateLimitHits >= 2) {
-            errorEl.innerText = 'Tu red está temporalmente limitada. Cambia a datos móviles o inténtalo más tarde.';
-          }
-        } else {
-          errorEl.style.color = 'var(--red)';
-          errorEl.innerText = 'Ha ocurrido un error. Inténtalo de nuevo.';
-          submitBtn.disabled  = false;
-          submitBtn.innerText = 'Enviar enlace';
-        }
+      } else {
+        const { error } = await client.auth.signInWithOtp({
+          email,
+          options: { emailRedirectTo: 'https://rbn888.github.io/Aurix/' }
+        });
+        if (error) { handleError(error); return; }
+        handleSuccess();
+        localStorage.setItem('last_email', email);
+        sessionStorage.setItem('otp_sent', '1');
+        submitBtn.innerText = 'Revisa tu email ✉️';
+        errorEl.style.color = 'var(--green)';
+        errorEl.innerText = 'Te hemos enviado un enlace de acceso';
       }
     });
 
