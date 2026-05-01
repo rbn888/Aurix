@@ -292,51 +292,44 @@
     // ---------- HANDLER ----------
 
     let cooldown = false;
-    let waitDuration = 90;
     let rateLimitHits = 0;
 
     function startCooldown(seconds) {
       cooldown = true;
       submitBtn.disabled = true;
       errorEl.style.color = 'orange';
-      let wait = seconds;
-      errorEl.innerText = `Demasiados intentos. Espera ${wait}s`;
+      let remaining = seconds;
+      errorEl.innerText = `Demasiados intentos. Espera ${remaining}s`;
       const interval = setInterval(() => {
-        wait--;
-        errorEl.innerText = `Demasiados intentos. Espera ${wait}s`;
-        if (wait <= 0) {
+        remaining--;
+        errorEl.innerText = `Demasiados intentos. Espera ${remaining}s`;
+        if (remaining <= 0) {
           clearInterval(interval);
           cooldown = false;
+          rateLimitHits = 0;
+          localStorage.removeItem('cooldown_until');
           submitBtn.disabled = false;
           submitBtn.innerText = 'Enviar acceso';
           errorEl.innerText = '';
-          errorEl.style.color = 'var(--red)';
-          localStorage.removeItem('cooldown_until');
         }
       }, 1000);
     }
 
     function handleSuccess(message) {
-      waitDuration = 90;
-      rateLimitHits = 0;
       cooldown = false;
+      rateLimitHits = 0;
       localStorage.removeItem('cooldown_until');
       submitBtn.disabled = false;
       submitBtn.innerText = 'Enviar acceso';
       errorEl.style.color = 'var(--green)';
-      errorEl.innerText = message || 'Te hemos enviado un enlace. Revisa tu correo.';
+      errorEl.innerText = message;
     }
 
     function handleRateLimit() {
       rateLimitHits++;
+      const waitDuration = Math.min(90 + (rateLimitHits - 1) * 30, 180);
       localStorage.setItem('cooldown_until', Date.now() + waitDuration * 1000);
       startCooldown(waitDuration);
-      errorEl.style.color = 'orange';
-      errorEl.innerText = rateLimitHits >= 2
-        ? 'Tu red está temporalmente limitada. Cambia de red o inténtalo más tarde.'
-        : `Demasiados intentos. Espera ${waitDuration}s.`;
-      waitDuration = Math.min(waitDuration + 30, 180);
-      submitBtn.innerText = 'Enviar acceso';
     }
 
     function handleError(err) {
@@ -356,7 +349,19 @@
     }
 
     submitBtn.addEventListener('click', async () => {
-      if (submitBtn.disabled || cooldown) return;
+      if (submitBtn.disabled) return;
+
+      // Self-heal: in-memory cooldown flag may be stale after suspension/sleep
+      if (cooldown) {
+        const cooldownUntil = Number(localStorage.getItem('cooldown_until') || 0);
+        if (cooldownUntil <= Date.now()) {
+          cooldown = false;
+          rateLimitHits = 0;
+          localStorage.removeItem('cooldown_until');
+        } else {
+          return;
+        }
+      }
 
       const email = emailEl.value.trim();
       if (!email || !email.includes('@')) {
@@ -383,9 +388,14 @@
 
     // ---------- UX RESTORE (post refresh) ----------
 
-    const _until = parseInt(localStorage.getItem('cooldown_until') || '0', 10);
-    if (_until && Date.now() < _until) {
-      startCooldown(Math.ceil((_until - Date.now()) / 1000));
+    const cooldownUntil = Number(localStorage.getItem('cooldown_until') || 0);
+    if (cooldownUntil > Date.now()) {
+      startCooldown(Math.ceil((cooldownUntil - Date.now()) / 1000));
+    } else {
+      // Hard reset: clears any stuck state from a previous session
+      localStorage.removeItem('cooldown_until');
+      cooldown = false;
+      rateLimitHits = 0;
     }
 
     if (sessionStorage.getItem('otp_sent')) {
