@@ -228,9 +228,9 @@
     // ── State ──────────────────────────────────────────────────
     let authMode       = 'login';
     let inviteUnlocked = false;
+    let currentInvite  = null;
 
     // ── DOM refs ───────────────────────────────────────────────
-    const VALID_CODE  = 'AURIX123';
     const inviteInput = document.getElementById('inviteCode');
     const authSection = document.getElementById('authSection');
     const inviteCheck = document.getElementById('inviteCheck');
@@ -240,9 +240,33 @@
     const errorEl     = document.getElementById('auth-error');
 
     // ── Invite gate ────────────────────────────────────────────
-    inviteInput.addEventListener('input', () => {
-      if (inviteInput.value.trim().toUpperCase() === VALID_CODE) {
+    async function validateInvite(code) {
+      if (!client || !code) return { valid: false };
+      try {
+        const { data, error } = await client
+          .from('invite_codes')
+          .select('*')
+          .eq('code', code)
+          .single();
+        if (error || !data)                   return { valid: false };
+        if (!data.active)                     return { valid: false };
+        if (data.used_count >= data.max_uses) return { valid: false };
+        return { valid: true, invite: data };
+      } catch {
+        return { valid: false };
+      }
+    }
+
+    inviteInput.addEventListener('input', async () => {
+      const code = inviteInput.value.trim().toUpperCase();
+      if (!code) return;
+      const result = await validateInvite(code);
+      if (result.valid) {
+        currentInvite = result.invite;
         unlockAuth();
+      } else {
+        currentInvite = null;
+        updateInviteState(false);
       }
     });
 
@@ -320,6 +344,11 @@
       } else if (authMode === 'login') {
         window.location.href = 'index.html';
       } else {
+        if (currentInvite) {
+          client.from('invite_codes')
+            .update({ used_count: currentInvite.used_count + 1 })
+            .eq('id', currentInvite.id);
+        }
         errorEl.style.color = 'var(--green)';
         errorEl.innerText   = 'Cuenta creada — revisa tu email para confirmar.';
         submitBtn.disabled  = false;
