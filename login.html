@@ -316,6 +316,7 @@
 
     let cooldown = false;
     let waitDuration = 90; // increases on repeated rate limits, max 180
+    let rateLimitHits = 0;
 
     function startCooldown(seconds) {
       cooldown = true;
@@ -369,7 +370,9 @@
           });
           if (error) throw error;
 
-          waitDuration = 90;
+          waitDuration = 90; rateLimitHits = 0;
+          cooldown = false;
+          localStorage.removeItem('cooldown_until');
           submitBtn.innerText = 'Revisa tu email ✉️';
           errorEl.style.color = 'var(--green)';
           errorEl.innerText   = 'Te hemos enviado un enlace para restablecer tu contraseña';
@@ -381,7 +384,9 @@
           });
           if (error) throw error;
 
-          waitDuration = 90;
+          waitDuration = 90; rateLimitHits = 0;
+          cooldown = false;
+          localStorage.removeItem('cooldown_until');
           localStorage.setItem('last_email', email);
           sessionStorage.setItem('otp_sent', '1');
 
@@ -391,13 +396,19 @@
         }
 
       } catch (err) {
-        const msg = err?.message || '';
+        const msg = (err?.message || '').toLowerCase();
+        const isRateLimit = msg.includes('rate') || msg.includes('too many') ||
+                            msg.includes('over') || msg.includes('limit');
 
-        if (msg.toLowerCase().includes('rate')) {
+        if (isRateLimit) {
+          rateLimitHits++;
           localStorage.setItem('cooldown_until', Date.now() + waitDuration * 1000);
           startCooldown(waitDuration);
           waitDuration = Math.min(waitDuration + 30, 180);
           submitBtn.innerText = 'Enviar enlace';
+          if (rateLimitHits >= 2) {
+            errorEl.innerText = 'Tu red está temporalmente limitada. Cambia a datos móviles o inténtalo más tarde.';
+          }
         } else {
           errorEl.style.color = 'var(--red)';
           errorEl.innerText = 'Ha ocurrido un error. Inténtalo de nuevo.';
