@@ -110,7 +110,10 @@ if (supabaseClient) {
 }
 
 async function requireAuth() {
-  if (!supabaseClient) return null; // no client → allow (offline / local dev)
+  if (!supabaseClient) {
+    window.location.href = 'login.html';
+    return false;
+  }
   try {
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) {
