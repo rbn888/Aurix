@@ -148,25 +148,26 @@ if (supabaseClient && !window.__AUTH_LISTENER__) {
   });
 }
 
-// iOS: magic link opens in Safari with access_token hash → let Supabase
-// process the token (createClient handles it), then load cleanly.
-if (window.location.hash.includes('access_token')) {
-  setTimeout(() => safeRedirect('index.html'), 100);
-}
-
-const waitForSession = async () => {
-  try {
-    for (let i = 0; i < 5; i++) {
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      if (session) return session;
-      await new Promise(r => setTimeout(r, 100));
+const waitForSession = () => new Promise(resolve => {
+  let done = false;
+  const finish = (val) => {
+    if (done) return;
+    done = true;
+    sub.unsubscribe();
+    clearTimeout(t);
+    resolve(val ?? null);
+  };
+  const t = setTimeout(() => finish(null), 5000);
+  const { data: { subscription: sub } } = supabaseClient.auth.onAuthStateChange((event, sess) => {
+    if (event === 'INITIAL_SESSION') {
+      finish(sess);
+    } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      finish(sess);
+    } else if (event === 'SIGNED_OUT') {
+      finish(null);
     }
-    return null;
-  } catch (e) {
-    console.error('[SESSION ERROR]', e);
-    return null;
-  }
-};
+  });
+});
 
 const ensureSession = async () => {
   const { data: { session } } = await supabaseClient.auth.getSession();

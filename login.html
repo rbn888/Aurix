@@ -182,14 +182,12 @@
 
       <!-- Auth form (locked until invite) -->
       <div id="authSection" class="auth-section locked">
-        <h2 id="auth-title">Iniciar sesión</h2>
+        <h2 id="auth-title">Acceder</h2>
         <input id="email" type="email" class="auth-input"
                placeholder="correo electrónico"
                autocomplete="email" disabled>
-        <button id="auth-submit" class="auth-btn" disabled>Enviar enlace</button>
+        <button id="auth-submit" class="auth-btn" disabled>Enviar acceso</button>
         <p id="auth-error" class="auth-error"></p>
-        <p id="forgot-link" class="auth-link">¿Olvidaste tu contraseña?</p>
-        <p id="back-link" class="auth-link" style="display:none">← Volver al inicio de sesión</p>
       </div>
 
       <p class="beta-version">Private Beta &bull; v0.1</p>
@@ -213,12 +211,17 @@
       window.location.href = base + path;
     }
 
-    // Redirect if already authenticated
-    (async () => {
-      if (!client) return;
-      const { data: { user } } = await client.auth.getUser();
-      if (user) safeRedirect('index.html');
-    })();
+    if (client) {
+      // Fast redirect if session already exists
+      client.auth.getSession().then(({ data: { session } }) => {
+        if (session) safeRedirect('index.html');
+      });
+
+      // Catch SIGNED_IN in case a magic link exchange completes while on this page
+      client.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session) safeRedirect('index.html');
+      });
+    }
 
     // ── DOM refs ───────────────────────────────────────────────
     const inviteInput = document.getElementById('inviteCode');
@@ -227,8 +230,6 @@
     const emailEl     = document.getElementById('email');
     const submitBtn   = document.getElementById('auth-submit');
     const errorEl     = document.getElementById('auth-error');
-    const forgotLink  = document.getElementById('forgot-link');
-    const backLink    = document.getElementById('back-link');
 
     // ── Invite gate ────────────────────────────────────────────
     async function validateInvite(code) {
@@ -259,38 +260,17 @@
       }
     });
 
-    // ── Mode (login | reset) ───────────────────────────────────
-    let mode = 'login';
-
-    function setMode(m) {
-      mode = m;
-      errorEl.innerText = '';
-      if (m === 'reset') {
-        document.getElementById('auth-title').innerText = 'Restablecer contraseña';
-        forgotLink.style.display = 'none';
-        backLink.style.display   = 'block';
-      } else {
-        document.getElementById('auth-title').innerText = 'Iniciar sesión';
-        forgotLink.style.display = 'block';
-        backLink.style.display   = 'none';
-      }
-    }
-
-    forgotLink.addEventListener('click', () => setMode('reset'));
-    backLink.addEventListener('click',   () => setMode('login'));
-
     function lockAuth() {
-      emailEl.disabled    = true;
-      submitBtn.disabled  = true;
+      emailEl.disabled   = true;
+      submitBtn.disabled = true;
       authSection.classList.remove('unlocked');
       authSection.classList.add('locked');
       inviteCheck.classList.remove('visible');
-      setMode('login');
     }
 
     function unlockAuth() {
-      emailEl.disabled    = false;
-      submitBtn.disabled  = false;
+      emailEl.disabled   = false;
+      submitBtn.disabled = false;
       authSection.classList.remove('locked');
       authSection.classList.add('unlocked');
       inviteCheck.classList.add('visible');
@@ -299,16 +279,13 @@
 
     // ---------- INIT ----------
 
-    // Prefill email
     const savedEmail = localStorage.getItem('last_email');
     if (savedEmail) emailEl.value = savedEmail;
 
-    // Enter → submit (solo en email, no global)
     emailEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') submitBtn.click();
     });
 
-    // Estado inicial
     lockAuth();
 
 
@@ -331,7 +308,7 @@
           clearInterval(interval);
           cooldown = false;
           submitBtn.disabled = false;
-          submitBtn.innerText = 'Enviar enlace';
+          submitBtn.innerText = 'Enviar acceso';
           errorEl.innerText = '';
           errorEl.style.color = 'var(--red)';
           localStorage.removeItem('cooldown_until');
@@ -345,7 +322,7 @@
       cooldown = false;
       localStorage.removeItem('cooldown_until');
       submitBtn.disabled = false;
-      submitBtn.innerText = 'Enviar enlace';
+      submitBtn.innerText = 'Enviar acceso';
       errorEl.style.color = 'var(--green)';
       errorEl.innerText = message || 'Te hemos enviado un enlace. Revisa tu correo.';
     }
@@ -359,7 +336,7 @@
         ? 'Tu red está temporalmente limitada. Cambia de red o inténtalo más tarde.'
         : `Demasiados intentos. Espera ${waitDuration}s.`;
       waitDuration = Math.min(waitDuration + 30, 180);
-      submitBtn.innerText = 'Enviar enlace';
+      submitBtn.innerText = 'Enviar acceso';
     }
 
     function handleError(err) {
@@ -374,7 +351,7 @@
       errorEl.innerText = 'Ha ocurrido un error. Inténtalo de nuevo.';
       if (!cooldown) {
         submitBtn.disabled = false;
-        submitBtn.innerText = 'Enviar enlace';
+        submitBtn.innerText = 'Enviar acceso';
       }
     }
 
@@ -391,31 +368,21 @@
       errorEl.innerText = '';
       errorEl.style.color = 'var(--red)';
       submitBtn.disabled = true;
-      submitBtn.innerText = 'Enviando enlace...';
+      submitBtn.innerText = 'Enviando acceso...';
 
-      if (mode === 'reset') {
-        const { error } = await client.auth.resetPasswordForEmail(email, {
-          redirectTo: 'https://rbn888.github.io/Aurix/reset-password.html'
-        });
-        if (error) { handleError(error); return; }
-        handleSuccess('Te hemos enviado un enlace para restablecer tu contraseña.');
-
-      } else {
-        const { error } = await client.auth.signInWithOtp({
-          email,
-          options: { emailRedirectTo: 'https://rbn888.github.io/Aurix/' }
-        });
-        if (error) { handleError(error); return; }
-        localStorage.setItem('last_email', email);
-        sessionStorage.setItem('otp_sent', '1');
-        handleSuccess('Te hemos enviado un enlace de acceso.');
-      }
+      const { error } = await client.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: 'https://rbn888.github.io/Aurix/index.html' }
+      });
+      if (error) { handleError(error); return; }
+      localStorage.setItem('last_email', email);
+      sessionStorage.setItem('otp_sent', '1');
+      handleSuccess('Te hemos enviado un enlace de acceso.');
     });
 
 
     // ---------- UX RESTORE (post refresh) ----------
 
-    // Resume cooldown if page was refreshed mid-countdown
     const _until = parseInt(localStorage.getItem('cooldown_until') || '0', 10);
     if (_until && Date.now() < _until) {
       startCooldown(Math.ceil((_until - Date.now()) / 1000));
@@ -426,10 +393,9 @@
       errorEl.style.color = 'var(--green)';
       errorEl.innerText = 'Te hemos enviado un enlace de acceso';
 
-      // Permitir reintento tras unos segundos (UX pro)
       setTimeout(() => {
         submitBtn.disabled = false;
-        submitBtn.innerText = 'Reenviar enlace';
+        submitBtn.innerText = 'Reenviar acceso';
       }, 5000);
     }
   </script>
