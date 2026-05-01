@@ -122,7 +122,8 @@ async function requireAuth() {
     }
     return user;
   } catch {
-    return null; // network error → allow, don't redirect
+    window.location.href = 'login.html';
+    return false;
   }
 }
 
