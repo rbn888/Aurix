@@ -148,6 +148,12 @@ if (supabaseClient && !window.__AUTH_LISTENER__) {
   });
 }
 
+// iOS: magic link opens in Safari with access_token hash → let Supabase
+// process the token (createClient handles it), then load cleanly.
+if (window.location.hash.includes('access_token')) {
+  setTimeout(() => safeRedirect('index.html'), 100);
+}
+
 const waitForSession = async () => {
   try {
     for (let i = 0; i < 5; i++) {

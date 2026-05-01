@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base href="/Aurix/">
   <title>AURIX — Acceso</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -313,10 +314,12 @@
 
     // ---------- HANDLER ----------
 
+    let cooldown = false;
+
     submitBtn.addEventListener('click', async () => {
 
-      // Anti double submit (CRÍTICO)
-      if (submitBtn.disabled) return;
+      // Anti double submit + rate-limit cooldown
+      if (submitBtn.disabled || cooldown) return;
 
       const email = emailEl.value.trim();
 
@@ -366,8 +369,10 @@
 
         errorEl.style.color = 'var(--red)';
         if (msg.toLowerCase().includes('rate')) {
+          cooldown = true;
           errorEl.style.color = 'orange';
-          errorEl.innerText = 'Has hecho varios intentos. Espera 1–2 minutos e inténtalo de nuevo.';
+          errorEl.innerText = 'Has hecho varios intentos. Espera 60 segundos.';
+          setTimeout(() => { cooldown = false; }, 60000);
         } else {
           errorEl.innerText = 'Ha ocurrido un error. Inténtalo de nuevo.';
         }
