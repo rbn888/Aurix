@@ -7934,7 +7934,11 @@ document.getElementById('appRoot').style.opacity = '0';
 
   document.getElementById('appRoot').style.opacity = '';
   render(true);
-  document.getElementById('bootLoader')?.remove();
+  const loader = document.getElementById('bootLoader');
+  if (loader) {
+    loader.style.opacity = '0';
+    setTimeout(() => loader.remove(), 200);
+  }
 })();
 
 // Bootstrap simulated history if this is the first session
