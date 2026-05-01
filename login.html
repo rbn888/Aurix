@@ -207,11 +207,16 @@
       client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     }
 
+    function safeRedirect(path) {
+      const base = 'https://rbn888.github.io/Aurix/';
+      window.location.href = base + path;
+    }
+
     // Redirect if already authenticated
     (async () => {
       if (!client) return;
       const { data: { user } } = await client.auth.getUser();
-      if (user) window.location.href = 'index.html';
+      if (user) safeRedirect('index.html');
     })();
 
     // ── DOM refs ───────────────────────────────────────────────
@@ -342,7 +347,10 @@
           errorEl.innerText   = 'Te hemos enviado un enlace para restablecer tu contraseña';
 
         } else {
-          const { error } = await client.auth.signInWithOtp({ email });
+          const { error } = await client.auth.signInWithOtp({
+            email,
+            options: { emailRedirectTo: 'https://rbn888.github.io/Aurix/' }
+          });
           if (error) throw error;
 
           localStorage.setItem('last_email', email);
@@ -357,9 +365,12 @@
         const msg = err?.message || '';
 
         errorEl.style.color = 'var(--red)';
-        errorEl.innerText = msg.includes('rate limit')
-          ? 'Demasiados intentos. Espera un momento.'
-          : 'Ha ocurrido un error. Inténtalo de nuevo.';
+        if (msg.toLowerCase().includes('rate')) {
+          errorEl.style.color = 'orange';
+          errorEl.innerText = 'Has hecho varios intentos. Espera 1–2 minutos e inténtalo de nuevo.';
+        } else {
+          errorEl.innerText = 'Ha ocurrido un error. Inténtalo de nuevo.';
+        }
 
         submitBtn.disabled  = false;
         submitBtn.innerText = 'Enviar enlace';

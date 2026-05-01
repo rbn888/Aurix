@@ -20,6 +20,11 @@ if (typeof SUPABASE_URL !== 'undefined' && typeof SUPABASE_ANON_KEY !== 'undefin
   console.warn('[SUPABASE] client NOT initialized (missing config)');
 }
 
+function safeRedirect(path) {
+  const base = 'https://rbn888.github.io/Aurix/';
+  window.location.href = base + path;
+}
+
 async function getUserId() {
   if (!supabaseClient) return null;
   try {
@@ -133,12 +138,12 @@ if (supabaseClient && !window.__AUTH_LISTENER__) {
   supabaseClient.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_IN') {
       if (!window.location.pathname.includes('index.html')) {
-        window.location.href = 'index.html';
+        safeRedirect('index.html');
       }
     }
     if (event === 'SIGNED_OUT') {
       sessionStorage.removeItem('otp_sent');
-      window.location.href = 'login.html';
+      safeRedirect('login.html');
     }
   });
 }
@@ -161,7 +166,7 @@ const ensureSession = async () => {
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) {
     if (!window.location.pathname.includes('login.html')) {
-      window.location.href = 'login.html';
+      safeRedirect('login.html');
     }
     return null;
   }
@@ -170,18 +175,18 @@ const ensureSession = async () => {
 
 async function requireAuth() {
   if (!supabaseClient) {
-    window.location.href = 'login.html';
+    safeRedirect('login.html');
     return false;
   }
   try {
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) {
-      window.location.href = 'login.html';
-      return false; // actively redirecting — caller must stop
+      safeRedirect('login.html');
+      return false;
     }
     return user;
   } catch {
-    window.location.href = 'login.html';
+    safeRedirect('login.html');
     return false;
   }
 }
@@ -7983,7 +7988,7 @@ document.getElementById('appRoot').style.opacity = '0';
 
     if (!session) {
       if (!window.location.pathname.includes('login.html')) {
-        window.location.href = 'login.html';
+        safeRedirect('login.html');
       }
       return;
     }
@@ -8008,7 +8013,7 @@ document.getElementById('appRoot').style.opacity = '0';
   } catch (e) {
     console.error('[BOOT ERROR]', e);
     if (!window.location.pathname.includes('login.html')) {
-      window.location.href = 'login.html';
+      safeRedirect('login.html');
     }
   }
 })();
