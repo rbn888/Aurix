@@ -188,6 +188,7 @@
         <input id="password" type="password" class="auth-input"
                placeholder="contraseña"
                autocomplete="current-password" disabled>
+        <p id="forgotPassword" class="auth-switch">¿Olvidaste tu contraseña?</p>
         <button id="auth-submit" class="auth-btn" disabled>Entrar</button>
         <p id="auth-switch" class="auth-switch"></p>
         <p id="auth-error" class="auth-error"></p>
@@ -359,6 +360,30 @@
     passwordEl.addEventListener('keydown', e => {
       if (e.key === 'Enter') submitBtn.click();
     });
+
+    // ── Password reset ─────────────────────────────────────────
+    async function resetPassword(email) {
+      return client.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/login.html',
+      });
+    }
+
+    document.getElementById('forgotPassword').onclick = async () => {
+      const email = emailEl.value.trim();
+      if (!email) {
+        errorEl.style.color = 'var(--red)';
+        errorEl.innerText   = 'Introduce tu email primero.';
+        return;
+      }
+      const { error } = await resetPassword(email);
+      if (error) {
+        errorEl.style.color = 'var(--red)';
+        errorEl.innerText   = 'Ha ocurrido un error. Inténtalo de nuevo.';
+      } else {
+        errorEl.style.color = 'var(--green)';
+        errorEl.innerText   = 'Revisa tu email para cambiar la contraseña.';
+      }
+    };
 
     // ── Init ───────────────────────────────────────────────────
     updateInviteState(false);
