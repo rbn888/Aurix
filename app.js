@@ -7934,6 +7934,7 @@ document.getElementById('appRoot').style.opacity = '0';
 
   document.getElementById('appRoot').style.opacity = '';
   render(true);
+  document.getElementById('bootLoader')?.remove();
 })();
 
 // Bootstrap simulated history if this is the first session
