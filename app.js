@@ -110,16 +110,16 @@ if (supabaseClient) {
 }
 
 async function requireAuth() {
-  if (!supabaseClient) return null;
+  if (!supabaseClient) return null; // no client → allow (offline / local dev)
   try {
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) {
       window.location.href = 'login.html';
-      return null;
+      return false; // actively redirecting — caller must stop
     }
     return user;
   } catch {
-    return null;
+    return null; // network error → allow, don't redirect
   }
 }
 
@@ -7909,21 +7909,23 @@ document.querySelectorAll('.menu-curr-btn')
 const _perfCurrBtn = document.getElementById('perfCurrBtn');
 if (_perfCurrBtn) _perfCurrBtn.textContent = baseCurrency === 'EUR' ? '€' : '$';
 
-render(true);
+document.getElementById('appRoot').style.opacity = '0';
 
 (async () => {
   const user = await requireAuth();
-  if (!user) return;
+  if (user === false) return; // redirecting to login.html — do not render
 
   const remote = await supabaseLoadPortfolio();
   if (remote && remote.assets && remote.holdings) {
     if (IS_DEV) console.log('[SUPABASE] loaded remote portfolio');
     assets = convertFromNewToFlat(remote.assets, remote.holdings);
     saveData({ assets: remote.assets, holdings: remote.holdings });
-    render(true);
   } else {
     if (IS_DEV) console.log('[SUPABASE] using local portfolio');
   }
+
+  document.getElementById('appRoot').style.opacity = '';
+  render(true);
 })();
 
 // Bootstrap simulated history if this is the first session
