@@ -260,14 +260,12 @@
       }
     });
 
-    // ── Shared state (declared here so lockAuth/unlockAuth can read cooldown) ──
-    let authUnlocked = false;
-    let cooldown     = false;
-    let rateLimitHits    = 0;
-    let _cooldownTimer   = null;
+    // ── Shared state ───────────────────────────────────────────
+    let cooldown       = false;
+    let rateLimitHits  = 0;
+    let _cooldownTimer = null;
 
     function lockAuth() {
-      authUnlocked = false;
       emailEl.disabled   = true;
       submitBtn.disabled = true;
       authSection.classList.remove('unlocked');
@@ -276,14 +274,12 @@
     }
 
     function unlockAuth() {
-      authUnlocked = true;
       emailEl.disabled = false;
-      // Only enable submit if cooldown is not active
-      if (!cooldown) submitBtn.disabled = false;
       authSection.classList.remove('locked');
       authSection.classList.add('unlocked');
       inviteCheck.classList.add('visible');
       emailEl.focus();
+      updateSubmitState();
     }
 
     // ---------- INIT ----------
@@ -291,6 +287,7 @@
     const savedEmail = localStorage.getItem('last_email');
     if (savedEmail) emailEl.value = savedEmail;
 
+    emailEl.addEventListener('input', updateSubmitState);
     emailEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') submitBtn.click();
     });
@@ -300,6 +297,12 @@
 
     // ---------- HANDLER ----------
 
+    // Single source of truth for submit button enabled state
+    function updateSubmitState() {
+      if (cooldown) { submitBtn.disabled = true; return; }
+      submitBtn.disabled = !(emailEl.value && emailEl.value.includes('@'));
+    }
+
     function clearTimer() {
       if (_cooldownTimer !== null) {
         clearInterval(_cooldownTimer);
@@ -307,7 +310,6 @@
       }
     }
 
-    // Full reset: state + storage + UI (only re-enables button if invite gate is open)
     function resetCooldownState() {
       clearTimer();
       cooldown = false;
@@ -315,36 +317,28 @@
       localStorage.removeItem('cooldown_until');
       errorEl.innerText = '';
       errorEl.style.color = 'var(--red)';
-      if (authUnlocked) {
-        submitBtn.disabled = false;
-        submitBtn.innerText = 'Enviar acceso';
-      }
+      updateSubmitState();
     }
 
-    // until = absolute timestamp (ms) — always anchored to real time, iOS-safe
+    // until = absolute ms timestamp — iOS/Safari-safe (no drift after suspension)
     function startCooldown(until) {
       clearTimer();
       cooldown = true;
-      submitBtn.disabled = true;
-      errorEl.style.color = 'orange';
+      updateSubmitState();
 
       const tick = () => {
         const remaining = Math.ceil((until - Date.now()) / 1000);
-        if (remaining <= 0) {
-          resetCooldownState();
-          return;
-        }
+        if (remaining <= 0) { resetCooldownState(); return; }
+        errorEl.style.color = 'orange';
         errorEl.innerText = `Demasiados intentos. Espera ${remaining}s`;
       };
 
-      tick(); // render immediately, don't wait first second
+      tick();
       _cooldownTimer = setInterval(tick, 1000);
     }
 
     function handleSuccess(message) {
       resetCooldownState();
-      // Always re-enable after a successful send (auth section is open at this point)
-      submitBtn.disabled = false;
       submitBtn.innerText = 'Enviar acceso';
       errorEl.style.color = 'var(--green)';
       errorEl.innerText = message;
@@ -362,16 +356,10 @@
       const msg = (err?.message || '').toLowerCase();
       const isRateLimit = msg.includes('rate') || msg.includes('too many') ||
                           msg.includes('over') || msg.includes('limit');
-      if (isRateLimit) {
-        handleRateLimit();
-        return;
-      }
+      if (isRateLimit) { handleRateLimit(); return; }
       errorEl.style.color = 'var(--red)';
       errorEl.innerText = 'Ha ocurrido un error. Inténtalo de nuevo.';
-      if (!cooldown) {
-        submitBtn.disabled = false;
-        submitBtn.innerText = 'Enviar acceso';
-      }
+      updateSubmitState();
     }
 
     submitBtn.addEventListener('click', async () => {
@@ -380,11 +368,8 @@
       // Self-heal: in-memory flag may be stale after tab sleep / device suspend
       if (cooldown) {
         const storedUntil = Number(localStorage.getItem('cooldown_until') || 0);
-        if (storedUntil <= Date.now()) {
-          resetCooldownState();
-        } else {
-          return;
-        }
+        if (storedUntil <= Date.now()) { resetCooldownState(); }
+        else { return; }
       }
 
       const email = emailEl.value.trim();
@@ -414,11 +399,9 @@
 
     const storedUntil = Number(localStorage.getItem('cooldown_until') || 0);
     if (storedUntil > Date.now()) {
-      startCooldown(storedUntil); // rebuild from stored timestamp — exact, no drift
+      startCooldown(storedUntil);
     } else {
-      localStorage.removeItem('cooldown_until'); // hard reset: prevent stuck state
-      cooldown = false;
-      rateLimitHits = 0;
+      resetCooldownState();
     }
 
     if (sessionStorage.getItem('otp_sent') && !cooldown) {
@@ -427,8 +410,8 @@
       errorEl.innerText = 'Te hemos enviado un enlace de acceso';
 
       setTimeout(() => {
-        if (!cooldown && authUnlocked) {
-          submitBtn.disabled = false;
+        if (!cooldown) {
+          updateSubmitState();
           submitBtn.innerText = 'Reenviar acceso';
         }
       }, 5000);
