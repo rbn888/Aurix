@@ -106,6 +106,9 @@ if (supabaseClient) {
     if (event === 'SIGNED_OUT') {
       window.location.href = 'login.html';
     }
+    if (event === 'TOKEN_REFRESHED') {
+      if (IS_DEV) console.log('[AUTH] session refreshed');
+    }
   });
 }
 
@@ -7917,6 +7920,7 @@ document.getElementById('appRoot').style.opacity = '0';
 
 (async () => {
   const user = await requireAuth();
+  if (IS_DEV) console.log('User session:', user);
   if (user === false) return; // redirecting to login.html — do not render
 
   const remote = await supabaseLoadPortfolio();
