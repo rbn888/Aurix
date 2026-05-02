@@ -448,7 +448,7 @@ const T = {
     tabProfile:  'Perfil',
     // Market screen
     market_subtitle:   'Activos en tiempo real',
-    market_search_ph:  'Buscar BTC, Apple, SPY...',
+    market_search_ph:  'Buscar activos (Apple, BTC, S&P 500…)',
     market_cap:        'Capitalización',
     fear_greed:        'Miedo y Codicia',
     btc_dom:           'Dominancia BTC',
@@ -619,7 +619,7 @@ const T = {
     tabProfile:  'Profile',
     // Market screen
     market_subtitle:   'Real-time assets',
-    market_search_ph:  'Search BTC, Apple, SPY...',
+    market_search_ph:  'Search assets (Apple, BTC, S&P 500…)',
     market_cap:        'Market Cap',
     fear_greed:        'Fear & Greed',
     btc_dom:           'BTC Dominance',
@@ -4772,7 +4772,6 @@ function renderMarket() {
   if (!container) return;
   container.innerHTML = `
     <div class="market-screen">
-      <div class="market-ticker-strip" id="marketTickerStrip"></div>
       <div class="market-header">
         <div class="market-title">${t('tabMarket')}</div>
         <div class="market-subtitle">${t('market_subtitle')}</div>
@@ -4795,10 +4794,6 @@ function renderMarket() {
           <div class="market-metric-card">
             <div class="label">${t('fear_greed')}</div>
             <div class="value" id="metricFearGreed">—</div>
-          </div>
-          <div class="market-metric-card">
-            <div class="label">${t('btc_dom')}</div>
-            <div class="value" id="metricBTCdom">—</div>
           </div>
           <div class="market-metric-card">
             <div class="label">${t('liquidations')}</div>
