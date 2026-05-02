@@ -14,7 +14,13 @@ if (typeof window.supabase === 'undefined') {
 
 let supabaseClient = null;
 if (typeof SUPABASE_URL !== 'undefined' && typeof SUPABASE_ANON_KEY !== 'undefined' && window.supabase) {
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession:      true,
+      autoRefreshToken:    true,
+      detectSessionInUrl:  true
+    }
+  });
   if (IS_DEV) console.log('[SUPABASE] client initialized');
 } else {
   console.warn('[SUPABASE] client NOT initialized (missing config)');
@@ -7999,6 +8005,9 @@ document.getElementById('appRoot').style.opacity = '0';
       }
       return;
     }
+
+    const currentUser = session.user;
+    if (IS_DEV) console.log('[AUTH] session restored:', currentUser?.email);
 
     if (window.location.hash) {
       history.replaceState(null, '', window.location.pathname);
