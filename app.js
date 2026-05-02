@@ -1453,6 +1453,7 @@ let currentTab       = 'home';
 let currentMarketTab = 'crypto';
 let marketSearchData = [];
 let MARKET_DATA      = [];
+let MARKET_DATA_FULL = [];
 const MARKET_METRICS_CACHE = {};
 const MARKET_CACHE = {};
 const _LOADING = {};
@@ -4955,10 +4956,18 @@ function renderMyAssetsBlock() {
   requestAnimationFrame(renderMarketInsights);
   const container = document.getElementById('marketMyAssets');
   if (!container) return;
+  const allCached = Object.values(MARKET_CACHE).flat();
+  if (allCached.length > 0) MARKET_DATA_FULL = allCached;
+  const source = MARKET_DATA_FULL.length > 0 ? MARKET_DATA_FULL : MARKET_DATA;
   const watchedSet = new Set(getWatchlist().map(_normalizeWLSymbol));
-  const filtered   = MARKET_DATA.filter(item =>
+  const filtered = source.filter(item =>
     watchedSet.has(_normalizeWLSymbol(item.symbol || item.provider_id))
   );
+  if (IS_DEV) {
+    console.log('[WATCHLIST]', getWatchlist());
+    console.log('[SOURCE SIZE]', source.length);
+    console.log('[MY ASSETS]', filtered.length);
+  }
   if (!filtered.length) {
     container.innerHTML = `<div class="empty-watchlist">${t('empty_watchlist')}</div>`;
     return;
