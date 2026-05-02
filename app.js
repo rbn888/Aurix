@@ -4785,22 +4785,6 @@ function renderMarket() {
           spellcheck="false"
         />
       </div>
-      <div class="market-metrics-header">
-        <div class="market-metrics-scroll">
-          <div class="market-metric-card">
-            <div class="label">${t('market_cap')}</div>
-            <div class="value" id="metricMarketCap">—</div>
-          </div>
-          <div class="market-metric-card">
-            <div class="label">${t('fear_greed')}</div>
-            <div class="value" id="metricFearGreed">—</div>
-          </div>
-          <div class="market-metric-card">
-            <div class="label">${t('liquidations')}</div>
-            <div class="value" id="metricLiquidations">—</div>
-          </div>
-        </div>
-      </div>
       <div class="market-tabs">
         <button class="market-tab ${currentMarketTab==='crypto'?'active':''}" data-market="crypto">${t('tab_crypto')}</button>
         <button class="market-tab ${currentMarketTab==='stocks'?'active':''}" data-market="stocks">${t('tab_stocks')}</button>
@@ -4810,7 +4794,6 @@ function renderMarket() {
       </div>
       <div class="market-body">
         <div class="market-main">
-          <div class="market-featured" id="marketFeatured"></div>
           <div id="marketList" class="market-section"></div>
         </div>
         <div class="market-sidebar">

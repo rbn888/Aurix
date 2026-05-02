@@ -5604,15 +5604,18 @@ main { padding-bottom: 72px; }
 }
 
 .market-search-wrap {
-  padding: 10px var(--space-4);
-  margin-bottom: 4px;
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--space-4);
+  margin: 20px 0 4px;
 }
 
 .market-search-wrap input {
   width: 100%;
-  height: 56px;
+  max-width: 640px;
+  height: 48px;
   padding: 0 20px;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid rgba(255,255,255,0.08);
   background: rgba(255,255,255,0.06);
   color: #fff;
@@ -5624,7 +5627,7 @@ main { padding-bottom: 72px; }
   display: flex;
   gap: 10px;
   padding: 10px var(--space-4);
-  margin-top: 16px;
+  margin: 16px 0 12px;
   overflow-x: auto;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
@@ -5759,7 +5762,7 @@ main { padding-bottom: 72px; }
 @media (min-width: 1024px) {
   #marketMyAssets {
     margin-top: 0;
-    align-self: flex-start;
+    align-self: start;
   }
 }
 
@@ -6054,8 +6057,8 @@ main { padding-bottom: 72px; }
 
   .market-row {
     display: grid;
-    grid-template-columns: 40px 2fr 1fr 1fr 1fr 1fr;
-    gap: 20px;
+    grid-template-columns: 40px minmax(160px, 2fr) minmax(100px, 1fr) minmax(80px, 1fr) minmax(80px, 1fr) 50px;
+    gap: 16px;
     align-items: center;
     padding: 12px 0;
     border-bottom: 1px solid rgba(255,255,255,0.04);
@@ -6063,8 +6066,8 @@ main { padding-bottom: 72px; }
 
   .market-table-header {
     display: grid;
-    grid-template-columns: 40px 2fr 1fr 1fr 1fr 1fr;
-    gap: 20px;
+    grid-template-columns: 40px minmax(160px, 2fr) minmax(100px, 1fr) minmax(80px, 1fr) minmax(80px, 1fr) 50px;
+    gap: 16px;
     font-size: 11px;
     font-weight: 600;
     color: var(--text-muted);
@@ -6090,6 +6093,9 @@ main { padding-bottom: 72px; }
 
   .market-symbol {
     font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .market-name-sub {
