@@ -50,7 +50,7 @@ async function supabaseLoadPortfolio() {
   if (!userId) return null;
   try {
     const { data, error } = await supabaseClient
-      .from('portfolio')
+      .from('user_portfolios')
       .select('*')
       .eq('user_id', userId)
       .single();
@@ -71,7 +71,7 @@ async function supabaseSavePortfolio(catalogAssets, holdings) {
   if (!userId) return;
   try {
     const { error } = await supabaseClient
-      .from('portfolio')
+      .from('user_portfolios')
       .upsert({
         user_id: userId,
         assets:  catalogAssets,
@@ -117,7 +117,7 @@ async function autoSaveToBackend(attempt = 1) {
   try {
     _isSaving = true;
     const { error } = await supabaseClient
-      .from('portfolio')
+      .from('user_portfolios')
       .upsert({
         user_id:    currentUser.id,
         assets,
@@ -167,7 +167,7 @@ async function loadPortfolioFromBackend(userId) {
   if (!supabaseClient || !userId) return null;
   try {
     const { data, error } = await supabaseClient
-      .from('portfolio')
+      .from('user_portfolios')
       .select('assets, holdings')
       .eq('user_id', userId)
       .single();
