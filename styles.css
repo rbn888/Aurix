@@ -5900,9 +5900,6 @@ main { padding-bottom: 72px; }
   font-weight: var(--font-weight-medium);
 }
 
-.market-chg.up   { color: var(--green); }
-.market-chg.down { color: var(--red); }
-
 .market-err {
   font-size: 13px;
   color: var(--text-dim);
@@ -6220,15 +6217,6 @@ main { padding-bottom: 72px; }
 }
 .market-ticker-strip .t-up   { color: #22c55e; }
 .market-ticker-strip .t-down { color: #ef4444; }
-
-/* Step 5: priority visuals */
-.market-row-price {
-  font-weight: var(--font-weight-semibold);
-  color: #fff;
-}
-.market-name-sub {
-  opacity: 0.55;
-}
 
 /* Step 6: featured card emphasis */
 .featured-card > div:nth-child(2) {
