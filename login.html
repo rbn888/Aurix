@@ -398,8 +398,10 @@
 
     function handleRateLimit() {
       retryCount++;
-      const waitMs = Math.min(5 * 60 * 1000, retryCount * 30 * 1000);
-      const until  = Date.now() + waitMs;
+      const waitMs = retryCount === 1 ? 60000
+                   : retryCount === 2 ? 120000
+                   : 300000;
+      const until = Date.now() + waitMs;
       localStorage.setItem('cooldown_until', until);
       startCooldown(until);
     }
