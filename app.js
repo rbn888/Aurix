@@ -122,6 +122,49 @@ async function loadInitialData() {
   return null;
 }
 
+async function loadPortfolioFromBackend(userId) {
+  if (!supabaseClient || !userId) return null;
+  try {
+    const { data, error } = await supabaseClient
+      .from('portfolio')
+      .select('assets, holdings')
+      .eq('user_id', userId)
+      .single();
+    if (error) {
+      if (IS_DEV) console.warn('[DATA] Supabase load error:', error.message);
+      return null;
+    }
+    return data || null;
+  } catch (err) {
+    if (IS_DEV) console.warn('[DATA] Supabase load exception:', err);
+    return null;
+  }
+}
+
+async function initPortfolioData(userId) {
+  // 1. Backend (fuente principal)
+  const backendData = await loadPortfolioFromBackend(userId);
+  if (isValidPortfolioData(backendData) && backendData.assets.length > 0) {
+    if (IS_DEV) console.log('[DATA] loaded from Supabase');
+    return backendData;
+  }
+
+  // 2. localStorage (fallback)
+  const localData = getPortfolioData();
+  if (localData.source === 'new' && localData.assets?.length > 0) {
+    if (IS_DEV) console.log('[DATA] loaded from localStorage');
+    return { assets: localData.assets, holdings: localData.holdings };
+  }
+  if (localData.source === 'legacy' && localData.legacy?.length > 0) {
+    if (IS_DEV) console.log('[DATA] loaded from localStorage (legacy)');
+    return convertToNewModel(localData.legacy);
+  }
+
+  // 3. Usuario nuevo
+  if (IS_DEV) console.log('[DATA] empty portfolio initialized');
+  return { assets: [], holdings: [] };
+}
+
 async function signUp(email, password) {
   const { data, error } = await supabaseClient.auth.signUp({ email, password });
   if (error) console.error('[AUTH] signup error', error);
@@ -8013,10 +8056,10 @@ document.getElementById('appRoot').style.opacity = '0';
       history.replaceState(null, '', window.location.pathname);
     }
 
-    const data = await loadInitialData();
-    if (data) {
-      assets = convertFromNewToFlat(data.assets, data.holdings);
-      saveData({ assets: data.assets, holdings: data.holdings });
+    const portfolioData = await initPortfolioData(currentUser.id);
+    assets = convertFromNewToFlat(portfolioData.assets, portfolioData.holdings);
+    if (portfolioData.assets.length > 0) {
+      saveData({ assets: portfolioData.assets, holdings: portfolioData.holdings });
     }
 
     document.getElementById('appRoot').style.opacity = '';
