@@ -4798,10 +4798,6 @@ function renderMarket() {
         <div class="market-main">
           <div id="marketList" class="market-section"></div>
         </div>
-        <div class="market-sidebar">
-          <div id="marketInsights"></div>
-          <div id="marketMyAssets"></div>
-        </div>
       </div>
     </div>
   `;
@@ -5036,7 +5032,7 @@ function renderFromCache(type) {
   if (!el) return false;
   if (!items.length) return false;
   const label = _TYPE_LABEL[normalizedType]?.() ?? normalizedType;
-  const tableHeader = `<div class="market-table-header"><span></span><span>Activo</span><span>Precio</span><span>24h %</span><span>Sparkline</span><span>Mkt Cap</span></div>`;
+  const tableHeader = `<div class="market-table-header"><div></div><div>Asset</div><div>Price</div><div>24h</div><div></div><div></div></div>`;
   el.innerHTML = `<div class="market-section-header">${label}</div>${tableHeader}${items.map(renderMarketItem).join('')}`;
   return true;
 }
