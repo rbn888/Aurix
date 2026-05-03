@@ -14,8 +14,24 @@ function logError(provider, message) {
 }
 
 // ── Cache ──────────────────────────────────────────────────
-const cache      = new Map(); // key → { data, ts }
-const CACHE_TTL  = 15_000;   // 15 s
+const PRICE_CACHE = new Map(); // provider_id → { value, timestamp, ttl }
+
+const TTL = {
+  crypto: 30 * 1000,
+  stock:  60 * 1000,
+  fx:     3600 * 1000,
+};
+
+function getCached(providerId) {
+  const entry = PRICE_CACHE.get(providerId);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > entry.ttl) return null;
+  return entry.value;
+}
+
+function setCache(providerId, value, ttl) {
+  PRICE_CACHE.set(providerId, { value, timestamp: Date.now(), ttl });
+}
 
 // ── Rate limit ─────────────────────────────────────────────
 const rateLimits   = new Map(); // ip → [timestamps]
@@ -125,35 +141,55 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'providers_required' });
   }
 
-  // ── Cache ──────────────────────────────────────────────
-  const cacheKey = JSON.stringify(providers);
-  const cached   = cache.get(cacheKey);
-  if (cached && now - cached.ts < CACHE_TTL) {
-    return res.status(200).json(cached.data);
-  }
-
   log('request start · providers:', providers.length);
 
   const { coingecko, twelvedata } = parseProviders(providers);
-  const prices    = {};
+  const prices     = {};
   const TWELVE_KEY = process.env.TWELVE_API_KEY;
   const tasks      = [];
 
-  if (coingecko.length > 0) {
+  // ── Serve cached, collect uncached ────────────────────
+  const uncachedCG  = [];
+  const uncachedTD  = [];
+
+  for (const item of coingecko) {
+    const hit = getCached(item.provider);
+    if (hit) prices[item.provider] = hit;
+    else uncachedCG.push(item);
+  }
+
+  for (const item of twelvedata) {
+    const hit = getCached(item.provider);
+    if (hit) prices[item.provider] = hit;
+    else uncachedTD.push(item);
+  }
+
+  // ── Fetch only what's missing ──────────────────────────
+  if (uncachedCG.length > 0) {
     tasks.push(
-      fetchCoinGecko(coingecko)
-        .then(r  => Object.assign(prices, r))
+      fetchCoinGecko(uncachedCG)
+        .then(r => {
+          for (const [id, val] of Object.entries(r)) {
+            setCache(id, val, TTL.crypto);
+            prices[id] = val;
+          }
+        })
         .catch(err => logError('coingecko', err.message))
     );
   }
 
-  if (twelvedata.length > 0) {
+  if (uncachedTD.length > 0) {
     if (!TWELVE_KEY) {
       logError('twelvedata', 'TWELVE_API_KEY not configured in env');
     } else {
       tasks.push(
-        fetchTwelveData(twelvedata, TWELVE_KEY)
-          .then(r  => Object.assign(prices, r))
+        fetchTwelveData(uncachedTD, TWELVE_KEY)
+          .then(r => {
+            for (const [id, val] of Object.entries(r)) {
+              setCache(id, val, TTL.stock);
+              prices[id] = val;
+            }
+          })
           .catch(err => logError('twelvedata', err.message))
       );
     }
@@ -161,9 +197,6 @@ export default async function handler(req, res) {
 
   await Promise.all(tasks);
 
-  const data = { prices };
-  cache.set(cacheKey, { data, ts: Date.now() });
-
   log('success · prices returned:', Object.keys(prices).length);
-  return res.status(200).json(data);
+  return res.status(200).json({ prices });
 }
