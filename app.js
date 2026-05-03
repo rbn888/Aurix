@@ -5266,10 +5266,20 @@ async function _refreshCrypto() {
   ];
   try {
     marketLog('background refresh: crypto');
-    const prices = await fetchLivePrices(CRYPTO_IDS.map(c => c.id));
+    const BATCH_SIZE = 20;
+    const allPrices  = {};
+    for (let i = 0; i < CRYPTO_IDS.length; i += BATCH_SIZE) {
+      const batch = CRYPTO_IDS.slice(i, i + BATCH_SIZE);
+      try {
+        const p = await fetchLivePrices(batch.map(c => c.id));
+        Object.assign(allPrices, p);
+      } catch (e) {
+        marketLog('crypto batch failed', i / BATCH_SIZE, e.message);
+      }
+    }
     const raw = CRYPTO_IDS
       .map(c => {
-        const p = prices[c.id];
+        const p = allPrices[c.id];
         return { symbol: c.symbol, name: c.name,
                  current_price: p?.usd ?? null,
                  price_change_percentage_24h: p?.usd_24h_change ?? 0 };
@@ -5278,7 +5288,7 @@ async function _refreshCrypto() {
     if (!raw.length) return;
     _setCryptoData(raw);
     if (currentMarketTab === 'crypto' || currentMarketTab === 'watchlist' || currentMarketTab === 'all') renderCurrentMarketView();
-    marketLog('updated from API: crypto');
+    marketLog('updated from API: crypto', raw.length);
   } catch (e) {
     marketLog('refresh failed: crypto —', e.message);
   }
