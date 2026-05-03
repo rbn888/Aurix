@@ -4937,8 +4937,6 @@ function renderMyAssetsBlock() {
   renderFeaturedBlock();
   renderMarketTickerStrip();
   requestAnimationFrame(renderMarketInsights);
-  const container = document.getElementById('marketMyAssets');
-  if (!container) return;
   const _dedupeMap = new Map();
   for (const item of Object.values(MARKET_CACHE).flat()) {
     const key = _normalizeWLSymbol(item.symbol || item.provider_id);
