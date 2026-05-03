@@ -4796,6 +4796,7 @@ function renderMarket() {
       </div>
       <div class="market-body">
         <div class="market-main">
+          <div id="marketMyAssets" class="market-my-assets"></div>
           <div id="marketList" class="market-section"></div>
         </div>
       </div>
@@ -4924,7 +4925,11 @@ function renderMarketTickerStrip() {
 }
 
 function renderMyAssetsBlock() {
-  if (!document.getElementById('marketList')) return;
+  const container = document.getElementById('marketMyAssets');
+  if (!container) {
+    console.warn('[WL] marketMyAssets container not found');
+    return;
+  }
   marketLog('renderMyAssetsBlock', currentMarketTab, MARKET_DATA.length);
   if (!MARKET_DATA.length) marketLog('WARNING: empty MARKET_DATA on render', currentMarketTab);
   const _listType = _TAB_TO_TYPE[currentMarketTab];
