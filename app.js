@@ -1478,6 +1478,17 @@ const MARKET_RUNTIME = {
 };
 const _refreshLocks = new Set(); // per-label guards — prevents concurrent same-type cycles
 
+// ── FC-7: Portfolio reactive runtime state ────────────────────────────────────
+const PORTFOLIO_RUNTIME = {
+  stale:                  false,
+  lastMarketEventAt:      0,
+  lastPortfolioRefreshAt: 0,
+  lastChangedSymbols:     [],
+  reactiveEvents:         0,
+  ignoredEvents:          0,
+  processing:             false,
+};
+
 // ── FC-6: Market event bus ─────────────────────────────────────────────────────
 const MARKET_EVENTS = {
   listeners: new Map(),
@@ -1568,6 +1579,81 @@ function getMarketEventHealth() {
     listeners:    { marketUpdate: MARKET_EVENTS.listenerCount('market:update') },
     version:      MARKET_DATA_VERSION,
     runtimeCycle: MARKET_RUNTIME.cycleId,
+  };
+}
+
+// ── FC-7: Portfolio reactive helpers ──────────────────────────────────────────
+function getPortfolioSymbols() {
+  try {
+    const assetList = Array.isArray(window.PORTFOLIO) ? window.PORTFOLIO
+                    : Array.isArray(assets)            ? assets
+                    : [];
+    return new Set(
+      assetList
+        .map(a => normalizeSymbol(a?.ticker || a?.symbol || ''))
+        .filter(Boolean)
+    );
+  } catch { return new Set(); }
+}
+
+function doesMarketEventAffectPortfolio(snapshot) {
+  if (!snapshot?.changedSymbols?.length) return false;
+  const portfolioSymbols = getPortfolioSymbols();
+  if (!portfolioSymbols.size) return false;
+  return snapshot.changedSymbols.some(s => portfolioSymbols.has(normalizeSymbol(s)));
+}
+
+async function handleReactivePortfolioUpdate(snapshot) {
+  if (!snapshot) return;
+
+  if (PORTFOLIO_RUNTIME.processing) {
+    PORTFOLIO_RUNTIME.ignoredEvents++;
+    return;
+  }
+
+  const affected = doesMarketEventAffectPortfolio(snapshot);
+
+  console.log('[portfolio-reactive] event analysis:', {
+    affected,
+    changed: snapshot.changedSymbols.length,
+    watched: getPortfolioSymbols().size,
+  });
+
+  if (!affected) {
+    PORTFOLIO_RUNTIME.ignoredEvents++;
+    return;
+  }
+
+  PORTFOLIO_RUNTIME.processing = true;
+  try {
+    PORTFOLIO_RUNTIME.stale             = true;
+    PORTFOLIO_RUNTIME.lastMarketEventAt = Date.now();
+    PORTFOLIO_RUNTIME.lastChangedSymbols = snapshot.changedSymbols;
+    PORTFOLIO_RUNTIME.reactiveEvents++;
+
+    console.log(
+      '[portfolio-reactive] relevant market update:',
+      snapshot.type,
+      snapshot.changedSymbols.length,
+      'symbols'
+    );
+    // FC-7: passive-only — no recalculation yet, no render, no emit (FC-8)
+  } catch (e) {
+    console.error('[portfolio-reactive] handler failed:', e?.message);
+  } finally {
+    PORTFOLIO_RUNTIME.processing = false;
+  }
+}
+
+function getPortfolioReactiveHealth() {
+  return {
+    stale:                  PORTFOLIO_RUNTIME.stale,
+    processing:             PORTFOLIO_RUNTIME.processing,
+    reactiveEvents:         PORTFOLIO_RUNTIME.reactiveEvents,
+    ignoredEvents:          PORTFOLIO_RUNTIME.ignoredEvents,
+    lastMarketEventAt:      PORTFOLIO_RUNTIME.lastMarketEventAt,
+    lastPortfolioRefreshAt: PORTFOLIO_RUNTIME.lastPortfolioRefreshAt,
+    watchedSymbols:         getPortfolioSymbols().size,
   };
 }
 
@@ -2734,6 +2820,11 @@ async function collectMarketPriceData(marketAssets) {
 // If any batch-level fetch fails (network, rate-limit) the rollback snapshot
 // is restored and NO history point is written.
 async function refreshPrices() {
+  // FC-7: track legacy refresh for reactive health
+  PORTFOLIO_RUNTIME.lastPortfolioRefreshAt = Date.now();
+  PORTFOLIO_RUNTIME.stale = false;
+  console.log('[portfolio-reactive] legacy refreshPrices() executed');
+
   // ── Legacy migration (one-time data fix) ──────────────────────────────
   let migrated = false;
   assets.forEach(a => {
@@ -8716,6 +8807,9 @@ fetchExchangeRate().then(() => {
 
 refreshPrices().then(() => marketStore.start());
 setInterval(() => refreshPrices().then(() => marketStore.syncFromRefresh()), 30_000);  // 30 s
+
+// FC-7: portfolio reactive subscriber
+const unsubscribePortfolioReactive = MARKET_EVENTS.subscribe('market:update', handleReactivePortfolioUpdate);
 
 // FC-6: debug subscriber — validates reactive runtime, non-invasive
 const unsubscribeMarketDebug = MARKET_EVENTS.subscribe('market:update', snapshot => {
