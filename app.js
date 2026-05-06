@@ -1464,6 +1464,73 @@ let marketSearchData = [];
 let MARKET_DATA         = [];
 let MARKET_DATA_VERSION = 0;
 
+// ── FC-5: Runtime state ────────────────────────────────────────────────────────
+const MARKET_RUNTIME = {
+  refreshing:    false,
+  cycleId:       0,
+  startedAt:     0,
+  completedAt:   0,
+  lastSuccessAt: 0,
+  lastFailureAt: 0,
+  health:        'cold',
+  lastDurationMs: 0,
+  providers:     {},
+};
+const _refreshLocks = new Set(); // per-label guards — prevents concurrent same-type cycles
+
+// ── FC-5: Refresh lock ────────────────────────────────────────────────────────
+async function withMarketRefreshLock(label, fn) {
+  if (_refreshLocks.has(label)) {
+    console.log(`[market-runtime] refresh skipped: ${label} already running`);
+    return;
+  }
+  _refreshLocks.add(label);
+  const cycleId = ++MARKET_RUNTIME.cycleId;
+  const t0      = Date.now();
+  MARKET_RUNTIME.startedAt = t0;
+  MARKET_RUNTIME.refreshing = true;
+  if (MARKET_RUNTIME.lastSuccessAt && Date.now() - MARKET_RUNTIME.lastSuccessAt > 60_000) {
+    console.warn('[market-runtime] stale snapshot warning');
+  }
+  console.log(`[market-runtime] cycle start #${cycleId} (${label})`);
+  try {
+    await fn();
+  } finally {
+    _refreshLocks.delete(label);
+    MARKET_RUNTIME.refreshing     = _refreshLocks.size > 0;
+    MARKET_RUNTIME.completedAt    = Date.now();
+    MARKET_RUNTIME.lastDurationMs = MARKET_RUNTIME.completedAt - t0;
+    console.log(`[market-runtime] cycle complete #${cycleId} (${label}) ${MARKET_RUNTIME.lastDurationMs}ms`);
+  }
+}
+
+// ── FC-5: Atomic write — validates and replaces one type-slice of MARKET_DATA ─
+function commitMarketData(type, items) {
+  if (!Array.isArray(items)) return false;
+  const valid = items.filter(_isValidMarketItem);
+  if (!valid.length) return false; // Phase 8: never overwrite with empty — last snapshot survives
+  MARKET_DATA = [...MARKET_DATA.filter(d => d.type !== type), ...valid];
+  MARKET_DATA_VERSION++;
+  return true;
+}
+
+// ── FC-5: Runtime health ───────────────────────────────────────────────────────
+function getMarketRuntimeHealth() {
+  const now   = Date.now();
+  const ageMs = MARKET_RUNTIME.lastSuccessAt ? now - MARKET_RUNTIME.lastSuccessAt : Infinity;
+  return {
+    healthy:       ageMs < 60_000,
+    stale:         ageMs >= 60_000,
+    critical:      ageMs >= 300_000,
+    ageMs,
+    lastSuccessAt: MARKET_RUNTIME.lastSuccessAt,
+    refreshing:    MARKET_RUNTIME.refreshing,
+    cycleId:       MARKET_RUNTIME.cycleId,
+    version:       MARKET_DATA_VERSION,
+    health:        MARKET_RUNTIME.health,
+  };
+}
+
 // ── FC-4: Read access layer ────────────────────────────────────────────────────
 function getMarketAsset(symbol) {
   const norm = normalizeSymbol(symbol);
@@ -5234,8 +5301,7 @@ function _applyTypeItems(tab, items) {
     _setCryptoData(items);
     return;
   }
-  MARKET_DATA = [...MARKET_DATA.filter(d => d.type !== type), ...items];
-  MARKET_DATA_VERSION++;
+  commitMarketData(type, items);
 }
 
 // Build local fallback items for any tab (synchronous, no network)
@@ -5384,6 +5450,8 @@ async function _refreshCrypto() {
     { id: 'convex-finance',       symbol: 'CVX',   name: 'Convex Finance'   },
     { id: 'yearn-finance',        symbol: 'YFI',   name: 'yearn.finance'    },
   ];
+  await withMarketRefreshLock('crypto', async () => {
+  const t0 = Date.now();
   try {
     const res = await fetch('https://isa-portfolio-ten.vercel.app/api/market/crypto');
     if (!res.ok) throw new Error(`http_${res.status}`);
@@ -5398,27 +5466,45 @@ async function _refreshCrypto() {
 
     if (!items.length) return;
     _setCryptoData(items);
+    MARKET_RUNTIME.providers.coingecko = { successAt: Date.now(), latencyMs: Date.now() - t0, healthy: true };
+    MARKET_RUNTIME.lastSuccessAt = Date.now();
+    MARKET_RUNTIME.health = 'healthy';
+    console.log(`[market-runtime] crypto refresh success ${Date.now() - t0}ms`);
     if (currentMarketTab === 'crypto' || currentMarketTab === 'watchlist' || currentMarketTab === 'all') renderCurrentMarketView();
   } catch (e) {
-    console.error('[market] crypto refresh failed:', e.message);
+    MARKET_RUNTIME.providers.coingecko = { failureAt: Date.now(), healthy: false };
+    MARKET_RUNTIME.lastFailureAt = Date.now();
+    console.error('[market-runtime] provider failure: coingecko', e.message);
   }
+  });
 }
 
 async function _refreshStocks() {
+  await withMarketRefreshLock('stocks', async () => {
+  const t0 = Date.now();
   try {
     const res  = await fetch('https://isa-portfolio-ten.vercel.app/api/market/stocks');
     const json = await res.json();
     if (!json || !json.data || !json.data.length) return;
     _setStocksData(json.data);
     MARKET_CACHE['stocks'] = [...MARKET_DATA];
+    MARKET_RUNTIME.providers.stocksApi = { successAt: Date.now(), latencyMs: Date.now() - t0, healthy: true };
+    MARKET_RUNTIME.lastSuccessAt = Date.now();
+    MARKET_RUNTIME.health = 'healthy';
+    console.log(`[market-runtime] stocks refresh success ${Date.now() - t0}ms`);
     if (currentMarketTab === 'stocks' || currentMarketTab === 'watchlist' || currentMarketTab === 'all') renderCurrentMarketView();
   } catch (e) {
-    console.error('[market] stocks refresh failed:', e.message);
+    MARKET_RUNTIME.providers.stocksApi = { failureAt: Date.now(), healthy: false };
+    MARKET_RUNTIME.lastFailureAt = Date.now();
+    console.error('[market-runtime] provider failure: stocks-api', e.message);
   }
+  });
 }
 
 async function _refreshGeneric(tab, symbols, fallbackMap, title) {
   const type = _TAB_TO_TYPE[tab];
+  await withMarketRefreshLock(tab, async () => {
+  const t0 = Date.now();
   try {
     const results = await Promise.all(
       symbols.map(async symbol => {
@@ -5427,13 +5513,19 @@ async function _refreshGeneric(tab, symbols, fallbackMap, title) {
       })
     );
     const safeResults = results.filter(item => item && item.symbol);
-    MARKET_DATA = [...MARKET_DATA.filter(d => d.type !== type), ...safeResults];
-    _dedupeMarketData();
-    MARKET_CACHE[tab] = [...MARKET_DATA];
-    if (currentMarketTab === tab || currentMarketTab === 'watchlist' || currentMarketTab === 'all') renderCurrentMarketView();
+    if (commitMarketData(type, safeResults)) {
+      _dedupeMarketData();
+      MARKET_CACHE[tab] = [...MARKET_DATA];
+      MARKET_RUNTIME.lastSuccessAt = Date.now();
+      MARKET_RUNTIME.health = 'healthy';
+      console.log(`[market-runtime] ${tab} refresh success ${Date.now() - t0}ms`);
+      if (currentMarketTab === tab || currentMarketTab === 'watchlist' || currentMarketTab === 'all') renderCurrentMarketView();
+    }
   } catch (e) {
-    console.error('[market] refresh failed:', tab, e.message);
+    MARKET_RUNTIME.lastFailureAt = Date.now();
+    console.error('[market-runtime] provider failure:', tab, e.message);
   }
+  });
 }
 
 // Prefetch all non-active tabs in background after initial render
@@ -5798,9 +5890,10 @@ function _setCryptoData(raw) {
     if (_isValidMarketItem(mdItem)) cryptoItems.push(mdItem);
   }
 
-  MARKET_DATA = [...MARKET_DATA.filter(d => d.type !== 'crypto'), ...cryptoItems];
-  _dedupeMarketData();
-  MARKET_CACHE['crypto'] = [...MARKET_DATA];
+  if (commitMarketData('crypto', cryptoItems)) {
+    _dedupeMarketData();
+    MARKET_CACHE['crypto'] = [...MARKET_DATA];
+  }
 }
 
 function loadCrypto() {
@@ -5860,8 +5953,9 @@ function _setStocksData(data) {
     if (_isValidMarketItem(mdItem)) mapped.push(mdItem);
   }
 
-  MARKET_DATA = [...MARKET_DATA.filter(x => x.type !== 'stock'), ...mapped];
-  _dedupeMarketData();
+  if (commitMarketData('stock', mapped)) {
+    _dedupeMarketData();
+  }
 }
 
 const MARKET_STOCKS = ['AAPL','MSFT','NVDA','TSLA','AMZN','META','GOOGL','JPM','V','WMT'];
