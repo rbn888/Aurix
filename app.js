@@ -2472,6 +2472,45 @@ function setUpdateStatus(state) {
 // Returns { [marketSymbol]: { price, change24h } } for all assets that
 // returned a valid price.  Per-asset failures are silently skipped so one
 // delisted ticker can't block the whole update.
+// ── FC-2 Phase 1: Financial Core — unified market price lookup ────────────
+const _fc2FallbackCache = { data: null, ts: 0 };
+const _FC2_CACHE_TTL    = 60_000; // 1 min — avoid fetch storms
+
+async function _fetchStocksFallbackFC2() {
+  const now = Date.now();
+  if (_fc2FallbackCache.data && now - _fc2FallbackCache.ts < _FC2_CACHE_TTL) {
+    return _fc2FallbackCache.data;
+  }
+  try {
+    const res  = await fetch('https://isa-portfolio-ten.vercel.app/api/market/stocks');
+    if (!res.ok) return null;
+    const json = await res.json();
+    const data = json?.data ?? null;
+    if (data) { _fc2FallbackCache.data = data; _fc2FallbackCache.ts = now; }
+    return data;
+  } catch { return null; }
+}
+
+async function getUnifiedMarketPrice(symbol) {
+  const norm = normalizeSymbol(symbol);
+
+  // 1. Check MARKET_DATA first — already-fetched data, no network cost
+  const item = MARKET_DATA.find(d => normalizeSymbol(d.symbol) === norm);
+  if (item?.price > 0) {
+    console.log('[FC2] source: MARKET_DATA', symbol);
+    return { price: item.price, change24h: item.change24h ?? null };
+  }
+
+  // 2. Fallback: single cached batch fetch from /api/market/stocks
+  console.log('[FC2] fallback triggered for', symbol);
+  const data  = await _fetchStocksFallbackFC2();
+  if (!data) return null;
+  const found = data.find(d => normalizeSymbol(d.symbol) === norm);
+  if (found?.price > 0) return { price: Number(found.price), change24h: found.change24h ?? null };
+
+  return null;
+}
+
 async function collectMarketPriceData(marketAssets) {
   const results = await Promise.allSettled(
     marketAssets.map(async a => {
@@ -2480,10 +2519,9 @@ async function collectMarketPriceData(marketAssets) {
         if (a.marketSymbol === 'GC=F') {
           price = await fetchGoldSpotPrice();
         } else {
-          const data  = await fetchYahooData(a.marketSymbol);
-          price       = data?.price         ?? null;
-          const prev  = data?.previousClose ?? null;
-          if (price && prev > 0) change24h = ((price - prev) / prev) * 100;
+          const data = await getUnifiedMarketPrice(a.marketSymbol);
+          price     = data?.price     ?? null;
+          change24h = data?.change24h ?? null;
         }
         if (change24h === null) {
           const fb = getFallbackData(a.marketSymbol);
