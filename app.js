@@ -9722,6 +9722,10 @@ if (window.innerWidth <= 768) {
 
 fetchExchangeRate().then(() => {
   render();
+  // Cold-start: populate derived state + formula cache from localStorage assets
+  // so the workspace shows real values before refreshPrices completes.
+  recomputeDerivedFinancialState('cold-start');
+  recomputeFinancialFormulas('cold-start');
   updateChart();
   updateDonut();
 });
