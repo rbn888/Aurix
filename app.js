@@ -1764,7 +1764,7 @@ function buildPortfolioReactiveHash(assets = []) {
     return assets
       .map(a => {
         const symbol = normalizeSymbol(a?.ticker || a?.symbol || '');
-        const qty    = Number(a?.amount || a?.quantity || 0);
+        const qty    = Number(a?.qty || a?.amount || a?.quantity || 0);
         const price  = Number(a?.price || 0);
         return `${symbol}:${qty}:${price}`;
       })
@@ -1897,7 +1897,7 @@ function buildPortfolioAllocations(assets, totalValue) {
 
   return assets
     .map(asset => {
-      const quantity = Number(asset.amount || asset.quantity || 0);
+      const quantity = Number(asset.qty || asset.amount || asset.quantity || 0);
       const price    = Number(asset.price || 0);
       const value    = quantity * price;
 
@@ -1916,7 +1916,7 @@ function buildPortfolioExposure(assets = []) {
 
   for (const asset of assets) {
     const type     = String(asset.type || 'unknown').toLowerCase();
-    const quantity = Number(asset.amount || asset.quantity || 0);
+    const quantity = Number(asset.qty || asset.amount || asset.quantity || 0);
     const price    = Number(asset.price || 0);
     const value    = quantity * price;
 
@@ -1945,7 +1945,7 @@ function recomputeDerivedFinancialState(source = 'unknown') {
 
     let totalValue = 0;
     for (const asset of portfolioAssets) {
-      const quantity = Number(asset.amount || asset.quantity || 0);
+      const quantity = Number(asset.qty || asset.amount || asset.quantity || 0);
       const price    = Number(asset.price || 0);
       totalValue += quantity * price;
     }
