@@ -1480,13 +1480,23 @@ const _refreshLocks = new Set(); // per-label guards — prevents concurrent sam
 
 // ── FC-7: Portfolio reactive runtime state ────────────────────────────────────
 const PORTFOLIO_RUNTIME = {
-  stale:                  false,
-  lastMarketEventAt:      0,
-  lastPortfolioRefreshAt: 0,
-  lastChangedSymbols:     [],
-  reactiveEvents:         0,
-  ignoredEvents:          0,
-  processing:             false,
+  stale:                       false,
+  lastMarketEventAt:           0,
+  lastPortfolioRefreshAt:      0,
+  lastChangedSymbols:          [],
+  reactiveEvents:              0,
+  ignoredEvents:               0,
+  processing:                  false,
+  // FC-8: deterministic reactive runtime
+  debounceMs:                  500,
+  debounceTimer:               null,
+  scheduled:                   false,
+  lastReactiveCalculationAt:   0,
+  lastReactiveRenderAt:        0,
+  lastRenderVersion:           0,
+  lastRecalculationDurationMs: 0,
+  lastChangedAssets:           [],
+  lastReactiveSource:          null,
 };
 
 // ── FC-6: Market event bus ─────────────────────────────────────────────────────
@@ -1626,9 +1636,8 @@ async function handleReactivePortfolioUpdate(snapshot) {
 
   PORTFOLIO_RUNTIME.processing = true;
   try {
-    PORTFOLIO_RUNTIME.stale             = true;
-    PORTFOLIO_RUNTIME.lastMarketEventAt = Date.now();
-    PORTFOLIO_RUNTIME.lastChangedSymbols = snapshot.changedSymbols;
+    PORTFOLIO_RUNTIME.lastMarketEventAt   = Date.now();
+    PORTFOLIO_RUNTIME.lastChangedSymbols  = snapshot.changedSymbols;
     PORTFOLIO_RUNTIME.reactiveEvents++;
 
     console.log(
@@ -1637,7 +1646,9 @@ async function handleReactivePortfolioUpdate(snapshot) {
       snapshot.changedSymbols.length,
       'symbols'
     );
-    // FC-7: passive-only — no recalculation yet, no render, no emit (FC-8)
+
+    // FC-8: schedule debounced reactive recalculation (consumer-only, no fetch).
+    scheduleReactivePortfolioRefresh('market-update');
   } catch (e) {
     console.error('[portfolio-reactive] handler failed:', e?.message);
   } finally {
@@ -1647,14 +1658,163 @@ async function handleReactivePortfolioUpdate(snapshot) {
 
 function getPortfolioReactiveHealth() {
   return {
-    stale:                  PORTFOLIO_RUNTIME.stale,
-    processing:             PORTFOLIO_RUNTIME.processing,
-    reactiveEvents:         PORTFOLIO_RUNTIME.reactiveEvents,
-    ignoredEvents:          PORTFOLIO_RUNTIME.ignoredEvents,
-    lastMarketEventAt:      PORTFOLIO_RUNTIME.lastMarketEventAt,
-    lastPortfolioRefreshAt: PORTFOLIO_RUNTIME.lastPortfolioRefreshAt,
-    watchedSymbols:         getPortfolioSymbols().size,
+    stale:                       PORTFOLIO_RUNTIME.stale,
+    processing:                  PORTFOLIO_RUNTIME.processing,
+    reactiveEvents:              PORTFOLIO_RUNTIME.reactiveEvents,
+    ignoredEvents:               PORTFOLIO_RUNTIME.ignoredEvents,
+    lastMarketEventAt:           PORTFOLIO_RUNTIME.lastMarketEventAt,
+    lastPortfolioRefreshAt:      PORTFOLIO_RUNTIME.lastPortfolioRefreshAt,
+    watchedSymbols:              getPortfolioSymbols().size,
+    // FC-8: deterministic reactive runtime
+    debounceMs:                  PORTFOLIO_RUNTIME.debounceMs,
+    scheduled:                   PORTFOLIO_RUNTIME.scheduled,
+    lastReactiveCalculationAt:   PORTFOLIO_RUNTIME.lastReactiveCalculationAt,
+    lastReactiveRenderAt:        PORTFOLIO_RUNTIME.lastReactiveRenderAt,
+    lastReactiveSource:          PORTFOLIO_RUNTIME.lastReactiveSource,
+    lastRecalculationDurationMs: PORTFOLIO_RUNTIME.lastRecalculationDurationMs,
+    lastChangedAssets:           PORTFOLIO_RUNTIME.lastChangedAssets,
+    lastRenderVersion:           PORTFOLIO_RUNTIME.lastRenderVersion,
   };
+}
+
+// ── FC-8: Deterministic reactive portfolio runtime ────────────────────────────
+// MARKET_DATA → invalidation → debounce → recalculation → controlled render.
+// Consumer-only: never fetches, never writes MARKET_DATA, never emits events.
+
+function getReactiveMarketPrice(symbol) {
+  if (!symbol) return null;
+
+  const norm = normalizeSymbol(symbol);
+
+  const item = MARKET_DATA.find(x =>
+    normalizeSymbol(x.canonicalSymbol || x.symbol) === norm
+  );
+
+  if (!item) return null;
+
+  const price = item.current_price ?? item.price ?? null;
+
+  return (typeof price === 'number' && isFinite(price) && price > 0)
+    ? price
+    : null;
+}
+
+function buildPortfolioReactiveHash(assets = []) {
+  try {
+    return assets
+      .map(a => {
+        const symbol = normalizeSymbol(a?.ticker || a?.symbol || '');
+        const qty    = Number(a?.amount || a?.quantity || 0);
+        const price  = Number(a?.price || 0);
+        return `${symbol}:${qty}:${price}`;
+      })
+      .join('|');
+  } catch {
+    return '';
+  }
+}
+
+function scheduleReactivePortfolioRefresh(source = 'market-event') {
+  PORTFOLIO_RUNTIME.stale              = true;
+  PORTFOLIO_RUNTIME.scheduled          = true;
+  PORTFOLIO_RUNTIME.lastReactiveSource = source;
+
+  if (PORTFOLIO_RUNTIME.debounceTimer) {
+    clearTimeout(PORTFOLIO_RUNTIME.debounceTimer);
+  }
+
+  PORTFOLIO_RUNTIME.debounceTimer = setTimeout(
+    () => {
+      PORTFOLIO_RUNTIME.debounceTimer = null;
+      runReactivePortfolioRefresh();
+    },
+    PORTFOLIO_RUNTIME.debounceMs
+  );
+
+  console.log('[portfolio-reactive] refresh scheduled', source);
+}
+
+async function runReactivePortfolioRefresh() {
+  if (PORTFOLIO_RUNTIME.processing) {
+    console.log('[portfolio-reactive] skipped — already processing');
+    return;
+  }
+
+  PORTFOLIO_RUNTIME.processing = true;
+
+  const t0 = Date.now();
+
+  try {
+    // Resolve portfolio: prefer window.PORTFOLIO, fall back to module-level
+    // `assets` (same pattern as getPortfolioSymbols) so reactive runtime works
+    // regardless of how the portfolio is exposed.
+    const portfolioAssets = Array.isArray(window.PORTFOLIO) ? window.PORTFOLIO
+                          : Array.isArray(assets)            ? assets
+                          : [];
+
+    if (!portfolioAssets.length) {
+      PORTFOLIO_RUNTIME.processing = false;
+      PORTFOLIO_RUNTIME.scheduled  = false;
+      PORTFOLIO_RUNTIME.stale      = false;
+      return;
+    }
+
+    const beforeHash = buildPortfolioReactiveHash(portfolioAssets);
+
+    const changedAssets = [];
+
+    for (const asset of portfolioAssets) {
+      const symbol = asset?.ticker || asset?.symbol;
+
+      const reactivePrice = getReactiveMarketPrice(symbol);
+
+      if (
+        typeof reactivePrice === 'number' &&
+        reactivePrice > 0 &&
+        reactivePrice !== asset.price
+      ) {
+        asset.price = reactivePrice;
+        changedAssets.push(normalizeSymbol(symbol));
+      }
+    }
+
+    const afterHash = buildPortfolioReactiveHash(portfolioAssets);
+    const changed   = beforeHash !== afterHash;
+
+    PORTFOLIO_RUNTIME.lastChangedAssets          = changedAssets;
+    PORTFOLIO_RUNTIME.lastReactiveCalculationAt  = Date.now();
+    PORTFOLIO_RUNTIME.lastRecalculationDurationMs = Date.now() - t0;
+
+    PORTFOLIO_RUNTIME.processing = false;
+    PORTFOLIO_RUNTIME.scheduled  = false;
+    PORTFOLIO_RUNTIME.stale      = false;
+
+    console.log('[portfolio-reactive] recalculation complete:', {
+      changed,
+      assets:   changedAssets.length,
+      duration: PORTFOLIO_RUNTIME.lastRecalculationDurationMs,
+    });
+
+    if (!changed) return;
+
+    if (PORTFOLIO_RUNTIME.lastRenderVersion === MARKET_DATA_VERSION) {
+      console.log('[portfolio-reactive] skipped render — same version');
+      return;
+    }
+
+    PORTFOLIO_RUNTIME.lastRenderVersion   = MARKET_DATA_VERSION;
+    PORTFOLIO_RUNTIME.lastReactiveRenderAt = Date.now();
+
+    // Use EXISTING render path only — no custom pipeline.
+    if (typeof render === 'function') {
+      render();
+    }
+
+    console.log('[portfolio-reactive] render committed');
+  } catch (e) {
+    PORTFOLIO_RUNTIME.processing = false;
+    console.error('[portfolio-reactive] refresh failed:', e?.message);
+  }
 }
 
 // ── FC-4: Read access layer ────────────────────────────────────────────────────
@@ -2820,7 +2980,8 @@ async function collectMarketPriceData(marketAssets) {
 // If any batch-level fetch fails (network, rate-limit) the rollback snapshot
 // is restored and NO history point is written.
 async function refreshPrices() {
-  // FC-7: track legacy refresh for reactive health
+  // FC-7/FC-8: track legacy refresh for reactive health
+  PORTFOLIO_RUNTIME.lastReactiveSource     = 'legacy-refresh';
   PORTFOLIO_RUNTIME.lastPortfolioRefreshAt = Date.now();
   PORTFOLIO_RUNTIME.stale = false;
   console.log('[portfolio-reactive] legacy refreshPrices() executed');
