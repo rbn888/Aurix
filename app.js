@@ -2403,6 +2403,8 @@ function initializeWorkspaceRuntime() {
   WORKSPACE_RUNTIME.sheets.set('main', _seedMainWorkspaceSheet());
   WORKSPACE_RUNTIME.activeSheetId = 'main';
   WORKSPACE_RUNTIME.activeSheet   = 'main';
+  // AW-7.3: hidratar user cells desde localStorage. System cells protegidas.
+  _hydrateWorkspaceFromPersistence();
   WORKSPACE_RUNTIME.initialized   = true;
 
   // AW-3: attach delegated click handler once on the persistent container.
@@ -2676,7 +2678,136 @@ function commitWorkspaceCellEdit(cellId, value) {
     WORKSPACE_RUNTIME.isEditing    = false;
   }
   WORKSPACE_RUNTIME.lastEditAt = Date.now();
+  // AW-7.3: persistir tras mutación efectiva (no en el no-op de empty input).
+  saveWorkspacePersistence();
   return true;
+}
+
+// ── AW-7.3: Workspace persistence (consumer-only, localStorage) ───────────────
+// Persiste sólo user cells del sheet 'main'. System cells (readonly:true OR
+// type==='formula') jamás se serializan ni se hidratan: vienen siempre del
+// runtime financiero. Schema v1 con corruption recovery: payload inválido →
+// removeItem + clean state, sin throws.
+
+const _AW73_STORAGE_KEY     = 'aurix.workspace.v1';
+const _AW73_SCHEMA_VERSION  = 1;
+
+function _isPersistableCellValue(v) {
+  // Sólo primitivos que round-trip limpio por JSON.
+  return v === null
+      || typeof v === 'string'
+      || typeof v === 'number'
+      || typeof v === 'boolean';
+}
+
+function serializeWorkspaceUserCells(sheet) {
+  const userCells = {};
+  if (!sheet || !sheet.cells) return userCells;
+  for (const [id, cell] of sheet.cells) {
+    if (!_isWorkspaceCellEditable(cell)) continue;        // system cells excluidas
+    if (!_isPersistableCellValue(cell.value)) continue;
+    userCells[id] = { value: cell.value };
+  }
+  return userCells;
+}
+
+function _wipeWorkspacePersistence(reason) {
+  console.warn('[workspace-persist] wiping (' + reason + ')');
+  try { localStorage.removeItem(_AW73_STORAGE_KEY); } catch (_) {}
+  return null;
+}
+
+function loadWorkspacePersistence() {
+  if (typeof localStorage === 'undefined') return null;
+
+  let raw = null;
+  try {
+    raw = localStorage.getItem(_AW73_STORAGE_KEY);
+  } catch (e) {
+    console.warn('[workspace-persist] read failed:', e?.message);
+    return null;
+  }
+  if (raw == null) return null;
+
+  let payload = null;
+  try {
+    payload = JSON.parse(raw);
+  } catch (e) {
+    return _wipeWorkspacePersistence('corrupted JSON');
+  }
+
+  if (!payload || typeof payload !== 'object')                   return _wipeWorkspacePersistence('invalid root');
+  if (payload.version !== _AW73_SCHEMA_VERSION)                  return _wipeWorkspacePersistence('version mismatch');
+  if (!payload.sheets || typeof payload.sheets !== 'object')     return _wipeWorkspacePersistence('missing sheets');
+  const main = payload.sheets.main;
+  if (!main || typeof main !== 'object')                         return _wipeWorkspacePersistence('missing main');
+  if (!main.userCells || typeof main.userCells !== 'object')     return _wipeWorkspacePersistence('missing userCells');
+
+  return payload;
+}
+
+function saveWorkspacePersistence() {
+  if (typeof localStorage === 'undefined') return false;
+  const sheet = WORKSPACE_RUNTIME.sheets.get('main');
+  if (!sheet) return false;
+
+  const payload = {
+    version:   _AW73_SCHEMA_VERSION,
+    updatedAt: Date.now(),
+    sheets: {
+      main: {
+        userCells: serializeWorkspaceUserCells(sheet),
+      },
+    },
+  };
+
+  try {
+    localStorage.setItem(_AW73_STORAGE_KEY, JSON.stringify(payload));
+    return true;
+  } catch (e) {
+    console.warn('[workspace-persist] save failed:', e?.message);
+    return false;
+  }
+}
+
+function mergeWorkspaceUserCells(sheet, userCells) {
+  if (!sheet || !sheet.cells) return 0;
+  if (!userCells || typeof userCells !== 'object') return 0;
+
+  let applied = 0;
+  for (const id of Object.keys(userCells)) {
+    if (!_isCellInGridBounds(id)) continue;                     // fuera de grid → skip
+    const incoming = userCells[id];
+    if (!incoming || typeof incoming !== 'object') continue;
+    if (!_isPersistableCellValue(incoming.value)) continue;
+
+    const existing = sheet.cells.get(id);
+    // System cells (readonly OR formula) JAMÁS se sobreescriben por payload.
+    if (existing && (existing.readonly || existing.type === 'formula')) continue;
+
+    if (existing) {
+      existing.value     = incoming.value;
+      existing.updatedAt = Date.now();
+    } else {
+      sheet.cells.set(id, createWorkspaceCell({
+        id,
+        type:  'value',
+        value: incoming.value,
+      }));
+    }
+    applied++;
+  }
+  return applied;
+}
+
+function _hydrateWorkspaceFromPersistence() {
+  const payload = loadWorkspacePersistence();
+  if (!payload) return 0;
+  const sheet = WORKSPACE_RUNTIME.sheets.get('main');
+  if (!sheet) return 0;
+  const applied = mergeWorkspaceUserCells(sheet, payload.sheets.main.userCells);
+  console.log('[workspace-persist] hydrated', { applied });
+  return applied;
 }
 
 function getWorkspaceRuntimeHealth() {
