@@ -2054,8 +2054,9 @@ const WORKSPACE_RUNTIME = {
   keyboardNavigationEnabled: true,
   lastNavigationAt:         0,
   lastFormulaBarValue:      '',
-  gridColumns:              ['A', 'B', 'C', 'D'],
-  gridRows:                 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+  // AW-5 §3: professional spreadsheet scale — 12 cols (A→L) × 30 rows.
+  gridColumns:              ['A','B','C','D','E','F','G','H','I','J','K','L'],
+  gridRows:                 Array.from({ length: 30 }, (_, i) => i + 1),
 };
 
 // AW-2: Sheet & Cell models — mutable internals, immutable snapshots.
@@ -2457,35 +2458,91 @@ function _formatWorkspaceCellDisplay(cell) {
   return _escapeWorkspaceText(cell.value ?? '');
 }
 
-function _buildWorkspaceCopilotMessages() {
-  // AW-4 §8: contextual operational monitor — concise, non-conversational
-  // signals derived from the same snapshot the grid reads. No personality.
-  const signals = [];
+// AW-5 §9: Risk Monitor signals — consumer-only, derived from the same
+// snapshots the grid reads. Returns category buckets so the desktop monitor
+// can render Bloomberg-style sections; the flat helper below preserves the
+// AW-4 contract for any caller that still wants a flat list.
+function _buildWorkspaceRiskCategories() {
   const derived = getDerivedFinancialSnapshot();
-  const totalValue  = Number(derived?.portfolio?.totalValue || 0);
-  const exposure    = derived?.portfolio?.exposure || {};
-  const allocations = derived?.portfolio?.allocations || [];
+  const portfolio   = derived?.portfolio || {};
+  const totalValue  = Number(portfolio.totalValue || 0);
+  const assetCount  = Number(portfolio.assetCount || 0);
+  const exposure    = portfolio.exposure || {};
+  const allocations = Array.isArray(portfolio.allocations) ? portfolio.allocations : [];
 
+  const concentration = [];
   const top = allocations[0];
   if (top && Number(top.allocation || 0) > 0.5) {
     const sym = top.symbol || 'Top asset';
     const pct = (Number(top.allocation || 0) * 100).toFixed(0);
-    signals.push(`${sym} concentration above ${pct}%`);
+    concentration.push({ tone: 'warn', text: `${sym} concentration above ${pct}%` });
+  } else if (top && Number(top.allocation || 0) > 0.35) {
+    const sym = top.symbol || 'Top asset';
+    const pct = (Number(top.allocation || 0) * 100).toFixed(0);
+    concentration.push({ tone: 'info', text: `${sym} dominant weight (${pct}%)` });
   }
+  if (assetCount > 0 && assetCount < 4) {
+    concentration.push({ tone: 'info', text: `Low diversification (${assetCount} positions)` });
+  }
+  if (!concentration.length) concentration.push({ tone: 'ok', text: 'Balanced exposure' });
 
+  const exposureSignals = [];
   if (totalValue > 0) {
     const crypto = Number(exposure.crypto || 0);
     const cryptoPct = crypto / totalValue;
     if (cryptoPct > 0.4) {
-      signals.push(`Crypto exposure elevated (${(cryptoPct * 100).toFixed(0)}%)`);
-      signals.push('Portfolio volatility sensitivity increased');
+      exposureSignals.push({ tone: 'warn', text: `Crypto exposure elevated (${(cryptoPct * 100).toFixed(0)}%)` });
+    } else if (cryptoPct > 0.15) {
+      exposureSignals.push({ tone: 'info', text: `Crypto exposure ${(cryptoPct * 100).toFixed(0)}%` });
+    }
+    const stocks = Number(exposure.stock || exposure.stocks || 0);
+    const stocksPct = stocks / totalValue;
+    if (stocksPct > 0.6) {
+      exposureSignals.push({ tone: 'info', text: `Equity weight ${(stocksPct * 100).toFixed(0)}%` });
     }
   }
+  if (!exposureSignals.length) {
+    exposureSignals.push({ tone: 'ok', text: 'Exposure within normal range' });
+  }
 
-  if (WORKSPACE_RUNTIME.stale) signals.push('Syncing market updates');
+  const volatility = [];
+  if (totalValue > 0) {
+    const cryptoPct = Number(exposure.crypto || 0) / totalValue;
+    if (cryptoPct > 0.4) {
+      volatility.push({ tone: 'warn', text: 'Portfolio sensitivity increased' });
+    } else if (cryptoPct > 0.2) {
+      volatility.push({ tone: 'info', text: 'Moderate volatility profile' });
+    }
+  }
+  if (WORKSPACE_RUNTIME.stale) {
+    volatility.push({ tone: 'info', text: 'Syncing market updates' });
+  }
+  if (!volatility.length) volatility.push({ tone: 'ok', text: 'Stable signal' });
 
-  if (!signals.length) signals.push('No active risk signals');
-  return signals;
+  return [
+    { id: 'concentration', label: 'Concentration', signals: concentration },
+    { id: 'exposure',      label: 'Exposure',      signals: exposureSignals },
+    { id: 'volatility',    label: 'Volatility',    signals: volatility },
+  ];
+}
+
+function _buildWorkspaceCopilotMessages() {
+  // Flat compatibility wrapper for older callers (mobile risk strip etc.).
+  const cats = _buildWorkspaceRiskCategories();
+  const out = [];
+  for (const cat of cats) {
+    for (const s of cat.signals) {
+      if (s.tone !== 'ok') out.push(s.text);
+    }
+  }
+  if (!out.length) out.push('No active risk signals');
+  return out;
+}
+
+function _isNumericDisplay(cell) {
+  if (!cell) return false;
+  if (cell.type === 'formula') return typeof cell.computed === 'number';
+  return typeof cell.value === 'number';
 }
 
 function _renderWorkspaceMatrixCell(cellId, cell) {
@@ -2496,6 +2553,7 @@ function _renderWorkspaceMatrixCell(cellId, cell) {
     cell?.type === 'formula' ? 'is-formula'  : '',
     cell?.readonly           ? 'is-readonly' : '',
     !cell                    ? 'is-empty'    : '',
+    _isNumericDisplay(cell)  ? 'is-numeric'  : '',
     isActive                 ? 'is-active'   : '',
   ].filter(Boolean).join(' ');
   return `<div class="${cls}" data-cell-id="${_escapeWorkspaceText(cellId)}" role="gridcell">${display}</div>`;
@@ -2503,29 +2561,29 @@ function _renderWorkspaceMatrixCell(cellId, cell) {
 
 function _renderWorkspaceFormulaBarValue(sheet) {
   const id = WORKSPACE_RUNTIME.activeCellId;
-  if (!id) return { coord: '—', value: '', empty: true };
+  if (!id) return { coord: '', value: '', empty: true, kind: 'none' };
   const cell = sheet.cells[id] || null;
-  if (!cell) return { coord: id, value: '', empty: true };
+  if (!cell) return { coord: id, value: '', empty: true, kind: 'empty' };
   if (cell.type === 'formula' && cell.formula) {
-    return { coord: id, value: '=' + cell.formula, empty: false };
+    return { coord: id, value: '=' + cell.formula, empty: false, kind: 'formula' };
   }
   if (cell.value != null && cell.value !== '') {
-    return { coord: id, value: String(cell.value), empty: false };
+    return { coord: id, value: String(cell.value), empty: false, kind: 'literal' };
   }
-  return { coord: id, value: '', empty: true };
+  return { coord: id, value: '', empty: true, kind: 'empty' };
 }
 
 function _renderWorkspaceDesktop(sheet) {
   const cols = WORKSPACE_RUNTIME.gridColumns;
   const rows = WORKSPACE_RUNTIME.gridRows;
 
-  // Sticky column headers row (corner + A/B/C/D)
+  // Sticky column headers row (corner + A/B/.../L)
   const colHeaders = `
     <div class="aurix-grid-corner" aria-hidden="true"></div>
     ${cols.map(c => `<div class="aurix-grid-col-header" role="columnheader">${_escapeWorkspaceText(c)}</div>`).join('')}
   `;
 
-  // Body: row header + N cells per row
+  // Body: row header + N cells per row (incluye celdas vacías)
   const bodyRows = rows.map(r => {
     const rowHeader = `<div class="aurix-grid-row-header" role="rowheader">${r}</div>`;
     const cellHtml  = cols.map(c => {
@@ -2536,13 +2594,37 @@ function _renderWorkspaceDesktop(sheet) {
     return rowHeader + cellHtml;
   }).join('');
 
+  // AW-5 §5: premium formula bar — separated badges + readonly value field.
   const fb = _renderWorkspaceFormulaBarValue(sheet);
-  const formulaInputValue = fb.value;
-  const formulaPlaceholder = fb.empty && !formulaInputValue ? 'fx' : '';
+  const coordLabel  = fb.coord || '—';
+  const coordEmpty  = !fb.coord;
+  const valueText   = fb.value;
+  const valueClass  = [
+    'aurix-formula-value',
+    fb.empty                 ? 'is-empty'   : '',
+    fb.kind === 'formula'    ? 'is-formula' : '',
+    fb.kind === 'literal'    ? 'is-literal' : '',
+  ].filter(Boolean).join(' ');
+  const valueDisplay = fb.empty
+    ? (fb.kind === 'none' ? 'Select a cell' : 'Empty cell')
+    : valueText;
 
-  const signals = _buildWorkspaceCopilotMessages()
-    .map(m => `<li class="aurix-copilot-signal">${_escapeWorkspaceText(m)}</li>`)
-    .join('');
+  // AW-5 §8: terminal-grade Risk Monitor — categorized sections.
+  const categories = _buildWorkspaceRiskCategories();
+  const riskBody = categories.map(cat => {
+    const items = cat.signals.map(s => `
+      <li class="aurix-risk-signal is-${_escapeWorkspaceText(s.tone)}">
+        <span class="aurix-risk-dot" aria-hidden="true"></span>
+        <span class="aurix-risk-text">${_escapeWorkspaceText(s.text)}</span>
+      </li>
+    `).join('');
+    return `
+      <section class="aurix-risk-group">
+        <h4 class="aurix-risk-group-title">${_escapeWorkspaceText(cat.label)}</h4>
+        <ul class="aurix-risk-list">${items}</ul>
+      </section>
+    `;
+  }).join('');
 
   // Column count drives the CSS grid template (row-header + N data cells)
   const gridStyle = `--aw-grid-cols:${cols.length}`;
@@ -2550,17 +2632,11 @@ function _renderWorkspaceDesktop(sheet) {
   return `
     <div class="aurix-workspace-shell is-desktop">
       <header class="aurix-toolbar">
-        <div class="aurix-formula-prefix">fx</div>
-        <div class="aurix-formula-cell">${_escapeWorkspaceText(fb.coord)}</div>
-        <input
-          class="aurix-formula-input"
-          type="text"
-          readonly
-          tabindex="-1"
-          value="${_escapeWorkspaceText(formulaInputValue)}"
-          placeholder="${_escapeWorkspaceText(formulaPlaceholder)}"
-          aria-label="Formula bar"
-        />
+        <div class="aurix-formula-fx" aria-hidden="true">fx</div>
+        <div class="aurix-formula-divider" aria-hidden="true"></div>
+        <div class="aurix-formula-coord ${coordEmpty ? 'is-empty' : ''}">${_escapeWorkspaceText(coordLabel)}</div>
+        <div class="aurix-formula-divider" aria-hidden="true"></div>
+        <div class="${valueClass}">${_escapeWorkspaceText(valueDisplay)}</div>
         <div class="aurix-toolbar-spacer"></div>
         <div class="aurix-sheet-name">${_escapeWorkspaceText(sheet.name)}</div>
       </header>
@@ -2574,8 +2650,9 @@ function _renderWorkspaceDesktop(sheet) {
         <aside class="aurix-copilot-panel" aria-label="Risk monitor">
           <div class="aurix-copilot-header">
             <span class="aurix-copilot-eyebrow">Risk Monitor</span>
+            <span class="aurix-copilot-subtitle">Live portfolio signals</span>
           </div>
-          <ul class="aurix-copilot-signals">${signals}</ul>
+          <div class="aurix-risk-body">${riskBody}</div>
         </aside>
       </div>
     </div>
@@ -2583,31 +2660,90 @@ function _renderWorkspaceDesktop(sheet) {
 }
 
 function _renderWorkspaceMobile(sheet) {
-  // AW-4 §9: mobile = financial quick-access layer. No grid, no formula bar,
-  // no duplicated formula list — only the summary cards + FAB. `sheet` is read
-  // for the header subtitle; cell-level data is intentionally suppressed.
+  // AW-5 §10: executive cockpit. Reads the same derived snapshot as desktop;
+  // never mutates state. Six condensed cards arranged in three rows of two,
+  // followed by a compact risk strip and the FAB.
   const derived = getDerivedFinancialSnapshot();
-  const totalValue = Number(derived?.portfolio?.totalValue || 0);
-  const assetCount = derived?.portfolio?.assetCount || 0;
-  const topAlloc   = derived?.portfolio?.allocations?.[0];
-  const exposure   = derived?.portfolio?.exposure || {};
+  const portfolio  = derived?.portfolio || {};
+  const totalValue = Number(portfolio.totalValue || 0);
+  const assetCount = Number(portfolio.assetCount || 0);
+  const topAlloc   = portfolio.allocations?.[0];
+  const exposure   = portfolio.exposure || {};
   const cryptoVal  = Number(exposure.crypto || 0);
   const cryptoPct  = totalValue > 0 ? (cryptoVal / totalValue * 100) : 0;
 
+  const dailyPnl    = (typeof portfolio.dailyPnl === 'number') ? portfolio.dailyPnl : null;
+  const dailyPnlPct = (typeof portfolio.dailyPnlPct === 'number') ? portfolio.dailyPnlPct : null;
+
+  const fmtMoney = v => '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtSigned = v => (v >= 0 ? '+' : '') + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   const topLabel = topAlloc?.symbol
-    ? `${topAlloc.symbol} (${((topAlloc.allocation || 0) * 100).toFixed(1)}%)`
+    ? `${topAlloc.symbol} · ${((topAlloc.allocation || 0) * 100).toFixed(1)}%`
     : '—';
 
-  const summary = [
-    { label: 'Portfolio Value', value: totalValue.toFixed(2) },
-    { label: 'Assets',          value: String(assetCount) },
-    { label: 'Top Allocation',  value: topLabel },
-    { label: 'Crypto Exposure', value: cryptoPct.toFixed(1) + '%' },
-  ].map(c => `
-    <div class="aurix-summary-card">
+  // AW-5 §10: simple consumer-only risk score — derived from concentration +
+  // crypto exposure. Range 0–100 (lower = safer). No new computation pipelines.
+  let riskScore = 25;
+  if (topAlloc && Number(topAlloc.allocation || 0) > 0.5) riskScore += 25;
+  else if (topAlloc && Number(topAlloc.allocation || 0) > 0.35) riskScore += 12;
+  if (cryptoPct > 40) riskScore += 25;
+  else if (cryptoPct > 15) riskScore += 10;
+  if (assetCount > 0 && assetCount < 4) riskScore += 10;
+  if (assetCount === 0) riskScore = 0;
+  riskScore = Math.min(100, Math.max(0, Math.round(riskScore)));
+  const riskBand = riskScore >= 60 ? 'High' : riskScore >= 35 ? 'Moderate' : 'Low';
+
+  const cards = [
+    {
+      label: 'Portfolio Value',
+      value: assetCount === 0 ? '—' : fmtMoney(totalValue),
+      tone:  'neutral',
+    },
+    {
+      label: 'Daily P&L',
+      value: dailyPnl == null ? '—' : fmtSigned(dailyPnl),
+      hint:  dailyPnlPct == null ? null : (dailyPnlPct >= 0 ? '+' : '') + dailyPnlPct.toFixed(2) + '%',
+      tone:  dailyPnl == null ? 'neutral' : (dailyPnl >= 0 ? 'positive' : 'negative'),
+    },
+    {
+      label: 'Top Allocation',
+      value: topLabel,
+      tone:  'neutral',
+    },
+    {
+      label: 'Crypto Exposure',
+      value: assetCount === 0 ? '—' : cryptoPct.toFixed(1) + '%',
+      tone:  cryptoPct > 40 ? 'warn' : 'neutral',
+    },
+    {
+      label: 'Asset Count',
+      value: String(assetCount),
+      tone:  'neutral',
+    },
+    {
+      label: 'Risk Score',
+      value: assetCount === 0 ? '—' : String(riskScore),
+      hint:  assetCount === 0 ? null : riskBand,
+      tone:  riskScore >= 60 ? 'warn' : (riskScore >= 35 ? 'info' : 'positive'),
+    },
+  ];
+
+  const summary = cards.map(c => `
+    <div class="aurix-summary-card is-${_escapeWorkspaceText(c.tone || 'neutral')}">
       <div class="aurix-summary-label">${_escapeWorkspaceText(c.label)}</div>
       <div class="aurix-summary-value">${_escapeWorkspaceText(c.value)}</div>
+      ${c.hint ? `<div class="aurix-summary-hint">${_escapeWorkspaceText(c.hint)}</div>` : ''}
     </div>
+  `).join('');
+
+  // AW-5 §11: compact risk strip (max 3 active signals, fall back to "Stable").
+  const flat = _buildWorkspaceCopilotMessages().slice(0, 3);
+  const riskItems = flat.map(t => `
+    <li class="aurix-mobile-risk-item">
+      <span class="aurix-mobile-risk-dot" aria-hidden="true"></span>
+      <span class="aurix-mobile-risk-text">${_escapeWorkspaceText(t)}</span>
+    </li>
   `).join('');
 
   return `
@@ -2617,6 +2753,12 @@ function _renderWorkspaceMobile(sheet) {
         <div class="aurix-mobile-subtitle">${_escapeWorkspaceText(sheet.name)}</div>
       </header>
       <section class="aurix-mobile-summary">${summary}</section>
+      <section class="aurix-mobile-risk" aria-label="Risk signals">
+        <header class="aurix-mobile-risk-header">
+          <span class="aurix-mobile-risk-eyebrow">Risk Signals</span>
+        </header>
+        <ul class="aurix-mobile-risk-list">${riskItems}</ul>
+      </section>
       <button
         class="aurix-mobile-copilot"
         type="button"
