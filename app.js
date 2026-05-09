@@ -7576,6 +7576,9 @@ function switchTab(tab) {
   currentTab = tab;
   if (_loopInterval)   { clearInterval(_loopInterval);   _loopInterval   = null; }
   if (_marketInterval) { clearInterval(_marketInterval); _marketInterval = null; }
+  // AW-6.1: opt the workspace tab out of the .app shell constraints so the
+  // grid can run full-bleed. Pure presentation toggle, no logic side-effects.
+  document.body.classList.toggle('workspace-active', tab === 'workspace');
   const mainEl      = document.querySelector('main');
   const placeholder = document.getElementById('tabPlaceholder');
   const workspaceEl = document.getElementById('aurixWorkspace');

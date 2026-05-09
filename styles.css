@@ -6656,9 +6656,9 @@ body.is-detail-view .mobile-slide            { height: auto !important; }
 }
 
 /* ── AW-1: Aurix Workspace — minimal foundation styles ─────────────────────── */
-/* AW-6 §1: full-width workstation. Eliminamos el max-width conservador:
-   en desktop usamos 92-96% del viewport con gutters mínimos para que el
-   grid no se sienta encajonado. Mobile mantiene padding cómodo. */
+/* AW-6.1 §1-3: full-bleed. El workspace escapa del .app (max-width:1080px)
+   activando body.workspace-active. Reglas escopeadas — sólo afectan al tab
+   workspace; el resto (Home/Market/Profile) queda intacto. */
 .aurix-workspace {
   width: 100%;
   min-height: 100vh;
@@ -6669,11 +6669,36 @@ body.is-detail-view .mobile-slide            { height: auto !important; }
   background: var(--bg);
 }
 
+/* AW-6.1 §2: liberar el .app shell sólo cuando workspace está activo. */
+body.workspace-active .app {
+  max-width: none;
+  padding: 0;
+}
+
+/* Header: sin padding lateral del .app, le damos su propio gutter para que
+   logo/menu no queden pegados al borde. Coincide con el gutter del workspace
+   para mantener alineación visual vertical. */
+body.workspace-active .header {
+  padding-left: clamp(16px, 2.5vw, 36px);
+  padding-right: clamp(16px, 2.5vw, 36px);
+}
+
 @media (min-width: 1024px) {
   .aurix-workspace {
     max-width: none;
     margin: 0;
     padding: 14px clamp(20px, 2.5vw, 36px) 18px;
+  }
+}
+
+/* AW-6.1 §8: mobile full-width — el workspace usa todo el ancho disponible
+   con padding interno mínimo y safe-area awareness para notch/bottom-nav. */
+@media (max-width: 1023.98px) {
+  body.workspace-active .aurix-workspace {
+    padding: var(--space-2)
+             max(var(--space-2), env(safe-area-inset-left))
+             96px
+             max(var(--space-2), env(safe-area-inset-right));
   }
 }
 
