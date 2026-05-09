@@ -2057,6 +2057,10 @@ const WORKSPACE_RUNTIME = {
   // AW-5 §3: professional spreadsheet scale — 12 cols (A→L) × 30 rows.
   gridColumns:              ['A','B','C','D','E','F','G','H','I','J','K','L'],
   gridRows:                 Array.from({ length: 30 }, (_, i) => i + 1),
+  // AW-7.1: editing foundation (literal values only; no formulas yet).
+  isEditing:                false,
+  editingValue:             '',
+  lastEditAt:               0,
 };
 
 // AW-2: Sheet & Cell models — mutable internals, immutable snapshots.
@@ -2125,11 +2129,20 @@ function createInitialWorkspaceSheet() {
 }
 
 function _onWorkspaceContainerClick(e) {
+  // Click sobre el input de edición: dejar al input gestionar focus/caret.
+  if (e.target.closest('[data-cell-edit-input]')) return;
+
   // Cell selection (desktop). Mobile rows are not clickable in AW-3.
   const cellEl = e.target.closest('[data-cell-id]');
   if (cellEl) {
     const id = cellEl.dataset.cellId;
-    if (id && setActiveCell(id)) {
+    if (!id) return;
+
+    // AW-7.1: si estábamos editando otra celda, hacer commit antes de cambiar.
+    if (WORKSPACE_RUNTIME.isEditing && WORKSPACE_RUNTIME.editingCell !== id) {
+      commitWorkspaceCellEdit();
+    }
+    if (setActiveCell(id)) {
       renderWorkspace();
     }
     return;
@@ -2137,6 +2150,74 @@ function _onWorkspaceContainerClick(e) {
   // Reserved: copilot button (mobile FAB) — no expand modal yet (AW-4+).
   // const copilotEl = e.target.closest('[data-aurix-copilot]');
   // if (copilotEl) { /* future */ }
+}
+
+// AW-7.1: doble click sobre user cell entra en modo edición.
+function _onWorkspaceContainerDblClick(e) {
+  const cellEl = e.target.closest('[data-cell-id]');
+  if (!cellEl) return;
+  const id = cellEl.dataset.cellId;
+  if (!id) return;
+  if (WORKSPACE_RUNTIME.isEditing && WORKSPACE_RUNTIME.editingCell === id) return;
+
+  setActiveCell(id);
+  if (beginWorkspaceCellEdit(id)) {
+    renderWorkspace();
+  }
+}
+
+// AW-7.1: bus de teclado del input de edición (delegado).
+function _onWorkspaceCellInputKeyDown(e) {
+  if (!e.target.closest('[data-cell-edit-input]')) return;
+  if (!WORKSPACE_RUNTIME.isEditing) return;
+
+  const inputEl = e.target;
+
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    cancelWorkspaceCellEdit();
+    renderWorkspace();
+    return;
+  }
+
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    WORKSPACE_RUNTIME.editingValue = inputEl.value;
+    commitWorkspaceCellEdit();
+    renderWorkspace();
+    return;
+  }
+
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    WORKSPACE_RUNTIME.editingValue = inputEl.value;
+    const cur = WORKSPACE_RUNTIME.editingCell;
+    commitWorkspaceCellEdit();
+    if (cur) {
+      const next = getAdjacentCell(cur, e.shiftKey ? 'left' : 'right');
+      if (next) setActiveCell(next);
+    }
+    renderWorkspace();
+    return;
+  }
+}
+
+// AW-7.1: input event keeps editingValue in sync (no re-render — mantiene focus).
+function _onWorkspaceCellInputChange(e) {
+  if (!e.target.closest('[data-cell-edit-input]')) return;
+  if (!WORKSPACE_RUNTIME.isEditing) return;
+  WORKSPACE_RUNTIME.editingValue = e.target.value;
+}
+
+// AW-7.1: blur del input → commit (commit-on-focus-loss).
+function _onWorkspaceCellInputBlur(e) {
+  const inputEl = e.target.closest('[data-cell-edit-input]');
+  if (!inputEl) return;
+  if (!WORKSPACE_RUNTIME.isEditing) return;
+  WORKSPACE_RUNTIME.editingValue = inputEl.value;
+  commitWorkspaceCellEdit();
+  // No renderWorkspace aquí: blur puede dispararse por click sobre otra celda
+  // (que ya re-renderiza) o cambio de tab. Evitamos doble render.
 }
 
 // AW-4 §6: Keyboard navigation. Desktop only. Pure interaction layer:
@@ -2169,6 +2250,44 @@ function _onWorkspaceKeyDown(e) {
     WORKSPACE_RUNTIME.lastNavigationAt = Date.now();
     renderWorkspace();
     return;
+  }
+
+  // AW-7.1: Enter sobre celda user-editable seleccionada → entra a editar.
+  // Si la celda es system (formula/readonly) o no hay activa, mantenemos
+  // la navegación AW-4 (Enter mueve abajo).
+  if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+    const cur = WORKSPACE_RUNTIME.activeCellId;
+    if (cur) {
+      const sheet = WORKSPACE_RUNTIME.sheets.get(WORKSPACE_RUNTIME.activeSheetId);
+      const cell  = sheet?.cells.get(cur) || null;
+      if (_isWorkspaceCellEditable(cell)) {
+        e.preventDefault();
+        if (beginWorkspaceCellEdit(cur)) {
+          renderWorkspace();
+        }
+        return;
+      }
+    }
+  }
+
+  // AW-7.1: typing directo sobre user cell seleccionada → edición con char inicial.
+  if (
+    !e.metaKey && !e.ctrlKey && !e.altKey
+    && typeof e.key === 'string' && e.key.length === 1
+    && !_AW4_NAV_KEYS[e.key]
+  ) {
+    const cur = WORKSPACE_RUNTIME.activeCellId;
+    if (cur) {
+      const sheet = WORKSPACE_RUNTIME.sheets.get(WORKSPACE_RUNTIME.activeSheetId);
+      const cell  = sheet?.cells.get(cur) || null;
+      if (_isWorkspaceCellEditable(cell)) {
+        e.preventDefault();
+        if (beginWorkspaceCellEdit(cur, e.key)) {
+          renderWorkspace();
+        }
+        return;
+      }
+    }
   }
 
   const dir = _AW4_NAV_KEYS[e.key];
@@ -2214,7 +2333,13 @@ function initializeWorkspaceRuntime() {
   // AW-3: attach delegated click handler once on the persistent container.
   const container = document.getElementById('aurixWorkspace');
   if (container && !container._aw3HandlersAttached) {
-    container.addEventListener('click', _onWorkspaceContainerClick);
+    container.addEventListener('click',    _onWorkspaceContainerClick);
+    // AW-7.1: dblclick → edit + delegated input listeners (use capture for blur
+    // since blur doesn't bubble by default).
+    container.addEventListener('dblclick', _onWorkspaceContainerDblClick);
+    container.addEventListener('keydown',  _onWorkspaceCellInputKeyDown);
+    container.addEventListener('input',    _onWorkspaceCellInputChange);
+    container.addEventListener('blur',     _onWorkspaceCellInputBlur, true);
     container._aw3HandlersAttached = true;
   }
 
@@ -2388,27 +2513,93 @@ function setActiveCell(cellId) {
   return true;
 }
 
-function beginWorkspaceCellEdit(cellId) {
+// AW-7.1: edit-mode lifecycle. Literal values only — no parser, no formulas.
+// System cells (readonly:true OR type==='formula') are protected.
+function _isWorkspaceCellEditable(cell) {
+  if (!cell) return true; // empty user cell within bounds → editable
+  if (cell.readonly) return false;
+  if (cell.type === 'formula') return false;
+  return true;
+}
+
+function _coerceWorkspaceLiteral(raw) {
+  const s = String(raw ?? '').trim();
+  if (s === '') return null;
+  // Pure number → number; everything else (incl. "15%", "BTC DCA") stays string.
+  if (/^-?\d+(?:\.\d+)?$/.test(s)) {
+    const n = Number(s);
+    if (Number.isFinite(n)) return n;
+  }
+  return s;
+}
+
+function beginWorkspaceCellEdit(cellId, initialValue) {
+  if (!_isCellInGridBounds(cellId)) return false;
   const sheet = WORKSPACE_RUNTIME.sheets.get(WORKSPACE_RUNTIME.activeSheetId);
   if (!sheet) return false;
   const cell = sheet.cells.get(cellId);
-  if (!cell || cell.readonly || cell.type === 'formula') return false;
-  WORKSPACE_RUNTIME.editingCell = cellId;
+  if (!_isWorkspaceCellEditable(cell)) return false;
+
+  const seed = (initialValue != null)
+    ? String(initialValue)
+    : (cell?.value != null ? String(cell.value) : '');
+
+  WORKSPACE_RUNTIME.editingCell  = cellId;
+  WORKSPACE_RUNTIME.editingValue = seed;
+  WORKSPACE_RUNTIME.isEditing    = true;
+  WORKSPACE_RUNTIME.lastEditAt   = Date.now();
+  return true;
+}
+
+function updateWorkspaceEditingValue(value) {
+  if (!WORKSPACE_RUNTIME.isEditing) return false;
+  WORKSPACE_RUNTIME.editingValue = String(value ?? '');
+  return true;
+}
+
+function cancelWorkspaceCellEdit() {
+  if (!WORKSPACE_RUNTIME.isEditing && WORKSPACE_RUNTIME.editingCell == null) return false;
+  WORKSPACE_RUNTIME.editingCell  = null;
+  WORKSPACE_RUNTIME.editingValue = '';
+  WORKSPACE_RUNTIME.isEditing    = false;
+  WORKSPACE_RUNTIME.lastEditAt   = Date.now();
   return true;
 }
 
 function commitWorkspaceCellEdit(cellId, value) {
+  const targetId = cellId ?? WORKSPACE_RUNTIME.editingCell;
+  if (!targetId) return false;
+  if (!_isCellInGridBounds(targetId)) return false;
+
   const sheet = WORKSPACE_RUNTIME.sheets.get(WORKSPACE_RUNTIME.activeSheetId);
   if (!sheet) return false;
-  const cell = sheet.cells.get(cellId);
-  if (!cell || cell.readonly || cell.type === 'formula') return false;
 
-  cell.value     = value;
-  cell.updatedAt = Date.now();
-  sheet.updatedAt = cell.updatedAt;
-  if (WORKSPACE_RUNTIME.editingCell === cellId) {
-    WORKSPACE_RUNTIME.editingCell = null;
+  let cell = sheet.cells.get(targetId);
+  if (!_isWorkspaceCellEditable(cell)) return false;
+
+  const raw = (value != null) ? value : WORKSPACE_RUNTIME.editingValue;
+  const coerced = _coerceWorkspaceLiteral(raw);
+
+  if (!cell) {
+    if (coerced == null) {
+      // Empty input on a non-existent cell → just exit edit mode.
+      if (WORKSPACE_RUNTIME.editingCell === targetId) cancelWorkspaceCellEdit();
+      return true;
+    }
+    cell = createWorkspaceCell({ id: targetId, type: 'value', value: coerced });
+    sheet.cells.set(targetId, cell);
+  } else {
+    cell.value     = coerced;
+    cell.updatedAt = Date.now();
   }
+  sheet.updatedAt = Date.now();
+
+  if (WORKSPACE_RUNTIME.editingCell === targetId) {
+    WORKSPACE_RUNTIME.editingCell  = null;
+    WORKSPACE_RUNTIME.editingValue = '';
+    WORKSPACE_RUNTIME.isEditing    = false;
+  }
+  WORKSPACE_RUNTIME.lastEditAt = Date.now();
   return true;
 }
 
@@ -2546,16 +2737,28 @@ function _isNumericDisplay(cell) {
 }
 
 function _renderWorkspaceMatrixCell(cellId, cell) {
-  const isActive = WORKSPACE_RUNTIME.activeCellId === cellId;
-  const display  = cell ? _formatWorkspaceCellDisplay(cell) : '';
+  const isActive  = WORKSPACE_RUNTIME.activeCellId === cellId;
+  const isEditing = WORKSPACE_RUNTIME.isEditing && WORKSPACE_RUNTIME.editingCell === cellId;
+  const isSystem  = !!(cell && (cell.readonly || cell.type === 'formula'));
+  const display   = cell ? _formatWorkspaceCellDisplay(cell) : '';
   const cls = [
     'aurix-grid-cell',
     cell?.type === 'formula' ? 'is-formula'  : '',
     cell?.readonly           ? 'is-readonly' : '',
+    isSystem                 ? 'is-system'   : '',
     !cell                    ? 'is-empty'    : '',
     _isNumericDisplay(cell)  ? 'is-numeric'  : '',
     isActive                 ? 'is-active'   : '',
+    isEditing                ? 'is-editing'  : '',
   ].filter(Boolean).join(' ');
+
+  if (isEditing) {
+    const v = _escapeWorkspaceText(WORKSPACE_RUNTIME.editingValue ?? '');
+    return `<div class="${cls}" data-cell-id="${_escapeWorkspaceText(cellId)}" role="gridcell">`
+      + `<input class="aurix-cell-edit" data-cell-edit-input data-cell-id="${_escapeWorkspaceText(cellId)}" type="text" value="${v}" autocomplete="off" spellcheck="false" />`
+      + `</div>`;
+  }
+
   return `<div class="${cls}" data-cell-id="${_escapeWorkspaceText(cellId)}" role="gridcell">${display}</div>`;
 }
 
@@ -2791,6 +2994,20 @@ function renderWorkspace() {
   WORKSPACE_RUNTIME.reactiveUpdates++;
   WORKSPACE_RUNTIME.lastComputedAt = WORKSPACE_RUNTIME.lastRenderAt;
   WORKSPACE_RUNTIME.stale          = false;
+
+  // AW-7.1: focus management — el input recién renderizado debe tomar foco.
+  // El cursor va al final cuando entras desde typing/Enter; selectAll cuando
+  // entras desde dblclick (siempre selectAll mantiene UX consistente: typing
+  // reemplaza la selección con el primer carácter de forma natural).
+  if (WORKSPACE_RUNTIME.isEditing && isDesktop) {
+    const inputEl = container.querySelector('[data-cell-edit-input]');
+    if (inputEl) {
+      inputEl.focus();
+      // place caret at end so initial-typed character isn't shifted
+      const len = inputEl.value.length;
+      try { inputEl.setSelectionRange(len, len); } catch (_) {}
+    }
+  }
 
   console.log('[workspace] rendered v' + WORKSPACE_RUNTIME.renderVersion + ' (' + (isDesktop ? 'desktop' : 'mobile') + ')');
 }
