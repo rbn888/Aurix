@@ -4447,8 +4447,7 @@ function _renderWorkspaceMobile(sheet) {
   return `
     <div class="aurix-workspace-shell is-mobile">
       <header class="aurix-mobile-header">
-        <div class="aurix-mobile-title">Aurix</div>
-        <div class="aurix-mobile-subtitle">${_escapeWorkspaceText(sheet.name)}</div>
+        <h2 class="aurix-mobile-title">Workspace</h2>
       </header>
       <section class="aurix-mobile-summary">${summary}</section>
       <section class="aurix-mobile-risk" aria-label="Risk signals">
