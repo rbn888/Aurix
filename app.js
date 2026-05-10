@@ -11514,12 +11514,44 @@ fetchExchangeRate().then(() => {
 refreshPrices().then(() => marketStore.start());
 setInterval(() => refreshPrices().then(() => marketStore.syncFromRefresh()), 30_000);  // 30 s
 
-// AW-8: prefetch broad market data so PRICE() works from any tab
+// AW-8: prefetch broad market data so PRICE() works from any tab, across
+// all supported asset classes. Staggered to avoid rate-limit spikes;
+// silent failures (offline, API down, etc.) preserve UX.
+//
+// _refreshCrypto / _refreshStocks exist as dedicated functions.
+// ETFs / indices / commodities share _refreshGeneric and are invoked via
+// the existing dispatcher refreshMarketInBackground(tab) — same path the
+// Market tab uses, but called proactively so MARKET_DATA covers them
+// before the user opens that tab.
 setTimeout(() => {
   if (typeof _refreshCrypto === 'function') {
     _refreshCrypto().catch(() => {});
   }
 }, 2000);
+
+setTimeout(() => {
+  if (typeof _refreshStocks === 'function') {
+    _refreshStocks().catch(() => {});
+  }
+}, 4000);
+
+setTimeout(() => {
+  if (typeof refreshMarketInBackground === 'function') {
+    refreshMarketInBackground('etfs').catch(() => {});
+  }
+}, 6000);
+
+setTimeout(() => {
+  if (typeof refreshMarketInBackground === 'function') {
+    refreshMarketInBackground('indices').catch(() => {});
+  }
+}, 8000);
+
+setTimeout(() => {
+  if (typeof refreshMarketInBackground === 'function') {
+    refreshMarketInBackground('commodities').catch(() => {});
+  }
+}, 10000);
 
 // FC-7: portfolio reactive subscriber
 const unsubscribePortfolioReactive = MARKET_EVENTS.subscribe('market:update', handleReactivePortfolioUpdate);
