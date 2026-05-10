@@ -2495,13 +2495,6 @@ function recalculateWorkspaceSheet(sheetId) {
         const result = evaluateWorkspaceFormula(parsed, sheet);
         nextComputed = result.computed;
         nextInvalid  = result.invalid;
-        console.log('[aw-7.4] recalc user', {
-          id:      cell.id,
-          formula: cell.formula,
-          parsedOK: !!parsed,
-          nextComputed,
-          nextInvalid,
-        });
       }
 
       if (nextComputed !== cell.computed || nextInvalid !== !!cell.invalid) {
@@ -2717,40 +2710,57 @@ function parseWorkspaceFormula(raw) {
 }
 
 function resolveWorkspaceCellReference(ref, sheet) {
-  if (!sheet || !ref) {
-    console.log('[aw-7.4] resolve bail: sheet/ref', { hasSheet: !!sheet, ref });
-    return NaN;
+  // AW-7.4 final: deterministic resolution para los 4 estados que un user
+  // formula puede referenciar. El bug previo era ambigüedad en el orden de
+  // las ramas; ahora es explícito y exhaustivo:
+  //   - empty cell                               → 0
+  //   - invalid cell                             → NaN
+  //   - formula cell (system o user) computed    → number, NaN o 0 según shape
+  //   - literal value cell con valor numérico    → ese number (vía value, NO computed)
+  //   - literal value cell con string parseable  → number
+  //   - todo lo demás                            → NaN
+
+  if (!sheet || !ref) return NaN;
+  if (!_isCellInGridBounds(ref)) return NaN;
+
+  // Resolver soporta sheet.cells como Map (live) o plain object (snapshot
+  // defensivo). Sólo el live Map debería llegar aquí en práctica, pero el
+  // fallback con [] elimina cualquier sorpresa si un caller futuro despista.
+  let cell = null;
+  if (sheet.cells) {
+    if (typeof sheet.cells.get === 'function') {
+      cell = sheet.cells.get(ref);
+    } else {
+      cell = sheet.cells[ref];
+    }
   }
-  if (!_isCellInGridBounds(ref)) {
-    console.log('[aw-7.4] resolve bail: out of bounds', { ref });
-    return NaN;
-  }
-  const cellsType = sheet.cells && typeof sheet.cells.get === 'function' ? 'Map' : (sheet.cells ? 'plain' : 'none');
-  const cell = (cellsType === 'Map') ? sheet.cells.get(ref)
-              : (cellsType === 'plain') ? sheet.cells[ref]
-              : null;
-  console.log('[aw-7.4] resolve', {
-    ref,
-    cellsType,
-    hasCell: !!cell,
-    cellType: cell?.type,
-    cellValue: cell?.value,
-    cellValueType: typeof cell?.value,
-    cellComputed: cell?.computed,
-    cellInvalid: cell?.invalid,
-  });
-  if (!cell) return 0;                                    // empty user cell → 0
+
+  // Empty cell within bounds → 0 (matches "vacía: 0" del spec).
+  if (!cell) return 0;
+
+  // Invalid → NaN (propaga #ERROR upstream).
+  if (cell.invalid) return NaN;
+
+  // Formula cell (system o user): el resultado vive en `computed`, NUNCA en
+  // `value` (que es null para formula cells).
   if (cell.type === 'formula') {
-    if (cell.invalid) return NaN;
     const c = cell.computed;
     if (typeof c === 'number' && Number.isFinite(c)) return c;
-    if (c == null) return 0;                              // cold-start / null → 0
-    return NaN;                                            // computed no numérico
+    if (c == null) return 0;                              // cold-start
+    return NaN;                                            // computed no numérico (ej. portfolio.topAllocation object)
   }
-  if (cell.value == null) return 0;
-  if (typeof cell.value === 'number') return Number.isFinite(cell.value) ? cell.value : NaN;
-  const n = Number(cell.value);
-  return Number.isFinite(n) ? n : NaN;
+
+  // Literal value cell: el resultado vive en `value` (number directo o string
+  // parseable). Esta es la rama que faltaba diferenciar bien del formula path
+  // y la causa del fallo en =C1+D1 cuando C1/D1 son literales user.
+  const v = cell.value;
+  if (v == null) return 0;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : NaN;
+  if (typeof v === 'string') {
+    const n = Number(v.trim());
+    return Number.isFinite(n) ? n : NaN;
+  }
+  return NaN;
 }
 
 function _aw74OperandValue(operand, sheet) {
@@ -2836,13 +2846,6 @@ function commitWorkspaceCellEdit(cellId, value) {
   const raw = (value != null) ? value : WORKSPACE_RUNTIME.editingValue;
   const trimmed = String(raw ?? '').trim();
 
-  console.log('[aw-7.4] commit', {
-    targetId,
-    rawType:  typeof raw,
-    trimmed,
-    isFormulaInput: isWorkspaceFormulaInput(trimmed),
-  });
-
   // AW-7.4: si el input arranca con `=`, ruta de fórmula; si no, literal.
   if (isWorkspaceFormulaInput(trimmed)) {
     if (!cell) {
@@ -2856,12 +2859,6 @@ function commitWorkspaceCellEdit(cellId, value) {
       cell.invalid  = false;
       cell.updatedAt = Date.now();
     }
-    console.log('[aw-7.4] commit→formula stored', {
-      targetId,
-      type:     cell.type,
-      formula:  cell.formula,
-      computed: cell.computed,
-    });
   } else {
     const coerced = _coerceWorkspaceLiteral(trimmed);
     if (!cell) {
@@ -2890,20 +2887,6 @@ function commitWorkspaceCellEdit(cellId, value) {
     WORKSPACE_RUNTIME.isEditing    = false;
   }
   WORKSPACE_RUNTIME.lastEditAt = Date.now();
-
-  // [aw-7.4 diagnostic] dump sheet cells right before recalc so we can see the
-  // exact state of C1/D1 etc. when a formula cell is being evaluated.
-  try {
-    const dump = {};
-    for (const [k, c] of sheet.cells) {
-      dump[k] = { type: c.type, value: c.value, valueType: typeof c.value, formula: c.formula, computed: c.computed };
-    }
-    console.log('[aw-7.4] sheet before recalc:', dump);
-    console.log('[aw-7.4] cells.size=' + sheet.cells.size + ' cellsCtor=' + (sheet.cells.constructor && sheet.cells.constructor.name));
-  } catch (e) {
-    console.warn('[aw-7.4] dump failed:', e?.message);
-  }
-
   // AW-7.4: brute-force recalc tras commit para que computed/invalid queden
   // listos antes del snapshot. Render volverá a llamarlo (idempotente).
   recalculateWorkspaceSheet(WORKSPACE_RUNTIME.activeSheetId);
@@ -3066,7 +3049,6 @@ function _hydrateWorkspaceFromPersistence() {
   if (!payload) return 0;
   const sheet = WORKSPACE_RUNTIME.sheets.get('main');
   if (!sheet) return 0;
-  console.log('[aw-7.4] hydrate payload userCells:', JSON.stringify(payload.sheets.main.userCells));
   const applied = mergeWorkspaceUserCells(sheet, payload.sheets.main.userCells);
   console.log('[workspace-persist] hydrated', { applied });
   return applied;
@@ -3114,11 +3096,7 @@ function _formatComputedValue(v) {
 }
 
 function _formatWorkspaceCellDisplay(cell) {
-  if (cell.type === 'formula') {
-    const out = _formatComputedValue(cell.computed);
-    console.log('[aw-7.4] cellDisplay formula', { id: cell.id, formula: cell.formula, computed: cell.computed, invalid: cell.invalid, display: out });
-    return out;
-  }
+  if (cell.type === 'formula') return _formatComputedValue(cell.computed);
   return _escapeWorkspaceText(cell.value ?? '');
 }
 
