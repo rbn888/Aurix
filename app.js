@@ -463,6 +463,14 @@ const T = {
     empty_watchlist:   'Añade activos ⭐ para seguirlos aquí',
     market_no_results: 'Sin resultados',
     stale:             'sin actualizar',
+    // Workspace shell
+    ws_title:              'Workspace',
+    ws_risk_monitor:       'Monitor de riesgo',
+    ws_risk_subtitle:      'Señales en vivo de tu cartera',
+    ws_risk_signals:       'Señales de riesgo',
+    ws_invalid_formula:    'Fórmula inválida',
+    ws_unknown_function:   'Función desconocida',
+    ws_invalid_range:      'Rango inválido',
     // Beta screen
     exit: 'Salir',
   },
@@ -636,6 +644,14 @@ const T = {
     empty_watchlist:   'Add assets ⭐ to track them here',
     market_no_results: 'No results',
     stale:             'stale data',
+    // Workspace shell
+    ws_title:              'Workspace',
+    ws_risk_monitor:       'Risk Monitor',
+    ws_risk_subtitle:      'Live portfolio signals',
+    ws_risk_signals:       'Risk Signals',
+    ws_invalid_formula:    'Invalid formula',
+    ws_unknown_function:   'Unknown function',
+    ws_invalid_range:      'Invalid range',
     // Beta screen
     exit: 'Exit',
   },
@@ -678,6 +694,8 @@ function switchLang(newLang) {
   applyTypeMetaLabels();
   if (currentTab === 'market') {
     renderMarket();
+  } else if (currentTab === 'workspace') {
+    if (typeof renderWorkspace === 'function') renderWorkspace();
   } else {
     render();
     updateDonut();
@@ -1213,7 +1231,8 @@ function attachFormatter(input, allowDecimals) {
 
 // ── Formatting ─────────────────────────────────────────────
 function formatCurrency(amount, currency) {
-  return new Intl.NumberFormat('es-ES', {
+  const locale = lang === 'en' ? 'en-US' : 'es-ES';
+  return new Intl.NumberFormat(locale, {
     style: 'currency', currency,
     minimumFractionDigits: 2, maximumFractionDigits: 2
   }).format(amount);
@@ -3378,11 +3397,11 @@ function _aw92ValidateFormula(value) {
 
   const parsed = parseWorkspaceFormula(trimmed);
   if (!parsed) {
-    if (_aw92IsRangeError(trimmed)) return 'Invalid range';
-    return 'Invalid formula';
+    if (_aw92IsRangeError(trimmed)) return t('ws_invalid_range');
+    return t('ws_invalid_formula');
   }
   const unknown = _aw92FindUnknownFunction(parsed);
-  if (unknown) return 'Unknown function';
+  if (unknown) return t('ws_unknown_function');
   return null;
 }
 
@@ -4342,10 +4361,10 @@ function _renderWorkspaceDesktop(sheet) {
             ${bodyRows}
           </div>
         </section>
-        <aside class="aurix-copilot-panel" aria-label="Risk monitor">
+        <aside class="aurix-copilot-panel" aria-label="${_escapeWorkspaceText(t('ws_risk_monitor'))}">
           <div class="aurix-copilot-header">
-            <span class="aurix-copilot-eyebrow">Risk Monitor</span>
-            <span class="aurix-copilot-subtitle">Live portfolio signals</span>
+            <span class="aurix-copilot-eyebrow">${_escapeWorkspaceText(t('ws_risk_monitor'))}</span>
+            <span class="aurix-copilot-subtitle">${_escapeWorkspaceText(t('ws_risk_subtitle'))}</span>
           </div>
           <div class="aurix-risk-body">${riskBody}</div>
         </aside>
@@ -4370,8 +4389,15 @@ function _renderWorkspaceMobile(sheet) {
   const dailyPnl    = (typeof portfolio.dailyPnl === 'number') ? portfolio.dailyPnl : null;
   const dailyPnlPct = (typeof portfolio.dailyPnlPct === 'number') ? portfolio.dailyPnlPct : null;
 
-  const fmtMoney = v => '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const fmtSigned = v => (v >= 0 ? '+' : '') + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Workspace mobile cards: read baseCurrency from app settings so the cards
+  // follow the global currency toggle. portfolio.totalValue is the raw
+  // qty*price aggregate (treated as USD per dashboard convention) — convert
+  // to base before formatting so EUR mode shows EUR values, not USD-with-€.
+  const fmtMoney  = v => formatBase(toBase(Number(v) || 0, 'USD'));
+  const fmtSigned = v => {
+    const base = toBase(Number(v) || 0, 'USD');
+    return (base >= 0 ? '+' : '') + formatBase(base);
+  };
 
   const topLabel = topAlloc?.symbol
     ? `${topAlloc.symbol} · ${((topAlloc.allocation || 0) * 100).toFixed(1)}%`
@@ -4444,12 +4470,12 @@ function _renderWorkspaceMobile(sheet) {
   return `
     <div class="aurix-workspace-shell is-mobile">
       <header class="aurix-mobile-header">
-        <h2 class="aurix-mobile-title">Workspace</h2>
+        <h2 class="aurix-mobile-title">${_escapeWorkspaceText(t('ws_title'))}</h2>
       </header>
       <section class="aurix-mobile-summary">${summary}</section>
-      <section class="aurix-mobile-risk" aria-label="Risk signals">
+      <section class="aurix-mobile-risk" aria-label="${_escapeWorkspaceText(t('ws_risk_signals'))}">
         <header class="aurix-mobile-risk-header">
-          <span class="aurix-mobile-risk-eyebrow">Risk Signals</span>
+          <span class="aurix-mobile-risk-eyebrow">${_escapeWorkspaceText(t('ws_risk_signals'))}</span>
         </header>
         <ul class="aurix-mobile-risk-list">${riskItems}</ul>
       </section>
@@ -11260,6 +11286,13 @@ function _applyCurrencyChange(currency) {
   render(true);
   updateChart(true);
   updateDonut();
+  // Propagate currency change to other surfaces that read baseCurrency at
+  // render time (workspace summary cards, market list).
+  if (currentTab === 'workspace' && typeof renderWorkspace === 'function') {
+    renderWorkspace();
+  } else if (currentTab === 'market' && typeof renderMarket === 'function') {
+    renderMarket();
+  }
 }
 
 document.querySelectorAll('.menu-curr-btn').forEach(btn => {
