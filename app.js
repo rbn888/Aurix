@@ -2848,15 +2848,29 @@ function commitWorkspaceCellEdit(cellId, value) {
 
   // AW-7.4: si el input arranca con `=`, ruta de fórmula; si no, literal.
   if (isWorkspaceFormulaInput(trimmed)) {
+    // AW-7.4 hardening: evaluamos la fórmula INLINE aquí mismo, para que
+    // cell.computed/cell.invalid queden poblados antes de cualquier render
+    // o snapshot. Si el render dispara antes de que el recalc post-commit
+    // termine (cascade, eventos paralelos, etc.), el computed ya es válido.
+    // recalc sigue ejecutándose después y es idempotente para chains.
+    const parsedNew = parseWorkspaceFormula(trimmed);
+    const evalNew   = evaluateWorkspaceFormula(parsedNew, sheet);
+
     if (!cell) {
-      cell = createWorkspaceCell({ id: targetId, type: 'formula', formula: trimmed });
+      cell = createWorkspaceCell({
+        id:       targetId,
+        type:     'formula',
+        formula:  trimmed,
+        computed: evalNew.computed,
+        invalid:  evalNew.invalid,
+      });
       sheet.cells.set(targetId, cell);
     } else {
       cell.type     = 'formula';
       cell.formula  = trimmed;
       cell.value    = null;
-      cell.computed = null;
-      cell.invalid  = false;
+      cell.computed = evalNew.computed;
+      cell.invalid  = evalNew.invalid;
       cell.updatedAt = Date.now();
     }
   } else {
