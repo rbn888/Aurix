@@ -3212,12 +3212,9 @@ function _aw91RenderAutocomplete(anchorEl) {
     drop.className = 'aurix-formula-autocomplete';
     container.appendChild(drop);
   }
-  const aRect  = anchorEl.getBoundingClientRect();
-  const cRect  = container.getBoundingClientRect();
-  drop.style.left     = (aRect.left   - cRect.left) + 'px';
-  drop.style.top      = (aRect.bottom - cRect.top  + 2) + 'px';
-  drop.style.minWidth = Math.max(200, aRect.width) + 'px';
 
+  // AW-9.1a: render content first so we can measure the dropdown's actual
+  // height and width to drive flip-on-overflow positioning.
   const items = WORKSPACE_RUNTIME.autocompleteItems;
   const sel   = WORKSPACE_RUNTIME.autocompleteSelectedIndex;
   drop.innerHTML = items.map((item, i) => `
@@ -3227,6 +3224,45 @@ function _aw91RenderAutocomplete(anchorEl) {
       <span class="aurix-formula-autocomplete-kind">${_escapeWorkspaceText(item.kind)}</span>
     </div>
   `).join('');
+
+  // AW-9.1a: width — match editor width within sensible bounds. Override the
+  // CSS min-width by setting an explicit width (clamped 220px..360px) so the
+  // panel never grows oversized over very wide cells / formula bar.
+  const aRect    = anchorEl.getBoundingClientRect();
+  const cRect    = container.getBoundingClientRect();
+  const W_MIN    = 220;
+  const W_MAX    = 360;
+  const editorW  = Math.round(aRect.width);
+  const width    = Math.max(W_MIN, Math.min(W_MAX, editorW || W_MIN));
+  drop.style.width    = width + 'px';
+  drop.style.minWidth = '0';
+
+  // Horizontal alignment: left edge of editor, relative to container.
+  drop.style.left = (aRect.left - cRect.left) + 'px';
+
+  // AW-9.1a: vertical — render BELOW the editor with a clear 10px gap so the
+  // active input text is never visually obscured. If the dropdown would
+  // overflow the viewport bottom, flip ABOVE the editor (when that fits).
+  // Priority: keep input visible.
+  const GAP            = 10;
+  const belowTop       = aRect.bottom - cRect.top + GAP;
+  drop.style.top       = belowTop + 'px';
+
+  // Now measure the rendered dropdown to decide if we need to flip.
+  const dRect          = drop.getBoundingClientRect();
+  const dropHeight     = dRect.height || 0;
+  const viewportH      = (typeof window !== 'undefined' && window.innerHeight)
+                       || document.documentElement.clientHeight
+                       || 0;
+  const overflowsBelow = (aRect.bottom + GAP + dropHeight) > viewportH;
+  if (overflowsBelow) {
+    const aboveTopAbs  = aRect.top - GAP - dropHeight;       // viewport-coord
+    if (aboveTopAbs >= 0) {
+      drop.style.top   = (aRect.top - cRect.top - GAP - dropHeight) + 'px';
+    }
+    // If above also overflows, leave the default below position — the input
+    // is still fully visible (dropdown sits beneath it).
+  }
 }
 
 function _aw91UpdateAutocomplete(inputEl) {
