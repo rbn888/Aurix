@@ -2064,6 +2064,15 @@ const WORKSPACE_RUNTIME = {
   // AW-7.2: tracks where the next post-render focus should land.
   // Transient UX hint, NOT a duplicate of editingValue. 'cell' | 'formula' | null.
   _editFocusTarget:         null,
+  // AW-7.5: workspace dependency graph engine. Forward edges (this cell
+  // depends on these refs) and reverse edges (these cells depend on this ref)
+  // power selective topological recompute and cycle detection. Workspace-only;
+  // never mixes with the Financial Core formula runtime (FC-10/11).
+  dependencyGraph:          new Map(),
+  reverseDependencyGraph:   new Map(),
+  graphVersion:             0,
+  cycleDetections:          0,
+  lastGraphBuildAt:         0,
 };
 
 // AW-2: Sheet & Cell models — mutable internals, immutable snapshots.
@@ -2468,44 +2477,30 @@ function resolveWorkspaceFormula(formulaId) {
 }
 
 function recalculateWorkspaceSheet(sheetId) {
+  // AW-7.5: replaces the AW-7.4 brute-force multi-pass loop. Now we only
+  // re-resolve system formulas (FC-snapshot consumer) and propagate any
+  // resulting changes to user formulas downstream via the dependency graph.
+  // User-formula chains are recomputed incrementally inside the propagate
+  // (no full sheet re-evaluation).
   const sheet = WORKSPACE_RUNTIME.sheets.get(sheetId);
   if (!sheet) return false;
 
   const now = Date.now();
+  const changedSystemRefs = new Set();
 
-  // AW-7.4: brute-force multi-pass para resolver cadenas (ej. C1 = =B1+1
-  // donde B1 = =A1+1). Sin dependency graph todavía — eso llega en AW-7.5.
-  // Convergencia esperada en pocas pasadas; cap en 8 protege contra ciclos.
-  const MAX_PASSES = 8;
-  for (let pass = 0; pass < MAX_PASSES; pass++) {
-    let changed = false;
-
-    for (const cell of sheet.cells.values()) {
-      if (cell.type !== 'formula' || !cell.formula) continue;
-
-      let nextComputed;
-      let nextInvalid = false;
-
-      if (cell.readonly) {
-        // System formula (FC-snapshot consumer): bare identifier sin '='.
-        nextComputed = resolveWorkspaceFormula(cell.formula);
-      } else {
-        // AW-7.4: user formula (=A1+B1). Parser propio, sin eval.
-        const parsed = parseWorkspaceFormula(cell.formula);
-        const result = evaluateWorkspaceFormula(parsed, sheet);
-        nextComputed = result.computed;
-        nextInvalid  = result.invalid;
-      }
-
-      if (nextComputed !== cell.computed || nextInvalid !== !!cell.invalid) {
-        cell.computed = nextComputed;
-        cell.invalid  = nextInvalid;
-        cell.updatedAt = now;
-        changed = true;
-      }
+  for (const cell of sheet.cells.values()) {
+    if (cell.type !== 'formula' || !cell.formula || !cell.readonly) continue;
+    const next = resolveWorkspaceFormula(cell.formula);
+    if (next !== cell.computed) {
+      cell.computed = next;
+      cell.updatedAt = now;
+      changedSystemRefs.add(cell.id);
     }
+  }
 
-    if (!changed) break;
+  // Each system cell whose computed shifted must propagate to its dependents.
+  for (const id of changedSystemRefs) {
+    _propagateWorkspaceChange(id);
   }
 
   sheet.updatedAt = now;
@@ -2785,6 +2780,208 @@ function evaluateWorkspaceFormula(parsed, sheet) {
   return { computed: r, invalid: false };
 }
 
+// ── AW-7.5: Workspace dependency graph engine ────────────────────────────────
+// Selective topological recompute. Replaces the brute-force multi-pass loop.
+//
+//   dependencyGraph        : cellId  → Set<refId>   ("this cell depends on")
+//   reverseDependencyGraph : refId   → Set<cellId>  ("these cells depend on")
+//
+// System formulas (B1/B2/B3, readonly+type='formula', body 'portfolio.*')
+// don't have cell-ref deps in the graph (their bodies are bare identifiers,
+// not cell refs). They DO appear as targets in reverseDependencyGraph when
+// user formulas reference them — that's how a portfolio change propagates
+// to user formulas like =B1*0.10.
+//
+// Cycles are marked with cell.computed='#CYCLE' + cell.invalid=true on every
+// member. The resolver returns NaN for invalid cells, so cells outside the
+// SCC that depend on it propagate as #ERROR upstream.
+
+function _extractFormulaDependencies(parsed) {
+  const deps = new Set();
+  if (!parsed) return deps;
+  const visit = (operand) => {
+    if (operand && operand.kind === 'ref' && operand.ref && _isCellInGridBounds(operand.ref)) {
+      deps.add(operand.ref);
+    }
+  };
+  visit(parsed.lhs);
+  visit(parsed.rhs);
+  return deps;
+}
+
+function _setCellDependencies(cellId, deps) {
+  // Remove old forward + reverse edges.
+  const oldDeps = WORKSPACE_RUNTIME.dependencyGraph.get(cellId);
+  if (oldDeps) {
+    for (const oldDep of oldDeps) {
+      const rev = WORKSPACE_RUNTIME.reverseDependencyGraph.get(oldDep);
+      if (rev) {
+        rev.delete(cellId);
+        if (rev.size === 0) WORKSPACE_RUNTIME.reverseDependencyGraph.delete(oldDep);
+      }
+    }
+  }
+  // Insert new forward + reverse edges.
+  if (deps && deps.size > 0) {
+    WORKSPACE_RUNTIME.dependencyGraph.set(cellId, new Set(deps));
+    for (const dep of deps) {
+      let rev = WORKSPACE_RUNTIME.reverseDependencyGraph.get(dep);
+      if (!rev) {
+        rev = new Set();
+        WORKSPACE_RUNTIME.reverseDependencyGraph.set(dep, rev);
+      }
+      rev.add(cellId);
+    }
+  } else {
+    WORKSPACE_RUNTIME.dependencyGraph.delete(cellId);
+  }
+  WORKSPACE_RUNTIME.graphVersion++;
+  WORKSPACE_RUNTIME.lastGraphBuildAt = Date.now();
+}
+
+function _clearCellDependencies(cellId) {
+  _setCellDependencies(cellId, null);
+}
+
+function _isInCycle(cellId) {
+  // BFS: starting from cellId's deps, can we reach cellId again?
+  const startDeps = WORKSPACE_RUNTIME.dependencyGraph.get(cellId);
+  if (!startDeps || startDeps.size === 0) return false;
+  const visited = new Set();
+  const queue = [...startDeps];
+  while (queue.length > 0) {
+    const id = queue.shift();
+    if (id === cellId) return true;
+    if (visited.has(id)) continue;
+    visited.add(id);
+    const deps = WORKSPACE_RUNTIME.dependencyGraph.get(id);
+    if (deps) for (const d of deps) queue.push(d);
+  }
+  return false;
+}
+
+function _collectAffectedDownstream(rootId) {
+  // Transitive closure via reverseDependencyGraph (excluding root itself).
+  const affected = new Set();
+  const queue = [];
+  const seedDeps = WORKSPACE_RUNTIME.reverseDependencyGraph.get(rootId);
+  if (seedDeps) for (const d of seedDeps) queue.push(d);
+  while (queue.length > 0) {
+    const id = queue.shift();
+    if (affected.has(id)) continue;
+    affected.add(id);
+    const next = WORKSPACE_RUNTIME.reverseDependencyGraph.get(id);
+    if (next) for (const d of next) queue.push(d);
+  }
+  return affected;
+}
+
+function _topologicalOrder(idSet) {
+  // DFS post-order: visit deps within the set first, then push self.
+  // `visiting` set prevents infinite recursion if the affected set contains a
+  // cycle (cycle members still get pushed once each, in some order).
+  const order = [];
+  const visited = new Set();
+  const visiting = new Set();
+  const visit = (id) => {
+    if (visited.has(id) || visiting.has(id)) return;
+    visiting.add(id);
+    const deps = WORKSPACE_RUNTIME.dependencyGraph.get(id);
+    if (deps) {
+      for (const dep of deps) {
+        if (idSet.has(dep)) visit(dep);
+      }
+    }
+    visiting.delete(id);
+    visited.add(id);
+    order.push(id);
+  };
+  for (const id of idSet) visit(id);
+  return order;
+}
+
+function _recomputeUserFormulaCell(cell, sheet) {
+  const parsed = parseWorkspaceFormula(cell.formula);
+  const result = evaluateWorkspaceFormula(parsed, sheet);
+  cell.computed = result.computed;
+  cell.invalid  = result.invalid;
+  cell.updatedAt = Date.now();
+}
+
+function _markCellAsCycle(cell) {
+  cell.computed = '#CYCLE';
+  cell.invalid  = true;
+  cell.updatedAt = Date.now();
+  WORKSPACE_RUNTIME.cycleDetections++;
+}
+
+function _propagateWorkspaceChange(rootCellId) {
+  const sheet = WORKSPACE_RUNTIME.sheets.get(WORKSPACE_RUNTIME.activeSheetId);
+  if (!sheet) return;
+
+  const affected = _collectAffectedDownstream(rootCellId);
+  if (affected.size === 0) return;
+
+  const order = _topologicalOrder(affected);
+  for (const id of order) {
+    const cell = sheet.cells.get(id);
+    if (!cell || cell.type !== 'formula' || !cell.formula || cell.readonly) continue;
+    if (_isInCycle(id)) {
+      _markCellAsCycle(cell);
+    } else {
+      _recomputeUserFormulaCell(cell, sheet);
+    }
+  }
+}
+
+function _rebuildAndRecomputeAll(sheet) {
+  if (!sheet || !sheet.cells) return;
+
+  WORKSPACE_RUNTIME.dependencyGraph.clear();
+  WORKSPACE_RUNTIME.reverseDependencyGraph.clear();
+
+  // 1. Build graph for every user formula cell.
+  for (const cell of sheet.cells.values()) {
+    if (cell.type === 'formula' && cell.formula && !cell.readonly) {
+      const parsed = parseWorkspaceFormula(cell.formula);
+      const deps = _extractFormulaDependencies(parsed);
+      _setCellDependencies(cell.id, deps);
+    }
+  }
+
+  // 2. Re-resolve system formulas (FC-snapshot consumer).
+  for (const cell of sheet.cells.values()) {
+    if (cell.type === 'formula' && cell.formula && cell.readonly) {
+      const next = resolveWorkspaceFormula(cell.formula);
+      if (next !== cell.computed) {
+        cell.computed = next;
+        cell.updatedAt = Date.now();
+      }
+    }
+  }
+
+  // 3. Evaluate user formulas in topological order (cycle members → #CYCLE).
+  const userFormulas = new Set();
+  for (const cell of sheet.cells.values()) {
+    if (cell.type === 'formula' && cell.formula && !cell.readonly) {
+      userFormulas.add(cell.id);
+    }
+  }
+  const order = _topologicalOrder(userFormulas);
+  for (const id of order) {
+    const cell = sheet.cells.get(id);
+    if (!cell) continue;
+    if (_isInCycle(id)) {
+      _markCellAsCycle(cell);
+    } else {
+      _recomputeUserFormulaCell(cell, sheet);
+    }
+  }
+
+  WORKSPACE_RUNTIME.graphVersion++;
+  WORKSPACE_RUNTIME.lastGraphBuildAt = Date.now();
+}
+
 function beginWorkspaceCellEdit(cellId, initialValue) {
   if (!_isCellInGridBounds(cellId)) return false;
   const sheet = WORKSPACE_RUNTIME.sheets.get(WORKSPACE_RUNTIME.activeSheetId);
@@ -2838,11 +3035,9 @@ function commitWorkspaceCellEdit(cellId, value) {
 
   // AW-7.4: si el input arranca con `=`, ruta de fórmula; si no, literal.
   if (isWorkspaceFormulaInput(trimmed)) {
-    // AW-7.4 hardening: evaluamos la fórmula INLINE aquí mismo, para que
-    // cell.computed/cell.invalid queden poblados antes de cualquier render
-    // o snapshot. Si el render dispara antes de que el recalc post-commit
-    // termine (cascade, eventos paralelos, etc.), el computed ya es válido.
-    // recalc sigue ejecutándose después y es idempotente para chains.
+    // AW-7.4 hardening: evaluate inline so cell.computed/cell.invalid son
+    // válidos incluso antes del propagate. AW-7.5 reemplaza el brute-force
+    // recalc por un propagate selectivo basado en el dependency graph.
     const parsedNew = parseWorkspaceFormula(trimmed);
     const evalNew   = evaluateWorkspaceFormula(parsedNew, sheet);
 
@@ -2863,6 +3058,11 @@ function commitWorkspaceCellEdit(cellId, value) {
       cell.invalid  = evalNew.invalid;
       cell.updatedAt = Date.now();
     }
+
+    // AW-7.5: actualizar grafo + cycle detection antes de propagar.
+    const deps = _extractFormulaDependencies(parsedNew);
+    _setCellDependencies(targetId, deps);
+    if (_isInCycle(targetId)) _markCellAsCycle(cell);
   } else {
     const coerced = _coerceWorkspaceLiteral(trimmed);
     if (!cell) {
@@ -2882,6 +3082,8 @@ function commitWorkspaceCellEdit(cellId, value) {
       cell.invalid  = false;
       cell.updatedAt = Date.now();
     }
+    // AW-7.5: literal cell — sin deps en el grafo.
+    _clearCellDependencies(targetId);
   }
   sheet.updatedAt = Date.now();
 
@@ -2891,9 +3093,8 @@ function commitWorkspaceCellEdit(cellId, value) {
     WORKSPACE_RUNTIME.isEditing    = false;
   }
   WORKSPACE_RUNTIME.lastEditAt = Date.now();
-  // AW-7.4: brute-force recalc tras commit para que computed/invalid queden
-  // listos antes del snapshot. Render volverá a llamarlo (idempotente).
-  recalculateWorkspaceSheet(WORKSPACE_RUNTIME.activeSheetId);
+  // AW-7.5: propagate selectivo a dependientes downstream (orden topológico).
+  _propagateWorkspaceChange(targetId);
   // AW-7.3: persistir tras mutación efectiva (no en el no-op de empty input).
   saveWorkspacePersistence();
   return true;
@@ -3054,6 +3255,11 @@ function _hydrateWorkspaceFromPersistence() {
   const sheet = WORKSPACE_RUNTIME.sheets.get('main');
   if (!sheet) return 0;
   const applied = mergeWorkspaceUserCells(sheet, payload.sheets.main.userCells);
+  // AW-7.5: rebuild dependency graph + initial topological recompute so that
+  // restored formula cells have their computed state ready for first render.
+  if (applied > 0) {
+    _rebuildAndRecomputeAll(sheet);
+  }
   console.log('[workspace-persist] hydrated', { applied });
   return applied;
 }
