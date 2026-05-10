@@ -2092,6 +2092,7 @@ function createWorkspaceCell(config = {}) {
     computed:  config.computed ?? null,
     format:    config.format   || null,
     readonly:  !!config.readonly,
+    invalid:   !!config.invalid, // AW-7.4: marked true cuando el parser/evaluator falla
     updatedAt: Date.now(),
   };
 }
@@ -2471,14 +2472,40 @@ function recalculateWorkspaceSheet(sheetId) {
   if (!sheet) return false;
 
   const now = Date.now();
-  for (const cell of sheet.cells.values()) {
-    if (cell.type === 'formula' && cell.formula) {
-      const next = resolveWorkspaceFormula(cell.formula);
-      if (next !== cell.computed) {
-        cell.computed  = next;
+
+  // AW-7.4: brute-force multi-pass para resolver cadenas (ej. C1 = =B1+1
+  // donde B1 = =A1+1). Sin dependency graph todavía — eso llega en AW-7.5.
+  // Convergencia esperada en pocas pasadas; cap en 8 protege contra ciclos.
+  const MAX_PASSES = 8;
+  for (let pass = 0; pass < MAX_PASSES; pass++) {
+    let changed = false;
+
+    for (const cell of sheet.cells.values()) {
+      if (cell.type !== 'formula' || !cell.formula) continue;
+
+      let nextComputed;
+      let nextInvalid = false;
+
+      if (cell.readonly) {
+        // System formula (FC-snapshot consumer): bare identifier sin '='.
+        nextComputed = resolveWorkspaceFormula(cell.formula);
+      } else {
+        // AW-7.4: user formula (=A1+B1). Parser propio, sin eval.
+        const parsed = parseWorkspaceFormula(cell.formula);
+        const result = evaluateWorkspaceFormula(parsed, sheet);
+        nextComputed = result.computed;
+        nextInvalid  = result.invalid;
+      }
+
+      if (nextComputed !== cell.computed || nextInvalid !== !!cell.invalid) {
+        cell.computed = nextComputed;
+        cell.invalid  = nextInvalid;
         cell.updatedAt = now;
+        changed = true;
       }
     }
+
+    if (!changed) break;
   }
 
   sheet.updatedAt = now;
@@ -2507,6 +2534,7 @@ function getWorkspaceSheetSnapshot(sheetId) {
       computed:  cell.computed,
       format:    cell.format,
       readonly:  cell.readonly,
+      invalid:   !!cell.invalid, // AW-7.4
       updatedAt: cell.updatedAt,
     });
   }
@@ -2591,12 +2619,13 @@ function setActiveCell(cellId) {
   return true;
 }
 
-// AW-7.1: edit-mode lifecycle. Literal values only — no parser, no formulas.
-// System cells (readonly:true OR type==='formula') are protected.
+// AW-7.1 / AW-7.4: edit-mode lifecycle. Permite literales y, desde AW-7.4,
+// también fórmulas user-side (=A1+B1). Sólo readonly bloquea edición —
+// system cells siguen protegidas, las user formulas (type='formula',
+// readonly:false) son editables como cualquier celda user-owned.
 function _isWorkspaceCellEditable(cell) {
   if (!cell) return true; // empty user cell within bounds → editable
   if (cell.readonly) return false;
-  if (cell.type === 'formula') return false;
   return true;
 }
 
@@ -2611,6 +2640,125 @@ function _coerceWorkspaceLiteral(raw) {
   return s;
 }
 
+// ── AW-7.4: Safe workspace formula parser v1 ─────────────────────────────────
+// Grammar:  =operand operator operand
+//   operand : cellRef (e.g., A1) | number (e.g., 10, 0.25, -5)
+//   operator: + - * /
+// Pure tokenizer + tiny AST. No eval, no Function constructor, no dynamic
+// execution. Workspace-only — completamente separado del Financial Formula
+// Runtime (FC-10/11). Las celdas system (B1/B2/B3) siguen resolviéndose por
+// la ruta existente `resolveWorkspaceFormula` (FC-snapshot consumer-only).
+
+function isWorkspaceFormulaInput(raw) {
+  const s = String(raw ?? '').trim();
+  return s.length > 1 && s.charCodeAt(0) === 61 /* '=' */;
+}
+
+function _aw74Tokenize(text) {
+  const tokens = [];
+  // Alternativas (en orden): whitespace | op | number | cellRef | catch-all (1 char).
+  const re = /\s+|([+\-*/])|(\d+(?:\.\d+)?)|([A-Za-z]+\d+)|(.)/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m[0].trim() === '') continue;
+    if (m[1])      tokens.push({ t: 'op',  v: m[1] });
+    else if (m[2]) tokens.push({ t: 'num', v: Number(m[2]) });
+    else if (m[3]) tokens.push({ t: 'ref', v: m[3].toUpperCase() });
+    else           return null; // unknown character → invalid
+  }
+  return tokens;
+}
+
+function parseWorkspaceFormula(raw) {
+  const s = String(raw ?? '').trim();
+  if (!isWorkspaceFormulaInput(s)) return null;
+  const body = s.slice(1).trim();
+  if (!body) return null;
+  const tokens = _aw74Tokenize(body);
+  if (!tokens || tokens.length === 0) return null;
+
+  let idx = 0;
+  const readOperand = () => {
+    let sign = 1;
+    if (tokens[idx]?.t === 'op' && (tokens[idx].v === '-' || tokens[idx].v === '+')) {
+      sign = tokens[idx].v === '-' ? -1 : 1;
+      idx++;
+    }
+    const t = tokens[idx];
+    if (!t) return null;
+    if (t.t === 'num') { idx++; return { kind: 'num', value: sign * t.v }; }
+    if (t.t === 'ref') { idx++; return { kind: 'ref', ref: t.v, sign }; }
+    return null;
+  };
+
+  const lhs = readOperand();
+  if (!lhs) return null;
+
+  // V1 exige exactamente: lhs op rhs.
+  const opTok = tokens[idx];
+  if (!opTok || opTok.t !== 'op' || !'+-*/'.includes(opTok.v)) return null;
+  const op = opTok.v;
+  idx++;
+
+  const rhs = readOperand();
+  if (!rhs) return null;
+
+  // No se permiten tokens trailing (single binary operation).
+  if (idx !== tokens.length) return null;
+
+  return { lhs, op, rhs };
+}
+
+function resolveWorkspaceCellReference(ref, sheet) {
+  if (!sheet || !ref) return NaN;
+  if (!_isCellInGridBounds(ref)) return NaN;
+  const cell = sheet.cells.get(ref);
+  if (!cell) return 0;                                    // empty user cell → 0
+  if (cell.type === 'formula') {
+    if (cell.invalid) return NaN;
+    const c = cell.computed;
+    if (typeof c === 'number' && Number.isFinite(c)) return c;
+    if (c == null) return 0;                              // cold-start / null → 0
+    return NaN;                                            // computed no numérico
+  }
+  if (cell.value == null) return 0;
+  if (typeof cell.value === 'number') return Number.isFinite(cell.value) ? cell.value : NaN;
+  const n = Number(cell.value);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function _aw74OperandValue(operand, sheet) {
+  if (!operand) return NaN;
+  if (operand.kind === 'num') return operand.value;
+  if (operand.kind === 'ref') {
+    const v = resolveWorkspaceCellReference(operand.ref, sheet);
+    return (operand.sign || 1) * v;
+  }
+  return NaN;
+}
+
+function evaluateWorkspaceFormula(parsed, sheet) {
+  if (!parsed) return { computed: '#ERROR', invalid: true };
+  const lhs = _aw74OperandValue(parsed.lhs, sheet);
+  const rhs = _aw74OperandValue(parsed.rhs, sheet);
+  if (!Number.isFinite(lhs) || !Number.isFinite(rhs)) {
+    return { computed: '#ERROR', invalid: true };
+  }
+  let r;
+  switch (parsed.op) {
+    case '+': r = lhs + rhs; break;
+    case '-': r = lhs - rhs; break;
+    case '*': r = lhs * rhs; break;
+    case '/':
+      if (rhs === 0) return { computed: '#DIV/0', invalid: true };
+      r = lhs / rhs;
+      break;
+    default:  return { computed: '#ERROR', invalid: true };
+  }
+  if (!Number.isFinite(r)) return { computed: '#ERROR', invalid: true };
+  return { computed: r, invalid: false };
+}
+
 function beginWorkspaceCellEdit(cellId, initialValue) {
   if (!_isCellInGridBounds(cellId)) return false;
   const sheet = WORKSPACE_RUNTIME.sheets.get(WORKSPACE_RUNTIME.activeSheetId);
@@ -2618,9 +2766,13 @@ function beginWorkspaceCellEdit(cellId, initialValue) {
   const cell = sheet.cells.get(cellId);
   if (!_isWorkspaceCellEditable(cell)) return false;
 
+  // AW-7.4: si la celda es user formula, sembrar con la formula source —
+  // no con el computed — para que el usuario pueda editarla literalmente.
   const seed = (initialValue != null)
     ? String(initialValue)
-    : (cell?.value != null ? String(cell.value) : '');
+    : (cell && typeof cell.formula === 'string' && cell.formula.length > 0
+         ? cell.formula
+         : (cell?.value != null ? String(cell.value) : ''));
 
   WORKSPACE_RUNTIME.editingCell  = cellId;
   WORKSPACE_RUNTIME.editingValue = seed;
@@ -2656,19 +2808,40 @@ function commitWorkspaceCellEdit(cellId, value) {
   if (!_isWorkspaceCellEditable(cell)) return false;
 
   const raw = (value != null) ? value : WORKSPACE_RUNTIME.editingValue;
-  const coerced = _coerceWorkspaceLiteral(raw);
+  const trimmed = String(raw ?? '').trim();
 
-  if (!cell) {
-    if (coerced == null) {
-      // Empty input on a non-existent cell → just exit edit mode.
-      if (WORKSPACE_RUNTIME.editingCell === targetId) cancelWorkspaceCellEdit();
-      return true;
+  // AW-7.4: si el input arranca con `=`, ruta de fórmula; si no, literal.
+  if (isWorkspaceFormulaInput(trimmed)) {
+    if (!cell) {
+      cell = createWorkspaceCell({ id: targetId, type: 'formula', formula: trimmed });
+      sheet.cells.set(targetId, cell);
+    } else {
+      cell.type     = 'formula';
+      cell.formula  = trimmed;
+      cell.value    = null;
+      cell.computed = null;
+      cell.invalid  = false;
+      cell.updatedAt = Date.now();
     }
-    cell = createWorkspaceCell({ id: targetId, type: 'value', value: coerced });
-    sheet.cells.set(targetId, cell);
   } else {
-    cell.value     = coerced;
-    cell.updatedAt = Date.now();
+    const coerced = _coerceWorkspaceLiteral(trimmed);
+    if (!cell) {
+      if (coerced == null) {
+        // Empty input on a non-existent cell → just exit edit mode.
+        if (WORKSPACE_RUNTIME.editingCell === targetId) cancelWorkspaceCellEdit();
+        return true;
+      }
+      cell = createWorkspaceCell({ id: targetId, type: 'value', value: coerced });
+      sheet.cells.set(targetId, cell);
+    } else {
+      // Conversión formula → literal limpia campos derivados.
+      cell.type     = 'value';
+      cell.value    = coerced;
+      cell.formula  = null;
+      cell.computed = null;
+      cell.invalid  = false;
+      cell.updatedAt = Date.now();
+    }
   }
   sheet.updatedAt = Date.now();
 
@@ -2678,6 +2851,9 @@ function commitWorkspaceCellEdit(cellId, value) {
     WORKSPACE_RUNTIME.isEditing    = false;
   }
   WORKSPACE_RUNTIME.lastEditAt = Date.now();
+  // AW-7.4: brute-force recalc tras commit para que computed/invalid queden
+  // listos antes del snapshot. Render volverá a llamarlo (idempotente).
+  recalculateWorkspaceSheet(WORKSPACE_RUNTIME.activeSheetId);
   // AW-7.3: persistir tras mutación efectiva (no en el no-op de empty input).
   saveWorkspacePersistence();
   return true;
@@ -2705,6 +2881,12 @@ function serializeWorkspaceUserCells(sheet) {
   if (!sheet || !sheet.cells) return userCells;
   for (const [id, cell] of sheet.cells) {
     if (!_isWorkspaceCellEditable(cell)) continue;        // system cells excluidas
+    // AW-7.4: persistir formula si la celda es user formula. Sólo se guarda
+    // la fórmula (string), nunca el computed (deriva del runtime).
+    if (cell.type === 'formula' && typeof cell.formula === 'string' && cell.formula.length > 0) {
+      userCells[id] = { formula: cell.formula };
+      continue;
+    }
     if (!_isPersistableCellValue(cell.value)) continue;
     userCells[id] = { value: cell.value };
   }
@@ -2779,14 +2961,40 @@ function mergeWorkspaceUserCells(sheet, userCells) {
     if (!_isCellInGridBounds(id)) continue;                     // fuera de grid → skip
     const incoming = userCells[id];
     if (!incoming || typeof incoming !== 'object') continue;
-    if (!_isPersistableCellValue(incoming.value)) continue;
 
     const existing = sheet.cells.get(id);
-    // System cells (readonly OR formula) JAMÁS se sobreescriben por payload.
-    if (existing && (existing.readonly || existing.type === 'formula')) continue;
+    // AW-7.4: sólo readonly bloquea override (las user formulas type='formula'
+    // pero readonly:false SÍ pueden re-aplicarse desde payload).
+    if (existing && existing.readonly) continue;
 
+    // AW-7.4: payload con formula → user formula cell.
+    if (typeof incoming.formula === 'string' && incoming.formula.length > 0) {
+      if (existing) {
+        existing.type     = 'formula';
+        existing.formula  = incoming.formula;
+        existing.value    = null;
+        existing.computed = null;
+        existing.invalid  = false;
+        existing.updatedAt = Date.now();
+      } else {
+        sheet.cells.set(id, createWorkspaceCell({
+          id,
+          type:    'formula',
+          formula: incoming.formula,
+        }));
+      }
+      applied++;
+      continue;
+    }
+
+    // Literal payload.
+    if (!_isPersistableCellValue(incoming.value)) continue;
     if (existing) {
-      existing.value     = incoming.value;
+      existing.type     = 'value';
+      existing.value    = incoming.value;
+      existing.formula  = null;
+      existing.computed = null;
+      existing.invalid  = false;
       existing.updatedAt = Date.now();
     } else {
       sheet.cells.set(id, createWorkspaceCell({
@@ -2946,7 +3154,10 @@ function _isNumericDisplay(cell) {
 function _renderWorkspaceMatrixCell(cellId, cell) {
   const isActive  = WORKSPACE_RUNTIME.activeCellId === cellId;
   const isEditing = WORKSPACE_RUNTIME.isEditing && WORKSPACE_RUNTIME.editingCell === cellId;
-  const isSystem  = !!(cell && (cell.readonly || cell.type === 'formula'));
+  // AW-7.4: is-system = sólo readonly (user formulas type='formula' no
+  // readonly NO son system y conservan cursor de celda editable).
+  const isSystem  = !!(cell && cell.readonly);
+  const isInvalid = !!(cell && cell.invalid);
   const display   = cell ? _formatWorkspaceCellDisplay(cell) : '';
   const cls = [
     'aurix-grid-cell',
@@ -2955,6 +3166,7 @@ function _renderWorkspaceMatrixCell(cellId, cell) {
     isSystem                 ? 'is-system'   : '',
     !cell                    ? 'is-empty'    : '',
     _isNumericDisplay(cell)  ? 'is-numeric'  : '',
+    isInvalid                ? 'is-invalid'  : '',
     isActive                 ? 'is-active'   : '',
     isEditing                ? 'is-editing'  : '',
   ].filter(Boolean).join(' ');
@@ -2989,8 +3201,9 @@ function _renderWorkspaceFormulaBarValue(sheet) {
     };
   }
 
-  // AW-7.2: system cells (formula o readonly:true) → representación readonly.
-  if (cell && (cell.readonly || cell.type === 'formula')) {
+  // AW-7.2 / AW-7.4: readonly cells (system formulas, future readonly literals)
+  // → representación readonly. Las user formulas NO son readonly: caen abajo.
+  if (cell && cell.readonly) {
     if (cell.type === 'formula' && cell.formula) {
       return { coord: id, value: '=' + cell.formula, empty: false, kind: 'formula', readonly: true, placeholder: '' };
     }
@@ -2998,7 +3211,12 @@ function _renderWorkspaceFormulaBarValue(sheet) {
     return { coord: id, value: literal, empty: literal === '', kind: 'literal', readonly: true, placeholder: '' };
   }
 
-  // AW-7.2: user cell (editable).
+  // AW-7.4: user formula cell — editable; mostrar formula source (ya con '=').
+  if (cell && cell.type === 'formula' && cell.formula) {
+    return { coord: id, value: cell.formula, empty: false, kind: 'formula', readonly: false, placeholder: '' };
+  }
+
+  // AW-7.2: user literal cell.
   if (cell && cell.value != null && cell.value !== '') {
     return { coord: id, value: String(cell.value), empty: false, kind: 'literal', readonly: false, placeholder: '' };
   }

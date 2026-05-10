@@ -7063,9 +7063,19 @@ body.workspace-active .header {
   background: rgba(138, 166, 255, 0.20);
 }
 
-/* AW-7.1: system cells (formula/readonly) — cursor + tono distintos. */
+/* AW-7.1: system cells (readonly) — cursor neutro, sin edición. */
 .aurix-grid-cell.is-system {
   cursor: default;
+}
+
+/* AW-7.4: invalid formula state (#ERROR / #DIV/0). */
+.aurix-grid-cell.is-invalid {
+  color: #E05A5A;
+  font-style: italic;
+}
+
+.aurix-grid-cell.is-invalid.is-active {
+  color: #E05A5A;
 }
 
 /* AW-7.1: editing state — input reemplaza el contenido visual. */
