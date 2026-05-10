@@ -2073,6 +2073,12 @@ const WORKSPACE_RUNTIME = {
   graphVersion:             0,
   cycleDetections:          0,
   lastGraphBuildAt:         0,
+  // AW-8: market + derived version tracking for native financial reactivity.
+  // Recalc detects deltas and propagates pseudo-deps (MARKET:* / FINANCIAL:*)
+  // so PRICE() / PORTFOLIO.* / EXPOSURE() / ALLOCATION() formulas refresh
+  // automatically when the FC pipeline updates.
+  lastMarketVersion:        0,
+  lastDerivedVersion:       0,
 };
 
 // AW-2: Sheet & Cell models — mutable internals, immutable snapshots.
@@ -2477,11 +2483,13 @@ function resolveWorkspaceFormula(formulaId) {
 }
 
 function recalculateWorkspaceSheet(sheetId) {
-  // AW-7.5: replaces the AW-7.4 brute-force multi-pass loop. Now we only
-  // re-resolve system formulas (FC-snapshot consumer) and propagate any
-  // resulting changes to user formulas downstream via the dependency graph.
-  // User-formula chains are recomputed incrementally inside the propagate
-  // (no full sheet re-evaluation).
+  // AW-7.5 + AW-8: graph-driven recalc.
+  //   - Re-resolves system formulas (B1/B2/B3, FC-snapshot consumer) and
+  //     propagates any user formulas that depend on them.
+  //   - AW-8: detects MARKET_DATA_VERSION / DERIVED_FINANCIAL_STATE.version
+  //     deltas and propagates `MARKET:*` / `FINANCIAL:*` pseudo-deps so
+  //     PRICE() / PORTFOLIO.* / EXPOSURE() / ALLOCATION() recompute
+  //     reactively when the FC pipeline updates.
   const sheet = WORKSPACE_RUNTIME.sheets.get(sheetId);
   if (!sheet) return false;
 
@@ -2498,9 +2506,31 @@ function recalculateWorkspaceSheet(sheetId) {
     }
   }
 
-  // Each system cell whose computed shifted must propagate to its dependents.
   for (const id of changedSystemRefs) {
     _propagateWorkspaceChange(id);
+  }
+
+  // AW-8: financial reactivity. Detect FC version deltas and propagate the
+  // matching pseudo-dep IDs from the reverse graph. Iterating the reverse
+  // graph keeps this O(#financial-refs) instead of touching every cell.
+  const mv = (typeof MARKET_DATA_VERSION === 'number') ? MARKET_DATA_VERSION : 0;
+  if (mv !== WORKSPACE_RUNTIME.lastMarketVersion) {
+    WORKSPACE_RUNTIME.lastMarketVersion = mv;
+    for (const refId of WORKSPACE_RUNTIME.reverseDependencyGraph.keys()) {
+      if (typeof refId === 'string' && refId.startsWith('MARKET:')) {
+        _propagateWorkspaceChange(refId);
+      }
+    }
+  }
+  const dv = (typeof DERIVED_FINANCIAL_STATE !== 'undefined' && DERIVED_FINANCIAL_STATE)
+    ? DERIVED_FINANCIAL_STATE.version : 0;
+  if (dv !== WORKSPACE_RUNTIME.lastDerivedVersion) {
+    WORKSPACE_RUNTIME.lastDerivedVersion = dv;
+    for (const refId of WORKSPACE_RUNTIME.reverseDependencyGraph.keys()) {
+      if (typeof refId === 'string' && refId.startsWith('FINANCIAL:')) {
+        _propagateWorkspaceChange(refId);
+      }
+    }
   }
 
   sheet.updatedAt = now;
@@ -2649,19 +2679,192 @@ function isWorkspaceFormulaInput(raw) {
   return s.length > 1 && s.charCodeAt(0) === 61 /* '=' */;
 }
 
-function _aw74Tokenize(text) {
+// ── AW-8: Parser V2 — recursive descent + AST ────────────────────────────────
+// Grammar (precedence climbing):
+//   expression     := additive
+//   additive       := multiplicative (('+' | '-') multiplicative)*
+//   multiplicative := unary (('*' | '/') unary)*
+//   unary          := ('+' | '-')? primary
+//   primary        := NUMBER | STRING | '(' expression ')' | identCallOrRef
+//   identCallOrRef := IDENT ( '(' argList? ')' | ':' IDENT | ε )
+//   argList        := argument (',' argument)*
+//   argument       := IDENT ':' IDENT | expression
+//
+// AST node kinds:
+//   { type: 'num',    value }
+//   { type: 'str',    value }
+//   { type: 'ref',    ref }
+//   { type: 'range',  from, to }
+//   { type: 'unary',  op, operand }
+//   { type: 'binary', op, lhs, rhs }
+//   { type: 'call',   name, args }
+//
+// No eval, no Function constructor, no dynamic execution. Pure tokenizer +
+// recursive descent + AST walker. Workspace-only.
+
+function _aw8Tokenize(text) {
   const tokens = [];
-  // Alternativas (en orden): whitespace | op | number | cellRef | catch-all (1 char).
-  const re = /\s+|([+\-*/])|(\d+(?:\.\d+)?)|([A-Za-z]+\d+)|(.)/g;
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    if (m[0].trim() === '') continue;
-    if (m[1])      tokens.push({ t: 'op',  v: m[1] });
-    else if (m[2]) tokens.push({ t: 'num', v: Number(m[2]) });
-    else if (m[3]) tokens.push({ t: 'ref', v: m[3].toUpperCase() });
-    else           return null; // unknown character → invalid
+  const n = text.length;
+  let i = 0;
+  while (i < n) {
+    const c = text[i];
+    // Whitespace
+    if (c === ' ' || c === '\t' || c === '\n' || c === '\r') { i++; continue; }
+    // Number (digits, optional decimal). Leading '.123' supported.
+    if ((c >= '0' && c <= '9') ||
+        (c === '.' && i + 1 < n && text[i+1] >= '0' && text[i+1] <= '9')) {
+      let j = i + 1;
+      while (j < n && ((text[j] >= '0' && text[j] <= '9') || text[j] === '.')) j++;
+      const num = Number(text.slice(i, j));
+      if (!Number.isFinite(num)) return null;
+      tokens.push({ t: 'num', v: num });
+      i = j;
+      continue;
+    }
+    // String literal: " or ' delimited (and the curly variants users may paste).
+    if (c === '"' || c === "'" || c === '“' || c === '”' || c === '‘' || c === '’') {
+      const openers = '"\'“‘';
+      const closers = '"\'”’';
+      // Accept any closing quote character (smart-quotes, ascii) after open.
+      let j = i + 1;
+      while (j < n && !closers.includes(text[j]) && text[j] !== c) j++;
+      if (j >= n) return null;
+      tokens.push({ t: 'str', v: text.slice(i + 1, j) });
+      i = j + 1;
+      continue;
+    }
+    // Identifier: letters / digits / '_' / '.', must start with letter or '_'.
+    if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c === '_') {
+      let j = i + 1;
+      while (j < n) {
+        const cj = text[j];
+        if ((cj >= 'A' && cj <= 'Z') || (cj >= 'a' && cj <= 'z') ||
+            (cj >= '0' && cj <= '9') || cj === '_' || cj === '.') {
+          j++;
+        } else break;
+      }
+      tokens.push({ t: 'ident', v: text.slice(i, j).toUpperCase() });
+      i = j;
+      continue;
+    }
+    // Operators
+    if (c === '+' || c === '-' || c === '*' || c === '/') {
+      tokens.push({ t: 'op', v: c });
+      i++;
+      continue;
+    }
+    // Punctuation
+    if (c === '(') { tokens.push({ t: 'lparen' }); i++; continue; }
+    if (c === ')') { tokens.push({ t: 'rparen' }); i++; continue; }
+    if (c === ',') { tokens.push({ t: 'comma'  }); i++; continue; }
+    if (c === ':') { tokens.push({ t: 'colon'  }); i++; continue; }
+    return null; // unknown char
   }
   return tokens;
+}
+
+function _isCellRefShape(s) {
+  return /^[A-Z]+\d+$/.test(s);
+}
+
+function _aw8Peek(state, offset = 0)  { return state.tokens[state.idx + offset]; }
+function _aw8Consume(state)            { return state.tokens[state.idx++]; }
+
+function _aw8ParseExpression(state) { return _aw8ParseAdditive(state); }
+
+function _aw8ParseAdditive(state) {
+  let left = _aw8ParseMultiplicative(state);
+  while (_aw8Peek(state)?.t === 'op' && (_aw8Peek(state).v === '+' || _aw8Peek(state).v === '-')) {
+    const op = _aw8Consume(state).v;
+    const right = _aw8ParseMultiplicative(state);
+    left = { type: 'binary', op, lhs: left, rhs: right };
+  }
+  return left;
+}
+
+function _aw8ParseMultiplicative(state) {
+  let left = _aw8ParseUnary(state);
+  while (_aw8Peek(state)?.t === 'op' && (_aw8Peek(state).v === '*' || _aw8Peek(state).v === '/')) {
+    const op = _aw8Consume(state).v;
+    const right = _aw8ParseUnary(state);
+    left = { type: 'binary', op, lhs: left, rhs: right };
+  }
+  return left;
+}
+
+function _aw8ParseUnary(state) {
+  const tok = _aw8Peek(state);
+  if (tok && tok.t === 'op' && (tok.v === '+' || tok.v === '-')) {
+    const op = _aw8Consume(state).v;
+    const operand = _aw8ParseUnary(state);
+    if (op === '+') return operand;
+    return { type: 'unary', op, operand };
+  }
+  return _aw8ParsePrimary(state);
+}
+
+function _aw8ParsePrimary(state) {
+  const tok = _aw8Peek(state);
+  if (!tok) throw new Error('aw8:eof');
+
+  if (tok.t === 'num')   { _aw8Consume(state); return { type: 'num', value: tok.v }; }
+  if (tok.t === 'str')   { _aw8Consume(state); return { type: 'str', value: tok.v }; }
+
+  if (tok.t === 'lparen') {
+    _aw8Consume(state);
+    const expr = _aw8ParseExpression(state);
+    const close = _aw8Consume(state);
+    if (!close || close.t !== 'rparen') throw new Error('aw8:rparen');
+    return expr;
+  }
+
+  if (tok.t === 'ident') {
+    _aw8Consume(state);
+    const name = tok.v;
+    // Function call: IDENT '(' …
+    if (_aw8Peek(state)?.t === 'lparen') {
+      _aw8Consume(state);
+      const args = [];
+      if (_aw8Peek(state)?.t !== 'rparen') {
+        args.push(_aw8ParseArg(state));
+        while (_aw8Peek(state)?.t === 'comma') {
+          _aw8Consume(state);
+          args.push(_aw8ParseArg(state));
+        }
+      }
+      const close = _aw8Consume(state);
+      if (!close || close.t !== 'rparen') throw new Error('aw8:rparen');
+      return { type: 'call', name, args };
+    }
+    // Range start: A1 ':' A5
+    if (_isCellRefShape(name) && _aw8Peek(state)?.t === 'colon') {
+      _aw8Consume(state);
+      const next = _aw8Consume(state);
+      if (!next || next.t !== 'ident' || !_isCellRefShape(next.v)) throw new Error('aw8:range');
+      return { type: 'range', from: name, to: next.v };
+    }
+    // Plain cell reference
+    if (_isCellRefShape(name)) {
+      return { type: 'ref', ref: name };
+    }
+    throw new Error('aw8:ident:' + name);
+  }
+
+  throw new Error('aw8:unexpected');
+}
+
+function _aw8ParseArg(state) {
+  // Argument can be a range (IDENT ':' IDENT) or any expression.
+  const a = _aw8Peek(state, 0);
+  const b = _aw8Peek(state, 1);
+  if (a?.t === 'ident' && b?.t === 'colon' && _isCellRefShape(a.v)) {
+    const from = _aw8Consume(state).v;
+    _aw8Consume(state); // colon
+    const to = _aw8Consume(state);
+    if (!to || to.t !== 'ident' || !_isCellRefShape(to.v)) throw new Error('aw8:range');
+    return { type: 'range', from, to: to.v };
+  }
+  return _aw8ParseExpression(state);
 }
 
 function parseWorkspaceFormula(raw) {
@@ -2669,39 +2872,193 @@ function parseWorkspaceFormula(raw) {
   if (!isWorkspaceFormulaInput(s)) return null;
   const body = s.slice(1).trim();
   if (!body) return null;
-  const tokens = _aw74Tokenize(body);
+  const tokens = _aw8Tokenize(body);
   if (!tokens || tokens.length === 0) return null;
-
-  let idx = 0;
-  const readOperand = () => {
-    let sign = 1;
-    if (tokens[idx]?.t === 'op' && (tokens[idx].v === '-' || tokens[idx].v === '+')) {
-      sign = tokens[idx].v === '-' ? -1 : 1;
-      idx++;
-    }
-    const t = tokens[idx];
-    if (!t) return null;
-    if (t.t === 'num') { idx++; return { kind: 'num', value: sign * t.v }; }
-    if (t.t === 'ref') { idx++; return { kind: 'ref', ref: t.v, sign }; }
+  const state = { tokens, idx: 0 };
+  let ast;
+  try {
+    ast = _aw8ParseExpression(state);
+    if (state.idx !== state.tokens.length) return null;
+  } catch (_e) {
     return null;
-  };
+  }
+  return ast;
+}
 
-  const lhs = readOperand();
-  if (!lhs) return null;
+// ── AW-8: Range expansion + numeric collection ────────────────────────────────
 
-  // V1 exige exactamente: lhs op rhs.
-  const opTok = tokens[idx];
-  if (!opTok || opTok.t !== 'op' || !'+-*/'.includes(opTok.v)) return null;
-  const op = opTok.v;
-  idx++;
+function _expandRange(rangeNode) {
+  if (!rangeNode || rangeNode.type !== 'range') return null;
+  const m1 = String(rangeNode.from || '').match(/^([A-Z]+)(\d+)$/);
+  const m2 = String(rangeNode.to   || '').match(/^([A-Z]+)(\d+)$/);
+  if (!m1 || !m2) return null;
+  const cols = WORKSPACE_RUNTIME.gridColumns;
+  const ci1 = cols.indexOf(m1[1]);
+  const ci2 = cols.indexOf(m2[1]);
+  if (ci1 < 0 || ci2 < 0) return null;
+  const r1 = parseInt(m1[2], 10);
+  const r2 = parseInt(m2[2], 10);
+  const cMin = Math.min(ci1, ci2), cMax = Math.max(ci1, ci2);
+  const rMin = Math.min(r1,  r2),  rMax = Math.max(r1,  r2);
+  const ids = [];
+  for (let c = cMin; c <= cMax; c++) {
+    for (let r = rMin; r <= rMax; r++) {
+      ids.push(cols[c] + r);
+    }
+  }
+  return ids;
+}
 
-  const rhs = readOperand();
-  if (!rhs) return null;
+function _aw8RangeNumericValues(rangeNode) {
+  const ids = _expandRange(rangeNode);
+  if (!ids) return null;
+  const sheet = WORKSPACE_RUNTIME.sheets.get(WORKSPACE_RUNTIME.activeSheetId);
+  if (!sheet) return [];
+  const out = [];
+  for (const id of ids) {
+    const cell = sheet.cells.get(id);
+    if (!cell) continue;            // skip empty cells
+    if (cell.invalid) continue;     // skip #ERROR / #CYCLE / #DIV/0
+    const v = resolveWorkspaceCellReference(id);
+    if (typeof v === 'number' && Number.isFinite(v)) out.push(v);
+  }
+  return out;
+}
 
-  // No se permiten tokens trailing (single binary operation).
-  if (idx !== tokens.length) return null;
+// ── AW-8: Function registries ────────────────────────────────────────────────
 
-  return { lhs, op, rhs };
+// Custom error code for evaluator control flow (no eval, no exception abuse —
+// just a discriminated tag so we can map to the right '#XXX' sentinel).
+function _AwEvalError(code) { this.code = code; }
+_AwEvalError.prototype = Object.create(Error.prototype);
+
+const _AW8_WORKSPACE_FUNCTIONS = Object.freeze({
+  SUM(args) {
+    if (args.length !== 1 || args[0].type !== 'range') throw new _AwEvalError('#ERROR');
+    const vs = _aw8RangeNumericValues(args[0]);
+    if (vs == null) throw new _AwEvalError('#ERROR');
+    let s = 0;
+    for (const v of vs) s += v;
+    return s;
+  },
+  AVG(args) {
+    if (args.length !== 1 || args[0].type !== 'range') throw new _AwEvalError('#ERROR');
+    const vs = _aw8RangeNumericValues(args[0]);
+    if (vs == null) throw new _AwEvalError('#ERROR');
+    if (vs.length === 0) return 0;
+    let s = 0;
+    for (const v of vs) s += v;
+    return s / vs.length;
+  },
+  MIN(args) {
+    if (args.length !== 1 || args[0].type !== 'range') throw new _AwEvalError('#ERROR');
+    const vs = _aw8RangeNumericValues(args[0]);
+    if (vs == null) throw new _AwEvalError('#ERROR');
+    if (vs.length === 0) return 0;
+    let m = vs[0];
+    for (let i = 1; i < vs.length; i++) if (vs[i] < m) m = vs[i];
+    return m;
+  },
+  MAX(args) {
+    if (args.length !== 1 || args[0].type !== 'range') throw new _AwEvalError('#ERROR');
+    const vs = _aw8RangeNumericValues(args[0]);
+    if (vs == null) throw new _AwEvalError('#ERROR');
+    if (vs.length === 0) return 0;
+    let m = vs[0];
+    for (let i = 1; i < vs.length; i++) if (vs[i] > m) m = vs[i];
+    return m;
+  },
+});
+
+// Financial functions: pure consumers of FC snapshots (getMarketSnapshot /
+// getDerivedFinancialSnapshot / getMarketPrice). Never fetch, never mutate.
+const _AW8_FINANCIAL_FUNCTIONS = Object.freeze({
+  PRICE(args) {
+    if (args.length !== 1 || args[0].type !== 'str') throw new _AwEvalError('#ERROR');
+    const symbol = String(args[0].value || '').trim();
+    if (!symbol) throw new _AwEvalError('#ERROR');
+    const price = (typeof getMarketPrice === 'function') ? getMarketPrice(symbol) : null;
+    if (price == null || !Number.isFinite(price)) throw new _AwEvalError('#ERROR');
+    return price;
+  },
+  'PORTFOLIO.VALUE'(args) {
+    if (args.length !== 0) throw new _AwEvalError('#ERROR');
+    const snap = (typeof getDerivedFinancialSnapshot === 'function') ? getDerivedFinancialSnapshot() : null;
+    return Number(snap?.portfolio?.totalValue || 0);
+  },
+  'PORTFOLIO.ASSETS'(args) {
+    if (args.length !== 0) throw new _AwEvalError('#ERROR');
+    const snap = (typeof getDerivedFinancialSnapshot === 'function') ? getDerivedFinancialSnapshot() : null;
+    return Number(snap?.portfolio?.assetCount || 0);
+  },
+  EXPOSURE(args) {
+    if (args.length !== 1 || args[0].type !== 'str') throw new _AwEvalError('#ERROR');
+    const cat = String(args[0].value || '').trim().toLowerCase();
+    if (!cat) throw new _AwEvalError('#ERROR');
+    const snap = (typeof getDerivedFinancialSnapshot === 'function') ? getDerivedFinancialSnapshot() : null;
+    const exp = snap?.portfolio?.exposure || {};
+    if (Object.prototype.hasOwnProperty.call(exp, cat)) return Number(exp[cat] || 0);
+    if (cat === 'stocks' && exp.stock != null) return Number(exp.stock || 0); // common alias
+    return 0;
+  },
+  ALLOCATION(args) {
+    if (args.length !== 1 || args[0].type !== 'str') throw new _AwEvalError('#ERROR');
+    const symbol = String(args[0].value || '').trim().toUpperCase();
+    if (!symbol) throw new _AwEvalError('#ERROR');
+    const snap = (typeof getDerivedFinancialSnapshot === 'function') ? getDerivedFinancialSnapshot() : null;
+    const allocs = snap?.portfolio?.allocations || [];
+    for (const a of allocs) {
+      if (String(a?.symbol || '').toUpperCase() === symbol) return Number(a.allocation || 0);
+    }
+    return 0;
+  },
+});
+
+function _aw8CallFunction(name, args) {
+  const upper = String(name).toUpperCase();
+  const wsFn  = _AW8_WORKSPACE_FUNCTIONS[upper];
+  if (wsFn)  return wsFn(args);
+  const finFn = _AW8_FINANCIAL_FUNCTIONS[upper];
+  if (finFn) return finFn(args);
+  throw new _AwEvalError('#ERROR');
+}
+
+// ── AW-8: AST evaluator ──────────────────────────────────────────────────────
+
+function _aw8EvalAst(node) {
+  if (!node) throw new _AwEvalError('#ERROR');
+  switch (node.type) {
+    case 'num': return node.value;
+    case 'str': return node.value;  // strings only meaningful as fn args
+    case 'ref': {
+      const v = resolveWorkspaceCellReference(node.ref);
+      if (typeof v !== 'number' || !Number.isFinite(v)) throw new _AwEvalError('#ERROR');
+      return v;
+    }
+    case 'range': throw new _AwEvalError('#ERROR'); // ranges only as fn args
+    case 'unary': {
+      const v = _aw8EvalAst(node.operand);
+      if (typeof v !== 'number' || !Number.isFinite(v)) throw new _AwEvalError('#ERROR');
+      return node.op === '-' ? -v : v;
+    }
+    case 'binary': {
+      const l = _aw8EvalAst(node.lhs);
+      const r = _aw8EvalAst(node.rhs);
+      if (typeof l !== 'number' || !Number.isFinite(l)) throw new _AwEvalError('#ERROR');
+      if (typeof r !== 'number' || !Number.isFinite(r)) throw new _AwEvalError('#ERROR');
+      switch (node.op) {
+        case '+': return l + r;
+        case '-': return l - r;
+        case '*': return l * r;
+        case '/':
+          if (r === 0) throw new _AwEvalError('#DIV/0');
+          return l / r;
+      }
+      throw new _AwEvalError('#ERROR');
+    }
+    case 'call': return _aw8CallFunction(node.name, node.args || []);
+  }
+  throw new _AwEvalError('#ERROR');
 }
 
 function resolveWorkspaceCellReference(ref /*, sheet (ignorado) */) {
@@ -2748,36 +3105,22 @@ function resolveWorkspaceCellReference(ref /*, sheet (ignorado) */) {
   return NaN;
 }
 
-function _aw74OperandValue(operand, sheet) {
-  if (!operand) return NaN;
-  if (operand.kind === 'num') return operand.value;
-  if (operand.kind === 'ref') {
-    const v = resolveWorkspaceCellReference(operand.ref, sheet);
-    return (operand.sign || 1) * v;
-  }
-  return NaN;
-}
-
-function evaluateWorkspaceFormula(parsed, sheet) {
+// AW-8: evaluateWorkspaceFormula now drives the full AST. Throws are routed
+// through _AwEvalError so '#DIV/0' / '#ERROR' propagate cleanly. The `sheet`
+// parameter is kept for signature stability — the resolver reads the live
+// runtime directly (AW-7.4 contract).
+function evaluateWorkspaceFormula(parsed, _sheet) {
   if (!parsed) return { computed: '#ERROR', invalid: true };
-  const lhs = _aw74OperandValue(parsed.lhs, sheet);
-  const rhs = _aw74OperandValue(parsed.rhs, sheet);
-  if (!Number.isFinite(lhs) || !Number.isFinite(rhs)) {
+  try {
+    const v = _aw8EvalAst(parsed);
+    if (typeof v !== 'number' || !Number.isFinite(v)) {
+      return { computed: '#ERROR', invalid: true };
+    }
+    return { computed: v, invalid: false };
+  } catch (e) {
+    if (e && e.code) return { computed: e.code, invalid: true };
     return { computed: '#ERROR', invalid: true };
   }
-  let r;
-  switch (parsed.op) {
-    case '+': r = lhs + rhs; break;
-    case '-': r = lhs - rhs; break;
-    case '*': r = lhs * rhs; break;
-    case '/':
-      if (rhs === 0) return { computed: '#DIV/0', invalid: true };
-      r = lhs / rhs;
-      break;
-    default:  return { computed: '#ERROR', invalid: true };
-  }
-  if (!Number.isFinite(r)) return { computed: '#ERROR', invalid: true };
-  return { computed: r, invalid: false };
 }
 
 // ── AW-7.5: Workspace dependency graph engine ────────────────────────────────
@@ -2796,16 +3139,65 @@ function evaluateWorkspaceFormula(parsed, sheet) {
 // member. The resolver returns NaN for invalid cells, so cells outside the
 // SCC that depend on it propagate as #ERROR upstream.
 
+// AW-8: dependency extraction walks the full AST. Discovers:
+//   - cell refs                   → 'A1', 'B5', ...
+//   - ranges (expanded)           → 'A1', 'A2', ..., 'A5'
+//   - PRICE("BTC")                → 'MARKET:BTC'
+//   - PORTFOLIO.VALUE/.ASSETS()   → 'FINANCIAL:PORTFOLIO_VALUE/_ASSETS'
+//   - EXPOSURE("crypto") (any)    → 'FINANCIAL:EXPOSURE'
+//   - ALLOCATION("BTC")  (any)    → 'FINANCIAL:ALLOCATION'
 function _extractFormulaDependencies(parsed) {
   const deps = new Set();
   if (!parsed) return deps;
-  const visit = (operand) => {
-    if (operand && operand.kind === 'ref' && operand.ref && _isCellInGridBounds(operand.ref)) {
-      deps.add(operand.ref);
+
+  const walk = (node) => {
+    if (!node) return;
+    switch (node.type) {
+      case 'num':
+      case 'str':
+        return;
+      case 'ref':
+        if (_isCellInGridBounds(node.ref)) deps.add(node.ref);
+        return;
+      case 'range': {
+        const ids = _expandRange(node);
+        if (ids) for (const id of ids) {
+          if (_isCellInGridBounds(id)) deps.add(id);
+        }
+        return;
+      }
+      case 'unary':  walk(node.operand); return;
+      case 'binary': walk(node.lhs); walk(node.rhs); return;
+      case 'call': {
+        const name = String(node.name || '').toUpperCase();
+        // Workspace functions (SUM/AVG/MIN/MAX): walk arg subtrees so any
+        // ranges or refs within them are picked up as cell deps.
+        if (Object.prototype.hasOwnProperty.call(_AW8_WORKSPACE_FUNCTIONS, name)) {
+          for (const a of node.args || []) walk(a);
+          return;
+        }
+        // Financial pseudo-deps. PRICE keys per-symbol so unrelated market
+        // updates don't trigger irrelevant recomputes; PORTFOLIO.* / EXPOSURE
+        // / ALLOCATION key on coarse FINANCIAL:* tags.
+        if (name === 'PRICE') {
+          const a = node.args && node.args[0];
+          if (a && a.type === 'str' && a.value) {
+            deps.add('MARKET:' + String(a.value).toUpperCase());
+          }
+          return;
+        }
+        if (name === 'PORTFOLIO.VALUE')  { deps.add('FINANCIAL:PORTFOLIO_VALUE');  return; }
+        if (name === 'PORTFOLIO.ASSETS') { deps.add('FINANCIAL:PORTFOLIO_ASSETS'); return; }
+        if (name === 'EXPOSURE')         { deps.add('FINANCIAL:EXPOSURE');         return; }
+        if (name === 'ALLOCATION')       { deps.add('FINANCIAL:ALLOCATION');       return; }
+        // Unknown function: still walk args (they may surface refs/ranges
+        // even if the call itself will error at evaluate time).
+        for (const a of node.args || []) walk(a);
+        return;
+      }
     }
   };
-  visit(parsed.lhs);
-  visit(parsed.rhs);
+  walk(parsed);
   return deps;
 }
 
