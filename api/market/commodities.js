@@ -39,6 +39,7 @@ async function fetchCommoditiesBatch(apiKey) {
 }
 
 export default async function handler(req, res) {
+  console.log('[commodities] API_KEY exists:', !!process.env.TWELVE_API_KEY);
   res.setHeader('Access-Control-Allow-Origin',  ALLOWED_ORIGIN);
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
