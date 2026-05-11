@@ -9290,7 +9290,7 @@ function fmtMktPrice(p) {
 
 // ── Bottom nav ─────────────────────────────────────────────
 const TAB_KEYS = { home: 'tabHome', insights: 'tabInsights', market: 'tabMarket', profile: 'tabProfile' };
-const NAV_ORDER = ['home', 'market', 'add', 'insights', 'workspace', 'profile'];
+const NAV_ORDER = ['home', 'market', 'add', 'workspace', 'profile'];
 
 function enforceNavOrder() {
   const container = document.getElementById('bottomNav');
