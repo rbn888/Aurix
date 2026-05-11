@@ -726,12 +726,8 @@ const FALLBACK_PRICES = {
 function getFallbackData(marketSymbol) {
   const base = FALLBACK_PRICES[marketSymbol];
   if (!base) return null;
-  // Apply tiny random variation (±0.4%) so it feels alive
-  const jitter  = 1 + (Math.random() - 0.5) * 0.008;
-  const price   = +(base * jitter).toFixed(base < 10 ? 3 : 2);
-  // Simulate a realistic-looking daily change
-  const change24h = +((Math.random() - 0.48) * 3.2).toFixed(2);
-  return { price, change24h, simulated: true };
+  const price = +base.toFixed(base < 10 ? 3 : 2);
+  return { price, change24h: null, simulated: true };
 }
 
 
