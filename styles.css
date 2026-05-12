@@ -6298,14 +6298,16 @@ main { padding-bottom: 72px; }
     letter-spacing: 0.01em;
   }
 
-  /* ── Search: premium glass with integrated lupa, focus ring */
+  /* ── Search: premium glass with integrated lupa, focus ring.
+     Rest state slightly more legible — border, icon and placeholder
+     pick up a touch more contrast without changing size or layout. */
   .market-search-wrap input {
     width: 320px;
     max-width: none;
     height: 40px;
     padding: 0 16px 0 40px;
     border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     background: rgba(13, 18, 30, 0.55);
     color: rgba(235, 243, 255, 0.95);
     font-size: 13px;
@@ -6314,10 +6316,10 @@ main { padding-bottom: 72px; }
     transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.22s ease;
   }
   .market-search-wrap input::placeholder {
-    color: rgba(180, 200, 230, 0.42);
+    color: rgba(190, 208, 234, 0.52);
   }
   .market-search-wrap input:hover {
-    border-color: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.20);
   }
   .market-search-wrap input:focus {
     outline: none;
@@ -6334,7 +6336,7 @@ main { padding-bottom: 72px; }
     width: 16px;
     height: 16px;
     fill: none;
-    stroke: rgba(196, 220, 255, 0.55);
+    stroke: rgba(204, 224, 255, 0.72);
     stroke-width: 1.7;
     stroke-linecap: round;
     stroke-linejoin: round;
@@ -7993,21 +7995,22 @@ body.workspace-active .header {
   }
 
   /* ── Grid column reassignment for the three zones.
-     Brand keeps its tight optical inset; utility zone widens to 36px
-     so Search sits visually further left of Settings, giving the
-     trio (TABS … SEARCH … SETTINGS) real breathing instead of a
-     paired cluster on the right edge. */
-  .header-left  { justify-self: start; grid-column: 1; padding-left: 4px; }
-  .header-right { grid-column: 3; gap: 36px; }
+     Brand gets a 20px optical inset so AURIX aligns with the
+     internal content edge of the cards (which carry ~20px padding),
+     not just with the cards' bounding-box edge. Utility zone gets a
+     symmetric 20px inset on the right plus a 40px gap so Search and
+     Settings read as two intentional controls with real breathing. */
+  .header-left  { justify-self: start; grid-column: 1; padding-left: 20px; }
+  .header-right { grid-column: 3; padding-right: 20px; gap: 40px; }
 
-  /* ── Branding: tighter tracking (0.22em) and a single softer
-     drop-shadow so AURIX reads as a flagship mark instead of a
-     neon glyph. Same semibold weight, more solid silhouette. */
+  /* ── Branding: tighter tracking (0.18em) and an even softer
+     drop-shadow so AURIX reads as a confident flagship mark, not
+     a landing-page banner. Same semibold weight, calmer aura. */
   .logo-block .logo-aurix {
     font-size: 24px;
-    letter-spacing: 0.22em;
+    letter-spacing: 0.18em;
     transform: none;
-    filter: drop-shadow(0 0 6px rgba(74, 130, 240, 0.18));
+    filter: drop-shadow(0 0 5px rgba(74, 130, 240, 0.14));
   }
 
   /* ── Tabs: flagship primary nav.
@@ -8074,12 +8077,12 @@ body.workspace-active .header {
     height: 36px;
     padding: 0;
     margin: 0;
-    background: rgba(74, 130, 240, 0.10);
-    border: 1px solid rgba(74, 130, 240, 0.42);
+    background: rgba(74, 130, 240, 0.12);
+    border: 1px solid rgba(74, 130, 240, 0.44);
     border-radius: 10px;
     box-shadow:
       inset 0 0 0 1px rgba(255, 255, 255, 0.025),
-      0 0 10px rgba(74, 130, 240, 0.10);
+      0 0 12px rgba(74, 130, 240, 0.14);
     cursor: pointer;
     transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.22s ease;
   }
