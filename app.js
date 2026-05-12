@@ -447,8 +447,8 @@ const T = {
     tabMarket:   'Mercado',
     tabProfile:  'Perfil',
     // Market screen
-    market_subtitle:   'Activos en tiempo real',
-    market_search_ph:  'Buscar activos (Apple, BTC, S&P 500…)',
+    market_subtitle:   'Descubre y monitoriza activos globales',
+    market_search_ph:  'Buscar BTC, Apple, Oro, S&P 500…',
     market_cap:        'Capitalización',
     fear_greed:        'Miedo y Codicia',
     btc_dom:           'Dominancia BTC',
@@ -628,8 +628,8 @@ const T = {
     tabMarket:   'Market',
     tabProfile:  'Profile',
     // Market screen
-    market_subtitle:   'Real-time assets',
-    market_search_ph:  'Search assets (Apple, BTC, S&P 500…)',
+    market_subtitle:   'Discover and monitor global assets',
+    market_search_ph:  'Search BTC, Apple, Gold, S&P 500…',
     market_cap:        'Market Cap',
     fear_greed:        'Fear & Greed',
     btc_dom:           'BTC Dominance',
@@ -8254,6 +8254,7 @@ function renderMarket() {
         <div class="market-subtitle">${t('market_subtitle')}</div>
       </div>
       <div class="market-search-wrap">
+        <svg class="market-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5l-4.6-4.6"/></svg>
         <input
           type="text"
           id="marketSearchInput"
@@ -8417,7 +8418,7 @@ function renderMyAssetsBlock(data) {
     if (b.price !== a.price) return (b.price || 0) - (a.price || 0);
     return a.symbol.localeCompare(b.symbol);
   });
-  const tableHeader = `<div class="market-table-header"><div></div><div>Asset</div><div>Price</div><div>24h</div><div></div><div></div></div>`;
+  const tableHeader = `<div class="market-table-header"><div>Asset</div><div>Price</div><div>24h</div><div></div><div></div></div>`;
   return `<div class="market-section-header">${t('tab_watchlist')}</div>${tableHeader}${sorted.map(renderMarketItem).join('')}`;
 }
 
@@ -8431,7 +8432,7 @@ function renderAllAssets(data) {
   if (!final.length) {
     return `<div class="market-empty">${t('market_no_results')}</div>`;
   }
-  const tableHeader = `<div class="market-table-header"><div></div><div>Asset</div><div>Price</div><div>24h</div><div></div><div></div></div>`;
+  const tableHeader = `<div class="market-table-header"><div>Asset</div><div>Price</div><div>24h</div><div></div><div></div></div>`;
   return `<div class="market-section-header">${t('tab_all')}</div>${tableHeader}${final.map(renderMarketItem).join('')}`;
 }
 
@@ -8524,7 +8525,7 @@ function renderFromCache(type, data) {
       </div>`).join('')}</div>`;
   }
   const label = _TYPE_LABEL[normalizedType]?.() ?? normalizedType;
-  const tableHeader = `<div class="market-table-header"><div></div><div>Asset</div><div>Price</div><div>24h</div><div></div><div></div></div>`;
+  const tableHeader = `<div class="market-table-header"><div>Asset</div><div>Price</div><div>24h</div><div></div><div></div></div>`;
   return `<div class="market-section-header">${label}</div>${tableHeader}${items.map(renderMarketItem).join('')}`;
 }
 
