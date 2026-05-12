@@ -4840,6 +4840,8 @@ let MARKET_DATA_FULL = [];
 const MARKET_METRICS_CACHE = {};
 const MARKET_CACHE = {};
 const MARKET_CACHE_TS = {};
+const MARKET_FAILURE_TS = {};
+const MARKET_FAILURE_BACKOFF = 5 * 60 * 1000; // 5 min cooldown after provider failure
 const PRICE_CACHE = {};
 const PRICE_PROVIDERS = {
   crypto:    ['coingecko'],
@@ -8602,6 +8604,8 @@ const MARKET_CACHE_TTL = 60 * 1000; // 1 minute
 // Background refresh per type — respects TTL, prevents concurrent calls
 async function refreshMarketInBackground(tab) {
   if (_LOADING[tab]) return;
+  const failAge = Date.now() - (MARKET_FAILURE_TS[tab] || 0);
+  if (failAge < MARKET_FAILURE_BACKOFF) return;
   const age = Date.now() - (MARKET_CACHE_TS[tab] || 0);
   if (MARKET_CACHE[tab]?.length && age < MARKET_CACHE_TTL) return;
 
@@ -8758,17 +8762,23 @@ async function _refreshStocks() {
   try {
     const res  = await fetch('https://isa-portfolio-ten.vercel.app/api/market/stocks');
     const json = await res.json();
-    if (!json || !json.data || !json.data.length) return;
+    if (!json || !json.data || !json.data.length) {
+      MARKET_FAILURE_TS['stocks'] = Date.now();
+      console.warn(`[market-runtime] stocks empty payload — backoff ${MARKET_FAILURE_BACKOFF / 1000}s`);
+      return;
+    }
     _setStocksData(json.data);
     MARKET_CACHE['stocks'] = [...MARKET_DATA];
     MARKET_RUNTIME.providers.stocksApi = { successAt: Date.now(), latencyMs: Date.now() - t0, healthy: true };
     MARKET_RUNTIME.lastSuccessAt = Date.now();
     MARKET_RUNTIME.health = 'healthy';
+    delete MARKET_FAILURE_TS['stocks'];
     console.log(`[market-runtime] stocks refresh success ${Date.now() - t0}ms`);
     if (currentMarketTab === 'stocks' || currentMarketTab === 'watchlist' || currentMarketTab === 'all') renderCurrentMarketView();
   } catch (e) {
     MARKET_RUNTIME.providers.stocksApi = { failureAt: Date.now(), healthy: false };
     MARKET_RUNTIME.lastFailureAt = Date.now();
+    MARKET_FAILURE_TS['stocks'] = Date.now();
     console.error('[market-runtime] provider failure: stocks-api', e.message);
   }
   });
@@ -8791,11 +8801,16 @@ async function _refreshGeneric(tab, symbols, fallbackMap, title) {
       MARKET_CACHE[tab] = [...MARKET_DATA];
       MARKET_RUNTIME.lastSuccessAt = Date.now();
       MARKET_RUNTIME.health = 'healthy';
+      delete MARKET_FAILURE_TS[tab];
       console.log(`[market-runtime] ${tab} refresh success ${Date.now() - t0}ms`);
       if (currentMarketTab === tab || currentMarketTab === 'watchlist' || currentMarketTab === 'all') renderCurrentMarketView();
+    } else {
+      MARKET_FAILURE_TS[tab] = Date.now();
+      console.warn(`[market-runtime] ${tab} produced no data — backoff ${MARKET_FAILURE_BACKOFF / 1000}s`);
     }
   } catch (e) {
     MARKET_RUNTIME.lastFailureAt = Date.now();
+    MARKET_FAILURE_TS[tab] = Date.now();
     console.error('[market-runtime] provider failure:', tab, e.message);
   }
   });
