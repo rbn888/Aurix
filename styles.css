@@ -7670,22 +7670,26 @@ body.workspace-active .header {
 
   /* ── Grid column reassignment for the three zones */
   .header-left  { justify-self: start; grid-column: 1; }
-  .header-right { grid-column: 3; gap: 8px; }
+  .header-right { grid-column: 3; gap: 12px; }
 
-  /* ── Branding: tighter tracking, softer aura, more solid silhouette */
+  /* ── Branding: drop the mobile scaleX transform so the natural
+     left edge of AURIX aligns with the .app content padding (and
+     therefore with the first content card below). Presence comes
+     from font-size + tracking instead. */
   .logo-block .logo-aurix {
     font-size: 24px;
     letter-spacing: 0.30em;
+    transform: none;
     filter:
       drop-shadow(0 0 8px rgba(74, 130, 240, 0.22))
       drop-shadow(0 0 18px rgba(74, 130, 240, 0.10));
   }
 
-  /* ── Tabs: more weight, bigger hit area, refined active state */
+  /* ── Tabs: bigger hit area, more horizontal breathing, refined active */
   .header-tabs {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
     grid-column: 2;
     justify-self: center;
     margin: 0;
@@ -7700,7 +7704,7 @@ body.workspace-active .header {
     font-weight: 500;
     letter-spacing: 0.015em;
     line-height: 1;
-    padding: 8px 14px;
+    padding: 9px 18px;
     border-radius: 8px;
     cursor: pointer;
     transition: color 0.18s ease, background-color 0.18s ease;
@@ -7716,8 +7720,8 @@ body.workspace-active .header {
   .header-tab.active::after {
     content: '';
     position: absolute;
-    left: 14px;
-    right: 14px;
+    left: 18px;
+    right: 18px;
     bottom: -7px;
     height: 1.5px;
     background: linear-gradient(90deg,
@@ -7728,9 +7732,9 @@ body.workspace-active .header {
     border-radius: 1px;
   }
 
-  /* ── Utility zone: search + account trigger.
-     Identical 36×36 footprint and hover treatment so they read as a
-     coherent pair, not two unrelated controls. */
+  /* ── Utility zone: same footprint for search + account so they line
+     up cleanly, but differentiated by accent — search reads as the
+     principal action (Aurix blue tint), account stays neutral utility. */
   .header-search,
   .menu-toggle {
     display: inline-flex;
@@ -7740,28 +7744,43 @@ body.workspace-active .header {
     height: 36px;
     padding: 0;
     margin: 0;
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 10px;
     cursor: pointer;
     transition: border-color 0.18s ease, background-color 0.18s ease;
   }
-  .header-search:hover,
-  .menu-toggle:hover {
-    border-color: rgba(255, 255, 255, 0.16);
-    background: rgba(255, 255, 255, 0.035);
+
+  /* Search — subtle Aurix blue accent: faint tinted border + surface,
+     icon stroke leans toward the brand light blue. */
+  .header-search {
+    background: rgba(74, 130, 240, 0.05);
+    border: 1px solid rgba(74, 130, 240, 0.22);
+  }
+  .header-search:hover {
+    background: rgba(74, 130, 240, 0.10);
+    border-color: rgba(74, 130, 240, 0.42);
   }
   .header-search svg {
     width: 17px;
     height: 17px;
     fill: none;
-    stroke: rgba(220, 230, 250, 0.72);
+    stroke: rgba(186, 212, 255, 0.92);
     stroke-width: 1.7;
     stroke-linecap: round;
     stroke-linejoin: round;
     transition: stroke 0.18s ease;
   }
-  .header-search:hover svg { stroke: rgba(235, 243, 255, 0.95); }
+  .header-search:hover svg { stroke: var(--aurix-blue-light); }
+
+  /* Account — neutral utility: keeps the existing soft grayscale shell
+     so it reads as secondary to Search without losing presence. */
+  .menu-toggle {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+  }
+  .menu-toggle:hover {
+    background: rgba(255, 255, 255, 0.035);
+    border-color: rgba(255, 255, 255, 0.18);
+  }
 
   /* Hide the mobile hamburger bars on desktop and reveal the account glyph */
   .menu-toggle-bar { display: none; }
