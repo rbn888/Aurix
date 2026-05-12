@@ -341,9 +341,8 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
 /* Hidden proxy button — keeps revokeAccess listener, never shown */
 #btnExit { display: none !important; }
 
-/* Desktop-only header-right widgets — hidden by default so mobile stays clean */
+/* Desktop-only header-search — hidden by default so mobile stays clean */
 .header-search { display: none; }
-.menu-toggle-glyph { display: none; }
 
 /* ── Language switcher ─────────────────────────────────── */
 .lang-switcher {
@@ -7669,12 +7668,12 @@ body.workspace-active .header {
   }
 
   /* ── Grid column reassignment for the three zones.
-     Brand gets a small optical inset so AURIX doesn't read as glued
-     to the content edge; Search and Account get extra breathing room
-     so they read as a sequence of two intentional controls, not a
-     button cluster. */
-  .header-left  { justify-self: start; grid-column: 1; padding-left: 8px; }
-  .header-right { grid-column: 3; gap: 20px; }
+     Brand gets a tight optical inset (4px) so AURIX no longer floats
+     loose from the system grid; utility zone widens its internal gap
+     to 24px so Search and the settings utility read as two distinct
+     controls instead of a paired cluster. */
+  .header-left  { justify-self: start; grid-column: 1; padding-left: 4px; }
+  .header-right { grid-column: 3; gap: 24px; }
 
   /* ── Branding: drop the mobile scaleX transform so the natural
      left edge of AURIX aligns with the .app content padding (and
@@ -7689,11 +7688,14 @@ body.workspace-active .header {
       drop-shadow(0 0 18px rgba(74, 130, 240, 0.10));
   }
 
-  /* ── Tabs: bigger hit area, stronger presence, refined active state */
+  /* ── Tabs: flagship primary nav.
+     Slightly more rest opacity so the labels read clearly without
+     hover, wider gap (14px) for breathing, hover surface bumped from
+     0.03 to 0.04 for a more confident response. */
   .header-tabs {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
     grid-column: 2;
     justify-self: center;
     margin: 0;
@@ -7702,7 +7704,7 @@ body.workspace-active .header {
     position: relative;
     background: transparent;
     border: 0;
-    color: rgba(220, 230, 250, 0.62);
+    color: rgba(220, 230, 250, 0.68);
     font-family: 'Inter', sans-serif;
     font-size: 14px;
     font-weight: 500;
@@ -7715,7 +7717,7 @@ body.workspace-active .header {
   }
   .header-tab:hover {
     color: rgba(235, 243, 255, 0.96);
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.04);
   }
   .header-tab.active {
     color: rgba(235, 243, 255, 1);
@@ -7736,11 +7738,11 @@ body.workspace-active .header {
     border-radius: 1px;
   }
 
-  /* ── Utility zone: same footprint for search + account so they line
-     up cleanly, but differentiated by accent — search reads as the
-     principal action (Aurix blue tint), account stays neutral utility. */
-  .header-search,
-  .menu-toggle {
+  /* ── Search — premium discover action.
+     Glass surface with Aurix blue accent, a slightly larger crisper
+     icon and a focus-ring style hover (outer 4px tinted halo). Reads
+     as the principal control of the utility zone. */
+  .header-search {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -7748,65 +7750,54 @@ body.workspace-active .header {
     height: 36px;
     padding: 0;
     margin: 0;
+    background: rgba(74, 130, 240, 0.10);
+    border: 1px solid rgba(74, 130, 240, 0.36);
     border-radius: 10px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
     cursor: pointer;
-    transition: border-color 0.18s ease, background-color 0.18s ease;
-  }
-
-  /* Search — premium discover action: glass surface with Aurix blue
-     accent, larger crisper icon. Reads as the principal control of
-     the utility zone. */
-  .header-search {
-    background: rgba(74, 130, 240, 0.08);
-    border: 1px solid rgba(74, 130, 240, 0.30);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.22s ease;
   }
   .header-search:hover {
-    background: rgba(74, 130, 240, 0.14);
-    border-color: rgba(74, 130, 240, 0.50);
+    background: rgba(74, 130, 240, 0.16);
+    border-color: rgba(74, 130, 240, 0.56);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.025),
+      0 0 0 4px rgba(74, 130, 240, 0.06);
   }
   .header-search svg {
-    width: 18px;
-    height: 18px;
+    width: 19px;
+    height: 19px;
     fill: none;
-    stroke: rgba(196, 220, 255, 0.96);
-    stroke-width: 1.8;
+    stroke: rgba(196, 220, 255, 0.98);
+    stroke-width: 1.9;
     stroke-linecap: round;
     stroke-linejoin: round;
     transition: stroke 0.18s ease;
   }
   .header-search:hover svg { stroke: var(--aurix-blue-light); }
 
-  /* Account — neutral utility: keeps the existing soft grayscale shell
-     so it reads as secondary to Search without losing presence. */
+  /* ── Settings utility — restores the 3-line shell utility (hamburger)
+     so it reads as preferences/settings, not as a profile/account
+     avatar. Keeps the mobile flex-column geometry and the X-on-open
+     animation untouched; only colors are refined for desktop. */
   .menu-toggle {
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.07);
+    margin-top: 0;
+    border-color: rgba(255, 255, 255, 0.07);
   }
   .menu-toggle:hover {
     background: rgba(255, 255, 255, 0.035);
     border-color: rgba(255, 255, 255, 0.18);
   }
-
-  /* Hide the mobile hamburger bars on desktop and reveal the account glyph */
-  .menu-toggle-bar { display: none; }
-  .menu-toggle-glyph {
-    display: block;
-    width: 19px;
-    height: 19px;
-    fill: none;
-    stroke: rgba(220, 230, 250, 0.72);
-    stroke-width: 1.6;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    transition: stroke 0.18s ease;
-  }
-  .menu-toggle:hover .menu-toggle-glyph { stroke: rgba(235, 243, 255, 0.95); }
   .menu-toggle.open {
     border-color: rgba(74, 130, 240, 0.32);
     background: rgba(74, 130, 240, 0.06);
   }
-  .menu-toggle.open .menu-toggle-glyph { stroke: var(--aurix-blue-light); }
+  .menu-toggle-bar {
+    background: rgba(220, 230, 250, 0.62);
+  }
+  .menu-toggle:hover .menu-toggle-bar {
+    background: rgba(235, 243, 255, 0.92);
+  }
 
   /* ── Dashboard CTAs: stronger type, flat surface, no neon halo */
   .btn-summary-action {
