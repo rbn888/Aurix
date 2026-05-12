@@ -7830,34 +7830,32 @@ body.workspace-active .header {
   }
 
   /* ── Grid column reassignment for the three zones.
-     Brand gets a tight optical inset (4px) so AURIX no longer floats
-     loose from the system grid; utility zone widens its internal gap
-     to 24px so Search and the settings utility read as two distinct
-     controls instead of a paired cluster. */
+     Brand keeps its tight optical inset; utility zone widens to 36px
+     so Search sits visually further left of Settings, giving the
+     trio (TABS … SEARCH … SETTINGS) real breathing instead of a
+     paired cluster on the right edge. */
   .header-left  { justify-self: start; grid-column: 1; padding-left: 4px; }
-  .header-right { grid-column: 3; gap: 24px; }
+  .header-right { grid-column: 3; gap: 36px; }
 
-  /* ── Branding: drop the mobile scaleX transform so the natural
-     left edge of AURIX aligns with the .app content padding (and
-     therefore with the first content card below). Presence comes
-     from font-size + tracking instead. */
+  /* ── Branding: tighter tracking (0.22em) and a single softer
+     drop-shadow so AURIX reads as a flagship mark instead of a
+     neon glyph. Same semibold weight, more solid silhouette. */
   .logo-block .logo-aurix {
     font-size: 24px;
-    letter-spacing: 0.30em;
+    letter-spacing: 0.22em;
     transform: none;
-    filter:
-      drop-shadow(0 0 8px rgba(74, 130, 240, 0.22))
-      drop-shadow(0 0 18px rgba(74, 130, 240, 0.10));
+    filter: drop-shadow(0 0 6px rgba(74, 130, 240, 0.18));
   }
 
   /* ── Tabs: flagship primary nav.
-     Slightly more rest opacity so the labels read clearly without
-     hover, wider gap (14px) for breathing, hover surface bumped from
-     0.03 to 0.04 for a more confident response. */
+     Single shared active state — same underline geometry for every
+     tab (including Workspace, whose header otherwise compresses).
+     bottom:-3px keeps the indicator inside the header's padding even
+     when body.workspace-active shortens .header padding-bottom to 6px. */
   .header-tabs {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 16px;
     grid-column: 2;
     justify-self: center;
     margin: 0;
@@ -7890,20 +7888,21 @@ body.workspace-active .header {
     position: absolute;
     left: 20px;
     right: 20px;
-    bottom: -7px;
+    bottom: -3px;
     height: 1.5px;
     background: linear-gradient(90deg,
       rgba(74, 130, 240, 0)   0%,
       var(--aurix-blue-light) 50%,
       rgba(74, 130, 240, 0)   100%);
-    box-shadow: 0 0 6px rgba(74, 130, 240, 0.35);
+    box-shadow: 0 0 6px rgba(74, 130, 240, 0.40);
     border-radius: 1px;
   }
 
   /* ── Search — premium discover action.
-     Glass surface with Aurix blue accent, a slightly larger crisper
-     icon and a focus-ring style hover (outer 4px tinted halo). Reads
-     as the principal control of the utility zone. */
+     Stronger Aurix-blue border, brighter icon stroke and a faint
+     blue micro-glow at rest so the control reads as "search assets"
+     at a glance. Hover keeps the focus-ring halo; keyboard focus
+     gets the same ring so the discoverability is consistent. */
   .header-search {
     display: inline-flex;
     align-items: center;
@@ -7913,30 +7912,36 @@ body.workspace-active .header {
     padding: 0;
     margin: 0;
     background: rgba(74, 130, 240, 0.10);
-    border: 1px solid rgba(74, 130, 240, 0.36);
+    border: 1px solid rgba(74, 130, 240, 0.42);
     border-radius: 10px;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.025),
+      0 0 10px rgba(74, 130, 240, 0.10);
     cursor: pointer;
     transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.22s ease;
   }
-  .header-search:hover {
+  .header-search:hover,
+  .header-search:focus-visible {
     background: rgba(74, 130, 240, 0.16);
-    border-color: rgba(74, 130, 240, 0.56);
+    border-color: rgba(74, 130, 240, 0.58);
     box-shadow:
       inset 0 0 0 1px rgba(255, 255, 255, 0.025),
-      0 0 0 4px rgba(74, 130, 240, 0.06);
+      0 0 14px rgba(74, 130, 240, 0.14),
+      0 0 0 4px rgba(74, 130, 240, 0.08);
+    outline: none;
   }
   .header-search svg {
     width: 19px;
     height: 19px;
     fill: none;
-    stroke: rgba(196, 220, 255, 0.98);
+    stroke: rgba(220, 234, 255, 1);
     stroke-width: 1.9;
     stroke-linecap: round;
     stroke-linejoin: round;
     transition: stroke 0.18s ease;
   }
-  .header-search:hover svg { stroke: var(--aurix-blue-light); }
+  .header-search:hover svg,
+  .header-search:focus-visible svg { stroke: var(--aurix-blue-light); }
 
   /* ── Settings utility — restores the 3-line shell utility (hamburger)
      so it reads as preferences/settings, not as a profile/account
