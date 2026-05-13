@@ -149,6 +149,22 @@ async function fetchTwelveData(items, apiKey) {
   }
 
   const data   = await res.json();
+
+  // ── TwelveData application-level error detection ────────────
+  // TwelveData often returns HTTP 200 with an error body shape:
+  //   { code: 401|429|400|..., status: "error", message: "..." }
+  // Without this guard, parseFloat(undefined) silently returns NaN and
+  // the empty result {} masks the real failure (quota exhausted, key
+  // revoked, plan limitation). Re-route through the existing handler
+  // .catch so logError surfaces the cause and providerFailures counter
+  // reflects reality.
+  if (data && data.status === 'error') {
+    OBSERVABILITY.pricing.providerFailures.twelvedata++;
+    throw new Error(
+      `TwelveData app-error code=${data.code ?? '?'} ${data.message ?? ''}`.trim()
+    );
+  }
+
   const result = {};
 
   if (items.length === 1) {
