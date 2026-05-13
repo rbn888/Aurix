@@ -6058,12 +6058,15 @@ async function _fetchStocksFallbackFC2() {
     return _fc2FallbackCache.data;
   }
   try {
-    const res  = await fetch('https://isa-portfolio-ten.vercel.app/api/market/stocks');
+    const url  = `${PRICES_PROXY}/snapshot?symbols=${encodeURIComponent(STOCKS_UNIVERSE.join(','))}`;
+    const res  = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return null;
     const json = await res.json();
-    const data = json?.data ?? null;
-    if (data) { _fc2FallbackCache.data = data; _fc2FallbackCache.ts = now; }
-    return data;
+    const data = (json?.snapshot ?? [])
+      .filter(p => Number.isFinite(p.price))
+      .map(p => ({ symbol: p.symbol, name: p.symbol, price: p.price, change24h: p.change24h ?? null }));
+    if (data.length) { _fc2FallbackCache.data = data; _fc2FallbackCache.ts = now; }
+    return data.length ? data : null;
   } catch { return null; }
 }
 
@@ -6077,7 +6080,7 @@ async function getUnifiedMarketPrice(symbol) {
     return { price: item.price, change24h: item.change24h ?? null };
   }
 
-  // 2. Fallback: single cached batch fetch from /api/market/stocks
+  // 2. Fallback: single cached batch snapshot for the stocks universe
   console.log('[FC2] fallback triggered for', symbol);
   const data  = await _fetchStocksFallbackFC2();
   if (!data) return null;
@@ -8945,14 +8948,19 @@ async function _refreshStocks() {
   await withMarketRefreshLock('stocks', async () => {
   const t0 = Date.now();
   try {
-    const res  = await fetch('https://isa-portfolio-ten.vercel.app/api/market/stocks');
+    const url  = `${PRICES_PROXY}/snapshot?symbols=${encodeURIComponent(STOCKS_UNIVERSE.join(','))}`;
+    const res  = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`http_${res.status}`);
     const json = await res.json();
-    if (!json || !json.data || !json.data.length) {
+    const data = (json?.snapshot ?? [])
+      .filter(p => Number.isFinite(p.price))
+      .map(p => ({ symbol: p.symbol, name: p.symbol, price: p.price, change24h: p.change24h ?? null }));
+    if (!data.length) {
       MARKET_FAILURE_TS['stocks'] = Date.now();
       console.warn(`[market-runtime] stocks empty payload — backoff ${MARKET_FAILURE_BACKOFF / 1000}s`);
       return;
     }
-    _setStocksData(json.data);
+    _setStocksData(data);
     MARKET_CACHE['stocks'] = [...MARKET_DATA];
     MARKET_RUNTIME.providers.stocksApi = { successAt: Date.now(), latencyMs: Date.now() - t0, healthy: true };
     MARKET_RUNTIME.lastSuccessAt = Date.now();
@@ -9083,6 +9091,11 @@ function renderMarketByType(type) {
 const MARKET_ETFS        = ['SPY','QQQ','VOO','VTI','URTH'];
 const MARKET_INDICES     = ['^GSPC','^IXIC','^DJI'];
 const MARKET_COMMODITIES = ['XAU/USD','XAG/USD','WTI'];
+// Mirrors backend CORE_STOCK_SYMBOLS — single source of truth for the live stock universe.
+const STOCKS_UNIVERSE = [
+  'AAPL','MSFT','NVDA','TSLA','AMZN','META','GOOGL','JPM','V','WMT',
+  'BRK.B','JNJ','PG','XOM','BAC','AVGO','COST','KO','MCD','NKE',
+];
 const INDEX_FALLBACKS    = { '^GSPC': 5300, '^IXIC': 18500, '^DJI': 42000 };
 const COMMODITY_FALLBACKS = { 'XAU/USD': 2320, 'XAG/USD': 27, 'WTI': 80 };
 const INDEX_NAMES        = { '^GSPC': 'S&P 500', '^IXIC': 'NASDAQ', '^DJI': 'Dow Jones' };
