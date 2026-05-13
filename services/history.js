@@ -31,17 +31,18 @@ const RANGE_DAYS = {
 };
 
 // ── Fetch raw price history for a single coin ─────────────────────────────
-// Returns the CoinGecko `prices` array: [[timestamp_ms, price_usd], ...]
+// Returns the same shape CoinGecko emits — proxied via /api/prices/history
+// so the browser never talks to providers directly.
 async function fetchHistory(id, days) {
   const res = await fetch(
-    `https://api.coingecko.com/api/v3/coins/${id}/market_chart` +
-    `?vs_currency=usd&days=${days}`,
+    `https://isa-portfolio-ten.vercel.app/api/prices/history` +
+    `?id=${encodeURIComponent(id)}&days=${encodeURIComponent(days)}`,
     { headers: { Accept: 'application/json' } }
   );
   if (res.status === 429) throw new Error('rate_limit');
   if (!res.ok)            throw new Error(`http_${res.status}`);
   const data = await res.json();
-  return data.prices; // [[ts_ms, usd_price], ...]
+  return Array.isArray(data?.prices) ? data.prices : []; // [[ts_ms, usd_price], ...]
 }
 
 // ── Time-grid normalisation ───────────────────────────────────────────────

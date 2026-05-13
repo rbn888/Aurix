@@ -918,7 +918,6 @@ function switchLang(newLang) {
 
 // ── State ──────────────────────────────────────────────────
 const STORAGE_KEY    = 'portfolio_assets';
-const COINGECKO      = 'https://api.coingecko.com/api/v3';
 const PRICES_PROXY   = 'https://isa-portfolio-ten.vercel.app/api/prices';
 
 // ── Fallback prices (used when APIs are unavailable) ──────
@@ -6268,15 +6267,16 @@ async function getAssetFromISIN(isin, signal) {
   }
   const cacheNull = () => { _isinCache.set(isin, { value: null, ts: Date.now() }); return null; };
   try {
-    const res = await fetch('https://api.openfigi.com/v3/mapping', {
+    // Proxied via /api/assets/resolve-isin — browser never talks to OpenFIGI.
+    const res = await fetch(`${PRICES_PROXY.replace('/api/prices','')}/api/assets/resolve-isin`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body:    JSON.stringify([{ idType: 'ID_ISIN', idValue: isin }]),
+      body:    JSON.stringify({ isin }),
       signal,
     });
     if (!res.ok) return cacheNull();
     const json  = await res.json();
-    const items = json?.[0]?.data;
+    const items = json?.data;
     if (!items?.length) return cacheNull();
 
     // Prefer US-listed ticker; else take first result
@@ -10450,35 +10450,20 @@ function getLocalResults(query, filter) {
     .slice(0, 8);
 }
 
-// ── Real-time API search ───────────────────────────────────
+// ── Real-time API search (proxied via backend) ───────────────────────────
+// Browser never talks to Yahoo or CORS proxies directly — backend forwards
+// to Yahoo Finance and returns the already-shaped result set.
 async function searchYahooFinance(query, signal) {
-  const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=8&newsCount=0&listsCount=0`;
-  const proxies = [
-    url,
-    `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-    `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-  ];
-  for (const proxyUrl of proxies) {
-    try {
-      const res = await fetch(proxyUrl, { signal, headers: { Accept: 'application/json' } });
-      if (!res.ok) continue;
-      let json = await res.json();
-      if (typeof json.contents === 'string') json = JSON.parse(json.contents);
-      const quotes = json?.quotes ?? [];
-      return quotes
-        .filter(q => q.quoteType === 'EQUITY' || q.quoteType === 'ETF')
-        .slice(0, 7)
-        .map(q => ({
-          ticker:       q.symbol,
-          name:         q.longname || q.shortname || q.symbol,
-          type:         q.quoteType === 'ETF' ? 'etf' : 'stock',
-          marketSymbol: q.symbol,
-        }));
-    } catch (err) {
-      if (err.name === 'AbortError') throw err;
-    }
+  const url = `${PRICES_PROXY.replace('/api/prices','')}/api/search/assets?q=${encodeURIComponent(query)}`;
+  try {
+    const res = await fetch(url, { signal, headers: { Accept: 'application/json' } });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return Array.isArray(json?.results) ? json.results : null;
+  } catch (err) {
+    if (err.name === 'AbortError') throw err;
+    return null;
   }
-  return null; // all proxies failed
 }
 
 // CoinGecko search removed — search limited to ASSET_DB
