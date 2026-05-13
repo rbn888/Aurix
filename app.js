@@ -1850,6 +1850,7 @@ function commitMarketData(type, items) {
   const changedSymbols = valid.map(x => x.symbol).filter(Boolean);
   const snapshot = buildMarketEventSnapshot(type, changedSymbols);
   MARKET_EVENTS.emit('market:update', snapshot);
+  if (typeof AURIX_TELEMETRY !== 'undefined') AURIX_TELEMETRY.market.marketUpdateCount++;
   console.log(`[market-events] emitted ${type} update (${changedSymbols.length} symbols)`);
   return true;
 }
@@ -2836,6 +2837,11 @@ function recalculateWorkspaceSheet(sheetId) {
   sheet.updatedAt = now;
   WORKSPACE_RUNTIME.recalculations++;
   WORKSPACE_RUNTIME.lastCalculatedAt = now;
+  if (typeof AURIX_TELEMETRY !== 'undefined') {
+    AURIX_TELEMETRY.workspace.recomputeRuns++;
+    AURIX_TELEMETRY.workspace.recomputeDurationMs.sum   += Date.now() - now;
+    AURIX_TELEMETRY.workspace.recomputeDurationMs.count++;
+  }
   return true;
 }
 
@@ -3173,13 +3179,20 @@ function parseWorkspaceFormula(raw) {
   const body = s.slice(1).trim();
   if (!body) return null;
   const tokens = _aw8Tokenize(body);
-  if (!tokens || tokens.length === 0) return null;
+  if (!tokens || tokens.length === 0) {
+    if (typeof AURIX_TELEMETRY !== 'undefined') AURIX_TELEMETRY.workspace.parserFailures++;
+    return null;
+  }
   const state = { tokens, idx: 0 };
   let ast;
   try {
     ast = _aw8ParseExpression(state);
-    if (state.idx !== state.tokens.length) return null;
+    if (state.idx !== state.tokens.length) {
+      if (typeof AURIX_TELEMETRY !== 'undefined') AURIX_TELEMETRY.workspace.parserFailures++;
+      return null;
+    }
   } catch (_e) {
+    if (typeof AURIX_TELEMETRY !== 'undefined') AURIX_TELEMETRY.workspace.parserFailures++;
     return null;
   }
   return ast;
@@ -3934,6 +3947,10 @@ function _recomputeUserFormulaCell(cell, sheet) {
   cell.computed = result.computed;
   cell.invalid  = result.invalid;
   cell.updatedAt = Date.now();
+  if (typeof AURIX_TELEMETRY !== 'undefined') {
+    AURIX_TELEMETRY.workspace.formulaEvalCount++;
+    if (result.invalid) AURIX_TELEMETRY.workspace.evalFailures++;
+  }
 }
 
 function _markCellAsCycle(cell) {
@@ -3949,6 +3966,10 @@ function _propagateWorkspaceChange(rootCellId) {
 
   const affected = _collectAffectedDownstream(rootCellId);
   if (affected.size === 0) return;
+  if (typeof AURIX_TELEMETRY !== 'undefined') {
+    AURIX_TELEMETRY.workspace.affectedNodeCount.sum   += affected.size;
+    AURIX_TELEMETRY.workspace.affectedNodeCount.count++;
+  }
 
   const order = _topologicalOrder(affected);
   for (const id of order) {
@@ -5151,6 +5172,74 @@ function resolveProviderKey(asset, provider) {
   if (!asset || !provider) return null;
   const key = asset.providerKeys?.[String(provider).toLowerCase()];
   return key ? `${String(provider).toLowerCase()}:${key}` : null;
+}
+
+// ── Observability ─────────────────────────────────────────────────────────
+// Lightweight in-memory counters surfaced via window.AURIX_DEBUG. Reset on
+// page reload. Pure increments — no side effects, no console spam.
+const AURIX_TELEMETRY = {
+  startedAt: Date.now(),
+  market: {
+    refreshAttempts:    0,
+    refreshFailures:    0,
+    backoffActivations: 0,
+    marketUpdateCount:  0,
+    staleFallbackUses:  0,
+  },
+  workspace: {
+    formulaEvalCount:    0,
+    evalFailures:        0,
+    parserFailures:      0,
+    cycleDetections:     0, // mirrors WORKSPACE_RUNTIME.cycleDetections
+    recomputeRuns:       0,
+    recomputeDurationMs: { sum: 0, count: 0 },
+    affectedNodeCount:   { sum: 0, count: 0 },
+  },
+};
+
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'AURIX_DEBUG', {
+    get() {
+      const avg = (b) => b.count > 0 ? Math.round(b.sum / b.count) : 0;
+      const t   = AURIX_TELEMETRY;
+      const mr  = (typeof MARKET_RUNTIME !== 'undefined') ? MARKET_RUNTIME : null;
+      const wr  = (typeof WORKSPACE_RUNTIME !== 'undefined') ? WORKSPACE_RUNTIME : null;
+      const pr  = (typeof PORTFOLIO_RUNTIME !== 'undefined') ? PORTFOLIO_RUNTIME : null;
+      return {
+        uptimeMs: Date.now() - t.startedAt,
+        market: {
+          refreshAttempts:    t.market.refreshAttempts,
+          refreshFailures:    t.market.refreshFailures,
+          backoffActivations: t.market.backoffActivations,
+          marketUpdateEvents: t.market.marketUpdateCount,
+          staleFallbackUsage: t.market.staleFallbackUses,
+          providers:          mr?.providers || {},
+          health:             mr?.health    || 'unknown',
+          cycleId:            mr?.cycleId   || 0,
+          lastDurationMs:     mr?.lastDurationMs ?? null,
+          activeBackoffs:     (typeof MARKET_FAILURE_TS !== 'undefined') ? Object.keys(MARKET_FAILURE_TS).length : 0,
+        },
+        workspace: {
+          formulaEvaluations:    t.workspace.formulaEvalCount,
+          formulaFailures:       t.workspace.evalFailures,
+          parserFailures:        t.workspace.parserFailures,
+          cycleDetections:       wr?.cycleDetections ?? t.workspace.cycleDetections,
+          recomputeRuns:         t.workspace.recomputeRuns,
+          recomputeDurationMsAvg: avg(t.workspace.recomputeDurationMs),
+          recomputeDurationMsTotal: t.workspace.recomputeDurationMs.sum,
+          affectedNodeCountAvg:  avg(t.workspace.affectedNodeCount),
+          marketVersion:         (typeof MARKET_DATA_VERSION === 'number') ? MARKET_DATA_VERSION : null,
+        },
+        portfolio: pr ? {
+          reactiveEvents:               pr.reactiveEvents,
+          ignoredEvents:                pr.ignoredEvents,
+          lastRecalculationDurationMs:  pr.lastRecalculationDurationMs,
+          stale:                        pr.stale,
+        } : null,
+      };
+    },
+    configurable: true,
+  });
 }
 
 function getMarketAsset(symbol) {
@@ -8982,9 +9071,13 @@ const MARKET_CACHE_TTL = 60 * 1000; // 1 minute
 async function refreshMarketInBackground(tab) {
   if (_LOADING[tab]) return;
   const failAge = Date.now() - (MARKET_FAILURE_TS[tab] || 0);
-  if (failAge < MARKET_FAILURE_BACKOFF) return;
+  if (failAge < MARKET_FAILURE_BACKOFF) {
+    if (typeof AURIX_TELEMETRY !== 'undefined') AURIX_TELEMETRY.market.backoffActivations++;
+    return;
+  }
   const age = Date.now() - (MARKET_CACHE_TS[tab] || 0);
   if (MARKET_CACHE[tab]?.length && age < MARKET_CACHE_TTL) return;
+  if (typeof AURIX_TELEMETRY !== 'undefined') AURIX_TELEMETRY.market.refreshAttempts++;
 
   _LOADING[tab] = true;
   try {
@@ -9140,6 +9233,7 @@ async function _refreshCrypto() {
   } catch (e) {
     MARKET_RUNTIME.providers.coingecko = { failureAt: Date.now(), healthy: false };
     MARKET_RUNTIME.lastFailureAt = Date.now();
+    if (typeof AURIX_TELEMETRY !== 'undefined') AURIX_TELEMETRY.market.refreshFailures++;
     console.error('[market-runtime] provider failure: coingecko', e.message);
   }
   });
@@ -9173,6 +9267,7 @@ async function _refreshStocks() {
     MARKET_RUNTIME.providers.stocksApi = { failureAt: Date.now(), healthy: false };
     MARKET_RUNTIME.lastFailureAt = Date.now();
     MARKET_FAILURE_TS['stocks'] = Date.now();
+    if (typeof AURIX_TELEMETRY !== 'undefined') AURIX_TELEMETRY.market.refreshFailures++;
     console.error('[market-runtime] provider failure: stocks-api', e.message);
   }
   });
@@ -9223,6 +9318,7 @@ async function _refreshGeneric(tab, symbols, fallbackMap, title) {
   } catch (e) {
     MARKET_RUNTIME.lastFailureAt = Date.now();
     MARKET_FAILURE_TS[tab] = Date.now();
+    if (typeof AURIX_TELEMETRY !== 'undefined') AURIX_TELEMETRY.market.refreshFailures++;
     console.error('[market-runtime] provider failure:', tab, e.message);
   }
   });
@@ -9311,6 +9407,7 @@ function _buildItem(symbol, data, fallbackMap, type) {
   }
   const cached = getCachedPrice(symbol);
   if (cached) {
+    if (typeof AURIX_TELEMETRY !== 'undefined') AURIX_TELEMETRY.market.staleFallbackUses++;
     return normalizeMarketData({ name, price: cached.price, fallback: true }, type, symbol);
   }
   const fb = getFallbackData(symbol) ?? { price: fallbackMap?.[symbol] ?? null, change24h: 0 };

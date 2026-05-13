@@ -12,6 +12,7 @@ import {
   setCache,
   fetchCoinGecko,
   fetchTwelveData,
+  OBSERVABILITY,
 } from '../prices.js';
 
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://rbn888.github.io';
@@ -189,6 +190,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET')     return res.status(405).json({ error: 'method_not_allowed' });
 
+  const _t0 = Date.now();
+  OBSERVABILITY.snapshot.requestCount++;
+
   const raw = (req.query?.symbols ?? '').toString().trim();
   if (!raw) return res.status(400).json({ error: 'symbols_required' });
 
@@ -196,6 +200,8 @@ export default async function handler(req, res) {
     raw.split(',').map(s => s.trim()).filter(Boolean)
   )].slice(0, MAX_SYMBOLS);
   if (requested.length === 0) return res.status(400).json({ error: 'symbols_required' });
+
+  OBSERVABILITY.snapshot.symbolsRequested += requested.length;
 
   // ── Resolve via registry ─────────────────────────────────
   const resolved   = []; // { canonical, entry }
@@ -330,6 +336,11 @@ export default async function handler(req, res) {
     snapshot.length < resolved.length;
 
   log('snapshot:', snapshot.length, 'partial:', partial);
+
+  OBSERVABILITY.snapshot.resolvedTotal += snapshot.length;
+  if (partial) OBSERVABILITY.snapshot.partialResponses++;
+  OBSERVABILITY.snapshot.latencyMs.sum += Date.now() - _t0;
+  OBSERVABILITY.snapshot.latencyMs.count++;
 
   return res.status(200).json({
     generatedAt: now,

@@ -13,6 +13,29 @@ function logError(provider, message) {
   console.error(`[API][ERROR][${provider}] ${new Date().toISOString()} ${message}`);
 }
 
+// ── Observability ───────────────────────────────────────────
+// Lightweight in-memory counters. Per-Vercel-instance (cold start resets).
+// Shared with api/prices/snapshot.js and api/debug/health.js via named export.
+const OBSERVABILITY = {
+  startedAt: Date.now(),
+  pricing: {
+    providerRequests:  { coingecko: 0, twelvedata: 0 },
+    providerFailures:  { coingecko: 0, twelvedata: 0 },
+    providerLatencyMs: { coingecko: { sum: 0, count: 0 }, twelvedata: { sum: 0, count: 0 } },
+    cacheHits:        0,
+    cacheMisses:      0,
+    partialResponses: 0,
+    rateLimitHits:    0,
+  },
+  snapshot: {
+    requestCount:     0,
+    symbolsRequested: 0,
+    resolvedTotal:    0,
+    partialResponses: 0,
+    latencyMs: { sum: 0, count: 0 },
+  },
+};
+
 // ── Cache policy ────────────────────────────────────────────
 // Single backend cache, keyed by provider_id (e.g. coingecko:bitcoin,
 // twelvedata:AAPL). Owner: this module. Shared with api/prices/snapshot.js
@@ -32,8 +55,12 @@ const TTL = {
 
 function getCached(providerId) {
   const entry = PRICE_CACHE.get(providerId);
-  if (!entry) return null;
-  if (Date.now() - entry.timestamp > entry.ttl) return null;
+  if (!entry) { OBSERVABILITY.pricing.cacheMisses++; return null; }
+  if (Date.now() - entry.timestamp > entry.ttl) {
+    OBSERVABILITY.pricing.cacheMisses++;
+    return null;
+  }
+  OBSERVABILITY.pricing.cacheHits++;
   return entry.value;
 }
 
@@ -71,14 +98,22 @@ function parseProviders(providers) {
 async function fetchCoinGecko(items) {
   const ids = items.map(i => i.id).join(',');
   log('coingecko ids:', ids);
+  const t0 = Date.now();
+  OBSERVABILITY.pricing.providerRequests.coingecko++;
 
   const url = `https://api.coingecko.com/api/v3/simple/price` +
               `?ids=${ids}&vs_currencies=usd&include_24hr_change=true`;
 
-  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-  if (!res.ok) throw new Error(`CoinGecko HTTP ${res.status}`);
+  let res;
+  try {
+    res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`CoinGecko HTTP ${res.status}`);
+  } catch (err) {
+    OBSERVABILITY.pricing.providerFailures.coingecko++;
+    throw err;
+  }
 
-  const data  = await res.json();
+  const data   = await res.json();
   const result = {};
 
   for (const { provider, id } of items) {
@@ -91,17 +126,27 @@ async function fetchCoinGecko(items) {
     }
   }
 
+  OBSERVABILITY.pricing.providerLatencyMs.coingecko.sum += Date.now() - t0;
+  OBSERVABILITY.pricing.providerLatencyMs.coingecko.count++;
   return result;
 }
 
 async function fetchTwelveData(items, apiKey) {
   const symbols = items.map(i => i.symbol).join(',');
   log('twelvedata symbols:', symbols);
+  const t0 = Date.now();
+  OBSERVABILITY.pricing.providerRequests.twelvedata++;
 
   const url = `https://api.twelvedata.com/price?symbol=${symbols}&apikey=${apiKey}`;
 
-  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-  if (!res.ok) throw new Error(`TwelveData HTTP ${res.status}`);
+  let res;
+  try {
+    res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`TwelveData HTTP ${res.status}`);
+  } catch (err) {
+    OBSERVABILITY.pricing.providerFailures.twelvedata++;
+    throw err;
+  }
 
   const data   = await res.json();
   const result = {};
@@ -121,6 +166,8 @@ async function fetchTwelveData(items, apiKey) {
     }
   }
 
+  OBSERVABILITY.pricing.providerLatencyMs.twelvedata.sum += Date.now() - t0;
+  OBSERVABILITY.pricing.providerLatencyMs.twelvedata.count++;
   return result;
 }
 
@@ -140,7 +187,10 @@ export default async function handler(req, res) {
               || 'unknown';
   const now = Date.now();
   const hits = (rateLimits.get(ip) || []).filter(t => now - t < RATE_WINDOW);
-  if (hits.length >= RATE_LIMIT) return res.status(429).json({ error: 'rate_limit' });
+  if (hits.length >= RATE_LIMIT) {
+    OBSERVABILITY.pricing.rateLimitHits++;
+    return res.status(429).json({ error: 'rate_limit' });
+  }
   hits.push(now);
   rateLimits.set(ip, hits);
 
@@ -205,10 +255,14 @@ export default async function handler(req, res) {
 
   await Promise.all(tasks);
 
+  if (Object.keys(prices).length < providers.length) {
+    OBSERVABILITY.pricing.partialResponses++;
+  }
+
   log('success · prices returned:', Object.keys(prices).length);
   return res.status(200).json({ prices });
 }
 
 // ── Named exports for reuse by other backend endpoints ─────
 // (e.g., api/prices/snapshot.js — does not affect default handler)
-export { PRICE_CACHE, TTL, getCached, setCache, fetchCoinGecko, fetchTwelveData };
+export { PRICE_CACHE, TTL, getCached, setCache, fetchCoinGecko, fetchTwelveData, OBSERVABILITY };
