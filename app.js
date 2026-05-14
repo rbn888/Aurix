@@ -3613,6 +3613,35 @@ const _AW8_WORKSPACE_FUNCTIONS = Object.freeze({
   },
 });
 
+// PR-8C: shared aggregator for portfolio PnL formulas. Reads `assets[]`
+// once and applies the canonical USD valuation (assetValueUSD from PR-6,
+// which already handles gold karat + EUR normalisation). Returning both
+// `pnl` and `cost` lets PORTFOLIO.PNL and PORTFOLIO.PNL_PCT share the
+// same walk without duplicating portfolio math.
+function _aw8PortfolioUnrealizedTotal() {
+  if (typeof assets === 'undefined' || !Array.isArray(assets)) return { pnl: 0, cost: 0 };
+  let pnl = 0, cost = 0;
+  for (const a of assets) {
+    if (!a || !a.costBasis || a.costBasis <= 0) continue;
+    cost += Number(a.costBasis) || 0;
+    const val = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : (Number(a.qty || 0) * Number(a.price || 0));
+    pnl += val - Number(a.costBasis);
+  }
+  return { pnl, cost };
+}
+
+// PR-8C: look up a holding by ticker symbol (case-insensitive). Returns
+// null if absent so callers can short-circuit to 0 for missing positions.
+function _aw8AssetByTicker(sym) {
+  if (typeof assets === 'undefined' || !Array.isArray(assets)) return null;
+  const target = String(sym || '').trim().toUpperCase();
+  if (!target) return null;
+  for (const a of assets) {
+    if (a && String(a.ticker || '').toUpperCase() === target) return a;
+  }
+  return null;
+}
+
 // Financial functions: pure consumers of FC snapshots (getMarketSnapshot /
 // getDerivedFinancialSnapshot / getMarketPrice). Never fetch, never mutate.
 const _AW8_FINANCIAL_FUNCTIONS = Object.freeze({
@@ -3654,6 +3683,80 @@ const _AW8_FINANCIAL_FUNCTIONS = Object.freeze({
       if (String(a?.symbol || '').toUpperCase() === symbol) return Number(a.allocation || 0);
     }
     return 0;
+  },
+  // PR-8C: per-asset reads. Missing holdings resolve to 0 rather than #ERROR
+  // so dashboards / templates don't break when a position is closed.
+  'ASSET.QTY'(args) {
+    if (args.length !== 1 || args[0].type !== 'str') throw new _AwEvalError('#ERROR');
+    const a = _aw8AssetByTicker(args[0].value);
+    return a ? (Number(a.qty) || 0) : 0;
+  },
+  'ASSET.PRICE'(args) {
+    if (args.length !== 1 || args[0].type !== 'str') throw new _AwEvalError('#ERROR');
+    const a = _aw8AssetByTicker(args[0].value);
+    return a ? (Number(a.price) || 0) : 0;
+  },
+  'ASSET.VALUE'(args) {
+    if (args.length !== 1 || args[0].type !== 'str') throw new _AwEvalError('#ERROR');
+    const a = _aw8AssetByTicker(args[0].value);
+    if (!a) return 0;
+    return (typeof assetValueUSD === 'function') ? assetValueUSD(a) : (Number(a.qty || 0) * Number(a.price || 0));
+  },
+  'ASSET.COST'(args) {
+    if (args.length !== 1 || args[0].type !== 'str') throw new _AwEvalError('#ERROR');
+    const a = _aw8AssetByTicker(args[0].value);
+    return a ? (Number(a.costBasis) || 0) : 0;
+  },
+  'ASSET.PNL'(args) {
+    if (args.length !== 1 || args[0].type !== 'str') throw new _AwEvalError('#ERROR');
+    const a = _aw8AssetByTicker(args[0].value);
+    if (!a || !a.costBasis || a.costBasis <= 0) return 0;
+    const val = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : (Number(a.qty || 0) * Number(a.price || 0));
+    return val - Number(a.costBasis);
+  },
+  'ASSET.PNL_PCT'(args) {
+    if (args.length !== 1 || args[0].type !== 'str') throw new _AwEvalError('#ERROR');
+    const a = _aw8AssetByTicker(args[0].value);
+    if (!a || !a.costBasis || a.costBasis <= 0) return 0;
+    const val = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : (Number(a.qty || 0) * Number(a.price || 0));
+    return ((val - Number(a.costBasis)) / Number(a.costBasis)) * 100;
+  },
+  // PR-8C: portfolio-wide unrealized aggregates. PORTFOLIO.UNREALIZED is an
+  // explicit alias for PORTFOLIO.PNL — same number, separate name for users
+  // building open-position dashboards. Both share _aw8PortfolioUnrealizedTotal
+  // so the iteration walks `assets[]` exactly once per cell evaluation.
+  'PORTFOLIO.PNL'(args) {
+    if (args.length !== 0) throw new _AwEvalError('#ERROR');
+    return _aw8PortfolioUnrealizedTotal().pnl;
+  },
+  'PORTFOLIO.PNL_PCT'(args) {
+    if (args.length !== 0) throw new _AwEvalError('#ERROR');
+    const { pnl, cost } = _aw8PortfolioUnrealizedTotal();
+    return cost > 0 ? (pnl / cost) * 100 : 0;
+  },
+  'PORTFOLIO.UNREALIZED'(args) {
+    if (args.length !== 0) throw new _AwEvalError('#ERROR');
+    return _aw8PortfolioUnrealizedTotal().pnl;
+  },
+  // PR-8C: live 24h change for a market symbol. Prefers MARKET_DATA (the
+  // canonical market table populated by the snapshot gateway); falls back
+  // to the asset's persisted change24h field for portfolio holdings.
+  'PRICE.CHANGE24H'(args) {
+    if (args.length !== 1 || args[0].type !== 'str') throw new _AwEvalError('#ERROR');
+    const sym = String(args[0].value || '').trim().toUpperCase();
+    if (!sym) throw new _AwEvalError('#ERROR');
+    if (typeof MARKET_DATA !== 'undefined' && Array.isArray(MARKET_DATA)) {
+      for (const m of MARKET_DATA) {
+        if (String(m?.symbol || '').toUpperCase() === sym) {
+          const c = m.price_change_percentage_24h ?? m.change24h;
+          if (typeof c === 'number' && Number.isFinite(c)) return c;
+          break;
+        }
+      }
+    }
+    const a = _aw8AssetByTicker(sym);
+    if (a && typeof a.change24h === 'number' && Number.isFinite(a.change24h)) return a.change24h;
+    throw new _AwEvalError('#ERROR');
   },
 });
 
@@ -3742,7 +3845,11 @@ function _aw8EvalAst(node) {
 // `noArgs` controls caret placement on insertion (zero-arg functions land
 // the caret after `)`); flag stays here as the only piece of metadata that
 // can't be inferred from the function body.
-const _AW8_NO_ARG_FUNCTIONS = new Set(['PORTFOLIO.VALUE', 'PORTFOLIO.ASSETS']);
+const _AW8_NO_ARG_FUNCTIONS = new Set([
+  'PORTFOLIO.VALUE', 'PORTFOLIO.ASSETS',
+  // PR-8C
+  'PORTFOLIO.PNL', 'PORTFOLIO.PNL_PCT', 'PORTFOLIO.UNREALIZED',
+]);
 const WORKSPACE_FORMULA_SUGGESTIONS = Object.freeze([
   ...Object.keys(_AW8_WORKSPACE_FUNCTIONS).map(key => ({
     key, label: key + '()', kind: 'workspace',
@@ -4265,6 +4372,29 @@ function _extractFormulaDependencies(parsed) {
             deps.add('FINANCIAL:ALLOCATION:' + String(a.value).toUpperCase());
           } else {
             deps.add('FINANCIAL:ALLOCATION');
+          }
+          return;
+        }
+        // PR-8C: per-asset and portfolio-wide reads. Tag with the coarse
+        // FINANCIAL:PORTFOLIO pseudo-dep so any mutation that bumps
+        // DERIVED_FINANCIAL_STATE.version (which save() always triggers)
+        // recomputes these cells. Per-symbol granularity (ASSET:<sym>)
+        // is a future refinement; today the recalc walks the whole
+        // FINANCIAL:* keyspace anyway, so coarse tagging is sufficient.
+        if (name === 'ASSET.QTY'      || name === 'ASSET.PRICE'    ||
+            name === 'ASSET.VALUE'    || name === 'ASSET.COST'     ||
+            name === 'ASSET.PNL'      || name === 'ASSET.PNL_PCT'  ||
+            name === 'PORTFOLIO.PNL'  || name === 'PORTFOLIO.PNL_PCT' ||
+            name === 'PORTFOLIO.UNREALIZED') {
+          deps.add('FINANCIAL:PORTFOLIO');
+          return;
+        }
+        // PR-8C: 24h change keys per symbol so unrelated market updates
+        // don't trigger recompute (mirrors the PRICE() dep behavior).
+        if (name === 'PRICE.CHANGE24H') {
+          const a = node.args && node.args[0];
+          if (a && a.type === 'str' && a.value) {
+            deps.add('MARKET:' + String(a.value).toUpperCase());
           }
           return;
         }
