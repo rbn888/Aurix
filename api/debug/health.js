@@ -33,6 +33,7 @@ export default async function handler(req, res) {
       providerLatencyMs: {
         coingecko:  { avg: avg(p.providerLatencyMs.coingecko),  total: p.providerLatencyMs.coingecko.sum  },
         twelvedata: { avg: avg(p.providerLatencyMs.twelvedata), total: p.providerLatencyMs.twelvedata.sum },
+        yahoo:      { avg: avg(p.providerLatencyMs.yahoo),      total: p.providerLatencyMs.yahoo.sum      },
       },
       cacheHits:        p.cacheHits,
       cacheMisses:      p.cacheMisses,
@@ -51,8 +52,8 @@ export default async function handler(req, res) {
     },
     health: {
       providerHealthy:
-        (p.providerRequests.coingecko + p.providerRequests.twelvedata) > 0 &&
-        (p.providerFailures.coingecko + p.providerFailures.twelvedata) === 0,
+        (p.providerRequests.coingecko + p.providerRequests.twelvedata + p.providerRequests.yahoo) > 0 &&
+        (p.providerFailures.coingecko + p.providerFailures.twelvedata + p.providerFailures.yahoo) === 0,
       cacheWorking: totalCacheReads > 0,
     },
   });

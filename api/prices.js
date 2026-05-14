@@ -19,9 +19,13 @@ function logError(provider, message) {
 const OBSERVABILITY = {
   startedAt: Date.now(),
   pricing: {
-    providerRequests:  { coingecko: 0, twelvedata: 0 },
-    providerFailures:  { coingecko: 0, twelvedata: 0 },
-    providerLatencyMs: { coingecko: { sum: 0, count: 0 }, twelvedata: { sum: 0, count: 0 } },
+    providerRequests:  { coingecko: 0, twelvedata: 0, yahoo: 0 },
+    providerFailures:  { coingecko: 0, twelvedata: 0, yahoo: 0 },
+    providerLatencyMs: {
+      coingecko:  { sum: 0, count: 0 },
+      twelvedata: { sum: 0, count: 0 },
+      yahoo:      { sum: 0, count: 0 },
+    },
     cacheHits:        0,
     cacheMisses:      0,
     partialResponses: 0,
@@ -78,6 +82,7 @@ const RATE_WINDOW  = 10_000; // 10 s
 function parseProviders(providers) {
   const coingecko  = [];
   const twelvedata = [];
+  const yahoo      = [];
 
   for (const p of providers) {
     if (typeof p !== 'string') continue;
@@ -86,11 +91,12 @@ function parseProviders(providers) {
     const ns = p.slice(0, sep);
     const id = p.slice(sep + 1).trim();
     if (!id) continue;
-    if (ns === 'coingecko')    coingecko.push({ provider: p, id });
+    if (ns === 'coingecko')       coingecko.push({ provider: p, id });
     else if (ns === 'twelvedata') twelvedata.push({ provider: p, symbol: id });
+    else if (ns === 'yahoo')      yahoo.push({ provider: p, symbol: id });
   }
 
-  return { coingecko, twelvedata };
+  return { coingecko, twelvedata, yahoo };
 }
 
 // ── Fetchers ───────────────────────────────────────────────
@@ -187,6 +193,78 @@ async function fetchTwelveData(items, apiKey) {
   return result;
 }
 
+async function fetchYahoo(items) {
+  // Yahoo Finance /v8/finance/chart is single-symbol. Fan out in parallel —
+  // free, no API key, covers stocks/ETFs/indices (^GSPC) and commodity
+  // futures (GC=F, SI=F, CL=F). One fetchYahoo call counts as one
+  // providerRequest for parity with batch fetchers above.
+  const symbols = items.map(i => i.symbol).join(',');
+  log('yahoo symbols:', symbols);
+  const t0 = Date.now();
+  OBSERVABILITY.pricing.providerRequests.yahoo++;
+
+  try {
+    const settled = await Promise.allSettled(
+      items.map(async ({ provider, symbol }) => {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/` +
+                    `${encodeURIComponent(symbol)}?range=1d&interval=1d`;
+        const res = await fetch(url, {
+          signal:  AbortSignal.timeout(8000),
+          headers: { 'User-Agent': 'Mozilla/5.0 (Aurix)', Accept: 'application/json' },
+        });
+        if (!res.ok) throw new Error(`Yahoo HTTP ${res.status}`);
+        const data = await res.json();
+
+        // ── Yahoo application-level error detection ─────────────
+        // Chart endpoint returns HTTP 200 with `{ chart: { error: {...} } }`
+        // on invalid symbols / rate limits. Mirrors the TwelveData guard
+        // above so the empty-result path doesn't mask real failures.
+        if (data?.chart?.error) {
+          throw new Error(
+            `Yahoo app-error ${data.chart.error.code || '?'} ${data.chart.error.description || ''}`.trim()
+          );
+        }
+
+        const meta  = data?.chart?.result?.[0]?.meta;
+        const price = meta?.regularMarketPrice;
+        if (!Number.isFinite(price)) throw new Error(`Yahoo no price for ${symbol}`);
+
+        const prev = Number.isFinite(meta.chartPreviousClose) ? meta.chartPreviousClose
+                   : Number.isFinite(meta.previousClose)      ? meta.previousClose
+                   : null;
+        const change24h = (prev && prev > 0) ? ((price - prev) / prev) * 100 : null;
+
+        return { provider, price, change24h };
+      })
+    );
+
+    const result = {};
+    for (const s of settled) {
+      if (s.status === 'fulfilled') {
+        result[s.value.provider] = { price: s.value.price, change24h: s.value.change24h };
+      } else {
+        logError('yahoo', s.reason?.message || 'unknown');
+      }
+    }
+
+    OBSERVABILITY.pricing.providerLatencyMs.yahoo.sum += Date.now() - t0;
+    OBSERVABILITY.pricing.providerLatencyMs.yahoo.count++;
+
+    // Parity with batch fetchers: if every symbol failed, surface as a
+    // provider failure so the handler's .catch logs it and the per-batch
+    // failure counter increments. Partial success returns normally.
+    if (Object.keys(result).length === 0 && items.length > 0) {
+      const firstErr = settled.find(s => s.status === 'rejected');
+      throw new Error(`Yahoo all-failed: ${firstErr?.reason?.message || 'unknown'}`);
+    }
+
+    return result;
+  } catch (err) {
+    OBSERVABILITY.pricing.providerFailures.yahoo++;
+    throw err;
+  }
+}
+
 // ── Handler ────────────────────────────────────────────────
 
 export default async function handler(req, res) {
@@ -217,7 +295,7 @@ export default async function handler(req, res) {
 
   log('request start · providers:', providers.length);
 
-  const { coingecko, twelvedata } = parseProviders(providers);
+  const { coingecko, twelvedata, yahoo } = parseProviders(providers);
   const prices     = {};
   const TWELVE_KEY = process.env.TWELVE_API_KEY;
   const tasks      = [];
@@ -225,6 +303,7 @@ export default async function handler(req, res) {
   // ── Serve cached, collect uncached ────────────────────
   const uncachedCG  = [];
   const uncachedTD  = [];
+  const uncachedYH  = [];
 
   for (const item of coingecko) {
     const hit = getCached(item.provider);
@@ -236,6 +315,12 @@ export default async function handler(req, res) {
     const hit = getCached(item.provider);
     if (hit) prices[item.provider] = hit;
     else uncachedTD.push(item);
+  }
+
+  for (const item of yahoo) {
+    const hit = getCached(item.provider);
+    if (hit) prices[item.provider] = hit;
+    else uncachedYH.push(item);
   }
 
   // ── Fetch only what's missing ──────────────────────────
@@ -269,6 +354,23 @@ export default async function handler(req, res) {
     }
   }
 
+  if (uncachedYH.length > 0) {
+    // PR-2A: per-symbol assetType is not known at this handler level —
+    // snapshot.js owns the registry. TTL.stock matches the existing
+    // TwelveData policy; PR-2B will route via the snapshot registry
+    // with per-assetType TTL buckets.
+    tasks.push(
+      fetchYahoo(uncachedYH)
+        .then(r => {
+          for (const [id, val] of Object.entries(r)) {
+            setCache(id, val, TTL.stock);
+            prices[id] = val;
+          }
+        })
+        .catch(err => logError('yahoo', err.message))
+    );
+  }
+
   await Promise.all(tasks);
 
   if (Object.keys(prices).length < providers.length) {
@@ -281,4 +383,4 @@ export default async function handler(req, res) {
 
 // ── Named exports for reuse by other backend endpoints ─────
 // (e.g., api/prices/snapshot.js — does not affect default handler)
-export { PRICE_CACHE, TTL, getCached, setCache, fetchCoinGecko, fetchTwelveData, OBSERVABILITY };
+export { PRICE_CACHE, TTL, getCached, setCache, fetchCoinGecko, fetchTwelveData, fetchYahoo, OBSERVABILITY };
