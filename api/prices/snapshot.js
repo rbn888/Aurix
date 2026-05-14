@@ -5,6 +5,17 @@
 //   symbol, assetType, price, currency,
 //   change24h, timestamp, source, stale, confidence
 // }
+//
+// ── Provider routing ──────────────────────────────────────
+//   crypto                        → CoinGecko (no fallback)
+//   stocks / ETFs / indices       → Yahoo primary
+//   commodities                   → Yahoo proxy primary
+//                                   (XAU/USD → GC=F, XAG/USD → SI=F, WTI → CL=F)
+//   TwelveData                    → fallback only, attempted on Yahoo failure
+//                                   and gated on TWELVE_API_KEY presence
+//
+// The canonical symbol (registry key) is preserved in the response
+// regardless of which proxy actually served the value.
 
 import {
   PRICE_CACHE,

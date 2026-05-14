@@ -5143,44 +5143,44 @@ const _ASSET_REGISTRY = Object.freeze({
   'asset:op':    { id:'asset:op',    type:'crypto', symbol:'OP',    displayName:'Optimism',         aliases:['OPTIMISM'],          providerKeys:{ coingecko:'optimism' } },
 
   // Stocks (mirrors STOCKS_UNIVERSE)
-  'asset:aapl':  { id:'asset:aapl',  type:'stock',  symbol:'AAPL',  displayName:'Apple Inc.',       aliases:['APPLE','NASDAQ:AAPL'],  providerKeys:{ twelvedata:'AAPL' } },
-  'asset:msft':  { id:'asset:msft',  type:'stock',  symbol:'MSFT',  displayName:'Microsoft Corp.',  aliases:['MICROSOFT','NASDAQ:MSFT'], providerKeys:{ twelvedata:'MSFT' } },
-  'asset:nvda':  { id:'asset:nvda',  type:'stock',  symbol:'NVDA',  displayName:'NVIDIA Corp.',     aliases:['NVIDIA','NASDAQ:NVDA'], providerKeys:{ twelvedata:'NVDA' } },
-  'asset:tsla':  { id:'asset:tsla',  type:'stock',  symbol:'TSLA',  displayName:'Tesla Inc.',       aliases:['TESLA','NASDAQ:TSLA'],  providerKeys:{ twelvedata:'TSLA' } },
-  'asset:amzn':  { id:'asset:amzn',  type:'stock',  symbol:'AMZN',  displayName:'Amazon.com Inc.',  aliases:['AMAZON','NASDAQ:AMZN'], providerKeys:{ twelvedata:'AMZN' } },
-  'asset:meta':  { id:'asset:meta',  type:'stock',  symbol:'META',  displayName:'Meta Platforms',   aliases:['FACEBOOK','NASDAQ:META'], providerKeys:{ twelvedata:'META' } },
-  'asset:googl': { id:'asset:googl', type:'stock',  symbol:'GOOGL', displayName:'Alphabet Inc.',    aliases:['GOOGLE','ALPHABET','NASDAQ:GOOGL'], providerKeys:{ twelvedata:'GOOGL' } },
-  'asset:jpm':   { id:'asset:jpm',   type:'stock',  symbol:'JPM',   displayName:'JPMorgan Chase',   aliases:['JPMORGAN','NYSE:JPM'],  providerKeys:{ twelvedata:'JPM' } },
-  'asset:v':     { id:'asset:v',     type:'stock',  symbol:'V',     displayName:'Visa Inc.',        aliases:['VISA','NYSE:V'],        providerKeys:{ twelvedata:'V' } },
-  'asset:wmt':   { id:'asset:wmt',   type:'stock',  symbol:'WMT',   displayName:'Walmart Inc.',     aliases:['WALMART','NYSE:WMT'],   providerKeys:{ twelvedata:'WMT' } },
-  'asset:brkb':  { id:'asset:brkb',  type:'stock',  symbol:'BRK.B', displayName:'Berkshire Hathaway',aliases:['BRKB','BERKSHIRE'],    providerKeys:{ twelvedata:'BRK.B' } },
-  'asset:jnj':   { id:'asset:jnj',   type:'stock',  symbol:'JNJ',   displayName:'Johnson & Johnson',aliases:['NYSE:JNJ'],             providerKeys:{ twelvedata:'JNJ' } },
-  'asset:pg':    { id:'asset:pg',    type:'stock',  symbol:'PG',    displayName:'Procter & Gamble', aliases:['NYSE:PG'],              providerKeys:{ twelvedata:'PG' } },
-  'asset:xom':   { id:'asset:xom',   type:'stock',  symbol:'XOM',   displayName:'Exxon Mobil',      aliases:['EXXON','NYSE:XOM'],     providerKeys:{ twelvedata:'XOM' } },
-  'asset:bac':   { id:'asset:bac',   type:'stock',  symbol:'BAC',   displayName:'Bank of America',  aliases:['NYSE:BAC'],             providerKeys:{ twelvedata:'BAC' } },
-  'asset:avgo':  { id:'asset:avgo',  type:'stock',  symbol:'AVGO',  displayName:'Broadcom Inc.',    aliases:['BROADCOM','NASDAQ:AVGO'], providerKeys:{ twelvedata:'AVGO' } },
-  'asset:cost':  { id:'asset:cost',  type:'stock',  symbol:'COST',  displayName:'Costco Wholesale', aliases:['COSTCO','NASDAQ:COST'], providerKeys:{ twelvedata:'COST' } },
-  'asset:ko':    { id:'asset:ko',    type:'stock',  symbol:'KO',    displayName:'Coca-Cola Co.',    aliases:['COCACOLA','NYSE:KO'],   providerKeys:{ twelvedata:'KO' } },
-  'asset:mcd':   { id:'asset:mcd',   type:'stock',  symbol:'MCD',   displayName:'McDonald’s Corp.', aliases:['MCDONALDS','NYSE:MCD'], providerKeys:{ twelvedata:'MCD' } },
-  'asset:nke':   { id:'asset:nke',   type:'stock',  symbol:'NKE',   displayName:'Nike Inc.',        aliases:['NIKE','NYSE:NKE'],      providerKeys:{ twelvedata:'NKE' } },
+  'asset:aapl':  { id:'asset:aapl',  type:'stock',  symbol:'AAPL',  displayName:'Apple Inc.',       aliases:['APPLE','NASDAQ:AAPL'],  providerKeys:{ yahoo:'AAPL', twelvedata:'AAPL' } },
+  'asset:msft':  { id:'asset:msft',  type:'stock',  symbol:'MSFT',  displayName:'Microsoft Corp.',  aliases:['MICROSOFT','NASDAQ:MSFT'], providerKeys:{ yahoo:'MSFT', twelvedata:'MSFT' } },
+  'asset:nvda':  { id:'asset:nvda',  type:'stock',  symbol:'NVDA',  displayName:'NVIDIA Corp.',     aliases:['NVIDIA','NASDAQ:NVDA'], providerKeys:{ yahoo:'NVDA', twelvedata:'NVDA' } },
+  'asset:tsla':  { id:'asset:tsla',  type:'stock',  symbol:'TSLA',  displayName:'Tesla Inc.',       aliases:['TESLA','NASDAQ:TSLA'],  providerKeys:{ yahoo:'TSLA', twelvedata:'TSLA' } },
+  'asset:amzn':  { id:'asset:amzn',  type:'stock',  symbol:'AMZN',  displayName:'Amazon.com Inc.',  aliases:['AMAZON','NASDAQ:AMZN'], providerKeys:{ yahoo:'AMZN', twelvedata:'AMZN' } },
+  'asset:meta':  { id:'asset:meta',  type:'stock',  symbol:'META',  displayName:'Meta Platforms',   aliases:['FACEBOOK','NASDAQ:META'], providerKeys:{ yahoo:'META', twelvedata:'META' } },
+  'asset:googl': { id:'asset:googl', type:'stock',  symbol:'GOOGL', displayName:'Alphabet Inc.',    aliases:['GOOGLE','ALPHABET','NASDAQ:GOOGL'], providerKeys:{ yahoo:'GOOGL', twelvedata:'GOOGL' } },
+  'asset:jpm':   { id:'asset:jpm',   type:'stock',  symbol:'JPM',   displayName:'JPMorgan Chase',   aliases:['JPMORGAN','NYSE:JPM'],  providerKeys:{ yahoo:'JPM', twelvedata:'JPM' } },
+  'asset:v':     { id:'asset:v',     type:'stock',  symbol:'V',     displayName:'Visa Inc.',        aliases:['VISA','NYSE:V'],        providerKeys:{ yahoo:'V', twelvedata:'V' } },
+  'asset:wmt':   { id:'asset:wmt',   type:'stock',  symbol:'WMT',   displayName:'Walmart Inc.',     aliases:['WALMART','NYSE:WMT'],   providerKeys:{ yahoo:'WMT', twelvedata:'WMT' } },
+  'asset:brkb':  { id:'asset:brkb',  type:'stock',  symbol:'BRK.B', displayName:'Berkshire Hathaway',aliases:['BRKB','BERKSHIRE'],    providerKeys:{ yahoo:'BRK-B', twelvedata:'BRK.B' } },
+  'asset:jnj':   { id:'asset:jnj',   type:'stock',  symbol:'JNJ',   displayName:'Johnson & Johnson',aliases:['NYSE:JNJ'],             providerKeys:{ yahoo:'JNJ', twelvedata:'JNJ' } },
+  'asset:pg':    { id:'asset:pg',    type:'stock',  symbol:'PG',    displayName:'Procter & Gamble', aliases:['NYSE:PG'],              providerKeys:{ yahoo:'PG', twelvedata:'PG' } },
+  'asset:xom':   { id:'asset:xom',   type:'stock',  symbol:'XOM',   displayName:'Exxon Mobil',      aliases:['EXXON','NYSE:XOM'],     providerKeys:{ yahoo:'XOM', twelvedata:'XOM' } },
+  'asset:bac':   { id:'asset:bac',   type:'stock',  symbol:'BAC',   displayName:'Bank of America',  aliases:['NYSE:BAC'],             providerKeys:{ yahoo:'BAC', twelvedata:'BAC' } },
+  'asset:avgo':  { id:'asset:avgo',  type:'stock',  symbol:'AVGO',  displayName:'Broadcom Inc.',    aliases:['BROADCOM','NASDAQ:AVGO'], providerKeys:{ yahoo:'AVGO', twelvedata:'AVGO' } },
+  'asset:cost':  { id:'asset:cost',  type:'stock',  symbol:'COST',  displayName:'Costco Wholesale', aliases:['COSTCO','NASDAQ:COST'], providerKeys:{ yahoo:'COST', twelvedata:'COST' } },
+  'asset:ko':    { id:'asset:ko',    type:'stock',  symbol:'KO',    displayName:'Coca-Cola Co.',    aliases:['COCACOLA','NYSE:KO'],   providerKeys:{ yahoo:'KO', twelvedata:'KO' } },
+  'asset:mcd':   { id:'asset:mcd',   type:'stock',  symbol:'MCD',   displayName:'McDonald’s Corp.', aliases:['MCDONALDS','NYSE:MCD'], providerKeys:{ yahoo:'MCD', twelvedata:'MCD' } },
+  'asset:nke':   { id:'asset:nke',   type:'stock',  symbol:'NKE',   displayName:'Nike Inc.',        aliases:['NIKE','NYSE:NKE'],      providerKeys:{ yahoo:'NKE', twelvedata:'NKE' } },
 
   // ETFs
-  'asset:spy':   { id:'asset:spy',   type:'etf',    symbol:'SPY',   displayName:'SPDR S&P 500 ETF',  aliases:['SPDR'],            providerKeys:{ twelvedata:'SPY' } },
-  'asset:qqq':   { id:'asset:qqq',   type:'etf',    symbol:'QQQ',   displayName:'Invesco QQQ Trust', aliases:['INVESCO-QQQ'],     providerKeys:{ twelvedata:'QQQ' } },
-  'asset:voo':   { id:'asset:voo',   type:'etf',    symbol:'VOO',   displayName:'Vanguard S&P 500',  aliases:[],                  providerKeys:{ twelvedata:'VOO' } },
-  'asset:vti':   { id:'asset:vti',   type:'etf',    symbol:'VTI',   displayName:'Vanguard Total Stock Market', aliases:[],        providerKeys:{ twelvedata:'VTI' } },
-  'asset:urth':  { id:'asset:urth',  type:'etf',    symbol:'URTH',  displayName:'iShares MSCI World',aliases:[],                  providerKeys:{ twelvedata:'URTH' } },
-  'asset:vea':   { id:'asset:vea',   type:'etf',    symbol:'VEA',   displayName:'Vanguard Developed Markets', aliases:[],         providerKeys:{ twelvedata:'VEA' } },
+  'asset:spy':   { id:'asset:spy',   type:'etf',    symbol:'SPY',   displayName:'SPDR S&P 500 ETF',  aliases:['SPDR'],            providerKeys:{ yahoo:'SPY', twelvedata:'SPY' } },
+  'asset:qqq':   { id:'asset:qqq',   type:'etf',    symbol:'QQQ',   displayName:'Invesco QQQ Trust', aliases:['INVESCO-QQQ'],     providerKeys:{ yahoo:'QQQ', twelvedata:'QQQ' } },
+  'asset:voo':   { id:'asset:voo',   type:'etf',    symbol:'VOO',   displayName:'Vanguard S&P 500',  aliases:[],                  providerKeys:{ yahoo:'VOO', twelvedata:'VOO' } },
+  'asset:vti':   { id:'asset:vti',   type:'etf',    symbol:'VTI',   displayName:'Vanguard Total Stock Market', aliases:[],        providerKeys:{ yahoo:'VTI', twelvedata:'VTI' } },
+  'asset:urth':  { id:'asset:urth',  type:'etf',    symbol:'URTH',  displayName:'iShares MSCI World',aliases:[],                  providerKeys:{ yahoo:'URTH', twelvedata:'URTH' } },
+  'asset:vea':   { id:'asset:vea',   type:'etf',    symbol:'VEA',   displayName:'Vanguard Developed Markets', aliases:[],         providerKeys:{ yahoo:'VEA', twelvedata:'VEA' } },
 
   // Indices
-  'asset:gspc':  { id:'asset:gspc',  type:'index',  symbol:'^GSPC', displayName:'S&P 500',           aliases:['SP500','S&P500','SPX','GSPC'], providerKeys:{ twelvedata:'^GSPC' } },
-  'asset:ixic':  { id:'asset:ixic',  type:'index',  symbol:'^IXIC', displayName:'NASDAQ Composite',  aliases:['NASDAQ','IXIC','NDX'],         providerKeys:{ twelvedata:'^IXIC' } },
-  'asset:dji':   { id:'asset:dji',   type:'index',  symbol:'^DJI',  displayName:'Dow Jones',         aliases:['DOW','DJI','DJIA','DOWJONES'], providerKeys:{ twelvedata:'^DJI' } },
+  'asset:gspc':  { id:'asset:gspc',  type:'index',  symbol:'^GSPC', displayName:'S&P 500',           aliases:['SP500','S&P500','SPX','GSPC'], providerKeys:{ yahoo:'^GSPC', twelvedata:'^GSPC' } },
+  'asset:ixic':  { id:'asset:ixic',  type:'index',  symbol:'^IXIC', displayName:'NASDAQ Composite',  aliases:['NASDAQ','IXIC','NDX'],         providerKeys:{ yahoo:'^IXIC', twelvedata:'^IXIC' } },
+  'asset:dji':   { id:'asset:dji',   type:'index',  symbol:'^DJI',  displayName:'Dow Jones',         aliases:['DOW','DJI','DJIA','DOWJONES'], providerKeys:{ yahoo:'^DJI', twelvedata:'^DJI' } },
 
   // Commodities
-  'asset:xauusd':{ id:'asset:xauusd',type:'commodity', symbol:'XAU/USD', displayName:'Gold (spot)',  aliases:['XAU','GOLD','GC=F','XAUUSD'],   providerKeys:{ twelvedata:'XAU/USD' } },
-  'asset:xagusd':{ id:'asset:xagusd',type:'commodity', symbol:'XAG/USD', displayName:'Silver (spot)',aliases:['XAG','SILVER','SI=F','XAGUSD'], providerKeys:{ twelvedata:'XAG/USD' } },
-  'asset:wti':   { id:'asset:wti',   type:'commodity', symbol:'WTI',     displayName:'Crude Oil (WTI)', aliases:['OIL','CL=F','WTIUSD','WTI/USD'], providerKeys:{ twelvedata:'WTI' } },
+  'asset:xauusd':{ id:'asset:xauusd',type:'commodity', symbol:'XAU/USD', displayName:'Gold (spot)',  aliases:['XAU','GOLD','GC=F','XAUUSD'],   providerKeys:{ yahoo:'GC=F', twelvedata:'XAU/USD' } },
+  'asset:xagusd':{ id:'asset:xagusd',type:'commodity', symbol:'XAG/USD', displayName:'Silver (spot)',aliases:['XAG','SILVER','SI=F','XAGUSD'], providerKeys:{ yahoo:'SI=F', twelvedata:'XAG/USD' } },
+  'asset:wti':   { id:'asset:wti',   type:'commodity', symbol:'WTI',     displayName:'Crude Oil (WTI)', aliases:['OIL','CL=F','WTIUSD','WTI/USD'], providerKeys:{ yahoo:'CL=F', twelvedata:'WTI' } },
 });
 
 // Flat alias → canonical-id index, built once at module init.
@@ -5383,13 +5383,6 @@ const MARKET_FAILURE_TS = {};
 const MARKET_FAILURE_BACKOFF = 5 * 60 * 1000; // 5 min cooldown after provider failure
 const PRICE_CACHE = {};
 const PRICE_CACHE_MAX_AGE = 10 * 60 * 1000; // 10 min hard cap on per-symbol fallback
-const PRICE_PROVIDERS = {
-  crypto:    ['coingecko'],
-  stock:     ['twelve', 'fallback'],
-  etf:       ['twelve'],
-  index:     ['twelve'],
-  commodity: ['twelve'],
-};
 const _LOADING = {};
 let _marketSearchQuery = '';
 function marketLog(...args) { if (false) console.log('[market]', ...args); }

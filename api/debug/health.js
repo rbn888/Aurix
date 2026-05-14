@@ -51,10 +51,21 @@ export default async function handler(req, res) {
       snapshotLatencyMs:  { avg: avg(s.latencyMs), total: s.latencyMs.sum },
     },
     health: {
+      // Primary providers: coingecko (crypto) and yahoo (stocks/ETFs/indices/
+      // commodities) — both must have served at least one request and zero
+      // failures for the gateway to count as healthy. TwelveData is a tier-1
+      // fallback only and its state is informational; the gateway can remain
+      // healthy with TD absent, exhausted, or failing.
       providerHealthy:
-        (p.providerRequests.coingecko + p.providerRequests.twelvedata + p.providerRequests.yahoo) > 0 &&
-        (p.providerFailures.coingecko + p.providerFailures.twelvedata + p.providerFailures.yahoo) === 0,
+        (p.providerRequests.coingecko + p.providerRequests.yahoo) > 0 &&
+        p.providerFailures.coingecko === 0 &&
+        p.providerFailures.yahoo     === 0,
       cacheWorking: totalCacheReads > 0,
+    },
+    routing: {
+      primary:  { crypto: 'coingecko', stock: 'yahoo', etf: 'yahoo', index: 'yahoo', commodity: 'yahoo' },
+      fallback: { stock: 'twelvedata', etf: 'twelvedata', index: 'twelvedata', commodity: 'twelvedata' },
+      twelvedataEnabled: !!process.env.TWELVE_API_KEY,
     },
   });
 }
