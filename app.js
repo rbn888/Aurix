@@ -2535,11 +2535,15 @@ function _seedMainWorkspaceSheet() {
   });
 
   const seed = [
-    { id: 'A1', type: 'value',   value: 'Portfolio Value' },
-    { id: 'B1', type: 'formula', formula: 'portfolio.totalValue',    readonly: true },
-    { id: 'A2', type: 'value',   value: 'Assets' },
-    { id: 'B2', type: 'formula', formula: 'portfolio.assetCount',    readonly: true },
-    { id: 'A3', type: 'value',   value: 'Top Allocation' },
+    // PR-8A: A1/A2/A3 labels translated at render time via the @i18n: prefix.
+    // B1/B2 declare cell.format so the computed value renders with the
+    // dashboard's currency / integer conventions; B3 returns an allocation
+    // object handled by the object branch of _formatComputedValue.
+    { id: 'A1', type: 'value',   value: '@i18n:wsCardPortfolioValue' },
+    { id: 'B1', type: 'formula', formula: 'portfolio.totalValue',    readonly: true, format: 'currency' },
+    { id: 'A2', type: 'value',   value: '@i18n:wsCardAssetCount' },
+    { id: 'B2', type: 'formula', formula: 'portfolio.assetCount',    readonly: true, format: 'integer' },
+    { id: 'A3', type: 'value',   value: '@i18n:wsCardTopAlloc' },
     { id: 'B3', type: 'formula', formula: 'portfolio.topAllocation', readonly: true },
   ];
 
@@ -3423,6 +3427,17 @@ function _aw8RangeNumericValues(rangeNode) {
 function _AwEvalError(code) { this.code = code; }
 _AwEvalError.prototype = Object.create(Error.prototype);
 
+// PR-8A: numeric coercion for scalar function args. Accepts a 'num' literal
+// or any AST node that evaluates to a finite number (refs, binary, calls).
+// Centralizes the pattern so the new math functions stay one-liner-ish and
+// nested expressions like ROUND(SUM(A1:A3), 2) work as expected.
+function _aw8ArgAsNumber(node) {
+  if (!node) throw new _AwEvalError('#ERROR');
+  const v = (node.type === 'num') ? node.value : _aw8EvalAst(node);
+  if (typeof v !== 'number' || !Number.isFinite(v)) throw new _AwEvalError('#ERROR');
+  return v;
+}
+
 const _AW8_WORKSPACE_FUNCTIONS = Object.freeze({
   SUM(args) {
     if (args.length !== 1 || args[0].type !== 'range') throw new _AwEvalError('#ERROR');
@@ -3458,6 +3473,71 @@ const _AW8_WORKSPACE_FUNCTIONS = Object.freeze({
     let m = vs[0];
     for (let i = 1; i < vs.length; i++) if (vs[i] > m) m = vs[i];
     return m;
+  },
+  // PR-8A: core math. Spreadsheet-standard semantics.
+  ROUND(args) {
+    if (args.length < 1 || args.length > 2) throw new _AwEvalError('#ERROR');
+    const n = _aw8ArgAsNumber(args[0]);
+    const d = args.length === 2 ? Math.trunc(_aw8ArgAsNumber(args[1])) : 0;
+    const factor = Math.pow(10, d);
+    return Math.round(n * factor) / factor;
+  },
+  ABS(args) {
+    if (args.length !== 1) throw new _AwEvalError('#ERROR');
+    return Math.abs(_aw8ArgAsNumber(args[0]));
+  },
+  SQRT(args) {
+    if (args.length !== 1) throw new _AwEvalError('#ERROR');
+    const n = _aw8ArgAsNumber(args[0]);
+    if (n < 0) throw new _AwEvalError('#ERROR');
+    return Math.sqrt(n);
+  },
+  POW(args) {
+    if (args.length !== 2) throw new _AwEvalError('#ERROR');
+    const b = _aw8ArgAsNumber(args[0]);
+    const e = _aw8ArgAsNumber(args[1]);
+    const r = Math.pow(b, e);
+    if (!Number.isFinite(r)) throw new _AwEvalError('#ERROR');
+    return r;
+  },
+  MOD(args) {
+    // Spreadsheet MOD: result has the sign of the divisor (matches Excel/Sheets).
+    if (args.length !== 2) throw new _AwEvalError('#ERROR');
+    const n = _aw8ArgAsNumber(args[0]);
+    const d = _aw8ArgAsNumber(args[1]);
+    if (d === 0) throw new _AwEvalError('#DIV/0');
+    return n - Math.floor(n / d) * d;
+  },
+  INT(args) {
+    // Floor toward -infinity (spreadsheet convention; INT(-1.5) === -2).
+    if (args.length !== 1) throw new _AwEvalError('#ERROR');
+    return Math.floor(_aw8ArgAsNumber(args[0]));
+  },
+  COUNT(args) {
+    // COUNT(range) — number of numeric (non-invalid) values in the range.
+    if (args.length !== 1 || args[0].type !== 'range') throw new _AwEvalError('#ERROR');
+    const vs = _aw8RangeNumericValues(args[0]);
+    if (vs == null) throw new _AwEvalError('#ERROR');
+    return vs.length;
+  },
+  COUNTA(args) {
+    // COUNTA(range) — number of non-empty cells (any value, ignoring invalid).
+    if (args.length !== 1 || args[0].type !== 'range') throw new _AwEvalError('#ERROR');
+    const ids = _expandRange(args[0]);
+    if (!ids) throw new _AwEvalError('#ERROR');
+    const sheet = WORKSPACE_RUNTIME.sheets.get(WORKSPACE_RUNTIME.activeSheetId);
+    if (!sheet) return 0;
+    let n = 0;
+    for (const id of ids) {
+      const cell = sheet.cells.get(id);
+      if (!cell || cell.invalid) continue;
+      if (cell.type === 'formula') {
+        if (cell.computed != null && cell.computed !== '') n++;
+      } else {
+        if (cell.value != null && cell.value !== '') n++;
+      }
+    }
+    return n;
   },
 });
 
@@ -3511,7 +3591,8 @@ function _aw8CallFunction(name, args) {
   if (wsFn)  return wsFn(args);
   const finFn = _AW8_FINANCIAL_FUNCTIONS[upper];
   if (finFn) return finFn(args);
-  throw new _AwEvalError('#ERROR');
+  // PR-8A: distinguish unknown name from generic eval error.
+  throw new _AwEvalError('#NAME?');
 }
 
 // ── AW-8: AST evaluator ──────────────────────────────────────────────────────
@@ -3556,16 +3637,21 @@ function _aw8EvalAst(node) {
 // Centralized suggestion registry — single source of truth, no duplication
 // between the engine and the dropdown. `noArgs` controls caret placement on
 // insertion: zero-arg functions land the caret after `)`, others inside `(`.
+// PR-8A: derive autocomplete catalog from the function registries so adding
+// a function in one place automatically updates the suggestion dropdown.
+// `noArgs` controls caret placement on insertion (zero-arg functions land
+// the caret after `)`); flag stays here as the only piece of metadata that
+// can't be inferred from the function body.
+const _AW8_NO_ARG_FUNCTIONS = new Set(['PORTFOLIO.VALUE', 'PORTFOLIO.ASSETS']);
 const WORKSPACE_FORMULA_SUGGESTIONS = Object.freeze([
-  { key: 'SUM',               label: 'SUM()',               kind: 'workspace', noArgs: false },
-  { key: 'AVG',               label: 'AVG()',               kind: 'workspace', noArgs: false },
-  { key: 'MIN',               label: 'MIN()',               kind: 'workspace', noArgs: false },
-  { key: 'MAX',               label: 'MAX()',               kind: 'workspace', noArgs: false },
-  { key: 'PRICE',             label: 'PRICE()',             kind: 'financial', noArgs: false },
-  { key: 'PORTFOLIO.VALUE',   label: 'PORTFOLIO.VALUE()',   kind: 'financial', noArgs: true  },
-  { key: 'PORTFOLIO.ASSETS',  label: 'PORTFOLIO.ASSETS()',  kind: 'financial', noArgs: true  },
-  { key: 'EXPOSURE',          label: 'EXPOSURE()',          kind: 'financial', noArgs: false },
-  { key: 'ALLOCATION',        label: 'ALLOCATION()',        kind: 'financial', noArgs: false },
+  ...Object.keys(_AW8_WORKSPACE_FUNCTIONS).map(key => ({
+    key, label: key + '()', kind: 'workspace',
+    noArgs: _AW8_NO_ARG_FUNCTIONS.has(key),
+  })),
+  ...Object.keys(_AW8_FINANCIAL_FUNCTIONS).map(key => ({
+    key, label: key + '()', kind: 'financial',
+    noArgs: _AW8_NO_ARG_FUNCTIONS.has(key),
+  })),
 ]);
 
 // Extract the trailing identifier-prefix the user is typing, but only when
@@ -3929,6 +4015,44 @@ function evaluateWorkspaceFormula(parsed, _sheet) {
     return { computed: '#ERROR', invalid: true };
   }
 }
+
+// PR-8A: parser smoke test. Literal-only cases (no sheet context needed).
+// Logs only on failure so a healthy boot is silent; wrapped in try so it
+// can never break the page. Catches operator-precedence regressions and
+// math-function semantic drift on every load.
+function _aw8RunSelfTest() {
+  const cases = [
+    { expr: '=1+2',             expect: 3       },
+    { expr: '=10/4',            expect: 2.5     },
+    { expr: '=2+3*4',           expect: 14      },
+    { expr: '=-5+10',           expect: 5       },
+    { expr: '=ROUND(1.234,2)',  expect: 1.23    },
+    { expr: '=ROUND(1.5,0)',    expect: 2       },
+    { expr: '=ABS(-5)',         expect: 5       },
+    { expr: '=SQRT(9)',         expect: 3       },
+    { expr: '=POW(2,3)',        expect: 8       },
+    { expr: '=MOD(10,3)',       expect: 1       },
+    { expr: '=INT(4.9)',        expect: 4       },
+    { expr: '=INT(-1.5)',       expect: -2      },
+    { expr: '=ROUND(POW(2,4)/3,2)', expect: 5.33 },
+  ];
+  const failures = [];
+  for (const c of cases) {
+    try {
+      const parsed = parseWorkspaceFormula(c.expr);
+      const result = evaluateWorkspaceFormula(parsed, null);
+      if (result.invalid || Math.abs(result.computed - c.expect) > 1e-9) {
+        failures.push(`${c.expr} → ${result.computed} (expected ${c.expect})`);
+      }
+    } catch (e) {
+      failures.push(`${c.expr} threw: ${e?.message || e}`);
+    }
+  }
+  if (failures.length > 0) {
+    console.warn('[workspace-selftest] regressions:', failures);
+  }
+}
+try { _aw8RunSelfTest(); } catch (e) { /* never block boot */ }
 
 // ── AW-7.5: Workspace dependency graph engine ────────────────────────────────
 // Selective topological recompute. Replaces the brute-force multi-pass loop.
@@ -4524,10 +4648,39 @@ function isWorkspaceDesktop() {
   return typeof window !== 'undefined' && window.innerWidth >= 1024;
 }
 
-function _formatComputedValue(v) {
+// PR-8A: format-aware computed value renderer. Cells set cell.format =
+// 'currency' | 'percent' | 'number' | 'integer' | 'date' | null. Currency
+// routes through formatDisplay so the workspace cell matches the dashboard
+// total under any baseCurrency. NaN/Infinity render as '—' instead of
+// leaking raw JS strings.
+function _formatComputedValue(v, format) {
   if (v == null) return '';
+
+  // Error tokens pass through verbatim (#ERROR, #CYCLE, #NAME?, #DIV/0)
+  if (typeof v === 'string' && v.charCodeAt(0) === 35 /* '#' */) return _escapeWorkspaceText(v);
+
   if (typeof v === 'number') {
-    return Number.isFinite(v) ? v.toFixed(2) : String(v);
+    if (!Number.isFinite(v)) return '—';
+    switch (format) {
+      case 'currency':
+        return (typeof formatDisplay === 'function')
+          ? _escapeWorkspaceText(formatDisplay(v, 'USD'))
+          : v.toFixed(2);
+      case 'percent':
+        return (v * 100).toFixed(2) + '%';
+      case 'integer':
+        return String(Math.trunc(v));
+      case 'number':
+        return v.toFixed(2);
+      case 'date': {
+        const d = new Date(v);
+        return Number.isFinite(d.getTime())
+          ? _escapeWorkspaceText(d.toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-US'))
+          : '—';
+      }
+      default:
+        return v.toFixed(2);
+    }
   }
   if (typeof v === 'object') {
     // AW-3: render allocation objects as "SYMBOL (xx.x%)" instead of raw JSON.
@@ -4542,9 +4695,35 @@ function _formatComputedValue(v) {
   return _escapeWorkspaceText(String(v));
 }
 
+// PR-8A: legacy seed labels that pre-PR-8A users have persisted as raw
+// English strings. When found at the canonical seed positions we still
+// translate live; user-typed strings elsewhere pass through untouched.
+const _AW8_LEGACY_SEED_LABEL_KEYS = Object.freeze({
+  'Portfolio Value': 'wsCardPortfolioValue',
+  'Assets':          'wsCardAssetCount',
+  'Top Allocation':  'wsCardTopAlloc',
+});
+
 function _formatWorkspaceCellDisplay(cell) {
-  if (cell.type === 'formula') return _formatComputedValue(cell.computed);
-  return _escapeWorkspaceText(cell.value ?? '');
+  if (cell.type === 'formula') return _formatComputedValue(cell.computed, cell.format);
+  const v = cell.value;
+  // PR-8A: seed labels carry i18n keys via "@i18n:<key>" prefix so toggling
+  // language re-renders them without invalidating persistence.
+  if (typeof v === 'string') {
+    if (v.startsWith('@i18n:')) {
+      const key = v.slice(6);
+      const translated = T[lang]?.[key];
+      return _escapeWorkspaceText(translated || key);
+    }
+    // PR-8A: legacy seed strings (pre-i18n persistence) at A1/A2/A3
+    // still translate live so existing users see ES labels under ES toggle.
+    if ((cell.id === 'A1' || cell.id === 'A2' || cell.id === 'A3')
+        && _AW8_LEGACY_SEED_LABEL_KEYS[v]) {
+      const translated = T[lang]?.[_AW8_LEGACY_SEED_LABEL_KEYS[v]];
+      if (translated) return _escapeWorkspaceText(translated);
+    }
+  }
+  return _escapeWorkspaceText(v ?? '');
 }
 
 // AW-5 §9: Risk Monitor signals — consumer-only, derived from the same
