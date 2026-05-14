@@ -9968,7 +9968,12 @@ function safeNumber(val, fallback = '—') {
 }
 function safePrice(val) {
   if (typeof val !== 'number' || isNaN(val)) return '—';
-  return `$${fmtMktPrice(val)}`;
+  // PR-7 hotfix C-1: market list / featured cards must honor the global
+  // baseCurrency toggle. Value is USD-canonical (source: snapshot gateway);
+  // route through toBase + dynamic symbol so EUR mode shows €, not mixed $.
+  // fmtMktPrice precision behavior preserved (4-decimals for sub-$1 prices).
+  const sym = baseCurrency === 'EUR' ? '€' : '$';
+  return `${sym}${fmtMktPrice(toBase(val, 'USD'))}`;
 }
 function safeChange(val) {
   if (typeof val !== 'number' || isNaN(val)) return '—';
