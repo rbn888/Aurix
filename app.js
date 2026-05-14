@@ -4742,12 +4742,18 @@ function serializeWorkspaceUserCells(sheet) {
     if (!_isWorkspaceCellEditable(cell)) continue;        // system cells excluidas
     // AW-7.4: persistir formula si la celda es user formula. Sólo se guarda
     // la fórmula (string), nunca el computed (deriva del runtime).
+    // PR-8D: include cell.format on both branches when set. Additive field,
+    // backwards-compatible with payloads written before PR-8D.
     if (cell.type === 'formula' && typeof cell.formula === 'string' && cell.formula.length > 0) {
-      userCells[id] = { formula: cell.formula };
+      const entry = { formula: cell.formula };
+      if (cell.format) entry.format = cell.format;
+      userCells[id] = entry;
       continue;
     }
     if (!_isPersistableCellValue(cell.value)) continue;
-    userCells[id] = { value: cell.value };
+    const entry = { value: cell.value };
+    if (cell.format) entry.format = cell.format;
+    userCells[id] = entry;
   }
   return userCells;
 }
@@ -4834,12 +4840,16 @@ function mergeWorkspaceUserCells(sheet, userCells) {
         existing.value    = null;
         existing.computed = null;
         existing.invalid  = false;
+        // PR-8D: round-trip cell.format. Additive field; older payloads
+        // without it leave the cell's format null.
+        if (typeof incoming.format === 'string') existing.format = incoming.format;
         existing.updatedAt = Date.now();
       } else {
         sheet.cells.set(id, createWorkspaceCell({
           id,
           type:    'formula',
           formula: incoming.formula,
+          format:  (typeof incoming.format === 'string') ? incoming.format : null,
         }));
       }
       applied++;
@@ -4854,12 +4864,15 @@ function mergeWorkspaceUserCells(sheet, userCells) {
       existing.formula  = null;
       existing.computed = null;
       existing.invalid  = false;
+      // PR-8D: round-trip cell.format on literal cells too.
+      if (typeof incoming.format === 'string') existing.format = incoming.format;
       existing.updatedAt = Date.now();
     } else {
       sheet.cells.set(id, createWorkspaceCell({
         id,
         type:  'value',
         value: incoming.value,
+        format: (typeof incoming.format === 'string') ? incoming.format : null,
       }));
     }
     applied++;
@@ -13168,6 +13181,317 @@ const unsubscribeWorkspaceReactive = MARKET_EVENTS.subscribe('market:update', ()
     console.error('[workspace-reactive] recalc failed:', e?.message);
   }
 });
+
+// ── PR-8D: Workspace UX fundamentals ─────────────────────────────────────────
+// Copy/paste (TSV via navigator.clipboard), undo/redo (bounded history ring),
+// click+drag multi-cell selection, and per-cell format shortcuts. All state
+// lives in _AW8D so the existing WORKSPACE_RUNTIME shape stays untouched.
+// Persistence round-trips the new `cell.format` field; older payloads ignore
+// it without breaking (additive schema, no version bump).
+
+const _AW8D = {
+  history:  { stack: [], index: -1, max: 50 },
+  selection: { startId: null, endId: null },
+  isDraggingSelection: false,
+};
+
+function _aw8dCellsInRect(startId, endId) {
+  if (!startId || !endId) return [];
+  const cols = WORKSPACE_RUNTIME.gridColumns;
+  const m1 = String(startId).match(/^([A-Z]+)(\d+)$/);
+  const m2 = String(endId).match(/^([A-Z]+)(\d+)$/);
+  if (!m1 || !m2) return [];
+  const ci1 = cols.indexOf(m1[1]), ci2 = cols.indexOf(m2[1]);
+  if (ci1 < 0 || ci2 < 0) return [];
+  const r1 = +m1[2], r2 = +m2[2];
+  const cMin = Math.min(ci1, ci2), cMax = Math.max(ci1, ci2);
+  const rMin = Math.min(r1, r2),  rMax = Math.max(r1, r2);
+  const ids = [];
+  for (let r = rMin; r <= rMax; r++) {
+    for (let c = cMin; c <= cMax; c++) ids.push(cols[c] + r);
+  }
+  return ids;
+}
+
+function _aw8dCurrentSelection() {
+  const sel = _AW8D.selection;
+  if (sel.startId && sel.endId) {
+    const ids = _aw8dCellsInRect(sel.startId, sel.endId);
+    if (ids.length > 0) return ids;
+  }
+  return WORKSPACE_RUNTIME.activeCellId ? [WORKSPACE_RUNTIME.activeCellId] : [];
+}
+
+function _aw8dUpdateSelectionStyle() {
+  const ids = new Set(_aw8dCellsInRect(_AW8D.selection.startId, _AW8D.selection.endId));
+  // Inline outline so we don't depend on CSS authoring; reset cleanly when
+  // the cell leaves the rectangle.
+  document.querySelectorAll('[data-cell-id]').forEach(el => {
+    if (ids.size > 1 && ids.has(el.dataset.cellId)) {
+      el.style.outline = '1px solid rgba(63, 191, 127, 0.6)';
+      el.style.outlineOffset = '-1px';
+    } else if (el.style.outline && el.style.outline.includes('63, 191, 127')) {
+      el.style.outline = '';
+      el.style.outlineOffset = '';
+    }
+  });
+}
+
+// ── History (undo / redo) ────────────────────────────────────────────────────
+function _aw8dRecordHistory() {
+  const sheet = WORKSPACE_RUNTIME.sheets.get('main');
+  if (!sheet) return;
+  const snap = serializeWorkspaceUserCells(sheet);
+  const snapStr = JSON.stringify(snap);
+  const last = _AW8D.history.index >= 0 ? _AW8D.history.stack[_AW8D.history.index] : null;
+  if (last != null && JSON.stringify(last) === snapStr) return;
+  // Truncate any forward (redo) branch before recording the new state.
+  _AW8D.history.stack.length = _AW8D.history.index + 1;
+  _AW8D.history.stack.push(snap);
+  if (_AW8D.history.stack.length > _AW8D.history.max) {
+    _AW8D.history.stack.shift();
+  } else {
+    _AW8D.history.index++;
+  }
+}
+
+function _aw8dApplyHistorySnapshot(snap) {
+  const sheet = WORKSPACE_RUNTIME.sheets.get('main');
+  if (!sheet) return;
+  // Wipe non-readonly cells; system seeds (B1/B2/B3) preserved by the
+  // readonly check.
+  for (const id of [...sheet.cells.keys()]) {
+    const c = sheet.cells.get(id);
+    if (c && !c.readonly) sheet.cells.delete(id);
+  }
+  mergeWorkspaceUserCells(sheet, snap);
+  // Rebuild dependency edges for any restored user formulas.
+  for (const [id, cell] of sheet.cells) {
+    if (cell.type === 'formula' && cell.formula && !cell.readonly) {
+      const parsed = parseWorkspaceFormula(cell.formula);
+      _setCellDependencies(id, _extractFormulaDependencies(parsed));
+    }
+  }
+  recalculateWorkspaceSheet(WORKSPACE_RUNTIME.activeSheetId);
+  if (typeof renderWorkspace === 'function') renderWorkspace();
+}
+
+function _aw8dUndo() {
+  if (_AW8D.history.index <= 0) return false;
+  _AW8D.history.index--;
+  _aw8dApplyHistorySnapshot(_AW8D.history.stack[_AW8D.history.index]);
+  return true;
+}
+
+function _aw8dRedo() {
+  if (_AW8D.history.index >= _AW8D.history.stack.length - 1) return false;
+  _AW8D.history.index++;
+  _aw8dApplyHistorySnapshot(_AW8D.history.stack[_AW8D.history.index]);
+  return true;
+}
+
+// History records after every persisted save. Cheap (one JSON.stringify of
+// the user-cells subset, plus the ring slice).
+const _aw8dOriginalSavePersistence = saveWorkspacePersistence;
+saveWorkspacePersistence = function() {
+  const r = _aw8dOriginalSavePersistence.apply(this, arguments);
+  try { _aw8dRecordHistory(); } catch (_) { /* never break save on history failure */ }
+  return r;
+};
+
+// ── Copy / Paste (TSV via Clipboard API) ─────────────────────────────────────
+function _aw8dRectAsTSV(startId, endId) {
+  const cols = WORKSPACE_RUNTIME.gridColumns;
+  const m1 = String(startId).match(/^([A-Z]+)(\d+)$/);
+  const m2 = String(endId).match(/^([A-Z]+)(\d+)$/);
+  if (!m1 || !m2) return '';
+  const ci1 = cols.indexOf(m1[1]), ci2 = cols.indexOf(m2[1]);
+  const r1 = +m1[2], r2 = +m2[2];
+  const cMin = Math.min(ci1, ci2), cMax = Math.max(ci1, ci2);
+  const rMin = Math.min(r1, r2),  rMax = Math.max(r1, r2);
+  const sheet = WORKSPACE_RUNTIME.sheets.get('main');
+  if (!sheet) return '';
+  const rows = [];
+  for (let r = rMin; r <= rMax; r++) {
+    const cells = [];
+    for (let c = cMin; c <= cMax; c++) {
+      const id = cols[c] + r;
+      const cell = sheet.cells.get(id);
+      if (!cell) { cells.push(''); continue; }
+      if (cell.type === 'formula' && cell.formula) {
+        cells.push('=' + cell.formula);
+      } else if (cell.value != null) {
+        cells.push(String(cell.value));
+      } else {
+        cells.push('');
+      }
+    }
+    rows.push(cells.join('\t'));
+  }
+  return rows.join('\n');
+}
+
+async function _aw8dCopySelection() {
+  const start = _AW8D.selection.startId || WORKSPACE_RUNTIME.activeCellId;
+  const end   = _AW8D.selection.endId   || WORKSPACE_RUNTIME.activeCellId;
+  if (!start) return;
+  const tsv = _aw8dRectAsTSV(start, end || start);
+  if (!tsv) return;
+  try {
+    if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(tsv);
+    }
+  } catch (_) { /* permissions denied — silent */ }
+}
+
+async function _aw8dPasteAt(targetId) {
+  if (!targetId) return;
+  let text = '';
+  try {
+    if (navigator && navigator.clipboard && navigator.clipboard.readText) {
+      text = await navigator.clipboard.readText();
+    }
+  } catch (_) { return; }
+  if (!text) return;
+
+  const cols = WORKSPACE_RUNTIME.gridColumns;
+  const m = String(targetId).match(/^([A-Z]+)(\d+)$/);
+  if (!m) return;
+  const ci0 = cols.indexOf(m[1]);
+  const r0  = +m[2];
+  if (ci0 < 0) return;
+  const sheet = WORKSPACE_RUNTIME.sheets.get('main');
+  if (!sheet) return;
+
+  const rows = text.replace(/\r\n?/g, '\n').replace(/\n$/, '').split('\n');
+  const maxRow = WORKSPACE_RUNTIME.gridRows.length;
+  for (let dr = 0; dr < rows.length; dr++) {
+    const fields = rows[dr].split('\t');
+    for (let dc = 0; dc < fields.length; dc++) {
+      const ci = ci0 + dc;
+      const rr = r0 + dr;
+      if (ci >= cols.length || rr > maxRow) continue;
+      const id = cols[ci] + rr;
+      const existing = sheet.cells.get(id);
+      if (existing && existing.readonly) continue;
+      const raw = fields[dc];
+      if (raw == null || raw === '') { sheet.cells.delete(id); continue; }
+      if (raw.startsWith('=') && raw.length > 1) {
+        sheet.cells.set(id, createWorkspaceCell({
+          id, type: 'formula', formula: raw.slice(1),
+          format: existing?.format ?? null,
+        }));
+      } else {
+        const trimmed = raw.trim();
+        const asNum = Number(trimmed);
+        const value = (trimmed !== '' && Number.isFinite(asNum)) ? asNum : raw;
+        sheet.cells.set(id, createWorkspaceCell({
+          id, type: 'value', value,
+          format: existing?.format ?? null,
+        }));
+      }
+    }
+  }
+  for (const [id, cell] of sheet.cells) {
+    if (cell.type === 'formula' && cell.formula && !cell.readonly) {
+      const parsed = parseWorkspaceFormula(cell.formula);
+      _setCellDependencies(id, _extractFormulaDependencies(parsed));
+    }
+  }
+  saveWorkspacePersistence();
+  recalculateWorkspaceSheet(WORKSPACE_RUNTIME.activeSheetId);
+  if (typeof renderWorkspace === 'function') renderWorkspace();
+}
+
+// ── Format shortcuts ─────────────────────────────────────────────────────────
+function _aw8dApplyFormatToSelection(format) {
+  const sheet = WORKSPACE_RUNTIME.sheets.get('main');
+  if (!sheet) return;
+  const ids = _aw8dCurrentSelection();
+  let touched = 0;
+  for (const id of ids) {
+    const cell = sheet.cells.get(id);
+    if (!cell || cell.readonly) continue;
+    cell.format = format;
+    cell.updatedAt = Date.now();
+    touched++;
+  }
+  if (!touched) return;
+  saveWorkspacePersistence();
+  if (typeof renderWorkspace === 'function') renderWorkspace();
+}
+
+// ── Global keyboard + mouse wiring ───────────────────────────────────────────
+// All gated on the workspace tab being active. Edit-input focus is left alone
+// so users can still type natively inside the cell / formula bar.
+function _aw8dIsInEditInput(target) {
+  return !!(target && target.closest && (
+    target.closest('[data-cell-edit-input]') ||
+    target.closest('[data-formula-bar-input]')
+  ));
+}
+
+document.addEventListener('keydown', (e) => {
+  if (typeof currentTab !== 'string' || currentTab !== 'workspace') return;
+  const mod = e.ctrlKey || e.metaKey;
+  if (!mod) return;
+  if (_aw8dIsInEditInput(e.target)) return;       // don't hijack typing
+  const k = e.key.toLowerCase();
+
+  // Format shortcuts: Cmd/Ctrl+Shift+1..4
+  if (e.shiftKey && !e.altKey) {
+    const map = { '1': 'integer', '2': 'number', '3': 'percent', '4': 'currency' };
+    if (Object.prototype.hasOwnProperty.call(map, e.key)) {
+      e.preventDefault();
+      _aw8dApplyFormatToSelection(map[e.key]);
+      return;
+    }
+  }
+
+  if (k === 'c') { e.preventDefault(); _aw8dCopySelection(); return; }
+  if (k === 'v') {
+    const target = WORKSPACE_RUNTIME.activeCellId
+      || _AW8D.selection.startId
+      || null;
+    if (target) { e.preventDefault(); _aw8dPasteAt(target); }
+    return;
+  }
+  if (k === 'z' && !e.shiftKey)  { e.preventDefault(); _aw8dUndo(); return; }
+  if (k === 'z' &&  e.shiftKey)  { e.preventDefault(); _aw8dRedo(); return; }
+  if (k === 'y')                 { e.preventDefault(); _aw8dRedo(); return; }
+});
+
+// Click + drag rectangular selection. Skips when the mousedown lands inside
+// an editing input so committing/blurring an edit isn't disrupted.
+document.addEventListener('mousedown', (e) => {
+  if (typeof currentTab !== 'string' || currentTab !== 'workspace') return;
+  if (_aw8dIsInEditInput(e.target)) return;
+  const cellEl = e.target.closest && e.target.closest('[data-cell-id]');
+  if (!cellEl) return;
+  const id = cellEl.dataset.cellId;
+  if (!id) return;
+  _AW8D.isDraggingSelection = true;
+  _AW8D.selection.startId = id;
+  _AW8D.selection.endId   = id;
+  _aw8dUpdateSelectionStyle();
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!_AW8D.isDraggingSelection) return;
+  const cellEl = e.target.closest && e.target.closest('[data-cell-id]');
+  if (!cellEl) return;
+  const id = cellEl.dataset.cellId;
+  if (!id || id === _AW8D.selection.endId) return;
+  _AW8D.selection.endId = id;
+  _aw8dUpdateSelectionStyle();
+});
+
+document.addEventListener('mouseup', () => {
+  _AW8D.isDraggingSelection = false;
+});
+
+// Seed history with the initial state once persistence has loaded.
+try { _aw8dRecordHistory(); } catch (_) { /* boot-time history seed is best-effort */ }
 
 // FC-10: register base financial formulas (pure consumers of derived snapshot).
 registerFinancialFormula(
