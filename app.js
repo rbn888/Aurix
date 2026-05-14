@@ -1454,13 +1454,34 @@ function formatCurrency(amount, currency) {
   }).format(amount);
 }
 function formatBase(amount) { return formatCurrency(amount, baseCurrency); }
-function formatUSD(n)       { return formatCurrency(n, 'USD'); }
 function formatShort(amount) {
   const sym = baseCurrency === 'EUR' ? '€' : '$';
   const abs = Math.abs(amount);
   if (abs >= 1_000_000) return sym + (amount / 1_000_000).toFixed(2) + 'M';
   if (abs >= 1_000)     return sym + (amount / 1_000).toFixed(1) + 'K';
   return formatBase(amount);
+}
+
+// ── Canonical display-currency layer ───────────────────────────────────────
+// All UI sites that render a monetary value to the user MUST route through
+// formatDisplay / formatDisplayShort. Internal accounting stays USD; this
+// pair is the single conversion + formatting bridge to baseCurrency.
+//
+//   formatDisplay(amount, from='USD')      → "$298.92" / "€275.01"
+//   formatDisplayShort(amount, from='USD') → "$1.2K" / "€1.1M"
+//
+// Out of scope: cash quantities (the qty IS denominated in the asset's own
+// currency), historical transaction prices, and `orig-price` tags — those
+// keep their native currency by design.
+function formatDisplay(amount, from = 'USD') {
+  const v = Number(amount);
+  if (!Number.isFinite(v)) return formatBase(0);
+  return formatBase(toBase(v, from));
+}
+function formatDisplayShort(amount, from = 'USD') {
+  const v = Number(amount);
+  if (!Number.isFinite(v)) return formatBase(0);
+  return formatShort(toBase(v, from));
 }
 
 // ── Currency conversion ─────────────────────────────────────
@@ -4697,14 +4718,14 @@ function _renderWorkspaceMobile(sheet) {
   const dailyPnl    = (typeof portfolio.dailyPnl === 'number') ? portfolio.dailyPnl : null;
   const dailyPnlPct = (typeof portfolio.dailyPnlPct === 'number') ? portfolio.dailyPnlPct : null;
 
-  // Workspace mobile cards: read baseCurrency from app settings so the cards
-  // follow the global currency toggle. portfolio.totalValue is the raw
-  // qty*price aggregate (treated as USD per dashboard convention) — convert
-  // to base before formatting so EUR mode shows EUR values, not USD-with-€.
-  const fmtMoney  = v => formatBase(toBase(Number(v) || 0, 'USD'));
+  // Workspace mobile cards: route monetary values through the canonical
+  // display layer so they pick up the global currency toggle uniformly.
+  // portfolio.totalValue is the raw qty*price aggregate (USD per dashboard
+  // convention) — formatDisplay handles the conversion + formatting.
+  const fmtMoney  = v => formatDisplay(v, 'USD');
   const fmtSigned = v => {
-    const base = toBase(Number(v) || 0, 'USD');
-    return (base >= 0 ? '+' : '') + formatBase(base);
+    const n = Number(v) || 0;
+    return (n >= 0 ? '+' : '') + formatDisplay(n, 'USD');
   };
 
   const topLabel = topAlloc?.symbol
@@ -5863,12 +5884,10 @@ function initChart() {
           ticks: {
             color: '#686868',
             maxTicksLimit: 5,
-            callback: v => {
-              const sym = baseCurrency === 'EUR' ? '€' : '$';
-              if (v >= 1_000_000) return sym + (v / 1_000_000).toFixed(2) + 'M';
-              if (v >= 1_000)     return sym + (v / 1_000).toFixed(1) + 'K';
-              return formatBase(v);
-            },
+            // Chart series are stored in USD (canonical). Route ticks
+            // through the canonical display layer so EUR mode shows
+            // EUR-converted axis labels, not USD numbers with €.
+            callback: v => formatDisplayShort(v, 'USD'),
           },
         }
       },
@@ -10148,7 +10167,7 @@ function render(animate = false) {
     const isRE = asset.type === 'real_estate';
 
     const rentHtml = (isRE && asset.rent > 0)
-      ? `<span class="asset-rent">+${formatCurrency(asset.rent, assetCurr)}${t('rentSuffix')}</span>`
+      ? `<span class="asset-rent">+${formatDisplay(asset.rent, assetCurr)}${t('rentSuffix')}</span>`
       : '';
 
     const subLineHtml = isCash
@@ -10158,10 +10177,10 @@ function render(animate = false) {
            ${rentHtml}`
         : isGold
           ? `<span class="units">${qtyUnitStr}</span>
-             <span class="price">${formatCurrency(asset.price, assetCurr)}${t('perTrOz')}${origHtml ? ` · ${origHtml}` : ''}</span>
+             <span class="price">${formatDisplay(asset.price, assetCurr)}${t('perTrOz')}${origHtml ? ` · ${origHtml}` : ''}</span>
              ${changeHtml}`
           : `<span class="units">${qtyUnitStr}</span>
-             <span class="price">${formatCurrency(asset.price, assetCurr)}${t('perUnit')}${origHtml ? ` · ${origHtml}` : ''}</span>
+             <span class="price">${formatDisplay(asset.price, assetCurr)}${t('perUnit')}${origHtml ? ` · ${origHtml}` : ''}</span>
              ${changeHtml}`;
 
     const _mStatus = getMarketStatus(asset.type);
@@ -10213,10 +10232,10 @@ function render(animate = false) {
         return `${formatQty(asset.qty)} ${t('units')}`;
       })();
       const priceStr = (!isCash && !isRE && asset.price > 0)
-        ? `${formatCurrency(asset.price, assetCurr)}${isGold ? t('perTrOz') : t('perUnit')}`
+        ? `${formatDisplay(asset.price, assetCurr)}${isGold ? t('perTrOz') : t('perUnit')}`
         : '';
       const darRentHtml = (isRE && asset.rent > 0)
-        ? `<span class="dar-rent">+${formatCurrency(asset.rent, assetCurr)}${t('rentSuffix')}</span>`
+        ? `<span class="dar-rent">+${formatDisplay(asset.rent, assetCurr)}${t('rentSuffix')}</span>`
         : '';
 
       const subParts   = [qtyStr, priceStr].filter(Boolean);
@@ -10641,7 +10660,7 @@ async function selectAsset(entry) {
 
     if (price) {
       pendingPrice            = price;
-      chipPriceEl.textContent = formatUSD(price);
+      chipPriceEl.textContent = formatDisplay(price, 'USD');
       setLookupStatus('ok', '');
     } else {
       chipPriceEl.textContent = t('noPrice');
@@ -10652,7 +10671,7 @@ async function selectAsset(entry) {
     const fb = entry.marketSymbol ? getFallbackData(entry.marketSymbol) : null;
     if (fb) {
       pendingPrice            = fb.price;
-      chipPriceEl.textContent = formatUSD(fb.price);
+      chipPriceEl.textContent = formatDisplay(fb.price, 'USD');
       setLookupStatus('ok', '');
     } else {
       chipPriceEl.textContent = t('noPrice');
@@ -11194,13 +11213,13 @@ function updatePreview() {
   const qty = parseLocalFloat(qtyInput.value) || 0;
   // Real estate: qty IS the value, already in rePendingCurrency
   if (isRealEstateMode) {
-    previewTotal.textContent = formatBase(toBase(qty, rePendingCurrency));
+    previewTotal.textContent = formatDisplay(qty, rePendingCurrency);
     return;
   }
   // Manual ISIN mode: qty × manual price (if any), in selected manualCurrency
   if (isManualMode) {
     const price = parseLocalFloat(document.getElementById('manualPrice')?.value) || 0;
-    previewTotal.textContent = formatBase(toBase(qty * price, manualCurrency));
+    previewTotal.textContent = formatDisplay(qty * price, manualCurrency);
     return;
   }
   const price = pendingPrice || 0;
@@ -11211,7 +11230,7 @@ function updatePreview() {
   } else {
     value = qty * price;
   }
-  previewTotal.textContent = formatBase(toBase(value, 'USD'));
+  previewTotal.textContent = formatDisplay(value, 'USD');
 }
 qtyInput.addEventListener('input', updatePreview);
 document.getElementById('manualPrice')?.addEventListener('input', updatePreview);
@@ -11462,7 +11481,7 @@ function updateReducePreview() {
     : isGold
       ? `${formatQty(remaining)} ${asset.goldUnit || 'g'}`
       : formatQty(remaining);
-  previewValueLeft.textContent = formatBase(toBase(assetNativeValue(remainingAsset), cur));
+  previewValueLeft.textContent = formatDisplay(assetNativeValue(remainingAsset), cur);
   reduceWarning.classList.toggle('visible', remaining === 0 && amount > 0);
 }
 
@@ -11601,7 +11620,7 @@ function updateAddPreview() {
   previewAddQtyTotal.textContent   = isCash
     ? formatCurrency(newQty, assetCurr)
     : isGold ? `${formatQty(newQty)} ${asset.goldUnit || 'g'}` : formatQty(newQty);
-  previewAddValueTotal.textContent = formatBase(toBase(assetNativeValue(newAsset), assetCurr));
+  previewAddValueTotal.textContent = formatDisplay(assetNativeValue(newAsset), assetCurr);
 }
 
 addQtyInput.addEventListener('input', updateAddPreview);
@@ -12156,13 +12175,13 @@ function openAssetDetailModal(assetId) {
   } else {
     priceRow.style.display = '';
     document.getElementById('adPrice').textContent =
-      asset.price != null ? formatCurrency(asset.price, assetCurr) : '—';
+      asset.price != null ? formatDisplay(asset.price, assetCurr) : '—';
   }
 
   // Total value
   const valueBase = assetNativeValue(asset);
   document.getElementById('adValue').textContent =
-    valueBase != null ? formatBase(toBase(valueBase, assetCurr)) : '—';
+    valueBase != null ? formatDisplay(valueBase, assetCurr) : '—';
   document.getElementById('adValueLabel').textContent = t('adValueLabel');
 
   // PnL
@@ -12364,12 +12383,9 @@ function initMobileCharts() {
             ticks: {
               color: '#686868',
               maxTicksLimit: 5,
-              callback: v => {
-                const sym = baseCurrency === 'EUR' ? '€' : '$';
-                if (v >= 1_000_000) return sym + (v / 1_000_000).toFixed(2) + 'M';
-                if (v >= 1_000)     return sym + (v / 1_000).toFixed(1) + 'K';
-                return formatBase(v);
-              },
+              // Asset-detail chart ticks: same canonical conversion as the
+              // dashboard chart above. Series are USD-denominated.
+              callback: v => formatDisplayShort(v, 'USD'),
             },
           },
         },
