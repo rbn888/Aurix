@@ -6176,29 +6176,27 @@ async function searchCoinFallback(_query) {
   return null;
 }
 
-// ── Twelve Data API (stocks / ETFs / metals) — proxied via /api/prices ──
-async function fetchTwelveData(symbol) {
-  const provider = `twelvedata:${symbol}`;
+// ── Canonical single-symbol price resolver ─────────────────────────────────
+// Routes through /api/prices/snapshot so the backend provider chain
+// (yahoo primary → twelvedata fallback for stocks/ETFs/indices/commodities)
+// is applied uniformly. Returns the USD price as a number, or null if the
+// symbol is not in the snapshot registry or the gateway returned nothing.
+async function resolveSymbolPrice(symbol) {
+  if (!symbol) return null;
   try {
-    const res = await fetch(PRICES_PROXY, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ providers: [provider] }),
-      signal:  AbortSignal.timeout(8000),
-    });
-    console.log('[twelve]', symbol, 'status:', res.status);
+    const url = `${PRICES_PROXY}/snapshot?symbols=${encodeURIComponent(symbol)}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return null;
-    const { prices } = await res.json();
-    const price = prices?.[provider]?.price;
-    if (!price || isNaN(price)) return null;
-    return { price, previousClose: null };
-  } catch (err) {
-    console.log('[twelve]', symbol, 'error:', err.message);
+    const json = await res.json();
+    const want = symbol.toUpperCase();
+    const hit  = (json?.snapshot ?? []).find(
+      p => p.symbol === symbol || p.symbol?.toUpperCase() === want
+    );
+    return Number.isFinite(hit?.price) ? hit.price : null;
+  } catch {
     return null;
   }
 }
-
-const fetchYahooData = fetchTwelveData;
 
 // ── Gold spot price: XAU/USD → GC=F → fallback (single batched snapshot) ──
 async function fetchGoldSpotPrice() {
@@ -6289,12 +6287,6 @@ async function getAssetFromISIN(isin, signal) {
     if (err.name !== 'AbortError') cacheNull();
     return null;
   }
-}
-
-// Thin wrapper used by ISIN modal to get a live price before saving
-async function fetchStockPrice(symbol) {
-  const data = await fetchYahooData(symbol);
-  return data?.price ?? null;
 }
 
 // Thin wrapper: find crypto by name/symbol and return price + coinId
@@ -10639,8 +10631,7 @@ async function selectAsset(entry) {
         // Gold: dedicated source chain (XAU/USD → GC=F → fallback) via snapshot
         price = await fetchGoldSpotPrice();
       } else {
-        const data = await fetchYahooData(entry.marketSymbol);
-        price      = data?.price ?? null;
+        price = await resolveSymbolPrice(entry.marketSymbol);
         if (!price) {
           const fb = getFallbackData(entry.marketSymbol);
           price    = fb?.price ?? null;
@@ -11148,7 +11139,7 @@ if (isinInputEl) {
             const cp = await fetchCryptoPrice(figiResult.symbol);
             if (!signal.aborted && cp) { prefill.price = cp.price; prefill.coinId = cp.coinId; }
           } else if (figiResult.symbol) {
-            const price = await fetchStockPrice(figiResult.symbol);
+            const price = await resolveSymbolPrice(figiResult.symbol);
             if (!signal.aborted && price) prefill.price = price;
           }
         }
