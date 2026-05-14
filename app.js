@@ -3241,6 +3241,19 @@ function _aw8Tokenize(text) {
       i++;
       continue;
     }
+    // PR-8B: comparison operators. Multi-char (`<=`, `>=`, `<>`) tried first.
+    if (c === '<') {
+      if (text[i+1] === '=') { tokens.push({ t: 'cmp', v: '<=' }); i += 2; continue; }
+      if (text[i+1] === '>') { tokens.push({ t: 'cmp', v: '<>' }); i += 2; continue; }
+      tokens.push({ t: 'cmp', v: '<' }); i++; continue;
+    }
+    if (c === '>') {
+      if (text[i+1] === '=') { tokens.push({ t: 'cmp', v: '>=' }); i += 2; continue; }
+      tokens.push({ t: 'cmp', v: '>' }); i++; continue;
+    }
+    if (c === '=') {
+      tokens.push({ t: 'cmp', v: '=' }); i++; continue;
+    }
     // Punctuation
     if (c === '(') { tokens.push({ t: 'lparen' }); i++; continue; }
     if (c === ')') { tokens.push({ t: 'rparen' }); i++; continue; }
@@ -3258,7 +3271,20 @@ function _isCellRefShape(s) {
 function _aw8Peek(state, offset = 0)  { return state.tokens[state.idx + offset]; }
 function _aw8Consume(state)            { return state.tokens[state.idx++]; }
 
-function _aw8ParseExpression(state) { return _aw8ParseAdditive(state); }
+function _aw8ParseExpression(state) { return _aw8ParseComparison(state); }
+
+// PR-8B: comparison level sits between expression and additive. Spreadsheet
+// convention: comparisons have lower precedence than arithmetic, so
+// 1+2>2 parses as (1+2)>2 → 1. Returns 1/0 numerically.
+function _aw8ParseComparison(state) {
+  let left = _aw8ParseAdditive(state);
+  while (_aw8Peek(state)?.t === 'cmp') {
+    const op = _aw8Consume(state).v;
+    const right = _aw8ParseAdditive(state);
+    left = { type: 'binary', op, lhs: left, rhs: right };
+  }
+  return left;
+}
 
 function _aw8ParseAdditive(state) {
   let left = _aw8ParseMultiplicative(state);
@@ -3539,6 +3565,52 @@ const _AW8_WORKSPACE_FUNCTIONS = Object.freeze({
     }
     return n;
   },
+  // PR-8B: logical formulas. Truthiness convention: any non-zero finite
+  // number is true, zero is false. Comparison ops return 1/0 so these
+  // chain naturally (IF(A1>10, …)). Branches may evaluate to strings.
+  IF(args) {
+    if (args.length !== 3) throw new _AwEvalError('#ERROR');
+    const cond = _aw8EvalAst(args[0]);
+    if (typeof cond !== 'number' || !Number.isFinite(cond)) throw new _AwEvalError('#ERROR');
+    return _aw8EvalAst(cond !== 0 ? args[1] : args[2]);
+  },
+  AND(args) {
+    if (args.length === 0) throw new _AwEvalError('#ERROR');
+    for (const a of args) {
+      const v = _aw8EvalAst(a);
+      if (typeof v !== 'number' || !Number.isFinite(v)) throw new _AwEvalError('#ERROR');
+      if (v === 0) return 0;
+    }
+    return 1;
+  },
+  OR(args) {
+    if (args.length === 0) throw new _AwEvalError('#ERROR');
+    for (const a of args) {
+      const v = _aw8EvalAst(a);
+      if (typeof v !== 'number' || !Number.isFinite(v)) throw new _AwEvalError('#ERROR');
+      if (v !== 0) return 1;
+    }
+    return 0;
+  },
+  NOT(args) {
+    if (args.length !== 1) throw new _AwEvalError('#ERROR');
+    const v = _aw8EvalAst(args[0]);
+    if (typeof v !== 'number' || !Number.isFinite(v)) throw new _AwEvalError('#ERROR');
+    return v === 0 ? 1 : 0;
+  },
+  IFERROR(args) {
+    if (args.length !== 2) throw new _AwEvalError('#ERROR');
+    try {
+      const v = _aw8EvalAst(args[0]);
+      // Catch infinity / NaN as errors so IFERROR(1/0, fallback) works even
+      // though arithmetic itself already throws #DIV/0 explicitly.
+      if (typeof v === 'number' && !Number.isFinite(v)) throw new _AwEvalError('#ERROR');
+      return v;
+    } catch (e) {
+      if (e instanceof _AwEvalError) return _aw8EvalAst(args[1]);
+      throw e;
+    }
+  },
 });
 
 // Financial functions: pure consumers of FC snapshots (getMarketSnapshot /
@@ -3614,17 +3686,45 @@ function _aw8EvalAst(node) {
       return node.op === '-' ? -v : v;
     }
     case 'binary': {
-      const l = _aw8EvalAst(node.lhs);
-      const r = _aw8EvalAst(node.rhs);
-      if (typeof l !== 'number' || !Number.isFinite(l)) throw new _AwEvalError('#ERROR');
-      if (typeof r !== 'number' || !Number.isFinite(r)) throw new _AwEvalError('#ERROR');
-      switch (node.op) {
-        case '+': return l + r;
-        case '-': return l - r;
-        case '*': return l * r;
-        case '/':
-          if (r === 0) throw new _AwEvalError('#DIV/0');
-          return l / r;
+      const op = node.op;
+      // Arithmetic operators: strict-numeric on both sides (preserved).
+      if (op === '+' || op === '-' || op === '*' || op === '/') {
+        const l = _aw8EvalAst(node.lhs);
+        const r = _aw8EvalAst(node.rhs);
+        if (typeof l !== 'number' || !Number.isFinite(l)) throw new _AwEvalError('#ERROR');
+        if (typeof r !== 'number' || !Number.isFinite(r)) throw new _AwEvalError('#ERROR');
+        switch (op) {
+          case '+': return l + r;
+          case '-': return l - r;
+          case '*': return l * r;
+          case '/':
+            if (r === 0) throw new _AwEvalError('#DIV/0');
+            return l / r;
+        }
+      }
+      // PR-8B: equality / inequality. Lax — accepts string literals so
+      //   IF("a"="a", …)  works without forcing numeric coercion.
+      if (op === '=' || op === '<>') {
+        const l = _aw8EvalAst(node.lhs);
+        const r = _aw8EvalAst(node.rhs);
+        let eq;
+        if (typeof l === 'number' && typeof r === 'number') {
+          eq = Number.isFinite(l) && Number.isFinite(r) && l === r;
+        } else {
+          eq = (l === r);
+        }
+        return (op === '=') ? (eq ? 1 : 0) : (eq ? 0 : 1);
+      }
+      // PR-8B: ordered comparisons require numeric operands.
+      if (op === '<' || op === '<=' || op === '>' || op === '>=') {
+        const l = _aw8EvalAst(node.lhs);
+        const r = _aw8EvalAst(node.rhs);
+        if (typeof l !== 'number' || !Number.isFinite(l)) throw new _AwEvalError('#ERROR');
+        if (typeof r !== 'number' || !Number.isFinite(r)) throw new _AwEvalError('#ERROR');
+        if (op === '<')  return l <  r ? 1 : 0;
+        if (op === '<=') return l <= r ? 1 : 0;
+        if (op === '>')  return l >  r ? 1 : 0;
+        return l >= r ? 1 : 0;
       }
       throw new _AwEvalError('#ERROR');
     }
@@ -4006,10 +4106,15 @@ function evaluateWorkspaceFormula(parsed, _sheet) {
   if (!parsed) return { computed: '#ERROR', invalid: true };
   try {
     const v = _aw8EvalAst(parsed);
-    if (typeof v !== 'number' || !Number.isFinite(v)) {
-      return { computed: '#ERROR', invalid: true };
+    // PR-8B: top-level results may now be strings (IF returning a literal
+    // branch) or numbers. Non-finite numbers still surface as #ERROR.
+    if (typeof v === 'string') return { computed: v, invalid: false };
+    if (typeof v === 'number') {
+      if (!Number.isFinite(v)) return { computed: '#ERROR', invalid: true };
+      return { computed: v, invalid: false };
     }
-    return { computed: v, invalid: false };
+    if (v == null) return { computed: '', invalid: false };
+    return { computed: '#ERROR', invalid: true };
   } catch (e) {
     if (e && e.code) return { computed: e.code, invalid: true };
     return { computed: '#ERROR', invalid: true };
@@ -4035,15 +4140,37 @@ function _aw8RunSelfTest() {
     { expr: '=INT(4.9)',        expect: 4       },
     { expr: '=INT(-1.5)',       expect: -2      },
     { expr: '=ROUND(POW(2,4)/3,2)', expect: 5.33 },
+    // PR-8B logical + comparison
+    { expr: '=1>0',                 expect: 1       },
+    { expr: '=1<0',                 expect: 0       },
+    { expr: '=5>=5',                expect: 1       },
+    { expr: '=2<>3',                expect: 1       },
+    { expr: '=4=4',                 expect: 1       },
+    { expr: '=IF(1>0,10,20)',       expect: 10      },
+    { expr: '=IF(0,10,20)',         expect: 20      },
+    { expr: '=IF(1>0,"yes","no")',  expect: 'yes'   },
+    { expr: '=AND(1,1,1)',          expect: 1       },
+    { expr: '=AND(1,1,0)',          expect: 0       },
+    { expr: '=OR(0,0,1)',           expect: 1       },
+    { expr: '=OR(0,0,0)',           expect: 0       },
+    { expr: '=NOT(1)',              expect: 0       },
+    { expr: '=NOT(0)',              expect: 1       },
+    { expr: '=IFERROR(SQRT(-1),0)', expect: 0       },
+    { expr: '=IFERROR(1/0,42)',     expect: 42      },
+    { expr: '=IFERROR(SQRT(9),99)', expect: 3       },
+    { expr: '=1+2>2',               expect: 1       }, // precedence: (1+2)>2
   ];
   const failures = [];
   for (const c of cases) {
     try {
       const parsed = parseWorkspaceFormula(c.expr);
       const result = evaluateWorkspaceFormula(parsed, null);
-      if (result.invalid || Math.abs(result.computed - c.expect) > 1e-9) {
-        failures.push(`${c.expr} → ${result.computed} (expected ${c.expect})`);
-      }
+      const ok = !result.invalid && (
+        typeof c.expect === 'string'
+          ? result.computed === c.expect
+          : Math.abs(result.computed - c.expect) <= 1e-9
+      );
+      if (!ok) failures.push(`${c.expr} → ${result.computed} (expected ${c.expect})`);
     } catch (e) {
       failures.push(`${c.expr} threw: ${e?.message || e}`);
     }
