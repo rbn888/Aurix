@@ -232,13 +232,23 @@ const REGISTRY = {
 
 // MC-6: Yahoo serves daily NAVs for mutual funds under opaque Morningstar
 // codes (e.g. 0P0001824G.L for Fundsmith Equity, 0P0001BBVY.F for Fidelity
-// Global Technology). There are tens of thousands of these and they're
-// opaque — registering each one would be a maintenance hole. Instead the
-// snapshot router recognises the Morningstar shape and routes Yahoo
-// passthrough with assetType:'fund'. The shape gate is deliberately
-// strict — only 0P prefix + uppercase/digits, optional .XX suffix — so
-// no other unknown input ever slips through to a Yahoo passthrough.
+// Global Technology). MC-7B generalises this to a controlled Yahoo
+// passthrough for any Yahoo-shaped ticker so European ETFs that the
+// REGISTRY doesn't cover (EXS1.DE, EMXC.L, …) and any other instrument
+// the search returns can resolve too. Character set + length cap stay
+// strict so random input can't trigger arbitrary upstream calls.
 const MORNINGSTAR_FUND_RE = /^0P[A-Z0-9]+(\.[A-Z]{1,3})?$/;
+const YAHOO_SYMBOL_RE     = /^[A-Z0-9.\-^=]+$/;
+const MAX_PASSTHROUGH_LEN = 24;
+
+function _inferYahooAssetType(symbol) {
+  if (MORNINGSTAR_FUND_RE.test(symbol)) return 'fund';
+  if (symbol.startsWith('^'))           return 'index';
+  if (/=F$/.test(symbol))               return 'commodity';   // GC=F / SI=F / CL=F
+  if (symbol.includes('=X'))            return 'commodity';   // FX pairs (EURUSD=X)
+  if (/\.[A-Z]{1,3}$/.test(symbol))     return 'etf';         // European listing form
+  return 'stock';
+}
 
 function resolveSymbol(raw) {
   if (REGISTRY[raw]) return { canonical: raw, entry: REGISTRY[raw] };
@@ -253,12 +263,17 @@ function resolveSymbol(raw) {
   if (stripped !== upper && REGISTRY[stripped]) {
     return { canonical: stripped, entry: REGISTRY[stripped] };
   }
-  // MC-6: mutual-fund Yahoo passthrough. Only Morningstar-shaped symbols.
-  if (MORNINGSTAR_FUND_RE.test(upper)) {
+  // MC-7B: generic Yahoo passthrough. Only symbols that pass the tight
+  // shape gate (uppercase letters / digits / . - ^ =, ≤24 chars) make
+  // it through. Yahoo serves price or 404; on 404 the snapshot omits
+  // the symbol exactly like before, so no false positives. assetType
+  // is inferred from shape so caching TTL and downstream rendering
+  // pick the right bucket (fund / index / etf / commodity / stock).
+  if (YAHOO_SYMBOL_RE.test(upper) && upper.length <= MAX_PASSTHROUGH_LEN) {
     return {
       canonical: upper,
       entry: {
-        assetType: 'fund',
+        assetType: _inferYahooAssetType(upper),
         providers: [{ provider: 'yahoo', providerId: upper }],
       },
     };

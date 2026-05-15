@@ -362,7 +362,7 @@ const T = {
     noResults:       q => `Sin resultados para "${q}"`,
     // Price lookup
     noPrice:         'sin precio',
-    priceUnavail:    'Precio no disponible — inténtalo de nuevo más tarde.',
+    priceUnavail:    'Precio no disponible para este activo.',
     priceNoConn:     'Sin conexión. Precio no disponible.',
     // Card button titles
     btnAdd:          'Añadir',
@@ -754,7 +754,7 @@ const T = {
     noResults:       q => `No results for "${q}"`,
     // Price lookup
     noPrice:         'no price',
-    priceUnavail:    'Price not available — try again later.',
+    priceUnavail:    'Price not available for this asset.',
     priceNoConn:     'No connection. Price unavailable.',
     // Card button titles
     btnAdd:          'Add',

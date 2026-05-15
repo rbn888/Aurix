@@ -1063,6 +1063,13 @@ body.modal-open {
   transition: opacity 0.25s ease, transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
   will-change: transform, opacity;
   overscroll-behavior: none;
+  /* MC-7B: cap modal height + flex layout so a long ISIN expansion or a
+     full add-asset form never pushes submit buttons off-screen on
+     desktop. Mobile keeps the dedicated sheet layout in the media-query
+     block below (which already sets overflow-y on .modal-body). */
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
 }
 .modal-overlay.open .modal {
   opacity: 1;
@@ -1075,6 +1082,8 @@ body.modal-open {
   justify-content: space-between;
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border);
+  /* MC-7B: header doesn't shrink so it stays pinned while body scrolls. */
+  flex-shrink: 0;
 }
 .modal-header h3 { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
 
@@ -1091,7 +1100,18 @@ body.modal-open {
 .modal-close:hover  { color: var(--text); background: var(--bg-card-2); }
 .modal-close:active { transform: scale(.85); transition-duration: 70ms; }
 
-.modal-body { padding: var(--space-5); }
+.modal-body {
+  padding: var(--space-5);
+  /* MC-7B: scroll the form body, not the whole modal, so the header
+     stays anchored. flex:1 + min-height:0 lets it shrink under the
+     90vh cap on .modal. Mobile media-query at line ~2981 overrides
+     this with its own sheet-friendly variant — same scroll contract. */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  flex: 1;
+  min-height: 0;
+}
 
 /* ── Form ──────────────────────────────────────────────── */
 .form-row {
