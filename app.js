@@ -14588,9 +14588,51 @@ const _WP6_INTENT_HANDLERS = {
     const ticker = String((params && params.ticker) || 'TSLA').trim().toUpperCase() || 'TSLA';
     return { title: 'Position Analysis', description: tpl.description, cells: tpl.build(ticker) };
   },
-  market_watch: () => {
-    const tpl = _wp6LookupWP4('market-watch');
-    return { title: 'Market Watch', description: tpl.description, cells: tpl.build() };
+  market_watch: (params) => {
+    // params.symbols: optional list of tickers; sanitized to non-empty
+    // uppercase strings, deduped, capped at 8. Missing/empty → fall back
+    // to the WP-4 default six-symbol watch. PRICE/PRICE.CHANGE24H alias
+    // resolution is the existing market-layer responsibility (PR-8C);
+    // symbols passed here are inlined verbatim into the formulas.
+    const requested = (params && Array.isArray(params.symbols)) ? params.symbols : null;
+    if (!requested || requested.length === 0) {
+      const tpl = _wp6LookupWP4('market-watch');
+      return { title: 'Market Watch', description: tpl.description, cells: tpl.build() };
+    }
+    const seen = new Set();
+    const symbols = [];
+    for (const raw of requested) {
+      if (typeof raw !== 'string' && typeof raw !== 'number') continue;
+      const sym = String(raw).trim().replace(/["']/g, '').toUpperCase();
+      if (!sym || seen.has(sym)) continue;
+      seen.add(sym);
+      symbols.push(sym);
+      if (symbols.length >= 8) break;
+    }
+    if (symbols.length === 0) {
+      const tpl = _wp6LookupWP4('market-watch');
+      return { title: 'Market Watch', description: tpl.description, cells: tpl.build() };
+    }
+    const cells = [
+      { id: 'A1', type: 'value', value: '@i18n:wsCardPortfolioValue' },
+      { id: 'A2', type: 'value', value: '@i18n:wsCardAssetCount' },
+      { id: 'A3', type: 'value', value: '@i18n:wsCardTopAlloc' },
+      { id: 'A5', type: 'value', value: 'Market Watch' },
+      { id: 'A6', type: 'value', value: 'Symbol' },
+      { id: 'B6', type: 'value', value: 'Price' },
+      { id: 'C6', type: 'value', value: '24h %' },
+    ];
+    symbols.forEach((sym, i) => {
+      const r = 7 + i;
+      cells.push({ id: `A${r}`, type: 'value',   value: sym });
+      cells.push({ id: `B${r}`, type: 'formula', formula: `=PRICE("${sym}")`,           format: 'currency' });
+      cells.push({ id: `C${r}`, type: 'formula', formula: `=PRICE.CHANGE24H("${sym}")`, format: 'number'   });
+    });
+    return {
+      title: 'Market Watch',
+      description: `Live prices and 24h change for ${symbols.length} ticker${symbols.length === 1 ? '' : 's'}`,
+      cells,
+    };
   },
   dividend_tracker: () => {
     // No external dividend feed. User fills B (qty) and C (div/share) per
