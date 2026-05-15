@@ -11640,13 +11640,28 @@ function renderMarketItem(item) {
   const normSym = normalizeSymbol(item.symbol);
   const watched = isInWatchlist(normSym);
   const chart   = renderSparkline(generateSparkline(chg ?? 0), (chg ?? 0) >= 0);
+  // MC-11A: compact type badge in the asset cell. Uses the same pill
+  // language as MC-10 fund cards so the visual system stays unified.
+  // Only renders when item.type is one of the known kinds — never invents.
+  const kind = String(item.type || '').toLowerCase();
+  const KIND_LABEL = { crypto:'CRYPTO', stock:'STOCK', etf:'ETF', index:'INDEX', commodity:'COMM', fund:'FUND', metal:'METAL' };
+  const badgeLabel = KIND_LABEL[kind];
+  const badgeHtml  = badgeLabel
+    ? `<span class="market-row-badge is-${kind}">${badgeLabel}</span>`
+    : '';
+  // MC-11A: directional indicator paired with the existing safeChange
+  // output. Colors stay on the .is-up / .is-down classes; the arrow is
+  // a CSS pseudo-element driven off those classes (no inline text).
   return `
     <div class="market-row" data-symbol="${normSym}">
       <div class="col col-asset">
         <div class="asset-wrapper">
           <div class="asset-icon">${item.symbol[0]}</div>
           <div class="asset-text">
-            <div class="asset-symbol">${item.symbol}</div>
+            <div class="asset-symbol-row">
+              <span class="asset-symbol">${item.symbol}</span>
+              ${badgeHtml}
+            </div>
             <div class="asset-name">${name}</div>
           </div>
         </div>
@@ -11657,7 +11672,7 @@ function renderMarketItem(item) {
       </div>
       <div class="col col-chart">${chart}</div>
       <div class="col col-action">
-        <button class="watchlist-btn ${watched ? 'active' : ''}" data-symbol="${normSym}">${watched ? '★' : '☆'}</button>
+        <button class="watchlist-btn ${watched ? 'active' : ''}" data-symbol="${normSym}" aria-label="${watched ? 'Unwatch' : 'Watch'} ${item.symbol}">${watched ? '★' : '☆'}</button>
       </div>
     </div>
   `;

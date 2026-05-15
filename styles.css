@@ -6214,9 +6214,21 @@ main { padding-bottom: 72px; }
   display: grid;
   grid-template-columns: 2.8fr 1fr 1fr 1.4fr 40px;
   align-items: center;
-  padding: 14px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
+  /* MC-11A: premium row geometry. Taller rows + softer divider + inset
+     hover glow + smooth transition. Keep grid template untouched so
+     existing alignment + columns are stable. */
+  padding: 16px 10px;
+  margin: 0 -10px;
+  border-bottom: 1px solid rgba(255,255,255,0.035);
+  border-radius: 10px;
+  transition: background 140ms ease, box-shadow 220ms ease, transform 160ms ease;
 }
+.market-row:hover {
+  background: rgba(255,255,255,0.035);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06),
+              0 6px 20px rgba(0,0,0,0.18);
+}
+.market-row:last-child { border-bottom: 0; }
 
 .market-row-left {
   display: flex;
@@ -8424,4 +8436,144 @@ body.workspace-active .header {
 
   /* ── Mobile bottom nav hidden on desktop */
   .bottom-nav { display: none; }
+}
+
+/* ── MC-11A: premium Market table polish ─────────────────────────────────
+   Visual-only upgrade to the shared .market-row used by Watchlist / All /
+   Crypto / Stocks / Indices / Commodities (plus the live ETF list inside
+   the merged Funds & ETFs tab). No layout grid changes — only typography,
+   spacing, badges, hover, and the watchlist star polish. Existing JS
+   click handlers (.watchlist-btn, .market-row[data-symbol]) untouched. */
+
+/* Asset cell typography hierarchy */
+.asset-symbol-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.asset-symbol {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  color: #fff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.asset-name {
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  color: rgba(255,255,255,0.50);
+  margin-top: 2px;
+}
+.asset-icon {
+  /* MC-11A: tighter circle, slightly larger ring, subtle inner contrast */
+  width: 34px;
+  height: 34px;
+  background: rgba(79,142,247,0.10);
+  border: 1px solid rgba(79,142,247,0.18);
+  color: rgba(255,255,255,0.88);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+/* Compact type badge — shares pill language with MC-10 funds cards */
+.market-row-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.70);
+  flex: 0 0 auto;
+  font-family: inherit;
+}
+.market-row-badge.is-crypto    { color: rgba(247,160,90,0.95);  border-color: rgba(247,160,90,0.30); }
+.market-row-badge.is-stock     { color: rgba(138,166,255,0.95); border-color: rgba(138,166,255,0.30); }
+.market-row-badge.is-etf       { color: rgba(138,166,255,0.95); border-color: rgba(138,166,255,0.30); }
+.market-row-badge.is-fund      { color: rgba(255,205,150,0.95); border-color: rgba(255,205,150,0.30); }
+.market-row-badge.is-index     { color: rgba(160,220,170,0.95); border-color: rgba(160,220,170,0.30); }
+.market-row-badge.is-commodity { color: rgba(255,180,120,0.95); border-color: rgba(255,180,120,0.30); }
+.market-row-badge.is-metal     { color: rgba(255,210,100,0.95); border-color: rgba(255,210,100,0.30); }
+
+/* Price + change typography */
+.col-price {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.col-change {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+}
+/* Directional indicator via pseudo-elements — no extra DOM needed. */
+.col-change.is-up::before {
+  content: '▲ ';
+  font-size: 8.5px;
+  margin-right: 3px;
+  vertical-align: 0.06em;
+}
+.col-change.is-down::before {
+  content: '▼ ';
+  font-size: 8.5px;
+  margin-right: 3px;
+  vertical-align: 0.06em;
+}
+
+/* Sparkline consistent sizing & subtle opacity (data unchanged) */
+.col-chart {
+  opacity: 0.85;
+  min-height: 28px;
+}
+.col-chart svg {
+  height: 28px;
+  width: auto;
+  max-width: 100%;
+}
+
+/* Watchlist star polish */
+.watchlist-btn {
+  font-size: 17px;
+  color: rgba(255,255,255,0.28);
+  padding: 4px 6px;
+  border-radius: 8px;
+  transition: color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+.watchlist-btn:hover {
+  color: rgba(255,215,0,0.85);
+  background: rgba(255,215,0,0.06);
+}
+.watchlist-btn.active {
+  color: #FFD700;
+}
+.watchlist-btn:active { transform: scale(0.92); }
+
+/* Smaller screens: keep table compact but readable */
+@media (max-width: 560px) {
+  .market-row {
+    padding: 14px 8px;
+    margin: 0 -8px;
+    grid-template-columns: minmax(0, 1.8fr) 0.9fr 0.9fr 0.9fr 32px;
+    gap: 6px;
+  }
+  .asset-icon { width: 30px; height: 30px; font-size: 12px; }
+  .asset-symbol { font-size: 13.5px; }
+  .asset-name   { font-size: 11px; }
+  .col-price    { font-size: 13px; }
+  .col-change   { font-size: 12px; }
+  .col-chart svg { height: 22px; }
+  .market-row-badge {
+    font-size: 8.5px;
+    padding: 1px 5px;
+  }
 }
