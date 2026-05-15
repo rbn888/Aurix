@@ -235,14 +235,26 @@ async function fetchYahoo(items) {
                    : null;
         const change24h = (prev && prev > 0) ? ((price - prev) / prev) * 100 : null;
 
-        return { provider, price, change24h };
+        // MC-6D: surface Yahoo meta.currency upstream so the snapshot
+        // handler can stamp the real quote currency on each PriceObject.
+        // Only ISO-4217 uppercase 3-letter codes are accepted — Yahoo's
+        // pence form "GBp" (price in pence, not pounds) is rejected to
+        // avoid FX 100×-scaling traps downstream.
+        const rawCurr = (meta && typeof meta.currency === 'string') ? meta.currency : '';
+        const currency = /^[A-Z]{3}$/.test(rawCurr) ? rawCurr : null;
+
+        return { provider, price, change24h, currency };
       })
     );
 
     const result = {};
     for (const s of settled) {
       if (s.status === 'fulfilled') {
-        result[s.value.provider] = { price: s.value.price, change24h: s.value.change24h };
+        result[s.value.provider] = {
+          price:     s.value.price,
+          change24h: s.value.change24h,
+          currency:  s.value.currency || null,   // MC-6D
+        };
       } else {
         logError('yahoo', s.reason?.message || 'unknown');
       }

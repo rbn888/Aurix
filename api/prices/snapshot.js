@@ -307,7 +307,7 @@ export default async function handler(req, res) {
   // Serving from a fallback's cache when the primary's cache expired but
   // the fallback's is still warm is the desired behaviour — TTLs are
   // per-assetType so the freshness window is identical.
-  const cachedHits = new Map(); // canonical → { price, change24h, cachedAt, source }
+  const cachedHits = new Map(); // canonical → { price, change24h, currency, cachedAt, source }
   const needFetch  = [];        // { canonical, entry, tier }
 
   for (const { canonical, entry } of resolved) {
@@ -318,6 +318,7 @@ export default async function handler(req, res) {
         hit = {
           price:     c.value.price,
           change24h: c.value.change24h ?? null,
+          currency:  c.value.currency  ?? null,   // MC-6D
           cachedAt:  c.timestamp,
           source:    p.provider,
         };
@@ -362,7 +363,10 @@ export default async function handler(req, res) {
               const val = result[it.providerKey];
               if (val) {
                 setCache(it.providerKey, val, ttlFor(it.entry.assetType));
-                fresh.set(it.canonical, { price: val.price, change24h: val.change24h ?? null, source: 'yahoo' });
+                // MC-6D: forward currency. Yahoo is the only provider that
+                // returns it today; coingecko/twelvedata branches default to
+                // null and fall back to USD when the PriceObject is built.
+                fresh.set(it.canonical, { price: val.price, change24h: val.change24h ?? null, currency: val.currency ?? null, source: 'yahoo' });
               }
             }
           })
@@ -379,7 +383,8 @@ export default async function handler(req, res) {
               const val = result[it.providerKey];
               if (val) {
                 setCache(it.providerKey, val, ttlFor(it.entry.assetType));
-                fresh.set(it.canonical, { price: val.price, change24h: val.change24h ?? null, source: 'coingecko' });
+                // Crypto prices are always USD-denominated from CoinGecko.
+                fresh.set(it.canonical, { price: val.price, change24h: val.change24h ?? null, currency: 'USD', source: 'coingecko' });
               }
             }
           })
@@ -396,7 +401,7 @@ export default async function handler(req, res) {
               const val = result[it.providerKey];
               if (val) {
                 setCache(it.providerKey, val, ttlFor(it.entry.assetType));
-                fresh.set(it.canonical, { price: val.price, change24h: val.change24h ?? null, source: 'twelvedata' });
+                fresh.set(it.canonical, { price: val.price, change24h: val.change24h ?? null, currency: val.currency ?? null, source: 'twelvedata' });
               }
             }
           })
@@ -429,7 +434,12 @@ export default async function handler(req, res) {
         symbol:     canonical,
         assetType:  entry.assetType,
         price:      freshHit.price,
-        currency:   'USD',
+        // MC-6D: real quote currency from upstream (Yahoo meta.currency
+        // for stocks/ETFs/funds/indices; 'USD' for CoinGecko). Falls back
+        // to 'USD' when the upstream didn't surface a code (e.g. legacy
+        // TwelveData response without currency, or a cache entry written
+        // before this commit).
+        currency:   freshHit.currency || 'USD',
         change24h:  freshHit.change24h ?? null,
         timestamp:  now,
         source:     freshHit.source,
@@ -443,7 +453,7 @@ export default async function handler(req, res) {
         symbol:     canonical,
         assetType:  entry.assetType,
         price:      cacheHit.price,
-        currency:   'USD',
+        currency:   cacheHit.currency || 'USD',
         change24h:  cacheHit.change24h ?? null,
         timestamp:  cacheHit.cachedAt,
         source:     cacheHit.source,

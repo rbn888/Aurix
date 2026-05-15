@@ -1371,6 +1371,7 @@ const CLEAN_LOGO_OVERRIDE = {
 let pendingCoinId       = null;
 let pendingMarketSymbol = null; // Yahoo Finance symbol for stock/etf/metal
 let pendingPrice        = null; // fetched price for selected asset
+let pendingCurrency     = null; // MC-6D: provider-reported quote currency for the selected asset
 let pendingKarat        = 18;   // karat for pending gold asset
 let pendingGoldUnit     = 'g';  // unit for pending gold asset ('g' | 'oz')
 let goldPriceUpdatedAt  = null; // timestamp of last successful live gold price fetch
@@ -7514,9 +7515,13 @@ async function searchCoinFallback(_query) {
 // ── Canonical single-symbol price resolver ─────────────────────────────────
 // Routes through /api/prices/snapshot so the backend provider chain
 // (yahoo primary → twelvedata fallback for stocks/ETFs/indices/commodities)
-// is applied uniformly. Returns the USD price as a number, or null if the
-// symbol is not in the snapshot registry or the gateway returned nothing.
-async function resolveSymbolPrice(symbol) {
+// is applied uniformly.
+//
+// MC-6D: resolveSymbolQuote returns BOTH price and currency so callers can
+// auto-stamp the user's asset.assetCurrency from provider metadata.
+// resolveSymbolPrice stays as the historical thin wrapper (number | null)
+// for any callsite that doesn't care about currency.
+async function resolveSymbolQuote(symbol) {
   if (!symbol) return null;
   try {
     const url = `${PRICES_PROXY}/snapshot?symbols=${encodeURIComponent(symbol)}`;
@@ -7527,10 +7532,19 @@ async function resolveSymbolPrice(symbol) {
     const hit  = (json?.snapshot ?? []).find(
       p => p.symbol === symbol || p.symbol?.toUpperCase() === want
     );
-    return Number.isFinite(hit?.price) ? hit.price : null;
+    if (!Number.isFinite(hit?.price)) return null;
+    // Validate to strict ISO-4217 shape (3 uppercase letters) so we never
+    // stamp something like Yahoo's "GBp" pence form onto an asset.
+    const raw = typeof hit?.currency === 'string' ? hit.currency.toUpperCase() : '';
+    const currency = /^[A-Z]{3}$/.test(raw) ? raw : null;
+    return { price: hit.price, currency };
   } catch {
     return null;
   }
+}
+async function resolveSymbolPrice(symbol) {
+  const q = await resolveSymbolQuote(symbol);
+  return q ? q.price : null;
 }
 
 // ── Gold spot price: XAU/USD → GC=F → fallback (single batched snapshot) ──
@@ -12067,6 +12081,7 @@ async function selectAsset(entry) {
   pendingCoinId       = null;
   pendingMarketSymbol = null;
   pendingPrice        = null;
+  pendingCurrency     = null;
 
   // Show chip, hide search
   chipBadgeEl.textContent         = entry.ticker.slice(0, 4);
@@ -12103,13 +12118,20 @@ async function selectAsset(entry) {
     } else if (entry.marketSymbol) {
       pendingMarketSymbol = entry.marketSymbol;
       if (entry.ticker === 'XAU') {
-        // Gold: dedicated source chain (XAU/USD → GC=F → fallback) via snapshot
+        // Gold: dedicated source chain (XAU/USD → GC=F → fallback) via snapshot.
+        // Always USD-denominated, so no currency capture needed.
         price = await fetchGoldSpotPrice();
       } else {
-        price = await resolveSymbolPrice(entry.marketSymbol);
-        if (!price) {
+        // MC-6D: use resolveSymbolQuote so we can stamp the real provider
+        // quote currency onto the asset at push time. Falls back to legacy
+        // fallback data (USD) if the gateway returned nothing.
+        const quote = await resolveSymbolQuote(entry.marketSymbol);
+        if (quote) {
+          price = quote.price;
+          if (quote.currency) pendingCurrency = quote.currency;
+        } else {
           const fb = getFallbackData(entry.marketSymbol);
-          price    = fb?.price ?? null;
+          price   = fb?.price ?? null;
         }
       }
     }
@@ -12144,6 +12166,7 @@ function clearSelectedAsset() {
   pendingCoinId        = null;
   pendingMarketSymbol  = null;
   pendingPrice         = null;
+  pendingCurrency      = null;
   pendingKarat         = 18;
   pendingGoldUnit      = 'g';
   selectedChipEl.style.display = 'none';
@@ -12429,6 +12452,7 @@ function openModal() {
   pendingCoinId        = null;
   pendingMarketSymbol  = null;
   pendingPrice         = null;
+  pendingCurrency      = null;
   pendingKarat         = 18;
   pendingGoldUnit      = 'g';
   currentSuggestions   = [];
@@ -12614,8 +12638,14 @@ if (isinInputEl) {
             const cp = await fetchCryptoPrice(figiResult.symbol);
             if (!signal.aborted && cp) { prefill.price = cp.price; prefill.coinId = cp.coinId; }
           } else if (figiResult.symbol) {
-            const price = await resolveSymbolPrice(figiResult.symbol);
-            if (!signal.aborted && price) prefill.price = price;
+            // MC-6D: surface currency too so enterManualMode pre-selects
+            // the correct currency button (its prefill.currency consumer
+            // already exists at app.js manualCurrency = prefill.currency).
+            const quote = await resolveSymbolQuote(figiResult.symbol);
+            if (!signal.aborted && quote) {
+              prefill.price = quote.price;
+              if (quote.currency) prefill.currency = quote.currency;
+            }
           }
         }
         if (signal.aborted) return;
@@ -12848,7 +12878,12 @@ assetForm.addEventListener('submit', e => {
       name, ticker, type, qty,
       price:         pendingPrice,
       coinId, marketSymbol,
-      assetCurrency: 'USD',
+      // MC-6D: stamp the provider-reported quote currency when available
+      // (Yahoo meta.currency surfaced through the snapshot endpoint).
+      // Falls back to USD for crypto, gold, and any asset where the
+      // provider didn't surface a currency code. Crypto and gold paths
+      // intentionally do not set pendingCurrency, so they keep USD.
+      assetCurrency: pendingCurrency || 'USD',
       change24h:     initialChange24h,
       prevPrice:     null,
       costBasis:     newPurchaseCost,
