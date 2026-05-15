@@ -453,14 +453,14 @@ const T = {
     fear_greed:        'Miedo y Codicia',
     btc_dom:           'Dominancia BTC',
     liquidations:      'Liquidaciones',
-    tab_watchlist:     'Mis activos',
+    tab_watchlist:     'Seguimiento',
     tab_all:           'Todo',
     tab_crypto:        'Cripto',
     tab_stocks:        'Acciones',
-    tab_etfs:          'ETFs',
+    tab_etfs:          'Fondos y ETFs',
     tab_indices:       'Índices',
     tab_commodities:   'Materias',
-    tab_funds:         'Fondos',
+    tab_funds:         'Fondos y ETFs',         // legacy alias — kept for any code reading the key
     // MC-9A: curated funds catalog category labels
     fundCat_msci_world:        'MSCI World',
     fundCat_sp_500:            'S&P 500',
@@ -856,14 +856,14 @@ const T = {
     fear_greed:        'Fear & Greed',
     btc_dom:           'BTC Dominance',
     liquidations:      'Liquidations',
-    tab_watchlist:     'My Assets',
+    tab_watchlist:     'Watchlist',
     tab_all:           'All',
     tab_crypto:        'Crypto',
     tab_stocks:        'Stocks',
-    tab_etfs:          'ETFs',
+    tab_etfs:          'Funds & ETFs',
     tab_indices:       'Indices',
     tab_commodities:   'Commodities',
-    tab_funds:         'Funds',
+    tab_funds:         'Funds & ETFs',           // legacy alias — kept for any code reading the key
     // MC-9A: curated funds catalog category labels
     fundCat_msci_world:        'MSCI World',
     fundCat_sp_500:            'S&P 500',
@@ -10320,10 +10320,12 @@ function renderMarket() {
         <button class="market-tab ${currentMarketTab==='all'?'active':''}" data-market="all">${t('tab_all')}</button>
         <button class="market-tab ${currentMarketTab==='crypto'?'active':''}" data-market="crypto">${t('tab_crypto')}</button>
         <button class="market-tab ${currentMarketTab==='stocks'?'active':''}" data-market="stocks">${t('tab_stocks')}</button>
+        <!-- MC-9A.1: ETFs + Funds merged into a single "Funds & ETFs" tab.
+             data-market="etfs" stays so existing currentMarketTab state and
+             hydrateMarket('etfs') pipeline keep working unchanged. -->
         <button class="market-tab ${currentMarketTab==='etfs'?'active':''}" data-market="etfs">${t('tab_etfs')}</button>
         <button class="market-tab ${currentMarketTab==='indices'?'active':''}" data-market="indices">${t('tab_indices')}</button>
         <button class="market-tab ${currentMarketTab==='commodities'?'active':''}" data-market="commodities">${t('tab_commodities')}</button>
-        <button class="market-tab ${currentMarketTab==='funds'?'active':''}" data-market="funds">${t('tab_funds')}</button>
       </div>
       <div class="market-body">
         <div class="market-main">
@@ -10495,6 +10497,9 @@ function renderCurrentMarketView() {
 
   if (!Array.isArray(MARKET_DATA)) return;
 
+  // MC-9A.1: ETFs and Funds merged into one tab. 'funds' kept in the
+  // valid set only so legacy persisted state (if any) still renders;
+  // the tab button itself was removed.
   const VALID_TABS = ['watchlist','all','crypto','stocks','etfs','indices','commodities','funds'];
   if (!VALID_TABS.includes(currentMarketTab)) return;
 
@@ -10515,11 +10520,14 @@ function renderCurrentMarketView() {
     html = renderMyAssetsBlock(data);
   } else if (currentMarketTab === 'all') {
     html = renderAllAssets(data);
-  } else if (currentMarketTab === 'funds') {
-    // MC-9A: curated funds/ETFs discovery view. UI-only — clicks reuse
-    // the existing openModal + selectAsset pipeline so pricing comes
-    // from the same infrastructure as the regular add-asset flow.
-    html = _renderFundsCatalog();
+  } else if (currentMarketTab === 'etfs' || currentMarketTab === 'funds') {
+    // MC-9A.1: merged Funds & ETFs tab. Discovery catalog (MC-9A) sits
+    // on top so users immediately see curated entry points; the existing
+    // live ETF market list (MC-9 baseline) renders below — both kept
+    // accessible per spec. Clicks on discovery cards reuse openModal +
+    // selectAsset; clicks on live rows keep their existing behavior.
+    const live = renderFromCache('etfs', data);
+    html = _renderFundsCatalog() + live;
   } else {
     const activeType = _TAB_TO_TYPE[currentMarketTab];
     if (!activeType) return;
@@ -10692,7 +10700,10 @@ function _renderFundsCatalog() {
 // inside #marketList, so we hook there.
 function _initFundsCatalogDelegation() {
   document.addEventListener('click', (e) => {
-    if (currentMarketTab !== 'funds') return;
+    // MC-9A.1: catalog now lives inside the merged Funds & ETFs tab.
+    // Accept 'etfs' (the current/canonical tab) and 'funds' (legacy
+    // persisted state) so existing users with old state still work.
+    if (currentMarketTab !== 'etfs' && currentMarketTab !== 'funds') return;
     const chip = e.target.closest && e.target.closest('[data-funds-cat]');
     if (chip) {
       const next = chip.dataset.fundsCat;
@@ -11118,13 +11129,6 @@ function initMarketTabs() {
       resetMarketUIState();
       updateMarketTabUI();
       updateMarketHeader();
-      // MC-9A: the curated funds tab is static — no provider hydrate.
-      // Click delegation is wired once in initMarket() (added at module
-      // boot), so just re-render.
-      if (type === 'funds') {
-        renderCurrentMarketView();
-        return;
-      }
       hydrateMarket(type);
     });
   });
