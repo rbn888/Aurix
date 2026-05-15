@@ -660,20 +660,13 @@ const T = {
     ws_mobile_note:          'La edición tipo hoja está disponible en escritorio. En móvil se muestran los indicadores clave.',
     globalSearchPH:           'Busca BTC, Tesla, IWDA, Oro...',
     globalSearchHeroTitle:    'Buscar activos',
-    globalSearchHeroSub:      'Encuentra acciones, cripto, ETFs, fondos, índices y materias primas',
+    globalSearchHeroSub:      'Busca acciones, cripto, ETFs, fondos, índices y materias primas.',
     globalSearchTrending:     'Populares',
-    globalSearchCategories:   'Categorías',
     globalSearchRecent:       'Recientes',
     globalSearchLoading:      'Buscando…',
     globalSearchNoResults:    'Sin resultados',
     globalSearchNoResultsHint:'No encontramos coincidencias. Prueba con otro nombre o ticker.',
     gs_add_to_portfolio:      '+ Añadir',
-    gs_cat_crypto:            'Cripto',
-    gs_cat_stocks:            'Acciones',
-    gs_cat_etfs:              'ETFs',
-    gs_cat_funds:             'Fondos',
-    gs_cat_indices:           'Índices',
-    gs_cat_commodities:       'Materias primas',
     // PR-WP6D: workspace assistant + template panel
     ws_templates_btn:        'Plantillas',
     ws_assistant_title:      'Asistente de Workspace',
@@ -1109,20 +1102,13 @@ const T = {
     ws_mobile_note:          'Spreadsheet editing is available on desktop. Mobile shows key workspace insights.',
     globalSearchPH:           'Search BTC, Tesla, IWDA, Gold...',
     globalSearchHeroTitle:    'Search assets',
-    globalSearchHeroSub:      'Find stocks, crypto, ETFs, funds, indices and commodities',
-    globalSearchTrending:     'Trending',
-    globalSearchCategories:   'Categories',
+    globalSearchHeroSub:      'Search stocks, crypto, ETFs, funds, indices and commodities.',
+    globalSearchTrending:     'Popular',
     globalSearchRecent:       'Recent',
     globalSearchLoading:      'Searching…',
     globalSearchNoResults:    'No results',
     globalSearchNoResultsHint:"We couldn't find a match. Try another name or ticker.",
     gs_add_to_portfolio:      '+ Add',
-    gs_cat_crypto:            'Crypto',
-    gs_cat_stocks:            'Stocks',
-    gs_cat_etfs:              'ETFs',
-    gs_cat_funds:             'Funds',
-    gs_cat_indices:           'Indices',
-    gs_cat_commodities:       'Commodities',
     // PR-WP6D: workspace assistant + template panel
     ws_templates_btn:        'Templates',
     ws_assistant_title:      'Workspace Assistant',
@@ -12828,32 +12814,22 @@ const _GLOBAL_SEARCH = {
   debounce:  null,
 };
 
-// GLOBAL-SEARCH-2: trending + category quick-tap chips surfaced in the
-// empty state. Each entry is just a search query string piped into the
-// existing searchAllAssets pipeline — no new providers, no hardcoded
-// data flowing into the portfolio.
+// GLOBAL-SEARCH-3: only "Popular" quick-tap chips surface in the empty
+// state. Each entry is just a search query piped into the existing
+// searchAllAssets pipeline — every chip represents a real asset. No
+// Category chips: a category chip should land on a real category page,
+// and we don't have those yet, so showing one would be incoherent.
 const _GS_TRENDING = [
-  { label:'BTC',  q:'BTC'  },
-  { label:'ETH',  q:'ETH'  },
-  { label:'TSLA', q:'TSLA' },
-  { label:'NVDA', q:'NVDA' },
-  { label:'SPY',  q:'SPY'  },
-  { label:'QQQ',  q:'QQQ'  },
-  { label:'IWDA', q:'IWDA' },
-  { label:'VWCE', q:'VWCE' },
-  { label:'Gold', q:'Gold' },
-];
-
-// Category chips prefill a representative query so the user sees real
-// results immediately. No new search engine: every query goes through
-// the same searchAllAssets pipeline as a normal text search.
-const _GS_CATEGORIES = [
-  { i18n:'gs_cat_crypto',      q:'BTC'     },
-  { i18n:'gs_cat_stocks',      q:'AAPL'    },
-  { i18n:'gs_cat_etfs',        q:'SPY'     },
-  { i18n:'gs_cat_funds',       q:'Fidelity'},
-  { i18n:'gs_cat_indices',     q:'S&P 500' },
-  { i18n:'gs_cat_commodities', q:'Gold'    },
+  { label:'BTC',      q:'BTC'      },
+  { label:'ETH',      q:'ETH'      },
+  { label:'TSLA',     q:'TSLA'     },
+  { label:'NVDA',     q:'NVDA'     },
+  { label:'SPY',      q:'SPY'      },
+  { label:'QQQ',      q:'QQQ'      },
+  { label:'IWDA',     q:'IWDA'     },
+  { label:'VWCE',     q:'VWCE'     },
+  { label:'Gold',     q:'Gold'     },
+  { label:'Fidelity', q:'Fidelity' },
 ];
 
 // Recent searches — capped at 5, query string only (no portfolio data
@@ -12890,8 +12866,7 @@ function _gsInit() {
   _GLOBAL_SEARCH.hint       = document.getElementById('globalSearchHint');
   _GLOBAL_SEARCH.empty      = document.getElementById('globalSearchEmpty');
   _GLOBAL_SEARCH.loading    = document.getElementById('globalSearchLoading');
-  _GLOBAL_SEARCH.trending   = document.getElementById('globalSearchTrending');
-  _GLOBAL_SEARCH.categories = document.getElementById('globalSearchCategories');
+  _GLOBAL_SEARCH.trending      = document.getElementById('globalSearchTrending');
   _GLOBAL_SEARCH.recentSection = document.getElementById('globalSearchRecentSection');
   _GLOBAL_SEARCH.recentChips   = document.getElementById('globalSearchRecentChips');
 
@@ -12899,12 +12874,6 @@ function _gsInit() {
   if (_GLOBAL_SEARCH.trending) {
     _GLOBAL_SEARCH.trending.innerHTML = _GS_TRENDING.map(c =>
       `<button type="button" class="gs-chip" data-gs-chip="${_gsEscape(c.q)}">${_gsEscape(c.label)}</button>`
-    ).join('');
-  }
-  // Category chips — labels via i18n so language switch reflows them.
-  if (_GLOBAL_SEARCH.categories) {
-    _GLOBAL_SEARCH.categories.innerHTML = _GS_CATEGORIES.map(c =>
-      `<button type="button" class="gs-chip is-cat" data-gs-chip="${_gsEscape(c.q)}">${_gsEscape(t(c.i18n) || c.q)}</button>`
     ).join('');
   }
 

@@ -9051,15 +9051,6 @@ body.gs-open { overflow: hidden; }
   flex-wrap: wrap;
   gap: 6px;
 }
-.gs-chip.is-cat {
-  border-color: rgba(138, 166, 255, 0.20);
-  background: rgba(138, 166, 255, 0.06);
-  color: rgba(225, 232, 255, 0.86);
-}
-.gs-chip.is-cat:hover {
-  border-color: rgba(138, 166, 255, 0.36);
-  background: rgba(138, 166, 255, 0.12);
-}
 .gs-chip.is-recent {
   border-color: rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.02);
