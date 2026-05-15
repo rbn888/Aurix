@@ -176,9 +176,18 @@ const REGISTRY = {
   VEA:  { assetType: 'etf', providers: [{ provider: 'yahoo', providerId: 'VEA'  }, { provider: 'twelvedata', providerId: 'VEA'  }] },
 
   // Indices: yahoo → twelvedata
-  '^GSPC': { assetType: 'index', providers: [{ provider: 'yahoo', providerId: '^GSPC' }, { provider: 'twelvedata', providerId: '^GSPC' }] },
-  '^IXIC': { assetType: 'index', providers: [{ provider: 'yahoo', providerId: '^IXIC' }, { provider: 'twelvedata', providerId: '^IXIC' }] },
-  '^DJI':  { assetType: 'index', providers: [{ provider: 'yahoo', providerId: '^DJI'  }, { provider: 'twelvedata', providerId: '^DJI'  }] },
+  '^GSPC':     { assetType: 'index', providers: [{ provider: 'yahoo', providerId: '^GSPC'     }, { provider: 'twelvedata', providerId: '^GSPC'     }] },
+  '^IXIC':     { assetType: 'index', providers: [{ provider: 'yahoo', providerId: '^IXIC'     }, { provider: 'twelvedata', providerId: '^IXIC'     }] },
+  '^DJI':      { assetType: 'index', providers: [{ provider: 'yahoo', providerId: '^DJI'      }, { provider: 'twelvedata', providerId: '^DJI'      }] },
+  // MC-2C: major international indices. Yahoo chart serves all of these
+  // on the caret symbol; TwelveData is the gateway fallback when
+  // TWELVE_API_KEY is set.
+  '^IBEX':     { assetType: 'index', providers: [{ provider: 'yahoo', providerId: '^IBEX'     }, { provider: 'twelvedata', providerId: '^IBEX'     }] },
+  '^GDAXI':    { assetType: 'index', providers: [{ provider: 'yahoo', providerId: '^GDAXI'    }, { provider: 'twelvedata', providerId: '^GDAXI'    }] },
+  '^FCHI':     { assetType: 'index', providers: [{ provider: 'yahoo', providerId: '^FCHI'     }, { provider: 'twelvedata', providerId: '^FCHI'     }] },
+  '^N225':     { assetType: 'index', providers: [{ provider: 'yahoo', providerId: '^N225'     }, { provider: 'twelvedata', providerId: '^N225'     }] },
+  '^FTSE':     { assetType: 'index', providers: [{ provider: 'yahoo', providerId: '^FTSE'     }, { provider: 'twelvedata', providerId: '^FTSE'     }] },
+  '^STOXX50E': { assetType: 'index', providers: [{ provider: 'yahoo', providerId: '^STOXX50E' }, { provider: 'twelvedata', providerId: '^STOXX50E' }] },
 
   // Commodities. Yahoo serves futures (GC=F, SI=F, CL=F) as proxies for the
   // spot canonical (XAU/USD, XAG/USD, WTI). Yahoo's bare "WTI" ticker is the

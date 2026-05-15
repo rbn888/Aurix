@@ -1242,6 +1242,18 @@ const ASSET_DB = [
   // Metals
   { ticker: 'XAU',   name: 'Gold',   type: 'metal', marketSymbol: 'GC=F' },
   { ticker: 'XAG',   name: 'Silver', type: 'metal', marketSymbol: 'SI=F' },
+  // MC-2C: indices — local-fallback discoverability. Bare-ticker form so
+  // local search returns them even when Yahoo search proxy is down.
+  // marketSymbol carries the caret form the snapshot REGISTRY expects.
+  { ticker: 'SPX',   name: 'S&P 500',        type: 'index', marketSymbol: '^GSPC'     },
+  { ticker: 'IXIC',  name: 'NASDAQ Composite', type: 'index', marketSymbol: '^IXIC'   },
+  { ticker: 'DJI',   name: 'Dow Jones',      type: 'index', marketSymbol: '^DJI'      },
+  { ticker: 'IBEX',  name: 'IBEX 35',        type: 'index', marketSymbol: '^IBEX'     },
+  { ticker: 'DAX',   name: 'DAX 40',         type: 'index', marketSymbol: '^GDAXI'    },
+  { ticker: 'CAC',   name: 'CAC 40',         type: 'index', marketSymbol: '^FCHI'     },
+  { ticker: 'N225',  name: 'Nikkei 225',     type: 'index', marketSymbol: '^N225'     },
+  { ticker: 'FTSE',  name: 'FTSE 100',       type: 'index', marketSymbol: '^FTSE'     },
+  { ticker: 'SX5E',  name: 'Euro Stoxx 50',  type: 'index', marketSymbol: '^STOXX50E' },
 ];
 
 let assets              = load();
@@ -6319,11 +6331,46 @@ const MARKET_SYMBOL_ALIASES = {
   GOLD:     'XAU/USD',
   SILVER:   'XAG/USD',
   OIL:      'WTI',
-  // User-friendly index shortcuts
-  SP500:    '^GSPC',
-  'S&P500': '^GSPC',
-  NASDAQ:   '^IXIC',
-  DOW:      '^DJI',
+  // User-friendly index shortcuts. Keys must be uppercased — lookup happens
+  // after String(input).trim().toUpperCase(), so spaced variants ("S&P 500",
+  // "DAX 40") are valid keys. _ASSET_REGISTRY aliases cover the same names
+  // via resolveAsset; this map is the secondary fallback for callers that
+  // don't go through the canonical resolver.
+  SP500:           '^GSPC',
+  'S&P500':        '^GSPC',
+  'S&P 500':       '^GSPC',
+  SPX:             '^GSPC',
+  NASDAQ:          '^IXIC',
+  'NASDAQ COMPOSITE': '^IXIC',
+  NDX:             '^IXIC',
+  DOW:             '^DJI',
+  'DOW JONES':     '^DJI',
+  DJIA:            '^DJI',
+  // MC-2C: human-friendly aliases for major international indices.
+  IBEX:            '^IBEX',
+  IBEX35:          '^IBEX',
+  'IBEX 35':       '^IBEX',
+  DAX:             '^GDAXI',
+  DAX40:           '^GDAXI',
+  'DAX 40':        '^GDAXI',
+  GDAXI:           '^GDAXI',
+  CAC:             '^FCHI',
+  CAC40:           '^FCHI',
+  'CAC 40':        '^FCHI',
+  FCHI:            '^FCHI',
+  NIKKEI:          '^N225',
+  NIKKEI225:       '^N225',
+  'NIKKEI 225':    '^N225',
+  N225:            '^N225',
+  FTSE:            '^FTSE',
+  FTSE100:         '^FTSE',
+  'FTSE 100':      '^FTSE',
+  'EURO STOXX':    '^STOXX50E',
+  EUROSTOXX:       '^STOXX50E',
+  'EURO STOXX 50': '^STOXX50E',
+  EUROSTOXX50:     '^STOXX50E',
+  SX5E:            '^STOXX50E',
+  STOXX50:         '^STOXX50E',
 };
 
 // ── Canonical Asset Registry ───────────────────────────────────────────────
@@ -6390,9 +6437,20 @@ const _ASSET_REGISTRY = Object.freeze({
   'asset:vea':   { id:'asset:vea',   type:'etf',    symbol:'VEA',   displayName:'Vanguard Developed Markets', aliases:[],         providerKeys:{ yahoo:'VEA', twelvedata:'VEA' } },
 
   // Indices
-  'asset:gspc':  { id:'asset:gspc',  type:'index',  symbol:'^GSPC', displayName:'S&P 500',           aliases:['SP500','S&P500','SPX','GSPC'], providerKeys:{ yahoo:'^GSPC', twelvedata:'^GSPC' } },
-  'asset:ixic':  { id:'asset:ixic',  type:'index',  symbol:'^IXIC', displayName:'NASDAQ Composite',  aliases:['NASDAQ','IXIC','NDX'],         providerKeys:{ yahoo:'^IXIC', twelvedata:'^IXIC' } },
-  'asset:dji':   { id:'asset:dji',   type:'index',  symbol:'^DJI',  displayName:'Dow Jones',         aliases:['DOW','DJI','DJIA','DOWJONES'], providerKeys:{ yahoo:'^DJI', twelvedata:'^DJI' } },
+  'asset:gspc':    { id:'asset:gspc',    type:'index', symbol:'^GSPC',     displayName:'S&P 500',         aliases:['SP500','S&P500','S&P 500','SPX','GSPC'],                                providerKeys:{ yahoo:'^GSPC',     twelvedata:'^GSPC'     } },
+  'asset:ixic':    { id:'asset:ixic',    type:'index', symbol:'^IXIC',     displayName:'NASDAQ Composite',aliases:['NASDAQ','NASDAQ COMPOSITE','IXIC','NDX'],                               providerKeys:{ yahoo:'^IXIC',     twelvedata:'^IXIC'     } },
+  'asset:dji':     { id:'asset:dji',     type:'index', symbol:'^DJI',      displayName:'Dow Jones',       aliases:['DOW','DOW JONES','DJI','DJIA','DOWJONES'],                              providerKeys:{ yahoo:'^DJI',      twelvedata:'^DJI'      } },
+  // MC-2C: major international indices. Yahoo serves all of these on the
+  // chart endpoint with the caret symbol shown below; TwelveData is the
+  // gateway-configured fallback (snapshot REGISTRY mirrors the canonical
+  // form). Aliases include both compact and spaced variants so the
+  // alias-index covers what users actually type.
+  'asset:ibex':    { id:'asset:ibex',    type:'index', symbol:'^IBEX',     displayName:'IBEX 35',         aliases:['IBEX','IBEX35','IBEX 35'],                                              providerKeys:{ yahoo:'^IBEX',     twelvedata:'^IBEX'     } },
+  'asset:gdaxi':   { id:'asset:gdaxi',   type:'index', symbol:'^GDAXI',    displayName:'DAX 40',          aliases:['DAX','DAX40','DAX 40','GDAXI'],                                         providerKeys:{ yahoo:'^GDAXI',    twelvedata:'^GDAXI'    } },
+  'asset:fchi':    { id:'asset:fchi',    type:'index', symbol:'^FCHI',     displayName:'CAC 40',          aliases:['CAC','CAC40','CAC 40','FCHI'],                                          providerKeys:{ yahoo:'^FCHI',     twelvedata:'^FCHI'     } },
+  'asset:n225':    { id:'asset:n225',    type:'index', symbol:'^N225',     displayName:'Nikkei 225',      aliases:['NIKKEI','NIKKEI225','NIKKEI 225','N225'],                               providerKeys:{ yahoo:'^N225',     twelvedata:'^N225'     } },
+  'asset:ftse':    { id:'asset:ftse',    type:'index', symbol:'^FTSE',     displayName:'FTSE 100',        aliases:['FTSE','FTSE100','FTSE 100'],                                            providerKeys:{ yahoo:'^FTSE',     twelvedata:'^FTSE'     } },
+  'asset:stoxx50e':{ id:'asset:stoxx50e',type:'index', symbol:'^STOXX50E', displayName:'Euro Stoxx 50',   aliases:['EURO STOXX','EUROSTOXX','EURO STOXX 50','EUROSTOXX50','SX5E','STOXX50','STOXX50E'], providerKeys:{ yahoo:'^STOXX50E', twelvedata:'^STOXX50E' } },
 
   // Commodities
   'asset:xauusd':{ id:'asset:xauusd',type:'commodity', symbol:'XAU/USD', displayName:'Gold (spot)',  aliases:['XAU','GOLD','GC=F','XAUUSD'],   providerKeys:{ yahoo:'GC=F', twelvedata:'XAU/USD' } },
@@ -10665,9 +10723,34 @@ const STOCKS_UNIVERSE = [
   'AAPL','MSFT','NVDA','TSLA','AMZN','META','GOOGL','JPM','V','WMT',
   'BRK.B','JNJ','PG','XOM','BAC','AVGO','COST','KO','MCD','NKE',
 ];
-const INDEX_FALLBACKS    = { '^GSPC': 5300, '^IXIC': 18500, '^DJI': 42000 };
+const INDEX_FALLBACKS    = {
+  '^GSPC':     5300,
+  '^IXIC':     18500,
+  '^DJI':      42000,
+  // MC-2C: rough offline fallbacks so the workspace doesn't surface 0 /
+  // null while the upstream snapshot is still resolving. Refresh on
+  // every snapshot fetch; only consulted when the cache is empty and
+  // the provider call fails.
+  '^IBEX':     11500,
+  '^GDAXI':    19000,
+  '^FCHI':     7500,
+  '^N225':     38000,
+  '^FTSE':     8200,
+  '^STOXX50E': 4900,
+};
 const COMMODITY_FALLBACKS = { 'XAU/USD': 2320, 'XAG/USD': 27, 'WTI': 80 };
-const INDEX_NAMES        = { '^GSPC': 'S&P 500', '^IXIC': 'NASDAQ', '^DJI': 'Dow Jones' };
+const INDEX_NAMES        = {
+  '^GSPC':     'S&P 500',
+  '^IXIC':     'NASDAQ',
+  '^DJI':      'Dow Jones',
+  // MC-2C
+  '^IBEX':     'IBEX 35',
+  '^GDAXI':    'DAX 40',
+  '^FCHI':     'CAC 40',
+  '^N225':     'Nikkei 225',
+  '^FTSE':     'FTSE 100',
+  '^STOXX50E': 'Euro Stoxx 50',
+};
 const COMMODITY_NAMES    = { 'XAU/USD': 'Gold', 'XAG/USD': 'Silver', 'WTI': 'Oil (WTI)' };
 
 function _buildItem(symbol, data, fallbackMap, type) {
