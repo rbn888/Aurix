@@ -3464,6 +3464,134 @@ function _aw8ArgAsNumber(node) {
   return v;
 }
 
+// PR-9: raw ref reader for string functions. The numeric resolver upstream
+// throws for non-numeric cell contents — that's correct for arithmetic but
+// breaks =LEN(A1) when A1 holds text. This path returns the cell's raw value
+// (string | number | '') without coercion. Error tokens and invalid cells
+// still throw so =LEN(B_with_error) surfaces #ERROR cleanly.
+function _aw8ResolveRefRaw(ref) {
+  if (!_isCellInGridBounds(ref)) throw new _AwEvalError('#ERROR');
+  const sheet = WORKSPACE_RUNTIME.sheets.get(WORKSPACE_RUNTIME.activeSheetId);
+  if (!sheet) return '';
+  const cell = sheet.cells.get(ref);
+  if (!cell) return '';
+  if (cell.invalid) throw new _AwEvalError('#ERROR');
+  if (cell.type === 'formula') {
+    const c = cell.computed;
+    if (c == null) return '';
+    if (typeof c === 'string' && c.charCodeAt(0) === 35 /* '#' */) throw new _AwEvalError('#ERROR');
+    return c;
+  }
+  return cell.value ?? '';
+}
+
+function _aw8ArgAsString(node) {
+  if (!node) throw new _AwEvalError('#ERROR');
+  if (node.type === 'str') return node.value;
+  if (node.type === 'num') return String(node.value);
+  if (node.type === 'ref') {
+    const v = _aw8ResolveRefRaw(node.ref);
+    return v == null ? '' : String(v);
+  }
+  const v = _aw8EvalAst(node);
+  if (v == null) return '';
+  if (typeof v === 'number') {
+    if (!Number.isFinite(v)) throw new _AwEvalError('#ERROR');
+    return String(v);
+  }
+  return String(v);
+}
+
+// PR-9: enumerate raw cell values (number | string) across a range for the
+// conditional aggregates. Skips empty / invalid / error-token cells; returns
+// null only if the range itself fails to expand. SUMIF/AVGIF additionally
+// filter on typeof === 'number' when summing.
+function _aw8RangeRawValues(rangeNode) {
+  const ids = _expandRange(rangeNode);
+  if (!ids) return null;
+  const sheet = WORKSPACE_RUNTIME.sheets.get(WORKSPACE_RUNTIME.activeSheetId);
+  if (!sheet) return [];
+  const out = [];
+  for (const id of ids) {
+    const cell = sheet.cells.get(id);
+    if (!cell) continue;
+    if (cell.invalid) continue;
+    if (cell.type === 'formula') {
+      const c = cell.computed;
+      if (c == null || c === '') continue;
+      if (typeof c === 'string' && c.charCodeAt(0) === 35) continue;
+      out.push(c);
+    } else {
+      const v = cell.value;
+      if (v == null || v === '') continue;
+      out.push(v);
+    }
+  }
+  return out;
+}
+
+// PR-9: predicate builder for SUMIF / COUNTIF / AVGIF. Criteria forms:
+//   - numeric AST              → exact numeric match
+//   - bare string              → exact case-insensitive string match
+//   - "<>N" | ">N" | ">=N"
+//     "<N"  | "<=N" | "=N"     → numeric comparator when RHS is finite;
+//                                otherwise string equality with "="/"<>".
+// Unsupported operator combinations resolve to a never-match predicate so
+// the caller surfaces an explicit 0 / #DIV/0 instead of a thrown error.
+function _aw8BuildCriteria(node) {
+  const raw = _aw8EvalAst(node);
+  if (typeof raw === 'number') {
+    return c => (typeof c === 'number' && c === raw);
+  }
+  if (typeof raw === 'string') {
+    const m = /^\s*(<>|<=|>=|<|>|=)\s*(.*)$/.exec(raw);
+    if (m) {
+      const op = m[1];
+      const restStr = m[2].trim();
+      const restNum = Number(restStr);
+      const isNumeric = restStr !== '' && Number.isFinite(restNum);
+      if (isNumeric) {
+        switch (op) {
+          case '<>': return c => !(typeof c === 'number' && c === restNum);
+          case '<=': return c => typeof c === 'number' && c <= restNum;
+          case '>=': return c => typeof c === 'number' && c >= restNum;
+          case '<':  return c => typeof c === 'number' && c <  restNum;
+          case '>':  return c => typeof c === 'number' && c >  restNum;
+          case '=':  return c => typeof c === 'number' && c === restNum;
+        }
+      } else {
+        const target = restStr.toUpperCase();
+        if (op === '<>') return c => String(c ?? '').toUpperCase() !== target;
+        if (op === '=')  return c => String(c ?? '').toUpperCase() === target;
+        return () => false;
+      }
+    }
+    const target = raw.toUpperCase();
+    return c => String(c ?? '').toUpperCase() === target;
+  }
+  return () => false;
+}
+
+// PR-9: ISO-only date coercion. Accepts numeric ms (canonical, returned by
+// TODAY/NOW/DATE) or strict "YYYY-MM-DD" optionally followed by
+// "Thh:mm[:ss]". Locale-dependent strings (e.g. "01/15/2025") throw #ERROR
+// rather than silently parse, so users get a predictable failure instead
+// of a wrong date.
+function _aw8ToDateMs(node) {
+  const v = _aw8EvalAst(node);
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string') {
+    const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(v.trim());
+    if (m) {
+      const y = +m[1], mo = +m[2] - 1, d = +m[3];
+      const hh = m[4] ? +m[4] : 0, mi = m[5] ? +m[5] : 0, ss = m[6] ? +m[6] : 0;
+      const dt = new Date(y, mo, d, hh, mi, ss);
+      if (Number.isFinite(dt.getTime())) return dt.getTime();
+    }
+  }
+  throw new _AwEvalError('#ERROR');
+}
+
 const _AW8_WORKSPACE_FUNCTIONS = Object.freeze({
   SUM(args) {
     if (args.length !== 1 || args[0].type !== 'range') throw new _AwEvalError('#ERROR');
@@ -3610,6 +3738,126 @@ const _AW8_WORKSPACE_FUNCTIONS = Object.freeze({
       if (e instanceof _AwEvalError) return _aw8EvalAst(args[1]);
       throw e;
     }
+  },
+  // PR-9: conditional aggregations. Single-range form. SUMIF / AVGIF restrict
+  // the sum to numeric matches; COUNTIF counts any match (numeric or string).
+  // AVGIF returns #DIV/0 when no numeric value matched.
+  SUMIF(args) {
+    if (args.length !== 2 || args[0].type !== 'range') throw new _AwEvalError('#ERROR');
+    const matches = _aw8BuildCriteria(args[1]);
+    const vals = _aw8RangeRawValues(args[0]);
+    if (vals == null) throw new _AwEvalError('#ERROR');
+    let s = 0;
+    for (const v of vals) if (matches(v) && typeof v === 'number') s += v;
+    return s;
+  },
+  COUNTIF(args) {
+    if (args.length !== 2 || args[0].type !== 'range') throw new _AwEvalError('#ERROR');
+    const matches = _aw8BuildCriteria(args[1]);
+    const vals = _aw8RangeRawValues(args[0]);
+    if (vals == null) throw new _AwEvalError('#ERROR');
+    let n = 0;
+    for (const v of vals) if (matches(v)) n++;
+    return n;
+  },
+  AVGIF(args) {
+    if (args.length !== 2 || args[0].type !== 'range') throw new _AwEvalError('#ERROR');
+    const matches = _aw8BuildCriteria(args[1]);
+    const vals = _aw8RangeRawValues(args[0]);
+    if (vals == null) throw new _AwEvalError('#ERROR');
+    let s = 0, n = 0;
+    for (const v of vals) if (matches(v) && typeof v === 'number') { s += v; n++; }
+    if (n === 0) throw new _AwEvalError('#DIV/0');
+    return s / n;
+  },
+  // PR-9: string utilities. CONCAT takes variable args. LEFT/RIGHT/MID use
+  // spreadsheet-standard 1-indexed positions; negative counts → #ERROR.
+  CONCAT(args) {
+    if (args.length === 0) throw new _AwEvalError('#ERROR');
+    let s = '';
+    for (const a of args) s += _aw8ArgAsString(a);
+    return s;
+  },
+  LEN(args) {
+    if (args.length !== 1) throw new _AwEvalError('#ERROR');
+    return _aw8ArgAsString(args[0]).length;
+  },
+  UPPER(args) {
+    if (args.length !== 1) throw new _AwEvalError('#ERROR');
+    return _aw8ArgAsString(args[0]).toUpperCase();
+  },
+  LOWER(args) {
+    if (args.length !== 1) throw new _AwEvalError('#ERROR');
+    return _aw8ArgAsString(args[0]).toLowerCase();
+  },
+  TRIM(args) {
+    if (args.length !== 1) throw new _AwEvalError('#ERROR');
+    return _aw8ArgAsString(args[0]).trim();
+  },
+  LEFT(args) {
+    if (args.length !== 2) throw new _AwEvalError('#ERROR');
+    const s = _aw8ArgAsString(args[0]);
+    const n = Math.trunc(_aw8ArgAsNumber(args[1]));
+    if (n < 0) throw new _AwEvalError('#ERROR');
+    return s.slice(0, n);
+  },
+  RIGHT(args) {
+    if (args.length !== 2) throw new _AwEvalError('#ERROR');
+    const s = _aw8ArgAsString(args[0]);
+    const n = Math.trunc(_aw8ArgAsNumber(args[1]));
+    if (n < 0) throw new _AwEvalError('#ERROR');
+    if (n === 0) return '';
+    return n >= s.length ? s : s.slice(s.length - n);
+  },
+  MID(args) {
+    if (args.length !== 3) throw new _AwEvalError('#ERROR');
+    const s = _aw8ArgAsString(args[0]);
+    const start = Math.trunc(_aw8ArgAsNumber(args[1]));
+    const len   = Math.trunc(_aw8ArgAsNumber(args[2]));
+    if (start < 1 || len < 0) throw new _AwEvalError('#ERROR');
+    return s.slice(start - 1, start - 1 + len);
+  },
+  // PR-9: date utilities. Canonical representation is ms-since-epoch so date
+  // arithmetic (=TODAY()-7) keeps working. Cells need cell.format='date' to
+  // render as a localized date; without it the raw ms surfaces. String input
+  // to DAY/MONTH/YEAR/DATEDIF must be ISO-shaped — locale-dependent parsing
+  // is deliberately excluded (would silently mis-parse "01/02/2025").
+  TODAY(args) {
+    if (args.length !== 0) throw new _AwEvalError('#ERROR');
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  },
+  NOW(args) {
+    if (args.length !== 0) throw new _AwEvalError('#ERROR');
+    return Date.now();
+  },
+  DATE(args) {
+    if (args.length !== 3) throw new _AwEvalError('#ERROR');
+    const y = Math.trunc(_aw8ArgAsNumber(args[0]));
+    const m = Math.trunc(_aw8ArgAsNumber(args[1]));
+    const d = Math.trunc(_aw8ArgAsNumber(args[2]));
+    const dt = new Date(y, m - 1, d);
+    if (!Number.isFinite(dt.getTime())) throw new _AwEvalError('#ERROR');
+    return dt.getTime();
+  },
+  DAY(args) {
+    if (args.length !== 1) throw new _AwEvalError('#ERROR');
+    return new Date(_aw8ToDateMs(args[0])).getDate();
+  },
+  MONTH(args) {
+    if (args.length !== 1) throw new _AwEvalError('#ERROR');
+    return new Date(_aw8ToDateMs(args[0])).getMonth() + 1;
+  },
+  YEAR(args) {
+    if (args.length !== 1) throw new _AwEvalError('#ERROR');
+    return new Date(_aw8ToDateMs(args[0])).getFullYear();
+  },
+  DATEDIF(args) {
+    if (args.length !== 2) throw new _AwEvalError('#ERROR');
+    const a = _aw8ToDateMs(args[0]);
+    const b = _aw8ToDateMs(args[1]);
+    return Math.floor((b - a) / 86400000);
   },
 });
 
@@ -3849,6 +4097,8 @@ const _AW8_NO_ARG_FUNCTIONS = new Set([
   'PORTFOLIO.VALUE', 'PORTFOLIO.ASSETS',
   // PR-8C
   'PORTFOLIO.PNL', 'PORTFOLIO.PNL_PCT', 'PORTFOLIO.UNREALIZED',
+  // PR-9
+  'TODAY', 'NOW',
 ]);
 const WORKSPACE_FORMULA_SUGGESTIONS = Object.freeze([
   ...Object.keys(_AW8_WORKSPACE_FUNCTIONS).map(key => ({
@@ -4266,6 +4516,20 @@ function _aw8RunSelfTest() {
     { expr: '=IFERROR(1/0,42)',     expect: 42      },
     { expr: '=IFERROR(SQRT(9),99)', expect: 3       },
     { expr: '=1+2>2',               expect: 1       }, // precedence: (1+2)>2
+    // PR-9 — string + date (selftest has no sheet, so SUMIF/COUNTIF/AVGIF
+    // exercised separately via the dedicated harness)
+    { expr: '=CONCAT("A","B")',                          expect: 'AB'  },
+    { expr: '=LEN("TSLA")',                              expect: 4     },
+    { expr: '=UPPER("btc")',                             expect: 'BTC' },
+    { expr: '=LOWER("BTC")',                             expect: 'btc' },
+    { expr: '=TRIM("  x  ")',                            expect: 'x'   },
+    { expr: '=LEFT("HELLO",2)',                          expect: 'HE'  },
+    { expr: '=RIGHT("HELLO",3)',                         expect: 'LLO' },
+    { expr: '=MID("HELLO",2,3)',                         expect: 'ELL' },
+    { expr: '=YEAR(DATE(2025,1,1))',                     expect: 2025  },
+    { expr: '=MONTH(DATE(2025,6,15))',                   expect: 6     },
+    { expr: '=DAY(DATE(2025,6,15))',                     expect: 15    },
+    { expr: '=DATEDIF(DATE(2025,1,1),DATE(2025,1,11))',  expect: 10    },
   ];
   const failures = [];
   for (const c of cases) {
