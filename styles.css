@@ -8964,22 +8964,24 @@ body.gs-open { overflow: hidden; }
 
 /* Hero: command-center title + subtitle + premium search input. */
 .gs-hero {
-  padding: 30px 32px 22px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 28px 30px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 .gs-hero-title {
-  margin: 0 0 4px;
-  font-size: 22px;
+  margin: 0 0 6px;
+  font-size: 26px;
   font-weight: 600;
-  letter-spacing: -0.015em;
-  color: rgba(245, 250, 255, 0.98);
-  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: rgba(247, 251, 255, 0.98);
+  line-height: 1.15;
 }
 .gs-hero-sub {
-  margin: 0 0 18px;
+  margin: 0 0 20px;
   font-size: 13px;
-  color: rgba(220, 230, 250, 0.55);
+  line-height: 1.55;
+  color: rgba(220, 230, 250, 0.50);
   letter-spacing: 0.005em;
+  max-width: 480px;
 }
 
 .gs-input-wrap {
@@ -8989,23 +8991,28 @@ body.gs-open { overflow: hidden; }
   padding: 0 16px;
   height: 52px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(8, 12, 22, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(8, 12, 22, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02),
+              0 1px 2px rgba(0, 0, 0, 0.25);
   transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.22s ease;
   cursor: text;
 }
 .gs-input-wrap:hover {
-  border-color: rgba(255, 255, 255, 0.20);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(8, 12, 22, 0.72);
 }
 .gs-input-wrap:focus-within {
   border-color: rgba(74, 130, 240, 0.55);
-  background: rgba(8, 12, 22, 0.82);
-  box-shadow: 0 0 0 4px rgba(74, 130, 240, 0.10);
+  background: rgba(8, 12, 22, 0.85);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03),
+              0 0 0 4px rgba(74, 130, 240, 0.14),
+              0 4px 14px rgba(74, 130, 240, 0.10);
 }
 .gs-icon {
-  width: 20px; height: 20px;
+  width: 18px; height: 18px;
   fill: none;
-  stroke: rgba(204, 224, 255, 0.65);
+  stroke: rgba(204, 224, 255, 0.70);
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -9018,13 +9025,17 @@ body.gs-open { overflow: hidden; }
   background: transparent;
   border: none;
   outline: none;
-  color: rgba(235, 243, 255, 0.96);
+  color: rgba(238, 245, 255, 0.97);
   font-family: 'Inter', sans-serif;
   font-size: 15px;
+  font-weight: 500;
   letter-spacing: 0.005em;
   height: 100%;
 }
-#globalSearchInput::placeholder { color: rgba(190, 208, 234, 0.45); }
+#globalSearchInput::placeholder {
+  color: rgba(190, 208, 234, 0.56);
+  font-weight: 400;
+}
 
 .gs-body {
   overflow-y: auto;
@@ -9032,24 +9043,25 @@ body.gs-open { overflow: hidden; }
   padding: 6px 0 12px;
 }
 
-/* Empty-state sections — "Populares", "Categorías", "Recientes". */
+/* Empty-state sections — "Populares" + "Recientes". Consistent
+   horizontal padding matching the hero so labels line up cleanly. */
 .gs-section {
-  padding: 16px 24px 4px;
+  padding: 18px 30px 0;
 }
-.gs-section + .gs-section { padding-top: 12px; }
+.gs-section + .gs-section { padding-top: 14px; }
 .gs-section[hidden] { display: none; }
 .gs-section-label {
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(220, 230, 250, 0.42);
-  margin-bottom: 10px;
+  color: rgba(220, 230, 250, 0.38);
+  margin-bottom: 12px;
 }
 .gs-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 7px;
 }
 .gs-chip.is-recent {
   border-color: rgba(255, 255, 255, 0.08);
@@ -9076,19 +9088,25 @@ body.gs-open { overflow: hidden; }
 .gs-chip {
   display: inline-flex;
   align-items: center;
-  padding: 7px 12px;
+  height: 30px;
+  padding: 0 13px;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.10);
-  background: rgba(255,255,255,0.04);
-  color: rgba(220, 230, 250, 0.78);
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.028);
+  color: rgba(225, 233, 250, 0.78);
   font-family: inherit;
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.015em;
   cursor: pointer;
-  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease, transform 0.14s ease;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease, transform 0.14s ease, box-shadow 0.16s ease;
 }
-.gs-chip:hover  { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(255,255,255,0.18); }
+.gs-chip:hover {
+  background: rgba(255,255,255,0.07);
+  color: #fff;
+  border-color: rgba(255,255,255,0.18);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
 .gs-chip:active { transform: scale(0.96); }
 
 .gs-loading {
@@ -9116,24 +9134,27 @@ body.gs-open { overflow: hidden; }
 .gs-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: 14px;
   align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 13px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.035);
+  transition: background 0.14s ease;
 }
+.gs-row:hover     { background: rgba(255, 255, 255, 0.025); }
 .gs-row:last-child { border-bottom: 0; }
 
-.gs-row-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.gs-row-main { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .gs-row-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .gs-row-ticker {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
   font-weight: 700;
   color: #fff;
+  letter-spacing: 0.005em;
 }
 .gs-row-name {
   font-size: 12.5px;
-  color: rgba(220, 230, 250, 0.62);
+  color: rgba(220, 230, 250, 0.58);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -9161,35 +9182,43 @@ body.gs-open { overflow: hidden; }
 .gs-row-badge.is-metal     { color: rgba(255,210,100,0.95); border-color: rgba(255,210,100,0.30); }
 
 .gs-row-meta {
-  font-size: 11px;
-  color: rgba(220, 230, 250, 0.42);
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(225, 233, 250, 0.62);
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
 }
 
 .gs-row-actions { display: flex; gap: 6px; flex: 0 0 auto; }
 .gs-row-btn {
-  height: 30px;
-  padding: 0 11px;
+  height: 32px;
+  padding: 0 14px;
   border-radius: 8px;
   border: 1px solid rgba(255,255,255,0.10);
   background: rgba(255,255,255,0.04);
-  color: rgba(220, 230, 250, 0.85);
+  color: rgba(220, 230, 250, 0.88);
   font-family: inherit;
   font-size: 12px;
   font-weight: 600;
+  letter-spacing: 0.01em;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, box-shadow 0.18s ease, transform 0.14s ease;
 }
-.gs-row-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.gs-row-btn:hover  { background: rgba(255,255,255,0.08); color: #fff; }
 .gs-row-btn:active { transform: scale(0.96); }
 .gs-row-btn.is-primary {
-  border-color: rgba(138,166,255,0.40);
-  background: rgba(138,166,255,0.10);
-  color: rgba(225,232,255,0.96);
+  border-color: rgba(138,166,255,0.45);
+  background: rgba(138,166,255,0.14);
+  color: rgba(232,238,255,0.98);
+  box-shadow: 0 1px 2px rgba(74,130,240,0.18),
+              inset 0 1px 0 rgba(255,255,255,0.06);
 }
 .gs-row-btn.is-primary:hover {
-  background: rgba(138,166,255,0.18);
+  background: rgba(138,166,255,0.22);
+  border-color: rgba(138,166,255,0.60);
+  box-shadow: 0 2px 10px rgba(74,130,240,0.28),
+              inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
 .gs-hint {
@@ -9247,19 +9276,20 @@ body.gs-open { overflow: hidden; }
   /* Hero loses its outer padding — the shell already owns the 18px
      gutter. Title trails right so it never overlaps the close button. */
   .gs-hero {
-    padding: 4px 0 12px;
-    margin: 0 0 6px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 6px 0 14px;
+    margin: 0 0 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.045);
   }
   .gs-hero-title {
-    margin: 0 40px 4px 0;
-    font-size: 18px;
-    line-height: 1.2;
+    margin: 0 40px 6px 0;
+    font-size: 22px;
+    letter-spacing: -0.02em;
+    line-height: 1.18;
   }
   .gs-hero-sub {
-    margin: 0 0 12px;
-    font-size: 12.5px;
-    line-height: 1.45;
+    margin: 0 0 14px;
+    font-size: 13px;
+    line-height: 1.5;
     max-width: 100%;
   }
   .gs-input-wrap {
@@ -9279,35 +9309,39 @@ body.gs-open { overflow: hidden; }
     -webkit-overflow-scrolling: touch;
     max-height: 55vh;
   }
-  .gs-section { padding: 12px 0 0; }
-  .gs-section + .gs-section { padding-top: 10px; }
+  .gs-section { padding: 14px 0 0; }
+  .gs-section + .gs-section { padding-top: 12px; }
   .gs-section-label {
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     font-size: 10px;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.16em;
   }
-  .gs-chips { gap: 6px; }
-  .gs-chip  { padding: 7px 12px; font-size: 12px; }
+  .gs-chips { gap: 7px; }
+  .gs-chip  { height: 32px; padding: 0 13px; font-size: 12.5px; }
 
   .gs-loading { padding: 22px 0; }
   .gs-hint    { padding: 22px 6px; font-size: 12.5px; }
 
-  .gs-results { padding: 8px 0 0; gap: 8px; }
+  /* Result cards: keep the card geometry but lift the price hierarchy
+     and tighten the row so they feel like native list items. */
+  .gs-results { padding: 10px 0 0; gap: 8px; }
   .gs-row {
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 10px;
-    padding: 11px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 14px;
-    background: rgba(255, 255, 255, 0.025);
+    background: rgba(255, 255, 255, 0.022);
+    transition: background 0.14s ease, transform 0.14s ease;
   }
+  .gs-row:active { transform: scale(0.985); }
   .gs-row-line { flex-wrap: wrap; gap: 6px 8px; }
   .gs-row-name { max-width: 100%; }
-  .gs-row-meta { font-size: 11.5px; }
+  .gs-row-meta { font-size: 12px; font-weight: 500; }
   .gs-row-actions { gap: 6px; }
-  .gs-row-btn { padding: 0 12px; font-size: 12px; height: 32px; }
+  .gs-row-btn { padding: 0 14px; font-size: 12px; height: 34px; }
   .gs-row-btn.is-primary {
-    border-color: rgba(138,166,255,0.45);
-    background: rgba(138,166,255,0.14);
+    border-color: rgba(138,166,255,0.50);
+    background: rgba(138,166,255,0.16);
   }
 }
