@@ -10580,6 +10580,36 @@ function renderAllAssets(data) {
   return `<div class="market-section-header">${t('tab_all')}</div>${tableHeader}${final.map(renderMarketItem).join('')}`;
 }
 
+// Bug-fix (aggregate tabs): compose a fresh dataset for All / Watchlist
+// from every per-tab cache (with a defensive type filter), so the view
+// never depends on which category tab the user happened to open last.
+// For any slice missing on cold load, fire refreshMarketInBackground —
+// it's idempotent (TTL + _LOADING guard) and the per-tab refresh
+// handlers already call renderCurrentMarketView() when the active tab
+// is 'all' or 'watchlist', so the view fills in as each fetch lands.
+function _composeAggregateDataset() {
+  const AGG_TABS = ['crypto', 'stocks', 'etfs', 'indices', 'commodities'];
+  const out = new Map();
+  for (const tab of AGG_TABS) {
+    const type = _TAB_TO_TYPE[tab];
+    if (!type) continue;
+    const typeLc = String(type).toLowerCase();
+    const cached = MARKET_CACHE[tab];
+    const slice  = (cached && cached.length)
+      ? cached.filter(d => String(d.type).toLowerCase() === typeLc)
+      : MARKET_DATA.filter(d => String(d.type).toLowerCase() === typeLc);
+    if (!slice.length) {
+      try { refreshMarketInBackground(tab); } catch (_) {}
+      continue;
+    }
+    for (const item of slice) {
+      const key = normalizeSymbol(item.symbol || item.provider_id);
+      if (key && !out.has(key)) out.set(key, item);
+    }
+  }
+  return Array.from(out.values());
+}
+
 function renderCurrentMarketView() {
   const el = document.getElementById('marketList');
   if (!el) return;
@@ -10592,7 +10622,10 @@ function renderCurrentMarketView() {
   const VALID_TABS = ['watchlist','all','crypto','stocks','etfs','indices','commodities','funds'];
   if (!VALID_TABS.includes(currentMarketTab)) return;
 
-  const data = Object.freeze([...MARKET_DATA]);
+  const isAggregate = (currentMarketTab === 'watchlist' || currentMarketTab === 'all');
+  const data = isAggregate
+    ? Object.freeze(_composeAggregateDataset())
+    : Object.freeze([...MARKET_DATA]);
 
   let html;
   if (_marketSearchQuery) {
@@ -10628,8 +10661,11 @@ function renderCurrentMarketView() {
     html = disc + renderFromCache(activeType, data);
   }
 
+  // Aggregate tabs (All / Watchlist) skip the lastKey short-circuit so
+  // every render reflects the freshest composed dataset — the html
+  // length can collide while a cache slice is still filling in.
   const renderKey = `${currentMarketTab}|${_marketSearchQuery}|${html.length}`;
-  if (el._lastKey === renderKey) return;
+  if (!isAggregate && el._lastKey === renderKey) return;
   el._lastKey = renderKey;
   el.innerHTML = html;
   renderFeaturedBlock(data);
