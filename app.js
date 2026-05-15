@@ -12829,7 +12829,7 @@ const _GS_TRENDING = [
   { label:'IWDA',     q:'IWDA'     },
   { label:'VWCE',     q:'VWCE'     },
   { label:'Gold',     q:'Gold'     },
-  { label:'Fidelity', q:'Fidelity' },
+  { label:'AAPL',     q:'AAPL'     },
 ];
 
 // Recent searches — capped at 5, query string only (no portfolio data
