@@ -7530,9 +7530,26 @@ async function resolveSymbolQuote(symbol) {
     if (!res.ok) return null;
     const json = await res.json();
     const want = symbol.toUpperCase();
-    const hit  = (json?.snapshot ?? []).find(
-      p => p.symbol === symbol || p.symbol?.toUpperCase() === want
-    );
+    // MC-7C: the snapshot router canonicalises some inputs — IWDA.AS /
+    // IWDA.L / IWDA.MC all converge to canonical 'IWDA' via the MC-3
+    // strip-suffix path, so the response.symbol is the bare ticker even
+    // when the request carries a suffix. Match against request, response,
+    // and the stripped form of either, so the find never falls through
+    // just because the listing variant differs from the canonical key.
+    // Importantly: this preserves PRODUCT identity — different products
+    // (Fidelity MSCI World mutual fund vs iShares Core MSCI World ETF)
+    // have different tickers entirely, so they never collide here; only
+    // alternate exchange listings of the *same* product converge.
+    const wantStripped = want.replace(/\.[A-Z]{1,3}$/, '');
+    const hit = (json?.snapshot ?? []).find(p => {
+      if (!p || !p.symbol) return false;
+      const ps  = String(p.symbol);
+      if (ps === symbol) return true;
+      const psu = ps.toUpperCase();
+      if (psu === want || psu === wantStripped) return true;
+      const psStripped = psu.replace(/\.[A-Z]{1,3}$/, '');
+      return psStripped === want || psStripped === wantStripped;
+    });
     if (!Number.isFinite(hit?.price)) return null;
     // Validate to strict ISO-4217 shape (3 uppercase letters) so we never
     // stamp something like Yahoo's "GBp" pence form onto an asset.
