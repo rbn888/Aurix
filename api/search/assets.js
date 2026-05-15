@@ -4,7 +4,12 @@
 //
 // Response shape matches what the frontend caller already expects:
 //   { results: [{ ticker, name, type, marketSymbol }, ...] }
-// where type is 'stock' or 'etf'.
+// where type is 'stock' | 'etf' | 'index'.
+//
+// MC-2B: indices (^GSPC, ^GDAXI, ^IBEX, ^N225, ^FTSE, …) are surfaced with
+// type:'index' so search returns "S&P 500", "DAX", "IBEX 35", "Nikkei",
+// "FTSE 100", etc. Pricing for indices outside the snapshot REGISTRY
+// (^GSPC / ^IXIC / ^DJI today) is out of scope for this change.
 
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://rbn888.github.io';
 const MAX_RESULTS    = 7;
@@ -33,14 +38,19 @@ export default async function handler(req, res) {
     const json    = await upstream.json();
     const quotes  = Array.isArray(json?.quotes) ? json.quotes : [];
     const results = quotes
-      .filter(qt => qt.quoteType === 'EQUITY' || qt.quoteType === 'ETF')
+      .filter(qt => qt.quoteType === 'EQUITY' || qt.quoteType === 'ETF' || qt.quoteType === 'INDEX')
       .slice(0, MAX_RESULTS)
-      .map(qt => ({
-        ticker:       qt.symbol,
-        name:         qt.longname || qt.shortname || qt.symbol,
-        type:         qt.quoteType === 'ETF' ? 'etf' : 'stock',
-        marketSymbol: qt.symbol,
-      }));
+      .map(qt => {
+        const type = qt.quoteType === 'ETF'   ? 'etf'
+                   : qt.quoteType === 'INDEX' ? 'index'
+                                              : 'stock';
+        return {
+          ticker:       qt.symbol,
+          name:         qt.longname || qt.shortname || qt.symbol,
+          type,
+          marketSymbol: qt.symbol,
+        };
+      });
     return res.status(200).json({ results });
   } catch (err) {
     console.error('[API][search] upstream failure:', err?.message);
