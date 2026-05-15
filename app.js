@@ -472,6 +472,11 @@ const T = {
     fundCat_dividend:          'Dividendo',
     fundCat_small_cap:         'Small Cap',
     // MC-11B: per-asset-class discovery category labels (tab-prefixed)
+    fundCat_popular:                  'Populares',
+    discCat_stocks_top:               'Top',
+    discCat_crypto_top:               'Top',
+    discCat_indices_major:            'Principales',
+    discCat_commodities_popular:      'Populares',
     discCat_stocks_magnificent_7:     'Magnificent 7',
     discCat_stocks_ai_leaders:        'Líderes IA',
     discCat_stocks_dividend_stocks:   'Dividendo',
@@ -896,6 +901,11 @@ const T = {
     fundCat_dividend:          'Dividend',
     fundCat_small_cap:         'Small Cap',
     // MC-11B: per-asset-class discovery category labels (tab-prefixed)
+    fundCat_popular:                  'Popular',
+    discCat_stocks_top:               'Top',
+    discCat_crypto_top:               'Top',
+    discCat_indices_major:            'Major',
+    discCat_commodities_popular:      'Popular',
     discCat_stocks_magnificent_7:     'Magnificent 7',
     discCat_stocks_ai_leaders:        'AI Leaders',
     discCat_stocks_dividend_stocks:   'Dividend',
@@ -10726,6 +10736,17 @@ const _TAB_TO_TYPE = { crypto: 'crypto', stocks: 'stock', etfs: 'etfs', indices:
 //             currency badge; omit when uncertain so we never lie)
 // Identity is preserved — different managers stay separate entries.
 const _FUNDS_CATALOG = [
+  // MC-11C.2: "Popular" lands first so the default view shows the most
+  // commonly tracked ETFs/funds across managers. Identity preserved —
+  // each entry stays a distinct product (Vanguard ≠ iShares etc.).
+  { id:'popular', items: [
+    { ticker:'IWDA.AS', name:'iShares Core MSCI World UCITS (Acc)', manager:'iShares',  type:'etf', marketSymbol:'IWDA.AS', ucits:true, share:'Acc',  currency:'EUR' },
+    { ticker:'VWCE.DE', name:'Vanguard FTSE All-World UCITS (Acc)', manager:'Vanguard', type:'etf', marketSymbol:'VWCE.DE', ucits:true, share:'Acc',  currency:'EUR' },
+    { ticker:'VUAA.L',  name:'Vanguard S&P 500 UCITS (Acc)',        manager:'Vanguard', type:'etf', marketSymbol:'VUAA.L',  ucits:true, share:'Acc',  currency:'USD' },
+    { ticker:'CSPX.L',  name:'iShares Core S&P 500 UCITS (Acc)',    manager:'iShares',  type:'etf', marketSymbol:'CSPX.L',  ucits:true, share:'Acc',  currency:'USD' },
+    { ticker:'EIMI.L',  name:'iShares Core MSCI EM IMI UCITS',      manager:'iShares',  type:'etf', marketSymbol:'EIMI.L',  ucits:true, share:'Acc',  currency:'USD' },
+    { ticker:'AGGH.L',  name:'iShares Core Global Agg Bond Hedged', manager:'iShares',  type:'etf', marketSymbol:'AGGH.L',  ucits:true, share:'Acc',  currency:'USD' },
+  ]},
   { id:'msci_world',       items: [
     { ticker:'IWDA.AS', name:'iShares Core MSCI World UCITS (Acc)',  manager:'iShares',   type:'etf', marketSymbol:'IWDA.AS', ucits:true,  share:'Acc',  currency:'EUR' },
     { ticker:'SWDA.L',  name:'iShares Core MSCI World UCITS (LSE)',  manager:'iShares',   type:'etf', marketSymbol:'SWDA.L',  ucits:true,  share:'Acc',  currency:'USD' },
@@ -10808,6 +10829,16 @@ const _FUNDS_CATALOG = [
 
 // Stocks
 const _STOCKS_CATALOG = [
+  // MC-11C.2: "Top" first — the most commonly tracked names so the
+  // default view is immediately useful on mobile.
+  { id:'top', items:[
+    { ticker:'AAPL', name:'Apple Inc.',       manager:'Tech',   type:'stock', marketSymbol:'AAPL', currency:'USD' },
+    { ticker:'MSFT', name:'Microsoft Corp.',  manager:'Tech',   type:'stock', marketSymbol:'MSFT', currency:'USD' },
+    { ticker:'NVDA', name:'NVIDIA Corp.',     manager:'Tech',   type:'stock', marketSymbol:'NVDA', currency:'USD' },
+    { ticker:'TSLA', name:'Tesla Inc.',       manager:'Auto',   type:'stock', marketSymbol:'TSLA', currency:'USD' },
+    { ticker:'AMZN', name:'Amazon.com Inc.',  manager:'Retail', type:'stock', marketSymbol:'AMZN', currency:'USD' },
+    { ticker:'META', name:'Meta Platforms',   manager:'Tech',   type:'stock', marketSymbol:'META', currency:'USD' },
+  ]},
   { id:'magnificent_7', items:[
     { ticker:'AAPL',  name:'Apple Inc.',          manager:'Tech',   type:'stock', marketSymbol:'AAPL',  currency:'USD' },
     { ticker:'MSFT',  name:'Microsoft Corp.',     manager:'Tech',   type:'stock', marketSymbol:'MSFT',  currency:'USD' },
@@ -10867,6 +10898,16 @@ const _STOCKS_CATALOG = [
 // fetchLivePrices(coinId) crypto-pricing branch directly. CoinGecko IDs
 // match _ASSET_REGISTRY (lines 5966+) where available.
 const _CRYPTO_CATALOG = [
+  // MC-11C.2: "Top" first — large-cap names with CoinGecko ids so they
+  // route through fetchLivePrices like every other crypto in the app.
+  { id:'top', items:[
+    { ticker:'BTC',  name:'Bitcoin',  manager:'L1',     type:'crypto', marketSymbol:'BTC',  coinId:'bitcoin',     currency:'USD' },
+    { ticker:'ETH',  name:'Ethereum', manager:'L1',     type:'crypto', marketSymbol:'ETH',  coinId:'ethereum',    currency:'USD' },
+    { ticker:'SOL',  name:'Solana',   manager:'L1',     type:'crypto', marketSymbol:'SOL',  coinId:'solana',      currency:'USD' },
+    { ticker:'BNB',  name:'BNB',      manager:'L1',     type:'crypto', marketSymbol:'BNB',  coinId:'binancecoin', currency:'USD' },
+    { ticker:'XRP',  name:'XRP',      manager:'L1',     type:'crypto', marketSymbol:'XRP',  coinId:'ripple',      currency:'USD' },
+    { ticker:'USDT', name:'Tether',   manager:'Stable', type:'crypto', marketSymbol:'USDT', coinId:'tether',      currency:'USD' },
+  ]},
   { id:'layer_1', items:[
     { ticker:'BTC',  name:'Bitcoin',       manager:'L1', type:'crypto', marketSymbol:'BTC',  coinId:'bitcoin',      currency:'USD' },
     { ticker:'ETH',  name:'Ethereum',      manager:'L1', type:'crypto', marketSymbol:'ETH',  coinId:'ethereum',     currency:'USD' },
@@ -10910,6 +10951,15 @@ const _CRYPTO_CATALOG = [
 
 // Indices
 const _INDICES_CATALOG = [
+  // MC-11C.2: "Major" first — the headline indices users glance at.
+  { id:'major', items:[
+    { ticker:'^GSPC',  name:'S&P 500',     manager:'US', type:'index', marketSymbol:'^GSPC',  currency:'USD' },
+    { ticker:'^IXIC',  name:'Nasdaq',      manager:'US', type:'index', marketSymbol:'^IXIC',  currency:'USD' },
+    { ticker:'^DJI',   name:'Dow Jones',   manager:'US', type:'index', marketSymbol:'^DJI',   currency:'USD' },
+    { ticker:'^GDAXI', name:'DAX 40',      manager:'DE', type:'index', marketSymbol:'^GDAXI', currency:'EUR' },
+    { ticker:'^IBEX',  name:'IBEX 35',     manager:'ES', type:'index', marketSymbol:'^IBEX',  currency:'EUR' },
+    { ticker:'^N225',  name:'Nikkei 225',  manager:'JP', type:'index', marketSymbol:'^N225',  currency:'JPY' },
+  ]},
   { id:'us', items:[
     { ticker:'^GSPC', name:'S&P 500',          manager:'US', type:'index', marketSymbol:'^GSPC', currency:'USD' },
     { ticker:'^IXIC', name:'NASDAQ Composite', manager:'US', type:'index', marketSymbol:'^IXIC', currency:'USD' },
@@ -10945,6 +10995,17 @@ const _INDICES_CATALOG = [
 // generic Yahoo passthrough (MC-7B). XAU/USD / XAG/USD / WTI hit the
 // existing canonical REGISTRY entries.
 const _COMMODITIES_CATALOG = [
+  // MC-11C.2: "Popular" first — the commodities tracked in 99% of
+  // dashboards. Symbols reuse the canonical REGISTRY entries (XAU/USD,
+  // XAG/USD, WTI) plus Yahoo futures (BZ=F, NG=F) handled by the
+  // generic snapshot passthrough — no provider/router changes needed.
+  { id:'popular', items:[
+    { ticker:'XAU/USD', name:'Gold (spot)',   manager:'Spot',    type:'commodity', marketSymbol:'XAU/USD', currency:'USD' },
+    { ticker:'XAG/USD', name:'Silver (spot)', manager:'Spot',    type:'commodity', marketSymbol:'XAG/USD', currency:'USD' },
+    { ticker:'WTI',     name:'WTI Crude Oil', manager:'Spot',    type:'commodity', marketSymbol:'WTI',     currency:'USD' },
+    { ticker:'BZ=F',    name:'Brent Crude',   manager:'Futures', type:'commodity', marketSymbol:'BZ=F',    currency:'USD' },
+    { ticker:'NG=F',    name:'Natural Gas',   manager:'Futures', type:'commodity', marketSymbol:'NG=F',    currency:'USD' },
+  ]},
   { id:'precious_metals', items:[
     { ticker:'XAU/USD', name:'Gold (spot)',       manager:'Spot',    type:'commodity', marketSymbol:'XAU/USD', currency:'USD' },
     { ticker:'XAG/USD', name:'Silver (spot)',     manager:'Spot',    type:'commodity', marketSymbol:'XAG/USD', currency:'USD' },
@@ -10968,11 +11029,13 @@ const _COMMODITIES_CATALOG = [
 ];
 
 // Per-tab active-category state. One stateful pointer per asset class.
-let _fundsActiveCategoryId       = 'msci_world';
-let _stocksActiveCategoryId      = 'magnificent_7';
-let _cryptoActiveCategoryId      = 'layer_1';
-let _indicesActiveCategoryId     = 'us';
-let _commoditiesActiveCategoryId = 'precious_metals';
+// MC-11C.2: every tab opens on its mobile-friendly "Top / Popular /
+// Major" category so the most-watched assets appear above the fold.
+let _fundsActiveCategoryId       = 'popular';
+let _stocksActiveCategoryId      = 'top';
+let _cryptoActiveCategoryId      = 'top';
+let _indicesActiveCategoryId     = 'major';
+let _commoditiesActiveCategoryId = 'popular';
 
 // MC-11B: discovery catalog registry — maps market tab id → { catalog
 // reference, state getter, state setter, i18n key prefix }. 'etfs' and
