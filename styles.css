@@ -8829,3 +8829,74 @@ body.workspace-active .header {
     font-weight: 600;
   }
 }
+
+/* ── MW-2: Dashboard mobile unified with Market / Workspace ──────────────
+   Mobile-only. Brings the Dashboard's gutter, card geometry, vertical
+   rhythm, chart container and safe-area bottom padding into line with
+   the language we shipped in MC-11C.3 and MW-1. No HTML/JS changes —
+   pure CSS overrides on top of the existing 640px rules. */
+@media (max-width: 560px) {
+  /* Horizontal gutter standardised to 12px so Dashboard / Market /
+     Workspace share the same screen edges. Safe-area aware bottom
+     padding stops content from scrolling under the fixed bottom nav
+     when the iPhone home indicator is present (env() resolves to 0
+     on devices without it, so desktop is unaffected). */
+  .app  { padding: 0 12px calc(60px + env(safe-area-inset-bottom) + 8px); }
+  main  { padding-bottom: 0; }
+
+  /* No screen-level "Dashboard" title is rendered — matches Market and
+     Workspace mobile (the bottom nav already signals the active tab).
+     Defensive: hide any future markup carrying this class. */
+  .dashboard-page-title { display: none; }
+
+  /* Defensive clamp — no Dashboard child may force the viewport wider
+     than the screen. html/body already have overflow-x:hidden. */
+  .app, main, .dashboard-top, .hero-card, .portfolio-slider-card,
+  .assets-section { max-width: 100%; }
+
+  /* Top spacing compressed to the same beat as the Market/Workspace
+     mobile shells. */
+  .dashboard-top { margin-top: var(--space-2); margin-bottom: var(--space-2); }
+
+  /* Hero card: same radius/border treatment as the Workspace summary
+     cards and the Market discovery cards. */
+  .hero-card {
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.07);
+    overflow: hidden;
+  }
+  .hero-left {
+    padding: 14px 14px var(--space-1) !important;
+  }
+  .hero-right {
+    padding: var(--space-2) 14px 14px;
+  }
+
+  /* Mobile slider card aligned with the hero card: same 14px radius,
+     same 12px horizontal padding, gentle 8px outer margin so the
+     vertical rhythm with the hero card above matches Workspace's
+     summary grid spacing. */
+  .portfolio-slider-card {
+    margin: 8px 0;
+    padding: 12px 12px 10px !important;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.07);
+  }
+
+  /* Chart container: fit viewport, never clip horizontally. width:100%
+     overrides any inline canvas width Chart.js writes during reflow. */
+  .chart-wrap, .mobile-chart-wrap {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  .chart-wrap canvas, .mobile-chart-wrap canvas {
+    max-width: 100%;
+  }
+
+  /* Section header ("Mis activos") tightened so the assets list rises
+     closer to the slider card, matching the Market list rhythm. */
+  .section-header { margin-bottom: var(--space-2); }
+  .assets-section { margin-top: var(--space-3); }
+  .assets-list   { gap: 6px; }
+}
