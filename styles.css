@@ -9211,58 +9211,101 @@ body.gs-open { overflow: hidden; }
 }
 .gs-hint[hidden] { display: none; }
 
-@media (max-width: 560px) {
-  /* GLOBAL-SEARCH-2: full-screen, premium native-app feel. Hero gains
-     safe-area top padding so the title sits in a proper header zone,
-     not glued to the notch. Close button moves a touch lower-right. */
+@media (max-width: 768px) {
+  /* GLOBAL-SEARCH-2B: premium command-sheet — a centred glass card
+     floating over the dim backdrop instead of a raw full-screen
+     panel. The shell's own padding owns the inner gutter, so
+     content never touches the viewport edge. Backdrop stays full-
+     screen; overlay scrolls if the sheet plus chrome exceeds the
+     viewport. */
   .gs-overlay {
+    align-items: flex-start;
+    justify-content: center;
     padding: 0;
-    align-items: stretch;
-    background: rgba(4, 8, 16, 0.82);
+    background: rgba(4, 8, 16, 0.74);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
   .gs-shell {
-    max-width: none;
-    height: 100%;
-    max-height: 100%;
-    border-radius: 0;
-    border: 0;
-    background: rgba(10, 14, 24, 0.98);
-    padding-bottom: env(safe-area-inset-bottom);
-    box-shadow: none;
+    width: calc(100vw - 24px);
+    max-width: 520px;
+    height: auto;
+    max-height: calc(100vh - 96px);
+    margin: max(72px, calc(env(safe-area-inset-top) + 56px)) auto 24px;
+    padding: 18px;
+    border-radius: 24px;
+    border: 1px solid rgba(138, 166, 255, 0.16);
+    background: linear-gradient(180deg, rgba(15,22,40,0.98), rgba(11,16,28,0.98));
+    box-shadow: 0 30px 80px rgba(0,0,0,0.55),
+                0 0 0 1px rgba(138,166,255,0.04) inset,
+                0 0 40px -8px rgba(74,130,240,0.18);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
+
+  /* Close button sits cleanly inside the sheet's padding. */
   .gs-close {
-    top: calc(env(safe-area-inset-top) + 12px);
-    right: 12px;
-    width: 34px; height: 34px;
-    font-size: 16px;
+    top: 16px;
+    right: 16px;
+    width: 32px;
+    height: 32px;
+    font-size: 15px;
   }
+
+  /* Hero loses its outer padding — the shell already owns the 18px
+     gutter. Title trails right so it never overlaps the close button. */
   .gs-hero {
-    padding: calc(env(safe-area-inset-top) + 22px) 18px 16px;
+    padding: 4px 0 12px;
+    margin: 0 0 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   }
-  .gs-hero-title { font-size: 20px; }
-  .gs-hero-sub   { font-size: 12.5px; margin-bottom: 14px; }
-  .gs-input-wrap { height: 48px; padding: 0 14px; gap: 10px; }
-  .gs-icon       { width: 18px; height: 18px; }
-  #globalSearchInput { font-size: 16px; }       /* iOS no-zoom threshold */
+  .gs-hero-title {
+    margin: 0 40px 4px 0;
+    font-size: 18px;
+    line-height: 1.2;
+  }
+  .gs-hero-sub {
+    margin: 0 0 12px;
+    font-size: 12.5px;
+    line-height: 1.45;
+    max-width: 100%;
+  }
+  .gs-input-wrap {
+    height: 50px;
+    padding: 0 14px;
+    gap: 10px;
+    border-radius: 12px;
+  }
+  .gs-icon { width: 18px; height: 18px; }
+  #globalSearchInput { font-size: 16px; }    /* iOS no-zoom threshold */
 
-  /* Section spacing tightened for touch surfaces. */
-  .gs-section { padding: 14px 16px 0; }
-  .gs-section + .gs-section { padding-top: 12px; }
-  .gs-section-label { margin-bottom: 8px; }
-  .gs-chips         { gap: 7px; }
-  .gs-chip          { padding: 8px 13px; font-size: 12.5px; }
+  /* Body scrolls inside the sheet — premium card geometry is
+     preserved no matter how many results land. */
+  .gs-body {
+    padding: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    max-height: 55vh;
+  }
+  .gs-section { padding: 12px 0 0; }
+  .gs-section + .gs-section { padding-top: 10px; }
+  .gs-section-label {
+    margin-bottom: 8px;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+  }
+  .gs-chips { gap: 6px; }
+  .gs-chip  { padding: 7px 12px; font-size: 12px; }
 
-  /* Loading + no-results blocks gain a bit more vertical room. */
-  .gs-loading { padding: 26px 16px; }
-  .gs-hint    { padding: 28px 24px; }
+  .gs-loading { padding: 22px 0; }
+  .gs-hint    { padding: 22px 6px; font-size: 12.5px; }
 
-  /* Result rows as card-like rounded blocks — matches the Workspace
-     summary / discovery card language. */
-  .gs-results { padding: 8px 14px 18px; gap: 8px; }
+  .gs-results { padding: 8px 0 0; gap: 8px; }
   .gs-row {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 10px;
-    padding: 12px 14px;
+    padding: 11px 12px;
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 14px;
     background: rgba(255, 255, 255, 0.025);
@@ -9271,7 +9314,7 @@ body.gs-open { overflow: hidden; }
   .gs-row-name { max-width: 100%; }
   .gs-row-meta { font-size: 11.5px; }
   .gs-row-actions { gap: 6px; }
-  .gs-row-btn { padding: 0 12px; font-size: 12px; height: 34px; }
+  .gs-row-btn { padding: 0 12px; font-size: 12px; height: 32px; }
   .gs-row-btn.is-primary {
     border-color: rgba(138,166,255,0.45);
     background: rgba(138,166,255,0.14);
