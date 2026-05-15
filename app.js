@@ -1372,6 +1372,7 @@ let pendingCoinId       = null;
 let pendingMarketSymbol = null; // Yahoo Finance symbol for stock/etf/metal
 let pendingPrice        = null; // fetched price for selected asset
 let pendingCurrency     = null; // MC-6D: provider-reported quote currency for the selected asset
+let pendingIsManualNav  = false;// MC-7: true when pendingPrice came from the user via the manual-NAV fallback path
 let pendingKarat        = 18;   // karat for pending gold asset
 let pendingGoldUnit     = 'g';  // unit for pending gold asset ('g' | 'oz')
 let goldPriceUpdatedAt  = null; // timestamp of last successful live gold price fetch
@@ -7784,6 +7785,53 @@ function setLookupStatus(state, msg = '') {
   lookupStatusEl.textContent = msg;
 }
 
+// MC-7: manual NAV fallback UI. Invoked only when a fund-typed asset
+// (entry.type === 'fund') failed every provider price path. Replaces
+// the static "price unavailable" message with an inline NAV input so
+// the user can still add the asset with an explicit, dated, user-
+// sourced value. Trust-safe language baked into the label.
+function _showManualNavPrompt(entry) {
+  if (!entry || entry.type !== 'fund') return;
+  lookupStatusEl.className   = 'lookup-status info';
+  lookupStatusEl.textContent = '';
+  const label = document.createElement('div');
+  label.textContent = 'Manual NAV — no provider price for this fund. Enter your own value:';
+  label.style.cssText = 'font-size:11px;color:#a3a3a9;margin-bottom:6px;line-height:1.4';
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:6px;align-items:center';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.inputMode = 'decimal';
+  input.placeholder = 'NAV';
+  input.style.cssText = 'flex:1;min-width:0;padding:6px 8px;border:1px solid rgba(255,255,255,0.14);border-radius:6px;background:rgba(255,255,255,0.04);color:#e8e8ea;font-family:inherit;font-size:13px;outline:none';
+  const save = document.createElement('button');
+  save.type = 'button';
+  save.textContent = 'Use NAV';
+  save.style.cssText = 'padding:6px 10px;border:1px solid rgba(255,255,255,0.16);border-radius:6px;background:rgba(138,166,255,0.18);color:#e8e8ea;font-family:inherit;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;white-space:nowrap';
+  row.appendChild(input);
+  row.appendChild(save);
+  lookupStatusEl.appendChild(label);
+  lookupStatusEl.appendChild(row);
+  const submit = () => {
+    const v = parseFloat(String(input.value || '').replace(',', '.').trim());
+    if (!Number.isFinite(v) || v <= 0) {
+      input.style.borderColor = '#ff8a8a';
+      input.focus();
+      return;
+    }
+    pendingPrice       = v;
+    pendingIsManualNav = true;
+    chipPriceEl.textContent = formatDisplay(v, pendingCurrency || 'USD');
+    const stamp = new Date().toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-US');
+    setLookupStatus('ok', 'Manual NAV · ' + stamp);
+  };
+  save.addEventListener('click', submit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); submit(); }
+  });
+  setTimeout(() => { try { input.focus(); } catch (_) {} }, 0);
+}
+
 // ── Update status ──────────────────────────────────────────
 let _lastUpdateState = null;
 
@@ -7992,6 +8040,16 @@ async function refreshPrices() {
         a.change24h = m.change24h;
         if (a.marketSymbol === 'GC=F') goldChangePct = m.change24h;
       }
+    } else if (a.type === 'fund'
+            && typeof a.manualNav === 'number'
+            && Number.isFinite(a.manualNav)
+            && a.manualNav > 0) {
+      // MC-7: provider returned nothing for this fund this cycle.
+      // Fall back to the user-supplied NAV. Provider wins whenever it
+      // does return — this branch is reached only when the market
+      // branch above didn't match (no marketSymbol, or marketPrices
+      // missed the symbol). Never applies to non-fund assets.
+      if (a.price !== a.manualNav) { a.prevPrice = a.price; a.price = a.manualNav; }
     }
   });
 
@@ -12082,6 +12140,7 @@ async function selectAsset(entry) {
   pendingMarketSymbol = null;
   pendingPrice        = null;
   pendingCurrency     = null;
+  pendingIsManualNav  = false;
 
   // Show chip, hide search
   chipBadgeEl.textContent         = entry.ticker.slice(0, 4);
@@ -12140,6 +12199,10 @@ async function selectAsset(entry) {
       pendingPrice            = price;
       chipPriceEl.textContent = formatDisplay(price, 'USD');
       setLookupStatus('ok', '');
+    } else if (entry.type === 'fund') {
+      // MC-7: provider couldn't price this fund — let the user enter NAV.
+      chipPriceEl.textContent = t('noPrice');
+      _showManualNavPrompt(entry);
     } else {
       chipPriceEl.textContent = t('noPrice');
       setLookupStatus('error', t('priceUnavail'));
@@ -12151,6 +12214,10 @@ async function selectAsset(entry) {
       pendingPrice            = fb.price;
       chipPriceEl.textContent = formatDisplay(fb.price, 'USD');
       setLookupStatus('ok', '');
+    } else if (entry.type === 'fund') {
+      // MC-7: also offer manual NAV when the provider call threw.
+      chipPriceEl.textContent = t('noPrice');
+      _showManualNavPrompt(entry);
     } else {
       chipPriceEl.textContent = t('noPrice');
       setLookupStatus('error', t('priceNoConn'));
@@ -12167,6 +12234,7 @@ function clearSelectedAsset() {
   pendingMarketSymbol  = null;
   pendingPrice         = null;
   pendingCurrency      = null;
+  pendingIsManualNav   = false;
   pendingKarat         = 18;
   pendingGoldUnit      = 'g';
   selectedChipEl.style.display = 'none';
@@ -12453,6 +12521,7 @@ function openModal() {
   pendingMarketSymbol  = null;
   pendingPrice         = null;
   pendingCurrency      = null;
+  pendingIsManualNav   = false;
   pendingKarat         = 18;
   pendingGoldUnit      = 'g';
   currentSuggestions   = [];
@@ -12887,6 +12956,13 @@ assetForm.addEventListener('submit', e => {
       change24h:     initialChange24h,
       prevPrice:     null,
       costBasis:     newPurchaseCost,
+      // MC-7: fund-only manual NAV fallback. Persisted only when the
+      // user actually went through the manual-NAV prompt (provider had
+      // no price). The refresh loop falls back to manualNav whenever
+      // the provider didn't write a fresh price for the asset.
+      ...(pendingIsManualNav && type === 'fund'
+        ? { manualNav: pendingPrice, manualNavUpdatedAt: Date.now() }
+        : {}),
       ...(isGoldAsset ? { karat, goldUnit } : {}),
       transactions:  [{ type: 'buy', qty, price: pendingPrice, ts: Date.now() }],
     });
