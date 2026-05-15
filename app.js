@@ -6408,7 +6408,14 @@ function getMarketAsset(symbol) {
     : (MARKET_SYMBOL_ALIASES[String(symbol || '').trim().toUpperCase()]
         || String(symbol || '').trim().toUpperCase());
   const norm      = normalizeSymbol(raw);
-  return MARKET_DATA.find(d => normalizeSymbol(d.symbol) === norm) ?? null;
+  // PR-WP6D.1: match against `canonicalSymbol || symbol`, mirroring the
+  // dashboard's known-working getReactiveMarketPrice lookup. MARKET_DATA
+  // items from _setStocksData / _setCryptoData carry both fields; items
+  // from the /snapshot path (_buildItem → normalizeMarketData) carry only
+  // `symbol`. Reading `canonicalSymbol` first means workspace PRICE() now
+  // resolves any item the dashboard can resolve — without provider /
+  // backend / pricing changes and without an asset.price fallback.
+  return MARKET_DATA.find(d => normalizeSymbol(d.canonicalSymbol || d.symbol) === norm) ?? null;
 }
 function getMarketPrice(symbol) {
   const item  = getMarketAsset(symbol);
