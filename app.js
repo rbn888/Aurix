@@ -381,6 +381,11 @@ const T = {
     goldSpotPerGram:      (k, p, c) => `Spot ${k}K: ${p} ${c}/g`,
     goldSpotPair:         (perG, perOz, c) => `Spot 24K: ${perG} ${c}/g · ${perOz} ${c}/oz`,
     goldPurityLabel:      'Pureza',
+    goldSpotValLabel:     'Valor spot',
+    goldSpotValMeta:      'Valor de metal en vivo',
+    goldResaleValLabel:   'Valor estimado de venta',
+    goldResaleMarginNote: m => `Basado en ${m}% de margen del comprador`,
+    goldResaleDisclaimer: 'Estimación orientativa, no garantía de compra.',
     qty:             'Cantidad',
     qtyGold:         u => `Cantidad (${u})`,
     estimatedVal:    'Valor estimado:',
@@ -828,6 +833,11 @@ const T = {
     goldSpotPerGram:      (k, p, c) => `Spot ${k}K: ${p} ${c}/g`,
     goldSpotPair:         (perG, perOz, c) => `Spot 24K: ${perG} ${c}/g · ${perOz} ${c}/oz`,
     goldPurityLabel:      'Purity',
+    goldSpotValLabel:     'Spot value',
+    goldSpotValMeta:      'Live metal value',
+    goldResaleValLabel:   'Estimated resale value',
+    goldResaleMarginNote: m => `Based on ${m}% dealer margin`,
+    goldResaleDisclaimer: 'Indicative estimate, not guaranteed dealer payout.',
     qty:             'Quantity',
     qtyGold:         u => `Quantity (${u})`,
     estimatedVal:    'Estimated value:',
@@ -1484,7 +1494,11 @@ let pendingPrice        = null; // fetched price for selected asset
 let pendingCurrency     = null; // MC-6D: provider-reported quote currency for the selected asset
 let pendingIsManualNav  = false;// MC-7: true when pendingPrice came from the user via the manual-NAV fallback path
 let pendingKarat        = 18;   // karat for pending gold asset
-let pendingGoldUnit     = 'g';  // unit for pending gold asset ('g' | 'oz')
+let pendingGoldUnit     = 'g';  // unit for pending gold asset ('g' | 'oz' | 'kg')
+// GOLD-2: pending resale margin (percent) for the physical-gold dual
+// valuation panel. Default 8% → factor 0.92. Margin is informational
+// only — portfolio totals always use spot.
+let pendingResaleMargin = 8;
 let goldPriceUpdatedAt  = null; // timestamp of last successful live gold price fetch
 let goldChangePct       = null; // daily % change for XAU — shared across all gold assets
 let isRealEstateMode    = false; // true when modal is in manual real-estate entry mode
@@ -13292,6 +13306,12 @@ function clearSelectedAsset() {
   pendingIsManualNav   = false;
   pendingKarat         = 18;
   pendingGoldUnit      = 'g';
+  pendingResaleMargin  = 8;
+  // Reset margin chip active state so a future XAU selection starts
+  // from the 8% default (matches the persisted default factor 0.92).
+  document.querySelectorAll('#goldMarginChips [data-margin]').forEach(b => {
+    b.classList.toggle('active', b.dataset.margin === '8');
+  });
   selectedChipEl.style.display = 'none';
   if (karatGroupEl)    karatGroupEl.style.display    = 'none';
   if (goldUnitGroupEl) goldUnitGroupEl.style.display = 'none';
@@ -13586,6 +13606,7 @@ function openModal() {
   pendingIsManualNav   = false;
   pendingKarat         = 18;
   pendingGoldUnit      = 'g';
+  pendingResaleMargin  = 8;
   currentSuggestions   = [];
   renderedSuggestions  = [];
   activeSearchFilter   = 'all';
@@ -13851,6 +13872,9 @@ function updatePreview() {
     const grams = _goldGrams(qty, pendingGoldUnit);
     value = grams * _goldPurity(pendingKarat) * (price / OZ_TO_G);
     _renderGoldSpotLine(price);
+    // GOLD-2: dual-value panel — spot stays canonical, resale is a
+    // purely informational haircut on top.
+    _renderGoldValuation(value);
   } else {
     value = qty * price;
   }
@@ -13869,6 +13893,23 @@ function _renderGoldSpotLine(spotPerOzUsd) {
   const perGram = spotPerOzUsd / OZ_TO_G;
   el.textContent = `${t('goldSectionTitle')} — ` +
     `${formatDisplay(perGram, 'USD')}/g · ${formatDisplay(perOz, 'USD')}/oz`;
+}
+
+// GOLD-2: render the dual-value gold panel (Spot vs Estimated resale).
+// Spot value is the canonical metal math (already computed by the
+// caller). Resale is spot × (1 - margin/100). Both amounts route
+// through formatDisplay so they follow the global currency toggle.
+function _renderGoldValuation(spotValueUsd) {
+  const spotEl   = document.getElementById('goldSpotValAmount');
+  const resaleEl = document.getElementById('goldResaleValAmount');
+  const marginEl = document.getElementById('goldResaleMarginLabel');
+  if (!spotEl || !resaleEl) return;
+  const v = Number(spotValueUsd) || 0;
+  const margin = Number(pendingResaleMargin) || 0;
+  const factor = Math.max(0, Math.min(1, 1 - margin / 100));
+  spotEl.textContent   = formatDisplay(v,          'USD');
+  resaleEl.textContent = formatDisplay(v * factor, 'USD');
+  if (marginEl) marginEl.textContent = t('goldResaleMarginNote')(margin);
 }
 qtyInput.addEventListener('input', updatePreview);
 document.getElementById('manualPrice')?.addEventListener('input', updatePreview);
@@ -14050,15 +14091,21 @@ assetForm.addEventListener('submit', e => {
       // the user picked; weightGrams + purityFactor + spotPriceAtAdd
       // are persisted so any downstream tool (reports, exports) can
       // reproduce the value without re-running the formula.
+      // GOLD-2: also persist the chosen dealer-margin estimate. Spot
+      // remains the canonical portfolio number — these fields are
+      // display/reporting only.
       ...(isGoldAsset ? {
         karat,
         goldUnit,
-        physicalGold:    true,
-        metal:           'gold',
-        purityFactor:    _goldPurity(karat),
-        weightInput:     qty,
-        weightGrams:     _goldGrams(qty, goldUnit),
-        spotPriceAtAdd:  pendingPrice,
+        physicalGold:      true,
+        metal:             'gold',
+        purityFactor:      _goldPurity(karat),
+        weightInput:       qty,
+        weightGrams:       _goldGrams(qty, goldUnit),
+        spotPriceAtAdd:    pendingPrice,
+        goldValuationMode: 'spot',
+        resaleMargin:      pendingResaleMargin,
+        resaleFactor:      +(Math.max(0, Math.min(1, 1 - pendingResaleMargin / 100))).toFixed(4),
       } : {}),
       transactions:  [{ type: 'buy', qty, price: pendingPrice, ts: Date.now() }],
     });
@@ -14712,6 +14759,21 @@ if (goldUnitGroupEl) {
         b.classList.toggle('active', b === btn)
       );
       if (qtyLabelEl) qtyLabelEl.textContent = t('qtyGold')(pendingGoldUnit);
+      updatePreview();
+    });
+  });
+}
+
+// GOLD-2: dealer margin selector for the resale estimate. Only updates
+// the informational resale figure — the portfolio always uses spot.
+const goldMarginChipsEl = document.getElementById('goldMarginChips');
+if (goldMarginChipsEl) {
+  goldMarginChipsEl.querySelectorAll('[data-margin]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pendingResaleMargin = parseInt(btn.dataset.margin, 10) || 8;
+      goldMarginChipsEl.querySelectorAll('[data-margin]').forEach(b =>
+        b.classList.toggle('active', b === btn)
+      );
       updatePreview();
     });
   });

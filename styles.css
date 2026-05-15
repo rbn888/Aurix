@@ -1186,6 +1186,86 @@ body.modal-open {
   letter-spacing: 0.005em;
 }
 .gold-spot-line:empty { display: none; }
+
+/* GOLD-2: dual-value panel (Spot vs Estimated resale). Lives inside
+   the gold section card. Two stacked rows with shared border, plus a
+   dealer-margin chip row under the resale row. */
+.gold-valuation-panel {
+  display: flex;
+  flex-direction: column;
+  margin-top: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.02);
+}
+.gold-val-row {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.gold-val-row + .gold-val-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+.gold-val-row--resale { background: rgba(255, 205, 96, 0.03); }
+.gold-val-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(220, 230, 250, 0.55);
+}
+.gold-val-amount {
+  font-size: 20px;
+  font-weight: 700;
+  color: rgba(248, 252, 255, 0.98);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  margin-top: 2px;
+}
+.gold-val-meta {
+  font-size: 11.5px;
+  color: rgba(220, 230, 250, 0.50);
+  letter-spacing: 0.005em;
+}
+.gold-margin-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+.gold-margin-chips button {
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(220, 230, 250, 0.72);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+.gold-margin-chips button:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.gold-margin-chips button.active {
+  border-color: rgba(255, 205, 96, 0.45);
+  background: rgba(255, 205, 96, 0.12);
+  color: rgba(255, 222, 150, 0.98);
+}
+.gold-val-disclaimer {
+  margin-top: 8px;
+  font-size: 11px;
+  color: rgba(220, 230, 250, 0.42);
+  font-style: italic;
+  letter-spacing: 0.005em;
+}
 .type-btn {
   flex: 1;
   background: transparent;

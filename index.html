@@ -406,11 +406,35 @@
 
         <!-- GOLD-1: Physical gold section (visible solo para XAU). Banner
              muestra el spot 24K en €/g + €/oz; selectores ampliados a
-             10/14/18/21/22/24K y g/oz/kg. -->
+             10/14/18/21/22/24K y g/oz/kg.
+             GOLD-2: añade panel dual Spot / Estimación de venta con
+             control de margen del comprador. Estimación de venta es
+             puramente informativa — el portfolio sigue usando el valor
+             spot como neto. -->
         <div class="form-group form-group--gold" id="goldSection" style="display:none">
           <div class="gold-section-head">
             <span class="gold-section-title" data-i18n="goldSectionTitle">Oro físico</span>
             <span class="gold-spot-line" id="goldSpotLine"></span>
+          </div>
+          <div class="gold-valuation-panel" id="goldValuationPanel">
+            <div class="gold-val-row gold-val-row--spot">
+              <div class="gold-val-label" data-i18n="goldSpotValLabel">Valor spot</div>
+              <div class="gold-val-amount" id="goldSpotValAmount">—</div>
+              <div class="gold-val-meta" data-i18n="goldSpotValMeta">Valor de metal en vivo</div>
+            </div>
+            <div class="gold-val-row gold-val-row--resale">
+              <div class="gold-val-label" data-i18n="goldResaleValLabel">Valor estimado de venta</div>
+              <div class="gold-val-amount" id="goldResaleValAmount">—</div>
+              <div class="gold-val-meta" id="goldResaleMarginLabel">Basado en 8% de margen del comprador</div>
+              <div class="gold-margin-chips" id="goldMarginChips" role="tablist">
+                <button type="button" data-margin="5">5%</button>
+                <button type="button" data-margin="8" class="active">8%</button>
+                <button type="button" data-margin="10">10%</button>
+                <button type="button" data-margin="12">12%</button>
+                <button type="button" data-margin="15">15%</button>
+              </div>
+              <div class="gold-val-disclaimer" data-i18n="goldResaleDisclaimer">Estimación orientativa, no garantía de compra.</div>
+            </div>
           </div>
         </div>
 
