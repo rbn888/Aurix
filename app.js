@@ -3878,6 +3878,37 @@ function _aw8PortfolioUnrealizedTotal() {
   return { pnl, cost };
 }
 
+// PR-WP5: portfolio analytics aggregator. One walk over assets[] computes
+// the per-position pnl%, total cost, win count, and best/worst tickers, so
+// PORTFOLIO.COST / WINRATE / BEST / WORST all read from a single shared
+// traversal (same pattern as _aw8PortfolioUnrealizedTotal for PNL family).
+// Positions with no costBasis are skipped (matches PR-8C convention) so a
+// closed or zero-cost position can't skew win-rate or pnl%-ranking.
+function _wp5PortfolioAnalytics() {
+  const out = { cost: 0, total: 0, wins: 0, best: null, worst: null };
+  if (typeof assets === 'undefined' || !Array.isArray(assets)) return out;
+  let bestPct = -Infinity, worstPct = Infinity;
+  for (const a of assets) {
+    if (!a || !a.costBasis || a.costBasis <= 0) continue;
+    const cost = Number(a.costBasis) || 0;
+    if (cost <= 0) continue;
+    out.cost  += cost;
+    out.total += 1;
+    const val = (typeof assetValueUSD === 'function')
+      ? assetValueUSD(a)
+      : (Number(a.qty || 0) * Number(a.price || 0));
+    const pnl = val - cost;
+    const pct = (pnl / cost) * 100;
+    if (pnl > 0) out.wins += 1;
+    const tk = String(a.ticker || '').toUpperCase();
+    if (tk) {
+      if (pct > bestPct)  { bestPct  = pct; out.best  = tk; }
+      if (pct < worstPct) { worstPct = pct; out.worst = tk; }
+    }
+  }
+  return out;
+}
+
 // PR-8C: look up a holding by ticker symbol (case-insensitive). Returns
 // null if absent so callers can short-circuit to 0 for missing positions.
 function _aw8AssetByTicker(sym) {
@@ -3985,6 +4016,40 @@ const _AW8_FINANCIAL_FUNCTIONS = Object.freeze({
   'PORTFOLIO.UNREALIZED'(args) {
     if (args.length !== 0) throw new _AwEvalError('#ERROR');
     return _aw8PortfolioUnrealizedTotal().pnl;
+  },
+  // PR-WP5: advanced portfolio analytics. All four read from a single
+  // _wp5PortfolioAnalytics walk over assets[]. BEST/WORST return ticker
+  // strings (string render path in _formatComputedValue handles them);
+  // COST and WINRATE return numbers (WINRATE already multiplied to a
+  // percentage to match PORTFOLIO.PNL_PCT convention).
+  'PORTFOLIO.COST'(args) {
+    if (args.length !== 0) throw new _AwEvalError('#ERROR');
+    return _wp5PortfolioAnalytics().cost;
+  },
+  'PORTFOLIO.WINRATE'(args) {
+    if (args.length !== 0) throw new _AwEvalError('#ERROR');
+    const a = _wp5PortfolioAnalytics();
+    return a.total > 0 ? (a.wins / a.total) * 100 : 0;
+  },
+  'PORTFOLIO.BEST'(args) {
+    if (args.length !== 0) throw new _AwEvalError('#ERROR');
+    return _wp5PortfolioAnalytics().best || '';
+  },
+  'PORTFOLIO.WORST'(args) {
+    if (args.length !== 0) throw new _AwEvalError('#ERROR');
+    return _wp5PortfolioAnalytics().worst || '';
+  },
+  // PR-WP5: PORTFOLIO.CAGR is intentionally blocked. portfolioHistory
+  // bootstraps with simulated random-walk data (generateSimulatedHistory)
+  // on a first-session user, and asset.transactions may carry a synthetic
+  // ts from the legacy migrate path. There is no runtime signal that
+  // separates real history from simulated, so any CAGR produced would be
+  // fake finance math. Surfacing #N/A makes the limitation explicit instead
+  // of leaking a misleading number; the slot stays reserved so a future
+  // change that records a verifiable inception date can implement it cleanly.
+  'PORTFOLIO.CAGR'(args) {
+    if (args.length !== 0) throw new _AwEvalError('#ERROR');
+    throw new _AwEvalError('#N/A');
   },
   // PR-8C: live 24h change for a market symbol. Prefers MARKET_DATA (the
   // canonical market table populated by the snapshot gateway); falls back
@@ -4099,6 +4164,8 @@ const _AW8_NO_ARG_FUNCTIONS = new Set([
   'PORTFOLIO.PNL', 'PORTFOLIO.PNL_PCT', 'PORTFOLIO.UNREALIZED',
   // PR-9
   'TODAY', 'NOW',
+  // PR-WP5
+  'PORTFOLIO.COST', 'PORTFOLIO.WINRATE', 'PORTFOLIO.BEST', 'PORTFOLIO.WORST', 'PORTFOLIO.CAGR',
 ]);
 const WORKSPACE_FORMULA_SUGGESTIONS = Object.freeze([
   ...Object.keys(_AW8_WORKSPACE_FUNCTIONS).map(key => ({
@@ -4649,7 +4716,13 @@ function _extractFormulaDependencies(parsed) {
             name === 'ASSET.VALUE'    || name === 'ASSET.COST'     ||
             name === 'ASSET.PNL'      || name === 'ASSET.PNL_PCT'  ||
             name === 'PORTFOLIO.PNL'  || name === 'PORTFOLIO.PNL_PCT' ||
-            name === 'PORTFOLIO.UNREALIZED') {
+            name === 'PORTFOLIO.UNREALIZED' ||
+            // PR-WP5: advanced analytics ride the same FINANCIAL:PORTFOLIO
+            // pseudo-dep, so any save() / derived-state bump reactivates
+            // them without per-function graph plumbing.
+            name === 'PORTFOLIO.COST'    || name === 'PORTFOLIO.WINRATE' ||
+            name === 'PORTFOLIO.BEST'    || name === 'PORTFOLIO.WORST'   ||
+            name === 'PORTFOLIO.CAGR') {
           deps.add('FINANCIAL:PORTFOLIO');
           return;
         }
