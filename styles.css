@@ -5942,6 +5942,127 @@ main { padding-bottom: 72px; }
   overflow-y: auto;
 }
 
+/* ── MC-9A: Funds / ETFs discovery view ─────────────────────────────────
+   Horizontal category chips + responsive card grid. Lives inside
+   #marketList alongside the existing market list rendering. Dark-theme
+   native; no images, no asset icons, no external dependencies. */
+.funds-discover {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 0 24px;
+}
+.funds-cats {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 2px 2px 6px;
+  margin: -2px;
+}
+.funds-cats::-webkit-scrollbar { display: none; }
+.funds-cat {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 999px;
+  color: rgba(255,255,255,0.78);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, transform 120ms ease;
+}
+.funds-cat:hover  { background: rgba(255,255,255,0.07); color: #fff; }
+.funds-cat:active { transform: scale(0.97); }
+.funds-cat.active {
+  background: rgba(138,166,255,0.18);
+  border-color: rgba(138,166,255,0.45);
+  color: #fff;
+}
+.funds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.funds-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  color: #e8e8ea;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease, box-shadow 160ms ease;
+  min-height: 96px;
+}
+.funds-card:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.18);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+}
+.funds-card:active { transform: scale(0.985); }
+.funds-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.funds-card-ticker {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+.funds-card-mgr {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.45);
+}
+.funds-card-name {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: rgba(255,255,255,0.78);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex: 1;
+}
+.funds-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+.funds-card-type {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.40);
+}
+.funds-card-cta {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(138,166,255,0.95);
+}
+@media (max-width: 480px) {
+  .funds-grid { grid-template-columns: 1fr; }
+}
+
 .market-section-title {
   font-size: 11px;
   font-weight: var(--font-weight-semibold);

@@ -460,6 +460,17 @@ const T = {
     tab_etfs:          'ETFs',
     tab_indices:       'Índices',
     tab_commodities:   'Materias',
+    tab_funds:         'Fondos',
+    // MC-9A: curated funds catalog category labels
+    fundCat_msci_world:        'MSCI World',
+    fundCat_sp_500:            'S&P 500',
+    fundCat_emerging_markets:  'Mercados Emergentes',
+    fundCat_nasdaq_100:        'Nasdaq 100',
+    fundCat_bonds:             'Bonos',
+    fundCat_gold:              'Oro',
+    fundCat_europe:            'Europa',
+    fundCat_dividend:          'Dividendo',
+    fundCat_small_cap:         'Small Cap',
     empty_watchlist:   'Añade activos ⭐ para seguirlos aquí',
     market_no_results: 'Sin resultados',
     stale:             'sin actualizar',
@@ -852,6 +863,17 @@ const T = {
     tab_etfs:          'ETFs',
     tab_indices:       'Indices',
     tab_commodities:   'Commodities',
+    tab_funds:         'Funds',
+    // MC-9A: curated funds catalog category labels
+    fundCat_msci_world:        'MSCI World',
+    fundCat_sp_500:            'S&P 500',
+    fundCat_emerging_markets:  'Emerging Markets',
+    fundCat_nasdaq_100:        'Nasdaq 100',
+    fundCat_bonds:             'Bonds',
+    fundCat_gold:              'Gold',
+    fundCat_europe:            'Europe',
+    fundCat_dividend:          'Dividend',
+    fundCat_small_cap:         'Small Cap',
     empty_watchlist:   'Add assets ⭐ to track them here',
     market_no_results: 'No results',
     stale:             'stale data',
@@ -10301,6 +10323,7 @@ function renderMarket() {
         <button class="market-tab ${currentMarketTab==='etfs'?'active':''}" data-market="etfs">${t('tab_etfs')}</button>
         <button class="market-tab ${currentMarketTab==='indices'?'active':''}" data-market="indices">${t('tab_indices')}</button>
         <button class="market-tab ${currentMarketTab==='commodities'?'active':''}" data-market="commodities">${t('tab_commodities')}</button>
+        <button class="market-tab ${currentMarketTab==='funds'?'active':''}" data-market="funds">${t('tab_funds')}</button>
       </div>
       <div class="market-body">
         <div class="market-main">
@@ -10472,7 +10495,7 @@ function renderCurrentMarketView() {
 
   if (!Array.isArray(MARKET_DATA)) return;
 
-  const VALID_TABS = ['watchlist','all','crypto','stocks','etfs','indices','commodities'];
+  const VALID_TABS = ['watchlist','all','crypto','stocks','etfs','indices','commodities','funds'];
   if (!VALID_TABS.includes(currentMarketTab)) return;
 
   const data = Object.freeze([...MARKET_DATA]);
@@ -10492,6 +10515,11 @@ function renderCurrentMarketView() {
     html = renderMyAssetsBlock(data);
   } else if (currentMarketTab === 'all') {
     html = renderAllAssets(data);
+  } else if (currentMarketTab === 'funds') {
+    // MC-9A: curated funds/ETFs discovery view. UI-only — clicks reuse
+    // the existing openModal + selectAsset pipeline so pricing comes
+    // from the same infrastructure as the regular add-asset flow.
+    html = _renderFundsCatalog();
   } else {
     const activeType = _TAB_TO_TYPE[currentMarketTab];
     if (!activeType) return;
@@ -10540,6 +10568,166 @@ const _TYPE_LABEL = {
   etfs: () => t('tab_etfs'), indices: () => t('tab_indices'), commodities: () => t('tab_commodities'),
 };
 const _TAB_TO_TYPE = { crypto: 'crypto', stocks: 'stock', etfs: 'etfs', indices: 'indices', commodities: 'commodities' };
+
+// ── MC-9A: curated Funds / ETFs discovery catalog ─────────────────────────
+// Static, hand-picked instruments grouped by investment theme. Every entry
+// is shaped exactly like a search result (ticker / name / type /
+// marketSymbol) so clicking a card flows through the existing selectAsset
+// → resolveSymbolQuote → /api/prices/snapshot pipeline with zero new
+// pricing logic. marketSymbol is a Yahoo-priceable ticker (REGISTRY entry
+// OR generic Yahoo passthrough handles all of them via MC-3 / MC-6 /
+// MC-7B). manager carried for the UI grouping only — never collapsed
+// across managers (Fidelity ≠ iShares ≠ Vanguard, each its own asset).
+const _FUNDS_CATALOG = [
+  { id:'msci_world',       items: [
+    { ticker:'IWDA.AS', name:'iShares Core MSCI World UCITS (Acc)',  manager:'iShares',   type:'etf', marketSymbol:'IWDA.AS' },
+    { ticker:'SWDA.L',  name:'iShares Core MSCI World UCITS (LSE)',  manager:'iShares',   type:'etf', marketSymbol:'SWDA.L'  },
+    { ticker:'EUNL.DE', name:'iShares Core MSCI World UCITS (Xetra)', manager:'iShares',  type:'etf', marketSymbol:'EUNL.DE' },
+    { ticker:'URTH',    name:'iShares MSCI World ETF',                manager:'iShares',  type:'etf', marketSymbol:'URTH'    },
+    { ticker:'CW8.PA',  name:'Amundi MSCI World UCITS',               manager:'Amundi',   type:'etf', marketSymbol:'CW8.PA'  },
+    { ticker:'LCWD.DE', name:'Amundi MSCI World UCITS (Xetra)',       manager:'Amundi',   type:'etf', marketSymbol:'LCWD.DE' },
+    { ticker:'XDWD.DE', name:'Xtrackers MSCI World UCITS',            manager:'Xtrackers',type:'etf', marketSymbol:'XDWD.DE' },
+    { ticker:'SWLD.L',  name:'SPDR MSCI World UCITS',                 manager:'SPDR',     type:'etf', marketSymbol:'SWLD.L'  },
+  ]},
+  { id:'sp_500',           items: [
+    { ticker:'VOO',     name:'Vanguard S&P 500 ETF',                  manager:'Vanguard', type:'etf', marketSymbol:'VOO'     },
+    { ticker:'SPY',     name:'SPDR S&P 500 ETF',                      manager:'SPDR',     type:'etf', marketSymbol:'SPY'     },
+    { ticker:'CSPX.L',  name:'iShares Core S&P 500 UCITS',            manager:'iShares',  type:'etf', marketSymbol:'CSPX.L'  },
+    { ticker:'SXR8.DE', name:'iShares Core S&P 500 (Xetra)',          manager:'iShares',  type:'etf', marketSymbol:'SXR8.DE' },
+    { ticker:'VUSA.L',  name:'Vanguard S&P 500 (Dist)',               manager:'Vanguard', type:'etf', marketSymbol:'VUSA.L'  },
+    { ticker:'VUAA.L',  name:'Vanguard S&P 500 (Acc)',                manager:'Vanguard', type:'etf', marketSymbol:'VUAA.L'  },
+    { ticker:'VFIAX',   name:'Vanguard 500 Index Admiral',            manager:'Vanguard', type:'fund',marketSymbol:'VFIAX'   },
+    { ticker:'FXAIX',   name:'Fidelity 500 Index',                    manager:'Fidelity', type:'fund',marketSymbol:'FXAIX'   },
+  ]},
+  { id:'emerging_markets', items: [
+    { ticker:'EIMI.L',  name:'iShares Core MSCI EM IMI UCITS',        manager:'iShares',  type:'etf', marketSymbol:'EIMI.L'  },
+    { ticker:'VFEM.L',  name:'Vanguard FTSE Emerging Markets',        manager:'Vanguard', type:'etf', marketSymbol:'VFEM.L'  },
+    { ticker:'EMIM.L',  name:'iShares Core MSCI EM (Dist)',           manager:'iShares',  type:'etf', marketSymbol:'EMIM.L'  },
+    { ticker:'XMME.DE', name:'Xtrackers MSCI Emerging Markets',       manager:'Xtrackers',type:'etf', marketSymbol:'XMME.DE' },
+    { ticker:'AEME.DE', name:'Amundi MSCI Emerging Markets',          manager:'Amundi',   type:'etf', marketSymbol:'AEME.DE' },
+    { ticker:'VWO',     name:'Vanguard FTSE Emerging Markets ETF',    manager:'Vanguard', type:'etf', marketSymbol:'VWO'     },
+  ]},
+  { id:'nasdaq_100',       items: [
+    { ticker:'QQQ',     name:'Invesco QQQ Trust',                     manager:'Invesco',  type:'etf', marketSymbol:'QQQ'     },
+    { ticker:'EQQQ.L',  name:'Invesco EQQQ NASDAQ-100 UCITS',         manager:'Invesco',  type:'etf', marketSymbol:'EQQQ.L'  },
+    { ticker:'CNDX.L',  name:'Invesco NASDAQ-100 (Acc)',              manager:'Invesco',  type:'etf', marketSymbol:'CNDX.L'  },
+    { ticker:'SXRV.DE', name:'iShares NASDAQ 100 UCITS (Xetra)',      manager:'iShares',  type:'etf', marketSymbol:'SXRV.DE' },
+    { ticker:'XNAQ.DE', name:'Xtrackers NASDAQ 100 UCITS',            manager:'Xtrackers',type:'etf', marketSymbol:'XNAQ.DE' },
+  ]},
+  { id:'bonds',            items: [
+    { ticker:'AGGH.L',  name:'iShares Core Global Agg Bond Hedged',   manager:'iShares',  type:'etf', marketSymbol:'AGGH.L'  },
+    { ticker:'VAGF.L',  name:'Vanguard Global Aggregate Bond',        manager:'Vanguard', type:'etf', marketSymbol:'VAGF.L'  },
+    { ticker:'AGG',     name:'iShares Core US Aggregate Bond ETF',    manager:'iShares',  type:'etf', marketSymbol:'AGG'     },
+    { ticker:'BND',     name:'Vanguard Total Bond Market ETF',        manager:'Vanguard', type:'etf', marketSymbol:'BND'     },
+    { ticker:'IEAG.L',  name:'iShares Core € Govt Bond UCITS',        manager:'iShares',  type:'etf', marketSymbol:'IEAG.L'  },
+  ]},
+  { id:'gold',             items: [
+    { ticker:'SGLN.L',  name:'iShares Physical Gold ETC',             manager:'iShares',   type:'etf', marketSymbol:'SGLN.L'  },
+    { ticker:'PHAU.L',  name:'WisdomTree Physical Gold',              manager:'WisdomTree',type:'etf', marketSymbol:'PHAU.L'  },
+    { ticker:'GLD',     name:'SPDR Gold Shares',                      manager:'SPDR',      type:'etf', marketSymbol:'GLD'     },
+    { ticker:'IAU',     name:'iShares Gold Trust',                    manager:'iShares',   type:'etf', marketSymbol:'IAU'     },
+    { ticker:'4GLD.DE', name:'Xetra-Gold ETC',                        manager:'Deka',      type:'etf', marketSymbol:'4GLD.DE' },
+  ]},
+  { id:'europe',           items: [
+    { ticker:'VEUR.L',  name:'Vanguard FTSE Developed Europe',        manager:'Vanguard', type:'etf', marketSymbol:'VEUR.L'  },
+    { ticker:'SXR7.DE', name:'iShares Core MSCI Europe (Xetra)',      manager:'iShares',  type:'etf', marketSymbol:'SXR7.DE' },
+    { ticker:'IMEU.L',  name:'iShares Core MSCI Europe UCITS',        manager:'iShares',  type:'etf', marketSymbol:'IMEU.L'  },
+    { ticker:'CEUS.PA', name:'Amundi MSCI Europe UCITS',              manager:'Amundi',   type:'etf', marketSymbol:'CEUS.PA' },
+    { ticker:'EXSA.DE', name:'iShares STOXX Europe 600',              manager:'iShares',  type:'etf', marketSymbol:'EXSA.DE' },
+  ]},
+  { id:'dividend',         items: [
+    { ticker:'VYM',     name:'Vanguard High Dividend Yield ETF',      manager:'Vanguard', type:'etf', marketSymbol:'VYM'     },
+    { ticker:'SCHD',    name:'Schwab US Dividend Equity',             manager:'Schwab',   type:'etf', marketSymbol:'SCHD'    },
+    { ticker:'VHYL.L',  name:'Vanguard FTSE All-World High Div Yld',  manager:'Vanguard', type:'etf', marketSymbol:'VHYL.L'  },
+    { ticker:'IUSA.AS', name:'iShares Core S&P 500 (Dist)',           manager:'iShares',  type:'etf', marketSymbol:'IUSA.AS' },
+    { ticker:'EXX5.DE', name:'iShares STOXX Global Select Dividend',  manager:'iShares',  type:'etf', marketSymbol:'EXX5.DE' },
+  ]},
+  { id:'small_cap',        items: [
+    { ticker:'IUSN.DE', name:'iShares MSCI World Small Cap UCITS',    manager:'iShares',  type:'etf', marketSymbol:'IUSN.DE' },
+    { ticker:'WSML.L',  name:'iShares MSCI World Small Cap UCITS',    manager:'iShares',  type:'etf', marketSymbol:'WSML.L'  },
+    { ticker:'VBR',     name:'Vanguard Small-Cap Value ETF',          manager:'Vanguard', type:'etf', marketSymbol:'VBR'     },
+    { ticker:'IJR',     name:'iShares Core S&P Small-Cap ETF',        manager:'iShares',  type:'etf', marketSymbol:'IJR'     },
+    { ticker:'VBK',     name:'Vanguard Small-Cap Growth ETF',         manager:'Vanguard', type:'etf', marketSymbol:'VBK'     },
+  ]},
+];
+
+let _fundsActiveCategoryId = 'msci_world';
+
+function _escFunds(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function _renderFundsCatalog() {
+  const cat = _FUNDS_CATALOG.find(c => c.id === _fundsActiveCategoryId) || _FUNDS_CATALOG[0];
+  const chips = _FUNDS_CATALOG.map(c => {
+    const label = t('fundCat_' + c.id) || c.id;
+    const active = c.id === cat.id ? ' active' : '';
+    return `<button class="funds-cat${active}" data-funds-cat="${_escFunds(c.id)}">${_escFunds(label)}</button>`;
+  }).join('');
+  const cards = cat.items.map(it => `
+    <button class="funds-card" data-funds-pick="${_escFunds(it.ticker)}" type="button">
+      <div class="funds-card-head">
+        <span class="funds-card-ticker">${_escFunds(it.ticker)}</span>
+        <span class="funds-card-mgr">${_escFunds(it.manager)}</span>
+      </div>
+      <div class="funds-card-name">${_escFunds(it.name)}</div>
+      <div class="funds-card-foot">
+        <span class="funds-card-type">${_escFunds((it.type || '').toUpperCase())}</span>
+        <span class="funds-card-cta">+ Add</span>
+      </div>
+    </button>
+  `).join('');
+  return `
+    <div class="funds-discover">
+      <div class="funds-cats" role="tablist">${chips}</div>
+      <div class="funds-grid">${cards}</div>
+    </div>
+  `;
+}
+
+// MC-9A: click delegation registered once at boot so it survives every
+// renderMarket() re-render. Both the category chips and the cards are
+// inside #marketList, so we hook there.
+function _initFundsCatalogDelegation() {
+  document.addEventListener('click', (e) => {
+    if (currentMarketTab !== 'funds') return;
+    const chip = e.target.closest && e.target.closest('[data-funds-cat]');
+    if (chip) {
+      const next = chip.dataset.fundsCat;
+      if (next && next !== _fundsActiveCategoryId) {
+        _fundsActiveCategoryId = next;
+        const el = document.getElementById('marketList');
+        if (el) {
+          el._lastKey = null;  // force re-render even if html length matches
+          renderCurrentMarketView();
+        }
+      }
+      return;
+    }
+    const card = e.target.closest && e.target.closest('[data-funds-pick]');
+    if (card) {
+      const ticker = card.dataset.fundsPick;
+      const cat = _FUNDS_CATALOG.find(c => c.id === _fundsActiveCategoryId) || _FUNDS_CATALOG[0];
+      const item = cat.items.find(i => i.ticker === ticker);
+      if (item) _openAddAssetWithFund(item);
+    }
+  });
+}
+_initFundsCatalogDelegation();
+
+// Open the existing Add Asset modal and call selectAsset() with the
+// catalog entry. selectAsset already handles price resolution via the
+// same /api/prices/snapshot path the rest of the app uses; no new
+// pricing code added here.
+function _openAddAssetWithFund(item) {
+  if (!item) return;
+  try { openModal(); } catch (_) {}
+  setTimeout(() => {
+    try { selectAsset(item); } catch (e) { console.warn('[funds-pick]', e?.message); }
+  }, 60);
+}
 
 function renderFromCache(type, data) {
   const normalizedType = String(type).toLowerCase().trim();
@@ -10930,6 +11118,13 @@ function initMarketTabs() {
       resetMarketUIState();
       updateMarketTabUI();
       updateMarketHeader();
+      // MC-9A: the curated funds tab is static — no provider hydrate.
+      // Click delegation is wired once in initMarket() (added at module
+      // boot), so just re-render.
+      if (type === 'funds') {
+        renderCurrentMarketView();
+        return;
+      }
       hydrateMarket(type);
     });
   });
