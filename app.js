@@ -2730,9 +2730,12 @@ function buildPortfolioAllocations(assets, totalValue) {
 
   return assets
     .map(asset => {
-      const quantity = Number(asset.qty || asset.amount || asset.quantity || 0);
-      const price    = Number(asset.price || 0);
-      const value    = quantity * price;
+      // LIQ-3: route through the canonical USD valuation so cash and
+      // any other non-USD-denominated holding (EUR stocks, physical
+      // gold, etc.) contribute their real USD weight to the allocation
+      // numerator. Raw qty*price would treat 20,000 EUR cash as 20,000
+      // USD here even though it's worth ~$21.7K.
+      const value = assetValueUSD(asset);
 
       return {
         symbol:     normalizeSymbol(asset.ticker || asset.symbol || ''),
@@ -2748,10 +2751,11 @@ function buildPortfolioExposure(assets = []) {
   const exposure = {};
 
   for (const asset of assets) {
-    const type     = String(asset.type || 'unknown').toLowerCase();
-    const quantity = Number(asset.qty || asset.amount || asset.quantity || 0);
-    const price    = Number(asset.price || 0);
-    const value    = quantity * price;
+    // LIQ-3: same canonical valuation as allocations — keeps the type
+    // buckets denominated in USD so the workspace crypto-exposure ratio
+    // and the dashboard donut never disagree.
+    const type  = String(asset.type || 'unknown').toLowerCase();
+    const value = assetValueUSD(asset);
 
     exposure[type] = (exposure[type] || 0) + value;
   }
@@ -2780,9 +2784,11 @@ function recomputeDerivedFinancialState(source = 'unknown') {
     let totalCostBasis    = 0;
     let totalRealizedPnL  = 0;
     for (const asset of portfolioAssets) {
-      const quantity = Number(asset.qty || asset.amount || asset.quantity || 0);
-      const price    = Number(asset.price || 0);
-      totalValue       += quantity * price;
+      // LIQ-3: canonical per-asset USD valuation (handles cash short-
+      // circuit, gold karat purity, EUR→USD conversion in one place).
+      // Raw qty*price would understate EUR cash by ~8.7% in totalValue
+      // since the LIQ-1 fix stores new cash with price = 1.
+      totalValue       += assetValueUSD(asset);
       totalCostBasis   += Number(asset.costBasis   || 0);
       totalRealizedPnL += Number(asset.realizedPnL || 0);
     }
