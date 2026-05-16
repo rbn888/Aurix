@@ -8046,7 +8046,7 @@ body.workspace-active .header {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 12px 14px 24px;
+  padding: 12px 14px calc(env(safe-area-inset-bottom) + 28px);
   max-width: min(560px, 100%);
   margin-inline: auto;
   width: 100%;
@@ -8063,7 +8063,87 @@ body.workspace-active .header {
 .aurix-mobile-risk,
 .aurix-mobile-risk-row { /* legacy guards */ }
 
-/* ── Hero KPI ─────────────────────────────────────────────── */
+/* ── Intelligence hero (workspace identity) ──────────────── */
+/* Workspace mobile leads with intelligence signals, not portfolio totals
+   — that surface belongs to Dashboard. The hero shows what needs
+   attention: active signals, risk band, sync status. */
+.ws-intel-hero {
+  position: relative;
+  padding: 20px 20px 18px;
+  border-radius: 22px;
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(79,142,247,0.16) 0%, rgba(79,142,247,0) 60%),
+    linear-gradient(180deg, rgba(20,26,40,0.92), rgba(12,16,26,0.92));
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.04) inset,
+    0 18px 40px -24px rgba(8,12,24,0.85);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+.ws-intel-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(60% 40% at 50% -10%, rgba(79,142,247,0.18), transparent 70%);
+  opacity: 0.9;
+}
+.ws-intel-hero.is-warn {
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(233,168,87,0.14) 0%, rgba(233,168,87,0) 60%),
+    linear-gradient(180deg, rgba(28,22,16,0.94), rgba(14,12,8,0.92));
+  border-color: rgba(233,168,87,0.24);
+}
+.ws-intel-hero.is-positive { border-color: rgba(63,191,127,0.22); }
+.ws-intel-hero.is-info     { border-color: rgba(138,166,255,0.22); }
+.ws-intel-eyebrow {
+  position: relative;
+  z-index: 1;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: #fff;
+  line-height: 1.2;
+}
+.ws-intel-sub {
+  position: relative;
+  z-index: 1;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: rgba(220,230,250,0.6);
+  letter-spacing: 0.005em;
+}
+.ws-intel-status {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.ws-intel-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(225,233,255,0.92);
+  white-space: nowrap;
+}
+.ws-intel-pill.is-positive { color: #3FBF7F; background: rgba(63,191,127,0.10); border-color: rgba(63,191,127,0.24); }
+.ws-intel-pill.is-info     { color: rgba(138,166,255,0.95); background: rgba(138,166,255,0.10); border-color: rgba(138,166,255,0.24); }
+.ws-intel-pill.is-warn     { color: #E9A857; background: rgba(233,168,87,0.10); border-color: rgba(233,168,87,0.28); }
+.ws-intel-pill.is-neutral  { color: rgba(225,233,255,0.70); }
+
+/* Legacy hero class — renderer no longer emits this, kept as a no-op. */
 .ws-hero {
   position: relative;
   padding: 20px 20px 18px;
@@ -8176,15 +8256,19 @@ body.workspace-active .header {
   font-weight: 600;
 }
 .ws-kpi-value {
-  font-size: 22px;
+  font-size: clamp(18px, 5vw, 24px);
   font-weight: 700;
   color: #fff;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
-  line-height: 1.1;
-  /* Long values (FX + thousands) — wrap rather than ellipsis. */
-  white-space: normal;
-  word-break: break-word;
+  line-height: 1.15;
+  /* MW-3: values here are always short (counts, OK/Pending, BTC). Use
+     nowrap + keep-all so a currency token like "US$" or "€1.2K" never
+     splits across lines (e.g. "U\nS$"). clamp() handles narrow phones. */
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ws-kpi-card.is-warn     .ws-kpi-value { color: #E9A857; }
 .ws-kpi-card.is-positive .ws-kpi-value { color: #3FBF7F; }
@@ -8264,27 +8348,20 @@ body.workspace-active .header {
 .ws-risk-card.is-info     { border-color: rgba(138,166,255,0.22); }
 .ws-risk-card.is-info     .ws-risk-icon { color: rgba(138,166,255,0.95); background: rgba(138,166,255,0.12); border-color: rgba(138,166,255,0.22); }
 
-/* ── Quick actions ────────────────────────────────────────── */
+/* ── Quick actions (2 actions, no truncation) ────────────── */
 .ws-quick-actions {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  margin: 4px -2px 0;
-  padding: 0 2px 4px;
-  scroll-padding-inline: 2px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
 }
-.ws-quick-actions::-webkit-scrollbar { display: none; }
 .ws-action {
-  flex: 1 1 auto;
-  min-width: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   min-height: 50px;
-  padding: 10px 14px;
+  padding: 12px 14px;
   border-radius: 16px;
   background: linear-gradient(180deg, rgba(138,166,255,0.10), rgba(138,166,255,0.04));
   border: 1px solid rgba(138,166,255,0.22);
@@ -8293,7 +8370,6 @@ body.workspace-active .header {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.01em;
-  white-space: nowrap;
   cursor: pointer;
   transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.22s ease;
 }
@@ -8315,9 +8391,16 @@ body.workspace-active .header {
   line-height: 1;
   flex-shrink: 0;
 }
+/* MW-3: labels never truncate — small phones get a slightly smaller
+   font instead. The two-column grid leaves enough room for "Añadir
+   liquidez" at 13px on a 360px viewport. */
 .ws-action-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+}
+@media (max-width: 360px) {
+  .ws-action { font-size: 12px; padding: 11px 10px; gap: 6px; }
 }
 
 /* ── AW-6.2: Immersive desktop workstation refinement ──────────────────────

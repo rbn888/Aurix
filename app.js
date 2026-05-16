@@ -686,15 +686,41 @@ const T = {
     ws_hero_meta:            (n, band) => `${n} ${n === 1 ? 'activo' : 'activos'} • riesgo ${band}`,
     ws_hero_meta_empty:      'Sin activos en cartera',
     ws_no_history:           'Sin histórico suficiente',
-    ws_pi_eyebrow:           'Portfolio Intelligence',
+    ws_pi_eyebrow:           'Inteligencia de cartera',
     ws_pi_sub:               'Visión consolidada de riesgo y exposición',
     ws_action_add_asset:     'Añadir activo',
     ws_action_add_liquidity: 'Añadir liquidez',
     ws_action_open_dashboard:'Abrir dashboard',
+    ws_action_sync:          'Sincronizar',
     ws_risk_concentration:   'Concentración',
     ws_risk_exposure:        'Exposición',
     ws_risk_volatility:      'Volatilidad',
     ws_risk_sync:            'Sincronización',
+    ws_intel_hero_label:     'Inteligencia de cartera',
+    ws_intel_hero_sub:       'Señales, fórmulas y alertas clave de tu cartera',
+    ws_intel_signal_one:     'señal activa',
+    ws_intel_signal_many:    'señales activas',
+    ws_intel_no_signals:     'Sin señales activas',
+    ws_intel_no_assets:      'Sin activos en cartera',
+    ws_intel_risk_prefix:    'Riesgo',
+    ws_intel_sync_ok:        'Datos actualizados',
+    ws_intel_sync_stale:     'Sincronización pendiente',
+    ws_kpi_active_signals:   'Señales activas',
+    ws_kpi_live_formulas:    'Fórmulas vivas',
+    ws_kpi_market_sync:      'Mercado sincronizado',
+    ws_kpi_critical_exposure:'Exposición crítica',
+    ws_kpi_sync_ok:          'OK',
+    ws_kpi_sync_stale:       'Pendiente',
+    ws_kpi_none:             'Sin alertas',
+    ws_risk_msg_concentration:    s => `${s} domina la cartera`,
+    ws_risk_msg_concentration_alt:'Concentración elevada en un único activo',
+    ws_risk_msg_concentration_ok: 'Asignación equilibrada',
+    ws_risk_msg_exposure:         'Cripto supera el umbral recomendado',
+    ws_risk_msg_exposure_ok:      'Exposición dentro del rango',
+    ws_risk_msg_volatility:       'Alta sensibilidad a movimientos del mercado',
+    ws_risk_msg_volatility_ok:    'Volatilidad bajo control',
+    ws_risk_msg_sync_ok:          'Datos actualizados',
+    ws_risk_msg_sync_stale:       'Actualización pendiente',
     globalSearchPH:           'Busca BTC, Tesla, IWDA, Oro...',
     globalSearchHeroTitle:    'Buscar activos',
     globalSearchHeroSub:      'Busca acciones, cripto, ETFs, fondos, índices y materias primas.',
@@ -1170,10 +1196,36 @@ const T = {
     ws_action_add_asset:     'Add asset',
     ws_action_add_liquidity: 'Add cash',
     ws_action_open_dashboard:'Open dashboard',
+    ws_action_sync:          'Sync now',
     ws_risk_concentration:   'Concentration',
     ws_risk_exposure:        'Exposure',
     ws_risk_volatility:      'Volatility',
     ws_risk_sync:            'Sync',
+    ws_intel_hero_label:     'Portfolio Intelligence',
+    ws_intel_hero_sub:       'Key signals, formulas and portfolio alerts',
+    ws_intel_signal_one:     'active signal',
+    ws_intel_signal_many:    'active signals',
+    ws_intel_no_signals:     'No active signals',
+    ws_intel_no_assets:      'No assets in portfolio',
+    ws_intel_risk_prefix:    'Risk',
+    ws_intel_sync_ok:        'Market data up to date',
+    ws_intel_sync_stale:     'Sync pending',
+    ws_kpi_active_signals:   'Active signals',
+    ws_kpi_live_formulas:    'Live formulas',
+    ws_kpi_market_sync:      'Market sync',
+    ws_kpi_critical_exposure:'Critical exposure',
+    ws_kpi_sync_ok:          'OK',
+    ws_kpi_sync_stale:       'Pending',
+    ws_kpi_none:             'No alerts',
+    ws_risk_msg_concentration:    s => `${s} dominates the portfolio`,
+    ws_risk_msg_concentration_alt:'High concentration in a single asset',
+    ws_risk_msg_concentration_ok: 'Balanced allocation',
+    ws_risk_msg_exposure:         'Crypto above recommended threshold',
+    ws_risk_msg_exposure_ok:      'Exposure within range',
+    ws_risk_msg_volatility:       'High sensitivity to market moves',
+    ws_risk_msg_volatility_ok:    'Volatility under control',
+    ws_risk_msg_sync_ok:          'Market data up to date',
+    ws_risk_msg_sync_stale:       'Update pending',
     globalSearchPH:           'Search BTC, Tesla, IWDA, Gold...',
     globalSearchHeroTitle:    'Search assets',
     globalSearchHeroSub:      'Search stocks, crypto, ETFs, funds, indices and commodities.',
@@ -6156,11 +6208,12 @@ function _renderWorkspaceDesktop(sheet) {
 }
 
 function _renderWorkspaceMobile(sheet) {
-  // MW-2: executive intelligence dashboard. Reads the same derived snapshot
-  // as the desktop renderer — pure consumer, no math, no state mutation.
-  // Hierarchy: hero KPI → secondary KPI grid → portfolio-intelligence
-  // section header → stacked risk cards → quick actions. Replaces the
-  // earlier equal-weight 2×3 grid + table risk panel.
+  // MW-3: Workspace as an intelligence layer, intentionally distinct from
+  // the dashboard. The dashboard answers "what do I own?"; this surface
+  // answers "what needs attention?" — active signals, live formulas,
+  // sync status, critical exposure. Pure consumer of the existing
+  // derived snapshot + formula runtime + workspace runtime. No math,
+  // pricing, providers or persistence touched.
   const derived = getDerivedFinancialSnapshot();
   const portfolio  = derived?.portfolio || {};
   const totalValue = Number(portfolio.totalValue || 0);
@@ -6170,25 +6223,7 @@ function _renderWorkspaceMobile(sheet) {
   const cryptoVal  = Number(exposure.crypto || 0);
   const cryptoPct  = totalValue > 0 ? (cryptoVal / totalValue * 100) : 0;
 
-  const dailyPnl    = (typeof portfolio.dailyPnl === 'number') ? portfolio.dailyPnl : null;
-  const dailyPnlPct = (typeof portfolio.dailyPnlPct === 'number') ? portfolio.dailyPnlPct : null;
-
-  // Monetary values route through the canonical display layer so the
-  // global currency toggle is honoured. portfolio.totalValue is the raw
-  // qty*price aggregate (USD per dashboard convention).
-  const fmtMoney  = v => formatDisplay(v, 'USD');
-  const fmtSigned = v => {
-    const n = Number(v) || 0;
-    return (n >= 0 ? '+' : '') + formatDisplay(n, 'USD');
-  };
-
-  // Liquidity in base currency, summed across cash entries via the
-  // canonical liquidity helper — never raw qty (mixed currencies).
-  const liquidityBase = (Array.isArray(assets) ? assets : [])
-    .filter(a => a.type === 'cash')
-    .reduce((s, a) => s + liquidityBaseValue(a), 0);
-
-  // Risk band — same heuristic the previous version used; consumer-only.
+  // Risk band — same consumer-only heuristic the desktop monitor follows.
   let riskScore = 25;
   if (topAlloc && Number(topAlloc.allocation || 0) > 0.5)  riskScore += 25;
   else if (topAlloc && Number(topAlloc.allocation || 0) > 0.35) riskScore += 12;
@@ -6205,113 +6240,155 @@ function _renderWorkspaceMobile(sheet) {
                   : riskScore >= 35 ? 'info'
                                     : 'positive';
 
-  // Hero delta: never render "—". If daily P&L is missing we either hide
-  // the line or replace it with a soft "not enough history" note.
-  let heroDeltaHtml = '';
-  if (dailyPnl != null) {
-    const signed = fmtSigned(dailyPnl);
-    const pctStr = dailyPnlPct != null
-      ? ` (${dailyPnlPct >= 0 ? '+' : ''}${dailyPnlPct.toFixed(2)}%)`
-      : '';
-    const deltaTone = dailyPnl >= 0 ? 'positive' : 'negative';
-    heroDeltaHtml = `<div class="ws-hero-delta is-${deltaTone}">${_escapeWorkspaceText(signed)} ${_escapeWorkspaceText(t('ws_hero_today'))}${_escapeWorkspaceText(pctStr)}</div>`;
-  } else if (assetCount > 0) {
-    heroDeltaHtml = `<div class="ws-hero-delta is-muted">${_escapeWorkspaceText(t('ws_no_history'))}</div>`;
+  // Signal categories come from the existing builder so the desktop
+  // monitor and the mobile intelligence layer never drift apart.
+  const categories = _buildWorkspaceRiskCategories();
+  const activeSignals = categories.reduce((n, cat) => {
+    const sig = cat.signals[0];
+    return n + (sig && sig.tone && sig.tone !== 'ok' ? 1 : 0);
+  }, 0);
+
+  // Live formulas — count of currently registered workspace formulas.
+  const liveFormulas = (FORMULA_RUNTIME && FORMULA_RUNTIME.formulas)
+    ? FORMULA_RUNTIME.formulas.size
+    : 0;
+
+  const syncStale = !!(WORKSPACE_RUNTIME && WORKSPACE_RUNTIME.stale);
+  const syncOk    = !syncStale;
+
+  // Critical exposure — the loudest active risk source. Crypto threshold
+  // wins over single-asset dominance because diversification copy reads
+  // more meaningful at the >40% crypto band.
+  let criticalExposure;
+  if (assetCount === 0) {
+    criticalExposure = t('ws_kpi_none');
+  } else if (cryptoPct > 40) {
+    criticalExposure = t('wsCardCryptoExposure');
+  } else if (topAlloc && Number(topAlloc.allocation || 0) > 0.5) {
+    criticalExposure = String(topAlloc.symbol || '').toUpperCase() || t('ws_kpi_none');
+  } else {
+    criticalExposure = t('ws_kpi_none');
   }
 
-  const heroMeta = assetCount === 0
-    ? t('ws_hero_meta_empty')
-    : (typeof t('ws_hero_meta') === 'function'
-        ? t('ws_hero_meta')(assetCount, String(riskBand).toLowerCase())
-        : `${assetCount} • ${riskBand}`);
+  // Hero status: 1) signals count, 2) risk band (when there are assets),
+  // 3) sync state. Each segment is rendered as a pill — premium and
+  // mobile-native, replaces the dashboard-style hero value.
+  const statusSegments = [];
+  if (assetCount === 0) {
+    statusSegments.push({ tone: 'neutral', text: t('ws_intel_no_assets') });
+  } else if (activeSignals === 0) {
+    statusSegments.push({ tone: 'positive', text: t('ws_intel_no_signals') });
+  } else {
+    const word = activeSignals === 1 ? t('ws_intel_signal_one') : t('ws_intel_signal_many');
+    const segTone = activeSignals > 1 ? 'warn' : 'info';
+    statusSegments.push({ tone: segTone, text: `${activeSignals} ${word}` });
+  }
+  if (assetCount > 0) {
+    statusSegments.push({
+      tone: heroTone,
+      text: `${t('ws_intel_risk_prefix')} ${String(riskBand).toLowerCase()}`,
+    });
+  }
+  statusSegments.push({
+    tone: syncOk ? 'positive' : 'info',
+    text: syncOk ? t('ws_intel_sync_ok') : t('ws_intel_sync_stale'),
+  });
 
-  const heroValueText = assetCount === 0 ? fmtMoney(0) : fmtMoney(totalValue);
+  const statusHtml = statusSegments.map(s => `
+    <span class="ws-intel-pill is-${_escapeWorkspaceText(s.tone)}">${_escapeWorkspaceText(s.text)}</span>
+  `).join('');
 
-  // Top allocation label — never "—", show a placeholder dash when empty
-  // but keep the card aligned with the rest of the grid.
-  const topLabel = topAlloc?.symbol
-    ? `${topAlloc.symbol} · ${((topAlloc.allocation || 0) * 100).toFixed(0)}%`
-    : '—';
-
-  // Secondary KPI grid — portfolio value is intentionally absent
-  // (already the hero); the four cards here are pure context metrics.
-  const secondary = [
-    { label: t('wsCardTopAlloc'),       value: topLabel,                                          tone: 'info'     },
-    { label: t('wsCardCryptoExposure'), value: assetCount === 0 ? '—' : cryptoPct.toFixed(1) + '%', tone: cryptoPct > 40 ? 'warn' : 'info' },
-    { label: t('wsCardAssetCount'),     value: String(assetCount),                                tone: 'neutral'  },
-    { label: t('wsCardLiquidity'),      value: formatBase(liquidityBase),                         tone: 'positive' },
+  // Workspace-native KPI grid — no portfolio total, no asset count repeat.
+  const kpiCards = [
+    {
+      label: t('ws_kpi_active_signals'),
+      value: String(activeSignals),
+      tone: activeSignals > 1 ? 'warn' : (activeSignals === 1 ? 'info' : 'positive'),
+    },
+    {
+      label: t('ws_kpi_live_formulas'),
+      value: String(liveFormulas),
+      tone: 'info',
+    },
+    {
+      label: t('ws_kpi_market_sync'),
+      value: syncOk ? t('ws_kpi_sync_ok') : t('ws_kpi_sync_stale'),
+      tone: syncOk ? 'positive' : 'info',
+    },
+    {
+      label: t('ws_kpi_critical_exposure'),
+      value: criticalExposure,
+      tone: assetCount === 0 ? 'neutral' : (cryptoPct > 40 || (topAlloc && Number(topAlloc.allocation || 0) > 0.5) ? 'warn' : 'positive'),
+    },
   ];
 
-  const kpiHtml = secondary.map(c => `
+  const kpiHtml = kpiCards.map(c => `
     <div class="ws-kpi-card is-${_escapeWorkspaceText(c.tone)}">
       <div class="ws-kpi-label">${_escapeWorkspaceText(c.label)}</div>
       <div class="ws-kpi-value">${_escapeWorkspaceText(c.value)}</div>
     </div>
   `).join('');
 
-  // Stacked risk cards — Concentration / Exposure / Volatility / Sync.
-  // Categories come from the existing derived signal builder; the Sync
-  // row is synthesised from the existing stale flag (no new pipelines).
-  const categories = _buildWorkspaceRiskCategories();
-  const syncStale = !!WORKSPACE_RUNTIME.stale;
-  categories.push({
-    id: 'sync',
-    label: t('ws_risk_sync'),
-    signals: [{
-      tone: syncStale ? 'info' : 'ok',
-      text: syncStale ? (t('wsSyncOffline') || 'Sync paused')
-                      : (t('wsSyncLive')    || 'Market live'),
-    }],
-  });
-
-  const RISK_LABEL_OVERRIDE = {
+  // Risk cards — mobile-native premium copy. Tone comes from the shared
+  // category builder so the icons + colours stay consistent with desktop,
+  // but the text is rewritten short-form so the rows breathe on mobile.
+  const RISK_ICON  = { concentration: '▲', exposure: '%', volatility: '⚡', sync: '↻' };
+  const RISK_LABEL = {
     concentration: t('ws_risk_concentration'),
     exposure:      t('ws_risk_exposure'),
     volatility:    t('ws_risk_volatility'),
     sync:          t('ws_risk_sync'),
   };
-  const RISK_ICON = {
-    concentration: '▲',
-    exposure:      '%',
-    volatility:    '⚡',
-    sync:          '↻',
-  };
+  const concSig = categories.find(c => c.id === 'concentration')?.signals?.[0] || { tone: 'ok' };
+  const expoSig = categories.find(c => c.id === 'exposure')?.signals?.[0]      || { tone: 'ok' };
+  const volSig  = categories.find(c => c.id === 'volatility')?.signals?.[0]    || { tone: 'ok' };
 
-  const riskCardsHtml = categories.map(cat => {
-    const sig  = cat.signals[0] || { tone: 'ok', text: '—' };
-    const tone = String(sig.tone || 'ok');
-    const icon = RISK_ICON[cat.id] || '•';
-    const label = RISK_LABEL_OVERRIDE[cat.id] || cat.label;
-    return `
-      <article class="ws-risk-card is-${_escapeWorkspaceText(tone)}">
-        <span class="ws-risk-icon" aria-hidden="true">${_escapeWorkspaceText(icon)}</span>
-        <div class="ws-risk-body">
-          <div class="ws-risk-label">${_escapeWorkspaceText(label)}</div>
-          <div class="ws-risk-msg">${_escapeWorkspaceText(sig.text)}</div>
-        </div>
-      </article>
-    `;
-  }).join('');
+  const concText = concSig.tone === 'ok'
+    ? t('ws_risk_msg_concentration_ok')
+    : (topAlloc && topAlloc.symbol
+        ? (typeof t('ws_risk_msg_concentration') === 'function'
+            ? t('ws_risk_msg_concentration')(String(topAlloc.symbol).toUpperCase())
+            : t('ws_risk_msg_concentration_alt'))
+        : t('ws_risk_msg_concentration_alt'));
+  const expoText = expoSig.tone === 'ok' ? t('ws_risk_msg_exposure_ok')   : t('ws_risk_msg_exposure');
+  const volText  = volSig.tone  === 'ok' ? t('ws_risk_msg_volatility_ok') : t('ws_risk_msg_volatility');
+  const syncText = syncOk ? t('ws_risk_msg_sync_ok') : t('ws_risk_msg_sync_stale');
+
+  const mobileRisk = [
+    { id: 'concentration', tone: concSig.tone || 'ok',     text: concText },
+    { id: 'exposure',      tone: expoSig.tone || 'ok',     text: expoText },
+    { id: 'volatility',    tone: volSig.tone  || 'ok',     text: volText  },
+    { id: 'sync',          tone: syncOk ? 'ok' : 'info',   text: syncText },
+  ];
+
+  const riskCardsHtml = mobileRisk.map(r => `
+    <article class="ws-risk-card is-${_escapeWorkspaceText(r.tone)}">
+      <span class="ws-risk-icon" aria-hidden="true">${_escapeWorkspaceText(RISK_ICON[r.id] || '•')}</span>
+      <div class="ws-risk-body">
+        <div class="ws-risk-label">${_escapeWorkspaceText(RISK_LABEL[r.id])}</div>
+        <div class="ws-risk-msg">${_escapeWorkspaceText(r.text)}</div>
+      </div>
+    </article>
+  `).join('');
 
   return `
     <div class="aurix-workspace-shell is-mobile">
-      <section class="ws-hero is-${_escapeWorkspaceText(heroTone)}">
-        <div class="ws-hero-label">${_escapeWorkspaceText(t('ws_hero_label'))}</div>
-        <div class="ws-hero-value">${_escapeWorkspaceText(heroValueText)}</div>
-        ${heroDeltaHtml}
-        <div class="ws-hero-meta">${_escapeWorkspaceText(heroMeta)}</div>
+      <section class="ws-intel-hero is-${_escapeWorkspaceText(heroTone)}">
+        <div class="ws-intel-eyebrow">${_escapeWorkspaceText(t('ws_intel_hero_label'))}</div>
+        <div class="ws-intel-sub">${_escapeWorkspaceText(t('ws_intel_hero_sub'))}</div>
+        <div class="ws-intel-status">${statusHtml}</div>
       </section>
 
       <section class="ws-kpi-grid">${kpiHtml}</section>
 
       <header class="ws-section-head">
-        <div class="ws-section-eyebrow">${_escapeWorkspaceText(t('ws_pi_eyebrow'))}</div>
+        <div class="ws-section-eyebrow">${_escapeWorkspaceText(t('ws_risk_signals'))}</div>
         <div class="ws-section-sub">${_escapeWorkspaceText(t('ws_pi_sub'))}</div>
       </header>
 
       <section class="ws-risk-stack" aria-label="${_escapeWorkspaceText(t('ws_risk_signals'))}">${riskCardsHtml}</section>
 
-      <section class="ws-quick-actions" aria-label="${_escapeWorkspaceText(t('ws_pi_eyebrow'))}">
+      <section class="ws-quick-actions">
         <button type="button" class="ws-action" data-ws-action="add-asset">
           <span class="ws-action-icon" aria-hidden="true">+</span>
           <span class="ws-action-label">${_escapeWorkspaceText(t('ws_action_add_asset'))}</span>
@@ -6319,10 +6396,6 @@ function _renderWorkspaceMobile(sheet) {
         <button type="button" class="ws-action" data-ws-action="add-liquidity">
           <span class="ws-action-icon" aria-hidden="true">+</span>
           <span class="ws-action-label">${_escapeWorkspaceText(t('ws_action_add_liquidity'))}</span>
-        </button>
-        <button type="button" class="ws-action" data-ws-action="open-dashboard">
-          <span class="ws-action-icon" aria-hidden="true">↗</span>
-          <span class="ws-action-label">${_escapeWorkspaceText(t('ws_action_open_dashboard'))}</span>
         </button>
       </section>
     </div>
