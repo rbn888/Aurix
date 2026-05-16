@@ -1906,6 +1906,22 @@ function _goldGrams(qty, unit) {
   return qty;
 }
 
+// LIQ-2: canonical liquidity valuation helpers — single source of truth
+// for cash. Nominal is the entered amount in the row's own assetCurrency
+// (what the user typed). Base is that amount converted exactly once to
+// the user's selected base currency. No market price, no synthetic unit
+// price, no double FX. Every cash consumer (row display, category total,
+// portfolio total, insights) must funnel through these so the figures
+// stay in lockstep.
+function liquidityNominal(asset) {
+  return Number(asset?.qty || 0);
+}
+function liquidityBaseValue(asset) {
+  const curr = (asset?.assetCurrency || 'USD').toUpperCase();
+  const nominal = liquidityNominal(asset);
+  return curr === baseCurrency ? nominal : toBase(nominal, curr);
+}
+
 // Gold-aware value in assetCurrency: applies karat purity for XAU assets
 function assetNativeValue(asset) {
   // LIQ-1: cash is just an amount of its own currency. Multiplying by a
@@ -1913,7 +1929,7 @@ function assetNativeValue(asset) {
   // FX rate when assetValueUSD later converts native→USD, which made
   // 20,000 EUR show as 21,739.13 EUR. For cash, qty IS the value in
   // assetCurrency by definition; price has no meaning beyond unity.
-  if (asset.type === 'cash') return Number(asset.qty || 0);
+  if (asset.type === 'cash') return liquidityNominal(asset);
   if (asset.ticker === 'XAU' && asset.karat) {
     // GOLD-1: physical gold — value = grams × purity × (spot per oz / OZ_TO_G).
     // Honours the stored unit (g | oz | kg). asset.price is the live USD
@@ -1944,6 +1960,12 @@ function totalValueBase() { return toBase(totalValueUSD(), 'USD'); }
 
 // ── P&L calculations ────────────────────────────────────────
 function assetPnLBase(asset) {
+  // LIQ-2: cash never produces P&L. Holding 20,000 EUR ≠ a position
+  // with a unit price that can drift; any cost-basis the legacy add-
+  // position flow may have stamped is a bookkeeping artifact, not a
+  // gain/loss. FX P&L is out of scope and would need an explicit FX
+  // valuation model — not coming from this path.
+  if (asset.type === 'cash') return { abs: 0, pct: 0 };
   const value = asset.qty * asset.price;
   const cost  = asset.costBasis || 0;
   if (!cost || cost <= 0) return { abs: 0, pct: 0 };
@@ -9262,7 +9284,10 @@ function generateBaseInsights() {
     });
   }
 
-  const liquidity    = assets.filter(a => a.type === 'cash').reduce((s, a) => s + a.qty, 0);
+  // LIQ-2: liquidity / total ratio — both in USD via assetValueUSD so
+  // the cash and non-cash legs share units. Previously this summed raw
+  // qty across mixed currencies (treating 20K EUR as 20K USD).
+  const liquidity    = assets.filter(a => a.type === 'cash').reduce((s, a) => s + assetValueUSD(a), 0);
   const liquidityPct = totalValue > 0 ? Math.round((liquidity / totalValue) * 100) : 0;
   if (totalValue > 0 && liquidityPct < 10) {
     candidates.push({
@@ -12441,8 +12466,17 @@ function render(animate = false) {
     const isCash     = asset.type === 'cash';
     const isGold     = asset.ticker === 'XAU' && asset.karat;
     const valueOrig  = assetNativeValue(asset);              // in assetCurr
-    const valueBase  = toBase(valueOrig, assetCurr);         // in baseCurrency
+    const valueBase  = isCash
+      ? liquidityBaseValue(asset)                            // LIQ-2: single conversion
+      : toBase(valueOrig, assetCurr);
     const showOrig   = assetCurr !== baseCurrency;
+    // LIQ-2: cash row prints the nominal entered amount as the primary
+    // figure (what the user actually holds), and adds an "≈ base value"
+    // hint only when the cash currency differs from baseCurrency.
+    const cashIsCrossCurrency = isCash && assetCurr !== baseCurrency;
+    const primaryValueText = isCash
+      ? formatCurrency(liquidityNominal(asset), assetCurr)
+      : formatBase(valueBase);
 
     const change24   = asset.change24h;
     const changeHtml = (!isCash && typeof change24 === 'number')
@@ -12500,7 +12534,9 @@ function render(animate = false) {
       : '';
 
     const subLineHtml = isCash
-      ? `<span class="units">${formatCurrency(asset.qty, assetCurr)} ${t('cashLabel')}</span>`
+      ? cashIsCrossCurrency
+        ? `<span class="units">≈ ${formatBase(valueBase)} · ${t('cashLabel')}</span>`
+        : `<span class="units">${t('cashLabel')}</span>`
       : isRE
         ? `<span class="units">${assetCurr === 'EUR' ? '€' : '$'} ${assetCurr}</span>
            ${rentHtml}`
@@ -12557,7 +12593,10 @@ function render(animate = false) {
         if (isGold)               return (asset.goldUnit || 'g') === 'g' ? gramsToDisplay(asset.qty) : `${formatQty(asset.qty)} oz`;
         if (asset.type === 'crypto') return `${formatQty(asset.qty)} ${asset.ticker.toUpperCase()}`;
         if (asset.type === 'metal')  return gramsToDisplay(asset.qty);
-        if (isCash)               return formatCurrency(asset.qty, assetCurr);
+        // LIQ-2: cash sub-line shows just the "efectivo" label — the
+        // nominal amount is already the primary dar-value, so repeating
+        // it here would clutter the row.
+        if (isCash)               return t('cashLabel');
         return `${formatQty(asset.qty)} ${t('units')}`;
       })();
       const priceStr = (!isCash && !isRE && asset.price > 0)
@@ -12582,7 +12621,8 @@ function render(animate = false) {
           ${txInfo}
         </div>
         <div class="dar-right">
-          <div class="dar-value ${flashClass}"${prevValueBase != null ? ` data-from="${prevValueBase.toFixed(6)}" data-to="${valueBase.toFixed(6)}"` : ''}>${formatBase(valueBase)}</div>
+          <div class="dar-value ${isCash ? '' : flashClass}"${(!isCash && prevValueBase != null) ? ` data-from="${prevValueBase.toFixed(6)}" data-to="${valueBase.toFixed(6)}"` : ''}>${primaryValueText}</div>
+          ${cashIsCrossCurrency ? `<span class="dar-fx">≈ ${formatBase(valueBase)}</span>` : ''}
           ${categoryValue > 0 ? `<span class="dar-cat-pct">${((valueBase / categoryValue) * 100).toFixed(1)}%</span>` : ''}
           ${darChangeHtml}
           ${pnlData ? `<span class="dar-pnl ${pnlData.abs >= 0 ? 'up' : 'down'}">${pnlData.abs >= 0 ? '+' : '−'}${formatBase(Math.abs(pnlData.abs))} (${pnlData.abs >= 0 ? '+' : '−'}${Math.abs(pnlData.pct).toFixed(1)}%)</span>` : ''}
@@ -12621,7 +12661,7 @@ function render(animate = false) {
         ${statusHtml}
       </div>
       <div class="asset-value">
-        <div class="asset-value-amount ${flashClass}"${prevValueBase != null ? ` data-from="${prevValueBase.toFixed(6)}" data-to="${valueBase.toFixed(6)}"` : ''}>${formatBase(valueBase)}</div>
+        <div class="asset-value-amount ${isCash ? '' : flashClass}"${(!isCash && prevValueBase != null) ? ` data-from="${prevValueBase.toFixed(6)}" data-to="${valueBase.toFixed(6)}"` : ''}>${primaryValueText}</div>
         <div class="asset-value-sub">${subLineHtml}</div>
         ${pnlHtml}
       </div>
@@ -14946,10 +14986,19 @@ function openAssetDetailModal(assetId) {
       asset.price != null ? formatDisplay(asset.price, assetCurr) : '—';
   }
 
-  // Total value
+  // Total value — LIQ-2: cash shows nominal in its own currency (with
+  // an ≈ base hint when cross-currency); every other type shows the
+  // base-currency value via formatDisplay.
   const valueBase = assetNativeValue(asset);
-  document.getElementById('adValue').textContent =
-    valueBase != null ? formatDisplay(valueBase, assetCurr) : '—';
+  const adValueEl = document.getElementById('adValue');
+  if (isCash) {
+    const nominalStr = formatCurrency(liquidityNominal(asset), assetCurr);
+    adValueEl.textContent = assetCurr !== baseCurrency
+      ? `${nominalStr} (≈ ${formatBase(liquidityBaseValue(asset))})`
+      : nominalStr;
+  } else {
+    adValueEl.textContent = valueBase != null ? formatDisplay(valueBase, assetCurr) : '—';
+  }
   document.getElementById('adValueLabel').textContent = t('adValueLabel');
 
   // PnL
