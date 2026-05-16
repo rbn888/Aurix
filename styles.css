@@ -8759,12 +8759,32 @@ body.workspace-active .header {
 @media (max-width: 560px) {
   /* (1) Hard-clamp page horizontals so no child can force the viewport
      wider than the screen. body/html already have overflow-x:hidden;
-     this layer adds the major market containers as a belt-and-braces. */
+     this layer adds the major market containers as a belt-and-braces.
+     width:100% (not 100vw) on the inner containers avoids the iOS
+     scrollbar-gutter overshoot that would otherwise reintroduce
+     sideways drift when the soft keyboard opens. */
   html, body, #app { max-width: 100vw; overflow-x: hidden; }
   .market-screen,
   .market-body,
   #marketList,
-  .market-section { max-width: 100%; overflow-x: hidden; }
+  .market-section {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+
+  /* Horizontal scrollers (top tabs, category chips) stay scrollable
+     internally but their overscroll must not bubble up and rock the
+     page sideways when the keyboard slides in. contain:paint isolates
+     repaints to the scroller bounds. */
+  .market-tabs,
+  .funds-cats {
+    max-width: 100%;
+    overscroll-behavior-x: contain;
+    contain: paint;
+  }
 
   /* (2) Row layout: 3-column grid — asset cell on the left (icon + name
      + type badge stacked), price/change stacked on the right, star on
@@ -8855,31 +8875,43 @@ body.workspace-active .header {
   .market-screen .market-header { display: none; }
 
   /* (2) Search becomes the top element with a blue-accent premium
-     style mirroring the desktop treatment: lupa visible, compact 38px
-     height, glass background, focus ring tinted Aurix blue. */
+     style mirroring the desktop treatment: lupa visible, compact 40px
+     height, glass background, focus ring tinted Aurix blue.
+     font-size sits at 16px — below this iOS Safari auto-zooms the
+     viewport on focus, which then drags the layout sideways and
+     clips the field. 16px keeps the page stable when the keyboard
+     opens. width/box-sizing/min-width locked so the focused input
+     can never exceed the viewport. */
   .market-search-wrap {
     position: relative;
     padding: 0 12px;
     margin: 10px 0 6px;
     justify-content: stretch;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
   }
   .market-search-wrap input {
     width: 100%;
-    max-width: none;
-    height: 38px;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    height: 40px;
     padding: 0 14px 0 38px;
     border-radius: 10px;
     border: 1px solid rgba(255,255,255,0.12);
     background: rgba(13,18,30,0.55);
     color: rgba(235,243,255,0.95);
-    font-size: 13px;
+    font-size: 16px;
     letter-spacing: 0.01em;
     opacity: 1;
     transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.22s ease;
   }
-  .market-search-wrap input::placeholder { color: rgba(190,208,234,0.52); }
+  .market-search-wrap input::placeholder { color: rgba(190,208,234,0.62); font-size: 14px; }
   .market-search-wrap input:focus {
     outline: none;
+    font-size: 16px;
     border-color: rgba(74,130,240,0.45);
     background: rgba(13,18,30,0.75);
     box-shadow: 0 0 0 4px rgba(74,130,240,0.08);
