@@ -1771,6 +1771,11 @@ let portfolioChartMobile = null;  // mobile slider instance — null on desktop
 // any fallback restores the legacy pixel-for-pixel.
 let _aurixDashDesktop = null;
 let _aurixDashMobile  = null;
+// CHART-5: registry of Aurix sparkline controllers for market rows.
+// Keyed by normalized symbol so subsequent renders can destroy stale
+// instances cleanly (col-chart elements are recreated on every
+// renderCurrentMarketView via innerHTML replacement).
+const _aurixMarketSpark = new Map();
 let _detailChart     = null;  // Chart.js instance for category detail sparkline
 let _detailChartType = null;  // which category the sparkline was last rendered for
 let _chartRevealProgress = 1; // 0–1 clip for left-to-right line reveal
@@ -7890,6 +7895,90 @@ function _aurixDashSync(surface) {
   }
 }
 
+// ── CHART-5 ──────────────────────────────────────────────────────
+// Market row sparkline V2 migration. Replaces the inline SVG output
+// from renderSparkline() with AurixCharts.createSparkline() on each
+// row's `.col-chart` cell. The SVG remains in the cell until V2
+// mounts — so:
+//   • flag off                → SVG renders (no change)
+//   • flag on, engine loading → SVG renders (engine retry next tick)
+//   • flag on, engine ready   → V2 mounts, SVG cleared
+//   • mount fails on a cell   → SVG remains visible on that cell
+// Each call destroys stale controllers before mounting fresh, so the
+// registry never leaks across re-renders.
+function _aurixSparkFlag() {
+  return typeof window !== 'undefined' && window.__AURIX_SPARKLINES_V2 !== false;
+}
+function _aurixSparkReady() {
+  return typeof window !== 'undefined'
+      && typeof window.AurixCharts === 'object'
+      && typeof window.AurixCharts.createSparkline === 'function'
+      && typeof window.AurixCharts.isReady === 'function'
+      && window.AurixCharts.isReady();
+}
+function _aurixSparkDestroyAll() {
+  _aurixMarketSpark.forEach(ctrl => { try { ctrl.destroy(); } catch (_) {} });
+  _aurixMarketSpark.clear();
+}
+function _aurixSparkMountAll(container) {
+  if (!container || !container.querySelectorAll) return;
+  // Always destroy stale controllers first — so the registry stays
+  // clean even when the flag is flipped off mid-session and the
+  // legacy SVG cells need to take back over.
+  _aurixSparkDestroyAll();
+  if (!_aurixSparkFlag())  return;
+  if (!_aurixSparkReady()) return;
+  const cells = container.querySelectorAll('.col-chart[data-spark-key]');
+  cells.forEach(cell => {
+    // Skip hidden cells (mobile media query hides .col-chart). The
+    // chart engine can't render into a 0-size container; falling
+    // through here leaves the legacy SVG visible (also hidden by CSS).
+    const r = cell.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return;
+
+    const key = cell.dataset.sparkKey || '';
+    const raw = cell.dataset.sparkChange;
+    const chg = (raw === '' || raw === null || raw === undefined) ? 0 : Number(raw);
+    const tone = chg > 0.005 ? 'positive' : (chg < -0.005 ? 'negative' : 'neutral');
+
+    try {
+      // Clear the legacy SVG only after we have engine readiness.
+      cell.innerHTML = '';
+      const ctrl = window.AurixCharts.createSparkline(cell, {
+        colorMode: tone,
+        height:    28,
+      });
+      // Build the same synthetic walk the legacy generateSparkline
+      // uses, mapped onto a monotonic time axis for the engine.
+      const pts  = (typeof generateSparkline === 'function') ? generateSparkline(chg) : [];
+      const now  = Date.now();
+      const step = 60 * 1000;
+      const series = pts.map((v, i) => ({
+        time:  now - (pts.length - i) * step,
+        value: Number(v),
+      }));
+      ctrl.setData(series, {
+        source:       'synthetic',
+        currency:     'USD',
+        granularity:  '1m',
+        isSynthetic:  false,  // suppress the "Estimación" badge on rows
+        completeness: 1,
+        asOf:         now,
+      });
+      if (key) _aurixMarketSpark.set(key, ctrl);
+    } catch (err) {
+      // Restore the legacy SVG so the row never ships an empty cell.
+      try {
+        const chart = (typeof renderSparkline === 'function' && typeof generateSparkline === 'function')
+          ? renderSparkline(generateSparkline(chg), chg >= 0)
+          : '';
+        cell.innerHTML = chart;
+      } catch (_) {}
+      console.warn('[market-spark-v2] mount fail', key, err && err.message ? err.message : err);
+    }
+  });
+}
+
 function initChart() {
   const canvas = document.getElementById('portfolioChart');
   if (!canvas || portfolioChart) return;
@@ -11364,6 +11453,12 @@ function renderCurrentMarketView() {
   if (!isAggregate && el._lastKey === renderKey) return;
   el._lastKey = renderKey;
   el.innerHTML = html;
+  // CHART-5: mount Aurix sparkline V2 on every row's `.col-chart` cell.
+  // No-op when the flag is off or the engine is still loading; the
+  // legacy SVG that was rendered inside the cell remains visible in
+  // either case. Each call destroys stale V2 controllers from the
+  // previous render so the registry never leaks.
+  try { _aurixSparkMountAll(el); } catch (_) {}
   renderFeaturedBlock(data);
   renderMarketTickerStrip(data);
   requestAnimationFrame(() => renderMarketInsights(data));
@@ -12746,7 +12841,7 @@ function renderMarketItem(item) {
       <div class="col col-change ${chg > 0 ? 'is-up' : chg < 0 ? 'is-down' : ''}">
         ${safeChange(chg)}
       </div>
-      <div class="col col-chart">${chart}</div>
+      <div class="col col-chart" data-spark-key="${normSym}" data-spark-change="${chg ?? ''}">${chart}</div>
       <div class="col col-action">
         <button class="watchlist-btn ${watched ? 'active' : ''}" data-symbol="${normSym}" aria-label="${watched ? 'Unwatch' : 'Watch'} ${item.symbol}">${watched ? '★' : '☆'}</button>
       </div>
