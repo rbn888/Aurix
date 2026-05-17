@@ -12875,3 +12875,53 @@ body.gs-open { overflow: hidden; }
     padding: 1px 5px;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   MARKET-8 — Loading shimmer for rows awaiting non-24H history.
+   No layout shift: skeleton has the same intrinsic dimensions as the
+   real change %. Sparkline cell stays the same size — just muted.
+   ══════════════════════════════════════════════════════════════════ */
+.col-change.is-loading,
+.col-chart.is-loading {
+  pointer-events: none;
+}
+.col-change-skeleton {
+  display: inline-block;
+  width: 56px;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(138, 166, 255, 0.06) 0%,
+    rgba(138, 166, 255, 0.16) 50%,
+    rgba(138, 166, 255, 0.06) 100%
+  );
+  background-size: 200% 100%;
+  animation: mktChangeShimmer 1.4s linear infinite;
+}
+.col-change-empty {
+  color: rgba(220, 230, 250, 0.42);
+  font-variant-numeric: tabular-nums;
+}
+.col-chart.is-loading {
+  position: relative;
+  opacity: 0.55;
+}
+.col-chart.is-loading::after {
+  content: '';
+  position: absolute;
+  inset: 30% 6%;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    rgba(138, 166, 255, 0.05) 0%,
+    rgba(138, 166, 255, 0.16) 50%,
+    rgba(138, 166, 255, 0.05) 100%
+  );
+  background-size: 200% 100%;
+  animation: mktChangeShimmer 1.4s linear infinite;
+}
+@keyframes mktChangeShimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}

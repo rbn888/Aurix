@@ -902,6 +902,7 @@ const T = {
     mktSortWatchlist:         'Seguimiento',
     mktSortName:              'Nombre',
     mktSortPrice:             'Precio',
+    mktSortChange:            'Cambio',
     mktSort24h:               'Cambio 24H',
     mktSortType:              'Tipo',
     mktSoonShort:             'Próx.',
@@ -1518,6 +1519,7 @@ const T = {
     mktSortWatchlist:         'Watchlist',
     mktSortName:              'Name',
     mktSortPrice:             'Price',
+    mktSortChange:            'Change',
     mktSort24h:               '24H change',
     mktSortType:              'Type',
     mktSoonShort:             'Soon',
@@ -8210,6 +8212,13 @@ function _aurixSparkMountAll(container) {
     const chg = (raw === '' || raw === null || raw === undefined) ? 0 : Number(raw);
     const tone = chg > 0.005 ? 'positive' : (chg < -0.005 ? 'negative' : 'neutral');
 
+    // MARKET-8: if the in-memory history cache has a series for this
+    // row at the currently selected timeframe, use the REAL series.
+    // Otherwise fall through to the synthetic walk used since CHART-5.
+    const realEntry = (typeof _mktHistoryEntryForCell === 'function')
+      ? _mktHistoryEntryForCell(cell)
+      : null;
+
     try {
       // Clear the legacy SVG only after we have engine readiness.
       cell.innerHTML = '';
@@ -8220,23 +8229,27 @@ function _aurixSparkMountAll(container) {
         // the cell in either layout with zero CSS coupling.
         height:    cell.clientHeight || 32,
       });
-      // Build the same synthetic walk the legacy generateSparkline
-      // uses, mapped onto a monotonic time axis for the engine.
-      const pts  = (typeof generateSparkline === 'function') ? generateSparkline(chg) : [];
-      const now  = Date.now();
-      const step = 60 * 1000;
-      const series = pts.map((v, i) => ({
-        time:  now - (pts.length - i) * step,
-        value: Number(v),
-      }));
-      ctrl.setData(series, {
-        source:       'synthetic',
-        currency:     'USD',
-        granularity:  '1m',
-        isSynthetic:  false,  // suppress the "Estimación" badge on rows
-        completeness: 1,
-        asOf:         now,
-      });
+      let series, meta;
+      if (realEntry && Array.isArray(realEntry.series) && realEntry.series.length >= 2) {
+        series = realEntry.series;
+        meta   = realEntry.meta || {
+          source: 'history', currency: 'USD', granularity: '1d',
+          isSynthetic: false, completeness: 1, asOf: Date.now(),
+        };
+      } else {
+        const pts  = (typeof generateSparkline === 'function') ? generateSparkline(chg) : [];
+        const now  = Date.now();
+        const step = 60 * 1000;
+        series = pts.map((v, i) => ({
+          time:  now - (pts.length - i) * step,
+          value: Number(v),
+        }));
+        meta = {
+          source: 'synthetic', currency: 'USD', granularity: '1m',
+          isSynthetic: false, completeness: 1, asOf: now,
+        };
+      }
+      ctrl.setData(series, meta);
       if (key) _aurixMarketSpark.set(key, ctrl);
     } catch (err) {
       // Restore the legacy SVG so the row never ships an empty cell.
@@ -12538,12 +12551,13 @@ function _aurixMktV4SyncSheet() {
   document.querySelectorAll('#mktFilterSheet [data-mkt-sort]').forEach(b => {
     b.classList.toggle('is-active', b.dataset.mktSort === _aurixMktSortBy);
   });
-  // MARKET-7: helper is always visible — it explains why 4 of the 5 period
-  // pills are muted. The pulse class is removed on every sync so it can
-  // re-trigger on the next disabled-pill tap.
+  // MARKET-8: every period is now selectable, so the helper text from
+  // MARKET-7 is no longer needed. Keep the node hidden — JS guards in
+  // the click handler are defensive but never fire (HTML no longer
+  // tags pills as soon-state).
   const helper = document.getElementById('mktFilterHelper');
   if (helper) {
-    helper.hidden = false;
+    helper.hidden = true;
     helper.classList.remove('mkt-helper-pulse');
   }
 }
@@ -12586,7 +12600,20 @@ function _aurixMktExpSortItems(items) {
   } else if (sb === 'price') {
     sorted.sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
   } else if (sb === 'change') {
-    sorted.sort((a, b) => (Number(b.change24h) || 0) - (Number(a.change24h) || 0));
+    // MARKET-8: sort by the currently selected timeframe's change pct.
+    // 24H falls back to live change24h immediately; other periods read
+    // the in-memory history cache. Rows without a cached value sink to
+    // the bottom so partial data never looks random.
+    sorted.sort((a, b) => {
+      const aV = _mktHistoryChangeForRow(a);
+      const bV = _mktHistoryChangeForRow(b);
+      const aMissing = aV == null || !Number.isFinite(aV);
+      const bMissing = bV == null || !Number.isFinite(bV);
+      if (aMissing && bMissing) return 0;
+      if (aMissing) return  1;
+      if (bMissing) return -1;
+      return bV - aV;
+    });
   } else if (sb === 'type') {
     sorted.sort((a, b) => String(a.type || '').localeCompare(String(b.type || '')));
   } else if (sb === 'watchlist') {
@@ -12602,18 +12629,16 @@ function _aurixMktExpSortItems(items) {
 function _aurixMktExpControlsHtml() {
   if (!_aurixMktExpFlag()) return '';
   const isEs = (typeof lang !== 'undefined' && lang === 'es');
-  // MARKET-7: SORT_OPTS carries a long label (sheet) + a short chip alias.
-  // The chip space is tight; "Cambio 24H" is fine in the sheet row but
-  // too verbose in a 3-segment chip. `chipEs/chipEn` is the compact form
-  // shown after the badge.
+  // MARKET-8: SORT_OPTS trimmed to high-value options. Cambio sorts by
+  // whatever timeframe is currently selected (24h change for 24H, 7d
+  // change for 7D, etc.). Chip uses a compact alias so the 3-segment
+  // chip stays readable on mobile.
   const SORT_OPTS = [
     { key: 'watchlist', es: 'Seguimiento', en: 'Watchlist',  chipEs: 'Seguim.', chipEn: 'Watch'  },
-    { key: 'name',      es: 'Nombre',      en: 'Name',       chipEs: 'Nombre',  chipEn: 'Name'   },
+    { key: 'change',    es: 'Cambio',      en: 'Change',     chipEs: 'Cambio',  chipEn: 'Change' },
     { key: 'price',     es: 'Precio',      en: 'Price',      chipEs: 'Precio',  chipEn: 'Price'  },
-    { key: 'change',    es: 'Cambio 24H',  en: '24H change', chipEs: 'Cambio',  chipEn: 'Change' },
-    { key: 'type',      es: 'Tipo',        en: 'Type',       chipEs: 'Tipo',    chipEn: 'Type'   },
   ];
-  const current = SORT_OPTS.find(o => o.key === _aurixMktSortBy) || SORT_OPTS[3];
+  const current = SORT_OPTS.find(o => o.key === _aurixMktSortBy) || SORT_OPTS[1];
   const currentChipLabel = isEs ? current.chipEs : current.chipEn;
 
   // MARKET-4B + MARKET-7: single "Filtros" chip. Premium, compact, opens
@@ -12636,24 +12661,17 @@ function _aurixMktExpControlsHtml() {
     `;
   }
 
-  // MARKET-2/3 fall-through: pill row + sort dropdown. MARKET-7 adds
-  // soon-state markers to non-24H pills so the V3 path is honest too.
+  // MARKET-2/3 fall-through: pill row + sort dropdown. MARKET-8 enables
+  // every period — taps wire through to the real history pipeline.
   const TFs = ['24H', '7D', '1M', '1Y', 'ALL'];
   const tfPills = TFs.map(tf => {
-    const isSoon = tf !== '24H';
-    const cls = `mkt-tf-pill${tf === _aurixMktTimeframe ? ' is-active' : ''}${isSoon ? ' is-soon' : ''}`;
-    const soonBadge = isSoon ? `<span class="mkt-tf-pill-soon">${isEs ? 'Próx.' : 'Soon'}</span>` : '';
-    const soonAttr  = isSoon ? ' data-mkt-tf-soon="1" aria-disabled="true"' : '';
-    return `<button type="button" class="${cls}" data-mkt-tf="${tf}"${soonAttr}>${tf}${soonBadge}</button>`;
+    const cls = `mkt-tf-pill${tf === _aurixMktTimeframe ? ' is-active' : ''}`;
+    return `<button type="button" class="${cls}" data-mkt-tf="${tf}">${tf}</button>`;
   }).join('');
   const sortItems = SORT_OPTS.map(o =>
     `<button type="button" class="mkt-sort-item${o.key === _aurixMktSortBy ? ' is-active' : ''}" data-mkt-sort="${o.key}">${isEs ? o.es : o.en}</button>`
   ).join('');
-  // MARKET-7: helper line under V3 pill row, always visible — explains
-  // why 4 of the 5 pills are muted. Honest and quiet.
-  const helperHtml = _aurixMktV3Flag()
-    ? `<div class="mkt-tf-helper">${isEs ? 'Más periodos estarán disponibles cuando activemos histórico avanzado.' : 'More periods will unlock when advanced history is enabled.'}</div>`
-    : '';
+  const helperHtml = '';
   return `
     <div class="mkt-explorer-controls" data-aurix-mkt-controls="1">
       <div class="mkt-tf-pills" role="tablist" aria-label="${isEs ? 'Periodo' : 'Timeframe'}">${tfPills}</div>
@@ -12746,6 +12764,11 @@ function renderCurrentMarketView() {
   // either case. Each call destroys stale V2 controllers from the
   // previous render so the registry never leaks.
   try { _aurixSparkMountAll(el); } catch (_) {}
+  // MARKET-8: kick off the historical backfill for visible rows. This
+  // is a no-op when the selected timeframe is 24H (which already has
+  // live change24h baked into the row) unless we want real 24h spark
+  // data. Concurrency-limited, cache-aware, generation-token-guarded.
+  try { _mktHistoryFetchVisible(data); } catch (e) { console.warn('[mkt-history] fetch fail:', e && e.message); }
   renderFeaturedBlock(data);
   renderMarketTickerStrip(data);
   requestAnimationFrame(() => renderMarketInsights(data));
@@ -14116,11 +14139,25 @@ const MARKET_STOCKS = ['AAPL','MSFT','NVDA','TSLA','AMZN','META','GOOGL','JPM','
 function renderMarketItem(item) {
   if (!item || !item.symbol) return '';
   const price   = item.current_price ?? item.price ?? null;
-  const chg     = item.price_change_percentage_24h ?? item.change24h ?? item.change ?? null;
+  const live24  = item.price_change_percentage_24h ?? item.change24h ?? item.change ?? null;
+  // MARKET-8: when a non-24H timeframe is active, the row's perf cell
+  // reads the in-memory history cache for the selected period. 24H still
+  // uses live change24h for instant render — the cache only enhances the
+  // sparkline for that one. The cached value is null when the fetch is
+  // still in flight (or failed) — the row enters its loading skeleton.
+  const selectedTf = (typeof _aurixMktExpFlag === 'function' && _aurixMktExpFlag())
+    ? (_aurixMktTimeframe || '24H')
+    : '24H';
+  const isPeriodSelected = selectedTf !== '24H';
+  const cachedChg = isPeriodSelected
+    ? _mktHistoryChangeForRow(item)
+    : null;
+  const chg = isPeriodSelected ? cachedChg : live24;
+  const isLoading = isPeriodSelected && (cachedChg == null);
   const name    = item.name || item.symbol;
   const normSym = normalizeSymbol(item.symbol);
   const watched = isInWatchlist(normSym);
-  const chart   = renderSparkline(generateSparkline(chg ?? 0), (chg ?? 0) >= 0);
+  const chart   = renderSparkline(generateSparkline(chg ?? live24 ?? 0), (chg ?? live24 ?? 0) >= 0);
   // MC-11A: compact type badge in the asset cell. Uses the same pill
   // language as MC-10 fund cards so the visual system stays unified.
   // Only renders when item.type is one of the known kinds — never invents.
@@ -14156,10 +14193,14 @@ function renderMarketItem(item) {
         </div>
       </div>
       <div class="col col-price">${safePrice(price)}</div>
-      <div class="col col-change ${chg > 0 ? 'is-up' : chg < 0 ? 'is-down' : ''}">
-        ${safeChange(chg)}
+      <div class="col col-change ${isLoading ? 'is-loading' : (chg > 0 ? 'is-up' : chg < 0 ? 'is-down' : '')}" data-mkt-tf="${selectedTf}">
+        ${isLoading
+            ? '<span class="col-change-skeleton" aria-label="Loading"></span>'
+            : (chg == null || !Number.isFinite(chg)
+                ? '<span class="col-change-empty">—</span>'
+                : safeChange(chg))}
       </div>
-      <div class="col col-chart" data-spark-key="${normSym}" data-spark-change="${chg ?? ''}">${chart}</div>
+      <div class="col col-chart${isLoading ? ' is-loading' : ''}" data-spark-key="${normSym}" data-spark-change="${chg ?? ''}" data-spark-tf="${selectedTf}">${isLoading ? '' : chart}</div>
       <div class="col col-action">
         <button class="watchlist-btn ${watched ? 'active' : ''}" data-symbol="${normSym}" aria-label="${watched ? 'Unwatch' : 'Watch'} ${item.symbol}">${watched ? '★' : '☆'}</button>
       </div>
@@ -20399,6 +20440,239 @@ document.addEventListener('DOMContentLoaded', () => {
 if (IS_DEV) {
   console.log('[DEBUG] SUPABASE_URL:', typeof SUPABASE_URL);
   console.log('[DEBUG] supabase object:', typeof window.supabase);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   MARKET-8 — Real historical timeframes for Market list rows.
+   Uses the existing AurixChartAdapters (Yahoo + CoinGecko proxies).
+   Cache-first, concurrency-limited, generation-token-guarded.
+   ══════════════════════════════════════════════════════════════════ */
+
+// UI timeframe → adapter range code. Adapter accepts: 24h, 7d, 30d,
+// 3m, 1y, all. 1M maps to 30d (closest match) and ALL to all.
+const _MKT_HISTORY_RANGE_MAP = Object.freeze({
+  '24H': '24h',
+  '7D':  '7d',
+  '1M':  '30d',
+  '1Y':  '1y',
+  'ALL': 'all',
+});
+// Per-range cache TTL in ms. Shorter periods refetch more often.
+const _MKT_HISTORY_TTL = Object.freeze({
+  '24h':  60 * 1000,
+  '7d':   5 * 60 * 1000,
+  '30d':  30 * 60 * 1000,
+  '1y':   6  * 3600 * 1000,
+  'all':  24 * 3600 * 1000,
+});
+const _marketHistoryCache  = new Map();          // key → entry
+const _marketHistoryQueue  = { running: 0, max: 3, pending: [] };
+let   _marketHistoryGen    = 0;                  // bumped on each render
+let   _marketHistoryErrors = 0;
+
+function _mktHistoryAdapterRange() {
+  return _MKT_HISTORY_RANGE_MAP[_aurixMktTimeframe || '24H'] || '24h';
+}
+function _mktHistoryCacheKey(item, range) {
+  // MARKET-8: cache keyed by NORMALIZED SYMBOL (BTC / AAPL / XAU)
+  // rather than per-adapter id, so the sparkline cell can look up
+  // entries directly via data-spark-key without re-deriving the
+  // adapter shape. Adapter shape is still computed at fetch time.
+  if (!item) return '';
+  const sym = normalizeSymbol(item.symbol || item.ticker || '');
+  if (!sym) return '';
+  return `${sym}|${range}`;
+}
+function _mktHistoryCacheFresh(entry, range) {
+  if (!entry) return false;
+  const ttl = _MKT_HISTORY_TTL[range] || 60 * 1000;
+  return (Date.now() - entry.ts) < ttl;
+}
+function _mktHistoryChangeForRow(item) {
+  // 24H: prefer the live change24h that flows through the market store.
+  // Other timeframes: read from the cache; null when not yet fetched.
+  const tf = _aurixMktTimeframe || '24H';
+  if (tf === '24H') {
+    const live = item && (item.price_change_percentage_24h ?? item.change24h ?? item.change);
+    return (live == null || !Number.isFinite(Number(live))) ? null : Number(live);
+  }
+  const range = _MKT_HISTORY_RANGE_MAP[tf] || '24h';
+  const key   = _mktHistoryCacheKey(item, range);
+  const entry = _marketHistoryCache.get(key);
+  if (!entry) return null;
+  if (!_mktHistoryCacheFresh(entry, range)) return null;
+  return (entry.changePct == null || !Number.isFinite(entry.changePct))
+    ? null
+    : entry.changePct;
+}
+function _mktHistoryEntryForCell(cell) {
+  // Cache lookup by normalized symbol + range. data-spark-tf is set
+  // by renderMarketItem so we know which range to ask for.
+  if (!cell || !cell.dataset) return null;
+  const sym = cell.dataset.sparkKey;
+  if (!sym) return null;
+  const tf    = cell.dataset.sparkTf || '24H';
+  const range = _MKT_HISTORY_RANGE_MAP[tf] || '24h';
+  const ent   = _marketHistoryCache.get(`${sym}|${range}`);
+  return (ent && _mktHistoryCacheFresh(ent, range)) ? ent : null;
+}
+function _mktHistoryEnqueue(job) {
+  _marketHistoryQueue.pending.push(job);
+  _mktHistoryDrain();
+}
+function _mktHistoryDrain() {
+  while (_marketHistoryQueue.running < _marketHistoryQueue.max && _marketHistoryQueue.pending.length) {
+    const job = _marketHistoryQueue.pending.shift();
+    _marketHistoryQueue.running++;
+    Promise.resolve()
+      .then(job)
+      .catch(err => { _marketHistoryErrors++; console.warn('[mkt-history] job fail:', err && err.message); })
+      .finally(() => {
+        _marketHistoryQueue.running--;
+        _mktHistoryDrain();
+      });
+  }
+}
+function _mktHistoryAdaptersReady() {
+  return typeof window !== 'undefined'
+      && window.AurixChartAdapters
+      && typeof window.AurixChartAdapters.yahooHistoryAdapter === 'function'
+      && typeof window.AurixChartAdapters.cryptoHistoryAdapter === 'function';
+}
+async function _mktHistoryFetchOne(item, range, gen) {
+  const adapter = _aurixMktPickAdapter(item);
+  if (!adapter) return;
+  const key = _mktHistoryCacheKey(item, range);
+  if (!key) return;
+  // Guard against double-fire when render runs back-to-back.
+  if (_mktHistoryCacheFresh(_marketHistoryCache.get(key), range)) return;
+  const fn = adapter.kind === 'crypto'
+    ? window.AurixChartAdapters.cryptoHistoryAdapter
+    : window.AurixChartAdapters.yahooHistoryAdapter;
+  const args = Object.assign({}, adapter.args, { range });
+  let result = null;
+  try { result = await fn(args); }
+  catch (_) { _marketHistoryErrors++; }
+  if (gen !== _marketHistoryGen) return; // stale — user moved on
+  const ok = result && Array.isArray(result.series) && result.series.length >= 2;
+  let entry;
+  if (!ok) {
+    entry = { ts: Date.now(), series: [], meta: (result && result.meta) || null, changePct: null };
+  } else {
+    const s = result.series;
+    let first = null, last = null;
+    for (let i = 0; i < s.length; i++) {
+      const v = Number(s[i].value);
+      if (Number.isFinite(v) && v > 0) { first = v; break; }
+    }
+    for (let i = s.length - 1; i >= 0; i--) {
+      const v = Number(s[i].value);
+      if (Number.isFinite(v) && v > 0) { last = v; break; }
+    }
+    const changePct = (first != null && last != null && first > 0)
+      ? ((last - first) / first) * 100
+      : null;
+    entry = { ts: Date.now(), series: s, meta: result.meta || null, changePct };
+  }
+  _marketHistoryCache.set(key, entry);
+  _mktHistoryApplyToRow(item, range, entry, gen);
+}
+function _mktHistoryApplyToRow(item, range, entry, gen) {
+  if (gen !== _marketHistoryGen) return;
+  if (range !== _mktHistoryAdapterRange()) return;
+  const list = document.getElementById('marketList');
+  if (!list) return;
+  const sym = normalizeSymbol(item.symbol);
+  const rows = list.querySelectorAll(`.market-row[data-symbol="${sym}"]`);
+  if (!rows.length) return;
+  rows.forEach(row => {
+    const cell = row.querySelector('.col-change');
+    if (cell) {
+      cell.classList.remove('is-loading');
+      const v = entry.changePct;
+      if (v == null || !Number.isFinite(v)) {
+        cell.classList.remove('is-up', 'is-down', 'is-flat');
+        cell.innerHTML = '<span class="col-change-empty">—</span>';
+      } else {
+        cell.classList.toggle('is-up',   v > 0);
+        cell.classList.toggle('is-down', v < 0);
+        cell.classList.toggle('is-flat', v === 0);
+        cell.textContent = (typeof safeChange === 'function') ? safeChange(v) : (v.toFixed(2) + '%');
+      }
+    }
+    // Sparkline: replace synthetic mount with real series (engine path).
+    const sparkCell = row.querySelector('.col-chart[data-spark-key]');
+    if (sparkCell && entry.series && entry.series.length >= 2 &&
+        window.AurixCharts && typeof window.AurixCharts.createSparkline === 'function') {
+      sparkCell.classList.remove('is-loading');
+      const r = sparkCell.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) {
+        const key = sparkCell.dataset.sparkKey;
+        if (key && _aurixMarketSpark.has(key)) {
+          try { _aurixMarketSpark.get(key).destroy(); } catch (_) {}
+          _aurixMarketSpark.delete(key);
+        }
+        sparkCell.innerHTML = '';
+        try {
+          const v = entry.changePct == null ? 0 : entry.changePct;
+          const ctrl = window.AurixCharts.createSparkline(sparkCell, {
+            colorMode: v > 0.005 ? 'positive' : v < -0.005 ? 'negative' : 'neutral',
+            height:    sparkCell.clientHeight || 32,
+          });
+          ctrl.setData(entry.series, entry.meta || {
+            source: 'history', currency: 'USD', granularity: '1d',
+            isSynthetic: false, completeness: 1, asOf: Date.now(),
+          });
+          if (key) _aurixMarketSpark.set(key, ctrl);
+        } catch (_) {}
+      }
+    } else if (sparkCell) {
+      sparkCell.classList.remove('is-loading');
+    }
+  });
+}
+function _mktHistoryFetchVisible(dataset) {
+  if (!_mktHistoryAdaptersReady()) return;
+  const range = _mktHistoryAdapterRange();
+  // Bump generation so any in-flight responses from a previous render
+  // (different tab / different timeframe) are silently dropped.
+  _marketHistoryGen++;
+  const gen = _marketHistoryGen;
+  // The dataset arg from renderCurrentMarketView already represents the
+  // currently visible universe (filtered by tab + search). For aggregate
+  // tabs (all/watchlist) it's the composed dataset.
+  const items = Array.isArray(dataset) ? dataset : [];
+  if (!items.length) return;
+  // For 24H we only enqueue when the cache is stale AND a sparkline
+  // upgrade is desired. To keep 24H rendering instant (using live
+  // change24h), we still backfill the sparkline asynchronously.
+  for (const item of items) {
+    if (!item || !item.symbol) continue;
+    const key = _mktHistoryCacheKey(item, range);
+    if (!key) continue;
+    if (_mktHistoryCacheFresh(_marketHistoryCache.get(key), range)) {
+      // Cache fresh — apply now so re-renders with stale DOM rehydrate.
+      _mktHistoryApplyToRow(item, range, _marketHistoryCache.get(key), gen);
+      continue;
+    }
+    _mktHistoryEnqueue(() => _mktHistoryFetchOne(item, range, gen));
+  }
+}
+
+// Debug surface — console-only, no UI.
+if (typeof window !== 'undefined') {
+  window.__aurixMarketHistoryDebug = function () {
+    return {
+      cacheSize:       _marketHistoryCache.size,
+      activeRange:     _mktHistoryAdapterRange(),
+      activeTimeframe: _aurixMktTimeframe,
+      pending:         _marketHistoryQueue.pending.length,
+      running:         _marketHistoryQueue.running,
+      errors:          _marketHistoryErrors,
+      gen:             _marketHistoryGen,
+      adaptersReady:   _mktHistoryAdaptersReady(),
+    };
+  };
 }
 
 /* ══════════════════════════════════════════════════════════════════
