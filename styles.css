@@ -138,6 +138,16 @@ select:focus-visible {
   --aurix-blue-soft:  rgba(138, 166, 255, 0.12);
   --aurix-blue-fill:  rgba(74, 130, 240, 0.22);
   --aurix-glow:       0 6px 22px -10px rgba(74, 130, 240, 0.45);
+
+  /* MODAL-SYSTEM-1: safe-area reservations for mobile modals so they
+     never visually go under the bottom navigation. Bottom nav is
+     `.bottom-nav { height: 60px }` (line ~5975). The gap adds a touch
+     of breathing room above the nav. */
+  --aurix-bottom-nav-height:  60px;
+  --aurix-modal-mobile-gap:   12px;
+  --aurix-modal-safe-bottom:  calc(
+    var(--aurix-bottom-nav-height) + env(safe-area-inset-bottom) + var(--aurix-modal-mobile-gap)
+  );
 }
 
 body {
@@ -12932,4 +12942,138 @@ body.gs-open { overflow: hidden; }
 @keyframes mktChangeShimmer {
   0%   { background-position: 100% 0; }
   100% { background-position: -100% 0; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   MODAL-SYSTEM-1 — Mobile modal safe-area & centering fix.
+   Root issue: the bottom nav (.bottom-nav, z-index 200, height 60px)
+   sits above the modal overlay (z-index 100), so any modal extending
+   to the viewport bottom gets visually clipped under the nav. Per-
+   modal padding hacks were always one fix behind. This block defines
+   a single source of truth — --aurix-modal-safe-bottom — and applies
+   it to ALL mobile overlays so content lifts above the nav by default.
+   Bottom-sheet modals keep their flex-end alignment via per-ID rules;
+   centered modals (preview, settings, reset) opt out via .modal--* .
+   ══════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* All overlays get safe-area padding. This is the cascading fix —
+     after this rule, no mobile modal can extend below safe-bottom. */
+  .modal-overlay {
+    padding:
+      calc(env(safe-area-inset-top, 0px) + 12px)
+      12px
+      var(--aurix-modal-safe-bottom)
+      12px;
+  }
+  /* Modals capped to the safe viewport height. The legacy
+     `max-height: 92svh` is overridden by the higher-specificity
+     `.modal-overlay > .modal` selector. */
+  .modal-overlay > .modal {
+    max-height: calc(
+      100dvh
+      - env(safe-area-inset-top, 0px)
+      - var(--aurix-modal-safe-bottom)
+      - 16px
+    );
+  }
+}
+
+/* ── Bottom-sheet family: preserve flex-end (sheet UX) for the modals
+   the user already expects to slide up from the bottom. The new
+   overlay padding-bottom keeps them above the nav, the sheet radius
+   stays intact. Scoped via overlay IDs so other modals don't inherit. */
+@media (max-width: 520px) {
+  #modalOverlay,
+  #liquidityOverlay,
+  #txOverlay,
+  #addOverlay,
+  #reduceOverlay,
+  #assetDetailOverlay {
+    align-items: flex-end;
+    padding-left: 0;
+    padding-right: 0;
+    padding-top: 0;
+    /* padding-bottom inherited from .modal-overlay (safe-bottom var). */
+  }
+  #modalOverlay     > .modal,
+  #liquidityOverlay > .modal,
+  #txOverlay        > .modal,
+  #addOverlay       > .modal,
+  #reduceOverlay    > .modal,
+  #assetDetailOverlay > .modal {
+    border-radius: 20px 20px 0 0;
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+/* ── Centered-safe modals: preview, settings, reset.
+   These three are NOT bottom sheets — they should open as fully
+   rounded cards centered in the safe viewport. */
+@media (max-width: 768px) {
+  #marketPreviewOverlay,
+  #settingsOverlay,
+  #resetConfirmOverlay {
+    align-items: center;
+    justify-content: center;
+  }
+  .modal--mkt-preview,
+  .modal--settings,
+  .modal--reset {
+    border-radius: 20px;
+    border: 1px solid var(--aurix-border);
+    border-bottom: 1px solid var(--aurix-border);
+    width: 100%;
+    /* Each modal keeps its desktop max-width so reset stays narrower
+       than settings; on viewport widths below that max they expand
+       to fit. */
+    align-self: center;
+    margin-bottom: 0;
+  }
+  .modal--settings .modal-body,
+  .modal--reset .modal-body {
+    overflow-y: auto;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  .modal--settings {
+    max-height: calc(
+      100dvh
+      - env(safe-area-inset-top, 0px)
+      - var(--aurix-modal-safe-bottom)
+      - 16px
+    );
+  }
+  .modal--reset {
+    max-height: calc(
+      100dvh
+      - env(safe-area-inset-top, 0px)
+      - var(--aurix-modal-safe-bottom)
+      - 16px
+    );
+  }
+}
+
+/* Market Preview — sized to a slightly smaller premium card, fits
+   under the safe-bottom even on tall devices. Overrides MARKET-9's
+   `height: min(82dvh, 700px)` because this rule comes later in the
+   cascade and uses the same single-class specificity. */
+@media (max-width: 520px) {
+  .modal--mkt-preview {
+    height: min(78dvh, 680px);
+    max-height: calc(
+      100dvh
+      - env(safe-area-inset-top, 0px)
+      - var(--aurix-modal-safe-bottom)
+      - 12px
+    );
+    /* Restore the bottom border that MARKET-9 stripped for sheet feel. */
+    border-bottom: 1px solid var(--aurix-border);
+  }
+  @media (min-height: 780px) {
+    .modal--mkt-preview {
+      height: min(80dvh, 700px);
+    }
+  }
 }
