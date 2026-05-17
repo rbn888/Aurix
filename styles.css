@@ -10979,3 +10979,157 @@ body.gs-open { overflow: hidden; }
     border-radius: 999px;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   MOBILE FINAL POLISH — incremental visual refinements (no logic).
+   Sits on top of MA-1 / ADD-V4.1 / ADD-V4.2 / MOBILE PASS 1A.
+   Scoped to ≤768px so desktop is untouched.
+   ═════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+  /* ── Mobile sheet system consistency ────────────────────────
+     Unify radius / backdrop / close-button sizing across Add Asset,
+     Liquidity, Reduce, Transaction and Detail modals so every sheet
+     reads as the same product surface. */
+  .modal-overlay.open { backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .modal {
+    border-radius: 22px 22px 0 0;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .modal-close {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    font-size: 14px;
+  }
+
+  /* ── Add Asset picker (Step 1) — compact ~9% ──────────────── */
+  /* Reduces each row's vertical footprint so the five type cards
+     ("Otro activo" included) sit comfortably above the bottom nav
+     without scrolling on a 6.7" phone. */
+  .add-v2-picker {
+    padding: 14px 16px 18px;
+    gap: 12px;
+  }
+  .add-v2-grid { gap: 8px; }
+  .add-v2-card {
+    padding: 12px 14px;
+    gap: 12px;
+    grid-template-columns: 40px 1fr 14px;
+    border-radius: 14px;
+  }
+  .add-v2-icon { width: 40px; height: 40px; border-radius: 11px; font-size: 17px; }
+  .add-v2-title { font-size: 14px; }
+  .add-v2-sub   { font-size: 12px; }
+  .add-v2-picker {
+    /* Reserve space for the home indicator + a comfortable buffer. */
+    padding-bottom: calc(env(safe-area-inset-bottom) + 22px);
+  }
+
+  /* ── Add Asset — selected chip compact ─────────────────────── */
+  /* When an asset is selected on mobile the chip currently uses
+     desktop chrome. Tighten padding/typography so quantity sits one
+     visual beat below the chip instead of two. */
+  .selected-chip {
+    padding: 9px 12px 9px 12px;
+    gap: 10px;
+    margin-bottom: 12px;
+    border-radius: 12px;
+  }
+  .chip-badge { width: 32px; height: 32px; border-radius: 8px; font-size: 10px; }
+  .chip-name { font-size: 13.5px; }
+  .chip-sub  { font-size: 11px; }
+  .chip-price { font-size: 12.5px; }
+
+  /* ── Add Asset — quantity rhythm ──────────────────────────── */
+  #qtyGroup { margin-bottom: 12px; }
+  #qtyGroup input { height: 46px; font-size: 16px; }
+  #formPreview {
+    padding: 10px 12px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+
+  /* ── Market mobile — tabs + discovery ──────────────────────── */
+  /* Tabs already padded to 22/22 in MOBILE PASS 1A; lift the active
+     pill slightly so it visually pops above the surrounding chrome
+     and never reads as clipped at the start of the scroll. */
+  .market-tab.active { box-shadow: 0 6px 18px -10px rgba(22,199,132,0.45); }
+
+  /* Discovery cards quieter — lower border alpha + reduced inner
+     padding so the live monitoring table reaches the user faster. */
+  .funds-card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.008));
+    border-color: rgba(255,255,255,0.05);
+  }
+  .funds-card:hover {
+    border-color: rgba(138,166,255,0.20);
+    background: linear-gradient(180deg, rgba(138,166,255,0.05), rgba(255,255,255,0.012));
+  }
+
+  /* Market row badge — drop visual weight a notch on mobile too. */
+  .market-row-badge {
+    background: rgba(255,255,255,0.035);
+    border-color: rgba(255,255,255,0.08);
+    color: rgba(220,230,250,0.62);
+  }
+
+  /* ── Global Search mobile — row density ───────────────────── */
+  /* Tighter vertical rhythm + cleaner divider/border alpha. */
+  .gs-row { padding: 10px 12px; border-radius: 12px; }
+  .gs-row + .gs-row { margin-top: 6px; }
+  .gs-row-ticker { font-size: 12.5px; letter-spacing: 0.02em; }
+  .gs-row-name { font-size: 12.5px; }
+
+  /* ── Workspace mobile — softer hero glow + safe-area ──────── */
+  /* Lower radial glow opacity so the hero feels premium-soft rather
+     than spotlit, and ensure the last action chip always clears the
+     bottom nav + home indicator. */
+  .ws-intel-hero {
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.03) inset,
+      0 14px 32px -22px rgba(8,12,24,0.85);
+  }
+  .ws-intel-hero::after {
+    background: radial-gradient(60% 40% at 50% -10%, rgba(79,142,247,0.12), transparent 70%);
+    opacity: 0.85;
+  }
+
+  /* Risk cards: slightly more air between cards and a touch less
+     padding so the four stacked cards (incl. Sync) breathe better
+     on a 360px viewport. */
+  .ws-risk-stack { gap: 12px; }
+  .ws-risk-card  { padding: 12px 14px; }
+
+  /* Last actionable section reserves enough bottom space for the
+     home indicator + bottom nav. The shell already includes safe-
+     area padding; add a little extra below the action buttons. */
+  .aurix-workspace-shell.is-mobile .ws-quick-actions {
+    margin-bottom: 4px;
+  }
+
+  /* ── Dashboard mobile — card cohesion ─────────────────────── */
+  /* Category cards on mobile inherit a touch of the desktop glass
+     surface so the lower dashboard reads as the same product. */
+  .cat-card {
+    border-radius: 16px;
+    border-color: rgba(255,255,255,0.07);
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.012));
+  }
+
+  /* ── Numbers + currency — guard rails ─────────────────────── */
+  /* Belt-and-braces: financial values never wrap or ellipsize on
+     mobile rows. Covers any new node added later that forgets the
+     rule. */
+  .col-price, .col-change,
+  .gs-row-meta,
+  .ws-kpi-value,
+  .gold-summary-amount,
+  .add-v2-preview-value,
+  .add-v2-preview-price {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+}
