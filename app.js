@@ -12478,16 +12478,22 @@ function _aurixMktExpControlsHtml() {
   // _aurixMktV4OpenSheet. The current selection is summarized inline
   // on the chip so users see active state at a glance.
   if (_aurixMktV4Flag()) {
-    const summary = `${_aurixMktTimeframe} · ${currentLabel}`;
+    const orderLabel = `${isEs ? 'Orden' : 'Sort'} ${currentLabel}`;
     const helperHtml = _aurixMktTimeframe !== '24H'
       ? `<div class="mkt-tf-helper">${isEs ? 'Datos históricos completos próximamente' : 'Extended historical data coming soon'}</div>`
       : '';
+    // UI-POLISH-1: chip exposes three layers — primary label, prominent
+    // timeframe badge (Aurix blue), and quieter sort summary — so the
+    // active state is legible at a glance without a single muted blob.
     return `
       <div class="mkt-explorer-controls is-v4" data-aurix-mkt-controls="1">
         <button type="button" class="mkt-filter-chip" data-mkt-filter-open aria-haspopup="dialog">
-          <span class="mkt-filter-chip-icon" aria-hidden="true">⚙</span>
+          <span class="mkt-filter-chip-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+          </span>
           <span class="mkt-filter-chip-label">${isEs ? 'Filtros' : 'Filters'}</span>
-          <span class="mkt-filter-chip-current">${summary}</span>
+          <span class="mkt-filter-chip-badge">${_aurixMktTimeframe}</span>
+          <span class="mkt-filter-chip-sort">${orderLabel}</span>
         </button>
       </div>
       ${helperHtml}

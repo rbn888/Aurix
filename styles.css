@@ -127,6 +127,17 @@ select:focus-visible {
   --text-primary:  #FFFFFF;
   --text-secondary: rgba(255,255,255,0.7);
   --text-tertiary:  rgba(255,255,255,0.5);
+
+  /* UI-POLISH-1: Aurix premium surfaces. Additive — never reassign
+     legacy --bg-* / --surface-* vars (that would cascade everywhere).
+     New rules opt in by name. */
+  --aurix-surface:    rgba(20, 30, 56, 0.55);
+  --aurix-surface-2:  rgba(28, 42, 74, 0.48);
+  --aurix-border:     rgba(138, 166, 255, 0.18);
+  --aurix-border-hi:  rgba(138, 166, 255, 0.32);
+  --aurix-blue-soft:  rgba(138, 166, 255, 0.12);
+  --aurix-blue-fill:  rgba(74, 130, 240, 0.22);
+  --aurix-glow:       0 6px 22px -10px rgba(74, 130, 240, 0.45);
 }
 
 body {
@@ -11914,3 +11925,297 @@ body.gs-open { overflow: hidden; }
   text-shadow: 0 0 8px rgba(244,196,90,0.18);
 }
 #marketList.is-v4 .watchlist-btn:active { transform: scale(0.88); }
+
+/* ══════════════════════════════════════════════════════════════════
+   UI-POLISH-1 — Aurix premium visual consistency pass.
+   Scoped overrides on the four surfaces that still leaked the
+   pre-Aurix grey/brown palette (filter chip, filter sheet, dashboard
+   range selector, category detail hero). All rules are append-only
+   and target existing selectors — flag-off → original look returns.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 1 ── Market filter chip (V4) ─────────────────────────────────── */
+.mkt-filter-chip {
+  gap: 8px;
+  padding: 7px 8px 7px 12px;
+  background: var(--aurix-surface);
+  border: 1px solid var(--aurix-border);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset;
+  color: rgba(225,233,255,0.96);
+  font-size: 12px;
+}
+.mkt-filter-chip:hover {
+  border-color: var(--aurix-border-hi);
+  background: rgba(28, 42, 74, 0.72);
+}
+.mkt-filter-chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(180, 200, 255, 0.95);
+  width: 14px;
+  height: 14px;
+}
+.mkt-filter-chip-label {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: rgba(232, 240, 255, 0.95);
+}
+.mkt-filter-chip-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--aurix-blue-fill);
+  border: 1px solid rgba(138, 166, 255, 0.36);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 1px rgba(74,130,240,0.10) inset;
+}
+.mkt-filter-chip-sort {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(200, 214, 240, 0.55);
+  letter-spacing: 0.01em;
+  padding-right: 4px;
+}
+/* Hide the legacy single-summary span if it's still in the DOM somewhere. */
+.mkt-filter-chip .mkt-filter-chip-current { display: none; }
+@media (max-width: 560px) {
+  #marketList.is-v4 .mkt-explorer-controls {
+    justify-content: flex-end;
+    padding-right: 6px;
+  }
+  .mkt-filter-chip-sort { display: none; }
+  .mkt-filter-chip { padding: 6px 8px 6px 11px; gap: 7px; }
+}
+
+/* 2 ── Market filter sheet (mobile bottom-sheet / desktop popover) */
+.mkt-filter-sheet {
+  background:
+    linear-gradient(180deg, rgba(28, 42, 74, 0.32) 0%, rgba(12, 18, 32, 0.0) 50%),
+    rgba(10, 14, 24, 0.96);
+  border: 1px solid var(--aurix-border);
+  border-bottom: 0;
+  box-shadow:
+    0 -24px 60px -20px rgba(2, 6, 14, 0.85),
+    0 0 0 1px rgba(255,255,255,0.02) inset;
+}
+.mkt-filter-title {
+  letter-spacing: -0.01em;
+  font-size: 16px;
+}
+.mkt-filter-close {
+  background: rgba(20, 30, 56, 0.55);
+  border: 1px solid var(--aurix-border);
+  color: rgba(220, 230, 250, 0.82);
+  border-radius: 12px;
+}
+.mkt-filter-close:hover {
+  background: var(--aurix-blue-soft);
+  border-color: var(--aurix-border-hi);
+  color: #fff;
+}
+.mkt-filter-section-label {
+  color: rgba(180, 200, 240, 0.55);
+  font-size: 10px;
+  letter-spacing: 0.20em;
+}
+.mkt-filter-pill {
+  background: var(--aurix-surface-2);
+  border: 1px solid rgba(138, 166, 255, 0.12);
+  color: rgba(220, 230, 250, 0.78);
+}
+.mkt-filter-pill:hover {
+  border-color: var(--aurix-border-hi);
+  background: var(--aurix-blue-soft);
+  color: #fff;
+}
+.mkt-filter-pill.is-active {
+  color: #fff;
+  background: linear-gradient(180deg, rgba(74,130,240,0.30), rgba(74,130,240,0.18));
+  border-color: rgba(138, 166, 255, 0.55);
+  box-shadow: var(--aurix-glow);
+}
+.mkt-filter-helper {
+  font-size: 11px;
+  color: rgba(180, 200, 240, 0.50);
+}
+.mkt-filter-sort-item {
+  background: var(--aurix-surface-2);
+  border: 1px solid rgba(138, 166, 255, 0.12);
+  color: rgba(220, 230, 250, 0.82);
+  border-radius: 12px;
+}
+.mkt-filter-sort-item:hover {
+  border-color: var(--aurix-border-hi);
+  background: var(--aurix-blue-soft);
+  color: #fff;
+}
+.mkt-filter-sort-item.is-active {
+  color: #fff;
+  background: linear-gradient(180deg, rgba(74,130,240,0.26), rgba(74,130,240,0.14));
+  border-color: rgba(138, 166, 255, 0.55);
+  box-shadow: var(--aurix-glow);
+}
+@media (min-width: 768px) {
+  .mkt-filter-sheet {
+    border-bottom: 1px solid var(--aurix-border);
+    box-shadow:
+      0 24px 60px -20px rgba(2, 6, 14, 0.85),
+      0 0 0 1px rgba(255,255,255,0.02) inset;
+  }
+}
+
+/* 3 ── Dashboard timeframe selector ─────────────────────────────── */
+.range-toggle {
+  background: var(--aurix-surface);
+  border: 1px solid var(--aurix-border);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset;
+}
+.range-btn {
+  color: rgba(200, 214, 240, 0.65);
+  padding: 5px 11px;
+  border-radius: 7px;
+  letter-spacing: 0.06em;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast),
+    box-shadow var(--dur-fast),
+    transform var(--dur-fast) var(--ease-premium),
+    filter var(--dur-fast) var(--ease-premium),
+    opacity var(--dur-fast);
+}
+.range-btn:not(.active):hover {
+  background: var(--aurix-blue-soft);
+  color: #fff;
+}
+.range-btn.active {
+  background: linear-gradient(180deg, rgba(74,130,240,0.42), rgba(74,130,240,0.22));
+  color: #fff;
+  box-shadow:
+    0 0 0 1px rgba(138,166,255,0.45) inset,
+    var(--aurix-glow);
+}
+
+/* The "%/€" toggle that lives in the same .chart-controls row — same
+   surface family so the row reads as one premium component. */
+.perf-toggle {
+  display: flex;
+  background: var(--aurix-surface);
+  border: 1px solid var(--aurix-border);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.perf-btn {
+  background: transparent;
+  border: 0;
+  color: rgba(200, 214, 240, 0.62);
+  border-radius: 7px;
+  padding: 5px 10px;
+  min-width: 30px;
+}
+.perf-btn:hover {
+  background: var(--aurix-blue-soft);
+  color: #fff;
+  border-color: transparent;
+}
+.perf-btn.active {
+  background: linear-gradient(180deg, rgba(74,130,240,0.42), rgba(74,130,240,0.22));
+  color: #fff;
+  border-color: transparent;
+  box-shadow:
+    0 0 0 1px rgba(138,166,255,0.45) inset,
+    var(--aurix-glow);
+}
+
+/* 4 ── Category detail hero ─────────────────────────────────────── */
+.detail-hero {
+  background:
+    linear-gradient(160deg, rgba(40, 60, 110, 0.28) 0%, rgba(14, 20, 36, 0.0) 55%),
+    linear-gradient(180deg, rgba(14, 22, 42, 0.92), rgba(8, 12, 22, 0.94));
+  border: 1px solid var(--aurix-border);
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.02) inset,
+    0 18px 40px -24px rgba(4, 8, 18, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+/* Category accent is the only place the category colour bleeds — keep
+   the rest of the card Aurix-dark-blue. */
+.detail-hero::before {
+  width: 3px;
+  background: var(--detail-hero-color, var(--aurix-blue-light));
+  opacity: 0.95;
+  box-shadow: 0 0 14px -2px var(--detail-hero-color, rgba(74,130,240,0.6));
+}
+.detail-hero-type {
+  color: rgba(180, 200, 240, 0.62);
+}
+.detail-hero-pct {
+  color: rgba(180, 200, 240, 0.55);
+}
+
+/* Category detail chart empty / "no histórico" copy — quieter so the
+   hero stays the focal point. The legacy chart canvas + Chart.js render
+   logic stays untouched; we only style its empty-state container. */
+.detail-chart-wrap .chart-no-data,
+.detail-chart-wrap .detail-no-data {
+  font-size: 11px;
+  color: rgba(180, 200, 240, 0.45);
+  letter-spacing: 0.01em;
+}
+
+/* 5 ── Category asset rows (detail list) ────────────────────────── */
+.assets-list.assets-list--detail {
+  background:
+    linear-gradient(180deg, rgba(20, 30, 56, 0.42), rgba(14, 20, 36, 0.55));
+  border: 1px solid var(--aurix-border);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.02) inset;
+  border-radius: 16px;
+}
+.detail-asset-row {
+  border-bottom-color: rgba(138, 166, 255, 0.08);
+  padding: 14px 18px;
+}
+.detail-asset-row:hover {
+  background: var(--aurix-blue-soft);
+}
+.detail-asset-row .dar-actions .btn-edit,
+.detail-asset-row .dar-actions .btn-delete {
+  background: rgba(20, 30, 56, 0.40);
+  border: 1px solid rgba(138, 166, 255, 0.10);
+  color: rgba(220, 230, 250, 0.72);
+}
+.detail-asset-row .dar-actions .btn-edit:hover {
+  background: var(--aurix-blue-soft);
+  border-color: var(--aurix-border-hi);
+  color: #fff;
+}
+.detail-asset-row .dar-actions .btn-delete:hover {
+  background: rgba(224, 90, 90, 0.10);
+  border-color: rgba(224, 90, 90, 0.35);
+  color: var(--red);
+}
+@media (max-width: 480px) {
+  .detail-hero {
+    border-radius: 16px;
+    padding: 18px 18px 14px;
+  }
+  .detail-asset-row { padding: 12px 14px; }
+}
