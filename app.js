@@ -7692,16 +7692,17 @@ function initChart() {
       },
       scales: {
         x: {
-          grid: { color: 'rgba(255,255,255,0.06)' },
+          // DESKTOP PASS 1: softer grid + lower-contrast tick labels.
+          grid: { color: 'rgba(255,255,255,0.035)' },
           border: { display: false },
-          ticks: { color: '#686868', maxTicksLimit: 6, maxRotation: 0 },
+          ticks: { color: 'rgba(220,230,250,0.42)', maxTicksLimit: 6, maxRotation: 0 },
         },
         y: {
           position: 'right',
-          grid: { color: 'rgba(255,255,255,0.06)' },
+          grid: { color: 'rgba(255,255,255,0.035)' },
           border: { display: false },
           ticks: {
-            color: '#686868',
+            color: 'rgba(220,230,250,0.42)',
             maxTicksLimit: 5,
             // Chart series are stored in USD (canonical). Route ticks
             // through the canonical display layer so EUR mode shows
@@ -15978,16 +15979,16 @@ function initMobileCharts() {
         plugins: { legend: { display: false }, tooltip: { enabled: false } },
         scales: {
           x: {
-            grid: { color: 'rgba(255,255,255,0.06)' },
+            grid: { color: 'rgba(255,255,255,0.035)' },
             border: { display: false },
-            ticks: { color: '#686868', maxTicksLimit: 6, maxRotation: 0 },
+            ticks: { color: 'rgba(220,230,250,0.42)', maxTicksLimit: 6, maxRotation: 0 },
           },
           y: {
             position: 'right',
-            grid: { color: 'rgba(255,255,255,0.06)' },
+            grid: { color: 'rgba(255,255,255,0.035)' },
             border: { display: false },
             ticks: {
-              color: '#686868',
+              color: 'rgba(220,230,250,0.42)',
               maxTicksLimit: 5,
               // Asset-detail chart ticks: same canonical conversion as the
               // dashboard chart above. Series are USD-denominated.
