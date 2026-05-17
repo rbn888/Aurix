@@ -12543,27 +12543,28 @@ body.gs-open { overflow: hidden; }
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   MARKET-6 — Mobile preview sheet structural rebuild (supersedes -5).
-   Goal: native-finance-app feel (Apple Stocks / Revolut / TradingView).
-   Strategy:
-     - Intentional sheet height (88dvh capped at 760px), not full-screen.
-     - Body is a SECOND flex column (header-stats-pills-meta fixed at
-       top, chart flexible, footer in own flex slot). Body itself does
-       NOT scroll under normal viewports — the chart absorbs free space.
-       Tiny viewports (≤670 dvh) fall back to scrollable body.
-     - Footer is a real opaque sheet footer (no sticky, no transparent
-       gradient bleed). Generous upward shadow, hairline Aurix border,
-       safe-area inset honored.
-     - Explicit layering: chart=1, footer=5, close=10. No bleed-through.
-   Desktop untouched — all rules under @media (max-width: 520px).
+   MARKET-9 — Mobile preview HARD FIX (supersedes -5 / -6).
+   Root cause from -6: flex column + `overflow: hidden` on body + chart
+   `flex: 1 1 auto` could push the modal-cta below the visible sheet
+   when content + min-heights exceeded available space. Sticky base
+   rules on .modal-cta then mis-anchored the footer.
+   Strategy: CSS Grid for the sheet AND for the body. Footer lives in
+   row 3 of an explicit `auto / minmax(0,1fr) / auto` track — it is
+   structurally forced into the visible viewport.
+   All rules scoped @media (max-width: 520px) — desktop untouched.
    ══════════════════════════════════════════════════════════════════ */
 @media (max-width: 520px) {
-  /* ── 1. Sheet shell ─────────────────────────────────────────── */
+  /* ── 1. Sheet shell — CSS Grid with footer in row 3 ───────────── */
   .modal--mkt-preview {
-    display: flex;
-    flex-direction: column;
-    height: min(88dvh, 760px);
-    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - 10px);
+    display: grid;
+    /* Rows: sheet-handle / header / body / footer.
+       sheet-handle is an inline 12px decoration so it collapses small;
+       header + footer auto-size to their content; body fills the rest
+       via minmax(0, 1fr) — the `0` floor lets it shrink if the chart
+       has too much intrinsic height. */
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    height: min(82dvh, 700px);
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - 12px);
     overflow: hidden;
     background:
       linear-gradient(180deg, rgba(28, 42, 74, 0.18) 0%, rgba(10, 14, 24, 0.0) 40%),
@@ -12572,14 +12573,21 @@ body.gs-open { overflow: hidden; }
     border-bottom: 0;
     box-shadow: 0 -28px 60px -20px rgba(2, 6, 14, 0.85);
   }
+  /* Taller viewports: nudge the sheet a touch taller. */
+  @media (min-height: 780px) {
+    .modal--mkt-preview {
+      height: min(84dvh, 720px);
+    }
+  }
   .modal--mkt-preview .sheet-handle {
+    grid-row: 1;
     background: rgba(180, 200, 240, 0.30);
     margin: 8px auto 2px;
   }
 
-  /* ── 2. Header (fixed, ~72px) ───────────────────────────────── */
+  /* ── 2. Header — row 2 of sheet grid ──────────────────────────── */
   .modal--mkt-preview .modal-header {
-    flex-shrink: 0;
+    grid-row: 2;
     padding: 6px 14px 12px;
     border-bottom: 1px solid rgba(138, 166, 255, 0.08);
     align-items: center;
@@ -12607,7 +12615,6 @@ body.gs-open { overflow: hidden; }
     font-size: 9px;
     letter-spacing: 0.08em;
   }
-  /* Close: 38×38, circular, highest layer */
   .modal--mkt-preview .modal-close {
     width: 38px;
     height: 38px;
@@ -12616,7 +12623,7 @@ body.gs-open { overflow: hidden; }
     border: 1px solid var(--aurix-border);
     color: rgba(225, 233, 255, 0.92);
     font-size: 14px;
-    z-index: 10;
+    z-index: 30;
     flex-shrink: 0;
   }
   .modal--mkt-preview .modal-close:hover,
@@ -12626,22 +12633,31 @@ body.gs-open { overflow: hidden; }
     color: #fff;
   }
 
-  /* ── 3. Body — second flex column, no overflow by default ───── */
+  /* ── 3. Body — row 3, scrollable, internal grid ───────────────── */
   .modal--mkt-preview .modal-body {
-    flex: 1 1 auto;
+    grid-row: 3;
     min-height: 0;
-    overflow: hidden;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    padding: 14px 16px 12px;
-    display: flex;
-    flex-direction: column;
+    padding: 14px 16px 12px !important; /* override generic mobile rule */
+    display: grid;
+    /* Rows: stats / pills / meta / chart. Each non-chart row is
+       `auto` so it collapses to 0 when hidden (.mkt-prv-meta has
+       [hidden]). Chart uses `minmax(170px, 1fr)` so it absorbs free
+       space but can shrink to a safe 170px floor. */
+    grid-template-rows: auto auto auto minmax(170px, 1fr);
+    gap: 10px;
+    z-index: 1;
   }
+  .modal--mkt-preview .mkt-prv-stats  { grid-row: 1; }
+  .modal--mkt-preview .mkt-prv-ranges { grid-row: 2; }
+  .modal--mkt-preview .mkt-prv-meta   { grid-row: 3; }
+  .modal--mkt-preview .mkt-prv-mount  { grid-row: 4; }
 
   /* ── 4. Price block ─────────────────────────────────────────── */
   .modal--mkt-preview .mkt-prv-stats {
-    flex-shrink: 0;
-    margin: 0 0 12px;
+    margin: 0;
     gap: 12px;
     align-items: baseline;
     flex-wrap: wrap;
@@ -12660,7 +12676,6 @@ body.gs-open { overflow: hidden; }
 
   /* ── 5. Range pills — one row, h-scroll if needed ───────────── */
   .modal--mkt-preview .mkt-prv-ranges {
-    flex-shrink: 0;
     display: flex;
     flex-wrap: nowrap;
     gap: 6px;
@@ -12669,7 +12684,7 @@ body.gs-open { overflow: hidden; }
     scrollbar-width: none;
     -ms-overflow-style: none;
     padding-bottom: 2px;
-    margin: 0 -2px 4px;
+    margin: 0 -2px;
   }
   .modal--mkt-preview .mkt-prv-ranges::-webkit-scrollbar { display: none; }
   .modal--mkt-preview .mkt-prv-ranges .aurix-chart-range {
@@ -12695,48 +12710,54 @@ body.gs-open { overflow: hidden; }
 
   /* ── 6. Meta label — subtle eyebrow ─────────────────────────── */
   .modal--mkt-preview .mkt-prv-meta {
-    flex-shrink: 0;
     font-size: 9.5px;
     letter-spacing: 0.20em;
     text-transform: uppercase;
     color: rgba(180, 200, 240, 0.46);
-    margin: 8px 0 6px;
+    margin: 0;
     font-weight: 700;
   }
 
-  /* ── 7. Chart — flex absorbs available space, bounded ───────── */
+  /* ── 7. Chart — row 4 of body grid, adapts to available space ── */
   .modal--mkt-preview .mkt-prv-mount {
-    flex: 1 1 auto;
     width: 100%;
-    min-height: 180px;
-    max-height: 260px;
-    margin: 0 0 8px;
+    height: auto;
+    min-height: 170px;
+    max-height: none;
+    min-width: 0;
+    margin: 0;
     border-radius: 12px;
     overflow: hidden;
     position: relative;
     z-index: 1;
   }
+  /* Tiny viewports: keep chart legible but never push the footer. */
+  @media (max-height: 650px) {
+    .modal--mkt-preview .mkt-prv-mount { min-height: 150px; }
+  }
 
-  /* ── 8. Footer CTA — real fixed footer, opaque, lifted ──────── */
-  /* Override the base `.modal-cta { position:sticky; background:gradient }`
-     completely. The gradient base faded to transparent at the top edge,
-     which is what produced the "blue button bleed-through" feeling. */
+  /* ── 8. Footer — row 4 of sheet grid, ALWAYS visible ──────────── */
+  /* Position: relative + !important defeats the legacy base rule
+     `.modal-cta { position: sticky; bottom: 0 }` so the footer's
+     visibility is guaranteed by grid placement, not by sticky offset. */
   .modal--mkt-preview .modal-cta.mkt-prv-cta,
   .modal--mkt-preview .mkt-prv-cta {
-    position: relative;
-    flex-shrink: 0;
+    grid-row: 4;
+    position: relative !important;
+    bottom: auto !important;
     display: flex;
     align-items: stretch;
     gap: 10px;
-    padding: 12px 16px max(14px, env(safe-area-inset-bottom));
-    background: linear-gradient(180deg, rgba(12, 18, 34, 0.98) 0%, rgba(8, 13, 26, 1) 100%);
-    border-top: 1px solid var(--aurix-border);
-    box-shadow: 0 -18px 40px rgba(0, 0, 0, 0.42);
-    z-index: 5;
+    padding: 12px 16px max(16px, env(safe-area-inset-bottom));
+    background:
+      linear-gradient(180deg, rgba(12, 18, 34, 0.99) 0%, rgba(7, 12, 24, 1) 100%);
+    background-clip: padding-box;
+    border-top: 1px solid rgba(100, 130, 255, 0.20);
+    box-shadow: 0 -18px 38px rgba(0, 0, 0, 0.45);
+    z-index: 20;
   }
-  /* Watchlist — 50×52 glass, gold when active */
   .modal--mkt-preview .mkt-prv-cta .btn-secondary {
-    width: 50px;
+    width: 52px;
     height: 52px;
     border-radius: 14px;
     background: rgba(20, 30, 56, 0.65);
@@ -12759,7 +12780,6 @@ body.gs-open { overflow: hidden; }
     border-color: rgba(244, 196, 90, 0.42);
     text-shadow: 0 0 10px rgba(244, 196, 90, 0.32);
   }
-  /* Add — 52px tall, 14px radius, Aurix gradient, no transparency */
   .modal--mkt-preview .mkt-prv-cta .btn-submit {
     flex: 1;
     height: 52px;
@@ -12779,18 +12799,6 @@ body.gs-open { overflow: hidden; }
   .modal--mkt-preview .mkt-prv-cta .btn-submit:active {
     transform: scale(0.985);
     box-shadow: 0 2px 10px -4px rgba(74, 130, 240, 0.55);
-  }
-
-  /* ── 9. Very small viewports — allow body to scroll as fallback */
-  @media (max-height: 670px) {
-    .modal--mkt-preview .modal-body {
-      overflow-y: auto;
-    }
-    .modal--mkt-preview .mkt-prv-mount {
-      flex: 0 0 auto;
-      height: 200px;
-      min-height: 180px;
-    }
   }
 }
 
