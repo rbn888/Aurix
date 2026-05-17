@@ -106,13 +106,18 @@ async function autoSaveToBackend(attempt = 1) {
   if (_isSaving || !currentUser || !supabaseClient) return;
 
   const localData = getPortfolioData();
-  if (!localData || (!localData.assets?.length && !localData.holdings?.length)) {
+  const hasAny    = !!(localData && (localData.assets?.length || localData.holdings?.length));
+  // RESET-2: when the reset tombstone is set, an empty local state
+  // STILL needs to be pushed so the remote row gets cleared. Skip
+  // only when the local is empty AND no tombstone is pending.
+  const tombstone = (typeof _aurixResetAt === 'function') ? _aurixResetAt() : 0;
+  if (!hasAny && !tombstone) {
     if (IS_DEV) console.warn('[DATA] skip autosave (empty data)');
     return;
   }
 
-  const assets   = localData.source === 'new' ? localData.assets   : [];
-  const holdings = localData.source === 'new' ? localData.holdings : [];
+  const assets   = (localData && localData.source === 'new') ? localData.assets   : [];
+  const holdings = (localData && localData.source === 'new') ? localData.holdings : [];
 
   try {
     _isSaving = true;
@@ -127,6 +132,11 @@ async function autoSaveToBackend(attempt = 1) {
 
     if (error) throw error;
     if (IS_DEV) console.log('[DATA] autosave success');
+    // Tombstone served its purpose — remote is now in sync with local.
+    if (tombstone) {
+      try { localStorage.removeItem(RESET_AT_KEY); } catch (_) {}
+      if (IS_DEV) console.log('[DATA] reset tombstone cleared after sync');
+    }
   } catch (e) {
     if (IS_DEV) console.error('[DATA] autosave error:', e);
     if (attempt < 3) setTimeout(() => autoSaveToBackend(attempt + 1), 1000 * attempt);
@@ -144,9 +154,15 @@ function isValidPortfolioData(data) {
 
 async function loadInitialData() {
   const remote = await supabaseLoadPortfolio();
-  if (isValidPortfolioData(remote)) {
+  // RESET-2: distrust remote if local reset tombstone is newer than
+  // the remote snapshot. Prevents stale Supabase rows from resurrecting
+  // a freshly-wiped portfolio.
+  if (isValidPortfolioData(remote) && !(typeof _shouldDistrustRemote === 'function' && _shouldDistrustRemote(remote))) {
     if (IS_DEV) console.log('[DATA] loaded from remote');
     return { assets: remote.assets, holdings: remote.holdings };
+  }
+  if (remote && typeof _shouldDistrustRemote === 'function' && _shouldDistrustRemote(remote)) {
+    if (IS_DEV) console.warn('[DATA] remote ignored — newer reset tombstone');
   }
 
   try {
@@ -168,7 +184,9 @@ async function loadPortfolioFromBackend(userId) {
   try {
     const { data, error } = await supabaseClient
       .from('user_portfolios')
-      .select('assets, holdings')
+      // RESET-2: include updated_at so _shouldDistrustRemote can
+      // compare against the local reset tombstone.
+      .select('assets, holdings, updated_at')
       .eq('user_id', userId)
       .single();
     if (error) {
@@ -185,9 +203,13 @@ async function loadPortfolioFromBackend(userId) {
 async function initPortfolioData(userId) {
   // 1. Backend (fuente principal)
   const backendData = await loadPortfolioFromBackend(userId);
-  if (isValidPortfolioData(backendData) && backendData.assets.length > 0) {
+  const distrustRemote = (typeof _shouldDistrustRemote === 'function') && _shouldDistrustRemote(backendData);
+  if (isValidPortfolioData(backendData) && backendData.assets.length > 0 && !distrustRemote) {
     if (IS_DEV) console.log('[DATA] loaded from Supabase');
     return backendData;
+  }
+  if (distrustRemote && IS_DEV) {
+    console.warn('[DATA] remote ignored — newer reset tombstone');
   }
 
   // 2. localStorage (fallback)
@@ -20713,8 +20735,47 @@ function _mktHistoryFetchVisible(dataset) {
   }
 }
 
-// Debug surface — console-only, no UI.
+// RESET-2: storage audit helper. Reports the count/size of every
+// known persistence key plus the reset tombstone — useful from the
+// console when verifying reset coverage.
 if (typeof window !== 'undefined') {
+  window.__aurixStorageDebug = function () {
+    const KEYS = [
+      'portfolio_assets', 'portfolio_history', 'category_history',
+      'portfolio_card_order', 'portfolio_cat_order',
+      'aurix_watchlist', 'aurix_assets', 'aurix_holdings',
+      'aurix.workspace.v1', 'aurix_insights_memory',
+      'aurix_user_profile', 'aurix_behavior', 'aurix_decisions',
+      'aurix_data_backup', 'aurix_data_version',
+      'aurix_identity', 'aurix_evolution',
+      // Preserved across reset:
+      'portfolio_lang', 'portfolio_base_currency', 'aurix_plan',
+      // Tombstone:
+      'aurix_reset_at',
+    ];
+    const out = {};
+    for (const k of KEYS) {
+      const raw = (function () { try { return localStorage.getItem(k); } catch (_) { return null; } })();
+      if (raw == null) { out[k] = null; continue; }
+      let count = null;
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) count = parsed.length;
+        else if (parsed && typeof parsed === 'object') {
+          if (Array.isArray(parsed.assets)) count = parsed.assets.length;
+          else count = Object.keys(parsed).length;
+        }
+      } catch (_) {}
+      out[k] = { bytes: raw.length, count };
+    }
+    out.__inMemory = {
+      assets:           Array.isArray(assets)           ? assets.length           : null,
+      portfolioHistory: Array.isArray(portfolioHistory) ? portfolioHistory.length : null,
+      categoryHistory:  Array.isArray(categoryHistory)  ? categoryHistory.length  : null,
+    };
+    return out;
+  };
+
   window.__aurixMarketHistoryDebug = function () {
     return {
       cacheSize:       _marketHistoryCache.size,
@@ -20856,23 +20917,82 @@ function closeResetConfirm() {
 // ── Safe reset ────────────────────────────────────────────────────
 // Clears portfolio-related state only. Preserves: language, base
 // currency, and the plan placeholder. Idempotent — safe to call twice.
+// RESET-2: tombstone marker so that any future load path (Supabase
+// remote, legacy migration, in-memory cache) can detect that the user
+// intentionally wiped their portfolio and must not resurrect old data.
+// Persisted in localStorage; cleared once remote sync confirms the
+// empty state has propagated.
+const RESET_AT_KEY = 'aurix_reset_at';
+
+function _aurixResetAt() {
+  try { return parseInt(localStorage.getItem(RESET_AT_KEY) || '0', 10) || 0; }
+  catch (_) { return 0; }
+}
+function _shouldDistrustRemote(remoteData) {
+  // True when local reset tombstone is newer than remote's updated_at —
+  // meaning the user wiped their portfolio after this remote snapshot
+  // was written. Used by initPortfolioData / loadInitialData so stale
+  // remote rows never resurrect deleted assets.
+  try {
+    const tombstone = _aurixResetAt();
+    if (!tombstone) return false;
+    const remoteAt = (remoteData && remoteData.updated_at)
+      ? new Date(remoteData.updated_at).getTime()
+      : 0;
+    return remoteAt < tombstone;
+  } catch (_) { return false; }
+}
+
+async function _pushEmptyPortfolioToBackend() {
+  // Best-effort push of empty assets/holdings to Supabase so the
+  // remote row immediately reflects the local wipe. If offline or
+  // unauthenticated, the tombstone alone protects future reads via
+  // _shouldDistrustRemote until autoSave can drain.
+  try {
+    if (!supabaseClient || !currentUser) return;
+    await supabaseClient
+      .from('user_portfolios')
+      .upsert({
+        user_id:    currentUser.id,
+        assets:     [],
+        holdings:   [],
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+    // Clear tombstone once remote is in sync — local + remote both empty.
+    try { localStorage.removeItem(RESET_AT_KEY); } catch (_) {}
+  } catch (e) {
+    console.warn('[reset] remote clear failed:', e && e.message);
+  }
+}
+
 function performSafeReset() {
+  // RESET-2: tombstone FIRST, before clearing any storage. If the
+  // user reloads mid-reset (e.g. unhandled error below), the marker
+  // alone is enough to prevent remote resurrection.
+  const RESET_AT = Date.now();
+  try { localStorage.setItem(RESET_AT_KEY, String(RESET_AT)); } catch (_) {}
+
   const PORTFOLIO_KEYS = [
-    'portfolio_assets',
-    'portfolio_history',
-    'category_history',
-    'portfolio_card_order',
-    'portfolio_cat_order',
-    'aurix_watchlist',
-    'aurix_assets',
-    'aurix_holdings',
-    'aurix.workspace.v1',
-    'aurix_insights_memory',
-    'aurix_user_profile',
-    'aurix_behavior',
-    'aurix_decisions',
-    'aurix_data_backup',
+    'portfolio_assets',          // legacy primary
+    'portfolio_history',         // PORTFOLIO_HISTORY snapshots
+    'category_history',          // CATEGORY_HISTORY snapshots
+    'portfolio_card_order',      // dashboard card order
+    'portfolio_cat_order',       // category drill-down order
+    'aurix_watchlist',           // watchlist symbols
+    'aurix_assets',              // new model catalog
+    'aurix_holdings',            // new model holdings
+    'aurix.workspace.v1',        // workspace cells
+    'aurix_insights_memory',     // AI insights memory
+    'aurix_user_profile',        // user profile (portfolio-derived)
+    'aurix_behavior',            // behavioral signals (portfolio-derived)
+    'aurix_decisions',           // user decisions log
+    'aurix_data_backup',         // legacy pre-migration backup
+    'aurix_identity',            // identity profile (portfolio-derived)
+    'aurix_evolution',           // AI evolution level (portfolio-derived)
   ];
+  // Preserve `aurix_data_version` (so the migration IIFE early-returns
+  // on next boot and can't accidentally rehydrate via its else branch),
+  // `portfolio_lang`, `portfolio_base_currency`, and `aurix_plan`.
   PORTFOLIO_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch (_) {} });
 
   try { assets = []; } catch (_) {}
@@ -20885,6 +21005,10 @@ function performSafeReset() {
   // Persist the empty state via the canonical save path so the
   // schema-version flag and migration vars stay consistent.
   try { if (typeof save === 'function') save(); } catch (_) {}
+
+  // Fire-and-forget remote wipe — does not block UI. Tombstone above
+  // is the real safety net; this is the happy-path acceleration.
+  try { _pushEmptyPortfolioToBackend(); } catch (_) {}
 
   // Re-render dashboard so the donut, KPIs and asset list all
   // reflect the empty state immediately.
