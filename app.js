@@ -1785,6 +1785,10 @@ let _aurixAssetRanges = null;
 let _aurixAssetAbort  = null;
 let _aurixAssetRange  = '30d';
 let _aurixAssetAsset  = null;
+// CHART-7B: category detail chart V2 (honest empty state — legacy
+// synthetic chart still ships unchanged when the flag is off, so the
+// V2 path is opt-in transparency, not a regression).
+let _aurixCategoryEntry = null;
 let _detailChart     = null;  // Chart.js instance for category detail sparkline
 let _detailChartType = null;  // which category the sparkline was last rendered for
 let _chartRevealProgress = 1; // 0–1 clip for left-to-right line reveal
@@ -8243,6 +8247,90 @@ function _aurixAssetMount(asset) {
   _aurixAssetLoad(asset, adapter);
 }
 
+// ── CHART-7B ──────────────────────────────────────────────────────
+// Category detail chart V2. Today's legacy chart (Chart.js inside
+// buildDetailSparkline) shows a *synthetic* smoothstep+sine walk
+// derived from change24h — there is no real per-category history in
+// storage to draw a true line. The spec accepts that:
+//   • Flag ON  → V2 mounts an honest premium empty state (engine's
+//     "no data" overlay with category-aware copy). No fake precision.
+//   • Flag OFF → legacy synthetic chart renders unchanged, exactly
+//     as it did pre-CHART-7B.
+//
+// Architecturally identical to the dashboard / asset-detail overlays:
+// the legacy canvas stays in the DOM (display:none during V2) so a
+// fallback restores the legacy view pixel-for-pixel.
+function _aurixCategoryFlag() {
+  return typeof window !== 'undefined' && window.__AURIX_CATEGORY_CHARTS_V2 !== false;
+}
+function _aurixCategoryReady() {
+  return typeof window !== 'undefined'
+      && typeof window.AurixCharts === 'object'
+      && typeof window.AurixCharts.createChart === 'function'
+      && typeof window.AurixCharts.isReady === 'function'
+      && window.AurixCharts.isReady();
+}
+function _aurixCategoryTeardown() {
+  if (!_aurixCategoryEntry) return;
+  const { ctrl, canvas } = _aurixCategoryEntry;
+  if (ctrl) { try { ctrl.destroy(); } catch (_) {} }
+  if (canvas) canvas.style.display = '';
+  _aurixCategoryEntry = null;
+}
+function _aurixCategoryMount(canvas) {
+  if (!canvas) return false;
+  const parent = canvas.parentNode; // .detail-chart-wrap
+  if (!parent) return false;
+  try {
+    // Parent has height set in CSS (82px desktop / 64px mobile) and
+    // is already position:relative. Belt-and-braces if a future CSS
+    // change strips it.
+    const cs = parent.ownerDocument && parent.ownerDocument.defaultView
+      ? parent.ownerDocument.defaultView.getComputedStyle(parent)
+      : { position: '' };
+    if (cs.position === 'static') parent.style.position = 'relative';
+
+    // Hide the legacy canvas — fallback restores display:'' on teardown.
+    canvas.style.display = 'none';
+
+    const host = document.createElement('div');
+    host.dataset.aurixCategory = '1';
+    host.style.position = 'absolute';
+    host.style.inset = '0';
+    parent.appendChild(host);
+
+    const ctrl = window.AurixCharts.createChart(host, {
+      variant:        'mini',
+      colorMode:      'neutral',
+      showCrosshair:  false,
+      showTooltip:    false,
+      showTimeScale:  false,
+      showPriceScale: false,
+      height:         parent.clientHeight || 82,
+    });
+
+    // CHART-7B honest empty state — no fake series passes through.
+    ctrl.setData([]);
+    try {
+      const emptyEl = host.querySelector('.aurix-chart-state--empty');
+      if (emptyEl) {
+        emptyEl.textContent = (typeof lang !== 'undefined' && lang === 'es')
+          ? 'No hay histórico de categoría disponible.'
+          : 'No category history available yet.';
+      }
+    } catch (_) {}
+
+    _aurixCategoryEntry = { ctrl, canvas, host };
+    return true;
+  } catch (err) {
+    console.warn('[chart-cat-v2] mount fail', err && err.message ? err.message : err);
+    // Restore canvas visibility so the legacy code path is a clean
+    // recovery — pixel-for-pixel identical to flag-off behaviour.
+    canvas.style.display = '';
+    return false;
+  }
+}
+
 function initChart() {
   const canvas = document.getElementById('portfolioChart');
   if (!canvas || portfolioChart) return;
@@ -9854,6 +9942,21 @@ function buildDetailSparkline(totalValue, change24h, color) {
   const canvas = document.getElementById('detailChartCanvas');
   if (!canvas) return;
   if (_detailChart) { _detailChart.destroy(); _detailChart = null; }
+  // CHART-7B: always tear down any prior V2 controller before either
+  // path runs — keeps the registry clean across category switches and
+  // flag flips.
+  _aurixCategoryTeardown();
+
+  // CHART-7B: try the V2 path first. On success it owns the surface
+  // and we skip the legacy synthetic Chart.js render entirely. Any
+  // failure (flag off, engine not ready, mount throws) falls through
+  // to the legacy path so the user never sees a blank hero.
+  if (_aurixCategoryFlag() && _aurixCategoryReady()) {
+    if (_aurixCategoryMount(canvas)) return;
+  }
+  // Restore canvas visibility for the legacy render path in case a
+  // prior V2 mount had hidden it.
+  canvas.style.display = '';
 
   const pts     = 32;
   const startVal = totalValue / (1 + (change24h || 0) / 100);
@@ -13303,6 +13406,9 @@ function render(animate = false) {
     _detailChartType = null;
     if (_heroRaf) { cancelAnimationFrame(_heroRaf); _heroRaf = null; }
     _heroValueShown = null;
+    // CHART-7B: also tear down the V2 category controller (no-op if
+    // legacy path was active for this drill-down).
+    try { _aurixCategoryTeardown(); } catch (_) {}
   }
 
   // Toggle premium detail-view styling on the list container
