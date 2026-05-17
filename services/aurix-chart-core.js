@@ -175,6 +175,16 @@
         display: none !important;
         pointer-events: none !important;
       }
+      /* CHART-4C hotfix: hard touch lock on the dashboard slider while
+         the chart is in inspection mode. stopPropagation in the state
+         machine already prevents the slider's listeners from running,
+         but touch-action:none is the browser-level guarantee that no
+         native gesture (pull-to-refresh, scroll, pinch) reclaims the
+         finger. Scoped to the explicit attribute we set on enter. */
+      [data-chart-inspecting="1"],
+      [data-chart-inspecting="1"] * {
+        touch-action: none !important;
+      }
       .aurix-chart-ranges {
         display: flex;
         gap: 6px;
@@ -500,60 +510,87 @@
       meta:     null,
     };
 
+    // CHART-4C hotfix: shared tooltip renderer reachable from BOTH
+    // the LWC subscribeCrosshairMove callback (desktop hover) AND the
+    // mobile inspection state machine. Previously the handler bailed
+    // on `!param.point`, which is undefined when LWC fires the
+    // callback from a programmatic setCrosshairPosition() call — so
+    // the tooltip never rendered for the mobile path. Now the state
+    // machine can call _renderTooltip(value, timeMs, xClient) directly.
+    const _ttTimeEl = (opts.showTooltip)
+      ? (tooltip.innerHTML =
+          '<div class="aurix-chart-tooltip-time"></div>' +
+          '<div class="aurix-chart-tooltip-value"></div>' +
+          '<div class="aurix-chart-tooltip-pct"></div>',
+         tooltip.querySelector('.aurix-chart-tooltip-time'))
+      : null;
+    const _ttValEl = opts.showTooltip ? tooltip.querySelector('.aurix-chart-tooltip-value') : null;
+    const _ttPctEl = opts.showTooltip ? tooltip.querySelector('.aurix-chart-tooltip-pct')   : null;
+
+    function _renderTooltip(value, timeMs, xClient, yClient) {
+      if (!opts.showTooltip || !_ttTimeEl || !_ttValEl) return;
+      _ttTimeEl.textContent = _formatTooltipTime(timeMs, _state.range);
+      _ttValEl.textContent  = _formatTooltipValue(value, _state.currency);
+      const first = _state.data[0]?.value;
+      const dir = first == null
+        ? 'flat'
+        : (value > first ? 'up' : (value < first ? 'down' : 'flat'));
+      _ttValEl.classList.toggle('is-up',   dir === 'up');
+      _ttValEl.classList.toggle('is-down', dir === 'down');
+      if (_ttPctEl) {
+        if (first != null && first > 0) {
+          const pct = ((value - first) / first) * 100;
+          const sign = pct >= 0 ? '+' : '';
+          _ttPctEl.textContent = `${sign}${pct.toFixed(2)}%`;
+          _ttPctEl.classList.toggle('is-up',   pct > 0.005);
+          _ttPctEl.classList.toggle('is-down', pct < -0.005);
+        } else {
+          _ttPctEl.textContent = '';
+        }
+      }
+      const hostRect = host.getBoundingClientRect();
+      const ttW = tooltip.offsetWidth  || 120;
+      const ttH = tooltip.offsetHeight || 56;
+      const localX = (typeof xClient === 'number') ? (xClient - hostRect.left) : (hostRect.width / 2);
+      // y: prefer the supplied yClient (desktop hover provides it);
+      // mobile inspection passes only x → pin tooltip near the top.
+      const localY = (typeof yClient === 'number')
+        ? Math.max(ttH + 6, yClient - hostRect.top)
+        : (ttH + 16);
+      const left = Math.max(ttW / 2 + 6, Math.min(hostRect.width - ttW / 2 - 6, localX));
+      tooltip.style.left = left + 'px';
+      tooltip.style.top  = localY + 'px';
+      tooltip.dataset.visible = 'true';
+    }
+    function _hideTooltip() {
+      if (tooltip) tooltip.dataset.visible = 'false';
+    }
+
     if (opts.showTooltip && opts.showCrosshair) {
-      // CHART-4B: premium tooltip — date/time muted, value prominent,
-      // optional % change vs first visible point in a tabular line.
-      tooltip.innerHTML =
-        '<div class="aurix-chart-tooltip-time"></div>' +
-        '<div class="aurix-chart-tooltip-value"></div>' +
-        '<div class="aurix-chart-tooltip-pct"></div>';
-      const timeEl = tooltip.querySelector('.aurix-chart-tooltip-time');
-      const valEl  = tooltip.querySelector('.aurix-chart-tooltip-value');
-      const pctEl  = tooltip.querySelector('.aurix-chart-tooltip-pct');
       chart.subscribeCrosshairMove(param => {
-        if (!param || !param.point || !param.time || !param.seriesData?.size) {
-          tooltip.dataset.visible = 'false';
+        if (!param || !param.time || !param.seriesData?.size) {
+          // Don't hide here — the mobile state machine may have just
+          // shown the tooltip via _renderTooltip(). Only hide when the
+          // pointer left the chart entirely (point present + no data).
+          if (param && param.point && !param.seriesData?.size) _hideTooltip();
           return;
         }
         const data = param.seriesData.get(series);
         if (!data || typeof data.value !== 'number') {
-          tooltip.dataset.visible = 'false';
+          _hideTooltip();
           return;
         }
         const ms = (typeof param.time === 'number' ? param.time * 1000 : Date.parse(param.time));
-        timeEl.textContent = _formatTooltipTime(ms, _state.range);
-        valEl.textContent  = _formatTooltipValue(data.value, _state.currency);
-        // Direction class — prefer explicit hint when present (e.g.
-        // dashboard KPI direction); otherwise derive vs first visible.
-        const first = _state.data[0]?.value;
-        const seriesDir = first == null
-          ? 'flat'
-          : (data.value > first ? 'up' : (data.value < first ? 'down' : 'flat'));
-        valEl.classList.toggle('is-up',   seriesDir === 'up');
-        valEl.classList.toggle('is-down', seriesDir === 'down');
-        // % change line vs first visible point.
-        if (pctEl) {
-          if (first != null && first > 0) {
-            const pct = ((data.value - first) / first) * 100;
-            const sign = pct >= 0 ? '+' : '';
-            pctEl.textContent = `${sign}${pct.toFixed(2)}%`;
-            pctEl.classList.toggle('is-up',   pct > 0.005);
-            pctEl.classList.toggle('is-down', pct < -0.005);
-          } else {
-            pctEl.textContent = '';
-          }
+        // Desktop path supplies a real point — use it. Mobile path
+        // has no param.point (setCrosshairPosition is programmatic);
+        // the state machine handles its own _renderTooltip call.
+        if (param.point) {
+          _renderTooltip(data.value, ms, undefined, undefined);  // recompute on host coords
+          // Snap x to the actual pointer when available.
+          const hostRect = host.getBoundingClientRect();
+          tooltip.style.left = Math.max(60, Math.min(hostRect.width - 60, param.point.x)) + 'px';
+          tooltip.style.top  = Math.max(60, param.point.y) + 'px';
         }
-        // Position — clamp inside host so the tooltip never escapes.
-        const x = param.point.x;
-        const y = param.point.y;
-        const hostRect = host.getBoundingClientRect();
-        const ttW = tooltip.offsetWidth  || 120;
-        const ttH = tooltip.offsetHeight || 48;
-        let left = Math.max(ttW / 2 + 6, Math.min(hostRect.width - ttW / 2 - 6, x));
-        let top  = Math.max(ttH + 6, y);
-        tooltip.style.left = left + 'px';
-        tooltip.style.top  = top  + 'px';
-        tooltip.dataset.visible = 'true';
       });
     }
 
@@ -597,9 +634,26 @@
 
         const _canvasEl = () => canvasHolder.querySelector('canvas');
 
-        // Snap an absolute clientX to the nearest data bar and tell
-        // LWC to render its crosshair there. Triggers our existing
-        // subscribeCrosshairMove handler, which positions the tooltip.
+        // Walk up to find the nearest dashboard slider root so we can
+        // mark inspection on it. CSS / other JS observers can hook
+        // [data-chart-inspecting="1"] to lock animations / gestures
+        // beyond what stopPropagation already covers.
+        const _findSliderRoot = () => {
+          let cur = host;
+          while (cur && cur instanceof Element) {
+            if (cur.id === 'portfolioMobileSlider' ||
+                cur.classList?.contains('portfolio-mobile-slider') ||
+                cur.classList?.contains('mobile-slider-track')) return cur;
+            cur = cur.parentNode;
+          }
+          return null;
+        };
+        const sliderRoot = _findSliderRoot();
+
+        // Snap a clientX to the nearest data bar, tell LWC to render
+        // its crosshair, AND render our DOM tooltip directly (the LWC
+        // subscribeCrosshairMove callback fires with no point info on
+        // programmatic setCrosshairPosition, so we cannot rely on it).
         const _crosshairAt = (clientX) => {
           if (!Array.isArray(_state.data) || !_state.data.length) return;
           const c = _canvasEl();
@@ -626,22 +680,29 @@
           try {
             chart.setCrosshairPosition(nearest.value, Math.floor(nearest.time / 1000), series);
           } catch (_) {}
+          // Render our DOM tooltip directly — bypasses the subscribe
+          // callback whose param.point is undefined on programmatic
+          // crosshair updates.
+          _renderTooltip(nearest.value, nearest.time, clientX, undefined);
         };
         const _clearCrosshair = () => {
           try { chart.clearCrosshairPosition(); } catch (_) {}
-          const tt = host.querySelector('.aurix-chart-tooltip');
-          if (tt) tt.dataset.visible = 'false';
+          _hideTooltip();
         };
 
         const enter = (x) => {
           inspecting = true;
           host.dataset.inspecting = 'true';
+          // Mark the dashboard slider root so any external listener
+          // (and our touch-action CSS guard below) can lock swipe.
+          if (sliderRoot) sliderRoot.setAttribute('data-chart-inspecting', '1');
           _crosshairAt(x);
         };
         const exit = () => {
           if (!inspecting) return;
           inspecting = false;
           delete host.dataset.inspecting;
+          if (sliderRoot) sliderRoot.removeAttribute('data-chart-inspecting');
           _clearCrosshair();
         };
 
@@ -672,9 +733,14 @@
           curX = t.clientX;
           curY = t.clientY;
           if (inspecting) {
-            // Block page scroll while the finger is driving the
-            // crosshair. Listener is non-passive only for this branch.
-            try { e.preventDefault(); } catch (_) {}
+            // Block page scroll AND prevent the ancestor carousel /
+            // slider listeners from seeing this event. preventDefault
+            // alone is not enough — the dashboard slider sets its own
+            // isDragging=true on touchstart and would still apply a
+            // transform during bubble. stopPropagation cuts the
+            // bubble path entirely so the slider never moves.
+            try { e.preventDefault();  } catch (_) {}
+            try { e.stopPropagation(); } catch (_) {}
             _crosshairAt(curX);
             return;
           }
@@ -686,9 +752,12 @@
             }
           }
         };
-        const onTouchEnd = () => {
+        const onTouchEnd = (e) => {
           if (pressTimer) { clearTimeout(pressTimer); pressTimer = 0; }
           if (inspecting) {
+            // Swallow the carousel's touchend so it doesn't apply a
+            // final swipe based on the inspection drag's dx.
+            try { if (e && e.stopPropagation) e.stopPropagation(); } catch (_) {}
             suppressNextClick = true;
             setTimeout(() => { suppressNextClick = false; }, 350);
             exit();
