@@ -1776,6 +1776,15 @@ let _aurixDashMobile  = null;
 // instances cleanly (col-chart elements are recreated on every
 // renderCurrentMarketView via innerHTML replacement).
 const _aurixMarketSpark = new Map();
+// CHART-6: asset-detail chart state. Single controller + ranges pill
+// at a time (the modal can only show one asset). AbortController
+// guards in-flight adapter requests so opening a different asset or
+// closing the modal mid-fetch never paints stale data.
+let _aurixAssetCtrl   = null;
+let _aurixAssetRanges = null;
+let _aurixAssetAbort  = null;
+let _aurixAssetRange  = '30d';
+let _aurixAssetAsset  = null;
 let _detailChart     = null;  // Chart.js instance for category detail sparkline
 let _detailChartType = null;  // which category the sparkline was last rendered for
 let _chartRevealProgress = 1; // 0–1 clip for left-to-right line reveal
@@ -7977,6 +7986,177 @@ function _aurixSparkMountAll(container) {
       console.warn('[market-spark-v2] mount fail', key, err && err.message ? err.message : err);
     }
   });
+}
+
+// ── CHART-6 ──────────────────────────────────────────────────────
+// Asset detail chart V2. Mounted inside #adChartSlot when the user
+// opens an asset detail and the feature flag is on. Today's modal
+// has no chart, so flag-off behaviour is identical to pre-CHART-6:
+// the slot stays `hidden`, modal renders exactly as before.
+const _AURIX_ASSET_RANGE_MAP = Object.freeze({
+  '24H':'24h', '1W':'7d', '1M':'30d', '1Y':'1y', 'ALL':'all',
+});
+function _aurixAssetFlag() {
+  return typeof window !== 'undefined' && window.__AURIX_ASSET_CHART_V2 !== false;
+}
+function _aurixAssetReady() {
+  return typeof window !== 'undefined'
+      && typeof window.AurixCharts === 'object'
+      && typeof window.AurixCharts.createChart === 'function'
+      && typeof window.AurixCharts.isReady === 'function'
+      && window.AurixCharts.isReady();
+}
+function _aurixAssetAdaptersReady() {
+  return typeof window !== 'undefined'
+      && typeof window.AurixChartAdapters === 'object'
+      && typeof window.AurixChartAdapters.yahooHistoryAdapter === 'function'
+      && typeof window.AurixChartAdapters.cryptoHistoryAdapter === 'function';
+}
+function _aurixAssetTeardown() {
+  if (_aurixAssetAbort) {
+    try { _aurixAssetAbort.abort(); } catch (_) {}
+    _aurixAssetAbort = null;
+  }
+  if (_aurixAssetRanges) {
+    try { _aurixAssetRanges.destroy(); } catch (_) {}
+    _aurixAssetRanges = null;
+  }
+  if (_aurixAssetCtrl) {
+    try { _aurixAssetCtrl.destroy(); } catch (_) {}
+    _aurixAssetCtrl = null;
+  }
+  const slot = document.getElementById('adChartSlot');
+  if (slot) slot.hidden = true;
+  const rangesHost = document.getElementById('adChartRanges');
+  if (rangesHost) rangesHost.innerHTML = '';
+  _aurixAssetAsset = null;
+}
+function _aurixAssetPickAdapter(asset) {
+  const a = asset || {};
+  const tp = String(a.type || '').toLowerCase();
+  if (tp === 'cash' || tp === 'real_estate') return null;
+  if (tp === 'crypto' && a.coinId) {
+    return { kind: 'crypto', args: { coinId: String(a.coinId) } };
+  }
+  // Stocks / ETFs / funds / indices / commodities / metals via Yahoo.
+  let sym = a.marketSymbol || a.ticker || '';
+  if (tp === 'metal' && (sym === 'XAU' || a.ticker === 'XAU')) sym = 'GC=F';
+  if (!sym) return null;
+  return { kind: 'yahoo', args: { symbol: String(sym).toUpperCase() } };
+}
+async function _aurixAssetLoad(asset, adapter) {
+  const ctrl = _aurixAssetCtrl;
+  if (!ctrl) return;
+  if (!_aurixAssetAdaptersReady()) {
+    try { ctrl.setState('error'); } catch (_) {}
+    return;
+  }
+  try { ctrl.setState('loading'); } catch (_) {}
+  if (_aurixAssetAbort) { try { _aurixAssetAbort.abort(); } catch (_) {} }
+  _aurixAssetAbort = (typeof AbortController === 'function') ? new AbortController() : null;
+  const args = Object.assign({}, adapter.args, {
+    range:  _aurixAssetRange,
+    signal: _aurixAssetAbort ? _aurixAssetAbort.signal : undefined,
+  });
+  try {
+    const fn = adapter.kind === 'crypto'
+      ? window.AurixChartAdapters.cryptoHistoryAdapter
+      : window.AurixChartAdapters.yahooHistoryAdapter;
+    const result = await fn(args);
+    // Drop late responses for a different asset/range than we now expect.
+    if (ctrl !== _aurixAssetCtrl) return;
+    if (asset !== _aurixAssetAsset) return;
+    if (!result || !Array.isArray(result.series) || !result.series.length) {
+      ctrl.setData([]);
+      return;
+    }
+    // Convert adapter-emitted prices into the user's display base.
+    const fromCurr = (result.meta && result.meta.currency) || 'USD';
+    const series = result.series.map(p => ({
+      time:  p.time,
+      value: toBase(p.value, fromCurr),
+    }));
+    try { ctrl.setCurrency(baseCurrency || 'USD'); } catch (_) {}
+    try { ctrl.setRange(_aurixAssetRange); } catch (_) {}
+    ctrl.setData(series, {
+      source:       (result.meta && result.meta.source) || 'unknown',
+      currency:     baseCurrency || 'USD',
+      granularity:  (result.meta && result.meta.granularity) || '1d',
+      isSynthetic:  !!(result.meta && result.meta.isSynthetic),
+      completeness: (result.meta && result.meta.completeness) || 1,
+      asOf:         Date.now(),
+    });
+  } catch (err) {
+    if (err && err.name === 'AbortError') return;
+    console.warn('[chart-asset] load fail', err && err.message ? err.message : err);
+    try { ctrl.setState('error'); } catch (_) {}
+  }
+}
+function _aurixAssetMount(asset) {
+  _aurixAssetTeardown();
+  if (!_aurixAssetFlag()) return;
+  const slot       = document.getElementById('adChartSlot');
+  const mount      = document.getElementById('adChartMount');
+  const rangesHost = document.getElementById('adChartRanges');
+  if (!slot || !mount) return;
+  const adapter = _aurixAssetPickAdapter(asset);
+  // No chart for cash, real estate, or assets we can't address (no
+  // coinId for crypto / no marketSymbol+ticker for the rest).
+  if (!adapter) return;
+  if (!_aurixAssetReady()) {
+    // Engine still loading via <script defer>. Try once more shortly.
+    setTimeout(() => {
+      if (_aurixAssetAsset !== asset) _aurixAssetMount(asset);
+    }, 150);
+    return;
+  }
+
+  slot.hidden = false;
+  _aurixAssetRange = '30d';
+  _aurixAssetAsset = asset;
+
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+  // Explicit pixel height so the chart engine has dimensions to work
+  // with even before the first ResizeObserver tick.
+  mount.style.height = isMobile ? '180px' : '210px';
+
+  try {
+    _aurixAssetCtrl = window.AurixCharts.createChart(mount, {
+      variant:          'asset',
+      colorMode:        'auto',
+      currency:         baseCurrency || 'USD',
+      showCrosshair:    true,
+      showTooltip:      true,
+      showTimeScale:    !isMobile,
+      showPriceScale:   !isMobile,
+      mobileInspection: isMobile,
+      height:           isMobile ? 180 : 210,
+      range:            _aurixAssetRange,
+    });
+  } catch (err) {
+    console.warn('[chart-asset] mount fail', err && err.message ? err.message : err);
+    _aurixAssetTeardown();
+    return;
+  }
+
+  // Range pills — premium chip system from AurixChartCore. Layout
+  // wraps on narrow modals, no horizontal overflow.
+  if (rangesHost && typeof window.AurixCharts.createRangePills === 'function') {
+    try {
+      _aurixAssetRanges = window.AurixCharts.createRangePills(rangesHost, {
+        ranges:  ['24H','1W','1M','1Y','ALL'],
+        initial: '1M',
+        onChange: label => {
+          const r = _AURIX_ASSET_RANGE_MAP[label] || '30d';
+          if (r === _aurixAssetRange) return;
+          _aurixAssetRange = r;
+          _aurixAssetLoad(_aurixAssetAsset, adapter);
+        },
+      });
+    } catch (_) {}
+  }
+
+  _aurixAssetLoad(asset, adapter);
 }
 
 function initChart() {
@@ -15951,11 +16131,17 @@ function openAssetDetailModal(assetId) {
 
   assetDetailOverlay.classList.add('open');
   document.body.classList.add('modal-open');
+  // CHART-6: mount the asset-history chart for this asset. No-op when
+  // the feature flag is off, the engine is missing, or the asset has
+  // no addressable adapter (cash / real estate / unmapped tickers).
+  try { _aurixAssetMount(asset); } catch (_) {}
 }
 
 function closeAssetDetailModal() {
   assetDetailOverlay.classList.remove('open');
   document.body.classList.remove('modal-open');
+  // CHART-6: tear down the chart + abort any in-flight history fetch.
+  try { _aurixAssetTeardown(); } catch (_) {}
   render();
 }
 

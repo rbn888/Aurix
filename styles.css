@@ -5653,6 +5653,23 @@ img {
 .ad-value--pos { color: var(--green); }
 .ad-value--neg { color: var(--red); }
 
+/* CHART-6: asset detail chart slot. Hidden by default; revealed by
+   _aurixAssetMount when the engine + adapter are ready and the asset
+   has an addressable history source. */
+.ad-chart-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.ad-chart-slot[hidden] { display: none; }
+.ad-chart-ranges { display: flex; flex-wrap: wrap; gap: 6px; }
+.ad-chart-mount  { width: 100%; min-height: 180px; }
+
 .ad-tx-section { display: flex; flex-direction: column; gap: var(--space-1); }
 
 .ad-tx-header {

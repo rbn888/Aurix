@@ -814,6 +814,14 @@
             </div>
           </div>
         </div>
+        <!-- CHART-6: AurixChart-engine slot for per-asset historical chart.
+             Hidden by default; populated by _aurixAssetMount() when the
+             feature flag is on AND the engine + adapters are loaded.
+             Flag off → slot stays hidden → modal looks exactly as today. -->
+        <div class="ad-chart-slot" id="adChartSlot" hidden>
+          <div class="ad-chart-ranges" id="adChartRanges"></div>
+          <div class="ad-chart-mount" id="adChartMount"></div>
+        </div>
         <div class="ad-tx-section" id="adTxSection">
           <div class="ad-tx-header">
             <span id="adTxTitle" data-i18n="adTxLabel">Transacciones</span>
