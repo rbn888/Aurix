@@ -8029,6 +8029,9 @@ function _aurixAssetTeardown() {
   if (slot) slot.hidden = true;
   const rangesHost = document.getElementById('adChartRanges');
   if (rangesHost) rangesHost.innerHTML = '';
+  // CHART-6B: clear the source / granularity line so stale text
+  // doesn't flash on the next asset open before the load resolves.
+  _aurixAssetSetMeta('');
   _aurixAssetAsset = null;
 }
 function _aurixAssetPickAdapter(asset) {
@@ -8044,11 +8047,53 @@ function _aurixAssetPickAdapter(asset) {
   if (!sym) return null;
   return { kind: 'yahoo', args: { symbol: String(sym).toUpperCase() } };
 }
+// CHART-6B: build the subtle source / granularity / context line shown
+// just above the chart canvas. Honest labels — funds say "NAV diario"
+// without intraday, physical gold says "Oro spot · Referencia de
+// mercado" so users never assume purity-adjusted history. Pure string
+// helper; safe to call with partial / empty meta.
+function _aurixAssetMetaLine(asset, adapter, meta) {
+  try {
+    const isEs = (typeof lang !== 'undefined' && lang === 'es');
+    const tp = String((asset && asset.type) || '').toLowerCase();
+    const g  = (meta && meta.granularity) || '';
+
+    // Funds → daily NAV badge, no provider noise.
+    if (tp === 'fund') return isEs ? 'NAV diario' : 'Daily NAV';
+
+    // Physical gold → spot reference (never imply purity-adjusted).
+    if (asset && asset.ticker === 'XAU') {
+      return (isEs ? 'Oro spot' : 'Gold spot') + ' · ' +
+             (isEs ? 'Referencia de mercado' : 'Market reference');
+    }
+
+    const parts = [];
+    if (adapter && adapter.kind === 'crypto')      parts.push('CoinGecko');
+    else if (adapter && adapter.kind === 'yahoo')  parts.push('Yahoo');
+
+    if      (g === '1d')  parts.push(isEs ? 'Diario'  : 'Daily');
+    else if (g === '5m')  parts.push('5m');
+    else if (g === '15m') parts.push('15m');
+    else if (g === '1h')  parts.push('1h');
+    else if (g === '1wk') parts.push(isEs ? 'Semanal' : 'Weekly');
+
+    return parts.join(' · ');
+  } catch (_) { return ''; }
+}
+
+function _aurixAssetSetMeta(line) {
+  const el = document.getElementById('adChartMeta');
+  if (!el) return;
+  if (line) { el.textContent = line; el.hidden = false; }
+  else      { el.textContent = '';   el.hidden = true;  }
+}
+
 async function _aurixAssetLoad(asset, adapter) {
   const ctrl = _aurixAssetCtrl;
   if (!ctrl) return;
   if (!_aurixAssetAdaptersReady()) {
     try { ctrl.setState('error'); } catch (_) {}
+    _aurixAssetSetMeta('');
     return;
   }
   try { ctrl.setState('loading'); } catch (_) {}
@@ -8068,6 +8113,10 @@ async function _aurixAssetLoad(asset, adapter) {
     if (asset !== _aurixAssetAsset) return;
     if (!result || !Array.isArray(result.series) || !result.series.length) {
       ctrl.setData([]);
+      // Show the asset-context line even on no-data so the badge
+      // (e.g. "NAV diario", "Oro spot") still explains WHY the chart
+      // is empty (intraday unavailable for funds, etc.).
+      _aurixAssetSetMeta(_aurixAssetMetaLine(asset, adapter, result && result.meta));
       return;
     }
     // Convert adapter-emitted prices into the user's display base.
@@ -8086,10 +8135,12 @@ async function _aurixAssetLoad(asset, adapter) {
       completeness: (result.meta && result.meta.completeness) || 1,
       asOf:         Date.now(),
     });
+    _aurixAssetSetMeta(_aurixAssetMetaLine(asset, adapter, result.meta));
   } catch (err) {
     if (err && err.name === 'AbortError') return;
     console.warn('[chart-asset] load fail', err && err.message ? err.message : err);
     try { ctrl.setState('error'); } catch (_) {}
+    _aurixAssetSetMeta('');
   }
 }
 function _aurixAssetMount(asset) {
@@ -8139,6 +8190,19 @@ function _aurixAssetMount(asset) {
     return;
   }
 
+  // CHART-6B: asset-specific empty state copy. Replaces the engine's
+  // generic "Sin datos disponibles" with copy tailored to the detail
+  // surface. Pure DOM-poke — fails silently if the engine HTML ever
+  // changes shape.
+  try {
+    const emptyEl = mount.querySelector('.aurix-chart-state--empty');
+    if (emptyEl) {
+      emptyEl.textContent = (typeof lang !== 'undefined' && lang === 'es')
+        ? 'No hay histórico disponible para este activo.'
+        : 'No historical data available for this asset.';
+    }
+  } catch (_) {}
+
   // Range pills — premium chip system from AurixChartCore. Layout
   // wraps on narrow modals, no horizontal overflow.
   if (rangesHost && typeof window.AurixCharts.createRangePills === 'function') {
@@ -8153,6 +8217,26 @@ function _aurixAssetMount(asset) {
           _aurixAssetLoad(_aurixAssetAsset, adapter);
         },
       });
+    } catch (_) {}
+
+    // CHART-6B: disable 24H pill for fund-type assets — Yahoo only
+    // returns daily NAVs for mutual funds. The aria-disabled + CSS
+    // pointer-events:none guarantees no fetch fires and the inactive
+    // state reads as disabled. Visual semantics on .ad-chart-meta
+    // ("NAV diario") explains why.
+    try {
+      const tp = String(asset.type || '').toLowerCase();
+      if (tp === 'fund') {
+        rangesHost.querySelectorAll('.aurix-chart-range').forEach(btn => {
+          if ((btn.textContent || '').trim() === '24H') {
+            btn.setAttribute('aria-disabled', 'true');
+            btn.classList.add('is-disabled');
+            btn.title = (typeof lang !== 'undefined' && lang === 'es')
+              ? 'NAV diario — sin intradía'
+              : 'Daily NAV — no intraday';
+          }
+        });
+      }
     } catch (_) {}
   }
 

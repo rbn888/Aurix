@@ -5669,6 +5669,26 @@ img {
 .ad-chart-slot[hidden] { display: none; }
 .ad-chart-ranges { display: flex; flex-wrap: wrap; gap: 6px; }
 .ad-chart-mount  { width: 100%; min-height: 180px; }
+/* CHART-6B: source / granularity line — subtle, eyebrow-cap, never
+   competes with the chart for attention. */
+.ad-chart-meta {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(220,230,250,0.50);
+  margin: 2px 2px 0;
+}
+.ad-chart-meta[hidden] { display: none; }
+/* CHART-6B: disabled range pill (e.g. 24H for daily-NAV funds). The
+   pointer-events:none guarantees no fetch fires; the muted opacity +
+   not-allowed cursor make the inactive state legible. */
+.aurix-chart-range[aria-disabled="true"],
+.aurix-chart-range.is-disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 
 .ad-tx-section { display: flex; flex-direction: column; gap: var(--space-1); }
 
