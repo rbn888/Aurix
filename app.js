@@ -7678,7 +7678,11 @@ function updateChartTooltip(context) {
 // portfolioHistory the legacy path reads, base-currency converted at
 // render time exactly as getChartData() does for parity.
 function _aurixDashFlag() {
-  return typeof window !== 'undefined' && !!window.__AURIX_CHART_V2;
+  if (typeof window === 'undefined') return false;
+  // CHART-4 (manual-testing phase): default ON. Set
+  // window.__AURIX_CHART_V2 = false to opt out cleanly. The legacy
+  // Chart.js chart remains the rendering fallback either way.
+  return window.__AURIX_CHART_V2 !== false;
 }
 function _aurixDashReady() {
   return typeof window !== 'undefined'
@@ -7686,6 +7690,29 @@ function _aurixDashReady() {
       && typeof window.AurixCharts.createChart === 'function'
       && typeof window.AurixCharts.isReady === 'function'
       && window.AurixCharts.isReady();
+}
+// CHART-4 hotfix: deferred-mount queue. The Aurix engine + Lightweight
+// Charts CDN load via <script defer>, which means they only execute
+// AFTER this synchronous app.js completes. initChart() runs during
+// that synchronous phase, so AurixCharts is still undefined when we
+// first try to mount. This helper polls _aurixDashReady() up to a
+// 4-second ceiling and mounts as soon as the engine is available.
+// On engine timeout it gives up silently; legacy Chart.js continues
+// rendering. Every call is independently abort-safe.
+function _aurixDashMountWhenReady(surface) {
+  if (!_aurixDashFlag()) return;
+  let attempts = 0;
+  const tryMount = () => {
+    if (_aurixDashReady()) {
+      try { _aurixDashMount(surface); } catch (_) {}
+      return;
+    }
+    if (++attempts > 40) return;  // ~4s ceiling
+    setTimeout(tryMount, 100);
+  };
+  // setTimeout(0) puts us behind the current microtask + at least one
+  // macrotask tick so defer-loaded scripts get a chance to execute.
+  setTimeout(tryMount, 0);
 }
 
 const _AURIX_DASH_SPAN = Object.freeze({
@@ -7807,6 +7834,13 @@ if (typeof window !== 'undefined') {
     _aurixDashTeardown('desktop');
     _aurixDashTeardown('mobile');
   };
+  // Manual post-boot enable. Re-attempts the V2 mount on whichever
+  // surface(s) are currently in the DOM. Useful if the user toggles
+  // the flag from the console without reloading.
+  window.__aurixDashEnable = function () {
+    _aurixDashMountWhenReady('desktop');
+    _aurixDashMountWhenReady('mobile');
+  };
 }
 
 function _aurixDashSync(surface) {
@@ -7913,10 +7947,12 @@ function initChart() {
   canvas.addEventListener('mouseleave', _hideTooltip);
   canvas.addEventListener('touchend',   _hideTooltip, { passive: true });
 
-  // CHART-4: attempt to overlay the Aurix V2 chart on top of this
-  // canvas. The flag default is false → no-op. Any failure inside
-  // _aurixDashMount falls back to the legacy chart automatically.
-  try { _aurixDashMount('desktop'); } catch (_) {}
+  // CHART-4: overlay the Aurix V2 chart on top of this canvas. The
+  // engine + Lightweight Charts CDN load via <script defer> and may
+  // still be queued at this point, so we defer the mount until both
+  // are ready. Any failure inside _aurixDashMount falls back to the
+  // legacy chart automatically.
+  _aurixDashMountWhenReady('desktop');
 }
 
 // ── Per-range display-point limits ───────────────────────────────────────
@@ -16218,9 +16254,10 @@ function initMobileCharts() {
   }
 
   // CHART-4: mobile dashboard chart V2 overlay. Same safety contract
-  // as the desktop hook above — flag off → no-op, mount failure → the
-  // legacy mobile chart resumes (its canvas is kept in layout).
-  try { _aurixDashMount('mobile'); } catch (_) {}
+  // as the desktop hook above — flag off → no-op, engine not yet
+  // loaded → wait, mount failure → the legacy mobile chart resumes
+  // (its canvas is kept in layout).
+  _aurixDashMountWhenReady('mobile');
 }
 
 function initMobileSlider() {
