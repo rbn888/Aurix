@@ -104,6 +104,11 @@ function scheduleSave() {
 
 async function autoSaveToBackend(attempt = 1) {
   if (_isSaving || !currentUser || !supabaseClient) return;
+  // RESET-5: while the atomic orchestrator is running, the reset
+  // routine pushes empty state itself via _pushEmptyPortfolioToBackend.
+  // A second push from a debounced save() here would race with that
+  // and could write a half-cleared state.
+  if (typeof _aurixResetInProgress !== 'undefined' && _aurixResetInProgress) return;
 
   const localData = getPortfolioData();
   const hasAny    = !!(localData && (localData.assets?.length || localData.holdings?.length));
@@ -20773,6 +20778,27 @@ if (typeof window !== 'undefined') {
       portfolioHistory: Array.isArray(portfolioHistory) ? portfolioHistory.length : null,
       categoryHistory:  Array.isArray(categoryHistory)  ? categoryHistory.length  : null,
     };
+    // RESET-5: surface the orchestrator's runtime state so callers
+    // can verify the atomic flow worked end-to-end.
+    out.__reset = {
+      resetInProgress: !!_aurixResetInProgress,
+      resetGeneration: _aurixResetGeneration,
+      resetAt:         _aurixResetAt(),
+    };
+    out.__charts = {
+      // truthy when a controller is currently alive
+      donut:           !!(typeof donutChart !== 'undefined' && donutChart),
+      donutMobile:     !!(typeof donutChartMobile !== 'undefined' && donutChartMobile),
+      detailChart:     !!(typeof _detailChart !== 'undefined' && _detailChart),
+      marketSparklines: (typeof _aurixMarketSpark !== 'undefined' && _aurixMarketSpark && _aurixMarketSpark.size) || 0,
+    };
+    out.__dashboardEmptyStateValid = (function () {
+      try {
+        return Array.isArray(assets) && assets.length === 0
+            && Array.isArray(portfolioHistory) && portfolioHistory.length === 0
+            && Array.isArray(categoryHistory)  && categoryHistory.length  === 0;
+      } catch (_) { return false; }
+    })();
     return out;
   };
 
@@ -20924,6 +20950,16 @@ function closeResetConfirm() {
 // empty state has propagated.
 const RESET_AT_KEY = 'aurix_reset_at';
 
+// RESET-5: atomic reset transaction state. While `_aurixResetInProgress`
+// is true, autosave / sparkline mount / async dashboard refreshes must
+// bail. `_aurixResetGeneration` lets consumers detect stale responses
+// from before the reset (bump on every reset call, compare on return).
+let _aurixResetInProgress = false;
+let _aurixResetGeneration = 0;
+function _aurixIsResetStale(gen) {
+  return gen !== _aurixResetGeneration;
+}
+
 function _aurixResetAt() {
   try { return parseInt(localStorage.getItem(RESET_AT_KEY) || '0', 10) || 0; }
   catch (_) { return 0; }
@@ -21025,6 +21061,112 @@ function performSafeReset() {
   } catch (_) {}
 }
 
+// ── RESET-5: atomic fresh start orchestrator ──────────────────────
+// Owns the entire reset lifecycle. Closes the modal first so the user
+// sees a clean transition, then tears down every chart controller,
+// wipes storage + memory via performSafeReset, and renders a single
+// stable empty dashboard frame.
+function _aurixTearDownAllCharts() {
+  // Dashboard chart V2 (desktop + mobile surfaces)
+  try { if (typeof _aurixDashTeardown === 'function') { _aurixDashTeardown('desktop'); _aurixDashTeardown('mobile'); } } catch (_) {}
+  // Market sparklines (per row)
+  try { if (typeof _aurixSparkDestroyAll === 'function') _aurixSparkDestroyAll(); } catch (_) {}
+  // Asset detail chart V2
+  try { if (typeof _aurixAssetTeardown === 'function') _aurixAssetTeardown(); } catch (_) {}
+  // Category chart V2
+  try { if (typeof _aurixCategoryTeardown === 'function') _aurixCategoryTeardown(); } catch (_) {}
+  // Market preview chart
+  try { if (typeof _aurixMktTeardown === 'function') _aurixMktTeardown(); } catch (_) {}
+  // Legacy Chart.js detail sparkline
+  try { if (typeof _detailChart !== 'undefined' && _detailChart) { _detailChart.destroy(); _detailChart = null; } } catch (_) {}
+  // Donut: keep instance, just clear data (re-renders cleanly on render())
+  try {
+    if (typeof donutChart !== 'undefined' && donutChart) {
+      donutChart.data.labels = [];
+      donutChart.data.datasets[0].data = [];
+      donutChart.update('none');
+    }
+  } catch (_) {}
+  try {
+    if (typeof donutChartMobile !== 'undefined' && donutChartMobile) {
+      donutChartMobile.data.labels = [];
+      donutChartMobile.data.datasets[0].data = [];
+      donutChartMobile.update('none');
+    }
+  } catch (_) {}
+}
+
+function _aurixShowToast(message, opts) {
+  // Minimal premium toast — body-level transient. Auto-disappears.
+  // Sits above the bottom nav safe area on mobile.
+  try {
+    const o = opts || {};
+    const variant = String(o.variant || 'success'); // success | info | error
+    const ms      = Math.max(1500, Math.min(6000, Number(o.duration) || 2400));
+    let host = document.getElementById('aurixToastHost');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'aurixToastHost';
+      host.className = 'aurix-toast-host';
+      document.body.appendChild(host);
+    }
+    const el = document.createElement('div');
+    el.className = `aurix-toast aurix-toast--${variant}`;
+    el.textContent = String(message || '');
+    host.appendChild(el);
+    // Trigger CSS transition on next frame.
+    requestAnimationFrame(() => el.classList.add('is-open'));
+    setTimeout(() => {
+      el.classList.remove('is-open');
+      setTimeout(() => { try { el.remove(); } catch (_) {} }, 360);
+    }, ms);
+  } catch (_) {}
+}
+
+async function performAtomicFreshStartReset() {
+  if (_aurixResetInProgress) return false;
+  _aurixResetInProgress = true;
+  _aurixResetGeneration++;
+  const gen = _aurixResetGeneration;
+
+  try {
+    // 1. Close the confirm + settings modals first so the user sees
+    //    the dashboard during the cleanup (no double-render with
+    //    overlays still mounted).
+    try { if (typeof closeResetConfirm   === 'function') closeResetConfirm();   } catch (_) {}
+    try { if (typeof closeSettingsPanel  === 'function') closeSettingsPanel();  } catch (_) {}
+
+    // 2. Tear down every chart controller before storage wipe. Stops
+    //    deferred resize/update callbacks from touching stale assets.
+    _aurixTearDownAllCharts();
+
+    // 3. Storage + memory wipe + tombstone + remote push (the legacy
+    //    safe path — already idempotent and well-tested via RESET-1/2).
+    try { performSafeReset(); } catch (e) {
+      console.warn('[reset] safe reset failed:', e && e.message);
+    }
+    if (_aurixIsResetStale(gen)) return false; // a newer reset took over
+
+    // 4. Single stable empty-state render after a paint tick. This
+    //    ensures the assets list, donut, KPIs, and any reactive
+    //    derived state all flush together — no half-empty UI.
+    await new Promise(r => requestAnimationFrame(() => r()));
+    try { if (typeof recomputeDerivedFinancialState === 'function') recomputeDerivedFinancialState('reset-frame2'); } catch (_) {}
+    try { if (typeof render === 'function') render(); } catch (_) {}
+
+    // 5. After the render commits, let the chart engine settle its
+    //    layout (resize observers / dvh changes) on the next frame.
+    await new Promise(r => requestAnimationFrame(() => r()));
+
+    // 6. Success toast.
+    const isEs = (typeof lang !== 'undefined' && lang === 'es');
+    _aurixShowToast(isEs ? 'Cartera reiniciada' : 'Portfolio reset', { variant: 'success' });
+    return true;
+  } finally {
+    _aurixResetInProgress = false;
+  }
+}
+
 // ── Export data (download as JSON file) ───────────────────────────
 function _todayStamp() {
   const d = new Date();
@@ -21106,9 +21248,14 @@ function exportPortfolioBackup() {
     if (e.target.closest && e.target.closest('#resetConfirmBtn')) {
       const btn = document.getElementById('resetConfirmBtn');
       if (btn && btn.disabled) return;
-      try { performSafeReset(); } catch (err) { console.warn('[settings] reset fail:', err && err.message); }
-      closeResetConfirm();
-      closeSettingsPanel();
+      // RESET-5: hand off to the atomic orchestrator. It owns the
+      // modal close, chart teardown, storage wipe, remote push,
+      // single empty render, and success toast. Button disables to
+      // prevent double-click during the brief async window.
+      if (btn) btn.disabled = true;
+      Promise.resolve()
+        .then(() => performAtomicFreshStartReset())
+        .catch(err => console.warn('[settings] reset fail:', err && err.message));
       return;
     }
   });
