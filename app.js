@@ -8105,9 +8105,10 @@ function _aurixSparkMountAll(container) {
       cell.innerHTML = '';
       const ctrl = window.AurixCharts.createSparkline(cell, {
         colorMode: tone,
-        // MARKET-1A: 32px matches the new .col-chart min-height so the
-        // V2 sparkline fills the cell without compression.
-        height:    32,
+        // MARKET-1A → MARKET-3: cell height = 32 px in V2, 34 px in V3.
+        // Reading clientHeight at mount time keeps the chart filling
+        // the cell in either layout with zero CSS coupling.
+        height:    cell.clientHeight || 32,
       });
       // Build the same synthetic walk the legacy generateSparkline
       // uses, mapped onto a monotonic time axis for the engine.
@@ -12336,6 +12337,14 @@ function _composeAggregateDataset() {
 function _aurixMktExpFlag() {
   return typeof window !== 'undefined' && window.__AURIX_MARKET_EXPLORER_V2 !== false;
 }
+// ── MARKET-3 ──────────────────────────────────────────────────────
+// Flagship row polish layered on top of the MARKET-2 controls. Adds
+// a `.is-v3` class to #marketList which scopes a CSS overlay of row
+// geometry / typography / sparkline width — pure visual. When the
+// flag is off, the MARKET-2 layout still ships unchanged.
+function _aurixMktV3Flag() {
+  return typeof window !== 'undefined' && window.__AURIX_MARKET_EXPLORER_V3 !== false;
+}
 function _aurixMktExpIsRealTimeframe() {
   return _aurixMktTimeframe === '24H';
 }
@@ -12381,6 +12390,14 @@ function _aurixMktExpControlsHtml() {
   const sortItems = SORT_OPTS.map(o =>
     `<button type="button" class="mkt-sort-item${o.key === _aurixMktSortBy ? ' is-active' : ''}" data-mkt-sort="${o.key}">${isEs ? o.es : o.en}</button>`
   ).join('');
+  // MARKET-3: honest helper text under the controls when the user
+  // selects a timeframe with no real data yet. Visible only on the V3
+  // flag — V2-only setups don't show it (the perf cell already reads
+  // "—" so the row itself is honest).
+  const showHelper = _aurixMktV3Flag() && _aurixMktTimeframe !== '24H';
+  const helperHtml = showHelper
+    ? `<div class="mkt-tf-helper">${isEs ? 'Histórico por periodo próximamente' : 'Period history coming soon'}</div>`
+    : '';
   return `
     <div class="mkt-explorer-controls" data-aurix-mkt-controls="1">
       <div class="mkt-tf-pills" role="tablist" aria-label="${isEs ? 'Periodo' : 'Timeframe'}">${tfPills}</div>
@@ -12393,6 +12410,7 @@ function _aurixMktExpControlsHtml() {
         <div class="mkt-sort-menu" id="mktSortMenu" hidden>${sortItems}</div>
       </div>
     </div>
+    ${helperHtml}
   `;
 }
 
@@ -12460,6 +12478,10 @@ function renderCurrentMarketView() {
   if (!isAggregate && el._lastKey === renderKey) return;
   el._lastKey = renderKey;
   el.innerHTML = html;
+  // MARKET-3: scope V3 row + control polish via a single class on the
+  // list container. Re-applied every render so flag flips mid-session
+  // converge on the next paint.
+  el.classList.toggle('is-v3', _aurixMktV3Flag());
   // CHART-5: mount Aurix sparkline V2 on every row's `.col-chart` cell.
   // No-op when the flag is off or the engine is still loading; the
   // legacy SVG that was rendered inside the cell remains visible in
