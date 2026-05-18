@@ -14643,3 +14643,115 @@ body.gs-open { overflow: hidden; }
   }
   .onb-success-tick { stroke-dashoffset: 0; }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   GOLD-UX-1 — Premium mobile gold entry redesign.
+   Adds the STEP 1 type selector (Joyería / Moneda / Lingote),
+   contextual karat filtering, premium copy spacing and a safer
+   sticky-CTA reserve so the primary button never sits over the
+   summary card on phones.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* STEP 1 — Tipo de oro */
+.gold-field-block--type { margin-bottom: 4px; }
+.gold-type-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.gold-type-chip {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 10px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(220,230,250,0.86);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .18s var(--ease-premium),
+              border-color .18s var(--ease-premium),
+              transform .12s var(--ease-premium),
+              box-shadow .22s var(--ease-premium);
+  min-height: 78px;
+}
+.gold-type-chip:hover {
+  background: rgba(233,196,106,0.05);
+  border-color: rgba(233,196,106,0.32);
+}
+.gold-type-chip:active { transform: scale(0.985); }
+.gold-type-chip.is-active {
+  background:
+    linear-gradient(180deg, rgba(233,196,106,0.18) 0%, rgba(233,196,106,0.04) 70%),
+    rgba(20, 18, 10, 0.6);
+  border-color: rgba(233,196,106,0.55);
+  color: rgba(255,238,176,0.98);
+  box-shadow:
+    0 0 0 1px rgba(233,196,106,0.20) inset,
+    0 8px 22px -12px rgba(233,196,106,0.40);
+}
+.gold-type-icon {
+  font-size: 22px;
+  line-height: 1;
+  color: rgba(233,196,106,0.78);
+}
+.gold-type-chip.is-active .gold-type-icon { color: #ffd66b; }
+.gold-type-name {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+}
+
+/* STEP 2 — Quilataje. Subline + contextual filtering. */
+.gold-field-sub {
+  font-size: 12px;
+  color: rgba(220,230,250,0.50);
+  line-height: 1.4;
+  margin-top: -4px;
+}
+
+/* Contextual karat filter: when a type is chosen, only the chips
+   marked with that context stay visible in the primary grid. The
+   "Más quilatajes" toggle adds `.gold-section--all-karats` which
+   restores every chip. Default state (no type yet) shows the three
+   pre-marked chips (18K / 22K / 24K). */
+#goldSection[data-gold-type="jewelry"] #goldPurityGrid .gold-chip:not([data-gold-contexts~="jewelry"]) { display: none; }
+#goldSection[data-gold-type="coin"]    #goldPurityGrid .gold-chip:not([data-gold-contexts~="coin"])    { display: none; }
+#goldSection[data-gold-type="bar"]     #goldPurityGrid .gold-chip:not([data-gold-contexts~="bar"])     { display: none; }
+#goldSection.gold-section--all-karats #goldPurityGrid .gold-chip { display: flex !important; }
+
+/* Bar-only: render the single 24K chip full-width so the grid stays
+   balanced visually rather than orphaning a 50% chip. */
+#goldSection[data-gold-type="bar"]:not(.gold-section--all-karats) #goldPurityGrid {
+  grid-template-columns: 1fr;
+}
+
+/* Compact market card — quieter meta line, less density. */
+.gold-market-card { padding: 12px 14px; }
+.gold-market-meta { font-size: 11.5px; opacity: 0.6; }
+
+/* Sticky CTA safe area — guarantee the summary card breathing room
+   above the sticky footer on phones (the previous 102px was tight
+   once the summary card and disclaimer both expanded). */
+@media (max-width: 768px) {
+  .modal[data-mode="gold"] .modal-body {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 132px);
+  }
+}
+
+/* Mobile spacing polish — bigger tap targets, gentler rhythm. */
+@media (max-width: 520px) {
+  .gold-type-chip { min-height: 72px; padding: 12px 8px; }
+  .gold-type-icon { font-size: 20px; }
+  .gold-type-name { font-size: 12.5px; }
+  .gold-field-label { font-size: 12px; }
+  .gold-field-sub   { font-size: 11.5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gold-type-chip { transition: none; }
+}

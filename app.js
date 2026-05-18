@@ -435,6 +435,16 @@ const T = {
     modalEditRETitle: 'Editar inmueble',
     karat:                'Quilates',
     goldUnit:             'Unidad',
+    // GOLD-UX-1: mobile-friendly gold entry copy.
+    gold_type_label:      'Qué tipo de oro tienes',
+    gold_type_jewelry:    'Joyería',
+    gold_type_coin:       'Moneda',
+    gold_type_bar:        'Lingote',
+    gold_karat_label:     'Quilataje',
+    gold_karat_sub:       'Selecciona el quilataje de tu oro.',
+    gold_more_karats:     'Más quilatajes',
+    gold_quantity_label:  'Cantidad',
+    gold_market_meta_sub: 'Valor ajustado según quilataje seleccionado.',
     gramUnit:             'g',
     ozUnit:               'oz troy',
     kgUnit:               'kg',
@@ -1189,6 +1199,16 @@ const T = {
     modalEditRETitle: 'Edit property',
     karat:                'Karats',
     goldUnit:             'Unit',
+    // GOLD-UX-1: mobile-friendly gold entry copy.
+    gold_type_label:      'What kind of gold do you have',
+    gold_type_jewelry:    'Jewelry',
+    gold_type_coin:       'Coin',
+    gold_type_bar:        'Bar',
+    gold_karat_label:     'Karat',
+    gold_karat_sub:       'Select the karat of your gold.',
+    gold_more_karats:     'More karats',
+    gold_quantity_label:  'Quantity',
+    gold_market_meta_sub: 'Value adjusts to the selected karat.',
     gramUnit:             'g',
     ozUnit:               'troy oz',
     kgUnit:               'kg',
@@ -16315,6 +16335,22 @@ function openModal(opts) {
   pendingResaleMargin  = 8;
   // ADD-V4.1: reset valuation mode to canonical spot on every open.
   if (typeof pendingGoldValuationMode !== 'undefined') pendingGoldValuationMode = 'spot';
+  // GOLD-UX-1: reset the type-step + advanced expansion so each
+  // re-open starts the user on STEP 1 (Joyería/Moneda/Lingote).
+  const _goldSecReset = document.getElementById('goldSection');
+  if (_goldSecReset) {
+    _goldSecReset.dataset.goldType = '';
+    _goldSecReset.classList.remove('gold-section--all-karats');
+    _goldSecReset.querySelectorAll('.gold-type-chip').forEach(b => b.classList.remove('is-active'));
+  }
+  const _goldAdvReset = document.getElementById('goldPurityAdvanced');
+  if (_goldAdvReset) _goldAdvReset.hidden = true;
+  const _goldMoreReset = document.getElementById('goldMoreToggle');
+  if (_goldMoreReset) {
+    _goldMoreReset.setAttribute('aria-expanded', 'false');
+    const _icon = _goldMoreReset.querySelector('.gold-more-icon');
+    if (_icon) _icon.textContent = '+';
+  }
   currentSuggestions   = [];
   renderedSuggestions  = [];
   activeSearchFilter   = 'all';
@@ -17610,6 +17646,37 @@ function _addV4SyncGoldUI() {
     const target = e.target.closest && e.target.closest('button');
     if (!target || target.disabled) return;
 
+    // GOLD-UX-1: STEP 1 — type chip click. Stamps a data-gold-type
+    // attribute on the section so CSS narrows the karat grid to the
+    // contextual subset. Also preselects a sensible default karat so
+    // the user can confirm with a single tap.
+    if (target.dataset.goldType !== undefined &&
+        target.classList.contains('gold-type-chip')) {
+      const chosen = target.dataset.goldType;
+      if (!chosen) return;
+      section.dataset.goldType = chosen;
+      section.classList.remove('gold-section--all-karats');
+      const adv = document.getElementById('goldPurityAdvanced');
+      if (adv) adv.hidden = true;
+      const moreBtn = document.getElementById('goldMoreToggle');
+      if (moreBtn) {
+        moreBtn.setAttribute('aria-expanded', 'false');
+        const icon = moreBtn.querySelector('.gold-more-icon');
+        if (icon) icon.textContent = '+';
+      }
+      // Update active class on the type chip row.
+      section.querySelectorAll('.gold-type-chip').forEach(b =>
+        b.classList.toggle('is-active', b.dataset.goldType === chosen));
+      // Default karat per type.
+      const DEFAULTS = { jewelry: 18, coin: 22, bar: 24 };
+      if (DEFAULTS[chosen] != null) {
+        pendingKarat = DEFAULTS[chosen];
+      }
+      _addV4SyncGoldUI();
+      updatePreview();
+      return;
+    }
+
     if (target.dataset.goldKarat) {
       pendingKarat = parseInt(target.dataset.goldKarat, 10) || pendingKarat;
       _addV4SyncGoldUI();
@@ -17641,6 +17708,10 @@ function _addV4SyncGoldUI() {
       if (!adv) return;
       const willOpen = adv.hidden;
       adv.hidden = !willOpen;
+      // GOLD-UX-1: when expanded, also unlock the contextual filter so
+      // every karat chip becomes visible. Collapsing returns to the
+      // type-narrowed primary view.
+      section.classList.toggle('gold-section--all-karats', willOpen);
       target.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
       const icon = target.querySelector('.gold-more-icon');
       if (icon) icon.textContent = willOpen ? '−' : '+';

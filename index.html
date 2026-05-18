@@ -552,58 +552,80 @@
              #karatGroup / #goldUnitGroup / #goldMarginChips nodes are
              kept (hidden) so old handlers stay no-ops; new buttons live
              inside #goldSection and use delegated handlers. -->
-        <div class="form-group form-group--gold" id="goldSection" style="display:none">
+        <div class="form-group form-group--gold" id="goldSection" style="display:none" data-gold-type="">
 
-          <!-- Section 1 — market reference -->
+          <!-- Section 1 — market reference (compact). Meta line is no
+               longer a dense "24K referencia spot" badge; per GOLD-UX-1
+               we surface a simple per-gram / per-oz pair so the user
+               focuses on price, not metallurgy terminology. -->
           <div class="gold-market-card" id="goldMarketRef">
             <div class="gold-market-head">
               <span class="gold-market-eyebrow" data-i18n="gold_market_label">Precio internacional del oro</span>
-              <span class="gold-market-meta" data-i18n="gold_market_meta">24K referencia spot</span>
             </div>
             <div class="gold-market-price" id="goldSpotLine">—</div>
+            <div class="gold-market-meta" id="goldSpotSecondary" data-i18n="gold_market_meta_sub">Referencia 24K · ajustada según quilataje</div>
           </div>
 
-          <!-- Section 2 — ¿Qué tienes? -->
-          <div class="gold-section-eyebrow" data-i18n="gold_what_label">¿Qué tienes?</div>
-
-          <div class="gold-field-block">
-            <div class="gold-field-label" data-i18n="gold_purity_label">Pureza</div>
-            <div class="gold-purity-grid" id="goldPurityGrid">
-              <button type="button" class="gold-chip" data-gold-karat="24">
-                <span class="gold-chip-title">24K</span>
-                <span class="gold-chip-sub" data-i18n="gold_purity_24_sub">Lingote</span>
+          <!-- Section 2 — STEP 1: tipo de oro -->
+          <div class="gold-field-block gold-field-block--type">
+            <div class="gold-field-label" data-i18n="gold_type_label">Qué tipo de oro tienes</div>
+            <div class="gold-type-row" id="goldTypeRow" role="radiogroup">
+              <button type="button" class="gold-type-chip" data-gold-type="jewelry">
+                <span class="gold-type-icon" aria-hidden="true">◐</span>
+                <span class="gold-type-name" data-i18n="gold_type_jewelry">Joyería</span>
               </button>
-              <button type="button" class="gold-chip" data-gold-karat="22">
+              <button type="button" class="gold-type-chip" data-gold-type="coin">
+                <span class="gold-type-icon" aria-hidden="true">●</span>
+                <span class="gold-type-name" data-i18n="gold_type_coin">Moneda</span>
+              </button>
+              <button type="button" class="gold-type-chip" data-gold-type="bar">
+                <span class="gold-type-icon" aria-hidden="true">▬</span>
+                <span class="gold-type-name" data-i18n="gold_type_bar">Lingote</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- STEP 2: quilataje contextual al tipo -->
+          <div class="gold-field-block">
+            <div class="gold-field-label" data-i18n="gold_karat_label">Quilataje</div>
+            <div class="gold-field-sub" data-i18n="gold_karat_sub">Selecciona el quilataje de tu oro.</div>
+            <div class="gold-purity-grid" id="goldPurityGrid">
+              <button type="button" class="gold-chip" data-gold-karat="24" data-gold-contexts="jewelry coin bar">
+                <span class="gold-chip-title">24K</span>
+                <span class="gold-chip-sub" data-i18n="gold_purity_24_sub">Puro</span>
+              </button>
+              <button type="button" class="gold-chip" data-gold-karat="22" data-gold-contexts="coin">
                 <span class="gold-chip-title">22K</span>
                 <span class="gold-chip-sub" data-i18n="gold_purity_22_sub">Moneda</span>
               </button>
-              <button type="button" class="gold-chip is-active" data-gold-karat="18">
+              <button type="button" class="gold-chip is-active" data-gold-karat="18" data-gold-contexts="jewelry">
                 <span class="gold-chip-title">18K</span>
                 <span class="gold-chip-sub" data-i18n="gold_purity_18_sub">Joyería</span>
               </button>
-              <button type="button" class="gold-chip" data-gold-karat="14">
-                <span class="gold-chip-title">14K</span>
-                <span class="gold-chip-sub" data-i18n="gold_purity_14_sub">Aleación</span>
-              </button>
             </div>
             <button type="button" class="gold-more-toggle" id="goldMoreToggle" aria-expanded="false">
-              <span data-i18n="gold_more_options">Más opciones</span>
+              <span data-i18n="gold_more_karats">Más quilatajes</span>
               <span class="gold-more-icon" aria-hidden="true">+</span>
             </button>
             <div class="gold-purity-advanced" id="goldPurityAdvanced" hidden>
-              <button type="button" class="gold-chip" data-gold-karat="21">
+              <button type="button" class="gold-chip" data-gold-karat="21" data-gold-contexts="">
                 <span class="gold-chip-title">21K</span>
-                <span class="gold-chip-sub" data-i18n="gold_purity_21_sub">Aleación</span>
+                <span class="gold-chip-sub" data-i18n="gold_purity_21_sub">Joyería fina</span>
               </button>
-              <button type="button" class="gold-chip" data-gold-karat="10">
+              <button type="button" class="gold-chip" data-gold-karat="14" data-gold-contexts="">
+                <span class="gold-chip-title">14K</span>
+                <span class="gold-chip-sub" data-i18n="gold_purity_14_sub">Joyería ligera</span>
+              </button>
+              <button type="button" class="gold-chip" data-gold-karat="10" data-gold-contexts="">
                 <span class="gold-chip-title">10K</span>
-                <span class="gold-chip-sub" data-i18n="gold_purity_10_sub">Aleación</span>
+                <span class="gold-chip-sub" data-i18n="gold_purity_10_sub">Joyería económica</span>
               </button>
             </div>
           </div>
 
+          <!-- STEP 3: cantidad — unit + amount stay together. -->
           <div class="gold-field-block">
-            <div class="gold-field-label" data-i18n="gold_unit_label">Unidad</div>
+            <div class="gold-field-label" data-i18n="gold_quantity_label">Cantidad</div>
             <div class="gold-unit-row" id="goldUnitRow">
               <button type="button" class="gold-pill is-active" data-gold-unit="g"  data-i18n="gramUnit">g</button>
               <button type="button" class="gold-pill"            data-gold-unit="oz" data-i18n="ozUnit">oz troy</button>
