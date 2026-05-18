@@ -13177,7 +13177,8 @@ body.gs-open { overflow: hidden; }
    matching <section[data-onb-step]> is shown.
    ══════════════════════════════════════════════════════════════════ */
 #onboardingOverlay {
-  z-index: 200; /* above settings/reset overlays */
+  /* Sits above bottom-nav (z-index 200) and every other modal layer. */
+  z-index: 250;
   padding: var(--space-3);
 }
 .modal--onboarding {
@@ -13494,19 +13495,37 @@ body.gs-open { overflow: hidden; }
   line-height: 1;
 }
 
-/* Mobile — fits above bottom nav, 92vw, safe-area aware. */
+/* Mobile — centered card, 92vw, sits above bottom-nav via the system
+   --aurix-modal-safe-bottom token (single source of truth shared with
+   every other overlay). The base .modal-overlay mobile rule already
+   sets padding-bottom: var(--aurix-modal-safe-bottom); we keep the
+   same alignment as the centered-safe family (settings / reset). */
 @media (max-width: 768px) {
   #onboardingOverlay {
-    align-items: flex-end;
-    padding: 0;
+    align-items: center;
+    justify-content: center;
+    /* Inherit padding-bottom (= --aurix-modal-safe-bottom) from the
+       base .modal-overlay mobile rule so the modal never sits under
+       the bottom nav. Top + horizontal padding are reset here so the
+       card fits the requested 92vw on small screens. */
+    padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+    padding-left: 0;
+    padding-right: 0;
   }
   .modal--onboarding {
-    width: 100%;
-    max-width: 100%;
-    border-radius: 22px 22px 0 0;
-    /* Leave room for bottom-nav (~72px) + iOS safe area. */
-    max-height: calc(100dvh - 72px - env(safe-area-inset-bottom, 0px));
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+    width: 92vw;
+    max-width: 92vw;
+    border-radius: var(--radius-lg);
+    /* Cap height so the card never overlaps the top safe-area or the
+       bottom-nav (the var already includes safe-area-inset-bottom). */
+    max-height: calc(
+      100dvh
+      - var(--aurix-modal-safe-bottom)
+      - env(safe-area-inset-top, 0px)
+      - 24px
+    );
+    align-self: center;
+    margin-bottom: 0;
   }
   .onb-step {
     padding: 48px 22px 20px;
