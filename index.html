@@ -1256,6 +1256,65 @@
   </div>
 </div>
 
+<!-- AURIX-SIGNALS-2: Portfolio Health bridge. Surfaced from the
+     dashboard signal CTA. Explains the signal in context, surfaces a
+     compact summary, and hands off to Workspace only as an explicit
+     secondary action. Never duplicates the risk monitor. -->
+<div class="modal-overlay" id="healthOverlay" aria-hidden="true">
+  <div class="modal modal--health" role="dialog" aria-modal="true" aria-labelledby="healthTitle">
+    <div class="modal-header">
+      <div class="modal-title-block">
+        <h3 id="healthTitle" data-i18n="healthTitle">Salud de cartera</h3>
+        <p class="modal-subtitle" data-i18n="healthSub">Resumen inteligente de tu portfolio</p>
+      </div>
+      <button class="modal-close" id="healthClose" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body health-body">
+
+      <section class="health-signal" id="healthSignalBox" data-kind="">
+        <div class="health-signal-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2 L4 22 L12 18 L20 22 Z"/>
+          </svg>
+        </div>
+        <div class="health-signal-text">
+          <span class="health-signal-label" data-i18n="signalTitle">Aurix Signal</span>
+          <p class="health-signal-msg" id="healthSignalMsg"></p>
+        </div>
+      </section>
+
+      <p class="health-context" id="healthContext"></p>
+
+      <section class="health-breakdown" id="healthBreakdown">
+        <div class="health-breakdown-row" data-row="top">
+          <span class="health-breakdown-label" data-i18n="healthBreakdownTop">Activo dominante</span>
+          <span class="health-breakdown-value" id="healthRowTop">—</span>
+        </div>
+        <div class="health-breakdown-row" data-row="cat">
+          <span class="health-breakdown-label" data-i18n="healthBreakdownCat">Categoría principal</span>
+          <span class="health-breakdown-value" id="healthRowCat">—</span>
+        </div>
+        <div class="health-breakdown-row" data-row="count">
+          <span class="health-breakdown-label" data-i18n="healthBreakdownCount">Número de activos</span>
+          <span class="health-breakdown-value" id="healthRowCount">—</span>
+        </div>
+        <div class="health-breakdown-row" data-row="cash">
+          <span class="health-breakdown-label" data-i18n="healthBreakdownCash">Efectivo</span>
+          <span class="health-breakdown-value" id="healthRowCash">—</span>
+        </div>
+      </section>
+
+      <p class="health-disclaimer" data-i18n="healthDisclaimer">Esto no es una recomendación financiera.</p>
+
+      <div class="health-actions">
+        <button type="button" class="btn-submit btn-submit--ghost" id="healthCloseBtn" data-i18n="healthCtaClose">Cerrar</button>
+        <button type="button" class="btn-submit btn-submit--primary" id="healthWorkspaceBtn" data-i18n="healthCtaWorkspace">Ver Workspace</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <!-- SETTINGS-1: reset confirmation. Requires typing the matching token
      so destructive action is never one accidental tap away. -->
 <div class="modal-overlay" id="resetConfirmOverlay">

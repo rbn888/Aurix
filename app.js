@@ -1003,6 +1003,22 @@ const T = {
     signalPerformanceCta:        'Ver detalle',
     signalLossBody:              'Uno de tus activos está bajo presión.',
     signalLossCta:               'Revisar',
+    // ── Portfolio Health panel ───────────────────────
+    healthTitle:                 'Salud de cartera',
+    healthSub:                   'Resumen inteligente de tu portfolio',
+    healthBreakdownTop:          'Activo dominante',
+    healthBreakdownCat:          'Categoría principal',
+    healthBreakdownCount:        'Número de activos',
+    healthBreakdownCash:         'Efectivo',
+    healthDisclaimer:            'Esto no es una recomendación financiera.',
+    healthCtaWorkspace:          'Ver Workspace',
+    healthCtaClose:              'Cerrar',
+    healthCtxConcentration:      (name, pct) => `${name} representa el ${pct}% de tu cartera.`,
+    healthCtxCrypto:             pct         => `Cripto representa el ${pct}% de tu cartera.`,
+    healthCtxCash:               pct         => `El efectivo representa el ${pct}% de tu cartera.`,
+    healthCtxSingle:             (name, cat) => `Tu único activo es ${name} (${cat}). Añadir otro activo reduce la dependencia de un solo movimiento.`,
+    healthCtxPerformance:        (name, ch)  => `Tu activo más fuerte es ${name} (${ch}). Está empujando el rendimiento del conjunto.`,
+    healthCtxLoss:               (name, ch)  => `Tu activo más débil es ${name} (${ch}). Está bajo presión respecto al resto.`,
   },
   en: {
     // Summary
@@ -1687,6 +1703,22 @@ const T = {
     signalPerformanceCta:        'View detail',
     signalLossBody:              'One of your holdings is under pressure.',
     signalLossCta:               'Review',
+    // ── Portfolio Health panel ───────────────────────
+    healthTitle:                 'Portfolio Health',
+    healthSub:                   'Smart summary of your portfolio',
+    healthBreakdownTop:          'Dominant asset',
+    healthBreakdownCat:          'Main category',
+    healthBreakdownCount:        'Number of assets',
+    healthBreakdownCash:         'Cash',
+    healthDisclaimer:            'This is not financial advice.',
+    healthCtaWorkspace:          'Open Workspace',
+    healthCtaClose:              'Close',
+    healthCtxConcentration:      (name, pct) => `${name} represents ${pct}% of your portfolio.`,
+    healthCtxCrypto:             pct         => `Crypto represents ${pct}% of your portfolio.`,
+    healthCtxCash:               pct         => `Cash represents ${pct}% of your portfolio.`,
+    healthCtxSingle:             (name, cat) => `Your only asset is ${name} (${cat}). Adding another asset reduces dependency on a single move.`,
+    healthCtxPerformance:        (name, ch)  => `Your strongest asset is ${name} (${ch}). It is driving overall performance.`,
+    healthCtxLoss:               (name, ch)  => `Your weakest asset is ${name} (${ch}). It is under pressure relative to the rest.`,
   },
 };
 
@@ -22058,6 +22090,178 @@ function computeAurixSignal() {
   return null;
 }
 
+// AURIX-SIGNALS-2: build a lightweight snapshot of the portfolio that
+// feeds the Health Panel breakdown. Pure computation against the
+// existing `assets` array + getDistribution()/totalValueUSD(); no
+// risk-engine duplication, no extra observers. All percentages are
+// rounded to integer for premium glanceability.
+function _aurixHealthSnapshot() {
+  const out = {
+    totUSD:        0,
+    topAsset:      null,    // { name, ticker, type, pctTotal }
+    topCategory:   null,    // { type, label, pctTotal }
+    assetCount:    0,
+    cashPct:       0,
+    cryptoPct:     0,
+  };
+  if (!Array.isArray(assets) || assets.length === 0) return out;
+  const totUSD = (typeof totalValueUSD === 'function') ? totalValueUSD() : 0;
+  out.totUSD     = totUSD;
+  out.assetCount = assets.length;
+  if (totUSD <= 0) return out;
+
+  // Top single asset
+  let topUsd = -1;
+  let topRef = null;
+  for (const a of assets) {
+    const v = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : 0;
+    if (v > topUsd) { topUsd = v; topRef = a; }
+  }
+  if (topRef) {
+    out.topAsset = {
+      name:     topRef.name || topRef.ticker || '—',
+      ticker:   topRef.ticker || '',
+      type:     topRef.type,
+      pctTotal: Math.round((topUsd / totUSD) * 100),
+    };
+  }
+  // Top category + crypto/cash percentages from getDistribution()
+  const dist = (typeof getDistribution === 'function') ? (getDistribution() || []) : [];
+  if (dist.length) {
+    const head = dist[0];
+    const meta = (typeof TYPE_META !== 'undefined' && TYPE_META[head.type]) || null;
+    out.topCategory = {
+      type:     head.type,
+      label:    meta ? meta.label : head.type,
+      pctTotal: Math.round(head.pct),
+    };
+  }
+  const cryptoEntry = dist.find(d => d.type === 'crypto');
+  const cashEntry   = dist.find(d => d.type === 'cash');
+  if (cryptoEntry) out.cryptoPct = Math.round(cryptoEntry.pct);
+  if (cashEntry)   out.cashPct   = Math.round(cashEntry.pct);
+  return out;
+}
+
+function _aurixHealthContext(signal, snap) {
+  if (!signal || !snap) return '';
+  const t24 = (asset) => {
+    if (typeof asset.change24h !== 'number') return '';
+    const sign = asset.change24h >= 0 ? '+' : '';
+    return `${sign}${asset.change24h.toFixed(1)}%`;
+  };
+  const typeLabel = (type) => {
+    const meta = (typeof TYPE_META !== 'undefined' && TYPE_META[type]) || null;
+    return meta ? meta.label : (type || '—');
+  };
+  switch (signal.kind) {
+    case 'concentration': {
+      if (!snap.topAsset) return '';
+      const fn = t('healthCtxConcentration');
+      return typeof fn === 'function' ? fn(snap.topAsset.name, snap.topAsset.pctTotal) : '';
+    }
+    case 'crypto': {
+      const fn = t('healthCtxCrypto');
+      return typeof fn === 'function' ? fn(snap.cryptoPct) : '';
+    }
+    case 'cash': {
+      const fn = t('healthCtxCash');
+      return typeof fn === 'function' ? fn(snap.cashPct) : '';
+    }
+    case 'single': {
+      if (!snap.topAsset) return '';
+      const fn = t('healthCtxSingle');
+      return typeof fn === 'function' ? fn(snap.topAsset.name, typeLabel(snap.topAsset.type)) : '';
+    }
+    case 'performance': {
+      // Find the asset with the max 24h change to surface its name.
+      let best = null, bestCh = -Infinity;
+      for (const a of assets) {
+        if (typeof a.change24h === 'number' && a.change24h > bestCh) { best = a; bestCh = a.change24h; }
+      }
+      if (!best) return '';
+      const fn = t('healthCtxPerformance');
+      return typeof fn === 'function' ? fn(best.name || best.ticker, t24(best)) : '';
+    }
+    case 'loss': {
+      let worst = null, worstCh = Infinity;
+      for (const a of assets) {
+        if (typeof a.change24h === 'number' && a.change24h < worstCh) { worst = a; worstCh = a.change24h; }
+      }
+      if (!worst) return '';
+      const fn = t('healthCtxLoss');
+      return typeof fn === 'function' ? fn(worst.name || worst.ticker, t24(worst)) : '';
+    }
+    default: return '';
+  }
+}
+
+function openHealthPanel() {
+  const overlay = document.getElementById('healthOverlay');
+  if (!overlay) return;
+  const signal = computeAurixSignal();
+  if (!signal) return; // Defensive: panel only exists alongside a signal.
+  const snap   = _aurixHealthSnapshot();
+
+  // Signal box
+  const sigBox  = document.getElementById('healthSignalBox');
+  const sigMsg  = document.getElementById('healthSignalMsg');
+  if (sigBox) sigBox.dataset.kind = signal.kind;
+  if (sigMsg) sigMsg.textContent  = t(signal.msg);
+
+  // Context line
+  const ctxEl = document.getElementById('healthContext');
+  if (ctxEl) ctxEl.textContent = _aurixHealthContext(signal, snap);
+
+  // Breakdown
+  const topRow   = document.getElementById('healthRowTop');
+  const catRow   = document.getElementById('healthRowCat');
+  const countRow = document.getElementById('healthRowCount');
+  const cashRow  = document.getElementById('healthRowCash');
+  if (topRow) {
+    const v = snap.topAsset
+      ? `${snap.topAsset.name} · ${snap.topAsset.pctTotal}%`
+      : '—';
+    topRow.textContent = v;
+    topRow.parentElement?.classList.toggle('is-empty', !snap.topAsset);
+  }
+  if (catRow) {
+    const v = snap.topCategory
+      ? `${snap.topCategory.label} · ${snap.topCategory.pctTotal}%`
+      : '—';
+    catRow.textContent = v;
+    catRow.parentElement?.classList.toggle('is-empty', !snap.topCategory);
+  }
+  if (countRow) {
+    countRow.textContent = String(snap.assetCount || 0);
+    countRow.parentElement?.classList.toggle('is-empty', !snap.assetCount);
+  }
+  if (cashRow) {
+    if (snap.cashPct > 0) {
+      cashRow.textContent = `${snap.cashPct}%`;
+      cashRow.parentElement?.classList.remove('is-empty');
+    } else {
+      cashRow.textContent = '—';
+      cashRow.parentElement?.classList.add('is-empty');
+    }
+  }
+
+  // Re-apply i18n in case the language changed since boot.
+  if (typeof applyI18n === 'function') applyI18n();
+
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('modal-open');
+}
+
+function closeHealthPanel() {
+  const overlay = document.getElementById('healthOverlay');
+  if (!overlay) return;
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('modal-open');
+}
+
 function renderAurixSignal() {
   const sec = document.getElementById('aurixSignal');
   if (!sec) return;
@@ -22157,19 +22361,50 @@ function renderAurixSignal() {
       return;
     }
 
-    // AURIX-SIGNALS-1: signal CTA deep-link. V1 routes every kind to
-    // the Workspace home (deep-link per kind is a future refinement —
-    // the spec allows this fallback explicitly). switchTab handles the
-    // tab swap, render flush and bottom-nav active state.
+    // AURIX-SIGNALS-2: signal CTA opens the Portfolio Health panel.
+    // The bridge experience explains the signal, surfaces a compact
+    // breakdown, and offers an explicit "Open Workspace" follow-up.
+    // No more direct route into the generic spreadsheet.
     const sigCta = e.target.closest && e.target.closest('#aurixSignalCta');
     if (sigCta) {
+      if (typeof openHealthPanel === 'function') openHealthPanel();
+      return;
+    }
+
+    // Portfolio Health panel — close interactions (X button, secondary
+    // CTA, and backdrop click on the overlay itself).
+    if (e.target.closest && e.target.closest('#healthClose')) {
+      closeHealthPanel();
+      return;
+    }
+    if (e.target.closest && e.target.closest('#healthCloseBtn')) {
+      closeHealthPanel();
+      return;
+    }
+    const healthOv = document.getElementById('healthOverlay');
+    if (healthOv && healthOv.classList.contains('open') && e.target === healthOv) {
+      closeHealthPanel();
+      return;
+    }
+
+    // Portfolio Health panel — explicit Workspace handoff.
+    if (e.target.closest && e.target.closest('#healthWorkspaceBtn')) {
+      closeHealthPanel();
       if (typeof switchTab === 'function') {
         switchTab('workspace');
       } else {
         const tab = document.querySelector('#bottomNav [data-tab="workspace"]');
         if (tab) tab.click();
       }
+      return;
     }
+  });
+
+  // ESC closes the Health panel without affecting other open overlays.
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const ov = document.getElementById('healthOverlay');
+    if (ov && ov.classList.contains('open')) closeHealthPanel();
   });
 })();
 
