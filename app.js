@@ -1055,6 +1055,14 @@ const T = {
     signalPerformanceBodyMobile: 'Activo en alza',
     signalLossBodyMobile:        'Activo bajo presión',
     signalCtaShort:              'Análisis',
+    // ADD-ASSET-DISCOVERY-1: contextual "Populares" label per filter tab.
+    searchPopularLabel:          'Populares',
+    searchPopularLabel_all:      'Populares',
+    searchPopularLabel_crypto:   'Criptos populares',
+    searchPopularLabel_stock:    'Acciones destacadas',
+    searchPopularLabel_etf:      'ETFs populares',
+    searchPopularLabel_metal:    'Metales',
+    searchEmptyHint:             'Busca por nombre, ticker o ISIN.',
     // ── Portfolio Health panel ───────────────────────
     healthTitle:                 'Salud de cartera',
     healthSub:                   'Resumen inteligente de tu portfolio',
@@ -1841,6 +1849,14 @@ const T = {
     signalPerformanceBodyMobile: 'Strong asset',
     signalLossBodyMobile:        'Under pressure',
     signalCtaShort:              'Analysis',
+    // ADD-ASSET-DISCOVERY-1: contextual "Popular" label per filter tab.
+    searchPopularLabel:          'Popular',
+    searchPopularLabel_all:      'Popular',
+    searchPopularLabel_crypto:   'Popular crypto',
+    searchPopularLabel_stock:    'Trending stocks',
+    searchPopularLabel_etf:      'Popular ETFs',
+    searchPopularLabel_metal:    'Metals',
+    searchEmptyHint:             'Search by name, ticker or ISIN.',
     // ── Portfolio Health panel ───────────────────────
     healthTitle:                 'Portfolio Health',
     healthSub:                   'Smart summary of your portfolio',
@@ -1981,29 +1997,45 @@ function getFallbackData(marketSymbol) {
 
 // ── Default suggestions per filter (shown on focus when input is empty) ─
 const DEFAULTS = {
+  // ADD-ASSET-DISCOVERY-1: a mixed "Populares" set so the default
+  // (no-filter) tab can also show curated entries instantly.
+  all: [
+    { ticker: 'BTC',   name: 'Bitcoin',                 type: 'crypto', coinId: 'bitcoin' },
+    { ticker: 'AAPL',  name: 'Apple',                   type: 'stock',  marketSymbol: 'AAPL' },
+    { ticker: 'SPY',   name: 'SPDR S&P 500 ETF',        type: 'etf',    marketSymbol: 'SPY' },
+    { ticker: 'NVDA',  name: 'NVIDIA',                  type: 'stock',  marketSymbol: 'NVDA' },
+    { ticker: 'ETH',   name: 'Ethereum',                type: 'crypto', coinId: 'ethereum' },
+    { ticker: 'XAU',   name: 'Gold',                    type: 'metal',  marketSymbol: 'GC=F' },
+  ],
   crypto: [
-    { ticker: 'BTC',  name: 'Bitcoin',   type: 'crypto', coinId: 'bitcoin' },
-    { ticker: 'ETH',  name: 'Ethereum',  type: 'crypto', coinId: 'ethereum' },
-    { ticker: 'SOL',  name: 'Solana',    type: 'crypto', coinId: 'solana' },
-    { ticker: 'USDC', name: 'USD Coin',  type: 'crypto', coinId: 'usd-coin' },
-    { ticker: 'USDT', name: 'Tether',    type: 'crypto', coinId: 'tether' },
+    { ticker: 'BTC',   name: 'Bitcoin',                 type: 'crypto', coinId: 'bitcoin' },
+    { ticker: 'ETH',   name: 'Ethereum',                type: 'crypto', coinId: 'ethereum' },
+    { ticker: 'SOL',   name: 'Solana',                  type: 'crypto', coinId: 'solana' },
+    { ticker: 'BNB',   name: 'BNB',                     type: 'crypto', coinId: 'binancecoin' },
+    { ticker: 'XRP',   name: 'XRP',                     type: 'crypto', coinId: 'ripple' },
+    { ticker: 'USDT',  name: 'Tether',                  type: 'crypto', coinId: 'tether' },
+    { ticker: 'USDC',  name: 'USD Coin',                type: 'crypto', coinId: 'usd-coin' },
   ],
   stock: [
-    { ticker: 'AAPL', name: 'Apple',     type: 'stock', marketSymbol: 'AAPL' },
-    { ticker: 'TSLA', name: 'Tesla',     type: 'stock', marketSymbol: 'TSLA' },
-    { ticker: 'MSFT', name: 'Microsoft', type: 'stock', marketSymbol: 'MSFT' },
-    { ticker: 'AMZN', name: 'Amazon',    type: 'stock', marketSymbol: 'AMZN' },
-    { ticker: 'NVDA', name: 'NVIDIA',    type: 'stock', marketSymbol: 'NVDA' },
+    { ticker: 'AAPL',  name: 'Apple',                   type: 'stock', marketSymbol: 'AAPL' },
+    { ticker: 'MSFT',  name: 'Microsoft',               type: 'stock', marketSymbol: 'MSFT' },
+    { ticker: 'NVDA',  name: 'NVIDIA',                  type: 'stock', marketSymbol: 'NVDA' },
+    { ticker: 'AMZN',  name: 'Amazon',                  type: 'stock', marketSymbol: 'AMZN' },
+    { ticker: 'GOOGL', name: 'Alphabet (Google)',       type: 'stock', marketSymbol: 'GOOGL' },
+    { ticker: 'META',  name: 'Meta Platforms',          type: 'stock', marketSymbol: 'META' },
+    { ticker: 'TSLA',  name: 'Tesla',                   type: 'stock', marketSymbol: 'TSLA' },
   ],
   etf: [
-    { ticker: 'SPY',  name: 'SPDR S&P 500 ETF',          type: 'etf', marketSymbol: 'SPY' },
-    { ticker: 'VOO',  name: 'Vanguard S&P 500 ETF',      type: 'etf', marketSymbol: 'VOO' },
-    { ticker: 'QQQ',  name: 'Invesco QQQ Trust',          type: 'etf', marketSymbol: 'QQQ' },
-    { ticker: 'VWCE', name: 'Vanguard FTSE All-World Acc', type: 'etf', marketSymbol: 'VWCE.DE' },
-    { ticker: 'URTH', name: 'iShares MSCI World ETF',     type: 'etf', marketSymbol: 'URTH' },
+    { ticker: 'SPY',   name: 'SPDR S&P 500 ETF',          type: 'etf', marketSymbol: 'SPY' },
+    { ticker: 'VOO',   name: 'Vanguard S&P 500 ETF',      type: 'etf', marketSymbol: 'VOO' },
+    { ticker: 'QQQ',   name: 'Invesco QQQ Trust',          type: 'etf', marketSymbol: 'QQQ' },
+    { ticker: 'VTI',   name: 'Vanguard Total Stock Market', type: 'etf', marketSymbol: 'VTI' },
+    { ticker: 'IWDA',  name: 'iShares Core MSCI World',     type: 'etf', marketSymbol: 'IWDA.L' },
+    { ticker: 'VWCE',  name: 'Vanguard FTSE All-World Acc', type: 'etf', marketSymbol: 'VWCE.DE' },
+    { ticker: 'EUNL',  name: 'iShares Core MSCI World (EUR)', type: 'etf', marketSymbol: 'EUNL.DE' },
   ],
   metal: [
-    { ticker: 'XAU', name: 'Gold', type: 'metal', marketSymbol: 'GC=F' },
+    { ticker: 'XAU', name: 'Gold',   type: 'metal', marketSymbol: 'GC=F' },
     { ticker: 'XAG', name: 'Silver', type: 'metal', marketSymbol: 'SI=F' },
   ],
 };
@@ -15780,11 +15812,25 @@ function _searchResultToMarketItem(result) {
 
 function showDefaultSuggestions() {
   const defaults = DEFAULTS[activeSearchFilter] || [];
-  if (!defaults.length) { closeSuggestions(); return; }
+  // ADD-ASSET-DISCOVERY-1: never bail with no UI — when a filter has
+  // no curated set (e.g. real_estate routes elsewhere), show a calm
+  // hint instead of an empty surface so the user always knows what
+  // to do next.
+  if (!defaults.length) {
+    assetSuggestionsEl.innerHTML =
+      `<div class="suggestion-empty">${escHtml(t('searchEmptyHint') || 'Search by name, ticker or ISIN.')}</div>`;
+    assetSuggestionsEl.classList.add('open');
+    renderedSuggestions = [];
+    return;
+  }
   renderedSuggestions = defaults;
 
+  // Contextual label per filter — "Criptos populares" / "ETFs populares"
+  // / etc. — falls back to the generic "Populares" key.
+  const labelText = t(`searchPopularLabel_${activeSearchFilter}`) || t('searchPopularLabel') || 'Populares';
+
   assetSuggestionsEl.innerHTML = `
-    <div class="sugg-section-label">Populares</div>
+    <div class="sugg-section-label">${escHtml(labelText)}</div>
     ${defaults.map((a, i) => `
       <div class="suggestion-item" data-idx="${i}">
         <div class="sugg-badge ${a.type}">${escHtml(a.ticker.slice(0, 5))}</div>
@@ -16034,6 +16080,12 @@ function enterSearchMode() {
   btnSubmitEl.style.display    = 'none';
   closeSuggestions();
   searchInput.placeholder = T[lang].searchPH[activeSearchFilter] || T[lang].searchPH.all;
+  // ADD-ASSET-DISCOVERY-1: when returning from a selected asset to
+  // browse mode, surface curated defaults again instead of leaving
+  // the suggestion area empty.
+  setTimeout(() => {
+    if (!searchInput.value.trim()) showDefaultSuggestions();
+  }, 40);
   suppressFocusDefaults = true;
   setTimeout(() => searchInput.focus(), 0);
 }
@@ -16086,7 +16138,10 @@ searchInput.addEventListener('input', () => {
   if (searchAbortCtrl) { searchAbortCtrl.abort(); searchAbortCtrl = null; }
 
   if (!q) {
-    closeSuggestions();
+    // ADD-ASSET-DISCOVERY-1: clearing the query restores the curated
+    // set for the current tab instead of closing the suggestion
+    // surface. Keeps the picker actionable at all times.
+    showDefaultSuggestions();
     return;
   }
 
@@ -16147,10 +16202,12 @@ searchClearBtn.addEventListener('click', () => {
   searchInput.focus();
 });
 
-// Show popular defaults on manual focus when a specific filter is active and input is empty
+// ADD-ASSET-DISCOVERY-1: focus on the empty search now ALWAYS shows
+// the curated defaults (including the 'all' tab), so the picker
+// never feels blank just because the user tapped the input.
 searchInput.addEventListener('focus', () => {
   if (suppressFocusDefaults) { suppressFocusDefaults = false; return; }
-  if (!searchInput.value.trim() && activeSearchFilter !== 'all') {
+  if (!searchInput.value.trim()) {
     showDefaultSuggestions();
   }
 });
@@ -16473,6 +16530,13 @@ function openModal(opts) {
   document.body.classList.add('modal-open');
   suppressFocusDefaults = true;
   setTimeout(() => searchInput.focus(), 50);
+  // ADD-ASSET-DISCOVERY-1: surface curated defaults right away so the
+  // form never appears blank — works for skipPicker paths AND for the
+  // picker → "Activo" transition (the suggestions stay rendered while
+  // hidden behind the picker, then reveal naturally on step change).
+  setTimeout(() => {
+    if (!searchInput.value.trim()) showDefaultSuggestions();
+  }, 70);
 }
 
 function closeModal() {
@@ -16534,7 +16598,10 @@ filterBtns.forEach(btn => {
 
     const q = searchInput.value.trim();
     if (!q) {
-      closeSuggestions();
+      // ADD-ASSET-DISCOVERY-1: tab tap with empty query → show the
+      // curated set immediately. No more blank surface until the
+      // user searches; works for every filter including 'all'.
+      showDefaultSuggestions();
       return;
     }
 
