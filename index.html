@@ -1185,6 +1185,20 @@
     <section class="onb-step" data-onb-step="WELCOME">
       <h2 class="onb-headline" data-i18n="onbWelcomeTitle">Bienvenido a Aurix.</h2>
       <p class="onb-sub" data-i18n="onbWelcomeSub">Todo tu patrimonio, en un solo lugar.</p>
+      <ul class="onb-bullets" aria-label="Aurix">
+        <li class="onb-bullet">
+          <span class="onb-bullet-dot" aria-hidden="true"></span>
+          <span data-i18n="onbWelcomeBullet1">Unifica tu cartera</span>
+        </li>
+        <li class="onb-bullet">
+          <span class="onb-bullet-dot" aria-hidden="true"></span>
+          <span data-i18n="onbWelcomeBullet2">Sigue tu evolución</span>
+        </li>
+        <li class="onb-bullet">
+          <span class="onb-bullet-dot" aria-hidden="true"></span>
+          <span data-i18n="onbWelcomeBullet3">Entiende tu exposición</span>
+        </li>
+      </ul>
       <div class="onb-footer">
         <button type="button" class="onb-cta onb-cta--primary" data-onb-next data-i18n="onbContinue">Continuar</button>
       </div>
@@ -1245,13 +1259,19 @@
       </div>
     </section>
 
-    <!-- Step: SUCCESS -->
+    <!-- Step: SUCCESS — ONBOARDING-2: multi-asset loop. No auto-close;
+         user chooses when to leave onboarding via the CTAs below. -->
     <section class="onb-step" data-onb-step="SUCCESS">
       <div class="onb-success-art" aria-hidden="true">
         <span class="onb-success-icon">✓</span>
       </div>
       <h2 class="onb-headline" data-i18n="onbSuccessTitle">Perfecto.</h2>
-      <p class="onb-sub" data-i18n="onbSuccessSub">Tu portfolio ha comenzado.</p>
+      <p class="onb-sub" data-i18n="onbSuccessSub">Tu cartera ha comenzado.</p>
+      <p class="onb-sub onb-success-body" id="onbSuccessBody"></p>
+      <div class="onb-footer onb-footer--split">
+        <button type="button" class="onb-cta onb-cta--ghost" id="onbGoDashboardBtn" data-i18n="onbGoDashboard">Ir al dashboard</button>
+        <button type="button" class="onb-cta onb-cta--primary" id="onbAddAnotherBtn" data-i18n="onbAddAnother">+ Añadir otro activo</button>
+      </div>
     </section>
   </div>
 </div>

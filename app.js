@@ -964,7 +964,14 @@ const T = {
     onbActSub:            'Empieza a construir tu visión financiera.',
     onbAddAssetBtn:       '+ Añadir activo',
     onbSuccessTitle:      'Perfecto.',
-    onbSuccessSub:        'Tu portfolio ha comenzado.',
+    onbSuccessSub:        'Tu cartera ha comenzado.',
+    onbSuccessBody1:      'Has añadido tu primer activo. Puedes seguir construyendo tu portfolio o ver ya tu dashboard.',
+    onbSuccessBodyN:      n => `Tu portfolio ya tiene ${n} activos. Puedes seguir construyendo o ver el dashboard.`,
+    onbAddAnother:        '+ Añadir otro activo',
+    onbGoDashboard:       'Ir al dashboard',
+    onbWelcomeBullet1:    'Unifica tu cartera',
+    onbWelcomeBullet2:    'Sigue tu evolución',
+    onbWelcomeBullet3:    'Entiende tu exposición',
     // ── Premium empty / activation states ────────────
     emptyHeroTitle:       'Tu portfolio está listo para empezar.',
     emptyHeroBody:        'Añade tu primer activo para construir tu visión financiera.',
@@ -1665,6 +1672,13 @@ const T = {
     onbAddAssetBtn:       '+ Add asset',
     onbSuccessTitle:      'Great.',
     onbSuccessSub:        'Your portfolio has started.',
+    onbSuccessBody1:      'You added your first asset. You can keep building your portfolio or go to your dashboard.',
+    onbSuccessBodyN:      n => `Your portfolio now has ${n} assets. You can keep building or go to your dashboard.`,
+    onbAddAnother:        '+ Add another asset',
+    onbGoDashboard:       'Go to dashboard',
+    onbWelcomeBullet1:    'Unify your portfolio',
+    onbWelcomeBullet2:    'Track your evolution',
+    onbWelcomeBullet3:    'Understand your exposure',
     // ── Premium empty / activation states ────────────
     emptyHeroTitle:       'Your portfolio is ready to begin.',
     emptyHeroBody:        'Add your first asset to start building your financial view.',
@@ -21827,6 +21841,22 @@ function exportPortfolioBackup() {
     });
   }
 
+  // ONBOARDING-2: success step body reflects the current asset count.
+  // n=1 → "Has añadido tu primer activo. …"; n>=2 → "Tu portfolio ya
+  // tiene N activos. …". Called every time the SUCCESS step mounts or
+  // the in-flight loop registers another asset-added event.
+  function _updateSuccessCopy() {
+    const body = document.getElementById('onbSuccessBody');
+    if (!body) return;
+    const n = Array.isArray(assets) ? assets.length : 0;
+    if (n <= 1) {
+      body.textContent = t('onbSuccessBody1') || '';
+    } else {
+      const fn = t('onbSuccessBodyN');
+      body.textContent = (typeof fn === 'function') ? fn(n) : '';
+    }
+  }
+
   // ── Step navigation handlers ───────────────────────────────────
   // Language selection
   document.addEventListener('click', e => {
@@ -21911,6 +21941,33 @@ function exportPortfolioBackup() {
       _hideOnboardingOverlay();
       return;
     }
+
+    // ONBOARDING-2: SUCCESS step — "+ Añadir otro activo".
+    // Multi-asset loop. Unlike the ACTIVATION CTA we don't gate this
+    // with _activationAddAttempted because rapid successive adds are
+    // the desired behaviour here. The asset-added listener above
+    // re-mounts the overlay once the user submits or cancels.
+    if (e.target.closest && e.target.closest('#onbAddAnotherBtn') && _ov()?.classList.contains('open')) {
+      awaitingAsset = true;
+      _hideOnboardingOverlay();
+      try {
+        if (typeof openModal === 'function') openModal();
+      } catch (err) {
+        console.warn('[onboarding] failed to open add-asset modal:', err && err.message);
+        awaitingAsset = false;
+        _openOnboardingOverlay();
+      }
+      return;
+    }
+
+    // ONBOARDING-2: SUCCESS step — "Ir al dashboard".
+    // User opted out of the loop. completeOnboarding flips the engine
+    // to COMPLETED; the state listener tears the overlay down.
+    if (e.target.closest && e.target.closest('#onbGoDashboardBtn') && _ov()?.classList.contains('open')) {
+      Eng.completeOnboarding();
+      _hideOnboardingOverlay();
+      return;
+    }
   });
 
   // ── Engine → UI bridge ────────────────────────────────────────
@@ -21922,20 +21979,33 @@ function exportPortfolioBackup() {
     }
     _syncSelectionsFromState();
 
-    // SUCCESS → re-open overlay (in case add-asset modal closed it),
-    // then auto-complete after a short reveal so the user sees the
-    // confirmation copy.
+    // ONBOARDING-2: SUCCESS step waits for an explicit user choice.
+    // We re-open the overlay (the add-asset modal closed it during
+    // the handoff) and write the current count copy. The two CTAs
+    // ("+ Add another" / "Go to dashboard") drive the next step —
+    // no automatic timer here.
     if (snap.state === STATES.SUCCESS) {
       awaitingAsset = false;
+      _updateSuccessCopy();
       if (!_ov()?.classList.contains('open')) _openOnboardingOverlay();
-      setTimeout(() => {
-        Eng.completeOnboarding();
-        _hideOnboardingOverlay();
-      }, 1100);
     }
     if (snap.state === STATES.COMPLETED) {
       _hideOnboardingOverlay();
     }
+  });
+
+  // ONBOARDING-2: multi-asset loop. Engine transitions ACTIVATION →
+  // SUCCESS on the first asset (handled by its own listener). For the
+  // 2nd+ asset the engine stays on SUCCESS and emits no state event,
+  // so we listen for asset-added directly and refresh the counter +
+  // re-mount the overlay if the add-asset modal closed it.
+  window.addEventListener('aurix:asset-added', () => {
+    if (!window._aurixOnboardingInProgress) return;
+    const snap = Eng.getSnapshot();
+    if (snap.state !== STATES.SUCCESS) return;
+    awaitingAsset = false;
+    _updateSuccessCopy();
+    if (!_ov()?.classList.contains('open')) _openOnboardingOverlay();
   });
 
   // ── Add-asset modal close handoff ─────────────────────────────
@@ -21951,13 +22021,14 @@ function exportPortfolioBackup() {
       if (!awaitingAsset) return;
       const isOpen = _addAssetOv.classList.contains('open');
       if (isOpen) return;
-      // Closed. Consume the single-shot guard FIRST so any further
-      // mutations don't re-enter this branch. If the asset-added event
-      // already fired, the engine has moved to SUCCESS and the state
-      // listener owns the reopen — we skip the ACTIVATION restore.
+      // Closed. Consume the awaiting flag FIRST so further mutations
+      // can't re-enter this branch. The reopen target depends on which
+      // step we're in — ONBOARDING-2 needs to also handle the SUCCESS
+      // multi-asset loop where the user might cancel the modal.
       awaitingAsset = false;
       const snap = Eng.getSnapshot();
-      if (snap.state === STATES.ACTIVATION && !snap.completed) {
+      if (snap.completed) return;
+      if (snap.state === STATES.ACTIVATION || snap.state === STATES.SUCCESS) {
         _openOnboardingOverlay();
       }
     });
