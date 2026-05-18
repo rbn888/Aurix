@@ -552,19 +552,7 @@
              #karatGroup / #goldUnitGroup / #goldMarginChips nodes are
              kept (hidden) so old handlers stay no-ops; new buttons live
              inside #goldSection and use delegated handlers. -->
-        <div class="form-group form-group--gold" id="goldSection" style="display:none" data-gold-type="">
-
-          <!-- Section 1 — market reference (compact). Meta line is no
-               longer a dense "24K referencia spot" badge; per GOLD-UX-1
-               we surface a simple per-gram / per-oz pair so the user
-               focuses on price, not metallurgy terminology. -->
-          <div class="gold-market-card" id="goldMarketRef">
-            <div class="gold-market-head">
-              <span class="gold-market-eyebrow" data-i18n="gold_market_label">Precio internacional del oro</span>
-            </div>
-            <div class="gold-market-price" id="goldSpotLine">—</div>
-            <div class="gold-market-meta" id="goldSpotSecondary" data-i18n="gold_market_meta_sub">Referencia 24K · ajustada según quilataje</div>
-          </div>
+        <div class="form-group form-group--gold" id="goldSection" style="display:none" data-gold-type="" data-gold-qty="0">
 
           <!-- Section 2 — STEP 1: tipo de oro -->
           <div class="gold-field-block gold-field-block--type">
@@ -603,9 +591,9 @@
                 <span class="gold-chip-sub" data-i18n="gold_purity_18_sub">Joyería</span>
               </button>
             </div>
-            <button type="button" class="gold-more-toggle" id="goldMoreToggle" aria-expanded="false">
-              <span data-i18n="gold_more_karats">Más quilatajes</span>
-              <span class="gold-more-icon" aria-hidden="true">+</span>
+            <button type="button" class="gold-more-toggle gold-more-toggle--subtle" id="goldMoreToggle" aria-expanded="false">
+              <span data-i18n="gold_more_karats_subtle">¿No es uno de estos? Ver más</span>
+              <span class="gold-more-icon" aria-hidden="true">›</span>
             </button>
             <div class="gold-purity-advanced" id="goldPurityAdvanced" hidden>
               <button type="button" class="gold-chip" data-gold-karat="21" data-gold-contexts="">
@@ -654,7 +642,8 @@
             </div>
           </div>
 
-          <!-- Summary -->
+          <!-- STEP 4 — estimated value. Primary focus once the user
+               has type + karat + qty. -->
           <div class="gold-summary-card" id="goldSummaryCard">
             <div class="gold-summary-label" data-i18n="gold_summary_label">Valor estimado hoy</div>
             <div class="gold-summary-amount" id="goldSummaryAmount">—</div>
@@ -662,6 +651,18 @@
             <div class="gold-summary-spot" id="goldSummarySpotRef" hidden></div>
             <div class="gold-summary-disclaimer" id="goldSummaryDisclaimer" hidden data-i18n="gold_disclaimer">Estimación orientativa, no garantía de compra.</div>
           </div>
+
+          <!-- GOLD-UX-2: market reference demoted to the bottom of the
+               flow. Compact secondary card — the primary value the user
+               cares about is their estimated holding value above. -->
+          <div class="gold-market-card gold-market-card--compact" id="goldMarketRef">
+            <div class="gold-market-head">
+              <span class="gold-market-eyebrow" data-i18n="gold_market_label">Precio internacional del oro</span>
+            </div>
+            <div class="gold-market-price" id="goldSpotLine">—</div>
+            <div class="gold-market-meta" id="goldSpotSecondary" data-i18n="gold_market_meta_sub">Referencia 24K · ajustada según quilataje</div>
+          </div>
+
         </div>
 
         <!-- Legacy karat / unit / margin chip groups kept hidden so any

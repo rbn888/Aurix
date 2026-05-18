@@ -445,6 +445,10 @@ const T = {
     gold_more_karats:     'Más quilatajes',
     gold_quantity_label:  'Cantidad',
     gold_market_meta_sub: 'Valor ajustado según quilataje seleccionado.',
+    // GOLD-UX-2: progressive CTA + secondary "more karats" link.
+    gold_cta_complete:    'Completa los datos',
+    gold_cta_add:         'Añadir oro a cartera',
+    gold_more_karats_subtle: '¿No es uno de estos? Ver más',
     gramUnit:             'g',
     ozUnit:               'oz troy',
     kgUnit:               'kg',
@@ -1209,6 +1213,10 @@ const T = {
     gold_more_karats:     'More karats',
     gold_quantity_label:  'Quantity',
     gold_market_meta_sub: 'Value adjusts to the selected karat.',
+    // GOLD-UX-2: progressive CTA + secondary "more karats" link.
+    gold_cta_complete:    'Complete the details',
+    gold_cta_add:         'Add gold to portfolio',
+    gold_more_karats_subtle: 'Not one of these? See more',
     gramUnit:             'g',
     ozUnit:               'troy oz',
     kgUnit:               'kg',
@@ -15824,6 +15832,18 @@ async function selectAsset(entry) {
   qtyGroup.style.display    = '';
   formPreviewEl.style.display = '';
   btnSubmitEl.style.display  = '';
+  // GOLD-UX-2: per-asset CTA copy. Non-gold assets keep the canonical
+  // "Añadir a cartera" / "Add to portfolio"; gold enters disabled
+  // with "Completa los datos" until the user finishes the flow.
+  if (entry.ticker === 'XAU') {
+    btnSubmitEl.textContent = t('gold_cta_complete');
+    btnSubmitEl.disabled    = true;
+    btnSubmitEl.classList.add('btn-submit--disabled');
+  } else {
+    btnSubmitEl.textContent = t('addToPortfolio');
+    btnSubmitEl.disabled    = false;
+    btnSubmitEl.classList.remove('btn-submit--disabled');
+  }
 
   // GOLD-1: physical gold section + karat/unit selectors. Section
   // banner header shows the live spot reference so the user grasps
@@ -16660,6 +16680,41 @@ function updatePreview() {
   // ADD-V4.2: keep the desktop preview value in lockstep with the
   // inline preview text. Mobile ignores this element (display:none).
   if (typeof _addV4RenderPreview === 'function') _addV4RenderPreview();
+  // GOLD-UX-2: refresh the gold-flow CTA gate every preview tick.
+  if (typeof _updateGoldCtaState === 'function') _updateGoldCtaState();
+}
+
+// GOLD-UX-2: validate the physical gold entry form and mirror the
+// result onto the sticky CTA. Required fields per the spec are:
+// type (Joyería/Moneda/Lingote), karat, unit and quantity > 0.
+function _isGoldFormValid() {
+  if (!selectedDbAsset || selectedDbAsset.ticker !== 'XAU') return null;
+  const section = document.getElementById('goldSection');
+  if (!section) return null;
+  const type     = section.dataset.goldType || '';
+  const qty      = parseLocalFloat(qtyInput.value);
+  const qtyValid = !isNaN(qty) && qty > 0;
+  return {
+    section,
+    type,
+    karat:    pendingKarat,
+    unit:     pendingGoldUnit,
+    qtyValid,
+    valid:    !!type && !!pendingKarat && !!pendingGoldUnit && qtyValid,
+  };
+}
+
+function _updateGoldCtaState() {
+  const v = _isGoldFormValid();
+  if (!v) return;
+  // Reflect the qty validity on the section so CSS can reveal STEP 4
+  // (estimated value) only when the user has actually entered an amount.
+  v.section.dataset.goldQty = v.qtyValid ? '1' : '0';
+  if (!btnSubmitEl) return;
+  const enabled = v.valid;
+  btnSubmitEl.disabled = !enabled;
+  btnSubmitEl.classList.toggle('btn-submit--disabled', !enabled);
+  btnSubmitEl.textContent = enabled ? t('gold_cta_add') : t('gold_cta_complete');
 }
 
 // ADD-V4.1: gold market reference — small premium card above the
@@ -16712,6 +16767,16 @@ document.getElementById('manualPrice')?.addEventListener('input', updatePreview)
 // ── Add Asset ──────────────────────────────────────────────
 assetForm.addEventListener('submit', e => {
   e.preventDefault();
+
+  // GOLD-UX-2: defensive guard. The CTA is disabled when the gold
+  // flow is incomplete, but if a future tweak (or dev tools) enables
+  // it, we still short-circuit here so the form can never persist a
+  // half-filled gold asset. The shared qty/price checks below catch
+  // every other branch.
+  if (selectedDbAsset && selectedDbAsset.ticker === 'XAU') {
+    const goldState = (typeof _isGoldFormValid === 'function') ? _isGoldFormValid() : null;
+    if (goldState && !goldState.valid) return;
+  }
 
   // ── Real estate branch: manual value entry, no live price ──
   if (isRealEstateMode) {
