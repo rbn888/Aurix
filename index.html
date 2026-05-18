@@ -143,6 +143,26 @@
 
       </section>
 
+      <!-- AURIX-SIGNALS-1: lightweight awareness signal. Detection is
+           deterministic and local — see computeAurixSignal() in app.js.
+           Hidden by default; renderAurixSignal() reveals it when a
+           rule fires. Tapping the CTA deep-links into Workspace. -->
+      <section class="aurix-signal" id="aurixSignal" hidden>
+        <div class="aurix-signal-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2 L4 22 L12 18 L20 22 Z"/>
+          </svg>
+        </div>
+        <div class="aurix-signal-body">
+          <span class="aurix-signal-title" data-i18n="signalTitle">Aurix Signal</span>
+          <p class="aurix-signal-msg" id="aurixSignalMsg"></p>
+        </div>
+        <button type="button" class="aurix-signal-cta" id="aurixSignalCta">
+          <span id="aurixSignalCtaLabel"></span>
+          <span class="aurix-signal-cta-arrow" aria-hidden="true">›</span>
+        </button>
+      </section>
+
       <section class="distribution-section" id="distributionSection" style="display:none">
         <div class="portfolio-combined-card">
           <div class="distribution-panel">

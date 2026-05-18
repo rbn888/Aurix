@@ -989,6 +989,20 @@ const T = {
     modalAddTitleFirst:   'Añade tu primer activo',
     modalAddSubFirst:     'Empieza creando la base de tu portfolio.',
     firstAssetToast:      'Perfecto — tu portfolio ha empezado.',
+    // ── Dashboard smart signals ──────────────────────
+    signalTitle:                 'Aurix Signal',
+    signalConcentrationBody:     'Un activo domina tu cartera.',
+    signalConcentrationCta:      'Analizar en Workspace',
+    signalCryptoBody:            'La exposición a cripto es elevada.',
+    signalCryptoCta:             'Ver análisis',
+    signalCashBody:              'Mantienes una posición elevada en efectivo.',
+    signalCashCta:               'Explorar asignación',
+    signalSingleBody:            'Tu cartera depende de un único activo.',
+    signalSingleCta:             'Explorar diversificación',
+    signalPerformanceBody:       'Tu mejor activo está impulsando el rendimiento.',
+    signalPerformanceCta:        'Ver detalle',
+    signalLossBody:              'Uno de tus activos está bajo presión.',
+    signalLossCta:               'Revisar',
   },
   en: {
     // Summary
@@ -1659,6 +1673,20 @@ const T = {
     modalAddTitleFirst:   'Add your first asset',
     modalAddSubFirst:     'Start building your portfolio foundation.',
     firstAssetToast:      'Great — your portfolio has started.',
+    // ── Dashboard smart signals ──────────────────────
+    signalTitle:                 'Aurix Signal',
+    signalConcentrationBody:     'One asset dominates your portfolio.',
+    signalConcentrationCta:      'Analyze in Workspace',
+    signalCryptoBody:            'Crypto exposure is elevated.',
+    signalCryptoCta:             'View analysis',
+    signalCashBody:              'You are holding a high cash allocation.',
+    signalCashCta:               'Explore allocation',
+    signalSingleBody:            'Your portfolio depends on a single asset.',
+    signalSingleCta:             'Explore diversification',
+    signalPerformanceBody:       'Your strongest holding is driving performance.',
+    signalPerformanceCta:        'View detail',
+    signalLossBody:              'One of your holdings is under pressure.',
+    signalLossCta:               'Review',
   },
 };
 
@@ -14628,6 +14656,12 @@ function render(animate = false) {
     }
   }
 
+  // AURIX-SIGNALS-1: refresh the dashboard awareness signal every
+  // render. computeAurixSignal hides the card on empty portfolios
+  // and drill-down views; otherwise it picks the highest-priority
+  // rule and writes copy + kind tag.
+  try { renderAurixSignal(); } catch (_) {}
+
   // Update section header: show category name + back button, or the normal title
   const assetsTitleEl    = document.getElementById('assetsSectionTitle');
   const filterIndicator  = document.getElementById('sectionFilterIndicator');
@@ -21957,6 +21991,103 @@ function exportPortfolioBackup() {
   window.maybeShowOnboarding = maybeShowOnboarding;
 })();
 
+// ── AURIX-SIGNALS-1: lightweight dashboard smart signals ──────────
+// Deterministic, local-only computation. No network, no observers, no
+// AI dependency. Surfaces awareness — never financial advice. One
+// signal at a time, priority-ordered per the product spec.
+function computeAurixSignal() {
+  if (!Array.isArray(assets) || assets.length === 0) return null;
+
+  const totUSD = (typeof totalValueUSD === 'function') ? totalValueUSD() : 0;
+  if (totUSD <= 0) return null;
+
+  // 1) CONCENTRATION — single asset > 60% of total value.
+  //   Gate by `assets.length >= 2` so a literal one-asset portfolio
+  //   falls through to the more specific SINGLE ASSET signal (rule 4)
+  //   instead of the generic "one asset dominates" copy.
+  let maxAssetUsd = 0;
+  for (const a of assets) {
+    const v = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : 0;
+    if (v > maxAssetUsd) maxAssetUsd = v;
+  }
+  const topPct = (maxAssetUsd / totUSD) * 100;
+  if (topPct > 60 && assets.length >= 2) {
+    return { kind: 'concentration', msg: 'signalConcentrationBody', cta: 'signalConcentrationCta' };
+  }
+
+  // 2) CRYPTO EXPOSURE — category > 50%.
+  const dist = (typeof getDistribution === 'function') ? (getDistribution() || []) : [];
+  const cryptoEntry = dist.find(d => d.type === 'crypto');
+  if (cryptoEntry && cryptoEntry.pct > 50) {
+    return { kind: 'crypto', msg: 'signalCryptoBody', cta: 'signalCryptoCta' };
+  }
+
+  // 3) CASH WEIGHT — category > 40%.
+  const cashEntry = dist.find(d => d.type === 'cash');
+  if (cashEntry && cashEntry.pct > 40) {
+    return { kind: 'cash', msg: 'signalCashBody', cta: 'signalCashCta' };
+  }
+
+  // 4) SINGLE ASSET — dependency on a single holding.
+  if (assets.length === 1) {
+    return { kind: 'single', msg: 'signalSingleBody', cta: 'signalSingleCta' };
+  }
+
+  // 5) PERFORMANCE — strongest 24h change > +15%.
+  let maxChange = -Infinity;
+  for (const a of assets) {
+    if (typeof a.change24h === 'number' && a.change24h > maxChange) {
+      maxChange = a.change24h;
+    }
+  }
+  if (Number.isFinite(maxChange) && maxChange > 15) {
+    return { kind: 'performance', msg: 'signalPerformanceBody', cta: 'signalPerformanceCta' };
+  }
+
+  // 6) LOSS PRESSURE — weakest 24h change < -12%.
+  let minChange = Infinity;
+  for (const a of assets) {
+    if (typeof a.change24h === 'number' && a.change24h < minChange) {
+      minChange = a.change24h;
+    }
+  }
+  if (Number.isFinite(minChange) && minChange < -12) {
+    return { kind: 'loss', msg: 'signalLossBody', cta: 'signalLossCta' };
+  }
+
+  return null;
+}
+
+function renderAurixSignal() {
+  const sec = document.getElementById('aurixSignal');
+  if (!sec) return;
+
+  // Empty portfolio OR drill-down view → no signal.
+  const emptyOrDrill = (!Array.isArray(assets) || assets.length === 0)
+                    || (typeof activeCategory !== 'undefined' && activeCategory);
+  if (emptyOrDrill) {
+    sec.hidden = true;
+    sec.removeAttribute('data-kind');
+    return;
+  }
+
+  const sig = computeAurixSignal();
+  if (!sig) {
+    sec.hidden = true;
+    sec.removeAttribute('data-kind');
+    return;
+  }
+
+  const msgEl   = document.getElementById('aurixSignalMsg');
+  const ctaLbl  = document.getElementById('aurixSignalCtaLabel');
+  const ctaBtn  = document.getElementById('aurixSignalCta');
+  if (msgEl)  msgEl.textContent  = t(sig.msg);
+  if (ctaLbl) ctaLbl.textContent = t(sig.cta);
+  if (ctaBtn) ctaBtn.dataset.signalKind = sig.kind;
+  sec.dataset.kind = sig.kind;
+  sec.hidden = false;
+}
+
 // ── AURIX-EMPTY-1 / ACTIVATION-2: activation card + quick-chip wiring ──
 // Pure event delegation — no engine, no state, no observers. Mounts
 // on the document so it survives every re-render of #assetsList.
@@ -22023,6 +22154,21 @@ function exportPortfolioBackup() {
     const chip = e.target.closest && e.target.closest('[data-empty-chip]');
     if (chip) {
       _handleChip(chip.dataset.emptyChip);
+      return;
+    }
+
+    // AURIX-SIGNALS-1: signal CTA deep-link. V1 routes every kind to
+    // the Workspace home (deep-link per kind is a future refinement —
+    // the spec allows this fallback explicitly). switchTab handles the
+    // tab swap, render flush and bottom-nav active state.
+    const sigCta = e.target.closest && e.target.closest('#aurixSignalCta');
+    if (sigCta) {
+      if (typeof switchTab === 'function') {
+        switchTab('workspace');
+      } else {
+        const tab = document.querySelector('#bottomNav [data-tab="workspace"]');
+        if (tab) tab.click();
+      }
     }
   });
 })();

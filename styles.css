@@ -13798,3 +13798,143 @@ body.gs-open { overflow: hidden; }
   .empty-state--activation { animation: none; }
   .empty-cta, .empty-chip { transition: none; }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   AURIX-SIGNALS-1 — Dashboard smart signal card.
+   Compact, premium, non-intrusive. One signal max at a time.
+   Driven entirely by renderAurixSignal() / computeAurixSignal() —
+   deterministic, no observers, no network.
+   ══════════════════════════════════════════════════════════════════ */
+.aurix-signal {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  margin: 14px 0 0;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(74, 130, 240, 0.10) 0%, rgba(12, 18, 32, 0.0) 75%),
+    rgba(14, 20, 32, 0.66);
+  border: 1px solid rgba(138, 166, 255, 0.14);
+  box-shadow:
+    0 8px 28px -16px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+  animation: aurix-signal-in .36s var(--ease-premium);
+}
+@keyframes aurix-signal-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.aurix-signal[hidden] { display: none; }
+
+.aurix-signal-icon {
+  width: 36px; height: 36px;
+  flex: 0 0 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(74, 130, 240, 0.14);
+  color: #8ab2ff;
+}
+.aurix-signal-icon svg { width: 18px; height: 18px; }
+
+.aurix-signal-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.aurix-signal-title {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(180, 200, 240, 0.62);
+}
+.aurix-signal-msg {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: #fff;
+  line-height: 1.4;
+}
+
+.aurix-signal-cta {
+  appearance: none;
+  border: none;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.003em;
+  cursor: pointer;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background .16s var(--ease-out), border-color .16s var(--ease-out),
+              color .16s var(--ease-out), transform .12s var(--ease-out);
+}
+.aurix-signal-cta:hover {
+  background: rgba(74, 130, 240, 0.12);
+  border-color: rgba(74, 130, 240, 0.36);
+  color: #fff;
+}
+.aurix-signal-cta:active { transform: scale(0.96); }
+.aurix-signal-cta-arrow {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  margin-left: 2px;
+  opacity: 0.7;
+}
+
+/* Subtle variant tinting per signal kind — never red/warning, just
+   a slightly different aurora tone so concentration ≠ performance
+   ≠ loss are distinguishable without alarming the user. */
+.aurix-signal[data-kind="concentration"] .aurix-signal-icon,
+.aurix-signal[data-kind="single"]        .aurix-signal-icon {
+  background: rgba(244, 196, 90, 0.16);
+  color: #f4c45a;
+}
+.aurix-signal[data-kind="crypto"] .aurix-signal-icon,
+.aurix-signal[data-kind="cash"]   .aurix-signal-icon {
+  background: rgba(74, 130, 240, 0.16);
+  color: #8ab2ff;
+}
+.aurix-signal[data-kind="performance"] .aurix-signal-icon {
+  background: rgba(74, 222, 128, 0.16);
+  color: #4ade80;
+}
+.aurix-signal[data-kind="loss"] .aurix-signal-icon {
+  background: rgba(224, 144, 74, 0.16);
+  color: #e0904a;
+}
+
+/* Mobile — stack the CTA below the message so the row stays
+   readable on narrow viewports, and keep the icon inline with the
+   title for visual rhythm. */
+@media (max-width: 520px) {
+  .aurix-signal {
+    flex-wrap: wrap;
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .aurix-signal-body { flex-basis: calc(100% - 50px); }
+  .aurix-signal-cta {
+    flex-basis: 100%;
+    justify-content: center;
+    padding: 9px 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurix-signal { animation: none; }
+  .aurix-signal-cta { transition: none; }
+}
