@@ -416,6 +416,20 @@
   // snapshot of local persistence + the last Supabase sync attempt +
   // UI runtime flags (awaiting-asset etc.) when the UI module is loaded.
   // Never exposes auth tokens, session secrets, or raw user records.
+  // DEBUG-HARDEN-1: only attached on localhost / dev hosts / explicit
+  // localStorage.aurix_debug=1 opt-in. Production keeps this name
+  // `undefined` on window.
+  function _isDebugHost() {
+    try {
+      const h = String((window.location && window.location.hostname) || '').toLowerCase();
+      if (h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0' || h === '::1') return true;
+      if (h.endsWith('.local')) return true;
+      if (h.startsWith('dev.') || h.startsWith('dev-') || h.includes('-dev.') || h.includes('.dev.')) return true;
+    } catch (_) {}
+    try { if (localStorage.getItem('aurix_debug') === '1') return true; } catch (_) {}
+    return false;
+  }
+  if (!_isDebugHost()) return;
   window.__aurixOnboardingDebug = function () {
     const local = _readLocal();
     // Optional UI snapshot from the wiring IIFE in app.js.

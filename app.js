@@ -21239,10 +21239,36 @@ function _aurixSeedStarterWatchlist(reason) {
   return out;
 }
 
-if (typeof window !== 'undefined') {
-  // Exposed for the engine bridge in app.js and for the debug probe.
-  window.__aurixSeedStarterWatchlist = _aurixSeedStarterWatchlist;
+// DEBUG-HARDEN-1: predicate for development-only window helpers.
+// Returns true on localhost, dev hostnames, or when the user has
+// explicitly opted in via localStorage.aurix_debug = '1'. All QA /
+// debug helpers MUST be gated through this so production never
+// surfaces them on `window`.
+function _aurixIsDebugHost() {
+  try {
+    const h = String((typeof window !== 'undefined' && window.location && window.location.hostname) || '').toLowerCase();
+    if (h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0' || h === '::1') return true;
+    if (h.endsWith('.local')) return true;
+    if (h.startsWith('dev.') || h.startsWith('dev-') || h.includes('-dev.') || h.includes('.dev.')) return true;
+  } catch (_) {}
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('aurix_debug') === '1') return true;
+  } catch (_) {}
+  return false;
+}
 
+if (typeof window !== 'undefined') {
+  // Exposed for the engine bridge in app.js so onboarding completion
+  // can plant the starter watchlist. NOT gated — production needs
+  // this code path to actually fire.
+  window.__aurixSeedStarterWatchlist = _aurixSeedStarterWatchlist;
+}
+
+// DEBUG-HARDEN-1: every helper below this guard is attached only on
+// development hosts (localhost / *.local / dev hostnames) or when the
+// user explicitly opts in via localStorage.aurix_debug = '1'. In
+// production these names stay `undefined` on window.
+if (typeof window !== 'undefined' && _aurixIsDebugHost()) {
   // ONBOARDING-WATCHLIST-2: developer probe. Reports the live state of
   // every surface the seed touches — useful when verifying that the
   // dashboard widget and the market watchlist tab actually mirror the
@@ -22285,7 +22311,8 @@ if (typeof window !== 'undefined') {
   // in devtools to verify the reset epoch is wiring through everything:
   // raw vs. filtered counts, whether any pre-epoch points still live
   // in memory, and what basis the current PnL calculation rests on.
-  window.__aurixHistoryDebug = function () {
+  // DEBUG-HARDEN-1: gated to dev hosts only.
+  if (_aurixIsDebugHost()) window.__aurixHistoryDebug = function () {
     const resetAt = (function () {
       try { return parseInt(localStorage.getItem(RESET_AT_KEY) || '0', 10) || 0; }
       catch (_) { return 0; }
@@ -23576,7 +23603,8 @@ function _aurixHealthScore(snap) {
 // resulting counts, the rotated signal pool and any stale future-
 // proof cache keys present in localStorage (none of which the
 // engine reads — they're cleared by reset to keep things tidy).
-window.__aurixHealthDebug = function () {
+// DEBUG-HARDEN-1: gated to dev hosts only.
+if (_aurixIsDebugHost()) window.__aurixHealthDebug = function () {
   const snap   = _aurixHealthSnapshot();
   const score  = _aurixHealthScore(snap);
   const symbols = Array.isArray(assets)
@@ -24060,7 +24088,8 @@ function renderAurixSignal() {
 // devtools to inspect live signal state — pool kinds, the active
 // entry, why the bar is visible/hidden, and the rotation timer
 // status. Safe to leave in: no side effects.
-if (typeof window !== 'undefined') {
+// DEBUG-HARDEN-1: gated to dev hosts only.
+if (typeof window !== 'undefined' && _aurixIsDebugHost()) {
   window.__aurixSignalDebug = function () {
     const livePool = (typeof computeAurixSignalPool === 'function')
       ? computeAurixSignalPool() : [];
