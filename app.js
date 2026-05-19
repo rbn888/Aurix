@@ -21107,6 +21107,175 @@ function toggleWatchlist(symbol) {
   return true;
 }
 
+// ── ONBOARDING-WATCHLIST-2: starter watchlist seeder ───────
+// Single source of truth: aurix_watchlist. When onboarding finishes
+// and the user picked interests but has no portfolio and no
+// pre-existing watchlist, we plant a curated 6-symbol starter list
+// so dashboard + market light up immediately. Idempotent — a one-shot
+// guard (aurix_watchlist_seeded) prevents reseeding across reloads
+// and never overrides user edits.
+const WATCHLIST_SEEDED_KEY = 'aurix_watchlist_seeded';
+
+const _AURIX_WL_INTEREST_MAP = Object.freeze({
+  crypto:      ['BTC', 'ETH'],
+  stock:       ['AAPL', 'NVDA'],
+  stocks:      ['AAPL', 'NVDA'],
+  etf:         ['SPY', 'QQQ'],
+  etfs:        ['SPY', 'QQQ'],
+  fund:        ['SPY', 'QQQ'],
+  funds:       ['SPY', 'QQQ'],
+  metal:       ['XAU'],
+  metals:      ['XAU'],
+  gold:        ['XAU'],
+  real_estate: ['VNQ'],
+  realestate:  ['VNQ'],
+  cash:        [],
+});
+
+// Build a balanced, interleaved starter watchlist from interests.
+// Round-robins category by category so the result feels curated,
+// never grouped. Caps at 6 symbols. Returns an empty array when no
+// interests resolve to known symbols.
+//
+// Real-estate (VNQ) is included only when MARKET_DATA reports it as
+// available. The spec says "skip if not supported", and a fresh-boot
+// MARKET_DATA snapshot may still be loading — we err on the side of
+// not surfacing an unpriced ETF that the user can't open.
+function _aurixBuildStarterWatchlist(interests) {
+  if (!Array.isArray(interests) || !interests.length) return { symbols: [], skipped: [] };
+  const lanes  = [];
+  const skipped = [];
+  const norm = s => String(s || '').trim().toLowerCase();
+  const _marketHas = sym => {
+    try {
+      if (!Array.isArray(MARKET_DATA)) return false;
+      const wanted = normalizeSymbol(sym);
+      return MARKET_DATA.some(d => normalizeSymbol(d.canonicalSymbol || d.symbol) === wanted);
+    } catch (_) { return false; }
+  };
+  for (const raw of interests) {
+    const key = norm(raw);
+    const lane = _AURIX_WL_INTEREST_MAP[key];
+    if (!lane) { skipped.push({ interest: raw, reason: 'unmapped' }); continue; }
+    if (!lane.length) { skipped.push({ interest: raw, reason: 'no-watchlist-mapping' }); continue; }
+    if (key === 'real_estate' || key === 'realestate') {
+      // VNQ only when the live catalog actually carries it.
+      const filtered = lane.filter(sym => _marketHas(sym));
+      if (!filtered.length) {
+        skipped.push({ interest: raw, reason: 'provider-unsupported' });
+        continue;
+      }
+      lanes.push(filtered);
+      continue;
+    }
+    lanes.push(lane.slice());
+  }
+  if (!lanes.length) return { symbols: [], skipped };
+  const out = [];
+  const MAX = 6;
+  let progress = true;
+  while (progress && out.length < MAX) {
+    progress = false;
+    for (const lane of lanes) {
+      if (!lane.length) continue;
+      const sym = lane.shift();
+      const k = normalizeSymbol(sym);
+      if (!k) continue;
+      if (!out.includes(k)) out.push(k);
+      progress = true;
+      if (out.length >= MAX) break;
+    }
+  }
+  return { symbols: out, skipped };
+}
+
+// Idempotent seeder. Returns a structured result so __aurixWatchlistDebug
+// can report exactly what happened (and why we skipped).
+function _aurixSeedStarterWatchlist(reason) {
+  const out = {
+    ran:        false,
+    reason:     reason || 'unknown',
+    skipped:    null,
+    seededWith: [],
+    interests:  [],
+  };
+  let alreadySeeded = false;
+  try { alreadySeeded = localStorage.getItem(WATCHLIST_SEEDED_KEY) === '1'; } catch (_) {}
+  if (alreadySeeded) { out.skipped = 'already-seeded'; return out; }
+
+  const current = (typeof getWatchlist === 'function') ? getWatchlist() : [];
+  if (current.length > 0) { out.skipped = 'watchlist-non-empty'; return out; }
+
+  const assetCount = (Array.isArray(assets) ? assets.length : 0);
+  if (assetCount > 0) { out.skipped = 'portfolio-non-empty'; return out; }
+
+  let interests = [];
+  try {
+    const prefs = JSON.parse(localStorage.getItem('aurix_onboarding_preferences') || '{}') || {};
+    if (Array.isArray(prefs.interests)) interests = prefs.interests.slice();
+  } catch (_) {}
+  if (!interests.length) {
+    try {
+      const snap = (typeof window !== 'undefined' && window.AurixOnboarding && typeof window.AurixOnboarding.getSnapshot === 'function')
+        ? window.AurixOnboarding.getSnapshot() : null;
+      if (snap && Array.isArray(snap.interests)) interests = snap.interests.slice();
+    } catch (_) {}
+  }
+  out.interests = interests;
+  if (!interests.length) { out.skipped = 'no-interests'; return out; }
+
+  const built = _aurixBuildStarterWatchlist(interests);
+  if (!built.symbols.length) {
+    out.skipped = 'no-mapped-symbols';
+    out.symbolsSkipped = built.skipped;
+    return out;
+  }
+
+  for (const sym of built.symbols) watchlistStore.add(sym);
+  try { localStorage.setItem(WATCHLIST_SEEDED_KEY, '1'); } catch (_) {}
+  out.ran = true;
+  out.seededWith = built.symbols.slice();
+  out.symbolsSkipped = built.skipped;
+  return out;
+}
+
+if (typeof window !== 'undefined') {
+  // Exposed for the engine bridge in app.js and for the debug probe.
+  window.__aurixSeedStarterWatchlist = _aurixSeedStarterWatchlist;
+
+  // ONBOARDING-WATCHLIST-2: developer probe. Reports the live state of
+  // every surface the seed touches — useful when verifying that the
+  // dashboard widget and the market watchlist tab actually mirror the
+  // seeded symbols.
+  window.__aurixWatchlistDebug = function () {
+    let seeded = false;
+    try { seeded = localStorage.getItem(WATCHLIST_SEEDED_KEY) === '1'; } catch (_) {}
+    let interests = [];
+    try {
+      const prefs = JSON.parse(localStorage.getItem('aurix_onboarding_preferences') || '{}') || {};
+      if (Array.isArray(prefs.interests)) interests = prefs.interests;
+    } catch (_) {}
+    const built = _aurixBuildStarterWatchlist(interests);
+    const wl = (typeof getWatchlist === 'function') ? getWatchlist() : [];
+    const wlNorm = wl.map(normalizeSymbol);
+    // Market watchlist tab consumes MARKET_DATA filtered by getWatchlist().
+    const marketHits = (Array.isArray(MARKET_DATA) ? MARKET_DATA : [])
+      .filter(d => wlNorm.includes(normalizeSymbol(d.canonicalSymbol || d.symbol)))
+      .map(d => d.symbol || d.canonicalSymbol);
+    return {
+      watchlist:                 wl,
+      seeded,
+      sourceInterests:           interests,
+      generatedSymbols:          built.symbols,
+      skippedReasons:            built.skipped,
+      dashboardVisibleSymbols:   wl,           // tracking card mirrors getWatchlist()
+      marketWatchlistSymbols:    marketHits,
+      assetCount:                Array.isArray(assets) ? assets.length : 0,
+      existingWatchlistCount:    wl.length,
+    };
+  };
+}
+
 // ── Market Store (live prices + smooth interpolation) ──────
 const marketStore = (() => {
   const POLL_MS = 5000;
@@ -21417,11 +21586,47 @@ const marketStore = (() => {
       '</div>';
   }
 
+  // ONBOARDING-WATCHLIST-2: dashboard tracking card now mirrors the
+  // canonical watchlist even when the user has no holdings yet. Owned
+  // assets keep their existing path (price comes from the asset row);
+  // seeded entries fall back to MARKET_DATA, and finally to a "—"
+  // placeholder so the row mounts without faking a price.
+  function _buildWatchlistRows() {
+    const keys = (typeof getWatchlist === 'function') ? getWatchlist() : [];
+    const ownedByKey = new Map();
+    if (Array.isArray(assets)) {
+      for (const a of assets) {
+        if (!a) continue;
+        const k = a.sym || a.name;
+        if (k) ownedByKey.set(k, a);
+      }
+    }
+    const rows = [];
+    for (const key of keys) {
+      const owned = ownedByKey.get(key);
+      if (owned && owned.price > 0) {
+        rows.push({ key, name: owned.name || key, price: owned.price, source: 'owned' });
+        continue;
+      }
+      let priced = 0, name = key;
+      try {
+        if (Array.isArray(MARKET_DATA)) {
+          const norm = normalizeSymbol(key);
+          const m = MARKET_DATA.find(d => normalizeSymbol(d.canonicalSymbol || d.symbol) === norm);
+          if (m) {
+            priced = Number(m.price) || 0;
+            name   = m.name || key;
+          }
+        }
+      } catch (_) {}
+      rows.push({ key, name, price: priced, source: priced > 0 ? 'market' : 'placeholder' });
+    }
+    // Cap at 5 so the card stays compact.
+    return rows.slice(0, 5);
+  }
+
   function renderWatchlist() {
-    const top = [...assets]
-      .filter(a => a.price > 0 && watchlistStore.includes(a.sym || a.name))
-      .sort((a, b) => b.price - a.price)
-      .slice(0, 5);
+    const top = _buildWatchlistRows();
 
     if (top.length === 0) {
       content.innerHTML =
@@ -21433,18 +21638,17 @@ const marketStore = (() => {
     }
 
     // Skip rebuild if structure is identical — animation loop keeps prices live
-    const keys = top.map(a => a.sym || a.name);
+    const keys = top.map(r => r.key);
     const rows = [...content.querySelectorAll('.watchlist-row[data-key]')];
     if (rows.length === top.length && keys.every((k, i) => k === rows[i]?.dataset.key)) return;
 
-    const html = top.map(a => {
-      const key   = a.sym || a.name;
-      const pd    = marketStore.getPrice(key);
-      const price = pd?.display ?? pd?.price ?? a.price;
-      return '<div class="watchlist-row" data-key="' + key + '">' +
-        '<span class="watchlist-sym">' + key + '</span>' +
-        '<canvas class="watchlist-spark placeholder" data-key="' + key + '"></canvas>' +
-        '<span class="watchlist-price" data-key="' + key + '">' + (price ? formatBase(price) : '--') + '</span>' +
+    const html = top.map(r => {
+      const pd    = marketStore.getPrice(r.key);
+      const price = pd?.display ?? pd?.price ?? r.price;
+      return '<div class="watchlist-row" data-key="' + r.key + '">' +
+        '<span class="watchlist-sym">' + r.key + '</span>' +
+        '<canvas class="watchlist-spark placeholder" data-key="' + r.key + '"></canvas>' +
+        '<span class="watchlist-price" data-key="' + r.key + '">' + (price ? formatBase(price) : '—') + '</span>' +
       '</div>';
     }).join('');
     content.innerHTML = '<div class="watchlist-preview">' + html + '</div>';
@@ -21452,8 +21656,10 @@ const marketStore = (() => {
   }
 
   async function render() {
-    const hasAssets = Array.isArray(assets) && assets.some(a => a.qty > 0);
-    if (hasAssets) {
+    const hasWatchlist = (typeof getWatchlist === 'function') && getWatchlist().length > 0;
+    if (hasWatchlist) {
+      // Either owned or seeded — single render path keeps dashboard +
+      // market watchlist surfaces consistent.
       renderWatchlist();
     } else {
       await fetchTickerPrices();
@@ -22278,6 +22484,7 @@ function performSafeReset() {
     'portfolio_card_order',      // dashboard card order
     'portfolio_cat_order',       // category drill-down order
     'aurix_watchlist',           // watchlist symbols
+    'aurix_watchlist_seeded',    // ONBOARDING-WATCHLIST-2: one-shot seed guard
     'aurix_assets',              // new model catalog
     'aurix_holdings',            // new model holdings
     'aurix.workspace.v1',        // workspace cells
@@ -22853,6 +23060,18 @@ function exportPortfolioBackup() {
     }
     if (snap.state === STATES.COMPLETED) {
       _hideOnboardingOverlay();
+      // ONBOARDING-WATCHLIST-2: plant the starter watchlist the moment
+      // onboarding finishes — only fires if assets and watchlist are
+      // both empty and a prior seed hasn't already run. The dashboard
+      // tracking card subscribes to watchlistStore changes, so the new
+      // symbols light up without a reload.
+      try {
+        if (typeof window.__aurixSeedStarterWatchlist === 'function') {
+          window.__aurixSeedStarterWatchlist('onboarding-completed');
+        }
+      } catch (e) {
+        console.warn('[onboarding] watchlist seed failed:', e && e.message);
+      }
     }
   });
 
