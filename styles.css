@@ -9609,6 +9609,321 @@ body.workspace-active .header {
 .ws-risk-card.is-info     { border-color: rgba(138,166,255,0.22); }
 .ws-risk-card.is-info     .ws-risk-icon { color: rgba(138,166,255,0.95); background: rgba(138,166,255,0.12); border-color: rgba(138,166,255,0.22); }
 
+/* ── WORKSPACE-MOBILE-1: premium cockpit ───────────────────
+   Mobile-only block. Hierarchy reads: cockpit head (eyebrow +
+   demoted action pills) → cockpit strip (4 chips) → hero insight
+   → diagnostic grid 2x2 → main signals (max 3) → micro sync row.
+   Selectors are scoped tightly so desktop rendering is unaffected. */
+
+.aurix-workspace-shell.is-mobile.is-empty { gap: 20px; }
+
+.ws-empty-card {
+  margin-top: 28px;
+  padding: 22px 22px 20px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(138,166,255,0.05), rgba(138,166,255,0.015));
+  border: 1px solid rgba(138,166,255,0.18);
+  text-align: center;
+}
+.ws-empty-title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  color: rgba(235,242,255,0.96);
+}
+.ws-empty-sub {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(220,230,250,0.66);
+}
+.ws-empty-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(138,166,255,0.20), rgba(138,166,255,0.06));
+  border: 1px solid rgba(138,166,255,0.36);
+  color: rgba(232,240,255,0.98);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: transform 0.16s ease, background 0.16s ease;
+}
+.ws-empty-cta:active { transform: scale(0.96); }
+
+/* Cockpit head — eyebrow titles on the left, compact action pills
+   on the right. On very narrow screens the action group wraps under
+   the title block without losing alignment. */
+.ws-cockpit-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ws-cockpit-titles { min-width: 0; flex: 1 1 auto; }
+.ws-cockpit-eyebrow {
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(180,196,228,0.62);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.ws-cockpit-sub {
+  font-size: 13px;
+  line-height: 1.4;
+  color: rgba(220,230,250,0.78);
+}
+.ws-cockpit-head .ws-action-row { margin-top: 0; flex: 0 0 auto; }
+
+/* Cockpit strip — 4 chips in a row. Each chip pairs a small uppercase
+   label with a value; tone shifts the value colour without overwhelming
+   the surface. */
+.ws-cockpit-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.ws-cockpit-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 10px 11px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
+  border: 1px solid rgba(255,255,255,0.06);
+  min-width: 0;
+}
+.ws-cockpit-chip-label {
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(190,204,230,0.55);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ws-cockpit-chip-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(235,242,255,0.96);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ws-cockpit-chip.is-positive .ws-cockpit-chip-value { color: #6BD49A; }
+.ws-cockpit-chip.is-info     .ws-cockpit-chip-value { color: rgba(174,196,255,0.98); }
+.ws-cockpit-chip.is-warn     .ws-cockpit-chip-value { color: #E9A857; }
+.ws-cockpit-chip.is-high,
+.ws-cockpit-chip.is-elevated  { border-color: rgba(233,168,87,0.22); }
+.ws-cockpit-chip.is-high     .ws-cockpit-chip-value,
+.ws-cockpit-chip.is-elevated .ws-cockpit-chip-value { color: #E9A857; }
+.ws-cockpit-chip.is-moderate .ws-cockpit-chip-value { color: rgba(174,196,255,0.98); }
+.ws-cockpit-chip.is-solid    .ws-cockpit-chip-value { color: #6BD49A; }
+.ws-cockpit-chip.is-neutral  .ws-cockpit-chip-value { color: rgba(220,230,250,0.7); }
+
+/* Hero insight — single dominant card. Visually weightier than the
+   diagnostic cards below so the user's eye lands here first. */
+.ws-hero-insight {
+  position: relative;
+  padding: 18px 18px 20px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(138,166,255,0.10), rgba(138,166,255,0.02));
+  border: 1px solid rgba(138,166,255,0.22);
+  overflow: hidden;
+}
+.ws-hero-insight::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 80% at 100% 0%, rgba(138,166,255,0.12), transparent 60%);
+}
+.ws-hero-eyebrow {
+  position: relative;
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(180,196,228,0.7);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.ws-hero-title {
+  position: relative;
+  margin: 0 0 4px;
+  font-size: 17px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  color: rgba(238,244,255,0.98);
+}
+.ws-hero-msg {
+  position: relative;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(220,230,250,0.74);
+}
+.ws-hero-insight.is-warn    { border-color: rgba(233,168,87,0.32); background: linear-gradient(180deg, rgba(233,168,87,0.10), rgba(233,168,87,0.02)); }
+.ws-hero-insight.is-warn::after    { background: radial-gradient(120% 80% at 100% 0%, rgba(233,168,87,0.14), transparent 60%); }
+.ws-hero-insight.is-positive { border-color: rgba(63,191,127,0.28); background: linear-gradient(180deg, rgba(63,191,127,0.10), rgba(63,191,127,0.02)); }
+.ws-hero-insight.is-positive::after{ background: radial-gradient(120% 80% at 100% 0%, rgba(63,191,127,0.14), transparent 60%); }
+.ws-hero-insight.is-neutral  { border-color: rgba(255,255,255,0.10); background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)); }
+.ws-hero-insight.is-neutral::after { background: none; }
+
+/* Diagnostic grid — 2x2 compact cards. Label / status / context line. */
+.ws-diag-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.ws-diag-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px 13px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
+  border: 1px solid rgba(255,255,255,0.06);
+  min-width: 0;
+}
+.ws-diag-label {
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(190,204,230,0.55);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ws-diag-status {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(235,242,255,0.96);
+  line-height: 1.2;
+}
+.ws-diag-context {
+  font-size: 11.5px;
+  color: rgba(200,214,238,0.62);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ws-diag-card.is-positive { border-color: rgba(63,191,127,0.22); }
+.ws-diag-card.is-positive .ws-diag-status { color: #6BD49A; }
+.ws-diag-card.is-info     { border-color: rgba(138,166,255,0.22); }
+.ws-diag-card.is-info     .ws-diag-status { color: rgba(174,196,255,0.98); }
+.ws-diag-card.is-warn     { border-color: rgba(233,168,87,0.26); }
+.ws-diag-card.is-warn     .ws-diag-status { color: #E9A857; }
+.ws-diag-card.is-neutral  { border-color: rgba(255,255,255,0.06); }
+.ws-diag-card.is-neutral  .ws-diag-status { color: rgba(220,230,250,0.78); }
+
+/* Main signals — same visual family as risk cards but lighter so the
+   hero insight retains primacy. Max 3 cards is enforced by JS. */
+.ws-signal-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.ws-signal-card {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.008));
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.ws-signal-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: rgba(138,166,255,0.95);
+  background: rgba(138,166,255,0.12);
+  border: 1px solid rgba(138,166,255,0.20);
+  flex-shrink: 0;
+}
+.ws-signal-body { min-width: 0; }
+.ws-signal-label {
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(200,214,238,0.55);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.ws-signal-msg {
+  font-size: 13px;
+  line-height: 1.4;
+  color: rgba(235,242,255,0.94);
+  font-weight: 500;
+}
+.ws-signal-card.is-ok       { border-color: rgba(63,191,127,0.22); }
+.ws-signal-card.is-ok       .ws-signal-icon { color: #3FBF7F; background: rgba(63,191,127,0.12); border-color: rgba(63,191,127,0.22); }
+.ws-signal-card.is-warn     { border-color: rgba(233,168,87,0.26); }
+.ws-signal-card.is-warn     .ws-signal-icon { color: #E9A857; background: rgba(233,168,87,0.14); border-color: rgba(233,168,87,0.30); }
+.ws-signal-card.is-critical { border-color: rgba(224,90,90,0.30); }
+.ws-signal-card.is-critical .ws-signal-icon { color: #E05A5A; background: rgba(224,90,90,0.14); border-color: rgba(224,90,90,0.30); }
+.ws-signal-card.is-info     { border-color: rgba(138,166,255,0.22); }
+.ws-signal-card.is-info     .ws-signal-icon { color: rgba(138,166,255,0.95); background: rgba(138,166,255,0.12); border-color: rgba(138,166,255,0.22); }
+.ws-signals-empty {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: rgba(200,214,238,0.55);
+  line-height: 1.4;
+}
+
+/* Micro sync status — small muted row, no longer a peer card. */
+.ws-micro-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: rgba(190,204,230,0.50);
+  font-weight: 500;
+}
+.ws-micro-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3FBF7F;
+  box-shadow: 0 0 0 3px rgba(63,191,127,0.12);
+}
+.ws-micro-status.is-stale { color: rgba(233,168,87,0.78); }
+.ws-micro-status.is-stale .ws-micro-dot {
+  background: #E9A857;
+  box-shadow: 0 0 0 3px rgba(233,168,87,0.14);
+}
+
+/* Tighter spacing on 375px-wide devices so the strip doesn't crowd. */
+@media (max-width: 380px) {
+  .ws-cockpit-strip { gap: 6px; }
+  .ws-cockpit-chip { padding: 9px 8px 10px; }
+  .ws-cockpit-chip-label { font-size: 9px; letter-spacing: 0.12em; }
+  .ws-cockpit-chip-value { font-size: 13px; }
+  .ws-hero-title { font-size: 15.5px; }
+  .ws-diag-card { padding: 11px 12px 12px; }
+}
+
 /* ADD-FLOW-ARCH-1: workspace action row. Compact pill duo that sits
    below the risk stack on mobile — the cockpit reads as intelligence
    first, actions second. The Add Asset / Add Liquidity intents stay

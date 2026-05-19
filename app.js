@@ -813,6 +813,46 @@ const T = {
     ws_intel_risk_prefix:    'Riesgo',
     ws_intel_sync_ok:        'Datos actualizados',
     ws_intel_sync_stale:     'Sincronización pendiente',
+    // WORKSPACE-MOBILE-1: premium cockpit copy.
+    ws_cockpit_health:       'Salud',
+    ws_cockpit_risk:         'Riesgo',
+    ws_cockpit_diversif:     'Diversificación',
+    ws_cockpit_liquidity:    'Liquidez',
+    ws_cockpit_health_empty: '—',
+    ws_cockpit_risk_low:     'Bajo',
+    ws_cockpit_risk_mid:     'Moderado',
+    ws_cockpit_risk_high:    'Alto',
+    ws_cockpit_div_low:      'Baja',
+    ws_cockpit_div_mid:      'Media',
+    ws_cockpit_div_high:     'Alta',
+    ws_hero_eyebrow:         'Insight principal',
+    ws_hero_empty_title:     'Aún no hay insight',
+    ws_hero_empty_msg:       'Añade activos para que el cockpit detecte tu primera señal.',
+    ws_diag_diversification: 'Diversificación',
+    ws_diag_liquidity:       'Liquidez',
+    ws_diag_concentration:   'Concentración',
+    ws_diag_performance:     'Rendimiento',
+    ws_diag_status_low:      'Baja',
+    ws_diag_status_high:     'Alta',
+    ws_diag_status_balanced: 'Equilibrada',
+    ws_diag_status_initial:  'Inicial',
+    ws_diag_status_none:     'Sin efectivo',
+    ws_diag_status_ok:       'OK',
+    ws_diag_ctx_div:         (n, c) => `${n} ${n === 1 ? 'activo' : 'activos'} · ${c} ${c === 1 ? 'categoría' : 'categorías'}`,
+    ws_diag_ctx_liq_none:    '0% registrado',
+    ws_diag_ctx_liq_pct:     pct => `${pct}% en efectivo`,
+    ws_diag_ctx_conc_top:    (ticker, pct) => `${ticker} ${pct}%`,
+    ws_diag_ctx_conc_low:    'Reparto saludable',
+    ws_diag_ctx_perf_initial:'Sin histórico suficiente',
+    ws_diag_ctx_perf_strong: name => `${name} liderando`,
+    ws_diag_ctx_perf_weak:   name => `${name} bajo presión`,
+    ws_signals_main:         'Señales principales',
+    ws_signals_empty:        'Sin señales activas. Sigue construyendo tu cartera.',
+    ws_micro_synced:         'Datos actualizados',
+    ws_micro_pending:        'Sincronización pendiente',
+    ws_empty_title:          'Tu workspace se activará cuando añadas activos.',
+    ws_empty_sub:            'Añade tu primer activo para ver el cockpit en acción.',
+    ws_empty_cta:            '+ Añadir activo',
     ws_kpi_active_signals:   'Señales activas',
     ws_kpi_live_formulas:    'Fórmulas vivas',
     ws_kpi_market_sync:      'Mercado sincronizado',
@@ -1618,6 +1658,46 @@ const T = {
     ws_intel_risk_prefix:    'Risk',
     ws_intel_sync_ok:        'Market data up to date',
     ws_intel_sync_stale:     'Sync pending',
+    // WORKSPACE-MOBILE-1: premium cockpit copy.
+    ws_cockpit_health:       'Health',
+    ws_cockpit_risk:         'Risk',
+    ws_cockpit_diversif:     'Diversification',
+    ws_cockpit_liquidity:    'Liquidity',
+    ws_cockpit_health_empty: '—',
+    ws_cockpit_risk_low:     'Low',
+    ws_cockpit_risk_mid:     'Moderate',
+    ws_cockpit_risk_high:    'High',
+    ws_cockpit_div_low:      'Low',
+    ws_cockpit_div_mid:      'Medium',
+    ws_cockpit_div_high:     'High',
+    ws_hero_eyebrow:         'Main insight',
+    ws_hero_empty_title:     'No insight yet',
+    ws_hero_empty_msg:       'Add assets so the cockpit can surface your first signal.',
+    ws_diag_diversification: 'Diversification',
+    ws_diag_liquidity:       'Liquidity',
+    ws_diag_concentration:   'Concentration',
+    ws_diag_performance:     'Performance',
+    ws_diag_status_low:      'Low',
+    ws_diag_status_high:     'High',
+    ws_diag_status_balanced: 'Balanced',
+    ws_diag_status_initial:  'Initial',
+    ws_diag_status_none:     'No cash',
+    ws_diag_status_ok:       'OK',
+    ws_diag_ctx_div:         (n, c) => `${n} ${n === 1 ? 'asset' : 'assets'} · ${c} ${c === 1 ? 'category' : 'categories'}`,
+    ws_diag_ctx_liq_none:    '0% recorded',
+    ws_diag_ctx_liq_pct:     pct => `${pct}% in cash`,
+    ws_diag_ctx_conc_top:    (ticker, pct) => `${ticker} ${pct}%`,
+    ws_diag_ctx_conc_low:    'Healthy spread',
+    ws_diag_ctx_perf_initial:'Not enough history yet',
+    ws_diag_ctx_perf_strong: name => `${name} leading`,
+    ws_diag_ctx_perf_weak:   name => `${name} under pressure`,
+    ws_signals_main:         'Main signals',
+    ws_signals_empty:        'No active signals. Keep building your portfolio.',
+    ws_micro_synced:         'Market data up to date',
+    ws_micro_pending:        'Sync pending',
+    ws_empty_title:          'Your workspace activates once you add assets.',
+    ws_empty_sub:            'Add your first asset to see the cockpit in action.',
+    ws_empty_cta:            '+ Add asset',
     ws_kpi_active_signals:   'Active signals',
     ws_kpi_live_formulas:    'Live formulas',
     ws_kpi_market_sync:      'Market sync',
@@ -7082,200 +7162,284 @@ function _renderWorkspaceDesktop(sheet) {
 }
 
 function _renderWorkspaceMobile(sheet) {
-  // MW-3: Workspace as an intelligence layer, intentionally distinct from
-  // the dashboard. The dashboard answers "what do I own?"; this surface
-  // answers "what needs attention?" — active signals, live formulas,
-  // sync status, critical exposure. Pure consumer of the existing
-  // derived snapshot + formula runtime + workspace runtime. No math,
-  // pricing, providers or persistence touched.
-  const derived = getDerivedFinancialSnapshot();
-  const portfolio  = derived?.portfolio || {};
-  const totalValue = Number(portfolio.totalValue || 0);
-  const assetCount = Number(portfolio.assetCount || 0);
-  const topAlloc   = portfolio.allocations?.[0];
-  const exposure   = portfolio.exposure || {};
-  const cryptoVal  = Number(exposure.crypto || 0);
-  const cryptoPct  = totalValue > 0 ? (cryptoVal / totalValue * 100) : 0;
+  // WORKSPACE-MOBILE-1: premium investor cockpit. Replaces the prior
+  // debug-leaning "intelligence" layout (live formulas, critical
+  // exposure, sync card) with a hierarchy a real investor reads at a
+  // glance:
+  //   1. Cockpit strip   — Health / Risk / Diversification / Liquidity
+  //   2. Hero insight    — the loudest active signal
+  //   3. Diagnostic grid — Diversification / Liquidity / Concentration / Performance
+  //   4. Main signals    — at most 3, ranked by importance
+  //   5. Micro sync row  — small, muted; no longer a peer card
+  //   6. Actions         — compact pill row, top-right of the header
+  // Pure consumer of existing helpers (health snapshot, signal pool,
+  // risk category builder, workspace runtime). No math/pricing
+  // touched.
 
-  // Risk band — same consumer-only heuristic the desktop monitor follows.
+  const snap   = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null;
+  const score  = (typeof _aurixHealthScore  === 'function') ? _aurixHealthScore(snap) : { score: null, tone: 'neutral' };
+  const assetCount = snap ? snap.assetCount : 0;
+
+  // Empty-state branch: cockpit only activates with real holdings.
+  if (!assetCount) {
+    return `
+      <div class="aurix-workspace-shell is-mobile is-empty">
+        <section class="ws-empty-card">
+          <h3 class="ws-empty-title">${_escapeWorkspaceText(t('ws_empty_title'))}</h3>
+          <p class="ws-empty-sub">${_escapeWorkspaceText(t('ws_empty_sub'))}</p>
+          <button type="button" class="ws-empty-cta" data-ws-action="add-asset">
+            ${_escapeWorkspaceText(t('ws_empty_cta'))}
+          </button>
+        </section>
+      </div>
+    `;
+  }
+
+  const derived   = getDerivedFinancialSnapshot();
+  const portfolio = (derived && derived.portfolio) || {};
+  const totalValue = Number(portfolio.totalValue || 0);
+  const exposure   = portfolio.exposure || {};
+  const cryptoPct  = totalValue > 0 ? (Number(exposure.crypto || 0) / totalValue * 100) : 0;
+  const topAlloc   = (portfolio.allocations || [])[0] || null;
+
+  // Risk band — same heuristic the desktop monitor follows so the two
+  // surfaces never disagree on tone.
   let riskScore = 25;
   if (topAlloc && Number(topAlloc.allocation || 0) > 0.5)  riskScore += 25;
   else if (topAlloc && Number(topAlloc.allocation || 0) > 0.35) riskScore += 12;
   if (cryptoPct > 40) riskScore += 25;
   else if (cryptoPct > 15) riskScore += 10;
   if (assetCount > 0 && assetCount < 4) riskScore += 10;
-  if (assetCount === 0) riskScore = 0;
   riskScore = Math.min(100, Math.max(0, Math.round(riskScore)));
-  const riskBand = riskScore >= 60 ? t('wsRiskBandHigh')
-                  : riskScore >= 35 ? t('wsRiskBandModerate')
-                                    : t('wsRiskBandLow');
-  const heroTone = assetCount === 0 ? 'neutral'
-                  : riskScore >= 60 ? 'warn'
-                  : riskScore >= 35 ? 'info'
-                                    : 'positive';
+  const riskBandKey = riskScore >= 60 ? 'ws_cockpit_risk_high'
+                     : riskScore >= 35 ? 'ws_cockpit_risk_mid'
+                                       : 'ws_cockpit_risk_low';
+  const riskTone    = riskScore >= 60 ? 'warn' : riskScore >= 35 ? 'info' : 'positive';
 
-  // Signal categories come from the existing builder so the desktop
-  // monitor and the mobile intelligence layer never drift apart.
-  const categories = _buildWorkspaceRiskCategories();
-  const activeSignals = categories.reduce((n, cat) => {
-    const sig = cat.signals[0];
-    return n + (sig && sig.tone && sig.tone !== 'ok' ? 1 : 0);
-  }, 0);
+  // Diversification reads from asset count + category count.
+  const catCount = Number(snap.categoryCount || 0);
+  let divTone, divKey;
+  if (assetCount <= 2 || catCount <= 1)      { divTone = 'warn';     divKey = 'ws_cockpit_div_low'; }
+  else if (assetCount <= 5 || catCount <= 2) { divTone = 'info';     divKey = 'ws_cockpit_div_mid'; }
+  else                                       { divTone = 'positive'; divKey = 'ws_cockpit_div_high'; }
 
-  // Live formulas — count of currently registered workspace formulas.
-  const liveFormulas = (FORMULA_RUNTIME && FORMULA_RUNTIME.formulas)
-    ? FORMULA_RUNTIME.formulas.size
-    : 0;
+  // Liquidity = cash %. Two distinct "warns": none at all and too much.
+  const cashPct = Number(snap.cashPct || 0);
+  const liqTone = (cashPct === 0)          ? 'warn'
+                 : (cashPct > 60)          ? 'info'
+                 : (cashPct >= 5)          ? 'positive'
+                                            : 'info';
+  const liqValue = `${cashPct}%`;
 
-  const syncStale = !!(WORKSPACE_RUNTIME && WORKSPACE_RUNTIME.stale);
-  const syncOk    = !syncStale;
-
-  // Critical exposure — the loudest active risk source. Crypto threshold
-  // wins over single-asset dominance because diversification copy reads
-  // more meaningful at the >40% crypto band.
-  let criticalExposure;
-  if (assetCount === 0) {
-    criticalExposure = t('ws_kpi_none');
-  } else if (cryptoPct > 40) {
-    criticalExposure = t('wsCardCryptoExposure');
-  } else if (topAlloc && Number(topAlloc.allocation || 0) > 0.5) {
-    criticalExposure = String(topAlloc.symbol || '').toUpperCase() || t('ws_kpi_none');
-  } else {
-    criticalExposure = t('ws_kpi_none');
-  }
-
-  // Hero status: 1) signals count, 2) risk band (when there are assets),
-  // 3) sync state. Each segment is rendered as a pill — premium and
-  // mobile-native, replaces the dashboard-style hero value.
-  const statusSegments = [];
-  if (assetCount === 0) {
-    statusSegments.push({ tone: 'neutral', text: t('ws_intel_no_assets') });
-  } else if (activeSignals === 0) {
-    statusSegments.push({ tone: 'positive', text: t('ws_intel_no_signals') });
-  } else {
-    const word = activeSignals === 1 ? t('ws_intel_signal_one') : t('ws_intel_signal_many');
-    const segTone = activeSignals > 1 ? 'warn' : 'info';
-    statusSegments.push({ tone: segTone, text: `${activeSignals} ${word}` });
-  }
-  if (assetCount > 0) {
-    statusSegments.push({
-      tone: heroTone,
-      text: `${t('ws_intel_risk_prefix')} ${String(riskBand).toLowerCase()}`,
-    });
-  }
-  statusSegments.push({
-    tone: syncOk ? 'positive' : 'info',
-    text: syncOk ? t('ws_intel_sync_ok') : t('ws_intel_sync_stale'),
-  });
-
-  const statusHtml = statusSegments.map(s => `
-    <span class="ws-intel-pill is-${_escapeWorkspaceText(s.tone)}">${_escapeWorkspaceText(s.text)}</span>
-  `).join('');
-
-  // Workspace-native KPI grid — no portfolio total, no asset count repeat.
-  const kpiCards = [
+  // Cockpit strip — 4 compact chips. Health uses the existing score so
+  // the surface stays consistent with Portfolio Health.
+  const cockpitChips = [
     {
-      label: t('ws_kpi_active_signals'),
-      value: String(activeSignals),
-      tone: activeSignals > 1 ? 'warn' : (activeSignals === 1 ? 'info' : 'positive'),
+      label: t('ws_cockpit_health'),
+      value: (score && score.score != null) ? String(score.score) : t('ws_cockpit_health_empty'),
+      tone:  score && score.tone ? score.tone : 'neutral',
     },
-    {
-      label: t('ws_kpi_live_formulas'),
-      value: String(liveFormulas),
-      tone: 'info',
-    },
-    {
-      label: t('ws_kpi_market_sync'),
-      value: syncOk ? t('ws_kpi_sync_ok') : t('ws_kpi_sync_stale'),
-      tone: syncOk ? 'positive' : 'info',
-    },
-    {
-      label: t('ws_kpi_critical_exposure'),
-      value: criticalExposure,
-      tone: assetCount === 0 ? 'neutral' : (cryptoPct > 40 || (topAlloc && Number(topAlloc.allocation || 0) > 0.5) ? 'warn' : 'positive'),
-    },
+    { label: t('ws_cockpit_risk'),       value: t(riskBandKey),     tone: riskTone },
+    { label: t('ws_cockpit_diversif'),   value: t(divKey),          tone: divTone },
+    { label: t('ws_cockpit_liquidity'),  value: liqValue,           tone: liqTone },
   ];
-
-  const kpiHtml = kpiCards.map(c => `
-    <div class="ws-kpi-card is-${_escapeWorkspaceText(c.tone)}">
-      <div class="ws-kpi-label">${_escapeWorkspaceText(c.label)}</div>
-      <div class="ws-kpi-value">${_escapeWorkspaceText(c.value)}</div>
+  const cockpitHtml = cockpitChips.map(c => `
+    <div class="ws-cockpit-chip is-${_escapeWorkspaceText(c.tone)}">
+      <span class="ws-cockpit-chip-label">${_escapeWorkspaceText(c.label)}</span>
+      <span class="ws-cockpit-chip-value">${_escapeWorkspaceText(c.value)}</span>
     </div>
   `).join('');
 
-  // Risk cards — mobile-native premium copy. Tone comes from the shared
-  // category builder so the icons + colours stay consistent with desktop,
-  // but the text is rewritten short-form so the rows breathe on mobile.
-  const RISK_ICON  = { concentration: '▲', exposure: '%', volatility: '⚡', sync: '↻' };
-  const RISK_LABEL = {
-    concentration: t('ws_risk_concentration'),
-    exposure:      t('ws_risk_exposure'),
-    volatility:    t('ws_risk_volatility'),
-    sync:          t('ws_risk_sync'),
+  // Hero insight = first entry from the canonical signal pool. This is
+  // the same source the dashboard signal bar consumes, so the two
+  // surfaces always agree on "what matters most".
+  const pool = (typeof computeAurixSignalPool === 'function') ? computeAurixSignalPool() : [];
+  const _resolveSignalCopy = (entry) => {
+    if (!entry) return { title: t('ws_hero_empty_title'), msg: t('ws_hero_empty_msg'), tone: 'neutral' };
+    let msg = entry.msgRaw;
+    if (!msg) {
+      const v = t(entry.msg);
+      msg = (typeof v === 'string') ? v : '';
+    }
+    const KIND_TONE = {
+      concentration: 'warn',
+      dominant:      'warn',
+      category:      'warn',
+      crypto:        'info',
+      single:        'warn',
+      lowdiv:        'info',
+      cash:          'info',
+      nocash:        'info',
+      performance:   'positive',
+      loss:          'warn',
+      insights:      'info',
+    };
+    return { title: msg || t('ws_hero_empty_title'), msg: '', tone: KIND_TONE[entry.kind] || 'info' };
   };
+  const heroEntry = pool[0] || null;
+  const hero = _resolveSignalCopy(heroEntry);
+
+  // Diagnostic grid — Diversification / Liquidity / Concentration /
+  // Performance. Each card carries a label, a status word, and a
+  // short context line. Statuses lean on the same data that drives
+  // the cockpit strip so a quick glance reads coherently.
+  const divCtx = (typeof t('ws_diag_ctx_div') === 'function')
+    ? t('ws_diag_ctx_div')(assetCount, catCount)
+    : `${assetCount} · ${catCount}`;
+
+  const liqCtx = cashPct === 0
+    ? t('ws_diag_ctx_liq_none')
+    : (typeof t('ws_diag_ctx_liq_pct') === 'function' ? t('ws_diag_ctx_liq_pct')(cashPct) : `${cashPct}%`);
+
+  const topAssetPct = snap.topAsset ? Number(snap.topAsset.pctTotal || 0) : 0;
+  const topAssetTk  = snap.topAsset ? String(snap.topAsset.ticker || snap.topAsset.name || '').toUpperCase() : '';
+  const concStatusKey = topAssetPct > 60 ? 'ws_diag_status_high'
+                       : topAssetPct > 35 ? 'ws_diag_status_balanced'
+                                          : 'ws_diag_status_ok';
+  const concTone = topAssetPct > 60 ? 'warn' : topAssetPct > 35 ? 'info' : 'positive';
+  const concCtx  = topAssetTk
+    ? (typeof t('ws_diag_ctx_conc_top') === 'function'
+        ? t('ws_diag_ctx_conc_top')(topAssetTk, topAssetPct)
+        : `${topAssetTk} ${topAssetPct}%`)
+    : t('ws_diag_ctx_conc_low');
+
+  let perfStatusKey = 'ws_diag_status_initial';
+  let perfTone = 'neutral';
+  let perfCtx  = t('ws_diag_ctx_perf_initial');
+  if (snap.bestAsset && snap.bestAsset.change24h >= 5) {
+    perfStatusKey = 'ws_diag_status_ok';
+    perfTone = 'positive';
+    perfCtx = (typeof t('ws_diag_ctx_perf_strong') === 'function')
+      ? t('ws_diag_ctx_perf_strong')(snap.bestAsset.ticker || snap.bestAsset.name)
+      : '';
+  }
+  if (snap.worstAsset && snap.worstAsset.change24h <= -10) {
+    perfStatusKey = 'ws_diag_status_high';
+    perfTone = 'warn';
+    perfCtx = (typeof t('ws_diag_ctx_perf_weak') === 'function')
+      ? t('ws_diag_ctx_perf_weak')(snap.worstAsset.ticker || snap.worstAsset.name)
+      : '';
+  }
+
+  const diag = [
+    { label: t('ws_diag_diversification'), statusKey: divKey,        tone: divTone, ctx: divCtx },
+    { label: t('ws_diag_liquidity'),       statusKey: cashPct === 0 ? 'ws_diag_status_none' : 'ws_diag_status_ok', tone: liqTone, ctx: liqCtx },
+    { label: t('ws_diag_concentration'),   statusKey: concStatusKey, tone: concTone, ctx: concCtx },
+    { label: t('ws_diag_performance'),     statusKey: perfStatusKey, tone: perfTone, ctx: perfCtx },
+  ];
+  const diagHtml = diag.map(d => `
+    <article class="ws-diag-card is-${_escapeWorkspaceText(d.tone)}">
+      <div class="ws-diag-label">${_escapeWorkspaceText(d.label)}</div>
+      <div class="ws-diag-status">${_escapeWorkspaceText(t(d.statusKey))}</div>
+      <div class="ws-diag-context">${_escapeWorkspaceText(d.ctx)}</div>
+    </article>
+  `).join('');
+
+  // Main signals — drop "sync" (relocated to micro-status), keep the
+  // three most actionable in priority order: concentration →
+  // diversification (mapped from exposure tone) → liquidity →
+  // volatility. Limited to 3 so the surface never feels noisy.
+  const categories = _buildWorkspaceRiskCategories();
   const concSig = categories.find(c => c.id === 'concentration')?.signals?.[0] || { tone: 'ok' };
   const expoSig = categories.find(c => c.id === 'exposure')?.signals?.[0]      || { tone: 'ok' };
   const volSig  = categories.find(c => c.id === 'volatility')?.signals?.[0]    || { tone: 'ok' };
 
-  const concText = concSig.tone === 'ok'
+  const concSignalText = concSig.tone === 'ok'
     ? t('ws_risk_msg_concentration_ok')
-    : (topAlloc && topAlloc.symbol
+    : (snap.topAsset && snap.topAsset.ticker
         ? (typeof t('ws_risk_msg_concentration') === 'function'
-            ? t('ws_risk_msg_concentration')(String(topAlloc.symbol).toUpperCase())
+            ? t('ws_risk_msg_concentration')(String(snap.topAsset.ticker).toUpperCase())
             : t('ws_risk_msg_concentration_alt'))
         : t('ws_risk_msg_concentration_alt'));
-  const expoText = expoSig.tone === 'ok' ? t('ws_risk_msg_exposure_ok')   : t('ws_risk_msg_exposure');
-  const volText  = volSig.tone  === 'ok' ? t('ws_risk_msg_volatility_ok') : t('ws_risk_msg_volatility');
-  const syncText = syncOk ? t('ws_risk_msg_sync_ok') : t('ws_risk_msg_sync_stale');
+  const liqSignalText = cashPct === 0
+    ? t('ws_diag_ctx_liq_none')
+    : (typeof t('ws_diag_ctx_liq_pct') === 'function' ? t('ws_diag_ctx_liq_pct')(cashPct) : `${cashPct}%`);
 
-  const mobileRisk = [
-    { id: 'concentration', tone: concSig.tone || 'ok',     text: concText },
-    { id: 'exposure',      tone: expoSig.tone || 'ok',     text: expoText },
-    { id: 'volatility',    tone: volSig.tone  || 'ok',     text: volText  },
-    { id: 'sync',          tone: syncOk ? 'ok' : 'info',   text: syncText },
+  const allSignals = [
+    {
+      id: 'concentration',
+      label: t('ws_risk_concentration'),
+      tone:  concSig.tone || 'ok',
+      msg:   concSignalText,
+    },
+    {
+      id: 'diversification',
+      label: t('ws_diag_diversification'),
+      tone:  divTone === 'positive' ? 'ok' : divTone,
+      msg:   divCtx,
+    },
+    {
+      id: 'liquidity',
+      label: t('ws_cockpit_liquidity'),
+      tone:  liqTone === 'positive' ? 'ok' : liqTone,
+      msg:   liqSignalText,
+    },
+    {
+      id: 'volatility',
+      label: t('ws_risk_volatility'),
+      tone:  volSig.tone === 'ok' ? 'ok' : volSig.tone,
+      msg:   volSig.tone === 'ok' ? t('ws_risk_msg_volatility_ok') : t('ws_risk_msg_volatility'),
+    },
   ];
+  // Active first (any tone other than 'ok'), then OK fills the
+  // remainder. Cap at 3 — no noise.
+  const ranked = [...allSignals].sort((a, b) => {
+    const w = s => s.tone === 'ok' ? 1 : 0;
+    return w(a) - w(b);
+  }).slice(0, 3);
+  const SIGNAL_ICON = { concentration: '▲', diversification: '◇', liquidity: '€', volatility: '⚡' };
 
-  const riskCardsHtml = mobileRisk.map(r => `
-    <article class="ws-risk-card is-${_escapeWorkspaceText(r.tone)}">
-      <span class="ws-risk-icon" aria-hidden="true">${_escapeWorkspaceText(RISK_ICON[r.id] || '•')}</span>
-      <div class="ws-risk-body">
-        <div class="ws-risk-label">${_escapeWorkspaceText(RISK_LABEL[r.id])}</div>
-        <div class="ws-risk-msg">${_escapeWorkspaceText(r.text)}</div>
+  const signalsHtml = ranked.map(r => `
+    <article class="ws-signal-card is-${_escapeWorkspaceText(r.tone)}">
+      <span class="ws-signal-icon" aria-hidden="true">${_escapeWorkspaceText(SIGNAL_ICON[r.id] || '•')}</span>
+      <div class="ws-signal-body">
+        <div class="ws-signal-label">${_escapeWorkspaceText(r.label)}</div>
+        <div class="ws-signal-msg">${_escapeWorkspaceText(r.msg)}</div>
       </div>
     </article>
   `).join('');
 
+  const syncOk = !(WORKSPACE_RUNTIME && WORKSPACE_RUNTIME.stale);
+  const microText = syncOk ? t('ws_micro_synced') : t('ws_micro_pending');
+
   return `
     <div class="aurix-workspace-shell is-mobile">
-      <section class="ws-intel-hero is-${_escapeWorkspaceText(heroTone)}">
-        <div class="ws-intel-eyebrow">${_escapeWorkspaceText(t('ws_intel_hero_label'))}</div>
-        <div class="ws-intel-sub">${_escapeWorkspaceText(t('ws_intel_hero_sub'))}</div>
-        <div class="ws-intel-status">${statusHtml}</div>
-      </section>
-
-      <section class="ws-kpi-grid">${kpiHtml}</section>
-
-      <header class="ws-section-head">
-        <div class="ws-section-eyebrow">${_escapeWorkspaceText(t('ws_risk_signals'))}</div>
-        <div class="ws-section-sub">${_escapeWorkspaceText(t('ws_pi_sub'))}</div>
+      <header class="ws-cockpit-head">
+        <div class="ws-cockpit-titles">
+          <div class="ws-cockpit-eyebrow">${_escapeWorkspaceText(t('ws_intel_hero_label'))}</div>
+          <div class="ws-cockpit-sub">${_escapeWorkspaceText(t('ws_pi_sub'))}</div>
+        </div>
+        <div class="ws-action-row" role="group" aria-label="${_escapeWorkspaceText(t('ws_action_add_asset'))}">
+          <button type="button" class="ws-action-pill" data-ws-action="add-asset" aria-label="${_escapeWorkspaceText(t('ws_action_add_asset'))}">
+            <span class="ws-action-pill-icon" aria-hidden="true">+</span>
+            <span class="ws-action-pill-label">${_escapeWorkspaceText(t('ws_action_add_asset_short'))}</span>
+          </button>
+          <button type="button" class="ws-action-pill" data-ws-action="add-liquidity" aria-label="${_escapeWorkspaceText(t('ws_action_add_liquidity'))}">
+            <span class="ws-action-pill-icon" aria-hidden="true">+</span>
+            <span class="ws-action-pill-label">${_escapeWorkspaceText(t('ws_action_add_liquidity_short'))}</span>
+          </button>
+        </div>
       </header>
 
-      <section class="ws-risk-stack" aria-label="${_escapeWorkspaceText(t('ws_risk_signals'))}">${riskCardsHtml}</section>
+      <section class="ws-cockpit-strip">${cockpitHtml}</section>
 
-      <!-- ADD-FLOW-ARCH-1: mobile workspace is an intelligence cockpit;
-           actions stay secondary. The chunky button grid is replaced
-           with a compact pill row that defers visual weight to the risk
-           cards above. -->
-      <section class="ws-action-row" aria-label="${_escapeWorkspaceText(t('ws_action_add_asset'))}">
-        <button type="button" class="ws-action-pill" data-ws-action="add-asset" aria-label="${_escapeWorkspaceText(t('ws_action_add_asset'))}">
-          <span class="ws-action-pill-icon" aria-hidden="true">+</span>
-          <span class="ws-action-pill-label">${_escapeWorkspaceText(t('ws_action_add_asset_short'))}</span>
-        </button>
-        <button type="button" class="ws-action-pill" data-ws-action="add-liquidity" aria-label="${_escapeWorkspaceText(t('ws_action_add_liquidity'))}">
-          <span class="ws-action-pill-icon" aria-hidden="true">+</span>
-          <span class="ws-action-pill-label">${_escapeWorkspaceText(t('ws_action_add_liquidity_short'))}</span>
-        </button>
+      <section class="ws-hero-insight is-${_escapeWorkspaceText(hero.tone)}">
+        <div class="ws-hero-eyebrow">${_escapeWorkspaceText(t('ws_hero_eyebrow'))}</div>
+        <h3 class="ws-hero-title">${_escapeWorkspaceText(hero.title)}</h3>
+        ${hero.msg ? `<p class="ws-hero-msg">${_escapeWorkspaceText(hero.msg)}</p>` : ''}
       </section>
+
+      <section class="ws-diag-grid">${diagHtml}</section>
+
+      <header class="ws-section-head">
+        <div class="ws-section-eyebrow">${_escapeWorkspaceText(t('ws_signals_main'))}</div>
+      </header>
+      <section class="ws-signal-stack" aria-label="${_escapeWorkspaceText(t('ws_signals_main'))}">${signalsHtml || `<p class="ws-signals-empty">${_escapeWorkspaceText(t('ws_signals_empty'))}</p>`}</section>
+
+      <p class="ws-micro-status ${syncOk ? 'is-ok' : 'is-stale'}" role="status">
+        <span class="ws-micro-dot" aria-hidden="true"></span>
+        ${_escapeWorkspaceText(microText)}
+      </p>
     </div>
   `;
 }
