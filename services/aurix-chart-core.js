@@ -126,33 +126,10 @@
         pointer-events: none;
       }
       .aurix-chart-badge[hidden] { display: none; }
-      /* AURIX-CHARTS-2 — premium current value chip for surfaces where
-         the LWC right-axis label is hidden (mobile portfolio). Reads
-         the latest series value and renders a compact glass pill in
-         the top-right corner. Pointer-events:none so it never steals
-         touch from the long-press inspection. */
-      .aurix-chart-valchip {
-        position: absolute;
-        top: 8px; right: 8px;
-        padding: 4px 9px;
-        border-radius: 999px;
-        font-size: 11.5px;
-        font-weight: 700;
-        letter-spacing: 0.005em;
-        font-variant-numeric: tabular-nums;
-        color: rgba(225,233,255,0.92);
-        background: rgba(14,18,28,0.72);
-        border: 1px solid rgba(255,255,255,0.07);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-        box-shadow: 0 6px 20px -12px rgba(4,8,16,0.6);
-        pointer-events: none;
-        z-index: 3;
-        transition: opacity 0.18s ease;
-      }
-      .aurix-chart-valchip[hidden] { display: none; }
-      .aurix-chart-valchip.is-up   { color: #3FBF7F; }
-      .aurix-chart-valchip.is-down { color: #E05A5A; }
+      /* AURIX-CHARTS — the permanent mobile value chip was removed.
+         Per spec the current value must surface only via the touch /
+         long-press tooltip path, never as an always-on overlay. The
+         tooltip styles below carry that responsibility. */
       .aurix-chart-tooltip {
         position: absolute;
         pointer-events: none;
@@ -517,16 +494,13 @@
     badge.hidden = true;
     host.appendChild(badge);
 
-    // AURIX-CHARTS-2 — current-value chip. Only rendered on the
-    // portfolio variant when the LWC right-axis label is hidden (the
-    // mobile surface). Desktop keeps the engine's native last-value
-    // marker — that's already the canonical chip there. Pre-created
-    // hidden; setData() shows it once we have a real value.
-    const valchip = document.createElement('div');
-    valchip.className = 'aurix-chart-valchip';
-    valchip.hidden = true;
-    const _shouldShowValChip = opts.variant === 'portfolio' && !opts.showPriceScale;
-    if (_shouldShowValChip) host.appendChild(valchip);
+    // AURIX-CHARTS — mobile current-value chip removed. The value must
+    // only surface on user interaction (long-press → tooltip), never as
+    // a permanent overlay on the chart. The chip element is kept null
+    // here so all downstream guards (`if (_shouldShowValChip)`) become
+    // no-ops; the tooltip path is unchanged.
+    const valchip = null;
+    const _shouldShowValChip = false;
 
     const loading = document.createElement('div');
     loading.className = 'aurix-chart-state aurix-chart-state--loading';

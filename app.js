@@ -2990,13 +2990,32 @@ function totalCostBasisBase() {
 function computeRangePnL(range) {
   const currentBase = totalValueBase();
   if (currentBase <= 0 || assets.length === 0) return null;
-  if (range === 'all') {
+
+  // AURIX-CHARTS-1 P0 FIX — when an epoch is set (post-reset), the
+  // 'all' range must NOT fall back to totalCostBasisBase(). asset.costBasis
+  // is not epoch-aware on its own: if a remote merge or partial wipe
+  // leaks even one pre-reset asset back into `assets`, the sum becomes
+  // ~54K against a real ~1.9K portfolio value → -52K / -96% hero PnL
+  // (exactly the contamination the user reported). When the user has
+  // explicitly reset their portfolio life, the only trustworthy basis
+  // is post-epoch history. If there isn't enough history yet, getChartData
+  // returns the flat baseline so the result is a clean 0.00 / 0.0%.
+  const epoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
+
+  if (range === 'all' && !epoch) {
     const invested = totalCostBasisBase();
     if (invested <= 0) return null;
     return { abs: currentBase - invested, pct: ((currentBase - invested) / invested) * 100 };
   }
+
   const data = getChartData(range);
-  if (!data || data.values.length < 2) return null;
+  if (!data || data.values.length < 2) {
+    // Post-epoch path with no history yet: explicit neutral so the
+    // hero PnL reads 0.00 / 0.0% instead of falling through to the
+    // (stale) cost-basis branch.
+    if (epoch) return { abs: 0, pct: 0 };
+    return null;
+  }
   const past = data.values[0];
   if (past <= 0) return null;
   return { abs: currentBase - past, pct: ((currentBase - past) / past) * 100 };
