@@ -12775,6 +12775,66 @@ body.gs-open { overflow: hidden; }
   color: rgba(180, 200, 240, 0.62);
   margin: 0 0 2px;
 }
+/* SETTINGS-INVESTOR-PROFILE-1 — investor profile section.
+   Three calm chip rows; never reads as a questionnaire. */
+.settings-section-sub {
+  font-size: 12.5px;
+  color: rgba(220, 230, 250, 0.62);
+  line-height: 1.45;
+  letter-spacing: 0.005em;
+  margin: -4px 0 4px;
+}
+.settings-profile-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.settings-profile-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(220, 230, 250, 0.55);
+}
+.settings-profile-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.settings-profile-chips--age { gap: 5px; }
+.settings-profile-chip {
+  appearance: none;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 999px;
+  padding: 8px 13px;
+  color: rgba(220, 230, 250, 0.78);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.003em;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .15s ease, border-color .15s ease, color .15s ease, transform .12s ease;
+}
+.settings-profile-chip:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.settings-profile-chip:active { transform: scale(0.97); }
+.settings-profile-chip.is-active {
+  background: rgba(74, 130, 240, 0.14);
+  border-color: rgba(74, 130, 240, 0.55);
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(74, 130, 240, 0.18) inset;
+}
+.settings-profile-chip--ghost {
+  background: transparent;
+  border-style: dashed;
+}
+.settings-profile-chip--ghost.is-active {
+  border-style: solid;
+}
 .settings-row {
   display: flex;
   justify-content: space-between;

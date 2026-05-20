@@ -1176,6 +1176,47 @@
         </div>
       </section>
 
+      <!-- SETTINGS-INVESTOR-PROFILE-1 — editable investor profile.
+           Lets users who already finished onboarding refine their
+           tonal signal context without re-running the flow. Reuses
+           the existing AurixOnboarding.savePreferences API so the
+           persisted shape stays identical to the onboarding step. -->
+      <section class="settings-section" id="settingsSectionProfile">
+        <h4 class="settings-section-title" data-i18n="settingsProfileTitle">Perfil inversor</h4>
+        <p class="settings-section-sub" data-i18n="settingsProfileSub">Ajusta cómo Aurix interpreta las señales de tu cartera.</p>
+
+        <div class="settings-profile-group">
+          <span class="settings-profile-label" data-i18n="settingsProfileRisk">Tu estilo de inversión</span>
+          <div class="settings-profile-chips" id="settingsRiskChips">
+            <button type="button" class="settings-profile-chip" data-settings-risk="conservative" data-i18n="onbRiskConservative">Conservador</button>
+            <button type="button" class="settings-profile-chip" data-settings-risk="balanced" data-i18n="onbRiskBalanced">Equilibrado</button>
+            <button type="button" class="settings-profile-chip" data-settings-risk="growth" data-i18n="onbRiskGrowth">Crecimiento</button>
+            <button type="button" class="settings-profile-chip" data-settings-risk="aggressive" data-i18n="onbRiskAggressive">Agresivo</button>
+          </div>
+        </div>
+
+        <div class="settings-profile-group">
+          <span class="settings-profile-label" data-i18n="settingsProfileExperience">Experiencia</span>
+          <div class="settings-profile-chips" id="settingsExperienceChips">
+            <button type="button" class="settings-profile-chip" data-settings-experience="beginner" data-i18n="settingsExperienceBeginner">Principiante</button>
+            <button type="button" class="settings-profile-chip" data-settings-experience="intermediate" data-i18n="settingsExperienceIntermediate">Intermedio</button>
+            <button type="button" class="settings-profile-chip" data-settings-experience="advanced" data-i18n="settingsExperienceAdvanced">Avanzado</button>
+            <button type="button" class="settings-profile-chip" data-settings-experience="professional" data-i18n="settingsExperienceProfessional">Profesional</button>
+          </div>
+        </div>
+
+        <div class="settings-profile-group">
+          <span class="settings-profile-label" data-i18n="settingsProfileAge">Etapa inversora</span>
+          <div class="settings-profile-chips settings-profile-chips--age" id="settingsAgeChips">
+            <button type="button" class="settings-profile-chip" data-settings-age="under_30" data-i18n="onbAgeUnder30">&lt;30</button>
+            <button type="button" class="settings-profile-chip" data-settings-age="age_30_45" data-i18n="onbAge30_45">30–45</button>
+            <button type="button" class="settings-profile-chip" data-settings-age="age_45_60" data-i18n="onbAge45_60">45–60</button>
+            <button type="button" class="settings-profile-chip" data-settings-age="over_60" data-i18n="onbAgeOver60">60+</button>
+            <button type="button" class="settings-profile-chip settings-profile-chip--ghost" data-settings-age="prefer_not_say" data-i18n="onbAgePreferNotSay">Prefiero no decirlo</button>
+          </div>
+        </div>
+      </section>
+
       <section class="settings-section" id="settingsSectionPrefs">
         <h4 class="settings-section-title" data-i18n="settingsPrefs">Preferencias</h4>
         <div class="settings-prefs-list">

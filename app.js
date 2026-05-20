@@ -987,6 +987,17 @@ const T = {
     settingsPrefs:            'Preferencias',
     settingsLang:             'Idioma',
     settingsCurrency:         'Moneda base',
+    // SETTINGS-INVESTOR-PROFILE-1 — investor profile section copy.
+    // Tone: tuning, not banking. No "risk tolerance assessment" wording.
+    settingsProfileTitle:        'Perfil inversor',
+    settingsProfileSub:          'Ajusta cómo Aurix interpreta las señales de tu cartera.',
+    settingsProfileRisk:         'Tu estilo de inversión',
+    settingsProfileExperience:   'Experiencia',
+    settingsProfileAge:          'Etapa inversora',
+    settingsExperienceBeginner:     'Principiante',
+    settingsExperienceIntermediate: 'Intermedio',
+    settingsExperienceAdvanced:     'Avanzado',
+    settingsExperienceProfessional: 'Profesional',
     settingsPrivacy:          'Privacidad',
     settingsSupport:          'Soporte',
     settingsSoon:             'Próximamente',
@@ -1871,6 +1882,15 @@ const T = {
     settingsPrefs:            'Preferences',
     settingsLang:             'Language',
     settingsCurrency:         'Base currency',
+    settingsProfileTitle:        'Investor profile',
+    settingsProfileSub:          'Adjust how Aurix interprets your portfolio signals.',
+    settingsProfileRisk:         'Your investing style',
+    settingsProfileExperience:   'Experience',
+    settingsProfileAge:          'Investment stage',
+    settingsExperienceBeginner:     'Beginner',
+    settingsExperienceIntermediate: 'Intermediate',
+    settingsExperienceAdvanced:     'Advanced',
+    settingsExperienceProfessional: 'Professional',
     settingsPrivacy:          'Privacy',
     settingsSupport:          'Support',
     settingsSoon:             'Coming soon',
@@ -22619,6 +22639,69 @@ function _settingsPopulate() {
     } catch (_) {}
     emailEl.textContent = email || (lang === 'es' ? 'Sin sesión' : 'No session');
   }
+
+  // SETTINGS-INVESTOR-PROFILE-1 — paint the three investor-profile
+  // chip rows from the current profile (or safe defaults if none is
+  // stored). Reuses the read helper from INVESTOR-PROFILE-1 so the
+  // displayed selection always matches what Signals actually consume.
+  _settingsPaintProfile();
+}
+
+function _settingsPaintProfile() {
+  const profile = (typeof _aurixInvestorProfile === 'function')
+    ? _aurixInvestorProfile()
+    : { experience: 'intermediate', riskProfile: 'balanced', ageBand: 'prefer_not_say' };
+  document.querySelectorAll('[data-settings-risk]').forEach(el => {
+    el.classList.toggle('is-active', el.dataset.settingsRisk === profile.riskProfile);
+  });
+  document.querySelectorAll('[data-settings-experience]').forEach(el => {
+    el.classList.toggle('is-active', el.dataset.settingsExperience === profile.experience);
+  });
+  document.querySelectorAll('[data-settings-age]').forEach(el => {
+    el.classList.toggle('is-active', el.dataset.settingsAge === profile.ageBand);
+  });
+}
+
+// Persist a single profile facet and refresh any surface that reads
+// it. Source of truth: AurixOnboarding.savePreferences (same API the
+// onboarding step uses), so settings + onboarding land in the same
+// localStorage blob. Signal copy is repainted in-place — no reload.
+function _settingsSaveProfile(patch) {
+  try {
+    if (typeof window !== 'undefined' && window.AurixOnboarding
+        && typeof window.AurixOnboarding.savePreferences === 'function') {
+      window.AurixOnboarding.savePreferences(patch);
+    } else {
+      // Fallback for an environment where the engine hasn't loaded
+      // yet — mirror the prefs blob directly so the data still lands.
+      const raw = localStorage.getItem('aurix_onboarding_preferences');
+      const cur = raw ? (JSON.parse(raw) || {}) : {};
+      const next = Object.assign({}, cur, patch);
+      localStorage.setItem('aurix_onboarding_preferences', JSON.stringify(next));
+    }
+  } catch (_) { /* best-effort */ }
+  // Re-paint the Settings chip row immediately so the click feels
+  // confirmed even if the engine emit hasn't fired yet.
+  _settingsPaintProfile();
+  // Refresh signals in-place. The pool itself is unchanged (profile
+  // doesn't add/remove signals, just retones them), but
+  // renderAurixSignal re-runs _aurixSignalResolveMsg on every paint
+  // so the new tone surfaces on the next frame.
+  try { if (typeof renderAurixSignal === 'function') renderAurixSignal(); } catch (_) {}
+}
+
+// Delegated click handler — wired once. Closes over no state.
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', e => {
+    const ov = document.getElementById('settingsOverlay');
+    if (!ov || !ov.classList.contains('open')) return;
+    const r = e.target.closest && e.target.closest('[data-settings-risk]');
+    if (r) { _settingsSaveProfile({ riskProfile: r.dataset.settingsRisk }); return; }
+    const x = e.target.closest && e.target.closest('[data-settings-experience]');
+    if (x) { _settingsSaveProfile({ experience: x.dataset.settingsExperience }); return; }
+    const a = e.target.closest && e.target.closest('[data-settings-age]');
+    if (a) { _settingsSaveProfile({ ageBand: a.dataset.settingsAge }); return; }
+  });
 }
 function openSettingsPanel() {
   const ov = document.getElementById('settingsOverlay');
