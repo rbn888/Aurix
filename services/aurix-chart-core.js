@@ -1115,12 +1115,22 @@
         _state.normalizedTimes  = normTimes;
         _state.normalizationSummary = normSummary;
         _state.rawSnapshot = deduped;  // pre-normalization, sec-grained
-        // Badge precedence: synthetic > optimized > none. Synthetic
-        // is the stronger honesty signal so it wins.
-        if (meta && meta.isSynthetic) {
+        // CHART-MICRO-POLISH-1 — remove the "Vista optimizada" /
+        // "Optimized view" / "Estimación" / "Estimate" badges from the
+        // user-facing dashboard. They read as engine/debug labels in a
+        // premium financial UI and added noise on 1A / TOTAL ranges
+        // where the visual-normalization layer kicks in. The badge node
+        // stays in the DOM so all callers (`badge.hidden = ...`) remain
+        // valid; we just keep it hidden by default. Under the explicit
+        // debug gate `localStorage.aurix_debug === '1'` the previous
+        // labels are still surfaced so engineers can confirm a
+        // normalization pass without touching code.
+        let _isDebug = false;
+        try { _isDebug = (window.localStorage && window.localStorage.getItem('aurix_debug') === '1'); } catch (_) {}
+        if (_isDebug && meta && meta.isSynthetic) {
           badge.hidden = false;
           badge.textContent = _isLangEs() ? 'Estimación' : 'Estimate';
-        } else if (useNorm && normSummary.outliers > 0) {
+        } else if (_isDebug && useNorm && normSummary.outliers > 0) {
           badge.hidden = false;
           badge.textContent = _isLangEs() ? 'Vista optimizada' : 'Optimized view';
         } else {
