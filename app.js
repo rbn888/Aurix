@@ -3228,8 +3228,16 @@ function recordSnapshot() {
     ? portfolioHistory.slice(0, -1)
     : portfolioHistory;
 
+  // AURIX-CHARTS-1 PHASE 1 — strict epoch guard on every write. Even
+  // if a remote merge or stale in-memory mutation briefly reintroduces
+  // a pre-reset point, the next snapshot cycle strips it on the write
+  // path. Combined with the chart-boundary filters this gives three
+  // independent layers of defense.
+  const _epoch  = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
   const cutoff = now - 365 * 86_400_000;
-  portfolioHistory = [...base, newPoint].filter(p => p.ts >= cutoff);
+  portfolioHistory = [...base, newPoint]
+    .filter(p => p.ts >= cutoff)
+    .filter(p => !_epoch || p.ts >= _epoch);
   lastSnapshotMs = now;
   saveHistory();
   // CHART-7C: piggy-back a category snapshot on the same cadence so
@@ -8701,21 +8709,48 @@ const _AURIX_DASH_SPAN = Object.freeze({
 // Build a normalized series for Aurix in BASE currency, mirroring
 // getChartData()'s render-time toBase() conversion. We never alter
 // portfolioHistory itself.
+//
+// AURIX-CHARTS-1 PHASE 1 — TRUSTED HISTORY. Every point fed to the V2
+// dashboard chart must satisfy `ts >= aurix_portfolio_epoch` when an
+// epoch is set, otherwise a pre-reset 52K snapshot can paint a phantom
+// -96% drop on top of a fresh post-reset portfolio. Defense-in-depth
+// mirrors loadHistory() + getChartData() — the same rule, asserted at
+// every read site.
 function _aurixDashSeries(range) {
-  if (!Array.isArray(portfolioHistory) || portfolioHistory.length < 2) return [];
   const now    = Date.now();
   const span   = _AURIX_DASH_SPAN[range];
   const cutoff = (range === 'all' || span === 0) ? 0 : now - span;
+  const epoch  = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
   const out = [];
-  for (const p of portfolioHistory) {
-    if (!p) continue;
-    const t = Number(p.ts);
-    const v = Number(p.value);
-    if (!Number.isFinite(t) || !Number.isFinite(v) || v <= 0) continue;
-    if (t < cutoff) continue;
-    out.push({ time: t, value: toBase(v, 'USD') });
+  if (Array.isArray(portfolioHistory)) {
+    for (const p of portfolioHistory) {
+      if (!p) continue;
+      const t = Number(p.ts);
+      const v = Number(p.value);
+      if (!Number.isFinite(t) || !Number.isFinite(v) || v <= 0) continue;
+      if (epoch && t < epoch) continue;   // PHASE 1 — strict epoch gate
+      if (t < cutoff) continue;
+      out.push({ time: t, value: toBase(v, 'USD') });
+    }
+    out.sort((a, b) => a.time - b.time);
   }
-  out.sort((a, b) => a.time - b.time);
+  // PHASE 1 — clean baseline. If the user has a live portfolio value
+  // but fewer than 2 valid post-epoch points (typical right after a
+  // reset, before recordSnapshot has accrued any history), feed a
+  // flat 5-minute baseline at the current value. Performance reads
+  // 0.00 / 0.0% — no red phantom drop, no fake history.
+  if (out.length < 2) {
+    let currentBase = 0;
+    try { currentBase = (typeof totalValueBase === 'function') ? Number(totalValueBase()) : 0; }
+    catch (_) { currentBase = 0; }
+    if (Number.isFinite(currentBase) && currentBase > 0) {
+      return [
+        { time: now - 5 * 60_000, value: currentBase },
+        { time: now,              value: currentBase },
+      ];
+    }
+    return [];
+  }
   return out;
 }
 
@@ -9910,18 +9945,35 @@ function getChartData(range) {
   //    This guarantees processSeries always receives the same ordered input
   //    regardless of when or where the chart is rendered.
   const _empty = { labels: [], values: [] };
-  if (!Array.isArray(portfolioHistory) || portfolioHistory.length < 2) return _empty;
 
-  // RESET-HISTORY-1: defense-in-depth — filter again at the chart
-  // boundary in case anything bypassed the load-time filter
-  // (in-memory mutation, late hydration, remote merge, etc).
+  // AURIX-CHARTS-1 PHASE 1 — TRUSTED HISTORY. Strict epoch filter at
+  // the chart boundary so a pre-reset 52K snapshot can never repaint a
+  // phantom -96% drop on a fresh post-reset portfolio.
   const _epoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
-  const source = portfolioHistory
-    .filter(p => p && typeof p.ts === 'number' && typeof p.value === 'number' && isFinite(p.value) && p.value > 0)
-    .filter(p => !_epoch || p.ts >= _epoch)
-    .sort((a, b) => a.ts - b.ts);
+  const source = Array.isArray(portfolioHistory)
+    ? portfolioHistory
+        .filter(p => p && typeof p.ts === 'number' && typeof p.value === 'number' && isFinite(p.value) && p.value > 0)
+        .filter(p => !_epoch || p.ts >= _epoch)
+        .sort((a, b) => a.ts - b.ts)
+    : [];
 
-  if (source.length < 2) return _empty;
+  // PHASE 1 — clean baseline. If the user has a live portfolio value
+  // but fewer than 2 valid post-epoch points, render a flat 5-minute
+  // baseline so the chart axis pins to the current value (no phantom
+  // crash line) and performance reads 0.00 / 0.0%.
+  if (source.length < 2) {
+    let currentBase = 0;
+    try { currentBase = (typeof totalValueBase === 'function') ? Number(totalValueBase()) : 0; }
+    catch (_) { currentBase = 0; }
+    if (Number.isFinite(currentBase) && currentBase > 0) {
+      const baseTs = now - 5 * 60_000;
+      return {
+        labels: [fmt(baseTs), fmt(now)],
+        values: [currentBase, currentBase],
+      };
+    }
+    return _empty;
+  }
 
   // Diagnostic logging — confirms the input is stable across reloads.
   // Remove once charts are confirmed stable.
@@ -22347,6 +22399,52 @@ if (typeof window !== 'undefined') {
       currentPortfolioValue:          currentValue,
       dashboardPerfBasis,
       ignoredOldPointsCount:          ignored,
+    };
+  };
+
+  // AURIX-CHARTS-1 PHASE 1 — chart-layer probe. Combines the
+  // history-side facts (raw vs filtered counts, epoch, ignored
+  // points) with what the dashboard chart pipeline actually fed
+  // the renderer. Useful for proving the post-reset path is clean
+  // from history → series → chart.
+  if (_aurixIsDebugHost()) window.__aurixChartDebug = function () {
+    const epoch = _aurixPortfolioEpoch();
+    const raw   = Array.isArray(portfolioHistory) ? portfolioHistory : [];
+    const validRaw = raw.filter(p =>
+      p && typeof p.ts === 'number' && typeof p.value === 'number' &&
+      isFinite(p.value) && p.value > 0
+    );
+    const postEpoch = epoch ? validRaw.filter(p => p.ts >= epoch) : validRaw.slice();
+    const ignored   = validRaw.length - postEpoch.length;
+    let v2Series = [];
+    try { v2Series = (typeof _aurixDashSeries === 'function') ? _aurixDashSeries(activeRange) : []; } catch (_) {}
+    let legacy = null;
+    try {
+      const d = (typeof getChartData === 'function') ? getChartData(activeRange) : null;
+      legacy = d && Array.isArray(d.values)
+        ? { points: d.values.length, first: d.values[0], last: d.values[d.values.length - 1] }
+        : null;
+    } catch (_) {}
+    let currentValue = 0;
+    try { currentValue = (typeof totalValueBase === 'function') ? Number(totalValueBase()) : 0; } catch (_) {}
+    const v2First = v2Series.length ? v2Series[0] : null;
+    const v2Last  = v2Series.length ? v2Series[v2Series.length - 1] : null;
+    const isBaselineFlat = v2Series.length === 2 && v2First && v2Last && v2First.value === v2Last.value;
+    return {
+      portfolioEpoch:               epoch,
+      activeRange,
+      rawHistoryCount:              validRaw.length,
+      postEpochHistoryCount:        postEpoch.length,
+      ignoredPreEpochCount:         ignored,
+      currentPortfolioValueBase:    currentValue,
+      v2FedSeriesCount:             v2Series.length,
+      v2FirstPoint:                 v2First,
+      v2LastPoint:                  v2Last,
+      v2BaselineFlatActive:         isBaselineFlat,
+      legacyChartData:              legacy,
+      v2ControllerDesktopActive:    !!_aurixDashDesktop,
+      v2ControllerMobileActive:     !!_aurixDashMobile,
+      chartV2FlagEnabled:           (typeof window !== 'undefined') ? window.__AURIX_CHART_V2 !== false : null,
     };
   };
 }
