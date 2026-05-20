@@ -2125,6 +2125,12 @@ body.modal-open {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+/* GOLD-MOBILE-P0: the [hidden] attribute on advanced karats has lower
+   specificity than the class rule above, so without this guard the
+   21K / 14K / 10K row leaks into the default karat grid. */
+.gold-purity-advanced[hidden] {
+  display: none !important;
+}
 .gold-chip {
   display: flex;
   flex-direction: column;
@@ -2225,10 +2231,32 @@ body.modal-open {
 }
 .gold-pill:active { transform: scale(0.97); }
 
-.gold-buyer-block {
+.gold-buyer-block,
+.gold-adjust-block {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+.gold-adjust-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 2px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+/* Re-assert [hidden] over the panel's class rule so the default
+   collapsed state actually hides on disk. */
+.gold-adjust-panel[hidden] { display: none !important; }
+.gold-buyer-row[hidden] { display: none !important; }
+.gold-adjust-eyebrow {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(220,230,250,0.55);
 }
 .gold-buyer-row {
   flex-direction: row;
@@ -2290,22 +2318,38 @@ body.modal-open {
    card above is the single source of truth for the user. */
 .modal[data-mode="gold"] #formPreview { display: none !important; }
 
-/* GOLD-UX-4: the asset modal mobile sticky CTA must (1) be visually
-   anchored at the bottom with a fully opaque base so nothing reads as
-   overlap and (2) reserve enough scroll padding that karats, unit
-   pills, qty input and the estimate card never sit underneath it. */
+/* GOLD-MOBILE-P0: in gold mode the CTA is a structural footer of the
+   sheet — header / scrollable body / fixed footer. The .modal is the
+   positioning context (transform already makes it a containing block,
+   but position:relative is set explicitly for clarity and Safari
+   parity). Body padding-bottom reserves CTA height + safe-area + 24px
+   so the karat chips, qty input and estimate card never overlap. */
 @media (max-width: 768px) {
-  .modal[data-mode="gold"] .modal-body,
+  .modal[data-mode="gold"] { position: relative; }
+  .modal[data-mode="gold"] .modal-cta {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: rgba(10,12,18,0.98);
+    border-top: 1px solid rgba(255,255,255,0.08);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 -8px 24px -10px rgba(0,0,0,0.55);
+    z-index: 5;
+  }
+  /* CTA ≈ 48px button + 12px top pad + 12px bottom pad ≈ 72px. Plus
+     safe-area + 24px breathing room above the last form element. */
+  .modal[data-mode="gold"] .modal-body {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 72px + 24px);
+  }
   .modal[data-mode="asset"] #assetForm.modal-body {
-    /* CTA pill ≈ 48px + 10px top pad + 12px bottom pad + safe-area
-       + 24px breathing room above the last form element. */
     padding-bottom: calc(env(safe-area-inset-bottom) + 48px + 22px + 24px);
   }
-  /* Solid base for the sticky CTA — the prior gradient ending at 0.7
-     alpha let underlying chips read through, which felt like overlap.
-     The thin top hairline replaces the gradient as the visual cue. */
-  .modal-overlay #modalOverlay .modal-cta,
-  .modal[data-mode="gold"]  .modal-cta,
+  /* Non-gold asset modes keep the sticky variant — solid base so the
+     CTA never reads as a translucent overlay. */
   .modal[data-mode="asset"] .modal-cta {
     background: rgba(5,7,13,0.96);
     border-top: 1px solid rgba(255,255,255,0.06);
@@ -15177,14 +15221,10 @@ body.gs-open { overflow: hidden; }
 .gold-market-card { padding: 12px 14px; }
 .gold-market-meta { font-size: 11.5px; opacity: 0.6; }
 
-/* Sticky CTA safe area — guarantee the summary card breathing room
-   above the sticky footer on phones (the previous 102px was tight
-   once the summary card and disclaimer both expanded). */
-@media (max-width: 768px) {
-  .modal[data-mode="gold"] .modal-body {
-    padding-bottom: calc(env(safe-area-inset-bottom) + 132px);
-  }
-}
+/* GOLD-MOBILE-P0: the gold CTA is now a structural absolute footer
+   (see the .modal[data-mode="gold"] .modal-cta rule earlier in the
+   file). The body padding-bottom is set there as CTA height + safe
+   area + 24px, so no extra reserve is needed here. */
 
 /* Mobile spacing polish — bigger tap targets, gentler rhythm. */
 @media (max-width: 520px) {
@@ -15224,14 +15264,17 @@ body.gs-open { overflow: hidden; }
 #goldSection[data-gold-type=""] .gold-section-eyebrow,
 #goldSection[data-gold-type=""] .gold-mode-row,
 #goldSection[data-gold-type=""] .gold-buyer-block,
+#goldSection[data-gold-type=""] .gold-adjust-block,
 #goldSection[data-gold-type=""] .gold-summary-card,
 #goldSection[data-gold-type=""] .gold-market-card {
   display: none;
 }
-/* STEP 4: hide the estimated-value card until the user has entered
-   a valid quantity. (Market card remains visible once a type is
-   chosen — small, at the bottom, so users can still verify it.) */
-#goldSection[data-gold-type]:not([data-gold-type=""])[data-gold-qty="0"] .gold-summary-card {
+/* STEP 4: hide the estimated-value card AND the "Ajustar estimación"
+   toggle until the user has entered a valid quantity. (Market card
+   remains visible once a type is chosen — small, at the bottom, so
+   users can still verify it.) */
+#goldSection[data-gold-type]:not([data-gold-type=""])[data-gold-qty="0"] .gold-summary-card,
+#goldSection[data-gold-type]:not([data-gold-type=""])[data-gold-qty="0"] .gold-adjust-block {
   display: none;
 }
 

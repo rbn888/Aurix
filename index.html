@@ -567,10 +567,10 @@
             </div>
           </div>
 
-          <!-- STEP 2: quilataje contextual al tipo -->
+          <!-- STEP 2: quilates contextual al tipo -->
           <div class="gold-field-block" id="goldKaratBlock">
-            <div class="gold-field-label" data-i18n="gold_karat_label">Quilataje</div>
-            <div class="gold-field-sub" data-i18n="gold_karat_sub">Selecciona el quilataje de tu oro.</div>
+            <div class="gold-field-label" data-i18n="gold_karat_label">Quilates</div>
+            <div class="gold-field-sub" data-i18n="gold_karat_sub">Selecciona los quilates de tu oro.</div>
             <div class="gold-purity-grid" id="goldPurityGrid">
               <button type="button" class="gold-chip" data-gold-karat="24" data-gold-contexts="jewelry coin bar">
                 <span class="gold-chip-title">24K</span>
@@ -621,30 +621,6 @@
                visually grouped, then restored on exit. -->
           <div id="goldQtyAnchor"></div>
 
-          <!-- Section 3 — Valoración -->
-          <div class="gold-section-eyebrow gold-section-eyebrow--tight" data-i18n="gold_value_label">Valorar como</div>
-          <div class="gold-mode-row" id="goldModeRow">
-            <button type="button" class="gold-pill is-active" data-gold-mode="spot"  data-i18n="gold_value_spot">Valor spot</button>
-            <button type="button" class="gold-pill"            data-gold-mode="resale" data-i18n="gold_value_resale">Venta estimada</button>
-          </div>
-
-          <!-- GOLD-UX-4: buyer-type selector demoted behind an
-               "Ajustar estimación" disclosure. The user sees a single
-               clean estimate first; advanced buyers can drill into the
-               margin model only if they want to. Only revealed in
-               resale valuation mode. -->
-          <div class="gold-buyer-block" id="goldBuyerBlock" hidden>
-            <button type="button" class="gold-buyer-toggle gold-more-toggle gold-more-toggle--subtle" id="goldBuyerToggle" aria-expanded="false" aria-controls="goldBuyerRow">
-              <span data-i18n="gold_adjust_estimate">Ajustar estimación</span>
-              <span class="gold-more-icon" aria-hidden="true">›</span>
-            </button>
-            <div class="gold-buyer-row" id="goldBuyerRow" hidden>
-              <button type="button" class="gold-pill" data-gold-buyer="premium" data-margin-internal="5"  data-i18n="gold_buyer_premium">Comprador premium</button>
-              <button type="button" class="gold-pill is-active" data-gold-buyer="standard" data-margin-internal="8" data-i18n="gold_buyer_standard">Comprador normal</button>
-              <button type="button" class="gold-pill" data-gold-buyer="conservative" data-margin-internal="15" data-i18n="gold_buyer_conservative">Comprador conservador</button>
-            </div>
-          </div>
-
           <!-- STEP 4 — estimated value. Primary focus once the user
                has type + karat + qty. Context line (#goldSummaryContext)
                appears below the amount to surface the math: karat,
@@ -653,9 +629,32 @@
             <div class="gold-summary-label" data-i18n="gold_summary_label">Valor estimado hoy</div>
             <div class="gold-summary-amount" id="goldSummaryAmount">—</div>
             <div class="gold-summary-context" id="goldSummaryContext"></div>
-            <div class="gold-summary-meta" id="goldSummaryMeta" data-i18n="gold_summary_meta_spot">Valor internacional del metal</div>
+            <div class="gold-summary-meta" id="goldSummaryMeta" data-i18n="gold_summary_meta_spot">Precio spot actualizado · estimación orientativa</div>
             <div class="gold-summary-spot" id="goldSummarySpotRef" hidden></div>
             <div class="gold-summary-disclaimer" id="goldSummaryDisclaimer" hidden data-i18n="gold_disclaimer">Estimación orientativa, no garantía de compra.</div>
+          </div>
+
+          <!-- GOLD-MOBILE-P0: single "Ajustar estimación" disclosure
+               that hides BOTH the spot/resale mode toggle and the buyer
+               selector. The user sees one clean estimate by default;
+               advanced users drill in only when they want to. -->
+          <div class="gold-adjust-block" id="goldBuyerBlock">
+            <button type="button" class="gold-adjust-toggle gold-more-toggle gold-more-toggle--subtle" id="goldBuyerToggle" aria-expanded="false" aria-controls="goldAdjustPanel">
+              <span data-i18n="gold_adjust_estimate">Ajustar estimación</span>
+              <span class="gold-more-icon" aria-hidden="true">›</span>
+            </button>
+            <div class="gold-adjust-panel" id="goldAdjustPanel" hidden>
+              <div class="gold-adjust-eyebrow" data-i18n="gold_value_label">Valorar como</div>
+              <div class="gold-mode-row" id="goldModeRow">
+                <button type="button" class="gold-pill is-active" data-gold-mode="spot"  data-i18n="gold_value_spot">Valor spot</button>
+                <button type="button" class="gold-pill"            data-gold-mode="resale" data-i18n="gold_value_resale">Venta estimada</button>
+              </div>
+              <div class="gold-buyer-row" id="goldBuyerRow" hidden>
+                <button type="button" class="gold-pill" data-gold-buyer="premium" data-margin-internal="5"  data-i18n="gold_buyer_premium">Comprador premium</button>
+                <button type="button" class="gold-pill is-active" data-gold-buyer="standard" data-margin-internal="8" data-i18n="gold_buyer_standard">Comprador normal</button>
+                <button type="button" class="gold-pill" data-gold-buyer="conservative" data-margin-internal="15" data-i18n="gold_buyer_conservative">Comprador conservador</button>
+              </div>
+            </div>
           </div>
 
           <!-- GOLD-UX-2: market reference demoted to the bottom of the
@@ -666,7 +665,7 @@
               <span class="gold-market-eyebrow" data-i18n="gold_market_label">Precio internacional del oro</span>
             </div>
             <div class="gold-market-price" id="goldSpotLine">—</div>
-            <div class="gold-market-meta" id="goldSpotSecondary" data-i18n="gold_market_meta_sub">Referencia 24K · ajustada según quilataje</div>
+            <div class="gold-market-meta" id="goldSpotSecondary" data-i18n="gold_market_meta_sub">Referencia 24K · ajustada por pureza</div>
           </div>
 
         </div>
@@ -729,7 +728,7 @@
           </div>
 
           <div class="modal-cta">
-            <button type="submit" class="btn-submit" id="btnSubmitAsset" style="display:none" data-i18n="addToPortfolio">Añadir a cartera</button>
+            <button type="submit" form="assetForm" class="btn-submit" id="btnSubmitAsset" style="display:none" data-i18n="addToPortfolio">Añadir a cartera</button>
           </div>
         </div><!-- /.add-v2-right -->
       </form>

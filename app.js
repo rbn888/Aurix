@@ -439,6 +439,8 @@ const T = {
     gold_type_jewelry:    'Joyería',
     gold_type_coin:       'Moneda',
     gold_type_bar:        'Lingote',
+    // GOLD-MOBILE-P0: copy refresh — "Quilataje" reads heavy in mobile,
+    // "Quilates" matches the buyer-facing terminology used everywhere else.
     gold_karat_label:     'Quilates',
     gold_karat_sub:       'Selecciona los quilates de tu oro.',
     gold_more_karats:     'Más quilates',
@@ -489,7 +491,10 @@ const T = {
     gold_buyer_standard:  'Comprador normal',
     gold_buyer_conservative: 'Comprador conservador',
     gold_summary_label:   'Valor estimado hoy',
-    gold_summary_meta_spot:   'Valor internacional del metal',
+    // GOLD-MOBILE-P0: collapse spot meta into a single line that already
+    // signals it's a live indicative estimate, so the user doesn't need
+    // to chase the disclaimer or the buyer block to feel oriented.
+    gold_summary_meta_spot:   'Precio spot actualizado · estimación orientativa',
     gold_summary_meta_resale: 'Estimación orientativa según comprador',
     gold_summary_spot_ref:    spot => `Valor spot: ${spot}`,
     gold_disclaimer:      'Estimación orientativa, no garantía de compra.',
@@ -1336,7 +1341,7 @@ const T = {
     gold_buyer_standard:  'Standard buyer',
     gold_buyer_conservative: 'Conservative buyer',
     gold_summary_label:   'Estimated value today',
-    gold_summary_meta_spot:   'International metal value',
+    gold_summary_meta_spot:   'Live spot price · indicative estimate',
     gold_summary_meta_resale: 'Indicative buyer-based estimate',
     gold_summary_spot_ref:    spot => `Spot value: ${spot}`,
     gold_disclaimer:      'Indicative estimate, not guaranteed dealer payout.',
@@ -16710,6 +16715,16 @@ function openModal(opts) {
     if (_showLbl) _showLbl.hidden = false;
     if (_hideLbl) _hideLbl.hidden = true;
   }
+  // GOLD-MOBILE-P0: collapse the "Ajustar estimación" panel on every
+  // open so the user always lands on the single clean estimate.
+  const _goldAdjPanelReset = document.getElementById('goldAdjustPanel');
+  if (_goldAdjPanelReset) _goldAdjPanelReset.hidden = true;
+  const _goldAdjToggleReset = document.getElementById('goldBuyerToggle');
+  if (_goldAdjToggleReset) {
+    _goldAdjToggleReset.setAttribute('aria-expanded', 'false');
+    const _adjIcon = _goldAdjToggleReset.querySelector('.gold-more-icon');
+    if (_adjIcon) _adjIcon.textContent = '›';
+  }
   currentSuggestions   = [];
   renderedSuggestions  = [];
   activeSearchFilter   = 'all';
@@ -18170,21 +18185,12 @@ function _addV4SyncGoldUI() {
   section.querySelectorAll('[data-gold-buyer]').forEach(b =>
     b.classList.toggle('is-active', Number(b.dataset.marginInternal) === Number(pendingResaleMargin))
   );
-  const buyerBlock = document.getElementById('goldBuyerBlock');
-  if (buyerBlock) buyerBlock.hidden = pendingGoldValuationMode !== 'resale';
-  // GOLD-UX-4: when the block hides (back to spot), collapse the
-  // buyer row so reopening resale starts from the single-estimate
-  // view, not a previously expanded selector.
-  if (pendingGoldValuationMode !== 'resale') {
-    const row = document.getElementById('goldBuyerRow');
-    if (row) row.hidden = true;
-    const btn = document.getElementById('goldBuyerToggle');
-    if (btn) {
-      btn.setAttribute('aria-expanded', 'false');
-      const icon = btn.querySelector('.gold-more-icon');
-      if (icon) icon.textContent = '›';
-    }
-  }
+  // GOLD-MOBILE-P0: the buyer-row visibility is independent of the
+  // "Ajustar estimación" panel state — buyer pills only render when
+  // the user is on resale mode. The panel itself stays under user
+  // control (toggle on #goldBuyerToggle / #goldAdjustPanel).
+  const buyerRowEl = document.getElementById('goldBuyerRow');
+  if (buyerRowEl) buyerRowEl.hidden = pendingGoldValuationMode !== 'resale';
   // Reveal the advanced 10K / 21K / 14K row if the user landed on a
   // karat that lives in that bucket (e.g. coming back to edit a 21K
   // asset). GOLD-UX-4: also sync the paired label visibility + the
@@ -18281,11 +18287,13 @@ function _addV4SyncGoldUI() {
       return;
     }
     if (target.id === 'goldBuyerToggle') {
-      // GOLD-UX-4: reveal/hide the premium/standard/conservative pills.
-      const row = document.getElementById('goldBuyerRow');
-      if (!row) return;
-      const willOpen = row.hidden;
-      row.hidden = !willOpen;
+      // GOLD-MOBILE-P0: toggles the whole "Ajustar estimación" panel
+      // (mode + buyer pills) instead of just the buyer row, so the
+      // resting state stays a single clean estimate.
+      const panel = document.getElementById('goldAdjustPanel');
+      if (!panel) return;
+      const willOpen = panel.hidden;
+      panel.hidden = !willOpen;
       target.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
       const icon = target.querySelector('.gold-more-icon');
       if (icon) icon.textContent = willOpen ? '‹' : '›';
