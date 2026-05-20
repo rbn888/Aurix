@@ -434,30 +434,38 @@ const T = {
     modalEditRETitle: 'Editar inmueble',
     karat:                'Quilates',
     goldUnit:             'Unidad',
-    // GOLD-UX-1: mobile-friendly gold entry copy.
-    gold_type_label:      'Qué tipo de oro tienes',
+    // GOLD-UX-PREMIUM-REBUILD copy. The flow is now:
+    //   1. ¿Qué tipo de oro tienes? (Joyería / Monedas / Lingote)
+    //   2. Pureza del oro (24/22/18/14/10/No lo sé)
+    //   3. Cantidad
+    //   → Estimate card, optional "Ajustar escenario de venta" disclosure.
+    gold_type_label:      '¿Qué tipo de oro tienes?',
     gold_type_jewelry:    'Joyería',
-    gold_type_coin:       'Moneda',
+    gold_type_coin:       'Monedas',
     gold_type_bar:        'Lingote',
-    // GOLD-MOBILE-P0: copy refresh — "Quilataje" reads heavy in mobile,
-    // "Quilates" matches the buyer-facing terminology used everywhere else.
-    gold_karat_label:     'Quilates',
-    gold_karat_sub:       'Selecciona los quilates de tu oro.',
+    gold_karat_label:     'Pureza del oro',
+    gold_karat_sub:       'Selecciona la pureza aproximada.',
     gold_more_karats:     'Más quilates',
     gold_quantity_label:  'Cantidad',
     gold_market_meta_sub: 'Referencia 24K · ajustada por pureza',
-    // GOLD-UX-2: progressive CTA + secondary "more karats" link.
+    // CTA copy. Gold flow CTA is "Añadir oro a cartera" — qty-aware
+    // variant kept for the rare "Añadir 25 g de oro" path used by the
+    // sticky-CTA stub when no live estimate has rendered yet.
     gold_cta_complete:    'Completa los datos',
     gold_cta_add:         'Añadir oro a cartera',
     gold_cta_add_qty:     qtyText => `Añadir ${qtyText} de oro`,
+    // Secondary summary above the CTA (e.g. "1 g · ≈ 109 US$").
+    gold_cta_secondary:   (qtyText, valueText) => `${qtyText} · ≈ ${valueText}`,
     gold_more_karats_subtle: '¿No es uno de estos? Ver más quilates',
     gold_less_karats_subtle: 'Ocultar quilates',
-    gold_adjust_estimate:    'Ajustar estimación',
-    // GOLD-UX-3: dynamic context line under the estimated value.
+    gold_adjust_estimate:    'Ajustar escenario de venta',
+    // Context line under the estimated value — REBUILD format follows
+    // the spec exactly: "[qty] · [purity] · [purity %]" → e.g.
+    // "1 g · 18K · 75% pureza".
     gold_summary_context: (karatStr, qtyText, purityText) =>
-      `${karatStr} · ${qtyText} · ${purityText}`,
-    gold_purity_max:      'pureza máxima',
-    gold_purity_approx:   pct => `${pct}% pureza aprox.`,
+      `${qtyText} · ${karatStr} · ${purityText}`,
+    gold_purity_max:      '99.9% pureza',
+    gold_purity_approx:   pct => `${pct}% pureza`,
     gramUnit:             'g',
     ozUnit:               'oz troy',
     kgUnit:               'kg',
@@ -477,25 +485,26 @@ const T = {
     gold_purity_label:    'Pureza',
     gold_unit_label:      'Unidad',
     gold_more_options:    'Más opciones',
-    gold_purity_24_sub:   'Oro puro',
-    gold_purity_22_sub:   'Moneda',
-    gold_purity_18_sub:   'Joyería común',
-    gold_purity_14_sub:   'Oro bajo',
+    gold_purity_24_sub:   'Oro puro · ~99.9%',
+    gold_purity_22_sub:   'Alta pureza · ~91.6%',
+    gold_purity_18_sub:   'Joyería común · ~75%',
+    gold_purity_14_sub:   'Pureza media · ~58.5%',
     gold_purity_21_sub:   'Joyería fina',
-    gold_purity_10_sub:   'Oro bajo',
-    gold_value_label:     'Valorar como',
+    gold_purity_10_sub:   'Pureza baja · ~41.7%',
+    gold_purity_unknown_title: 'No lo sé',
+    gold_purity_unknown_sub:   'Usaremos 18K',
+    gold_value_label:     'Escenario',
     gold_value_spot:      'Valor spot',
     gold_value_resale:    'Venta estimada',
-    gold_buyer_label:     'Tipo de comprador',
-    gold_buyer_premium:   'Comprador premium',
-    gold_buyer_standard:  'Comprador normal',
-    gold_buyer_conservative: 'Comprador conservador',
+    gold_buyer_label:     'Escenario de venta',
+    gold_buyer_premium:   'Optimista',
+    gold_buyer_standard:  'Mercado',
+    gold_buyer_conservative: 'Conservador',
     gold_summary_label:   'Valor estimado hoy',
-    // GOLD-MOBILE-P0: collapse spot meta into a single line that already
-    // signals it's a live indicative estimate, so the user doesn't need
-    // to chase the disclaimer or the buyer block to feel oriented.
-    gold_summary_meta_spot:   'Precio spot actualizado · estimación orientativa',
-    gold_summary_meta_resale: 'Estimación orientativa según comprador',
+    // REBUILD: spot meta now reads as a single short trust line; the
+    // disclaimer / buyer wording lives behind "Ajustar escenario".
+    gold_summary_meta_spot:   'Precio spot internacional actualizado',
+    gold_summary_meta_resale: 'Estimación orientativa según escenario',
     gold_summary_spot_ref:    spot => `Valor spot: ${spot}`,
     gold_disclaimer:      'Estimación orientativa, no garantía de compra.',
     qty:             'Cantidad',
@@ -1286,28 +1295,27 @@ const T = {
     modalEditRETitle: 'Edit property',
     karat:                'Karats',
     goldUnit:             'Unit',
-    // GOLD-UX-1: mobile-friendly gold entry copy.
-    gold_type_label:      'What kind of gold do you have',
+    // GOLD-UX-PREMIUM-REBUILD copy mirroring the Spanish flow.
+    gold_type_label:      'What kind of gold do you have?',
     gold_type_jewelry:    'Jewelry',
-    gold_type_coin:       'Coin',
+    gold_type_coin:       'Coins',
     gold_type_bar:        'Bar',
-    gold_karat_label:     'Karat',
-    gold_karat_sub:       'Select your gold karat.',
+    gold_karat_label:     'Gold purity',
+    gold_karat_sub:       'Select the approximate purity.',
     gold_more_karats:     'More karats',
     gold_quantity_label:  'Quantity',
     gold_market_meta_sub: '24K reference · adjusted by purity',
-    // GOLD-UX-2: progressive CTA + secondary "more karats" link.
     gold_cta_complete:    'Complete the details',
     gold_cta_add:         'Add gold to portfolio',
     gold_cta_add_qty:     qtyText => `Add ${qtyText} of gold`,
+    gold_cta_secondary:   (qtyText, valueText) => `${qtyText} · ≈ ${valueText}`,
     gold_more_karats_subtle: 'Not one of these? Show more karats',
     gold_less_karats_subtle: 'Hide karats',
-    gold_adjust_estimate:    'Adjust estimate',
-    // GOLD-UX-3: dynamic context line under the estimated value.
+    gold_adjust_estimate:    'Adjust sale scenario',
     gold_summary_context: (karatStr, qtyText, purityText) =>
-      `${karatStr} · ${qtyText} · ${purityText}`,
-    gold_purity_max:      'highest purity',
-    gold_purity_approx:   pct => `${pct}% purity approx.`,
+      `${qtyText} · ${karatStr} · ${purityText}`,
+    gold_purity_max:      '99.9% purity',
+    gold_purity_approx:   pct => `${pct}% purity`,
     gramUnit:             'g',
     ozUnit:               'troy oz',
     kgUnit:               'kg',
@@ -1327,22 +1335,24 @@ const T = {
     gold_purity_label:    'Purity',
     gold_unit_label:      'Unit',
     gold_more_options:    'More options',
-    gold_purity_24_sub:   'Pure gold',
-    gold_purity_22_sub:   'Coin',
-    gold_purity_18_sub:   'Common jewelry',
-    gold_purity_14_sub:   'Low purity',
+    gold_purity_24_sub:   'Pure gold · ~99.9%',
+    gold_purity_22_sub:   'High purity · ~91.6%',
+    gold_purity_18_sub:   'Common jewelry · ~75%',
+    gold_purity_14_sub:   'Mid purity · ~58.5%',
     gold_purity_21_sub:   'Fine jewelry',
-    gold_purity_10_sub:   'Low purity',
-    gold_value_label:     'Value as',
+    gold_purity_10_sub:   'Low purity · ~41.7%',
+    gold_purity_unknown_title: "I don't know",
+    gold_purity_unknown_sub:   "We'll use 18K",
+    gold_value_label:     'Scenario',
     gold_value_spot:      'Spot value',
     gold_value_resale:    'Estimated resale',
-    gold_buyer_label:     'Buyer profile',
-    gold_buyer_premium:   'Premium buyer',
-    gold_buyer_standard:  'Standard buyer',
-    gold_buyer_conservative: 'Conservative buyer',
+    gold_buyer_label:     'Sale scenario',
+    gold_buyer_premium:   'Optimistic',
+    gold_buyer_standard:  'Market',
+    gold_buyer_conservative: 'Conservative',
     gold_summary_label:   'Estimated value today',
-    gold_summary_meta_spot:   'Live spot price · indicative estimate',
-    gold_summary_meta_resale: 'Indicative buyer-based estimate',
+    gold_summary_meta_spot:   'Live international spot price',
+    gold_summary_meta_resale: 'Indicative estimate by scenario',
     gold_summary_spot_ref:    spot => `Spot value: ${spot}`,
     gold_disclaimer:      'Indicative estimate, not guaranteed dealer payout.',
     qty:             'Quantity',
@@ -16693,30 +16703,17 @@ function openModal(opts) {
   pendingResaleMargin  = 8;
   // ADD-V4.1: reset valuation mode to canonical spot on every open.
   if (typeof pendingGoldValuationMode !== 'undefined') pendingGoldValuationMode = 'spot';
-  // GOLD-UX-1: reset the type-step + advanced expansion so each
-  // re-open starts the user on STEP 1 (Joyería/Moneda/Lingote).
+  // GOLD-UX-PREMIUM-REBUILD — reset the type step + scenario
+  // disclosure so each re-open lands cleanly on STEP 1 with no leaked
+  // selection state from the previous session.
   const _goldSecReset = document.getElementById('goldSection');
   if (_goldSecReset) {
     _goldSecReset.dataset.goldType = '';
-    _goldSecReset.classList.remove('gold-section--all-karats');
+    _goldSecReset.dataset.goldQty  = '0';
     _goldSecReset.querySelectorAll('.gold-type-chip').forEach(b => b.classList.remove('is-active'));
   }
-  const _goldAdvReset = document.getElementById('goldPurityAdvanced');
-  if (_goldAdvReset) _goldAdvReset.hidden = true;
-  const _goldMoreReset = document.getElementById('goldMoreToggle');
-  if (_goldMoreReset) {
-    _goldMoreReset.setAttribute('aria-expanded', 'false');
-    const _icon = _goldMoreReset.querySelector('.gold-more-icon');
-    if (_icon) _icon.textContent = '›';
-    // GOLD-UX-4: restore the "Ver más quilates" label every open so
-    // the previous-session toggle state can't leak in.
-    const _showLbl = _goldMoreReset.querySelector('[data-show]');
-    const _hideLbl = _goldMoreReset.querySelector('[data-hide]');
-    if (_showLbl) _showLbl.hidden = false;
-    if (_hideLbl) _hideLbl.hidden = true;
-  }
-  // GOLD-MOBILE-P0: collapse the "Ajustar estimación" panel on every
-  // open so the user always lands on the single clean estimate.
+  // Collapse the "Ajustar escenario de venta" disclosure so the user
+  // always lands on the single clean spot estimate.
   const _goldAdjPanelReset = document.getElementById('goldAdjustPanel');
   if (_goldAdjPanelReset) _goldAdjPanelReset.hidden = true;
   const _goldAdjToggleReset = document.getElementById('goldBuyerToggle');
@@ -16725,6 +16722,11 @@ function openModal(opts) {
     const _adjIcon = _goldAdjToggleReset.querySelector('.gold-more-icon');
     if (_adjIcon) _adjIcon.textContent = '›';
   }
+  // Clear the CTA secondary line + the count-up tween state so the
+  // next valid estimate animates from zero.
+  const _goldCtaSumReset = document.getElementById('goldCtaSummary');
+  if (_goldCtaSumReset) { _goldCtaSumReset.hidden = true; _goldCtaSumReset.textContent = ''; }
+  _goldEstLast = 0;
   currentSuggestions   = [];
   renderedSuggestions  = [];
   activeSearchFilter   = 'all';
@@ -17092,6 +17094,13 @@ function _buildGoldContextLine() {
 // to instant write under prefers-reduced-motion.
 let _goldEstLast = 0;
 let _goldEstRaf  = null;
+// GOLD-UX-PREMIUM-REBUILD — the estimate is always indicative, so the
+// amount renders with an ≈ prefix to signal that intent visually. The
+// helper centralises the format so the animation tween and the static
+// write paths share a single source of truth.
+function _formatGoldEstimateText(usd) {
+  return `≈ ${formatDisplay(usd, 'USD')}`;
+}
 function _animateGoldEstimate(targetUsd) {
   const el = document.getElementById('goldSummaryAmount');
   if (!el) return;
@@ -17099,7 +17108,7 @@ function _animateGoldEstimate(targetUsd) {
     && matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (reduced || _goldEstLast === 0 || !Number.isFinite(_goldEstLast)) {
     _goldEstLast = targetUsd;
-    el.textContent = formatDisplay(targetUsd, 'USD');
+    el.textContent = _formatGoldEstimateText(targetUsd);
     return;
   }
   if (_goldEstRaf) cancelAnimationFrame(_goldEstRaf);
@@ -17111,9 +17120,9 @@ function _animateGoldEstimate(targetUsd) {
   (function step(now) {
     const p = Math.min((now - t0) / dur, 1);
     const v = start + (end - start) * easeOutQuad(p);
-    el.textContent = formatDisplay(v, 'USD');
+    el.textContent = _formatGoldEstimateText(v);
     if (p < 1) _goldEstRaf = requestAnimationFrame(step);
-    else { _goldEstRaf = null; _goldEstLast = end; el.textContent = formatDisplay(end, 'USD'); }
+    else { _goldEstRaf = null; _goldEstLast = end; el.textContent = _formatGoldEstimateText(end); }
   })(t0);
 }
 
@@ -17140,28 +17149,42 @@ function _isGoldFormValid() {
 function _updateGoldCtaState() {
   const v = _isGoldFormValid();
   if (!v) return;
-  // Reflect the qty validity on the section so CSS can reveal STEP 4
-  // (estimated value) only when the user has actually entered an amount.
+  // Reflect the qty validity on the section so CSS can reveal the
+  // estimate card / scenario disclosure only when the user has entered
+  // a valid amount.
   v.section.dataset.goldQty = v.qtyValid ? '1' : '0';
-  // GOLD-UX-3: paint the context line under the estimated value.
+  // Context line under the estimated value — REBUILD format
+  // "[qty] · [purity] · [purity %]".
   const ctxEl = document.getElementById('goldSummaryContext');
   if (ctxEl) ctxEl.textContent = _buildGoldContextLine();
+  // GOLD-UX-PREMIUM-REBUILD — compact "1 g · ≈ 109 US$" line above the
+  // CTA so the user always sees what they're about to add at a glance.
+  // Reads the last animated estimate so currency formatting stays in
+  // sync with the big amount.
+  const ctaSummaryEl = document.getElementById('goldCtaSummary');
+  if (ctaSummaryEl) {
+    if (v.valid && _goldEstLast > 0) {
+      const qty = parseLocalFloat(qtyInput.value);
+      const qtyText = _formatGoldQtyText(qty, pendingGoldUnit);
+      const valStr  = formatDisplay(_goldEstLast, 'USD');
+      const fn      = t('gold_cta_secondary');
+      ctaSummaryEl.textContent = (typeof fn === 'function')
+        ? fn(qtyText, valStr)
+        : `${qtyText} · ≈ ${valStr}`;
+      ctaSummaryEl.hidden = false;
+    } else {
+      ctaSummaryEl.hidden = true;
+      ctaSummaryEl.textContent = '';
+    }
+  }
   if (!btnSubmitEl) return;
   const enabled = v.valid;
   btnSubmitEl.disabled = !enabled;
   btnSubmitEl.classList.toggle('btn-submit--disabled', !enabled);
-  if (!enabled) {
-    btnSubmitEl.textContent = t('gold_cta_complete');
-  } else {
-    // GOLD-UX-3: prefer the dynamic "Añadir 25 g de oro" label when we
-    // can build the qty text; fall back to the generic copy otherwise.
-    const qty = parseLocalFloat(qtyInput.value);
-    const qtyText = _formatGoldQtyText(qty, pendingGoldUnit);
-    const dynFn   = t('gold_cta_add_qty');
-    btnSubmitEl.textContent = (qtyText && typeof dynFn === 'function')
-      ? dynFn(qtyText)
-      : t('gold_cta_add');
-  }
+  // REBUILD: CTA always reads "Añadir oro a cartera" once valid. The
+  // qty-aware "Añadir 25 g de oro" variant is no longer used — the
+  // secondary summary line above already surfaces qty + value.
+  btnSubmitEl.textContent = enabled ? t('gold_cta_add') : t('gold_cta_complete');
 }
 
 // ADD-V4.1: gold market reference — small premium card above the
@@ -18185,34 +18208,11 @@ function _addV4SyncGoldUI() {
   section.querySelectorAll('[data-gold-buyer]').forEach(b =>
     b.classList.toggle('is-active', Number(b.dataset.marginInternal) === Number(pendingResaleMargin))
   );
-  // GOLD-MOBILE-P0: the buyer-row visibility is independent of the
-  // "Ajustar estimación" panel state — buyer pills only render when
-  // the user is on resale mode. The panel itself stays under user
-  // control (toggle on #goldBuyerToggle / #goldAdjustPanel).
+  // GOLD-UX-PREMIUM-REBUILD — scenario pills are visible whenever the
+  // "Ajustar escenario de venta" disclosure is open. Visibility is
+  // owned by the panel toggle, not the valuation mode.
   const buyerRowEl = document.getElementById('goldBuyerRow');
-  if (buyerRowEl) buyerRowEl.hidden = pendingGoldValuationMode !== 'resale';
-  // Reveal the advanced 10K / 21K / 14K row if the user landed on a
-  // karat that lives in that bucket (e.g. coming back to edit a 21K
-  // asset). GOLD-UX-4: also sync the paired label visibility + the
-  // chevron so the toggle reads correctly when auto-expanded.
-  const adv = document.getElementById('goldPurityAdvanced');
-  if (adv) {
-    const inAdvanced = pendingKarat === 10 || pendingKarat === 14 || pendingKarat === 21;
-    if (inAdvanced) {
-      adv.hidden = false;
-      section.classList.add('gold-section--all-karats');
-    }
-    const moreBtn = document.getElementById('goldMoreToggle');
-    if (moreBtn) {
-      moreBtn.setAttribute('aria-expanded', inAdvanced ? 'true' : 'false');
-      const showLbl = moreBtn.querySelector('[data-show]');
-      const hideLbl = moreBtn.querySelector('[data-hide]');
-      if (showLbl) showLbl.hidden = inAdvanced;
-      if (hideLbl) hideLbl.hidden = !inAdvanced;
-      const icon = moreBtn.querySelector('.gold-more-icon');
-      if (icon) icon.textContent = inAdvanced ? '‹' : '›';
-    }
-  }
+  if (buyerRowEl) buyerRowEl.hidden = false;
 }
 
 (function _addV4WireGold() {
@@ -18222,44 +18222,35 @@ function _addV4SyncGoldUI() {
     const target = e.target.closest && e.target.closest('button');
     if (!target || target.disabled) return;
 
-    // GOLD-UX-1: STEP 1 — type chip click. Stamps a data-gold-type
-    // attribute on the section so CSS narrows the karat grid to the
-    // contextual subset. Also preselects a sensible default karat so
-    // the user can confirm with a single tap.
+    // GOLD-UX-PREMIUM-REBUILD STEP 1 — type chip click. Stamps the
+    // selection on the section so CSS reveals STEP 2 / STEP 3 / the
+    // estimate card. Preselects a sensible default karat per type so
+    // the user can keep moving without a second tap.
     if (target.dataset.goldType !== undefined &&
         target.classList.contains('gold-type-chip')) {
       const chosen = target.dataset.goldType;
       if (!chosen) return;
       section.dataset.goldType = chosen;
-      section.classList.remove('gold-section--all-karats');
-      const adv = document.getElementById('goldPurityAdvanced');
-      if (adv) adv.hidden = true;
-      const moreBtn = document.getElementById('goldMoreToggle');
-      if (moreBtn) {
-        moreBtn.setAttribute('aria-expanded', 'false');
-        const icon = moreBtn.querySelector('.gold-more-icon');
-        if (icon) icon.textContent = '›';
-        // GOLD-UX-4: collapse the advanced label back to "Ver más
-        // quilates" when the user picks a new gold type so each type
-        // starts from its contextual karat subset.
-        const showLbl = moreBtn.querySelector('[data-show]');
-        const hideLbl = moreBtn.querySelector('[data-hide]');
-        if (showLbl) showLbl.hidden = false;
-        if (hideLbl) hideLbl.hidden = true;
-      }
       // Update active class on the type chip row.
       section.querySelectorAll('.gold-type-chip').forEach(b =>
         b.classList.toggle('is-active', b.dataset.goldType === chosen));
-      // Default karat per type.
+      // Default karat per type — exact spec mapping.
       const DEFAULTS = { jewelry: 18, coin: 22, bar: 24 };
-      if (DEFAULTS[chosen] != null) {
-        pendingKarat = DEFAULTS[chosen];
-      }
+      if (DEFAULTS[chosen] != null) pendingKarat = DEFAULTS[chosen];
       _addV4SyncGoldUI();
       updatePreview();
       return;
     }
 
+    // GOLD-UX-PREMIUM-REBUILD STEP 2 — "No lo sé" chip maps
+    // conservatively to 18K. Sits next to the numeric purity chips so
+    // a non-expert never feels blocked.
+    if (target.dataset.goldKaratUnknown) {
+      pendingKarat = 18;
+      _addV4SyncGoldUI();
+      updatePreview();
+      return;
+    }
     if (target.dataset.goldKarat) {
       pendingKarat = parseInt(target.dataset.goldKarat, 10) || pendingKarat;
       _addV4SyncGoldUI();
@@ -18280,42 +18271,26 @@ function _addV4SyncGoldUI() {
       return;
     }
     if (target.dataset.goldBuyer) {
+      // GOLD-UX-PREMIUM-REBUILD — picking a scenario pill auto-flips
+      // valuation to "resale" so the user doesn't have to make a second
+      // decision after opening the disclosure. The (now-hidden) mode
+      // toggle stays in the DOM so the existing valuation math reads
+      // the same `pendingGoldValuationMode` flag.
       const m = parseInt(target.dataset.marginInternal, 10);
       if (Number.isFinite(m)) pendingResaleMargin = m;
+      pendingGoldValuationMode = 'resale';
       _addV4SyncGoldUI();
       updatePreview();
       return;
     }
     if (target.id === 'goldBuyerToggle') {
-      // GOLD-MOBILE-P0: toggles the whole "Ajustar estimación" panel
-      // (mode + buyer pills) instead of just the buyer row, so the
-      // resting state stays a single clean estimate.
+      // Toggles the "Ajustar escenario de venta" disclosure (scenario
+      // pills). Resting state shows only the clean spot estimate.
       const panel = document.getElementById('goldAdjustPanel');
       if (!panel) return;
       const willOpen = panel.hidden;
       panel.hidden = !willOpen;
       target.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-      const icon = target.querySelector('.gold-more-icon');
-      if (icon) icon.textContent = willOpen ? '‹' : '›';
-      return;
-    }
-    if (target.id === 'goldMoreToggle') {
-      const adv = document.getElementById('goldPurityAdvanced');
-      if (!adv) return;
-      const willOpen = adv.hidden;
-      adv.hidden = !willOpen;
-      // GOLD-UX-1: when expanded, also unlock the contextual filter so
-      // every karat chip becomes visible. Collapsing returns to the
-      // type-narrowed primary view.
-      section.classList.toggle('gold-section--all-karats', willOpen);
-      target.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-      // GOLD-UX-4: swap "Ver más quilates" ↔ "Ocultar quilates" via
-      // paired labels (one visible at a time) so the toggle reads
-      // naturally in both states. Icon rotates to convey the action.
-      const showLbl = target.querySelector('[data-show]');
-      const hideLbl = target.querySelector('[data-hide]');
-      if (showLbl) showLbl.hidden = willOpen;
-      if (hideLbl) hideLbl.hidden = !willOpen;
       const icon = target.querySelector('.gold-more-icon');
       if (icon) icon.textContent = willOpen ? '‹' : '›';
       return;

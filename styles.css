@@ -1776,6 +1776,25 @@ body.modal-open {
   /* Desktop hides the inline #formPreview line — the live preview
      card on the right is the canonical view. */
   .modal[data-mode="asset"] #formPreview { display: none !important; }
+
+  /* GOLD-UX-PREMIUM-REBUILD — on desktop the gold CTA is NOT sticky.
+     It sits below the estimate as a regular block. The body gets its
+     own scroll if content overflows the modal cap. */
+  .modal[data-mode="gold"] .modal-cta {
+    position: static;
+    padding: 8px 0 0;
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-top: 0;
+    box-shadow: none;
+    margin-top: 4px;
+  }
+  .modal[data-mode="gold"] .btn-submit {
+    padding: 14px;
+    border-radius: 12px;
+    font-size: 14px;
+  }
 }
 
 /* Picker step gets a tighter, centred width on the wider desktop
@@ -2251,6 +2270,7 @@ body.modal-open {
    collapsed state actually hides on disk. */
 .gold-adjust-panel[hidden] { display: none !important; }
 .gold-buyer-row[hidden] { display: none !important; }
+.gold-mode-row[hidden]  { display: none !important; }
 .gold-adjust-eyebrow {
   font-size: 10.5px;
   font-weight: 700;
@@ -2314,6 +2334,31 @@ body.modal-open {
   letter-spacing: 0.005em;
 }
 
+/* GOLD-UX-PREMIUM-REBUILD — secondary "1 g · ≈ 109 US$" line above
+   the CTA. Tabular nums + tight letter-spacing so the number reads as
+   a precise figure, not chatter. Collapses to zero height when blank
+   so the CTA never shifts during the form's empty state. */
+.gold-cta-summary {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgba(233,196,106,0.78);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gold-cta-summary[hidden] { display: none !important; }
+/* Compact CTA pill in gold mode — the summary line above already
+   states qty + value, so the button can stay short and confident. */
+.modal[data-mode="gold"] .btn-submit {
+  padding: 13px 16px;
+  font-size: 14.5px;
+  letter-spacing: 0.005em;
+}
+
 /* Hide the legacy in-form estimate strip in gold mode — the summary
    card above is the single source of truth for the user. */
 .modal[data-mode="gold"] #formPreview { display: none !important; }
@@ -2340,10 +2385,12 @@ body.modal-open {
     box-shadow: 0 -8px 24px -10px rgba(0,0,0,0.55);
     z-index: 5;
   }
-  /* CTA ≈ 48px button + 12px top pad + 12px bottom pad ≈ 72px. Plus
-     safe-area + 24px breathing room above the last form element. */
+  /* Footer footprint = CTA pill (48px) + 12px top + 12px bottom +
+     14px secondary summary line + 6px margin = ~92px. Body padding
+     adds 24px breathing room above so the last element never sits
+     under the footer. */
   .modal[data-mode="gold"] .modal-body {
-    padding-bottom: calc(env(safe-area-inset-bottom) + 72px + 24px);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 92px + 24px);
   }
   .modal[data-mode="asset"] #assetForm.modal-body {
     padding-bottom: calc(env(safe-area-inset-bottom) + 48px + 22px + 24px);
@@ -15193,7 +15240,11 @@ body.gs-open { overflow: hidden; }
   letter-spacing: -0.005em;
 }
 
-/* STEP 2 — Quilataje. Subline + contextual filtering. */
+/* GOLD-UX-PREMIUM-REBUILD — STEP 2 "Pureza del oro".
+   All purity tiers (24/22/18/14/10) plus a "No lo sé" tile are visible
+   upfront. The legacy contextual filter + "Ver más quilates" advanced
+   disclosure are intentionally gone — they made common karats feel
+   hidden and added friction. */
 .gold-field-sub {
   font-size: 12px;
   color: rgba(220,230,250,0.50);
@@ -15201,20 +15252,24 @@ body.gs-open { overflow: hidden; }
   margin-top: -4px;
 }
 
-/* Contextual karat filter: when a type is chosen, only the chips
-   marked with that context stay visible in the primary grid. The
-   "Más quilatajes" toggle adds `.gold-section--all-karats` which
-   restores every chip. Default state (no type yet) shows the three
-   pre-marked chips (18K / 22K / 24K). */
-#goldSection[data-gold-type="jewelry"] #goldPurityGrid .gold-chip:not([data-gold-contexts~="jewelry"]) { display: none; }
-#goldSection[data-gold-type="coin"]    #goldPurityGrid .gold-chip:not([data-gold-contexts~="coin"])    { display: none; }
-#goldSection[data-gold-type="bar"]     #goldPurityGrid .gold-chip:not([data-gold-contexts~="bar"])     { display: none; }
-#goldSection.gold-section--all-karats #goldPurityGrid .gold-chip { display: flex !important; }
-
-/* Bar-only: render the single 24K chip full-width so the grid stays
-   balanced visually rather than orphaning a 50% chip. */
-#goldSection[data-gold-type="bar"]:not(.gold-section--all-karats) #goldPurityGrid {
-  grid-template-columns: 1fr;
+/* The "No lo sé" tile reads as a calmer ghost option so it doesn't
+   compete with the numeric purity chips for primary attention. */
+.gold-chip--unknown {
+  background: rgba(255,255,255,0.015);
+  border-style: dashed;
+  border-color: rgba(255,255,255,0.10);
+}
+.gold-chip--unknown .gold-chip-title {
+  font-size: 14px;
+  letter-spacing: -0.002em;
+  color: rgba(220,230,250,0.78);
+}
+.gold-chip--unknown .gold-chip-sub {
+  color: rgba(220,230,250,0.42);
+}
+.gold-chip--unknown:hover {
+  border-color: rgba(233,196,106,0.35);
+  background: rgba(233,196,106,0.04);
 }
 
 /* Compact market card — quieter meta line, less density. */
@@ -15368,30 +15423,9 @@ body.gs-open { overflow: hidden; }
   display: none;
 }
 
-/* Lingote fast-path — when the user picks "Lingote" we minimise the
-   karat field block so 99% of bars (24K) need zero extra interaction
-   to reach quantity. The Más-quilatajes link remains accessible. The
-   `#goldKaratBlock` selector keeps this compatible with browsers that
-   don't yet ship :has(). */
-#goldSection[data-gold-type="bar"]:not(.gold-section--all-karats) #goldKaratBlock {
-  gap: 4px;
-  padding: 6px 0 0;
-}
-#goldSection[data-gold-type="bar"]:not(.gold-section--all-karats) #goldKaratBlock .gold-field-sub {
-  display: none;
-}
-#goldSection[data-gold-type="bar"]:not(.gold-section--all-karats) #goldKaratBlock .gold-field-label {
-  font-size: 10.5px;
-  opacity: 0.55;
-  letter-spacing: 0.10em;
-  text-transform: uppercase;
-}
-#goldSection[data-gold-type="bar"]:not(.gold-section--all-karats) #goldPurityGrid .gold-chip {
-  padding: 9px 14px;
-}
-#goldSection[data-gold-type="bar"]:not(.gold-section--all-karats) #goldKaratBlock .gold-chip-sub {
-  display: none;
-}
+/* GOLD-UX-PREMIUM-REBUILD — the previous Lingote fast-path is gone.
+   With all purity tiers visible upfront and a per-type preselect (bar
+   defaults to 24K), no per-type CSS reshape is needed. */
 
 /* Mobile tightening — slightly less vertical air without crushing
    readability. Applies to both the form-group--gold rhythm and the

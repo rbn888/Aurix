@@ -548,9 +548,9 @@
              inside #goldSection and use delegated handlers. -->
         <div class="form-group form-group--gold" id="goldSection" style="display:none" data-gold-type="" data-gold-qty="0">
 
-          <!-- Section 2 — STEP 1: tipo de oro -->
+          <!-- GOLD-UX-PREMIUM-REBUILD STEP 1 — tipo de oro -->
           <div class="gold-field-block gold-field-block--type">
-            <div class="gold-field-label" data-i18n="gold_type_label">Qué tipo de oro tienes</div>
+            <div class="gold-field-label" data-i18n="gold_type_label">¿Qué tipo de oro tienes?</div>
             <div class="gold-type-row" id="goldTypeRow" role="radiogroup">
               <button type="button" class="gold-type-chip" data-gold-type="jewelry">
                 <span class="gold-type-icon" aria-hidden="true">◐</span>
@@ -558,7 +558,7 @@
               </button>
               <button type="button" class="gold-type-chip" data-gold-type="coin">
                 <span class="gold-type-icon" aria-hidden="true">●</span>
-                <span class="gold-type-name" data-i18n="gold_type_coin">Moneda</span>
+                <span class="gold-type-name" data-i18n="gold_type_coin">Monedas</span>
               </button>
               <button type="button" class="gold-type-chip" data-gold-type="bar">
                 <span class="gold-type-icon" aria-hidden="true">▬</span>
@@ -567,41 +567,39 @@
             </div>
           </div>
 
-          <!-- STEP 2: quilates contextual al tipo -->
+          <!-- GOLD-UX-PREMIUM-REBUILD STEP 2 — pureza del oro.
+               All five purity tiers are visible upfront; the previous
+               contextual filter + "Ver más quilates" advanced disclosure
+               are gone because they made common karats feel hidden. The
+               "No lo sé" tile lets a non-expert user proceed; JS maps it
+               conservatively to 18K. -->
           <div class="gold-field-block" id="goldKaratBlock">
-            <div class="gold-field-label" data-i18n="gold_karat_label">Quilates</div>
-            <div class="gold-field-sub" data-i18n="gold_karat_sub">Selecciona los quilates de tu oro.</div>
+            <div class="gold-field-label" data-i18n="gold_karat_label">Pureza del oro</div>
+            <div class="gold-field-sub" data-i18n="gold_karat_sub">Selecciona la pureza aproximada.</div>
             <div class="gold-purity-grid" id="goldPurityGrid">
-              <button type="button" class="gold-chip" data-gold-karat="24" data-gold-contexts="jewelry coin bar">
+              <button type="button" class="gold-chip" data-gold-karat="24">
                 <span class="gold-chip-title">24K</span>
-                <span class="gold-chip-sub" data-i18n="gold_purity_24_sub">Puro</span>
+                <span class="gold-chip-sub" data-i18n="gold_purity_24_sub">Oro puro · ~99.9%</span>
               </button>
-              <button type="button" class="gold-chip" data-gold-karat="22" data-gold-contexts="coin">
+              <button type="button" class="gold-chip" data-gold-karat="22">
                 <span class="gold-chip-title">22K</span>
-                <span class="gold-chip-sub" data-i18n="gold_purity_22_sub">Moneda</span>
+                <span class="gold-chip-sub" data-i18n="gold_purity_22_sub">Alta pureza · ~91.6%</span>
               </button>
-              <button type="button" class="gold-chip is-active" data-gold-karat="18" data-gold-contexts="jewelry">
+              <button type="button" class="gold-chip is-active" data-gold-karat="18">
                 <span class="gold-chip-title">18K</span>
-                <span class="gold-chip-sub" data-i18n="gold_purity_18_sub">Joyería</span>
+                <span class="gold-chip-sub" data-i18n="gold_purity_18_sub">Joyería común · ~75%</span>
               </button>
-            </div>
-            <button type="button" class="gold-more-toggle gold-more-toggle--subtle" id="goldMoreToggle" aria-expanded="false" aria-controls="goldPurityAdvanced">
-              <span class="gold-more-label" data-show data-i18n="gold_more_karats_subtle">¿No es uno de estos? Ver más quilates</span>
-              <span class="gold-more-label" data-hide hidden data-i18n="gold_less_karats_subtle">Ocultar quilates</span>
-              <span class="gold-more-icon" aria-hidden="true">›</span>
-            </button>
-            <div class="gold-purity-advanced" id="goldPurityAdvanced" hidden>
-              <button type="button" class="gold-chip" data-gold-karat="21" data-gold-contexts="">
-                <span class="gold-chip-title">21K</span>
-                <span class="gold-chip-sub" data-i18n="gold_purity_21_sub">Joyería fina</span>
-              </button>
-              <button type="button" class="gold-chip" data-gold-karat="14" data-gold-contexts="">
+              <button type="button" class="gold-chip" data-gold-karat="14">
                 <span class="gold-chip-title">14K</span>
-                <span class="gold-chip-sub" data-i18n="gold_purity_14_sub">Joyería ligera</span>
+                <span class="gold-chip-sub" data-i18n="gold_purity_14_sub">Pureza media · ~58.5%</span>
               </button>
-              <button type="button" class="gold-chip" data-gold-karat="10" data-gold-contexts="">
+              <button type="button" class="gold-chip" data-gold-karat="10">
                 <span class="gold-chip-title">10K</span>
-                <span class="gold-chip-sub" data-i18n="gold_purity_10_sub">Joyería económica</span>
+                <span class="gold-chip-sub" data-i18n="gold_purity_10_sub">Pureza baja · ~41.7%</span>
+              </button>
+              <button type="button" class="gold-chip gold-chip--unknown" data-gold-karat-unknown="1">
+                <span class="gold-chip-title" data-i18n="gold_purity_unknown_title">No lo sé</span>
+                <span class="gold-chip-sub" data-i18n="gold_purity_unknown_sub">Usaremos 18K</span>
               </button>
             </div>
           </div>
@@ -621,38 +619,46 @@
                visually grouped, then restored on exit. -->
           <div id="goldQtyAnchor"></div>
 
-          <!-- STEP 4 — estimated value. Primary focus once the user
-               has type + karat + qty. Context line (#goldSummaryContext)
-               appears below the amount to surface the math: karat,
-               quantity and approximate purity. -->
+          <!-- GOLD-UX-PREMIUM-REBUILD — estimate card. Anchors the flow.
+               Amount reads with an ≈ prefix to signal "indicative", the
+               meta below it follows the spec format "[qty] · [purity] ·
+               [purity %]", and a small spot-basis line confirms the
+               price source. The card auto-reveals once qty is valid via
+               #goldSection[data-gold-qty="1"] in CSS. -->
           <div class="gold-summary-card" id="goldSummaryCard">
             <div class="gold-summary-label" data-i18n="gold_summary_label">Valor estimado hoy</div>
             <div class="gold-summary-amount" id="goldSummaryAmount">—</div>
             <div class="gold-summary-context" id="goldSummaryContext"></div>
-            <div class="gold-summary-meta" id="goldSummaryMeta" data-i18n="gold_summary_meta_spot">Precio spot actualizado · estimación orientativa</div>
+            <div class="gold-summary-meta" id="goldSummaryMeta" data-i18n="gold_summary_meta_spot">Precio spot internacional actualizado</div>
             <div class="gold-summary-spot" id="goldSummarySpotRef" hidden></div>
             <div class="gold-summary-disclaimer" id="goldSummaryDisclaimer" hidden data-i18n="gold_disclaimer">Estimación orientativa, no garantía de compra.</div>
           </div>
 
-          <!-- GOLD-MOBILE-P0: single "Ajustar estimación" disclosure
-               that hides BOTH the spot/resale mode toggle and the buyer
-               selector. The user sees one clean estimate by default;
-               advanced users drill in only when they want to. -->
+          <!-- GOLD-UX-PREMIUM-REBUILD — "Ajustar escenario de venta".
+               Buyer profile pills are demoted entirely behind this
+               disclosure. By default the user only sees a clean spot
+               estimate; advanced users drill in to flip the scenario
+               (Optimista / Mercado / Conservador → existing 5/8/15
+               margins so submit-time persistence is unchanged). -->
           <div class="gold-adjust-block" id="goldBuyerBlock">
             <button type="button" class="gold-adjust-toggle gold-more-toggle gold-more-toggle--subtle" id="goldBuyerToggle" aria-expanded="false" aria-controls="goldAdjustPanel">
-              <span data-i18n="gold_adjust_estimate">Ajustar estimación</span>
+              <span data-i18n="gold_adjust_estimate">Ajustar escenario de venta</span>
               <span class="gold-more-icon" aria-hidden="true">›</span>
             </button>
             <div class="gold-adjust-panel" id="goldAdjustPanel" hidden>
-              <div class="gold-adjust-eyebrow" data-i18n="gold_value_label">Valorar como</div>
-              <div class="gold-mode-row" id="goldModeRow">
+              <div class="gold-adjust-eyebrow" data-i18n="gold_value_label">Escenario</div>
+              <div class="gold-buyer-row" id="goldBuyerRow">
+                <button type="button" class="gold-pill" data-gold-buyer="premium" data-margin-internal="5"  data-i18n="gold_buyer_premium">Optimista</button>
+                <button type="button" class="gold-pill is-active" data-gold-buyer="standard" data-margin-internal="8" data-i18n="gold_buyer_standard">Mercado</button>
+                <button type="button" class="gold-pill" data-gold-buyer="conservative" data-margin-internal="15" data-i18n="gold_buyer_conservative">Conservador</button>
+              </div>
+              <!-- Internal-only spot/resale mode driver; flipped to
+                   "resale" the moment the user touches a scenario pill
+                   so the same valuation math fires without forcing
+                   another decision on them. -->
+              <div class="gold-mode-row" id="goldModeRow" hidden>
                 <button type="button" class="gold-pill is-active" data-gold-mode="spot"  data-i18n="gold_value_spot">Valor spot</button>
                 <button type="button" class="gold-pill"            data-gold-mode="resale" data-i18n="gold_value_resale">Venta estimada</button>
-              </div>
-              <div class="gold-buyer-row" id="goldBuyerRow" hidden>
-                <button type="button" class="gold-pill" data-gold-buyer="premium" data-margin-internal="5"  data-i18n="gold_buyer_premium">Comprador premium</button>
-                <button type="button" class="gold-pill is-active" data-gold-buyer="standard" data-margin-internal="8" data-i18n="gold_buyer_standard">Comprador normal</button>
-                <button type="button" class="gold-pill" data-gold-buyer="conservative" data-margin-internal="15" data-i18n="gold_buyer_conservative">Comprador conservador</button>
               </div>
             </div>
           </div>
@@ -728,6 +734,11 @@
           </div>
 
           <div class="modal-cta">
+            <!-- GOLD-UX-PREMIUM-REBUILD — compact secondary line above
+                 the CTA (mobile + desktop) so the user sees what they're
+                 about to add at a glance. Hidden until the gold flow is
+                 valid; rendered by _updateGoldCtaState. -->
+            <div class="gold-cta-summary" id="goldCtaSummary" hidden></div>
             <button type="submit" form="assetForm" class="btn-submit" id="btnSubmitAsset" style="display:none" data-i18n="addToPortfolio">Añadir a cartera</button>
           </div>
         </div><!-- /.add-v2-right -->
