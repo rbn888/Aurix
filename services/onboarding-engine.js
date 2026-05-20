@@ -25,6 +25,12 @@
     WELCOME:     'WELCOME',
     INTERESTS:   'INTERESTS',
     EXPERIENCE:  'EXPERIENCE',
+    // ONBOARDING-PROFILE-UI-1 — single premium step that collects
+    // riskProfile (required, defaults to 'balanced') and ageBand
+    // (optional, defaults to 'prefer_not_say'). Sits AFTER experience
+    // because the user has already declared a posture by then; this
+    // step refines the signal tone without feeling like a quiz.
+    PROFILE:     'PROFILE',
     ACTIVATION:  'ACTIVATION',
     SUCCESS:     'SUCCESS',
     COMPLETED:   'COMPLETED',
@@ -36,6 +42,7 @@
     STATES.WELCOME,
     STATES.INTERESTS,
     STATES.EXPERIENCE,
+    STATES.PROFILE,
     STATES.ACTIVATION,
     STATES.SUCCESS,
   ];

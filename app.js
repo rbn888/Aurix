@@ -1041,6 +1041,22 @@ const T = {
     onbExpActiveDesc:     'Invierto con regularidad',
     onbExpAdvanced:       'Avanzado',
     onbExpAdvancedDesc:   'Conozco los mercados',
+    // ONBOARDING-PROFILE-UI-1 — investor profile step. Calm, premium
+    // wording — never alarmist. The questions feel like a tone tuner,
+    // not a quiz.
+    onbProfileTitle:      'Personaliza tu inteligencia',
+    onbProfileSub:        'Aurix ajustará las señales según tu forma de invertir.',
+    onbRiskQuestion:      '¿Cómo prefieres invertir?',
+    onbRiskConservative:  'Conservador',
+    onbRiskBalanced:      'Equilibrado',
+    onbRiskGrowth:        'Crecimiento',
+    onbRiskAggressive:    'Agresivo',
+    onbAgeQuestion:       'Etapa inversora',
+    onbAgeUnder30:        '<30',
+    onbAge30_45:          '30–45',
+    onbAge45_60:          '45–60',
+    onbAgeOver60:         '60+',
+    onbAgePreferNotSay:   'Prefiero no decirlo',
     onbActTitle:          'Añade tu primer activo',
     onbActSub:            'Empieza a construir tu visión financiera.',
     onbAddAssetBtn:       '+ Añadir activo',
@@ -1903,6 +1919,19 @@ const T = {
     onbAssetRe:           'Real estate',
     onbExpTitle:          'How would you describe yourself?',
     onbExpSub:            'Optional. We will tune detail to your level.',
+    onbProfileTitle:      'Personalize your intelligence',
+    onbProfileSub:        'Aurix will tune insights to your investing style.',
+    onbRiskQuestion:      'How do you prefer to invest?',
+    onbRiskConservative:  'Conservative',
+    onbRiskBalanced:      'Balanced',
+    onbRiskGrowth:        'Growth',
+    onbRiskAggressive:    'Aggressive',
+    onbAgeQuestion:       'Investment stage',
+    onbAgeUnder30:        '<30',
+    onbAge30_45:          '30–45',
+    onbAge45_60:          '45–60',
+    onbAgeOver60:         '60+',
+    onbAgePreferNotSay:   'Prefer not to say',
     onbExpBeginner:       'Beginner',
     onbExpBeginnerDesc:   'Just getting started',
     onbExpActive:         'Active investor',
@@ -23178,6 +23207,24 @@ function exportPortfolioBackup() {
     document.querySelectorAll('[data-onb-exp]').forEach(el => {
       el.classList.toggle('is-selected', (pendingExp || snap.experience) === el.dataset.onbExp);
     });
+
+    // ONBOARDING-PROFILE-UI-1 — risk profile + age band selection
+    // mirror. Defaults apply visually when nothing is stored yet:
+    // balanced is highlighted in the markup; prefer_not_say carries
+    // is-active. We override both with the engine's stored value
+    // when present so a reload mid-flow restores the user's pick.
+    const riskNow = snap.riskProfile || 'balanced';
+    document.querySelectorAll('[data-onb-risk]').forEach(el => {
+      const sel = el.dataset.onbRisk === riskNow;
+      el.classList.toggle('is-selected', sel);
+      el.classList.toggle('is-active',   sel);
+    });
+    const ageNow = snap.ageBand || 'prefer_not_say';
+    document.querySelectorAll('[data-onb-age]').forEach(el => {
+      const sel = el.dataset.onbAge === ageNow;
+      el.classList.toggle('is-selected', sel);
+      el.classList.toggle('is-active',   sel);
+    });
   }
 
   // ONBOARDING-2 / 2B: success step body + count chip reflect the
@@ -23259,6 +23306,23 @@ function exportPortfolioBackup() {
     if (expCard && _ov()?.classList.contains('open')) {
       pendingExp = expCard.dataset.onbExp;
       Eng.savePreferences({ experience: pendingExp });
+      _syncSelectionsFromState();
+      return;
+    }
+
+    // ONBOARDING-PROFILE-UI-1 — risk profile chip (single-select).
+    // Persists immediately so a "back" navigation never loses the
+    // selection. Continue handler is the generic [data-onb-next].
+    const riskChip = e.target.closest && e.target.closest('[data-onb-risk]');
+    if (riskChip && _ov()?.classList.contains('open')) {
+      Eng.savePreferences({ riskProfile: riskChip.dataset.onbRisk });
+      _syncSelectionsFromState();
+      return;
+    }
+    // Age band chip (single-select, optional).
+    const ageChip = e.target.closest && e.target.closest('[data-onb-age]');
+    if (ageChip && _ov()?.classList.contains('open')) {
+      Eng.savePreferences({ ageBand: ageChip.dataset.onbAge });
       _syncSelectionsFromState();
       return;
     }

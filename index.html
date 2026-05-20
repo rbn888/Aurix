@@ -1213,6 +1213,7 @@
       <span class="onb-progress-dot" data-step="WELCOME"></span>
       <span class="onb-progress-dot" data-step="INTERESTS"></span>
       <span class="onb-progress-dot" data-step="EXPERIENCE"></span>
+      <span class="onb-progress-dot" data-step="PROFILE"></span>
       <span class="onb-progress-dot" data-step="ACTIVATION"></span>
     </div>
     <button type="button" class="onb-skip" id="onbSkipBtn" data-i18n="onbSkip">Saltar</button>
@@ -1300,6 +1301,37 @@
           <span class="onb-exp-desc" data-i18n="onbExpAdvancedDesc">Conozco los mercados</span>
         </button>
       </div>
+      <div class="onb-footer onb-footer--split">
+        <button type="button" class="onb-cta onb-cta--ghost" data-onb-back data-i18n="onbBack">Atrás</button>
+        <button type="button" class="onb-cta onb-cta--primary" data-onb-next data-i18n="onbContinue">Continuar</button>
+      </div>
+    </section>
+
+    <!-- ONBOARDING-PROFILE-UI-1 — single combined investor-profile
+         step. Collects riskProfile (default: balanced) + ageBand
+         (default: prefer_not_say). Never alarmist, never a quiz:
+         picks reuse the existing onb-chip premium style. -->
+    <section class="onb-step" data-onb-step="PROFILE">
+      <h2 class="onb-headline" data-i18n="onbProfileTitle">Personaliza tu inteligencia</h2>
+      <p class="onb-sub" data-i18n="onbProfileSub">Aurix ajustará las señales según tu forma de invertir.</p>
+
+      <p class="onb-sub onb-sub--label" data-i18n="onbRiskQuestion">¿Cómo prefieres invertir?</p>
+      <div class="onb-chips" id="onbRiskChips">
+        <button type="button" class="onb-chip" data-onb-risk="conservative" data-i18n="onbRiskConservative">Conservador</button>
+        <button type="button" class="onb-chip is-active" data-onb-risk="balanced" data-i18n="onbRiskBalanced">Equilibrado</button>
+        <button type="button" class="onb-chip" data-onb-risk="growth" data-i18n="onbRiskGrowth">Crecimiento</button>
+        <button type="button" class="onb-chip" data-onb-risk="aggressive" data-i18n="onbRiskAggressive">Agresivo</button>
+      </div>
+
+      <p class="onb-sub onb-sub--label" data-i18n="onbAgeQuestion">Etapa inversora</p>
+      <div class="onb-chips onb-chips--age" id="onbAgeChips">
+        <button type="button" class="onb-chip" data-onb-age="under_30" data-i18n="onbAgeUnder30">&lt;30</button>
+        <button type="button" class="onb-chip" data-onb-age="age_30_45" data-i18n="onbAge30_45">30–45</button>
+        <button type="button" class="onb-chip" data-onb-age="age_45_60" data-i18n="onbAge45_60">45–60</button>
+        <button type="button" class="onb-chip" data-onb-age="over_60" data-i18n="onbAgeOver60">60+</button>
+        <button type="button" class="onb-chip onb-chip--ghost is-active" data-onb-age="prefer_not_say" data-i18n="onbAgePreferNotSay">Prefiero no decirlo</button>
+      </div>
+
       <div class="onb-footer onb-footer--split">
         <button type="button" class="onb-cta onb-cta--ghost" data-onb-back data-i18n="onbBack">Atrás</button>
         <button type="button" class="onb-cta onb-cta--primary" data-onb-next data-i18n="onbContinue">Continuar</button>
