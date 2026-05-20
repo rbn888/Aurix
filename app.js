@@ -1097,6 +1097,26 @@ const T = {
     signalLossBody:              'Uno de tus activos está bajo presión.',
     signalLossCta:               'Revisar',
     signalCryptoBodySoft:        'Cripto representa una parte importante de tu cartera.',
+    // INVESTOR-PROFILE-1 — tonal variants. Resolver picks one per
+    // profile; absent variants fall back to the base copy above.
+    signalConcentrationBody_conservative: 'Tu exposición a activos volátiles supera tu perfil objetivo.',
+    signalConcentrationBody_aggressive:   'Alta exposición a crecimiento, coherente con un perfil dinámico.',
+    signalConcentrationBody_pro:          'Concentración detectada en una categoría principal.',
+    signalConcentrationBody_beginner:     'Tu cartera depende mucho de un solo activo.',
+    signalCategoryBody_conservative:      'Tu exposición a activos volátiles supera tu perfil objetivo.',
+    signalCategoryBody_aggressive:        'Alta exposición a crecimiento, coherente con un perfil dinámico.',
+    signalCategoryBody_pro:               'Concentración detectada en una categoría principal.',
+    signalCategoryBody_beginner:          'Tu cartera depende mucho de una sola categoría.',
+    signalCryptoBody_conservative:        'Tu exposición a cripto supera tu perfil objetivo.',
+    signalCryptoBody_aggressive:          'Alta exposición a cripto, coherente con un perfil dinámico.',
+    signalCryptoBody_pro:                 'Cripto representa una parte mayoritaria del portfolio.',
+    signalCryptoBody_beginner:            'La parte cripto de tu cartera es elevada.',
+    signalSingleBody_conservative:        'Toda tu cartera depende de un único activo.',
+    signalSingleBody_pro:                 'Cartera concentrada en un único activo.',
+    signalSingleBody_beginner:            'Tu cartera tiene un solo activo. Diversificar reduce sorpresas.',
+    signalCashBody_conservative:          'Tu reserva de liquidez es amplia, alineada con un perfil prudente.',
+    signalCashBody_pro:                   'Alta proporción de liquidez sin desplegar.',
+    signalCashBody_beginner:              'Una parte importante de tu cartera está en liquidez.',
     signalDominantBody:          name => `${name} domina tu cartera.`,
     signalCategoryBody:          'Tu cartera tiene una sola categoría dominante.',
     signalLowDivBody:            'Tu portfolio tiene poca diversificación.',
@@ -1944,6 +1964,25 @@ const T = {
     signalLossBody:              'One of your holdings is under pressure.',
     signalLossCta:               'Review',
     signalCryptoBodySoft:        'Crypto represents a meaningful share of your portfolio.',
+    // INVESTOR-PROFILE-1 — tonal variants, EN mirror of the ES set.
+    signalConcentrationBody_conservative: 'Your volatile-asset exposure is above your target profile.',
+    signalConcentrationBody_aggressive:   'High growth exposure, consistent with a dynamic profile.',
+    signalConcentrationBody_pro:          'Concentration detected in a primary holding.',
+    signalConcentrationBody_beginner:     'Your portfolio depends heavily on a single asset.',
+    signalCategoryBody_conservative:      'Your volatile-asset exposure is above your target profile.',
+    signalCategoryBody_aggressive:        'High growth exposure, consistent with a dynamic profile.',
+    signalCategoryBody_pro:               'Concentration detected in a primary category.',
+    signalCategoryBody_beginner:          'Your portfolio depends heavily on a single category.',
+    signalCryptoBody_conservative:        'Your crypto exposure is above your target profile.',
+    signalCryptoBody_aggressive:          'High crypto exposure, consistent with a dynamic profile.',
+    signalCryptoBody_pro:                 'Crypto represents a majority of the portfolio.',
+    signalCryptoBody_beginner:            'A large share of your portfolio is in crypto.',
+    signalSingleBody_conservative:        'Your entire portfolio depends on a single asset.',
+    signalSingleBody_pro:                 'Portfolio concentrated in one asset.',
+    signalSingleBody_beginner:            'Your portfolio holds just one asset. Diversifying reduces surprises.',
+    signalCashBody_conservative:          'Your liquidity reserve is large, aligned with a prudent profile.',
+    signalCashBody_pro:                   'High share of capital sitting in liquidity.',
+    signalCashBody_beginner:              'A large share of your portfolio sits in liquidity.',
     signalDominantBody:          name => `${name} dominates your portfolio.`,
     signalCategoryBody:          'Your portfolio has a single dominant category.',
     signalLowDivBody:            'Your portfolio has limited diversification.',
@@ -23999,6 +24038,69 @@ function _aurixSignalIsNarrow() {
   return (typeof matchMedia === 'function') && matchMedia('(max-width: 360px)').matches;
 }
 
+// ── INVESTOR-PROFILE-1 ─────────────────────────────────────────────
+// Aurix Signals personalise their tone to the user's investor profile.
+// Profile lives in the onboarding prefs (experience, riskProfile,
+// ageBand). Reading it never forces onboarding — missing values fall
+// through to safe defaults (intermediate / balanced / prefer_not_say).
+function _aurixInvestorProfile() {
+  let snap = null;
+  try {
+    if (typeof window !== 'undefined' && window.AurixOnboarding
+        && typeof window.AurixOnboarding.getSnapshot === 'function') {
+      snap = window.AurixOnboarding.getSnapshot();
+    }
+  } catch (_) { snap = null; }
+  if (!snap) {
+    // Fallback path — older sessions or non-hydrated boots.
+    try {
+      const raw = localStorage.getItem('aurix_onboarding_preferences');
+      if (raw) snap = JSON.parse(raw) || {};
+    } catch (_) { snap = {}; }
+  }
+  snap = snap || {};
+  const experience  = (typeof snap.experience  === 'string' && snap.experience)  ? snap.experience  : 'intermediate';
+  const riskProfile = (typeof snap.riskProfile === 'string' && snap.riskProfile) ? snap.riskProfile : 'balanced';
+  const ageBand     = (typeof snap.ageBand     === 'string' && snap.ageBand)     ? snap.ageBand     : 'prefer_not_say';
+  return { experience, riskProfile, ageBand };
+}
+
+// Pick a tonal suffix for a signal kind. Priority:
+//   1. Risk-profile match on volatile-exposure signals (concentration /
+//      category / crypto / single / dominant) — conservative gets a
+//      "exceeds your objective" frame, aggressive gets a "coherent
+//      with a dynamic profile" frame.
+//   2. Experience match — professional → neutral/technical, beginner →
+//      gentle plain-language.
+//   3. Otherwise empty suffix → existing copy stays.
+// The resolver below always falls back to the base key if no profile-
+// specific i18n string exists, so this layer is purely additive.
+function _aurixSignalToneSuffix(kind, profile) {
+  if (!kind || !profile) return '';
+  const volatileKinds = new Set(['concentration', 'category', 'crypto', 'single', 'dominant']);
+  const isVolatile = volatileKinds.has(kind);
+  if (isVolatile && profile.riskProfile === 'conservative') return '_conservative';
+  if (isVolatile && profile.riskProfile === 'aggressive')   return '_aggressive';
+  if (profile.experience === 'professional')                 return '_pro';
+  if (profile.experience === 'beginner')                     return '_beginner';
+  return '';
+}
+
+// Resolve a key with the tonal suffix if a translation exists, else
+// fall back to the base. Pure helper — no DOM.
+function _aurixSignalToneResolve(baseKey, kind) {
+  if (!baseKey) return baseKey;
+  const profile = _aurixInvestorProfile();
+  const suffix  = _aurixSignalToneSuffix(kind, profile);
+  if (!suffix) return baseKey;
+  const tonedKey = baseKey + suffix;
+  if (typeof t === 'function') {
+    const v = t(tonedKey);
+    if (typeof v === 'string' && v && v !== tonedKey) return tonedKey;
+  }
+  return baseKey;
+}
+
 function _aurixSignalResolveMsg(entry, isOnly) {
   // Each entry can carry an i18n key (`msg`), a softer key (`msgSoft`)
   // when it's the only signal in the pool, a `msgRaw` (pre-formatted
@@ -24006,16 +24108,24 @@ function _aurixSignalResolveMsg(entry, isOnly) {
   // or mobile-specific variants (`msgMobile`, `msgRawMobile`,
   // `msgMobileSoft`). The mobile copies are preferred on ≤640px so
   // the bar never has to ellipsis meaning away.
+  //
+  // INVESTOR-PROFILE-1 — each candidate key passes through the tonal
+  // resolver before t() is called, so a beginner / professional /
+  // conservative / aggressive variant overrides the base copy when
+  // present. Missing variants silently fall back, so this layer is
+  // purely additive and never breaks an existing signal.
   if (_aurixSignalIsMobile()) {
     if (entry.msgRawMobile) return entry.msgRawMobile;
-    const mKey = (isOnly && entry.msgMobileSoft) ? entry.msgMobileSoft : entry.msgMobile;
-    if (mKey) {
+    const mBase = (isOnly && entry.msgMobileSoft) ? entry.msgMobileSoft : entry.msgMobile;
+    if (mBase) {
+      const mKey = _aurixSignalToneResolve(mBase, entry.kind);
       const mv = (typeof t === 'function') ? t(mKey) : null;
       if (typeof mv === 'string' && mv) return mv;
     }
   }
   if (entry.msgRaw) return entry.msgRaw;
-  const key = (isOnly && entry.msgSoft) ? entry.msgSoft : entry.msg;
+  const base = (isOnly && entry.msgSoft) ? entry.msgSoft : entry.msg;
+  const key  = _aurixSignalToneResolve(base, entry.kind);
   const v = (typeof t === 'function') ? t(key) : null;
   return (typeof v === 'string') ? v : (typeof v === 'function' ? '' : (key || ''));
 }
@@ -24194,6 +24304,16 @@ if (typeof window !== 'undefined' && _aurixIsDebugHost()) {
     const livePool = (typeof computeAurixSignalPool === 'function')
       ? computeAurixSignalPool() : [];
     const idx = _aurixSignalSafeIdx(_aurixSignalPool.length);
+    const active = _aurixSignalPool[idx] || null;
+    // INVESTOR-PROFILE-1 — show which profile facets drove the
+    // tonal selection for the currently active signal so engineers
+    // can verify the personalisation pipeline end-to-end.
+    const profile = (typeof _aurixInvestorProfile === 'function') ? _aurixInvestorProfile() : null;
+    const toneSuffix = (active && profile && typeof _aurixSignalToneSuffix === 'function')
+      ? _aurixSignalToneSuffix(active.kind, profile) : '';
+    const activeBaseKey = active ? active.msg : null;
+    const activeResolvedKey = (active && typeof _aurixSignalToneResolve === 'function')
+      ? _aurixSignalToneResolve(activeBaseKey, active.kind) : activeBaseKey;
     return {
       assets: Array.isArray(assets) ? assets.map(a => ({
         ticker: a.ticker || a.symbol || null,
@@ -24203,13 +24323,18 @@ if (typeof window !== 'undefined' && _aurixIsDebugHost()) {
       signalPool:       _aurixSignalPool.map(s => s.kind),
       livePool:         livePool.map(s => s.kind),
       currentIdx:       _aurixSignalIdx,
-      activeSignal:     _aurixSignalPool[idx] || null,
+      activeSignal:     active,
       visibilityReason: _aurixSignalVisibility,
       timerState: {
         running: !!_aurixSignalTimer,
         paused:  _aurixSignalPaused,
         intervalMs: AURIX_SIGNAL_ROTATE_MS,
       },
+      investorProfile: profile,
+      activeToneSuffix:    toneSuffix || '(none — base copy)',
+      activeBaseKey,
+      activeResolvedKey,
+      activeTonedDiffers:  activeBaseKey !== activeResolvedKey,
     };
   };
 }

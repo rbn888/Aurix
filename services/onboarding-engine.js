@@ -53,12 +53,18 @@
   };
 
   // In-memory mirror of the persisted record. Source of truth for the UI.
+  // INVESTOR-PROFILE-1 — riskProfile + ageBand are optional additive
+  // fields. Missing values stay null (the signal layer applies safe
+  // defaults — balanced / intermediate / prefer_not_say — at read time).
+  // Existing flows that ignore these fields keep working unchanged.
   let _state = {
     state:        STATES.NOT_STARTED,
     completed:    false,
     language:     null,
     interests:    [],
     experience:   null,
+    riskProfile:  null,
+    ageBand:      null,
     completedAt:  null,
   };
   let _hydrated = false;
@@ -137,6 +143,9 @@
       language:     prefs.language     || null,
       interests:    Array.isArray(prefs.interests) ? prefs.interests : [],
       experience:   prefs.experience   || null,
+      // INVESTOR-PROFILE-1 — additive optional fields.
+      riskProfile:  prefs.riskProfile  || null,
+      ageBand:      prefs.ageBand      || null,
       completedAt:  prefs.completedAt  || null,
     };
   }
@@ -149,6 +158,8 @@
       language:    s.language,
       interests:   s.interests || [],
       experience:  s.experience,
+      riskProfile: s.riskProfile || null,
+      ageBand:     s.ageBand     || null,
       completedAt: s.completedAt || null,
     }));
   }
@@ -317,6 +328,15 @@
     if (data && typeof data.language === 'string') {
       next.language = data.language;
     }
+    // INVESTOR-PROFILE-1 — accept the new fields. Allow null to clear.
+    if (data && typeof data.riskProfile !== 'undefined') {
+      next.riskProfile = (typeof data.riskProfile === 'string' && data.riskProfile) ? data.riskProfile : null;
+      _analytics('risk_profile_selected', { riskProfile: next.riskProfile });
+    }
+    if (data && typeof data.ageBand !== 'undefined') {
+      next.ageBand = (typeof data.ageBand === 'string' && data.ageBand) ? data.ageBand : null;
+      _analytics('age_band_selected', { ageBand: next.ageBand });
+    }
     _state = next;
     _writeLocal(_state);
     _syncRemote(_state);
@@ -351,6 +371,8 @@
       language:    null,
       interests:   [],
       experience:  null,
+      riskProfile: null,
+      ageBand:     null,
       completedAt: null,
     };
     window._aurixOnboardingInProgress = false;
@@ -365,6 +387,8 @@
       language:    _state.language,
       interests:   _state.interests.slice(),
       experience:  _state.experience,
+      riskProfile: _state.riskProfile,
+      ageBand:     _state.ageBand,
       completedAt: _state.completedAt,
       hydrated:    _hydrated,
     };
