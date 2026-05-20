@@ -864,6 +864,104 @@ const T = {
     ws_diag_ctx_perf_weak:   name => `${name} bajo presión`,
     ws_signals_main:         'Señales principales',
     ws_signals_empty:        'Sin señales activas. Sigue construyendo tu cartera.',
+    // WORKSPACE-INTELLIGENCE-3 — premium copy for the cockpit. Tone:
+    // institutional, calm, explanatory. Every state pair (label + sub)
+    // is one short sentence; the engine pairs them with a hero/dimension
+    // explanation that always carries the WHY.
+    ws_intel_title:           'Inteligencia de cartera',
+    ws_intel_sub:             'Visión estratégica de tu patrimonio',
+    ws_intel_explainer:       'Aurix interpreta estructura, riesgo, concentración y resiliencia.',
+    ws_intel_section_dimensions: 'Dimensiones de cartera',
+    ws_intel_section_signals:    'Señales explicadas',
+    // status strip labels (shared with diag grid)
+    ws_intel_status_health:        'Salud',
+    ws_intel_status_risk:          'Riesgo',
+    ws_intel_status_diversif:      'Diversificación',
+    ws_intel_status_liquidity:     'Liquidez',
+    // risk tonal states
+    ws_intel_risk_calm:        'Bajo',
+    ws_intel_risk_calm_sub:    'Estructura prudente',
+    ws_intel_risk_mid:         'Medio',
+    ws_intel_risk_mid_sub:     'Controlado',
+    ws_intel_risk_elevated:    'Elevado',
+    ws_intel_risk_elevated_sub:'Necesita atención',
+    // diversification tonal states
+    ws_intel_div_low:        'Baja',
+    ws_intel_div_low_sub:    (n, c) => `${n} ${n === 1 ? 'activo' : 'activos'} · ${c} ${c === 1 ? 'categoría' : 'categorías'}`,
+    ws_intel_div_mid:        'Media',
+    ws_intel_div_mid_sub:    (n, c) => `${n} ${n === 1 ? 'activo' : 'activos'} · ${c} ${c === 1 ? 'categoría' : 'categorías'}`,
+    ws_intel_div_high:       'Sólida',
+    ws_intel_div_high_sub:   (n, c) => `${n} activos · ${c} categorías`,
+    // liquidity tonal states
+    ws_intel_liq_none:       'Limitada',
+    ws_intel_liq_none_sub:   'Sin margen inmediato',
+    ws_intel_liq_thin:       'Ajustada',
+    ws_intel_liq_thin_sub:   pct => `${pct}% disponible · margen reducido`,
+    ws_intel_liq_ok:         'Equilibrada',
+    ws_intel_liq_ok_sub:     pct => `${pct}% disponible para nuevas decisiones`,
+    ws_intel_liq_high:       'Alta',
+    ws_intel_liq_high_sub:   pct => `${pct}% sin desplegar`,
+    // concentration states (used in dimensions card)
+    ws_intel_conc_low:       'Equilibrada',
+    ws_intel_conc_mod:       'Moderada',
+    ws_intel_conc_high:      'Concentrada',
+    // performance dimension
+    ws_intel_perf_initial:   'Inicial',
+    // dimensions grid
+    ws_intel_dim_diversification:     'Diversificación',
+    ws_intel_dim_diversification_why: (n, c) => `Distribuyes capital entre ${n} ${n === 1 ? 'activo' : 'activos'} y ${c} ${c === 1 ? 'categoría' : 'categorías'}.`,
+    ws_intel_dim_liquidity:           'Liquidez',
+    ws_intel_dim_liquidity_why_none:  '0% del patrimonio disponible inmediatamente.',
+    ws_intel_dim_liquidity_why_pct:   pct => `${pct}% del patrimonio disponible inmediatamente.`,
+    ws_intel_dim_concentration:       'Concentración',
+    ws_intel_dim_concentration_why:   (name, pct) => `${name} concentra el ${pct}% del peso total.`,
+    ws_intel_dim_concentration_why_none: 'Reparto sin un asset dominante.',
+    ws_intel_dim_performance:         'Rendimiento',
+    ws_intel_dim_performance_why_initial: 'Todavía no hay histórico suficiente para una lectura representativa.',
+    // hero variants — every one pairs claim + reason.
+    ws_intel_hero_eyebrow:     'Insight principal',
+    ws_intel_empty_title:      'Tu inteligencia aparecerá cuando construyas cartera.',
+    ws_intel_empty_explanation:'A medida que añadas activos, Aurix interpretará estructura, riesgo y resiliencia.',
+    ws_intel_hero_single_title:       'Cartera dependiente de un solo activo',
+    ws_intel_hero_single_summary:     name => `Todo el patrimonio registrado está concentrado en ${name}.`,
+    ws_intel_hero_single_explanation: 'Con una sola posición tu evolución total reproduce exactamente el movimiento de ese activo.',
+    ws_intel_hero_single_hint:        'Diversificar reduce sorpresas y mejora resiliencia.',
+    ws_intel_hero_conc_title:         name => `Concentración relevante en ${name}`,
+    ws_intel_hero_conc_summary:       (name, pct) => `${name} representa el ${pct}% de tu cartera.`,
+    ws_intel_hero_conc_explanation:   'Una parte importante de tu rendimiento dependerá del movimiento de un único activo.',
+    ws_intel_hero_conc_hint:          'Revisa el equilibrio cuando puedas.',
+    ws_intel_hero_conc_mod_title:     name => `${name} pesa por encima del resto`,
+    ws_intel_hero_conc_mod_summary:   (name, pct) => `${name} representa el ${pct}% del total registrado.`,
+    ws_intel_hero_crypto_title:       'Exposición elevada a cripto',
+    ws_intel_hero_crypto_summary:     pct => `Cripto representa el ${pct}% del patrimonio.`,
+    ws_intel_hero_crypto_explanation: 'Las decisiones de mercado en cripto influirán más que las del resto de tu estructura.',
+    ws_intel_hero_crypto_hint:        '',
+    ws_intel_hero_liq_title:          'Liquidez limitada',
+    ws_intel_hero_liq_summary:        'Actualmente no tienes capital inmediatamente desplegable registrado.',
+    ws_intel_hero_liq_explanation:    'Eso reduce flexibilidad ante oportunidades o eventos inesperados.',
+    ws_intel_hero_liq_hint:           'Una pequeña reserva mejora resiliencia.',
+    ws_intel_hero_resilient_title:    'Estructura equilibrada',
+    ws_intel_hero_resilient_summary:  'Ningún activo ni categoría domina el peso de la cartera.',
+    ws_intel_hero_resilient_explanation:'Tu rendimiento agregado no depende de una sola decisión.',
+    // deep signals (institutional intelligence rows)
+    ws_intel_signal_concentration:               'Concentración',
+    ws_intel_signal_concentration_title:         name => `${name} domina el peso de la cartera`,
+    ws_intel_signal_concentration_title_none:    'Reparto sin un líder claro',
+    ws_intel_signal_concentration_explanation:   (name, pct) => `Tu evolución total responderá especialmente a movimientos de ${name} (${pct}% del peso).`,
+    ws_intel_signal_concentration_explanation_none: 'Ningún activo concentra el rendimiento agregado.',
+    ws_intel_signal_diversification:              'Diversificación',
+    ws_intel_signal_diversification_title_strong: 'Cobertura razonable entre categorías',
+    ws_intel_signal_diversification_title_mid:    'Diversificación intermedia',
+    ws_intel_signal_diversification_title_low:    'Diversificación reducida',
+    ws_intel_signal_diversification_explanation:  (n, c) => `Tu cartera incluye ${n} ${n === 1 ? 'activo' : 'activos'} repartidos entre ${c} ${c === 1 ? 'categoría' : 'categorías'}.`,
+    ws_intel_signal_liquidity:                    'Liquidez',
+    ws_intel_signal_liquidity_title_none:         'Sin reserva inmediata',
+    ws_intel_signal_liquidity_title_pct:          pct => `Reserva del ${pct}% del patrimonio`,
+    ws_intel_signal_liquidity_explanation_none:   'Toda tu cartera está invertida; cualquier nueva decisión requiere reasignar.',
+    ws_intel_signal_liquidity_explanation_pct:    pct => `Mantienes ${pct}% en liquidez como margen de maniobra.`,
+    ws_intel_signal_performance:                  'Rendimiento',
+    ws_intel_signal_performance_title_initial:    'Sin lectura histórica representativa',
+    ws_intel_signal_performance_explanation_initial: 'La cartera necesita más historia para una conclusión fiable.',
     ws_micro_synced:         'Datos actualizados',
     ws_micro_pending:        'Sincronización pendiente',
     ws_empty_title:          'Tu workspace se activará cuando añadas activos.',
@@ -1759,6 +1857,91 @@ const T = {
     ws_diag_ctx_perf_weak:   name => `${name} under pressure`,
     ws_signals_main:         'Main signals',
     ws_signals_empty:        'No active signals. Keep building your portfolio.',
+    ws_intel_title:           'Portfolio intelligence',
+    ws_intel_sub:             'Strategic view of your wealth',
+    ws_intel_explainer:       'Aurix interprets structure, risk, concentration and resilience.',
+    ws_intel_section_dimensions: 'Portfolio dimensions',
+    ws_intel_section_signals:    'Explained signals',
+    ws_intel_status_health:        'Health',
+    ws_intel_status_risk:          'Risk',
+    ws_intel_status_diversif:      'Diversification',
+    ws_intel_status_liquidity:     'Liquidity',
+    ws_intel_risk_calm:        'Low',
+    ws_intel_risk_calm_sub:    'Prudent structure',
+    ws_intel_risk_mid:         'Medium',
+    ws_intel_risk_mid_sub:     'In control',
+    ws_intel_risk_elevated:    'Elevated',
+    ws_intel_risk_elevated_sub:'Worth reviewing',
+    ws_intel_div_low:        'Low',
+    ws_intel_div_low_sub:    (n, c) => `${n} ${n === 1 ? 'asset' : 'assets'} · ${c} ${c === 1 ? 'category' : 'categories'}`,
+    ws_intel_div_mid:        'Medium',
+    ws_intel_div_mid_sub:    (n, c) => `${n} ${n === 1 ? 'asset' : 'assets'} · ${c} ${c === 1 ? 'category' : 'categories'}`,
+    ws_intel_div_high:       'Solid',
+    ws_intel_div_high_sub:   (n, c) => `${n} assets · ${c} categories`,
+    ws_intel_liq_none:       'Limited',
+    ws_intel_liq_none_sub:   'No immediate room',
+    ws_intel_liq_thin:       'Thin',
+    ws_intel_liq_thin_sub:   pct => `${pct}% available · tight buffer`,
+    ws_intel_liq_ok:         'Balanced',
+    ws_intel_liq_ok_sub:     pct => `${pct}% available for new decisions`,
+    ws_intel_liq_high:       'High',
+    ws_intel_liq_high_sub:   pct => `${pct}% undeployed`,
+    ws_intel_conc_low:       'Balanced',
+    ws_intel_conc_mod:       'Moderate',
+    ws_intel_conc_high:      'Concentrated',
+    ws_intel_perf_initial:   'Initial',
+    ws_intel_dim_diversification:     'Diversification',
+    ws_intel_dim_diversification_why: (n, c) => `Capital is spread across ${n} ${n === 1 ? 'asset' : 'assets'} and ${c} ${c === 1 ? 'category' : 'categories'}.`,
+    ws_intel_dim_liquidity:           'Liquidity',
+    ws_intel_dim_liquidity_why_none:  '0% of your wealth is immediately deployable.',
+    ws_intel_dim_liquidity_why_pct:   pct => `${pct}% of your wealth is immediately deployable.`,
+    ws_intel_dim_concentration:       'Concentration',
+    ws_intel_dim_concentration_why:   (name, pct) => `${name} carries ${pct}% of the total weight.`,
+    ws_intel_dim_concentration_why_none: 'No single asset dominates the mix.',
+    ws_intel_dim_performance:         'Performance',
+    ws_intel_dim_performance_why_initial: 'Not enough history yet for a representative reading.',
+    ws_intel_hero_eyebrow:     'Main insight',
+    ws_intel_empty_title:      'Your intelligence will appear when you start building.',
+    ws_intel_empty_explanation:'As you add assets, Aurix will interpret structure, risk and resilience.',
+    ws_intel_hero_single_title:       'Portfolio depends on a single asset',
+    ws_intel_hero_single_summary:     name => `All recorded wealth is concentrated in ${name}.`,
+    ws_intel_hero_single_explanation: 'With one position, your total evolution mirrors that asset exactly.',
+    ws_intel_hero_single_hint:        'Diversifying reduces surprises and improves resilience.',
+    ws_intel_hero_conc_title:         name => `Material concentration in ${name}`,
+    ws_intel_hero_conc_summary:       (name, pct) => `${name} represents ${pct}% of your portfolio.`,
+    ws_intel_hero_conc_explanation:   'A meaningful share of your performance will depend on a single asset.',
+    ws_intel_hero_conc_hint:          'Review the balance when you can.',
+    ws_intel_hero_conc_mod_title:     name => `${name} carries more weight than the rest`,
+    ws_intel_hero_conc_mod_summary:   (name, pct) => `${name} represents ${pct}% of the recorded total.`,
+    ws_intel_hero_crypto_title:       'Elevated crypto exposure',
+    ws_intel_hero_crypto_summary:     pct => `Crypto represents ${pct}% of your wealth.`,
+    ws_intel_hero_crypto_explanation: 'Crypto market moves will influence the portfolio more than the rest of its structure.',
+    ws_intel_hero_crypto_hint:        '',
+    ws_intel_hero_liq_title:          'Limited liquidity',
+    ws_intel_hero_liq_summary:        'You currently have no immediately deployable capital recorded.',
+    ws_intel_hero_liq_explanation:    'That reduces flexibility against opportunities or unexpected events.',
+    ws_intel_hero_liq_hint:           'A small reserve improves resilience.',
+    ws_intel_hero_resilient_title:    'Balanced structure',
+    ws_intel_hero_resilient_summary:  'No single asset or category dominates the mix.',
+    ws_intel_hero_resilient_explanation:'Your aggregate performance is not tied to one decision.',
+    ws_intel_signal_concentration:               'Concentration',
+    ws_intel_signal_concentration_title:         name => `${name} dominates the portfolio weight`,
+    ws_intel_signal_concentration_title_none:    'No clear leader in the mix',
+    ws_intel_signal_concentration_explanation:   (name, pct) => `Your total evolution will respond mainly to moves in ${name} (${pct}% of weight).`,
+    ws_intel_signal_concentration_explanation_none: 'No asset disproportionately drives aggregate performance.',
+    ws_intel_signal_diversification:              'Diversification',
+    ws_intel_signal_diversification_title_strong: 'Reasonable cross-category coverage',
+    ws_intel_signal_diversification_title_mid:    'Intermediate diversification',
+    ws_intel_signal_diversification_title_low:    'Limited diversification',
+    ws_intel_signal_diversification_explanation:  (n, c) => `Your portfolio holds ${n} ${n === 1 ? 'asset' : 'assets'} across ${c} ${c === 1 ? 'category' : 'categories'}.`,
+    ws_intel_signal_liquidity:                    'Liquidity',
+    ws_intel_signal_liquidity_title_none:         'No immediate reserve',
+    ws_intel_signal_liquidity_title_pct:          pct => `Reserve at ${pct}% of wealth`,
+    ws_intel_signal_liquidity_explanation_none:   'Your portfolio is fully invested; any new decision requires reallocating.',
+    ws_intel_signal_liquidity_explanation_pct:    pct => `You hold ${pct}% in liquidity as room to maneuver.`,
+    ws_intel_signal_performance:                  'Performance',
+    ws_intel_signal_performance_title_initial:    'No representative historical read yet',
+    ws_intel_signal_performance_explanation_initial: 'The portfolio needs more history for a reliable conclusion.',
     ws_micro_synced:         'Market data up to date',
     ws_micro_pending:        'Sync pending',
     ws_empty_title:          'Your workspace activates once you add assets.',
@@ -7232,22 +7415,27 @@ function _renderWorkspaceDesktop(sheet) {
     fb.readonly              ? 'is-readonly' : 'is-editable',
   ].filter(Boolean).join(' ');
 
-  // AW-5 §8: terminal-grade Risk Monitor — categorized sections.
-  const categories = _buildWorkspaceRiskCategories();
-  const riskBody = categories.map(cat => {
-    const items = cat.signals.map(s => `
-      <li class="aurix-risk-signal is-${_escapeWorkspaceText(s.tone)}">
-        <span class="aurix-risk-dot" aria-hidden="true"></span>
-        <span class="aurix-risk-text">${_escapeWorkspaceText(s.text)}</span>
-      </li>
-    `).join('');
-    return `
-      <section class="aurix-risk-group">
-        <h4 class="aurix-risk-group-title">${_escapeWorkspaceText(cat.label)}</h4>
-        <ul class="aurix-risk-list">${items}</ul>
-      </section>
-    `;
-  }).join('');
+  // WORKSPACE-INTELLIGENCE-3 — desktop right rail. The legacy
+  // Risk Monitor (categorised dot list) is replaced by the same
+  // intelligence layout the mobile cockpit renders. Spreadsheet on
+  // the left stays intact; the panel reads like a Bloomberg-style
+  // intelligence sidebar.
+  const _intelDesktop = (typeof _aurixWorkspaceIntelligence === 'function')
+    ? _aurixWorkspaceIntelligence()
+    : null;
+  const intelPanelBody = (_intelDesktop && _intelDesktop.mode !== 'zero')
+    ? `
+        <section class="ws-intel-stats ws-intel-stats--desktop">${_renderIntelStatusStripHtml(_intelDesktop)}</section>
+        ${_renderIntelHeroHtml(_intelDesktop)}
+        ${_renderIntelDimensionsHtml(_intelDesktop)}
+        ${_renderIntelSignalsHtml(_intelDesktop)}
+      `
+    : `
+        <section class="ws-intel-empty">
+          <h3 class="ws-intel-empty-title">${_escapeWorkspaceText(t('ws_intel_empty_title'))}</h3>
+          <p class="ws-intel-empty-body">${_escapeWorkspaceText(t('ws_intel_empty_explanation'))}</p>
+        </section>
+      `;
 
   // Column count drives the CSS grid template (row-header + N data cells)
   const gridStyle = `--aw-grid-cols:${cols.length}`;
@@ -7283,19 +7471,146 @@ function _renderWorkspaceDesktop(sheet) {
             ${bodyRows}
           </div>
         </section>
-        <aside class="aurix-copilot-panel" aria-label="${_escapeWorkspaceText(t('ws_risk_monitor'))}">
+        <aside class="aurix-copilot-panel aurix-copilot-panel--intel" aria-label="${_escapeWorkspaceText(t('ws_intel_title'))}">
           <div class="aurix-copilot-header">
-            <span class="aurix-copilot-eyebrow">${_escapeWorkspaceText(t('ws_risk_monitor'))}</span>
-            <span class="aurix-copilot-subtitle">${_escapeWorkspaceText(t('ws_risk_subtitle'))}</span>
+            <span class="aurix-copilot-eyebrow">${_escapeWorkspaceText(t('ws_intel_title'))}</span>
+            <span class="aurix-copilot-subtitle">${_escapeWorkspaceText(t('ws_intel_sub'))}</span>
           </div>
-          <div class="aurix-risk-body">${riskBody}</div>
+          <div class="ws-intel-body">${intelPanelBody}</div>
         </aside>
       </div>
     </div>
   `;
 }
 
+// WORKSPACE-INTELLIGENCE-3 — shared HTML builders for the intelligence
+// surface. Both the mobile renderer and the desktop right panel
+// consume the same blocks so the two surfaces never diverge on copy
+// or structure. Each builder is pure: it takes the intelligence
+// payload returned by _aurixWorkspaceIntelligence and returns HTML.
+function _renderIntelStatusStripHtml(intel) {
+  if (!intel || !intel.status) return '';
+  const order = ['health', 'risk', 'diversification', 'liquidity'];
+  const label = {
+    health:          t('ws_intel_status_health'),
+    risk:            t('ws_intel_status_risk'),
+    diversification: t('ws_intel_status_diversif'),
+    liquidity:       t('ws_intel_status_liquidity'),
+  };
+  return order.map(key => {
+    const s = intel.status[key];
+    if (!s) return '';
+    return `
+      <article class="ws-intel-stat is-${_escapeWorkspaceText(s.tone)}">
+        <div class="ws-intel-stat-label">${_escapeWorkspaceText(label[key])}</div>
+        <div class="ws-intel-stat-value">${_escapeWorkspaceText(s.value)}</div>
+        <div class="ws-intel-stat-sub">${_escapeWorkspaceText(s.sub)}</div>
+      </article>
+    `;
+  }).join('');
+}
+
+function _renderIntelHeroHtml(intel) {
+  if (!intel || !intel.hero) return '';
+  const h = intel.hero;
+  return `
+    <section class="ws-intel-hero is-${_escapeWorkspaceText(h.severity || 'neutral')}">
+      <div class="ws-intel-hero-eyebrow">${_escapeWorkspaceText(h.eyebrow || '')}</div>
+      <h3 class="ws-intel-hero-title">${_escapeWorkspaceText(h.title || '')}</h3>
+      ${h.summary
+        ? `<p class="ws-intel-hero-summary">${_escapeWorkspaceText(h.summary)}</p>`
+        : ''}
+      ${h.explanation
+        ? `<p class="ws-intel-hero-explanation">${_escapeWorkspaceText(h.explanation)}</p>`
+        : ''}
+      ${h.optionalHint
+        ? `<p class="ws-intel-hero-hint">${_escapeWorkspaceText(h.optionalHint)}</p>`
+        : ''}
+    </section>
+  `;
+}
+
+function _renderIntelDimensionsHtml(intel) {
+  if (!intel || !Array.isArray(intel.dimensions) || !intel.dimensions.length) return '';
+  const cards = intel.dimensions.map(d => `
+    <article class="ws-intel-dim is-${_escapeWorkspaceText(d.tone)}">
+      <div class="ws-intel-dim-label">${_escapeWorkspaceText(d.label)}</div>
+      <div class="ws-intel-dim-state">${_escapeWorkspaceText(d.state)}</div>
+      <p class="ws-intel-dim-why">${_escapeWorkspaceText(d.why)}</p>
+    </article>
+  `).join('');
+  return `
+    <section class="ws-intel-dimensions" aria-label="${_escapeWorkspaceText(t('ws_intel_section_dimensions'))}">
+      <h4 class="ws-intel-section-title">${_escapeWorkspaceText(t('ws_intel_section_dimensions'))}</h4>
+      <div class="ws-intel-dim-grid">${cards}</div>
+    </section>
+  `;
+}
+
+function _renderIntelSignalsHtml(intel) {
+  if (!intel || !Array.isArray(intel.signals) || !intel.signals.length) return '';
+  const rows = intel.signals.map(s => `
+    <article class="ws-intel-signal is-${_escapeWorkspaceText(s.severity || 'neutral')}">
+      <div class="ws-intel-signal-cat">${_escapeWorkspaceText(s.category)}</div>
+      <div class="ws-intel-signal-title">${_escapeWorkspaceText(s.title)}</div>
+      <p class="ws-intel-signal-explanation">${_escapeWorkspaceText(s.explanation)}</p>
+    </article>
+  `).join('');
+  return `
+    <section class="ws-intel-signals" aria-label="${_escapeWorkspaceText(t('ws_intel_section_signals'))}">
+      <h4 class="ws-intel-section-title">${_escapeWorkspaceText(t('ws_intel_section_signals'))}</h4>
+      <div class="ws-intel-signal-stack">${rows}</div>
+    </section>
+  `;
+}
+
+function _renderIntelHeaderHtml() {
+  return `
+    <header class="ws-intel-header">
+      <div class="ws-intel-eyebrow">${_escapeWorkspaceText(t('ws_intel_title'))}</div>
+      <h2 class="ws-intel-headline">${_escapeWorkspaceText(t('ws_intel_sub'))}</h2>
+      <p class="ws-intel-explainer">${_escapeWorkspaceText(t('ws_intel_explainer'))}</p>
+    </header>
+  `;
+}
+
 function _renderWorkspaceMobile(sheet) {
+  // WORKSPACE-INTELLIGENCE-3 — investor intelligence cockpit.
+  // Replaces the prior + Activo / + Liquidez header + the duplicated
+  // health-modal feel with a single coherent reading order: header →
+  // status strip → hero insight → dimensions grid → explained signals.
+  // Every block is sourced from _aurixWorkspaceIntelligence so copy
+  // and severity propagate consistently. The action pills, sync micro
+  // status and signal cap-at-three rules from MOBILE-1 are gone by
+  // design — this surface is intelligence, not a control panel.
+  const intel = (typeof _aurixWorkspaceIntelligence === 'function')
+    ? _aurixWorkspaceIntelligence()
+    : null;
+
+  if (!intel || intel.mode === 'zero') {
+    return `
+      <div class="aurix-workspace-shell is-mobile is-empty">
+        ${_renderIntelHeaderHtml()}
+        <section class="ws-intel-empty">
+          <h3 class="ws-intel-empty-title">${_escapeWorkspaceText(t('ws_intel_empty_title'))}</h3>
+          <p class="ws-intel-empty-body">${_escapeWorkspaceText(t('ws_intel_empty_explanation'))}</p>
+        </section>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="aurix-workspace-shell is-mobile is-intelligence">
+      ${_renderIntelHeaderHtml()}
+      <section class="ws-intel-stats">${_renderIntelStatusStripHtml(intel)}</section>
+      ${_renderIntelHeroHtml(intel)}
+      ${_renderIntelDimensionsHtml(intel)}
+      ${_renderIntelSignalsHtml(intel)}
+    </div>
+  `;
+}
+
+function _renderWorkspaceMobileLegacy(sheet) {
   // WORKSPACE-MOBILE-1: premium investor cockpit. Replaces the prior
   // debug-leaning "intelligence" layout (live formulas, critical
   // exposure, sync card) with a hierarchy a real investor reads at a
@@ -23882,6 +24197,321 @@ function _aurixHealthScore(snap) {
   else if (s >= 40) { label = t('healthScoreElevated'); tone = 'elevated'; explain = t('healthScoreExplainElevated'); }
   else              { label = t('healthScoreHigh');     tone = 'high';     explain = t('healthScoreExplainHigh'); }
   return { score: s, label, tone, explain: explain || '' };
+}
+
+// WORKSPACE-INTELLIGENCE-3 — the WHY engine.
+//
+// Workspace is NOT a snapshot. It is interpretation. Every fact this
+// engine surfaces is paired with the reason it matters, so the user
+// reads "Bitcoin representa el 40% de tu cartera. Eso hace que una
+// parte importante de tu rendimiento dependa de un solo activo."
+// instead of the truncated "BTC domina".
+//
+// Output shape — reusable across surfaces:
+//   {
+//     mode: 'zero' | 'one' | 'normal',
+//     status: {
+//       health:          { value, state, sub, tone },
+//       risk:            { value, state, sub, tone },
+//       diversification: { value, state, sub, tone },
+//       liquidity:       { value, state, sub, tone },
+//     },
+//     hero: { title, summary, explanation, optionalHint, severity, kind },
+//     dimensions: [ { id, label, state, why, tone } ],   // 4 cards
+//     signals:    [ { kind, category, title, explanation, severity } ],
+//   }
+//
+// No new portfolio math — this is a pure interpretation layer over
+// _aurixHealthSnapshot + getDerivedFinancialSnapshot, the same data
+// the dashboard signal pool consumes.
+function _aurixWorkspaceIntelligence() {
+  const snap   = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null;
+  const score  = (typeof _aurixHealthScore    === 'function') ? _aurixHealthScore(snap) : { score: null, tone: 'neutral' };
+  const assetCount = snap ? Number(snap.assetCount || 0) : 0;
+  const totUSD     = snap ? Number(snap.totUSD || 0)     : 0;
+  const _ti = (key, ...args) => {
+    const v = (typeof t === 'function') ? t(key) : null;
+    return (typeof v === 'function') ? v(...args) : (typeof v === 'string' ? v : '');
+  };
+
+  if (!assetCount || totUSD <= 0) {
+    return {
+      mode: 'zero',
+      status: null,
+      hero: {
+        eyebrow:      _ti('ws_intel_hero_eyebrow'),
+        title:        _ti('ws_intel_empty_title'),
+        summary:      '',
+        explanation:  _ti('ws_intel_empty_explanation'),
+        optionalHint: '',
+        severity:     'neutral',
+        kind:         'empty',
+      },
+      dimensions: [],
+      signals:    [],
+    };
+  }
+
+  // Distribution + percentages. Reuse the live in-memory math.
+  const cryptoPct  = Number(snap.cryptoPct || 0);
+  const cashPct    = Number(snap.cashPct   || 0);
+  const catCount   = Number(snap.categoryCount || 0);
+  const topAsset   = snap.topAsset || null;
+  const topCat     = snap.topCategory || null;
+  const topAssetPct = topAsset ? Number(topAsset.pctTotal || 0) : 0;
+  const topAssetName = topAsset
+    ? (topAsset.name || String(topAsset.ticker || '').toUpperCase() || '—')
+    : '';
+
+  // Risk band — same heuristic the existing cockpit uses, kept
+  // deterministic so terminal + cockpit never disagree.
+  let riskScore = 25;
+  if (topAssetPct > 50)       riskScore += 25;
+  else if (topAssetPct > 35)  riskScore += 12;
+  if (cryptoPct > 40)         riskScore += 25;
+  else if (cryptoPct > 15)    riskScore += 10;
+  if (assetCount > 0 && assetCount < 4) riskScore += 10;
+  riskScore = Math.min(100, Math.max(0, Math.round(riskScore)));
+  const riskState =
+    riskScore >= 60 ? _ti('ws_intel_risk_elevated') :
+    riskScore >= 35 ? _ti('ws_intel_risk_mid')      :
+                      _ti('ws_intel_risk_calm');
+  const riskTone =
+    riskScore >= 60 ? 'warn' :
+    riskScore >= 35 ? 'info' :
+                      'positive';
+  const riskSub =
+    riskScore >= 60 ? _ti('ws_intel_risk_elevated_sub') :
+    riskScore >= 35 ? _ti('ws_intel_risk_mid_sub')      :
+                      _ti('ws_intel_risk_calm_sub');
+
+  // Diversification.
+  let divState, divTone, divSub;
+  if (assetCount <= 2 || catCount <= 1) {
+    divState = _ti('ws_intel_div_low');
+    divTone  = 'warn';
+    divSub   = _ti('ws_intel_div_low_sub', assetCount, catCount);
+  } else if (assetCount <= 5 || catCount <= 2) {
+    divState = _ti('ws_intel_div_mid');
+    divTone  = 'info';
+    divSub   = _ti('ws_intel_div_mid_sub', assetCount, catCount);
+  } else {
+    divState = _ti('ws_intel_div_high');
+    divTone  = 'positive';
+    divSub   = _ti('ws_intel_div_high_sub', assetCount, catCount);
+  }
+
+  // Liquidity. Note the spec tone: never alarmist. "Sin margen
+  // inmediato" beats "Sin liquidez".
+  let liqState, liqTone, liqSub;
+  if (cashPct === 0) {
+    liqState = _ti('ws_intel_liq_none');
+    liqTone  = 'warn';
+    liqSub   = _ti('ws_intel_liq_none_sub');
+  } else if (cashPct < 5) {
+    liqState = _ti('ws_intel_liq_thin');
+    liqTone  = 'info';
+    liqSub   = _ti('ws_intel_liq_thin_sub', cashPct);
+  } else if (cashPct > 60) {
+    liqState = _ti('ws_intel_liq_high');
+    liqTone  = 'info';
+    liqSub   = _ti('ws_intel_liq_high_sub', cashPct);
+  } else {
+    liqState = _ti('ws_intel_liq_ok');
+    liqTone  = 'positive';
+    liqSub   = _ti('ws_intel_liq_ok_sub', cashPct);
+  }
+
+  // STATUS STRIP — four cards. Health reuses the score helper so
+  // workspace + portfolio-health never disagree.
+  const status = {
+    health: {
+      value: (score && score.score != null) ? String(score.score) : '—',
+      state: (score && score.label) || '',
+      sub:   (score && score.label) || '',
+      tone:  score && score.tone ? score.tone : 'neutral',
+    },
+    risk: {
+      value: riskState,
+      state: riskState,
+      sub:   riskSub,
+      tone:  riskTone,
+    },
+    diversification: {
+      value: divState,
+      state: divState,
+      sub:   divSub,
+      tone:  divTone,
+    },
+    liquidity: {
+      value: `${cashPct}%`,
+      state: liqState,
+      sub:   liqSub,
+      tone:  liqTone,
+    },
+  };
+
+  // DIMENSIONS — full prose state for the grid below the hero.
+  const dimensions = [
+    {
+      id:    'diversification',
+      label: _ti('ws_intel_dim_diversification'),
+      state: divState,
+      why:   _ti('ws_intel_dim_diversification_why', assetCount, catCount),
+      tone:  divTone,
+    },
+    {
+      id:    'liquidity',
+      label: _ti('ws_intel_dim_liquidity'),
+      state: liqState,
+      why:   cashPct === 0
+              ? _ti('ws_intel_dim_liquidity_why_none')
+              : _ti('ws_intel_dim_liquidity_why_pct', cashPct),
+      tone:  liqTone,
+    },
+    {
+      id:    'concentration',
+      label: _ti('ws_intel_dim_concentration'),
+      state: topAssetPct > 60 ? _ti('ws_intel_conc_high')
+            : topAssetPct > 35 ? _ti('ws_intel_conc_mod')
+                               : _ti('ws_intel_conc_low'),
+      why:   topAsset
+              ? _ti('ws_intel_dim_concentration_why', topAssetName, topAssetPct)
+              : _ti('ws_intel_dim_concentration_why_none'),
+      tone:  topAssetPct > 60 ? 'warn' : topAssetPct > 35 ? 'info' : 'positive',
+    },
+    {
+      id:    'performance',
+      label: _ti('ws_intel_dim_performance'),
+      state: _ti('ws_intel_perf_initial'),
+      why:   _ti('ws_intel_dim_performance_why_initial'),
+      tone:  'neutral',
+    },
+  ];
+
+  // HERO INSIGHT — pick the single most consequential interpretation.
+  // Priority: single asset → high concentration → high crypto → liquidity gap → moderate concentration → resilient default.
+  const hero = (() => {
+    if (assetCount === 1 && topAsset) {
+      return {
+        eyebrow:      _ti('ws_intel_hero_eyebrow'),
+        title:        _ti('ws_intel_hero_single_title'),
+        summary:      _ti('ws_intel_hero_single_summary', topAssetName),
+        explanation:  _ti('ws_intel_hero_single_explanation'),
+        optionalHint: _ti('ws_intel_hero_single_hint'),
+        severity:     'warn',
+        kind:         'single',
+      };
+    }
+    if (topAssetPct > 60 && topAsset) {
+      return {
+        eyebrow:      _ti('ws_intel_hero_eyebrow'),
+        title:        _ti('ws_intel_hero_conc_title', topAssetName),
+        summary:      _ti('ws_intel_hero_conc_summary', topAssetName, topAssetPct),
+        explanation:  _ti('ws_intel_hero_conc_explanation'),
+        optionalHint: _ti('ws_intel_hero_conc_hint'),
+        severity:     'warn',
+        kind:         'concentration',
+      };
+    }
+    if (cryptoPct > 50) {
+      return {
+        eyebrow:      _ti('ws_intel_hero_eyebrow'),
+        title:        _ti('ws_intel_hero_crypto_title'),
+        summary:      _ti('ws_intel_hero_crypto_summary', cryptoPct),
+        explanation:  _ti('ws_intel_hero_crypto_explanation'),
+        optionalHint: _ti('ws_intel_hero_crypto_hint'),
+        severity:     'info',
+        kind:         'crypto',
+      };
+    }
+    if (cashPct === 0) {
+      return {
+        eyebrow:      _ti('ws_intel_hero_eyebrow'),
+        title:        _ti('ws_intel_hero_liq_title'),
+        summary:      _ti('ws_intel_hero_liq_summary'),
+        explanation:  _ti('ws_intel_hero_liq_explanation'),
+        optionalHint: _ti('ws_intel_hero_liq_hint'),
+        severity:     'moderate',
+        kind:         'liquidity',
+      };
+    }
+    if (topAssetPct > 35 && topAsset) {
+      return {
+        eyebrow:      _ti('ws_intel_hero_eyebrow'),
+        title:        _ti('ws_intel_hero_conc_mod_title', topAssetName),
+        summary:      _ti('ws_intel_hero_conc_mod_summary', topAssetName, topAssetPct),
+        explanation:  _ti('ws_intel_hero_conc_explanation'),
+        optionalHint: '',
+        severity:     'info',
+        kind:         'concentration',
+      };
+    }
+    return {
+      eyebrow:      _ti('ws_intel_hero_eyebrow'),
+      title:        _ti('ws_intel_hero_resilient_title'),
+      summary:      _ti('ws_intel_hero_resilient_summary'),
+      explanation:  _ti('ws_intel_hero_resilient_explanation'),
+      optionalHint: '',
+      severity:     'positive',
+      kind:         'resilient',
+    };
+  })();
+
+  // DEEP SIGNALS — institutional intelligence rows, category + claim +
+  // one explanation sentence. Always ordered concentration → diversif
+  // → liquidity → performance so the reader builds a mental model in
+  // the same direction every time.
+  const signals = [
+    {
+      kind:        'concentration',
+      category:    _ti('ws_intel_signal_concentration'),
+      title:       topAsset
+                    ? _ti('ws_intel_signal_concentration_title', topAssetName)
+                    : _ti('ws_intel_signal_concentration_title_none'),
+      explanation: topAsset
+                    ? _ti('ws_intel_signal_concentration_explanation', topAssetName, topAssetPct)
+                    : _ti('ws_intel_signal_concentration_explanation_none'),
+      severity:    topAssetPct > 60 ? 'warn' : topAssetPct > 35 ? 'info' : 'positive',
+    },
+    {
+      kind:        'diversification',
+      category:    _ti('ws_intel_signal_diversification'),
+      title:       divTone === 'positive'
+                    ? _ti('ws_intel_signal_diversification_title_strong')
+                    : divTone === 'info'
+                      ? _ti('ws_intel_signal_diversification_title_mid')
+                      : _ti('ws_intel_signal_diversification_title_low'),
+      explanation: _ti('ws_intel_signal_diversification_explanation', assetCount, catCount),
+      severity:    divTone === 'positive' ? 'positive' : divTone === 'info' ? 'info' : 'warn',
+    },
+    {
+      kind:        'liquidity',
+      category:    _ti('ws_intel_signal_liquidity'),
+      title:       cashPct === 0
+                    ? _ti('ws_intel_signal_liquidity_title_none')
+                    : _ti('ws_intel_signal_liquidity_title_pct', cashPct),
+      explanation: cashPct === 0
+                    ? _ti('ws_intel_signal_liquidity_explanation_none')
+                    : _ti('ws_intel_signal_liquidity_explanation_pct', cashPct),
+      severity:    liqTone === 'positive' ? 'positive' : liqTone === 'info' ? 'info' : 'warn',
+    },
+    {
+      kind:        'performance',
+      category:    _ti('ws_intel_signal_performance'),
+      title:       _ti('ws_intel_signal_performance_title_initial'),
+      explanation: _ti('ws_intel_signal_performance_explanation_initial'),
+      severity:    'neutral',
+    },
+  ];
+
+  return {
+    mode: assetCount === 1 ? 'one' : 'normal',
+    status,
+    hero,
+    dimensions,
+    signals,
+  };
 }
 
 // HEALTH-3: developer-facing diagnostics for the Portfolio Health
