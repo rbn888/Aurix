@@ -21,19 +21,26 @@
   'use strict';
 
   // ── Theme tokens ────────────────────────────────────────────────
+  // AURIX-CHARTS-2 — premium palette. Line is now slightly desaturated
+  // for a calmer Apple-Stocks / Bloomberg-lite look; area gradient
+  // alphas tuned down so the fill reads as breath, not as neon glow.
+  // A dedicated `flat` pair handles the post-reset baseline so the
+  // neutral state never reuses up/down hue.
   const THEME = Object.freeze({
     bg:        'transparent',
     text:      'rgba(220, 230, 250, 0.42)',
     textHi:    'rgba(225, 233, 255, 0.92)',
-    line:      'rgba(138, 166, 255, 0.95)',          // Aurix blue
-    lineUp:    'rgba(63, 191, 127, 0.95)',
-    lineDown:  'rgba(224, 90, 90, 0.95)',
-    areaTop:   'rgba(138, 166, 255, 0.28)',
+    line:      'rgba(138, 166, 255, 0.92)',          // Aurix blue
+    lineUp:    'rgba(63, 191, 127, 0.94)',           // emerald
+    lineDown:  'rgba(224, 90, 90, 0.94)',            // refined red
+    lineFlat:  'rgba(180, 196, 224, 0.78)',          // calm gray-blue
+    areaTop:   'rgba(138, 166, 255, 0.22)',
     areaBot:   'rgba(138, 166, 255, 0.00)',
-    areaTopUp: 'rgba(63, 191, 127, 0.22)',
-    areaTopDn: 'rgba(224, 90, 90, 0.22)',
+    areaTopUp: 'rgba(63, 191, 127, 0.18)',
+    areaTopDn: 'rgba(224, 90, 90, 0.16)',
+    areaTopFlat:'rgba(180, 196, 224, 0.10)',
     grid:      'rgba(255, 255, 255, 0.035)',
-    crosshair: 'rgba(138, 166, 255, 0.40)',
+    crosshair: 'rgba(138, 166, 255, 0.42)',
     border:    'rgba(255, 255, 255, 0.06)',
   });
 
@@ -119,6 +126,33 @@
         pointer-events: none;
       }
       .aurix-chart-badge[hidden] { display: none; }
+      /* AURIX-CHARTS-2 — premium current value chip for surfaces where
+         the LWC right-axis label is hidden (mobile portfolio). Reads
+         the latest series value and renders a compact glass pill in
+         the top-right corner. Pointer-events:none so it never steals
+         touch from the long-press inspection. */
+      .aurix-chart-valchip {
+        position: absolute;
+        top: 8px; right: 8px;
+        padding: 4px 9px;
+        border-radius: 999px;
+        font-size: 11.5px;
+        font-weight: 700;
+        letter-spacing: 0.005em;
+        font-variant-numeric: tabular-nums;
+        color: rgba(225,233,255,0.92);
+        background: rgba(14,18,28,0.72);
+        border: 1px solid rgba(255,255,255,0.07);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        box-shadow: 0 6px 20px -12px rgba(4,8,16,0.6);
+        pointer-events: none;
+        z-index: 3;
+        transition: opacity 0.18s ease;
+      }
+      .aurix-chart-valchip[hidden] { display: none; }
+      .aurix-chart-valchip.is-up   { color: #3FBF7F; }
+      .aurix-chart-valchip.is-down { color: #E05A5A; }
       .aurix-chart-tooltip {
         position: absolute;
         pointer-events: none;
@@ -483,6 +517,17 @@
     badge.hidden = true;
     host.appendChild(badge);
 
+    // AURIX-CHARTS-2 — current-value chip. Only rendered on the
+    // portfolio variant when the LWC right-axis label is hidden (the
+    // mobile surface). Desktop keeps the engine's native last-value
+    // marker — that's already the canonical chip there. Pre-created
+    // hidden; setData() shows it once we have a real value.
+    const valchip = document.createElement('div');
+    valchip.className = 'aurix-chart-valchip';
+    valchip.hidden = true;
+    const _shouldShowValChip = opts.variant === 'portfolio' && !opts.showPriceScale;
+    if (_shouldShowValChip) host.appendChild(valchip);
+
     const loading = document.createElement('div');
     loading.className = 'aurix-chart-state aurix-chart-state--loading';
     loading.innerHTML = '<div class="aurix-chart-skeleton"></div>';
@@ -490,7 +535,17 @@
 
     const empty = document.createElement('div');
     empty.className = 'aurix-chart-state aurix-chart-state--empty';
-    empty.textContent = _isLangEs() ? 'Sin datos disponibles' : 'No data available';
+    // AURIX-CHARTS-2 — portfolio empty surface reads as a calm
+    // invitation, not a "no data" error. Other variants (asset /
+    // sparkline / mini) keep the neutral fallback because their
+    // host containers don't carry their own placeholder overlay.
+    if (opts.variant === 'portfolio') {
+      empty.textContent = _isLangEs()
+        ? 'Tu evolución aparecerá aquí'
+        : 'Your evolution will appear here';
+    } else {
+      empty.textContent = _isLangEs() ? 'Sin datos disponibles' : 'No data available';
+    }
     host.appendChild(empty);
 
     const errorEl = document.createElement('div');
@@ -590,15 +645,28 @@
       handleScale:  opts.variant === 'sparkline' ? false : true,
     });
 
+    // AURIX-CHARTS-2 — portfolio surface gets a slightly heavier
+    // stroke + larger crosshair marker so the line reads premium on
+    // both retina desktop and dense mobile. Sparkline + mini stay
+    // razor-thin so they feel like cell glyphs, not micro-charts.
+    const _portfolioLineWidth = (opts.variant === 'portfolio') ? 2.25
+                              : (opts.variant === 'asset')     ? 2
+                              :                                  1.5;
+    const _portfolioMarkerR   = (opts.variant === 'portfolio') ? 4
+                              : (opts.variant === 'asset')     ? 3
+                              :                                  3;
     const series = chart.addAreaSeries({
       lineColor:       THEME.line,
-      lineWidth:       2,
+      lineWidth:       _portfolioLineWidth,
+      lineType:        (LWC.LineType && LWC.LineType.Curved != null) ? LWC.LineType.Curved : 0,
       topColor:        THEME.areaTop,
       bottomColor:     THEME.areaBot,
       priceLineVisible: false,
       lastValueVisible: opts.variant !== 'sparkline',
       crosshairMarkerVisible: opts.variant !== 'sparkline',
-      crosshairMarkerRadius:  3,
+      crosshairMarkerRadius:  _portfolioMarkerR,
+      crosshairMarkerBorderWidth: 2,
+      crosshairMarkerBorderColor: 'rgba(14,18,28,0.92)',
       // CHART-4B: custom series-level price format so the price scale
       // marker label (the floating chip next to the crosshair) also
       // uses Aurix compact currency, not Lightweight Charts' default.
@@ -610,10 +678,14 @@
     });
 
     // Apply colorMode shading at series level.
+    // AURIX-CHARTS-2 — 'neutral' (flat baseline) now uses a dedicated
+    // gray-blue token pair so a post-reset chart never repaints in
+    // red and never sits on the same hue as a true positive run.
     function _applyColor(mode) {
-      if (mode === 'positive')      series.applyOptions({ lineColor: THEME.lineUp,   topColor: THEME.areaTopUp, bottomColor: THEME.areaBot });
-      else if (mode === 'negative') series.applyOptions({ lineColor: THEME.lineDown, topColor: THEME.areaTopDn, bottomColor: THEME.areaBot });
-      else                          series.applyOptions({ lineColor: THEME.line,    topColor: THEME.areaTop,   bottomColor: THEME.areaBot });
+      if (mode === 'positive')      series.applyOptions({ lineColor: THEME.lineUp,   topColor: THEME.areaTopUp,  bottomColor: THEME.areaBot });
+      else if (mode === 'negative') series.applyOptions({ lineColor: THEME.lineDown, topColor: THEME.areaTopDn,  bottomColor: THEME.areaBot });
+      else if (mode === 'neutral')  series.applyOptions({ lineColor: THEME.lineFlat, topColor: THEME.areaTopFlat,bottomColor: THEME.areaBot });
+      else                          series.applyOptions({ lineColor: THEME.line,     topColor: THEME.areaTop,    bottomColor: THEME.areaBot });
     }
     if (opts.colorMode && opts.colorMode !== 'auto') _applyColor(opts.colorMode);
 
@@ -1002,6 +1074,7 @@
         if (!arr.length) {
           host.dataset.state = 'empty';
           series.setData([]);
+          if (_shouldShowValChip) valchip.hidden = true;
           return;
         }
         // Lightweight Charts wants UTC seconds + ascending order.
@@ -1012,6 +1085,7 @@
         if (!formatted.length) {
           host.dataset.state = 'empty';
           series.setData([]);
+          if (_shouldShowValChip) valchip.hidden = true;
           return;
         }
         // Dedupe identical timestamps (LWC requires strictly ascending).
@@ -1077,6 +1151,16 @@
           badge.textContent = _isLangEs() ? 'Vista optimizada' : 'Optimized view';
         } else {
           badge.hidden = true;
+        }
+        // AURIX-CHARTS-2 — paint the mobile current-value chip with the
+        // latest series value. Tone tracks the resolved direction (up /
+        // down / neutral) so the chip and the line read the same story.
+        if (_shouldShowValChip) {
+          const lastVal = visualSeries[visualSeries.length - 1].value;
+          valchip.textContent = _compactCurrency(lastVal, _formatterCurrency);
+          valchip.classList.toggle('is-up',   resolved === 'positive');
+          valchip.classList.toggle('is-down', resolved === 'negative');
+          valchip.hidden = false;
         }
         host.dataset.state = 'ready';
         try { chart.timeScale().fitContent(); } catch (_) {}

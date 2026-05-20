@@ -1914,7 +1914,7 @@ const T = {
     emptyPerf:            'Waiting for your first asset',
     emptyDonutLabel:      'No assets',
     emptyDonutSub:        'Add your first asset',
-    emptyChartTitle:      'Your portfolio evolution will appear here',
+    emptyChartTitle:      'Your evolution will appear here',
     emptyChartBody:       'once you add assets.',
     emptyCatSub:          'No allocation yet',
     emptyActivationTitle: 'Start your portfolio',
