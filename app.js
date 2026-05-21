@@ -3561,6 +3561,32 @@ if (typeof window !== 'undefined') {
       lastAt:  last ? new Date(last.ts).toISOString() : null,
     };
   };
+  // DASHBOARD-DRILLDOWN-RACE-1: introspection helper for the
+  // dashboard/category render orchestration. Returns the live view
+  // state (activeCategory, the render generation token, who triggered
+  // the most recent transition) plus *observed* DOM state for the two
+  // root-only sections — so a developer can confirm at any moment
+  // whether the dashboard root widgets are visible on screen, not just
+  // whether the code believes they should be.
+  window.__aurixViewDebug = function () {
+    const distEl = document.getElementById('distributionSection');
+    const dashEl = document.querySelector('.dashboard-top');
+    const assetsEl = document.getElementById('assetsSection');
+    const _visible = (el) => !!(el && el.style.display !== 'none' && el.offsetParent !== null);
+    return {
+      activeCategory,
+      dashboardRenderToken: _dashboardRenderToken,
+      lastRenderSource:     _lastRenderSource,
+      rootWidgetsMounted:   _rootWidgetsMounted,
+      categoryViewMounted:  _categoryViewMounted,
+      observed: {
+        distributionVisible: _visible(distEl),
+        dashboardTopVisible: _visible(dashEl),
+        assetsSectionVisible: _visible(assetsEl),
+        bodyIsDetailView: document.body.classList.contains('is-detail-view'),
+      },
+    };
+  };
 }
 
 function generateSimulatedHistory(currentVal) {
@@ -3636,6 +3662,23 @@ const donutCenterSubEl      = document.getElementById('donutCenterSub');
 let _donutHoverIdx = -1;   // ephemeral hover (index into _donutDist)
 let _donutDist     = [];
 let activeCategory = null; // persistent category filter ('crypto', 'metal', …, or null)
+// DASHBOARD-DRILLDOWN-RACE-1: generation token bumped on every
+// view/category transition. Any async work (price refresh, watchlist
+// rebuild, deferred animation step) that captured the token before the
+// transition must check it against the live value before painting —
+// stale paints are how dashboard root widgets used to leak into the
+// category drill-down. lastRenderSource is debug-only; rootWidgetsMounted
+// and categoryViewMounted track the most recent commit so the debug
+// helper can introspect actual DOM state.
+let _dashboardRenderToken = 0;
+let _lastRenderSource     = 'init';
+let _rootWidgetsMounted   = false;
+let _categoryViewMounted  = false;
+function _bumpDashboardRenderToken(source) {
+  _dashboardRenderToken++;
+  _lastRenderSource = String(source || 'unknown');
+  return _dashboardRenderToken;
+}
 let currentTab       = 'home';
 let currentMarketTab = 'watchlist';
 let marketSearchData = [];
@@ -8955,12 +8998,22 @@ function updateDonut() {
   _donutDist     = dist || [];
   _donutHoverIdx = -1;
 
+  // DASHBOARD-DRILLDOWN-RACE-1: the distribution section is a dashboard
+  // root widget — the watchlist card sits inside it too. When the user
+  // is inside a category drill-down the section must stay hidden, even
+  // when an async tick (price refresh, watchlist subscriber callback)
+  // re-enters this function. render() owns the show-side of the toggle
+  // on entry/exit; here we keep the chart data current (so back-nav
+  // lands on a fresh donut without a paint flash) while never touching
+  // `display`. Same guard covers both the empty and the live branches.
+  const _inCategoryView = activeCategory !== null;
+
   if (!dist || dist.length === 0) {
     // AURIX-EMPTY-1: ghost-ring placeholder instead of collapsing the
     // section. Preserves the donut footprint, surfaces the "no assets"
     // copy as the center label, and clears the legend. The ring colour
     // is a neutral surface tone — never red / warning.
-    distributionSectionEl.style.display = '';
+    if (!_inCategoryView) distributionSectionEl.style.display = '';
     distributionSectionEl.classList.add('distribution-section--empty');
     if (distributionLegendEl) distributionLegendEl.innerHTML = '';
     const _mLegend = document.getElementById('distributionLegendMobile');
@@ -8994,12 +9047,19 @@ function updateDonut() {
   // Live data path — clear empty-mode marker if it was set previously.
   distributionSectionEl.classList.remove('distribution-section--empty');
 
-  if (distributionSectionEl.style.display === 'none' || !distributionSectionEl.dataset.entered) {
-    distributionSectionEl.dataset.entered = '1';
-    distributionSectionEl.classList.add('is-entering');
-    distributionSectionEl.addEventListener('animationend', () => distributionSectionEl.classList.remove('is-entering'), { once: true });
+  // DASHBOARD-DRILLDOWN-RACE-1: skip the enter-animation + display
+  // reveal when the user is inside a category drill-down. We still
+  // update legend / chart datasets below so a return to root paints
+  // fresh data immediately. render() is the authoritative owner of
+  // distribution visibility on view transitions.
+  if (!_inCategoryView) {
+    if (distributionSectionEl.style.display === 'none' || !distributionSectionEl.dataset.entered) {
+      distributionSectionEl.dataset.entered = '1';
+      distributionSectionEl.classList.add('is-entering');
+      distributionSectionEl.addEventListener('animationend', () => distributionSectionEl.classList.remove('is-entering'), { once: true });
+    }
+    distributionSectionEl.style.display = '';
   }
-  distributionSectionEl.style.display = '';
   resetDonutCenter();
 
   // Legend
@@ -11619,14 +11679,26 @@ function setActiveCategory(type) {
   if (next === activeCategory) return;
   if (_catTransitioning && !reducedMotion) return; // ignore clicks mid-transition
 
+  // DASHBOARD-DRILLDOWN-RACE-1: bump the token immediately so any
+  // in-flight async paint (price refresh, deferred animation step,
+  // watchlist rebuild) that captured the previous token will exit
+  // early and not draw root widgets over the new view.
+  const _myToken = _bumpDashboardRenderToken(next === null ? 'leave-category' : `enter-${next}`);
+
   const EASE       = 'cubic-bezier(0.22, 1, 0.36, 1)';
   const isDrilling = next !== null;
 
   function _commit() {
+    // If another category transition fired between scheduling and
+    // running this commit, abandon the stale one — only the latest
+    // user intent paints.
+    if (_myToken !== _dashboardRenderToken) return;
     activeCategory = next;
     updateCategoryCards();
     render(true);
     _applyDonutState();
+    _rootWidgetsMounted  = (activeCategory === null);
+    _categoryViewMounted = (activeCategory !== null);
   }
 
   // Reduced-motion: instant swap, no animations
@@ -15683,6 +15755,13 @@ function switchTab(tab) {
 
 // ── Render ─────────────────────────────────────────────────
 function render(animate = false) {
+  // DASHBOARD-DRILLDOWN-RACE-1: record what this render thinks the
+  // view is so __aurixViewDebug() can report whether the most recent
+  // paint matched the live activeCategory. We don't bump the token
+  // here — render() is called from many code paths, only explicit
+  // view transitions bump the generation.
+  _rootWidgetsMounted  = (activeCategory === null);
+  _categoryViewMounted = (activeCategory !== null);
   assets.forEach(asset => {
     migrateLegacyAssetToTransactions(asset);
     sanitizeTransactionPrices(asset);
