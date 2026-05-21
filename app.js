@@ -3579,6 +3579,7 @@ if (typeof window !== 'undefined') {
       lastRenderSource:     _lastRenderSource,
       rootWidgetsMounted:   _rootWidgetsMounted,
       categoryViewMounted:  _categoryViewMounted,
+      enteringCategory:     _enteringCategory,
       observed: {
         distributionVisible: _visible(distEl),
         dashboardTopVisible: _visible(dashEl),
@@ -3674,6 +3675,15 @@ let _dashboardRenderToken = 0;
 let _lastRenderSource     = 'init';
 let _rootWidgetsMounted   = false;
 let _categoryViewMounted  = false;
+// DRILLDOWN-RACE-2: separate visual-transition flag for the drill-in
+// animation. activeCategory commits immediately on click (so any
+// refresh that fires during the 210ms fade already sees the new
+// view), but the dashboard root widgets must remain visible for the
+// opacity fade to play — _enteringCategory tells render() / updateDonut
+// / any other root-widget code path that visibility is owned by the
+// inline-style animation right now and not to mutate display until
+// the transition's final _commit clears the flag.
+let _enteringCategory     = false;
 function _bumpDashboardRenderToken(source) {
   _dashboardRenderToken++;
   _lastRenderSource = String(source || 'unknown');
@@ -8998,15 +9008,16 @@ function updateDonut() {
   _donutDist     = dist || [];
   _donutHoverIdx = -1;
 
-  // DASHBOARD-DRILLDOWN-RACE-1: the distribution section is a dashboard
-  // root widget — the watchlist card sits inside it too. When the user
-  // is inside a category drill-down the section must stay hidden, even
-  // when an async tick (price refresh, watchlist subscriber callback)
-  // re-enters this function. render() owns the show-side of the toggle
-  // on entry/exit; here we keep the chart data current (so back-nav
-  // lands on a fresh donut without a paint flash) while never touching
-  // `display`. Same guard covers both the empty and the live branches.
-  const _inCategoryView = activeCategory !== null;
+  // DASHBOARD-DRILLDOWN-RACE-1 / DRILLDOWN-RACE-2: the distribution
+  // section is a dashboard root widget — the watchlist card sits
+  // inside it too. Two gates must both be open before we unhide the
+  // section here: activeCategory must be null (we're on root) AND
+  // _enteringCategory must be false (no drill-in animation is in
+  // flight). The second gate matters during the 210ms window between
+  // user click and the post-animation _commit — without it a price
+  // refresh in that window could repaint the root widgets while the
+  // category view is sliding in.
+  const _inCategoryView = (activeCategory !== null) || _enteringCategory;
 
   if (!dist || dist.length === 0) {
     // AURIX-EMPTY-1: ghost-ring placeholder instead of collapsing the
@@ -11688,11 +11699,33 @@ function setActiveCategory(type) {
   const EASE       = 'cubic-bezier(0.22, 1, 0.36, 1)';
   const isDrilling = next !== null;
 
+  // DRILLDOWN-RACE-2: commit activeCategory IMMEDIATELY on drill-in so
+  // any async work that fires during the 210ms fade animation reads
+  // the new view from the live state — never the stale null. The
+  // _enteringCategory flag tells render() / updateDonut that the
+  // root-widget visibility is owned by the inline-style opacity
+  // animation right now and not to mutate `display`. The flag clears
+  // just before the post-animation _commit so the final render() lays
+  // down the canonical display:none on root widgets.
+  // Leave path keeps the old contract — activeCategory stays set until
+  // _commit fires after the assetsSection fade — because the leak only
+  // ever happened on drill-IN. Setting null too early on leave would
+  // race with the assetsSection fade-out.
+  if (isDrilling) {
+    activeCategory    = next;
+    _enteringCategory = true;
+    _categoryViewMounted = true;
+    _rootWidgetsMounted  = false;
+  }
+
   function _commit() {
     // If another category transition fired between scheduling and
     // running this commit, abandon the stale one — only the latest
     // user intent paints.
     if (_myToken !== _dashboardRenderToken) return;
+    // Clear the visual-transition flag before render() so the
+    // canonical display:none gets applied on root widgets.
+    _enteringCategory = false;
     activeCategory = next;
     updateCategoryCards();
     render(true);
@@ -15816,11 +15849,22 @@ function render(animate = false) {
   // Section visibility: full-page navigation between dashboard and category drill-down
   const assetsSectionEl = document.getElementById('assetsSection');
   const dashTopEl        = document.querySelector('.dashboard-top'); // the hero card
+  // DRILLDOWN-RACE-2: during the drill-in fade animation, visibility
+  // of every top-level section is owned by the inline-style opacity
+  // transition that setActiveCategory installed. render() may still
+  // fire from a refresh tick in that window — and it must not mutate
+  // `display` on any section, or the fade will either get cut short
+  // (display:none on the root widgets) or the assetsSection will pop
+  // in over the still-fading dashboard. We let the post-animation
+  // _commit's render(true) — fired with _enteringCategory=false — lay
+  // down the final canonical display state.
   if (activeCategory) {
     // Category drill-down: hide dashboard, show asset list only
-    if (assetsSectionEl)        { assetsSectionEl.style.display = ''; assetsSectionEl.classList.add('is-detail'); }
-    if (dashTopEl)               dashTopEl.style.display               = 'none';
-    if (distributionSectionEl)   distributionSectionEl.style.display   = 'none';
+    if (!_enteringCategory) {
+      if (assetsSectionEl)        { assetsSectionEl.style.display = ''; assetsSectionEl.classList.add('is-detail'); }
+      if (dashTopEl)               dashTopEl.style.display               = 'none';
+      if (distributionSectionEl)   distributionSectionEl.style.display   = 'none';
+    }
     // categoriesSection already hidden by updateCategoryCards() short-circuit
     // Render premium detail hero (category stats + mini sparkline)
     const typeAssets = assets.filter(a => (TYPE_META[a.type] ? a.type : 'other') === activeCategory);
