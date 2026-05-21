@@ -384,10 +384,10 @@ const T = {
     // Search
     searchPH: {
       all: 'Buscar BTC, Apple, Vanguard, MSCI World…',
-      crypto: 'Buscar BTC, ETH, SOL…',
-      stock: 'Buscar Apple, Tesla, NVIDIA…',
-      etf: 'Buscar SPY, IWDA, Vanguard…',
-      metal: 'Buscar Oro, Plata…',
+      crypto: 'Busca Bitcoin, Ethereum, Solana…',
+      stock: 'Busca Apple, NVIDIA, Tesla…',
+      etf: 'Busca SPY, VOO, IWDA…',
+      metal: 'Oro, plata…',
       real_estate: 'Describe el inmueble por tipo o ubicación…',
     },
     noResults:       q => `Sin resultados para "${q}"`,
@@ -943,6 +943,15 @@ const T = {
     ws_intel_hero_resilient_title:    'Estructura equilibrada',
     ws_intel_hero_resilient_summary:  'Ningún activo ni categoría domina el peso de la cartera.',
     ws_intel_hero_resilient_explanation:'Tu rendimiento agregado no depende de una sola decisión.',
+    // REAL-ESTATE-INTEL: calm narrative when property weight dominates.
+    // Property is not the same shape of risk as crypto or a single
+    // stock — illiquid, long-term, stable in price. We talk about
+    // liquidity and flexibility, never "overexposure".
+    ws_intel_hero_re_title:           'Patrimonio apoyado en inmuebles',
+    ws_intel_hero_re_summary:         pct => `Los inmuebles representan ${pct}% de tu patrimonio.`,
+    ws_intel_hero_re_explanation:     'Esto puede aportar estabilidad, pero reduce liquidez y flexibilidad si necesitas mover capital rápidamente.',
+    ws_intel_hero_re_hint:            'Esta concentración es habitual cuando el patrimonio incluye vivienda o inmuebles de inversión.',
+    ws_intel_hero_re_liquid_hint:     (lpct, lval) => `Cartera líquida disponible: ${lpct}% (~${lval}).`,
     // deep signals (institutional intelligence rows)
     ws_intel_signal_concentration:               'Concentración',
     ws_intel_signal_concentration_title:         name => `${name} domina el peso de la cartera`,
@@ -1203,6 +1212,16 @@ const T = {
     emptyChipSpy:         'SPY ETF',
     emptyChipCash:        'Liquidez',
     emptyChipGold:        'Oro',
+    // CAT-CONTEXT-1: empty-state copy per category drill-down. Never use the
+    // generic "Añadir activo" when the user already chose a category.
+    emptyCategory: {
+      crypto:      { title: 'Todavía no tienes cripto en tu cartera.', cta: 'Añadir cripto' },
+      stock:       { title: 'Todavía no tienes acciones.',             cta: 'Añadir acción' },
+      etf:         { title: 'Todavía no tienes ETFs o fondos.',        cta: 'Añadir ETF' },
+      metal:       { title: 'Todavía no tienes metales en tu cartera.', cta: 'Añadir metal' },
+      real_estate: { title: 'Todavía no tienes inmuebles registrados.', cta: 'Añadir inmueble' },
+      cash:        { title: 'Todavía no tienes liquidez registrada.',   cta: 'Añadir liquidez' },
+    },
     // ── First asset add flow ─────────────────────────
     modalAddTitleFirst:   'Añade tu primer activo',
     modalAddSubFirst:     'Empieza creando la base de tu portfolio.',
@@ -1249,6 +1268,14 @@ const T = {
     signalInsightsBody:          'Análisis de tu cartera disponible.',
     signalInsightsBodyMobile:    'Análisis disponible',
     signalInsightsCta:           'Ver análisis',
+    // CAT-CONTEXT-1 / REAL-ESTATE-INTEL: calm, informative signal when
+    // real estate dominates the portfolio. Property weight is normal for
+    // households with a primary residence — Aurix talks about liquidity
+    // and flexibility, never "overexposure".
+    signalRealEstateBody:        'Tu patrimonio está muy apoyado en inmuebles.',
+    signalRealEstateBodyMobile:  'Peso inmobiliario alto',
+    signalRealEstateCta:         'Ver análisis',
+    signalRealEstateLiquidBody:  pct => `Cartera líquida disponible: ${pct}% del patrimonio.`,
     // SIGNAL-MOBILE-2: short copy used on viewports ≤640px so the
     // mobile signal bar never ellipses meaning away. Each kind has a
     // 1–3 word version that still conveys the awareness.
@@ -1390,10 +1417,10 @@ const T = {
     // Search
     searchPH: {
       all: 'Search BTC, Apple, Vanguard, MSCI World…',
-      crypto: 'Search BTC, ETH, SOL…',
-      stock: 'Search Apple, Tesla, NVIDIA…',
-      etf: 'Search SPY, IWDA, Vanguard…',
-      metal: 'Search Gold, Silver…',
+      crypto: 'Search Bitcoin, Ethereum, Solana…',
+      stock: 'Search Apple, NVIDIA, Tesla…',
+      etf: 'Search SPY, VOO, IWDA…',
+      metal: 'Gold, silver…',
       real_estate: 'Describe the property by type or location…',
     },
     noResults:       q => `No results for "${q}"`,
@@ -1921,6 +1948,11 @@ const T = {
     ws_intel_hero_liq_summary:        'You currently have no immediately deployable capital recorded.',
     ws_intel_hero_liq_explanation:    'That reduces flexibility against opportunities or unexpected events.',
     ws_intel_hero_liq_hint:           'A small reserve improves resilience.',
+    ws_intel_hero_re_title:           'Wealth supported by real estate',
+    ws_intel_hero_re_summary:         pct => `Real estate represents ${pct}% of your net worth.`,
+    ws_intel_hero_re_explanation:     'This may add stability, but reduces liquidity and flexibility if you need to move capital quickly.',
+    ws_intel_hero_re_hint:            'This concentration is common when wealth includes a primary residence or investment property.',
+    ws_intel_hero_re_liquid_hint:     (lpct, lval) => `Liquid portfolio available: ${lpct}% (~${lval}).`,
     ws_intel_hero_resilient_title:    'Balanced structure',
     ws_intel_hero_resilient_summary:  'No single asset or category dominates the mix.',
     ws_intel_hero_resilient_explanation:'Your aggregate performance is not tied to one decision.',
@@ -2177,6 +2209,15 @@ const T = {
     emptyChipSpy:         'SPY ETF',
     emptyChipCash:        'Liquidity',
     emptyChipGold:        'Gold',
+    // CAT-CONTEXT-1: category drill-down empty-state copy.
+    emptyCategory: {
+      crypto:      { title: "You don't have any crypto yet.",         cta: 'Add crypto' },
+      stock:       { title: "You don't have any stocks yet.",         cta: 'Add stock' },
+      etf:         { title: "You don't have any ETFs or funds yet.",  cta: 'Add ETF' },
+      metal:       { title: "You don't have any metals yet.",         cta: 'Add metal' },
+      real_estate: { title: "You don't have any properties on file.", cta: 'Add property' },
+      cash:        { title: "You don't have any liquidity tracked.",  cta: 'Add liquidity' },
+    },
     // ── First asset add flow ─────────────────────────
     modalAddTitleFirst:   'Add your first asset',
     modalAddSubFirst:     'Start building your portfolio foundation.',
@@ -2222,6 +2263,11 @@ const T = {
     signalInsightsBody:          'Portfolio insights available.',
     signalInsightsBodyMobile:    'Insights available',
     signalInsightsCta:           'View analysis',
+    // CAT-CONTEXT-1 / REAL-ESTATE-INTEL — real estate calm narrative.
+    signalRealEstateBody:        'Your wealth is primarily supported by real estate.',
+    signalRealEstateBodyMobile:  'Real estate weight high',
+    signalRealEstateCta:         'View analysis',
+    signalRealEstateLiquidBody:  pct => `Liquid portfolio available: ${pct}% of net worth.`,
     // SIGNAL-MOBILE-2: short copy for ≤640px viewports.
     signalConcentrationBodyMobile:'High concentration',
     signalDominantBodyMobile:    name => `${name} dominates`,
@@ -2642,9 +2688,18 @@ let suppressFocusDefaults = false;  // true when focus is programmatic (openModa
 // ADD-FLOW-ARCH-1: which intent currently owns a modal. Exactly one
 // of these can be active at a time — opening one closes and releases
 // the other. Exposed via window for debug + automated checks.
-let _modalContext = null; // null | 'asset' | 'liquidity'
+// CAT-CONTEXT-1: extended to track the contextual flow opened from a
+// category (gold / real_estate) so downstream code can detect intent
+// without re-deriving it from DOM state. assetFilterContext mirrors
+// the underlying type filter when the modal was opened from a category
+// drill-down — used by openContextualModal to prevent stale carry-over
+// between sessions (e.g. user enters Stocks → adds → exits → enters
+// Crypto: we must clear the previous filter context).
+let _modalContext = null; // null | 'asset' | 'liquidity' | 'gold' | 'real_estate'
+let _modalAssetFilterContext = null; // null | 'crypto' | 'stock' | 'etf' | 'fund' | 'metal' | 'real_estate'
 if (typeof window !== 'undefined') {
   Object.defineProperty(window, '__aurixModalContext', { get: () => _modalContext });
+  Object.defineProperty(window, '__aurixModalAssetFilterContext', { get: () => _modalAssetFilterContext });
 }
 
 // ── Asset type metadata ────────────────────────────────────
@@ -2726,6 +2781,37 @@ const summaryPerfEl = document.getElementById('summaryPerf');
 const assetCountEl  = document.getElementById('assetCount');
 const assetsListEl  = document.getElementById('assetsList');
 const emptyStateEl  = document.getElementById('emptyState');
+
+// CAT-CONTEXT-1: swap the empty-state copy + CTA when the user is
+// inside a category drill-down. We re-use the same DOM node (so the
+// aurora/orb styling is preserved) but flip its data-mode attribute
+// so CSS can hide the multi-category quickstart chips and secondary
+// "Explore market" CTA — those reference assets outside the current
+// category and would be off-message. Passing null restores the
+// generic activation copy used on the empty dashboard.
+function _applyEmptyStateForCategory(categoryType) {
+  if (!emptyStateEl) return;
+  const titleEl = emptyStateEl.querySelector('.empty-state-title');
+  const bodyEl  = emptyStateEl.querySelector('.empty-state-body');
+  const ctaEl   = emptyStateEl.querySelector('[data-empty-action="add-asset"]');
+  if (!categoryType) {
+    emptyStateEl.removeAttribute('data-empty-category');
+    if (titleEl) titleEl.textContent = t('emptyActivationTitle');
+    if (bodyEl)  bodyEl.textContent  = t('emptyActivationBody');
+    if (ctaEl)   ctaEl.textContent   = t('emptyCtaPrimary');
+    return;
+  }
+  const map = (T[lang] && T[lang].emptyCategory) || {};
+  const cfg = map[categoryType];
+  if (!cfg) {
+    emptyStateEl.removeAttribute('data-empty-category');
+    return;
+  }
+  emptyStateEl.setAttribute('data-empty-category', categoryType);
+  if (titleEl) titleEl.textContent = cfg.title;
+  if (bodyEl)  bodyEl.textContent  = '';
+  if (ctaEl)   ctaEl.textContent   = '+ ' + cfg.cta;
+}
 const modalOverlay  = document.getElementById('modalOverlay');
 const btnAdd        = document.getElementById('btnAdd');
 const modalClose    = document.getElementById('modalClose');
@@ -7234,13 +7320,26 @@ function _buildWorkspaceRiskCategories() {
   const exposure    = portfolio.exposure || {};
   const allocations = Array.isArray(portfolio.allocations) ? portfolio.allocations : [];
 
+  // REAL-ESTATE-INTEL: if the top allocation is a real-estate holding
+  // we never raise the concentration alarm — property is illiquid,
+  // long-term, low daily volatility. We resolve "top is RE" by mapping
+  // the allocation symbol back to the live assets array (allocations
+  // only carry symbol + value), and downgrade tone to info.
+  const topAllocAsset = (() => {
+    const topSym = allocations[0] && allocations[0].symbol;
+    if (!topSym || !Array.isArray(assets)) return null;
+    const sym = String(topSym).toUpperCase();
+    return assets.find(a => String(a.ticker || a.symbol || '').toUpperCase() === sym) || null;
+  })();
+  const topAllocIsRE = !!(topAllocAsset && topAllocAsset.type === 'real_estate');
+
   const concentration = [];
   const top = allocations[0];
-  if (top && Number(top.allocation || 0) > 0.5) {
+  if (top && Number(top.allocation || 0) > 0.5 && !topAllocIsRE) {
     const sym = top.symbol || t('wsTopAssetFallback');
     const pct = (Number(top.allocation || 0) * 100).toFixed(0);
     concentration.push({ tone: 'warn', text: t('wsConcentrationAbove')(sym, pct) });
-  } else if (top && Number(top.allocation || 0) > 0.35) {
+  } else if (top && Number(top.allocation || 0) > 0.35 && !topAllocIsRE) {
     const sym = top.symbol || t('wsTopAssetFallback');
     const pct = (Number(top.allocation || 0) * 100).toFixed(0);
     concentration.push({ tone: 'info', text: t('wsDominantWeight')(sym, pct) });
@@ -15688,6 +15787,7 @@ function render(animate = false) {
   }
 
   if (assets.length === 0) {
+    _applyEmptyStateForCategory(null);
     assetsListEl.appendChild(emptyStateEl);
     return;
   }
@@ -15700,6 +15800,7 @@ function render(animate = false) {
     : display;
 
   if (filtered.length === 0) {
+    _applyEmptyStateForCategory(activeCategory);
     assetsListEl.appendChild(emptyStateEl);
     return;
   }
@@ -17005,13 +17106,45 @@ document.addEventListener('click', (e) => {
 // ADD-V2.2: maps the category type onto the right contextual mode so
 // the Step-2 chrome matches (RE → real_estate mode, anything else →
 // asset mode with quick picks).
+// CAT-CONTEXT-1: the user already chose the category — opening the
+// modal must inherit that decision and bypass any generic discovery
+// surface. Metal lands directly on the gold flow (XAU pre-selected);
+// real_estate lands on the property form; crypto/stock/etf land on the
+// asset flow with the matching filter already engaged and the placeholder
+// + quick picks tuned to that intent. Also publishes the live filter
+// context so other surfaces (intelligence, debug) can read it.
 function openContextualModal(type) {
   openModal({ skipPicker: true });
-  const filterKey = { crypto: 'crypto', stock: 'stock', etf: 'etf', metal: 'metal', real_estate: 'real_estate' }[type];
-  if (typeof _addV2SetMode === 'function') {
-    _addV2SetMode(type === 'real_estate' ? 'real_estate' : 'asset');
+  // Real estate is its own flow — no asset search, no filter button.
+  if (type === 'real_estate') {
+    _modalContext = 'real_estate';
+    _modalAssetFilterContext = 'real_estate';
+    if (typeof _addV2SetMode === 'function') _addV2SetMode('real_estate');
+    try { if (typeof enterRealEstateMode === 'function') enterRealEstateMode(); } catch (_) {}
+    return;
   }
-  if (typeof _addV2RefreshQuick === 'function' && type !== 'real_estate') _addV2RefreshQuick();
+  // Metals / Gold: jump straight into the gold flow with XAU pre-selected
+  // — the user already said "Gold/Metals", we never need to ask again.
+  if (type === 'metal') {
+    _modalContext = 'gold';
+    _modalAssetFilterContext = 'metal';
+    if (typeof _addV2SetMode === 'function') _addV2SetMode('gold');
+    setTimeout(() => {
+      try {
+        if (typeof selectAsset === 'function') {
+          selectAsset({ ticker:'XAU', name:'Gold', type:'metal', marketSymbol:'GC=F' });
+        }
+      } catch (_) {}
+    }, 30);
+    return;
+  }
+  // Financial assets — keep the asset surface, just lock the filter so
+  // crypto means crypto, stocks means stocks, etc.
+  const filterKey = { crypto: 'crypto', stock: 'stock', etf: 'etf', fund: 'etf' }[type];
+  if (typeof _addV2SetMode === 'function') _addV2SetMode('asset');
+  _modalContext = 'asset';
+  _modalAssetFilterContext = filterKey || null;
+  if (typeof _addV2RefreshQuick === 'function') _addV2RefreshQuick();
   if (filterKey) {
     const btn = document.querySelector(`.filter-btn[data-filter="${filterKey}"]`);
     if (btn) btn.click();
@@ -17286,7 +17419,13 @@ function closeModal() {
   _applyFirstAssetModalCopy(false);
   // ADD-FLOW-ARCH-1: release the asset context only if it still owns
   // it (an in-flight openLiquidityModal already overrode it).
-  if (_modalContext === 'asset') _modalContext = null;
+  // CAT-CONTEXT-1: 'gold' and 'real_estate' are also asset-modal flows,
+  // so they get released here too. Clear the assetFilterContext on every
+  // close so the next session never inherits stale filter state.
+  if (_modalContext === 'asset' || _modalContext === 'gold' || _modalContext === 'real_estate') {
+    _modalContext = null;
+  }
+  _modalAssetFilterContext = null;
 }
 
 // ADD-V4.2 hotfix: ISIN advanced is only meaningful for traditional
@@ -23968,9 +24107,17 @@ function computeAurixSignalPool() {
     return n[0] || '—';
   })();
 
+  // REAL-ESTATE-INTEL: detect whether the dominant weight is real
+  // estate so we can swap the alarmist "concentration" / "dominant"
+  // copy for the calmer property-aware narrative. RE is illiquid,
+  // long-term, low daily volatility — comparing its weight to a single
+  // altcoin would mislead the user.
+  const topIsRealEstate     = !!(topAsset && topAsset.type === 'real_estate');
+  const topCatIsRealEstate  = !!(dist.length && dist[0].type === 'real_estate');
+
   // 1) CONCENTRATION — top asset > 60% (and 2+ assets — single-asset
   //    portfolios get a more specific signal below).
-  if (topPct > 60 && assets.length >= 2) {
+  if (topPct > 60 && assets.length >= 2 && !topIsRealEstate) {
     push({
       kind: 'concentration',
       msg: 'signalConcentrationBody',
@@ -23992,12 +24139,26 @@ function computeAurixSignalPool() {
   }
 
   // 2) CATEGORY CONCENTRATION — top category > 60%.
-  if (dist.length && dist[0].pct > 60) {
+  if (dist.length && dist[0].pct > 60 && !topCatIsRealEstate) {
     push({
       kind: 'category',
       msg: 'signalCategoryBody',
       msgMobile: 'signalCategoryBodyMobile',
       cta: 'signalCryptoCta',
+    });
+  }
+
+  // 2b) REAL ESTATE — calm informative signal when property weight is
+  //     high. We do NOT call this overexposure; we describe what's
+  //     happening (low liquidity, long-term anchor) and let the user
+  //     read on. Threshold matches the spec (≥ 70% triggers narrative).
+  const rePct = Math.round((dist.find(d => d.type === 'real_estate') || {}).pct || 0);
+  if (rePct >= 70) {
+    push({
+      kind: 'real_estate',
+      msg: 'signalRealEstateBody',
+      msgMobile: 'signalRealEstateBodyMobile',
+      cta: 'signalRealEstateCta',
     });
   }
 
@@ -24119,6 +24280,17 @@ function _aurixHealthSnapshot() {
     assetCount:    0,
     cashPct:       0,
     cryptoPct:     0,
+    // REAL-ESTATE-INTEL: track property weight separately so the
+    // intelligence layer can interpret concentration calmly when the
+    // dominant asset is a primary residence or investment property
+    // — long-term, illiquid, not marked-to-market daily.
+    realEstatePct: 0,
+    // Liquid net worth view — total net worth excluding real estate.
+    // A user with a 200K property + 10K stocks has "total wealth" 210K
+    // but "investable / liquid portfolio" of just 10K. Surfacing both
+    // is key for serious investors.
+    liquidUSD:     0,
+    liquidPct:     0,    // % of total that is liquid (non-RE)
     worstAsset:    null,    // { name, ticker, change24h }
     bestAsset:     null,    // { name, ticker, change24h }
   };
@@ -24127,6 +24299,18 @@ function _aurixHealthSnapshot() {
   out.totUSD     = totUSD;
   out.assetCount = assets.length;
   if (totUSD <= 0) return out;
+
+  // REAL-ESTATE-INTEL: compute property USD weight + liquid net worth
+  // before the rest of the snapshot so other heuristics can read them.
+  let reUSD = 0;
+  for (const a of assets) {
+    if (!a || a.type !== 'real_estate') continue;
+    const v = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : 0;
+    if (Number.isFinite(v) && v > 0) reUSD += v;
+  }
+  out.realEstatePct = Math.round((reUSD / totUSD) * 100);
+  out.liquidUSD     = Math.max(0, totUSD - reUSD);
+  out.liquidPct     = Math.round((out.liquidUSD / totUSD) * 100);
 
   // Top single asset (by value) + best/worst 24h change pass.
   let topUsd = -1;
@@ -24182,9 +24366,17 @@ function _aurixHealthScore(snap) {
   if (!snap || snap.assetCount === 0 || snap.totUSD <= 0) {
     return { score: null, label: t('healthScoreEmpty') || '—', tone: 'solid', explain: '' };
   }
+  // REAL-ESTATE-INTEL: real estate is illiquid, long-term, low daily
+  // volatility — treating a single property the same as a single
+  // altcoin for the "dominant asset" deduction would over-penalize
+  // perfectly normal household structures (e.g. primary residence
+  // + a small investment portfolio). When the dominant asset OR
+  // category is real estate, we apply a softer deduction instead.
+  const topIsRE = !!(snap.topAsset && snap.topAsset.type === 'real_estate');
+  const catIsRE = !!(snap.topCategory && snap.topCategory.type === 'real_estate');
   let s = 100;
-  if (snap.topAsset && snap.topAsset.pctTotal > 60)      s -= 25;
-  if (snap.topCategory && snap.topCategory.pctTotal > 60) s -= 20;
+  if (snap.topAsset && snap.topAsset.pctTotal > 60)       s -= topIsRE ? 8  : 25;
+  if (snap.topCategory && snap.topCategory.pctTotal > 60) s -= catIsRE ? 6  : 20;
   if (snap.cryptoPct > 50)                                s -= 15;
   if (snap.assetCount === 1)                              s -= 25;
   if (snap.cashPct > 60)                                  s -= 10;
@@ -24263,11 +24455,28 @@ function _aurixWorkspaceIntelligence() {
     ? (topAsset.name || String(topAsset.ticker || '').toUpperCase() || '—')
     : '';
 
+  // REAL-ESTATE-INTEL: surface property weight + liquid net worth up
+  // front so every downstream heuristic (risk band, dimensions, deep
+  // signals, hero) interprets concentration calmly when it comes from
+  // a primary residence or investment property.
+  const realEstatePct = Number(snap.realEstatePct || 0);
+  const liquidPct     = Number(snap.liquidPct     || 0);
+  const liquidUSD     = Number(snap.liquidUSD     || 0);
+  const topIsRE       = !!(topAsset && topAsset.type === 'real_estate');
+  const topCatIsRE    = !!(topCat   && topCat.type   === 'real_estate');
+  const liquidLabel   = (typeof formatBase === 'function' && Number.isFinite(liquidUSD))
+    ? formatBase(liquidUSD)
+    : `$${Math.round(liquidUSD).toLocaleString()}`;
+
   // Risk band — same heuristic the existing cockpit uses, kept
   // deterministic so terminal + cockpit never disagree.
+  // REAL-ESTATE-INTEL: a top asset that happens to be a primary
+  // residence shouldn't push the risk band into "elevated". Property
+  // concentration adds modestly (illiquidity matters), but not as much
+  // as a single dominant equity or crypto position.
   let riskScore = 25;
-  if (topAssetPct > 50)       riskScore += 25;
-  else if (topAssetPct > 35)  riskScore += 12;
+  if (topAssetPct > 50)       riskScore += topIsRE ? 8 : 25;
+  else if (topAssetPct > 35)  riskScore += topIsRE ? 4 : 12;
   if (cryptoPct > 40)         riskScore += 25;
   else if (cryptoPct > 15)    riskScore += 10;
   if (assetCount > 0 && assetCount < 4) riskScore += 10;
@@ -24378,7 +24587,13 @@ function _aurixWorkspaceIntelligence() {
       why:   topAsset
               ? _ti('ws_intel_dim_concentration_why', topAssetName, topAssetPct)
               : _ti('ws_intel_dim_concentration_why_none'),
-      tone:  topAssetPct > 60 ? 'warn' : topAssetPct > 35 ? 'info' : 'positive',
+      // REAL-ESTATE-INTEL: never paint property concentration as warn —
+      // a primary residence anchoring a household balance sheet is not
+      // the same risk shape as a single altcoin.
+      tone:  topIsRE ? (topAssetPct > 60 ? 'info' : 'positive')
+            : topAssetPct > 60 ? 'warn'
+            : topAssetPct > 35 ? 'info'
+                               : 'positive',
     },
     {
       id:    'performance',
@@ -24390,7 +24605,7 @@ function _aurixWorkspaceIntelligence() {
   ];
 
   // HERO INSIGHT — pick the single most consequential interpretation.
-  // Priority: single asset → high concentration → high crypto → liquidity gap → moderate concentration → resilient default.
+  // Priority: single asset → real-estate dominance → high concentration → high crypto → liquidity gap → moderate concentration → resilient default.
   const hero = (() => {
     if (assetCount === 1 && topAsset) {
       return {
@@ -24401,6 +24616,23 @@ function _aurixWorkspaceIntelligence() {
         optionalHint: _ti('ws_intel_hero_single_hint'),
         severity:     'warn',
         kind:         'single',
+      };
+    }
+    // REAL-ESTATE-INTEL: when real estate dominates we never say
+    // "overexposed". We describe stability + reduced liquidity, and
+    // surface the liquid portfolio number so the user reads a complete
+    // picture instead of a misleading single percentage.
+    if (realEstatePct >= 70 || (topIsRE && topAssetPct > 60) || (topCatIsRE && Number(topCat.pctTotal || 0) > 60)) {
+      const reShown = realEstatePct || (topCatIsRE ? Number(topCat.pctTotal || 0) : topAssetPct);
+      return {
+        eyebrow:      _ti('ws_intel_hero_eyebrow'),
+        title:        _ti('ws_intel_hero_re_title'),
+        summary:      _ti('ws_intel_hero_re_summary', reShown),
+        explanation:  _ti('ws_intel_hero_re_explanation'),
+        optionalHint: _ti('ws_intel_hero_re_liquid_hint', liquidPct, liquidLabel)
+                      || _ti('ws_intel_hero_re_hint'),
+        severity:     'info',
+        kind:         'real_estate',
       };
     }
     if (topAssetPct > 60 && topAsset) {
@@ -24472,7 +24704,11 @@ function _aurixWorkspaceIntelligence() {
       explanation: topAsset
                     ? _ti('ws_intel_signal_concentration_explanation', topAssetName, topAssetPct)
                     : _ti('ws_intel_signal_concentration_explanation_none'),
-      severity:    topAssetPct > 60 ? 'warn' : topAssetPct > 35 ? 'info' : 'positive',
+      // REAL-ESTATE-INTEL: downgrade severity when property dominates.
+      severity:    topIsRE ? (topAssetPct > 60 ? 'info' : 'positive')
+                  : topAssetPct > 60 ? 'warn'
+                  : topAssetPct > 35 ? 'info'
+                                     : 'positive',
     },
     {
       kind:        'diversification',
@@ -25170,6 +25406,18 @@ if (typeof window !== 'undefined' && _aurixIsDebugHost()) {
     if (action) {
       const a = action.dataset.emptyAction;
       if (a === 'add-asset') {
+        // CAT-CONTEXT-1: empty state inside a category drill-down must
+        // route through the contextual flow, never re-ask via the
+        // generic picker.
+        const cat = typeof activeCategory === 'string' ? activeCategory : null;
+        if (cat === 'cash') {
+          if (typeof openLiquidityModal === 'function') openLiquidityModal();
+          return;
+        }
+        if (cat && typeof openContextualModal === 'function') {
+          openContextualModal(cat);
+          return;
+        }
         if (typeof openModal === 'function') openModal();
         return;
       }

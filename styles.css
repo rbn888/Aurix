@@ -14715,6 +14715,15 @@ body.gs-open { overflow: hidden; }
   .empty-cta, .empty-chip { transition: none; }
 }
 
+/* CAT-CONTEXT-1: empty state inside a category drill-down hides the
+   multi-class quickstart chips and the secondary "explore market" CTA —
+   both reference assets outside the active category and would push the
+   user back into the generic decision they already made. */
+.empty-state[data-empty-category] .empty-state-quickstart,
+.empty-state[data-empty-category] .empty-cta--secondary {
+  display: none !important;
+}
+
 /* ══════════════════════════════════════════════════════════════════
    AURIX-SIGNALS-2 — Compact dashboard awareness card + Portfolio
    Health bridge. The card is intentionally slim so it never pushes
