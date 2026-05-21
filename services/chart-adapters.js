@@ -39,9 +39,13 @@
 
   // ── Range → provider arg maps ─────────────────────────────────
   // Yahoo accepts named ranges + intervals; the backend already owns
-  // that mapping. Crypto / CoinGecko uses `days` (a number).
+  // that mapping. Crypto / CoinGecko uses `days` — a number for fixed
+  // windows, or the string 'max' for the full available history.
+  // ASSET-CHARTS-1: 'all' must mean *all* available history, not 365
+  // days — otherwise BTC TOTAL is indistinguishable from 1Y. CoinGecko
+  // accepts days=max and returns the full series from genesis.
   const CRYPTO_DAYS = Object.freeze({
-    '24h': 1, '7d': 7, '30d': 30, '3m': 90, '1y': 365, 'all': 365,
+    '24h': 1, '7d': 7, '30d': 30, '3m': 90, '1y': 365, 'all': 'max',
   });
 
   // Coarse cumulative window in ms, used to bucket "completeness"

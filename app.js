@@ -9607,8 +9607,16 @@ function _aurixSparkMountAll(container) {
 // opens an asset detail and the feature flag is on. Today's modal
 // has no chart, so flag-off behaviour is identical to pre-CHART-6:
 // the slot stays `hidden`, modal renders exactly as before.
+// ASSET-CHARTS-1: range pill labels mirror the dashboard chart
+// (24H / 7D / 30D / 1Y / TOTAL) so the two surfaces feel like one
+// product. The map resolves both the canonical labels and a couple of
+// older variants kept here so an in-flight pill click from a stale
+// asset chart instance never silently falls through to the default.
 const _AURIX_ASSET_RANGE_MAP = Object.freeze({
-  '24H':'24h', '1W':'7d', '1M':'30d', '1Y':'1y', 'ALL':'all',
+  '24H':'24h', '7D':'7d', '30D':'30d', '1Y':'1y', 'TOTAL':'all',
+  // Back-compat aliases for any cached / inherited surface that still
+  // emits the older labels.
+  '1W':'7d', '1M':'30d', 'ALL':'all',
 });
 function _aurixAssetFlag() {
   return typeof window !== 'undefined' && window.__AURIX_ASSET_CHART_V2 !== false;
@@ -9822,8 +9830,12 @@ function _aurixAssetMount(asset) {
   if (rangesHost && typeof window.AurixCharts.createRangePills === 'function') {
     try {
       _aurixAssetRanges = window.AurixCharts.createRangePills(rangesHost, {
-        ranges:  ['24H','1W','1M','1Y','ALL'],
-        initial: '1M',
+        // ASSET-CHARTS-1: aligned with the dashboard's 24H/7D/30D/1A/TOTAL
+        // pill row. TOTAL routes through to the provider's max-history
+        // range (Yahoo: range=max, CoinGecko: days=max) — never a
+        // truncated 1Y stand-in.
+        ranges:  ['24H','7D','30D','1Y','TOTAL'],
+        initial: '30D',
         onChange: label => {
           const r = _AURIX_ASSET_RANGE_MAP[label] || '30d';
           if (r === _aurixAssetRange) return;

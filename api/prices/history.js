@@ -6,7 +6,10 @@
 // it preserves the response shape `services/history.js` already consumes.
 
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://rbn888.github.io';
-const ALLOWED_DAYS   = new Set(['1', '7', '30', '90', '180', '365']);
+// ASSET-CHARTS-1: 'max' lets the crypto chart's TOTAL range return the
+// full available history from genesis — CoinGecko accepts the literal
+// string "max" alongside the fixed-day values for /coins/{id}/market_chart.
+const ALLOWED_DAYS   = new Set(['1', '7', '30', '90', '180', '365', 'max']);
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin',  ALLOWED_ORIGIN);
