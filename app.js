@@ -11860,9 +11860,14 @@ function updateCategoryCards() {
   const grid    = document.getElementById('categoriesGrid');
   if (!section || !grid) return;
 
-  // In category drill-down, this section is replaced by the filtered asset list
+  // In category drill-down, this section is replaced by the filtered asset list.
+  // DRILLDOWN-RACE-2 audit: also bail out during the drill-in animation
+  // — the inline-style fade owns visibility of categoriesSection in that
+  // window. Without this guard a refresh-triggered updateDonut →
+  // updateCategoryCards in the 210ms fade could cut the section to
+  // display:none mid-animation.
   if (activeCategory !== null) {
-    section.style.display = 'none';
+    if (!_enteringCategory) section.style.display = 'none';
     return;
   }
 
@@ -25385,7 +25390,13 @@ function renderAurixSignal() {
     _aurixSignalStopRotation();
     return;
   }
-  if (typeof activeCategory !== 'undefined' && activeCategory) {
+  // DRILLDOWN-RACE-2 audit: Aurix Signal is a dashboard root widget.
+  // The original check covered the steady state — also gate on
+  // _enteringCategory so an async refresh that lands inside the 210ms
+  // drill-in animation cannot re-paint the signal card over the
+  // category drill-down.
+  if ((typeof activeCategory !== 'undefined' && activeCategory) ||
+      (typeof _enteringCategory !== 'undefined' && _enteringCategory)) {
     _aurixSignalVisibility = 'hidden:drilldown';
     sec.hidden = true;
     sec.removeAttribute('data-kind');
