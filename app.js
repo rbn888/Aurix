@@ -1319,8 +1319,12 @@ const T = {
     },
     catHeroCount: n => `${n} ${n === 1 ? 'posición' : 'posiciones'}`,
     // CATEGORY-DETAIL-POLISH-1: compact chip + top-holding label.
+    // CATEGORY-HERO-FINAL-WEB-MOBILE: "Principal" reads as the
+    // canonical Spanish label for the lead holding — calmer + more
+    // institutional than "Mayor", which colloquially sounds like "the
+    // bigger one" rather than "the leading position".
     catHeroPctChip:   pct => `${pct}% cartera`,
-    catHeroTopChip:   name => `Mayor: ${name}`,
+    catHeroTopChip:   name => `Principal: ${name}`,
     // CATEGORY-DETAIL-CHARTS-2 — premium category performance panel.
     categoryPerfTitle: name => `Rendimiento de ${name}`,
     categoryPerfEmptyTitle: 'Histórico de categoría en construcción.',
@@ -12787,7 +12791,6 @@ function renderDetailHero(type, typeAssets) {
     : typeAssets.reduce(
         (s, a) => s + toBase(assetNativeValue(a), (a.assetCurrency || 'USD').toUpperCase()), 0
       );
-  const change24h = computeCategoryChange(typeAssets);
 
   // Create hero element once.
   // CATEGORY-DETAIL-1: the hero now reads top-to-bottom as a brief —
@@ -12809,6 +12812,11 @@ function renderDetailHero(type, typeAssets) {
     // appears immediately below. The old long "Cripto representa el X%
     // de tu patrimonio" sentence is gone — replaced by the calm
     // "13% cartera" chip and the existing contextual insight line.
+    // CATEGORY-HERO-FINAL-WEB-MOBILE — the hero is now strictly an
+    // identity surface. Performance (change pill, PnL row) is owned by
+    // the dedicated chart panel below; analytical prose (insight) is
+    // owned by Workspace intelligence. Hero keeps category label,
+    // total value, and a compact chip rail for structural metadata.
     heroEl.innerHTML = `
       <div class="detail-hero-info">
         <div class="detail-hero-meta">
@@ -12816,7 +12824,6 @@ function renderDetailHero(type, typeAssets) {
           <span class="detail-hero-type"></span>
         </div>
         <div class="detail-hero-value"></div>
-        <span class="detail-hero-change"></span>
       </div>
       <aside class="detail-hero-side">
         <div class="detail-hero-chips">
@@ -12824,8 +12831,6 @@ function renderDetailHero(type, typeAssets) {
           <span class="detail-hero-chip is-count"></span>
           <span class="detail-hero-chip is-top" hidden></span>
         </div>
-        <p class="detail-hero-insight"></p>
-        <span class="detail-hero-pnl"></span>
       </aside>`;
     const hdr = document.querySelector('#assetsSection .section-header');
     if (hdr) hdr.after(heroEl);
@@ -12845,23 +12850,12 @@ function renderDetailHero(type, typeAssets) {
   // Animated value: count-up from 0 on first entry, smooth interpolation on update
   _animateHeroValue(heroEl.querySelector('.detail-hero-value'), totalValue);
 
-  const changeEl = heroEl.querySelector('.detail-hero-change');
-  if (change24h !== null) {
-    const sign = change24h >= 0 ? '+' : '';
-    const cls  = change24h > 0.005 ? 'up' : change24h < -0.005 ? 'down' : 'flat';
-    changeEl.textContent = `${sign}${change24h.toFixed(2)}%`;
-    changeEl.className   = `detail-hero-change ${cls}`;
-    changeEl.style.display = '';
-  } else {
-    changeEl.style.display = 'none';
-  }
-
-  // CATEGORY-DETAIL-POLISH-1 — populate the compact chip rail in the
-  // hero's right column. Long summary sentence is gone; the chips
-  // ("13% cartera", "5 posiciones", optionally "Mayor: BTC") carry the
-  // same information without the duplication the old summary created.
+  // CATEGORY-HERO-FINAL-WEB-MOBILE — populate only the identity chips.
+  // Performance + analytical prose are owned by the chart panel and
+  // Workspace intelligence respectively, per the Aurix information
+  // hierarchy: this surface answers "what am I looking at", not
+  // "how is it performing" or "what does it mean".
   const portfolioTotal = totalValueBase();
-  const insightEl = heroEl.querySelector('.detail-hero-insight');
   const chipPctEl   = heroEl.querySelector('.detail-hero-chip.is-pct');
   const chipCountEl = heroEl.querySelector('.detail-hero-chip.is-count');
   const chipTopEl   = heroEl.querySelector('.detail-hero-chip.is-top');
@@ -12914,42 +12908,13 @@ function renderDetailHero(type, typeAssets) {
     }
   }
 
-  if (insightEl) {
-    const copy = _categoryInsightCopy(type, typeAssets, totalValue);
-    if (copy) {
-      insightEl.textContent = copy;
-      insightEl.style.display = '';
-    } else {
-      insightEl.textContent = '';
-      insightEl.style.display = 'none';
-    }
-  }
-
-  const categoryPnLAbs = typeAssets.reduce((s, a) => {
-    const p = assetPnLBase(a);
-    return p ? s + p.abs : s;
-  }, 0);
-  const categoryCostBasis = typeAssets.reduce((s, a) => {
-    if (a.costBasis == null || a.costBasis <= 0 || a.type === 'cash' || a.type === 'real_estate') return s;
-    return s + toBase(a.costBasis, (a.assetCurrency || 'USD').toUpperCase());
-  }, 0);
-  const pnlEl = heroEl.querySelector('.detail-hero-pnl');
-  if (categoryCostBasis > 0) {
-    const pnlPct = (categoryPnLAbs / categoryCostBasis) * 100;
-    const sign = categoryPnLAbs >= 0 ? '+' : '−';
-    const cls  = categoryPnLAbs > 0 ? 'up' : categoryPnLAbs < 0 ? 'down' : 'flat';
-    pnlEl.textContent = `${sign}${formatBase(Math.abs(categoryPnLAbs))} (${sign}${Math.abs(pnlPct).toFixed(1)}%)`;
-    pnlEl.className   = `detail-hero-pnl ${cls}`;
-    pnlEl.style.display = '';
-  } else {
-    pnlEl.style.display = 'none';
-  }
-
-  // Re-build sparkline only when the category changes (not on every price tick)
-  if (_detailChartType !== type) {
-    _detailChartType = type;
-    requestAnimationFrame(() => buildDetailSparkline(totalValue, change24h, m.color));
-  }
+  // CATEGORY-HERO-FINAL-WEB-MOBILE — track the category we've already
+  // shown so consumers that listened to _detailChartType continue to
+  // work; the underlying sparkline call is gone (legacy buildDetailSparkline
+  // had no canvas to draw on once the inner chart wrap was removed in
+  // CATEGORY-DETAIL-CHARTS-2). The dedicated perf panel below the hero
+  // owns the rebuild via _aurixCategoryPerfRender.
+  if (_detailChartType !== type) _detailChartType = type;
 }
 
 // ── Insights tab ───────────────────────────────────────────
