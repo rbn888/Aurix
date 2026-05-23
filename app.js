@@ -1318,6 +1318,9 @@ const T = {
       cash:        'Liquidez disponible para nuevas oportunidades.',
     },
     catHeroCount: n => `${n} ${n === 1 ? 'posición' : 'posiciones'}`,
+    // CATEGORY-DETAIL-POLISH-1: compact chip + top-holding label.
+    catHeroPctChip:   pct => `${pct}% cartera`,
+    catHeroTopChip:   name => `Mayor: ${name}`,
     // CATEGORY-DETAIL-CHARTS-2 — premium category performance panel.
     categoryPerfTitle: name => `Rendimiento de ${name}`,
     categoryPerfEmptyTitle: 'Histórico de categoría en construcción.',
@@ -2399,6 +2402,9 @@ const T = {
       cash:        'Liquidity ready for new opportunities.',
     },
     catHeroCount: n => `${n} ${n === 1 ? 'position' : 'positions'}`,
+    // CATEGORY-DETAIL-POLISH-1: compact chip + top-holding label.
+    catHeroPctChip:   pct => `${pct}% portfolio`,
+    catHeroTopChip:   name => `Top: ${name}`,
     // CATEGORY-DETAIL-CHARTS-2 — premium category performance panel.
     categoryPerfTitle: name => `${name} performance`,
     categoryPerfEmptyTitle: 'Category history is still building.',
@@ -3776,8 +3782,15 @@ function _categoryRangeCutoff(range) {
 function _categorySeriesForRange(type, range) {
   const buckets = _categoryBucketsForType(type);
   if (!Array.isArray(categoryHistory) || !categoryHistory.length) return [];
-  const cutoff = _categoryRangeCutoff(range);
-  const out = [];
+  // CATEGORY-DETAIL-POLISH-1: align the cutoff with the portfolio epoch
+  // so any snapshot taken before a reset can never bleed into the chart
+  // or the %% change calculation. The loadCategoryHistory path already
+  // applies this once at startup; re-checking here defends against any
+  // path that mutates categoryHistory in-memory after a later reset.
+  const rangeCutoff = _categoryRangeCutoff(range);
+  const epoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
+  const cutoff = Math.max(rangeCutoff, epoch || 0);
+  let out = [];
   for (const p of categoryHistory) {
     if (!p || typeof p.ts !== 'number') continue;
     if (p.ts < cutoff) continue;
@@ -3788,6 +3801,26 @@ function _categorySeriesForRange(type, range) {
     }
     if (!(v > 0)) continue;
     out.push({ time: p.ts, value: +v.toFixed(2) });
+  }
+  // CATEGORY-DETAIL-POLISH-1: trim leading points up to the most recent
+  // *structural* change. A jump > 150% between consecutive snapshots is
+  // never a market move at our snapshot cadence — it's an add / remove
+  // / reset event. Treating it as the start of the visible baseline
+  // turns "-99% all-time" charts (originated from a single dust point
+  // followed by a real position) into a clean post-event line. The
+  // threshold is intentionally conservative so true crypto spikes
+  // (e.g. +60% on a meme coin) keep their drama.
+  if (out.length >= 3) {
+    const STRUCTURAL = 1.5; // 150% jump
+    let trimAt = 0;
+    for (let i = 1; i < out.length; i++) {
+      const prev = out[i - 1].value;
+      const cur  = out[i].value;
+      if (prev > 0 && Math.abs(cur - prev) / prev >= STRUCTURAL) {
+        trimAt = i; // keep this point and everything after
+      }
+    }
+    if (trimAt > 0) out = out.slice(trimAt);
   }
   return out;
 }
@@ -12762,24 +12795,31 @@ function renderDetailHero(type, typeAssets) {
     heroEl = document.createElement('div');
     heroEl.id        = 'detailHero';
     heroEl.className = 'detail-hero';
-    // CATEGORY-DETAIL-CHARTS-2 — the sparkline that lived inside the
-    // hero is gone; the dedicated "Rendimiento de [categoría]" panel
-    // below carries the line chart now. Removing it here avoids two
-    // redundant chart surfaces in the same drill-down.
+    // CATEGORY-DETAIL-POLISH-1 — two-column hero with a compact
+    // "side" rail on the right. Desktop uses the right space for
+    // chips + insight; mobile keeps the same DOM but stacks the chips
+    // top-right via CSS so the value column stays short and the chart
+    // appears immediately below. The old long "Cripto representa el X%
+    // de tu patrimonio" sentence is gone — replaced by the calm
+    // "13% cartera" chip and the existing contextual insight line.
     heroEl.innerHTML = `
       <div class="detail-hero-info">
         <div class="detail-hero-meta">
           <span class="detail-hero-dot"></span>
           <span class="detail-hero-type"></span>
-          <span class="detail-hero-count"></span>
         </div>
         <div class="detail-hero-value"></div>
         <span class="detail-hero-change"></span>
-        <p class="detail-hero-summary"></p>
+      </div>
+      <aside class="detail-hero-side">
+        <div class="detail-hero-chips">
+          <span class="detail-hero-chip is-pct"></span>
+          <span class="detail-hero-chip is-count"></span>
+          <span class="detail-hero-chip is-top" hidden></span>
+        </div>
         <p class="detail-hero-insight"></p>
-        <span class="detail-hero-pct" hidden></span>
         <span class="detail-hero-pnl"></span>
-      </div>`;
+      </aside>`;
     const hdr = document.querySelector('#assetsSection .section-header');
     if (hdr) hdr.after(heroEl);
   }
@@ -12809,31 +12849,64 @@ function renderDetailHero(type, typeAssets) {
     changeEl.style.display = 'none';
   }
 
-  // CATEGORY-DETAIL-1 — populate the new investor-grade blocks. The
-  // bare "X.X% de la cartera" chip becomes a full sentence so the
-  // drill-down reads as a brief, not a stat sheet. The hidden pct
-  // element retains the raw value for any caller that querySelectors
-  // it (no live callers today; future-proof).
+  // CATEGORY-DETAIL-POLISH-1 — populate the compact chip rail in the
+  // hero's right column. Long summary sentence is gone; the chips
+  // ("13% cartera", "5 posiciones", optionally "Mayor: BTC") carry the
+  // same information without the duplication the old summary created.
   const portfolioTotal = totalValueBase();
-  const pctEl     = heroEl.querySelector('.detail-hero-pct');
-  const summaryEl = heroEl.querySelector('.detail-hero-summary');
   const insightEl = heroEl.querySelector('.detail-hero-insight');
-  const countEl   = heroEl.querySelector('.detail-hero-count');
+  const chipPctEl   = heroEl.querySelector('.detail-hero-chip.is-pct');
+  const chipCountEl = heroEl.querySelector('.detail-hero-chip.is-count');
+  const chipTopEl   = heroEl.querySelector('.detail-hero-chip.is-top');
   const allocPct  = portfolioTotal > 0 ? (totalValue / portfolioTotal) * 100 : 0;
-  if (pctEl) pctEl.textContent = portfolioTotal > 0
-    ? `${allocPct.toFixed(1)}%${t('pctOfPortfolio')}`
-    : '';
-  const summaryMap = (T[lang] && T[lang].catHeroSummary) || {};
-  const summaryFn  = summaryMap[type] || summaryMap.other;
-  if (summaryEl) {
-    if (portfolioTotal > 0 && typeof summaryFn === 'function') {
-      summaryEl.textContent = summaryFn(Math.round(allocPct));
-      summaryEl.style.display = '';
+  const n         = Array.isArray(typeAssets) ? typeAssets.length : 0;
+  const countFn = t('catHeroCount');
+
+  // Visible chips.
+  const pctChipFn = t('catHeroPctChip');
+  if (chipPctEl) {
+    if (portfolioTotal > 0 && typeof pctChipFn === 'function') {
+      chipPctEl.textContent = pctChipFn(Math.round(allocPct));
+      chipPctEl.hidden = false;
     } else {
-      summaryEl.textContent = '';
-      summaryEl.style.display = 'none';
+      chipPctEl.textContent = '';
+      chipPctEl.hidden = true;
     }
   }
+  if (chipCountEl) {
+    if (n > 0 && typeof countFn === 'function') {
+      chipCountEl.textContent = countFn(n);
+      chipCountEl.hidden = false;
+    } else {
+      chipCountEl.textContent = '';
+      chipCountEl.hidden = true;
+    }
+  }
+  // Top holding chip: only when there's a clear leader (2+ positions
+  // and the top weight ≥ 25% of the category). Single-asset categories
+  // would just echo the type name, which is noise.
+  if (chipTopEl) {
+    let topName = '';
+    if (Array.isArray(typeAssets) && typeAssets.length >= 2 && totalValue > 0) {
+      let top = null, topVal = 0;
+      for (const a of typeAssets) {
+        const v = toBase(assetNativeValue(a), (a.assetCurrency || 'USD').toUpperCase());
+        if (Number.isFinite(v) && v > topVal) { topVal = v; top = a; }
+      }
+      if (top && (topVal / totalValue) >= 0.25) {
+        topName = (top.ticker && String(top.ticker).toUpperCase()) || top.name || '';
+      }
+    }
+    const topFn = t('catHeroTopChip');
+    if (topName && typeof topFn === 'function') {
+      chipTopEl.textContent = topFn(topName);
+      chipTopEl.hidden = false;
+    } else {
+      chipTopEl.textContent = '';
+      chipTopEl.hidden = true;
+    }
+  }
+
   if (insightEl) {
     const copy = _categoryInsightCopy(type, typeAssets, totalValue);
     if (copy) {
@@ -12842,17 +12915,6 @@ function renderDetailHero(type, typeAssets) {
     } else {
       insightEl.textContent = '';
       insightEl.style.display = 'none';
-    }
-  }
-  const countFn = t('catHeroCount');
-  if (countEl) {
-    const n = Array.isArray(typeAssets) ? typeAssets.length : 0;
-    if (n > 0 && typeof countFn === 'function') {
-      countEl.textContent = countFn(n);
-      countEl.style.display = '';
-    } else {
-      countEl.textContent = '';
-      countEl.style.display = 'none';
     }
   }
 
