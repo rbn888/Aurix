@@ -1281,14 +1281,43 @@ const T = {
     emptyChipGold:        'Oro',
     // CAT-CONTEXT-1: empty-state copy per category drill-down. Never use the
     // generic "Añadir activo" when the user already chose a category.
+    // CATEGORY-DETAIL-1: tighter, more investor-grade phrasing ("exposición
+    // a cripto" reads cleaner than "cripto en tu cartera").
     emptyCategory: {
-      crypto:      { title: 'Todavía no tienes cripto en tu cartera.', cta: 'Añadir cripto' },
-      stock:       { title: 'Todavía no tienes acciones.',             cta: 'Añadir acción' },
-      etf:         { title: 'Todavía no tienes ETFs o fondos.',        cta: 'Añadir ETF' },
-      metal:       { title: 'Todavía no tienes metales en tu cartera.', cta: 'Añadir metal' },
+      crypto:      { title: 'Todavía no tienes exposición a cripto.',   cta: 'Añadir cripto' },
+      stock:       { title: 'Todavía no tienes acciones en tu cartera.',cta: 'Añadir acción' },
+      etf:         { title: 'Todavía no tienes ETFs ni fondos.',        cta: 'Añadir ETF' },
+      metal:       { title: 'Todavía no tienes metales preciosos.',     cta: 'Añadir metal' },
       real_estate: { title: 'Todavía no tienes inmuebles registrados.', cta: 'Añadir inmueble' },
       cash:        { title: 'Todavía no tienes liquidez registrada.',   cta: 'Añadir liquidez' },
     },
+    // CATEGORY-DETAIL-1 — premium category hero copy. Each category
+    // gets a full sentence (allocation share) + a contextual insight,
+    // so the drill-down reads like a brief from an analyst, not a
+    // dashboard widget.
+    catHeroSummary: {
+      crypto:      pct => `Cripto representa el ${pct}% de tu patrimonio.`,
+      stock:       pct => `Acciones representan el ${pct}% de tu cartera.`,
+      etf:         pct => `Fondos y ETFs representan el ${pct}% de tu cartera.`,
+      metal:       pct => `Metales representan el ${pct}% de tu patrimonio.`,
+      real_estate: pct => `Inmuebles representan el ${pct}% de tu patrimonio.`,
+      cash:        pct => `Liquidez representa el ${pct}% de tu patrimonio.`,
+      other:       pct => `Otros activos representan el ${pct}% de tu patrimonio.`,
+    },
+    catHeroInsight: {
+      cryptoTop:   name => `${name} concentra la mayor parte de tu exposición.`,
+      cryptoSpread:n    => `Tu exposición a cripto se reparte entre ${n} posiciones.`,
+      stockTop:    name => `${name} concentra el mayor peso entre tus acciones.`,
+      stockSpread: n    => `Tu exposición está diversificada entre ${n} posiciones.`,
+      etfTop:      name => `${name} es la mayor posición entre tus fondos.`,
+      etfSpread:   n    => `Tu inversión se reparte entre ${n} fondos y ETFs.`,
+      otherTop:    name => `${name} es tu mayor posición en esta categoría.`,
+      otherSpread: n    => `Posiciones diversas en ${n} activos.`,
+      metal:       'Los metales aportan estabilidad defensiva.',
+      real_estate: 'Los inmuebles aportan estructura patrimonial.',
+      cash:        'Liquidez disponible para nuevas oportunidades.',
+    },
+    catHeroCount: n => `${n} ${n === 1 ? 'posición' : 'posiciones'}`,
     // ── First asset add flow ─────────────────────────
     modalAddTitleFirst:   'Añade tu primer activo',
     modalAddSubFirst:     'Empieza creando la base de tu portfolio.',
@@ -2325,14 +2354,39 @@ const T = {
     emptyChipCash:        'Liquidity',
     emptyChipGold:        'Gold',
     // CAT-CONTEXT-1: category drill-down empty-state copy.
+    // CATEGORY-DETAIL-1: tighter, exposure-focused phrasing.
     emptyCategory: {
-      crypto:      { title: "You don't have any crypto yet.",         cta: 'Add crypto' },
-      stock:       { title: "You don't have any stocks yet.",         cta: 'Add stock' },
-      etf:         { title: "You don't have any ETFs or funds yet.",  cta: 'Add ETF' },
-      metal:       { title: "You don't have any metals yet.",         cta: 'Add metal' },
+      crypto:      { title: "You don't have crypto exposure yet.",    cta: 'Add crypto' },
+      stock:       { title: "You don't hold any stocks yet.",         cta: 'Add stock' },
+      etf:         { title: "You don't hold any ETFs or funds yet.",  cta: 'Add ETF' },
+      metal:       { title: "You don't hold any precious metals yet.",cta: 'Add metal' },
       real_estate: { title: "You don't have any properties on file.", cta: 'Add property' },
       cash:        { title: "You don't have any liquidity tracked.",  cta: 'Add liquidity' },
     },
+    // CATEGORY-DETAIL-1 — premium category hero copy.
+    catHeroSummary: {
+      crypto:      pct => `Crypto represents ${pct}% of your wealth.`,
+      stock:       pct => `Stocks represent ${pct}% of your portfolio.`,
+      etf:         pct => `Funds and ETFs represent ${pct}% of your portfolio.`,
+      metal:       pct => `Precious metals represent ${pct}% of your wealth.`,
+      real_estate: pct => `Real estate represents ${pct}% of your wealth.`,
+      cash:        pct => `Liquidity represents ${pct}% of your wealth.`,
+      other:       pct => `Other assets represent ${pct}% of your wealth.`,
+    },
+    catHeroInsight: {
+      cryptoTop:   name => `${name} carries most of your crypto exposure.`,
+      cryptoSpread:n    => `Your crypto exposure is spread across ${n} positions.`,
+      stockTop:    name => `${name} carries the largest weight among your stocks.`,
+      stockSpread: n    => `Your stock exposure is diversified across ${n} positions.`,
+      etfTop:      name => `${name} is your largest fund position.`,
+      etfSpread:   n    => `Your investment is spread across ${n} funds and ETFs.`,
+      otherTop:    name => `${name} is your largest position in this category.`,
+      otherSpread: n    => `Mixed positions across ${n} assets.`,
+      metal:       'Metals add defensive stability to your portfolio.',
+      real_estate: 'Real estate adds structural anchor to your wealth.',
+      cash:        'Liquidity ready for new opportunities.',
+    },
+    catHeroCount: n => `${n} ${n === 1 ? 'position' : 'positions'}`,
     // ── First asset add flow ─────────────────────────
     modalAddTitleFirst:   'Add your first asset',
     modalAddSubFirst:     'Start building your portfolio foundation.',
@@ -12376,6 +12430,45 @@ function buildDetailSparkline(totalValue, change24h, color) {
   });
 }
 
+// CATEGORY-DETAIL-1 — derive the contextual insight line for a category
+// drill-down. Static categories (metals / real-estate / cash) get a
+// fixed institutional sentence; data-driven categories (crypto / stocks
+// / ETFs / other) flex between "X concentra…" when one holding leads
+// the category and "diversificada entre N posiciones" when the spread
+// is wider. Pure function — never touches DOM, safe to call from any
+// render path. Threshold of 55% chosen deliberately: a 50/50 split
+// reads as balanced, not as dominance; 55%+ feels like a clear lead.
+function _categoryInsightCopy(type, typeAssets, totalValue) {
+  const map = (T[lang] && T[lang].catHeroInsight) || {};
+  if (type === 'metal')       return map.metal       || '';
+  if (type === 'real_estate') return map.real_estate || '';
+  if (type === 'cash')        return map.cash        || '';
+  if (!Array.isArray(typeAssets) || !typeAssets.length || !(totalValue > 0)) return '';
+
+  // Find the largest position in the category subset.
+  let top = null, topVal = 0;
+  for (const a of typeAssets) {
+    const v = toBase(assetNativeValue(a), (a.assetCurrency || 'USD').toUpperCase());
+    if (Number.isFinite(v) && v > topVal) { topVal = v; top = a; }
+  }
+  if (!top) return '';
+
+  const topPct  = (topVal / totalValue) * 100;
+  const topName = (top.ticker && String(top.ticker).toUpperCase()) || top.name || '—';
+  const dominates = typeAssets.length === 1 || topPct >= 55;
+
+  const keys = {
+    crypto: dominates ? 'cryptoTop' : 'cryptoSpread',
+    stock:  dominates ? 'stockTop'  : 'stockSpread',
+    etf:    dominates ? 'etfTop'    : 'etfSpread',
+    other:  dominates ? 'otherTop'  : 'otherSpread',
+  };
+  const k = keys[type] || keys.other;
+  const fn = map[k];
+  if (typeof fn !== 'function') return '';
+  return dominates ? fn(topName) : fn(typeAssets.length);
+}
+
 // Render or update the premium detail hero (category name, total value,
 // 24h change badge, mini sparkline chart). Called from render() when in
 // category drill-down. Re-creates sparkline only when category changes.
@@ -12389,7 +12482,14 @@ function renderDetailHero(type, typeAssets) {
       );
   const change24h = computeCategoryChange(typeAssets);
 
-  // Create hero element once
+  // Create hero element once.
+  // CATEGORY-DETAIL-1: the hero now reads top-to-bottom as a brief —
+  //   meta row (category + position count) → headline value → 24h badge
+  //   → "Cripto representa el X% de tu patrimonio." (summary sentence,
+  //   replacing the bare X.X% chip) → contextual insight → PnL line.
+  // The .detail-hero-pct slot is kept as a hidden compatibility hook —
+  // callers that querySelector it (none today, but future surfaces) get
+  // a stable address. Layout is owned by .detail-hero-summary instead.
   let heroEl = document.getElementById('detailHero');
   if (!heroEl) {
     heroEl = document.createElement('div');
@@ -12400,10 +12500,13 @@ function renderDetailHero(type, typeAssets) {
         <div class="detail-hero-meta">
           <span class="detail-hero-dot"></span>
           <span class="detail-hero-type"></span>
+          <span class="detail-hero-count"></span>
         </div>
         <div class="detail-hero-value"></div>
         <span class="detail-hero-change"></span>
-        <span class="detail-hero-pct"></span>
+        <p class="detail-hero-summary"></p>
+        <p class="detail-hero-insight"></p>
+        <span class="detail-hero-pct" hidden></span>
         <span class="detail-hero-pnl"></span>
       </div>
       <div class="detail-chart-wrap"><canvas id="detailChartCanvas"></canvas></div>`;
@@ -12436,12 +12539,51 @@ function renderDetailHero(type, typeAssets) {
     changeEl.style.display = 'none';
   }
 
+  // CATEGORY-DETAIL-1 — populate the new investor-grade blocks. The
+  // bare "X.X% de la cartera" chip becomes a full sentence so the
+  // drill-down reads as a brief, not a stat sheet. The hidden pct
+  // element retains the raw value for any caller that querySelectors
+  // it (no live callers today; future-proof).
   const portfolioTotal = totalValueBase();
-  const pctEl = heroEl.querySelector('.detail-hero-pct');
-  if (portfolioTotal > 0) {
-    pctEl.textContent = `${((totalValue / portfolioTotal) * 100).toFixed(1)}%${t('pctOfPortfolio')}`;
-  } else {
-    pctEl.textContent = '';
+  const pctEl     = heroEl.querySelector('.detail-hero-pct');
+  const summaryEl = heroEl.querySelector('.detail-hero-summary');
+  const insightEl = heroEl.querySelector('.detail-hero-insight');
+  const countEl   = heroEl.querySelector('.detail-hero-count');
+  const allocPct  = portfolioTotal > 0 ? (totalValue / portfolioTotal) * 100 : 0;
+  if (pctEl) pctEl.textContent = portfolioTotal > 0
+    ? `${allocPct.toFixed(1)}%${t('pctOfPortfolio')}`
+    : '';
+  const summaryMap = (T[lang] && T[lang].catHeroSummary) || {};
+  const summaryFn  = summaryMap[type] || summaryMap.other;
+  if (summaryEl) {
+    if (portfolioTotal > 0 && typeof summaryFn === 'function') {
+      summaryEl.textContent = summaryFn(Math.round(allocPct));
+      summaryEl.style.display = '';
+    } else {
+      summaryEl.textContent = '';
+      summaryEl.style.display = 'none';
+    }
+  }
+  if (insightEl) {
+    const copy = _categoryInsightCopy(type, typeAssets, totalValue);
+    if (copy) {
+      insightEl.textContent = copy;
+      insightEl.style.display = '';
+    } else {
+      insightEl.textContent = '';
+      insightEl.style.display = 'none';
+    }
+  }
+  const countFn = t('catHeroCount');
+  if (countEl) {
+    const n = Array.isArray(typeAssets) ? typeAssets.length : 0;
+    if (n > 0 && typeof countFn === 'function') {
+      countEl.textContent = countFn(n);
+      countEl.style.display = '';
+    } else {
+      countEl.textContent = '';
+      countEl.style.display = 'none';
+    }
   }
 
   const categoryPnLAbs = typeAssets.reduce((s, a) => {

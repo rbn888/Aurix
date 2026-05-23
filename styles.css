@@ -5112,6 +5112,46 @@ body:not(.hero-active) #orb-canvas {
   margin-top: 6px;
 }
 
+/* CATEGORY-DETAIL-1 — premium hero copy blocks: count chip in the meta
+   row, full-sentence summary, contextual insight line. */
+.detail-hero-meta {
+  flex-wrap: wrap;
+}
+.detail-hero-count {
+  margin-left: auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.detail-hero-summary {
+  margin: 10px 0 0;
+  font-size: 13.5px;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-bright);
+  letter-spacing: -.005em;
+  line-height: 1.35;
+}
+.detail-hero-insight {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-muted);
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+@media (max-width: 480px) {
+  .detail-hero-summary { font-size: 12.5px; margin-top: 8px; }
+  .detail-hero-insight { font-size: 11.5px; }
+  .detail-hero-count   { font-size: 9.5px; padding: 2px 8px; }
+}
+
 .detail-hero-pnl {
   display: block;
   font-size: 12px;
