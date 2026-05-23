@@ -5054,15 +5054,20 @@ body:not(.hero-active) #orb-canvas {
 
 .detail-hero-info { position: relative; z-index: 1; min-width: 0; }
 
-/* Right-side rail: chips on top, contextual insight below, then PnL. */
+/* Right-side rail: chips only, vertically centered alongside the value
+   on the left so the hero reads balanced rather than top-heavy. */
 .detail-hero-side {
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  justify-content: center;
   gap: 8px;
   min-width: 0;
+  /* Allow the hero grid to align the side rail vertically with the
+     value column without forcing the hero into a taller box. */
+  align-self: stretch;
 }
 .detail-hero-chips {
   display: flex;
@@ -5070,24 +5075,34 @@ body:not(.hero-active) #orb-canvas {
   gap: 6px;
   justify-content: flex-end;
 }
+/* CATEGORY-DETAIL-DENSITY-FINAL — premium pill style. Slightly looser
+   padding + softer border so the chip reads like an Aurix surface,
+   not a technical badge. Tabular numerics keep "13%" vertically
+   aligned with adjacent chips. */
 .detail-hero-chip {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
+  padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(138, 166, 255, 0.10);
-  border: 1px solid rgba(138, 166, 255, 0.18);
-  color: rgba(225, 233, 255, 0.92);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  background:
+    linear-gradient(180deg, rgba(138, 166, 255, 0.16), rgba(138, 166, 255, 0.08));
+  border: 1px solid rgba(138, 166, 255, 0.24);
+  color: rgba(232, 240, 255, 0.95);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 6px 18px -10px rgba(74, 130, 240, 0.45);
 }
 .detail-hero-chip[hidden] { display: none; }
 .detail-hero-chip.is-top {
-  background: rgba(138, 166, 255, 0.06);
-  color: rgba(225, 233, 255, 0.82);
+  background:
+    linear-gradient(180deg, rgba(138, 166, 255, 0.08), rgba(138, 166, 255, 0.04));
+  border-color: rgba(138, 166, 255, 0.18);
+  color: rgba(225, 233, 255, 0.85);
 }
 /* The insight + PnL inherit the existing rules but lean right within
    the side rail so the column reads top-to-bottom as a brief. */
@@ -5102,28 +5117,35 @@ body:not(.hero-active) #orb-canvas {
 
 @media (max-width: 640px) {
   /* Mobile: keep the 2-column grid but tighten widths and padding so
-     the chart appears immediately after a shorter hero. */
+     the chart appears immediately after a shorter hero.
+     CATEGORY-DETAIL-DENSITY-FINAL — chips stack vertically and centre
+     on the value's vertical midline, hugging the right edge. The hero
+     now reads as identity + two clean chips, nothing else. */
   .detail-hero {
     grid-template-columns: minmax(0, 1fr) auto;
     padding: 14px 16px 14px;
     gap: 12px;
+    align-items: center;
   }
   .detail-hero-side {
     align-items: flex-end;
+    justify-content: center;
     gap: 6px;
   }
-  .detail-hero-side .detail-hero-insight {
-    /* On mobile the insight reads better aligned with the value column;
-       move it under the chip cluster but kept right-aligned & smaller. */
-    font-size: 11px;
-    max-width: 180px;
+  .detail-hero-chips {
+    flex-direction: column;
+    align-items: flex-end;
+    flex-wrap: nowrap;
+    gap: 6px;
   }
-  .detail-hero-chip { font-size: 10.5px; padding: 3px 8px; }
+  .detail-hero-chip {
+    font-size: 11px;
+    padding: 5px 11px;
+  }
 }
 @media (max-width: 380px) {
-  .detail-hero { grid-template-columns: minmax(0, 1fr); }
-  .detail-hero-side { align-items: flex-start; }
-  .detail-hero-side .detail-hero-insight { text-align: left; max-width: 100%; }
+  .detail-hero { grid-template-columns: minmax(0, 1fr) auto; }
+  .detail-hero-chip { font-size: 10.5px; padding: 4px 10px; }
 }
 
 .detail-hero-meta {
@@ -5340,8 +5362,10 @@ body:not(.hero-active) #orb-canvas {
 .category-perf-chart {
   position: relative;
   width: 100%;
-  height: 220px;
-  min-height: 220px;
+  /* CATEGORY-DETAIL-DENSITY-FINAL — desktop trimmed ~9% so holdings
+     surface higher in the viewport without losing readability. */
+  height: 200px;
+  min-height: 200px;
 }
 .category-perf-empty {
   position: absolute;
@@ -5374,14 +5398,14 @@ body:not(.hero-active) #orb-canvas {
 }
 
 @media (max-width: 480px) {
-  /* CATEGORY-MOBILE-POLISH-2: more bottom padding so the LWC x-axis
-     labels (11 / 16 / 21 / 23 …) breathe inside the panel and don't
-     visually collide with the positions card. Chart bumped to 220px
-     for the same reason — gives the axis a comfortable row of pixels. */
+  /* CATEGORY-DETAIL-DENSITY-FINAL — mobile chart trimmed ~19% to lift
+     holdings into view. Panel keeps a generous bottom padding (22px)
+     so the LWC x-axis labels stay safely inside the card and never
+     bleed into the positions list below. */
   .category-perf-panel  { padding: 14px 14px 22px; margin-bottom: 16px; }
   .category-perf-title  { font-size: 13.5px; }
   .category-perf-change { font-size: 11.5px; }
-  .category-perf-chart  { height: 220px; min-height: 220px; }
+  .category-perf-chart  { height: 178px; min-height: 178px; }
   .category-perf-empty  { inset: 50px 14px 22px; padding: 18px; }
   .category-perf-range  { padding: 5px 9px; font-size: 10.5px; }
 }
