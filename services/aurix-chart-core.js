@@ -629,6 +629,46 @@
     const _portfolioMarkerR   = (opts.variant === 'portfolio') ? 4
                               : (opts.variant === 'asset')     ? 3
                               :                                  3;
+
+    // CHART-SCALE-1 — minimum visual y-domain padding for surfaces that
+    // opt in via visualNormalization.robustScale (the dashboard
+    // portfolio chart). LWC's default autoscale hugs min/max tightly,
+    // so a +0.1% real move can paint a line that looks dramatic.
+    //
+    // The provider only widens the y-axis — never narrows it. When the
+    // real first→last move is meaningful (≥1.5%), the original auto-
+    // scale is returned untouched so a -5% day still reads as -5%.
+    //
+    // Anchored on the last visible value so the chart endpoint stays
+    // aligned with the live KPI. Floor padding is symmetric around the
+    // anchor so a flat / reset baseline sits in the middle of the box.
+    const _shouldUseMinPadding = !!(opts.visualNormalization && opts.visualNormalization.robustScale);
+    let _scaleHints = null;
+    function _scalePaddingProvider(baseImpl) {
+      const original = (typeof baseImpl === 'function') ? (baseImpl() || null) : baseImpl;
+      if (!original || !original.priceRange) return original || null;
+      if (!_scaleHints) return original;
+      const { firstValue, lastValue, anchor } = _scaleHints;
+      if (!Number.isFinite(anchor)    || anchor    <= 0) return original;
+      if (!Number.isFinite(firstValue)|| firstValue<= 0) return original;
+      if (!Number.isFinite(lastValue))                  return original;
+      const movePct = Math.abs((lastValue - firstValue) / firstValue * 100);
+      let targetPct;
+      if      (movePct < 0.5) targetPct = 1.0;   // calm
+      else if (movePct < 1.5) targetPct = 2.0;   // moderate
+      else                    return original;   // normal auto-scale
+      const halfAbs    = anchor * (targetPct / 200);
+      const desiredMin = anchor - halfAbs;
+      const desiredMax = anchor + halfAbs;
+      return {
+        priceRange: {
+          minValue: Math.min(original.priceRange.minValue, desiredMin),
+          maxValue: Math.max(original.priceRange.maxValue, desiredMax),
+        },
+        margins: original.margins,
+      };
+    }
+
     const series = chart.addAreaSeries({
       lineColor:       THEME.line,
       lineWidth:       _portfolioLineWidth,
@@ -650,6 +690,12 @@
         minMove: 0.01,
       },
     });
+
+    // CHART-SCALE-1 — opt-in min y-domain padding. Applied after series
+    // creation so the literal above stays focused on visual options.
+    if (_shouldUseMinPadding) {
+      try { series.applyOptions({ autoscaleInfoProvider: _scalePaddingProvider }); } catch (_) {}
+    }
 
     // Apply colorMode shading at series level.
     // AURIX-CHARTS-2 — 'neutral' (flat baseline) now uses a dedicated
@@ -1047,6 +1093,7 @@
         const arr = Array.isArray(seriesData) ? seriesData : [];
         if (!arr.length) {
           host.dataset.state = 'empty';
+          _scaleHints = null;
           series.setData([]);
           if (_shouldShowValChip) valchip.hidden = true;
           return;
@@ -1058,6 +1105,7 @@
           .sort((a, b) => a.time - b.time);
         if (!formatted.length) {
           host.dataset.state = 'empty';
+          _scaleHints = null;
           series.setData([]);
           if (_shouldShowValChip) valchip.hidden = true;
           return;
@@ -1093,6 +1141,19 @@
             console.warn('[aurix-chart] normalization fail:', err && err.message);
             visualSeries = deduped;
             normTimes    = null;
+          }
+        }
+        // CHART-SCALE-1 — refresh scale hints from the VISUAL endpoints
+        // before setData triggers the autoscale recompute. First / last
+        // drive the % move threshold; last drives the symmetric padding
+        // anchor so the chart endpoint stays aligned with the live KPI.
+        if (_shouldUseMinPadding) {
+          const fv = visualSeries[0].value;
+          const lv = visualSeries[visualSeries.length - 1].value;
+          if (Number.isFinite(fv) && Number.isFinite(lv)) {
+            _scaleHints = { firstValue: fv, lastValue: lv, anchor: lv };
+          } else {
+            _scaleHints = null;
           }
         }
         // Some LWC builds reject duplicate times — the dedupe above
