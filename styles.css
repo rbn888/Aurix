@@ -4078,9 +4078,11 @@ body:not(.hero-active) #orb-canvas {
   }
   .logo-block .logo-aurix { font-size: 21px; }
 
-  /* Dashboard top — breathing room */
+  /* DASHBOARD-MOBILE-DENSITY-1 — tighter rhythm above the card so the
+     chart + Aurix Signal surface lift slightly into view. The 4-step
+     top margin used to push the card too far down on small screens. */
   .dashboard-top {
-    margin-top: var(--space-4);
+    margin-top: var(--space-3);
     margin-bottom: var(--space-2);
   }
 
@@ -4095,7 +4097,11 @@ body:not(.hero-active) #orb-canvas {
   .hero-left {
     flex-shrink: 0;         /* never compress the value block */
     height: auto;           /* reset the desktop height:100% */
-    padding: 18px var(--space-4) var(--space-1) var(--space-4) !important;
+    /* DASHBOARD-MOBILE-DENSITY-1 — bottom padding was creating dead
+       space below the meta row (the now-hidden summary-footer used to
+       fill it). Drop bottom padding to keep card breathing without
+       the gap. */
+    padding: 16px var(--space-4) 12px var(--space-4) !important;
     border-right: none;
     border-bottom: none;
   }
@@ -8951,24 +8957,37 @@ main { padding-bottom: 72px; }
   /* Hide large action buttons — FAB replaces them */
   #btnAdd, #btnAddLiquidity { display: none; }
 
-  /* FAB container — optically aligned with meta line (activos · actualizado) */
+  /* DASHBOARD-MOBILE-DENSITY-1 — the summary-footer block exists only
+     to wrap those two buttons, both display:none above. Hiding it
+     here removes the empty padding-top + margin-top that used to
+     leave dead space below the meta row. */
+  .summary-footer { display: none; }
+
+  /* DASHBOARD-MOBILE-DENSITY-1 — FAB sits naturally as the right cell
+     of the meta row's flex layout (.summary-meta-row uses
+     justify-content: space-between). The previous absolute
+     positioning floated it over a fixed centre slot, which pinned it
+     too low and broke the "one footer row" alignment with
+     "7 activos · Actualizado ahora". */
   .portfolio-actions-mobile {
-    display: block;
-    position: absolute;
-    top: 50%;
-    right: 12px;
-    transform: translateY(-10%);
-    z-index: 6;
+    display: inline-flex;
+    align-items: center;
+    margin-left: auto;
+    /* Relative so the absolute .fab-menu (below) still anchors to the
+       button instead of escaping all the way up the layout tree. */
+    position: relative;
+    transform: none;
+    z-index: auto;
   }
 
   .fab-trigger {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
     background: rgba(59, 130, 246, 0.15);
     border: 1px solid rgba(59, 130, 246, 0.35);
     color: #60a5fa;
-    font-size: var(--font-size-lg);
+    font-size: 17px;
     line-height: 1;
     display: flex;
     align-items: center;
