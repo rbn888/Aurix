@@ -912,7 +912,9 @@ const T = {
     ws_intel_dim_diversification_why: (n, c) => `Distribuyes capital entre ${n} ${n === 1 ? 'activo' : 'activos'} y ${c} ${c === 1 ? 'categoría' : 'categorías'}.`,
     ws_intel_dim_liquidity:           'Liquidez',
     ws_intel_dim_liquidity_why_none:  '0% del patrimonio disponible inmediatamente.',
-    ws_intel_dim_liquidity_why_pct:   pct => `${pct}% del patrimonio disponible inmediatamente.`,
+    // WORKSPACE-LIQUIDITY-LOGIC-1: aligned with the new liquidity hero
+    // so card and headline read the same story.
+    ws_intel_dim_liquidity_why_pct:   pct => `Mantienes un ${pct}% en liquidez disponible.`,
     ws_intel_dim_concentration:       'Concentración',
     ws_intel_dim_concentration_why:   (name, pct) => `${name} concentra el ${pct}% del peso total.`,
     ws_intel_dim_concentration_why_none: 'Reparto sin un asset dominante.',
@@ -940,6 +942,14 @@ const T = {
     ws_intel_hero_liq_summary:        'Actualmente no tienes capital inmediatamente desplegable registrado.',
     ws_intel_hero_liq_explanation:    'Eso reduce flexibilidad ante oportunidades o eventos inesperados.',
     ws_intel_hero_liq_hint:           'Una pequeña reserva mejora resiliencia.',
+    // WORKSPACE-LIQUIDITY-LOGIC-1: calm hero when liquidity is the
+    // largest holding. Fiat/cash is not a volatile asset, so we never
+    // frame it as concentration or dominance — we describe what it
+    // enables (flexibility, opportunity, less forced selling).
+    ws_intel_hero_liq_rel_title:      'Liquidez relevante',
+    ws_intel_hero_liq_rel_summary:    pct => `Mantienes un ${pct}% en liquidez disponible.`,
+    ws_intel_hero_liq_rel_explanation:'Una parte importante de tu patrimonio está disponible para oportunidades o imprevistos.',
+    ws_intel_hero_liq_rel_hint:       'Esto aporta margen para nuevas decisiones y reduce necesidad de vender activos.',
     ws_intel_hero_resilient_title:    'Estructura equilibrada',
     ws_intel_hero_resilient_summary:  'Ningún activo ni categoría domina el peso de la cartera.',
     ws_intel_hero_resilient_explanation:'Tu rendimiento agregado no depende de una sola decisión.',
@@ -958,6 +968,11 @@ const T = {
     ws_intel_signal_concentration_title_none:    'Reparto sin un líder claro',
     ws_intel_signal_concentration_explanation:   (name, pct) => `Tu evolución total responderá especialmente a movimientos de ${name} (${pct}% del peso).`,
     ws_intel_signal_concentration_explanation_none: 'Ningún activo concentra el rendimiento agregado.',
+    // WORKSPACE-LIQUIDITY-LOGIC-1: framing for portfolios where cash is
+    // present and the concentration narrative must read against the
+    // invested subset rather than the full mix.
+    ws_intel_signal_concentration_title_invested: name => `Entre los activos invertidos, ${name} es la mayor posición`,
+    ws_intel_signal_concentration_explanation_invested: (name, pct) => `${name} representa el ${pct}% de tu patrimonio (liquidez aparte).`,
     ws_intel_signal_diversification:              'Diversificación',
     ws_intel_signal_diversification_title_strong: 'Cobertura razonable entre categorías',
     ws_intel_signal_diversification_title_mid:    'Diversificación intermedia',
@@ -1921,7 +1936,8 @@ const T = {
     ws_intel_dim_diversification_why: (n, c) => `Capital is spread across ${n} ${n === 1 ? 'asset' : 'assets'} and ${c} ${c === 1 ? 'category' : 'categories'}.`,
     ws_intel_dim_liquidity:           'Liquidity',
     ws_intel_dim_liquidity_why_none:  '0% of your wealth is immediately deployable.',
-    ws_intel_dim_liquidity_why_pct:   pct => `${pct}% of your wealth is immediately deployable.`,
+    // WORKSPACE-LIQUIDITY-LOGIC-1: aligned with the liquidity hero copy.
+    ws_intel_dim_liquidity_why_pct:   pct => `You hold ${pct}% in available liquidity.`,
     ws_intel_dim_concentration:       'Concentration',
     ws_intel_dim_concentration_why:   (name, pct) => `${name} carries ${pct}% of the total weight.`,
     ws_intel_dim_concentration_why_none: 'No single asset dominates the mix.',
@@ -1948,6 +1964,12 @@ const T = {
     ws_intel_hero_liq_summary:        'You currently have no immediately deployable capital recorded.',
     ws_intel_hero_liq_explanation:    'That reduces flexibility against opportunities or unexpected events.',
     ws_intel_hero_liq_hint:           'A small reserve improves resilience.',
+    // WORKSPACE-LIQUIDITY-LOGIC-1: calm hero when liquidity is the
+    // largest holding — fiat/cash is not a volatile asset.
+    ws_intel_hero_liq_rel_title:      'Meaningful liquidity',
+    ws_intel_hero_liq_rel_summary:    pct => `You hold ${pct}% in available liquidity.`,
+    ws_intel_hero_liq_rel_explanation:'A meaningful share of your wealth is ready for opportunities or unexpected events.',
+    ws_intel_hero_liq_rel_hint:       'It gives you room for new decisions and reduces the need to sell other assets.',
     ws_intel_hero_re_title:           'Wealth supported by real estate',
     ws_intel_hero_re_summary:         pct => `Real estate represents ${pct}% of your net worth.`,
     ws_intel_hero_re_explanation:     'This may add stability, but reduces liquidity and flexibility if you need to move capital quickly.',
@@ -1961,6 +1983,11 @@ const T = {
     ws_intel_signal_concentration_title_none:    'No clear leader in the mix',
     ws_intel_signal_concentration_explanation:   (name, pct) => `Your total evolution will respond mainly to moves in ${name} (${pct}% of weight).`,
     ws_intel_signal_concentration_explanation_none: 'No asset disproportionately drives aggregate performance.',
+    // WORKSPACE-LIQUIDITY-LOGIC-1: invested-subset framing for portfolios
+    // where cash is meaningful and concentration must be read against
+    // the invested half of the balance sheet.
+    ws_intel_signal_concentration_title_invested: name => `Among invested assets, ${name} is the largest position`,
+    ws_intel_signal_concentration_explanation_invested: (name, pct) => `${name} represents ${pct}% of your wealth (liquidity aside).`,
     ws_intel_signal_diversification:              'Diversification',
     ws_intel_signal_diversification_title_strong: 'Reasonable cross-category coverage',
     ws_intel_signal_diversification_title_mid:    'Intermediate diversification',
@@ -24254,10 +24281,16 @@ function computeAurixSignalPool() {
   // altcoin would mislead the user.
   const topIsRealEstate     = !!(topAsset && topAsset.type === 'real_estate');
   const topCatIsRealEstate  = !!(dist.length && dist[0].type === 'real_estate');
+  // WORKSPACE-LIQUIDITY-LOGIC-1: cash/currency is not a volatile asset.
+  // A 70% EUR weight should never trigger "EUR domina la cartera" — the
+  // cashPct signal (rule 6 below) carries the meaningful interpretation
+  // for high liquidity. RE was already excluded via topIsRealEstate.
+  const topIsCash           = !!(topAsset && topAsset.type === 'cash');
+  const topCatIsCash        = !!(dist.length && dist[0].type === 'cash');
 
   // 1) CONCENTRATION — top asset > 60% (and 2+ assets — single-asset
   //    portfolios get a more specific signal below).
-  if (topPct > 60 && assets.length >= 2 && !topIsRealEstate) {
+  if (topPct > 60 && assets.length >= 2 && !topIsRealEstate && !topIsCash) {
     push({
       kind: 'concentration',
       msg: 'signalConcentrationBody',
@@ -24279,7 +24312,9 @@ function computeAurixSignalPool() {
   }
 
   // 2) CATEGORY CONCENTRATION — top category > 60%.
-  if (dist.length && dist[0].pct > 60 && !topCatIsRealEstate) {
+  //    WORKSPACE-LIQUIDITY-LOGIC-1: cash as a category is liquidity, not
+  //    "category concentration"; the cashPct signal owns that narrative.
+  if (dist.length && dist[0].pct > 60 && !topCatIsRealEstate && !topCatIsCash) {
     push({
       kind: 'category',
       msg: 'signalCategoryBody',
@@ -24415,6 +24450,13 @@ function _aurixHealthSnapshot() {
   const out = {
     totUSD:        0,
     topAsset:      null,    // { name, ticker, type, pctTotal }
+    // WORKSPACE-LIQUIDITY-LOGIC-1: largest NON-LIQUIDITY holding. Cash /
+    // currency entries are not the same shape of risk as crypto, equity
+    // or commodities — they don't oscillate, so they should not drive
+    // "X domina la cartera" copy. Workspace concentration narratives
+    // read from this field; the original topAsset stays unchanged for
+    // any caller that genuinely needs the absolute largest holding.
+    topInvestedAsset: null, // { name, ticker, type, pctTotal }
     topCategory:   null,    // { type, label, pctTotal }
     categoryCount: 0,
     assetCount:    0,
@@ -24455,11 +24497,18 @@ function _aurixHealthSnapshot() {
   // Top single asset (by value) + best/worst 24h change pass.
   let topUsd = -1;
   let topRef = null;
+  // WORKSPACE-LIQUIDITY-LOGIC-1: parallel pass for the largest non-cash
+  // holding. Cheaper than a second loop and keeps the snapshot pure.
+  let topInvUsd = -1;
+  let topInvRef = null;
   let bestRef = null, bestCh = -Infinity;
   let worstRef = null, worstCh = Infinity;
   for (const a of assets) {
     const v = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : 0;
     if (v > topUsd) { topUsd = v; topRef = a; }
+    if (a && a.type !== 'cash' && v > topInvUsd) {
+      topInvUsd = v; topInvRef = a;
+    }
     if (typeof a.change24h === 'number') {
       if (a.change24h > bestCh)  { bestCh  = a.change24h; bestRef  = a; }
       if (a.change24h < worstCh) { worstCh = a.change24h; worstRef = a; }
@@ -24471,6 +24520,14 @@ function _aurixHealthSnapshot() {
       ticker:   topRef.ticker || '',
       type:     topRef.type,
       pctTotal: Math.round((topUsd / totUSD) * 100),
+    };
+  }
+  if (topInvRef) {
+    out.topInvestedAsset = {
+      name:     topInvRef.name || topInvRef.ticker || '—',
+      ticker:   topInvRef.ticker || '',
+      type:     topInvRef.type,
+      pctTotal: Math.round((topInvUsd / totUSD) * 100),
     };
   }
   if (bestRef && Number.isFinite(bestCh)) {
@@ -24512,10 +24569,17 @@ function _aurixHealthScore(snap) {
   // perfectly normal household structures (e.g. primary residence
   // + a small investment portfolio). When the dominant asset OR
   // category is real estate, we apply a softer deduction instead.
-  const topIsRE = !!(snap.topAsset && snap.topAsset.type === 'real_estate');
+  // WORKSPACE-LIQUIDITY-LOGIC-1: read the deduction against the largest
+  // INVESTED holding, not the absolute largest. A 65% EUR cash position
+  // is not the same risk shape as a 65% single altcoin; cash already
+  // has its own dedicated cashPct deductions below. No fallback to
+  // topAsset on purpose — if topInvestedAsset is null, the portfolio
+  // is fully liquid and the concentration deduction must not fire.
+  const dominantAsset = snap.topInvestedAsset || null;
+  const topIsRE = !!(dominantAsset && dominantAsset.type === 'real_estate');
   const catIsRE = !!(snap.topCategory && snap.topCategory.type === 'real_estate');
   let s = 100;
-  if (snap.topAsset && snap.topAsset.pctTotal > 60)       s -= topIsRE ? 8  : 25;
+  if (dominantAsset && dominantAsset.pctTotal > 60)       s -= topIsRE ? 8  : 25;
   if (snap.topCategory && snap.topCategory.pctTotal > 60) s -= catIsRE ? 6  : 20;
   if (snap.cryptoPct > 50)                                s -= 15;
   if (snap.assetCount === 1)                              s -= 25;
@@ -24595,6 +24659,20 @@ function _aurixWorkspaceIntelligence() {
     ? (topAsset.name || String(topAsset.ticker || '').toUpperCase() || '—')
     : '';
 
+  // WORKSPACE-LIQUIDITY-LOGIC-1: the *invested* top holding drives
+  // concentration narrative (hero / dimension card / deep signal).
+  // Cash/currency is interpreted separately as flexibility, not as
+  // dominance, so a 36% EUR position never reads "Euros domina".
+  // Falls back to the absolute top when the user holds no invested
+  // assets — in that case the single-asset / liquidity heroes own the
+  // narrative anyway.
+  const topInvested     = snap.topInvestedAsset || null;
+  const topInvestedPct  = topInvested ? Number(topInvested.pctTotal || 0) : 0;
+  const topInvestedName = topInvested
+    ? (topInvested.name || String(topInvested.ticker || '').toUpperCase() || '—')
+    : '';
+  const topIsCash       = !!(topAsset && topAsset.type === 'cash');
+
   // REAL-ESTATE-INTEL: surface property weight + liquid net worth up
   // front so every downstream heuristic (risk band, dimensions, deep
   // signals, hero) interprets concentration calmly when it comes from
@@ -24602,8 +24680,10 @@ function _aurixWorkspaceIntelligence() {
   const realEstatePct = Number(snap.realEstatePct || 0);
   const liquidPct     = Number(snap.liquidPct     || 0);
   const liquidUSD     = Number(snap.liquidUSD     || 0);
-  const topIsRE       = !!(topAsset && topAsset.type === 'real_estate');
-  const topCatIsRE    = !!(topCat   && topCat.type   === 'real_estate');
+  // WORKSPACE-LIQUIDITY-LOGIC-1: RE check now reads from the invested
+  // top so a cash entry never masks real-estate dominance.
+  const topIsRE       = !!(topInvested && topInvested.type === 'real_estate');
+  const topCatIsRE    = !!(topCat      && topCat.type      === 'real_estate');
   const liquidLabel   = (typeof formatBase === 'function' && Number.isFinite(liquidUSD))
     ? formatBase(liquidUSD)
     : `$${Math.round(liquidUSD).toLocaleString()}`;
@@ -24614,9 +24694,11 @@ function _aurixWorkspaceIntelligence() {
   // residence shouldn't push the risk band into "elevated". Property
   // concentration adds modestly (illiquidity matters), but not as much
   // as a single dominant equity or crypto position.
+  // WORKSPACE-LIQUIDITY-LOGIC-1: risk reads against the invested
+  // subset so cash weight never inflates the risk band.
   let riskScore = 25;
-  if (topAssetPct > 50)       riskScore += topIsRE ? 8 : 25;
-  else if (topAssetPct > 35)  riskScore += topIsRE ? 4 : 12;
+  if (topInvestedPct > 50)       riskScore += topIsRE ? 8 : 25;
+  else if (topInvestedPct > 35)  riskScore += topIsRE ? 4 : 12;
   if (cryptoPct > 40)         riskScore += 25;
   else if (cryptoPct > 15)    riskScore += 10;
   if (assetCount > 0 && assetCount < 4) riskScore += 10;
@@ -24721,19 +24803,23 @@ function _aurixWorkspaceIntelligence() {
     {
       id:    'concentration',
       label: _ti('ws_intel_dim_concentration'),
-      state: topAssetPct > 60 ? _ti('ws_intel_conc_high')
-            : topAssetPct > 35 ? _ti('ws_intel_conc_mod')
-                               : _ti('ws_intel_conc_low'),
-      why:   topAsset
-              ? _ti('ws_intel_dim_concentration_why', topAssetName, topAssetPct)
+      // WORKSPACE-LIQUIDITY-LOGIC-1: concentration state, copy and tone
+      // are all read against the invested subset. Cash weight does not
+      // count as concentration — it's interpreted separately as
+      // liquidity / flexibility above.
+      state: topInvestedPct > 60 ? _ti('ws_intel_conc_high')
+            : topInvestedPct > 35 ? _ti('ws_intel_conc_mod')
+                                  : _ti('ws_intel_conc_low'),
+      why:   topInvested
+              ? _ti('ws_intel_dim_concentration_why', topInvestedName, topInvestedPct)
               : _ti('ws_intel_dim_concentration_why_none'),
       // REAL-ESTATE-INTEL: never paint property concentration as warn —
       // a primary residence anchoring a household balance sheet is not
       // the same risk shape as a single altcoin.
-      tone:  topIsRE ? (topAssetPct > 60 ? 'info' : 'positive')
-            : topAssetPct > 60 ? 'warn'
-            : topAssetPct > 35 ? 'info'
-                               : 'positive',
+      tone:  topIsRE ? (topInvestedPct > 60 ? 'info' : 'positive')
+            : topInvestedPct > 60 ? 'warn'
+            : topInvestedPct > 35 ? 'info'
+                                  : 'positive',
     },
     {
       id:    'performance',
@@ -24745,9 +24831,15 @@ function _aurixWorkspaceIntelligence() {
   ];
 
   // HERO INSIGHT — pick the single most consequential interpretation.
-  // Priority: single asset → real-estate dominance → high concentration → high crypto → liquidity gap → moderate concentration → resilient default.
+  // Priority: single asset → real-estate dominance → liquidity relevant
+  // → high concentration → high crypto → liquidity gap → moderate
+  // concentration → resilient default.
+  // WORKSPACE-LIQUIDITY-LOGIC-1: a single-asset portfolio where the
+  // only asset is cash is not "dependent on one risky position" — it's
+  // a fully-liquid balance sheet. The dedicated liquidity hero below
+  // owns that case.
   const hero = (() => {
-    if (assetCount === 1 && topAsset) {
+    if (assetCount === 1 && topAsset && !topIsCash) {
       return {
         eyebrow:      _ti('ws_intel_hero_eyebrow'),
         title:        _ti('ws_intel_hero_single_title'),
@@ -24762,8 +24854,8 @@ function _aurixWorkspaceIntelligence() {
     // "overexposed". We describe stability + reduced liquidity, and
     // surface the liquid portfolio number so the user reads a complete
     // picture instead of a misleading single percentage.
-    if (realEstatePct >= 70 || (topIsRE && topAssetPct > 60) || (topCatIsRE && Number(topCat.pctTotal || 0) > 60)) {
-      const reShown = realEstatePct || (topCatIsRE ? Number(topCat.pctTotal || 0) : topAssetPct);
+    if (realEstatePct >= 70 || (topIsRE && topInvestedPct > 60) || (topCatIsRE && Number(topCat.pctTotal || 0) > 60)) {
+      const reShown = realEstatePct || (topCatIsRE ? Number(topCat.pctTotal || 0) : topInvestedPct);
       return {
         eyebrow:      _ti('ws_intel_hero_eyebrow'),
         title:        _ti('ws_intel_hero_re_title'),
@@ -24775,11 +24867,27 @@ function _aurixWorkspaceIntelligence() {
         kind:         'real_estate',
       };
     }
-    if (topAssetPct > 60 && topAsset) {
+    // WORKSPACE-LIQUIDITY-LOGIC-1: when cash/currency is the largest
+    // single holding, we never call it concentration or dominance. The
+    // hero describes what that liquidity ENABLES (flexibility for new
+    // decisions, less forced selling). 25% floor avoids surfacing this
+    // when cash happens to win by a single percentage point.
+    if (topIsCash && cashPct >= 25) {
       return {
         eyebrow:      _ti('ws_intel_hero_eyebrow'),
-        title:        _ti('ws_intel_hero_conc_title', topAssetName),
-        summary:      _ti('ws_intel_hero_conc_summary', topAssetName, topAssetPct),
+        title:        _ti('ws_intel_hero_liq_rel_title'),
+        summary:      _ti('ws_intel_hero_liq_rel_summary', cashPct),
+        explanation:  _ti('ws_intel_hero_liq_rel_explanation'),
+        optionalHint: _ti('ws_intel_hero_liq_rel_hint'),
+        severity:     'positive',
+        kind:         'liquidity_relevant',
+      };
+    }
+    if (topInvestedPct > 60 && topInvested) {
+      return {
+        eyebrow:      _ti('ws_intel_hero_eyebrow'),
+        title:        _ti('ws_intel_hero_conc_title', topInvestedName),
+        summary:      _ti('ws_intel_hero_conc_summary', topInvestedName, topInvestedPct),
         explanation:  _ti('ws_intel_hero_conc_explanation'),
         optionalHint: _ti('ws_intel_hero_conc_hint'),
         severity:     'warn',
@@ -24808,11 +24916,11 @@ function _aurixWorkspaceIntelligence() {
         kind:         'liquidity',
       };
     }
-    if (topAssetPct > 35 && topAsset) {
+    if (topInvestedPct > 35 && topInvested) {
       return {
         eyebrow:      _ti('ws_intel_hero_eyebrow'),
-        title:        _ti('ws_intel_hero_conc_mod_title', topAssetName),
-        summary:      _ti('ws_intel_hero_conc_mod_summary', topAssetName, topAssetPct),
+        title:        _ti('ws_intel_hero_conc_mod_title', topInvestedName),
+        summary:      _ti('ws_intel_hero_conc_mod_summary', topInvestedName, topInvestedPct),
         explanation:  _ti('ws_intel_hero_conc_explanation'),
         optionalHint: '',
         severity:     'info',
@@ -24838,17 +24946,25 @@ function _aurixWorkspaceIntelligence() {
     {
       kind:        'concentration',
       category:    _ti('ws_intel_signal_concentration'),
-      title:       topAsset
-                    ? _ti('ws_intel_signal_concentration_title', topAssetName)
+      // WORKSPACE-LIQUIDITY-LOGIC-1: read against the invested subset.
+      // When the user holds meaningful cash we explicitly frame the
+      // concentration narrative as "among invested assets…" so fiat is
+      // never described as dominating the portfolio.
+      title:       topInvested
+                    ? (topIsCash
+                        ? _ti('ws_intel_signal_concentration_title_invested', topInvestedName)
+                        : _ti('ws_intel_signal_concentration_title',          topInvestedName))
                     : _ti('ws_intel_signal_concentration_title_none'),
-      explanation: topAsset
-                    ? _ti('ws_intel_signal_concentration_explanation', topAssetName, topAssetPct)
+      explanation: topInvested
+                    ? (topIsCash
+                        ? _ti('ws_intel_signal_concentration_explanation_invested', topInvestedName, topInvestedPct)
+                        : _ti('ws_intel_signal_concentration_explanation',          topInvestedName, topInvestedPct))
                     : _ti('ws_intel_signal_concentration_explanation_none'),
       // REAL-ESTATE-INTEL: downgrade severity when property dominates.
-      severity:    topIsRE ? (topAssetPct > 60 ? 'info' : 'positive')
-                  : topAssetPct > 60 ? 'warn'
-                  : topAssetPct > 35 ? 'info'
-                                     : 'positive',
+      severity:    topIsRE ? (topInvestedPct > 60 ? 'info' : 'positive')
+                  : topInvestedPct > 60 ? 'warn'
+                  : topInvestedPct > 35 ? 'info'
+                                        : 'positive',
     },
     {
       kind:        'diversification',
