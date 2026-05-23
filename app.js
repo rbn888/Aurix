@@ -885,6 +885,19 @@ const T = {
     ws_intel_risk_mid_sub:     'Controlado',
     ws_intel_risk_elevated:    'Elevado',
     ws_intel_risk_elevated_sub:'Necesita atención',
+    // WORKSPACE-COHERENCE-1 — profile-adapted risk wording. Resolver in
+    // _aurixWorkspaceIntelligence appends the suffix matching the user's
+    // riskProfile (conservative / aggressive). Professional / balanced
+    // fall through to the neutral base copy above. Calm band reads
+    // identically across profiles by design — there's nothing to nuance.
+    ws_intel_risk_elevated_conservative:    'Superior a tu perfil objetivo',
+    ws_intel_risk_elevated_sub_conservative:'Conviene revisar la exposición',
+    ws_intel_risk_elevated_aggressive:      'Coherente con un perfil dinámico',
+    ws_intel_risk_elevated_sub_aggressive:  'Apropiado para asumir más riesgo',
+    ws_intel_risk_mid_conservative:         'Por encima de tu perfil objetivo',
+    ws_intel_risk_mid_sub_conservative:     'Revisa si encaja con tu perfil prudente',
+    ws_intel_risk_mid_aggressive:           'Coherente con un perfil dinámico',
+    ws_intel_risk_mid_sub_aggressive:       'Margen para asumir más riesgo',
     // diversification tonal states
     ws_intel_div_low:        'Baja',
     ws_intel_div_low_sub:    (n, c) => `${n} ${n === 1 ? 'activo' : 'activos'} · ${c} ${c === 1 ? 'categoría' : 'categorías'}`,
@@ -906,7 +919,10 @@ const T = {
     ws_intel_conc_mod:       'Moderada',
     ws_intel_conc_high:      'Concentrada',
     // performance dimension
-    ws_intel_perf_initial:   'Inicial',
+    // WORKSPACE-COHERENCE-1: "Inicial" reads as a placeholder; calmer
+    // and more honest framing for portfolios that haven't accumulated
+    // enough history yet.
+    ws_intel_perf_initial:   'Historial en construcción',
     // dimensions grid
     ws_intel_dim_diversification:     'Diversificación',
     ws_intel_dim_diversification_why: (n, c) => `Distribuyes capital entre ${n} ${n === 1 ? 'activo' : 'activos'} y ${c} ${c === 1 ? 'categoría' : 'categorías'}.`,
@@ -937,7 +953,9 @@ const T = {
     ws_intel_hero_crypto_title:       'Exposición elevada a cripto',
     ws_intel_hero_crypto_summary:     pct => `Cripto representa el ${pct}% del patrimonio.`,
     ws_intel_hero_crypto_explanation: 'Las decisiones de mercado en cripto influirán más que las del resto de tu estructura.',
-    ws_intel_hero_crypto_hint:        '',
+    // WORKSPACE-COHERENCE-1: every hero now answers qué pasa / por qué
+    // importa / qué mirar después. Hint owns the third slot.
+    ws_intel_hero_crypto_hint:        'Considera si este peso encaja con tu horizonte de inversión.',
     ws_intel_hero_liq_title:          'Liquidez limitada',
     ws_intel_hero_liq_summary:        'Actualmente no tienes capital inmediatamente desplegable registrado.',
     ws_intel_hero_liq_explanation:    'Eso reduce flexibilidad ante oportunidades o eventos inesperados.',
@@ -953,6 +971,19 @@ const T = {
     ws_intel_hero_resilient_title:    'Estructura equilibrada',
     ws_intel_hero_resilient_summary:  'Ningún activo ni categoría domina el peso de la cartera.',
     ws_intel_hero_resilient_explanation:'Tu rendimiento agregado no depende de una sola decisión.',
+    // WORKSPACE-COHERENCE-1: forward-looking hint for the balanced state.
+    ws_intel_hero_resilient_hint:     'Buen momento para definir reglas de rebalanceo periódico.',
+    // WORKSPACE-COHERENCE-1 — "early history" narrative. Fires as the
+    // hero when the portfolio is too young / small for any other
+    // narrative to be honest. Replaces the previous silent fallback to
+    // "resilient" for 2–3-asset starters.
+    ws_intel_hero_history_title:      'Historial en construcción',
+    ws_intel_hero_history_summary:    'Tu cartera todavía está formándose.',
+    ws_intel_hero_history_explanation:'Las primeras semanas no aportan suficiente histórico para conclusiones fiables; el patrón emergerá con más movimientos.',
+    ws_intel_hero_history_hint:       'A medida que registres operaciones la lectura ganará fiabilidad.',
+    // WORKSPACE-COHERENCE-1: forward-looking hint for moderate
+    // concentration so the hero closes with "qué mirar después".
+    ws_intel_hero_conc_mod_hint:      'Conviene vigilar cómo evoluciona este peso con el tiempo.',
     // REAL-ESTATE-INTEL: calm narrative when property weight dominates.
     // Property is not the same shape of risk as crypto or a single
     // stock — illiquid, long-term, stable in price. We talk about
@@ -984,8 +1015,9 @@ const T = {
     ws_intel_signal_liquidity_explanation_none:   'Toda tu cartera está invertida; cualquier nueva decisión requiere reasignar.',
     ws_intel_signal_liquidity_explanation_pct:    pct => `Mantienes ${pct}% en liquidez como margen de maniobra.`,
     ws_intel_signal_performance:                  'Rendimiento',
-    ws_intel_signal_performance_title_initial:    'Sin lectura histórica representativa',
-    ws_intel_signal_performance_explanation_initial: 'La cartera necesita más historia para una conclusión fiable.',
+    // WORKSPACE-COHERENCE-1: clearer, less clinical framing.
+    ws_intel_signal_performance_title_initial:    'Aún no hay histórico suficiente para una lectura fiable.',
+    ws_intel_signal_performance_explanation_initial: 'La cartera necesita más historia para extraer una conclusión representativa.',
     ws_micro_synced:         'Datos actualizados',
     ws_micro_pending:        'Sincronización pendiente',
     ws_empty_title:          'Tu workspace se activará cuando añadas activos.',
@@ -1914,6 +1946,15 @@ const T = {
     ws_intel_risk_mid_sub:     'In control',
     ws_intel_risk_elevated:    'Elevated',
     ws_intel_risk_elevated_sub:'Worth reviewing',
+    // WORKSPACE-COHERENCE-1 — profile-adapted risk wording.
+    ws_intel_risk_elevated_conservative:    'Above your target profile',
+    ws_intel_risk_elevated_sub_conservative:'Worth reviewing your exposure',
+    ws_intel_risk_elevated_aggressive:      'Consistent with a dynamic profile',
+    ws_intel_risk_elevated_sub_aggressive:  'Suited for taking more risk',
+    ws_intel_risk_mid_conservative:         'Above your target profile',
+    ws_intel_risk_mid_sub_conservative:     'Check whether it fits your prudent profile',
+    ws_intel_risk_mid_aggressive:           'Consistent with a dynamic profile',
+    ws_intel_risk_mid_sub_aggressive:       'Room to take more risk',
     ws_intel_div_low:        'Low',
     ws_intel_div_low_sub:    (n, c) => `${n} ${n === 1 ? 'asset' : 'assets'} · ${c} ${c === 1 ? 'category' : 'categories'}`,
     ws_intel_div_mid:        'Medium',
@@ -1931,7 +1972,9 @@ const T = {
     ws_intel_conc_low:       'Balanced',
     ws_intel_conc_mod:       'Moderate',
     ws_intel_conc_high:      'Concentrated',
-    ws_intel_perf_initial:   'Initial',
+    // WORKSPACE-COHERENCE-1: calmer framing than the placeholder
+    // "Initial".
+    ws_intel_perf_initial:   'History building',
     ws_intel_dim_diversification:     'Diversification',
     ws_intel_dim_diversification_why: (n, c) => `Capital is spread across ${n} ${n === 1 ? 'asset' : 'assets'} and ${c} ${c === 1 ? 'category' : 'categories'}.`,
     ws_intel_dim_liquidity:           'Liquidity',
@@ -1959,7 +2002,8 @@ const T = {
     ws_intel_hero_crypto_title:       'Elevated crypto exposure',
     ws_intel_hero_crypto_summary:     pct => `Crypto represents ${pct}% of your wealth.`,
     ws_intel_hero_crypto_explanation: 'Crypto market moves will influence the portfolio more than the rest of its structure.',
-    ws_intel_hero_crypto_hint:        '',
+    // WORKSPACE-COHERENCE-1: every hero now closes with a forward look.
+    ws_intel_hero_crypto_hint:        'Consider whether this weight fits your investment horizon.',
     ws_intel_hero_liq_title:          'Limited liquidity',
     ws_intel_hero_liq_summary:        'You currently have no immediately deployable capital recorded.',
     ws_intel_hero_liq_explanation:    'That reduces flexibility against opportunities or unexpected events.',
@@ -1978,6 +2022,13 @@ const T = {
     ws_intel_hero_resilient_title:    'Balanced structure',
     ws_intel_hero_resilient_summary:  'No single asset or category dominates the mix.',
     ws_intel_hero_resilient_explanation:'Your aggregate performance is not tied to one decision.',
+    // WORKSPACE-COHERENCE-1: forward-looking hints + early-history hero.
+    ws_intel_hero_resilient_hint:     'A good moment to set periodic rebalancing rules.',
+    ws_intel_hero_history_title:      'History building',
+    ws_intel_hero_history_summary:    'Your portfolio is still taking shape.',
+    ws_intel_hero_history_explanation:'The first weeks do not yet provide enough history for reliable conclusions; the pattern will emerge as more moves are recorded.',
+    ws_intel_hero_history_hint:       'As you record more activity, the readings will grow more reliable.',
+    ws_intel_hero_conc_mod_hint:      'Worth tracking how this weight evolves over time.',
     ws_intel_signal_concentration:               'Concentration',
     ws_intel_signal_concentration_title:         name => `${name} dominates the portfolio weight`,
     ws_intel_signal_concentration_title_none:    'No clear leader in the mix',
@@ -1999,8 +2050,9 @@ const T = {
     ws_intel_signal_liquidity_explanation_none:   'Your portfolio is fully invested; any new decision requires reallocating.',
     ws_intel_signal_liquidity_explanation_pct:    pct => `You hold ${pct}% in liquidity as room to maneuver.`,
     ws_intel_signal_performance:                  'Performance',
-    ws_intel_signal_performance_title_initial:    'No representative historical read yet',
-    ws_intel_signal_performance_explanation_initial: 'The portfolio needs more history for a reliable conclusion.',
+    // WORKSPACE-COHERENCE-1: clearer, less clinical framing.
+    ws_intel_signal_performance_title_initial:    'Not enough history yet for a reliable reading.',
+    ws_intel_signal_performance_explanation_initial: 'The portfolio needs more history before a representative conclusion can be drawn.',
     ws_micro_synced:         'Market data up to date',
     ws_micro_pending:        'Sync pending',
     ws_empty_title:          'Your workspace activates once you add assets.',
@@ -24703,17 +24755,39 @@ function _aurixWorkspaceIntelligence() {
   else if (cryptoPct > 15)    riskScore += 10;
   if (assetCount > 0 && assetCount < 4) riskScore += 10;
   riskScore = Math.min(100, Math.max(0, Math.round(riskScore)));
+  // WORKSPACE-COHERENCE-1 — risk WORDING adapts to the user's investor
+  // profile. The numeric riskScore is unchanged (same machine truth);
+  // only the human framing flexes:
+  //   • conservative → "superior a tu perfil objetivo"
+  //   • aggressive   → "coherente con un perfil dinámico"
+  //   • professional / balanced → neutral base copy
+  // Profile reads from the existing _aurixInvestorProfile helper. Calm
+  // band stays universal — nothing to nuance when risk is low.
+  const profile = (typeof _aurixInvestorProfile === 'function')
+    ? _aurixInvestorProfile()
+    : { riskProfile: 'balanced', experience: 'intermediate' };
+  const _resolveProfileKey = (baseKey) => {
+    const rp = profile && profile.riskProfile;
+    if (rp !== 'conservative' && rp !== 'aggressive') return baseKey;
+    const tonedKey = `${baseKey}_${rp}`;
+    if (typeof t === 'function') {
+      const v = t(tonedKey);
+      if ((typeof v === 'string' && v && v !== tonedKey) ||
+           typeof v === 'function') return tonedKey;
+    }
+    return baseKey;
+  };
   const riskState =
-    riskScore >= 60 ? _ti('ws_intel_risk_elevated') :
-    riskScore >= 35 ? _ti('ws_intel_risk_mid')      :
+    riskScore >= 60 ? _ti(_resolveProfileKey('ws_intel_risk_elevated')) :
+    riskScore >= 35 ? _ti(_resolveProfileKey('ws_intel_risk_mid'))      :
                       _ti('ws_intel_risk_calm');
   const riskTone =
     riskScore >= 60 ? 'warn' :
     riskScore >= 35 ? 'info' :
                       'positive';
   const riskSub =
-    riskScore >= 60 ? _ti('ws_intel_risk_elevated_sub') :
-    riskScore >= 35 ? _ti('ws_intel_risk_mid_sub')      :
+    riskScore >= 60 ? _ti(_resolveProfileKey('ws_intel_risk_elevated_sub')) :
+    riskScore >= 35 ? _ti(_resolveProfileKey('ws_intel_risk_mid_sub'))      :
                       _ti('ws_intel_risk_calm_sub');
 
   // Diversification.
@@ -24922,9 +24996,28 @@ function _aurixWorkspaceIntelligence() {
         title:        _ti('ws_intel_hero_conc_mod_title', topInvestedName),
         summary:      _ti('ws_intel_hero_conc_mod_summary', topInvestedName, topInvestedPct),
         explanation:  _ti('ws_intel_hero_conc_explanation'),
-        optionalHint: '',
+        // WORKSPACE-COHERENCE-1: hint now closes with a forward look so
+        // the moderate-concentration hero answers "qué mirar después".
+        optionalHint: _ti('ws_intel_hero_conc_mod_hint'),
         severity:     'info',
         kind:         'concentration',
+      };
+    }
+    // WORKSPACE-COHERENCE-1 — early-history hero. Fires when nothing
+    // structural triggered: the portfolio is just too young / small for
+    // a meaningful concentration / liquidity / RE / crypto narrative.
+    // We say so explicitly instead of defaulting to "Estructura
+    // equilibrada", which can read as a confident claim about a 2-asset
+    // wallet with two days of history.
+    if (assetCount <= 3) {
+      return {
+        eyebrow:      _ti('ws_intel_hero_eyebrow'),
+        title:        _ti('ws_intel_hero_history_title'),
+        summary:      _ti('ws_intel_hero_history_summary'),
+        explanation:  _ti('ws_intel_hero_history_explanation'),
+        optionalHint: _ti('ws_intel_hero_history_hint'),
+        severity:     'neutral',
+        kind:         'early_history',
       };
     }
     return {
@@ -24932,7 +25025,9 @@ function _aurixWorkspaceIntelligence() {
       title:        _ti('ws_intel_hero_resilient_title'),
       summary:      _ti('ws_intel_hero_resilient_summary'),
       explanation:  _ti('ws_intel_hero_resilient_explanation'),
-      optionalHint: '',
+      // WORKSPACE-COHERENCE-1: forward-looking hint for the balanced
+      // state, completes the "qué mirar después" beat.
+      optionalHint: _ti('ws_intel_hero_resilient_hint'),
       severity:     'positive',
       kind:         'resilient',
     };
@@ -24997,12 +25092,35 @@ function _aurixWorkspaceIntelligence() {
     },
   ];
 
+  // WORKSPACE-COHERENCE-1 — de-duplicate signals against the hero.
+  // The hero is the loudest narrative on the surface; an "explained
+  // signal" that simply restates it makes the page read like four
+  // disconnected cards saying the same thing four ways. Each hero kind
+  // maps to the deep-signal row that would repeat it; we filter that
+  // row out so the section becomes "the rest of the story, calmly".
+  // Hero kinds with no obvious overlap (empty / null) keep the full
+  // four rows.
+  const HERO_TO_MUTED_SIGNAL = {
+    single:             'concentration',
+    real_estate:        'concentration',
+    liquidity_relevant: 'liquidity',
+    concentration:      'concentration',
+    crypto:             'concentration',
+    liquidity:          'liquidity',
+    resilient:          'diversification',
+    early_history:      'performance',
+  };
+  const mutedKind  = hero && hero.kind ? HERO_TO_MUTED_SIGNAL[hero.kind] : null;
+  const visibleSignals = mutedKind
+    ? signals.filter(s => s.kind !== mutedKind)
+    : signals;
+
   return {
     mode: assetCount === 1 ? 'one' : 'normal',
     status,
     hero,
     dimensions,
-    signals,
+    signals: visibleSignals,
   };
 }
 
