@@ -5070,10 +5070,14 @@ body:not(.hero-active) #orb-canvas {
    navy capsule with subtle dividers, each cell showing a caption above
    a tabular-numeric value. Reads like a Bloomberg / Apple Finance
    identity card, not floating badges. */
+/* AURIX-FINAL-CATEGORY-POLISH — quieter, more institutional rail.
+   More breathing room, calmer captions (smaller + softer colour),
+   stronger numeric values, and softer dividers so the rail feels
+   like a premium finance product rather than a dashboard widget. */
 .detail-hero-meta-rail {
   display: flex;
   align-items: stretch;
-  padding: 8px 6px;
+  padding: 10px 8px;
   border-radius: 14px;
   background:
     linear-gradient(180deg, rgba(20, 30, 56, 0.50), rgba(14, 22, 42, 0.42));
@@ -5087,9 +5091,9 @@ body:not(.hero-active) #orb-canvas {
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  gap: 4px;
-  padding: 6px 16px;
-  min-width: 92px;
+  gap: 5px;
+  padding: 8px 20px;
+  min-width: 102px;
   position: relative;
 }
 .detail-hero-meta-item[hidden] { display: none; }
@@ -5097,20 +5101,20 @@ body:not(.hero-active) #orb-canvas {
   content: '';
   position: absolute;
   left: 0;
-  top: 18%;
-  bottom: 18%;
+  top: 22%;
+  bottom: 22%;
   width: 1px;
-  background: rgba(138, 166, 255, 0.18);
+  background: rgba(138, 166, 255, 0.10);
 }
 .detail-hero-meta-caption {
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(180, 200, 240, 0.58);
+  color: rgba(180, 200, 240, 0.42);
 }
 .detail-hero-meta-value {
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 700;
   letter-spacing: -0.005em;
   color: rgba(232, 240, 255, 0.96);
@@ -5120,7 +5124,7 @@ body:not(.hero-active) #orb-canvas {
 .detail-hero-meta-item.is-top .detail-hero-meta-value {
   /* Tickers tend to be uppercase + 3–4 chars; nudge them a hair
      smaller so they sit visually balanced next to the numeric cells. */
-  font-size: 16px;
+  font-size: 17px;
   letter-spacing: 0.01em;
 }
 
@@ -5150,14 +5154,16 @@ body:not(.hero-active) #orb-canvas {
     gap: 6px;
   }
   .detail-hero-meta-item {
+    /* AURIX-FINAL-CATEGORY-POLISH — calmer pills: lower opacity bg +
+       softer border so the total value clearly dominates the hero. */
     flex-direction: row;
     align-items: baseline;
     gap: 6px;
     padding: 4px 11px;
     min-width: 0;
     border-radius: 999px;
-    background: rgba(138, 166, 255, 0.06);
-    border: 1px solid rgba(138, 166, 255, 0.14);
+    background: rgba(138, 166, 255, 0.04);
+    border: 1px solid rgba(138, 166, 255, 0.10);
   }
   .detail-hero-meta-item + .detail-hero-meta-item::before {
     display: none;
@@ -5165,11 +5171,11 @@ body:not(.hero-active) #orb-canvas {
   .detail-hero-meta-caption {
     font-size: 9px;
     letter-spacing: 0.10em;
-    color: rgba(180, 200, 240, 0.52);
+    color: rgba(180, 200, 240, 0.46);
   }
   .detail-hero-meta-value {
     font-size: 11px;
-    color: rgba(225, 233, 255, 0.88);
+    color: rgba(225, 233, 255, 0.82);
     font-weight: 600;
   }
   /* Principal cell stays desktop-only — agreed in CATEGORY-MOBILE-POLISH-2. */
@@ -5398,10 +5404,11 @@ body:not(.hero-active) #orb-canvas {
 .category-perf-chart {
   position: relative;
   width: 100%;
-  /* CATEGORY-DETAIL-DENSITY-FINAL — desktop trimmed ~9% so holdings
-     surface higher in the viewport without losing readability. */
-  height: 200px;
-  min-height: 200px;
+  /* AURIX-FINAL-CATEGORY-POLISH — trim a further ~6% so the first
+     holdings row lifts into view without scrolling, while the chart
+     stays the panel's focal point. */
+  height: 188px;
+  min-height: 188px;
 }
 .category-perf-empty {
   position: absolute;
@@ -5480,9 +5487,9 @@ body:not(.hero-active) #orb-canvas {
 
 @media (max-width: 480px) {
   .detail-hero          { padding: var(--space-3) 18px var(--space-2); }
-  /* CATEGORY-HERO-PREMIUM-FINAL: bumped ~14% so the total reads as the
-     mobile hero's clear focal point above the metadata pills. */
-  .detail-hero-value    { font-size: 25px; }
+  /* AURIX-FINAL-CATEGORY-POLISH: bumped +4% more so the value reads as
+     unambiguously the focal point against the calmer pills. */
+  .detail-hero-value    { font-size: 26px; }
   .detail-chart-wrap    { height: 64px; margin-top: var(--space-2); }
 }
 
