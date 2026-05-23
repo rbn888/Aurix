@@ -9798,8 +9798,14 @@ function _aurixDashMount(surface) {
       // the press threshold fires, so page scroll/swipe are normal.
       showCrosshair:  true,
       showTooltip:    true,
-      showTimeScale:  isDesktop,
-      showPriceScale: isDesktop,
+      // DASHBOARD-MOBILE-CHART-PARITY: the time + price axes used to
+      // be desktop-only, which left the mobile dashboard chart looking
+      // bare next to the category detail chart that ships them on
+      // both surfaces. Bringing axes to mobile unifies the Aurix
+      // premium chart language across every surface (dashboard +
+      // category detail + asset detail) without changing the engine.
+      showTimeScale:  true,
+      showPriceScale: true,
       mobileInspection: !isDesktop,
       currency:       baseCurrency || 'USD',
       range:          activeRange,
