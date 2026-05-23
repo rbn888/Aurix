@@ -5033,94 +5033,103 @@ body:not(.hero-active) #orb-canvas {
    Shows category name, total value, 24h change, mini sparkline.
    ─────────────────────────────────────────────────────── */
 .detail-hero {
-  /* CATEGORY-DETAIL-POLISH-1: premium Aurix navy surface — matches the
-     dedicated category-perf-panel below it so hero + chart read as one
-     visual family instead of grey-card + grey-card. Two-column grid:
-     value column on the left, compact chips + insight on the right. */
+  /* CATEGORY-HERO-PREMIUM-FINAL: institutional two-column hero —
+     dominant value on the left, segmented metadata rail on the right.
+     Right column sizes to its content so the rail neither floats in
+     dead space nor crushes against the value. */
   background:
     linear-gradient(180deg, rgba(28, 42, 74, 0.38) 0%, rgba(14, 20, 36, 0.18) 60%),
     var(--bg-card);
   border: 1px solid var(--aurix-border, rgba(138, 166, 255, 0.18));
   border-radius: 16px;
-  padding: 20px var(--space-5) 18px;
+  padding: 22px 24px 20px;
   margin-bottom: 14px;
   overflow: hidden;
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 240px);
-  align-items: flex-start;
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 28px;
 }
 
 .detail-hero-info { position: relative; z-index: 1; min-width: 0; }
 
-/* Right-side rail: chips only, vertically centered alongside the value
-   on the left so the hero reads balanced rather than top-heavy. */
+/* Right-side rail: institutional metadata block, vertically centered
+   alongside the value on the left. */
 .detail-hero-side {
   position: relative;
   z-index: 1;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 8px;
-  min-width: 0;
-  /* Allow the hero grid to align the side rail vertically with the
-     value column without forcing the hero into a taller box. */
-  align-self: stretch;
-}
-.detail-hero-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  justify-content: flex-end;
-}
-/* CATEGORY-DETAIL-DENSITY-FINAL — premium pill style. Slightly looser
-   padding + softer border so the chip reads like an Aurix surface,
-   not a technical badge. Tabular numerics keep "13%" vertically
-   aligned with adjacent chips. */
-.detail-hero-chip {
-  display: inline-flex;
   align-items: center;
-  padding: 6px 12px;
-  border-radius: 999px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+/* CATEGORY-HERO-PREMIUM-FINAL — segmented metadata rail for desktop.
+   Three cells (Exposición / Posiciones / Principal) sit inside a single
+   navy capsule with subtle dividers, each cell showing a caption above
+   a tabular-numeric value. Reads like a Bloomberg / Apple Finance
+   identity card, not floating badges. */
+.detail-hero-meta-rail {
+  display: flex;
+  align-items: stretch;
+  padding: 8px 6px;
+  border-radius: 14px;
   background:
-    linear-gradient(180deg, rgba(138, 166, 255, 0.16), rgba(138, 166, 255, 0.08));
-  border: 1px solid rgba(138, 166, 255, 0.24);
-  color: rgba(232, 240, 255, 0.95);
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+    linear-gradient(180deg, rgba(20, 30, 56, 0.50), rgba(14, 22, 42, 0.42));
+  border: 1px solid var(--aurix-border, rgba(138, 166, 255, 0.18));
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.04) inset,
-    0 6px 18px -10px rgba(74, 130, 240, 0.45);
+    0 10px 28px -20px rgba(4, 8, 18, 0.7);
 }
-.detail-hero-chip[hidden] { display: none; }
-.detail-hero-chip.is-top {
-  background:
-    linear-gradient(180deg, rgba(138, 166, 255, 0.08), rgba(138, 166, 255, 0.04));
-  border-color: rgba(138, 166, 255, 0.18);
-  color: rgba(225, 233, 255, 0.85);
+.detail-hero-meta-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 16px;
+  min-width: 92px;
+  position: relative;
 }
-/* The insight + PnL inherit the existing rules but lean right within
-   the side rail so the column reads top-to-bottom as a brief. */
-.detail-hero-side .detail-hero-insight {
-  text-align: right;
-  margin: 0;
-  max-width: 100%;
+.detail-hero-meta-item[hidden] { display: none; }
+.detail-hero-meta-item + .detail-hero-meta-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 18%;
+  bottom: 18%;
+  width: 1px;
+  background: rgba(138, 166, 255, 0.18);
 }
-.detail-hero-side .detail-hero-pnl {
-  margin: 0;
+.detail-hero-meta-caption {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(180, 200, 240, 0.58);
+}
+.detail-hero-meta-value {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: rgba(232, 240, 255, 0.96);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+.detail-hero-meta-item.is-top .detail-hero-meta-value {
+  /* Tickers tend to be uppercase + 3–4 chars; nudge them a hair
+     smaller so they sit visually balanced next to the numeric cells. */
+  font-size: 16px;
+  letter-spacing: 0.01em;
 }
 
 @media (max-width: 640px) {
-  /* Mobile: keep the 2-column grid but tighten widths and padding so
-     the chart appears immediately after a shorter hero.
-     CATEGORY-DETAIL-DENSITY-FINAL — chips stack vertically and centre
-     on the value's vertical midline, hugging the right edge. The hero
-     now reads as identity + two clean chips, nothing else. */
+  /* CATEGORY-HERO-PREMIUM-FINAL — mobile collapses the desktop rail to
+     a quiet vertical stack of pills. No outer capsule, no dividers,
+     calmer borders so the total value clearly dominates the card. The
+     Principal cell hides — covered by the `[hidden]` rule above plus
+     the explicit override below for the `.is-top` class. */
   .detail-hero {
     grid-template-columns: minmax(0, 1fr) auto;
     padding: 14px 16px 14px;
@@ -5130,22 +5139,47 @@ body:not(.hero-active) #orb-canvas {
   .detail-hero-side {
     align-items: flex-end;
     justify-content: center;
-    gap: 6px;
   }
-  .detail-hero-chips {
+  .detail-hero-meta-rail {
     flex-direction: column;
     align-items: flex-end;
-    flex-wrap: nowrap;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
     gap: 6px;
   }
-  .detail-hero-chip {
-    font-size: 11px;
-    padding: 5px 11px;
+  .detail-hero-meta-item {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 6px;
+    padding: 4px 11px;
+    min-width: 0;
+    border-radius: 999px;
+    background: rgba(138, 166, 255, 0.06);
+    border: 1px solid rgba(138, 166, 255, 0.14);
   }
+  .detail-hero-meta-item + .detail-hero-meta-item::before {
+    display: none;
+  }
+  .detail-hero-meta-caption {
+    font-size: 9px;
+    letter-spacing: 0.10em;
+    color: rgba(180, 200, 240, 0.52);
+  }
+  .detail-hero-meta-value {
+    font-size: 11px;
+    color: rgba(225, 233, 255, 0.88);
+    font-weight: 600;
+  }
+  /* Principal cell stays desktop-only — agreed in CATEGORY-MOBILE-POLISH-2. */
+  .detail-hero-meta-item.is-top { display: none !important; }
 }
 @media (max-width: 380px) {
   .detail-hero { grid-template-columns: minmax(0, 1fr) auto; }
-  .detail-hero-chip { font-size: 10.5px; padding: 4px 10px; }
+  .detail-hero-meta-caption { font-size: 8.5px; }
+  .detail-hero-meta-value   { font-size: 10.5px; }
+  .detail-hero-meta-item    { padding: 3px 10px; }
 }
 
 .detail-hero-meta {
@@ -5170,7 +5204,9 @@ body:not(.hero-active) #orb-canvas {
 }
 
 .detail-hero-value {
-  font-size: 28px;
+  /* CATEGORY-HERO-PREMIUM-FINAL: total category value anchors the hero.
+     Bumped ~10% so it clearly dominates the metadata rail on its right. */
+  font-size: 31px;
   font-weight: 800;
   color: var(--text-bright);
   font-variant-numeric: tabular-nums;
@@ -5444,7 +5480,9 @@ body:not(.hero-active) #orb-canvas {
 
 @media (max-width: 480px) {
   .detail-hero          { padding: var(--space-3) 18px var(--space-2); }
-  .detail-hero-value    { font-size: 22px; }
+  /* CATEGORY-HERO-PREMIUM-FINAL: bumped ~14% so the total reads as the
+     mobile hero's clear focal point above the metadata pills. */
+  .detail-hero-value    { font-size: 25px; }
   .detail-chart-wrap    { height: 64px; margin-top: var(--space-2); }
 }
 

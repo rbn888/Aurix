@@ -1325,6 +1325,13 @@ const T = {
     // bigger one" rather than "the leading position".
     catHeroPctChip:   pct => `${pct}% cartera`,
     catHeroTopChip:   name => `Principal: ${name}`,
+    // CATEGORY-HERO-PREMIUM-FINAL: institutional metadata rail labels.
+    // The new caption+value structure replaces the flat chips so the
+    // hero reads like a Bloomberg-style identity card.
+    catHeroLabelPct:   'Exposición',
+    catHeroLabelCount: 'Posiciones',
+    catHeroLabelTop:   'Principal',
+    catHeroValueCount: n => String(n),
     // CATEGORY-DETAIL-CHARTS-2 — premium category performance panel.
     categoryPerfTitle: name => `Rendimiento de ${name}`,
     categoryPerfEmptyTitle: 'Histórico de categoría en construcción.',
@@ -2409,6 +2416,11 @@ const T = {
     // CATEGORY-DETAIL-POLISH-1: compact chip + top-holding label.
     catHeroPctChip:   pct => `${pct}% portfolio`,
     catHeroTopChip:   name => `Top: ${name}`,
+    // CATEGORY-HERO-PREMIUM-FINAL: institutional metadata rail labels.
+    catHeroLabelPct:   'Exposure',
+    catHeroLabelCount: 'Positions',
+    catHeroLabelTop:   'Primary',
+    catHeroValueCount: n => String(n),
     // CATEGORY-DETAIL-CHARTS-2 — premium category performance panel.
     categoryPerfTitle: name => `${name} performance`,
     categoryPerfEmptyTitle: 'Category history is still building.',
@@ -12812,11 +12824,12 @@ function renderDetailHero(type, typeAssets) {
     // appears immediately below. The old long "Cripto representa el X%
     // de tu patrimonio" sentence is gone — replaced by the calm
     // "13% cartera" chip and the existing contextual insight line.
-    // CATEGORY-HERO-FINAL-WEB-MOBILE — the hero is now strictly an
-    // identity surface. Performance (change pill, PnL row) is owned by
-    // the dedicated chart panel below; analytical prose (insight) is
-    // owned by Workspace intelligence. Hero keeps category label,
-    // total value, and a compact chip rail for structural metadata.
+    // CATEGORY-HERO-PREMIUM-FINAL — institutional metadata rail.
+    // Each cell carries a small caption above its value so the hero
+    // reads like a Bloomberg / Apple Finance identity card. On desktop
+    // the three cells render as a single segmented rail with dividers;
+    // on mobile the same DOM collapses to quiet vertical pills via CSS.
+    // The total value on the left stays the dominant visual anchor.
     heroEl.innerHTML = `
       <div class="detail-hero-info">
         <div class="detail-hero-meta">
@@ -12826,10 +12839,19 @@ function renderDetailHero(type, typeAssets) {
         <div class="detail-hero-value"></div>
       </div>
       <aside class="detail-hero-side">
-        <div class="detail-hero-chips">
-          <span class="detail-hero-chip is-pct"></span>
-          <span class="detail-hero-chip is-count"></span>
-          <span class="detail-hero-chip is-top" hidden></span>
+        <div class="detail-hero-meta-rail">
+          <div class="detail-hero-meta-item is-pct">
+            <span class="detail-hero-meta-caption"></span>
+            <span class="detail-hero-meta-value"></span>
+          </div>
+          <div class="detail-hero-meta-item is-count">
+            <span class="detail-hero-meta-caption"></span>
+            <span class="detail-hero-meta-value"></span>
+          </div>
+          <div class="detail-hero-meta-item is-top" hidden>
+            <span class="detail-hero-meta-caption"></span>
+            <span class="detail-hero-meta-value"></span>
+          </div>
         </div>
       </aside>`;
     const hdr = document.querySelector('#assetsSection .section-header');
@@ -12850,63 +12872,57 @@ function renderDetailHero(type, typeAssets) {
   // Animated value: count-up from 0 on first entry, smooth interpolation on update
   _animateHeroValue(heroEl.querySelector('.detail-hero-value'), totalValue);
 
-  // CATEGORY-HERO-FINAL-WEB-MOBILE — populate only the identity chips.
-  // Performance + analytical prose are owned by the chart panel and
-  // Workspace intelligence respectively, per the Aurix information
-  // hierarchy: this surface answers "what am I looking at", not
-  // "how is it performing" or "what does it mean".
+  // CATEGORY-HERO-PREMIUM-FINAL — populate the metadata rail. Captions
+  // come from i18n so language toggles flip them; values stay numeric
+  // (or ticker) so the rail reads like an identity card, not a sentence.
+  // Performance + analytical prose stay out — they live in the chart
+  // panel and Workspace per the Aurix information hierarchy.
   const portfolioTotal = totalValueBase();
-  const chipPctEl   = heroEl.querySelector('.detail-hero-chip.is-pct');
-  const chipCountEl = heroEl.querySelector('.detail-hero-chip.is-count');
-  const chipTopEl   = heroEl.querySelector('.detail-hero-chip.is-top');
-  const allocPct  = portfolioTotal > 0 ? (totalValue / portfolioTotal) * 100 : 0;
-  const n         = Array.isArray(typeAssets) ? typeAssets.length : 0;
-  const countFn = t('catHeroCount');
+  const allocPct = portfolioTotal > 0 ? (totalValue / portfolioTotal) * 100 : 0;
+  const n        = Array.isArray(typeAssets) ? typeAssets.length : 0;
 
-  // Visible chips.
-  const pctChipFn = t('catHeroPctChip');
-  if (chipPctEl) {
-    if (portfolioTotal > 0 && typeof pctChipFn === 'function') {
-      chipPctEl.textContent = pctChipFn(Math.round(allocPct));
-      chipPctEl.hidden = false;
-    } else {
-      chipPctEl.textContent = '';
-      chipPctEl.hidden = true;
-    }
-  }
-  if (chipCountEl) {
-    if (n > 0 && typeof countFn === 'function') {
-      chipCountEl.textContent = countFn(n);
-      chipCountEl.hidden = false;
-    } else {
-      chipCountEl.textContent = '';
-      chipCountEl.hidden = true;
-    }
-  }
-  // Top holding chip: only when there's a clear leader (2+ positions
+  const _setMeta = (selector, captionKey, value, showWhen) => {
+    const cell = heroEl.querySelector(selector);
+    if (!cell) return;
+    const show = !!showWhen;
+    cell.hidden = !show;
+    if (!show) return;
+    const captionEl = cell.querySelector('.detail-hero-meta-caption');
+    const valueEl   = cell.querySelector('.detail-hero-meta-value');
+    const captionVal = (typeof t === 'function') ? t(captionKey) : '';
+    if (captionEl) captionEl.textContent = (typeof captionVal === 'string') ? captionVal : '';
+    if (valueEl)   valueEl.textContent   = value;
+  };
+
+  _setMeta('.detail-hero-meta-item.is-pct',
+           'catHeroLabelPct',
+           `${Math.round(allocPct)}%`,
+           portfolioTotal > 0);
+  _setMeta('.detail-hero-meta-item.is-count',
+           'catHeroLabelCount',
+           String(n),
+           n > 0);
+
+  // Top holding cell: only when there's a clear leader (2+ positions
   // and the top weight ≥ 25% of the category). Single-asset categories
-  // would just echo the type name, which is noise.
-  if (chipTopEl) {
-    let topName = '';
-    if (Array.isArray(typeAssets) && typeAssets.length >= 2 && totalValue > 0) {
-      let top = null, topVal = 0;
-      for (const a of typeAssets) {
-        const v = toBase(assetNativeValue(a), (a.assetCurrency || 'USD').toUpperCase());
-        if (Number.isFinite(v) && v > topVal) { topVal = v; top = a; }
-      }
-      if (top && (topVal / totalValue) >= 0.25) {
-        topName = (top.ticker && String(top.ticker).toUpperCase()) || top.name || '';
-      }
+  // would just echo the type name, which is noise. Mobile hides the
+  // cell entirely via CSS — keep that contract; populate either way so
+  // the desktop view stays informative when the user resizes up.
+  let topName = '';
+  if (Array.isArray(typeAssets) && typeAssets.length >= 2 && totalValue > 0) {
+    let top = null, topVal = 0;
+    for (const a of typeAssets) {
+      const v = toBase(assetNativeValue(a), (a.assetCurrency || 'USD').toUpperCase());
+      if (Number.isFinite(v) && v > topVal) { topVal = v; top = a; }
     }
-    const topFn = t('catHeroTopChip');
-    if (topName && typeof topFn === 'function') {
-      chipTopEl.textContent = topFn(topName);
-      chipTopEl.hidden = false;
-    } else {
-      chipTopEl.textContent = '';
-      chipTopEl.hidden = true;
+    if (top && (topVal / totalValue) >= 0.25) {
+      topName = (top.ticker && String(top.ticker).toUpperCase()) || top.name || '';
     }
   }
+  _setMeta('.detail-hero-meta-item.is-top',
+           'catHeroLabelTop',
+           topName,
+           !!topName);
 
   // CATEGORY-HERO-FINAL-WEB-MOBILE — track the category we've already
   // shown so consumers that listened to _detailChartType continue to
