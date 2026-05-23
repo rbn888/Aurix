@@ -337,10 +337,15 @@ const T = {
     emptyTitle:      'No tienes activos todavía.',
     emptySub:        'Pulsa "Añadir activo" para comenzar.',
     // Update status
-    refreshing:      'actualizando...',
-    updated:         t => `actualizado ${t}`,
-    updateError:     'error al actualizar',
-    rateLimit:       'límite API — reintentando pronto',
+    // PORTFOLIO-BOOT-REFRESH-1: calmer, more explicit copy for boot
+    // refresh. `updated` keeps the timestamp variant for callers that
+    // want a precise time; the status-strip now uses the friendlier
+    // "Actualizado ahora" right after success.
+    refreshing:      'Actualizando precios…',
+    updated:         t => `Actualizado ${t}`,
+    updateError:     'No se pudo actualizar',
+    updateStaleSince:n => `Última actualización: hace ${n} min`,
+    rateLimit:       'Límite de API — reintentando pronto',
     // Market status
     live24:          '24/7',
     liveMarket:      'Mercado abierto',
@@ -1432,9 +1437,10 @@ const T = {
     emptyTitle:      'You have no assets yet.',
     emptySub:        'Press "Add asset" to get started.',
     // Update status
-    refreshing:      'refreshing...',
-    updated:         t => `updated ${t}`,
-    updateError:     'update error',
+    refreshing:      'Refreshing prices…',
+    updated:         t => `Updated ${t}`,
+    updateError:     'Update failed',
+    updateStaleSince:n => `Last updated ${n} min ago`,
     rateLimit:       'API limit — retrying soon',
     // Market status
     live24:          '24/7',
@@ -11375,11 +11381,24 @@ let _lastUpdateState = null;
 function setUpdateStatus(state) {
   _lastUpdateState = state;
   updateDotEl.className = `update-dot ${state === 'rate_limit' ? 'error' : state}`;
-  const time = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  // PORTFOLIO-BOOT-REFRESH-1: success → calm "Actualizado ahora"; error
+  // → if a previous successful refresh exists, soften to "Última
+  // actualización: hace X min" so the user keeps the cached anchor
+  // instead of just seeing a red error label.
+  const okFn       = t('updatedNow');
+  const okText     = (typeof okFn === 'string') ? okFn
+                   : (typeof okFn === 'function' ? okFn() : 'Actualizado');
+  const elapsedMin = (typeof lastRefreshAt === 'number' && lastRefreshAt > 0)
+    ? Math.max(0, Math.round((Date.now() - lastRefreshAt) / 60000))
+    : null;
+  const staleFn    = t('updateStaleSince');
+  const errorText  = (elapsedMin != null && typeof staleFn === 'function')
+    ? staleFn(elapsedMin)
+    : t('updateError');
   const msg = {
     refreshing: t('refreshing'),
-    ok:         t('updated')(time),
-    error:      t('updateError'),
+    ok:         okText,
+    error:      errorText,
     rate_limit: t('rateLimit'),
   };
   updateTextEl.textContent = msg[state] ?? '';
@@ -11500,7 +11519,19 @@ async function collectMarketPriceData(marketAssets) {
 //   collect all prices → apply atomically → record snapshot → render
 // If any batch-level fetch fails (network, rate-limit) the rollback snapshot
 // is restored and NO history point is written.
+// PORTFOLIO-BOOT-REFRESH-1: single-promise guard so concurrent callers
+// (boot kick + setInterval tick + reactive subscribers) share the same
+// inflight fetch instead of stampeding the price endpoints. Returns the
+// active promise immediately if one is already running. The boot
+// timestamp is captured for the "Última actualización: hace X min"
+// stale-status copy below.
+let _refreshInFlight = null;
 async function refreshPrices() {
+  if (_refreshInFlight) return _refreshInFlight;
+  _refreshInFlight = _refreshPricesImpl().finally(() => { _refreshInFlight = null; });
+  return _refreshInFlight;
+}
+async function _refreshPricesImpl() {
   // FC-7/FC-8: track legacy refresh for reactive health
   PORTFOLIO_RUNTIME.lastReactiveSource     = 'legacy-refresh';
   PORTFOLIO_RUNTIME.lastPortfolioRefreshAt = Date.now();
@@ -11594,6 +11625,16 @@ async function refreshPrices() {
   save();
   lastRefreshAt = Date.now();
   render();
+  // PORTFOLIO-BOOT-REFRESH-1: also refresh Workspace intelligence when
+  // the user is sitting on that tab. render() targets the dashboard
+  // surface; the Workspace shell lives in a separate root, so fresh
+  // prices would otherwise stay invisible there until a tab toggle.
+  try {
+    if (typeof currentTab === 'string' && currentTab === 'workspace' &&
+        typeof renderWorkspace === 'function') {
+      renderWorkspace();
+    }
+  } catch (_) { /* never block the price pipeline */ }
   setUpdateStatus('ok');
 
   // Runs only on success — chart errors must never affect price status or rollback
@@ -20006,6 +20047,22 @@ document.getElementById('appRoot').style.opacity = '0';
       loader.style.opacity = '0';
       setTimeout(() => loader.remove(), 200);
     }
+
+    // PORTFOLIO-BOOT-REFRESH-1: now that auth + portfolio have resolved,
+    // kick a priority price refresh immediately so the cached values
+    // visible on the first paint get replaced with live prices in
+    // seconds — instead of waiting up to 30 s for the next polling
+    // tick. refreshPrices() carries its own in-flight guard and sets
+    // the "Actualizando precios…" status on entry, so this never
+    // stampedes the top-level boot kick or the interval poller.
+    Promise.resolve().then(() => {
+      if (typeof refreshPrices === 'function') {
+        refreshPrices().catch(err => {
+          console.warn('[PORTFOLIO-BOOT-REFRESH-1] priority refresh failed:', err);
+          try { setUpdateStatus('error'); } catch (_) {}
+        });
+      }
+    });
 
     // ONBOARDING-1: spec §8 bootstrap order. Auth + portfolio resolved
     // above; reset state is checked inside the engine's guards. We defer
