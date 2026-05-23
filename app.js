@@ -1318,6 +1318,18 @@ const T = {
       cash:        'Liquidez disponible para nuevas oportunidades.',
     },
     catHeroCount: n => `${n} ${n === 1 ? 'posición' : 'posiciones'}`,
+    // CATEGORY-DETAIL-CHARTS-2 — premium category performance panel.
+    categoryPerfTitle: name => `Rendimiento de ${name}`,
+    categoryPerfEmptyTitle: 'Histórico de categoría en construcción.',
+    categoryPerfEmptyBody:  'A medida que registres movimientos verás la evolución temporal aquí.',
+    catRange_1d:  '1D',
+    catRange_1w:  '1S',
+    catRange_1m:  '1M',
+    catRange_3m:  '3M',
+    catRange_6m:  '6M',
+    catRange_ytd: 'YTD',
+    catRange_1y:  '1A',
+    catRange_all: 'TODO',
     // ── First asset add flow ─────────────────────────
     modalAddTitleFirst:   'Añade tu primer activo',
     modalAddSubFirst:     'Empieza creando la base de tu portfolio.',
@@ -2387,6 +2399,18 @@ const T = {
       cash:        'Liquidity ready for new opportunities.',
     },
     catHeroCount: n => `${n} ${n === 1 ? 'position' : 'positions'}`,
+    // CATEGORY-DETAIL-CHARTS-2 — premium category performance panel.
+    categoryPerfTitle: name => `${name} performance`,
+    categoryPerfEmptyTitle: 'Category history is still building.',
+    categoryPerfEmptyBody:  'As you record more activity, the evolution over time will show up here.',
+    catRange_1d:  '1D',
+    catRange_1w:  '1W',
+    catRange_1m:  '1M',
+    catRange_3m:  '3M',
+    catRange_6m:  '6M',
+    catRange_ytd: 'YTD',
+    catRange_1y:  '1Y',
+    catRange_all: 'ALL',
     // ── First asset add flow ─────────────────────────
     modalAddTitleFirst:   'Add your first asset',
     modalAddSubFirst:     'Start building your portfolio foundation.',
@@ -3716,6 +3740,56 @@ function recordCategorySnapshot() {
   const cutoff = now - 365 * 86_400_000;
   categoryHistory = [...base, newPoint].filter(p => p.ts >= cutoff);
   saveCategoryHistory();
+}
+
+// CATEGORY-DETAIL-CHARTS-2 — read helpers over the same categoryHistory
+// array. Pure functions, no DOM, no fetch: take the canonical USD-based
+// per-bucket totals already persisted at every snapshot and project a
+// series for a single category over a chosen range. ETFs intentionally
+// merge with `fund` so the user sees a single "Fondos y ETFs" line.
+function _categoryBucketsForType(type) {
+  switch (String(type || '').toLowerCase()) {
+    case 'crypto':      return ['crypto'];
+    case 'stock':       return ['stock'];
+    case 'etf':         return ['etf', 'fund'];
+    case 'metal':       return ['metal'];
+    case 'real_estate': return ['real_estate'];
+    case 'cash':        return ['liquidity'];
+    case 'other':       return ['other'];
+    default:            return [String(type || '').toLowerCase()];
+  }
+}
+function _categoryRangeCutoff(range) {
+  const now = Date.now();
+  switch (range) {
+    case '24h':  return now - 24 * 3_600_000;
+    case '7d':   return now - 7 * 86_400_000;
+    case '30d':  return now - 30 * 86_400_000;
+    case '3m':   return now - 90 * 86_400_000;
+    case '6m':   return now - 180 * 86_400_000;
+    case 'ytd':  { const d = new Date(); return new Date(d.getFullYear(), 0, 1).getTime(); }
+    case '1y':   return now - 365 * 86_400_000;
+    case 'all':  return 0;
+    default:     return now - 30 * 86_400_000;
+  }
+}
+function _categorySeriesForRange(type, range) {
+  const buckets = _categoryBucketsForType(type);
+  if (!Array.isArray(categoryHistory) || !categoryHistory.length) return [];
+  const cutoff = _categoryRangeCutoff(range);
+  const out = [];
+  for (const p of categoryHistory) {
+    if (!p || typeof p.ts !== 'number') continue;
+    if (p.ts < cutoff) continue;
+    let v = 0;
+    for (const k of buckets) {
+      const x = Number(p[k]);
+      if (Number.isFinite(x) && x >= 0) v += x;
+    }
+    if (!(v > 0)) continue;
+    out.push({ time: p.ts, value: +v.toFixed(2) });
+  }
+  return out;
 }
 
 // Console diagnostics. Read-only summary — no DOM, no UI surface.
@@ -10222,6 +10296,199 @@ function _aurixCategoryMount(canvas) {
   }
 }
 
+// ── CATEGORY-DETAIL-CHARTS-2 ──────────────────────────────────────
+// Premium dedicated performance panel for category drilldowns. Lives
+// directly below the hero (NOT inside it), reads real per-bucket USD
+// history from categoryHistory, and routes through the V2 AurixCharts
+// engine so the styling matches the dashboard / asset detail charts.
+//
+// Lifecycle:
+//   • render() → if activeCategory, calls _aurixCategoryPerfRender(type)
+//   • _aurixCategoryPerfRender remounts when the category changes,
+//     otherwise just refreshes data so price ticks reflect immediately.
+//   • Leaving the category (back to dashboard) triggers teardown.
+//
+// Ranges: 1D / 1S / 1M / 3M / 6M / YTD / 1A / TODO. Pills persist their
+// active state in a module-level variable so a user who picked 3M stays
+// on 3M as they switch between categories — predictable, no surprise.
+let _aurixCategoryPerfEntry = null; // { type, ctrl, panel }
+let _aurixCategoryPerfRange = '30d';
+const _AURIX_CATEGORY_PERF_RANGES = ['24h','7d','30d','3m','6m','ytd','1y','all'];
+const _AURIX_CATEGORY_PERF_RANGE_LABELS = {
+  '24h': 'catRange_1d',
+  '7d':  'catRange_1w',
+  '30d': 'catRange_1m',
+  '3m':  'catRange_3m',
+  '6m':  'catRange_6m',
+  'ytd': 'catRange_ytd',
+  '1y':  'catRange_1y',
+  'all': 'catRange_all',
+};
+
+function _aurixCategoryPerfTeardown() {
+  if (!_aurixCategoryPerfEntry) return;
+  const { ctrl, panel } = _aurixCategoryPerfEntry;
+  try { ctrl && ctrl.destroy(); } catch (_) {}
+  try { panel && panel.parentNode && panel.parentNode.removeChild(panel); } catch (_) {}
+  _aurixCategoryPerfEntry = null;
+}
+
+function _aurixCategoryPerfUpdateHeader(panel, series) {
+  const changeEl = panel.querySelector('.category-perf-change');
+  if (!changeEl) return;
+  if (!Array.isArray(series) || series.length < 2) {
+    changeEl.textContent = '';
+    changeEl.className = 'category-perf-change';
+    return;
+  }
+  const first = series[0].value;
+  const last  = series[series.length - 1].value;
+  const abs   = last - first;
+  const pct   = first > 0 ? (abs / first) * 100 : 0;
+  const sign  = abs >= 0 ? '+' : '−';
+  const tone  = abs > 0 ? 'up' : abs < 0 ? 'down' : 'flat';
+  changeEl.className = 'category-perf-change is-' + tone;
+  // formatBase available globally — same currency rendering as the rest
+  // of the dashboard.
+  const absText = (typeof formatBase === 'function')
+    ? formatBase(Math.abs(abs))
+    : Math.abs(abs).toFixed(2);
+  changeEl.textContent = `${sign}${absText} (${sign}${Math.abs(pct).toFixed(2)}%)`;
+}
+
+function _aurixCategoryPerfApplyRange(range) {
+  const entry = _aurixCategoryPerfEntry;
+  if (!entry || !entry.panel) return;
+  const { type, panel, ctrl } = entry;
+  const series = _categorySeriesForRange(type, range);
+  const emptyEl = panel.querySelector('.category-perf-empty');
+  // No chart engine, or not enough history — both render the premium
+  // empty state instead of leaving a blank chart area.
+  if (!ctrl || series.length < 2) {
+    if (emptyEl) emptyEl.hidden = false;
+    if (ctrl) { try { ctrl.setData([]); } catch (_) {} }
+    _aurixCategoryPerfUpdateHeader(panel, []);
+    return;
+  }
+  if (emptyEl) emptyEl.hidden = true;
+  try { ctrl.setRange(range); }   catch (_) {}
+  try { ctrl.setData(series); }   catch (_) {}
+  _aurixCategoryPerfUpdateHeader(panel, series);
+}
+
+function _aurixCategoryPerfBuildPanel(type) {
+  const meta    = (typeof TYPE_META !== 'undefined' && TYPE_META[type]) || { label: type, color: '#8aa6ff' };
+  const titleFn = (typeof t === 'function') ? t('categoryPerfTitle') : null;
+  const titleText = (typeof titleFn === 'function') ? titleFn(meta.label) : `${meta.label}`;
+  const pills = _AURIX_CATEGORY_PERF_RANGES.map(r => {
+    const labelFn = (typeof t === 'function') ? t(_AURIX_CATEGORY_PERF_RANGE_LABELS[r]) : null;
+    const label = (typeof labelFn === 'string' && labelFn) ? labelFn : r.toUpperCase();
+    const active = r === _aurixCategoryPerfRange;
+    return `
+      <button type="button" class="category-perf-range${active ? ' is-active' : ''}"
+        data-cat-perf-range="${r}"
+        aria-pressed="${active ? 'true' : 'false'}">${escHtml(label)}</button>
+    `;
+  }).join('');
+  const emptyTitle = (typeof t === 'function' && typeof t('categoryPerfEmptyTitle') === 'string')
+    ? t('categoryPerfEmptyTitle')
+    : 'Histórico de categoría en construcción.';
+  const emptyBody  = (typeof t === 'function' && typeof t('categoryPerfEmptyBody') === 'string')
+    ? t('categoryPerfEmptyBody')
+    : '';
+  const panel = document.createElement('section');
+  panel.className = 'category-perf-panel';
+  panel.id = 'categoryPerfPanel';
+  panel.style.setProperty('--category-perf-color', meta.color || '#8aa6ff');
+  panel.innerHTML = `
+    <header class="category-perf-header">
+      <div class="category-perf-title-wrap">
+        <h3 class="category-perf-title">${escHtml(titleText)}</h3>
+        <span class="category-perf-change"></span>
+      </div>
+      <nav class="category-perf-ranges" role="tablist" aria-label="Range">${pills}</nav>
+    </header>
+    <div class="category-perf-chart"></div>
+    <div class="category-perf-empty" hidden>
+      <p class="category-perf-empty-title">${escHtml(emptyTitle)}</p>
+      <p class="category-perf-empty-body">${escHtml(emptyBody)}</p>
+    </div>
+  `;
+  return panel;
+}
+
+function _aurixCategoryPerfRender(type) {
+  if (!type) { _aurixCategoryPerfTeardown(); return; }
+  const hero = document.getElementById('detailHero');
+  if (!hero) return;
+
+  // Same category, same panel → just refresh data + header.
+  if (_aurixCategoryPerfEntry && _aurixCategoryPerfEntry.type === type &&
+      _aurixCategoryPerfEntry.panel && _aurixCategoryPerfEntry.panel.isConnected) {
+    _aurixCategoryPerfApplyRange(_aurixCategoryPerfRange);
+    return;
+  }
+
+  // Different category (or first mount): teardown + remount.
+  _aurixCategoryPerfTeardown();
+
+  const panel = _aurixCategoryPerfBuildPanel(type);
+  hero.after(panel);
+
+  let ctrl = null;
+  const chartHost = panel.querySelector('.category-perf-chart');
+  if (chartHost && window.AurixCharts && typeof window.AurixCharts.createChart === 'function' &&
+      typeof window.AurixCharts.isReady === 'function' && window.AurixCharts.isReady()) {
+    try {
+      ctrl = window.AurixCharts.createChart(chartHost, {
+        variant:        'portfolio',
+        height:         220,
+        colorMode:      'auto',
+        showCrosshair:  true,
+        showTooltip:    true,
+        showTimeScale:  true,
+        showPriceScale: true,
+        // Mobile uses long-press inspection so the tooltip surfaces
+        // without disabling swipe gestures elsewhere.
+        mobileInspection: true,
+        currency:       baseCurrency || 'USD',
+        range:          _aurixCategoryPerfRange,
+        visualNormalization: {
+          enabled:       true,
+          outlierFilter: true,
+          smoothing:     true,
+          // CHART-SCALE-1 — same minimum y-domain padding the dashboard
+          // uses, so a calm category day reads calm here too.
+          robustScale:   true,
+          mode:          'portfolio',
+        },
+      });
+    } catch (err) {
+      console.warn('[category-perf] V2 mount failed:', err && err.message);
+      ctrl = null;
+    }
+  }
+
+  _aurixCategoryPerfEntry = { type, ctrl, panel };
+
+  // Wire range pills (delegated within the panel, never leaks).
+  panel.addEventListener('click', (e) => {
+    const btn = e.target.closest && e.target.closest('[data-cat-perf-range]');
+    if (!btn || !panel.contains(btn)) return;
+    const range = btn.getAttribute('data-cat-perf-range');
+    if (!range || range === _aurixCategoryPerfRange) return;
+    _aurixCategoryPerfRange = range;
+    panel.querySelectorAll('.category-perf-range').forEach(b => {
+      const isActive = b.getAttribute('data-cat-perf-range') === range;
+      b.classList.toggle('is-active', isActive);
+      b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+    _aurixCategoryPerfApplyRange(range);
+  });
+
+  _aurixCategoryPerfApplyRange(_aurixCategoryPerfRange);
+}
+
 // ── MARKET-1B ─────────────────────────────────────────────────────
 // Premium Market asset preview. Clicking a market row opens a modal
 // with the asset's identity, live price/change, real history chart
@@ -12495,6 +12762,10 @@ function renderDetailHero(type, typeAssets) {
     heroEl = document.createElement('div');
     heroEl.id        = 'detailHero';
     heroEl.className = 'detail-hero';
+    // CATEGORY-DETAIL-CHARTS-2 — the sparkline that lived inside the
+    // hero is gone; the dedicated "Rendimiento de [categoría]" panel
+    // below carries the line chart now. Removing it here avoids two
+    // redundant chart surfaces in the same drill-down.
     heroEl.innerHTML = `
       <div class="detail-hero-info">
         <div class="detail-hero-meta">
@@ -12508,8 +12779,7 @@ function renderDetailHero(type, typeAssets) {
         <p class="detail-hero-insight"></p>
         <span class="detail-hero-pct" hidden></span>
         <span class="detail-hero-pnl"></span>
-      </div>
-      <div class="detail-chart-wrap"><canvas id="detailChartCanvas"></canvas></div>`;
+      </div>`;
     const hdr = document.querySelector('#assetsSection .section-header');
     if (hdr) hdr.after(heroEl);
   }
@@ -16278,6 +16548,11 @@ function render(animate = false) {
     // Render premium detail hero (category stats + mini sparkline)
     const typeAssets = assets.filter(a => (TYPE_META[a.type] ? a.type : 'other') === activeCategory);
     renderDetailHero(activeCategory, typeAssets);
+    // CATEGORY-DETAIL-CHARTS-2 — premium performance panel directly
+    // below the hero. _aurixCategoryPerfRender is idempotent: same
+    // category → just refreshes data, no DOM thrash; switching
+    // categories → tears down and remounts cleanly.
+    try { _aurixCategoryPerfRender(activeCategory); } catch (_) {}
   } else {
     // Dashboard: show all dashboard sections, hide asset list
     if (assetsSectionEl) { assetsSectionEl.style.display = 'none'; assetsSectionEl.classList.remove('is-detail'); }
@@ -16293,6 +16568,9 @@ function render(animate = false) {
     // CHART-7B: also tear down the V2 category controller (no-op if
     // legacy path was active for this drill-down).
     try { _aurixCategoryTeardown(); } catch (_) {}
+    // CATEGORY-DETAIL-CHARTS-2 — also tear down the dedicated perf panel
+    // when the user returns to the dashboard root view.
+    try { _aurixCategoryPerfTeardown(); } catch (_) {}
   }
 
   // Toggle premium detail-view styling on the list container
@@ -24000,6 +24278,8 @@ function _aurixTearDownAllCharts() {
   try { if (typeof _aurixAssetTeardown === 'function') _aurixAssetTeardown(); } catch (_) {}
   // Category chart V2
   try { if (typeof _aurixCategoryTeardown === 'function') _aurixCategoryTeardown(); } catch (_) {}
+  // CATEGORY-DETAIL-CHARTS-2 — premium performance panel.
+  try { if (typeof _aurixCategoryPerfTeardown === 'function') _aurixCategoryPerfTeardown(); } catch (_) {}
   // Market preview chart
   try { if (typeof _aurixMktTeardown === 'function') _aurixMktTeardown(); } catch (_) {}
   // Legacy Chart.js detail sparkline
