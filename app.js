@@ -1053,6 +1053,21 @@ const T = {
     ws_templates_btn:        'Plantillas',
     ws_assistant_title:      'Asistente de Workspace',
     ws_templates_section:    'Plantillas',
+    // WORKSPACE-WEB-MODES-1 — persistent desktop view modes.
+    ws_mode_intelligence:    'Inteligencia',
+    ws_mode_sheet:           'Hoja',
+    ws_mode_templates:       'Plantillas',
+    ws_mode_see_intel:       'Ver inteligencia →',
+    ws_templates_soon_title: 'Plantillas inteligentes',
+    ws_templates_soon_sub:   'Llegarán pronto.',
+    ws_templates_soon_hint:  'Diseños premium para distintas formas de gestionar patrimonio.',
+    ws_templates_card_summary:   'Resumen patrimonial',
+    ws_templates_card_crypto:    'Seguimiento cripto',
+    ws_templates_card_dividends: 'Dividendos',
+    ws_templates_card_properties:'Inmuebles',
+    ws_templates_card_liquidity: 'Liquidez',
+    ws_templates_card_custom:    'Personalizada',
+    ws_templates_soon_tag:       'Próximamente',
     ws_assistant_placeholder:'Pide a Aurix que cree un workspace...',
     ws_assistant_build:      'Crear',
     ws_err_empty:            'introduce un prompt',
@@ -2088,6 +2103,21 @@ const T = {
     ws_templates_btn:        'Templates',
     ws_assistant_title:      'Workspace Assistant',
     ws_templates_section:    'Templates',
+    // WORKSPACE-WEB-MODES-1 — persistent desktop view modes.
+    ws_mode_intelligence:    'Intelligence',
+    ws_mode_sheet:           'Sheet',
+    ws_mode_templates:       'Templates',
+    ws_mode_see_intel:       'View intelligence →',
+    ws_templates_soon_title: 'Smart templates',
+    ws_templates_soon_sub:   'Coming soon.',
+    ws_templates_soon_hint:  'Premium layouts for the different ways of managing wealth.',
+    ws_templates_card_summary:   'Wealth summary',
+    ws_templates_card_crypto:    'Crypto tracking',
+    ws_templates_card_dividends: 'Dividends',
+    ws_templates_card_properties:'Properties',
+    ws_templates_card_liquidity: 'Liquidity',
+    ws_templates_card_custom:    'Custom',
+    ws_templates_soon_tag:       'Soon',
     ws_assistant_placeholder:'Ask Aurix to build a workspace...',
     ws_assistant_build:      'Build',
     ws_err_empty:            'enter a prompt',
@@ -7612,7 +7642,127 @@ function _renderWorkspaceFormulaBarValue(sheet) {
   return { coord: id, value: '', empty: true, kind: 'empty', readonly: false, placeholder: t('wsEmptyCell') };
 }
 
+// WORKSPACE-WEB-MODES-1 — persistent desktop view modes.
+// The desktop Workspace surfaces three modes — Inteligencia / Hoja /
+// Plantillas — picked via a top segmented switcher. The choice is
+// persisted in localStorage so the surface opens in the user's last
+// mode on next entry. Defaults to 'intelligence' for new users so the
+// first impression is the interpretation layer, not the spreadsheet.
+//
+// Mobile is unchanged: _renderWorkspaceMobile owns its own narrative
+// and already opens directly on the intelligence cockpit.
+const WORKSPACE_MODE_KEY = 'aurix_workspace_mode';
+const WORKSPACE_MODES    = ['intelligence', 'sheet', 'templates'];
+function _wsGetMode() {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const v = localStorage.getItem(WORKSPACE_MODE_KEY);
+      if (WORKSPACE_MODES.indexOf(v) !== -1) return v;
+    }
+  } catch (_) {}
+  return 'intelligence';
+}
+function _wsSetMode(mode) {
+  if (WORKSPACE_MODES.indexOf(mode) === -1) return;
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(WORKSPACE_MODE_KEY, mode);
+    }
+  } catch (_) {}
+}
+
+function _renderWorkspaceModeSwitcher(activeMode) {
+  return `
+    <nav class="aurix-ws-modes" role="tablist" aria-label="Workspace modes">
+      ${WORKSPACE_MODES.map(m => `
+        <button type="button" role="tab"
+          class="aurix-ws-mode${activeMode === m ? ' is-active' : ''}"
+          data-ws-mode="${m}"
+          aria-pressed="${activeMode === m ? 'true' : 'false'}">
+          ${_escapeWorkspaceText(t('ws_mode_' + m) || m)}
+        </button>
+      `).join('')}
+    </nav>
+  `;
+}
+
+function _renderWorkspaceTemplatesMode() {
+  const cards = [
+    { id: 'summary',    icon: '◧' },
+    { id: 'crypto',     icon: '◆' },
+    { id: 'dividends',  icon: '%' },
+    { id: 'properties', icon: '⌂' },
+    { id: 'liquidity',  icon: '◯' },
+    { id: 'custom',     icon: '+' },
+  ].map(c => `
+    <article class="aurix-ws-tpl-card" aria-disabled="true">
+      <div class="aurix-ws-tpl-icon" aria-hidden="true">${_escapeWorkspaceText(c.icon)}</div>
+      <div class="aurix-ws-tpl-title">${_escapeWorkspaceText(t('ws_templates_card_' + c.id) || c.id)}</div>
+      <div class="aurix-ws-tpl-tag">${_escapeWorkspaceText(t('ws_templates_soon_tag') || 'Soon')}</div>
+    </article>
+  `).join('');
+  return `
+    <main class="aurix-ws-templates-mode">
+      <header class="aurix-ws-templates-header">
+        <h2 class="aurix-ws-templates-title">${_escapeWorkspaceText(t('ws_templates_soon_title') || 'Templates')}</h2>
+        <p class="aurix-ws-templates-sub">${_escapeWorkspaceText(t('ws_templates_soon_sub') || '')}</p>
+        <p class="aurix-ws-templates-hint">${_escapeWorkspaceText(t('ws_templates_soon_hint') || '')}</p>
+      </header>
+      <div class="aurix-ws-tpl-grid">${cards}</div>
+    </main>
+  `;
+}
+
+function _renderWorkspaceIntelligenceMode() {
+  const intel = (typeof _aurixWorkspaceIntelligence === 'function')
+    ? _aurixWorkspaceIntelligence()
+    : null;
+  if (!intel || intel.mode === 'zero') {
+    return `
+      <main class="aurix-ws-intel-mode is-empty">
+        <section class="ws-intel-empty">
+          <h3 class="ws-intel-empty-title">${_escapeWorkspaceText(t('ws_intel_empty_title'))}</h3>
+          <p class="ws-intel-empty-body">${_escapeWorkspaceText(t('ws_intel_empty_explanation'))}</p>
+        </section>
+      </main>
+    `;
+  }
+  return `
+    <main class="aurix-ws-intel-mode">
+      ${_renderIntelHeaderHtml()}
+      <section class="ws-intel-stats ws-intel-stats--desktop">${_renderIntelStatusStripHtml(intel)}</section>
+      ${_renderIntelHeroHtml(intel)}
+      ${_renderIntelDimensionsHtml(intel)}
+      ${_renderIntelSignalsHtml(intel)}
+    </main>
+  `;
+}
+
 function _renderWorkspaceDesktop(sheet) {
+  // WORKSPACE-WEB-MODES-1: branch on the persisted mode. Intelligence
+  // and Templates modes drop the toolbar / formula bar / grid entirely
+  // — those surfaces only belong in 'sheet' mode.
+  const activeMode = _wsGetMode();
+  const switcher   = _renderWorkspaceModeSwitcher(activeMode);
+
+  if (activeMode === 'intelligence') {
+    return `
+      <div class="aurix-workspace-shell is-desktop" data-ws-mode="intelligence">
+        ${switcher}
+        ${_renderWorkspaceIntelligenceMode()}
+      </div>
+    `;
+  }
+  if (activeMode === 'templates') {
+    return `
+      <div class="aurix-workspace-shell is-desktop" data-ws-mode="templates">
+        ${switcher}
+        ${_renderWorkspaceTemplatesMode()}
+      </div>
+    `;
+  }
+
+  // Default → 'sheet' mode. Existing spreadsheet workstation.
   const cols = WORKSPACE_RUNTIME.gridColumns;
   const rows = WORKSPACE_RUNTIME.gridRows;
 
@@ -7646,36 +7796,19 @@ function _renderWorkspaceDesktop(sheet) {
     fb.readonly              ? 'is-readonly' : 'is-editable',
   ].filter(Boolean).join(' ');
 
-  // WORKSPACE-INTELLIGENCE-3 — desktop right rail. The legacy
-  // Risk Monitor (categorised dot list) is replaced by the same
-  // intelligence layout the mobile cockpit renders. Spreadsheet on
-  // the left stays intact; the panel reads like a Bloomberg-style
-  // intelligence sidebar.
-  const _intelDesktop = (typeof _aurixWorkspaceIntelligence === 'function')
-    ? _aurixWorkspaceIntelligence()
-    : null;
-  const intelPanelBody = (_intelDesktop && _intelDesktop.mode !== 'zero')
-    ? `
-        <section class="ws-intel-stats ws-intel-stats--desktop">${_renderIntelStatusStripHtml(_intelDesktop)}</section>
-        ${_renderIntelHeroHtml(_intelDesktop)}
-        ${_renderIntelDimensionsHtml(_intelDesktop)}
-        ${_renderIntelSignalsHtml(_intelDesktop)}
-      `
-    : `
-        <section class="ws-intel-empty">
-          <h3 class="ws-intel-empty-title">${_escapeWorkspaceText(t('ws_intel_empty_title'))}</h3>
-          <p class="ws-intel-empty-body">${_escapeWorkspaceText(t('ws_intel_empty_explanation'))}</p>
-        </section>
-      `;
-
   // Column count drives the CSS grid template (row-header + N data cells)
   const gridStyle = `--aw-grid-cols:${cols.length}`;
 
   // AW-6 §6: formula bar = command surface. Layout: fx | coord | divider |
   // value (1fr) | sheet-name. One divisor sólo, más respiración alrededor.
+  // WORKSPACE-WEB-MODES-1: the right-rail intelligence aside is removed.
+  // Intelligence has its own full-width mode now; this surface stays
+  // focused on the spreadsheet. A compact "Ver inteligencia →" pill in
+  // the toolbar keeps it one click away.
   return `
-    <div class="aurix-workspace-shell is-desktop">
-      <header class="aurix-toolbar" style="grid-template-columns:auto auto auto 1fr auto auto">
+    <div class="aurix-workspace-shell is-desktop" data-ws-mode="sheet">
+      ${switcher}
+      <header class="aurix-toolbar" style="grid-template-columns:auto auto auto 1fr auto auto auto">
         <div class="aurix-formula-fx" aria-hidden="true">fx</div>
         <div class="aurix-formula-coord ${coordEmpty ? 'is-empty' : ''}">${_escapeWorkspaceText(coordLabel)}</div>
         <div class="aurix-formula-divider" aria-hidden="true"></div>
@@ -7692,8 +7825,12 @@ function _renderWorkspaceDesktop(sheet) {
         />
         <div class="aurix-sheet-name">${_escapeWorkspaceText(sheet.name)}</div>
         <button type="button" data-aurix-templates
-          style="padding:7px 14px;border:1px solid rgba(255,255,255,0.14);border-radius:6px;background:rgba(255,255,255,0.05);color:#e8e8ea;font-family:inherit;font-size:11.5px;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;font-weight:600;white-space:nowrap"
+          class="aurix-ws-pill"
           aria-label="Open workspace templates">${_escapeWorkspaceText(t('ws_templates_btn') || 'Templates')}</button>
+        <button type="button" data-ws-mode="intelligence"
+          class="aurix-ws-pill is-ghost"
+          aria-label="${_escapeWorkspaceText(t('ws_mode_see_intel') || 'View intelligence')}"
+          >${_escapeWorkspaceText(t('ws_mode_see_intel') || 'View intelligence →')}</button>
       </header>
       <div class="aurix-workspace-body">
         <section class="aurix-grid-panel" role="grid" aria-label="Spreadsheet" tabindex="0">
@@ -7702,13 +7839,6 @@ function _renderWorkspaceDesktop(sheet) {
             ${bodyRows}
           </div>
         </section>
-        <aside class="aurix-copilot-panel aurix-copilot-panel--intel" aria-label="${_escapeWorkspaceText(t('ws_intel_title'))}">
-          <div class="aurix-copilot-header">
-            <span class="aurix-copilot-eyebrow">${_escapeWorkspaceText(t('ws_intel_title'))}</span>
-            <span class="aurix-copilot-subtitle">${_escapeWorkspaceText(t('ws_intel_sub'))}</span>
-          </div>
-          <div class="ws-intel-body">${intelPanelBody}</div>
-        </aside>
       </div>
     </div>
   `;
@@ -20932,6 +21062,27 @@ document.addEventListener('click', (e) => {
   e.stopPropagation();
   if (_WP4.menuEl) _wp4CloseSelector();
   else              _wp4OpenSelector(btn);
+});
+
+// WORKSPACE-WEB-MODES-1 — top mode switcher click. Document-level so it
+// survives every renderWorkspace() teardown. Also handles the in-Hoja
+// "Ver inteligencia →" pill, which uses the same data attribute.
+document.addEventListener('click', (e) => {
+  if (typeof currentTab !== 'string' || currentTab !== 'workspace') return;
+  const btn = e.target.closest && e.target.closest('[data-ws-mode]');
+  if (!btn) return;
+  // The templates selector overlay sits inside the workspace container
+  // and could carry a [data-aurix-templates] sibling. Don't intercept
+  // anything that isn't actually our switcher / pill — the explicit
+  // tagname guard avoids accidental hijacks of future markup.
+  if (btn.tagName !== 'BUTTON') return;
+  const mode = btn.getAttribute('data-ws-mode');
+  if (WORKSPACE_MODES.indexOf(mode) === -1) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (_wsGetMode() === mode) return;  // already active, noop
+  _wsSetMode(mode);
+  if (typeof renderWorkspace === 'function') renderWorkspace();
 });
 
 // Esc closes the template selector (when not editing a cell).

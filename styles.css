@@ -15854,3 +15854,224 @@ body.gs-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .gold-summary-context { transition: none; }
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   WORKSPACE-WEB-MODES-1 — desktop workspace persistent view modes.
+   Three top-level surfaces (Inteligencia / Hoja / Plantillas) selected
+   via a premium segmented switcher at the top of the workspace shell.
+   Mobile is untouched — the mobile cockpit owns its own surface and
+   already lands on the intelligence narrative directly.
+   ───────────────────────────────────────────────────────────────── */
+.aurix-ws-modes {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.025) inset,
+    0 6px 18px rgba(0, 0, 0, 0.18);
+}
+.aurix-ws-mode {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  padding: 8px 18px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(225, 233, 255, 0.62);
+  background: transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+.aurix-ws-mode:hover {
+  color: rgba(225, 233, 255, 0.92);
+  background: rgba(138, 166, 255, 0.06);
+}
+.aurix-ws-mode.is-active {
+  color: #ffffff;
+  background: rgba(138, 166, 255, 0.18);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 4px 14px -6px rgba(138, 166, 255, 0.55);
+}
+.aurix-ws-mode:focus-visible {
+  outline: 2px solid rgba(138, 166, 255, 0.55);
+  outline-offset: 2px;
+}
+
+/* Reusable pill (toolbar buttons in Hoja mode). */
+.aurix-ws-pill {
+  padding: 7px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e8e8ea;
+  font-family: inherit;
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.aurix-ws-pill:hover {
+  background: rgba(138, 166, 255, 0.10);
+  border-color: rgba(138, 166, 255, 0.32);
+}
+.aurix-ws-pill.is-ghost {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.10);
+  color: rgba(225, 233, 255, 0.78);
+}
+.aurix-ws-pill.is-ghost:hover {
+  color: #ffffff;
+  border-color: rgba(138, 166, 255, 0.40);
+  background: rgba(138, 166, 255, 0.06);
+}
+
+/* Sheet mode — the workspace body now hosts only the grid; remove the
+   220px right-rail track that the legacy "spreadsheet + intel side"
+   layout reserved. */
+.aurix-workspace-shell[data-ws-mode="sheet"] .aurix-workspace-body {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Intelligence mode — full-width single column. */
+.aurix-workspace-shell[data-ws-mode="intelligence"] {
+  overflow: hidden;
+}
+.aurix-ws-intel-mode {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 22px 28px 28px;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.025) inset,
+    0 10px 28px rgba(0, 0, 0, 0.20);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.aurix-ws-intel-mode.is-empty {
+  align-items: center;
+  justify-content: center;
+}
+/* Within intelligence mode, the dimension grid breathes more on
+   desktop and the signals stack pads up — they finally have room. */
+.aurix-ws-intel-mode .ws-intel-dim-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.aurix-ws-intel-mode .ws-intel-signal-stack {
+  gap: 10px;
+}
+
+/* Templates mode — polished placeholder gallery. */
+.aurix-workspace-shell[data-ws-mode="templates"] {
+  overflow: hidden;
+}
+.aurix-ws-templates-mode {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 28px 32px 32px;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.025) inset,
+    0 10px 28px rgba(0, 0, 0, 0.20);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.aurix-ws-templates-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 640px;
+}
+.aurix-ws-templates-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: rgba(225, 233, 255, 0.94);
+}
+.aurix-ws-templates-sub {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(225, 233, 255, 0.74);
+}
+.aurix-ws-templates-hint {
+  margin: 0;
+  font-size: 12.5px;
+  color: rgba(220, 230, 250, 0.55);
+}
+.aurix-ws-tpl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+.aurix-ws-tpl-card {
+  position: relative;
+  padding: 18px 18px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 120px;
+  cursor: not-allowed;
+  opacity: 0.78;
+  transition: transform 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+.aurix-ws-tpl-card:hover {
+  opacity: 1;
+  border-color: rgba(138, 166, 255, 0.22);
+  transform: translateY(-1px);
+}
+.aurix-ws-tpl-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: rgba(138, 166, 255, 0.12);
+  color: rgba(225, 233, 255, 0.92);
+  font-size: 16px;
+  font-weight: 600;
+}
+.aurix-ws-tpl-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(225, 233, 255, 0.94);
+  letter-spacing: -0.003em;
+}
+.aurix-ws-tpl-tag {
+  margin-top: auto;
+  align-self: flex-start;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  color: rgba(220, 230, 250, 0.62);
+  font-size: 10px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
