@@ -10473,9 +10473,16 @@ function _aurixCategoryPerfRender(type) {
   if (chartHost && window.AurixCharts && typeof window.AurixCharts.createChart === 'function' &&
       typeof window.AurixCharts.isReady === 'function' && window.AurixCharts.isReady()) {
     try {
+      // CATEGORY-MOBILE-POLISH-2: avoid pinning the chart host to a
+      // hard 220 px height — on mobile the panel is shorter and the
+      // mismatch pushed the x-axis labels past the panel edge, into
+      // the positions card below. We now read the parent's clientHeight
+      // (which CSS controls responsively) and fall back to 240 only if
+      // CSS hasn't sized the container yet.
+      const _chartHostH = (chartHost && chartHost.clientHeight) || 240;
       ctrl = window.AurixCharts.createChart(chartHost, {
         variant:        'portfolio',
-        height:         220,
+        height:         _chartHostH,
         colorMode:      'auto',
         showCrosshair:  true,
         showTooltip:    true,
