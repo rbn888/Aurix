@@ -3407,6 +3407,14 @@ body:not(.hero-active) #orb-canvas {
   .categories-grid { grid-template-columns: 1fr; gap: 10px; }
   .cat-card { min-height: 100px; }
 }
+/* FINAL-MOBILE-POLISH-1 — dashboard category cards are a quick
+   snapshot, not an analysis surface. The textual percentage echoes
+   the donut on the hero card above, so on mobile we drop it for
+   populated categories. Empty cards keep the .cat-card-pct slot to
+   surface the "Sin asignación todavía" status instead. */
+@media (max-width: 768px) {
+  .cat-card:not(.cat-card--empty) .cat-card-pct { display: none; }
+}
 /* Blur only on desktop — skip on mobile to avoid GPU lag */
 @media (min-width: 768px) {
   .cat-card {
@@ -4097,11 +4105,12 @@ body:not(.hero-active) #orb-canvas {
   .hero-left {
     flex-shrink: 0;         /* never compress the value block */
     height: auto;           /* reset the desktop height:100% */
-    /* DASHBOARD-MOBILE-DENSITY-1 — bottom padding was creating dead
-       space below the meta row (the now-hidden summary-footer used to
-       fill it). Drop bottom padding to keep card breathing without
-       the gap. */
-    padding: 16px var(--space-4) 12px var(--space-4) !important;
+    /* FINAL-MOBILE-POLISH-1 — tighten bottom dead space further so
+       the meta row lifts toward the value (~6–10px) and the chart +
+       Aurix Signal cards sit higher above the fold. Previous polish
+       (DASHBOARD-MOBILE-DENSITY-1) left 12px below the row, which
+       still read as a gap once the footer was hidden. */
+    padding: 16px var(--space-4) 6px var(--space-4) !important;
     border-right: none;
     border-bottom: none;
   }
@@ -4116,6 +4125,15 @@ body:not(.hero-active) #orb-canvas {
   .summary-total {
     font-size: clamp(26px, 8vw, 38px);
     color: #ffffff;
+    /* FINAL-MOBILE-POLISH-1 — value-to-meta gap tightened so the
+       footer line rises ~4px toward the total. Combined with the
+       perf-line override below, the whole meta row lifts ~8–10px. */
+    margin-bottom: 2px;
+  }
+  /* FINAL-MOBILE-POLISH-1 — calm the perf line: smaller bottom margin
+     keeps it tucked under the total instead of pushing the meta row
+     down. Desktop default (14px) stays for wider canvases. */
+  .summary-perf {
     margin-bottom: 6px;
   }
   .summary-meta {
@@ -5133,6 +5151,9 @@ body:not(.hero-active) #orb-canvas {
   font-size: 17px;
   letter-spacing: 0.01em;
 }
+/* FINAL-MOBILE-POLISH-1 — the inline unit ("cartera", "activos") is
+   mobile-only. Desktop keeps the formal caption-above-value rail. */
+.detail-hero-meta-unit { display: none; }
 
 @media (max-width: 640px) {
   /* CATEGORY-HERO-PREMIUM-FINAL — mobile collapses the desktop rail to
@@ -5174,15 +5195,24 @@ body:not(.hero-active) #orb-canvas {
   .detail-hero-meta-item + .detail-hero-meta-item::before {
     display: none;
   }
-  .detail-hero-meta-caption {
-    font-size: 9px;
-    letter-spacing: 0.10em;
-    color: rgba(180, 200, 240, 0.46);
-  }
+  /* FINAL-MOBILE-POLISH-1 — drop the uppercase enterprise caption on
+     mobile. The chip reads as a single inline phrase via the unit
+     span below, e.g. "13% cartera" instead of "EXPOSICIÓN 13%". */
+  .detail-hero-meta-caption { display: none; }
   .detail-hero-meta-value {
     font-size: 11px;
     color: rgba(225, 233, 255, 0.82);
     font-weight: 600;
+  }
+  /* FINAL-MOBILE-POLISH-1 — softer secondary token that gives the
+     chip its consumer-premium reading: number first, lowercase unit
+     after. Calmer weight + colour so the number stays the anchor. */
+  .detail-hero-meta-unit {
+    display: inline;
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(180, 200, 240, 0.55);
+    letter-spacing: 0.005em;
   }
   /* Principal cell stays desktop-only — agreed in CATEGORY-MOBILE-POLISH-2. */
   .detail-hero-meta-item.is-top { display: none !important; }
@@ -9049,6 +9079,13 @@ main { padding-bottom: 72px; }
   .fab-trigger {
     margin-right: var(--space-1);
     transition: transform 0.15s ease;
+    /* FINAL-MOBILE-POLISH-1 — the "+" glyph sits a hair above the
+       optical centre of the 32px box because of font metrics, so
+       align-items: center on the row pulled the button visually
+       higher than the meta text baseline. A 1px push down via
+       margin restores parity with "X activos · Actualizado ahora"
+       without fighting the :active scale transform. */
+    margin-top: 1px;
   }
 
   .fab-trigger:active {

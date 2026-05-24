@@ -1332,6 +1332,13 @@ const T = {
     catHeroLabelCount: 'Posiciones',
     catHeroLabelTop:   'Principal',
     catHeroValueCount: n => String(n),
+    // FINAL-MOBILE-POLISH-1 — consumer-premium chip units. Mobile
+    // collapses the enterprise "EXPOSICIÓN 13%" caption stack into
+    // a single inline phrase ("13% cartera", "2 activos") that
+    // reads less like a dashboard and more like a premium investing
+    // product. Desktop keeps the formal caption above the value.
+    catHeroChipPctUnit:   'cartera',
+    catHeroChipCountUnit: n => (n === 1 ? 'activo' : 'activos'),
     // CATEGORY-DETAIL-CHARTS-2 — premium category performance panel.
     categoryPerfTitle: name => `Rendimiento de ${name}`,
     categoryPerfEmptyTitle: 'Histórico de categoría en construcción.',
@@ -2421,6 +2428,9 @@ const T = {
     catHeroLabelCount: 'Positions',
     catHeroLabelTop:   'Primary',
     catHeroValueCount: n => String(n),
+    // FINAL-MOBILE-POLISH-1 — consumer-premium chip units, mobile only.
+    catHeroChipPctUnit:   'portfolio',
+    catHeroChipCountUnit: n => (n === 1 ? 'asset' : 'assets'),
     // CATEGORY-DETAIL-CHARTS-2 — premium category performance panel.
     categoryPerfTitle: name => `${name} performance`,
     categoryPerfEmptyTitle: 'Category history is still building.',
@@ -12849,10 +12859,12 @@ function renderDetailHero(type, typeAssets) {
           <div class="detail-hero-meta-item is-pct">
             <span class="detail-hero-meta-caption"></span>
             <span class="detail-hero-meta-value"></span>
+            <span class="detail-hero-meta-unit"></span>
           </div>
           <div class="detail-hero-meta-item is-count">
             <span class="detail-hero-meta-caption"></span>
             <span class="detail-hero-meta-value"></span>
+            <span class="detail-hero-meta-unit"></span>
           </div>
           <div class="detail-hero-meta-item is-top" hidden>
             <span class="detail-hero-meta-caption"></span>
@@ -12887,7 +12899,12 @@ function renderDetailHero(type, typeAssets) {
   const allocPct = portfolioTotal > 0 ? (totalValue / portfolioTotal) * 100 : 0;
   const n        = Array.isArray(typeAssets) ? typeAssets.length : 0;
 
-  const _setMeta = (selector, captionKey, value, showWhen) => {
+  // FINAL-MOBILE-POLISH-1 — _setMeta now also populates an optional
+  // `unit` span. Desktop keeps caption above value; mobile hides the
+  // caption via CSS and reads the inline `[value] [unit]` phrase
+  // ("13% cartera", "2 activos"). The Principal cell stays
+  // desktop-only and skips the unit entirely.
+  const _setMeta = (selector, captionKey, value, showWhen, unitText) => {
     const cell = heroEl.querySelector(selector);
     if (!cell) return;
     const show = !!showWhen;
@@ -12895,19 +12912,29 @@ function renderDetailHero(type, typeAssets) {
     if (!show) return;
     const captionEl = cell.querySelector('.detail-hero-meta-caption');
     const valueEl   = cell.querySelector('.detail-hero-meta-value');
+    const unitEl    = cell.querySelector('.detail-hero-meta-unit');
     const captionVal = (typeof t === 'function') ? t(captionKey) : '';
     if (captionEl) captionEl.textContent = (typeof captionVal === 'string') ? captionVal : '';
     if (valueEl)   valueEl.textContent   = value;
+    if (unitEl)    unitEl.textContent    = (typeof unitText === 'string') ? unitText : '';
   };
+
+  const pctUnitVal   = (typeof t === 'function') ? t('catHeroChipPctUnit')      : '';
+  const countUnitRaw = (typeof t === 'function') ? t('catHeroChipCountUnit')    : '';
+  const countUnitVal = (typeof countUnitRaw === 'function') ? countUnitRaw(n)
+                     : (typeof countUnitRaw === 'string')   ? countUnitRaw
+                     : '';
 
   _setMeta('.detail-hero-meta-item.is-pct',
            'catHeroLabelPct',
            `${Math.round(allocPct)}%`,
-           portfolioTotal > 0);
+           portfolioTotal > 0,
+           typeof pctUnitVal === 'string' ? pctUnitVal : '');
   _setMeta('.detail-hero-meta-item.is-count',
            'catHeroLabelCount',
            String(n),
-           n > 0);
+           n > 0,
+           countUnitVal);
 
   // Top holding cell: only when there's a clear leader (2+ positions
   // and the top weight ≥ 25% of the category). Single-asset categories
