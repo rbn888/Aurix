@@ -9344,7 +9344,14 @@ function donutHandleClick(idx) {
 
 function initDonut() {
   const canvas = document.getElementById('donutChart');
-  if (!canvas || donutChart) return;
+  if (!canvas) return;
+  // PWA-CONSISTENCY-1: destroy any prior instance instead of patching it.
+  // A stale Chart.js controller bound to a recycled canvas (e.g. after a
+  // PWA tab restore) renders blank on iOS standalone — always rebuild.
+  if (donutChart) {
+    try { donutChart.destroy(); } catch (_) {}
+    donutChart = null;
+  }
 
   donutChart = new Chart(canvas.getContext('2d'), {
     type: 'doughnut',
@@ -10991,7 +10998,15 @@ function _aurixMktOpenSymbol(symbol, itemOverride) {
 
 function initChart() {
   const canvas = document.getElementById('portfolioChart');
-  if (!canvas || portfolioChart) return;
+  if (!canvas) return;
+  // PWA-CONSISTENCY-1: destroy + rebuild. Also tear down the Aurix V2
+  // overlay so its host node and lightweight-charts instance get rebuilt
+  // against the fresh canvas — never patch a stale host.
+  if (portfolioChart) {
+    try { portfolioChart.destroy(); } catch (_) {}
+    portfolioChart = null;
+  }
+  try { _aurixDashTeardown('desktop'); } catch (_) {}
 
   portfolioChart = new Chart(canvas.getContext('2d'), {
     type: 'line',
@@ -20345,7 +20360,13 @@ document.addEventListener('keydown', e => {
 
 function initMobileCharts() {
   const mCanvas = document.getElementById('portfolioChartMobile');
-  if (mCanvas && !portfolioChartMobile) {
+  if (mCanvas) {
+    // PWA-CONSISTENCY-1: destroy + rebuild on every mount.
+    if (portfolioChartMobile) {
+      try { portfolioChartMobile.destroy(); } catch (_) {}
+      portfolioChartMobile = null;
+    }
+    try { _aurixDashTeardown('mobile'); } catch (_) {}
     portfolioChartMobile = new Chart(mCanvas.getContext('2d'), {
       type: 'line',
       data: {
@@ -20391,7 +20412,11 @@ function initMobileCharts() {
   }
 
   const dCanvas = document.getElementById('donutChartMobile');
-  if (dCanvas && !donutChartMobile) {
+  if (dCanvas) {
+    if (donutChartMobile) {
+      try { donutChartMobile.destroy(); } catch (_) {}
+      donutChartMobile = null;
+    }
     donutChartMobile = new Chart(dCanvas.getContext('2d'), {
       type: 'doughnut',
       data: {
@@ -20516,61 +20541,104 @@ if (_perfCurrBtn) _perfCurrBtn.textContent = baseCurrency === 'EUR' ? '€' : '$
 
 document.getElementById('appRoot').style.opacity = '0';
 
+// PWA-CONSISTENCY-1: unified deterministic boot pipeline.
+//   auth → portfolio → exchange rate → prices → calc → render → charts
+// Every step runs inside this single IIFE so Safari mobile, the iOS
+// home-screen PWA, and desktop converge on identical state before the
+// loader hides. Charts only mount AFTER calc commits so the first paint
+// never reveals stale cached values.
 (async () => {
   if (window.__APP_BOOTED__) return;
   window.__APP_BOOTED__ = true;
 
-  try {
-    const session = await waitForSession();
+  const hideLoader = () => {
+    const loader = document.getElementById('bootLoader');
+    if (loader) {
+      loader.style.opacity = '0';
+      setTimeout(() => loader.remove(), 200);
+    }
+  };
 
+  try {
+    // 1. AUTH
+    const session = await waitForSession();
     if (!session) {
       if (!window.location.pathname.includes('login.html')) {
         safeRedirect('login.html');
       }
       return;
     }
-
     currentUser = session.user;
     if (IS_DEV) console.log('[AUTH] session restored:', currentUser?.email);
-
     if (window.location.hash) {
       history.replaceState(null, '', window.location.pathname);
     }
 
+    // 2. PORTFOLIO
     const portfolioData = await initPortfolioData(currentUser.id);
     assets = convertFromNewToFlat(portfolioData.assets, portfolioData.holdings);
     if (portfolioData.assets.length > 0) {
       saveData({ assets: portfolioData.assets, holdings: portfolioData.holdings });
     }
 
+    // 2a. RESET-6 tombstone — restore sane defaults before any render so
+    // stale UI prefs from the prior session never leak across the reload.
+    try {
+      if (typeof _aurixResetAt === 'function' && _aurixResetAt() > 0) {
+        if (typeof _applyFreshDefaults === 'function') _applyFreshDefaults();
+      }
+    } catch (_) {}
+
+    // 2b. RESET-HISTORY-1: seed simulated history only on a true cold
+    // start (no epoch set, no real snapshots yet, portfolio has value).
+    try {
+      if (typeof _aurixPortfolioEpoch === 'function' && _aurixPortfolioEpoch() === 0) {
+        const val = totalValueUSD();
+        if (portfolioHistory.length === 0 && val > 0) {
+          portfolioHistory = generateSimulatedHistory(val);
+          saveHistory();
+        }
+      }
+    } catch (_) {}
+
+    // 3. EXCHANGE RATE — must resolve before prices so EUR mode renders
+    //    consistent numbers on first paint.
+    try { await fetchExchangeRate(); } catch (_) {}
+
+    // 4. PRICES — block first paint until live prices land (or the call
+    //    fails). Same user + same account => same numbers everywhere.
+    try {
+      await refreshPrices();
+    } catch (err) {
+      console.warn('[BOOT] refreshPrices failed (continuing with cache)', err);
+      try { setUpdateStatus('error'); } catch (_) {}
+    }
+    try { marketStore.start(); } catch (_) {}
+
+    // 5. CALC — derived state + formulas from the now-fresh prices.
+    try { recomputeDerivedFinancialState('boot'); } catch (_) {}
+    try { recomputeFinancialFormulas('boot'); } catch (_) {}
+
+    // 6. RENDER
     document.getElementById('appRoot').style.opacity = '';
     render(true);
-    const loader = document.getElementById('bootLoader');
-    if (loader) {
-      loader.style.opacity = '0';
-      setTimeout(() => loader.remove(), 200);
+
+    // 7. CHARTS — destroy+recreate so a recycled DOM (PWA tab restore)
+    //    never paints into a stale host.
+    initChart();
+    initDonut();
+    updateChart();
+    updateDonut();
+    if (window.innerWidth <= 768) {
+      initMobileCharts();
+      updateChart();
+      updateDonut();
+      initMobileSlider();
     }
 
-    // PORTFOLIO-BOOT-REFRESH-1: now that auth + portfolio have resolved,
-    // kick a priority price refresh immediately so the cached values
-    // visible on the first paint get replaced with live prices in
-    // seconds — instead of waiting up to 30 s for the next polling
-    // tick. refreshPrices() carries its own in-flight guard and sets
-    // the "Actualizando precios…" status on entry, so this never
-    // stampedes the top-level boot kick or the interval poller.
-    Promise.resolve().then(() => {
-      if (typeof refreshPrices === 'function') {
-        refreshPrices().catch(err => {
-          console.warn('[PORTFOLIO-BOOT-REFRESH-1] priority refresh failed:', err);
-          try { setUpdateStatus('error'); } catch (_) {}
-        });
-      }
-    });
-
-    // ONBOARDING-1: spec §8 bootstrap order. Auth + portfolio resolved
-    // above; reset state is checked inside the engine's guards. We defer
-    // the decision behind a microtask so the first paint commits before
-    // the modal animates in — keeps the perceived load snappy.
+    // 8. Boot complete — hide loader, start polling, kick onboarding.
+    hideLoader();
+    setInterval(() => refreshPrices().then(() => marketStore.syncFromRefresh()), 30_000);
     Promise.resolve().then(() => {
       if (typeof window.maybeShowOnboarding === 'function') {
         window.maybeShowOnboarding();
@@ -20578,61 +20646,12 @@ document.getElementById('appRoot').style.opacity = '0';
     });
   } catch (e) {
     console.error('[BOOT ERROR]', e);
+    hideLoader();
     if (!window.location.pathname.includes('login.html')) {
       safeRedirect('login.html');
     }
   }
 })();
-
-// Bootstrap simulated history if this is the first session
-(function bootstrapHistory() {
-  // RESET-HISTORY-1: after a reset, the user's mental model is "start
-  // from zero". Injecting 30 days of synthetic history would betray
-  // that and re-introduce the very baseline divergence the reset is
-  // meant to wipe. When an epoch is set we let real snapshots accrue
-  // naturally instead.
-  if (_aurixPortfolioEpoch() > 0) return;
-  const val = totalValueUSD();
-  if (portfolioHistory.length === 0 && val > 0) {
-    portfolioHistory = generateSimulatedHistory(val);
-    saveHistory();
-  }
-})();
-
-initChart();
-updateChart();
-initDonut();
-updateDonut();
-
-if (window.innerWidth <= 768) {
-  initMobileCharts();
-  updateChart();   // sync mobile chart after instance created
-  updateDonut();   // sync mobile donut after instance created
-  initMobileSlider();
-}
-
-// RESET-6: tombstone boot guard — if the previous session ended in a
-// reset, restore sane defaults before the first render() so no stale
-// UI prefs leak across the reload. Runs once; effectively a no-op
-// when no tombstone is present.
-try {
-  if (typeof _aurixResetAt === 'function' && _aurixResetAt() > 0) {
-    if (typeof _applyFreshDefaults === 'function') _applyFreshDefaults();
-  }
-} catch (_) {}
-
-fetchExchangeRate().then(() => {
-  render();
-  // Cold-start: populate derived state + formula cache from localStorage assets
-  // so the workspace shows real values before refreshPrices completes.
-  recomputeDerivedFinancialState('cold-start');
-  recomputeFinancialFormulas('cold-start');
-  updateChart();
-  updateDonut();
-});
-
-refreshPrices().then(() => marketStore.start());
-setInterval(() => refreshPrices().then(() => marketStore.syncFromRefresh()), 30_000);  // 30 s
 
 // FC-7: portfolio reactive subscriber
 const unsubscribePortfolioReactive = MARKET_EVENTS.subscribe('market:update', handleReactivePortfolioUpdate);
