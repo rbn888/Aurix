@@ -261,20 +261,25 @@
     const otpBackEl    = document.getElementById('otp-back');
 
     // ── Invite gate ────────────────────────────────────────────
+    // SUPABASE-RLS-CLIENT-MIGRATION: invite_codes is now RLS-locked away
+    // from anon/authenticated. The validate_invite_code SECURITY DEFINER
+    // RPC is the only client-callable surface and returns just a boolean,
+    // so no row data (owner, used_count, max_uses…) leaks to the browser.
     async function validateInvite(code) {
       if (!client || !code) return { valid: false };
       try {
-        const { data, error } = await client
-          .from('invite_codes')
-          .select('*')
-          .eq('code', code)
-          .single();
-        if (error || !data)                   return { valid: false };
-        if (!data.active)                     return { valid: false };
-        if (data.used_count >= data.max_uses) return { valid: false };
-        return { valid: true, invite: data };
-      } catch {
-        return { valid: false };
+        const { data, error } = await client.rpc(
+          'validate_invite_code',
+          { p_code: code }
+        );
+        if (error) {
+          // Network / RPC error — surface to callers/devtools while
+          // keeping the same locked-UX as an invalid code.
+          return { valid: false, error: error.message || 'network' };
+        }
+        return { valid: data === true };
+      } catch (e) {
+        return { valid: false, error: (e && e.message) ? e.message : 'network' };
       }
     }
 
