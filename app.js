@@ -29,9 +29,26 @@ if (typeof SUPABASE_URL !== 'undefined' && typeof SUPABASE_ANON_KEY !== 'undefin
   console.warn('[SUPABASE] client NOT initialized (missing config)');
 }
 
+// REDIRECT-DERIVE-1: derive the redirect base from the live location
+// so the app stops being pinned to rbn888.github.io. On GitHub Pages
+// the path is /Aurix/<file>.html, so when the current pathname starts
+// with /Aurix/ we preserve that prefix; on a future custom domain
+// (e.g. https://aurix.app/) the same helper routes to the root.
+// The path argument is whitelisted to a known set of internal targets
+// so a stray caller can never trigger an external redirect via a
+// protocol-relative ("//evil.com/x") or absolute ("https://evil/")
+// string. Unknown targets fall back to login.html.
+const _SAFE_REDIRECT_TARGETS = new Set([
+  'index.html',
+  'login.html',
+  'reset.html',
+  'reset-password.html',
+]);
 function safeRedirect(path) {
-  const base = 'https://rbn888.github.io/Aurix/';
-  window.location.href = base + path;
+  const target  = _SAFE_REDIRECT_TARGETS.has(path) ? path : 'login.html';
+  const onAurix = window.location.pathname.startsWith('/Aurix/');
+  const base    = window.location.origin + (onAurix ? '/Aurix/' : '/');
+  window.location.href = base + target;
 }
 
 async function getUserId() {
