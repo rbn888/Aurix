@@ -12109,11 +12109,28 @@ async function _refreshPricesImpl() {
     if (a.type === 'crypto' && a.coinId) {
       const d = cryptoPrices[a.coinId];
       if (!d) return;
-      if (d.usd !== a.price) { a.prevPrice = a.price; a.price = d.usd; }
+      // PRICES-PRESERVE-1: only overwrite when the incoming USD price
+      // is a real number > 0. Missing / null / NaN / 0 prices keep the
+      // last known a.price so dashboard, totals and charts do not
+      // briefly drop to zero on a partial provider response. change24h
+      // is still updated when the provider sent one (nullish-coalesce
+      // already preserves the previous value otherwise).
+      if (typeof d.usd === 'number' && Number.isFinite(d.usd) && d.usd > 0 && d.usd !== a.price) {
+        a.prevPrice = a.price;
+        a.price = d.usd;
+      }
       a.change24h = d.usd_24h_change ?? a.change24h;
     } else if (a.marketSymbol && marketPrices[a.marketSymbol]) {
       const m = marketPrices[a.marketSymbol];
-      if (m.price !== a.price) { a.prevPrice = a.price; a.price = m.price; }
+      // PRICES-PRESERVE-1: same guard for stocks/ETFs/metals/funds.
+      // collectMarketPriceData already drops null prices upstream, but
+      // a NaN or 0 from the snapshot path would still slip past the
+      // `!= null` filter there. Belt-and-braces: keep a.price intact
+      // unless the new value is finite and positive.
+      if (typeof m.price === 'number' && Number.isFinite(m.price) && m.price > 0 && m.price !== a.price) {
+        a.prevPrice = a.price;
+        a.price = m.price;
+      }
       if (m.change24h != null) {
         a.change24h = m.change24h;
         if (a.marketSymbol === 'GC=F') goldChangePct = m.change24h;
