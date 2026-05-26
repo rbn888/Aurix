@@ -249,6 +249,58 @@ async function signOut() {
   await supabaseClient.auth.signOut();
 }
 
+// AUTH-ISOLATION-1: local-cache keys cleared on SIGNED_OUT and on
+// performSafeReset. Single source of truth so a logged-out user A
+// cannot leak portfolio/identity/onboarding state to user B on a
+// shared browser when B's Supabase row is empty.
+// Preserves intentionally: `aurix_data_version`, `portfolio_lang`,
+// `portfolio_base_currency`, `aurix_plan` (user prefs, not state).
+const PORTFOLIO_KEYS = [
+  'portfolio_assets',          // legacy primary
+  'portfolio_history',         // PORTFOLIO_HISTORY snapshots
+  'category_history',          // CATEGORY_HISTORY snapshots
+  'portfolio_card_order',      // dashboard card order
+  'portfolio_cat_order',       // category drill-down order
+  'aurix_watchlist',           // watchlist symbols
+  'aurix_watchlist_seeded',    // one-shot seed guard
+  'aurix_assets',              // new model catalog
+  'aurix_holdings',            // new model holdings
+  'aurix.workspace.v1',        // workspace cells
+  'aurix_insights_memory',     // AI insights memory
+  'aurix_user_profile',        // user profile (portfolio-derived)
+  'aurix_behavior',            // behavioral signals (portfolio-derived)
+  'aurix_decisions',           // user decisions log
+  'aurix_data_backup',         // legacy pre-migration backup
+  'aurix_identity',            // identity profile (portfolio-derived)
+  'aurix_evolution',           // AI evolution level (portfolio-derived)
+  'aurix_onboarding_completed',// activation flag
+  'aurix_onboarding_step',     // current step in the activation flow
+  'aurix_onboarding_preferences',
+  'aurix_health_snapshot',
+  'aurix_signal_state',
+  'aurix_workspace_snapshot',
+  'aurix_risk_snapshot',
+  'aurix_portfolio_summary',
+  'aurix_dashboard_chart_cache',
+  'aurix_chart_cache',
+  'aurix_portfolio_history',
+  'aurix_category_history',
+];
+
+// AUTH-ISOLATION-1: auth-only locals (email autofill / OTP step
+// restore). Cleared on SIGNED_OUT so the next user does not see
+// the previous user's email pre-filled or land mid-OTP.
+const AUTH_LOCAL_KEYS = [
+  'last_email',
+  'aurix_otp_email',
+];
+
+function _clearLocalUserState() {
+  PORTFOLIO_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch (_) {} });
+  AUTH_LOCAL_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch (_) {} });
+  try { sessionStorage.removeItem('otp_sent'); } catch (_) {}
+}
+
 if (supabaseClient && !window.__AUTH_LISTENER__) {
   window.__AUTH_LISTENER__ = true;
 
@@ -259,7 +311,7 @@ if (supabaseClient && !window.__AUTH_LISTENER__) {
       }
     }
     if (event === 'SIGNED_OUT') {
-      sessionStorage.removeItem('otp_sent');
+      _clearLocalUserState();
       safeRedirect('login.html');
     }
   });
@@ -24283,46 +24335,9 @@ function performSafeReset() {
   try { localStorage.setItem(RESET_AT_KEY, String(RESET_AT)); } catch (_) {}
   try { localStorage.setItem(PORTFOLIO_EPOCH_KEY, String(RESET_AT)); } catch (_) {}
 
-  const PORTFOLIO_KEYS = [
-    'portfolio_assets',          // legacy primary
-    'portfolio_history',         // PORTFOLIO_HISTORY snapshots
-    'category_history',          // CATEGORY_HISTORY snapshots
-    'portfolio_card_order',      // dashboard card order
-    'portfolio_cat_order',       // category drill-down order
-    'aurix_watchlist',           // watchlist symbols
-    'aurix_watchlist_seeded',    // ONBOARDING-WATCHLIST-2: one-shot seed guard
-    'aurix_assets',              // new model catalog
-    'aurix_holdings',            // new model holdings
-    'aurix.workspace.v1',        // workspace cells
-    'aurix_insights_memory',     // AI insights memory
-    'aurix_user_profile',        // user profile (portfolio-derived)
-    'aurix_behavior',            // behavioral signals (portfolio-derived)
-    'aurix_decisions',           // user decisions log
-    'aurix_data_backup',         // legacy pre-migration backup
-    'aurix_identity',            // identity profile (portfolio-derived)
-    'aurix_evolution',           // AI evolution level (portfolio-derived)
-    'aurix_onboarding_completed',// activation flag — clear so onboarding can re-show
-    'aurix_onboarding_step',     // current step in the activation flow
-    'aurix_onboarding_preferences', // language/interests/experience snapshot
-    // HEALTH-3: future-proof — any module writing these snapshot keys
-    // will see them cleared on reset alongside the legacy caches.
-    'aurix_health_snapshot',     // Portfolio Health derived summary
-    'aurix_signal_state',        // dashboard signal rotation pointer
-    'aurix_workspace_snapshot',  // workspace derived summary
-    'aurix_risk_snapshot',       // workspace risk monitor cache
-    'aurix_portfolio_summary',   // generic portfolio summary cache
-    // RESET-HISTORY-1: defensive — clear any chart-series caches in
-    // case a future module persists derived dashboard data. Removing
-    // a non-existent key is a no-op.
-    'aurix_dashboard_chart_cache',
-    'aurix_chart_cache',
-    'aurix_portfolio_history',   // alt key seen in spec
-    'aurix_category_history',    // alt key seen in spec
-  ];
-  // Preserve `aurix_data_version` (so the migration IIFE early-returns
-  // on next boot and can't accidentally rehydrate via its else branch),
-  // `portfolio_lang` (user preference, not portfolio state),
-  // `portfolio_base_currency`, and `aurix_plan`.
+  // AUTH-ISOLATION-1: PORTFOLIO_KEYS hoisted to module scope so the
+  // SIGNED_OUT handler clears the same set. See declaration near the
+  // auth listener at the top of this file.
   PORTFOLIO_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch (_) {} });
 
   // ONBOARDING-1: notify the engine so its in-memory mirror is cleared
