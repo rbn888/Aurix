@@ -486,6 +486,7 @@ const T = {
     noPrice:         'sin precio',
     priceUnavail:    'Precio no disponible para este activo.',
     priceNoConn:     'Sin conexión. Precio no disponible.',
+    goldPriceUnavail:'Precio del oro no disponible. Inténtalo de nuevo en unos segundos.',
     // Card button titles
     btnAdd:          'Añadir',
     btnReduce:       'Reducir',
@@ -1644,6 +1645,7 @@ const T = {
     noPrice:         'no price',
     priceUnavail:    'Price not available for this asset.',
     priceNoConn:     'No connection. Price unavailable.',
+    goldPriceUnavail:'Gold price unavailable. Please try again in a few seconds.',
     // Card button titles
     btnAdd:          'Add',
     btnReduce:       'Reduce',
@@ -11558,9 +11560,13 @@ async function fetchGoldSpotPrice() {
     }
   } catch { /* fall through */ }
 
-  // Final fallback: hardcoded — no timestamp update (not a live price)
-  const fb = getFallbackData('GC=F');
-  return fb?.price ?? FALLBACK_PRICES['GC=F'];
+  // GOLD-PRICE-1: snapshot failed. Returning null forces the gold
+  // submit path to reject the entry instead of locking in the stale
+  // hardcoded FALLBACK_PRICES['GC=F']. The market-refresh caller
+  // (collectMarketPriceData) already filters null prices out, so
+  // existing gold holdings keep their last live price rather than
+  // being repriced against a simulated value.
+  return null;
 }
 
 // ── OpenFIGI: ISIN → ticker / name / type ──────────────────
@@ -17815,11 +17821,16 @@ async function selectAsset(entry) {
       _showManualNavPrompt(entry);
     } else {
       chipPriceEl.textContent = t('noPrice');
-      setLookupStatus('error', t('priceUnavail'));
+      // GOLD-PRICE-1: physical gold no longer falls back to a hardcoded
+      // simulated price, so surface a gold-specific message that nudges
+      // the user to retry instead of the generic "no disponible".
+      setLookupStatus('error', entry.ticker === 'XAU' ? t('goldPriceUnavail') : t('priceUnavail'));
     }
   } catch (err) {
-    // Network error: try local fallback for non-crypto
-    const fb = entry.marketSymbol ? getFallbackData(entry.marketSymbol) : null;
+    // Network error: try local fallback for non-crypto.
+    // GOLD-PRICE-1: gold is excluded — physical gold confirmation must
+    // never lock in a simulated price, even from the offline fallback.
+    const fb = (entry.marketSymbol && entry.ticker !== 'XAU') ? getFallbackData(entry.marketSymbol) : null;
     if (fb) {
       pendingPrice            = fb.price;
       chipPriceEl.textContent = formatDisplay(fb.price, 'USD');
@@ -17830,7 +17841,7 @@ async function selectAsset(entry) {
       _showManualNavPrompt(entry);
     } else {
       chipPriceEl.textContent = t('noPrice');
-      setLookupStatus('error', t('priceNoConn'));
+      setLookupStatus('error', entry.ticker === 'XAU' ? t('goldPriceUnavail') : t('priceNoConn'));
     }
   }
 
@@ -18644,20 +18655,34 @@ function updatePreview() {
   }
   const price = pendingPrice || 0;
   let value;
+  let valueUnavail = false;
   if (selectedDbAsset?.ticker === 'XAU' && pendingKarat) {
-    // GOLD-1: physical gold preview uses the same formula as the
-    // canonical assetNativeValue path so what the user sees here is
-    // exactly what gets persisted and rendered on the dashboard.
-    const grams = _goldGrams(qty, pendingGoldUnit);
-    value = grams * _goldPurity(pendingKarat) * (price / OZ_TO_G);
-    _renderGoldSpotLine(price);
-    // GOLD-2: dual-value panel — spot stays canonical, resale is a
-    // purely informational haircut on top.
-    _renderGoldValuation(value);
+    // GOLD-PRICE-1: when the live spot is unavailable, the estimate is
+    // not meaningful. Render an explicit unavailable state instead of
+    // ≈ 0 US$ so the user understands why the CTA is blocked.
+    if (!Number.isFinite(price) || price <= 0) {
+      _renderGoldSpotLine(null);
+      const goldAmountEl = document.getElementById('goldSummaryAmount');
+      if (goldAmountEl) goldAmountEl.textContent = '—';
+      const goldSpotRefEl = document.getElementById('goldSummarySpotRef');
+      if (goldSpotRefEl) { goldSpotRefEl.hidden = true; goldSpotRefEl.textContent = ''; }
+      valueUnavail = true;
+      value = 0;
+    } else {
+      // GOLD-1: physical gold preview uses the same formula as the
+      // canonical assetNativeValue path so what the user sees here is
+      // exactly what gets persisted and rendered on the dashboard.
+      const grams = _goldGrams(qty, pendingGoldUnit);
+      value = grams * _goldPurity(pendingKarat) * (price / OZ_TO_G);
+      _renderGoldSpotLine(price);
+      // GOLD-2: dual-value panel — spot stays canonical, resale is a
+      // purely informational haircut on top.
+      _renderGoldValuation(value);
+    }
   } else {
     value = qty * price;
   }
-  previewTotal.textContent = formatDisplay(value, 'USD');
+  previewTotal.textContent = valueUnavail ? '—' : formatDisplay(value, 'USD');
   // ADD-V4.2: keep the desktop preview value in lockstep with the
   // inline preview text. Mobile ignores this element (display:none).
   if (typeof _addV4RenderPreview === 'function') _addV4RenderPreview();
@@ -18743,13 +18768,19 @@ function _isGoldFormValid() {
   const type     = section.dataset.goldType || '';
   const qty      = parseLocalFloat(qtyInput.value);
   const qtyValid = !isNaN(qty) && qty > 0;
+  // GOLD-PRICE-1: a live spot price is now mandatory for the CTA. With
+  // fetchGoldSpotPrice() returning null on failure, requiring it here
+  // keeps the submit button disabled instead of allowing a stale
+  // FALLBACK_PRICES['GC=F'] cost basis to be persisted.
+  const priceValid = Number.isFinite(pendingPrice) && pendingPrice > 0;
   return {
     section,
     type,
     karat:    pendingKarat,
     unit:     pendingGoldUnit,
     qtyValid,
-    valid:    !!type && !!pendingKarat && !!pendingGoldUnit && qtyValid,
+    priceValid,
+    valid:    !!type && !!pendingKarat && !!pendingGoldUnit && qtyValid && priceValid,
   };
 }
 
