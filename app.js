@@ -12713,7 +12713,7 @@ function updateCategoryCards() {
       ? `<span class="market-status ${catStatus === '24/7' ? 'crypto' : catStatus}"><span class="dot"></span>${getMarketLabel(catStatus)}</span>`
       : '';
 
-    return `<button class="cat-card${isEmpty ? ' cat-card--empty' : ''}" data-type="${type}">
+    return `<button class="cat-card${isEmpty ? ' cat-card--empty' : ''}" data-type="${type}"${isEmpty ? ' aria-disabled="true"' : ''}>
       ${visual}
       ${catStatusHtml}
       <div class="cat-card-content">
@@ -12743,9 +12743,15 @@ function updateCategoryCards() {
 
   grid.querySelectorAll('.cat-card').forEach(btn => {
     let _tapOk = false;
+    // CAT-EMPTY-1: empty categories render but do not drill down.
+    // Reading the class once at bind time is enough — cards are
+    // re-rendered (and these listeners re-bound) whenever assets
+    // change, so the flag never gets stale relative to the DOM.
+    const isEmptyCard = btn.classList.contains('cat-card--empty');
 
     // touchstart: visual press feedback immediately
     btn.addEventListener('touchstart', () => {
+      if (isEmptyCard) return;
       _tapOk = true;
       btn.classList.add('is-pressing');
     }, { passive: true });
@@ -12759,6 +12765,7 @@ function updateCategoryCards() {
     // touchend: fire action if finger didn't scroll away
     btn.addEventListener('touchend', (e) => {
       btn.classList.remove('is-pressing');
+      if (isEmptyCard) { _tapOk = false; return; }
       if (_tapOk && !justDragged) {
         _tapOk = false;
         e.preventDefault(); // prevent ghost click
@@ -12773,8 +12780,13 @@ function updateCategoryCards() {
       btn.classList.remove('is-pressing');
     });
 
-    // click: fallback for desktop / non-touch
-    btn.addEventListener('click', () => { if (!justDragged) setActiveCategory(btn.dataset.type); });
+    // click: fallback for desktop / non-touch.
+    // Also gates keyboard activation: Enter / Space on a <button>
+    // dispatches click, so empty cards stay un-drillable via keyboard.
+    btn.addEventListener('click', () => {
+      if (isEmptyCard) return;
+      if (!justDragged) setActiveCategory(btn.dataset.type);
+    });
   });
 }
 

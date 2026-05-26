@@ -3337,6 +3337,9 @@ body:not(.hero-active) #orb-canvas {
 /* Empty category — no assets yet: visible but clearly inactive */
 .cat-card--empty {
   opacity: 0.9;
+  /* CAT-EMPTY-1: drill-down is blocked in JS for empty cards, so
+     stop signalling tap-actionable via the pointer cursor. */
+  cursor: default;
 }
 .cat-card--empty .cat-card-value { color: var(--text-muted); }
 .cat-card--empty:hover { border-color: var(--border-hi); }
