@@ -345,7 +345,22 @@ const waitForSession = () => new Promise(resolve => {
     clearTimeout(t);
     resolve(val ?? null);
   };
-  const t = setTimeout(() => finish(null), 5000);
+  // AUTH-RESTORE-1: on cold PWA boot / slow mobile network /
+  // iOS standalone mode, INITIAL_SESSION can take longer than 5 s.
+  // Previously this resolved null and bounced authenticated users to
+  // login. Fall back to getSession() (reads from local IndexedDB
+  // storage) before declaring the session missing.
+  const t = setTimeout(async () => {
+    try {
+      const { data } = await supabaseClient.auth.getSession();
+      if (done) return;
+      finish(data?.session || null);
+    } catch (e) {
+      if (IS_DEV) console.warn('[AUTH] getSession fallback failed:', e?.message || e);
+      if (done) return;
+      finish(null);
+    }
+  }, 5000);
   const { data: { subscription: sub } } = supabaseClient.auth.onAuthStateChange((event, sess) => {
     if (event === 'INITIAL_SESSION') {
       finish(sess);
