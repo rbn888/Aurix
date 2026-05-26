@@ -150,6 +150,25 @@ async function autoSaveToBackend(attempt = 1) {
   }
 }
 
+// DELETE-LAST-1: when a delete empties the portfolio, the
+// autoSaveToBackend guard (`if (!hasAny && !tombstone) return`)
+// skips the upsert — so the remote keeps the stale row and the
+// deleted asset resurrects on reload. Calling this before save()
+// sets the reset tombstone so the same autosave path pushes the
+// empty state and self-clears the marker on success (autosave
+// success branch already handles tombstone cleanup).
+// Preserves _shouldDistrustRemote semantics: a tombstone newer than
+// remote.updated_at distrusts the stale row until autosave drains,
+// identical to performSafeReset behaviour.
+function _persistEmptyPortfolioIfNeeded(reason) {
+  try {
+    if (!Array.isArray(assets) || assets.length > 0) return;
+    if (typeof _aurixResetAt === 'function' && _aurixResetAt()) return;
+    localStorage.setItem(RESET_AT_KEY, String(Date.now()));
+    if (IS_DEV) console.log('[DATA] empty-state tombstone set (' + (reason || 'delete') + ')');
+  } catch (_) {}
+}
+
 function isValidPortfolioData(data) {
   return data &&
     Array.isArray(data.assets) &&
@@ -19145,6 +19164,7 @@ reduceForm.addEventListener('submit', e => {
     asset.qty = remaining;
   }
 
+  _persistEmptyPortfolioIfNeeded('reduce');
   save();
   render(true);
   closeReduceModal();
@@ -19450,6 +19470,7 @@ function applyInlineEdit(id) {
 
   const inlineType = asset.type;
   closeInlineEdit();
+  _persistEmptyPortfolioIfNeeded('inline-reduce');
   save();
   render(true);
   if (!inlineWasRemoved) _flashAssetCard(id);
@@ -19495,6 +19516,7 @@ assetsListEl.addEventListener('click', e => {
       delCard.classList.add('card--exiting');
       setTimeout(() => {
         assets = assets.filter(a => a.id !== delId);
+        _persistEmptyPortfolioIfNeeded('delete');
         save();
         render(true);
         _flashCategoryCard(delType);
@@ -19502,6 +19524,7 @@ assetsListEl.addEventListener('click', e => {
       }, 200);
     } else {
       assets = assets.filter(a => a.id !== delId);
+      _persistEmptyPortfolioIfNeeded('delete');
       save();
       render(true);
       _flashCategoryCard(delType);
