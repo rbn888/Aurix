@@ -3370,9 +3370,24 @@ function saveData({ assets: catalogAssets, holdings }) {
 
 // ── Input number formatting ────────────────────────────────
 // Parse an es-ES formatted string ("1.234,56") back to a JS float
+// INPUT-HARDEN-1: returns NaN (the existing sentinel) for:
+//   - empty / non-string
+//   - exponential notation ("1e9", "1E9", "1e999") — almost never
+//     intentional in a portfolio form; also blocks the "1e999 →
+//     Infinity" path that previously slipped past `isNaN()` guards
+//   - explicit Infinity / NaN strings
+//   - magnitudes > MAX_INPUT_NUMBER (1e12 ≈ a trillion in base units)
+// Callers already use the NaN sentinel (either `|| 0` for previews
+// or `if (isNaN(v) || v <= 0)` to block submits), so the contract
+// is unchanged for valid inputs.
+const MAX_INPUT_NUMBER = 1e12;
 function parseLocalFloat(str) {
   if (typeof str !== 'string' || str === '') return NaN;
-  return parseFloat(str.replace(/\./g, '').replace(',', '.'));
+  if (/[eE]/.test(str)) return NaN;
+  const n = parseFloat(str.replace(/\./g, '').replace(',', '.'));
+  if (!Number.isFinite(n)) return NaN;
+  if (Math.abs(n) > MAX_INPUT_NUMBER) return NaN;
+  return n;
 }
 
 // Handles both European ("2.446,77") and standard ("2446.77") price strings.
