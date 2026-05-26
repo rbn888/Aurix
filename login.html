@@ -175,6 +175,18 @@
     }
 
     .auth-link:hover { color: var(--text); }
+
+    /* OTP-RESEND-1: button reset so a <button> can use .auth-link
+       styling and pick up a native :disabled state during cooldown. */
+    button.auth-link {
+      background: none;
+      border: none;
+      padding: 0;
+      font: inherit;
+      width: 100%;
+    }
+    button.auth-link:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.auth-link:disabled:hover { color: var(--text-muted); }
   </style>
 </head>
 <body>
@@ -220,6 +232,7 @@
                maxlength="8" autocomplete="one-time-code">
         <button id="otp-submit" class="auth-btn">Verificar código</button>
         <p id="otp-error" class="auth-error"></p>
+        <button id="otp-resend" type="button" class="auth-link">Reenviar código</button>
         <p class="auth-link" id="otp-back">Usar otro email</p>
       </div>
 
@@ -265,6 +278,29 @@
     const otpSubmitBtn = document.getElementById('otp-submit');
     const otpErrorEl   = document.getElementById('otp-error');
     const otpBackEl    = document.getElementById('otp-back');
+    const otpResendEl  = document.getElementById('otp-resend');
+
+    // OTP-RESEND-1: friendly Spanish messages for the auth surfaces.
+    // We never show raw Supabase error text to the user — every error
+    // is classified into one of the known buckets below. Generic stays
+    // as the safe fallback so a future SDK error string never leaks.
+    const AUTH_ERROR_TEXT = {
+      rate:          'Demasiados intentos. Espera unos segundos.',
+      'otp-invalid': 'Código incorrecto o caducado.',
+      network:       'No se pudo conectar. Revisa tu conexión.',
+      generic:       'No se pudo completar. Inténtalo de nuevo.',
+    };
+    function _classifyAuthError(err) {
+      const msg    = ((err && (err.message || err.error_description)) || '').toLowerCase();
+      const status = (err && (err.status || err.statusCode)) || 0;
+      if (status === 429 || msg.includes('rate') || msg.includes('too many') || msg.includes('throttle')) return 'rate';
+      if (msg.includes('expired') || msg.includes('invalid') || msg.includes('token') || msg.includes('otp')) return 'otp-invalid';
+      if (msg.includes('fetch') || msg.includes('network') || msg.includes('offline')) return 'network';
+      return 'generic';
+    }
+    function _authErrorText(err) {
+      return AUTH_ERROR_TEXT[_classifyAuthError(err)] || AUTH_ERROR_TEXT.generic;
+    }
 
     // ── Invite gate ────────────────────────────────────────────
     // SUPABASE-RLS-CLIENT-MIGRATION: invite_codes is now RLS-locked away
@@ -447,19 +483,29 @@
 
         console.log('OTP REQUEST FIRED');
 
-        const { error } = await client.auth.signInWithOtp({
-          email,
-          options: { shouldCreateUser: true }
-        });
+        // OTP-RESEND-1: catch thrown network failures so they route
+        // through the classifier instead of falling silently through
+        // try/finally. Supabase resolves auth errors as data; fetch
+        // failures throw, so we need both paths.
+        let sendErr = null;
+        try {
+          const { error } = await client.auth.signInWithOtp({
+            email,
+            options: { shouldCreateUser: true }
+          });
+          sendErr = error || null;
+        } catch (e) {
+          sendErr = e;
+        }
 
-        if (error) {
-          console.log('OTP error:', error);
-          if (isRateLimitError(error)) {
+        if (sendErr) {
+          console.log('OTP error:', sendErr);
+          if (isRateLimitError(sendErr) || _classifyAuthError(sendErr) === 'rate') {
             handleRateLimit();
             return;
           }
           errorEl.style.color = 'var(--red)';
-          errorEl.innerText   = 'Ha ocurrido un error. Inténtalo de nuevo.';
+          errorEl.innerText   = _authErrorText(sendErr);
           updateSubmitState();
           return;
         }
@@ -507,15 +553,31 @@
         otpSubmitBtn.disabled  = true;
         otpSubmitBtn.innerText = 'Verificando...';
 
-        const { error } = await client.auth.verifyOtp({
-          email,
-          token: code,
-          type: 'email'
-        });
+        let verifyErr = null;
+        try {
+          const { error } = await client.auth.verifyOtp({
+            email,
+            token: code,
+            type: 'email'
+          });
+          verifyErr = error || null;
+        } catch (e) {
+          // OTP-RESEND-1: a thrown fetch error (offline / DNS) is a
+          // 'network' class. Surface it via the classifier instead of
+          // letting the unhandled promise reject silently.
+          verifyErr = e;
+        }
 
-        if (error) {
+        if (verifyErr) {
           otpErrorEl.style.color = 'var(--red)';
-          otpErrorEl.innerText   = 'Código inválido o expirado. Inténtalo de nuevo.';
+          // Force the OTP-invalid bucket when the SDK returned an
+          // error object without a clear class — verifyOtp failures
+          // are almost always wrong/expired codes.
+          const cls = _classifyAuthError(verifyErr);
+          const txt = (cls === 'network' || cls === 'rate')
+            ? AUTH_ERROR_TEXT[cls]
+            : AUTH_ERROR_TEXT['otp-invalid'];
+          otpErrorEl.innerText   = txt;
           otpSubmitBtn.disabled  = false;
           otpSubmitBtn.innerText = 'Verificar código';
           return;
@@ -529,7 +591,77 @@
       }
     });
 
-    otpBackEl.addEventListener('click', showEmailStep);
+    // ── OTP resend (cooldown 30s) ──────────────────────────────
+    // OTP-RESEND-1: lets users re-trigger signInWithOtp without
+    // abandoning the OTP step. Invite gate is preserved implicitly:
+    // the OTP step is only reachable after a successful invite +
+    // signInWithOtp earlier in this flow (or via the localStorage
+    // restore at the bottom, which itself depends on a prior gated
+    // OTP send), so resend cannot bypass the invite check.
+    let isResending = false;
+    let _resendTimer = null;
+    function _clearResendTimer() {
+      if (_resendTimer) { clearInterval(_resendTimer); _resendTimer = null; }
+    }
+    function _resetResendButton() {
+      _clearResendTimer();
+      otpResendEl.disabled  = false;
+      otpResendEl.innerText = 'Reenviar código';
+    }
+    function _startResendCooldown(seconds) {
+      _clearResendTimer();
+      const until = Date.now() + seconds * 1000;
+      otpResendEl.disabled = true;
+      const tick = () => {
+        const remaining = Math.ceil((until - Date.now()) / 1000);
+        if (remaining <= 0) { _resetResendButton(); return; }
+        otpResendEl.innerText = `Reenviar en ${remaining}s`;
+      };
+      tick();
+      _resendTimer = setInterval(tick, 1000);
+    }
+
+    otpResendEl.addEventListener('click', async () => {
+      if (isResending || otpResendEl.disabled) return;
+      const email = localStorage.getItem('aurix_otp_email') || emailEl.value.trim();
+      if (!email) { showEmailStep(); return; }
+
+      isResending = true;
+      otpErrorEl.innerText = '';
+      otpResendEl.disabled = true;
+      const originalLabel = otpResendEl.innerText;
+      otpResendEl.innerText = 'Reenviando...';
+
+      let resendErr = null;
+      try {
+        const { error } = await client.auth.signInWithOtp({
+          email,
+          options: { shouldCreateUser: true }
+        });
+        resendErr = error || null;
+      } catch (e) {
+        resendErr = e;
+      }
+
+      if (resendErr) {
+        otpErrorEl.style.color = 'var(--red)';
+        otpErrorEl.innerText   = _authErrorText(resendErr);
+        // Restore button so the user can retry once they've waited.
+        // The error text already communicates why; no extra cooldown.
+        otpResendEl.disabled   = false;
+        otpResendEl.innerText  = originalLabel || 'Reenviar código';
+      } else {
+        otpErrorEl.style.color = 'var(--text-muted)';
+        otpErrorEl.innerText   = 'Nuevo código enviado. Revisa tu email.';
+        _startResendCooldown(30);
+      }
+      isResending = false;
+    });
+
+    otpBackEl.addEventListener('click', () => {
+      _resetResendButton();
+      showEmailStep();
+    });
 
     // ── Cooldown restore — hard reset if expired (prevents ghost cooldown) ──
     const storedUntil = Number(localStorage.getItem('cooldown_until')) || 0;
