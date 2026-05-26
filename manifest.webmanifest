@@ -1,0 +1,19 @@
+{
+  "name": "Aurix",
+  "short_name": "Aurix",
+  "lang": "es",
+  "start_url": "/Aurix/index.html",
+  "scope": "/Aurix/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B0F1A",
+  "theme_color": "#0B0F1A",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
