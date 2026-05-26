@@ -325,15 +325,37 @@
       }
     }
 
-    inviteInput.addEventListener('input', async () => {
+    // INVITE-DEBOUNCE-1: the previous handler fired validate_invite_code
+    // on every keystroke (7 RPCs to validate "AURIX24"). Debounce 250 ms
+    // after the last edit and skip codes shorter than the minimum length
+    // so the RPC only runs when the user has actually stopped typing a
+    // plausible code. _inviteSeq + a re-check against the current input
+    // value protect against a stale older RPC resolving after a newer
+    // one and mis-unlocking the auth section.
+    let _inviteTimer = null;
+    let _inviteSeq   = 0;
+    const INVITE_MIN_LEN = 3;
+    inviteInput.addEventListener('input', () => {
+      clearTimeout(_inviteTimer);
       const code = inviteInput.value.trim().toUpperCase();
-      if (!code) return;
-      const result = await validateInvite(code);
-      if (result.valid) {
-        unlockAuth();
-      } else {
+      if (code.length < INVITE_MIN_LEN) {
+        // Below the minimum length we never call the RPC; explicitly
+        // re-lock so a prior unlock state from a longer string can't
+        // linger after a delete.
         lockAuth();
+        return;
       }
+      _inviteTimer = setTimeout(async () => {
+        const myCode = code;
+        const seq    = ++_inviteSeq;
+        const result = await validateInvite(myCode);
+        // Race guard: ignore responses from older keystrokes and also
+        // verify the user hasn't edited the input mid-flight.
+        if (seq !== _inviteSeq) return;
+        if (myCode !== inviteInput.value.trim().toUpperCase()) return;
+        if (result.valid) unlockAuth();
+        else              lockAuth();
+      }, 250);
     });
 
     // ── State ──────────────────────────────────────────────────
