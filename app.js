@@ -20623,6 +20623,26 @@ function initMobileCharts() {
   _aurixDashMountWhenReady('mobile');
 }
 
+// MOBILE-RESIZE-1: tear down both mobile Chart.js instances and the
+// V2 overlay when the viewport crosses out of the mobile breakpoint.
+// initMobileCharts above already self-heals on entry (destroy +
+// rebuild), so this helper only handles the exit path.
+function _teardownMobileCharts() {
+  try {
+    if (portfolioChartMobile) {
+      portfolioChartMobile.destroy();
+      portfolioChartMobile = null;
+    }
+  } catch (_) {}
+  try {
+    if (donutChartMobile) {
+      donutChartMobile.destroy();
+      donutChartMobile = null;
+    }
+  } catch (_) {}
+  try { _aurixDashTeardown('mobile'); } catch (_) {}
+}
+
 function initMobileSlider() {
   const track = document.getElementById('mobileSliderTrack');
   if (!track) return;
@@ -20826,6 +20846,36 @@ document.getElementById('appRoot').style.opacity = '0';
     }
   }
 })();
+
+// MOBILE-RESIZE-1: remount the mobile portfolio + donut charts on
+// resize, rotation, split-view, or PWA viewport changes. The boot
+// block only initialises mobile charts once when `innerWidth <= 768`
+// is true at load; without this listener a portrait → landscape
+// rotation, iOS URL-bar collapse, or split-screen toggle leaves the
+// canvases at stale dimensions (blank / cropped). Initialisation is
+// idempotent (initMobileCharts already destroys before rebuilding),
+// debounced 200 ms so a continuous drag does not stampede the
+// recreate path. initMobileSlider is intentionally NOT re-run because
+// it attaches direct DOM listeners with no cleanup, so a second run
+// would duplicate the swipe handlers.
+if (!window.__AURIX_VIEWPORT_LISTENER__) {
+  window.__AURIX_VIEWPORT_LISTENER__ = true;
+  let _aurixViewportTimer = null;
+  const _onAurixViewportChange = () => {
+    clearTimeout(_aurixViewportTimer);
+    _aurixViewportTimer = setTimeout(() => {
+      if (window.innerWidth <= 768) {
+        try { initMobileCharts(); } catch (_) {}
+        try { if (typeof updateChart === 'function') updateChart(true); } catch (_) {}
+        try { if (typeof updateDonut === 'function') updateDonut();     } catch (_) {}
+      } else {
+        try { _teardownMobileCharts(); } catch (_) {}
+      }
+    }, 200);
+  };
+  window.addEventListener('resize',            _onAurixViewportChange, { passive: true });
+  window.addEventListener('orientationchange', _onAurixViewportChange, { passive: true });
+}
 
 // FC-7: portfolio reactive subscriber
 const unsubscribePortfolioReactive = MARKET_EVENTS.subscribe('market:update', handleReactivePortfolioUpdate);
