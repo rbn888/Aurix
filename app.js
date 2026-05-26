@@ -193,32 +193,14 @@ function isValidPortfolioData(data) {
     typeof data.holdings === 'object';
 }
 
-async function loadInitialData() {
-  const remote = await supabaseLoadPortfolio();
-  // RESET-2: distrust remote if local reset tombstone is newer than
-  // the remote snapshot. Prevents stale Supabase rows from resurrecting
-  // a freshly-wiped portfolio.
-  if (isValidPortfolioData(remote) && !(typeof _shouldDistrustRemote === 'function' && _shouldDistrustRemote(remote))) {
-    if (IS_DEV) console.log('[DATA] loaded from remote');
-    return { assets: remote.assets, holdings: remote.holdings };
-  }
-  if (remote && typeof _shouldDistrustRemote === 'function' && _shouldDistrustRemote(remote)) {
-    if (IS_DEV) console.warn('[DATA] remote ignored — newer reset tombstone');
-  }
-
-  try {
-    const localAssets   = JSON.parse(localStorage.getItem('aurix_assets')  || 'null');
-    const localHoldings = JSON.parse(localStorage.getItem('aurix_holdings') || 'null');
-    if (localAssets && localHoldings) {
-      if (IS_DEV) console.log('[DATA] remote unavailable, using local cache');
-      return { assets: localAssets, holdings: localHoldings };
-    }
-  } catch (e) {
-    if (IS_DEV) console.warn('[DATA] local parse error', e);
-  }
-
-  return null;
-}
+// LEGACY-LOAD-1: loadInitialData removed. It accepted
+// { assets: [], holdings: [] } as a valid remote payload via
+// isValidPortfolioData, which would have let an empty Supabase row
+// authoritatively clobber a populated local cache if any caller had
+// adopted it. initPortfolioData (still active) sidesteps the trap by
+// also requiring backendData.assets.length > 0 before trusting the
+// remote, so the boot path is unaffected. isValidPortfolioData stays
+// because initPortfolioData still uses it as a shape gate.
 
 async function loadPortfolioFromBackend(userId) {
   if (!supabaseClient || !userId) return null;
@@ -24502,8 +24484,8 @@ function _aurixResetAt() {
 function _shouldDistrustRemote(remoteData) {
   // True when local reset tombstone is newer than remote's updated_at —
   // meaning the user wiped their portfolio after this remote snapshot
-  // was written. Used by initPortfolioData / loadInitialData so stale
-  // remote rows never resurrect deleted assets.
+  // was written. Used by initPortfolioData so stale remote rows
+  // never resurrect deleted assets.
   try {
     const tombstone = _aurixResetAt();
     if (!tombstone) return false;
