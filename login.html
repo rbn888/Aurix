@@ -280,6 +280,18 @@
     const otpBackEl    = document.getElementById('otp-back');
     const otpResendEl  = document.getElementById('otp-resend');
 
+    // EMAIL-VALIDATE-1: basic syntactic check before issuing an OTP
+    // request. Stricter than `includes('@')` (which let "a@", "@b",
+    // "test domain@x" through) but intentionally NOT full RFC 5322 —
+    // the OTP send itself is the authoritative validator. Trims first
+    // so trailing spaces from autofill / paste do not block valid
+    // addresses. Returns false for null / undefined / non-string.
+    function _isValidEmail(raw) {
+      if (typeof raw !== 'string') return false;
+      const s = raw.trim();
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+    }
+
     // OTP-RESEND-1: friendly Spanish messages for the auth surfaces.
     // We never show raw Supabase error text to the user — every error
     // is classified into one of the known buckets below. Generic stays
@@ -427,7 +439,7 @@
         submitBtn.innerText = 'Enviar código de acceso';
         return;
       }
-      const validEmail = emailEl.value && emailEl.value.includes('@');
+      const validEmail = _isValidEmail(emailEl.value);
       submitBtn.disabled  = !validEmail;
       submitBtn.innerText = 'Enviar código de acceso';
     }
@@ -486,7 +498,7 @@
 
       try {
         const email = emailEl.value.trim();
-        if (!email || !email.includes('@')) {
+        if (!_isValidEmail(email)) {
           errorEl.style.color = 'var(--red)';
           errorEl.innerText = 'Introduce un email válido';
           return;
