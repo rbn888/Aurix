@@ -18952,10 +18952,16 @@ assetForm.addEventListener('submit', e => {
     const price  = parseLocalFloat(document.getElementById('manualPrice')?.value) || 0;
     const ticker = nameVal.replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase() || 'MANU';
 
-    // Merge into existing position if same ISIN (or same ticker+type fallback)
+    // MANUAL-MERGE-1: merge only when the user typed a real ISIN AND
+    // it matches an existing row with the same currency. Without an
+    // ISIN the derived 4-letter ticker (e.g. "Vanguard ETF 1" and
+    // "Vanguard Fund 2" → VANG) is not reliable identity, so manual
+    // entries without an ISIN always create a new row to avoid silent
+    // qty/costBasis collapse across unrelated assets.
+    const newManualCurrency = (manualCurrency || 'USD').toUpperCase();
     const existing = isinVal
-      ? assets.find(a => a.isin === isinVal)
-      : assets.find(a => a.ticker.toUpperCase() === ticker && a.type === manualAssetType);
+      ? assets.find(a => a.isin === isinVal && (a.assetCurrency || 'USD').toUpperCase() === newManualCurrency)
+      : null;
 
     let manualFlashId = existing?.id;
     if (existing) {
@@ -19011,11 +19017,19 @@ assetForm.addEventListener('submit', e => {
 
   // Merge into existing position
   // Gold: always isolated by karat + unit — never merged across combinations
+  // MANUAL-MERGE-1: market and ticker-fallback paths additionally require
+  // the same currency. Same ticker on different exchanges (e.g. IWDA.L
+  // in USD vs IWDA.AS in EUR) must NOT collapse into one row — qty/cost
+  // basis would silently mix denominations and corrupt PnL. Crypto and
+  // gold paths are always USD-denominated, so the currency check is
+  // unnecessary for those branches.
+  const newCurrency = (pendingCurrency || 'USD').toUpperCase();
   const existing = assets.find(a => {
+    const aCurrency = (a.assetCurrency || 'USD').toUpperCase();
     if (coinId && a.coinId) return a.coinId === coinId;
     if (isGoldAsset)        return a.ticker === 'XAU' && a.karat === karat && a.goldUnit === goldUnit;
-    if (marketSymbol && a.marketSymbol) return a.marketSymbol === marketSymbol;
-    return a.ticker.toUpperCase() === ticker.toUpperCase() && a.type === type;
+    if (marketSymbol && a.marketSymbol) return a.marketSymbol === marketSymbol && aCurrency === newCurrency;
+    return a.ticker.toUpperCase() === ticker.toUpperCase() && a.type === type && aCurrency === newCurrency;
   });
 
   // Cost basis for this purchase (in asset's native USD)
