@@ -20838,6 +20838,30 @@ document.getElementById('appRoot').style.opacity = '0';
         window.maybeShowOnboarding();
       }
     });
+
+    // MARKET-HYDRATE-1: seeded watchlist symbols stayed at "—" on the
+    // dashboard tracking card until the user actually opened the Market
+    // tab (the only path that previously hydrated MARKET_DATA for them).
+    // Fire-and-forget hydration after initial render so the dashboard
+    // converges to real prices in the background. The helper already
+    // (a) skips symbols already priced — duplicate-request guard, and
+    // (b) swallows network failures, so this never throws or blocks.
+    Promise.resolve().then(() => {
+      try {
+        const symbols = (typeof getWatchlist === 'function') ? getWatchlist() : [];
+        let seeded = false;
+        try { seeded = localStorage.getItem('aurix_watchlist_seeded') === 'true'; } catch (_) {}
+        if ((symbols && symbols.length) || seeded) {
+          if (typeof _wp6dHydrateMarketDataFor === 'function') {
+            _wp6dHydrateMarketDataFor(symbols).catch(err => {
+              if (IS_DEV) console.warn('[market-hydrate] watchlist hydration failed:', err?.message);
+            });
+          }
+        }
+      } catch (e) {
+        if (IS_DEV) console.warn('[market-hydrate] watchlist hydration error:', e?.message);
+      }
+    });
   } catch (e) {
     console.error('[BOOT ERROR]', e);
     hideLoader();
