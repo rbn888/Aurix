@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 
-const ALLOWED_ORIGIN = 'https://rbn888.github.io';
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://rbn888.github.io';
 
 const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 5 * 60 * 1000;
