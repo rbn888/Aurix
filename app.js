@@ -252,17 +252,12 @@ async function initPortfolioData(userId) {
   return { assets: [], holdings: [] };
 }
 
-async function signUp(email, password) {
-  const { data, error } = await supabaseClient.auth.signUp({ email, password });
-  if (error) console.error('[AUTH] signup error', error);
-  return data;
-}
-
-async function signIn(email, password) {
-  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-  if (error) console.error('[AUTH] login error', error);
-  return data;
-}
+// AUTH-HARDEN-1: password auth intentionally disabled. Invite-gated
+// OTP (signInWithOtp + validate_invite_code RPC) is the only public
+// auth flow — leaving signUp / signInWithPassword wrappers as window
+// globals would let any DevTools console bypass the invite gate.
+// signOut below is the only auth helper that survives; the UI logout
+// button (app.js:22401) depends on it.
 
 async function signOut() {
   await supabaseClient.auth.signOut();
