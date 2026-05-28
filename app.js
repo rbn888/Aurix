@@ -9994,58 +9994,26 @@ function _aurixDashMountWhenReady(surface) {
   setTimeout(tryMount, 0);
 }
 
-const _AURIX_DASH_SPAN = Object.freeze({
-  '24h': 24 * 3600 * 1000,
-  '7d':  7  * 86400 * 1000,
-  '30d': 30 * 86400 * 1000,
-  '1y':  365 * 86400 * 1000,
-  'all': 0,
-});
-
-// Build a normalized series for Aurix in BASE currency, mirroring
-// getChartData()'s render-time toBase() conversion. We never alter
-// portfolioHistory itself.
-//
-// AURIX-CHARTS-1 PHASE 1 — TRUSTED HISTORY. Every point fed to the V2
-// dashboard chart must satisfy `ts >= aurix_portfolio_epoch` when an
-// epoch is set, otherwise a pre-reset 52K snapshot can paint a phantom
-// -96% drop on top of a fresh post-reset portfolio. Defense-in-depth
-// mirrors loadHistory() + getChartData() — the same rule, asserted at
-// every read site.
+// CHART-PARITY-1: the V2 dashboard series is now derived from the
+// SAME unified pipeline (getChartData) that feeds the legacy desktop
+// + mobile Chart.js instances. This eliminates the previous
+// divergence where the V2 overlay's parallel filter+sort+toBase path
+// produced a different shape than the legacy processSeries+grid+
+// downsample path, which in turn made desktop and mobile screenshots
+// show conflicting % deltas for the same portfolio + range. Both
+// surfaces now read identical timestamps + values; the V2 overlay's
+// own visualNormalization is intentionally disabled at mount time
+// (see _aurixDashMount) so neither side smooths data the other does
+// not. portfolioHistory itself is never mutated.
 function _aurixDashSeries(range) {
-  const now    = Date.now();
-  const span   = _AURIX_DASH_SPAN[range];
-  const cutoff = (range === 'all' || span === 0) ? 0 : now - span;
-  const epoch  = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
-  const out = [];
-  if (Array.isArray(portfolioHistory)) {
-    for (const p of portfolioHistory) {
-      if (!p) continue;
-      const t = Number(p.ts);
-      const v = Number(p.value);
-      if (!Number.isFinite(t) || !Number.isFinite(v) || v <= 0) continue;
-      if (epoch && t < epoch) continue;   // PHASE 1 — strict epoch gate
-      if (t < cutoff) continue;
-      out.push({ time: t, value: toBase(v, 'USD') });
-    }
-    out.sort((a, b) => a.time - b.time);
-  }
-  // PHASE 1 — clean baseline. If the user has a live portfolio value
-  // but fewer than 2 valid post-epoch points (typical right after a
-  // reset, before recordSnapshot has accrued any history), feed a
-  // flat 5-minute baseline at the current value. Performance reads
-  // 0.00 / 0.0% — no red phantom drop, no fake history.
-  if (out.length < 2) {
-    let currentBase = 0;
-    try { currentBase = (typeof totalValueBase === 'function') ? Number(totalValueBase()) : 0; }
-    catch (_) { currentBase = 0; }
-    if (Number.isFinite(currentBase) && currentBase > 0) {
-      return [
-        { time: now - 5 * 60_000, value: currentBase },
-        { time: now,              value: currentBase },
-      ];
-    }
-    return [];
+  const data = (typeof getChartData === 'function') ? getChartData(range) : null;
+  if (!data) return [];
+  const values     = Array.isArray(data.values)     ? data.values     : [];
+  const timestamps = Array.isArray(data.timestamps) ? data.timestamps : [];
+  if (values.length < 2 || timestamps.length !== values.length) return [];
+  const out = new Array(values.length);
+  for (let i = 0; i < values.length; i++) {
+    out[i] = { time: timestamps[i], value: values[i] };
   }
   return out;
 }
@@ -10125,16 +10093,20 @@ function _aurixDashMount(surface) {
       // (window resize, mobile slider transitions) is handled by the
       // engine's own ResizeObserver — see services/aurix-chart-core.js.
       height:         parent.clientHeight || (isDesktop ? 190 : 220),
-      // CHART-CORE: dashboard opts into visual normalization so a
-      // bad historical snapshot, a single-bar pricing glitch, or a
-      // currency anomaly can't dominate the line on long ranges. Raw
-      // values in portfolioHistory are NEVER mutated — this lives at
-      // the render layer only.
+      // CHART-PARITY-1: visual normalization disabled. Sanitisation
+      // now lives upstream in getChartData (the single source of
+      // truth for both legacy and V2 dashboard surfaces), so the V2
+      // engine's parallel outlier-filter + smoothing would only
+      // re-shape data the legacy chart shows as-is, reintroducing
+      // exactly the desktop ↔ mobile divergence this commit fixes.
+      // Leaving the field present and explicit so a future debug
+      // session can re-enable per-surface without remembering the
+      // default lived deep in the engine.
       visualNormalization: {
-        enabled:       true,
-        outlierFilter: true,
-        smoothing:     true,
-        robustScale:   true,
+        enabled:       false,
+        outlierFilter: false,
+        smoothing:     false,
+        robustScale:   false,
         mode:          'portfolio',
       },
     });
@@ -11466,7 +11438,18 @@ function getChartData(range) {
   //    portfolioHistory is treated as read-only; we never mutate it here.
   //    This guarantees processSeries always receives the same ordered input
   //    regardless of when or where the chart is rendered.
-  const _empty = { labels: [], values: [] };
+  //
+  // CHART-PARITY-1: this is now the single source of truth for the
+  // portfolio chart. Legacy Chart.js (desktop + mobile) and the V2
+  // lightweight-charts overlay both read from this function via
+  // getChartData / _aurixDashSeries, so the series, the first value
+  // and the deltaPct are byte-identical across every surface.
+  const _empty = {
+    labels: [], values: [], timestamps: [],
+    firstValue: null, lastValue: null,
+    deltaAbs: null, deltaPct: null,
+    pointsCount: 0, isLowData: true, source: 'empty',
+  };
 
   // AURIX-CHARTS-1 PHASE 1 — TRUSTED HISTORY. Strict epoch filter at
   // the chart boundary so a pre-reset 52K snapshot can never repaint a
@@ -11490,8 +11473,16 @@ function getChartData(range) {
     if (Number.isFinite(currentBase) && currentBase > 0) {
       const baseTs = now - 5 * 60_000;
       return {
-        labels: [fmt(baseTs), fmt(now)],
-        values: [currentBase, currentBase],
+        labels:      [fmt(baseTs), fmt(now)],
+        values:      [currentBase, currentBase],
+        timestamps:  [baseTs, now],
+        firstValue:  currentBase,
+        lastValue:   currentBase,
+        deltaAbs:    0,
+        deltaPct:    0,
+        pointsCount: 2,
+        isLowData:   true,
+        source:      'flat-baseline',
       };
     }
     return _empty;
@@ -11549,9 +11540,36 @@ function getChartData(range) {
     }
   }
 
+  const labels     = final.map(p => fmt(p.ts));
+  const timestamps = final.map(p => p.ts);
+  const values     = final.map(p => toBase(p.value, 'USD'));
+  // CHART-PARITY-1: firstValue is sanitised here so every consumer
+  // (legacy updateChart, V2 _aurixDashSync, computeRangePnL) sees the
+  // same baseline. Skip leading zero/NaN values that would produce a
+  // division-by-zero or absurd %; if none of the values is valid, the
+  // delta fields stay null and callers render "—" instead of lying.
+  let firstValue = null;
+  for (let i = 0; i < values.length; i++) {
+    if (Number.isFinite(values[i]) && values[i] > 0) { firstValue = values[i]; break; }
+  }
+  const lastValue = values.length ? values[values.length - 1] : null;
+  const deltaAbs  = (Number.isFinite(firstValue) && Number.isFinite(lastValue))
+    ? lastValue - firstValue
+    : null;
+  const deltaPct  = (Number.isFinite(firstValue) && firstValue > 0 && Number.isFinite(lastValue))
+    ? ((lastValue - firstValue) / firstValue) * 100
+    : null;
   return {
-    labels: final.map(p => fmt(p.ts)),
-    values: final.map(p => toBase(p.value, 'USD')),
+    labels,
+    values,
+    timestamps,
+    firstValue,
+    lastValue,
+    deltaAbs,
+    deltaPct,
+    pointsCount: values.length,
+    isLowData:   values.length < 2,
+    source:      'history',
   };
 }
 
@@ -11583,12 +11601,21 @@ function updateChart(animate = false) {
   // Use the live portfolio value as "now" so chart PnL never diverges from
   // the actual portfolio total, even when the last chart point is a snapshot
   // that's slightly behind the current price feed.
-  const startValue   = data.values[0];
+  //
+  // CHART-PARITY-1: firstValue comes from the unified data pipeline
+  // (the same series the V2 overlay reads). If it is null — invalid or
+  // <= 0 — the % is not meaningful and we render "—" rather than a
+  // misleading huge number. Both desktop and the mobile mirror below
+  // read the SAME chartChangeEl text, so they cannot disagree.
+  const startValue   = data.firstValue;
   const currentValue = totalValueBase();
-  const pct = startValue > 0 ? ((currentValue - startValue) / startValue) * 100 : 0;
-  const cls = pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat';
+  const safeBase     = Number.isFinite(startValue) && startValue > 0;
+  const pct = safeBase ? ((currentValue - startValue) / startValue) * 100 : 0;
+  const cls = !safeBase ? 'flat' : (pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat');
 
-  if (activePerfMode === 'curr') {
+  if (!safeBase) {
+    chartChangeEl.textContent = '—';
+  } else if (activePerfMode === 'curr') {
     const absChange = currentValue - startValue;
     const absSign   = absChange >= 0 ? '+' : '';
     chartChangeEl.textContent = `${absSign}${formatBase(absChange)}`;
