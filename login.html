@@ -302,6 +302,76 @@
   <script>
     'use strict';
 
+    // OBSERVABILITY-LOGIN-1: tiny inline reporter for the login flow.
+    // Mirrors the app.js reporter contract — same /api/client-log endpoint,
+    // same payload allowlist, no PII (no email, invite code or OTP token).
+    // Removable: delete this IIFE plus every _reportLoginSafe call site.
+    (function () {
+      const _isDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      if (_isDev) { window._reportLogin = function () {}; return; }
+      try {
+        const ENDPOINT    = 'https://isa-portfolio-ten.vercel.app/api/client-log';
+        const MAX_REPORTS = 5;
+        const seen        = new Set();
+        let sent          = 0;
+        function trim(s, n) {
+          if (typeof s !== 'string') return '';
+          return s.length > n ? s.slice(0, n) : s;
+        }
+        function send(kind, msg, stack) {
+          try {
+            if (navigator.onLine === false) return;
+            if (sent >= MAX_REPORTS) return;
+            const sig = (kind || '') + '|' + (msg || '').slice(0, 120);
+            if (seen.has(sig)) return;
+            seen.add(sig);
+            sent++;
+            const payload = {
+              build: window.AURIX_BUILD || '',
+              ts:    Date.now(),
+              kind:  kind || 'unknown',
+              msg:   trim(msg, 500),
+              stack: trim(stack, 1500),
+              path:  trim(location.pathname, 200),
+              ua:    trim(navigator.userAgent, 300),
+            };
+            fetch(ENDPOINT, {
+              method:  'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body:    JSON.stringify(payload),
+              keepalive: true,
+              mode:    'cors',
+              credentials: 'omit',
+            }).catch(function () {});
+          } catch (_) { /* reporter must never throw */ }
+        }
+        window._reportLogin = send;
+        window.addEventListener('error', function (e) {
+          try {
+            const file = (e && e.filename) || '';
+            if (file.indexOf('chrome-extension://') === 0 ||
+                file.indexOf('moz-extension://')    === 0 ||
+                file.indexOf('safari-extension://') === 0) return;
+            send('uncaught', (e && e.message) || 'uncaught', (e && e.error && e.error.stack) || '');
+          } catch (_) {}
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          try {
+            const r = e && e.reason;
+            send('unhandledrejection', r ? (r.message || String(r)) : 'unhandledrejection', (r && r.stack) || '');
+          } catch (_) {}
+        });
+      } catch (_) { /* reporter setup must never throw */ }
+    })();
+
+    function _reportLoginSafe(kind, msg, stack) {
+      try {
+        if (typeof window._reportLogin === 'function') {
+          window._reportLogin(kind, msg, stack);
+        }
+      } catch (_) {}
+    }
+
     // ── Supabase client ────────────────────────────────────────
     let client = null;
     if (typeof SUPABASE_URL !== 'undefined' && typeof SUPABASE_ANON_KEY !== 'undefined' && window.supabase) {
@@ -394,10 +464,12 @@
         if (error) {
           // Network / RPC error — surface to callers/devtools while
           // keeping the same locked-UX as an invalid code.
+          _reportLoginSafe('invite-rpc', error.message || 'rpc error', '');
           return { valid: false, error: error.message || 'network' };
         }
         return { valid: data === true };
       } catch (e) {
+        _reportLoginSafe('invite-rpc', (e && e.message) || 'network', (e && e.stack) || '');
         return { valid: false, error: (e && e.message) ? e.message : 'network' };
       }
     }
@@ -603,6 +675,7 @@
             handleRateLimit();
             return;
           }
+          _reportLoginSafe('otp-send', (sendErr.message || String(sendErr)), sendErr.stack || '');
           errorEl.style.color = 'var(--red)';
           errorEl.innerText   = _authErrorText(sendErr);
           updateSubmitState();
@@ -676,6 +749,12 @@
           const txt = (cls === 'network' || cls === 'rate')
             ? AUTH_ERROR_TEXT[cls]
             : AUTH_ERROR_TEXT['otp-invalid'];
+          // Skip the two normal-user-feedback buckets ('otp-invalid' = wrong
+          // or expired code, 'rate' = throttled). Only network/generic
+          // failures reach the reporter.
+          if (cls !== 'otp-invalid' && cls !== 'rate') {
+            _reportLoginSafe('otp-verify', (verifyErr.message || String(verifyErr)), verifyErr.stack || '');
+          }
           otpErrorEl.innerText   = txt;
           otpSubmitBtn.disabled  = false;
           otpSubmitBtn.innerText = 'Verificar código';
@@ -745,6 +824,9 @@
       if (resendErr) {
         otpErrorEl.style.color = 'var(--red)';
         otpErrorEl.innerText   = _authErrorText(resendErr);
+        if (!(isRateLimitError(resendErr) || _classifyAuthError(resendErr) === 'rate')) {
+          _reportLoginSafe('otp-resend', (resendErr.message || String(resendErr)), resendErr.stack || '');
+        }
         // Restore button so the user can retry once they've waited.
         // The error text already communicates why; no extra cooldown.
         otpResendEl.disabled   = false;
