@@ -5,11 +5,132 @@ const IS_DEV =
   location.hostname === 'localhost' ||
   location.hostname === '127.0.0.1';
 
+// OBSERVABILITY-1: lightweight production error reporter.
+// Active only in production, rate-limited, deduplicated, fire-and-forget.
+// Removable: delete this IIFE plus api/client-log.js to disable.
+// Payload contract is intentionally narrow — no portfolio, holdings,
+// emails, tokens or Supabase session objects are ever sent.
+(function () {
+  if (IS_DEV) return;
+  try {
+    const ENDPOINT    = 'https://isa-portfolio-ten.vercel.app/api/client-log';
+    const API_HOST    = 'isa-portfolio-ten.vercel.app';
+    const MAX_REPORTS = 10;     // per page session — caps spam, prevents loops
+    const MAX_MSG     = 500;
+    const MAX_STACK   = 1500;
+    const MAX_UA      = 300;
+    const seen        = new Set();
+    let sent          = 0;
+
+    function trim(s, n) {
+      if (typeof s !== 'string') return '';
+      return s.length > n ? s.slice(0, n) : s;
+    }
+
+    function send(kind, msg, stack, endpoint) {
+      try {
+        // Skip while offline — the worst case is silent loss, but the
+        // alternative is hammering the queued fetch on reconnect.
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+        if (sent >= MAX_REPORTS) return;
+        const sig = (kind || '') + '|' + (msg || '').slice(0, 120) + '|' + (endpoint || '');
+        if (seen.has(sig)) return;
+        seen.add(sig);
+        sent++;
+
+        const payload = {
+          build: (typeof window !== 'undefined' && window.AURIX_BUILD) || '',
+          ts:    Date.now(),
+          kind:  kind || 'unknown',
+          msg:   trim(msg, MAX_MSG),
+          stack: trim(stack, MAX_STACK),
+          path:  trim(location.pathname, 200),
+          ua:    trim(navigator.userAgent, MAX_UA),
+        };
+        if (endpoint) payload.endpoint = trim(endpoint, 200);
+
+        // keepalive: true so the request survives page unload/navigation.
+        // .catch() swallows any reporter-side failure so the app keeps running.
+        _nativeFetch(ENDPOINT, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(payload),
+          keepalive: true,
+          mode:    'cors',
+          credentials: 'omit',
+        }).catch(function () {});
+      } catch (_) { /* reporter must never throw */ }
+    }
+
+    // Capture the native fetch BEFORE the monkey-patch below so reports
+    // never recurse through their own wrapper.
+    const _nativeFetch = window.fetch.bind(window);
+
+    window.reportError = function (kind, msg, stack, endpoint) {
+      send(kind, msg, stack, endpoint);
+    };
+
+    window.addEventListener('error', function (e) {
+      try {
+        const file = (e && e.filename) || '';
+        // Ignore noise from browser extensions injecting into the page.
+        if (file.indexOf('chrome-extension://') === 0 ||
+            file.indexOf('moz-extension://')    === 0 ||
+            file.indexOf('safari-extension://') === 0) return;
+        const msg = (e && e.message) || 'uncaught';
+        const stk = (e && e.error && e.error.stack) || '';
+        send('uncaught', msg, stk);
+      } catch (_) {}
+    });
+
+    window.addEventListener('unhandledrejection', function (e) {
+      try {
+        const r   = e && e.reason;
+        const msg = r ? (r.message || String(r)) : 'unhandledrejection';
+        const stk = (r && r.stack) || '';
+        send('unhandledrejection', msg, stk);
+      } catch (_) {}
+    });
+
+    // Wrap fetch to capture severe non-2xx responses from the Aurix
+    // backend only. We skip 4xx auth/validation noise (401/403/404) so
+    // expected denials, missing assets and invite/validation errors do
+    // not flood the log. 408/429/5xx are operationally meaningful.
+    window.fetch = function (input, init) {
+      return _nativeFetch(input, init).then(function (resp) {
+        try {
+          const url = typeof input === 'string'
+            ? input
+            : (input && typeof input.url === 'string' ? input.url : '');
+          if (!url || url.indexOf(API_HOST) === -1) return resp;
+          const s = resp && resp.status;
+          const report = s >= 500 || s === 408 || s === 429;
+          if (!report) return resp;
+          let path = url;
+          try { path = new URL(url, location.origin).pathname; } catch (_) {}
+          send('api', 'HTTP ' + s, '', path);
+        } catch (_) {}
+        return resp;
+      });
+    };
+  } catch (_) { /* reporter setup must never throw */ }
+})();
+
+function _reportSafe(kind, msg, stack, endpoint) {
+  try {
+    if (typeof window !== 'undefined' && typeof window.reportError === 'function') {
+      window.reportError(kind, msg, stack, endpoint);
+    }
+  } catch (_) {}
+}
+
 if (typeof SUPABASE_URL === 'undefined') {
   console.error('[SUPABASE ERROR] config.js not loaded');
+  _reportSafe('auth-boot', 'config.js not loaded');
 }
 if (typeof window.supabase === 'undefined') {
   console.error('[SUPABASE ERROR] CDN not loaded');
+  _reportSafe('auth-boot', 'supabase CDN not loaded');
 }
 
 let supabaseClient = null;
@@ -12091,6 +12212,12 @@ async function _refreshPricesImpl() {
   // ── 3. Rollback only if both sources failed ───────────────────────────
   if (!cryptoSuccess && !marketSuccess) {
     console.error('[refreshPrices] both sources failed:', cryptoResult.reason, marketResult.reason);
+    {
+      const reason = cryptoResult.reason || marketResult.reason;
+      const rmsg   = reason ? (reason.message || String(reason)) : 'both sources failed';
+      const rstk   = (reason && reason.stack) || '';
+      _reportSafe('refresh', rmsg, rstk);
+    }
     assets.forEach((a, i) => {
       a.price     = rollback[i].price;
       a.prevPrice = rollback[i].prevPrice;
@@ -20804,6 +20931,7 @@ document.getElementById('appRoot').style.opacity = '0';
       await refreshPrices();
     } catch (err) {
       console.warn('[BOOT] refreshPrices failed (continuing with cache)', err);
+      _reportSafe('refresh', (err && err.message) || 'boot refresh failed', (err && err.stack) || '');
       try { setUpdateStatus('error'); } catch (_) {}
     }
     try { marketStore.start(); } catch (_) {}
