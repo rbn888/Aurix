@@ -12946,21 +12946,42 @@ function updateCategoryCards() {
 
   grid.querySelectorAll('.cat-card').forEach(btn => {
     let _tapOk = false;
+    // CAT-TAP-SLOP-1: capture the touchstart coordinates so touchmove
+    // can ignore the natural 2–6 px wiggle of a real finger and only
+    // cancel the tap when the user has actually started a scroll. The
+    // previous version cancelled on any pixel of movement, which made
+    // a non-trivial fraction of taps feel unresponsive on mobile.
+    let _tapX = 0;
+    let _tapY = 0;
+    const TAP_SLOP_PX = 10;
     // CAT-EMPTY-1: empty categories render but do not drill down.
     // Reading the class once at bind time is enough — cards are
     // re-rendered (and these listeners re-bound) whenever assets
     // change, so the flag never gets stale relative to the DOM.
     const isEmptyCard = btn.classList.contains('cat-card--empty');
 
-    // touchstart: visual press feedback immediately
-    btn.addEventListener('touchstart', () => {
+    // touchstart: visual press feedback immediately + snapshot the
+    // starting finger position for the touchmove slop test below.
+    btn.addEventListener('touchstart', (e) => {
       if (isEmptyCard) return;
       _tapOk = true;
+      const t = e.touches && e.touches[0];
+      _tapX = t ? t.clientX : 0;
+      _tapY = t ? t.clientY : 0;
       btn.classList.add('is-pressing');
     }, { passive: true });
 
-    // touchmove: user is scrolling, cancel tap
-    btn.addEventListener('touchmove', () => {
+    // touchmove: only cancel the tap if the finger has moved past the
+    // slop threshold (i.e. the user is genuinely scrolling). Below the
+    // threshold we keep both _tapOk and the .is-pressing class so the
+    // tap still fires on touchend.
+    btn.addEventListener('touchmove', (e) => {
+      if (!_tapOk) return;
+      const t = e.touches && e.touches[0];
+      if (!t) return;
+      const dx = t.clientX - _tapX;
+      const dy = t.clientY - _tapY;
+      if ((dx * dx + dy * dy) < (TAP_SLOP_PX * TAP_SLOP_PX)) return;
       _tapOk = false;
       btn.classList.remove('is-pressing');
     }, { passive: true });
@@ -20815,6 +20836,42 @@ function initMobileCharts() {
               // Asset-detail chart ticks: same canonical conversion as the
               // dashboard chart above. Series are USD-denominated.
               callback: v => formatDisplayShort(v, 'USD'),
+            },
+            // CHART-FIT-MOBILE-1: tighten the Y-axis so the portfolio
+            // line uses the available chart height instead of being
+            // compressed into the middle by Chart.js's default
+            // nice-rounding. On phones the loose default range is
+            // especially visible — flat-ish portfolios collapse the
+            // line into a narrow band. Here we compute min/max from
+            // the visible data, enforce a minimum visual range so a
+            // near-flat series still shows movement, and add a 6 %
+            // padding so the line and the latest-value badge never
+            // touch the canvas edges. Desktop config is intentionally
+            // left alone (different visual budget).
+            afterDataLimits(scale) {
+              const ds = scale.chart.data.datasets && scale.chart.data.datasets[0];
+              const data = (ds && ds.data) || [];
+              const nums = data.filter(v => typeof v === 'number' && isFinite(v));
+              if (nums.length < 2) return;
+              let lo = Math.min.apply(null, nums);
+              let hi = Math.max.apply(null, nums);
+              if (lo === hi) {
+                const span = Math.max(Math.abs(hi) * 0.005, 0.5);
+                lo -= span; hi += span;
+              } else {
+                // Minimum visual range: ~0.4 % of the higher value
+                // so a near-flat curve still has visible movement.
+                const minRange = Math.max(Math.abs(hi) * 0.004, 0.5);
+                if ((hi - lo) < minRange) {
+                  const mid = (hi + lo) / 2;
+                  lo = mid - minRange / 2;
+                  hi = mid + minRange / 2;
+                }
+                const pad = (hi - lo) * 0.06;
+                lo -= pad; hi += pad;
+              }
+              scale.min = lo;
+              scale.max = hi;
             },
           },
         },
