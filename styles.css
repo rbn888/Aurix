@@ -15148,6 +15148,19 @@ body.gs-open { overflow: hidden; }
   display: none !important;
 }
 
+/* AURIX-EMPTY-MOBILE-COMPACT-1: on phones + portrait tablets, the
+   quickstart chip row on the dashboard's empty state pushes the
+   primary CTAs below the fold. Hide it on the main activation card
+   so the first action is reachable without scroll. The :not()
+   guard scopes the rule to the dashboard empty state — category
+   drill-down empty states already hide chips above and stay
+   unaffected. Desktop layout is untouched. */
+@media (max-width: 768px) {
+  .empty-state--activation:not([data-empty-category]) .empty-state-quickstart {
+    display: none;
+  }
+}
+
 /* ══════════════════════════════════════════════════════════════════
    AURIX-SIGNALS-2 — Compact dashboard awareness card + Portfolio
    Health bridge. The card is intentionally slim so it never pushes
