@@ -1464,8 +1464,8 @@ const T = {
     // ── Premium empty / activation states ────────────
     emptyHeroTitle:       'Tu portfolio está listo para empezar.',
     emptyHeroBody:        'Añade tu primer activo para construir tu visión financiera.',
-    emptyCtaPrimary:      '+ Añadir primer activo',
-    emptyCtaSecondary:    'Explorar mercado',
+    emptyCtaPrimary:      'Añadir activo',
+    emptyCtaSecondary:    'Añadir liquidez',
     emptyAssetCount:      'Sin activos todavía',
     emptyPerf:            'Esperando tu primer activo',
     emptyDonutLabel:      'Sin activos',
@@ -1473,8 +1473,8 @@ const T = {
     emptyChartTitle:      'Tu evolución aparecerá aquí',
     emptyChartBody:       'cuando añadas activos.',
     emptyCatSub:          'Sin asignación todavía',
-    emptyActivationTitle: 'Empieza tu portfolio',
-    emptyActivationBody:  'Añade acciones, cripto, ETFs, oro o liquidez.',
+    emptyActivationTitle: 'Empieza creando tu cartera',
+    emptyActivationBody:  'Añade tu primer activo para ver rendimiento, distribución e insights.',
     emptyQuickStart:      'Empieza con',
     emptyChipBtc:         'Bitcoin',
     emptyChipAapl:        'Apple',
@@ -2572,8 +2572,8 @@ const T = {
     // ── Premium empty / activation states ────────────
     emptyHeroTitle:       'Your portfolio is ready to begin.',
     emptyHeroBody:        'Add your first asset to start building your financial view.',
-    emptyCtaPrimary:      '+ Add first asset',
-    emptyCtaSecondary:    'Explore market',
+    emptyCtaPrimary:      'Add asset',
+    emptyCtaSecondary:    'Add liquidity',
     emptyAssetCount:      'No assets yet',
     emptyPerf:            'Waiting for your first asset',
     emptyDonutLabel:      'No assets',
@@ -2581,8 +2581,8 @@ const T = {
     emptyChartTitle:      'Your evolution will appear here',
     emptyChartBody:       'once you add assets.',
     emptyCatSub:          'No allocation yet',
-    emptyActivationTitle: 'Start your portfolio',
-    emptyActivationBody:  'Add stocks, crypto, ETFs, gold or liquidity.',
+    emptyActivationTitle: 'Start building your portfolio',
+    emptyActivationBody:  'Add your first asset to see performance, distribution and insights.',
     emptyQuickStart:      'Start with',
     emptyChipBtc:         'Bitcoin',
     emptyChipAapl:        'Apple',
@@ -26876,16 +26876,6 @@ if (typeof window !== 'undefined' && _aurixIsDebugHost()) {
     }, 60);
   }
 
-  function _openMarketTab() {
-    if (typeof switchTab === 'function') {
-      switchTab('market');
-      return;
-    }
-    // Fallback: dispatch a click on the bottom-nav market tab.
-    const tab = document.querySelector('#bottomNav [data-tab="market"]');
-    if (tab) tab.click();
-  }
-
   function _handleChip(kind) {
     _quickAdd(kind);
   }
@@ -26911,8 +26901,11 @@ if (typeof window !== 'undefined' && _aurixIsDebugHost()) {
         if (typeof openModal === 'function') openModal();
         return;
       }
-      if (a === 'explore-market') {
-        _openMarketTab();
+      if (a === 'add-liquidity') {
+        // AURIX-EMPTY-1: secondary CTA opens the existing liquidity
+        // modal. Same flow as the global "+ Añadir liquidez" button so
+        // no duplicate logic.
+        if (typeof openLiquidityModal === 'function') openLiquidityModal();
         return;
       }
     }
