@@ -308,8 +308,17 @@
       client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     }
 
+    const _SAFE_REDIRECT_TARGETS = new Set([
+      'index.html',
+      'login.html',
+      'reset.html',
+      'reset-password.html',
+    ]);
     function safeRedirect(path) {
-      window.location.href = '/Aurix/' + path;
+      const target  = _SAFE_REDIRECT_TARGETS.has(path) ? path : 'login.html';
+      const onAurix = window.location.pathname.startsWith('/Aurix/');
+      const base    = window.location.origin + (onAurix ? '/Aurix/' : '/');
+      window.location.href = base + target;
     }
 
     if (client) {
@@ -674,7 +683,7 @@
         }
 
         localStorage.removeItem('aurix_otp_email');
-        window.location.href = '/Aurix/index.html';
+        safeRedirect('index.html');
 
       } finally {
         isVerifying = false;
