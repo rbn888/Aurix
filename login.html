@@ -299,6 +299,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
+  <script src="services/ux.js"></script>
   <script>
     'use strict';
 
@@ -648,9 +649,8 @@
           localStorage.removeItem('cooldown_until');
         }
 
-        errorEl.innerText   = '';
-        submitBtn.disabled  = true;
-        submitBtn.innerText = 'Enviando código...';
+        errorEl.innerText = '';
+        window.setButtonBusy(submitBtn, true, 'Enviando código...');
 
         console.log('OTP REQUEST FIRED');
 
@@ -671,6 +671,7 @@
 
         if (sendErr) {
           console.log('OTP error:', sendErr);
+          window.setButtonBusy(submitBtn, false);
           if (isRateLimitError(sendErr) || _classifyAuthError(sendErr) === 'rate') {
             handleRateLimit();
             return;
@@ -721,9 +722,8 @@
           return;
         }
 
-        otpErrorEl.innerText   = '';
-        otpSubmitBtn.disabled  = true;
-        otpSubmitBtn.innerText = 'Verificando...';
+        otpErrorEl.innerText = '';
+        window.setButtonBusy(otpSubmitBtn, true, 'Verificando...');
 
         let verifyErr = null;
         try {
@@ -755,9 +755,8 @@
           if (cls !== 'otp-invalid' && cls !== 'rate') {
             _reportLoginSafe('otp-verify', (verifyErr.message || String(verifyErr)), verifyErr.stack || '');
           }
-          otpErrorEl.innerText   = txt;
-          otpSubmitBtn.disabled  = false;
-          otpSubmitBtn.innerText = 'Verificar código';
+          otpErrorEl.innerText = txt;
+          window.setButtonBusy(otpSubmitBtn, false);
           return;
         }
 
@@ -806,9 +805,7 @@
 
       isResending = true;
       otpErrorEl.innerText = '';
-      otpResendEl.disabled = true;
-      const originalLabel = otpResendEl.innerText;
-      otpResendEl.innerText = 'Reenviando...';
+      window.setButtonBusy(otpResendEl, true, 'Reenviando...');
 
       let resendErr = null;
       try {
@@ -821,16 +818,17 @@
         resendErr = e;
       }
 
+      // Restore the resend button before either branch runs. On the
+      // success path, _startResendCooldown will re-disable + relabel
+      // with the countdown; on the error path, the user can retry.
+      window.setButtonBusy(otpResendEl, false);
+
       if (resendErr) {
         otpErrorEl.style.color = 'var(--red)';
         otpErrorEl.innerText   = _authErrorText(resendErr);
         if (!(isRateLimitError(resendErr) || _classifyAuthError(resendErr) === 'rate')) {
           _reportLoginSafe('otp-resend', (resendErr.message || String(resendErr)), resendErr.stack || '');
         }
-        // Restore button so the user can retry once they've waited.
-        // The error text already communicates why; no extra cooldown.
-        otpResendEl.disabled   = false;
-        otpResendEl.innerText  = originalLabel || 'Reenviar código';
       } else {
         otpErrorEl.style.color = 'var(--text-muted)';
         otpErrorEl.innerText   = 'Nuevo código enviado. Revisa tu email.';

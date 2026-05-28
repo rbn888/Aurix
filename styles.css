@@ -267,6 +267,20 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
   pointer-events: none;
 }
 
+/* ── UX-LOADING-1: standardized async-button busy state ───
+   Pairs with services/ux.js (setButtonBusy). Adds a subtle
+   opacity + cursor signal without changing layout. Scoped
+   to <button> so it does not collide with the existing
+   table-cell rules (.col-change.is-loading / .col-chart.is-loading)
+   which keep their own treatment. */
+button.is-loading,
+button[aria-busy="true"] {
+  pointer-events: none;
+  opacity: 0.72;
+  cursor: progress;
+  transition: opacity 160ms ease;
+}
+
 /* ── App Shell ─────────────────────────────────────────── */
 .app {
   max-width: 1080px;
