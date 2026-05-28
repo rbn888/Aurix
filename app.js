@@ -235,9 +235,54 @@ async function saveRemoteSafe(catalogAssets, holdings) {
   }
 }
 
+// SAVE-INDICATOR-1: subtle autosave status. State machine fires only
+// at existing scheduleSave / autoSaveToBackend lifecycle points, so the
+// save flow itself is untouched. The DOM node starts hidden, so any
+// session that never triggers a save (anonymous browse, boot-only) never
+// sees the indicator. Lazy lookup keeps DOM-init ordering safe.
+let _saveSyncedFadeTimer = null;
+function _setSaveStatus(state) {
+  const el = document.getElementById('saveStatus');
+  if (!el) return;
+  clearTimeout(_saveSyncedFadeTimer);
+  if (state === 'hidden') {
+    el.hidden = true;
+    el.removeAttribute('data-state');
+    el.textContent = '';
+    return;
+  }
+  const labels = {
+    saving:   t('saveSaving'),
+    saved:    t('saveSaved'),
+    retrying: t('saveRetrying'),
+    offline:  t('saveOffline'),
+    failed:   t('saveFailed'),
+  };
+  const label = labels[state];
+  if (!label) return;
+  el.hidden = false;
+  el.setAttribute('data-state', state);
+  el.textContent = label;
+  if (state === 'saved') {
+    // After a successful save the badge recedes (lower opacity via CSS)
+    // so the user is reassured but the indicator is not nagging. It stays
+    // readable; the next save cycle promotes it back to full opacity.
+    _saveSyncedFadeTimer = setTimeout(() => {
+      if (el.getAttribute('data-state') === 'saved') {
+        el.setAttribute('data-state', 'saved-faded');
+      }
+    }, 3500);
+  }
+}
+
 function scheduleSave() {
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => { autoSaveToBackend(); }, 500);
+  // SAVE-INDICATOR-1: surface the pending state immediately so the user
+  // gets feedback during the 500 ms debounce window, not just when the
+  // upsert actually fires. If the user is offline the indicator reflects
+  // that instead; the existing retry path will recover when online.
+  _setSaveStatus((typeof navigator !== 'undefined' && navigator.onLine === false) ? 'offline' : 'saving');
 }
 
 async function autoSaveToBackend(attempt = 1) {
@@ -275,6 +320,7 @@ async function autoSaveToBackend(attempt = 1) {
 
     if (error) throw error;
     if (IS_DEV) console.log('[DATA] autosave success');
+    _setSaveStatus('saved');
     // Tombstone served its purpose — remote is now in sync with local.
     if (tombstone) {
       try { localStorage.removeItem(RESET_AT_KEY); } catch (_) {}
@@ -282,10 +328,24 @@ async function autoSaveToBackend(attempt = 1) {
     }
   } catch (e) {
     if (IS_DEV) console.error('[DATA] autosave error:', e);
-    if (attempt < 3) setTimeout(() => autoSaveToBackend(attempt + 1), 1000 * attempt);
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    if (attempt < 3) {
+      _setSaveStatus(offline ? 'offline' : 'retrying');
+      setTimeout(() => autoSaveToBackend(attempt + 1), 1000 * attempt);
+    } else {
+      _setSaveStatus(offline ? 'offline' : 'failed');
+    }
   } finally {
     _isSaving = false;
   }
+}
+
+// SAVE-INDICATOR-1: react to connectivity changes. Going offline mid-save
+// surfaces the offline state immediately; coming back online retries the
+// pending save once (the function self-guards if nothing is pending).
+if (typeof window !== 'undefined') {
+  window.addEventListener('offline', () => { _setSaveStatus('offline'); });
+  window.addEventListener('online',  () => { try { autoSaveToBackend(); } catch (_) {} });
 }
 
 // DELETE-LAST-1: when a delete empties the portfolio, the
@@ -547,6 +607,12 @@ const T = {
     updateError:     'No se pudo actualizar',
     updateStaleSince:n => `Última actualización: hace ${n} min`,
     rateLimit:       'Límite de API — reintentando pronto',
+    // Autosave status
+    saveSaving:      'Guardando…',
+    saveSaved:       'Guardado',
+    saveRetrying:    'Reintentando…',
+    saveOffline:     'Sin conexión',
+    saveFailed:      'Sin sincronizar',
     // Market status
     live24:          '24/7',
     liveMarket:      'Mercado abierto',
@@ -1706,6 +1772,12 @@ const T = {
     updateError:     'Update failed',
     updateStaleSince:n => `Last updated ${n} min ago`,
     rateLimit:       'API limit — retrying soon',
+    // Autosave status
+    saveSaving:      'Saving…',
+    saveSaved:       'Saved',
+    saveRetrying:    'Retrying…',
+    saveOffline:     'Offline',
+    saveFailed:      'Not synced',
     // Market status
     live24:          '24/7',
     liveMarket:      'Market open',

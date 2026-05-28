@@ -155,6 +155,10 @@
                 <span class="update-dot" id="updateDot"></span>
                 <span id="updateText" data-i18n="noPrices">precios no cargados</span>
               </span>
+              <!-- SAVE-INDICATOR-1: subtle autosave status. Hidden until
+                   a save cycle has actually started, so brand-new sessions
+                   never see it. State machine lives in _setSaveStatus(). -->
+              <span class="save-indicator" id="saveStatus" aria-live="polite" hidden></span>
 
             </div>
             <!-- Mobile FAB — inline with "activos · actualizado", hidden on desktop -->

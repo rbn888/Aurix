@@ -3621,6 +3621,57 @@ body:not(.hero-active) #orb-canvas {
   background: #f39c12;
   animation: pulse-dot .9s ease-in-out infinite alternate;
 }
+
+/* SAVE-INDICATOR-1: subtle autosave status pill. Visual peer of
+   .update-indicator — same compact muted text, same colored-dot
+   convention. starts hidden via [hidden] (the JS toggles it only
+   once a save cycle has actually fired) so layout never shifts on
+   first paint. The "saved-faded" variant lowers opacity after a
+   few seconds so a stale "Guardado" recedes without disappearing. */
+.save-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  opacity: 1;
+  transition: opacity 280ms ease;
+}
+.save-indicator::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex-shrink: 0;
+  transition: background 280ms ease;
+}
+.save-indicator[data-state="saving"]::before,
+.save-indicator[data-state="retrying"]::before {
+  background: #f39c12;
+  animation: pulse-dot .9s ease-in-out infinite alternate;
+}
+.save-indicator[data-state="saved"]::before,
+.save-indicator[data-state="saved-faded"]::before {
+  background: var(--green);
+}
+.save-indicator[data-state="offline"]::before,
+.save-indicator[data-state="failed"]::before {
+  background: var(--red);
+}
+.save-indicator[data-state="saved-faded"] { opacity: 0.55; }
+
+@media (max-width: 480px) {
+  /* On very narrow screens hide the save indicator label and keep just
+     the dot, so the meta row never wraps. State is still announced via
+     aria-live to assistive tech. */
+  .save-indicator { font-size: 0; gap: 0; margin-left: 8px; }
+  .save-indicator::before { width: 7px; height: 7px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .save-indicator::before { animation: none; }
+}
 @keyframes pulse-live {
   0%   { opacity: .4; transform: scale(1); }
   50%  { opacity: 1;  transform: scale(1.4); }
