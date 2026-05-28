@@ -12,6 +12,62 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Aurix">
+  <script>
+    // PWA-CONSISTENCY-1: global build identifier + standalone detection.
+    // Runs synchronously before any other script so a stale build cannot
+    // serve a half-cached app. Same user + same account must render the
+    // same code on Safari mobile, the iOS home-screen PWA, and desktop.
+    (function() {
+      window.AURIX_BUILD = 'pwa-consistency-1';
+      try {
+        var KEY     = 'aurix_build';
+        var RELOAD  = 'aurix_build_reload';
+        var stored  = null;
+        try { stored = localStorage.getItem(KEY); } catch (_) {}
+        if (stored && stored !== window.AURIX_BUILD) {
+          // Avoid reload loops: only purge+reload once per build change.
+          var alreadyReloaded = false;
+          try { alreadyReloaded = sessionStorage.getItem(RELOAD) === window.AURIX_BUILD; } catch (_) {}
+          if (!alreadyReloaded) {
+            try { sessionStorage.setItem(RELOAD, window.AURIX_BUILD); } catch (_) {}
+            try { localStorage.setItem(KEY, window.AURIX_BUILD); } catch (_) {}
+            var done = false;
+            var finish = function() {
+              if (done) return;
+              done = true;
+              try { window.location.reload(); } catch (_) {}
+            };
+            // Hard-cap the reset so a slow caches/SW API never hangs boot.
+            setTimeout(finish, 1500);
+            var jobs = [];
+            if (typeof caches !== 'undefined' && caches.keys) {
+              jobs.push(caches.keys().then(function(keys) {
+                return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+              }).catch(function() {}));
+            }
+            if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+              jobs.push(navigator.serviceWorker.getRegistrations().then(function(regs) {
+                return Promise.all(regs.map(function(r) { return r.unregister(); }));
+              }).catch(function() {}));
+            }
+            Promise.all(jobs).then(finish, finish);
+            return; // halt further script execution on this load
+          }
+        } else if (!stored) {
+          try { localStorage.setItem(KEY, window.AURIX_BUILD); } catch (_) {}
+        }
+        // Standalone detection — iOS Safari + modern display-mode media query.
+        var iosStandalone = window.navigator.standalone === true;
+        var mqStandalone  = false;
+        try { mqStandalone = window.matchMedia('(display-mode: standalone)').matches; } catch (_) {}
+        var isStandalone  = iosStandalone || mqStandalone;
+        window.IS_STANDALONE     = isStandalone;
+        window.IS_IOS_STANDALONE = iosStandalone;
+        document.documentElement.setAttribute('data-standalone', isStandalone ? 'true' : 'false');
+        if (iosStandalone) document.documentElement.setAttribute('data-ios-standalone', 'true');
+      } catch (_) { /* boot guard must never throw */ }
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&display=swap" rel="stylesheet">
