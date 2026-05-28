@@ -3112,6 +3112,11 @@ let activeSearchFilter   = 'all';    // 'all' | 'crypto' | 'stock' | 'etf' | 'me
 let focusedSuggIdx       = -1;
 let searchDebounceTimer  = null;
 let searchAbortCtrl      = null;
+// SEARCH-DELAYED-SPINNER-1: the 150 ms gate that decides whether the
+// loading indicator ever paints for the current request. Cleared in
+// every place that aborts a search so a stale spinner never lights up
+// for a query the user has already moved past.
+let searchSpinnerTimer   = null;
 let suppressFocusDefaults = false;  // true when focus is programmatic (openModal/enterSearchMode)
 // ADD-FLOW-ARCH-1: which intent currently owns a modal. Exactly one
 // of these can be active at a time — opening one closes and releases
@@ -18126,6 +18131,7 @@ searchInput.addEventListener('input', () => {
   searchClearBtn.style.display = q ? '' : 'none';
 
   clearTimeout(searchDebounceTimer);
+  clearTimeout(searchSpinnerTimer);
   if (searchAbortCtrl) { searchAbortCtrl.abort(); searchAbortCtrl = null; }
 
   if (!q) {
@@ -18136,14 +18142,16 @@ searchInput.addEventListener('input', () => {
     return;
   }
 
-  // Phase 1 — instant local results (skip for 'all' to avoid partial-results flash)
+  // Phase 1 — instant local results. Loading state is intentionally
+  // suppressed here; the 150 ms delayed spinner below covers the
+  // API-pending window, so fast responses never flash a loading row.
+  // For the 'all' filter (or any filter whose local set is empty) we
+  // skip the immediate paint and let the popover keep whatever it had
+  // until either the spinner fires or the API returns.
   const localResults = getLocalResults(q, activeSearchFilter);
   currentSuggestions = localResults;
-  if (activeSearchFilter === 'all') {
-    // Show loading only — wait for complete combined results in Phase 2
-    renderSuggestions([], q, true);
-  } else {
-    renderSuggestions(localResults, q, activeSearchFilter !== 'metal');
+  if (localResults.length > 0 && activeSearchFilter !== 'all') {
+    renderSuggestions(localResults, q, false);
   }
 
   // Phase 2 — API results after 300ms (skip for metals, they're local only)
@@ -18152,13 +18160,27 @@ searchInput.addEventListener('input', () => {
   searchDebounceTimer = setTimeout(async () => {
     searchAbortCtrl = new AbortController();
     const { signal } = searchAbortCtrl;
+
+    // SEARCH-DELAYED-SPINNER-1: only paint the loading indicator if the
+    // request is still in flight after 150 ms. The signal + query guards
+    // make sure a search the user has already abandoned cannot paint
+    // a spinner over the new one.
+    searchSpinnerTimer = setTimeout(() => {
+      if (signal.aborted) return;
+      if (searchInput.value.trim() !== q) return;
+      renderSuggestions(currentSuggestions, q, true);
+    }, 150);
+
     try {
       const results = await searchByFilter(q, activeSearchFilter, signal);
+      clearTimeout(searchSpinnerTimer);
       if (signal.aborted || searchInput.value.trim() !== q) return;
       if (results && results.length) currentSuggestions = results;
       renderSuggestions(currentSuggestions, q, false);
     } catch (err) {
+      clearTimeout(searchSpinnerTimer);
       if (err.name === 'AbortError') return;
+      if (searchInput.value.trim() !== q) return;
       renderSuggestions(currentSuggestions, q, false);
     }
   }, 300);
@@ -18187,6 +18209,7 @@ searchClearBtn.addEventListener('click', () => {
   searchInput.value = '';
   searchClearBtn.style.display = 'none';
   clearTimeout(searchDebounceTimer);
+  clearTimeout(searchSpinnerTimer);
   if (searchAbortCtrl) { searchAbortCtrl.abort(); searchAbortCtrl = null; }
   closeSuggestions();
   suppressFocusDefaults = true;
@@ -18579,6 +18602,7 @@ function closeModal() {
   modalOverlay.classList.remove('open');
   document.body.classList.remove('modal-open');
   clearTimeout(searchDebounceTimer);
+  clearTimeout(searchSpinnerTimer);
   if (searchAbortCtrl) { searchAbortCtrl.abort(); searchAbortCtrl = null; }
   closeSuggestions();
   // AURIX-ACTIVATION-2: clear the first-asset flag and restore the
@@ -18644,6 +18668,7 @@ filterBtns.forEach(btn => {
 
     // Cancel any pending search
     clearTimeout(searchDebounceTimer);
+    clearTimeout(searchSpinnerTimer);
     if (searchAbortCtrl) { searchAbortCtrl.abort(); searchAbortCtrl = null; }
 
     const q = searchInput.value.trim();
@@ -18655,23 +18680,38 @@ filterBtns.forEach(btn => {
       return;
     }
 
-    // Re-run search with new filter
+    // Re-run search with new filter. Same delayed-spinner contract as
+    // the input handler above — local results are painted instantly
+    // with loading=false, the 150 ms spinner only fires if the API
+    // is genuinely slow.
     const localResults = getLocalResults(q, activeSearchFilter);
     currentSuggestions = localResults;
-    renderSuggestions(localResults, q, activeSearchFilter !== 'metal');
+    if (localResults.length > 0 && activeSearchFilter !== 'all') {
+      renderSuggestions(localResults, q, false);
+    }
 
     if (activeSearchFilter === 'metal') return;
 
     searchDebounceTimer = setTimeout(async () => {
       searchAbortCtrl = new AbortController();
       const { signal } = searchAbortCtrl;
+
+      searchSpinnerTimer = setTimeout(() => {
+        if (signal.aborted) return;
+        if (searchInput.value.trim() !== q) return;
+        renderSuggestions(currentSuggestions, q, true);
+      }, 150);
+
       try {
         const results = await searchByFilter(q, activeSearchFilter, signal);
+        clearTimeout(searchSpinnerTimer);
         if (signal.aborted || searchInput.value.trim() !== q) return;
         if (results && results.length) currentSuggestions = results;
         renderSuggestions(currentSuggestions, q, false);
       } catch (err) {
+        clearTimeout(searchSpinnerTimer);
         if (err.name === 'AbortError') return;
+        if (searchInput.value.trim() !== q) return;
         renderSuggestions(currentSuggestions, q, false);
       }
     }, 300);
