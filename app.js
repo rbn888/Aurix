@@ -4187,37 +4187,18 @@ if (typeof window !== 'undefined') {
   };
 }
 
-function generateSimulatedHistory(currentVal) {
-  if (currentVal <= 0) return [];
-  const now  = Date.now();
-  const DAY  = 86_400_000;
-  const HOUR = 3_600_000;
-  let val = currentVal;
-
-  // 30 daily points (30→1 days ago) — used by 7d and 30d views
-  const daily = [];
-  for (let i = 30; i >= 1; i--) {
-    const d = (Math.random() - 0.47) * 0.035;
-    val = val * (1 - d);
-    daily.push({ ts: now - i * DAY, value: +(Math.max(0, val).toFixed(2)) });
-  }
-
-  // 24 hourly points (last day) — used by 24h view
-  val = currentVal;
-  const hourly = [];
-  for (let i = 24; i >= 1; i--) {
-    const d = (Math.random() - 0.48) * 0.009;
-    val = val * (1 - d);
-    hourly.push({ ts: now - i * HOUR, value: +(Math.max(0, val).toFixed(2)) });
-  }
-
-  return [...daily, ...hourly, { ts: now, value: +(currentVal.toFixed(2)) }];
-}
-
 function recordSnapshot() {
   const now = Date.now();
   const val = totalValueUSD(); // always store in USD for consistent history
-  if (val <= 0) return;
+  // PORTFOLIO-CHART-FIX-1: hard finite + positive guard so a transient
+  // NaN/Infinity from a partially-applied refresh can never sneak into
+  // localStorage. (val <= 0 alone was false for NaN.)
+  if (!Number.isFinite(val) || val <= 0) return;
+  // TODO(jump-guard): also skip when dt < 2 min and |Δ%| > 25 % vs. the
+  // previous valid point, BUT only when the change is not user-driven
+  // (add/edit/delete). Requires threading a "source" arg through
+  // onPortfolioChange so legitimate explicit adds aren't dropped;
+  // deferred until that plumbing lands.
 
   const last     = portfolioHistory[portfolioHistory.length - 1];
   const newPoint = { ts: now, value: +(val.toFixed(2)) };
@@ -6501,14 +6482,13 @@ const _AW8_FINANCIAL_FUNCTIONS = Object.freeze({
     if (args.length !== 0) throw new _AwEvalError('#ERROR');
     return _wp5PortfolioAnalytics().worst || '';
   },
-  // PR-WP5: PORTFOLIO.CAGR is intentionally blocked. portfolioHistory
-  // bootstraps with simulated random-walk data (generateSimulatedHistory)
-  // on a first-session user, and asset.transactions may carry a synthetic
-  // ts from the legacy migrate path. There is no runtime signal that
-  // separates real history from simulated, so any CAGR produced would be
-  // fake finance math. Surfacing #N/A makes the limitation explicit instead
-  // of leaking a misleading number; the slot stays reserved so a future
-  // change that records a verifiable inception date can implement it cleanly.
+  // PR-WP5: PORTFOLIO.CAGR is intentionally blocked. asset.transactions
+  // may still carry a synthetic ts from the legacy migrate path, and
+  // there is no runtime signal that separates real inception dates from
+  // those legacy stamps, so any CAGR produced would be fake finance math.
+  // Surfacing #N/A makes the limitation explicit instead of leaking a
+  // misleading number; the slot stays reserved so a future change that
+  // records a verifiable inception date can implement it cleanly.
   'PORTFOLIO.CAGR'(args) {
     if (args.length !== 0) throw new _AwEvalError('#ERROR');
     throw new _AwEvalError('#N/A');
@@ -11361,21 +11341,25 @@ function initChart() {
 // ── Per-range display-point limits ───────────────────────────────────────
 const MAX_POINTS = { '24h': 80, '7d': 120, '30d': 150, '1y': 200, 'all': 250 };
 
-// ── Downsample via bucket-averaging ──────────────────────────────────────
-// Groups data into equal-sized buckets and averages ts + value within each.
-// Returns the input unchanged when it is already at or below maxPoints.
+// ── Downsample: last-sample-per-bucket with anchored endpoints ──────────
+// PORTFOLIO-CHART-FIX-1: the prior bucket-average variant mean-shifted
+// timestamps AND values inside each bucket, which on TOTAL produced a
+// shifted/diluted tail whenever data.length wasn't a clean multiple of
+// maxPoints. Now: split into `maxPoints` evenly-sized buckets, keep the
+// last real point in each bucket, then explicitly anchor result[0] and
+// result[maxPoints - 1] to the true first/last data points so the
+// visible chart endpoints always match the underlying series.
 function downsample(data, maxPoints = 120) {
   if (!data || data.length <= maxPoints) return data;
-  const bucketSize = Math.floor(data.length / maxPoints);
-  const result     = [];
-  for (let i = 0; i < data.length; i += bucketSize) {
-    const bucket = data.slice(i, i + bucketSize);
-    const sum    = bucket.reduce(
-      (acc, p) => { acc.ts += p.ts; acc.value += p.value; return acc; },
-      { ts: 0, value: 0 }
-    );
-    result.push({ ts: sum.ts / bucket.length, value: sum.value / bucket.length });
+  const n          = data.length;
+  const bucketSize = n / maxPoints;
+  const result     = new Array(maxPoints);
+  for (let b = 0; b < maxPoints; b++) {
+    const idx = Math.min(n - 1, Math.floor((b + 1) * bucketSize) - 1);
+    result[b] = data[idx];
   }
+  result[0]             = data[0];
+  result[maxPoints - 1] = data[n - 1];
   return result;
 }
 
@@ -11660,8 +11644,8 @@ function updateChart(animate = false) {
   if (_aurixDashMobile)  _aurixDashSync('mobile');
 }
 
-function onPortfolioChange(animate = false) {
-  recordSnapshot();
+function onPortfolioChange(animate = false, opts = {}) {
+  if (!opts || !opts.skipSnapshot) recordSnapshot();
   updateChart(animate);
   updateDonut();
 }
@@ -12394,8 +12378,16 @@ async function _refreshPricesImpl() {
   } catch (_) { /* never block the price pipeline */ }
   setUpdateStatus('ok');
 
-  // Runs only on success — chart errors must never affect price status or rollback
-  try { onPortfolioChange(); } catch { /* chart errors stay contained */ }
+  // Runs only on success — chart errors must never affect price status or rollback.
+  // PORTFOLIO-CHART-FIX-1: a partial fulfillment (one provider rejected)
+  // still applies the prices it did receive, but its `totalValueUSD()`
+  // mixes fresh + stale across asset classes. Writing that into
+  // portfolioHistory is what produces the visible step when the failing
+  // provider recovers next cycle. Update the chart visually, but skip
+  // the history append until both feeds succeed together.
+  const _anyFeedFailed = !cryptoSuccess || !marketSuccess;
+  if (_anyFeedFailed) console.log('[chart-history] skip snapshot: partial refresh failure');
+  try { onPortfolioChange(false, { skipSnapshot: _anyFeedFailed }); } catch { /* chart errors stay contained */ }
 }
 
 // ── Animated count-up for total value ─────────────────────
@@ -21105,17 +21097,10 @@ document.getElementById('appRoot').style.opacity = '0';
       }
     } catch (_) {}
 
-    // 2b. RESET-HISTORY-1: seed simulated history only on a true cold
-    // start (no epoch set, no real snapshots yet, portfolio has value).
-    try {
-      if (typeof _aurixPortfolioEpoch === 'function' && _aurixPortfolioEpoch() === 0) {
-        const val = totalValueUSD();
-        if (portfolioHistory.length === 0 && val > 0) {
-          portfolioHistory = generateSimulatedHistory(val);
-          saveHistory();
-        }
-      }
-    } catch (_) {}
+    // PORTFOLIO-CHART-FIX-1: simulated cold-start seed removed. The
+    // 30-day / 24-hour random-walk seed presented synthetic data as if
+    // it were real history. getChartData()'s flat-baseline branch now
+    // handles the low-data state honestly until real snapshots accrue.
 
     // 3. EXCHANGE RATE — must resolve before prices so EUR mode renders
     //    consistent numbers on first paint.
