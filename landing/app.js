@@ -1,0 +1,250 @@
+/* ============================================================
+   AURIX landing — i18n (ES/EN), header, mobile menu, reveal,
+   early-access placeholder. Vanilla JS, no dependencies.
+   ============================================================ */
+(function () {
+  'use strict';
+
+  /* ── Translations ───────────────────────────────────── */
+  var I18N = {
+    es: {
+      'nav.product': 'Producto', 'nav.workspace': 'Workspace', 'nav.roadmap': 'Roadmap', 'nav.early': 'Acceso anticipado',
+      'cta.enter': 'Entrar en Aurix', 'cta.request': 'Solicitar acceso',
+
+      'hero.eyebrow': 'Sistema operativo del patrimonio',
+      'hero.h1': 'El sistema operativo de tu patrimonio.',
+      'hero.sub': 'Acciones, fondos, cripto, metales, inmuebles y liquidez. Todo tu patrimonio en una única plataforma.',
+      'preview.label': 'Vista previa del producto',
+
+      'problem.title': 'Tu patrimonio está fragmentado.',
+      'problem.lead': 'Repartido entre bancos, brókers y aplicaciones que no se hablan entre sí.',
+      'frag.banks': 'Bancos', 'frag.brokers': 'Brókers', 'frag.crypto': 'Cripto',
+      'frag.realestate': 'Inmuebles', 'frag.metals': 'Metales', 'frag.cash': 'Liquidez',
+      'pain.1.t': 'Sin visibilidad', 'pain.1.d': 'Nunca ves el total real de lo que tienes.',
+      'pain.2.t': 'Sin claridad', 'pain.2.d': 'No sabes cómo está repartido tu patrimonio.',
+      'pain.3.t': 'Sin contexto', 'pain.3.d': 'Los números no te dicen qué significan.',
+
+      'solution.title': 'Una única visión.',
+      'solution.lead': 'Aurix centraliza cada clase de activo en una sola interfaz, con el contexto que necesitas para decidir.',
+      'asset.stocks': 'Acciones', 'asset.etfs': 'ETFs', 'asset.funds': 'Fondos', 'asset.crypto': 'Cripto',
+      'asset.metals': 'Metales', 'asset.realestate': 'Inmuebles', 'asset.cash': 'Liquidez',
+      'feat.value.t': 'Valor total', 'feat.value.d': 'Tu patrimonio completo, actualizado y unificado.',
+      'feat.alloc.t': 'Asignación', 'feat.alloc.d': 'Cómo está repartido entre clases de activo.',
+      'feat.evo.t': 'Evolución', 'feat.evo.d': 'El recorrido de tu patrimonio en el tiempo.',
+      'feat.health.t': 'Salud de cartera', 'feat.health.d': 'Concentración, liquidez y riesgo, interpretados.',
+      'feat.insights.t': 'Insights', 'feat.insights.d': 'Observaciones claras sobre tu estructura.',
+      'feat.intel.t': 'Inteligencia', 'feat.intel.d': 'Contexto, no solo cifras.',
+
+      'previewsec.title': 'Diseñado como un producto premium.',
+      'previewsec.lead': 'Una interfaz clara, institucional y rápida — en escritorio y en el móvil.',
+
+      'ws.eyebrow': 'Workspace',
+      'ws.title1': 'Más que seguimiento.', 'ws.title2': 'Comprensión.',
+      'ws.lead': 'La capa de inteligencia de Aurix. Workspace interpreta tu cartera y te ayuda a entender qué hay detrás de los números.',
+      'ws.tag.health': 'Health Score', 'ws.tag.risk': 'Señales de riesgo', 'ws.tag.analysis': 'Análisis de cartera', 'ws.tag.actions': 'Insights accionables',
+      'ws.c1.t': 'Concentración', 'ws.c1.d': 'Detecta cuándo un activo pesa demasiado.',
+      'ws.c2.t': 'Diversificación', 'ws.c2.d': 'Entiende el reparto real entre clases.',
+      'ws.c3.t': 'Liquidez', 'ws.c3.d': 'Cuánto podrías mover sin fricción.',
+      'ws.c4.t': 'Riesgo', 'ws.c4.d': 'Exposición interpretada, no solo medida.',
+      'ws.c5.t': 'Salud de cartera', 'ws.c5.d': 'Una lectura única del estado de tu patrimonio.',
+
+      'roadmap.title': 'Hacia dónde va Aurix.',
+      'roadmap.now': 'Ahora', 'roadmap.next': 'Próximo', 'roadmap.later': 'Después',
+      'rm.now.1': 'Dashboard de patrimonio', 'rm.now.2': 'Inteligencia de asignación', 'rm.now.3': 'Seguimiento de mercado', 'rm.now.4': 'Workspace',
+      'rm.next.1': 'Métricas avanzadas', 'rm.next.2': 'Salud de cartera ampliada', 'rm.next.3': 'Seguimiento de objetivos', 'rm.next.4': 'Planificación patrimonial',
+      'rm.later.1': 'App nativa iOS', 'rm.later.2': 'App nativa Android', 'rm.later.3': 'Insights asistidos por IA', 'rm.later.4': 'Capa de automatización',
+
+      'early.title': 'Solicita acceso anticipado.',
+      'early.sub': 'Aurix está en beta privada. Déjanos tus datos y te avisaremos.',
+      'early.name': 'Nombre', 'early.email': 'Email', 'early.button': 'Solicitar acceso',
+      'early.note': 'No compartiremos tu información. Beta privada · plazas limitadas.',
+      'early.invalid': 'Revisa tu nombre y un email válido.',
+      'early.success': 'Gracias. Te avisaremos cuando tu acceso esté listo.',
+
+      'social.title': 'Sigue la construcción de Aurix.',
+      'footer.tag': 'Operating System for Wealth',
+      'footer.product': 'Producto', 'footer.legal': 'Legal', 'footer.privacy': 'Privacidad', 'footer.terms': 'Términos', 'footer.social': 'Social'
+    },
+    en: {
+      'nav.product': 'Product', 'nav.workspace': 'Workspace', 'nav.roadmap': 'Roadmap', 'nav.early': 'Early Access',
+      'cta.enter': 'Enter Aurix', 'cta.request': 'Request Access',
+
+      'hero.eyebrow': 'Operating System for Wealth',
+      'hero.h1': 'The operating system for your wealth.',
+      'hero.sub': 'Stocks, funds, crypto, metals, real estate and cash. Unified in one platform.',
+      'preview.label': 'Product preview',
+
+      'problem.title': 'Your wealth is fragmented.',
+      'problem.lead': 'Spread across banks, brokers and apps that never talk to each other.',
+      'frag.banks': 'Banks', 'frag.brokers': 'Brokers', 'frag.crypto': 'Crypto',
+      'frag.realestate': 'Real Estate', 'frag.metals': 'Metals', 'frag.cash': 'Cash',
+      'pain.1.t': 'No visibility', 'pain.1.d': 'You never see the real total of what you own.',
+      'pain.2.t': 'No clarity', 'pain.2.d': 'You don’t know how your wealth is allocated.',
+      'pain.3.t': 'No context', 'pain.3.d': 'The numbers don’t tell you what they mean.',
+
+      'solution.title': 'One unified view.',
+      'solution.lead': 'Aurix centralizes every asset class into a single interface, with the context you need to decide.',
+      'asset.stocks': 'Stocks', 'asset.etfs': 'ETFs', 'asset.funds': 'Funds', 'asset.crypto': 'Crypto',
+      'asset.metals': 'Metals', 'asset.realestate': 'Real Estate', 'asset.cash': 'Cash',
+      'feat.value.t': 'Total value', 'feat.value.d': 'Your complete wealth, live and unified.',
+      'feat.alloc.t': 'Allocation', 'feat.alloc.d': 'How it is split across asset classes.',
+      'feat.evo.t': 'Evolution', 'feat.evo.d': 'Your wealth’s journey over time.',
+      'feat.health.t': 'Portfolio health', 'feat.health.d': 'Concentration, liquidity and risk, interpreted.',
+      'feat.insights.t': 'Insights', 'feat.insights.d': 'Clear observations about your structure.',
+      'feat.intel.t': 'Intelligence', 'feat.intel.d': 'Context, not just figures.',
+
+      'previewsec.title': 'Designed like a premium product.',
+      'previewsec.lead': 'A clear, institutional and fast interface — on desktop and on mobile.',
+
+      'ws.eyebrow': 'Workspace',
+      'ws.title1': 'More than tracking.', 'ws.title2': 'Understanding.',
+      'ws.lead': 'The intelligence layer of Aurix. Workspace interprets your portfolio and helps you understand what is behind the numbers.',
+      'ws.tag.health': 'Health Score', 'ws.tag.risk': 'Risk signals', 'ws.tag.analysis': 'Portfolio analysis', 'ws.tag.actions': 'Actionable insights',
+      'ws.c1.t': 'Concentration', 'ws.c1.d': 'Spot when a single asset weighs too much.',
+      'ws.c2.t': 'Diversification', 'ws.c2.d': 'Understand the real split across classes.',
+      'ws.c3.t': 'Liquidity', 'ws.c3.d': 'How much you could move without friction.',
+      'ws.c4.t': 'Risk', 'ws.c4.d': 'Exposure interpreted, not just measured.',
+      'ws.c5.t': 'Portfolio health', 'ws.c5.d': 'A single reading of your wealth’s state.',
+
+      'roadmap.title': 'Where Aurix is heading.',
+      'roadmap.now': 'Now', 'roadmap.next': 'Next', 'roadmap.later': 'Later',
+      'rm.now.1': 'Portfolio Dashboard', 'rm.now.2': 'Allocation Intelligence', 'rm.now.3': 'Market Tracking', 'rm.now.4': 'Workspace',
+      'rm.next.1': 'Advanced Metrics', 'rm.next.2': 'Portfolio Health Expansion', 'rm.next.3': 'Goal Tracking', 'rm.next.4': 'Wealth Planning',
+      'rm.later.1': 'Native iOS App', 'rm.later.2': 'Native Android App', 'rm.later.3': 'AI Assisted Insights', 'rm.later.4': 'Automation Layer',
+
+      'early.title': 'Request early access.',
+      'early.sub': 'Aurix is in private beta. Leave your details and we’ll reach out.',
+      'early.name': 'Name', 'early.email': 'Email', 'early.button': 'Request Access',
+      'early.note': 'We will not share your information. Private beta · limited spots.',
+      'early.invalid': 'Please check your name and a valid email.',
+      'early.success': 'Thank you. We’ll let you know when your access is ready.',
+
+      'social.title': 'Follow the building of Aurix.',
+      'footer.tag': 'Operating System for Wealth',
+      'footer.product': 'Product', 'footer.legal': 'Legal', 'footer.privacy': 'Privacy', 'footer.terms': 'Terms', 'footer.social': 'Social'
+    }
+  };
+
+  var LS_KEY = 'aurix_lang';
+  var lang = 'es';
+
+  function detectLang() {
+    var stored;
+    try { stored = localStorage.getItem(LS_KEY); } catch (_) {}
+    if (stored === 'es' || stored === 'en') return stored;
+    var nav = ((navigator.language || navigator.userLanguage || 'en') + '').toLowerCase();
+    return nav.indexOf('es') === 0 ? 'es' : 'en';
+  }
+
+  function applyLang(next) {
+    lang = (next === 'en') ? 'en' : 'es';
+    var dict = I18N[lang];
+    document.documentElement.lang = lang;
+    try { localStorage.setItem(LS_KEY, lang); } catch (_) {}
+
+    var nodes = document.querySelectorAll('[data-i18n]');
+    for (var i = 0; i < nodes.length; i++) {
+      var key = nodes[i].getAttribute('data-i18n');
+      if (dict[key] != null) nodes[i].textContent = dict[key];
+    }
+    // Reflect active state on every language toggle (header + mobile)
+    var btns = document.querySelectorAll('.lang-btn');
+    for (var j = 0; j < btns.length; j++) {
+      btns[j].classList.toggle('active', btns[j].getAttribute('data-lang') === lang);
+    }
+    // Keep the early-access note in sync unless it is showing a live status
+    var note = document.getElementById('earlyNote');
+    if (note && !note.classList.contains('ok')) note.textContent = dict['early.note'];
+  }
+
+  function t(key) { return (I18N[lang] && I18N[lang][key]) || (I18N.es[key]) || ''; }
+
+  /* ── Init ───────────────────────────────────────────── */
+  function init() {
+    applyLang(detectLang());
+
+    // Language toggle
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('.lang-btn');
+      if (b) { applyLang(b.getAttribute('data-lang')); }
+    });
+
+    // Header scroll state (rAF-throttled)
+    var header = document.getElementById('siteHeader');
+    var ticking = false;
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () {
+        header.classList.toggle('scrolled', window.scrollY > 12);
+        ticking = false;
+      });
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+
+    // Mobile menu
+    var menuToggle = document.getElementById('menuToggle');
+    var mobileMenu = document.getElementById('mobileMenu');
+    function closeMenu() {
+      document.body.classList.remove('menu-open');
+      menuToggle.setAttribute('aria-expanded', 'false');
+      mobileMenu.setAttribute('aria-hidden', 'true');
+    }
+    menuToggle.addEventListener('click', function () {
+      var open = !document.body.classList.contains('menu-open');
+      document.body.classList.toggle('menu-open', open);
+      menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      mobileMenu.setAttribute('aria-hidden', open ? 'false' : 'true');
+    });
+    mobileMenu.addEventListener('click', function (e) {
+      if (e.target.closest('a')) closeMenu();
+    });
+
+    // Reveal on scroll
+    var reveals = document.querySelectorAll('.reveal');
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || !('IntersectionObserver' in window)) {
+      for (var r = 0; r < reveals.length; r++) reveals[r].classList.add('is-visible');
+    } else {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (en.isIntersecting) { en.target.classList.add('is-visible'); io.unobserve(en.target); }
+        });
+      }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+      for (var k = 0; k < reveals.length; k++) io.observe(reveals[k]);
+    }
+
+    // Early-access form — placeholder behavior (no backend yet)
+    var form = document.getElementById('earlyForm');
+    if (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var name = form.querySelector('#ea-name');
+        var email = form.querySelector('#ea-email');
+        var note = document.getElementById('earlyNote');
+        var emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((email.value || '').trim());
+        var nameOk = (name.value || '').trim().length >= 2;
+        name.classList.toggle('invalid', !nameOk);
+        email.classList.toggle('invalid', !emailOk);
+        if (!nameOk || !emailOk) {
+          note.classList.remove('ok');
+          note.textContent = t('early.invalid');
+          return;
+        }
+        note.classList.add('ok');
+        note.textContent = t('early.success');
+        form.querySelector('button[type="submit"]').disabled = true;
+        // TODO: POST to early-access endpoint when the backend exists.
+      });
+    }
+
+    // Footer year (no Date pinning needed for a static label)
+    var y = document.getElementById('year');
+    if (y) { try { y.textContent = String(new Date().getFullYear()); } catch (_) {} }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else { init(); }
+})();

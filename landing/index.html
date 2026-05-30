@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <style>html,body{background:#05070f;margin:0}</style>
+
+  <title>Aurix — Operating System for Wealth</title>
+  <meta name="description" content="Track, understand and manage your entire wealth across stocks, funds, crypto, real estate, metals and cash from one platform.">
+  <link rel="canonical" href="https://aurixsystem.io/">
+  <meta name="theme-color" content="#05070f">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Aurix">
+  <meta property="og:title" content="Aurix — Operating System for Wealth">
+  <meta property="og:description" content="Track, understand and manage your entire wealth across stocks, funds, crypto, real estate, metals and cash from one platform.">
+  <meta property="og:url" content="https://aurixsystem.io/">
+  <meta property="og:image" content="https://aurixsystem.io/og-image.svg">
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Aurix — Operating System for Wealth">
+  <meta name="twitter:description" content="Track, understand and manage your entire wealth across stocks, funds, crypto, real estate, metals and cash from one platform.">
+  <meta name="twitter:image" content="https://aurixsystem.io/og-image.svg">
+
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ─────────────── HEADER ─────────────── -->
+  <header class="site-header" id="siteHeader">
+    <div class="container header-inner">
+      <a class="brand" href="#top" aria-label="Aurix">AURIX</a>
+
+      <nav class="nav-center" aria-label="Primary">
+        <a href="#product"   data-i18n="nav.product">Producto</a>
+        <a href="#workspace" data-i18n="nav.workspace">Workspace</a>
+        <a href="#roadmap"   data-i18n="nav.roadmap">Roadmap</a>
+        <a href="#early-access" data-i18n="nav.early">Acceso anticipado</a>
+      </nav>
+
+      <div class="header-right">
+        <div class="lang-toggle" role="group" aria-label="Language">
+          <button class="lang-btn" data-lang="es">ES</button>
+          <span class="lang-sep">|</span>
+          <button class="lang-btn" data-lang="en">EN</button>
+        </div>
+        <a class="btn btn-ghost" href="https://app.aurixsystem.io" data-i18n="cta.enter">Entrar en Aurix</a>
+        <a class="btn btn-primary" href="#early-access" data-i18n="cta.request">Solicitar acceso</a>
+        <button class="menu-toggle" id="menuToggle" aria-label="Menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile menu -->
+  <div class="mobile-menu" id="mobileMenu" aria-hidden="true">
+    <nav class="mobile-nav" aria-label="Mobile">
+      <a href="#product"   data-i18n="nav.product">Producto</a>
+      <a href="#workspace" data-i18n="nav.workspace">Workspace</a>
+      <a href="#roadmap"   data-i18n="nav.roadmap">Roadmap</a>
+      <a href="#early-access" data-i18n="nav.early">Acceso anticipado</a>
+    </nav>
+    <div class="mobile-actions">
+      <a class="btn btn-primary btn-block" href="#early-access" data-i18n="cta.request">Solicitar acceso</a>
+      <a class="btn btn-ghost btn-block" href="https://app.aurixsystem.io" data-i18n="cta.enter">Entrar en Aurix</a>
+    </div>
+    <div class="mobile-lang">
+      <button class="lang-btn" data-lang="es">ES</button>
+      <span class="lang-sep">|</span>
+      <button class="lang-btn" data-lang="en">EN</button>
+    </div>
+  </div>
+
+  <main id="top">
+
+    <!-- ─────────────── HERO ─────────────── -->
+    <section class="hero">
+      <div class="hero-bg" aria-hidden="true"></div>
+      <div class="container hero-inner">
+        <div class="hero-copy">
+          <span class="eyebrow reveal" data-i18n="hero.eyebrow">Operating System for Wealth</span>
+          <h1 class="hero-title reveal" data-i18n="hero.h1">El sistema operativo de tu patrimonio.</h1>
+          <p class="hero-sub reveal" data-i18n="hero.sub">Acciones, fondos, cripto, metales, inmuebles y liquidez. Todo tu patrimonio en una única plataforma.</p>
+          <div class="hero-cta reveal">
+            <a class="btn btn-primary btn-lg" href="#early-access" data-i18n="cta.request">Solicitar acceso</a>
+            <a class="btn btn-ghost btn-lg" href="https://app.aurixsystem.io" data-i18n="cta.enter">Entrar en Aurix</a>
+          </div>
+        </div>
+
+        <!-- Premium product preview placeholder (stylized, no real data) -->
+        <div class="hero-visual reveal" aria-hidden="true">
+          <div class="preview-card preview-card--hero">
+            <span class="preview-chip" data-i18n="preview.label">Vista previa del producto</span>
+            <div class="pv-header">
+              <span class="pv-dot"></span><span class="pv-dot"></span><span class="pv-dot"></span>
+            </div>
+            <div class="pv-total">
+              <div class="pv-skel pv-skel--label"></div>
+              <div class="pv-skel pv-skel--value"></div>
+              <div class="pv-skel pv-skel--meta"></div>
+            </div>
+            <div class="pv-chart">
+              <svg viewBox="0 0 320 90" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="lg" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="rgba(79,142,247,.34)"/>
+                    <stop offset="1" stop-color="rgba(79,142,247,0)"/>
+                  </linearGradient>
+                </defs>
+                <path d="M0,70 C40,60 70,30 110,38 C150,46 180,18 220,24 C260,30 290,12 320,16 L320,90 L0,90 Z" fill="url(#lg)"/>
+                <path d="M0,70 C40,60 70,30 110,38 C150,46 180,18 220,24 C260,30 290,12 320,16" fill="none" stroke="#7db8ff" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="pv-alloc">
+              <span class="pv-bar"><i style="width:52%"></i></span>
+              <span class="pv-bar"><i style="width:27%;background:#7db8ff"></i></span>
+              <span class="pv-bar"><i style="width:14%;background:#27c768"></i></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────── PROBLEM ─────────────── -->
+    <section class="section section--problem" id="product">
+      <div class="container">
+        <h2 class="section-title reveal" data-i18n="problem.title">Tu patrimonio está fragmentado.</h2>
+        <p class="section-lead reveal" data-i18n="problem.lead">Repartido entre bancos, brókers y aplicaciones que no se hablan entre sí.</p>
+        <div class="frag-grid">
+          <div class="frag reveal" data-i18n="frag.banks">Bancos</div>
+          <div class="frag reveal" data-i18n="frag.brokers">Brókers</div>
+          <div class="frag reveal" data-i18n="frag.crypto">Cripto</div>
+          <div class="frag reveal" data-i18n="frag.realestate">Inmuebles</div>
+          <div class="frag reveal" data-i18n="frag.metals">Metales</div>
+          <div class="frag reveal" data-i18n="frag.cash">Liquidez</div>
+        </div>
+        <div class="pain-row">
+          <div class="pain reveal"><h3 data-i18n="pain.1.t">Sin visibilidad</h3><p data-i18n="pain.1.d">Nunca ves el total real de lo que tienes.</p></div>
+          <div class="pain reveal"><h3 data-i18n="pain.2.t">Sin claridad</h3><p data-i18n="pain.2.d">No sabes cómo está repartido tu patrimonio.</p></div>
+          <div class="pain reveal"><h3 data-i18n="pain.3.t">Sin contexto</h3><p data-i18n="pain.3.d">Los números no te dicen qué significan.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────── SOLUTION ─────────────── -->
+    <section class="section section--solution">
+      <div class="container">
+        <h2 class="section-title reveal" data-i18n="solution.title">Una única visión.</h2>
+        <p class="section-lead reveal" data-i18n="solution.lead">Aurix centraliza cada clase de activo en una sola interfaz, con el contexto que necesitas para decidir.</p>
+        <div class="asset-grid">
+          <span class="asset reveal" data-i18n="asset.stocks">Acciones</span>
+          <span class="asset reveal" data-i18n="asset.etfs">ETFs</span>
+          <span class="asset reveal" data-i18n="asset.funds">Fondos</span>
+          <span class="asset reveal" data-i18n="asset.crypto">Cripto</span>
+          <span class="asset reveal" data-i18n="asset.metals">Metales</span>
+          <span class="asset reveal" data-i18n="asset.realestate">Inmuebles</span>
+          <span class="asset reveal" data-i18n="asset.cash">Liquidez</span>
+        </div>
+        <div class="feature-grid">
+          <div class="feature reveal"><h3 data-i18n="feat.value.t">Valor total</h3><p data-i18n="feat.value.d">Tu patrimonio completo, actualizado y unificado.</p></div>
+          <div class="feature reveal"><h3 data-i18n="feat.alloc.t">Asignación</h3><p data-i18n="feat.alloc.d">Cómo está repartido entre clases de activo.</p></div>
+          <div class="feature reveal"><h3 data-i18n="feat.evo.t">Evolución</h3><p data-i18n="feat.evo.d">El recorrido de tu patrimonio en el tiempo.</p></div>
+          <div class="feature reveal"><h3 data-i18n="feat.health.t">Salud de cartera</h3><p data-i18n="feat.health.d">Concentración, liquidez y riesgo, interpretados.</p></div>
+          <div class="feature reveal"><h3 data-i18n="feat.insights.t">Insights</h3><p data-i18n="feat.insights.d">Observaciones claras sobre tu estructura.</p></div>
+          <div class="feature reveal"><h3 data-i18n="feat.intel.t">Inteligencia</h3><p data-i18n="feat.intel.d">Contexto, no solo cifras.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────── PRODUCT PREVIEW ─────────────── -->
+    <section class="section section--preview">
+      <div class="container">
+        <h2 class="section-title reveal" data-i18n="previewsec.title">Diseñado como un producto premium.</h2>
+        <p class="section-lead reveal" data-i18n="previewsec.lead">Una interfaz clara, institucional y rápida — en escritorio y en el móvil.</p>
+        <div class="preview-stage reveal">
+          <div class="preview-card preview-card--desktop" aria-hidden="true">
+            <span class="preview-chip" data-i18n="preview.label">Vista previa del producto</span>
+            <div class="pv-header"><span class="pv-dot"></span><span class="pv-dot"></span><span class="pv-dot"></span></div>
+            <div class="pv-grid">
+              <div class="pv-col pv-col--hero">
+                <div class="pv-skel pv-skel--label"></div>
+                <div class="pv-skel pv-skel--value"></div>
+                <div class="pv-skel pv-skel--meta"></div>
+              </div>
+              <div class="pv-col pv-col--chart">
+                <svg viewBox="0 0 320 110" preserveAspectRatio="none">
+                  <path d="M0,86 C50,76 80,40 120,48 C160,56 190,22 230,30 C270,38 300,16 320,20 L320,110 L0,110 Z" fill="url(#lg)"/>
+                  <path d="M0,86 C50,76 80,40 120,48 C160,56 190,22 230,30 C270,38 300,16 320,20" fill="none" stroke="#7db8ff" stroke-width="2"/>
+                </svg>
+              </div>
+            </div>
+            <div class="pv-tiles">
+              <div class="pv-tile"><span class="pv-tile-dot" style="background:#4f8ef7"></span><i class="pv-bar2"><b style="width:52%"></b></i></div>
+              <div class="pv-tile"><span class="pv-tile-dot" style="background:#7db8ff"></span><i class="pv-bar2"><b style="width:27%;background:#7db8ff"></b></i></div>
+              <div class="pv-tile"><span class="pv-tile-dot" style="background:#27c768"></span><i class="pv-bar2"><b style="width:14%;background:#27c768"></b></i></div>
+            </div>
+          </div>
+          <div class="preview-card preview-card--mobile" aria-hidden="true">
+            <span class="preview-chip" data-i18n="preview.label">Vista previa del producto</span>
+            <div class="pv-skel pv-skel--label"></div>
+            <div class="pv-skel pv-skel--value"></div>
+            <div class="pv-skel pv-skel--meta"></div>
+            <div class="pv-ring">
+              <svg viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="48" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="12"/>
+                <circle cx="60" cy="60" r="48" fill="none" stroke="#4f8ef7" stroke-width="12" stroke-linecap="round" stroke-dasharray="160 300" transform="rotate(-90 60 60)"/>
+                <circle cx="60" cy="60" r="48" fill="none" stroke="#7db8ff" stroke-width="12" stroke-linecap="round" stroke-dasharray="80 300" stroke-dashoffset="-170" transform="rotate(-90 60 60)"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────── WORKSPACE (INTELLIGENCE) ─────────────── -->
+    <section class="section section--workspace" id="workspace">
+      <div class="container ws-inner">
+        <div class="ws-copy">
+          <span class="eyebrow reveal" data-i18n="ws.eyebrow">Workspace</span>
+          <h2 class="section-title reveal"><span data-i18n="ws.title1">Más que seguimiento.</span><br><span class="accent" data-i18n="ws.title2">Comprensión.</span></h2>
+          <p class="section-lead reveal" data-i18n="ws.lead">La capa de inteligencia de Aurix. Workspace interpreta tu cartera y te ayuda a entender qué hay detrás de los números.</p>
+          <div class="ws-tags reveal">
+            <span class="tag" data-i18n="ws.tag.health">Health Score</span>
+            <span class="tag" data-i18n="ws.tag.risk">Señales de riesgo</span>
+            <span class="tag" data-i18n="ws.tag.analysis">Análisis de cartera</span>
+            <span class="tag" data-i18n="ws.tag.actions">Insights accionables</span>
+          </div>
+        </div>
+        <div class="ws-cards">
+          <div class="ws-card reveal"><h3 data-i18n="ws.c1.t">Concentración</h3><p data-i18n="ws.c1.d">Detecta cuándo un activo pesa demasiado.</p></div>
+          <div class="ws-card reveal"><h3 data-i18n="ws.c2.t">Diversificación</h3><p data-i18n="ws.c2.d">Entiende el reparto real entre clases.</p></div>
+          <div class="ws-card reveal"><h3 data-i18n="ws.c3.t">Liquidez</h3><p data-i18n="ws.c3.d">Cuánto podrías mover sin fricción.</p></div>
+          <div class="ws-card reveal"><h3 data-i18n="ws.c4.t">Riesgo</h3><p data-i18n="ws.c4.d">Exposición interpretada, no solo medida.</p></div>
+          <div class="ws-card reveal ws-card--wide"><h3 data-i18n="ws.c5.t">Salud de cartera</h3><p data-i18n="ws.c5.d">Una lectura única del estado de tu patrimonio.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────── ROADMAP ─────────────── -->
+    <section class="section section--roadmap" id="roadmap">
+      <div class="container">
+        <h2 class="section-title reveal" data-i18n="roadmap.title">Hacia dónde va Aurix.</h2>
+        <div class="timeline">
+          <div class="phase reveal">
+            <span class="phase-tag phase-tag--now" data-i18n="roadmap.now">Ahora</span>
+            <ul>
+              <li data-i18n="rm.now.1">Dashboard de patrimonio</li>
+              <li data-i18n="rm.now.2">Inteligencia de asignación</li>
+              <li data-i18n="rm.now.3">Seguimiento de mercado</li>
+              <li data-i18n="rm.now.4">Workspace</li>
+            </ul>
+          </div>
+          <div class="phase reveal">
+            <span class="phase-tag phase-tag--next" data-i18n="roadmap.next">Próximo</span>
+            <ul>
+              <li data-i18n="rm.next.1">Métricas avanzadas</li>
+              <li data-i18n="rm.next.2">Salud de cartera ampliada</li>
+              <li data-i18n="rm.next.3">Seguimiento de objetivos</li>
+              <li data-i18n="rm.next.4">Planificación patrimonial</li>
+            </ul>
+          </div>
+          <div class="phase reveal">
+            <span class="phase-tag phase-tag--later" data-i18n="roadmap.later">Después</span>
+            <ul>
+              <li data-i18n="rm.later.1">App nativa iOS</li>
+              <li data-i18n="rm.later.2">App nativa Android</li>
+              <li data-i18n="rm.later.3">Insights asistidos por IA</li>
+              <li data-i18n="rm.later.4">Capa de automatización</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────── EARLY ACCESS ─────────────── -->
+    <section class="section section--early" id="early-access">
+      <div class="container">
+        <div class="early-card reveal">
+          <h2 class="early-title" data-i18n="early.title">Solicita acceso anticipado.</h2>
+          <p class="early-sub" data-i18n="early.sub">Aurix está en beta privada. Déjanos tus datos y te avisaremos.</p>
+          <form class="early-form" id="earlyForm" novalidate>
+            <div class="field">
+              <label for="ea-name" data-i18n="early.name">Nombre</label>
+              <input id="ea-name" name="name" type="text" autocomplete="name" required>
+            </div>
+            <div class="field">
+              <label for="ea-email" data-i18n="early.email">Email</label>
+              <input id="ea-email" name="email" type="email" autocomplete="email" required>
+            </div>
+            <button class="btn btn-primary btn-lg btn-block" type="submit" data-i18n="early.button">Solicitar acceso</button>
+            <p class="early-note" id="earlyNote" data-i18n="early.note">No compartiremos tu información. Beta privada · plazas limitadas.</p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────── SOCIAL ─────────────── -->
+    <section class="section section--social">
+      <div class="container social-inner">
+        <h2 class="section-title reveal" data-i18n="social.title">Sigue la construcción de Aurix.</h2>
+        <div class="social-links reveal">
+          <!-- TODO: replace href="#" with real profile URLs when available -->
+          <a class="social-link" href="#" aria-label="X (Twitter)" data-todo="social-x">X</a>
+          <a class="social-link" href="#" aria-label="Instagram" data-todo="social-instagram">Instagram</a>
+          <a class="social-link" href="#" aria-label="LinkedIn" data-todo="social-linkedin">LinkedIn</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ─────────────── FOOTER ─────────────── -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="brand">AURIX</span>
+        <p class="footer-tag" data-i18n="footer.tag">Operating System for Wealth</p>
+      </div>
+      <div class="footer-cols">
+        <div class="footer-col">
+          <h4 data-i18n="footer.product">Producto</h4>
+          <a href="#product" data-i18n="nav.product">Producto</a>
+          <a href="#workspace" data-i18n="nav.workspace">Workspace</a>
+          <a href="#roadmap" data-i18n="nav.roadmap">Roadmap</a>
+          <a href="#early-access" data-i18n="nav.early">Acceso anticipado</a>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.legal">Legal</h4>
+          <!-- TODO: link real legal pages when available -->
+          <a href="#" data-i18n="footer.privacy" data-todo="legal-privacy">Privacidad</a>
+          <a href="#" data-i18n="footer.terms" data-todo="legal-terms">Términos</a>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.social">Social</h4>
+          <a href="#" data-todo="social-x">X</a>
+          <a href="#" data-todo="social-instagram">Instagram</a>
+          <a href="#" data-todo="social-linkedin">LinkedIn</a>
+        </div>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <span>© <span id="year">2026</span> Aurix</span>
+      <a class="btn btn-ghost btn-sm" href="https://app.aurixsystem.io" data-i18n="cta.enter">Entrar en Aurix</a>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
