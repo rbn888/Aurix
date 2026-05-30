@@ -17115,7 +17115,43 @@ function renderMetricsPlaceholder() {
   `;
 }
 
-function switchTab(tab) {
+// AURIX-PREMIUM-MOTION-1 — premium main-tab content transition.
+// switchTab() now wraps the original swap (_applyTab) in a subtle
+// fade-out → swap → fade-in so navigation reads like a native app instead
+// of an instant web-page swap. Motion is opacity + a 4px translateY only
+// (no scale, no slide, no bounce), total ~200ms. A monotonic token guards
+// against fast repeated taps (stale steps abort; the last tapped tab always
+// wins and no container is left hidden), and prefers-reduced-motion swaps
+// instantly. Display/render/active-state logic is unchanged.
+const _TAB_EASE   = 'cubic-bezier(0.22, 1, 0.36, 1)';
+const _TAB_OUT_MS = 80;
+const _TAB_IN_MS  = 120;
+let _tabToken = 0;
+let _tabTimer = null;
+let _tabRaf   = null;
+
+function _tabContainers() {
+  return [
+    document.querySelector('main'),
+    document.getElementById('tabPlaceholder'),
+    document.getElementById('aurixWorkspace'),
+  ].filter(Boolean);
+}
+function _tabVisibleContainer() {
+  return _tabContainers().find(c => {
+    try { return getComputedStyle(c).display !== 'none'; } catch (_) { return false; }
+  }) || null;
+}
+function _tabResetStyles(c) {
+  if (!c) return;
+  c.style.transition = '';
+  c.style.opacity    = '';
+  c.style.transform  = '';
+}
+
+// The original swap — sets display, renders the target surface and updates
+// the active nav state. Pure logic, no motion; called once per navigation.
+function _applyTab(tab) {
   switchView('dashboard'); // always collapse hero when navigating
   currentTab = tab;
   if (_loopInterval)   { clearInterval(_loopInterval);   _loopInterval   = null; }
@@ -17155,6 +17191,59 @@ function switchTab(tab) {
     }
     updateBottomNavActive();
   }
+}
+
+function switchTab(tab) {
+  const myToken = ++_tabToken;
+  if (_tabTimer) { clearTimeout(_tabTimer); _tabTimer = null; }
+  if (_tabRaf)   { cancelAnimationFrame(_tabRaf); _tabRaf = null; }
+
+  // Reduced motion (or no transition support) → swap instantly, clean state.
+  if (reducedMotion) {
+    _applyTab(tab);
+    _tabContainers().forEach(_tabResetStyles);
+    return;
+  }
+
+  const outgoing = _tabVisibleContainer();
+
+  // Phase 1 — fade the current content out (opacity only; it stays in place).
+  if (outgoing) {
+    outgoing.style.transition = `opacity ${_TAB_OUT_MS}ms ${_TAB_EASE}`;
+    outgoing.style.opacity    = '0';
+  }
+
+  _tabTimer = setTimeout(() => {
+    if (myToken !== _tabToken) return; // superseded by a newer tap
+
+    // Phase 2 — swap content + render the target surface.
+    _applyTab(tab);
+
+    const incoming = _tabVisibleContainer();
+    // Any non-visible container (incl. the one we just faded out, now
+    // display:none) gets its inline motion styles cleared so nothing is
+    // ever left stuck at opacity 0.
+    _tabContainers().forEach(c => { if (c !== incoming) _tabResetStyles(c); });
+
+    if (!incoming) return;
+
+    // Phase 3 — fade the new content in from a subtle 4px rise.
+    incoming.style.transition = 'none';
+    incoming.style.opacity    = '0';
+    incoming.style.transform  = 'translateY(4px)';
+    void incoming.offsetWidth; // force reflow so the start state applies
+
+    _tabRaf = requestAnimationFrame(() => {
+      if (myToken !== _tabToken) return;
+      incoming.style.transition = `opacity ${_TAB_IN_MS}ms ${_TAB_EASE}, transform ${_TAB_IN_MS}ms ${_TAB_EASE}`;
+      incoming.style.opacity    = '1';
+      incoming.style.transform  = 'translateY(0)';
+      _tabTimer = setTimeout(() => {
+        if (myToken !== _tabToken) return;
+        _tabResetStyles(incoming); // back to default (opacity 1, no transform)
+      }, _TAB_IN_MS + 40);
+    });
+  }, _TAB_OUT_MS);
 }
 
 // ── Render ─────────────────────────────────────────────────
