@@ -11399,6 +11399,76 @@ function processSeries(data) {
   }
 }
 
+// PORTFOLIO-CHART-FIX-2 — display-only sanitation of polluted history.
+// Input is expected already validated (finite, value > 0), deduped and
+// sorted ascending by ts (i.e. the output of processSeries). This removes
+// isolated corrupt spikes/valleys and ultra-short impossible jumps that
+// some legacy snapshot writes left behind in localStorage.
+//
+// IMPORTANT: this NEVER mutates portfolioHistory / localStorage. It only
+// shapes the in-memory series handed to the chart for the current render.
+// It is intentionally conservative: it only drops points that look like
+// single-sample corruption, so genuine large moves over time survive.
+function sanitizeHistoryForDisplay(points) {
+  if (!Array.isArray(points) || points.length < 3) {
+    return { points: Array.isArray(points) ? points : [], removed: 0 };
+  }
+
+  let removed = 0;
+
+  // 1. Isolated spike/valley removal. For an interior point B between its
+  //    immediate neighbours A and C, drop B when A and C agree closely but
+  //    B diverges massively from both — the classic single-sample glitch.
+  const SPIKE_DIVERGE = 0.25; // B differs > 25% from each neighbour
+  const NEIGHBOUR_AGREE = 0.08; // A and C within 8% of each other
+  const keepSpike = new Array(points.length).fill(true);
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const a = points[i - 1].value;
+    const b = points[i].value;
+    const c = points[i + 1].value;
+    if (!(a > 0) || !(b > 0) || !(c > 0)) continue;
+
+    const divFromA = Math.abs(b / a - 1);
+    const divFromC = Math.abs(b / c - 1);
+    const neighbourGap = Math.abs(c / a - 1);
+
+    if (divFromA > SPIKE_DIVERGE && divFromC > SPIKE_DIVERGE && neighbourGap < NEIGHBOUR_AGREE) {
+      keepSpike[i] = false;
+      removed++;
+    }
+  }
+
+  const despiked = points.filter((_, i) => keepSpike[i]);
+
+  // 2. Ultra-short impossible jumps. A change of > 25% in under 2 minutes is
+  //    not a real portfolio move at refresh cadence, so drop the later point.
+  //    TODO(PORTFOLIO-CHART-FIX-2): history points carry only { ts, value }
+  //    with no user-action marker, so we cannot distinguish a legitimate
+  //    large deposit/withdrawal made within 2 minutes from corruption. If a
+  //    marker (e.g. { action: 'deposit' }) is added to portfolioHistory
+  //    writes later, skip this rule when the later point is marked.
+  const JUMP_MS = 2 * 60 * 1000;
+  const JUMP_PCT = 0.25;
+  const cleaned = [];
+
+  for (let i = 0; i < despiked.length; i++) {
+    const cur = despiked[i];
+    const prev = cleaned[cleaned.length - 1];
+    if (prev && prev.value > 0) {
+      const dt = cur.ts - prev.ts;
+      const deltaPct = Math.abs(cur.value / prev.value - 1);
+      if (dt >= 0 && dt < JUMP_MS && deltaPct > JUMP_PCT) {
+        removed++;
+        continue; // exclude the later point
+      }
+    }
+    cleaned.push(cur);
+  }
+
+  return { points: cleaned, removed };
+}
+
 
 function getChartData(range) {
   const now = Date.now();
@@ -11481,8 +11551,19 @@ function getChartData(range) {
   );
 
   // 2. Process the full normalised dataset
-  const processed = processSeries(source);
-  if (!processed || processed.length < 2) return _empty;
+  const processedRaw = processSeries(source);
+  if (!processedRaw || processedRaw.length < 2) return _empty;
+
+  // 2b. PORTFOLIO-CHART-FIX-2 — display-only sanitation. Strip isolated
+  //     corrupt spikes/valleys and ultra-short impossible jumps left in
+  //     stored history WITHOUT mutating localStorage. If sanitation would
+  //     leave too few points to plot, fall back to the unsanitised series
+  //     so the chart still renders.
+  const { points: sanitized, removed: _sanitizedRemoved } = sanitizeHistoryForDisplay(processedRaw);
+  const processed = (sanitized && sanitized.length >= 2) ? sanitized : processedRaw;
+  if (IS_DEV) {
+    console.debug('[chart-history] sanitized points:', _sanitizedRemoved);
+  }
 
   // 3. Build output — time-grid for windowed ranges, downsample for 'all'
   let final;
