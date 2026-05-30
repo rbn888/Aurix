@@ -11,15 +11,23 @@
       'nav.product': 'Producto', 'nav.workspace': 'Workspace', 'nav.roadmap': 'Roadmap', 'nav.early': 'Acceso anticipado',
       'cta.enter': 'Entrar en Aurix', 'cta.request': 'Solicitar acceso',
 
-      'hero.eyebrow': 'Sistema operativo del patrimonio',
-      'hero.h1': 'El sistema operativo de tu patrimonio.',
-      'hero.sub': 'Acciones, fondos, cripto, metales, inmuebles y liquidez. Todo tu patrimonio en una única plataforma.',
+      'hero.eyebrow': 'Sistema privado de patrimonio',
+      'hero.h1a': 'Todo tu patrimonio.',
+      'hero.h1b': 'Un solo sistema operativo.',
+      'hero.sub': 'Aurix reúne acciones, fondos, cripto, metales, inmuebles y liquidez en una interfaz clara y privada.',
       'preview.label': 'Vista previa del producto',
+      'mock.total': 'Patrimonio total', 'mock.value': '4,82 M€', 'mock.delta': '+8,4% YTD',
+      'mock.health': 'Salud de cartera', 'mock.health.v': 'Sólida',
+      'mock.risk': 'Riesgo', 'mock.risk.v': 'Equilibrado',
 
       'problem.title': 'Tu patrimonio está fragmentado.',
       'problem.lead': 'Repartido entre bancos, brókers y aplicaciones que no se hablan entre sí.',
-      'frag.banks': 'Bancos', 'frag.brokers': 'Brókers', 'frag.crypto': 'Cripto',
-      'frag.realestate': 'Inmuebles', 'frag.metals': 'Metales', 'frag.cash': 'Liquidez',
+      'frag.banks.t': 'Bancos', 'frag.banks.d': 'efectivo y depósitos',
+      'frag.brokers.t': 'Brókers', 'frag.brokers.d': 'acciones, ETFs y fondos',
+      'frag.crypto.t': 'Cripto', 'frag.crypto.d': 'activos digitales',
+      'frag.realestate.t': 'Inmuebles', 'frag.realestate.d': 'asignación inmobiliaria',
+      'frag.metals.t': 'Metales', 'frag.metals.d': 'oro y metales preciosos',
+      'frag.cash.t': 'Liquidez', 'frag.cash.d': 'posición disponible',
       'pain.1.t': 'Sin visibilidad', 'pain.1.d': 'Nunca ves el total real de lo que tienes.',
       'pain.2.t': 'Sin claridad', 'pain.2.d': 'No sabes cómo está repartido tu patrimonio.',
       'pain.3.t': 'Sin contexto', 'pain.3.d': 'Los números no te dicen qué significan.',
@@ -28,7 +36,7 @@
       'solution.lead': 'Aurix centraliza cada clase de activo en una sola interfaz, con el contexto que necesitas para decidir.',
       'asset.stocks': 'Acciones', 'asset.etfs': 'ETFs', 'asset.funds': 'Fondos', 'asset.crypto': 'Cripto',
       'asset.metals': 'Metales', 'asset.realestate': 'Inmuebles', 'asset.cash': 'Liquidez',
-      'feat.value.t': 'Valor total', 'feat.value.d': 'Tu patrimonio completo, actualizado y unificado.',
+      'feat.value.t': 'Valor total', 'feat.value.d': 'Unificado entre todas tus clases de activo.',
       'feat.alloc.t': 'Asignación', 'feat.alloc.d': 'Cómo está repartido entre clases de activo.',
       'feat.evo.t': 'Evolución', 'feat.evo.d': 'El recorrido de tu patrimonio en el tiempo.',
       'feat.health.t': 'Salud de cartera', 'feat.health.d': 'Concentración, liquidez y riesgo, interpretados.',
@@ -47,6 +55,8 @@
       'ws.c3.t': 'Liquidez', 'ws.c3.d': 'Cuánto podrías mover sin fricción.',
       'ws.c4.t': 'Riesgo', 'ws.c4.d': 'Exposición interpretada, no solo medida.',
       'ws.c5.t': 'Salud de cartera', 'ws.c5.d': 'Una lectura única del estado de tu patrimonio.',
+      'ws.c6.t': 'Insights', 'ws.c6.d': 'Observaciones claras y accionables.',
+      'ws.c7.t': 'Inteligencia', 'ws.c7.d': 'Contexto sobre tu estructura, no solo cifras.',
 
       'roadmap.title': 'Hacia dónde va Aurix.',
       'roadmap.now': 'Ahora', 'roadmap.next': 'Próximo', 'roadmap.later': 'Después',
@@ -54,12 +64,12 @@
       'rm.next.1': 'Métricas avanzadas', 'rm.next.2': 'Salud de cartera ampliada', 'rm.next.3': 'Seguimiento de objetivos', 'rm.next.4': 'Planificación patrimonial',
       'rm.later.1': 'App nativa iOS', 'rm.later.2': 'App nativa Android', 'rm.later.3': 'Insights asistidos por IA', 'rm.later.4': 'Capa de automatización',
 
-      'early.title': 'Solicita acceso anticipado.',
-      'early.sub': 'Aurix está en beta privada. Déjanos tus datos y te avisaremos.',
+      'early.title': 'Solicita acceso privado.',
+      'early.sub': 'Aurix funciona actualmente por invitación. Déjanos tus datos y contactaremos con usuarios seleccionados cuando abramos nuevas plazas.',
       'early.name': 'Nombre', 'early.email': 'Email', 'early.button': 'Solicitar acceso',
       'early.note': 'No compartiremos tu información. Beta privada · plazas limitadas.',
       'early.invalid': 'Revisa tu nombre y un email válido.',
-      'early.success': 'Gracias. Te avisaremos cuando tu acceso esté listo.',
+      'early.success': 'Solicitud recibida. Te contactaremos pronto.',
       'early.trust': 'Beta privada · Acceso por invitación · Sin promesas financieras',
 
       'social.title': 'Sigue la construcción de Aurix.',
@@ -73,15 +83,23 @@
       'nav.product': 'Product', 'nav.workspace': 'Workspace', 'nav.roadmap': 'Roadmap', 'nav.early': 'Early Access',
       'cta.enter': 'Enter Aurix', 'cta.request': 'Request Access',
 
-      'hero.eyebrow': 'Operating System for Wealth',
-      'hero.h1': 'The operating system for your wealth.',
-      'hero.sub': 'Stocks, funds, crypto, metals, real estate and cash. Unified in one platform.',
+      'hero.eyebrow': 'Private Wealth OS',
+      'hero.h1a': 'Your entire wealth.',
+      'hero.h1b': 'One operating system.',
+      'hero.sub': 'Aurix brings stocks, funds, crypto, metals, real estate and cash into one clear, private interface.',
       'preview.label': 'Product preview',
+      'mock.total': 'Total Wealth', 'mock.value': '$4.82M', 'mock.delta': '+8.4% YTD',
+      'mock.health': 'Health Score', 'mock.health.v': 'Strong',
+      'mock.risk': 'Risk', 'mock.risk.v': 'Balanced',
 
       'problem.title': 'Your wealth is fragmented.',
       'problem.lead': 'Spread across banks, brokers and apps that never talk to each other.',
-      'frag.banks': 'Banks', 'frag.brokers': 'Brokers', 'frag.crypto': 'Crypto',
-      'frag.realestate': 'Real Estate', 'frag.metals': 'Metals', 'frag.cash': 'Cash',
+      'frag.banks.t': 'Banks', 'frag.banks.d': 'Cash and deposits',
+      'frag.brokers.t': 'Brokers', 'frag.brokers.d': 'Stocks, ETFs and funds',
+      'frag.crypto.t': 'Crypto', 'frag.crypto.d': 'Digital assets',
+      'frag.realestate.t': 'Real Estate', 'frag.realestate.d': 'Property allocation',
+      'frag.metals.t': 'Metals', 'frag.metals.d': 'Gold and precious metals',
+      'frag.cash.t': 'Cash', 'frag.cash.d': 'Liquidity position',
       'pain.1.t': 'No visibility', 'pain.1.d': 'You never see the real total of what you own.',
       'pain.2.t': 'No clarity', 'pain.2.d': 'You don’t know how your wealth is allocated.',
       'pain.3.t': 'No context', 'pain.3.d': 'The numbers don’t tell you what they mean.',
@@ -90,7 +108,7 @@
       'solution.lead': 'Aurix centralizes every asset class into a single interface, with the context you need to decide.',
       'asset.stocks': 'Stocks', 'asset.etfs': 'ETFs', 'asset.funds': 'Funds', 'asset.crypto': 'Crypto',
       'asset.metals': 'Metals', 'asset.realestate': 'Real Estate', 'asset.cash': 'Cash',
-      'feat.value.t': 'Total value', 'feat.value.d': 'Your complete wealth, live and unified.',
+      'feat.value.t': 'Total value', 'feat.value.d': 'Unified across asset classes.',
       'feat.alloc.t': 'Allocation', 'feat.alloc.d': 'How it is split across asset classes.',
       'feat.evo.t': 'Evolution', 'feat.evo.d': 'Your wealth’s journey over time.',
       'feat.health.t': 'Portfolio health', 'feat.health.d': 'Concentration, liquidity and risk, interpreted.',
@@ -109,6 +127,8 @@
       'ws.c3.t': 'Liquidity', 'ws.c3.d': 'How much you could move without friction.',
       'ws.c4.t': 'Risk', 'ws.c4.d': 'Exposure interpreted, not just measured.',
       'ws.c5.t': 'Portfolio health', 'ws.c5.d': 'A single reading of your wealth’s state.',
+      'ws.c6.t': 'Insights', 'ws.c6.d': 'Clear, actionable observations.',
+      'ws.c7.t': 'Intelligence', 'ws.c7.d': 'Context on your structure, not just figures.',
 
       'roadmap.title': 'Where Aurix is heading.',
       'roadmap.now': 'Now', 'roadmap.next': 'Next', 'roadmap.later': 'Later',
@@ -116,12 +136,12 @@
       'rm.next.1': 'Advanced Metrics', 'rm.next.2': 'Portfolio Health Expansion', 'rm.next.3': 'Goal Tracking', 'rm.next.4': 'Wealth Planning',
       'rm.later.1': 'Native iOS App', 'rm.later.2': 'Native Android App', 'rm.later.3': 'AI Assisted Insights', 'rm.later.4': 'Automation Layer',
 
-      'early.title': 'Request early access.',
-      'early.sub': 'Aurix is in private beta. Leave your details and we’ll reach out.',
+      'early.title': 'Request private access.',
+      'early.sub': 'Aurix is currently invite-only. Leave your details and we’ll contact selected users as new places open.',
       'early.name': 'Name', 'early.email': 'Email', 'early.button': 'Request Access',
       'early.note': 'We will not share your information. Private beta · limited spots.',
       'early.invalid': 'Please check your name and a valid email.',
-      'early.success': 'Thank you. We’ll let you know when your access is ready.',
+      'early.success': 'Request received. We’ll be in touch.',
       'early.trust': 'Private beta · Invite-only access · No financial promises',
 
       'social.title': 'Follow the building of Aurix.',
@@ -176,9 +196,19 @@
 
   function t(key) { return (I18N[lang] && I18N[lang][key]) || (I18N.es[key]) || ''; }
 
+  // AURIX-LANDING-PREMIUM-PASS-1: single source of truth for the private-app
+  // URL. Every "Enter Aurix" link ([data-app-link]) points here.
+  // TODO: flip APP_URL to 'https://app.aurixsystem.io' once that subdomain is
+  // live (the HTML href is the same live fallback for no-JS).
+  var APP_URL = 'https://rbn888.github.io/Aurix/';
+
   /* ── Init ───────────────────────────────────────────── */
   function init() {
     applyLang(detectLang());
+
+    // Point every "Enter Aurix" CTA at the canonical app URL.
+    var appLinks = document.querySelectorAll('[data-app-link]');
+    for (var a = 0; a < appLinks.length; a++) appLinks[a].setAttribute('href', APP_URL);
 
     // Language toggle
     document.addEventListener('click', function (e) {

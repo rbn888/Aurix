@@ -408,6 +408,85 @@ body.menu-open .mobile-menu{ opacity:1; transform:none; pointer-events:auto; }
   display:block; padding:6px 0; color:var(--dim); cursor:default;
 }
 
+/* ════ AURIX-LANDING-PREMIUM-PASS-1 ════════════════════════════════ */
+
+/* Hero product mock — fictional UI, labelled "Product preview". */
+.preview-card.mock{ padding:18px 18px 16px; }
+.mock-total{ margin-bottom:10px; }
+.mock-label{ display:block; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); }
+.mock-value-row{ display:flex; align-items:baseline; gap:10px; margin-top:6px; }
+.mock-value{ font-size:30px; font-weight:800; letter-spacing:-.02em; color:#fff; font-variant-numeric:tabular-nums; }
+.mock-delta{ font-size:13px; font-weight:600; color:var(--green); }
+.mock-chart{ height:60px; margin:2px 0 12px; }
+.mock-chart svg{ width:100%; height:100%; }
+.mock-alloc{ display:flex; flex-direction:column; gap:8px; }
+.mock-row{ display:flex; align-items:center; gap:10px; font-size:12px; color:var(--muted); }
+.mock-row span{ flex:0 0 68px; }
+.mock-bar{ flex:1 1 auto; height:6px; border-radius:999px; background:rgba(255,255,255,.06); overflow:hidden; }
+.mock-bar b{ display:block; height:100%; border-radius:999px; background:var(--accent); }
+.mock-foot{ display:flex; gap:10px; margin-top:14px; }
+.mock-stat{ flex:1; border:1px solid var(--border); border-radius:12px; padding:9px 12px; background:rgba(255,255,255,.02); }
+.mock-stat-k{ display:block; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
+.mock-stat-v{ display:block; margin-top:3px; font-size:14px; font-weight:700; color:var(--text); }
+.mock-stat-v.good{ color:var(--green); }
+
+/* Part 4 — asset-class cards (icon + title + line) */
+@media (min-width:861px){ .frag-grid{ grid-template-columns:repeat(3,1fr); } }
+.frag-card{
+  display:flex; flex-direction:column; align-items:flex-start; gap:7px;
+  padding:22px 20px; border:1px solid var(--border); border-radius:16px;
+  background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.012));
+  transition:transform .2s var(--ease), border-color .2s var(--ease);
+}
+.frag-card:hover{ transform:translateY(-3px); border-color:var(--border-hi); }
+.frag-ico{ width:26px; height:26px; fill:none; stroke:var(--accent-2); stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; opacity:.9; }
+.frag-card h3{ font-size:15.5px; font-weight:700; letter-spacing:-.01em; }
+.frag-card p{ font-size:13px; color:var(--muted); }
+
+/* Part 5 — product cards with mini visuals */
+.feature--viz{ display:flex; flex-direction:column; }
+.fv-figure{ display:flex; align-items:baseline; gap:8px; margin:8px 0 10px; }
+.fv-num{ font-size:26px; font-weight:800; letter-spacing:-.02em; color:#fff; font-variant-numeric:tabular-nums; }
+.fv-delta{ font-size:12.5px; font-weight:600; color:var(--green); }
+.fv-bars{ display:flex; flex-direction:column; gap:6px; margin:10px 0; }
+.fv-bars i{ display:block; height:6px; border-radius:999px; background:rgba(255,255,255,.06); overflow:hidden; }
+.fv-bars b{ display:block; height:100%; border-radius:999px; background:var(--accent); }
+.fv-spark{ height:44px; margin:10px 0; }
+.fv-spark svg{ width:100%; height:100%; }
+.feature--viz p{ margin-top:auto; }
+
+/* Part 6 — Workspace: denser, compact cards + indicator */
+.ws-cards{ grid-template-columns:1fr 1fr; gap:12px; }
+.ws-card{ padding:18px 18px; }
+.ws-card h3{ font-size:16px; margin-bottom:5px; }
+.ws-card p{ font-size:13.5px; }
+.ws-ind{ display:block; height:4px; margin-top:14px; border-radius:999px; background:rgba(255,255,255,.06); overflow:hidden; }
+.ws-ind b{ display:block; height:100%; border-radius:999px; background:var(--accent); }
+
+/* Part 7 — Roadmap compression (~35% less height) */
+.timeline{ gap:14px; margin-top:32px; }
+.phase{ padding:20px 22px; }
+.phase-tag{ margin-bottom:12px; }
+.phase ul{ gap:9px; }
+.phase li{ font-size:14.5px; }
+
+/* Part 11 — mobile visual rhythm: tighten section + hero rhythm, smaller mock */
+@media (max-width:860px){
+  .section{ padding:58px 0; }
+  .ws-cards{ gap:10px; }
+}
+@media (max-width:560px){
+  .frag-grid{ grid-template-columns:1fr 1fr; gap:10px; }
+  .ws-cards{ grid-template-columns:1fr 1fr; gap:9px; }
+  .ws-card{ padding:14px 14px; }
+  .preview-card.mock{ padding:14px; }
+  .mock-value{ font-size:24px; }
+  .mock-chart{ height:48px; }
+  .mock-foot{ gap:8px; }
+  .timeline{ gap:10px; }
+  .phase{ padding:16px 18px; }
+}
+
 @media (prefers-reduced-motion: reduce){
   html{ scroll-behavior:auto; }
   .reveal{ opacity:1; transform:none; transition:none; }
