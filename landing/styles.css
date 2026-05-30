@@ -13,8 +13,10 @@
   --border-hi: rgba(138,178,255,0.26);
 
   --text:      #f4f7fc;
-  --muted:     rgba(226,234,250,0.64);
-  --dim:       rgba(226,234,250,0.42);
+  /* AURIX-LANDING-POLISH-1: lifted muted/dim for AA-friendlier contrast on the
+     dark surface (was .64/.42) without going full bright-white. */
+  --muted:     rgba(228,236,251,0.72);
+  --dim:       rgba(222,231,248,0.56);
 
   --accent:    #4f8ef7;
   --accent-2:  #7db8ff;
@@ -357,8 +359,54 @@ body.menu-open .mobile-menu{ opacity:1; transform:none; pointer-events:auto; }
   .early-card{ padding:36px 22px; }
 }
 
-/* Large screens — keep content centered, never stretched */
-@media (min-width:1500px){ :root{ --maxw:1240px; } }
+/* Large screens — fill more of the canvas at 1600/1900 so 1728/1920 don't feel
+   empty, while 1440 keeps its balanced 1200 container. Hero gets a touch more
+   vertical presence and a slightly larger preview at width. */
+@media (min-width:1600px){
+  :root{ --maxw:1320px; }
+  .hero{ padding:168px 0 104px; }
+  .hero-inner{ gap:64px; }
+  :root{ --h1: clamp(40px, 5.4vw, 92px); }
+}
+@media (min-width:1900px){
+  :root{ --maxw:1380px; }
+}
+
+/* ── AURIX-LANDING-POLISH-1: section rhythm + polished elements ── */
+/* Subtle alternating depth + restrained radial accents — premium, no loud
+   gradients. Breaks the run of identical dark sections for scanability. */
+.section--solution,
+.section--roadmap{
+  background:rgba(255,255,255,0.014);
+  border-top:1px solid var(--border);
+}
+.section--workspace{
+  background:radial-gradient(58% 50% at 86% 8%, rgba(79,142,247,.07), transparent 62%);
+}
+.section--early{
+  background:radial-gradient(54% 70% at 50% -6%, rgba(79,142,247,.06), transparent 60%);
+}
+
+/* Early-access trust microcopy — small, premium, confidence-building. */
+.early-trust{
+  margin-top:16px; text-align:center;
+  font-size:12.5px; letter-spacing:.015em; color:var(--dim);
+}
+
+/* Social "coming soon" caption */
+.social-soon{
+  margin-top:16px; text-align:center;
+  font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim);
+}
+
+/* Disabled (no-href) labels — social row + footer legal/social. Non-interactive,
+   clearly muted, never read or behave as a live link. */
+.social-link.is-disabled{
+  color:var(--muted); cursor:default; pointer-events:none; opacity:.8;
+}
+.footer-col .is-disabled{
+  display:block; padding:6px 0; color:var(--dim); cursor:default;
+}
 
 @media (prefers-reduced-motion: reduce){
   html{ scroll-behavior:auto; }

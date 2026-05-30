@@ -16,12 +16,19 @@
   <meta property="og:title" content="Aurix — Operating System for Wealth">
   <meta property="og:description" content="Track, understand and manage your entire wealth across stocks, funds, crypto, real estate, metals and cash from one platform.">
   <meta property="og:url" content="https://aurixsystem.io/">
-  <meta property="og:image" content="https://aurixsystem.io/og-image.svg">
+  <meta property="og:locale" content="es_ES">
+  <meta property="og:locale:alternate" content="en_US">
+  <!-- Raster OG image (1200x630 PNG) — many platforms (LinkedIn, X, WhatsApp,
+       Slack) do not render SVG previews; the SVG is kept as a vector fallback. -->
+  <meta property="og:image" content="https://aurixsystem.io/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:type" content="image/png">
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Aurix — Operating System for Wealth">
   <meta name="twitter:description" content="Track, understand and manage your entire wealth across stocks, funds, crypto, real estate, metals and cash from one platform.">
-  <meta name="twitter:image" content="https://aurixsystem.io/og-image.svg">
+  <meta name="twitter:image" content="https://aurixsystem.io/og-image.png">
 
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -296,6 +303,7 @@
             <button class="btn btn-primary btn-lg btn-block" type="submit" data-i18n="early.button">Solicitar acceso</button>
             <p class="early-note" id="earlyNote" data-i18n="early.note">No compartiremos tu información. Beta privada · plazas limitadas.</p>
           </form>
+          <p class="early-trust" data-i18n="early.trust">Beta privada · Acceso por invitación · Sin promesas financieras</p>
         </div>
       </div>
     </section>
@@ -305,11 +313,14 @@
       <div class="container social-inner">
         <h2 class="section-title reveal" data-i18n="social.title">Sigue la construcción de Aurix.</h2>
         <div class="social-links reveal">
-          <!-- TODO: replace href="#" with real profile URLs when available -->
-          <a class="social-link" href="#" aria-label="X (Twitter)" data-todo="social-x">X</a>
-          <a class="social-link" href="#" aria-label="Instagram" data-todo="social-instagram">Instagram</a>
-          <a class="social-link" href="#" aria-label="LinkedIn" data-todo="social-linkedin">LinkedIn</a>
+          <!-- TODO(AURIX-LANDING): swap each <span> for <a href="REAL_URL"> once
+               the official profiles exist. Disabled (no href) until then so the
+               landing never ships a dead link. -->
+          <span class="social-link is-disabled" aria-disabled="true" data-todo="social-x">X</span>
+          <span class="social-link is-disabled" aria-disabled="true" data-todo="social-instagram">Instagram</span>
+          <span class="social-link is-disabled" aria-disabled="true" data-todo="social-linkedin">LinkedIn</span>
         </div>
+        <p class="social-soon reveal" data-i18n="social.soon">Próximamente</p>
       </div>
     </section>
   </main>
@@ -331,15 +342,16 @@
         </div>
         <div class="footer-col">
           <h4 data-i18n="footer.legal">Legal</h4>
-          <!-- TODO: link real legal pages when available -->
-          <a href="#" data-i18n="footer.privacy" data-todo="legal-privacy">Privacidad</a>
-          <a href="#" data-i18n="footer.terms" data-todo="legal-terms">Términos</a>
+          <!-- TODO(AURIX-LANDING): swap for <a href="..."> when the legal pages
+               exist. Disabled (no href) meanwhile — no dead links shipped. -->
+          <span class="is-disabled" aria-disabled="true" data-i18n="footer.privacy" data-todo="legal-privacy">Privacidad</span>
+          <span class="is-disabled" aria-disabled="true" data-i18n="footer.terms" data-todo="legal-terms">Términos</span>
         </div>
         <div class="footer-col">
           <h4 data-i18n="footer.social">Social</h4>
-          <a href="#" data-todo="social-x">X</a>
-          <a href="#" data-todo="social-instagram">Instagram</a>
-          <a href="#" data-todo="social-linkedin">LinkedIn</a>
+          <span class="is-disabled" aria-disabled="true" data-todo="social-x">X</span>
+          <span class="is-disabled" aria-disabled="true" data-todo="social-instagram">Instagram</span>
+          <span class="is-disabled" aria-disabled="true" data-todo="social-linkedin">LinkedIn</span>
         </div>
       </div>
     </div>

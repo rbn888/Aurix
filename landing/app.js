@@ -60,10 +60,14 @@
       'early.note': 'No compartiremos tu información. Beta privada · plazas limitadas.',
       'early.invalid': 'Revisa tu nombre y un email válido.',
       'early.success': 'Gracias. Te avisaremos cuando tu acceso esté listo.',
+      'early.trust': 'Beta privada · Acceso por invitación · Sin promesas financieras',
 
       'social.title': 'Sigue la construcción de Aurix.',
+      'social.soon': 'Próximamente',
       'footer.tag': 'Operating System for Wealth',
-      'footer.product': 'Producto', 'footer.legal': 'Legal', 'footer.privacy': 'Privacidad', 'footer.terms': 'Términos', 'footer.social': 'Social'
+      'footer.product': 'Producto', 'footer.legal': 'Legal', 'footer.privacy': 'Privacidad', 'footer.terms': 'Términos', 'footer.social': 'Social',
+      'meta.title': 'Aurix — El sistema operativo de tu patrimonio',
+      'meta.desc': 'Controla, entiende y gestiona todo tu patrimonio — acciones, fondos, cripto, inmuebles, metales y liquidez — desde una sola plataforma.'
     },
     en: {
       'nav.product': 'Product', 'nav.workspace': 'Workspace', 'nav.roadmap': 'Roadmap', 'nav.early': 'Early Access',
@@ -118,10 +122,14 @@
       'early.note': 'We will not share your information. Private beta · limited spots.',
       'early.invalid': 'Please check your name and a valid email.',
       'early.success': 'Thank you. We’ll let you know when your access is ready.',
+      'early.trust': 'Private beta · Invite-only access · No financial promises',
 
       'social.title': 'Follow the building of Aurix.',
+      'social.soon': 'Coming soon',
       'footer.tag': 'Operating System for Wealth',
-      'footer.product': 'Product', 'footer.legal': 'Legal', 'footer.privacy': 'Privacy', 'footer.terms': 'Terms', 'footer.social': 'Social'
+      'footer.product': 'Product', 'footer.legal': 'Legal', 'footer.privacy': 'Privacy', 'footer.terms': 'Terms', 'footer.social': 'Social',
+      'meta.title': 'Aurix — The operating system for your wealth',
+      'meta.desc': 'Track, understand and manage your entire wealth — stocks, funds, crypto, real estate, metals and cash — from one platform.'
     }
   };
 
@@ -155,6 +163,15 @@
     // Keep the early-access note in sync unless it is showing a live status
     var note = document.getElementById('earlyNote');
     if (note && !note.classList.contains('ok')) note.textContent = dict['early.note'];
+
+    // AURIX-LANDING-POLISH-1: multilingual SEO basics — localize the document
+    // title, meta description and og:locale when the language changes. (No
+    // separate /en route; single page, dynamic per selection.)
+    if (dict['meta.title']) document.title = dict['meta.title'];
+    var md = document.querySelector('meta[name="description"]');
+    if (md && dict['meta.desc']) md.setAttribute('content', dict['meta.desc']);
+    var ogl = document.querySelector('meta[property="og:locale"]');
+    if (ogl) ogl.setAttribute('content', lang === 'en' ? 'en_US' : 'es_ES');
   }
 
   function t(key) { return (I18N[lang] && I18N[lang][key]) || (I18N.es[key]) || ''; }
