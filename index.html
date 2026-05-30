@@ -3,7 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <base href="/Aurix/">
+  <!-- AURIX-APP-DOMAIN-READY-1: no <base href>. Every asset/page link in this
+       app is relative, so it resolves correctly both under the GitHub Pages
+       subpath (https://rbn888.github.io/Aurix/) during migration AND at the
+       root custom domain (https://app.aurixsystem.io/) later. The API origin
+       (window.AURIX_API_BASE) is defined once in config.js, loaded before
+       app.js / services below. -->
   <style>
     /* AURIX-PREMIUM-ENTRY-1: paint dark on the very first frame so there is
        no white flash before styles.css or the boot splash parse. This inline

@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <base href="/Aurix/">
+  <!-- AURIX-APP-DOMAIN-READY-1: no <base href> — relative links work under
+       /Aurix/ (GitHub Pages) and at the root custom domain. -->
   <style>
     /* AURIX-MOBILE-HERO-LOADER-CHART-PREMIUM-1: paint the Aurix dark surface
        on the very first frame — ahead of the render-blocking styles.css — so
@@ -319,7 +320,13 @@
       const _isDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
       if (_isDev) { window._reportLogin = function () {}; return; }
       try {
-        const ENDPOINT    = 'https://isa-portfolio-ten.vercel.app/api/client-log';
+        // AURIX-APP-DOMAIN-READY-1: API origin from the shared source of truth
+        // (window.AURIX_API_BASE in config.js, loaded just above). Falls back to
+        // the current Vercel project so a missing config can never break login.
+        const _apiBase    = (typeof window.AURIX_API_BASE === 'string')
+          ? window.AURIX_API_BASE
+          : 'https://isa-portfolio-ten.vercel.app';
+        const ENDPOINT    = _apiBase + '/api/client-log';
         const MAX_REPORTS = 5;
         const seen        = new Set();
         let sent          = 0;

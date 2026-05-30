@@ -35,7 +35,12 @@
 (function () {
   'use strict';
 
-  const API_BASE = 'https://isa-portfolio-ten.vercel.app';
+  // AURIX-APP-DOMAIN-READY-1: single source of truth for the API origin
+  // (window.AURIX_API_BASE, set in index.html). Default stays the current
+  // Vercel project during migration; set to '' for a same-origin /api later.
+  const API_BASE = (typeof window !== 'undefined' && typeof window.AURIX_API_BASE === 'string')
+    ? window.AURIX_API_BASE
+    : 'https://isa-portfolio-ten.vercel.app';
 
   // ── Range → provider arg maps ─────────────────────────────────
   // Yahoo accepts named ranges + intervals; the backend already owns

@@ -34,8 +34,13 @@ const RANGE_DAYS = {
 // Returns the same shape CoinGecko emits — proxied via /api/prices/history
 // so the browser never talks to providers directly.
 async function fetchHistory(id, days) {
+  // AURIX-APP-DOMAIN-READY-1: API origin from the single source of truth
+  // (window.AURIX_API_BASE); default = current Vercel project during migration.
+  const _apiBase = (typeof window !== 'undefined' && typeof window.AURIX_API_BASE === 'string')
+    ? window.AURIX_API_BASE
+    : 'https://isa-portfolio-ten.vercel.app';
   const res = await fetch(
-    `https://isa-portfolio-ten.vercel.app/api/prices/history` +
+    `${_apiBase}/api/prices/history` +
     `?id=${encodeURIComponent(id)}&days=${encodeURIComponent(days)}`,
     { headers: { Accept: 'application/json' } }
   );

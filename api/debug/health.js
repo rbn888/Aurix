@@ -5,14 +5,28 @@
 
 import { OBSERVABILITY, PRICE_CACHE } from '../prices.js';
 
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://rbn888.github.io';
+// AURIX-APP-DOMAIN-READY-1: allowlist (comma-separated) instead of a single
+// origin, so the GitHub Pages app (rbn888.github.io) and the future
+// app.aurixsystem.io app are both accepted during migration. ALLOWED_ORIGINS
+// overrides the legacy ALLOWED_ORIGIN env var when present.
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || 'https://rbn888.github.io,https://app.aurixsystem.io')
+  .split(',').map(s => s.trim()).filter(Boolean);
+// Reflect the request Origin only when it is allow-listed (never wildcard '*');
+// localhost (any port) is accepted for local dev. Unknown origins fall back to
+// the first configured origin so existing behaviour is preserved.
+function corsOrigin(req) {
+  const o = (req && req.headers && req.headers.origin) || '';
+  if (o && (ALLOWED_ORIGINS.includes(o) || /^http:\/\/localhost(:\d+)?$/.test(o))) return o;
+  return ALLOWED_ORIGINS[0];
+}
 
 function avg(b) {
   return b.count > 0 ? Math.round(b.sum / b.count) : 0;
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin',  ALLOWED_ORIGIN);
+  res.setHeader('Access-Control-Allow-Origin',  corsOrigin(req));
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Cache-Control', 'no-store');

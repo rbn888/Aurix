@@ -8,7 +8,12 @@ async function getMarketSignals() {
   // Reuses the existing pricing gateway endpoint — no new backend route.
   let res;
   try {
-    res = await fetch('https://isa-portfolio-ten.vercel.app/api/prices', {
+    // AURIX-APP-DOMAIN-READY-1: API origin from the single source of truth
+    // (window.AURIX_API_BASE); default = current Vercel project during migration.
+    const _apiBase = (typeof window !== 'undefined' && typeof window.AURIX_API_BASE === 'string')
+      ? window.AURIX_API_BASE
+      : 'https://isa-portfolio-ten.vercel.app';
+    res = await fetch(_apiBase + '/api/prices', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ providers: ['coingecko:bitcoin'] }),

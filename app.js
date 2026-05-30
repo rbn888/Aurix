@@ -13,8 +13,18 @@ const IS_DEV =
 (function () {
   if (IS_DEV) return;
   try {
-    const ENDPOINT    = 'https://isa-portfolio-ten.vercel.app/api/client-log';
-    const API_HOST    = 'isa-portfolio-ten.vercel.app';
+    // AURIX-APP-DOMAIN-READY-1: single source of truth for the API origin.
+    // window.AURIX_API_BASE is set early in index.html; default stays the
+    // current Vercel project during migration. Set it to '' later to call a
+    // same-origin /api (e.g. app.aurixsystem.io/api) with no CORS.
+    const API_ORIGIN  = (typeof window !== 'undefined' && typeof window.AURIX_API_BASE === 'string')
+      ? window.AURIX_API_BASE
+      : 'https://isa-portfolio-ten.vercel.app';
+    const ENDPOINT    = API_ORIGIN + '/api/client-log';
+    // Hostname used only to tag backend fetches for error reporting. Falls
+    // back to the Vercel host when API_ORIGIN is relative/same-origin ('').
+    let API_HOST      = 'isa-portfolio-ten.vercel.app';
+    try { if (API_ORIGIN) API_HOST = new URL(API_ORIGIN).host; } catch (_) {}
     const MAX_REPORTS = 10;     // per page session — caps spam, prevents loops
     const MAX_MSG     = 500;
     const MAX_STACK   = 1500;
@@ -2916,7 +2926,14 @@ function switchLang(newLang) {
 
 // ── State ──────────────────────────────────────────────────
 const STORAGE_KEY    = 'portfolio_assets';
-const PRICES_PROXY   = 'https://isa-portfolio-ten.vercel.app/api/prices';
+// AURIX-APP-DOMAIN-READY-1: derived from the single API-origin source of truth
+// (window.AURIX_API_BASE, set in index.html). All other API URLs in app.js are
+// built from PRICES_PROXY via .replace('/api/prices', ...), so this one switch
+// moves the whole app to a same-origin /api later (set AURIX_API_BASE = '').
+const AURIX_API_ORIGIN = (typeof window !== 'undefined' && typeof window.AURIX_API_BASE === 'string')
+  ? window.AURIX_API_BASE
+  : 'https://isa-portfolio-ten.vercel.app';
+const PRICES_PROXY   = AURIX_API_ORIGIN + '/api/prices';
 
 // ── Fallback prices (used when APIs are unavailable) ──────
 const FALLBACK_PRICES = {
