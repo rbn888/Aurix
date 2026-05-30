@@ -43,8 +43,9 @@
       'feat.insights.t': 'Insights', 'feat.insights.d': 'Observaciones claras sobre tu estructura.',
       'feat.intel.t': 'Inteligencia', 'feat.intel.d': 'Contexto, no solo cifras.',
 
-      'previewsec.title': 'Diseñado como un producto premium.',
-      'previewsec.lead': 'Una interfaz clara, institucional y rápida — en escritorio y en el móvil.',
+      'trust.label': 'Unificado en',
+      'show.title': 'Diseñado como un producto premium.',
+      'show.lead': 'Una experiencia clara, institucional y rápida.',
 
       'ws.eyebrow': 'Workspace',
       'ws.title1': 'Más que seguimiento.', 'ws.title2': 'Comprensión.',
@@ -64,17 +65,17 @@
       'rm.next.1': 'Métricas avanzadas', 'rm.next.2': 'Salud de cartera ampliada', 'rm.next.3': 'Seguimiento de objetivos', 'rm.next.4': 'Planificación patrimonial',
       'rm.later.1': 'App nativa iOS', 'rm.later.2': 'App nativa Android', 'rm.later.3': 'Insights asistidos por IA', 'rm.later.4': 'Capa de automatización',
 
-      'early.title': 'Solicita acceso privado.',
-      'early.sub': 'Aurix funciona actualmente por invitación. Déjanos tus datos y contactaremos con usuarios seleccionados cuando abramos nuevas plazas.',
+      'early.eyebrow': 'Beta privada',
+      'early.title': 'Solo por invitación.',
+      'early.sub': 'Aurix está disponible actualmente para un número limitado de usuarios.',
       'early.name': 'Nombre', 'early.email': 'Email', 'early.button': 'Solicitar acceso',
       'early.note': 'No compartiremos tu información. Beta privada · plazas limitadas.',
       'early.invalid': 'Revisa tu nombre y un email válido.',
       'early.success': 'Solicitud recibida. Te contactaremos pronto.',
-      'early.trust': 'Beta privada · Acceso por invitación · Sin promesas financieras',
-
-      'social.title': 'Sigue la construcción de Aurix.',
-      'social.soon': 'Próximamente',
-      'footer.tag': 'Operating System for Wealth',
+      'early.trust': 'Acceso por invitación · Sin promesas financieras',
+      'modal.title': 'Solicita acceso privado.',
+      'modal.sub': 'Déjanos tus datos y contactaremos con usuarios seleccionados.',
+      'footer.tag': 'Private Wealth OS',
       'footer.product': 'Producto', 'footer.legal': 'Legal', 'footer.privacy': 'Privacidad', 'footer.terms': 'Términos', 'footer.social': 'Social',
       'meta.title': 'Aurix — El sistema operativo de tu patrimonio',
       'meta.desc': 'Controla, entiende y gestiona todo tu patrimonio — acciones, fondos, cripto, inmuebles, metales y liquidez — desde una sola plataforma.'
@@ -115,8 +116,9 @@
       'feat.insights.t': 'Insights', 'feat.insights.d': 'Clear observations about your structure.',
       'feat.intel.t': 'Intelligence', 'feat.intel.d': 'Context, not just figures.',
 
-      'previewsec.title': 'Designed like a premium product.',
-      'previewsec.lead': 'A clear, institutional and fast interface — on desktop and on mobile.',
+      'trust.label': 'Unified across',
+      'show.title': 'Designed like a premium product.',
+      'show.lead': 'A clear, institutional and fast experience.',
 
       'ws.eyebrow': 'Workspace',
       'ws.title1': 'More than tracking.', 'ws.title2': 'Understanding.',
@@ -136,17 +138,17 @@
       'rm.next.1': 'Advanced Metrics', 'rm.next.2': 'Portfolio Health Expansion', 'rm.next.3': 'Goal Tracking', 'rm.next.4': 'Wealth Planning',
       'rm.later.1': 'Native iOS App', 'rm.later.2': 'Native Android App', 'rm.later.3': 'AI Assisted Insights', 'rm.later.4': 'Automation Layer',
 
-      'early.title': 'Request private access.',
-      'early.sub': 'Aurix is currently invite-only. Leave your details and we’ll contact selected users as new places open.',
+      'early.eyebrow': 'Private Beta',
+      'early.title': 'Invitation only.',
+      'early.sub': 'Aurix is currently available to a limited number of users.',
       'early.name': 'Name', 'early.email': 'Email', 'early.button': 'Request Access',
       'early.note': 'We will not share your information. Private beta · limited spots.',
       'early.invalid': 'Please check your name and a valid email.',
       'early.success': 'Request received. We’ll be in touch.',
-      'early.trust': 'Private beta · Invite-only access · No financial promises',
-
-      'social.title': 'Follow the building of Aurix.',
-      'social.soon': 'Coming soon',
-      'footer.tag': 'Operating System for Wealth',
+      'early.trust': 'Invite-only · No financial promises',
+      'modal.title': 'Request private access.',
+      'modal.sub': 'Leave your details and we’ll contact selected users.',
+      'footer.tag': 'Private Wealth OS',
       'footer.product': 'Product', 'footer.legal': 'Legal', 'footer.privacy': 'Privacy', 'footer.terms': 'Terms', 'footer.social': 'Social',
       'meta.title': 'Aurix — The operating system for your wealth',
       'meta.desc': 'Track, understand and manage your entire wealth — stocks, funds, crypto, real estate, metals and cash — from one platform.'
@@ -192,6 +194,16 @@
     if (md && dict['meta.desc']) md.setAttribute('content', dict['meta.desc']);
     var ogl = document.querySelector('meta[property="og:locale"]');
     if (ogl) ogl.setAttribute('content', lang === 'en' ? 'en_US' : 'es_ES');
+
+    // Keep the animated wealth figure in the active language (final value).
+    var cv = document.getElementById('countValue');
+    if (cv && !cv.dataset.counting) cv.textContent = fmtWealth(WEALTH_TARGET);
+  }
+
+  // Fictional headline wealth figure (labelled "Product preview"). ES: 4,82 M€ · EN: $4.82M
+  var WEALTH_TARGET = 4.82;
+  function fmtWealth(n) {
+    return lang === 'en' ? ('$' + n.toFixed(2) + 'M') : (n.toFixed(2).replace('.', ',') + ' M€');
   }
 
   function t(key) { return (I18N[lang] && I18N[lang][key]) || (I18N.es[key]) || ''; }
@@ -261,6 +273,60 @@
       }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
       for (var k = 0; k < reveals.length; k++) io.observe(reveals[k]);
     }
+
+    // Total-value counter — subtle count-up to the fictional figure on reveal.
+    var cv = document.getElementById('countValue');
+    if (cv) {
+      if (reduce || !('IntersectionObserver' in window)) {
+        cv.textContent = fmtWealth(WEALTH_TARGET);
+      } else {
+        var cio = new IntersectionObserver(function (entries) {
+          entries.forEach(function (en) {
+            if (!en.isIntersecting) return;
+            cio.unobserve(en.target);
+            cv.dataset.counting = '1';
+            var dur = 1100, start = null;
+            function step(ts) {
+              if (start === null) start = ts;
+              var p = Math.min(1, (ts - start) / dur);
+              var eased = 1 - Math.pow(1 - p, 3);
+              cv.textContent = fmtWealth(WEALTH_TARGET * eased);
+              if (p < 1) requestAnimationFrame(step);
+              else { cv.textContent = fmtWealth(WEALTH_TARGET); delete cv.dataset.counting; }
+            }
+            requestAnimationFrame(step);
+          });
+        }, { threshold: 0.6 });
+        cio.observe(cv);
+      }
+    }
+
+    // Request-access modal (exclusive, compact). No backend.
+    var modal = document.getElementById('accessModal');
+    var openBtn = document.getElementById('openModal');
+    function openModal() {
+      if (!modal) return;
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('modal-open');
+      var f = modal.querySelector('#ea-name');
+      if (f) setTimeout(function () { try { f.focus(); } catch (_) {} }, 60);
+    }
+    function closeModal() {
+      if (!modal) return;
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('modal-open');
+    }
+    if (openBtn) openBtn.addEventListener('click', openModal);
+    if (modal) {
+      modal.addEventListener('click', function (e) {
+        if (e.target.closest('[data-modal-close]')) closeModal();
+      });
+    }
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && modal && modal.classList.contains('open')) closeModal();
+    });
 
     // Early-access form — placeholder behavior (no backend yet)
     var form = document.getElementById('earlyForm');
