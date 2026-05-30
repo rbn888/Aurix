@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <base href="/Aurix/">
   <!-- RESET-CANONICAL-1: canonical password reset entrypoint. -->
+  <style>
+    /* AURIX-MOBILE-HERO-LOADER-CHART-PREMIUM-1: dark first frame ahead of the
+       render-blocking styles.css so there is no white flash before paint.
+       Matches --bg (#05070f) — the rendered body background. */
+    html, body { background:#05070f; margin:0; }
+  </style>
   <title>AURIX — Nueva contraseña</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="icon.svg">

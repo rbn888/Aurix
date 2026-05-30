@@ -3480,22 +3480,51 @@ body:not(.hero-active) #orb-canvas {
 @media (min-width: 769px) {
   .distribution-section { display: none !important; }
   .categories-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+  /* AURIX-DESKTOP-HERO-ALLOCATION-PREMIUM-1 — institutional allocation tile.
+     The dominant-asset icons and the market open/closed badge are hidden on
+     the desktop hub: both used to sit in the bottom-right / top-right and
+     collided with (or competed against) the allocation bar and the new header
+     %. Removing them yields a clean, uniform tile — header (label · %) → value
+     → a full-width allocation bar pinned to the foot. Mobile (<=768px) keeps
+     the icons, the market badge and its original layout untouched. */
+  /* (specificity raised to .cat-card .X so these beat the base
+     .cat-card-visual{display:flex} / .cat-card-content{max-width:calc(...)}
+     rules that are declared later in the file by source order.) */
+  .cat-card .cat-card-visual,
+  .cat-card .market-status { display: none; }
+  /* Icons gone → content reclaims the full width; flex:1 pins the bar to the
+     bottom as its own full-width row, well clear of the value. */
+  .cat-card .cat-card-content { max-width: 100%; flex: 1 1 auto; }
+  /* The % sits at the right end of the header so it reads as the label for the
+     proportional bar below — value stays the prominent figure. */
+  .cat-card-pct--head {
+    margin-left: auto;
+    color: var(--text);
+    opacity: 0.8;
+    font-weight: 600;
+  }
+
   .cat-card-bar {
     display: block;
-    margin-top: 12px;
+    margin-top: 14px;
     height: 4px;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.05);
     overflow: hidden;
   }
   .cat-card-bar-fill {
     display: block;
     height: 100%;
-    min-width: 2px;
+    min-width: 3px;
     border-radius: inherit;
-    opacity: 0.85;
-    transition: width .5s var(--ease-premium);
+    opacity: 0.9;
+    transition: width .5s var(--ease-premium),
+                opacity .2s var(--ease-out);
   }
+  /* Hover already lifts the card (see .cat-card:hover) — also brighten the
+     bar fill to its full strength. Subtle, no neon glow. */
+  .cat-card:hover .cat-card-bar-fill { opacity: 1; }
 }
 
 /* Tablet: 2 columns */
@@ -15501,6 +15530,55 @@ body.gs-open { overflow: hidden; }
 .aurix-signal[data-tone="moderate"] .aurix-signal-icon { color: #7db8ff; }
 .aurix-signal[data-tone="elevated"] .aurix-signal-icon { color: #f4c45a; }
 .aurix-signal[data-tone="high"]     .aurix-signal-icon { color: #e0904a; }
+
+/* AURIX-MOBILE-HERO-LOADER-CHART-PREMIUM-1 — health teaser as ONE compact
+   insight/action: "Salud sólida · Ver análisis ›". Desktop + mobile.
+   • The status dot/orb is removed entirely. Health state is now carried by the
+     text alone, so the only green status dot left in the hero is the single
+     sync dot in the meta row (no duplicate green indicators).
+   • The state text and the CTA sit next to each other (separated by a middot)
+     instead of being pushed to opposite edges — the body no longer stretches.
+   These rules win over the generic mobile signal bar (icon glass/breath/halo,
+   far-right pill) on specificity, so the row reads identically on every size. */
+.aurix-signal--health .aurix-signal-icon { display: none; }
+/* Scoped under .hero-left so these layout props beat the generic mobile
+   signal-bar rules (.aurix-signal {…}) on specificity, not source order. */
+.hero-left .aurix-signal--health {
+  justify-content: flex-start;
+  align-items: baseline;
+  gap: 0;
+  flex-wrap: nowrap;
+}
+.aurix-signal--health .aurix-signal-body {
+  flex: 0 1 auto;
+  flex-direction: row;
+  align-items: baseline;
+}
+.aurix-signal--health .aurix-signal-msg {
+  flex: 0 1 auto;
+  width: auto;
+  max-width: none;
+  overflow: visible;
+  white-space: nowrap;
+}
+.aurix-signal--health .aurix-signal-msg::after {
+  content: '·';
+  margin: 0 7px;
+  color: rgba(180, 200, 240, 0.34);
+  font-weight: 600;
+}
+.aurix-signal--health .aurix-signal-cta {
+  flex: 0 0 auto;
+  height: auto;
+  padding: 2px 4px;
+  background: transparent;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.aurix-signal--health .aurix-signal-cta:hover {
+  background: rgba(74, 130, 240, 0.10);
+  color: #fff;
+}
 
 /* Mobile — premium single-row signal bar:
    [icon 34px] [AURIX SIGNAL / message · ellipsis] [Ver análisis ›]

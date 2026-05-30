@@ -11644,8 +11644,14 @@ function getChartData(range) {
   // 3. Build output — time-grid for windowed ranges, downsample for 'all'
   let final;
   let mode = 'history';
+  // AURIX-MOBILE-HERO-LOADER-CHART-PREMIUM-1: track how many REAL (raw,
+  // sanitized) points feed the active range, so the dev diagnostics below can
+  // contrast rawPoints vs renderPoints and we can tell a sparse-data artifact
+  // (few raw points spread over a grid) from genuine movement.
+  let rawInRange = null;
   if (range === 'all') {
     const filtered = processed.filter(p => p.ts >= 0); // all points
+    rawInRange = filtered.length;
     if (filtered.length < 2) return _empty;
     final = downsample(filtered, MAX_POINTS['all'] || 250);
     mode = 'all-downsample';
@@ -11654,6 +11660,7 @@ function getChartData(range) {
     const points    = MAX_POINTS[range] || 120;
     const gridStart = now - duration;
     const inRange   = processed.filter(p => p.ts >= gridStart);
+    rawInRange = inRange.length;
 
     // CHART-DENSITY-1 (AURIX-PREMIUM-ENTRY-AND-CHART-1): the evenly-spaced
     // grid below fills every slot with the last-known value (carry-forward).
@@ -11758,12 +11765,17 @@ function getChartData(range) {
         }
       }
     }
+    // Render-mode taxonomy for the log: 'grid' (carry-forward dense),
+    // 'sparse-actual' (real snapshots plotted directly — no vertical walls),
+    // 'all-downsample' (TOTAL long-term), 'flat-baseline' (handled earlier).
     console.debug('[chart-diag]', {
       range,
       source: 'history',
       mode,
-      pointsCount: values.length,
-      sourcePointsInRange: (range === 'all') ? processed.length : undefined,
+      rawPoints: rawInRange,            // real sanitized points feeding the range
+      renderPoints: values.length,      // points actually plotted
+      pointsCount: values.length,       // (kept for back-compat)
+      sourcePointsInRange: (range === 'all') ? processed.length : rawInRange,
       sanitizedRemoved: _sanitizedRemoved,
       firstValue, lastValue,
       deltaPct: deltaPct == null ? null : +deltaPct.toFixed(2),
@@ -11828,15 +11840,22 @@ function updateChart(animate = false) {
   const pct = safeBase ? ((currentValue - startValue) / startValue) * 100 : 0;
   const cls = !safeBase ? 'flat' : (pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat');
 
+  // AURIX-MOBILE-HERO-LOADER-CHART-PREMIUM-1: the chart/evolution section now
+  // owns ALL performance, so it shows BOTH the percent and the amount delta on
+  // one compact line ("+0,73% · +36,49 €"). Both are derived from the SAME
+  // range baseline (firstValue) and live total here, so they can never
+  // disagree, and both update together when the user switches 24H/7D/30D/1A/
+  // TOTAL. The %/€ toggle now just controls EMPHASIS (which value leads) and
+  // the tooltip mode — the header always carries both figures.
   if (!safeBase) {
     chartChangeEl.textContent = '—';
-  } else if (activePerfMode === 'curr') {
-    const absChange = currentValue - startValue;
-    const absSign   = absChange >= 0 ? '+' : '';
-    chartChangeEl.textContent = `${absSign}${formatBase(absChange)}`;
   } else {
-    const sign = pct >= 0 ? '+' : '';
-    chartChangeEl.textContent = `${sign}${pct.toFixed(2)}%`;
+    const absChange = currentValue - startValue;
+    const pctStr = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+    const absStr = `${absChange >= 0 ? '+' : ''}${formatBase(absChange)}`;
+    chartChangeEl.textContent = activePerfMode === 'curr'
+      ? `${absStr} · ${pctStr}`
+      : `${pctStr} · ${absStr}`;
   }
   chartChangeEl.className = `chart-change ${cls}`;
 
@@ -13174,6 +13193,16 @@ function updateCategoryCards() {
     const allocBar  = isEmpty ? '' :
       `<div class="cat-card-bar" aria-hidden="true"><span class="cat-card-bar-fill" style="width:${allocPct.toFixed(1)}%;background:${m.color}"></span></div>`;
 
+    // AURIX-DESKTOP-HERO-ALLOCATION-PREMIUM-1: the allocation % moves UP into
+    // the header (right-aligned, beside the category label) so it visually
+    // describes the proportional bar at the foot of the card. Empty categories
+    // keep their status sub-label below the value (no misleading bar/percent).
+    // The mobile rule that hides the populated % (.cat-card-pct) still matches
+    // by class, so the mobile cards are untouched.
+    const pctHeader = isEmpty ? '' :
+      `<span class="cat-card-pct cat-card-pct--head">${dist.pct.toFixed(1)}%</span>`;
+    const emptySub  = isEmpty ? `<span class="cat-card-pct">${t('emptyCatSub')}</span>` : '';
+
     return `<button class="cat-card${isEmpty ? ' cat-card--empty' : ''}" data-type="${type}"${isEmpty ? ' aria-disabled="true"' : ''}>
       ${visual}
       ${catStatusHtml}
@@ -13181,9 +13210,10 @@ function updateCategoryCards() {
         <div class="cat-card-header">
           <span class="cat-card-dot" style="background:${m.color}"></span>
           <span class="cat-card-name">${m.label}</span>
+          ${pctHeader}
         </div>
         <span class="cat-card-value" data-target="${isEmpty ? '' : dist.valueBase}">${isEmpty ? '—' : formatBase(dist.valueBase)}</span>
-        <span class="cat-card-pct">${isEmpty ? t('emptyCatSub') : dist.pct.toFixed(1) + '%'}</span>
+        ${emptySub}
         ${rentLineHtml}
         ${hint}
       </div>
@@ -13275,23 +13305,13 @@ function updateCategoryCards() {
 
 // ── Performance display ─────────────────────────────────────
 function updatePerformance() {
-  if (!summaryPerfEl) return;
-  if (assets.length === 0) { summaryPerfEl.style.display = 'none'; return; }
-
-  let result = computeRangePnL(activeRange);
-  if (!result && activeRange !== 'all') result = computeRangePnL('all'); // fallback to cost basis
-  if (!result) { summaryPerfEl.style.display = 'none'; return; }
-
-  // AURIX-PREMIUM-CLEANUP-1: the hero owns the DELTA AMOUNT only; the
-  // range performance % is owned by the chart header (chart-change), so we
-  // no longer print the percentage here — it was the duplicated copy.
-  const { abs } = result;
-  const isPos  = abs >= 0;
-  const sign   = isPos ? '+' : '−';
-
-  summaryPerfEl.textContent = `${sign}${formatBase(Math.abs(abs))}`;
-  summaryPerfEl.className   = `summary-perf ${isPos ? 'positive' : 'negative'}`;
-  summaryPerfEl.style.display = '';
+  // AURIX-MOBILE-HERO-LOADER-CHART-PREMIUM-1: the hero no longer shows any
+  // performance line. The chart/evolution section now owns ALL performance
+  // (both the % and the amount delta — see updateChart), so the hero answers
+  // only "what is my portfolio worth and is it synced/healthy?". This kills
+  // the split where the hero showed the amount and the chart showed the %.
+  // The element is kept in the DOM (a clean revert point) but stays hidden.
+  if (summaryPerfEl) summaryPerfEl.style.display = 'none';
 }
 
 // ── Detail View ────────────────────────────────────────────
@@ -17298,11 +17318,10 @@ function render(animate = false) {
       totalValueEl.classList.remove('summary-total--compact');
     }
     if (assetCountEl)   assetCountEl.textContent = t('emptyAssetCount');
-    if (summaryPerfEl) {
-      summaryPerfEl.textContent = t('emptyPerf');
-      summaryPerfEl.className   = 'summary-perf';
-      summaryPerfEl.style.display = '';
-    }
+    // AURIX-MOBILE-HERO-LOADER-CHART-PREMIUM-1: hero performance line removed
+    // (chart owns all performance) — keep it hidden in the empty state too so
+    // no stray "Esperando tu primer activo" copy reappears.
+    if (summaryPerfEl) summaryPerfEl.style.display = 'none';
   }
 
   // AURIX-SIGNALS-1: refresh the dashboard awareness signal every
