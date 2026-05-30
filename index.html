@@ -242,22 +242,21 @@
 
       </section>
 
-      <!-- AURIX-SIGNALS-1: lightweight awareness signal. Detection is
-           deterministic and local — see computeAurixSignal() in app.js.
-           Hidden by default; renderAurixSignal() reveals it when a
-           rule fires. Tapping the CTA deep-links into Workspace. -->
-      <section class="aurix-signal" id="aurixSignal" hidden>
+      <!-- AURIX-PREMIUM-CLEANUP-1: the dashboard owns STATUS, the Workspace
+           owns INTELLIGENCE. This is now a single-line Workspace teaser —
+           it shows the portfolio health state (no rotating carousel) and the
+           whole card routes into Workspace. renderAurixSignal() fills the
+           state + tone; it stays hidden on an empty portfolio / drill-down. -->
+      <section class="aurix-signal aurix-signal--health" id="aurixSignal" role="button" tabindex="0" hidden>
         <div class="aurix-signal-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2 L4 22 L12 18 L20 22 Z"/>
-          </svg>
+          <span class="aurix-signal-dot"></span>
         </div>
         <div class="aurix-signal-body">
-          <span class="aurix-signal-title" data-i18n="signalTitle">Aurix Signal</span>
-          <p class="aurix-signal-msg" id="aurixSignalMsg"></p>
+          <span class="aurix-signal-title" data-i18n="healthTitle">Salud de cartera</span>
+          <span class="aurix-signal-msg" id="aurixSignalMsg"></span>
         </div>
         <button type="button" class="aurix-signal-cta" id="aurixSignalCta">
-          <span id="aurixSignalCtaLabel"></span>
+          <span id="aurixSignalCtaLabel" data-i18n="signalHealthCta">Ver análisis</span>
           <span class="aurix-signal-cta-arrow" aria-hidden="true">›</span>
         </button>
       </section>
@@ -271,7 +270,7 @@
                 <canvas id="donutChart"></canvas>
                 <div class="donut-center-label">
                   <div class="donut-center-val" id="donutCenterVal"></div>
-                  <div class="donut-center-sub" id="donutCenterSub" data-i18n="donutTotal">total</div>
+                  <div class="donut-center-sub" id="donutCenterSub"></div>
                 </div>
               </div>
               <div class="distribution-legend" id="distributionLegend"></div>
@@ -329,7 +328,7 @@
                 <canvas id="donutChartMobile"></canvas>
                 <div class="donut-center-label">
                   <div class="donut-center-val" id="donutCenterValMobile"></div>
-                  <div class="donut-center-sub" id="donutCenterSubMobile" data-i18n="donutTotal">total</div>
+                  <div class="donut-center-sub" id="donutCenterSubMobile"></div>
                 </div>
               </div>
               <div class="distribution-legend" id="distributionLegendMobile"></div>

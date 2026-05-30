@@ -1665,6 +1665,7 @@ const T = {
     signalInsightsBody:          'Análisis de tu cartera disponible.',
     signalInsightsBodyMobile:    'Análisis disponible',
     signalInsightsCta:           'Ver análisis',
+    signalHealthCta:             'Ver análisis',
     // CAT-CONTEXT-1 / REAL-ESTATE-INTEL: calm, informative signal when
     // real estate dominates the portfolio. Property weight is normal for
     // households with a primary residence — Aurix talks about liquidity
@@ -2763,6 +2764,7 @@ const T = {
     signalInsightsBody:          'Portfolio insights available.',
     signalInsightsBodyMobile:    'Insights available',
     signalInsightsCta:           'View analysis',
+    signalHealthCta:             'View analysis',
     // CAT-CONTEXT-1 / REAL-ESTATE-INTEL — real estate calm narrative.
     signalRealEstateBody:        'Your wealth is primarily supported by real estate.',
     signalRealEstateBodyMobile:  'Real estate weight high',
@@ -9621,8 +9623,12 @@ function lightenHex(hex, f) {
 }
 
 function resetDonutCenter() {
-  donutCenterValEl.textContent = formatShort(totalValueBase());
-  if (donutCenterSubEl) donutCenterSubEl.textContent = t('donutTotal');
+  // AURIX-PREMIUM-CLEANUP-1: the portfolio total is owned by the hero card.
+  // The donut centre no longer repeats it — the default state is visually
+  // neutral (empty) and only fills with CATEGORY CONTEXT on hover/selection
+  // (see setDonutCenter). This holds for desktop and the mobile mirror.
+  donutCenterValEl.textContent = '';
+  if (donutCenterSubEl) donutCenterSubEl.textContent = '';
 }
 
 function setDonutCenter(item) {
@@ -13257,15 +13263,14 @@ function updatePerformance() {
   if (!result && activeRange !== 'all') result = computeRangePnL('all'); // fallback to cost basis
   if (!result) { summaryPerfEl.style.display = 'none'; return; }
 
-  const { abs, pct } = result;
+  // AURIX-PREMIUM-CLEANUP-1: the hero owns the DELTA AMOUNT only; the
+  // range performance % is owned by the chart header (chart-change), so we
+  // no longer print the percentage here — it was the duplicated copy.
+  const { abs } = result;
   const isPos  = abs >= 0;
   const sign   = isPos ? '+' : '−';
-  const locale = lang === 'es' ? 'es-ES' : 'en-US';
-  const pctStr = new Intl.NumberFormat(locale, {
-    minimumFractionDigits: 1, maximumFractionDigits: 1,
-  }).format(Math.abs(pct));
 
-  summaryPerfEl.textContent = `${sign}${formatBase(Math.abs(abs))} (${sign}${pctStr}%)`;
+  summaryPerfEl.textContent = `${sign}${formatBase(Math.abs(abs))}`;
   summaryPerfEl.className   = `summary-perf ${isPos ? 'positive' : 'negative'}`;
   summaryPerfEl.style.display = '';
 }
@@ -27142,40 +27147,39 @@ function renderAurixSignal() {
     return;
   }
 
-  _aurixSignalPool = computeAurixSignalPool();
-  // SIGNAL-HOTFIX: with assets present the pool now always contains at
-  // least the generic `insights` fallback. The empty branch below is a
-  // safety net for the edge case where totalValueUSD() returns 0 (e.g.
-  // hydration in progress) — show the fallback inline rather than
-  // hiding the module.
-  if (!_aurixSignalPool.length) {
-    _aurixSignalPool = [{
-      kind: 'insights',
-      msg: 'signalInsightsBody',
-      msgMobile: 'signalInsightsBodyMobile',
-      cta: 'signalInsightsCta',
-    }];
-  }
+  // AURIX-PREMIUM-CLEANUP-1: single-line Workspace teaser. The dashboard is
+  // the STATUS surface, so this shows only the portfolio HEALTH STATE (and a
+  // tone-coloured status dot) — no rotating pool, no 10s carousel, no
+  // duplicated recommendations. Workspace owns the full interpretation.
+  _aurixSignalStopRotation();
 
-  // SIGNAL-HOTFIX: if the pool length changed since the previous
-  // render, the stored index may reference a different entry — reset
-  // to 0 and drop any in-flight rotation timer so the next tick is
-  // computed from the new pool, not the stale one.
-  if (_aurixSignalPool.length !== _aurixSignalPoolLen) {
-    _aurixSignalIdx = 0;
-    _aurixSignalPoolLen = _aurixSignalPool.length;
-    _aurixSignalStopRotation();
-  }
-  const idx = _aurixSignalSafeIdx(_aurixSignalPool.length);
-  _aurixSignalIdx = idx;
-  _aurixSignalVisibility = 'visible:' + (_aurixSignalPool[idx] && _aurixSignalPool[idx].kind);
-  _aurixSignalApply(_aurixSignalPool[idx], _aurixSignalPool.length === 1);
+  const snap  = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null;
+  const score = (typeof _aurixHealthScore    === 'function') ? _aurixHealthScore(snap) : null;
+  const tone  = (score && score.tone)  || 'solid';
+  const state = (score && score.label) || (t('healthScoreEmpty') || '—');
+
+  const msgEl = document.getElementById('aurixSignalMsg');
+  const ctaEl = document.getElementById('aurixSignalCtaLabel');
+  if (msgEl) msgEl.textContent = state;
+  if (ctaEl) ctaEl.textContent = t('signalHealthCta') || 'Ver análisis';
+
+  sec.removeAttribute('data-kind');
+  sec.setAttribute('data-tone', tone);
+  _aurixSignalVisibility = 'visible:health:' + tone;
   sec.hidden = false;
-  _aurixSignalBindHover();
   _aurixSignalBindResize();
-  // Only rotate when there is more than one valid signal.
-  if (_aurixSignalPool.length > 1) _aurixSignalStartRotation();
-  else _aurixSignalStopRotation();
+
+  // Keyboard parity for role="button" — Enter/Space opens Workspace too.
+  if (!sec.dataset.keybound) {
+    sec.dataset.keybound = '1';
+    sec.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Spacebar') {
+        ev.preventDefault();
+        if (typeof switchTab === 'function') switchTab('workspace');
+        else { const tab = document.querySelector('#bottomNav [data-tab="workspace"]'); if (tab) tab.click(); }
+      }
+    });
+  }
 }
 
 // SIGNAL-HOTFIX: temporary debug probe. Run `__aurixSignalDebug()` in
@@ -27297,13 +27301,17 @@ if (typeof window !== 'undefined' && _aurixIsDebugHost()) {
       return;
     }
 
-    // AURIX-SIGNALS-2: signal CTA opens the Portfolio Health panel.
-    // The bridge experience explains the signal, surfaces a compact
-    // breakdown, and offers an explicit "Open Workspace" follow-up.
-    // No more direct route into the generic spreadsheet.
-    const sigCta = e.target.closest && e.target.closest('#aurixSignalCta');
-    if (sigCta) {
-      if (typeof openHealthPanel === 'function') openHealthPanel();
+    // AURIX-PREMIUM-CLEANUP-1: the signal is a Workspace teaser. The WHOLE
+    // card (and its CTA, which lives inside it) routes straight into
+    // Workspace — no Health-panel modal detour. Workspace owns intelligence.
+    const sigEl = e.target.closest && e.target.closest('#aurixSignal');
+    if (sigEl) {
+      if (typeof switchTab === 'function') {
+        switchTab('workspace');
+      } else {
+        const tab = document.querySelector('#bottomNav [data-tab="workspace"]');
+        if (tab) tab.click();
+      }
       return;
     }
 

@@ -4178,7 +4178,8 @@ body:not(.hero-active) #orb-canvas {
        Aurix Signal cards sit higher above the fold. Previous polish
        (DASHBOARD-MOBILE-DENSITY-1) left 12px below the row, which
        still read as a gap once the footer was hidden. */
-    padding: 16px var(--space-4) 6px var(--space-4) !important;
+    /* AURIX-PREMIUM-CLEANUP-1 — small premium breathing room (6px→10px). */
+    padding: 16px var(--space-4) 10px var(--space-4) !important;
     border-right: none;
     border-bottom: none;
   }
@@ -4193,10 +4194,9 @@ body:not(.hero-active) #orb-canvas {
   .summary-total {
     font-size: clamp(26px, 8vw, 38px);
     color: #ffffff;
-    /* FINAL-MOBILE-POLISH-1 — value-to-meta gap tightened so the
-       footer line rises ~4px toward the total. Combined with the
-       perf-line override below, the whole meta row lifts ~8–10px. */
-    margin-bottom: 2px;
+    /* AURIX-PREMIUM-CLEANUP-1 — value-to-meta gap relaxed slightly
+       (2px→6px) for premium breathing room without growing height. */
+    margin-bottom: 6px;
   }
   /* FINAL-MOBILE-POLISH-1 — calm the perf line: smaller bottom margin
      keeps it tucked under the total instead of pushing the meta row
@@ -15380,6 +15380,30 @@ body.gs-open { overflow: hidden; }
   background: rgba(224, 144, 74, 0.16);
   color: #e0904a;
 }
+
+/* AURIX-PREMIUM-CLEANUP-1 — Workspace health teaser.
+   Status dot inside the icon chip; the chip goes transparent so only the
+   tone-coloured dot (+ its existing subtle pulse) reads. The whole card is
+   clickable and routes into Workspace. Tones never use red/warning. */
+.aurix-signal--health { cursor: pointer; }
+.aurix-signal--health:hover { border-color: rgba(138, 166, 255, 0.22); }
+.aurix-signal--health .aurix-signal-icon {
+  background: transparent;
+  border-radius: 50%;
+}
+.aurix-signal-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+/* The state text reuses .aurix-signal-msg styling but should hug the title
+   rather than stretch, so the line reads "PORTFOLIO HEALTH · State". */
+.aurix-signal--health .aurix-signal-msg { flex: 0 1 auto; }
+.aurix-signal[data-tone="solid"]    .aurix-signal-icon { color: #4ade80; }
+.aurix-signal[data-tone="moderate"] .aurix-signal-icon { color: #7db8ff; }
+.aurix-signal[data-tone="elevated"] .aurix-signal-icon { color: #f4c45a; }
+.aurix-signal[data-tone="high"]     .aurix-signal-icon { color: #e0904a; }
 
 /* Mobile — premium single-row signal bar:
    [icon 34px] [AURIX SIGNAL / message · ellipsis] [Ver análisis ›]
