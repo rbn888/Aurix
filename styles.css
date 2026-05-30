@@ -289,6 +289,33 @@ button[aria-busy="true"] {
   background: var(--bg-main);
 }
 
+/* AURIX-DESKTOP-LAYOUT-1 — widen the content shell on desktop so 1440px /
+   1920px screens stop leaving a tiny centred app. Desktop-only (>=1024px);
+   below this width the 1080px cap never constrained anything (the viewport
+   is already narrower), so mobile and tablet stay visually identical.
+   Workspace keeps its own full-bleed shell via body.workspace-active .app. */
+@media (min-width: 1024px) {
+  .app { max-width: 1280px; }
+}
+
+/* Wide desktop: lay the dashboard asset list out in two columns so cards
+   don't stretch into long, sparse single-column rows on big monitors. The
+   category-detail list (a single stacked card of rows) is excluded, and any
+   non-card child (empty state, drag placeholder) spans the full width so it
+   is never awkwardly half-width. Below 1280px the list stays single-column,
+   and the mobile touch-reorder path (single column) is untouched. */
+@media (min-width: 1280px) {
+  .assets-list:not(.assets-list--detail) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+    align-items: start;
+  }
+  .assets-list:not(.assets-list--detail) > :not(.asset-card) {
+    grid-column: 1 / -1;
+  }
+}
+
 /* ── Header ────────────────────────────────────────────── */
 .header {
   display: grid;
