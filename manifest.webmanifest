@@ -6,8 +6,8 @@
   "scope": "/Aurix/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0B0F1A",
-  "theme_color": "#0B0F1A",
+  "background_color": "#070a14",
+  "theme_color": "#070a14",
   "icons": [
     {
       "src": "icon.svg",

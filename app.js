@@ -11601,12 +11601,14 @@ function getChartData(range) {
   }
 
   // Diagnostic logging — confirms the input is stable across reloads.
-  // Remove once charts are confirmed stable.
-  console.debug('[chart] history snapshot —',
-    'len:', source.length,
-    '| first:', new Date(source[0].ts).toISOString(),
-    '| last:', new Date(source[source.length - 1].ts).toISOString()
-  );
+  // Dev-only: never noisy in production.
+  if (IS_DEV) {
+    console.debug('[chart] history snapshot —',
+      'len:', source.length,
+      '| first:', new Date(source[0].ts).toISOString(),
+      '| last:', new Date(source[source.length - 1].ts).toISOString()
+    );
+  }
 
   // 2. Process the full normalised dataset
   const processedRaw = processSeries(source);
@@ -11625,41 +11627,80 @@ function getChartData(range) {
 
   // 3. Build output — time-grid for windowed ranges, downsample for 'all'
   let final;
+  let mode = 'history';
   if (range === 'all') {
     const filtered = processed.filter(p => p.ts >= 0); // all points
     if (filtered.length < 2) return _empty;
     final = downsample(filtered, MAX_POINTS['all'] || 250);
+    mode = 'all-downsample';
   } else {
-    // Time-grid normalization: create a fixed, evenly-spaced timeline and
-    // fill each slot with the last known value (carry-forward).  This makes
-    // the chart deterministic (same grid every render) and eliminates steps
-    // caused by sparse snapshot windows.
     const duration  = ms[range];
     const points    = MAX_POINTS[range] || 120;
     const gridStart = now - duration;
-    const step      = duration / points;
+    const inRange   = processed.filter(p => p.ts >= gridStart);
 
-    let di        = 0;
-    let lastValue = null;
-    const grid    = [];
+    // CHART-DENSITY-1 (AURIX-PREMIUM-ENTRY-AND-CHART-1): the evenly-spaced
+    // grid below fills every slot with the last-known value (carry-forward).
+    // With dense history that reads as a smooth, deterministic line — but
+    // with only a handful of real snapshots in the window it turns them into
+    // long FLAT PLATFORMS joined by VERTICAL WALLS (a stale value held across
+    // many ticks, then a sudden jump at the next real sample). So we only use
+    // the grid when there are enough real points for it to look natural;
+    // otherwise we plot the actual sanitized snapshots and let the line slope
+    // honestly between real samples. Thresholds per range:
+    const GRID_MIN_POINTS = { '24h': 12, '7d': 14, '30d': 20, '1y': 24 };
+    const minForGrid = GRID_MIN_POINTS[range] || 12;
 
-    for (let i = 0; i <= points; i++) {
-      const t = gridStart + i * step;
-      // Advance to consume all processed points up to this grid tick
-      while (di < processed.length && processed[di].ts <= t) {
-        lastValue = processed[di].value;
-        di++;
+    if (inRange.length < 2) {
+      // Fewer than 2 real points inside this window — fall back to an honest
+      // flat baseline pinned at the current value (no phantom slope/wall).
+      let currentBase = 0;
+      try { currentBase = (typeof totalValueBase === 'function') ? Number(totalValueBase()) : 0; }
+      catch (_) { currentBase = 0; }
+      if (Number.isFinite(currentBase) && currentBase > 0) {
+        const baseTs = now - 5 * 60_000;
+        return {
+          labels:      [fmt(baseTs), fmt(now)],
+          values:      [currentBase, currentBase],
+          timestamps:  [baseTs, now],
+          firstValue:  currentBase,
+          lastValue:   currentBase,
+          deltaAbs:    0,
+          deltaPct:    0,
+          pointsCount: 2,
+          isLowData:   true,
+          source:      'flat-baseline',
+        };
       }
-      if (lastValue !== null) grid.push({ ts: t, value: lastValue });
+      return _empty;
     }
 
-    if (grid.length < 2) {
-      // Grid produced too few points (very sparse data) — fall back to simple filter
-      const filtered = processed.filter(p => p.ts >= gridStart);
-      if (filtered.length < 2) return _empty;
-      final = downsample(filtered, points);
+    if (inRange.length < minForGrid) {
+      // Low density — plot the real snapshots directly. No carry-forward, so
+      // no flat platforms / vertical walls; the line slopes between samples.
+      final = inRange;
+      mode  = 'sparse-actual';
     } else {
-      final = grid;
+      // Dense enough — deterministic evenly-spaced grid with carry-forward.
+      const step = duration / points;
+      let di        = 0;
+      let lastValue = null;
+      const grid    = [];
+      for (let i = 0; i <= points; i++) {
+        const t = gridStart + i * step;
+        while (di < processed.length && processed[di].ts <= t) {
+          lastValue = processed[di].value;
+          di++;
+        }
+        if (lastValue !== null) grid.push({ ts: t, value: lastValue });
+      }
+      if (grid.length < 2) {
+        final = downsample(inRange, points);
+        mode  = 'sparse-actual';
+      } else {
+        final = grid;
+        mode  = 'grid';
+      }
     }
   }
 
@@ -11682,6 +11723,41 @@ function getChartData(range) {
   const deltaPct  = (Number.isFinite(firstValue) && firstValue > 0 && Number.isFinite(lastValue))
     ? ((lastValue - firstValue) / firstValue) * 100
     : null;
+
+  // CHART-DIAG-1 (AURIX-PREMIUM-ENTRY-AND-CHART-1): dev-only diagnostics so
+  // we can tell whether an aggressive line is real movement, a sparse-data
+  // artifact or remaining corruption — never logs in production.
+  if (IS_DEV) {
+    let mn = Infinity, mx = -Infinity;
+    let maxJumpPct = 0, maxJumpAt = null;
+    for (let i = 0; i < values.length; i++) {
+      const v = values[i];
+      if (v < mn) mn = v;
+      if (v > mx) mx = v;
+      if (i > 0 && values[i - 1] > 0) {
+        const jp = Math.abs(values[i] / values[i - 1] - 1) * 100;
+        if (jp > maxJumpPct) {
+          maxJumpPct = jp;
+          maxJumpAt  = { ts: new Date(timestamps[i]).toISOString(), from: values[i - 1], to: v };
+        }
+      }
+    }
+    console.debug('[chart-diag]', {
+      range,
+      source: 'history',
+      mode,
+      pointsCount: values.length,
+      sourcePointsInRange: (range === 'all') ? processed.length : undefined,
+      sanitizedRemoved: _sanitizedRemoved,
+      firstValue, lastValue,
+      deltaPct: deltaPct == null ? null : +deltaPct.toFixed(2),
+      min: Number.isFinite(mn) ? mn : null,
+      max: Number.isFinite(mx) ? mx : null,
+      maxAdjacentJumpPct: +maxJumpPct.toFixed(2),
+      largestJump: maxJumpAt,
+    });
+  }
+
   return {
     labels,
     values,
