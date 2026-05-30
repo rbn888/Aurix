@@ -3476,55 +3476,60 @@ body:not(.hero-active) #orb-canvas {
    donut, category cards and order — is completely untouched. */
 /* Bar hidden by default (mobile/tablet) — base rule FIRST so the desktop
    override below wins by source order. Keeps mobile category cards identical. */
-.cat-card-bar { display: none; }
+/* Weight group (label · % + bar) — hidden on mobile so the mobile card keeps
+   its original layout (icons stay the only visual). Shown on desktop. */
+.cat-card-weight { display: none; }
+
+/* ── Premium asset glyphs for classes with no third-party logo ── */
+.cat-glyph {
+  width: 24px; height: 24px; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 7px; background: rgba(255,255,255,0.06);
+  font-size: 13px; font-weight: 700; line-height: 1; color: #fff;
+}
+.cat-glyph svg { width: 16px; height: 16px; display: block; }
+.cat-glyph--cash { color: #34d27f; background: rgba(39,199,104,0.14); }
+.cat-glyph--re   svg { fill: #b6a6f3; }
+
 @media (min-width: 769px) {
   .distribution-section { display: none !important; }
   .categories-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
-  /* AURIX-DESKTOP-HERO-ALLOCATION-PREMIUM-1 — institutional allocation tile.
-     The dominant-asset icons and the market open/closed badge are hidden on
-     the desktop hub: both used to sit in the bottom-right / top-right and
-     collided with (or competed against) the allocation bar and the new header
-     %. Removing them yields a clean, uniform tile — header (label · %) → value
-     → a full-width allocation bar pinned to the foot. Mobile (<=768px) keeps
-     the icons, the market badge and its original layout untouched. */
-  /* (specificity raised to .cat-card .X so these beat the base
-     .cat-card-visual{display:flex} / .cat-card-content{max-width:calc(...)}
-     rules that are declared later in the file by source order.) */
-  .cat-card .cat-card-visual,
-  .cat-card .market-status { display: none; }
-  /* Icons gone → content reclaims the full width; flex:1 pins the bar to the
-     bottom as its own full-width row, well clear of the value. */
-  .cat-card .cat-card-content { max-width: 100%; flex: 1 1 auto; }
-  /* The % sits at the right end of the header so it reads as the label for the
-     proportional bar below — value stays the prominent figure. */
-  .cat-card-pct--head {
-    margin-left: auto;
-    color: var(--text);
-    opacity: 0.8;
-    font-weight: 600;
+  /* AURIX-DASHBOARD-ASSET-CARDS-PREMIUM-1 — patrimonial cards with real asset
+     identity restored. The card reads top→bottom: header (dot + name, market
+     badge top-right) → value (protagonist) → real asset icons → weight
+     (Participación · % tied to its bar) pinned to the foot. Icons are flowed
+     (order:2, margin-top:auto) so they never collide with the bar. */
+  .cat-card { flex-direction: column; }
+  .cat-card .cat-card-content { order: 1; max-width: 100%; }
+  .cat-card .cat-card-visual {
+    display: flex; position: static; order: 2;
+    bottom: auto; right: auto;
+    justify-content: flex-start; flex-wrap: wrap;
+    margin-top: auto; padding-top: 14px; gap: 8px;
   }
+  .cat-card .cat-card-weight { display: block; order: 3; margin-top: 12px; }
+  .cat-card .market-status { display: flex; }   /* re-enabled top-right badge */
+  .cat-card .cat-card-hint { display: none; }    /* hover lift is the affordance */
+  .cat-card .cat-card-value { font-size: 23px; }
 
+  .cat-card-weight-label {
+    display: block; font-size: 11px; color: var(--text-muted);
+    letter-spacing: .01em; margin-bottom: 7px; font-variant-numeric: tabular-nums;
+  }
   .cat-card-bar {
-    display: block;
-    margin-top: 14px;
-    height: 4px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.05);
-    overflow: hidden;
+    display: block; height: 5px; border-radius: 999px;
+    background: rgba(255,255,255,0.05); overflow: hidden;
   }
   .cat-card-bar-fill {
-    display: block;
-    height: 100%;
-    min-width: 3px;
-    border-radius: inherit;
-    opacity: 0.9;
-    transition: width .5s var(--ease-premium),
-                opacity .2s var(--ease-out);
+    display: block; height: 100%; min-width: 4px; border-radius: inherit;
+    opacity: 0.92;
+    transition: width .5s var(--ease-premium), opacity .2s var(--ease-out);
   }
-  /* Hover already lifts the card (see .cat-card:hover) — also brighten the
-     bar fill to its full strength. Subtle, no neon glow. */
+  /* Hover: full-strength bar + a soft glow on the asset icons (subtle). */
   .cat-card:hover .cat-card-bar-fill { opacity: 1; }
+  .cat-card:hover .cat-card-visual img,
+  .cat-card:hover .cat-glyph { filter: drop-shadow(0 0 6px rgba(138,178,255,0.35)); }
 }
 
 /* Tablet: 2 columns */

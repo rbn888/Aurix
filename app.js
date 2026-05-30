@@ -834,6 +834,7 @@ const T = {
     rangeAll: 'TOTAL',
     backAll:  'Todos',
     viewHint: 'Ver activos →',
+    catWeightLabel: 'Participación',
     // Benchmark comparison
     bmPortfolio: 'Cartera',
     bmMarket:    'Mercado',
@@ -1988,6 +1989,7 @@ const T = {
     rangeAll: 'ALL',
     backAll:  'All',
     viewHint: 'View assets →',
+    catWeightLabel: 'Allocation',
     // Benchmark comparison
     bmPortfolio: 'Portfolio',
     bmMarket:    'Market',
@@ -13114,23 +13116,72 @@ function setActiveCategory(type) {
 // ── Category card visual builder ───────────────────────────
 // Renders logos in the bottom-right visual zone.
 // Renders logos in the bottom-right visual zone.
+// AURIX-DASHBOARD-ASSET-CARDS-PREMIUM-1: real asset identity for every card.
+// Assets with a logo (crypto / stock / etf) keep the live image + fallback
+// chain. Asset classes that have no third-party logo (metals, real estate,
+// cash) now render a premium inline-SVG / symbol glyph instead of disappearing
+// — no emoji, no heavy external images. Capped to keep the row clean.
+const _CAT_VISUAL_MAX = 4;
+
+function _currencyGlyph(cur) {
+  const c = (cur || 'EUR').toUpperCase();
+  const sym = c === 'USD' ? '$' : c === 'GBP' ? '£' : c === 'EUR' ? '€' : c === 'CHF' ? '₣' : c === 'JPY' ? '¥' : 'FX';
+  return `<span class="cat-glyph cat-glyph--cash" title="${escHtml(c)}">${sym}</span>`;
+}
+function _metalKind(ticker) {
+  const s = (ticker || '').toLowerCase();
+  if (s.includes('xag') || s.includes('silver') || s.includes('plata')) return 'silver';
+  if (s.includes('xcu') || s.includes('copper') || s.includes('cobre')) return 'copper';
+  return 'gold'; // XAU / oro / default metal
+}
+function _metalGlyph(ticker) {
+  const fill = { gold: '#d4af37', silver: '#c4ccd6', copper: '#c87f4a' }[_metalKind(ticker)];
+  return `<span class="cat-glyph cat-glyph--metal" title="${escHtml(ticker || 'Metal')}">`
+    + `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9h9l3 6H9z" fill="${fill}" opacity="0.92"/>`
+    + `<path d="M3 15h9l2 4H5z" fill="${fill}"/></svg></span>`;
+}
+function _realEstateGlyph() {
+  return `<span class="cat-glyph cat-glyph--re">`
+    + `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6 8 6v8a1 1 0 01-1 1h-4v-5h-6v5H5a1 1 0 01-1-1z"/></svg></span>`;
+}
+
 // Crypto tries spothq CDN first, falls back via _logoFallback.
 function buildCardVisual(type, typeAssets) {
-  const validAssets = typeAssets
-    .map(a => ({ symbol: a.ticker, url: getAssetLogo(a.ticker, a.type), type: a.type }))
-    .filter(a => a.url);
-
-  if (!validAssets.length) return '';
-
-  const imgs = validAssets.map(a => {
-    const sym   = escHtml(a.symbol);
-    const onErr = a.type === 'crypto' ? '_logoFallback(this)' : 'this.style.display=\'none\'';
-    const extra = a.type === 'crypto' ? ' data-fallback-step="0"' : '';
-    return `<img src="${a.url}" width="24" height="24" alt="${sym} logo" ` +
-      `data-key="${sym}"${extra} onload="this.classList.add('loaded')" onerror="${onErr}">`;
-  }).join('');
-
-  return `<div class="cat-card-visual">${imgs}</div>`;
+  const items = [];
+  const seen  = new Set();
+  for (const a of typeAssets) {
+    if (items.length >= _CAT_VISUAL_MAX) break;
+    const url = getAssetLogo(a.ticker, a.type);
+    let key, html;
+    if (url) {
+      key = 'img:' + (a.ticker || '').toUpperCase();
+      if (seen.has(key)) continue;
+      const sym   = escHtml(a.ticker || '');
+      const onErr = a.type === 'crypto' ? '_logoFallback(this)' : 'this.style.display=\'none\'';
+      const extra = a.type === 'crypto' ? ' data-fallback-step="0"' : '';
+      html = `<img src="${url}" width="24" height="24" alt="${sym} logo" `
+           + `data-key="${sym}"${extra} onload="this.classList.add('loaded')" onerror="${onErr}">`;
+    } else if (a.type === 'cash') {
+      const cur = (a.assetCurrency || 'EUR').toUpperCase();
+      key = 'cur:' + cur; if (seen.has(key)) continue;
+      html = _currencyGlyph(cur);
+    } else if (a.type === 'metal') {
+      key = 'metal:' + _metalKind(a.ticker); if (seen.has(key)) continue;
+      html = _metalGlyph(a.ticker);
+    } else if (a.type === 'real_estate') {
+      key = 're'; if (seen.has(key)) continue;
+      html = _realEstateGlyph();
+    } else {
+      // stock/etf/other without a resolved logo → premium ticker chip
+      const sym = escHtml((a.ticker || '?'));
+      key = 'tk:' + sym; if (seen.has(key)) continue;
+      html = `<span class="logo-fallback" title="${sym}">${(sym[0] || '?').toUpperCase()}</span>`;
+    }
+    seen.add(key);
+    items.push(html);
+  }
+  if (!items.length) return '';
+  return `<div class="cat-card-visual">${items.join('')}</div>`;
 }
 
 function updateCategoryCards() {
@@ -13207,34 +13258,32 @@ function updateCategoryCards() {
     // a subtle fill showing its share of the portfolio. CSS hides this on
     // mobile (<=768px) so the mobile category cards stay visually identical.
     const allocPct  = Math.max(0, Math.min(100, Number(dist.pct) || 0));
-    const allocBar  = isEmpty ? '' :
-      `<div class="cat-card-bar" aria-hidden="true"><span class="cat-card-bar-fill" style="width:${allocPct.toFixed(1)}%;background:${m.color}"></span></div>`;
-
-    // AURIX-DESKTOP-HERO-ALLOCATION-PREMIUM-1: the allocation % moves UP into
-    // the header (right-aligned, beside the category label) so it visually
-    // describes the proportional bar at the foot of the card. Empty categories
-    // keep their status sub-label below the value (no misleading bar/percent).
-    // The mobile rule that hides the populated % (.cat-card-pct) still matches
-    // by class, so the mobile cards are untouched.
-    const pctHeader = isEmpty ? '' :
-      `<span class="cat-card-pct cat-card-pct--head">${dist.pct.toFixed(1)}%</span>`;
+    // AURIX-DASHBOARD-ASSET-CARDS-PREMIUM-1: the weight indicator pairs a label
+    // ("Participación · X%") WITH the proportional bar, so the % is never an
+    // isolated stat. Empty categories render no bar/percent (clean, intentional)
+    // — and the value stays the protagonist. On mobile the weight stays hidden
+    // (as the bar was before), preserving the existing mobile layout.
+    const weight = isEmpty ? '' :
+      `<div class="cat-card-weight" aria-hidden="true">
+        <span class="cat-card-weight-label">${t('catWeightLabel')} · ${dist.pct.toFixed(1)}%</span>
+        <div class="cat-card-bar"><span class="cat-card-bar-fill" style="width:${allocPct.toFixed(1)}%;background:${m.color}"></span></div>
+      </div>`;
     const emptySub  = isEmpty ? `<span class="cat-card-pct">${t('emptyCatSub')}</span>` : '';
 
     return `<button class="cat-card${isEmpty ? ' cat-card--empty' : ''}" data-type="${type}"${isEmpty ? ' aria-disabled="true"' : ''}>
-      ${visual}
+      ${isEmpty ? '' : visual}
       ${catStatusHtml}
       <div class="cat-card-content">
         <div class="cat-card-header">
           <span class="cat-card-dot" style="background:${m.color}"></span>
           <span class="cat-card-name">${m.label}</span>
-          ${pctHeader}
         </div>
         <span class="cat-card-value" data-target="${isEmpty ? '' : dist.valueBase}">${isEmpty ? '—' : formatBase(dist.valueBase)}</span>
         ${emptySub}
         ${rentLineHtml}
         ${hint}
       </div>
-      ${allocBar}
+      ${weight}
     </button>`;
   }).join('');
 
