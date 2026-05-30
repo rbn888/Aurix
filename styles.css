@@ -3466,6 +3466,38 @@ body:not(.hero-active) #orb-canvas {
   .cat-card-hint { opacity: 0.4; }
 }
 
+/* AURIX-DESKTOP-ALLOCATION-HUB-1 — desktop-only allocation hub.
+   The smart category cards ARE the desktop allocation representation, so the
+   old donut + legend + watchlist block is removed from the desktop dashboard
+   (mobile keeps its separate slider donut; the watchlist still lives in
+   Market). Six categories lay out as a balanced 3×2 grid with no orphan row,
+   and each card gains a proportional allocation bar. All of this is gated to
+   >=769px (the existing desktop boundary), so mobile (<=768px) — its slider
+   donut, category cards and order — is completely untouched. */
+/* Bar hidden by default (mobile/tablet) — base rule FIRST so the desktop
+   override below wins by source order. Keeps mobile category cards identical. */
+.cat-card-bar { display: none; }
+@media (min-width: 769px) {
+  .distribution-section { display: none !important; }
+  .categories-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cat-card-bar {
+    display: block;
+    margin-top: 12px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+  }
+  .cat-card-bar-fill {
+    display: block;
+    height: 100%;
+    min-width: 2px;
+    border-radius: inherit;
+    opacity: 0.85;
+    transition: width .5s var(--ease-premium);
+  }
+}
+
 /* Tablet: 2 columns */
 @media (max-width: 700px) {
   .categories-grid { grid-template-columns: repeat(2, 1fr); }

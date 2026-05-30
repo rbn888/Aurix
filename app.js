@@ -13166,6 +13166,14 @@ function updateCategoryCards() {
       ? `<span class="market-status ${catStatus === '24/7' ? 'crypto' : catStatus}"><span class="dot"></span>${getMarketLabel(catStatus)}</span>`
       : '';
 
+    // AURIX-DESKTOP-ALLOCATION-HUB-1: proportional allocation bar. The smart
+    // category cards are now the desktop allocation hub, so each card carries
+    // a subtle fill showing its share of the portfolio. CSS hides this on
+    // mobile (<=768px) so the mobile category cards stay visually identical.
+    const allocPct  = Math.max(0, Math.min(100, Number(dist.pct) || 0));
+    const allocBar  = isEmpty ? '' :
+      `<div class="cat-card-bar" aria-hidden="true"><span class="cat-card-bar-fill" style="width:${allocPct.toFixed(1)}%;background:${m.color}"></span></div>`;
+
     return `<button class="cat-card${isEmpty ? ' cat-card--empty' : ''}" data-type="${type}"${isEmpty ? ' aria-disabled="true"' : ''}>
       ${visual}
       ${catStatusHtml}
@@ -13179,6 +13187,7 @@ function updateCategoryCards() {
         ${rentLineHtml}
         ${hint}
       </div>
+      ${allocBar}
     </button>`;
   }).join('');
 
