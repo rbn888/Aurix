@@ -2921,7 +2921,10 @@ body:not(.hero-active) #orb-canvas {
 
 /* ── Distribution Section ─────────────────────────────── */
 .distribution-section {
-  margin-bottom: var(--space-6);
+  /* AURIX-DASHBOARD-PREMIUM-PASS-1: tighter band before the category cards
+     (was --space-6 / 32px) so the desktop dashboard reads composed, not
+     sparse. Desktop-only section (hidden on mobile). */
+  margin-bottom: var(--space-5);
   min-width: 0;
 }
 
@@ -3689,12 +3692,13 @@ body:not(.hero-active) #orb-canvas {
 }
 .save-indicator[data-state="saved-faded"] { opacity: 0.55; }
 
-@media (max-width: 480px) {
-  /* On very narrow screens hide the save indicator label and keep just
-     the dot, so the meta row never wraps. State is still announced via
-     aria-live to assistive tech. */
-  .save-indicator { font-size: 0; gap: 0; margin-left: 8px; }
-  .save-indicator::before { width: 7px; height: 7px; }
+@media (max-width: 768px) {
+  /* AURIX-DASHBOARD-PREMIUM-PASS-1: on the mobile hero the update-indicator
+     ("● Actualizado ahora") is the single status. Hide the autosave
+     indicator's dot AND label so the meta row never shows a second bare
+     green dot. The element stays in the DOM (aria-live) for assistive tech. */
+  .save-indicator { font-size: 0; gap: 0; margin: 0; }
+  .save-indicator::before { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .save-indicator::before { animation: none; }
@@ -15417,12 +15421,27 @@ body.gs-open { overflow: hidden; }
 .aurix-signal--health .aurix-signal-icon {
   background: transparent;
   border-radius: 50%;
+  /* AURIX-DASHBOARD-PREMIUM-PASS-1: compact dot chip for the in-hero row. */
+  width: 16px; height: 16px; flex: 0 0 16px;
 }
 .aurix-signal-dot {
   width: 9px; height: 9px;
   border-radius: 50%;
   background: currentColor;
   box-shadow: 0 0 8px currentColor;
+}
+
+/* AURIX-DASHBOARD-PREMIUM-PASS-1: the teaser now lives INSIDE the hero-left
+   column (below the add buttons) as a compact health status row rather than a
+   full-width banner between hero and chart. Tighten it to part-of-the-hero
+   spacing and drop the fly-in (it's not a separate card anymore). Applies to
+   both desktop and mobile since hero-left is the shared column. */
+.hero-left .aurix-signal {
+  width: 100%;
+  margin: 14px 0 0;
+  padding: 9px 12px;
+  gap: 10px;
+  animation: none;
 }
 /* The state text reuses .aurix-signal-msg styling but should hug the title
    rather than stretch, so the line reads "PORTFOLIO HEALTH · State". */

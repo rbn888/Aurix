@@ -205,6 +205,25 @@
               <button class="btn-summary-action btn-secondary" id="btnAddLiquidity" data-i18n="addLiquidity">+ Añadir liquidez</button>
             </div>
           </div>
+
+          <!-- AURIX-DASHBOARD-PREMIUM-PASS-1: the Workspace health teaser now
+               lives inside the hero (below the add buttons) as a compact
+               status row instead of a full-width banner between hero and
+               chart. Dashboard owns STATUS; the whole row opens Workspace.
+               renderAurixSignal() fills the state + tone and hides it on an
+               empty portfolio / drill-down. -->
+          <section class="aurix-signal aurix-signal--health" id="aurixSignal" role="button" tabindex="0" hidden>
+            <div class="aurix-signal-icon" aria-hidden="true">
+              <span class="aurix-signal-dot"></span>
+            </div>
+            <div class="aurix-signal-body">
+              <span class="aurix-signal-msg" id="aurixSignalMsg"></span>
+            </div>
+            <button type="button" class="aurix-signal-cta" id="aurixSignalCta">
+              <span id="aurixSignalCtaLabel" data-i18n="signalHealthCta">Ver análisis</span>
+              <span class="aurix-signal-cta-arrow" aria-hidden="true">›</span>
+            </button>
+          </section>
         </div>
 
         <div class="hero-right">
@@ -240,27 +259,6 @@
           </div>
         </div>
 
-      </section>
-
-      <!-- AURIX-PREMIUM-CLEANUP-1: the dashboard owns STATUS, the Workspace
-           owns INTELLIGENCE. This is now a single-line Workspace teaser —
-           it shows the portfolio health state (no rotating carousel) and the
-           whole card routes into Workspace. renderAurixSignal() fills the
-           state + tone; it stays hidden on an empty portfolio / drill-down. -->
-      <section class="aurix-signal aurix-signal--health" id="aurixSignal" role="button" tabindex="0" hidden>
-        <div class="aurix-signal-icon" aria-hidden="true">
-          <span class="aurix-signal-dot"></span>
-        </div>
-        <div class="aurix-signal-body">
-          <!-- AURIX-WORKSPACE-TEASER-POLISH-1: the state label IS the line
-               (e.g. "Salud sólida") — no redundant "Salud de cartera ·"
-               prefix, no uppercase-heavy title. renderAurixSignal fills it. -->
-          <span class="aurix-signal-msg" id="aurixSignalMsg"></span>
-        </div>
-        <button type="button" class="aurix-signal-cta" id="aurixSignalCta">
-          <span id="aurixSignalCtaLabel" data-i18n="signalHealthCta">Ver análisis</span>
-          <span class="aurix-signal-cta-arrow" aria-hidden="true">›</span>
-        </button>
       </section>
 
       <section class="distribution-section" id="distributionSection" style="display:none">
