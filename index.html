@@ -252,7 +252,9 @@
           <span class="aurix-signal-dot"></span>
         </div>
         <div class="aurix-signal-body">
-          <span class="aurix-signal-title" data-i18n="healthTitle">Salud de cartera</span>
+          <!-- AURIX-WORKSPACE-TEASER-POLISH-1: the state label IS the line
+               (e.g. "Salud sólida") — no redundant "Salud de cartera ·"
+               prefix, no uppercase-heavy title. renderAurixSignal fills it. -->
           <span class="aurix-signal-msg" id="aurixSignalMsg"></span>
         </div>
         <button type="button" class="aurix-signal-cta" id="aurixSignalCta">

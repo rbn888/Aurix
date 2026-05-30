@@ -1666,6 +1666,12 @@ const T = {
     signalInsightsBodyMobile:    'Análisis disponible',
     signalInsightsCta:           'Ver análisis',
     signalHealthCta:             'Ver análisis',
+    // AURIX-WORKSPACE-TEASER-POLISH-1: natural one-word-ish health states for
+    // the dashboard teaser line (display only; Health Score logic unchanged).
+    teaserHealthSolid:           'Salud sólida',
+    teaserHealthModerate:        'Riesgo moderado',
+    teaserHealthElevated:        'Riesgo elevado',
+    teaserHealthHigh:            'Riesgo alto',
     // CAT-CONTEXT-1 / REAL-ESTATE-INTEL: calm, informative signal when
     // real estate dominates the portfolio. Property weight is normal for
     // households with a primary residence — Aurix talks about liquidity
@@ -2765,6 +2771,10 @@ const T = {
     signalInsightsBodyMobile:    'Insights available',
     signalInsightsCta:           'View analysis',
     signalHealthCta:             'View analysis',
+    teaserHealthSolid:           'Solid health',
+    teaserHealthModerate:        'Moderate risk',
+    teaserHealthElevated:        'Elevated risk',
+    teaserHealthHigh:            'High risk',
     // CAT-CONTEXT-1 / REAL-ESTATE-INTEL — real estate calm narrative.
     signalRealEstateBody:        'Your wealth is primarily supported by real estate.',
     signalRealEstateBodyMobile:  'Real estate weight high',
@@ -24976,10 +24986,8 @@ function _settingsSaveProfile(patch) {
   // Re-paint the Settings chip row immediately so the click feels
   // confirmed even if the engine emit hasn't fired yet.
   _settingsPaintProfile();
-  // Refresh signals in-place. The pool itself is unchanged (profile
-  // doesn't add/remove signals, just retones them), but
-  // renderAurixSignal re-runs _aurixSignalResolveMsg on every paint
-  // so the new tone surfaces on the next frame.
+  // Re-render the dashboard health teaser in place so any state change
+  // surfaces on the next frame.
   try { if (typeof renderAurixSignal === 'function') renderAurixSignal(); } catch (_) {}
 }
 
@@ -26745,8 +26753,6 @@ if (_aurixIsDebugHost()) window.__aurixHealthDebug = function () {
     scoreLabel:     score.label,
     scoreTone:      score.tone,
     signalPool:     computeAurixSignalPool().map(s => s.kind),
-    signalIdx:      _aurixSignalIdx,
-    signalPaused:   _aurixSignalPaused,
     lastComputedAt: new Date().toISOString(),
     staleKeysFound,
   };
@@ -26977,38 +26983,12 @@ function closeHealthPanel() {
   document.body.classList.remove('modal-open');
 }
 
-// AURIX-SIGNALS-3: rotation state for the dashboard signal card.
-// Cycle through the pool every ~10s with a soft cross-fade. Pause on
-// hover and respect prefers-reduced-motion. The pool is regenerated
-// from the live portfolio every cycle so adds / removes / price ticks
-// keep the message accurate.
-let _aurixSignalIdx     = 0;
-let _aurixSignalTimer   = null;
-let _aurixSignalPool    = [];
-let _aurixSignalPoolLen = 0;
-let _aurixSignalPaused  = false;
-let _aurixSignalHoverBound = false;
+// AURIX-WORKSPACE-TEASER-POLISH-1: the dashboard signal is now a static
+// single-line Workspace teaser (see renderAurixSignal). The legacy rotation
+// carousel — its pool index / timer / pause state, the ~10s interval, the
+// per-tick apply + tonal-copy resolver and the mobile/narrow copy probes —
+// has been removed. Only the visibility-reason tag is kept for diagnostics.
 let _aurixSignalVisibility = 'init';
-const AURIX_SIGNAL_ROTATE_MS = 10000;
-
-// SIGNAL-HOTFIX: bound the index to the live pool length. Prevents an
-// out-of-range read (returns undefined → silent disappearance) when
-// the pool shrinks between ticks or when the previous index leaked
-// from a longer pool.
-function _aurixSignalSafeIdx(len) {
-  if (!len || len < 1) return 0;
-  const n = Number.isFinite(_aurixSignalIdx) ? _aurixSignalIdx : 0;
-  return Math.max(0, Math.min(n, len - 1));
-}
-
-// SIGNAL-MOBILE-2: viewport probes. ≤640px → use mobile-specific
-// short copy. ≤360px → also shorten the CTA label to "Análisis ›".
-function _aurixSignalIsMobile() {
-  return (typeof matchMedia === 'function') && matchMedia('(max-width: 640px)').matches;
-}
-function _aurixSignalIsNarrow() {
-  return (typeof matchMedia === 'function') && matchMedia('(max-width: 360px)').matches;
-}
 
 // ── INVESTOR-PROFILE-1 ─────────────────────────────────────────────
 // Aurix Signals personalise their tone to the user's investor profile.
@@ -27037,154 +27017,8 @@ function _aurixInvestorProfile() {
   return { experience, riskProfile, ageBand };
 }
 
-// Pick a tonal suffix for a signal kind. Priority:
-//   1. Risk-profile match on volatile-exposure signals (concentration /
-//      category / crypto / single / dominant) — conservative gets a
-//      "exceeds your objective" frame, aggressive gets a "coherent
-//      with a dynamic profile" frame.
-//   2. Experience match — professional → neutral/technical, beginner →
-//      gentle plain-language.
-//   3. Otherwise empty suffix → existing copy stays.
-// The resolver below always falls back to the base key if no profile-
-// specific i18n string exists, so this layer is purely additive.
-function _aurixSignalToneSuffix(kind, profile) {
-  if (!kind || !profile) return '';
-  const volatileKinds = new Set(['concentration', 'category', 'crypto', 'single', 'dominant']);
-  const isVolatile = volatileKinds.has(kind);
-  if (isVolatile && profile.riskProfile === 'conservative') return '_conservative';
-  if (isVolatile && profile.riskProfile === 'aggressive')   return '_aggressive';
-  if (profile.experience === 'professional')                 return '_pro';
-  if (profile.experience === 'beginner')                     return '_beginner';
-  return '';
-}
-
-// Resolve a key with the tonal suffix if a translation exists, else
-// fall back to the base. Pure helper — no DOM.
-function _aurixSignalToneResolve(baseKey, kind) {
-  if (!baseKey) return baseKey;
-  const profile = _aurixInvestorProfile();
-  const suffix  = _aurixSignalToneSuffix(kind, profile);
-  if (!suffix) return baseKey;
-  const tonedKey = baseKey + suffix;
-  if (typeof t === 'function') {
-    const v = t(tonedKey);
-    if (typeof v === 'string' && v && v !== tonedKey) return tonedKey;
-  }
-  return baseKey;
-}
-
-function _aurixSignalResolveMsg(entry, isOnly) {
-  // Each entry can carry an i18n key (`msg`), a softer key (`msgSoft`)
-  // when it's the only signal in the pool, a `msgRaw` (pre-formatted
-  // string used by the dominant-asset entry that interpolates a name)
-  // or mobile-specific variants (`msgMobile`, `msgRawMobile`,
-  // `msgMobileSoft`). The mobile copies are preferred on ≤640px so
-  // the bar never has to ellipsis meaning away.
-  //
-  // INVESTOR-PROFILE-1 — each candidate key passes through the tonal
-  // resolver before t() is called, so a beginner / professional /
-  // conservative / aggressive variant overrides the base copy when
-  // present. Missing variants silently fall back, so this layer is
-  // purely additive and never breaks an existing signal.
-  if (_aurixSignalIsMobile()) {
-    if (entry.msgRawMobile) return entry.msgRawMobile;
-    const mBase = (isOnly && entry.msgMobileSoft) ? entry.msgMobileSoft : entry.msgMobile;
-    if (mBase) {
-      const mKey = _aurixSignalToneResolve(mBase, entry.kind);
-      const mv = (typeof t === 'function') ? t(mKey) : null;
-      if (typeof mv === 'string' && mv) return mv;
-    }
-  }
-  if (entry.msgRaw) return entry.msgRaw;
-  const base = (isOnly && entry.msgSoft) ? entry.msgSoft : entry.msg;
-  const key  = _aurixSignalToneResolve(base, entry.kind);
-  const v = (typeof t === 'function') ? t(key) : null;
-  return (typeof v === 'string') ? v : (typeof v === 'function' ? '' : (key || ''));
-}
-
-function _aurixSignalCtaLabel(entry) {
-  // On ≤360px viewports we fall back to a generic "Análisis" /
-  // "Analysis" so the pill never wraps or overlaps the message.
-  if (_aurixSignalIsNarrow()) {
-    const short = (typeof t === 'function') ? t('signalCtaShort') : null;
-    if (typeof short === 'string' && short) return short;
-  }
-  const v = (typeof t === 'function') ? t(entry.cta) : null;
-  return (typeof v === 'string') ? v : '';
-}
-
-function _aurixSignalApply(entry, isOnly) {
-  const sec    = document.getElementById('aurixSignal');
-  const msgEl  = document.getElementById('aurixSignalMsg');
-  const ctaLbl = document.getElementById('aurixSignalCtaLabel');
-  const ctaBtn = document.getElementById('aurixSignalCta');
-  if (!sec || !msgEl) return;
-  const msgText = _aurixSignalResolveMsg(entry, !!isOnly);
-  const ctaText = _aurixSignalCtaLabel(entry);
-
-  const reduced = (typeof matchMedia === 'function')
-    && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const writeNow = () => {
-    msgEl.textContent = msgText;
-    if (ctaLbl) ctaLbl.textContent = ctaText;
-    if (ctaBtn) ctaBtn.dataset.signalKind = entry.kind;
-    sec.dataset.kind = entry.kind;
-  };
-
-  if (reduced || sec.dataset.firstPaint !== '1') {
-    writeNow();
-    sec.dataset.firstPaint = '1';
-    return;
-  }
-  // Cross-fade: dim the content for ~180ms, swap text, fade back in.
-  sec.classList.add('is-fading');
-  setTimeout(() => {
-    writeNow();
-    sec.classList.remove('is-fading');
-  }, 180);
-}
-
-function _aurixSignalStopRotation() {
-  if (_aurixSignalTimer) { clearInterval(_aurixSignalTimer); _aurixSignalTimer = null; }
-}
-
-function _aurixSignalStartRotation() {
-  _aurixSignalStopRotation();
-  _aurixSignalTimer = setInterval(() => {
-    if (_aurixSignalPaused) return;
-    // Recompute pool — keeps copy fresh if the portfolio changed since
-    // last tick. If the pool shrank, clamp the index.
-    _aurixSignalPool = computeAurixSignalPool();
-    if (!_aurixSignalPool.length) { renderAurixSignal(); return; }
-    // SIGNAL-HOTFIX: if the pool length changed since last tick, the
-    // stored index may no longer point at the same entry — restart
-    // from 0 so the rotation stays predictable.
-    if (_aurixSignalPool.length !== _aurixSignalPoolLen) {
-      _aurixSignalIdx = 0;
-      _aurixSignalPoolLen = _aurixSignalPool.length;
-    } else {
-      _aurixSignalIdx = (_aurixSignalIdx + 1) % _aurixSignalPool.length;
-    }
-    const idx = _aurixSignalSafeIdx(_aurixSignalPool.length);
-    _aurixSignalIdx = idx;
-    _aurixSignalApply(_aurixSignalPool[idx], _aurixSignalPool.length === 1);
-  }, AURIX_SIGNAL_ROTATE_MS);
-}
-
-function _aurixSignalBindHover() {
-  if (_aurixSignalHoverBound) return;
-  const sec = document.getElementById('aurixSignal');
-  if (!sec) return;
-  _aurixSignalHoverBound = true;
-  sec.addEventListener('mouseenter', () => { _aurixSignalPaused = true;  });
-  sec.addEventListener('mouseleave', () => { _aurixSignalPaused = false; });
-}
-
-// SIGNAL-MOBILE-2: re-apply the current entry when the viewport
-// crosses the mobile / narrow breakpoints so copy + CTA label switch
-// without waiting for the next 10s rotation tick. Debounced so a
-// rapid resize doesn't thrash. The icon breathing animation is owned
-// by CSS, so it never restarts here.
+// Re-render the teaser on viewport changes (debounced) so its visibility
+// decisions stay correct across breakpoints. The dot's pulse is CSS-owned.
 let _aurixSignalResizeTimer = null;
 let _aurixSignalResizeBound = false;
 function _aurixSignalBindResize() {
@@ -27195,10 +27029,7 @@ function _aurixSignalBindResize() {
     _aurixSignalResizeTimer = setTimeout(() => {
       const sec = document.getElementById('aurixSignal');
       if (!sec) return;
-      // SIGNAL-HOTFIX: never trust an outdated cached pool on resize —
-      // recompute from live state and re-run the full render path so
-      // visibility decisions stay correct after viewport changes.
-      try { renderAurixSignal(); } catch (_) { /* never let resize hide the bar */ }
+      try { renderAurixSignal(); } catch (_) { /* never let resize hide the teaser */ }
     }, 180);
   });
 }
@@ -27213,12 +27044,7 @@ function renderAurixSignal() {
   if (!Array.isArray(assets) || assets.length === 0) {
     _aurixSignalVisibility = 'hidden:empty';
     sec.hidden = true;
-    sec.removeAttribute('data-kind');
-    sec.dataset.firstPaint = '';
-    _aurixSignalPool = [];
-    _aurixSignalPoolLen = 0;
-    _aurixSignalIdx = 0;
-    _aurixSignalStopRotation();
+    sec.removeAttribute('data-tone');
     return;
   }
   // DRILLDOWN-RACE-2 audit: Aurix Signal is a dashboard root widget.
@@ -27230,22 +27056,29 @@ function renderAurixSignal() {
       (typeof _enteringCategory !== 'undefined' && _enteringCategory)) {
     _aurixSignalVisibility = 'hidden:drilldown';
     sec.hidden = true;
-    sec.removeAttribute('data-kind');
-    sec.dataset.firstPaint = '';
-    _aurixSignalStopRotation();
+    sec.removeAttribute('data-tone');
     return;
   }
 
-  // AURIX-PREMIUM-CLEANUP-1: single-line Workspace teaser. The dashboard is
-  // the STATUS surface, so this shows only the portfolio HEALTH STATE (and a
-  // tone-coloured status dot) — no rotating pool, no 10s carousel, no
-  // duplicated recommendations. Workspace owns the full interpretation.
-  _aurixSignalStopRotation();
-
+  // AURIX-PREMIUM-CLEANUP-1 / AURIX-WORKSPACE-TEASER-POLISH-1: single-line
+  // Workspace teaser. The dashboard owns STATUS, so this shows only the
+  // portfolio health STATE (natural copy) and a tone-coloured dot — no
+  // rotating pool, no carousel. Workspace owns the full interpretation.
   const snap  = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null;
   const score = (typeof _aurixHealthScore    === 'function') ? _aurixHealthScore(snap) : null;
-  const tone  = (score && score.tone)  || 'solid';
-  const state = (score && score.label) || (t('healthScoreEmpty') || '—');
+  const tone  = (score && score.tone) || 'solid';
+
+  // Map the (unchanged) health tone to a natural teaser label so the line
+  // reads "Salud sólida" rather than "Salud de cartera · Salud sólida".
+  const _TEASER_LABEL = {
+    solid:    'teaserHealthSolid',
+    moderate: 'teaserHealthModerate',
+    elevated: 'teaserHealthElevated',
+    high:     'teaserHealthHigh',
+  };
+  const state = (score && score.score != null)
+    ? (t(_TEASER_LABEL[tone] || 'teaserHealthSolid') || score.label)
+    : (t('healthScoreEmpty') || '—');
 
   const msgEl = document.getElementById('aurixSignalMsg');
   const ctaEl = document.getElementById('aurixSignalCtaLabel');
@@ -27271,47 +27104,28 @@ function renderAurixSignal() {
   }
 }
 
-// SIGNAL-HOTFIX: temporary debug probe. Run `__aurixSignalDebug()` in
-// devtools to inspect live signal state — pool kinds, the active
-// entry, why the bar is visible/hidden, and the rotation timer
-// status. Safe to leave in: no side effects.
+// AURIX-WORKSPACE-TEASER-POLISH-1: debug probe for the Workspace teaser.
+// Run `__aurixSignalDebug()` in devtools to inspect the live health state
+// the teaser displays, why it's visible/hidden, and the investor profile.
+// The legacy rotation/pool fields were removed with the carousel.
 // DEBUG-HARDEN-1: gated to dev hosts only.
 if (typeof window !== 'undefined' && _aurixIsDebugHost()) {
   window.__aurixSignalDebug = function () {
     const livePool = (typeof computeAurixSignalPool === 'function')
       ? computeAurixSignalPool() : [];
-    const idx = _aurixSignalSafeIdx(_aurixSignalPool.length);
-    const active = _aurixSignalPool[idx] || null;
-    // INVESTOR-PROFILE-1 — show which profile facets drove the
-    // tonal selection for the currently active signal so engineers
-    // can verify the personalisation pipeline end-to-end.
+    const snap  = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null;
+    const score = (typeof _aurixHealthScore    === 'function') ? _aurixHealthScore(snap) : null;
     const profile = (typeof _aurixInvestorProfile === 'function') ? _aurixInvestorProfile() : null;
-    const toneSuffix = (active && profile && typeof _aurixSignalToneSuffix === 'function')
-      ? _aurixSignalToneSuffix(active.kind, profile) : '';
-    const activeBaseKey = active ? active.msg : null;
-    const activeResolvedKey = (active && typeof _aurixSignalToneResolve === 'function')
-      ? _aurixSignalToneResolve(activeBaseKey, active.kind) : activeBaseKey;
     return {
       assets: Array.isArray(assets) ? assets.map(a => ({
         ticker: a.ticker || a.symbol || null,
         type:   a.type || null,
         qty:    a.quantity ?? a.qty ?? null,
       })) : [],
-      signalPool:       _aurixSignalPool.map(s => s.kind),
+      health: score ? { score: score.score, tone: score.tone, label: score.label } : null,
       livePool:         livePool.map(s => s.kind),
-      currentIdx:       _aurixSignalIdx,
-      activeSignal:     active,
       visibilityReason: _aurixSignalVisibility,
-      timerState: {
-        running: !!_aurixSignalTimer,
-        paused:  _aurixSignalPaused,
-        intervalMs: AURIX_SIGNAL_ROTATE_MS,
-      },
-      investorProfile: profile,
-      activeToneSuffix:    toneSuffix || '(none — base copy)',
-      activeBaseKey,
-      activeResolvedKey,
-      activeTonedDiffers:  activeBaseKey !== activeResolvedKey,
+      investorProfile:  profile,
     };
   };
 }
