@@ -533,6 +533,27 @@ button[aria-busy="true"] {
   box-shadow: 0 4px 12px rgba(47,107,255,0.25);
   font-weight: var(--font-weight-semibold);
 }
+
+/* AURIX-HERO-PREMIUM-REFINE-1: clear primary/secondary hierarchy for the hero
+   add buttons with a calmer glow. Scoped to .btn-summary-action so global
+   .btn-primary / .btn-secondary used elsewhere (modals etc.) are untouched.
+   Primary = subtle accent fill; Secondary = quiet ghost outline. */
+.btn-summary-action.btn-primary {
+  background: rgba(79,142,247,0.14);
+  border-color: rgba(79,142,247,0.30);
+  box-shadow: 0 2px 10px rgba(47,107,255,0.16);
+}
+.btn-summary-action.btn-secondary {
+  background: transparent;
+  border-color: rgba(255,255,255,0.10);
+  color: var(--text-muted);
+  box-shadow: none;
+}
+.btn-summary-action.btn-secondary:hover {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.18);
+  color: var(--text);
+}
 .btn-primary:hover,
 .btn-secondary:hover {
   background: rgba(79,142,247,.15);
@@ -3659,24 +3680,17 @@ body:not(.hero-active) #orb-canvas {
    first paint. The "saved-faded" variant lowers opacity after a
    few seconds so a stale "Guardado" recedes without disappearing. */
 .save-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-left: 10px;
-  font-size: 12px;
-  color: var(--text-muted);
+  /* AURIX-HERO-PREMIUM-REFINE-1: the update-indicator ("● Sincronizado") is
+     now the SINGLE visible sync status. This element is kept only for its
+     aria-live announcements (saving / saved / failed) — it is visually hidden
+     everywhere so the hero never shows a duplicate status dot. */
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
   white-space: nowrap;
-  opacity: 1;
-  transition: opacity 280ms ease;
 }
-.save-indicator::before {
-  content: '';
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--text-dim);
-  flex-shrink: 0;
-  transition: background 280ms ease;
-}
+.save-indicator::before { display: none; }
 .save-indicator[data-state="saving"]::before,
 .save-indicator[data-state="retrying"]::before {
   background: #f39c12;
@@ -3691,18 +3705,8 @@ body:not(.hero-active) #orb-canvas {
   background: var(--red);
 }
 .save-indicator[data-state="saved-faded"] { opacity: 0.55; }
-
-@media (max-width: 768px) {
-  /* AURIX-DASHBOARD-PREMIUM-PASS-1: on the mobile hero the update-indicator
-     ("● Actualizado ahora") is the single status. Hide the autosave
-     indicator's dot AND label so the meta row never shows a second bare
-     green dot. The element stays in the DOM (aria-live) for assistive tech. */
-  .save-indicator { font-size: 0; gap: 0; margin: 0; }
-  .save-indicator::before { display: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .save-indicator::before { animation: none; }
-}
+/* Note: .save-indicator is visually hidden globally (see base rule above);
+   these state ::before colours are inert now but kept for a clean revert. */
 @keyframes pulse-live {
   0%   { opacity: .4; transform: scale(1); }
   50%  { opacity: 1;  transform: scale(1.4); }
@@ -15431,17 +15435,32 @@ body.gs-open { overflow: hidden; }
   box-shadow: 0 0 8px currentColor;
 }
 
-/* AURIX-DASHBOARD-PREMIUM-PASS-1: the teaser now lives INSIDE the hero-left
-   column (below the add buttons) as a compact health status row rather than a
-   full-width banner between hero and chart. Tighten it to part-of-the-hero
-   spacing and drop the fly-in (it's not a separate card anymore). Applies to
-   both desktop and mobile since hero-left is the shared column. */
+/* AURIX-HERO-PREMIUM-REFINE-1: the health teaser is now an integrated insight
+   ROW inside hero-left — not a bordered mini-card. Drop the card chrome
+   (border / background / shadow / fly-in) so it reads as part of the hero
+   module; it sits just under the add buttons (which already carry the single
+   top divider) separated only by margin. Applies to desktop + mobile. */
 .hero-left .aurix-signal {
   width: 100%;
-  margin: 14px 0 0;
-  padding: 9px 12px;
-  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  gap: 8px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
   animation: none;
+  min-height: 0;
+}
+/* Tiny, subtle health dot — no glow ring, no status orb, so it never
+   competes with the sync dot in the meta row above. */
+.hero-left .aurix-signal .aurix-signal-icon {
+  width: auto; height: auto; flex: 0 0 auto;
+}
+.hero-left .aurix-signal .aurix-signal-icon::after { display: none; }
+.hero-left .aurix-signal .aurix-signal-dot {
+  width: 6px; height: 6px;
+  box-shadow: none;
 }
 /* The state text reuses .aurix-signal-msg styling but should hug the title
    rather than stretch, so the line reads "PORTFOLIO HEALTH · State". */

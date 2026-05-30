@@ -618,7 +618,7 @@ const T = {
     liveMarket:      'Mercado abierto',
     closed:          'Mercado cerrado',
     estimatedPrice:  'Precio estimado',
-    updatedNow:      'Actualizado ahora',
+    updatedNow:      'Sincronizado',
     updatedMins:     n => `Actualizado hace ${n} min`,
     // Gold status
     goldLive:        'Live · ',
@@ -1790,7 +1790,7 @@ const T = {
     liveMarket:      'Market open',
     closed:          'Market closed',
     estimatedPrice:  'Estimated price',
-    updatedNow:      'Updated just now',
+    updatedNow:      'Synced just now',
     updatedMins:     n => `Updated ${n} min ago`,
     // Gold status
     goldLive:        'Live · ',
