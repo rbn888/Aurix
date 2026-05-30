@@ -424,10 +424,15 @@
 
   function _formatTooltipValue(value, currency) {
     try {
-      const locale = _isLangEs() ? 'es-ES' : 'en-US';
+      // PORTFOLIO-CHART-FIX-3: keep the tooltip precise (2 decimals) and
+      // locale-consistent with the axis. Locale follows the CURRENCY so EUR
+      // reads "5.432,18 €" and USD reads "$5,432.18" regardless of UI lang.
+      const cur    = (currency || 'USD').toUpperCase() === 'EUR' ? 'EUR' : 'USD';
+      const locale = cur === 'EUR' ? 'es-ES' : 'en-US';
       return new Intl.NumberFormat(locale, {
         style: 'currency',
-        currency: currency || 'USD',
+        currency: cur,
+        useGrouping: 'always',
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }).format(value);
@@ -560,15 +565,35 @@
     // and any LWC-driven numeric output. State is kept in a closure so
     // setCurrency() rebinds it without recreating the chart.
     let _formatterCurrency = (opts.currency || 'USD').toUpperCase();
+    // PORTFOLIO-CHART-FIX-3: premium, locale-consistent axis formatter.
+    // Locale follows the CURRENCY (EUR→es-ES, USD→en-US) so we never mix an
+    // "€5.4K" style with es-ES numbers. Below 1M shows whole grouped units
+    // with NO K (EUR "5.400 €", USD "$5,400"); at/above 1M shows compact
+    // millions (EUR "1,2 M €", USD "$1.2M"). Sub-1000 values keep up to 2
+    // decimals so low-value asset/sparkline series stay readable.
     const _compactCurrency = (value, currency) => {
-      const sym = (currency || _formatterCurrency) === 'EUR' ? '€' : '$';
+      const cur = (currency || _formatterCurrency) === 'EUR' ? 'EUR' : 'USD';
       if (!Number.isFinite(value)) return '';
+      const locale = cur === 'EUR' ? 'es-ES' : 'en-US';
       const abs = Math.abs(value);
-      if (abs >= 1_000_000) return sym + (value / 1_000_000).toFixed(2) + 'M';
-      if (abs >= 10_000)    return sym + (value / 1_000).toFixed(1) + 'K';
-      if (abs >= 1_000)     return sym + (value / 1_000).toFixed(2) + 'K';
-      if (abs >= 100)       return sym + value.toFixed(0);
-      return sym + value.toFixed(2);
+      try {
+        if (abs >= 1_000_000) {
+          return new Intl.NumberFormat(locale, {
+            style: 'currency', currency: cur,
+            notation: 'compact', compactDisplay: 'short',
+            minimumFractionDigits: 0, maximumFractionDigits: 1,
+          }).format(value);
+        }
+        return new Intl.NumberFormat(locale, {
+          style: 'currency', currency: cur,
+          useGrouping: 'always',
+          minimumFractionDigits: 0,
+          maximumFractionDigits: abs >= 1_000 ? 0 : 2,
+        }).format(value);
+      } catch (_) {
+        const sym = cur === 'EUR' ? '€' : '$';
+        return sym + value.toFixed(2);
+      }
     };
     const _priceFormatter = v => _compactCurrency(v, _formatterCurrency);
 

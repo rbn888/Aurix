@@ -3669,6 +3669,61 @@ function formatDisplayShort(amount, from = 'USD') {
   return formatShort(toBase(v, from));
 }
 
+// ── Chart axis / tooltip formatters (PORTFOLIO-CHART-FIX-3) ─────────────────
+// Dedicated, locale-consistent currency formatting for the portfolio chart.
+// The chart dataset is ALREADY in baseCurrency (getChartData converts each
+// point via toBase), so these format the value AS-IS and never re-convert —
+// the legacy formatDisplayShort path double-converted in EUR.
+// Locale is keyed off the CURRENCY itself (EUR→es-ES, USD→en-US) so the chart
+// is internally consistent regardless of the app's UI language, and never
+// mixes an "€5.4K" style with es-ES grouped numbers.
+function _chartCurrencyLocale(cur) {
+  return cur === 'EUR' ? 'es-ES' : 'en-US';
+}
+// Axis: short + rounded for mobile. Below 1M shows whole grouped units with
+// NO K (EUR "5.400 €", USD "$5,400"); at/above 1M shows locale-compact
+// millions (EUR "1,2 M €", USD "$1.2M"). Sub-1000 values keep up to 2
+// decimals so low-value series (e.g. asset-detail charts) stay readable.
+function formatChartAxis(amount) {
+  const v = Number(amount);
+  if (!Number.isFinite(v)) return '';
+  const cur    = baseCurrency;
+  const locale = _chartCurrencyLocale(cur);
+  const abs    = Math.abs(v);
+  try {
+    if (abs >= 1_000_000) {
+      return new Intl.NumberFormat(locale, {
+        style: 'currency', currency: cur,
+        notation: 'compact', compactDisplay: 'short',
+        minimumFractionDigits: 0, maximumFractionDigits: 1,
+      }).format(v);
+    }
+    return new Intl.NumberFormat(locale, {
+      style: 'currency', currency: cur,
+      useGrouping: 'always',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: abs >= 1_000 ? 0 : 2,
+    }).format(v);
+  } catch (_) {
+    return formatBase(v);
+  }
+}
+// Tooltip: always precise — 2 decimals (EUR "5.432,18 €", USD "$5,432.18").
+function formatChartTooltip(amount) {
+  const v = Number(amount);
+  if (!Number.isFinite(v)) return '';
+  const cur = baseCurrency;
+  try {
+    return new Intl.NumberFormat(_chartCurrencyLocale(cur), {
+      style: 'currency', currency: cur,
+      useGrouping: 'always',
+      minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }).format(v);
+  } catch (_) {
+    return formatBase(v);
+  }
+}
+
 // ── Currency conversion ─────────────────────────────────────
 async function fetchExchangeRate() {
   // FX fetch removed — uses hardcoded default (usdToEur = 0.92)
@@ -9899,7 +9954,9 @@ function updateChartTooltip(context) {
   const first = data.length ? data[0] : value;
   let valText, valDir;
   if (activePerfMode === 'curr') {
-    valText = formatBase(value);
+    // Precise, locale-consistent tooltip value (5.432,18 € / $5,432.18).
+    // value (dp.raw) is already in baseCurrency — format without converting.
+    valText = formatChartTooltip(value);
     valDir  = value > first ? 'up' : value < first ? 'down' : 'flat';
   } else {
     const pct  = first > 0 ? ((value - first) / first) * 100 : 0;
@@ -11299,10 +11356,11 @@ function initChart() {
           ticks: {
             color: 'rgba(220,230,250,0.42)',
             maxTicksLimit: 5,
-            // Chart series are stored in USD (canonical). Route ticks
-            // through the canonical display layer so EUR mode shows
-            // EUR-converted axis labels, not USD numbers with €.
-            callback: v => formatDisplayShort(v, 'USD'),
+            // Series values are already converted to baseCurrency by
+            // getChartData, so the axis must NOT re-convert. formatChartAxis
+            // renders locale-consistent labels (5.400 € / $5,400), never
+            // the mixed "€5.4K" style.
+            callback: v => formatChartAxis(v),
           },
         }
       },
@@ -20933,9 +20991,10 @@ function initMobileCharts() {
             ticks: {
               color: 'rgba(220,230,250,0.42)',
               maxTicksLimit: 5,
-              // Asset-detail chart ticks: same canonical conversion as the
-              // dashboard chart above. Series are USD-denominated.
-              callback: v => formatDisplayShort(v, 'USD'),
+              // Mobile portfolio chart ticks: series are already in
+              // baseCurrency, so format as-is via the shared chart-axis
+              // formatter for desktop/mobile parity (5.400 € / $5,400).
+              callback: v => formatChartAxis(v),
             },
             // CHART-FIT-MOBILE-1: tighten the Y-axis so the portfolio
             // line uses the available chart height instead of being
