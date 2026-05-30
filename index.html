@@ -74,26 +74,80 @@
 </head>
 <body>
 
-<div id="bootLoader" style="
-  position:fixed;
-  inset:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:#0b0b0b;
-  color:#fff;
-  font-family:sans-serif;
-  z-index:9999;
-  transition:opacity 0.2s ease;
-">
-  <div style="opacity:0.7" id="bootLoaderText">Loading...</div>
+<style>
+  /* BOOT-LOADER-FIX-1: premium Aurix splash. Lightweight CSS only — no JS
+     animation, no layout shift (fixed full-screen overlay), and motion is
+     disabled under prefers-reduced-motion. */
+  #bootLoader{
+    position:fixed; inset:0; z-index:9999;
+    display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(120% 120% at 50% 32%, #0e1830 0%, #070a14 55%, #04060c 100%);
+    color:#eaf2ff;
+    font-family:'Inter', system-ui, -apple-system, Segoe UI, sans-serif;
+    transition:opacity .35s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #bootLoader .boot-splash{
+    position:relative;
+    display:flex; flex-direction:column; align-items:center;
+    gap:18px; padding:24px;
+  }
+  #bootLoader .boot-orb{
+    position:absolute; top:50%; left:50%;
+    width:260px; height:260px; margin:-130px 0 0 -130px;
+    border-radius:50%;
+    background:radial-gradient(circle at 50% 50%,
+      rgba(56,189,248,0.42) 0%, rgba(37,99,235,0.22) 38%, rgba(37,99,235,0) 70%);
+    filter:blur(6px);
+    animation:bootOrbPulse 2.8s ease-in-out infinite;
+    pointer-events:none;
+  }
+  #bootLoader .boot-wordmark{
+    position:relative;
+    font-weight:900; font-size:34px;
+    letter-spacing:.32em; padding-left:.32em; /* optical centering vs tracking */
+    background:linear-gradient(180deg,#ffffff 0%,#bcd4ff 100%);
+    -webkit-background-clip:text; background-clip:text;
+    -webkit-text-fill-color:transparent; color:transparent;
+    text-shadow:0 0 24px rgba(120,180,255,0.25);
+  }
+  #bootLoader .boot-status{
+    position:relative;
+    font-size:13px; font-weight:500; letter-spacing:.02em;
+    color:rgba(200,216,245,0.62);
+    animation:bootStatusFade 2.2s ease-in-out infinite;
+  }
+  @keyframes bootOrbPulse{
+    0%,100%{ transform:scale(.92); opacity:.65; }
+    50%    { transform:scale(1.08); opacity:1; }
+  }
+  @keyframes bootStatusFade{
+    0%,100%{ opacity:.45; }
+    50%    { opacity:.85; }
+  }
+  @media (max-width:480px){
+    #bootLoader .boot-orb{ width:200px; height:200px; margin:-100px 0 0 -100px; }
+    #bootLoader .boot-wordmark{ font-size:28px; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    #bootLoader{ transition:none; }
+    #bootLoader .boot-orb,
+    #bootLoader .boot-status{ animation:none; }
+  }
+</style>
+<div id="bootLoader" role="status" aria-live="polite" aria-label="Cargando Aurix">
+  <div class="boot-splash">
+    <div class="boot-orb" aria-hidden="true"></div>
+    <div class="boot-wordmark">AURIX</div>
+    <div class="boot-status" id="bootLoaderText">Preparando dashboard</div>
+  </div>
 </div>
 <script>
   (function() {
     try {
       var lang = localStorage.getItem('portfolio_lang') || 'es';
       var el = document.getElementById('bootLoaderText');
-      if (el) el.textContent = lang === 'es' ? 'Cargando…' : 'Loading…';
+      if (el) el.textContent = lang === 'es' ? 'Preparando dashboard' : 'Preparing dashboard';
       document.documentElement.lang = lang;
     } catch (_) {}
   })();

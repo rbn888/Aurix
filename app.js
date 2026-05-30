@@ -21189,12 +21189,15 @@ if (_perfCurrBtn) _perfCurrBtn.textContent = baseCurrency === 'EUR' ? '€' : '$
 
 document.getElementById('appRoot').style.opacity = '0';
 
-// PWA-CONSISTENCY-1: unified deterministic boot pipeline.
-//   auth → portfolio → exchange rate → prices → calc → render → charts
+// PWA-CONSISTENCY-1 / BOOT-LOADER-FIX-1: unified deterministic boot pipeline.
+//   auth → portfolio → exchange rate → calc → render → charts → hide loader
+//   → THEN refreshPrices() asynchronously (no longer blocks first paint)
 // Every step runs inside this single IIFE so Safari mobile, the iOS
-// home-screen PWA, and desktop converge on identical state before the
-// loader hides. Charts only mount AFTER calc commits so the first paint
-// never reveals stale cached values.
+// home-screen PWA, and desktop converge on identical state. The first paint
+// now renders from cached/local/Supabase data (with derived state recomputed
+// from last-known prices) so the premium splash clears as soon as the
+// dashboard is ready — live prices land a moment later and update the UI and
+// chart through refreshPrices()'s own render/onPortfolioChange path.
 (async () => {
   if (window.__APP_BOOTED__) return;
   window.__APP_BOOTED__ = true;
@@ -21203,7 +21206,8 @@ document.getElementById('appRoot').style.opacity = '0';
     const loader = document.getElementById('bootLoader');
     if (loader) {
       loader.style.opacity = '0';
-      setTimeout(() => loader.remove(), 200);
+      // Matches the splash's 0.35s opacity transition in index.html.
+      setTimeout(() => loader.remove(), 400);
     }
   };
 
@@ -21242,30 +21246,21 @@ document.getElementById('appRoot').style.opacity = '0';
     // it were real history. getChartData()'s flat-baseline branch now
     // handles the low-data state honestly until real snapshots accrue.
 
-    // 3. EXCHANGE RATE — must resolve before prices so EUR mode renders
-    //    consistent numbers on first paint.
+    // 3. EXCHANGE RATE — instant (hardcoded default); keep before render so
+    //    EUR mode formats consistent numbers on the very first paint.
     try { await fetchExchangeRate(); } catch (_) {}
 
-    // 4. PRICES — block first paint until live prices land (or the call
-    //    fails). Same user + same account => same numbers everywhere.
-    try {
-      await refreshPrices();
-    } catch (err) {
-      console.warn('[BOOT] refreshPrices failed (continuing with cache)', err);
-      _reportSafe('refresh', (err && err.message) || 'boot refresh failed', (err && err.stack) || '');
-      try { setUpdateStatus('error'); } catch (_) {}
-    }
-    try { marketStore.start(); } catch (_) {}
-
-    // 5. CALC — derived state + formulas from the now-fresh prices.
+    // 4. CALC — derived state + formulas from cached/local prices so the
+    //    first paint shows last-known values immediately (no longer waits
+    //    for the live price refresh, which now runs after the loader hides).
     try { recomputeDerivedFinancialState('boot'); } catch (_) {}
     try { recomputeFinancialFormulas('boot'); } catch (_) {}
 
-    // 6. RENDER
+    // 5. RENDER — dashboard from cached/local/Supabase data.
     document.getElementById('appRoot').style.opacity = '';
     render(true);
 
-    // 7. CHARTS — destroy+recreate so a recycled DOM (PWA tab restore)
+    // 6. CHARTS — destroy+recreate so a recycled DOM (PWA tab restore)
     //    never paints into a stale host.
     initChart();
     initDonut();
@@ -21278,9 +21273,38 @@ document.getElementById('appRoot').style.opacity = '0';
       initMobileSlider();
     }
 
-    // 8. Boot complete — hide loader, start polling, kick onboarding.
+    // 7. Boot visually complete — hide the splash now. The dashboard is
+    //    interactive with last-known values; live prices arrive next.
     hideLoader();
-    setInterval(() => refreshPrices().then(() => marketStore.syncFromRefresh()), 30_000);
+
+    // 8. PRICES (deferred) — fetch live prices AFTER first paint so the
+    //    splash never waits on the network. refreshPrices() already
+    //    save()s, render()s and updates the chart via onPortfolioChange()
+    //    on success; on total failure it rolls back and keeps last-known
+    //    values, so either way the UI stays correct. We then recompute
+    //    derived state and refresh so formulas reflect the new prices
+    //    (and the chart still updates on the failure path). _refreshInFlight
+    //    inside refreshPrices() guards against any duplicate concurrent
+    //    call, and the 30s polling interval starts only AFTER this first
+    //    refresh settles — so there is exactly one boot refresh.
+    const bootRefresh = (async () => {
+      try { marketStore.start(); } catch (_) {}
+      try {
+        await refreshPrices();
+      } catch (err) {
+        console.warn('[BOOT] refreshPrices failed (continuing with cache)', err);
+        _reportSafe('refresh', (err && err.message) || 'boot refresh failed', (err && err.stack) || '');
+        try { setUpdateStatus('error'); } catch (_) {}
+      }
+      try { recomputeDerivedFinancialState('boot'); } catch (_) {}
+      try { recomputeFinancialFormulas('boot'); } catch (_) {}
+      try { render(); } catch (_) {}
+      try { updateChart(); } catch (_) {}
+    })();
+    bootRefresh.then(() => {
+      setInterval(() => refreshPrices().then(() => marketStore.syncFromRefresh()), 30_000);
+    });
+
     Promise.resolve().then(() => {
       if (typeof window.maybeShowOnboarding === 'function') {
         window.maybeShowOnboarding();
