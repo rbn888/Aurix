@@ -121,21 +121,6 @@
       </div>
     </section>
 
-    <!-- ─────────────── TRUST BAR ─────────────── -->
-    <section class="trustbar">
-      <div class="container trustbar-inner reveal">
-        <span class="trustbar-label" data-i18n="trust.label">Unificado en</span>
-        <ul class="trustbar-list">
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-5 9 5M5 9v9m14-9v9M3 19h18"/></svg><span data-i18n="frag.banks.t">Bancos</span></li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5-5 4 4 8-8"/></svg><span data-i18n="frag.brokers.t">Brókers</span></li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V9m5 10V5m5 14v-7m5 7V8"/></svg><span data-i18n="asset.funds">Fondos</span></li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/></svg><span data-i18n="frag.crypto.t">Cripto</span></li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7M5 10v10h14V10"/></svg><span data-i18n="frag.realestate.t">Inmuebles</span></li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 7h20v10H2zM2 11h20"/></svg><span data-i18n="frag.cash.t">Liquidez</span></li>
-        </ul>
-      </div>
-    </section>
-
     <!-- ─────────────── PROBLEM ─────────────── -->
     <section class="section section--problem" id="product">
       <div class="container">
@@ -162,17 +147,11 @@
       <div class="container">
         <h2 class="section-title reveal" data-i18n="solution.title">Una única visión.</h2>
         <p class="section-lead reveal" data-i18n="solution.lead">Aurix centraliza cada clase de activo en una sola interfaz, con el contexto que necesitas para decidir.</p>
-        <div class="tabs reveal" role="tablist" aria-label="Asset classes">
-          <span class="tab is-active" data-i18n="asset.stocks">Acciones</span>
-          <span class="tab" data-i18n="asset.etfs">ETFs</span>
-          <span class="tab" data-i18n="asset.funds">Fondos</span>
-          <span class="tab" data-i18n="asset.crypto">Cripto</span>
-          <span class="tab" data-i18n="asset.metals">Metales</span>
-          <span class="tab" data-i18n="asset.realestate">Inmuebles</span>
-          <span class="tab" data-i18n="asset.cash">Liquidez</span>
-        </div>
-        <div class="feature-grid">
-          <div class="feature feature--viz reveal">
+        <p class="asset-line reveal" data-i18n="solution.assets">Acciones · ETFs · Fondos · Cripto · Inmuebles · Metales · Liquidez</p>
+        <!-- B5: metrics hierarchy — Total value is the protagonist; allocation +
+             evolution sit below in two columns (stack on mobile). -->
+        <div class="metrics">
+          <div class="feature feature--value reveal">
             <h3 data-i18n="feat.value.t">Valor total</h3>
             <div class="fv-figure" aria-hidden="true">
               <span class="fv-num" id="countValue" data-count="4.82">4,82 M€</span>
@@ -180,17 +159,19 @@
             </div>
             <p data-i18n="feat.value.d">Unificado entre todas tus clases de activo.</p>
           </div>
-          <div class="feature feature--viz reveal">
-            <h3 data-i18n="feat.alloc.t">Asignación</h3>
-            <div class="fv-bars anim-bars" aria-hidden="true">
-              <i><b style="width:42%"></b></i><i><b style="width:24%;background:#7db8ff"></b></i><i><b style="width:16%;background:#9b8cff"></b></i><i><b style="width:12%;background:#f4c45a"></b></i><i><b style="width:6%;background:#27c768"></b></i>
+          <div class="metrics-row">
+            <div class="feature feature--viz reveal">
+              <h3 data-i18n="feat.alloc.t">Asignación</h3>
+              <div class="fv-bars anim-bars" aria-hidden="true">
+                <i><b style="width:42%"></b></i><i><b style="width:24%;background:#7db8ff"></b></i><i><b style="width:16%;background:#9b8cff"></b></i><i><b style="width:12%;background:#f4c45a"></b></i><i><b style="width:6%;background:#27c768"></b></i>
+              </div>
+              <p data-i18n="feat.alloc.d">Cómo está repartido entre clases de activo.</p>
             </div>
-            <p data-i18n="feat.alloc.d">Cómo está repartido entre clases de activo.</p>
-          </div>
-          <div class="feature feature--viz reveal">
-            <h3 data-i18n="feat.evo.t">Evolución</h3>
-            <div class="fv-spark" aria-hidden="true"><svg viewBox="0 0 200 44" preserveAspectRatio="none"><path class="draw-line" d="M0,34 C30,30 45,14 70,20 C95,26 120,8 150,14 C175,19 190,10 200,12" fill="none" stroke="#7db8ff" stroke-width="2"/></svg></div>
-            <p data-i18n="feat.evo.d">El recorrido de tu patrimonio en el tiempo.</p>
+            <div class="feature feature--viz reveal">
+              <h3 data-i18n="feat.evo.t">Evolución</h3>
+              <div class="fv-spark" aria-hidden="true"><svg viewBox="0 0 200 44" preserveAspectRatio="none"><path class="draw-line" d="M0,34 C30,30 45,14 70,20 C95,26 120,8 150,14 C175,19 190,10 200,12" fill="none" stroke="#7db8ff" stroke-width="2"/></svg></div>
+              <p data-i18n="feat.evo.d">El recorrido de tu patrimonio en el tiempo.</p>
+            </div>
           </div>
         </div>
       </div>
@@ -333,11 +314,10 @@
       <div class="footer-brand">
         <span class="brand">AURIX</span>
         <p class="footer-tag" data-i18n="footer.tag">Private Wealth OS</p>
+        <!-- LinkedIn omitted until an official profile exists (no dead links). -->
         <div class="footer-social">
           <a href="https://x.com/AurixSystem" target="_blank" rel="noopener noreferrer" aria-label="X (Twitter)">X</a>
           <a href="https://instagram.com/aurixapp" target="_blank" rel="noopener noreferrer" aria-label="Instagram">Instagram</a>
-          <!-- TODO(AURIX-LANDING): no official LinkedIn URL yet — disabled. -->
-          <span class="is-disabled" aria-disabled="true" data-todo="social-linkedin">LinkedIn</span>
         </div>
       </div>
       <div class="footer-cols">
@@ -346,7 +326,6 @@
           <a href="#product" data-i18n="nav.product">Producto</a>
           <a href="#workspace" data-i18n="nav.workspace">Workspace</a>
           <a href="#roadmap" data-i18n="nav.roadmap">Roadmap</a>
-          <a href="#early-access" data-i18n="nav.early">Acceso anticipado</a>
         </div>
         <div class="footer-col">
           <h4 data-i18n="footer.legal">Legal</h4>

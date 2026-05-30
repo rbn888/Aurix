@@ -610,6 +610,62 @@ body.modal-open{ overflow:hidden; }
   .tabs{ width:100%; overflow-x:auto; flex-wrap:nowrap; -webkit-overflow-scrolling:touch; }
 }
 
+/* ════════ AURIX LANDING — PREMIUM PASS ULTIMATE V2 ════════ */
+
+/* B13 — tighter global rhythm */
+.section{ padding:72px 0; }
+.hero{ padding:120px 0 64px; }
+
+/* B2 — asset cards read as institutional categories */
+.frag-card{ padding:28px 24px; border-radius:18px; }
+.frag-card:hover{ transform:translateY(-2px); box-shadow:0 22px 48px -34px rgba(8,12,24,.92), inset 0 0 0 1px rgba(138,178,255,.14); }
+.frag-ico{ width:24px; height:24px; }
+
+/* B3 — problems become a quiet, secondary "consequences" band */
+.pain-row{ grid-template-columns:repeat(3,1fr); gap:14px; margin-top:34px; padding-top:30px; border-top:1px solid var(--border); }
+.pain-card{ padding:14px 16px; gap:12px; background:rgba(255,255,255,.018); border-color:rgba(255,255,255,.05); }
+.pain-card:hover{ transform:none; border-color:var(--border); }
+.pain-ico{ width:20px; height:20px; flex:0 0 20px; opacity:.55; stroke:var(--muted); }
+.pain-card h3{ font-size:14px; font-weight:600; color:var(--muted); margin-bottom:3px; }
+.pain-card p{ font-size:12.5px; color:var(--dim); }
+
+/* B4 — asset classes as a calm descriptive line (not tabs) */
+.asset-line{ text-align:center; color:var(--dim); font-size:14.5px; letter-spacing:.03em; margin:30px auto 36px; max-width:720px; }
+
+/* B5 — metrics hierarchy: Total value protagonist, then 2-up */
+.metrics{ display:flex; flex-direction:column; gap:16px; }
+.feature--value{ padding:30px 30px; }
+.feature--value .fv-figure{ margin:10px 0 12px; }
+.feature--value .fv-num{ font-size:clamp(34px,4.6vw,46px); }
+.feature--value .fv-delta{ font-size:14px; }
+.metrics-row{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+
+/* B7 — heavier Workspace headline so the narrative leads the cards */
+.ws-copy .section-title{ font-size:clamp(30px,4vw,52px); }
+.ws-copy .eyebrow{ margin-bottom:18px; }
+
+/* B9 — mockup gets more presence */
+.shot{ max-width:1080px; }
+.showcase{ margin-top:30px; }
+
+/* B10 — roadmap tightened */
+.timeline{ margin-top:28px; }
+.phase ul{ gap:8px; }
+.phase li{ font-size:14px; }
+.phase-tag{ margin:22px 0 12px; }
+
+@media (max-width:860px){
+  .section{ padding:44px 0; }
+  .hero{ padding:100px 0 44px; }
+  .metrics-row{ grid-template-columns:1fr 1fr; }
+  .pain-row{ grid-template-columns:1fr; gap:10px; padding-top:24px; margin-top:26px; }
+  .feature--value{ padding:24px 22px; }
+}
+@media (max-width:560px){
+  .metrics-row{ grid-template-columns:1fr; }
+  .asset-line{ margin:24px auto 28px; }
+}
+
 @media (prefers-reduced-motion: reduce){
   html{ scroll-behavior:auto; }
   .reveal{ opacity:1; transform:none; transition:none; }
