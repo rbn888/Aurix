@@ -1097,6 +1097,27 @@
     </div>
   </div>
 
+  <!-- ─────── AURIX-ASSET-MANAGE-OVERLAY-1 · compact Gestionar sheet ─────── -->
+  <div class="manage-overlay" id="assetManageOverlay" aria-hidden="true">
+    <div class="manage-sheet" role="dialog" aria-modal="true" aria-labelledby="mngName">
+      <div class="manage-head">
+        <span class="manage-badge" id="mngBadge" aria-hidden="true"></span>
+        <div class="manage-id">
+          <span class="manage-name" id="mngName"></span>
+          <span class="manage-ticker" id="mngTicker"></span>
+        </div>
+        <button class="manage-x" id="mngClose" type="button" aria-label="Close">&times;</button>
+      </div>
+      <div class="manage-actions">
+        <button class="manage-act" type="button" data-mng-act="buy"><span class="manage-act-ic">+</span><span data-i18n="ad.buy">Comprar</span></button>
+        <button class="manage-act" type="button" data-mng-act="sell"><span class="manage-act-ic">−</span><span data-i18n="ad.sell">Vender</span></button>
+        <button class="manage-act" type="button" data-mng-act="tx" aria-expanded="false"><span class="manage-act-ic">≣</span><span data-i18n="ad.viewTx">Ver transacciones</span><span class="manage-chevron" aria-hidden="true">▾</span></button>
+        <button class="manage-act manage-act--danger" type="button" data-mng-act="del"><span class="manage-act-ic">✕</span><span data-i18n="ad.delete">Eliminar activo</span></button>
+      </div>
+      <div class="manage-tx" id="mngTx" hidden></div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <!-- CHART-2: TradingView Lightweight Charts — engine library for the
        isolated AurixChartCore prototype. Not yet wired to any production

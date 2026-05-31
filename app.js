@@ -17690,9 +17690,10 @@ function render(animate = false) {
          <button class="btn-reduce"  title="${t('btnReduce')}" data-id="${asset.id}">−</button>
          <button class="btn-delete"  title="${t('btnDelete')}" data-id="${asset.id}">✕</button>`;
 
-    // AURIX-ASSET-DETAIL-1: inline +/−/✕ removed — the category row now opens
-    // the asset-detail screen, where management lives under "Gestionar".
-    const darActionsHtml = '';
+    // AURIX-ASSET-MANAGE-OVERLAY-1: no loose +/−/✕ — each row gets a single
+    // "Gestionar" button that opens a compact overlay (the user stays in the
+    // category view). The row body also opens it.
+    const darActionsHtml = `<button class="dar-manage" type="button" data-id="${asset.id}" data-i18n="ad.manage">${t('ad.manage')}</button>`;
 
     const txInfo = (() => {
       const buys = (asset.transactions || []).filter(tx => tx.type === 'buy');
@@ -20349,6 +20350,9 @@ function applyInlineEdit(id) {
 
 // ── Delete / Reduce / Add click dispatcher ─────────────────
 assetsListEl.addEventListener('click', e => {
+  const mngBtn = e.target.closest('.dar-manage');
+  if (mngBtn) { openAssetManage(mngBtn.dataset.id); return; }
+
   const editREBtn = e.target.closest('.btn-edit-re');
   if (editREBtn) { openEditRealEstateModal(editREBtn.dataset.id); return; }
 
@@ -21024,8 +21028,80 @@ assetsListEl.addEventListener('click', e => {
   if (justDragged) return;
   if (e.target.closest('button') || e.target.closest('.asset-edit-strip')) return;
   const card = e.target.closest('.asset-card, .detail-asset-row');
-  if (card) openAssetDetail(card.dataset.assetId);
+  // AURIX-ASSET-MANAGE-OVERLAY-1: row → compact Gestionar overlay (NOT the
+  // full-screen detail; assetDetailSection stays dormant for now).
+  if (card) openAssetManage(card.dataset.assetId);
 });
+
+/* ───────── AURIX-ASSET-MANAGE-OVERLAY-1 · compact manage sheet ─────────
+   Stays inside the category view. Reuses existing flows (openModal /
+   openReduceModal / delete). No Wealth Engine / Ledger / chart touched. */
+let _mngAssetId = null;
+function openAssetManage(id) {
+  const a = assets.find(x => x.id === id); if (!a) return;
+  _mngAssetId = id;
+  const ov = document.getElementById('assetManageOverlay'); if (!ov) return;
+  const $ = s => document.getElementById(s);
+  const badge = $('mngBadge'); if (badge) { try { badge.innerHTML = buildBadgeHtml(a, '', 'mng-badge-inner'); } catch (_) { badge.innerHTML = ''; } }
+  if ($('mngName'))   $('mngName').textContent   = getDisplayName(a);
+  if ($('mngTicker')) $('mngTicker').textContent = a.ticker || '';
+  const tx = $('mngTx'); if (tx) { tx.hidden = true; tx.innerHTML = ''; }
+  const txBtn = ov.querySelector('[data-mng-act="tx"]'); if (txBtn) txBtn.setAttribute('aria-expanded', 'false');
+  ov.classList.add('open'); ov.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('modal-open');
+}
+function closeAssetManage() {
+  _mngAssetId = null;
+  const ov = document.getElementById('assetManageOverlay');
+  if (ov) { ov.classList.remove('open'); ov.setAttribute('aria-hidden', 'true'); }
+  document.body.classList.remove('modal-open');
+}
+function _mngRenderTx() {
+  const a = assets.find(x => x.id === _mngAssetId);
+  const el = document.getElementById('mngTx'); if (!el || !a) return;
+  const txs = Array.isArray(a.transactions) ? a.transactions : [];
+  const cur = (a.assetCurrency || 'USD').toUpperCase();
+  if (!txs.length) { el.innerHTML = `<div class="mng-tx-empty">${escHtml(t('noTransactions'))}</div>`; return; }
+  el.innerHTML = txs.slice().reverse().map(tx => {
+    let date = ''; try { date = new Date(tx.ts).toLocaleDateString(lang === 'en' ? 'en-GB' : 'es-ES', { day: '2-digit', month: 'short', year: 'numeric' }); } catch (_) {}
+    const isBuy  = tx.type === 'buy';
+    const label  = isBuy ? t('txTypeBuy') : t('txTypeSell');
+    const amount = (Number(tx.qty) || 0) * (Number(tx.price) || 0);
+    return `<div class="mng-tx-row ${isBuy ? 'up' : 'down'}">
+      <span class="mng-tx-type">${escHtml(label)}</span>
+      <span class="mng-tx-meta">${escHtml([formatQty(tx.qty), '@ ' + formatCurrency(tx.price, cur), date].filter(Boolean).join(' · '))}</span>
+      <span class="mng-tx-amount">${escHtml(formatCurrency(amount, cur))}</span>
+    </div>`;
+  }).join('');
+}
+function _mngDelete() {
+  const id = _mngAssetId; const a = assets.find(x => x.id === id); if (!a) return;
+  if (!window.confirm(t('confirmDeleteAsset'))) return;
+  const delType = a.type;
+  assets = assets.filter(x => x.id !== id);
+  try { _persistEmptyPortfolioIfNeeded('delete'); } catch (_) {}
+  save(); closeAssetManage(); render(true);
+  try { _flashCategoryCard(delType); } catch (_) {}
+  onPortfolioChange(true);
+}
+(function _wireAssetManage() {
+  const ov = document.getElementById('assetManageOverlay'); if (!ov) return;
+  document.getElementById('mngClose')?.addEventListener('click', closeAssetManage);
+  ov.addEventListener('click', e => { if (e.target === ov) closeAssetManage(); });
+  ov.querySelector('.manage-actions')?.addEventListener('click', e => {
+    const b = e.target.closest('[data-mng-act]'); if (!b) return;
+    const act = b.dataset.mngAct, id = _mngAssetId;
+    if (act === 'buy')       { closeAssetManage(); openModal(); }
+    else if (act === 'sell') { closeAssetManage(); if (id) openReduceModal(id); }
+    else if (act === 'del')  { _mngDelete(); }
+    else if (act === 'tx')   {
+      const tx = document.getElementById('mngTx'); if (!tx) return;
+      const show = tx.hidden; if (show) _mngRenderTx();
+      tx.hidden = !show; b.setAttribute('aria-expanded', show ? 'true' : 'false');
+    }
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && ov.classList.contains('open')) closeAssetManage(); });
+})();
 
 /* ───────── AURIX-ASSET-DETAIL-1 · own-screen controller ─────────
    Consumes wealthEngine.getPosition / positionInsights + wealthLedger
