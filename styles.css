@@ -4231,24 +4231,47 @@ body:not(.hero-active) #orb-canvas {
 
 /* ── Mobile header: center logo (≤ 768px) ─────────────── */
 @media (max-width: 768px) {
+  /* AURIX-MOBILE-POLISH-1 (#1 + #2): native-app header. AURIX sits left,
+     controls right ([AURIX] ............ [☰]). Fixed height, safe-area aware,
+     persistent subtle glass + hairline border, always sticky. Replaces the
+     old centered-logo + absolutely-pinned menu that read as "logo flotando /
+     menú desplazado". */
   .header {
-    grid-template-columns: 1fr;
-    justify-items: center;
-    position: relative; /* contain absolute header-right */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    grid-template-columns: none;
+    justify-items: initial;
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    min-height: 52px;
+    padding: 8px 2px;
+    padding-top: calc(8px + env(safe-area-inset-top, 0px));
+    margin-bottom: var(--space-2);
+    background: rgba(11, 15, 26, 0.72);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
+  /* Logo left — no longer centered in a 1fr cell. */
   .header-left {
-    grid-column: 1;
+    grid-column: auto;
+    justify-self: initial;
   }
   .logo-block {
-    align-items: center;
+    align-items: flex-start;
+    margin-top: 0;
   }
-  /* Pin flag switcher to top-right without displacing the logo */
+  /* Controls right — static (not absolutely pinned), so nothing floats. */
   .header-right {
-    position: absolute;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    grid-column: unset;
+    position: static;
+    transform: none;
+    right: auto;
+    top: auto;
+    grid-column: auto;
+    justify-self: initial;
+    gap: 8px;
   }
 }
 
@@ -4259,10 +4282,13 @@ body:not(.hero-active) #orb-canvas {
     padding: 0 var(--space-3) 48px;
   }
 
-  /* Header — tighter vertical rhythm */
+  /* Header — tighter vertical rhythm. AURIX-MOBILE-POLISH-1: keep the
+     safe-area inset on the top padding so the logo never sits under the
+     status bar / Dynamic Island on notched iPhones. */
   .header {
-    padding: var(--space-2) 0 var(--space-2);
-    margin-bottom: 0;
+    padding: 6px 2px;
+    padding-top: calc(6px + env(safe-area-inset-top, 0px));
+    margin-bottom: var(--space-1);
   }
   .logo-block .logo-aurix { font-size: 21px; }
 
@@ -9054,7 +9080,9 @@ main { padding-bottom: 72px; }
     display: block;
     overflow: hidden;
     width: 100%;
-    min-height: 280px;
+    /* AURIX-MOBILE-POLISH-1 (#6): chart height reduced ~17% (280→232) so more
+       categories surface above the fold without losing legibility. */
+    min-height: 232px;
     height: auto;
     position: relative;
     padding-bottom: 18px !important;
@@ -9075,7 +9103,7 @@ main { padding-bottom: 72px; }
   /* Each slide: no padding — card provides it */
   .mobile-slide {
     width: 50%;
-    min-height: 280px;
+    min-height: 232px;
     flex-shrink: 0;
     box-sizing: border-box;
     padding: 0;
@@ -16877,4 +16905,63 @@ body.gs-open { overflow: hidden; }
   @keyframes mngUp{ from{transform:translateY(16px); opacity:.6} to{transform:none; opacity:1} }
   .mng-tx-row{ grid-template-columns:auto 1fr; row-gap:3px; }
   .mng-tx-amount{ grid-column:2; justify-self:end; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   AURIX-MOBILE-POLISH-1 — native-app mobile refinements (must win the cascade,
+   so this block lives last). Scoped to ≤768px; desktop is untouched.
+   ════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* #7 — Add action. Replace the tiny floating "+" FAB (read as misaligned)
+     with clear, labelled buttons inside the hero card. Reuses the existing
+     #btnAdd / #btnAddLiquidity handlers — no new JS. flex-wrap means they can
+     never look cut, even at 320px. */
+  .portfolio-actions-mobile { display: none !important; }
+  .summary-footer {
+    display: block !important;
+    margin-top: 12px !important;
+    padding-top: 0 !important;
+    border-top: none !important;
+  }
+  #btnAdd, #btnAddLiquidity { display: inline-flex !important; }
+  .summary-actions {
+    display: flex !important;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+  }
+  .btn-summary-action {
+    flex: 1 1 auto;
+    min-width: 132px;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+
+  /* #8 — vertical rhythm. Keep the slider card visually tied to the hero card
+     (no dead band between them) without compressing the content. */
+  .portfolio-slider-card { margin-top: var(--space-2) !important; }
+  .categories-section    { margin-top: var(--space-2); }
+
+  /* #10 — 641–768px range. The desktop hero-card is a 2-column grid
+     (value | chart), but the chart half (.hero-right) is hidden ≤768px, which
+     left an empty right column with the value/buttons cramped on the left.
+     Collapse the card to a single full-width column across the whole mobile
+     range (it only did so ≤640px before). */
+  .hero-card {
+    display: flex !important;
+    flex-direction: column;
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+  .hero-left {
+    height: auto;
+    border-right: none;
+    border-bottom: none;
+  }
 }
