@@ -190,6 +190,137 @@
     return { usd: total };
   }
 
+  /* ══════════════════════════════════════════════════════════════════════════
+     AURIX-PORTFOLIO-CHART-CASHFLOW-AWARE-1 — cashflow-aware evolution math.
+
+     Pure infrastructure: lets Aurix separate PATRIMONIO (net worth) from
+     APORTACIONES (external capital in/out) so a deposit is never read as
+     market gain. No UI is touched — these series are produced in parallel and
+     consumed later (Wealth Evolution, cashflow-aware chart, Workspace, reports).
+
+     Integrity rules (see spec §2, §11): external capital only (opening / deposit
+     / withdrawal / transfer_in / transfer_out via CONTRIB_SIGN). buy/sell are
+     internal moves and never count as contributions. dividend/fee are excluded
+     in v1. Missing data → confidence 'insufficient'; an estimated opening →
+     'partial'. Nothing is invented, interpolated, or artificially smoothed.
+     All amounts are normalised to the base currency (same unit as net worth).
+     ════════════════════════════════════════════════════════════════════════ */
+
+  // Is this a valid external-capital flow we can place on a timeline?
+  function _isContribEvent(e) {
+    return !!e && typeof e === 'object'
+      && !!CONTRIB_SIGN[e.type]
+      && Number.isFinite(Number(e.ts))
+      && Number.isFinite(Number(e.amount)) && Number(e.amount) >= 0;
+  }
+
+  // Net external capital contributed up to (and including) `ts`, in base ccy.
+  // Internal moves (buy/sell/dividend/fee) never affect the result.
+  function calculateNetContributionsAt(events, ts) {
+    var arr = Array.isArray(events) ? events : (_ledger().events || []);
+    var cutoff = Number(ts);
+    if (!Number.isFinite(cutoff)) cutoff = Infinity;
+    var total = 0;
+    for (var i = 0; i < arr.length; i++) {
+      var e = arr[i];
+      if (!_isContribEvent(e)) continue;
+      if (Number(e.ts) > cutoff) continue;
+      total += CONTRIB_SIGN[e.type] * _toBaseAmt(Number(e.amount) || 0, e.currency);
+    }
+    return total;
+  }
+
+  // Cumulative net-contributions step series in base currency:
+  //   [{ ts, contributions }]  ascending by ts, no duplicate timestamps.
+  // Deterministic (same input → same output): same-ts flows collapse into one
+  // point and addition is order-independent. Invalid events are ignored.
+  function buildCashflowSeries(events) {
+    var arr = Array.isArray(events) ? events : (_ledger().events || []);
+    var flows = [];
+    for (var i = 0; i < arr.length; i++) {
+      var e = arr[i];
+      if (!_isContribEvent(e)) continue;
+      flows.push({ ts: Number(e.ts), delta: CONTRIB_SIGN[e.type] * _toBaseAmt(Number(e.amount) || 0, e.currency) });
+    }
+    if (!flows.length) return [];
+    flows.sort(function (a, b) { return a.ts - b.ts; });
+    var out = [], running = 0;
+    for (var j = 0; j < flows.length; j++) {
+      running += flows[j].delta;
+      var last = out.length ? out[out.length - 1] : null;
+      if (last && last.ts === flows[j].ts) last.contributions = running; // collapse same-ts
+      else out.push({ ts: flows[j].ts, contributions: running });
+    }
+    return out;
+  }
+
+  // Three aligned series + an honesty verdict. PURE: net worth comes from the
+  // caller's portfolioHistory, contributions from the ledger events.
+  //   { netWorthSeries:[{ts,value}], contributionsSeries:[{ts,value}],
+  //     gainSeries:[{ts,value}], confidence, startsAt, notes:[] }
+  function buildEvolutionSeries(portfolioHistory, events) {
+    var notes = [];
+
+    var hist = (Array.isArray(portfolioHistory) ? portfolioHistory : [])
+      .filter(function (p) { return p && Number.isFinite(Number(p.ts)) && Number.isFinite(Number(p.value)); })
+      .map(function (p) { return { ts: Number(p.ts), value: Number(p.value) }; })
+      .sort(function (a, b) { return a.ts - b.ts; });
+
+    var evs = Array.isArray(events) ? events : (_ledger().events || []);
+    var contribEvents = evs.filter(_isContribEvent);
+
+    var netWorthSeries     = hist.map(function (p) { return { ts: p.ts, value: p.value }; });
+    var contributionsSeries = buildCashflowSeries(contribEvents)
+      .map(function (c) { return { ts: c.ts, value: c.contributions }; });
+
+    // No external-capital events at all → we cannot separate aportaciones from
+    // growth. Be honest: 'insufficient', and never fabricate contributions.
+    if (!contribEvents.length) {
+      notes.push('no-ledger-flows');
+      return {
+        netWorthSeries: netWorthSeries,
+        contributionsSeries: [],
+        gainSeries: [],
+        confidence: 'insufficient',
+        startsAt: null,
+        notes: notes,
+      };
+    }
+
+    // gain(ts) = netWorth(ts) − netContributions(≤ ts). Aligned to net-worth
+    // samples (the only timestamps where total value is actually known).
+    var gainSeries = hist.map(function (p) {
+      return { ts: p.ts, value: p.value - calculateNetContributionsAt(contribEvents, p.ts) };
+    });
+
+    // startsAt = earliest real data point across both series — never earlier
+    // than the first event (no invented pre-history).
+    var firstContribTs = contribEvents.reduce(function (m, e) {
+      var t = Number(e.ts); return (m == null || t < m) ? t : m;
+    }, null);
+    var firstHistTs = hist.length ? hist[0].ts : null;
+    var startsAt = (firstHistTs == null) ? firstContribTs
+                 : (firstContribTs == null) ? firstHistTs
+                 : Math.min(firstHistTs, firstContribTs);
+
+    // Confidence: an estimated opening baseline means the early history is a
+    // reference, not a recorded deposit → 'partial'. Otherwise 'complete'.
+    var hasEstimatedOpening = contribEvents.some(function (e) { return e.type === 'opening' && e.tsEstimated; });
+    var confidence;
+    if (hasEstimatedOpening) { confidence = 'partial'; notes.push('estimated-opening'); }
+    else                     { confidence = 'complete'; }
+    if (!hist.length) notes.push('no-networth-history');
+
+    return {
+      netWorthSeries: netWorthSeries,
+      contributionsSeries: contributionsSeries,
+      gainSeries: gainSeries,
+      confidence: confidence,
+      startsAt: startsAt,
+      notes: notes,
+    };
+  }
+
   /* ── Persistence (localStorage; events[] only — see header note) ────────── */
   var _cache = null;
   function _ledger() {
@@ -284,6 +415,40 @@
       ];
       ok('netContributions = opening+dep-wd, excludes buy', _approx(netContributions(synth).base, 1300));
       ok('realizedFromLedger sums sell.realized', _approx(realizedFromLedger([createEvent({ id: 's', type: 'sell', qty: 1, price: 9, amount: 9, currency: 'USD', realized: 42 })]).usd, 42));
+
+      /* ── AURIX-PORTFOLIO-CHART-CASHFLOW-AWARE-1 — cases A–G ──────────────── */
+      var bc = _baseCcy();
+      var mk = function (type, amount, ts, extra) { return createEvent(Object.assign({ type: type, amount: amount, currency: bc, ts: ts }, extra || {})); };
+      var lastVal = function (series) { return series && series.length ? series[series.length - 1].value : null; };
+
+      var rA = buildEvolutionSeries([{ ts: 200, value: 10000 }], [mk('deposit', 10000, 100)]);
+      ok('evo A: contributions 10000', _approx(lastVal(rA.contributionsSeries), 10000));
+      ok('evo A: gain 0',              _approx(lastVal(rA.gainSeries), 0));
+
+      var rB = buildEvolutionSeries([{ ts: 200, value: 12000 }], [mk('deposit', 10000, 100)]);
+      ok('evo B: contributions 10000', _approx(lastVal(rB.contributionsSeries), 10000));
+      ok('evo B: gain 2000',           _approx(lastVal(rB.gainSeries), 2000));
+
+      var rC = buildEvolutionSeries([{ ts: 300, value: 17000 }], [mk('deposit', 10000, 100), mk('deposit', 5000, 200)]);
+      ok('evo C: contributions 15000', _approx(lastVal(rC.contributionsSeries), 15000));
+      ok('evo C: gain 2000',           _approx(lastVal(rC.gainSeries), 2000));
+
+      var rD = buildEvolutionSeries([{ ts: 300, value: 9000 }], [mk('deposit', 10000, 100), mk('withdrawal', 2000, 200)]);
+      ok('evo D: contributions 8000',  _approx(lastVal(rD.contributionsSeries), 8000));
+      ok('evo D: gain 1000',           _approx(lastVal(rD.gainSeries), 1000));
+
+      var eE = [mk('deposit', 10000, 100),
+                createEvent({ type: 'buy',  qty: 1, price: 5000, amount: 5000, currency: bc, ts: 200 }),
+                createEvent({ type: 'sell', qty: 1, price: 6000, amount: 6000, currency: bc, ts: 300, realized: 1000 })];
+      ok('evo E: buy/sell ignored (net 10000)', _approx(calculateNetContributionsAt(eE, Infinity), 10000));
+
+      var rF = buildEvolutionSeries([{ ts: 200, value: 20000 }],
+                [createEvent({ id: 'opening:v1', type: 'opening', amount: 20000, currency: bc, ts: 100, tsEstimated: true })]);
+      ok('evo F: estimated opening → partial', rF.confidence === 'partial');
+
+      var rG = buildEvolutionSeries([{ ts: 200, value: 5000 }], []);
+      ok('evo G: no ledger → insufficient', rG.confidence === 'insufficient');
+      ok('evo G: series empty-safe', rG.contributionsSeries.length === 0 && rG.gainSeries.length === 0);
     } catch (e) { ok('selfTest threw', false, { error: e && e.message }); }
 
     var pass = R.every(function (r) { return r.pass; });
@@ -304,6 +469,10 @@
     computeOpeningEvent: computeOpeningEvent,
     netContributions: netContributions,
     realizedFromLedger: realizedFromLedger,
+    // AURIX-PORTFOLIO-CHART-CASHFLOW-AWARE-1 — cashflow-aware evolution math.
+    calculateNetContributionsAt: calculateNetContributionsAt,
+    buildCashflowSeries: buildCashflowSeries,
+    buildEvolutionSeries: buildEvolutionSeries,
     getEvents: getEvents,
     eventsForAsset: eventsForAsset,
     isMigrated: isMigrated,

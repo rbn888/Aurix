@@ -319,6 +319,23 @@
     // into includeClosed = true without changing the engine's defaults.
     activeAssets: _assets,
     allAssets:    _allAssets,
+    // AURIX-PORTFOLIO-CHART-CASHFLOW-AWARE-1: cashflow-aware evolution math.
+    // The pure implementations live in wealthLedger (the source of truth for
+    // capital flows + base-currency conversion); the engine exposes them so
+    // callers have one math namespace. Late-bound because the ledger script
+    // loads after the engine. Returns null if the ledger isn't present.
+    buildEvolutionSeries: function (portfolioHistory, events) {
+      var L = (typeof window !== 'undefined') ? window.wealthLedger : null;
+      return (L && typeof L.buildEvolutionSeries === 'function') ? L.buildEvolutionSeries(portfolioHistory, events) : null;
+    },
+    buildCashflowSeries: function (events) {
+      var L = (typeof window !== 'undefined') ? window.wealthLedger : null;
+      return (L && typeof L.buildCashflowSeries === 'function') ? L.buildCashflowSeries(events) : null;
+    },
+    calculateNetContributionsAt: function (events, ts) {
+      var L = (typeof window !== 'undefined') ? window.wealthLedger : null;
+      return (L && typeof L.calculateNetContributionsAt === 'function') ? L.calculateNetContributionsAt(events, ts) : null;
+    },
   };
 
   // Auto-run the self-test once in dev. Note: at load the portfolio is usually
