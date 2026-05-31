@@ -836,6 +836,9 @@ const T = {
     backAll:  'Todos',
     viewHint: 'Ver activos →',
     catWeightLabel: 'Participación',
+    darAvgLabel:    'Precio medio de compra',
+    darWeightLabel: 'Peso en categoría',
+    darPnlLabel:    'Ganancia/Pérdida',
     // AURIX-ASSET-DETAIL-1
     'ad.back': 'Volver', 'ad.manage': 'Gestionar', 'ad.buy': 'Comprar', 'ad.sell': 'Vender',
     'ad.viewTx': 'Ver transacciones', 'ad.delete': 'Eliminar activo',
@@ -2002,6 +2005,9 @@ const T = {
     backAll:  'All',
     viewHint: 'View assets →',
     catWeightLabel: 'Allocation',
+    darAvgLabel:    'Average buy price',
+    darWeightLabel: 'Weight in category',
+    darPnlLabel:    'Gain/Loss',
     // AURIX-ASSET-DETAIL-1
     'ad.back': 'Back', 'ad.manage': 'Manage', 'ad.buy': 'Buy', 'ad.sell': 'Sell',
     'ad.viewTx': 'View transactions', 'ad.delete': 'Delete asset',
@@ -17385,6 +17391,11 @@ function _applyTab(tab) {
   // These are dashboard-internal states; leaving for a tab must reset them.
   if (typeof activeAssetId  !== 'undefined') activeAssetId  = null;
   if (typeof activeCategory !== 'undefined') activeCategory = null;
+  // AURIX-MOBILE-CATEGORY-POLISH-1 (#4): leaving the category drill-down via a
+  // tab/logo (not the in-view back button) must also drop the detail-view body
+  // class — it gates the mobile slider + detail styling, and a stale flag left
+  // the dashboard half-rendered (top visible, lower cards hidden).
+  document.body.classList.remove('is-detail-view');
   const _adsSec = document.getElementById('assetDetailSection');
   if (_adsSec) _adsSec.style.display = 'none';
   currentTab = tab;
@@ -17401,6 +17412,11 @@ function _applyTab(tab) {
     placeholder.style.display = 'none';
     if (workspaceEl) workspaceEl.style.display = 'none';
     render();
+    // AURIX-MOBILE-CATEGORY-POLISH-1 (#4): the category grid's visibility is
+    // owned by updateCategoryCards() (render() never re-shows it). When the
+    // user returns home via the logo / nav Dashboard — not the back button —
+    // we must rebuild it explicitly, or the lower cards stay hidden.
+    if (typeof updateCategoryCards === 'function') updateCategoryCards();
     updateBottomNavActive();
   } else if (tab === 'workspace') {
     mainEl.style.display      = 'none';
@@ -17776,7 +17792,9 @@ function render(animate = false) {
       const avg         = avgBuyPrice(asset);
       const totalBought = buys.reduce((s, tx) => s + tx.qty, 0);
       const avgFmt      = avg != null ? formatCurrency(avg, assetCurr) : '—';
-      return `<div class="dar-tx-info">∅ ${avgFmt}</div>`;
+      // AURIX-MOBILE-CATEGORY-POLISH-1 (#7): explicit label instead of the
+      // cryptic "∅" — a new user understands "Precio medio de compra".
+      return `<div class="dar-tx-info"><span class="dar-metric-label">${t('darAvgLabel')}: </span>${avgFmt}</div>`;
     })();
 
     // ── Premium detail row (category drill-down view) ────────
@@ -17821,9 +17839,9 @@ function render(animate = false) {
         <div class="dar-right">
           <div class="dar-value ${isCash ? '' : flashClass}"${(!isCash && prevValueBase != null) ? ` data-from="${prevValueBase.toFixed(6)}" data-to="${valueBase.toFixed(6)}"` : ''}>${primaryValueText}</div>
           ${cashIsCrossCurrency ? `<span class="dar-fx">≈ ${formatBase(valueBase)}</span>` : ''}
-          ${categoryValue > 0 ? `<span class="dar-cat-pct">${((valueBase / categoryValue) * 100).toFixed(1)}%</span>` : ''}
+          ${pnlData ? `<span class="dar-pnl ${pnlData.abs >= 0 ? 'up' : 'down'}"><span class="dar-metric-label">${t('darPnlLabel')}: </span>${pnlData.abs >= 0 ? '+' : '−'}${formatBase(Math.abs(pnlData.abs))} (${pnlData.abs >= 0 ? '+' : '−'}${Math.abs(pnlData.pct).toFixed(1)}%)</span>` : ''}
+          ${categoryValue > 0 ? `<span class="dar-cat-pct"><span class="dar-metric-label">${t('darWeightLabel')}: </span>${((valueBase / categoryValue) * 100).toFixed(1)}%</span>` : ''}
           ${darChangeHtml}
-          ${pnlData ? `<span class="dar-pnl ${pnlData.abs >= 0 ? 'up' : 'down'}">${pnlData.abs >= 0 ? '+' : '−'}${formatBase(Math.abs(pnlData.abs))} (${pnlData.abs >= 0 ? '+' : '−'}${Math.abs(pnlData.pct).toFixed(1)}%)</span>` : ''}
           <div class="dar-actions">${darActionsHtml}</div>
         </div>
         <div class="asset-edit-strip dar-strip" id="aes-${asset.id}">

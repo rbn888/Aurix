@@ -4245,8 +4245,10 @@ body:not(.hero-active) #orb-canvas {
     position: sticky;
     top: 0;
     z-index: 60;
-    min-height: 52px;
-    padding: 8px 2px;
+    min-height: 54px;
+    /* Horizontal padding is 0 so AURIX lines up exactly with the card edge
+       (the .app shell already insets the content). */
+    padding: 8px 0;
     padding-top: calc(8px + env(safe-area-inset-top, 0px));
     margin-bottom: var(--space-2);
     background: rgba(11, 15, 26, 0.72);
@@ -4254,14 +4256,24 @@ body:not(.hero-active) #orb-canvas {
     -webkit-backdrop-filter: blur(18px) saturate(140%);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
-  /* Logo left — no longer centered in a 1fr cell. */
+  /* Logo left — no longer centered in a 1fr cell. AURIX-MOBILE-CATEGORY-POLISH-1
+     (#1): drop the desktop scaleX/scaleY transform on mobile (it squished the
+     mark and made it read as floating/too-high); a clean font size sits
+     vertically centred in the fixed-height bar. */
   .header-left {
     grid-column: auto;
     justify-self: initial;
+    display: flex;
+    align-items: center;
   }
   .logo-block {
     align-items: flex-start;
     margin-top: 0;
+  }
+  .logo-block .logo-aurix {
+    transform: none;
+    font-size: 20px;
+    letter-spacing: 0.36em;
   }
   /* Controls right — static (not absolutely pinned), so nothing floats. */
   .header-right {
@@ -4277,20 +4289,22 @@ body:not(.hero-active) #orb-canvas {
 
 /* ── Large mobile / tablet (≤ 640px) ──────────────────── */
 @media (max-width: 640px) {
-  /* App shell — compact side padding */
+  /* App shell — premium side padding. AURIX-MOBILE-CATEGORY-POLISH-1 (#2):
+     16px (was 12px) so the centered content breathes and never sits tight
+     against the left edge. .app is already max-width capped + margin:auto. */
   .app {
-    padding: 0 var(--space-3) 48px;
+    padding: 0 var(--space-4) 48px;
   }
 
   /* Header — tighter vertical rhythm. AURIX-MOBILE-POLISH-1: keep the
      safe-area inset on the top padding so the logo never sits under the
      status bar / Dynamic Island on notched iPhones. */
   .header {
-    padding: 6px 2px;
+    padding: 6px 0;
     padding-top: calc(6px + env(safe-area-inset-top, 0px));
     margin-bottom: var(--space-1);
   }
-  .logo-block .logo-aurix { font-size: 21px; }
+  .logo-block .logo-aurix { font-size: 20px; }
 
   /* DASHBOARD-MOBILE-DENSITY-1 — tighter rhythm above the card so the
      chart + Aurix Signal surface lift slightly into view. The 4-step
@@ -5934,16 +5948,50 @@ body:not(.hero-active) #orb-canvas {
 
 /* Mobile ≤ 520px */
 @media (max-width: 520px) {
+  /* AURIX-MOBILE-CATEGORY-POLISH-1 (#5 + #7): stack the row. Badge + identity
+     on top; every metric on its own labelled line; the Gestionar button gets
+     a full-width row INSIDE the card so it can never be cramped against the
+     edge or clipped. */
   .detail-asset-row {
-    grid-template-columns: 36px 1fr auto;
-    gap: 0 10px;
-    padding: var(--space-2) 14px;
+    grid-template-columns: 36px 1fr;
+    grid-template-areas:
+      "badge info"
+      "right right";
+    gap: 8px 10px;
+    padding: 14px;
+    align-items: start;
   }
-  .dar-badge          { width: 36px; height: 36px; border-radius: 9px; font-size: 9.5px; }
-  .dar-name           { font-size: var(--font-size-sm); }
-  .dar-value          { font-size: var(--font-size-sm); }
-  .dar-change         { font-size: 11px; padding: 2px 6px; }
-  .dar-actions button { width: 28px; height: 28px; }
+  .dar-badge { grid-area: badge; width: 36px; height: 36px; border-radius: 9px; font-size: 9.5px; }
+  .dar-info  { grid-area: info; }
+  .dar-right {
+    grid-area: right;
+    align-items: stretch;
+    gap: 5px;
+  }
+  .dar-name  { font-size: var(--font-size-sm); }
+  /* Current value is the protagonist — biggest figure in the block. */
+  .dar-value { font-size: 18px; line-height: 1.1; }
+  /* Reveal the labels and left-align the named metrics. The .detail-asset-row
+     prefix raises specificity above the base .dar-metric-label{display:none}
+     / .dar-pnl{text-align:right} rules that appear later in the sheet. */
+  .detail-asset-row .dar-metric-label { display: inline; }
+  .detail-asset-row .dar-cat-pct,
+  .detail-asset-row .dar-pnl {
+    text-align: left;
+    font-size: 12.5px;
+    white-space: normal;
+  }
+  .dar-change { align-self: flex-start; font-size: 11px; padding: 2px 6px; }
+  /* Gestionar — own full-width row, comfortable tap target. The triple-class
+     selector beats both `.dar-actions button{width:28px}` and the base
+     `.dar-manage` padding. */
+  .dar-actions { margin-top: 8px; }
+  .detail-asset-row .dar-actions .dar-manage {
+    width: 100%;
+    padding: 11px 14px;
+    font-size: 14px;
+    text-align: center;
+  }
   .detail-chart-wrap  { height: 80px; }
   .assets-section.is-detail .section-filter-name { font-size: 17px; }
   .btn-add-context    { font-size: 11px; padding: 5px 10px; }
@@ -6337,6 +6385,14 @@ body:not(.hero-active) #orb-canvas {
 }
 .dar-pnl.up   { color: var(--green); }
 .dar-pnl.down { color: var(--red); }
+
+/* AURIX-MOBILE-CATEGORY-POLISH-1 (#7): metric labels. Hidden by default so the
+   desktop right column stays compact (value/weight/P&L right-aligned), EXCEPT
+   the avg-buy-price label which always shows (it lives in the roomy left
+   column and replaces the cryptic "∅"). The weight / P&L labels are revealed
+   on mobile, where the row stacks and every figure gets named. */
+.dar-metric-label { display: none; font-weight: var(--font-weight-medium); color: var(--text-muted); }
+.dar-tx-info .dar-metric-label { display: inline; }
 
 /* ── Logo artifact safety override (highest specificity) ── */
 .cat-card-visual img {
