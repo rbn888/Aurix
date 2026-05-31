@@ -1,5 +1,8 @@
 <!DOCTYPE html>
-<html lang="es">
+<!-- AURIX-DASHBOARD-PREMIUM-POLISH-1: paint dark on the very first frame via an
+     inline attribute on <html> (applied before any CSS parses) so mobile
+     Safari/Chrome never flash white before styles load. -->
+<html lang="es" style="background:#070a14">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -84,7 +87,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=162">
 </head>
-<body>
+<body style="background:#070a14">
+
 
 <style>
   /* AURIX-PREMIUM-ENTRY-1: minimal premium splash — only the AURIX wordmark

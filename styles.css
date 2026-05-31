@@ -3490,6 +3490,17 @@ body:not(.hero-active) #orb-canvas {
 .cat-glyph svg { width: 16px; height: 16px; display: block; }
 .cat-glyph--cash { color: #34d27f; background: rgba(39,199,104,0.14); }
 .cat-glyph--re   svg { fill: #b6a6f3; }
+/* AURIX-DASHBOARD-PREMIUM-POLISH-1: the metal ingot is its own dimensional
+   object — drop the flat glyph chip and let the SVG breathe a touch larger
+   with a soft cast shadow so it reads as premium on desktop and mobile. */
+.cat-glyph--metal { background: transparent; }
+.cat-glyph--metal svg {
+  width: 21px; height: 21px;
+  filter: drop-shadow(0 2px 2.5px rgba(0,0,0,0.45));
+}
+.cat-glyph--metal-gold   svg { filter: drop-shadow(0 2px 3px rgba(120,82,12,0.5)); }
+.cat-glyph--metal-silver svg { filter: drop-shadow(0 2px 3px rgba(40,52,70,0.5)); }
+.cat-glyph--metal-copper svg { filter: drop-shadow(0 2px 3px rgba(96,50,20,0.5)); }
 
 @media (min-width: 769px) {
   .distribution-section { display: none !important; }

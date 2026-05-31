@@ -628,7 +628,8 @@ const T = {
     liveMarket:      'Mercado abierto',
     closed:          'Mercado cerrado',
     estimatedPrice:  'Precio estimado',
-    updatedNow:      'Sincronizado',
+    updatedNow:      (hhmm) => `Actualizado a las ${hhmm}`,
+    updatedRecently: 'Actualizado recientemente',
     updatedMins:     n => `Actualizado hace ${n} min`,
     // Gold status
     goldLive:        'Live · ',
@@ -1811,7 +1812,8 @@ const T = {
     liveMarket:      'Market open',
     closed:          'Market closed',
     estimatedPrice:  'Estimated price',
-    updatedNow:      'Synced just now',
+    updatedNow:      (hhmm) => `Updated at ${hhmm}`,
+    updatedRecently: 'Updated recently',
     updatedMins:     n => `Updated ${n} min ago`,
     // Gold status
     goldLive:        'Live · ',
@@ -11920,15 +11922,15 @@ function updateChart(animate = false) {
   // disagree, and both update together when the user switches 24H/7D/30D/1A/
   // TOTAL. The %/€ toggle now just controls EMPHASIS (which value leads) and
   // the tooltip mode — the header always carries both figures.
+  // AURIX-DASHBOARD-PREMIUM-POLISH-1: show ONLY the metric the toggle selects —
+  // percent in '%' mode, money in '$/€' mode (never both). Colour by sign.
   if (!safeBase) {
     chartChangeEl.textContent = '—';
-  } else {
+  } else if (activePerfMode === 'curr') {
     const absChange = currentValue - startValue;
-    const pctStr = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
-    const absStr = `${absChange >= 0 ? '+' : ''}${formatBase(absChange)}`;
-    chartChangeEl.textContent = activePerfMode === 'curr'
-      ? `${absStr} · ${pctStr}`
-      : `${pctStr} · ${absStr}`;
+    chartChangeEl.textContent = `${absChange >= 0 ? '+' : ''}${formatBase(absChange)}`;
+  } else {
+    chartChangeEl.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
   }
   chartChangeEl.className = `chart-change ${cls}`;
 
@@ -12426,9 +12428,23 @@ function setUpdateStatus(state) {
   // → if a previous successful refresh exists, soften to "Última
   // actualización: hace X min" so the user keeps the cached anchor
   // instead of just seeing a red error label.
+  // AURIX-DASHBOARD-PREMIUM-POLISH-1: show the exact local time of the last
+  // successful refresh ("Actualizado a las 20:40" / "Updated at 20:40").
+  // Fall back to "Actualizado recientemente" when there is no reliable
+  // timestamp yet.
   const okFn       = t('updatedNow');
-  const okText     = (typeof okFn === 'string') ? okFn
-                   : (typeof okFn === 'function' ? okFn() : 'Actualizado');
+  const refTs      = (typeof lastRefreshAt === 'number' && lastRefreshAt > 0)
+    ? lastRefreshAt
+    : null;
+  let okHHmm = null;
+  if (refTs != null) {
+    try {
+      okHHmm = new Date(refTs).toLocaleTimeString(lang === 'en' ? 'en-GB' : 'es-ES',
+        { hour: '2-digit', minute: '2-digit', hour12: false });
+    } catch (_) { okHHmm = null; }
+  }
+  const okText     = (okHHmm && typeof okFn === 'function') ? okFn(okHHmm)
+                   : t('updatedRecently');
   const elapsedMin = (typeof lastRefreshAt === 'number' && lastRefreshAt > 0)
     ? Math.max(0, Math.round((Date.now() - lastRefreshAt) / 60000))
     : null;
@@ -13188,11 +13204,28 @@ function _metalKind(ticker) {
   if (s.includes('xcu') || s.includes('copper') || s.includes('cobre')) return 'copper';
   return 'gold'; // XAU / oro / default metal
 }
+let _ingotSeq = 0;
 function _metalGlyph(ticker) {
-  const fill = { gold: '#d4af37', silver: '#c4ccd6', copper: '#c87f4a' }[_metalKind(ticker)];
-  return `<span class="cat-glyph cat-glyph--metal" title="${escHtml(ticker || 'Metal')}">`
-    + `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9h9l3 6H9z" fill="${fill}" opacity="0.92"/>`
-    + `<path d="M3 15h9l2 4H5z" fill="${fill}"/></svg></span>`;
+  // AURIX-DASHBOARD-PREMIUM-POLISH-1: premium inline-SVG ingot with perspective
+  // (lit top face + gradient front face), a subtle shine streak and a soft
+  // bevel border. Pure vector — scales crisply and stays light on mobile.
+  // Each instance gets a unique gradient id so cards never cross-reference.
+  const kind = _metalKind(ticker);
+  const c = {
+    gold:   { top: '#fff1c2', hi: '#f4d27a', lo: '#b8841f', edge: 'rgba(94,62,8,.45)' },
+    silver: { top: '#fbfdff', hi: '#dfe6ee', lo: '#97a2b2', edge: 'rgba(70,82,99,.45)' },
+    copper: { top: '#ffdcc0', hi: '#e09a63', lo: '#a35d31', edge: 'rgba(86,46,20,.45)' },
+  }[kind];
+  const gid = `ingot${++_ingotSeq}`;
+  return `<span class="cat-glyph cat-glyph--metal cat-glyph--metal-${kind}" title="${escHtml(ticker || 'Metal')}">`
+    + `<svg viewBox="0 0 24 24" aria-hidden="true">`
+    +   `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0.35" y2="1">`
+    +     `<stop offset="0" stop-color="${c.hi}"/><stop offset="1" stop-color="${c.lo}"/>`
+    +   `</linearGradient></defs>`
+    +   `<path d="M6 8 L16 8 L20 11 L10 11 Z" fill="${c.top}"/>`
+    +   `<path d="M10 11 L20 11 L21.5 18 L8.5 18 Z" fill="url(#${gid})" stroke="${c.edge}" stroke-width="0.4" stroke-linejoin="round"/>`
+    +   `<path d="M12 12.2 L17 12.2 L16 14 L11 14 Z" fill="rgba(255,255,255,.5)"/>`
+    + `</svg></span>`;
 }
 function _realEstateGlyph() {
   return `<span class="cat-glyph cat-glyph--re">`
@@ -13270,6 +13303,40 @@ function updateCategoryCards() {
     section.addEventListener('animationend', () => section.classList.remove('is-entering'), { once: true });
   }
   section.style.display = '';
+
+  // AURIX-DASHBOARD-PREMIUM-POLISH-1: silent periodic refresh. A price refresh
+  // only changes numbers, not the card structure (which categories exist /
+  // which are empty). When the structure is unchanged, patch the live values
+  // in place instead of rebuilding grid.innerHTML — this keeps the DOM stable
+  // (no card disappears/reappears) and, crucially, does NOT replay the
+  // staggered entrance animation on every refresh (which caused the flicker).
+  const sig = ALL_CATEGORIES
+    .map(tp => `${tp}:${(distMap[tp]?.valueBase || 0) > 0 ? '1' : '0'}`)
+    .join('|');
+  if (grid.dataset.sig === sig && grid.children.length === ALL_CATEGORIES.length) {
+    ALL_CATEGORIES.forEach(type => {
+      const dist = distMap[type] || { type, valueBase: 0, pct: 0 };
+      const card = grid.querySelector(`.cat-card[data-type="${type}"]`);
+      if (!card) return;
+      if (dist.valueBase > 0) {
+        const valEl = card.querySelector('.cat-card-value');
+        if (valEl) { valEl.dataset.target = dist.valueBase; valEl.textContent = formatBase(dist.valueBase); }
+        const wLbl = card.querySelector('.cat-card-weight-label');
+        if (wLbl) wLbl.textContent = `${t('catWeightLabel')} · ${dist.pct.toFixed(1)}%`;
+        const wFill = card.querySelector('.cat-card-bar-fill');
+        if (wFill) wFill.style.width = `${Math.max(0, Math.min(100, Number(dist.pct) || 0)).toFixed(1)}%`;
+      }
+      const stEl = card.querySelector('.market-status');
+      const st   = getMarketStatus(type);
+      if (stEl && st) {
+        stEl.className = `market-status ${st === '24/7' ? 'crypto' : st}`;
+        stEl.innerHTML = `<span class="dot"></span>${getMarketLabel(st)}`;
+      }
+    });
+    return;
+  }
+  grid.dataset.sig = sig;
+
   const hint = `<span class="cat-card-hint">${t('viewHint')}</span>`;
   grid.innerHTML = ALL_CATEGORIES.map(type => {
     const dist       = distMap[type] || { type, valueBase: 0, pct: 0 };
@@ -17312,6 +17379,14 @@ function _tabResetStyles(c) {
 // the active nav state. Pure logic, no motion; called once per navigation.
 function _applyTab(tab) {
   switchView('dashboard'); // always collapse hero when navigating
+  // AURIX-DASHBOARD-PREMIUM-POLISH-1 (#7 global nav consistency): switching to
+  // ANY top-level tab exits the dashboard sub-states (category drill-down /
+  // asset detail) so every destination — Dashboard included — lands clean.
+  // These are dashboard-internal states; leaving for a tab must reset them.
+  if (typeof activeAssetId  !== 'undefined') activeAssetId  = null;
+  if (typeof activeCategory !== 'undefined') activeCategory = null;
+  const _adsSec = document.getElementById('assetDetailSection');
+  if (_adsSec) _adsSec.style.display = 'none';
   currentTab = tab;
   if (_loopInterval)   { clearInterval(_loopInterval);   _loopInterval   = null; }
   if (_marketInterval) { clearInterval(_marketInterval); _marketInterval = null; }
@@ -18872,10 +18947,19 @@ document.addEventListener('click', e => {
 
 document.addEventListener('click', trackInteraction);
 
-// Logo → home
+// Logo → home. AURIX-DASHBOARD-PREMIUM-POLISH-1 (#7): the AURIX logo is the
+// global "Home" from ANY internal state (category, asset detail, market,
+// metrics, workspace, an open overlay/modal/menu). It closes every transient
+// surface and then lands on a clean dashboard. The dashboard sub-states
+// (activeCategory / activeAssetId) are cleared by _applyTab('home') below.
 document.addEventListener('click', (e) => {
   const logo = e.target.closest('#logoHome');
   if (!logo) return;
+  try { if (typeof closeModal        === 'function') closeModal(); }        catch (_) {}
+  try { if (typeof closeGlobalSearch === 'function') closeGlobalSearch(); } catch (_) {}
+  try { if (typeof closeAssetManage  === 'function') closeAssetManage(); }  catch (_) {}
+  try { if (typeof closeSuggestions  === 'function') closeSuggestions(); }  catch (_) {}
+  try { if (typeof _closeAdsMenu     === 'function') _closeAdsMenu(); }     catch (_) {}
   if (typeof switchTab === 'function') switchTab('home');
 });
 
@@ -21240,8 +21324,12 @@ function _adsDeleteActive() {
 })();
 
 // ── Event Listeners ────────────────────────────────────────
-document.querySelector('.header-title')
-  ?.addEventListener('click', () => { switchView('hero'); });
+// AURIX-DASHBOARD-PREMIUM-POLISH-1 (#8): removed the legacy ".header-title →
+// switchView('hero')" listener. The logo (#logoHome) IS the .header-title, so
+// this rogue handler re-entered the hero view and started the boot orb on
+// every logo click — the "monstruito/bola" artifact flashing behind the
+// dashboard. The logo now only goes Home (handler above); nothing re-enters
+// hero on a logo click.
 
 document.querySelectorAll('#bottomNav .item[data-tab]').forEach(el => {
   el.addEventListener('click', () => {
