@@ -835,6 +835,16 @@ const T = {
     backAll:  'Todos',
     viewHint: 'Ver activos →',
     catWeightLabel: 'Participación',
+    // AURIX-ASSET-DETAIL-1
+    'ad.back': 'Volver', 'ad.manage': 'Gestionar', 'ad.buy': 'Comprar', 'ad.sell': 'Vender',
+    'ad.viewTx': 'Ver transacciones', 'ad.delete': 'Eliminar activo',
+    'ad.qty': 'Cantidad', 'ad.avgBuy': 'Precio medio de compra', 'ad.gainLoss': 'Ganancia / Pérdida', 'ad.weightCat': 'Peso en categoría',
+    'ad.evolution': 'Evolución', 'ad.history': 'Historial', 'ad.insights': 'Insights', 'ad.insufficient': 'Histórico insuficiente',
+    adBuy: 'Compra', adSell: 'Venta', adDeposit: 'Depósito', adWithdrawal: 'Retirada', adMove: 'Movimiento', adApprox: 'aprox.',
+    confirmDeleteAsset: '¿Eliminar este activo? Esta acción no se puede deshacer.',
+    insAvg: (avg, tk, cur, pct, dir) => `Tu precio medio de compra es ${avg}. ${tk} cotiza actualmente a ${cur}. La posición está un ${pct}% por ${dir === 'below' ? 'debajo' : 'encima'} de tu coste medio.`,
+    insRealized: (amt, name) => `Has realizado ${amt} de ganancias históricas en ${name}.`,
+    insWeight: (tk, pct, cat) => `${tk} representa el ${pct}% de tu patrimonio en ${cat}.`,
     // Benchmark comparison
     bmPortfolio: 'Cartera',
     bmMarket:    'Mercado',
@@ -1990,6 +2000,16 @@ const T = {
     backAll:  'All',
     viewHint: 'View assets →',
     catWeightLabel: 'Allocation',
+    // AURIX-ASSET-DETAIL-1
+    'ad.back': 'Back', 'ad.manage': 'Manage', 'ad.buy': 'Buy', 'ad.sell': 'Sell',
+    'ad.viewTx': 'View transactions', 'ad.delete': 'Delete asset',
+    'ad.qty': 'Quantity', 'ad.avgBuy': 'Average buy price', 'ad.gainLoss': 'Gain / Loss', 'ad.weightCat': 'Weight in category',
+    'ad.evolution': 'Evolution', 'ad.history': 'History', 'ad.insights': 'Insights', 'ad.insufficient': 'Insufficient history',
+    adBuy: 'Buy', adSell: 'Sell', adDeposit: 'Deposit', adWithdrawal: 'Withdrawal', adMove: 'Move', adApprox: 'approx.',
+    confirmDeleteAsset: 'Delete this asset? This cannot be undone.',
+    insAvg: (avg, tk, cur, pct, dir) => `Your average buy price is ${avg}. ${tk} currently trades at ${cur}. The position is ${pct}% ${dir === 'below' ? 'below' : 'above'} your average cost.`,
+    insRealized: (amt, name) => `You have realized ${amt} of historical gains on ${name}.`,
+    insWeight: (tk, pct, cat) => `${tk} represents ${pct}% of your wealth in ${cat}.`,
     // Benchmark comparison
     bmPortfolio: 'Portfolio',
     bmMarket:    'Market',
@@ -4360,6 +4380,7 @@ const donutCenterSubEl      = document.getElementById('donutCenterSub');
 let _donutHoverIdx = -1;   // ephemeral hover (index into _donutDist)
 let _donutDist     = [];
 let activeCategory = null; // persistent category filter ('crypto', 'metal', …, or null)
+let activeAssetId  = null; // AURIX-ASSET-DETAIL-1: open asset-detail screen (id) or null
 // DASHBOARD-DRILLDOWN-RACE-1: generation token bumped on every
 // view/category transition. Any async work (price refresh, watchlist
 // rebuild, deferred animation step) that captured the token before the
@@ -17399,6 +17420,13 @@ function render(animate = false) {
     syncQtyFromTransactions(asset);
     syncCostBasisFromTransactions(asset);
   });
+  // AURIX-ASSET-DETAIL-1: while the asset-detail screen is open, refresh it and
+  // skip the dashboard/category section toggling so a price tick can't repaint
+  // the dashboard over the screen. Data is synced above first.
+  if (typeof activeAssetId !== 'undefined' && activeAssetId) {
+    try { renderAssetDetail(); } catch (_) {}
+    return;
+  }
   countUpTotalValue(totalValueBase());
   updatePerformance();
   assetCountEl.textContent = t('assetCount')(assets.length);
@@ -17662,7 +17690,9 @@ function render(animate = false) {
          <button class="btn-reduce"  title="${t('btnReduce')}" data-id="${asset.id}">−</button>
          <button class="btn-delete"  title="${t('btnDelete')}" data-id="${asset.id}">✕</button>`;
 
-    const darActionsHtml = actionsHtml;
+    // AURIX-ASSET-DETAIL-1: inline +/−/✕ removed — the category row now opens
+    // the asset-detail screen, where management lives under "Gestionar".
+    const darActionsHtml = '';
 
     const txInfo = (() => {
       const buys = (asset.transactions || []).filter(tx => tx.type === 'buy');
@@ -20994,8 +21024,144 @@ assetsListEl.addEventListener('click', e => {
   if (justDragged) return;
   if (e.target.closest('button') || e.target.closest('.asset-edit-strip')) return;
   const card = e.target.closest('.asset-card, .detail-asset-row');
-  if (card) openAssetDetailModal(card.dataset.assetId);
+  if (card) openAssetDetail(card.dataset.assetId);
 });
+
+/* ───────── AURIX-ASSET-DETAIL-1 · own-screen controller ─────────
+   Consumes wealthEngine.getPosition / positionInsights + wealthLedger
+   .eventsForAsset. No new calculations in the UI. */
+function _adsHideMain() {
+  const hide = el => { if (el) el.style.display = 'none'; };
+  hide(document.querySelector('.dashboard-top'));
+  hide(document.getElementById('distributionSection'));
+  hide(document.getElementById('categoriesSection'));
+  hide(document.getElementById('assetsSection'));
+}
+function _closeAdsMenu() {
+  const m = document.getElementById('adsManageMenu');
+  const b = document.getElementById('adsManageBtn');
+  if (m) m.hidden = true;
+  if (b) b.setAttribute('aria-expanded', 'false');
+}
+function openAssetDetail(id) {
+  if (!id || !assets.find(a => a.id === id)) return;
+  activeAssetId = id;
+  const sec = document.getElementById('assetDetailSection');
+  if (!sec) return;
+  _adsHideMain();
+  sec.style.display = '';
+  renderAssetDetail();
+  try { window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' }); } catch (_) { try { window.scrollTo(0, 0); } catch (__) {} }
+}
+function closeAssetDetail() {
+  activeAssetId = null;
+  _closeAdsMenu();
+  const sec = document.getElementById('assetDetailSection');
+  if (sec) sec.style.display = 'none';
+  render(); // repaints the category drill-down (activeCategory still set) or dashboard
+}
+function _adsHistoryRow(ev) {
+  const cur   = ev.currency || baseCurrency;
+  const label = { buy: 'adBuy', sell: 'adSell', deposit: 'adDeposit', withdrawal: 'adWithdrawal' }[ev.type] || 'adMove';
+  let date = '';
+  try { date = new Date(ev.ts).toLocaleDateString(lang === 'en' ? 'en-GB' : 'es-ES', { day: '2-digit', month: 'short', year: 'numeric' }); } catch (_) {}
+  if (ev.tsEstimated) date += ' · ' + t('adApprox');
+  const cls   = (ev.type === 'sell' || ev.type === 'withdrawal') ? 'down' : 'up';
+  const parts = [];
+  if (ev.qty != null)   parts.push(formatQty(ev.qty));
+  if (ev.price != null) parts.push('@ ' + formatCurrency(ev.price, cur));
+  if (date)             parts.push(date);
+  const amount = (ev.amount != null) ? formatCurrency(ev.amount, cur) : '';
+  return `<div class="ad2-tx ${cls}">
+    <span class="ad2-tx-type">${escHtml(t(label))}</span>
+    <span class="ad2-tx-meta">${escHtml(parts.filter(Boolean).join(' · '))}</span>
+    <span class="ad2-tx-amount">${escHtml(amount)}</span>
+  </div>`;
+}
+function _adsInsightText(i) {
+  switch (i.kind) {
+    case 'costVsMarket':   return t('insAvg')(formatBase(i.avgBase), i.ticker, formatBase(i.currentBase), i.pct.toFixed(1), i.dir);
+    case 'realized':       return t('insRealized')(formatBase(i.amountBase), i.name);
+    case 'weightCategory': return t('insWeight')(i.ticker, i.pct.toFixed(1), i.category);
+    default:               return t('ad.insufficient');
+  }
+}
+function renderAssetDetail() {
+  const id = activeAssetId; if (!id) return;
+  const a  = assets.find(x => x.id === id);
+  const WE = window.wealthEngine, WL = window.wealthLedger;
+  if (!a || !WE || !WE.getPosition) { closeAssetDetail(); return; }
+  const p = WE.getPosition(id);
+  if (!p) { closeAssetDetail(); return; }
+  const $ = s => document.getElementById(s);
+  const badge = $('adsBadge'); if (badge) { try { badge.innerHTML = buildBadgeHtml(a, '', 'ad2-badge-inner'); } catch (_) { badge.innerHTML = ''; } }
+  if ($('adsName'))   $('adsName').textContent   = getDisplayName(a);
+  if ($('adsTicker')) $('adsTicker').textContent = a.ticker || '';
+  if ($('adsValue'))  $('adsValue').textContent  = formatBase(p.value.base);
+  if ($('adsQty'))    $('adsQty').textContent    = formatQty(p.quantity) + (a.type === 'cash' ? '' : (a.ticker ? ' ' + a.ticker : ''));
+  if ($('adsAvg'))    $('adsAvg').textContent    = p.avgBuyPrice ? formatBase(p.avgBuyPrice.base) : '—';
+  const glEl = $('adsGl');
+  if (glEl) {
+    if (p.gainLoss) {
+      const pos = p.gainLoss.abs.base >= 0;
+      glEl.textContent = `${pos ? '+' : '−'}${formatBase(Math.abs(p.gainLoss.abs.base))} (${pos ? '+' : '−'}${Math.abs(p.gainLoss.pct || 0).toFixed(1)}%)`;
+      glEl.className   = 'ad2-v ' + (pos ? 'up' : 'down');
+    } else { glEl.textContent = '—'; glEl.className = 'ad2-v'; }
+  }
+  if ($('adsWeight')) $('adsWeight').textContent = (p.weightInCategory != null) ? p.weightInCategory.toFixed(1) + '%' : '—';
+  const hist = $('adsHistory');
+  if (hist) {
+    const evs = (WL && WL.eventsForAsset) ? WL.eventsForAsset(id).slice().reverse() : [];
+    hist.innerHTML = evs.length ? evs.map(_adsHistoryRow).join('') : `<span class="ad2-muted">${escHtml(t('ad.insufficient'))}</span>`;
+  }
+  const insEl = $('adsInsights');
+  if (insEl) {
+    const ins = (WE.positionInsights ? WE.positionInsights(id) : []) || [];
+    insEl.innerHTML = ins.map(i => `<div class="ad2-insight">${escHtml(_adsInsightText(i))}</div>`).join('');
+  }
+}
+function _adsDeleteActive() {
+  const id = activeAssetId; if (!id) return;
+  const a = assets.find(x => x.id === id); if (!a) return;
+  if (!window.confirm(t('confirmDeleteAsset'))) return;
+  const delType = a.type;
+  assets = assets.filter(x => x.id !== id);
+  try { _persistEmptyPortfolioIfNeeded('delete'); } catch (_) {}
+  save();
+  closeAssetDetail();
+  try { _flashCategoryCard(delType); } catch (_) {}
+  onPortfolioChange(true);
+}
+(function _wireAssetDetail() {
+  document.getElementById('adsBack')?.addEventListener('click', closeAssetDetail);
+  const mb = document.getElementById('adsManageBtn');
+  mb?.addEventListener('click', e => {
+    e.stopPropagation();
+    const m = document.getElementById('adsManageMenu');
+    if (!m) return;
+    const willOpen = m.hidden;
+    m.hidden = !willOpen;
+    mb.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  });
+  document.getElementById('adsManageMenu')?.addEventListener('click', e => {
+    const b = e.target.closest('[data-ad-act]'); if (!b) return;
+    const act = b.dataset.adAct; _closeAdsMenu();
+    if (act === 'buy')       openModal();
+    else if (act === 'sell') { if (activeAssetId) openReduceModal(activeAssetId); }
+    else if (act === 'tx')   { const h = document.getElementById('adsHistoryBlock'); if (h) h.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' }); }
+    else if (act === 'del')  _adsDeleteActive();
+  });
+  document.addEventListener('click', e => {
+    const m = document.getElementById('adsManageMenu');
+    if (m && !m.hidden && !e.target.closest('.ad2-manage')) _closeAdsMenu();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const m = document.getElementById('adsManageMenu');
+    if (m && !m.hidden) { _closeAdsMenu(); return; }
+    if (activeAssetId) closeAssetDetail();
+  });
+})();
 
 // ── Event Listeners ────────────────────────────────────────
 document.querySelector('.header-title')

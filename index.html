@@ -393,6 +393,59 @@
         </div>
       </section>
 
+      <!-- ─────────── AURIX-ASSET-DETAIL-1 · own screen (not modal) ─────────── -->
+      <section class="asset-detail" id="assetDetailSection" style="display:none" aria-label="Asset detail">
+        <div class="ad2-head">
+          <button class="ad2-back" id="adsBack" type="button"><span aria-hidden="true">←</span><span data-i18n="ad.back">Volver</span></button>
+          <div class="ad2-manage">
+            <button class="ad2-manage-btn" id="adsManageBtn" type="button" aria-haspopup="true" aria-expanded="false"><span data-i18n="ad.manage">Gestionar</span> <span aria-hidden="true">▾</span></button>
+            <div class="ad2-menu" id="adsManageMenu" role="menu" hidden>
+              <button role="menuitem" type="button" data-ad-act="buy"  data-i18n="ad.buy">Comprar</button>
+              <button role="menuitem" type="button" data-ad-act="sell" data-i18n="ad.sell">Vender</button>
+              <button role="menuitem" type="button" data-ad-act="tx"   data-i18n="ad.viewTx">Ver transacciones</button>
+              <button role="menuitem" type="button" data-ad-act="del" class="ad2-menu-danger" data-i18n="ad.delete">Eliminar activo</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="ad2-hero">
+          <span class="ad2-badge" id="adsBadge" aria-hidden="true"></span>
+          <div class="ad2-id">
+            <span class="ad2-name" id="adsName"></span>
+            <span class="ad2-ticker" id="adsTicker"></span>
+          </div>
+          <div class="ad2-value" id="adsValue">—</div>
+        </div>
+
+        <div class="ad2-metrics">
+          <div class="ad2-metric"><span class="ad2-k" data-i18n="ad.qty">Cantidad</span><span class="ad2-v" id="adsQty">—</span></div>
+          <div class="ad2-metric"><span class="ad2-k" data-i18n="ad.avgBuy">Precio medio de compra</span><span class="ad2-v" id="adsAvg">—</span></div>
+          <div class="ad2-metric"><span class="ad2-k" data-i18n="ad.gainLoss">Ganancia / Pérdida</span><span class="ad2-v" id="adsGl">—</span></div>
+          <div class="ad2-metric"><span class="ad2-k" data-i18n="ad.weightCat">Peso en categoría</span><span class="ad2-v" id="adsWeight">—</span></div>
+        </div>
+
+        <!-- Evolución: prepared block. Live per-asset chart → AURIX-ASSET-EVOLUTION-CHART-1 -->
+        <div class="ad2-block ad2-evo">
+          <div class="ad2-block-head">
+            <h3 data-i18n="ad.evolution">Evolución</h3>
+            <div class="ad2-evo-filters" aria-hidden="true">
+              <button type="button" class="is-active">7D</button><button type="button">30D</button><button type="button">YTD</button><button type="button">ALL</button>
+            </div>
+          </div>
+          <div class="ad2-evo-body" id="adsEvo"><span class="ad2-muted" data-i18n="ad.insufficient">Histórico insuficiente</span></div>
+        </div>
+
+        <div class="ad2-block ad2-history" id="adsHistoryBlock">
+          <div class="ad2-block-head"><h3 data-i18n="ad.history">Historial</h3></div>
+          <div class="ad2-history-list" id="adsHistory"></div>
+        </div>
+
+        <div class="ad2-block ad2-insights">
+          <div class="ad2-block-head"><h3 data-i18n="ad.insights">Insights</h3></div>
+          <div class="ad2-insights-list" id="adsInsights"></div>
+        </div>
+      </section>
+
     </main>
 
     <!-- Hero view — full-screen overlay, shown on demand -->
