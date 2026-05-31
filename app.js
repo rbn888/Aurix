@@ -3478,6 +3478,35 @@ function save() {
   }
 }
 
+// AURIX-WEALTH-LEDGER-CAPTURE-1: append-only ledger capture for live operations.
+// Fully isolated + guarded — a ledger failure can NEVER block a trade or save.
+// Trade events reuse the shared deterministic id so a captured buy/sell and any
+// later backfill of the same transaction collapse to one event (dedup).
+function _ledgerTrade(asset, type, qty, price, ts, realized) {
+  try {
+    const WL = window.wealthLedger;
+    if (!WL || !WL.record || !asset) return;
+    const ev = {
+      id:       WL.tradeEventId(asset.id, ts, type, qty, price),
+      type, qty, price, amount: qty * price,
+      currency: (asset.assetCurrency || 'USD'),
+      assetId:  asset.id, ticker: asset.ticker, ts, origin: 'user',
+    };
+    if (realized != null) ev.realized = realized;
+    WL.record(ev);
+  } catch (_) {}
+}
+function _ledgerCashFlow(type, asset, amount, currency, ts, source) {
+  try {
+    const WL = window.wealthLedger;
+    if (!WL || !WL.record) return;
+    const ev = { type, amount, currency, ts, origin: 'user' };
+    if (asset) { ev.assetId = asset.id; ev.ticker = asset.ticker; }
+    if (source) ev.source = source;
+    WL.record(ev);
+  } catch (_) {}
+}
+
 // ── Aurix Data Layer — Phase 1 + SPEC B ───────────────────
 function inferPriceSource(a) {
   if (a.type === 'cash')         return 'fx';
@@ -19698,6 +19727,8 @@ assetForm.addEventListener('submit', e => {
       : null;
 
     let manualFlashId = existing?.id;
+    const _mBuyTs = Date.now();
+    const _mBuyPx = price > 0 ? price : (existing ? (existing.price || 0) : 1);
     if (existing) {
       const manualAddedCost = qty * (price > 0 ? price : existing.price || 0);
       existing.costBasis = (existing.costBasis || existing.qty * (existing.price || 0)) + manualAddedCost;
@@ -19706,6 +19737,7 @@ assetForm.addEventListener('submit', e => {
       // Backfill symbols if a lookup ran after the original save
       if (manualPendingSymbol  && !existing.marketSymbol) existing.marketSymbol = manualPendingSymbol;
       if (manualPendingCoinId  && !existing.coinId)       existing.coinId       = manualPendingCoinId;
+      _ledgerTrade(existing, 'buy', qty, _mBuyPx, _mBuyTs);
     } else {
       manualFlashId = Date.now().toString(36) + Math.random().toString(36).slice(2);
       assets.push({
@@ -19722,8 +19754,9 @@ assetForm.addEventListener('submit', e => {
         change24h:     null,
         prevPrice:     null,
         costBasis:     qty * (price > 0 ? price : 1),
-        transactions:  [{ type: 'buy', qty, price: price > 0 ? price : 1, ts: Date.now() }],
+        transactions:  [{ type: 'buy', qty, price: price > 0 ? price : 1, ts: _mBuyTs }],
       });
+      _ledgerTrade(assets.find(a => a.id === manualFlashId), 'buy', qty, _mBuyPx, _mBuyTs);
     }
     save();
     render(true);
@@ -19772,12 +19805,14 @@ assetForm.addEventListener('submit', e => {
     : qty * pendingPrice;
 
   let normalFlashId = existing?.id;
+  const _buyTs = Date.now();
   if (existing) {
     existing.costBasis = (existing.costBasis || assetNativeValue(existing)) + newPurchaseCost;
     existing.qty    = +(existing.qty + qty).toFixed(8);
     existing.price  = pendingPrice;
     if (!existing.transactions) existing.transactions = [];
-    existing.transactions.push({ type: 'buy', qty, price: pendingPrice, ts: Date.now() });
+    existing.transactions.push({ type: 'buy', qty, price: pendingPrice, ts: _buyTs });
+    _ledgerTrade(existing, 'buy', qty, pendingPrice, _buyTs);
   } else {
     let initialChange24h = null;
     if (marketSymbol && type !== 'crypto') {
@@ -19826,8 +19861,9 @@ assetForm.addEventListener('submit', e => {
         resaleMargin:      pendingResaleMargin,
         resaleFactor:      +(Math.max(0, Math.min(1, 1 - pendingResaleMargin / 100))).toFixed(4),
       } : {}),
-      transactions:  [{ type: 'buy', qty, price: pendingPrice, ts: Date.now() }],
+      transactions:  [{ type: 'buy', qty, price: pendingPrice, ts: _buyTs }],
     });
+    _ledgerTrade(assets.find(a => a.id === normalFlashId), 'buy', qty, pendingPrice, _buyTs);
   }
 
   save();
@@ -19944,13 +19980,22 @@ reduceForm.addEventListener('submit', e => {
     ? (currentPrice - avgCostPerUnit) * amount
     : 0;
   if (!Array.isArray(asset.transactions)) asset.transactions = [];
+  const _sellTs    = Date.now();
+  const _sellPrice = Number.isFinite(currentPrice) ? currentPrice : 0;
   asset.transactions.push({
     type:  'sell',
     qty:   amount,
-    price: Number.isFinite(currentPrice) ? currentPrice : 0,
-    ts:    Date.now(),
+    price: _sellPrice,
+    ts:    _sellTs,
   });
   asset.realizedPnL = Number(asset.realizedPnL || 0) + (Number.isFinite(realized) ? realized : 0);
+  // AURIX-WEALTH-LEDGER-CAPTURE-1: cash reductions are withdrawals; everything
+  // else is a sell (with durable realized PnL on the event).
+  if (asset.type === 'cash') {
+    _ledgerCashFlow('withdrawal', asset, amount, (asset.assetCurrency || 'USD'), _sellTs, asset.source || null);
+  } else {
+    _ledgerTrade(asset, 'sell', amount, _sellPrice, _sellTs, (Number.isFinite(realized) ? realized : 0));
+  }
   if (wasRemoved) {
     assets = assets.filter(a => a.id !== reduceTargetId);
   } else {
@@ -20496,6 +20541,9 @@ liquidityForm.addEventListener('submit', e => {
       source:        source || null,
     });
   }
+
+  // AURIX-WEALTH-LEDGER-CAPTURE-1: every liquidity add is a deposit event.
+  _ledgerCashFlow('deposit', assets.find(a => a.type === 'cash' && a.assetCurrency === curr), qty, curr, Date.now(), source);
 
   save();
   render(true);

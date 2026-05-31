@@ -55,6 +55,12 @@
   }
   function _randId() { return _now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
+  // Shared deterministic id for a trade event, so a captured buy/sell (CAPTURE-1)
+  // and the same trade seen by a later backfill collapse to ONE event (dedup).
+  function tradeEventId(assetId, ts, type, qty, price) {
+    return 'tx_' + _hash([assetId, ts, type, qty, price].join('|'));
+  }
+
   /* ── createEvent / validate / append ────────────────────────────────────── */
   function createEvent(partial) {
     partial = partial || {};
@@ -105,6 +111,9 @@
     var out = [];
     for (var i = 0; i < arr.length; i++) {
       var a = arr[i];
+      // Cash flows are deposits/withdrawals, not buy/sell — captured live, never
+      // backfilled (pre-history is unknown). Skip cash here to avoid mislabelling.
+      if (a && a.type === 'cash') continue;
       var txs = (a && Array.isArray(a.transactions)) ? a.transactions : [];
       for (var j = 0; j < txs.length; j++) {
         var tx = txs[j];
@@ -113,7 +122,7 @@
         if (qty <= 0) continue;
         var ts = Number.isFinite(tx.ts) ? tx.ts : _now();
         var cur = String(a.assetCurrency || 'USD').toUpperCase();
-        var id = 'bf_' + _hash([a.id, ts, tx.type, qty, price].join('|'));
+        var id = tradeEventId(a.id, ts, tx.type, qty, price);
         out.push(createEvent({
           id: id, type: tx.type, qty: qty, price: price,
           amount: qty * price, currency: cur,
@@ -214,6 +223,23 @@
     return { migrated: true, count: events.length, backfilled: bf.length };
   }
 
+  /* ── record — append-only capture of a single live event (CAPTURE-1) ────── */
+  // Used by app.js write-paths. Append-only + idempotent by id; never throws to
+  // the caller (the trade/save must never be blocked by the ledger). Returns the
+  // event, or null if invalid.
+  function record(partial) {
+    try {
+      var ev = createEvent(partial);
+      if (!validate(ev).ok) return null;
+      var L = _ledger();
+      var events = append(L.events || [], ev);
+      if (events !== (L.events || [])) {
+        _save({ events: events, ledgerMigrated: L.ledgerMigrated, schema: SCHEMA });
+      }
+      return ev;
+    } catch (_) { return null; }
+  }
+
   /* ── Dev-only self-test ─────────────────────────────────────────────────── */
   function _approx(a, b, t) { return Math.abs((Number(a) || 0) - (Number(b) || 0)) <= (t == null ? 0.01 : t); }
   function selfTest() {
@@ -264,6 +290,8 @@
     createEvent: createEvent,
     validate: validate,
     append: append,
+    record: record,
+    tradeEventId: tradeEventId,
     backfillFromAssets: backfillFromAssets,
     computeOpeningEvent: computeOpeningEvent,
     netContributions: netContributions,
