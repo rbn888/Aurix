@@ -34,7 +34,16 @@
   'use strict';
 
   /* ── Dependency resolvers (late-bound, defensive) ───────────────────────── */
-  function _assets()   { try { return (typeof assets !== 'undefined' && Array.isArray(assets)) ? assets : []; } catch (_) { return []; } }
+  // AURIX-CLOSED-POSITIONS-1: closed positions (fully sold, qty 0) stay in the
+  // global `assets` array for historical analysis but must NOT affect the live
+  // figures. _assets() therefore returns ACTIVE positions only — i.e. the
+  // engine defaults to includeClosed = false for every calculation that reads
+  // it (net worth, allocation, contributions, gain/loss). A future analysis
+  // surface can pass the full array explicitly (the engine functions accept a
+  // `list` param) to opt into includeClosed = true.
+  function _isClosed(a) { return !!a && a.lifecycleStatus === 'closed'; }
+  function _allAssets() { try { return (typeof assets !== 'undefined' && Array.isArray(assets)) ? assets : []; } catch (_) { return []; } }
+  function _assets()    { return _allAssets().filter(a => !_isClosed(a)); }
   function _baseCcy()  { try { return (typeof baseCurrency !== 'undefined' && baseCurrency) ? baseCurrency : 'USD'; } catch (_) { return 'USD'; } }
   function _fx()       { try { return (typeof usdToEur !== 'undefined' && usdToEur) ? usdToEur : 1; } catch (_) { return 1; } }
   function _meta()     { try { return (typeof TYPE_META !== 'undefined' && TYPE_META) ? TYPE_META : {}; } catch (_) { return {}; } }
@@ -303,6 +312,13 @@
     getPosition,
     positionInsights,
     selfTest,
+    // AURIX-CLOSED-POSITIONS-1: read accessors. activeAssets() is the default
+    // input for every calculation above (includeClosed = false). allAssets()
+    // exposes the full set incl. closed positions, so a future historical
+    // surface can call e.g. calculateGainLoss(wealthEngine.allAssets()) to opt
+    // into includeClosed = true without changing the engine's defaults.
+    activeAssets: _assets,
+    allAssets:    _allAssets,
   };
 
   // Auto-run the self-test once in dev. Note: at load the portfolio is usually

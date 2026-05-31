@@ -3888,8 +3888,32 @@ function assetValueUSD(asset) {
   return curr === 'USD' ? native : native / usdToEur;
 }
 
+// ── AURIX-CLOSED-POSITIONS-1 · position lifecycle ──────────────────────────
+// A fully-sold position is NEVER deleted — it transitions to 'closed' (qty 0)
+// so its transaction history and realizedPnL survive for Wealth Evolution /
+// Workspace Intelligence. Active views/aggregations operate on activeAssets()
+// only, so the visible behaviour is identical to before. Re-buying a closed
+// position reactivates the SAME row (see the add-asset merge branches) — no
+// duplicate is ever created.
+function isClosedAsset(a) { return !!a && a.lifecycleStatus === 'closed'; }
+function activeAssets()   { return Array.isArray(assets) ? assets.filter(a => !isClosedAsset(a)) : []; }
+function _closePosition(asset, ts) {
+  if (!asset) return;
+  asset.qty             = 0;
+  asset.costBasis       = 0;            // remaining cost is 0; gain is now realizedPnL
+  asset.lifecycleStatus = 'closed';
+  asset.closedAt        = ts || Date.now();
+}
+function _reactivatePosition(asset) {
+  if (!asset || !isClosedAsset(asset)) return;
+  asset.lifecycleStatus = 'active';
+  asset.closedAt        = null;
+}
+
 function totalValueUSD() {
-  return assets.reduce((sum, a) => sum + assetValueUSD(a), 0);
+  // Closed positions carry qty 0 → assetValueUSD 0, so they never alter the
+  // total; activeAssets() keeps it explicit and cheap.
+  return activeAssets().reduce((sum, a) => sum + assetValueUSD(a), 0);
 }
 
 function totalValueBase() { return toBase(totalValueUSD(), 'USD'); }
@@ -3974,6 +3998,12 @@ function computeCostBasisFromTransactions(asset) {
 }
 
 function syncCostBasisFromTransactions(asset) {
+  // AURIX-CLOSED-POSITIONS-1: closed → zero remaining cost basis. The gain is
+  // already captured in realizedPnL; this keeps every cost-basis aggregation
+  // (totalCostBasisBase, derived state, range P&L) blind to closed positions,
+  // including those closed at a loss (where buys > sells would otherwise leave
+  // a positive residual).
+  if (isClosedAsset(asset)) { asset.costBasis = 0; return; }
   if (!asset.transactions || !asset.transactions.length) return;
   let totalCost = 0;
   for (const tx of asset.transactions) {
@@ -3994,6 +4024,9 @@ function migrateLegacyAssetToTransactions(asset) {
 }
 
 function syncQtyFromTransactions(asset) {
+  // AURIX-CLOSED-POSITIONS-1: a closed position is always qty 0 — never let a
+  // re-derivation resurrect a residual quantity into the live figures.
+  if (isClosedAsset(asset)) { asset.qty = 0; return; }
   if (!asset.transactions || !asset.transactions.length) return;
   let qty = 0;
   for (const tx of asset.transactions) {
@@ -4906,9 +4939,13 @@ function recomputeDerivedFinancialState(source = 'unknown') {
 
   try {
     // Same portfolio resolution as FC-8 reactive runtime.
-    const portfolioAssets = Array.isArray(window.PORTFOLIO) ? window.PORTFOLIO
+    // AURIX-CLOSED-POSITIONS-1: derived financial state reflects the ACTIVE
+    // portfolio only — closed positions must not inflate assetCount or fold
+    // their realized gain into the live totals (identical behaviour to before,
+    // when a fully-sold asset was removed from the array).
+    const portfolioAssets = (Array.isArray(window.PORTFOLIO) ? window.PORTFOLIO
                           : Array.isArray(assets)            ? assets
-                          : [];
+                          : []).filter(a => !isClosedAsset(a));
 
     let totalValue        = 0;
     let totalCostBasis    = 0;
@@ -13347,7 +13384,7 @@ function updateCategoryCards() {
   grid.innerHTML = ALL_CATEGORIES.map(type => {
     const dist       = distMap[type] || { type, valueBase: 0, pct: 0 };
     const m          = TYPE_META[type] || TYPE_META.other;
-    const typeAssets = assets.filter(a => (TYPE_META[a.type] ? a.type : 'other') === type);
+    const typeAssets = activeAssets().filter(a => (TYPE_META[a.type] ? a.type : 'other') === type);
     const visual     = buildCardVisual(type, typeAssets, dist.pct);
     const isEmpty    = dist.valueBase === 0;
 
@@ -17520,13 +17557,13 @@ function render(animate = false) {
   }
   countUpTotalValue(totalValueBase());
   updatePerformance();
-  assetCountEl.textContent = t('assetCount')(assets.length);
+  assetCountEl.textContent = t('assetCount')(activeAssets().length);
 
   // AURIX-EMPTY-1: hero empty mode. Single source of truth: assets.length.
   // Applied AFTER the regular value updates so the premium copy is the
   // last write — never raced by countUp / updatePerformance. The class
   // toggle is the contract every dependent CSS rule listens to.
-  const _dashEmpty  = assets.length === 0;
+  const _dashEmpty  = activeAssets().length === 0;
   const _dashTopEl  = document.querySelector('.dashboard-top');
   if (_dashTopEl) _dashTopEl.classList.toggle('is-empty', _dashEmpty && !activeCategory);
   if (_dashEmpty && !activeCategory) {
@@ -17583,7 +17620,7 @@ function render(animate = false) {
     }
     // categoriesSection already hidden by updateCategoryCards() short-circuit
     // Render premium detail hero (category stats + mini sparkline)
-    const typeAssets = assets.filter(a => (TYPE_META[a.type] ? a.type : 'other') === activeCategory);
+    const typeAssets = activeAssets().filter(a => (TYPE_META[a.type] ? a.type : 'other') === activeCategory);
     renderDetailHero(activeCategory, typeAssets);
     // CATEGORY-DETAIL-CHARTS-2 — premium performance panel directly
     // below the hero. _aurixCategoryPerfRender is idempotent: same
@@ -17633,14 +17670,16 @@ function render(animate = false) {
     assetsListEl.removeChild(assetsListEl.firstChild);
   }
 
-  if (assets.length === 0) {
+  if (activeAssets().length === 0) {
     _applyEmptyStateForCategory(null);
     assetsListEl.appendChild(emptyStateEl);
     return;
   }
 
   // Sort by value descending; apply custom drag-drop order in main list view
-  const sorted   = [...assets].sort((a, b) => assetNativeValue(b) - assetNativeValue(a));
+  // AURIX-CLOSED-POSITIONS-1: render only active positions (closed rows stay
+  // in `assets` for history but never appear in the dashboard / category list).
+  const sorted   = [...activeAssets()].sort((a, b) => assetNativeValue(b) - assetNativeValue(a));
   const display  = activeCategory ? sorted : applyCustomOrder(sorted);
   const filtered = activeCategory
     ? display.filter(a => (TYPE_META[a.type] ? a.type : 'other') === activeCategory)
@@ -19863,6 +19902,8 @@ assetForm.addEventListener('submit', e => {
     const _mBuyTs = Date.now();
     const _mBuyPx = price > 0 ? price : (existing ? (existing.price || 0) : 1);
     if (existing) {
+      // AURIX-CLOSED-POSITIONS-1: reactivate if this ISIN row was closed.
+      _reactivatePosition(existing);
       const manualAddedCost = qty * (price > 0 ? price : existing.price || 0);
       existing.costBasis = (existing.costBasis || existing.qty * (existing.price || 0)) + manualAddedCost;
       existing.qty = +(existing.qty + qty).toFixed(8);
@@ -19940,6 +19981,10 @@ assetForm.addEventListener('submit', e => {
   let normalFlashId = existing?.id;
   const _buyTs = Date.now();
   if (existing) {
+    // AURIX-CLOSED-POSITIONS-1: re-buying a closed position reactivates the
+    // SAME row (history stays unified) — never a duplicate. costBasis on a
+    // closed row is 0, so this naturally re-bases to the new purchase cost.
+    _reactivatePosition(existing);
     existing.costBasis = (existing.costBasis || assetNativeValue(existing)) + newPurchaseCost;
     existing.qty    = +(existing.qty + qty).toFixed(8);
     existing.price  = pendingPrice;
@@ -20130,7 +20175,9 @@ reduceForm.addEventListener('submit', e => {
     _ledgerTrade(asset, 'sell', amount, _sellPrice, _sellTs, (Number.isFinite(realized) ? realized : 0));
   }
   if (wasRemoved) {
-    assets = assets.filter(a => a.id !== reduceTargetId);
+    // AURIX-CLOSED-POSITIONS-1: full sell → CLOSE, never delete. History +
+    // realizedPnL (already accrued above) stay attached to the row.
+    _closePosition(asset, _sellTs);
   } else {
     if (asset.costBasis && asset.qty > 0) asset.costBasis *= remaining / asset.qty;
     asset.qty = remaining;
