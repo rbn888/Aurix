@@ -161,6 +161,69 @@
     };
   }
 
+  /* ── Per-asset position (AURIX-ASSET-DETAIL-1, Fase A) ──────────────────── */
+  function _findById(arr, id) { for (var i = 0; i < arr.length; i++) if (arr[i] && arr[i].id === id) return arr[i]; return null; }
+  function _effType(a, meta) { return (a.type && meta[a.type]) ? a.type : 'other'; }
+
+  // Everything the asset-detail screen needs, computed here (the screen only
+  // consumes). Currency-correct (USD canonical + base). Unknown/ineligible
+  // figures are null so the UI can render "—" instead of fabricating.
+  function getPosition(assetId, list) {
+    var arr = Array.isArray(list) ? list : _assets();
+    var a = _findById(arr, assetId);
+    if (!a) return null;
+    var meta = _meta();
+    var cur = String(a.assetCurrency || 'USD').toUpperCase();
+    var valueUSD = _valUSD(a);
+    var qty = Number(a.qty || 0);
+    var invested = _isInvested(a) && Number(a.costBasis || 0) > 0;
+    var costUSD = invested ? _toUSD(Number(a.costBasis || 0), cur) : 0;
+    var avgUSD = (invested && qty > 0) ? costUSD / qty : null;
+    var curUnitUSD = qty > 0 ? valueUSD / qty : null;
+    var glUSD = invested ? valueUSD - costUSD : null;
+    var glPct = (invested && costUSD > 0) ? (glUSD / costUSD) * 100 : null;
+    var myType = _effType(a, meta);
+    var catUSD = 0;
+    for (var i = 0; i < arr.length; i++) { var v = _valUSD(arr[i]); if (v > 0 && _effType(arr[i], meta) === myType) catUSD += v; }
+    var weightCat = catUSD > 0 ? (valueUSD / catUSD) * 100 : null;
+    var realizedUSD = _toUSD(Number(a.realizedPnL || 0), cur);
+    var pair = function (usd) { return { usd: usd, base: _toBase(usd) }; };
+    return {
+      assetId: a.id, ticker: a.ticker, name: a.name, type: a.type,
+      category: { key: myType, label: (meta[myType] && meta[myType].label) || myType },
+      currency: _baseCcy(),
+      value: pair(valueUSD),
+      quantity: qty,
+      avgBuyPrice:  avgUSD == null ? null : pair(avgUSD),
+      currentPrice: curUnitUSD == null ? null : pair(curUnitUSD),
+      gainLoss:     glUSD == null ? null : { abs: pair(glUSD), pct: glPct },
+      realized:     pair(realizedUSD),
+      weightInCategory: weightCat,
+      isInvested: invested,
+      computedAt: _now(),
+    };
+  }
+
+  // Up to 3 deterministic, structured insights (kind + numbers). The UI maps
+  // each kind to localized copy — no inference, no fabrication. Honest "—"
+  // becomes the 'insufficient' kind when nothing reliable exists.
+  function positionInsights(assetId, list) {
+    var p = getPosition(assetId, list);
+    if (!p) return [];
+    var out = [];
+    if (p.isInvested && p.avgBuyPrice && p.currentPrice && p.gainLoss) {
+      out.push({ kind: 'costVsMarket', ticker: p.ticker, avgBase: p.avgBuyPrice.base, currentBase: p.currentPrice.base,
+                 pct: Math.abs(p.gainLoss.pct || 0), dir: (p.gainLoss.abs.usd >= 0 ? 'above' : 'below') });
+    }
+    if (p.realized && p.realized.usd > 0.005) {
+      out.push({ kind: 'realized', name: p.name || p.ticker, amountBase: p.realized.base });
+    }
+    if (p.weightInCategory != null) {
+      out.push({ kind: 'weightCategory', ticker: p.ticker, category: p.category.label, pct: p.weightInCategory });
+    }
+    return out.length ? out.slice(0, 3) : [{ kind: 'insufficient' }];
+  }
+
   /* ── Dev-only parity self-test ──────────────────────────────────────────── */
   function _approx(a, b, tol) { return Math.abs((Number(a) || 0) - (Number(b) || 0)) <= (tol == null ? 0.01 : tol); }
 
@@ -237,6 +300,8 @@
     calculateReturnPercent,
     calculateAllocation,
     computeSnapshot,
+    getPosition,
+    positionInsights,
     selfTest,
   };
 

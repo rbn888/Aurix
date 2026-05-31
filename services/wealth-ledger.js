@@ -208,6 +208,14 @@
   function getEvents()      { return (_ledger().events || []).slice(); }
   function isMigrated()     { return !!_ledger().ledgerMigrated; }
 
+  // Per-asset timeline (AURIX-ASSET-DETAIL-1) — events for one asset, oldest
+  // first. The detail screen's history consumes this directly (Ledger only).
+  function eventsForAsset(assetId, events) {
+    var arr = Array.isArray(events) ? events : (_ledger().events || []);
+    return arr.filter(function (e) { return e && e.assetId === assetId; })
+              .sort(function (a, b) { return (a.ts || 0) - (b.ts || 0); });
+  }
+
   /* ── One-time idempotent backfill (called on portfolio-ready) ───────────── */
   function ensureBackfill(list) {
     var L = _ledger();
@@ -297,6 +305,7 @@
     netContributions: netContributions,
     realizedFromLedger: realizedFromLedger,
     getEvents: getEvents,
+    eventsForAsset: eventsForAsset,
     isMigrated: isMigrated,
     ensureBackfill: ensureBackfill,
     selfTest: selfTest,
