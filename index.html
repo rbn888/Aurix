@@ -1065,6 +1065,10 @@
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
        Loads after app.js so it can read its primitives. No consumers yet. -->
   <script src="services/wealth-engine.js?v=1"></script>
+  <!-- AURIX-WEALTH-LEDGER-1: invisible event-ledger foundation (window.wealthLedger).
+       One-time idempotent backfill on 'aurix:portfolio-ready'. No write-path capture,
+       no UI, no DERIVED/RLS changes. -->
+  <script src="services/wealth-ledger.js?v=1"></script>
   <script src="services/prices.js"></script>
   <script src="aurora-bg.js"></script>
   <script src="orb.js"></script>

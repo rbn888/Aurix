@@ -3550,6 +3550,9 @@ function convertToNewModel(flatAssets) {
     quantity:  a.qty,
     avg_price: a.qty > 0 ? (a.costBasis || 0) / a.qty : 0,
     costBasis: a.costBasis || 0,
+    // AURIX-WEALTH-LEDGER-1: realized PnL is now durable (was local-only).
+    // Folds into the existing holdings jsonb column — no schema/RLS change.
+    realizedPnL: a.realizedPnL || 0,
     transactions: a.transactions || [],
   }));
   return { assets: catalogAssets, holdings };
@@ -3574,6 +3577,7 @@ function convertFromNewToFlat(catalogAssets, holdings) {
       change24h:     asset.change24h  ?? null,
       prevPrice:     asset.prevPrice  ?? null,
       costBasis:     h.costBasis,
+      realizedPnL:   h.realizedPnL || 0,
       transactions:  h.transactions || [],
       coinId:        asset.coinId     ?? null,
       marketSymbol:  asset.marketSymbol ?? null,
@@ -21506,6 +21510,11 @@ document.getElementById('appRoot').style.opacity = '0';
     if (portfolioData.assets.length > 0) {
       saveData({ assets: portfolioData.assets, holdings: portfolioData.holdings });
     }
+
+    // AURIX-WEALTH-LEDGER-1: portfolio is hydrated — signal so the (invisible)
+    // wealth-ledger can run its one-time, idempotent backfill. Additive only;
+    // no behaviour change if the listener/module is absent.
+    try { window.dispatchEvent(new CustomEvent('aurix:portfolio-ready')); } catch (_) {}
 
     // 2a. RESET-6 tombstone — restore sane defaults before any render so
     // stale UI prefs from the prior session never leak across the reload.
