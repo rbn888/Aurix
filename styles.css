@@ -413,7 +413,10 @@ button[aria-busy="true"] {
   letter-spacing: .38em;
   transform: scaleX(1.18) scaleY(0.86);
   transform-origin: center center;
-  animation: logo-enter .3s .05s var(--ease-out) both;
+  /* AURIX-PWA-FIRST-FRAME-CRITICAL-1: removed the `logo-enter` entrance
+     animation (translateY + opacity) — it was the visible wordmark "movement"
+     on boot. The mark now appears static at full opacity; the splash → header
+     handoff is a clean fade with no motion. */
   transition: opacity .15s, filter .15s;
   /* AURIX-BRAND-PREMIUM-HEADER-2 (B1): minimal institutional depth + glow —
      "se siente, no se ve" (was a stronger 0.25/0.12 aura). */
