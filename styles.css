@@ -36,9 +36,9 @@ select:focus-visible {
   --border-hi:   #303030;
   --accent:      var(--aurix-blue);  /* AURIX-DESIGN-SYSTEM-1: legacy accent → canonical blue */
   --accent-dim:  #1a2438;
-  --green:       #4ade80;
-  --green-dim:   rgba(74,222,128,.09);
-  --red:         #e05a5a;
+  --green:       var(--aurix-success);
+  --green-dim:   rgba(63, 191, 127,.09);
+  --red:         var(--aurix-danger);  /* AURIX-DESIGN-SYSTEM-1: → canonical danger */
   --orange:      #e0904a;
   --text:        #e2e2e2;
   --text-bright: rgba(255,255,255,0.92);
@@ -135,8 +135,8 @@ select:focus-visible {
   --color-text-tertiary:  rgba(255, 255, 255, 0.5);
 
   /* States */
-  --color-positive: #4CAF50;
-  --color-negative: #F44336;
+  --color-positive: var(--aurix-success);
+  --color-negative: var(--aurix-danger);
 
   /* ── Visual system ── */
   --bg-main:    #0B0F1A;
@@ -668,8 +668,8 @@ button[aria-busy="true"] {
 }
 .summary-perf.positive { color: var(--green); }
 .summary-perf.negative { color: var(--red); }
-.positive { text-shadow: 0 0 6px rgba(34,197,94,0.3); }
-.negative { text-shadow: 0 0 6px rgba(239,68,68,0.25); }
+.positive { text-shadow: 0 0 6px rgba(63, 191, 127,0.3); }
+.negative { text-shadow: 0 0 6px rgba(224, 90, 90,0.25); }
 
 .summary-meta {
   font-size: 12px;
@@ -762,7 +762,7 @@ button[aria-busy="true"] {
 .asset-badge.stock       { background: rgba(192,200,216,.15); color: #c0c8d8; }
 .asset-badge.etf         { background: rgba(143,157,186,.15); color: #8f9dba; }
 .asset-badge.metal       { background: rgba(212,168,67,.15);  color: #d4a843; }
-.asset-badge.cash        { background: rgba(74,222,128,.15);  color: #4ade80; }
+.asset-badge.cash        { background: rgba(63, 191, 127,.15);  color: var(--aurix-success); }
 .asset-badge.real_estate { background: rgba(167,139,250,.15); color: #a78bfa; }
 .asset-badge.other       { background: rgba(107,114,128,.15); color: #6b7280; }
 
@@ -931,8 +931,8 @@ button[aria-busy="true"] {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  background: rgba(74,222,128,.07);
-  border: 1px solid rgba(74,222,128,.18);
+  background: rgba(63, 191, 127,.07);
+  border: 1px solid rgba(63, 191, 127,.18);
   border-radius: 12px;
   padding: var(--space-2) var(--space-3);
   margin-bottom: 10px;
@@ -1018,7 +1018,7 @@ button[aria-busy="true"] {
 .btn-add-pos:hover {
   color: var(--green);
   background: var(--green-dim);
-  border-color: rgba(39,199,104,.25);
+  border-color: rgba(63, 191, 127,.25);
   transform: translateY(-1px);
 }
 .btn-reduce:hover {
@@ -1029,8 +1029,8 @@ button[aria-busy="true"] {
 }
 .btn-delete:hover {
   color: var(--red);
-  background: rgba(232,69,69,.10);
-  border-color: rgba(232,69,69,.25);
+  background: rgba(224, 90, 90,.10);
+  border-color: rgba(224, 90, 90,.25);
   transform: translateY(-1px);
 }
 .btn-add-pos:active,
@@ -1068,11 +1068,11 @@ button[aria-busy="true"] {
   border-radius: 50%;
   flex-shrink: 0;
 }
-.market-status.open   { color: #22c55e; }
-.market-status.closed { color: #ef4444; }
+.market-status.open   { color: var(--aurix-success); }
+.market-status.closed { color: var(--aurix-danger); }
 .market-status.crypto { color: #a855f7; }
-.market-status.open   .dot { background: #22c55e; animation: mkt-pulse 1.5s ease-in-out infinite; }
-.market-status.closed .dot { background: #ef4444; }
+.market-status.open   .dot { background: var(--aurix-success); animation: mkt-pulse 1.5s ease-in-out infinite; }
+.market-status.closed .dot { background: var(--aurix-danger); }
 .market-status.crypto .dot { background: #a855f7; }
 
 @keyframes mkt-pulse {
@@ -2558,11 +2558,11 @@ body.modal-open {
    it as different from the discovery-focused asset modal. The
    border + header hairline are subtle so the surface stays calm. */
 .modal--liquidity {
-  border-color: rgba(74, 222, 128, 0.18);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(74, 222, 128, 0.10) inset;
+  border-color: rgba(63, 191, 127, 0.18);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(63, 191, 127, 0.10) inset;
 }
 .modal--liquidity .modal-header {
-  border-bottom: 1px solid rgba(74, 222, 128, 0.16);
+  border-bottom: 1px solid rgba(63, 191, 127, 0.16);
 }
 .modal--liquidity .modal-header h3 {
   color: rgba(218, 246, 224, 0.96);
@@ -2592,13 +2592,13 @@ body.modal-open {
   transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
 }
 .liq-source-pill:hover {
-  background: rgba(74,222,128,0.08);
-  border-color: rgba(74,222,128,0.22);
+  background: rgba(63, 191, 127,0.08);
+  border-color: rgba(63, 191, 127,0.22);
   color: rgba(225,242,228,0.95);
 }
 .liq-source-pill.active {
-  background: rgba(74,222,128,0.16);
-  border-color: rgba(74,222,128,0.40);
+  background: rgba(63, 191, 127,0.16);
+  border-color: rgba(63, 191, 127,0.40);
   color: rgba(232,250,236,0.98);
 }
 .liq-source-pill:active { transform: scale(0.96); }
@@ -2690,7 +2690,7 @@ body.modal-open {
 .btn-submit--green {
   background: var(--green);
 }
-.btn-submit--green:hover { opacity: .93; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(74,222,128,.25); }
+.btn-submit--green:hover { opacity: .93; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(63, 191, 127,.25); }
 
 /* ── Hero view — full-screen overlay ───────────────────── */
 #hero-view {
@@ -3508,7 +3508,7 @@ body:not(.hero-active) #orb-canvas {
   font-size: 13px; font-weight: 700; line-height: 1; color: #fff;
 }
 .cat-glyph svg { width: 16px; height: 16px; display: block; }
-.cat-glyph--cash { color: #34d27f; background: rgba(39,199,104,0.14); }
+.cat-glyph--cash { color: var(--aurix-success); background: rgba(63, 191, 127,0.14); }
 .cat-glyph--re   svg { fill: #b6a6f3; }
 /* AURIX-DASHBOARD-PREMIUM-POLISH-1: the metal ingot is its own dimensional
    object — drop the flat glyph chip and let the SVG breathe a touch larger
@@ -3811,9 +3811,9 @@ body:not(.hero-active) #orb-canvas {
 }
 /* Ripple-glow for live status dots (status-dot.live, gold-live-dot) */
 @keyframes pulse-dot-glow {
-  0%   { box-shadow: 0 0 0 0   rgba(39,199,104,.55); }
-  65%  { box-shadow: 0 0 0 5px rgba(39,199,104,.0);  }
-  100% { box-shadow: 0 0 0 0   rgba(39,199,104,.0);  }
+  0%   { box-shadow: 0 0 0 0   rgba(63, 191, 127,.55); }
+  65%  { box-shadow: 0 0 0 5px rgba(63, 191, 127,.0);  }
+  100% { box-shadow: 0 0 0 0   rgba(63, 191, 127,.0);  }
 }
 @keyframes pulse-dot {
   from { opacity: .35; transform: scale(.75); }
@@ -4855,7 +4855,7 @@ body:not(.hero-active) #orb-canvas {
   inset: -30%;
   background:
     radial-gradient(circle 750px at 22% 32%, rgba(74, 130, 240,.10) 0%, transparent 60%),
-    radial-gradient(circle 600px at 80% 74%, rgba(39,199,104,.06) 0%, transparent 60%);
+    radial-gradient(circle 600px at 80% 74%, rgba(63, 191, 127,.06) 0%, transparent 60%);
   animation: beta-bg-drift 26s ease-in-out infinite alternate;
   pointer-events: none;
 }
@@ -5256,8 +5256,8 @@ body:not(.hero-active) #orb-canvas {
   margin: 5px 4px;
 }
 
-.menu-item--danger { color: #ff6b6b; }
-.menu-item--danger:hover { background: rgba(232,69,69,.10); color: #ff8585; }
+.menu-item--danger { color: var(--aurix-danger); }
+.menu-item--danger:hover { background: rgba(224, 90, 90,.10); color: var(--aurix-danger); }
 
 /* ── Menu currency toggle ─────────────────────────────── */
 .menu-curr-row {
@@ -5539,8 +5539,8 @@ body:not(.hero-active) #orb-canvas {
   padding: 3px 10px;
   border-radius: 20px;
 }
-.detail-hero-change.up   { background: rgba(39,199,104,.14); color: var(--green); }
-.detail-hero-change.down { background: rgba(232,69,69,.12);  color: var(--red);   }
+.detail-hero-change.up   { background: rgba(63, 191, 127,.14); color: var(--green); }
+.detail-hero-change.down { background: rgba(224, 90, 90,.12);  color: var(--red);   }
 .detail-hero-change.flat { background: rgba(107,116,148,.14); color: var(--text-muted); }
 
 .detail-hero-pct {
@@ -5859,7 +5859,7 @@ body:not(.hero-active) #orb-canvas {
 .dar-badge.stock       { background: rgba(192,200,216,.10); color: #c0c8d8; }
 .dar-badge.etf         { background: rgba(143,157,186,.12); color: #8f9dba; }
 .dar-badge.metal       { background: rgba(212,168,67,.15);  color: #d4a843; }
-.dar-badge.cash        { background: rgba(74,222,128,.12);  color: #4ade80; }
+.dar-badge.cash        { background: rgba(63, 191, 127,.12);  color: var(--aurix-success); }
 .dar-badge.real_estate { background: rgba(167,139,250,.14); color: #a78bfa; }
 /* Badge with logo — no coloured background in list view either */
 .dar-badge.badge--has-logo { background: none !important; box-shadow: none !important; }
@@ -5889,7 +5889,7 @@ body:not(.hero-active) #orb-canvas {
   font-size: 11px;
   font-weight: var(--font-weight-semibold);
   color: var(--green);
-  background: rgba(39,199,104,.10);
+  background: rgba(63, 191, 127,.10);
   border-radius: 4px;
   padding: 1px 5px;
 }
@@ -5918,8 +5918,8 @@ body:not(.hero-active) #orb-canvas {
   padding: 2px 7px;
   border-radius: 6px;
 }
-.dar-change.up   { background: rgba(39,199,104,.12); color: var(--green); }
-.dar-change.down { background: rgba(232,69,69,.10);  color: var(--red);   }
+.dar-change.up   { background: rgba(63, 191, 127,.12); color: var(--green); }
+.dar-change.down { background: rgba(224, 90, 90,.10);  color: var(--red);   }
 .dar-change.flat { background: rgba(107,116,148,.12); color: var(--text-muted); }
 
 .dar-cat-pct {
@@ -5957,8 +5957,8 @@ body:not(.hero-active) #orb-canvas {
               border-color var(--dur-fast) var(--ease-premium);
 }
 .dar-actions button:hover         { background: var(--bg-card-2); color: var(--text); border-color: var(--border-hi); }
-.dar-actions .btn-add-pos:hover   { color: var(--green); border-color: rgba(39,199,104,.30); background: rgba(39,199,104,.08); }
-.dar-actions .btn-delete:hover    { color: var(--red);   border-color: rgba(232,69,69,.30);  background: rgba(232,69,69,.08); }
+.dar-actions .btn-add-pos:hover   { color: var(--green); border-color: rgba(63, 191, 127,.30); background: rgba(63, 191, 127,.08); }
+.dar-actions .btn-delete:hover    { color: var(--red);   border-color: rgba(224, 90, 90,.30);  background: rgba(224, 90, 90,.08); }
 .dar-actions button:active {
   transform: scale(.88);
   filter: brightness(.80);
@@ -6136,14 +6136,14 @@ body:not(.hero-active) #orb-canvas {
   flex-shrink: 0;
 }
 .aes-confirm-btn:hover {
-  background: rgba(39,199,104,.12);
+  background: rgba(63, 191, 127,.12);
   color: var(--green);
-  border-color: rgba(39,199,104,.30);
+  border-color: rgba(63, 191, 127,.30);
 }
 .aes-cancel-btn:hover {
-  background: rgba(232,69,69,.08);
+  background: rgba(224, 90, 90,.08);
   color: var(--red);
-  border-color: rgba(232,69,69,.25);
+  border-color: rgba(224, 90, 90,.25);
 }
 .aes-confirm-btn:active,
 .aes-cancel-btn:active {
@@ -6796,7 +6796,7 @@ img {
 }
 .ad-tx-delete:hover {
   opacity: 1;
-  background: rgba(232,69,69,.12);
+  background: rgba(224, 90, 90,.12);
   color: var(--red);
 }
 
@@ -7392,8 +7392,8 @@ main { padding-bottom: 72px; }
 .tx-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
 
 .tx-type       { font-size: 11px; font-weight: 700; letter-spacing: .06em; }
-.tx-type.buy   { color: #4caf50; }
-.tx-type.sell  { color: #f44336; }
+.tx-type.buy   { color: var(--aurix-success); }
+.tx-type.sell  { color: var(--aurix-danger); }
 .tx-asset      { font-size: 13px; color: #ddd; }
 .tx-date       { font-size: 11px; color: #555; }
 .tx-main       { font-size: 13px; font-weight: var(--font-weight-semibold); color: #fff; }
@@ -7481,7 +7481,7 @@ main { padding-bottom: 72px; }
 }
 
 .ticker-change.positive { color: #27c768; }
-.ticker-change.negative { color: #ff5a5a; }
+.ticker-change.negative { color: var(--aurix-danger); }
 
 /* Watchlist preview */
 .watchlist-preview {
@@ -8051,7 +8051,7 @@ main { padding-bottom: 72px; }
 }
 
 @keyframes wl-price-down {
-  0%   { color: #ff4d4f; text-shadow: 0 0 6px rgba(255,77,79,0.35); transform: translateY(2px); }
+  0%   { color: var(--aurix-danger); text-shadow: 0 0 6px rgba(224, 90, 90,0.35); transform: translateY(2px); }
   100% { color: inherit; text-shadow: none; transform: translateY(0); }
 }
 
@@ -8129,7 +8129,7 @@ main { padding-bottom: 72px; }
 }
 
 .market-tab.active {
-  background: #16c784;
+  background: var(--aurix-success);
   color: #000;
   font-weight: 500;
 }
@@ -8153,16 +8153,16 @@ main { padding-bottom: 72px; }
 }
 
 .market-chg.up {
-  background: rgba(22,199,132,0.10);
-  color: #16c784;
+  background: rgba(63, 191, 127,0.10);
+  color: var(--aurix-success);
   border-radius: 6px;
   padding: 2px 6px;
   font-size: 12px;
 }
 
 .market-chg.down {
-  background: rgba(234,57,67,0.10);
-  color: #ea3943;
+  background: rgba(224, 90, 90,0.10);
+  color: var(--aurix-danger);
   border-radius: 6px;
   padding: 2px 6px;
   font-size: 12px;
@@ -8404,11 +8404,11 @@ main { padding-bottom: 72px; }
 }
 
 .market-my-assets .market-row {
-  background: rgba(22,199,132,0.04);
+  background: rgba(63, 191, 127,0.04);
 }
 
 .green { color: #00ff88; }
-.red   { color: #ff4d4d; }
+.red   { color: var(--aurix-danger); }
 
 .market-empty {
   padding: 40px;
@@ -8701,8 +8701,8 @@ main { padding-bottom: 72px; }
 .col-chart  { justify-content: flex-end; line-height: 0; opacity: 0.9; }
 .col-action { justify-content: flex-end; }
 
-.col-change.is-up   { color: #16c784; }
-.col-change.is-down { color: #ea3943; }
+.col-change.is-up   { color: var(--aurix-success); }
+.col-change.is-down { color: var(--aurix-danger); }
 
 .asset-wrapper {
   display: flex;
@@ -8765,13 +8765,13 @@ main { padding-bottom: 72px; }
 }
 
 .change.pos .change-pill {
-  background: rgba(34,197,94,0.12);
-  color: #22c55e;
+  background: rgba(63, 191, 127,0.12);
+  color: var(--aurix-success);
 }
 
 .change.neg .change-pill {
-  background: rgba(239,68,68,0.12);
-  color: #ef4444;
+  background: rgba(224, 90, 90,0.12);
+  color: var(--aurix-danger);
 }
 
 @media (min-width: 1024px) {
@@ -9052,8 +9052,8 @@ main { padding-bottom: 72px; }
   white-space: nowrap;
 }
 
-.insight.bullish { color: #22c55e; border: 1px solid rgba(34,197,94,0.2); }
-.insight.bearish { color: #ef4444; border: 1px solid rgba(239,68,68,0.2); }
+.insight.bullish { color: var(--aurix-success); border: 1px solid rgba(63, 191, 127,0.2); }
+.insight.bearish { color: var(--aurix-danger); border: 1px solid rgba(224, 90, 90,0.2); }
 .insight.neutral { color: #eab308; border: 1px solid rgba(234,179,8,0.2); }
 
 .insight {
@@ -9085,11 +9085,11 @@ main { padding-bottom: 72px; }
 
 /* Step 1–2: value transitions + flash */
 @keyframes flash-up {
-  0%   { background: rgba(34,197,94,0.18); }
+  0%   { background: rgba(63, 191, 127,0.18); }
   100% { background: transparent; }
 }
 @keyframes flash-down {
-  0%   { background: rgba(239,68,68,0.18); }
+  0%   { background: rgba(224, 90, 90,0.18); }
   100% { background: transparent; }
 }
 .value-flash-up   { animation: flash-up   0.45s ease forwards; }
@@ -9126,8 +9126,8 @@ main { padding-bottom: 72px; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.market-ticker-strip .t-up   { color: #22c55e; }
-.market-ticker-strip .t-down { color: #ef4444; }
+.market-ticker-strip .t-up   { color: var(--aurix-success); }
+.market-ticker-strip .t-down { color: var(--aurix-danger); }
 
 /* Step 6: featured card emphasis */
 .featured-card > div:nth-child(2) {
@@ -10534,7 +10534,7 @@ body.workspace-active .header {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ws-cockpit-chip.is-positive .ws-cockpit-chip-value { color: #6BD49A; }
+.ws-cockpit-chip.is-positive .ws-cockpit-chip-value { color: var(--aurix-success); }
 .ws-cockpit-chip.is-info     .ws-cockpit-chip-value { color: rgba(174,196,255,0.98); }
 .ws-cockpit-chip.is-warn     .ws-cockpit-chip-value { color: #E9A857; }
 .ws-cockpit-chip.is-high,
@@ -10542,7 +10542,7 @@ body.workspace-active .header {
 .ws-cockpit-chip.is-high     .ws-cockpit-chip-value,
 .ws-cockpit-chip.is-elevated .ws-cockpit-chip-value { color: #E9A857; }
 .ws-cockpit-chip.is-moderate .ws-cockpit-chip-value { color: rgba(174,196,255,0.98); }
-.ws-cockpit-chip.is-solid    .ws-cockpit-chip-value { color: #6BD49A; }
+.ws-cockpit-chip.is-solid    .ws-cockpit-chip-value { color: var(--aurix-success); }
 .ws-cockpit-chip.is-neutral  .ws-cockpit-chip-value { color: rgba(220,230,250,0.7); }
 
 /* Hero insight — single dominant card. Visually weightier than the
@@ -10635,7 +10635,7 @@ body.workspace-active .header {
   text-overflow: ellipsis;
 }
 .ws-diag-card.is-positive { border-color: rgba(63,191,127,0.22); }
-.ws-diag-card.is-positive .ws-diag-status { color: #6BD49A; }
+.ws-diag-card.is-positive .ws-diag-status { color: var(--aurix-success); }
 .ws-diag-card.is-info     { border-color: rgba(74, 130, 240,0.22); }
 .ws-diag-card.is-info     .ws-diag-status { color: rgba(174,196,255,0.98); }
 .ws-diag-card.is-warn     { border-color: rgba(233,168,87,0.26); }
@@ -10825,7 +10825,7 @@ body.workspace-active .header {
   white-space: normal;
 }
 .ws-intel-stat.is-positive .ws-intel-stat-value,
-.ws-intel-stat.is-solid    .ws-intel-stat-value { color: #6BD49A; }
+.ws-intel-stat.is-solid    .ws-intel-stat-value { color: var(--aurix-success); }
 .ws-intel-stat.is-info     .ws-intel-stat-value,
 .ws-intel-stat.is-moderate .ws-intel-stat-value { color: rgba(174, 196, 255, 0.98); }
 .ws-intel-stat.is-warn     .ws-intel-stat-value,
@@ -10937,7 +10937,7 @@ body.workspace-active .header {
   line-height: 1.5;
   color: rgba(220, 230, 250, 0.6);
 }
-.ws-intel-dim.is-positive .ws-intel-dim-state { color: #6BD49A; }
+.ws-intel-dim.is-positive .ws-intel-dim-state { color: var(--aurix-success); }
 .ws-intel-dim.is-info     .ws-intel-dim-state { color: rgba(174, 196, 255, 0.98); }
 .ws-intel-dim.is-warn     .ws-intel-dim-state { color: #E9A857; }
 .ws-intel-dim.is-neutral  .ws-intel-dim-state { color: rgba(220, 230, 250, 0.72); }
@@ -12792,7 +12792,7 @@ body.gs-open { overflow: hidden; }
   /* Tabs already padded to 22/22 in MOBILE PASS 1A; lift the active
      pill slightly so it visually pops above the surrounding chrome
      and never reads as clipped at the start of the scroll. */
-  .market-tab.active { box-shadow: 0 6px 18px -10px rgba(22,199,132,0.45); }
+  .market-tab.active { box-shadow: 0 6px 18px -10px rgba(63, 191, 127,0.45); }
 
   /* Discovery cards quieter — lower border alpha + reduced inner
      padding so the live monitoring table reaches the user faster. */
@@ -14705,11 +14705,11 @@ body.gs-open { overflow: hidden; }
   transform: translateY(0) scale(1);
 }
 .aurix-toast--success {
-  border-color: rgba(74, 222, 128, 0.32);
+  border-color: rgba(63, 191, 127, 0.32);
   box-shadow:
     0 14px 38px -10px rgba(2, 6, 14, 0.75),
-    0 0 0 1px rgba(74, 222, 128, 0.08) inset,
-    0 0 24px -8px rgba(74, 222, 128, 0.30);
+    0 0 0 1px rgba(63, 191, 127, 0.08) inset,
+    0 0 24px -8px rgba(63, 191, 127, 0.30);
 }
 .aurix-toast--error {
   border-color: rgba(224, 90, 90, 0.40);
@@ -15073,12 +15073,12 @@ body.gs-open { overflow: hidden; }
   line-height: 1;
 }
 .onb-success-art {
-  background: radial-gradient(circle at 50% 40%, rgba(74,222,128,0.30), rgba(74,222,128,0.0) 70%);
+  background: radial-gradient(circle at 50% 40%, rgba(63, 191, 127,0.30), rgba(63, 191, 127,0.0) 70%);
 }
 .onb-success-icon {
   font-size: 30px;
   font-weight: 700;
-  color: #4ade80;
+  color: var(--aurix-success);
   line-height: 1;
 }
 
@@ -15606,8 +15606,8 @@ body.gs-open { overflow: hidden; }
   color: var(--aurix-blue);
 }
 .aurix-signal[data-kind="performance"] .aurix-signal-icon {
-  background: rgba(74, 222, 128, 0.16);
-  color: #4ade80;
+  background: rgba(63, 191, 127, 0.16);
+  color: var(--aurix-success);
 }
 .aurix-signal[data-kind="loss"] .aurix-signal-icon {
   background: rgba(224, 144, 74, 0.16);
@@ -15663,7 +15663,7 @@ body.gs-open { overflow: hidden; }
 /* The state text reuses .aurix-signal-msg styling but should hug the title
    rather than stretch, so the line reads "PORTFOLIO HEALTH · State". */
 .aurix-signal--health .aurix-signal-msg { flex: 0 1 auto; }
-.aurix-signal[data-tone="solid"]    .aurix-signal-icon { color: #4ade80; }
+.aurix-signal[data-tone="solid"]    .aurix-signal-icon { color: var(--aurix-success); }
 .aurix-signal[data-tone="moderate"] .aurix-signal-icon { color: #7db8ff; }
 .aurix-signal[data-tone="elevated"] .aurix-signal-icon { color: #f4c45a; }
 .aurix-signal[data-tone="high"]     .aurix-signal-icon { color: #e0904a; }
@@ -15844,8 +15844,8 @@ body.gs-open { overflow: hidden; }
   .aurix-signal[data-kind="performance"] .aurix-signal-icon {
     background:
       linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.0) 60%),
-      rgba(74, 222, 128, 0.18);
-    border-color: rgba(74, 222, 128, 0.22);
+      rgba(63, 191, 127, 0.18);
+    border-color: rgba(63, 191, 127, 0.22);
   }
   .aurix-signal[data-kind="loss"] .aurix-signal-icon {
     background:
@@ -15936,7 +15936,7 @@ body.gs-open { overflow: hidden; }
   justify-content: center;
   position: relative;
   background:
-    conic-gradient(var(--health-ring-color, #4ade80) calc(var(--health-score, 0) * 1%),
+    conic-gradient(var(--health-ring-color, var(--aurix-success)) calc(var(--health-score, 0) * 1%),
                    rgba(255,255,255,0.06) 0);
   transition: --health-score 600ms var(--ease-premium);
 }
@@ -15997,7 +15997,7 @@ body.gs-open { overflow: hidden; }
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: var(--health-ring-color, #4ade80);
+  background: var(--health-ring-color, var(--aurix-success));
   width: 0%;
   transition: width 520ms var(--ease-premium), background 240ms var(--ease-out);
 }
@@ -16011,11 +16011,11 @@ body.gs-open { overflow: hidden; }
 }
 
 /* Score tone palette — driven by data-tone on the ring */
-.health-score-ring[data-tone="solid"]    { --health-ring-color: #4ade80; }
+.health-score-ring[data-tone="solid"]    { --health-ring-color: var(--aurix-success); }
 .health-score-ring[data-tone="moderate"] { --health-ring-color: var(--aurix-blue); }
 .health-score-ring[data-tone="elevated"] { --health-ring-color: #f4c45a; }
 .health-score-ring[data-tone="high"]     { --health-ring-color: #e0904a; }
-.health-score-ring[data-tone="solid"]    ~ .health-score-meta .health-score-tag { background: rgba(74, 222, 128, 0.16); color: #4ade80; }
+.health-score-ring[data-tone="solid"]    ~ .health-score-meta .health-score-tag { background: rgba(63, 191, 127, 0.16); color: var(--aurix-success); }
 .health-score-ring[data-tone="moderate"] ~ .health-score-meta .health-score-tag { background: rgba(74, 130, 240, 0.16); color: var(--aurix-blue); }
 .health-score-ring[data-tone="elevated"] ~ .health-score-meta .health-score-tag { background: rgba(244, 196, 90, 0.16); color: #f4c45a; }
 .health-score-ring[data-tone="high"]     ~ .health-score-meta .health-score-tag { background: rgba(224, 144, 74, 0.18); color: #e0904a; }
@@ -16088,8 +16088,8 @@ body.gs-open { overflow: hidden; }
 .health-card[data-tone="warn"]   .health-card-title { color: #f4c45a; }
 .health-card[data-tone="bad"]    { background: rgba(224, 144, 74, 0.08); border-color: rgba(224, 144, 74, 0.22); }
 .health-card[data-tone="bad"]    .health-card-title { color: #e0904a; }
-.health-card[data-tone="good"]   { background: rgba(74, 222, 128, 0.07); border-color: rgba(74, 222, 128, 0.20); }
-.health-card[data-tone="good"]   .health-card-title { color: #4ade80; }
+.health-card[data-tone="good"]   { background: rgba(63, 191, 127, 0.07); border-color: rgba(63, 191, 127, 0.20); }
+.health-card[data-tone="good"]   .health-card-title { color: var(--aurix-success); }
 .health-card[data-tone="info"]   { background: rgba(74, 130, 240, 0.07); border-color: rgba(74, 130, 240, 0.20); }
 .health-card[data-tone="info"]   .health-card-title { color: var(--aurix-blue); }
 
@@ -16316,8 +16316,8 @@ body.gs-open { overflow: hidden; }
   inset: 0;
   border-radius: 999px;
   background:
-    radial-gradient(circle at 50% 50%, rgba(74, 222, 128, 0.28) 0%, rgba(74, 222, 128, 0.0) 65%);
-  border: 1px solid rgba(74, 222, 128, 0.40);
+    radial-gradient(circle at 50% 50%, rgba(63, 191, 127, 0.28) 0%, rgba(63, 191, 127, 0.0) 65%);
+  border: 1px solid rgba(63, 191, 127, 0.40);
   animation: onb-success-pulse 1800ms var(--ease-premium) 1;
 }
 .onb-success-tick {
@@ -16325,7 +16325,7 @@ body.gs-open { overflow: hidden; }
   inset: 0;
   width: 100%; height: 100%;
   padding: 22px;
-  color: #4ade80;
+  color: var(--aurix-success);
   stroke-dasharray: 30;
   stroke-dashoffset: 30;
   animation: onb-tick-draw 600ms var(--ease-premium) 220ms forwards;
@@ -16346,9 +16346,9 @@ body.gs-open { overflow: hidden; }
   gap: 6px;
   padding: 5px 12px;
   border-radius: 999px;
-  background: rgba(74, 222, 128, 0.10);
-  color: #4ade80;
-  border: 1px solid rgba(74, 222, 128, 0.28);
+  background: rgba(63, 191, 127, 0.10);
+  color: var(--aurix-success);
+  border: 1px solid rgba(63, 191, 127, 0.28);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.005em;
@@ -16942,8 +16942,8 @@ body.gs-open { overflow: hidden; }
 .ad2-tx{ display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:12px; padding:13px 4px; border-bottom:1px solid var(--border-subtle); }
 .ad2-tx:last-child{ border-bottom:none; }
 .ad2-tx-type{ font-size:12px; font-weight:700; padding:3px 10px; border-radius:999px; background:rgba(255,255,255,.06); color:var(--text-muted); }
-.ad2-tx.up .ad2-tx-type{ color:var(--green); background:rgba(39,199,104,.12); }
-.ad2-tx.down .ad2-tx-type{ color:var(--red); background:rgba(239,68,68,.12); }
+.ad2-tx.up .ad2-tx-type{ color:var(--green); background:rgba(63, 191, 127,.12); }
+.ad2-tx.down .ad2-tx-type{ color:var(--red); background:rgba(224, 90, 90,.12); }
 .ad2-tx-meta{ font-size:13px; color:var(--text-muted); font-variant-numeric:tabular-nums; }
 .ad2-tx-amount{ font-size:14px; font-weight:600; color:var(--text-bright); font-variant-numeric:tabular-nums; }
 
@@ -16984,15 +16984,15 @@ body.gs-open { overflow: hidden; }
 .manage-act:hover{ background:rgba(255,255,255,.05); }
 .manage-act-ic{ width:26px; height:26px; flex:0 0 26px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; background:rgba(255,255,255,.06); color:var(--text-muted); font-size:15px; }
 .manage-act--danger{ color:var(--red); }
-.manage-act--danger .manage-act-ic{ color:var(--red); background:rgba(239,68,68,.12); }
+.manage-act--danger .manage-act-ic{ color:var(--red); background:rgba(224, 90, 90,.12); }
 .manage-chevron{ margin-left:auto; color:var(--text-muted); font-size:12px; }
 .manage-tx{ margin-top:8px; border-top:1px solid var(--border-subtle); padding-top:10px; max-height:240px; overflow:auto; }
 .manage-tx[hidden]{ display:none; }
 .mng-tx-row{ display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:10px; padding:9px 4px; border-bottom:1px solid var(--border-subtle); }
 .mng-tx-row:last-child{ border-bottom:none; }
 .mng-tx-type{ font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:rgba(255,255,255,.06); color:var(--text-muted); }
-.mng-tx-row.up .mng-tx-type{ color:var(--green); background:rgba(39,199,104,.12); }
-.mng-tx-row.down .mng-tx-type{ color:var(--red); background:rgba(239,68,68,.12); }
+.mng-tx-row.up .mng-tx-type{ color:var(--green); background:rgba(63, 191, 127,.12); }
+.mng-tx-row.down .mng-tx-type{ color:var(--red); background:rgba(224, 90, 90,.12); }
 .mng-tx-meta{ font-size:12px; color:var(--text-muted); font-variant-numeric:tabular-nums; }
 .mng-tx-amount{ font-size:13px; font-weight:600; color:var(--text-bright); font-variant-numeric:tabular-nums; }
 .mng-tx-empty{ color:var(--text-muted); font-size:13.5px; padding:8px 4px; }
