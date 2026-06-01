@@ -16931,15 +16931,19 @@ body.gs-open { overflow: hidden; }
   border-color: rgba(233, 168, 87, 0.3);
 }
 .aurix-ws-intel-mode .ws-exec-hero.is-warn .ws-exec-hero-watch-ic { color: var(--aurix-warning); }
+/* AURIX-BRAND-PREMIUM-HEADER-2 (P1): the hero is the Aurix brand surface, so it
+   stays blue-dominant even when the portfolio reads positive (slightly richer
+   blue than neutral). Green is reserved for the Health metric and Strength
+   signals — never the hero. */
 .aurix-ws-intel-mode .ws-exec-hero.is-positive {
-  border-color: rgba(63, 191, 127, 0.3);
+  border-color: var(--aurix-blue-border);
   background:
-    radial-gradient(125% 135% at 10% -10%, rgba(63, 191, 127, 0.15) 0%, rgba(63, 191, 127, 0.04) 36%, transparent 68%),
-    linear-gradient(162deg, rgba(16, 34, 27, 0.5) 0%, rgba(11, 16, 26, 0.92) 100%);
-  box-shadow: 0 26px 64px -36px rgba(63, 191, 127, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    radial-gradient(125% 135% at 10% -10%, rgba(74, 130, 240, 0.2) 0%, rgba(74, 130, 240, 0.055) 36%, transparent 68%),
+    linear-gradient(162deg, var(--aurix-surface) 0%, rgba(11, 16, 26, 0.92) 100%);
+  box-shadow: 0 26px 64px -36px var(--aurix-blue-glow), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
-.aurix-ws-intel-mode .ws-exec-hero.is-positive::before { background: linear-gradient(90deg, transparent, var(--aurix-success), transparent); }
-.aurix-ws-intel-mode .ws-exec-hero.is-positive .ws-exec-hero-eyebrow { color: var(--aurix-success); }
+.aurix-ws-intel-mode .ws-exec-hero.is-positive::before { background: linear-gradient(90deg, transparent, var(--aurix-blue), transparent); }
+.aurix-ws-intel-mode .ws-exec-hero.is-positive .ws-exec-hero-eyebrow { color: var(--aurix-blue-light); }
 
 /* Health Matrix — compact, terminal-grade, secondary to the hero. */
 .aurix-ws-intel-mode .ws-exec-matrix {
@@ -16949,6 +16953,8 @@ body.gs-open { overflow: hidden; }
   border-radius: 18px;
   border: 1px solid var(--aurix-border);
   background: linear-gradient(180deg, rgba(17, 23, 35, 0.7) 0%, rgba(10, 14, 22, 0.7) 100%);
+  /* AURIX-BRAND-PREMIUM-HEADER-2 (P1): Level-2 depth, secondary to the hero. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 26px -20px rgba(0, 0, 0, 0.55);
 }
 .aurix-ws-intel-mode .ws-exec-matrix-head {
   font-size: 10px;
@@ -16979,10 +16985,16 @@ body.gs-open { overflow: hidden; }
   font-size: 17px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums;
 }
 /* Tone mapping (engine tones → DS colors). */
+/* AURIX-BRAND-PREMIUM-HEADER-2 (P1): positive/solid reads Aurix blue across the
+   matrix to cut green dominance; only the Health row keeps green (Salud = verde). */
 .aurix-ws-intel-mode .ws-exec-metric.is-positive .ws-exec-metric-bar,
-.aurix-ws-intel-mode .ws-exec-metric.is-solid .ws-exec-metric-bar { background: var(--aurix-success); }
+.aurix-ws-intel-mode .ws-exec-metric.is-solid .ws-exec-metric-bar { background: var(--aurix-blue); }
 .aurix-ws-intel-mode .ws-exec-metric.is-positive .ws-exec-metric-value,
-.aurix-ws-intel-mode .ws-exec-metric.is-solid .ws-exec-metric-value { color: var(--aurix-success); }
+.aurix-ws-intel-mode .ws-exec-metric.is-solid .ws-exec-metric-value { color: var(--aurix-blue-light); }
+.aurix-ws-intel-mode .ws-exec-metric--health.is-positive .ws-exec-metric-bar,
+.aurix-ws-intel-mode .ws-exec-metric--health.is-solid .ws-exec-metric-bar { background: var(--aurix-success); }
+.aurix-ws-intel-mode .ws-exec-metric--health.is-positive .ws-exec-metric-value,
+.aurix-ws-intel-mode .ws-exec-metric--health.is-solid .ws-exec-metric-value { color: var(--aurix-success); }
 .aurix-ws-intel-mode .ws-exec-metric.is-warn .ws-exec-metric-bar,
 .aurix-ws-intel-mode .ws-exec-metric.is-elevated .ws-exec-metric-bar,
 .aurix-ws-intel-mode .ws-exec-metric.is-high .ws-exec-metric-bar { background: var(--aurix-warning); }
@@ -17027,9 +17039,12 @@ body.gs-open { overflow: hidden; }
   gap: 8px;
   padding: 19px 18px 20px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.025);
+  /* AURIX-BRAND-PREMIUM-HEADER-2 (P1): Level-2 material — subtle top-light
+     gradient + soft depth shadow so cards read as a clear tier below the hero. */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.012) 100%);
   border: 1px solid var(--aurix-border);
-  transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 26px -20px rgba(0, 0, 0, 0.55);
+  transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
 }
 .aurix-ws-intel-mode .ws-exec-dim:hover {
   border-color: var(--aurix-blue-border);
@@ -17044,7 +17059,7 @@ body.gs-open { overflow: hidden; }
   background: var(--aurix-blue);
   opacity: 0.7;
 }
-.aurix-ws-intel-mode .ws-exec-dim.is-positive::before { background: var(--aurix-success); }
+.aurix-ws-intel-mode .ws-exec-dim.is-positive::before { background: var(--aurix-blue); }
 .aurix-ws-intel-mode .ws-exec-dim.is-warn::before { background: var(--aurix-warning); }
 .aurix-ws-intel-mode .ws-exec-dim.is-neutral::before { background: var(--aurix-text-secondary); opacity: 0.4; }
 .aurix-ws-intel-mode .ws-exec-dim-head { display: flex; align-items: center; gap: 9px; }
@@ -17059,7 +17074,7 @@ body.gs-open { overflow: hidden; }
 .aurix-ws-intel-mode .ws-exec-dim-state {
   font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -0.01em;
 }
-.aurix-ws-intel-mode .ws-exec-dim.is-positive .ws-exec-dim-state { color: var(--aurix-success); }
+.aurix-ws-intel-mode .ws-exec-dim.is-positive .ws-exec-dim-state { color: var(--aurix-blue-light); }
 .aurix-ws-intel-mode .ws-exec-dim.is-warn .ws-exec-dim-state { color: var(--aurix-warning); }
 .aurix-ws-intel-mode .ws-exec-dim.is-info .ws-exec-dim-state { color: var(--aurix-blue-light); }
 .aurix-ws-intel-mode .ws-exec-dim-why {
@@ -17075,9 +17090,11 @@ body.gs-open { overflow: hidden; }
   align-items: start;
   padding: 16px 18px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.025);
+  /* AURIX-BRAND-PREMIUM-HEADER-2 (P1): Level-2 material, matching the dimensions. */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.012) 100%);
   border: 1px solid var(--aurix-border);
   border-left: 3px solid var(--aurix-blue);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 26px -20px rgba(0, 0, 0, 0.55);
   transition: border-color 0.16s ease, background 0.16s ease;
 }
 .aurix-ws-intel-mode .ws-exec-signal:hover { background: rgba(255, 255, 255, 0.04); }

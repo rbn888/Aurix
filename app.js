@@ -8444,7 +8444,7 @@ function _renderExecMatrix(intel) {
     const s = intel.status[key];
     if (!s) return '';
     return `
-      <div class="ws-exec-metric is-${_escapeWorkspaceText(s.tone || 'neutral')}">
+      <div class="ws-exec-metric ws-exec-metric--${key} is-${_escapeWorkspaceText(s.tone || 'neutral')}">
         <span class="ws-exec-metric-bar" aria-hidden="true"></span>
         <div class="ws-exec-metric-text">
           <span class="ws-exec-metric-label">${_escapeWorkspaceText(label[key])}</span>
