@@ -34,7 +34,7 @@ select:focus-visible {
   --bg-card-2:   #212121;
   --border:      #272727;
   --border-hi:   #303030;
-  --accent:      #4f8ef7;
+  --accent:      var(--aurix-blue);  /* AURIX-DESIGN-SYSTEM-1: legacy accent → canonical blue */
   --accent-dim:  #1a2438;
   --green:       #4ade80;
   --green-dim:   rgba(74,222,128,.09);
@@ -63,9 +63,31 @@ select:focus-visible {
   --glow-soft:   none;
   --glow-medium: none;
   --glow-strong: none;
-  /* Brand */
-  --aurix-blue:       #2bc8f2;
-  --aurix-blue-light: #4a82f0;
+  /* ════════ AURIX DESIGN SYSTEM v1 — canonical brand tokens (AURIX-DESIGN-SYSTEM-1)
+     Single source of truth. ONE blue + its states, one success / danger /
+     warning, one bg / card / border, two text levels. Legacy token names alias
+     into these (here and below) so existing rules stay coherent with no
+     per-rule edits. New rules must consume these, never raw literals. */
+  --aurix-blue:         #4A82F0;                 /* primary action: buttons, active tabs, focus, links */
+  --aurix-blue-hover:   #5A8EF3;                 /* hover / pressed lift */
+  --aurix-blue-soft:    rgba(74, 130, 240, .16); /* soft tint / fill */
+  --aurix-blue-border:  rgba(74, 130, 240, .28); /* active / accent border */
+  --aurix-blue-glow:    rgba(74, 130, 240, .35); /* glow color — use inside box-shadow */
+
+  --aurix-success:      #3fbf7f;
+  --aurix-danger:       #e05a5a;
+  --aurix-warning:      #e9a857;
+
+  --aurix-bg:           #070a14;
+  --aurix-card:         #11161f;
+  --aurix-border:       var(--aurix-blue-border);
+
+  --aurix-text:           rgba(255, 255, 255, 0.92);
+  --aurix-text-secondary: rgba(255, 255, 255, 0.62);
+
+  /* Legacy blue alias → canonical (the cyan #2bc8f2 is retired; do not assign
+     new literals to --aurix-blue-light). */
+  --aurix-blue-light:   var(--aurix-blue);
   /* Category palette */
   --color-crypto:      #2563EB;
   --color-real-estate: #7C3AED;
@@ -123,21 +145,19 @@ select:focus-visible {
   --surface-3:  rgba(255,255,255,0.08);
   --border-subtle: rgba(255,255,255,0.06);  /* alias of --color-border-subtle */
   --border-strong: rgba(255,255,255,0.10);  /* alias of --color-border-default */
-  --accent:        #2F6BFF;
+  --accent:        var(--aurix-blue);  /* AURIX-DESIGN-SYSTEM-1: legacy accent → canonical blue */
   --text-primary:  #FFFFFF;
   --text-secondary: rgba(255,255,255,0.7);
   --text-tertiary:  rgba(255,255,255,0.5);
 
-  /* UI-POLISH-1: Aurix premium surfaces. Additive — never reassign
-     legacy --bg-* / --surface-* vars (that would cascade everywhere).
-     New rules opt in by name. */
+  /* UI-POLISH-1 glass surfaces — additive (never reassign legacy --bg-* /
+     --surface-*). The blue tokens here now alias the canonical AURIX DESIGN
+     SYSTEM values above so the whole app reads as one blue. */
   --aurix-surface:    rgba(20, 30, 56, 0.55);
   --aurix-surface-2:  rgba(28, 42, 74, 0.48);
-  --aurix-border:     rgba(138, 166, 255, 0.18);
-  --aurix-border-hi:  rgba(138, 166, 255, 0.32);
-  --aurix-blue-soft:  rgba(138, 166, 255, 0.12);
-  --aurix-blue-fill:  rgba(74, 130, 240, 0.22);
-  --aurix-glow:       0 6px 22px -10px rgba(74, 130, 240, 0.45);
+  --aurix-border-hi:  var(--aurix-blue-border);
+  --aurix-blue-fill:  var(--aurix-blue-soft);
+  --aurix-glow:       0 6px 22px -10px var(--aurix-blue-glow);
 
   /* MODAL-SYSTEM-1: safe-area reservations for mobile modals so they
      never visually go under the bottom navigation. Bottom nav is
