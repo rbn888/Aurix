@@ -8125,13 +8125,15 @@ main { padding-bottom: 72px; }
   cursor: pointer;
   font-size: 13px;
   white-space: nowrap;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: background 0.16s ease, color 0.16s ease;
 }
 
 .market-tab.active {
-  background: var(--aurix-success);
-  color: #000;
-  font-weight: 500;
+  /* AURIX-DESIGN-SYSTEM-1: active tab is the canonical blue everywhere (was a
+     green fill on mobile while desktop was blue — single identity now). */
+  background: var(--aurix-blue-soft);
+  color: var(--aurix-blue-light);
+  font-weight: 600;
 }
 
 .market-featured {
@@ -12792,7 +12794,7 @@ body.gs-open { overflow: hidden; }
   /* Tabs already padded to 22/22 in MOBILE PASS 1A; lift the active
      pill slightly so it visually pops above the surrounding chrome
      and never reads as clipped at the start of the scroll. */
-  .market-tab.active { box-shadow: 0 6px 18px -10px rgba(63, 191, 127,0.45); }
+  .market-tab.active { box-shadow: 0 6px 18px -10px var(--aurix-blue-glow); }
 
   /* Discovery cards quieter — lower border alpha + reduced inner
      padding so the live monitoring table reaches the user faster. */
