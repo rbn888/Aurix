@@ -4258,33 +4258,49 @@ body:not(.hero-active) #orb-canvas {
     -webkit-backdrop-filter: blur(18px) saturate(140%);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
-  /* Logo left — no longer centered in a 1fr cell. AURIX-MOBILE-CATEGORY-POLISH-1
-     (#1): drop the desktop scaleX/scaleY transform on mobile (it squished the
-     mark and made it read as floating/too-high); a clean font size sits
-     vertically centred in the fixed-height bar. */
+  /* AURIX-LAUNCH-CRITICAL-MOBILE-1 (#2): AURIX centred in the mobile header
+     (roadmap requirement), hamburger/search on the right. The logo is taken
+     out of flow and absolutely centred across the full bar so it is optically
+     centred on the SCREEN regardless of the right-controls width. The
+     container is pointer-events:none (clicks pass through to the controls
+     underneath) while the wordmark itself stays tappable for "back home".
+     Vertical box starts below the status bar via the safe-area inset so the
+     mark never rides under the notch / Dynamic Island. Drop the desktop
+     scaleX/scaleY transform (it squished the mark and read as floating). */
   .header-left {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: env(safe-area-inset-top, 0px);
+    bottom: 0;
     grid-column: auto;
     justify-self: initial;
     display: flex;
     align-items: center;
+    justify-content: center;
+    pointer-events: none;
   }
   .logo-block {
-    align-items: flex-start;
+    align-items: center;
     margin-top: 0;
+    pointer-events: auto;
   }
   .logo-block .logo-aurix {
     transform: none;
     font-size: 20px;
     letter-spacing: 0.36em;
   }
-  /* Controls right — static (not absolutely pinned), so nothing floats. */
+  /* Controls right — static in flow, kept above the centred logo layer and
+     always clickable. */
   .header-right {
-    position: static;
+    position: relative;
+    z-index: 2;
     transform: none;
     right: auto;
     top: auto;
     grid-column: auto;
     justify-self: initial;
+    margin-left: auto;
     gap: 8px;
   }
 }
