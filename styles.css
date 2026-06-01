@@ -16817,6 +16817,309 @@ body.gs-open { overflow: hidden; }
   gap: 10px;
 }
 
+/* ════════ AURIX-WORKSPACE-EXECUTIVE-INTELLIGENCE-1 ═══════════════════════════
+   Desktop executive patrimonial report. Scoped entirely under
+   .aurix-ws-intel-mode (desktop intelligence mode) — no .is-mobile, sheet or
+   templates rule is touched. Built on Aurix Design System tokens. */
+
+/* Premium dark canvas (replaces the flat gray card look behind the report). */
+.aurix-ws-intel-mode.is-exec {
+  padding: 24px clamp(20px, 2.2vw, 34px) 32px;
+  gap: 22px;
+  background:
+    radial-gradient(140% 120% at 0% 0%, rgba(74, 130, 240, 0.05) 0%, transparent 46%),
+    linear-gradient(180deg, rgba(14, 19, 30, 0.72) 0%, rgba(8, 11, 18, 0.78) 100%);
+  border-color: var(--aurix-border);
+}
+
+/* ── Block 1 — Executive hero band (≈68% hero / ≈32% matrix) ── */
+.aurix-ws-intel-mode .ws-exec-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(290px, 0.47fr);
+  gap: 16px;
+  align-items: stretch;
+}
+@media (max-width: 1140px) {
+  .aurix-ws-intel-mode .ws-exec-band {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+}
+
+/* Hero — the dominant conclusion. */
+.aurix-ws-intel-mode .ws-exec-hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding: 30px 32px 30px;
+  border-radius: 22px;
+  border: 1px solid var(--aurix-blue-border);
+  background:
+    radial-gradient(125% 135% at 10% -10%, rgba(74, 130, 240, 0.18) 0%, rgba(74, 130, 240, 0.05) 36%, transparent 68%),
+    linear-gradient(162deg, var(--aurix-surface) 0%, rgba(11, 16, 26, 0.92) 100%);
+  box-shadow:
+    0 26px 64px -36px var(--aurix-blue-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.aurix-ws-intel-mode .ws-exec-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--aurix-blue), transparent);
+  opacity: 0.55;
+}
+.aurix-ws-intel-mode .ws-exec-hero-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--aurix-blue-light);
+}
+.aurix-ws-intel-mode .ws-exec-hero-title {
+  margin: 0;
+  font-size: clamp(23px, 2.3vw, 33px);
+  line-height: 1.13;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+  max-width: 28ch;
+}
+.aurix-ws-intel-mode .ws-exec-hero-lead {
+  margin: 2px 0 0;
+  font-size: 15.5px;
+  line-height: 1.5;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  max-width: 62ch;
+}
+.aurix-ws-intel-mode .ws-exec-hero-body {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.62;
+  color: var(--aurix-text-secondary);
+  max-width: 66ch;
+}
+.aurix-ws-intel-mode .ws-exec-hero-watch {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 7px 0 0;
+  padding: 12px 14px;
+  border-radius: 13px;
+  background: var(--aurix-blue-soft);
+  border: 1px solid var(--aurix-blue-border);
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.88);
+}
+.aurix-ws-intel-mode .ws-exec-hero-watch-ic { color: var(--aurix-blue-light); margin-top: 1px; }
+
+/* Hero tone variants — recolor the glow/border by severity, keep dominance. */
+.aurix-ws-intel-mode .ws-exec-hero.is-warn {
+  border-color: rgba(233, 168, 87, 0.32);
+  background:
+    radial-gradient(125% 135% at 10% -10%, rgba(233, 168, 87, 0.16) 0%, rgba(233, 168, 87, 0.04) 36%, transparent 68%),
+    linear-gradient(162deg, rgba(40, 31, 18, 0.55) 0%, rgba(11, 16, 26, 0.92) 100%);
+  box-shadow: 0 26px 64px -36px rgba(233, 168, 87, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.aurix-ws-intel-mode .ws-exec-hero.is-warn::before { background: linear-gradient(90deg, transparent, var(--aurix-warning), transparent); }
+.aurix-ws-intel-mode .ws-exec-hero.is-warn .ws-exec-hero-eyebrow { color: var(--aurix-warning); }
+.aurix-ws-intel-mode .ws-exec-hero.is-warn .ws-exec-hero-watch {
+  background: rgba(233, 168, 87, 0.12);
+  border-color: rgba(233, 168, 87, 0.3);
+}
+.aurix-ws-intel-mode .ws-exec-hero.is-warn .ws-exec-hero-watch-ic { color: var(--aurix-warning); }
+.aurix-ws-intel-mode .ws-exec-hero.is-positive {
+  border-color: rgba(63, 191, 127, 0.3);
+  background:
+    radial-gradient(125% 135% at 10% -10%, rgba(63, 191, 127, 0.15) 0%, rgba(63, 191, 127, 0.04) 36%, transparent 68%),
+    linear-gradient(162deg, rgba(16, 34, 27, 0.5) 0%, rgba(11, 16, 26, 0.92) 100%);
+  box-shadow: 0 26px 64px -36px rgba(63, 191, 127, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.aurix-ws-intel-mode .ws-exec-hero.is-positive::before { background: linear-gradient(90deg, transparent, var(--aurix-success), transparent); }
+.aurix-ws-intel-mode .ws-exec-hero.is-positive .ws-exec-hero-eyebrow { color: var(--aurix-success); }
+
+/* Health Matrix — compact, terminal-grade, secondary to the hero. */
+.aurix-ws-intel-mode .ws-exec-matrix {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 16px 6px;
+  border-radius: 18px;
+  border: 1px solid var(--aurix-border);
+  background: linear-gradient(180deg, rgba(17, 23, 35, 0.7) 0%, rgba(10, 14, 22, 0.7) 100%);
+}
+.aurix-ws-intel-mode .ws-exec-matrix-head {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--aurix-text-secondary);
+  padding: 0 2px 12px;
+  border-bottom: 1px solid var(--aurix-border);
+}
+.aurix-ws-intel-mode .ws-exec-metric {
+  display: grid;
+  grid-template-columns: 3px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.aurix-ws-intel-mode .ws-exec-metric:last-child { border-bottom: 0; }
+.aurix-ws-intel-mode .ws-exec-metric-bar { width: 3px; height: 26px; border-radius: 2px; background: var(--aurix-blue); }
+.aurix-ws-intel-mode .ws-exec-metric-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.aurix-ws-intel-mode .ws-exec-metric-label { font-size: 13px; font-weight: 600; color: #fff; }
+.aurix-ws-intel-mode .ws-exec-metric-sub {
+  font-size: 11px; color: var(--aurix-text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.aurix-ws-intel-mode .ws-exec-metric-value {
+  font-size: 17px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums;
+}
+/* Tone mapping (engine tones → DS colors). */
+.aurix-ws-intel-mode .ws-exec-metric.is-positive .ws-exec-metric-bar,
+.aurix-ws-intel-mode .ws-exec-metric.is-solid .ws-exec-metric-bar { background: var(--aurix-success); }
+.aurix-ws-intel-mode .ws-exec-metric.is-positive .ws-exec-metric-value,
+.aurix-ws-intel-mode .ws-exec-metric.is-solid .ws-exec-metric-value { color: var(--aurix-success); }
+.aurix-ws-intel-mode .ws-exec-metric.is-warn .ws-exec-metric-bar,
+.aurix-ws-intel-mode .ws-exec-metric.is-elevated .ws-exec-metric-bar,
+.aurix-ws-intel-mode .ws-exec-metric.is-high .ws-exec-metric-bar { background: var(--aurix-warning); }
+.aurix-ws-intel-mode .ws-exec-metric.is-warn .ws-exec-metric-value,
+.aurix-ws-intel-mode .ws-exec-metric.is-elevated .ws-exec-metric-value,
+.aurix-ws-intel-mode .ws-exec-metric.is-high .ws-exec-metric-value { color: var(--aurix-warning); }
+.aurix-ws-intel-mode .ws-exec-metric.is-info .ws-exec-metric-bar,
+.aurix-ws-intel-mode .ws-exec-metric.is-moderate .ws-exec-metric-bar { background: var(--aurix-blue); }
+.aurix-ws-intel-mode .ws-exec-metric.is-neutral .ws-exec-metric-bar { background: var(--aurix-text-secondary); opacity: 0.5; }
+
+/* ── Section framing (shared by Dimensions + Signals) ── */
+.aurix-ws-intel-mode .ws-exec-section { display: flex; flex-direction: column; gap: 13px; }
+.aurix-ws-intel-mode .ws-exec-section-title {
+  margin: 0;
+  padding-left: 2px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--aurix-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.aurix-ws-intel-mode .ws-exec-section-title::after {
+  content: ''; flex: 1; height: 1px; background: var(--aurix-border);
+}
+
+/* ── Block 2 — Portfolio Dimensions (clean cards, more air) ── */
+.aurix-ws-intel-mode .ws-exec-dim-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 1024px) {
+  .aurix-ws-intel-mode .ws-exec-dim-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.aurix-ws-intel-mode .ws-exec-dim {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 19px 18px 20px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--aurix-border);
+  transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+}
+.aurix-ws-intel-mode .ws-exec-dim:hover {
+  border-color: var(--aurix-blue-border);
+  background: rgba(74, 130, 240, 0.05);
+  transform: translateY(-2px);
+}
+.aurix-ws-intel-mode .ws-exec-dim::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 18px; right: 18px;
+  height: 2px; border-radius: 0 0 2px 2px;
+  background: var(--aurix-blue);
+  opacity: 0.7;
+}
+.aurix-ws-intel-mode .ws-exec-dim.is-positive::before { background: var(--aurix-success); }
+.aurix-ws-intel-mode .ws-exec-dim.is-warn::before { background: var(--aurix-warning); }
+.aurix-ws-intel-mode .ws-exec-dim.is-neutral::before { background: var(--aurix-text-secondary); opacity: 0.4; }
+.aurix-ws-intel-mode .ws-exec-dim-head { display: flex; align-items: center; gap: 9px; }
+.aurix-ws-intel-mode .ws-exec-dim-idx {
+  font-size: 11px; font-weight: 700; color: var(--aurix-blue-light);
+  font-variant-numeric: tabular-nums; opacity: 0.85;
+}
+.aurix-ws-intel-mode .ws-exec-dim-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--aurix-text-secondary);
+}
+.aurix-ws-intel-mode .ws-exec-dim-state {
+  font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -0.01em;
+}
+.aurix-ws-intel-mode .ws-exec-dim.is-positive .ws-exec-dim-state { color: var(--aurix-success); }
+.aurix-ws-intel-mode .ws-exec-dim.is-warn .ws-exec-dim-state { color: var(--aurix-warning); }
+.aurix-ws-intel-mode .ws-exec-dim.is-info .ws-exec-dim-state { color: var(--aurix-blue-light); }
+.aurix-ws-intel-mode .ws-exec-dim-why {
+  margin: 0; font-size: 13px; line-height: 1.5; color: var(--aurix-text-secondary);
+}
+
+/* ── Block 3 — Signals as actionable conclusions ── */
+.aurix-ws-intel-mode .ws-exec-signal-stack { display: flex; flex-direction: column; gap: 10px; }
+.aurix-ws-intel-mode .ws-exec-signal {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 14px;
+  align-items: start;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--aurix-border);
+  border-left: 3px solid var(--aurix-blue);
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+.aurix-ws-intel-mode .ws-exec-signal:hover { background: rgba(255, 255, 255, 0.04); }
+.aurix-ws-intel-mode .ws-exec-signal.is-strength  { border-left-color: var(--aurix-success); }
+.aurix-ws-intel-mode .ws-exec-signal.is-attention { border-left-color: var(--aurix-warning); }
+.aurix-ws-intel-mode .ws-exec-signal.is-risk      { border-left-color: var(--aurix-danger); }
+.aurix-ws-intel-mode .ws-exec-signal.is-context   { border-left-color: var(--aurix-blue); }
+.aurix-ws-intel-mode .ws-exec-signal-ic {
+  width: 40px; height: 40px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 700;
+  background: var(--aurix-blue-soft); color: var(--aurix-blue-light);
+  border: 1px solid var(--aurix-blue-border);
+}
+.aurix-ws-intel-mode .ws-exec-signal.is-strength .ws-exec-signal-ic {
+  background: rgba(63, 191, 127, 0.14); color: var(--aurix-success); border-color: rgba(63, 191, 127, 0.3);
+}
+.aurix-ws-intel-mode .ws-exec-signal.is-attention .ws-exec-signal-ic {
+  background: rgba(233, 168, 87, 0.14); color: var(--aurix-warning); border-color: rgba(233, 168, 87, 0.3);
+}
+.aurix-ws-intel-mode .ws-exec-signal.is-risk .ws-exec-signal-ic {
+  background: rgba(224, 90, 90, 0.14); color: var(--aurix-danger); border-color: rgba(224, 90, 90, 0.3);
+}
+.aurix-ws-intel-mode .ws-exec-signal-body { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.aurix-ws-intel-mode .ws-exec-signal-head { display: flex; align-items: center; gap: 10px; }
+.aurix-ws-intel-mode .ws-exec-signal-level {
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--aurix-blue-light);
+}
+.aurix-ws-intel-mode .ws-exec-signal.is-strength  .ws-exec-signal-level { color: var(--aurix-success); }
+.aurix-ws-intel-mode .ws-exec-signal.is-attention .ws-exec-signal-level { color: var(--aurix-warning); }
+.aurix-ws-intel-mode .ws-exec-signal.is-risk      .ws-exec-signal-level { color: var(--aurix-danger); }
+.aurix-ws-intel-mode .ws-exec-signal-cat {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--aurix-text-secondary);
+}
+.aurix-ws-intel-mode .ws-exec-signal-cat::before { content: '·'; margin-right: 8px; opacity: 0.5; }
+.aurix-ws-intel-mode .ws-exec-signal-title { font-size: 15px; font-weight: 700; color: #fff; line-height: 1.3; }
+.aurix-ws-intel-mode .ws-exec-signal-msg {
+  margin: 0; font-size: 13px; line-height: 1.55; color: var(--aurix-text-secondary);
+}
+
 /* Templates mode — polished placeholder gallery. */
 .aurix-workspace-shell[data-ws-mode="templates"] {
   overflow: hidden;

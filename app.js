@@ -1171,6 +1171,13 @@ const T = {
     ws_intel_explainer:       'Aurix interpreta estructura, riesgo, concentración y resiliencia.',
     ws_intel_section_dimensions: 'Dimensiones de cartera',
     ws_intel_section_signals:    'Señales explicadas',
+    // AURIX-WORKSPACE-EXECUTIVE-INTELLIGENCE-1 — desktop executive report
+    ws_exec_eyebrow:      'Inteligencia ejecutiva',
+    ws_exec_matrix_title: 'Salud del patrimonio',
+    ws_exec_sig_strength:  'Fortaleza',
+    ws_exec_sig_attention: 'Atención',
+    ws_exec_sig_risk:      'Riesgo',
+    ws_exec_sig_context:   'Contexto',
     // status strip labels (shared with diag grid)
     ws_intel_status_health:        'Salud',
     ws_intel_status_risk:          'Riesgo',
@@ -2341,6 +2348,13 @@ const T = {
     ws_intel_explainer:       'Aurix interprets structure, risk, concentration and resilience.',
     ws_intel_section_dimensions: 'Portfolio dimensions',
     ws_intel_section_signals:    'Explained signals',
+    // AURIX-WORKSPACE-EXECUTIVE-INTELLIGENCE-1 — desktop executive report
+    ws_exec_eyebrow:      'Executive intelligence',
+    ws_exec_matrix_title: 'Portfolio health',
+    ws_exec_sig_strength:  'Strength',
+    ws_exec_sig_attention: 'Attention',
+    ws_exec_sig_risk:      'Risk',
+    ws_exec_sig_context:   'Context',
     ws_intel_status_health:        'Health',
     ws_intel_status_risk:          'Risk',
     ws_intel_status_diversif:      'Diversification',
@@ -8381,13 +8395,128 @@ function _renderWorkspaceIntelligenceMode() {
     `;
   }
   return `
-    <main class="aurix-ws-intel-mode">
-      ${_renderIntelHeaderHtml()}
-      <section class="ws-intel-stats ws-intel-stats--desktop">${_renderIntelStatusStripHtml(intel)}</section>
-      ${_renderIntelHeroHtml(intel)}
-      ${_renderIntelDimensionsHtml(intel)}
-      ${_renderIntelSignalsHtml(intel)}
+    <main class="aurix-ws-intel-mode is-exec">
+      ${_renderExecHeroBand(intel)}
+      ${_renderExecDimensions(intel)}
+      ${_renderExecSignals(intel)}
     </main>
+  `;
+}
+
+/* ════════ AURIX-WORKSPACE-EXECUTIVE-INTELLIGENCE-1 ════════════════════════════
+   Desktop "executive patrimonial report" presentation. PURELY presentational:
+   every value is read from the unchanged intel object built by
+   _aurixWorkspaceIntelligence() (status / hero / dimensions / signals). The new
+   .ws-exec-* classes are scoped under .aurix-ws-intel-mode and are NOT used by
+   the mobile cockpit (_renderWorkspaceMobile), the sheet mode or the templates
+   mode, so the redesign is fully encapsulated to desktop intelligence. No
+   logic, calculation, scoring or data shape is touched here. */
+
+// Block 1 — Executive Intelligence Hero (dominant insight) + compact Health Matrix.
+function _renderExecHeroBand(intel) {
+  const h = intel && intel.hero ? intel.hero : {};
+  const sev = _escapeWorkspaceText(h.severity || 'neutral');
+  const hero = `
+    <section class="ws-exec-hero is-${sev}">
+      <div class="ws-exec-hero-eyebrow">${_escapeWorkspaceText(t('ws_exec_eyebrow'))}</div>
+      <h2 class="ws-exec-hero-title">${_escapeWorkspaceText(h.title || '')}</h2>
+      ${h.summary     ? `<p class="ws-exec-hero-lead">${_escapeWorkspaceText(h.summary)}</p>` : ''}
+      ${h.explanation ? `<p class="ws-exec-hero-body">${_escapeWorkspaceText(h.explanation)}</p>` : ''}
+      ${h.optionalHint
+        ? `<p class="ws-exec-hero-watch"><span class="ws-exec-hero-watch-ic" aria-hidden="true">◆</span><span>${_escapeWorkspaceText(h.optionalHint)}</span></p>`
+        : ''}
+    </section>
+  `;
+  return `<div class="ws-exec-band">${hero}${_renderExecMatrix(intel)}</div>`;
+}
+
+// Compact, terminal-style Health Matrix (Health / Risk / Diversification / Liquidity).
+function _renderExecMatrix(intel) {
+  if (!intel || !intel.status) return '';
+  const order = ['health', 'risk', 'diversification', 'liquidity'];
+  const label = {
+    health:          t('ws_intel_status_health'),
+    risk:            t('ws_intel_status_risk'),
+    diversification: t('ws_intel_status_diversif'),
+    liquidity:       t('ws_intel_status_liquidity'),
+  };
+  const rows = order.map(key => {
+    const s = intel.status[key];
+    if (!s) return '';
+    return `
+      <div class="ws-exec-metric is-${_escapeWorkspaceText(s.tone || 'neutral')}">
+        <span class="ws-exec-metric-bar" aria-hidden="true"></span>
+        <div class="ws-exec-metric-text">
+          <span class="ws-exec-metric-label">${_escapeWorkspaceText(label[key])}</span>
+          <span class="ws-exec-metric-sub">${_escapeWorkspaceText(s.sub || '')}</span>
+        </div>
+        <span class="ws-exec-metric-value">${_escapeWorkspaceText(s.value)}</span>
+      </div>
+    `;
+  }).join('');
+  return `
+    <aside class="ws-exec-matrix" aria-label="${_escapeWorkspaceText(t('ws_exec_matrix_title'))}">
+      <div class="ws-exec-matrix-head">${_escapeWorkspaceText(t('ws_exec_matrix_title'))}</div>
+      <div class="ws-exec-matrix-list">${rows}</div>
+    </aside>
+  `;
+}
+
+// Block 2 — Portfolio Dimensions (clean explanatory cards).
+function _renderExecDimensions(intel) {
+  if (!intel || !Array.isArray(intel.dimensions) || !intel.dimensions.length) return '';
+  const cards = intel.dimensions.map((d, i) => `
+    <article class="ws-exec-dim is-${_escapeWorkspaceText(d.tone || 'neutral')}">
+      <div class="ws-exec-dim-head">
+        <span class="ws-exec-dim-idx">${String(i + 1).padStart(2, '0')}</span>
+        <span class="ws-exec-dim-label">${_escapeWorkspaceText(d.label)}</span>
+      </div>
+      <div class="ws-exec-dim-state">${_escapeWorkspaceText(d.state)}</div>
+      <p class="ws-exec-dim-why">${_escapeWorkspaceText(d.why)}</p>
+    </article>
+  `).join('');
+  return `
+    <section class="ws-exec-section ws-exec-dimensions" aria-label="${_escapeWorkspaceText(t('ws_intel_section_dimensions'))}">
+      <h3 class="ws-exec-section-title">${_escapeWorkspaceText(t('ws_intel_section_dimensions'))}</h3>
+      <div class="ws-exec-dim-grid">${cards}</div>
+    </section>
+  `;
+}
+
+// Block 3 — Signals as actionable conclusions (Strength / Attention / Risk / Context).
+function _renderExecSignals(intel) {
+  if (!intel || !Array.isArray(intel.signals) || !intel.signals.length) return '';
+  // Presentational map: engine severity → executive level badge.
+  const LEVEL = {
+    positive: { cls: 'strength',  key: 'ws_exec_sig_strength',  ic: '▲' },
+    warn:     { cls: 'attention', key: 'ws_exec_sig_attention', ic: '!' },
+    critical: { cls: 'risk',      key: 'ws_exec_sig_risk',      ic: '▼' },
+    high:     { cls: 'risk',      key: 'ws_exec_sig_risk',      ic: '▼' },
+    danger:   { cls: 'risk',      key: 'ws_exec_sig_risk',      ic: '▼' },
+    info:     { cls: 'context',   key: 'ws_exec_sig_context',   ic: '◆' },
+    neutral:  { cls: 'context',   key: 'ws_exec_sig_context',   ic: '◆' },
+  };
+  const rows = intel.signals.map(s => {
+    const lv = LEVEL[s.severity] || LEVEL.neutral;
+    return `
+      <article class="ws-exec-signal is-${lv.cls}">
+        <span class="ws-exec-signal-ic" aria-hidden="true">${lv.ic}</span>
+        <div class="ws-exec-signal-body">
+          <div class="ws-exec-signal-head">
+            <span class="ws-exec-signal-level">${_escapeWorkspaceText(t(lv.key))}</span>
+            <span class="ws-exec-signal-cat">${_escapeWorkspaceText(s.category)}</span>
+          </div>
+          <div class="ws-exec-signal-title">${_escapeWorkspaceText(s.title)}</div>
+          <p class="ws-exec-signal-msg">${_escapeWorkspaceText(s.explanation)}</p>
+        </div>
+      </article>
+    `;
+  }).join('');
+  return `
+    <section class="ws-exec-section ws-exec-signals" aria-label="${_escapeWorkspaceText(t('ws_intel_section_signals'))}">
+      <h3 class="ws-exec-section-title">${_escapeWorkspaceText(t('ws_intel_section_signals'))}</h3>
+      <div class="ws-exec-signal-stack">${rows}</div>
+    </section>
   `;
 }
 
