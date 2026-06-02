@@ -15771,6 +15771,51 @@ body.gs-open { overflow: hidden; }
     border-color: rgba(74,130,240,0.24);
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   AURIX-WEALTH-CARD-PREMIUM-DESKTOP-1 — flagship polish, DESKTOP ≥1024 ONLY.
+   Mobile + tablet (<1024) are frozen: every rule below is inside the query,
+   so those breakpoints are pixel-identical. Refine, don't redesign.
+   ════════════════════════════════════════════════════════════════════ */
+@keyframes aurixVerAnalisisSheen {
+  /* Long pause (off-screen), then one slow left→right sweep ≈ every 8s. */
+  0%, 72% { transform: translateX(-140%); }
+  88%     { transform: translateX(140%); }
+  100%    { transform: translateX(140%); }
+}
+@media (min-width: 1024px) {
+  /* Wealth area: the figure reads as MORE important without being larger —
+     a layered shadow lifts it off the surface (depth, not size/colour/neon). */
+  .hero-left .summary-total {
+    text-shadow: 0 1px 1px rgba(0,0,0,0.22), 0 0 18px rgba(255,255,255,0.16);
+  }
+  /* Composition balance: a touch more bottom breathing so the column reads
+     designed, not top-stacked. (hero-left is shorter than the chart column,
+     so this does not change the card height.) */
+  .hero-left { padding-bottom: 32px; }
+  /* "Añadir liquidez" — equal-weight contrast at desktop. Stays NEUTRAL
+     (not Aurix-blue), so it reads as an equal action, never a second primary. */
+  .summary-footer .btn-summary-action.btn-secondary {
+    background: rgba(255,255,255,0.055);
+    border-color: rgba(255,255,255,0.22);
+  }
+  /* "Ver análisis" — extremely subtle, low-frequency travelling glow.
+     "Aurix is analysing", not "there is an animation". The static blue glow
+     (base rule) stays; this adds a faint sheen that sweeps once ≈ every 8s. */
+  .aurix-signal--health .aurix-signal-cta { position: relative; overflow: hidden; }
+  .aurix-signal--health .aurix-signal-cta::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 38%, rgba(122,166,255,0.20) 50%, transparent 62%);
+    transform: translateX(-140%);
+    animation: aurixVerAnalisisSheen 8s var(--ease-out) infinite;
+    pointer-events: none;
+  }
+}
+@media (min-width: 1024px) and (prefers-reduced-motion: reduce) {
+  .aurix-signal--health .aurix-signal-cta::after { animation: none; opacity: 0; }
+}
 /* Tiny, subtle health dot — no glow ring, no status orb, so it never
    competes with the sync dot in the meta row above. */
 .hero-left .aurix-signal .aurix-signal-icon {
