@@ -377,6 +377,150 @@ function _persistEmptyPortfolioIfNeeded(reason) {
   } catch (_) {}
 }
 
+// ── AURIX-PERSISTENCE-REMOTE-HISTORY-WATCHLIST-1 ───────────────────────
+// Histórico (portfolio_history / category_history) and the watchlist were
+// local-only, so the iOS standalone PWA (a SEPARATE storage container from
+// Safari) showed them empty and deleting/recreating the home-screen shortcut
+// wiped them. They now ride in user_portfolios alongside assets/holdings.
+//
+//   • History    → union-by-ts merge on load (monotonic, never shrinks
+//                   except via the existing reset epoch / tombstone).
+//   • Watchlist  → last-write-wins by `watchlist_updated_at`, so explicit
+//                   deletions stick. Pre-existing (unstamped) lists union
+//                   once during migration to guarantee zero data loss.
+//
+// localStorage stays the hot path (recordSnapshot is untouched); a throttled
+// flush mirrors state to Supabase (≤1/60s) plus an immediate flush on
+// pagehide/visibilitychange so nothing is lost when the PWA backgrounds.
+const WATCHLIST_TS_KEY = 'aurix_watchlist_updated_at';
+let _bootLoadComplete  = false;
+let _stateFlushTimer   = null;
+let _lastStateFlushMs  = 0;
+
+function _aurixWatchlistTs() {
+  try { return parseInt(localStorage.getItem(WATCHLIST_TS_KEY) || '0', 10) || 0; }
+  catch (_) { return 0; }
+}
+
+// Union two history arrays by timestamp (last write per ts wins), keep only
+// finite positive values, sort ascending, then apply the reset epoch guard —
+// mirrors loadHistory() exactly so the merged in-memory array stays clean.
+function _mergeHistoryByTs(localArr, remoteArr) {
+  const all = []
+    .concat(Array.isArray(localArr)  ? localArr  : [])
+    .concat(Array.isArray(remoteArr) ? remoteArr : []);
+  const valid = all.filter(p =>
+    p && typeof p.ts === 'number' &&
+    typeof p.value === 'number' && isFinite(p.value) && p.value > 0);
+  const deduped = Object.values(valid.reduce((acc, p) => { acc[p.ts] = p; return acc; }, {}));
+  return _aurixFilterAfterEpoch(deduped.sort((a, b) => a.ts - b.ts), 'ts');
+}
+
+// Same as above for category snapshots (total >= 0; mirrors loadCategoryHistory).
+function _mergeCategoryByTs(localArr, remoteArr) {
+  const all = []
+    .concat(Array.isArray(localArr)  ? localArr  : [])
+    .concat(Array.isArray(remoteArr) ? remoteArr : []);
+  const valid = all.filter(p =>
+    p && typeof p.ts === 'number' &&
+    typeof p.total === 'number' && isFinite(p.total) && p.total >= 0);
+  const deduped = Object.values(valid.reduce((acc, p) => { acc[p.ts] = p; return acc; }, {}));
+  return _aurixFilterAfterEpoch(deduped.sort((a, b) => a.ts - b.ts), 'ts');
+}
+
+// Reconcile remote state into local memory + localStorage at boot. Called
+// from initPortfolioData with the row from loadPortfolioFromBackend.
+function _mergeRemoteState(remoteRow) {
+  try {
+    const distrust = (typeof _shouldDistrustRemote === 'function') && _shouldDistrustRemote(remoteRow);
+
+    // ── History (union-by-ts). If the local reset tombstone is newer than
+    //    the remote row, ignore remote history so a reset never resurrects.
+    const remoteHist = (!distrust && remoteRow && Array.isArray(remoteRow.portfolio_history)) ? remoteRow.portfolio_history : [];
+    const remoteCat  = (!distrust && remoteRow && Array.isArray(remoteRow.category_history))  ? remoteRow.category_history  : [];
+    portfolioHistory = _mergeHistoryByTs(portfolioHistory, remoteHist);
+    categoryHistory  = _mergeCategoryByTs(categoryHistory, remoteCat);
+    try { saveHistory(); } catch (_) {}
+    try { saveCategoryHistory(); } catch (_) {}
+
+    // ── Watchlist (last-write-wins, deletion-preserving).
+    const remoteTs   = (!distrust && remoteRow && remoteRow.watchlist_updated_at)
+      ? new Date(remoteRow.watchlist_updated_at).getTime() : 0;
+    const localTs    = _aurixWatchlistTs();
+    const remoteList = (!distrust && remoteRow && Array.isArray(remoteRow.watchlist)) ? remoteRow.watchlist : [];
+    const localList  = (typeof getWatchlist === 'function') ? getWatchlist() : [];
+
+    if (localTs > 0) {
+      // Both sides participate in the timestamp protocol → pure LWW.
+      if (remoteTs > localTs) {
+        try { watchlistStore._hydrate(remoteList); } catch (_) {}
+        try { localStorage.setItem(WATCHLIST_TS_KEY, String(remoteTs)); } catch (_) {}
+      }
+    } else {
+      // Local is unstamped (legacy / pre-migration). NEVER let it be silently
+      // overwritten — union with remote so no real symbol is lost, then stamp
+      // so the union becomes authoritative and propagates. Steady-state LWW
+      // (and deletion stickiness) takes over once both sides are stamped.
+      const union = Array.from(new Set([].concat(localList, remoteList)));
+      try { watchlistStore._hydrate(union); } catch (_) {}
+      const stamp = Math.max(Date.now(), remoteTs + 1);
+      try { localStorage.setItem(WATCHLIST_TS_KEY, String(stamp)); } catch (_) {}
+    }
+
+    // Boot load is complete; enable flushing and schedule the migration write
+    // (idempotent — union/LWW converge, so re-running is harmless).
+    _bootLoadComplete = true;
+    scheduleStateFlush();
+  } catch (e) {
+    if (IS_DEV) console.warn('[STATE] merge failed', e);
+    _bootLoadComplete = true; // never block flushing on a merge hiccup
+  }
+}
+
+function scheduleStateFlush() {
+  if (!_bootLoadComplete) return;
+  try { clearTimeout(_stateFlushTimer); } catch (_) {}
+  _stateFlushTimer = setTimeout(() => { _flushStatePersistence('debounced'); }, 2000);
+}
+
+async function _flushStatePersistence(reason) {
+  if (!supabaseClient || !currentUser) return;
+  if (typeof _aurixResetInProgress !== 'undefined' && _aurixResetInProgress) return;
+  // Throttle to ≤1 write / 60s, except forced lifecycle flushes (pagehide /
+  // visibilitychange) which must always persist before the app backgrounds.
+  const now = Date.now();
+  if (reason !== 'lifecycle' && _lastStateFlushMs && now - _lastStateFlushMs < 60_000) {
+    scheduleStateFlush(); // ensure the latest state still lands after the window
+    return;
+  }
+  _lastStateFlushMs = now;
+  try {
+    const localTs   = _aurixWatchlistTs();
+    const localData = getPortfolioData();
+    // assets/holdings are authoritative in localStorage post boot-load (the
+    // _bootLoadComplete gate guarantees the remote row was already merged in),
+    // so writing them here cannot clobber a populated remote with empty local.
+    const catalog   = (localData && localData.source === 'new') ? localData.assets   : [];
+    const holdings  = (localData && localData.source === 'new') ? localData.holdings  : {};
+    const { error } = await supabaseClient
+      .from('user_portfolios')
+      .upsert({
+        user_id:              currentUser.id,
+        assets:               catalog,
+        holdings,
+        portfolio_history:    portfolioHistory,
+        category_history:     categoryHistory,
+        watchlist:            (typeof getWatchlist === 'function') ? getWatchlist() : [],
+        watchlist_updated_at: localTs > 0 ? new Date(localTs).toISOString() : null,
+        updated_at:           new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+    if (error) throw error;
+    if (IS_DEV) console.log('[STATE] flush ok (' + reason + ') hist=' + portfolioHistory.length + ' cat=' + categoryHistory.length);
+  } catch (e) {
+    if (IS_DEV) console.warn('[STATE] flush failed (' + reason + ')', e && e.message);
+  }
+}
+
 function isValidPortfolioData(data) {
   return data &&
     Array.isArray(data.assets) &&
@@ -400,7 +544,10 @@ async function loadPortfolioFromBackend(userId) {
       .from('user_portfolios')
       // RESET-2: include updated_at so _shouldDistrustRemote can
       // compare against the local reset tombstone.
-      .select('assets, holdings, updated_at')
+      // AURIX-PERSISTENCE-REMOTE-HISTORY-WATCHLIST-1: also pull the
+      // remote history + watchlist columns so Safari and the iOS PWA
+      // (separate storage containers) converge to identical data.
+      .select('assets, holdings, updated_at, portfolio_history, category_history, watchlist, watchlist_updated_at')
       .eq('user_id', userId)
       .single();
     if (error) {
@@ -417,6 +564,10 @@ async function loadPortfolioFromBackend(userId) {
 async function initPortfolioData(userId) {
   // 1. Backend (fuente principal)
   const backendData = await loadPortfolioFromBackend(userId);
+  // AURIX-PERSISTENCE-REMOTE-HISTORY-WATCHLIST-1: reconcile remote history +
+  // watchlist into local memory/storage. Runs regardless of which source wins
+  // for assets/holdings below; respects the reset epoch/tombstone internally.
+  _mergeRemoteState(backendData);
   const distrustRemote = (typeof _shouldDistrustRemote === 'function') && _shouldDistrustRemote(backendData);
   if (isValidPortfolioData(backendData) && backendData.assets.length > 0 && !distrustRemote) {
     if (IS_DEV) console.log('[DATA] loaded from Supabase');
@@ -467,6 +618,7 @@ const PORTFOLIO_KEYS = [
   'portfolio_cat_order',       // category drill-down order
   'aurix_watchlist',           // watchlist symbols
   'aurix_watchlist_seeded',    // one-shot seed guard
+  'aurix_watchlist_updated_at',// watchlist last-write-wins timestamp (remote sync)
   'aurix_assets',              // new model catalog
   'aurix_holdings',            // new model holdings
   'aurix.workspace.v1',        // workspace cells
@@ -4420,6 +4572,12 @@ function recordSnapshot() {
   // Wrapped in try/catch so any future bug in category bucketing can
   // never break the legacy portfolio-history write above.
   try { recordCategorySnapshot(); } catch (e) { console.warn('[category-snapshot] fail:', e && e.message); }
+
+  // AURIX-PERSISTENCE-REMOTE-HISTORY-WATCHLIST-1: mirror the new snapshot to
+  // Supabase (throttled ≤1/60s inside the flush) so the chart history survives
+  // across Safari ↔ PWA and shortcut recreation. localStorage above is the hot
+  // path and is unaffected; this is fire-and-forget.
+  try { scheduleStateFlush(); } catch (_) {}
 
   console.log('[snapshot]', { ts: now, total: totalValueBase(), historyLength: portfolioHistory.length });
 }
@@ -22198,6 +22356,23 @@ document.getElementById('appRoot').style.opacity = '0';
   }
 })();
 
+// AURIX-PERSISTENCE-REMOTE-HISTORY-WATCHLIST-1: durability flush. iOS rarely
+// fires `beforeunload` for standalone PWAs, so persist remote state on the
+// reliable lifecycle events (`pagehide`, and `visibilitychange` → hidden when
+// the user swaps apps / locks the phone). The flush self-guards on
+// _bootLoadComplete and on having a session, so this is a safe no-op pre-boot.
+if (!window.__AURIX_STATE_FLUSH_LISTENER__) {
+  window.__AURIX_STATE_FLUSH_LISTENER__ = true;
+  const _flushOnHide = () => {
+    if (!_bootLoadComplete) return;
+    try { _flushStatePersistence('lifecycle'); } catch (_) {}
+  };
+  window.addEventListener('pagehide', _flushOnHide);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') _flushOnHide();
+  });
+}
+
 // MOBILE-RESIZE-1: remount the mobile portfolio + donut charts on
 // resize, rotation, split-view, or PWA viewport changes. The boot
 // block only initialises mobile charts once when `innerWidth <= 768`
@@ -24175,6 +24350,14 @@ const watchlistStore = (() => {
 
   function _persist() { localStorage.setItem(KEY, JSON.stringify(_list)); }
   function _notify()  { _subs.forEach(fn => fn()); }
+  // AURIX-PERSISTENCE-REMOTE-HISTORY-WATCHLIST-1: stamp the modification time
+  // on every USER edit so last-write-wins can arbitrate between the Safari and
+  // PWA storage containers (and so deletions stick). _hydrate (remote adoption
+  // / migration) does NOT stamp — its caller owns the timestamp.
+  function _touch() {
+    try { localStorage.setItem(WATCHLIST_TS_KEY, String(Date.now())); } catch (_) {}
+    try { if (typeof scheduleStateFlush === 'function') scheduleStateFlush(); } catch (_) {}
+  }
 
   const _stored = localStorage.getItem(KEY);
   _list = _stored ? JSON.parse(_stored) : _defaultList();
@@ -24182,8 +24365,10 @@ const watchlistStore = (() => {
   return {
     getWatchlist: ()  => [..._list],
     includes:     key => _list.includes(key),
-    add(key)          { if (!_list.includes(key)) { _list = [..._list, key]; _persist(); _notify(); } },
-    remove(key)       { _list = _list.filter(k => k !== key); _persist(); _notify(); },
+    add(key)          { if (!_list.includes(key)) { _list = [..._list, key]; _persist(); _touch(); _notify(); } },
+    remove(key)       { _list = _list.filter(k => k !== key); _persist(); _touch(); _notify(); },
+    // Bulk-replace from remote without bumping the user-edit timestamp.
+    _hydrate(list)    { _list = Array.isArray(list) ? [...list] : []; _persist(); _notify(); },
     subscribe:    fn  => _subs.push(fn),
   };
 })();
@@ -25835,6 +26020,14 @@ async function _pushEmptyPortfolioToBackend() {
         user_id:    currentUser.id,
         assets:     [],
         holdings:   [],
+        // AURIX-PERSISTENCE-REMOTE-HISTORY-WATCHLIST-1: a reset must also wipe
+        // the remote history + watchlist, else the union-by-ts merge would
+        // resurrect pre-reset history on the next load. (The epoch filter is a
+        // second line of defence; this clears the source.)
+        portfolio_history:    [],
+        category_history:     [],
+        watchlist:            [],
+        watchlist_updated_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' });
     // Clear tombstone once remote is in sync — local + remote both empty.
