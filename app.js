@@ -393,6 +393,11 @@ function _persistEmptyPortfolioIfNeeded(reason) {
 // flush mirrors state to Supabase (≤1/60s) plus an immediate flush on
 // pagehide/visibilitychange so nothing is lost when the PWA backgrounds.
 const WATCHLIST_TS_KEY = 'aurix_watchlist_updated_at';
+// AURIX-LAUNCH-P0-PERSISTENCE: critical display preferences (language + base
+// currency) now sync to Supabase via the same last-write-wins protocol as the
+// watchlist. NOT in PORTFOLIO_KEYS — prefs are preserved across reset/sign-out
+// (a language/currency choice is not user-private portfolio state).
+const PREFS_TS_KEY     = 'aurix_prefs_updated_at';
 let _bootLoadComplete  = false;
 let _stateFlushTimer   = null;
 let _lastStateFlushMs  = 0;
@@ -400,6 +405,49 @@ let _lastStateFlushMs  = 0;
 function _aurixWatchlistTs() {
   try { return parseInt(localStorage.getItem(WATCHLIST_TS_KEY) || '0', 10) || 0; }
   catch (_) { return 0; }
+}
+
+function _aurixPrefsTs() {
+  try { return parseInt(localStorage.getItem(PREFS_TS_KEY) || '0', 10) || 0; }
+  catch (_) { return 0; }
+}
+
+// Stamp a user-driven preference change and flush it to the backend. Called
+// from switchLang / _applyCurrencyChange so an explicit choice always wins
+// (newer timestamp) over any other container's stored value.
+function _touchPrefs() {
+  try { localStorage.setItem(PREFS_TS_KEY, String(Date.now())); } catch (_) {}
+  try { if (typeof scheduleStateFlush === 'function') scheduleStateFlush(); } catch (_) {}
+}
+
+// Apply remote preferences into local memory + DOM WITHOUT triggering the heavy
+// re-render paths in switchLang/_applyCurrencyChange (which assume an
+// initialised chart/DOM). The boot render + chart init that run later in the
+// boot sequence read `lang`/`baseCurrency` fresh, so setting the values here is
+// sufficient; applyI18n covers the already-parsed static chrome.
+function _applyRemotePrefs(prefs) {
+  if (!prefs || typeof prefs !== 'object') return;
+  // Language — whitelist to the supported set.
+  if ((prefs.lang === 'es' || prefs.lang === 'en') && typeof lang !== 'undefined' && prefs.lang !== lang) {
+    try {
+      lang = prefs.lang;
+      localStorage.setItem(LANG_KEY, lang);
+      document.documentElement.lang = lang;
+      document.querySelectorAll('[data-lang]').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
+      if (typeof applyI18n === 'function') applyI18n();
+      if (typeof applyTypeMetaLabels === 'function') applyTypeMetaLabels();
+    } catch (_) {}
+  }
+  // Base currency — whitelist to the supported set.
+  if ((prefs.baseCurrency === 'USD' || prefs.baseCurrency === 'EUR') && typeof baseCurrency !== 'undefined' && prefs.baseCurrency !== baseCurrency) {
+    try {
+      baseCurrency = prefs.baseCurrency;
+      localStorage.setItem(BASE_KEY, baseCurrency);
+      document.querySelectorAll('.menu-curr-btn').forEach(b => b.classList.toggle('active', b.dataset.currency === baseCurrency));
+      const perfCurrBtn = document.getElementById('perfCurrBtn');
+      if (perfCurrBtn) perfCurrBtn.textContent = baseCurrency === 'EUR' ? '€' : '$';
+    } catch (_) {}
+  }
 }
 
 // Union two history arrays by timestamp (last write per ts wins), keep only
@@ -467,6 +515,30 @@ function _mergeRemoteState(remoteRow) {
       try { localStorage.setItem(WATCHLIST_TS_KEY, String(stamp)); } catch (_) {}
     }
 
+    // ── Critical preferences (language + base currency), last-write-wins.
+    //    Prefs are NOT gated by the reset tombstone: a language/currency choice
+    //    is preserved across reset, so it must survive a distrusted remote row.
+    let localPrefsTs = _aurixPrefsTs();
+    // Legacy guard: an explicit pre-migration choice (LANG_KEY/BASE_KEY present
+    // in localStorage but no timestamp) is stamped now so it becomes
+    // authoritative and is never silently overwritten by an older remote value.
+    // A genuinely fresh container (no explicit keys) stays at ts 0 and adopts
+    // the remote prefs below.
+    const hasLocalExplicitPrefs = (function () {
+      try { return localStorage.getItem(LANG_KEY) != null || localStorage.getItem(BASE_KEY) != null; }
+      catch (_) { return false; }
+    })();
+    if (localPrefsTs === 0 && hasLocalExplicitPrefs) {
+      localPrefsTs = Date.now();
+      try { localStorage.setItem(PREFS_TS_KEY, String(localPrefsTs)); } catch (_) {}
+    }
+    const remotePrefs   = (remoteRow && remoteRow.preferences && typeof remoteRow.preferences === 'object') ? remoteRow.preferences : null;
+    const remotePrefsTs = (remoteRow && remoteRow.preferences_updated_at) ? new Date(remoteRow.preferences_updated_at).getTime() : 0;
+    if (remotePrefs && remotePrefsTs > localPrefsTs) {
+      _applyRemotePrefs(remotePrefs);
+      try { localStorage.setItem(PREFS_TS_KEY, String(remotePrefsTs)); } catch (_) {}
+    }
+
     // Boot load is complete; enable flushing and schedule the migration write
     // (idempotent — union/LWW converge, so re-running is harmless).
     _bootLoadComplete = true;
@@ -495,7 +567,8 @@ async function _flushStatePersistence(reason) {
   }
   _lastStateFlushMs = now;
   try {
-    const localTs   = _aurixWatchlistTs();
+    const localTs      = _aurixWatchlistTs();
+    const localPrefsTs = _aurixPrefsTs();
     const localData = getPortfolioData();
     // assets/holdings are authoritative in localStorage post boot-load (the
     // _bootLoadComplete gate guarantees the remote row was already merged in),
@@ -512,6 +585,8 @@ async function _flushStatePersistence(reason) {
         category_history:     categoryHistory,
         watchlist:            (typeof getWatchlist === 'function') ? getWatchlist() : [],
         watchlist_updated_at: localTs > 0 ? new Date(localTs).toISOString() : null,
+        preferences:          { lang: (typeof lang !== 'undefined' ? lang : 'es'), baseCurrency: (typeof baseCurrency !== 'undefined' ? baseCurrency : 'USD') },
+        preferences_updated_at: localPrefsTs > 0 ? new Date(localPrefsTs).toISOString() : null,
         updated_at:           new Date().toISOString(),
       }, { onConflict: 'user_id' });
     if (error) throw error;
@@ -547,7 +622,7 @@ async function loadPortfolioFromBackend(userId) {
       // AURIX-PERSISTENCE-REMOTE-HISTORY-WATCHLIST-1: also pull the
       // remote history + watchlist columns so Safari and the iOS PWA
       // (separate storage containers) converge to identical data.
-      .select('assets, holdings, updated_at, portfolio_history, category_history, watchlist, watchlist_updated_at')
+      .select('assets, holdings, updated_at, portfolio_history, category_history, watchlist, watchlist_updated_at, preferences, preferences_updated_at')
       .eq('user_id', userId)
       .single();
     if (error) {
@@ -3101,6 +3176,8 @@ function switchLang(newLang) {
   if (newLang === lang) return;
   lang = newLang;
   localStorage.setItem(LANG_KEY, lang);
+  // AURIX-LAUNCH-P0-PERSISTENCE: stamp + flush so this explicit choice wins.
+  try { _touchPrefs(); } catch (_) {}
   document.documentElement.lang = lang;
   document.querySelectorAll('[data-lang]').forEach(b => {
     b.classList.toggle('active', b.dataset.lang === lang);
@@ -20864,6 +20941,8 @@ assetsListEl.addEventListener('keydown', e => {
 function _applyCurrencyChange(currency) {
   baseCurrency = currency;
   localStorage.setItem(BASE_KEY, baseCurrency);
+  // AURIX-LAUNCH-P0-PERSISTENCE: stamp + flush so this explicit choice wins.
+  try { _touchPrefs(); } catch (_) {}
   document.querySelectorAll('.menu-curr-btn')
     .forEach(b => b.classList.toggle('active', b.dataset.currency === baseCurrency));
   const perfCurrBtn = document.getElementById('perfCurrBtn');
