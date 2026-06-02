@@ -688,6 +688,12 @@ body.modal-open{ overflow:hidden; }
   font-size:clamp(30px,4.4vw,58px); font-weight:800; letter-spacing:-.03em;
   line-height:1.12; margin-top:20px; color:var(--text);
 }
+/* AURIX-WEBSITE-HERO-COPY-RHYTHM-1: three logical lines (Centralize / Understand
+   / Discover). Same font, size, weight, colour and line-height as before — only
+   the line breaks change. A restrained gap groups the three steps; text-wrap
+   balance keeps the long third line wrapping evenly (premium) on narrow widths. */
+.positioning-title span{ display:block; text-wrap:balance; }
+.positioning-title span + span{ margin-top:.3em; }
 .positioning-lead{
   font-size:var(--lead); color:var(--muted); line-height:1.6;
   max-width:62ch; margin:28px auto 0;

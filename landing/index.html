@@ -204,7 +204,16 @@
     <section class="section section--positioning">
       <div class="container positioning-inner">
         <span class="eyebrow reveal" data-i18n="pos.eyebrow">Wealth Intelligence Platform</span>
-        <h2 class="positioning-title reveal" data-i18n="pos.title">Centralize your wealth. Understand its evolution. Discover what is driving your financial growth.</h2>
+        <!-- AURIX-WEBSITE-HERO-COPY-RHYTHM-1: same words, same <h2>/class/styles
+             — only split into three logical lines so the value prop reads as
+             three clean steps (Centralize / Understand / Discover) instead of
+             wrapping at unnatural points. data-i18n sets textContent, so each
+             line is its own keyed span (no <br>, survives language switch). -->
+        <h2 class="positioning-title reveal">
+          <span data-i18n="pos.title1">Centralize your wealth.</span>
+          <span data-i18n="pos.title2">Understand its evolution.</span>
+          <span data-i18n="pos.title3">Discover what is driving your financial growth.</span>
+        </h2>
         <p class="positioning-lead reveal" data-i18n="pos.lead">Aurix transforms fragmented financial data into clarity, context and actionable understanding.</p>
         <p class="positioning-lead positioning-lead--dim reveal" data-i18n="pos.lead2">Because building wealth is not only about tracking assets. It is about understanding the decisions, trends and forces shaping your financial future.</p>
       </div>

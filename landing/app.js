@@ -81,7 +81,9 @@
       'footer.desc': 'Aurix es una plataforma de inteligencia patrimonial diseñada para ayudarte a centralizar tu patrimonio, interpretar su evolución y entender qué impulsa realmente tu crecimiento financiero.',
 
       'pos.eyebrow': 'Plataforma de inteligencia patrimonial',
-      'pos.title': 'Centraliza tu patrimonio. Entiende su evolución. Descubre qué impulsa tu crecimiento financiero.',
+      'pos.title1': 'Centraliza tu patrimonio.',
+      'pos.title2': 'Entiende su evolución.',
+      'pos.title3': 'Descubre qué impulsa tu crecimiento financiero.',
       'pos.lead': 'Aurix transforma datos financieros fragmentados en claridad, contexto y comprensión accionable.',
       'pos.lead2': 'Porque construir patrimonio no consiste solo en seguir activos. Consiste en entender las decisiones, tendencias y fuerzas que moldean tu futuro financiero.',
 
@@ -168,7 +170,9 @@
       'footer.desc': 'Aurix is a Wealth Intelligence Platform designed to help people centralize their wealth, interpret its evolution and understand what is really driving their financial growth.',
 
       'pos.eyebrow': 'Wealth Intelligence Platform',
-      'pos.title': 'Centralize your wealth. Understand its evolution. Discover what is driving your financial growth.',
+      'pos.title1': 'Centralize your wealth.',
+      'pos.title2': 'Understand its evolution.',
+      'pos.title3': 'Discover what is driving your financial growth.',
       'pos.lead': 'Aurix transforms fragmented financial data into clarity, context and actionable understanding.',
       'pos.lead2': 'Because building wealth is not only about tracking assets. It is about understanding the decisions, trends and forces shaping your financial future.',
 
