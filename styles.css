@@ -736,19 +736,27 @@ button[aria-busy="true"] {
 }
 
 .summary-footer {
-  /* AURIX-DASHBOARD-HERO-PREMIUM-COMPOSITION-1: anchor the add actions to the
-     BOTTOM of the hero-left column (which stretches to the card height) instead
-     of stacking them tight under the status. This consumes the empty space that
-     used to sit below the buttons, lets them breathe, and isolates the health
-     mini-card above — all without a fixed number (auto adapts to the card
-     height). Desktop only: .summary-footer is display:none ≤768px (FAB used). */
+  /* AURIX-DASHBOARD-HERO-COMPOSITION-FIX-1: anchored to the bottom of the
+     full-height hero-left (margin-top:auto) — the auto gap gives the buttons
+     breathing room above (from the health pill) and the column's bottom padding
+     gives margin below the card edge. Divider REMOVED: a full-width hairline
+     above small left-aligned buttons read as a stray line; spacing alone
+     separates the zones now (spec Option A). Desktop only (display:none ≤768px). */
   margin-top: auto;
-  padding-top: 14px;
-  border-top: 1px solid var(--color-border-subtle);
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+/* AURIX-DASHBOARD-HERO-COMPOSITION-FIX-1: a touch more presence for the hero add
+   actions on desktop so they read as clear primary/secondary actions, not faint
+   chips — modest, not enormous. Primary keeps its lit-glass weight over the
+   ghost secondary. Desktop only (the buttons are hidden ≤768px). */
+@media (min-width: 769px) {
+  .summary-footer .btn-summary-action {
+    font-size: 12.5px;
+    padding: 8px 16px;
+  }
 }
 
 /* ── Assets Section ────────────────────────────────────── */
@@ -15727,23 +15735,28 @@ body.gs-open { overflow: hidden; }
   animation: none;
   min-height: 0;
 }
-/* AURIX-DASHBOARD-HERO-PREMIUM-COMPOSITION-1: on DESKTOP, give the health teaser
-   a RESTRAINED premium mini-card surface so it reads as a distinct "Aurix
-   recommendation" instead of a lost text row — reverses the flat-row treatment
-   of AURIX-HERO-PREMIUM-REFINE-1 (desktop only; mobile keeps the compact row to
-   stay untouched). Very subtle: faint blue-tinted glass + hairline border, no
-   loud colour, no shadow glow, and no pulse (the hero ::after stays hidden via
-   the rule below), per "premium, elegante — no efectos". */
+/* AURIX-DASHBOARD-HERO-COMPOSITION-FIX-1: on DESKTOP the health teaser is a
+   compact premium PILL that hugs its content ("Salud sólida · Ver análisis ›"),
+   NOT a full-width bar (the previous COMPOSITION-1 surface stretched the whole
+   column and read as a stray rectangle). align-self:flex-start stops the flex
+   column from stretching it; width:fit-content sizes it to the text. Subtle
+   glass + hairline + pill radius, soft hover (the row is clickable). Desktop
+   only; mobile keeps the compact inline row untouched. */
 @media (min-width: 769px) {
   .hero-left .aurix-signal {
-    padding: 9px 12px;
-    gap: 10px;
-    background:
-      linear-gradient(180deg, rgba(74,130,240,0.07) 0%, rgba(12,18,32,0.0) 80%),
-      rgba(255,255,255,0.02);
-    border: 1px solid rgba(74,130,240,0.12);
-    border-radius: 12px;
-    box-shadow: 0 2px 12px -9px rgba(0,0,0,0.55);
+    align-self: flex-start;
+    width: fit-content;
+    max-width: 100%;
+    padding: 7px 13px 7px 11px;
+    gap: 8px;
+    background: rgba(74,130,240,0.06);
+    border: 1px solid rgba(74,130,240,0.14);
+    border-radius: 999px;
+    box-shadow: none;
+  }
+  .hero-left .aurix-signal:hover {
+    background: rgba(74,130,240,0.10);
+    border-color: rgba(74,130,240,0.24);
   }
 }
 /* Tiny, subtle health dot — no glow ring, no status orb, so it never
