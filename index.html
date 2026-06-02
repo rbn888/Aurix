@@ -56,7 +56,7 @@
     // serve a half-cached app. Same user + same account must render the
     // same code on Safari mobile, the iOS home-screen PWA, and desktop.
     (function() {
-      window.AURIX_BUILD = 'v177-hero-composition-1';
+      window.AURIX_BUILD = 'v178-add-flow-1';
       try {
         var KEY     = 'aurix_build';
         var RELOAD  = 'aurix_build_reload';
@@ -532,19 +532,28 @@
           <h3 data-i18n="addV2_picker_title">¿Qué quieres añadir?</h3>
           <button class="modal-close" id="addV2PickerClose" type="button" aria-label="Close">✕</button>
         </div>
-        <p class="add-v2-picker-sub" data-i18n="addV2_picker_sub">Elige el tipo para empezar.</p>
+        <p class="add-v2-picker-sub" data-i18n="addV2_picker_sub">Elige el tipo de patrimonio que quieres registrar.</p>
         <div class="add-v2-grid">
           <button type="button" class="add-v2-card" data-pick="asset">
             <span class="add-v2-icon">◆</span>
             <span class="add-v2-text">
-              <span class="add-v2-title" data-i18n="addV2_pick_asset_title">Activo financiero</span>
-              <span class="add-v2-sub" data-i18n="addV2_pick_asset_sub">Acciones, ETFs, fondos, cripto, índices</span>
+              <span class="add-v2-title" data-i18n="addV2_pick_asset_title">Activo de inversión</span>
+              <span class="add-v2-sub" data-i18n="addV2_pick_asset_sub">Acciones, ETFs, fondos, cripto e índices</span>
             </span>
             <span class="add-v2-chevron" aria-hidden="true">›</span>
           </button>
-          <!-- ADD-FLOW-ARCH-1: liquidity intentionally removed from this
-               picker. Adding cash is a separate flow with its own modal —
-               see openLiquidityModal() / #liquidityOverlay. -->
+          <!-- AURIX-MOBILE-ADD-FLOW-PREMIUM-1: liquidity restored to the picker.
+               data-pick="liquidity" routes through the existing dedicated flow
+               (openLiquidityModal / #liquidityOverlay) — the _addV2Wire handler
+               already has the liquidity case; no new flow created. -->
+          <button type="button" class="add-v2-card" data-pick="liquidity">
+            <span class="add-v2-icon">$</span>
+            <span class="add-v2-text">
+              <span class="add-v2-title" data-i18n="addV2_pick_liquidity_title">Liquidez</span>
+              <span class="add-v2-sub" data-i18n="addV2_pick_liquidity_sub">Efectivo, cuenta bancaria o capital disponible</span>
+            </span>
+            <span class="add-v2-chevron" aria-hidden="true">›</span>
+          </button>
           <button type="button" class="add-v2-card" data-pick="gold">
             <span class="add-v2-icon">◉</span>
             <span class="add-v2-text">
@@ -557,7 +566,7 @@
             <span class="add-v2-icon">⌂</span>
             <span class="add-v2-text">
               <span class="add-v2-title" data-i18n="addV2_pick_re_title">Inmueble</span>
-              <span class="add-v2-sub" data-i18n="addV2_pick_re_sub">Valor del inmueble y renta mensual</span>
+              <span class="add-v2-sub" data-i18n="addV2_pick_re_sub">Vivienda, propiedad o renta mensual</span>
             </span>
             <span class="add-v2-chevron" aria-hidden="true">›</span>
           </button>
@@ -1160,7 +1169,7 @@
   <script src="config.js"></script>
   <script src="services/ux.js"></script>
   <script src="services/onboarding-engine.js?v=1"></script>
-  <script src="app.js?v=174"></script>
+  <script src="app.js?v=178"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
        Loads after app.js so it can read its primitives. No consumers yet. -->
   <script src="services/wealth-engine.js?v=1"></script>
