@@ -420,15 +420,16 @@ button[aria-busy="true"] {
      on boot. The mark now appears static at full opacity; the splash → header
      handoff is a clean fade with no motion. */
   transition: opacity .15s, filter .15s;
-  /* AURIX-BRAND-PREMIUM-HEADER-3: silent premium. The wordmark now reads as a
-     SOLID corporate blue with only an imperceptible top-lit material gradient
-     (range hugs #4A82F0 — ~5% lighter top / ~4% deeper base, no visible ramp).
-     The blue outer aura is gone (no glow / neon / gaming); a single tight,
-     neutral contact shadow gives crisp edge definition — closer to Apple /
-     Linear / Stripe wordmarks. No size / position / typography / motion change.
-     Scoped to the header variant; the login mark keeps the base gradient. */
-  background: linear-gradient(180deg, #5489F1 0%, #4A82F0 52%, #4179E9 100%);
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  /* AURIX-WORDMARK-RECTANGLE-BUG-1 (HOTFIX): the premium passes added a
+     `background:` SHORTHAND here, which resets background-clip back to
+     border-box — the gradient then rendered as a SOLID BLUE RECTANGLE while the
+     transparent text (-webkit-text-fill-color from the base) vanished. Fix: drop
+     the background override entirely so the header mark inherits the base
+     .logo-aurix rule, where `background` and `-webkit-background-clip:text` live
+     together and always clip to the glyphs. Restored the prior stable glow.
+     (Re-premiumise later ONLY by re-asserting the clip in the SAME rule as any
+     background override.) */
+  filter: drop-shadow(0 1px 8px rgba(74, 130, 240, 0.10)) drop-shadow(0 0 20px rgba(74, 130, 240, 0.06));
 }
 #logoHome:hover .logo-aurix { opacity: .75; }
 #logoHome:active .logo-aurix { opacity: .55; transition-duration: 60ms; }
