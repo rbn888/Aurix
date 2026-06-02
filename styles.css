@@ -420,12 +420,15 @@ button[aria-busy="true"] {
      on boot. The mark now appears static at full opacity; the splash → header
      handoff is a clean fade with no motion. */
   transition: opacity .15s, filter .15s;
-  /* AURIX-BRAND-PREMIUM-1: subtler outer aura (less glow = more refined, not
-     brighter) + a hair-deeper gradient tail for material depth. The background
-     is scoped to the header wordmark here, so the login mark is untouched; the
-     -webkit-background-clip:text from .logo-aurix still clips it to the glyphs. */
-  background: linear-gradient(168deg, #6A9CFF 0%, #4A82F0 64%, #3F77E4 100%);
-  filter: drop-shadow(0 1px 6px rgba(74, 130, 240, 0.10)) drop-shadow(0 0 13px rgba(74, 130, 240, 0.035));
+  /* AURIX-BRAND-PREMIUM-HEADER-3: silent premium. The wordmark now reads as a
+     SOLID corporate blue with only an imperceptible top-lit material gradient
+     (range hugs #4A82F0 — ~5% lighter top / ~4% deeper base, no visible ramp).
+     The blue outer aura is gone (no glow / neon / gaming); a single tight,
+     neutral contact shadow gives crisp edge definition — closer to Apple /
+     Linear / Stripe wordmarks. No size / position / typography / motion change.
+     Scoped to the header variant; the login mark keeps the base gradient. */
+  background: linear-gradient(180deg, #5489F1 0%, #4A82F0 52%, #4179E9 100%);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
 }
 #logoHome:hover .logo-aurix { opacity: .75; }
 #logoHome:active .logo-aurix { opacity: .55; transition-duration: 60ms; }
