@@ -674,3 +674,83 @@ body.modal-open{ overflow:hidden; }
   .anim-bars b, .ws-ind b{ transform:none; transition:none; }
   .draw-line{ stroke-dashoffset:0; transition:none; }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   AURIX-WEBSITE-MESSAGING-AND-COMMUNITY-1
+   Additive only — all-new classes, no overrides of existing selectors.
+   Reuses the existing token system (--accent-2, --surface, --border…).
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── Block 1 · Strategic positioning ───────────────────── */
+.section--positioning{ border-top:1px solid var(--border); }
+.positioning-inner{ max-width:960px; margin:0 auto; text-align:center; }
+.positioning-title{
+  font-size:clamp(30px,4.4vw,58px); font-weight:800; letter-spacing:-.03em;
+  line-height:1.12; margin-top:20px; color:var(--text);
+}
+.positioning-lead{
+  font-size:var(--lead); color:var(--muted); line-height:1.6;
+  max-width:62ch; margin:28px auto 0;
+}
+.positioning-lead--dim{ color:var(--dim); margin-top:16px; }
+
+/* ── Block 2 · Community ────────────────────────────────── */
+.section--community{ border-top:1px solid var(--border); }
+.community-inner{ text-align:center; }
+.community-inner .section-title{ max-width:none; margin:0 auto; }
+.community-inner .section-lead{ margin-left:auto; margin-right:auto; }
+.community-grid{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:16px;
+  margin:40px auto 0; max-width:920px;
+}
+.community-card{
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  padding:26px 18px; border-radius:var(--radius-sm);
+  background:var(--surface); border:1px solid var(--border);
+  transition:transform .2s var(--ease), border-color .2s var(--ease), background .2s var(--ease);
+}
+.community-card:hover{
+  transform:translateY(-4px);
+  border-color:var(--border-hi);
+  background:rgba(79,142,247,.07);
+}
+.community-ico{
+  width:26px; height:26px; margin-bottom:6px;
+  fill:none; stroke:var(--accent-2); stroke-width:1.6;
+  stroke-linecap:round; stroke-linejoin:round; opacity:.9;
+  transition:stroke .2s var(--ease), opacity .2s var(--ease);
+}
+.community-card:hover .community-ico{ stroke:var(--accent-3); opacity:1; }
+.community-name{ font-size:15px; font-weight:700; color:var(--text); letter-spacing:-.01em; }
+.community-handle{ font-size:13px; color:var(--dim); }
+.community-card--secondary{ opacity:.82; }
+.community-card--secondary:hover{ opacity:1; }
+
+/* ── Block 3 · Footer description + social column ──────── */
+.footer-desc{ color:var(--muted); font-size:14px; line-height:1.65; margin-top:14px; max-width:42ch; }
+.footer-col--social a{ display:flex; align-items:baseline; gap:8px; }
+.footer-handle{ color:var(--dim); font-size:13px; }
+
+/* ── Block 4 · Credibility strip ───────────────────────── */
+.credibility{ border-top:1px solid var(--border); padding:64px 0; }
+.credibility-inner{ text-align:center; }
+.credibility-line{
+  font-size:clamp(20px,2.6vw,30px); font-weight:600; letter-spacing:-.02em;
+  line-height:1.35; color:var(--text); margin:0;
+}
+.credibility-line span{ display:block; }
+.credibility-line span + span{ color:var(--muted); }
+.credibility-line span:last-child{ color:var(--accent-2); }
+
+/* ── Responsive ────────────────────────────────────────── */
+@media (max-width:860px){
+  .community-grid{ grid-template-columns:repeat(2,1fr); gap:12px; }
+  .credibility{ padding:48px 0; }
+}
+@media (max-width:560px){
+  .community-card{ padding:20px 12px; }
+  .positioning-lead{ margin-top:22px; }
+}
+@media (prefers-reduced-motion: reduce){
+  .community-card:hover{ transform:none; }
+}

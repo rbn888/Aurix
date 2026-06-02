@@ -197,6 +197,19 @@
       </div>
     </section>
 
+    <!-- ─────────────── POSITIONING (AURIX-WEBSITE-MESSAGING-1) ─────────────── -->
+    <!-- Strategic positioning: reframes Aurix as a Wealth Intelligence Platform.
+         Placed after the product is understood (problem → solution → workspace)
+         and before the visual showcase. Additive; nothing existing was moved. -->
+    <section class="section section--positioning">
+      <div class="container positioning-inner">
+        <span class="eyebrow reveal" data-i18n="pos.eyebrow">Wealth Intelligence Platform</span>
+        <h2 class="positioning-title reveal" data-i18n="pos.title">Centralize your wealth. Understand its evolution. Discover what is driving your financial growth.</h2>
+        <p class="positioning-lead reveal" data-i18n="pos.lead">Aurix transforms fragmented financial data into clarity, context and actionable understanding.</p>
+        <p class="positioning-lead positioning-lead--dim reveal" data-i18n="pos.lead2">Because building wealth is not only about tracking assets. It is about understanding the decisions, trends and forces shaping your financial future.</p>
+      </div>
+    </section>
+
     <!-- ─────────────── SHOWCASE ─────────────── -->
     <section class="section section--showcase">
       <div class="container">
@@ -306,6 +319,50 @@
         </div>
       </div>
     </section>
+    <!-- ─────────────── COMMUNITY (AURIX-WEBSITE-MESSAGING-1) ─────────────── -->
+    <!-- Trust signal, not a primary CTA. Lives at the bottom of the landing,
+         below the access CTA and above the footer. Quiet, integrated cards. -->
+    <section class="section section--community" id="community">
+      <div class="container community-inner">
+        <h2 class="section-title reveal" data-i18n="community.title">Join the Aurix Community</h2>
+        <p class="section-lead reveal" data-i18n="community.text">Follow product development, receive updates and connect with early users building the future of wealth intelligence.</p>
+        <div class="community-grid reveal">
+          <a class="community-card" href="https://x.com/AurixSystem" target="_blank" rel="noopener noreferrer" aria-label="Aurix en X (@AurixSystem)">
+            <svg class="community-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l16 16M20 4L4 20"/></svg>
+            <span class="community-name">X</span>
+            <span class="community-handle">@AurixSystem</span>
+          </a>
+          <a class="community-card" href="https://instagram.com/aurixapp" target="_blank" rel="noopener noreferrer" aria-label="Aurix en Instagram (@AurixApp)">
+            <svg class="community-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="5"/><circle cx="12" cy="12" r="3.6"/><circle cx="17.2" cy="6.8" r="1.1"/></svg>
+            <span class="community-name">Instagram</span>
+            <span class="community-handle">@AurixApp</span>
+          </a>
+          <a class="community-card" href="https://tiktok.com/@aurixsystem" target="_blank" rel="noopener noreferrer" aria-label="Aurix en TikTok (@AurixSystem)">
+            <svg class="community-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 20a3.2 3.2 0 103.2-3.2V4c1 2.4 2.8 3.6 5 3.6"/></svg>
+            <span class="community-name">TikTok</span>
+            <span class="community-handle">@AurixSystem</span>
+          </a>
+          <a class="community-card community-card--secondary" href="https://t.me/aurix_system" target="_blank" rel="noopener noreferrer" aria-label="Comunidad de Aurix en Telegram">
+            <svg class="community-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 4L3 11.2l6 2.2L11 20l3.2-3.8L19 19z"/><path d="M9 13.4L17 7"/></svg>
+            <span class="community-name">Telegram</span>
+            <span class="community-handle" data-i18n="community.tg.sub">Official Community</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────── CREDIBILITY STRIP (AURIX-WEBSITE-MESSAGING-1) ─────────────── -->
+    <!-- The last thing the visitor reads before the footer. No buttons, no icons,
+         no animation — a quiet, memorable closing statement. -->
+    <aside class="credibility" aria-label="Aurix">
+      <div class="container credibility-inner">
+        <p class="credibility-line">
+          <span data-i18n="cred.1">One platform.</span>
+          <span data-i18n="cred.2">All your wealth.</span>
+          <span data-i18n="cred.3">Complete visibility.</span>
+        </p>
+      </div>
+    </aside>
   </main>
 
   <!-- ─────────────── FOOTER ─────────────── -->
@@ -314,11 +371,10 @@
       <div class="footer-brand">
         <span class="brand">AURIX</span>
         <p class="footer-tag" data-i18n="footer.tag">Private Wealth OS</p>
-        <!-- LinkedIn omitted until an official profile exists (no dead links). -->
-        <div class="footer-social">
-          <a href="https://x.com/AurixSystem" target="_blank" rel="noopener noreferrer" aria-label="X (Twitter)">X</a>
-          <a href="https://instagram.com/aurixapp" target="_blank" rel="noopener noreferrer" aria-label="Instagram">Instagram</a>
-        </div>
+        <!-- AURIX-WEBSITE-MESSAGING-1: footer description — turns the footer into
+             a credibility surface that restates the Wealth Intelligence Platform
+             positioning. -->
+        <p class="footer-desc" data-i18n="footer.desc">Aurix is a Wealth Intelligence Platform designed to help people centralize their wealth, interpret its evolution and understand what is really driving their financial growth.</p>
       </div>
       <div class="footer-cols">
         <div class="footer-col">
@@ -332,6 +388,15 @@
           <!-- TODO(AURIX-LANDING): real legal pages pending — disabled, no dead links. -->
           <span class="is-disabled" aria-disabled="true" data-i18n="footer.privacy" data-todo="legal-privacy">Privacidad</span>
           <span class="is-disabled" aria-disabled="true" data-i18n="footer.terms" data-todo="legal-terms">Términos</span>
+        </div>
+        <!-- AURIX-WEBSITE-MESSAGING-1: Social column. All four channels live,
+             open in a new tab with rel="noopener noreferrer". -->
+        <div class="footer-col footer-col--social">
+          <h4 data-i18n="footer.social">Social</h4>
+          <a href="https://x.com/AurixSystem" target="_blank" rel="noopener noreferrer">X <span class="footer-handle">@AurixSystem</span></a>
+          <a href="https://instagram.com/aurixapp" target="_blank" rel="noopener noreferrer">Instagram <span class="footer-handle">@AurixApp</span></a>
+          <a href="https://tiktok.com/@aurixsystem" target="_blank" rel="noopener noreferrer">TikTok <span class="footer-handle">@AurixSystem</span></a>
+          <a href="https://t.me/aurix_system" target="_blank" rel="noopener noreferrer">Telegram <span class="footer-handle" data-i18n="community.tg.sub">Official Community</span></a>
         </div>
       </div>
     </div>

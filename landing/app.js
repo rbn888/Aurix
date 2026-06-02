@@ -78,6 +78,19 @@
       'modal.sub': 'Déjanos tus datos y contactaremos con usuarios seleccionados.',
       'footer.tag': 'Private Wealth OS',
       'footer.product': 'Producto', 'footer.legal': 'Legal', 'footer.privacy': 'Privacidad', 'footer.terms': 'Términos', 'footer.social': 'Social',
+      'footer.desc': 'Aurix es una plataforma de inteligencia patrimonial diseñada para ayudarte a centralizar tu patrimonio, interpretar su evolución y entender qué impulsa realmente tu crecimiento financiero.',
+
+      'pos.eyebrow': 'Plataforma de inteligencia patrimonial',
+      'pos.title': 'Centraliza tu patrimonio. Entiende su evolución. Descubre qué impulsa tu crecimiento financiero.',
+      'pos.lead': 'Aurix transforma datos financieros fragmentados en claridad, contexto y comprensión accionable.',
+      'pos.lead2': 'Porque construir patrimonio no consiste solo en seguir activos. Consiste en entender las decisiones, tendencias y fuerzas que moldean tu futuro financiero.',
+
+      'community.title': 'Únete a la comunidad de Aurix',
+      'community.text': 'Sigue el desarrollo del producto, recibe novedades y conecta con los primeros usuarios que están construyendo el futuro de la inteligencia patrimonial.',
+      'community.tg.sub': 'Comunidad oficial',
+
+      'cred.1': 'Una sola plataforma.', 'cred.2': 'Todo tu patrimonio.', 'cred.3': 'Visibilidad completa.',
+
       'meta.title': 'Aurix — El sistema operativo de tu patrimonio',
       'meta.desc': 'Controla, entiende y gestiona todo tu patrimonio — acciones, fondos, cripto, inmuebles, metales y liquidez — desde una sola plataforma.'
     },
@@ -152,6 +165,19 @@
       'modal.sub': 'Leave your details and we’ll contact selected users.',
       'footer.tag': 'Private Wealth OS',
       'footer.product': 'Product', 'footer.legal': 'Legal', 'footer.privacy': 'Privacy', 'footer.terms': 'Terms', 'footer.social': 'Social',
+      'footer.desc': 'Aurix is a Wealth Intelligence Platform designed to help people centralize their wealth, interpret its evolution and understand what is really driving their financial growth.',
+
+      'pos.eyebrow': 'Wealth Intelligence Platform',
+      'pos.title': 'Centralize your wealth. Understand its evolution. Discover what is driving your financial growth.',
+      'pos.lead': 'Aurix transforms fragmented financial data into clarity, context and actionable understanding.',
+      'pos.lead2': 'Because building wealth is not only about tracking assets. It is about understanding the decisions, trends and forces shaping your financial future.',
+
+      'community.title': 'Join the Aurix Community',
+      'community.text': 'Follow product development, receive updates and connect with early users building the future of wealth intelligence.',
+      'community.tg.sub': 'Official Community',
+
+      'cred.1': 'One platform.', 'cred.2': 'All your wealth.', 'cred.3': 'Complete visibility.',
+
       'meta.title': 'Aurix — The operating system for your wealth',
       'meta.desc': 'Track, understand and manage your entire wealth — stocks, funds, crypto, real estate, metals and cash — from one platform.'
     }
