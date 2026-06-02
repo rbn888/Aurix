@@ -12378,15 +12378,24 @@ function updateChart(animate = false) {
   const data = getChartData(activeRange);
 
   if (!data.values.length) {
+    // AURIX-PWA-HISTORY-HYDRATION-1: the "add assets to see your evolution"
+    // empty message must only show when the portfolio is GENUINELY empty (no
+    // assets). On a freshly installed PWA the chart can be momentarily empty
+    // during boot (remote history + live prices still hydrating, so value=0 and
+    // history<2 points) even though the account HAS assets — showing the
+    // empty/onboarding copy there falsely reads as a brand-new portfolio. Hide
+    // it in that transient state; flat-baseline / real history takes over once
+    // value + history are available.
+    const genuinelyEmpty = !(Array.isArray(assets) && assets.length > 0);
     chartChangeEl.textContent = '';
-    chartNoDataEl.style.display = '';
+    chartNoDataEl.style.display = genuinelyEmpty ? '' : 'none';
     portfolioChart.data.labels = [];
     portfolioChart.data.datasets[0].data = [];
     portfolioChart.update('none');
     // Mobile sync — clear
     const _mnd = document.getElementById('chartNoDataMobile');
     const _mch = document.getElementById('chartChangeMobile');
-    if (_mnd) _mnd.style.display = '';
+    if (_mnd) _mnd.style.display = genuinelyEmpty ? '' : 'none';
     if (_mch) _mch.textContent = '';
     if (portfolioChartMobile) {
       portfolioChartMobile.data.labels = [];
