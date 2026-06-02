@@ -15806,6 +15806,21 @@ body.gs-open { overflow: hidden; }
     background: rgba(255,255,255,0.055);
     border-color: rgba(255,255,255,0.22);
   }
+  /* Bloque 3 — raised-key relief: a brighter top inset edge + a faint dark
+     bottom inset edge so both actions feel tactile/premium. Additive to the
+     existing material; no size/function/hierarchy change. Whisper-subtle. */
+  .summary-footer .btn-summary-action.btn-primary {
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.12),
+      inset 0 -1px 0 rgba(0,0,0,0.16),
+      0 1px 2px rgba(0,0,0,0.20),
+      0 4px 14px -6px rgba(74,130,240,0.22);
+  }
+  .summary-footer .btn-summary-action.btn-secondary {
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      inset 0 -1px 0 rgba(0,0,0,0.14);
+  }
   /* "Ver análisis" — extremely subtle, low-frequency travelling glow.
      "Aurix is analysing", not "there is an animation". The static blue glow
      (base rule) stays; this adds a faint sheen that sweeps once ≈ every 8s. */
