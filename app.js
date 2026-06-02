@@ -644,23 +644,33 @@ async function _flushStatePersistence(reason) {
     // so writing them here cannot clobber a populated remote with empty local.
     const catalog   = (localData && localData.source === 'new') ? localData.assets   : [];
     const holdings  = (localData && localData.source === 'new') ? localData.holdings  : {};
-    const { error } = await supabaseClient
+    const payload = {
+      user_id:              currentUser.id,
+      assets:               catalog,
+      holdings,
+      portfolio_history:    portfolioHistory,
+      category_history:     categoryHistory,
+      watchlist:            (typeof getWatchlist === 'function') ? getWatchlist() : [],
+      watchlist_updated_at: localTs > 0 ? new Date(localTs).toISOString() : null,
+      preferences:          { lang: (typeof lang !== 'undefined' ? lang : 'es'), baseCurrency: (typeof baseCurrency !== 'undefined' ? baseCurrency : 'USD') },
+      preferences_updated_at: localPrefsTs > 0 ? new Date(localPrefsTs).toISOString() : null,
+      ui_state:             _collectUiState(),
+      ui_state_updated_at:  localUiTs > 0 ? new Date(localUiTs).toISOString() : null,
+      updated_at:           new Date().toISOString(),
+    };
+    let { error } = await supabaseClient
       .from('user_portfolios')
-      .upsert({
-        user_id:              currentUser.id,
-        assets:               catalog,
-        holdings,
-        portfolio_history:    portfolioHistory,
-        category_history:     categoryHistory,
-        watchlist:            (typeof getWatchlist === 'function') ? getWatchlist() : [],
-        watchlist_updated_at: localTs > 0 ? new Date(localTs).toISOString() : null,
-        preferences:          { lang: (typeof lang !== 'undefined' ? lang : 'es'), baseCurrency: (typeof baseCurrency !== 'undefined' ? baseCurrency : 'USD') },
-        preferences_updated_at: localPrefsTs > 0 ? new Date(localPrefsTs).toISOString() : null,
-        ui_state:             _collectUiState(),
-        ui_state_updated_at:  localUiTs > 0 ? new Date(localUiTs).toISOString() : null,
-        updated_at:           new Date().toISOString(),
-      }, { onConflict: 'user_id' });
-    if (error) throw error;
+      .upsert(payload, { onConflict: 'user_id' });
+    if (error) {
+      // AURIX-ACCOUNT-SOURCE-OF-TRUTH-1 Phase 1: push-safe. If the ui_state
+      // columns are not migrated yet, the whole upsert errors — retry WITHOUT
+      // them so core data (assets/history/watchlist/preferences) still persists.
+      // Once the SQL is applied, the first branch succeeds and this never runs.
+      const { ui_state, ui_state_updated_at, ...core } = payload;
+      const retry = await supabaseClient.from('user_portfolios').upsert(core, { onConflict: 'user_id' });
+      if (retry.error) throw retry.error;
+      if (IS_DEV) console.warn('[STATE] ui_state columns not present yet — saved core only (' + (error.message || '') + ')');
+    }
     if (IS_DEV) console.log('[STATE] flush ok (' + reason + ') hist=' + portfolioHistory.length + ' cat=' + categoryHistory.length);
   } catch (e) {
     if (IS_DEV) console.warn('[STATE] flush failed (' + reason + ')', e && e.message);
@@ -693,7 +703,10 @@ async function loadPortfolioFromBackend(userId) {
       // AURIX-PERSISTENCE-REMOTE-HISTORY-WATCHLIST-1: also pull the
       // remote history + watchlist columns so Safari and the iOS PWA
       // (separate storage containers) converge to identical data.
-      .select('assets, holdings, updated_at, portfolio_history, category_history, watchlist, watchlist_updated_at, preferences, preferences_updated_at, ui_state, ui_state_updated_at')
+      // AURIX-ACCOUNT-SOURCE-OF-TRUTH-1 Phase 1: select('*') is push-safe — a
+      // not-yet-migrated ui_state column simply won't appear (an explicit list
+      // would 400 the whole load). Every column is read defensively below.
+      .select('*')
       .eq('user_id', userId)
       .single();
     if (error) {
