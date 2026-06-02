@@ -15784,15 +15784,22 @@ body.gs-open { overflow: hidden; }
   100%    { transform: translateX(140%); }
 }
 @media (min-width: 1024px) {
-  /* Wealth area: the figure reads as MORE important without being larger —
-     a layered shadow lifts it off the surface (depth, not size/colour/neon). */
+  /* 1. Wealth = absolute focus: figure +~7% size ONLY (same typography, weight,
+     colour, position) + a layered shadow that lifts it off the surface (depth,
+     not neon). 45/42 ≈ +7%. */
   .hero-left .summary-total {
+    font-size: clamp(30px, 4.3vw, 45px);
     text-shadow: 0 1px 1px rgba(0,0,0,0.22), 0 0 18px rgba(255,255,255,0.16);
   }
-  /* Composition balance: a touch more bottom breathing so the column reads
-     designed, not top-stacked. (hero-left is shorter than the chart column,
-     so this does not change the card height.) */
-  .hero-left { padding-bottom: 32px; }
+  /* 2/3/6. Vertical balance via dual auto-margins: the free space splits EQUALLY
+     above the actions AND above the health pill, so the actions sit a touch
+     lower than the info block (elegant breathing) and the health capsule drops
+     to a distinct lower "intelligence" layer — leaving a bottom gap that
+     optically matches the top margin above "VALOR TOTAL" (padding-top ==
+     padding-bottom == --space-5). Buttons + pill themselves are untouched. */
+  .hero-left { padding-bottom: var(--space-5); }
+  .hero-left .summary-footer { margin-top: auto; }
+  .hero-left .aurix-signal   { margin-top: auto; }
   /* "Añadir liquidez" — equal-weight contrast at desktop. Stays NEUTRAL
      (not Aurix-blue), so it reads as an equal action, never a second primary. */
   .summary-footer .btn-summary-action.btn-secondary {
