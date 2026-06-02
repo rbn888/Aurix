@@ -606,14 +606,18 @@ button[aria-busy="true"] {
     0 6px 18px -6px rgba(74,130,240,0.28);
 }
 .btn-summary-action.btn-secondary {
-  background: transparent;
-  border-color: rgba(255,255,255,0.10);
-  color: var(--text-muted);
-  box-shadow: none;
+  /* AURIX-WEALTH-CARD-HIERARCHY-REFINEMENT-1: lift the secondary to the same
+     visual level as the primary — brighter text, a present premium outline and
+     a faint fill — so "Añadir liquidez" reads as an equal action, not a faded
+     ghost. Stays neutral (vs the primary's Aurix-blue) to keep the hierarchy. */
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.16);
+  color: var(--text);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
 }
 .btn-summary-action.btn-secondary:hover {
-  background: rgba(255,255,255,0.05);
-  border-color: rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.075);
+  border-color: rgba(255,255,255,0.28);
   color: var(--text);
 }
 .btn-primary:hover,
@@ -736,13 +740,14 @@ button[aria-busy="true"] {
 }
 
 .summary-footer {
-  /* AURIX-DASHBOARD-HERO-COMPOSITION-FIX-1: anchored to the bottom of the
-     full-height hero-left (margin-top:auto) — the auto gap gives the buttons
-     breathing room above (from the health pill) and the column's bottom padding
-     gives margin below the card edge. Divider REMOVED: a full-width hairline
-     above small left-aligned buttons read as a stray line; spacing alone
-     separates the zones now (spec Option A). Desktop only (display:none ≤768px). */
-  margin-top: auto;
+  /* AURIX-WEALTH-CARD-HIERARCHY-REFINEMENT-1: actions sit immediately after the
+     info block (new order: value → actions → health). No longer bottom-anchored
+     — margin-top:auto created a big central void that buried the buttons and
+     over-promoted the health row. A comfortable fixed top margin gives premium
+     air without a dead gap. Visual order (footer before the health pill) is set
+     via `order` on desktop. Desktop only (display:none ≤768px). Divider stays
+     removed. */
+  margin-top: var(--space-4);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -15743,7 +15748,14 @@ body.gs-open { overflow: hidden; }
    glass + hairline + pill radius, soft hover (the row is clickable). Desktop
    only; mobile keeps the compact inline row untouched. */
 @media (min-width: 769px) {
+  /* AURIX-WEALTH-CARD-HIERARCHY-REFINEMENT-1: reorder the hero-left column to
+     value → actions → health WITHOUT touching the DOM. The actions (order:1)
+     follow the info block; the health pill (order:2) drops below them as a
+     secondary layer. */
+  .hero-left .summary-footer { order: 1; }
   .hero-left .aurix-signal {
+    order: 2;
+    margin-top: var(--space-4);   /* premium gap below the actions */
     align-self: flex-start;
     width: fit-content;
     max-width: 100%;
@@ -15820,6 +15832,10 @@ body.gs-open { overflow: hidden; }
   background: transparent;
   border-radius: 8px;
   white-space: nowrap;
+  /* AURIX-WEALTH-CARD-HIERARCHY-REFINEMENT-1: a very subtle STATIC blue glow on
+     "Ver análisis" — premium hint of intelligence, no continuous motion / no
+     shimmer loop (per spec: sin movimiento continuo). */
+  text-shadow: 0 0 8px rgba(74, 130, 240, 0.28);
 }
 .aurix-signal--health .aurix-signal-cta:hover {
   background: rgba(74, 130, 240, 0.10);
