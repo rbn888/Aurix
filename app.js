@@ -450,6 +450,52 @@ function _applyRemotePrefs(prefs) {
   }
 }
 
+// ── AURIX-ACCOUNT-SOURCE-OF-TRUTH-1 · Phase 1: UI state (workspace + orders) ──
+// Same last-write-wins protocol as preferences. Keys (literals to avoid TDZ on
+// the later-declared CARD_ORDER_KEY / CAT_ORDER_KEY / _AW73_STORAGE_KEY consts).
+const UI_STATE_TS_KEY = 'aurix_ui_state_updated_at';
+function _aurixUiStateTs() {
+  try { return parseInt(localStorage.getItem(UI_STATE_TS_KEY) || '0', 10) || 0; }
+  catch (_) { return 0; }
+}
+// Stamp a user-driven UI-state change (workspace edit / card reorder / category
+// reorder) and flush. Called from saveWorkspacePersistence + the order savers.
+function _touchUiState() {
+  try { localStorage.setItem(UI_STATE_TS_KEY, String(Date.now())); } catch (_) {}
+  try { if (typeof scheduleStateFlush === 'function') scheduleStateFlush(); } catch (_) {}
+}
+// Snapshot the current UI state for the remote flush payload.
+function _collectUiState() {
+  let workspace = null, cardOrder = [], catOrder = [];
+  try { const raw = localStorage.getItem('aurix.workspace.v1'); workspace = raw ? JSON.parse(raw) : null; } catch (_) {}
+  try { cardOrder = JSON.parse(localStorage.getItem('portfolio_card_order') || 'null') || []; } catch (_) {}
+  try { catOrder  = JSON.parse(localStorage.getItem('portfolio_cat_order')  || 'null') || []; } catch (_) {}
+  return { workspace, cardOrder, catOrder };
+}
+// Apply remote UI state into localStorage + the in-memory order vars. The boot
+// render reads _cardOrder/_catOrder and the workspace mounts from localStorage,
+// so writing here (before render) is sufficient — no heavy re-render needed.
+function _applyRemoteUiState(ui) {
+  if (!ui || typeof ui !== 'object') return;
+  try {
+    if (ui.workspace && typeof ui.workspace === 'object') {
+      localStorage.setItem('aurix.workspace.v1', JSON.stringify(ui.workspace));
+    }
+  } catch (_) {}
+  try {
+    if (Array.isArray(ui.cardOrder)) {
+      localStorage.setItem('portfolio_card_order', JSON.stringify(ui.cardOrder));
+      if (typeof _cardOrder !== 'undefined') _cardOrder = ui.cardOrder;
+    }
+  } catch (_) {}
+  try {
+    if (Array.isArray(ui.catOrder)) {
+      localStorage.setItem('portfolio_cat_order', JSON.stringify(ui.catOrder));
+      if (typeof _catOrder !== 'undefined') _catOrder = ui.catOrder;
+    }
+  } catch (_) {}
+}
+
 // Union two history arrays by timestamp (last write per ts wins), keep only
 // finite positive values, sort ascending, then apply the reset epoch guard —
 // mirrors loadHistory() exactly so the merged in-memory array stays clean.
@@ -539,6 +585,28 @@ function _mergeRemoteState(remoteRow) {
       try { localStorage.setItem(PREFS_TS_KEY, String(remotePrefsTs)); } catch (_) {}
     }
 
+    // ── UI state (workspace + card/category order), last-write-wins. Same legacy
+    //    guard as preferences: an explicit unstamped local state becomes
+    //    authoritative on first migration; a fresh container adopts the remote.
+    let localUiTs = _aurixUiStateTs();
+    const hasLocalUi = (function () {
+      try {
+        return localStorage.getItem('aurix.workspace.v1') != null ||
+               localStorage.getItem('portfolio_card_order') != null ||
+               localStorage.getItem('portfolio_cat_order')  != null;
+      } catch (_) { return false; }
+    })();
+    if (localUiTs === 0 && hasLocalUi) {
+      localUiTs = Date.now();
+      try { localStorage.setItem(UI_STATE_TS_KEY, String(localUiTs)); } catch (_) {}
+    }
+    const remoteUi   = (remoteRow && remoteRow.ui_state && typeof remoteRow.ui_state === 'object') ? remoteRow.ui_state : null;
+    const remoteUiTs = (remoteRow && remoteRow.ui_state_updated_at) ? new Date(remoteRow.ui_state_updated_at).getTime() : 0;
+    if (remoteUi && remoteUiTs > localUiTs) {
+      _applyRemoteUiState(remoteUi);
+      try { localStorage.setItem(UI_STATE_TS_KEY, String(remoteUiTs)); } catch (_) {}
+    }
+
     // Boot load is complete; enable flushing and schedule the migration write
     // (idempotent — union/LWW converge, so re-running is harmless).
     _bootLoadComplete = true;
@@ -569,6 +637,7 @@ async function _flushStatePersistence(reason) {
   try {
     const localTs      = _aurixWatchlistTs();
     const localPrefsTs = _aurixPrefsTs();
+    const localUiTs    = _aurixUiStateTs();
     const localData = getPortfolioData();
     // assets/holdings are authoritative in localStorage post boot-load (the
     // _bootLoadComplete gate guarantees the remote row was already merged in),
@@ -587,6 +656,8 @@ async function _flushStatePersistence(reason) {
         watchlist_updated_at: localTs > 0 ? new Date(localTs).toISOString() : null,
         preferences:          { lang: (typeof lang !== 'undefined' ? lang : 'es'), baseCurrency: (typeof baseCurrency !== 'undefined' ? baseCurrency : 'USD') },
         preferences_updated_at: localPrefsTs > 0 ? new Date(localPrefsTs).toISOString() : null,
+        ui_state:             _collectUiState(),
+        ui_state_updated_at:  localUiTs > 0 ? new Date(localUiTs).toISOString() : null,
         updated_at:           new Date().toISOString(),
       }, { onConflict: 'user_id' });
     if (error) throw error;
@@ -622,7 +693,7 @@ async function loadPortfolioFromBackend(userId) {
       // AURIX-PERSISTENCE-REMOTE-HISTORY-WATCHLIST-1: also pull the
       // remote history + watchlist columns so Safari and the iOS PWA
       // (separate storage containers) converge to identical data.
-      .select('assets, holdings, updated_at, portfolio_history, category_history, watchlist, watchlist_updated_at, preferences, preferences_updated_at')
+      .select('assets, holdings, updated_at, portfolio_history, category_history, watchlist, watchlist_updated_at, preferences, preferences_updated_at, ui_state, ui_state_updated_at')
       .eq('user_id', userId)
       .single();
     if (error) {
@@ -8174,6 +8245,9 @@ function saveWorkspacePersistence() {
 
   try {
     localStorage.setItem(_AW73_STORAGE_KEY, JSON.stringify(payload));
+    // AURIX-ACCOUNT-SOURCE-OF-TRUTH-1 Phase 1: mirror workspace changes to the
+    // account (LWW). Fire-and-forget; never let it break the local save.
+    try { if (typeof _touchUiState === 'function') _touchUiState(); } catch (_) {}
     return true;
   } catch (e) {
     console.warn('[workspace-persist] save failed:', e?.message);
@@ -13319,6 +13393,7 @@ function _ddSaveOrder() {
     .map(c => c.dataset.assetId);
   _cardOrder = ids;
   localStorage.setItem(CARD_ORDER_KEY, JSON.stringify(ids));
+  try { if (typeof _touchUiState === 'function') _touchUiState(); } catch (_) {} // AURIX-ACCOUNT-SOURCE-OF-TRUTH-1 P1
 }
 
 function applyCustomOrder(assetList) {
@@ -24148,6 +24223,7 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   function saveCatOrder() {
     _catOrder = [...grid.querySelectorAll('.cat-card[data-type]')].map(c => c.dataset.type);
     localStorage.setItem(CAT_ORDER_KEY, JSON.stringify(_catOrder));
+    try { if (typeof _touchUiState === 'function') _touchUiState(); } catch (_) {} // AURIX-ACCOUNT-SOURCE-OF-TRUTH-1 P1
   }
 
   // active:  hold timer has fired, drag is armed
