@@ -736,7 +736,13 @@ button[aria-busy="true"] {
 }
 
 .summary-footer {
-  margin-top: var(--space-3);
+  /* AURIX-DASHBOARD-HERO-PREMIUM-COMPOSITION-1: anchor the add actions to the
+     BOTTOM of the hero-left column (which stretches to the card height) instead
+     of stacking them tight under the status. This consumes the empty space that
+     used to sit below the buttons, lets them breathe, and isolates the health
+     mini-card above — all without a fixed number (auto adapts to the card
+     height). Desktop only: .summary-footer is display:none ≤768px (FAB used). */
+  margin-top: auto;
   padding-top: 14px;
   border-top: 1px solid var(--color-border-subtle);
   display: flex;
@@ -15720,6 +15726,25 @@ body.gs-open { overflow: hidden; }
   box-shadow: none;
   animation: none;
   min-height: 0;
+}
+/* AURIX-DASHBOARD-HERO-PREMIUM-COMPOSITION-1: on DESKTOP, give the health teaser
+   a RESTRAINED premium mini-card surface so it reads as a distinct "Aurix
+   recommendation" instead of a lost text row — reverses the flat-row treatment
+   of AURIX-HERO-PREMIUM-REFINE-1 (desktop only; mobile keeps the compact row to
+   stay untouched). Very subtle: faint blue-tinted glass + hairline border, no
+   loud colour, no shadow glow, and no pulse (the hero ::after stays hidden via
+   the rule below), per "premium, elegante — no efectos". */
+@media (min-width: 769px) {
+  .hero-left .aurix-signal {
+    padding: 9px 12px;
+    gap: 10px;
+    background:
+      linear-gradient(180deg, rgba(74,130,240,0.07) 0%, rgba(12,18,32,0.0) 80%),
+      rgba(255,255,255,0.02);
+    border: 1px solid rgba(74,130,240,0.12);
+    border-radius: 12px;
+    box-shadow: 0 2px 12px -9px rgba(0,0,0,0.55);
+  }
 }
 /* Tiny, subtle health dot — no glow ring, no status orb, so it never
    competes with the sync dot in the meta row above. */
