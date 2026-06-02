@@ -24,6 +24,7 @@
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <meta name="theme-color" content="#070a14">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Aurix">
   <!-- AURIX-PWA-FIRST-FRAME-CRITICAL-1: a real PNG icon + dark native iOS launch
@@ -39,6 +40,16 @@
   <link rel="apple-touch-startup-image" media="(device-width:430px) and (device-height:932px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)" href="splash/launch-1290x2796.png">
   <link rel="apple-touch-startup-image" media="(device-width:375px) and (device-height:812px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)" href="splash/launch-1125x2436.png">
   <link rel="apple-touch-startup-image" media="(device-width:414px) and (device-height:896px) and (-webkit-device-pixel-ratio:2) and (orientation:portrait)" href="splash/launch-828x1792.png">
+  <!-- AURIX-PWA-FIRST-FRAME: solid #070a14 startup images for the rest of the
+       iPhone lineup so no device ever shows a white native launch screen. These
+       carry no wordmark (no text renderer available to pixel-match the splash);
+       the in-page #bootLoader paints the AURIX wordmark immediately after, so
+       the sequence is "black → AURIX" with no white frame and no movement. -->
+  <link rel="apple-touch-startup-image" media="(device-width:375px) and (device-height:667px) and (-webkit-device-pixel-ratio:2) and (orientation:portrait)" href="splash/launch-750x1334.png">
+  <link rel="apple-touch-startup-image" media="(device-width:414px) and (device-height:736px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)" href="splash/launch-1242x2208.png">
+  <link rel="apple-touch-startup-image" media="(device-width:414px) and (device-height:896px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)" href="splash/launch-1242x2688.png">
+  <link rel="apple-touch-startup-image" media="(device-width:402px) and (device-height:874px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)" href="splash/launch-1206x2622.png">
+  <link rel="apple-touch-startup-image" media="(device-width:440px) and (device-height:956px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)" href="splash/launch-1320x2868.png">
   <script>
     // PWA-CONSISTENCY-1: global build identifier + standalone detection.
     // Runs synchronously before any other script so a stale build cannot

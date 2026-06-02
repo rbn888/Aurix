@@ -262,10 +262,10 @@ main { animation: page-enter .4s var(--ease-out) forwards; }
   to   { opacity: 1; }
 }
 
-@keyframes logo-enter {
-  from { opacity: 0;   transform: translateY(6px) scaleX(1.18) scaleY(0.86); }
-  to   { opacity: .88; transform: translateY(0)   scaleX(1.18) scaleY(0.86); }
-}
+/* AURIX-PWA-FIRST-FRAME: removed the dead `logo-enter` keyframe (translateY +
+   scale). Its consumer was already deleted when the wordmark entrance animation
+   was retired; keeping a motion keyframe around is a foot-gun for the
+   "no movement on boot" guarantee. */
 
 /* ── Skeleton shimmer ───────────────────────────────────── */
 @keyframes shimmer {
