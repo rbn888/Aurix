@@ -11544,15 +11544,17 @@ body.workspace-active .header {
     transition: color 0.18s ease, background-color 0.18s ease;
   }
   .header-tab:hover {
-    /* AURIX-BRAND-PREMIUM-HEADER-2 (B3): Aurix-tinted hover (was neutral white)
-       so navigation reads as a premium product surface. */
+    /* AURIX-HEADER-NAV-ACTIVE-BACKGROUND-1: Aurix-tinted hover via TEXT only —
+       no background pill, so the header stays clean and integrated with the
+       black surface (was a faint blue fill). */
     color: rgba(235, 243, 255, 0.96);
-    background: rgba(74, 130, 240, 0.07);
   }
   .header-tab.active {
+    /* AURIX-HEADER-NAV-ACTIVE-BACKGROUND-1: removed the bluish pill/rectangle
+       behind the active tab. The active state now reads through bright text +
+       the bottom blue underline glow (::after) only — no background surface. */
     color: #fff;
     font-weight: 600;
-    background: rgba(74, 130, 240, 0.06);
   }
   .header-tab.active::after {
     content: '';
