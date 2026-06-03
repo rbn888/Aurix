@@ -196,6 +196,7 @@
           </div>
           <div class="menu-divider"></div>
           <button id="menuGeneral" class="menu-item menu-item--general" data-i18n="settingsGeneral" role="menuitem">⚙ General</button>
+          <button id="menuFounder" class="menu-item menu-item--founder" data-i18n="settingsFounderName" role="menuitem">✦ Aurix Founder</button>
           <div class="menu-divider"></div>
           <button id="menuExit" class="menu-item menu-item--danger" data-i18n="exit" role="menuitem">Salir</button>
         </div>
@@ -1354,12 +1355,7 @@
             <span class="plan-card-badge" id="planTierBadge" data-i18n="settingsPlanCurrent">Plan actual</span>
           </div>
           <div class="plan-card-body">
-            <div class="plan-usage">
-              <span class="plan-usage-label" data-i18n="settingsAssetsUsed">Activos usados</span>
-              <span class="plan-usage-value" id="planAssetsUsed">0 / 10</span>
-            </div>
-            <div class="plan-usage-bar"><span class="plan-usage-bar-fill" id="planUsageFill" style="width:0%"></span></div>
-            <div class="plan-usage-warn" id="planUsageWarn" hidden data-i18n="settingsAssetsSoftWarn">Estás cerca del límite del plan Free.</div>
+            <p class="plan-card-desc" id="planCurrentDesc">Seguimiento completo de tu patrimonio. Sin límite de activos.</p>
           </div>
         </div>
 
@@ -1370,7 +1366,7 @@
           </div>
           <div class="plan-card-body">
             <p class="plan-card-desc" data-i18n="settingsFounderDesc">Acceso anticipado. Sin límite de activos. Precio fundador de por vida.</p>
-            <button type="button" class="btn-submit btn-submit--plan" id="planFounderCta" data-i18n="settingsFounderCta" disabled>Mejorar a Founder</button>
+            <button type="button" class="btn-submit btn-submit--plan" id="planFounderCta" data-i18n="settingsFounderCta">Conocer Aurix Founder</button>
             <p class="plan-card-note" data-i18n="settingsFounderSoon">Próximamente</p>
           </div>
         </div>
@@ -1457,6 +1453,67 @@
         </div>
       </section>
 
+    </div>
+  </div>
+</div>
+
+<!-- AURIX-MONETIZATION-1 · Phases 4/5/8 — Aurix Founder page. Commercial
+     presentation only. No checkout: the CTA shows Early Access until Stripe is
+     wired (no real payment, no subscription). Reuses .modal-overlay / .modal. -->
+<div class="modal-overlay" id="founderOverlay" aria-hidden="true">
+  <div class="modal modal--founder" role="dialog" aria-modal="true" aria-labelledby="founderTitle">
+    <div class="modal-header">
+      <div class="modal-title-block">
+        <h3 id="founderTitle" data-i18n="founderTitle">Aurix Founder</h3>
+        <p class="modal-subtitle" data-i18n="founderSubtitle">Acceso anticipado a la plataforma de inteligencia patrimonial.</p>
+      </div>
+      <button class="modal-close" id="founderClose" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body founder-body">
+      <div class="founder-hero">
+        <span class="founder-badge" data-i18n="founderBadge">Oferta fundador</span>
+        <div class="founder-price"><span class="founder-price-amount" id="founderPriceAmount">14,99 € / año</span></div>
+        <p class="founder-price-note" data-i18n="founderPriceNote">Precio fundador de por vida.</p>
+      </div>
+
+      <div class="founder-section">
+        <h4 class="founder-section-title" data-i18n="founderIncludesTitle">Incluye</h4>
+        <ul class="founder-benefits" id="founderBenefitsList"><!-- rendered by _renderFounderBenefits() --></ul>
+      </div>
+
+      <div class="founder-section">
+        <h4 class="founder-section-title" data-i18n="founderPerksTitle">Ventajas de fundador</h4>
+        <ul class="founder-perks">
+          <li data-i18n="founderPerkLifetime">Precio fundador de por vida</li>
+          <li data-i18n="founderPerkPremium">Acceso a todas las funciones premium actuales</li>
+          <li data-i18n="founderPerkPriority">Acceso prioritario a futuras funciones</li>
+          <li data-i18n="founderPerkSupport">Soporte temprano al desarrollo</li>
+        </ul>
+      </div>
+
+      <div class="founder-cta-wrap">
+        <button type="button" class="btn-submit btn-submit--plan founder-cta" id="founderCta" data-i18n="founderCta">Early Access · Próximamente</button>
+        <p class="founder-cta-note" id="founderCtaNote" data-i18n="founderCtaNote">Aún no está abierto. Te avisaremos al activar el acceso fundador.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AURIX-MONETIZATION-1 · Phase 6 — Premium upgrade screen. DORMANT: with
+     ENFORCE_ENTITLEMENTS=false, requireFeature() never opens this. It exists so
+     gated surfaces have a destination the day enforcement is switched on. -->
+<div class="modal-overlay" id="upgradeOverlay" aria-hidden="true">
+  <div class="modal modal--upgrade" role="dialog" aria-modal="true" aria-labelledby="upgradeTitle">
+    <div class="modal-header">
+      <div class="modal-title-block">
+        <h3 id="upgradeTitle" data-i18n="upgradeTitle">Función premium</h3>
+        <p class="modal-subtitle" id="upgradeFeatureName">Aurix Founder</p>
+      </div>
+      <button class="modal-close" id="upgradeClose" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body upgrade-body">
+      <p class="upgrade-lead" data-i18n="upgradeLead">Esta herramienta forma parte del plan premium de Aurix.</p>
+      <button type="button" class="btn-submit btn-submit--plan" id="upgradeFounderBtn" data-i18n="upgradeSeeFounder">Ver Aurix Founder</button>
     </div>
   </div>
 </div>

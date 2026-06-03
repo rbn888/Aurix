@@ -496,6 +496,34 @@ function _applyRemoteUiState(ui) {
   } catch (_) {}
 }
 
+// ── Subscription / plan sync (AURIX-MONETIZATION-1) ───────────────
+// The active plan (tier + status + commercial metadata) is an account-level
+// fact, so it rides the same last-write-wins remote-sync rail as preferences /
+// ui_state. Storage + tier logic live with the plan model (PLAN_KEY, defined in
+// the SETTINGS-1 block); here we only expose the timestamp + collect/apply
+// helpers the sync layer uses. This is pure persistence — it never reads or
+// flips ENFORCE_ENTITLEMENTS and never gates a feature.
+const SUBSCRIPTION_TS_KEY = 'aurix_subscription_updated_at';
+function _aurixSubscriptionTs() {
+  try { return parseInt(localStorage.getItem(SUBSCRIPTION_TS_KEY) || '0', 10) || 0; }
+  catch (_) { return 0; }
+}
+// Stamp a plan change (promo redemption / manual grant / future Stripe webhook)
+// and schedule the remote flush. Called from savePlan.
+function _touchSubscription() {
+  try { localStorage.setItem(SUBSCRIPTION_TS_KEY, String(Date.now())); } catch (_) {}
+  try { if (typeof scheduleStateFlush === 'function') scheduleStateFlush(); } catch (_) {}
+}
+// Snapshot the current plan for the remote flush payload.
+function _collectSubscription() {
+  try { return (typeof getPlan === 'function') ? getPlan() : null; } catch (_) { return null; }
+}
+// Apply a remote plan object into localStorage (last-write-wins adoption).
+function _applyRemoteSubscription(sub) {
+  if (!sub || typeof sub !== 'object' || typeof sub.tier !== 'string') return;
+  try { localStorage.setItem('aurix_plan', JSON.stringify(sub)); } catch (_) {}
+}
+
 // Union two history arrays by timestamp (last write per ts wins), keep only
 // finite positive values, sort ascending, then apply the reset epoch guard —
 // mirrors loadHistory() exactly so the merged in-memory array stays clean.
@@ -607,6 +635,26 @@ function _mergeRemoteState(remoteRow) {
       try { localStorage.setItem(UI_STATE_TS_KEY, String(remoteUiTs)); } catch (_) {}
     }
 
+    // ── Subscription / plan (last-write-wins). Account-level like preferences,
+    //    so it is NOT gated by the reset tombstone (a plan survives a portfolio
+    //    reset). A legacy explicit local plan (key present, no timestamp) is
+    //    stamped once so it becomes authoritative and is never silently
+    //    overwritten by an older remote.
+    let localSubTs = _aurixSubscriptionTs();
+    const hasLocalPlan = (function () {
+      try { return localStorage.getItem('aurix_plan') != null; } catch (_) { return false; }
+    })();
+    if (localSubTs === 0 && hasLocalPlan) {
+      localSubTs = Date.now();
+      try { localStorage.setItem(SUBSCRIPTION_TS_KEY, String(localSubTs)); } catch (_) {}
+    }
+    const remoteSub   = (remoteRow && remoteRow.subscription && typeof remoteRow.subscription === 'object') ? remoteRow.subscription : null;
+    const remoteSubTs = (remoteRow && remoteRow.subscription_updated_at) ? new Date(remoteRow.subscription_updated_at).getTime() : 0;
+    if (remoteSub && remoteSubTs > localSubTs) {
+      _applyRemoteSubscription(remoteSub);
+      try { localStorage.setItem(SUBSCRIPTION_TS_KEY, String(remoteSubTs)); } catch (_) {}
+    }
+
     // Boot load is complete; enable flushing and schedule the migration write
     // (idempotent — union/LWW converge, so re-running is harmless).
     _bootLoadComplete = true;
@@ -638,6 +686,7 @@ async function _flushStatePersistence(reason) {
     const localTs      = _aurixWatchlistTs();
     const localPrefsTs = _aurixPrefsTs();
     const localUiTs    = _aurixUiStateTs();
+    const localSubTs   = _aurixSubscriptionTs();
     const localData = getPortfolioData();
     // assets/holdings are authoritative in localStorage post boot-load (the
     // _bootLoadComplete gate guarantees the remote row was already merged in),
@@ -656,20 +705,23 @@ async function _flushStatePersistence(reason) {
       preferences_updated_at: localPrefsTs > 0 ? new Date(localPrefsTs).toISOString() : null,
       ui_state:             _collectUiState(),
       ui_state_updated_at:  localUiTs > 0 ? new Date(localUiTs).toISOString() : null,
+      subscription:            _collectSubscription(),
+      subscription_updated_at: localSubTs > 0 ? new Date(localSubTs).toISOString() : null,
       updated_at:           new Date().toISOString(),
     };
     let { error } = await supabaseClient
       .from('user_portfolios')
       .upsert(payload, { onConflict: 'user_id' });
     if (error) {
-      // AURIX-ACCOUNT-SOURCE-OF-TRUTH-1 Phase 1: push-safe. If the ui_state
-      // columns are not migrated yet, the whole upsert errors — retry WITHOUT
-      // them so core data (assets/history/watchlist/preferences) still persists.
-      // Once the SQL is applied, the first branch succeeds and this never runs.
-      const { ui_state, ui_state_updated_at, ...core } = payload;
+      // AURIX-ACCOUNT-SOURCE-OF-TRUTH-1 Phase 1: push-safe. If the ui_state OR
+      // the subscription columns are not migrated yet, the whole upsert errors —
+      // retry WITHOUT them so core data (assets/history/watchlist/preferences)
+      // still persists. Once the SQL is applied, the first branch succeeds and
+      // this never runs. (AURIX-MONETIZATION-1 adds subscription to the strip.)
+      const { ui_state, ui_state_updated_at, subscription, subscription_updated_at, ...core } = payload;
       const retry = await supabaseClient.from('user_portfolios').upsert(core, { onConflict: 'user_id' });
       if (retry.error) throw retry.error;
-      if (IS_DEV) console.warn('[STATE] ui_state columns not present yet — saved core only (' + (error.message || '') + ')');
+      if (IS_DEV) console.warn('[STATE] ui_state/subscription columns not present yet — saved core only (' + (error.message || '') + ')');
     }
     if (IS_DEV) console.log('[STATE] flush ok (' + reason + ') hist=' + portfolioHistory.length + ' cat=' + categoryHistory.length);
   } catch (e) {
@@ -1762,8 +1814,25 @@ const T = {
     settingsFounderName:      'Aurix Founder',
     settingsFounderPrice:     '14,99€ / año',
     settingsFounderDesc:      'Acceso anticipado. Sin límite de activos. Precio fundador de por vida.',
-    settingsFounderCta:       'Mejorar a Founder',
+    settingsFounderCta:       'Conocer Aurix Founder',
     settingsFounderSoon:      'Próximamente',
+    // AURIX-MONETIZATION-1 — Founder page
+    founderTitle:             'Aurix Founder',
+    founderSubtitle:          'Acceso anticipado a la plataforma de inteligencia patrimonial.',
+    founderBadge:             'Oferta fundador',
+    founderPriceNote:         'Precio fundador de por vida.',
+    founderIncludesTitle:     'Incluye',
+    founderPerksTitle:        'Ventajas de fundador',
+    founderPerkLifetime:      'Precio fundador de por vida',
+    founderPerkPremium:       'Acceso a todas las funciones premium actuales',
+    founderPerkPriority:      'Acceso prioritario a futuras funciones',
+    founderPerkSupport:       'Soporte temprano al desarrollo',
+    founderCta:               'Early Access · Próximamente',
+    founderCtaNote:           'Aún no está abierto. Te avisaremos al activar el acceso fundador.',
+    // AURIX-MONETIZATION-1 — Upgrade screen (dormant)
+    upgradeTitle:             'Función premium',
+    upgradeLead:              'Esta herramienta forma parte del plan premium de Aurix.',
+    upgradeSeeFounder:        'Ver Aurix Founder',
     settingsData:             'Datos',
     settingsExport:           'Exportar datos',
     settingsExportSub:        'Descarga un JSON con toda tu cartera',
@@ -2913,8 +2982,25 @@ const T = {
     settingsFounderName:      'Aurix Founder',
     settingsFounderPrice:     '€14.99 / year',
     settingsFounderDesc:      'Early access. Unlimited assets. Founder price for life.',
-    settingsFounderCta:       'Upgrade to Founder',
+    settingsFounderCta:       'About Aurix Founder',
     settingsFounderSoon:      'Coming soon',
+    // AURIX-MONETIZATION-1 — Founder page
+    founderTitle:             'Aurix Founder',
+    founderSubtitle:          'Early access to the wealth intelligence platform.',
+    founderBadge:             'Founder offer',
+    founderPriceNote:         'Founder price for life.',
+    founderIncludesTitle:     'Includes',
+    founderPerksTitle:        'Founder perks',
+    founderPerkLifetime:      'Founder price for life',
+    founderPerkPremium:       'Access to every current premium feature',
+    founderPerkPriority:      'Priority access to future features',
+    founderPerkSupport:       'Early support to development',
+    founderCta:               'Early Access · Coming soon',
+    founderCtaNote:           'Not open yet. We will let you know when founder access goes live.',
+    // AURIX-MONETIZATION-1 — Upgrade screen (dormant)
+    upgradeTitle:             'Premium feature',
+    upgradeLead:              'This tool is part of Aurix premium.',
+    upgradeSeeFounder:        'See Aurix Founder',
     settingsData:             'Data',
     settingsExport:           'Export data',
     settingsExportSub:        'Download a JSON file with your portfolio',
@@ -25904,84 +25990,257 @@ if (typeof window !== 'undefined') {
    SETTINGS-1 — General panel, plan foundation, safe reset, export.
    ══════════════════════════════════════════════════════════════════ */
 
-// ── Plan foundation (display only — no enforcement yet) ───────────
+/* ──────────────────────────────────────────────────────────────────
+   AURIX-MONETIZATION-1 — Plans & entitlements (built, kept DORMANT).
+   --------------------------------------------------------------------
+   The full commercial model (Free / Founder / Premium) lives here as a
+   real, launch-ready product skeleton. It is wired end-to-end but stays
+   completely inert until launch, governed by ONE compile-time switch:
+
+       ENFORCE_ENTITLEMENTS = false
+
+   Design contract (do not break):
+   • While the switch is false, EVERY feature is unlocked for EVERY tier.
+     Total access in prelaunch depends on this switch ALONE — never on a
+     user's tier. Nobody is silently forced to 'founder' to keep access.
+   • Tiers stay honest: a user's stored tier is their real commercial tier
+     (default 'free'). Flipping the switch to true at launch activates the
+     real Free/Founder/Premium gating with zero rearchitecture — no data
+     migration, no feature rewrites; call sites already use hasFeature().
+   • This module performs NO payments, NO Stripe, NO real subscriptions,
+     NO paywalls. Those are separate, later, signalled steps.
+   ────────────────────────────────────────────────────────────────── */
+
+// MASTER SWITCH — the single source of truth for whether gating is live.
+// false = prelaunch / development: everything unlocked. Flip to true to launch.
+const ENFORCE_ENTITLEMENTS = false;
+
 const PLAN_KEY = 'aurix_plan';
+
+// Premium feature catalog — the surfaces that become paid at launch. New premium
+// modules (Wealth Evolution, Portfolio Intelligence, …) register their key here
+// and gate themselves with hasFeature(<key>); nothing else needs to change.
+const PREMIUM_FEATURES = Object.freeze([
+  'wealth_evolution',
+  'portfolio_intelligence',
+  'portfolio_health',
+  'monthly_reports',
+  'advanced_exports',
+  'ai_wealth_assistant',
+  'workspace_advanced',
+]);
+
+// Tier → entitled feature set. Founder and Premium both unlock the full premium
+// catalog; Founder additionally carries the early-adopter commercial perks
+// (lifetime price), expressed in PLAN_CATALOG rather than as extra features.
+const PLAN_FEATURES = Object.freeze({
+  free:    new Set([]),
+  founder: new Set(PREMIUM_FEATURES),
+  premium: new Set(PREMIUM_FEATURES),
+});
+
+// Commercial plan metadata — display + future checkout. No enforcement here.
+const PLAN_CATALOG = Object.freeze({
+  free: {
+    id: 'free', name: 'Aurix Free', price: null, period: null,
+  },
+  founder: {
+    id: 'founder', name: 'Aurix Founder', price: 14.99, period: 'year',
+    priceLabel: { es: '14,99 € / año', en: '€14.99 / year' },
+    lifetimePrice: true, earlyAccess: true,
+  },
+  premium: {
+    id: 'premium', name: 'Aurix Premium', price: null, period: 'year',
+  },
+});
+
+// Asset limits kept UNLIMITED for every tier on purpose: Aurix differentiates by
+// intelligence, not by capping how much wealth you can track. The structure is
+// retained so a future lever could exist, but there is no cap and no UI today.
 const PLAN_LIMITS = Object.freeze({
-  free:    { maxAssets: 10 },
+  free:    { maxAssets: Infinity },
   founder: { maxAssets: Infinity },
-  pro:     { maxAssets: Infinity },
+  premium: { maxAssets: Infinity },
 });
 
 function _planDefault() {
   return {
-    tier: 'free',
+    tier: 'free',           // real commercial tier (free | founder | premium)
+    status: 'active',       // active | trialing | past_due | canceled | expired
     startedAt: Date.now(),
+    renewsAt: null,
+    expiresAt: null,
+    canceledAt: null,
     trialEndsAt: null,
-    founderEligible: true,
+    promoCode: null,
+    source: 'default',      // default | promo | manual | stripe
+    founderEligible: true,  // early-adopter eligibility (commercial flag)
   };
 }
+
 function loadPlan() {
+  let plan = null;
   try {
     const raw = JSON.parse(localStorage.getItem(PLAN_KEY) || 'null');
     if (raw && typeof raw === 'object' && typeof raw.tier === 'string') {
-      return Object.assign(_planDefault(), raw);
+      plan = Object.assign(_planDefault(), raw);
     }
   } catch (_) {}
-  const fresh = _planDefault();
-  try { localStorage.setItem(PLAN_KEY, JSON.stringify(fresh)); } catch (_) {}
-  return fresh;
+  if (!plan) {
+    plan = _planDefault();
+    try { localStorage.setItem(PLAN_KEY, JSON.stringify(plan)); } catch (_) {}
+  }
+  // Normalize the legacy 'pro' tier name to 'premium' (no behavior change).
+  if (plan.tier === 'pro') plan.tier = 'premium';
+  // Unknown tier → fall back to the real default tier, never to a paid one.
+  if (!PLAN_FEATURES[plan.tier]) plan.tier = 'free';
+  return plan;
 }
 function getPlan() { return loadPlan(); }
-function planTierName(tier) {
-  if (tier === 'founder') return 'Aurix Founder';
-  if (tier === 'pro')     return 'Aurix Pro';
-  return 'Aurix Free';
+
+// Persist a plan object and stamp it for last-write-wins remote sync.
+function savePlan(plan) {
+  try { localStorage.setItem(PLAN_KEY, JSON.stringify(plan)); } catch (_) {}
+  try { if (typeof _touchSubscription === 'function') _touchSubscription(); } catch (_) {}
+  return plan;
 }
+// Set/replace the active tier. The single entry point used by promo redemption,
+// manual grants and the future Stripe webhook bridge — dormant in prelaunch but
+// fully wired, so activation needs no new plumbing.
+function setPlanTier(tier, patch) {
+  const next = (tier === 'pro') ? 'premium' : tier;
+  if (!PLAN_FEATURES[next]) return getPlan();
+  const plan = Object.assign(getPlan(), { tier: next }, patch || {});
+  return savePlan(plan);
+}
+
+function planTierName(tier) {
+  const key = (tier === 'pro') ? 'premium' : tier;
+  const c = PLAN_CATALOG[key];
+  return (c && c.name) ? c.name : 'Aurix Free';
+}
+function isPremiumTier(tier) {
+  const t = tier || getPlan().tier;
+  return t === 'founder' || t === 'premium';
+}
+function planStatus() { return getPlan().status || 'active'; }
+
+// ── THE entitlement gate ──────────────────────────────────────────
+// Every premium surface asks this one question. While ENFORCE_ENTITLEMENTS is
+// false it always returns true (prelaunch: everything unlocked for everyone,
+// regardless of tier). When true, the real per-tier entitlement applies. No
+// other code in the app needs to know the switch exists.
+function hasFeature(feature) {
+  if (!ENFORCE_ENTITLEMENTS) return true;
+  const set = PLAN_FEATURES[getPlan().tier] || PLAN_FEATURES.free;
+  return set.has(feature);
+}
+// Expose the entitlement surface for other modules (premium features, the
+// future checkout bridge) without reaching into internals.
+try {
+  window.aurixEntitlements = {
+    ENFORCE_ENTITLEMENTS: ENFORCE_ENTITLEMENTS,
+    hasFeature: hasFeature,
+    getPlan: getPlan,
+    setPlanTier: setPlanTier,
+    isPremiumTier: isPremiumTier,
+    planStatus: planStatus,
+    PREMIUM_FEATURES: PREMIUM_FEATURES,
+    PLAN_CATALOG: PLAN_CATALOG,
+  };
+} catch (_) {}
+
+/* ──────────────────────────────────────────────────────────────────
+   AURIX-MONETIZATION-1 · Phase 3 — Promo codes (architecture, DORMANT).
+   --------------------------------------------------------------------
+   The redemption schema and resolver are defined now so codes can be
+   honoured the day checkout goes live, with no rearchitecture. Nothing
+   here charges money or flips entitlements on its own; applyPromoCode is
+   the single, explicit entry point and it only mutates the local plan
+   (which then syncs). Real validation will move server-side alongside
+   Stripe — resolvePromoCode is the seam for that swap.
+   ────────────────────────────────────────────────────────────────── */
+const PROMO_CODE_TYPES = Object.freeze(['percent', 'fixed', 'free', 'founder']);
+
+// Seed catalog — illustrative and INERT. No prelaunch UI redeems these; real
+// codes will be validated server-side. Shape: { type, value, grantsTier, expiresAt? }.
+const PROMO_CODES = Object.freeze({
+  FOUNDER100:  { type: 'founder', value: 0,   grantsTier: 'founder', note: 'Founder access, 100% off' },
+  EARLYACCESS: { type: 'percent', value: 100, grantsTier: 'premium', note: 'Early-access full unlock' },
+  PARTNER:     { type: 'free',    value: 0,   grantsTier: 'premium', note: 'Partner comp access' },
+});
+
+// Resolve a code to its effect WITHOUT applying it. Returns null if unknown,
+// malformed or expired. This is the seam to later swap for a server-side check.
+function resolvePromoCode(code) {
+  if (!code || typeof code !== 'string') return null;
+  const key = code.trim().toUpperCase();
+  const def = PROMO_CODES[key];
+  if (!def) return null;
+  if (def.expiresAt && Date.now() > def.expiresAt) return null;
+  if (!PROMO_CODE_TYPES.includes(def.type)) return null;
+  return Object.assign({ code: key }, def);
+}
+
+// Apply a resolved code to the local plan. Explicit, opt-in, dormant: nothing in
+// the prelaunch UI calls this yet. When wired, it records the grant + promo code
+// on the plan and lets the normal sync carry it. Returns the updated plan or null.
+function applyPromoCode(code) {
+  const effect = resolvePromoCode(code);
+  if (!effect) return null;
+  return setPlanTier(effect.grantsTier, { promoCode: effect.code, source: 'promo' });
+}
+try {
+  if (window.aurixEntitlements) {
+    window.aurixEntitlements.resolvePromoCode = resolvePromoCode;
+    window.aurixEntitlements.applyPromoCode = applyPromoCode;
+  }
+} catch (_) {}
 
 // ── Settings panel open / close + populate ────────────────────────
 function _settingsT(key) {
   try { return (T && T[lang] && T[lang][key]) || key; } catch (_) { return key; }
 }
-function _settingsFormatAssetUsage(plan, count) {
-  const limit = (PLAN_LIMITS[plan.tier] || PLAN_LIMITS.free).maxAssets;
-  if (!Number.isFinite(limit)) return `${count} / ∞`;
-  return `${count} / ${limit}`;
-}
 function _settingsPopulate() {
   const plan  = getPlan();
-  const count = Array.isArray(assets) ? assets.length : 0;
 
   const tierEl   = document.getElementById('planTierName');
-  const usedEl   = document.getElementById('planAssetsUsed');
-  const fillEl   = document.getElementById('planUsageFill');
-  const warnEl   = document.getElementById('planUsageWarn');
   const langEl   = document.getElementById('settingsLangValue');
   const currEl   = document.getElementById('settingsCurrencyValue');
   const emailEl  = document.getElementById('settingsAccountEmail');
+  const statusEl = document.getElementById('settingsAccountStatus');
 
   if (tierEl) tierEl.textContent = planTierName(plan.tier);
-  if (usedEl) usedEl.textContent = _settingsFormatAssetUsage(plan, count);
-
-  const limit = (PLAN_LIMITS[plan.tier] || PLAN_LIMITS.free).maxAssets;
-  if (fillEl) {
-    const pct = !Number.isFinite(limit) ? 12 : Math.max(0, Math.min(100, (count / limit) * 100));
-    fillEl.style.width = pct.toFixed(1) + '%';
-    fillEl.classList.toggle('is-over', Number.isFinite(limit) && count > limit);
-  }
-  if (warnEl) {
-    const showWarn = plan.tier === 'free' && Number.isFinite(limit) && count >= limit;
-    warnEl.hidden = !showWarn;
-  }
   if (langEl) langEl.textContent = lang === 'es' ? 'Español' : 'English';
   if (currEl) currEl.textContent = baseCurrency === 'EUR' ? '€ EUR' : '$ USD';
 
+  // Tier-aware description for the current-plan card (replaces the old asset
+  // usage meter, removed in AURIX-MONETIZATION-1 · Phase 7 — Aurix does not cap
+  // the number of assets). Painted dynamically so it stays correct per tier.
+  const descEl = document.getElementById('planCurrentDesc');
+  if (descEl) {
+    descEl.textContent = isPremiumTier(plan.tier)
+      ? (lang === 'es' ? 'Acceso completo a todas las herramientas premium.' : 'Full access to every premium tool.')
+      : (lang === 'es' ? 'Seguimiento completo de tu patrimonio. Sin límite de activos.' : 'Full wealth tracking. No asset limit.');
+  }
+
+  // AURIX-MONETIZATION-1 · Phase 7 — Account reflects the REAL Supabase session.
+  // currentUser is the single source of truth (set in the auth-restore handler).
+  // The legacy window.__aurixSession path was never populated, so the email and
+  // status fields were stuck on "Sin sesión" even with an active session.
+  const session = (typeof currentUser !== 'undefined' && currentUser) ? currentUser : null;
   if (emailEl) {
-    let email = '';
-    try {
-      const session = (typeof window !== 'undefined' && window.__aurixSession) || null;
-      if (session && session.email) email = session.email;
-    } catch (_) {}
-    emailEl.textContent = email || (lang === 'es' ? 'Sin sesión' : 'No session');
+    emailEl.textContent = (session && session.email)
+      ? session.email
+      : (lang === 'es' ? 'Sin sesión' : 'No session');
+  }
+  if (statusEl) {
+    // Drop the static data-i18n binding ("Local · sin sesión") so a later
+    // applyI18n() pass can't overwrite the live value, then paint real status.
+    try { statusEl.removeAttribute('data-i18n'); } catch (_) {}
+    statusEl.textContent = session
+      ? (lang === 'es' ? 'Sesión activa' : 'Active session')
+      : (lang === 'es' ? 'Sin sesión' : 'No session');
   }
 
   // SETTINGS-INVESTOR-PROFILE-1 — paint the three investor-profile
@@ -26522,6 +26781,158 @@ function exportPortfolioBackup() {
     const settingsOv = document.getElementById('settingsOverlay');
     if (resetOv && resetOv.classList.contains('open'))      { closeResetConfirm();   return; }
     if (settingsOv && settingsOv.classList.contains('open')) { closeSettingsPanel(); return; }
+  });
+})();
+
+/* ──────────────────────────────────────────────────────────────────
+   AURIX-MONETIZATION-1 · Phases 4/5/6/8 — Founder page + upgrade gate.
+   --------------------------------------------------------------------
+   Presentation + a dormant gate. No payments, no Stripe, no paywall.
+   requireFeature() is the seam premium surfaces will call; while
+   ENFORCE_ENTITLEMENTS=false it always runs the allowed path, so the
+   upgrade modal never appears. The Founder page is reachable from the
+   menu and the settings plan card. The main dashboard is left untouched.
+   ────────────────────────────────────────────────────────────────── */
+
+// Localized labels for premium features — drives the Founder benefits list and
+// the upgrade modal headline. New premium modules add their key + label here.
+const FEATURE_LABELS = {
+  wealth_evolution:       { es: 'Wealth Evolution',        en: 'Wealth Evolution' },
+  portfolio_intelligence: { es: 'Portfolio Intelligence',  en: 'Portfolio Intelligence' },
+  workspace_advanced:     { es: 'Workspace avanzado',      en: 'Advanced Workspace' },
+  portfolio_health:       { es: 'Portfolio Health',        en: 'Portfolio Health' },
+  monthly_reports:        { es: 'Informes mensuales',      en: 'Monthly reports' },
+  advanced_exports:       { es: 'Exportaciones avanzadas', en: 'Advanced exports' },
+  ai_wealth_assistant:    { es: 'AI Wealth Assistant',     en: 'AI Wealth Assistant' },
+};
+// Display order for the Founder "Incluye" list (matches the product framing).
+const FOUNDER_BENEFIT_ORDER = [
+  'wealth_evolution', 'portfolio_intelligence', 'workspace_advanced',
+  'portfolio_health', 'monthly_reports', 'advanced_exports', 'ai_wealth_assistant',
+];
+function _featureLabel(key) {
+  const l = FEATURE_LABELS[key];
+  if (!l) return key;
+  return (typeof lang !== 'undefined' && l[lang]) ? l[lang] : l.es;
+}
+
+function _renderFounderBenefits() {
+  const ul = document.getElementById('founderBenefitsList');
+  if (!ul) return;
+  const futureLabel = (typeof lang !== 'undefined' && lang === 'en')
+    ? 'Future premium tools' : 'Futuras herramientas premium';
+  const items = FOUNDER_BENEFIT_ORDER.map(k => _featureLabel(k)).concat([futureLabel]);
+  ul.innerHTML = items.map(() =>
+    '<li class="founder-benefit"><span class="founder-benefit-check" aria-hidden="true">✓</span>' +
+    '<span class="founder-benefit-label"></span></li>').join('');
+  // Set text safely (labels are trusted, but textContent keeps it injection-proof).
+  const labels = ul.querySelectorAll('.founder-benefit-label');
+  items.forEach((label, i) => { if (labels[i]) labels[i].textContent = label; });
+}
+
+function openFounderPage() {
+  const ov = document.getElementById('founderOverlay');
+  if (!ov) return;
+  _renderFounderBenefits();
+  const priceEl = document.getElementById('founderPriceAmount');
+  try {
+    const c = (typeof PLAN_CATALOG !== 'undefined') ? PLAN_CATALOG.founder : null;
+    if (priceEl && c && c.priceLabel) priceEl.textContent = c.priceLabel[lang] || c.priceLabel.es;
+  } catch (_) {}
+  if (typeof applyI18n === 'function') applyI18n();
+  ov.classList.add('open');
+  ov.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('modal-open');
+}
+function closeFounderPage() {
+  const ov = document.getElementById('founderOverlay');
+  if (!ov) return;
+  ov.classList.remove('open');
+  ov.setAttribute('aria-hidden', 'true');
+  // Keep the body lock if the settings panel that launched it is still open.
+  const settings = document.getElementById('settingsOverlay');
+  if (!settings || !settings.classList.contains('open')) {
+    document.body.classList.remove('modal-open');
+  }
+}
+
+function openUpgradeModal(feature) {
+  const ov = document.getElementById('upgradeOverlay');
+  if (!ov) return;
+  const nameEl = document.getElementById('upgradeFeatureName');
+  if (nameEl) {
+    nameEl.textContent = feature
+      ? _featureLabel(feature)
+      : (lang === 'en' ? 'Premium feature' : 'Función premium');
+  }
+  if (typeof applyI18n === 'function') applyI18n();
+  ov.classList.add('open');
+  ov.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('modal-open');
+}
+function closeUpgradeModal() {
+  const ov = document.getElementById('upgradeOverlay');
+  if (!ov) return;
+  ov.classList.remove('open');
+  ov.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('modal-open');
+}
+
+// The seam every premium surface will call. While ENFORCE_ENTITLEMENTS=false,
+// hasFeature() is always true → onAllowed runs and the upgrade modal never
+// shows. Returns true if access was granted. Deliberately NOT wired into the
+// dashboard in prelaunch (the main dashboard stays untouched).
+function requireFeature(feature, onAllowed) {
+  if (hasFeature(feature)) {
+    if (typeof onAllowed === 'function') onAllowed();
+    return true;
+  }
+  openUpgradeModal(feature);
+  return false;
+}
+try {
+  if (window.aurixEntitlements) {
+    window.aurixEntitlements.requireFeature = requireFeature;
+    window.aurixEntitlements.openFounderPage = openFounderPage;
+    window.aurixEntitlements.openUpgradeModal = openUpgradeModal;
+  }
+} catch (_) {}
+
+(function _initFounderUI() {
+  if (typeof document === 'undefined') return;
+  document.addEventListener('click', e => {
+    // Menu entry → Founder page (also closes the hamburger menu).
+    if (e.target.closest && e.target.closest('#menuFounder')) {
+      e.stopPropagation();
+      const panel = document.getElementById('menuPanel');
+      const toggle = document.getElementById('menuToggle');
+      if (panel && panel.classList.contains('open')) panel.classList.remove('open');
+      if (toggle) toggle.setAttribute('aria-expanded', 'false');
+      openFounderPage();
+      return;
+    }
+    // Settings plan card CTA → Founder page.
+    if (e.target.closest && e.target.closest('#planFounderCta')) { openFounderPage(); return; }
+    // Upgrade modal → Founder page.
+    if (e.target.closest && e.target.closest('#upgradeFounderBtn')) {
+      closeUpgradeModal(); openFounderPage(); return;
+    }
+    // Closes.
+    if (e.target.closest && e.target.closest('#founderClose')) { closeFounderPage(); return; }
+    if (e.target.closest && e.target.closest('#upgradeClose'))  { closeUpgradeModal(); return; }
+    // Backdrop closes.
+    const fov = document.getElementById('founderOverlay');
+    if (fov && fov.classList.contains('open') && e.target === fov) { closeFounderPage(); return; }
+    const uov = document.getElementById('upgradeOverlay');
+    if (uov && uov.classList.contains('open') && e.target === uov) { closeUpgradeModal(); return; }
+  });
+  // Escape closes whichever monetization overlay is on top.
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const uov = document.getElementById('upgradeOverlay');
+    const fov = document.getElementById('founderOverlay');
+    if (uov && uov.classList.contains('open')) { closeUpgradeModal(); return; }
+    if (fov && fov.classList.contains('open')) { closeFounderPage();  return; }
   });
 })();
 

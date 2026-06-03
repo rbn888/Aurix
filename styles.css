@@ -14058,6 +14058,125 @@ body.gs-open { overflow: hidden; }
   text-align: center;
 }
 
+/* ════════════════════════════════════════════════════════════════
+   AURIX-MONETIZATION-1 — Founder page + upgrade screen.
+   Encapsulated, additive classes. Reuse the gold founder accent and
+   the shared .modal-overlay / .modal chrome. No layout change to any
+   existing surface.
+   ════════════════════════════════════════════════════════════════ */
+.menu-item--founder { color: rgba(244, 196, 90, 0.92); }
+.menu-item--founder:hover { background: rgba(244, 196, 90, 0.10); color: #fff; }
+
+.modal--founder, .modal--upgrade { max-width: 460px; }
+
+.founder-body { display: flex; flex-direction: column; gap: 22px; }
+
+.founder-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 22px 18px 20px;
+  border-radius: 16px;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(244, 196, 90, 0.14), rgba(14, 20, 36, 0.0));
+  border: 1px solid rgba(244, 196, 90, 0.28);
+}
+.founder-badge {
+  padding: 3px 11px;
+  border-radius: 999px;
+  background: rgba(244, 196, 90, 0.16);
+  border: 1px solid rgba(244, 196, 90, 0.36);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(244, 196, 90, 0.95);
+}
+.founder-price-amount {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.founder-price-note {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(244, 196, 90, 0.82);
+}
+
+.founder-section { display: flex; flex-direction: column; gap: 12px; }
+.founder-section-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(220, 230, 250, 0.55);
+}
+.founder-benefits, .founder-perks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.founder-benefit { display: flex; align-items: center; gap: 10px; }
+.founder-benefit-check {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(244, 196, 90, 0.16);
+  color: rgba(244, 196, 90, 0.95);
+  font-size: 11px;
+  font-weight: 800;
+}
+.founder-benefit-label { font-size: 13.5px; font-weight: 600; color: var(--text-bright); }
+.founder-perks li {
+  position: relative;
+  padding-left: 16px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: rgba(220, 230, 250, 0.78);
+}
+.founder-perks li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(244, 196, 90, 0.7);
+}
+
+.founder-cta-wrap { display: flex; flex-direction: column; gap: 10px; }
+.founder-cta {
+  width: 100%;
+  cursor: default;
+}
+.founder-cta-note {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  text-align: center;
+  color: rgba(220, 230, 250, 0.55);
+}
+
+.upgrade-body { display: flex; flex-direction: column; gap: 16px; }
+.upgrade-lead {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: rgba(220, 230, 250, 0.82);
+}
+
 /* ── Data actions ── */
 .settings-actions {
   display: flex;
