@@ -320,7 +320,11 @@
         total += cb; coveredVal += cb; expectedVal += cb;
       }
 
-      var coverage = expectedVal > 0 ? (coveredVal / expectedVal) : (holdings.length ? 0 : 1);
+      // Coverage measures: of the value we EXPECT at t, how much is backed by a
+      // real feed/event. When nothing is expected at t (empty portfolio, or a
+      // point before any position/cash existed), net worth is fully KNOWN to be
+      // ~0 — that is complete knowledge, not "uncovered". So coverage = 1 then.
+      var coverage = expectedVal > 0 ? (coveredVal / expectedVal) : 1;
       coverageAccum += coverage;
       series.push({ t: t, v: +total.toFixed(2), confidence: classifyConfidence(coverage, hasStatic) });
     }
@@ -515,9 +519,11 @@
     selfTest: selfTest
   });
 
-  // Node: run the self-test immediately so `node <file>` validates the core.
-  // Browser: NEVER auto-runs (and in Fase A the file is not even loaded).
-  if (typeof window === 'undefined' && typeof process !== 'undefined') {
+  // Node: run the self-test ONLY when executed directly (`node <file>`), never
+  // when required by another module (avoids side effects on import). Browser:
+  // never auto-runs (and in this phase the file is not even loaded).
+  if (typeof window === 'undefined' && typeof process !== 'undefined' &&
+      typeof module !== 'undefined' && typeof require !== 'undefined' && require.main === module) {
     var r = selfTest();
     if (!r.pass && typeof process.exit === 'function') process.exit(1);
   }

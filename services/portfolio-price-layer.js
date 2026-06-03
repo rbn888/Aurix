@@ -290,8 +290,10 @@
     selfTest: selfTest
   });
 
-  // Node: run the async self-test and exit non-zero on failure. Browser: inert.
-  if (typeof window === 'undefined' && typeof process !== 'undefined') {
+  // Node: run the async self-test ONLY when executed directly (never on require,
+  // so importing this module has no side effects on the shared cache). Browser: inert.
+  if (typeof window === 'undefined' && typeof process !== 'undefined' &&
+      typeof module !== 'undefined' && typeof require !== 'undefined' && require.main === module) {
     selfTest().then(function (r) { if (!r.pass && typeof process.exit === 'function') process.exit(1); });
   }
 
