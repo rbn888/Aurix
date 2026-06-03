@@ -527,6 +527,20 @@
     }
     host.appendChild(empty);
 
+    // AURIX-CHARTS-PREMIUM-REFINEMENT-1 · Block 7 — the portfolio empty surface
+    // tells two different stories: a brand-new portfolio ("your evolution will
+    // appear here") vs one that already has assets but not enough history yet
+    // ("building history"). setData picks the copy via meta.emptyReason. Scoped
+    // to the portfolio variant; other variants keep their neutral fallback.
+    function _applyEmptyCopy(reason) {
+      if (opts.variant !== 'portfolio') return;
+      if (reason === 'low_data') {
+        empty.textContent = _isLangEs() ? 'Histórico en construcción' : 'Building your history';
+      } else {
+        empty.textContent = _isLangEs() ? 'Tu evolución aparecerá aquí' : 'Your evolution will appear here';
+      }
+    }
+
     const errorEl = document.createElement('div');
     errorEl.className = 'aurix-chart-state aurix-chart-state--error';
     errorEl.textContent = _isLangEs() ? 'No se pudo cargar el gráfico' : 'Chart could not be loaded';
@@ -604,7 +618,10 @@
         background: { type: 'solid', color: 'rgba(0,0,0,0)' },
         textColor:  THEME.text,
         fontFamily: 'inherit',
-        fontSize:   11,
+        // Block 3 (scoped to portfolio): axis labels one step more discreet so
+        // they don't compete with the curve, while staying legible on iPhone
+        // retina (priority #11/#12). Other variants keep 11 unchanged.
+        fontSize:   opts.variant === 'portfolio' ? 10 : 11,
         // CHART-4B: suppress the Lightweight Charts attribution logo so
         // the surface reads as Aurix-native. Library supports this in
         // 4.x; older builds silently ignore the option and we'll catch
@@ -694,14 +711,28 @@
       };
     }
 
+    // AURIX-CHARTS-PREMIUM-REFINEMENT-1 — portfolio-only visual tuning. SCOPED to
+    // variant 'portfolio' so asset/category/sparkline charts (shared engine +
+    // shared THEME) stay byte-for-byte untouched. Goal (priority #13): the curve
+    // is the protagonist. We soften the area gradient so the line reads stronger
+    // by contrast, and drop the floating last-value label (it duplicates the Hero
+    // Card). The LINE itself is left identical to THEME — no hue/weight change,
+    // no data smoothing (visualNormalization stays off). Fidelity over aesthetics.
+    const _isPortfolio = opts.variant === 'portfolio';
+    const _area = _isPortfolio
+      ? { base: 'rgba(138, 166, 255, 0.15)', up: 'rgba(63, 191, 127, 0.13)', down: 'rgba(224, 90, 90, 0.12)', flat: 'rgba(180, 196, 224, 0.07)', bot: THEME.areaBot }
+      : { base: THEME.areaTop, up: THEME.areaTopUp, down: THEME.areaTopDn, flat: THEME.areaTopFlat, bot: THEME.areaBot };
+
     const series = chart.addAreaSeries({
       lineColor:       THEME.line,
       lineWidth:       _portfolioLineWidth,
       lineType:        (LWC.LineType && LWC.LineType.Curved != null) ? LWC.LineType.Curved : 0,
-      topColor:        THEME.areaTop,
-      bottomColor:     THEME.areaBot,
+      topColor:        _area.base,
+      bottomColor:     _area.bot,
       priceLineVisible: false,
-      lastValueVisible: opts.variant !== 'sparkline',
+      // Block 2: hide the floating last-value label on the portfolio surface
+      // (asset/mini keep it; sparkline never had it). Value lives in the Hero Card.
+      lastValueVisible: opts.variant !== 'sparkline' && opts.variant !== 'portfolio',
       crosshairMarkerVisible: opts.variant !== 'sparkline',
       crosshairMarkerRadius:  _portfolioMarkerR,
       crosshairMarkerBorderWidth: 2,
@@ -727,10 +758,10 @@
     // gray-blue token pair so a post-reset chart never repaints in
     // red and never sits on the same hue as a true positive run.
     function _applyColor(mode) {
-      if (mode === 'positive')      series.applyOptions({ lineColor: THEME.lineUp,   topColor: THEME.areaTopUp,  bottomColor: THEME.areaBot });
-      else if (mode === 'negative') series.applyOptions({ lineColor: THEME.lineDown, topColor: THEME.areaTopDn,  bottomColor: THEME.areaBot });
-      else if (mode === 'neutral')  series.applyOptions({ lineColor: THEME.lineFlat, topColor: THEME.areaTopFlat,bottomColor: THEME.areaBot });
-      else                          series.applyOptions({ lineColor: THEME.line,     topColor: THEME.areaTop,    bottomColor: THEME.areaBot });
+      if (mode === 'positive')      series.applyOptions({ lineColor: THEME.lineUp,   topColor: _area.up,   bottomColor: _area.bot });
+      else if (mode === 'negative') series.applyOptions({ lineColor: THEME.lineDown, topColor: _area.down, bottomColor: _area.bot });
+      else if (mode === 'neutral')  series.applyOptions({ lineColor: THEME.lineFlat, topColor: _area.flat, bottomColor: _area.bot });
+      else                          series.applyOptions({ lineColor: THEME.line,     topColor: _area.base, bottomColor: _area.bot });
     }
     if (opts.colorMode && opts.colorMode !== 'auto') _applyColor(opts.colorMode);
 
@@ -1118,6 +1149,7 @@
         const arr = Array.isArray(seriesData) ? seriesData : [];
         if (!arr.length) {
           host.dataset.state = 'empty';
+          _applyEmptyCopy(meta && meta.emptyReason);
           _scaleHints = null;
           series.setData([]);
           if (_shouldShowValChip) valchip.hidden = true;
@@ -1130,6 +1162,7 @@
           .sort((a, b) => a.time - b.time);
         if (!formatted.length) {
           host.dataset.state = 'empty';
+          _applyEmptyCopy(meta && meta.emptyReason);
           _scaleHints = null;
           series.setData([]);
           if (_shouldShowValChip) valchip.hidden = true;

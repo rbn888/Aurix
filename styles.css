@@ -12137,7 +12137,11 @@ body.workspace-active .header {
      summary grid spacing. */
   .portfolio-slider-card {
     margin: 8px 0;
-    padding: 12px 12px 10px !important;
+    /* Block 4: trim horizontal padding (12→8px) so the curve gains real width
+       on phones. Header + curve shift in tandem, still a clean legible inset
+       (priority #12 — clarity not sacrificed). Pairs with the narrower axis font
+       and the removed floating label to make the curve the protagonist (#13). */
+    padding: 12px 8px 10px !important;
     border-radius: 14px;
     border: 1px solid rgba(255,255,255,0.07);
   }

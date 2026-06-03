@@ -444,8 +444,7 @@ function _applyRemotePrefs(prefs) {
       baseCurrency = prefs.baseCurrency;
       localStorage.setItem(BASE_KEY, baseCurrency);
       document.querySelectorAll('.menu-curr-btn').forEach(b => b.classList.toggle('active', b.dataset.currency === baseCurrency));
-      const perfCurrBtn = document.getElementById('perfCurrBtn');
-      if (perfCurrBtn) perfCurrBtn.textContent = baseCurrency === 'EUR' ? '€' : '$';
+      _syncPerfCurrencyButtons();
     } catch (_) {}
   }
 }
@@ -1952,6 +1951,9 @@ const T = {
     emptyDonutSub:        'Añade tu primer activo',
     emptyChartTitle:      'Tu evolución aparecerá aquí',
     emptyChartBody:       'cuando añadas activos.',
+    // AURIX-CHARTS-PREMIUM-REFINEMENT-1 · Block 7 — insufficient-history state
+    lowDataTitle:         'Histórico en construcción',
+    lowDataBody:          'Aurix necesita más puntos de datos para mostrar una evolución fiable.',
     emptyCatSub:          'Sin asignación todavía',
     emptyActivationTitle: 'Empieza creando tu cartera',
     emptyActivationBody:  'Añade tu primer activo para ver rendimiento, distribución e insights.',
@@ -3114,6 +3116,9 @@ const T = {
     emptyDonutSub:        'Add your first asset',
     emptyChartTitle:      'Your evolution will appear here',
     emptyChartBody:       'once you add assets.',
+    // AURIX-CHARTS-PREMIUM-REFINEMENT-1 · Block 7 — insufficient-history state
+    lowDataTitle:         'Building your history',
+    lowDataBody:          'Aurix needs more data points to show a reliable evolution.',
     emptyCatSub:          'No allocation yet',
     emptyActivationTitle: 'Start building your portfolio',
     emptyActivationBody:  'Add your first asset to see performance, distribution and insights.',
@@ -4154,6 +4159,22 @@ function formatShort(amount) {
   if (abs >= 1_000_000) return sym + (amount / 1_000_000).toFixed(2) + 'M';
   if (abs >= 1_000)     return sym + (amount / 1_000).toFixed(1) + 'K';
   return formatBase(amount);
+}
+
+// AURIX-CHARTS-PREMIUM-REFINEMENT-1 · Block 1 — single source for the active
+// base-currency symbol, plus a sync that updates EVERY perf %/currency toggle:
+// the desktop #perfCurrBtn AND the mobile slider button (which had no id and so
+// was stuck on a hardcoded €). Both carry data-perf="curr", so the selector hits
+// both. EUR/USD are the only supported base currencies today; structured so
+// £/others can extend later without touching call sites.
+function getCurrencySymbol(curr) {
+  const c = String(curr || baseCurrency || 'USD').toUpperCase();
+  return c === 'EUR' ? '€' : '$';
+}
+function _syncPerfCurrencyButtons() {
+  const sym = getCurrencySymbol(baseCurrency);
+  try { document.querySelectorAll('[data-perf="curr"]').forEach(b => { b.textContent = sym; }); }
+  catch (_) {}
 }
 
 // ── Canonical display-currency layer ───────────────────────────────────────
@@ -10864,7 +10885,11 @@ function _aurixDashSync(surface) {
     ctrl.setCurrency(baseCurrency || 'USD');
     const series = _aurixDashSeries(activeRange);
     if (!series.length) {
-      ctrl.setData([]);
+      // Block 7: distinguish "no assets yet" from "has assets but history is
+      // still building" (<2 usable points) so the engine's empty surface shows
+      // the right premium copy instead of the add-assets invitation.
+      const hasAssets = Array.isArray(assets) && assets.length > 0;
+      ctrl.setData([], { emptyReason: hasAssets ? 'low_data' : 'no_assets' });
       return;
     }
     // CHART-4B: derive the chart's tonal direction from the SAME source
@@ -12459,6 +12484,23 @@ function getChartData(range) {
   };
 }
 
+// AURIX-CHARTS-PREMIUM-REFINEMENT-1 · Block 7 — paint the legacy (fallback)
+// chart no-data surface as one of two premium states, or hide it. Keeps
+// data-i18n in sync so a language switch re-localizes the right copy. The V2
+// engine has its own empty surface (see _applyEmptyCopy); this covers the
+// Chart.js fallback, which would otherwise draw a lone 1-point line.
+function _setChartNoData(el, state) {
+  if (!el) return;
+  if (state === 'hide') { el.style.display = 'none'; return; }
+  const titleKey = state === 'low' ? 'lowDataTitle' : 'emptyChartTitle';
+  const bodyKey  = state === 'low' ? 'lowDataBody'  : 'emptyChartBody';
+  const titleEl = el.querySelector('.chart-no-data-title');
+  const bodyEl  = el.querySelector('.chart-no-data-body');
+  if (titleEl) { titleEl.setAttribute('data-i18n', titleKey); titleEl.textContent = t(titleKey); }
+  if (bodyEl)  { bodyEl.setAttribute('data-i18n', bodyKey);   bodyEl.textContent  = t(bodyKey); }
+  el.style.display = '';
+}
+
 function updateChart(animate = false) {
   if (!portfolioChart) return;
   const data = getChartData(activeRange);
@@ -12474,14 +12516,14 @@ function updateChart(animate = false) {
     // value + history are available.
     const genuinelyEmpty = !(Array.isArray(assets) && assets.length > 0);
     chartChangeEl.textContent = '';
-    chartNoDataEl.style.display = genuinelyEmpty ? '' : 'none';
+    _setChartNoData(chartNoDataEl, genuinelyEmpty ? 'empty' : 'hide');
     portfolioChart.data.labels = [];
     portfolioChart.data.datasets[0].data = [];
     portfolioChart.update('none');
     // Mobile sync — clear
     const _mnd = document.getElementById('chartNoDataMobile');
     const _mch = document.getElementById('chartChangeMobile');
-    if (_mnd) _mnd.style.display = genuinelyEmpty ? '' : 'none';
+    _setChartNoData(_mnd, genuinelyEmpty ? 'empty' : 'hide');
     if (_mch) _mch.textContent = '';
     if (portfolioChartMobile) {
       portfolioChartMobile.data.labels = [];
@@ -12491,7 +12533,31 @@ function updateChart(animate = false) {
     return;
   }
 
-  chartNoDataEl.style.display = 'none';
+  // Block 7: assets exist but history is too thin to draw a real evolution
+  // (≤1 usable point). Show the premium "building history" state instead of a
+  // lone dot / artificial line. Triggered strictly on point count — a valid
+  // flat series (≥2 points) still renders, so financial truth is never hidden
+  // (priority #8). The V2 engine already does this via _applyEmptyCopy; this
+  // covers the Chart.js fallback path.
+  if (data.values.length < 2 && Array.isArray(assets) && assets.length > 0) {
+    chartChangeEl.textContent = '';
+    _setChartNoData(chartNoDataEl, 'low');
+    portfolioChart.data.labels = [];
+    portfolioChart.data.datasets[0].data = [];
+    portfolioChart.update('none');
+    const _mnd = document.getElementById('chartNoDataMobile');
+    const _mch = document.getElementById('chartChangeMobile');
+    _setChartNoData(_mnd, 'low');
+    if (_mch) _mch.textContent = '';
+    if (portfolioChartMobile) {
+      portfolioChartMobile.data.labels = [];
+      portfolioChartMobile.data.datasets[0].data = [];
+      portfolioChartMobile.update('none');
+    }
+    return;
+  }
+
+  _setChartNoData(chartNoDataEl, 'hide');
 
   // Use the live portfolio value as "now" so chart PnL never diverges from
   // the actual portfolio total, even when the last chart point is a snapshot
@@ -12547,7 +12613,7 @@ function updateChart(animate = false) {
   // Mobile sync — mirror data and change indicator
   const _mnd = document.getElementById('chartNoDataMobile');
   const _mch = document.getElementById('chartChangeMobile');
-  if (_mnd) _mnd.style.display = 'none';
+  _setChartNoData(_mnd, 'hide');
   if (_mch) { _mch.textContent = chartChangeEl.textContent; _mch.className = chartChangeEl.className; }
   if (portfolioChartMobile) {
     portfolioChartMobile.data.labels = data.labels;
@@ -21132,8 +21198,7 @@ function _applyCurrencyChange(currency) {
   try { _touchPrefs(); } catch (_) {}
   document.querySelectorAll('.menu-curr-btn')
     .forEach(b => b.classList.toggle('active', b.dataset.currency === baseCurrency));
-  const perfCurrBtn = document.getElementById('perfCurrBtn');
-  if (perfCurrBtn) perfCurrBtn.textContent = baseCurrency === 'EUR' ? '€' : '$';
+  _syncPerfCurrencyButtons();
   render(true);
   updateChart(true);
   updateDonut();
@@ -22457,9 +22522,8 @@ function initMobileSlider() {
 document.querySelectorAll('.menu-curr-btn')
   .forEach(b => b.classList.toggle('active', b.dataset.currency === baseCurrency));
 
-// Set initial perf-toggle currency button label to match base currency
-const _perfCurrBtn = document.getElementById('perfCurrBtn');
-if (_perfCurrBtn) _perfCurrBtn.textContent = baseCurrency === 'EUR' ? '€' : '$';
+// Set initial perf-toggle currency label on ALL toggles (desktop + mobile).
+_syncPerfCurrencyButtons();
 
 document.getElementById('appRoot').style.opacity = '0';
 
