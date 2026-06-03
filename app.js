@@ -10826,20 +10826,25 @@ function _aurixDashMount(surface) {
       // (window resize, mobile slider transitions) is handled by the
       // engine's own ResizeObserver — see services/aurix-chart-core.js.
       height:         parent.clientHeight || (isDesktop ? 190 : 220),
-      // CHART-PARITY-1: visual normalization disabled. Sanitisation
-      // now lives upstream in getChartData (the single source of
-      // truth for both legacy and V2 dashboard surfaces), so the V2
-      // engine's parallel outlier-filter + smoothing would only
-      // re-shape data the legacy chart shows as-is, reintroducing
-      // exactly the desktop ↔ mobile divergence this commit fixes.
-      // Leaving the field present and explicit so a future debug
-      // session can re-enable per-surface without remembering the
-      // default lived deep in the engine.
+      // CHART-PARITY-1: data sanitisation (outlier filter + smoothing) stays
+      // DISABLED. It would re-shape the series the legacy chart shows as-is,
+      // reintroducing the desktop ↔ mobile divergence that commit fixed — and
+      // it would violate AURIX's "no deceptive smoothing / no invented points"
+      // rule. enabled/outlierFilter/smoothing remain false on purpose.
+      //
+      // AURIX-CHART-ENGINE-FOUNDATION-1 · R1 (honest scale): re-enable ONLY
+      // robustScale. This is fully decoupled from the smoothing path — it does
+      // NOT touch a single data point (services/aurix-chart-core.js: _normalizeSeries
+      // runs only when `enabled`; the min-padding provider runs on `robustScale`).
+      // It only widens the Y autoscale domain to a sane minimum so a small move
+      // reads as small: a 24H +0.25% becomes a subtle rise, not a vertical wall.
+      // The provider ONLY widens, never narrows (movePct ≥ 1.5% returns the real
+      // autoscale untouched), so large moves are never hidden — fidelity intact.
       visualNormalization: {
         enabled:       false,
         outlierFilter: false,
         smoothing:     false,
-        robustScale:   false,
+        robustScale:   true,
         mode:          'portfolio',
       },
     });
