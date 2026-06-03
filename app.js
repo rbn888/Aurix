@@ -12279,31 +12279,14 @@ function getChartData(range) {
         .sort((a, b) => a.ts - b.ts)
     : [];
 
-  // PHASE 1 — clean baseline. If the user has a live portfolio value
-  // but fewer than 2 valid post-epoch points, render a flat 5-minute
-  // baseline so the chart axis pins to the current value (no phantom
-  // crash line) and performance reads 0.00 / 0.0%.
-  if (source.length < 2) {
-    let currentBase = 0;
-    try { currentBase = (typeof totalValueBase === 'function') ? Number(totalValueBase()) : 0; }
-    catch (_) { currentBase = 0; }
-    if (Number.isFinite(currentBase) && currentBase > 0) {
-      const baseTs = now - 5 * 60_000;
-      return {
-        labels:      [fmt(baseTs), fmt(now)],
-        values:      [currentBase, currentBase],
-        timestamps:  [baseTs, now],
-        firstValue:  currentBase,
-        lastValue:   currentBase,
-        deltaAbs:    0,
-        deltaPct:    0,
-        pointsCount: 2,
-        isLowData:   true,
-        source:      'flat-baseline',
-      };
-    }
-    return _empty;
-  }
+  // AURIX-CHART-ENGINE-FOUNDATION-1 · R2 — financial integrity. Previously a
+  // synthetic "flat baseline" (two identical points at the live value) was
+  // injected when fewer than 2 real post-epoch points existed, so the axis
+  // pinned to the current value. That invents a flat evolution the portfolio
+  // never actually held in a measured way, so it is removed: with <2 real
+  // points there is nothing honest to plot → report empty and let the
+  // insufficient-history surface ("Histórico en construcción") handle it.
+  if (source.length < 2) return _empty;
 
   // Diagnostic logging — confirms the input is stable across reloads.
   // Dev-only: never noisy in production.
@@ -12351,69 +12334,22 @@ function getChartData(range) {
     const inRange   = processed.filter(p => p.ts >= gridStart);
     rawInRange = inRange.length;
 
-    // CHART-DENSITY-1 (AURIX-PREMIUM-ENTRY-AND-CHART-1): the evenly-spaced
-    // grid below fills every slot with the last-known value (carry-forward).
-    // With dense history that reads as a smooth, deterministic line — but
-    // with only a handful of real snapshots in the window it turns them into
-    // long FLAT PLATFORMS joined by VERTICAL WALLS (a stale value held across
-    // many ticks, then a sudden jump at the next real sample). So we only use
-    // the grid when there are enough real points for it to look natural;
-    // otherwise we plot the actual sanitized snapshots and let the line slope
-    // honestly between real samples. Thresholds per range:
-    const GRID_MIN_POINTS = { '24h': 12, '7d': 14, '30d': 20, '1y': 24 };
-    const minForGrid = GRID_MIN_POINTS[range] || 12;
-
-    if (inRange.length < 2) {
-      // Fewer than 2 real points inside this window — fall back to an honest
-      // flat baseline pinned at the current value (no phantom slope/wall).
-      let currentBase = 0;
-      try { currentBase = (typeof totalValueBase === 'function') ? Number(totalValueBase()) : 0; }
-      catch (_) { currentBase = 0; }
-      if (Number.isFinite(currentBase) && currentBase > 0) {
-        const baseTs = now - 5 * 60_000;
-        return {
-          labels:      [fmt(baseTs), fmt(now)],
-          values:      [currentBase, currentBase],
-          timestamps:  [baseTs, now],
-          firstValue:  currentBase,
-          lastValue:   currentBase,
-          deltaAbs:    0,
-          deltaPct:    0,
-          pointsCount: 2,
-          isLowData:   true,
-          source:      'flat-baseline',
-        };
-      }
-      return _empty;
-    }
-
-    if (inRange.length < minForGrid) {
-      // Low density — plot the real snapshots directly. No carry-forward, so
-      // no flat platforms / vertical walls; the line slopes between samples.
-      final = inRange;
-      mode  = 'sparse-actual';
-    } else {
-      // Dense enough — deterministic evenly-spaced grid with carry-forward.
-      const step = duration / points;
-      let di        = 0;
-      let lastValue = null;
-      const grid    = [];
-      for (let i = 0; i <= points; i++) {
-        const t = gridStart + i * step;
-        while (di < processed.length && processed[di].ts <= t) {
-          lastValue = processed[di].value;
-          di++;
-        }
-        if (lastValue !== null) grid.push({ ts: t, value: lastValue });
-      }
-      if (grid.length < 2) {
-        final = downsample(inRange, points);
-        mode  = 'sparse-actual';
-      } else {
-        final = grid;
-        mode  = 'grid';
-      }
-    }
+    // AURIX-CHART-ENGINE-FOUNDATION-1 · R2 — financial integrity: plot ONLY
+    // real measured snapshots. The previous code filled an evenly-spaced grid
+    // with the last-known value (carry-forward) whenever density crossed a
+    // threshold — that held a stale value FLAT across time slots that were
+    // never measured and then jumped at the next real sample (the "flat
+    // platform + vertical wall" artifact the user reported). That fabricated
+    // continuity is removed entirely: real points are connected directly, so
+    // the line slopes honestly between true samples and asserts nothing about
+    // unmeasured gaps. With <2 real in-window points there is nothing honest to
+    // draw → report empty (the insufficient-history surface handles it) instead
+    // of inventing a flat baseline. downsample only SELECTS real points (last
+    // per bucket + anchored endpoints) to cap render cost on very dense windows;
+    // it never fabricates a value.
+    if (inRange.length < 2) return _empty;
+    final = (inRange.length > points) ? downsample(inRange, points) : inRange;
+    mode  = 'real';
   }
 
   const labels     = final.map(p => fmt(p.ts));
