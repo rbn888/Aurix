@@ -226,18 +226,46 @@
     return { mode: 'market', provider: 'yahoo', key: String(sym).toUpperCase() };
   }
 
-  /* ── Composition: the net-worth series ───────────────────────────────────────
-     PURE. Prices are passed in (priceByKey: { key → [{t,v}] }); no fetching here.
+  /* ── buildCashBaseAt — aggregate cash → BASE, ONCE per currency ──────────────
+     Cash is a portfolio-level, per-CURRENCY fact (not a per-asset one). This is
+     the SINGLE place cash is aggregated, which structurally removes any chance
+     of double counting (two cash entries in the same currency can't be summed
+     twice). fxByCurrency: { CCY → factor to base }; the base currency's factor
+     is 1. A currency with no known factor is skipped (cannot be valued honestly)
+     — coverage / confidence upstream reflects that rather than guessing.        */
+  function buildCashBaseAt(cashTimeline, fxByCurrency, baseCurrency) {
+    var fx = fxByCurrency || {};
+    var base = String(baseCurrency || 'USD').toUpperCase();
+    var ccys = (cashTimeline && cashTimeline.byCurrency) ? Object.keys(cashTimeline.byCurrency) : [];
+    return function (t) {
+      var sum = 0;
+      for (var i = 0; i < ccys.length; i++) {
+        var ccy = ccys[i];
+        var bal = cashTimeline.balanceAt(t, ccy);
+        if (!bal) continue;
+        var rate = (ccy === base) ? 1 : (_isFiniteNum(fx[ccy]) ? fx[ccy] : null);
+        if (rate == null) continue;
+        sum += bal * rate;
+      }
+      return sum;
+    };
+  }
+
+  /* ── Composition: the net-worth series — STRICTLY BASE CURRENCY ──────────────
+     PURE. The engine NEVER does FX and NEVER assumes any currency: ALL inputs
+     must already be in the base currency (the caller / Fase C pre-converts).
      Inputs:
-       grid          : ascending timestamps (from buildGrid)
-       holdings      : [{ asset, classification, qtyTimeline, currentValue }]
-                       classification = { mode:'market'|'cash'|'static', provider?, key? }
-                       currentValue   = live value in BASE currency (for static + anchor)
-       priceByKey    : map of provider key → real price series [{t,v}] (BASE ccy)
-       cashTimeline  : from buildCashTimeline (optional)
-       fxAt(ts)      : function → conversion factor to base ccy (default 1)
-       nowValue      : live total (BASE) to anchor the final point (optional)
-       baseCurrency  : label only
+       grid        : ascending timestamps (from buildGrid)
+       holdings    : [{ asset, classification:{mode:'market'|'static', key?}, qtyTimeline, currentValue }]
+                     • market : value(t) = qtyTimeline.at(t) × priceByKey[key] sampled at t  (BASE)
+                     • static : currentValue held flat (real estate / manual / no-feed) (BASE)
+                     • 'cash' classification is IGNORED here — cash enters ONCE via
+                       cashBaseAt (aggregated per-currency), so it can never double-count.
+       priceByKey  : { key → [{t,v}] } real price series, ALREADY CONVERTED TO BASE
+       cashBaseAt  : optional function(t) → total cash in BASE (see buildCashBaseAt)
+       nowValue    : live total (BASE) to anchor ONLY the final point
+       fxApproximated : true when any conversion used a non-historical rate → caps
+                        overall confidence at 'partial' (honest FX caveat, never COMPLETE)
      Output (fullscreen/crosshair-ready, extensible):
        { series:[{t, v, confidence}], meta:{...}, overlays:[], annotations:[] }   */
   function composeNetWorth(input) {
@@ -245,8 +273,8 @@
     var grid = _asArray(o.grid);
     var holdings = _asArray(o.holdings);
     var priceByKey = o.priceByKey || {};
-    var fxAt = (typeof o.fxAt === 'function') ? o.fxAt : function () { return 1; };
-    var cashTl = o.cashTimeline || null;
+    var cashBaseAt = (typeof o.cashBaseAt === 'function') ? o.cashBaseAt : null;
+    var lastT = grid.length ? grid[grid.length - 1] : 0;
 
     var series = [];
     var anyStaticOverall = false;
@@ -260,40 +288,36 @@
         var h = holdings[hi];
         var cls = h.classification || { mode: 'static' };
 
-        if (cls.mode === 'cash') {
-          // Cash is reconstructed from its timeline if present, else flat current.
-          var cv = cashTl
-            ? cashTl.balanceAt(t, (h.asset && h.asset.assetCurrency) || 'USD') * fxAt(t)
-            : _num(h.currentValue, 0);
-          total += cv; coveredVal += cv; expectedVal += cv;
-          continue;
-        }
+        if (cls.mode === 'cash') continue;   // cash handled once via cashBaseAt — no per-asset double count
 
         if (cls.mode === 'market' && h.qtyTimeline) {
           var qty = h.qtyTimeline.at(t);
           if (qty <= 0) continue;                       // no position at t → no value
-          var px = sampleSeriesAt(priceByKey[cls.key], t, 'linear');
+          var px = sampleSeriesAt(priceByKey[cls.key], t, 'linear');   // price ALREADY in base
           if (px == null) {
             // Position held but NO real price coverage at t → uncovered. It does
             // not contribute to the drawn value; it only adds to `expectedVal`
             // (weighted by the last-known price) so coverage — and therefore the
             // point's confidence — drops honestly. Never invent the value.
-            var lastPx = sampleSeriesAt(priceByKey[cls.key], grid[grid.length - 1], 'linear');
-            expectedVal += (lastPx != null) ? qty * lastPx * fxAt(t) : _num(h.currentValue, 0);
+            var lastPx = sampleSeriesAt(priceByKey[cls.key], lastT, 'linear');
+            expectedVal += (lastPx != null) ? qty * lastPx : _num(h.currentValue, 0);
             continue;
           }
-          // Covered: real value at t. expected == covered (coverage neutral).
-          var v = qty * px * fxAt(t);
+          var v = qty * px;                             // base × base, no FX here
           total += v; coveredVal += v; expectedVal += v;
           continue;
         }
 
-        // static (real estate, manual / no-feed funds): held flat at current value.
+        // static (real estate, manual / no-feed funds): held flat at current BASE value.
         var sv = _num(h.currentValue, 0);
-        total += sv; expectedVal += sv; hasStatic = true; anyStaticOverall = true;
-        // static value counts as "covered" in the sense of being known, but its
-        // presence downgrades confidence to PARTIAL via hasStatic.
-        coveredVal += sv;
+        total += sv; expectedVal += sv; coveredVal += sv;
+        hasStatic = true; anyStaticOverall = true;
+      }
+
+      // Cash: aggregated per-currency upstream and added ONCE (covered + known).
+      if (cashBaseAt) {
+        var cb = _num(cashBaseAt(t), 0);
+        total += cb; coveredVal += cb; expectedVal += cb;
       }
 
       var coverage = expectedVal > 0 ? (coveredVal / expectedVal) : (holdings.length ? 0 : 1);
@@ -301,7 +325,8 @@
       series.push({ t: t, v: +total.toFixed(2), confidence: classifyConfidence(coverage, hasStatic) });
     }
 
-    // Anchor the final point to the live total so the chart end == Hero Card.
+    // Anchor ONLY the final point to the live total (never rescale history, never
+    // touch historical points, never fabricate a point to reconcile).
     if (_isFiniteNum(o.nowValue) && series.length) {
       series[series.length - 1] = {
         t: series[series.length - 1].t,
@@ -312,6 +337,8 @@
 
     var avgCoverage = series.length ? (coverageAccum / series.length) : 0;
     var overallConf = classifyConfidence(avgCoverage, anyStaticOverall);
+    // FX approximation (non-historical rate) is an honest fidelity caveat → never COMPLETE.
+    if (o.fxApproximated && overallConf === CONFIDENCE.COMPLETE) overallConf = CONFIDENCE.PARTIAL;
     var first = series.length ? series[0].v : null;
     var last = series.length ? series[series.length - 1].v : null;
 
@@ -325,6 +352,7 @@
         pointCount: series.length,
         coverage: +avgCoverage.toFixed(3),
         confidence: overallConf,
+        fxApproximated: !!o.fxApproximated,
         anchored: _isFiniteNum(o.nowValue),
         firstValue: first,
         lastValue: last,
@@ -418,6 +446,46 @@
     check('static flat both points', comp3.series[0].v === 300000 && comp3.series[1].v === 300000);
     check('static → partial', comp3.meta.confidence === CONFIDENCE.PARTIAL);
 
+    // AMENDMENT (Fase A.1) — base-currency contract + per-currency cash aggregation.
+    // buildCashBaseAt: EUR 1000 (base) + USD 500 × 0.9 = 1450 (no double count).
+    var cashTl2 = buildCashTimeline([
+      { type: 'deposit', amount: 1000, currency: 'EUR', ts: 100 },
+      { type: 'deposit', amount: 500,  currency: 'USD', ts: 100 }
+    ]);
+    var cashBaseAt = buildCashBaseAt(cashTl2, { USD: 0.9 }, 'EUR');
+    check('cashBaseAt aggregates per-currency to base', cashBaseAt(150) === 1450);
+
+    // compose with aggregate cash: market 200 (1×@200 base) + cash 1450 = 1650.
+    var comp4 = composeNetWorth({
+      grid: [100, 200], range: '24h', baseCurrency: 'EUR',
+      holdings: [{ asset: { type: 'stock', ticker: 'X' }, classification: { mode: 'market', key: 'X' },
+        qtyTimeline: buildQuantityTimeline([{ type: 'buy', qty: 1, price: 180, ts: 100 }]) }],
+      priceByKey: { X: [{ t: 100, v: 180 }, { t: 200, v: 200 }] },
+      cashBaseAt: cashBaseAt
+    });
+    check('compose adds aggregate cash once', comp4.series[comp4.series.length - 1].v === 1650);
+
+    // no double count: passing extra 'cash' holdings must NOT add cash twice.
+    var comp5 = composeNetWorth({
+      grid: [100, 200], range: '24h', baseCurrency: 'EUR',
+      holdings: [
+        { asset: { type: 'cash', assetCurrency: 'EUR' }, classification: { mode: 'cash' } },
+        { asset: { type: 'cash', assetCurrency: 'EUR' }, classification: { mode: 'cash' } }
+      ],
+      cashBaseAt: function () { return 1450; }
+    });
+    check('cash holdings ignored → no double count', comp5.series[0].v === 1450 && comp5.series[1].v === 1450);
+
+    // fxApproximated caps confidence at partial even when fully covered.
+    var comp6 = composeNetWorth({
+      grid: [100, 200], range: '24h',
+      holdings: [{ asset: { type: 'stock', ticker: 'Y' }, classification: { mode: 'market', key: 'Y' },
+        qtyTimeline: buildQuantityTimeline([{ type: 'buy', qty: 1, price: 10, ts: 100 }]) }],
+      priceByKey: { Y: [{ t: 100, v: 10 }, { t: 200, v: 11 }] },
+      fxApproximated: true
+    });
+    check('fxApproximated caps confidence at partial', comp6.meta.confidence === CONFIDENCE.PARTIAL && comp6.meta.fxApproximated === true);
+
     try {
       console.log('%c[AurixPCE] self-test ' + (ok ? 'PASS' : 'FAIL'),
         'color:' + (ok ? '#27c768' : '#e0664a') + ';font-weight:700',
@@ -439,6 +507,7 @@
     buildGrid: buildGrid,
     buildQuantityTimeline: buildQuantityTimeline,
     buildCashTimeline: buildCashTimeline,
+    buildCashBaseAt: buildCashBaseAt,
     sampleSeriesAt: sampleSeriesAt,
     classifyConfidence: classifyConfidence,
     composeNetWorth: composeNetWorth,
