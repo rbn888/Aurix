@@ -10971,14 +10971,33 @@ function _aurixDashSync(surface) {
 }
 
 // AURIX-PORTFOLIO-CHART-ENGINE-1 · Fase D — Portfolio Chart Engine wiring.
-// All of this is inert unless window.__AURIX_PORTFOLIO_RECON === true. The PCE
-// is layered as an OPTIONAL enhancement on top of the always-correct snapshot
-// paint: snapshots are the complete fallback, the reconstruction only swaps in
-// AFTER it passes the fidelity gate (coverage ≥ 0.85, confidence ≠ insufficient,
-// ≥ 2 points), within the 2500 ms timeout, with no error. Scope is the V2
-// overlay only; the legacy Chart.js path and getChartData() are untouched.
+// Activation is governed by _aurixReconFlag() below: in this VALIDATION BUILD it
+// is ON by default (founder opens Aurix and sees the reconstructed chart), with
+// an always-available runtime kill switch. The PCE is layered as an OPTIONAL
+// enhancement on top of the always-correct snapshot paint: snapshots are the
+// complete fallback, the reconstruction only swaps in AFTER it passes the
+// fidelity gate (coverage ≥ 0.85, confidence ≠ insufficient, ≥ 2 points), within
+// the 2500 ms timeout, with no error. Scope is the V2 overlay only; the legacy
+// Chart.js path and getChartData() are untouched.
+// AURIX-PORTFOLIO-CHART-ENGINE-1 · Fase D — VALIDATION BUILD switch.
+// true  → the PCE is ON BY DEFAULT so the founder just opens Aurix and sees the
+//         reconstructed chart (no console, no flag, no steps). The full fallback
+//         to snapshots is UNCHANGED — gate/timeout/abort/error all still demote
+//         to snapshots, so producción nunca queda peor.
+// IMPORTANT: flip to `false` before any push to producción — that restores the
+// original "OFF by default" behaviour. The runtime override below always wins,
+// so this constant only sets the DEFAULT.
+const AURIX_PCE_VALIDATION_MODE = true;
+
 function _aurixReconFlag() {
-  return typeof window !== 'undefined' && window.__AURIX_PORTFOLIO_RECON === true;
+  if (typeof window === 'undefined') return false;
+  // Explicit runtime override always wins, in BOTH directions → instant kill
+  // switch (window.__AURIX_PORTFOLIO_RECON = false) and instant force-on, with
+  // no rebuild. Rule 1 (flag OFF / fallback siempre disponible) preserved.
+  if (window.__AURIX_PORTFOLIO_RECON === true)  return true;
+  if (window.__AURIX_PORTFOLIO_RECON === false) return false;
+  // Otherwise use the build default (validation build = ON).
+  return AURIX_PCE_VALIDATION_MODE === true;
 }
 
 // Drop any cached reconstruction + abort in-flight work. Called on structural
