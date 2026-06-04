@@ -1170,6 +1170,15 @@
   <script src="config.js"></script>
   <script src="services/ux.js"></script>
   <script src="services/onboarding-engine.js?v=1"></script>
+  <!-- AURIX-PORTFOLIO-CHART-ENGINE-1 · Fase D: Portfolio Chart Engine (PCE).
+       Load order = engine → price-layer → net-worth → adapter (ascending deps).
+       `defer` so boot is uninterrupted; their globals are only used lazily at
+       render time, gated by window.__AURIX_PORTFOLIO_RECON (default OFF). With
+       the flag off these modules are inert — dashboard behaviour is unchanged. -->
+  <script defer src="services/portfolio-chart-engine.js?v=1"></script>
+  <script defer src="services/portfolio-price-layer.js?v=1"></script>
+  <script defer src="services/portfolio-net-worth.js?v=1"></script>
+  <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script src="app.js?v=183"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
        Loads after app.js so it can read its primitives. No consumers yet. -->

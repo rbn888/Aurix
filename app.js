@@ -3724,6 +3724,16 @@ let portfolioChartMobile = null;  // mobile slider instance — null on desktop
 // any fallback restores the legacy pixel-for-pixel.
 let _aurixDashDesktop = null;
 let _aurixDashMobile  = null;
+// AURIX-PORTFOLIO-CHART-ENGINE-1 · Fase D — Portfolio Chart Engine swap state.
+// All OFF by default. `_reconActive` holds the LAST reconstruction that passed
+// the fidelity gate, keyed by (range,currency); `_aurixDashSync` paints it
+// (re-anchored to the live total) instead of snapshots only while it matches
+// the current view. `_reconSeq`/`_reconAbort` give single-flight + abort so a
+// stale or superseded async result can never repaint the chart.
+let _reconActive      = null;   // { range, currency, series:[{time,value}], confidence, coverage, fxApproximated, granularity }
+let _reconSeq         = 0;
+let _reconAbort       = null;
+let _reconInflightKey = null;
 // CHART-5: registry of Aurix sparkline controllers for market rows.
 // Keyed by normalized symbol so subsequent renders can destroy stale
 // instances cleanly (col-chart elements are recreated on every
@@ -10888,7 +10898,33 @@ function _aurixDashSync(surface) {
   try {
     ctrl.setRange(activeRange);
     ctrl.setCurrency(baseCurrency || 'USD');
-    const series = _aurixDashSeries(activeRange);
+
+    // AURIX-PORTFOLIO-CHART-ENGINE-1 · Fase D — pick the source. Default stays
+    // the snapshot series (legacy behaviour, untouched). Only when the flag is
+    // ON *and* a gated reconstruction matches the current (range,currency) do we
+    // swap to it. The last point is re-anchored to the live total RIGHT HERE so
+    // it always equals the Hero Card, no matter how stale the cached
+    // reconstruction is. Flag OFF ⇒ this whole branch is skipped and the path
+    // below is byte-identical to before.
+    const snapSeries = _aurixDashSeries(activeRange);
+    let series  = snapSeries;
+    let isRecon = false;
+    if (_aurixReconFlag()
+        && _reconActive
+        && _reconActive.range === activeRange
+        && _reconActive.currency === (baseCurrency || 'USD')
+        && Array.isArray(_reconActive.series)
+        && _reconActive.series.length >= 2) {
+      let rs = _reconActive.series;
+      const liveBase = (typeof totalValueBase === 'function') ? Number(totalValueBase()) : NaN;
+      if (Number.isFinite(liveBase)) {
+        rs = rs.slice();
+        rs[rs.length - 1] = { time: rs[rs.length - 1].time, value: liveBase };
+      }
+      series  = rs;
+      isRecon = true;
+    }
+
     if (!series.length) {
       // Block 7: distinguish "no assets yet" from "has assets but history is
       // still building" (<2 usable points) so the engine's empty surface shows
@@ -10913,12 +10949,18 @@ function _aurixDashSync(surface) {
       }
     } catch (_) { /* leave direction null → auto first/last */ }
 
+    // Fase D — when the reconstructed line is shown, recompute the headline KPI
+    // (chart-change %/€) from the reconstructed baseline + live total so the
+    // figure matches the line actually drawn. No-op for snapshots: the value
+    // updateChart already set stands.
+    if (isRecon) { try { _aurixReconSyncHeadline(series); } catch (_) {} }
+
     ctrl.setData(series, {
-      source:       'local-snapshot',
+      source:       isRecon ? 'reconstructed' : 'local-snapshot',
       currency:     baseCurrency || 'USD',
-      granularity:  '5m',
+      granularity:  isRecon ? (_reconActive.granularity || '5m') : '5m',
       isSynthetic:  false,
-      completeness: 1,
+      completeness: isRecon ? (Number.isFinite(_reconActive.coverage) ? _reconActive.coverage : 1) : 1,
       asOf:         Date.now(),
       direction:    direction,
     });
@@ -10926,6 +10968,129 @@ function _aurixDashSync(surface) {
     console.warn('[chart-v2] sync failed for', surface, err && err.message ? err.message : err);
     _aurixDashTeardown(surface);
   }
+}
+
+// AURIX-PORTFOLIO-CHART-ENGINE-1 · Fase D — Portfolio Chart Engine wiring.
+// All of this is inert unless window.__AURIX_PORTFOLIO_RECON === true. The PCE
+// is layered as an OPTIONAL enhancement on top of the always-correct snapshot
+// paint: snapshots are the complete fallback, the reconstruction only swaps in
+// AFTER it passes the fidelity gate (coverage ≥ 0.85, confidence ≠ insufficient,
+// ≥ 2 points), within the 2500 ms timeout, with no error. Scope is the V2
+// overlay only; the legacy Chart.js path and getChartData() are untouched.
+function _aurixReconFlag() {
+  return typeof window !== 'undefined' && window.__AURIX_PORTFOLIO_RECON === true;
+}
+
+// Drop any cached reconstruction + abort in-flight work. Called on structural
+// changes (add/edit/delete) so the next render shows snapshots immediately and
+// a fresh reconstruction is kicked off against the new portfolio.
+function _aurixReconInvalidate() {
+  _reconActive = null;
+  _reconInflightKey = null;
+  if (_reconAbort) { try { _reconAbort.abort(); } catch (_) {} _reconAbort = null; }
+  _reconSeq++;
+}
+
+// Keep the headline KPI coherent with a reconstructed line (mirror of the
+// snapshot logic in updateChart, including the mobile mirror + perf-mode).
+function _aurixReconSyncHeadline(series) {
+  if (!chartChangeEl) return;
+  const startValue   = (series && series.length) ? Number(series[0].value) : NaN;
+  const currentValue = (typeof totalValueBase === 'function') ? Number(totalValueBase()) : NaN;
+  const safeBase     = Number.isFinite(startValue) && startValue > 0 && Number.isFinite(currentValue);
+  const pct = safeBase ? ((currentValue - startValue) / startValue) * 100 : 0;
+  const cls = !safeBase ? 'flat' : (pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat');
+  if (!safeBase) {
+    chartChangeEl.textContent = '—';
+  } else if (activePerfMode === 'curr') {
+    const absChange = currentValue - startValue;
+    chartChangeEl.textContent = `${absChange >= 0 ? '+' : ''}${formatBase(absChange)}`;
+  } else {
+    chartChangeEl.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+  }
+  chartChangeEl.className = `chart-change ${cls}`;
+  const _mch = document.getElementById('chartChangeMobile');
+  if (_mch) { _mch.textContent = chartChangeEl.textContent; _mch.className = chartChangeEl.className; }
+}
+
+// Decide whether to (re)compute a reconstruction for the current view, then do
+// it in the background with single-flight + abort + 2500 ms timeout. Called once
+// per updateChart, AFTER snapshots are already painted. On success it stores
+// _reconActive and re-syncs the V2 surfaces (which then paint the swap). On any
+// failure/timeout/abort/gate-rejection it does nothing → snapshots remain.
+function _aurixReconRefresh() {
+  if (!_aurixReconFlag()) return;
+  if (typeof window === 'undefined') return;
+  if (!window.AurixPortfolioRecon || !window.AurixNetWorth || !window.AurixChartAdapters) return;
+
+  const range    = activeRange;
+  const currency = baseCurrency || 'USD';
+  const key      = range + ':' + currency;
+
+  // Already have a gated reconstruction for this exact view, or one in flight
+  // for it → nothing to do. (The price layer TTL-caches the heavy history
+  // fetches, and _aurixDashSync re-anchors the tail to the live total, so a
+  // cached shape stays correct without re-fetching on every price tick.)
+  if (_reconActive && _reconActive.range === range && _reconActive.currency === currency) return;
+  if (_reconInflightKey === key) return;
+
+  // Single-flight: abort any prior, bump the sequence token.
+  if (_reconAbort) { try { _reconAbort.abort(); } catch (_) {} }
+  _reconAbort = (typeof AbortController === 'function') ? new AbortController() : null;
+  const mySeq  = ++_reconSeq;
+  const signal = _reconAbort ? _reconAbort.signal : undefined;
+  _reconInflightKey = key;
+
+  // Gather injected dependencies from this closure — the adapter reads NO app
+  // globals; everything it needs is passed explicitly.
+  let assetsSnapshot;
+  try { assetsSnapshot = (typeof activeAssets === 'function') ? activeAssets() : []; }
+  catch (_) { assetsSnapshot = []; }
+  const baseC = currency;
+  const fxToBase = function (ccy) {
+    const c = String(ccy || '').toUpperCase();
+    if (c === baseC) return 1;
+    if (c === 'USD' || c === 'EUR') return toBase(1, c);   // only USD/EUR known today
+    return null;                                           // unknown ⇒ uncovered, never guess
+  };
+  const currentValueOf = function (a) { try { return toBase(assetValueUSD(a), 'USD'); } catch (_) { return 0; } };
+  let cashEvents = [];
+  try { cashEvents = (window.wealthLedger && typeof window.wealthLedger.getEvents === 'function') ? window.wealthLedger.getEvents() : []; }
+  catch (_) { cashEvents = []; }
+  let nowValue = NaN;
+  try { nowValue = (typeof totalValueBase === 'function') ? totalValueBase() : NaN; } catch (_) {}
+
+  const nowMs = Date.now();   // the engine is deterministic; the caller stamps time.
+  const TIMEOUT_MS = 2500;
+  const timeout = new Promise(function (resolve) { setTimeout(function () { resolve('__timeout__'); }, TIMEOUT_MS); });
+  const work = window.AurixPortfolioRecon.buildDashboardSeries({
+    assets: assetsSnapshot, range: range, baseCurrency: baseC, signal: signal,
+    currentValueOf: currentValueOf, fxToBase: fxToBase, cashEvents: cashEvents, nowValue: nowValue,
+    now: nowMs, asOf: nowMs,
+  });
+
+  Promise.race([work, timeout]).then(function (res) {
+    // Superseded by a newer kick / invalidation → drop silently.
+    if (mySeq !== _reconSeq) return;
+    _reconInflightKey = null;
+    // Timeout → abort in-flight fetches, keep snapshots.
+    if (res === '__timeout__') { if (_reconAbort) { try { _reconAbort.abort(); } catch (_) {} } return; }
+    // Gate failed / error / engine unavailable → keep snapshots.
+    if (!res || !Array.isArray(res.series) || res.series.length < 2) return;
+    // View changed while computing, or flag turned off mid-flight → discard.
+    if (range !== activeRange || baseC !== (baseCurrency || 'USD')) return;
+    if (!_aurixReconFlag()) return;
+
+    _reconActive = {
+      range: range, currency: baseC, series: res.series,
+      confidence: res.confidence, coverage: res.coverage,
+      fxApproximated: res.fxApproximated, granularity: res.granularity,
+    };
+    // Swap in: re-sync mounted V2 surfaces. _aurixDashSync now sees a matching
+    // _reconActive and paints the reconstructed line (does NOT re-kick).
+    try { if (_aurixDashDesktop) _aurixDashSync('desktop'); } catch (_) {}
+    try { if (_aurixDashMobile)  _aurixDashSync('mobile'); } catch (_) {}
+  }).catch(function () { _reconInflightKey = null; /* error ⇒ snapshots */ });
 }
 
 // ── CHART-5 ──────────────────────────────────────────────────────
@@ -12567,10 +12732,19 @@ function updateChart(animate = false) {
   // aren't mounted, and recovers via teardown if it throws.
   if (_aurixDashDesktop) _aurixDashSync('desktop');
   if (_aurixDashMobile)  _aurixDashSync('mobile');
+
+  // AURIX-PORTFOLIO-CHART-ENGINE-1 · Fase D — after snapshots are painted,
+  // (re)compute the reconstruction in the background. Inert when the flag is
+  // OFF (returns immediately) → behaviour above is unchanged.
+  try { _aurixReconRefresh(); } catch (_) {}
 }
 
 function onPortfolioChange(animate = false, opts = {}) {
   if (!opts || !opts.skipSnapshot) recordSnapshot();
+  // Fase D — structural change ⇒ drop the cached reconstruction so the chart
+  // shows snapshots immediately and a fresh PCE run is kicked for the new
+  // portfolio. No-op effect when the flag is OFF (nothing is ever cached).
+  _aurixReconInvalidate();
   updateChart(animate);
   updateDonut();
 }
