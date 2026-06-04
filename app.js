@@ -4366,6 +4366,20 @@ function totalValueUSD() {
 
 function totalValueBase() { return toBase(totalValueUSD(), 'USD'); }
 
+// ── AURIX-INVESTABLE-WEALTH-1 · investable wealth ──────────────────────────
+// PRODUCT DECISION (2026-06-04): the main Dashboard (Hero, chart, KPI/return,
+// distribution) represents INVESTABLE wealth, not total net worth. Real estate
+// is patrimonio but NOT investable — it is static, dominates the total (a
+// 380k house vs a 6k portfolio = 98% flat line) and crushes any real market
+// movement. It lives ONLY in its own card/category. totalValueUSD/Base stay
+// untouched (total net worth, used by Category/Workspace/recordSnapshot/
+// persistence and a future "patrimonio total" mode). 'other' stays investable;
+// only real_estate is excluded.
+function isInvestableAsset(a) { return _aurixCategoryBucket(a) !== 'real_estate'; }
+function investableAssets()   { return activeAssets().filter(isInvestableAsset); }
+function investableValueUSD()  { return investableAssets().reduce((sum, a) => sum + assetValueUSD(a), 0); }
+function investableValueBase() { return toBase(investableValueUSD(), 'USD'); }
+
 // ── P&L calculations ────────────────────────────────────────
 function assetPnLBase(asset) {
   // LIQ-2: cash never produces P&L. Holding 20,000 EUR ≠ a position
@@ -10311,6 +10325,41 @@ function getDistribution() {
     }));
 }
 
+// AURIX-INVESTABLE-WEALTH-1 — distribution for the DASHBOARD (donut + cards),
+// computed over INVESTABLE wealth. getDistribution() above stays total-based and
+// untouched for the insight/AI/Workspace consumers. Here the denominator is
+// investableValueUSD(); real_estate is excluded from the donut by default.
+// opts.includeNonInvestable=true ALSO returns the real_estate group (valueBase
+// only, pct 0, flagged nonInvestable) so its card can still show its value +
+// monthly income while NOT competing in the participation %.
+function getInvestableDistribution(opts) {
+  const includeNonInvestable = !!(opts && opts.includeNonInvestable);
+  const invUSD = investableValueUSD();
+
+  const groups = {};
+  assets.forEach(a => {
+    const valUSD = assetValueUSD(a);
+    const key    = TYPE_META[a.type] ? a.type : 'other';
+    groups[key]  = (groups[key] || 0) + valUSD;
+  });
+
+  let entries = Object.entries(groups).filter(([, v]) => v > 0);
+  if (!includeNonInvestable) entries = entries.filter(([type]) => type !== 'real_estate');
+  if (!entries.length) return null;
+
+  return entries
+    .sort(([, a], [, b]) => b - a)
+    .map(([type, valueUSD]) => {
+      const nonInvestable = (type === 'real_estate');
+      return {
+        type,
+        valueBase: toBase(valueUSD, 'USD'),
+        pct:       (nonInvestable || invUSD <= 0) ? 0 : (valueUSD / invUSD) * 100,
+        nonInvestable,
+      };
+    });
+}
+
 // Lighten a hex color by a multiplier (e.g. 1.18 = 18% brighter)
 function lightenHex(hex, f) {
   const n = parseInt(hex.replace('#', ''), 16);
@@ -10449,7 +10498,10 @@ function initDonut() {
 let _donutHasData = false;   // track whether donut has been populated before
 
 function updateDonut() {
-  const dist   = getDistribution();
+  // AURIX-INVESTABLE-WEALTH-1 — the donut + legend show the INVESTABLE
+  // distribution (real estate excluded; it lives in its own card). % are over
+  // investable wealth so a 98%-house portfolio no longer flattens every slice.
+  const dist   = getInvestableDistribution();
   _donutDist     = dist || [];
   _donutHoverIdx = -1;
 
@@ -10749,7 +10801,9 @@ function _aurixDashMountWhenReady(surface) {
 // (see _aurixDashMount) so neither side smooths data the other does
 // not. portfolioHistory itself is never mutated.
 function _aurixDashSeries(range) {
-  const data = (typeof getChartData === 'function') ? getChartData(range) : null;
+  // AURIX-INVESTABLE-WEALTH-1 — Dashboard chart = investable wealth (excludes
+  // real estate), derived from categoryHistory. Snapshots remain the fallback.
+  const data = (typeof getChartData === 'function') ? getChartData(range, _investableSnapshotSource()) : null;
   if (!data) return [];
   const values     = Array.isArray(data.values)     ? data.values     : [];
   const timestamps = Array.isArray(data.timestamps) ? data.timestamps : [];
@@ -10916,7 +10970,7 @@ function _aurixDashSync(surface) {
         && Array.isArray(_reconActive.series)
         && _reconActive.series.length >= 2) {
       let rs = _reconActive.series;
-      const liveBase = (typeof totalValueBase === 'function') ? Number(totalValueBase()) : NaN;
+      const liveBase = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN;
       if (Number.isFinite(liveBase)) {
         rs = rs.slice();
         rs[rs.length - 1] = { time: rs[rs.length - 1].time, value: liveBase };
@@ -10942,7 +10996,7 @@ function _aurixDashSync(surface) {
     let direction = null;
     try {
       const start = Number(series[0]?.value);
-      const now   = (typeof totalValueBase === 'function') ? Number(totalValueBase()) : NaN;
+      const now   = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN;
       if (Number.isFinite(start) && start > 0 && Number.isFinite(now)) {
         const pct = ((now - start) / start) * 100;
         direction = pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat';
@@ -11015,7 +11069,7 @@ function _aurixReconInvalidate() {
 function _aurixReconSyncHeadline(series) {
   if (!chartChangeEl) return;
   const startValue   = (series && series.length) ? Number(series[0].value) : NaN;
-  const currentValue = (typeof totalValueBase === 'function') ? Number(totalValueBase()) : NaN;
+  const currentValue = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN;
   const safeBase     = Number.isFinite(startValue) && startValue > 0 && Number.isFinite(currentValue);
   const pct = safeBase ? ((currentValue - startValue) / startValue) * 100 : 0;
   const cls = !safeBase ? 'flat' : (pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat');
@@ -11063,7 +11117,7 @@ function _aurixReconRefresh() {
   // Gather injected dependencies from this closure — the adapter reads NO app
   // globals; everything it needs is passed explicitly.
   let assetsSnapshot;
-  try { assetsSnapshot = (typeof activeAssets === 'function') ? activeAssets() : []; }
+  try { assetsSnapshot = (typeof investableAssets === 'function') ? investableAssets() : []; }
   catch (_) { assetsSnapshot = []; }
   const baseC = currency;
   const fxToBase = function (ccy) {
@@ -11077,7 +11131,7 @@ function _aurixReconRefresh() {
   try { cashEvents = (window.wealthLedger && typeof window.wealthLedger.getEvents === 'function') ? window.wealthLedger.getEvents() : []; }
   catch (_) { cashEvents = []; }
   let nowValue = NaN;
-  try { nowValue = (typeof totalValueBase === 'function') ? totalValueBase() : NaN; } catch (_) {}
+  try { nowValue = (typeof investableValueBase === 'function') ? investableValueBase() : NaN; } catch (_) {}
 
   const nowMs = Date.now();   // the engine is deterministic; the caller stamps time.
   const TIMEOUT_MS = 2500;
@@ -12417,7 +12471,29 @@ function sanitizeHistoryForDisplay(points) {
 }
 
 
-function getChartData(range) {
+// AURIX-INVESTABLE-WEALTH-1 — investable history for the Dashboard chart,
+// derived from the EXISTING categoryHistory snapshots (which already store
+// `total` and `real_estate` per point, timestamp-aligned with portfolioHistory).
+// investable(t) = total(t) − real_estate(t). This does NOT touch recordSnapshot,
+// portfolioHistory, persistence or Supabase — it only reads a series already
+// persisted. Returned in USD ({ts,value}); getChartData() applies epoch filter,
+// sanitation, downsample and base-currency conversion exactly as for snapshots.
+function _investableSnapshotSource() {
+  if (!Array.isArray(categoryHistory)) return [];
+  const out = [];
+  for (const p of categoryHistory) {
+    if (!p || typeof p.ts !== 'number') continue;
+    const inv = Number(p.total) - Number(p.real_estate || 0);
+    if (!Number.isFinite(inv) || inv <= 0) continue;
+    out.push({ ts: p.ts, value: +inv.toFixed(2) });
+  }
+  return out;
+}
+
+// AURIX-INVESTABLE-WEALTH-1 — optional `sourceOverride` ([{ts,value(USD)}]) lets
+// the Dashboard feed the investable series instead of portfolioHistory. With no
+// override the behaviour is byte-identical to before (reads portfolioHistory).
+function getChartData(range, sourceOverride) {
   const now = Date.now();
 
   const ms = {
@@ -12456,8 +12532,9 @@ function getChartData(range) {
   // the chart boundary so a pre-reset 52K snapshot can never repaint a
   // phantom -96% drop on a fresh post-reset portfolio.
   const _epoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
-  const source = Array.isArray(portfolioHistory)
-    ? portfolioHistory
+  const _rawSource = Array.isArray(sourceOverride) ? sourceOverride : portfolioHistory;
+  const source = Array.isArray(_rawSource)
+    ? _rawSource
         .filter(p => p && typeof p.ts === 'number' && typeof p.value === 'number' && isFinite(p.value) && p.value > 0)
         .filter(p => !_epoch || p.ts >= _epoch)
         .sort((a, b) => a.ts - b.ts)
@@ -12628,7 +12705,9 @@ function _setChartNoData(el, state) {
 
 function updateChart(animate = false) {
   if (!portfolioChart) return;
-  const data = getChartData(activeRange);
+  // AURIX-INVESTABLE-WEALTH-1 — Dashboard chart + KPI use the investable series
+  // (excludes real estate), derived from categoryHistory. Snapshots fallback.
+  const data = getChartData(activeRange, _investableSnapshotSource());
 
   if (!data.values.length) {
     // AURIX-PWA-HISTORY-HYDRATION-1: the "add assets to see your evolution"
@@ -12694,7 +12773,9 @@ function updateChart(animate = false) {
   // misleading huge number. Both desktop and the mobile mirror below
   // read the SAME chartChangeEl text, so they cannot disagree.
   const startValue   = data.firstValue;
-  const currentValue = totalValueBase();
+  // AURIX-INVESTABLE-WEALTH-1 — KPI/return over investable wealth (matches the
+  // investable chart series + Hero). Real estate excluded.
+  const currentValue = investableValueBase();
   const safeBase     = Number.isFinite(startValue) && startValue > 0;
   const pct = safeBase ? ((currentValue - startValue) / startValue) * 100 : 0;
   const cls = !safeBase ? 'flat' : (pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat');
@@ -14086,8 +14167,12 @@ function updateCategoryCards() {
     ? _catOrder
     : CAT_DEFAULT_ORDER;
 
-  // Build a lookup from _donutDist so we can fill in live values where available
-  const distMap = Object.fromEntries((_donutDist || []).map(d => [d.type, d]));
+  // AURIX-INVESTABLE-WEALTH-1 — cards use the investable distribution, but WITH
+  // the non-investable real-estate group included so its card keeps showing its
+  // value + monthly income. real_estate is flagged nonInvestable (pct 0) and its
+  // participation bar is suppressed below — it no longer competes in the %.
+  const _cardDist = getInvestableDistribution({ includeNonInvestable: true }) || [];
+  const distMap = Object.fromEntries(_cardDist.map(d => [d.type, d]));
 
   console.log('[categories] rendering:', ALL_CATEGORIES, '| live dist:', Object.keys(distMap));
 
@@ -14115,10 +14200,14 @@ function updateCategoryCards() {
       if (dist.valueBase > 0) {
         const valEl = card.querySelector('.cat-card-value');
         if (valEl) { valEl.dataset.target = dist.valueBase; valEl.textContent = formatBase(dist.valueBase); }
-        const wLbl = card.querySelector('.cat-card-weight-label');
-        if (wLbl) wLbl.textContent = `${t('catWeightLabel')} · ${dist.pct.toFixed(1)}%`;
-        const wFill = card.querySelector('.cat-card-bar-fill');
-        if (wFill) wFill.style.width = `${Math.max(0, Math.min(100, Number(dist.pct) || 0)).toFixed(1)}%`;
+        // AURIX-INVESTABLE-WEALTH-1 — non-investable (real estate) shows value
+        // only, never a participation %/bar.
+        if (!dist.nonInvestable) {
+          const wLbl = card.querySelector('.cat-card-weight-label');
+          if (wLbl) wLbl.textContent = `${t('catWeightLabel')} · ${dist.pct.toFixed(1)}%`;
+          const wFill = card.querySelector('.cat-card-bar-fill');
+          if (wFill) wFill.style.width = `${Math.max(0, Math.min(100, Number(dist.pct) || 0)).toFixed(1)}%`;
+        }
       }
       const stEl = card.querySelector('.market-status');
       const st   = getMarketStatus(type);
@@ -14178,7 +14267,10 @@ function updateCategoryCards() {
     // isolated stat. Empty categories render no bar/percent (clean, intentional)
     // — and the value stays the protagonist. On mobile the weight stays hidden
     // (as the bar was before), preserving the existing mobile layout.
-    const weight = isEmpty ? '' :
+    // AURIX-INVESTABLE-WEALTH-1 — non-investable categories (real estate) render
+    // value + monthly income but NO participation %/bar: they are patrimonio,
+    // not investable, so they don't compete in the distribution.
+    const weight = (isEmpty || dist.nonInvestable) ? '' :
       `<div class="cat-card-weight" aria-hidden="true">
         <span class="cat-card-weight-label">${t('catWeightLabel')} · ${dist.pct.toFixed(1)}%</span>
         <div class="cat-card-bar"><span class="cat-card-bar-fill" style="width:${allocPct.toFixed(1)}%;background:${m.color}"></span></div>
@@ -18306,7 +18398,10 @@ function render(animate = false) {
     try { renderAssetDetail(); } catch (_) {}
     return;
   }
-  countUpTotalValue(totalValueBase());
+  // AURIX-INVESTABLE-WEALTH-1 — the Hero shows INVESTABLE wealth (real estate
+  // excluded; it lives in its own card/category). totalValueBase() stays the
+  // total net worth for other surfaces and a future "patrimonio total" mode.
+  countUpTotalValue(investableValueBase());
   updatePerformance();
   assetCountEl.textContent = t('assetCount')(activeAssets().length);
 
