@@ -4584,6 +4584,35 @@ function _aurixFilterAfterEpoch(arr, tsKey) {
   return arr.filter(p => p && typeof p[key] === 'number' && p[key] >= epoch);
 }
 
+// AURIX-INVESTABLE-CHART-EPOCH-1 — VISUAL baseline for the INVESTABLE dashboard
+// chart ONLY. Snapshots/reconstruction points before this instant are IGNORED
+// (never deleted) so the chart measures the real portfolio from a clean starting
+// point, free of contaminated test history (e.g. a fictitious ~1M spike on May 1).
+// Separate from the portfolio reset epoch (_aurixPortfolioEpoch) and fully non-
+// destructive: portfolioHistory/categoryHistory/transactions/Supabase stay intact,
+// and setting the constant to 0 reverts completely. The optional localStorage
+// override re-baselines without a redeploy (emergency only).
+const AURIX_INVESTABLE_CHART_EPOCH = 1780604468000; // 2026-06-04T20:21:08Z — "B" reset (start from now)
+const INVESTABLE_CHART_EPOCH_KEY = 'aurix_investable_chart_epoch';
+function _aurixInvestableChartEpoch() {
+  let override = 0;
+  try { override = parseInt(localStorage.getItem(INVESTABLE_CHART_EPOCH_KEY) || '0', 10) || 0; } catch (_) {}
+  const portfolioEpoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
+  // Never show less-clean than the portfolio reset epoch, the constant baseline,
+  // or an explicit override — whichever is most recent.
+  return Math.max(portfolioEpoch, AURIX_INVESTABLE_CHART_EPOCH || 0, override);
+}
+// Emergency re-baseline to "now" (or a given ts) without a redeploy. Revert with
+// localStorage.removeItem('aurix_investable_chart_epoch') (then the constant rules).
+if (typeof window !== 'undefined') {
+  window.__aurixRebaselineInvestable = function (ts) {
+    const v = (typeof ts === 'number' && ts > 0) ? ts : Date.now();
+    try { localStorage.setItem(INVESTABLE_CHART_EPOCH_KEY, String(v)); } catch (_) {}
+    try { if (typeof updateChart === 'function') updateChart(true); } catch (_) {}
+    return v;
+  };
+}
+
 function loadHistory() {
   try {
     const raw = JSON.parse(localStorage.getItem(HISTORY_KEY));
@@ -11134,12 +11163,15 @@ function _aurixReconRefresh() {
   try { nowValue = (typeof investableValueBase === 'function') ? investableValueBase() : NaN; } catch (_) {}
 
   const nowMs = Date.now();   // the engine is deterministic; the caller stamps time.
+  // AURIX-INVESTABLE-CHART-EPOCH-1 — the TOTAL/'all' grid must start at the visual
+  // baseline, not at the oldest (possibly contaminated) transaction.
+  const epoch = (typeof _aurixInvestableChartEpoch === 'function') ? _aurixInvestableChartEpoch() : 0;
   const TIMEOUT_MS = 2500;
   const timeout = new Promise(function (resolve) { setTimeout(function () { resolve('__timeout__'); }, TIMEOUT_MS); });
   const work = window.AurixPortfolioRecon.buildDashboardSeries({
     assets: assetsSnapshot, range: range, baseCurrency: baseC, signal: signal,
     currentValueOf: currentValueOf, fxToBase: fxToBase, cashEvents: cashEvents, nowValue: nowValue,
-    now: nowMs, asOf: nowMs,
+    now: nowMs, asOf: nowMs, firstTs: (epoch > 0 ? epoch : undefined),
   });
 
   Promise.race([work, timeout]).then(function (res) {
@@ -11149,13 +11181,20 @@ function _aurixReconRefresh() {
     // Timeout → abort in-flight fetches, keep snapshots.
     if (res === '__timeout__') { if (_reconAbort) { try { _reconAbort.abort(); } catch (_) {} } return; }
     // Gate failed / error / engine unavailable → keep snapshots.
-    if (!res || !Array.isArray(res.series) || res.series.length < 2) return;
+    if (!res || !Array.isArray(res.series)) return;
+    // AURIX-INVESTABLE-CHART-EPOCH-1 — clamp to the visual baseline so no range
+    // (incl. 1Y/TOTAL, or old test transactions) ever shows pre-baseline data.
+    // If too few points remain, skip the swap → snapshots (also baselined) →
+    // "building history". The last point (= live Hero total) is always ≥ epoch.
+    let series = res.series;
+    if (epoch > 0) series = series.filter(function (p) { return p && typeof p.time === 'number' && p.time >= epoch; });
+    if (series.length < 2) return;
     // View changed while computing, or flag turned off mid-flight → discard.
     if (range !== activeRange || baseC !== (baseCurrency || 'USD')) return;
     if (!_aurixReconFlag()) return;
 
     _reconActive = {
-      range: range, currency: baseC, series: res.series,
+      range: range, currency: baseC, series: series,
       confidence: res.confidence, coverage: res.coverage,
       fxApproximated: res.fxApproximated, granularity: res.granularity,
     };
@@ -12480,9 +12519,13 @@ function sanitizeHistoryForDisplay(points) {
 // sanitation, downsample and base-currency conversion exactly as for snapshots.
 function _investableSnapshotSource() {
   if (!Array.isArray(categoryHistory)) return [];
+  // AURIX-INVESTABLE-CHART-EPOCH-1 — ignore everything before the visual baseline
+  // (the contaminated pre-reset history is read-only and stays in categoryHistory).
+  const epoch = (typeof _aurixInvestableChartEpoch === 'function') ? _aurixInvestableChartEpoch() : 0;
   const out = [];
   for (const p of categoryHistory) {
     if (!p || typeof p.ts !== 'number') continue;
+    if (epoch && p.ts < epoch) continue;
     const inv = Number(p.total) - Number(p.real_estate || 0);
     if (!Number.isFinite(inv) || inv <= 0) continue;
     out.push({ ts: p.ts, value: +inv.toFixed(2) });
