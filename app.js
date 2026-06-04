@@ -27638,9 +27638,16 @@ try {
 // dashboard rotates one signal at a time from the pool below; the
 // Health panel consumes the primary (highest-priority) one.
 function computeAurixSignalPool() {
+  // AURIX-INVESTABLE-WEALTH-1 — signals/recommendations analyse INVESTABLE wealth
+  // only. Shadowing `assets` with the investable subset (real estate excluded)
+  // makes every composition rule below (concentration, single-asset, low-div,
+  // liquidity, performance/loss) read investable wealth; the real-estate signal
+  // (rePct, from getInvestableDistribution) reads 0 → stays inert. totalValueUSD/
+  // getDistribution (total) are untouched globally.
+  const assets = (typeof investableAssets === 'function') ? investableAssets() : [];
   if (!Array.isArray(assets) || assets.length === 0) return [];
 
-  const totUSD = (typeof totalValueUSD === 'function') ? totalValueUSD() : 0;
+  const totUSD = (typeof investableValueUSD === 'function') ? investableValueUSD() : 0;
   if (totUSD <= 0) return [];
 
   const pool = [];
@@ -27658,7 +27665,9 @@ function computeAurixSignalPool() {
     if (v > topAssetUsd) { topAssetUsd = v; topAsset = a; }
   }
   const topPct = (topAssetUsd / totUSD) * 100;
-  const dist = (typeof getDistribution === 'function') ? (getDistribution() || []) : [];
+  // INVESTABLE distribution (real estate excluded) → category/crypto/cash signals
+  // reflect the manageable portfolio; the rePct rule below reads 0 and stays inert.
+  const dist = (typeof getInvestableDistribution === 'function') ? (getInvestableDistribution() || []) : [];
   const cryptoPct = (dist.find(d => d.type === 'crypto') || {}).pct || 0;
   const cashPct   = (dist.find(d => d.type === 'cash')   || {}).pct || 0;
 
@@ -27874,8 +27883,17 @@ function _aurixHealthSnapshot() {
     worstAsset:    null,    // { name, ticker, change24h }
     bestAsset:     null,    // { name, ticker, change24h }
   };
+  // AURIX-INVESTABLE-WEALTH-1 — Workspace intelligence analyses INVESTABLE wealth
+  // only (real estate lives in its own card/category). Shadowing `assets` with the
+  // investable subset makes EVERY loop, count and guard below operate on investable
+  // wealth, so liquidity/concentration/diversification/exposure are never distorted
+  // by a dominant property — and real estate can never surface here (the reUSD loop
+  // finds none → realEstatePct → 0, so the RE-aware branches downstream stay inert).
+  // totalValueUSD/getDistribution (total) are untouched globally; here we read the
+  // investable equivalents.
+  const assets = (typeof investableAssets === 'function') ? investableAssets() : [];
   if (!Array.isArray(assets) || assets.length === 0) return out;
-  const totUSD = (typeof totalValueUSD === 'function') ? totalValueUSD() : 0;
+  const totUSD = (typeof investableValueUSD === 'function') ? investableValueUSD() : 0;
   out.totUSD     = totUSD;
   out.assetCount = assets.length;
   if (totUSD <= 0) return out;
@@ -27934,8 +27952,9 @@ function _aurixHealthSnapshot() {
   if (worstRef && Number.isFinite(worstCh)) {
     out.worstAsset = { name: worstRef.name || worstRef.ticker, ticker: worstRef.ticker || '', change24h: worstCh };
   }
-  // Top category + crypto/cash percentages from getDistribution()
-  const dist = (typeof getDistribution === 'function') ? (getDistribution() || []) : [];
+  // Top category + crypto/cash percentages — INVESTABLE distribution (real
+  // estate excluded), so exposure/diversification reflect the manageable portfolio.
+  const dist = (typeof getInvestableDistribution === 'function') ? (getInvestableDistribution() || []) : [];
   out.categoryCount = dist.length;
   if (dist.length) {
     const head = dist[0];
