@@ -3350,6 +3350,25 @@ body:not(.hero-active) #orb-canvas {
 /* Energy sweep removed — clean chart surface */
 .chart-wrap::after { display: none; }
 
+/* AURIX-WEB-POLISH-1 — desktop (≥1024px) premium dashboard chart. More vertical
+   presence (190px → 240px, ≈+26%) so the curve reads like a financial platform,
+   not a technical widget; a deeper surface gradient for depth; and a tighter
+   internal rhythm so the card feels fully used rather than padded with dead space.
+   Desktop-only → mobile (≤768px, 220px) and tablet stay untouched. Presentation
+   only: no data, no ranges, no logic. The chart engine reads .chart-wrap's height
+   via its ResizeObserver, so the canvas grows with the wrap. */
+@media (min-width: 1024px) {
+  .chart-wrap {
+    height: 240px;
+    background: linear-gradient(to bottom,
+      rgba(138, 166, 255, 0.055) 0%,
+      rgba(255, 255, 255, 0.018) 42%,
+      rgba(255, 255, 255, 0) 100%);
+  }
+  .chart-header { margin-bottom: 14px; }
+  .hero-right   { padding-bottom: 14px; }
+}
+
 .chart-no-data {
   position: absolute;
   inset: 0;
@@ -8852,20 +8871,24 @@ main { padding-bottom: 72px; }
      and use a 2-column grid so the hero title sits left and the search
      bar sits right on the same row, with tabs + list spanning full
      width below. */
+  /* AURIX-WEB-POLISH-1 — the screen opens straight into an operative toolbar
+     (filter tabs left, search right) on a single row, like a financial terminal,
+     with the table directly below. The marketing-style hero (title + subtitle) is
+     dropped on web to reclaim vertical space and raise the useful content.
+     Desktop-only: mobile keeps its header + layout. */
   .market-screen {
-    padding: var(--space-4) 0 80px;
+    padding: var(--space-3) 0 80px;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      "hero   search"
-      "tabs   tabs"
+      "tabs   search"
       "body   body";
     column-gap: var(--space-5);
-    row-gap: var(--space-4);
-    align-items: end;
+    row-gap: var(--space-3);
+    align-items: center;
   }
 
-  .market-header      { grid-area: hero;   padding: 0; }
+  .market-header      { display: none; }
   .market-search-wrap { grid-area: search; padding: 0; margin: 0; justify-content: flex-end; position: relative; }
   .market-tabs        { grid-area: tabs;   padding: 0; margin: 0; overflow: visible; }
   .market-body        { grid-area: body;   margin-top: 0; }
@@ -8992,15 +9015,19 @@ main { padding-bottom: 72px; }
   }
 
   /* ── Table header row: 5-col grid matching rows, right-aligned numeric labels */
+  /* AURIX-WEB-POLISH-1 — denser, terminal-grade table: tighter column rhythm
+     (less air between blocks, better use of the horizontal space) shared by the
+     header and the rows so they stay perfectly aligned. */
   .market-table-header {
     display: grid;
-    grid-template-columns: 2.8fr 1fr 1fr 1.4fr 40px;
+    grid-template-columns: 2.3fr 1fr 0.9fr 1.2fr 36px;
+    column-gap: 10px;
     font-size: 11px;
     font-weight: 600;
     color: rgba(220, 230, 250, 0.40);
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    padding: 10px 0;
+    padding: 8px 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     margin-bottom: 0;
   }
@@ -9011,8 +9038,9 @@ main { padding-bottom: 72px; }
 
   /* ── Rows: data-terminal density with premium hover */
   .market-row {
-    grid-template-columns: 2.8fr 1fr 1fr 1.4fr 40px;
-    height: 56px;
+    grid-template-columns: 2.3fr 1fr 0.9fr 1.2fr 36px;
+    column-gap: 10px;
+    height: 48px;
     padding: 0 4px;
     margin: 0 -4px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);

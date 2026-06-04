@@ -10918,7 +10918,20 @@ function _aurixDashMount(surface) {
       // Inherit the parent box explicitly so any container reflow
       // (window resize, mobile slider transitions) is handled by the
       // engine's own ResizeObserver — see services/aurix-chart-core.js.
-      height:         parent.clientHeight || (isDesktop ? 190 : 220),
+      height:         parent.clientHeight || (isDesktop ? 240 : 220),
+      // AURIX-WEB-POLISH-1 — DESKTOP-ONLY premium render (mobile mount untouched →
+      // byte-identical). Heavier, cleaner stroke; deeper area gradient for depth;
+      // more discrete grid so the data outshines the guide lines. Pure presentation.
+      ...(isDesktop ? {
+        lineWidth: 2.7,
+        gridColor: 'rgba(255, 255, 255, 0.022)',
+        areaColors: {
+          base: 'rgba(138, 166, 255, 0.22)',
+          up:   'rgba(63, 191, 127, 0.20)',
+          down: 'rgba(224, 90, 90, 0.17)',
+          flat: 'rgba(180, 196, 224, 0.10)',
+        },
+      } : {}),
       // CHART-PARITY-1: data sanitisation (outlier filter + smoothing) stays
       // DISABLED. It would re-shape the series the legacy chart shows as-is,
       // reintroducing the desktop ↔ mobile divergence that commit fixed — and

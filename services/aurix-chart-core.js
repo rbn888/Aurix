@@ -635,8 +635,11 @@
         priceFormatter: _priceFormatter,
       },
       grid: {
-        vertLines: { color: opts.showPriceScale ? THEME.grid : 'rgba(0,0,0,0)' },
-        horzLines: { color: opts.showPriceScale ? THEME.grid : 'rgba(0,0,0,0)' },
+        // AURIX-WEB-POLISH-1: optional per-instance grid color (desktop dashboard
+        // passes a more discrete value so data outshines the guide lines). Falls
+        // back to THEME.grid → all other charts byte-identical.
+        vertLines: { color: opts.showPriceScale ? ((typeof opts.gridColor === 'string') ? opts.gridColor : THEME.grid) : 'rgba(0,0,0,0)' },
+        horzLines: { color: opts.showPriceScale ? ((typeof opts.gridColor === 'string') ? opts.gridColor : THEME.grid) : 'rgba(0,0,0,0)' },
       },
       rightPriceScale: {
         visible: !!opts.showPriceScale,
@@ -665,7 +668,11 @@
     // stroke + larger crosshair marker so the line reads premium on
     // both retina desktop and dense mobile. Sparkline + mini stay
     // razor-thin so they feel like cell glyphs, not micro-charts.
-    const _portfolioLineWidth = (opts.variant === 'portfolio') ? 2.25
+    // AURIX-WEB-POLISH-1: optional per-instance lineWidth override (desktop
+    // dashboard passes a slightly heavier stroke). Falls back to the variant
+    // defaults → asset/category/sparkline/mobile charts byte-identical.
+    const _portfolioLineWidth = (typeof opts.lineWidth === 'number' && opts.lineWidth > 0) ? opts.lineWidth
+                              : (opts.variant === 'portfolio') ? 2.25
                               : (opts.variant === 'asset')     ? 2
                               :                                  1.5;
     const _portfolioMarkerR   = (opts.variant === 'portfolio') ? 4
@@ -719,9 +726,16 @@
     // Card). The LINE itself is left identical to THEME — no hue/weight change,
     // no data smoothing (visualNormalization stays off). Fidelity over aesthetics.
     const _isPortfolio = opts.variant === 'portfolio';
-    const _area = _isPortfolio
-      ? { base: 'rgba(138, 166, 255, 0.15)', up: 'rgba(63, 191, 127, 0.13)', down: 'rgba(224, 90, 90, 0.12)', flat: 'rgba(180, 196, 224, 0.07)', bot: THEME.areaBot }
-      : { base: THEME.areaTop, up: THEME.areaTopUp, down: THEME.areaTopDn, flat: THEME.areaTopFlat, bot: THEME.areaBot };
+    // AURIX-WEB-POLISH-1: optional per-instance area gradient override
+    // (opts.areaColors = {base,up,down,flat[,bot]}). The desktop dashboard passes
+    // a slightly deeper fill for more premium depth. Falls back to the variant
+    // defaults → asset/category/sparkline/mobile charts byte-identical.
+    const _ac = (opts.areaColors && typeof opts.areaColors === 'object') ? opts.areaColors : null;
+    const _area = _ac
+      ? { base: _ac.base, up: _ac.up, down: _ac.down, flat: _ac.flat, bot: (_ac.bot != null ? _ac.bot : THEME.areaBot) }
+      : _isPortfolio
+        ? { base: 'rgba(138, 166, 255, 0.15)', up: 'rgba(63, 191, 127, 0.13)', down: 'rgba(224, 90, 90, 0.12)', flat: 'rgba(180, 196, 224, 0.07)', bot: THEME.areaBot }
+        : { base: THEME.areaTop, up: THEME.areaTopUp, down: THEME.areaTopDn, flat: THEME.areaTopFlat, bot: THEME.areaBot };
 
     const series = chart.addAreaSeries({
       lineColor:       THEME.line,
