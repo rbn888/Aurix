@@ -3819,6 +3819,13 @@ let portfolioChartMobile = null;  // mobile slider instance — null on desktop
 // any fallback restores the legacy pixel-for-pixel.
 let _aurixDashDesktop = null;
 let _aurixDashMobile  = null;
+// AURIX-CHART-UX-1 #4: last series that rendered VALID for a given range this
+// session. Once a range has shown a real line, a transient empty/insufficient
+// sync (render race, momentary recompute) must NOT downgrade it to the
+// "Histórico en construcción" overlay — we re-show the last good series instead.
+// Range change bypasses naturally (stored range differs); a genuinely empty
+// portfolio (no assets) still shows the empty surface.
+let _aurixLastGood    = { range: null, series: null };
 // AURIX-PORTFOLIO-CHART-ENGINE-1 · Fase D — Portfolio Chart Engine swap state.
 // All OFF by default. `_reconActive` holds the LAST reconstruction that passed
 // the fidelity gate, keyed by (range,currency); `_aurixDashSync` paints it
@@ -11337,6 +11344,21 @@ function _aurixDashSync(surface) {
     // building" so the engine's empty surface shows the right premium copy.
     if (!_aurixChartSeriesPasses(series, activeRange)) {
       const hasAssets = Array.isArray(assets) && assets.length > 0;
+      // AURIX-CHART-UX-1 #4: never replace an already-valid series with the
+      // "building" overlay. If THIS range rendered a real line this session and
+      // the portfolio still has assets, re-show that last good series (re-anchored
+      // to the live value) — a transient empty sync is a render race, not real
+      // insufficiency. Range change bypasses (stored range differs); a genuinely
+      // empty portfolio (no assets) still falls through to the empty surface.
+      if (hasAssets && _aurixLastGood.range === activeRange &&
+          Array.isArray(_aurixLastGood.series) && _aurixLastGood.series.length >= 2) {
+        try {
+          const keep = _aurixChartAnchorTail(_aurixLastGood.series);
+          ctrl.setData(keep, { source: 'local-snapshot', currency: baseCurrency || 'USD', isSynthetic: false, completeness: 1, asOf: Date.now() });
+          try { _aurixReconSyncHeadline(keep); } catch (_) {}
+        } catch (_) {}
+        return;
+      }
       // AURIX-CHART-LOADING-1: distinguish LOADING from BUILDING. If the portfolio
       // has assets but the data the series depends on isn't ready yet (boot merge
       // / first price refresh pending), show a discreet LOADING skeleton instead
@@ -11352,6 +11374,9 @@ function _aurixDashSync(surface) {
       _aurixClearChartHeadline();
       return;
     }
+    // AURIX-CHART-UX-1 #4: this range now has a valid series — remember it so a
+    // later transient empty sync can re-show it instead of the overlay.
+    _aurixLastGood = { range: activeRange, series: series };
     // CHART-4B: derive the chart's tonal direction from the SAME source
     // the visible dashboard performance KPI uses (legacy updateChart
     // computes `pct = (totalValueBase() - series[0]) / series[0]`).

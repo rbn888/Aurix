@@ -883,6 +883,24 @@
         hi += grow;
       }
 
+      // 3. AURIX-CHART-UX-1 #3 — snap the domain to a "nice" round step so the
+      // right-axis divisions read clean (…5800 · 6000 · 6200…). Targets ~4
+      // divisions; floors the low / ceils the high to multiples of the step, so
+      // it ONLY ever widens the domain (never compresses the curve). Pure
+      // presentation — does not touch any data point.
+      const span = hi - lo;
+      if (span > 0) {
+        const rawStep = span / 4;
+        const mag  = Math.pow(10, Math.floor(Math.log10(rawStep)));
+        const norm = rawStep / mag;
+        const unit = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10;
+        const step = unit * mag;
+        if (Number.isFinite(step) && step > 0) {
+          lo = Math.floor(lo / step) * step;
+          hi = Math.ceil(hi / step) * step;
+        }
+      }
+
       return { priceRange: { minValue: lo, maxValue: hi }, margins: original.margins };
     }
 
