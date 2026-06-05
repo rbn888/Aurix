@@ -10844,6 +10844,100 @@ function _aurixDashSeries(range) {
   return out;
 }
 
+// ── AURIX-CHART-RELIABILITY-GATE-1 ───────────────────────────────
+// PARTE A — DATA SUFFICIENCY GATES. A range only earns a drawn curve when it
+// has ENOUGH real, valid points. The reported problem: TOTAL with 2–4 post-reset
+// points renders as an aggressive red diagonal that looks like a huge crash that
+// never happened. So TOTAL needs a denser baseline (≥5 real points); below that
+// it stays in the neutral "Histórico en construcción" surface — no line, no red
+// %/€. Short windows (24H/7D/30D/1A) keep the existing ≥2 minimum: two honest
+// measured points ARE a legitimate segment there. Pure validation — never
+// mutates, never fabricates, never interpolates (rules #1, #2, #3, #5).
+const _AURIX_CHART_MIN_POINTS = Object.freeze({ '24h': 2, '7d': 2, '30d': 2, '1y': 2, 'all': 5 });
+function _aurixChartMinPoints(range) {
+  const m = _AURIX_CHART_MIN_POINTS[String(range || '').toLowerCase()];
+  return (typeof m === 'number') ? m : 2;
+}
+// Count points with a finite, positive value AND a finite, positive timestamp.
+// This rejects NaN/zero/negative values and bad timestamps from contaminated
+// history so they never inflate the gate count.
+function _aurixChartValidPointCount(series) {
+  if (!Array.isArray(series)) return 0;
+  let n = 0;
+  for (let i = 0; i < series.length; i++) {
+    const p = series[i];
+    if (!p) continue;
+    if (Number.isFinite(p.time) && p.time > 0 && Number.isFinite(p.value) && p.value > 0) n++;
+  }
+  return n;
+}
+// Gate by raw count (used by the legacy Chart.js path, which already knows its
+// real point count via getChartData → pointsCount).
+function _aurixChartCountPasses(count, range) {
+  return Number(count) >= _aurixChartMinPoints(range);
+}
+// Gate by series (used by the V2 overlay + reconstruction swap).
+function _aurixChartSeriesPasses(series, range) {
+  return _aurixChartValidPointCount(series) >= _aurixChartMinPoints(range);
+}
+// PARTE B — CHART VALUE CONSISTENCY (fidelity-guarded). Re-anchor the LAST drawn
+// point to the live Dashboard investable value so lastChartPoint.value ===
+// dashboardInvestableValue (rule #4) — but ONLY when that is an honest feed-lag
+// correction, NEVER a cosmetic lie. Two hard guards (Fidelity > Aesthetics):
+//
+//   • TEMPORAL guard: the last point must represent the current moment — its
+//     timestamp within ±_AURIX_ANCHOR_RECENCY_MS of now. An old endpoint is real
+//     measured history; overwriting its value would slope/jump the curve to a
+//     value the portfolio never held at that time → we leave it UNTOUCHED.
+//   • DIFFERENCE guard: the live↔last gap must be small (≤ _AURIX_ANCHOR_MAX_DRIFT,
+//     relative). A small gap is genuine price-feed lag (seconds of drift). A large
+//     gap is a real divergence (structural change / contamination), not lag;
+//     faking a vertical jump to the live value would deceive → we leave it
+//     UNTOUCHED and (dev) log the reason.
+//
+// On either guard failing we return the series UNCHANGED — the chart shows the
+// real measured endpoint, and the headline KPI (computed independently from the
+// live value in updateChart / _aurixReconSyncHeadline) still reflects the truth,
+// so performance is never falsified. Identical for snapshots and the PCE.
+// Touches ONLY the last point; creates NO point; modifies NO historical point;
+// no interpolation. Returns a NEW array on change; never mutates the input.
+const _AURIX_ANCHOR_RECENCY_MS = 15 * 60 * 1000;  // 15 min — covers live price-feed lag, rejects stale endpoints
+const _AURIX_ANCHOR_MAX_DRIFT  = 0.02;            // 2% relative — beyond this it is divergence, not feed lag
+function _aurixChartAnchorTail(series) {
+  if (!Array.isArray(series) || !series.length) return series;
+  const live = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN;
+  if (!Number.isFinite(live) || live <= 0) return series;
+  const last = series[series.length - 1];
+  if (!last || !Number.isFinite(last.value) || last.value <= 0 || !Number.isFinite(last.time)) return series;
+  // TEMPORAL guard — only the genuinely-current endpoint may be refreshed.
+  const ageMs = Date.now() - last.time;
+  if (Math.abs(ageMs) > _AURIX_ANCHOR_RECENCY_MS) {
+    if (typeof IS_DEV !== 'undefined' && IS_DEV) console.debug('[chart-anchor] skip — stale endpoint (no re-anchor)', { ageMs });
+    return series;
+  }
+  // DIFFERENCE guard — only a small feed-lag correction, never a fabricated jump.
+  const drift = Math.abs(live - last.value) / last.value;
+  if (drift > _AURIX_ANCHOR_MAX_DRIFT) {
+    if (typeof IS_DEV !== 'undefined' && IS_DEV) console.debug('[chart-anchor] skip — divergence > tolerance (no re-anchor)', { drift: +drift.toFixed(4), last: last.value, live });
+    return series;
+  }
+  const out = series.slice();
+  out[out.length - 1] = { time: last.time, value: live };
+  return out;
+}
+// Neutralise the headline KPI (%/€) so a gated range never shows misleading
+// performance (rules #5, #7). Mirrors the legacy clear in updateChart.
+function _aurixClearChartHeadline() {
+  try {
+    if (typeof chartChangeEl !== 'undefined' && chartChangeEl) {
+      chartChangeEl.textContent = '';
+      chartChangeEl.className = 'chart-change';
+    }
+    const m = document.getElementById('chartChangeMobile');
+    if (m) { m.textContent = ''; m.className = 'chart-change'; }
+  } catch (_) {}
+}
+
 function _aurixDashTeardown(surface) {
   const ctrl     = surface === 'desktop' ? _aurixDashDesktop : _aurixDashMobile;
   const canvasId = surface === 'desktop' ? 'portfolioChart'  : 'portfolioChartMobile';
@@ -10919,9 +11013,13 @@ function _aurixDashMount(surface) {
       // (window resize, mobile slider transitions) is handled by the
       // engine's own ResizeObserver — see services/aurix-chart-core.js.
       height:         parent.clientHeight || (isDesktop ? 240 : 220),
-      // AURIX-WEB-POLISH-1 — DESKTOP-ONLY premium render (mobile mount untouched →
-      // byte-identical). Heavier, cleaner stroke; deeper area gradient for depth;
-      // more discrete grid so the data outshines the guide lines. Pure presentation.
+      // AURIX-WEB-POLISH-1 — premium render. Heavier, cleaner stroke; deeper area
+      // gradient for depth; more discrete grid so the data outshines the guide
+      // lines. Pure presentation (no data change). AURIX-CHART-RELIABILITY-GATE-1
+      // · PARTE C/D: mobile now gets the same premium language (it previously fell
+      // back to engine defaults and read like a generic JS-lib chart in the
+      // screenshot). Mobile is tuned a touch lighter than desktop so the line
+      // stays crisp on a denser retina surface.
       ...(isDesktop ? {
         lineWidth: 2.7,
         gridColor: 'rgba(255, 255, 255, 0.022)',
@@ -10931,7 +11029,16 @@ function _aurixDashMount(surface) {
           down: 'rgba(224, 90, 90, 0.17)',
           flat: 'rgba(180, 196, 224, 0.10)',
         },
-      } : {}),
+      } : {
+        lineWidth: 2.4,
+        gridColor: 'rgba(255, 255, 255, 0.016)',
+        areaColors: {
+          base: 'rgba(138, 166, 255, 0.20)',
+          up:   'rgba(63, 191, 127, 0.18)',
+          down: 'rgba(224, 90, 90, 0.15)',
+          flat: 'rgba(180, 196, 224, 0.09)',
+        },
+      }),
       // CHART-PARITY-1: data sanitisation (outlier filter + smoothing) stays
       // DISABLED. It would re-shape the series the legacy chart shows as-is,
       // reintroducing the desktop ↔ mobile divergence that commit fixed — and
@@ -11011,22 +11118,25 @@ function _aurixDashSync(surface) {
         && _reconActive.currency === (baseCurrency || 'USD')
         && Array.isArray(_reconActive.series)
         && _reconActive.series.length >= 2) {
-      let rs = _reconActive.series;
-      const liveBase = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN;
-      if (Number.isFinite(liveBase)) {
-        rs = rs.slice();
-        rs[rs.length - 1] = { time: rs[rs.length - 1].time, value: liveBase };
-      }
-      series  = rs;
+      series  = _reconActive.series;
       isRecon = true;
     }
 
-    if (!series.length) {
-      // Block 7: distinguish "no assets yet" from "has assets but history is
-      // still building" (<2 usable points) so the engine's empty surface shows
-      // the right premium copy instead of the add-assets invitation.
+    // PARTE B — pin the tail to the live Dashboard investable value (rule #4),
+    // for BOTH the snapshot and reconstructed series, so whichever line is drawn
+    // always lands exactly on the Hero figure (no deceptive endpoint drift).
+    series = _aurixChartAnchorTail(series);
+
+    // PARTE A — reliability gate. An empty series (no assets / <2 points) OR a
+    // series that fails the per-range minimum (e.g. TOTAL with <5 real points)
+    // routes to the neutral "Histórico en construcción" surface instead of a
+    // misleading line, and clears the headline so no red %/€ shows (rules #5/#7).
+    // Block 7: distinguish "no assets yet" from "has assets but history is still
+    // building" so the engine's empty surface shows the right premium copy.
+    if (!_aurixChartSeriesPasses(series, activeRange)) {
       const hasAssets = Array.isArray(assets) && assets.length > 0;
       ctrl.setData([], { emptyReason: hasAssets ? 'low_data' : 'no_assets' });
+      _aurixClearChartHeadline();
       return;
     }
     // CHART-4B: derive the chart's tonal direction from the SAME source
@@ -11201,7 +11311,9 @@ function _aurixReconRefresh() {
     // "building history". The last point (= live Hero total) is always ≥ epoch.
     let series = res.series;
     if (epoch > 0) series = series.filter(function (p) { return p && typeof p.time === 'number' && p.time >= epoch; });
-    if (series.length < 2) return;
+    // PARTE A — reliability gate on the reconstruction too: a sparse recon (e.g.
+    // TOTAL with <5 post-epoch points) must NOT swap in over the neutral surface.
+    if (!_aurixChartSeriesPasses(series, range)) return;
     // View changed while computing, or flag turned off mid-flight → discard.
     if (range !== activeRange || baseC !== (baseCurrency || 'USD')) return;
     if (!_aurixReconFlag()) return;
@@ -12799,7 +12911,11 @@ function updateChart(animate = false) {
   // flat series (≥2 points) still renders, so financial truth is never hidden
   // (priority #8). The V2 engine already does this via _applyEmptyCopy; this
   // covers the Chart.js fallback path.
-  if (data.values.length < 2 && Array.isArray(assets) && assets.length > 0) {
+  // AURIX-CHART-RELIABILITY-GATE-1 · PARTE A — reliability gate (replaces the
+  // bare <2 check). TOTAL with <5 real post-reset points renders as a misleading
+  // aggressive diagonal, so it now ALSO routes to the neutral "building history"
+  // surface and clears the KPI (no red %/€). Short ranges keep the ≥2 minimum.
+  if (!_aurixChartCountPasses(data.pointsCount, activeRange) && Array.isArray(assets) && assets.length > 0) {
     chartChangeEl.textContent = '';
     _setChartNoData(chartNoDataEl, 'low');
     portfolioChart.data.labels = [];
@@ -12814,6 +12930,12 @@ function updateChart(animate = false) {
       portfolioChartMobile.data.datasets[0].data = [];
       portfolioChartMobile.update('none');
     }
+    // Keep the V2 overlays in lockstep: re-sync so they paint the neutral
+    // surface too (otherwise a range switch INTO a gated range would leave the
+    // previous range's line drawn on the overlay). _aurixDashSync re-applies the
+    // same gate and sets the empty state.
+    if (_aurixDashDesktop) _aurixDashSync('desktop');
+    if (_aurixDashMobile)  _aurixDashSync('mobile');
     return;
   }
 

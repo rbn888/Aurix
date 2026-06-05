@@ -9275,8 +9275,11 @@ main { padding-bottom: 72px; }
     overflow: hidden;
     width: 100%;
     /* AURIX-MOBILE-POLISH-1 (#6): chart height reduced ~17% (280→232) so more
-       categories surface above the fold without losing legibility. */
-    min-height: 232px;
+       categories surface above the fold without losing legibility.
+       AURIX-CHART-RELIABILITY-GATE-1 · PARTE D: +20px (232→252) to give the
+       premium curve more useful vertical presence on mobile without pushing the
+       category list meaningfully below the fold. */
+    min-height: 252px;
     height: auto;
     position: relative;
     padding-bottom: 18px !important;
@@ -9297,7 +9300,7 @@ main { padding-bottom: 72px; }
   /* Each slide: no padding — card provides it */
   .mobile-slide {
     width: 50%;
-    min-height: 232px;
+    min-height: 252px;
     flex-shrink: 0;
     box-sizing: border-box;
     padding: 0;

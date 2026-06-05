@@ -84,6 +84,31 @@
         text-align: center;
         padding: 12px;
       }
+      /* AURIX-CHART-RELIABILITY-GATE-1 · PARTE C — premium "building history"
+         surface. Stacked, centered, calm. Reads as reassurance, not error. */
+      .aurix-chart-state--rich {
+        flex-direction: column;
+        gap: 6px;
+        padding: 16px 22px;
+        max-width: 340px;
+        margin: 0 auto;
+      }
+      .aurix-chart-state--rich .aurix-empty-title {
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        color: rgba(228,235,255,0.90);
+      }
+      .aurix-chart-state--rich .aurix-empty-body {
+        font-size: 12px;
+        line-height: 1.45;
+        color: rgba(214,225,248,0.62);
+      }
+      .aurix-chart-state--rich .aurix-empty-note {
+        font-size: 11px;
+        line-height: 1.4;
+        color: rgba(200,212,238,0.40);
+      }
       .aurix-chart-host[data-state="loading"] .aurix-chart-state--loading,
       .aurix-chart-host[data-state="empty"]   .aurix-chart-state--empty,
       .aurix-chart-host[data-state="error"]   .aurix-chart-state--error {
@@ -532,12 +557,36 @@
     // appear here") vs one that already has assets but not enough history yet
     // ("building history"). setData picks the copy via meta.emptyReason. Scoped
     // to the portfolio variant; other variants keep their neutral fallback.
+    // AURIX-CHART-RELIABILITY-GATE-1 · PARTE A/C — the "building history" surface
+    // is now a premium, reassuring multi-line state (title + body + note) so a
+    // gated TOTAL/1A range reads as "we're generating your history", never as an
+    // error or a crash. Other reasons + non-portfolio variants keep the calm
+    // single-line copy. Built with DOM text nodes (no innerHTML / no injection).
     function _applyEmptyCopy(reason) {
       if (opts.variant !== 'portfolio') return;
+      const es = _isLangEs();
+      empty.textContent = '';
       if (reason === 'low_data') {
-        empty.textContent = _isLangEs() ? 'Histórico en construcción' : 'Building your history';
+        empty.classList.add('aurix-chart-state--rich');
+        const title = document.createElement('div');
+        title.className = 'aurix-empty-title';
+        title.textContent = es ? 'Histórico en construcción' : 'Building your history';
+        const body = document.createElement('div');
+        body.className = 'aurix-empty-body';
+        body.textContent = es
+          ? 'Estamos generando tu histórico invertible desde el nuevo baseline.'
+          : 'We are building your investable history from the new baseline.';
+        const note = document.createElement('div');
+        note.className = 'aurix-empty-note';
+        note.textContent = es
+          ? 'Los rangos recientes estarán disponibles a medida que Aurix registre nuevos datos.'
+          : 'Recent ranges will appear as Aurix records new data.';
+        empty.appendChild(title);
+        empty.appendChild(body);
+        empty.appendChild(note);
       } else {
-        empty.textContent = _isLangEs() ? 'Tu evolución aparecerá aquí' : 'Your evolution will appear here';
+        empty.classList.remove('aurix-chart-state--rich');
+        empty.textContent = es ? 'Tu evolución aparecerá aquí' : 'Your evolution will appear here';
       }
     }
 
