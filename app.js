@@ -1411,8 +1411,9 @@ const T = {
     discCat_commodities_energy_commodities: 'Energía',
     discCat_commodities_industrial_metals:  'Metales industriales',
     view_more_discovery: 'Ver más',
-    empty_watchlist:        'Tu seguimiento está vacío',
+    empty_watchlist:        'Aún no sigues ningún activo',
     empty_watchlist_helper: 'Añade activos con la estrella para monitorizarlos aquí.',
+    empty_watchlist_cta:    'Explorar activos',
     market_no_results: 'Sin resultados',
     stale:             'sin actualizar',
     // Metrics placeholder
@@ -2614,8 +2615,9 @@ const T = {
     discCat_commodities_energy_commodities: 'Energy',
     discCat_commodities_industrial_metals:  'Industrial Metals',
     view_more_discovery: 'View more',
-    empty_watchlist:        'Your watchlist is empty',
+    empty_watchlist:        "You're not following any assets yet",
     empty_watchlist_helper: 'Star assets to monitor them here.',
+    empty_watchlist_cta:    'Explore assets',
     market_no_results: 'No results',
     stale:             'stale data',
     // Metrics placeholder
@@ -16756,6 +16758,18 @@ function renderMarketTickerStrip(data) {
   }).join('&ensp;·&ensp;');
 }
 
+// AURIX-MARKET-LAUNCH-1 P4 — empty-watchlist CTA: jump to the "Todo" tab so the
+// user can discover assets to follow. Reuses the existing tab-click logic (no new
+// navigation path) → consistent on web + mobile.
+if (typeof window !== 'undefined') {
+  window._aurixMktGoExplore = function () {
+    try {
+      const btn = document.querySelector('.market-tab[data-market="all"]');
+      if (btn) btn.click();
+    } catch (_) {}
+  };
+}
+
 function renderMyAssetsBlock(data) {
   const watchedSet = new Set(getWatchlist().map(normalizeSymbol));
   const filtered = data.filter(item =>
@@ -16767,6 +16781,7 @@ function renderMyAssetsBlock(data) {
         <div class="empty-watchlist-icon" aria-hidden="true">★</div>
         <div class="empty-watchlist-title">${t('empty_watchlist')}</div>
         <div class="empty-watchlist-helper">${t('empty_watchlist_helper')}</div>
+        <button type="button" class="empty-watchlist-cta" onclick="_aurixMktGoExplore()">${t('empty_watchlist_cta')}</button>
       </div>
     `;
   }
