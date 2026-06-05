@@ -637,6 +637,17 @@ function _mergeRemoteState(remoteRow) {
     const remoteList = (!distrust && remoteRow && Array.isArray(remoteRow.watchlist)) ? remoteRow.watchlist : [];
     const localList  = (typeof getWatchlist === 'function') ? getWatchlist() : [];
 
+    // AURIX-PERSIST-DEBUG-1: complete the persist chain for WATCHLIST (the asset
+    // chain already logs [persist-merge]; this mirrors it so tests 1/2/5 are
+    // diagnosable end-to-end). Behind the same flag → inert in production.
+    let _wlMergeOutcome = (localTs > 0)
+      ? (remoteTs > localTs ? 'remote-wins (LWW)' : 'local-kept (LWW)')
+      : 'union (local unstamped)';
+    _persistDebug('[persist-merge] watchlist', {
+      outcome: _wlMergeOutcome, remoteTs, localTs,
+      remote: remoteList, local: localList,
+    });
+
     if (localTs > 0) {
       // Both sides participate in the timestamp protocol → pure LWW.
       if (remoteTs > localTs) {
