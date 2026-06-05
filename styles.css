@@ -8815,23 +8815,63 @@ main { padding-bottom: 72px; }
   flex-shrink: 0;
 }
 
-/* AURIX-ASSET-ICON-CONSISTENCY-1 — shared real-logo overlay. Sits on top of the
-   text/initial badge (.asset-icon / .sugg-badge / .add-v2-asset-icon); if the
-   logo loads it covers the initial, if it errors `onerror="this.remove()"`
-   reveals the premium initial beneath. One render path + one fallback so an
-   asset's icon is identical across Market, Search and the quick-picks. */
+/* AURIX-MARKET-ICONS-1 — single conditional asset-icon renderer (logo XOR premium
+   fallback, NEVER both). Replaces the old overlay that left the placeholder
+   visible behind the logo (double render). The initial fallback is in the DOM but
+   hidden whenever a logo is present; the real logo fills the box and the badge's
+   own bg is removed so no legacy circle/square shows behind it. */
 .asset-icon,
 .sugg-badge,
 .add-v2-asset-icon { position: relative; overflow: hidden; }
-.asset-logo-overlay {
+.aurix-aicon-init {
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+}
+.aurix-aicon-img {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;          /* fill the box; circular containers clip to a clean circle */
   border-radius: inherit;
-  background: inherit;
   display: block;
+  z-index: 2;                 /* above the (hidden) initial */
+}
+/* When a real logo is shown: hide the initial AND strip the legacy badge bg/border
+   so ONLY the logo is visible — no placeholder, circle or square behind it. */
+.asset-icon.has-logo .aurix-aicon-init,
+.sugg-badge.has-logo .aurix-aicon-init,
+.add-v2-asset-icon.has-logo .aurix-aicon-init { display: none; }
+.asset-icon.has-logo,
+.sugg-badge.has-logo,
+.add-v2-asset-icon.has-logo {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+/* Premium fallback (no logo): one unified Aurix circle — dark gradient + clean
+   centered initial — same box/size as a real logo, so the user can't tell which
+   is which. Replaces the old flat/tinted placeholders. */
+.asset-icon:not(.has-logo),
+.sugg-badge:not(.has-logo),
+.add-v2-asset-icon:not(.has-logo) {
+  background: radial-gradient(circle at 32% 26%, rgba(58,74,116,0.85) 0%, rgba(17,23,40,0.96) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  color: rgba(228,235,255,0.92) !important;
+}
+.aurix-aicon-init {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: rgba(228,235,255,0.92);
+}
+/* AURIX-MARKET-ICONS-1 — when buildBadgeHtml surfaces (Dashboard holdings /
+   category cards / asset+portfolio detail) show a real logo, strip the tinted
+   badge square so only the logo shows, consistent with the rule above. The
+   no-logo state keeps its premium tinted badge + text via .asset-badge. */
+.badge--has-logo {
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .asset-text {

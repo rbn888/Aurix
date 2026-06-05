@@ -18572,7 +18572,7 @@ function renderMarketItem(item) {
     <div class="market-row" data-symbol="${normSym}">
       <div class="col col-asset">
         <div class="asset-wrapper">
-          <div class="asset-icon">${_assetLogoOverlayHtml(item)}${escHtml((item.symbol || '?')[0])}</div>
+          ${_assetIconHtml(item, item.symbol, 'asset-icon')}
           <div class="asset-text">
             <div class="asset-symbol-row">
               <span class="asset-symbol">${item.symbol}</span>
@@ -19305,14 +19305,30 @@ function _resolveLogoBySymbol(symbol, type) {
   }
   return null;
 }
-// Shared logo <img> overlay for surfaces that render a text/initial badge (Market
-// row, search result, quick-pick). Resolves via getAssetLogo() and overlays the
-// real logo on the badge; on load error it removes itself, revealing the
-// initial/text fallback beneath. ONE render path + ONE fallback everywhere.
-function _assetLogoOverlayHtml(asset) {
-  const url = getAssetLogo(asset);
-  if (!url) return '';
-  return `<img class="asset-logo-overlay" src="${escHtml(url)}" alt="" loading="lazy" aria-hidden="true" onerror="this.remove()">`;
+// AURIX-MARKET-ICONS-1 — single canonical asset-icon renderer for the badge
+// surfaces (Market row, Seguimiento, Search, quick-picks). CONDITIONAL render —
+// logo XOR premium fallback, never both — so no legacy placeholder is ever
+// visible behind a real logo (kills the double-render). When getAssetLogo(asset)
+// resolves, ONLY the logo shows (the container's own badge bg is removed via
+// `.has-logo`); otherwise ONLY a premium circular initial shows. On <img> error
+// it cleanly reverts to the premium fallback. `baseClass` carries the per-surface
+// sizing/shape class so each surface keeps its dimensions.
+function _aurixIconImgError(img) {
+  try {
+    const host = img && img.parentElement;
+    if (img) img.remove();
+    if (host) host.classList.remove('has-logo');   // reveal the premium initial fallback
+  } catch (_) {}
+}
+function _assetIconHtml(asset, initialSource, baseClass) {
+  const url  = getAssetLogo(asset);
+  const raw  = String(initialSource || (asset && (asset.symbol || asset.ticker)) || '?').trim();
+  const init = escHtml((raw.charAt(0) || '?').toUpperCase());
+  const cls  = baseClass + (url ? ' has-logo' : '');
+  const img  = url
+    ? `<img class="aurix-aicon-img" src="${escHtml(url)}" alt="" loading="lazy" aria-hidden="true" onerror="_aurixIconImgError(this)">`
+    : '';
+  return `<div class="${cls}"><span class="aurix-aicon-init">${init}</span>${img}</div>`;
 }
 
 // ── Logo resolution helpers ─────────────────────────────────
@@ -19899,7 +19915,7 @@ function showDefaultSuggestions() {
     <div class="sugg-section-label">${escHtml(labelText)}</div>
     ${defaults.map((a, i) => `
       <div class="suggestion-item" data-idx="${i}">
-        <div class="sugg-badge ${a.type}">${_assetLogoOverlayHtml(a)}${escHtml(a.ticker.slice(0, 5))}</div>
+        ${_assetIconHtml(a, a.ticker, 'sugg-badge ' + a.type)}
         <div class="sugg-info">
           <div class="sugg-name">${escHtml(getDisplayName(a))}</div>
           <div class="sugg-ticker">${escHtml(a.ticker)}</div>
@@ -19930,7 +19946,7 @@ function renderSuggestions(results, query, loading = false) {
 
   assetSuggestionsEl.innerHTML = results.map((a, i) => `
     <div class="suggestion-item" data-idx="${i}">
-      <div class="sugg-badge ${a.type}">${escHtml(a.ticker.slice(0, 5))}</div>
+      ${_assetIconHtml(a, a.ticker, 'sugg-badge ' + a.type)}
       <div class="sugg-info">
         <div class="sugg-name">${escHtml(getDisplayName(a))}</div>
         <div class="sugg-ticker">${escHtml(a.ticker)}</div>
@@ -22847,7 +22863,7 @@ function _addV2RenderQuickPicks() {
   const typeLabel = T[lang].typeLabel || {};
   wrap.innerHTML = picks.map(p => `
     <button type="button" class="add-v2-asset-card" data-quick-ticker="${escHtml(p.ticker)}">
-      <span class="add-v2-asset-icon ${escHtml(p.type)}">${_assetLogoOverlayHtml(p)}${escHtml(p.ticker.slice(0, 4))}</span>
+      ${_assetIconHtml(p, p.ticker, 'add-v2-asset-icon ' + p.type)}
       <span class="add-v2-asset-text">
         <span class="add-v2-asset-name">${escHtml(p.name)}</span>
         <span class="add-v2-asset-meta">
