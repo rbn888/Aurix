@@ -5,7 +5,7 @@
 // {ticker, name, type, coinId, marketSymbol}).
 //
 // Response shape:
-//   { results: [{ ticker, name, type:'crypto', coinId, marketSymbol }, ...] }
+//   { results: [{ ticker, name, type:'crypto', coinId, marketSymbol, image }, ...] }
 //
 // CoinGecko upstream notes:
 //   - free tier: ~30 req/min per IP. Upstream 429 → we return 502 + [].
@@ -76,6 +76,13 @@ export default async function handler(req, res) {
         type:         'crypto',
         coinId:       c.id,
         marketSymbol: ticker,
+        // AURIX-ASSET-ICON-1: surface the provider's own logo (CoinGecko returns
+        // `large`/`thumb` per coin) so assets like HYPE/Hyperliquid that are not
+        // on the static icon CDNs still render their correct icon. The frontend
+        // prefers this when present and falls back to the CDN chain otherwise.
+        image:        (typeof c.large === 'string' && c.large) ? c.large
+                    : (typeof c.thumb === 'string' && c.thumb) ? c.thumb
+                    : null,
       });
       if (results.length >= MAX_RESULTS) break;
     }

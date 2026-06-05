@@ -4036,6 +4036,7 @@ function convertToNewModel(flatAssets) {
     prevPrice:     a.prevPrice  ?? null,
     coinId:        a.coinId     ?? null,
     marketSymbol:  a.marketSymbol ?? null,
+    image:         a.image      ?? null,   // AURIX-ASSET-ICON-1: provider logo (persisted)
     karat:         a.karat      ?? null,
     goldUnit:      a.goldUnit   ?? null,
     isin:          a.isin       ?? null,
@@ -4085,6 +4086,7 @@ function convertFromNewToFlat(catalogAssets, holdings) {
       transactions:  h.transactions || [],
       coinId:        asset.coinId     ?? null,
       marketSymbol:  asset.marketSymbol ?? null,
+      image:         asset.image      ?? null,   // AURIX-ASSET-ICON-1: provider logo (persisted)
       karat:         asset.karat      ?? null,
       goldUnit:      asset.goldUnit   ?? null,
       isin:          asset.isin       ?? null,
@@ -19189,6 +19191,13 @@ function _logoFinalHide(img) {
 }
 
 function getAssetLogoUrl(asset) {
+  // AURIX-ASSET-ICON-1: prefer the provider's own logo (e.g. CoinGecko image
+  // captured at add-time) when present and valid — this resolves icons for
+  // assets not on the static CDNs (HYPE/Hyperliquid, new listings). Falls back
+  // to the symbol-based CDN chain (and ultimately the premium badge) otherwise.
+  if (asset && typeof asset.image === 'string' && /^https:\/\//.test(asset.image)) {
+    return asset.image;
+  }
   return getAssetLogo(asset.ticker, asset.type);
 }
 
@@ -21163,6 +21172,9 @@ assetForm.addEventListener('submit', e => {
       name, ticker, type, qty,
       price:         pendingPrice,
       coinId, marketSymbol,
+      // AURIX-ASSET-ICON-1: persist the provider logo URL captured from the
+      // search result so the correct icon (e.g. HYPE) survives refresh + device.
+      image:         (selectedDbAsset && typeof selectedDbAsset.image === 'string') ? selectedDbAsset.image : null,
       // MC-6D: stamp the provider-reported quote currency when available
       // (Yahoo meta.currency surfaced through the snapshot endpoint).
       // Falls back to USD for crypto, gold, and any asset where the
