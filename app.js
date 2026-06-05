@@ -4607,7 +4607,16 @@ function _aurixFilterAfterEpoch(arr, tsKey) {
 // destructive: portfolioHistory/categoryHistory/transactions/Supabase stay intact,
 // and setting the constant to 0 reverts completely. The optional localStorage
 // override re-baselines without a redeploy (emergency only).
-const AURIX_INVESTABLE_CHART_EPOCH = 1780604468000; // 2026-06-04T20:21:08Z — "B" reset (start from now)
+// AURIX-CHART-REBASELINE-LAUNCH-1 (2026-06-05) — clean-total re-baseline. The "B"
+// reset (2026-06-04T20:21:08Z) sat just BEFORE a contaminated ~12–18k investable
+// snapshot, so that point leaked into 24H/7D/30D and painted a false drop
+// (-54%/-64%). Moved to the start of launch day so EVERY range (24H/7D/30D/1Y/
+// TOTAL) starts from the same clean baseline and no pre-baseline point can render.
+// Must be a FIXED past instant — never Date.now() (would blank the chart forever)
+// and never a future ts (would blank it until it passes). Identical on web + mobile
+// because it is a constant. Fully non-destructive (history/Supabase untouched);
+// set to 0 to revert. See docs/AURIX-DATA-001 for the source-data audit.
+const AURIX_INVESTABLE_CHART_EPOCH = 1780617600000; // 2026-06-05T00:00:00Z — launch clean baseline
 const INVESTABLE_CHART_EPOCH_KEY = 'aurix_investable_chart_epoch';
 function _aurixInvestableChartEpoch() {
   let override = 0;
