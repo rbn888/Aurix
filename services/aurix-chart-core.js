@@ -455,7 +455,17 @@
       const loc = _isLangEs() ? 'es-ES' : (locale || 'en-US');
       const r   = String(range || '').toLowerCase();
       if (r === '24h') {
-        return d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
+        // AURIX-CHART-AXIS-2 — professionalize the 24H axis: snap the LABEL to the
+        // nearest whole hour so the marks read as clean human times (08:00 · 12:00
+        // · 16:00 …) instead of the raw, irregular snapshot minutes (22:39 · 07:56).
+        // Data is untouched — no point is moved, added or interpolated; this is an
+        // axis guide only and the crosshair tooltip still shows the exact minute.
+        // Local timezone (Date + toLocale*). Adjacent ticks that round to the same
+        // hour are de-duped by the per-instance tickMarkFormatter wrapper.
+        const h = new Date(ms);
+        if (h.getMinutes() >= 30) h.setHours(h.getHours() + 1);
+        h.setMinutes(0, 0, 0);
+        return h.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
       }
       if (r === '7d' || r === '30d' || r === '3m') {
         return d.toLocaleDateString(loc, { day: 'numeric', month: 'short' });
@@ -709,6 +719,11 @@
     };
     const _priceFormatter = v => _compactCurrency(v, _formatterCurrency);
 
+    // AURIX-CHART-AXIS-2 — per-instance dedup memory for the 24H hour-rounded
+    // axis labels (see the tickMarkFormatter wrapper below).
+    let _axisLastMs = -1;
+    let _axisLastLabel = null;
+
     const chart = LWC.createChart(canvasHolder, {
       width:  canvasHolder.clientWidth  || 320,
       height: canvasHolder.clientHeight || 240,
@@ -775,7 +790,18 @@
           fixRightEdge: true,
           lockVisibleTimeRangeOnResize: true,
           tickMarkFormatter: function (time, _tickMarkType, locale) {
-            return _formatAxisTick(time, _state && _state.range, locale);
+            const range = _state && _state.range;
+            const label = _formatAxisTick(time, range, locale);
+            // AURIX-CHART-AXIS-2 — on 24H, suppress a repeated hour when two
+            // adjacent ticks round to the same whole hour (no "12:00 · 12:00").
+            // Ticks arrive left→right; a time going backwards starts a new render
+            // pass, so reset the dedup memory there.
+            const ms = (typeof time === 'number') ? time * 1000 : Date.parse(time);
+            if (!(ms > _axisLastMs)) _axisLastLabel = null;
+            _axisLastMs = ms;
+            if (String(range).toLowerCase() === '24h' && label && label === _axisLastLabel) return '';
+            _axisLastLabel = label;
+            return label;
           },
         } : {}),
       },
