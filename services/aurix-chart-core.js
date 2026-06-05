@@ -693,7 +693,14 @@
       rightPriceScale: {
         visible: !!opts.showPriceScale,
         borderVisible: false,
-        scaleMargins: { top: 0.10, bottom: 0.04 },
+        // AURIX-CHART-WEB-SCALE-1 — the dashboard (robustScale) chart now carries
+        // its real vertical breathing room in the autoscale domain provider, so
+        // here it only needs small SYMMETRIC pixel margins to keep the curve off
+        // the literal edges and stop it reading as "pinned to the top". Other
+        // charts keep the prior asymmetric margins (byte-identical).
+        scaleMargins: (opts.visualNormalization && opts.visualNormalization.robustScale)
+          ? { top: 0.06, bottom: 0.06 }
+          : { top: 0.10, bottom: 0.04 },
       },
       leftPriceScale: { visible: false },
       timeScale: {
@@ -728,43 +735,59 @@
                               : (opts.variant === 'asset')     ? 3
                               :                                  3;
 
-    // CHART-SCALE-1 — minimum visual y-domain padding for surfaces that
-    // opt in via visualNormalization.robustScale (the dashboard
-    // portfolio chart). LWC's default autoscale hugs min/max tightly,
-    // so a +0.1% real move can paint a line that looks dramatic.
+    // AURIX-CHART-WEB-SCALE-1 — institutional Y-axis domain. Opt-in via
+    // visualNormalization.robustScale (the dashboard portfolio chart, web AND
+    // mobile — so the two surfaces stay coherent by construction, no duplicated
+    // logic). LWC's raw autoscale hugs the data min/max, so on a TALL web chart a
+    // real intraday drop renders as a near-vertical plunge pinned to the edges,
+    // while the SHORTER mobile chart looked calmer with the very same data. This
+    // provider reshapes ONLY the visible value domain (never the data):
     //
-    // The provider only widens the y-axis — never narrows it. When the
-    // real first→last move is meaningful (≥1.5%), the original auto-
-    // scale is returned untouched so a -5% day still reads as -5%.
+    //   1. PADDING — expand the domain by a fraction of the visible range
+    //      (institutional ~10% each side), with an absolute floor (fraction of
+    //      the anchor) so a near-flat series still gets breathing room. The curve
+    //      no longer touches the top/bottom and a big move reads clearly without
+    //      looking like an artificial cut.
+    //   2. MIN DOMAIN WIDTH — for very small real moves, floor the TOTAL domain
+    //      width so a +0.1% blip is a gentle ripple, not a wall.
     //
-    // Anchored on the last visible value so the chart endpoint stays
-    // aligned with the live KPI. Floor padding is symmetric around the
-    // anchor so a flat / reset baseline sits in the middle of the box.
+    // It ONLY ever WIDENS the domain → a genuine -5% day is never compressed or
+    // hidden, just framed with calm padding. No point is added, moved, removed or
+    // interpolated; values are untouched (Fidelity > Aesthetics).
     const _shouldUseMinPadding = !!(opts.visualNormalization && opts.visualNormalization.robustScale);
+    const _PAD_FRAC_OF_RANGE   = 0.10;    // vertical padding as a fraction of the visible range, each side
+    const _PAD_MIN_FRAC_ANCHOR = 0.006;   // absolute floor (0.6% of value) so near-flat ranges aren't zero-padded
     let _scaleHints = null;
     function _scalePaddingProvider(baseImpl) {
       const original = (typeof baseImpl === 'function') ? (baseImpl() || null) : baseImpl;
       if (!original || !original.priceRange) return original || null;
       if (!_scaleHints) return original;
       const { firstValue, lastValue, anchor } = _scaleHints;
-      if (!Number.isFinite(anchor)    || anchor    <= 0) return original;
-      if (!Number.isFinite(firstValue)|| firstValue<= 0) return original;
-      if (!Number.isFinite(lastValue))                  return original;
+      if (!Number.isFinite(anchor)     || anchor     <= 0) return original;
+      if (!Number.isFinite(firstValue) || firstValue <= 0) return original;
+      if (!Number.isFinite(lastValue))                     return original;
+      let lo = Number(original.priceRange.minValue);
+      let hi = Number(original.priceRange.maxValue);
+      if (!Number.isFinite(lo) || !Number.isFinite(hi) || hi < lo) return original;
+
+      // 1. Institutional padding — fraction of the visible range, floored on the anchor.
+      const range = hi - lo;
+      const pad   = Math.max(range * _PAD_FRAC_OF_RANGE, anchor * _PAD_MIN_FRAC_ANCHOR);
+      lo -= pad;
+      hi += pad;
+
+      // 2. Minimum TOTAL domain width for tiny moves (calm small ripples).
       const movePct = Math.abs((lastValue - firstValue) / firstValue * 100);
-      let targetPct;
-      if      (movePct < 0.5) targetPct = 1.0;   // calm
-      else if (movePct < 1.5) targetPct = 2.0;   // moderate
-      else                    return original;   // normal auto-scale
-      const halfAbs    = anchor * (targetPct / 200);
-      const desiredMin = anchor - halfAbs;
-      const desiredMax = anchor + halfAbs;
-      return {
-        priceRange: {
-          minValue: Math.min(original.priceRange.minValue, desiredMin),
-          maxValue: Math.max(original.priceRange.maxValue, desiredMax),
-        },
-        margins: original.margins,
-      };
+      let minWidth = 0;
+      if      (movePct < 0.5) minWidth = anchor * 0.010;   // ≈1.0% total
+      else if (movePct < 1.5) minWidth = anchor * 0.020;   // ≈2.0% total
+      if (minWidth > 0 && (hi - lo) < minWidth) {
+        const grow = (minWidth - (hi - lo)) / 2;
+        lo -= grow;
+        hi += grow;
+      }
+
+      return { priceRange: { minValue: lo, maxValue: hi }, margins: original.margins };
     }
 
     // AURIX-CHARTS-PREMIUM-REFINEMENT-1 — portfolio-only visual tuning. SCOPED to
