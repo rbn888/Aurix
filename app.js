@@ -10953,6 +10953,74 @@ function _aurixClearChartHeadline() {
   } catch (_) {}
 }
 
+// ── AURIX-CHART-INTRADAY-DIVERGENCE-1 ────────────────────────────
+// Anti-divergence gate for the INTRADAY (24H) dashboard chart. Over 24h the
+// investable value cannot legitimately sit far from the CURRENT value, so a
+// point that diverges absurdly is contamination — an old total-wealth / pre-
+// correction / mixed-regime snapshot leaking into the window. Such points make
+// series[0] huge and paint a false vertical drop (the reported -54.60%: a 12.5k
+// plateau falling to the real ~5.6k). We DROP those points for DISPLAY ONLY —
+// categoryHistory / portfolioHistory / Supabase are never touched and nothing is
+// interpolated or invented; if too few clean points remain, the existing
+// reliability gate shows the neutral "Histórico en construcción" surface.
+//
+// SCOPED to 24H: longer ranges (7D/30D/1Y/TOTAL) can legitimately differ a lot
+// from today (real growth, contributions), so they are never filtered here.
+// Band is generous enough to keep any realistic intraday move on diversified
+// investable wealth (±~50%) and only catches clearly-impossible regimes.
+const _AURIX_INTRADAY_DIV_HI = 1.5;   // a 24h point >1.5x the live value = contamination
+const _AURIX_INTRADAY_DIV_LO = 0.6;   // …or <0.6x the live value
+function _aurixChartIsIntraday(range) {
+  return String(range || '').toLowerCase() === '24h';
+}
+// Drop intraday {time,value} points that diverge absurdly from the live
+// investable value. Returns the input untouched when not intraday, when the live
+// value is unknown, or when nothing diverges. Never mutates the input.
+function _aurixChartDropDivergent(series, range) {
+  if (!_aurixChartIsIntraday(range) || !Array.isArray(series) || !series.length) return series;
+  const live = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN;
+  if (!Number.isFinite(live) || live <= 0) return series;
+  const hi = live * _AURIX_INTRADAY_DIV_HI;
+  const lo = live * _AURIX_INTRADAY_DIV_LO;
+  const clean = series.filter(p => p && Number.isFinite(p.value) && p.value >= lo && p.value <= hi);
+  if (clean.length !== series.length && typeof IS_DEV !== 'undefined' && IS_DEV) {
+    console.warn('[chart-divergence] dropped', series.length - clean.length, 'contaminated 24H point(s) vs live', live);
+  }
+  return (clean.length === series.length) ? series : clean;
+}
+// Same gate for the getChartData() result object (parallel arrays) used by the
+// legacy chart + the headline KPI. Rebuilds the kept slices and recomputes
+// firstValue / pointsCount so the headline can never read a contaminated
+// baseline. Returns the input untouched outside 24H or when nothing diverges.
+function _aurixCleanIntradayData(data, range) {
+  if (!data || !_aurixChartIsIntraday(range) || !Array.isArray(data.values) || !data.values.length) return data;
+  const live = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN;
+  if (!Number.isFinite(live) || live <= 0) return data;
+  const hi = live * _AURIX_INTRADAY_DIV_HI;
+  const lo = live * _AURIX_INTRADAY_DIV_LO;
+  const keep = [];
+  for (let i = 0; i < data.values.length; i++) {
+    const v = data.values[i];
+    if (Number.isFinite(v) && v >= lo && v <= hi) keep.push(i);
+  }
+  if (keep.length === data.values.length) return data;   // nothing contaminated
+  const values     = keep.map(i => data.values[i]);
+  const labels     = Array.isArray(data.labels)     ? keep.map(i => data.labels[i])     : data.labels;
+  const timestamps = Array.isArray(data.timestamps) ? keep.map(i => data.timestamps[i]) : data.timestamps;
+  let firstValue = null;
+  for (const v of values) { if (Number.isFinite(v) && v > 0) { firstValue = v; break; } }
+  if (typeof IS_DEV !== 'undefined' && IS_DEV) {
+    console.warn('[chart-divergence] cleaned', data.values.length - keep.length, 'contaminated 24H point(s); firstValue', firstValue, 'live', live);
+  }
+  return Object.assign({}, data, {
+    labels, values, timestamps,
+    firstValue,
+    lastValue:  values.length ? values[values.length - 1] : null,
+    pointsCount: values.length,
+    isLowData:   values.length < 2,
+  });
+}
+
 function _aurixDashTeardown(surface) {
   const ctrl     = surface === 'desktop' ? _aurixDashDesktop : _aurixDashMobile;
   const canvasId = surface === 'desktop' ? 'portfolioChart'  : 'portfolioChartMobile';
@@ -11136,6 +11204,13 @@ function _aurixDashSync(surface) {
       series  = _reconActive.series;
       isRecon = true;
     }
+
+    // AURIX-CHART-INTRADAY-DIVERGENCE-1 — drop contaminated 24H points (absurdly
+    // divergent from the live value) for BOTH the snapshot AND the reconstructed
+    // series, so a mixed-regime point can never reach the line or the headline
+    // (spec #6: PCE never swaps in an inconsistent intraday series). No-op outside
+    // 24H / when nothing diverges. Display-only; nothing mutated or interpolated.
+    series = _aurixChartDropDivergent(series, activeRange);
 
     // PARTE B — pin the tail to the live Dashboard investable value (rule #4),
     // for BOTH the snapshot and reconstructed series, so whichever line is drawn
@@ -12890,7 +12965,11 @@ function updateChart(animate = false) {
   if (!portfolioChart) return;
   // AURIX-INVESTABLE-WEALTH-1 — Dashboard chart + KPI use the investable series
   // (excludes real estate), derived from categoryHistory. Snapshots fallback.
-  const data = getChartData(activeRange, _investableSnapshotSource());
+  // AURIX-CHART-INTRADAY-DIVERGENCE-1 — strip contaminated 24H points (absurdly
+  // divergent from the live value) BEFORE the headline KPI + chart read the
+  // series, so a mixed-regime snapshot can never paint a false vertical drop.
+  // No-op outside 24H and when nothing diverges. Display-only; storage untouched.
+  const data = _aurixCleanIntradayData(getChartData(activeRange, _investableSnapshotSource()), activeRange);
 
   if (!data.values.length) {
     // AURIX-PWA-HISTORY-HYDRATION-1: the "add assets to see your evolution"
