@@ -8815,6 +8815,25 @@ main { padding-bottom: 72px; }
   flex-shrink: 0;
 }
 
+/* AURIX-ASSET-ICON-CONSISTENCY-1 — shared real-logo overlay. Sits on top of the
+   text/initial badge (.asset-icon / .sugg-badge / .add-v2-asset-icon); if the
+   logo loads it covers the initial, if it errors `onerror="this.remove()"`
+   reveals the premium initial beneath. One render path + one fallback so an
+   asset's icon is identical across Market, Search and the quick-picks. */
+.asset-icon,
+.sugg-badge,
+.add-v2-asset-icon { position: relative; overflow: hidden; }
+.asset-logo-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: inherit;
+  background: inherit;
+  display: block;
+}
+
 .asset-text {
   display: flex;
   flex-direction: column;

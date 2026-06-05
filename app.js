@@ -4111,6 +4111,7 @@ function convertToNewModel(flatAssets) {
     coinId:        a.coinId     ?? null,
     marketSymbol:  a.marketSymbol ?? null,
     image:         a.image      ?? null,   // AURIX-ASSET-ICON-1: provider logo (persisted)
+    logo:          a.logo       ?? null,   // AURIX-ASSET-ICON-CONSISTENCY-1: alt logo field
     karat:         a.karat      ?? null,
     goldUnit:      a.goldUnit   ?? null,
     isin:          a.isin       ?? null,
@@ -4161,6 +4162,7 @@ function convertFromNewToFlat(catalogAssets, holdings) {
       coinId:        asset.coinId     ?? null,
       marketSymbol:  asset.marketSymbol ?? null,
       image:         asset.image      ?? null,   // AURIX-ASSET-ICON-1: provider logo (persisted)
+      logo:          asset.logo       ?? null,   // AURIX-ASSET-ICON-CONSISTENCY-1: alt logo field
       karat:         asset.karat      ?? null,
       goldUnit:      asset.goldUnit   ?? null,
       isin:          asset.isin       ?? null,
@@ -14475,7 +14477,7 @@ function buildCardVisual(type, typeAssets) {
   const seen  = new Set();
   for (const a of typeAssets) {
     if (items.length >= _CAT_VISUAL_MAX) break;
-    const url = getAssetLogo(a.ticker, a.type);
+    const url = getAssetLogo(a);   // AURIX-ASSET-ICON-CONSISTENCY-1: asset-aware (image→logo→mapping→CDN)
     let key, html;
     if (url) {
       key = 'img:' + (a.ticker || '').toUpperCase();
@@ -18498,7 +18500,7 @@ function renderMarketItem(item) {
     <div class="market-row" data-symbol="${normSym}">
       <div class="col col-asset">
         <div class="asset-wrapper">
-          <div class="asset-icon">${item.symbol[0]}</div>
+          <div class="asset-icon">${_assetLogoOverlayHtml(item)}${escHtml((item.symbol || '?')[0])}</div>
           <div class="asset-text">
             <div class="asset-symbol-row">
               <span class="asset-symbol">${item.symbol}</span>
@@ -19198,17 +19200,47 @@ function escHtml(str) {
   }[c]));
 }
 
-function getAssetLogo(symbol, type) {
-  const sym = symbol.toLowerCase().trim();
-  if (type === 'crypto') {
-    const clean = CLEAN_LOGO_OVERRIDE[symbol.toUpperCase().trim()];
-    if (clean) return clean;
-    return `https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/32/color/${sym}.png`;
+// AURIX-ASSET-ICON-CONSISTENCY-1 — THE single global asset-logo resolver. Every
+// surface (Dashboard, Holdings, Category cards, Market, Search, Watchlist,
+// Workspace, Asset/Portfolio detail) MUST resolve icons through this one function
+// so an asset has ONE visual identity everywhere. Resolution hierarchy:
+//   1. asset.image — provider logo persisted at add-time (CoinGecko etc.)
+//   2. asset.logo  — alternate persisted field
+//   3. known symbol mapping (CLEAN_LOGO_OVERRIDE)
+//   4. provider/symbol CDN (crypto: spothq by symbol; stock/etf: FMP by symbol)
+//   5. null → the caller renders the premium initial/badge fallback.
+// Back-compat: also accepts the legacy (symbolString, type) call form.
+function getAssetLogo(assetOrSymbol, maybeType) {
+  if (assetOrSymbol && typeof assetOrSymbol === 'object') {
+    const a = assetOrSymbol;
+    if (typeof a.image === 'string' && /^https:\/\//.test(a.image)) return a.image;   // 1
+    if (typeof a.logo  === 'string' && /^https:\/\//.test(a.logo))  return a.logo;    // 2
+    return _resolveLogoBySymbol(a.ticker || a.symbol || '', a.type || '');            // 3+4
   }
-  if (type === 'stock' || type === 'etf') {
-    return `https://financialmodelingprep.com/image-stock/${symbol.toUpperCase().trim()}.png`;
+  return _resolveLogoBySymbol(assetOrSymbol || '', maybeType);                        // legacy (symbol,type)
+}
+function _resolveLogoBySymbol(symbol, type) {
+  const sym = String(symbol || '').toLowerCase().trim();
+  if (!sym) return null;
+  const t = String(type || '').toLowerCase();
+  if (t === 'crypto') {
+    const clean = CLEAN_LOGO_OVERRIDE[String(symbol).toUpperCase().trim()];          // 3
+    if (clean) return clean;
+    return `https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/32/color/${sym}.png`; // 4
+  }
+  if (t === 'stock' || t === 'etf') {
+    return `https://financialmodelingprep.com/image-stock/${String(symbol).toUpperCase().trim()}.png`;
   }
   return null;
+}
+// Shared logo <img> overlay for surfaces that render a text/initial badge (Market
+// row, search result, quick-pick). Resolves via getAssetLogo() and overlays the
+// real logo on the badge; on load error it removes itself, revealing the
+// initial/text fallback beneath. ONE render path + ONE fallback everywhere.
+function _assetLogoOverlayHtml(asset) {
+  const url = getAssetLogo(asset);
+  if (!url) return '';
+  return `<img class="asset-logo-overlay" src="${escHtml(url)}" alt="" loading="lazy" aria-hidden="true" onerror="this.remove()">`;
 }
 
 // ── Logo resolution helpers ─────────────────────────────────
@@ -19276,14 +19308,10 @@ function _logoFinalHide(img) {
 }
 
 function getAssetLogoUrl(asset) {
-  // AURIX-ASSET-ICON-1: prefer the provider's own logo (e.g. CoinGecko image
-  // captured at add-time) when present and valid — this resolves icons for
-  // assets not on the static CDNs (HYPE/Hyperliquid, new listings). Falls back
-  // to the symbol-based CDN chain (and ultimately the premium badge) otherwise.
-  if (asset && typeof asset.image === 'string' && /^https:\/\//.test(asset.image)) {
-    return asset.image;
-  }
-  return getAssetLogo(asset.ticker, asset.type);
+  // AURIX-ASSET-ICON-CONSISTENCY-1: thin alias over the single global resolver so
+  // every legacy caller goes through the same hierarchy (image → logo → mapping →
+  // CDN → fallback). No per-screen resolver may exist.
+  return getAssetLogo(asset);
 }
 
 function buildBadgeHtml(asset, badgeText, cls = 'asset-badge') {
@@ -19799,7 +19827,7 @@ function showDefaultSuggestions() {
     <div class="sugg-section-label">${escHtml(labelText)}</div>
     ${defaults.map((a, i) => `
       <div class="suggestion-item" data-idx="${i}">
-        <div class="sugg-badge ${a.type}">${escHtml(a.ticker.slice(0, 5))}</div>
+        <div class="sugg-badge ${a.type}">${_assetLogoOverlayHtml(a)}${escHtml(a.ticker.slice(0, 5))}</div>
         <div class="sugg-info">
           <div class="sugg-name">${escHtml(getDisplayName(a))}</div>
           <div class="sugg-ticker">${escHtml(a.ticker)}</div>
@@ -22747,7 +22775,7 @@ function _addV2RenderQuickPicks() {
   const typeLabel = T[lang].typeLabel || {};
   wrap.innerHTML = picks.map(p => `
     <button type="button" class="add-v2-asset-card" data-quick-ticker="${escHtml(p.ticker)}">
-      <span class="add-v2-asset-icon ${escHtml(p.type)}">${escHtml(p.ticker.slice(0, 4))}</span>
+      <span class="add-v2-asset-icon ${escHtml(p.type)}">${_assetLogoOverlayHtml(p)}${escHtml(p.ticker.slice(0, 4))}</span>
       <span class="add-v2-asset-text">
         <span class="add-v2-asset-name">${escHtml(p.name)}</span>
         <span class="add-v2-asset-meta">
