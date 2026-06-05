@@ -13647,6 +13647,69 @@ body.gs-open { overflow: hidden; }
   .mkt-filter-chip { padding: 6px 8px 6px 11px; gap: 7px; }
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   MARKET-MOBILE-1 — premium mobile Market launch pass. SCOPED to phones
+   (≤768px) + the V4 list container, so desktop / web stays byte-identical.
+   Pairs with the app.js mobile subcategory FILTER (the only behavioural
+   change). Pure presentation here:
+     • drop the big discovery cards (the chips now drive the list);
+     • fuse subcategory chips (LEFT) + Filtros/period chip (RIGHT) into ONE
+       compact toolbar row, killing the empty left gap;
+     • compress the vertical rhythm so the list lands sooner.
+   The V4 row layout itself is already premium (sparkline + alignment) and
+   is intentionally left untouched.
+   ══════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* (A) Remove the big discovery cards + "Ver más": pure duplication on
+     mobile now that a subcategory chip filters the list directly, and the
+     main reason the useful list was pushed far down the screen. */
+  #marketList.is-v4 .funds-grid,
+  #marketList.is-v4 .funds-show-more { display: none !important; }
+  #marketList.is-v4 .funds-discover  { gap: 0; padding: 0 0 2px; }
+
+  /* (B) One compact toolbar — subcategory chips LEFT, Filtros/period chip
+     floated RIGHT over the chips' faded tail (mask fade, the same language
+     as the main tab rows). Only when a chips row exists (:has), so
+     Seguimiento / Todo / search never get an overlapping chip. */
+  #marketList.is-v4:has(.funds-discover) { position: relative; }
+  #marketList.is-v4:has(.funds-discover) .funds-cats {
+    display: flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 0 104px 0 2px;            /* reserve room for the floating chip */
+    margin: 0;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 100px), transparent calc(100% - 48px));
+            mask-image: linear-gradient(to right, #000 calc(100% - 100px), transparent calc(100% - 48px));
+  }
+  #marketList.is-v4:has(.funds-discover) .mkt-explorer-controls.is-v4 {
+    position: absolute;
+    top: 0; right: 0;
+    z-index: 4;
+    height: 40px;
+    margin: 0;
+    padding: 0 2px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    background: transparent;
+    pointer-events: none;              /* the fade zone stays click-through… */
+  }
+  #marketList.is-v4:has(.funds-discover) .mkt-explorer-controls.is-v4 .mkt-filter-chip {
+    pointer-events: auto;              /* …only the chip itself is interactive */
+  }
+
+  /* (C) No-chips tabs (Seguimiento / Todo / search): keep the chip in flow
+     but left-aligned, so there is no big empty gap on the left. */
+  #marketList.is-v4:not(:has(.funds-discover)) .mkt-explorer-controls.is-v4 {
+    justify-content: flex-start;
+    padding: 2px 2px 8px;
+  }
+
+  /* (D) Compress the rhythm so the list reaches the user sooner. */
+  #marketList.is-v4 { margin-top: 6px; }
+  #marketList.is-v4 .market-section-header { padding: 6px 8px 4px; }
+}
+
 /* 2 ── Market filter sheet (mobile bottom-sheet / desktop popover) */
 .mkt-filter-sheet {
   background:

@@ -17402,9 +17402,42 @@ function _openAddAssetWithFund(item) {
   }, 60);
 }
 
+// MARKET-MOBILE-1: on MOBILE only, the subcategory chips (Top / Layer 1 / DeFi…)
+// act as real list filters — web behaviour is intentionally unchanged. Returns a
+// Set of normalized tickers for the ACTIVE NON-DEFAULT category of the current
+// tab, or null when no filter should apply (desktop, default category, or no
+// catalog). The caller falls back to the full list when the set yields nothing,
+// so the list can never end up empty. No data is fetched, created or mutated —
+// this only narrows which already-loaded rows are shown.
+function _aurixMktMobileCategoryFilter() {
+  try {
+    if (!window.matchMedia || !window.matchMedia('(max-width: 768px)').matches) return null;
+    const reg = _DISCOVERY_CATALOGS[currentMarketTab];
+    if (!reg || !Array.isArray(reg.catalog) || !reg.catalog.length) return null;
+    const activeId  = reg.get();
+    const defaultId = reg.catalog[0].id;          // 'top' / 'popular' / 'major' → full list
+    if (!activeId || activeId === defaultId) return null;
+    const cat = reg.catalog.find(c => c.id === activeId);
+    if (!cat || !Array.isArray(cat.items) || !cat.items.length) return null;
+    const set = new Set();
+    cat.items.forEach(it => {
+      const s = normalizeSymbol(it.ticker || it.marketSymbol || '');
+      if (s) set.add(s);
+    });
+    return set.size ? set : null;
+  } catch (_) { return null; }
+}
+
 function renderFromCache(type, data) {
   const normalizedType = String(type).toLowerCase().trim();
   let items = data.filter(d => String(d.type).toLowerCase().trim() === normalizedType);
+  // MARKET-MOBILE-1: apply the mobile subcategory filter (with safe fallback to
+  // the full list when there is no overlap with loaded data).
+  const _catSet = _aurixMktMobileCategoryFilter();
+  if (_catSet) {
+    const sub = items.filter(it => _catSet.has(normalizeSymbol(it.symbol)));
+    if (sub.length) items = sub;
+  }
   if (!items.length) {
     return `<div class="market-skeleton">${Array.from({ length: 8 }).map(() => `
       <div class="market-row skeleton">
