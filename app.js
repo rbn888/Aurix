@@ -458,6 +458,12 @@ const WATCHLIST_TS_KEY = 'aurix_watchlist_updated_at';
 // (a language/currency choice is not user-private portfolio state).
 const PREFS_TS_KEY     = 'aurix_prefs_updated_at';
 let _bootLoadComplete  = false;
+// AURIX-CHART-LOADING-1: set true once the first price refresh settles (success
+// OR failure). Until then the live investable value is partial/stale, so the
+// chart shows a discreet LOADING state instead of prematurely deciding "building",
+// and the 24H anti-divergence gate is deferred (it would otherwise drop valid
+// points when measured against an incomplete live value → false building on 24H).
+let _aurixPricesReady  = false;
 let _stateFlushTimer   = null;
 let _lastStateFlushMs  = 0;
 let _watchlistFlushTimer = null;
@@ -10987,6 +10993,14 @@ function _aurixChartCountPasses(count, range) {
 function _aurixChartSeriesPasses(series, range) {
   return _aurixChartValidPointCount(series) >= _aurixChartMinPoints(range);
 }
+// AURIX-CHART-LOADING-1: is the data the chart depends on trustworthy yet? Boot
+// must have merged remote state AND the first price refresh must have settled —
+// before that the live investable value is partial/stale, so we must NOT decide
+// "building" prematurely nor run the divergence gate (which compares points to
+// that live value). When false, the caller shows a discreet LOADING state.
+function _aurixChartDataReady() {
+  return _bootLoadComplete === true && _aurixPricesReady === true;
+}
 // PARTE B — CHART VALUE CONSISTENCY (fidelity-guarded). Re-anchor the LAST drawn
 // point to the live Dashboard investable value so lastChartPoint.value ===
 // dashboardInvestableValue (rule #4) — but ONLY when that is an honest feed-lag
@@ -11070,6 +11084,10 @@ function _aurixChartIsIntraday(range) {
 // value is unknown, or when nothing diverges. Never mutates the input.
 function _aurixChartDropDivergent(series, range) {
   if (!_aurixChartIsIntraday(range) || !Array.isArray(series) || !series.length) return series;
+  // AURIX-CHART-LOADING-1: defer divergence filtering until the live value is
+  // trustworthy — comparing against a partial/stale boot value would drop valid
+  // points and falsely trigger "building" on 24H.
+  if (!_aurixChartDataReady()) return series;
   const live = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN;
   if (!Number.isFinite(live) || live <= 0) return series;
   const hi = live * _AURIX_INTRADAY_DIV_HI;
@@ -11086,6 +11104,8 @@ function _aurixChartDropDivergent(series, range) {
 // baseline. Returns the input untouched outside 24H or when nothing diverges.
 function _aurixCleanIntradayData(data, range) {
   if (!data || !_aurixChartIsIntraday(range) || !Array.isArray(data.values) || !data.values.length) return data;
+  // AURIX-CHART-LOADING-1: defer until the live value is trustworthy (see above).
+  if (!_aurixChartDataReady()) return data;
   const live = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN;
   if (!Number.isFinite(live) || live <= 0) return data;
   const hi = live * _AURIX_INTRADAY_DIV_HI;
@@ -11317,6 +11337,17 @@ function _aurixDashSync(surface) {
     // building" so the engine's empty surface shows the right premium copy.
     if (!_aurixChartSeriesPasses(series, activeRange)) {
       const hasAssets = Array.isArray(assets) && assets.length > 0;
+      // AURIX-CHART-LOADING-1: distinguish LOADING from BUILDING. If the portfolio
+      // has assets but the data the series depends on isn't ready yet (boot merge
+      // / first price refresh pending), show a discreet LOADING skeleton instead
+      // of prematurely declaring "Histórico en construcción". updateChart re-runs
+      // once data is ready (bootRefresh + price polling), so it converges to the
+      // line automatically without a manual refresh.
+      if (hasAssets && !_aurixChartDataReady()) {
+        try { ctrl.setState('loading'); } catch (_) {}
+        _aurixClearChartHeadline();
+        return;
+      }
       ctrl.setData([], { emptyReason: hasAssets ? 'low_data' : 'no_assets' });
       _aurixClearChartHeadline();
       return;
@@ -13102,14 +13133,19 @@ function updateChart(animate = false) {
   // aggressive diagonal, so it now ALSO routes to the neutral "building history"
   // surface and clears the KPI (no red %/€). Short ranges keep the ≥2 minimum.
   if (!_aurixChartCountPasses(data.pointsCount, activeRange) && Array.isArray(assets) && assets.length > 0) {
+    // AURIX-CHART-LOADING-1: while the underlying data isn't ready yet (boot merge
+    // / first price refresh pending), do NOT show "building" — hide the overlay so
+    // the legacy canvas reads as loading, not as insufficient history. updateChart
+    // re-runs once ready and converges to the line/building automatically.
+    const _low = _aurixChartDataReady() ? 'low' : 'hide';
     chartChangeEl.textContent = '';
-    _setChartNoData(chartNoDataEl, 'low');
+    _setChartNoData(chartNoDataEl, _low);
     portfolioChart.data.labels = [];
     portfolioChart.data.datasets[0].data = [];
     portfolioChart.update('none');
     const _mnd = document.getElementById('chartNoDataMobile');
     const _mch = document.getElementById('chartChangeMobile');
-    _setChartNoData(_mnd, 'low');
+    _setChartNoData(_mnd, _low);
     if (_mch) _mch.textContent = '';
     if (portfolioChartMobile) {
       portfolioChartMobile.data.labels = [];
@@ -23313,6 +23349,12 @@ document.getElementById('appRoot').style.opacity = '0';
         _reportSafe('refresh', (err && err.message) || 'boot refresh failed', (err && err.stack) || '');
         try { setUpdateStatus('error'); } catch (_) {}
       }
+      // AURIX-CHART-LOADING-1: the first price refresh has settled (success OR
+      // failure → we keep last-known/cache, the best we have). The live value is
+      // now as trustworthy as it gets, so the chart may decide ready/building and
+      // run the divergence gate. Set BEFORE the render/updateChart below so this
+      // pass converges out of the loading state with no manual refresh.
+      _aurixPricesReady = true;
       try { recomputeDerivedFinancialState('boot'); } catch (_) {}
       try { recomputeFinancialFormulas('boot'); } catch (_) {}
       try { render(); } catch (_) {}
