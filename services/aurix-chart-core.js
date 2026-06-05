@@ -433,17 +433,66 @@
   // ── Internal helpers ───────────────────────────────────────────
   function _msToSec(ms) { return Math.floor(ms / 1000); }
 
-  function _formatTooltipTime(ms, range) {
+  // AURIX-CHART-AXIS-1 — range-aware X-axis tick label, in the user's LOCAL
+  // timezone. `Date` + `toLocale*` are local by construction (no UTC assumption,
+  // no hardcoded offset). Replaces LWC's default mixed output (a bare day number
+  // "5" interleaved with times like "17:00"). Pure display — never touches data.
+  //   24H            → HH:mm
+  //   7D / 30D / 3M  → "5 jun"  (day + short month)
+  //   6M / YTD / 1Y / TOTAL → "jun 26" (short month + 2-digit year)
+  function _formatAxisTick(time, range, locale) {
     try {
-      const d = new Date(ms);
-      const esLocale = _isLangEs() ? 'es-ES' : 'en-US';
-      if (range === '24h') {
-        return d.toLocaleTimeString(esLocale, { hour: '2-digit', minute: '2-digit' });
+      let ms;
+      if (typeof time === 'number') {
+        ms = time * 1000;                                   // UTCTimestamp (seconds)
+      } else if (time && typeof time === 'object' && time.year) {
+        ms = new Date(time.year, (time.month || 1) - 1, time.day || 1).getTime(); // BusinessDay
+      } else {
+        ms = Date.parse(time);
       }
-      if (range === '7d') {
-        return d.toLocaleDateString(esLocale, { weekday: 'short', day: '2-digit' });
+      if (!Number.isFinite(ms)) return '';
+      const d   = new Date(ms);
+      const loc = _isLangEs() ? 'es-ES' : (locale || 'en-US');
+      const r   = String(range || '').toLowerCase();
+      if (r === '24h') {
+        return d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
       }
-      return d.toLocaleDateString(esLocale, { day: '2-digit', month: 'short' });
+      if (r === '7d' || r === '30d' || r === '3m') {
+        return d.toLocaleDateString(loc, { day: 'numeric', month: 'short' });
+      }
+      return d.toLocaleDateString(loc, { month: 'short', year: '2-digit' });
+    } catch (_) { return ''; }
+  }
+
+  function _formatTooltipTime(ms, range, variant) {
+    try {
+      const d   = new Date(ms);                             // local timezone
+      const loc = _isLangEs() ? 'es-ES' : 'en-US';
+      const r   = String(range || '').toLowerCase();
+      // AURIX-CHART-AXIS-1 — the richer time/date tooltip copy is SCOPED to the
+      // portfolio surface. Asset / Market (variant 'asset') keep the prior copy
+      // → byte-identical, Market untouched.
+      if (variant !== 'portfolio') {
+        if (r === '24h') return d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
+        if (r === '7d')  return d.toLocaleDateString(loc, { weekday: 'short', day: '2-digit' });
+        return d.toLocaleDateString(loc, { day: '2-digit', month: 'short' });
+      }
+      const hm = d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
+      if (r === '24h') {
+        // "Hoy, 17:04" when the point is on the current local day; otherwise keep
+        // the date so a 24h window that crosses midnight stays unambiguous.
+        const now = new Date();
+        const sameDay = d.getFullYear() === now.getFullYear()
+                     && d.getMonth()    === now.getMonth()
+                     && d.getDate()     === now.getDate();
+        if (sameDay) return (_isLangEs() ? 'Hoy, ' : 'Today, ') + hm;
+        return d.toLocaleDateString(loc, { day: 'numeric', month: 'short' }) + ', ' + hm;
+      }
+      if (r === '7d' || r === '30d' || r === '3m') {
+        return d.toLocaleDateString(loc, { day: 'numeric', month: 'short' }) + ', ' + hm;
+      }
+      // 1A / TOTAL (+ 6M/YTD) → full date, no time (the bucket is a day, not a minute).
+      return d.toLocaleDateString(loc, { day: 'numeric', month: 'short', year: 'numeric' });
     } catch (_) { return ''; }
   }
 
@@ -698,8 +747,12 @@
         // here it only needs small SYMMETRIC pixel margins to keep the curve off
         // the literal edges and stop it reading as "pinned to the top". Other
         // charts keep the prior asymmetric margins (byte-identical).
+        // AURIX-CHART-AXIS-1 — 0.06 → 0.08 symmetric: a touch more headroom so the
+        // top/bottom right-axis price labels are never clipped against the pane
+        // edge, while the line still fills the box (real padding lives in the
+        // domain provider, so this is purely label breathing room).
         scaleMargins: (opts.visualNormalization && opts.visualNormalization.robustScale)
-          ? { top: 0.06, bottom: 0.06 }
+          ? { top: 0.08, bottom: 0.08 }
           : { top: 0.10, bottom: 0.04 },
       },
       leftPriceScale: { visible: false },
@@ -708,6 +761,23 @@
         borderVisible: false,
         timeVisible: true,
         secondsVisible: false,
+        // AURIX-CHART-AXIS-1 — axis polish SCOPED to the portfolio surface
+        // (dashboard + category-perf, both variant 'portfolio'). Asset / Market
+        // (variant 'asset') and sparkline/mini keep LWC's default labels + edge
+        // behaviour → byte-identical, Market untouched.
+        //   • fixLeftEdge/fixRightEdge: keep the series flush to both edges so the
+        //     curve fills the width and LWC left-/right-aligns the first/last
+        //     label instead of clipping it past the pane.
+        //   • tickMarkFormatter: range-aware, local-timezone labels (_formatAxisTick).
+        //     `_state` resolves lazily at render time, after the controller inits it.
+        ...(opts.variant === 'portfolio' ? {
+          fixLeftEdge: true,
+          fixRightEdge: true,
+          lockVisibleTimeRangeOnResize: true,
+          tickMarkFormatter: function (time, _tickMarkType, locale) {
+            return _formatAxisTick(time, _state && _state.range, locale);
+          },
+        } : {}),
       },
       crosshair: opts.showCrosshair
         ? {
@@ -883,7 +953,7 @@
 
     function _renderTooltip(value, timeMs, xClient, yClient) {
       if (!opts.showTooltip || !_ttTimeEl || !_ttValEl) return;
-      _ttTimeEl.textContent = _formatTooltipTime(timeMs, _state.range);
+      _ttTimeEl.textContent = _formatTooltipTime(timeMs, _state.range, opts.variant);
       _ttValEl.textContent  = _formatTooltipValue(value, _state.currency);
       // CHART-CORE: note line if this exact timestamp was visually
       // normalized. Set hidden=true (not text='') so future logic can
