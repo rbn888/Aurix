@@ -401,6 +401,7 @@ const PREFS_TS_KEY     = 'aurix_prefs_updated_at';
 let _bootLoadComplete  = false;
 let _stateFlushTimer   = null;
 let _lastStateFlushMs  = 0;
+let _watchlistFlushTimer = null;
 
 function _aurixWatchlistTs() {
   try { return parseInt(localStorage.getItem(WATCHLIST_TS_KEY) || '0', 10) || 0; }
@@ -670,13 +671,27 @@ function scheduleStateFlush() {
   _stateFlushTimer = setTimeout(() => { _flushStatePersistence('debounced'); }, 2000);
 }
 
+// WATCHLIST-SYNC-1: a watchlist edit (star toggle) is a deliberate, low-volume
+// action whose whole point is to follow an asset everywhere. Propagate it across
+// devices PROMPTLY instead of waiting out the 60s state-flush throttle, which
+// could otherwise delay a mobile "follow" from reaching the web for up to a
+// minute when the phone stays in the foreground (so no pagehide/visibilitychange
+// lifecycle flush fires). Debounced at 1.5s so a burst of toggles still coalesces
+// into a single write. Reads/merges are unchanged — this only affects WHEN the
+// already-correct payload is persisted.
+function scheduleWatchlistFlush() {
+  if (!_bootLoadComplete) return;
+  try { clearTimeout(_watchlistFlushTimer); } catch (_) {}
+  _watchlistFlushTimer = setTimeout(() => { _flushStatePersistence('watchlist'); }, 1500);
+}
+
 async function _flushStatePersistence(reason) {
   if (!supabaseClient || !currentUser) return;
   if (typeof _aurixResetInProgress !== 'undefined' && _aurixResetInProgress) return;
   // Throttle to ≤1 write / 60s, except forced lifecycle flushes (pagehide /
   // visibilitychange) which must always persist before the app backgrounds.
   const now = Date.now();
-  if (reason !== 'lifecycle' && _lastStateFlushMs && now - _lastStateFlushMs < 60_000) {
+  if (reason !== 'lifecycle' && reason !== 'watchlist' && _lastStateFlushMs && now - _lastStateFlushMs < 60_000) {
     scheduleStateFlush(); // ensure the latest state still lands after the window
     return;
   }
@@ -25127,6 +25142,9 @@ const watchlistStore = (() => {
   // / migration) does NOT stamp — its caller owns the timestamp.
   function _touch() {
     try { localStorage.setItem(WATCHLIST_TS_KEY, String(Date.now())); } catch (_) {}
+    // WATCHLIST-SYNC-1: prompt cross-device propagation (bypasses the 60s
+    // throttle, debounced). scheduleStateFlush stays as the catch-all.
+    try { if (typeof scheduleWatchlistFlush === 'function') scheduleWatchlistFlush(); } catch (_) {}
     try { if (typeof scheduleStateFlush === 'function') scheduleStateFlush(); } catch (_) {}
   }
 
