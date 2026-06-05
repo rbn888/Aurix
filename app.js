@@ -5,6 +5,23 @@ const IS_DEV =
   location.hostname === 'localhost' ||
   location.hostname === '127.0.0.1';
 
+// AURIX-PERSIST-DEBUG-1: opt-in persistence tracing for the asset-durability
+// audit. OFF in production by default (IS_DEV is false on the live site), so it
+// adds zero noise. Enable on ANY device/browser without a redeploy:
+//   localStorage.setItem('aurix_persist_debug','1'); location.reload();
+// Disable: localStorage.removeItem('aurix_persist_debug').
+// Tags map 1:1 to the durability checkpoints:
+//   [persist-add-asset] [persist-save-local] [persist-save-backend]
+//   [persist-load-backend] [persist-merge] [persist-render]
+function _persistDebugOn() {
+  if (typeof window !== 'undefined' && window.__AURIX_PERSIST_DEBUG === true) return true;
+  try { return localStorage.getItem('aurix_persist_debug') === '1'; } catch (_) { return false; }
+}
+function _persistDebug(tag, data) {
+  if (!_persistDebugOn()) return;
+  try { console.log('%c' + tag, 'color:#8aa6ff;font-weight:700', data != null ? data : ''); } catch (_) {}
+}
+
 // OBSERVABILITY-1: lightweight production error reporter.
 // Active only in production, rate-limited, deduplicated, fire-and-forget.
 // Removable: delete this IIFE plus api/client-log.js to disable.
@@ -285,6 +302,41 @@ function _setSaveStatus(state) {
   }
 }
 
+// AURIX-PERSIST-HARDEN-1: decide what is SAFE to write to the backend's
+// assets/holdings columns. Prevents the clobber class behind the observed
+// "added on mobile → gone, never reached web" bug: a save/flush firing while
+// local state is empty/ambiguous (e.g. web first-login before the remote row is
+// written to localStorage, or a 'legacy'/missing-keys source) must NEVER push an
+// empty array over a populated remote.
+//   • Real local assets present            → send them.
+//   • Empty AND authoritative (remote already merged via _bootLoadComplete, OR an
+//     explicit reset) → send [] (so a genuine "deleted my last asset" / reset
+//     does sync).
+//   • Empty AND not-yet-loaded / ambiguous → { omit:true } → caller leaves the
+//     assets/holdings columns untouched so the remote is preserved.
+// User-created assets are therefore never wiped by a race or a source mismatch.
+function _aurixAssetsForBackend() {
+  // The in-memory working set is the runtime source of truth (localStorage can
+  // lag during boot, before the first save()). If it holds assets, ALWAYS send
+  // them — converted to the persisted catalog/holdings shape.
+  const live = (typeof assets !== 'undefined' && Array.isArray(assets)) ? assets : [];
+  if (live.length > 0) {
+    try {
+      const conv = convertToNewModel(live);
+      return { assets: conv.assets, holdings: conv.holdings, omit: false, reason: 'live-data' };
+    } catch (_) { /* fall through to the empty path */ }
+  }
+  // Empty working set. An empty array is written ONLY on an EXPLICIT reset
+  // (resetInProgress or the reset tombstone — the DELETE-LAST path sets it, so a
+  // genuine "deleted my last asset" still syncs). Any other empty (boot race,
+  // failed remote load, 'legacy'/missing-keys source) is treated as ambiguous →
+  // omit the assets/holdings columns so a populated remote is NEVER clobbered.
+  const resetting = (typeof _aurixResetInProgress !== 'undefined' && _aurixResetInProgress) ||
+                    ((typeof _aurixResetAt === 'function') && _aurixResetAt() > 0);
+  if (resetting) return { assets: [], holdings: [], omit: false, reason: 'reset' };
+  return { assets: null, holdings: null, omit: true, reason: 'empty-not-reset' };
+}
+
 function scheduleSave() {
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => { autoSaveToBackend(); }, 500);
@@ -296,29 +348,34 @@ function scheduleSave() {
 }
 
 async function autoSaveToBackend(attempt = 1) {
-  if (_isSaving || !currentUser || !supabaseClient) return;
+  if (_isSaving || !currentUser || !supabaseClient) {
+    _persistDebug('[persist-save-backend] skip', { reason: _isSaving ? 'in-flight' : (!currentUser ? 'no-user' : 'no-client') });
+    return;
+  }
   // RESET-5: while the atomic orchestrator is running, the reset
   // routine pushes empty state itself via _pushEmptyPortfolioToBackend.
   // A second push from a debounced save() here would race with that
   // and could write a half-cleared state.
   if (typeof _aurixResetInProgress !== 'undefined' && _aurixResetInProgress) return;
 
-  const localData = getPortfolioData();
-  const hasAny    = !!(localData && (localData.assets?.length || localData.holdings?.length));
-  // RESET-2: when the reset tombstone is set, an empty local state
-  // STILL needs to be pushed so the remote row gets cleared. Skip
-  // only when the local is empty AND no tombstone is pending.
   const tombstone = (typeof _aurixResetAt === 'function') ? _aurixResetAt() : 0;
-  if (!hasAny && !tombstone) {
-    if (IS_DEV) console.warn('[DATA] skip autosave (empty data)');
+  // AURIX-PERSIST-HARDEN-1: never push an empty/ambiguous assets array over a
+  // populated remote — only live data or an explicit reset writes the columns.
+  const safe = _aurixAssetsForBackend();
+  if (safe.omit) {
+    _persistDebug('[persist-save-backend] skip (omit assets → preserve remote)', { reason: safe.reason });
+    if (IS_DEV) console.warn('[DATA] skip autosave (empty/ambiguous, remote preserved)');
     return;
   }
-
-  const assets   = (localData && localData.source === 'new') ? localData.assets   : [];
-  const holdings = (localData && localData.source === 'new') ? localData.holdings : [];
+  const assets   = safe.assets;
+  const holdings = safe.holdings;
 
   try {
     _isSaving = true;
+    _persistDebug('[persist-save-backend] upsert →', {
+      reason: safe.reason, assetCount: Array.isArray(assets) ? assets.length : 0,
+      symbols: Array.isArray(assets) ? assets.map(a => a.symbol || a.ticker) : [],
+    });
     const { error } = await supabaseClient
       .from('user_portfolios')
       .upsert({
@@ -329,6 +386,7 @@ async function autoSaveToBackend(attempt = 1) {
       }, { onConflict: 'user_id' });
 
     if (error) throw error;
+    _persistDebug('[persist-save-backend] OK', { assetCount: Array.isArray(assets) ? assets.length : 0 });
     if (IS_DEV) console.log('[DATA] autosave success');
     _setSaveStatus('saved');
     // Tombstone served its purpose — remote is now in sync with local.
@@ -337,6 +395,7 @@ async function autoSaveToBackend(attempt = 1) {
       if (IS_DEV) console.log('[DATA] reset tombstone cleared after sync');
     }
   } catch (e) {
+    _persistDebug('[persist-save-backend] ERROR', e && e.message ? e.message : e);
     if (IS_DEV) console.error('[DATA] autosave error:', e);
     const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
     if (attempt < 3) {
@@ -701,16 +760,15 @@ async function _flushStatePersistence(reason) {
     const localPrefsTs = _aurixPrefsTs();
     const localUiTs    = _aurixUiStateTs();
     const localSubTs   = _aurixSubscriptionTs();
-    const localData = getPortfolioData();
-    // assets/holdings are authoritative in localStorage post boot-load (the
-    // _bootLoadComplete gate guarantees the remote row was already merged in),
-    // so writing them here cannot clobber a populated remote with empty local.
-    const catalog   = (localData && localData.source === 'new') ? localData.assets   : [];
-    const holdings  = (localData && localData.source === 'new') ? localData.holdings  : {};
+    // AURIX-PERSIST-HARDEN-1: assets/holdings are written ONLY when safe — live
+    // data or an explicit reset. On an empty/ambiguous local state (boot race,
+    // failed load, source mismatch) the columns are OMITTED from the upsert, so
+    // the populated remote is preserved instead of being clobbered with []. The
+    // rest of the state (history/watchlist/prefs) still flushes regardless.
+    const safe = _aurixAssetsForBackend();
+    _persistDebug('[persist-save-backend] flush', { reason, assets: safe.reason, count: Array.isArray(safe.assets) ? safe.assets.length : 'omit' });
     const payload = {
       user_id:              currentUser.id,
-      assets:               catalog,
-      holdings,
       portfolio_history:    portfolioHistory,
       category_history:     categoryHistory,
       watchlist:            (typeof getWatchlist === 'function') ? getWatchlist() : [],
@@ -723,6 +781,12 @@ async function _flushStatePersistence(reason) {
       subscription_updated_at: localSubTs > 0 ? new Date(localSubTs).toISOString() : null,
       updated_at:           new Date().toISOString(),
     };
+    // Only touch assets/holdings when safe (see _aurixAssetsForBackend). Omitting
+    // them from the upsert leaves those remote columns untouched.
+    if (!safe.omit) {
+      payload.assets   = safe.assets;
+      payload.holdings = safe.holdings;
+    }
     let { error } = await supabaseClient
       .from('user_portfolios')
       .upsert(payload, { onConflict: 'user_id' });
@@ -776,9 +840,15 @@ async function loadPortfolioFromBackend(userId) {
       .eq('user_id', userId)
       .single();
     if (error) {
+      _persistDebug('[persist-load-backend] ERROR', error.message);
       if (IS_DEV) console.warn('[DATA] Supabase load error:', error.message);
       return null;
     }
+    _persistDebug('[persist-load-backend]', {
+      assetCount: (data && Array.isArray(data.assets)) ? data.assets.length : 0,
+      symbols: (data && Array.isArray(data.assets)) ? data.assets.map(a => a && (a.symbol || a.ticker)) : [],
+      updated_at: data && data.updated_at,
+    });
     return data || null;
   } catch (err) {
     if (IS_DEV) console.warn('[DATA] Supabase load exception:', err);
@@ -795,9 +865,13 @@ async function initPortfolioData(userId) {
   _mergeRemoteState(backendData);
   const distrustRemote = (typeof _shouldDistrustRemote === 'function') && _shouldDistrustRemote(backendData);
   if (isValidPortfolioData(backendData) && backendData.assets.length > 0 && !distrustRemote) {
+    _persistDebug('[persist-merge] remote wins', { assetCount: backendData.assets.length, symbols: backendData.assets.map(a => a && (a.symbol || a.ticker)) });
     if (IS_DEV) console.log('[DATA] loaded from Supabase');
     return backendData;
   }
+  _persistDebug('[persist-merge] remote NOT used for assets', {
+    distrustRemote, remoteAssetCount: (backendData && Array.isArray(backendData.assets)) ? backendData.assets.length : 0,
+  });
   if (distrustRemote && IS_DEV) {
     console.warn('[DATA] remote ignored — newer reset tombstone');
   }
@@ -4104,6 +4178,11 @@ function saveData({ assets: catalogAssets, holdings }) {
   localStorage.setItem('aurix_holdings', JSON.stringify(holdings));
   const legacy = convertToLegacyFormat(catalogAssets, holdings);
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ assets: legacy, lastUpdated: Date.now() }));
+  _persistDebug('[persist-save-local]', {
+    aurix_assets: Array.isArray(catalogAssets) ? catalogAssets.length : 0,
+    aurix_holdings: Array.isArray(holdings) ? holdings.length : (holdings && typeof holdings === 'object' ? Object.keys(holdings).length : 0),
+    symbols: Array.isArray(catalogAssets) ? catalogAssets.map(a => a && (a.symbol || a.ticker)) : [],
+  });
 }
 
 // ── Input number formatting ────────────────────────────────
@@ -18832,6 +18911,12 @@ function render(animate = false) {
     assetsListEl.removeChild(assetsListEl.firstChild);
   }
 
+  _persistDebug('[persist-render]', {
+    total: Array.isArray(assets) ? assets.length : 0,
+    active: (typeof activeAssets === 'function') ? activeAssets().length : null,
+    symbols: Array.isArray(assets) ? assets.map(a => a && (a.ticker || a.symbol)) : [],
+  });
+
   if (activeAssets().length === 0) {
     _applyEmptyStateForCategory(null);
     assetsListEl.appendChild(emptyStateEl);
@@ -21216,6 +21301,12 @@ assetForm.addEventListener('submit', e => {
     _ledgerTrade(assets.find(a => a.id === normalFlashId), 'buy', qty, pendingPrice, _buyTs);
   }
 
+  _persistDebug('[persist-add-asset]', {
+    added: ticker, type,
+    totalNow: Array.isArray(assets) ? assets.length : 0,
+    symbols: Array.isArray(assets) ? assets.map(a => a && (a.ticker || a.symbol)) : [],
+    authed: !!currentUser,
+  });
   save();
   render(true);
   closeModal();
