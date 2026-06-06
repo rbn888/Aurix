@@ -18007,3 +18007,65 @@ body.gs-open { overflow: hidden; }
     border-bottom: none;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   AURIX-HOLDINGS-PREMIUM-UI-1 — holdings polish (UI/UX only). No data,
+   financial calc, persistence, FX, snapshots, chart, Market or PCE touched.
+   Append-only + encapsulated so it is trivially reversible.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 1 — Stock / ETF logos integrated with the dark theme. FMP stock images often
+   carry a white background and, drawn raw at a 50% circle, read as a harsh
+   white sticker on the dark Aurix surface. Frame them in a subtle dark chip
+   with a thin blue border (the crypto-icon language) and inset the mark as a
+   rounded-square so the white never dominates. Crypto / metal / cash keep their
+   clean transparent marks (untouched). */
+.asset-badge.stock.badge--has-logo,
+.asset-badge.etf.badge--has-logo,
+.dar-badge.stock.badge--has-logo,
+.dar-badge.etf.badge--has-logo,
+.mng-badge-inner.stock.badge--has-logo,
+.mng-badge-inner.etf.badge--has-logo {
+  background: radial-gradient(circle at 50% 36%, rgba(42,56,92,0.55) 0%, rgba(15,21,37,0.92) 100%) !important;
+  border: 1px solid rgba(74,130,240,0.26) !important;
+  box-shadow: 0 0 0 1px rgba(8,12,22,0.45) inset !important;
+}
+.asset-badge.stock .asset-badge-logo,
+.asset-badge.etf .asset-badge-logo,
+.dar-badge.stock .asset-badge-logo,
+.dar-badge.etf .asset-badge-logo,
+.mng-badge-inner.stock .asset-badge-logo,
+.mng-badge-inner.etf .asset-badge-logo {
+  width: 66%;
+  height: 66%;
+  border-radius: 6px;            /* rounded-square, never a full white disc */
+  object-fit: contain;
+}
+
+/* 2 — The card / detail-row BODY is no longer a click target (only "Gestionar"
+   opens actions), so it must not read as interactive. */
+.asset-card,
+.detail-asset-row { cursor: default; }
+
+/* 3 — Premium "Gestionar" pill — the single action trigger, consistent on web
+   and mobile. Overrides the cramped 28px square it inherited from
+   `.dar-actions button` on desktop, so the web list no longer reads as flat. */
+.dar-actions .dar-manage {
+  width: auto;
+  min-height: 32px;
+  padding: 7px 14px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgba(228,236,255,0.95);
+  background: linear-gradient(180deg, rgba(74,130,240,0.20), rgba(74,130,240,0.10));
+  border: 1px solid rgba(74,130,240,0.34);
+  transition: background 0.15s var(--ease-out, ease), border-color 0.15s var(--ease-out, ease), transform 0.12s var(--ease-premium, ease);
+}
+.dar-actions .dar-manage:hover {
+  background: linear-gradient(180deg, rgba(74,130,240,0.30), rgba(74,130,240,0.16));
+  border-color: rgba(74,130,240,0.52);
+  color: #fff;
+}
+.dar-actions .dar-manage:active { transform: scale(0.96); }

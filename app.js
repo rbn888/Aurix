@@ -23032,15 +23032,11 @@ document.getElementById('adTxList').addEventListener('click', e => {
   }
 });
 
-// Delegate clicks on asset cards / detail rows → detail modal
-assetsListEl.addEventListener('click', e => {
-  if (justDragged) return;
-  if (e.target.closest('button') || e.target.closest('.asset-edit-strip')) return;
-  const card = e.target.closest('.asset-card, .detail-asset-row');
-  // AURIX-ASSET-MANAGE-OVERLAY-1: row → compact Gestionar overlay (NOT the
-  // full-screen detail; assetDetailSection stays dormant for now).
-  if (card) openAssetManage(card.dataset.assetId);
-});
+// AURIX-HOLDINGS-PREMIUM-UI-1: the asset card / detail row BODY is no longer a
+// click trigger — tapping a holding does nothing, to prevent accidental opens.
+// Actions are reached ONLY via the explicit "Gestionar" button, which the
+// `.dar-manage` delegate above (openAssetManage) already handles. The manage
+// overlay and every buy / sell / view-transactions flow are unchanged.
 
 /* ───────── AURIX-ASSET-MANAGE-OVERLAY-1 · compact manage sheet ─────────
    Stays inside the category view. Reuses existing flows (openModal /
