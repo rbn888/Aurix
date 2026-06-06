@@ -279,7 +279,7 @@
           </div>
           <div class="chart-wrap">
             <canvas id="portfolioChart"></canvas>
-            <div class="chart-no-data" id="chartNoData">
+            <div class="chart-no-data" id="chartNoData" style="display:none">
               <span class="chart-no-data-title" data-i18n="emptyChartTitle">Tu evolución aparecerá aquí</span>
               <span class="chart-no-data-body"  data-i18n="emptyChartBody">cuando añadas activos.</span>
             </div>
@@ -344,7 +344,7 @@
             </div>
             <div class="chart-wrap mobile-chart-wrap">
               <canvas id="portfolioChartMobile"></canvas>
-              <div class="chart-no-data" id="chartNoDataMobile">
+              <div class="chart-no-data" id="chartNoDataMobile" style="display:none">
                 <span class="chart-no-data-title" data-i18n="emptyChartTitle">Tu evolución aparecerá aquí</span>
                 <span class="chart-no-data-body"  data-i18n="emptyChartBody">cuando añadas activos.</span>
               </div>
@@ -1179,7 +1179,7 @@
   <script defer src="services/portfolio-price-layer.js?v=1"></script>
   <script defer src="services/portfolio-net-worth.js?v=1"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
-  <script src="app.js?v=207"></script>
+  <script src="app.js?v=208"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
        Loads after app.js so it can read its primitives. No consumers yet. -->
   <script src="services/wealth-engine.js?v=1"></script>

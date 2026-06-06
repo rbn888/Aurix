@@ -3873,6 +3873,14 @@ let _aurixDashMobile  = null;
 // the session, so returning to any range never downgrades to building unless
 // its data is genuinely empty. In-memory → a full page refresh resets it.
 const _aurixLastGoodByRange = Object.create(null);
+// AURIX-DASHBOARD-CHART-PREMIUM-FINAL — holdings-transition freeze. After a REAL
+// holdings change (qty / asset set changes — detected via a fingerprint so price
+// ticks never trigger it), the chart LINE is frozen on its last-good series for a
+// short window so the transient A/B/A snapshots (price/FX settling) are never
+// drawn as vertical teeth. Hero/total update immediately; only the line waits.
+const _AURIX_CHART_SETTLE_MS   = 2500;
+let   _aurixChartSettleUntil   = 0;
+let   _aurixLastAssetFingerprint = null;
 // AURIX-PORTFOLIO-CHART-ENGINE-1 · Fase D — Portfolio Chart Engine swap state.
 // All OFF by default. `_reconActive` holds the LAST reconstruction that passed
 // the fidelity gate, keyed by (range,currency); `_aurixDashSync` paints it
@@ -11436,6 +11444,27 @@ function validateChartSeries(range, series, liveValue) {
   return { valid: true, cleanedSeries: pts, reason: 'ok', droppedPoints: dropped, isPartial: dropped.length > 0 };
 }
 
+// AURIX-DASHBOARD-CHART-PREMIUM-FINAL — PRESENTATION-only display series. The
+// chart LINE is drawn from this; the KPI/headline keep reading the RAW validated
+// series (firstValue + live anchor), so no return is ever invented. A
+// conservative median-of-3 over INTERIOR points removes transient single-point
+// "teeth" (the A/B/A snapshot alternation while a freshly-added holding's price
+// settles) WITHOUT shifting sustained levels — a real deposit/crash spans ≥2
+// points and survives — and WITHOUT moving the endpoints (which carry the KPI
+// baseline + the live anchor). Each replaced value is an EXISTING neighbour
+// value (a median), never an interpolated/invented number. Raw data untouched.
+function _aurixDisplaySeries(series) {
+  if (!Array.isArray(series) || series.length < 5) return series;
+  const out = series.slice();
+  for (let i = 1; i < series.length - 1; i++) {
+    const a = series[i - 1].value, b = series[i].value, c = series[i + 1].value;
+    if (!(Number.isFinite(a) && Number.isFinite(b) && Number.isFinite(c))) continue;
+    const med = Math.max(Math.min(a, b), Math.min(Math.max(a, b), c));  // median(a,b,c)
+    if (med !== b) out[i] = { time: series[i].time, value: med };
+  }
+  return out;
+}
+
 function _aurixDashTeardown(surface) {
   const ctrl     = surface === 'desktop' ? _aurixDashDesktop : _aurixDashMobile;
   const canvasId = surface === 'desktop' ? 'portfolioChart'  : 'portfolioChartMobile';
@@ -11655,7 +11684,7 @@ function _aurixDashSync(surface) {
       if (_hasAssets && Array.isArray(_lg) && _lg.length >= 2) {
         try {
           const keep = _aurixChartAnchorTail(_lg);
-          ctrl.setData(keep, { source: 'local-snapshot', currency: baseCurrency || 'USD', isSynthetic: false, completeness: 1, asOf: Date.now() });
+          ctrl.setData(_aurixDisplaySeries(keep), { source: 'local-snapshot', currency: baseCurrency || 'USD', isSynthetic: false, completeness: 1, asOf: Date.now() });
           _aurixReconSyncHeadline(keep);
         } catch (_) {}
       } else {
@@ -11663,6 +11692,24 @@ function _aurixDashSync(surface) {
         _aurixClearChartHeadline();
       }
       return;
+    }
+
+    // AURIX-DASHBOARD-CHART-PREMIUM-FINAL — holdings-transition freeze. While the
+    // post-change settle window is open, keep the per-range last-good line frozen
+    // instead of drawing the transient A/B snapshots (teeth). The Hero/total are
+    // already correct; only the line waits. onPortfolioChange schedules one clean
+    // repaint after the window. Data untouched — transient points just aren't
+    // DRAWN. (Skipped if there is no last-good line yet, e.g. the first asset.)
+    if (Date.now() < _aurixChartSettleUntil) {
+      const _lgSettle = _aurixLastGoodByRange[activeRange];
+      if (Array.isArray(_lgSettle) && _lgSettle.length >= 2) {
+        try {
+          const keep = _aurixChartAnchorTail(_lgSettle);
+          ctrl.setData(_aurixDisplaySeries(keep), { source: 'local-snapshot', currency: baseCurrency || 'USD', isSynthetic: false, completeness: 1, asOf: Date.now() });
+          _aurixReconSyncHeadline(keep);
+        } catch (_) {}
+        return;
+      }
     }
 
     // PARTE B — pin the tail to the live Dashboard investable value (rule #4),
@@ -11688,7 +11735,7 @@ function _aurixDashSync(surface) {
       if (hasAssets && Array.isArray(_lgSeries) && _lgSeries.length >= 2) {
         try {
           const keep = _aurixChartAnchorTail(_lgSeries);
-          ctrl.setData(keep, { source: 'local-snapshot', currency: baseCurrency || 'USD', isSynthetic: false, completeness: 1, asOf: Date.now() });
+          ctrl.setData(_aurixDisplaySeries(keep), { source: 'local-snapshot', currency: baseCurrency || 'USD', isSynthetic: false, completeness: 1, asOf: Date.now() });
           try { _aurixReconSyncHeadline(keep); } catch (_) {}
         } catch (_) {}
         return;
@@ -11735,7 +11782,10 @@ function _aurixDashSync(surface) {
     // they can never disagree (no false metric vs a clean line).
     try { _aurixReconSyncHeadline(series); } catch (_) {}
 
-    ctrl.setData(series, {
+    // AURIX-DASHBOARD-CHART-PREMIUM-FINAL — draw the de-teethed display series
+    // (presentation only); the headline above already used the RAW validated
+    // series, so the KPI stays honest while the line reads premium.
+    ctrl.setData(_aurixDisplaySeries(series), {
       source:       isRecon ? 'reconstructed' : 'local-snapshot',
       currency:     baseCurrency || 'USD',
       granularity:  isRecon ? (_reconActive.granularity || '5m') : '5m',
@@ -13463,6 +13513,15 @@ function updateChart(animate = false) {
   // frame). updateChart re-runs once ready (bootRefresh + price polling) and
   // paints the clean, validated state. Pure render gating — no data touched.
   if (typeof _aurixChartDataReady === 'function' && !_aurixChartDataReady()) {
+    // AURIX-DASHBOARD-CHART-PREMIUM-FINAL — never leave the default-visible legacy
+    // "Tu evolución aparecerá aquí" overlay showing while not ready: with assets
+    // it must be hidden (V2 shows a premium loading / last-good line), and the
+    // "evolución aparecerá aquí" copy is reserved for a genuinely empty portfolio.
+    try {
+      const _empty = !(Array.isArray(assets) && assets.length > 0);
+      _setChartNoData(chartNoDataEl, _empty ? 'empty' : 'hide');
+      _setChartNoData(document.getElementById('chartNoDataMobile'), _empty ? 'empty' : 'hide');
+    } catch (_) {}
     try { if (_aurixDashDesktop) _aurixDashSync('desktop'); } catch (_) {}
     try { if (_aurixDashMobile)  _aurixDashSync('mobile'); } catch (_) {}
     return;
@@ -13658,6 +13717,19 @@ function onPortfolioChange(animate = false, opts = {}) {
   // shows snapshots immediately and a fresh PCE run is kicked for the new
   // portfolio. No-op effect when the flag is OFF (nothing is ever cached).
   _aurixReconInvalidate();
+  // AURIX-DASHBOARD-CHART-PREMIUM-FINAL — open a short chart-settle window ONLY
+  // on a REAL holdings change (qty / asset set differs from last). onPortfolioChange
+  // also fires on every price refresh (same fingerprint) → those never freeze the
+  // chart. While settling, _aurixDashSync keeps the last-good line; we schedule a
+  // single clean repaint just after the window so the new stable state lands.
+  try {
+    const fp = (Array.isArray(assets) ? assets : []).map(a => `${a.id}:${a.qty}`).sort().join('|');
+    if (_aurixLastAssetFingerprint !== null && fp !== _aurixLastAssetFingerprint) {
+      _aurixChartSettleUntil = Date.now() + _AURIX_CHART_SETTLE_MS;
+      setTimeout(() => { try { updateChart(false); } catch (_) {} }, _AURIX_CHART_SETTLE_MS + 60);
+    }
+    _aurixLastAssetFingerprint = fp;
+  } catch (_) {}
   updateChart(animate);
   updateDonut();
 }
