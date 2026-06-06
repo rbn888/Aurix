@@ -1458,6 +1458,19 @@
             _scaleHints = null;
           }
         }
+        // AURIX-CHART-INSTITUTIONAL-PHASE2 — a structural jump (deposit / buy /
+        // sell) renders as a clean step (Linear) instead of a smooth curve that
+        // would overshoot and read as market performance. Portfolio surface only;
+        // ordinary market series stay Curved. Driven by meta.straight from the app.
+        if (opts.variant === 'portfolio' && LWC.LineType && meta) {
+          try {
+            series.applyOptions({
+              lineType: meta.straight
+                ? (LWC.LineType.Simple  != null ? LWC.LineType.Simple  : 0)
+                : (LWC.LineType.Curved  != null ? LWC.LineType.Curved  : 0),
+            });
+          } catch (_) {}
+        }
         // Some LWC builds reject duplicate times — the dedupe above
         // already guarantees uniqueness, but normalization can
         // theoretically produce equal values; it never changes time.

@@ -11220,6 +11220,50 @@ function auditChartSeries(series, range) {
   } catch (_) {}
 }
 
+// ── AURIX-CHART-INSTITUTIONAL-PHASE2 ─────────────────────────────
+// Derived, in-memory chart data-quality (never persisted). Drives baseline mode
+// (render a recent baseline + microcopy instead of a big empty state when there
+// ARE recent clean points but not enough history for the range) and the
+// structural-move headline hint. Pure read over the already-normalized series.
+const _AURIX_BASELINE_EXPECT_DAYS = Object.freeze({ '30d': 30, '1y': 365, 'all': 90 });
+function _aurixChartDataQuality(series, range) {
+  const r = String(range || '').toLowerCase();
+  const arr = Array.isArray(series) ? series : [];
+  const valid = arr.filter(p => p && Number.isFinite(p.time) && p.time > 0 && Number.isFinite(p.value) && p.value > 0);
+  const n = valid.length;
+  const firstCleanTs = n ? valid[0].time : null;
+  const lastCleanTs  = n ? valid[n - 1].time : null;
+  const spanDays   = (n >= 2) ? (lastCleanTs - firstCleanTs) / 86400000 : 0;
+  const expectDays = _AURIX_BASELINE_EXPECT_DAYS[r] || 0;
+  const coverageRatio = expectDays > 0 ? Math.min(1, spanDays / expectDays) : 1;
+  let hasStructuralJump = false;   // a large sustained step = portfolio move, not market
+  for (let i = 1; i < valid.length; i++) {
+    const a = valid[i - 1].value, b = valid[i].value;
+    if (a > 0 && Math.abs(b / a - 1) >= 0.12) { hasStructuralJump = true; break; }
+  }
+  return {
+    validPointCount: n, firstCleanTs, lastCleanTs, coverageRatio, hasStructuralJump,
+    shouldShowBuildingState: n < 2,
+    shouldShowBaselineMode:  n >= 2 && expectDays > 0 && coverageRatio < 0.25,
+  };
+}
+function _aurixBaselineNoteText(dq) {
+  if (!dq || !dq.firstCleanTs) return '';
+  const es = (typeof lang !== 'undefined' && lang === 'es');
+  let d = '';
+  try { d = new Date(dq.firstCleanTs).toLocaleDateString(es ? 'es-ES' : 'en-US', { day: 'numeric', month: 'short' }); } catch (_) {}
+  return (es ? 'Histórico disponible desde ' : 'History available since ') + d;
+}
+// Sets the small contextual note under the chart headline (desktop + mobile).
+function _aurixSetChartNote(text) {
+  ['chartBaselineNote', 'chartBaselineNoteMobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (text) { el.textContent = text; el.hidden = false; }
+    else { el.textContent = ''; el.hidden = true; }
+  });
+}
+
 function _aurixDashSeries(range) {
   // AURIX-INVESTABLE-WEALTH-1 — Dashboard chart = investable wealth (excludes
   // real estate), derived from categoryHistory. Snapshots remain the fallback.
@@ -11802,7 +11846,15 @@ function _aurixDashSync(surface) {
     // misleading line, and clears the headline so no red %/€ shows (rules #5/#7).
     // Block 7: distinguish "no assets yet" from "has assets but history is still
     // building" so the engine's empty surface shows the right premium copy.
-    if (!_aurixChartSeriesPasses(series, activeRange)) {
+    // AURIX-CHART-INSTITUTIONAL-PHASE2 — baseline mode: with ≥2 clean points we
+    // now RENDER the recent baseline (a calm near-live line, no longer an
+    // aggressive diagonal — normalize/validate already removed contamination) and
+    // surface a "Histórico desde …" microcopy when coverage is low, instead of a
+    // big empty state. Full "Histórico en construcción" only when there are <2
+    // valid points or no assets (was: the stricter per-range count gate).
+    const _dq = _aurixChartDataQuality(series, activeRange);
+    if (_dq.shouldShowBuildingState) {
+      _aurixSetChartNote('');
       const hasAssets = Array.isArray(assets) && assets.length > 0;
       // AURIX-CHART-UX-1 #4: never replace an already-valid series with the
       // "building" overlay. If THIS range rendered a real line this session and
@@ -11861,9 +11913,23 @@ function _aurixDashSync(surface) {
     // they can never disagree (no false metric vs a clean line).
     try { _aurixReconSyncHeadline(series); } catch (_) {}
 
+    // AURIX-CHART-INSTITUTIONAL-PHASE2 — contextual note: a recent-baseline
+    // microcopy when coverage is low, else a discreet "portfolio moves" hint
+    // when the series contains a structural jump (deposit/buy/sell), so a
+    // contribution is never read as pure market performance. KPI unchanged.
+    {
+      const _es = (typeof lang !== 'undefined' && lang === 'es');
+      _aurixSetChartNote(
+        _dq.shouldShowBaselineMode ? _aurixBaselineNoteText(_dq)
+        : _dq.hasStructuralJump    ? (_es ? 'Incluye movimientos de cartera' : 'Includes portfolio moves')
+        :                            ''
+      );
+    }
+
     // AURIX-DASHBOARD-CHART-PREMIUM-FINAL — draw the de-teethed display series
-    // (presentation only); the headline above already used the RAW validated
-    // series, so the KPI stays honest while the line reads premium.
+    // (presentation only); the headline above used the RAW validated series, so
+    // the KPI stays honest. PHASE2: `straight` renders a structural jump as a
+    // clean step (no curve overshoot) instead of a misleading smooth rise.
     ctrl.setData(_aurixDisplaySeries(series), {
       source:       isRecon ? 'reconstructed' : 'local-snapshot',
       currency:     baseCurrency || 'USD',
@@ -11872,6 +11938,7 @@ function _aurixDashSync(surface) {
       completeness: isRecon ? (Number.isFinite(_reconActive.coverage) ? _reconActive.coverage : 1) : 1,
       asOf:         Date.now(),
       direction:    direction,
+      straight:     _dq.hasStructuralJump,
     });
   } catch (err) {
     console.warn('[chart-v2] sync failed for', surface, err && err.message ? err.message : err);
