@@ -4423,15 +4423,111 @@ function formatChartTooltip(amount) {
 }
 
 // ── Currency conversion ─────────────────────────────────────
+// ── AURIX-FX-1 (F2-A) — multi-currency FX engine ──────────────────────────
+// Single source of truth for currency conversion. Canonical pivot = USD;
+// _aurixFxRate(ccy) returns USD per 1 unit of ccy (USD → 1), or null when the
+// currency is genuinely unknown. Live rates come from Yahoo via the existing
+// prices proxy (GBPUSD=X / CHFUSD=X / JPYUSD=X), cached in localStorage with a
+// TTL; a clearly-marked STATIC fallback covers the supported set offline. It
+// NEVER assumes "non-USD = EUR": an unsupported currency returns null so the
+// caller treats that holding as uncovered (partial), never invented. EUR stays
+// pinned to the existing `usdToEur` anchor (NOT fetched) so USD/EUR valuation
+// is byte-identical to pre-F2.
+const _AURIX_FX_TTL      = 12 * 60 * 60 * 1000;   // 12h — FX drifts slowly vs. portfolio-valuation needs
+const _AURIX_FX_KEY      = 'aurix_fx_rates_v1';
+const _AURIX_FX_PAIRS    = { GBP: 'GBPUSD=X', CHF: 'CHFUSD=X', JPY: 'JPYUSD=X' };
+// STATIC fallback (USD per 1 unit) — approximate, last resort only; drives the
+// 'approx' status. EUR is intentionally absent (it uses the usdToEur anchor).
+const _AURIX_FX_FALLBACK = { USD: 1, GBP: 1.27, CHF: 1.11, JPY: 0.0064 };
+let _aurixFxCache = null;   // { ts, rates: { ccy: usdPerUnit } } | null
+
+function _aurixFxLoad() {
+  if (_aurixFxCache) return _aurixFxCache;
+  try {
+    const o = JSON.parse(localStorage.getItem(_AURIX_FX_KEY));
+    if (o && o.rates && typeof o.ts === 'number') _aurixFxCache = o;
+  } catch (_) {}
+  return _aurixFxCache;
+}
+function _aurixFxFresh() {
+  const c = _aurixFxLoad();
+  return !!(c && c.rates && (Date.now() - c.ts) < _AURIX_FX_TTL);
+}
+// Rate (USD per 1 unit) + provenance. status: 'live' | 'approx' | 'unknown'.
+function _aurixFxLookup(ccy) {
+  const c = String(ccy || '').toUpperCase();
+  if (c === 'USD') return { rate: 1, status: 'live' };
+  // EUR stays on the existing anchor → USD/EUR behaviour unchanged from pre-F2.
+  if (c === 'EUR') return { rate: (Number.isFinite(usdToEur) && usdToEur > 0) ? 1 / usdToEur : null, status: 'live' };
+  if (_aurixFxFresh()) {
+    const r = _aurixFxCache.rates[c];
+    if (Number.isFinite(r) && r > 0) return { rate: r, status: 'live' };
+  }
+  const fb = _AURIX_FX_FALLBACK[c];
+  if (Number.isFinite(fb) && fb > 0) return { rate: fb, status: 'approx' };
+  return { rate: null, status: 'unknown' };
+}
+function _aurixFxRate(ccy)   { return _aurixFxLookup(ccy).rate; }     // number | null
+function _aurixFxStatus(ccy) { return _aurixFxLookup(ccy).status; }   // 'live'|'approx'|'unknown'
+
+// Coverage helpers for the F2-C snapshot guard (skip closed positions).
+function _aurixFxCurrencies(list) {
+  const arr = Array.isArray(list) ? list : [];
+  const out = [];
+  for (const a of arr) {
+    if (!a || (typeof isClosedAsset === 'function' && isClosedAsset(a))) continue;
+    out.push(String(a.assetCurrency || 'USD').toUpperCase());
+  }
+  return out;
+}
+function _aurixFxUncovered(list)  { return _aurixFxCurrencies(list).filter(c => _aurixFxStatus(c) === 'unknown').length; }
+function _aurixFxApproxUsed(list) { return _aurixFxCurrencies(list).some(c => _aurixFxStatus(c) === 'approx'); }
+
+// Best-effort live refresh (Yahoo via the existing snapshot proxy). Self-guards
+// on the TTL, never throws, never blocks: offline / proxy failure simply keeps
+// the cached or static fallback. Does NOT fetch EUR (anchored on usdToEur).
+async function _aurixFxRefresh() {
+  if (_aurixFxFresh()) return;
+  if (typeof PRICES_PROXY === 'undefined' || typeof fetch !== 'function') return;
+  try {
+    const syms = Object.values(_AURIX_FX_PAIRS).join(',');
+    const res  = await fetch(`${PRICES_PROXY}/snapshot?symbols=${encodeURIComponent(syms)}`, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return;
+    const json  = await res.json();
+    const bySym = new Map((json && json.snapshot || []).map(p => [String(p.symbol), p]));
+    const rates = {};
+    for (const [ccy, sym] of Object.entries(_AURIX_FX_PAIRS)) {
+      const p = bySym.get(sym);
+      if (p && Number.isFinite(p.price) && p.price > 0) rates[ccy] = p.price;   // USD per 1 unit
+    }
+    if (Object.keys(rates).length) {
+      _aurixFxCache = { ts: Date.now(), rates };
+      try { localStorage.setItem(_AURIX_FX_KEY, JSON.stringify(_aurixFxCache)); } catch (_) {}
+    }
+  } catch (_) { /* offline / proxy fail → keep cache / fallback; never throw */ }
+}
+
 async function fetchExchangeRate() {
-  // FX fetch removed — uses hardcoded default (usdToEur = 0.92)
+  // AURIX-FX-1 (F2-A): refresh the multi-currency rate cache (GBP/CHF/JPY) from
+  // Yahoo. EUR remains on the static `usdToEur` anchor (unchanged behaviour).
+  // Best-effort: failure leaves the cache / approximate fallback intact.
+  await _aurixFxRefresh();
 }
 
 function toBase(amount, fromCurrency) {
   const from = (fromCurrency || 'USD').toUpperCase();
   if (from === baseCurrency) return amount;
-  if (from === 'USD') return amount * usdToEur;   // USD → EUR
-  return amount / usdToEur;                        // EUR → USD
+  // Backward-compatible USD↔EUR fast paths — byte-identical to pre-F2 arithmetic
+  // (base currency is always USD or EUR in the UI).
+  if (from === 'USD' && baseCurrency === 'EUR') return amount * usdToEur;
+  if (from === 'EUR' && baseCurrency === 'USD') return amount / usdToEur;
+  // AURIX-FX-1 (F2-A) general path (GBP/CHF/JPY/…) via the USD pivot. Unknown
+  // currency → NaN (uncovered; never assume EUR). Sum + snapshot guards treat
+  // NaN as uncovered and never invent or persist it as complete.
+  const fromRate = _aurixFxRate(from);
+  const baseRate = _aurixFxRate(baseCurrency);
+  if (!Number.isFinite(fromRate) || !Number.isFinite(baseRate) || baseRate <= 0) return NaN;
+  return amount * fromRate / baseRate;
 }
 
 // GOLD-1: physical-gold valuation constants. Spec-precise troy-ounce
@@ -4491,7 +4587,13 @@ function assetNativeValue(asset) {
 function assetValueUSD(asset) {
   const curr   = (asset.assetCurrency || 'USD').toUpperCase();
   const native = assetNativeValue(asset);
-  return curr === 'USD' ? native : native / usdToEur;
+  if (curr === 'USD') return native;
+  if (curr === 'EUR') return native / usdToEur;   // unchanged — byte-identical to pre-F2
+  // AURIX-FX-1 (F2-A): other currencies via the FX engine (USD per unit).
+  // Unknown currency → NaN (uncovered; never assume EUR). The sum guards + the
+  // F2-C snapshot guard treat NaN as uncovered and never invent / persist it.
+  const rate = _aurixFxRate(curr);
+  return Number.isFinite(rate) ? native * rate : NaN;
 }
 
 // ── AURIX-CLOSED-POSITIONS-1 · position lifecycle ──────────────────────────
@@ -4519,7 +4621,10 @@ function _reactivatePosition(asset) {
 function totalValueUSD() {
   // Closed positions carry qty 0 → assetValueUSD 0, so they never alter the
   // total; activeAssets() keeps it explicit and cheap.
-  return activeAssets().reduce((sum, a) => sum + assetValueUSD(a), 0);
+  // F2-A: skip uncovered-FX assets (assetValueUSD → NaN) so one exotic currency
+  // can never NaN-poison the whole total — covered portion only, never invented.
+  // USD/EUR-only portfolios are unaffected (nothing is NaN).
+  return activeAssets().reduce((sum, a) => { const v = assetValueUSD(a); return Number.isFinite(v) ? sum + v : sum; }, 0);
 }
 
 function totalValueBase() { return toBase(totalValueUSD(), 'USD'); }
@@ -4535,7 +4640,7 @@ function totalValueBase() { return toBase(totalValueUSD(), 'USD'); }
 // only real_estate is excluded.
 function isInvestableAsset(a) { return _aurixCategoryBucket(a) !== 'real_estate'; }
 function investableAssets()   { return activeAssets().filter(isInvestableAsset); }
-function investableValueUSD()  { return investableAssets().reduce((sum, a) => sum + assetValueUSD(a), 0); }
+function investableValueUSD()  { return investableAssets().reduce((sum, a) => { const v = assetValueUSD(a); return Number.isFinite(v) ? sum + v : sum; }, 0); }
 function investableValueBase() { return toBase(investableValueUSD(), 'USD'); }
 
 // ── P&L calculations ────────────────────────────────────────
@@ -4895,6 +5000,13 @@ function recordCategorySnapshot() {
     other:       +buckets.other.toFixed(2),
   };
 
+  // F2-C: flag (never block) FX provenance. The per-asset loop above already
+  // excluded any uncovered holding from total + buckets (never invented), so
+  // the point stays internally consistent (total == Σbuckets); fxPartial marks
+  // it as NOT complete, fxApprox marks use of the static fallback rate.
+  if (_aurixFxUncovered(assets) > 0)  newPoint.fxPartial = true;
+  if (_aurixFxApproxUsed(assets))     newPoint.fxApprox  = true;
+
   // AURIX-DATA-001 · F4 — capture-time integrity guard. Refuse to persist a
   // point that is impossible (non-finite total/bucket, or a total that does not
   // equal the sum of its buckets). By construction the point above is always
@@ -5053,6 +5165,12 @@ function recordSnapshot() {
 
   const last     = portfolioHistory[portfolioHistory.length - 1];
   const newPoint = { ts: now, value: +(val.toFixed(2)) };
+  // F2-C: flag (never block) FX provenance. `val` already excludes any
+  // uncovered holding (covered portion only — never invented); fxPartial marks
+  // the point as NOT a complete snapshot, fxApprox marks use of the static
+  // fallback rate. Additive fields — readers/validators ignore them.
+  if (_aurixFxUncovered(activeAssets()) > 0)  newPoint.fxPartial = true;
+  if (_aurixFxApproxUsed(activeAssets()))     newPoint.fxApprox  = true;
 
   // Dedup: upsert only if called within 5 s of the last point (same moment).
   // Otherwise strictly append so historyLength grows on every price refresh.
