@@ -8891,6 +8891,134 @@ main { padding-bottom: 72px; }
   box-shadow: none !important;
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   AURIX-MARKET-ICONS-PREMIUM-1 — premium Market-family asset icons.
+   Scope: .asset-icon / .sugg-badge / .add-v2-asset-icon (Market row,
+   Seguimiento, Search, quick-picks). The Dashboard / category badge
+   family (.asset-badge / .cat-card-visual / .logo-fallback) is NOT
+   touched. Goals: zero flicker (stable box + opacity fade-in, the
+   designed fallback never flashes as an empty box or a bare letter),
+   strong contrast on the dark Aurix bg, a designed fallback per type.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Fallback layer — fills the box, centered, sits behind the logo. */
+.aurix-aicon-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  overflow: hidden;
+  z-index: 1;
+  line-height: 1;
+}
+/* Logo layer — fades in only once decoded (no "letter→logo", no reflow). */
+.aurix-aicon-img {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.aurix-aicon-img.is-loaded { opacity: 1; }
+/* While a logo is present, hide the designed fallback — the user sees a
+   neutral premium plate (the container bg) until the logo fades in. */
+.asset-icon.has-logo .aurix-aicon-fallback,
+.sugg-badge.has-logo .aurix-aicon-fallback,
+.add-v2-asset-icon.has-logo .aurix-aicon-fallback { visibility: hidden; }
+
+/* Per-type plates so the logo always sits on the right backdrop. */
+.aicon--crypto.has-logo {
+  background: radial-gradient(circle at 50% 38%, #1b2438 0%, #0d1322 100%) !important;
+  border: 1px solid rgba(255,255,255,0.05) !important;
+}
+.aicon--crypto .aurix-aicon-img { object-fit: cover; }
+/* Stocks / ETFs / funds — light chip so black / dark logos stay visible
+   on the dark Aurix bg (Robinhood-style provider chip). */
+.aicon--stock.has-logo,
+.aicon--etf.has-logo,
+.aicon--fund.has-logo {
+  background: #f3f6fc !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  box-shadow: 0 0 0 1px rgba(8,12,22,0.40) inset !important;
+}
+.aicon--stock .aurix-aicon-img,
+.aicon--etf   .aurix-aicon-img,
+.aicon--fund  .aurix-aicon-img { object-fit: contain; padding: 16%; }
+
+/* ── Premium fallbacks (no logo) ───────────────────────────────────── */
+/* Crypto / stock / generic — clean initial on the existing Aurix dark
+   circle (inherits the :not(.has-logo) gradient defined above). */
+.aicon-fb-init .aurix-aicon-init {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: rgba(228,235,255,0.94);
+}
+/* For index / ETF / fund / commodity the inner badge paints the full box,
+   so neutralise the generic gradient + border on the container. */
+.asset-icon.aicon--index:not(.has-logo),
+.asset-icon.aicon--etf:not(.has-logo),
+.asset-icon.aicon--fund:not(.has-logo),
+.asset-icon.aicon--commodity:not(.has-logo),
+.asset-icon.aicon--metal:not(.has-logo),
+.sugg-badge.aicon--index:not(.has-logo),
+.sugg-badge.aicon--etf:not(.has-logo),
+.sugg-badge.aicon--fund:not(.has-logo),
+.sugg-badge.aicon--commodity:not(.has-logo),
+.sugg-badge.aicon--metal:not(.has-logo),
+.add-v2-asset-icon.aicon--index:not(.has-logo),
+.add-v2-asset-icon.aicon--etf:not(.has-logo),
+.add-v2-asset-icon.aicon--fund:not(.has-logo),
+.add-v2-asset-icon.aicon--commodity:not(.has-logo),
+.add-v2-asset-icon.aicon--metal:not(.has-logo) {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+/* ETF / fund — institutional provider monogram chip. */
+.aicon-fb-provider {
+  font-weight: 800;
+  font-size: 9px;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: #eaf1ff;
+  background:
+    linear-gradient(180deg, rgba(74,130,240,0.32), rgba(40,70,140,0.16)),
+    #131a2c;
+  border: 1px solid rgba(120,160,240,0.35);
+}
+
+/* Index — numeric / family badge with a category accent. */
+.aicon-fb-index {
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+.aicon-fb-index.idx-sp    { background: radial-gradient(circle at 38% 30%, #e8584f, #9c2a23); }
+.aicon-fb-index.idx-ndx   { background: radial-gradient(circle at 38% 30%, #4a82f0, #2350a8); }
+.aicon-fb-index.idx-dji   { background: radial-gradient(circle at 38% 30%, #5b7fb0, #2c3f5c); font-size: 9px; }
+.aicon-fb-index.idx-stoxx { background: radial-gradient(circle at 38% 30%, #3aa0e0, #1f5fa0); }
+.aicon-fb-index.idx-rut   { background: radial-gradient(circle at 38% 30%, #9a6cf0, #5733a8); font-size: 8.5px; }
+.aicon-fb-index.idx-gen   { background: radial-gradient(circle at 38% 30%, #46618f, #25324c); font-size: 9px; }
+
+/* Commodity — inline SVG glyph on a dark plate + a subtle premium glow
+   (the glow doubles as the contrast halo so nothing reads black-on-black). */
+.aicon-fb-commodity {
+  background: radial-gradient(circle at 50% 40%, #1a2236, #0c1120);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.aicon-cmd {
+  width: 70%;
+  height: 70%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.aicon-cmd svg { width: 100%; height: 100%; display: block; }
+.aicon-cmd--gold   { filter: drop-shadow(0 0 5px rgba(230,180,70,0.45)); }
+.aicon-cmd--silver { filter: drop-shadow(0 0 5px rgba(200,210,225,0.40)); }
+.aicon-cmd--oil    { filter: drop-shadow(0 0 5px rgba(210,145,63,0.50)); }
+.aicon-cmd--gas    { filter: drop-shadow(0 0 6px rgba(74,130,240,0.55)); }
+
 .asset-text {
   display: flex;
   flex-direction: column;

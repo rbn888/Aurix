@@ -19329,21 +19329,131 @@ function _resolveLogoBySymbol(symbol, type) {
 // it cleanly reverts to the premium fallback. `baseClass` carries the per-surface
 // sizing/shape class so each surface keeps its dimensions.
 function _aurixIconImgError(img) {
+  // Real load failure (or no logo) → drop to the designed premium fallback.
+  // The container size never changed, so there is no layout shift.
   try {
     const host = img && img.parentElement;
     if (img) img.remove();
-    if (host) host.classList.remove('has-logo');   // reveal the premium initial fallback
+    if (host) host.classList.remove('has-logo');   // reveal the premium fallback
   } catch (_) {}
 }
+function _aurixIconImgOk(img) {
+  // Logo decoded → fade it in over the (hidden) fallback. Pure opacity
+  // animation: the box geometry is fixed from first paint, so no reflow.
+  try { if (img) img.classList.add('is-loaded'); } catch (_) {}
+}
+
+// AURIX-MARKET-ICONS-PREMIUM-1 — premium per-type fallbacks for the Market
+// family. Everything below is DERIVED from the asset's own symbol / name /
+// type — no network, no data mutation, no persistence. ETFs/funds get an
+// institutional provider monogram, indices a numeric/family badge,
+// commodities an inline SVG glyph, crypto/stocks a clean initial.
+const _AURIX_ICON_PROVIDERS = [
+  [/ishares/i,             'iSh' ],
+  [/vanguard/i,            'VANG'],
+  [/fidelity/i,            'FID' ],
+  [/amundi/i,              'AMUN'],
+  [/van\s*eck|vaneck/i,    'VANE'],
+  [/wisdom\s*tree/i,       'WISD'],
+  [/spdr|state\s*street/i, 'SPDR'],
+  [/invesco/i,             'INV' ],
+  [/blackrock/i,           'BLK' ],
+  [/xtrackers/i,           'XTR' ],
+  [/schwab/i,              'SCHW'],
+  [/msci/i,                'MSCI'],
+  [/ftse/i,                'FTSE'],
+];
+function _aurixProviderBadge(name, sym) {
+  const hay = `${name || ''} ${sym || ''}`;
+  for (const [re, label] of _AURIX_ICON_PROVIDERS) if (re.test(hay)) return label;
+  return 'ETF';
+}
+function _aurixIndexBadge(sym, name) {
+  const s = `${sym || ''} ${name || ''}`.toUpperCase();
+  if (/GSPC|S&P\s*500|\bSPX\b/.test(s))           return { label: '500',  cls: 'idx-sp'    };
+  if (/IXIC|NASDAQ|\bNDX\b/.test(s))              return { label: 'NDQ',  cls: 'idx-ndx'   };
+  if (/DJI|DOW/.test(s))                          return { label: 'DJI',  cls: 'idx-dji'   };
+  if (/STOXX|SX5E/.test(s))                       return { label: '50',   cls: 'idx-stoxx' };
+  if (/RUSSELL|\bRUT\b/.test(s))                  return { label: '2000', cls: 'idx-rut'   };
+  if (/IBEX/.test(s))                             return { label: '35',   cls: 'idx-gen'   };
+  if (/DAX|GDAXI/.test(s))                        return { label: 'DAX',  cls: 'idx-gen'   };
+  if (/FCHI|\bCAC\b/.test(s))                     return { label: 'CAC',  cls: 'idx-gen'   };
+  if (/N225|NIKKEI/.test(s))                      return { label: '225',  cls: 'idx-gen'   };
+  if (/FTSE/.test(s))                             return { label: 'FTSE', cls: 'idx-gen'   };
+  const raw = String(sym || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase();
+  return { label: raw || 'IDX', cls: 'idx-gen' };
+}
+function _aurixCommodityKey(sym, name) {
+  const s = `${sym || ''} ${name || ''}`.toUpperCase();
+  if (/XAU|GOLD|\bORO\b/.test(s))                            return 'gold';
+  if (/XAG|SILVER|PLATA/.test(s))                            return 'silver';
+  if (/\bNG\b|NATURAL\s*GAS|\bGAS\b/.test(s))                return 'gas';
+  if (/WTI|BRENT|CRUDE|\bOIL\b|PETRO|\bCL\b|\bBZ\b/.test(s)) return 'oil';
+  return null;
+}
+function _aurixCommodityIcon(sym, name) {
+  const key = _aurixCommodityKey(sym, name);
+  if (!key) return '';
+  const bars = (main, sheen) =>
+    `<path d="M4 23 L5.6 18 L13.4 18 L15 23 Z" fill="${main}"/>` +
+    `<path d="M5.6 18 L13.4 18 L12.9 19.3 L6.1 19.3 Z" fill="${sheen}"/>` +
+    `<path d="M17 23 L18.6 18 L26.4 18 L28 23 Z" fill="${main}"/>` +
+    `<path d="M18.6 18 L26.4 18 L25.9 19.3 L19.1 19.3 Z" fill="${sheen}"/>` +
+    `<path d="M10.5 16.4 L12.1 11.4 L19.9 11.4 L21.5 16.4 Z" fill="${main}"/>` +
+    `<path d="M12.1 11.4 L19.9 11.4 L19.4 12.7 L12.6 12.7 Z" fill="${sheen}"/>`;
+  const svgs = {
+    gold:   `<svg viewBox="0 0 32 32" fill="none" aria-hidden="true">${bars('#E0A93B', '#FBE39A')}</svg>`,
+    silver: `<svg viewBox="0 0 32 32" fill="none" aria-hidden="true">${bars('#AEB8C6', '#EEF3F8')}</svg>`,
+    oil:    `<svg viewBox="0 0 32 32" fill="none" aria-hidden="true">` +
+            `<path d="M16 5 C12 12 9 15.5 9 19.5 A7 7 0 0 0 23 19.5 C23 15.5 20 12 16 5 Z" fill="#D2913F"/>` +
+            `<path d="M12.8 18.6 a3.2 3.2 0 0 0 3.2 3.2" stroke="#FCE6BE" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>`,
+    gas:    `<svg viewBox="0 0 32 32" fill="none" aria-hidden="true">` +
+            `<path d="M16 5 C18.6 10 22 12 20.5 17 A6.6 6.6 0 1 1 11.5 17 C13 13.5 13.4 11 16 5 Z" fill="#4A82F0"/>` +
+            `<path d="M16 12.6 C17.4 14.8 18.6 15.8 17.9 18.2 A3 3 0 1 1 13.9 18.4 C14.7 16.7 15.2 15.3 16 12.6 Z" fill="#A9C8FF"/></svg>`,
+  };
+  return `<span class="aicon-cmd aicon-cmd--${key}">${svgs[key]}</span>`;
+}
+function _aurixPremiumFallback(asset, initialSource) {
+  const type = String((asset && asset.type) || '').toLowerCase();
+  const sym  = String((asset && (asset.symbol || asset.ticker)) || initialSource || '').trim();
+  const name = String((asset && asset.name) || '').trim();
+  if (type === 'commodity' || type === 'metal') {
+    const cmd = _aurixCommodityIcon(sym, name);
+    if (cmd) return `<span class="aurix-aicon-fallback aicon-fb-commodity">${cmd}</span>`;
+  }
+  if (type === 'index') {
+    const b = _aurixIndexBadge(sym, name);
+    return `<span class="aurix-aicon-fallback aicon-fb-index ${b.cls}">${escHtml(b.label)}</span>`;
+  }
+  if (type === 'etf' || type === 'fund') {
+    return `<span class="aurix-aicon-fallback aicon-fb-provider">${escHtml(_aurixProviderBadge(name, sym))}</span>`;
+  }
+  const init = escHtml((sym.charAt(0) || '?').toUpperCase());
+  return `<span class="aurix-aicon-fallback aicon-fb-init"><span class="aurix-aicon-init">${init}</span></span>`;
+}
+// Logo URL decision for the Market family ONLY (the global getAssetLogo is
+// untouched). A real persisted provider logo (image/logo) wins for any type;
+// otherwise only crypto + stocks get a by-symbol CDN logo. ETF/fund/index/
+// commodity skip the unreliable by-symbol guess (it can resolve to a generic
+// grey image) and use the designed premium badge instead.
+function _aurixMktIconUrl(asset) {
+  if (!asset || typeof asset !== 'object') return getAssetLogo(asset) || null;
+  if (typeof asset.image === 'string' && /^https:\/\//.test(asset.image)) return asset.image;
+  if (typeof asset.logo  === 'string' && /^https:\/\//.test(asset.logo))  return asset.logo;
+  const type = String(asset.type || '').toLowerCase();
+  if (type === 'crypto' || type === 'stock') return getAssetLogo(asset);
+  return null;
+}
 function _assetIconHtml(asset, initialSource, baseClass) {
-  const url  = getAssetLogo(asset);
-  const raw  = String(initialSource || (asset && (asset.symbol || asset.ticker)) || '?').trim();
-  const init = escHtml((raw.charAt(0) || '?').toUpperCase());
-  const cls  = baseClass + (url ? ' has-logo' : '');
-  const img  = url
-    ? `<img class="aurix-aicon-img" src="${escHtml(url)}" alt="" loading="lazy" aria-hidden="true" onerror="_aurixIconImgError(this)">`
+  const type     = String((asset && asset.type) || '').toLowerCase();
+  const url      = _aurixMktIconUrl(asset);
+  const fallback = _aurixPremiumFallback(asset, initialSource);
+  const typeCls  = type ? ` aicon--${type}` : '';
+  const cls      = `${baseClass}${typeCls}${url ? ' has-logo' : ''}`;
+  const img      = url
+    ? `<img class="aurix-aicon-img" src="${escHtml(url)}" alt="" loading="lazy" decoding="async" aria-hidden="true" onload="_aurixIconImgOk(this)" onerror="_aurixIconImgError(this)">`
     : '';
-  return `<div class="${cls}"><span class="aurix-aicon-init">${init}</span>${img}</div>`;
+  return `<div class="${cls}">${fallback}${img}</div>`;
 }
 
 // ── Logo resolution helpers ─────────────────────────────────
