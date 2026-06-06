@@ -13728,49 +13728,36 @@ body.gs-open { overflow: hidden; }
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   MARKET-MOBILE-1 / MARKET-MOBILE-POLISH — premium mobile Market launch
-   pass. SCOPED to phones (≤768px) + the V4 list container, so desktop /
-   web stays byte-identical. Pairs with the app.js mobile subcategory
-   FILTER (the only behavioural change). Pure presentation here:
-     • drop the big discovery cards (the chips now drive the list);
-     • three clearly separated bands — Subcategorías → Filtros → Lista —
-       via a flex column + `order` (no DOM/JS change). The Filtros chip
-       no longer floats over the chips' faded tail, so it can never
-       overlap a long category name; it sits on its own quiet row;
-     • drop the redundant grey category label (Cripto / Acciones / …) —
-       the active tab already communicates context;
-     • quiet the Filtros chip so it reads as a peer of the subcategory
-       chips, not a hero control (lower height, no glow, chip surface);
-     • compress the vertical rhythm so the list lands sooner.
-   The V4 row layout itself is already premium (sparkline + alignment) and
-   is intentionally left untouched. Tabs WITHOUT subcategory chips
-   (Seguimiento / Todo / search) are matched out via :not(:has(…)) and stay
-   byte-identical to before.
+   MARKET-MOBILE-POLISH-2 — launch simplification + premium tab polish.
+   SCOPED to phones (≤768px); desktop / web stays byte-identical. Pure
+   presentation — no Market logic, search, watchlist or data touched.
+     • CAMBIO 1 — remove the Filtros control entirely (unfinished, low
+       value, ate critical vertical space). display:none collapses the
+       row with no empty gap; the list rises automatically.
+     • CAMBIO 2 — remove the duplicated grey title under the tabs on
+       EVERY tab (Seguimiento / Todo / Cripto / … ). The active tab is
+       already the context, so the list starts right under the tabs.
+     • CAMBIO 3 — spend the recovered space on a more premium top-tab row
+       (more padding + spacing, softer active glow, smooth tactile states).
+   Subcategory chips (Top / Layer 1 / DeFi…) stay: they are functional
+   filters, not a title. The V4 row layout (sparkline + alignment) and the
+   filter-sheet markup/JS are left intact — the sheet is simply unreachable
+   on mobile, so nothing behavioural changes.
    ══════════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  /* (A) Remove the big discovery cards + "Ver más": pure duplication on
-     mobile now that a subcategory chip filters the list directly, and the
-     main reason the useful list was pushed far down the screen. */
+  /* (A) Drop the big discovery cards + "Ver más": pure duplication on
+     mobile now that a subcategory chip filters the list directly. */
   #marketList.is-v4 .funds-grid,
   #marketList.is-v4 .funds-show-more { display: none !important; }
   #marketList.is-v4 .funds-discover  { gap: 0; padding: 0 0 2px; }
 
-  /* (B) Three separated bands — Subcategorías → Filtros → Lista. The list
-     container becomes a flex column ONLY when a subcategory chips row
-     exists (:has), and `order` lifts the chips above the Filtros control.
-     Only two elements get an explicit order; everything else (section
-     header, table header, rows) keeps its default 0 and natural source
-     order, so the list stacks exactly as before. */
-  #marketList.is-v4:has(.funds-discover) {
-    display: flex;
-    flex-direction: column;
-  }
-  #marketList.is-v4:has(.funds-discover) .funds-discover        { order: -2; }
-  #marketList.is-v4:has(.funds-discover) .mkt-explorer-controls.is-v4 { order: -1; }
+  /* (B) CAMBIO 1 — remove the Filtros block. No empty gap is left (the
+     row collapses); the list rises automatically. */
+  #marketList.is-v4 .mkt-explorer-controls { display: none !important; }
 
-  /* Subcategory chips: full, un-masked row — no reserved gap, no fade, no
-     overlap zone (the floating chip is gone). */
-  #marketList.is-v4:has(.funds-discover) .funds-cats {
+  /* (C) Subcategory chips: full, un-masked row that sits directly under
+     the tabs (these are filters, not a title — they stay). */
+  #marketList.is-v4 .funds-cats {
     display: flex;
     align-items: center;
     min-height: 0;
@@ -13780,78 +13767,52 @@ body.gs-open { overflow: hidden; }
             mask-image: none;
   }
 
-  /* (C) Filtros control — de-floated into normal flow, right-aligned, on
-     its own quiet row. Applies to chips tabs AND no-chips tabs alike;
-     no-chips tabs (Seguimiento / Todo / search) left-align it so there is
-     no big empty gap on the left. */
-  #marketList.is-v4 .mkt-explorer-controls.is-v4 {
-    position: static;
-    height: auto;
-    z-index: auto;
-    margin: 0;
-    padding: 4px 2px 8px;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    background: transparent;
-    pointer-events: auto;
-  }
-  #marketList.is-v4:not(:has(.funds-discover)) .mkt-explorer-controls.is-v4 {
-    justify-content: flex-start;
-    padding: 2px 2px 8px;
-  }
+  /* (D) CAMBIO 2 — remove the duplicated grey title under the tabs on
+     EVERY tab; the active tab already defines the context. */
+  #marketList.is-v4 .market-section-header { display: none !important; }
 
-  /* (D) Compress the rhythm so the list reaches the user sooner. */
-  #marketList.is-v4 { margin-top: 6px; }
-  #marketList.is-v4 .market-section-header { padding: 6px 8px 4px; }
+  /* (E) Compress the top rhythm so the list reaches the user sooner. */
+  #marketList.is-v4 { margin-top: 4px; }
+}
 
-  /* (E) Drop the redundant grey category label (Cripto / Acciones / ETFs
-     / Índices / Materias) — the active tab already says where we are.
-     Scoped to chips tabs only, so Seguimiento ("Seguimiento") and Todo
-     ("Todo") keep their header (there the label is the only context). */
-  #marketList.is-v4:has(.funds-discover) .market-section-header { display: none !important; }
-
-  /* (F) Quiet the Filtros chip so it reads as a peer of the subcategory
-     chips, not a hero control: lower height, no backdrop glow, the same
-     subtle chip surface/identity as .funds-cat. */
-  #marketList.is-v4 .mkt-filter-chip {
-    gap: 6px;
-    padding: 5px 10px;
-    background: rgba(255,255,255,0.025);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 8px;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    box-shadow: none;
-    color: rgba(225,232,255,0.78);
-    font-size: 11px;
+/* CAMBIO 3 — PREMIUM TABS POLISH (mobile only). Elevates the existing
+   pill language (more padding + breathing room, a softer gradient glow on
+   the active tab aligned with the Dashboard range buttons, smooth + tactile
+   states, slightly more solid text). Navigation / behaviour unchanged.
+   Scoped ≤768px so the desktop segmented control stays byte-identical. */
+@media (max-width: 768px) {
+  .market-tabs {
+    gap: 10px;
+    padding-top: 10px;
+    padding-bottom: 8px;
   }
-  #marketList.is-v4 .mkt-filter-chip:hover {
-    border-color: rgba(74,130,240,0.30);
-    background: rgba(74,130,240,0.08);
-  }
-  #marketList.is-v4 .mkt-filter-chip-icon {
-    width: 13px;
-    height: 13px;
-    color: rgba(180,200,255,0.72);
-  }
-  #marketList.is-v4 .mkt-filter-chip-label {
+  .market-tab {
+    padding: 9px 16px;
+    font-size: 13px;
     font-weight: 600;
-    color: rgba(225,232,255,0.85);
+    letter-spacing: 0.01em;
+    line-height: 1.2;
+    color: rgba(225, 233, 250, 0.66);
+    background: rgba(255, 255, 255, 0.045);
+    border-radius: 999px;
+    transition:
+      background 0.2s var(--ease-out, ease),
+      color 0.2s var(--ease-out, ease),
+      box-shadow 0.2s var(--ease-out, ease),
+      transform 0.12s var(--ease-premium, cubic-bezier(0.2, 0.8, 0.2, 1));
   }
-  /* Quieter 24H badge — subtle outline pill, no fill glow. */
-  #marketList.is-v4 .mkt-filter-chip-badge {
-    padding: 2px 7px;
-    background: rgba(74,130,240,0.12);
-    border: 1px solid rgba(74,130,240,0.22);
-    color: rgba(225,232,255,0.88);
-    font-size: 9.5px;
+  .market-tab:hover {
+    color: rgba(235, 243, 255, 0.92);
+    background: rgba(255, 255, 255, 0.07);
+  }
+  .market-tab:active { transform: scale(0.96); }
+  .market-tab.active {
+    color: #fff;
     font-weight: 700;
-    box-shadow: none;
-  }
-  #marketList.is-v4 .mkt-filter-chip-sort {
-    font-size: 10px;
-    color: rgba(200,214,240,0.50);
+    background: linear-gradient(180deg, rgba(74,130,240,0.30), rgba(74,130,240,0.15));
+    box-shadow:
+      0 0 0 1px rgba(74,130,240,0.40) inset,
+      0 8px 22px -12px rgba(74,130,240,0.70);
   }
 }
 
