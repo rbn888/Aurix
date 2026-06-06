@@ -119,18 +119,26 @@
       .aurix-chart-host[data-state="error"]   .aurix-chart-canvas {
         opacity: 0.0;
       }
+      /* AURIX-CHART-FINAL-UX-MICROFIX — the loading state must NOT show a central
+         rectangle/box. Full-bleed, borderless, ULTRA-subtle shimmer integrated
+         into the chart background instead. (The caller shows the per-range
+         last-good line when one exists, so this only ever appears on the very
+         first paint of a session — never as a flash on refresh.) Visual only:
+         the loading LOGIC is unchanged. */
       .aurix-chart-skeleton {
-        width: 80%;
-        height: 60%;
-        border-radius: 8px;
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: inherit;
         background: linear-gradient(
           90deg,
-          rgba(255,255,255,0.03) 0%,
-          rgba(138,166,255,0.06) 50%,
-          rgba(255,255,255,0.03) 100%
+          rgba(255,255,255,0.010) 0%,
+          rgba(138,166,255,0.020) 50%,
+          rgba(255,255,255,0.010) 100%
         );
         background-size: 200% 100%;
-        animation: aurix-chart-shimmer 1.4s linear infinite;
+        animation: aurix-chart-shimmer 2.2s linear infinite;
       }
       @keyframes aurix-chart-shimmer {
         from { background-position: 200% 0; }
@@ -468,10 +476,34 @@
         return h.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
       }
       if (r === '7d' || r === '30d' || r === '3m') {
-        return d.toLocaleDateString(loc, { day: 'numeric', month: 'short' });
+        return d.toLocaleDateString(loc, { day: 'numeric', month: 'short' });   // "6 jun"
       }
-      return d.toLocaleDateString(loc, { month: 'short', year: '2-digit' });
+      // AURIX-CHART-FINAL-UX-MICROFIX — 1A reads as clean months ("jul · sep · …");
+      // TOTAL keeps the year so multi-year spans never collide ("jun 25").
+      if (r === '1y') {
+        return d.toLocaleDateString(loc, { month: 'short' });                   // "jun"
+      }
+      return d.toLocaleDateString(loc, { month: 'short', year: '2-digit' });    // "jun 25"
     } catch (_) { return ''; }
+  }
+  // AURIX-CHART-FINAL-UX-MICROFIX — per-range bucket key for the axis label
+  // thinner. One label is emitted per bucket (first tick wins), which gives an
+  // even, capped set of labels per range AND removes repeats — without snapping
+  // or moving any tick (the label still sits at its real time; data untouched).
+  //   24H → 6-hour blocks (≤4)   7D → day (≤7)   30D → week (≤5)
+  //   1A  → 2-month blocks (≤6)  TOTAL → month
+  function _axisBucketKey(ms, r) {
+    const d = new Date(ms);
+    if (r === '24h') {
+      // Local-aligned absolute 6-hour block (00/06/12/18) → ~4 labels / 24h,
+      // and never split across midnight into extra blocks.
+      const localMs = ms - d.getTimezoneOffset() * 60000;
+      return Math.floor(localMs / (6 * 3600000));
+    }
+    if (r === '7d')  return d.toDateString();
+    if (r === '30d' || r === '3m') return Math.floor(ms / (7 * 86400000));
+    if (r === '1y')  return d.getFullYear() * 6 + Math.floor(d.getMonth() / 2);
+    return d.getFullYear() * 12 + d.getMonth();   // all / default → month
   }
 
   function _formatTooltipTime(ms, range, variant) {
@@ -719,10 +751,12 @@
     };
     const _priceFormatter = v => _compactCurrency(v, _formatterCurrency);
 
-    // AURIX-CHART-AXIS-2 — per-instance dedup memory for the 24H hour-rounded
-    // axis labels (see the tickMarkFormatter wrapper below).
+    // AURIX-CHART-FINAL-UX-MICROFIX — per-instance, per-render-pass dedup memory
+    // for the axis labels. Sets are reset whenever the tick stream restarts
+    // (time goes backwards = a new left→right render pass).
     let _axisLastMs = -1;
-    let _axisLastLabel = null;
+    let _axisSeenBuckets = null;
+    let _axisSeenLabels  = null;
 
     const chart = LWC.createChart(canvasHolder, {
       width:  canvasHolder.clientWidth  || 320,
@@ -790,22 +824,27 @@
           fixRightEdge: true,
           lockVisibleTimeRangeOnResize: true,
           tickMarkFormatter: function (time, _tickMarkType, locale) {
-            const range = _state && _state.range;
-            const label = _formatAxisTick(time, range, locale);
-            // AURIX-CHART-AXIS-2 — on 24H, suppress a repeated hour when two
-            // adjacent ticks round to the same whole hour (no "12:00 · 12:00").
-            // Ticks arrive left→right; a time going backwards starts a new render
-            // pass, so reset the dedup memory there.
-            const ms = (typeof time === 'number') ? time * 1000 : Date.parse(time);
-            if (!(ms > _axisLastMs)) _axisLastLabel = null;
+            const r  = String((_state && _state.range) || '').toLowerCase();
+            const ms = (typeof time === 'number') ? time * 1000
+                     : (time && typeof time === 'object' && time.year)
+                       ? new Date(time.year, (time.month || 1) - 1, time.day || 1).getTime()
+                       : Date.parse(time);
+            // AURIX-CHART-FINAL-UX-MICROFIX — start a fresh dedup pass when the
+            // tick stream restarts (first call, or time going backwards).
+            if (!_axisSeenBuckets || !(ms > _axisLastMs)) {
+              _axisSeenBuckets = new Set();
+              _axisSeenLabels  = new Set();
+            }
             _axisLastMs = ms;
-            // AURIX-CHART-POLISH-2 · req 5 — suppress ANY adjacent duplicate label
-            // (was 24H-only). On 7D two snapshots the same day both rounded to
-            // "5 jun"; on TOTAL adjacent ticks landed in the same month
-            // ("jun 25 · jun 25"). Blanking the repeat leaves clean, non-repeating
-            // axis guides for every range. Data is untouched (axis guide only).
-            if (label && label === _axisLastLabel) return '';
-            _axisLastLabel = label;
+            const label = _formatAxisTick(time, r, locale);
+            if (!label) return '';
+            // GLOBAL dedup (not just adjacent): one label per range bucket (even,
+            // capped spacing) AND never the same label string twice anywhere on
+            // the axis. Pure label thinning — no tick is moved or invented.
+            const bucket = _axisBucketKey(ms, r);
+            if (_axisSeenBuckets.has(bucket) || _axisSeenLabels.has(label)) return '';
+            _axisSeenBuckets.add(bucket);
+            _axisSeenLabels.add(label);
             return label;
           },
         } : {}),
