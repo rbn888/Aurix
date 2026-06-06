@@ -18069,3 +18069,28 @@ body.gs-open { overflow: hidden; }
   box-shadow: 0 0 0 3px rgba(74,130,240,0.14);
   outline: none;
 }
+/* AURIX-CONTEXTUAL-ADD-FIX-1 — asset preview card inside the contextual panels:
+   was flat grey (var(--bg-card-2)); make it Aurix dark-blue with a soft blue
+   border + glow, and frame the icon in a consistent Aurix container. Scoped to
+   these overlays so the shared .reduce-asset-info elsewhere is untouched. */
+#addOverlay .reduce-asset-info,
+#reduceOverlay .reduce-asset-info {
+  background: radial-gradient(circle at 18% 0%, rgba(42,56,92,0.40) 0%, rgba(13,18,32,0.92) 70%);
+  border: 1px solid rgba(122,162,255,0.25);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.02) inset, 0 0 28px -16px rgba(74,130,240,0.40);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+#addOverlay .reduce-asset-info .asset-badge,
+#reduceOverlay .reduce-asset-info .asset-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+  flex-shrink: 0;
+}
+#addOverlay .reduce-asset-info .asset-badge .asset-badge-logo,
+#reduceOverlay .reduce-asset-info .asset-badge .asset-badge-logo {
+  width: 66%;
+  height: 66%;
+  object-fit: contain;
+}

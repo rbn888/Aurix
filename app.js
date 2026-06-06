@@ -22212,9 +22212,26 @@ addForm.addEventListener('submit', e => {
     return;
   }
 
+  // AURIX-CONTEXTUAL-ADD-FIX-1 — record the buy through the SAME durable path as
+  // every real holdings edit (the canonical re-buy + the contextual sell): push a
+  // 'buy' transaction AND log the ledger trade. Without this the qty-only mutation
+  // did not survive: save() → recomputeDerivedFinancialState (and the holdings
+  // merge) recompute the quantity FROM the transaction ledger, so an add with no
+  // transaction reverted to the previous value on render/refresh (the reported
+  // "10 → +1 → still 10"). qty + costBasis are still updated here for the instant
+  // optimistic paint; the ledger makes it persist. Mirrors the sell handler.
+  const _buyTs    = Date.now();
+  const _buyPrice = Number.isFinite(Number(asset.price)) ? Number(asset.price) : 0;
   const addedCostNative = assetNativeValue({ ...asset, qty: amount });
   asset.costBasis = (asset.costBasis || assetNativeValue(asset)) + addedCostNative;
   asset.qty = +(asset.qty + amount).toFixed(8);
+  if (!Array.isArray(asset.transactions)) asset.transactions = [];
+  asset.transactions.push({ type: 'buy', qty: amount, price: _buyPrice, ts: _buyTs });
+  if (asset.type === 'cash') {
+    _ledgerCashFlow('deposit', asset, amount, (asset.assetCurrency || 'USD'), _buyTs, asset.source || null);
+  } else {
+    _ledgerTrade(asset, 'buy', amount, _buyPrice, _buyTs);
+  }
   const addFlashId   = asset.id;
   const addFlashType = asset.type;
   save();
