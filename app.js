@@ -11318,6 +11318,105 @@ function _aurixCleanIntradayData(data, range) {
   });
 }
 
+// ── AURIX-CHART-FINAL-FIX ────────────────────────────────────────
+// THE single validate+clean pass for the Dashboard chart series, run on EVERY
+// render path (V2 sync, snapshots, reconstructed swap, range switch, refresh /
+// polling) BEFORE anything is drawn. It NEVER mutates persisted data
+// (categoryHistory / portfolioHistory / Supabase untouched) — it only shapes
+// the in-memory series for the current render, and it NEVER smooths: points are
+// dropped or kept, never altered.
+//
+//   validateChartSeries(range, series, liveValue) →
+//     { valid, cleanedSeries, reason, droppedPoints, isPartial }
+//
+// Conservative by construction — it drops ONLY impossible / isolated
+// contamination and NEVER a real move (a deposit / big buy / real crash is a
+// SUSTAINED level change whose neighbours follow it, so it is kept):
+//   • structural    — non-finite / non-positive value or timestamp, dupes.
+//   • interior spike — a point far off the line between its two neighbours AND
+//                      far more than the neighbours' own gap → an isolated
+//                      needle that returns. Trend-safe (no neighbour-agreement
+//                      requirement, which is what let needles survive on 7D/1A).
+//   • edge          — a leading/trailing point hugely off its single neighbour
+//                      AND (live known) on the side farther from the live value
+//                      → the régime-transition anchor that slopes the whole line
+//                      (the 30D diagonal). Live-gated so boot never false-drops.
+//   • final gates   — below the per-range minimum, or a lone 2-point pair that
+//                      differs wildly (the 30D diagonal with nothing between) →
+//                      valid:false → caller shows "building", never a fake line.
+// liveValue: current investable value in base currency, or NaN/0 when not yet
+// trustworthy (then live-relative checks are skipped — conservative).
+const _AURIX_VCS = Object.freeze({
+  SPIKE_DEV:     0.40,   // interior point > 40% off its neighbours' midpoint …
+  SPIKE_VS_GAP:  2.5,    // … and > 2.5× the neighbours' own gap → isolated needle
+  EDGE_DEV:      0.50,   // leading/trailing point > 50% off its single neighbour
+  TWO_PT_INCOMP: 0.50,   // lone 2-point pair differing > 50% → diagonal artefact
+});
+function validateChartSeries(range, series, liveValue) {
+  const dropped = [];
+  const r       = String(range || '').toLowerCase();
+  const minPts  = (typeof _aurixChartMinPoints === 'function') ? _aurixChartMinPoints(r) : 2;
+  const live    = Number(liveValue);
+  const haveLive = Number.isFinite(live) && live > 0;
+
+  // 1. Structural clean — finite/positive value + finite/positive time; dedupe
+  //    by time (last write wins); sort ascending. Corrupt dates / NaN / Inf / 0
+  //    are dropped here.
+  const seen = new Map();
+  for (const p of (Array.isArray(series) ? series : [])) {
+    if (!p) continue;
+    const t = Number(p.time), v = Number(p.value);
+    if (!Number.isFinite(t) || t <= 0 || !Number.isFinite(v) || v <= 0) { dropped.push({ reason: 'structural', time: p && p.time, value: p && p.value }); continue; }
+    seen.set(t, { time: t, value: v });
+  }
+  let pts = Array.from(seen.values()).sort((a, b) => a.time - b.time);
+  if (pts.length < 2) {
+    return { valid: false, cleanedSeries: pts, reason: 'insufficient', droppedPoints: dropped, isPartial: dropped.length > 0 };
+  }
+
+  // 2. Isolated interior needle removal (trend-safe).
+  const keep = new Array(pts.length).fill(true);
+  for (let i = 1; i < pts.length - 1; i++) {
+    const a = pts[i - 1].value, b = pts[i].value, c = pts[i + 1].value;
+    const interp = (a + c) / 2;
+    if (!(interp > 0)) continue;
+    const dev = Math.abs(b - interp) / interp;
+    const gap = Math.abs(c - a) / Math.min(a, c);
+    if (dev > _AURIX_VCS.SPIKE_DEV && dev > _AURIX_VCS.SPIKE_VS_GAP * gap) {
+      keep[i] = false;
+      dropped.push({ reason: 'interior_spike', time: pts[i].time, value: pts[i].value });
+    }
+  }
+  pts = pts.filter((_, i) => keep[i]);
+
+  // 3. Contaminated endpoint removal — one leading and/or one trailing point.
+  //    Live-gated: only when we KNOW the live value can we tell which endpoint
+  //    is the contaminated (farther-from-live) side, so boot never false-drops.
+  if (haveLive && pts.length >= 3) {
+    const f = pts[0], f1 = pts[1];
+    if (Math.abs(f.value / f1.value - 1) > _AURIX_VCS.EDGE_DEV && Math.abs(f.value - live) > Math.abs(f1.value - live)) {
+      dropped.push({ reason: 'leading_edge', time: f.time, value: f.value });
+      pts = pts.slice(1);
+    }
+  }
+  if (haveLive && pts.length >= 3) {
+    const l = pts[pts.length - 1], l1 = pts[pts.length - 2];
+    if (Math.abs(l.value / l1.value - 1) > _AURIX_VCS.EDGE_DEV && Math.abs(l.value - live) > Math.abs(l1.value - live)) {
+      dropped.push({ reason: 'trailing_edge', time: l.time, value: l.value });
+      pts = pts.slice(0, -1);
+    }
+  }
+
+  // 4. Final gates.
+  if (pts.length < minPts) {
+    return { valid: false, cleanedSeries: pts, reason: 'insufficient_after_clean', droppedPoints: dropped, isPartial: true };
+  }
+  if (pts.length === 2 && Math.abs(pts[1].value / pts[0].value - 1) > _AURIX_VCS.TWO_PT_INCOMP) {
+    return { valid: false, cleanedSeries: pts, reason: 'two_point_incompatible', droppedPoints: dropped, isPartial: true };
+  }
+  return { valid: true, cleanedSeries: pts, reason: 'ok', droppedPoints: dropped, isPartial: dropped.length > 0 };
+}
+
 function _aurixDashTeardown(surface) {
   const ctrl     = surface === 'desktop' ? _aurixDashDesktop : _aurixDashMobile;
   const canvasId = surface === 'desktop' ? 'portfolioChart'  : 'portfolioChartMobile';
@@ -11508,6 +11607,23 @@ function _aurixDashSync(surface) {
     // (spec #6: PCE never swaps in an inconsistent intraday series). No-op outside
     // 24H / when nothing diverges. Display-only; nothing mutated or interpolated.
     series = _aurixChartDropDivergent(series, activeRange);
+
+    // AURIX-CHART-FINAL-FIX — single validate+clean pass for BOTH the snapshot
+    // and the reconstructed series, on EVERY range. Removes isolated needles
+    // (all ranges), a contaminated leading/trailing point (the 30D diagonal),
+    // and structural corruption; an invalid series (e.g. a lone 2-point
+    // incompatible 30D pair) collapses to [] so the gate below shows the
+    // last-good line or "building" — never a transient/contaminated frame
+    // (kills the refresh red flash + the false spikes). Live value is gated on
+    // _aurixChartDataReady so boot never false-drops endpoints.
+    {
+      const _live = _aurixChartDataReady() ? Number(investableValueBase()) : NaN;
+      const _vcs  = validateChartSeries(activeRange, series, _live);
+      series = _vcs.valid ? _vcs.cleanedSeries : [];
+      if (typeof IS_DEV !== 'undefined' && IS_DEV && _vcs.droppedPoints.length) {
+        console.debug('[chart-validate]', activeRange, _vcs.reason, '· dropped', _vcs.droppedPoints.length, _vcs.droppedPoints.map(d => d.reason));
+      }
+    }
 
     // PARTE B — pin the tail to the live Dashboard investable value (rule #4),
     // for BOTH the snapshot and reconstructed series, so whichever line is drawn
@@ -13297,6 +13413,38 @@ function updateChart(animate = false) {
   // series, so a mixed-regime snapshot can never paint a false vertical drop.
   // No-op outside 24H and when nothing diverges. Display-only; storage untouched.
   const data = _aurixCleanIntradayData(getChartData(activeRange, _investableSnapshotSource()), activeRange);
+
+  // AURIX-CHART-FINAL-FIX — validate+clean the legacy (fallback) series with the
+  // SAME pass as the V2 path. Invalid (e.g. a 30D 2-point incompatible diagonal)
+  // → empty the arrays so the gate below routes to building instead of drawing a
+  // false line; otherwise filter the parallel label/value/timestamp arrays to
+  // the cleaned points (no smoothing). Live value gated on _aurixChartDataReady.
+  if (Array.isArray(data.values) && data.values.length) {
+    const _live = _aurixChartDataReady() ? Number(investableValueBase()) : NaN;
+    const _ser  = [];
+    for (let i = 0; i < data.values.length; i++) _ser.push({ time: data.timestamps[i], value: data.values[i] });
+    const _vcs = validateChartSeries(activeRange, _ser, _live);
+    if (!_vcs.valid) {
+      // Route to the BUILDING surface via the count gate below (which also
+      // re-syncs the V2 overlay). Keep values non-empty so the "genuinely
+      // empty / add assets" branch is skipped; pointsCount 0 fails the gate →
+      // neutral "Histórico en construcción", never a false diagonal.
+      data.pointsCount = 0; data.isLowData = true;
+    } else if (_vcs.droppedPoints.length) {
+      const okTs = new Set(_vcs.cleanedSeries.map(p => p.time));
+      const li = [], vi = [], ti = [];
+      for (let i = 0; i < data.values.length; i++) {
+        if (!okTs.has(data.timestamps[i])) continue;
+        if (Array.isArray(data.labels)) li.push(data.labels[i]);
+        vi.push(data.values[i]); ti.push(data.timestamps[i]);
+      }
+      if (Array.isArray(data.labels)) data.labels = li;
+      data.values = vi; data.timestamps = ti; data.pointsCount = vi.length;
+      let _fv = null; for (const v of vi) { if (Number.isFinite(v) && v > 0) { _fv = v; break; } }
+      data.firstValue = _fv;
+      data.lastValue  = vi.length ? vi[vi.length - 1] : null;
+    }
+  }
 
   if (!data.values.length) {
     // AURIX-PWA-HISTORY-HYDRATION-1: the "add assets to see your evolution"
