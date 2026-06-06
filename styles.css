@@ -18023,9 +18023,7 @@ body.gs-open { overflow: hidden; }
 .asset-badge.stock.badge--has-logo,
 .asset-badge.etf.badge--has-logo,
 .dar-badge.stock.badge--has-logo,
-.dar-badge.etf.badge--has-logo,
-.mng-badge-inner.stock.badge--has-logo,
-.mng-badge-inner.etf.badge--has-logo {
+.dar-badge.etf.badge--has-logo {
   background: radial-gradient(circle at 50% 36%, rgba(42,56,92,0.55) 0%, rgba(15,21,37,0.92) 100%) !important;
   border: 1px solid rgba(74,130,240,0.26) !important;
   box-shadow: 0 0 0 1px rgba(8,12,22,0.45) inset !important;
@@ -18033,9 +18031,7 @@ body.gs-open { overflow: hidden; }
 .asset-badge.stock .asset-badge-logo,
 .asset-badge.etf .asset-badge-logo,
 .dar-badge.stock .asset-badge-logo,
-.dar-badge.etf .asset-badge-logo,
-.mng-badge-inner.stock .asset-badge-logo,
-.mng-badge-inner.etf .asset-badge-logo {
+.dar-badge.etf .asset-badge-logo {
   width: 66%;
   height: 66%;
   border-radius: 6px;            /* rounded-square, never a full white disc */
@@ -18069,3 +18065,84 @@ body.gs-open { overflow: hidden; }
   color: #fff;
 }
 .dar-actions .dar-manage:active { transform: scale(0.96); }
+
+/* ══════════════════════════════════════════════════════════════════
+   AURIX-ASSET-ACTION-SHEET-PREMIUM-1 — "Gestionar activo" sheet polish.
+   UI/UX only — no buy/sell/tx/delete logic, persistence, sync or calc touched.
+   Shared sheet markup (#assetManageOverlay) → applies to every asset/category,
+   web + mobile. The header badge had NO sized container, so the shared
+   buildBadgeHtml logo had no reference box and wide ETF/fund marks (SPDR,
+   iShares) blew up to their intrinsic width. Pin a fixed premium container.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 1 — Header icon: fixed, balanced container (same icon language as holdings). */
+.manage-badge {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+  border-radius: 15px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 34%, rgba(42,56,92,0.50) 0%, rgba(15,21,37,0.92) 100%);
+  border: 1px solid rgba(74,130,240,0.18);      /* very soft, not dominant */
+  box-shadow: 0 0 0 1px rgba(8,12,22,0.4) inset;
+}
+/* The inner badge just fills the container — the container is the single frame
+   (no double chip / border from the holdings rules). */
+.manage-badge .mng-badge-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+/* Logo: always CONTAINED + padded → never gigante, never cropped, never half
+   the header. Works for square (AAPL) and wide (SPDR/iShares) marks alike. */
+.manage-badge .asset-badge-logo {
+  width: 72%;
+  height: 72%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 7px;
+  padding: 0;
+}
+/* Fallback (no logo): premium initial / institutional monogram (passed by
+   openAssetManage), centered and legible. Shown ONLY when there is no logo —
+   when a logo loads, .badge--has-logo keeps the text hidden (no overlap). */
+.manage-badge .mng-badge-inner:not(.badge--has-logo) .asset-badge-text {
+  display: inline-flex;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: rgba(228,236,255,0.92);
+}
+@media (min-width: 560px) {
+  .manage-badge { width: 64px; height: 64px; flex-basis: 64px; border-radius: 16px; }
+  .manage-badge .mng-badge-inner:not(.badge--has-logo) .asset-badge-text { font-size: 17px; }
+}
+
+/* 2 — Action rows: consistent height, premium per-action icon capsules. */
+.manage-act { min-height: 48px; }
+.manage-act-ic {
+  width: 30px;
+  height: 30px;
+  flex-basis: 30px;
+  border-radius: 9px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.manage-act[data-mng-act="buy"]  .manage-act-ic { color: #5ad19a; background: rgba(63,191,127,0.14); }
+.manage-act[data-mng-act="sell"] .manage-act-ic { color: #e0a85a; background: rgba(224,168,90,0.14); }
+.manage-act[data-mng-act="tx"]   .manage-act-ic { color: rgba(200,214,240,0.92); background: rgba(255,255,255,0.07); }
+.manage-act[data-mng-act="del"]  .manage-act-ic { color: #e06a6a; background: rgba(224,90,90,0.12); }
+.manage-act--danger { color: rgba(232,150,150,0.95); }
+.manage-act:hover           { background: rgba(255,255,255,0.05); }
+.manage-act--danger:hover   { background: rgba(224,90,90,0.09); }
+.manage-act:active          { transform: scale(0.99); }

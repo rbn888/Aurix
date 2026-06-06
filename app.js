@@ -23047,7 +23047,19 @@ function openAssetManage(id) {
   _mngAssetId = id;
   const ov = document.getElementById('assetManageOverlay'); if (!ov) return;
   const $ = s => document.getElementById(s);
-  const badge = $('mngBadge'); if (badge) { try { badge.innerHTML = buildBadgeHtml(a, '', 'mng-badge-inner'); } catch (_) { badge.innerHTML = ''; } }
+  const badge = $('mngBadge');
+  if (badge) {
+    try {
+      // AURIX-ASSET-ACTION-SHEET-PREMIUM-1: premium fallback shown only when no
+      // logo loads — institutional monogram for ETFs/funds (iShares/SPDR/…),
+      // else the ticker initial. Pure presentation; reuses the shared resolver.
+      const _mt = String(a.type || '').toLowerCase();
+      const _fb = ((_mt === 'etf' || _mt === 'fund') && typeof _aurixProviderBadge === 'function')
+        ? _aurixProviderBadge(a.name, a.ticker)
+        : (String(a.ticker || a.name || '?').charAt(0) || '?').toUpperCase();
+      badge.innerHTML = buildBadgeHtml(a, escHtml(_fb), 'mng-badge-inner');
+    } catch (_) { badge.innerHTML = ''; }
+  }
   if ($('mngName'))   $('mngName').textContent   = getDisplayName(a);
   if ($('mngTicker')) $('mngTicker').textContent = a.ticker || '';
   const tx = $('mngTx'); if (tx) { tx.hidden = true; tx.innerHTML = ''; }
