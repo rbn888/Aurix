@@ -11348,9 +11348,14 @@ function getRangeAvailability(range, cleanSeries, epoch) {
     reason = available ? 'ready' : 'building_insufficient_coverage';
     recentBaseline = available && spanDays < 365;
   } else if (r === 'all') {
-    available = uniqueDays >= 5 || spanDays >= 7;
-    reason = available ? 'ready' : 'building_insufficient_coverage';
-    recentBaseline = available && spanDays < 90;
+    // AURIX-CHART-LAUNCH-QUALITY — TOTAL = ALL available valid history, NOT 30D
+    // and NOT 1A. 1 point → building; 2+ points → render from the first valid
+    // post-epoch point to now. Magnitude compatibility vs the live value is
+    // enforced separately (validateSeriesAgainstLive), so a contaminated pair
+    // still routes to building.
+    available = pointCount >= 2;
+    reason = available ? 'ready' : 'building_no_points';
+    recentBaseline = false;
   } else {
     available = pointCount >= 2;            // unknown range → permissive
     reason = available ? 'ready' : 'building_no_points';
@@ -11393,15 +11398,10 @@ function _aurixChartDataQuality(series, range) {
     shouldShowBaselineMode:  avail.available && avail.recentBaseline,
   };
 }
-function _aurixBaselineNoteText(dq) {
-  const ts = dq && (dq.coverageStart || dq.firstCleanTs);
-  if (!ts) return '';
-  const es = (typeof lang !== 'undefined' && lang === 'es');
-  let d = '';
-  try { d = new Date(ts).toLocaleDateString(es ? 'es-ES' : 'en-US', { day: 'numeric', month: 'short' }); } catch (_) {}
-  return (es ? 'Histórico disponible desde ' : 'History available since ') + d;
-}
-// Sets the small contextual note under the chart headline (desktop + mobile).
+// AURIX-CHART-LAUNCH-QUALITY-1 — the recent-baseline "Histórico disponible desde
+// …" note was removed (spec §6); the only contextual note now is the structural-
+// move hint set in _aurixDashSync. Sets the small note under the headline
+// (desktop + mobile).
 function _aurixSetChartNote(text) {
   ['chartBaselineNote', 'chartBaselineNoteMobile'].forEach(id => {
     const el = document.getElementById(id);
@@ -11892,6 +11892,95 @@ if (typeof window !== 'undefined') {
   };
 }
 
+// ── AURIX-CHART-LAUNCH-QUALITY-1 ─────────────────────────────────
+// Final pre-render compatibility gate against the live value. Blocks a series
+// whose magnitude is implausible FOR ITS OWN coverage span (the 18k/20k-vs-6.9k
+// contamination), and any mixed-regime outlier, while NEVER blocking a move that
+// is plausible for that span. When it cannot be sure it prefers BUILDING over a
+// false chart (spec §6). Display-only — never mutates or persists.
+function validateSeriesAgainstLive(range, series, liveValue) {
+  const arr = Array.isArray(series)
+    ? series.filter(p => p && Number.isFinite(p.time) && p.time > 0 && Number.isFinite(p.value) && p.value > 0)
+    : [];
+  if (arr.length < 2) return { valid: false, reason: 'too_few' };
+  if (!Number.isFinite(liveValue) || liveValue <= 0) return { valid: true, reason: 'no_live' }; // boot — cannot check, don't block
+  // Outer absolute régime band (mixed-regime contamination, any span).
+  const band = _AURIX_REGIME_BAND[String(range || '').toLowerCase()] || [0.1, 12];
+  const rlo = liveValue * band[0], rhi = liveValue * band[1];
+  for (const p of arr) { if (p.value < rlo || p.value > rhi) return { valid: false, reason: 'regime_incompatible' }; }
+  // Plausible fold for the actual span: generous (1.5×/day) so real volatility /
+  // contributions pass; tight enough that an impossible-for-the-span value fails.
+  // e.g. a ~0.3-day TOTAL baseline → fold ~1.45 → a 2.6×-of-live start is rejected.
+  const spanDays = (arr[arr.length - 1].time - arr[0].time) / 86400000;
+  const fold = 1 + 1.5 * Math.max(spanDays, 0.1);
+  const lo = liveValue / fold, hi = liveValue * fold;
+  if (arr[0].value < lo || arr[0].value > hi) return { valid: false, reason: 'headline_implausible' };
+  return { valid: true, reason: 'ok' };
+}
+// A per-range last-good line may be re-shown ONLY if it is still post-epoch,
+// passes availability AND is still compatible with the live value. Otherwise it
+// is contaminated/stale and must be discarded, never rendered as a fallback.
+function _aurixLastGoodReusable(lg, range, liveValue) {
+  if (!Array.isArray(lg) || lg.length < 2) return false;
+  const epoch = (typeof _aurixInvestableChartEpoch === 'function') ? _aurixInvestableChartEpoch() : 0;
+  if (epoch && lg.some(p => p && Number(p.time) < epoch)) return false;
+  if (!getRangeAvailability(range, lg, epoch).available) return false;
+  if (!validateSeriesAgainstLive(range, lg, liveValue).valid) return false;
+  return true;
+}
+// SINGLE visual state machine for the Dashboard chart. Returns exactly one of
+// 'loading' | 'empty' | 'building' | 'ready' (mutually exclusive) plus the series
+// to draw when ready. Both surfaces + the legacy path read this, so a range can
+// never show two states at once.
+function getDashboardChartRenderState(range) {
+  const hasAssets = Array.isArray(assets) && assets.length > 0;
+  if (!hasAssets) return { state: 'empty', series: [], isRecon: false };
+  const ready = (typeof _aurixChartDataReady === 'function') ? _aurixChartDataReady() : true;
+  const epoch = (typeof _aurixInvestableChartEpoch === 'function') ? _aurixInvestableChartEpoch() : 0;
+  const live  = ready ? Number(investableValueBase()) : NaN;
+
+  // Candidate series: snapshot, or a gated reconstruction matching (range,ccy).
+  let series = _aurixDashSeries(range);
+  let isRecon = false;
+  if (_aurixReconFlag() && _reconActive && _reconActive.range === range
+      && _reconActive.currency === (baseCurrency || 'USD')
+      && Array.isArray(_reconActive.series) && _reconActive.series.length >= 2) {
+    series = _reconActive.series; isRecon = true;
+  }
+  series = _aurixChartDropDivergent(series, range);
+  const vcs = validateChartSeries(range, series, live);
+  series = vcs.valid ? vcs.cleanedSeries : [];
+
+  // Not trustworthy yet (boot/refresh): keep a reusable last-good line, else a
+  // premium loading surface — NEVER a fresh (possibly contaminated) frame and
+  // never an empty container.
+  if (!ready) {
+    const lg = _aurixLastGoodByRange[range];
+    if (Array.isArray(lg) && lg.length >= 2) return { state: 'ready', series: _aurixChartAnchorTail(lg), isRecon: false, fromLastGood: true };
+    return { state: 'loading', series: [], isRecon: false };
+  }
+  // Holdings-transition settle window: freeze the last-good line (no teeth).
+  if (Date.now() < _aurixChartSettleUntil) {
+    const lg = _aurixLastGoodByRange[range];
+    if (Array.isArray(lg) && lg.length >= 2) return { state: 'ready', series: _aurixChartAnchorTail(lg), isRecon: false, fromLastGood: true };
+  }
+  // Ready: anchor the tail to live, then gate on availability AND live-compat.
+  if (series.length >= 2) series = _aurixChartAnchorTail(series);
+  const availOK = getRangeAvailability(range, series, epoch).available;
+  const liveOK  = validateSeriesAgainstLive(range, series, live).valid;
+  if (series.length >= 2 && availOK && liveOK) {
+    _aurixLastGoodByRange[range] = series;   // remember ONLY a fully-validated series
+    return { state: 'ready', series, isRecon };
+  }
+  // Candidate not renderable — reuse last-good only if it still passes everything.
+  const lg = _aurixLastGoodByRange[range];
+  if (_aurixLastGoodReusable(lg, range, live)) {
+    return { state: 'ready', series: _aurixChartAnchorTail(lg), isRecon: false, fromLastGood: true };
+  }
+  if (lg) delete _aurixLastGoodByRange[range];   // drop a stale/contaminated last-good
+  return { state: 'building', series: [], isRecon: false };
+}
+
 function _aurixDashSync(surface) {
   const ctrl = surface === 'desktop' ? _aurixDashDesktop : _aurixDashMobile;
   if (!ctrl) return;
@@ -11899,212 +11988,70 @@ function _aurixDashSync(surface) {
     ctrl.setRange(activeRange);
     ctrl.setCurrency(baseCurrency || 'USD');
 
-    // AURIX-PORTFOLIO-CHART-ENGINE-1 · Fase D — pick the source. Default stays
-    // the snapshot series (legacy behaviour, untouched). Only when the flag is
-    // ON *and* a gated reconstruction matches the current (range,currency) do we
-    // swap to it. The last point is re-anchored to the live total RIGHT HERE so
-    // it always equals the Hero Card, no matter how stale the cached
-    // reconstruction is. Flag OFF ⇒ this whole branch is skipped and the path
-    // below is byte-identical to before.
-    const snapSeries = _aurixDashSeries(activeRange);
-    let series  = snapSeries;
-    let isRecon = false;
-    if (_aurixReconFlag()
-        && _reconActive
-        && _reconActive.range === activeRange
-        && _reconActive.currency === (baseCurrency || 'USD')
-        && Array.isArray(_reconActive.series)
-        && _reconActive.series.length >= 2) {
-      series  = _reconActive.series;
-      isRecon = true;
-    }
-
-    // AURIX-CHART-INTRADAY-DIVERGENCE-1 — drop contaminated 24H points (absurdly
-    // divergent from the live value) for BOTH the snapshot AND the reconstructed
-    // series, so a mixed-regime point can never reach the line or the headline
-    // (spec #6: PCE never swaps in an inconsistent intraday series). No-op outside
-    // 24H / when nothing diverges. Display-only; nothing mutated or interpolated.
-    series = _aurixChartDropDivergent(series, activeRange);
-
-    // AURIX-CHART-FINAL-FIX — single validate+clean pass for BOTH the snapshot
-    // and the reconstructed series, on EVERY range. Removes isolated needles
-    // (all ranges), a contaminated leading/trailing point (the 30D diagonal),
-    // and structural corruption; an invalid series (e.g. a lone 2-point
-    // incompatible 30D pair) collapses to [] so the gate below shows the
-    // last-good line or "building" — never a transient/contaminated frame
-    // (kills the refresh red flash + the false spikes). Live value is gated on
-    // _aurixChartDataReady so boot never false-drops endpoints.
-    {
-      const _live = _aurixChartDataReady() ? Number(investableValueBase()) : NaN;
-      const _vcs  = validateChartSeries(activeRange, series, _live);
-      series = _vcs.valid ? _vcs.cleanedSeries : [];
-      if (typeof IS_DEV !== 'undefined' && IS_DEV && _vcs.droppedPoints.length) {
-        console.debug('[chart-validate]', activeRange, _vcs.reason, '· dropped', _vcs.droppedPoints.length, _vcs.droppedPoints.map(d => d.reason));
-      }
-    }
-
-    // AURIX-CHART-FINAL-FIX (flash) — NEVER paint a fresh series before the live
-    // value is trustworthy. The live-gated cleaning above (régime / endpoint) is
-    // deferred during boot/refresh, so painting now could flash a contaminated
-    // red frame before it stabilises. Show the per-range last-good line if we
-    // have one, else the loading state; the next sync (post-ready) paints clean.
-    if (!_aurixChartDataReady()) {
-      const _hasAssets = Array.isArray(assets) && assets.length > 0;
-      const _lg = _aurixLastGoodByRange[activeRange];
-      if (_hasAssets && Array.isArray(_lg) && _lg.length >= 2) {
-        try {
-          const keep = _aurixChartAnchorTail(_lg);
-          ctrl.setData(_aurixDisplaySeries(keep), { source: 'local-snapshot', currency: baseCurrency || 'USD', isSynthetic: false, completeness: 1, asOf: Date.now() });
-          _aurixReconSyncHeadline(keep);
-        } catch (_) {}
-      } else {
-        try { ctrl.setState('loading'); } catch (_) {}
-        _aurixClearChartHeadline();
-      }
-      return;
-    }
-
-    // AURIX-DASHBOARD-CHART-PREMIUM-FINAL — holdings-transition freeze. While the
-    // post-change settle window is open, keep the per-range last-good line frozen
-    // instead of drawing the transient A/B snapshots (teeth). The Hero/total are
-    // already correct; only the line waits. onPortfolioChange schedules one clean
-    // repaint after the window. Data untouched — transient points just aren't
-    // DRAWN. (Skipped if there is no last-good line yet, e.g. the first asset.)
-    if (Date.now() < _aurixChartSettleUntil) {
-      const _lgSettle = _aurixLastGoodByRange[activeRange];
-      if (Array.isArray(_lgSettle) && _lgSettle.length >= 2) {
-        try {
-          const keep = _aurixChartAnchorTail(_lgSettle);
-          ctrl.setData(_aurixDisplaySeries(keep), { source: 'local-snapshot', currency: baseCurrency || 'USD', isSynthetic: false, completeness: 1, asOf: Date.now() });
-          _aurixReconSyncHeadline(keep);
-        } catch (_) {}
-        return;
-      }
-    }
-
-    // PARTE B — pin the tail to the live Dashboard investable value (rule #4),
-    // for BOTH the snapshot and reconstructed series, so whichever line is drawn
-    // always lands exactly on the Hero figure (no deceptive endpoint drift).
-    series = _aurixChartAnchorTail(series);
-
-    // PARTE A — reliability gate. An empty series (no assets / <2 points) OR a
-    // series that fails the per-range minimum (e.g. TOTAL with <5 real points)
-    // routes to the neutral "Histórico en construcción" surface instead of a
-    // misleading line, and clears the headline so no red %/€ shows (rules #5/#7).
-    // Block 7: distinguish "no assets yet" from "has assets but history is still
-    // building" so the engine's empty surface shows the right premium copy.
-    // AURIX-CHART-INSTITUTIONAL-PHASE2 — baseline mode: with ≥2 clean points we
-    // now RENDER the recent baseline (a calm near-live line, no longer an
-    // aggressive diagonal — normalize/validate already removed contamination) and
-    // surface a "Histórico desde …" microcopy when coverage is low, instead of a
-    // big empty state. Full "Histórico en construcción" only when there are <2
-    // valid points or no assets (was: the stricter per-range count gate).
-    const _dq = _aurixChartDataQuality(series, activeRange);
-    // AURIX-CHART-RANGE-AVAILABILITY-1 (diag) — render-decision trace for the V2
-    // surface. Gated by window.AURIX_DEBUG_CHART. Answers: availability fields +
-    // final decision + which path (path:'v2').
+    // AURIX-CHART-LAUNCH-QUALITY-1 — ONE decision, ONE rendered state. The single
+    // visual state machine (loading | empty | building | ready) owns the chart,
+    // the headline and the contextual note for BOTH surfaces. No two states, no
+    // baseline "Historico desde ..." note, no legacy/V2 double-paint.
+    const decision = getDashboardChartRenderState(activeRange);
     if (typeof window !== 'undefined' && window.AURIX_DEBUG_CHART === true) {
       try {
         const _ep = (typeof _aurixInvestableChartEpoch === 'function') ? _aurixInvestableChartEpoch() : 0;
-        const _av = getRangeAvailability(activeRange, series, _ep);
-        const _hasLG = Array.isArray(_aurixLastGoodByRange[activeRange]) && _aurixLastGoodByRange[activeRange].length >= 2;
+        const _av = getRangeAvailability(activeRange, decision.series, _ep);
         console.log('[AURIX_RENDER_DECISION]', {
-          path: 'v2', activeRange,
-          available: _av.available, isBuilding: !_av.available,
-          renderMode: _av.available ? 'line' : (_hasLG ? 'reshow_last_good' : 'building'),
-          uniqueDays: _av.uniqueDays, spanDays: +Number(_av.spanDays).toFixed(3),
-          pointCount: _av.pointCount, availabilityReason: _av.reason,
-          hasLastGood: _hasLG,
+          path: 'v2', surface, activeRange, state: decision.state,
+          fromLastGood: !!decision.fromLastGood,
+          available: _av.available, uniqueDays: _av.uniqueDays,
+          spanDays: +Number(_av.spanDays).toFixed(3), pointCount: _av.pointCount,
+          availabilityReason: _av.reason,
         });
       } catch (_) {}
     }
-    if (_dq.shouldShowBuildingState) {
-      _aurixSetChartNote('');
-      const hasAssets = Array.isArray(assets) && assets.length > 0;
-      // AURIX-CHART-UX-1 #4: never replace an already-valid series with the
-      // "building" overlay. If THIS range rendered a real line this session and
-      // the portfolio still has assets, re-show that last good series (re-anchored
-      // to the live value) — a transient empty sync is a render race, not real
-      // insufficiency. Range change bypasses (stored range differs); a genuinely
-      // empty portfolio (no assets) still falls through to the empty surface.
-      const _lgSeries = _aurixLastGoodByRange[activeRange];
-      if (hasAssets && Array.isArray(_lgSeries) && _lgSeries.length >= 2) {
-        try {
-          const keep = _aurixChartAnchorTail(_lgSeries);
-          ctrl.setData(_aurixDisplaySeries(keep), { source: 'local-snapshot', currency: baseCurrency || 'USD', isSynthetic: false, completeness: 1, asOf: Date.now() });
-          try { _aurixReconSyncHeadline(keep); } catch (_) {}
-        } catch (_) {}
-        return;
-      }
-      // AURIX-CHART-LOADING-1: distinguish LOADING from BUILDING. If the portfolio
-      // has assets but the data the series depends on isn't ready yet (boot merge
-      // / first price refresh pending), show a discreet LOADING skeleton instead
-      // of prematurely declaring "Histórico en construcción". updateChart re-runs
-      // once data is ready (bootRefresh + price polling), so it converges to the
-      // line automatically without a manual refresh.
-      if (hasAssets && !_aurixChartDataReady()) {
-        try { ctrl.setState('loading'); } catch (_) {}
-        _aurixClearChartHeadline();
-        return;
-      }
-      ctrl.setData([], { emptyReason: hasAssets ? 'low_data' : 'no_assets' });
-      _aurixClearChartHeadline();
+
+    if (decision.state === 'loading') {
+      try { ctrl.setState('loading'); } catch (_) {}
+      _aurixClearChartHeadline(); _aurixSetChartNote('');
       return;
     }
-    // AURIX-CHART-UX-1 #4 / POLISH-2 req 1: this range now has a valid series —
-    // remember it PER RANGE so a later transient empty sync (or a return to this
-    // range after switching away) re-shows it instead of the building overlay.
-    _aurixLastGoodByRange[activeRange] = series;
-    // CHART-4B: derive the chart's tonal direction from the SAME source
-    // the visible dashboard performance KPI uses (legacy updateChart
-    // computes `pct = (totalValueBase() - series[0]) / series[0]`).
-    // Passing it explicitly keeps the line color in lockstep with the
-    // KPI text even when the last persisted snapshot lags slightly
-    // behind the live total.
+    if (decision.state === 'empty') {
+      ctrl.setData([], { emptyReason: 'no_assets' });
+      _aurixClearChartHeadline(); _aurixSetChartNote('');
+      return;
+    }
+    if (decision.state === 'building') {
+      ctrl.setData([], { emptyReason: 'low_data' });
+      _aurixClearChartHeadline(); _aurixSetChartNote('');
+      return;
+    }
+
+    // state === 'ready' — draw the validated series + honest headline.
+    const series = decision.series;
     let direction = null;
     try {
-      const start = Number(series[0]?.value);
+      const start = Number(series[0] && series[0].value);
       const now   = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN;
       if (Number.isFinite(start) && start > 0 && Number.isFinite(now)) {
         const pct = ((now - start) / start) * 100;
         direction = pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat';
       }
-    } catch (_) { /* leave direction null → auto first/last */ }
-
-    // AURIX-CHART-FINAL-FIX (req 5) — derive the headline KPI (chart-change %/€)
-    // from the EXACT validated + anchored series being painted, for BOTH the
-    // snapshot and the reconstructed path (was recon-only). This guarantees the
-    // chart and the KPI are computed from one and the same validated series —
-    // they can never disagree (no false metric vs a clean line).
+    } catch (_) {}
     try { _aurixReconSyncHeadline(series); } catch (_) {}
-
-    // AURIX-CHART-INSTITUTIONAL-PHASE2 — contextual note: a recent-baseline
-    // microcopy when coverage is low, else a discreet "portfolio moves" hint
-    // when the series contains a structural jump (deposit/buy/sell), so a
-    // contribution is never read as pure market performance. KPI unchanged.
+    // Contextual note: ONLY the "portfolio moves" hint on a structural jump. The
+    // recent-baseline "Historico disponible desde ..." note is removed (spec section 6).
     {
+      const _dq = _aurixChartDataQuality(series, activeRange);
       const _es = (typeof lang !== 'undefined' && lang === 'es');
-      _aurixSetChartNote(
-        _dq.shouldShowBaselineMode ? _aurixBaselineNoteText(_dq)
-        : _dq.hasStructuralJump    ? (_es ? 'Incluye movimientos de cartera' : 'Includes portfolio moves')
-        :                            ''
-      );
+      _aurixSetChartNote(_dq.hasStructuralJump ? (_es ? 'Incluye movimientos de cartera' : 'Includes portfolio moves') : '');
+      ctrl.setData(_aurixDisplaySeries(series), {
+        source:       decision.isRecon ? 'reconstructed' : 'local-snapshot',
+        currency:     baseCurrency || 'USD',
+        granularity:  decision.isRecon ? ((_reconActive && _reconActive.granularity) || '5m') : '5m',
+        isSynthetic:  false,
+        completeness: decision.isRecon ? (Number.isFinite(_reconActive && _reconActive.coverage) ? _reconActive.coverage : 1) : 1,
+        asOf:         Date.now(),
+        direction:    direction,
+        straight:     _dq.hasStructuralJump,
+      });
     }
-
-    // AURIX-DASHBOARD-CHART-PREMIUM-FINAL — draw the de-teethed display series
-    // (presentation only); the headline above used the RAW validated series, so
-    // the KPI stays honest. PHASE2: `straight` renders a structural jump as a
-    // clean step (no curve overshoot) instead of a misleading smooth rise.
-    ctrl.setData(_aurixDisplaySeries(series), {
-      source:       isRecon ? 'reconstructed' : 'local-snapshot',
-      currency:     baseCurrency || 'USD',
-      granularity:  isRecon ? (_reconActive.granularity || '5m') : '5m',
-      isSynthetic:  false,
-      completeness: isRecon ? (Number.isFinite(_reconActive.coverage) ? _reconActive.coverage : 1) : 1,
-      asOf:         Date.now(),
-      direction:    direction,
-      straight:     _dq.hasStructuralJump,
-    });
   } catch (err) {
     console.warn('[chart-v2] sync failed for', surface, err && err.message ? err.message : err);
     _aurixDashTeardown(surface);
@@ -13816,6 +13763,20 @@ function _setChartNoData(el, state) {
 
 function updateChart(animate = false) {
   if (!portfolioChart) return;
+  // AURIX-CHART-LAUNCH-QUALITY-1 — single owner. When the V2 overlay is mounted
+  // it is the SOLE owner of every visual state (loading/empty/building/ready) AND
+  // the headline; the legacy Chart.js canvas is display:none behind it. So this
+  // path must NOT paint a second state — that is what produced the duplicate /
+  // overlapping messages and the empty block. Hide the legacy #chartNoData
+  // overlay and delegate to V2. The legacy drawing below runs ONLY as a fallback
+  // when V2 failed to mount (lightweight-charts unavailable / torn down).
+  if (_aurixDashDesktop || _aurixDashMobile) {
+    try { _setChartNoData(chartNoDataEl, 'hide'); } catch (_) {}
+    try { _setChartNoData(document.getElementById('chartNoDataMobile'), 'hide'); } catch (_) {}
+    try { if (_aurixDashDesktop) _aurixDashSync('desktop'); } catch (_) {}
+    try { if (_aurixDashMobile)  _aurixDashSync('mobile'); } catch (_) {}
+    return;
+  }
   // AURIX-CHART-STABILITY-CLOSEOUT — render gate. Until boot has merged remote
   // state AND the first price refresh has settled, the live investable value
   // (and therefore the validated series + headline) is not trustworthy, so we

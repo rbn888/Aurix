@@ -636,8 +636,8 @@
     // host containers don't carry their own placeholder overlay.
     if (opts.variant === 'portfolio') {
       empty.textContent = _isLangEs()
-        ? 'Tu evolución aparecerá aquí'
-        : 'Your evolution will appear here';
+        ? 'Tu evolución aparecerá aquí cuando añadas activos.'
+        : 'Your evolution will appear here when you add assets.';
     } else {
       empty.textContent = _isLangEs() ? 'Sin datos disponibles' : 'No data available';
     }
@@ -658,6 +658,8 @@
       const es = _isLangEs();
       empty.textContent = '';
       if (reason === 'low_data') {
+        // AURIX-CHART-LAUNCH-QUALITY-1 — ONE clean building message (title + body
+        // only). No third line, no "Histórico disponible desde …", no overlap.
         empty.classList.add('aurix-chart-state--rich');
         const title = document.createElement('div');
         title.className = 'aurix-empty-title';
@@ -665,19 +667,15 @@
         const body = document.createElement('div');
         body.className = 'aurix-empty-body';
         body.textContent = es
-          ? 'Estamos generando tu histórico invertible desde el nuevo baseline.'
-          : 'We are building your investable history from the new baseline.';
-        const note = document.createElement('div');
-        note.className = 'aurix-empty-note';
-        note.textContent = es
-          ? 'Los rangos recientes estarán disponibles a medida que Aurix registre nuevos datos.'
-          : 'Recent ranges will appear as Aurix records new data.';
+          ? 'Aurix está recopilando suficientes datos para mostrar una evolución fiable.'
+          : 'Aurix is gathering enough data to show a reliable evolution.';
         empty.appendChild(title);
         empty.appendChild(body);
-        empty.appendChild(note);
       } else {
         empty.classList.remove('aurix-chart-state--rich');
-        empty.textContent = es ? 'Tu evolución aparecerá aquí' : 'Your evolution will appear here';
+        empty.textContent = es
+          ? 'Tu evolución aparecerá aquí cuando añadas activos.'
+          : 'Your evolution will appear here when you add assets.';
       }
     }
 

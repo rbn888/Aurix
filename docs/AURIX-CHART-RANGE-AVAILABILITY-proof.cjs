@@ -29,7 +29,7 @@ function getRangeAvailability(range, cleanSeries, epoch) {
   else if (r === '7d') { available = uniqueDays >= 2 || pointCount >= 4; reason = available ? 'ready' : 'building_insufficient_points'; recentBaseline = available && uniqueDays < 7; }
   else if (r === '30d') { available = uniqueDays >= 5 || spanDays >= 7; reason = available ? 'ready' : 'building_insufficient_days'; recentBaseline = available && uniqueDays < 30; }
   else if (r === '1y') { available = spanDays >= 30; reason = available ? 'ready' : 'building_insufficient_coverage'; recentBaseline = available && spanDays < 365; }
-  else if (r === 'all') { available = uniqueDays >= 5 || spanDays >= 7; reason = available ? 'ready' : 'building_insufficient_coverage'; recentBaseline = available && spanDays < 90; }
+  else if (r === 'all') { available = pointCount >= 2; reason = available ? 'ready' : 'building_no_points'; recentBaseline = false; } /* AURIX-CHART-LAUNCH-QUALITY: TOTAL = all available history */
   else { available = pointCount >= 2; reason = available ? 'ready' : 'building_no_points'; }
   return { available, reason, recentBaseline, uniqueDays, pointCount, spanDays, coverageStart, coverageEnd };
 }
@@ -55,8 +55,8 @@ console.log('\n=== CURRENT DATA: clean history only since 6-jun baseline ===');
      (() => { const a = getRangeAvailability('30d', today, EPOCH); return !a.available && a.reason === 'building_insufficient_days'; })());
   ok('1A  → BUILDING (span far below 30 days)',
      (() => { const a = getRangeAvailability('1y', today, EPOCH); return !a.available; })());
-  ok('TOTAL → BUILDING (single-day post-baseline)',
-     (() => { const a = getRangeAvailability('all', today, EPOCH); return !a.available; })());
+  ok('TOTAL → READY (all available history; 2+ points, NOT 30D/1A)',
+     (() => { const a = getRangeAvailability('all', today, EPOCH); return a.available; })());
 }
 
 console.log('\n=== 24H sufficiency ===');
@@ -89,7 +89,8 @@ console.log('\n=== 1A / TOTAL thresholds ===');
 {
   ok('1A: 20-day span → building', !getRangeAvailability('1y', daily(20), EPOCH).available);
   ok('1A: 31-day span → ready', getRangeAvailability('1y', daily(31), EPOCH).available);
-  ok('TOTAL: 3 days → building', !getRangeAvailability('all', daily(3), EPOCH).available);
+  ok('TOTAL: 1 point → building', !getRangeAvailability('all', daily(1), EPOCH).available);
+  ok('TOTAL: 2 points → ready (all available history)', getRangeAvailability('all', daily(2), EPOCH).available);
   ok('TOTAL: 5 days → ready', getRangeAvailability('all', daily(5), EPOCH).available);
 }
 
