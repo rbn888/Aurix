@@ -23098,7 +23098,13 @@ function _mngRenderTx() {
   const el = document.getElementById('mngTx'); if (!el || !a) return;
   const txs = Array.isArray(a.transactions) ? a.transactions : [];
   const cur = (a.assetCurrency || 'USD').toUpperCase();
-  if (!txs.length) { el.innerHTML = `<div class="mng-tx-empty">${escHtml(t('noTransactions'))}</div>`; return; }
+  if (!txs.length) {
+    // AURIX-ASSET-MANAGE-FLOW-1 — asset-specific empty state.
+    const _nm  = (typeof getDisplayName === 'function') ? getDisplayName(a) : (a.name || a.ticker || '');
+    const _msg = (typeof lang !== 'undefined' && lang === 'en') ? `No transactions yet for ${_nm}` : `Aún no hay transacciones para ${_nm}`;
+    el.innerHTML = `<div class="mng-tx-empty">${escHtml(_msg)}</div>`;
+    return;
+  }
   el.innerHTML = txs.slice().reverse().map(tx => {
     let date = ''; try { date = new Date(tx.ts).toLocaleDateString(lang === 'en' ? 'en-GB' : 'es-ES', { day: '2-digit', month: 'short', year: 'numeric' }); } catch (_) {}
     const isBuy  = tx.type === 'buy';
@@ -23128,7 +23134,12 @@ function _mngDelete() {
   ov.querySelector('.manage-actions')?.addEventListener('click', e => {
     const b = e.target.closest('[data-mng-act]'); if (!b) return;
     const act = b.dataset.mngAct, id = _mngAssetId;
-    if (act === 'buy')       { closeAssetManage(); openModal(); }
+    // AURIX-ASSET-MANAGE-FLOW-1 — "Comprar" must operate on THE SELECTED asset,
+    // not open the generic "Añadir activo / liquidez / euro físico" picker.
+    // Route to the existing contextual add-position flow (openInlineEdit add) —
+    // type-agnostic (crypto/stock/etf/fund/commodity/cash/gold), no picker,
+    // keeps the asset context. Sell/tx/delete were already contextual.
+    if (act === 'buy')       { closeAssetManage(); if (id) openInlineEdit(id, 'add'); }
     else if (act === 'sell') { closeAssetManage(); if (id) openReduceModal(id); }
     else if (act === 'del')  { _mngDelete(); }
     else if (act === 'tx')   {
