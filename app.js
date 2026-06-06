@@ -11351,6 +11351,13 @@ const _AURIX_VCS = Object.freeze({
   SPIKE_VS_GAP:  2.5,    // … and > 2.5× the neighbours' own gap → isolated needle
   EDGE_DEV:      0.50,   // leading/trailing point > 50% off its single neighbour
   TWO_PT_INCOMP: 0.50,   // lone 2-point pair differing > 50% → diagonal artefact
+  // NOTE: a SUSTAINED contaminated plateau (multiple points far from live ended
+  // by a cliff) is deliberately NOT auto-trimmed here — it is structurally
+  // identical to a real large move (a deposit / withdrawal / crash), so any
+  // series-only heuristic that removed it would also hide real downside, which
+  // breaks the hard rule "never block a real move". The honest elimination of
+  // that residual case is the reversible investable-epoch re-baseline
+  // (display-only; see docs/AURIX-DATA-001 §5) — NOT a render-time guess.
 });
 function validateChartSeries(range, series, liveValue) {
   const dropped = [];
@@ -11625,6 +11632,27 @@ function _aurixDashSync(surface) {
       }
     }
 
+    // AURIX-CHART-FINAL-FIX (flash) — NEVER paint a fresh series before the live
+    // value is trustworthy. The live-gated cleaning above (régime / endpoint) is
+    // deferred during boot/refresh, so painting now could flash a contaminated
+    // red frame before it stabilises. Show the per-range last-good line if we
+    // have one, else the loading state; the next sync (post-ready) paints clean.
+    if (!_aurixChartDataReady()) {
+      const _hasAssets = Array.isArray(assets) && assets.length > 0;
+      const _lg = _aurixLastGoodByRange[activeRange];
+      if (_hasAssets && Array.isArray(_lg) && _lg.length >= 2) {
+        try {
+          const keep = _aurixChartAnchorTail(_lg);
+          ctrl.setData(keep, { source: 'local-snapshot', currency: baseCurrency || 'USD', isSynthetic: false, completeness: 1, asOf: Date.now() });
+          _aurixReconSyncHeadline(keep);
+        } catch (_) {}
+      } else {
+        try { ctrl.setState('loading'); } catch (_) {}
+        _aurixClearChartHeadline();
+      }
+      return;
+    }
+
     // PARTE B — pin the tail to the live Dashboard investable value (rule #4),
     // for BOTH the snapshot and reconstructed series, so whichever line is drawn
     // always lands exactly on the Hero figure (no deceptive endpoint drift).
@@ -11688,11 +11716,12 @@ function _aurixDashSync(surface) {
       }
     } catch (_) { /* leave direction null → auto first/last */ }
 
-    // Fase D — when the reconstructed line is shown, recompute the headline KPI
-    // (chart-change %/€) from the reconstructed baseline + live total so the
-    // figure matches the line actually drawn. No-op for snapshots: the value
-    // updateChart already set stands.
-    if (isRecon) { try { _aurixReconSyncHeadline(series); } catch (_) {} }
+    // AURIX-CHART-FINAL-FIX (req 5) — derive the headline KPI (chart-change %/€)
+    // from the EXACT validated + anchored series being painted, for BOTH the
+    // snapshot and the reconstructed path (was recon-only). This guarantees the
+    // chart and the KPI are computed from one and the same validated series —
+    // they can never disagree (no false metric vs a clean line).
+    try { _aurixReconSyncHeadline(series); } catch (_) {}
 
     ctrl.setData(series, {
       source:       isRecon ? 'reconstructed' : 'local-snapshot',
