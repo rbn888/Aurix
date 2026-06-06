@@ -118,10 +118,17 @@ function _normalizeYahooChart(symbol, range, interval, raw) {
   const close    = Array.isArray(quote.close)  ? quote.close  : [];
   const volume   = Array.isArray(quote.volume) ? quote.volume : [];
 
-  // Strict ISO-4217 only — Yahoo's "GBp" (pence) and similar non-ISO
-  // codes are dropped here so we never propagate ambiguous currency.
-  const rawCurr  = (typeof meta.currency === 'string') ? meta.currency : '';
+  // AURIX-DATA-001 · F1 — London "pence" quotes (GBp / GBX) arrive in PENCE.
+  // Normalise OHLC pence→pounds (exact ÷100) and stamp the real ISO currency
+  // 'GBP' so the historical series shares the same honest scale as the realtime
+  // proxy, instead of rejecting the currency while keeping pence prices (the
+  // 100× contamination). Volume is a share count → never scaled. Real pounds
+  // quotes ("GBP", uppercase) are NOT pence and pass through unchanged.
+  let rawCurr  = (typeof meta.currency === 'string') ? meta.currency.trim() : '';
+  const _isPence = (rawCurr === 'GBp') || (rawCurr.toUpperCase() === 'GBX');
+  if (_isPence) rawCurr = 'GBP';
   const currency = /^[A-Z]{3}$/.test(rawCurr) ? rawCurr : null;
+  const _scale = _isPence ? 0.01 : 1;
 
   const points = [];
   for (let i = 0; i < tsArr.length; i++) {
@@ -130,10 +137,10 @@ function _normalizeYahooChart(symbol, range, interval, raw) {
     if (typeof ts !== 'number' || !Number.isFinite(c)) continue;
     points.push({
       time:   ts * 1000,
-      open:   Number.isFinite(open[i])   ? open[i]   : null,
-      high:   Number.isFinite(high[i])   ? high[i]   : null,
-      low:    Number.isFinite(low[i])    ? low[i]    : null,
-      close:  c,
+      open:   Number.isFinite(open[i])   ? open[i]   * _scale : null,
+      high:   Number.isFinite(high[i])   ? high[i]   * _scale : null,
+      low:    Number.isFinite(low[i])    ? low[i]    * _scale : null,
+      close:  c * _scale,
       volume: Number.isFinite(volume[i]) ? volume[i] : null,
     });
   }

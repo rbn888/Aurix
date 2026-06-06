@@ -604,13 +604,42 @@ function _mergeHistoryByTs(localArr, remoteArr) {
 }
 
 // Same as above for category snapshots (total >= 0; mirrors loadCategoryHistory).
+// AURIX-DATA-001 · F3/F4 — integrity invariant for a categoryHistory point.
+// A valid Aurix snapshot is finite, non-negative, and its `total` equals the
+// sum of its per-bucket fields (that is exactly how recordCategorySnapshot
+// builds it). This rejects ONLY impossible / internally-corrupt points —
+// NaN/Inf/negative fields, or a `total` that contradicts its own buckets
+// (e.g. a foreign-schema or feed-glitch row). It is DELIBERATELY not a
+// magnitude or regime threshold: a legitimate move of ANY size — a €100k
+// deposit, a large buy, a +50% crypto day — keeps `total === Σbuckets` and
+// stays finite, so it always passes. The consistency tolerance (max of €1 or
+// 5%) only absorbs independent toFixed(2) rounding; legitimate points sit at
+// 0% divergence, so it can never trip on a real move.
+const _AURIX_CAT_BUCKETS = ['crypto','stock','etf','fund','metal','real_estate','liquidity','other'];
+function _aurixCategoryPointValid(p) {
+  if (!p || typeof p.ts !== 'number' || !Number.isFinite(p.ts)) return false;
+  if (typeof p.total !== 'number' || !Number.isFinite(p.total) || p.total < 0) return false;
+  let sum = 0, sawBucket = false;
+  for (const k of _AURIX_CAT_BUCKETS) {
+    if (p[k] === undefined || p[k] === null) continue;   // sparse/legacy schema: skip absent buckets
+    const v = Number(p[k]);
+    if (!Number.isFinite(v) || v < 0) return false;       // impossible bucket → reject
+    sum += v; sawBucket = true;
+  }
+  if (sawBucket && Math.abs(p.total - sum) > Math.max(1, p.total * 0.05)) return false; // total contradicts its buckets
+  return true;
+}
+
 function _mergeCategoryByTs(localArr, remoteArr) {
   const all = []
     .concat(Array.isArray(localArr)  ? localArr  : [])
     .concat(Array.isArray(remoteArr) ? remoteArr : []);
-  const valid = all.filter(p =>
-    p && typeof p.ts === 'number' &&
-    typeof p.total === 'number' && isFinite(p.total) && p.total >= 0);
+  // AURIX-DATA-001 · F3 — reject corrupt / foreign-schema points at the merge
+  // boundary (was: total finite ≥ 0 only, which let NaN/Inf buckets and rows
+  // whose total contradicts their buckets through). Pure integrity invariant —
+  // never a magnitude/regime threshold, so a legitimate remote point of any
+  // size whose total === Σbuckets always survives.
+  const valid = all.filter(_aurixCategoryPointValid);
   const deduped = Object.values(valid.reduce((acc, p) => { acc[p.ts] = p; return acc; }, {}));
   return _aurixFilterAfterEpoch(deduped.sort((a, b) => a.ts - b.ts), 'ts');
 }
@@ -4865,6 +4894,19 @@ function recordCategorySnapshot() {
     liquidity:   +buckets.liquidity.toFixed(2),
     other:       +buckets.other.toFixed(2),
   };
+
+  // AURIX-DATA-001 · F4 — capture-time integrity guard. Refuse to persist a
+  // point that is impossible (non-finite total/bucket, or a total that does not
+  // equal the sum of its buckets). By construction the point above is always
+  // valid, so this NEVER blocks a legitimate move — a deposit, a big buy or a
+  // +50% crypto day all stay finite and internally consistent and pass. It is a
+  // backstop so a FUTURE upstream regression (bad price, new asset type, FX
+  // edge) can never immortalise a corrupt point into 30D / 1A / TOTAL history.
+  // There is deliberately no magnitude limit, so real volatility is never hidden.
+  if (!_aurixCategoryPointValid(newPoint)) {
+    if (IS_DEV) console.warn('[AURIX-DATA-001/F4] rejected impossible snapshot point', newPoint);
+    return;
+  }
 
   // 5-second upsert mirrors portfolioHistory so the two series stay
   // perfectly aligned timestamp-for-timestamp.

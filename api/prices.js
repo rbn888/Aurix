@@ -240,7 +240,7 @@ async function fetchYahoo(items) {
         }
 
         const meta  = data?.chart?.result?.[0]?.meta;
-        const price = meta?.regularMarketPrice;
+        let   price = meta?.regularMarketPrice;
         if (!Number.isFinite(price)) throw new Error(`Yahoo no price for ${symbol}`);
 
         const prev = Number.isFinite(meta.chartPreviousClose) ? meta.chartPreviousClose
@@ -248,12 +248,19 @@ async function fetchYahoo(items) {
                    : null;
         const change24h = (prev && prev > 0) ? ((price - prev) / prev) * 100 : null;
 
-        // MC-6D: surface Yahoo meta.currency upstream so the snapshot
-        // handler can stamp the real quote currency on each PriceObject.
-        // Only ISO-4217 uppercase 3-letter codes are accepted — Yahoo's
-        // pence form "GBp" (price in pence, not pounds) is rejected to
-        // avoid FX 100×-scaling traps downstream.
-        const rawCurr = (meta && typeof meta.currency === 'string') ? meta.currency : '';
+        // MC-6D / AURIX-DATA-001 · F1 — surface Yahoo meta.currency upstream so
+        // the snapshot handler can stamp the real quote currency on each
+        // PriceObject. London "pence" quotes (GBp / GBX) arrive in PENCE, not
+        // pounds: the old code rejected the currency (→ null → 'USD' downstream)
+        // while KEEPING the pence price, valuing a £95 holding as $9,500 (the
+        // 100× contamination root cause). Normalise pence→pounds (exact ÷100)
+        // AND stamp the real ISO currency 'GBP', so the value is correct and
+        // downstream FX is honest. change24h is a percentage (scale-invariant),
+        // computed above and untouched. Real pounds quotes ("GBP", uppercase)
+        // are NOT pence and pass through unchanged.
+        let rawCurr = (meta && typeof meta.currency === 'string') ? meta.currency.trim() : '';
+        const _isPence = (rawCurr === 'GBp') || (rawCurr.toUpperCase() === 'GBX');
+        if (_isPence) { price = price / 100; rawCurr = 'GBP'; }
         const currency = /^[A-Z]{3}$/.test(rawCurr) ? rawCurr : null;
 
         return { provider, price, change24h, currency };
