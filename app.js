@@ -11211,11 +11211,20 @@ function auditChartSeries(series, range) {
       }
     }
     const first = arr.find(p => p && p.value > 0);
+    // PHASE2 data-quality snapshot so the failure-report protocol has the exact
+    // fields the QA checklist asks for (coverage/jump/baseline/building decisions).
+    let dq = null;
+    try { if (typeof _aurixChartDataQuality === 'function') dq = _aurixChartDataQuality(arr, range); } catch (_) {}
     console.log('[AURIX_DEBUG_CHART]', range, {
       points: arr.length, dupTs, outOfOrder, nonPos, transientReversions: reversions,
       firstValue: first && first.value, lastValue: arr.length ? arr[arr.length - 1].value : null,
       liveValue: live,
       headlineVsTotalPct: (first && first.value > 0 && Number.isFinite(live)) ? +(((live - first.value) / first.value) * 100).toFixed(2) : null,
+      validPointCount: dq ? dq.validPointCount : null,
+      coverageRatio: dq ? +Number(dq.coverageRatio).toFixed(3) : null,
+      hasStructuralJump: dq ? dq.hasStructuralJump : null,
+      shouldShowBaselineMode: dq ? dq.shouldShowBaselineMode : null,
+      shouldShowBuildingState: dq ? dq.shouldShowBuildingState : null,
     });
   } catch (_) {}
 }
