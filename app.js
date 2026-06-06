@@ -3849,8 +3849,6 @@ let lastSnapshotMs   = 0;
 let lastRefreshAt    = null;   // timestamp of last successful price refresh
 let activeRange      = '24h';
 let activePerfMode   = '%';    // '%' = percentage change | 'curr' = absolute gain/loss in base currency
-let _inlineEditId    = null;   // id of asset currently open in inline edit strip
-let _inlineEditMode  = null;   // 'add' | 'reduce'
 let portfolioChart   = null;
 let portfolioChartMobile = null;  // mobile slider instance — null on desktop
 // CHART-4: Aurix V2 dashboard overlay controllers, one per surface.
@@ -19438,10 +19436,6 @@ function render(animate = false) {
     }
   }
 
-  // Reset inline edit state before clearing DOM (elements are about to be destroyed)
-  _inlineEditId  = null;
-  _inlineEditMode = null;
-
   // Clear list (keep empty state node)
   while (assetsListEl.firstChild) {
     assetsListEl.removeChild(assetsListEl.firstChild);
@@ -19665,18 +19659,6 @@ function render(animate = false) {
           ${categoryValue > 0 ? `<span class="dar-cat-pct"><span class="dar-metric-label">${t('darWeightLabel')}: </span>${((valueBase / categoryValue) * 100).toFixed(1)}%</span>` : ''}
           ${darChangeHtml}
           <div class="dar-actions">${darActionsHtml}</div>
-        </div>
-        <div class="asset-edit-strip dar-strip" id="aes-${asset.id}">
-          <div class="aes-body">
-            <div class="aes-row">
-              <span class="aes-label"></span>
-              <input class="aes-qty-input" type="text" inputmode="decimal" placeholder="0" data-id="${asset.id}" />
-              <span class="aes-preview"></span>
-              <button class="aes-confirm-btn" data-id="${asset.id}">✓</button>
-              <button class="aes-cancel-btn">✕</button>
-            </div>
-            <div class="aes-error"></div>
-          </div>
         </div>`;
       if (animate) {
         row.style.setProperty('--card-i', cardIndex);
@@ -19705,18 +19687,6 @@ function render(animate = false) {
       </div>
       <div class="asset-actions">
         ${actionsHtml}
-      </div>
-      <div class="asset-edit-strip" id="aes-${asset.id}">
-        <div class="aes-body">
-          <div class="aes-row">
-            <span class="aes-label"></span>
-            <input class="aes-qty-input" type="text" inputmode="decimal" placeholder="0" data-id="${asset.id}" />
-            <span class="aes-preview"></span>
-            <button class="aes-confirm-btn" data-id="${asset.id}">✓</button>
-            <button class="aes-cancel-btn">✕</button>
-          </div>
-          <div class="aes-error"></div>
-        </div>
       </div>
     `;
     if (animate) card.style.setProperty('--card-i', cardIndex);
@@ -22305,149 +22275,6 @@ function openEditRealEstateModal(id) {
   qtyInput.dispatchEvent(new Event('input'));
 }
 
-// ── Inline edit strip ──────────────────────────────────────
-function openInlineEdit(id, mode) {
-  if (_inlineEditId && _inlineEditId !== id) closeInlineEdit();
-
-  const asset = assets.find(a => a.id === id);
-  if (!asset) return;
-
-  _inlineEditId   = id;
-  _inlineEditMode = mode;
-
-  const strip = document.getElementById(`aes-${id}`);
-  if (!strip) return;
-
-  const isCash = asset.type === 'cash';
-  const isGold = asset.ticker === 'XAU' && asset.karat;
-  const assetCurr = (asset.assetCurrency || 'USD').toUpperCase();
-
-  const currentQtyStr = isCash
-    ? formatCurrency(asset.qty, assetCurr)
-    : isGold
-      ? `${formatQty(asset.qty)} ${asset.goldUnit || 'g'}`
-      : `${formatQty(asset.qty)} ${t('units')}`;
-
-  const labelEl   = strip.querySelector('.aes-label');
-  const inputEl   = strip.querySelector('.aes-qty-input');
-  const previewEl = strip.querySelector('.aes-preview');
-  const errorEl   = strip.querySelector('.aes-error');
-
-  if (labelEl)   labelEl.textContent   = `${mode === 'add' ? t('btnAdd') : t('btnReduce')}: ${currentQtyStr}`;
-  if (inputEl)   { inputEl.value = ''; }
-  if (previewEl) previewEl.textContent = '';
-  if (errorEl)   errorEl.textContent   = '';
-
-  strip.closest('.asset-card, .detail-asset-row')?.classList.add('card--editing');
-  strip.classList.add('aes-open');
-
-  setTimeout(() => inputEl?.focus(), 180);
-}
-
-function closeInlineEdit() {
-  if (!_inlineEditId) return;
-  const strip = document.getElementById(`aes-${_inlineEditId}`);
-  if (strip) {
-    strip.classList.remove('aes-open');
-    strip.closest('.asset-card, .detail-asset-row')?.classList.remove('card--editing');
-  }
-  _inlineEditId   = null;
-  _inlineEditMode = null;
-}
-
-function updateInlinePreview(id) {
-  const asset = assets.find(a => a.id === id);
-  if (!asset) return;
-  const strip = document.getElementById(`aes-${id}`);
-  if (!strip) return;
-
-  const inputEl   = strip.querySelector('.aes-qty-input');
-  const previewEl = strip.querySelector('.aes-preview');
-  const errorEl   = strip.querySelector('.aes-error');
-  if (!inputEl || !previewEl) return;
-
-  const isCash    = asset.type === 'cash';
-  const isGold    = asset.ticker === 'XAU' && asset.karat;
-  const assetCurr = (asset.assetCurrency || 'USD').toUpperCase();
-  const amount    = parseLocalFloat(inputEl.value) || 0;
-  errorEl.textContent = '';
-
-  if (amount <= 0) { previewEl.textContent = ''; return; }
-
-  let newQty;
-  if (_inlineEditMode === 'add') {
-    newQty = asset.qty + amount;
-  } else {
-    const maxStr = isGold ? `${formatQty(asset.qty)} ${asset.goldUnit || 'g'}` : formatQty(asset.qty);
-    if (amount > asset.qty) {
-      errorEl.textContent = t('cantExceed')(maxStr);
-      previewEl.textContent = '';
-      return;
-    }
-    newQty = asset.qty - amount;
-  }
-
-  const newValueBase = toBase(assetNativeValue({ ...asset, qty: newQty }), assetCurr);
-  const newQtyStr    = isCash
-    ? formatCurrency(newQty, assetCurr)
-    : isGold
-      ? `${formatQty(newQty)} ${asset.goldUnit || 'g'}`
-      : `${formatQty(newQty)} ${t('units')}`;
-
-  previewEl.textContent = `→ ${newQtyStr} · ${formatBase(newValueBase)}`;
-  previewEl.classList.toggle('aes-preview--remove', _inlineEditMode === 'reduce' && newQty === 0);
-}
-
-function applyInlineEdit(id) {
-  const asset = assets.find(a => a.id === id);
-  if (!asset) return;
-  const strip = document.getElementById(`aes-${id}`);
-  if (!strip) return;
-
-  const inputEl = strip.querySelector('.aes-qty-input');
-  const errorEl = strip.querySelector('.aes-error');
-  const amount  = parseLocalFloat(inputEl.value);
-
-  if (isNaN(amount) || amount <= 0) {
-    errorEl.textContent = t('errQtyGtZero');
-    inputEl.classList.add('aes-shake');
-    setTimeout(() => inputEl.classList.remove('aes-shake'), 500);
-    return;
-  }
-
-  let inlineWasRemoved = false;
-  if (_inlineEditMode === 'reduce') {
-    const isGold = asset.ticker === 'XAU' && asset.karat;
-    if (amount > asset.qty) {
-      errorEl.textContent = t('cantExceed')(isGold ? `${formatQty(asset.qty)} ${asset.goldUnit || 'g'}` : formatQty(asset.qty));
-      inputEl.classList.add('aes-shake');
-      setTimeout(() => inputEl.classList.remove('aes-shake'), 500);
-      return;
-    }
-    const remaining = asset.qty - amount;
-    if (remaining === 0) {
-      inlineWasRemoved = true;
-      assets = assets.filter(a => a.id !== id);
-    } else {
-      if (asset.costBasis && asset.qty > 0) asset.costBasis *= remaining / asset.qty;
-      asset.qty = remaining;
-    }
-  } else {
-    const inlineAddedCost = assetNativeValue({ ...asset, qty: amount });
-    asset.costBasis = (asset.costBasis || assetNativeValue(asset)) + inlineAddedCost;
-    asset.qty += amount;
-  }
-
-  const inlineType = asset.type;
-  closeInlineEdit();
-  _persistEmptyPortfolioIfNeeded('inline-reduce');
-  save();
-  render(true);
-  if (!inlineWasRemoved) _flashAssetCard(id);
-  _flashCategoryCard(inlineType);
-  onPortfolioChange(true);
-}
-
 // ── Delete / Reduce / Add click dispatcher ─────────────────
 assetsListEl.addEventListener('click', e => {
   const mngBtn = e.target.closest('.dar-manage');
@@ -22465,17 +22292,10 @@ assetsListEl.addEventListener('click', e => {
   const reduceBtn = e.target.closest('.btn-reduce');
   if (reduceBtn) { openReduceModal(reduceBtn.dataset.id); return; }
 
-  const confirmBtn = e.target.closest('.aes-confirm-btn');
-  if (confirmBtn) { applyInlineEdit(confirmBtn.dataset.id); return; }
-
-  const cancelBtn = e.target.closest('.aes-cancel-btn');
-  if (cancelBtn) { closeInlineEdit(); return; }
-
   const deleteBtn = e.target.closest('.btn-delete');
   if (deleteBtn) {
     const delId   = deleteBtn.dataset.id;
     const delType = assets.find(a => a.id === delId)?.type;
-    if (_inlineEditId === delId) closeInlineEdit();
 
     const delCard = assetsListEl.querySelector(`[data-asset-id="${delId}"]`);
     if (delCard && !reducedMotion) {
@@ -22496,24 +22316,6 @@ assetsListEl.addEventListener('click', e => {
       _flashCategoryCard(delType);
       onPortfolioChange(true);
     }
-  }
-});
-
-// Live preview as the user types in the inline input
-assetsListEl.addEventListener('input', e => {
-  const inputEl = e.target.closest('.aes-qty-input');
-  if (inputEl) updateInlinePreview(inputEl.dataset.id);
-});
-
-// Confirm on Enter, dismiss on Escape in inline input
-assetsListEl.addEventListener('keydown', e => {
-  if (!e.target.closest('.asset-edit-strip')) return;
-  if (e.key === 'Enter') {
-    const inputEl = e.target.closest('.aes-qty-input');
-    if (inputEl) { e.preventDefault(); applyInlineEdit(inputEl.dataset.id); }
-  } else if (e.key === 'Escape') {
-    e.preventDefault();
-    closeInlineEdit();
   }
 });
 
