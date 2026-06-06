@@ -44,7 +44,15 @@
   function _fx()      { try { return (typeof usdToEur !== 'undefined' && usdToEur) ? usdToEur : 1; } catch (_) { return 1; } }
   function _valUSD(a) { try { return (typeof assetValueUSD === 'function') ? (Number(assetValueUSD(a)) || 0) : 0; } catch (_) { return 0; } }
   function _toBaseAmt(amount, cur) { try { return (typeof toBase === 'function') ? toBase(amount, cur || 'USD') : amount; } catch (_) { return amount; } }
-  function _toUSD(amount, cur) { return (String(cur || 'USD').toUpperCase() === 'USD') ? amount : amount / _fx(); }
+  // AURIX-DATA-001 (F2-cost) — multi-FX. USD/EUR byte-identical (EUR via _fx());
+  // GBP/CHF/JPY via the app FX engine (_aurixFxRate); unknown ccy → NaN (uncovered).
+  function _toUSD(amount, cur) {
+    var c = String(cur || 'USD').toUpperCase();
+    if (c === 'USD') return amount;
+    if (c === 'EUR') return amount / _fx();
+    try { if (typeof _aurixFxRate === 'function') { var r = _aurixFxRate(c); if (Number.isFinite(r)) return amount * r; } } catch (_) {}
+    return NaN;
+  }
   function _now() { try { return Date.now(); } catch (_) { return 0; } }
 
   // Stable hash → deterministic ids so a re-run of the backfill never dups.

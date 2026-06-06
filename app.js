@@ -4612,6 +4612,29 @@ function assetValueUSD(asset) {
   return Number.isFinite(rate) ? native * rate : NaN;
 }
 
+// AURIX-DATA-001 (F2-cost) — cost basis & realized P&L in USD, via the SAME
+// multi-FX engine as assetValueUSD. `costBasis` / `realizedPnL` are stored in the
+// asset's NATIVE currency; comparing them against a USD value produced a phantom
+// P&L for any non-USD holding (e.g. a GBP position with a flat price showed
+// +27%). USD untouched; EUR pinned to usdToEur (byte-identical); GBP/CHF/JPY via
+// _aurixFxRate; unknown currency → NaN (uncovered, never assume EUR). Callers
+// skip NaN so one exotic currency can never NaN-poison an aggregate.
+function _nativeToUSD(amount, currency) {
+  const c = (currency || 'USD').toUpperCase();
+  if (c === 'USD') return amount;
+  if (c === 'EUR') return amount / usdToEur;
+  const r = _aurixFxRate(c);
+  return Number.isFinite(r) ? amount * r : NaN;
+}
+function costBasisUSD(asset) {
+  const v = Number(asset && asset.costBasis);
+  return Number.isFinite(v) ? _nativeToUSD(v, asset && asset.assetCurrency) : 0;
+}
+function realizedPnLUSD(asset) {
+  const v = Number(asset && asset.realizedPnL);
+  return Number.isFinite(v) ? _nativeToUSD(v, asset && asset.assetCurrency) : 0;
+}
+
 // ── AURIX-CLOSED-POSITIONS-1 · position lifecycle ──────────────────────────
 // A fully-sold position is NEVER deleted — it transitions to 'closed' (qty 0)
 // so its transaction history and realizedPnL survive for Wealth Evolution /
@@ -5778,9 +5801,15 @@ function recomputeDerivedFinancialState(source = 'unknown') {
       // circuit, gold karat purity, EUR→USD conversion in one place).
       // Raw qty*price would understate EUR cash by ~8.7% in totalValue
       // since the LIQ-1 fix stores new cash with price = 1.
-      totalValue       += assetValueUSD(asset);
-      totalCostBasis   += Number(asset.costBasis   || 0);
-      totalRealizedPnL += Number(asset.realizedPnL || 0);
+      // AURIX-DATA-001 (F2-cost) — value AND cost/realized all in USD, each
+      // guarded so an uncovered-FX asset can't NaN-poison the aggregate (covered
+      // portion only, never invented). USD/EUR portfolios stay byte-identical.
+      const _vUSD  = assetValueUSD(asset);
+      const _cbUSD = costBasisUSD(asset);
+      const _rpUSD = realizedPnLUSD(asset);
+      if (Number.isFinite(_vUSD))  totalValue       += _vUSD;
+      if (Number.isFinite(_cbUSD)) totalCostBasis   += _cbUSD;
+      if (Number.isFinite(_rpUSD)) totalRealizedPnL += _rpUSD;
     }
     // Aggregate P&L: unrealized = open-position MtM gain; realized = locked
     // gain from prior partial sells (persisted on the asset record).
@@ -7314,9 +7343,13 @@ function _aw8PortfolioUnrealizedTotal() {
   let pnl = 0, cost = 0;
   for (const a of assets) {
     if (!a || !a.costBasis || a.costBasis <= 0) continue;
-    cost += Number(a.costBasis) || 0;
-    const val = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : (Number(a.qty || 0) * Number(a.price || 0));
-    pnl += val - Number(a.costBasis);
+    // AURIX-DATA-001 (F2-cost) — compare USD value against USD cost basis (was
+    // native cost vs USD value → phantom P&L). Uncovered FX → skip, never a phantom.
+    const val   = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : (Number(a.qty || 0) * Number(a.price || 0));
+    const cbUSD = (typeof costBasisUSD === 'function') ? costBasisUSD(a) : Number(a.costBasis) || 0;
+    if (!Number.isFinite(val) || !Number.isFinite(cbUSD)) continue;
+    cost += cbUSD;
+    pnl  += val - cbUSD;
   }
   return { pnl, cost };
 }
@@ -7441,15 +7474,19 @@ const _AW8_FINANCIAL_FUNCTIONS = Object.freeze({
     if (args.length !== 1 || args[0].type !== 'str') throw new _AwEvalError('#ERROR');
     const a = _aw8AssetByTicker(args[0].value);
     if (!a || !a.costBasis || a.costBasis <= 0) return 0;
-    const val = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : (Number(a.qty || 0) * Number(a.price || 0));
-    return val - Number(a.costBasis);
+    const val   = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : (Number(a.qty || 0) * Number(a.price || 0));
+    const cbUSD = (typeof costBasisUSD === 'function') ? costBasisUSD(a) : Number(a.costBasis) || 0;  // AURIX-DATA-001 (F2-cost)
+    if (!Number.isFinite(val) || !Number.isFinite(cbUSD)) return 0;
+    return val - cbUSD;
   },
   'ASSET.PNL_PCT'(args) {
     if (args.length !== 1 || args[0].type !== 'str') throw new _AwEvalError('#ERROR');
     const a = _aw8AssetByTicker(args[0].value);
     if (!a || !a.costBasis || a.costBasis <= 0) return 0;
-    const val = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : (Number(a.qty || 0) * Number(a.price || 0));
-    return ((val - Number(a.costBasis)) / Number(a.costBasis)) * 100;
+    const val   = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : (Number(a.qty || 0) * Number(a.price || 0));
+    const cbUSD = (typeof costBasisUSD === 'function') ? costBasisUSD(a) : Number(a.costBasis) || 0;  // AURIX-DATA-001 (F2-cost)
+    if (!Number.isFinite(val) || !Number.isFinite(cbUSD) || cbUSD <= 0) return 0;
+    return ((val - cbUSD) / cbUSD) * 100;
   },
   // PR-8C: portfolio-wide unrealized aggregates. PORTFOLIO.UNREALIZED is an
   // explicit alias for PORTFOLIO.PNL — same number, separate name for users
@@ -12173,8 +12210,11 @@ function _aurixReconRefresh() {
   const fxToBase = function (ccy) {
     const c = String(ccy || '').toUpperCase();
     if (c === baseC) return 1;
-    if (c === 'USD' || c === 'EUR') return toBase(1, c);   // only USD/EUR known today
-    return null;                                           // unknown ⇒ uncovered, never guess
+    // AURIX-DATA-001 (F2-D) — multi-FX via the same engine as the live value
+    // (USD/EUR/GBP/CHF/JPY). Unknown ⇒ NaN ⇒ null (uncovered, never guess EUR),
+    // so the reconstruction no longer silently drops a GBP/CHF/JPY holding.
+    const r = (typeof toBase === 'function') ? toBase(1, c) : NaN;
+    return Number.isFinite(r) ? r : null;
   };
   const currentValueOf = function (a) { try { return toBase(assetValueUSD(a), 'USD'); } catch (_) { return 0; } };
   let cashEvents = [];

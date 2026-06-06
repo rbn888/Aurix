@@ -54,8 +54,15 @@
     try { return (typeof toBase === 'function') ? toBase(usd, 'USD') : usd; } catch (_) { return usd; }
   }
   // Convert an amount in its own currency to USD (mirrors assetValueUSD's logic).
+  // AURIX-DATA-001 (F2-cost) — multi-FX. USD/EUR byte-identical (EUR via _fx());
+  // GBP/CHF/JPY via the app FX engine (_aurixFxRate, USD per unit); unknown
+  // currency → NaN (uncovered, never assume EUR).
   function _toUSD(amount, cur) {
-    return (String(cur || 'USD').toUpperCase() === 'USD') ? amount : amount / _fx();
+    var c = String(cur || 'USD').toUpperCase();
+    if (c === 'USD') return amount;
+    if (c === 'EUR') return amount / _fx();
+    try { if (typeof _aurixFxRate === 'function') { var r = _aurixFxRate(c); if (Number.isFinite(r)) return amount * r; } } catch (_) {}
+    return NaN;
   }
 
   // Asset-type rules. Cash + real estate are excluded from cost basis / PnL.
