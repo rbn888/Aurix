@@ -11145,6 +11145,81 @@ function _aurixDashMountWhenReady(surface) {
 // own visualNormalization is intentionally disabled at mount time
 // (see _aurixDashMount) so neither side smooths data the other does
 // not. portfolioHistory itself is never mutated.
+// ── AURIX-DASHBOARD-CHART-INSTITUTIONAL-1 ────────────────────────
+// Display-only chart-series normalization. RAW snapshots / categoryHistory /
+// portfolioHistory are NEVER mutated or persisted — this only shapes the
+// in-memory series the chart + headline read (both go through _aurixDashSeries,
+// so the line and the % can never diverge). Two protections:
+//   • collapse near-duplicate-time points (per-range pixel bucket, last wins)
+//     so clustered snapshots never stack into a vertical "spike";
+//   • drop legacy/contaminated points grossly incompatible with the live value
+//     (the reported 18–20k legacy points that paint a false -62% next to a real
+//     ~7k portfolio). Bands are wide enough that ordinary volatility and
+//     realistic moves are NEVER touched; long ranges (where large real growth is
+//     normal) stay very loose, so a real gain/loss is never hidden. If too few
+//     compatible points remain → report invalid so the caller shows the neutral
+//     "Histórico en construcción" surface instead of a false drop.
+const _AURIX_REGIME_BAND = Object.freeze({
+  '24h': [0.6, 1.5], '7d': [0.5, 2.2], '30d': [0.4, 2.5], '1y': [0.15, 8], 'all': [0.1, 12],
+});
+const _AURIX_BUCKET_MS = Object.freeze({
+  '24h': 5 * 60000, '7d': 60 * 60000, '30d': 6 * 60 * 60000, '1y': 86400000, 'all': 86400000,
+});
+function normalizeChartRawSeries(series, opts) {
+  const o = opts || {};
+  const r = String(o.range || '').toLowerCase();
+  const minPts   = (typeof _aurixChartMinPoints === 'function') ? _aurixChartMinPoints(r) : 2;
+  const bucketMs = _AURIX_BUCKET_MS[r] || 86400000;
+  const byBucket = new Map();
+  for (const p of (Array.isArray(series) ? series : [])) {
+    const t = Number(p && p.time), v = Number(p && p.value);
+    if (!Number.isFinite(t) || t <= 0 || !Number.isFinite(v) || v <= 0) continue;
+    byBucket.set(Math.floor(t / bucketMs), { time: t, value: v });   // last per pixel-bucket wins
+  }
+  let pts = Array.from(byBucket.values()).sort((a, b) => a.time - b.time);
+  let droppedRegime = 0;
+  if (pts.length < 2) return { series: pts, valid: false, reason: 'insufficient', droppedRegime };
+  const live = Number(o.liveValue);
+  if (Number.isFinite(live) && live > 0) {
+    const band = _AURIX_REGIME_BAND[r] || [0.1, 12];
+    const lo = live * band[0], hi = live * band[1];
+    const clean = pts.filter(p => p.value >= lo && p.value <= hi);
+    droppedRegime = pts.length - clean.length;
+    if (droppedRegime > 0) {
+      if (clean.length < minPts) return { series: clean, valid: false, reason: 'regime_incompatible', droppedRegime };
+      pts = clean;
+    }
+  }
+  return { series: pts, valid: true, reason: 'ok', droppedRegime };
+}
+// Non-intrusive diagnostic — only logs when window.AURIX_DEBUG_CHART === true.
+function auditChartSeries(series, range) {
+  if (typeof window === 'undefined' || window.AURIX_DEBUG_CHART !== true) return;
+  try {
+    const arr = Array.isArray(series) ? series : [];
+    const live = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN;
+    let dupTs = 0, outOfOrder = 0, nonPos = 0, reversions = 0, lastT = -Infinity;
+    const seenT = new Set();
+    for (let i = 0; i < arr.length; i++) {
+      const t = Number(arr[i] && arr[i].time), v = Number(arr[i] && arr[i].value);
+      if (seenT.has(t)) dupTs++; seenT.add(t);
+      if (t < lastT) outOfOrder++; lastT = t;
+      if (!(v > 0)) nonPos++;
+      if (i > 0 && i < arr.length - 1) {
+        const a = Number(arr[i - 1].value), c = Number(arr[i + 1].value);
+        if (a > 0 && c > 0 && Math.abs(v / a - 1) > 0.1 && Math.abs(c / a - 1) < 0.03) reversions++;
+      }
+    }
+    const first = arr.find(p => p && p.value > 0);
+    console.log('[AURIX_DEBUG_CHART]', range, {
+      points: arr.length, dupTs, outOfOrder, nonPos, transientReversions: reversions,
+      firstValue: first && first.value, lastValue: arr.length ? arr[arr.length - 1].value : null,
+      liveValue: live,
+      headlineVsTotalPct: (first && first.value > 0 && Number.isFinite(live)) ? +(((live - first.value) / first.value) * 100).toFixed(2) : null,
+    });
+  } catch (_) {}
+}
+
 function _aurixDashSeries(range) {
   // AURIX-INVESTABLE-WEALTH-1 — Dashboard chart = investable wealth (excludes
   // real estate), derived from categoryHistory. Snapshots remain the fallback.
@@ -11157,7 +11232,13 @@ function _aurixDashSeries(range) {
   for (let i = 0; i < values.length; i++) {
     out[i] = { time: timestamps[i], value: values[i] };
   }
-  return out;
+  // AURIX-DASHBOARD-CHART-INSTITUTIONAL-1 — normalize at this single source so
+  // both surfaces AND the headline read one coherent, de-contaminated series.
+  const live = (typeof _aurixChartDataReady === 'function' && _aurixChartDataReady() && typeof investableValueBase === 'function')
+    ? Number(investableValueBase()) : NaN;
+  auditChartSeries(out, range);
+  const norm = normalizeChartRawSeries(out, { range, liveValue: live });
+  return norm.valid ? norm.series : [];
 }
 
 // ── AURIX-CHART-RELIABILITY-GATE-1 ───────────────────────────────
