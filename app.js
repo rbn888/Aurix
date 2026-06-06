@@ -1345,6 +1345,11 @@ const T = {
     'ad.evolution': 'Evolución', 'ad.history': 'Historial', 'ad.insights': 'Insights', 'ad.insufficient': 'Histórico insuficiente',
     adBuy: 'Compra', adSell: 'Venta', adDeposit: 'Depósito', adWithdrawal: 'Retirada', adMove: 'Movimiento', adApprox: 'aprox.',
     confirmDeleteAsset: '¿Eliminar este activo? Esta acción no se puede deshacer.',
+    deleteAssetTitle: 'Eliminar activo',
+    deleteAssetMsg: (name) => `Se eliminará ${name} y todo su historial de transacciones. Esta acción no se puede deshacer.`,
+    keepBtn: 'Cancelar',
+    buyToast: (q, n) => `Compra registrada · +${q} ${n}`,
+    sellToast: (q, n) => `Venta registrada · −${q} ${n}`,
     insAvg: (avg, tk, cur, pct, dir) => `Tu precio medio de compra es ${avg}. ${tk} cotiza actualmente a ${cur}. La posición está un ${pct}% por ${dir === 'below' ? 'debajo' : 'encima'} de tu coste medio.`,
     insRealized: (amt, name) => `Has realizado ${amt} de ganancias históricas en ${name}.`,
     insWeight: (tk, pct, cat) => `${tk} representa el ${pct}% de tu patrimonio en ${cat}.`,
@@ -2544,6 +2549,11 @@ const T = {
     'ad.evolution': 'Evolution', 'ad.history': 'History', 'ad.insights': 'Insights', 'ad.insufficient': 'Insufficient history',
     adBuy: 'Buy', adSell: 'Sell', adDeposit: 'Deposit', adWithdrawal: 'Withdrawal', adMove: 'Move', adApprox: 'approx.',
     confirmDeleteAsset: 'Delete this asset? This cannot be undone.',
+    deleteAssetTitle: 'Delete asset',
+    deleteAssetMsg: (name) => `${name} and its full transaction history will be removed. This cannot be undone.`,
+    keepBtn: 'Cancel',
+    buyToast: (q, n) => `Buy recorded · +${q} ${n}`,
+    sellToast: (q, n) => `Sell recorded · −${q} ${n}`,
     insAvg: (avg, tk, cur, pct, dir) => `Your average buy price is ${avg}. ${tk} currently trades at ${cur}. The position is ${pct}% ${dir === 'below' ? 'below' : 'above'} your average cost.`,
     insRealized: (amt, name) => `You have realized ${amt} of historical gains on ${name}.`,
     insWeight: (tk, pct, cat) => `${tk} represents ${pct}% of your wealth in ${cat}.`,
@@ -11145,6 +11155,14 @@ function _aurixDashMountWhenReady(surface) {
 // own visualNormalization is intentionally disabled at mount time
 // (see _aurixDashMount) so neither side smooths data the other does
 // not. portfolioHistory itself is never mutated.
+//
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  CHART QA PASS — do not modify without explicit request.      ║
+// ║  Dashboard chart engine (normalize / data-quality / dash      ║
+// ║  series / reliability gate / FINAL-FIX / getChartData /       ║
+// ║  updateChart) is frozen after iPhone QA. Touch only for a     ║
+// ║  critical bug, and only when the user explicitly asks.        ║
+// ╚══════════════════════════════════════════════════════════════╝
 // ── AURIX-DASHBOARD-CHART-INSTITUTIONAL-1 ────────────────────────
 // Display-only chart-series normalization. RAW snapshots / categoryHistory /
 // portfolioHistory are NEVER mutated or persisted — this only shapes the
@@ -22261,6 +22279,7 @@ reduceForm.addEventListener('submit', e => {
     asset.qty = remaining;
   }
 
+  const sellToastName = (typeof getDisplayName === 'function') ? getDisplayName(asset) : (asset.name || asset.ticker || '');
   _persistEmptyPortfolioIfNeeded('reduce');
   save();
   render(true);
@@ -22268,6 +22287,10 @@ reduceForm.addEventListener('submit', e => {
   if (!wasRemoved) _flashAssetCard(reduceTargetId);
   _flashCategoryCard(reduceType);
   onPortfolioChange(true);
+  try {
+    if (typeof _aurixShowToast === 'function')
+      _aurixShowToast(t('sellToast')(formatQty(amount), sellToastName), { variant: 'info', duration: 2200 });
+  } catch (_) {}
 });
 
 reduceClose.addEventListener('click', closeReduceModal);
@@ -22391,12 +22414,17 @@ addForm.addEventListener('submit', e => {
   }
   const addFlashId   = asset.id;
   const addFlashType = asset.type;
+  const addToastName = (typeof getDisplayName === 'function') ? getDisplayName(asset) : (asset.name || asset.ticker || '');
   save();
   render(true);
   closeAddModal();
   _flashAssetCard(addFlashId);
   _flashCategoryCard(addFlashType);
   onPortfolioChange(true);
+  try {
+    if (typeof _aurixShowToast === 'function')
+      _aurixShowToast(t('buyToast')(formatQty(amount), addToastName), { variant: 'success', duration: 2200 });
+  } catch (_) {}
 });
 
 addClose.addEventListener('click', closeAddModal);
@@ -22469,27 +22497,34 @@ assetsListEl.addEventListener('click', e => {
   const deleteBtn = e.target.closest('.btn-delete');
   if (deleteBtn) {
     const delId   = deleteBtn.dataset.id;
-    const delType = assets.find(a => a.id === delId)?.type;
-
-    const delCard = assetsListEl.querySelector(`[data-asset-id="${delId}"]`);
-    if (delCard && !reducedMotion) {
-      delCard.classList.add('card--exiting');
-      setTimeout(() => {
+    const delAsset = assets.find(a => a.id === delId);
+    if (!delAsset) return;
+    const delType = delAsset.type;
+    const delName = (typeof getDisplayName === 'function') ? getDisplayName(delAsset) : (delAsset.name || delAsset.ticker || '');
+    // HARDEN: the dashboard card "✕" used to delete with NO confirmation.
+    // Route it through the same premium confirm as the manage sheet so a
+    // mistap can never wipe a position.
+    _aurixConfirm({
+      title: t('deleteAssetTitle'), message: t('deleteAssetMsg')(delName),
+      confirmLabel: t('btnDelete'), cancelLabel: t('keepBtn'), danger: true,
+    }).then(ok => {
+      if (!ok || !assets.find(a => a.id === delId)) return;
+      const commit = () => {
         assets = assets.filter(a => a.id !== delId);
         _persistEmptyPortfolioIfNeeded('delete');
         save();
         render(true);
         _flashCategoryCard(delType);
         onPortfolioChange(true);
-      }, 200);
-    } else {
-      assets = assets.filter(a => a.id !== delId);
-      _persistEmptyPortfolioIfNeeded('delete');
-      save();
-      render(true);
-      _flashCategoryCard(delType);
-      onPortfolioChange(true);
-    }
+      };
+      const delCard = assetsListEl.querySelector(`[data-asset-id="${delId}"]`);
+      if (delCard && !reducedMotion) {
+        delCard.classList.add('card--exiting');
+        setTimeout(commit, 200);
+      } else {
+        commit();
+      }
+    });
   }
 });
 
@@ -23158,9 +23193,16 @@ function _mngRenderTx() {
     </div>`;
   }).join('');
 }
-function _mngDelete() {
+async function _mngDelete() {
   const id = _mngAssetId; const a = assets.find(x => x.id === id); if (!a) return;
-  if (!window.confirm(t('confirmDeleteAsset'))) return;
+  const _nm = (typeof getDisplayName === 'function') ? getDisplayName(a) : (a.name || a.ticker || '');
+  const ok = await _aurixConfirm({
+    title: t('deleteAssetTitle'), message: t('deleteAssetMsg')(_nm),
+    confirmLabel: t('btnDelete'), cancelLabel: t('keepBtn'), danger: true,
+  });
+  if (!ok) return;
+  // Re-resolve in case state changed while the dialog was open.
+  if (!assets.find(x => x.id === id)) return;
   const delType = a.type;
   assets = assets.filter(x => x.id !== id);
   try { _persistEmptyPortfolioIfNeeded('delete'); } catch (_) {}
@@ -23285,10 +23327,16 @@ function renderAssetDetail() {
     insEl.innerHTML = ins.map(i => `<div class="ad2-insight">${escHtml(_adsInsightText(i))}</div>`).join('');
   }
 }
-function _adsDeleteActive() {
+async function _adsDeleteActive() {
   const id = activeAssetId; if (!id) return;
   const a = assets.find(x => x.id === id); if (!a) return;
-  if (!window.confirm(t('confirmDeleteAsset'))) return;
+  const _nm = (typeof getDisplayName === 'function') ? getDisplayName(a) : (a.name || a.ticker || '');
+  const ok = await _aurixConfirm({
+    title: t('deleteAssetTitle'), message: t('deleteAssetMsg')(_nm),
+    confirmLabel: t('btnDelete'), cancelLabel: t('keepBtn'), danger: true,
+  });
+  if (!ok) return;
+  if (!assets.find(x => x.id === id)) return;
   const delType = a.type;
   assets = assets.filter(x => x.id !== id);
   try { _persistEmptyPortfolioIfNeeded('delete'); } catch (_) {}
@@ -27992,6 +28040,57 @@ function _aurixShowToast(message, opts) {
       setTimeout(() => { try { el.remove(); } catch (_) {} }, 360);
     }, ms);
   } catch (_) {}
+}
+
+// AURIX-PREMIUM-CONFIRM-DIALOG-1: premium replacement for native confirm().
+// Returns a Promise<boolean> (true = confirmed, false = cancelled). Dark-blue
+// Aurix sheet, soft glow, Escape/backdrop = cancel, Enter = confirm. The cancel
+// button is focused by default so a destructive action is never the accidental
+// path. Falls back to window.confirm if DOM construction ever fails. UI-only —
+// no persistence/data/engine touched.
+function _aurixConfirm(opts) {
+  const o = opts || {};
+  return new Promise(resolve => {
+    try {
+      const danger = o.danger !== false; // destructive styling by default
+      const prev = document.getElementById('aurixConfirmHost');
+      if (prev) { try { prev.remove(); } catch (_) {} }
+      const host = document.createElement('div');
+      host.id = 'aurixConfirmHost';
+      host.className = 'aurix-confirm-host';
+      host.innerHTML =
+        `<div class="aurix-confirm-backdrop"></div>` +
+        `<div class="aurix-confirm" role="alertdialog" aria-modal="true" aria-labelledby="aurixConfirmTitle" aria-describedby="aurixConfirmMsg">` +
+          `<div class="aurix-confirm-title" id="aurixConfirmTitle">${escHtml(o.title || '')}</div>` +
+          `<div class="aurix-confirm-msg" id="aurixConfirmMsg">${escHtml(o.message || '')}</div>` +
+          `<div class="aurix-confirm-actions">` +
+            `<button type="button" class="aurix-confirm-btn aurix-confirm-cancel">${escHtml(o.cancelLabel || 'Cancelar')}</button>` +
+            `<button type="button" class="aurix-confirm-btn ${danger ? 'aurix-confirm-danger' : 'aurix-confirm-primary'}">${escHtml(o.confirmLabel || 'OK')}</button>` +
+          `</div>` +
+        `</div>`;
+      document.body.appendChild(host);
+      requestAnimationFrame(() => host.classList.add('is-open'));
+      let done = false;
+      const cleanup = (val) => {
+        if (done) return; done = true;
+        host.classList.remove('is-open');
+        document.removeEventListener('keydown', onKey, true);
+        setTimeout(() => { try { host.remove(); } catch (_) {} }, 240);
+        resolve(val);
+      };
+      const onKey = (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); cleanup(false); }
+        else if (e.key === 'Enter') { e.preventDefault(); cleanup(true); }
+      };
+      host.querySelector('.aurix-confirm-cancel').addEventListener('click', () => cleanup(false));
+      host.querySelector('.aurix-confirm-danger, .aurix-confirm-primary').addEventListener('click', () => cleanup(true));
+      host.querySelector('.aurix-confirm-backdrop').addEventListener('click', () => cleanup(false));
+      document.addEventListener('keydown', onKey, true);
+      setTimeout(() => { try { host.querySelector('.aurix-confirm-cancel').focus(); } catch (_) {} }, 30);
+    } catch (_) {
+      try { resolve(window.confirm(o.message || '')); } catch (_e) { resolve(false); }
+    }
+  });
 }
 
 async function performAtomicFreshStartReset() {
