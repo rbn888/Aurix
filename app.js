@@ -1305,7 +1305,7 @@ const T = {
     cantExceed:       m => `No puedes restar más de ${m}.`,
     unidades:         'unidades',
     // Modal: Add position
-    modalAddPosTitle: 'Añadir a posición',
+    modalAddPosTitle: 'Aumentar posición',
     addQtyLabel:      u => u ? `Cantidad a añadir (${u})` : 'Cantidad a añadir',
     addQtyLabelCash:  'Importe a añadir',
     newTotalQty:      'Nueva cantidad total',
@@ -2509,7 +2509,7 @@ const T = {
     cantExceed:       m => `Cannot subtract more than ${m}.`,
     unidades:         'units',
     // Modal: Add position
-    modalAddPosTitle: 'Add to position',
+    modalAddPosTitle: 'Increase position',
     addQtyLabel:      u => u ? `Quantity to add (${u})` : 'Quantity to add',
     addQtyLabelCash:  'Amount to add',
     newTotalQty:      'New total quantity',
@@ -22456,21 +22456,14 @@ assetsListEl.addEventListener('click', e => {
   const editREBtn = e.target.closest('.btn-edit-re');
   if (editREBtn) { openEditRealEstateModal(editREBtn.dataset.id); return; }
 
+  // AURIX-HOLDING-CONTEXTUAL-BUY-SELL-1 — the +/− card buttons open the dedicated
+  // contextual panels (Aumentar / Reducir posición), never an inline form inside
+  // the card. A holding card stays visual-only.
   const addBtn = e.target.closest('.btn-add-pos');
-  if (addBtn) {
-    const id = addBtn.dataset.id;
-    if (_inlineEditId === id && _inlineEditMode === 'add') { closeInlineEdit(); return; }
-    openInlineEdit(id, 'add');
-    return;
-  }
+  if (addBtn) { openAddModal(addBtn.dataset.id); return; }
 
   const reduceBtn = e.target.closest('.btn-reduce');
-  if (reduceBtn) {
-    const id = reduceBtn.dataset.id;
-    if (_inlineEditId === id && _inlineEditMode === 'reduce') { closeInlineEdit(); return; }
-    openInlineEdit(id, 'reduce');
-    return;
-  }
+  if (reduceBtn) { openReduceModal(reduceBtn.dataset.id); return; }
 
   const confirmBtn = e.target.closest('.aes-confirm-btn');
   if (confirmBtn) { applyInlineEdit(confirmBtn.dataset.id); return; }
@@ -23206,12 +23199,12 @@ function _mngDelete() {
   ov.querySelector('.manage-actions')?.addEventListener('click', e => {
     const b = e.target.closest('[data-mng-act]'); if (!b) return;
     const act = b.dataset.mngAct, id = _mngAssetId;
-    // AURIX-ASSET-MANAGE-FLOW-1 — "Comprar" must operate on THE SELECTED asset,
-    // not open the generic "Añadir activo / liquidez / euro físico" picker.
-    // Route to the existing contextual add-position flow (openInlineEdit add) —
-    // type-agnostic (crypto/stock/etf/fund/commodity/cash/gold), no picker,
-    // keeps the asset context. Sell/tx/delete were already contextual.
-    if (act === 'buy')       { closeAssetManage(); if (id) openInlineEdit(id, 'add'); }
+    // AURIX-HOLDING-CONTEXTUAL-BUY-SELL-1 — Buy and Sell behave identically:
+    // both open a DEDICATED contextual panel for the selected asset. Buy →
+    // openAddModal ("Aumentar posición"), Sell → openReduceModal ("Reducir
+    // posición"). Never the generic add-asset picker, never an inline form in
+    // the card. tx/delete were already contextual.
+    if (act === 'buy')       { closeAssetManage(); if (id) openAddModal(id); }
     else if (act === 'sell') { closeAssetManage(); if (id) openReduceModal(id); }
     else if (act === 'del')  { _mngDelete(); }
     else if (act === 'tx')   {
