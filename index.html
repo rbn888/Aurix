@@ -1160,7 +1160,7 @@
        `defer` so its absence (e.g. CDN miss) never blocks app boot;
        AurixChartCore checks readiness before using it. -->
   <script defer src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-  <script defer src="services/aurix-chart-core.js?v=7"></script>
+  <script defer src="services/aurix-chart-core.js?v=8"></script>
   <!-- CHART-3: historical data adapter layer. Pure infra — no UI consumer.
        Loads `defer` so boot stays uninterrupted; safe even if absent. -->
   <script defer src="services/chart-adapters.js"></script>
@@ -1179,7 +1179,7 @@
   <script defer src="services/portfolio-price-layer.js?v=1"></script>
   <script defer src="services/portfolio-net-worth.js?v=1"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
-  <script src="app.js?v=198"></script>
+  <script src="app.js?v=199"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
        Loads after app.js so it can read its primitives. No consumers yet. -->
   <script src="services/wealth-engine.js?v=1"></script>

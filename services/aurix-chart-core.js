@@ -799,7 +799,12 @@
             const ms = (typeof time === 'number') ? time * 1000 : Date.parse(time);
             if (!(ms > _axisLastMs)) _axisLastLabel = null;
             _axisLastMs = ms;
-            if (String(range).toLowerCase() === '24h' && label && label === _axisLastLabel) return '';
+            // AURIX-CHART-POLISH-2 · req 5 — suppress ANY adjacent duplicate label
+            // (was 24H-only). On 7D two snapshots the same day both rounded to
+            // "5 jun"; on TOTAL adjacent ticks landed in the same month
+            // ("jun 25 · jun 25"). Blanking the repeat leaves clean, non-repeating
+            // axis guides for every range. Data is untouched (axis guide only).
+            if (label && label === _axisLastLabel) return '';
             _axisLastLabel = label;
             return label;
           },

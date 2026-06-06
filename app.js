@@ -3836,9 +3836,14 @@ let _aurixDashMobile  = null;
 // session. Once a range has shown a real line, a transient empty/insufficient
 // sync (render race, momentary recompute) must NOT downgrade it to the
 // "Histórico en construcción" overlay — we re-show the last good series instead.
-// Range change bypasses naturally (stored range differs); a genuinely empty
-// portfolio (no assets) still shows the empty surface.
-let _aurixLastGood    = { range: null, series: null };
+// A genuinely empty portfolio (no assets) still shows the empty surface.
+// AURIX-CHART-POLISH-2 · req 1 — PER-RANGE memory. The previous single slot
+// ({range,series}) only remembered the LAST viewed range, so 24H→7D→24H lost
+// 24H's good series and a transient empty sync on return re-triggered
+// "building". Keyed by range, every range keeps its own last good series for
+// the session, so returning to any range never downgrades to building unless
+// its data is genuinely empty. In-memory → a full page refresh resets it.
+const _aurixLastGoodByRange = Object.create(null);
 // AURIX-PORTFOLIO-CHART-ENGINE-1 · Fase D — Portfolio Chart Engine swap state.
 // All OFF by default. `_reconActive` holds the LAST reconstruction that passed
 // the fidelity gate, keyed by (range,currency); `_aurixDashSync` paints it
@@ -11363,10 +11368,10 @@ function _aurixDashSync(surface) {
       // to the live value) — a transient empty sync is a render race, not real
       // insufficiency. Range change bypasses (stored range differs); a genuinely
       // empty portfolio (no assets) still falls through to the empty surface.
-      if (hasAssets && _aurixLastGood.range === activeRange &&
-          Array.isArray(_aurixLastGood.series) && _aurixLastGood.series.length >= 2) {
+      const _lgSeries = _aurixLastGoodByRange[activeRange];
+      if (hasAssets && Array.isArray(_lgSeries) && _lgSeries.length >= 2) {
         try {
-          const keep = _aurixChartAnchorTail(_aurixLastGood.series);
+          const keep = _aurixChartAnchorTail(_lgSeries);
           ctrl.setData(keep, { source: 'local-snapshot', currency: baseCurrency || 'USD', isSynthetic: false, completeness: 1, asOf: Date.now() });
           try { _aurixReconSyncHeadline(keep); } catch (_) {}
         } catch (_) {}
@@ -11387,9 +11392,10 @@ function _aurixDashSync(surface) {
       _aurixClearChartHeadline();
       return;
     }
-    // AURIX-CHART-UX-1 #4: this range now has a valid series — remember it so a
-    // later transient empty sync can re-show it instead of the overlay.
-    _aurixLastGood = { range: activeRange, series: series };
+    // AURIX-CHART-UX-1 #4 / POLISH-2 req 1: this range now has a valid series —
+    // remember it PER RANGE so a later transient empty sync (or a return to this
+    // range after switching away) re-shows it instead of the building overlay.
+    _aurixLastGoodByRange[activeRange] = series;
     // CHART-4B: derive the chart's tonal direction from the SAME source
     // the visible dashboard performance KPI uses (legacy updateChart
     // computes `pct = (totalValueBase() - series[0]) / series[0]`).
