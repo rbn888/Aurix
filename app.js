@@ -12999,14 +12999,19 @@ function initChart() {
       labels: [],
       datasets: [{
         data: [],
-        borderColor: 'rgba(255,255,255,0.85)',
+        // AURIX-CHART-STABILITY-CLOSEOUT — the legacy Chart.js line was pure
+        // white (rgba(255,255,255,0.85)); in the brief window before the V2
+        // overlay mounts and hides this canvas (every refresh) it flashed as a
+        // white line. Use a calm premium Aurix tone so the fallback is never a
+        // jarring white line. The V2 overlay remains the primary visible chart.
+        borderColor: 'rgba(122,162,255,0.92)',
         backgroundColor: 'transparent',
         fill: true,
         tension: 0.4,
         pointRadius: 0,
         pointHoverRadius: 4,
-        pointHoverBackgroundColor: '#fff',
-        pointHoverBorderColor: 'rgba(255,255,255,0.3)',
+        pointHoverBackgroundColor: 'rgba(122,162,255,1)',
+        pointHoverBorderColor: 'rgba(122,162,255,0.3)',
         pointHoverBorderWidth: 2,
         borderWidth: 2,
       }]
@@ -13447,6 +13452,21 @@ function _setChartNoData(el, state) {
 
 function updateChart(animate = false) {
   if (!portfolioChart) return;
+  // AURIX-CHART-STABILITY-CLOSEOUT — render gate. Until boot has merged remote
+  // state AND the first price refresh has settled, the live investable value
+  // (and therefore the validated series + headline) is not trustworthy, so we
+  // must NOT repaint with a fresh / partial / pre-fix-contaminated series — that
+  // is what produced the white-line flash and the transient -63% on refresh /
+  // scroll / holdings change. While not ready we leave whatever is already drawn
+  // (the last good line) and only re-sync the V2 overlay, which has its own gate
+  // (per-range last-good line, else a clean loading surface — never a partial
+  // frame). updateChart re-runs once ready (bootRefresh + price polling) and
+  // paints the clean, validated state. Pure render gating — no data touched.
+  if (typeof _aurixChartDataReady === 'function' && !_aurixChartDataReady()) {
+    try { if (_aurixDashDesktop) _aurixDashSync('desktop'); } catch (_) {}
+    try { if (_aurixDashMobile)  _aurixDashSync('mobile'); } catch (_) {}
+    return;
+  }
   // AURIX-INVESTABLE-WEALTH-1 — Dashboard chart + KPI use the investable series
   // (excludes real estate), derived from categoryHistory. Snapshots fallback.
   // AURIX-CHART-INTRADAY-DIVERGENCE-1 — strip contaminated 24H points (absurdly
