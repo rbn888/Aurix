@@ -4864,7 +4864,19 @@ function _aurixFilterAfterEpoch(arr, tsKey) {
 // and never a future ts (would blank it until it passes). Identical on web + mobile
 // because it is a constant. Fully non-destructive (history/Supabase untouched);
 // set to 0 to revert. See docs/AURIX-DATA-001 for the source-data audit.
-const AURIX_INVESTABLE_CHART_EPOCH = 1780617600000; // 2026-06-05T00:00:00Z — launch clean baseline
+// AURIX-CHART-CLOSEOUT re-baseline (2026-06-06): moved one day forward (was
+// 1780617600000 = 2026-06-05T00:00:00Z) so the chart excludes EVERY snapshot
+// written BEFORE the data-integrity fixes landed — F1 (LSE pence) + F2
+// (multi-currency FX) + F3/F4 (snapshot guards), commits a77d629 / e286a94 /
+// 18b3d50. Those pre-fix points are the source of the residual sustained
+// -55%/-63% contamination that no render-time heuristic can remove without also
+// hiding real moves. Display-only + reversible: portfolioHistory /
+// categoryHistory / Supabase are NEVER touched — this only filters which
+// snapshots the chart READS. Revert by setting this to 0 (then the portfolio
+// reset epoch rules) or, per-device, localStorage.removeItem('aurix_investable_chart_epoch').
+// If a range has too few real points after the cut, the reliability gate +
+// validateChartSeries show "Histórico en construcción" (building), never a line.
+const AURIX_INVESTABLE_CHART_EPOCH = 1780704000000; // 2026-06-06T00:00:00Z — post data-fix clean baseline
 const INVESTABLE_CHART_EPOCH_KEY = 'aurix_investable_chart_epoch';
 function _aurixInvestableChartEpoch() {
   let override = 0;
