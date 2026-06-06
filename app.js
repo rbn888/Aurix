@@ -11239,7 +11239,9 @@ function auditChartSeries(series, range) {
       liveValue: live,
       headlineVsTotalPct: (first && first.value > 0 && Number.isFinite(live)) ? +(((live - first.value) / first.value) * 100).toFixed(2) : null,
       validPointCount: dq ? dq.validPointCount : null,
+      uniqueDays: dq ? dq.uniqueDays : null,
       coverageRatio: dq ? +Number(dq.coverageRatio).toFixed(3) : null,
+      availabilityReason: dq ? dq.availabilityReason : null,
       hasStructuralJump: dq ? dq.hasStructuralJump : null,
       shouldShowBaselineMode: dq ? dq.shouldShowBaselineMode : null,
       shouldShowBuildingState: dq ? dq.shouldShowBuildingState : null,
@@ -11253,6 +11255,78 @@ function auditChartSeries(series, range) {
 // ARE recent clean points but not enough history for the range) and the
 // structural-move headline hint. Pure read over the already-normalized series.
 const _AURIX_BASELINE_EXPECT_DAYS = Object.freeze({ '30d': 30, '1y': 365, 'all': 90 });
+
+// ── AURIX-CHART-RANGE-AVAILABILITY-1 ─────────────────────────────
+// SINGLE availability authority for the Dashboard chart. A range earns a drawn
+// curve ONLY when it has REAL temporal coverage — not merely ≥2 points. This is
+// the rule that stops a 30D from painting a flat line (and a false -0.06%) off
+// two same-day points: 30D needs distinct days / real span, otherwise it routes
+// to "Histórico en construcción". Honest by design — better building than a poor
+// or fake curve. Display-only: never mutates, persists, or fabricates data.
+//   24h : ≥4 intraday points AND ≥30 min of real span
+//   7d  : ≥2 distinct days  OR ≥4 clean points (shown with recent-baseline note)
+//   30d : ≥5 distinct days  OR ≥7 days of real span
+//   1y  : ≥30 days of real span
+//   all : ≥5 distinct days  OR ≥7 days of real span (post-baseline build-out)
+const _AURIX_RANGE_RULES = Object.freeze({
+  '24h': { minPoints: 4, minSpanMin: 30 },
+  '7d':  { minDays: 2, altMinPoints: 4, recentBelowDays: 7 },
+  '30d': { minDays: 5, minSpanDays: 7, recentBelowDays: 30 },
+  '1y':  { minSpanDays: 30, recentBelowDays: 365 },
+  'all': { minDays: 5, minSpanDays: 7, recentBelowDays: 90 },
+});
+function getRangeAvailability(range, cleanSeries, epoch) {
+  const r   = String(range || '').toLowerCase();
+  const arr = Array.isArray(cleanSeries) ? cleanSeries : [];
+  const ep  = Number(epoch) > 0 ? Number(epoch) : 0;
+  // Only post-baseline, finite, positive points count toward coverage.
+  const valid = arr.filter(p => p && Number.isFinite(p.time) && p.time > 0 &&
+    Number.isFinite(p.value) && p.value > 0 && (!ep || p.time >= ep));
+  const pointCount    = valid.length;
+  const coverageStart = pointCount ? valid[0].time : null;
+  const coverageEnd   = pointCount ? valid[pointCount - 1].time : null;
+  const spanMs   = pointCount >= 2 ? (coverageEnd - coverageStart) : 0;
+  const spanDays = spanMs / 86400000;
+  const spanMin  = spanMs / 60000;
+  const dayset = new Set();
+  for (let i = 0; i < valid.length; i++) dayset.add(Math.floor(valid[i].time / 86400000));
+  const uniqueDays = dayset.size;
+
+  let available = false, reason = 'building', recentBaseline = false;
+  if (pointCount < 2) {
+    reason = 'building_no_points';
+  } else if (r === '24h') {
+    available = pointCount >= 4 && spanMin >= 30;
+    reason = available ? 'ready' : 'building_insufficient_intraday';
+  } else if (r === '7d') {
+    available = uniqueDays >= 2 || pointCount >= 4;
+    reason = available ? 'ready' : 'building_insufficient_points';
+    recentBaseline = available && uniqueDays < 7;
+  } else if (r === '30d') {
+    available = uniqueDays >= 5 || spanDays >= 7;
+    reason = available ? 'ready' : 'building_insufficient_days';
+    recentBaseline = available && uniqueDays < 30;
+  } else if (r === '1y') {
+    available = spanDays >= 30;
+    reason = available ? 'ready' : 'building_insufficient_coverage';
+    recentBaseline = available && spanDays < 365;
+  } else if (r === 'all') {
+    available = uniqueDays >= 5 || spanDays >= 7;
+    reason = available ? 'ready' : 'building_insufficient_coverage';
+    recentBaseline = available && spanDays < 90;
+  } else {
+    available = pointCount >= 2;            // unknown range → permissive
+    reason = available ? 'ready' : 'building_no_points';
+  }
+  // "Histórico disponible desde …" date, clamped to the baseline epoch.
+  const labelStart = (coverageStart != null && ep) ? Math.max(coverageStart, ep) : coverageStart;
+  return {
+    available, reason, recentBaseline,
+    coverageStart: labelStart, coverageEnd, uniqueDays, pointCount, spanDays,
+    label: recentBaseline ? 'recent_baseline' : (available ? 'ready' : 'building'),
+  };
+}
+
 function _aurixChartDataQuality(series, range) {
   const r = String(range || '').toLowerCase();
   const arr = Array.isArray(series) ? series : [];
@@ -11268,17 +11342,26 @@ function _aurixChartDataQuality(series, range) {
     const a = valid[i - 1].value, b = valid[i].value;
     if (a > 0 && Math.abs(b / a - 1) >= 0.12) { hasStructuralJump = true; break; }
   }
+  // AURIX-CHART-RANGE-AVAILABILITY-1 — the availability policy is now the single
+  // authority for building vs render (was: the naive n<2). This is what sends a
+  // no-coverage 30D/1A/TOTAL to "Histórico en construcción" instead of a
+  // flat/false line + bogus %. Baseline-mode (recent-history note) is exactly
+  // "available but young".
+  const _epoch = (typeof _aurixInvestableChartEpoch === 'function') ? _aurixInvestableChartEpoch() : 0;
+  const avail = getRangeAvailability(r, valid, _epoch);
   return {
     validPointCount: n, firstCleanTs, lastCleanTs, coverageRatio, hasStructuralJump,
-    shouldShowBuildingState: n < 2,
-    shouldShowBaselineMode:  n >= 2 && expectDays > 0 && coverageRatio < 0.25,
+    uniqueDays: avail.uniqueDays, availabilityReason: avail.reason, coverageStart: avail.coverageStart,
+    shouldShowBuildingState: !avail.available,
+    shouldShowBaselineMode:  avail.available && avail.recentBaseline,
   };
 }
 function _aurixBaselineNoteText(dq) {
-  if (!dq || !dq.firstCleanTs) return '';
+  const ts = dq && (dq.coverageStart || dq.firstCleanTs);
+  if (!ts) return '';
   const es = (typeof lang !== 'undefined' && lang === 'es');
   let d = '';
-  try { d = new Date(dq.firstCleanTs).toLocaleDateString(es ? 'es-ES' : 'en-US', { day: 'numeric', month: 'short' }); } catch (_) {}
+  try { d = new Date(ts).toLocaleDateString(es ? 'es-ES' : 'en-US', { day: 'numeric', month: 'short' }); } catch (_) {}
   return (es ? 'Histórico disponible desde ' : 'History available since ') + d;
 }
 // Sets the small contextual note under the chart headline (desktop + mobile).
@@ -11880,6 +11963,24 @@ function _aurixDashSync(surface) {
     // big empty state. Full "Histórico en construcción" only when there are <2
     // valid points or no assets (was: the stricter per-range count gate).
     const _dq = _aurixChartDataQuality(series, activeRange);
+    // AURIX-CHART-RANGE-AVAILABILITY-1 (diag) — render-decision trace for the V2
+    // surface. Gated by window.AURIX_DEBUG_CHART. Answers: availability fields +
+    // final decision + which path (path:'v2').
+    if (typeof window !== 'undefined' && window.AURIX_DEBUG_CHART === true) {
+      try {
+        const _ep = (typeof _aurixInvestableChartEpoch === 'function') ? _aurixInvestableChartEpoch() : 0;
+        const _av = getRangeAvailability(activeRange, series, _ep);
+        const _hasLG = Array.isArray(_aurixLastGoodByRange[activeRange]) && _aurixLastGoodByRange[activeRange].length >= 2;
+        console.log('[AURIX_RENDER_DECISION]', {
+          path: 'v2', activeRange,
+          available: _av.available, isBuilding: !_av.available,
+          renderMode: _av.available ? 'line' : (_hasLG ? 'reshow_last_good' : 'building'),
+          uniqueDays: _av.uniqueDays, spanDays: +Number(_av.spanDays).toFixed(3),
+          pointCount: _av.pointCount, availabilityReason: _av.reason,
+          hasLastGood: _hasLG,
+        });
+      } catch (_) {}
+    }
     if (_dq.shouldShowBuildingState) {
       _aurixSetChartNote('');
       const hasAssets = Array.isArray(assets) && assets.length > 0;
@@ -13773,11 +13874,31 @@ function updateChart(animate = false) {
   // flat series (≥2 points) still renders, so financial truth is never hidden
   // (priority #8). The V2 engine already does this via _applyEmptyCopy; this
   // covers the Chart.js fallback path.
-  // AURIX-CHART-RELIABILITY-GATE-1 · PARTE A — reliability gate (replaces the
-  // bare <2 check). TOTAL with <5 real post-reset points renders as a misleading
-  // aggressive diagonal, so it now ALSO routes to the neutral "building history"
-  // surface and clears the KPI (no red %/€). Short ranges keep the ≥2 minimum.
-  if (!_aurixChartCountPasses(data.pointsCount, activeRange) && Array.isArray(assets) && assets.length > 0) {
+  // AURIX-CHART-RANGE-AVAILABILITY-1 — unify the legacy (headline-owning) gate
+  // onto the SAME availability policy as the V2 overlay. The old count-only gate
+  // (≥2 for 30D) let a no-coverage 30D pass → it drew a flat line AND wrote a
+  // false -0.06% into the shared headline. Now both paths agree: a range without
+  // real temporal coverage (distinct days / span) routes to "building" and the
+  // headline is cleared (spec §7 — no %/€ without coverage). Display-only.
+  let _legacyAvail;
+  {
+    const _aser = [];
+    for (let i = 0; i < data.values.length; i++) _aser.push({ time: data.timestamps[i], value: data.values[i] });
+    const _ep = (typeof _aurixInvestableChartEpoch === 'function') ? _aurixInvestableChartEpoch() : 0;
+    _legacyAvail = getRangeAvailability(activeRange, _aser, _ep);
+    if (typeof window !== 'undefined' && window.AURIX_DEBUG_CHART === true) {
+      try {
+        console.log('[AURIX_RENDER_DECISION]', {
+          path: 'legacy', activeRange,
+          available: _legacyAvail.available, isBuilding: !_legacyAvail.available,
+          renderMode: (!_legacyAvail.available && Array.isArray(assets) && assets.length > 0) ? 'building' : 'line',
+          uniqueDays: _legacyAvail.uniqueDays, spanDays: +Number(_legacyAvail.spanDays).toFixed(3),
+          pointCount: _legacyAvail.pointCount, availabilityReason: _legacyAvail.reason,
+        });
+      } catch (_) {}
+    }
+  }
+  if (!_legacyAvail.available && Array.isArray(assets) && assets.length > 0) {
     // AURIX-CHART-LOADING-1: while the underlying data isn't ready yet (boot merge
     // / first price refresh pending), do NOT show "building" — hide the overlay so
     // the legacy canvas reads as loading, not as insufficient history. updateChart
