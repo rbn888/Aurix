@@ -11806,13 +11806,13 @@ function _aurixDashMount(surface) {
       // the press threshold fires, so page scroll/swipe are normal.
       showCrosshair:  true,
       showTooltip:    true,
-      // DASHBOARD-MOBILE-CHART-PARITY: the time + price axes used to
-      // be desktop-only, which left the mobile dashboard chart looking
-      // bare next to the category detail chart that ships them on
-      // both surfaces. Bringing axes to mobile unifies the Aurix
-      // premium chart language across every surface (dashboard +
-      // category detail + asset detail) without changing the engine.
-      showTimeScale:  true,
+      // AURIX-MOBILE-CHART-PREMIUM-CLOSEOUT — the X axis is now DESKTOP-ONLY. On
+      // mobile the bottom date/time labels read as clipped noise and broke the
+      // premium look, and they add little value on a small touch surface (the real
+      // date is available on long-press / crosshair). Hiding the whole time scale on
+      // mobile also reclaims ~20px of vertical room so the line breathes. Desktop
+      // keeps the full axis (showTimeScale stays true there) — unchanged.
+      showTimeScale:  isDesktop,
       showPriceScale: true,
       mobileInspection: !isDesktop,
       currency:       baseCurrency || 'USD',

@@ -636,6 +636,12 @@
       opts.showPriceScale = false;
     }
 
+    // AURIX-MOBILE-CHART-PREMIUM-CLOSEOUT — the mobile dashboard chart is the only
+    // portfolio surface mounted with long-press inspection (mobileInspection:true);
+    // desktop passes false. Used to scope mobile-only presentation (no X axis,
+    // always-curved line, extra bottom Y headroom) without touching desktop.
+    const _isMobilePortfolio = opts.variant === 'portfolio' && !!opts.mobileInspection;
+
     // Host element wraps both the chart canvas and the state overlays.
     const host = document.createElement('div');
     host.className = 'aurix-chart-host';
@@ -1092,7 +1098,9 @@
       // autoscaleInfoProvider is set these provider margins are the authoritative
       // label-clearance control (they supersede the fractional scaleMargins for this
       // series). Bottom stays tight so the curve keeps its vertical presence.
-      return { priceRange: { minValue: lo, maxValue: hi }, margins: { above: 34, below: 8 } };
+      // Mobile gets extra BOTTOM headroom too so the lowest right-axis label never
+      // clips against the pane bottom (mobile-scoped; desktop bottom unchanged).
+      return { priceRange: { minValue: lo, maxValue: hi }, margins: { above: 34, below: _isMobilePortfolio ? 22 : 8 } };
     }
 
     // AURIX-CHARTS-PREMIUM-REFINEMENT-1 — portfolio-only visual tuning. SCOPED to
@@ -1619,10 +1627,16 @@
         // sell) renders as a clean step (Linear) instead of a smooth curve that
         // would overshoot and read as market performance. Portfolio surface only;
         // ordinary market series stay Curved. Driven by meta.straight from the app.
+        // AURIX-MOBILE-CHART-PREMIUM-CLOSEOUT — MOBILE always uses a smooth Curved
+        // line (never the straight step): on a small surface the step reads as an
+        // angular "wall", and forcing one consistent mode also kills the recta↔curva
+        // flicker between refreshes. Desktop keeps the institutional step behaviour
+        // (meta.straight) unchanged. Display-only — no data is smoothed.
         if (opts.variant === 'portfolio' && LWC.LineType && meta) {
           try {
+            const wantStraight = meta.straight && !_isMobilePortfolio;
             series.applyOptions({
-              lineType: meta.straight
+              lineType: wantStraight
                 ? (LWC.LineType.Simple  != null ? LWC.LineType.Simple  : 0)
                 : (LWC.LineType.Curved  != null ? LWC.LineType.Curved  : 0),
             });
@@ -1748,7 +1762,7 @@
           fitMode: _fitModeApplied,
           visibleLogicalRange: vlr,
           barCount: _barCount,
-          yMargins: _shouldUseMinPadding ? { above: 34, below: 8 } : 'default',
+          yMargins: _shouldUseMinPadding ? { above: 34, below: _isMobilePortfolio ? 22 : 8 } : 'default',
           xTickMode: (xaxis ? 'dom-overlay' : 'native'),
           xLabels: xaxis ? xaxis.childElementCount : 0,
           densifiedBars: _barCount,
