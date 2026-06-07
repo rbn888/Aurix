@@ -688,8 +688,9 @@
     // point (portfolio surface). Pure presentation: positioned from the rendered
     // coords, pointer-events:none (never steals touch / swipe), shown only in the
     // ready state. Especially valuable on mobile where the axes are hidden.
-    const endpoint = (opts.variant === 'portfolio') ? document.createElement('div') : null;
-    if (endpoint) { endpoint.className = 'aurix-chart-endpoint'; endpoint.setAttribute('aria-hidden', 'true'); host.appendChild(endpoint); }
+    // AURIX-FINAL-CHART-POLISH-PASS-V2 — NO permanent end-dot. The line ends clean;
+    // the contextual marker comes only from the LWC crosshair on hover / long-press.
+    const endpoint = null;
 
     // AURIX-CHARTS — mobile current-value chip removed. The value must
     // only surface on user interaction (long-press → tooltip), never as
@@ -961,7 +962,7 @@
     // hidden, just framed with calm padding. No point is added, moved, removed or
     // interpolated; values are untouched (Fidelity > Aesthetics).
     const _shouldUseMinPadding = !!(opts.visualNormalization && opts.visualNormalization.robustScale);
-    const _PAD_FRAC_OF_RANGE   = 0.10;    // vertical padding as a fraction of the visible range, each side
+    const _PAD_FRAC_OF_RANGE   = 0.07;    // AURIX-FINAL-CHART-POLISH-PASS-V2 — less air, more line presence (was 0.10)
     const _PAD_MIN_FRAC_ANCHOR = 0.006;   // absolute floor (0.6% of value) so near-flat ranges aren't zero-padded
     let _scaleHints = null;
     // AURIX-CHART-LINE-RANGE-POLISH — number of points currently plotted, so the
@@ -1148,7 +1149,10 @@
       // series). Bottom stays tight so the curve keeps its vertical presence.
       // Mobile gets extra BOTTOM headroom too so the lowest right-axis label never
       // clips against the pane bottom (mobile-scoped; desktop bottom unchanged).
-      return { priceRange: { minValue: lo, maxValue: hi }, margins: { above: 34, below: _isMobilePortfolio ? 22 : 8 } };
+      // AURIX-FINAL-CHART-POLISH-PASS-V2 — mobile has no axis labels to clear, so
+      // tighten its top/bottom margins → the line fills ~70-75% of the card. Desktop
+      // keeps generous top room so the highest price label never clips.
+      return { priceRange: { minValue: lo, maxValue: hi }, margins: { above: _isMobilePortfolio ? 14 : 34, below: _isMobilePortfolio ? 12 : 8 } };
     }
 
     // AURIX-CHARTS-PREMIUM-REFINEMENT-1 — portfolio-only visual tuning. SCOPED to
