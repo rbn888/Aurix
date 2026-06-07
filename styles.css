@@ -3350,6 +3350,91 @@ body:not(.hero-active) #orb-canvas {
 /* Energy sweep removed — clean chart surface */
 .chart-wrap::after { display: none; }
 
+/* ── AURIX-CHART-LOADING-PREMIUM-1 ──────────────────────────────────────────
+   Premium loading skin: the dashboard chart area must NEVER read as an empty
+   dark rectangle. A subtle grid + a tenue ghost line live behind the canvas /
+   V2 host (which are transparent until a real line paints), so from the very
+   first frame — before lightweight-charts/the V2 engine mount — the surface
+   feels intentional and alive. It fades out the moment a real series is ready
+   ([data-chart-state="ready"]). Pure presentation: no data, no logic. */
+.chart-loading-skin {
+  position: absolute;
+  inset: 0;
+  z-index: 0;                 /* behind the chart canvas / V2 host */
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity .5s var(--ease-out);
+  /* Calm, ultra-subtle guide grid integrated with the card surface. */
+  background-image:
+    repeating-linear-gradient(to right,
+      transparent 0, transparent calc(20% - 1px),
+      rgba(255,255,255,0.020) calc(20% - 1px), rgba(255,255,255,0.020) 20%),
+    repeating-linear-gradient(to bottom,
+      transparent 0, transparent calc(25% - 1px),
+      rgba(255,255,255,0.016) calc(25% - 1px), rgba(255,255,255,0.016) 25%);
+}
+/* Once a real, validated series is ready the skin dissolves — no double grid,
+   no double line. Driven by JS mirroring the single chart state machine. */
+.chart-wrap[data-chart-state="ready"] .chart-loading-skin { opacity: 0; }
+/* Empty portfolio uses its own calm invitation copy — keep the skin out of the
+   way so the two surfaces never stack. */
+.chart-wrap[data-chart-state="empty"] .chart-loading-skin { opacity: 0; }
+
+.chart-loading-skin__line {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  animation: chart-ghost-breathe 3s ease-in-out infinite;
+}
+.chart-loading-skin__stroke {
+  fill: none;
+  stroke: rgba(138,166,255,0.22);   /* Aurix blue, tenue — clearly not real data */
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.chart-loading-skin__area { fill: rgba(138,166,255,0.05); }
+
+/* Very calm breathing so it feels alive without an aggressive shimmer. */
+@keyframes chart-ghost-breathe {
+  0%, 100% { opacity: .68; }
+  50%      { opacity: 1; }
+}
+
+/* Neutralize the V2 engine's own shimmer skeleton ONLY on the dashboard chart
+   (.chart-wrap), so there is a SINGLE premium loading visual. Higher specificity
+   than the engine's runtime-injected rule, so order is irrelevant. Asset /
+   category detail (.detail-chart-wrap) and the brand demo keep their shimmer. */
+.chart-wrap .aurix-chart-skeleton { display: none !important; }
+
+/* Left→right "draw" reveal when the chart goes loading/building → ready. A soft
+   cover with a blue pen-glow leading edge collapses toward the right, revealing
+   the freshly-painted line from left to right. One-shot; class added/removed by
+   JS only on a genuine first paint (never on minor refresh / last-good repaint). */
+@keyframes chart-draw-reveal {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+.chart-wrap--revealing::after {
+  content: '';
+  display: block;             /* override .chart-wrap::after { display:none } */
+  position: absolute;
+  inset: 0;
+  z-index: 3;                 /* above the canvas during the wipe */
+  /* Pen-glow leading edge, then a solid cover that matches the hero-card
+     background so the line appears to draw itself in from the left. */
+  background: linear-gradient(to right,
+    rgba(138,166,255,.30) 0px,
+    rgba(138,166,255,.10) 12px,
+    rgba(138,166,255,.02) 26px,
+    #0d1018               34px);
+  transform-origin: right center;
+  /* easeOutCubic, ~560ms — premium, not sluggish (spec: 450–650ms). */
+  animation: chart-draw-reveal .56s cubic-bezier(0.215, 0.61, 0.355, 1) forwards;
+  pointer-events: none;
+}
+
 /* AURIX-WEB-POLISH-1 — desktop (≥1024px) premium dashboard chart. More vertical
    presence (190px → 240px, ≈+26%) so the curve reads like a financial platform,
    not a technical widget; a deeper surface gradient for depth; and a tighter
@@ -4891,6 +4976,11 @@ body:not(.hero-active) #orb-canvas {
   .categories-grid .cat-card          { opacity: 1; transform: none; }
   .categories-grid .cat-card.cat-card--visible { transition: none; }
   .chart-wrap--drawing::after { animation: none; opacity: 0; }
+  /* AURIX-CHART-LOADING-PREMIUM-1 — no draw animation; show the chart at once.
+     The loading skin still appears (static, no breathing) so the area is never
+     an empty rectangle, but it switches instantly to the ready chart. */
+  .chart-wrap--revealing::after { animation: none; display: none; }
+  .chart-loading-skin__line     { animation: none; }
   .hero-card::before { animation: none; }
   .cat-card-visual img { opacity: 1; transform: none; }
   .chart-wrap::after { animation: none; opacity: 0; }

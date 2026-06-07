@@ -11981,6 +11981,45 @@ function getDashboardChartRenderState(range) {
   return { state: 'building', series: [], isRecon: false };
 }
 
+// AURIX-CHART-LOADING-PREMIUM-1 — visual-only loading/draw wiring. Mirrors the
+// single chart render state onto the .chart-wrap element so the premium loading
+// skin (grid + ghost line baked into index.html) stays visible until a real,
+// validated series is ready and then dissolves; and plays a one-shot left→right
+// "draw" reveal on the FIRST genuine paint into ready. Touches NO data / FX /
+// series / financial logic — only a data-attribute + a transient class on the
+// wrapper. Both surfaces (desktop + mobile) are tracked independently.
+const _aurixChartSkinPrev = { desktop: null, mobile: null };
+function _aurixChartWrapFor(surface) {
+  const id = surface === 'desktop' ? 'portfolioChart' : 'portfolioChartMobile';
+  const c = document.getElementById(id);
+  return c ? c.closest('.chart-wrap') : null;
+}
+function _aurixPlayChartReveal(wrap) {
+  if (!wrap) return;
+  try {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    wrap.classList.remove('chart-wrap--revealing');
+    void wrap.offsetWidth;            // reflow so the one-shot animation restarts
+    wrap.classList.add('chart-wrap--revealing');
+    setTimeout(() => { try { wrap.classList.remove('chart-wrap--revealing'); } catch (_) {} }, 760);
+  } catch (_) {}
+}
+function _aurixSetChartSkin(surface, state, opts) {
+  const wrap = _aurixChartWrapFor(surface);
+  if (!wrap) return;
+  const prev = _aurixChartSkinPrev[surface];
+  wrap.dataset.chartState = state;    // → [data-chart-state="loading|empty|building|ready"]
+  const fromLastGood   = !!(opts && opts.fromLastGood);
+  const suppressReveal = !!(opts && opts.suppressReveal);
+  // Draw reveal ONLY on a genuine first paint into ready — never on a last-good
+  // repaint, a ready→ready refresh, a rapid range flip, or the legacy path
+  // (which runs its own Chart.js reveal).
+  if (state === 'ready' && !fromLastGood && !suppressReveal && prev !== 'ready') {
+    _aurixPlayChartReveal(wrap);
+  }
+  _aurixChartSkinPrev[surface] = state;
+}
+
 function _aurixDashSync(surface) {
   const ctrl = surface === 'desktop' ? _aurixDashDesktop : _aurixDashMobile;
   if (!ctrl) return;
@@ -12009,21 +12048,25 @@ function _aurixDashSync(surface) {
 
     if (decision.state === 'loading') {
       try { ctrl.setState('loading'); } catch (_) {}
+      _aurixSetChartSkin(surface, 'loading');
       _aurixClearChartHeadline(); _aurixSetChartNote('');
       return;
     }
     if (decision.state === 'empty') {
       ctrl.setData([], { emptyReason: 'no_assets' });
+      _aurixSetChartSkin(surface, 'empty');
       _aurixClearChartHeadline(); _aurixSetChartNote('');
       return;
     }
     if (decision.state === 'building') {
       ctrl.setData([], { emptyReason: 'low_data' });
+      _aurixSetChartSkin(surface, 'building');
       _aurixClearChartHeadline(); _aurixSetChartNote('');
       return;
     }
 
     // state === 'ready' — draw the validated series + honest headline.
+    _aurixSetChartSkin(surface, 'ready', { fromLastGood: !!decision.fromLastGood });
     const series = decision.series;
     let direction = null;
     try {
@@ -13796,6 +13839,10 @@ function updateChart(animate = false) {
       const _empty = !(Array.isArray(assets) && assets.length > 0);
       _setChartNoData(chartNoDataEl, _empty ? 'empty' : 'hide');
       _setChartNoData(document.getElementById('chartNoDataMobile'), _empty ? 'empty' : 'hide');
+      // Legacy fallback (V2 not mounted): keep the premium loading skin showing
+      // while data isn't trustworthy yet — never an empty rectangle.
+      if (!_aurixDashDesktop) _aurixSetChartSkin('desktop', _empty ? 'empty' : 'loading');
+      if (!_aurixDashMobile)  _aurixSetChartSkin('mobile',  _empty ? 'empty' : 'loading');
     } catch (_) {}
     try { if (_aurixDashDesktop) _aurixDashSync('desktop'); } catch (_) {}
     try { if (_aurixDashMobile)  _aurixDashSync('mobile'); } catch (_) {}
@@ -13853,6 +13900,8 @@ function updateChart(animate = false) {
     const genuinelyEmpty = !(Array.isArray(assets) && assets.length > 0);
     chartChangeEl.textContent = '';
     _setChartNoData(chartNoDataEl, genuinelyEmpty ? 'empty' : 'hide');
+    if (!_aurixDashDesktop) _aurixSetChartSkin('desktop', genuinelyEmpty ? 'empty' : 'loading');
+    if (!_aurixDashMobile)  _aurixSetChartSkin('mobile',  genuinelyEmpty ? 'empty' : 'loading');
     portfolioChart.data.labels = [];
     portfolioChart.data.datasets[0].data = [];
     portfolioChart.update('none');
@@ -13907,6 +13956,8 @@ function updateChart(animate = false) {
     const _low = _aurixChartDataReady() ? 'low' : 'hide';
     chartChangeEl.textContent = '';
     _setChartNoData(chartNoDataEl, _low);
+    if (!_aurixDashDesktop) _aurixSetChartSkin('desktop', _low === 'low' ? 'building' : 'loading');
+    if (!_aurixDashMobile)  _aurixSetChartSkin('mobile',  _low === 'low' ? 'building' : 'loading');
     portfolioChart.data.labels = [];
     portfolioChart.data.datasets[0].data = [];
     portfolioChart.update('none');
@@ -13993,6 +14044,12 @@ function updateChart(animate = false) {
     portfolioChartMobile.data.datasets[0].data = data.values;
     portfolioChartMobile.update('none');
   }
+
+  // Legacy fallback drew a real line — dissolve the loading skin. The Chart.js
+  // canvas runs its own left→right reveal (_chartRevealProgress), so suppress
+  // the CSS curtain here to avoid a double animation.
+  if (!_aurixDashDesktop) _aurixSetChartSkin('desktop', 'ready', { suppressReveal: true });
+  if (!_aurixDashMobile)  _aurixSetChartSkin('mobile',  'ready', { suppressReveal: true });
 
   // CHART-4: keep any live Aurix V2 overlays in lockstep with the
   // legacy chart. _aurixDashSync is a no-op when the controllers

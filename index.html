@@ -279,6 +279,16 @@
             </div>
           </div>
           <div class="chart-wrap">
+            <!-- AURIX-CHART-LOADING-PREMIUM-1 — premium loading skin (grid + ghost line).
+                 Baked into the markup so the chart area is NEVER an empty dark rectangle,
+                 even before the V2 engine + lightweight-charts finish loading. Sits behind
+                 the canvas/host; fades out via [data-chart-state="ready"]. Visual only. -->
+            <div class="chart-loading-skin" aria-hidden="true">
+              <svg class="chart-loading-skin__line" viewBox="0 0 100 40" preserveAspectRatio="none">
+                <path class="chart-loading-skin__area"   d="M0,30 C14,26 24,31 38,23 C52,15 66,20 80,15 C88,12 94,14 100,13 L100,40 L0,40 Z"/>
+                <path class="chart-loading-skin__stroke" d="M0,30 C14,26 24,31 38,23 C52,15 66,20 80,15 C88,12 94,14 100,13"/>
+              </svg>
+            </div>
             <canvas id="portfolioChart"></canvas>
             <div class="chart-no-data" id="chartNoData" style="display:none">
               <span class="chart-no-data-title" data-i18n="emptyChartTitle">Tu evolución aparecerá aquí</span>
@@ -345,6 +355,13 @@
               </div>
             </div>
             <div class="chart-wrap mobile-chart-wrap">
+              <!-- AURIX-CHART-LOADING-PREMIUM-1 — premium loading skin (mobile surface). -->
+              <div class="chart-loading-skin" aria-hidden="true">
+                <svg class="chart-loading-skin__line" viewBox="0 0 100 40" preserveAspectRatio="none">
+                  <path class="chart-loading-skin__area"   d="M0,30 C14,26 24,31 38,23 C52,15 66,20 80,15 C88,12 94,14 100,13 L100,40 L0,40 Z"/>
+                  <path class="chart-loading-skin__stroke" d="M0,30 C14,26 24,31 38,23 C52,15 66,20 80,15 C88,12 94,14 100,13"/>
+                </svg>
+              </div>
               <canvas id="portfolioChartMobile"></canvas>
               <div class="chart-no-data" id="chartNoDataMobile" style="display:none">
                 <span class="chart-no-data-title" data-i18n="emptyChartTitle">Tu evolución aparecerá aquí</span>
