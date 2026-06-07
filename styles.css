@@ -846,6 +846,26 @@ button[aria-busy="true"] {
 .badge--has-logo .asset-badge-text { display: none; }
 .dar-badge .asset-badge-logo { width: 22px; height: 22px; }
 
+/* ══ AURIX-METALS-VISUAL-SYSTEM-V1 — premium metal icon badge ══════════════════
+   When a badge renders a precious-metal asset it shows the Aurix metal glyph
+   (bar / coin / ring) on a neutral dark plate (so gold AND silver tones pop),
+   never the gold-tinted text pill. Works across every badge size class. */
+.badge--metal-icon {
+  padding: 0 !important;
+  overflow: hidden;
+  background: radial-gradient(circle at 38% 28%, rgba(58,74,116,0.45) 0%, rgba(17,23,40,0.96) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  box-shadow: none !important;
+}
+.badge--metal-icon svg {
+  width: 74%;
+  height: 74%;
+  display: block;
+}
+/* Add-metal picker tile (#11 reuse) — same glyph, sized to the option icon box. */
+.add-v2-icon--metal { overflow: hidden; }
+.add-v2-icon--metal svg { width: 76%; height: 76%; display: block; }
+
 .asset-info { min-width: 0; }
 
 .asset-name {

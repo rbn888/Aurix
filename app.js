@@ -15439,36 +15439,118 @@ function _metalKind(ticker) {
   if (s.includes('xcu') || s.includes('copper') || s.includes('cobre')) return 'copper';
   return 'gold'; // XAU / oro / default metal
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// AURIX-METALS-VISUAL-SYSTEM-V1 — the SINGLE source of truth for precious-metal
+// iconography. A premium, Aurix-native inline-SVG family (NO emoji / NO external
+// icons): three visual types (bullion bar · coin · jewelry ring) × metal tone
+// (gold / silver / copper). All share one perspective, one lighting model
+// (bright `top` highlight + `hi→lo` body gradient + `edge` bevel) and the same
+// 24×24 optical weight, so the user recognises the asset WITHOUT reading text.
+// Reused everywhere (Dashboard card, asset rows, detail, add-metal picker).
+// Extensible: add a visualType case (watch, diamond, art…) here and the whole
+// app inherits it — driven by asset.visualType via the icon registry below.
+// ══════════════════════════════════════════════════════════════════════════
+const _AURIX_METAL_PALETTE = {
+  gold:   { top: '#fff1c2', hi: '#f4d27a', lo: '#b8841f', edge: 'rgba(94,62,8,.45)' },
+  silver: { top: '#fbfdff', hi: '#dfe6ee', lo: '#97a2b2', edge: 'rgba(70,82,99,.45)' },
+  copper: { top: '#ffdcc0', hi: '#e09a63', lo: '#a35d31', edge: 'rgba(86,46,20,.45)' },
+};
 let _ingotSeq = 0;
-function _metalGlyph(ticker) {
-  // AURIX-DASHBOARD-PREMIUM-POLISH-1: premium inline-SVG ingot with perspective
-  // (lit top face + gradient front face), a subtle shine streak and a soft
-  // bevel border. Pure vector — scales crisply and stays light on mobile.
-  // Each instance gets a unique gradient id so cards never cross-reference.
-  const kind = _metalKind(ticker);
-  const c = {
-    gold:   { top: '#fff1c2', hi: '#f4d27a', lo: '#b8841f', edge: 'rgba(94,62,8,.45)' },
-    silver: { top: '#fbfdff', hi: '#dfe6ee', lo: '#97a2b2', edge: 'rgba(70,82,99,.45)' },
-    copper: { top: '#ffdcc0', hi: '#e09a63', lo: '#a35d31', edge: 'rgba(86,46,20,.45)' },
-  }[kind];
-  const gid = `ingot${++_ingotSeq}`;
-  return `<span class="cat-glyph cat-glyph--metal cat-glyph--metal-${kind}" title="${escHtml(ticker || 'Metal')}">`
-    + `<svg viewBox="0 0 24 24" aria-hidden="true">`
-    +   `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0.35" y2="1">`
-    +     `<stop offset="0" stop-color="${c.hi}"/><stop offset="1" stop-color="${c.lo}"/>`
-    +   `</linearGradient></defs>`
-    +   `<path d="M6 8 L16 8 L20 11 L10 11 Z" fill="${c.top}"/>`
-    +   `<path d="M10 11 L20 11 L21.5 18 L8.5 18 Z" fill="url(#${gid})" stroke="${c.edge}" stroke-width="0.4" stroke-linejoin="round"/>`
-    +   `<path d="M12 12.2 L17 12.2 L16 14 L11 14 Z" fill="rgba(255,255,255,.5)"/>`
-    + `</svg></span>`;
+// Core renderer: returns ONLY the <svg> for (metalKind, visualType). The shared
+// gradient + highlight keep the family coherent across types.
+function aurixMetalIconSvg(metalKind, visualType) {
+  const c   = _AURIX_METAL_PALETTE[metalKind] || _AURIX_METAL_PALETTE.gold;
+  const vt  = (visualType === 'coin' || visualType === 'jewelry') ? visualType : 'bullion';
+  const gid = `amg${++_ingotSeq}`;
+  const grad = `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0.35" y2="1">`
+    + `<stop offset="0" stop-color="${c.hi}"/><stop offset="1" stop-color="${c.lo}"/></linearGradient></defs>`;
+  if (vt === 'coin') {
+    // Circular bullion coin — reeded rim (dashed ring) + inner relief + top sheen.
+    return `<svg viewBox="0 0 24 24" aria-hidden="true">${grad}`
+      + `<circle cx="12" cy="12" r="9" fill="none" stroke="${c.lo}" stroke-width="1.4" stroke-dasharray="0.6 0.9" opacity="0.85"/>`
+      + `<circle cx="12" cy="12" r="7.7" fill="url(#${gid})" stroke="${c.edge}" stroke-width="0.5"/>`
+      + `<circle cx="12" cy="12" r="5.4" fill="none" stroke="${c.top}" stroke-width="0.7" opacity="0.65"/>`
+      + `<circle cx="12" cy="12" r="2.7" fill="${c.top}" opacity="0.55"/>`
+      + `<path d="M7.4 9.4 A6.2 6.2 0 0 1 15 8.3" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="0.9" stroke-linecap="round"/>`
+      + `</svg>`;
+  }
+  if (vt === 'jewelry') {
+    // Elegant ring with a discreet integrated stone — same tone family.
+    return `<svg viewBox="0 0 24 24" aria-hidden="true">${grad}`
+      + `<circle cx="12" cy="14.4" r="5.9" fill="none" stroke="url(#${gid})" stroke-width="2.6"/>`
+      + `<circle cx="12" cy="14.4" r="7.1" fill="none" stroke="${c.edge}" stroke-width="0.4" opacity="0.6"/>`
+      + `<path d="M9.4 14.4 A2.6 5.9 0 0 1 12 8.6" fill="none" stroke="${c.top}" stroke-width="0.9" stroke-linecap="round" opacity="0.7"/>`
+      + `<path d="M12 4.6 L14.2 7 L12 9.4 L9.8 7 Z" fill="${c.top}" stroke="${c.edge}" stroke-width="0.4" stroke-linejoin="round"/>`
+      + `<path d="M10.6 7 L13.4 7" stroke="rgba(255,255,255,.65)" stroke-width="0.55" stroke-linecap="round"/>`
+      + `</svg>`;
+  }
+  // bullion (bar) — the original isometric ingot (lit top + gradient front + shine).
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${grad}`
+    + `<path d="M6 8 L16 8 L20 11 L10 11 Z" fill="${c.top}"/>`
+    + `<path d="M10 11 L20 11 L21.5 18 L8.5 18 Z" fill="url(#${gid})" stroke="${c.edge}" stroke-width="0.4" stroke-linejoin="round"/>`
+    + `<path d="M12 12.2 L17 12.2 L16 14 L11 14 Z" fill="rgba(255,255,255,.5)"/>`
+    + `</svg>`;
+}
+// AURIX-METALS-VISUAL-SYSTEM-V1 — map an asset to its visual type. Reads the
+// persisted `visualType`/`goldType` (bar→bullion, coin, jewelry); falls back to
+// name keywords; defaults to bullion. (Display-only; the technical karat/XAU/XAG
+// stay in the data, never as the primary visual.)
+function _metalVisualType(asset) {
+  const v = String((asset && (asset.visualType || asset.goldType)) || '').toLowerCase();
+  if (v === 'coin') return 'coin';
+  if (v === 'jewelry' || v === 'ring' || v === 'joya') return 'jewelry';
+  if (v === 'bar' || v === 'bullion' || v === 'lingote') return 'bullion';
+  const n = String((asset && asset.name) || '').toLowerCase();
+  if (/\bcoin\b|moneda/.test(n)) return 'coin';
+  if (/\bring\b|jewel|joya|anillo|collar|pulsera|pendant/.test(n)) return 'jewelry';
+  return 'bullion';
+}
+// Wrapped glyph (span + svg) for the Dashboard category-card visual zone.
+function _metalGlyphHtml(metalKind, visualType, title) {
+  return `<span class="cat-glyph cat-glyph--metal cat-glyph--metal-${metalKind}" title="${escHtml(title || 'Metal')}">`
+    + aurixMetalIconSvg(metalKind, visualType) + `</span>`;
+}
+function _metalGlyph(ticker, visualType) {
+  // Thin wrapper kept for backward compatibility — delegates to the single
+  // AURIX-METALS-VISUAL-SYSTEM-V1 registry. `visualType` defaults to bullion.
+  return _metalGlyphHtml(_metalKind(ticker), visualType || 'bullion', ticker);
 }
 function _realEstateGlyph() {
   return `<span class="cat-glyph cat-glyph--re">`
     + `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6 8 6v8a1 1 0 01-1 1h-4v-5h-6v5H5a1 1 0 01-1-1z"/></svg></span>`;
 }
 
+// AURIX-METALS-VISUAL-SYSTEM-V1 — the Metals dashboard card represents CATEGORIES
+// present (type × metal), NOT inventory: dedup to unique (metalKind, visualType)
+// pairs, in the fixed order bullion → coin → jewelry (then gold → silver → copper),
+// capped at 3 icons, NO auxiliary text. So "5 gold bars" → one [Bar]; "gold bar +
+// gold coin + silver ring" → [Bar][Coin][Ring] — the user reads the composition
+// visually in under half a second.
+function _buildMetalCardVisual(metalAssets) {
+  const VT_ORDER = { bullion: 0, coin: 1, jewelry: 2 };
+  const MK_ORDER = { gold: 0, silver: 1, copper: 2 };
+  const seen = new Set();
+  const combos = [];
+  for (const a of (Array.isArray(metalAssets) ? metalAssets : [])) {
+    if (!a || a.type !== 'metal' || (a.qty || 0) <= 0) continue;   // only active holdings
+    const mk = _metalKind(a.ticker);
+    const vt = _metalVisualType(a);
+    const key = mk + ':' + vt;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    combos.push({ mk, vt });
+  }
+  if (!combos.length) return '';
+  combos.sort((x, y) => (VT_ORDER[x.vt] - VT_ORDER[y.vt]) || (MK_ORDER[x.mk] - MK_ORDER[y.mk]));
+  const html = combos.slice(0, 3).map(c => _metalGlyphHtml(c.mk, c.vt)).join('');
+  return `<div class="cat-card-visual">${html}</div>`;
+}
+
 // Crypto tries spothq CDN first, falls back via _logoFallback.
 function buildCardVisual(type, typeAssets) {
+  // AURIX-METALS-VISUAL-SYSTEM-V1 — metals get the dynamic type-aware visual.
+  if (String(type).toLowerCase() === 'metal') return _buildMetalCardVisual(typeAssets);
   const items = [];
   const seen  = new Set();
   for (const a of typeAssets) {
@@ -20422,6 +20504,16 @@ function getAssetLogoUrl(asset) {
 }
 
 function buildBadgeHtml(asset, badgeText, cls = 'asset-badge') {
+  // AURIX-METALS-VISUAL-SYSTEM-V1 — metals render the premium Aurix metal icon
+  // (bar / coin / ring × tone) as the PRIMARY visual, never the technical text
+  // (18K / XAU / XAG). The karat/ticker stay in the data for logic, not display.
+  // Single source → every surface using buildBadgeHtml (rows, detail, manage,
+  // reduce) inherits it.
+  if (asset && asset.type === 'metal') {
+    return `<div class="${cls} metal badge--metal-icon">`
+      + aurixMetalIconSvg(_metalKind(asset.ticker), _metalVisualType(asset))
+      + `</div>`;
+  }
   const logoUrl = getAssetLogoUrl(asset);
   if (logoUrl) {
     const isCrypto = asset.type === 'crypto';
@@ -21427,7 +21519,7 @@ function _aurixRenderMetalPicker() {
   if (!wrap) return;
   wrap.innerHTML = _AURIX_METAL_ADD.map(m => `
     <button type="button" class="add-v2-card" data-metal-pick="${escHtml(m.key)}">
-      <span class="add-v2-icon">${m.icon}</span>
+      <span class="add-v2-icon add-v2-icon--metal">${aurixMetalIconSvg(m.key === 'silver' ? 'silver' : 'gold', 'bullion')}</span>
       <span class="add-v2-text">
         <span class="add-v2-title">${escHtml(t('metalPick_' + m.key + '_title'))}</span>
         <span class="add-v2-sub">${escHtml(t('metalPick_' + m.key + '_sub'))}</span>
@@ -22455,6 +22547,15 @@ assetForm.addEventListener('submit', e => {
       ...(isGoldAsset ? {
         karat,
         goldUnit,
+        // AURIX-METALS-VISUAL-SYSTEM-V1 — persist the visual type chosen in the gold
+        // form (jewelry / coin / bar) as the canonical `visualType` (bullion/coin/
+        // jewelry) so the icon system can show the right glyph everywhere. Defaults
+        // to bullion when the form didn't capture a type.
+        visualType:        (() => {
+          const gt = (document.getElementById('goldSection') || {}).dataset
+            ? (document.getElementById('goldSection').dataset.goldType || '') : '';
+          return gt === 'coin' ? 'coin' : gt === 'jewelry' ? 'jewelry' : 'bullion';
+        })(),
         physicalGold:      true,
         metal:             'gold',
         purityFactor:      _goldPurity(karat),
