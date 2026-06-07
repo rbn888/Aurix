@@ -1295,6 +1295,19 @@ body.modal-open {
 .modal:not([data-step="picker"]) > #addV2Picker {
   display: none;
 }
+/* AURIX-METALS-ADD-SHEET-FIX — metal-picker step: same chrome hiding as the
+   generic picker, and show ONLY the metal picker section on this step. */
+.modal[data-step="metal-picker"] > .modal-header,
+.modal[data-step="metal-picker"] > .add-type-toggle,
+.modal[data-step="metal-picker"] > #assetForm {
+  display: none;
+}
+.modal:not([data-step="metal-picker"]) > #addV2MetalPicker {
+  display: none;
+}
+.modal[data-step="metal-picker"] > #addV2MetalPicker {
+  display: flex;
+}
 
 .add-v2-picker {
   display: flex;

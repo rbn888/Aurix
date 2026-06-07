@@ -56,7 +56,7 @@
     // serve a half-cached app. Same user + same account must render the
     // same code on Safari mobile, the iOS home-screen PWA, and desktop.
     (function() {
-      window.AURIX_BUILD = 'v192-mobile-hide-yaxis';
+      window.AURIX_BUILD = 'v193-metals-add-sheet';
       try {
         var KEY     = 'aurix_build';
         var RELOAD  = 'aurix_build_reload';
@@ -114,7 +114,7 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=204">
+  <link rel="stylesheet" href="styles.css?v=205">
 </head>
 <body style="background:#070a14">
 
@@ -598,6 +598,20 @@
             </span>
           </button>
         </div>
+      </section>
+
+      <!-- AURIX-METALS-ADD-SHEET-FIX — metal selection sheet. "+ Añadir metal" no
+           longer jumps straight to gold; it opens this picker. Shown only on
+           data-step="metal-picker". Options are rendered from the metals registry
+           in app.js (currently Oro + Plata; copper deferred until HG=F spot pricing
+           is wired). Reuses the premium .add-v2-picker / .add-v2-card styling. -->
+      <section class="add-v2-picker" id="addV2MetalPicker">
+        <div class="add-v2-picker-head">
+          <h3 data-i18n="metalPicker_title">Añadir metal</h3>
+          <button class="modal-close" id="addV2MetalPickerClose" type="button" aria-label="Close">✕</button>
+        </div>
+        <p class="add-v2-picker-sub" data-i18n="metalPicker_sub">Elige el metal que quieres registrar.</p>
+        <div class="add-v2-grid" id="addV2MetalOptions"></div>
       </section>
 
       <div class="modal-header">
@@ -1198,7 +1212,7 @@
   <script defer src="services/portfolio-price-layer.js?v=1"></script>
   <script defer src="services/portfolio-net-worth.js?v=1"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
-  <script src="app.js?v=223"></script>
+  <script src="app.js?v=224"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
        Loads after app.js so it can read its primitives. No consumers yet. -->
   <script src="services/wealth-engine.js?v=2"></script>

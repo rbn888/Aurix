@@ -1199,6 +1199,13 @@ const T = {
     addV2_pick_re_sub:         'Vivienda, propiedad o renta mensual',
     addV2_pick_other_title:    'Otro activo',
     addV2_pick_other_sub:      'Próximamente',
+    // AURIX-METALS-ADD-SHEET-FIX — metal selection sheet copy.
+    metalPicker_title:         'Añadir metal',
+    metalPicker_sub:           'Elige el metal que quieres registrar.',
+    metalPick_gold_title:      'Oro',
+    metalPick_gold_sub:        'Joyería, lingotes o monedas por peso y pureza',
+    metalPick_silver_title:    'Plata',
+    metalPick_silver_sub:      'Lingotes, monedas o plata de inversión',
     addV2_back:                'Volver',
     // ADD-V2.2: contextual Step-2 polish — quick picks, recents, advanced.
     addV2_quick_recent:        'Recientes',
@@ -2421,6 +2428,13 @@ const T = {
     addV2_pick_re_sub:         'Home, property or monthly rent',
     addV2_pick_other_title:    'Other asset',
     addV2_pick_other_sub:      'Coming soon',
+    // AURIX-METALS-ADD-SHEET-FIX — metal selection sheet copy.
+    metalPicker_title:         'Add metal',
+    metalPicker_sub:           'Choose the metal you want to record.',
+    metalPick_gold_title:      'Gold',
+    metalPick_gold_sub:        'Jewelry, bars or coins by weight and purity',
+    metalPick_silver_title:    'Silver',
+    metalPick_silver_sub:      'Bars, coins or investment silver',
     addV2_back:                'Back',
     // ADD-V2.2: contextual Step-2 polish — quick picks, recents, advanced.
     addV2_quick_recent:        'Recent',
@@ -21397,6 +21411,45 @@ document.addEventListener('click', (e) => {
 
 // ── Modal ──────────────────────────────────────────────────
 
+// AURIX-METALS-ADD-SHEET-FIX — supported metals for the "+ Añadir metal" picker.
+// EXTENSIBLE registry: add an entry here once a metal's pricing is wired and it
+// will appear in the sheet automatically (no other change needed). Copper
+// (XCU / HG=F) is intentionally omitted for now — api/prices/snapshot.js has no
+// HG=F spot proxy, so it would be an unpriceable holding; add it when wired.
+//   mode 'gold'  → the premium physical-gold flow (weight + purity).
+//   mode 'asset' → the standard quantity + price flow (e.g. silver via SI=F).
+const _AURIX_METAL_ADD = [
+  { key: 'gold',   mode: 'gold',  icon: '◉', asset: { ticker: 'XAU', name: 'Gold',   type: 'metal', marketSymbol: 'GC=F' } },
+  { key: 'silver', mode: 'asset', icon: '◍', asset: { ticker: 'XAG', name: 'Silver', type: 'metal', marketSymbol: 'SI=F' } },
+];
+function _aurixRenderMetalPicker() {
+  const wrap = document.getElementById('addV2MetalOptions');
+  if (!wrap) return;
+  wrap.innerHTML = _AURIX_METAL_ADD.map(m => `
+    <button type="button" class="add-v2-card" data-metal-pick="${escHtml(m.key)}">
+      <span class="add-v2-icon">${m.icon}</span>
+      <span class="add-v2-text">
+        <span class="add-v2-title">${escHtml(t('metalPick_' + m.key + '_title'))}</span>
+        <span class="add-v2-sub">${escHtml(t('metalPick_' + m.key + '_sub'))}</span>
+      </span>
+      <span class="add-v2-chevron" aria-hidden="true">›</span>
+    </button>`).join('');
+}
+// Open the concrete add flow for a chosen metal. Gold → premium gold flow; other
+// metals → standard asset flow with the metal pre-selected via the canonical
+// selectAsset pipeline (so pricing/quantity behave exactly as a searched pick).
+function _aurixMetalPick(key) {
+  const m = _AURIX_METAL_ADD.find(x => x.key === key);
+  if (!m) return;
+  _modalContext = (m.mode === 'gold') ? 'gold' : 'asset';
+  _modalAssetFilterContext = 'metal';
+  if (typeof _addV2SetMode === 'function') _addV2SetMode(m.mode === 'gold' ? 'gold' : 'asset');
+  if (typeof _addV2Activate === 'function') _addV2Activate('form');
+  setTimeout(() => {
+    try { if (typeof selectAsset === 'function') selectAsset(Object.assign({}, m.asset)); } catch (_) {}
+  }, 30);
+}
+
 // Opens the add-asset modal pre-filtered to the given category type.
 // Reuses openModal() then programmatically clicks the matching filter button.
 // ADD-V2.1: skips the type picker — contextual entry points already
@@ -21421,19 +21474,14 @@ function openContextualModal(type) {
     try { if (typeof enterRealEstateMode === 'function') enterRealEstateMode(); } catch (_) {}
     return;
   }
-  // Metals / Gold: jump straight into the gold flow with XAU pre-selected
-  // — the user already said "Gold/Metals", we never need to ask again.
+  // AURIX-METALS-ADD-SHEET-FIX — "+ Añadir metal" must let the user CHOOSE the
+  // metal, not jump straight to gold. Open the metal picker sheet (Oro / Plata,
+  // from the metals registry). Each option then opens its concrete add flow.
   if (type === 'metal') {
-    _modalContext = 'gold';
+    _modalContext = 'metal-picker';
     _modalAssetFilterContext = 'metal';
-    if (typeof _addV2SetMode === 'function') _addV2SetMode('gold');
-    setTimeout(() => {
-      try {
-        if (typeof selectAsset === 'function') {
-          selectAsset({ ticker:'XAU', name:'Gold', type:'metal', marketSymbol:'GC=F' });
-        }
-      } catch (_) {}
-    }, 30);
+    if (typeof _aurixRenderMetalPicker === 'function') _aurixRenderMetalPicker();
+    if (typeof _addV2Activate === 'function') _addV2Activate('metal-picker');
     return;
   }
   // Financial assets — keep the asset surface, just lock the filter so
@@ -23873,6 +23921,17 @@ function _addV4RenderPreview() {
   const pickerClose = document.getElementById('addV2PickerClose');
   const backBtn     = document.getElementById('addV2Back');
   if (pickerClose) pickerClose.addEventListener('click', closeModal);
+  // AURIX-METALS-ADD-SHEET-FIX — wire the metal picker sheet (Oro / Plata).
+  const metalPicker = document.getElementById('addV2MetalPicker');
+  const metalClose  = document.getElementById('addV2MetalPickerClose');
+  if (metalClose) metalClose.addEventListener('click', closeModal);
+  if (metalPicker) {
+    metalPicker.addEventListener('click', e => {
+      const card = e.target.closest && e.target.closest('[data-metal-pick]');
+      if (!card || card.classList.contains('is-disabled')) return;
+      if (typeof _aurixMetalPick === 'function') _aurixMetalPick(card.dataset.metalPick);
+    });
+  }
   if (backBtn) {
     backBtn.addEventListener('click', () => {
       // Reset every sub-flow state that Step 2 might have entered, then
