@@ -164,6 +164,23 @@
         background-size: 200% 100%;
         animation: aurix-chart-shimmer 2.2s linear infinite;
       }
+      /* AURIX-CHART-VISIBLE-ENGINE-CLOSEOUT — custom DOM X-axis for the portfolio
+         surface. LWC's native time scale offers too few/uneven ticks on the
+         densified series (often a single label), so we suppress the native labels
+         and paint our own evenly-spaced, range-aware marks (real dates/times). */
+      .aurix-xaxis {
+        position: absolute; left: 0; right: 0; bottom: 0; height: 18px;
+        pointer-events: none; z-index: 2;
+      }
+      .aurix-xaxis-label {
+        position: absolute; bottom: 1px;
+        font-size: 10px; line-height: 1;
+        color: rgba(220,230,250,0.42);
+        white-space: nowrap; font-variant-numeric: tabular-nums;
+        transform: translateX(-50%);
+      }
+      .aurix-xaxis-label.edge-l { transform: none; }
+      .aurix-xaxis-label.edge-r { transform: none; }
       @keyframes aurix-chart-shimmer {
         from { background-position: 200% 0; }
         to   { background-position: -200% 0; }
@@ -643,6 +660,12 @@
     badge.hidden = true;
     host.appendChild(badge);
 
+    // AURIX-CHART-VISIBLE-ENGINE-CLOSEOUT — custom DOM X-axis (portfolio + time
+    // scale only). Painted by _renderXAxis from the REAL series; the native LWC
+    // labels are suppressed (tickMarkFormatter returns '' for portfolio).
+    const xaxis = (opts.variant === 'portfolio' && opts.showTimeScale) ? document.createElement('div') : null;
+    if (xaxis) { xaxis.className = 'aurix-xaxis'; host.appendChild(xaxis); }
+
     // AURIX-CHARTS — mobile current-value chip removed. The value must
     // only surface on user interaction (long-press → tooltip), never as
     // a permanent overlay on the chart. The chip element is kept null
@@ -848,52 +871,16 @@
         //     it left the line as a short centred stub. OFF + scroll/scale locked
         //     means the endpoints pin exactly to the plot edges and stay there, so
         //     every range fills the same full width.
-        //   • tickMarkFormatter: range-aware, local-timezone labels (_formatAxisTick).
-        //     `_state` resolves lazily at render time, after the controller inits it.
+        //   • AURIX-CHART-VISIBLE-ENGINE-CLOSEOUT: native LWC time labels are
+        //     SUPPRESSED for the portfolio surface (tickMarkFormatter → '') because
+        //     LWC offers too few/uneven ticks on the densified series (often a single
+        //     label). The bottom strip stays reserved (visible:true) and our own
+        //     evenly-spaced DOM axis (_renderXAxis) paints the real range-aware marks.
         ...(opts.variant === 'portfolio' ? {
           fixLeftEdge: false,
           fixRightEdge: false,
           lockVisibleTimeRangeOnResize: false,
-          tickMarkFormatter: function (time, _tickMarkType, locale) {
-            const r  = String((_state && _state.range) || '').toLowerCase();
-            const ms = (typeof time === 'number') ? time * 1000
-                     : (time && typeof time === 'object' && time.year)
-                       ? new Date(time.year, (time.month || 1) - 1, time.day || 1).getTime()
-                       : Date.parse(time);
-            // AURIX-CHART-FINAL-UX-MICROFIX — start a fresh dedup pass when the
-            // tick stream restarts (first call, or time going backwards).
-            if (!_axisSeenBuckets || !(ms > _axisLastMs)) {
-              _axisSeenBuckets = new Set();
-              _axisSeenLabels  = new Set();
-            }
-            _axisLastMs = ms;
-            const label = _formatAxisTick(time, r, locale);
-            if (!label) return '';
-            // AURIX-CHART-FINAL-RENDER-FIX — for a SPARSE range (few plotted points)
-            // pick ticks by EVEN POSITION (≈5 marks: start · quarters · end) instead
-            // of by time bucket. A time bucket collapses to one label when the span
-            // is only a few days (the bare 30D/1A axis); position-even always gives a
-            // balanced, professional spread. Real dates/times are still the labels.
-            const N = Array.isArray(_renderTimesSec) ? _renderTimesSec.length : 0;
-            if (N >= 2 && N <= 14 && typeof time === 'number') {
-              const idx = _renderTimesSec.indexOf(time);
-              if (idx < 0) return '';
-              const TARGET = Math.min(5, N);
-              const targets = new Set();
-              for (let k = 0; k < TARGET; k++) targets.add(Math.round(k * (N - 1) / (TARGET - 1)));
-              if (!targets.has(idx) || _axisSeenLabels.has(label)) return '';
-              _axisSeenLabels.add(label);
-              return label;
-            }
-            // Dense range: GLOBAL dedup — one label per range bucket (even, capped
-            // spacing) AND never the same label string twice anywhere on the axis.
-            // Pure label thinning — no tick is moved or invented.
-            const bucket = _axisBucketKey(ms, r);
-            if (_axisSeenBuckets.has(bucket) || _axisSeenLabels.has(label)) return '';
-            _axisSeenBuckets.add(bucket);
-            _axisSeenLabels.add(label);
-            return label;
-          },
+          tickMarkFormatter: function () { return ''; },
         } : {}),
       },
       crosshair: opts.showCrosshair
@@ -960,32 +947,97 @@
     // instead of by time bucket — a time bucket collapses to a single label when a
     // sparse range spans only a few days, which is what made 30D/1A axes look bare.
     let _renderTimesSec = null;
-    // Compact range render: frame the visible range so the FIRST and LAST data
-    // points sit on the plot's left/right edges. LWC's fitContent() shows the full
-    // BAR range ([-0.5, N-0.5]), which leaves a half-bar margin on each side —
-    // negligible on a dense window but, on a sparse range (few points / little
-    // coverage), it renders the line as a short centred stub that "doesn't reach
-    // side to side". Pinning [0, N-1] makes a sparse 30D/1A/TOTAL fill the width as
-    // an intentional evolution. SCOPED to the portfolio surface; other variants
-    // keep LWC's default framing. Pure view framing — no point is moved, added or
-    // invented; real timestamps stay in the tooltip and on the axis.
+    // AURIX-CHART-VISIBLE-ENGINE-CLOSEOUT — empirically (headless Chrome render of
+    // the real engine) Lightweight Charts reserves a structural HALF-BAR margin at
+    // each plot edge that NO logical-range trick removes: with N points the first
+    // point sits ~1/(2N) in from the edge, so setVisibleLogicalRange([0,N-1]) had no
+    // visible effect (it reported [0,N-1] but the render kept fitContent's framing).
+    // That is why sparse 30D/1A/TOTAL never filled. The fix is _densifyForDisplay
+    // (below): a sparse line is UPSAMPLED along its own real segments so N is large,
+    // 1/(2N) ≈ 0 and fitContent fills the width. So _fitView is now simply
+    // fitContent for every surface.
     let _fitModeApplied = 'none';
     function _fitView() {
-      try {
-        const ts = chart.timeScale();
-        // Belt-and-braces: fitContent() ALWAYS runs first as a guaranteed baseline
-        // framing (fills the width, modulo half-bar margins). Then, for the portfolio
-        // surface, pin [0, N-1] to remove the half-bar margins so the first/last
-        // point sit exactly on the plot edges → every range fills the same width. If
-        // the pin ever no-ops, fitContent has still framed the data (never a stub).
-        ts.fitContent();
-        if (opts.variant === 'portfolio' && _barCount >= 2) {
-          ts.setVisibleLogicalRange({ from: 0, to: _barCount - 1 });
-          _fitModeApplied = 'fitContent+pin[0,' + (_barCount - 1) + ']';
-        } else {
-          _fitModeApplied = 'fitContent';
+      try { chart.timeScale().fitContent(); _fitModeApplied = 'fitContent'; } catch (_) {}
+      try { _renderXAxis(); } catch (_) {}
+    }
+    // Display-only line densifier. Samples ALONG the existing real segments (linear),
+    // so every added point lies exactly on the line already drawn between two real
+    // measured points — it adds NO new information and invents NO snapshot. Endpoints
+    // stay exactly on real points. The headline + tooltips read the REAL series
+    // (_state.data); this only changes how finely the SAME line is sampled so it
+    // fills the plot. Applied to the portfolio surface when the series is sparse.
+    function _densifyForDisplay(arr) {
+      const TARGET = 48;
+      if (!Array.isArray(arr) || arr.length < 2 || arr.length >= 24) return arr;
+      const t0 = arr[0].time, t1 = arr[arr.length - 1].time, span = t1 - t0;
+      if (!(span > 0)) return arr;
+      const out = []; let j = 0;
+      for (let s = 0; s < TARGET; s++) {
+        const t = t0 + span * s / (TARGET - 1);
+        while (j < arr.length - 1 && arr[j + 1].time < t) j++;
+        const a = arr[j], b = arr[Math.min(j + 1, arr.length - 1)];
+        const f = (b.time > a.time) ? Math.max(0, Math.min(1, (t - a.time) / (b.time - a.time))) : 0;
+        out.push({ time: Math.round(t), value: a.value + (b.value - a.value) * f });
+      }
+      for (let i = 1; i < out.length; i++) if (out[i].time <= out[i - 1].time) out[i].time = out[i - 1].time + 1;
+      return out;
+    }
+    // Nearest REAL data point (in _state.data, ms) to a given ms — so tooltips snap
+    // to real snapshots even when the visible line was densified for display.
+    function _nearestRealPoint(ms) {
+      const d = _state && Array.isArray(_state.data) ? _state.data : [];
+      let near = null, best = Infinity;
+      for (const p of d) {
+        if (!p || typeof p.time !== 'number' || typeof p.value !== 'number') continue;
+        const diff = Math.abs(p.time - ms);
+        if (diff < best) { best = diff; near = p; }
+      }
+      return near;
+    }
+    // AURIX-CHART-VISIBLE-ENGINE-CLOSEOUT — paint the custom DOM X-axis: up to 5
+    // evenly-spaced, range-aware marks sampled from the REAL series (start · quarters
+    // · end), positioned across the actual plot width (host minus the right price
+    // scale). Honest real dates/times; nothing invented. Re-run on data + resize.
+    function _renderXAxis() {
+      if (!xaxis) return;
+      const real = (_state && Array.isArray(_state.data))
+        ? _state.data.filter(p => p && Number.isFinite(p.time) && Number.isFinite(p.value) && p.value > 0)
+        : [];
+      if (real.length < 2 || host.dataset.state !== 'ready') { xaxis.textContent = ''; return; }
+      let rightW = 0;
+      try { rightW = (chart.priceScale && chart.priceScale('right').width()) || 0; } catch (_) {}
+      const plotW = Math.max(0, host.clientWidth - rightW);
+      if (plotW < 40) { xaxis.textContent = ''; return; }
+      const r = String((_state && _state.range) || '').toLowerCase();
+      // Span-aware label format: for TOTAL / 1A over a SHORT real span (a young
+      // portfolio) the month-only format collapses start+end to the same string, so
+      // fall back to day+month so the endpoints read as distinct real dates.
+      const spanDays = (real[real.length - 1].time - real[0].time) / 86400000;
+      const shortLongRange = (r === 'all' || r === '1y') && spanDays < 45;
+      const fmt = (tsMs) => {
+        if (shortLongRange) {
+          try { return new Date(tsMs).toLocaleDateString(_isLangEs() ? 'es-ES' : 'en-US', { day: 'numeric', month: 'short' }); } catch (_) {}
         }
-      } catch (_) {}
+        return _formatAxisTick(Math.floor(tsMs / 1000), r, null);
+      };
+      const K = Math.min(5, real.length);
+      xaxis.textContent = '';
+      let prevLabel = null;
+      for (let k = 0; k < K; k++) {
+        const idx = (K === 1) ? 0 : Math.round(k * (real.length - 1) / (K - 1));
+        const label = fmt(real[idx].time);
+        if (!label || label === prevLabel) continue;   // skip empties + adjacent dupes
+        prevLabel = label;
+        const frac = (K === 1) ? 0.5 : (k / (K - 1));
+        const span = document.createElement('span');
+        span.className = 'aurix-xaxis-label';
+        span.textContent = label;
+        if (k === 0)            { span.classList.add('edge-l'); span.style.left = '2px'; }
+        else if (k === K - 1)   { span.classList.add('edge-r'); span.style.left = Math.max(0, plotW - 2) + 'px'; span.style.transform = 'translateX(-100%)'; }
+        else                    { span.style.left = (frac * plotW) + 'px'; }
+        xaxis.appendChild(span);
+      }
     }
     function _scalePaddingProvider(baseImpl) {
       const original = (typeof baseImpl === 'function') ? (baseImpl() || null) : baseImpl;
@@ -1222,8 +1274,14 @@
           _hideTooltip();
           return;
         }
-        const ms = (typeof param.time === 'number' ? param.time * 1000 : Date.parse(param.time));
-        _renderTooltip(data.value, ms, undefined, undefined);
+        // AURIX-CHART-VISIBLE-ENGINE-CLOSEOUT — the visible line may be densified, so
+        // snap the tooltip to the nearest REAL snapshot (honest date + value), never
+        // an interpolated display sample.
+        const rawMs = (typeof param.time === 'number' ? param.time * 1000 : Date.parse(param.time));
+        const near  = (opts.variant === 'portfolio') ? _nearestRealPoint(rawMs) : null;
+        const val   = near ? near.value : data.value;
+        const ms    = near ? near.time  : rawMs;
+        _renderTooltip(val, ms, undefined, undefined);
         // Snap x/y to the actual pointer for premium desktop hover.
         const hostRect = host.getBoundingClientRect();
         tooltip.style.left = Math.max(60, Math.min(hostRect.width - 60, param.point.x)) + 'px';
@@ -1573,9 +1631,14 @@
         // Some LWC builds reject duplicate times — the dedupe above
         // already guarantees uniqueness, but normalization can
         // theoretically produce equal values; it never changes time.
-        series.setData(visualSeries);
-        _barCount = visualSeries.length;   // for compact-range view framing (_fitView)
-        _renderTimesSec = visualSeries.map(p => p.time);  // for position-even axis ticks
+        // AURIX-CHART-VISIBLE-ENGINE-CLOSEOUT — densify the VISIBLE line for the
+        // portfolio surface so a sparse range fills the plot (see _densifyForDisplay).
+        // _state.data keeps the REAL series, so headline + tooltips never read a
+        // densified value. Other variants render the real series unchanged.
+        const renderSeries = (opts.variant === 'portfolio') ? _densifyForDisplay(visualSeries) : visualSeries;
+        series.setData(renderSeries);
+        _barCount = renderSeries.length;
+        _renderTimesSec = renderSeries.map(p => p.time);  // for position-even axis ticks
         // Direction (colour) inferred from the VISUAL series so the
         // chart line + label-area gradient match what the user sees.
         const hinted = meta && (meta.direction || meta.directionHint);
@@ -1686,8 +1749,9 @@
           visibleLogicalRange: vlr,
           barCount: _barCount,
           yMargins: _shouldUseMinPadding ? { above: 34, below: 8 } : 'default',
-          xTickMode: (Array.isArray(_renderTimesSec) && _renderTimesSec.length >= 2 && _renderTimesSec.length <= 14)
-            ? 'position-even' : 'time-bucket',
+          xTickMode: (xaxis ? 'dom-overlay' : 'native'),
+          xLabels: xaxis ? xaxis.childElementCount : 0,
+          densifiedBars: _barCount,
           hostSize: { w: Math.round(host.clientWidth), h: Math.round(host.clientHeight) },
           canvasSize: { w: Math.round(canvasHolder.clientWidth), h: Math.round(canvasHolder.clientHeight) },
           state: host.dataset.state,
