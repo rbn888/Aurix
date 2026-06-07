@@ -969,18 +969,21 @@
     // an intentional evolution. SCOPED to the portfolio surface; other variants
     // keep LWC's default framing. Pure view framing — no point is moved, added or
     // invented; real timestamps stay in the tooltip and on the axis.
+    let _fitModeApplied = 'none';
     function _fitView() {
       try {
         const ts = chart.timeScale();
+        // Belt-and-braces: fitContent() ALWAYS runs first as a guaranteed baseline
+        // framing (fills the width, modulo half-bar margins). Then, for the portfolio
+        // surface, pin [0, N-1] to remove the half-bar margins so the first/last
+        // point sit exactly on the plot edges → every range fills the same width. If
+        // the pin ever no-ops, fitContent has still framed the data (never a stub).
+        ts.fitContent();
         if (opts.variant === 'portfolio' && _barCount >= 2) {
-          // Pin the FIRST and LAST points exactly to the plot's left/right edges so
-          // every range fills the same full width. fitContent() is intentionally NOT
-          // called here for portfolio — it frames [-0.5, N-0.5] (half-bar margins)
-          // and would re-stub a sparse range. With fix*Edge + scroll/scale off this
-          // is the final, stable framing.
           ts.setVisibleLogicalRange({ from: 0, to: _barCount - 1 });
+          _fitModeApplied = 'fitContent+pin[0,' + (_barCount - 1) + ']';
         } else {
-          ts.fitContent();
+          _fitModeApplied = 'fitContent';
         }
       } catch (_) {}
     }
@@ -1666,6 +1669,28 @@
           outliersDetected: _state.normalizationSummary ? _state.normalizationSummary.outliers : 0,
           smoothingApplied: !!(_state.normalizationSummary && _state.normalizationSummary.smoothed > 0),
           isSynthetic:      !!(_state.meta && _state.meta.isSynthetic),
+        };
+      },
+      // AURIX-CHART-VISIBLE-ENGINE-CLOSEOUT — live view-framing snapshot so the
+      // app-level [AURIX_CHART_VISIBLE_ENGINE] log can report the ACTUAL visible
+      // logical range (proves whether the [0,N-1] pin stuck), the fit mode, the
+      // Y margins and the X-tick mode — without the user pasting console snippets.
+      getViewDebug() {
+        let vlr = null;
+        try {
+          const r = chart.timeScale().getVisibleLogicalRange();
+          if (r) vlr = { from: +Number(r.from).toFixed(2), to: +Number(r.to).toFixed(2) };
+        } catch (_) {}
+        return {
+          fitMode: _fitModeApplied,
+          visibleLogicalRange: vlr,
+          barCount: _barCount,
+          yMargins: _shouldUseMinPadding ? { above: 34, below: 8 } : 'default',
+          xTickMode: (Array.isArray(_renderTimesSec) && _renderTimesSec.length >= 2 && _renderTimesSec.length <= 14)
+            ? 'position-even' : 'time-bucket',
+          hostSize: { w: Math.round(host.clientWidth), h: Math.round(host.clientHeight) },
+          canvasSize: { w: Math.round(canvasHolder.clientWidth), h: Math.round(canvasHolder.clientHeight) },
+          state: host.dataset.state,
         };
       },
       setState(state) {

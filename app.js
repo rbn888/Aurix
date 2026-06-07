@@ -12031,6 +12031,75 @@ function _aurixSetChartSkin(surface, state, opts) {
   _aurixChartSkinPrev[surface] = state;
 }
 
+// AURIX-CHART-VISIBLE-ENGINE-CLOSEOUT — auto-diagnostic. With window.AURIX_DEBUG_CHART
+// === true the code itself reports which engine is actually painting the visible
+// Dashboard chart (v2 / legacy / none) plus framing, sizes, render state and the
+// exact reasons behind a building state — so nobody has to paste console snippets.
+// Fires after the first render and on every range change.
+function _aurixChartVisibleEngine(surface) {
+  const ctrl     = surface === 'desktop' ? _aurixDashDesktop : _aurixDashMobile;
+  const canvasId = surface === 'desktop' ? 'portfolioChart'  : 'portfolioChartMobile';
+  const canvas   = document.getElementById(canvasId);
+  if (ctrl) return 'v2';
+  if (canvas) {
+    const cs = (canvas.ownerDocument.defaultView || window).getComputedStyle(canvas);
+    if (cs.visibility !== 'hidden' && cs.display !== 'none') return 'legacy';
+  }
+  return 'none';
+}
+function _aurixLogVisibleEngine(surface) {
+  if (typeof window === 'undefined' || window.AURIX_DEBUG_CHART !== true) return;
+  try {
+    const verOf = sel => { const e = document.querySelector(sel); const s = e && (e.src || e.href) || ''; const m = s.match(/\?v=([0-9]+)/); return m ? ('v=' + m[1]) : (s ? 'no-ver' : 'absent'); };
+    const ctrl     = surface === 'desktop' ? _aurixDashDesktop : _aurixDashMobile;
+    const canvasId = surface === 'desktop' ? 'portfolioChart'  : 'portfolioChartMobile';
+    const canvas   = document.getElementById(canvasId);
+    const wrap     = canvas ? canvas.closest('.chart-wrap') : null;
+    const range    = activeRange;
+    const live  = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN;
+    const epoch = (typeof _aurixInvestableChartEpoch === 'function') ? _aurixInvestableChartEpoch() : 0;
+    let dec = null, av = null, vcs = null, vsl = null, ser = [];
+    try { ser = _aurixDashSeries(range); } catch (_) {}
+    try { dec = getDashboardChartRenderState(range); } catch (_) {}
+    const used = (dec && Array.isArray(dec.series) && dec.series.length) ? dec.series : ser;
+    try { av  = getRangeAvailability(range, used, epoch); } catch (_) {}
+    try { vcs = validateChartSeries(range, ser, live); } catch (_) {}
+    try { vsl = validateSeriesAgainstLive(range, used, live); } catch (_) {}
+    const vals = used.map(p => p && p.value).filter(Number.isFinite);
+    const view = (ctrl && typeof ctrl.getViewDebug === 'function') ? ctrl.getViewDebug() : null;
+    const sz = el => el ? { w: Math.round(el.clientWidth), h: Math.round(el.clientHeight) } : null;
+    console.log('[AURIX_CHART_VISIBLE_ENGINE]', {
+      build: window.AURIX_BUILD,
+      appVer:    verOf('script[src*="app.js"]'),
+      coreVer:   verOf('script[src*="aurix-chart-core"]'),
+      stylesVer: verOf('link[href*="styles.css"]'),
+      activeRange: range,
+      isDesktop: surface === 'desktop', isMobile: surface === 'mobile',
+      v2Mounted: !!ctrl,
+      legacyCanvasVisible: canvas ? ((canvas.ownerDocument.defaultView || window).getComputedStyle(canvas).visibility !== 'hidden') : null,
+      visibleEngine: _aurixChartVisibleEngine(surface),
+      wrapSize: sz(wrap), canvasSize: sz(canvas), hostSize: view ? view.hostSize : null,
+      pointCount: used.length,
+      renderState: dec && dec.state,
+      fitMode: view && view.fitMode,
+      visibleLogicalRange: view && view.visibleLogicalRange,
+      yMargins: view && view.yMargins,
+      xTickMode: view && view.xTickMode,
+      // TOTAL / why-building forensics:
+      candidatePts: ser.length,
+      cleanedPts: vcs && (vcs.cleanedSeries || []).length,
+      liveValue: Number.isFinite(live) ? +live.toFixed(2) : null,
+      first: vals.length ? vals[0] : null, last: vals.length ? vals[vals.length - 1] : null,
+      min: vals.length ? Math.min(...vals) : null, max: vals.length ? Math.max(...vals) : null,
+      validateChartSeries: vcs && vcs.reason,
+      validateSeriesAgainstLive: vsl && vsl.reason,
+      getRangeAvailability: av && av.reason,
+    });
+  } catch (e) {
+    try { console.warn('[AURIX_CHART_VISIBLE_ENGINE] log failed:', e && e.message); } catch (_) {}
+  }
+}
+
 function _aurixDashSync(surface) {
   const ctrl = surface === 'desktop' ? _aurixDashDesktop : _aurixDashMobile;
   if (!ctrl) return;
@@ -13411,6 +13480,10 @@ function initChart() {
         },
         y: {
           position: 'right',
+          // AURIX-CHART-VISIBLE-ENGINE-CLOSEOUT — legacy fallback parity with V2:
+          // breathing room so the top/bottom right-axis labels (e.g. "11.000 €")
+          // are never clipped against the plot edge, no matter how high the value.
+          grace: '10%',
           grid: { color: 'rgba(255,255,255,0.035)' },
           border: { display: false },
           ticks: {
@@ -13826,6 +13899,18 @@ function _setChartNoData(el, state) {
 
 function updateChart(animate = false) {
   if (!portfolioChart) return;
+  // AURIX-CHART-VISIBLE-ENGINE-CLOSEOUT — auto-diagnostic (debug only). Scheduled on
+  // the next frame so it reads POST-render sizes + the actual visible logical range.
+  // Covers first render AND range change (range buttons call updateChart). No-op
+  // unless window.AURIX_DEBUG_CHART === true.
+  if (typeof window !== 'undefined' && window.AURIX_DEBUG_CHART === true) {
+    try {
+      requestAnimationFrame(() => {
+        if (_aurixDashDesktop || document.getElementById('portfolioChart'))     _aurixLogVisibleEngine('desktop');
+        if (_aurixDashMobile  || document.getElementById('portfolioChartMobile')) _aurixLogVisibleEngine('mobile');
+      });
+    } catch (_) {}
+  }
   // AURIX-CHART-LAUNCH-QUALITY-1 — single owner. When the V2 overlay is mounted
   // it is the SOLE owner of every visual state (loading/empty/building/ready) AND
   // the headline; the legacy Chart.js canvas is display:none behind it. So this
@@ -23898,6 +23983,9 @@ function initMobileCharts() {
           },
           y: {
             position: 'right',
+            // AURIX-CHART-VISIBLE-ENGINE-CLOSEOUT — legacy fallback parity (mobile):
+            // headroom so the top right-axis label is never clipped.
+            grace: '10%',
             grid: { color: 'rgba(255,255,255,0.035)' },
             border: { display: false },
             ticks: {
