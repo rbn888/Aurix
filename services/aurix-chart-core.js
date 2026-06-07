@@ -869,9 +869,25 @@
             _axisLastMs = ms;
             const label = _formatAxisTick(time, r, locale);
             if (!label) return '';
-            // GLOBAL dedup (not just adjacent): one label per range bucket (even,
-            // capped spacing) AND never the same label string twice anywhere on
-            // the axis. Pure label thinning — no tick is moved or invented.
+            // AURIX-CHART-FINAL-RENDER-FIX — for a SPARSE range (few plotted points)
+            // pick ticks by EVEN POSITION (≈5 marks: start · quarters · end) instead
+            // of by time bucket. A time bucket collapses to one label when the span
+            // is only a few days (the bare 30D/1A axis); position-even always gives a
+            // balanced, professional spread. Real dates/times are still the labels.
+            const N = Array.isArray(_renderTimesSec) ? _renderTimesSec.length : 0;
+            if (N >= 2 && N <= 14 && typeof time === 'number') {
+              const idx = _renderTimesSec.indexOf(time);
+              if (idx < 0) return '';
+              const TARGET = Math.min(5, N);
+              const targets = new Set();
+              for (let k = 0; k < TARGET; k++) targets.add(Math.round(k * (N - 1) / (TARGET - 1)));
+              if (!targets.has(idx) || _axisSeenLabels.has(label)) return '';
+              _axisSeenLabels.add(label);
+              return label;
+            }
+            // Dense range: GLOBAL dedup — one label per range bucket (even, capped
+            // spacing) AND never the same label string twice anywhere on the axis.
+            // Pure label thinning — no tick is moved or invented.
             const bucket = _axisBucketKey(ms, r);
             if (_axisSeenBuckets.has(bucket) || _axisSeenLabels.has(label)) return '';
             _axisSeenBuckets.add(bucket);
@@ -887,13 +903,15 @@
             horzLine: { color: THEME.crosshair, style: 2, width: 1, labelVisible: false },
           }
         : { mode: 0 },
-      // AURIX-CHART-FINAL-RENDER-FIX — the portfolio surface is a glanceable KPI
-      // chart with a fixed per-range window: scrolling/zooming it is not a feature
-      // and it let the user (or an inertial fling) knock the framing off its pinned
-      // edges. Lock it (like sparkline) so the [0, N-1] framing from _fitView stays
-      // stable. Crosshair / long-press inspection are independent and still work.
-      handleScroll: (opts.variant === 'sparkline' || opts.variant === 'portfolio') ? false : true,
-      handleScale:  (opts.variant === 'sparkline' || opts.variant === 'portfolio') ? false : true,
+      // CHART-4B: sparkline is inert; all other surfaces keep LWC's default
+      // interaction. AURIX-CHART-FINAL-RENDER-FIX — the portfolio dashboard framing
+      // is enforced programmatically (the [0, N-1] pin in _fitView, re-applied after
+      // layout), NOT by locking interaction: locking handleScale also tends to make
+      // LWC ignore setVisibleLogicalRange, which is exactly what kept 30D/1A from
+      // filling. So interaction stays enabled and the pin is the single source of
+      // truth for the framing.
+      handleScroll: opts.variant === 'sparkline' ? false : true,
+      handleScale:  opts.variant === 'sparkline' ? false : true,
     });
 
     // AURIX-CHARTS-2 — portfolio surface gets a slightly heavier
@@ -937,6 +955,11 @@
     // AURIX-CHART-LINE-RANGE-POLISH — number of points currently plotted, so the
     // view-framing helper can pin the endpoints to the plot edges.
     let _barCount = 0;
+    // AURIX-CHART-FINAL-RENDER-FIX — ascending array of the plotted point times (in
+    // seconds). Lets the axis thinner select EVENLY-SPACED ticks by POSITION (index)
+    // instead of by time bucket — a time bucket collapses to a single label when a
+    // sparse range spans only a few days, which is what made 30D/1A axes look bare.
+    let _renderTimesSec = null;
     // Compact range render: frame the visible range so the FIRST and LAST data
     // points sit on the plot's left/right edges. LWC's fitContent() shows the full
     // BAR range ([-0.5, N-0.5]), which leaves a half-bar margin on each side —
@@ -1014,7 +1037,7 @@
       // autoscaleInfoProvider is set these provider margins are the authoritative
       // label-clearance control (they supersede the fractional scaleMargins for this
       // series). Bottom stays tight so the curve keeps its vertical presence.
-      return { priceRange: { minValue: lo, maxValue: hi }, margins: { above: 28, below: 8 } };
+      return { priceRange: { minValue: lo, maxValue: hi }, margins: { above: 34, below: 8 } };
     }
 
     // AURIX-CHARTS-PREMIUM-REFINEMENT-1 — portfolio-only visual tuning. SCOPED to
@@ -1465,6 +1488,7 @@
           _applyEmptyCopy(meta && meta.emptyReason);
           _scaleHints = null;
           _barCount = 0;
+          _renderTimesSec = null;
           series.setData([]);
           if (_shouldShowValChip) valchip.hidden = true;
           return;
@@ -1479,6 +1503,7 @@
           _applyEmptyCopy(meta && meta.emptyReason);
           _scaleHints = null;
           _barCount = 0;
+          _renderTimesSec = null;
           series.setData([]);
           if (_shouldShowValChip) valchip.hidden = true;
           return;
@@ -1547,6 +1572,7 @@
         // theoretically produce equal values; it never changes time.
         series.setData(visualSeries);
         _barCount = visualSeries.length;   // for compact-range view framing (_fitView)
+        _renderTimesSec = visualSeries.map(p => p.time);  // for position-even axis ticks
         // Direction (colour) inferred from the VISUAL series so the
         // chart line + label-area gradient match what the user sees.
         const hinted = meta && (meta.direction || meta.directionHint);
@@ -1595,7 +1621,14 @@
           valchip.hidden = false;
         }
         host.dataset.state = 'ready';
+        // AURIX-CHART-FINAL-RENDER-FIX — pin now, and AGAIN after layout settles.
+        // At first paint (and on a hidden mobile slide) the canvas width can still
+        // be 0/stale, so a single synchronous pin frames against the wrong width and
+        // the sparse line looks half-empty. Re-applying on the next frame + a macro
+        // tick makes the full-width framing land reliably.
         _fitView();
+        try { requestAnimationFrame(_fitView); } catch (_) {}
+        try { setTimeout(_fitView, 0); } catch (_) {}
       },
       setRange(range) {
         _state.range = String(range || '7d');
