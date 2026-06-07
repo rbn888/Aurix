@@ -22267,7 +22267,12 @@ function _updateGoldCtaState() {
   }
   if (!btnSubmitEl) return;
   const enabled = v.valid;
-  btnSubmitEl.disabled = !enabled;
+  // AURIX-METALS-ADD-COIN-BUTTON-BUG — keep the gold CTA CLICKABLE even when the
+  // form is incomplete (only the "incomplete" look is applied). A natively
+  // `disabled` button swallows the click silently — that is exactly what made
+  // the button feel dead for some types. Now an incomplete click triggers the
+  // submit handler, which shows a specific toast instead of doing nothing.
+  btnSubmitEl.disabled = false;
   btnSubmitEl.classList.toggle('btn-submit--disabled', !enabled);
   // REBUILD: CTA always reads "Añadir oro a cartera" once valid. The
   // qty-aware "Añadir 25 g de oro" variant is no longer used — the
@@ -22335,8 +22340,35 @@ assetForm.addEventListener('submit', e => {
   // half-filled gold asset. The shared qty/price checks below catch
   // every other branch.
   if (selectedDbAsset && selectedDbAsset.ticker === 'XAU') {
-    const goldState = (typeof _isGoldFormValid === 'function') ? _isGoldFormValid() : null;
-    if (goldState && !goldState.valid) return;
+    // AURIX-METALS-ADD-COIN-BUTTON-BUG — the add flow must work for EVERY type
+    // (jewelry / coin / bar) and must NEVER fail silently (spec #4/#5). Auto-recover
+    // safe defaults, then — if still incomplete — tell the user exactly what's
+    // missing (and re-fetch the spot price) instead of a dead button.
+    if (typeof pendingGoldUnit === 'undefined' || !pendingGoldUnit) pendingGoldUnit = 'g';
+    if (!pendingKarat) pendingKarat = 18;
+    const gs = (typeof _isGoldFormValid === 'function') ? _isGoldFormValid() : null;
+    if (gs && !gs.valid) {
+      if (!gs.type) {
+        try { _aurixShowToast((typeof lang !== 'undefined' && lang === 'es') ? 'Elige el tipo: joyería, moneda o lingote' : 'Choose a type: jewelry, coin or bar', { variant: 'error' }); } catch (_) {}
+        try { document.getElementById('goldTypeRow')?.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
+        return;
+      }
+      if (!gs.qtyValid) {
+        try { _aurixShowToast((typeof lang !== 'undefined' && lang === 'es') ? 'Introduce una cantidad mayor que 0' : 'Enter a quantity greater than 0', { variant: 'error' }); } catch (_) {}
+        try { qtyInput.focus(); } catch (_) {}
+        return;
+      }
+      if (!gs.priceValid) {
+        // Most likely transient cause: spot price not loaded yet → don't dead-end,
+        // fetch it and let the user retry once it lands.
+        try { _aurixShowToast((typeof lang !== 'undefined' && lang === 'es') ? 'Obteniendo el precio del oro… inténtalo de nuevo en un segundo' : 'Fetching the gold price… try again in a second', { variant: 'info' }); } catch (_) {}
+        try { if (typeof fetchGoldSpotPrice === 'function') fetchGoldSpotPrice().then(p => { if (Number.isFinite(p) && p > 0) { pendingPrice = p; if (typeof updatePreview === 'function') updatePreview(); } }); } catch (_) {}
+        return;
+      }
+      // Any other incomplete state — surface it, never silent.
+      try { _aurixShowToast((typeof lang !== 'undefined' && lang === 'es') ? 'Completa los datos del metal para continuar' : 'Complete the metal details to continue', { variant: 'error' }); } catch (_) {}
+      return;
+    }
   }
 
   // ── Real estate branch: manual value entry, no live price ──
@@ -22469,6 +22501,16 @@ assetForm.addEventListener('submit', e => {
   const isGoldAsset = ticker === 'XAU';
   const karat       = isGoldAsset ? pendingKarat    : undefined;
   const goldUnit    = isGoldAsset ? pendingGoldUnit : undefined;
+  // AURIX-METALS-ADD-COIN-BUTTON-BUG / VISUAL-SYSTEM — the chosen physical type
+  // (bar→bullion / coin / jewelry). Computed once so the dedup AND persistence
+  // agree: a coin and a bar at the same karat+unit are DIFFERENT positions and
+  // must never silently merge (that merge was hiding freshly-added coins).
+  const goldVisualType = isGoldAsset
+    ? (() => {
+        const gt = (((document.getElementById('goldSection') || {}).dataset) || {}).goldType || '';
+        return gt === 'coin' ? 'coin' : gt === 'jewelry' ? 'jewelry' : 'bullion';
+      })()
+    : undefined;
   const name        = isGoldAsset ? `Gold ${karat}K` : selectedDbAsset.name;
 
   // Merge into existing position
@@ -22483,7 +22525,7 @@ assetForm.addEventListener('submit', e => {
   const existing = assets.find(a => {
     const aCurrency = (a.assetCurrency || 'USD').toUpperCase();
     if (coinId && a.coinId) return a.coinId === coinId;
-    if (isGoldAsset)        return a.ticker === 'XAU' && a.karat === karat && a.goldUnit === goldUnit;
+    if (isGoldAsset)        return a.ticker === 'XAU' && a.karat === karat && a.goldUnit === goldUnit && (a.visualType || 'bullion') === goldVisualType;
     if (marketSymbol && a.marketSymbol) return a.marketSymbol === marketSymbol && aCurrency === newCurrency;
     return a.ticker.toUpperCase() === ticker.toUpperCase() && a.type === type && aCurrency === newCurrency;
   });
@@ -22547,15 +22589,9 @@ assetForm.addEventListener('submit', e => {
       ...(isGoldAsset ? {
         karat,
         goldUnit,
-        // AURIX-METALS-VISUAL-SYSTEM-V1 — persist the visual type chosen in the gold
-        // form (jewelry / coin / bar) as the canonical `visualType` (bullion/coin/
-        // jewelry) so the icon system can show the right glyph everywhere. Defaults
-        // to bullion when the form didn't capture a type.
-        visualType:        (() => {
-          const gt = (document.getElementById('goldSection') || {}).dataset
-            ? (document.getElementById('goldSection').dataset.goldType || '') : '';
-          return gt === 'coin' ? 'coin' : gt === 'jewelry' ? 'jewelry' : 'bullion';
-        })(),
+        // AURIX-METALS-VISUAL-SYSTEM-V1 — persist the chosen visual type so the icon
+        // system shows the right glyph everywhere (computed once, above).
+        visualType:        goldVisualType,
         physicalGold:      true,
         metal:             'gold',
         purityFactor:      _goldPurity(karat),
