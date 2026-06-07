@@ -1152,6 +1152,18 @@
       try { series.applyOptions({ autoscaleInfoProvider: _scalePaddingProvider }); } catch (_) {}
     }
 
+    // AURIX-MOBILE-CHART-HIDE-AXES — minimalist premium MOBILE chart: hide the right
+    // price axis (no side amounts) so the LINE is the protagonist. We hide it via
+    // the price scale's `visible:false` (NOT showPriceScale:false) on purpose — the
+    // engine gates the subtle GRID colour on opts.showPriceScale, so keeping that
+    // true preserves the grid while this only removes the axis labels/border. With
+    // the axis hidden LWC reclaims its width, so the plot uses the full width (no
+    // empty gutter). Autoscale padding still applies → vertical room is unchanged.
+    // Desktop (not _isMobilePortfolio) keeps the right axis untouched.
+    if (_isMobilePortfolio) {
+      try { chart.priceScale('right').applyOptions({ visible: false }); } catch (_) {}
+    }
+
     // Apply colorMode shading at series level.
     // AURIX-CHARTS-2 — 'neutral' (flat baseline) now uses a dedicated
     // gray-blue token pair so a post-reset chart never repaints in
