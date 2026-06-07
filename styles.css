@@ -9447,9 +9447,18 @@ main { padding-bottom: 72px; }
 
   /* Card container — same visual hierarchy as hero-card */
   .portfolio-slider-card {
+    /* AURIX-DASHBOARD-CARD-HARMONIZATION (#11.8) — single shared spacing system so
+       the chart slide and the donut slide evolve together and read as one premium
+       component. Both slides consume THESE vars, never independent hardcoded values. */
+    --slide-pad-x:        var(--space-3);  /* sectionHorizontalPadding */
+    --slide-pad-top:      var(--space-3);  /* titleTopSpacing (card → title) */
+    --slide-pad-bottom:   18px;            /* carouselBottomSpacing (dots zone) */
+    --slide-title-mb:     14px;            /* title → content, BOTH slides */
+    --slide-controls-gap: 6px;             /* chartControlsSpacing */
+    --slide-legend-rowgap: 8px;            /* donutLegendSpacing */
     display: block;
     margin: var(--space-1) 0;
-    padding: var(--space-3) var(--space-3) var(--space-2) !important;
+    padding: var(--slide-pad-top) var(--slide-pad-x) var(--space-2) !important;
     background: var(--surface-2);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
@@ -9473,7 +9482,7 @@ main { padding-bottom: 72px; }
     min-height: 252px;
     height: auto;
     position: relative;
-    padding-bottom: 18px !important;
+    padding-bottom: var(--slide-pad-bottom) !important;
     touch-action: pan-y;
     user-select: none;
     -webkit-user-select: none;
@@ -9497,10 +9506,15 @@ main { padding-bottom: 72px; }
     padding: 0;
   }
 
-  /* Chart header: consistent spacing */
+  /* Chart header: title → content gap from the shared system (#11.1/#11.2). */
   .portfolio-mobile-slider .chart-header {
-    margin-bottom: var(--space-2);
+    margin-bottom: var(--slide-title-mb);
   }
+  /* #11.2 — tighter control rhythm to reclaim vertical space for the chart,
+     keeping touch targets (≥28px). Scoped to the slider so desktop is untouched. */
+  .portfolio-mobile-slider .chart-controls { gap: var(--slide-controls-gap); }
+  .portfolio-mobile-slider .range-btn { padding: 5px 9px; }
+  .portfolio-mobile-slider .perf-btn  { padding: 4px 9px; min-height: 28px; }
 
   /* Chart slide: flex column so chart-wrap fills remaining space */
   .mobile-slide-chart {
@@ -9508,34 +9522,39 @@ main { padding-bottom: 72px; }
     flex-direction: column;
   }
 
+  /* #11.3 — kill the dead margin above the chart (was margin-top:var(--space-3)
+     from the shared mobile .chart-wrap rule); that ~16px now goes to the line. */
   .mobile-slide-chart .chart-wrap {
     flex: 1;
     min-height: 0;
+    margin-top: 0;
     position: relative;
     overflow: hidden;
   }
 
-  /* Donut slide: top-aligned to match chart slide title position */
+  /* Donut slide: title starts at the SAME Y as the chart title (#11.1) — no extra
+     top padding; the card padding-top is the single source of the title baseline. */
   .mobile-slide-donut {
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
     align-items: stretch;
-    padding-top: 6px;
+    padding-top: 0;
   }
 
-  /* Donut slide: stack donut + legend vertically */
+  /* Donut slide: stack donut + legend vertically, tighter (#11.4). */
   .mobile-distribution-inner {
     flex-direction: column;
     align-items: center;
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 
+  /* #11.5 — donut slightly larger so it carries the same visual weight as the line. */
   .mobile-donut-wrap {
     position: relative;
     flex-shrink: 0;
-    width: min(160px, 45vw);
-    height: min(160px, 45vw);
+    width: min(180px, 48vw);
+    height: min(180px, 48vw);
     overflow: visible;
   }
 
@@ -9689,15 +9708,16 @@ main { padding-bottom: 72px; }
     opacity: 0.85 !important;
   }
 
-  /* ── Donut legend — 2-column compact grid ── */
+  /* ── Donut legend — 2-column compact grid (#11.4) — tighter row rhythm + closer
+     columns so it consumes ~15-25% less height; row-gap from the shared system. ── */
   .distribution-legend {
     display: grid !important;
     grid-template-columns: auto auto !important;
     justify-content: start;
-    column-gap: var(--space-5);
-    row-gap: 10px;
+    column-gap: var(--space-4);
+    row-gap: var(--slide-legend-rowgap);
     width: fit-content;
-    margin: var(--space-2) auto 0;
+    margin: var(--space-1) auto 0;
   }
 
   .distribution-legend .legend-item {
@@ -9710,7 +9730,8 @@ main { padding-bottom: 72px; }
     white-space: nowrap;
   }
 
-  /* ── Donut title: reset section-title overrides to match chart-title ── */
+  /* ── Donut title: matches chart-title exactly (font + start Y) and uses the
+     SHARED title→content gap so both slides feel identical (#11.1/#11.8). ── */
   .mobile-slide-donut .section-title.card-title {
     font-size: 11px !important;
     font-weight: var(--font-weight-semibold) !important;
@@ -9718,7 +9739,7 @@ main { padding-bottom: 72px; }
     opacity: 1 !important;
     line-height: 1 !important;
     margin-top: 0 !important;
-    margin-bottom: 28px !important;
+    margin-bottom: var(--slide-title-mb) !important;
     transform: none;
   }
 }
@@ -9802,7 +9823,9 @@ body.is-detail-view .mobile-slide            { height: auto !important; }
   .portfolio-slider-card > *:last-child { margin-bottom: 0 !important; }
 }
 
-/* ── Donut spacing override ── */
+/* ── Donut spacing override — AURIX-DASHBOARD-CARD-HARMONIZATION (#11.1): this is
+   the cascade-winning rule for the donut title; it now uses the SHARED
+   title→content gap so it stays aligned with the chart slide. ── */
 @media (max-width: 768px) {
   .mobile-slide-donut .section-title.card-title {
     font-size: 11px !important;
@@ -9811,7 +9834,7 @@ body.is-detail-view .mobile-slide            { height: auto !important; }
     opacity: 1 !important;
     line-height: 1 !important;
     margin-top: 0 !important;
-    margin-bottom: 28px !important;
+    margin-bottom: var(--slide-title-mb) !important;
     transform: none !important;
   }
 }
