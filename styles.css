@@ -8920,10 +8920,12 @@ main { padding-bottom: 72px; }
   z-index: 1;
   line-height: 1;
 }
-/* Logo layer — fades in only once decoded (no "letter→logo", no reflow). */
+/* AURIX-MARKET-ICON-FLICKER-FIX — paint the logo immediately (like the Dashboard
+   badge), not via an opacity-0 → 1 fade. The fade replayed on every refresh (even
+   for cached logos) and read as a flicker; the designed fallback is hidden when a
+   logo exists and the dark plate covers the brief decode gap, so no letter flash. */
 .aurix-aicon-img {
-  opacity: 0;
-  transition: opacity 160ms ease;
+  opacity: 1;
 }
 .aurix-aicon-img.is-loaded { opacity: 1; }
 /* While a logo is present, hide the designed fallback — the user sees a
