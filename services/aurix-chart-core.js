@@ -840,15 +840,20 @@
         // (dashboard + category-perf, both variant 'portfolio'). Asset / Market
         // (variant 'asset') and sparkline/mini keep LWC's default labels + edge
         // behaviour → byte-identical, Market untouched.
-        //   • fixLeftEdge/fixRightEdge: keep the series flush to both edges so the
-        //     curve fills the width and LWC left-/right-aligns the first/last
-        //     label instead of clipping it past the pane.
+        //   • AURIX-CHART-FINAL-RENDER-FIX: fixLeftEdge/fixRightEdge are now OFF.
+        //     With them ON, LWC framed the visible range to the full first/last BAR
+        //     ([-0.5, N-0.5]), re-introducing a half-bar margin on each side that
+        //     OVERRODE _fitView's setVisibleLogicalRange([0, N-1]). Invisible on a
+        //     dense window (0.5/N ≈ 0) but on a sparse range (30D/1A with few points)
+        //     it left the line as a short centred stub. OFF + scroll/scale locked
+        //     means the endpoints pin exactly to the plot edges and stay there, so
+        //     every range fills the same full width.
         //   • tickMarkFormatter: range-aware, local-timezone labels (_formatAxisTick).
         //     `_state` resolves lazily at render time, after the controller inits it.
         ...(opts.variant === 'portfolio' ? {
-          fixLeftEdge: true,
-          fixRightEdge: true,
-          lockVisibleTimeRangeOnResize: true,
+          fixLeftEdge: false,
+          fixRightEdge: false,
+          lockVisibleTimeRangeOnResize: false,
           tickMarkFormatter: function (time, _tickMarkType, locale) {
             const r  = String((_state && _state.range) || '').toLowerCase();
             const ms = (typeof time === 'number') ? time * 1000
@@ -882,8 +887,13 @@
             horzLine: { color: THEME.crosshair, style: 2, width: 1, labelVisible: false },
           }
         : { mode: 0 },
-      handleScroll: opts.variant === 'sparkline' ? false : true,
-      handleScale:  opts.variant === 'sparkline' ? false : true,
+      // AURIX-CHART-FINAL-RENDER-FIX — the portfolio surface is a glanceable KPI
+      // chart with a fixed per-range window: scrolling/zooming it is not a feature
+      // and it let the user (or an inertial fling) knock the framing off its pinned
+      // edges. Lock it (like sparkline) so the [0, N-1] framing from _fitView stays
+      // stable. Crosshair / long-press inspection are independent and still work.
+      handleScroll: (opts.variant === 'sparkline' || opts.variant === 'portfolio') ? false : true,
+      handleScale:  (opts.variant === 'sparkline' || opts.variant === 'portfolio') ? false : true,
     });
 
     // AURIX-CHARTS-2 — portfolio surface gets a slightly heavier
@@ -939,9 +949,15 @@
     function _fitView() {
       try {
         const ts = chart.timeScale();
-        ts.fitContent();
         if (opts.variant === 'portfolio' && _barCount >= 2) {
+          // Pin the FIRST and LAST points exactly to the plot's left/right edges so
+          // every range fills the same full width. fitContent() is intentionally NOT
+          // called here for portfolio — it frames [-0.5, N-0.5] (half-bar margins)
+          // and would re-stub a sparse range. With fix*Edge + scroll/scale off this
+          // is the final, stable framing.
           ts.setVisibleLogicalRange({ from: 0, to: _barCount - 1 });
+        } else {
+          ts.fitContent();
         }
       } catch (_) {}
     }
@@ -992,7 +1008,13 @@
         }
       }
 
-      return { priceRange: { minValue: lo, maxValue: hi }, margins: original.margins };
+      // AURIX-CHART-FINAL-RENDER-FIX — explicit generous TOP pixel margin so the
+      // highest right-axis price label (e.g. "11.000 €") is NEVER clipped against the
+      // pane top, no matter how high the value climbs. When a custom
+      // autoscaleInfoProvider is set these provider margins are the authoritative
+      // label-clearance control (they supersede the fractional scaleMargins for this
+      // series). Bottom stays tight so the curve keeps its vertical presence.
+      return { priceRange: { minValue: lo, maxValue: hi }, margins: { above: 28, below: 8 } };
     }
 
     // AURIX-CHARTS-PREMIUM-REFINEMENT-1 — portfolio-only visual tuning. SCOPED to
