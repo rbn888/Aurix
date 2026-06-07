@@ -8938,18 +8938,21 @@ main { padding-bottom: 72px; }
   border: 1px solid rgba(255,255,255,0.05) !important;
 }
 .aicon--crypto .aurix-aicon-img { object-fit: cover; }
-/* Stocks / ETFs / funds — light chip so black / dark logos stay visible
-   on the dark Aurix bg (Robinhood-style provider chip). */
+/* AURIX-ASSET-ICON-UNIFICATION — stocks / ETFs / funds now sit on the SAME
+   premium dark Aurix plate as crypto (no more stark white "sticker" chip), so a
+   stock in Market looks identical to the same stock on the Dashboard. The old
+   #f3f6fc chip also broke light-text logos (e.g. Invesco/QQQ = white text → white
+   on white). Logos render transparent on the integrated dark plate. */
 .aicon--stock.has-logo,
 .aicon--etf.has-logo,
 .aicon--fund.has-logo {
-  background: #f3f6fc !important;
-  border: 1px solid rgba(255,255,255,0.10) !important;
-  box-shadow: 0 0 0 1px rgba(8,12,22,0.40) inset !important;
+  background: radial-gradient(circle at 50% 38%, #1b2438 0%, #0d1322 100%) !important;
+  border: 1px solid rgba(255,255,255,0.05) !important;
+  box-shadow: none !important;
 }
 .aicon--stock .aurix-aicon-img,
 .aicon--etf   .aurix-aicon-img,
-.aicon--fund  .aurix-aicon-img { object-fit: contain; padding: 16%; }
+.aicon--fund  .aurix-aicon-img { object-fit: contain; padding: 15%; }
 
 /* ── Premium fallbacks (no logo) ───────────────────────────────────── */
 /* Crypto / stock / generic — clean initial on the existing Aurix dark

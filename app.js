@@ -20413,12 +20413,12 @@ function _aurixPremiumFallback(asset, initialSource) {
 // commodity skip the unreliable by-symbol guess (it can resolve to a generic
 // grey image) and use the designed premium badge instead.
 function _aurixMktIconUrl(asset) {
-  if (!asset || typeof asset !== 'object') return getAssetLogo(asset) || null;
-  if (typeof asset.image === 'string' && /^https:\/\//.test(asset.image)) return asset.image;
-  if (typeof asset.logo  === 'string' && /^https:\/\//.test(asset.logo))  return asset.logo;
-  const type = String(asset.type || '').toLowerCase();
-  if (type === 'crypto' || type === 'stock') return getAssetLogo(asset);
-  return null;
+  // AURIX-ASSET-ICON-UNIFICATION — Market resolves logos through the SINGLE
+  // canonical resolver (getAssetLogo: image → logo → CLEAN_LOGO_OVERRIDE → CDN/FMP)
+  // for EVERY type. Previously it only resolved crypto/stock, so Market ETFs lost
+  // the logo the Dashboard showed (divergence). Now Market === Dashboard at the
+  // source: same asset, same URL, no per-screen reinterpretation.
+  return getAssetLogo(asset) || null;
 }
 function _assetIconHtml(asset, initialSource, baseClass) {
   const type     = String((asset && asset.type) || '').toLowerCase();
