@@ -181,6 +181,18 @@
       }
       .aurix-xaxis-label.edge-l { transform: none; }
       .aurix-xaxis-label.edge-r { transform: none; }
+      /* AURIX-CHART-LINE-PREMIUM-DETAIL-PASS — live end-dot. Colour + halo are set
+         inline (matched to the line); this owns size, centring and stacking. It is
+         pointer-events:none so it never intercepts touch / swipe. */
+      .aurix-chart-endpoint {
+        position: absolute;
+        width: 7px; height: 7px;
+        margin-left: -3.5px; margin-top: -3.5px;
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 3;
+        will-change: left, top;
+      }
       @keyframes aurix-chart-shimmer {
         from { background-position: 200% 0; }
         to   { background-position: -200% 0; }
@@ -672,6 +684,13 @@
     const xaxis = (opts.variant === 'portfolio' && opts.showTimeScale) ? document.createElement('div') : null;
     if (xaxis) { xaxis.className = 'aurix-xaxis'; host.appendChild(xaxis); }
 
+    // AURIX-CHART-LINE-PREMIUM-DETAIL-PASS — a discreet "live" end-dot at the last
+    // point (portfolio surface). Pure presentation: positioned from the rendered
+    // coords, pointer-events:none (never steals touch / swipe), shown only in the
+    // ready state. Especially valuable on mobile where the axes are hidden.
+    const endpoint = (opts.variant === 'portfolio') ? document.createElement('div') : null;
+    if (endpoint) { endpoint.className = 'aurix-chart-endpoint'; endpoint.setAttribute('aria-hidden', 'true'); host.appendChild(endpoint); }
+
     // AURIX-CHARTS — mobile current-value chip removed. The value must
     // only surface on user interaction (long-press → tooltip), never as
     // a permanent overlay on the chart. The chip element is kept null
@@ -966,6 +985,35 @@
     function _fitView() {
       try { chart.timeScale().fitContent(); _fitModeApplied = 'fitContent'; } catch (_) {}
       try { _renderXAxis(); } catch (_) {}
+      try { _renderEndpoint(); } catch (_) {}
+    }
+    // AURIX-CHART-LINE-PREMIUM-DETAIL-PASS — same rgb, new alpha (for the end-dot halo).
+    function _rgbaAlpha(color, a) {
+      const m = String(color || '').match(/rgba?\(([^)]+)\)/);
+      if (m) { const p = m[1].split(',').map(s => s.trim()); return `rgba(${p[0]},${p[1]},${p[2]},${a})`; }
+      return color;
+    }
+    // Position the live end-dot at the last plotted point, coloured to match the
+    // line. Hidden unless the chart is in the ready state with ≥1 real point.
+    function _renderEndpoint() {
+      if (!endpoint) return;
+      try {
+        const real = (_state && Array.isArray(_state.data)) ? _state.data : [];
+        const N = Array.isArray(_renderTimesSec) ? _renderTimesSec.length : 0;
+        const last = real.length ? real[real.length - 1] : null;
+        if (host.dataset.state !== 'ready' || !N || !last || !Number.isFinite(last.value)) {
+          endpoint.style.display = 'none';
+          return;
+        }
+        const x = chart.timeScale().timeToCoordinate(_renderTimesSec[N - 1]);
+        const y = series.priceToCoordinate(last.value);
+        if (x == null || y == null) { endpoint.style.display = 'none'; return; }
+        endpoint.style.left = x + 'px';
+        endpoint.style.top  = y + 'px';
+        endpoint.style.background = _lineColorNow;
+        endpoint.style.boxShadow = `0 0 0 3px ${_rgbaAlpha(_lineColorNow, 0.18)}, 0 0 11px 1px ${_rgbaAlpha(_lineColorNow, 0.45)}`;
+        endpoint.style.display = '';
+      } catch (_) { endpoint.style.display = 'none'; }
     }
     // Display-only line densifier. Samples ALONG the existing real segments (linear),
     // so every added point lies exactly on the line already drawn between two real
@@ -1122,8 +1170,19 @@
         ? { base: 'rgba(138, 166, 255, 0.15)', up: 'rgba(63, 191, 127, 0.13)', down: 'rgba(224, 90, 90, 0.12)', flat: 'rgba(180, 196, 224, 0.07)', bot: THEME.areaBot }
         : { base: THEME.areaTop, up: THEME.areaTopUp, down: THEME.areaTopDn, flat: THEME.areaTopFlat, bot: THEME.areaBot };
 
+    // AURIX-CHART-LINE-PREMIUM-DETAIL-PASS — optional per-instance line colours so
+    // the portfolio surface can use a slightly more vivid Aurix green WITHOUT
+    // touching the shared THEME (Market / asset / sparkline stay byte-identical).
+    // Falls back to THEME for any tone not provided.
+    const _LC     = (opts.lineColors && typeof opts.lineColors === 'object') ? opts.lineColors : {};
+    const _lcBase = _LC.base || THEME.line;
+    const _lcUp   = _LC.up   || THEME.lineUp;
+    const _lcDown = _LC.down || THEME.lineDown;
+    const _lcFlat = _LC.flat || THEME.lineFlat;
+    let _lineColorNow = _lcBase;   // tracked so the live end-dot matches the line
+
     const series = chart.addAreaSeries({
-      lineColor:       THEME.line,
+      lineColor:       _lcBase,
       lineWidth:       _portfolioLineWidth,
       lineType:        (LWC.LineType && LWC.LineType.Curved != null) ? LWC.LineType.Curved : 0,
       topColor:        _area.base,
@@ -1169,10 +1228,14 @@
     // gray-blue token pair so a post-reset chart never repaints in
     // red and never sits on the same hue as a true positive run.
     function _applyColor(mode) {
-      if (mode === 'positive')      series.applyOptions({ lineColor: THEME.lineUp,   topColor: _area.up,   bottomColor: _area.bot });
-      else if (mode === 'negative') series.applyOptions({ lineColor: THEME.lineDown, topColor: _area.down, bottomColor: _area.bot });
-      else if (mode === 'neutral')  series.applyOptions({ lineColor: THEME.lineFlat, topColor: _area.flat, bottomColor: _area.bot });
-      else                          series.applyOptions({ lineColor: THEME.line,     topColor: _area.base, bottomColor: _area.bot });
+      let lc, top;
+      if (mode === 'positive')      { lc = _lcUp;   top = _area.up;   }
+      else if (mode === 'negative') { lc = _lcDown; top = _area.down; }
+      else if (mode === 'neutral')  { lc = _lcFlat; top = _area.flat; }
+      else                          { lc = _lcBase; top = _area.base; }
+      _lineColorNow = lc;
+      series.applyOptions({ lineColor: lc, topColor: top, bottomColor: _area.bot });
+      try { _renderEndpoint(); } catch (_) {}
     }
     if (opts.colorMode && opts.colorMode !== 'auto') _applyColor(opts.colorMode);
 
@@ -1571,6 +1634,7 @@
           _barCount = 0;
           _renderTimesSec = null;
           series.setData([]);
+          try { _renderEndpoint(); } catch (_) {}
           if (_shouldShowValChip) valchip.hidden = true;
           return;
         }
@@ -1586,6 +1650,7 @@
           _barCount = 0;
           _renderTimesSec = null;
           series.setData([]);
+          try { _renderEndpoint(); } catch (_) {}
           if (_shouldShowValChip) valchip.hidden = true;
           return;
         }
@@ -1786,6 +1851,9 @@
       setState(state) {
         const valid = new Set(['loading', 'empty', 'error', 'ready']);
         if (valid.has(state)) host.dataset.state = state;
+        // Hide the live end-dot whenever we leave the ready state (loading/empty/
+        // building/error) so it never lingers over a skin/placeholder.
+        try { _renderEndpoint(); } catch (_) {}
       },
       resize() {
         const w = canvasHolder.clientWidth  || 0;

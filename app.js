@@ -11842,23 +11842,30 @@ function _aurixDashMount(surface) {
       // back to engine defaults and read like a generic JS-lib chart in the
       // screenshot). Mobile is tuned a touch lighter than desktop so the line
       // stays crisp on a denser retina surface.
+      // AURIX-CHART-LINE-PREMIUM-DETAIL-PASS — a more vivid-but-elegant Aurix green
+      // for the positive line (scoped to the portfolio surface via opts.lineColors —
+      // THEME and Market are untouched). down/base/flat fall back to THEME.
+      lineColors: { up: 'rgba(46, 204, 132, 1)' },
       ...(isDesktop ? {
         lineWidth: 2.7,
         gridColor: 'rgba(255, 255, 255, 0.022)',
+        // Richer fill (more depth, still fades softly to transparent → no flat block).
         areaColors: {
-          base: 'rgba(138, 166, 255, 0.22)',
-          up:   'rgba(63, 191, 127, 0.20)',
-          down: 'rgba(224, 90, 90, 0.17)',
-          flat: 'rgba(180, 196, 224, 0.10)',
+          base: 'rgba(138, 166, 255, 0.26)',
+          up:   'rgba(46, 204, 132, 0.26)',
+          down: 'rgba(224, 90, 90, 0.20)',
+          flat: 'rgba(180, 196, 224, 0.12)',
         },
       } : {
-        lineWidth: 2.4,
+        // Mobile has no axes → the line + fill carry the chart; give them a touch
+        // more presence (stroke 2.4 → 2.7, deeper fill) while staying premium.
+        lineWidth: 2.7,
         gridColor: 'rgba(255, 255, 255, 0.016)',
         areaColors: {
-          base: 'rgba(138, 166, 255, 0.20)',
-          up:   'rgba(63, 191, 127, 0.18)',
-          down: 'rgba(224, 90, 90, 0.15)',
-          flat: 'rgba(180, 196, 224, 0.09)',
+          base: 'rgba(138, 166, 255, 0.26)',
+          up:   'rgba(46, 204, 132, 0.27)',
+          down: 'rgba(224, 90, 90, 0.20)',
+          flat: 'rgba(180, 196, 224, 0.12)',
         },
       }),
       // CHART-PARITY-1: data sanitisation (outlier filter + smoothing) stays
