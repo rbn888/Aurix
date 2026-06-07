@@ -109,6 +109,30 @@
         line-height: 1.4;
         color: rgba(200,212,238,0.40);
       }
+      /* AURIX-CHART-PREMIUM-POLISH-WEB-MOBILE — discreet building microcopy. Pinned
+         to the bottom-left, low-contrast, single line. Sits over the calm ghost
+         grid (loading skin) so the 'building' state reads as a quiet financial
+         placeholder, never a dominant text block in the middle of the chart. */
+      .aurix-chart-state--note {
+        align-items: flex-end;
+        justify-content: flex-start;
+        padding: 0 14px 12px;
+      }
+      .aurix-coverage-note {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 11.5px;
+        letter-spacing: 0.01em;
+        color: rgba(210,222,245,0.52);
+      }
+      .aurix-coverage-note::before {
+        content: '';
+        width: 5px; height: 5px;
+        border-radius: 50%;
+        background: rgba(138,166,255,0.6);
+        box-shadow: 0 0 6px rgba(138,166,255,0.45);
+      }
       .aurix-chart-host[data-state="loading"] .aurix-chart-state--loading,
       .aurix-chart-host[data-state="empty"]   .aurix-chart-state--empty,
       .aurix-chart-host[data-state="error"]   .aurix-chart-state--error {
@@ -490,15 +514,19 @@
   // thinner. One label is emitted per bucket (first tick wins), which gives an
   // even, capped set of labels per range AND removes repeats — without snapping
   // or moving any tick (the label still sits at its real time; data untouched).
-  //   24H → 6-hour blocks (≤4)   7D → day (≤7)   30D → week (≤5)
+  //   24H → 4-hour blocks (≤6)   7D → day (≤7)   30D → week (≤5)
   //   1A  → 2-month blocks (≤6)  TOTAL → month
   function _axisBucketKey(ms, r) {
     const d = new Date(ms);
     if (r === '24h') {
-      // Local-aligned absolute 6-hour block (00/06/12/18) → ~4 labels / 24h,
-      // and never split across midnight into extra blocks.
+      // AURIX-CHART-PREMIUM-POLISH-WEB-MOBILE — local-aligned absolute 4-hour blocks
+      // (…00/04/08/12/16/20) → up to ~6 evenly-spaced hour labels across the window
+      // instead of an over-thinned, lopsided 3 (e.g. "18:00 · 10:00 · 15:00"). The
+      // labels stay at their real tick times (no point moved) and read as a clean
+      // ascending time-of-day progression. LWC still decides which ticks to place;
+      // this only governs how many we keep per block.
       const localMs = ms - d.getTimezoneOffset() * 60000;
-      return Math.floor(localMs / (6 * 3600000));
+      return Math.floor(localMs / (4 * 3600000));
     }
     if (r === '7d')  return d.toDateString();
     if (r === '30d' || r === '3m') return Math.floor(ms / (7 * 86400000));
@@ -657,22 +685,20 @@
       if (opts.variant !== 'portfolio') return;
       const es = _isLangEs();
       empty.textContent = '';
+      empty.classList.remove('aurix-chart-state--rich');
       if (reason === 'low_data') {
-        // AURIX-CHART-LAUNCH-QUALITY-1 — ONE clean building message (title + body
-        // only). No third line, no "Histórico disponible desde …", no overlap.
-        empty.classList.add('aurix-chart-state--rich');
-        const title = document.createElement('div');
-        title.className = 'aurix-empty-title';
-        title.textContent = es ? 'Histórico en construcción' : 'Building your history';
-        const body = document.createElement('div');
-        body.className = 'aurix-empty-body';
-        body.textContent = es
-          ? 'Aurix está recopilando suficientes datos para mostrar una evolución fiable.'
-          : 'Aurix is gathering enough data to show a reliable evolution.';
-        empty.appendChild(title);
-        empty.appendChild(body);
+        // AURIX-CHART-PREMIUM-POLISH-WEB-MOBILE — building is now DISCREET, never a
+        // dominant block. A single low-key microcopy pinned to the bottom-left, on
+        // top of the calm ghost-grid loading skin (which stays visible behind the
+        // transparent host in the 'building' state). No title, no long paragraph,
+        // no half-chart text mass. Only ever shown for genuine 0/1-point ranges.
+        empty.classList.add('aurix-chart-state--note');
+        const note = document.createElement('div');
+        note.className = 'aurix-coverage-note';
+        note.textContent = es ? 'Generando histórico fiable' : 'Building reliable history';
+        empty.appendChild(note);
       } else {
-        empty.classList.remove('aurix-chart-state--rich');
+        empty.classList.remove('aurix-chart-state--note');
         empty.textContent = es
           ? 'Tu evolución aparecerá aquí cuando añadas activos.'
           : 'Your evolution will appear here when you add assets.';
@@ -794,12 +820,14 @@
         // here it only needs small SYMMETRIC pixel margins to keep the curve off
         // the literal edges and stop it reading as "pinned to the top". Other
         // charts keep the prior asymmetric margins (byte-identical).
-        // AURIX-CHART-AXIS-1 — 0.06 → 0.08 symmetric: a touch more headroom so the
-        // top/bottom right-axis price labels are never clipped against the pane
-        // edge, while the line still fills the box (real padding lives in the
-        // domain provider, so this is purely label breathing room).
+        // AURIX-CHART-AXIS-1 — symmetric label breathing room (real padding lives in
+        // the domain provider, so this is purely so the price labels clear the pane).
+        // AURIX-CHART-PREMIUM-POLISH-WEB-MOBILE — the TOP right-axis label (e.g.
+        // "7.120 €") was being clipped against the pane top on web. Bump the top
+        // margin 0.08 → 0.16 so the highest gridline label always sits fully inside
+        // the plot; bottom stays tight so the curve keeps its vertical presence.
         scaleMargins: (opts.visualNormalization && opts.visualNormalization.robustScale)
-          ? { top: 0.08, bottom: 0.08 }
+          ? { top: 0.16, bottom: 0.08 }
           : { top: 0.10, bottom: 0.04 },
       },
       leftPriceScale: { visible: false },

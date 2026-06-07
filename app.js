@@ -11329,37 +11329,19 @@ function getRangeAvailability(range, cleanSeries, epoch) {
   for (let i = 0; i < valid.length; i++) dayset.add(Math.floor(valid[i].time / 86400000));
   const uniqueDays = dayset.size;
 
-  let available = false, reason = 'building', recentBaseline = false;
-  if (pointCount < 2) {
-    reason = 'building_no_points';
-  } else if (r === '24h') {
-    available = pointCount >= 4 && spanMin >= 30;
-    reason = available ? 'ready' : 'building_insufficient_intraday';
-  } else if (r === '7d') {
-    available = uniqueDays >= 2 || pointCount >= 4;
-    reason = available ? 'ready' : 'building_insufficient_points';
-    recentBaseline = available && uniqueDays < 7;
-  } else if (r === '30d') {
-    available = uniqueDays >= 5 || spanDays >= 7;
-    reason = available ? 'ready' : 'building_insufficient_days';
-    recentBaseline = available && uniqueDays < 30;
-  } else if (r === '1y') {
-    available = spanDays >= 30;
-    reason = available ? 'ready' : 'building_insufficient_coverage';
-    recentBaseline = available && spanDays < 365;
-  } else if (r === 'all') {
-    // AURIX-CHART-LAUNCH-QUALITY — TOTAL = ALL available valid history, NOT 30D
-    // and NOT 1A. 1 point → building; 2+ points → render from the first valid
-    // post-epoch point to now. Magnitude compatibility vs the live value is
-    // enforced separately (validateSeriesAgainstLive), so a contaminated pair
-    // still routes to building.
-    available = pointCount >= 2;
-    reason = available ? 'ready' : 'building_no_points';
-    recentBaseline = false;
-  } else {
-    available = pointCount >= 2;            // unknown range → permissive
-    reason = available ? 'ready' : 'building_no_points';
-  }
+  // AURIX-CHART-PREMIUM-POLISH-WEB-MOBILE — UNIFIED honest coverage policy. Every
+  // range (24H / 7D / 30D / 1A / TOTAL) renders whenever there are ≥2 valid,
+  // post-epoch points; coverage/recency NEVER gates a range into "building".
+  // Magnitude compatibility vs the live value (contamination / DATA-001) is
+  // enforced SEPARATELY and UNCHANGED by validateSeriesAgainstLive, so an
+  // incompatible or contaminated pair still routes to building. building is now
+  // reserved strictly for 0/1 points (and, upstream, incompatible series). This
+  // is the policy the spec asks for: prefer an honest chart with little history
+  // over a dominant "building" block. The recent-baseline note path is retired
+  // (no more "Histórico disponible desde …").
+  const available = pointCount >= 2;
+  const reason = available ? 'ready' : (pointCount < 1 ? 'building_no_points' : 'building_one_point');
+  const recentBaseline = false;
   // "Histórico disponible desde …" date, clamped to the baseline epoch.
   const labelStart = (coverageStart != null && ep) ? Math.max(coverageStart, ep) : coverageStart;
   return {
@@ -12082,8 +12064,11 @@ function _aurixDashSync(surface) {
     // recent-baseline "Historico disponible desde ..." note is removed (spec section 6).
     {
       const _dq = _aurixChartDataQuality(series, activeRange);
-      const _es = (typeof lang !== 'undefined' && lang === 'es');
-      _aurixSetChartNote(_dq.hasStructuralJump ? (_es ? 'Incluye movimientos de cartera' : 'Includes portfolio moves') : '');
+      // AURIX-CHART-PREMIUM-POLISH-WEB-MOBILE — no secondary subtitle under the
+      // headline. The chart block is title + % (when ready) + tabs + chart/state,
+      // nothing else. _dq is still used below for the structural-jump LINE SHAPE
+      // (straight steps for deposits/moves), which is a visual decision, not copy.
+      _aurixSetChartNote('');
       ctrl.setData(_aurixDisplaySeries(series), {
         source:       decision.isRecon ? 'reconstructed' : 'local-snapshot',
         currency:     baseCurrency || 'USD',

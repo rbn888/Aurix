@@ -3408,31 +3408,40 @@ body:not(.hero-active) #orb-canvas {
    category detail (.detail-chart-wrap) and the brand demo keep their shimmer. */
 .chart-wrap .aurix-chart-skeleton { display: none !important; }
 
-/* Left→right "draw" reveal when the chart goes loading/building → ready. A soft
-   cover with a blue pen-glow leading edge collapses toward the right, revealing
-   the freshly-painted line from left to right. One-shot; class added/removed by
-   JS only on a genuine first paint (never on minor refresh / last-good repaint). */
-@keyframes chart-draw-reveal {
-  from { transform: scaleX(1); }
-  to   { transform: scaleX(0); }
+/* Left→right "draw" reveal when the chart goes loading/building → ready. The real
+   chart layer (V2 host) is progressively UNCLIPPED from left to right, so the line
+   + area appear to draw themselves in. CRITICAL: there is NO dark cover — the old
+   solid curtain (#0d1018) collapsing toward the right is exactly what read as a
+   "black mass on the right" on refresh; it is removed. A soft blue pen-glow of
+   LIGHT (never a dark fill) rides the leading edge. One-shot; class added/removed
+   by JS only on a genuine first paint (never on minor refresh / last-good repaint).
+   ~520ms easeOutCubic (spec: 400–600ms). */
+@keyframes chart-draw-clip {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+.chart-wrap--revealing .aurix-chart-host {
+  animation: chart-draw-clip .52s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+@keyframes chart-draw-glow {
+  0%   { left: 0;    opacity: 0; }
+  12%  { opacity: .9; }
+  86%  { opacity: .9; }
+  100% { left: 100%; opacity: 0; }
 }
 .chart-wrap--revealing::after {
   content: '';
   display: block;             /* override .chart-wrap::after { display:none } */
   position: absolute;
-  inset: 0;
-  z-index: 3;                 /* above the canvas during the wipe */
-  /* Pen-glow leading edge, then a solid cover that matches the hero-card
-     background so the line appears to draw itself in from the left. */
-  background: linear-gradient(to right,
-    rgba(138,166,255,.30) 0px,
-    rgba(138,166,255,.10) 12px,
-    rgba(138,166,255,.02) 26px,
-    #0d1018               34px);
-  transform-origin: right center;
-  /* easeOutCubic, ~560ms — premium, not sluggish (spec: 450–650ms). */
-  animation: chart-draw-reveal .56s cubic-bezier(0.215, 0.61, 0.355, 1) forwards;
+  top: 0; bottom: 0;
+  left: 0;
+  width: 56px;
+  margin-left: -28px;         /* centre the glow on the reveal frontier */
+  z-index: 3;
   pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(138,166,255,0.22), transparent);
+  filter: blur(1px);
+  animation: chart-draw-glow .52s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 
 /* AURIX-WEB-POLISH-1 — desktop (≥1024px) premium dashboard chart. More vertical
@@ -4980,6 +4989,7 @@ body:not(.hero-active) #orb-canvas {
      The loading skin still appears (static, no breathing) so the area is never
      an empty rectangle, but it switches instantly to the ready chart. */
   .chart-wrap--revealing::after { animation: none; display: none; }
+  .chart-wrap--revealing .aurix-chart-host { animation: none; clip-path: none; }
   .chart-loading-skin__line     { animation: none; }
   .hero-card::before { animation: none; }
   .cat-card-visual img { opacity: 1; transform: none; }
