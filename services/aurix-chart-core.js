@@ -924,6 +924,27 @@
     const _PAD_FRAC_OF_RANGE   = 0.10;    // vertical padding as a fraction of the visible range, each side
     const _PAD_MIN_FRAC_ANCHOR = 0.006;   // absolute floor (0.6% of value) so near-flat ranges aren't zero-padded
     let _scaleHints = null;
+    // AURIX-CHART-LINE-RANGE-POLISH — number of points currently plotted, so the
+    // view-framing helper can pin the endpoints to the plot edges.
+    let _barCount = 0;
+    // Compact range render: frame the visible range so the FIRST and LAST data
+    // points sit on the plot's left/right edges. LWC's fitContent() shows the full
+    // BAR range ([-0.5, N-0.5]), which leaves a half-bar margin on each side —
+    // negligible on a dense window but, on a sparse range (few points / little
+    // coverage), it renders the line as a short centred stub that "doesn't reach
+    // side to side". Pinning [0, N-1] makes a sparse 30D/1A/TOTAL fill the width as
+    // an intentional evolution. SCOPED to the portfolio surface; other variants
+    // keep LWC's default framing. Pure view framing — no point is moved, added or
+    // invented; real timestamps stay in the tooltip and on the axis.
+    function _fitView() {
+      try {
+        const ts = chart.timeScale();
+        ts.fitContent();
+        if (opts.variant === 'portfolio' && _barCount >= 2) {
+          ts.setVisibleLogicalRange({ from: 0, to: _barCount - 1 });
+        }
+      } catch (_) {}
+    }
     function _scalePaddingProvider(baseImpl) {
       const original = (typeof baseImpl === 'function') ? (baseImpl() || null) : baseImpl;
       if (!original || !original.priceRange) return original || null;
@@ -1390,7 +1411,7 @@
       const h = canvasHolder.clientHeight || 0;
       if (!w || !h) return;
       try { chart.applyOptions({ width: w, height: h }); } catch (_) {}
-      try { chart.timeScale().fitContent(); } catch (_) {}
+      _fitView();
     };
     if (typeof ResizeObserver === 'function') {
       _ro = new ResizeObserver(() => {
@@ -1421,6 +1442,7 @@
           host.dataset.state = 'empty';
           _applyEmptyCopy(meta && meta.emptyReason);
           _scaleHints = null;
+          _barCount = 0;
           series.setData([]);
           if (_shouldShowValChip) valchip.hidden = true;
           return;
@@ -1434,6 +1456,7 @@
           host.dataset.state = 'empty';
           _applyEmptyCopy(meta && meta.emptyReason);
           _scaleHints = null;
+          _barCount = 0;
           series.setData([]);
           if (_shouldShowValChip) valchip.hidden = true;
           return;
@@ -1501,6 +1524,7 @@
         // already guarantees uniqueness, but normalization can
         // theoretically produce equal values; it never changes time.
         series.setData(visualSeries);
+        _barCount = visualSeries.length;   // for compact-range view framing (_fitView)
         // Direction (colour) inferred from the VISUAL series so the
         // chart line + label-area gradient match what the user sees.
         const hinted = meta && (meta.direction || meta.directionHint);
@@ -1549,7 +1573,7 @@
           valchip.hidden = false;
         }
         host.dataset.state = 'ready';
-        try { chart.timeScale().fitContent(); } catch (_) {}
+        _fitView();
       },
       setRange(range) {
         _state.range = String(range || '7d');
@@ -1598,7 +1622,7 @@
         const h = canvasHolder.clientHeight || 0;
         if (!w || !h) return;
         try { chart.applyOptions({ width: w, height: h }); } catch (_) {}
-        try { chart.timeScale().fitContent(); } catch (_) {}
+        _fitView();
       },
       destroy() {
         // CHART-7A: tooltip + crosshair must be hidden BEFORE the host

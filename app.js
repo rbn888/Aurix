@@ -3881,6 +3881,14 @@ let _aurixDashMobile  = null;
 // the session, so returning to any range never downgrades to building unless
 // its data is genuinely empty. In-memory → a full page refresh resets it.
 const _aurixLastGoodByRange = Object.create(null);
+// AURIX-CHART-LINE-RANGE-POLISH — per-range latch for the line shape (straight
+// step vs curved). The structural-jump detection can flip between renders (a
+// deposit point entering/leaving, anchor drift near the 12% threshold), which
+// made 7D visibly alternate recta↔curva on plain price-poll refreshes. We latch
+// 'straight' per range once a real structural jump is seen, so the mode is stable
+// for the session; it is reset on a genuine holdings change (onPortfolioChange),
+// where the series legitimately changes. Pure presentation — no data touched.
+const _aurixChartStraightLatch = Object.create(null);
 // AURIX-DASHBOARD-CHART-PREMIUM-FINAL — holdings-transition freeze. After a REAL
 // holdings change (qty / asset set changes — detected via a fingerprint so price
 // ticks never trigger it), the chart LINE is frozen on its last-good series for a
@@ -11622,7 +11630,12 @@ const _AURIX_VCS = Object.freeze({
   SPIKE_DEV:     0.40,   // interior point > 40% off its neighbours' midpoint …
   SPIKE_VS_GAP:  2.5,    // … and > 2.5× the neighbours' own gap → isolated needle
   EDGE_DEV:      0.50,   // leading/trailing point > 50% off its single neighbour
-  TWO_PT_INCOMP: 0.50,   // lone 2-point pair differing > 50% → diagonal artefact
+  TWO_PT_INCOMP: 0.50,   // lone 2-point pair differing > 50% → diagonal artefact (boot / no live)
+  TWO_PT_OVERLIVE: 1.0,  // AURIX-CHART-LINE-RANGE-POLISH — with live KNOWN, a 2-point pair is a
+                         //   contamination artefact ONLY if a point sits > (1+this)× live (the
+                         //   DATA-001 signature: an early total-wealth / pre-correction point ABOVE
+                         //   the investable live value). Legit growth (points at/below live) renders,
+                         //   so a young 30D/1A/TOTAL shows an honest evolution instead of building.
   // NOTE: a SUSTAINED contaminated plateau (multiple points far from live ended
   // by a cliff) is deliberately NOT auto-trimmed here — it is structurally
   // identical to a real large move (a deposit / withdrawal / crash), so any
@@ -11690,8 +11703,24 @@ function validateChartSeries(range, series, liveValue) {
   if (pts.length < minPts) {
     return { valid: false, cleanedSeries: pts, reason: 'insufficient_after_clean', droppedPoints: dropped, isPartial: true };
   }
-  if (pts.length === 2 && Math.abs(pts[1].value / pts[0].value - 1) > _AURIX_VCS.TWO_PT_INCOMP) {
-    return { valid: false, cleanedSeries: pts, reason: 'two_point_incompatible', droppedPoints: dropped, isPartial: true };
+  // AURIX-CHART-LINE-RANGE-POLISH — lone 2-point pair. A big move between two real
+  // snapshots is LEGITIMATE for a young or long range (a deposit / sustained growth,
+  // e.g. TOTAL since day one), so we no longer reject it on jump size alone — that
+  // was forcing TOTAL/30D/1A into "building". The pair routes to building ONLY when
+  // it carries the contamination signature, evaluated against live when known:
+  //   • live known  → a point sitting well ABOVE live (DATA-001: an old total-wealth
+  //                    / pre-correction value leaking in). Legit growth (points
+  //                    at/below live) passes and renders.
+  //   • live unknown → cannot verify, so keep the conservative jump guard.
+  if (pts.length === 2) {
+    if (haveLive) {
+      const hiPt = Math.max(pts[0].value, pts[1].value);
+      if (hiPt > live * (1 + _AURIX_VCS.TWO_PT_OVERLIVE)) {
+        return { valid: false, cleanedSeries: pts, reason: 'two_point_overlive', droppedPoints: dropped, isPartial: true };
+      }
+    } else if (Math.abs(pts[1].value / pts[0].value - 1) > _AURIX_VCS.TWO_PT_INCOMP) {
+      return { valid: false, cleanedSeries: pts, reason: 'two_point_unverifiable', droppedPoints: dropped, isPartial: true };
+    }
   }
   return { valid: true, cleanedSeries: pts, reason: 'ok', droppedPoints: dropped, isPartial: dropped.length > 0 };
 }
@@ -12069,6 +12098,12 @@ function _aurixDashSync(surface) {
       // nothing else. _dq is still used below for the structural-jump LINE SHAPE
       // (straight steps for deposits/moves), which is a visual decision, not copy.
       _aurixSetChartNote('');
+      // AURIX-CHART-LINE-RANGE-POLISH — stabilise the line shape per range. Latch
+      // 'straight' once a real structural jump is seen so the mode never flips
+      // recta↔curva on ordinary refreshes (reset on holdings change). One coherent
+      // visual mode per range.
+      if (_dq.hasStructuralJump) _aurixChartStraightLatch[activeRange] = true;
+      const _straight = _aurixChartStraightLatch[activeRange] === true;
       ctrl.setData(_aurixDisplaySeries(series), {
         source:       decision.isRecon ? 'reconstructed' : 'local-snapshot',
         currency:     baseCurrency || 'USD',
@@ -12077,7 +12112,7 @@ function _aurixDashSync(surface) {
         completeness: decision.isRecon ? (Number.isFinite(_reconActive && _reconActive.coverage) ? _reconActive.coverage : 1) : 1,
         asOf:         Date.now(),
         direction:    direction,
-        straight:     _dq.hasStructuralJump,
+        straight:     _straight,
       });
     }
   } catch (err) {
@@ -14063,6 +14098,10 @@ function onPortfolioChange(animate = false, opts = {}) {
     const fp = (Array.isArray(assets) ? assets : []).map(a => `${a.id}:${a.qty}`).sort().join('|');
     if (_aurixLastAssetFingerprint !== null && fp !== _aurixLastAssetFingerprint) {
       _aurixChartSettleUntil = Date.now() + _AURIX_CHART_SETTLE_MS;
+      // AURIX-CHART-LINE-RANGE-POLISH — a real holdings change reshapes the series,
+      // so re-evaluate the line-shape latch from scratch (a removed deposit may no
+      // longer warrant a straight step).
+      for (const k in _aurixChartStraightLatch) delete _aurixChartStraightLatch[k];
       setTimeout(() => { try { updateChart(false); } catch (_) {} }, _AURIX_CHART_SETTLE_MS + 60);
     }
     _aurixLastAssetFingerprint = fp;
