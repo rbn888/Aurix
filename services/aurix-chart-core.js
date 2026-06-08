@@ -1054,6 +1054,63 @@
     // evenly-spaced, range-aware marks sampled from the REAL series (start · quarters
     // · end), positioned across the actual plot width (host minus the right price
     // scale). Honest real dates/times; nothing invented. Re-run on data + resize.
+    // AURIX-CHART-XAXIS-TIME-1 — institutional, TIME-anchored axis marks. Generates
+    // uniform real-time ticks per range (round hours / days / weeks / months / years)
+    // within the real [t0,t1] span, range-aware and scaling to months/years as the
+    // span grows. Display-only: reads no data, invents no point. The marks are placed
+    // by timeToCoordinate() in _renderXAxis (true time position), replacing the old
+    // index-by-pixel-fraction placement that made 24H hours look non-equidistant.
+    function _axisTimeTicks(r, t0, t1) {
+      const HOUR = 3600000, DAY = 86400000;
+      const loc  = _isLangEs() ? 'es-ES' : 'en-US';
+      const span = t1 - t0, spanDays = span / DAY;
+      const fH  = (ms) => { try { return new Date(ms).toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+      const fD  = (ms) => { try { return new Date(ms).toLocaleDateString(loc, { day: 'numeric', month: 'short' }); } catch (_) { return ''; } };
+      const fM  = (ms) => { try { return new Date(ms).toLocaleDateString(loc, { month: 'short' }); } catch (_) { return ''; } };
+      const fMY = (ms) => { try { return new Date(ms).toLocaleDateString(loc, { month: 'short', year: '2-digit' }); } catch (_) { return ''; } };
+      const out = [];
+      const add = (ms, label) => { if (label && ms >= t0 - 1000 && ms <= t1 + 1000) out.push({ ms, label }); };
+      if (r === '24h') {
+        const spanH = span / HOUR;
+        const stepH = spanH <= 4 ? 1 : spanH <= 9 ? 2 : spanH <= 15 ? 3 : 6;
+        const d = new Date(t0); d.setMinutes(0, 0, 0);
+        d.setHours(Math.ceil(d.getHours() / stepH) * stepH, 0, 0, 0); // align to a stepH multiple from midnight
+        while (d.getTime() < t0) d.setHours(d.getHours() + stepH);
+        for (let ms = d.getTime(); ms <= t1; ) { add(ms, fH(ms)); const n = new Date(ms); n.setHours(n.getHours() + stepH); ms = n.getTime(); }
+      } else if (r === '7d') {
+        const d = new Date(t0); d.setHours(0, 0, 0, 0);
+        while (d.getTime() < t0) d.setDate(d.getDate() + 1);
+        for (; d.getTime() <= t1; d.setDate(d.getDate() + 1)) add(d.getTime(), fD(d.getTime()));
+      } else if (r === '30d' || r === '3m') {
+        const stepD = spanDays <= 8 ? 1 : spanDays <= 24 ? 3 : 7;
+        const d = new Date(t0); d.setHours(0, 0, 0, 0);
+        while (d.getTime() < t0) d.setDate(d.getDate() + 1);
+        for (; d.getTime() <= t1; d.setDate(d.getDate() + stepD)) add(d.getTime(), fD(d.getTime()));
+      } else { // 1y / all / total
+        if (spanDays < 45) {
+          // Young long-range history: a few evenly-timed day+month marks (months would
+          // collapse to one label). Honest — no day is invented, marks span real [t0,t1].
+          const K = Math.max(2, Math.min(5, Math.round(spanDays) + 1));
+          for (let k = 0; k < K; k++) { const ms = t0 + span * k / (K - 1); add(ms, fD(ms)); }
+        } else if (spanDays < 365 * 1.6) {
+          const stepMo = spanDays > 250 ? 2 : 1;
+          const d = new Date(t0); d.setDate(1); d.setHours(0, 0, 0, 0);
+          while (d.getTime() < t0) d.setMonth(d.getMonth() + 1);
+          for (; d.getTime() <= t1; d.setMonth(d.getMonth() + stepMo)) add(d.getTime(), fM(d.getTime()));
+        } else {
+          const stepMo = spanDays > 365 * 4 ? 12 : 3;
+          const d = new Date(t0); d.setDate(1); d.setHours(0, 0, 0, 0);
+          while (d.getTime() < t0) d.setMonth(d.getMonth() + 1);
+          for (; d.getTime() <= t1; d.setMonth(d.getMonth() + stepMo)) add(d.getTime(), fMY(d.getTime()));
+        }
+      }
+      // Guarantee the two real endpoints if a loop under-produced (very short span).
+      if (out.length < 2) {
+        const f = (r === '24h') ? fH : (((r === 'all' || r === '1y') && spanDays >= 45) ? fMY : fD);
+        out.length = 0; add(t0, f(t0)); add(t1, f(t1));
+      }
+      return out;
+    }
     function _renderXAxis() {
       if (!xaxis) return;
       const real = (_state && Array.isArray(_state.data))
@@ -1064,33 +1121,36 @@
       try { rightW = (chart.priceScale && chart.priceScale('right').width()) || 0; } catch (_) {}
       const plotW = Math.max(0, host.clientWidth - rightW);
       if (plotW < 40) { xaxis.textContent = ''; return; }
-      const r = String((_state && _state.range) || '').toLowerCase();
-      // Span-aware label format: for TOTAL / 1A over a SHORT real span (a young
-      // portfolio) the month-only format collapses start+end to the same string, so
-      // fall back to day+month so the endpoints read as distinct real dates.
-      const spanDays = (real[real.length - 1].time - real[0].time) / 86400000;
-      const shortLongRange = (r === 'all' || r === '1y') && spanDays < 45;
-      const fmt = (tsMs) => {
-        if (shortLongRange) {
-          try { return new Date(tsMs).toLocaleDateString(_isLangEs() ? 'es-ES' : 'en-US', { day: 'numeric', month: 'short' }); } catch (_) {}
-        }
-        return _formatAxisTick(Math.floor(tsMs / 1000), r, null);
-      };
-      const K = Math.min(5, real.length);
+      const r  = String((_state && _state.range) || '').toLowerCase();
+      const t0 = real[0].time, t1 = real[real.length - 1].time;   // ms
+      if (!(t1 > t0)) { xaxis.textContent = ''; return; }
+      const ticks = _axisTimeTicks(r, t0, t1);
+      // Place each tick at its REAL time coordinate (px). timeToCoordinate uses the
+      // chart's time format (seconds). On the densified sparse ranges the bars are
+      // even-time so this is exactly time-proportional; on a dense 24H it tracks the
+      // plotted bars. Strictly more accurate than the old pixel-fraction placement.
+      const placed = [];
+      for (let i = 0; i < ticks.length; i++) {
+        let x = null;
+        try { x = chart.timeScale().timeToCoordinate(Math.floor(ticks[i].ms / 1000)); } catch (_) {}
+        if (x == null || !Number.isFinite(x)) continue;
+        x = Math.max(0, Math.min(plotW, x));
+        placed.push({ x: x, label: ticks[i].label });
+      }
+      // De-crowd: drop labels closer than 44px or adjacent duplicates (keep the last).
       xaxis.textContent = '';
-      let prevLabel = null;
-      for (let k = 0; k < K; k++) {
-        const idx = (K === 1) ? 0 : Math.round(k * (real.length - 1) / (K - 1));
-        const label = fmt(real[idx].time);
-        if (!label || label === prevLabel) continue;   // skip empties + adjacent dupes
-        prevLabel = label;
-        const frac = (K === 1) ? 0.5 : (k / (K - 1));
+      let lastX = -1e9, lastLabel = null;
+      for (let i = 0; i < placed.length; i++) {
+        const x = placed[i].x, label = placed[i].label;
+        if (label === lastLabel) continue;
+        if ((x - lastX) < 44 && i !== placed.length - 1) continue;
+        lastX = x; lastLabel = label;
         const span = document.createElement('span');
         span.className = 'aurix-xaxis-label';
         span.textContent = label;
-        if (k === 0)            { span.classList.add('edge-l'); span.style.left = '2px'; }
-        else if (k === K - 1)   { span.classList.add('edge-r'); span.style.left = Math.max(0, plotW - 2) + 'px'; span.style.transform = 'translateX(-100%)'; }
-        else                    { span.style.left = (frac * plotW) + 'px'; }
+        if (x <= 6)              { span.classList.add('edge-l'); span.style.left = '2px'; }
+        else if (x >= plotW - 6) { span.classList.add('edge-r'); span.style.left = Math.max(0, plotW - 2) + 'px'; span.style.transform = 'translateX(-100%)'; }
+        else                     { span.style.left = x + 'px'; }
         xaxis.appendChild(span);
       }
     }

@@ -12146,6 +12146,23 @@ function _aurixDashSync(surface) {
       } catch (_) {}
     }
 
+    // AURIX-CHART-RENDER-DEBOUNCE-1 — coalesce redundant identical syncs (boot-time
+    // mount + updateChart double-paint, no-op re-syncs) so the line never visibly
+    // re-draws when nothing changed. Any real change (new snapshot, live move, range/
+    // currency/state/shape) differs in the fingerprint → still repaints. Display-only:
+    // never skips a genuine update, never delays first paint, never empties the canvas.
+    let _syncFp;
+    if (decision.state === 'ready') {
+      const _s = Array.isArray(decision.series) ? decision.series : [];
+      const _live = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN;
+      const _lat = _aurixChartStraightLatch[activeRange] === true ? 1 : 0;
+      _syncFp = `ready|${activeRange}|${baseCurrency || 'USD'}|${_s.length}|${_s[0] && _s[0].value}|${_s[_s.length - 1] && _s[_s.length - 1].value}|${_live}|${_lat}|${decision.fromLastGood ? 1 : 0}`;
+    } else {
+      _syncFp = `${decision.state}|${activeRange}|${baseCurrency || 'USD'}`;
+    }
+    if (ctrl.__aurixSyncFp === _syncFp) return;
+    ctrl.__aurixSyncFp = _syncFp;
+
     if (decision.state === 'loading') {
       try { ctrl.setState('loading'); } catch (_) {}
       _aurixSetChartSkin(surface, 'loading');
