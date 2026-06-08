@@ -12156,7 +12156,11 @@ function _aurixDashSync(surface) {
       const _s = Array.isArray(decision.series) ? decision.series : [];
       const _live = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN;
       const _lat = _aurixChartStraightLatch[activeRange] === true ? 1 : 0;
-      _syncFp = `ready|${activeRange}|${baseCurrency || 'USD'}|${_s.length}|${_s[0] && _s[0].value}|${_s[_s.length - 1] && _s[_s.length - 1].value}|${_live}|${_lat}|${decision.fromLastGood ? 1 : 0}`;
+      // AURIX-CHART-PERFMODE-FIX — activePerfMode (% vs €) MUST be in the fingerprint:
+      // the headline KPI is formatted from it, so a toggle with the same series/live
+      // would otherwise be coalesced away and the headline would stay stale until the
+      // next range change.
+      _syncFp = `ready|${activeRange}|${baseCurrency || 'USD'}|${activePerfMode}|${_s.length}|${_s[0] && _s[0].value}|${_s[_s.length - 1] && _s[_s.length - 1].value}|${_live}|${_lat}|${decision.fromLastGood ? 1 : 0}`;
     } else {
       _syncFp = `${decision.state}|${activeRange}|${baseCurrency || 'USD'}`;
     }

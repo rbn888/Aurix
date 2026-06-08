@@ -1125,15 +1125,24 @@
       const t0 = real[0].time, t1 = real[real.length - 1].time;   // ms
       if (!(t1 > t0)) { xaxis.textContent = ''; return; }
       const ticks = _axisTimeTicks(r, t0, t1);
-      // Place each tick at its REAL time coordinate (px). timeToCoordinate uses the
-      // chart's time format (seconds). On the densified sparse ranges the bars are
-      // even-time so this is exactly time-proportional; on a dense 24H it tracks the
-      // plotted bars. Strictly more accurate than the old pixel-fraction placement.
+      // AURIX-CHART-XAXIS-VISIBLE-FIX — place by TIME FRACTION between the two real
+      // endpoints' coordinates. timeToCoordinate() returns null for arbitrary times
+      // that are not exact bars (round hours rarely are) → querying each tick made the
+      // whole axis disappear. The endpoints t0/t1 ARE exact bars, so their coordinate
+      // is valid (same call _renderEndpoint relies on); we anchor on them and
+      // interpolate ticks by elapsed-time fraction → always visible AND time-spaced.
+      const t0s = Math.floor(t0 / 1000), t1s = Math.floor(t1 / 1000);
+      let leftX = null, rightX = null;
+      try { leftX  = chart.timeScale().timeToCoordinate(t0s); } catch (_) {}
+      try { rightX = chart.timeScale().timeToCoordinate(t1s); } catch (_) {}
+      if (leftX  == null || !Number.isFinite(leftX))  leftX  = 0;
+      if (rightX == null || !Number.isFinite(rightX)) rightX = plotW;
+      const denom = (t1 - t0) || 1;
       const placed = [];
       for (let i = 0; i < ticks.length; i++) {
-        let x = null;
-        try { x = chart.timeScale().timeToCoordinate(Math.floor(ticks[i].ms / 1000)); } catch (_) {}
-        if (x == null || !Number.isFinite(x)) continue;
+        const frac = (ticks[i].ms - t0) / denom;            // elapsed-time fraction
+        let x = leftX + frac * (rightX - leftX);
+        if (!Number.isFinite(x)) continue;
         x = Math.max(0, Math.min(plotW, x));
         placed.push({ x: x, label: ticks[i].label });
       }
