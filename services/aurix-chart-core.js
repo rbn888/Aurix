@@ -1054,12 +1054,13 @@
     // evenly-spaced, range-aware marks sampled from the REAL series (start · quarters
     // · end), positioned across the actual plot width (host minus the right price
     // scale). Honest real dates/times; nothing invented. Re-run on data + resize.
-    // AURIX-CHART-XAXIS-TIME-1 — institutional, TIME-anchored axis marks. Generates
-    // uniform real-time ticks per range (round hours / days / weeks / months / years)
-    // within the real [t0,t1] span, range-aware and scaling to months/years as the
-    // span grows. Display-only: reads no data, invents no point. The marks are placed
-    // by timeToCoordinate() in _renderXAxis (true time position), replacing the old
-    // index-by-pixel-fraction placement that made 24H hours look non-equidistant.
+    // AURIX-CHART-XAXIS-TIME-1 / AURIX-CHART-XAXIS-PREMIUM-1 — institutional, range-aware
+    // time marks within the real [t0,t1] span. Placed by elapsed-time fraction in
+    // _renderXAxis (anchored on the two real endpoints' coordinates). Display-only:
+    // reads no data, creates no point, never implies history outside [t0,t1].
+    //   24H  → round hours (UNCHANGED, founder-approved)
+    //   7D/30D → evenly-spaced day+month marks (always include first/last visible day)
+    //   1Y/TOTAL → MONTH unit always (month+year + wider steps on long TOTAL spans)
     function _axisTimeTicks(r, t0, t1) {
       const HOUR = 3600000, DAY = 86400000;
       const loc  = _isLangEs() ? 'es-ES' : 'en-US';
@@ -1071,43 +1072,40 @@
       const out = [];
       const add = (ms, label) => { if (label && ms >= t0 - 1000 && ms <= t1 + 1000) out.push({ ms, label }); };
       if (r === '24h') {
+        // 24H — founder-approved, UNCHANGED. Round-hour marks aligned to a stepH multiple.
         const spanH = span / HOUR;
         const stepH = spanH <= 4 ? 1 : spanH <= 9 ? 2 : spanH <= 15 ? 3 : 6;
         const d = new Date(t0); d.setMinutes(0, 0, 0);
         d.setHours(Math.ceil(d.getHours() / stepH) * stepH, 0, 0, 0); // align to a stepH multiple from midnight
         while (d.getTime() < t0) d.setHours(d.getHours() + stepH);
         for (let ms = d.getTime(); ms <= t1; ) { add(ms, fH(ms)); const n = new Date(ms); n.setHours(n.getHours() + stepH); ms = n.getTime(); }
-      } else if (r === '7d') {
-        const d = new Date(t0); d.setHours(0, 0, 0, 0);
-        while (d.getTime() < t0) d.setDate(d.getDate() + 1);
-        for (; d.getTime() <= t1; d.setDate(d.getDate() + 1)) add(d.getTime(), fD(d.getTime()));
-      } else if (r === '30d' || r === '3m') {
-        const stepD = spanDays <= 8 ? 1 : spanDays <= 24 ? 3 : 7;
-        const d = new Date(t0); d.setHours(0, 0, 0, 0);
-        while (d.getTime() < t0) d.setDate(d.getDate() + 1);
-        for (; d.getTime() <= t1; d.setDate(d.getDate() + stepD)) add(d.getTime(), fD(d.getTime()));
-      } else { // 1y / all / total
-        if (spanDays < 45) {
-          // Young long-range history: a few evenly-timed day+month marks (months would
-          // collapse to one label). Honest — no day is invented, marks span real [t0,t1].
-          const K = Math.max(2, Math.min(5, Math.round(spanDays) + 1));
-          for (let k = 0; k < K; k++) { const ms = t0 + span * k / (K - 1); add(ms, fD(ms)); }
-        } else if (spanDays < 365 * 1.6) {
-          const stepMo = spanDays > 250 ? 2 : 1;
-          const d = new Date(t0); d.setDate(1); d.setHours(0, 0, 0, 0);
-          while (d.getTime() < t0) d.setMonth(d.getMonth() + 1);
-          for (; d.getTime() <= t1; d.setMonth(d.getMonth() + stepMo)) add(d.getTime(), fM(d.getTime()));
-        } else {
-          const stepMo = spanDays > 365 * 4 ? 12 : 3;
-          const d = new Date(t0); d.setDate(1); d.setHours(0, 0, 0, 0);
-          while (d.getTime() < t0) d.setMonth(d.getMonth() + 1);
-          for (; d.getTime() <= t1; d.setMonth(d.getMonth() + stepMo)) add(d.getTime(), fMY(d.getTime()));
-        }
+      } else if (r === '7d' || r === '30d' || r === '3m') {
+        // Day ranges: evenly-spaced (by time) day+month marks. frac 0 / 1 pin the FIRST
+        // (t0) and LAST (t1) visible day, so the earliest relevant day (e.g. 6 Jun) never
+        // drops; the count scales with the span (young → 2-3 days; a full 30D → ~weekly).
+        // Honest — each mark is a real instant inside the visible window.
+        const want = (r === '7d') ? 5 : 6;
+        const K = Math.max(2, Math.min(want, Math.round(spanDays) + 1));
+        for (let k = 0; k < K; k++) { const ms = t0 + span * k / (K - 1); add(ms, fD(ms)); }
+      } else {
+        // 1Y / TOTAL: MONTH unit always (never loose days, even when history is young).
+        // First (partial) month sits at t0; then 1st-of-month boundaries. Long TOTAL
+        // escalates to month+year and wider month steps. Marks stay inside the real span.
+        const longTotal = (r === 'all' || r === 'total') && spanDays >= 365 * 1.6;
+        const fmtM = longTotal ? fMY : fM;
+        const stepMo = spanDays >= 365 * 4 ? 12 : spanDays >= 365 * 1.6 ? 3 : spanDays >= 250 ? 2 : 1;
+        add(t0, fmtM(t0));
+        const d = new Date(t0); d.setDate(1); d.setHours(0, 0, 0, 0);
+        do { d.setMonth(d.getMonth() + stepMo); } while (d.getTime() <= t0);
+        for (; d.getTime() <= t1; d.setMonth(d.getMonth() + stepMo)) add(d.getTime(), fmtM(d.getTime()));
       }
-      // Guarantee the two real endpoints if a loop under-produced (very short span).
+      // Guarantee a drawable axis. Day/24H ranges fall back to day/hour endpoints; month
+      // ranges keep the month unit (a single-month span shows that one month).
       if (out.length < 2) {
-        const f = (r === '24h') ? fH : (((r === 'all' || r === '1y') && spanDays >= 45) ? fMY : fD);
-        out.length = 0; add(t0, f(t0)); add(t1, f(t1));
+        const monthRange = (r === '1y' || r === 'all' || r === 'total');
+        const f = (r === '24h') ? fH : monthRange ? (((r === 'all' || r === 'total') && spanDays >= 365 * 1.6) ? fMY : fM) : fD;
+        const a = f(t0), b = f(t1);
+        out.length = 0; add(t0, a); if (b !== a) add(t1, b);
       }
       return out;
     }
