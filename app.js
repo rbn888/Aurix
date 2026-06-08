@@ -1,5 +1,4 @@
 'use strict';
-console.log('APP JS LOADED');
 
 const IS_DEV =
   location.hostname === 'localhost' ||
@@ -5275,7 +5274,7 @@ function recordSnapshot() {
   // path and is unaffected; this is fire-and-forget.
   try { scheduleStateFlush(); } catch (_) {}
 
-  console.log('[snapshot]', { ts: now, total: totalValueBase(), historyLength: portfolioHistory.length });
+  if (IS_DEV) console.log('[snapshot]', { ts: now, total: totalValueBase(), historyLength: portfolioHistory.length });
 }
 
 // ── Distribution donut ─────────────────────────────────────
@@ -5453,7 +5452,7 @@ const MARKET_EVENTS = {
 // ── FC-5: Refresh lock ────────────────────────────────────────────────────────
 async function withMarketRefreshLock(label, fn) {
   if (_refreshLocks.has(label)) {
-    console.log(`[market-runtime] refresh skipped: ${label} already running`);
+    if (IS_DEV) console.log(`[market-runtime] refresh skipped: ${label} already running`);
     return;
   }
   _refreshLocks.add(label);
@@ -5464,7 +5463,7 @@ async function withMarketRefreshLock(label, fn) {
   if (MARKET_RUNTIME.lastSuccessAt && Date.now() - MARKET_RUNTIME.lastSuccessAt > 60_000) {
     console.warn('[market-runtime] stale snapshot warning');
   }
-  console.log(`[market-runtime] cycle start #${cycleId} (${label})`);
+  if (IS_DEV) console.log(`[market-runtime] cycle start #${cycleId} (${label})`);
   try {
     await fn();
   } finally {
@@ -5472,7 +5471,7 @@ async function withMarketRefreshLock(label, fn) {
     MARKET_RUNTIME.refreshing     = _refreshLocks.size > 0;
     MARKET_RUNTIME.completedAt    = Date.now();
     MARKET_RUNTIME.lastDurationMs = MARKET_RUNTIME.completedAt - t0;
-    console.log(`[market-runtime] cycle complete #${cycleId} (${label}) ${MARKET_RUNTIME.lastDurationMs}ms`);
+    if (IS_DEV) console.log(`[market-runtime] cycle complete #${cycleId} (${label}) ${MARKET_RUNTIME.lastDurationMs}ms`);
   }
 }
 
@@ -5487,7 +5486,7 @@ function commitMarketData(type, items) {
   const snapshot = buildMarketEventSnapshot(type, changedSymbols);
   MARKET_EVENTS.emit('market:update', snapshot);
   if (typeof AURIX_TELEMETRY !== 'undefined') AURIX_TELEMETRY.market.marketUpdateCount++;
-  console.log(`[market-events] emitted ${type} update (${changedSymbols.length} symbols)`);
+  if (IS_DEV) console.log(`[market-events] emitted ${type} update (${changedSymbols.length} symbols)`);
   return true;
 }
 
@@ -5547,7 +5546,7 @@ async function handleReactivePortfolioUpdate(snapshot) {
 
   const affected = doesMarketEventAffectPortfolio(snapshot);
 
-  console.log('[portfolio-reactive] event analysis:', {
+  if (IS_DEV) console.log('[portfolio-reactive] event analysis:', {
     affected,
     changed: snapshot.changedSymbols.length,
     watched: getPortfolioSymbols().size,
@@ -5564,7 +5563,7 @@ async function handleReactivePortfolioUpdate(snapshot) {
     PORTFOLIO_RUNTIME.lastChangedSymbols  = snapshot.changedSymbols;
     PORTFOLIO_RUNTIME.reactiveEvents++;
 
-    console.log(
+    if (IS_DEV) console.log(
       '[portfolio-reactive] relevant market update:',
       snapshot.type,
       snapshot.changedSymbols.length,
@@ -5655,12 +5654,12 @@ function scheduleReactivePortfolioRefresh(source = 'market-event') {
     PORTFOLIO_RUNTIME.debounceMs
   );
 
-  console.log('[portfolio-reactive] refresh scheduled', source);
+  if (IS_DEV) console.log('[portfolio-reactive] refresh scheduled', source);
 }
 
 async function runReactivePortfolioRefresh() {
   if (PORTFOLIO_RUNTIME.processing) {
-    console.log('[portfolio-reactive] skipped — already processing');
+    if (IS_DEV) console.log('[portfolio-reactive] skipped — already processing');
     return;
   }
 
@@ -5713,7 +5712,7 @@ async function runReactivePortfolioRefresh() {
     PORTFOLIO_RUNTIME.scheduled  = false;
     PORTFOLIO_RUNTIME.stale      = false;
 
-    console.log('[portfolio-reactive] recalculation complete:', {
+    if (IS_DEV) console.log('[portfolio-reactive] recalculation complete:', {
       changed,
       assets:   changedAssets.length,
       duration: PORTFOLIO_RUNTIME.lastRecalculationDurationMs,
@@ -5722,7 +5721,7 @@ async function runReactivePortfolioRefresh() {
     if (!changed) return;
 
     if (PORTFOLIO_RUNTIME.lastRenderVersion === MARKET_DATA_VERSION) {
-      console.log('[portfolio-reactive] skipped render — same version');
+      if (IS_DEV) console.log('[portfolio-reactive] skipped render — same version');
       return;
     }
 
@@ -5734,7 +5733,7 @@ async function runReactivePortfolioRefresh() {
       render();
     }
 
-    console.log('[portfolio-reactive] render committed');
+    if (IS_DEV) console.log('[portfolio-reactive] render committed');
 
     // FC-9: invalidate + recompute derived state after a committed render.
     // Consumer-only — does not write MARKET_DATA, render, or emit events.
@@ -5753,7 +5752,7 @@ async function runReactivePortfolioRefresh() {
 function invalidateDerivedFinancialState(source = 'unknown') {
   DERIVED_FINANCIAL_STATE.stale              = true;
   DERIVED_FINANCIAL_STATE.runtime.lastSource = source;
-  console.log('[derived-state] invalidated:', source);
+  if (IS_DEV) console.log('[derived-state] invalidated:', source);
 }
 
 function buildPortfolioAllocations(assets, totalValue) {
@@ -5797,7 +5796,7 @@ function buildPortfolioExposure(assets = []) {
 function recomputeDerivedFinancialState(source = 'unknown') {
   if (DERIVED_FINANCIAL_STATE.processing) {
     DERIVED_FINANCIAL_STATE.runtime.skipped++;
-    console.log('[derived-state] skipped recomputation');
+    if (IS_DEV) console.log('[derived-state] skipped recomputation');
     return;
   }
 
@@ -5873,7 +5872,7 @@ function recomputeDerivedFinancialState(source = 'unknown') {
     DERIVED_FINANCIAL_STATE.runtime.recomputations++;
     DERIVED_FINANCIAL_STATE.runtime.lastSource      = source;
 
-    console.log('[derived-state] recomputed:', {
+    if (IS_DEV) console.log('[derived-state] recomputed:', {
       assets:   portfolioAssets.length,
       totalValue,
       duration: DERIVED_FINANCIAL_STATE.runtime.lastDurationMs,
@@ -6421,7 +6420,7 @@ function initializeWorkspaceRuntime() {
     window._aw4KeyboardAttached = true;
   }
 
-  console.log('[workspace] initialized');
+  if (IS_DEV) console.log('[workspace] initialized');
 }
 
 function getWorkspaceSnapshot() {
@@ -8903,7 +8902,7 @@ function _hydrateWorkspaceFromPersistence() {
   if (typeof _wp6dEnsureMarketDataForSheet === 'function') {
     _wp6dEnsureMarketDataForSheet(sheet);
   }
-  console.log('[workspace-persist] hydrated', { applied });
+  if (IS_DEV) console.log('[workspace-persist] hydrated', { applied });
   return applied;
 }
 
@@ -9979,7 +9978,7 @@ function renderWorkspace() {
     _aw92RemoveValidationDOM();
   }
 
-  console.log('[workspace] rendered v' + WORKSPACE_RUNTIME.renderVersion + ' (' + (isDesktop ? 'desktop' : 'mobile') + ')');
+  if (IS_DEV) console.log('[workspace] rendered v' + WORKSPACE_RUNTIME.renderVersion + ' (' + (isDesktop ? 'desktop' : 'mobile') + ')');
 }
 
 // ── FC-10: Financial formula engine ───────────────────────────────────────────
@@ -10025,7 +10024,7 @@ function rebuildFormulaDependencyGraph() {
   FORMULA_RUNTIME.graphVersion++;
   FORMULA_RUNTIME.lastGraphBuildAt = Date.now();
 
-  console.log('[formula-graph] rebuilt:', {
+  if (IS_DEV) console.log('[formula-graph] rebuilt:', {
     formulas:     FORMULA_RUNTIME.formulas.size,
     graphVersion: FORMULA_RUNTIME.graphVersion,
   });
@@ -10092,7 +10091,7 @@ function registerFinancialFormula(id, dependencies, compute) {
     compute,
   });
 
-  console.log('[formula-runtime] registered:', id);
+  if (IS_DEV) console.log('[formula-runtime] registered:', id);
 
   // FC-11: keep dependency graph in sync with formula registry.
   rebuildFormulaDependencyGraph();
@@ -10107,7 +10106,7 @@ function invalidateFinancialFormulas(changedDependencies = [], reason = 'unknown
     FORMULA_RUNTIME.dirtyFormulas.add(formulaId);
   }
 
-  console.log('[formula-runtime] invalidated:', {
+  if (IS_DEV) console.log('[formula-runtime] invalidated:', {
     reason,
     affected: affected.length,
   });
@@ -10137,7 +10136,7 @@ function computeFinancialFormula(id) {
 
 function recomputeFinancialFormulas(source = 'unknown') {
   if (FORMULA_RUNTIME.processing) {
-    console.log('[formula-runtime] skipped recomputation');
+    if (IS_DEV) console.log('[formula-runtime] skipped recomputation');
     return;
   }
 
@@ -10162,7 +10161,7 @@ function recomputeFinancialFormulas(source = 'unknown') {
     FORMULA_RUNTIME.lastComputedAt = Date.now();
     FORMULA_RUNTIME.lastDurationMs = Date.now() - t0;
 
-    console.log('[formula-runtime] recomputed selective:', {
+    if (IS_DEV) console.log('[formula-runtime] recomputed selective:', {
       dirty:    dirty.length,
       duration: FORMULA_RUNTIME.lastDurationMs,
       source,
@@ -12228,7 +12227,7 @@ function _aurixDashSync(surface) {
 // IMPORTANT: flip to `false` before any push to producción — that restores the
 // original "OFF by default" behaviour. The runtime override below always wins,
 // so this constant only sets the DEFAULT.
-const AURIX_PCE_VALIDATION_MODE = true;
+const AURIX_PCE_VALIDATION_MODE = false;
 
 function _aurixReconFlag() {
   if (typeof window === 'undefined') return false;
@@ -14735,12 +14734,12 @@ async function getUnifiedMarketPrice(symbol) {
   // 1. Check MARKET_DATA first — already-fetched data, no network cost
   const item = MARKET_DATA.find(d => normalizeSymbol(d.symbol) === norm);
   if (item?.price > 0) {
-    console.log('[FC2] source: MARKET_DATA', symbol);
+    if (IS_DEV) console.log('[FC2] source: MARKET_DATA', symbol);
     return { price: item.price, change24h: item.change24h ?? null };
   }
 
   // 2. Fallback: single cached batch snapshot for the stocks universe
-  console.log('[FC2] fallback triggered for', symbol);
+  if (IS_DEV) console.log('[FC2] fallback triggered for', symbol);
   const data  = await _fetchStocksFallbackFC2();
   if (!data) return null;
   const found = data.find(d => normalizeSymbol(d.symbol) === norm);
@@ -14834,7 +14833,7 @@ async function _refreshPricesImpl() {
   PORTFOLIO_RUNTIME.lastReactiveSource     = 'legacy-refresh';
   PORTFOLIO_RUNTIME.lastPortfolioRefreshAt = Date.now();
   PORTFOLIO_RUNTIME.stale = false;
-  console.log('[portfolio-reactive] legacy refreshPrices() executed');
+  if (IS_DEV) console.log('[portfolio-reactive] legacy refreshPrices() executed');
 
   // ── Legacy migration (one-time data fix) ──────────────────────────────
   let migrated = false;
@@ -14966,7 +14965,7 @@ async function _refreshPricesImpl() {
   // provider recovers next cycle. Update the chart visually, but skip
   // the history append until both feeds succeed together.
   const _anyFeedFailed = !cryptoSuccess || !marketSuccess;
-  if (_anyFeedFailed) console.log('[chart-history] skip snapshot: partial refresh failure');
+  if (IS_DEV && _anyFeedFailed) console.log('[chart-history] skip snapshot: partial refresh failure');
   try { onPortfolioChange(false, { skipSnapshot: _anyFeedFailed }); } catch { /* chart errors stay contained */ }
 }
 
@@ -15623,7 +15622,7 @@ function updateCategoryCards() {
   const _cardDist = getInvestableDistribution({ includeNonInvestable: true }) || [];
   const distMap = Object.fromEntries(_cardDist.map(d => [d.type, d]));
 
-  console.log('[categories] rendering:', ALL_CATEGORIES, '| live dist:', Object.keys(distMap));
+  if (IS_DEV) console.log('[categories] rendering:', ALL_CATEGORIES, '| live dist:', Object.keys(distMap));
 
   if (!section.dataset.entered) {
     section.dataset.entered = '1';
@@ -18977,7 +18976,7 @@ async function _refreshCrypto() {
     MARKET_RUNTIME.providers.coingecko = { successAt: Date.now(), latencyMs: Date.now() - t0, healthy: true };
     MARKET_RUNTIME.lastSuccessAt = Date.now();
     MARKET_RUNTIME.health = 'healthy';
-    console.log(`[market-runtime] crypto refresh success ${Date.now() - t0}ms`);
+    if (IS_DEV) console.log(`[market-runtime] crypto refresh success ${Date.now() - t0}ms`);
     if (currentMarketTab === 'crypto' || currentMarketTab === 'watchlist' || currentMarketTab === 'all') renderCurrentMarketView();
   } catch (e) {
     MARKET_RUNTIME.providers.coingecko = { failureAt: Date.now(), healthy: false };
@@ -19010,7 +19009,7 @@ async function _refreshStocks() {
     MARKET_RUNTIME.lastSuccessAt = Date.now();
     MARKET_RUNTIME.health = 'healthy';
     delete MARKET_FAILURE_TS['stocks'];
-    console.log(`[market-runtime] stocks refresh success ${Date.now() - t0}ms`);
+    if (IS_DEV) console.log(`[market-runtime] stocks refresh success ${Date.now() - t0}ms`);
     if (currentMarketTab === 'stocks' || currentMarketTab === 'watchlist' || currentMarketTab === 'all') renderCurrentMarketView();
   } catch (e) {
     MARKET_RUNTIME.providers.stocksApi = { failureAt: Date.now(), healthy: false };
@@ -19043,7 +19042,7 @@ async function _refreshGeneric(tab, symbols, fallbackMap, title) {
         }
       }
     } catch (err) {
-      console.log('[market-runtime] snapshot fetch failed for', tab, '·', err.message);
+      if (IS_DEV) console.log('[market-runtime] snapshot fetch failed for', tab, '·', err.message);
     }
 
     const results = symbols.map(symbol => {
@@ -19058,7 +19057,7 @@ async function _refreshGeneric(tab, symbols, fallbackMap, title) {
       MARKET_RUNTIME.lastSuccessAt = Date.now();
       MARKET_RUNTIME.health = 'healthy';
       delete MARKET_FAILURE_TS[tab];
-      console.log(`[market-runtime] ${tab} refresh success ${Date.now() - t0}ms`);
+      if (IS_DEV) console.log(`[market-runtime] ${tab} refresh success ${Date.now() - t0}ms`);
       if (currentMarketTab === tab || currentMarketTab === 'watchlist' || currentMarketTab === 'all') renderCurrentMarketView();
     } else {
       MARKET_FAILURE_TS[tab] = Date.now();
@@ -26141,7 +26140,7 @@ recomputeFinancialFormulas('initial-bootstrap');
 
 // FC-6: debug subscriber — validates reactive runtime, non-invasive
 const unsubscribeMarketDebug = MARKET_EVENTS.subscribe('market:update', snapshot => {
-  console.log(
+  if (IS_DEV) console.log(
     '[market-events] update received:',
     snapshot.type,
     snapshot.changedSymbols.length,
@@ -27520,8 +27519,6 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 
 if (IS_DEV) {
-  console.log('[DEBUG] SUPABASE_URL:', typeof SUPABASE_URL);
-  console.log('[DEBUG] supabase object:', typeof window.supabase);
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -29955,13 +29952,12 @@ function _aurixWorkspaceIntelligence() {
             : topInvestedPct > 35 ? 'info'
                                   : 'positive',
     },
-    {
-      id:    'performance',
-      label: _ti('ws_intel_dim_performance'),
-      state: _ti('ws_intel_perf_initial'),
-      why:   _ti('ws_intel_dim_performance_why_initial'),
-      tone:  'neutral',
-    },
+    // BLOQUE-0.3 — the 'performance' dimension was a permanent hardcoded
+    // placeholder ("Historial en construcción") shown to every user regardless
+    // of real history/PnL. Hidden until a real, flow-aware performance reading
+    // is built (Bloque 2.1). i18n keys (ws_intel_dim_performance / _perf_initial
+    // / _why_initial) are kept for that work. Render maps over this array, so
+    // omitting the card simply yields 3 honest dimensions.
   ];
 
   // HERO INSIGHT — pick the single most consequential interpretation.
@@ -30143,13 +30139,8 @@ function _aurixWorkspaceIntelligence() {
                     : _ti('ws_intel_signal_liquidity_explanation_pct', cashPct),
       severity:    liqTone === 'positive' ? 'positive' : liqTone === 'info' ? 'info' : 'warn',
     },
-    {
-      kind:        'performance',
-      category:    _ti('ws_intel_signal_performance'),
-      title:       _ti('ws_intel_signal_performance_title_initial'),
-      explanation: _ti('ws_intel_signal_performance_explanation_initial'),
-      severity:    'neutral',
-    },
+    // BLOQUE-0.3 — performance signal hidden alongside its dimension (placeholder
+    // only). Restored when real performance lands (Bloque 2.1). i18n keys kept.
   ];
 
   // WORKSPACE-COHERENCE-1 — de-duplicate signals against the hero.
