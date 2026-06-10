@@ -12621,6 +12621,8 @@ const _AURIX_PCE_FEED_REASON = {
   'upstream-error': 'error upstream CoinGecko (502/503/504) tras reintentos — transitorio',
   'empty-feed-real': 'CoinGecko 200 SIN histórico — sin datos reales',
   'aborted': 'cancelado (cambio de vista / timeout)',
+  // SPEC 4.1H — last-known-price carry-forward used to bridge transient gaps.
+  'carried-forward': 'último precio válido mantenido (LKP) en huecos transitorios → confidence=partial',
   'unknown': '—',
 };
 // SPEC 4.1D — render the per-asset coverage breakdown for a range (default 30D),
@@ -12664,6 +12666,7 @@ function _aurixPceByAssetHtml(rangeKey) {
       <td>${(a.coverageContribution == null) ? '—' : a.coverageContribution}</td>
       <td class="${missCls}">${miss}</td>
       <td>${_aurixPceFmtTs(a.firstPriceTs)} → ${_aurixPceFmtTs(a.lastPriceTs)}</td>
+      <td>${a.carriedForwardPoints || 0}</td>
       <td>${esc(fs)}</td>
       <td class="pce-sub">${_AURIX_PCE_FEED_REASON[fs] || '—'}</td>
     </tr>`;
@@ -12671,7 +12674,7 @@ function _aurixPceByAssetHtml(rangeKey) {
   return `<div class="pce-ov-subtitle">${rangeKey.toUpperCase()} Coverage by Asset · orden: missing DESC</div>
     <table class="pce-ov-tbl">
       <thead><tr>
-        <th>symbol</th><th>key</th><th>id</th><th>type</th><th>ccy</th><th>weight</th><th>cov+</th><th>miss−</th><th>first→last px</th><th>feedStatus</th><th>reason</th>
+        <th>symbol</th><th>key</th><th>id</th><th>type</th><th>ccy</th><th>weight</th><th>cov+</th><th>miss−</th><th>first→last px</th><th>CF pts</th><th>feedStatus</th><th>reason</th>
       </tr></thead><tbody>${body}</tbody></table>`;
 }
 function _aurixPceOverlayRender() {

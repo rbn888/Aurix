@@ -67,6 +67,30 @@
        nowValue       : live total (BASE) to anchor ONLY the last point
        concurrency    : price fan-out cap
      Returns: Promise< { series, meta, overlays, annotations } >  (engine envelope)  */
+  // SPEC 4.1H — Last Known Price carry-forward (forward-fill ONLY). Robustness
+  // for transient feed gaps: within an ALREADY-FETCHED historical market series,
+  // hold the last VALID price across null/missing points. Hard rules:
+  //   • forward-fill only — leading nulls (before any real price) stay null (NO backfill)
+  //   • step, never interpolate (carried value = exact last real price)
+  //   • requires ≥1 real point — a fully empty/all-null series stays as-is (NO fabrication)
+  //   • operates on the {t,v} price series; never touches live pricing / valuation / engine math
+  // Returns { series, carried } where `carried` = number of points filled.
+  function _carryForwardSeries(series) {
+    var arr = Array.isArray(series) ? series : [];
+    var hasValid = false;
+    for (var i = 0; i < arr.length; i++) { if (arr[i] && _isFiniteNum(arr[i].v)) { hasValid = true; break; } }
+    if (!hasValid) return { series: arr, carried: 0 };   // empty / all-null → unchanged (no fabrication)
+    var out = new Array(arr.length);
+    var last = null, carried = 0;
+    for (var j = 0; j < arr.length; j++) {
+      var p = arr[j];
+      if (p && _isFiniteNum(p.v)) { last = p.v; out[j] = p; }
+      else if (last !== null) { out[j] = { t: (p && p.t), v: last, _carriedForward: true }; carried++; }
+      else { out[j] = p; }   // leading gap before any real price → keep (no backfill)
+    }
+    return { series: out, carried: carried };
+  }
+
   async function buildNetWorthSeries(opts) {
     var o = opts || {};
     var engine = _engine(o);
@@ -155,6 +179,18 @@
       cashBaseAt = engine.buildCashBaseAt(cashTl, fxByCurrency, base);
     }
 
+    // SPEC 4.1H — Last Known Price carry-forward over each market price series,
+    // AFTER fetch and BEFORE compose. Dense feeds (CoinGecko/Yahoo) have no
+    // internal nulls → usually a no-op; it only acts on genuinely gappy series.
+    // Empty series and leading gaps are untouched (no fabrication / no backfill).
+    var _cfByKey = {}, _cfTotal = 0, _cfAssets = 0;
+    for (var pk in priceByKey) {
+      if (!Object.prototype.hasOwnProperty.call(priceByKey, pk)) continue;
+      var _cf = _carryForwardSeries(priceByKey[pk]);
+      priceByKey[pk] = _cf.series;
+      if (_cf.carried > 0) { _cfByKey[pk] = _cf.carried; _cfTotal += _cf.carried; _cfAssets++; }
+    }
+
     // 5. Compose on the definitive base-currency contract.
     var result = engine.composeNetWorth({
       grid: grid,
@@ -203,7 +239,18 @@
             er.feedStatus = 'fx-unsupported';
             if (!er.currency) er.currency = _fxDropped[er.key];
           }
+          // SPEC 4.1H — surface carry-forward per asset (read-only diagnostic).
+          var _cfp = (er.key != null && _cfByKey[er.key]) ? _cfByKey[er.key] : 0;
+          er.carriedForwardPoints = _cfp;
+          if (_cfp > 0 && (er.feedStatus === 'ok' || er.feedStatus === 'leading-edge-gap')) er.feedStatus = 'carried-forward';
         }
+      }
+      // SPEC 4.1H — fleet-level CF telemetry + honest confidence: any carry-forward
+      // means the series is not 100% live-measured → never report 'complete'.
+      if (result && result.meta) {
+        result.meta.carriedForwardPoints = _cfTotal;
+        result.meta.carriedForwardAssets = _cfAssets;
+        if (_cfTotal > 0 && result.meta.confidence === 'complete') result.meta.confidence = 'partial';
       }
     } catch (_) { /* diagnostic enrichment must never break the build */ }
 
