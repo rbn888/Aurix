@@ -46,7 +46,13 @@ export default async function handler(req, res) {
   try {
     const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart` +
                 `?vs_currency=usd&days=${days}`;
-    const upstream = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    // SPEC 4.1G — optional CoinGecko Demo API key. When COINGECKO_DEMO_API_KEY is
+    // set in the backend env, send it (lifts the keyless rate limit that caused
+    // the burst 429s). Absent → identical keyless behaviour as before. No key is
+    // ever hardcoded; local/dev without the env var is unaffected.
+    const _cgHeaders = { Accept: 'application/json' };
+    if (process.env.COINGECKO_DEMO_API_KEY) _cgHeaders['x-cg-demo-api-key'] = process.env.COINGECKO_DEMO_API_KEY;
+    const upstream = await fetch(url, { signal: AbortSignal.timeout(10000), headers: _cgHeaders });
     if (upstream.status === 429) {
       return res.status(429).json({ error: 'rate_limit' });
     }

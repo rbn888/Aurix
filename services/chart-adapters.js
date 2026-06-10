@@ -77,6 +77,36 @@
 
   function _warn(...args) { try { console.warn('[chart-adapters]', ...args); } catch (_) {} }
 
+  // SPEC 4.1G — abort-aware delay for retry backoff. Rejects immediately if the
+  // caller's AbortController fires, so retries never outlive a cancelled request.
+  function _sleep(ms, signal) {
+    return new Promise(function (resolve, reject) {
+      if (signal && signal.aborted) { reject(new Error('aborted')); return; }
+      const id = setTimeout(resolve, ms);
+      if (signal && typeof signal.addEventListener === 'function') {
+        signal.addEventListener('abort', function () { clearTimeout(id); reject(new Error('aborted')); }, { once: true });
+      }
+    });
+  }
+  // SPEC 4.1G — per-coin crypto feed diagnostic side-channel (write-only). The
+  // founder overlay reads window.__aurixCryptoFeedDiag to distinguish a genuine
+  // 'empty-feed-real' from a transient 'rate-limited' / 'upstream-error'. Touches
+  // no data/persistence; keyed by lower-cased coinId.
+  function _cryptoDiag(coinId, status) {
+    try {
+      if (typeof window === 'undefined') return;
+      const g = (window.__aurixCryptoFeedDiag = window.__aurixCryptoFeedDiag || {});
+      g[String(coinId || '').toLowerCase()] = { status: status, at: Date.now() };
+    } catch (_) {}
+  }
+  function _cryptoEmpty(coinId, reason) {
+    _cryptoDiag(coinId, reason);
+    return {
+      series: [],
+      meta: { source: 'coingecko', currency: 'USD', granularity: '1h', isSynthetic: false, completeness: 0, asOf: Date.now(), error: reason },
+    };
+  }
+
   function _emptyResult(source, currency, granularity) {
     return Object.freeze({
       series: [],
@@ -183,50 +213,71 @@
       return _emptyResult('coingecko', 'USD', '1h');
     }
 
-    let res;
-    try {
-      res = await fetch(
-        `${API_BASE}/api/prices/history` +
-          `?id=${encodeURIComponent(coinId)}&days=${encodeURIComponent(days)}`,
-        { signal: a.signal, headers: { Accept: 'application/json' } }
-      );
-    } catch (err) {
-      _warn('crypto fetch fail', coinId, range, err?.message);
-      return _emptyResult('coingecko', 'USD', '1h');
-    }
-    if (!res.ok) {
+    const url = `${API_BASE}/api/prices/history` +
+      `?id=${encodeURIComponent(coinId)}&days=${encodeURIComponent(days)}`;
+    // SPEC 4.1G — transient CoinGecko 429/502/503/504 (rate-limit / upstream)
+    // must NOT turn valid crypto into a permanent empty-feed. Retry up to twice
+    // with short jittered backoff (immediate → 400-700ms → 900-1400ms), aborting
+    // cleanly if the caller cancels. A 200 with no prices is a GENUINE empty
+    // (not retried). On final failure we return empty WITH a distinguishable
+    // reason so the overlay can show rate-limited / upstream-error vs no-history.
+    const BACKOFFS  = [0, 400 + Math.floor(Math.random() * 300), 900 + Math.floor(Math.random() * 500)];
+    const RETRYABLE = { 429: 'rate-limited', 502: 'upstream-error', 503: 'upstream-error', 504: 'upstream-error' };
+    let lastReason  = 'upstream-error';
+
+    for (let attempt = 0; attempt < BACKOFFS.length; attempt++) {
+      if (a.signal && a.signal.aborted) return _cryptoEmpty(coinId, 'aborted');
+      if (attempt > 0) {
+        try { await _sleep(BACKOFFS[attempt], a.signal); }
+        catch (_) { return _cryptoEmpty(coinId, 'aborted'); }
+      }
+
+      let res;
+      try {
+        res = await fetch(url, { signal: a.signal, headers: { Accept: 'application/json' } });
+      } catch (err) {
+        if (a.signal && a.signal.aborted) return _cryptoEmpty(coinId, 'aborted');
+        lastReason = 'upstream-error';
+        _warn('crypto fetch fail', coinId, range, err?.message);
+        continue;   // network error → retry
+      }
+
+      if (res.ok) {
+        let body;
+        try { body = await res.json(); } catch (_) { body = null; }
+        const prices = Array.isArray(body?.prices) ? body.prices : [];
+        if (!prices.length) return _cryptoEmpty(coinId, 'empty-feed-real');   // 200 + no data → genuine; don't retry
+
+        // CoinGecko granularity is implicit by `days`: <=1d → 5m, <=90d → 1h, >90d → 1d.
+        const granularity = days <= 1 ? '5m' : days <= 90 ? '1h' : '1d';
+        const series = [];
+        for (const p of prices) {
+          if (!Array.isArray(p) || p.length < 2) continue;
+          const t = p[0], v = p[1];
+          if (typeof t !== 'number' || typeof v !== 'number' || !Number.isFinite(v)) continue;
+          series.push({ time: t, value: v });
+        }
+        _cryptoDiag(coinId, 'ok');
+        return {
+          series,
+          meta: {
+            source:       'coingecko',
+            currency:     'USD',
+            granularity:  granularity,
+            isSynthetic:  false,
+            completeness: _completenessFor(series.length, range),
+            asOf:         Date.now(),
+          },
+        };
+      }
+
+      // Non-2xx: retry on transient codes, stop on the rest (e.g. 400/404).
+      lastReason = RETRYABLE[res.status] || 'upstream-error';
       _warn('crypto http', coinId, range, res.status);
-      return _emptyResult('coingecko', 'USD', '1h');
+      if (!RETRYABLE[res.status]) break;
     }
 
-    let body;
-    try { body = await res.json(); } catch (_) { body = null; }
-    const prices = Array.isArray(body?.prices) ? body.prices : [];
-    if (!prices.length) return _emptyResult('coingecko', 'USD', '1h');
-
-    // CoinGecko granularity is implicit by `days` per their docs:
-    //   <=1d → 5-minute, <=90d → hourly, >90d → daily.
-    const granularity = days <= 1 ? '5m' : days <= 90 ? '1h' : '1d';
-
-    const series = [];
-    for (const p of prices) {
-      if (!Array.isArray(p) || p.length < 2) continue;
-      const t = p[0], v = p[1];
-      if (typeof t !== 'number' || typeof v !== 'number' || !Number.isFinite(v)) continue;
-      series.push({ time: t, value: v });
-    }
-
-    return {
-      series,
-      meta: {
-        source:       'coingecko',
-        currency:     'USD',
-        granularity:  granularity,
-        isSynthetic:  false,
-        completeness: _completenessFor(series.length, range),
-        asOf:         Date.now(),
-      },
-    };
+    return _cryptoEmpty(coinId, lastReason);
   }
 
   // ── 3. Portfolio adapter (local snapshots) ───────────────────

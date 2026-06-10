@@ -41,7 +41,7 @@
     'all':  24 * 60 * 60 * 1000
   };
   var DEFAULT_TTL = 5 * 60 * 1000;
-  var DEFAULT_CONCURRENCY = 6;
+  var DEFAULT_CONCURRENCY = 4;   // SPEC 4.1G — smaller fan-out → fewer CoinGecko 429s (PCE-only path; Yahoo barely affected)
   var MAX_ENTRIES = 200;            // bound memory (simple LRU by insertion order)
 
   function _now(injected) { return (typeof injected === 'number') ? injected : Date.now(); }
@@ -111,8 +111,11 @@
       .then(function () { return fetcher({ provider: o.provider, key: o.key, range: o.range, signal: o.signal }); })
       .then(function (res) {
         var data = normalizeAdapterResult(res);
-        _cache.set(ck, { data: data, fetchedAt: now });
-        _evictIfNeeded();
+        // SPEC 4.1G — never cache an EMPTY series: a transient rate-limit /
+        // upstream error (429/502) must not get pinned for the whole TTL and keep
+        // showing empty-feed after the network recovers. Only real data is cached;
+        // empties are re-fetched on the next request.
+        if (data.series && data.series.length) { _cache.set(ck, { data: data, fetchedAt: now }); _evictIfNeeded(); }
         _inflight.delete(ck);
         return Object.assign({}, data, { fetchedAt: now, cached: false });
       })

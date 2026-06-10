@@ -12590,8 +12590,13 @@ async function _aurixPceScanAll() {
   if (_aurixPceScanning) return;
   _aurixPceScanning = true;
   try { _aurixPceOverlayRender(); } catch (_) {}
-  for (const r of ['30d', '1y', 'all', '7d', '24h']) {
-    try { await _aurixPceScanRange(r); } catch (_) {}
+  // SPEC 4.1G — scan ranges SEQUENTIALLY with a small inter-range delay so we
+  // don't fire 5 ranges × N crypto at CoinGecko in one burst (the cause of the
+  // 429/502 empty-feed). Founder-only path; never runs for normal users.
+  const _ranges = ['30d', '1y', 'all', '7d', '24h'];
+  for (let i = 0; i < _ranges.length; i++) {
+    try { await _aurixPceScanRange(_ranges[i]); } catch (_) {}
+    if (i < _ranges.length - 1) { await new Promise(res => setTimeout(res, 350)); }
   }
   _aurixPceScanning = false;
   try { _aurixPceOverlayRender(); } catch (_) {}
@@ -12611,6 +12616,11 @@ const _AURIX_PCE_FEED_REASON = {
   'fx-unsupported': 'divisa FX no soportada',
   'static-covered': 'flat (sin feed) — NO baja coverage',
   'cash-covered': 'cash — NO baja coverage',
+  // SPEC 4.1G — distinguishable crypto feed failures (from window.__aurixCryptoFeedDiag).
+  'rate-limited': 'CoinGecko 429 (rate-limit) tras reintentos — transitorio',
+  'upstream-error': 'error upstream CoinGecko (502/503/504) tras reintentos — transitorio',
+  'empty-feed-real': 'CoinGecko 200 SIN histórico — sin datos reales',
+  'aborted': 'cancelado (cambio de vista / timeout)',
   'unknown': '—',
 };
 // SPEC 4.1D — render the per-asset coverage breakdown for a range (default 30D),
@@ -12633,6 +12643,17 @@ function _aurixPceByAssetHtml(rangeKey) {
     if (a.name && a.name !== a.symbol) ids.push(esc(a.name));
     const miss = (a.missingContribution || 0);
     const missCls = miss > 0.0005 ? 'pce-bad' : 'pce-dim';
+    // SPEC 4.1G — refine an 'empty-feed' market row with the crypto adapter's
+    // diagnostic (rate-limited / upstream-error / empty-feed-real) so a transient
+    // CoinGecko failure is never mislabelled as "no history".
+    let fs = a.feedStatus || 'unknown';
+    if (a.mode === 'market' && (fs === 'empty-feed' || a.feedEmpty) && a.key) {
+      try {
+        const d = (typeof window !== 'undefined' && window.__aurixCryptoFeedDiag)
+          ? window.__aurixCryptoFeedDiag[String(a.key).toLowerCase()] : null;
+        if (d && d.status && d.status !== 'ok') fs = d.status;
+      } catch (_) {}
+    }
     body += `<tr>
       <td>${label}${ids.length ? `<div class="pce-sub">${ids.join(' · ')}</div>` : ''}</td>
       <td>${esc(a.key) || '—'}</td>
@@ -12643,8 +12664,8 @@ function _aurixPceByAssetHtml(rangeKey) {
       <td>${(a.coverageContribution == null) ? '—' : a.coverageContribution}</td>
       <td class="${missCls}">${miss}</td>
       <td>${_aurixPceFmtTs(a.firstPriceTs)} → ${_aurixPceFmtTs(a.lastPriceTs)}</td>
-      <td>${esc(a.feedStatus) || 'unknown'}</td>
-      <td class="pce-sub">${_AURIX_PCE_FEED_REASON[a.feedStatus] || '—'}</td>
+      <td>${esc(fs)}</td>
+      <td class="pce-sub">${_AURIX_PCE_FEED_REASON[fs] || '—'}</td>
     </tr>`;
   }
   return `<div class="pce-ov-subtitle">${rangeKey.toUpperCase()} Coverage by Asset · orden: missing DESC</div>
