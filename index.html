@@ -56,7 +56,7 @@
     // serve a half-cached app. Same user + same account must render the
     // same code on Safari mobile, the iOS home-screen PWA, and desktop.
     (function() {
-      window.AURIX_BUILD = 'v210-pce-asset-identity';
+      window.AURIX_BUILD = 'v211-crypto-history-resilient';
       try {
         var KEY     = 'aurix_build';
         var RELOAD  = 'aurix_build_reload';
@@ -1196,7 +1196,7 @@
   <script defer src="services/aurix-chart-core.js?v=24"></script>
   <!-- CHART-3: historical data adapter layer. Pure infra — no UI consumer.
        Loads `defer` so boot stays uninterrupted; safe even if absent. -->
-  <script defer src="services/chart-adapters.js"></script>
+  <script defer src="services/chart-adapters.js?v=2"></script>
   <script src="services/market.js"></script>
   <script src="ai/insightEngine.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.0"></script>
@@ -1209,10 +1209,10 @@
        render time, gated by window.__AURIX_PORTFOLIO_RECON (default OFF). With
        the flag off these modules are inert — dashboard behaviour is unchanged. -->
   <script defer src="services/portfolio-chart-engine.js?v=2"></script>
-  <script defer src="services/portfolio-price-layer.js?v=1"></script>
+  <script defer src="services/portfolio-price-layer.js?v=2"></script>
   <script defer src="services/portfolio-net-worth.js?v=3"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
-  <script src="app.js?v=237"></script>
+  <script src="app.js?v=238"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
        Loads after app.js so it can read its primitives. No consumers yet. -->
   <script src="services/wealth-engine.js?v=2"></script>
