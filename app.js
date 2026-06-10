@@ -12308,84 +12308,102 @@ function _aurixReconSyncHeadline(series) {
 // ONLY while the recon flag is on (validation). Production (flag off) never
 // reaches it, so there is zero overhead and zero behaviour change there.
 const _PCE_COV_MIN = { '30d': 0.90, '1y': 0.90, 'all': 0.85, '7d': 0.85, '24h': 0.80 };
+// SPEC 4.1B — latest telemetry row per range, read by the founder overlay.
+const _aurixPceTelStore = {};
+
+// Build one telemetry row (async — re-reads raw engine meta). Pure: returns the
+// row, emits nothing. Shared by the live kick (_aurixPceValidationLog) and the
+// founder overlay's all-ranges scan.
+async function _aurixPceComputeRow(args) {
+  const range = args.range, currency = args.currency;
+
+  // Raw engine meta — read directly (no abort signal) so even a gate-rejected
+  // or timed-out range surfaces its true coverage/confidence for the founder.
+  let meta = null;
+  try {
+    const NW = window.AurixNetWorth;
+    if (NW && typeof NW.buildNetWorthSeries === 'function') {
+      const env = await NW.buildNetWorthSeries(Object.assign({}, args.opts, { signal: undefined }));
+      meta = (env && env.meta) ? env.meta : null;
+    }
+  } catch (_) {}
+
+  // Snapshot baseline (current official source) for the A/B comparison.
+  let snap = null;
+  try { snap = (typeof getChartData === 'function') ? getChartData(range, _investableSnapshotSource()) : null; } catch (_) {}
+
+  // Light, local asset classification (diagnostic estimate — mirrors the
+  // engine's defaultResolveHolding intent without calling into it).
+  let assetsIncluded = 0, assetsExcluded = 0; const excludedList = [];
+  try {
+    const list = (typeof investableAssets === 'function') ? investableAssets() : [];
+    for (const a of list) {
+      const tp = String((a && a.type) || '').toLowerCase();
+      const sym = (a && (a.marketSymbol || a.ticker)) || '';
+      const feed = (tp === 'crypto' && a.coinId)
+        || ((tp === 'stock' || tp === 'etf' || tp === 'fund' || tp === 'index') && sym)
+        || (tp === 'metal' && (sym || a.ticker === 'XAU' || a.ticker === 'XAG'))
+        || (tp === 'cash');
+      if (feed) assetsIncluded++; else { assetsExcluded++; excludedList.push((a && (a.ticker || a.symbol || a.name)) || '?'); }
+    }
+  } catch (_) {}
+
+  const reconOk     = !!(args.res && Array.isArray(args.res.series));
+  const reconPoints = reconOk ? args.res.series.length : 0;
+  const coverage    = meta && Number.isFinite(meta.coverage) ? +meta.coverage.toFixed(3) : null;
+  const confidence  = meta ? (meta.confidence || null) : null;
+  const threshold   = (_PCE_COV_MIN[range] != null) ? _PCE_COV_MIN[range] : null;
+  const coveragePass   = (coverage != null && threshold != null) ? coverage >= threshold : null;
+  const confidencePass = (confidence != null) ? confidence !== 'insufficient' : null;
+
+  const snapshot = snap ? {
+    rawPoints:    snap.pointsCount,
+    renderPoints: Array.isArray(snap.values) ? snap.values.length : 0,
+    firstValue:   snap.firstValue, lastValue: snap.lastValue,
+    returnPct:    Number.isFinite(snap.deltaPct) ? +snap.deltaPct.toFixed(2) : null,
+  } : null;
+
+  const reconstruction = reconOk ? {
+    renderPoints: reconPoints,
+    firstValue:   args.res.firstValue, lastValue: args.res.lastValue,
+    returnPct:    Number.isFinite(args.res.deltaPct) ? +args.res.deltaPct.toFixed(2) : null,
+    fxApproximated: !!args.res.fxApproximated, granularity: args.res.granularity || null,
+  } : null;
+
+  let abDiff = null;
+  if (reconstruction && snapshot) {
+    const dv = (Number.isFinite(reconstruction.lastValue) && Number.isFinite(snapshot.lastValue)) ? +(reconstruction.lastValue - snapshot.lastValue).toFixed(2) : null;
+    const dr = (Number.isFinite(reconstruction.returnPct) && Number.isFinite(snapshot.returnPct)) ? +(reconstruction.returnPct - snapshot.returnPct).toFixed(2) : null;
+    abDiff = { lastValueDelta: dv, returnPctDelta: dr, pointsDelta: reconPoints - snapshot.renderPoints };
+  }
+
+  return {
+    range, currency,
+    sourceUsed: args.outcome,                 // 'reconstruction' | 'snapshots'
+    reason: args.reason || null,
+    coverage, coverageThreshold: threshold, coveragePass,
+    confidence, confidencePass,
+    fxApproximated: meta ? !!meta.fxApproximated : (reconstruction ? reconstruction.fxApproximated : null),
+    rawPoints: snapshot ? snapshot.rawPoints : null,
+    renderPoints: reconPoints,
+    assetsIncluded, assetsExcluded, excludedList,
+    buildTimeMs: args.buildTimeMs,
+    reconstruction, snapshot, abDiff,
+  };
+}
+
+// Emit a row: console.log (SPEC 4.1A) + store + refresh the founder overlay.
+function _aurixPceEmit(row) {
+  if (!row) return;
+  try { console.log('[PCE]', row); } catch (_) {}
+  try { _aurixPceTelStore[row.range] = row; } catch (_) {}
+  try { if (typeof _aurixPceOverlayRender === 'function') _aurixPceOverlayRender(); } catch (_) {}
+}
+
 async function _aurixPceValidationLog(args) {
   try {
     if (!_aurixReconFlag()) return;
-    const range = args.range, currency = args.currency;
-
-    // Raw engine meta — read directly (no abort signal) so even a gate-rejected
-    // or timed-out range surfaces its true coverage/confidence for the founder.
-    let meta = null;
-    try {
-      const NW = window.AurixNetWorth;
-      if (NW && typeof NW.buildNetWorthSeries === 'function') {
-        const env = await NW.buildNetWorthSeries(Object.assign({}, args.opts, { signal: undefined }));
-        meta = (env && env.meta) ? env.meta : null;
-      }
-    } catch (_) {}
-
-    // Snapshot baseline (current official source) for the A/B comparison.
-    let snap = null;
-    try { snap = (typeof getChartData === 'function') ? getChartData(range, _investableSnapshotSource()) : null; } catch (_) {}
-
-    // Light, local asset classification (diagnostic estimate — mirrors the
-    // engine's defaultResolveHolding intent without calling into it).
-    let assetsIncluded = 0, assetsExcluded = 0; const excludedList = [];
-    try {
-      const list = (typeof investableAssets === 'function') ? investableAssets() : [];
-      for (const a of list) {
-        const tp = String((a && a.type) || '').toLowerCase();
-        const sym = (a && (a.marketSymbol || a.ticker)) || '';
-        const feed = (tp === 'crypto' && a.coinId)
-          || ((tp === 'stock' || tp === 'etf' || tp === 'fund' || tp === 'index') && sym)
-          || (tp === 'metal' && (sym || a.ticker === 'XAU' || a.ticker === 'XAG'))
-          || (tp === 'cash');
-        if (feed) assetsIncluded++; else { assetsExcluded++; excludedList.push((a && (a.ticker || a.symbol || a.name)) || '?'); }
-      }
-    } catch (_) {}
-
-    const reconOk     = !!(args.res && Array.isArray(args.res.series));
-    const reconPoints = reconOk ? args.res.series.length : 0;
-    const coverage    = meta && Number.isFinite(meta.coverage) ? +meta.coverage.toFixed(3) : null;
-    const confidence  = meta ? (meta.confidence || null) : null;
-    const threshold   = (_PCE_COV_MIN[range] != null) ? _PCE_COV_MIN[range] : null;
-    const coveragePass   = (coverage != null && threshold != null) ? coverage >= threshold : null;
-    const confidencePass = (confidence != null) ? confidence !== 'insufficient' : null;
-
-    const snapshot = snap ? {
-      rawPoints:    snap.pointsCount,
-      renderPoints: Array.isArray(snap.values) ? snap.values.length : 0,
-      firstValue:   snap.firstValue, lastValue: snap.lastValue,
-      returnPct:    Number.isFinite(snap.deltaPct) ? +snap.deltaPct.toFixed(2) : null,
-    } : null;
-
-    const reconstruction = reconOk ? {
-      renderPoints: reconPoints,
-      firstValue:   args.res.firstValue, lastValue: args.res.lastValue,
-      returnPct:    Number.isFinite(args.res.deltaPct) ? +args.res.deltaPct.toFixed(2) : null,
-      fxApproximated: !!args.res.fxApproximated, granularity: args.res.granularity || null,
-    } : null;
-
-    let abDiff = null;
-    if (reconstruction && snapshot) {
-      const dv = (Number.isFinite(reconstruction.lastValue) && Number.isFinite(snapshot.lastValue)) ? +(reconstruction.lastValue - snapshot.lastValue).toFixed(2) : null;
-      const dr = (Number.isFinite(reconstruction.returnPct) && Number.isFinite(snapshot.returnPct)) ? +(reconstruction.returnPct - snapshot.returnPct).toFixed(2) : null;
-      abDiff = { lastValueDelta: dv, returnPctDelta: dr, pointsDelta: reconPoints - snapshot.renderPoints };
-    }
-
-    console.log('[PCE]', {
-      range, currency,
-      sourceUsed: args.outcome,                 // 'reconstruction' | 'snapshots'
-      reason: args.reason || null,
-      coverage, coverageThreshold: threshold, coveragePass,
-      confidence, confidencePass,
-      fxApproximated: meta ? !!meta.fxApproximated : (reconstruction ? reconstruction.fxApproximated : null),
-      rawPoints: snapshot ? snapshot.rawPoints : null,
-      renderPoints: reconPoints,
-      assetsIncluded, assetsExcluded, excludedList,
-      buildTimeMs: args.buildTimeMs,
-      reconstruction, snapshot, abDiff,
-    });
+    _aurixPceEmit(await _aurixPceComputeRow(args));
   } catch (_) { /* telemetry must never break the chart */ }
 }
 
@@ -12502,6 +12520,174 @@ function _aurixReconRefresh() {
     // SPEC 4.1A — validation telemetry (flag-gated, diagnostic-only, no data touch).
     try { _aurixPceValidationLog({ range: range, currency: baseC, opts: _pceOpts, res: res, outcome: _outcome, reason: _reason, buildTimeMs: _buildTimeMs }); } catch (_) {}
   }).catch(function () { _reconInflightKey = null; /* error ⇒ snapshots */ });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC 4.1B — PCE FOUNDER VALIDATION TOGGLE + TELEMETRY OVERLAY
+// Internal, founder-only tool to validate PCE in production WITHOUT the console
+// and WITHOUT activating PCE by default. Founder mode is opt-in per device via
+// `?aurix_pce_founder=1` (persisted to localStorage). It ONLY sets the runtime
+// recon flag (window.__AURIX_PORTFOLIO_RECON) — it NEVER changes
+// AURIX_PCE_VALIDATION_MODE, data, persistence, Supabase, portfolioHistory or
+// PCE internals. For every normal user (mode off) nothing mounts, PCE stays OFF,
+// and behaviour is identical.
+// ════════════════════════════════════════════════════════════════════════════
+const _AURIX_PCE_FOUNDER_KEY = 'aurix_pce_founder';
+function _aurixPceFounderMode() {
+  try { return localStorage.getItem(_AURIX_PCE_FOUNDER_KEY) === '1'; } catch (_) { return false; }
+}
+// Gather the (read-only) reconstruction inputs for a range — mirrors the
+// dependency-gathering in _aurixReconRefresh; used by the overlay's range scan.
+function _aurixPceGatherOpts(range, currency) {
+  const baseC = currency || baseCurrency || 'USD';
+  let assetsSnapshot = [];
+  try { assetsSnapshot = (typeof investableAssets === 'function') ? investableAssets() : []; } catch (_) {}
+  const fxToBase = function (ccy) {
+    const c = String(ccy || '').toUpperCase();
+    if (c === baseC) return 1;
+    const r = (typeof toBase === 'function') ? toBase(1, c) : NaN;
+    return Number.isFinite(r) ? r : null;
+  };
+  const currentValueOf = function (a) { try { return toBase(assetValueUSD(a), 'USD'); } catch (_) { return 0; } };
+  let cashEvents = [];
+  try { cashEvents = (window.wealthLedger && typeof window.wealthLedger.getEvents === 'function') ? window.wealthLedger.getEvents() : []; } catch (_) {}
+  let nowValue = NaN;
+  try { nowValue = (typeof investableValueBase === 'function') ? investableValueBase() : NaN; } catch (_) {}
+  const nowMs = Date.now();
+  const epoch = (typeof _aurixInvestableChartEpoch === 'function') ? _aurixInvestableChartEpoch() : 0;
+  return {
+    assets: assetsSnapshot, range: range, baseCurrency: baseC, signal: undefined,
+    currentValueOf: currentValueOf, fxToBase: fxToBase, cashEvents: cashEvents, nowValue: nowValue,
+    now: nowMs, asOf: nowMs, firstTs: (epoch > 0 ? epoch : undefined),
+  };
+}
+// Compute + emit telemetry for one range WITHOUT disturbing the visible chart.
+// The outcome decision mirrors the live callback (minus view/flag/abort checks).
+async function _aurixPceScanRange(range) {
+  if (!window.AurixPortfolioRecon || typeof window.AurixPortfolioRecon.buildDashboardSeries !== 'function') return;
+  const currency = baseCurrency || 'USD';
+  const opts = _aurixPceGatherOpts(range, currency);
+  const t0 = Date.now();
+  let res = null, outcome = 'snapshots', reason = '';
+  try { res = await window.AurixPortfolioRecon.buildDashboardSeries(opts); }
+  catch (_) { reason = 'error'; }
+  const buildTimeMs = Date.now() - t0;
+  if (!res || !Array.isArray(res.series)) { if (!reason) reason = 'gated-or-error'; }
+  else {
+    const epoch = opts.firstTs || 0;
+    let series = res.series;
+    if (epoch > 0) series = series.filter(function (p) { return p && typeof p.time === 'number' && p.time >= epoch; });
+    if (typeof _aurixChartSeriesPasses === 'function' && !_aurixChartSeriesPasses(series, range)) reason = 'reliability-gate';
+    else outcome = 'reconstruction';
+  }
+  const row = await _aurixPceComputeRow({ range: range, currency: currency, opts: opts, res: res, outcome: outcome, reason: reason, buildTimeMs: buildTimeMs });
+  _aurixPceEmit(row);
+}
+let _aurixPceScanning = false;
+async function _aurixPceScanAll() {
+  if (_aurixPceScanning) return;
+  _aurixPceScanning = true;
+  try { _aurixPceOverlayRender(); } catch (_) {}
+  for (const r of ['30d', '1y', 'all', '7d', '24h']) {
+    try { await _aurixPceScanRange(r); } catch (_) {}
+  }
+  _aurixPceScanning = false;
+  try { _aurixPceOverlayRender(); } catch (_) {}
+}
+
+const _AURIX_PCE_RANGE_LABELS = [['30d', '30D'], ['1y', '1Y'], ['all', 'TOTAL'], ['7d', '7D'], ['24h', '24H']];
+function _aurixPceFmtPass(v) { return v === true ? '✅' : v === false ? '❌' : '—'; }
+function _aurixPceFmtNum(v) { return (v == null || !isFinite(v)) ? '—' : String(v); }
+function _aurixPceOverlayRender() {
+  const body = document.getElementById('pceOvBody');
+  if (!body) return;
+  const ccyEl = document.getElementById('pceOvCcy'); if (ccyEl) ccyEl.textContent = baseCurrency || 'USD';
+  const tgl = document.querySelector('#aurixPceOv [data-pce="toggle"]');
+  if (tgl) tgl.textContent = 'PCE: ' + ((typeof _aurixReconFlag === 'function' && _aurixReconFlag()) ? 'ON' : 'OFF');
+  const scanBtn = document.querySelector('#aurixPceOv [data-pce="scan"]');
+  if (scanBtn) scanBtn.textContent = _aurixPceScanning ? 'Scanning…' : 'Scan all ranges';
+  let rows = '';
+  for (const [key, label] of _AURIX_PCE_RANGE_LABELS) {
+    const r = _aurixPceTelStore[key];
+    if (!r) { rows += `<tr><td>${label}</td><td colspan="9" class="pce-dim">—</td></tr>`; continue; }
+    const ab = r.abDiff || {};
+    const cov = (r.coverage == null) ? '—' : r.coverage.toFixed(3);
+    const srcCls = r.sourceUsed === 'reconstruction' ? 'pce-ok' : 'pce-dim';
+    rows += `<tr>
+      <td>${label}</td>
+      <td>${cov} ${_aurixPceFmtPass(r.coveragePass)}<div class="pce-sub">thr ${_aurixPceFmtNum(r.coverageThreshold)}</div></td>
+      <td>${r.confidence || '—'} ${_aurixPceFmtPass(r.confidencePass)}</td>
+      <td class="${srcCls}">${r.sourceUsed || '—'}${r.reason ? `<div class="pce-sub">${r.reason}</div>` : ''}</td>
+      <td>${_aurixPceFmtNum(r.rawPoints)} → ${_aurixPceFmtNum(r.renderPoints)}</td>
+      <td>${_aurixPceFmtNum(r.buildTimeMs)}ms</td>
+      <td>${_aurixPceFmtNum(r.assetsIncluded)}/${_aurixPceFmtNum(r.assetsExcluded)}</td>
+      <td>${r.fxApproximated ? 'fx≈' : '—'}</td>
+      <td>${ab.lastValueDelta == null ? '—' : ab.lastValueDelta}</td>
+      <td>${ab.returnPctDelta == null ? '—' : ab.returnPctDelta + '%'}</td>
+    </tr>`;
+  }
+  body.innerHTML = `<table class="pce-ov-tbl">
+    <thead><tr>
+      <th>Range</th><th>coverage</th><th>confidence</th><th>sourceUsed</th>
+      <th>raw→render</th><th>build</th><th>in/ex</th><th>fx</th><th>ΔvalueAB</th><th>ΔretAB</th>
+    </tr></thead><tbody>${rows}</tbody></table>
+    <div class="pce-ov-note">Thresholds: 30D/1Y ≥0.90 · TOTAL/7D ≥0.85 · 24H ≥0.80 · confidence ≠ insufficient. Chart swaps to reconstruction only when its own gate passes; else snapshots.</div>`;
+}
+function _aurixPceOverlayMount() {
+  if (!_aurixPceFounderMode()) return;
+  if (document.getElementById('aurixPceOv')) return;
+  const el = document.createElement('div');
+  el.className = 'aurix-pce-ov';
+  el.id = 'aurixPceOv';
+  el.innerHTML = `
+    <div class="pce-ov-head">
+      <span class="pce-ov-title">PCE Validation · <span id="pceOvCcy">USD</span></span>
+      <div class="pce-ov-actions">
+        <button type="button" data-pce="toggle">PCE: ON</button>
+        <button type="button" data-pce="scan">Scan all ranges</button>
+        <button type="button" data-pce="collapse" aria-label="Collapse">▼</button>
+      </div>
+    </div>
+    <div class="pce-ov-body" id="pceOvBody"></div>
+    <div class="pce-ov-foot"><button type="button" data-pce="disable">Disable PCE validation</button></div>`;
+  el.addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-pce]'); if (!btn) return;
+    const act = btn.getAttribute('data-pce');
+    if (act === 'toggle') {
+      const on = !(typeof _aurixReconFlag === 'function' && _aurixReconFlag());
+      window.__AURIX_PORTFOLIO_RECON = on;
+      try { if (typeof _aurixReconInvalidate === 'function') _aurixReconInvalidate(); } catch (_) {}
+      try { updateChart(true); } catch (_) {}
+      _aurixPceOverlayRender();
+    } else if (act === 'scan') {
+      _aurixPceScanAll();
+    } else if (act === 'collapse') {
+      el.classList.toggle('is-collapsed');
+      btn.textContent = el.classList.contains('is-collapsed') ? '▲' : '▼';
+    } else if (act === 'disable') {
+      window.__AURIX_PORTFOLIO_RECON = false;
+      try { localStorage.removeItem(_AURIX_PCE_FOUNDER_KEY); } catch (_) {}
+      try { if (typeof _aurixReconInvalidate === 'function') _aurixReconInvalidate(); } catch (_) {}
+      try { updateChart(true); } catch (_) {}
+      try { el.remove(); } catch (_) {}
+    }
+  });
+  document.body.appendChild(el);
+  _aurixPceOverlayRender();
+}
+// One-time init. Reads the query param (persists founder mode), and when founder
+// mode is active turns PCE ON for THIS device only (runtime flag — never the
+// global default) and mounts the overlay. No-op for every normal user.
+function _aurixPceFounderInit() {
+  try {
+    let qp = false;
+    try { qp = /[?&]aurix_pce_founder=1\b/.test(window.location.search || ''); } catch (_) {}
+    if (qp) { try { localStorage.setItem(_AURIX_PCE_FOUNDER_KEY, '1'); } catch (_) {} }
+    if (!_aurixPceFounderMode()) return;
+    window.__AURIX_PORTFOLIO_RECON = true;   // device-only runtime flag
+    _aurixPceOverlayMount();
+    try { updateChart(false); } catch (_) {}
+  } catch (_) {}
 }
 
 // ── CHART-5 ──────────────────────────────────────────────────────
@@ -27793,6 +27979,10 @@ function closeWatchlistModal() {
 
 document.addEventListener('DOMContentLoaded', () => {
   enforceNavOrder();
+
+  // SPEC 4.1B — mount the founder PCE-validation overlay (no-op unless founder
+  // mode is enabled on this device). Never affects normal users.
+  try { _aurixPceFounderInit(); } catch (_) {}
 
   const modal = document.getElementById('watchlist-modal');
   if (modal) modal.addEventListener('click', e => { if (e.target === modal) closeWatchlistModal(); });
