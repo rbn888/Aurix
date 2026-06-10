@@ -12389,6 +12389,8 @@ async function _aurixPceComputeRow(args) {
     assetsIncluded, assetsExcluded, excludedList,
     buildTimeMs: args.buildTimeMs,
     reconstruction, snapshot, abDiff,
+    // SPEC 4.1D — read-only per-asset coverage breakdown (from engine meta).
+    coverageByAsset: (meta && Array.isArray(meta.coverageByAsset)) ? meta.coverageByAsset : null,
   };
 }
 
@@ -12598,6 +12600,49 @@ async function _aurixPceScanAll() {
 const _AURIX_PCE_RANGE_LABELS = [['30d', '30D'], ['1y', '1Y'], ['all', 'TOTAL'], ['7d', '7D'], ['24h', '24H']];
 function _aurixPceFmtPass(v) { return v === true ? '✅' : v === false ? '❌' : '—'; }
 function _aurixPceFmtNum(v) { return (v == null || !isFinite(v)) ? '—' : String(v); }
+function _aurixPceFmtTs(ms) {
+  if (ms == null || !isFinite(ms)) return '—';
+  try { return new Date(ms).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }); } catch (_) { return '—'; }
+}
+const _AURIX_PCE_FEED_REASON = {
+  'ok': 'feed cubre toda la ventana',
+  'leading-edge-gap': 'feed empieza después del inicio de ventana',
+  'empty-feed': 'sin histórico de precio devuelto',
+  'fx-unsupported': 'divisa FX no soportada',
+  'static-covered': 'flat (sin feed) — NO baja coverage',
+  'cash-covered': 'cash — NO baja coverage',
+  'unknown': '—',
+};
+// SPEC 4.1D — render the per-asset coverage breakdown for a range (default 30D),
+// sorted by missingContribution DESC so the deficit driver is on top.
+function _aurixPceByAssetHtml(rangeKey) {
+  const r = _aurixPceTelStore[rangeKey];
+  const rows = (r && Array.isArray(r.coverageByAsset)) ? r.coverageByAsset.slice() : null;
+  if (!rows || !rows.length) return `<div class="pce-ov-note">${rangeKey.toUpperCase()} Coverage by Asset: aún sin datos — pulsa “Scan all ranges”.</div>`;
+  rows.sort((a, b) => (b.missingContribution || 0) - (a.missingContribution || 0));
+  let body = '';
+  for (const a of rows) {
+    const label = a.symbol || a.name || (a.mode === 'cash' ? 'CASH' : '?');
+    const miss = (a.missingContribution || 0);
+    const missCls = miss > 0.0005 ? 'pce-bad' : 'pce-dim';
+    body += `<tr>
+      <td>${label}${a.name && a.symbol && a.name !== a.symbol ? `<div class="pce-sub">${a.name}</div>` : ''}</td>
+      <td>${a.type || a.mode || '—'}</td>
+      <td>${a.currency || '—'}</td>
+      <td>${a.currentWeightPct == null ? '—' : a.currentWeightPct + '%'}</td>
+      <td>${(a.coverageContribution == null) ? '—' : a.coverageContribution}</td>
+      <td class="${missCls}">${miss}</td>
+      <td>${_aurixPceFmtTs(a.firstPriceTs)} → ${_aurixPceFmtTs(a.lastPriceTs)}</td>
+      <td>${a.feedStatus || 'unknown'}</td>
+      <td class="pce-sub">${_AURIX_PCE_FEED_REASON[a.feedStatus] || '—'}</td>
+    </tr>`;
+  }
+  return `<div class="pce-ov-subtitle">${rangeKey.toUpperCase()} Coverage by Asset · orden: missing DESC</div>
+    <table class="pce-ov-tbl">
+      <thead><tr>
+        <th>symbol</th><th>type</th><th>ccy</th><th>weight</th><th>cov+</th><th>miss−</th><th>first→last px</th><th>feedStatus</th><th>reason</th>
+      </tr></thead><tbody>${body}</tbody></table>`;
+}
 function _aurixPceOverlayRender() {
   const body = document.getElementById('pceOvBody');
   if (!body) return;
@@ -12631,7 +12676,8 @@ function _aurixPceOverlayRender() {
       <th>Range</th><th>coverage</th><th>confidence</th><th>sourceUsed</th>
       <th>raw→render</th><th>build</th><th>in/ex</th><th>fx</th><th>ΔvalueAB</th><th>ΔretAB</th>
     </tr></thead><tbody>${rows}</tbody></table>
-    <div class="pce-ov-note">Thresholds: 30D/1Y ≥0.90 · TOTAL/7D ≥0.85 · 24H ≥0.80 · confidence ≠ insufficient. Chart swaps to reconstruction only when its own gate passes; else snapshots.</div>`;
+    <div class="pce-ov-note">Thresholds: 30D/1Y ≥0.90 · TOTAL/7D ≥0.85 · 24H ≥0.80 · confidence ≠ insufficient. Chart swaps to reconstruction only when its own gate passes; else snapshots.</div>
+    ${_aurixPceByAssetHtml('30d')}`;
 }
 function _aurixPceOverlayMount() {
   if (!_aurixPceFounderMode()) return;

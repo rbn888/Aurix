@@ -18417,6 +18417,8 @@ body.gs-open { overflow: hidden; }
 .aurix-pce-ov .pce-sub { color: rgba(200, 210, 235, 0.5); font-size: 9.5px; }
 .aurix-pce-ov .pce-ok { color: #2ecc84; }
 .aurix-pce-ov .pce-dim { color: rgba(200, 210, 235, 0.45); }
+.aurix-pce-ov .pce-bad { color: #ff8a8a; font-weight: 700; }
+.aurix-pce-ov .pce-ov-subtitle { padding: 10px 4px 4px; color: #8aa6ff; font-weight: 700; letter-spacing: 0.02em; }
 .aurix-pce-ov .pce-ov-note { padding: 6px 4px 2px; color: rgba(200, 210, 235, 0.5); font-size: 9.5px; }
 .aurix-pce-ov .pce-ov-foot {
   padding: 8px 10px; border-top: 1px solid rgba(255, 255, 255, 0.08);

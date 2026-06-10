@@ -280,6 +280,17 @@
     var anyStaticOverall = false;
     var coverageAccum = 0;
 
+    // SPEC 4.1D — READ-ONLY per-asset coverage attribution. Diagnostic ONLY: the
+    // sub-pass below RE-reads the same prices/qty/cash and normalises by the same
+    // expectedVal(t), accumulating each holding's covered/missing SHARE. It never
+    // touches total/coveredVal/expectedVal/coverage/series — the official value is
+    // unchanged. Across all rows + cash, coverageContribution sums to avgCoverage
+    // and missingContribution sums to (1 − avgCoverage).
+    var _dxN = holdings.length;
+    var _dxCov = new Array(_dxN), _dxMiss = new Array(_dxN), _dxUncov = new Array(_dxN);
+    for (var _di = 0; _di < _dxN; _di++) { _dxCov[_di] = 0; _dxMiss[_di] = 0; _dxUncov[_di] = false; }
+    var _dxCashCov = 0;
+
     for (var gi = 0; gi < grid.length; gi++) {
       var t = grid[gi];
       var total = 0, coveredVal = 0, expectedVal = 0, hasStatic = false;
@@ -327,6 +338,31 @@
       var coverage = expectedVal > 0 ? (coveredVal / expectedVal) : 1;
       coverageAccum += coverage;
       series.push({ t: t, v: +total.toFixed(2), confidence: classifyConfidence(coverage, hasStatic) });
+
+      // SPEC 4.1D diagnostic sub-pass (read-only). Recomputes each holding's
+      // covered/missing share of expectedVal(t); writes ONLY to _dx* arrays.
+      if (expectedVal > 0) {
+        for (var dj = 0; dj < _dxN; dj++) {
+          var dh = holdings[dj];
+          var dcls = dh.classification || { mode: 'static' };
+          if (dcls.mode === 'cash') continue;
+          if (dcls.mode === 'market' && dh.qtyTimeline) {
+            var dq = dh.qtyTimeline.at(t);
+            if (dq <= 0) continue;
+            var dpx = sampleSeriesAt(priceByKey[dcls.key], t, 'linear');
+            if (dpx == null) {
+              var dlast = sampleSeriesAt(priceByKey[dcls.key], lastT, 'linear');
+              _dxMiss[dj] += ((dlast != null) ? dq * dlast : _num(dh.currentValue, 0)) / expectedVal;
+              _dxUncov[dj] = true;
+            } else {
+              _dxCov[dj] += (dq * dpx) / expectedVal;
+            }
+            continue;
+          }
+          _dxCov[dj] += _num(dh.currentValue, 0) / expectedVal;   // static
+        }
+        if (cashBaseAt) _dxCashCov += _num(cashBaseAt(t), 0) / expectedVal;
+      }
     }
 
     // Anchor ONLY the final point to the live total (never rescale history, never
@@ -346,6 +382,43 @@
     var first = series.length ? series[0].v : null;
     var last = series.length ? series[series.length - 1].v : null;
 
+    // SPEC 4.1D — assemble the read-only per-asset coverage diagnostic. Pure
+    // metadata; does not affect series/coverage/confidence above.
+    var coverageByAsset = [];
+    var _gn = grid.length || 1;
+    var _gridStart = grid.length ? grid[0] : 0;
+    for (var ci = 0; ci < holdings.length; ci++) {
+      var cclas = holdings[ci].classification || { mode: 'static' };
+      if (cclas.mode === 'cash') continue;   // emitted once as the aggregate cash row
+      var crow = {
+        index: ci,
+        mode: cclas.mode || 'static',
+        key: (cclas.key != null) ? cclas.key : null,
+        coverageContribution: +(_dxCov[ci] / _gn).toFixed(4),
+        missingContribution:  +(_dxMiss[ci] / _gn).toFixed(4),
+        everUncovered: !!_dxUncov[ci],
+        feedEmpty: false, firstPriceTs: null, lastPriceTs: null, feedStatus: 'static-covered'
+      };
+      if (cclas.mode === 'market') {
+        var feed = priceByKey[cclas.key];
+        var hasFeed = _asArray(feed).length > 0;
+        crow.feedEmpty = !hasFeed;
+        crow.firstPriceTs = hasFeed ? feed[0].t : null;
+        crow.lastPriceTs = hasFeed ? feed[feed.length - 1].t : null;
+        crow.feedStatus = !hasFeed ? 'empty-feed'
+          : ((crow.firstPriceTs > _gridStart || _dxUncov[ci]) ? 'leading-edge-gap' : 'ok');
+      }
+      coverageByAsset.push(crow);
+    }
+    if (cashBaseAt) {
+      coverageByAsset.push({
+        index: -1, mode: 'cash', key: null,
+        coverageContribution: +(_dxCashCov / _gn).toFixed(4),
+        missingContribution: 0, everUncovered: false,
+        feedEmpty: false, firstPriceTs: null, lastPriceTs: null, feedStatus: 'cash-covered'
+      });
+    }
+
     return {
       series: series,
       meta: {
@@ -362,7 +435,8 @@
         lastValue: last,
         deltaAbs: (_isFiniteNum(first) && _isFiniteNum(last)) ? +(last - first).toFixed(2) : null,
         deltaPct: (_isFiniteNum(first) && first > 0 && _isFiniteNum(last)) ? +(((last - first) / first) * 100).toFixed(4) : null,
-        source: 'reconstructed'
+        source: 'reconstructed',
+        coverageByAsset: coverageByAsset   // SPEC 4.1D — read-only diagnostic
       },
       // Reserved for fullscreen / advanced analysis (Fase posterior; vacíos hoy).
       overlays: [],

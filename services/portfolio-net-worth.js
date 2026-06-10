@@ -110,6 +110,7 @@
     }
 
     var fxApproximated = false;
+    var _fxDropped = {};   // SPEC 4.1D diagnostic — keys dropped for unknown FX
 
     // 3. Fetch price series (Fase B: dedup + concurrency + error isolation),
     //    then CONVERT each series to base by its OWN quote currency.
@@ -125,7 +126,7 @@
         var entry = byKey[k];
         var ccy = String(entry.currency || 'USD').toUpperCase();
         var factor = (ccy === base) ? 1 : fxToBase(ccy);
-        if (!_isFiniteNum(factor)) { priceByKey[k] = []; continue; }   // unknown FX → uncovered, never guess
+        if (!_isFiniteNum(factor)) { priceByKey[k] = []; _fxDropped[k] = ccy; continue; }   // unknown FX → uncovered, never guess
         if (factor !== 1) fxApproximated = true;                       // current-rate conversion → approximate
         var src = Array.isArray(entry.series) ? entry.series : [];
         if (factor === 1) { priceByKey[k] = src; }
@@ -167,6 +168,39 @@
       asOf: o.asOf,
       fxApproximated: fxApproximated
     });
+
+    // SPEC 4.1D — enrich the engine's read-only coverageByAsset with asset
+    // identity, the currency, the FX-unsupported reason (known only here, not in
+    // the pure engine), and current weight %. Purely additive metadata: it never
+    // alters series/coverage/confidence/value.
+    try {
+      var cba = result && result.meta && result.meta.coverageByAsset;
+      if (Array.isArray(cba) && cba.length) {
+        var _tcv = 0;
+        for (var ti = 0; ti < holdings.length; ti++) {
+          var _hv = _num((holdings[ti] && holdings[ti].currentValue), NaN);
+          if (!_isFiniteNum(_hv)) { try { _hv = _num(currentValueOf(holdings[ti] && holdings[ti].asset), 0); } catch (_) { _hv = 0; } }
+          holdings[ti]._cv = _hv; _tcv += (_hv > 0 ? _hv : 0);
+        }
+        for (var ei = 0; ei < cba.length; ei++) {
+          var er = cba[ei];
+          var ha = (er.index >= 0 && holdings[er.index]) ? holdings[er.index].asset : null;
+          if (ha) {
+            er.symbol   = ha.ticker || ha.symbol || ha.marketSymbol || null;
+            er.name     = ha.name || null;
+            er.type     = ha.type || null;
+            er.currency = (ha.assetCurrency || ha.currency || null);
+            var _cv = (er.index >= 0 && holdings[er.index]) ? holdings[er.index]._cv : 0;
+            er.currentWeightPct = (_tcv > 0 && _isFiniteNum(_cv)) ? +((_cv / _tcv) * 100).toFixed(2) : null;
+          }
+          if (er.feedStatus === 'empty-feed' && er.key != null && _fxDropped[er.key]) {
+            er.feedStatus = 'fx-unsupported';
+            if (!er.currency) er.currency = _fxDropped[er.key];
+          }
+        }
+      }
+    } catch (_) { /* diagnostic enrichment must never break the build */ }
+
     return result;
   }
 
