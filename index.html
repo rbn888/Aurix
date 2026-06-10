@@ -56,7 +56,7 @@
     // serve a half-cached app. Same user + same account must render the
     // same code on Safari mobile, the iOS home-screen PWA, and desktop.
     (function() {
-      window.AURIX_BUILD = 'v211-crypto-history-resilient';
+      window.AURIX_BUILD = 'v212-lkp-carry-forward';
       try {
         var KEY     = 'aurix_build';
         var RELOAD  = 'aurix_build_reload';
@@ -1210,9 +1210,9 @@
        the flag off these modules are inert — dashboard behaviour is unchanged. -->
   <script defer src="services/portfolio-chart-engine.js?v=2"></script>
   <script defer src="services/portfolio-price-layer.js?v=2"></script>
-  <script defer src="services/portfolio-net-worth.js?v=3"></script>
+  <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
-  <script src="app.js?v=238"></script>
+  <script src="app.js?v=239"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
        Loads after app.js so it can read its primitives. No consumers yet. -->
   <script src="services/wealth-engine.js?v=2"></script>
