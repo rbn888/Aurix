@@ -13545,7 +13545,20 @@ function initChart() {
         onProgress(anim) {
           _chartRevealProgress = anim.numSteps > 0 ? anim.currentStep / anim.numSteps : 1;
         },
-        onComplete() { _chartRevealProgress = 1; }
+        onComplete() {
+          _chartRevealProgress = 1;
+          // SPEC 3.2 BLOCK B: the legacy cold-draw has finished painting the
+          // real line (fallback path, when the V2 overlay isn't mounted). Flip
+          // the chart gate so the splash can clear with the chart fully drawn.
+          // Fires only on a genuine animated draw — the not-ready gate returns
+          // before animating, so this never opens on a half-built/empty frame.
+          try {
+            if (window.__aurixBootReady && !window.__aurixBootReady.chart) {
+              window.__aurixBootReady.chart = true;
+              if (typeof window.__aurixMaybeFinishBoot === 'function') window.__aurixMaybeFinishBoot();
+            }
+          } catch (_) {}
+        }
       },
     },
     plugins: [fillGradientPlugin, lineGlowPlugin, lineRevealPlugin, crosshairPlugin],
@@ -18091,6 +18104,55 @@ function _aurixMktExpControlsHtml() {
   `;
 }
 
+// SPEC 3.2 BLOCK E — in-place price patcher for the Market list. Given the
+// freshly-rendered html, transplant ONLY the dynamic cells (price, change,
+// sparkline, watchlist star) onto the existing rows when the row set + order is
+// identical AND the surrounding (non-row) markup is byte-identical — leaving
+// each row's .col-asset (the icon <img>) untouched so a background price refresh
+// never destroys + reloads icons (no flicker, no empty-icon flash). Returns true
+// if it patched (caller skips innerHTML), false if anything structural differs
+// (caller does a full render). Conservative by design: any mismatch or DOM
+// hiccup → full render, so it can never paint a stale structure.
+function _aurixMktPatchInPlace(el, html) {
+  try {
+    const liveRows = el.querySelectorAll('.market-row[data-symbol]');
+    if (!liveRows.length) return false;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    const freshRows = tmp.querySelectorAll('.market-row[data-symbol]');
+    if (freshRows.length !== liveRows.length) return false;
+    for (let i = 0; i < freshRows.length; i++) {
+      if (freshRows[i].getAttribute('data-symbol') !== liveRows[i].getAttribute('data-symbol')) return false;
+    }
+    // Compare the surrounding skeleton (rows blanked) so any prepended/removed
+    // non-row block (controls, discovery catalog, empty state) forces a full
+    // render rather than a silent partial patch.
+    const skeleton = node => {
+      const clone = node.cloneNode(true);
+      clone.querySelectorAll('.market-row[data-symbol]').forEach(r => { r.innerHTML = ''; });
+      return clone.innerHTML;
+    };
+    if (skeleton(tmp) !== skeleton(el)) return false;
+    // Structure matches — patch only the dynamic cells, preserve .col-asset.
+    const DYN = ['.col-price', '.col-change', '.col-chart', '.col-action'];
+    for (let i = 0; i < liveRows.length; i++) {
+      const f = freshRows[i], l = liveRows[i];
+      for (const sel of DYN) {
+        const fc = f.querySelector(sel), lc = l.querySelector(sel);
+        if (!fc || !lc) continue;
+        if (lc.className !== fc.className) lc.className = fc.className;
+        ['data-mkt-tf', 'data-spark-change', 'data-spark-tf'].forEach(attr => {
+          if (fc.hasAttribute(attr)) lc.setAttribute(attr, fc.getAttribute(attr));
+        });
+        if (lc.innerHTML !== fc.innerHTML) lc.innerHTML = fc.innerHTML;
+      }
+    }
+    return true;
+  } catch (_) {
+    return false; // any DOM hiccup → safe full render
+  }
+}
+
 function renderCurrentMarketView() {
   const el = document.getElementById('marketList');
   if (!el) return;
@@ -18154,13 +18216,19 @@ function renderCurrentMarketView() {
   const renderKey = `${currentMarketTab}|${_marketSearchQuery}|${html.length}`;
   if (!isAggregate && el._lastKey === renderKey) return;
   el._lastKey = renderKey;
-  el.innerHTML = html;
-  // MARKET-3: scope V3 row + control polish via a single class on the
-  // list container. Re-applied every render so flag flips mid-session
-  // converge on the next paint.
-  el.classList.toggle('is-v3', _aurixMktV3Flag());
-  // MARKET-4B: V4 is layered on V3 (overrides mobile row + controls).
-  el.classList.toggle('is-v4', _aurixMktV4Flag());
+  // SPEC 3.2 BLOCK E — when only prices/variation/sparklines change (same rows,
+  // same order, same surrounding markup), patch the dynamic cells IN PLACE so
+  // every <img> icon node survives — no destroy+reload, no flicker. Any
+  // structural change falls through to the full innerHTML render below.
+  if (!_aurixMktPatchInPlace(el, html)) {
+    el.innerHTML = html;
+    // MARKET-3: scope V3 row + control polish via a single class on the
+    // list container. Re-applied every render so flag flips mid-session
+    // converge on the next paint.
+    el.classList.toggle('is-v3', _aurixMktV3Flag());
+    // MARKET-4B: V4 is layered on V3 (overrides mobile row + controls).
+    el.classList.toggle('is-v4', _aurixMktV4Flag());
+  }
   // CHART-5: mount Aurix sparkline V2 on every row's `.col-chart` cell.
   // No-op when the flag is off or the engine is still loading; the
   // legacy SVG that was rendered inside the cell remains visible in
@@ -24411,6 +24479,77 @@ _syncPerfCurrencyButtons();
 
 document.getElementById('appRoot').style.opacity = '0';
 
+// ── AURIX-READY-FIRST-1 (SPEC 3.2) ──────────────────────────────────────────
+// READY GATE: the premium splash (#bootLoader) must clear ONLY when the first
+// visible frame is genuinely finished — dashboard rendered, chart drawn (its
+// real validated line OR an honest premium loading surface — never a half-built
+// / flashing line), the initial-viewport icons preloaded, and navigation
+// interactive. hideLoader is no longer called directly from the boot pipeline:
+// every readiness signal flips a flag and calls maybeFinishBoot(), which hides
+// the splash only once ALL flags are set (or a hard failsafe fires so boot can
+// never hang).
+window.__aurixBootReady = {
+  auth: false, portfolio: false, fx: false,
+  dashboard: false, chart: false, icons: false,
+};
+let _aurixBootFinished = false;
+function _aurixHideLoader() {
+  const loader = document.getElementById('bootLoader');
+  if (loader) {
+    loader.style.opacity = '0';
+    // Matches the splash's 0.35s opacity transition in index.html.
+    setTimeout(() => { try { loader.remove(); } catch (_) {} }, 400);
+  }
+}
+function _aurixMaybeFinishBoot(force) {
+  if (_aurixBootFinished) return;
+  const r = window.__aurixBootReady || {};
+  const allReady = r.auth && r.portfolio && r.fx && r.dashboard && r.chart && r.icons;
+  if (force || allReady) {
+    _aurixBootFinished = true;
+    _aurixHideLoader();
+  }
+}
+window.__aurixMaybeFinishBoot = _aurixMaybeFinishBoot;
+// FAILSAFE: never let the splash hang. If any boot step stalls (slow auth, the
+// price network, a slow icon CDN), force the splash away after a hard ceiling.
+// Auth self-caps at 5s and the price wait at ~2.5s, so the normal path wins
+// well before this in healthy conditions — this is a backstop only.
+setTimeout(() => { try { _aurixMaybeFinishBoot(true); } catch (_) {} }, 9000);
+
+// SPEC 3.2 BLOCK C — preload the icons for the dashboard's initial viewport
+// (the user's holdings) WHILE the splash is still up, so they are warm in cache
+// before the splash clears (no progressive/staggered icon pop-in on the first
+// frame). Resolves on completion OR a per-image cap and never rejects, so it can
+// gate the splash safely. Uses the SAME canonical resolver (getAssetLogo) the
+// dashboard renders with; the existing premium fallback still handles any image
+// that fails — the fallback is NOT removed.
+function _aurixPreloadBootIcons() {
+  try {
+    const urls = new Set();
+    if (Array.isArray(assets) && typeof getAssetLogo === 'function') {
+      for (const a of assets) {
+        const u = getAssetLogo(a);
+        if (typeof u === 'string' && /^https?:\/\//.test(u)) urls.add(u);
+      }
+    }
+    if (!urls.size) return Promise.resolve();
+    const loads = [...urls].slice(0, 24).map(u => new Promise(resolve => {
+      let done = false;
+      const finish = () => { if (!done) { done = true; resolve(); } };
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = finish;
+      img.onerror = finish; // the fallback renderer owns the visual; never block boot
+      img.src = u;
+      setTimeout(finish, 1200); // per-image ceiling
+    }));
+    return Promise.all(loads);
+  } catch (_) {
+    return Promise.resolve();
+  }
+}
+
 // PWA-CONSISTENCY-1 / BOOT-LOADER-FIX-1: unified deterministic boot pipeline.
 //   auth → portfolio → exchange rate → calc → render → charts → hide loader
 //   → THEN refreshPrices() asynchronously (no longer blocks first paint)
@@ -24424,15 +24563,10 @@ document.getElementById('appRoot').style.opacity = '0';
   if (window.__APP_BOOTED__) return;
   window.__APP_BOOTED__ = true;
 
-  const hideLoader = () => {
-    const loader = document.getElementById('bootLoader');
-    if (loader) {
-      loader.style.opacity = '0';
-      // Matches the splash's 0.35s opacity transition in index.html.
-      setTimeout(() => loader.remove(), 400);
-    }
-  };
-
+  // hideLoader / maybeFinishBoot live at module scope (AURIX-READY-FIRST-1) so
+  // the chart's animation onComplete and the icon-preload promise can flip
+  // readiness flags too. The splash clears via _aurixMaybeFinishBoot() once
+  // every flag is set (or the failsafe fires).
   try {
     // 1. AUTH
     const session = await waitForSession();
@@ -24443,13 +24577,24 @@ document.getElementById('appRoot').style.opacity = '0';
       return;
     }
     currentUser = session.user;
+    window.__aurixBootReady.auth = true;
     if (IS_DEV) console.log('[AUTH] session restored:', currentUser?.email);
     if (window.location.hash) {
       history.replaceState(null, '', window.location.pathname);
     }
 
-    // 2. PORTFOLIO
-    const portfolioData = await initPortfolioData(currentUser.id);
+    // 2 + 3. PORTFOLIO + EXCHANGE RATE — run in parallel (SPEC 3.2 BLOCK D).
+    // They are independent: FX only drives number formatting; the portfolio
+    // feeds the model. Parallelising removes the FX round-trip from the splash.
+    // FX stays best-effort (own catch) so it can never fail the portfolio load,
+    // and still lands before render so EUR mode formats consistent numbers on
+    // the very first paint.
+    const [portfolioData] = await Promise.all([
+      initPortfolioData(currentUser.id),
+      fetchExchangeRate().catch(() => {}),
+    ]);
+    window.__aurixBootReady.portfolio = true;
+    window.__aurixBootReady.fx = true;
     assets = convertFromNewToFlat(portfolioData.assets, portfolioData.holdings);
     if (portfolioData.assets.length > 0) {
       saveData({ assets: portfolioData.assets, holdings: portfolioData.holdings });
@@ -24473,10 +24618,6 @@ document.getElementById('appRoot').style.opacity = '0';
     // it were real history. getChartData()'s flat-baseline branch now
     // handles the low-data state honestly until real snapshots accrue.
 
-    // 3. EXCHANGE RATE — instant (hardcoded default); keep before render so
-    //    EUR mode formats consistent numbers on the very first paint.
-    try { await fetchExchangeRate(); } catch (_) {}
-
     // 4. CALC — derived state + formulas from cached/local prices so the
     //    first paint shows last-known values immediately (no longer waits
     //    for the live price refresh, which now runs after the loader hides).
@@ -24486,6 +24627,15 @@ document.getElementById('appRoot').style.opacity = '0';
     // 5. RENDER — dashboard from cached/local/Supabase data.
     document.getElementById('appRoot').style.opacity = '';
     render(true);
+    window.__aurixBootReady.dashboard = true;
+
+    // BLOCK C — preload the initial-viewport icons (holdings) while the splash
+    // is still up, then release the icon gate. Runs against the gate without
+    // blocking the rest of boot; the failsafe covers a stalled CDN.
+    _aurixPreloadBootIcons().then(() => {
+      window.__aurixBootReady.icons = true;
+      _aurixMaybeFinishBoot();
+    });
 
     // 6. CHARTS — destroy+recreate so a recycled DOM (PWA tab restore)
     //    never paints into a stale host.
@@ -24500,20 +24650,16 @@ document.getElementById('appRoot').style.opacity = '0';
       initMobileSlider();
     }
 
-    // 7. Boot visually complete — hide the splash now. The dashboard is
-    //    interactive with last-known values; live prices arrive next.
-    hideLoader();
-
-    // 8. PRICES (deferred) — fetch live prices AFTER first paint so the
-    //    splash never waits on the network. refreshPrices() already
-    //    save()s, render()s and updates the chart via onPortfolioChange()
-    //    on success; on total failure it rolls back and keeps last-known
-    //    values, so either way the UI stays correct. We then recompute
-    //    derived state and refresh so formulas reflect the new prices
-    //    (and the chart still updates on the failure path). _refreshInFlight
-    //    inside refreshPrices() guards against any duplicate concurrent
-    //    call, and the 30s polling interval starts only AFTER this first
-    //    refresh settles — so there is exactly one boot refresh.
+    // 7. PRICES — SPEC 3.2 / CTO decision (ready-first): run the first live
+    //    refresh BEFORE clearing the splash, capped at ~2.5s, so the chart
+    //    draws its REAL line inside the splash and the user never sees a second
+    //    draw afterwards. The anti-flash gate (_aurixChartDataReady) is left
+    //    fully intact — refreshPrices() flips _aurixPricesReady and re-runs
+    //    updateChart() so the validated line lands exactly once. On total
+    //    failure it rolls back and keeps last-known values. _refreshInFlight
+    //    inside refreshPrices() guards against any duplicate concurrent call,
+    //    and the 30s polling interval starts only AFTER this first refresh
+    //    settles — so there is exactly one boot refresh.
     const bootRefresh = (async () => {
       try { marketStore.start(); } catch (_) {}
       try {
@@ -24537,6 +24683,19 @@ document.getElementById('appRoot').style.opacity = '0';
     bootRefresh.then(() => {
       setInterval(() => refreshPrices().then(() => marketStore.syncFromRefresh()), 30_000);
     });
+
+    // BLOCK B — wait for the real chart draw, capped so the splash can't hang on
+    // the price network. When bootRefresh settles within the cap the validated
+    // line has been drawn (the V2 overlay paints synchronously; the legacy
+    // Chart.js onComplete also flips this flag on the fallback path). On timeout
+    // we release with the honest premium loading surface still showing — never a
+    // fake line. Either way the chart gate opens and the splash can clear.
+    await Promise.race([
+      bootRefresh,
+      new Promise(resolve => setTimeout(resolve, 2500)),
+    ]);
+    window.__aurixBootReady.chart = true;
+    _aurixMaybeFinishBoot();
 
     Promise.resolve().then(() => {
       if (typeof window.maybeShowOnboarding === 'function') {
@@ -24569,7 +24728,7 @@ document.getElementById('appRoot').style.opacity = '0';
     });
   } catch (e) {
     console.error('[BOOT ERROR]', e);
-    hideLoader();
+    _aurixMaybeFinishBoot(true);
     if (!window.location.pathname.includes('login.html')) {
       safeRedirect('login.html');
     }
