@@ -3709,20 +3709,20 @@ let   _cgMap            = null; // sym → coingecko id  (in-memory, backed by l
 // If a URL fails, the existing onerror → _logoFallback chain takes over transparently.
 // To use local files instead: place PNGs in /public/logos/ and update the paths below.
 const CLEAN_LOGO_OVERRIDE = {
-  BTC:   'https://assets.coingecko.com/coins/images/1/small/bitcoin.png',
-  ETH:   'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
-  USDC:  'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
-  USDT:  'https://assets.coingecko.com/coins/images/325/small/Tether.png',
-  BNB:   'https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png',
-  SOL:   'https://assets.coingecko.com/coins/images/4128/small/solana.png',
-  ADA:   'https://assets.coingecko.com/coins/images/975/small/cardano.png',
-  XRP:   'https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png',
-  DOGE:  'https://assets.coingecko.com/coins/images/5/small/dogecoin.png',
-  DOT:   'https://assets.coingecko.com/coins/images/12171/small/polkadot.png',
-  MATIC: 'https://assets.coingecko.com/coins/images/4713/small/matic-token-icon.png',
-  LINK:  'https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png',
-  AVAX:  'https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png',
-  LTC:   'https://assets.coingecko.com/coins/images/2/small/litecoin.png',
+  BTC:   'https://assets.coingecko.com/coins/images/1/large/bitcoin.png',
+  ETH:   'https://assets.coingecko.com/coins/images/279/large/ethereum.png',
+  USDC:  'https://assets.coingecko.com/coins/images/6319/large/usdc.png',
+  USDT:  'https://assets.coingecko.com/coins/images/325/large/Tether.png',
+  BNB:   'https://assets.coingecko.com/coins/images/825/large/bnb-icon2_2x.png',
+  SOL:   'https://assets.coingecko.com/coins/images/4128/large/solana.png',
+  ADA:   'https://assets.coingecko.com/coins/images/975/large/cardano.png',
+  XRP:   'https://assets.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png',
+  DOGE:  'https://assets.coingecko.com/coins/images/5/large/dogecoin.png',
+  DOT:   'https://assets.coingecko.com/coins/images/12171/large/polkadot.png',
+  MATIC: 'https://assets.coingecko.com/coins/images/4713/large/matic-token-icon.png',
+  LINK:  'https://assets.coingecko.com/coins/images/877/large/chainlink-new-logo.png',
+  AVAX:  'https://assets.coingecko.com/coins/images/12559/large/Avalanche_Circle_RedWhite_Trans.png',
+  LTC:   'https://assets.coingecko.com/coins/images/2/large/litecoin.png',
 };
 
 // One-time migration: backfill costBasis for existing assets that predate this field.
@@ -18170,6 +18170,11 @@ function renderCurrentMarketView() {
     ? Object.freeze(_composeAggregateDataset())
     : Object.freeze([...MARKET_DATA]);
 
+  // SPEC 3.3 — warm the first-viewport icons before we paint the list (no-op
+  // when not searching; search composes its own slice further down). Fire-and-
+  // forget; the eager <img> on the leading rows does the real work.
+  if (!_marketSearchQuery) { try { _aurixPreloadMarketIcons(data); } catch (_) {} }
+
   let html;
   if (_marketSearchQuery) {
     const q = normalizeSymbol(_marketSearchQuery);
@@ -19640,7 +19645,29 @@ function _setStocksData(data) {
 const MARKET_STOCKS = ['AAPL','MSFT','NVDA','TSLA','AMZN','META','GOOGL','JPM','V','WMT'];
 
 
-function renderMarketItem(item) {
+// SPEC 3.3 — number of leading Market rows whose icon loads eager (above the
+// fold). Deeper rows stay lazy so we don't fetch the whole list up front.
+const _AURIX_MKT_EAGER_ICONS = 12;
+
+// SPEC 3.3 — warm the HTTP cache for the icons of the first visible Market rows
+// so they paint instantly on the first frame (belt-and-suspenders with the eager
+// <img> below). Uses the SAME canonical resolver, fire-and-forget: never rejects,
+// never blocks a render, the row's own <img> + premium fallback own the visual.
+function _aurixPreloadMarketIcons(visibleData) {
+  try {
+    if (!Array.isArray(visibleData) || typeof getAssetLogo !== 'function') return;
+    const urls = new Set();
+    for (const a of visibleData.slice(0, _AURIX_MKT_EAGER_ICONS)) {
+      const u = getAssetLogo(a);
+      if (typeof u === 'string' && /^https?:\/\//.test(u)) urls.add(u);
+    }
+    urls.forEach(u => { const img = new Image(); img.decoding = 'async'; img.src = u; });
+  } catch (_) { /* never break a render on a preload hiccup */ }
+}
+
+// `idx` arrives from the .map(renderMarketItem) callsites; the first
+// _AURIX_MKT_EAGER_ICONS rows get an eager icon (no first-viewport pop-in).
+function renderMarketItem(item, idx) {
   if (!item || !item.symbol) return '';
   const price   = item.current_price ?? item.price ?? null;
   const live24  = item.price_change_percentage_24h ?? item.change24h ?? item.change ?? null;
@@ -19686,7 +19713,7 @@ function renderMarketItem(item) {
     <div class="market-row" data-symbol="${normSym}">
       <div class="col col-asset">
         <div class="asset-wrapper">
-          ${_assetIconHtml(item, item.symbol, 'asset-icon')}
+          ${_assetIconHtml(item, item.symbol, 'asset-icon', typeof idx === 'number' && idx < _AURIX_MKT_EAGER_ICONS)}
           <div class="asset-text">
             <div class="asset-symbol-row">
               <span class="asset-symbol">${item.symbol}</span>
@@ -20384,7 +20411,9 @@ function _resolveLogoBySymbol(symbol, type) {
   if (t === 'crypto') {
     const clean = CLEAN_LOGO_OVERRIDE[String(symbol).toUpperCase().trim()];          // 3
     if (clean) return clean;
-    return `https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/32/color/${sym}.png`; // 4
+    // SPEC 3.3 — request the 128px raster (same symbol coverage as /32/) so the
+    // icon is sharp on retina/mobile; the 32px source upscaled looked blurry.
+    return `https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/128/color/${sym}.png`; // 4
   }
   if (t === 'stock' || t === 'etf') {
     return `https://financialmodelingprep.com/image-stock/${String(symbol).toUpperCase().trim()}.png`;
@@ -20515,14 +20544,18 @@ function _aurixMktIconUrl(asset) {
   // source: same asset, same URL, no per-screen reinterpretation.
   return getAssetLogo(asset) || null;
 }
-function _assetIconHtml(asset, initialSource, baseClass) {
+function _assetIconHtml(asset, initialSource, baseClass, eager) {
   const type     = String((asset && asset.type) || '').toLowerCase();
   const url      = _aurixMktIconUrl(asset);
   const fallback = _aurixPremiumFallback(asset, initialSource);
   const typeCls  = type ? ` aicon--${type}` : '';
   const cls      = `${baseClass}${typeCls}${url ? ' has-logo' : ''}`;
+  // SPEC 3.3 — above-the-fold Market rows load eager so the first viewport has
+  // no staggered icon pop-in; deeper rows stay lazy. Defaults to lazy, so every
+  // other surface (Seguimiento, Search, quick-picks) is unchanged.
+  const loadAttr = eager ? 'eager' : 'lazy';
   const img      = url
-    ? `<img class="aurix-aicon-img" src="${escHtml(url)}" alt="" loading="lazy" decoding="async" aria-hidden="true" onload="_aurixIconImgOk(this)" onerror="_aurixIconImgError(this)">`
+    ? `<img class="aurix-aicon-img" src="${escHtml(url)}" alt="" loading="${loadAttr}" decoding="async" aria-hidden="true" onload="_aurixIconImgOk(this)" onerror="_aurixIconImgError(this)">`
     : '';
   return `<div class="${cls}">${fallback}${img}</div>`;
 }

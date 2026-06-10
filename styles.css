@@ -8961,9 +8961,13 @@ main { padding-bottom: 72px; }
   border: 1px solid rgba(255,255,255,0.05) !important;
   box-shadow: none !important;
 }
+/* SPEC 3.3 — stock/ETF/fund logos (FMP, often with internal whitespace, not
+   always square) keep object-fit:contain so they are never cropped, but the
+   surrounding padding drops 15% → 9% so they fill the circle like crypto and
+   stop reading as small stickers. Crypto stays object-fit:cover (fills). */
 .aicon--stock .aurix-aicon-img,
 .aicon--etf   .aurix-aicon-img,
-.aicon--fund  .aurix-aicon-img { object-fit: contain; padding: 15%; }
+.aicon--fund  .aurix-aicon-img { object-fit: contain; padding: 9%; }
 
 /* ── Premium fallbacks (no logo) ───────────────────────────────────── */
 /* Crypto / stock / generic — clean initial on the existing Aurix dark
