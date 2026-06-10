@@ -186,6 +186,12 @@
           var er = cba[ei];
           var ha = (er.index >= 0 && holdings[er.index]) ? holdings[er.index].asset : null;
           if (ha) {
+            // SPEC 4.1E — read-only identity fields so the founder overlay can
+            // name the empty-feed rows (no more "?"). Purely diagnostic.
+            er.assetId      = (ha.id != null) ? ha.id : (ha.assetId != null ? ha.assetId : null);
+            er.coinId       = ha.coinId || null;
+            er.ticker       = ha.ticker || null;
+            er.marketSymbol = ha.marketSymbol || null;
             er.symbol   = ha.ticker || ha.symbol || ha.marketSymbol || null;
             er.name     = ha.name || null;
             er.type     = ha.type || null;

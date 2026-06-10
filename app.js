@@ -12620,27 +12620,37 @@ function _aurixPceByAssetHtml(rangeKey) {
   const rows = (r && Array.isArray(r.coverageByAsset)) ? r.coverageByAsset.slice() : null;
   if (!rows || !rows.length) return `<div class="pce-ov-note">${rangeKey.toUpperCase()} Coverage by Asset: aún sin datos — pulsa “Scan all ranges”.</div>`;
   rows.sort((a, b) => (b.missingContribution || 0) - (a.missingContribution || 0));
+  const esc = (v) => (v == null || v === '') ? '' : (typeof escHtml === 'function' ? escHtml(String(v)) : String(v));
   let body = '';
   for (const a of rows) {
-    const label = a.symbol || a.name || (a.mode === 'cash' ? 'CASH' : '?');
+    // SPEC 4.1E — name the row by the best available identity so empty-feed rows
+    // never read as "?": symbol → name → key (coinId/ticker) → assetId.
+    const label = esc(a.symbol || a.name || a.key || a.assetId || (a.mode === 'cash' ? 'CASH' : '?'));
+    const ids = [];
+    if (a.coinId) ids.push('coin:' + esc(a.coinId));
+    if (a.ticker && a.ticker !== a.symbol) ids.push('tkr:' + esc(a.ticker));
+    if (a.marketSymbol && a.marketSymbol !== a.symbol) ids.push('mkt:' + esc(a.marketSymbol));
+    if (a.name && a.name !== a.symbol) ids.push(esc(a.name));
     const miss = (a.missingContribution || 0);
     const missCls = miss > 0.0005 ? 'pce-bad' : 'pce-dim';
     body += `<tr>
-      <td>${label}${a.name && a.symbol && a.name !== a.symbol ? `<div class="pce-sub">${a.name}</div>` : ''}</td>
-      <td>${a.type || a.mode || '—'}</td>
-      <td>${a.currency || '—'}</td>
+      <td>${label}${ids.length ? `<div class="pce-sub">${ids.join(' · ')}</div>` : ''}</td>
+      <td>${esc(a.key) || '—'}</td>
+      <td>${esc(a.assetId) || '—'}</td>
+      <td>${esc(a.type || a.mode) || '—'}</td>
+      <td>${esc(a.currency) || '—'}</td>
       <td>${a.currentWeightPct == null ? '—' : a.currentWeightPct + '%'}</td>
       <td>${(a.coverageContribution == null) ? '—' : a.coverageContribution}</td>
       <td class="${missCls}">${miss}</td>
       <td>${_aurixPceFmtTs(a.firstPriceTs)} → ${_aurixPceFmtTs(a.lastPriceTs)}</td>
-      <td>${a.feedStatus || 'unknown'}</td>
+      <td>${esc(a.feedStatus) || 'unknown'}</td>
       <td class="pce-sub">${_AURIX_PCE_FEED_REASON[a.feedStatus] || '—'}</td>
     </tr>`;
   }
   return `<div class="pce-ov-subtitle">${rangeKey.toUpperCase()} Coverage by Asset · orden: missing DESC</div>
     <table class="pce-ov-tbl">
       <thead><tr>
-        <th>symbol</th><th>type</th><th>ccy</th><th>weight</th><th>cov+</th><th>miss−</th><th>first→last px</th><th>feedStatus</th><th>reason</th>
+        <th>symbol</th><th>key</th><th>id</th><th>type</th><th>ccy</th><th>weight</th><th>cov+</th><th>miss−</th><th>first→last px</th><th>feedStatus</th><th>reason</th>
       </tr></thead><tbody>${body}</tbody></table>`;
 }
 function _aurixPceOverlayRender() {
