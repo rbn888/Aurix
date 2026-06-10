@@ -1477,10 +1477,12 @@ const T = {
     navDashboard:      'Panel',
     navMarket:         'Mercado',
     navMetrics:        'Métricas',
+    navIntelligence:   'Intelligence',
     navWorkspace:      'Workspace',
     // Tooltips (bottom nav)
     tipSearch:         'Buscar',
     tipMetrics:        'Métricas',
+    tipIntelligence:   'Intelligence',
     tipWorkspace:      'Workspace',
     // ARIA labels
     ariaBackHome:      'Volver al inicio',
@@ -2693,10 +2695,12 @@ const T = {
     navDashboard:      'Dashboard',
     navMarket:         'Market',
     navMetrics:        'Metrics',
+    navIntelligence:   'Intelligence',
     navWorkspace:      'Workspace',
     // Tooltips (bottom nav)
     tipSearch:         'Search',
     tipMetrics:        'Metrics',
+    tipIntelligence:   'Intelligence',
     tipWorkspace:      'Workspace',
     // ARIA labels
     ariaBackHome:      'Back to home',
@@ -9189,7 +9193,11 @@ function _renderWorkspaceFormulaBarValue(sheet) {
 // Mobile is unchanged: _renderWorkspaceMobile owns its own narrative
 // and already opens directly on the intelligence cockpit.
 const WORKSPACE_MODE_KEY = 'aurix_workspace_mode';
-const WORKSPACE_MODES    = ['intelligence', 'sheet', 'templates'];
+// IA.1 — Workspace is a work zone (Sheet + Templates). Portfolio intelligence
+// moved to the dedicated Intelligence tab, so 'intelligence' is no longer a
+// Workspace mode. A legacy localStorage value of 'intelligence' is ignored by
+// _wsGetMode (not in the list) and falls back to 'sheet'.
+const WORKSPACE_MODES    = ['sheet', 'templates'];
 function _wsGetMode() {
   try {
     if (typeof localStorage !== 'undefined') {
@@ -9197,7 +9205,7 @@ function _wsGetMode() {
       if (WORKSPACE_MODES.indexOf(v) !== -1) return v;
     }
   } catch (_) {}
-  return 'intelligence';
+  return 'sheet';
 }
 function _wsSetMode(mode) {
   if (WORKSPACE_MODES.indexOf(mode) === -1) return;
@@ -9939,9 +9947,15 @@ function renderWorkspace() {
   if (!sheet) return;
 
   const isDesktop = isWorkspaceDesktop();
+  // IA.1 — Workspace is a work zone now (Sheet on desktop, Templates).
+  // Portfolio intelligence moved to the Intelligence tab, so the mobile
+  // Workspace no longer opens the intelligence cockpit (sheet editing is
+  // desktop-only). Mobile Workspace shows the Templates surface. The mobile
+  // intelligence cockpit renderer (_renderWorkspaceMobile) is now reused by
+  // the Intelligence tab — left intact, just not called here.
   container.innerHTML = isDesktop
     ? _renderWorkspaceDesktop(sheet)
-    : _renderWorkspaceMobile(sheet);
+    : `<div class="aurix-workspace-shell is-mobile">${_renderWorkspaceTemplatesMode()}</div>`;
   if (!isDesktop) _bindWorkspaceMobileActions(container);
 
   WORKSPACE_RUNTIME.renderVersion++;
@@ -20147,7 +20161,7 @@ function fmtMktPrice(p) {
 
 // ── Bottom nav ─────────────────────────────────────────────
 const TAB_KEYS = { home: 'tabHome', insights: 'tabInsights', market: 'tabMarket', profile: 'tabProfile' };
-const NAV_ORDER = ['home', 'market', 'search', 'profile', 'workspace'];
+const NAV_ORDER = ['home', 'market', 'search', 'intelligence', 'workspace'];
 
 function enforceNavOrder() {
   const container = document.getElementById('bottomNav');
@@ -20256,6 +20270,10 @@ function _tabResetStyles(c) {
 // The original swap — sets display, renders the target surface and updates
 // the active nav state. Pure logic, no motion; called once per navigation.
 function _applyTab(tab) {
+  // IA.1 NAVIGATION REFACTOR — Metrics → Intelligence. Legacy aliases map any
+  // old deep-link/state ('metrics' / 'profile') to the new 'intelligence' tab.
+  // Internal fallback only; never a visible UI label.
+  if (tab === 'metrics' || tab === 'profile') tab = 'intelligence';
   switchView('dashboard'); // always collapse hero when navigating
   // AURIX-DASHBOARD-PREMIUM-POLISH-1 (#7 global nav consistency): switching to
   // ANY top-level tab exits the dashboard sub-states (category drill-down /
@@ -20305,8 +20323,10 @@ function _applyTab(tab) {
       startInsightRotation();
     } else if (tab === 'market') {
       renderMarket();
-    } else if (tab === 'profile') {
-      placeholder.innerHTML = renderMetricsPlaceholder();
+    } else if (tab === 'intelligence') {
+      // IA.1 — portfolio intelligence now lives in its own tab (moved out of
+      // Workspace). Read-only patrimonial reading; reuses the existing renderers.
+      placeholder.innerHTML = renderIntelligenceTab();
     } else {
       const _label = tab.charAt(0).toUpperCase() + tab.slice(1);
       placeholder.innerHTML = `<p class="placeholder-label">${_label}</p>`;
@@ -20315,7 +20335,25 @@ function _applyTab(tab) {
   }
 }
 
+// IA.1 — render the Intelligence tab. The portfolio intelligence (health,
+// risk, diversification, liquidity, concentration, signals/score) was moved
+// out of Workspace into this dedicated tab. PURELY a move: it reuses the
+// EXISTING renderers (desktop exec layout / mobile cockpit) reading the live
+// `_aurixWorkspaceIntelligence()` payload. Read-only — no editable sheet here.
+function renderIntelligenceTab() {
+  const desktop = (typeof isWorkspaceDesktop === 'function')
+    ? isWorkspaceDesktop()
+    : (typeof window !== 'undefined' && window.innerWidth >= 1024);
+  let inner = '';
+  try {
+    inner = desktop ? _renderWorkspaceIntelligenceMode() : _renderWorkspaceMobile(null);
+  } catch (_) { inner = ''; }
+  return `<section class="aurix-intelligence-screen">${inner}</section>`;
+}
+
 function switchTab(tab) {
+  // IA.1 — legacy alias (see _applyTab): old 'metrics'/'profile' → 'intelligence'.
+  if (tab === 'metrics' || tab === 'profile') tab = 'intelligence';
   const myToken = ++_tabToken;
   if (_tabTimer) { clearTimeout(_tabTimer); _tabTimer = null; }
   if (_tabRaf)   { cancelAnimationFrame(_tabRaf); _tabRaf = null; }
