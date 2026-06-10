@@ -12298,6 +12298,97 @@ function _aurixReconSyncHeadline(series) {
 // per updateChart, AFTER snapshots are already painted. On success it stores
 // _reconActive and re-syncs the V2 surfaces (which then paint the swap). On any
 // failure/timeout/abort/gate-rejection it does nothing → snapshots remain.
+// SPEC 4.1A — PCE VALIDATION TELEMETRY. Emits one [PCE] console line per
+// reconstruction kick: coverage/confidence/points/timing + an A/B comparison
+// against the current snapshot source, plus per-spec coverage thresholds. It is
+// DIAGNOSTIC-ONLY: it re-reads the RAW engine meta via a signal-less
+// buildNetWorthSeries (so a GATE-rejected range still reports its true coverage,
+// price-layer cache makes this cheap) and reads the snapshot series — it touches
+// NO data, persistence, Supabase or portfolioHistory, mutates nothing, and runs
+// ONLY while the recon flag is on (validation). Production (flag off) never
+// reaches it, so there is zero overhead and zero behaviour change there.
+const _PCE_COV_MIN = { '30d': 0.90, '1y': 0.90, 'all': 0.85, '7d': 0.85, '24h': 0.80 };
+async function _aurixPceValidationLog(args) {
+  try {
+    if (!_aurixReconFlag()) return;
+    const range = args.range, currency = args.currency;
+
+    // Raw engine meta — read directly (no abort signal) so even a gate-rejected
+    // or timed-out range surfaces its true coverage/confidence for the founder.
+    let meta = null;
+    try {
+      const NW = window.AurixNetWorth;
+      if (NW && typeof NW.buildNetWorthSeries === 'function') {
+        const env = await NW.buildNetWorthSeries(Object.assign({}, args.opts, { signal: undefined }));
+        meta = (env && env.meta) ? env.meta : null;
+      }
+    } catch (_) {}
+
+    // Snapshot baseline (current official source) for the A/B comparison.
+    let snap = null;
+    try { snap = (typeof getChartData === 'function') ? getChartData(range, _investableSnapshotSource()) : null; } catch (_) {}
+
+    // Light, local asset classification (diagnostic estimate — mirrors the
+    // engine's defaultResolveHolding intent without calling into it).
+    let assetsIncluded = 0, assetsExcluded = 0; const excludedList = [];
+    try {
+      const list = (typeof investableAssets === 'function') ? investableAssets() : [];
+      for (const a of list) {
+        const tp = String((a && a.type) || '').toLowerCase();
+        const sym = (a && (a.marketSymbol || a.ticker)) || '';
+        const feed = (tp === 'crypto' && a.coinId)
+          || ((tp === 'stock' || tp === 'etf' || tp === 'fund' || tp === 'index') && sym)
+          || (tp === 'metal' && (sym || a.ticker === 'XAU' || a.ticker === 'XAG'))
+          || (tp === 'cash');
+        if (feed) assetsIncluded++; else { assetsExcluded++; excludedList.push((a && (a.ticker || a.symbol || a.name)) || '?'); }
+      }
+    } catch (_) {}
+
+    const reconOk     = !!(args.res && Array.isArray(args.res.series));
+    const reconPoints = reconOk ? args.res.series.length : 0;
+    const coverage    = meta && Number.isFinite(meta.coverage) ? +meta.coverage.toFixed(3) : null;
+    const confidence  = meta ? (meta.confidence || null) : null;
+    const threshold   = (_PCE_COV_MIN[range] != null) ? _PCE_COV_MIN[range] : null;
+    const coveragePass   = (coverage != null && threshold != null) ? coverage >= threshold : null;
+    const confidencePass = (confidence != null) ? confidence !== 'insufficient' : null;
+
+    const snapshot = snap ? {
+      rawPoints:    snap.pointsCount,
+      renderPoints: Array.isArray(snap.values) ? snap.values.length : 0,
+      firstValue:   snap.firstValue, lastValue: snap.lastValue,
+      returnPct:    Number.isFinite(snap.deltaPct) ? +snap.deltaPct.toFixed(2) : null,
+    } : null;
+
+    const reconstruction = reconOk ? {
+      renderPoints: reconPoints,
+      firstValue:   args.res.firstValue, lastValue: args.res.lastValue,
+      returnPct:    Number.isFinite(args.res.deltaPct) ? +args.res.deltaPct.toFixed(2) : null,
+      fxApproximated: !!args.res.fxApproximated, granularity: args.res.granularity || null,
+    } : null;
+
+    let abDiff = null;
+    if (reconstruction && snapshot) {
+      const dv = (Number.isFinite(reconstruction.lastValue) && Number.isFinite(snapshot.lastValue)) ? +(reconstruction.lastValue - snapshot.lastValue).toFixed(2) : null;
+      const dr = (Number.isFinite(reconstruction.returnPct) && Number.isFinite(snapshot.returnPct)) ? +(reconstruction.returnPct - snapshot.returnPct).toFixed(2) : null;
+      abDiff = { lastValueDelta: dv, returnPctDelta: dr, pointsDelta: reconPoints - snapshot.renderPoints };
+    }
+
+    console.log('[PCE]', {
+      range, currency,
+      sourceUsed: args.outcome,                 // 'reconstruction' | 'snapshots'
+      reason: args.reason || null,
+      coverage, coverageThreshold: threshold, coveragePass,
+      confidence, confidencePass,
+      fxApproximated: meta ? !!meta.fxApproximated : (reconstruction ? reconstruction.fxApproximated : null),
+      rawPoints: snapshot ? snapshot.rawPoints : null,
+      renderPoints: reconPoints,
+      assetsIncluded, assetsExcluded, excludedList,
+      buildTimeMs: args.buildTimeMs,
+      reconstruction, snapshot, abDiff,
+    });
+  } catch (_) { /* telemetry must never break the chart */ }
+}
+
 function _aurixReconRefresh() {
   if (!_aurixReconFlag()) return;
   if (typeof window === 'undefined') return;
@@ -12349,42 +12440,67 @@ function _aurixReconRefresh() {
   const epoch = (typeof _aurixInvestableChartEpoch === 'function') ? _aurixInvestableChartEpoch() : 0;
   const TIMEOUT_MS = 2500;
   const timeout = new Promise(function (resolve) { setTimeout(function () { resolve('__timeout__'); }, TIMEOUT_MS); });
-  const work = window.AurixPortfolioRecon.buildDashboardSeries({
+  // SPEC 4.1A — capture the exact build inputs + start time so the validation
+  // telemetry below can re-read the RAW engine meta (coverage/confidence): the
+  // adapter's fidelity gate returns null on reject and discards that meta, so a
+  // rejected range would otherwise report no coverage. Diagnostic-only reuse.
+  const _pceOpts = {
     assets: assetsSnapshot, range: range, baseCurrency: baseC, signal: signal,
     currentValueOf: currentValueOf, fxToBase: fxToBase, cashEvents: cashEvents, nowValue: nowValue,
     now: nowMs, asOf: nowMs, firstTs: (epoch > 0 ? epoch : undefined),
-  });
+  };
+  const _pceT0 = Date.now();
+  const work = window.AurixPortfolioRecon.buildDashboardSeries(_pceOpts);
 
   Promise.race([work, timeout]).then(function (res) {
-    // Superseded by a newer kick / invalidation → drop silently.
+    // Superseded by a newer kick / invalidation → drop silently (no telemetry).
     if (mySeq !== _reconSeq) return;
     _reconInflightKey = null;
-    // Timeout → abort in-flight fetches, keep snapshots.
-    if (res === '__timeout__') { if (_reconAbort) { try { _reconAbort.abort(); } catch (_) {} } return; }
-    // Gate failed / error / engine unavailable → keep snapshots.
-    if (!res || !Array.isArray(res.series)) return;
-    // AURIX-INVESTABLE-CHART-EPOCH-1 — clamp to the visual baseline so no range
-    // (incl. 1Y/TOTAL, or old test transactions) ever shows pre-baseline data.
-    // If too few points remain, skip the swap → snapshots (also baselined) →
-    // "building history". The last point (= live Hero total) is always ≥ epoch.
-    let series = res.series;
-    if (epoch > 0) series = series.filter(function (p) { return p && typeof p.time === 'number' && p.time >= epoch; });
-    // PARTE A — reliability gate on the reconstruction too: a sparse recon (e.g.
-    // TOTAL with <5 post-epoch points) must NOT swap in over the neutral surface.
-    if (!_aurixChartSeriesPasses(series, range)) return;
-    // View changed while computing, or flag turned off mid-flight → discard.
-    if (range !== activeRange || baseC !== (baseCurrency || 'USD')) return;
-    if (!_aurixReconFlag()) return;
+    const _buildTimeMs = Date.now() - _pceT0;
 
-    _reconActive = {
-      range: range, currency: baseC, series: series,
-      confidence: res.confidence, coverage: res.coverage,
-      fxApproximated: res.fxApproximated, granularity: res.granularity,
-    };
-    // Swap in: re-sync mounted V2 surfaces. _aurixDashSync now sees a matching
-    // _reconActive and paints the reconstructed line (does NOT re-kick).
-    try { if (_aurixDashDesktop) _aurixDashSync('desktop'); } catch (_) {}
-    try { if (_aurixDashMobile)  _aurixDashSync('mobile'); } catch (_) {}
+    // SPEC 4.1A — funnel every terminal outcome through a single decision + one
+    // telemetry emit. Each branch preserves the EXACT original behaviour
+    // (timeout → abort+snapshots, gate-fail → snapshots, success → swap in).
+    let _outcome = 'snapshots', _reason = '';
+    if (res === '__timeout__') {
+      // Timeout → abort in-flight fetches, keep snapshots.
+      if (_reconAbort) { try { _reconAbort.abort(); } catch (_) {} }
+      _reason = 'timeout';
+    } else if (!res || !Array.isArray(res.series)) {
+      // Gate failed / error / engine unavailable → keep snapshots.
+      _reason = 'gated-or-error';
+    } else {
+      // AURIX-INVESTABLE-CHART-EPOCH-1 — clamp to the visual baseline so no range
+      // (incl. 1Y/TOTAL, or old test transactions) ever shows pre-baseline data.
+      // If too few points remain, skip the swap → snapshots (also baselined) →
+      // "building history". The last point (= live Hero total) is always ≥ epoch.
+      let series = res.series;
+      if (epoch > 0) series = series.filter(function (p) { return p && typeof p.time === 'number' && p.time >= epoch; });
+      // PARTE A — reliability gate on the reconstruction too: a sparse recon (e.g.
+      // TOTAL with <5 post-epoch points) must NOT swap in over the neutral surface.
+      if (!_aurixChartSeriesPasses(series, range)) {
+        _reason = 'reliability-gate';
+      } else if (range !== activeRange || baseC !== (baseCurrency || 'USD')) {
+        // View changed while computing → discard.
+        _reason = 'view-changed';
+      } else if (!_aurixReconFlag()) {
+        // Flag turned off mid-flight → discard.
+        _reason = 'flag-off';
+      } else {
+        _reconActive = {
+          range: range, currency: baseC, series: series,
+          confidence: res.confidence, coverage: res.coverage,
+          fxApproximated: res.fxApproximated, granularity: res.granularity,
+        };
+        // Swap in: re-sync mounted V2 surfaces. _aurixDashSync now sees a matching
+        // _reconActive and paints the reconstructed line (does NOT re-kick).
+        try { if (_aurixDashDesktop) _aurixDashSync('desktop'); } catch (_) {}
+        try { if (_aurixDashMobile)  _aurixDashSync('mobile'); } catch (_) {}
+        _outcome = 'reconstruction';
+      }
+    }
+    // SPEC 4.1A — validation telemetry (flag-gated, diagnostic-only, no data touch).
+    try { _aurixPceValidationLog({ range: range, currency: baseC, opts: _pceOpts, res: res, outcome: _outcome, reason: _reason, buildTimeMs: _buildTimeMs }); } catch (_) {}
   }).catch(function () { _reconInflightKey = null; /* error ⇒ snapshots */ });
 }
 
