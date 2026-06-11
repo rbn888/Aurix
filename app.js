@@ -1988,6 +1988,36 @@ const T = {
     wsTplTiempoEstimado:     'Tiempo estimado (meses)',
     wsTplAportNecesaria:     'Aportación para lograrlo en 5 años',
     wsTplProyeccion:         'Proyección del capital actual (5 años)',
+    // WS.2 — Financial Tools Hub
+    ws2_hub_title:        'Herramientas financieras',
+    ws2_hub_sub:          'Calcula, planifica y proyecta — sin tocar tu hoja.',
+    ws2_open_tool_cta:    'Abrir',
+    ws2_back:             'Volver a plantillas',
+    ws2_open_sheet:       'Abrir Sheet',
+    ws2_use_as_sheet:     'Usar como hoja',
+    ws2_disclaimer:       'Simulación. No es una promesa de rentabilidad.',
+    ws2_breakdown_title:  'Desglose anual',
+    ws2_year:             'Año',
+    ws2_sav_income:       'Ingresos mensuales',
+    ws2_sav_housing:      'Vivienda',
+    ws2_sav_food:         'Comida',
+    ws2_sav_transport:    'Transporte',
+    ws2_sav_leisure:      'Ocio',
+    ws2_sav_subs:         'Suscripciones',
+    ws2_sav_other:        'Otros gastos',
+    ws2_sav_goal:         'Objetivo de ahorro mensual',
+    ws2_sav_totalExp:     'Gasto total',
+    ws2_sav_saving:       'Ahorro estimado',
+    ws2_sav_rate:         'Tasa de ahorro',
+    ws2_sav_diff:         'Diferencia vs objetivo',
+    ws2_sav_top:          'Mayor gasto',
+    ws2_goal_months:      'Meses estimados',
+    ws2_goal_years:       'Años estimados',
+    ws2_goal_status_label:'Estado',
+    ws2_goal_status_reached:      'Objetivo alcanzado',
+    ws2_goal_status_ontrack:      'Encaminado',
+    ws2_goal_status_needmore:     'Necesita más aportación',
+    ws2_goal_status_insufficient: 'Sin datos suficientes',
     // PR-WP6D: in-cell labels written by WP-4 / WP-6 templates (rendered via @i18n:)
     wsTplPortfolioPnl:       'P&L de cartera',
     wsTplPortfolioPnlPct:    'P&L % de cartera',
@@ -3254,6 +3284,36 @@ const T = {
     wsTplTiempoEstimado:     'Estimated time (months)',
     wsTplAportNecesaria:     'Contribution to reach it in 5 years',
     wsTplProyeccion:         'Current capital projection (5 years)',
+    // WS.2 — Financial Tools Hub
+    ws2_hub_title:        'Financial tools',
+    ws2_hub_sub:          'Calculate, plan and project — without touching your sheet.',
+    ws2_open_tool_cta:    'Open',
+    ws2_back:             'Back to templates',
+    ws2_open_sheet:       'Open Sheet',
+    ws2_use_as_sheet:     'Use as sheet',
+    ws2_disclaimer:       'Simulation. Not a promise of returns.',
+    ws2_breakdown_title:  'Yearly breakdown',
+    ws2_year:             'Year',
+    ws2_sav_income:       'Monthly income',
+    ws2_sav_housing:      'Housing',
+    ws2_sav_food:         'Food',
+    ws2_sav_transport:    'Transport',
+    ws2_sav_leisure:      'Leisure',
+    ws2_sav_subs:         'Subscriptions',
+    ws2_sav_other:        'Other expenses',
+    ws2_sav_goal:         'Monthly savings goal',
+    ws2_sav_totalExp:     'Total spending',
+    ws2_sav_saving:       'Estimated savings',
+    ws2_sav_rate:         'Savings rate',
+    ws2_sav_diff:         'Difference vs goal',
+    ws2_sav_top:          'Top expense',
+    ws2_goal_months:      'Estimated months',
+    ws2_goal_years:       'Estimated years',
+    ws2_goal_status_label:'Status',
+    ws2_goal_status_reached:      'Goal reached',
+    ws2_goal_status_ontrack:      'On track',
+    ws2_goal_status_needmore:     'Needs more contribution',
+    ws2_goal_status_insufficient: 'Not enough data',
     // PR-WP6D: in-cell labels written by WP-4 / WP-6 templates (rendered via @i18n:)
     wsTplPortfolioPnl:       'Portfolio PnL',
     wsTplPortfolioPnlPct:    'Portfolio PnL %',
@@ -9494,21 +9554,25 @@ function _renderWorkspaceModeSwitcher(activeMode) {
 
 function _renderWorkspaceTemplatesMode() {
   const esc = _escapeWorkspaceText;
-  // WS.1 — first functional premium planning templates. Clicking applies the
-  // template to the sheet (confirm-if-touched) and navigates to Sheet.
+  // WS.2 — Financial Tools Hub. If a tool is open, render that dedicated tool;
+  // otherwise render the hub cards. Clicking a card OPENS its tool (it does NOT
+  // seed the Sheet and shows NO replace-cells confirmation). The legacy WS.1
+  // "use as sheet" path stays available as a secondary action inside each tool.
+  if (_WS2_ACTIVE_TOOL && typeof _ws2RenderTool === 'function') {
+    return _ws2RenderTool(_WS2_ACTIVE_TOOL);
+  }
   const active = [
-    { id: 'compound-interest', icon: '∑', nameKey: 'ws_tpl_compound_name', descKey: 'ws_tpl_compound_desc' },
-    { id: 'monthly-savings',   icon: '◷', nameKey: 'ws_tpl_savings_name',  descKey: 'ws_tpl_savings_desc'  },
-    { id: 'financial-goal',    icon: '◎', nameKey: 'ws_tpl_goal_name',     descKey: 'ws_tpl_goal_desc'     },
+    { id: 'compound', icon: '∑', nameKey: 'ws_tpl_compound_name', descKey: 'ws_tpl_compound_desc' },
+    { id: 'savings',  icon: '◷', nameKey: 'ws_tpl_savings_name',  descKey: 'ws_tpl_savings_desc'  },
+    { id: 'goal',     icon: '◎', nameKey: 'ws_tpl_goal_name',     descKey: 'ws_tpl_goal_desc'     },
   ].map(c => `
-    <button type="button" class="aurix-ws-tpl-card is-active" data-ws-apply-tpl="${esc(c.id)}">
+    <button type="button" class="aurix-ws-tpl-card is-active" data-ws2-tool-open="${esc(c.id)}">
       <div class="aurix-ws-tpl-icon" aria-hidden="true">${esc(c.icon)}</div>
       <div class="aurix-ws-tpl-title">${esc(t(c.nameKey) || c.id)}</div>
       <div class="aurix-ws-tpl-desc">${esc(t(c.descKey) || '')}</div>
-      <div class="aurix-ws-tpl-cta">${esc(t('ws_tpl_apply_cta') || 'Aplicar')}</div>
+      <div class="aurix-ws-tpl-cta">${esc(t('ws2_open_tool_cta') || 'Abrir')}</div>
     </button>
   `).join('');
-  // Remaining templates stay as "Próximamente".
   const soon = [
     { id: 'crypto',     icon: '◆' },
     { id: 'properties', icon: '⌂' },
@@ -9524,8 +9588,8 @@ function _renderWorkspaceTemplatesMode() {
   return `
     <main class="aurix-ws-templates-mode">
       <header class="aurix-ws-templates-header">
-        <h2 class="aurix-ws-templates-title">${esc(t('ws_templates_available_title') || 'Plantillas')}</h2>
-        <p class="aurix-ws-templates-sub">${esc(t('ws_templates_available_sub') || '')}</p>
+        <h2 class="aurix-ws-templates-title">${esc(t('ws2_hub_title') || 'Herramientas financieras')}</h2>
+        <p class="aurix-ws-templates-sub">${esc(t('ws2_hub_sub') || '')}</p>
       </header>
       <div class="aurix-ws-tpl-grid">${active}</div>
       <div class="aurix-ws-tpl-soon-head">${esc(t('ws_templates_soon_tag') || 'Próximamente')}</div>
@@ -26884,6 +26948,281 @@ document.addEventListener('click', (e) => {
   _wsApplyTemplateFromTab(card.getAttribute('data-ws-apply-tpl'));
 });
 
+/* ════════ WS.2 — Financial Tools Hub ═════════════════════════════════════════
+   Templates are no longer seeded onto the Sheet by default. Each active card
+   opens a DEDICATED interactive tool inside Workspace (templates mode). Pure JS
+   math (full Math available — no formula engine), live recalc on input, local
+   per-tool persistence. The Sheet is never overwritten without an explicit
+   secondary "usar como hoja" action (which reuses the WS.1 apply path). */
+let _WS2_ACTIVE_TOOL = null; // null = hub cards | 'compound' | 'savings' | 'goal'
+
+const _WS2_DEFAULTS = {
+  compound: { capital: 10000, monthly: 200, rate: 6, years: 10 },
+  savings:  { income: 2500, housing: 800, food: 400, transport: 150, leisure: 200, subs: 50, other: 150, goal: 500 },
+  goal:     { target: 50000, current: 10000, monthly: 300, rate: 4 },
+};
+// tool id → WS.1 sheet-template id (for the secondary "usar como hoja" action)
+const _WS2_SHEET_TPL = { compound: 'compound-interest', savings: 'monthly-savings', goal: 'financial-goal' };
+
+function _ws2Load(id) {
+  const def = _WS2_DEFAULTS[id] || {};
+  try {
+    const raw = localStorage.getItem('aurix_ws2_' + id);
+    if (raw) { const o = JSON.parse(raw); if (o && typeof o === 'object') return { ...def, ...o }; }
+  } catch (_) {}
+  return { ...def };
+}
+function _ws2Save(id, state) { try { localStorage.setItem('aurix_ws2_' + id, JSON.stringify(state)); } catch (_) {} }
+function _ws2Money(n) {
+  if (!Number.isFinite(n)) return '—';
+  const sym = (typeof baseCurrency !== 'undefined' && baseCurrency === 'EUR') ? '€' : '$';
+  return sym + Math.round(n).toLocaleString('es-ES');
+}
+function _ws2Pct(n) { return Number.isFinite(n) ? (n.toFixed(1) + '%') : '—'; }
+
+function _ws2ComputeCompound(s) {
+  const P = +s.capital || 0, PMT = +s.monthly || 0, annual = +s.rate || 0, Y = Math.max(0, Math.min(60, +s.years || 0));
+  const r = annual / 100 / 12, n = Y * 12;
+  const fv = (r === 0) ? (P + PMT * n) : (P * Math.pow(1 + r, n) + PMT * ((Math.pow(1 + r, n) - 1) / r));
+  const contributed = P + PMT * n;
+  const rows = [];
+  for (let k = 1; k <= Y && k <= 40; k++) {
+    const nk = k * 12;
+    rows.push({ year: k, value: (r === 0) ? (P + PMT * nk) : (P * Math.pow(1 + r, nk) + PMT * ((Math.pow(1 + r, nk) - 1) / r)) });
+  }
+  return { fv, contributed, gain: fv - contributed, rows };
+}
+function _ws2ComputeSavings(s) {
+  const income = +s.income || 0;
+  const exp = { housing: +s.housing || 0, food: +s.food || 0, transport: +s.transport || 0, leisure: +s.leisure || 0, subs: +s.subs || 0, other: +s.other || 0 };
+  const totalExp = Object.values(exp).reduce((a, b) => a + b, 0);
+  const saving = income - totalExp;
+  let topKey = null, topVal = -1;
+  for (const k in exp) { if (exp[k] > topVal) { topVal = exp[k]; topKey = k; } }
+  return { totalExp, saving, rate: income > 0 ? saving / income * 100 : 0, diff: saving - (+s.goal || 0), topKey, topVal };
+}
+function _ws2ComputeGoal(s) {
+  const goal = +s.target || 0, P = +s.current || 0, C = +s.monthly || 0, annual = +s.rate || 0;
+  const gap = Math.max(0, goal - P);
+  const r = annual / 100 / 12;
+  let months;
+  if (gap <= 0) months = 0;
+  else if (C <= 0 && r <= 0) months = Infinity;
+  else if (r <= 0) months = gap / C;
+  else {
+    const denom = P + C / r, numer = goal + C / r;
+    months = (denom > 0 && numer > 0) ? Math.log(numer / denom) / Math.log(1 + r) : Infinity;
+    if (!Number.isFinite(months) || months < 0) months = (C > 0 ? gap / C : Infinity);
+  }
+  const need5y = gap / 60;
+  let status;
+  if (gap <= 0)            status = 'reached';
+  else if (C <= 0)         status = 'insufficient';
+  else if (C >= need5y)    status = 'ontrack';
+  else                     status = 'needmore';
+  return { gap, months, years: Number.isFinite(months) ? months / 12 : Infinity, need5y, status };
+}
+
+// Display strings keyed by data-ws2-out attribute.
+function _ws2Outputs(id, s) {
+  if (id === 'compound') {
+    const c = _ws2ComputeCompound(s);
+    return { fv: _ws2Money(c.fv), contributed: _ws2Money(c.contributed), gain: _ws2Money(c.gain) };
+  }
+  if (id === 'savings') {
+    const c = _ws2ComputeSavings(s);
+    return {
+      totalExp: _ws2Money(c.totalExp),
+      saving:   _ws2Money(c.saving),
+      rate:     _ws2Pct(c.rate),
+      diff:     (c.diff >= 0 ? '+' : '−') + _ws2Money(Math.abs(c.diff)),
+      top:      c.topKey ? (t('ws2_sav_' + c.topKey) + ' · ' + _ws2Money(c.topVal)) : '—',
+    };
+  }
+  if (id === 'goal') {
+    const c = _ws2ComputeGoal(s);
+    return {
+      gap:    _ws2Money(c.gap),
+      months: Number.isFinite(c.months) ? String(Math.ceil(c.months)) : '—',
+      years:  Number.isFinite(c.years)  ? c.years.toFixed(1)           : '—',
+      need5y: _ws2Money(c.need5y),
+    };
+  }
+  return {};
+}
+
+function _ws2BreakdownRows(rows) {
+  if (!rows || !rows.length) return '';
+  const yLbl = t('ws2_year') || 'Año';
+  return rows.map(r => `<div class="ws2-bd-row"><span class="ws2-bd-year">${yLbl} ${r.year}</span><span class="ws2-bd-val">${_ws2Money(r.value)}</span></div>`).join('');
+}
+
+// Live recalc: read inputs, persist, write outputs (no re-render → no focus loss).
+function _ws2Recalc(container) {
+  if (!container) return;
+  const id = container.getAttribute('data-ws2-tool');
+  if (!id) return;
+  const state = { ...(_WS2_DEFAULTS[id] || {}) };
+  container.querySelectorAll('[data-ws2-in]').forEach(el => {
+    const v = parseFloat(el.value);
+    state[el.getAttribute('data-ws2-in')] = Number.isFinite(v) ? v : 0;
+  });
+  _ws2Save(id, state);
+  const out = _ws2Outputs(id, state);
+  for (const k in out) {
+    const el = container.querySelector(`[data-ws2-out="${k}"]`);
+    if (el) el.textContent = out[k];
+  }
+  if (id === 'compound') {
+    const bd = container.querySelector('[data-ws2-breakdown]');
+    if (bd) bd.innerHTML = _ws2BreakdownRows(_ws2ComputeCompound(state).rows);
+  }
+  if (id === 'goal') {
+    const badge = container.querySelector('[data-ws2-status]');
+    if (badge) {
+      const st = _ws2ComputeGoal(state).status;
+      badge.className = 'ws2-status is-' + st;
+      badge.textContent = t('ws2_goal_status_' + st) || '';
+    }
+  }
+}
+
+function _ws2Field(key, labelKey, value) {
+  return `<label class="ws2-field">
+    <span class="ws2-field-label">${_escapeWorkspaceText(t(labelKey) || key)}</span>
+    <input class="ws2-input" type="number" inputmode="decimal" step="any" data-ws2-in="${_escapeWorkspaceText(key)}" value="${_escapeWorkspaceText(String(value))}">
+  </label>`;
+}
+function _ws2Out(key, labelKey, valueStr, big) {
+  return `<div class="ws2-result${big ? ' is-big' : ''}">
+    <span class="ws2-result-label">${_escapeWorkspaceText(t(labelKey) || '')}</span>
+    <span class="ws2-result-value" data-ws2-out="${_escapeWorkspaceText(key)}">${_escapeWorkspaceText(valueStr)}</span>
+  </div>`;
+}
+
+function _ws2RenderTool(id) {
+  const esc = _escapeWorkspaceText;
+  const s   = _ws2Load(id);
+  const out = _ws2Outputs(id, s);
+  const nameKey = { compound: 'ws_tpl_compound_name', savings: 'ws_tpl_savings_name', goal: 'ws_tpl_goal_name' }[id] || '';
+  const head = `
+    <header class="ws2-tool-head">
+      <button type="button" class="ws2-back" data-ws2-back>← ${esc(t('ws2_back') || 'Volver')}</button>
+      <h2 class="ws2-tool-title">${esc(t(nameKey) || id)}</h2>
+      <div class="ws2-tool-actions">
+        <button type="button" class="ws2-ghost" data-ws2-sheet>${esc(t('ws2_open_sheet') || 'Abrir Sheet')}</button>
+      </div>
+    </header>`;
+  let inputs = '', results = '', extra = '';
+
+  if (id === 'compound') {
+    inputs = [
+      _ws2Field('capital', 'wsTplCapitalInicial', s.capital),
+      _ws2Field('monthly', 'wsTplAportMensual',  s.monthly),
+      _ws2Field('rate',    'wsTplRentAnual',      s.rate),
+      _ws2Field('years',   'wsTplAnios',          s.years),
+    ].join('');
+    results = [
+      _ws2Out('fv',          'wsTplValorFuturo',   out.fv, true),
+      _ws2Out('contributed', 'wsTplTotalAportado', out.contributed),
+      _ws2Out('gain',        'wsTplGanancia',      out.gain),
+    ].join('');
+    extra = `
+      <div class="ws2-breakdown">
+        <div class="ws2-breakdown-title">${esc(t('ws2_breakdown_title') || 'Desglose anual')}</div>
+        <div class="ws2-bd-rows" data-ws2-breakdown>${_ws2BreakdownRows(_ws2ComputeCompound(s).rows)}</div>
+      </div>`;
+  } else if (id === 'savings') {
+    inputs = [
+      _ws2Field('income',    'ws2_sav_income',    s.income),
+      _ws2Field('housing',   'ws2_sav_housing',   s.housing),
+      _ws2Field('food',      'ws2_sav_food',      s.food),
+      _ws2Field('transport', 'ws2_sav_transport', s.transport),
+      _ws2Field('leisure',   'ws2_sav_leisure',   s.leisure),
+      _ws2Field('subs',      'ws2_sav_subs',      s.subs),
+      _ws2Field('other',     'ws2_sav_other',     s.other),
+      _ws2Field('goal',      'ws2_sav_goal',      s.goal),
+    ].join('');
+    results = [
+      _ws2Out('saving',   'ws2_sav_saving',   out.saving, true),
+      _ws2Out('totalExp', 'ws2_sav_totalExp', out.totalExp),
+      _ws2Out('rate',     'ws2_sav_rate',     out.rate),
+      _ws2Out('diff',     'ws2_sav_diff',     out.diff),
+      _ws2Out('top',      'ws2_sav_top',      out.top),
+    ].join('');
+  } else if (id === 'goal') {
+    inputs = [
+      _ws2Field('target',  'wsTplObjetivo',      s.target),
+      _ws2Field('current', 'wsTplCapitalActual', s.current),
+      _ws2Field('monthly', 'wsTplAportMensual',  s.monthly),
+      _ws2Field('rate',    'wsTplRentEsperada',  s.rate),
+    ].join('');
+    const st = _ws2ComputeGoal(s).status;
+    results = [
+      _ws2Out('gap',    'wsTplGap',           out.gap, true),
+      _ws2Out('months', 'ws2_goal_months',    out.months),
+      _ws2Out('years',  'ws2_goal_years',     out.years),
+      _ws2Out('need5y', 'wsTplAportNecesaria', out.need5y),
+    ].join('');
+    extra = `
+      <div class="ws2-status-wrap">
+        <span class="ws2-status-label">${esc(t('ws2_goal_status_label') || 'Estado')}</span>
+        <span class="ws2-status is-${esc(st)}" data-ws2-status>${esc(t('ws2_goal_status_' + st) || '')}</span>
+      </div>`;
+  }
+
+  return `
+    <main class="aurix-ws-templates-mode ws2-tool" data-ws2-tool="${esc(id)}">
+      ${head}
+      <div class="ws2-tool-body">
+        <section class="ws2-inputs">${inputs}</section>
+        <section class="ws2-results">${results}${extra}</section>
+      </div>
+      <footer class="ws2-tool-foot">
+        <button type="button" class="ws2-use-sheet" data-ws2-use-sheet="${esc(id)}">${esc(t('ws2_use_as_sheet') || 'Usar como hoja')}</button>
+        <p class="ws2-disclaimer">${esc(t('ws2_disclaimer') || '')}</p>
+      </footer>
+    </main>`;
+}
+
+// WS.2 click handlers (document-level; survive renderWorkspace teardown).
+document.addEventListener('click', (e) => {
+  if (typeof currentTab !== 'string' || currentTab !== 'workspace') return;
+  const open = e.target.closest && e.target.closest('[data-ws2-tool-open]');
+  if (open) {
+    e.preventDefault(); e.stopPropagation();
+    _WS2_ACTIVE_TOOL = open.getAttribute('data-ws2-tool-open');
+    if (typeof renderWorkspace === 'function') renderWorkspace();
+    return;
+  }
+  if (e.target.closest && e.target.closest('[data-ws2-back]')) {
+    e.preventDefault(); e.stopPropagation();
+    _WS2_ACTIVE_TOOL = null;
+    if (typeof renderWorkspace === 'function') renderWorkspace();
+    return;
+  }
+  if (e.target.closest && e.target.closest('[data-ws2-sheet]')) {
+    e.preventDefault(); e.stopPropagation();
+    _WS2_ACTIVE_TOOL = null;
+    if (typeof _wsSetMode === 'function') _wsSetMode('sheet');
+    if (typeof renderWorkspace === 'function') renderWorkspace();
+    return;
+  }
+  const useSheet = e.target.closest && e.target.closest('[data-ws2-use-sheet]');
+  if (useSheet) {
+    e.preventDefault(); e.stopPropagation();
+    const tplId = _WS2_SHEET_TPL[useSheet.getAttribute('data-ws2-use-sheet')];
+    if (tplId && typeof _wsApplyTemplateFromTab === 'function') { _WS2_ACTIVE_TOOL = null; _wsApplyTemplateFromTab(tplId); }
+    return;
+  }
+});
+// Live recalc on input edit inside a tool.
+document.addEventListener('input', (e) => {
+  if (typeof currentTab !== 'string' || currentTab !== 'workspace') return;
+  if (!(e.target && e.target.matches && e.target.matches('[data-ws2-in]'))) return;
+  _ws2Recalc(e.target.closest('[data-ws2-tool]'));
+});
+
 // WORKSPACE-WEB-MODES-1 — top mode switcher click. Document-level so it
 // survives every renderWorkspace() teardown. Also handles the in-Hoja
 // "Ver inteligencia →" pill, which uses the same data attribute.
@@ -26901,6 +27240,9 @@ document.addEventListener('click', (e) => {
   e.preventDefault();
   e.stopPropagation();
   if (_wsGetMode() === mode) return;  // already active, noop
+  // WS.2: landing on Templates via the switcher always shows the hub cards,
+  // not a previously-open tool.
+  if (mode === 'templates') _WS2_ACTIVE_TOOL = null;
   _wsSetMode(mode);
   if (typeof renderWorkspace === 'function') renderWorkspace();
 });

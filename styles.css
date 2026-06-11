@@ -18784,3 +18784,123 @@ body.gs-open { overflow: hidden; }
   .int-exec-line { font-size: 14px; }
   .int-block { padding: 16px; }
 }
+
+/* ════════ WS.2 — Financial Tools Hub (dedicated tools) ═══════════════════════
+   Premium interactive tools that open inside Workspace templates mode (never
+   the Sheet). Encapsulated under ws2-* classes; responsive. */
+.ws2-tool { max-width: 920px; margin: 0 auto; }
+.ws2-tool-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.ws2-tool-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-bright, #e8eaf0);
+  letter-spacing: -0.01em;
+  flex: 1 1 auto;
+}
+.ws2-tool-actions { margin-left: auto; }
+.ws2-back, .ws2-ghost, .ws2-use-sheet {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(225,233,255,0.9);
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+.ws2-back:hover, .ws2-ghost:hover, .ws2-use-sheet:hover { background: rgba(255,255,255,0.08); border-color: rgba(74,130,240,0.4); }
+.ws2-back:active, .ws2-ghost:active, .ws2-use-sheet:active { transform: scale(0.97); }
+
+.ws2-tool-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  align-items: start;
+}
+.ws2-inputs, .ws2-results {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid var(--color-border-subtle, rgba(255,255,255,0.08));
+  background: var(--bg-card, rgba(255,255,255,0.02));
+}
+.ws2-field { display: flex; flex-direction: column; gap: 5px; }
+.ws2-field-label { font-size: 12px; color: var(--text-muted, rgba(220,230,250,0.6)); }
+.ws2-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border-subtle, rgba(255,255,255,0.1));
+  background: rgba(255,255,255,0.03);
+  color: var(--text-bright, #e8eaf0);
+  font: inherit;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.ws2-input:focus { outline: none; border-color: rgba(74,130,240,0.5); }
+
+.ws2-result {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border-subtle, rgba(255,255,255,0.06));
+}
+.ws2-result:last-of-type { border-bottom: 0; }
+.ws2-result-label { font-size: 12.5px; color: var(--text-muted, rgba(220,230,250,0.6)); }
+.ws2-result-value { font-size: 15px; font-weight: 600; color: var(--text-bright, #e8eaf0); font-variant-numeric: tabular-nums; text-align: right; }
+.ws2-result.is-big {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 4px 0 14px;
+}
+.ws2-result.is-big .ws2-result-label { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+.ws2-result.is-big .ws2-result-value { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+
+.ws2-breakdown { margin-top: 14px; }
+.ws2-breakdown-title { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted, rgba(220,230,250,0.5)); margin-bottom: 8px; }
+.ws2-bd-rows { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
+.ws2-bd-row { display: flex; justify-content: space-between; font-size: 12.5px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.ws2-bd-year { color: var(--text-muted, rgba(220,230,250,0.6)); }
+.ws2-bd-val { color: var(--text-bright, #e8eaf0); font-variant-numeric: tabular-nums; }
+
+.ws2-status-wrap { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+.ws2-status-label { font-size: 12px; color: var(--text-muted, rgba(220,230,250,0.6)); }
+.ws2-status {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+.ws2-status.is-reached      { color: rgba(72,207,173,0.95); border-color: rgba(72,207,173,0.4); background: rgba(72,207,173,0.08); }
+.ws2-status.is-ontrack      { color: rgba(99,179,237,0.95); border-color: rgba(99,179,237,0.4); background: rgba(99,179,237,0.08); }
+.ws2-status.is-needmore     { color: rgba(232,176,84,0.95); border-color: rgba(232,176,84,0.4); background: rgba(232,176,84,0.08); }
+.ws2-status.is-insufficient { color: var(--text-muted, rgba(220,230,250,0.6)); }
+
+.ws2-tool-foot { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.ws2-use-sheet { align-self: flex-start; opacity: 0.85; }
+.ws2-disclaimer { margin: 0; font-size: 11px; color: var(--text-muted, rgba(220,230,250,0.55)); opacity: 0.85; }
+
+@media (max-width: 720px) {
+  .ws2-tool-body { grid-template-columns: 1fr; gap: 14px; }
+  .ws2-result.is-big .ws2-result-value { font-size: 26px; }
+  .ws2-tool-title { font-size: 16px; flex-basis: 100%; order: 2; }
+  .ws2-back { order: 1; }
+  .ws2-tool-actions { order: 3; }
+}
