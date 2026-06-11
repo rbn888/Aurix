@@ -1953,6 +1953,41 @@ const T = {
     ws_tpl_dividend_desc:    'Introduce cantidad y dividendo por acción por ticker — el ingreso anual se calcula automáticamente',
     ws_tpl_fire_name:        'Calculadora FIRE',
     ws_tpl_fire_desc:        'Edita B6-B11 para modelar tu escenario; B12 proyecta valor futuro vía interés compuesto',
+    // WS.1 — premium planning templates (tab + cell labels)
+    ws_templates_available_title: 'Plantillas',
+    ws_templates_available_sub:   'Planifica, simula y proyecta tu patrimonio.',
+    ws_tpl_apply_cta:        'Aplicar',
+    ws_tpl_applied:          'Plantilla aplicada',
+    ws_tpl_compound_name:    'Interés compuesto',
+    ws_tpl_compound_desc:    'Simula el valor futuro con aportaciones mensuales.',
+    ws_tpl_savings_name:     'Ahorro mensual',
+    ws_tpl_savings_desc:     'Proyecta tu ahorro acumulado y el progreso hacia un objetivo.',
+    ws_tpl_goal_name:        'Objetivo financiero',
+    ws_tpl_goal_desc:        'Calcula el gap, el tiempo estimado y la aportación necesaria.',
+    wsTplCompoundTitle:      'Interés compuesto',
+    wsTplCapitalInicial:     'Capital inicial',
+    wsTplAportMensual:       'Aportación mensual',
+    wsTplRentAnual:          'Rentabilidad anual (%)',
+    wsTplAnios:              'Años',
+    wsTplValorFuturo:        'Valor futuro estimado',
+    wsTplTotalAportado:      'Total aportado',
+    wsTplGanancia:           'Ganancia estimada',
+    wsTplSimDisclaimer:      'Simulación. No es una promesa de rentabilidad.',
+    wsTplSavingsTitle:       'Ahorro mensual',
+    wsTplAhorroMensual:      'Ahorro mensual',
+    wsTplPlazoMeses:         'Plazo (meses)',
+    wsTplObjetivoOpc:        'Objetivo (opcional)',
+    wsTplAcumulado:          'Ahorro acumulado',
+    wsTplProgreso:           'Progreso hacia objetivo (%)',
+    wsTplMesesObjetivo:      'Meses para el objetivo',
+    wsTplGoalTitle:          'Objetivo financiero',
+    wsTplObjetivo:           'Objetivo',
+    wsTplCapitalActual:      'Capital actual',
+    wsTplRentEsperada:       'Rentabilidad esperada (%) — opcional',
+    wsTplGap:                'Gap restante',
+    wsTplTiempoEstimado:     'Tiempo estimado (meses)',
+    wsTplAportNecesaria:     'Aportación para lograrlo en 5 años',
+    wsTplProyeccion:         'Proyección del capital actual (5 años)',
     // PR-WP6D: in-cell labels written by WP-4 / WP-6 templates (rendered via @i18n:)
     wsTplPortfolioPnl:       'P&L de cartera',
     wsTplPortfolioPnlPct:    'P&L % de cartera',
@@ -3184,6 +3219,41 @@ const T = {
     ws_tpl_dividend_desc:    'Enter qty and div/share per ticker — annual income computes automatically',
     ws_tpl_fire_name:        'FIRE Calculator',
     ws_tpl_fire_desc:        'Edit B6-B11 to model your scenario; B12 projects future value via compounding',
+    // WS.1 — premium planning templates (tab + cell labels)
+    ws_templates_available_title: 'Templates',
+    ws_templates_available_sub:   'Plan, simulate and project your wealth.',
+    ws_tpl_apply_cta:        'Apply',
+    ws_tpl_applied:          'Template applied',
+    ws_tpl_compound_name:    'Compound interest',
+    ws_tpl_compound_desc:    'Simulate future value with monthly contributions.',
+    ws_tpl_savings_name:     'Monthly savings',
+    ws_tpl_savings_desc:     'Project accumulated savings and progress toward a goal.',
+    ws_tpl_goal_name:        'Financial goal',
+    ws_tpl_goal_desc:        'Compute the gap, time estimate and required contribution.',
+    wsTplCompoundTitle:      'Compound interest',
+    wsTplCapitalInicial:     'Initial capital',
+    wsTplAportMensual:       'Monthly contribution',
+    wsTplRentAnual:          'Annual return (%)',
+    wsTplAnios:              'Years',
+    wsTplValorFuturo:        'Estimated future value',
+    wsTplTotalAportado:      'Total contributed',
+    wsTplGanancia:           'Estimated gain',
+    wsTplSimDisclaimer:      'Simulation. Not a promise of returns.',
+    wsTplSavingsTitle:       'Monthly savings',
+    wsTplAhorroMensual:      'Monthly savings',
+    wsTplPlazoMeses:         'Term (months)',
+    wsTplObjetivoOpc:        'Goal (optional)',
+    wsTplAcumulado:          'Accumulated savings',
+    wsTplProgreso:           'Progress to goal (%)',
+    wsTplMesesObjetivo:      'Months to goal',
+    wsTplGoalTitle:          'Financial goal',
+    wsTplObjetivo:           'Goal',
+    wsTplCapitalActual:      'Current capital',
+    wsTplRentEsperada:       'Expected return (%) — optional',
+    wsTplGap:                'Remaining gap',
+    wsTplTiempoEstimado:     'Estimated time (months)',
+    wsTplAportNecesaria:     'Contribution to reach it in 5 years',
+    wsTplProyeccion:         'Current capital projection (5 years)',
     // PR-WP6D: in-cell labels written by WP-4 / WP-6 templates (rendered via @i18n:)
     wsTplPortfolioPnl:       'Portfolio PnL',
     wsTplPortfolioPnlPct:    'Portfolio PnL %',
@@ -9423,28 +9493,43 @@ function _renderWorkspaceModeSwitcher(activeMode) {
 }
 
 function _renderWorkspaceTemplatesMode() {
-  const cards = [
-    { id: 'summary',    icon: '◧' },
+  const esc = _escapeWorkspaceText;
+  // WS.1 — first functional premium planning templates. Clicking applies the
+  // template to the sheet (confirm-if-touched) and navigates to Sheet.
+  const active = [
+    { id: 'compound-interest', icon: '∑', nameKey: 'ws_tpl_compound_name', descKey: 'ws_tpl_compound_desc' },
+    { id: 'monthly-savings',   icon: '◷', nameKey: 'ws_tpl_savings_name',  descKey: 'ws_tpl_savings_desc'  },
+    { id: 'financial-goal',    icon: '◎', nameKey: 'ws_tpl_goal_name',     descKey: 'ws_tpl_goal_desc'     },
+  ].map(c => `
+    <button type="button" class="aurix-ws-tpl-card is-active" data-ws-apply-tpl="${esc(c.id)}">
+      <div class="aurix-ws-tpl-icon" aria-hidden="true">${esc(c.icon)}</div>
+      <div class="aurix-ws-tpl-title">${esc(t(c.nameKey) || c.id)}</div>
+      <div class="aurix-ws-tpl-desc">${esc(t(c.descKey) || '')}</div>
+      <div class="aurix-ws-tpl-cta">${esc(t('ws_tpl_apply_cta') || 'Aplicar')}</div>
+    </button>
+  `).join('');
+  // Remaining templates stay as "Próximamente".
+  const soon = [
     { id: 'crypto',     icon: '◆' },
-    { id: 'dividends',  icon: '%' },
     { id: 'properties', icon: '⌂' },
     { id: 'liquidity',  icon: '◯' },
     { id: 'custom',     icon: '+' },
   ].map(c => `
     <article class="aurix-ws-tpl-card" aria-disabled="true">
-      <div class="aurix-ws-tpl-icon" aria-hidden="true">${_escapeWorkspaceText(c.icon)}</div>
-      <div class="aurix-ws-tpl-title">${_escapeWorkspaceText(t('ws_templates_card_' + c.id) || c.id)}</div>
-      <div class="aurix-ws-tpl-tag">${_escapeWorkspaceText(t('ws_templates_soon_tag') || 'Soon')}</div>
+      <div class="aurix-ws-tpl-icon" aria-hidden="true">${esc(c.icon)}</div>
+      <div class="aurix-ws-tpl-title">${esc(t('ws_templates_card_' + c.id) || c.id)}</div>
+      <div class="aurix-ws-tpl-tag">${esc(t('ws_templates_soon_tag') || 'Soon')}</div>
     </article>
   `).join('');
   return `
     <main class="aurix-ws-templates-mode">
       <header class="aurix-ws-templates-header">
-        <h2 class="aurix-ws-templates-title">${_escapeWorkspaceText(t('ws_templates_soon_title') || 'Templates')}</h2>
-        <p class="aurix-ws-templates-sub">${_escapeWorkspaceText(t('ws_templates_soon_sub') || '')}</p>
-        <p class="aurix-ws-templates-hint">${_escapeWorkspaceText(t('ws_templates_soon_hint') || '')}</p>
+        <h2 class="aurix-ws-templates-title">${esc(t('ws_templates_available_title') || 'Plantillas')}</h2>
+        <p class="aurix-ws-templates-sub">${esc(t('ws_templates_available_sub') || '')}</p>
       </header>
-      <div class="aurix-ws-tpl-grid">${cards}</div>
+      <div class="aurix-ws-tpl-grid">${active}</div>
+      <div class="aurix-ws-tpl-soon-head">${esc(t('ws_templates_soon_tag') || 'Próximamente')}</div>
+      <div class="aurix-ws-tpl-grid is-soon">${soon}</div>
     </main>
   `;
 }
@@ -26503,6 +26588,95 @@ const _WP4_TEMPLATES = [
       return rows;
     },
   },
+  // ── WS.1 — Premium planning templates ──────────────────────────────────────
+  // Pure deterministic planning sheets (no portfolio coupling). A1-A3 carry the
+  // system portfolio labels pairing the readonly B1-B3 seeds (apply preserves
+  // them); editable inputs + formulas start at row 5 / column B6+ to avoid the
+  // readonly cells. Formula engine supports POW + arithmetic + cell refs.
+  {
+    id:          'compound-interest',
+    name:        'Compound interest',
+    description: 'Simulate future value with monthly contributions',
+    nameKey:     'ws_tpl_compound_name',
+    descKey:     'ws_tpl_compound_desc',
+    build: () => [
+      { id: 'A1', type: 'value', value: '@i18n:wsCardPortfolioValue' },
+      { id: 'A2', type: 'value', value: '@i18n:wsCardAssetCount' },
+      { id: 'A3', type: 'value', value: '@i18n:wsCardTopAlloc' },
+      { id: 'A5',  type: 'value', value: '@i18n:wsTplCompoundTitle' },
+      { id: 'A6',  type: 'value', value: '@i18n:wsTplCapitalInicial' },
+      { id: 'B6',  type: 'value', value: 10000, format: 'currency' },
+      { id: 'A7',  type: 'value', value: '@i18n:wsTplAportMensual' },
+      { id: 'B7',  type: 'value', value: 200,   format: 'currency' },
+      { id: 'A8',  type: 'value', value: '@i18n:wsTplRentAnual' },
+      { id: 'B8',  type: 'value', value: 6,     format: 'number' },
+      { id: 'A9',  type: 'value', value: '@i18n:wsTplAnios' },
+      { id: 'B9',  type: 'value', value: 10,    format: 'integer' },
+      { id: 'A11', type: 'value',   value: '@i18n:wsTplValorFuturo' },
+      { id: 'B11', type: 'formula', formula: '=B6*POW(1+B8/100/12,B9*12)+B7*(POW(1+B8/100/12,B9*12)-1)/(B8/100/12)', format: 'currency' },
+      { id: 'A12', type: 'value',   value: '@i18n:wsTplTotalAportado' },
+      { id: 'B12', type: 'formula', formula: '=B6+B7*B9*12', format: 'currency' },
+      { id: 'A13', type: 'value',   value: '@i18n:wsTplGanancia' },
+      { id: 'B13', type: 'formula', formula: '=B11-B12', format: 'currency' },
+      { id: 'A15', type: 'value',   value: '@i18n:wsTplSimDisclaimer' },
+    ],
+  },
+  {
+    id:          'monthly-savings',
+    name:        'Monthly savings',
+    description: 'Project accumulated savings and progress to a goal',
+    nameKey:     'ws_tpl_savings_name',
+    descKey:     'ws_tpl_savings_desc',
+    build: () => [
+      { id: 'A1', type: 'value', value: '@i18n:wsCardPortfolioValue' },
+      { id: 'A2', type: 'value', value: '@i18n:wsCardAssetCount' },
+      { id: 'A3', type: 'value', value: '@i18n:wsCardTopAlloc' },
+      { id: 'A5',  type: 'value', value: '@i18n:wsTplSavingsTitle' },
+      { id: 'A6',  type: 'value', value: '@i18n:wsTplAhorroMensual' },
+      { id: 'B6',  type: 'value', value: 300,   format: 'currency' },
+      { id: 'A7',  type: 'value', value: '@i18n:wsTplPlazoMeses' },
+      { id: 'B7',  type: 'value', value: 24,    format: 'integer' },
+      { id: 'A8',  type: 'value', value: '@i18n:wsTplObjetivoOpc' },
+      { id: 'B8',  type: 'value', value: 10000, format: 'currency' },
+      { id: 'A10', type: 'value',   value: '@i18n:wsTplAcumulado' },
+      { id: 'B10', type: 'formula', formula: '=B6*B7', format: 'currency' },
+      { id: 'A11', type: 'value',   value: '@i18n:wsTplProgreso' },
+      { id: 'B11', type: 'formula', formula: '=B10/B8*100', format: 'number' },
+      { id: 'A12', type: 'value',   value: '@i18n:wsTplMesesObjetivo' },
+      { id: 'B12', type: 'formula', formula: '=ROUND(B8/B6,0)', format: 'integer' },
+      { id: 'A14', type: 'value',   value: '@i18n:wsTplSimDisclaimer' },
+    ],
+  },
+  {
+    id:          'financial-goal',
+    name:        'Financial goal',
+    description: 'Gap to a goal, time estimate and required contribution',
+    nameKey:     'ws_tpl_goal_name',
+    descKey:     'ws_tpl_goal_desc',
+    build: () => [
+      { id: 'A1', type: 'value', value: '@i18n:wsCardPortfolioValue' },
+      { id: 'A2', type: 'value', value: '@i18n:wsCardAssetCount' },
+      { id: 'A3', type: 'value', value: '@i18n:wsCardTopAlloc' },
+      { id: 'A5',  type: 'value', value: '@i18n:wsTplGoalTitle' },
+      { id: 'A6',  type: 'value', value: '@i18n:wsTplObjetivo' },
+      { id: 'B6',  type: 'value', value: 50000, format: 'currency' },
+      { id: 'A7',  type: 'value', value: '@i18n:wsTplCapitalActual' },
+      { id: 'B7',  type: 'value', value: 10000, format: 'currency' },
+      { id: 'A8',  type: 'value', value: '@i18n:wsTplAportMensual' },
+      { id: 'B8',  type: 'value', value: 300,   format: 'currency' },
+      { id: 'A9',  type: 'value', value: '@i18n:wsTplRentEsperada' },
+      { id: 'B9',  type: 'value', value: 4,     format: 'number' },
+      { id: 'A11', type: 'value',   value: '@i18n:wsTplGap' },
+      { id: 'B11', type: 'formula', formula: '=MAX(0,B6-B7)', format: 'currency' },
+      { id: 'A12', type: 'value',   value: '@i18n:wsTplTiempoEstimado' },
+      { id: 'B12', type: 'formula', formula: '=ROUND(MAX(0,B6-B7)/B8,0)', format: 'integer' },
+      { id: 'A13', type: 'value',   value: '@i18n:wsTplAportNecesaria' },
+      { id: 'B13', type: 'formula', formula: '=ROUND(MAX(0,B6-B7)/60,0)', format: 'currency' },
+      { id: 'A14', type: 'value',   value: '@i18n:wsTplProyeccion' },
+      { id: 'B14', type: 'formula', formula: '=ROUND(B7*POW(1+B9/100,5),0)', format: 'currency' },
+      { id: 'A16', type: 'value',   value: '@i18n:wsTplSimDisclaimer' },
+    ],
+  },
 ];
 
 // PR-WP6D: localized display helpers for the template selector + confirm
@@ -26584,7 +26758,7 @@ function _wp4ConfirmAndApply(template) {
     const raw = (typeof window !== 'undefined' && window.prompt)
       ? window.prompt(promptMsg, 'TSLA')
       : 'TSLA';
-    if (raw == null) return;       // user cancelled the prompt
+    if (raw == null) return false;       // user cancelled the prompt
     ticker = String(raw).trim().toUpperCase() || 'TSLA';
   }
   // PR-WP6D: only confirm when the user has actually touched the workspace
@@ -26596,9 +26770,9 @@ function _wp4ConfirmAndApply(template) {
       ? fn(_wp4TemplateName(template))
       : `Apply "${_wp4TemplateName(template)}"? This replaces current workspace cells (system seeds preserved).`;
     const ok = window.confirm(msg);
-    if (!ok) return;
+    if (!ok) return false;
   }
-  _wp4ApplyTemplate(template, ticker);
+  return _wp4ApplyTemplate(template, ticker);
 }
 
 function _wp4OpenSelector(anchor) {
@@ -26683,6 +26857,31 @@ document.addEventListener('click', (e) => {
   e.stopPropagation();
   if (_WP4.menuEl) _wp4CloseSelector();
   else              _wp4OpenSelector(btn);
+});
+
+// WS.1 — apply a premium planning template from the Templates tab card.
+// Reuses _wp4ConfirmAndApply (confirm-if-touched gate) and, on success,
+// navigates to the Sheet + shows a brief "Plantilla aplicada" toast.
+function _wsApplyTemplateFromTab(id) {
+  const tpl = (Array.isArray(_WP4_TEMPLATES)) ? _WP4_TEMPLATES.find(x => x.id === id) : null;
+  if (!tpl) return;
+  const applied = _wp4ConfirmAndApply(tpl);   // false if the user cancelled
+  if (!applied) return;
+  if (typeof _wsSetMode === 'function') _wsSetMode('sheet');
+  if (typeof renderWorkspace === 'function') renderWorkspace();
+  try {
+    if (typeof _aurixShowToast === 'function') {
+      _aurixShowToast(t('ws_tpl_applied') || 'Plantilla aplicada', { variant: 'success' });
+    }
+  } catch (_) {}
+}
+document.addEventListener('click', (e) => {
+  if (typeof currentTab !== 'string' || currentTab !== 'workspace') return;
+  const card = e.target.closest && e.target.closest('[data-ws-apply-tpl]');
+  if (!card) return;
+  e.preventDefault();
+  e.stopPropagation();
+  _wsApplyTemplateFromTab(card.getAttribute('data-ws-apply-tpl'));
 });
 
 // WORKSPACE-WEB-MODES-1 — top mode switcher click. Document-level so it
