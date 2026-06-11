@@ -30185,10 +30185,12 @@ function _aurixHealthSnapshot() {
   // only (real estate lives in its own card/category). Shadowing `assets` with the
   // investable subset makes EVERY loop, count and guard below operate on investable
   // wealth, so liquidity/concentration/diversification/exposure are never distorted
-  // by a dominant property — and real estate can never surface here (the reUSD loop
-  // finds none → realEstatePct → 0, so the RE-aware branches downstream stay inert).
+  // by a dominant property. EXCEPTION (WE.1): the realEstatePct / liquidUSD / liquidPct
+  // block below intentionally steps OUTSIDE this investable shadow — it reads real
+  // estate from the full active set and divides by TOTAL wealth, because property
+  // weight is only meaningful against total patrimony, not the investable subset.
   // totalValueUSD/getDistribution (total) are untouched globally; here we read the
-  // investable equivalents.
+  // investable equivalents for everything except that RE block.
   const assets = (typeof investableAssets === 'function') ? investableAssets() : [];
   if (!Array.isArray(assets) || assets.length === 0) return out;
   const totUSD = (typeof investableValueUSD === 'function') ? investableValueUSD() : 0;
@@ -30196,17 +30198,29 @@ function _aurixHealthSnapshot() {
   out.assetCount = assets.length;
   if (totUSD <= 0) return out;
 
-  // REAL-ESTATE-INTEL: compute property USD weight + liquid net worth
-  // before the rest of the snapshot so other heuristics can read them.
+  // REAL-ESTATE-INTEL: property weight + liquid net worth, measured against
+  // TOTAL wealth (RE + investable) — the insight reads "inmuebles representan
+  // el X% de tu patrimonio".
+  // WE.1 (parity-safe fix): `assets`/`totUSD` above are the INVESTABLE shadow
+  // (real estate excluded), so the previous `for (a of assets)` loop could
+  // never see a real_estate asset → reUSD was always 0 → realEstatePct stuck
+  // at 0 and the RE-aware intelligence branch (realEstatePct >= 70) never
+  // fired. Read real estate from the full active set and divide by TOTAL wealth
+  // so the % is real. Note total = investable + real_estate (isInvestableAsset
+  // excludes only real_estate), so liquidUSD collapses back to the investable
+  // total — internally consistent. No displayed Dashboard figure changes; this
+  // only un-sticks a 0 the intelligence layer was designed to consume.
   let reUSD = 0;
-  for (const a of assets) {
+  const _allActiveAssets = (typeof activeAssets === 'function') ? activeAssets() : [];
+  for (const a of _allActiveAssets) {
     if (!a || a.type !== 'real_estate') continue;
     const v = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : 0;
     if (Number.isFinite(v) && v > 0) reUSD += v;
   }
-  out.realEstatePct = Math.round((reUSD / totUSD) * 100);
-  out.liquidUSD     = Math.max(0, totUSD - reUSD);
-  out.liquidPct     = Math.round((out.liquidUSD / totUSD) * 100);
+  const _totalWealthUSD = (typeof totalValueUSD === 'function') ? totalValueUSD() : (totUSD + reUSD);
+  out.realEstatePct = _totalWealthUSD > 0 ? Math.round((reUSD / _totalWealthUSD) * 100) : 0;
+  out.liquidUSD     = Math.max(0, _totalWealthUSD - reUSD);
+  out.liquidPct     = _totalWealthUSD > 0 ? Math.round((out.liquidUSD / _totalWealthUSD) * 100) : 0;
 
   // Top single asset (by value) + best/worst 24h change pass.
   let topUsd = -1;
