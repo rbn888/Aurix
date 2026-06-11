@@ -4181,6 +4181,11 @@ function convertToNewModel(flatAssets) {
     goldUnit:      a.goldUnit   ?? null,
     isin:          a.isin       ?? null,
     rent:          a.rent       ?? null,
+    // WL.1 (Fase 2 — Wealth Location): optional { type, provider, label }.
+    // Pure metadata — no financial calc reads it; persisted (local + remote
+    // via the catalog jsonb, no schema change) so it round-trips and is ready
+    // for the WL.2 capture UI. null = unassigned.
+    location:      a.location   ?? null,
     price_source:  inferPriceSource(a),
     provider_id:   inferProviderId(a),
   }));
@@ -4232,6 +4237,7 @@ function convertFromNewToFlat(catalogAssets, holdings) {
       goldUnit:      asset.goldUnit   ?? null,
       isin:          asset.isin       ?? null,
       rent:          asset.rent       ?? null,
+      location:      asset.location   ?? null,   // WL.1: round-trip Wealth Location metadata
     };
   }).filter(Boolean);
 }
@@ -5006,6 +5012,26 @@ function _aurixCategoryBucket(asset) {
   if (t === 'real_estate')                  return 'real_estate';
   if (t === 'cash')                         return 'liquidity';
   return 'other';
+}
+
+// WL.1 (Fase 2 — Wealth Location) ── canonical location taxonomy + grouping key.
+// Headless foundation: defines WHERE wealth is held (bank/broker/exchange/wallet/
+// custodian/other). Pure metadata — never enters a financial calculation. The
+// capture UI + "¿dónde está mi patrimonio?" view land in WL.2.
+const _AURIX_LOCATION_TYPES = Object.freeze(['bank', 'broker', 'exchange', 'wallet', 'custodian', 'other']);
+
+// Stable grouping key for an asset's location. Prefers the concrete provider
+// (e.g. 'kraken', 'santander'), falls back to the location type, then to
+// 'unassigned' when no location is set. Casing-normalised so it never splits a
+// group on capitalisation (same discipline as _aurixCategoryBucket).
+function _aurixLocationKey(asset) {
+  const loc = asset && asset.location;
+  if (!loc || typeof loc !== 'object') return 'unassigned';
+  const provider = typeof loc.provider === 'string' ? loc.provider.trim().toLowerCase() : '';
+  if (provider) return provider;
+  const type = typeof loc.type === 'string' ? loc.type.trim().toLowerCase() : '';
+  if (type && _AURIX_LOCATION_TYPES.indexOf(type) !== -1) return type;
+  return 'unassigned';
 }
 
 function recordCategorySnapshot() {
@@ -10761,6 +10787,35 @@ function getInvestableDistribution(opts) {
       valueBase: toBase(valueUSD, 'USD'),
       pct:       (nonInvestable || invUSD <= 0) ? 0 : (valueUSD / invUSD) * 100,
       nonInvestable,
+    }));
+}
+
+// WL.1 (Fase 2 — Wealth Location) ── distribution of TOTAL wealth by location.
+// Mirrors getDistribution() exactly (same denominator = totalValueUSD, same
+// value primitive = assetValueUSD, same shape) but groups by _aurixLocationKey
+// instead of asset type. Headless: nothing renders this yet — it's the data
+// pipe the WL.2 "¿dónde está mi patrimonio?" view will consume. Returns null on
+// empty portfolio. Assets with no location collapse into the 'unassigned' key.
+// No financial figure changes anywhere; this is a NEW read-only aggregator.
+function getLocationDistribution() {
+  const totUSD = totalValueUSD();
+  if (totUSD <= 0) return null;
+
+  const groups = {};
+  assets.forEach(a => {
+    const valUSD = assetValueUSD(a);
+    if (!Number.isFinite(valUSD) || valUSD <= 0) return;
+    const key   = _aurixLocationKey(a);
+    groups[key] = (groups[key] || 0) + valUSD;
+  });
+
+  return Object.entries(groups)
+    .filter(([, v]) => v > 0)
+    .sort(([, a], [, b]) => b - a)
+    .map(([key, valueUSD]) => ({
+      key,
+      valueBase: toBase(valueUSD, 'USD'),
+      pct:       (valueUSD / totUSD) * 100,
     }));
 }
 
