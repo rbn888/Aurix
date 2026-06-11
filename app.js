@@ -1456,32 +1456,13 @@ const T = {
     empty_watchlist_cta:    'Explorar activos',
     market_no_results: 'Sin resultados',
     stale:             'sin actualizar',
-    // Metrics placeholder
-    metrics_badge:     'Próximamente',
-    metrics_title:     'Métricas avanzadas',
-    metrics_subtitle:  'Inteligencia de mercado de próxima generación',
-    metrics_microcopy: 'Estamos construyendo herramientas avanzadas de análisis institucional para Aurix.',
-    metrics_f1:        'Mapas de liquidación',
-    metrics_f1_desc:   'Zonas de liquidación forzada en tiempo real entre exchanges.',
-    metrics_f2:        'Sentimiento de mercado',
-    metrics_f2_desc:   'Señales agregadas alcistas y bajistas del comportamiento del mercado.',
-    metrics_f3:        'Señales macro',
-    metrics_f3_desc:   'Indicadores top-down que conectan el contexto macro con tu cartera.',
-    metrics_f4:        'Flujos cross-asset',
-    metrics_f4_desc:   'Hacia dónde rota el capital entre crypto, renta variable y materias.',
-    metrics_f5:        'Regímenes de volatilidad',
-    metrics_f5_desc:   'Detección del régimen de volatilidad para cada clase de activo.',
-    metrics_f6:        'Monitor de riesgo inteligente',
-    metrics_f6_desc:   'Alertas en vivo de exposición y concentración de cartera.',
     // Navigation labels (desktop header tabs)
     navDashboard:      'Panel',
     navMarket:         'Mercado',
-    navMetrics:        'Métricas',
     navIntelligence:   'Intelligence',
     navWorkspace:      'Workspace',
     // Tooltips (bottom nav)
     tipSearch:         'Buscar',
-    tipMetrics:        'Métricas',
     tipIntelligence:   'Intelligence',
     tipWorkspace:      'Workspace',
     // ARIA labels
@@ -1527,6 +1508,7 @@ const T = {
     pctOfPortfolio:    ' de la cartera',
     // Watchlist empty
     watchlistEmpty:    'No hay activos en seguimiento',
+    watchlistSuggestions: 'Sugerencias',
     // Status pills
     statusOpen:        'Abierto',
     statusClosed:      'Cerrado',
@@ -2674,32 +2656,13 @@ const T = {
     empty_watchlist_cta:    'Explore assets',
     market_no_results: 'No results',
     stale:             'stale data',
-    // Metrics placeholder
-    metrics_badge:     'Coming Soon',
-    metrics_title:     'Advanced Metrics',
-    metrics_subtitle:  'Next-generation market intelligence',
-    metrics_microcopy: "We're building advanced institutional-grade analytics for Aurix.",
-    metrics_f1:        'Liquidation Heatmaps',
-    metrics_f1_desc:   'Real-time forced-liquidation zones across major exchanges.',
-    metrics_f2:        'Market Sentiment',
-    metrics_f2_desc:   'Aggregated bullish and bearish signals from market behaviour.',
-    metrics_f3:        'Macro Signals',
-    metrics_f3_desc:   'Top-down indicators linking the macro context to your portfolio.',
-    metrics_f4:        'Cross-Asset Flows',
-    metrics_f4_desc:   'Where capital is rotating between crypto, equities and commodities.',
-    metrics_f5:        'Volatility Regimes',
-    metrics_f5_desc:   'Volatility regime detection across every asset class you hold.',
-    metrics_f6:        'Smart Risk Monitoring',
-    metrics_f6_desc:   'Live exposure and concentration alerts for your portfolio.',
     // Navigation labels (desktop header tabs)
     navDashboard:      'Dashboard',
     navMarket:         'Market',
-    navMetrics:        'Metrics',
     navIntelligence:   'Intelligence',
     navWorkspace:      'Workspace',
     // Tooltips (bottom nav)
     tipSearch:         'Search',
-    tipMetrics:        'Metrics',
     tipIntelligence:   'Intelligence',
     tipWorkspace:      'Workspace',
     // ARIA labels
@@ -2745,6 +2708,7 @@ const T = {
     pctOfPortfolio:    ' of portfolio',
     // Watchlist empty
     watchlistEmpty:    'No assets being tracked',
+    watchlistSuggestions: 'Suggestions',
     // Status pills
     statusOpen:        'Open',
     statusClosed:      'Closed',
@@ -10763,28 +10727,41 @@ function getInvestableDistribution(opts) {
   const includeNonInvestable = !!(opts && opts.includeNonInvestable);
   const invUSD = investableValueUSD();
 
-  const groups = {};
+  // LR.3 (B): the non-investable (real_estate) decision now routes through the
+  // SAME canonical predicate the hero uses — isInvestableAsset (→ category
+  // bucket, casing-normalised) — instead of an inline `type === 'real_estate'`
+  // string compare on the display key. For normal assets this is identical
+  // output (figures unchanged); it only corrects the audited edge case where a
+  // real-estate asset whose `type` casing didn't match the literal slipped into
+  // the donut numerator but was excluded from the hero denominator (donut and
+  // hero disagreeing on what counts as inmueble).
+  const groups    = {};   // investable assets, grouped by display key
+  const nonInvest = {};   // non-investable (real_estate) assets, by display key
   assets.forEach(a => {
     const valUSD = assetValueUSD(a);
     const key    = TYPE_META[a.type] ? a.type : 'other';
-    groups[key]  = (groups[key] || 0) + valUSD;
+    if (isInvestableAsset(a)) groups[key]    = (groups[key]    || 0) + valUSD;
+    else                      nonInvest[key] = (nonInvest[key] || 0) + valUSD;
   });
 
-  let entries = Object.entries(groups).filter(([, v]) => v > 0);
-  if (!includeNonInvestable) entries = entries.filter(([type]) => type !== 'real_estate');
+  let entries = Object.entries(groups)
+    .filter(([, v]) => v > 0)
+    .map(([type, valueUSD]) => ({ type, valueUSD, nonInvestable: false }));
+  if (includeNonInvestable) {
+    Object.entries(nonInvest)
+      .filter(([, v]) => v > 0)
+      .forEach(([type, valueUSD]) => entries.push({ type, valueUSD, nonInvestable: true }));
+  }
   if (!entries.length) return null;
 
   return entries
-    .sort(([, a], [, b]) => b - a)
-    .map(([type, valueUSD]) => {
-      const nonInvestable = (type === 'real_estate');
-      return {
-        type,
-        valueBase: toBase(valueUSD, 'USD'),
-        pct:       (nonInvestable || invUSD <= 0) ? 0 : (valueUSD / invUSD) * 100,
-        nonInvestable,
-      };
-    });
+    .sort((a, b) => b.valueUSD - a.valueUSD)
+    .map(({ type, valueUSD, nonInvestable }) => ({
+      type,
+      valueBase: toBase(valueUSD, 'USD'),
+      pct:       (nonInvestable || invUSD <= 0) ? 0 : (valueUSD / invUSD) * 100,
+      nonInvestable,
+    }));
 }
 
 // Lighten a hex color by a multiplier (e.g. 1.18 = 18% brighter)
@@ -20196,42 +20173,10 @@ function switchView(view) {
   }
 }
 
-// Premium "coming soon" surface for the Metrics tab. Presentation only —
-// no fetching, no live data. Communicates product vision while the real
-// metrics module is being built.
-function renderMetricsPlaceholder() {
-  const features = [
-    { glyph: '<rect x="4" y="4" width="5" height="5" rx="1"/><rect x="11" y="4" width="5" height="5" rx="1"/><rect x="18" y="4" width="2" height="5" rx="1"/><rect x="4" y="11" width="5" height="5" rx="1"/><rect x="11" y="11" width="5" height="5" rx="1"/><rect x="4" y="18" width="5" height="2" rx="1"/>' },
-    { glyph: '<path d="M4 16l5-5 4 3 7-8"/><path d="M20 6v4h-4"/>' },
-    { glyph: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18"/>' },
-    { glyph: '<path d="M4 8h12"/><path d="M13 5l3 3-3 3"/><path d="M20 16H8"/><path d="M11 13l-3 3 3 3"/>' },
-    { glyph: '<path d="M3 16l4-8 4 6 4-10 4 8 2-3"/>' },
-    { glyph: '<path d="M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6l8-3z"/>' },
-  ];
-  const cards = features.map((f, i) => `
-    <article class="metrics-feature-card">
-      <div class="metrics-feature-glyph">
-        <svg viewBox="0 0 24 24" aria-hidden="true">${f.glyph}</svg>
-      </div>
-      <h3 class="metrics-feature-title">${t('metrics_f' + (i + 1))}</h3>
-      <p class="metrics-feature-desc">${t('metrics_f' + (i + 1) + '_desc')}</p>
-    </article>
-  `).join('');
-  return `
-    <section class="metrics-screen">
-      <header class="metrics-hero">
-        <span class="metrics-badge">
-          <span class="metrics-badge-dot"></span>
-          <span>${t('metrics_badge')}</span>
-        </span>
-        <h1 class="metrics-title">${t('metrics_title')}</h1>
-        <p class="metrics-subtitle">${t('metrics_subtitle')}</p>
-        <p class="metrics-microcopy">${t('metrics_microcopy')}</p>
-      </header>
-      <div class="metrics-feature-grid">${cards}</div>
-    </section>
-  `;
-}
+// LR.3 (J): the legacy Metrics "coming soon" placeholder (renderMetricsPlaceholder)
+// and its metrics_* copy were removed with the IA.1 nav refactor — the Metrics
+// tab no longer exists (any legacy 'metrics' deep-link aliases to Intelligence in
+// _applyTab/switchTab), so the surface was dead code with no caller.
 
 // AURIX-PREMIUM-MOTION-1 — premium main-tab content transition.
 // switchTab() now wraps the original swap (_applyTab) in a subtle
@@ -27919,16 +27864,29 @@ const marketStore = (() => {
       return;
     }
 
-    // Skip rebuild if structure is identical — animation loop keeps prices live
-    const keys = top.map(r => r.key);
+    // Skip rebuild if structure is identical — animation loop keeps prices live.
+    // LR.3 (H): the seeded "Sugerencia" tag now depends on source, so the skip
+    // signature includes seeded state too — otherwise a seeded→owned transition
+    // (user buys a watchlisted symbol) would leave a stale tag until the next
+    // structural change.
+    const sig  = top.map(r => r.key + (r.source && r.source !== 'owned' ? ':s' : ':o'));
     const rows = [...content.querySelectorAll('.watchlist-row[data-key]')];
-    if (rows.length === top.length && keys.every((k, i) => k === rows[i]?.dataset.key)) return;
+    if (rows.length === top.length &&
+        sig.every((s, i) => s === (rows[i]?.dataset.key + (rows[i]?.classList.contains('seeded') ? ':s' : ':o')))) return;
 
     const html = top.map(r => {
       const pd    = marketStore.getPrice(r.key);
       const price = pd?.display ?? pd?.price ?? r.price;
-      return '<div class="watchlist-row" data-key="' + r.key + '">' +
-        '<span class="watchlist-sym">' + r.key + '</span>' +
+      // LR.3 (H): seeded/curated markets (source !== 'owned') carry a quiet
+      // "Sugerencia" tag so they never read as positions the user owns. The
+      // symbol + tag stay inside a single grid cell so the row layout (sym /
+      // spark / price) is unchanged. Presentation only.
+      const seeded  = (r.source && r.source !== 'owned');
+      const symCell = seeded
+        ? '<span class="watchlist-sym">' + r.key + '<span class="watchlist-seed-tag">' + t('watchlistSuggestions') + '</span></span>'
+        : '<span class="watchlist-sym">' + r.key + '</span>';
+      return '<div class="watchlist-row' + (seeded ? ' seeded' : '') + '" data-key="' + r.key + '">' +
+        symCell +
         '<canvas class="watchlist-spark placeholder" data-key="' + r.key + '"></canvas>' +
         '<span class="watchlist-price" data-key="' + r.key + '">' + (price ? formatBase(price) : '—') + '</span>' +
       '</div>';
@@ -27979,7 +27937,11 @@ function _wlRenderBody() {
   if (tracked.length === 0) {
     body.innerHTML = '<div class="watchlist-modal-empty">' + t('watchlistEmpty') + '</div>';
   } else {
-    body.innerHTML = tracked.map(r => {
+    // LR.3 (H): a single row renderer reused for both groups. Owned positions
+    // render on top unlabelled; seeded/curated markets (source !== 'owned')
+    // render below a "Sugerencias" divider so they never read as the user's
+    // own holdings. Presentation only — no change to which keys are tracked.
+    const _wlRow = (r) => {
       const key       = r.key;
       const pd        = marketStore.getPrice(key);
       const rawPrice  = pd?.display ?? pd?.price ?? r.price;
@@ -27989,13 +27951,20 @@ function _wlRenderBody() {
         ? '<button class="remove-btn" data-key="' + key + '">✕</button>'
         : '';
       const typeAttr  = r.type ? ' data-type="' + r.type + '"' : '';
-      return '<div class="watchlist-modal-row' + editClass + '" data-key="' + key + '"' + typeAttr + '>' +
+      const seedClass = (r.source && r.source !== 'owned') ? ' seeded' : '';
+      return '<div class="watchlist-modal-row' + editClass + seedClass + '" data-key="' + key + '"' + typeAttr + '>' +
         '<span class="watchlist-modal-sym">'   + (r.sym  || key) + '</span>' +
         '<span class="watchlist-modal-name">'  + (r.name || '')  + '</span>' +
         '<span class="watchlist-modal-price">' + price            + '</span>' +
         removeBtn +
       '</div>';
-    }).join('');
+    };
+    let _wlHtml = owned.map(_wlRow).join('');
+    if (virtuals.length) {
+      _wlHtml += '<div class="watchlist-modal-section">' + t('watchlistSuggestions') + '</div>';
+      _wlHtml += virtuals.map(_wlRow).join('');
+    }
+    body.innerHTML = _wlHtml;
 
     // Animate newly added row
     if (_wlLastAdded) {

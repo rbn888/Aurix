@@ -199,6 +199,18 @@
       letter-spacing: 0.01em;
     }
 
+    /* OTP destination email — surfaced before the code field so a typo in
+       the email is caught before the user waits for a code that won't come. */
+    .otp-dest {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-bright);
+      text-align: center;
+      letter-spacing: 0.01em;
+      word-break: break-all;
+      margin: -4px 0 2px;
+    }
+
     /* ── Submit button ── */
     .auth-btn {
       width: 100%;
@@ -264,7 +276,7 @@
 
     <div class="beta-card">
       <div class="beta-access-label">Acceso privado</div>
-      <p class="beta-hint">Introduce tu código de invitación</p>
+      <p class="beta-hint">Aurix se encuentra actualmente en beta privada. Introduce tu código de invitación para continuar.</p>
 
       <!-- Invite gate -->
       <div class="invite-section">
@@ -291,7 +303,8 @@
       <!-- OTP step (shown after email is sent) -->
       <div id="otpSection" class="auth-section" style="display:none">
         <h2 class="auth-title">Verificar código</h2>
-        <p class="otp-hint">Introduce el código de acceso enviado a tu email</p>
+        <p class="otp-hint">Estamos enviando el código de acceso a:</p>
+        <p class="otp-dest" id="otpDestEmail"></p>
         <input id="otp-code" type="text" inputmode="numeric" pattern="[0-9]*"
                class="auth-input otp-input" placeholder="00000000"
                maxlength="8" autocomplete="one-time-code">
@@ -553,6 +566,14 @@
       otpStep = true;
       authSection.style.display = 'none';
       otpSection.style.display  = 'flex';
+      // F (LR.3): show the destination email so a typo is caught before the
+      // user waits for a code that will never arrive. textContent avoids any
+      // markup injection from the address. Falls back to the email field.
+      const _destEl = document.getElementById('otpDestEmail');
+      if (_destEl) {
+        _destEl.textContent =
+          (localStorage.getItem('aurix_otp_email') || (emailEl && emailEl.value.trim()) || '');
+      }
       otpCodeEl.value            = '';
       otpErrorEl.innerText       = '';
       otpSubmitBtn.disabled      = true;
