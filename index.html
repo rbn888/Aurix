@@ -951,6 +951,38 @@
           <div class="form-group" id="qtyGroup" style="display:none">
             <label for="assetQty" id="qtyLabel" data-i18n="qty">Cantidad</label>
             <input type="text" inputmode="decimal" id="assetQty" placeholder="0" autocomplete="off">
+
+            <!-- WL.2 (Fase 2 — Wealth Location): optional location/custodian.
+                 Nested inside #qtyGroup so it shares its show/hide. Pure
+                 metadata — never affects valuation. -->
+            <div class="wl-loc-field">
+              <label for="assetLocationType" class="wl-loc-field-label" data-i18n="wlLocLabel">Ubicación / custodio (opcional)</label>
+              <div class="wl-loc-field-inputs">
+                <select id="assetLocationType" class="wl-loc-field-type">
+                  <option value="" data-i18n="wlLocTypeNone">Tipo…</option>
+                  <option value="broker" data-i18n="wlLocTypeBroker">Broker</option>
+                  <option value="exchange" data-i18n="wlLocTypeExchange">Exchange</option>
+                  <option value="wallet" data-i18n="wlLocTypeWallet">Wallet</option>
+                  <option value="bank" data-i18n="wlLocTypeBank">Banco</option>
+                  <option value="custodian" data-i18n="wlLocTypeCustodian">Custodio</option>
+                  <option value="other" data-i18n="wlLocTypeOther">Otro</option>
+                </select>
+                <input type="text" id="assetLocationProvider" class="wl-loc-field-provider"
+                       list="assetLocationProviders" autocomplete="off"
+                       placeholder="Nombre (ej. Interactive Brokers)" data-i18n-placeholder="wlLocProviderPh">
+                <datalist id="assetLocationProviders">
+                  <option value="Interactive Brokers"></option>
+                  <option value="Trade Republic"></option>
+                  <option value="Kraken"></option>
+                  <option value="Binance"></option>
+                  <option value="Coinbase"></option>
+                  <option value="Santander"></option>
+                  <option value="BBVA"></option>
+                  <option value="Ledger"></option>
+                  <option value="Wallet propia"></option>
+                </datalist>
+              </div>
+            </div>
           </div>
 
           <div class="form-preview" id="formPreview" style="display:none">

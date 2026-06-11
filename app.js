@@ -1509,6 +1509,20 @@ const T = {
     // Watchlist empty
     watchlistEmpty:    'No hay activos en seguimiento',
     watchlistSuggestions: 'Sugerencias',
+    // WL.2 — Wealth Location (Fase 2)
+    wlLocLabel:        'Ubicación / custodio (opcional)',
+    wlLocProviderPh:   'Nombre (ej. Interactive Brokers)',
+    wlLocTypeNone:     'Tipo…',
+    wlLocTypeBroker:   'Broker',
+    wlLocTypeExchange: 'Exchange',
+    wlLocTypeWallet:   'Wallet',
+    wlLocTypeBank:     'Banco',
+    wlLocTypeCustodian:'Custodio',
+    wlLocTypeOther:    'Otro',
+    wlLocCardTitle:    'Dónde está tu patrimonio',
+    wlLocCardSubtitle: 'Distribución por custodio, broker, exchange o wallet.',
+    wlLocEmpty:        'Añade ubicación a tus activos para ver esta distribución.',
+    wlLocUnassigned:   'Sin ubicación',
     // Status pills
     statusOpen:        'Abierto',
     statusClosed:      'Cerrado',
@@ -2709,6 +2723,20 @@ const T = {
     // Watchlist empty
     watchlistEmpty:    'No assets being tracked',
     watchlistSuggestions: 'Suggestions',
+    // WL.2 — Wealth Location (Fase 2)
+    wlLocLabel:        'Location / custodian (optional)',
+    wlLocProviderPh:   'Name (e.g. Interactive Brokers)',
+    wlLocTypeNone:     'Type…',
+    wlLocTypeBroker:   'Broker',
+    wlLocTypeExchange: 'Exchange',
+    wlLocTypeWallet:   'Wallet',
+    wlLocTypeBank:     'Bank',
+    wlLocTypeCustodian:'Custodian',
+    wlLocTypeOther:    'Other',
+    wlLocCardTitle:    'Where your wealth is held',
+    wlLocCardSubtitle: 'Distribution by custodian, broker, exchange or wallet.',
+    wlLocEmpty:        'Add a location to your assets to see this distribution.',
+    wlLocUnassigned:   'Unassigned',
     // Status pills
     statusOpen:        'Open',
     statusClosed:      'Closed',
@@ -5032,6 +5060,81 @@ function _aurixLocationKey(asset) {
   const type = typeof loc.type === 'string' ? loc.type.trim().toLowerCase() : '';
   if (type && _AURIX_LOCATION_TYPES.indexOf(type) !== -1) return type;
   return 'unassigned';
+}
+
+// WL.2 ── human label for a location type (i18n). Empty string for unknown.
+function _wlTypeLabel(type) {
+  const map = {
+    bank: 'wlLocTypeBank', broker: 'wlLocTypeBroker', exchange: 'wlLocTypeExchange',
+    wallet: 'wlLocTypeWallet', custodian: 'wlLocTypeCustodian', other: 'wlLocTypeOther',
+  };
+  const k = map[String(type || '').toLowerCase()];
+  return k ? t(k) : '';
+}
+
+// WL.2 ── read the optional location/custodian fields from the add/edit modal.
+// Returns { type?, provider? } or null when the user left both blank (so add
+// stays frictionless and existing locations are conserved on a buy-more edit).
+function _wlReadLocationForm() {
+  const typeEl = document.getElementById('assetLocationType');
+  const provEl = document.getElementById('assetLocationProvider');
+  const type     = typeEl ? String(typeEl.value || '').trim().toLowerCase() : '';
+  const provider = provEl ? String(provEl.value || '').trim() : '';
+  if (!type && !provider) return null;
+  const loc = {};
+  if (type && _AURIX_LOCATION_TYPES.indexOf(type) !== -1) loc.type = type;
+  if (provider) loc.provider = provider;
+  return Object.keys(loc).length ? loc : null;
+}
+
+// WL.2 ── reset the modal's location fields (called on open so a prior entry
+// never leaks into the next asset).
+function _wlResetLocationForm() {
+  const typeEl = document.getElementById('assetLocationType');
+  const provEl = document.getElementById('assetLocationProvider');
+  if (typeEl) typeEl.value = '';
+  if (provEl) provEl.value = '';
+}
+
+// WL.2 ── "Dónde está tu patrimonio" card for the Intelligence surface.
+// Pure presentation over getLocationDistribution(); no calc, no scoring. Shows
+// an empty state until the user assigns at least one location. Used by both the
+// desktop exec layout and the mobile cockpit (responsive via CSS).
+function _renderWealthLocationCard() {
+  const dist = (typeof getLocationDistribution === 'function') ? getLocationDistribution() : null;
+  const assigned = Array.isArray(dist) ? dist.filter(d => d.key !== 'unassigned') : [];
+  let body;
+  if (!assigned.length) {
+    body = `<p class="wl-loc-empty">${_escapeWorkspaceText(t('wlLocEmpty'))}</p>`;
+  } else {
+    const rows = dist.map(d => {
+      const isUn      = d.key === 'unassigned';
+      const name      = isUn ? t('wlLocUnassigned') : (d.label || _wlTypeLabel(d.type) || d.key);
+      const typeLabel = (!isUn && d.type) ? _wlTypeLabel(d.type) : '';
+      const pct       = Math.round(d.pct);
+      const val       = (typeof formatBase === 'function') ? formatBase(d.valueBase) : '';
+      const barPct    = Math.max(2, Math.min(100, Math.round(d.pct)));
+      return `
+        <div class="wl-loc-row${isUn ? ' is-unassigned' : ''}">
+          <div class="wl-loc-row-top">
+            <span class="wl-loc-row-name">${_escapeWorkspaceText(name)}</span>
+            ${typeLabel ? `<span class="wl-loc-row-type">${_escapeWorkspaceText(typeLabel)}</span>` : ''}
+            <span class="wl-loc-row-pct">${pct}%</span>
+          </div>
+          <div class="wl-loc-row-track" aria-hidden="true"><span class="wl-loc-row-bar" style="width:${barPct}%"></span></div>
+          <span class="wl-loc-row-val">${_escapeWorkspaceText(val)}</span>
+        </div>`;
+    }).join('');
+    body = `<div class="wl-loc-rows">${rows}</div>`;
+  }
+  return `
+    <section class="wl-loc-card">
+      <header class="wl-loc-head">
+        <h3 class="wl-loc-title">${_escapeWorkspaceText(t('wlLocCardTitle'))}</h3>
+        <p class="wl-loc-sub">${_escapeWorkspaceText(t('wlLocCardSubtitle'))}</p>
+      </header>
+      ${body}
+    </section>`;
 }
 
 function recordCategorySnapshot() {
@@ -9267,6 +9370,7 @@ function _renderWorkspaceIntelligenceMode() {
       ${_renderExecHeroBand(intel)}
       ${_renderExecDimensions(intel)}
       ${_renderExecSignals(intel)}
+      ${_renderWealthLocationCard()}
     </main>
   `;
 }
@@ -9617,6 +9721,7 @@ function _renderWorkspaceMobile(sheet) {
       ${_renderIntelHeroHtml(intel)}
       ${_renderIntelDimensionsHtml(intel)}
       ${_renderIntelSignalsHtml(intel)}
+      ${_renderWealthLocationCard()}
     </div>
   `;
 }
@@ -10802,11 +10907,19 @@ function getLocationDistribution() {
   if (totUSD <= 0) return null;
 
   const groups = {};
+  const meta   = {};   // key → { type, label } captured from the first asset of the group
   assets.forEach(a => {
     const valUSD = assetValueUSD(a);
     if (!Number.isFinite(valUSD) || valUSD <= 0) return;
     const key   = _aurixLocationKey(a);
     groups[key] = (groups[key] || 0) + valUSD;
+    if (!meta[key]) {
+      const loc = (a && a.location && typeof a.location === 'object') ? a.location : null;
+      const label = loc && typeof loc.label === 'string' && loc.label.trim()
+        ? loc.label.trim()
+        : (loc && typeof loc.provider === 'string' && loc.provider.trim() ? loc.provider.trim() : null);
+      meta[key] = { type: (loc && typeof loc.type === 'string') ? loc.type : null, label };
+    }
   });
 
   return Object.entries(groups)
@@ -10814,6 +10927,8 @@ function getLocationDistribution() {
     .sort(([, a], [, b]) => b - a)
     .map(([key, valueUSD]) => ({
       key,
+      type:      meta[key] ? meta[key].type  : null,
+      label:     meta[key] ? meta[key].label : null,
       valueBase: toBase(valueUSD, 'USD'),
       pct:       (valueUSD / totUSD) * 100,
     }));
@@ -22264,6 +22379,9 @@ function openModal(opts) {
   // liquidity flow so state from one intent can never bleed into the
   // other (e.g. user opens liquidity, closes mid-input, opens asset).
   _modalContext = 'asset';
+  // WL.2: clear any location/custodian left from a previous add so it never
+  // bleeds into the next asset. Pre-fill on edit is handled at the call site.
+  try { _wlResetLocationForm(); } catch (_) {}
   try {
     if (typeof liquidityOverlay !== 'undefined' && liquidityOverlay &&
         liquidityOverlay.classList.contains('open')) {
@@ -22882,6 +23000,12 @@ document.getElementById('manualPrice')?.addEventListener('input', updatePreview)
 assetForm.addEventListener('submit', e => {
   e.preventDefault();
 
+  // WL.2 (Fase 2 — Wealth Location): read the optional location/custodian once
+  // so every add/buy/edit branch below can stamp it. null when left blank →
+  // new assets persist no location, and a buy-more edit conserves the existing
+  // asset.location instead of wiping it. Pure metadata; never affects valuation.
+  const _newLoc = (typeof _wlReadLocationForm === 'function') ? _wlReadLocationForm() : null;
+
   // GOLD-UX-2: defensive guard. The CTA is disabled when the gold
   // flow is incomplete, but if a future tweak (or dev tools) enables
   // it, we still short-circuit here so the form can never persist a
@@ -22942,6 +23066,7 @@ assetForm.addEventListener('submit', e => {
         existing.rent          = rent;
         existing.assetCurrency = rePendingCurrency;
         existing.costBasis     = value;
+        if (_newLoc) existing.location = _newLoc;   // WL.2: conserve unless user set one
       }
     } else {
       reFlashId = Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -22959,6 +23084,7 @@ assetForm.addEventListener('submit', e => {
         prevPrice:     null,
         rent,
         costBasis:     value,
+        location:      _newLoc,            // WL.2: optional Wealth Location metadata
       });
     }
     save();
@@ -23006,6 +23132,7 @@ assetForm.addEventListener('submit', e => {
       // Backfill symbols if a lookup ran after the original save
       if (manualPendingSymbol  && !existing.marketSymbol) existing.marketSymbol = manualPendingSymbol;
       if (manualPendingCoinId  && !existing.coinId)       existing.coinId       = manualPendingCoinId;
+      if (_newLoc) existing.location = _newLoc;   // WL.2: conserve unless user set one
       _ledgerTrade(existing, 'buy', qty, _mBuyPx, _mBuyTs);
     } else {
       manualFlashId = Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -23023,6 +23150,7 @@ assetForm.addEventListener('submit', e => {
         change24h:     null,
         prevPrice:     null,
         costBasis:     qty * (price > 0 ? price : 1),
+        location:      _newLoc,            // WL.2: optional Wealth Location metadata
         transactions:  [{ type: 'buy', qty, price: price > 0 ? price : 1, ts: _mBuyTs }],
       });
       _ledgerTrade(assets.find(a => a.id === manualFlashId), 'buy', qty, _mBuyPx, _mBuyTs);
@@ -23095,6 +23223,7 @@ assetForm.addEventListener('submit', e => {
     existing.price  = pendingPrice;
     if (!existing.transactions) existing.transactions = [];
     existing.transactions.push({ type: 'buy', qty, price: pendingPrice, ts: _buyTs });
+    if (_newLoc) existing.location = _newLoc;   // WL.2: conserve unless user set one
     _ledgerTrade(existing, 'buy', qty, pendingPrice, _buyTs);
   } else {
     let initialChange24h = null;
@@ -23120,6 +23249,7 @@ assetForm.addEventListener('submit', e => {
       change24h:     initialChange24h,
       prevPrice:     null,
       costBasis:     newPurchaseCost,
+      location:      _newLoc,            // WL.2: optional Wealth Location metadata
       // MC-7: fund-only manual NAV fallback. Persisted only when the
       // user actually went through the manual-NAV prompt (provider had
       // no price). The refresh loop falls back to manualNav whenever
