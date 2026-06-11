@@ -1526,7 +1526,7 @@ const T = {
     // INT.1 — Premium Portfolio Intelligence
     int_empty_title:   'Aún no hay análisis disponible',
     int_empty_body:    'Añade activos a tu cartera para que Aurix interprete tu patrimonio.',
-    int_exec_eyebrow:  'Resumen ejecutivo',
+    int_exec_eyebrow:  'Lectura patrimonial',
     int_exec_early:    'Aún no hay suficiente información para un análisis completo. Añade más activos para enriquecer la lectura de tu patrimonio.',
     int_exec_concentrated: pct => `Una parte relevante de tu patrimonio depende de tus principales posiciones (cerca del ${pct}%).`,
     int_exec_diversified:  'Tu patrimonio está razonablemente diversificado entre varias categorías.',
@@ -1534,15 +1534,15 @@ const T = {
     int_exec_liquidity_good: 'Mantienes una buena liquidez disponible.',
     int_exec_liquidity_low:  'Tu liquidez inmediata es reducida frente al resto del patrimonio.',
     int_exec_illiquid:       'Combina activos líquidos y no líquidos: esto aporta estabilidad, pero reduce flexibilidad.',
-    int_signals_title: 'Señales clave',
+    int_signals_title: 'Señales relevantes',
     int_sig_concAsset_title:  'Concentración en un activo',
     int_sig_concAsset_body:   (name, pct) => `${name} representa cerca del ${pct}% de tu patrimonio invertible.`,
     int_sig_concCat_title:    'Concentración en una categoría',
     int_sig_concCat_body:     (label, pct) => `${label} concentra cerca del ${pct}% de tu patrimonio invertible.`,
     int_sig_crypto_title:     'Exposición cripto elevada',
     int_sig_crypto_body:      pct => `La cripto representa cerca del ${pct}% de tu patrimonio invertible.`,
-    int_sig_realEstate_title: 'Patrimonio poco líquido',
-    int_sig_realEstate_body:  pct => `Cerca del ${pct}% de tu patrimonio está en activos poco líquidos.`,
+    int_sig_realEstate_title: 'Patrimonio inmobiliario registrado',
+    int_sig_realEstate_body:  'Tus inmuebles se mantienen fuera del análisis de patrimonio invertible.',
     int_sig_highLiq_title:    'Liquidez elevada',
     int_sig_highLiq_body:     pct => `El efectivo representa cerca del ${pct}% de tu patrimonio.`,
     int_sig_lowLiq_title:     'Liquidez reducida',
@@ -1555,17 +1555,18 @@ const T = {
     int_sig_early_body:       'Aún no hay suficientes activos para una lectura completa.',
     int_sig_balanced_title:   'Cartera equilibrada',
     int_sig_balanced_body:    'No se detectan concentraciones relevantes en tu patrimonio.',
-    int_drivers_title: 'Qué mueve tu patrimonio',
+    int_drivers_title: 'Factores principales',
     int_drivers_topAsset: (name, pct) => `Tu mayor posición es ${name}, con un ${pct}% del patrimonio invertible.`,
     int_drivers_topCat:   (label, pct) => `Tu mayor exposición está en ${label}, con un ${pct}% del patrimonio invertible.`,
     int_drivers_top3:     pct => `El ${pct}% de tu patrimonio invertible depende de tus 3 mayores posiciones.`,
-    int_liq_title:     'Liquidez',
-    int_liq_immediate: pct => `Tu liquidez inmediata representa aproximadamente el ${pct}% del patrimonio analizado.`,
+    int_liq_title:     'Liquidez invertible',
+    int_liq_immediate: pct => `Tu liquidez inmediata representa aproximadamente el ${pct}% de tu patrimonio invertible.`,
+    int_re_note:       'Patrimonio inmobiliario registrado, fuera del análisis invertible.',
     int_liq_illiquid:  'Una parte relevante de tu patrimonio está en activos poco líquidos.',
     int_liq_cash:      'Efectivo',
     int_liq_market:    'Activos de mercado',
     int_liq_realestate:'Inmuebles',
-    int_review_title:  'Áreas para revisar',
+    int_review_title:  'Áreas a vigilar',
     int_review_concentration: 'Revisar la dependencia de tu principal activo.',
     int_review_liquidity:     'Comprobar si tu liquidez cubre tus necesidades.',
     int_review_realestate:    'Revisar el peso de tus activos poco líquidos.',
@@ -2854,7 +2855,7 @@ const T = {
     // INT.1 — Premium Portfolio Intelligence
     int_empty_title:   'No analysis available yet',
     int_empty_body:    'Add assets to your portfolio so Aurix can interpret your wealth.',
-    int_exec_eyebrow:  'Executive summary',
+    int_exec_eyebrow:  'Wealth reading',
     int_exec_early:    'There isn’t enough information yet for a full analysis. Add more assets to enrich the reading of your wealth.',
     int_exec_concentrated: pct => `A meaningful part of your wealth depends on your main positions (around ${pct}%).`,
     int_exec_diversified:  'Your wealth is reasonably diversified across several categories.',
@@ -2862,15 +2863,15 @@ const T = {
     int_exec_liquidity_good: 'You hold a healthy amount of available liquidity.',
     int_exec_liquidity_low:  'Your immediate liquidity is low relative to the rest of your wealth.',
     int_exec_illiquid:       'It combines liquid and illiquid assets: this adds stability, but reduces flexibility.',
-    int_signals_title: 'Key signals',
+    int_signals_title: 'Relevant signals',
     int_sig_concAsset_title:  'Single-asset concentration',
     int_sig_concAsset_body:   (name, pct) => `${name} represents around ${pct}% of your investable wealth.`,
     int_sig_concCat_title:    'Category concentration',
     int_sig_concCat_body:     (label, pct) => `${label} concentrates around ${pct}% of your investable wealth.`,
     int_sig_crypto_title:     'High crypto exposure',
     int_sig_crypto_body:      pct => `Crypto represents around ${pct}% of your investable wealth.`,
-    int_sig_realEstate_title: 'Less-liquid wealth',
-    int_sig_realEstate_body:  pct => `Around ${pct}% of your wealth is held in less-liquid assets.`,
+    int_sig_realEstate_title: 'Real estate on record',
+    int_sig_realEstate_body:  'Your real estate stays outside the investable-wealth analysis.',
     int_sig_highLiq_title:    'High liquidity',
     int_sig_highLiq_body:     pct => `Cash represents around ${pct}% of your wealth.`,
     int_sig_lowLiq_title:     'Low liquidity',
@@ -2883,17 +2884,18 @@ const T = {
     int_sig_early_body:       'There aren’t enough assets yet for a full reading.',
     int_sig_balanced_title:   'Balanced portfolio',
     int_sig_balanced_body:    'No meaningful concentrations were detected in your wealth.',
-    int_drivers_title: 'What drives your wealth',
+    int_drivers_title: 'Key drivers',
     int_drivers_topAsset: (name, pct) => `Your largest position is ${name}, at ${pct}% of investable wealth.`,
     int_drivers_topCat:   (label, pct) => `Your largest exposure is in ${label}, at ${pct}% of investable wealth.`,
     int_drivers_top3:     pct => `${pct}% of your investable wealth depends on your 3 largest positions.`,
-    int_liq_title:     'Liquidity',
-    int_liq_immediate: pct => `Your immediate liquidity represents approximately ${pct}% of the analysed wealth.`,
+    int_liq_title:     'Investable liquidity',
+    int_liq_immediate: pct => `Your immediate liquidity represents approximately ${pct}% of your investable wealth.`,
+    int_re_note:       'Real estate on record, kept outside the investable analysis.',
     int_liq_illiquid:  'A meaningful part of your wealth is held in less-liquid assets.',
     int_liq_cash:      'Cash',
     int_liq_market:    'Market assets',
     int_liq_realestate:'Real estate',
-    int_review_title:  'Areas to review',
+    int_review_title:  'Areas to watch',
     int_review_concentration: 'Review your dependence on your main asset.',
     int_review_liquidity:     'Check whether your liquidity covers your needs.',
     int_review_realestate:    'Review the weight of your less-liquid assets.',
@@ -20747,13 +20749,25 @@ function _intTop3Investable() {
 // 4 — Liquidity view. Denominators over TOTAL wealth (via getDistribution) so
 // cash / market / real-estate weights sum coherently. Real estate = illiquid;
 // never inferred as debt, never net-equity, never negative.
+// INT.1R — real estate presence ONLY (count). Never its gross value/%; real
+// estate is separate patrimonial context, not part of the investable analysis.
+function _intRealEstatePresence() {
+  const all = (typeof activeAssets === 'function') ? activeAssets() : [];
+  let count = 0;
+  for (const a of all) if (a && a.type === 'real_estate') count++;
+  return { count };
+}
+
+// 4 — Liquidity view. INT.1R: measured over INVESTABLE wealth ONLY (real estate
+// excluded — getInvestableDistribution drops it). cash IS investable; market =
+// everything investable that isn't cash. Real estate never becomes a bar or a
+// denominator here — it surfaces only as a neutral context note.
 function buildLiquidityView() {
-  const dist = (typeof getDistribution === 'function') ? (getDistribution() || []) : [];
-  const find = ty => Math.round((dist.find(d => d.type === ty) || {}).pct || 0);
-  const cashPct = find('cash');
-  const rePct   = find('real_estate');
-  const marketPct = Math.max(0, 100 - cashPct - rePct);
-  return { cashPct, rePct, marketPct, hasRE: rePct > 0 };
+  const dist = (typeof getInvestableDistribution === 'function') ? (getInvestableDistribution() || []) : [];
+  const cashPct = Math.round((dist.find(d => d.type === 'cash') || {}).pct || 0);
+  const marketPct = Math.max(0, 100 - cashPct);
+  const re = _intRealEstatePresence();
+  return { cashPct, marketPct, hasRE: re.count > 0, reCount: re.count };
 }
 
 // 3 — Portfolio drivers. What actually moves the wealth: top asset, top
@@ -20783,8 +20797,10 @@ function buildPortfolioSignals(snap, liq) {
     push('watch', 'concCat', t('int_sig_concCat_body')(tcat.label, tcat.pctTotal), tcat.pctTotal + '%');
   if (snap.cryptoPct >= 40)
     push('watch', 'crypto', t('int_sig_crypto_body')(snap.cryptoPct), snap.cryptoPct + '%');
-  if (liq && liq.rePct >= 30)
-    push('info', 'realEstate', t('int_sig_realEstate_body')(liq.rePct), liq.rePct + '%');
+  // INT.1R: real estate is NEVER a watch and NEVER carries its gross %. It is a
+  // low-weight neutral context note only — no value, no severity escalation.
+  if (liq && liq.hasRE)
+    push('info', 'realEstate', t('int_sig_realEstate_body'), null);
   if (liq && liq.cashPct >= 40)
     push('info', 'highLiq', t('int_sig_highLiq_body')(liq.cashPct), liq.cashPct + '%');
   else if (liq && liq.cashPct <= 3)
@@ -20818,7 +20834,10 @@ function buildPortfolioExecutiveSummary(snap, liq, drivers) {
   if (liq && liq.cashPct >= 30)      sentences.push(t('int_exec_liquidity_good'));
   else if (liq && liq.cashPct <= 3)  { sentences.push(t('int_exec_liquidity_low')); if (state === 'positive') state = 'info'; }
 
-  if (liq && liq.rePct >= 30) sentences.push(t('int_exec_illiquid'));
+  // INT.1R: the summary speaks ONLY of investable wealth. The old "combina
+  // activos líquidos y no líquidos" line was driven by real estate's gross
+  // value (which made a property-heavy household read as ~98% illiquid) —
+  // removed. Real estate is surfaced neutrally in the Liquidity note + signal.
 
   return { state, sentences: sentences.slice(0, 3) };
 }
@@ -20828,7 +20847,7 @@ function buildReviewAreas(snap, liq) {
   const areas = [];
   if (snap.topInvestedAsset && snap.topInvestedAsset.pctTotal >= 50) areas.push(t('int_review_concentration'));
   if (liq && liq.cashPct <= 5)         areas.push(t('int_review_liquidity'));
-  if (liq && liq.rePct  >= 30)         areas.push(t('int_review_realestate'));
+  // INT.1R: real estate is NEVER framed as a "review / problem" area. Removed.
   if (snap.categoryCount && snap.categoryCount <= 2) areas.push(t('int_review_diversify'));
   areas.push(t('int_review_workspace'));
   let uniq = [...new Set(areas)].slice(0, 4);
@@ -20866,7 +20885,7 @@ function _renderPremiumIntelligence() {
 
   // 2 — Key signals
   const signalsHtml = `
-    <section class="int-block">
+    <section class="int-block int-block--signals">
       <h3 class="int-block-title">${esc(t('int_signals_title'))}</h3>
       <div class="int-signals">
         ${signals.map(s => `
@@ -20887,7 +20906,7 @@ function _renderPremiumIntelligence() {
   if (drivers.topCategory) driverLines.push(t('int_drivers_topCat')(drivers.topCategory.label, drivers.topCategory.pctTotal));
   if (drivers.items.length) driverLines.push(t('int_drivers_top3')(drivers.pct));
   const driversHtml = `
-    <section class="int-block">
+    <section class="int-block int-block--drivers">
       <h3 class="int-block-title">${esc(t('int_drivers_title'))}</h3>
       <div class="int-driver-lines">
         ${driverLines.map(l => `<p class="int-driver-line">${esc(l)}</p>`).join('')}
@@ -20903,17 +20922,16 @@ function _renderPremiumIntelligence() {
         </div>` : ''}
     </section>`;
 
-  // 4 — Liquidity view (+ where the wealth is held, from WL.2)
+  // 4 — Liquidity view. INT.1R: cash + market ONLY, over INVESTABLE wealth.
+  // Real estate is NEVER a bar here; if present it shows as a calm context note.
   const liqRows = [
     { key: 'cash',   label: t('int_liq_cash'),   pct: liq.cashPct },
     { key: 'market', label: t('int_liq_market'), pct: liq.marketPct },
   ];
-  if (liq.hasRE) liqRows.push({ key: 'realestate', label: t('int_liq_realestate'), pct: liq.rePct });
   const liqHtml = `
-    <section class="int-block">
+    <section class="int-block int-block--liquidity">
       <h3 class="int-block-title">${esc(t('int_liq_title'))}</h3>
       <p class="int-liq-lead">${esc(t('int_liq_immediate')(liq.cashPct))}</p>
-      ${liq.rePct >= 30 ? `<p class="int-liq-note">${esc(t('int_liq_illiquid'))}</p>` : ''}
       <div class="int-liq-rows">
         ${liqRows.filter(r => r.pct > 0).map(r => `
           <div class="int-liq-row is-${r.key}">
@@ -20922,12 +20940,13 @@ function _renderPremiumIntelligence() {
             <span class="int-liq-pct">${r.pct}%</span>
           </div>`).join('')}
       </div>
+      ${liq.hasRE ? `<p class="int-liq-re-note">${esc(t('int_re_note'))}</p>` : ''}
       ${(typeof _renderWealthLocationCard === 'function') ? _renderWealthLocationCard() : ''}
     </section>`;
 
   // 5 — Recommended review areas
   const reviewHtml = `
-    <section class="int-block">
+    <section class="int-block int-block--review">
       <h3 class="int-block-title">${esc(t('int_review_title'))}</h3>
       <ul class="int-review-list">
         ${reviews.map(r => `<li class="int-review-item">${esc(r)}</li>`).join('')}

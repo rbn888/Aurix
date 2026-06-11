@@ -18666,6 +18666,33 @@ body.gs-open { overflow: hidden; }
   padding: 4px 16px 40px;
 }
 .int-premium.is-empty { min-height: 40vh; justify-content: center; }
+
+/* INT.1R — desktop premium layout. Stop looking like a stretched mobile column:
+   widen the canvas and arrange the blocks in a balanced 2-column grid (the
+   wealth reading + signals stay full-width as the lead; drivers / liquidity sit
+   side by side; areas-to-watch spans full width). */
+@media (min-width: 1024px) {
+  .int-premium {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    max-width: 1140px;
+    padding: 8px 28px 48px;
+    align-items: start;
+  }
+  .int-exec,
+  .int-block--signals,
+  .int-block--review,
+  .int-disclaimer { grid-column: 1 / -1; }
+  .int-block--drivers   { grid-column: 1 / 2; }
+  .int-block--liquidity { grid-column: 2 / 3; }
+  /* On the wide canvas the signal cards breathe in a 2-up grid. */
+  .int-block--signals .int-signals { grid-template-columns: repeat(2, 1fr); }
+  .int-exec { padding: 26px 30px 26px 32px; }
+}
+@media (min-width: 1440px) {
+  .int-premium { max-width: 1240px; }
+}
 .int-empty-card {
   text-align: center;
   padding: 40px 24px;
@@ -18751,6 +18778,17 @@ body.gs-open { overflow: hidden; }
 /* 4 — Liquidity */
 .int-liq-lead { margin: 0 0 4px; font-size: 13.5px; line-height: 1.5; color: var(--text-bright); }
 .int-liq-note { margin: 0 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--text-muted); }
+/* INT.1R — neutral real-estate context note (never alarmist, never a % bar). */
+.int-liq-re-note {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--color-border-subtle);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
 .int-liq-rows { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
 .int-liq-row { display: grid; grid-template-columns: minmax(90px, 1fr) 2fr auto; align-items: center; gap: 10px; }
 .int-liq-label { font-size: 12.5px; color: var(--text-muted); }
