@@ -8414,12 +8414,22 @@ main { padding-bottom: 72px; }
 }
 .funds-grid {
   display: grid;
-  /* MARKET-1A: auto-fit (was auto-fill) collapses unused tracks when
-     there are fewer cards than columns, so 6–7 cards never leave
-     ghost holes at the end of the row. */
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
+  /* MP.1: balanced FIXED columns per breakpoint. auto-fit's 1fr tracks
+     stretched a partial last row to a DIFFERENT width than the rows above
+     (the "5+2 huecos / tarjetas de anchuras distintas" problem). Fixed
+     counts keep every card the same width at every width; a partial last
+     row simply leaves trailing empty tracks (left-aligned, equal width).
+     Mobile-first 2 cols → tablet 3 → desktop 4. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
+@media (min-width: 600px) {
+  .funds-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .funds-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+}
+.funds-card { min-width: 0; }   /* MP.1: prevent 2-col mobile content blowout */
 .funds-card {
   display: flex;
   flex-direction: column;
@@ -8524,7 +8534,9 @@ main { padding-bottom: 72px; }
   color: rgba(74, 130, 240,0.95);
 }
 @media (max-width: 480px) {
-  .funds-grid { grid-template-columns: 1fr; }
+  /* MP.1: small iPhones keep 2 clean columns (was 1) — tighter gap so the
+     pair never overflows a 360px viewport. */
+  .funds-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 }
 
 .market-section-title {
