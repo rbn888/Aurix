@@ -1523,6 +1523,55 @@ const T = {
     wlLocCardSubtitle: 'Distribución por custodio, broker, exchange o wallet.',
     wlLocEmpty:        'Añade ubicación a tus activos para ver esta distribución.',
     wlLocUnassigned:   'Sin ubicación',
+    // INT.1 — Premium Portfolio Intelligence
+    int_empty_title:   'Aún no hay análisis disponible',
+    int_empty_body:    'Añade activos a tu cartera para que Aurix interprete tu patrimonio.',
+    int_exec_eyebrow:  'Resumen ejecutivo',
+    int_exec_early:    'Aún no hay suficiente información para un análisis completo. Añade más activos para enriquecer la lectura de tu patrimonio.',
+    int_exec_concentrated: pct => `Una parte relevante de tu patrimonio depende de tus principales posiciones (cerca del ${pct}%).`,
+    int_exec_diversified:  'Tu patrimonio está razonablemente diversificado entre varias categorías.',
+    int_exec_balanced:     'Tu cartera mantiene un equilibrio razonable entre tus posiciones.',
+    int_exec_liquidity_good: 'Mantienes una buena liquidez disponible.',
+    int_exec_liquidity_low:  'Tu liquidez inmediata es reducida frente al resto del patrimonio.',
+    int_exec_illiquid:       'Combina activos líquidos y no líquidos: esto aporta estabilidad, pero reduce flexibilidad.',
+    int_signals_title: 'Señales clave',
+    int_sig_concAsset_title:  'Concentración en un activo',
+    int_sig_concAsset_body:   (name, pct) => `${name} representa cerca del ${pct}% de tu patrimonio invertible.`,
+    int_sig_concCat_title:    'Concentración en una categoría',
+    int_sig_concCat_body:     (label, pct) => `${label} concentra cerca del ${pct}% de tu patrimonio invertible.`,
+    int_sig_crypto_title:     'Exposición cripto elevada',
+    int_sig_crypto_body:      pct => `La cripto representa cerca del ${pct}% de tu patrimonio invertible.`,
+    int_sig_realEstate_title: 'Patrimonio poco líquido',
+    int_sig_realEstate_body:  pct => `Cerca del ${pct}% de tu patrimonio está en activos poco líquidos.`,
+    int_sig_highLiq_title:    'Liquidez elevada',
+    int_sig_highLiq_body:     pct => `El efectivo representa cerca del ${pct}% de tu patrimonio.`,
+    int_sig_lowLiq_title:     'Liquidez reducida',
+    int_sig_lowLiq_body:      pct => `Tu liquidez inmediata es reducida (cerca del ${pct}%).`,
+    int_sig_diversified_title:'Diversificación razonable',
+    int_sig_diversified_body: 'Tu patrimonio está repartido entre varias categorías.',
+    int_sig_concentrated_title:'Cartera muy concentrada',
+    int_sig_concentrated_body: 'Tu patrimonio se apoya en muy pocas posiciones.',
+    int_sig_early_title:      'Información todavía limitada',
+    int_sig_early_body:       'Aún no hay suficientes activos para una lectura completa.',
+    int_sig_balanced_title:   'Cartera equilibrada',
+    int_sig_balanced_body:    'No se detectan concentraciones relevantes en tu patrimonio.',
+    int_drivers_title: 'Qué mueve tu patrimonio',
+    int_drivers_topAsset: (name, pct) => `Tu mayor posición es ${name}, con un ${pct}% del patrimonio invertible.`,
+    int_drivers_topCat:   (label, pct) => `Tu mayor exposición está en ${label}, con un ${pct}% del patrimonio invertible.`,
+    int_drivers_top3:     pct => `El ${pct}% de tu patrimonio invertible depende de tus 3 mayores posiciones.`,
+    int_liq_title:     'Liquidez',
+    int_liq_immediate: pct => `Tu liquidez inmediata representa aproximadamente el ${pct}% del patrimonio analizado.`,
+    int_liq_illiquid:  'Una parte relevante de tu patrimonio está en activos poco líquidos.',
+    int_liq_cash:      'Efectivo',
+    int_liq_market:    'Activos de mercado',
+    int_liq_realestate:'Inmuebles',
+    int_review_title:  'Áreas para revisar',
+    int_review_concentration: 'Revisar la dependencia de tu principal activo.',
+    int_review_liquidity:     'Comprobar si tu liquidez cubre tus necesidades.',
+    int_review_realestate:    'Revisar el peso de tus activos poco líquidos.',
+    int_review_diversify:     'Analizar si quieres diversificar más entre categorías.',
+    int_review_workspace:     'Usar Workspace para simular aportaciones futuras.',
+    int_disclaimer:    'Aurix interpreta tu patrimonio con datos reales. No es asesoramiento de inversión.',
     // Status pills
     statusOpen:        'Abierto',
     statusClosed:      'Cerrado',
@@ -2737,6 +2786,55 @@ const T = {
     wlLocCardSubtitle: 'Distribution by custodian, broker, exchange or wallet.',
     wlLocEmpty:        'Add a location to your assets to see this distribution.',
     wlLocUnassigned:   'Unassigned',
+    // INT.1 — Premium Portfolio Intelligence
+    int_empty_title:   'No analysis available yet',
+    int_empty_body:    'Add assets to your portfolio so Aurix can interpret your wealth.',
+    int_exec_eyebrow:  'Executive summary',
+    int_exec_early:    'There isn’t enough information yet for a full analysis. Add more assets to enrich the reading of your wealth.',
+    int_exec_concentrated: pct => `A meaningful part of your wealth depends on your main positions (around ${pct}%).`,
+    int_exec_diversified:  'Your wealth is reasonably diversified across several categories.',
+    int_exec_balanced:     'Your portfolio keeps a reasonable balance across your positions.',
+    int_exec_liquidity_good: 'You hold a healthy amount of available liquidity.',
+    int_exec_liquidity_low:  'Your immediate liquidity is low relative to the rest of your wealth.',
+    int_exec_illiquid:       'It combines liquid and illiquid assets: this adds stability, but reduces flexibility.',
+    int_signals_title: 'Key signals',
+    int_sig_concAsset_title:  'Single-asset concentration',
+    int_sig_concAsset_body:   (name, pct) => `${name} represents around ${pct}% of your investable wealth.`,
+    int_sig_concCat_title:    'Category concentration',
+    int_sig_concCat_body:     (label, pct) => `${label} concentrates around ${pct}% of your investable wealth.`,
+    int_sig_crypto_title:     'High crypto exposure',
+    int_sig_crypto_body:      pct => `Crypto represents around ${pct}% of your investable wealth.`,
+    int_sig_realEstate_title: 'Less-liquid wealth',
+    int_sig_realEstate_body:  pct => `Around ${pct}% of your wealth is held in less-liquid assets.`,
+    int_sig_highLiq_title:    'High liquidity',
+    int_sig_highLiq_body:     pct => `Cash represents around ${pct}% of your wealth.`,
+    int_sig_lowLiq_title:     'Low liquidity',
+    int_sig_lowLiq_body:      pct => `Your immediate liquidity is low (around ${pct}%).`,
+    int_sig_diversified_title:'Reasonable diversification',
+    int_sig_diversified_body: 'Your wealth is spread across several categories.',
+    int_sig_concentrated_title:'Highly concentrated portfolio',
+    int_sig_concentrated_body: 'Your wealth rests on very few positions.',
+    int_sig_early_title:      'Limited information so far',
+    int_sig_early_body:       'There aren’t enough assets yet for a full reading.',
+    int_sig_balanced_title:   'Balanced portfolio',
+    int_sig_balanced_body:    'No meaningful concentrations were detected in your wealth.',
+    int_drivers_title: 'What drives your wealth',
+    int_drivers_topAsset: (name, pct) => `Your largest position is ${name}, at ${pct}% of investable wealth.`,
+    int_drivers_topCat:   (label, pct) => `Your largest exposure is in ${label}, at ${pct}% of investable wealth.`,
+    int_drivers_top3:     pct => `${pct}% of your investable wealth depends on your 3 largest positions.`,
+    int_liq_title:     'Liquidity',
+    int_liq_immediate: pct => `Your immediate liquidity represents approximately ${pct}% of the analysed wealth.`,
+    int_liq_illiquid:  'A meaningful part of your wealth is held in less-liquid assets.',
+    int_liq_cash:      'Cash',
+    int_liq_market:    'Market assets',
+    int_liq_realestate:'Real estate',
+    int_review_title:  'Areas to review',
+    int_review_concentration: 'Review your dependence on your main asset.',
+    int_review_liquidity:     'Check whether your liquidity covers your needs.',
+    int_review_realestate:    'Review the weight of your less-liquid assets.',
+    int_review_diversify:     'Consider whether to diversify further across categories.',
+    int_review_workspace:     'Use Workspace to simulate future contributions.',
+    int_disclaimer:    'Aurix interprets your wealth with real data. It is not investment advice.',
     // Status pills
     statusOpen:        'Open',
     statusClosed:      'Closed',
@@ -20456,14 +20554,246 @@ function _applyTab(tab) {
 // EXISTING renderers (desktop exec layout / mobile cockpit) reading the live
 // `_aurixWorkspaceIntelligence()` payload. Read-only — no editable sheet here.
 function renderIntelligenceTab() {
-  const desktop = (typeof isWorkspaceDesktop === 'function')
-    ? isWorkspaceDesktop()
-    : (typeof window !== 'undefined' && window.innerWidth >= 1024);
+  // INT.1 — premium deterministic portfolio intelligence layer. Reads only
+  // existing data (snapshot + distributions); no new APIs, no AI, no external
+  // data. Responsive single markup (CSS handles desktop/mobile). The legacy
+  // workspace-intelligence renderers stay in place (dormant for this tab).
   let inner = '';
   try {
-    inner = desktop ? _renderWorkspaceIntelligenceMode() : _renderWorkspaceMobile(null);
-  } catch (_) { inner = ''; }
+    inner = _renderPremiumIntelligence();
+  } catch (e) {
+    if (typeof IS_DEV !== 'undefined' && IS_DEV) console.warn('[INT.1] render failed:', e);
+    inner = '';
+  }
   return `<section class="aurix-intelligence-screen">${inner}</section>`;
+}
+
+/* ════════ INT.1 — Premium Portfolio Intelligence Layer ════════════════════════
+   Deterministic, explainable, non-alarmist interpretation of the user's wealth.
+   NO investment advice, NO buy/sell, NO AI, NO external data. Every block reads
+   ONLY existing primitives (_aurixHealthSnapshot, getDistribution, investable*,
+   assetValueUSD, getLocationDistribution). Real estate is treated as illiquid
+   wealth — never penalised, never merged with liquid-investment concentration. */
+
+// Top 3 investable positions by weight (over investable wealth).
+function _intTop3Investable() {
+  const inv    = (typeof investableAssets === 'function') ? investableAssets() : [];
+  const totUSD = (typeof investableValueUSD === 'function') ? investableValueUSD() : 0;
+  if (!inv.length || totUSD <= 0) return { items: [], pct: 0 };
+  const ranked = inv
+    .map(a => ({
+      name: (typeof getDisplayName === 'function') ? getDisplayName(a) : (a.name || a.ticker || '—'),
+      usd:  (typeof assetValueUSD === 'function') ? (assetValueUSD(a) || 0) : 0,
+    }))
+    .filter(x => x.usd > 0)
+    .sort((a, b) => b.usd - a.usd)
+    .slice(0, 3);
+  const top3usd = ranked.reduce((s, x) => s + x.usd, 0);
+  return {
+    items: ranked.map(x => ({ name: x.name, pct: Math.round((x.usd / totUSD) * 100) })),
+    pct:   Math.round((top3usd / totUSD) * 100),
+  };
+}
+
+// 4 — Liquidity view. Denominators over TOTAL wealth (via getDistribution) so
+// cash / market / real-estate weights sum coherently. Real estate = illiquid;
+// never inferred as debt, never net-equity, never negative.
+function buildLiquidityView() {
+  const dist = (typeof getDistribution === 'function') ? (getDistribution() || []) : [];
+  const find = ty => Math.round((dist.find(d => d.type === ty) || {}).pct || 0);
+  const cashPct = find('cash');
+  const rePct   = find('real_estate');
+  const marketPct = Math.max(0, 100 - cashPct - rePct);
+  return { cashPct, rePct, marketPct, hasRE: rePct > 0 };
+}
+
+// 3 — Portfolio drivers. What actually moves the wealth: top asset, top
+// category, top-3 combined weight (all over investable wealth).
+function buildPortfolioDrivers(snap) {
+  const top3 = _intTop3Investable();
+  return {
+    topAsset:    snap.topInvestedAsset || null,
+    topCategory: snap.topCategory || null,
+    items:       top3.items,
+    pct:         top3.pct,
+  };
+}
+
+// 2 — Key signals. Allowed set only; severity limited to positive | info |
+// watch (never aggressive). Real estate is always 'info' + neutral copy.
+function buildPortfolioSignals(snap, liq) {
+  const out  = [];
+  const push = (severity, key, body, metric) =>
+    out.push({ severity, title: t('int_sig_' + key + '_title'), body, metric: metric || null });
+  const tia  = snap.topInvestedAsset;
+  const tcat = snap.topCategory;
+
+  if (tia && tia.pctTotal >= 60)
+    push('watch', 'concAsset', t('int_sig_concAsset_body')(tia.name, tia.pctTotal), tia.pctTotal + '%');
+  if (tcat && tcat.pctTotal >= 60)
+    push('watch', 'concCat', t('int_sig_concCat_body')(tcat.label, tcat.pctTotal), tcat.pctTotal + '%');
+  if (snap.cryptoPct >= 40)
+    push('watch', 'crypto', t('int_sig_crypto_body')(snap.cryptoPct), snap.cryptoPct + '%');
+  if (liq && liq.rePct >= 30)
+    push('info', 'realEstate', t('int_sig_realEstate_body')(liq.rePct), liq.rePct + '%');
+  if (liq && liq.cashPct >= 40)
+    push('info', 'highLiq', t('int_sig_highLiq_body')(liq.cashPct), liq.cashPct + '%');
+  else if (liq && liq.cashPct <= 3)
+    push('info', 'lowLiq', t('int_sig_lowLiq_body')(liq.cashPct), liq.cashPct + '%');
+
+  const diversified = snap.categoryCount >= 3 &&
+    (!tcat || tcat.pctTotal < 45) && (!tia || tia.pctTotal < 40);
+  if (diversified) push('positive', 'diversified', t('int_sig_diversified_body'));
+  if (snap.assetCount > 0 && snap.assetCount <= 2)
+    push('watch', 'concentrated', t('int_sig_concentrated_body'), String(snap.assetCount));
+  if (snap.assetCount > 0 && snap.assetCount < 3 && !out.length)
+    push('info', 'early', t('int_sig_early_body'));
+  if (!out.length) push('positive', 'balanced', t('int_sig_balanced_body'));
+
+  // Lead with positives/neutral, keep watches visible but not alarmist; cap 5.
+  const rank = { positive: 0, info: 1, watch: 2 };
+  return out.sort((a, b) => rank[a.severity] - rank[b.severity]).slice(0, 5);
+}
+
+// 1 — Executive summary. 2–3 calm sentences. state = positive | info | watch.
+function buildPortfolioExecutiveSummary(snap, liq, drivers) {
+  if (snap.assetCount < 3) return { state: 'info', sentences: [t('int_exec_early')] };
+  const sentences = [];
+  let state = 'positive';
+  const tcat = snap.topCategory;
+
+  if (drivers && drivers.pct >= 60) { sentences.push(t('int_exec_concentrated')(drivers.pct)); state = 'watch'; }
+  else if (snap.categoryCount >= 3 && (!tcat || tcat.pctTotal < 45)) { sentences.push(t('int_exec_diversified')); state = 'positive'; }
+  else { sentences.push(t('int_exec_balanced')); state = 'info'; }
+
+  if (liq && liq.cashPct >= 30)      sentences.push(t('int_exec_liquidity_good'));
+  else if (liq && liq.cashPct <= 3)  { sentences.push(t('int_exec_liquidity_low')); if (state === 'positive') state = 'info'; }
+
+  if (liq && liq.rePct >= 30) sentences.push(t('int_exec_illiquid'));
+
+  return { state, sentences: sentences.slice(0, 3) };
+}
+
+// 5 — Recommended review AREAS (not advice — never buy/sell/rebalance).
+function buildReviewAreas(snap, liq) {
+  const areas = [];
+  if (snap.topInvestedAsset && snap.topInvestedAsset.pctTotal >= 50) areas.push(t('int_review_concentration'));
+  if (liq && liq.cashPct <= 5)         areas.push(t('int_review_liquidity'));
+  if (liq && liq.rePct  >= 30)         areas.push(t('int_review_realestate'));
+  if (snap.categoryCount && snap.categoryCount <= 2) areas.push(t('int_review_diversify'));
+  areas.push(t('int_review_workspace'));
+  let uniq = [...new Set(areas)].slice(0, 4);
+  if (uniq.length < 2) uniq = [...new Set([...uniq, t('int_review_diversify')])].slice(0, 4);
+  return uniq;
+}
+
+// ── Renderer ──────────────────────────────────────────────────────────────
+function _renderPremiumIntelligence() {
+  const snap = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null;
+  const esc  = (typeof _escapeWorkspaceText === 'function') ? _escapeWorkspaceText : (s => String(s == null ? '' : s));
+
+  if (!snap || !snap.assetCount || snap.totUSD <= 0) {
+    return `
+      <div class="int-premium is-empty">
+        <section class="int-empty-card">
+          <h2 class="int-empty-title">${esc(t('int_empty_title'))}</h2>
+          <p class="int-empty-body">${esc(t('int_empty_body'))}</p>
+        </section>
+      </div>`;
+  }
+
+  const liq     = buildLiquidityView();
+  const drivers = buildPortfolioDrivers(snap);
+  const exec    = buildPortfolioExecutiveSummary(snap, liq, drivers);
+  const signals = buildPortfolioSignals(snap, liq);
+  const reviews = buildReviewAreas(snap, liq);
+
+  // 1 — Executive summary
+  const execHtml = `
+    <section class="int-exec is-${esc(exec.state)}">
+      <span class="int-exec-eyebrow">${esc(t('int_exec_eyebrow'))}</span>
+      ${exec.sentences.map(s => `<p class="int-exec-line">${esc(s)}</p>`).join('')}
+    </section>`;
+
+  // 2 — Key signals
+  const signalsHtml = `
+    <section class="int-block">
+      <h3 class="int-block-title">${esc(t('int_signals_title'))}</h3>
+      <div class="int-signals">
+        ${signals.map(s => `
+          <article class="int-signal is-${esc(s.severity)}">
+            <div class="int-signal-top">
+              <span class="int-signal-dot" aria-hidden="true"></span>
+              <span class="int-signal-title">${esc(s.title)}</span>
+              ${s.metric ? `<span class="int-signal-metric">${esc(s.metric)}</span>` : ''}
+            </div>
+            <p class="int-signal-body">${esc(s.body)}</p>
+          </article>`).join('')}
+      </div>
+    </section>`;
+
+  // 3 — Portfolio drivers
+  const driverLines = [];
+  if (drivers.topAsset)    driverLines.push(t('int_drivers_topAsset')(drivers.topAsset.name, drivers.topAsset.pctTotal));
+  if (drivers.topCategory) driverLines.push(t('int_drivers_topCat')(drivers.topCategory.label, drivers.topCategory.pctTotal));
+  if (drivers.items.length) driverLines.push(t('int_drivers_top3')(drivers.pct));
+  const driversHtml = `
+    <section class="int-block">
+      <h3 class="int-block-title">${esc(t('int_drivers_title'))}</h3>
+      <div class="int-driver-lines">
+        ${driverLines.map(l => `<p class="int-driver-line">${esc(l)}</p>`).join('')}
+      </div>
+      ${drivers.items.length ? `
+        <div class="int-driver-bars">
+          ${drivers.items.map(it => `
+            <div class="int-driver-row">
+              <span class="int-driver-name">${esc(it.name)}</span>
+              <span class="int-driver-track" aria-hidden="true"><span class="int-driver-bar" style="width:${Math.max(2, Math.min(100, it.pct))}%"></span></span>
+              <span class="int-driver-pct">${it.pct}%</span>
+            </div>`).join('')}
+        </div>` : ''}
+    </section>`;
+
+  // 4 — Liquidity view (+ where the wealth is held, from WL.2)
+  const liqRows = [
+    { key: 'cash',   label: t('int_liq_cash'),   pct: liq.cashPct },
+    { key: 'market', label: t('int_liq_market'), pct: liq.marketPct },
+  ];
+  if (liq.hasRE) liqRows.push({ key: 'realestate', label: t('int_liq_realestate'), pct: liq.rePct });
+  const liqHtml = `
+    <section class="int-block">
+      <h3 class="int-block-title">${esc(t('int_liq_title'))}</h3>
+      <p class="int-liq-lead">${esc(t('int_liq_immediate')(liq.cashPct))}</p>
+      ${liq.rePct >= 30 ? `<p class="int-liq-note">${esc(t('int_liq_illiquid'))}</p>` : ''}
+      <div class="int-liq-rows">
+        ${liqRows.filter(r => r.pct > 0).map(r => `
+          <div class="int-liq-row is-${r.key}">
+            <span class="int-liq-label">${esc(r.label)}</span>
+            <span class="int-liq-track" aria-hidden="true"><span class="int-liq-bar" style="width:${Math.max(2, Math.min(100, r.pct))}%"></span></span>
+            <span class="int-liq-pct">${r.pct}%</span>
+          </div>`).join('')}
+      </div>
+      ${(typeof _renderWealthLocationCard === 'function') ? _renderWealthLocationCard() : ''}
+    </section>`;
+
+  // 5 — Recommended review areas
+  const reviewHtml = `
+    <section class="int-block">
+      <h3 class="int-block-title">${esc(t('int_review_title'))}</h3>
+      <ul class="int-review-list">
+        ${reviews.map(r => `<li class="int-review-item">${esc(r)}</li>`).join('')}
+      </ul>
+    </section>`;
+
+  return `
+    <div class="int-premium">
+      ${execHtml}
+      ${signalsHtml}
+      ${driversHtml}
+      ${liqHtml}
+      ${reviewHtml}
+      <p class="int-disclaimer">${esc(t('int_disclaimer'))}</p>
+    </div>`;
 }
 
 function switchTab(tab) {
