@@ -1573,6 +1573,104 @@ const T = {
     int_review_diversify:     'Analizar si quieres diversificar más entre categorías.',
     int_review_workspace:     'Usar Workspace para simular aportaciones futuras.',
     int_disclaimer:    'Aurix interpreta tu patrimonio con datos reales. No es asesoramiento de inversión.',
+    // ── INT.2 — Aurix Intelligence Command Center ──
+    intcc_eyebrow:        'Inteligencia patrimonial',
+    intcc_empty_title:    'Aún no hay análisis disponible',
+    intcc_empty_body:     'Añade activos a tu cartera para que Aurix interprete tu patrimonio.',
+    intcc_read_healthy:      'Tu patrimonio está sano',
+    intcc_read_balanced:     'Tu patrimonio está equilibrado',
+    intcc_read_growing:      'Tu patrimonio está creciendo',
+    intcc_read_attention:    'Tu patrimonio requiere atención',
+    intcc_read_concentrated: 'Tu patrimonio está concentrado',
+    intcc_sub_healthy:       'La estructura general es sólida y no se observan dependencias excesivas de una sola posición.',
+    intcc_sub_balanced:      'La diversificación actual es razonable y no se observan dependencias excesivas de una sola posición.',
+    intcc_sub_growing:       pct => `Tu patrimonio invertible ha avanzado cerca de un ${pct}% en el periodo registrado.`,
+    intcc_sub_attention:     'Se observan algunos puntos que conviene mirar con calma, sin urgencia.',
+    intcc_sub_concentrated:  name => name ? `Una parte relevante de tu patrimonio se apoya en ${name}.` : 'Una parte relevante de tu patrimonio se apoya en pocas posiciones.',
+    intcc_chip_div:    'Diversificación adecuada',
+    intcc_chip_liq:    'Liquidez suficiente',
+    intcc_chip_conc:   'Concentración controlada',
+    intcc_chip_growth: 'Crecimiento elevado',
+    intcc_chip_watch:  'A vigilar',
+    intcc_health_title:   'Aurix Health',
+    intcc_health_suffix:  '/ 100',
+    intcc_band_excellent: 'Excelente',
+    intcc_band_good:      'Buena',
+    intcc_band_watch:     'A vigilar',
+    intcc_band_limited:   'Limitada',
+    intcc_band_empty:     '—',
+    intcc_hs_clean:       'Tu cartera muestra buena diversificación y equilibrio.',
+    intcc_hs_conc1_high:  'Una sola posición concentra buena parte de tu patrimonio invertible.',
+    intcc_hs_conc1_mid:   'Tu mayor posición tiene un peso destacado.',
+    intcc_hs_conc3_high:  'Tus tres mayores posiciones concentran casi todo el patrimonio invertible.',
+    intcc_hs_div_low:     'Tu patrimonio se reparte en muy pocas categorías.',
+    intcc_hs_div_mid:     'La diversificación entre categorías es todavía limitada.',
+    intcc_hs_crypto_high: 'La exposición a cripto es elevada.',
+    intcc_hs_crypto_mid:  'La exposición a cripto es notable.',
+    intcc_hs_liq_zero:    'No mantienes liquidez inmediata.',
+    intcc_hs_liq_low:     'Tu liquidez inmediata es muy reducida.',
+    intcc_hs_liq_idle:    'Mantienes una proporción alta en efectivo.',
+    intcc_hs_single:      'Tu patrimonio invertible se apoya en una sola posición.',
+    intcc_slv_title:   'Desde tu última visita',
+    intcc_slv_empty:   'Aún estamos aprendiendo de tu patrimonio. Vuelve pronto para ver su evolución.',
+    intcc_slv_grow:    pct => `Tu patrimonio ha crecido alrededor de un ${pct}%.`,
+    intcc_slv_drop:    pct => `Tu patrimonio ha bajado alrededor de un ${pct}%.`,
+    intcc_slv_liq_up:  'Tu liquidez ha aumentado.',
+    intcc_slv_liq_down:'Tu liquidez ha disminuido.',
+    intcc_slv_crypto_up:'La cripto ha ganado peso en tu cartera.',
+    intcc_slv_topcat:  label => `${label} ha pasado a ser tu mayor exposición.`,
+    intcc_radar_title: 'Radar patrimonial',
+    intcc_dim_div:    'Diversificación',
+    intcc_dim_liq:    'Liquidez',
+    intcc_dim_conc:   'Concentración',
+    intcc_dim_stab:   'Estabilidad',
+    intcc_dim_growth: 'Crecimiento',
+    intcc_drivers_title: 'Lo que más influye hoy',
+    intcc_drv_explain:   (name, pct) => `${name} es hoy el principal motor de tu patrimonio, con cerca del ${pct}%.`,
+    intcc_drv_none:      'Aún no hay posiciones suficientes para identificar tus factores principales.',
+    intcc_explore_title: 'Explora tu patrimonio',
+    intcc_explore_hint:  'Toca una pregunta para ver la respuesta.',
+    intcc_q_movers:        '¿Qué mueve más mi patrimonio?',
+    intcc_q_concentration: '¿Dónde estoy concentrado?',
+    intcc_q_liquidity:     '¿Tengo suficiente liquidez?',
+    intcc_q_watch:         '¿Qué debería vigilar?',
+    intcc_x_movers:      (name, pct) => `Hoy ${name} es tu mayor influencia, con cerca del ${pct}% de tu patrimonio invertible.`,
+    intcc_x_movers_none: 'Todavía no hay posiciones suficientes para medir qué mueve tu patrimonio.',
+    intcc_x_conc:        (name, pct) => `Tu mayor concentración está en ${name}, con cerca del ${pct}% del patrimonio invertible.`,
+    intcc_x_conc_none:   'No se observa una concentración destacada en una sola posición.',
+    intcc_x_liq:         pct => `Tu liquidez inmediata representa cerca del ${pct}% de tu patrimonio invertible.`,
+    intcc_x_watch_none:  'No se observan áreas que destaquen para vigilar en este momento.',
+    intcc_identity_title: 'Identidad de tu patrimonio',
+    intcc_id_growth_t:     'Patrimonio orientado al crecimiento',
+    intcc_id_growth_b:     'Tu cartera se inclina hacia activos con mayor potencial de revalorización.',
+    intcc_id_balanced_t:   'Patrimonio equilibrado',
+    intcc_id_balanced_b:   'Combinas distintas categorías buscando equilibrio entre estabilidad y crecimiento.',
+    intcc_id_tech_t:       'Patrimonio tecnológico',
+    intcc_id_tech_b:       'Tu cartera tiene una marcada presencia de activos digitales y tecnológicos.',
+    intcc_id_defensive_t:  'Patrimonio defensivo',
+    intcc_id_defensive_b:  'Tu cartera prioriza la estabilidad y la liquidez sobre la exposición al riesgo.',
+    intcc_id_diversified_t:'Patrimonio diversificado',
+    intcc_id_diversified_b:'Tu patrimonio está repartido entre varias categorías sin dependencias marcadas.',
+    intcc_id_hybrid_t:     'Patrimonio híbrido',
+    intcc_id_hybrid_b:     'Tu cartera combina varios perfiles sin una orientación única dominante.',
+    intcc_watch_title: 'Áreas a vigilar',
+    intcc_watch_clean: 'No se observan áreas destacadas que vigilar en este momento.',
+    intcc_w_dep_t:    'Dependencia de activo principal',
+    intcc_w_dep_b:    name => `Buena parte de tu patrimonio invertible se apoya en ${name}.`,
+    intcc_w_liq_t:    'Liquidez reducida',
+    intcc_w_liq_b:    'Tu liquidez inmediata es baja frente al resto del patrimonio.',
+    intcc_w_crypto_t: 'Exposición cripto',
+    intcc_w_crypto_b: pct => `La cripto representa cerca del ${pct}% de tu patrimonio invertible.`,
+    intcc_w_sector_t: 'Exposición sectorial',
+    intcc_w_sector_b: label => `${label} concentra una parte relevante de tu patrimonio invertible.`,
+    intcc_w_div_t:    'Diversificación limitada',
+    intcc_w_div_b:    'Tu patrimonio se reparte entre muy pocas categorías.',
+    intcc_timeline_title: 'Tu línea temporal',
+    intcc_timeline_empty: 'Todavía no hay hitos suficientes en tu historial. Aparecerán a medida que tu patrimonio evolucione.',
+    intcc_tl_cross:  amount => `Tu patrimonio superó ${amount}.`,
+    intcc_tl_liq10:  'Tu liquidez bajó por debajo del 10%.',
+    intcc_re_ctx:    n => n === 1 ? '1 inmueble registrado, como contexto patrimonial.' : `${n} inmuebles registrados, como contexto patrimonial.`,
+    intcc_disclaimer: 'Aurix interpreta tu patrimonio con datos reales. No es asesoramiento de inversión.',
     // Status pills
     statusOpen:        'Abierto',
     statusClosed:      'Cerrado',
@@ -2902,6 +3000,104 @@ const T = {
     int_review_diversify:     'Consider whether to diversify further across categories.',
     int_review_workspace:     'Use Workspace to simulate future contributions.',
     int_disclaimer:    'Aurix interprets your wealth with real data. It is not investment advice.',
+    // ── INT.2 — Aurix Intelligence Command Center ──
+    intcc_eyebrow:        'Wealth intelligence',
+    intcc_empty_title:    'No analysis available yet',
+    intcc_empty_body:     'Add assets to your portfolio so Aurix can interpret your wealth.',
+    intcc_read_healthy:      'Your wealth is healthy',
+    intcc_read_balanced:     'Your wealth is balanced',
+    intcc_read_growing:      'Your wealth is growing',
+    intcc_read_attention:    'Your wealth needs attention',
+    intcc_read_concentrated: 'Your wealth is concentrated',
+    intcc_sub_healthy:       'The overall structure is solid and shows no excessive dependence on a single position.',
+    intcc_sub_balanced:      'Current diversification is reasonable and shows no excessive dependence on a single position.',
+    intcc_sub_growing:       pct => `Your investable wealth has advanced around ${pct}% over the recorded period.`,
+    intcc_sub_attention:     'A few points are worth looking at calmly, with no urgency.',
+    intcc_sub_concentrated:  name => name ? `A relevant part of your wealth rests on ${name}.` : 'A relevant part of your wealth rests on a few positions.',
+    intcc_chip_div:    'Adequate diversification',
+    intcc_chip_liq:    'Sufficient liquidity',
+    intcc_chip_conc:   'Concentration in check',
+    intcc_chip_growth: 'High growth',
+    intcc_chip_watch:  'To watch',
+    intcc_health_title:   'Aurix Health',
+    intcc_health_suffix:  '/ 100',
+    intcc_band_excellent: 'Excellent',
+    intcc_band_good:      'Good',
+    intcc_band_watch:     'To watch',
+    intcc_band_limited:   'Limited',
+    intcc_band_empty:     '—',
+    intcc_hs_clean:       'Your portfolio shows solid diversification and balance.',
+    intcc_hs_conc1_high:  'A single position holds a large share of your investable wealth.',
+    intcc_hs_conc1_mid:   'Your largest position carries a notable weight.',
+    intcc_hs_conc3_high:  'Your three largest positions hold almost all of your investable wealth.',
+    intcc_hs_div_low:     'Your wealth is spread across very few categories.',
+    intcc_hs_div_mid:     'Diversification across categories is still limited.',
+    intcc_hs_crypto_high: 'Crypto exposure is high.',
+    intcc_hs_crypto_mid:  'Crypto exposure is notable.',
+    intcc_hs_liq_zero:    'You hold no immediate liquidity.',
+    intcc_hs_liq_low:     'Your immediate liquidity is very low.',
+    intcc_hs_liq_idle:    'You hold a high proportion in cash.',
+    intcc_hs_single:      'Your investable wealth rests on a single position.',
+    intcc_slv_title:   'Since your last visit',
+    intcc_slv_empty:   'We are still learning about your wealth. Come back soon to see how it evolves.',
+    intcc_slv_grow:    pct => `Your wealth has grown by around ${pct}%.`,
+    intcc_slv_drop:    pct => `Your wealth has fallen by around ${pct}%.`,
+    intcc_slv_liq_up:  'Your liquidity has increased.',
+    intcc_slv_liq_down:'Your liquidity has decreased.',
+    intcc_slv_crypto_up:'Crypto has gained weight in your portfolio.',
+    intcc_slv_topcat:  label => `${label} has become your largest exposure.`,
+    intcc_radar_title: 'Wealth radar',
+    intcc_dim_div:    'Diversification',
+    intcc_dim_liq:    'Liquidity',
+    intcc_dim_conc:   'Concentration',
+    intcc_dim_stab:   'Stability',
+    intcc_dim_growth: 'Growth',
+    intcc_drivers_title: 'What moves it most today',
+    intcc_drv_explain:   (name, pct) => `${name} is today the main driver of your wealth, at around ${pct}%.`,
+    intcc_drv_none:      'Not enough positions yet to identify your key drivers.',
+    intcc_explore_title: 'Explore your wealth',
+    intcc_explore_hint:  'Tap a question to see the answer.',
+    intcc_q_movers:        'What moves my wealth most?',
+    intcc_q_concentration: 'Where am I concentrated?',
+    intcc_q_liquidity:     'Do I have enough liquidity?',
+    intcc_q_watch:         'What should I watch?',
+    intcc_x_movers:      (name, pct) => `Today ${name} is your biggest influence, at around ${pct}% of your investable wealth.`,
+    intcc_x_movers_none: 'Not enough positions yet to measure what moves your wealth.',
+    intcc_x_conc:        (name, pct) => `Your biggest concentration is in ${name}, at around ${pct}% of your investable wealth.`,
+    intcc_x_conc_none:   'No notable concentration in a single position.',
+    intcc_x_liq:         pct => `Your immediate liquidity is around ${pct}% of your investable wealth.`,
+    intcc_x_watch_none:  'No standout areas to watch at this time.',
+    intcc_identity_title: 'Your wealth identity',
+    intcc_id_growth_t:     'Growth-oriented wealth',
+    intcc_id_growth_b:     'Your portfolio leans toward assets with higher appreciation potential.',
+    intcc_id_balanced_t:   'Balanced wealth',
+    intcc_id_balanced_b:   'You combine different categories, seeking balance between stability and growth.',
+    intcc_id_tech_t:       'Technology wealth',
+    intcc_id_tech_b:       'Your portfolio has a strong presence of digital and technology assets.',
+    intcc_id_defensive_t:  'Defensive wealth',
+    intcc_id_defensive_b:  'Your portfolio prioritizes stability and liquidity over risk exposure.',
+    intcc_id_diversified_t:'Diversified wealth',
+    intcc_id_diversified_b:'Your wealth is spread across several categories with no marked dependencies.',
+    intcc_id_hybrid_t:     'Hybrid wealth',
+    intcc_id_hybrid_b:     'Your portfolio combines several profiles with no single dominant orientation.',
+    intcc_watch_title: 'Areas to watch',
+    intcc_watch_clean: 'No standout areas to watch at this time.',
+    intcc_w_dep_t:    'Dependence on the main asset',
+    intcc_w_dep_b:    name => `A large part of your investable wealth rests on ${name}.`,
+    intcc_w_liq_t:    'Reduced liquidity',
+    intcc_w_liq_b:    'Your immediate liquidity is low relative to the rest of your wealth.',
+    intcc_w_crypto_t: 'Crypto exposure',
+    intcc_w_crypto_b: pct => `Crypto is around ${pct}% of your investable wealth.`,
+    intcc_w_sector_t: 'Sector exposure',
+    intcc_w_sector_b: label => `${label} holds a relevant part of your investable wealth.`,
+    intcc_w_div_t:    'Limited diversification',
+    intcc_w_div_b:    'Your wealth is spread across very few categories.',
+    intcc_timeline_title: 'Your timeline',
+    intcc_timeline_empty: 'Not enough milestones in your history yet. They will appear as your wealth evolves.',
+    intcc_tl_cross:  amount => `Your wealth crossed ${amount}.`,
+    intcc_tl_liq10:  'Your liquidity dropped below 10%.',
+    intcc_re_ctx:    n => n === 1 ? '1 property on record, as wealth context.' : `${n} properties on record, as wealth context.`,
+    intcc_disclaimer: 'Aurix interprets your wealth with real data. It is not investment advice.',
     // Status pills
     statusOpen:        'Open',
     statusClosed:      'Closed',
@@ -20688,9 +20884,10 @@ function _applyTab(tab) {
     } else if (tab === 'market') {
       renderMarket();
     } else if (tab === 'intelligence') {
-      // IA.1 — portfolio intelligence now lives in its own tab (moved out of
-      // Workspace). Read-only patrimonial reading; reuses the existing renderers.
+      // INT.2 — Aurix Intelligence Command Center. Read-only patrimonial reading;
+      // init wires reveal animations + the inline explore delegation.
       placeholder.innerHTML = renderIntelligenceTab();
+      if (typeof _initIntelligenceCommandCenter === 'function') _initIntelligenceCommandCenter();
     } else {
       const _label = tab.charAt(0).toUpperCase() + tab.slice(1);
       placeholder.innerHTML = `<p class="placeholder-label">${_label}</p>`;
@@ -20709,12 +20906,14 @@ function renderIntelligenceTab() {
   // existing data (snapshot + distributions); no new APIs, no AI, no external
   // data. Responsive single markup (CSS handles desktop/mobile). The legacy
   // workspace-intelligence renderers stay in place (dormant for this tab).
+  // INT.2 — Aurix Intelligence Command Center. Falls back to the INT.1 premium
+  // layout if the command-center renderer throws, so the tab is never blank.
   let inner = '';
   try {
-    inner = _renderPremiumIntelligence();
+    inner = _renderIntelligenceCommandCenter();
   } catch (e) {
-    if (typeof IS_DEV !== 'undefined' && IS_DEV) console.warn('[INT.1] render failed:', e);
-    inner = '';
+    if (typeof IS_DEV !== 'undefined' && IS_DEV) console.warn('[INT.2] render failed, falling back to INT.1:', e);
+    try { inner = _renderPremiumIntelligence(); } catch (_) { inner = ''; }
   }
   return `<section class="aurix-intelligence-screen">${inner}</section>`;
 }
@@ -20962,6 +21161,529 @@ function _renderPremiumIntelligence() {
       ${reviewHtml}
       <p class="int-disclaimer">${esc(t('int_disclaimer'))}</p>
     </div>`;
+}
+
+/* ════════ INT.2 — Aurix Intelligence Command Center ═══════════════════════════
+   Full rebuild of the Intelligence tab into the premium interpretation surface:
+   "the place where Aurix interprets the user's wealth". Deterministic,
+   explainable, non-alarmist. Reads ONLY existing primitives (_aurixHealthSnapshot,
+   investable*, getInvestableDistribution, assetValueUSD, portfolioHistory,
+   categoryHistory). No AI, no external data, no buy/sell/rebalance advice.
+
+   REAL-ESTATE RULE (critical, never to be repeated): real estate is CONTEXT only.
+   It never enters the score, drivers, radar, liquidity or concentration — the
+   snapshot already operates on the investable subset. Properties surface only as
+   a neutral secondary note ("N inmuebles registrados"). */
+
+let _intccExploreWired = false;
+const _INTCC_VISIT_KEY  = 'aurix_intcc_last_visit_v1';
+
+function _intccEsc(s) {
+  return (typeof _escapeWorkspaceText === 'function')
+    ? _escapeWorkspaceText(s)
+    : String(s == null ? '' : s);
+}
+function _intccClamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+
+// Real historical growth of investable+total wealth over the recorded window.
+// Returns a % (can be negative) or null when there is not enough history to be
+// meaningful. NEVER invents — reads the stored portfolioHistory series only.
+function _intccGrowthPct() {
+  const h = (typeof portfolioHistory !== 'undefined' && Array.isArray(portfolioHistory)) ? portfolioHistory : [];
+  if (h.length < 2) return null;
+  const first = h[0], last = h[h.length - 1];
+  if (!first || !last || !(first.value > 0) || !(last.ts > first.ts)) return null;
+  if (last.ts - first.ts < 3 * 86400000) return null;   // need ≥ ~3 days of span
+  return ((last.value - first.value) / first.value) * 100;
+}
+
+// Radar — 5 deterministic dimensions, each 0–100 (higher = healthier). All read
+// from the investable snapshot, so real estate never shifts any axis.
+function _intccRadar(snap, drivers, growthPct) {
+  const top1   = (snap.topInvestedAsset && snap.topInvestedAsset.pctTotal) || 0;
+  const top3   = (drivers && drivers.pct) || 0;
+  const cats   = snap.categoryCount || 0;
+  const cash   = snap.cashPct || 0;
+  const crypto = snap.cryptoPct || 0;
+  const topCat = (snap.topCategory && snap.topCategory.pctTotal) || 0;
+  const topCatType = (snap.topCategory && String(snap.topCategory.type || '')) || '';
+
+  let diversification = 30 + cats * 14 - Math.max(0, topCat - 40) * 0.7 - Math.max(0, top1 - 35) * 0.5;
+  let liquidity       = 100 - Math.max(0, 8 - cash) * 8 - Math.max(0, cash - 55) * 0.7;
+  let concentration   = 100 - Math.max(0, top1 - 20) * 1.5 - Math.max(0, top3 - 55) * 0.8;
+  let stability       = 100 - crypto * 0.7 - (snap.assetCount <= 1 ? 25 : 0) - Math.max(0, top1 - 50) * 0.4;
+  let growth;
+  if (growthPct != null) growth = 55 + growthPct * 2.2;
+  else growth = 45 + crypto * 0.25 + (/stock|etf|crypto/.test(topCatType) ? 10 : 0);
+
+  return {
+    diversification: Math.round(_intccClamp(diversification, 6, 100)),
+    liquidity:       Math.round(_intccClamp(liquidity, 6, 100)),
+    concentration:   Math.round(_intccClamp(concentration, 6, 100)),
+    stability:       Math.round(_intccClamp(stability, 6, 100)),
+    growth:          Math.round(_intccClamp(growth, 6, 100)),
+  };
+}
+
+// Aurix Health Score — official 0–100 with the INT.2 bands. Starts at 100 and
+// applies fixed, explainable deductions. Inputs (spec): top-1 / top-3
+// concentration, number of categories, crypto exposure, investable liquidity,
+// single-position. PROHIBITED: gross real-estate value, penalising real estate,
+// total wealth for liquidity — none of those are read here.
+function _intccHealthScore(snap, drivers) {
+  if (!snap || !snap.assetCount || snap.totUSD <= 0)
+    return { score: null, band: 'empty', label: t('intcc_band_empty'), reasons: [] };
+  const top1   = (snap.topInvestedAsset && snap.topInvestedAsset.pctTotal) || 0;
+  const top3   = (drivers && drivers.pct) || 0;
+  const cats   = snap.categoryCount || 0;
+  const cash   = snap.cashPct || 0;
+  const crypto = snap.cryptoPct || 0;
+  let s = 100;
+  const reasons = [];
+  if (top1 > 60)        { s -= 22; reasons.push(t('intcc_hs_conc1_high')); }
+  else if (top1 > 45)   { s -= 12; reasons.push(t('intcc_hs_conc1_mid')); }
+  else if (top1 > 35)   { s -= 6; }
+  if (top3 > 80)        { s -= 12; reasons.push(t('intcc_hs_conc3_high')); }
+  else if (top3 > 65)   { s -= 6; }
+  if (cats <= 1)        { s -= 18; reasons.push(t('intcc_hs_div_low')); }
+  else if (cats === 2)  { s -= 9;  reasons.push(t('intcc_hs_div_mid')); }
+  if (crypto > 60)      { s -= 16; reasons.push(t('intcc_hs_crypto_high')); }
+  else if (crypto > 45) { s -= 9;  reasons.push(t('intcc_hs_crypto_mid')); }
+  else if (crypto > 30) { s -= 4; }
+  if (cash === 0)       { s -= 8;  reasons.push(t('intcc_hs_liq_zero')); }
+  else if (cash < 3)    { s -= 5;  reasons.push(t('intcc_hs_liq_low')); }
+  else if (cash > 70)   { s -= 6;  reasons.push(t('intcc_hs_liq_idle')); }
+  if (snap.assetCount === 1) { s -= 15; reasons.push(t('intcc_hs_single')); }
+  s = Math.round(_intccClamp(s, 0, 100));
+  let band, label;
+  if (s >= 90)      { band = 'excellent'; label = t('intcc_band_excellent'); }
+  else if (s >= 75) { band = 'good';      label = t('intcc_band_good'); }
+  else if (s >= 60) { band = 'watch';     label = t('intcc_band_watch'); }
+  else              { band = 'limited';   label = t('intcc_band_limited'); }
+  const explain = reasons.length ? reasons[0] : t('intcc_hs_clean');
+  return { score: s, band, label, reasons: reasons.slice(0, 3), explain };
+}
+
+// Bloque 1 — the dominant wealth reading. Dynamic title + human subtext + state.
+function _intccReading(snap, score, radar, drivers, growthPct) {
+  const top1 = (snap.topInvestedAsset && snap.topInvestedAsset.pctTotal) || 0;
+  const top3 = (drivers && drivers.pct) || 0;
+  let state, title, sub;
+  if (score.score != null && score.score < 60)        { state = 'attention';    title = t('intcc_read_attention'); }
+  else if (top1 >= 50 || top3 >= 70)                   { state = 'concentrated'; title = t('intcc_read_concentrated'); }
+  else if (growthPct != null && growthPct >= 8)        { state = 'growing';      title = t('intcc_read_growing'); }
+  else if (score.score != null && score.score >= 90 &&
+           radar.concentration >= 60)                  { state = 'healthy';      title = t('intcc_read_healthy'); }
+  else                                                 { state = 'balanced';     title = t('intcc_read_balanced'); }
+
+  if (state === 'attention')         sub = t('intcc_sub_attention');
+  else if (state === 'concentrated') sub = t('intcc_sub_concentrated')(top1 >= 50 && snap.topInvestedAsset ? snap.topInvestedAsset.name : (snap.topCategory ? snap.topCategory.label : ''));
+  else if (state === 'growing')      sub = t('intcc_sub_growing')(Math.round(growthPct));
+  else if (state === 'healthy')      sub = t('intcc_sub_healthy');
+  else                               sub = t('intcc_sub_balanced');
+  return { state, title, sub };
+}
+
+// Bloque 7 — wealth identity classification (positive tone, never judging).
+function _intccIdentity(snap, radar) {
+  const crypto = snap.cryptoPct || 0;
+  const cash   = snap.cashPct || 0;
+  const cats   = snap.categoryCount || 0;
+  const topCatType = (snap.topCategory && String(snap.topCategory.type || '')) || '';
+  let key;
+  if (crypto >= 55 || topCatType === 'crypto')                          key = 'tech';
+  else if (cash >= 45 || (crypto < 10 && (topCatType === 'cash' || topCatType === 'metal'))) key = 'defensive';
+  else if (radar.growth >= 70 && crypto >= 25)                          key = 'growth';
+  else if (cats >= 4 && radar.concentration >= 65)                      key = 'diversified';
+  else if (radar.diversification >= 55 && radar.concentration >= 55)    key = 'balanced';
+  else                                                                  key = 'hybrid';
+  return { key, title: t('intcc_id_' + key + '_t'), body: t('intcc_id_' + key + '_b') };
+}
+
+// Bloque 8 — areas to watch (max 4, observational only, never advice).
+function _intccWatchAreas(snap, liq) {
+  const a = [];
+  const top1 = (snap.topInvestedAsset && snap.topInvestedAsset.pctTotal) || 0;
+  if (top1 >= 45 && snap.topInvestedAsset) a.push({ key: 'dep', title: t('intcc_w_dep_t'), body: t('intcc_w_dep_b')(snap.topInvestedAsset.name) });
+  if (liq && liq.cashPct <= 5)             a.push({ key: 'liq', title: t('intcc_w_liq_t'), body: t('intcc_w_liq_b') });
+  if ((snap.cryptoPct || 0) >= 45)         a.push({ key: 'crypto', title: t('intcc_w_crypto_t'), body: t('intcc_w_crypto_b')(snap.cryptoPct) });
+  else if (snap.topCategory && snap.topCategory.pctTotal >= 55) a.push({ key: 'sector', title: t('intcc_w_sector_t'), body: t('intcc_w_sector_b')(snap.topCategory.label) });
+  if ((snap.categoryCount || 0) <= 2)      a.push({ key: 'div', title: t('intcc_w_div_t'), body: t('intcc_w_div_b') });
+  return a.slice(0, 4);
+}
+
+// Bloque 6 — deterministic inline answers for the explore questions.
+function _intccExploreAnswer(key, snap, liq, drivers) {
+  switch (key) {
+    case 'movers': {
+      const top = drivers.items && drivers.items[0];
+      return top ? t('intcc_x_movers')(top.name, top.pct) : t('intcc_x_movers_none');
+    }
+    case 'concentration':
+      return snap.topInvestedAsset ? t('intcc_x_conc')(snap.topInvestedAsset.name, snap.topInvestedAsset.pctTotal) : t('intcc_x_conc_none');
+    case 'liquidity':
+      return t('intcc_x_liq')(liq.cashPct);
+    case 'watch': {
+      const areas = _intccWatchAreas(snap, liq);
+      return areas.length ? areas[0].body : t('intcc_x_watch_none');
+    }
+    default: return '';
+  }
+}
+
+// Bloque 3 — "Desde tu última visita". Compares the live state against a stored
+// visit marker. REAL data only (portfolioHistory total + investable category
+// weights); when there is no prior marker it returns an elegant empty state.
+function _intccReadVisitMarker() {
+  try { const raw = localStorage.getItem(_INTCC_VISIT_KEY); return raw ? JSON.parse(raw) : null; } catch (_) { return null; }
+}
+function _intccCurrentMarker(snap) {
+  const h = (typeof portfolioHistory !== 'undefined' && Array.isArray(portfolioHistory)) ? portfolioHistory : [];
+  const last = h.length ? h[h.length - 1] : null;
+  return {
+    ts:        last ? last.ts : 0,
+    value:     last ? last.value : 0,
+    cashPct:   snap.cashPct || 0,
+    cryptoPct: snap.cryptoPct || 0,
+    topCat:    (snap.topCategory && snap.topCategory.type) || null,
+  };
+}
+function _intccSinceLastVisit(snap) {
+  const prev = _intccReadVisitMarker();
+  const cur  = _intccCurrentMarker(snap);
+  if (!prev || !prev.ts) return { items: [], empty: true };
+  const items = [];
+  if (prev.value > 0 && cur.value > 0) {
+    const d = ((cur.value - prev.value) / prev.value) * 100;
+    if (d >= 1.5)       items.push({ tone: 'up',   text: t('intcc_slv_grow')(Math.round(d)) });
+    else if (d <= -1.5) items.push({ tone: 'down', text: t('intcc_slv_drop')(Math.round(Math.abs(d))) });
+  }
+  const dl = cur.cashPct - (prev.cashPct || 0);
+  if (dl >= 5)       items.push({ tone: 'info', text: t('intcc_slv_liq_up') });
+  else if (dl <= -5) items.push({ tone: 'info', text: t('intcc_slv_liq_down') });
+  if (cur.cryptoPct - (prev.cryptoPct || 0) >= 6) items.push({ tone: 'info', text: t('intcc_slv_crypto_up') });
+  if (prev.topCat && cur.topCat && prev.topCat !== cur.topCat && snap.topCategory)
+    items.push({ tone: 'info', text: t('intcc_slv_topcat')(snap.topCategory.label) });
+  return { items: items.slice(0, 4), empty: items.length === 0 };
+}
+
+// Bloque 9 — intelligence timeline. Milestones derived strictly from the real
+// stored series (portfolioHistory total crossings + categoryHistory liquidity).
+function _intccTimeline() {
+  const out = [];
+  const h = (typeof portfolioHistory !== 'undefined' && Array.isArray(portfolioHistory)) ? portfolioHistory : [];
+  const THRESH = [10000, 25000, 50000, 100000, 250000, 500000, 1000000, 2000000, 5000000];
+  if (h.length >= 2) {
+    for (const thr of THRESH) {
+      for (let i = 1; i < h.length; i++) {
+        if (h[i - 1].value < thr && h[i].value >= thr) {
+          out.push({ ts: h[i].ts, tone: 'up', text: t('intcc_tl_cross')(formatBase(thr)) });
+          break;
+        }
+      }
+    }
+  }
+  const ch = (typeof categoryHistory !== 'undefined' && Array.isArray(categoryHistory)) ? categoryHistory : [];
+  for (let i = 1; i < ch.length; i++) {
+    const pT = ch[i - 1].total, cT = ch[i].total;
+    if (pT > 0 && cT > 0) {
+      const pL = (ch[i - 1].liquidity / pT) * 100, cL = (ch[i].liquidity / cT) * 100;
+      if (pL >= 10 && cL < 10) { out.push({ ts: ch[i].ts, tone: 'info', text: t('intcc_tl_liq10') }); break; }
+    }
+  }
+  out.sort((a, b) => b.ts - a.ts);
+  return out.slice(0, 5);
+}
+function _intccDate(ts) {
+  try {
+    const loc = (typeof lang !== 'undefined' && lang === 'en') ? 'en-US' : 'es-ES';
+    return new Date(ts).toLocaleDateString(loc, { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch (_) { return ''; }
+}
+
+// ── Visual primitives (pure SVG/CSS, no external assets) ────────────────────
+
+// Animated Aurix energy orb — glow + pulse + ECG, tone driven by reading state.
+function _intccOrbHtml() {
+  return `
+    <div class="intcc-orb" aria-hidden="true">
+      <span class="intcc-orb-glow"></span>
+      <span class="intcc-orb-ring intcc-orb-ring--1"></span>
+      <span class="intcc-orb-ring intcc-orb-ring--2"></span>
+      <span class="intcc-orb-core"></span>
+      <svg class="intcc-orb-ecg" viewBox="0 0 120 40" preserveAspectRatio="none">
+        <path d="M0 20 H28 L33 20 L38 7 L44 33 L50 20 L62 20 L68 20 L73 13 L79 27 L85 20 H120"/>
+      </svg>
+    </div>`;
+}
+
+// Health score ring (SVG arc + big number rendered by the caller alongside).
+function _intccScoreRingHtml(score) {
+  const r = 52, c = 2 * Math.PI * r;
+  const pct = (score.score || 0) / 100;
+  const off = c * (1 - _intccClamp(pct, 0, 1));
+  return `
+    <svg class="intcc-score-svg" viewBox="0 0 130 130" aria-hidden="true">
+      <circle class="intcc-score-track" cx="65" cy="65" r="${r}"/>
+      <circle class="intcc-score-arc" cx="65" cy="65" r="${r}"
+        stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"
+        transform="rotate(-90 65 65)"/>
+    </svg>`;
+}
+
+// Premium wealth radar — pentagon grid + filled data polygon + outer labels.
+function _intccRadarSvg(radar) {
+  const dims = [
+    { key: 'diversification', label: t('intcc_dim_div') },
+    { key: 'liquidity',       label: t('intcc_dim_liq') },
+    { key: 'concentration',   label: t('intcc_dim_conc') },
+    { key: 'stability',       label: t('intcc_dim_stab') },
+    { key: 'growth',          label: t('intcc_dim_growth') },
+  ];
+  const cx = 110, cy = 106, R = 76, n = dims.length;
+  const ang = i => (-90 + i * (360 / n)) * Math.PI / 180;
+  const pt  = (i, r) => [cx + Math.cos(ang(i)) * r, cy + Math.sin(ang(i)) * r];
+  let rings = '';
+  [0.25, 0.5, 0.75, 1].forEach(f => {
+    const p = dims.map((_, i) => pt(i, R * f).map(v => v.toFixed(1)).join(',')).join(' ');
+    rings += `<polygon class="intcc-radar-ring" points="${p}"/>`;
+  });
+  let axes = '';
+  dims.forEach((_, i) => { const [x, y] = pt(i, R); axes += `<line class="intcc-radar-axis" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; });
+  const dp = dims.map((d, i) => pt(i, R * (radar[d.key] / 100)).map(v => v.toFixed(1)).join(',')).join(' ');
+  let labels = '', dots = '';
+  dims.forEach((d, i) => {
+    const [lx, ly] = pt(i, R + 15);
+    const anchor = Math.abs(lx - cx) < 8 ? 'middle' : (lx > cx ? 'start' : 'end');
+    labels += `<text class="intcc-radar-label" x="${lx.toFixed(1)}" y="${(ly + 3).toFixed(1)}" text-anchor="${anchor}">${_intccEsc(d.label)}</text>`;
+    const [dx, dy] = pt(i, R * (radar[d.key] / 100));
+    dots += `<circle class="intcc-radar-dot" cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="2.6"/>`;
+  });
+  // viewBox padded horizontally so the outer end/start-anchored labels
+  // (Diversificación, Concentración…) are never clipped on narrow screens.
+  return `
+    <svg class="intcc-radar-svg" viewBox="-58 -4 336 224" role="img" aria-label="${_intccEsc(t('intcc_radar_title'))}">
+      <g class="intcc-radar-grid">${rings}${axes}</g>
+      <polygon class="intcc-radar-area" points="${dp}"/>
+      <g class="intcc-radar-dots">${dots}</g>
+      <g class="intcc-radar-labels">${labels}</g>
+    </svg>`;
+}
+
+// ── Main renderer ───────────────────────────────────────────────────────────
+function _renderIntelligenceCommandCenter() {
+  const snap = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null;
+  const esc  = _intccEsc;
+
+  if (!snap || !snap.assetCount || snap.totUSD <= 0) {
+    return `
+      <div class="aurix-intcc is-empty">
+        <section class="intcc-empty-card">
+          <h2 class="intcc-empty-title">${esc(t('intcc_empty_title'))}</h2>
+          <p class="intcc-empty-body">${esc(t('intcc_empty_body'))}</p>
+        </section>
+      </div>`;
+  }
+
+  const liq       = (typeof buildLiquidityView === 'function') ? buildLiquidityView() : { cashPct: snap.cashPct, marketPct: 100 - snap.cashPct, hasRE: false, reCount: 0 };
+  const drivers   = (typeof buildPortfolioDrivers === 'function') ? buildPortfolioDrivers(snap) : { items: [], pct: 0 };
+  const growthPct = _intccGrowthPct();
+  const radar     = _intccRadar(snap, drivers, growthPct);
+  const score     = _intccHealthScore(snap, drivers);
+  const reading   = _intccReading(snap, score, radar, drivers, growthPct);
+  const identity  = _intccIdentity(snap, radar);
+  const watch     = _intccWatchAreas(snap, liq);
+  const slv       = _intccSinceLastVisit(snap);
+  const timeline  = _intccTimeline();
+  const reCount   = (liq && liq.reCount) || 0;
+
+  // Bloque 1 — chips
+  const chips = [];
+  if (radar.diversification >= 60)                       chips.push({ tone: 'good', label: t('intcc_chip_div') });
+  if (liq.cashPct >= 5 && liq.cashPct <= 60)             chips.push({ tone: 'good', label: t('intcc_chip_liq') });
+  if (((snap.topInvestedAsset && snap.topInvestedAsset.pctTotal) || 0) < 45) chips.push({ tone: 'good', label: t('intcc_chip_conc') });
+  if (growthPct != null && growthPct >= 8)               chips.push({ tone: 'accent', label: t('intcc_chip_growth') });
+  if (score.score != null && score.score < 60)           chips.push({ tone: 'warn', label: t('intcc_chip_watch') });
+
+  const heroHtml = `
+    <section class="intcc-hero is-${esc(reading.state)}" data-state="${esc(reading.state)}">
+      ${_intccOrbHtml()}
+      <div class="intcc-hero-body">
+        <span class="intcc-eyebrow">${esc(t('intcc_eyebrow'))}</span>
+        <h2 class="intcc-hero-title">${esc(reading.title)}</h2>
+        <p class="intcc-hero-sub">${esc(reading.sub)}</p>
+        ${chips.length ? `<div class="intcc-chips">${chips.map(c => `<span class="intcc-chip is-${esc(c.tone)}">${esc(c.label)}</span>`).join('')}</div>` : ''}
+        ${reCount > 0 ? `<p class="intcc-re-ctx">${esc(t('intcc_re_ctx')(reCount))}</p>` : ''}
+      </div>
+    </section>`;
+
+  // Bloque 2 — Aurix Health
+  const healthHtml = `
+    <section class="intcc-card intcc-health is-${esc(score.band)}">
+      <h3 class="intcc-card-title">${esc(t('intcc_health_title'))}</h3>
+      <div class="intcc-health-main">
+        <div class="intcc-score-ring">
+          ${_intccScoreRingHtml(score)}
+          <div class="intcc-score-num"><span class="intcc-score-val">${score.score != null ? score.score : '—'}</span><span class="intcc-score-suffix">${esc(t('intcc_health_suffix'))}</span></div>
+        </div>
+        <div class="intcc-health-side">
+          <span class="intcc-health-badge is-${esc(score.band)}">${esc(score.label)}</span>
+          <p class="intcc-health-explain">${esc(score.explain)}</p>
+        </div>
+      </div>
+    </section>`;
+
+  // Bloque 3 — Since last visit
+  const slvHtml = `
+    <section class="intcc-card intcc-slv">
+      <h3 class="intcc-card-title">${esc(t('intcc_slv_title'))}</h3>
+      ${slv.empty
+        ? `<p class="intcc-slv-empty">${esc(t('intcc_slv_empty'))}</p>`
+        : `<ul class="intcc-slv-list">${slv.items.map(it => `<li class="intcc-slv-item is-${esc(it.tone)}"><span class="intcc-slv-dot" aria-hidden="true"></span>${esc(it.text)}</li>`).join('')}</ul>`}
+    </section>`;
+
+  // Bloque 4 — Radar
+  const radarHtml = `
+    <section class="intcc-card intcc-radar">
+      <h3 class="intcc-card-title">${esc(t('intcc_radar_title'))}</h3>
+      <div class="intcc-radar-wrap">${_intccRadarSvg(radar)}</div>
+    </section>`;
+
+  // Bloque 5 — Drivers
+  const topDriver = drivers.items && drivers.items[0];
+  const driversHtml = `
+    <section class="intcc-card intcc-drivers">
+      <h3 class="intcc-card-title">${esc(t('intcc_drivers_title'))}</h3>
+      ${drivers.items && drivers.items.length ? `
+        ${topDriver ? `<p class="intcc-drv-explain">${esc(t('intcc_drv_explain')(topDriver.name, topDriver.pct))}</p>` : ''}
+        <ol class="intcc-drv-list">
+          ${drivers.items.map((it, i) => `
+            <li class="intcc-drv-row">
+              <span class="intcc-drv-rank">${i + 1}</span>
+              <span class="intcc-drv-name">${esc(it.name)}</span>
+              <span class="intcc-drv-track" aria-hidden="true"><span class="intcc-drv-bar" style="width:${Math.max(3, Math.min(100, it.pct))}%"></span></span>
+              <span class="intcc-drv-pct">${it.pct}%</span>
+            </li>`).join('')}
+        </ol>`
+        : `<p class="intcc-empty-body">${esc(t('intcc_drv_none'))}</p>`}
+    </section>`;
+
+  // Bloque 6 — Explore (inline, deterministic)
+  const questions = [
+    { key: 'movers',        label: t('intcc_q_movers') },
+    { key: 'concentration', label: t('intcc_q_concentration') },
+    { key: 'liquidity',     label: t('intcc_q_liquidity') },
+    { key: 'watch',         label: t('intcc_q_watch') },
+  ];
+  const exploreHtml = `
+    <section class="intcc-card intcc-explore">
+      <h3 class="intcc-card-title">${esc(t('intcc_explore_title'))}</h3>
+      <p class="intcc-explore-hint">${esc(t('intcc_explore_hint'))}</p>
+      <div class="intcc-explore-list">
+        ${questions.map(q => `
+          <div class="intcc-x-item">
+            <button type="button" class="intcc-x-q" data-intcc-q="${esc(q.key)}" aria-expanded="false">
+              <span>${esc(q.label)}</span><span class="intcc-x-caret" aria-hidden="true">+</span>
+            </button>
+            <div class="intcc-x-answer" id="intcc-x-${esc(q.key)}"><p>${esc(_intccExploreAnswer(q.key, snap, liq, drivers))}</p></div>
+          </div>`).join('')}
+      </div>
+    </section>`;
+
+  // Bloque 7 — Identity
+  const identityHtml = `
+    <section class="intcc-card intcc-identity is-${esc(identity.key)}">
+      <h3 class="intcc-card-title">${esc(t('intcc_identity_title'))}</h3>
+      <div class="intcc-id-body">
+        <span class="intcc-id-icon is-${esc(identity.key)}" aria-hidden="true"></span>
+        <div>
+          <p class="intcc-id-name">${esc(identity.title)}</p>
+          <p class="intcc-id-desc">${esc(identity.body)}</p>
+        </div>
+      </div>
+    </section>`;
+
+  // Bloque 8 — Watch areas
+  const watchHtml = `
+    <section class="intcc-card intcc-watch">
+      <h3 class="intcc-card-title">${esc(t('intcc_watch_title'))}</h3>
+      ${watch.length ? `
+        <ul class="intcc-watch-list">
+          ${watch.map(w => `
+            <li class="intcc-watch-item">
+              <span class="intcc-watch-mark" aria-hidden="true"></span>
+              <div><p class="intcc-watch-name">${esc(w.title)}</p><p class="intcc-watch-desc">${esc(w.body)}</p></div>
+            </li>`).join('')}
+        </ul>`
+        : `<p class="intcc-watch-clean">${esc(t('intcc_watch_clean'))}</p>`}
+    </section>`;
+
+  // Bloque 9 — Timeline
+  const timelineHtml = `
+    <section class="intcc-card intcc-timeline">
+      <h3 class="intcc-card-title">${esc(t('intcc_timeline_title'))}</h3>
+      ${timeline.length ? `
+        <ol class="intcc-tl-list">
+          ${timeline.map(ev => `
+            <li class="intcc-tl-item is-${esc(ev.tone)}">
+              <span class="intcc-tl-node" aria-hidden="true"></span>
+              <div class="intcc-tl-body"><p class="intcc-tl-text">${esc(ev.text)}</p><span class="intcc-tl-date">${esc(_intccDate(ev.ts))}</span></div>
+            </li>`).join('')}
+        </ol>`
+        : `<p class="intcc-empty-body">${esc(t('intcc_timeline_empty'))}</p>`}
+    </section>`;
+
+  return `
+    <div class="aurix-intcc">
+      ${heroHtml}
+      ${healthHtml}
+      ${slvHtml}
+      ${radarHtml}
+      ${driversHtml}
+      ${exploreHtml}
+      ${identityHtml}
+      ${watchHtml}
+      ${timelineHtml}
+      <p class="intcc-disclaimer">${esc(t('intcc_disclaimer'))}</p>
+    </div>`;
+}
+
+// Post-mount init: trigger reveal animation, wire the (one-time) inline explore
+// delegation, and refresh the visit marker (throttled so "since last visit"
+// stays meaningful within a single session).
+function _initIntelligenceCommandCenter() {
+  try {
+    const root = document.querySelector('.aurix-intcc');
+    if (root && !root.classList.contains('is-empty')) {
+      requestAnimationFrame(() => root.classList.add('is-revealed'));
+    }
+  } catch (_) {}
+
+  try {
+    const prev = _intccReadVisitMarker();
+    const now  = Date.now();
+    if (!prev || !prev.savedAt || now - prev.savedAt > 30 * 60 * 1000) {
+      const snap = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null;
+      if (snap) {
+        const cur = _intccCurrentMarker(snap);
+        cur.savedAt = now;
+        localStorage.setItem(_INTCC_VISIT_KEY, JSON.stringify(cur));
+      }
+    }
+  } catch (_) {}
+
+  if (!_intccExploreWired) {
+    _intccExploreWired = true;
+    document.addEventListener('click', e => {
+      const btn = e.target && e.target.closest ? e.target.closest('[data-intcc-q]') : null;
+      if (!btn) return;
+      const ans = document.getElementById('intcc-x-' + btn.getAttribute('data-intcc-q'));
+      if (!ans) return;
+      const open = ans.classList.toggle('is-open');
+      btn.classList.toggle('is-active', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  }
 }
 
 function switchTab(tab) {
