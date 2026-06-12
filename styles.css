@@ -18862,7 +18862,7 @@ body.gs-open { overflow: hidden; }
 /* Shared card surface — INT.2P: navy/blue glass, not flat grey */
 .intcc-card {
   position: relative;
-  padding: 20px;
+  padding: 18px;
   border-radius: 18px;
   border: 1px solid rgba(74,130,240,0.16);
   background:
@@ -19091,8 +19091,8 @@ body.gs-open { overflow: hidden; }
 .intcc-x-q {
   width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
   font: inherit; cursor: pointer; text-align: left;
-  padding: 13px 15px; border: 0; background: transparent;
-  font-size: 13.5px; font-weight: 600; color: var(--text-bright);
+  padding: 11px 14px; border: 0; background: transparent;
+  font-size: 13px; font-weight: 600; color: var(--text-bright);
   transition: background 140ms ease;
 }
 .intcc-x-q:hover { background: rgba(74,130,240,0.07); }
@@ -19208,15 +19208,40 @@ body.gs-open { overflow: hidden; }
   .intcc-disclaimer { order: 8; }
 }
 @media (max-width: 640px) {
-  .aurix-intcc { padding: 4px 12px 32px; gap: 12px; }
-  .intcc-hero { flex-direction: column; text-align: center; padding: 22px 20px; gap: 16px; }
-  .intcc-hero-body { text-align: center; }
-  .intcc-hero-sub { max-width: none; }
-  .intcc-chips { justify-content: center; }
-  .intcc-hero-title { font-size: 22px; }
-  .intcc-hero-orb-wrap .intcc-orb { width: 96px; height: 96px; }
-  .intcc-hero .intcc-score-ring, .intcc-hero .intcc-score-svg { width: 110px; height: 110px; }
-  .intcc-hero .intcc-score-val { font-size: 31px; }
+  /* Bloque 12 — clear the bottom nav (safe area) so last cards aren't hidden */
+  .aurix-intcc { padding: 4px 12px calc(78px + env(safe-area-inset-bottom, 0px)); gap: 12px; }
+
+  /* Bloque 1 — compact hero: [ score | orb ] top row, then title / sub / chips */
+  .intcc-hero { flex-flow: row wrap; align-items: center; gap: 12px 14px; padding: 16px 18px; text-align: left; }
+  .intcc-hero-score { order: 1; flex-direction: row; align-items: center; gap: 10px; }
+  .intcc-hero-orb-wrap { order: 2; margin-left: auto; }
+  .intcc-hero-body { order: 3; flex-basis: 100%; min-width: 100%; text-align: left; }
+  .intcc-hero .intcc-eyebrow { display: none; }            /* remove "Inteligencia patrimonial" */
+  .intcc-hero-health-label { display: none; }              /* remove duplicated label */
+  .intcc-hero-score .intcc-health-badge { margin: 0; }
+  .intcc-hero .intcc-score-ring, .intcc-hero .intcc-score-svg { width: 84px; height: 84px; }
+  .intcc-hero .intcc-score-val { font-size: 25px; }
+  .intcc-hero .intcc-score-suffix { font-size: 9px; margin-top: 1px; }
+  .intcc-hero-orb-wrap .intcc-orb { width: 84px; height: 84px; }
+  .intcc-hero-title { font-size: 20px; margin-bottom: 6px; }
+  .intcc-hero-sub { max-width: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .intcc-chips { margin-top: 10px; }
+  .intcc-chip { height: 25px; padding: 0 10px; font-size: 11px; }
+
+  /* Bloque 4/5/6/9 — compact cards on mobile */
+  .intcc-card { padding: 14px 15px; }
+  .intcc-card-title { margin-bottom: 10px; }
+  .intcc-radar-svg { max-width: 280px; }
+  .intcc-drv-explain { font-size: 12px; margin-bottom: 10px; }
+  .intcc-drv-list { gap: 9px; }
+  .intcc-x-q { padding: 9px 13px; font-size: 12.5px; }
+  .intcc-x-caret { width: 20px; height: 20px; }
+  .intcc-x-caret svg { width: 11px; height: 11px; }
+  .intcc-watch-list { gap: 11px; }
+  .intcc-tl-item { padding-bottom: 14px; }
+  .intcc-id-icon { width: 44px; height: 44px; }
+  .intcc-id-icon svg { width: 21px; height: 21px; }
+  .intcc-id-name { font-size: 15px; }
 }
 
 /* Reduced-motion — calm everything, keep it readable */

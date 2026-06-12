@@ -1670,7 +1670,7 @@ const T = {
     intcc_id_hybrid_b:     'Tu cartera mezcla crecimiento, estabilidad y liquidez sin una identidad única.',
     intcc_id_hybrid_x:     'Es un perfil flexible, todavía sin un sesgo claro que lo defina.',
     intcc_watch_title: 'Áreas a vigilar',
-    intcc_watch_clean: 'No se observan señales que requieran atención especial en este momento. Aurix seguirá monitorizando liquidez, concentración y diversificación.',
+    intcc_watch_clean: 'No se observan señales prioritarias. Aurix seguirá vigilando liquidez, concentración y diversificación.',
     intcc_w_dep_t:    'Dependencia de activo principal',
     intcc_w_dep_b:    name => `Buena parte de tu patrimonio invertible se apoya en ${name}.`,
     intcc_w_liq_t:    'Liquidez reducida',
@@ -3114,7 +3114,7 @@ const T = {
     intcc_id_hybrid_b:     'Your portfolio mixes growth, stability and liquidity with no single identity.',
     intcc_id_hybrid_x:     'A flexible profile, still without a clear defining bias.',
     intcc_watch_title: 'Areas to watch',
-    intcc_watch_clean: 'No signals require special attention right now. Aurix will keep monitoring liquidity, concentration and diversification.',
+    intcc_watch_clean: 'No priority signals right now. Aurix will keep watching liquidity, concentration and diversification.',
     intcc_w_dep_t:    'Dependence on the main asset',
     intcc_w_dep_b:    name => `A large part of your investable wealth rests on ${name}.`,
     intcc_w_liq_t:    'Reduced liquidity',
@@ -21580,13 +21580,14 @@ function _renderIntelligenceCommandCenter() {
   const watch     = _intccWatchAreas(snap, liq);
   const timeline  = _intccTimeline();
 
-  // Bloque 1 — chips
-  const chips = [];
-  if (radar.diversification >= 60)                       chips.push({ tone: 'good', label: t('intcc_chip_div') });
-  if (liq.cashPct >= 5 && liq.cashPct <= 60)             chips.push({ tone: 'good', label: t('intcc_chip_liq') });
-  if (((snap.topInvestedAsset && snap.topInvestedAsset.pctTotal) || 0) < 45) chips.push({ tone: 'good', label: t('intcc_chip_conc') });
-  if (growthPct != null && growthPct >= 8)               chips.push({ tone: 'accent', label: t('intcc_chip_growth') });
-  if (score.score != null && score.score < 60)           chips.push({ tone: 'warn', label: t('intcc_chip_watch') });
+  // Bloque 1/3 — chips. INT.2U: max 3 shown; "Crecimiento elevado" removed (the
+  // title already communicates growth). Positive signals first, then watch.
+  const chipsAll = [];
+  if (radar.diversification >= 60)                       chipsAll.push({ tone: 'good', label: t('intcc_chip_div') });
+  if (liq.cashPct >= 5 && liq.cashPct <= 60)             chipsAll.push({ tone: 'good', label: t('intcc_chip_liq') });
+  if (((snap.topInvestedAsset && snap.topInvestedAsset.pctTotal) || 0) < 45) chipsAll.push({ tone: 'good', label: t('intcc_chip_conc') });
+  if (score.score != null && score.score < 60)           chipsAll.push({ tone: 'warn', label: t('intcc_chip_watch') });
+  const chips = chipsAll.slice(0, 3);
 
   // Bloque 1/2 — institutional hero. Reading order: Health score → main
   // conclusion → visual signature (orb). Score shown ONCE (no duplicated metric).
@@ -21703,8 +21704,8 @@ function _renderIntelligenceCommandCenter() {
           </div>`}
     </section>`;
 
-  // Bloque 9/11 — Timeline. Scalable: max 4 visible, "+N más" when longer.
-  const TL_MAX = 4;
+  // Bloque 8/9/11 — Timeline. Scalable: max 3 visible (INT.2U), "+N más" when longer.
+  const TL_MAX = 3;
   const tlShown = timeline.slice(0, TL_MAX);
   const tlExtra = Math.max(0, timeline.length - TL_MAX);
   const timelineHtml = `
