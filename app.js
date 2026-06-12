@@ -1612,7 +1612,8 @@ const T = {
     intcc_hs_liq_idle:    'Mantienes una proporción alta en efectivo.',
     intcc_hs_single:      'Tu patrimonio invertible se apoya en una sola posición.',
     intcc_slv_title:   'Desde tu última visita',
-    intcc_slv_empty:   'Aurix está construyendo tu historial patrimonial. Cuando haya más datos, verás aquí los cambios relevantes.',
+    intcc_slv_empty:   'Aurix está construyendo tu historial patrimonial. Pronto verás aquí los cambios más relevantes.',
+    intcc_slv_more:    n => `+${n} ${n === 1 ? 'cambio' : 'cambios'} más`,
     intcc_slv_grow:    pct => `Tu patrimonio ha crecido alrededor de un ${pct}%.`,
     intcc_slv_drop:    pct => `Tu patrimonio ha bajado alrededor de un ${pct}%.`,
     intcc_slv_liq_up:  'Tu liquidez ha aumentado.',
@@ -1650,24 +1651,24 @@ const T = {
     intcc_x_liq_high:    pct => `Tu liquidez es elevada. Representa cerca del ${pct}% del patrimonio invertible: aporta flexibilidad, aunque puede reducir tu exposición a crecimiento.`,
     intcc_x_watch_none:  'No se detectan áreas críticas ahora mismo. Aurix seguirá monitorizando concentración, liquidez y exposición.',
     intcc_identity_title: 'Identidad patrimonial',
-    intcc_id_growth_t:     'Patrimonio orientado al crecimiento',
-    intcc_id_growth_b:     'Tu patrimonio tiene una orientación clara hacia el crecimiento.',
-    intcc_id_growth_x:     'La mayor parte de tu exposición se apoya en activos con mayor potencial de revalorización.',
-    intcc_id_balanced_t:   'Patrimonio equilibrado',
-    intcc_id_balanced_b:   'Tu patrimonio mantiene un equilibrio saludable entre categorías.',
-    intcc_id_balanced_x:   'Combinas estabilidad y crecimiento sin que ninguna parte domine al resto.',
-    intcc_id_tech_t:       'Patrimonio tecnológico',
-    intcc_id_tech_b:       'Tu patrimonio tiene una marcada orientación tecnológica.',
-    intcc_id_tech_x:       'La presencia de activos digitales y compañías tecnológicas define parte importante de tu exposición.',
-    intcc_id_defensive_t:  'Patrimonio defensivo',
-    intcc_id_defensive_b:  'Tu patrimonio prioriza la estabilidad y la liquidez.',
-    intcc_id_defensive_x:  'El peso de la liquidez y de los activos de menor volatilidad reduce tu exposición al riesgo.',
-    intcc_id_diversified_t:'Patrimonio diversificado',
-    intcc_id_diversified_b:'Tu patrimonio está bien repartido entre varias categorías.',
-    intcc_id_diversified_x:'La distribución entre clases de activo evita dependencias marcadas de una sola posición.',
-    intcc_id_hybrid_t:     'Patrimonio híbrido',
-    intcc_id_hybrid_b:     'Tu patrimonio combina varios perfiles a la vez.',
-    intcc_id_hybrid_x:     'Conviven rasgos de crecimiento, estabilidad y diversificación sin una orientación única dominante.',
+    intcc_id_growth_t:     'Perfil orientado al crecimiento',
+    intcc_id_growth_b:     'Buena parte de tu cartera busca revalorización a medio y largo plazo.',
+    intcc_id_growth_x:     'Predominan activos con mayor recorrido potencial; el equilibrio con la liquidez marca tu margen de maniobra.',
+    intcc_id_balanced_t:   'Perfil equilibrado',
+    intcc_id_balanced_b:   'Repartes el peso entre crecimiento, estabilidad y liquidez sin un sesgo dominante.',
+    intcc_id_balanced_x:   'Es una estructura versátil, capaz de absorber altibajos sin depender de una sola apuesta.',
+    intcc_id_tech_t:       'Perfil tecnológico',
+    intcc_id_tech_b:       'Los activos digitales y las compañías de tecnología marcan el carácter de tu cartera.',
+    intcc_id_tech_x:       'Aporta un potencial de crecimiento elevado; su contrapartida es una mayor sensibilidad al ciclo tecnológico.',
+    intcc_id_defensive_t:  'Perfil defensivo y líquido',
+    intcc_id_defensive_b:  'La liquidez y los activos estables forman el núcleo de tu patrimonio.',
+    intcc_id_defensive_x:  'Priorizas disponibilidad y baja volatilidad, a cambio de una menor exposición al crecimiento.',
+    intcc_id_diversified_t:'Perfil diversificado',
+    intcc_id_diversified_b:'Tu patrimonio se reparte con holgura entre varias clases de activo.',
+    intcc_id_diversified_x:'Ninguna posición concentra el riesgo, lo que suaviza el impacto de un mal momento puntual.',
+    intcc_id_hybrid_t:     'Perfil híbrido',
+    intcc_id_hybrid_b:     'Tu cartera mezcla crecimiento, estabilidad y liquidez sin una identidad única.',
+    intcc_id_hybrid_x:     'Es un perfil flexible, todavía sin un sesgo claro que lo defina.',
     intcc_watch_title: 'Áreas a vigilar',
     intcc_watch_clean: 'No se detectan áreas prioritarias ahora mismo. Aurix seguirá vigilando concentración, liquidez y exposición.',
     intcc_w_dep_t:    'Dependencia de activo principal',
@@ -1684,6 +1685,7 @@ const T = {
     intcc_timeline_empty: 'Aurix está construyendo tu historial patrimonial. Tus hitos aparecerán aquí a medida que tu patrimonio evolucione.',
     intcc_tl_cross:  amount => `Tu patrimonio superó ${amount}.`,
     intcc_tl_liq10:  'Tu liquidez bajó por debajo del 10%.',
+    intcc_tl_more:   n => `+${n} ${n === 1 ? 'hito' : 'hitos'} más en tu historial`,
     intcc_re_ctx:    n => n === 1 ? '1 inmueble registrado, como contexto patrimonial.' : `${n} inmuebles registrados, como contexto patrimonial.`,
     intcc_disclaimer: 'Aurix interpreta tu patrimonio con datos reales. No es asesoramiento de inversión.',
     // Status pills
@@ -3054,7 +3056,8 @@ const T = {
     intcc_hs_liq_idle:    'You hold a high proportion in cash.',
     intcc_hs_single:      'Your investable wealth rests on a single position.',
     intcc_slv_title:   'Since your last visit',
-    intcc_slv_empty:   'Aurix is building your wealth history. Once there is more data, relevant changes will show up here.',
+    intcc_slv_empty:   'Aurix is building your wealth history. Soon you will see the most relevant changes here.',
+    intcc_slv_more:    n => `+${n} more ${n === 1 ? 'change' : 'changes'}`,
     intcc_slv_grow:    pct => `Your wealth has grown by around ${pct}%.`,
     intcc_slv_drop:    pct => `Your wealth has fallen by around ${pct}%.`,
     intcc_slv_liq_up:  'Your liquidity has increased.',
@@ -3092,24 +3095,24 @@ const T = {
     intcc_x_liq_high:    pct => `Your liquidity is high. It's around ${pct}% of your investable wealth: it adds flexibility, though it may reduce growth exposure.`,
     intcc_x_watch_none:  'No critical areas right now. Aurix will keep monitoring concentration, liquidity and exposure.',
     intcc_identity_title: 'Wealth identity',
-    intcc_id_growth_t:     'Growth-oriented wealth',
-    intcc_id_growth_b:     'Your wealth has a clear orientation toward growth.',
-    intcc_id_growth_x:     'Most of your exposure rests on assets with higher appreciation potential.',
-    intcc_id_balanced_t:   'Balanced wealth',
-    intcc_id_balanced_b:   'Your wealth keeps a healthy balance across categories.',
-    intcc_id_balanced_x:   'You combine stability and growth without any single part dominating the rest.',
-    intcc_id_tech_t:       'Technology wealth',
-    intcc_id_tech_b:       'Your wealth has a strong technology orientation.',
-    intcc_id_tech_x:       'The presence of digital assets and technology companies defines an important part of your exposure.',
-    intcc_id_defensive_t:  'Defensive wealth',
-    intcc_id_defensive_b:  'Your wealth prioritizes stability and liquidity.',
-    intcc_id_defensive_x:  'The weight of liquidity and lower-volatility assets reduces your risk exposure.',
-    intcc_id_diversified_t:'Diversified wealth',
-    intcc_id_diversified_b:'Your wealth is well spread across several categories.',
-    intcc_id_diversified_x:'The distribution across asset classes avoids marked dependence on a single position.',
-    intcc_id_hybrid_t:     'Hybrid wealth',
-    intcc_id_hybrid_b:     'Your wealth combines several profiles at once.',
-    intcc_id_hybrid_x:     'Traits of growth, stability and diversification coexist with no single dominant orientation.',
+    intcc_id_growth_t:     'Growth-oriented profile',
+    intcc_id_growth_b:     'A good part of your portfolio seeks appreciation over the medium to long term.',
+    intcc_id_growth_x:     'Higher-potential assets dominate; the balance with liquidity sets your room to manoeuvre.',
+    intcc_id_balanced_t:   'Balanced profile',
+    intcc_id_balanced_b:   'You spread weight across growth, stability and liquidity with no dominant bias.',
+    intcc_id_balanced_x:   'A versatile structure, able to absorb ups and downs without leaning on a single bet.',
+    intcc_id_tech_t:       'Technology profile',
+    intcc_id_tech_b:       'Digital assets and technology companies define the character of your portfolio.',
+    intcc_id_tech_x:       'It brings high growth potential; the trade-off is greater sensitivity to the tech cycle.',
+    intcc_id_defensive_t:  'Defensive, liquid profile',
+    intcc_id_defensive_b:  'Liquidity and stable assets form the core of your wealth.',
+    intcc_id_defensive_x:  'You prioritize availability and low volatility, at the cost of less growth exposure.',
+    intcc_id_diversified_t:'Diversified profile',
+    intcc_id_diversified_b:'Your wealth is comfortably spread across several asset classes.',
+    intcc_id_diversified_x:'No position concentrates the risk, which softens the impact of a single rough patch.',
+    intcc_id_hybrid_t:     'Hybrid profile',
+    intcc_id_hybrid_b:     'Your portfolio mixes growth, stability and liquidity with no single identity.',
+    intcc_id_hybrid_x:     'A flexible profile, still without a clear defining bias.',
     intcc_watch_title: 'Areas to watch',
     intcc_watch_clean: 'No priority areas right now. Aurix will keep watching concentration, liquidity and exposure.',
     intcc_w_dep_t:    'Dependence on the main asset',
@@ -3126,6 +3129,7 @@ const T = {
     intcc_timeline_empty: 'Aurix is building your wealth history. Your milestones will appear here as your wealth evolves.',
     intcc_tl_cross:  amount => `Your wealth crossed ${amount}.`,
     intcc_tl_liq10:  'Your liquidity dropped below 10%.',
+    intcc_tl_more:   n => `+${n} more ${n === 1 ? 'milestone' : 'milestones'} in your history`,
     intcc_re_ctx:    n => n === 1 ? '1 property on record, as wealth context.' : `${n} properties on record, as wealth context.`,
     intcc_disclaimer: 'Aurix interprets your wealth with real data. It is not investment advice.',
     // Status pills
@@ -21356,7 +21360,7 @@ function _intccWatchAreas(snap, liq) {
   if ((snap.cryptoPct || 0) >= 45)         a.push({ key: 'crypto', title: t('intcc_w_crypto_t'), body: t('intcc_w_crypto_b')(snap.cryptoPct) });
   else if (snap.topCategory && snap.topCategory.pctTotal >= 55) a.push({ key: 'sector', title: t('intcc_w_sector_t'), body: t('intcc_w_sector_b')(snap.topCategory.label) });
   if ((snap.categoryCount || 0) <= 2)      a.push({ key: 'div', title: t('intcc_w_div_t'), body: t('intcc_w_div_b') });
-  return a.slice(0, 4);
+  return a.slice(0, 3);
 }
 
 // Bloque 6/8 — deterministic, smarter inline answers for the explore questions.
@@ -21424,7 +21428,8 @@ function _intccSinceLastVisit(snap) {
   if (cur.cryptoPct - (prev.cryptoPct || 0) >= 6) items.push({ tone: 'info', text: t('intcc_slv_crypto_up') });
   if (prev.topCat && cur.topCat && prev.topCat !== cur.topCat && snap.topCategory)
     items.push({ tone: 'info', text: t('intcc_slv_topcat')(snap.topCategory.label) });
-  return { items: items.slice(0, 4), empty: items.length === 0 };
+  // Return up to 8 real changes; the renderer shows 3 and counts the rest.
+  return { items: items.slice(0, 8), empty: items.length === 0 };
 }
 
 // Bloque 9 — intelligence timeline. Milestones derived strictly from the real
@@ -21452,7 +21457,7 @@ function _intccTimeline() {
     }
   }
   out.sort((a, b) => b.ts - a.ts);
-  return out.slice(0, 5);
+  return out.slice(0, 8);
 }
 function _intccDate(ts) {
   try {
@@ -21575,7 +21580,6 @@ function _renderIntelligenceCommandCenter() {
   const watch     = _intccWatchAreas(snap, liq);
   const slv       = _intccSinceLastVisit(snap);
   const timeline  = _intccTimeline();
-  const reCount   = (liq && liq.reCount) || 0;
 
   // Bloque 1 — chips
   const chips = [];
@@ -21585,40 +21589,41 @@ function _renderIntelligenceCommandCenter() {
   if (growthPct != null && growthPct >= 8)               chips.push({ tone: 'accent', label: t('intcc_chip_growth') });
   if (score.score != null && score.score < 60)           chips.push({ tone: 'warn', label: t('intcc_chip_watch') });
 
+  // Bloque 2 — unified hero: orb + health score + wealth reading as ONE premium
+  // block (INT.2R). The orb is the living signature, the score gives Salud its
+  // protagonism, and the reading + chips are compact alongside.
   const heroHtml = `
-    <section class="intcc-hero is-${esc(reading.state)}" data-state="${esc(reading.state)}">
-      ${_intccOrbHtml()}
+    <section class="intcc-hero is-${esc(reading.state)} is-${esc(score.band)}" data-state="${esc(reading.state)}">
+      <div class="intcc-hero-gauge">
+        ${_intccOrbHtml()}
+        <div class="intcc-hero-score">
+          ${_intccScoreRingHtml(score)}
+          <div class="intcc-score-num"><span class="intcc-score-val">${score.score != null ? score.score : '—'}</span><span class="intcc-score-suffix">${esc(t('intcc_health_suffix'))}</span></div>
+        </div>
+      </div>
       <div class="intcc-hero-body">
         <span class="intcc-eyebrow">${esc(t('intcc_eyebrow'))}</span>
         <h2 class="intcc-hero-title">${esc(reading.title)}</h2>
         <p class="intcc-hero-sub">${esc(reading.sub)}</p>
+        <div class="intcc-hero-meta">
+          <span class="intcc-health-badge is-${esc(score.band)}">${esc(score.label)}</span>
+          <span class="intcc-hero-health-label">${esc(t('intcc_health_title'))} · ${score.score != null ? score.score : '—'}/100</span>
+        </div>
         ${chips.length ? `<div class="intcc-chips">${chips.map(c => `<span class="intcc-chip is-${esc(c.tone)}">${esc(c.label)}</span>`).join('')}</div>` : ''}
       </div>
     </section>`;
 
-  // Bloque 2 — Aurix Health
-  const healthHtml = `
-    <section class="intcc-card intcc-health is-${esc(score.band)}">
-      <h3 class="intcc-card-title">${esc(t('intcc_health_title'))}</h3>
-      <div class="intcc-health-main">
-        <div class="intcc-score-ring">
-          ${_intccScoreRingHtml(score)}
-          <div class="intcc-score-num"><span class="intcc-score-val">${score.score != null ? score.score : '—'}</span><span class="intcc-score-suffix">${esc(t('intcc_health_suffix'))}</span></div>
-        </div>
-        <div class="intcc-health-side">
-          <span class="intcc-health-badge is-${esc(score.band)}">${esc(score.label)}</span>
-          <p class="intcc-health-explain">${esc(score.explain)}</p>
-        </div>
-      </div>
-    </section>`;
-
-  // Bloque 3 — Since last visit
+  // Bloque 3 — Since last visit. Scalable: max 3 visible, "+N más" when longer.
+  const SLV_MAX = 3;
+  const slvShown = slv.items.slice(0, SLV_MAX);
+  const slvExtra = Math.max(0, slv.items.length - SLV_MAX);
   const slvHtml = `
     <section class="intcc-card intcc-slv">
       <h3 class="intcc-card-title">${esc(t('intcc_slv_title'))}</h3>
       ${slv.empty
         ? `<p class="intcc-slv-empty">${esc(t('intcc_slv_empty'))}</p>`
-        : `<ul class="intcc-slv-list">${slv.items.map(it => `<li class="intcc-slv-item is-${esc(it.tone)}"><span class="intcc-slv-dot" aria-hidden="true"></span>${esc(it.text)}</li>`).join('')}</ul>`}
+        : `<ul class="intcc-slv-list">${slvShown.map(it => `<li class="intcc-slv-item is-${esc(it.tone)}"><span class="intcc-slv-dot" aria-hidden="true"></span>${esc(it.text)}</li>`).join('')}</ul>
+           ${slvExtra > 0 ? `<p class="intcc-more-note">${esc(t('intcc_slv_more')(slvExtra))}</p>` : ''}`}
     </section>`;
 
   // Bloque 4 — Radar
@@ -21663,12 +21668,14 @@ function _renderIntelligenceCommandCenter() {
   const exploreHtml = `
     <section class="intcc-card intcc-explore">
       <h3 class="intcc-card-title">${esc(t('intcc_explore_title'))}</h3>
-      <p class="intcc-explore-hint">${esc(t('intcc_explore_hint'))}</p>
       <div class="intcc-explore-list">
         ${questions.map(q => `
           <div class="intcc-x-item">
             <button type="button" class="intcc-x-q" data-intcc-q="${esc(q.key)}" aria-expanded="false">
-              <span>${esc(q.label)}</span><span class="intcc-x-caret" aria-hidden="true">+</span>
+              <span class="intcc-x-label">${esc(q.label)}</span>
+              <span class="intcc-x-caret" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </span>
             </button>
             <div class="intcc-x-answer" id="intcc-x-${esc(q.key)}"><p>${esc(_intccExploreAnswer(q.key, snap, liq, drivers))}</p></div>
           </div>`).join('')}
@@ -21689,7 +21696,6 @@ function _renderIntelligenceCommandCenter() {
           <p class="intcc-id-explain">${esc(identity.explain)}</p>
         </div>
       </div>
-      ${reCount > 0 ? `<p class="intcc-re-ctx">${esc(t('intcc_re_ctx')(reCount))}</p>` : ''}
     </section>`;
 
   // Bloque 8 — Watch areas
@@ -21712,25 +21718,28 @@ function _renderIntelligenceCommandCenter() {
           </div>`}
     </section>`;
 
-  // Bloque 9 — Timeline
+  // Bloque 9/11 — Timeline. Scalable: max 4 visible, "+N más" when longer.
+  const TL_MAX = 4;
+  const tlShown = timeline.slice(0, TL_MAX);
+  const tlExtra = Math.max(0, timeline.length - TL_MAX);
   const timelineHtml = `
     <section class="intcc-card intcc-timeline">
       <h3 class="intcc-card-title">${esc(t('intcc_timeline_title'))}</h3>
       ${timeline.length ? `
         <ol class="intcc-tl-list">
-          ${timeline.map(ev => `
+          ${tlShown.map(ev => `
             <li class="intcc-tl-item is-${esc(ev.tone)}">
               <span class="intcc-tl-node" aria-hidden="true"></span>
               <div class="intcc-tl-body"><p class="intcc-tl-text">${esc(ev.text)}</p><span class="intcc-tl-date">${esc(_intccDate(ev.ts))}</span></div>
             </li>`).join('')}
-        </ol>`
+        </ol>
+        ${tlExtra > 0 ? `<p class="intcc-more-note">${esc(t('intcc_tl_more')(tlExtra))}</p>` : ''}`
         : `<p class="intcc-empty-body">${esc(t('intcc_timeline_empty'))}</p>`}
     </section>`;
 
   return `
     <div class="aurix-intcc">
       ${heroHtml}
-      ${healthHtml}
       ${slvHtml}
       ${radarHtml}
       ${driversHtml}
@@ -21773,9 +21782,21 @@ function _initIntelligenceCommandCenter() {
       if (!btn) return;
       const ans = document.getElementById('intcc-x-' + btn.getAttribute('data-intcc-q'));
       if (!ans) return;
-      const open = ans.classList.toggle('is-open');
-      btn.classList.toggle('is-active', open);
-      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      const item     = btn.closest('.intcc-x-item');
+      const list     = btn.closest('.intcc-explore-list');
+      const willOpen = !ans.classList.contains('is-open');
+      // INT.2R — only one answer open at a time; collapse the rest first.
+      if (list) {
+        list.querySelectorAll('.intcc-x-answer.is-open').forEach(a => a.classList.remove('is-open'));
+        list.querySelectorAll('.intcc-x-q.is-active').forEach(b => { b.classList.remove('is-active'); b.setAttribute('aria-expanded', 'false'); });
+        list.querySelectorAll('.intcc-x-item.is-active').forEach(i => i.classList.remove('is-active'));
+      }
+      if (willOpen) {
+        ans.classList.add('is-open');
+        btn.classList.add('is-active');
+        btn.setAttribute('aria-expanded', 'true');
+        if (item) item.classList.add('is-active');
+      }
     });
   }
 }
@@ -33060,14 +33081,14 @@ function renderAurixSignal() {
   sec.hidden = false;
   _aurixSignalBindResize();
 
-  // Keyboard parity for role="button" — Enter/Space opens Workspace too.
+  // Keyboard parity for role="button" — Enter/Space opens Intelligence too (INT.2R).
   if (!sec.dataset.keybound) {
     sec.dataset.keybound = '1';
     sec.addEventListener('keydown', (ev) => {
       if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Spacebar') {
         ev.preventDefault();
-        if (typeof switchTab === 'function') switchTab('workspace');
-        else { const tab = document.querySelector('#bottomNav [data-tab="workspace"]'); if (tab) tab.click(); }
+        if (typeof switchTab === 'function') switchTab('intelligence');
+        else { const tab = document.querySelector('#bottomNav [data-tab="intelligence"]'); if (tab) tab.click(); }
       }
     });
   }
@@ -33173,15 +33194,16 @@ if (typeof window !== 'undefined' && _aurixIsDebugHost()) {
       return;
     }
 
-    // AURIX-PREMIUM-CLEANUP-1: the signal is a Workspace teaser. The WHOLE
-    // card (and its CTA, which lives inside it) routes straight into
-    // Workspace — no Health-panel modal detour. Workspace owns intelligence.
+    // INT.2R (Bloque 12): the Dashboard health signal ("Ver análisis") now routes
+    // to the dedicated Intelligence tab — portfolio intelligence moved out of
+    // Workspace (IA.1), so the old Workspace handoff was stale. The WHOLE card
+    // (and its inner CTA) opens Intelligence.
     const sigEl = e.target.closest && e.target.closest('#aurixSignal');
     if (sigEl) {
       if (typeof switchTab === 'function') {
-        switchTab('workspace');
+        switchTab('intelligence');
       } else {
-        const tab = document.querySelector('#bottomNav [data-tab="workspace"]');
+        const tab = document.querySelector('#bottomNav [data-tab="intelligence"]');
         if (tab) tab.click();
       }
       return;
