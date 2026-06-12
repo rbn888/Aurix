@@ -18941,15 +18941,16 @@ body.gs-open { overflow: hidden; }
 .intcc-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .intcc-chip {
   display: inline-flex; align-items: center; gap: 6px;
-  height: 28px; padding: 0 13px; border-radius: 999px;
+  height: 25px; padding: 0 12px; border-radius: 999px;       /* INT.2V — height -10% */
   font-size: 11.5px; font-weight: 600; line-height: 1; white-space: nowrap;
-  border: 1px solid var(--color-border-subtle); color: var(--text-bright);
-  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.05); color: var(--text-bright);   /* softer border */
+  background: rgba(255,255,255,0.035);
+  box-shadow: inset 0 0 12px rgba(74,130,240,0.06);          /* premium inner glow */
 }
 .intcc-chip.is-good::before, .intcc-chip.is-accent::before { content: '✓'; font-size: 10px; font-weight: 800; opacity: 0.95; }
-.intcc-chip.is-good   { border-color: rgba(63,191,127,0.4);  color: #8fe6b6; background: rgba(63,191,127,0.10); }
-.intcc-chip.is-accent { border-color: rgba(74,130,240,0.45); color: #aecbff; background: rgba(74,130,240,0.12); }
-.intcc-chip.is-warn   { border-color: rgba(233,168,87,0.45); color: #f3cf9a; background: rgba(233,168,87,0.12); }
+.intcc-chip.is-good   { border-color: rgba(63,191,127,0.28); color: #8fe6b6; background: rgba(63,191,127,0.09);  box-shadow: inset 0 0 12px rgba(63,191,127,0.12); }
+.intcc-chip.is-accent { border-color: rgba(74,130,240,0.30); color: #aecbff; background: rgba(74,130,240,0.10); box-shadow: inset 0 0 12px rgba(74,130,240,0.14); }
+.intcc-chip.is-warn   { border-color: rgba(233,168,87,0.30); color: #f3cf9a; background: rgba(233,168,87,0.10); box-shadow: inset 0 0 12px rgba(233,168,87,0.12); }
 
 /* Energy orb — pure SVG/CSS, no external assets */
 .intcc-orb {
@@ -18958,11 +18959,11 @@ body.gs-open { overflow: hidden; }
   display: grid; place-items: center;
 }
 .intcc-orb-glow {
-  position: absolute; inset: -20%;
+  position: absolute; inset: -24%;                 /* INT.2V — halo +10% */
   border-radius: 50%;
   background:
-    radial-gradient(circle, rgba(var(--orb-c), 0.70), rgba(var(--orb-c), 0.14) 52%, transparent 72%);
-  filter: blur(7px);
+    radial-gradient(circle, rgba(var(--orb-c), 0.82), rgba(var(--orb-c), 0.16) 52%, transparent 72%);  /* outer glow +15% */
+  filter: blur(8px);
   animation: intccOrbPulse 4.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 .intcc-orb-ring {
@@ -18974,11 +18975,12 @@ body.gs-open { overflow: hidden; }
 .intcc-orb-core {
   position: absolute; inset: 31%;
   border-radius: 50%;
-  background: radial-gradient(circle at 36% 30%, rgba(255,255,255,0.98), rgba(var(--orb-c), 0.95) 42%, rgba(var(--orb-c), 0.40) 100%);
+  /* INT.2V — top reflection +10%, inner glow +10% */
+  background: radial-gradient(circle at 35% 28%, rgba(255,255,255,1), rgba(var(--orb-c), 0.96) 42%, rgba(var(--orb-c), 0.42) 100%);
   box-shadow:
-    0 0 26px rgba(var(--orb-c), 0.85),
-    inset 0 0 12px rgba(255,255,255,0.45),
-    inset 0 -4px 10px rgba(var(--orb-c), 0.6);
+    0 0 30px rgba(var(--orb-c), 0.92),
+    inset 0 0 13px rgba(255,255,255,0.55),
+    inset 0 -4px 11px rgba(var(--orb-c), 0.62);
   animation: intccOrbBreath 4.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 .intcc-orb-ecg {
@@ -19087,7 +19089,7 @@ body.gs-open { overflow: hidden; }
 /* ── Bloque 6 — Explore (inline) ── */
 .intcc-explore-hint { margin: -6px 0 14px; font-size: 12px; color: var(--text-muted); }
 .intcc-explore-list { display: flex; flex-direction: column; gap: 8px; }
-.intcc-x-item { border: 1px solid var(--color-border-subtle); border-radius: 12px; overflow: hidden; background: rgba(255,255,255,0.015); }
+.intcc-x-item { position: relative; border: 1px solid var(--color-border-subtle); border-radius: 12px; background: rgba(255,255,255,0.015); }
 .intcc-x-q {
   width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
   font: inherit; cursor: pointer; text-align: left;
@@ -19107,9 +19109,18 @@ body.gs-open { overflow: hidden; }
 .intcc-x-q:hover .intcc-x-caret { background: rgba(74,130,240,0.2); color: #cfe0ff; }
 .intcc-x-q.is-active .intcc-x-caret { transform: rotate(180deg); background: rgba(74,130,240,0.24); color: #cfe0ff; }
 .intcc-x-item.is-active { border-color: rgba(74,130,240,0.4); background: rgba(74,130,240,0.05); }
-.intcc-x-answer { max-height: 0; overflow: hidden; transition: max-height 300ms cubic-bezier(0.22,1,0.36,1); }
-.intcc-x-answer.is-open { max-height: 220px; }
-.intcc-x-answer p { margin: 0; padding: 2px 15px 14px; font-size: 13px; line-height: 1.55; color: var(--text-muted); }
+/* INT.2V Bloque 7 — premium internal popover: absolute, z-index, never grows the
+   card nor pushes content below; soft opacity + translateY transition. */
+.intcc-x-answer {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 30;
+  border-radius: 12px; border: 1px solid rgba(74,130,240,0.40);
+  background: linear-gradient(165deg, rgba(34,48,80,0.99), rgba(15,21,37,0.99));
+  box-shadow: 0 16px 42px rgba(0,0,0,0.52), 0 0 0 1px rgba(74,130,240,0.12);
+  opacity: 0; transform: translateY(-4px); pointer-events: none;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.intcc-x-answer.is-open { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.intcc-x-answer p { margin: 0; padding: 12px 14px; font-size: 13px; line-height: 1.55; color: var(--text-bright); }
 
 /* "+N más" footer for scalable Desde-última-visita / Línea temporal */
 .intcc-more-note { margin: 12px 0 0; font-size: 11.5px; font-weight: 600; color: rgba(150,180,240,0.7); letter-spacing: 0.02em; }
@@ -19193,6 +19204,7 @@ body.gs-open { overflow: hidden; }
   .intcc-timeline  { grid-column: 9 / 13; grid-row: 3; }
   .intcc-disclaimer { grid-column: 1 / 13; grid-row: 4; }
   .intcc-hero-title { font-size: 27px; }
+  .intcc-hero-orb-wrap { margin-right: 32px; }   /* INT.2V Bloque 4 — breathing room */
 }
 @media (min-width: 1440px) { .aurix-intcc { max-width: 1340px; } }
 
@@ -19211,18 +19223,18 @@ body.gs-open { overflow: hidden; }
   /* Bloque 12 — clear the bottom nav (safe area) so last cards aren't hidden */
   .aurix-intcc { padding: 4px 12px calc(78px + env(safe-area-inset-bottom, 0px)); gap: 12px; }
 
-  /* Bloque 1 — compact hero: [ score | orb ] top row, then title / sub / chips */
-  .intcc-hero { flex-flow: row wrap; align-items: center; gap: 12px 14px; padding: 16px 18px; text-align: left; }
-  .intcc-hero-score { order: 1; flex-direction: row; align-items: center; gap: 10px; }
-  .intcc-hero-orb-wrap { order: 2; margin-left: auto; }
+  /* Bloque 1/2/8 — compact hero: [ SALUD module | orb ] top row, then LECTURA */
+  .intcc-hero { flex-flow: row wrap; align-items: center; gap: 10px 14px; padding: 14px 18px; text-align: left; }
+  .intcc-hero-score { order: 1; display: flex; flex-flow: row wrap; align-items: center; justify-content: center; gap: 4px 8px; }
+  .intcc-hero-health-label { flex-basis: 100%; text-align: center; font-size: 9px; letter-spacing: 0.08em; margin: 0 0 2px; }   /* label ABOVE circle */
+  .intcc-hero-orb-wrap { order: 2; margin-left: auto; margin-right: 0; }
   .intcc-hero-body { order: 3; flex-basis: 100%; min-width: 100%; text-align: left; }
-  .intcc-hero .intcc-eyebrow { display: none; }            /* remove "Inteligencia patrimonial" */
-  .intcc-hero-health-label { display: none; }              /* remove duplicated label */
-  .intcc-hero-score .intcc-health-badge { margin: 0; }
-  .intcc-hero .intcc-score-ring, .intcc-hero .intcc-score-svg { width: 84px; height: 84px; }
-  .intcc-hero .intcc-score-val { font-size: 25px; }
-  .intcc-hero .intcc-score-suffix { font-size: 9px; margin-top: 1px; }
-  .intcc-hero-orb-wrap .intcc-orb { width: 84px; height: 84px; }
+  .intcc-hero .intcc-eyebrow { display: block; font-size: 9.5px; letter-spacing: 0.12em; margin-bottom: 5px; }   /* "Lectura patrimonial" */
+  .intcc-hero-score .intcc-health-badge { margin: 0; font-size: 10.5px; padding: 3px 9px; }
+  .intcc-hero .intcc-score-ring, .intcc-hero .intcc-score-svg { width: 76px; height: 76px; }
+  .intcc-hero .intcc-score-val { font-size: 23px; }
+  .intcc-hero .intcc-score-suffix { font-size: 8.5px; margin-top: 1px; }
+  .intcc-hero-orb-wrap .intcc-orb { width: 77px; height: 77px; }
   .intcc-hero-title { font-size: 20px; margin-bottom: 6px; }
   .intcc-hero-sub { max-width: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .intcc-chips { margin-top: 10px; }

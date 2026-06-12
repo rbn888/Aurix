@@ -1574,7 +1574,7 @@ const T = {
     int_review_workspace:     'Usar Workspace para simular aportaciones futuras.',
     int_disclaimer:    'Aurix interpreta tu patrimonio con datos reales. No es asesoramiento de inversión.',
     // ── INT.2 — Aurix Intelligence Command Center ──
-    intcc_eyebrow:        'Inteligencia patrimonial',
+    intcc_eyebrow:        'Lectura patrimonial',
     intcc_empty_title:    'Aún no hay análisis disponible',
     intcc_empty_body:     'Añade activos a tu cartera para que Aurix interprete tu patrimonio.',
     intcc_read_healthy:      'Tu patrimonio está sano',
@@ -3018,7 +3018,7 @@ const T = {
     int_review_workspace:     'Use Workspace to simulate future contributions.',
     int_disclaimer:    'Aurix interprets your wealth with real data. It is not investment advice.',
     // ── INT.2 — Aurix Intelligence Command Center ──
-    intcc_eyebrow:        'Wealth intelligence',
+    intcc_eyebrow:        'Wealth reading',
     intcc_empty_title:    'No analysis available yet',
     intcc_empty_body:     'Add assets to your portfolio so Aurix can interpret your wealth.',
     intcc_read_healthy:      'Your wealth is healthy',
@@ -21594,12 +21594,12 @@ function _renderIntelligenceCommandCenter() {
   const heroHtml = `
     <section class="intcc-hero is-${esc(reading.state)} is-${esc(score.band)}" data-state="${esc(reading.state)}">
       <div class="intcc-hero-score">
+        <span class="intcc-hero-health-label">${esc(t('intcc_health_title'))}</span>
         <div class="intcc-score-ring">
           ${_intccScoreRingHtml(score)}
           <div class="intcc-score-num"><span class="intcc-score-val">${score.score != null ? score.score : '—'}</span><span class="intcc-score-suffix">${esc(t('intcc_health_suffix'))}</span></div>
         </div>
         <span class="intcc-health-badge is-${esc(score.band)}">${esc(score.label)}</span>
-        <span class="intcc-hero-health-label">${esc(t('intcc_health_title'))}</span>
       </div>
       <div class="intcc-hero-body">
         <span class="intcc-eyebrow">${esc(t('intcc_eyebrow'))}</span>
