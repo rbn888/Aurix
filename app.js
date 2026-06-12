@@ -1627,8 +1627,8 @@ const T = {
     intcc_dim_stab:   'Estabilidad',
     intcc_dim_growth: 'Crecimiento',
     intcc_drivers_title: 'Factores principales',
-    intcc_drv_explain_asset: (name, pct) => `${name} es hoy tu principal motor de exposición, con cerca del ${pct}% del patrimonio invertible.`,
-    intcc_drv_explain_cash:  name => `Tu mayor componente actual es liquidez en ${name}: aporta flexibilidad más que rentabilidad.`,
+    intcc_drv_explain_asset: name => `${name} representa actualmente la mayor exposición individual de tu patrimonio.`,
+    intcc_drv_explain_cash:  (name, pct) => `Tu mayor posición actual es efectivo en ${name} (${pct}%). Aporta estabilidad y capacidad para aprovechar oportunidades.`,
     intcc_drv_kind_eng:  'Exposición',
     intcc_drv_kind_liq:  'Liquidez',
     intcc_drv_none:      'Aún no hay posiciones suficientes para identificar tus factores principales.',
@@ -1638,8 +1638,8 @@ const T = {
     intcc_q_concentration: '¿Dónde estoy concentrado?',
     intcc_q_liquidity:     '¿Tengo suficiente liquidez?',
     intcc_q_watch:         '¿Qué debería vigilar?',
-    intcc_x_movers:      (name, pct) => `Tu principal motor de exposición es ${name}, con cerca del ${pct}% del patrimonio invertible.`,
-    intcc_x_movers_cash: name => `Tu mayor componente actual es liquidez en ${name}. Como divisa estable, no impulsa rentabilidad, pero sí aumenta tu flexibilidad.`,
+    intcc_x_movers:      (name, pct) => `Tu mayor exposición de mercado es ${name}, con cerca del ${pct}% del patrimonio invertible.`,
+    intcc_x_movers_cash: (name, pct) => `Tu mayor posición actual es efectivo en ${name} (${pct}%). Aporta estabilidad y capacidad para aprovechar oportunidades, aunque no impulsa la rentabilidad.`,
     intcc_x_movers_none: 'Todavía no hay posiciones suficientes para medir qué mueve tu patrimonio.',
     intcc_x_conc:        (name, pct) => `Tu mayor concentración está en ${name}, con cerca del ${pct}% del patrimonio invertible.`,
     intcc_x_conc_ok:     'No parece excesiva si el resto está bien distribuido.',
@@ -1649,8 +1649,8 @@ const T = {
     intcc_x_liq_mid:     pct => `Tu liquidez es moderada. Representa cerca del ${pct}% del patrimonio invertible.`,
     intcc_x_liq_good:    pct => `Sí. Tu liquidez inmediata representa cerca del ${pct}% del patrimonio invertible, un nivel cómodo para reaccionar ante oportunidades o imprevistos.`,
     intcc_x_liq_high:    pct => `Tu liquidez es elevada. Representa cerca del ${pct}% del patrimonio invertible: aporta flexibilidad, aunque puede reducir tu exposición a crecimiento.`,
-    intcc_x_watch_none:  'No se detectan áreas críticas ahora mismo. Aurix seguirá monitorizando concentración, liquidez y exposición.',
-    intcc_identity_title: 'Identidad patrimonial',
+    intcc_x_watch_none:  'No se observan señales que requieran atención especial en este momento. Aurix seguirá monitorizando liquidez, concentración y diversificación.',
+    intcc_identity_title: 'Perfil patrimonial',
     intcc_id_growth_t:     'Perfil orientado al crecimiento',
     intcc_id_growth_b:     'Buena parte de tu cartera busca revalorización a medio y largo plazo.',
     intcc_id_growth_x:     'Predominan activos con mayor recorrido potencial; el equilibrio con la liquidez marca tu margen de maniobra.',
@@ -1670,7 +1670,7 @@ const T = {
     intcc_id_hybrid_b:     'Tu cartera mezcla crecimiento, estabilidad y liquidez sin una identidad única.',
     intcc_id_hybrid_x:     'Es un perfil flexible, todavía sin un sesgo claro que lo defina.',
     intcc_watch_title: 'Áreas a vigilar',
-    intcc_watch_clean: 'No se detectan áreas prioritarias ahora mismo. Aurix seguirá vigilando concentración, liquidez y exposición.',
+    intcc_watch_clean: 'No se observan señales que requieran atención especial en este momento. Aurix seguirá monitorizando liquidez, concentración y diversificación.',
     intcc_w_dep_t:    'Dependencia de activo principal',
     intcc_w_dep_b:    name => `Buena parte de tu patrimonio invertible se apoya en ${name}.`,
     intcc_w_liq_t:    'Liquidez reducida',
@@ -3071,8 +3071,8 @@ const T = {
     intcc_dim_stab:   'Stability',
     intcc_dim_growth: 'Growth',
     intcc_drivers_title: 'Key drivers',
-    intcc_drv_explain_asset: (name, pct) => `${name} is today your main exposure driver, at around ${pct}% of your investable wealth.`,
-    intcc_drv_explain_cash:  name => `Your largest current component is liquidity in ${name}: it adds flexibility more than return.`,
+    intcc_drv_explain_asset: name => `${name} is currently the single largest exposure in your wealth.`,
+    intcc_drv_explain_cash:  (name, pct) => `Your largest current position is cash in ${name} (${pct}%). It adds stability and the capacity to seize opportunities.`,
     intcc_drv_kind_eng:  'Exposure',
     intcc_drv_kind_liq:  'Liquidity',
     intcc_drv_none:      'Not enough positions yet to identify your key drivers.',
@@ -3082,8 +3082,8 @@ const T = {
     intcc_q_concentration: 'Where am I concentrated?',
     intcc_q_liquidity:     'Do I have enough liquidity?',
     intcc_q_watch:         'What should I watch?',
-    intcc_x_movers:      (name, pct) => `Your main exposure driver is ${name}, at around ${pct}% of your investable wealth.`,
-    intcc_x_movers_cash: name => `Your largest current component is liquidity in ${name}. As a stable currency it doesn't drive return, but it does add flexibility.`,
+    intcc_x_movers:      (name, pct) => `Your largest market exposure is ${name}, at around ${pct}% of your investable wealth.`,
+    intcc_x_movers_cash: (name, pct) => `Your largest current position is cash in ${name} (${pct}%). It adds stability and the capacity to seize opportunities, though it doesn't drive return.`,
     intcc_x_movers_none: 'Not enough positions yet to measure what moves your wealth.',
     intcc_x_conc:        (name, pct) => `Your biggest concentration is in ${name}, at around ${pct}% of your investable wealth.`,
     intcc_x_conc_ok:     "It doesn't look excessive if the rest is well distributed.",
@@ -3093,8 +3093,8 @@ const T = {
     intcc_x_liq_mid:     pct => `Your liquidity is moderate. It's around ${pct}% of your investable wealth.`,
     intcc_x_liq_good:    pct => `Yes. Your immediate liquidity is around ${pct}% of your investable wealth — a comfortable level to react to opportunities or surprises.`,
     intcc_x_liq_high:    pct => `Your liquidity is high. It's around ${pct}% of your investable wealth: it adds flexibility, though it may reduce growth exposure.`,
-    intcc_x_watch_none:  'No critical areas right now. Aurix will keep monitoring concentration, liquidity and exposure.',
-    intcc_identity_title: 'Wealth identity',
+    intcc_x_watch_none:  'No signals require special attention right now. Aurix will keep monitoring liquidity, concentration and diversification.',
+    intcc_identity_title: 'Wealth profile',
     intcc_id_growth_t:     'Growth-oriented profile',
     intcc_id_growth_b:     'A good part of your portfolio seeks appreciation over the medium to long term.',
     intcc_id_growth_x:     'Higher-potential assets dominate; the balance with liquidity sets your room to manoeuvre.',
@@ -3114,7 +3114,7 @@ const T = {
     intcc_id_hybrid_b:     'Your portfolio mixes growth, stability and liquidity with no single identity.',
     intcc_id_hybrid_x:     'A flexible profile, still without a clear defining bias.',
     intcc_watch_title: 'Areas to watch',
-    intcc_watch_clean: 'No priority areas right now. Aurix will keep watching concentration, liquidity and exposure.',
+    intcc_watch_clean: 'No signals require special attention right now. Aurix will keep monitoring liquidity, concentration and diversification.',
     intcc_w_dep_t:    'Dependence on the main asset',
     intcc_w_dep_b:    name => `A large part of your investable wealth rests on ${name}.`,
     intcc_w_liq_t:    'Reduced liquidity',
@@ -21371,7 +21371,7 @@ function _intccExploreAnswer(key, snap, liq, drivers) {
       if (!top) return t('intcc_x_movers_none');
       // A stable currency / cash top component is liquidity, not an engine.
       return _intccIsMonetary(top.type)
-        ? t('intcc_x_movers_cash')(top.name)
+        ? t('intcc_x_movers_cash')(top.name, top.pct)
         : t('intcc_x_movers')(top.name, top.pct);
     }
     case 'concentration': {
@@ -21578,7 +21578,6 @@ function _renderIntelligenceCommandCenter() {
   const reading   = _intccReading(snap, score, radar, drivers, growthPct);
   const identity  = _intccIdentity(snap, radar);
   const watch     = _intccWatchAreas(snap, liq);
-  const slv       = _intccSinceLastVisit(snap);
   const timeline  = _intccTimeline();
 
   // Bloque 1 — chips
@@ -21589,41 +21588,27 @@ function _renderIntelligenceCommandCenter() {
   if (growthPct != null && growthPct >= 8)               chips.push({ tone: 'accent', label: t('intcc_chip_growth') });
   if (score.score != null && score.score < 60)           chips.push({ tone: 'warn', label: t('intcc_chip_watch') });
 
-  // Bloque 2 — unified hero: orb + health score + wealth reading as ONE premium
-  // block (INT.2R). The orb is the living signature, the score gives Salud its
-  // protagonism, and the reading + chips are compact alongside.
+  // Bloque 1/2 — institutional hero. Reading order: Health score → main
+  // conclusion → visual signature (orb). Score shown ONCE (no duplicated metric).
   const heroHtml = `
     <section class="intcc-hero is-${esc(reading.state)} is-${esc(score.band)}" data-state="${esc(reading.state)}">
-      <div class="intcc-hero-gauge">
-        ${_intccOrbHtml()}
-        <div class="intcc-hero-score">
+      <div class="intcc-hero-score">
+        <div class="intcc-score-ring">
           ${_intccScoreRingHtml(score)}
           <div class="intcc-score-num"><span class="intcc-score-val">${score.score != null ? score.score : '—'}</span><span class="intcc-score-suffix">${esc(t('intcc_health_suffix'))}</span></div>
         </div>
+        <span class="intcc-health-badge is-${esc(score.band)}">${esc(score.label)}</span>
+        <span class="intcc-hero-health-label">${esc(t('intcc_health_title'))}</span>
       </div>
       <div class="intcc-hero-body">
         <span class="intcc-eyebrow">${esc(t('intcc_eyebrow'))}</span>
         <h2 class="intcc-hero-title">${esc(reading.title)}</h2>
         <p class="intcc-hero-sub">${esc(reading.sub)}</p>
-        <div class="intcc-hero-meta">
-          <span class="intcc-health-badge is-${esc(score.band)}">${esc(score.label)}</span>
-          <span class="intcc-hero-health-label">${esc(t('intcc_health_title'))} · ${score.score != null ? score.score : '—'}/100</span>
-        </div>
         ${chips.length ? `<div class="intcc-chips">${chips.map(c => `<span class="intcc-chip is-${esc(c.tone)}">${esc(c.label)}</span>`).join('')}</div>` : ''}
       </div>
-    </section>`;
-
-  // Bloque 3 — Since last visit. Scalable: max 3 visible, "+N más" when longer.
-  const SLV_MAX = 3;
-  const slvShown = slv.items.slice(0, SLV_MAX);
-  const slvExtra = Math.max(0, slv.items.length - SLV_MAX);
-  const slvHtml = `
-    <section class="intcc-card intcc-slv">
-      <h3 class="intcc-card-title">${esc(t('intcc_slv_title'))}</h3>
-      ${slv.empty
-        ? `<p class="intcc-slv-empty">${esc(t('intcc_slv_empty'))}</p>`
-        : `<ul class="intcc-slv-list">${slvShown.map(it => `<li class="intcc-slv-item is-${esc(it.tone)}"><span class="intcc-slv-dot" aria-hidden="true"></span>${esc(it.text)}</li>`).join('')}</ul>
-           ${slvExtra > 0 ? `<p class="intcc-more-note">${esc(t('intcc_slv_more')(slvExtra))}</p>` : ''}`}
+      <div class="intcc-hero-orb-wrap">
+        ${_intccOrbHtml()}
+      </div>
     </section>`;
 
   // Bloque 4 — Radar
@@ -21638,8 +21623,8 @@ function _renderIntelligenceCommandCenter() {
   const topDriver = drivers.items && drivers.items[0];
   const driverLead = topDriver
     ? (_intccIsMonetary(topDriver.type)
-        ? t('intcc_drv_explain_cash')(topDriver.name)
-        : t('intcc_drv_explain_asset')(topDriver.name, topDriver.pct))
+        ? t('intcc_drv_explain_cash')(topDriver.name, topDriver.pct)
+        : t('intcc_drv_explain_asset')(topDriver.name))
     : '';
   const driversHtml = `
     <section class="intcc-card intcc-drivers">
@@ -21740,7 +21725,6 @@ function _renderIntelligenceCommandCenter() {
   return `
     <div class="aurix-intcc">
       ${heroHtml}
-      ${slvHtml}
       ${radarHtml}
       ${driversHtml}
       ${exploreHtml}
