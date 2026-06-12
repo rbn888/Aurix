@@ -18988,10 +18988,10 @@ body.gs-open { overflow: hidden; }
   overflow: visible;
 }
 .intcc-orb-ecg path {
-  fill: none; stroke: #7fd3ff; stroke-width: 1.5;
+  fill: none; stroke: #9fe2ff; stroke-width: 1.9;          /* INT.2X — brighter cyan, more visible over the core */
   stroke-linecap: round; stroke-linejoin: round;
   stroke-dasharray: 58 202; stroke-dashoffset: 260;
-  filter: drop-shadow(0 0 4px rgba(56,189,248,0.95));
+  filter: drop-shadow(0 0 3px rgba(56,189,248,1)) drop-shadow(0 0 7px rgba(56,189,248,0.55));
   animation: intccEcg 3s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 @keyframes intccOrbPulse  { 0%,100% { opacity: 0.65; transform: scale(0.97); } 50% { opacity: 1; transform: scale(1.05); } }
@@ -19203,15 +19203,23 @@ body.gs-open { overflow: hidden; }
   .intcc-watch     { grid-column: 5 / 9;  grid-row: 3; }
   .intcc-timeline  { grid-column: 9 / 13; grid-row: 3; }
   .intcc-disclaimer { grid-column: 1 / 13; grid-row: 4; }
-  .intcc-hero-title { font-size: 27px; }
-  .intcc-hero-orb-wrap { margin-right: 32px; }   /* INT.2V — breathing room */
-  /* INT.2W Bloque 2 — premium divider between Salud (left) and Inteligencia
-     (centre). The orb sits to the right of the body, so it stays grouped with
-     Inteligencia, not Salud. */
+  .intcc-hero-title { font-size: 27px; margin-bottom: 9px; }
+  .intcc-hero-orb-wrap { margin-right: 28px; }   /* INT.2V/2X — breathing room */
+  /* INT.2X Bloque 1/2 — central Inteligencia zone as a premium fintech-style
+     soft card: airy padding, contained, doesn't grow the hero. Salud stays left,
+     orb right (grouped with Inteligencia). */
   .intcc-hero-body {
-    padding-left: 30px; margin-left: 6px;
-    border-left: 1px solid rgba(120,160,255,0.14);
-    box-shadow: -1px 0 18px -10px rgba(77,141,255,0.5);
+    align-self: stretch;
+    display: flex; flex-direction: column; justify-content: center;
+    margin: 0 8px; padding: 16px 26px;
+    background: linear-gradient(165deg, rgba(120,160,255,0.06), rgba(255,255,255,0.012));
+    border: 1px solid rgba(120,160,255,0.13);
+    border-radius: 16px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 26px -16px rgba(77,141,255,0.6);
+  }
+  .intcc-hero-body .intcc-eyebrow {
+    font-size: 11px; letter-spacing: 0.16em; color: rgba(159,194,255,0.95);
+    margin-bottom: 11px; font-weight: 700;
   }
 }
 @media (min-width: 1440px) { .aurix-intcc { max-width: 1340px; } }
@@ -19231,21 +19239,25 @@ body.gs-open { overflow: hidden; }
   /* Bloque 12 — clear the bottom nav (safe area) so last cards aren't hidden */
   .aurix-intcc { padding: 4px 12px calc(78px + env(safe-area-inset-bottom, 0px)); gap: 12px; }
 
-  /* Bloque 3/5 — mobile hero. Row 1: Salud (label/score/Excelente, vertical) left
-     + orb right. Row 2: Inteligencia. Row 3: chips. Subtle divider separates the
-     Salud row from the Inteligencia block — no mixing. */
-  .intcc-hero { flex-flow: row wrap; align-items: center; gap: 8px 14px; padding: 14px 18px; text-align: left; }
-  .intcc-hero-score { order: 1; flex-direction: column; align-items: flex-start; gap: 3px; }
-  .intcc-hero-health-label { text-align: left; font-size: 9px; letter-spacing: 0.08em; margin: 0; }   /* label ABOVE circle */
-  .intcc-hero-orb-wrap { order: 2; margin-left: auto; margin-right: 0; }
-  .intcc-hero-body { order: 3; flex-basis: 100%; min-width: 100%; text-align: left; margin-top: 8px; padding-top: 12px; border-top: 1px solid rgba(120,160,255,0.12); }
-  .intcc-hero .intcc-eyebrow { display: block; font-size: 9.5px; letter-spacing: 0.12em; margin-bottom: 5px; }   /* "Inteligencia patrimonial" */
-  .intcc-hero-score .intcc-health-badge { margin: 2px 0 0; font-size: 10px; padding: 3px 9px; }
-  .intcc-hero .intcc-score-ring, .intcc-hero .intcc-score-svg { width: 68px; height: 68px; }
-  .intcc-hero .intcc-score-val { font-size: 21px; }
-  .intcc-hero .intcc-score-suffix { font-size: 8px; margin-top: 0; }
-  .intcc-hero-orb-wrap .intcc-orb { width: 74px; height: 74px; }
+  /* Bloque 4/5/6 — mobile hero hierarchy via explicit grid (deterministic):
+     row 1 = Inteligencia reading (full width); row 2 = Salud left + orb right. */
+  .intcc-hero {
+    display: grid; align-items: center;
+    grid-template-columns: 1fr auto;     /* score flexible (left), orb fixed (right) */
+    grid-template-areas: "body body" "score orb";
+    gap: 13px 14px; padding: 16px 18px; text-align: left;
+  }
+  .intcc-hero-body { grid-area: body; min-width: 0; text-align: left; padding: 0 0 13px; border-bottom: 1px solid rgba(120,160,255,0.12); }
+  .intcc-hero .intcc-eyebrow { display: block; font-size: 10px; letter-spacing: 0.14em; font-weight: 700; color: rgba(159,194,255,0.95); margin-bottom: 6px; }   /* "Inteligencia patrimonial" header */
   .intcc-hero-title { font-size: 20px; margin-bottom: 6px; }
+  .intcc-hero-score { grid-area: score; justify-self: start; flex-direction: column; align-items: flex-start; gap: 3px; }
+  .intcc-hero-health-label { text-align: left; font-size: 9px; letter-spacing: 0.08em; margin: 0; }   /* label ABOVE circle */
+  .intcc-hero-orb-wrap { grid-area: orb; justify-self: end; }
+  .intcc-hero-score .intcc-health-badge { margin: 2px 0 0; font-size: 10px; padding: 3px 9px; }
+  .intcc-hero .intcc-score-ring, .intcc-hero .intcc-score-svg { width: 66px; height: 66px; }
+  .intcc-hero .intcc-score-val { font-size: 20px; }
+  .intcc-hero .intcc-score-suffix { font-size: 8px; margin-top: 0; }
+  .intcc-hero-orb-wrap .intcc-orb { width: 72px; height: 72px; }
   .intcc-hero-sub { max-width: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .intcc-chips { margin-top: 10px; }
   .intcc-chip { height: 25px; padding: 0 10px; font-size: 11px; }
