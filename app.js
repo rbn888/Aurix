@@ -1739,6 +1739,40 @@ const T = {
     wsh_fp_now:            'Ahora',
     wsh_fp_base:           'Base',
     wsh_fp_future:         'Futuro',
+    // WS.2 — Scenario Builder
+    wsb_title:         'Scenario Builder',
+    wsb_subtitle:      'Compara decisiones antes de ejecutarlas.',
+    wsb_back:          'Volver a Workspace',
+    wsb_current_title: 'Escenario actual',
+    wsb_current_note:  'Tu punto de partida, con datos reales de tu patrimonio.',
+    wsb_horizon:       'Horizonte 10 años · 6% anual',
+    wsb_metric_wealth: 'Patrimonio invertible',
+    wsb_metric_liquidity: 'Liquidez',
+    wsb_metric_topexp: 'Mayor exposición',
+    wsb_scenarios_title: 'Escenarios',
+    wsb_a_name: 'Más constancia',
+    wsb_a_desc: '+200 €/mes',
+    wsb_b_name: 'Crecimiento acelerado',
+    wsb_b_desc: '+500 €/mes',
+    wsb_c_name: 'Crecimiento equilibrado',
+    wsb_c_desc: '+500 €/mes · mayor estabilidad',
+    wsb_stab_steady:   'Constante',
+    wsb_stab_dynamic:  'Dinámico',
+    wsb_stab_balanced: 'Equilibrado',
+    wsb_proj:   'Patrimonio proyectado',
+    wsb_diff:   'Diferencia vs actual',
+    wsb_save:   'Guardar escenario',
+    wsb_saved:  'Guardado ✓',
+    wsb_read_a: 'Una aportación constante suma de forma sólida a largo plazo.',
+    wsb_read_b: 'Aportar más acelera notablemente tu patrimonio proyectado.',
+    wsb_read_c: 'Crecimiento similar al acelerado, con una evolución más estable.',
+    wsb_chart_title: 'Comparativa a 10 años',
+    wsb_axis_now: 'Actual',
+    wsb_concl_title: 'Lectura de Aurix',
+    wsb_concl_balanced: 'El escenario equilibrado combina crecimiento y estabilidad.',
+    wsb_concl_more: 'Aumentar aportaciones mejora claramente el resultado proyectado.',
+    wsb_concl_steady: 'El mayor impacto viene de mantener una aportación mensual constante.',
+    wsb_disclaimer: 'Simulación orientativa. No es una promesa de rentabilidad ni asesoramiento financiero.',
     // Status pills
     statusOpen:        'Abierto',
     statusClosed:      'Cerrado',
@@ -3234,6 +3268,40 @@ const T = {
     wsh_fp_now:            'Now',
     wsh_fp_base:           'Base',
     wsh_fp_future:         'Future',
+    // WS.2 — Scenario Builder
+    wsb_title:         'Scenario Builder',
+    wsb_subtitle:      'Compare decisions before you make them.',
+    wsb_back:          'Back to Workspace',
+    wsb_current_title: 'Current scenario',
+    wsb_current_note:  'Your starting point, from your real wealth data.',
+    wsb_horizon:       '10-year horizon · 6% annual',
+    wsb_metric_wealth: 'Investable wealth',
+    wsb_metric_liquidity: 'Liquidity',
+    wsb_metric_topexp: 'Top exposure',
+    wsb_scenarios_title: 'Scenarios',
+    wsb_a_name: 'More consistency',
+    wsb_a_desc: '+€200/mo',
+    wsb_b_name: 'Accelerated growth',
+    wsb_b_desc: '+€500/mo',
+    wsb_c_name: 'Balanced growth',
+    wsb_c_desc: '+€500/mo · higher stability',
+    wsb_stab_steady:   'Steady',
+    wsb_stab_dynamic:  'Dynamic',
+    wsb_stab_balanced: 'Balanced',
+    wsb_proj:   'Projected wealth',
+    wsb_diff:   'Difference vs current',
+    wsb_save:   'Save scenario',
+    wsb_saved:  'Saved ✓',
+    wsb_read_a: 'A steady contribution adds up solidly over the long run.',
+    wsb_read_b: 'Contributing more notably accelerates your projected wealth.',
+    wsb_read_c: 'Growth similar to accelerated, with a more stable trajectory.',
+    wsb_chart_title: '10-year comparison',
+    wsb_axis_now: 'Current',
+    wsb_concl_title: 'Aurix reading',
+    wsb_concl_balanced: 'The balanced scenario combines growth and stability.',
+    wsb_concl_more: 'Increasing contributions clearly improves the projected outcome.',
+    wsb_concl_steady: 'The biggest impact comes from keeping a steady monthly contribution.',
+    wsb_disclaimer: 'Indicative simulation. Not a promise of returns nor financial advice.',
     // Status pills
     statusOpen:        'Open',
     statusClosed:      'Closed',
@@ -10644,17 +10712,52 @@ function _wshMetrics() {
 
 // Idempotent mount: build once + run the reveal; on later calls (price ticks,
 // refresh) just refresh the live numbers so the entrance animation never restarts.
+// WS.2 — internal Workspace view state (no global nav change). 'home' | 'scenario'.
+let _wshView  = 'home';
+let _wshWired = false;
+
+function _wshReveal(container) {
+  try { const r = container.querySelector('.aurix-wsh'); if (r) requestAnimationFrame(() => r.classList.add('is-revealed')); } catch (_) {}
+}
+
+// Workspace entry / view dispatcher. Idempotent per view: price-tick re-renders
+// don't rebuild (keeps the Scenario Builder's interactive state + animations).
 function renderWorkspaceHome(container) {
   container = container || document.getElementById('aurixWorkspace');
   if (!container) return;
+  _wshWireOnce();
+  const cur   = container.querySelector('.aurix-wsh');
+  const shown = cur ? cur.getAttribute('data-wsh-view') : null;
+
+  if (_wshView === 'scenario') {
+    if (shown === 'scenario') return;
+    container.innerHTML = _renderScenarioBuilder();
+    _wshReveal(container);
+    return;
+  }
+  // Home
   const metrics = _wshMetrics();
-  const existing = container.querySelector('.aurix-wsh');
-  if (existing) { _wshRefreshMetrics(existing, metrics); return; }
+  if (shown === 'home') { _wshRefreshMetrics(cur, metrics); return; }
   container.innerHTML = _renderWorkspaceHome(metrics);
-  try {
-    const root = container.querySelector('.aurix-wsh');
-    if (root) requestAnimationFrame(() => root.classList.add('is-revealed'));
-  } catch (_) {}
+  _wshReveal(container);
+}
+
+// One-time delegated handler for Workspace internal navigation + scenario save.
+function _wshWireOnce() {
+  if (_wshWired) return;
+  _wshWired = true;
+  document.addEventListener('click', e => {
+    const t = e.target && e.target.closest ? e.target.closest('[data-wsh-cta],[data-wsh-nav],[data-wsh-save]') : null;
+    if (!t) return;
+    if (t.getAttribute('data-wsh-cta') === 'scenario' || t.getAttribute('data-wsh-nav') === 'scenario') {
+      _wshView = 'scenario'; renderWorkspaceHome(); return;
+    }
+    if (t.getAttribute('data-wsh-nav') === 'home') {
+      _wshView = 'home'; renderWorkspaceHome(); return;
+    }
+    const saveId = t.getAttribute('data-wsh-save');
+    if (saveId) { _wsbSaveScenario(saveId, t); return; }
+  });
 }
 
 function _wshRefreshMetrics(root, metrics) {
@@ -10809,13 +10912,184 @@ function _renderWorkspaceHome(metrics) {
     </section>`;
 
   return `
-    <div class="aurix-wsh">
+    <div class="aurix-wsh" data-wsh-view="home">
       ${heroHtml}
       ${goalsHtml}
       ${scenarioHtml}
       ${planningHtml}
       ${workspacesHtml}
     </div>`;
+}
+
+// ── WS.2 — Scenario Builder MVP ──────────────────────────────────────────────
+// Deterministic projection: initial capital compounded monthly + a monthly
+// contribution compounded monthly (ordinary annuity). Pure, no side effects, no
+// external APIs, no AI. Does NOT touch wealthEngine or any real portfolio data.
+function projectScenario(baseWealth, monthlyContribution, annualReturn, years, stabilityLabel) {
+  const base = Math.max(0, Number(baseWealth) || 0);
+  const m    = Math.max(0, Number(monthlyContribution) || 0);
+  const yr   = Math.max(0, Number(years) || 0);
+  const n    = Math.round(yr * 12);
+  const r    = (Number(annualReturn) || 0) / 12;
+  const fvBase    = base * Math.pow(1 + r, n);
+  const fvContrib = r > 0 ? m * ((Math.pow(1 + r, n) - 1) / r) : m * n;
+  const projected = fvBase + fvContrib;
+  return {
+    projected,
+    contributed: m * n,
+    years: yr,
+    monthly: m,
+    stability: stabilityLabel || '',
+    baseGrowthOnly: fvBase,
+  };
+}
+
+// MVP scenario set (spec): A +200, B +500, C +500 with higher stability framing.
+const _WSB_HORIZON = 10;
+const _WSB_RETURN  = 0.06;
+function _wsbScenarios() {
+  return [
+    { id: 'A', name: t('wsb_a_name'), desc: t('wsb_a_desc'), monthly: 200, stabKey: 'steady',   read: t('wsb_read_a') },
+    { id: 'B', name: t('wsb_b_name'), desc: t('wsb_b_desc'), monthly: 500, stabKey: 'dynamic',  read: t('wsb_read_b') },
+    { id: 'C', name: t('wsb_c_name'), desc: t('wsb_c_desc'), monthly: 500, stabKey: 'balanced', read: t('wsb_read_c') },
+  ];
+}
+
+// Real, read-only baseline for the "Escenario actual" block.
+function _wsbBaseline() {
+  let wealth = 0, wealthFmt = '—', liq = null, top = null;
+  try { if (typeof investableValueBase === 'function') { wealth = investableValueBase() || 0; wealthFmt = formatBase(wealth); } } catch (_) {}
+  try { const lv = (typeof buildLiquidityView === 'function') ? buildLiquidityView() : null; if (lv && typeof lv.cashPct === 'number') liq = Math.round(lv.cashPct); } catch (_) {}
+  try {
+    const snap = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null;
+    if (snap && snap.topInvestedAsset && snap.topInvestedAsset.name) top = { name: snap.topInvestedAsset.name, pct: Math.round(snap.topInvestedAsset.pctTotal || 0) };
+  } catch (_) {}
+  return { wealth, wealthFmt, liq, top };
+}
+
+// Deterministic Aurix conclusion from the projected set (no advice, no alarmism).
+function _wsbConclusion(results) {
+  if (!results || !results.length) return t('wsb_concl_steady');
+  const max = results.reduce((a, b) => (b.projected > a.projected ? b : a), results[0]);
+  // +500 scenarios lead; when the balanced one ties the top, frame it as balance.
+  const balanced = results.find(s => s.stabKey === 'balanced');
+  if (balanced && Math.abs(balanced.projected - max.projected) < 1) return t('wsb_concl_balanced');
+  if (max.monthly >= 500) return t('wsb_concl_more');
+  return t('wsb_concl_steady');
+}
+
+// Simple pure-SVG comparative bar chart (baseline + 3 scenarios). No libraries.
+function _wsbChartHtml(baselineProj, results) {
+  const esc = _intccEsc;
+  const bars = [{ label: t('wsb_axis_now'), v: baselineProj, base: true }]
+    .concat(results.map(s => ({ label: s.id, v: s.projected, base: false })));
+  const max = Math.max.apply(null, bars.map(b => b.v).concat([1]));
+  const W = 320, H = 150, pad = 22, gap = 18;
+  const bw = (W - pad * 2 - gap * (bars.length - 1)) / bars.length;
+  let rects = '';
+  bars.forEach((b, i) => {
+    const h = Math.max(3, (b.v / max) * (H - pad * 2));
+    const x = pad + i * (bw + gap);
+    const y = H - pad - h;
+    rects += `<rect class="wsb-bar${b.base ? ' is-base' : ''}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="5"/>`;
+    rects += `<text class="wsb-bar-x" x="${(x + bw / 2).toFixed(1)}" y="${(H - 6).toFixed(1)}" text-anchor="middle">${esc(b.label)}</text>`;
+  });
+  return `
+    <svg class="wsb-chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('wsb_chart_title'))}">
+      <line class="wsb-chart-base" x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}"/>
+      ${rects}
+    </svg>`;
+}
+
+function _renderScenarioBuilder() {
+  const esc = _intccEsc;
+  const bl  = _wsbBaseline();
+  const baseProj = projectScenario(bl.wealth, 0, _WSB_RETURN, _WSB_HORIZON).projected;
+  const scenarios = _wsbScenarios();
+  const saved = _wshReadStore(_WSH_SCENARIOS_KEY);
+  const isSaved = id => saved.some(s => s && s.scenarioId === id);
+
+  const results = scenarios.map(s => {
+    const p = projectScenario(bl.wealth, s.monthly, _WSB_RETURN, _WSB_HORIZON, t('wsb_stab_' + s.stabKey));
+    return Object.assign({}, s, { projected: p.projected, diff: p.projected - baseProj, contributed: p.contributed });
+  });
+
+  // Baseline metrics (only render the ones we actually have).
+  const blMetrics = [`<div class="wsb-bl-metric"><span class="wsb-bl-val">${esc(bl.wealthFmt)}</span><span class="wsb-bl-label">${esc(t('wsb_metric_wealth'))}</span></div>`];
+  if (bl.liq != null) blMetrics.push(`<div class="wsb-bl-metric"><span class="wsb-bl-val">${bl.liq}%</span><span class="wsb-bl-label">${esc(t('wsb_metric_liquidity'))}</span></div>`);
+  if (bl.top) blMetrics.push(`<div class="wsb-bl-metric"><span class="wsb-bl-val">${esc(bl.top.name)} · ${bl.top.pct}%</span><span class="wsb-bl-label">${esc(t('wsb_metric_topexp'))}</span></div>`);
+
+  const cards = results.map(s => `
+    <div class="wsb-card">
+      <div class="wsb-card-head">
+        <p class="wsb-card-name">${esc(s.name)}</p>
+        <span class="wsb-pill is-${esc(s.stabKey)}">${esc(t('wsb_stab_' + s.stabKey))}</span>
+      </div>
+      <p class="wsb-card-desc">${esc(s.desc)}</p>
+      <div class="wsb-card-rows">
+        <div class="wsb-row"><span>${esc(t('wsb_proj'))}</span><b>${esc(formatBase(s.projected))}</b></div>
+        <div class="wsb-row is-diff"><span>${esc(t('wsb_diff'))}</span><b>+${esc(formatBase(s.diff))}</b></div>
+      </div>
+      <p class="wsb-card-read">${esc(s.read)}</p>
+      <button type="button" class="wsh-cta wsb-save${isSaved(s.id) ? ' is-saved' : ''}" data-wsh-save="${esc(s.id)}"${isSaved(s.id) ? ' disabled' : ''}>${esc(isSaved(s.id) ? t('wsb_saved') : t('wsb_save'))}</button>
+    </div>`).join('');
+
+  return `
+    <div class="aurix-wsh wsh-sb is-revealed" data-wsh-view="scenario">
+      <section class="wsh-card wsb-header">
+        <button type="button" class="wsb-back" data-wsh-nav="home">‹ ${esc(t('wsb_back'))}</button>
+        <h2 class="wsb-title">${esc(t('wsb_title'))}</h2>
+        <p class="wsb-subtitle">${esc(t('wsb_subtitle'))}</p>
+      </section>
+
+      <section class="wsh-card wsb-current">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb_current_title'))}</h3><span class="wsb-horizon">${esc(t('wsb_horizon'))}</span></header>
+        <p class="wsb-note">${esc(t('wsb_current_note'))}</p>
+        <div class="wsb-bl-grid">${blMetrics.join('')}</div>
+      </section>
+
+      <section class="wsh-card wsb-scenarios">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb_scenarios_title'))}</h3></header>
+        <div class="wsb-grid">${cards}</div>
+      </section>
+
+      <section class="wsh-card wsb-compare">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb_chart_title'))}</h3></header>
+        <div class="wsb-chart">${_wsbChartHtml(baseProj, results)}</div>
+      </section>
+
+      <section class="wsh-card wsb-concl is-feature">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb_concl_title'))}</h3></header>
+        <p class="wsb-concl-text">${esc(_wsbConclusion(results))}</p>
+      </section>
+
+      <p class="wsb-disclaimer">${esc(t('wsb_disclaimer'))}</p>
+    </div>`;
+}
+
+// Save a predefined scenario to localStorage (single-device; no real data touched).
+function _wsbSaveScenario(id, btn) {
+  try {
+    const bl = _wsbBaseline();
+    const baseProj = projectScenario(bl.wealth, 0, _WSB_RETURN, _WSB_HORIZON).projected;
+    const s = _wsbScenarios().find(x => x.id === id);
+    if (!s) return;
+    const p = projectScenario(bl.wealth, s.monthly, _WSB_RETURN, _WSB_HORIZON, t('wsb_stab_' + s.stabKey));
+    const store = _wshReadStore(_WSH_SCENARIOS_KEY);
+    if (store.some(x => x && x.scenarioId === id)) return; // already saved
+    store.push({
+      scenarioId: id,
+      name: s.name,
+      monthly: s.monthly,
+      annualReturn: _WSB_RETURN,
+      years: _WSB_HORIZON,
+      projected: Math.round(p.projected),
+      diff: Math.round(p.projected - baseProj),
+      createdAt: Date.now(),
+    });
+    localStorage.setItem(_WSH_SCENARIOS_KEY, JSON.stringify(store));
+    if (btn) { btn.textContent = t('wsb_saved'); btn.classList.add('is-saved'); btn.setAttribute('disabled', ''); }
+  } catch (_) {}
 }
 
 function renderWorkspace() {

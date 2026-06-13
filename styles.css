@@ -19556,6 +19556,75 @@ body.gs-open { overflow: hidden; }
   .wsh-fp-node { animation: none !important; opacity: 1 !important; }
 }
 
+/* ── WS.2 — Scenario Builder (inside Workspace, wsb-* namespace) ── */
+.wsb-header { position: relative; }
+.wsb-back {
+  font: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 600; color: #aecbff; margin: 0 0 12px; padding: 5px 12px 5px 8px;
+  border-radius: 999px; background: rgba(74,130,240,0.10); border: 1px solid rgba(74,130,240,0.28);
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+.wsb-back:hover { background: rgba(74,130,240,0.20); color: #cfe0ff; border-color: rgba(74,130,240,0.5); }
+.wsb-title { margin: 0 0 6px; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; color: var(--text-bright, #fff); }
+.wsb-subtitle { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text-muted); }
+.wsb-horizon { font-size: 11px; font-weight: 600; color: rgba(159,194,255,0.8); letter-spacing: 0.02em; }
+.wsb-note { margin: 0 0 14px; font-size: 12.5px; line-height: 1.5; color: var(--text-muted); }
+
+.wsb-bl-grid { display: flex; flex-wrap: wrap; gap: 26px; }
+.wsb-bl-metric { display: flex; flex-direction: column; gap: 3px; }
+.wsb-bl-val { font-size: 19px; font-weight: 700; color: var(--text-bright); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.wsb-bl-label { font-size: 11px; color: var(--text-muted); letter-spacing: 0.02em; }
+
+.wsb-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.wsb-card {
+  display: flex; flex-direction: column; gap: 10px; padding: 16px;
+  border-radius: 14px; border: 1px solid rgba(120,160,255,0.13); background: rgba(255,255,255,0.025);
+}
+.wsb-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wsb-card-name { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-bright); }
+.wsb-pill {
+  display: inline-flex; align-items: center; height: 21px; padding: 0 9px; border-radius: 999px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap;
+  color: #aecbff; background: rgba(74,130,240,0.12); border: 1px solid rgba(74,130,240,0.28);
+}
+.wsb-pill.is-steady   { color: #8fe6b6; background: rgba(63,191,127,0.12); border-color: rgba(63,191,127,0.30); }
+.wsb-pill.is-dynamic  { color: #9fc6ff; background: rgba(74,130,240,0.14); border-color: rgba(74,130,240,0.34); }
+.wsb-pill.is-balanced { color: #cbe0a6; background: rgba(150,200,80,0.12); border-color: rgba(150,200,80,0.32); }
+.wsb-card-desc { margin: -2px 0 2px; font-size: 12px; font-weight: 600; color: rgba(159,194,255,0.85); }
+.wsb-card-rows { display: flex; flex-direction: column; gap: 6px; }
+.wsb-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--text-muted); }
+.wsb-row b { color: var(--text-bright); font-variant-numeric: tabular-nums; font-size: 13.5px; }
+.wsb-row.is-diff b { color: #8fe6b6; }
+.wsb-card-read { margin: 2px 0 0; font-size: 12px; line-height: 1.45; color: var(--text-muted); }
+.wsb-save { margin-top: 4px; text-align: center; }
+.wsb-save.is-saved { color: #8fe6b6; background: rgba(63,191,127,0.12); border-color: rgba(63,191,127,0.35); cursor: default; }
+
+.wsb-chart { display: grid; place-items: center; }
+.wsb-chart-svg { width: 100%; max-width: 420px; height: auto; }
+.wsb-chart-base { stroke: rgba(150,180,240,0.18); stroke-width: 1; }
+.wsb-bar { fill: #5c9cff; filter: drop-shadow(0 0 6px rgba(74,130,240,0.4)); }
+.wsb-bar.is-base { fill: rgba(150,180,240,0.4); filter: none; }
+.wsb-bar-x { fill: rgba(214,226,255,0.7); font-size: 10px; font-weight: 700; }
+
+.wsb-concl.is-feature {
+  border-color: rgba(77,141,255,0.34);
+  background:
+    radial-gradient(130% 150% at 88% 6%, rgba(92,156,255,0.18), transparent 58%),
+    linear-gradient(165deg, rgba(34,52,92,0.58), rgba(14,20,38,0.64));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 18px 46px rgba(0,0,0,0.34), 0 0 30px rgba(77,141,255,0.10);
+}
+.wsb-concl-text { margin: 0; font-size: 15px; line-height: 1.5; font-weight: 600; color: var(--text-bright); }
+.wsb-disclaimer { margin: 4px 2px 0; font-size: 11px; line-height: 1.5; color: var(--text-muted); opacity: 0.7; text-align: center; }
+
+@media (min-width: 1024px) {
+  .wsb-title { font-size: 25px; }
+}
+@media (max-width: 720px) {
+  .wsb-grid { grid-template-columns: 1fr; }
+  .wsb-bl-grid { gap: 16px 22px; }
+  .wsb-title { font-size: 20px; }
+}
+
 /* ════════ WS.2 — Financial Tools Hub (dedicated tools) ═══════════════════════
    Premium interactive tools that open inside Workspace templates mode (never
    the Sheet). Encapsulated under ws2-* classes; responsive. */
