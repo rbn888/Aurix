@@ -19258,7 +19258,13 @@ body.gs-open { overflow: hidden; }
 }
 @media (max-width: 640px) {
   /* Bloque 12 — clear the bottom nav (safe area) so last cards aren't hidden */
-  .aurix-intcc { padding: 4px 12px calc(78px + env(safe-area-inset-bottom, 0px)); gap: 12px; }
+  /* INT.2ZB — mobile width utilisation. The app shell adds 20px side padding and
+     the container another 12px → ~32px lateral margin, too much on a phone. Drop
+     the container's own side padding and pull -6px into the shell padding so cards
+     sit ~14px from the screen edge (never <12px). Desktop untouched (≥1024 grid).
+     Card radius/glow and per-card inner padding are unchanged, so content never
+     touches the edge; safe-area bottom is preserved. */
+  .aurix-intcc { margin-left: -6px; margin-right: -6px; padding: 4px 0 calc(78px + env(safe-area-inset-bottom, 0px)); gap: 12px; }
 
   /* INT.2Y — mobile composition: the single desktop hero is replaced by two
      dedicated cards (Inteligencia + Salud). Hide the desktop hero, reveal the
