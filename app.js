@@ -1574,11 +1574,11 @@ const T = {
     int_review_workspace:     'Usar Workspace para simular aportaciones futuras.',
     int_disclaimer:    'Aurix interpreta tu patrimonio con datos reales. No es asesoramiento de inversión.',
     // ── INT.2 — Aurix Intelligence Command Center ──
-    intcc_eyebrow:        'Inteligencia patrimonial',
+    intcc_eyebrow:        'Inteligencia',
     intcc_empty_title:    'Aún no hay análisis disponible',
     intcc_empty_body:     'Añade activos a tu cartera para que Aurix interprete tu patrimonio.',
-    intcc_read_healthy:      'Tu patrimonio está sano',
-    intcc_read_balanced:     'Tu patrimonio está equilibrado',
+    intcc_read_healthy:      'Tu patrimonio conserva una estructura saludable',
+    intcc_read_balanced:     'Tu cartera muestra una evolución equilibrada',
     intcc_read_growing:      'Tu patrimonio está creciendo',
     intcc_read_attention:    'Tu patrimonio requiere atención',
     intcc_read_concentrated: 'Tu patrimonio está concentrado',
@@ -1596,7 +1596,7 @@ const T = {
     intcc_mhint_cash:  'El peso de efectivo aporta estabilidad y flexibilidad.',
     intcc_mhint_div:   'Tu cartera mantiene una diversificación razonable entre varias categorías.',
     intcc_mhint_watch: 'Aurix seguirá vigilando liquidez, concentración y diversificación.',
-    intcc_health_title:   'Salud patrimonial',
+    intcc_health_title:   'Salud',
     intcc_health_suffix:  '/ 100',
     intcc_band_excellent: 'Excelente',
     intcc_band_good:      'Buena',
@@ -1624,7 +1624,7 @@ const T = {
     intcc_slv_liq_down:'Tu liquidez ha disminuido.',
     intcc_slv_crypto_up:'La cripto ha ganado peso en tu cartera.',
     intcc_slv_topcat:  label => `${label} ha pasado a ser tu mayor exposición.`,
-    intcc_radar_title: 'Radar patrimonial',
+    intcc_radar_title: 'Radar',
     intcc_dim_div:    'Diversificación',
     intcc_dim_liq:    'Liquidez',
     intcc_dim_conc:   'Concentración',
@@ -1688,8 +1688,11 @@ const T = {
     intcc_timeline_title: 'Línea temporal',
     intcc_timeline_empty: 'Aurix está construyendo tu historial patrimonial. Tus hitos aparecerán aquí a medida que tu patrimonio evolucione.',
     intcc_tl_cross:  amount => `Tu patrimonio superó ${amount}.`,
+    intcc_tl_ath:    'Tu patrimonio marcó un nuevo máximo histórico.',
+    intcc_tl_drop:   pct => `Tu patrimonio retrocedió alrededor de un ${pct}% desde su máximo.`,
     intcc_tl_liq10:  'Tu liquidez bajó por debajo del 10%.',
-    intcc_tl_more:   n => `+${n} ${n === 1 ? 'hito' : 'hitos'} más en tu historial`,
+    intcc_tl_liq_up: 'Tu liquidez se recuperó por encima del 15%.',
+    intcc_tl_more:   n => `+${n} ${n === 1 ? 'evento anterior' : 'eventos anteriores'}`,
     intcc_re_ctx:    n => n === 1 ? '1 inmueble registrado, como contexto patrimonial.' : `${n} inmuebles registrados, como contexto patrimonial.`,
     intcc_disclaimer: 'Aurix interpreta tu patrimonio con datos reales. No es asesoramiento de inversión.',
     // Status pills
@@ -3022,11 +3025,11 @@ const T = {
     int_review_workspace:     'Use Workspace to simulate future contributions.',
     int_disclaimer:    'Aurix interprets your wealth with real data. It is not investment advice.',
     // ── INT.2 — Aurix Intelligence Command Center ──
-    intcc_eyebrow:        'Wealth intelligence',
+    intcc_eyebrow:        'Intelligence',
     intcc_empty_title:    'No analysis available yet',
     intcc_empty_body:     'Add assets to your portfolio so Aurix can interpret your wealth.',
-    intcc_read_healthy:      'Your wealth is healthy',
-    intcc_read_balanced:     'Your wealth is balanced',
+    intcc_read_healthy:      'Your wealth keeps a healthy structure',
+    intcc_read_balanced:     'Your portfolio shows a balanced trajectory',
     intcc_read_growing:      'Your wealth is growing',
     intcc_read_attention:    'Your wealth needs attention',
     intcc_read_concentrated: 'Your wealth is concentrated',
@@ -3044,7 +3047,7 @@ const T = {
     intcc_mhint_cash:  'Your cash position adds stability and flexibility.',
     intcc_mhint_div:   'Your portfolio keeps a reasonable spread across several categories.',
     intcc_mhint_watch: 'Aurix will keep watching liquidity, concentration and diversification.',
-    intcc_health_title:   'Aurix Health',
+    intcc_health_title:   'Health',
     intcc_health_suffix:  '/ 100',
     intcc_band_excellent: 'Excellent',
     intcc_band_good:      'Good',
@@ -3072,7 +3075,7 @@ const T = {
     intcc_slv_liq_down:'Your liquidity has decreased.',
     intcc_slv_crypto_up:'Crypto has gained weight in your portfolio.',
     intcc_slv_topcat:  label => `${label} has become your largest exposure.`,
-    intcc_radar_title: 'Wealth radar',
+    intcc_radar_title: 'Radar',
     intcc_dim_div:    'Diversification',
     intcc_dim_liq:    'Liquidity',
     intcc_dim_conc:   'Concentration',
@@ -3136,8 +3139,11 @@ const T = {
     intcc_timeline_title: 'Timeline',
     intcc_timeline_empty: 'Aurix is building your wealth history. Your milestones will appear here as your wealth evolves.',
     intcc_tl_cross:  amount => `Your wealth crossed ${amount}.`,
+    intcc_tl_ath:    'Your wealth set a new all-time high.',
+    intcc_tl_drop:   pct => `Your wealth pulled back around ${pct}% from its peak.`,
     intcc_tl_liq10:  'Your liquidity dropped below 10%.',
-    intcc_tl_more:   n => `+${n} more ${n === 1 ? 'milestone' : 'milestones'} in your history`,
+    intcc_tl_liq_up: 'Your liquidity recovered above 15%.',
+    intcc_tl_more:   n => `+${n} earlier ${n === 1 ? 'event' : 'events'}`,
     intcc_re_ctx:    n => n === 1 ? '1 property on record, as wealth context.' : `${n} properties on record, as wealth context.`,
     intcc_disclaimer: 'Aurix interprets your wealth with real data. It is not investment advice.',
     // Status pills
@@ -21278,7 +21284,7 @@ function _intccRadar(snap, drivers, growthPct) {
 // total wealth for liquidity — none of those are read here.
 function _intccHealthScore(snap, drivers) {
   if (!snap || !snap.assetCount || snap.totUSD <= 0)
-    return { score: null, band: 'empty', label: t('intcc_band_empty'), reasons: [] };
+    return { score: null, band: 'empty', tone: 'green', label: t('intcc_band_empty'), reasons: [] };
   const top1   = (snap.topInvestedAsset && snap.topInvestedAsset.pctTotal) || 0;
   const top3   = (drivers && drivers.pct) || 0;
   const cats   = snap.categoryCount || 0;
@@ -21307,7 +21313,19 @@ function _intccHealthScore(snap, drivers) {
   else if (s >= 60) { band = 'watch';     label = t('intcc_band_watch'); }
   else              { band = 'limited';   label = t('intcc_band_limited'); }
   const explain = reasons.length ? reasons[0] : t('intcc_hs_clean');
-  return { score: s, band, label, reasons: reasons.slice(0, 3), explain };
+  // INT.2Z — visual tone by score range (5 levels), independent of the label
+  // band. Drives ring/badge/accent colour only; the score formula is untouched.
+  return { score: s, band, tone: _intccScoreTone(s), label, reasons: reasons.slice(0, 3), explain };
+}
+
+// INT.2Z — premium 5-level colour tone, purely visual (no effect on the score).
+function _intccScoreTone(s) {
+  if (s == null) return 'green';
+  if (s >= 80) return 'green';
+  if (s >= 60) return 'lime';
+  if (s >= 40) return 'amber';
+  if (s >= 20) return 'orange';
+  return 'red';
 }
 
 // Bloque 1 — the dominant wealth reading. Dynamic title + human subtext + state.
@@ -21442,11 +21460,18 @@ function _intccSinceLastVisit(snap) {
 
 // Bloque 9 — intelligence timeline. Milestones derived strictly from the real
 // stored series (portfolioHistory total crossings + categoryHistory liquidity).
+// INT.2Z — Timeline V2. Coherent, prioritised milestones derived strictly from
+// the real stored series (no invented events, no backend): wealth thresholds,
+// all-time high, relevant drawdown, and liquidity crossings. Events carry their
+// real timestamp, are de-duplicated and sorted most-recent-first; the renderer
+// shows the top 3 and counts the rest as "+N eventos anteriores".
 function _intccTimeline() {
   const out = [];
   const h = (typeof portfolioHistory !== 'undefined' && Array.isArray(portfolioHistory)) ? portfolioHistory : [];
-  const THRESH = [10000, 25000, 50000, 100000, 250000, 500000, 1000000, 2000000, 5000000];
+
   if (h.length >= 2) {
+    // Wealth threshold crossings (hitos patrimoniales).
+    const THRESH = [10000, 25000, 50000, 100000, 250000, 500000, 1000000, 2000000, 5000000];
     for (const thr of THRESH) {
       for (let i = 1; i < h.length; i++) {
         if (h[i - 1].value < thr && h[i].value >= thr) {
@@ -21455,17 +21480,47 @@ function _intccTimeline() {
         }
       }
     }
+    // All-time high — the single point where the running max last advanced, only
+    // with enough span so a brand-new portfolio doesn't "set a record" on day 1.
+    if ((h[h.length - 1].ts - h[0].ts) >= 3 * 86400000) {
+      let peak = h[0].value, peakIdx = 0;
+      for (let i = 1; i < h.length; i++) { if (h[i].value > peak) { peak = h[i].value; peakIdx = i; } }
+      if (peakIdx >= 1 && peak > 0) out.push({ ts: h[peakIdx].ts, tone: 'up', text: t('intcc_tl_ath') });
+    }
+    // Largest relevant drawdown from a running peak (bajada relevante ≥10%).
+    let runPeak = h[0].value, worst = 0, worstTs = 0;
+    for (let i = 1; i < h.length; i++) {
+      if (h[i].value > runPeak) runPeak = h[i].value;
+      else if (runPeak > 0) {
+        const dd = ((runPeak - h[i].value) / runPeak) * 100;
+        if (dd > worst) { worst = dd; worstTs = h[i].ts; }
+      }
+    }
+    if (worst >= 10 && worstTs) out.push({ ts: worstTs, tone: 'down', text: t('intcc_tl_drop')(Math.round(worst)) });
   }
+
+  // Liquidity crossings (cambios de liquidez) from the category series.
   const ch = (typeof categoryHistory !== 'undefined' && Array.isArray(categoryHistory)) ? categoryHistory : [];
   for (let i = 1; i < ch.length; i++) {
     const pT = ch[i - 1].total, cT = ch[i].total;
     if (pT > 0 && cT > 0) {
       const pL = (ch[i - 1].liquidity / pT) * 100, cL = (ch[i].liquidity / cT) * 100;
-      if (pL >= 10 && cL < 10) { out.push({ ts: ch[i].ts, tone: 'info', text: t('intcc_tl_liq10') }); break; }
+      if (pL >= 10 && cL < 10) { out.push({ ts: ch[i].ts, tone: 'down', text: t('intcc_tl_liq10') }); break; }
     }
   }
-  out.sort((a, b) => b.ts - a.ts);
-  return out.slice(0, 8);
+  for (let i = 1; i < ch.length; i++) {
+    const pT = ch[i - 1].total, cT = ch[i].total;
+    if (pT > 0 && cT > 0) {
+      const pL = (ch[i - 1].liquidity / pT) * 100, cL = (ch[i].liquidity / cT) * 100;
+      if (pL < 15 && cL >= 15) { out.push({ ts: ch[i].ts, tone: 'info', text: t('intcc_tl_liq_up') }); break; }
+    }
+  }
+
+  // De-duplicate (same ts + text) and order chronologically, newest first.
+  const seen = new Set();
+  const dedup = out.filter(e => { const k = e.ts + '|' + e.text; if (seen.has(k)) return false; seen.add(k); return true; });
+  dedup.sort((a, b) => b.ts - a.ts);
+  return dedup.slice(0, 12);
 }
 function _intccDate(ts) {
   try {
@@ -21603,7 +21658,6 @@ function _renderIntelligenceCommandCenter() {
   const radar     = _intccRadar(snap, drivers, growthPct);
   const score     = _intccHealthScore(snap, drivers);
   const reading   = _intccReading(snap, score, radar, drivers, growthPct);
-  const identity  = _intccIdentity(snap, radar);
   const watch     = _intccWatchAreas(snap, liq);
   const timeline  = _intccTimeline();
 
@@ -21619,14 +21673,14 @@ function _renderIntelligenceCommandCenter() {
   // Bloque 1/2 — institutional hero. Reading order: Health score → main
   // conclusion → visual signature (orb). Score shown ONCE (no duplicated metric).
   const heroHtml = `
-    <section class="intcc-hero is-${esc(reading.state)} is-${esc(score.band)}" data-state="${esc(reading.state)}">
+    <section class="intcc-hero is-${esc(reading.state)} is-tone-${esc(score.tone)}" data-state="${esc(reading.state)}">
       <div class="intcc-hero-score">
         <span class="intcc-hero-health-label">${esc(t('intcc_health_title'))}</span>
         <div class="intcc-score-ring">
           ${_intccScoreRingHtml(score)}
           <div class="intcc-score-num"><span class="intcc-score-val">${score.score != null ? score.score : '—'}</span><span class="intcc-score-suffix">${esc(t('intcc_health_suffix'))}</span></div>
         </div>
-        <span class="intcc-health-badge is-${esc(score.band)}">${esc(score.label)}</span>
+        <span class="intcc-health-badge is-tone-${esc(score.tone)}">${esc(score.label)}</span>
       </div>
       <div class="intcc-hero-body">
         <span class="intcc-eyebrow">${esc(t('intcc_eyebrow'))}</span>
@@ -21656,7 +21710,7 @@ function _renderIntelligenceCommandCenter() {
 
   const mConcl = chips.length ? chips : [{ tone: 'good', label: t('intcc_chip_div') }];
   const mHealthHtml = `
-    <section class="intcc-card intcc-m-card intcc-m-health is-${esc(score.band)}">
+    <section class="intcc-card intcc-m-card intcc-m-health is-tone-${esc(score.tone)}">
       <h3 class="intcc-card-title">${esc(t('intcc_health_title'))}</h3>
       <div class="intcc-m-health-body">
         <div class="intcc-m-health-score">
@@ -21664,7 +21718,7 @@ function _renderIntelligenceCommandCenter() {
             ${_intccScoreRingHtml(score)}
             <div class="intcc-score-num"><span class="intcc-score-val">${score.score != null ? score.score : '—'}</span><span class="intcc-score-suffix">${esc(t('intcc_health_suffix'))}</span></div>
           </div>
-          <span class="intcc-health-badge is-${esc(score.band)}">${esc(score.label)}</span>
+          <span class="intcc-health-badge is-tone-${esc(score.tone)}">${esc(score.label)}</span>
         </div>
         <ul class="intcc-m-concl">
           ${mConcl.map(c => `<li class="intcc-m-concl-row is-${esc(c.tone)}"><span class="intcc-m-concl-check" aria-hidden="true">✓</span>${esc(c.label)}</li>`).join('')}
@@ -21728,21 +21782,9 @@ function _renderIntelligenceCommandCenter() {
       </div>
     </section>`;
 
-  // Bloque 7/9 — Identity. Premium radial "sello" icon, natural copy + short
-  // explanation. Real-estate context lives here as a discreet secondary note
-  // (no value, no %, never an analysis input).
-  const identityHtml = `
-    <section class="intcc-card intcc-identity is-${esc(identity.key)}">
-      <h3 class="intcc-card-title">${esc(t('intcc_identity_title'))}</h3>
-      <div class="intcc-id-body">
-        ${_intccIdentityIcon(identity.key)}
-        <div class="intcc-id-text">
-          <p class="intcc-id-name">${esc(identity.title)}</p>
-          <p class="intcc-id-desc">${esc(identity.body)}</p>
-          <p class="intcc-id-explain">${esc(identity.explain)}</p>
-        </div>
-      </div>
-    </section>`;
+  // INT.2Z — "Perfil patrimonial" (Identity) card removed globally; it did not
+  // add enough value for the space. `_intccIdentity` / `_intccIdentityIcon` kept
+  // dormant for a future, richer wealth-profile system.
 
   // Bloque 8 — Watch areas
   const watchHtml = `
@@ -21791,7 +21833,6 @@ function _renderIntelligenceCommandCenter() {
       ${radarHtml}
       ${driversHtml}
       ${exploreHtml}
-      ${identityHtml}
       ${watchHtml}
       ${timelineHtml}
       <p class="intcc-disclaimer">${esc(t('intcc_disclaimer'))}</p>
