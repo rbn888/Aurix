@@ -19419,33 +19419,36 @@ body.gs-open { overflow: hidden; }
 }
 
 /* Hero — premium electric-blue glass, orb on the right (Aurix signature). */
+/* WS.5A P9 — lighter hero (less landing-page weight: smaller padding/title, no
+   heavy bottom shadow). Workspace doesn't need to sell itself. */
 .wsh-hero {
-  position: relative; display: flex; align-items: center; gap: 30px;
-  padding: 22px 30px; border-radius: 22px; overflow: hidden;
-  border: 1px solid rgba(77,141,255,0.30);
+  position: relative; display: flex; align-items: center; gap: 26px;
+  padding: 16px 24px; border-radius: 18px; overflow: hidden;
+  border: 1px solid rgba(77,141,255,0.24);
   background:
-    radial-gradient(120% 150% at 8% 8%, rgba(77,141,255,0.16), transparent 56%),
-    radial-gradient(120% 150% at 92% 92%, rgba(37,99,235,0.14), transparent 60%),
-    linear-gradient(165deg, rgba(30,46,82,0.62), rgba(13,19,36,0.62));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 18px 50px rgba(0,0,0,0.34);
+    radial-gradient(120% 150% at 8% 8%, rgba(77,141,255,0.12), transparent 56%),
+    radial-gradient(120% 150% at 92% 92%, rgba(37,99,235,0.10), transparent 60%),
+    linear-gradient(165deg, rgba(30,46,82,0.55), rgba(13,19,36,0.58));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 10px 30px rgba(0,0,0,0.26);
 }
 .wsh-hero-main { flex: 1 1 auto; min-width: 0; }
 .wsh-eyebrow {
-  display: block; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase;
-  color: rgba(159,194,255,0.95); margin-bottom: 10px; font-weight: 700;
+  display: block; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: rgba(159,194,255,0.9); margin-bottom: 7px; font-weight: 700;
 }
 .wsh-hero-title {
-  margin: 0 0 8px; font-size: 24px; line-height: 1.18; font-weight: 700;
+  margin: 0 0 6px; font-size: 20px; line-height: 1.18; font-weight: 700;
   letter-spacing: -0.01em; color: var(--text-bright, #fff);
 }
-.wsh-hero-sub { margin: 0 0 18px; font-size: 14px; line-height: 1.55; color: var(--text-muted, rgba(255,255,255,0.66)); max-width: 56ch; }
-.wsh-stats { display: flex; flex-wrap: wrap; gap: 26px; }
+.wsh-hero-sub { margin: 0 0 13px; font-size: 13px; line-height: 1.5; color: var(--text-muted, rgba(255,255,255,0.66)); max-width: 56ch; }
+.wsh-stats { display: flex; flex-wrap: wrap; gap: 22px; }
 .wsh-stat { display: flex; flex-direction: column; gap: 3px; }
 .wsh-stat-val { font-size: 21px; font-weight: 700; color: var(--text-bright, #fff); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .wsh-stat-label { font-size: 11px; color: var(--text-muted); letter-spacing: 0.02em; }
 /* WS.1A — Future Path visual (Workspace's own hero signature; no Intelligence orb) */
-.wsh-hero-viz { flex: 0 0 auto; display: grid; place-items: center; width: 220px; }
+.wsh-hero-viz { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 8px; width: 230px; }
 .wsh-fp-svg { width: 220px; height: auto; overflow: visible; }
+.wsh-fp-reading { margin: 0; text-align: center; font-size: 11.5px; line-height: 1.4; font-weight: 600; color: rgba(159,194,255,0.85); max-width: 230px; }
 .wsh-fp-grid line { stroke: rgba(150,180,240,0.16); stroke-width: 1; stroke-dasharray: 2 4; }
 .wsh-fp-area { opacity: 0.9; }
 .wsh-fp-line {
@@ -19527,7 +19530,7 @@ body.gs-open { overflow: hidden; }
 /* Desktop polish */
 @media (min-width: 1024px) {
   .aurix-wsh { gap: 16px; }
-  .wsh-hero-title { font-size: 27px; }
+  .wsh-hero-title { font-size: 22px; }
   .wsh-card { padding: 20px; }
 }
 
@@ -19763,9 +19766,58 @@ body.gs-open { overflow: hidden; }
 .wsg-progress.is-no-data  .wsg-bar-fill { background: rgba(150,180,240,0.4); }
 .wsg-out { display: flex; flex-direction: column; gap: 14px; }
 
+/* WS.5A P7 — human state badge */
+.wsg-state-row { display: flex; }
+.wsg-state { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 11px; border-radius: 999px; font-size: 11.5px; font-weight: 700; border: 1px solid transparent; }
+.wsg-state-ic { width: 14px; height: 14px; flex: 0 0 auto; }
+.wsg-state.is-on-track { color: #8fb8ff; background: rgba(74,130,240,0.12); border-color: rgba(74,130,240,0.30); }
+.wsg-state.is-reached  { color: #8fe6b6; background: rgba(63,191,127,0.12); border-color: rgba(63,191,127,0.32); }
+.wsg-state.is-behind   { color: #f3cf9a; background: rgba(233,168,87,0.12); border-color: rgba(233,168,87,0.32); }
+.wsg-state.is-no-data  { color: var(--text-muted); background: rgba(150,180,240,0.08); border-color: rgba(150,180,240,0.20); }
+
+/* WS.5A P6 — premium select arrow + create form with always-on side preview */
+.wsg-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239fc2ff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px;
+}
+.wsg-create-body { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-bottom: 16px; align-items: start; }
+.wsg-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 0; }
+.wsg-form-preview {
+  position: sticky; top: 12px; display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 14px;
+  border: 1px solid rgba(77,141,255,0.30);
+  background: radial-gradient(130% 150% at 88% 6%, rgba(92,156,255,0.16), transparent 60%), linear-gradient(165deg, rgba(34,52,92,0.5), rgba(14,20,38,0.55));
+}
+.wsg-pv-title { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(159,194,255,0.9); }
+.wsg-pv-state { align-self: flex-start; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; color: #8fb8ff; background: rgba(74,130,240,0.12); border: 1px solid rgba(74,130,240,0.3); }
+.wsg-pv-state.is-reached { color: #8fe6b6; background: rgba(63,191,127,0.12); border-color: rgba(63,191,127,0.32); }
+.wsg-pv-state.is-behind  { color: #f3cf9a; background: rgba(233,168,87,0.12); border-color: rgba(233,168,87,0.32); }
+.wsg-pv-state.is-no-data { color: var(--text-muted); background: rgba(150,180,240,0.08); border-color: rgba(150,180,240,0.2); }
+
+/* WS.5A P8 — Scenario impact block (lead with the result) */
+.wsb-impact.is-feature {
+  border-color: rgba(77,141,255,0.34);
+  background: radial-gradient(130% 150% at 50% 0%, rgba(92,156,255,0.18), transparent 62%), linear-gradient(165deg, rgba(34,52,92,0.58), rgba(14,20,38,0.64));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 30px rgba(77,141,255,0.10);
+}
+.wsb-impact-row { display: flex; align-items: center; gap: 18px; }
+.wsb-impact-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.wsb-impact-label { font-size: 11px; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text-muted); font-weight: 600; }
+.wsb-impact-val { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: var(--text-bright); font-variant-numeric: tabular-nums; }
+.wsb-impact-col.is-best .wsb-impact-val { color: #8fe6b6; }
+.wsb-impact-arrow { flex: 0 0 auto; font-size: 22px; color: rgba(159,194,255,0.7); }
+.wsb-impact-uplift { display: flex; align-items: baseline; gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(120,160,255,0.14); }
+.wsb-impact-delta { font-size: 22px; font-weight: 800; color: #8fe6b6; font-variant-numeric: tabular-nums; }
+.wsb-impact-pct { font-size: 15px; font-weight: 700; color: #8fe6b6; }
+.wsb-impact-cap { font-size: 12px; color: var(--text-muted); margin-left: auto; }
+
 @media (max-width: 720px) {
   .wsg-form { grid-template-columns: 1fr; }
   .wsg-grid { grid-template-columns: 1fr; }
+  .wsg-create-body { grid-template-columns: 1fr; }
+  .wsg-form-preview { position: static; }
+  .wsb-impact-row { flex-direction: column; align-items: stretch; gap: 12px; }
+  .wsb-impact-arrow { transform: rotate(90deg); align-self: center; }
+  .wsb-impact-val { font-size: 23px; }
 }
 
 /* ════════ WS.2 — Financial Tools Hub (dedicated tools) ═══════════════════════

@@ -1714,33 +1714,37 @@ const T = {
     wsh_goal_eta:          'Fecha estimada',
     wsh_goal_confidence:   'Confianza',
     wsh_pending:           'Por definir',
-    wsh_scenario_title:    'Scenario Builder',
+    wsh_scenario_title:    'Simulador de escenarios',
     wsh_scenario_current:  'Escenario actual',
     wsh_scenario_best:     'Mejor escenario guardado',
     wsh_scenario_empty:    'Crea tu primer escenario para comparar decisiones antes de ejecutarlas.',
     wsh_scenario_concl:    'Aurix comparará patrimonio futuro, riesgo, liquidez y tiempo objetivo, y resumirá qué decisión te conviene.',
     wsh_scenario_cta:      'Crear escenario',
-    wsh_planning_title:    'Planning',
-    wsh_plan_retirement:   'Retirement Planner',
-    wsh_plan_fire:         'FIRE Planner',
-    wsh_plan_projection:   'Future Wealth Projection',
+    wsh_planning_title:    'Planificación',
+    wsh_plan_retirement:   'Plan de jubilación',
+    wsh_plan_fire:         'Plan FIRE',
+    wsh_plan_projection:   'Proyección patrimonial',
     wsh_plan_soon:         'Próximamente',
     wsh_plan_updated:      'Última actualización',
     wsh_workspaces_title:  'Workspaces',
-    wsh_ws_investment:     'Investment Planner',
-    wsh_ws_budget:         'Wealth Budget',
-    wsh_ws_property:       'Property Analyzer',
-    wsh_ws_business:       'Business Cashflow',
-    wsh_ws_networth:       'Net Worth Workbook',
-    wsh_ws_fire:           'FIRE Workbook',
+    wsh_ws_investment:     'Planificador de inversión',
+    wsh_ws_budget:         'Presupuesto patrimonial',
+    wsh_ws_property:       'Analizador inmobiliario',
+    wsh_ws_business:       'Flujo de caja empresarial',
+    wsh_ws_networth:       'Balance patrimonial',
+    wsh_ws_fire:           'Plan independencia financiera',
     wsh_soon:              'Próximamente',
     wsh_none:              '—',
-    wsh_fp_aria:           'Proyección de tu patrimonio: ahora, base y futuro',
-    wsh_fp_now:            'Ahora',
-    wsh_fp_base:           'Base',
-    wsh_fp_future:         'Futuro',
+    wsh_fp_aria:           'Tu camino patrimonial: hoy, proyección y meta',
+    wsh_fp_now:            'Hoy',
+    wsh_fp_base:           'Proyección',
+    wsh_fp_future:         'Meta',
+    wsh_fp_read_none:      'No has definido objetivos todavía.',
+    wsh_fp_read_goal:      n => `Tu objetivo más cercano está a ${n} ${n === 1 ? 'año' : 'años'}.`,
+    wsh_fp_read_scenario:  pct => `Tu mejor escenario supera tu situación actual en un ${pct}%.`,
+    wsh_fp_read_reached:   'Ya has alcanzado uno de tus objetivos.',
     // WS.2 — Scenario Builder
-    wsb_title:         'Scenario Builder',
+    wsb_title:         'Simulador de escenarios',
     wsb_subtitle:      'Compara decisiones antes de ejecutarlas.',
     wsb_back:          'Volver a Workspace',
     wsb_current_title: 'Escenario actual',
@@ -1773,9 +1777,11 @@ const T = {
     wsb_concl_more: 'Aumentar aportaciones mejora claramente el resultado proyectado.',
     wsb_concl_steady: 'El mayor impacto viene de mantener una aportación mensual constante.',
     wsb_disclaimer: 'Simulación orientativa. No es una promesa de rentabilidad ni asesoramiento financiero.',
+    wsb_impact_best:   'Mejor escenario',
+    wsb_impact_uplift: 'Mejora proyectada a 10 años',
     // WS.3 — Planning · Wealth Projection
     wsp_cta:          'Explorar proyección',
-    wsp_title:        'Wealth Projection',
+    wsp_title:        'Proyección patrimonial',
     wsp_subtitle:     'Proyecta cómo podría crecer tu patrimonio.',
     wsp_inputs_title: 'Parámetros',
     wsp_in_monthly:   'Aportación mensual',
@@ -1858,6 +1864,11 @@ const T = {
     wsg_read_ontrack_date: 'Vas en línea para alcanzarlo en la fecha prevista.',
     wsg_read_ontrack_years: y => `A este ritmo, podrías alcanzarlo en aproximadamente ${y} ${y === 1 ? 'año' : 'años'}.`,
     wsg_read_ontrack: 'Este objetivo está avanzando a buen ritmo.',
+    wsg_state_ontrack: 'Vas por buen camino',
+    wsg_state_behind:  'Necesitas aumentar el ritmo',
+    wsg_state_reached: 'Objetivo alcanzado',
+    wsg_state_nodata:  'Faltan datos',
+    wsg_pv_title:      'Resultado',
     // Status pills
     statusOpen:        'Abierto',
     statusClosed:      'Cerrado',
@@ -3349,10 +3360,14 @@ const T = {
     wsh_ws_fire:           'FIRE Workbook',
     wsh_soon:              'Coming soon',
     wsh_none:              '—',
-    wsh_fp_aria:           'Your wealth projection: now, base and future',
-    wsh_fp_now:            'Now',
-    wsh_fp_base:           'Base',
-    wsh_fp_future:         'Future',
+    wsh_fp_aria:           'Your wealth path: today, projection and goal',
+    wsh_fp_now:            'Today',
+    wsh_fp_base:           'Projection',
+    wsh_fp_future:         'Goal',
+    wsh_fp_read_none:      'You haven\'t set any goals yet.',
+    wsh_fp_read_goal:      n => `Your nearest goal is ${n} ${n === 1 ? 'year' : 'years'} away.`,
+    wsh_fp_read_scenario:  pct => `Your best scenario beats your current situation by ${pct}%.`,
+    wsh_fp_read_reached:   'You\'ve already reached one of your goals.',
     // WS.2 — Scenario Builder
     wsb_title:         'Scenario Builder',
     wsb_subtitle:      'Compare decisions before you make them.',
@@ -3387,6 +3402,8 @@ const T = {
     wsb_concl_more: 'Increasing contributions clearly improves the projected outcome.',
     wsb_concl_steady: 'The biggest impact comes from keeping a steady monthly contribution.',
     wsb_disclaimer: 'Indicative simulation. Not a promise of returns nor financial advice.',
+    wsb_impact_best:   'Best scenario',
+    wsb_impact_uplift: 'Projected improvement over 10 years',
     // WS.3 — Planning · Wealth Projection
     wsp_cta:          'Explore projection',
     wsp_title:        'Wealth Projection',
@@ -3472,6 +3489,11 @@ const T = {
     wsg_read_ontrack_date: 'You are on track to reach it by the target date.',
     wsg_read_ontrack_years: y => `At this pace, you could reach it in about ${y} ${y === 1 ? 'year' : 'years'}.`,
     wsg_read_ontrack: 'This goal is progressing at a good pace.',
+    wsg_state_ontrack: 'On track',
+    wsg_state_behind:  'Pick up the pace',
+    wsg_state_reached: 'Goal reached',
+    wsg_state_nodata:  'Missing data',
+    wsg_pv_title:      'Result',
     // Status pills
     statusOpen:        'Open',
     statusClosed:      'Closed',
@@ -10964,6 +10986,7 @@ function _wshWireOnce() {
     if (el.getAttribute('data-wsp-input')) { _wspOnInput(); return; }
     if (el.getAttribute('data-ws4-input')) { _ws4OnInput(el); return; }
     if (el.getAttribute('data-wsg-input')) { _wsgOnInput(el); return; }
+    if (el.getAttribute('data-wsg-form')) { _wsgFormPreview(); return; }
   });
 }
 
@@ -10978,6 +11001,28 @@ function _wshRefreshMetrics(root, metrics) {
 // WS.1A — Workspace's own hero visual: a premium "future path" projection curve
 // (present → base → future) with scenario nodes. Pure SVG/CSS, no libraries, no
 // Intelligence orb/ECG/pulse. Blue Aurix, soft one-shot draw animation.
+// WS.5A — dynamic reading under the Future Path. Communicates, not decorates.
+// Priority: reached goal → nearest goal ETA → best scenario uplift → none.
+function _wshFuturePathReading() {
+  let goals = [], scenarios = [];
+  try { goals = _wshReadStore(_WSH_GOALS_KEY); } catch (_) {}
+  try { scenarios = _wshReadStore(_WSH_SCENARIOS_KEY); } catch (_) {}
+  const wealth = (function () { try { return _ws4Real().wealth; } catch (_) { return 0; } })();
+
+  if (goals.length && typeof calculateGoalProgress === 'function') {
+    const progs = goals.map(g => calculateGoalProgress(g, wealth));
+    if (progs.some(p => p.state === 'reached')) return t('wsh_fp_read_reached');
+    const yrs = progs.filter(p => p.months != null && p.state !== 'reached').map(p => Math.max(1, Math.ceil(p.months / 12)));
+    if (yrs.length) return t('wsh_fp_read_goal')(Math.min.apply(null, yrs));
+  }
+  if (scenarios.length) {
+    const best = scenarios.reduce((a, b) => ((b.projected || 0) > (a.projected || 0) ? b : a), scenarios[0]);
+    const base = (best.projected || 0) - (best.diff || 0);
+    if (base > 0 && best.diff > 0) return t('wsh_fp_read_scenario')(Math.round(best.diff / base * 100));
+  }
+  return t('wsh_fp_read_none');
+}
+
 function _wshFuturePathHtml() {
   const esc = (typeof _intccEsc === 'function') ? _intccEsc : (s => String(s == null ? '' : s));
   const line = 'M14 104 C 56 100 78 86 110 64 C 150 38 178 30 206 22';
@@ -11035,7 +11080,10 @@ function _renderWorkspaceHome(metrics) {
           ${stat('projects', t('wsh_stat_projects'))}
         </div>
       </div>
-      <div class="wsh-hero-viz">${_wshFuturePathHtml()}</div>
+      <div class="wsh-hero-viz">
+        ${_wshFuturePathHtml()}
+        <p class="wsh-fp-reading">${esc(_wshFuturePathReading())}</p>
+      </div>
     </section>`;
 
   // Goals snapshot — example goal types as starting templates (no fabricated
@@ -11258,6 +11306,31 @@ function _renderScenarioBuilder() {
       <button type="button" class="wsh-cta wsb-save${isSaved(s.id) ? ' is-saved' : ''}" data-wsh-save="${esc(s.id)}"${isSaved(s.id) ? ' disabled' : ''}>${esc(isSaved(s.id) ? t('wsb_saved') : t('wsb_save'))}</button>
     </div>`).join('');
 
+  // WS.5A P8 — lead with the impact, not the table: current trajectory → best
+  // scenario, with a big uplift in € and %.
+  const best = results.reduce((a, b) => (b.projected > a.projected ? b : a), results[0]);
+  const uplift = best.projected - baseProj;
+  const upliftPct = baseProj > 0 ? Math.round(uplift / baseProj * 100) : 0;
+  const impactHtml = `
+    <section class="wsh-card wsb-impact is-feature">
+      <div class="wsb-impact-row">
+        <div class="wsb-impact-col">
+          <span class="wsb-impact-label">${esc(t('wsb_current_title'))}</span>
+          <span class="wsb-impact-val">${esc(formatBase(baseProj))}</span>
+        </div>
+        <div class="wsb-impact-arrow" aria-hidden="true">→</div>
+        <div class="wsb-impact-col is-best">
+          <span class="wsb-impact-label">${esc(t('wsb_impact_best'))} · ${esc(best.name)}</span>
+          <span class="wsb-impact-val">${esc(formatBase(best.projected))}</span>
+        </div>
+      </div>
+      <div class="wsb-impact-uplift">
+        <span class="wsb-impact-delta">+${esc(formatBase(uplift))}</span>
+        <span class="wsb-impact-pct">+${upliftPct}%</span>
+        <span class="wsb-impact-cap">${esc(t('wsb_impact_uplift'))}</span>
+      </div>
+    </section>`;
+
   return `
     <div class="aurix-wsh wsh-sb is-revealed" data-wsh-view="scenario">
       <section class="wsh-card wsb-header">
@@ -11265,6 +11338,8 @@ function _renderScenarioBuilder() {
         <h2 class="wsb-title">${esc(t('wsb_title'))}</h2>
         <p class="wsb-subtitle">${esc(t('wsb_subtitle'))}</p>
       </section>
+
+      ${impactHtml}
 
       <section class="wsh-card wsb-current">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb_current_title'))}</h3><span class="wsb-horizon">${esc(t('wsb_horizon'))}</span></header>
@@ -11691,6 +11766,34 @@ function _wsgReading(goal, prog) {
   return prog.months != null ? t('wsg_read_ontrack_years')(Math.max(1, Math.ceil(prog.months / 12))) : t('wsg_read_ontrack');
 }
 
+// WS.5A P6 — live "Resultado" preview on the create form (real-time, no save).
+function _wsgPreviewHtml(prog) {
+  const esc = _intccEsc;
+  const sm = _wsgStateMeta(prog.state);
+  const years = (prog.months != null && prog.state !== 'reached') ? Math.max(1, Math.ceil(prog.months / 12)) : null;
+  const rows = [
+    { label: t('wsh_goal_progress'), value: prog.target > 0 ? prog.pct + '%' : '—' },
+    { label: t('wsg_r_years'), value: prog.state === 'reached' ? t('ws4_done') : (years != null ? t('wsp_unit_years')(years) : '—') },
+  ];
+  if (prog.requiredMonthly != null) rows.push({ label: t('wsg_r_required'), value: formatBase(prog.requiredMonthly) + t('ws4_permonth') });
+  return `
+    <span class="wsg-pv-state is-${esc(prog.state)}">${esc(t('wsg_state_' + sm.key))}</span>
+    <div class="ws4-rows">
+      ${rows.map(r => `<div class="ws4-row"><span class="ws4-row-label">${esc(r.label)}</span><b class="ws4-row-val">${esc(r.value)}</b></div>`).join('')}
+    </div>`;
+}
+function _wsgFormValues(root) {
+  const v = sel => { const el = root.querySelector('[data-wsg-form="' + sel + '"]'); return el ? el.value : ''; };
+  const year = Number(v('year')) || 0;
+  return { target: Number(v('target')) || 0, current: Number(v('current')) || 0, monthly: Number(v('monthly')) || 0, targetYear: year > 0 ? year : null, mode: 'manual' };
+}
+function _wsgFormPreview() {
+  const root = document.querySelector('.wsh-wsg'); if (!root) return;
+  const out = root.querySelector('[data-wsg-preview]'); if (!out) return;
+  let wealth = 0; try { wealth = _ws4Real().wealth; } catch (_) {}
+  out.innerHTML = _wsgPreviewHtml(calculateGoalProgress(_wsgFormValues(root), wealth));
+}
+
 function _wsgCreate() {
   const root = document.querySelector('.wsh-wsg'); if (!root) return;
   const val = sel => { const el = root.querySelector('[data-wsg-form="' + sel + '"]'); return el ? el.value : ''; };
@@ -11722,9 +11825,21 @@ function _wsgOnInput(el) {
   if (out) out.innerHTML = _wsgCardOutHtml(g, calculateGoalProgress(g, _ws4Real().wealth));
 }
 
+// WS.5A P7 — human state (label + icon + colour), no internal terms shown.
+function _wsgStateMeta(state) {
+  const M = {
+    'on-track': { key: 'ontrack',  icon: '<path d="M4 16l5-5 3 3 7-7"/><path d="M16 7h4v4"/>' },
+    'behind':   { key: 'behind',   icon: '<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>' },
+    'reached':  { key: 'reached',  icon: '<path d="M5 13l4 4L19 7"/>' },
+    'no-data':  { key: 'nodata',   icon: '<path d="M12 8h.01"/><path d="M11 12h1v4h1"/>' },
+  };
+  return M[state] || M['no-data'];
+}
+
 function _wsgCardOutHtml(g, prog) {
   const esc = _intccEsc;
   const hasDate = g.targetYear && g.targetYear > _wsgThisYear();
+  const sm = _wsgStateMeta(prog.state);
   const rows = [
     { label: t('wsg_r_target'),    value: formatBase(prog.target) },
     { label: t('wsg_r_current'),   value: formatBase(prog.current) },
@@ -11733,6 +11848,12 @@ function _wsgCardOutHtml(g, prog) {
   ];
   if (hasDate && prog.requiredMonthly != null) rows.push({ label: t('wsg_r_required'), value: formatBase(prog.requiredMonthly) + t('ws4_permonth') });
   return `
+    <div class="wsg-state-row">
+      <span class="wsg-state is-${esc(prog.state)}">
+        <svg class="wsg-state-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${sm.icon}</svg>
+        ${esc(t('wsg_state_' + sm.key))}
+      </span>
+    </div>
     <div class="wsg-progress is-${esc(prog.state)}">
       <div class="wsg-bar-track"><span class="wsg-bar-fill" style="width:${prog.pct}%"></span></div>
       <span class="wsg-pct">${prog.pct}%</span>
@@ -11751,16 +11872,23 @@ function _renderGoals() {
 
   const typeOpts = _WSG_TYPES.map(ty => `<option value="${esc(ty)}"${ty === prefill ? ' selected' : ''}>${esc(t('wsg_type_' + ty))}</option>`).join('');
 
+  const previewInit = calculateGoalProgress({ target: 100000, current: 0, monthly: 300, mode: 'manual', targetYear: null }, real.wealth);
   const createCard = `
     <section class="wsh-card wsg-create-card">
       <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsg_create_title'))}</h3></header>
-      <div class="wsg-form">
-        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_type'))}</span><select class="wsg-select" data-wsg-form="type">${typeOpts}</select></label>
-        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_name'))}</span><input class="wsg-text" type="text" data-wsg-form="name" placeholder="${esc(t('wsg_name_ph'))}"></label>
-        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_target'))}</span><span class="ws4-field-input"><input class="ws4-num" type="number" data-wsg-form="target" value="100000" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>
-        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="number" data-wsg-form="current" value="0" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>
-        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="number" data-wsg-form="monthly" value="300" min="0" step="50"><span class="ws4-field-unit">€</span></span></label>
-        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_year'))}</span><input class="ws4-num" type="number" data-wsg-form="year" value="" min="${_wsgThisYear() + 1}" max="2100" step="1" placeholder="${_wsgThisYear() + 10}"></label>
+      <div class="wsg-create-body">
+        <div class="wsg-form">
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_type'))}</span><select class="wsg-select" data-wsg-form="type">${typeOpts}</select></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_name'))}</span><input class="wsg-text" type="text" data-wsg-form="name" placeholder="${esc(t('wsg_name_ph'))}"></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_target'))}</span><span class="ws4-field-input"><input class="ws4-num" type="number" data-wsg-form="target" value="100000" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="number" data-wsg-form="current" value="0" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="number" data-wsg-form="monthly" value="300" min="0" step="50"><span class="ws4-field-unit">€</span></span></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_year'))}</span><input class="ws4-num" type="number" data-wsg-form="year" value="" min="${_wsgThisYear() + 1}" max="2100" step="1" placeholder="${_wsgThisYear() + 10}"></label>
+        </div>
+        <aside class="wsg-form-preview">
+          <span class="wsg-pv-title">${esc(t('wsg_pv_title'))}</span>
+          <div data-wsg-preview>${_wsgPreviewHtml(previewInit)}</div>
+        </aside>
       </div>
       <button type="button" class="wsh-cta is-primary" data-wsg-create>${esc(t('wsg_create_btn'))}</button>
     </section>`;
