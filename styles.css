@@ -19820,6 +19820,49 @@ body.gs-open { overflow: hidden; }
   .wsb-impact-val { font-size: 23px; }
 }
 
+/* ── WS.5A Commit B — save model (P5), Continuar (P3), Mis Proyectos (P4) ── */
+.wsg-card-foot, .wsg-foot-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.wsg-card-foot { margin-top: 4px; padding-top: 12px; border-top: 1px solid rgba(120,160,255,0.10); }
+.wsg-savebar { display: flex; align-items: center; gap: 10px; }
+.wsg-savestate { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; }
+.wsg-savestate.is-saved   { color: rgba(143,230,182,0.85); }
+.wsg-savestate.is-dirty   { color: #f3cf9a; }
+.wsg-savestate.is-unsaved { color: var(--text-muted); }
+.wsg-savebtn { padding: 6px 16px; }
+.wsg-savebtn[disabled] { opacity: 0.45; cursor: default; }
+.wsg-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.wsg-act {
+  font: inherit; cursor: pointer; font-size: 11.5px; font-weight: 600; color: #aecbff;
+  padding: 6px 11px; border-radius: 8px; background: rgba(74,130,240,0.08); border: 1px solid rgba(74,130,240,0.22);
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.wsg-act:hover { background: rgba(74,130,240,0.18); color: #cfe0ff; }
+.wsg-act.is-danger { color: #f0a3a3; background: rgba(224,90,90,0.08); border-color: rgba(224,90,90,0.24); }
+.wsg-act.is-danger:hover { background: rgba(224,90,90,0.16); color: #f5c0c0; }
+
+/* P3 — Continuar */
+.wsh-continue { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.wsh-cont-info { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.wsh-cont-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(159,194,255,0.85); }
+.wsh-cont-name { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-bright); }
+.wsh-cont-meta { font-size: 12px; color: var(--text-muted); }
+
+/* P4 — Mis proyectos */
+.wsh-proj-grid { display: flex; flex-direction: column; gap: 10px; }
+.wsh-proj { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(120,160,255,0.12); background: rgba(255,255,255,0.025); }
+.wsh-proj-info { display: flex; align-items: center; gap: 12px; min-width: 0; flex-wrap: wrap; }
+.wsh-proj-name { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-bright); }
+.wsh-proj-meta { font-size: 11.5px; color: var(--text-muted); }
+.wsh-proj-acts { display: flex; gap: 6px; flex: 0 0 auto; }
+
+@media (max-width: 720px) {
+  .wsh-continue { flex-direction: column; align-items: stretch; gap: 12px; }
+  .wsh-proj { flex-direction: column; align-items: stretch; }
+  .wsh-proj-acts { justify-content: flex-end; }
+  .wsg-card-foot, .wsg-foot-card { flex-direction: column; align-items: stretch; }
+  .wsg-actions { justify-content: flex-end; }
+}
+
 /* ════════ WS.2 — Financial Tools Hub (dedicated tools) ═══════════════════════
    Premium interactive tools that open inside Workspace templates mode (never
    the Sheet). Encapsulated under ws2-* classes; responsive. */

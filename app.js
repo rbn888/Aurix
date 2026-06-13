@@ -1869,6 +1869,23 @@ const T = {
     wsg_state_reached: 'Objetivo alcanzado',
     wsg_state_nodata:  'Faltan datos',
     wsg_pv_title:      'Resultado',
+    // WS.5A P5/P3/P4 — save model + projects
+    wsg_save_pending:  'Cambios pendientes',
+    wsg_save_done:     'Guardado',
+    wsg_save_unsaved:  'Sin guardar',
+    wsg_save_btn:      'Guardar',
+    wsg_act_rename:    'Renombrar',
+    wsg_act_dup:       'Duplicar',
+    wsg_act_del:       'Eliminar',
+    wsg_copy_suffix:   '(copia)',
+    wsg_delete_confirm:'¿Eliminar este elemento? No se puede deshacer.',
+    wsg_rename_prompt: 'Nuevo nombre:',
+    wsh_continue_title:'Continuar donde lo dejaste',
+    wsh_continue_btn:  'Continuar',
+    wsh_projects_title:'Mis proyectos',
+    wsh_projects_empty:'No tienes proyectos guardados.',
+    wsh_projects_cta:  'Crear primer proyecto',
+    wsh_proj_open:     'Abrir',
     // Status pills
     statusOpen:        'Abierto',
     statusClosed:      'Cerrado',
@@ -3494,6 +3511,23 @@ const T = {
     wsg_state_reached: 'Goal reached',
     wsg_state_nodata:  'Missing data',
     wsg_pv_title:      'Result',
+    // WS.5A P5/P3/P4 — save model + projects
+    wsg_save_pending:  'Pending changes',
+    wsg_save_done:     'Saved',
+    wsg_save_unsaved:  'Not saved',
+    wsg_save_btn:      'Save',
+    wsg_act_rename:    'Rename',
+    wsg_act_dup:       'Duplicate',
+    wsg_act_del:       'Delete',
+    wsg_copy_suffix:   '(copy)',
+    wsg_delete_confirm:'Delete this item? This cannot be undone.',
+    wsg_rename_prompt: 'New name:',
+    wsh_continue_title:'Continue where you left off',
+    wsh_continue_btn:  'Continue',
+    wsh_projects_title:'My projects',
+    wsh_projects_empty:'You have no saved projects.',
+    wsh_projects_cta:  'Create first project',
+    wsh_proj_open:     'Open',
     // Status pills
     statusOpen:        'Open',
     statusClosed:      'Closed',
@@ -10910,6 +10944,12 @@ let _wshView    = 'home';
 let _wshWired   = false;
 let _ws4ActiveId = null;   // WS.4 — currently open workspace project id
 let _wsgPrefill = null;    // WS.5 — prefill the create-goal type when arriving from Home
+// WS.5A P5 — real save model (editar ≠ guardar). Working copies hold unsaved
+// edits; nothing persists until the user confirms "Guardar".
+let _wsgWorking = {};      // goalId -> working goal (unsaved edits)
+let _wsgDirty   = {};      // goalId -> true when there are pending changes
+let _ws4Draft   = null;    // WS.4 open workspace working copy (may be unsaved)
+let _ws4Dirty   = false;   // WS.4 pending changes flag
 
 function _wshReveal(container) {
   try { const r = container.querySelector('.aurix-wsh'); if (r) requestAnimationFrame(() => r.classList.add('is-revealed')); } catch (_) {}
@@ -10961,9 +11001,18 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode]')
+      ? e.target.closest('[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act]')
       : null;
     if (!t) return;
+    // P5/P4 — goal lifecycle
+    const gSave = t.getAttribute('data-wsg-save-goal'); if (gSave) { _wsgSaveGoal(gSave); return; }
+    const gAct = t.getAttribute('data-wsg-act'); if (gAct) { const id = t.getAttribute('data-wsg-id'); if (gAct === 'dup') _wsgDuplicate(id); else if (gAct === 'del') _wsgDelete(id); else if (gAct === 'rename') _wsgRename(id); return; }
+    // P5 — workspace save + lifecycle
+    const w4Save = t.getAttribute('data-ws4-save'); if (w4Save !== null && t.hasAttribute('data-ws4-save')) { _ws4SaveDraft(); return; }
+    const w4Act = t.getAttribute('data-ws4-act'); if (w4Act) { if (w4Act === 'dup') _ws4Duplicate(); else if (w4Act === 'del') _ws4Delete(); else if (w4Act === 'rename') _ws4Rename(); return; }
+    // P4 — Mis Proyectos: open / duplicate / delete by entity ref
+    const xOpen = t.getAttribute('data-wsx-open'); if (xOpen) { _wsxOpen(xOpen); return; }
+    const xAct = t.getAttribute('data-wsx-act'); if (xAct) { _wsxAct(xAct, t.getAttribute('data-wsx-ref')); return; }
     const cta = t.getAttribute('data-wsh-cta');
     const nav = t.getAttribute('data-wsh-nav');
     if (cta === 'scenario' || nav === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); return; }
@@ -11056,6 +11105,41 @@ function _wshFuturePathHtml() {
         ${nodes.map(n => `<text class="wsh-fp-label" x="${n.x}" y="129" text-anchor="${anchor[n.key]}">${esc(t('wsh_fp_' + n.key))}</text>`).join('')}
       </g>
     </svg>`;
+}
+
+// WS.5A P3/P4 — unified view of saved items across the 3 stores.
+function _wshAllProjects() {
+  const out = [];
+  try { _wshReadStore(_WSH_GOALS_KEY).forEach(g => { if (g) out.push({ kind: 'goal', id: g.id, name: g.name, typeLabel: t('wsg_type_' + (g.type || 'free')), ts: g.updatedAt || g.createdAt || 0, ref: 'goal:' + g.id }); }); } catch (_) {}
+  try { _wshReadStore(_WSH_PROJECTS_KEY).forEach(p => { if (p) out.push({ kind: 'workspace', id: p.id, name: p.name, typeLabel: t('wsh_ws_' + p.type), ts: p.updatedAt || p.createdAt || 0, ref: 'workspace:' + p.id }); }); } catch (_) {}
+  try { _wshReadStore(_WSH_SCENARIOS_KEY).forEach(s => { if (s) { const id = s.scenarioId || s.id; out.push({ kind: 'scenario', id, name: s.name, typeLabel: t('wsh_scenario_title'), ts: s.createdAt || 0, ref: 'scenario:' + id }); } }); } catch (_) {}
+  return out;
+}
+function _wshLastEdited() { const all = _wshAllProjects(); return all.length ? all.reduce((a, b) => (b.ts > a.ts ? b : a), all[0]) : null; }
+
+function _wsxOpen(ref) {
+  const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
+  if (kind === 'goal') { _wshView = 'goals'; renderWorkspaceHome(); }
+  else if (kind === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); }
+  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } }
+}
+function _wsxAct(act, ref) {
+  if (!ref) return;
+  const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
+  const confirmDel = () => !(typeof confirm === 'function') || confirm(t('wsg_delete_confirm'));
+  const now = Date.now();
+  if (kind === 'goal') {
+    if (act === 'del') { if (!confirmDel()) return; _wsgSaveAll(_wsgGoals().filter(g => g && g.id !== id)); delete _wsgWorking[id]; delete _wsgDirty[id]; }
+    else if (act === 'dup') { const s = _wsgGoals().find(g => g && g.id === id); if (s) _wsgPersist(Object.assign({}, s, { id: 'wsg_' + now, name: s.name + ' ' + t('wsg_copy_suffix'), createdAt: now, updatedAt: now })); }
+  } else if (kind === 'workspace') {
+    if (act === 'del') { if (!confirmDel()) return; _ws4SaveAll(_ws4Projects().filter(p => p && p.id !== id)); }
+    else if (act === 'dup') { const s = _ws4Projects().find(p => p && p.id === id); if (s) _ws4Persist(Object.assign({}, s, { id: 'ws4_' + now, inputs: Object.assign({}, s.inputs), name: s.name + ' ' + t('wsg_copy_suffix'), createdAt: now, updatedAt: now })); }
+  } else if (kind === 'scenario') {
+    const arr = _wshReadStore(_WSH_SCENARIOS_KEY);
+    if (act === 'del') { if (!confirmDel()) return; try { localStorage.setItem(_WSH_SCENARIOS_KEY, JSON.stringify(arr.filter(s => (s.scenarioId || s.id) !== id))); } catch (_) {} }
+    else if (act === 'dup') { const s = arr.find(x => (x.scenarioId || x.id) === id); if (s) { arr.push(Object.assign({}, s, { scenarioId: (s.scenarioId || 'scn') + '_' + now, createdAt: now })); try { localStorage.setItem(_WSH_SCENARIOS_KEY, JSON.stringify(arr)); } catch (_) {} } }
+  }
+  const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); }
 }
 
 function _renderWorkspaceHome(metrics) {
@@ -11183,9 +11267,44 @@ function _renderWorkspaceHome(metrics) {
       </div>
     </section>`;
 
+  // WS.5A P3 — "Continuar donde lo dejaste": last-edited saved item (or nothing).
+  const last = _wshLastEdited();
+  const continueHtml = last ? `
+    <section class="wsh-card wsh-continue">
+      <div class="wsh-cont-info">
+        <span class="wsh-cont-eyebrow">${esc(t('wsh_continue_title'))}</span>
+        <p class="wsh-cont-name">${esc(last.name)}</p>
+        <span class="wsh-cont-meta">${esc(last.typeLabel)} · ${esc(_intccDate(last.ts))}</span>
+      </div>
+      <button type="button" class="wsh-cta is-primary" data-wsx-open="${esc(last.ref)}">${esc(t('wsh_continue_btn'))}</button>
+    </section>` : '';
+
+  // WS.5A P4 — "Mis proyectos": all saved goals/scenarios/workspaces.
+  const all = _wshAllProjects().sort((a, b) => b.ts - a.ts);
+  const projectsHtml = `
+    <section class="wsh-card wsh-projects">
+      <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsh_projects_title'))}</h3></header>
+      ${all.length ? `<div class="wsh-proj-grid">${all.map(p => `
+        <div class="wsh-proj">
+          <div class="wsh-proj-info">
+            <span class="wsb-pill is-dynamic">${esc(p.typeLabel)}</span>
+            <p class="wsh-proj-name">${esc(p.name)}</p>
+            <span class="wsh-proj-meta">${esc(_intccDate(p.ts))}</span>
+          </div>
+          <div class="wsh-proj-acts">
+            <button type="button" class="wsg-act" data-wsx-open="${esc(p.ref)}">${esc(t('wsh_proj_open'))}</button>
+            <button type="button" class="wsg-act" data-wsx-act="dup" data-wsx-ref="${esc(p.ref)}">${esc(t('wsg_act_dup'))}</button>
+            <button type="button" class="wsg-act is-danger" data-wsx-act="del" data-wsx-ref="${esc(p.ref)}">${esc(t('wsg_act_del'))}</button>
+          </div>
+        </div>`).join('')}</div>`
+      : `<p class="wsh-empty">${esc(t('wsh_projects_empty'))}</p><button type="button" class="wsh-cta is-primary" data-wsh-cta="goals">${esc(t('wsh_projects_cta'))}</button>`}
+    </section>`;
+
   return `
     <div class="aurix-wsh" data-wsh-view="home">
       ${heroHtml}
+      ${continueHtml}
+      ${projectsHtml}
       ${goalsHtml}
       ${scenarioHtml}
       ${planningHtml}
@@ -11611,43 +11730,86 @@ function _ws4Templates() {
 
 function _ws4Projects() { return _wshReadStore(_WSH_PROJECTS_KEY); }
 function _ws4SaveAll(list) { try { localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify(list)); } catch (_) {} }
-function _ws4Get() { return _ws4Projects().find(x => x && x.id === _ws4ActiveId) || null; }
+function _ws4Get() { return _ws4Draft; }   // P5 — live working copy (may be unsaved)
 function _ws4Persist(p) { const list = _ws4Projects(); const i = list.findIndex(x => x && x.id === p.id); if (i >= 0) list[i] = p; else list.push(p); _ws4SaveAll(list); }
 function _ws4Summarize(type, inputs) { const c = _ws4Templates()[type].compute(inputs); return { rows: c.rows, reading: c.reading }; }
 
-// Open the existing project for a template, or create one (one per template type
-// for MVP — keeps the Home counter meaningful and avoids duplicate spam).
+// P5 — open a saved workspace (working copy) or create an UNSAVED draft. Nothing
+// persists until "Guardar".
 function _ws4OpenOrCreate(type) {
   const tmpl = _ws4Templates()[type];
   if (!tmpl) return;
-  const list = _ws4Projects();
-  let p = list.find(x => x && x.type === type);
-  if (!p) {
+  const existing = _ws4Projects().find(x => x && x.type === type);
+  if (existing) {
+    _ws4Draft = Object.assign({}, existing, { inputs: Object.assign({}, existing.inputs) });
+    _ws4Dirty = false;
+  } else {
     const inputs = {}; tmpl.fields.forEach(f => { inputs[f.k] = f.def; });
     const now = Date.now();
-    p = { id: 'ws4_' + now, type, name: tmpl.name, mode: 'manual', inputs, createdAt: now, updatedAt: now, summary: _ws4Summarize(type, inputs) };
-    list.push(p); _ws4SaveAll(list);
+    _ws4Draft = { id: 'ws4_' + now, type, name: tmpl.name, mode: 'manual', inputs, createdAt: now, updatedAt: now, __unsaved: true };
+    _ws4Dirty = false;
   }
-  _ws4ActiveId = p.id; _wshView = 'workspace'; renderWorkspaceHome();
+  _ws4ActiveId = _ws4Draft.id; _wshView = 'workspace'; renderWorkspaceHome();
 }
 
 function _ws4SetMode(mode) {
   const p = _ws4Get(); if (!p) return;
   p.mode = mode;
   if (mode === 'sync') { const real = _ws4Real(); _ws4Templates()[p.type].fields.forEach(f => { if (f.sync) p.inputs[f.k] = f.sync(real); }); }
-  p.updatedAt = Date.now(); p.summary = _ws4Summarize(p.type, p.inputs); _ws4Persist(p);
+  _ws4Dirty = true;
   const c = document.getElementById('aurixWorkspace');
   if (c) { c.innerHTML = _renderWorkspaceDetail(); _wshReveal(c); }
 }
 
 function _ws4OnInput(el) {
   const p = _ws4Get(); if (!p) return;
-  const k = el.getAttribute('data-ws4-input');
-  p.inputs[k] = Number(el.value);
-  p.updatedAt = Date.now(); p.summary = _ws4Summarize(p.type, p.inputs); _ws4Persist(p);
+  p.inputs[el.getAttribute('data-ws4-input')] = Number(el.value);
+  _ws4Dirty = true;
   const root = document.querySelector('.wsh-ws4');
   const out  = root && root.querySelector('[data-ws4-out]');
   if (out) out.innerHTML = _ws4OutHtml(_ws4Templates()[p.type].compute(p.inputs, _ws4Real()));
+  const bar = root && root.querySelector('[data-ws4-savebar]');
+  if (bar) bar.innerHTML = _ws4SaveBarHtml();
+}
+
+// P5 — explicit save + lifecycle for workspaces.
+function _ws4SaveDraft() {
+  const p = _ws4Get(); if (!p) return;
+  p.updatedAt = Date.now(); p.summary = _ws4Summarize(p.type, p.inputs); delete p.__unsaved;
+  _ws4Persist(p); _ws4Dirty = false;
+  const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceDetail(); _wshReveal(c); }
+}
+function _ws4Duplicate() {
+  const p = _ws4Get(); if (!p) return;
+  const now = Date.now();
+  const copy = Object.assign({}, p, { id: 'ws4_' + now, inputs: Object.assign({}, p.inputs), name: p.name + ' ' + t('wsg_copy_suffix'), createdAt: now, updatedAt: now });
+  delete copy.__unsaved; copy.summary = _ws4Summarize(copy.type, copy.inputs);
+  _ws4Persist(copy); _ws4Draft = copy; _ws4ActiveId = copy.id; _ws4Dirty = false;
+  const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceDetail(); _wshReveal(c); }
+}
+function _ws4Delete() {
+  const p = _ws4Get(); if (!p) return;
+  if (typeof confirm === 'function' && !confirm(t('wsg_delete_confirm'))) return;
+  _ws4SaveAll(_ws4Projects().filter(x => x && x.id !== p.id));
+  _ws4Draft = null; _ws4ActiveId = null; _wshView = 'home'; renderWorkspaceHome();
+}
+function _ws4Rename() {
+  const p = _ws4Get(); if (!p) return;
+  const name = (typeof prompt === 'function') ? prompt(t('wsg_rename_prompt'), p.name) : null;
+  if (name == null) return;
+  p.name = String(name).trim() || p.name; _ws4Dirty = true;
+  const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceDetail(); _wshReveal(c); }
+}
+function _ws4SaveBarHtml() {
+  const esc = _intccEsc;
+  const p = _ws4Get();
+  const unsaved = !!(p && p.__unsaved);
+  const state = unsaved ? 'unsaved' : (_ws4Dirty ? 'dirty' : 'saved');
+  const lbl = { unsaved: t('wsg_save_unsaved'), dirty: t('wsg_save_pending'), saved: t('wsg_save_done') }[state];
+  const canSave = unsaved || _ws4Dirty;
+  return `
+    <span class="wsg-savestate is-${state}">${esc(lbl)}</span>
+    <button type="button" class="wsh-cta wsg-savebtn" data-ws4-save${canSave ? '' : ' disabled'}>${esc(t('wsg_save_btn'))}</button>`;
 }
 
 function _ws4OutHtml(c) {
@@ -11707,10 +11869,19 @@ function _renderWorkspaceDetail() {
         </section>
 
         <section class="wsh-card ws4-out-card">
-          <header class="wsh-head"><h3 class="wsh-title">${esc(t('ws4_summary_title'))}</h3><span class="ws4-autosave">${esc(t('ws4_autosave'))}</span></header>
+          <header class="wsh-head"><h3 class="wsh-title">${esc(t('ws4_summary_title'))}</h3></header>
           <div class="ws4-out" data-ws4-out>${_ws4OutHtml(c)}</div>
         </section>
       </div>
+
+      <section class="wsh-card wsg-foot-card">
+        <div class="wsg-savebar" data-ws4-savebar>${_ws4SaveBarHtml()}</div>
+        <div class="wsg-actions">
+          <button type="button" class="wsg-act" data-ws4-act="rename">${esc(t('wsg_act_rename'))}</button>
+          <button type="button" class="wsg-act" data-ws4-act="dup">${esc(t('wsg_act_dup'))}</button>
+          <button type="button" class="wsg-act is-danger" data-ws4-act="del">${esc(t('wsg_act_del'))}</button>
+        </div>
+      </section>
 
       <p class="wsb-disclaimer">${esc(t('wsb_disclaimer'))}</p>
     </div>`;
@@ -11723,7 +11894,9 @@ const _WSG_TYPES = ['wealth', 'emergency', 'home', 'fire', 'free'];
 function _wsgThisYear() { try { return new Date().getFullYear(); } catch (_) { return 2026; } }
 function _wsgGoals() { return _wshReadStore(_WSH_GOALS_KEY); }
 function _wsgSaveAll(list) { try { localStorage.setItem(_WSH_GOALS_KEY, JSON.stringify(list)); } catch (_) {} }
-function _wsgGet(id) { return _wsgGoals().find(g => g && g.id === id) || null; }
+// Working copy (unsaved edits) overrides the stored goal for display/edit.
+function _wsgGet(id) { return _wsgWorking[id] || _wsgGoals().find(g => g && g.id === id) || null; }
+function _wsgStored(id) { return _wsgGoals().find(g => g && g.id === id) || null; }
 function _wsgPersist(g) { const list = _wsgGoals(); const i = list.findIndex(x => x && x.id === g.id); if (i >= 0) list[i] = g; else list.push(g); _wsgSaveAll(list); }
 
 // Deterministic progress. currentWealth is the real read-only figure (for sync).
@@ -11810,19 +11983,61 @@ function _wsgCreate() {
   const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); }
 }
 
+// P5 — edits mutate the WORKING copy and mark dirty; nothing persists here.
+function _wsgEnsureWorking(id) {
+  if (!_wsgWorking[id]) { const s = _wsgStored(id); if (s) _wsgWorking[id] = Object.assign({}, s); }
+  return _wsgWorking[id];
+}
 function _wsgSetMode(id, mode) {
-  const g = _wsgGet(id); if (!g) return;
-  g.mode = mode; g.updatedAt = Date.now(); _wsgPersist(g);
+  const g = _wsgEnsureWorking(id); if (!g) return;
+  g.mode = mode; _wsgDirty[id] = true;
   const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); }
 }
 
 function _wsgOnInput(el) {
   const id = el.getAttribute('data-wsg-id'); const k = el.getAttribute('data-wsg-input');
-  const g = _wsgGet(id); if (!g) return;
-  g[k] = Number(el.value); g.updatedAt = Date.now(); _wsgPersist(g);
+  const g = _wsgEnsureWorking(id); if (!g) return;
+  g[k] = Number(el.value); _wsgDirty[id] = true;
   const card = el.closest('.wsg-card'); if (!card) return;
   const out = card.querySelector('[data-wsg-out]');
   if (out) out.innerHTML = _wsgCardOutHtml(g, calculateGoalProgress(g, _ws4Real().wealth));
+  const bar = card.querySelector('[data-wsg-savebar]');
+  if (bar) bar.innerHTML = _wsgSaveBarHtml(id);
+}
+
+// P5 — explicit save + lifecycle actions (Guardar / Duplicar / Eliminar / Renombrar).
+function _wsgSaveGoal(id) {
+  const g = _wsgWorking[id]; if (!g) return;
+  g.updatedAt = Date.now(); _wsgPersist(g);
+  delete _wsgWorking[id]; delete _wsgDirty[id];
+  const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); }
+}
+function _wsgDuplicate(id) {
+  const s = _wsgGet(id); if (!s) return;
+  const now = Date.now();
+  const copy = Object.assign({}, s, { id: 'wsg_' + now, name: s.name + ' ' + t('wsg_copy_suffix'), createdAt: now, updatedAt: now });
+  _wsgPersist(copy);
+  const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); }
+}
+function _wsgDelete(id) {
+  if (typeof confirm === 'function' && !confirm(t('wsg_delete_confirm'))) return;
+  _wsgSaveAll(_wsgGoals().filter(g => g && g.id !== id));
+  delete _wsgWorking[id]; delete _wsgDirty[id];
+  const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); }
+}
+function _wsgRename(id) {
+  const g = _wsgEnsureWorking(id); if (!g) return;
+  const name = (typeof prompt === 'function') ? prompt(t('wsg_rename_prompt'), g.name) : null;
+  if (name == null) return;
+  g.name = String(name).trim() || g.name; _wsgDirty[id] = true;
+  const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); }
+}
+function _wsgSaveBarHtml(id) {
+  const esc = _intccEsc;
+  const dirty = !!_wsgDirty[id];
+  return `
+    <span class="wsg-savestate is-${dirty ? 'dirty' : 'saved'}">${esc(dirty ? t('wsg_save_pending') : t('wsg_save_done'))}</span>
+    <button type="button" class="wsh-cta wsg-savebtn" data-wsg-save-goal="${esc(id)}"${dirty ? '' : ' disabled'}>${esc(t('wsg_save_btn'))}</button>`;
 }
 
 // WS.5A P7 — human state (label + icon + colour), no internal terms shown.
@@ -11893,7 +12108,9 @@ function _renderGoals() {
       <button type="button" class="wsh-cta is-primary" data-wsg-create>${esc(t('wsg_create_btn'))}</button>
     </section>`;
 
-  const listInner = goals.length ? goals.map(g => {
+  // P5 — display the working copy (unsaved edits) over the stored goal.
+  const listInner = goals.length ? goals.map(stored => {
+    const g = _wsgWorking[stored.id] || stored;
     const prog = calculateGoalProgress(g, real.wealth);
     const isSync = g.mode === 'sync';
     return `
@@ -11912,6 +12129,14 @@ function _renderGoals() {
           <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="number" data-wsg-input="monthly" data-wsg-id="${esc(g.id)}" value="${esc(g.monthly)}" min="0" step="50"><span class="ws4-field-unit">€</span></span></label>
         </div>
         <div class="wsg-out" data-wsg-out>${_wsgCardOutHtml(g, prog)}</div>
+        <div class="wsg-card-foot">
+          <div class="wsg-savebar" data-wsg-savebar>${_wsgSaveBarHtml(g.id)}</div>
+          <div class="wsg-actions">
+            <button type="button" class="wsg-act" data-wsg-act="rename" data-wsg-id="${esc(g.id)}" title="${esc(t('wsg_act_rename'))}">${esc(t('wsg_act_rename'))}</button>
+            <button type="button" class="wsg-act" data-wsg-act="dup" data-wsg-id="${esc(g.id)}" title="${esc(t('wsg_act_dup'))}">${esc(t('wsg_act_dup'))}</button>
+            <button type="button" class="wsg-act is-danger" data-wsg-act="del" data-wsg-id="${esc(g.id)}" title="${esc(t('wsg_act_del'))}">${esc(t('wsg_act_del'))}</button>
+          </div>
+        </div>
       </div>`;
   }).join('') : `<p class="wsh-empty">${esc(t('wsg_empty'))}</p>`;
 
