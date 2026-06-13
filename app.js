@@ -1773,6 +1773,29 @@ const T = {
     wsb_concl_more: 'Aumentar aportaciones mejora claramente el resultado proyectado.',
     wsb_concl_steady: 'El mayor impacto viene de mantener una aportación mensual constante.',
     wsb_disclaimer: 'Simulación orientativa. No es una promesa de rentabilidad ni asesoramiento financiero.',
+    // WS.3 — Planning · Wealth Projection
+    wsp_cta:          'Explorar proyección',
+    wsp_title:        'Wealth Projection',
+    wsp_subtitle:     'Proyecta cómo podría crecer tu patrimonio.',
+    wsp_inputs_title: 'Parámetros',
+    wsp_in_monthly:   'Aportación mensual',
+    wsp_in_years:     'Horizonte',
+    wsp_in_return:    'Rentabilidad esperada',
+    wsp_unit_years:   n => `${n} ${n === 1 ? 'año' : 'años'}`,
+    wsp_sum_final:    'Patrimonio final',
+    wsp_sum_contrib:  'Aportado total',
+    wsp_sum_gain:     'Ganancia estimada',
+    wsp_scn_cons:     'Conservador',
+    wsp_scn_base:     'Base',
+    wsp_scn_opt:      'Optimista',
+    wsp_diff_base:    'Diferencia vs base',
+    wsp_ref:          'Referencia',
+    wsp_chart_title:  'Proyección de patrimonio',
+    wsp_axis_now:     'Hoy',
+    wsp_axis_year:    n => `Año ${n}`,
+    wsp_read_horizon: 'Un horizonte más largo mejora el efecto del crecimiento compuesto.',
+    wsp_read_monthly: 'La aportación mensual tiene un impacto relevante en la proyección final.',
+    wsp_read_steady:  n => `Manteniendo este ritmo, tu patrimonio podría crecer de forma sostenida durante los próximos ${n} años.`,
     // Status pills
     statusOpen:        'Abierto',
     statusClosed:      'Cerrado',
@@ -3302,6 +3325,29 @@ const T = {
     wsb_concl_more: 'Increasing contributions clearly improves the projected outcome.',
     wsb_concl_steady: 'The biggest impact comes from keeping a steady monthly contribution.',
     wsb_disclaimer: 'Indicative simulation. Not a promise of returns nor financial advice.',
+    // WS.3 — Planning · Wealth Projection
+    wsp_cta:          'Explore projection',
+    wsp_title:        'Wealth Projection',
+    wsp_subtitle:     'Project how your wealth could grow.',
+    wsp_inputs_title: 'Parameters',
+    wsp_in_monthly:   'Monthly contribution',
+    wsp_in_years:     'Horizon',
+    wsp_in_return:    'Expected return',
+    wsp_unit_years:   n => `${n} ${n === 1 ? 'year' : 'years'}`,
+    wsp_sum_final:    'Final wealth',
+    wsp_sum_contrib:  'Total contributed',
+    wsp_sum_gain:     'Estimated gain',
+    wsp_scn_cons:     'Conservative',
+    wsp_scn_base:     'Base',
+    wsp_scn_opt:      'Optimistic',
+    wsp_diff_base:    'Difference vs base',
+    wsp_ref:          'Reference',
+    wsp_chart_title:  'Wealth projection',
+    wsp_axis_now:     'Today',
+    wsp_axis_year:    n => `Year ${n}`,
+    wsp_read_horizon: 'A longer horizon improves the effect of compound growth.',
+    wsp_read_monthly: 'The monthly contribution has a relevant impact on the final projection.',
+    wsp_read_steady:  n => `At this pace, your wealth could grow steadily over the next ${n} years.`,
     // Status pills
     statusOpen:        'Open',
     statusClosed:      'Closed',
@@ -10712,7 +10758,8 @@ function _wshMetrics() {
 
 // Idempotent mount: build once + run the reveal; on later calls (price ticks,
 // refresh) just refresh the live numbers so the entrance animation never restarts.
-// WS.2 — internal Workspace view state (no global nav change). 'home' | 'scenario'.
+// WS.2/WS.3 — internal Workspace view state (no global nav change).
+// 'home' | 'scenario' | 'planning'.
 let _wshView  = 'home';
 let _wshWired = false;
 
@@ -10735,6 +10782,12 @@ function renderWorkspaceHome(container) {
     _wshReveal(container);
     return;
   }
+  if (_wshView === 'planning') {
+    if (shown === 'planning') return;
+    container.innerHTML = _renderWealthProjection();
+    _wshReveal(container);
+    return;
+  }
   // Home
   const metrics = _wshMetrics();
   if (shown === 'home') { _wshRefreshMetrics(cur, metrics); return; }
@@ -10752,11 +10805,19 @@ function _wshWireOnce() {
     if (t.getAttribute('data-wsh-cta') === 'scenario' || t.getAttribute('data-wsh-nav') === 'scenario') {
       _wshView = 'scenario'; renderWorkspaceHome(); return;
     }
+    if (t.getAttribute('data-wsh-cta') === 'planning' || t.getAttribute('data-wsh-nav') === 'planning') {
+      _wshView = 'planning'; renderWorkspaceHome(); return;
+    }
     if (t.getAttribute('data-wsh-nav') === 'home') {
       _wshView = 'home'; renderWorkspaceHome(); return;
     }
     const saveId = t.getAttribute('data-wsh-save');
     if (saveId) { _wsbSaveScenario(saveId, t); return; }
+  });
+  // WS.3 — live recompute of the Wealth Projection on slider input (no rebuild).
+  document.addEventListener('input', e => {
+    const el = e.target;
+    if (el && el.getAttribute && el.getAttribute('data-wsp-input')) _wspOnInput();
   });
 }
 
@@ -10877,15 +10938,24 @@ function _renderWorkspaceHome(metrics) {
       <button type="button" class="wsh-cta is-primary" data-wsh-cta="scenario">${esc(t('wsh_scenario_cta'))}</button>
     </section>`;
 
-  // Planning snapshot — premium placeholder cards for WS.3.
+  // Planning snapshot — WS.3 activates "Wealth Projection"; the other two stay
+  // as premium "coming soon" placeholders, visually coherent.
   const planItems = [
-    { key: 'retirement' }, { key: 'fire' }, { key: 'projection' },
+    { key: 'retirement', active: false },
+    { key: 'fire',       active: false },
+    { key: 'projection', active: true  },
   ];
   const planningHtml = `
     <section class="wsh-card wsh-planning">
       <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsh_planning_title'))}</h3></header>
       <div class="wsh-plan-grid">
-        ${planItems.map(p => `
+        ${planItems.map(p => p.active ? `
+          <div class="wsh-plan is-active" role="button" tabindex="0" data-wsh-cta="planning">
+            <p class="wsh-plan-name">${esc(t('wsh_plan_' + p.key))}</p>
+            <div class="wsh-plan-foot">
+              <span class="wsh-plan-go" data-wsh-cta="planning">${esc(t('wsp_cta'))} ›</span>
+            </div>
+          </div>` : `
           <div class="wsh-plan">
             <p class="wsh-plan-name">${esc(t('wsh_plan_' + p.key))}</p>
             <div class="wsh-plan-foot">
@@ -11090,6 +11160,155 @@ function _wsbSaveScenario(id, btn) {
     localStorage.setItem(_WSH_SCENARIOS_KEY, JSON.stringify(store));
     if (btn) { btn.textContent = t('wsb_saved'); btn.classList.add('is-saved'); btn.setAttribute('disabled', ''); }
   } catch (_) {}
+}
+
+// ── WS.3 — Planning · Wealth Projection MVP ──────────────────────────────────
+// Deterministic plan projection. Reuses projectScenario() for the end value and
+// builds the annual series from it. Pure, no wealthEngine, no APIs, no AI.
+function projectWealthPlan(initialWealth, monthlyContribution, annualReturn, years) {
+  const yrs = Math.max(0, Math.round(Number(years) || 0));
+  const init = Math.max(0, Number(initialWealth) || 0);
+  const m    = Math.max(0, Number(monthlyContribution) || 0);
+  const finalWealth = projectScenario(init, m, annualReturn, yrs).projected;
+  const contributed = init + m * yrs * 12;        // total money in (initial + aportaciones)
+  const gain        = finalWealth - contributed;  // estimated growth
+  const series = [];
+  for (let y = 0; y <= yrs; y++) series.push({ year: y, value: projectScenario(init, m, annualReturn, y).projected });
+  return { finalWealth, contributed, gain, series, finalYear: yrs, multiple: contributed > 0 ? finalWealth / contributed : 1 };
+}
+
+const _WSP_KEY = 'aurix_ws_planning_v1';
+function _wspClamp(v, lo, hi, dflt) { v = Number(v); if (!isFinite(v)) return dflt; return Math.min(hi, Math.max(lo, v)); }
+function _wspReadInputs() {
+  try { const o = JSON.parse(localStorage.getItem(_WSP_KEY) || 'null'); if (o && typeof o === 'object') return { monthly: _wspClamp(o.monthly, 0, 2000, 300), years: _wspClamp(o.years, 1, 40, 10), ret: _wspClamp(o.ret, 0, 12, 6) }; } catch (_) {}
+  return { monthly: 300, years: 10, ret: 6 };
+}
+function _wspWriteInputs(o) { try { localStorage.setItem(_WSP_KEY, JSON.stringify(o)); } catch (_) {} }
+function _wspInitialWealth() { try { if (typeof investableValueBase === 'function') return investableValueBase() || 0; } catch (_) {} return 0; }
+
+// Pure-SVG multi-line projection chart (Conservador / Base / Optimista). No libs.
+function _wspChartHtml(scns, years) {
+  const esc = _intccEsc;
+  const W = 340, H = 168, pad = 24;
+  const maxVal = Math.max.apply(null, scns.map(s => s.finalWealth).concat([1]));
+  const yrs = Math.max(1, years);
+  const xF = y => pad + (y / yrs) * (W - 2 * pad);
+  const yF = v => (H - pad) - (v / maxVal) * (H - 2 * pad);
+  let out = '';
+  const base = scns.find(s => s.key === 'base');
+  if (base) {
+    const pts = base.series.map(p => xF(p.year).toFixed(1) + ',' + yF(p.value).toFixed(1)).join(' ');
+    out += `<polygon class="wsp-area" points="${pad},${(H - pad)} ${pts} ${(W - pad)},${(H - pad)}"/>`;
+  }
+  scns.forEach(s => {
+    const pts = s.series.map(p => xF(p.year).toFixed(1) + ',' + yF(p.value).toFixed(1)).join(' ');
+    out += `<polyline class="wsp-line is-${esc(s.key)}" points="${pts}"/>`;
+  });
+  return `
+    <svg class="wsp-chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('wsp_chart_title'))}">
+      <line class="wsp-axis" x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}"/>
+      ${out}
+      <text class="wsp-axis-x" x="${pad}" y="${H - 7}" text-anchor="start">${esc(t('wsp_axis_now'))}</text>
+      <text class="wsp-axis-x" x="${W - pad}" y="${H - 7}" text-anchor="end">${esc(t('wsp_axis_year')(years))}</text>
+    </svg>`;
+}
+
+// Output region (summary + chart + scenarios + reading). Rebuilt on input without
+// touching the sliders, so editing never loses focus/position.
+function _wspOutputsHtml(initial, monthly, years, ret) {
+  const esc  = _intccEsc;
+  const main = projectWealthPlan(initial, monthly, ret / 100, years);
+  const scns = [
+    { key: 'cons', rate: 0.04, tone: 'steady',   name: t('wsp_scn_cons') },
+    { key: 'base', rate: 0.06, tone: 'dynamic',  name: t('wsp_scn_base') },
+    { key: 'opt',  rate: 0.08, tone: 'balanced', name: t('wsp_scn_opt')  },
+  ].map(s => Object.assign(s, projectWealthPlan(initial, monthly, s.rate, years)));
+  const baseFinal = scns[1].finalWealth;
+
+  const reading = years >= 15 ? t('wsp_read_horizon')
+    : (monthly >= 500 ? t('wsp_read_monthly') : t('wsp_read_steady')(years));
+
+  const sum = (val, label) => `<div class="wsp-sum-metric"><span class="wsp-sum-val">${esc(val)}</span><span class="wsp-sum-label">${esc(label)}</span></div>`;
+  const cards = scns.map(s => `
+    <div class="wsb-card">
+      <div class="wsb-card-head">
+        <p class="wsb-card-name">${esc(s.name)}</p>
+        <span class="wsb-pill is-${esc(s.tone)}">${Math.round(s.rate * 100)}%</span>
+      </div>
+      <div class="wsb-card-rows">
+        <div class="wsb-row"><span>${esc(t('wsp_sum_final'))}</span><b>${esc(formatBase(s.finalWealth))}</b></div>
+        <div class="wsb-row is-diff"><span>${esc(t('wsp_diff_base'))}</span><b>${s.key === 'base' ? esc(t('wsp_ref')) : (s.finalWealth >= baseFinal ? '+' : '−') + esc(formatBase(Math.abs(s.finalWealth - baseFinal)))}</b></div>
+      </div>
+    </div>`).join('');
+
+  return `
+    <div class="wsp-summary">
+      ${sum(formatBase(main.finalWealth), t('wsp_sum_final'))}
+      ${sum(formatBase(main.contributed), t('wsp_sum_contrib'))}
+      ${sum(formatBase(main.gain), t('wsp_sum_gain'))}
+    </div>
+    <div class="wsp-chart">
+      ${_wspChartHtml(scns, years)}
+      <div class="wsp-legend">
+        <span class="wsp-leg is-cons">${esc(t('wsp_scn_cons'))}</span>
+        <span class="wsp-leg is-base">${esc(t('wsp_scn_base'))}</span>
+        <span class="wsp-leg is-opt">${esc(t('wsp_scn_opt'))}</span>
+      </div>
+    </div>
+    <div class="wsp-scn-grid">${cards}</div>
+    <div class="wsp-reading">${esc(reading)}</div>`;
+}
+
+// Recompute on slider input: update value labels + the output region only.
+function _wspOnInput() {
+  const root = document.querySelector('.wsh-wsp');
+  if (!root) return;
+  const get = k => { const el = root.querySelector('[data-wsp-input="' + k + '"]'); return el ? Number(el.value) : null; };
+  const monthly = get('monthly'), years = get('years'), ret = get('return');
+  if (monthly == null || years == null || ret == null) return;
+  _wspWriteInputs({ monthly, years, ret });
+  const setLbl = (k, v) => { const el = root.querySelector('[data-wsp-label="' + k + '"]'); if (el) el.textContent = v; };
+  setLbl('monthly', formatBase(monthly));
+  setLbl('years', t('wsp_unit_years')(years));
+  setLbl('return', ret + '%');
+  const out = root.querySelector('[data-wsp-out]');
+  if (out) out.innerHTML = _wspOutputsHtml(_wspInitialWealth(), monthly, years, ret);
+}
+
+function _renderWealthProjection() {
+  const esc = _intccEsc;
+  const initial = _wspInitialWealth();
+  const inp = _wspReadInputs();
+  const field = (key, label, valLabel, min, max, step) => `
+    <div class="wsp-field">
+      <div class="wsp-field-head"><span class="wsp-field-name">${esc(label)}</span><b class="wsp-field-val" data-wsp-label="${key}">${esc(valLabel)}</b></div>
+      <input class="wsp-range" type="range" min="${min}" max="${max}" step="${step}" value="${inp[key === 'return' ? 'ret' : key]}" data-wsp-input="${key === 'return' ? 'return' : key}" aria-label="${esc(label)}">
+    </div>`;
+
+  return `
+    <div class="aurix-wsh wsh-wsp is-revealed" data-wsh-view="planning">
+      <section class="wsh-card wsb-header">
+        <button type="button" class="wsb-back" data-wsh-nav="home">‹ ${esc(t('wsb_back'))}</button>
+        <h2 class="wsb-title">${esc(t('wsp_title'))}</h2>
+        <p class="wsb-subtitle">${esc(t('wsp_subtitle'))}</p>
+      </section>
+
+      <section class="wsh-card wsp-inputs-card">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsp_inputs_title'))}</h3><span class="wsb-horizon">${esc(formatBase(initial))}</span></header>
+        <div class="wsp-inputs">
+          ${field('monthly', t('wsp_in_monthly'), formatBase(inp.monthly), 0, 2000, 50)}
+          ${field('years',   t('wsp_in_years'),   t('wsp_unit_years')(inp.years), 1, 40, 1)}
+          ${field('return',  t('wsp_in_return'),  inp.ret + '%', 0, 12, 0.5)}
+        </div>
+      </section>
+
+      <section class="wsh-card wsp-out-card">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsp_chart_title'))}</h3></header>
+        <div class="wsp-out" data-wsp-out>${_wspOutputsHtml(initial, inp.monthly, inp.years, inp.ret)}</div>
+      </section>
+
+      <p class="wsb-disclaimer">${esc(t('wsb_disclaimer'))}</p>
+    </div>`;
 }
 
 function renderWorkspace() {

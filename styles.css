@@ -19625,6 +19625,59 @@ body.gs-open { overflow: hidden; }
   .wsb-title { font-size: 20px; }
 }
 
+/* ── WS.3 — Planning · Wealth Projection (wsp-* namespace) ── */
+/* Active planning card on the Home snapshot */
+.wsh-plan.is-active { cursor: pointer; border-color: rgba(77,141,255,0.30); background: rgba(74,130,240,0.07); }
+.wsh-plan.is-active:hover { border-color: rgba(77,141,255,0.5); background: rgba(74,130,240,0.12); }
+.wsh-plan-go { font-size: 12px; font-weight: 700; color: #aecbff; letter-spacing: 0.01em; }
+
+/* Inputs (premium sliders) */
+.wsp-inputs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.wsp-field { display: flex; flex-direction: column; gap: 10px; }
+.wsp-field-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.wsp-field-name { font-size: 12px; color: var(--text-muted); }
+.wsp-field-val { font-size: 15px; font-weight: 700; color: var(--text-bright); font-variant-numeric: tabular-nums; }
+.wsp-range { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 999px; background: rgba(120,160,255,0.18); outline: none; }
+.wsp-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #5c9cff; border: 2px solid #cfe0ff; box-shadow: 0 0 8px rgba(74,130,240,0.6); cursor: pointer; }
+.wsp-range::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #5c9cff; border: 2px solid #cfe0ff; box-shadow: 0 0 8px rgba(74,130,240,0.6); cursor: pointer; }
+
+/* Output region */
+.wsp-out { display: flex; flex-direction: column; gap: 18px; }
+.wsp-summary { display: flex; flex-wrap: wrap; gap: 26px; }
+.wsp-sum-metric { display: flex; flex-direction: column; gap: 3px; }
+.wsp-sum-val { font-size: 21px; font-weight: 700; color: var(--text-bright); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.wsp-sum-label { font-size: 11px; color: var(--text-muted); letter-spacing: 0.02em; }
+
+.wsp-chart { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.wsp-chart-svg { width: 100%; max-width: 460px; height: auto; }
+.wsp-axis { stroke: rgba(150,180,240,0.18); stroke-width: 1; }
+.wsp-axis-x { fill: rgba(214,226,255,0.6); font-size: 9px; font-weight: 700; letter-spacing: 0.04em; }
+.wsp-area { fill: rgba(74,130,240,0.12); }
+.wsp-line { fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.wsp-line.is-cons { stroke: rgba(150,180,240,0.6); stroke-width: 1.8; }
+.wsp-line.is-base { stroke: #5c9cff; filter: drop-shadow(0 0 5px rgba(74,130,240,0.5)); }
+.wsp-line.is-opt  { stroke: #8fe6b6; stroke-width: 1.8; }
+.wsp-legend { display: flex; flex-wrap: wrap; gap: 14px; }
+.wsp-leg { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--text-muted); }
+.wsp-leg::before { content: ''; width: 12px; height: 3px; border-radius: 2px; background: currentColor; }
+.wsp-leg.is-cons { color: rgba(170,195,245,0.85); }
+.wsp-leg.is-base { color: #7fb0ff; }
+.wsp-leg.is-opt  { color: #8fe6b6; }
+
+.wsp-scn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.wsp-reading {
+  margin: 0; padding: 14px 16px; border-radius: 14px; font-size: 14px; line-height: 1.5; font-weight: 600;
+  color: var(--text-bright);
+  border: 1px solid rgba(77,141,255,0.30);
+  background: radial-gradient(130% 150% at 88% 6%, rgba(92,156,255,0.16), transparent 60%), linear-gradient(165deg, rgba(34,52,92,0.5), rgba(14,20,38,0.55));
+}
+
+@media (max-width: 720px) {
+  .wsp-inputs { grid-template-columns: 1fr; gap: 14px; }
+  .wsp-summary { gap: 16px 22px; }
+  .wsp-scn-grid { grid-template-columns: 1fr; }
+}
+
 /* ════════ WS.2 — Financial Tools Hub (dedicated tools) ═══════════════════════
    Premium interactive tools that open inside Workspace templates mode (never
    the Sheet). Encapsulated under ws2-* classes; responsive. */
