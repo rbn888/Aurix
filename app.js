@@ -1592,6 +1592,10 @@ const T = {
     intcc_chip_conc:   'Concentración controlada',
     intcc_chip_growth: 'Crecimiento elevado',
     intcc_chip_watch:  'A vigilar',
+    intcc_mhint_liq:   'La liquidez actual te da margen para reaccionar ante oportunidades.',
+    intcc_mhint_cash:  'El peso de efectivo aporta estabilidad y flexibilidad.',
+    intcc_mhint_div:   'Tu cartera mantiene una diversificación razonable entre varias categorías.',
+    intcc_mhint_watch: 'Aurix seguirá vigilando liquidez, concentración y diversificación.',
     intcc_health_title:   'Salud patrimonial',
     intcc_health_suffix:  '/ 100',
     intcc_band_excellent: 'Excelente',
@@ -3036,6 +3040,10 @@ const T = {
     intcc_chip_conc:   'Concentration in check',
     intcc_chip_growth: 'High growth',
     intcc_chip_watch:  'To watch',
+    intcc_mhint_liq:   'Your current liquidity gives you room to act on opportunities.',
+    intcc_mhint_cash:  'Your cash position adds stability and flexibility.',
+    intcc_mhint_div:   'Your portfolio keeps a reasonable spread across several categories.',
+    intcc_mhint_watch: 'Aurix will keep watching liquidity, concentration and diversification.',
     intcc_health_title:   'Aurix Health',
     intcc_health_suffix:  '/ 100',
     intcc_band_excellent: 'Excellent',
@@ -21535,7 +21543,12 @@ function _intccRadarSvg(radar) {
   const dp = dims.map((d, i) => pt(i, R * (radar[d.key] / 100)).map(v => v.toFixed(1)).join(',')).join(' ');
   let labels = '', dots = '';
   dims.forEach((d, i) => {
-    const [lx, ly] = pt(i, R + 15);
+    // INT.2Y — the apex (top) label sits directly above the highest data point;
+    // when that axis maxes out (e.g. Diversificación 100) the numeric value used
+    // to collide with the dot. Push the apex label/value slightly higher (extra
+    // radial offset); the viewBox top padding below absorbs it. Math untouched.
+    const isApex = (i === 0);
+    const [lx, ly] = pt(i, R + (isApex ? 26 : 15));
     const anchor = Math.abs(lx - cx) < 8 ? 'middle' : (lx > cx ? 'start' : 'end');
     // Label + a dimmer numeric value stacked underneath → values legible
     // without turning the radar into a table.
@@ -21545,9 +21558,10 @@ function _intccRadarSvg(radar) {
     dots += `<circle class="intcc-radar-dot" cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="2.6"/>`;
   });
   // viewBox padded horizontally so the outer end/start-anchored labels
-  // (Diversificación, Concentración…) are never clipped on narrow screens.
+  // (Diversificación, Concentración…) are never clipped on narrow screens, and
+  // INT.2Y — extra top padding so the raised apex label never clips.
   return `
-    <svg class="intcc-radar-svg" viewBox="-58 -4 336 224" role="img" aria-label="${_intccEsc(t('intcc_radar_title'))}">
+    <svg class="intcc-radar-svg" viewBox="-58 -12 336 232" role="img" aria-label="${_intccEsc(t('intcc_radar_title'))}">
       <g class="intcc-radar-grid">${rings}${axes}</g>
       <polygon class="intcc-radar-area" points="${dp}"/>
       <g class="intcc-radar-dots">${dots}</g>
@@ -21556,6 +21570,19 @@ function _intccRadarSvg(radar) {
 }
 
 // ── Main renderer ───────────────────────────────────────────────────────────
+// INT.2Y — mobile-only intelligence hint. Deterministic, professional, never
+// alarmist: derived from existing liquidity / diversification signals. No AI, no
+// buy/sell, never calls cash a "motor", never surfaces real estate.
+function buildMobileIntelligenceHint(snap, liq, radar) {
+  const cash = (liq && typeof liq.cashPct === 'number') ? liq.cashPct : ((snap && snap.cashPct) || 0);
+  const cats = (snap && snap.categoryCount) || 0;
+  const div  = (radar && typeof radar.diversification === 'number') ? radar.diversification : 0;
+  if (cash >= 15 && cash <= 60)  return t('intcc_mhint_liq');
+  if (cash > 60)                 return t('intcc_mhint_cash');
+  if (div >= 60 && cats >= 3)    return t('intcc_mhint_div');
+  return t('intcc_mhint_watch');
+}
+
 function _renderIntelligenceCommandCenter() {
   const snap = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null;
   const esc  = _intccEsc;
@@ -21609,6 +21636,39 @@ function _renderIntelligenceCommandCenter() {
       </div>
       <div class="intcc-hero-orb-wrap">
         ${_intccOrbHtml()}
+      </div>
+    </section>`;
+
+  // INT.2Y — mobile-only composition. Two dedicated cards replace the single
+  // hero on phones (≤640px); the desktop hero above is hidden there. Desktop /
+  // tablet are untouched. Card 1: Inteligencia (reading + hint + orb, no score).
+  // Card 2: Salud (score left + conclusions right). Both share the same engines.
+  const mHint = buildMobileIntelligenceHint(snap, liq, radar);
+  const mHeroHtml = `
+    <section class="intcc-card intcc-m-card intcc-m-hero is-${esc(reading.state)}">
+      <div class="intcc-m-hero-text">
+        <span class="intcc-eyebrow">${esc(t('intcc_eyebrow'))}</span>
+        <h2 class="intcc-m-hero-title">${esc(reading.title)}</h2>
+        <p class="intcc-m-hero-hint">${esc(mHint)}</p>
+      </div>
+      <div class="intcc-m-orb">${_intccOrbHtml()}</div>
+    </section>`;
+
+  const mConcl = chips.length ? chips : [{ tone: 'good', label: t('intcc_chip_div') }];
+  const mHealthHtml = `
+    <section class="intcc-card intcc-m-card intcc-m-health is-${esc(score.band)}">
+      <h3 class="intcc-card-title">${esc(t('intcc_health_title'))}</h3>
+      <div class="intcc-m-health-body">
+        <div class="intcc-m-health-score">
+          <div class="intcc-score-ring">
+            ${_intccScoreRingHtml(score)}
+            <div class="intcc-score-num"><span class="intcc-score-val">${score.score != null ? score.score : '—'}</span><span class="intcc-score-suffix">${esc(t('intcc_health_suffix'))}</span></div>
+          </div>
+          <span class="intcc-health-badge is-${esc(score.band)}">${esc(score.label)}</span>
+        </div>
+        <ul class="intcc-m-concl">
+          ${mConcl.map(c => `<li class="intcc-m-concl-row is-${esc(c.tone)}"><span class="intcc-m-concl-check" aria-hidden="true">✓</span>${esc(c.label)}</li>`).join('')}
+        </ul>
       </div>
     </section>`;
 
@@ -21726,6 +21786,8 @@ function _renderIntelligenceCommandCenter() {
   return `
     <div class="aurix-intcc">
       ${heroHtml}
+      ${mHeroHtml}
+      ${mHealthHtml}
       ${radarHtml}
       ${driversHtml}
       ${exploreHtml}
