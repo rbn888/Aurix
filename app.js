@@ -21846,11 +21846,55 @@ function _renderIntelligenceCommandCenter() {
 // Post-mount init: trigger reveal animation, wire the (one-time) inline explore
 // delegation, and refresh the visit marker (throttled so "since last visit"
 // stays meaningful within a single session).
+// INT.2ZA — Health ring build-up. The arc draws from empty to its real value and
+// the number counts up 0 → score, ~1050ms ease-out (no bounce, no loop), synced
+// with the radar/orb entrance. Static HTML already holds the FINAL value, so this
+// is a pure enhancement: reduced-motion (or no JS) simply shows the final ring.
+// Reads the target from the DOM — never recomputes the score.
+function _intccAnimateScoreRings(root) {
+  if (!root) return;
+  if (reducedMotion) return;                       // final value already painted
+  const rings = root.querySelectorAll('.intcc-score-ring');
+  rings.forEach(ring => {
+    const arc   = ring.querySelector('.intcc-score-arc');
+    const valEl = ring.querySelector('.intcc-score-val');
+    if (!arc) return;
+    const circ        = parseFloat(arc.getAttribute('stroke-dasharray'));
+    const finalOffset = parseFloat(arc.getAttribute('stroke-dashoffset'));
+    if (!(circ > 0) || isNaN(finalOffset)) return;
+
+    // Arc: start empty, then let the CSS transition draw it to the real offset.
+    arc.style.transition = 'none';
+    arc.style.strokeDashoffset = circ;
+    void arc.getBoundingClientRect();              // commit the empty state
+    requestAnimationFrame(() => {
+      arc.style.transition = '';                   // CSS: stroke-dashoffset 1.1s ease-out
+      arc.style.strokeDashoffset = finalOffset;
+    });
+
+    // Number: count up 0 → final (ease-out cubic). Always lands on the exact score.
+    const finalScore = valEl ? parseInt(valEl.textContent, 10) : NaN;
+    if (valEl && !isNaN(finalScore)) {
+      const DUR = 1050, t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      valEl.textContent = '0';
+      const step = now => {
+        const p = Math.min(1, (now - t0) / DUR);
+        const eased = 1 - Math.pow(1 - p, 3);
+        valEl.textContent = String(Math.round(eased * finalScore));
+        if (p < 1) requestAnimationFrame(step);
+        else valEl.textContent = String(finalScore);
+      };
+      requestAnimationFrame(step);
+    }
+  });
+}
+
 function _initIntelligenceCommandCenter() {
   try {
     const root = document.querySelector('.aurix-intcc');
     if (root && !root.classList.contains('is-empty')) {
       requestAnimationFrame(() => root.classList.add('is-revealed'));
+      _intccAnimateScoreRings(root);
     }
   } catch (_) {}
 
