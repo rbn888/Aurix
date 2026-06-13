@@ -19723,6 +19723,51 @@ body.gs-open { overflow: hidden; }
   .ws4-detail-grid { grid-template-columns: 1fr; }
 }
 
+/* ── WS.5 — Goals Engine (wsg-* namespace) ── */
+/* Home goals snapshot: clickable templates + dual CTA */
+.wsh-goal.is-active { cursor: pointer; }
+.wsh-goal.is-active:hover { border-color: rgba(77,141,255,0.42); background: rgba(74,130,240,0.10); transform: translateY(-2px); }
+.wsh-head-ctas { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+
+/* Create form */
+.wsg-form { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px; }
+.wsg-select, .wsg-text {
+  -webkit-appearance: none; appearance: none; width: 100%; box-sizing: border-box;
+  padding: 10px 12px; font: inherit; font-size: 14px; font-weight: 600; color: var(--text-bright);
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(120,160,255,0.18); border-radius: 10px; outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.wsg-select:focus, .wsg-text:focus { border-color: rgba(77,141,255,0.55); box-shadow: 0 0 0 3px rgba(77,141,255,0.15); }
+.wsg-select { cursor: pointer; }
+.wsg-select option { background: #0f1730; color: #fff; }
+.wsg-text::placeholder { color: var(--text-muted); font-weight: 500; }
+
+/* Goals list */
+.wsg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.wsg-card { display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.13); background: rgba(255,255,255,0.025); }
+.wsg-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.wsg-card-id { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.wsg-card-name { margin: 0; font-size: 15px; font-weight: 700; color: var(--text-bright); }
+.wsg-modes { flex: 0 0 auto; }
+.wsg-modes .ws4-mode { padding: 5px 11px; font-size: 11px; }
+.wsg-card-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.wsg-sync-note { grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: rgba(159,194,255,0.85); padding: 8px 0; }
+
+/* Progress bar */
+.wsg-progress { display: flex; align-items: center; gap: 10px; }
+.wsg-bar-track { flex: 1 1 auto; height: 8px; border-radius: 999px; background: rgba(120,160,255,0.14); overflow: hidden; }
+.wsg-bar-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #4A82F0, #6aa0ff); transition: width 0.6s cubic-bezier(0.22,1,0.36,1); }
+.wsg-pct { flex: 0 0 auto; font-size: 13px; font-weight: 700; color: var(--text-bright); font-variant-numeric: tabular-nums; }
+.wsg-progress.is-reached  .wsg-bar-fill { background: linear-gradient(90deg, #3fbf7f, #6fe0a6); }
+.wsg-progress.is-behind   .wsg-bar-fill { background: linear-gradient(90deg, #e9a857, #f3cf9a); }
+.wsg-progress.is-no-data  .wsg-bar-fill { background: rgba(150,180,240,0.4); }
+.wsg-out { display: flex; flex-direction: column; gap: 14px; }
+
+@media (max-width: 720px) {
+  .wsg-form { grid-template-columns: 1fr; }
+  .wsg-grid { grid-template-columns: 1fr; }
+}
+
 /* ════════ WS.2 — Financial Tools Hub (dedicated tools) ═══════════════════════
    Premium interactive tools that open inside Workspace templates mode (never
    the Sheet). Encapsulated under ws2-* classes; responsive. */

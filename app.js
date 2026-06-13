@@ -1838,6 +1838,26 @@ const T = {
     ws4_read_nw_lo: 'Tu patrimonio está mayormente invertido.',
     ws4_read_fire_done: 'Ya alcanzas el patrimonio necesario para tu objetivo FIRE.',
     ws4_read_fire_dep: 'Este plan FIRE depende principalmente de tu ritmo de aportación.',
+    // WS.5 — Goals Engine
+    wsg_cta_create: 'Crear objetivo', wsg_cta_view: 'Ver objetivos',
+    wsg_title: 'Objetivos', wsg_subtitle: 'Convierte tus metas en objetivos medibles.',
+    wsg_create_title: 'Crear objetivo', wsg_list_title: 'Tus objetivos',
+    wsg_empty: 'Aún no has definido objetivos. Crea el primero arriba.',
+    wsg_f_type: 'Tipo', wsg_f_name: 'Nombre', wsg_f_target: 'Cantidad objetivo',
+    wsg_f_current: 'Cantidad actual', wsg_f_monthly: 'Aportación mensual', wsg_f_year: 'Año objetivo (opcional)',
+    wsg_create_btn: 'Crear objetivo', wsg_name_ph: 'Ej. Libertad financiera',
+    wsg_type_wealth: 'Patrimonio objetivo', wsg_type_emergency: 'Fondo de emergencia',
+    wsg_type_home: 'Vivienda', wsg_type_fire: 'FIRE', wsg_type_free: 'Objetivo libre',
+    wsg_r_target: 'Cantidad objetivo', wsg_r_current: 'Cantidad actual', wsg_r_remaining: 'Distancia restante',
+    wsg_r_eta: 'Fecha estimada', wsg_r_required: 'Ritmo necesario',
+    wsg_sync_on: w => `Cantidad actual sincronizada con tu patrimonio real (${w}).`,
+    wsg_read_reached: 'Objetivo alcanzado.',
+    wsg_read_nodata: 'Define una cantidad objetivo para medir tu progreso.',
+    wsg_read_behind_date: 'Necesitas aumentar el ritmo mensual para llegar en la fecha prevista.',
+    wsg_read_behind_nomonthly: 'Define una aportación mensual para avanzar hacia este objetivo.',
+    wsg_read_ontrack_date: 'Vas en línea para alcanzarlo en la fecha prevista.',
+    wsg_read_ontrack_years: y => `A este ritmo, podrías alcanzarlo en aproximadamente ${y} ${y === 1 ? 'año' : 'años'}.`,
+    wsg_read_ontrack: 'Este objetivo está avanzando a buen ritmo.',
     // Status pills
     statusOpen:        'Abierto',
     statusClosed:      'Cerrado',
@@ -3432,6 +3452,26 @@ const T = {
     ws4_read_nw_lo: 'Your wealth is mostly invested.',
     ws4_read_fire_done: 'You already reach the wealth needed for your FIRE goal.',
     ws4_read_fire_dep: 'This FIRE plan depends mainly on your contribution pace.',
+    // WS.5 — Goals Engine
+    wsg_cta_create: 'Create goal', wsg_cta_view: 'View goals',
+    wsg_title: 'Goals', wsg_subtitle: 'Turn your aspirations into measurable goals.',
+    wsg_create_title: 'Create goal', wsg_list_title: 'Your goals',
+    wsg_empty: 'You have no goals yet. Create your first one above.',
+    wsg_f_type: 'Type', wsg_f_name: 'Name', wsg_f_target: 'Target amount',
+    wsg_f_current: 'Current amount', wsg_f_monthly: 'Monthly contribution', wsg_f_year: 'Target year (optional)',
+    wsg_create_btn: 'Create goal', wsg_name_ph: 'e.g. Financial freedom',
+    wsg_type_wealth: 'Target wealth', wsg_type_emergency: 'Emergency fund',
+    wsg_type_home: 'Home', wsg_type_fire: 'FIRE', wsg_type_free: 'Custom goal',
+    wsg_r_target: 'Target amount', wsg_r_current: 'Current amount', wsg_r_remaining: 'Remaining distance',
+    wsg_r_eta: 'Estimated date', wsg_r_required: 'Required pace',
+    wsg_sync_on: w => `Current amount synced with your real wealth (${w}).`,
+    wsg_read_reached: 'Goal reached.',
+    wsg_read_nodata: 'Set a target amount to measure your progress.',
+    wsg_read_behind_date: 'You need to raise the monthly pace to reach it by the target date.',
+    wsg_read_behind_nomonthly: 'Set a monthly contribution to progress toward this goal.',
+    wsg_read_ontrack_date: 'You are on track to reach it by the target date.',
+    wsg_read_ontrack_years: y => `At this pace, you could reach it in about ${y} ${y === 1 ? 'year' : 'years'}.`,
+    wsg_read_ontrack: 'This goal is progressing at a good pace.',
     // Status pills
     statusOpen:        'Open',
     statusClosed:      'Closed',
@@ -10847,6 +10887,7 @@ function _wshMetrics() {
 let _wshView    = 'home';
 let _wshWired   = false;
 let _ws4ActiveId = null;   // WS.4 — currently open workspace project id
+let _wsgPrefill = null;    // WS.5 — prefill the create-goal type when arriving from Home
 
 function _wshReveal(container) {
   try { const r = container.querySelector('.aurix-wsh'); if (r) requestAnimationFrame(() => r.classList.add('is-revealed')); } catch (_) {}
@@ -10879,6 +10920,12 @@ function renderWorkspaceHome(container) {
     _wshReveal(container);
     return;
   }
+  if (_wshView === 'goals') {
+    if (shown === 'goals') return;
+    container.innerHTML = _renderGoals();
+    _wshReveal(container);
+    return;
+  }
   // Home
   const metrics = _wshMetrics();
   if (shown === 'home') { _wshRefreshMetrics(cur, metrics); return; }
@@ -10891,32 +10938,32 @@ function _wshWireOnce() {
   if (_wshWired) return;
   _wshWired = true;
   document.addEventListener('click', e => {
-    const t = e.target && e.target.closest ? e.target.closest('[data-wsh-cta],[data-wsh-nav],[data-wsh-save]') : null;
+    const t = e.target && e.target.closest
+      ? e.target.closest('[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode]')
+      : null;
     if (!t) return;
-    if (t.getAttribute('data-wsh-cta') === 'scenario' || t.getAttribute('data-wsh-nav') === 'scenario') {
-      _wshView = 'scenario'; renderWorkspaceHome(); return;
-    }
-    if (t.getAttribute('data-wsh-cta') === 'planning' || t.getAttribute('data-wsh-nav') === 'planning') {
-      _wshView = 'planning'; renderWorkspaceHome(); return;
-    }
-    if (t.getAttribute('data-wsh-cta') === 'workspace') {
-      const type = t.getAttribute('data-ws4-type');
-      if (type) { _ws4OpenOrCreate(type); return; }
-    }
-    if (t.getAttribute('data-wsh-nav') === 'home') {
-      _wshView = 'home'; _ws4ActiveId = null; renderWorkspaceHome(); return;
-    }
-    const mode = t.getAttribute('data-ws4-mode');
-    if (mode) { _ws4SetMode(mode); return; }
+    const cta = t.getAttribute('data-wsh-cta');
+    const nav = t.getAttribute('data-wsh-nav');
+    if (cta === 'scenario' || nav === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); return; }
+    if (cta === 'planning' || nav === 'planning') { _wshView = 'planning'; renderWorkspaceHome(); return; }
+    if (cta === 'goals' || nav === 'goals') { const ty = t.getAttribute('data-wsg-type'); if (ty) _wsgPrefill = ty; _wshView = 'goals'; renderWorkspaceHome(); return; }
+    if (cta === 'workspace') { const type = t.getAttribute('data-ws4-type'); if (type) { _ws4OpenOrCreate(type); return; } }
+    if (nav === 'home') { _wshView = 'home'; _ws4ActiveId = null; renderWorkspaceHome(); return; }
+    const ws4mode = t.getAttribute('data-ws4-mode');
+    if (ws4mode) { _ws4SetMode(ws4mode); return; }
+    const wsgMode = t.getAttribute('data-wsg-mode');
+    if (wsgMode) { _wsgSetMode(t.getAttribute('data-wsg-id'), wsgMode); return; }
+    if (t.hasAttribute('data-wsg-create')) { _wsgCreate(); return; }
     const saveId = t.getAttribute('data-wsh-save');
     if (saveId) { _wsbSaveScenario(saveId, t); return; }
   });
-  // WS.3/WS.4 — live recompute on input (no full rebuild → inputs keep focus).
+  // WS.3/WS.4/WS.5 — live recompute on input (no full rebuild → inputs keep focus).
   document.addEventListener('input', e => {
     const el = e.target;
     if (!el || !el.getAttribute) return;
     if (el.getAttribute('data-wsp-input')) { _wspOnInput(); return; }
     if (el.getAttribute('data-ws4-input')) { _ws4OnInput(el); return; }
+    if (el.getAttribute('data-wsg-input')) { _wsgOnInput(el); return; }
   });
 }
 
@@ -10993,25 +11040,31 @@ function _renderWorkspaceHome(metrics) {
 
   // Goals snapshot — example goal types as starting templates (no fabricated
   // progress/dates; the Goals engine lands in a later WS.x).
+  // WS.5 — the goal templates now open the Goals view (prefilling the create
+  // form type); the snapshot also shows real progress of saved goals if any.
   const goalTypes = [
-    { key: 'wealth', icon: '<path d="M4 16l5-5 3 3 7-7"/><path d="M16 7h4v4"/>' },
-    { key: 'fire',   icon: '<path d="M12 3c2 3 4 4.5 4 8a4 4 0 0 1-8 0c0-1.6.7-2.8 1.5-3.8C10 9 11 7 12 3z"/>' },
-    { key: 'house',  icon: '<path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/>' },
+    { key: 'wealth', wsg: 'wealth', icon: '<path d="M4 16l5-5 3 3 7-7"/><path d="M16 7h4v4"/>' },
+    { key: 'fire',   wsg: 'fire',   icon: '<path d="M12 3c2 3 4 4.5 4 8a4 4 0 0 1-8 0c0-1.6.7-2.8 1.5-3.8C10 9 11 7 12 3z"/>' },
+    { key: 'house',  wsg: 'home',   icon: '<path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/>' },
   ];
+  const goalsSaved = _wshReadStore(_WSH_GOALS_KEY);
   const goalsHtml = `
     <section class="wsh-card wsh-goals">
       <header class="wsh-head">
         <h3 class="wsh-title">${esc(t('wsh_goals_title'))}</h3>
-        <button type="button" class="wsh-cta" data-wsh-cta="goals">${esc(t('wsh_goals_cta'))}</button>
+        <span class="wsh-head-ctas">
+          <button type="button" class="wsh-cta" data-wsh-cta="goals">${esc(t('wsg_cta_create'))}</button>
+          <button type="button" class="wsh-cta" data-wsh-cta="goals">${esc(t('wsg_cta_view'))}</button>
+        </span>
       </header>
-      <p class="wsh-empty">${esc(t('wsh_goals_empty'))}</p>
+      ${goalsSaved.length ? '' : `<p class="wsh-empty">${esc(t('wsh_goals_empty'))}</p>`}
       <div class="wsh-goals-grid">
         ${goalTypes.map(g => `
-          <div class="wsh-goal">
+          <div class="wsh-goal is-active" role="button" tabindex="0" data-wsh-cta="goals" data-wsg-type="${esc(g.wsg)}">
             <span class="wsh-goal-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${g.icon}</svg></span>
             <p class="wsh-goal-name">${esc(t('wsh_goal_' + g.key))}</p>
             <span class="wsh-goal-track" aria-hidden="true"><span class="wsh-goal-bar"></span></span>
-            <span class="wsh-goal-meta">${esc(t('wsh_goal_define'))}</span>
+            <span class="wsh-goal-meta">${esc(t('wsh_goal_define'))} ›</span>
           </div>`).join('')}
       </div>
     </section>`;
@@ -11584,6 +11637,168 @@ function _renderWorkspaceDetail() {
         </section>
       </div>
 
+      <p class="wsb-disclaimer">${esc(t('wsb_disclaimer'))}</p>
+    </div>`;
+}
+
+// ── WS.5 — Goals Engine MVP ──────────────────────────────────────────────────
+// Real goals with a deterministic progress engine. Aurix Sync reads real wealth
+// (read-only); manual mode uses the entered amount. No wealthEngine, no APIs, no AI.
+const _WSG_TYPES = ['wealth', 'emergency', 'home', 'fire', 'free'];
+function _wsgThisYear() { try { return new Date().getFullYear(); } catch (_) { return 2026; } }
+function _wsgGoals() { return _wshReadStore(_WSH_GOALS_KEY); }
+function _wsgSaveAll(list) { try { localStorage.setItem(_WSH_GOALS_KEY, JSON.stringify(list)); } catch (_) {} }
+function _wsgGet(id) { return _wsgGoals().find(g => g && g.id === id) || null; }
+function _wsgPersist(g) { const list = _wsgGoals(); const i = list.findIndex(x => x && x.id === g.id); if (i >= 0) list[i] = g; else list.push(g); _wsgSaveAll(list); }
+
+// Deterministic progress. currentWealth is the real read-only figure (for sync).
+function calculateGoalProgress(goal, currentWealth) {
+  const target = Math.max(0, Number(goal.target) || 0);
+  const cur = goal.mode === 'sync' ? Math.max(0, Number(currentWealth) || 0) : Math.max(0, Number(goal.current) || 0);
+  if (target <= 0) return { state: 'no-data', pct: 0, remaining: 0, months: null, etaYear: null, requiredMonthly: null, current: cur, target };
+  if (cur >= target) return { state: 'reached', pct: 100, remaining: 0, months: 0, etaYear: _wsgThisYear(), requiredMonthly: 0, current: cur, target };
+  const pct = Math.min(99, Math.round(cur / target * 100));
+  const remaining = target - cur;
+  const r = 0.05 / 12;
+  const monthly = Math.max(0, Number(goal.monthly) || 0);
+  let months = null;
+  if (monthly > 0 || cur > 0) {
+    for (let n = 1; n <= 600; n++) {
+      const fv = cur * Math.pow(1 + r, n) + (r > 0 ? monthly * ((Math.pow(1 + r, n) - 1) / r) : monthly * n);
+      if (fv >= target) { months = n; break; }
+    }
+  }
+  const etaYear = months != null ? _wsgThisYear() + Math.ceil(months / 12) : null;
+  const N = (goal.targetYear && goal.targetYear > _wsgThisYear()) ? (goal.targetYear - _wsgThisYear()) * 12 : null;
+  let requiredMonthly = null, state;
+  if (N) {
+    const fvCur = cur * Math.pow(1 + r, N);
+    const denom = r > 0 ? ((Math.pow(1 + r, N) - 1) / r) : N;
+    requiredMonthly = Math.max(0, (target - fvCur) / denom);
+    state = monthly >= requiredMonthly * 0.98 ? 'on-track' : 'behind';
+  } else {
+    state = monthly > 0 ? 'on-track' : 'behind';
+  }
+  return { state, pct, remaining, months, etaYear, requiredMonthly, current: cur, target };
+}
+
+function _wsgReading(goal, prog) {
+  if (prog.state === 'reached')  return t('wsg_read_reached');
+  if (prog.state === 'no-data')  return t('wsg_read_nodata');
+  const hasDate = goal.targetYear && goal.targetYear > _wsgThisYear();
+  if (prog.state === 'behind')   return hasDate ? t('wsg_read_behind_date') : t('wsg_read_behind_nomonthly');
+  if (hasDate)                   return t('wsg_read_ontrack_date');
+  return prog.months != null ? t('wsg_read_ontrack_years')(Math.max(1, Math.ceil(prog.months / 12))) : t('wsg_read_ontrack');
+}
+
+function _wsgCreate() {
+  const root = document.querySelector('.wsh-wsg'); if (!root) return;
+  const val = sel => { const el = root.querySelector('[data-wsg-form="' + sel + '"]'); return el ? el.value : ''; };
+  const type = val('type') || 'wealth';
+  const name = (val('name') || '').trim() || t('wsg_type_' + type);
+  const target = Number(val('target')) || 0;
+  const current = Number(val('current')) || 0;
+  const monthly = Number(val('monthly')) || 0;
+  const year = Number(val('year')) || 0;
+  const now = Date.now();
+  const g = { id: 'wsg_' + now, type, name, target, current, monthly, targetYear: year > 0 ? year : null, mode: 'manual', createdAt: now, updatedAt: now };
+  _wsgPersist(g);
+  _wsgPrefill = null;
+  const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); }
+}
+
+function _wsgSetMode(id, mode) {
+  const g = _wsgGet(id); if (!g) return;
+  g.mode = mode; g.updatedAt = Date.now(); _wsgPersist(g);
+  const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); }
+}
+
+function _wsgOnInput(el) {
+  const id = el.getAttribute('data-wsg-id'); const k = el.getAttribute('data-wsg-input');
+  const g = _wsgGet(id); if (!g) return;
+  g[k] = Number(el.value); g.updatedAt = Date.now(); _wsgPersist(g);
+  const card = el.closest('.wsg-card'); if (!card) return;
+  const out = card.querySelector('[data-wsg-out]');
+  if (out) out.innerHTML = _wsgCardOutHtml(g, calculateGoalProgress(g, _ws4Real().wealth));
+}
+
+function _wsgCardOutHtml(g, prog) {
+  const esc = _intccEsc;
+  const hasDate = g.targetYear && g.targetYear > _wsgThisYear();
+  const rows = [
+    { label: t('wsg_r_target'),    value: formatBase(prog.target) },
+    { label: t('wsg_r_current'),   value: formatBase(prog.current) },
+    { label: t('wsg_r_remaining'), value: formatBase(prog.remaining) },
+    { label: t('wsg_r_eta'),       value: prog.etaYear ? '~ ' + prog.etaYear : t('wsh_none') },
+  ];
+  if (hasDate && prog.requiredMonthly != null) rows.push({ label: t('wsg_r_required'), value: formatBase(prog.requiredMonthly) + t('ws4_permonth') });
+  return `
+    <div class="wsg-progress is-${esc(prog.state)}">
+      <div class="wsg-bar-track"><span class="wsg-bar-fill" style="width:${prog.pct}%"></span></div>
+      <span class="wsg-pct">${prog.pct}%</span>
+    </div>
+    <div class="ws4-rows">
+      ${rows.map(r => `<div class="ws4-row"><span class="ws4-row-label">${esc(r.label)}</span><b class="ws4-row-val">${esc(r.value)}</b></div>`).join('')}
+    </div>
+    <div class="ws4-reading">${esc(_wsgReading(g, prog))}</div>`;
+}
+
+function _renderGoals() {
+  const esc = _intccEsc;
+  const goals = _wsgGoals();
+  const real = _ws4Real();
+  const prefill = _wsgPrefill || 'wealth';
+
+  const typeOpts = _WSG_TYPES.map(ty => `<option value="${esc(ty)}"${ty === prefill ? ' selected' : ''}>${esc(t('wsg_type_' + ty))}</option>`).join('');
+
+  const createCard = `
+    <section class="wsh-card wsg-create-card">
+      <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsg_create_title'))}</h3></header>
+      <div class="wsg-form">
+        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_type'))}</span><select class="wsg-select" data-wsg-form="type">${typeOpts}</select></label>
+        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_name'))}</span><input class="wsg-text" type="text" data-wsg-form="name" placeholder="${esc(t('wsg_name_ph'))}"></label>
+        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_target'))}</span><span class="ws4-field-input"><input class="ws4-num" type="number" data-wsg-form="target" value="100000" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>
+        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="number" data-wsg-form="current" value="0" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>
+        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="number" data-wsg-form="monthly" value="300" min="0" step="50"><span class="ws4-field-unit">€</span></span></label>
+        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_year'))}</span><input class="ws4-num" type="number" data-wsg-form="year" value="" min="${_wsgThisYear() + 1}" max="2100" step="1" placeholder="${_wsgThisYear() + 10}"></label>
+      </div>
+      <button type="button" class="wsh-cta is-primary" data-wsg-create>${esc(t('wsg_create_btn'))}</button>
+    </section>`;
+
+  const listInner = goals.length ? goals.map(g => {
+    const prog = calculateGoalProgress(g, real.wealth);
+    const isSync = g.mode === 'sync';
+    return `
+      <div class="wsg-card" data-wsg-cardid="${esc(g.id)}">
+        <div class="wsg-card-head">
+          <div class="wsg-card-id"><span class="wsb-pill is-dynamic">${esc(t('wsg_type_' + g.type))}</span><p class="wsg-card-name">${esc(g.name)}</p></div>
+          <div class="ws4-modes wsg-modes">
+            <button type="button" class="ws4-mode${!isSync ? ' is-active' : ''}" data-wsg-mode="manual" data-wsg-id="${esc(g.id)}">${esc(t('ws4_mode_manual'))}</button>
+            <button type="button" class="ws4-mode${isSync ? ' is-active' : ''}" data-wsg-mode="sync" data-wsg-id="${esc(g.id)}">${esc(t('ws4_mode_sync'))}</button>
+          </div>
+        </div>
+        <div class="wsg-card-edit">
+          ${isSync
+            ? `<div class="wsg-sync-note">${esc(real.hasReal ? t('wsg_sync_on')(formatBase(real.wealth)) : t('ws4_sync_none'))}</div>`
+            : `<label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_r_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="number" data-wsg-input="current" data-wsg-id="${esc(g.id)}" value="${esc(g.current)}" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>`}
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="number" data-wsg-input="monthly" data-wsg-id="${esc(g.id)}" value="${esc(g.monthly)}" min="0" step="50"><span class="ws4-field-unit">€</span></span></label>
+        </div>
+        <div class="wsg-out" data-wsg-out>${_wsgCardOutHtml(g, prog)}</div>
+      </div>`;
+  }).join('') : `<p class="wsh-empty">${esc(t('wsg_empty'))}</p>`;
+
+  return `
+    <div class="aurix-wsh wsh-wsg is-revealed" data-wsh-view="goals">
+      <section class="wsh-card wsb-header">
+        <button type="button" class="wsb-back" data-wsh-nav="home">‹ ${esc(t('wsb_back'))}</button>
+        <h2 class="wsb-title">${esc(t('wsg_title'))}</h2>
+        <p class="wsb-subtitle">${esc(t('wsg_subtitle'))}</p>
+      </section>
+      ${createCard}
+      <section class="wsh-card wsg-list-card">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsg_list_title'))}</h3></header>
+        <div class="wsg-grid">${listInner}</div>
+      </section>
       <p class="wsb-disclaimer">${esc(t('wsb_disclaimer'))}</p>
     </div>`;
 }
