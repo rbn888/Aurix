@@ -1796,6 +1796,48 @@ const T = {
     wsp_read_horizon: 'Un horizonte más largo mejora el efecto del crecimiento compuesto.',
     wsp_read_monthly: 'La aportación mensual tiene un impacto relevante en la proyección final.',
     wsp_read_steady:  n => `Manteniendo este ritmo, tu patrimonio podría crecer de forma sostenida durante los próximos ${n} años.`,
+    // WS.4 — Workspaces
+    ws4_section_cta: 'Crear workspace',
+    ws4_create: 'Crear', ws4_open: 'Abrir',
+    ws4_mode_manual: 'Manual', ws4_mode_sync: 'Aurix Sync',
+    ws4_sync_ctx: (w, l) => `Datos reales · Patrimonio ${w} · Liquidez ${l}`,
+    ws4_sync_none: 'Aurix usará tus datos reales cuando estén disponibles para esta plantilla.',
+    ws4_inputs_title: 'Parámetros', ws4_summary_title: 'Resumen',
+    ws4_autosave: 'Guardado automáticamente', ws4_permonth: '/mes', ws4_done: 'Alcanzado',
+    ws4_sub_investment: 'Planifica tus aportaciones hacia un objetivo anual.',
+    ws4_sub_budget:     'Calcula tu capacidad de ahorro e inversión.',
+    ws4_sub_property:   'Estima entrada, hipoteca y esfuerzo mensual.',
+    ws4_sub_business:   'Margen y caja estimada de tu actividad.',
+    ws4_sub_networth:   'Foto de tu patrimonio: inversión y liquidez.',
+    ws4_sub_fire:       'Calcula tu objetivo de independencia financiera.',
+    ws4_f_annualgoal: 'Objetivo anual', ws4_f_monthly: 'Aportación mensual', ws4_f_alloc: 'Asignación a RV',
+    ws4_f_income: 'Ingresos mensuales', ws4_f_expenses: 'Gastos estimados',
+    ws4_f_price: 'Precio objetivo', ws4_f_downpct: 'Entrada', ws4_f_rate: 'Interés hipoteca',
+    ws4_f_revenue: 'Ingresos', ws4_f_costs: 'Costes',
+    ws4_f_totalwealth: 'Patrimonio total', ws4_f_liquidity: 'Liquidez',
+    ws4_f_annualspend: 'Gasto anual', ws4_f_currentwealth: 'Patrimonio actual',
+    ws4_r_annualcontrib: 'Aportación anual', ws4_r_coverage: 'Cobertura del objetivo', ws4_r_allocsplit: 'RV / Defensivo',
+    ws4_r_savings: 'Ahorro estimado', ws4_r_savingsrate: 'Tasa de ahorro', ws4_r_investcap: 'Capacidad de inversión anual',
+    ws4_r_down: 'Entrada', ws4_r_mortgage: 'Hipoteca estimada', ws4_r_effort: 'Esfuerzo mensual',
+    ws4_r_margin: 'Margen', ws4_r_marginpct: 'Margen %', ws4_r_cashyear: 'Caja anual estimada',
+    ws4_r_invested: 'Inversión', ws4_r_liqpct: 'Liquidez %', ws4_r_total: 'Patrimonio total',
+    ws4_r_needed: 'Patrimonio necesario', ws4_r_progress: 'Progreso', ws4_r_years: 'Años aprox.',
+    ws4_read_inv_hi: 'Tu ritmo de aportación cubre el objetivo anual planteado.',
+    ws4_read_inv_mid: 'Tu aportación avanza hacia el objetivo anual definido.',
+    ws4_read_inv_lo: 'Aumentar la aportación acercaría el objetivo anual.',
+    ws4_read_bud_hi: 'Tu capacidad de ahorro actual permite construir margen de inversión.',
+    ws4_read_bud_mid: 'Este presupuesto deja una tasa de ahorro ajustada.',
+    ws4_read_bud_lo: 'El margen de ahorro es reducido en este presupuesto.',
+    ws4_read_prop_hi: 'Una entrada sólida reduce el esfuerzo mensual de la hipoteca.',
+    ws4_read_prop_lo: 'Una entrada mayor reduciría el esfuerzo mensual estimado.',
+    ws4_read_biz_hi: 'El margen actual genera una caja sólida.',
+    ws4_read_biz_mid: 'El margen deja una caja ajustada pero positiva.',
+    ws4_read_biz_lo: 'El margen es estrecho; la caja estimada es limitada.',
+    ws4_read_nw_hi: 'Tu patrimonio mantiene una posición de liquidez amplia.',
+    ws4_read_nw_mid: 'Tu patrimonio combina inversión y liquidez disponible.',
+    ws4_read_nw_lo: 'Tu patrimonio está mayormente invertido.',
+    ws4_read_fire_done: 'Ya alcanzas el patrimonio necesario para tu objetivo FIRE.',
+    ws4_read_fire_dep: 'Este plan FIRE depende principalmente de tu ritmo de aportación.',
     // Status pills
     statusOpen:        'Abierto',
     statusClosed:      'Cerrado',
@@ -3348,6 +3390,48 @@ const T = {
     wsp_read_horizon: 'A longer horizon improves the effect of compound growth.',
     wsp_read_monthly: 'The monthly contribution has a relevant impact on the final projection.',
     wsp_read_steady:  n => `At this pace, your wealth could grow steadily over the next ${n} years.`,
+    // WS.4 — Workspaces
+    ws4_section_cta: 'Create workspace',
+    ws4_create: 'Create', ws4_open: 'Open',
+    ws4_mode_manual: 'Manual', ws4_mode_sync: 'Aurix Sync',
+    ws4_sync_ctx: (w, l) => `Real data · Wealth ${w} · Liquidity ${l}`,
+    ws4_sync_none: 'Aurix will use your real data for this template when available.',
+    ws4_inputs_title: 'Parameters', ws4_summary_title: 'Summary',
+    ws4_autosave: 'Saved automatically', ws4_permonth: '/mo', ws4_done: 'Reached',
+    ws4_sub_investment: 'Plan your contributions toward an annual goal.',
+    ws4_sub_budget:     'Work out your saving and investing capacity.',
+    ws4_sub_property:   'Estimate down payment, mortgage and monthly effort.',
+    ws4_sub_business:   'Margin and estimated cash from your activity.',
+    ws4_sub_networth:   'A snapshot of your wealth: invested and liquidity.',
+    ws4_sub_fire:       'Work out your financial-independence target.',
+    ws4_f_annualgoal: 'Annual goal', ws4_f_monthly: 'Monthly contribution', ws4_f_alloc: 'Equity allocation',
+    ws4_f_income: 'Monthly income', ws4_f_expenses: 'Estimated expenses',
+    ws4_f_price: 'Target price', ws4_f_downpct: 'Down payment', ws4_f_rate: 'Mortgage rate',
+    ws4_f_revenue: 'Revenue', ws4_f_costs: 'Costs',
+    ws4_f_totalwealth: 'Total wealth', ws4_f_liquidity: 'Liquidity',
+    ws4_f_annualspend: 'Annual spend', ws4_f_currentwealth: 'Current wealth',
+    ws4_r_annualcontrib: 'Annual contribution', ws4_r_coverage: 'Goal coverage', ws4_r_allocsplit: 'Equity / Defensive',
+    ws4_r_savings: 'Estimated savings', ws4_r_savingsrate: 'Savings rate', ws4_r_investcap: 'Annual investing capacity',
+    ws4_r_down: 'Down payment', ws4_r_mortgage: 'Estimated mortgage', ws4_r_effort: 'Monthly effort',
+    ws4_r_margin: 'Margin', ws4_r_marginpct: 'Margin %', ws4_r_cashyear: 'Estimated annual cash',
+    ws4_r_invested: 'Invested', ws4_r_liqpct: 'Liquidity %', ws4_r_total: 'Total wealth',
+    ws4_r_needed: 'Wealth needed', ws4_r_progress: 'Progress', ws4_r_years: 'Approx. years',
+    ws4_read_inv_hi: 'Your contribution pace covers the annual goal you set.',
+    ws4_read_inv_mid: 'Your contribution is progressing toward the annual goal.',
+    ws4_read_inv_lo: 'Increasing the contribution would bring the annual goal closer.',
+    ws4_read_bud_hi: 'Your current saving capacity allows building an investing margin.',
+    ws4_read_bud_mid: 'This budget leaves a tight savings rate.',
+    ws4_read_bud_lo: 'The savings margin is limited in this budget.',
+    ws4_read_prop_hi: 'A solid down payment reduces the monthly mortgage effort.',
+    ws4_read_prop_lo: 'A larger down payment would reduce the estimated monthly effort.',
+    ws4_read_biz_hi: 'The current margin generates solid cash.',
+    ws4_read_biz_mid: 'The margin leaves tight but positive cash.',
+    ws4_read_biz_lo: 'The margin is narrow; estimated cash is limited.',
+    ws4_read_nw_hi: 'Your wealth keeps an ample liquidity position.',
+    ws4_read_nw_mid: 'Your wealth combines investment and available liquidity.',
+    ws4_read_nw_lo: 'Your wealth is mostly invested.',
+    ws4_read_fire_done: 'You already reach the wealth needed for your FIRE goal.',
+    ws4_read_fire_dep: 'This FIRE plan depends mainly on your contribution pace.',
     // Status pills
     statusOpen:        'Open',
     statusClosed:      'Closed',
@@ -10758,10 +10842,11 @@ function _wshMetrics() {
 
 // Idempotent mount: build once + run the reveal; on later calls (price ticks,
 // refresh) just refresh the live numbers so the entrance animation never restarts.
-// WS.2/WS.3 — internal Workspace view state (no global nav change).
-// 'home' | 'scenario' | 'planning'.
-let _wshView  = 'home';
-let _wshWired = false;
+// WS.2/WS.3/WS.4 — internal Workspace view state (no global nav change).
+// 'home' | 'scenario' | 'planning' | 'workspace'.
+let _wshView    = 'home';
+let _wshWired   = false;
+let _ws4ActiveId = null;   // WS.4 — currently open workspace project id
 
 function _wshReveal(container) {
   try { const r = container.querySelector('.aurix-wsh'); if (r) requestAnimationFrame(() => r.classList.add('is-revealed')); } catch (_) {}
@@ -10788,6 +10873,12 @@ function renderWorkspaceHome(container) {
     _wshReveal(container);
     return;
   }
+  if (_wshView === 'workspace') {
+    if (shown === 'workspace' && cur.getAttribute('data-ws4-id') === String(_ws4ActiveId)) return;
+    container.innerHTML = _renderWorkspaceDetail();
+    _wshReveal(container);
+    return;
+  }
   // Home
   const metrics = _wshMetrics();
   if (shown === 'home') { _wshRefreshMetrics(cur, metrics); return; }
@@ -10808,16 +10899,24 @@ function _wshWireOnce() {
     if (t.getAttribute('data-wsh-cta') === 'planning' || t.getAttribute('data-wsh-nav') === 'planning') {
       _wshView = 'planning'; renderWorkspaceHome(); return;
     }
-    if (t.getAttribute('data-wsh-nav') === 'home') {
-      _wshView = 'home'; renderWorkspaceHome(); return;
+    if (t.getAttribute('data-wsh-cta') === 'workspace') {
+      const type = t.getAttribute('data-ws4-type');
+      if (type) { _ws4OpenOrCreate(type); return; }
     }
+    if (t.getAttribute('data-wsh-nav') === 'home') {
+      _wshView = 'home'; _ws4ActiveId = null; renderWorkspaceHome(); return;
+    }
+    const mode = t.getAttribute('data-ws4-mode');
+    if (mode) { _ws4SetMode(mode); return; }
     const saveId = t.getAttribute('data-wsh-save');
     if (saveId) { _wsbSaveScenario(saveId, t); return; }
   });
-  // WS.3 — live recompute of the Wealth Projection on slider input (no rebuild).
+  // WS.3/WS.4 — live recompute on input (no full rebuild → inputs keep focus).
   document.addEventListener('input', e => {
     const el = e.target;
-    if (el && el.getAttribute && el.getAttribute('data-wsp-input')) _wspOnInput();
+    if (!el || !el.getAttribute) return;
+    if (el.getAttribute('data-wsp-input')) { _wspOnInput(); return; }
+    if (el.getAttribute('data-ws4-input')) { _ws4OnInput(el); return; }
   });
 }
 
@@ -10966,17 +11065,19 @@ function _renderWorkspaceHome(metrics) {
       </div>
     </section>`;
 
-  // Workspaces snapshot — up to 6 documents (visual only).
+  // Workspaces snapshot — WS.4: 6 active templates. Each card opens/creates its
+  // workspace; "Abrir" if one already exists for that template, else "Crear".
   const wsItems = ['investment', 'budget', 'property', 'business', 'networth', 'fire'];
+  const wsExisting = {}; _wshReadStore(_WSH_PROJECTS_KEY).forEach(p => { if (p && p.type) wsExisting[p.type] = true; });
   const workspacesHtml = `
     <section class="wsh-card wsh-workspaces">
-      <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsh_workspaces_title'))}</h3></header>
+      <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsh_workspaces_title'))}</h3><span class="wsh-ws-cta">${esc(t('ws4_section_cta'))}</span></header>
       <div class="wsh-ws-grid">
         ${wsItems.map(k => `
-          <div class="wsh-ws">
+          <div class="wsh-ws is-active" role="button" tabindex="0" data-wsh-cta="workspace" data-ws4-type="${esc(k)}">
             <span class="wsh-ws-mark" aria-hidden="true"></span>
             <p class="wsh-ws-name">${esc(t('wsh_ws_' + k))}</p>
-            <span class="wsh-pill">${esc(t('wsh_soon'))}</span>
+            <span class="wsh-ws-go">${esc(wsExisting[k] ? t('ws4_open') : t('ws4_create'))} ›</span>
           </div>`).join('')}
       </div>
     </section>`;
@@ -11306,6 +11407,182 @@ function _renderWealthProjection() {
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsp_chart_title'))}</h3></header>
         <div class="wsp-out" data-wsp-out>${_wspOutputsHtml(initial, inp.monthly, inp.years, inp.ret)}</div>
       </section>
+
+      <p class="wsb-disclaimer">${esc(t('wsb_disclaimer'))}</p>
+    </div>`;
+}
+
+// ── WS.4 — Workspaces MVP (template projects, manual / Aurix Sync) ────────────
+// Read-only: Aurix Sync precharges real wealth/liquidity but never writes to the
+// portfolio. Deterministic per-template helpers, no heavy architecture.
+function _ws4Real() {
+  let wealth = 0, liqPct = 0;
+  try { if (typeof investableValueBase === 'function') wealth = investableValueBase() || 0; } catch (_) {}
+  try { const lv = (typeof buildLiquidityView === 'function') ? buildLiquidityView() : null; if (lv && typeof lv.cashPct === 'number') liqPct = lv.cashPct; } catch (_) {}
+  return { wealth: Math.round(wealth), liqPct: Math.round(liqPct), liquidity: Math.round(wealth * liqPct / 100), hasReal: wealth > 0 };
+}
+function _ws4Mortgage(loan, ratePct) { const r = (ratePct || 0) / 12 / 100, n = 360; return r > 0 ? loan * r / (1 - Math.pow(1 + r, -n)) : loan / n; }
+function _ws4FireYears(cur, monthly, needed) { if (cur >= needed) return 0; for (let y = 1; y <= 60; y++) { if (projectScenario(cur, monthly, 0.05, y).projected >= needed) return y; } return 60; }
+
+function _ws4Templates() {
+  const eur = v => formatBase(v);
+  return {
+    investment: { name: t('wsh_ws_investment'), sub: t('ws4_sub_investment'),
+      fields: [
+        { k: 'annualGoal', label: t('ws4_f_annualgoal'), def: 12000, min: 0, max: 100000, step: 1000, unit: '€' },
+        { k: 'monthly',    label: t('ws4_f_monthly'),    def: 300,   min: 0, max: 3000,   step: 50,   unit: '€' },
+        { k: 'alloc',      label: t('ws4_f_alloc'),      def: 70,    min: 0, max: 100,    step: 5,    unit: '%' },
+      ],
+      compute: v => { const annual = (v.monthly || 0) * 12; const cov = v.annualGoal > 0 ? Math.round(annual / v.annualGoal * 100) : 0;
+        return { rows: [ { label: t('ws4_r_annualcontrib'), value: eur(annual) }, { label: t('ws4_r_coverage'), value: v.annualGoal > 0 ? cov + '%' : '—' }, { label: t('ws4_r_allocsplit'), value: (v.alloc || 0) + '% / ' + (100 - (v.alloc || 0)) + '%' } ],
+          reading: cov >= 100 ? t('ws4_read_inv_hi') : cov >= 50 ? t('ws4_read_inv_mid') : t('ws4_read_inv_lo') }; } },
+    budget: { name: t('wsh_ws_budget'), sub: t('ws4_sub_budget'),
+      fields: [
+        { k: 'income',   label: t('ws4_f_income'),   def: 2500, min: 0, max: 20000, step: 100, unit: '€' },
+        { k: 'expenses', label: t('ws4_f_expenses'), def: 1800, min: 0, max: 20000, step: 100, unit: '€' },
+      ],
+      compute: v => { const sav = (v.income || 0) - (v.expenses || 0); const rate = v.income > 0 ? Math.round(sav / v.income * 100) : 0;
+        return { rows: [ { label: t('ws4_r_savings'), value: eur(sav) }, { label: t('ws4_r_savingsrate'), value: v.income > 0 ? rate + '%' : '—' }, { label: t('ws4_r_investcap'), value: eur(Math.max(0, sav) * 12) } ],
+          reading: rate >= 20 ? t('ws4_read_bud_hi') : rate >= 5 ? t('ws4_read_bud_mid') : t('ws4_read_bud_lo') }; } },
+    property: { name: t('wsh_ws_property'), sub: t('ws4_sub_property'),
+      fields: [
+        { k: 'price',   label: t('ws4_f_price'),   def: 250000, min: 0, max: 2000000, step: 5000, unit: '€' },
+        { k: 'downPct', label: t('ws4_f_downpct'), def: 20,     min: 0, max: 60,      step: 5,    unit: '%' },
+        { k: 'rate',    label: t('ws4_f_rate'),    def: 3.5,    min: 0, max: 8,       step: 0.25, unit: '%' },
+      ],
+      compute: v => { const down = (v.price || 0) * (v.downPct || 0) / 100; const loan = (v.price || 0) - down; const eff = _ws4Mortgage(loan, v.rate || 0);
+        return { rows: [ { label: t('ws4_r_down'), value: eur(down) }, { label: t('ws4_r_mortgage'), value: eur(loan) }, { label: t('ws4_r_effort'), value: eur(eff) + t('ws4_permonth') } ],
+          reading: (v.downPct || 0) >= 20 ? t('ws4_read_prop_hi') : t('ws4_read_prop_lo') }; } },
+    business: { name: t('wsh_ws_business'), sub: t('ws4_sub_business'),
+      fields: [
+        { k: 'revenue', label: t('ws4_f_revenue'), def: 8000, min: 0, max: 100000, step: 500, unit: '€' },
+        { k: 'costs',   label: t('ws4_f_costs'),   def: 5000, min: 0, max: 100000, step: 500, unit: '€' },
+      ],
+      compute: v => { const m = (v.revenue || 0) - (v.costs || 0); const mp = v.revenue > 0 ? Math.round(m / v.revenue * 100) : 0;
+        return { rows: [ { label: t('ws4_r_margin'), value: eur(m) }, { label: t('ws4_r_marginpct'), value: v.revenue > 0 ? mp + '%' : '—' }, { label: t('ws4_r_cashyear'), value: eur(m * 12) } ],
+          reading: mp >= 30 ? t('ws4_read_biz_hi') : mp >= 10 ? t('ws4_read_biz_mid') : t('ws4_read_biz_lo') }; } },
+    networth: { name: t('wsh_ws_networth'), sub: t('ws4_sub_networth'),
+      fields: [
+        { k: 'totalWealth', label: t('ws4_f_totalwealth'), def: 0, min: 0, max: 10000000, step: 1000, unit: '€', sync: r => r.wealth },
+        { k: 'liquidity',   label: t('ws4_f_liquidity'),   def: 0, min: 0, max: 10000000, step: 1000, unit: '€', sync: r => r.liquidity },
+      ],
+      compute: v => { const inv = Math.max(0, (v.totalWealth || 0) - (v.liquidity || 0)); const lp = v.totalWealth > 0 ? Math.round((v.liquidity || 0) / v.totalWealth * 100) : 0;
+        return { rows: [ { label: t('ws4_r_invested'), value: eur(inv) }, { label: t('ws4_r_liqpct'), value: v.totalWealth > 0 ? lp + '%' : '—' }, { label: t('ws4_r_total'), value: eur(v.totalWealth || 0) } ],
+          reading: lp >= 50 ? t('ws4_read_nw_hi') : lp >= 10 ? t('ws4_read_nw_mid') : t('ws4_read_nw_lo') }; } },
+    fire: { name: t('wsh_ws_fire'), sub: t('ws4_sub_fire'),
+      fields: [
+        { k: 'annualSpend',   label: t('ws4_f_annualspend'),   def: 24000, min: 0, max: 200000,  step: 1000, unit: '€' },
+        { k: 'currentWealth', label: t('ws4_f_currentwealth'), def: 0,     min: 0, max: 10000000, step: 1000, unit: '€', sync: r => r.wealth },
+        { k: 'monthly',       label: t('ws4_f_monthly'),       def: 500,   min: 0, max: 5000,    step: 50,   unit: '€' },
+      ],
+      compute: v => { const needed = (v.annualSpend || 0) * 25; const prog = needed > 0 ? Math.round((v.currentWealth || 0) / needed * 100) : 0; const yrs = _ws4FireYears(v.currentWealth || 0, v.monthly || 0, needed);
+        return { rows: [ { label: t('ws4_r_needed'), value: eur(needed) }, { label: t('ws4_r_progress'), value: needed > 0 ? prog + '%' : '—' }, { label: t('ws4_r_years'), value: prog >= 100 ? t('ws4_done') : t('wsp_unit_years')(yrs) } ],
+          reading: prog >= 100 ? t('ws4_read_fire_done') : t('ws4_read_fire_dep') }; } },
+  };
+}
+
+function _ws4Projects() { return _wshReadStore(_WSH_PROJECTS_KEY); }
+function _ws4SaveAll(list) { try { localStorage.setItem(_WSH_PROJECTS_KEY, JSON.stringify(list)); } catch (_) {} }
+function _ws4Get() { return _ws4Projects().find(x => x && x.id === _ws4ActiveId) || null; }
+function _ws4Persist(p) { const list = _ws4Projects(); const i = list.findIndex(x => x && x.id === p.id); if (i >= 0) list[i] = p; else list.push(p); _ws4SaveAll(list); }
+function _ws4Summarize(type, inputs) { const c = _ws4Templates()[type].compute(inputs); return { rows: c.rows, reading: c.reading }; }
+
+// Open the existing project for a template, or create one (one per template type
+// for MVP — keeps the Home counter meaningful and avoids duplicate spam).
+function _ws4OpenOrCreate(type) {
+  const tmpl = _ws4Templates()[type];
+  if (!tmpl) return;
+  const list = _ws4Projects();
+  let p = list.find(x => x && x.type === type);
+  if (!p) {
+    const inputs = {}; tmpl.fields.forEach(f => { inputs[f.k] = f.def; });
+    const now = Date.now();
+    p = { id: 'ws4_' + now, type, name: tmpl.name, mode: 'manual', inputs, createdAt: now, updatedAt: now, summary: _ws4Summarize(type, inputs) };
+    list.push(p); _ws4SaveAll(list);
+  }
+  _ws4ActiveId = p.id; _wshView = 'workspace'; renderWorkspaceHome();
+}
+
+function _ws4SetMode(mode) {
+  const p = _ws4Get(); if (!p) return;
+  p.mode = mode;
+  if (mode === 'sync') { const real = _ws4Real(); _ws4Templates()[p.type].fields.forEach(f => { if (f.sync) p.inputs[f.k] = f.sync(real); }); }
+  p.updatedAt = Date.now(); p.summary = _ws4Summarize(p.type, p.inputs); _ws4Persist(p);
+  const c = document.getElementById('aurixWorkspace');
+  if (c) { c.innerHTML = _renderWorkspaceDetail(); _wshReveal(c); }
+}
+
+function _ws4OnInput(el) {
+  const p = _ws4Get(); if (!p) return;
+  const k = el.getAttribute('data-ws4-input');
+  p.inputs[k] = Number(el.value);
+  p.updatedAt = Date.now(); p.summary = _ws4Summarize(p.type, p.inputs); _ws4Persist(p);
+  const root = document.querySelector('.wsh-ws4');
+  const out  = root && root.querySelector('[data-ws4-out]');
+  if (out) out.innerHTML = _ws4OutHtml(_ws4Templates()[p.type].compute(p.inputs, _ws4Real()));
+}
+
+function _ws4OutHtml(c) {
+  const esc = _intccEsc;
+  return `
+    <div class="ws4-rows">
+      ${c.rows.map(r => `<div class="ws4-row"><span class="ws4-row-label">${esc(r.label)}</span><b class="ws4-row-val">${esc(r.value)}</b></div>`).join('')}
+    </div>
+    <div class="ws4-reading">${esc(c.reading)}</div>`;
+}
+
+function _renderWorkspaceDetail() {
+  const esc = _intccEsc;
+  const p = _ws4Get();
+  if (!p) { _wshView = 'home'; return _renderWorkspaceHome(_wshMetrics()); }
+  const tmpl = _ws4Templates()[p.type];
+  const real = _ws4Real();
+  const c = tmpl.compute(p.inputs, real);
+  const isSync = p.mode === 'sync';
+  const hasSyncField = tmpl.fields.some(f => f.sync);
+
+  const fieldHtml = tmpl.fields.map(f => `
+    <label class="ws4-field">
+      <span class="ws4-field-name">${esc(f.label)}</span>
+      <span class="ws4-field-input">
+        <input class="ws4-num" type="number" inputmode="decimal" data-ws4-input="${esc(f.k)}" value="${esc(p.inputs[f.k])}" min="${f.min}" max="${f.max}" step="${f.step}">
+        <span class="ws4-field-unit">${esc(f.unit)}</span>
+      </span>
+    </label>`).join('');
+
+  const syncCtx = isSync
+    ? (real.hasReal
+        ? `<p class="ws4-sync-ctx">${esc(t('ws4_sync_ctx')(formatBase(real.wealth), real.liqPct + '%'))}</p>`
+        : `<p class="ws4-sync-ctx is-empty">${esc(t('ws4_sync_none'))}</p>`)
+    : '';
+
+  return `
+    <div class="aurix-wsh wsh-ws4 is-revealed" data-wsh-view="workspace" data-ws4-id="${esc(p.id)}">
+      <section class="wsh-card wsb-header">
+        <button type="button" class="wsb-back" data-wsh-nav="home">‹ ${esc(t('wsb_back'))}</button>
+        <h2 class="wsb-title">${esc(p.name)}</h2>
+        <p class="wsb-subtitle">${esc(tmpl.sub)}</p>
+      </section>
+
+      <section class="wsh-card ws4-modes-card">
+        <div class="ws4-modes" role="tablist">
+          <button type="button" class="ws4-mode${!isSync ? ' is-active' : ''}" data-ws4-mode="manual">${esc(t('ws4_mode_manual'))}</button>
+          <button type="button" class="ws4-mode${isSync ? ' is-active' : ''}" data-ws4-mode="sync">${esc(t('ws4_mode_sync'))}</button>
+        </div>
+        ${syncCtx}
+      </section>
+
+      <div class="ws4-detail-grid">
+        <section class="wsh-card ws4-inputs-card">
+          <header class="wsh-head"><h3 class="wsh-title">${esc(t('ws4_inputs_title'))}</h3></header>
+          <div class="ws4-fields">${fieldHtml}</div>
+        </section>
+
+        <section class="wsh-card ws4-out-card">
+          <header class="wsh-head"><h3 class="wsh-title">${esc(t('ws4_summary_title'))}</h3><span class="ws4-autosave">${esc(t('ws4_autosave'))}</span></header>
+          <div class="ws4-out" data-ws4-out>${_ws4OutHtml(c)}</div>
+        </section>
+      </div>
 
       <p class="wsb-disclaimer">${esc(t('wsb_disclaimer'))}</p>
     </div>`;

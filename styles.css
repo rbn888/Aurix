@@ -19665,7 +19665,7 @@ body.gs-open { overflow: hidden; }
 .wsp-leg.is-opt  { color: #8fe6b6; }
 
 .wsp-scn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.wsp-reading {
+.wsp-reading, .ws4-reading {
   margin: 0; padding: 14px 16px; border-radius: 14px; font-size: 14px; line-height: 1.5; font-weight: 600;
   color: var(--text-bright);
   border: 1px solid rgba(77,141,255,0.30);
@@ -19676,6 +19676,51 @@ body.gs-open { overflow: hidden; }
   .wsp-inputs { grid-template-columns: 1fr; gap: 14px; }
   .wsp-summary { gap: 16px 22px; }
   .wsp-scn-grid { grid-template-columns: 1fr; }
+}
+
+/* ── WS.4 — Workspaces (template projects, ws4-* namespace) ── */
+/* Active template cards on the Home Workspaces snapshot */
+.wsh-ws.is-active { cursor: pointer; }
+.wsh-ws.is-active:hover { border-color: rgba(77,141,255,0.42); background: rgba(74,130,240,0.10); transform: translateY(-2px); }
+.wsh-ws-go { font-size: 11.5px; font-weight: 700; color: #aecbff; letter-spacing: 0.01em; }
+.wsh-ws-cta { font-size: 11px; font-weight: 600; color: rgba(159,194,255,0.7); letter-spacing: 0.02em; }
+
+/* Mode toggle (Manual / Aurix Sync) */
+.ws4-modes { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(120,160,255,0.14); }
+.ws4-mode { font: inherit; cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--text-muted); padding: 7px 16px; border-radius: 9px; border: 0; background: transparent; transition: background 160ms ease, color 160ms ease; }
+.ws4-mode.is-active { color: #cfe0ff; background: rgba(74,130,240,0.22); box-shadow: inset 0 0 0 1px rgba(74,130,240,0.34); }
+.ws4-sync-ctx { margin: 12px 0 0; font-size: 12px; font-weight: 600; color: rgba(159,194,255,0.85); }
+.ws4-sync-ctx.is-empty { color: var(--text-muted); font-weight: 500; }
+
+/* Detail layout: 2 columns desktop, 1 mobile */
+.ws4-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.ws4-fields { display: flex; flex-direction: column; gap: 14px; }
+.ws4-field { display: flex; flex-direction: column; gap: 7px; }
+.ws4-field-name { font-size: 12px; color: var(--text-muted); }
+.ws4-field-input { position: relative; display: block; }
+.ws4-num {
+  -webkit-appearance: none; appearance: none; -moz-appearance: textfield;
+  width: 100%; box-sizing: border-box; padding: 10px 34px 10px 12px;
+  font: inherit; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--text-bright); background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(120,160,255,0.18); border-radius: 10px; outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.ws4-num:focus { border-color: rgba(77,141,255,0.55); box-shadow: 0 0 0 3px rgba(77,141,255,0.15); }
+.ws4-num::-webkit-outer-spin-button, .ws4-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.ws4-field-unit { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 12.5px; font-weight: 600; color: rgba(159,194,255,0.7); pointer-events: none; }
+.ws4-autosave { font-size: 10.5px; font-weight: 600; color: rgba(143,230,182,0.8); letter-spacing: 0.02em; }
+
+/* Output rows (light table) + reading */
+.ws4-out { display: flex; flex-direction: column; gap: 14px; }
+.ws4-rows { display: flex; flex-direction: column; }
+.ws4-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 11px 0; border-bottom: 1px solid rgba(120,160,255,0.10); }
+.ws4-row:last-child { border-bottom: 0; }
+.ws4-row-label { font-size: 13px; color: var(--text-muted); }
+.ws4-row-val { font-size: 15px; font-weight: 700; color: var(--text-bright); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 720px) {
+  .ws4-detail-grid { grid-template-columns: 1fr; }
 }
 
 /* ════════ WS.2 — Financial Tools Hub (dedicated tools) ═══════════════════════
