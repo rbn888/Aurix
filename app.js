@@ -1735,6 +1735,10 @@ const T = {
     wsh_ws_fire:           'FIRE Workbook',
     wsh_soon:              'Próximamente',
     wsh_none:              '—',
+    wsh_fp_aria:           'Proyección de tu patrimonio: ahora, base y futuro',
+    wsh_fp_now:            'Ahora',
+    wsh_fp_base:           'Base',
+    wsh_fp_future:         'Futuro',
     // Status pills
     statusOpen:        'Abierto',
     statusClosed:      'Cerrado',
@@ -3226,6 +3230,10 @@ const T = {
     wsh_ws_fire:           'FIRE Workbook',
     wsh_soon:              'Coming soon',
     wsh_none:              '—',
+    wsh_fp_aria:           'Your wealth projection: now, base and future',
+    wsh_fp_now:            'Now',
+    wsh_fp_base:           'Base',
+    wsh_fp_future:         'Future',
     // Status pills
     statusOpen:        'Open',
     statusClosed:      'Closed',
@@ -10657,9 +10665,46 @@ function _wshRefreshMetrics(root, metrics) {
   set('projects', String(metrics.projects));
 }
 
+// WS.1A — Workspace's own hero visual: a premium "future path" projection curve
+// (present → base → future) with scenario nodes. Pure SVG/CSS, no libraries, no
+// Intelligence orb/ECG/pulse. Blue Aurix, soft one-shot draw animation.
+function _wshFuturePathHtml() {
+  const esc = (typeof _intccEsc === 'function') ? _intccEsc : (s => String(s == null ? '' : s));
+  const line = 'M14 104 C 56 100 78 86 110 64 C 150 38 178 30 206 22';
+  const nodes = [
+    { x: 14,  y: 104, key: 'now' },
+    { x: 110, y: 64,  key: 'base' },
+    { x: 206, y: 22,  key: 'future' },
+  ];
+  const anchor = { now: 'start', base: 'middle', future: 'end' };
+  return `
+    <svg class="wsh-fp-svg" viewBox="0 0 220 132" role="img" aria-label="${esc(t('wsh_fp_aria'))}">
+      <defs>
+        <linearGradient id="wshFpFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#4A82F0" stop-opacity="0.30"/>
+          <stop offset="1" stop-color="#4A82F0" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="wshFpLine" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stop-color="#4A82F0"/>
+          <stop offset="1" stop-color="#9fc2ff"/>
+        </linearGradient>
+      </defs>
+      <g class="wsh-fp-grid" aria-hidden="true">
+        <line x1="14" y1="116" x2="206" y2="116"/>
+      </g>
+      <path class="wsh-fp-area" d="${line} L206 116 L14 116 Z" fill="url(#wshFpFill)"/>
+      <path class="wsh-fp-line" d="${line}" fill="none" stroke="url(#wshFpLine)"/>
+      <g class="wsh-fp-nodes">
+        ${nodes.map(n => `<circle class="wsh-fp-node is-${n.key}" cx="${n.x}" cy="${n.y}" r="4.2"/>`).join('')}
+      </g>
+      <g class="wsh-fp-labels">
+        ${nodes.map(n => `<text class="wsh-fp-label" x="${n.x}" y="129" text-anchor="${anchor[n.key]}">${esc(t('wsh_fp_' + n.key))}</text>`).join('')}
+      </g>
+    </svg>`;
+}
+
 function _renderWorkspaceHome(metrics) {
   const esc = (typeof _intccEsc === 'function') ? _intccEsc : (s => String(s == null ? '' : s));
-  const orb = (typeof _intccOrbHtml === 'function') ? _intccOrbHtml() : '';
 
   const stat = (key, label) => `
     <div class="wsh-stat">
@@ -10680,7 +10725,7 @@ function _renderWorkspaceHome(metrics) {
           ${stat('projects', t('wsh_stat_projects'))}
         </div>
       </div>
-      <div class="wsh-hero-orb" aria-hidden="true">${orb}</div>
+      <div class="wsh-hero-viz">${_wshFuturePathHtml()}</div>
     </section>`;
 
   // Goals snapshot — example goal types as starting templates (no fabricated
