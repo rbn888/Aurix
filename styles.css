@@ -19863,6 +19863,43 @@ body.gs-open { overflow: hidden; }
   .wsg-actions { justify-content: flex-end; }
 }
 
+/* ── WS.5B — studio layout: compact hero, internal tabs, templates, tools ── */
+.wsh-hero.is-studio { padding: 14px 22px; gap: 22px; }
+.wsh-hero.is-studio .wsh-hero-main { display: flex; flex-direction: column; justify-content: center; }
+.wsh-studio-root { gap: 14px; }
+
+.wsh-tabs { display: flex; gap: 6px; padding: 5px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(120,160,255,0.12); }
+.wsh-tab { flex: 1 1 0; font: inherit; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-muted); padding: 10px 14px; border: 0; border-radius: 10px; background: transparent; transition: background 160ms ease, color 160ms ease; }
+.wsh-tab:hover { color: #cfe0ff; }
+.wsh-tab.is-active { color: #cfe0ff; background: rgba(74,130,240,0.20); box-shadow: inset 0 0 0 1px rgba(74,130,240,0.32); }
+.wsh-tabpanel { display: flex; flex-direction: column; gap: 14px; }
+
+/* Templates catalog */
+.wsh-tpl-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.wsh-tpl { cursor: pointer; display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.13); background: rgba(255,255,255,0.025); transition: border-color 200ms ease, transform 200ms ease, background 200ms ease; }
+.wsh-tpl:hover { border-color: rgba(77,141,255,0.42); transform: translateY(-2px); background: rgba(74,130,240,0.08); }
+.wsh-tpl-name { margin: 0; font-size: 14.5px; font-weight: 700; color: var(--text-bright); }
+.wsh-tpl-desc { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--text-muted); flex: 1 1 auto; }
+.wsh-tpl-go { font-size: 12px; font-weight: 700; color: #aecbff; }
+
+/* Tools */
+.wsh-tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.wsh-tool { display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.12); background: rgba(255,255,255,0.025); }
+.wsh-tool-icon { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; color: #aecbff; background: rgba(74,130,240,0.12); border: 1px solid rgba(74,130,240,0.30); }
+.wsh-tool-icon svg { width: 20px; height: 20px; }
+.wsh-tool-name { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-bright); }
+.wsh-tool-desc { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--text-muted); flex: 1 1 auto; }
+.wsh-tool .wsh-pill { align-self: flex-start; }
+
+.wsh-space-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.wsh-space-empty .wsh-empty { margin: 0; }
+
+@media (max-width: 720px) {
+  .wsh-tabs { position: sticky; top: 6px; z-index: 6; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+  .wsh-tpl-grid { grid-template-columns: 1fr; }
+  .wsh-tool-grid { grid-template-columns: 1fr; }
+}
+
 /* ════════ WS.2 — Financial Tools Hub (dedicated tools) ═══════════════════════
    Premium interactive tools that open inside Workspace templates mode (never
    the Sheet). Encapsulated under ws2-* classes; responsive. */

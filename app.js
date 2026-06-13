@@ -1886,6 +1886,22 @@ const T = {
     wsh_projects_empty:'No tienes proyectos guardados.',
     wsh_projects_cta:  'Crear primer proyecto',
     wsh_proj_open:     'Abrir',
+    // WS.5B — studio layout, tabs, tools
+    wsh_studio_title:  'Tu zona de trabajo',
+    wsh_studio_sub:    'Crea plantillas, simulaciones y planes financieros.',
+    wstab_space:       'Mi espacio',
+    wstab_templates:   'Plantillas',
+    wstab_tools:       'Herramientas',
+    wsh_space_empty:   'Aún no tienes elementos guardados.',
+    wsh_space_cta:     'Crear desde plantilla',
+    wstpl_use:         'Usar plantilla',
+    wstpl_plans_title: 'Planes',
+    wstool_compound_n: 'Interés compuesto',
+    wstool_compound_d: 'Proyecta el crecimiento compuesto de una cantidad.',
+    wstool_budget_n:   'Presupuesto mensual',
+    wstool_budget_d:   'Organiza ingresos y gastos mensuales.',
+    wstool_journal_n:  'Diario de operaciones',
+    wstool_journal_d:  'Registra y revisa tus operaciones.',
     // Status pills
     statusOpen:        'Abierto',
     statusClosed:      'Cerrado',
@@ -3528,6 +3544,22 @@ const T = {
     wsh_projects_empty:'You have no saved projects.',
     wsh_projects_cta:  'Create first project',
     wsh_proj_open:     'Open',
+    // WS.5B — studio layout, tabs, tools
+    wsh_studio_title:  'Your workspace',
+    wsh_studio_sub:    'Create templates, simulations and financial plans.',
+    wstab_space:       'My space',
+    wstab_templates:   'Templates',
+    wstab_tools:       'Tools',
+    wsh_space_empty:   'You have no saved items yet.',
+    wsh_space_cta:     'Create from template',
+    wstpl_use:         'Use template',
+    wstpl_plans_title: 'Plans',
+    wstool_compound_n: 'Compound Growth',
+    wstool_compound_d: 'Project the compound growth of an amount.',
+    wstool_budget_n:   'Monthly Budget',
+    wstool_budget_d:   'Organize monthly income and expenses.',
+    wstool_journal_n:  'Trade Journal',
+    wstool_journal_d:  'Log and review your trades.',
     // Status pills
     statusOpen:        'Open',
     statusClosed:      'Closed',
@@ -10944,6 +10976,7 @@ let _wshView    = 'home';
 let _wshWired   = false;
 let _ws4ActiveId = null;   // WS.4 — currently open workspace project id
 let _wsgPrefill = null;    // WS.5 — prefill the create-goal type when arriving from Home
+let _wsTab = 'space';      // WS.5B — Home internal tab: 'space' | 'templates' | 'tools'
 // WS.5A P5 — real save model (editar ≠ guardar). Working copies hold unsaved
 // edits; nothing persists until the user confirms "Guardar".
 let _wsgWorking = {};      // goalId -> working goal (unsaved edits)
@@ -11001,9 +11034,12 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act]')
+      ? e.target.closest('[data-wstab],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act]')
       : null;
     if (!t) return;
+    // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
+    const tab = t.getAttribute('data-wstab');
+    if (tab) { _wsTab = tab; _wshView = 'home'; const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } return; }
     // P5/P4 — goal lifecycle
     const gSave = t.getAttribute('data-wsg-save-goal'); if (gSave) { _wsgSaveGoal(gSave); return; }
     const gAct = t.getAttribute('data-wsg-act'); if (gAct) { const id = t.getAttribute('data-wsg-id'); if (gAct === 'dup') _wsgDuplicate(id); else if (gAct === 'del') _wsgDelete(id); else if (gAct === 'rename') _wsgRename(id); return; }
@@ -11107,12 +11143,28 @@ function _wshFuturePathHtml() {
     </svg>`;
 }
 
+// WS.5B P7 — lenient numeric parse. Empty/partial/invalid → 0 for computation,
+// but the input is never overwritten while typing (handlers only update outputs),
+// so deleting / clearing / pasting all work; normalization happens on save.
+function _wsNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
+
+// WS.5B P6 — always-translated display label. Workspace names defaulted to the
+// template name (English before the ES fix), so we derive from the type via i18n
+// unless the user set a custom name. Goals/scenarios use their user-entered name.
+function _wsLabel(kind, item) {
+  if (!item) return '';
+  if (kind === 'workspace') return item.customName || t('wsh_ws_' + item.type);
+  if (kind === 'goal') return item.name || t('wsg_type_' + (item.type || 'free'));
+  if (kind === 'scenario') return item.name || t('wsh_scenario_title');
+  return item.name || '';
+}
+
 // WS.5A P3/P4 — unified view of saved items across the 3 stores.
 function _wshAllProjects() {
   const out = [];
-  try { _wshReadStore(_WSH_GOALS_KEY).forEach(g => { if (g) out.push({ kind: 'goal', id: g.id, name: g.name, typeLabel: t('wsg_type_' + (g.type || 'free')), ts: g.updatedAt || g.createdAt || 0, ref: 'goal:' + g.id }); }); } catch (_) {}
-  try { _wshReadStore(_WSH_PROJECTS_KEY).forEach(p => { if (p) out.push({ kind: 'workspace', id: p.id, name: p.name, typeLabel: t('wsh_ws_' + p.type), ts: p.updatedAt || p.createdAt || 0, ref: 'workspace:' + p.id }); }); } catch (_) {}
-  try { _wshReadStore(_WSH_SCENARIOS_KEY).forEach(s => { if (s) { const id = s.scenarioId || s.id; out.push({ kind: 'scenario', id, name: s.name, typeLabel: t('wsh_scenario_title'), ts: s.createdAt || 0, ref: 'scenario:' + id }); } }); } catch (_) {}
+  try { _wshReadStore(_WSH_GOALS_KEY).forEach(g => { if (g) out.push({ kind: 'goal', id: g.id, name: _wsLabel('goal', g), typeLabel: t('wsg_type_' + (g.type || 'free')), ts: g.updatedAt || g.createdAt || 0, ref: 'goal:' + g.id }); }); } catch (_) {}
+  try { _wshReadStore(_WSH_PROJECTS_KEY).forEach(p => { if (p) out.push({ kind: 'workspace', id: p.id, name: _wsLabel('workspace', p), typeLabel: t('wsh_ws_' + p.type), ts: p.updatedAt || p.createdAt || 0, ref: 'workspace:' + p.id }); }); } catch (_) {}
+  try { _wshReadStore(_WSH_SCENARIOS_KEY).forEach(s => { if (s) { const id = s.scenarioId || s.id; out.push({ kind: 'scenario', id, name: _wsLabel('scenario', s), typeLabel: t('wsh_scenario_title'), ts: s.createdAt || 0, ref: 'scenario:' + id }); } }); } catch (_) {}
   return out;
 }
 function _wshLastEdited() { const all = _wshAllProjects(); return all.length ? all.reduce((a, b) => (b.ts > a.ts ? b : a), all[0]) : null; }
@@ -11144,171 +11196,115 @@ function _wsxAct(act, ref) {
 
 function _renderWorkspaceHome(metrics) {
   const esc = (typeof _intccEsc === 'function') ? _intccEsc : (s => String(s == null ? '' : s));
+  const tab = (_wsTab === 'templates' || _wsTab === 'tools') ? _wsTab : 'space';
 
-  const stat = (key, label) => `
-    <div class="wsh-stat">
-      <span class="wsh-stat-val" data-wsh-metric="${key}">${esc(key === 'wealth' ? metrics.wealth : metrics[key])}</span>
-      <span class="wsh-stat-label">${esc(label)}</span>
-    </div>`;
-
+  // WS.5B P1 — compact "studio" header (no metrics, no WORKSPACE label). Future
+  // Path stays as a pure visual signature (no explanatory reading text).
   const heroHtml = `
-    <section class="wsh-hero">
+    <section class="wsh-hero is-studio">
       <div class="wsh-hero-main">
-        <span class="wsh-eyebrow">${esc(t('wsh_eyebrow'))}</span>
-        <h2 class="wsh-hero-title">${esc(t('wsh_hero_title'))}</h2>
-        <p class="wsh-hero-sub">${esc(t('wsh_hero_sub'))}</p>
-        <div class="wsh-stats">
-          ${stat('wealth', t('wsh_stat_wealth'))}
-          ${stat('goals', t('wsh_stat_goals'))}
-          ${stat('scenarios', t('wsh_stat_scenarios'))}
-          ${stat('projects', t('wsh_stat_projects'))}
-        </div>
+        <h2 class="wsh-hero-title">${esc(t('wsh_studio_title'))}</h2>
+        <p class="wsh-hero-sub">${esc(t('wsh_studio_sub'))}</p>
       </div>
-      <div class="wsh-hero-viz">
-        ${_wshFuturePathHtml()}
-        <p class="wsh-fp-reading">${esc(_wshFuturePathReading())}</p>
-      </div>
+      <div class="wsh-hero-viz">${_wshFuturePathHtml()}</div>
     </section>`;
 
-  // Goals snapshot — example goal types as starting templates (no fabricated
-  // progress/dates; the Goals engine lands in a later WS.x).
-  // WS.5 — the goal templates now open the Goals view (prefilling the create
-  // form type); the snapshot also shows real progress of saved goals if any.
-  const goalTypes = [
-    { key: 'wealth', wsg: 'wealth', icon: '<path d="M4 16l5-5 3 3 7-7"/><path d="M16 7h4v4"/>' },
-    { key: 'fire',   wsg: 'fire',   icon: '<path d="M12 3c2 3 4 4.5 4 8a4 4 0 0 1-8 0c0-1.6.7-2.8 1.5-3.8C10 9 11 7 12 3z"/>' },
-    { key: 'house',  wsg: 'home',   icon: '<path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/>' },
-  ];
-  const goalsSaved = _wshReadStore(_WSH_GOALS_KEY);
-  const goalsHtml = `
-    <section class="wsh-card wsh-goals">
-      <header class="wsh-head">
-        <h3 class="wsh-title">${esc(t('wsh_goals_title'))}</h3>
-        <span class="wsh-head-ctas">
-          <button type="button" class="wsh-cta" data-wsh-cta="goals">${esc(t('wsg_cta_create'))}</button>
-          <button type="button" class="wsh-cta" data-wsh-cta="goals">${esc(t('wsg_cta_view'))}</button>
-        </span>
-      </header>
-      ${goalsSaved.length ? '' : `<p class="wsh-empty">${esc(t('wsh_goals_empty'))}</p>`}
-      <div class="wsh-goals-grid">
-        ${goalTypes.map(g => `
-          <div class="wsh-goal is-active" role="button" tabindex="0" data-wsh-cta="goals" data-wsg-type="${esc(g.wsg)}">
-            <span class="wsh-goal-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${g.icon}</svg></span>
-            <p class="wsh-goal-name">${esc(t('wsh_goal_' + g.key))}</p>
-            <span class="wsh-goal-track" aria-hidden="true"><span class="wsh-goal-bar"></span></span>
-            <span class="wsh-goal-meta">${esc(t('wsh_goal_define'))} ›</span>
-          </div>`).join('')}
-      </div>
-    </section>`;
+  // WS.5B P2 — internal tabs: Mi espacio / Plantillas / Herramientas.
+  const TABS = [['space', 'wstab_space'], ['templates', 'wstab_templates'], ['tools', 'wstab_tools']];
+  const tabsHtml = `
+    <nav class="wsh-tabs" role="tablist">
+      ${TABS.map(([k, lk]) => `<button type="button" class="wsh-tab${tab === k ? ' is-active' : ''}" data-wstab="${k}">${esc(t(lk))}</button>`).join('')}
+    </nav>`;
 
-  // Scenario Builder snapshot — the feature card. Preview of the compare view.
-  const scenarioHtml = `
-    <section class="wsh-card wsh-scenario is-feature">
-      <header class="wsh-head">
-        <h3 class="wsh-title">${esc(t('wsh_scenario_title'))}</h3>
-      </header>
-      <div class="wsh-sc-compare">
-        <div class="wsh-sc-col">
-          <span class="wsh-sc-label">${esc(t('wsh_scenario_current'))}</span>
-          <span class="wsh-sc-value">${esc(metrics.wealth)}</span>
+  let panel = '';
+  if (tab === 'space') {
+    // P3 Continuar + P4 (renamed) Mi espacio.
+    const last = _wshLastEdited();
+    const continueHtml = last ? `
+      <section class="wsh-card wsh-continue">
+        <div class="wsh-cont-info">
+          <span class="wsh-cont-eyebrow">${esc(t('wsh_continue_title'))}</span>
+          <p class="wsh-cont-name">${esc(last.name)}</p>
+          <span class="wsh-cont-meta">${esc(last.typeLabel)} · ${esc(_intccDate(last.ts))}</span>
         </div>
-        <div class="wsh-sc-vs" aria-hidden="true">vs</div>
-        <div class="wsh-sc-col is-best">
-          <span class="wsh-sc-label">${esc(t('wsh_scenario_best'))}</span>
-          <span class="wsh-sc-value">${esc(t('wsh_pending'))}</span>
-        </div>
-      </div>
-      <p class="wsh-sc-concl">${esc(t('wsh_scenario_concl'))}</p>
-      <button type="button" class="wsh-cta is-primary" data-wsh-cta="scenario">${esc(t('wsh_scenario_cta'))}</button>
-    </section>`;
-
-  // Planning snapshot — WS.3 activates "Wealth Projection"; the other two stay
-  // as premium "coming soon" placeholders, visually coherent.
-  const planItems = [
-    { key: 'retirement', active: false },
-    { key: 'fire',       active: false },
-    { key: 'projection', active: true  },
-  ];
-  const planningHtml = `
-    <section class="wsh-card wsh-planning">
-      <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsh_planning_title'))}</h3></header>
-      <div class="wsh-plan-grid">
-        ${planItems.map(p => p.active ? `
-          <div class="wsh-plan is-active" role="button" tabindex="0" data-wsh-cta="planning">
-            <p class="wsh-plan-name">${esc(t('wsh_plan_' + p.key))}</p>
-            <div class="wsh-plan-foot">
-              <span class="wsh-plan-go" data-wsh-cta="planning">${esc(t('wsp_cta'))} ›</span>
+        <button type="button" class="wsh-cta is-primary" data-wsx-open="${esc(last.ref)}">${esc(t('wsh_continue_btn'))}</button>
+      </section>` : '';
+    const all = _wshAllProjects().sort((a, b) => b.ts - a.ts);
+    const spaceHtml = `
+      <section class="wsh-card wsh-projects">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_space'))}</h3></header>
+        ${all.length ? `<div class="wsh-proj-grid">${all.map(p => `
+          <div class="wsh-proj">
+            <div class="wsh-proj-info">
+              <span class="wsb-pill is-dynamic">${esc(p.typeLabel)}</span>
+              <p class="wsh-proj-name">${esc(p.name)}</p>
+              <span class="wsh-proj-meta">${esc(_intccDate(p.ts))}</span>
             </div>
-          </div>` : `
-          <div class="wsh-plan">
-            <p class="wsh-plan-name">${esc(t('wsh_plan_' + p.key))}</p>
-            <div class="wsh-plan-foot">
-              <span class="wsh-pill">${esc(t('wsh_plan_soon'))}</span>
-              <span class="wsh-plan-upd">${esc(t('wsh_plan_updated'))}: ${esc(t('wsh_none'))}</span>
+            <div class="wsh-proj-acts">
+              <button type="button" class="wsg-act" data-wsx-open="${esc(p.ref)}">${esc(t('wsh_proj_open'))}</button>
+              <button type="button" class="wsg-act" data-wsx-act="dup" data-wsx-ref="${esc(p.ref)}">${esc(t('wsg_act_dup'))}</button>
+              <button type="button" class="wsg-act is-danger" data-wsx-act="del" data-wsx-ref="${esc(p.ref)}">${esc(t('wsg_act_del'))}</button>
             </div>
-          </div>`).join('')}
-      </div>
-    </section>`;
-
-  // Workspaces snapshot — WS.4: 6 active templates. Each card opens/creates its
-  // workspace; "Abrir" if one already exists for that template, else "Crear".
-  const wsItems = ['investment', 'budget', 'property', 'business', 'networth', 'fire'];
-  const wsExisting = {}; _wshReadStore(_WSH_PROJECTS_KEY).forEach(p => { if (p && p.type) wsExisting[p.type] = true; });
-  const workspacesHtml = `
-    <section class="wsh-card wsh-workspaces">
-      <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsh_workspaces_title'))}</h3><span class="wsh-ws-cta">${esc(t('ws4_section_cta'))}</span></header>
-      <div class="wsh-ws-grid">
-        ${wsItems.map(k => `
-          <div class="wsh-ws is-active" role="button" tabindex="0" data-wsh-cta="workspace" data-ws4-type="${esc(k)}">
-            <span class="wsh-ws-mark" aria-hidden="true"></span>
-            <p class="wsh-ws-name">${esc(t('wsh_ws_' + k))}</p>
-            <span class="wsh-ws-go">${esc(wsExisting[k] ? t('ws4_open') : t('ws4_create'))} ›</span>
-          </div>`).join('')}
-      </div>
-    </section>`;
-
-  // WS.5A P3 — "Continuar donde lo dejaste": last-edited saved item (or nothing).
-  const last = _wshLastEdited();
-  const continueHtml = last ? `
-    <section class="wsh-card wsh-continue">
-      <div class="wsh-cont-info">
-        <span class="wsh-cont-eyebrow">${esc(t('wsh_continue_title'))}</span>
-        <p class="wsh-cont-name">${esc(last.name)}</p>
-        <span class="wsh-cont-meta">${esc(last.typeLabel)} · ${esc(_intccDate(last.ts))}</span>
-      </div>
-      <button type="button" class="wsh-cta is-primary" data-wsx-open="${esc(last.ref)}">${esc(t('wsh_continue_btn'))}</button>
-    </section>` : '';
-
-  // WS.5A P4 — "Mis proyectos": all saved goals/scenarios/workspaces.
-  const all = _wshAllProjects().sort((a, b) => b.ts - a.ts);
-  const projectsHtml = `
-    <section class="wsh-card wsh-projects">
-      <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsh_projects_title'))}</h3></header>
-      ${all.length ? `<div class="wsh-proj-grid">${all.map(p => `
-        <div class="wsh-proj">
-          <div class="wsh-proj-info">
-            <span class="wsb-pill is-dynamic">${esc(p.typeLabel)}</span>
-            <p class="wsh-proj-name">${esc(p.name)}</p>
-            <span class="wsh-proj-meta">${esc(_intccDate(p.ts))}</span>
-          </div>
-          <div class="wsh-proj-acts">
-            <button type="button" class="wsg-act" data-wsx-open="${esc(p.ref)}">${esc(t('wsh_proj_open'))}</button>
-            <button type="button" class="wsg-act" data-wsx-act="dup" data-wsx-ref="${esc(p.ref)}">${esc(t('wsg_act_dup'))}</button>
-            <button type="button" class="wsg-act is-danger" data-wsx-act="del" data-wsx-ref="${esc(p.ref)}">${esc(t('wsg_act_del'))}</button>
-          </div>
-        </div>`).join('')}</div>`
-      : `<p class="wsh-empty">${esc(t('wsh_projects_empty'))}</p><button type="button" class="wsh-cta is-primary" data-wsh-cta="goals">${esc(t('wsh_projects_cta'))}</button>`}
-    </section>`;
+          </div>`).join('')}</div>`
+        : `<div class="wsh-space-empty"><p class="wsh-empty">${esc(t('wsh_space_empty'))}</p><button type="button" class="wsh-cta is-primary" data-wstab="templates">${esc(t('wsh_space_cta'))}</button></div>`}
+      </section>`;
+    panel = continueHtml + spaceHtml;
+  } else if (tab === 'templates') {
+    const wsItems = ['investment', 'budget', 'property', 'business', 'networth', 'fire'];
+    const tplCards = wsItems.map(k => `
+      <div class="wsh-tpl" role="button" tabindex="0" data-wsh-cta="workspace" data-ws4-type="${esc(k)}">
+        <p class="wsh-tpl-name">${esc(t('wsh_ws_' + k))}</p>
+        <p class="wsh-tpl-desc">${esc(t('ws4_sub_' + k))}</p>
+        <span class="wsh-tpl-go">${esc(t('wstpl_use'))} ›</span>
+      </div>`).join('');
+    // Plans (goals / scenario / projection) — also creatable, kept reachable.
+    const plans = [
+      { cta: 'goals',    name: t('wsg_title'),           desc: t('wsg_subtitle') },
+      { cta: 'scenario', name: t('wsh_scenario_title'),  desc: t('wsb_subtitle') },
+      { cta: 'planning', name: t('wsp_title'),           desc: t('wsp_subtitle') },
+    ];
+    const planCards = plans.map(p => `
+      <div class="wsh-tpl" role="button" tabindex="0" data-wsh-cta="${esc(p.cta)}">
+        <p class="wsh-tpl-name">${esc(p.name)}</p>
+        <p class="wsh-tpl-desc">${esc(p.desc)}</p>
+        <span class="wsh-tpl-go">${esc(t('wstpl_use'))} ›</span>
+      </div>`).join('');
+    panel = `
+      <section class="wsh-card">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstpl_plans_title'))}</h3></header>
+        <div class="wsh-tpl-grid">${planCards}</div>
+      </section>
+      <section class="wsh-card">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsh_workspaces_title'))}</h3></header>
+        <div class="wsh-tpl-grid">${tplCards}</div>
+      </section>`;
+  } else {
+    // Tools — visual cards (placeholder state where not implemented).
+    const tools = [
+      { k: 'compound', icon: '<path d="M4 16l5-5 3 3 7-7"/><path d="M16 7h4v4"/>' },
+      { k: 'budget',   icon: '<path d="M4 7h16v12H4z"/><path d="M4 11h16"/><circle cx="16" cy="15" r="1.3"/>' },
+      { k: 'journal',  icon: '<path d="M6 4h11a1 1 0 0 1 1 1v15l-3-2-3 2-3-2-3 2V5a1 1 0 0 1 1-1z"/>' },
+    ];
+    panel = `
+      <section class="wsh-card">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_tools'))}</h3></header>
+        <div class="wsh-tool-grid">
+          ${tools.map(tl => `
+            <div class="wsh-tool">
+              <span class="wsh-tool-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${tl.icon}</svg></span>
+              <p class="wsh-tool-name">${esc(t('wstool_' + tl.k + '_n'))}</p>
+              <p class="wsh-tool-desc">${esc(t('wstool_' + tl.k + '_d'))}</p>
+              <span class="wsh-pill">${esc(t('wsh_soon'))}</span>
+            </div>`).join('')}
+        </div>
+      </section>`;
+  }
 
   return `
-    <div class="aurix-wsh" data-wsh-view="home">
+    <div class="aurix-wsh wsh-studio-root" data-wsh-view="home" data-wstab="${tab}">
       ${heroHtml}
-      ${continueHtml}
-      ${projectsHtml}
-      ${goalsHtml}
-      ${scenarioHtml}
-      ${planningHtml}
-      ${workspacesHtml}
+      ${tabsHtml}
+      <div class="wsh-tabpanel">${panel}</div>
     </div>`;
 }
 
@@ -11763,7 +11759,7 @@ function _ws4SetMode(mode) {
 
 function _ws4OnInput(el) {
   const p = _ws4Get(); if (!p) return;
-  p.inputs[el.getAttribute('data-ws4-input')] = Number(el.value);
+  p.inputs[el.getAttribute('data-ws4-input')] = _wsNum(el.value);
   _ws4Dirty = true;
   const root = document.querySelector('.wsh-ws4');
   const out  = root && root.querySelector('[data-ws4-out]');
@@ -11795,9 +11791,9 @@ function _ws4Delete() {
 }
 function _ws4Rename() {
   const p = _ws4Get(); if (!p) return;
-  const name = (typeof prompt === 'function') ? prompt(t('wsg_rename_prompt'), p.name) : null;
+  const name = (typeof prompt === 'function') ? prompt(t('wsg_rename_prompt'), _wsLabel('workspace', p)) : null;
   if (name == null) return;
-  p.name = String(name).trim() || p.name; _ws4Dirty = true;
+  p.customName = String(name).trim() || p.customName; _ws4Dirty = true;
   const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceDetail(); _wshReveal(c); }
 }
 function _ws4SaveBarHtml() {
@@ -11835,7 +11831,7 @@ function _renderWorkspaceDetail() {
     <label class="ws4-field">
       <span class="ws4-field-name">${esc(f.label)}</span>
       <span class="ws4-field-input">
-        <input class="ws4-num" type="number" inputmode="decimal" data-ws4-input="${esc(f.k)}" value="${esc(p.inputs[f.k])}" min="${f.min}" max="${f.max}" step="${f.step}">
+        <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-ws4-input="${esc(f.k)}" value="${esc(p.inputs[f.k])}">
         <span class="ws4-field-unit">${esc(f.unit)}</span>
       </span>
     </label>`).join('');
@@ -11850,7 +11846,7 @@ function _renderWorkspaceDetail() {
     <div class="aurix-wsh wsh-ws4 is-revealed" data-wsh-view="workspace" data-ws4-id="${esc(p.id)}">
       <section class="wsh-card wsb-header">
         <button type="button" class="wsb-back" data-wsh-nav="home">‹ ${esc(t('wsb_back'))}</button>
-        <h2 class="wsb-title">${esc(p.name)}</h2>
+        <h2 class="wsb-title">${esc(_wsLabel('workspace', p))}</h2>
         <p class="wsb-subtitle">${esc(tmpl.sub)}</p>
       </section>
 
@@ -11997,7 +11993,7 @@ function _wsgSetMode(id, mode) {
 function _wsgOnInput(el) {
   const id = el.getAttribute('data-wsg-id'); const k = el.getAttribute('data-wsg-input');
   const g = _wsgEnsureWorking(id); if (!g) return;
-  g[k] = Number(el.value); _wsgDirty[id] = true;
+  g[k] = _wsNum(el.value); _wsgDirty[id] = true;
   const card = el.closest('.wsg-card'); if (!card) return;
   const out = card.querySelector('[data-wsg-out]');
   if (out) out.innerHTML = _wsgCardOutHtml(g, calculateGoalProgress(g, _ws4Real().wealth));
@@ -12095,10 +12091,10 @@ function _renderGoals() {
         <div class="wsg-form">
           <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_type'))}</span><select class="wsg-select" data-wsg-form="type">${typeOpts}</select></label>
           <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_name'))}</span><input class="wsg-text" type="text" data-wsg-form="name" placeholder="${esc(t('wsg_name_ph'))}"></label>
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_target'))}</span><span class="ws4-field-input"><input class="ws4-num" type="number" data-wsg-form="target" value="100000" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="number" data-wsg-form="current" value="0" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="number" data-wsg-form="monthly" value="300" min="0" step="50"><span class="ws4-field-unit">€</span></span></label>
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_year'))}</span><input class="ws4-num" type="number" data-wsg-form="year" value="" min="${_wsgThisYear() + 1}" max="2100" step="1" placeholder="${_wsgThisYear() + 10}"></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_target'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="target" value="100000" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="current" value="0" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="monthly" value="300" min="0" step="50"><span class="ws4-field-unit">€</span></span></label>
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_year'))}</span><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-form="year" value="" min="${_wsgThisYear() + 1}" max="2100" step="1" placeholder="${_wsgThisYear() + 10}"></label>
         </div>
         <aside class="wsg-form-preview">
           <span class="wsg-pv-title">${esc(t('wsg_pv_title'))}</span>
@@ -12125,8 +12121,8 @@ function _renderGoals() {
         <div class="wsg-card-edit">
           ${isSync
             ? `<div class="wsg-sync-note">${esc(real.hasReal ? t('wsg_sync_on')(formatBase(real.wealth)) : t('ws4_sync_none'))}</div>`
-            : `<label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_r_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="number" data-wsg-input="current" data-wsg-id="${esc(g.id)}" value="${esc(g.current)}" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>`}
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="number" data-wsg-input="monthly" data-wsg-id="${esc(g.id)}" value="${esc(g.monthly)}" min="0" step="50"><span class="ws4-field-unit">€</span></span></label>
+            : `<label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_r_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="current" data-wsg-id="${esc(g.id)}" value="${esc(g.current)}" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>`}
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="monthly" data-wsg-id="${esc(g.id)}" value="${esc(g.monthly)}" min="0" step="50"><span class="ws4-field-unit">€</span></span></label>
         </div>
         <div class="wsg-out" data-wsg-out>${_wsgCardOutHtml(g, prog)}</div>
         <div class="wsg-card-foot">
