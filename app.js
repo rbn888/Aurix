@@ -11024,6 +11024,9 @@ let _ws4ActiveId = null;   // WS.4 — currently open workspace project id
 let _wsgPrefill = null;    // WS.5 — prefill the create-goal type when arriving from Home
 let _wsTab = 'space';      // WS.5B — Home internal tab: 'space' | 'templates' | 'tools'
 // WS.6 — Compound Growth tool working state.
+// WS.5C deploy gate: the tool code ships but stays DORMANT (card = "Próximamente",
+// view unreachable) until WS.6 is integrated + released. Flip to true to deploy WS.6.
+const AURIX_WS6_TOOL = false;
 let _wsToolActive  = 'compound';
 let _wsToolInputs  = null;   // { initial, monthly, ret, years }
 let _wsToolEditId  = null;   // saved project id when editing an existing one
@@ -11379,7 +11382,7 @@ function _renderWorkspaceHome(metrics) {
   } else {
     // Tools — visual cards (placeholder state where not implemented).
     const tools = [
-      { k: 'compound', active: true,  icon: '<path d="M4 16l5-5 3 3 7-7"/><path d="M16 7h4v4"/>' },
+      { k: 'compound', active: AURIX_WS6_TOOL, icon: '<path d="M4 16l5-5 3 3 7-7"/><path d="M16 7h4v4"/>' },
       { k: 'budget',   active: false, icon: '<path d="M4 7h16v12H4z"/><path d="M4 11h16"/><circle cx="16" cy="15" r="1.3"/>' },
       { k: 'journal',  active: false, icon: '<path d="M6 4h11a1 1 0 0 1 1 1v15l-3-2-3 2-3-2-3 2V5a1 1 0 0 1 1-1z"/>' },
     ];
@@ -12276,6 +12279,7 @@ function _wsToolDefaults() {
 }
 
 function _wsOpenTool(toolKey, projectId) {
+  if (!AURIX_WS6_TOOL) return;                      // WS.6 gated until release
   if (toolKey && toolKey !== 'compound') return;   // only Compound Growth is implemented
   _wsToolActive = 'compound';
   if (projectId) {
