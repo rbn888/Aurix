@@ -1695,6 +1695,46 @@ const T = {
     intcc_tl_more:   n => `+${n} ${n === 1 ? 'evento anterior' : 'eventos anteriores'}`,
     intcc_re_ctx:    n => n === 1 ? '1 inmueble registrado, como contexto patrimonial.' : `${n} inmuebles registrados, como contexto patrimonial.`,
     intcc_disclaimer: 'Aurix interpreta tu patrimonio con datos reales. No es asesoramiento de inversión.',
+    // WS.1 — Workspace Home (planning center)
+    wsh_eyebrow:        'Workspace',
+    wsh_hero_title:     'Diseña tu futuro financiero',
+    wsh_hero_sub:       'Planifica, simula y construye el patrimonio que deseas alcanzar.',
+    wsh_stat_wealth:    'Patrimonio actual',
+    wsh_stat_goals:     'Objetivos activos',
+    wsh_stat_scenarios: 'Escenarios creados',
+    wsh_stat_projects:  'Proyectos guardados',
+    wsh_goals_title:       'Objetivos',
+    wsh_goals_cta:         'Ver todos los objetivos',
+    wsh_goals_empty:       'Aún no has definido objetivos. Convierte una meta en un objetivo medible y Aurix calculará tu progreso, fecha estimada y confianza.',
+    wsh_goal_wealth:       'Patrimonio objetivo',
+    wsh_goal_fire:         'FIRE',
+    wsh_goal_house:        'Compra vivienda',
+    wsh_goal_define:       'Definir objetivo',
+    wsh_goal_progress:     'Progreso',
+    wsh_goal_eta:          'Fecha estimada',
+    wsh_goal_confidence:   'Confianza',
+    wsh_pending:           'Por definir',
+    wsh_scenario_title:    'Scenario Builder',
+    wsh_scenario_current:  'Escenario actual',
+    wsh_scenario_best:     'Mejor escenario guardado',
+    wsh_scenario_empty:    'Crea tu primer escenario para comparar decisiones antes de ejecutarlas.',
+    wsh_scenario_concl:    'Aurix comparará patrimonio futuro, riesgo, liquidez y tiempo objetivo, y resumirá qué decisión te conviene.',
+    wsh_scenario_cta:      'Crear escenario',
+    wsh_planning_title:    'Planning',
+    wsh_plan_retirement:   'Retirement Planner',
+    wsh_plan_fire:         'FIRE Planner',
+    wsh_plan_projection:   'Future Wealth Projection',
+    wsh_plan_soon:         'Próximamente',
+    wsh_plan_updated:      'Última actualización',
+    wsh_workspaces_title:  'Workspaces',
+    wsh_ws_investment:     'Investment Planner',
+    wsh_ws_budget:         'Wealth Budget',
+    wsh_ws_property:       'Property Analyzer',
+    wsh_ws_business:       'Business Cashflow',
+    wsh_ws_networth:       'Net Worth Workbook',
+    wsh_ws_fire:           'FIRE Workbook',
+    wsh_soon:              'Próximamente',
+    wsh_none:              '—',
     // Status pills
     statusOpen:        'Abierto',
     statusClosed:      'Cerrado',
@@ -3146,6 +3186,46 @@ const T = {
     intcc_tl_more:   n => `+${n} earlier ${n === 1 ? 'event' : 'events'}`,
     intcc_re_ctx:    n => n === 1 ? '1 property on record, as wealth context.' : `${n} properties on record, as wealth context.`,
     intcc_disclaimer: 'Aurix interprets your wealth with real data. It is not investment advice.',
+    // WS.1 — Workspace Home (planning center)
+    wsh_eyebrow:        'Workspace',
+    wsh_hero_title:     'Design your financial future',
+    wsh_hero_sub:       'Plan, simulate and build the wealth you want to reach.',
+    wsh_stat_wealth:    'Current wealth',
+    wsh_stat_goals:     'Active goals',
+    wsh_stat_scenarios: 'Scenarios created',
+    wsh_stat_projects:  'Saved projects',
+    wsh_goals_title:       'Goals',
+    wsh_goals_cta:         'View all goals',
+    wsh_goals_empty:       'You have no goals yet. Turn an aspiration into a measurable goal and Aurix will track your progress, estimated date and confidence.',
+    wsh_goal_wealth:       'Target wealth',
+    wsh_goal_fire:         'FIRE',
+    wsh_goal_house:        'Home purchase',
+    wsh_goal_define:       'Define goal',
+    wsh_goal_progress:     'Progress',
+    wsh_goal_eta:          'Estimated date',
+    wsh_goal_confidence:   'Confidence',
+    wsh_pending:           'Not set',
+    wsh_scenario_title:    'Scenario Builder',
+    wsh_scenario_current:  'Current scenario',
+    wsh_scenario_best:     'Best saved scenario',
+    wsh_scenario_empty:    'Create your first scenario to compare decisions before you make them.',
+    wsh_scenario_concl:    'Aurix will compare future wealth, risk, liquidity and time-to-goal, and sum up which decision suits you.',
+    wsh_scenario_cta:      'Create scenario',
+    wsh_planning_title:    'Planning',
+    wsh_plan_retirement:   'Retirement Planner',
+    wsh_plan_fire:         'FIRE Planner',
+    wsh_plan_projection:   'Future Wealth Projection',
+    wsh_plan_soon:         'Coming soon',
+    wsh_plan_updated:      'Last updated',
+    wsh_workspaces_title:  'Workspaces',
+    wsh_ws_investment:     'Investment Planner',
+    wsh_ws_budget:         'Wealth Budget',
+    wsh_ws_property:       'Property Analyzer',
+    wsh_ws_business:       'Business Cashflow',
+    wsh_ws_networth:       'Net Worth Workbook',
+    wsh_ws_fire:           'FIRE Workbook',
+    wsh_soon:              'Coming soon',
+    wsh_none:              '—',
     // Status pills
     statusOpen:        'Open',
     statusClosed:      'Closed',
@@ -10524,9 +10604,181 @@ function _bindWorkspaceMobileActions(container) {
   });
 }
 
+// WS.1 — new Workspace Home (planning center) becomes the main entry. When this
+// flag is on, every renderWorkspace() call path renders the Home; the legacy
+// Sheet + Templates code below stays fully intact and DORMANT (flip to false to
+// recover the legacy Workspace). Nothing legacy is deleted.
+const AURIX_WS_HOME = true;
+
+// WS.1 storage keys — projects/goals/scenarios live single-device for now (no
+// Supabase). They are EMPTY in WS.1 (engines arrive in WS.2+); the readers below
+// return real counts honestly (0 today) so the hero never fabricates numbers.
+const _WSH_GOALS_KEY     = 'aurix_ws_goals_v1';
+const _WSH_SCENARIOS_KEY = 'aurix_ws_scenarios_v1';
+const _WSH_PROJECTS_KEY  = 'aurix_ws_projects_v1';
+function _wshReadStore(key) {
+  try { const raw = localStorage.getItem(key); const v = raw ? JSON.parse(raw) : []; return Array.isArray(v) ? v : []; }
+  catch (_) { return []; }
+}
+
+// Live, honest metrics for the hero. Wealth is the SAME investable figure the
+// Dashboard/Intelligence use (read-only); counts come from the WS stores.
+function _wshMetrics() {
+  let wealth = '—';
+  try { if (typeof investableValueBase === 'function') wealth = formatBase(investableValueBase()); } catch (_) {}
+  return {
+    wealth,
+    goals:     _wshReadStore(_WSH_GOALS_KEY).length,
+    scenarios: _wshReadStore(_WSH_SCENARIOS_KEY).length,
+    projects:  _wshReadStore(_WSH_PROJECTS_KEY).length,
+  };
+}
+
+// Idempotent mount: build once + run the reveal; on later calls (price ticks,
+// refresh) just refresh the live numbers so the entrance animation never restarts.
+function renderWorkspaceHome(container) {
+  container = container || document.getElementById('aurixWorkspace');
+  if (!container) return;
+  const metrics = _wshMetrics();
+  const existing = container.querySelector('.aurix-wsh');
+  if (existing) { _wshRefreshMetrics(existing, metrics); return; }
+  container.innerHTML = _renderWorkspaceHome(metrics);
+  try {
+    const root = container.querySelector('.aurix-wsh');
+    if (root) requestAnimationFrame(() => root.classList.add('is-revealed'));
+  } catch (_) {}
+}
+
+function _wshRefreshMetrics(root, metrics) {
+  const set = (k, v) => { const el = root.querySelector('[data-wsh-metric="' + k + '"]'); if (el) el.textContent = v; };
+  set('wealth', metrics.wealth);
+  set('goals', String(metrics.goals));
+  set('scenarios', String(metrics.scenarios));
+  set('projects', String(metrics.projects));
+}
+
+function _renderWorkspaceHome(metrics) {
+  const esc = (typeof _intccEsc === 'function') ? _intccEsc : (s => String(s == null ? '' : s));
+  const orb = (typeof _intccOrbHtml === 'function') ? _intccOrbHtml() : '';
+
+  const stat = (key, label) => `
+    <div class="wsh-stat">
+      <span class="wsh-stat-val" data-wsh-metric="${key}">${esc(key === 'wealth' ? metrics.wealth : metrics[key])}</span>
+      <span class="wsh-stat-label">${esc(label)}</span>
+    </div>`;
+
+  const heroHtml = `
+    <section class="wsh-hero">
+      <div class="wsh-hero-main">
+        <span class="wsh-eyebrow">${esc(t('wsh_eyebrow'))}</span>
+        <h2 class="wsh-hero-title">${esc(t('wsh_hero_title'))}</h2>
+        <p class="wsh-hero-sub">${esc(t('wsh_hero_sub'))}</p>
+        <div class="wsh-stats">
+          ${stat('wealth', t('wsh_stat_wealth'))}
+          ${stat('goals', t('wsh_stat_goals'))}
+          ${stat('scenarios', t('wsh_stat_scenarios'))}
+          ${stat('projects', t('wsh_stat_projects'))}
+        </div>
+      </div>
+      <div class="wsh-hero-orb" aria-hidden="true">${orb}</div>
+    </section>`;
+
+  // Goals snapshot — example goal types as starting templates (no fabricated
+  // progress/dates; the Goals engine lands in a later WS.x).
+  const goalTypes = [
+    { key: 'wealth', icon: '<path d="M4 16l5-5 3 3 7-7"/><path d="M16 7h4v4"/>' },
+    { key: 'fire',   icon: '<path d="M12 3c2 3 4 4.5 4 8a4 4 0 0 1-8 0c0-1.6.7-2.8 1.5-3.8C10 9 11 7 12 3z"/>' },
+    { key: 'house',  icon: '<path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/>' },
+  ];
+  const goalsHtml = `
+    <section class="wsh-card wsh-goals">
+      <header class="wsh-head">
+        <h3 class="wsh-title">${esc(t('wsh_goals_title'))}</h3>
+        <button type="button" class="wsh-cta" data-wsh-cta="goals">${esc(t('wsh_goals_cta'))}</button>
+      </header>
+      <p class="wsh-empty">${esc(t('wsh_goals_empty'))}</p>
+      <div class="wsh-goals-grid">
+        ${goalTypes.map(g => `
+          <div class="wsh-goal">
+            <span class="wsh-goal-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${g.icon}</svg></span>
+            <p class="wsh-goal-name">${esc(t('wsh_goal_' + g.key))}</p>
+            <span class="wsh-goal-track" aria-hidden="true"><span class="wsh-goal-bar"></span></span>
+            <span class="wsh-goal-meta">${esc(t('wsh_goal_define'))}</span>
+          </div>`).join('')}
+      </div>
+    </section>`;
+
+  // Scenario Builder snapshot — the feature card. Preview of the compare view.
+  const scenarioHtml = `
+    <section class="wsh-card wsh-scenario is-feature">
+      <header class="wsh-head">
+        <h3 class="wsh-title">${esc(t('wsh_scenario_title'))}</h3>
+      </header>
+      <div class="wsh-sc-compare">
+        <div class="wsh-sc-col">
+          <span class="wsh-sc-label">${esc(t('wsh_scenario_current'))}</span>
+          <span class="wsh-sc-value">${esc(metrics.wealth)}</span>
+        </div>
+        <div class="wsh-sc-vs" aria-hidden="true">vs</div>
+        <div class="wsh-sc-col is-best">
+          <span class="wsh-sc-label">${esc(t('wsh_scenario_best'))}</span>
+          <span class="wsh-sc-value">${esc(t('wsh_pending'))}</span>
+        </div>
+      </div>
+      <p class="wsh-sc-concl">${esc(t('wsh_scenario_concl'))}</p>
+      <button type="button" class="wsh-cta is-primary" data-wsh-cta="scenario">${esc(t('wsh_scenario_cta'))}</button>
+    </section>`;
+
+  // Planning snapshot — premium placeholder cards for WS.3.
+  const planItems = [
+    { key: 'retirement' }, { key: 'fire' }, { key: 'projection' },
+  ];
+  const planningHtml = `
+    <section class="wsh-card wsh-planning">
+      <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsh_planning_title'))}</h3></header>
+      <div class="wsh-plan-grid">
+        ${planItems.map(p => `
+          <div class="wsh-plan">
+            <p class="wsh-plan-name">${esc(t('wsh_plan_' + p.key))}</p>
+            <div class="wsh-plan-foot">
+              <span class="wsh-pill">${esc(t('wsh_plan_soon'))}</span>
+              <span class="wsh-plan-upd">${esc(t('wsh_plan_updated'))}: ${esc(t('wsh_none'))}</span>
+            </div>
+          </div>`).join('')}
+      </div>
+    </section>`;
+
+  // Workspaces snapshot — up to 6 documents (visual only).
+  const wsItems = ['investment', 'budget', 'property', 'business', 'networth', 'fire'];
+  const workspacesHtml = `
+    <section class="wsh-card wsh-workspaces">
+      <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsh_workspaces_title'))}</h3></header>
+      <div class="wsh-ws-grid">
+        ${wsItems.map(k => `
+          <div class="wsh-ws">
+            <span class="wsh-ws-mark" aria-hidden="true"></span>
+            <p class="wsh-ws-name">${esc(t('wsh_ws_' + k))}</p>
+            <span class="wsh-pill">${esc(t('wsh_soon'))}</span>
+          </div>`).join('')}
+      </div>
+    </section>`;
+
+  return `
+    <div class="aurix-wsh">
+      ${heroHtml}
+      ${goalsHtml}
+      ${scenarioHtml}
+      ${planningHtml}
+      ${workspacesHtml}
+    </div>`;
+}
+
 function renderWorkspace() {
   const container = document.getElementById('aurixWorkspace');
   if (!container) return;
+
+  // WS.1 — route to the new planning Home; legacy path below is preserved.
+  if (AURIX_WS_HOME) { renderWorkspaceHome(container); return; }
 
   initializeWorkspaceRuntime();
   recalculateWorkspaceSheet(WORKSPACE_RUNTIME.activeSheetId);
