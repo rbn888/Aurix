@@ -19510,11 +19510,15 @@ body.gs-open { overflow: hidden; }
 
 /* Mobile — vertical cards, snapshot grids collapse gracefully. */
 @media (max-width: 720px) {
-  .wsh-hero { flex-direction: column; align-items: flex-start; gap: 18px; padding: 18px 18px 20px; }
+  .wsh-hero { flex-direction: column; align-items: stretch; gap: 18px; padding: 18px 18px 20px; }
+  .wsh-hero-main { width: 100%; }
   .wsh-hero-orb { align-self: center; order: -1; }
   .wsh-hero-orb .intcc-orb { width: 84px; height: 84px; }
   .wsh-hero-title { font-size: 21px; }
-  .wsh-stats { gap: 16px 22px; }
+  .wsh-hero-sub { max-width: none; }
+  .wsh-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+  /* header wraps so a long CTA never overflows the card on narrow screens */
+  .wsh-head { flex-wrap: wrap; }
   .wsh-goals-grid { grid-template-columns: 1fr; }
   .wsh-plan-grid { grid-template-columns: 1fr; }
   .wsh-ws-grid { grid-template-columns: 1fr 1fr; }
