@@ -18934,6 +18934,10 @@ body.gs-open { overflow: hidden; }
 .intcc-hero .intcc-score-svg  { width: 116px; height: 116px; }
 .intcc-hero-score .intcc-health-badge { margin: 2px 0 0; }
 .intcc-hero-health-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; color: rgba(159,194,255,0.95); text-transform: uppercase; }
+/* INT.2ZC — desktop/tablet hero: the Inteligencia module groups body + orb as one
+   block (sibling to the Salud module). Hidden hero (≤640) is unaffected; mobile
+   uses the dedicated .intcc-m-* cards. */
+.intcc-hero-intel { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 20px; }
 .intcc-hero-body { flex: 1 1 auto; min-width: 0; }
 .intcc-hero .intcc-score-val { font-size: 33px; }
 .intcc-hero .intcc-score-suffix { margin-top: 2px; }
@@ -19225,20 +19229,32 @@ body.gs-open { overflow: hidden; }
   .intcc-watch     { grid-column: 1 / 7;  grid-row: 3; }
   .intcc-timeline  { grid-column: 7 / 13; grid-row: 3; }
   .intcc-disclaimer { grid-column: 1 / 13; grid-row: 4; }
+  .intcc-hero { gap: 20px; }
   .intcc-hero-title { font-size: 27px; margin-bottom: 9px; }
-  .intcc-hero-orb-wrap { margin-right: 28px; }   /* INT.2V/2X — breathing room */
-  /* INT.2X Bloque 1/2 — central Inteligencia zone as a premium fintech-style
-     soft card: airy padding, contained, doesn't grow the hero. Salud stays left,
-     orb right (grouped with Inteligencia). */
-  .intcc-hero-body {
+  /* INT.2ZC — Salud (left) and Inteligencia (right) read as two sibling modules
+     inside ONE hero. The Inteligencia module is the premium soft sub-card that
+     WRAPS title + headline + text + chips + orb, so the orb no longer floats
+     outside it. Premium separation = gap + the card's border + a tenuous vertical
+     glow bleeding into the gap (no thick table line). */
+  .intcc-hero-intel {
     align-self: stretch;
-    display: flex; flex-direction: column; justify-content: center;
-    margin: 0 8px; padding: 16px 26px;
+    display: flex; align-items: center; gap: 22px;
+    padding: 16px 24px;
     background: linear-gradient(165deg, rgba(120,160,255,0.06), rgba(255,255,255,0.012));
     border: 1px solid rgba(120,160,255,0.13);
     border-radius: 16px;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 26px -16px rgba(77,141,255,0.6);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.05),
+      0 8px 26px -16px rgba(77,141,255,0.6),
+      -12px 0 26px -20px rgba(77,141,255,0.55);
   }
+  .intcc-hero-body {
+    flex: 1 1 auto; min-width: 0;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  /* Orb lives inside the Inteligencia card, vertically centred with the text; the
+     card's right padding keeps it off the hero edge. */
+  .intcc-hero-orb-wrap { flex: 0 0 auto; align-self: center; margin: 0; }
   .intcc-hero-body .intcc-eyebrow {
     font-size: 11px; letter-spacing: 0.16em; color: rgba(159,194,255,0.95);
     margin-bottom: 11px; font-weight: 700;

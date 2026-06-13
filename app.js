@@ -21687,14 +21687,16 @@ function _renderIntelligenceCommandCenter() {
         </div>
         <span class="intcc-health-badge is-tone-${esc(score.tone)}">${esc(score.label)}</span>
       </div>
-      <div class="intcc-hero-body">
-        <span class="intcc-eyebrow">${esc(t('intcc_eyebrow'))}</span>
-        <h2 class="intcc-hero-title">${esc(reading.title)}</h2>
-        <p class="intcc-hero-sub">${esc(reading.sub)}</p>
-        ${chips.length ? `<div class="intcc-chips">${chips.map(c => `<span class="intcc-chip is-${esc(c.tone)}">${esc(c.label)}</span>`).join('')}</div>` : ''}
-      </div>
-      <div class="intcc-hero-orb-wrap">
-        ${_intccOrbHtml()}
+      <div class="intcc-hero-intel">
+        <div class="intcc-hero-body">
+          <span class="intcc-eyebrow">${esc(t('intcc_eyebrow'))}</span>
+          <h2 class="intcc-hero-title">${esc(reading.title)}</h2>
+          <p class="intcc-hero-sub">${esc(reading.sub)}</p>
+          ${chips.length ? `<div class="intcc-chips">${chips.map(c => `<span class="intcc-chip is-${esc(c.tone)}">${esc(c.label)}</span>`).join('')}</div>` : ''}
+        </div>
+        <div class="intcc-hero-orb-wrap">
+          ${_intccOrbHtml()}
+        </div>
       </div>
     </section>`;
 
