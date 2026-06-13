@@ -19863,6 +19863,42 @@ body.gs-open { overflow: hidden; }
   .wsg-actions { justify-content: flex-end; }
 }
 
+/* ── WS.6 — Compound Growth tool (wstool-* namespace) ── */
+.wsh-tool.is-active { cursor: pointer; }
+.wsh-tool.is-active:hover { border-color: rgba(77,141,255,0.42); transform: translateY(-2px); background: rgba(74,130,240,0.08); }
+.wsh-tool-go { font-size: 12px; font-weight: 700; color: #aecbff; }
+.wstool-fields { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.wstool-out { display: flex; flex-direction: column; gap: 18px; }
+.wstool-result { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; align-items: stretch; }
+.wstool-res-main {
+  display: flex; flex-direction: column; gap: 4px; justify-content: center; padding: 18px 20px; border-radius: 14px;
+  border: 1px solid rgba(77,141,255,0.30);
+  background: radial-gradient(130% 150% at 80% 0%, rgba(92,156,255,0.20), transparent 60%), linear-gradient(165deg, rgba(34,52,92,0.58), rgba(14,20,38,0.62));
+}
+.wstool-res-label { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); font-weight: 600; }
+.wstool-res-final { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; color: var(--text-bright); font-variant-numeric: tabular-nums; }
+.wstool-res-orient { font-size: 11px; color: rgba(159,194,255,0.7); font-weight: 600; }
+.wstool-res-split { display: flex; flex-direction: column; gap: 10px; }
+.wstool-res-cell { display: flex; flex-direction: column; gap: 3px; padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(120,160,255,0.13); background: rgba(255,255,255,0.025); }
+.wstool-res-v { font-size: 20px; font-weight: 800; color: var(--text-bright); font-variant-numeric: tabular-nums; }
+.wstool-res-cell.is-gain .wstool-res-v { color: #8fe6b6; }
+.wstool-res-k { font-size: 11.5px; color: var(--text-muted); }
+.wstool-chart { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.wstool-chart-svg { width: 100%; max-width: 480px; height: auto; }
+.wstool-area { fill: rgba(74,130,240,0.14); }
+.wstool-line { fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.wstool-line.is-total { stroke: #5c9cff; filter: drop-shadow(0 0 5px rgba(74,130,240,0.5)); }
+.wstool-line.is-contrib { stroke: rgba(150,180,240,0.6); stroke-width: 1.8; stroke-dasharray: 4 3; }
+.wstool-ms { display: flex; flex-direction: column; gap: 8px; }
+.wstool-ms-title { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(159,194,255,0.9); }
+.wstool-ms-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.wstool-ms-list li { position: relative; padding-left: 18px; font-size: 13px; line-height: 1.45; color: var(--text-bright); }
+.wstool-ms-list li::before { content: ''; position: absolute; left: 0; top: 7px; width: 7px; height: 7px; border-radius: 50%; background: #5fd6a0; box-shadow: 0 0 8px rgba(63,191,127,0.5); }
+@media (max-width: 720px) {
+  .wstool-fields { grid-template-columns: 1fr 1fr; }
+  .wstool-result { grid-template-columns: 1fr; }
+}
+
 /* ── WS.5B — studio layout: compact hero, internal tabs, templates, tools ── */
 .wsh-hero.is-studio { padding: 14px 22px; gap: 22px; }
 .wsh-hero.is-studio .wsh-hero-main { display: flex; flex-direction: column; justify-content: center; }

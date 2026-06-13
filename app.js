@@ -1902,6 +1902,24 @@ const T = {
     wstool_budget_d:   'Organiza ingresos y gastos mensuales.',
     wstool_journal_n:  'Diario de operaciones',
     wstool_journal_d:  'Registra y revisa tus operaciones.',
+    // WS.6 — Compound Growth tool
+    wstool_back:          'Volver a Herramientas',
+    wstool_in_initial:    'Capital inicial',
+    wstool_in_monthly:    'Aportación mensual',
+    wstool_in_return:     'Rentabilidad anual',
+    wstool_in_years:      'Tiempo',
+    wstool_unit_years:    'años',
+    wstool_res_final:     'Capital final estimado',
+    wstool_res_contrib:   'Capital aportado',
+    wstool_res_interest:  'Crecimiento generado',
+    wstool_orient:        'Proyección orientativa',
+    wstool_chart_title:   'Evolución del capital',
+    wstool_legend_total:  'Capital total',
+    wstool_legend_contrib:'Aportado',
+    wstool_ms_title:      'Hitos',
+    wstool_ms_cross:      (amt, y) => `Superas ${amt} en el año ${y}`,
+    wstool_ms_crossover:  y => `El crecimiento generado supera tus aportaciones en el año ${y}`,
+    wstool_save:          'Guardar proyecto',
     // Status pills
     statusOpen:        'Abierto',
     statusClosed:      'Cerrado',
@@ -3560,6 +3578,24 @@ const T = {
     wstool_budget_d:   'Organize monthly income and expenses.',
     wstool_journal_n:  'Trade Journal',
     wstool_journal_d:  'Log and review your trades.',
+    // WS.6 — Compound Growth tool
+    wstool_back:          'Back to Tools',
+    wstool_in_initial:    'Initial capital',
+    wstool_in_monthly:    'Monthly contribution',
+    wstool_in_return:     'Annual return',
+    wstool_in_years:      'Time',
+    wstool_unit_years:    'years',
+    wstool_res_final:     'Estimated final capital',
+    wstool_res_contrib:   'Capital contributed',
+    wstool_res_interest:  'Growth generated',
+    wstool_orient:        'Indicative projection',
+    wstool_chart_title:   'Capital over time',
+    wstool_legend_total:  'Total capital',
+    wstool_legend_contrib:'Contributed',
+    wstool_ms_title:      'Milestones',
+    wstool_ms_cross:      (amt, y) => `You pass ${amt} in year ${y}`,
+    wstool_ms_crossover:  y => `Growth generated exceeds your contributions in year ${y}`,
+    wstool_save:          'Save project',
     // Status pills
     statusOpen:        'Open',
     statusClosed:      'Closed',
@@ -10977,6 +11013,11 @@ let _wshWired   = false;
 let _ws4ActiveId = null;   // WS.4 — currently open workspace project id
 let _wsgPrefill = null;    // WS.5 — prefill the create-goal type when arriving from Home
 let _wsTab = 'space';      // WS.5B — Home internal tab: 'space' | 'templates' | 'tools'
+// WS.6 — Compound Growth tool working state.
+let _wsToolActive  = 'compound';
+let _wsToolInputs  = null;   // { initial, monthly, ret, years }
+let _wsToolEditId  = null;   // saved project id when editing an existing one
+let _wsToolDirty   = false;
 // WS.5A P5 — real save model (editar ≠ guardar). Working copies hold unsaved
 // edits; nothing persists until the user confirms "Guardar".
 let _wsgWorking = {};      // goalId -> working goal (unsaved edits)
@@ -11021,6 +11062,12 @@ function renderWorkspaceHome(container) {
     _wshReveal(container);
     return;
   }
+  if (_wshView === 'tool') {
+    if (shown === 'tool') return;
+    container.innerHTML = _renderCompoundTool();
+    _wshReveal(container);
+    return;
+  }
   // Home
   const metrics = _wshMetrics();
   if (shown === 'home') { _wshRefreshMetrics(cur, metrics); return; }
@@ -11034,7 +11081,7 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act]')
+      ? e.target.closest('[data-wstab],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -11055,7 +11102,10 @@ function _wshWireOnce() {
     if (cta === 'planning' || nav === 'planning') { _wshView = 'planning'; renderWorkspaceHome(); return; }
     if (cta === 'goals' || nav === 'goals') { const ty = t.getAttribute('data-wsg-type'); if (ty) _wsgPrefill = ty; _wshView = 'goals'; renderWorkspaceHome(); return; }
     if (cta === 'workspace') { const type = t.getAttribute('data-ws4-type'); if (type) { _ws4OpenOrCreate(type); return; } }
+    if (cta === 'tool') { _wsOpenTool(t.getAttribute('data-wstool') || 'compound'); return; }
+    if (nav === 'tools') { _wshView = 'home'; _wsTab = 'tools'; const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } return; }
     if (nav === 'home') { _wshView = 'home'; _ws4ActiveId = null; renderWorkspaceHome(); return; }
+    if (t.hasAttribute('data-wstool-save')) { _wsToolSave(); return; }
     const ws4mode = t.getAttribute('data-ws4-mode');
     if (ws4mode) { _ws4SetMode(ws4mode); return; }
     const wsgMode = t.getAttribute('data-wsg-mode');
@@ -11072,6 +11122,7 @@ function _wshWireOnce() {
     if (el.getAttribute('data-ws4-input')) { _ws4OnInput(el); return; }
     if (el.getAttribute('data-wsg-input')) { _wsgOnInput(el); return; }
     if (el.getAttribute('data-wsg-form')) { _wsgFormPreview(); return; }
+    if (el.getAttribute('data-wstool-input')) { _wsToolOnInput(el); return; }
   });
 }
 
@@ -11151,9 +11202,10 @@ function _wsNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(/[^
 // WS.5B P6 — always-translated display label. Workspace names defaulted to the
 // template name (English before the ES fix), so we derive from the type via i18n
 // unless the user set a custom name. Goals/scenarios use their user-entered name.
+function _wsTypeLabel(type) { return type === 'compound_growth' ? t('wstool_compound_n') : t('wsh_ws_' + type); }
 function _wsLabel(kind, item) {
   if (!item) return '';
-  if (kind === 'workspace') return item.customName || t('wsh_ws_' + item.type);
+  if (kind === 'workspace') return item.customName || _wsTypeLabel(item.type);
   if (kind === 'goal') return item.name || t('wsg_type_' + (item.type || 'free'));
   if (kind === 'scenario') return item.name || t('wsh_scenario_title');
   return item.name || '';
@@ -11163,7 +11215,7 @@ function _wsLabel(kind, item) {
 function _wshAllProjects() {
   const out = [];
   try { _wshReadStore(_WSH_GOALS_KEY).forEach(g => { if (g) out.push({ kind: 'goal', id: g.id, name: _wsLabel('goal', g), typeLabel: t('wsg_type_' + (g.type || 'free')), ts: g.updatedAt || g.createdAt || 0, ref: 'goal:' + g.id }); }); } catch (_) {}
-  try { _wshReadStore(_WSH_PROJECTS_KEY).forEach(p => { if (p) out.push({ kind: 'workspace', id: p.id, name: _wsLabel('workspace', p), typeLabel: t('wsh_ws_' + p.type), ts: p.updatedAt || p.createdAt || 0, ref: 'workspace:' + p.id }); }); } catch (_) {}
+  try { _wshReadStore(_WSH_PROJECTS_KEY).forEach(p => { if (p) out.push({ kind: 'workspace', id: p.id, name: _wsLabel('workspace', p), typeLabel: _wsTypeLabel(p.type), ts: p.updatedAt || p.createdAt || 0, ref: 'workspace:' + p.id }); }); } catch (_) {}
   try { _wshReadStore(_WSH_SCENARIOS_KEY).forEach(s => { if (s) { const id = s.scenarioId || s.id; out.push({ kind: 'scenario', id, name: _wsLabel('scenario', s), typeLabel: t('wsh_scenario_title'), ts: s.createdAt || 0, ref: 'scenario:' + id }); } }); } catch (_) {}
   return out;
 }
@@ -11173,7 +11225,7 @@ function _wsxOpen(ref) {
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
   if (kind === 'goal') { _wshView = 'goals'; renderWorkspaceHome(); }
   else if (kind === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); }
-  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } }
+  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
 }
 function _wsxAct(act, ref) {
   if (!ref) return;
@@ -11281,20 +11333,20 @@ function _renderWorkspaceHome(metrics) {
   } else {
     // Tools — visual cards (placeholder state where not implemented).
     const tools = [
-      { k: 'compound', icon: '<path d="M4 16l5-5 3 3 7-7"/><path d="M16 7h4v4"/>' },
-      { k: 'budget',   icon: '<path d="M4 7h16v12H4z"/><path d="M4 11h16"/><circle cx="16" cy="15" r="1.3"/>' },
-      { k: 'journal',  icon: '<path d="M6 4h11a1 1 0 0 1 1 1v15l-3-2-3 2-3-2-3 2V5a1 1 0 0 1 1-1z"/>' },
+      { k: 'compound', active: true,  icon: '<path d="M4 16l5-5 3 3 7-7"/><path d="M16 7h4v4"/>' },
+      { k: 'budget',   active: false, icon: '<path d="M4 7h16v12H4z"/><path d="M4 11h16"/><circle cx="16" cy="15" r="1.3"/>' },
+      { k: 'journal',  active: false, icon: '<path d="M6 4h11a1 1 0 0 1 1 1v15l-3-2-3 2-3-2-3 2V5a1 1 0 0 1 1-1z"/>' },
     ];
     panel = `
       <section class="wsh-card">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_tools'))}</h3></header>
         <div class="wsh-tool-grid">
           ${tools.map(tl => `
-            <div class="wsh-tool">
+            <div class="wsh-tool${tl.active ? ' is-active' : ''}"${tl.active ? ' role="button" tabindex="0" data-wsh-cta="tool" data-wstool="' + esc(tl.k) + '"' : ''}>
               <span class="wsh-tool-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${tl.icon}</svg></span>
               <p class="wsh-tool-name">${esc(t('wstool_' + tl.k + '_n'))}</p>
               <p class="wsh-tool-desc">${esc(t('wstool_' + tl.k + '_d'))}</p>
-              <span class="wsh-pill">${esc(t('wsh_soon'))}</span>
+              <span class="${tl.active ? 'wsh-tool-go' : 'wsh-pill'}">${esc(tl.active ? t('wstpl_use') + ' ›' : t('wsh_soon'))}</span>
             </div>`).join('')}
         </div>
       </section>`;
@@ -12147,6 +12199,175 @@ function _renderGoals() {
       <section class="wsh-card wsg-list-card">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsg_list_title'))}</h3></header>
         <div class="wsg-grid">${listInner}</div>
+      </section>
+      <p class="wsb-disclaimer">${esc(t('wsb_disclaimer'))}</p>
+    </div>`;
+}
+
+// ── WS.6 — Compound Growth tool (Workspace > Herramientas) ───────────────────
+// Deterministic: initial compounded monthly + monthly contributions (ordinary
+// annuity). No APIs, no AI, no wealthEngine.
+function calculateCompoundGrowth(initial, monthly, annualReturn, years) {
+  const init = Math.max(0, Number(initial) || 0);
+  const m    = Math.max(0, Number(monthly) || 0);
+  const yrs  = Math.max(0, Math.round(Number(years) || 0));
+  const r    = (Number(annualReturn) || 0) / 12;
+  const fv = (nn) => init * Math.pow(1 + r, nn) + (r > 0 ? m * ((Math.pow(1 + r, nn) - 1) / r) : m * nn);
+  const n = yrs * 12;
+  const final = fv(n);
+  const contributed = init + m * n;
+  const interest = final - contributed;
+  const series = [];
+  for (let y = 0; y <= yrs; y++) series.push({ year: y, total: fv(y * 12), contributed: init + m * y * 12 });
+  return { final, contributed, interest, series, multiple: contributed > 0 ? final / contributed : 1, gainPct: contributed > 0 ? interest / contributed * 100 : 0 };
+}
+
+function _wsToolDefaults() {
+  let initial = 1000;
+  try { if (typeof investableValueBase === 'function') { const w = investableValueBase(); if (w > 0) initial = Math.round(w); } } catch (_) {}
+  return { initial, monthly: 300, ret: 6, years: 20 };
+}
+
+function _wsOpenTool(toolKey, projectId) {
+  if (toolKey && toolKey !== 'compound') return;   // only Compound Growth is implemented
+  _wsToolActive = 'compound';
+  if (projectId) {
+    const p = _ws4Projects().find(x => x && x.id === projectId);
+    if (p && p.inputs) { _wsToolInputs = Object.assign(_wsToolDefaults(), p.inputs); _wsToolEditId = projectId; _wsToolDirty = false; }
+    else { _wsToolInputs = _wsToolDefaults(); _wsToolEditId = null; _wsToolDirty = false; }
+  } else { _wsToolInputs = _wsToolDefaults(); _wsToolEditId = null; _wsToolDirty = false; }
+  _wshView = 'tool'; renderWorkspaceHome();
+}
+
+function _wsToolOnInput(el) {
+  if (!_wsToolInputs) return;
+  _wsToolInputs[el.getAttribute('data-wstool-input')] = _wsNum(el.value);
+  _wsToolDirty = true;
+  const root = document.querySelector('.wsh-tool-view');
+  const out = root && root.querySelector('[data-wstool-out]');
+  if (out) out.innerHTML = _wsToolOutHtml(_wsToolInputs);
+  const bar = root && root.querySelector('[data-wstool-savebar]');
+  if (bar) bar.innerHTML = _wsToolSaveBarHtml();
+}
+
+function _wsToolSave() {
+  if (!_wsToolInputs) return;
+  const res = calculateCompoundGrowth(_wsToolInputs.initial, _wsToolInputs.monthly, _wsToolInputs.ret / 100, _wsToolInputs.years);
+  const now = Date.now();
+  const list = _ws4Projects();
+  const existing = _wsToolEditId ? list.find(p => p && p.id === _wsToolEditId) : null;
+  const proj = {
+    id: existing ? existing.id : ('ws4_' + now),
+    type: 'compound_growth',
+    customName: existing ? existing.customName : undefined,
+    inputs: Object.assign({}, _wsToolInputs),
+    results: { final: Math.round(res.final), contributed: Math.round(res.contributed), interest: Math.round(res.interest) },
+    createdAt: existing ? (existing.createdAt || now) : now,
+    updatedAt: now,
+  };
+  _ws4Persist(proj);
+  _wsToolEditId = proj.id; _wsToolDirty = false;
+  const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderCompoundTool(); _wshReveal(c); }
+}
+
+function _wsToolSaveBarHtml() {
+  const esc = _intccEsc;
+  const state = _wsToolEditId ? (_wsToolDirty ? 'dirty' : 'saved') : 'unsaved';
+  const lbl = { unsaved: t('wsg_save_unsaved'), dirty: t('wsg_save_pending'), saved: t('wsg_save_done') }[state];
+  const canSave = !_wsToolEditId || _wsToolDirty;
+  return `
+    <span class="wsg-savestate is-${state}">${esc(lbl)}</span>
+    <button type="button" class="wsh-cta is-primary wsg-savebtn" data-wstool-save${canSave ? '' : ' disabled'}>${esc(t('wstool_save'))}</button>`;
+}
+
+function _wsToolMilestones(res) {
+  const out = [];
+  const TH = [50000, 100000, 250000, 500000, 1000000];
+  for (const thr of TH) { const pt = res.series.find(s => s.total >= thr); if (pt && pt.year > 0) out.push(t('wstool_ms_cross')(formatBase(thr), pt.year)); }
+  const cross = res.series.find(s => s.contributed > 0 && (s.total - s.contributed) > s.contributed);
+  if (cross && cross.year > 0) out.push(t('wstool_ms_crossover')(cross.year));
+  return out.slice(0, 5);
+}
+
+function _wsToolChartHtml(res, years) {
+  const esc = _intccEsc;
+  const W = 360, H = 170, pad = 24;
+  const maxVal = Math.max.apply(null, res.series.map(s => s.total).concat([1]));
+  const yrs = Math.max(1, years);
+  const xF = y => pad + (y / yrs) * (W - 2 * pad);
+  const yF = v => (H - pad) - (v / maxVal) * (H - 2 * pad);
+  const totalPts = res.series.map(s => xF(s.year).toFixed(1) + ',' + yF(s.total).toFixed(1)).join(' ');
+  const contribPts = res.series.map(s => xF(s.year).toFixed(1) + ',' + yF(s.contributed).toFixed(1)).join(' ');
+  return `
+    <svg class="wstool-chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('wstool_chart_title'))}">
+      <line class="wsp-axis" x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}"/>
+      <polygon class="wstool-area" points="${pad},${H - pad} ${totalPts} ${W - pad},${H - pad}"/>
+      <polyline class="wstool-line is-total" points="${totalPts}"/>
+      <polyline class="wstool-line is-contrib" points="${contribPts}"/>
+      <text class="wsp-axis-x" x="${pad}" y="${H - 7}" text-anchor="start">${esc(t('wsp_axis_now'))}</text>
+      <text class="wsp-axis-x" x="${W - pad}" y="${H - 7}" text-anchor="end">${esc(t('wsp_axis_year')(years))}</text>
+    </svg>`;
+}
+
+function _wsToolOutHtml(inp) {
+  const esc = _intccEsc;
+  const res = calculateCompoundGrowth(inp.initial, inp.monthly, inp.ret / 100, inp.years);
+  const ms = _wsToolMilestones(res);
+  return `
+    <div class="wstool-result">
+      <div class="wstool-res-main">
+        <span class="wstool-res-label">${esc(t('wstool_res_final'))}</span>
+        <span class="wstool-res-final">${esc(formatBase(res.final))}</span>
+        <span class="wstool-res-orient">${esc(t('wstool_orient'))}</span>
+      </div>
+      <div class="wstool-res-split">
+        <div class="wstool-res-cell"><span class="wstool-res-v">${esc(formatBase(res.contributed))}</span><span class="wstool-res-k">${esc(t('wstool_res_contrib'))}</span></div>
+        <div class="wstool-res-cell is-gain"><span class="wstool-res-v">+${esc(formatBase(res.interest))}</span><span class="wstool-res-k">${esc(t('wstool_res_interest'))}</span></div>
+      </div>
+    </div>
+    <div class="wstool-chart">
+      ${_wsToolChartHtml(res, Math.max(1, Math.round(inp.years || 0)))}
+      <div class="wsp-legend">
+        <span class="wsp-leg is-base">${esc(t('wstool_legend_total'))}</span>
+        <span class="wsp-leg is-cons">${esc(t('wstool_legend_contrib'))}</span>
+      </div>
+    </div>
+    ${ms.length ? `<div class="wstool-ms"><span class="wstool-ms-title">${esc(t('wstool_ms_title'))}</span><ul class="wstool-ms-list">${ms.map(m => `<li>${esc(m)}</li>`).join('')}</ul></div>` : ''}`;
+}
+
+function _renderCompoundTool() {
+  const esc = _intccEsc;
+  if (!_wsToolInputs) _wsToolInputs = _wsToolDefaults();
+  const inp = _wsToolInputs;
+  const field = (k, label, unit) => `
+    <label class="ws4-field">
+      <span class="ws4-field-name">${esc(label)}</span>
+      <span class="ws4-field-input">
+        <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(inp[k])}">
+        <span class="ws4-field-unit">${esc(unit)}</span>
+      </span>
+    </label>`;
+  return `
+    <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
+      <section class="wsh-card wsb-header">
+        <button type="button" class="wsb-back" data-wsh-nav="tools">‹ ${esc(t('wstool_back'))}</button>
+        <h2 class="wsb-title">${esc(t('wstool_compound_n'))}</h2>
+        <p class="wsb-subtitle">${esc(t('wstool_compound_d'))}</p>
+      </section>
+      <section class="wsh-card wstool-inputs-card">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('ws4_inputs_title'))}</h3></header>
+        <div class="wstool-fields">
+          ${field('initial', t('wstool_in_initial'), '€')}
+          ${field('monthly', t('wstool_in_monthly'), '€')}
+          ${field('ret',     t('wstool_in_return'),  '%')}
+          ${field('years',   t('wstool_in_years'),   t('wstool_unit_years'))}
+        </div>
+      </section>
+      <section class="wsh-card wstool-out-card">
+        <div class="wstool-out" data-wstool-out>${_wsToolOutHtml(inp)}</div>
+      </section>
+      <section class="wsh-card wsg-foot-card">
+        <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
       </section>
       <p class="wsb-disclaimer">${esc(t('wsb_disclaimer'))}</p>
     </div>`;
