@@ -1459,12 +1459,12 @@ const T = {
     // Navigation labels (desktop header tabs)
     navDashboard:      'Panel',
     navMarket:         'Mercado',
-    navIntelligence:   'Intelligence',
-    navWorkspace:      'Workspace',
+    navIntelligence:   'Inteligencia',
+    navWorkspace:      'Espacio',
     // Tooltips (bottom nav)
     tipSearch:         'Buscar',
-    tipIntelligence:   'Intelligence',
-    tipWorkspace:      'Workspace',
+    tipIntelligence:   'Inteligencia',
+    tipWorkspace:      'Espacio',
     // ARIA labels
     ariaBackHome:      'Volver al inicio',
     ariaPrimaryNav:    'Navegación principal',
@@ -1920,6 +1920,11 @@ const T = {
     wstool_ms_cross:      (amt, y) => `Superas ${amt} en el año ${y}`,
     wstool_ms_crossover:  y => `El crecimiento generado supera tus aportaciones en el año ${y}`,
     wstool_save:          'Guardar proyecto',
+    // WS.5C — delete confirm modal
+    wsmodal_del_title: 'Eliminar elemento',
+    wsmodal_del_text:  'Esta acción no se puede deshacer.',
+    wsmodal_cancel:    'Cancelar',
+    wsmodal_delete:    'Eliminar',
     // Status pills
     statusOpen:        'Abierto',
     statusClosed:      'Cerrado',
@@ -3596,6 +3601,11 @@ const T = {
     wstool_ms_cross:      (amt, y) => `You pass ${amt} in year ${y}`,
     wstool_ms_crossover:  y => `Growth generated exceeds your contributions in year ${y}`,
     wstool_save:          'Save project',
+    // WS.5C — delete confirm modal
+    wsmodal_del_title: 'Delete item',
+    wsmodal_del_text:  'This action cannot be undone.',
+    wsmodal_cancel:    'Cancel',
+    wsmodal_delete:    'Delete',
     // Status pills
     statusOpen:        'Open',
     statusClosed:      'Closed',
@@ -11199,9 +11209,50 @@ function _wshFuturePathHtml() {
 // so deleting / clearing / pasting all work; normalization happens on save.
 function _wsNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
 
+// WS.5C — premium Aurix confirm modal (replaces window.confirm). Runs onConfirm
+// only when the user presses Eliminar; closes on Cancelar / backdrop / Esc.
+function _wsConfirm(onConfirm) {
+  const esc = _intccEsc;
+  const prev = document.getElementById('wsConfirmModal'); if (prev) prev.remove();
+  const ov = document.createElement('div');
+  ov.id = 'wsConfirmModal'; ov.className = 'ws-modal-overlay';
+  ov.innerHTML = `
+    <div class="ws-modal" role="dialog" aria-modal="true" aria-labelledby="wsModalTitle">
+      <h3 class="ws-modal-title" id="wsModalTitle">${esc(t('wsmodal_del_title'))}</h3>
+      <p class="ws-modal-text">${esc(t('wsmodal_del_text'))}</p>
+      <div class="ws-modal-actions">
+        <button type="button" class="ws-modal-btn is-cancel" data-wsmodal="cancel">${esc(t('wsmodal_cancel'))}</button>
+        <button type="button" class="ws-modal-btn is-danger" data-wsmodal="ok">${esc(t('wsmodal_delete'))}</button>
+      </div>
+    </div>`;
+  const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  ov.addEventListener('click', e => {
+    if (e.target === ov) { close(); return; }
+    const b = e.target.closest ? e.target.closest('[data-wsmodal]') : null; if (!b) return;
+    if (b.getAttribute('data-wsmodal') === 'ok') { close(); try { onConfirm(); } catch (_) {} } else { close(); }
+  });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => ov.classList.add('is-open'));
+}
+
 // WS.5B P6 — always-translated display label. Workspace names defaulted to the
 // template name (English before the ES fix), so we derive from the type via i18n
 // unless the user set a custom name. Goals/scenarios use their user-entered name.
+// WS.5C — stylized mini-mockup per template (pure stroke SVG, Aurix blue).
+function _wsTplViz(k) {
+  const V = {
+    bars:    '<path d="M11 34 V22"/><path d="M25 34 V16"/><path d="M39 34 V11"/><path d="M53 34 V6"/>',
+    curve:   '<path class="v-area" d="M6 32 C 22 30 32 22 46 12 L58 6 L58 35 L6 35 Z"/><path d="M6 32 C 22 30 32 22 46 12 L58 6"/>',
+    donut:   '<circle class="v-track" cx="32" cy="20" r="12"/><path d="M32 8 a12 12 0 0 1 10.4 18"/>',
+    compare: '<path class="v-dim" d="M18 34 V22"/><path d="M46 34 V8"/><path class="v-dim2" d="M30 14 h6 m-3 -3 v6"/>',
+    house:   '<path d="M13 22 L32 9 L51 22"/><path d="M19 22 V35 H45 V22"/>',
+    target:  '<circle class="v-track" cx="32" cy="20" r="13"/><circle class="v-track" cx="32" cy="20" r="7"/><circle class="v-dot" cx="32" cy="20" r="2.4"/>',
+  };
+  return `<svg class="wsh-tpl-viz-svg is-${k}" viewBox="0 0 64 40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${V[k] || V.bars}</svg>`;
+}
+
 function _wsTypeLabel(type) { return type === 'compound_growth' ? t('wstool_compound_n') : t('wsh_ws_' + type); }
 function _wsLabel(kind, item) {
   if (!item) return '';
@@ -11230,36 +11281,28 @@ function _wsxOpen(ref) {
 function _wsxAct(act, ref) {
   if (!ref) return;
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
-  const confirmDel = () => !(typeof confirm === 'function') || confirm(t('wsg_delete_confirm'));
   const now = Date.now();
-  if (kind === 'goal') {
-    if (act === 'del') { if (!confirmDel()) return; _wsgSaveAll(_wsgGoals().filter(g => g && g.id !== id)); delete _wsgWorking[id]; delete _wsgDirty[id]; }
-    else if (act === 'dup') { const s = _wsgGoals().find(g => g && g.id === id); if (s) _wsgPersist(Object.assign({}, s, { id: 'wsg_' + now, name: s.name + ' ' + t('wsg_copy_suffix'), createdAt: now, updatedAt: now })); }
-  } else if (kind === 'workspace') {
-    if (act === 'del') { if (!confirmDel()) return; _ws4SaveAll(_ws4Projects().filter(p => p && p.id !== id)); }
-    else if (act === 'dup') { const s = _ws4Projects().find(p => p && p.id === id); if (s) _ws4Persist(Object.assign({}, s, { id: 'ws4_' + now, inputs: Object.assign({}, s.inputs), name: s.name + ' ' + t('wsg_copy_suffix'), createdAt: now, updatedAt: now })); }
-  } else if (kind === 'scenario') {
-    const arr = _wshReadStore(_WSH_SCENARIOS_KEY);
-    if (act === 'del') { if (!confirmDel()) return; try { localStorage.setItem(_WSH_SCENARIOS_KEY, JSON.stringify(arr.filter(s => (s.scenarioId || s.id) !== id))); } catch (_) {} }
-    else if (act === 'dup') { const s = arr.find(x => (x.scenarioId || x.id) === id); if (s) { arr.push(Object.assign({}, s, { scenarioId: (s.scenarioId || 'scn') + '_' + now, createdAt: now })); try { localStorage.setItem(_WSH_SCENARIOS_KEY, JSON.stringify(arr)); } catch (_) {} } }
+  const rerender = () => { const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } };
+  const doDelete = () => {
+    if (kind === 'goal') { _wsgSaveAll(_wsgGoals().filter(g => g && g.id !== id)); delete _wsgWorking[id]; delete _wsgDirty[id]; }
+    else if (kind === 'workspace') { _ws4SaveAll(_ws4Projects().filter(p => p && p.id !== id)); }
+    else if (kind === 'scenario') { try { localStorage.setItem(_WSH_SCENARIOS_KEY, JSON.stringify(_wshReadStore(_WSH_SCENARIOS_KEY).filter(s => (s.scenarioId || s.id) !== id))); } catch (_) {} }
+    rerender();
+  };
+  if (act === 'del') { _wsConfirm(doDelete); return; }
+  if (act === 'dup') {
+    if (kind === 'goal') { const s = _wsgGoals().find(g => g && g.id === id); if (s) _wsgPersist(Object.assign({}, s, { id: 'wsg_' + now, name: s.name + ' ' + t('wsg_copy_suffix'), createdAt: now, updatedAt: now })); }
+    else if (kind === 'workspace') { const s = _ws4Projects().find(p => p && p.id === id); if (s) _ws4Persist(Object.assign({}, s, { id: 'ws4_' + now, inputs: Object.assign({}, s.inputs), customName: (s.customName ? s.customName + ' ' + t('wsg_copy_suffix') : undefined), createdAt: now, updatedAt: now })); }
+    else if (kind === 'scenario') { const arr = _wshReadStore(_WSH_SCENARIOS_KEY); const s = arr.find(x => (x.scenarioId || x.id) === id); if (s) { arr.push(Object.assign({}, s, { scenarioId: (s.scenarioId || 'scn') + '_' + now, createdAt: now })); try { localStorage.setItem(_WSH_SCENARIOS_KEY, JSON.stringify(arr)); } catch (_) {} } }
+    rerender();
   }
-  const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); }
 }
 
 function _renderWorkspaceHome(metrics) {
   const esc = (typeof _intccEsc === 'function') ? _intccEsc : (s => String(s == null ? '' : s));
   const tab = (_wsTab === 'templates' || _wsTab === 'tools') ? _wsTab : 'space';
 
-  // WS.5B P1 — compact "studio" header (no metrics, no WORKSPACE label). Future
-  // Path stays as a pure visual signature (no explanatory reading text).
-  const heroHtml = `
-    <section class="wsh-hero is-studio">
-      <div class="wsh-hero-main">
-        <h2 class="wsh-hero-title">${esc(t('wsh_studio_title'))}</h2>
-        <p class="wsh-hero-sub">${esc(t('wsh_studio_sub'))}</p>
-      </div>
-      <div class="wsh-hero-viz">${_wshFuturePathHtml()}</div>
-    </section>`;
+  // WS.5C — no hero. Workspace opens directly on the internal tabs.
 
   // WS.5B P2 — internal tabs: Mi espacio / Plantillas / Herramientas.
   const TABS = [['space', 'wstab_space'], ['templates', 'wstab_templates'], ['tools', 'wstab_tools']];
@@ -11302,21 +11345,24 @@ function _renderWorkspaceHome(metrics) {
       </section>`;
     panel = continueHtml + spaceHtml;
   } else if (tab === 'templates') {
+    const wsViz = { investment: 'donut', budget: 'bars', property: 'house', business: 'bars', networth: 'donut', fire: 'curve' };
     const wsItems = ['investment', 'budget', 'property', 'business', 'networth', 'fire'];
     const tplCards = wsItems.map(k => `
       <div class="wsh-tpl" role="button" tabindex="0" data-wsh-cta="workspace" data-ws4-type="${esc(k)}">
+        <div class="wsh-tpl-viz">${_wsTplViz(wsViz[k])}</div>
         <p class="wsh-tpl-name">${esc(t('wsh_ws_' + k))}</p>
         <p class="wsh-tpl-desc">${esc(t('ws4_sub_' + k))}</p>
         <span class="wsh-tpl-go">${esc(t('wstpl_use'))} ›</span>
       </div>`).join('');
     // Plans (goals / scenario / projection) — also creatable, kept reachable.
     const plans = [
-      { cta: 'goals',    name: t('wsg_title'),           desc: t('wsg_subtitle') },
-      { cta: 'scenario', name: t('wsh_scenario_title'),  desc: t('wsb_subtitle') },
-      { cta: 'planning', name: t('wsp_title'),           desc: t('wsp_subtitle') },
+      { cta: 'goals',    viz: 'target',  name: t('wsg_title'),          desc: t('wsg_subtitle') },
+      { cta: 'scenario', viz: 'compare', name: t('wsh_scenario_title'), desc: t('wsb_subtitle') },
+      { cta: 'planning', viz: 'curve',   name: t('wsp_title'),          desc: t('wsp_subtitle') },
     ];
     const planCards = plans.map(p => `
       <div class="wsh-tpl" role="button" tabindex="0" data-wsh-cta="${esc(p.cta)}">
+        <div class="wsh-tpl-viz">${_wsTplViz(p.viz)}</div>
         <p class="wsh-tpl-name">${esc(p.name)}</p>
         <p class="wsh-tpl-desc">${esc(p.desc)}</p>
         <span class="wsh-tpl-go">${esc(t('wstpl_use'))} ›</span>
@@ -11354,7 +11400,6 @@ function _renderWorkspaceHome(metrics) {
 
   return `
     <div class="aurix-wsh wsh-studio-root" data-wsh-view="home" data-wstab="${tab}">
-      ${heroHtml}
       ${tabsHtml}
       <div class="wsh-tabpanel">${panel}</div>
     </div>`;
@@ -11837,9 +11882,10 @@ function _ws4Duplicate() {
 }
 function _ws4Delete() {
   const p = _ws4Get(); if (!p) return;
-  if (typeof confirm === 'function' && !confirm(t('wsg_delete_confirm'))) return;
-  _ws4SaveAll(_ws4Projects().filter(x => x && x.id !== p.id));
-  _ws4Draft = null; _ws4ActiveId = null; _wshView = 'home'; renderWorkspaceHome();
+  _wsConfirm(() => {
+    _ws4SaveAll(_ws4Projects().filter(x => x && x.id !== p.id));
+    _ws4Draft = null; _ws4ActiveId = null; _wshView = 'home'; renderWorkspaceHome();
+  });
 }
 function _ws4Rename() {
   const p = _ws4Get(); if (!p) return;
@@ -12068,10 +12114,11 @@ function _wsgDuplicate(id) {
   const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); }
 }
 function _wsgDelete(id) {
-  if (typeof confirm === 'function' && !confirm(t('wsg_delete_confirm'))) return;
-  _wsgSaveAll(_wsgGoals().filter(g => g && g.id !== id));
-  delete _wsgWorking[id]; delete _wsgDirty[id];
-  const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); }
+  _wsConfirm(() => {
+    _wsgSaveAll(_wsgGoals().filter(g => g && g.id !== id));
+    delete _wsgWorking[id]; delete _wsgDirty[id];
+    const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderGoals(); _wshReveal(c); }
+  });
 }
 function _wsgRename(id) {
   const g = _wsgEnsureWorking(id); if (!g) return;
