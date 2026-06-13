@@ -18876,10 +18876,13 @@ body.gs-open { overflow: hidden; }
   transform: translateY(-2px);
   box-shadow: 0 14px 36px rgba(0,0,0,0.32), 0 0 0 1px rgba(74,130,240,0.12), 0 0 28px rgba(74,130,240,0.10);
 }
+/* INT.2ZA — refined title accent: a small premium glowing dot (was a wide dash
+   that read like a big hyphen). Same accent on every Intelligence title. */
 .intcc-card-title::before {
-  content: ''; display: inline-block; width: 14px; height: 2px; border-radius: 2px;
+  content: ''; display: inline-block; width: 5px; height: 5px; border-radius: 50%;
   background: var(--aurix-blue, #4A82F0); vertical-align: middle;
-  margin-right: 8px; opacity: 0.85;
+  margin-right: 9px; opacity: 0.95; position: relative; top: -1px;
+  box-shadow: 0 0 6px rgba(74,130,240,0.55);
 }
 /* INT.2Z — unified Intelligence title system: same Aurix-blue, weight, tracking,
    accent dash and spacing across every card (Salud, Radar, Factores, Explora,
@@ -18966,11 +18969,11 @@ body.gs-open { overflow: hidden; }
   display: grid; place-items: center;
 }
 .intcc-orb-glow {
-  position: absolute; inset: -26%;                 /* INT.2Z — deeper halo */
+  position: absolute; inset: -28%;                 /* INT.2ZA — orb V3, deeper halo */
   border-radius: 50%;
   background:
-    radial-gradient(circle, rgba(var(--orb-c), 0.92), rgba(var(--orb-c), 0.22) 50%, transparent 73%);  /* INT.2Z — deeper, fuller glow */
-  filter: blur(9px);
+    radial-gradient(circle, rgba(var(--orb-c), 0.98), rgba(var(--orb-c), 0.26) 48%, transparent 74%);  /* INT.2ZA — fuller inner glow */
+  filter: blur(10px);
   animation: intccOrbPulse 4.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 .intcc-orb-ring {
@@ -18980,15 +18983,15 @@ body.gs-open { overflow: hidden; }
 .intcc-orb-ring--1 { inset: 6%;  animation: intccOrbSpin 16s linear infinite; border-top-color: rgba(var(--orb-c), 0.95); border-right-color: rgba(var(--orb-c), 0.6); }
 .intcc-orb-ring--2 { inset: 19%; animation: intccOrbSpin 11s linear infinite reverse; border-left-color: rgba(var(--orb-c), 0.8); }
 .intcc-orb-core {
-  position: absolute; inset: 30%;                  /* INT.2Z — +presence */
+  position: absolute; inset: 29%;                  /* INT.2ZA — orb V3, +presence */
   border-radius: 50%;
-  /* INT.2Z — more realistic sphere: soft blue-tinted specular highlight (never
-     pure white), deeper body, stronger bottom shadow. Stays Aurix blue. */
-  background: radial-gradient(circle at 34% 26%, rgba(224,240,255,1), rgba(var(--orb-c), 0.98) 44%, rgba(var(--orb-c), 0.40) 100%);
+  /* INT.2ZA — deeper, more dimensional sphere: soft blue-tinted specular highlight
+     (never pure white), richer body, stronger bottom shadow. Stays Aurix blue. */
+  background: radial-gradient(circle at 33% 25%, rgba(226,241,255,1), rgba(var(--orb-c), 0.99) 42%, rgba(var(--orb-c), 0.36) 100%);
   box-shadow:
-    0 0 34px rgba(var(--orb-c), 0.95),
-    inset 0 2px 10px rgba(214,236,255,0.6),
-    inset 0 -5px 13px rgba(var(--orb-c), 0.68);
+    0 0 38px rgba(var(--orb-c), 0.98),
+    inset 0 2px 11px rgba(214,236,255,0.66),
+    inset 0 -6px 15px rgba(var(--orb-c), 0.72);
   animation: intccOrbBreath 4.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 .intcc-orb-ecg {
@@ -18996,10 +18999,10 @@ body.gs-open { overflow: hidden; }
   overflow: visible;
 }
 .intcc-orb-ecg path {
-  fill: none; stroke: #aee7ff; stroke-width: 2.1;          /* INT.2Z — brighter cyan, thicker so the center crossing reads clearly */
+  fill: none; stroke: #bdecff; stroke-width: 2.3;          /* INT.2ZA — brighter cyan, thicker so the center crossing reads clearly */
   stroke-linecap: round; stroke-linejoin: round;
   stroke-dasharray: 58 202; stroke-dashoffset: 260;
-  filter: drop-shadow(0 0 3.5px rgba(56,189,248,1)) drop-shadow(0 0 9px rgba(56,189,248,0.62));
+  filter: drop-shadow(0 0 4px rgba(56,189,248,1)) drop-shadow(0 0 10px rgba(56,189,248,0.68));
   animation: intccEcg 3s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 @keyframes intccOrbPulse  { 0%,100% { opacity: 0.65; transform: scale(0.97); } 50% { opacity: 1; transform: scale(1.05); } }
@@ -19266,16 +19269,14 @@ body.gs-open { overflow: hidden; }
   .intcc-m-health { order: 1; }
 
   /* Card 1 — Inteligencia: reading + smart hint on the left, blue orb on the
-     right. No health score here, no blue dot before the title. */
+     right. No health score here. INT.2ZA — the "Inteligencia" title now uses the
+     unified .intcc-card-title (same as Salud/Radar/etc.), so it matches the system. */
   .intcc-m-hero {
     --orb-c: 77,141,255;                 /* electric Aurix blue #4D8DFF */
     display: flex; align-items: center; gap: 14px;
   }
   .intcc-m-hero-text { flex: 1 1 auto; min-width: 0; }
-  .intcc-m-hero .intcc-eyebrow {
-    display: block; font-size: 10px; letter-spacing: 0.14em; font-weight: 700;
-    text-transform: uppercase; color: rgba(159,194,255,0.95); margin: 0 0 6px;
-  }
+  .intcc-m-hero .intcc-card-title { margin: 0 0 8px; }
   .intcc-m-hero-title {
     margin: 0 0 6px; font-size: 19px; line-height: 1.2; font-weight: 700;
     letter-spacing: -0.01em; color: var(--text-bright, #fff);
@@ -19285,7 +19286,7 @@ body.gs-open { overflow: hidden; }
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
   .intcc-m-orb { flex: 0 0 auto; display: grid; place-items: center; }
-  .intcc-m-orb .intcc-orb { width: 64px; height: 64px; }
+  .intcc-m-orb .intcc-orb { width: 72px; height: 72px; }   /* INT.2ZA — orb V3 +~12% */
 
   /* Card 2 — Salud: score ring + badge on the left, sober conclusion rows on
      the right (distinct from the solid Excelente badge). */

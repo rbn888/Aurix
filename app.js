@@ -1686,7 +1686,7 @@ const T = {
     intcc_w_div_t:    'Diversificación limitada',
     intcc_w_div_b:    'Tu patrimonio se reparte entre muy pocas categorías.',
     intcc_timeline_title: 'Línea temporal',
-    intcc_timeline_empty: 'Aurix está construyendo tu historial patrimonial. Tus hitos aparecerán aquí a medida que tu patrimonio evolucione.',
+    intcc_timeline_empty: 'Aurix construye tu historial. Tus hitos aparecerán aquí.',
     intcc_tl_cross:  amount => `Tu patrimonio superó ${amount}.`,
     intcc_tl_ath:    'Tu patrimonio marcó un nuevo máximo histórico.',
     intcc_tl_drop:   pct => `Tu patrimonio retrocedió alrededor de un ${pct}% desde su máximo.`,
@@ -3137,7 +3137,7 @@ const T = {
     intcc_w_div_t:    'Limited diversification',
     intcc_w_div_b:    'Your wealth is spread across very few categories.',
     intcc_timeline_title: 'Timeline',
-    intcc_timeline_empty: 'Aurix is building your wealth history. Your milestones will appear here as your wealth evolves.',
+    intcc_timeline_empty: 'Aurix is building your history. Your milestones will appear here.',
     intcc_tl_cross:  amount => `Your wealth crossed ${amount}.`,
     intcc_tl_ath:    'Your wealth set a new all-time high.',
     intcc_tl_drop:   pct => `Your wealth pulled back around ${pct}% from its peak.`,
@@ -21458,24 +21458,25 @@ function _intccSinceLastVisit(snap) {
   return { items: items.slice(0, 8), empty: items.length === 0 };
 }
 
-// Bloque 9 — intelligence timeline. Milestones derived strictly from the real
-// stored series (portfolioHistory total crossings + categoryHistory liquidity).
-// INT.2Z — Timeline V2. Coherent, prioritised milestones derived strictly from
-// the real stored series (no invented events, no backend): wealth thresholds,
-// all-time high, relevant drawdown, and liquidity crossings. Events carry their
-// real timestamp, are de-duplicated and sorted most-recent-first; the renderer
-// shows the top 3 and counts the rest as "+N eventos anteriores".
+// Bloque 9 — intelligence timeline.
+// INT.2ZA — Timeline V3. Coherent, prioritised milestones derived strictly from
+// the real stored series (no invented events, no backend, no drill-down): wealth
+// thresholds, all-time high, relevant drawdown, and liquidity crossings. Each
+// event carries its real timestamp + a relevance weight (`prio`). We pick the 5
+// most relevant, then display them chronologically (newest first). Hard cap 5,
+// NO "+N earlier events" CTA (it was not actionable).
 function _intccTimeline() {
   const out = [];
   const h = (typeof portfolioHistory !== 'undefined' && Array.isArray(portfolioHistory)) ? portfolioHistory : [];
 
   if (h.length >= 2) {
-    // Wealth threshold crossings (hitos patrimoniales).
+    // Wealth threshold crossings (hitos patrimoniales) — lowest priority so a run
+    // of similar amounts never crowds out the more informative events.
     const THRESH = [10000, 25000, 50000, 100000, 250000, 500000, 1000000, 2000000, 5000000];
     for (const thr of THRESH) {
       for (let i = 1; i < h.length; i++) {
         if (h[i - 1].value < thr && h[i].value >= thr) {
-          out.push({ ts: h[i].ts, tone: 'up', text: t('intcc_tl_cross')(formatBase(thr)) });
+          out.push({ ts: h[i].ts, tone: 'up', prio: 1, text: t('intcc_tl_cross')(formatBase(thr)) });
           break;
         }
       }
@@ -21485,7 +21486,7 @@ function _intccTimeline() {
     if ((h[h.length - 1].ts - h[0].ts) >= 3 * 86400000) {
       let peak = h[0].value, peakIdx = 0;
       for (let i = 1; i < h.length; i++) { if (h[i].value > peak) { peak = h[i].value; peakIdx = i; } }
-      if (peakIdx >= 1 && peak > 0) out.push({ ts: h[peakIdx].ts, tone: 'up', text: t('intcc_tl_ath') });
+      if (peakIdx >= 1 && peak > 0) out.push({ ts: h[peakIdx].ts, tone: 'up', prio: 3, text: t('intcc_tl_ath') });
     }
     // Largest relevant drawdown from a running peak (bajada relevante ≥10%).
     let runPeak = h[0].value, worst = 0, worstTs = 0;
@@ -21496,7 +21497,7 @@ function _intccTimeline() {
         if (dd > worst) { worst = dd; worstTs = h[i].ts; }
       }
     }
-    if (worst >= 10 && worstTs) out.push({ ts: worstTs, tone: 'down', text: t('intcc_tl_drop')(Math.round(worst)) });
+    if (worst >= 10 && worstTs) out.push({ ts: worstTs, tone: 'down', prio: 3, text: t('intcc_tl_drop')(Math.round(worst)) });
   }
 
   // Liquidity crossings (cambios de liquidez) from the category series.
@@ -21505,22 +21506,26 @@ function _intccTimeline() {
     const pT = ch[i - 1].total, cT = ch[i].total;
     if (pT > 0 && cT > 0) {
       const pL = (ch[i - 1].liquidity / pT) * 100, cL = (ch[i].liquidity / cT) * 100;
-      if (pL >= 10 && cL < 10) { out.push({ ts: ch[i].ts, tone: 'down', text: t('intcc_tl_liq10') }); break; }
+      if (pL >= 10 && cL < 10) { out.push({ ts: ch[i].ts, tone: 'down', prio: 2, text: t('intcc_tl_liq10') }); break; }
     }
   }
   for (let i = 1; i < ch.length; i++) {
     const pT = ch[i - 1].total, cT = ch[i].total;
     if (pT > 0 && cT > 0) {
       const pL = (ch[i - 1].liquidity / pT) * 100, cL = (ch[i].liquidity / cT) * 100;
-      if (pL < 15 && cL >= 15) { out.push({ ts: ch[i].ts, tone: 'info', text: t('intcc_tl_liq_up') }); break; }
+      if (pL < 15 && cL >= 15) { out.push({ ts: ch[i].ts, tone: 'info', prio: 2, text: t('intcc_tl_liq_up') }); break; }
     }
   }
 
-  // De-duplicate (same ts + text) and order chronologically, newest first.
+  // De-duplicate (same ts + text).
   const seen = new Set();
   const dedup = out.filter(e => { const k = e.ts + '|' + e.text; if (seen.has(k)) return false; seen.add(k); return true; });
-  dedup.sort((a, b) => b.ts - a.ts);
-  return dedup.slice(0, 12);
+  // Select the 5 most relevant (priority, then recency) …
+  const TL_KEEP = 5;
+  const selected = dedup.slice().sort((a, b) => (b.prio - a.prio) || (b.ts - a.ts)).slice(0, TL_KEEP);
+  // … then present them chronologically, newest first.
+  selected.sort((a, b) => b.ts - a.ts);
+  return selected;
 }
 function _intccDate(ts) {
   try {
@@ -21701,7 +21706,7 @@ function _renderIntelligenceCommandCenter() {
   const mHeroHtml = `
     <section class="intcc-card intcc-m-card intcc-m-hero is-${esc(reading.state)}">
       <div class="intcc-m-hero-text">
-        <span class="intcc-eyebrow">${esc(t('intcc_eyebrow'))}</span>
+        <h3 class="intcc-card-title">${esc(t('intcc_eyebrow'))}</h3>
         <h2 class="intcc-m-hero-title">${esc(reading.title)}</h2>
         <p class="intcc-m-hero-hint">${esc(mHint)}</p>
       </div>
@@ -21806,22 +21811,21 @@ function _renderIntelligenceCommandCenter() {
           </div>`}
     </section>`;
 
-  // Bloque 8/9/11 — Timeline. Scalable: max 3 visible (INT.2U), "+N más" when longer.
-  const TL_MAX = 3;
-  const tlShown = timeline.slice(0, TL_MAX);
-  const tlExtra = Math.max(0, timeline.length - TL_MAX);
+  // Bloque 8/9/11 — Timeline. INT.2ZA: up to 5 curated events, chronological
+  // (newest first). No "+N earlier events" note — the builder already keeps only
+  // the most relevant 5, so there is nothing un-actionable to hint at.
+  const tlShown = timeline.slice(0, 5);
   const timelineHtml = `
     <section class="intcc-card intcc-timeline">
       <h3 class="intcc-card-title">${esc(t('intcc_timeline_title'))}</h3>
-      ${timeline.length ? `
+      ${tlShown.length ? `
         <ol class="intcc-tl-list">
           ${tlShown.map(ev => `
             <li class="intcc-tl-item is-${esc(ev.tone)}">
               <span class="intcc-tl-node" aria-hidden="true"></span>
               <div class="intcc-tl-body"><p class="intcc-tl-text">${esc(ev.text)}</p><span class="intcc-tl-date">${esc(_intccDate(ev.ts))}</span></div>
             </li>`).join('')}
-        </ol>
-        ${tlExtra > 0 ? `<p class="intcc-more-note">${esc(t('intcc_tl_more')(tlExtra))}</p>` : ''}`
+        </ol>`
         : `<p class="intcc-empty-body">${esc(t('intcc_timeline_empty'))}</p>`}
     </section>`;
 
