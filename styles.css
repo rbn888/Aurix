@@ -20236,6 +20236,97 @@ body.gs-open { overflow: hidden; }
   .wsh-tchip { flex: 1 1 100%; }
 }
 
+/* ════════ WS.12 — Real Estate Portfolio Pro ═════════════════════════════════ */
+/* Portfolio summary — KPIs dominate (Equity / Cashflow / Rentabilidad). */
+.wsre-summary { display: flex; flex-direction: column; gap: 14px; }
+.wsre-sum-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.wsre-sum-count { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(159,194,255,0.9); }
+.wsre-sum-value { font-size: 26px; font-weight: 800; color: var(--text-bright); font-variant-numeric: tabular-nums; }
+.wsre-sum-vlbl { font-size: 11px; color: var(--text-muted); }
+.wsre-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.wsre-kpi { display: flex; flex-direction: column; gap: 3px; padding: 16px 18px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.16); background: rgba(255,255,255,0.025); }
+.wsre-kpi.is-equity { border-color: rgba(77,141,255,0.30); background: radial-gradient(130% 150% at 85% 0%, rgba(92,156,255,0.16), transparent 60%), rgba(255,255,255,0.022); }
+.wsre-kpi.is-cf { border-color: rgba(47,217,142,0.26); }
+.wsre-kpi.is-yield { border-color: rgba(224,177,92,0.26); }
+.wsre-kpi-v { font-size: 24px; font-weight: 800; color: var(--text-bright); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.wsre-kpi-v.is-pos { color: #7ef0b8; } .wsre-kpi-v.is-neg { color: #f0897f; }
+.wsre-kpi-k { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); font-weight: 600; }
+.wsre-subkpis { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+.wsre-subkpi { display: inline-flex; flex-direction: column; gap: 1px; }
+.wsre-subkpi b { font-size: 14px; font-weight: 700; color: var(--text-bright); font-variant-numeric: tabular-nums; }
+.wsre-subkpi i { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); font-style: normal; }
+/* Property grid — premium visual cards (never an Excel table). */
+.wsre-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.wsre-card { display: flex; flex-direction: column; border-radius: 16px; overflow: hidden; border: 1px solid rgba(120,160,255,0.14); background: rgba(255,255,255,0.022); cursor: pointer; transition: border-color 180ms ease, transform 180ms ease; }
+.wsre-card:hover { border-color: rgba(77,141,255,0.36); transform: translateY(-2px); }
+.wsre-cover { height: 108px; background-size: cover; background-position: center; position: relative; }
+.wsre-status { position: absolute; top: 10px; right: 10px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(8,12,22,0.7); }
+.wsre-status.is-green { background: #2fd98e; box-shadow: 0 0 8px rgba(47,217,142,0.6); }
+.wsre-status.is-amber { background: #e0a85c; box-shadow: 0 0 8px rgba(224,168,92,0.6); }
+.wsre-status.is-red { background: #f0897f; box-shadow: 0 0 8px rgba(240,137,127,0.6); }
+.wsre-card-body { display: flex; flex-direction: column; gap: 9px; padding: 13px 15px; }
+.wsre-card-top { display: flex; flex-direction: column; gap: 1px; }
+.wsre-card-name { margin: 0; font-size: 15px; font-weight: 800; color: var(--text-bright); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wsre-card-city { font-size: 11.5px; color: var(--text-muted); }
+.wsre-card-rows { display: flex; flex-direction: column; gap: 4px; }
+.wsre-prow { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-muted); }
+.wsre-prow b { color: var(--text-bright); font-variant-numeric: tabular-nums; font-weight: 700; }
+.wsre-prow b.is-win { color: #7ef0b8; } .wsre-prow b.is-loss { color: #f0897f; }
+.wsre-card-acts { display: flex; gap: 7px; margin-top: 2px; }
+.wsre-mini { width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; color: var(--text-muted); background: transparent; border: 1px solid rgba(120,160,255,0.16); }
+.wsre-mini:hover { color: #cfe0ff; border-color: rgba(120,160,255,0.34); }
+.wsre-mini.is-danger:hover { color: #f0897f; border-color: rgba(240,137,127,0.4); }
+.wsre-mini svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.wsre-empty-hint { margin: 10px 0 0; font-size: 12.5px; color: rgba(159,194,255,0.8); }
+/* Create/edit property form */
+.wsre-form-photo { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.wsre-photo-pv { width: 96px; height: 64px; flex: none; border-radius: 12px; background-size: cover; background-position: center; background-color: rgba(74,130,240,0.10); border: 1px solid rgba(120,160,255,0.16); background-image: linear-gradient(150deg, rgba(74,130,240,0.2), rgba(10,16,30,0.7)); }
+.wsre-photo-pv.has-photo { background-image: none; }
+.wsre-photo-btn { font-size: 12.5px; font-weight: 700; color: #cfe0ff; padding: 9px 14px; border-radius: 9px; border: 1px solid rgba(74,130,240,0.30); background: rgba(74,130,240,0.14); cursor: pointer; }
+.wsre-photo-btn:hover { background: rgba(74,130,240,0.24); }
+.wsre-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.wsre-form-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.wsre-form-btns { display: flex; gap: 8px; margin-left: auto; }
+.wsre-prev { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.wsre-prev.is-win { color: #7ef0b8; } .wsre-prev.is-loss { color: #f0897f; }
+/* Property detail */
+.wsre-detail-hero { display: flex; flex-direction: column; gap: 14px; }
+.wsre-detail-cover { height: 200px; border-radius: 14px; background-size: cover; background-position: center; position: relative; }
+.wsre-detail-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.wsre-d-rows { display: flex; flex-direction: column; gap: 7px; }
+.wsre-d-row { display: flex; justify-content: space-between; font-size: 13.5px; color: var(--text-muted); padding: 7px 0; border-bottom: 1px solid rgba(120,160,255,0.08); }
+.wsre-d-row b { color: var(--text-bright); font-variant-numeric: tabular-nums; }
+.wsre-d-notes { margin: 14px 0 0; font-size: 13px; line-height: 1.5; color: var(--text-bright); padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.03); }
+.wsre-tl-form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.wsre-tl-form .wsjrn-select { flex: 0 0 auto; width: auto; }
+.wsre-tl-form [data-wsre-tl-text] { flex: 1 1 160px; }
+.wsre-tl-datein { flex: 0 0 90px; }
+.wsre-tl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.wsre-tl-item { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-bright); }
+.wsre-tl-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: #5c9cff; }
+.wsre-tl-dot.is-buy { background: #4d8dff; } .wsre-tl-dot.is-reform { background: #e0a85c; }
+.wsre-tl-dot.is-rent_up { background: #2fd98e; } .wsre-tl-dot.is-incident { background: #f0897f; }
+.wsre-tl-label { flex: 1 1 auto; }
+.wsre-tl-date { font-size: 11.5px; color: var(--text-muted); }
+/* Mi Espacio preview (Trabajo diario) */
+.wspv-re { padding: 0; align-items: stretch; justify-content: flex-end; background-size: cover; background-position: center; background-image: linear-gradient(160deg, rgba(74,130,240,0.22), rgba(10,16,30,0.9)); position: relative; }
+.wspv-re.has-photo::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8,12,22,0.05), rgba(8,12,22,0.82)); }
+.wspv-re-ov { position: absolute; top: 12px; left: 14px; display: flex; flex-direction: column; gap: 0; z-index: 2; }
+.wspv-re-eq { font-size: 20px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; text-shadow: 0 1px 6px rgba(0,0,0,0.5); }
+.wspv-re-lbl { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.82); }
+.wspv-re-foot { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; font-size: 12px; font-weight: 700; color: #fff; text-shadow: 0 1px 5px rgba(0,0,0,0.5); }
+.wspv-re-foot .is-win { color: #7ef0b8; } .wspv-re-foot .is-loss { color: #f0897f; }
+.wspv-re-tpl { align-items: center; justify-content: center; }
+.wspv-re-tpl .wspv-re-ov { position: static; align-items: center; text-align: center; }
+.wspv-re-tpl .wspv-re-eq { font-size: 15px; }
+@media (max-width: 920px) { .wsre-grid { grid-template-columns: repeat(2, 1fr); } .wsre-form-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) {
+  .wsre-kpis { grid-template-columns: 1fr; }
+  .wsre-grid { grid-template-columns: 1fr; }
+  .wsre-form-grid { grid-template-columns: 1fr 1fr; }
+  .wsre-detail-kpis { grid-template-columns: 1fr; }
+}
+
 /* ════════ WS.2 — Financial Tools Hub (dedicated tools) ═══════════════════════
    Premium interactive tools that open inside Workspace templates mode (never
    the Sheet). Encapsulated under ws2-* classes; responsive. */

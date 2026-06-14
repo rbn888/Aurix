@@ -1998,6 +1998,55 @@ const T = {
     wsmse_pinned:       'Herramientas fijadas',
     wsmse_demo_hint:    'Vista previa · crea el tuyo',
     wsh_premium_badge:  'Premium',
+    // WS.12 — Real Estate Portfolio Pro
+    wsre_n:             'Portfolio Inmobiliario Pro',
+    wsre_d:             'Gestiona tu cartera inmobiliaria completa.',
+    wsre_save:          'Guardar cartera',
+    wsre_unit:          'inmuebles',
+    wsre_permonth:      '/mes',
+    wsre_grid_title:    'Inmuebles',
+    wsre_kpi_equity:    'Equity',
+    wsre_kpi_cashflow:  'Cashflow',
+    wsre_kpi_yield:     'Rentabilidad',
+    wsre_kpi_value:     'Valor actual',
+    wsre_kpi_mortgage:  'Hipoteca',
+    wsre_kpi_cf_annual: 'Cashflow anual',
+    wsre_kpi_buy:       'Valor compra',
+    wsre_add:           'Nuevo inmueble',
+    wsre_edit:          'Editar inmueble',
+    wsre_add_btn:       'Añadir inmueble',
+    wsre_f_name:        'Nombre',
+    wsre_f_type:        'Tipo',
+    wsre_f_city:        'Ciudad',
+    wsre_f_photo:       'Foto',
+    wsre_f_buy:         'Precio compra',
+    wsre_f_value:       'Valor actual',
+    wsre_f_rent:        'Alquiler mensual',
+    wsre_f_expenses:    'Gastos mensuales',
+    wsre_f_mortgage:    'Hipoteca pendiente',
+    wsre_f_payment:     'Cuota hipotecaria',
+    wsre_f_date:        'Fecha compra',
+    wsre_f_notes:       'Notas',
+    wsre_t_flat:        'Piso',
+    wsre_t_house:       'Casa',
+    wsre_t_local:       'Local',
+    wsre_t_office:      'Oficina',
+    wsre_t_warehouse:   'Nave',
+    wsre_t_garage:      'Garaje',
+    wsre_back_portfolio:'Volver a la cartera',
+    wsre_d_finance:     'Resumen financiero',
+    wsre_d_gross:       'Rentabilidad bruta',
+    wsre_d_roi:         'ROI simple',
+    wsre_d_timeline:    'Historial',
+    wsre_tl_buy:        'Compra',
+    wsre_tl_reform:     'Reforma',
+    wsre_tl_rent_up:    'Subida de alquiler',
+    wsre_tl_incident:   'Incidencia',
+    wsre_tl_note:       'Nota',
+    wsre_tl_ph:         'Descripción…',
+    wsre_tl_date:       'Fecha',
+    wsre_tl_empty:      'Sin eventos todavía',
+    wsre_empty:         'Vista demo · añade tu primer inmueble',
     // WS.5C — delete confirm modal
     wsmodal_del_title: 'Eliminar elemento',
     wsmodal_del_text:  'Esta acción no se puede deshacer.',
@@ -3768,6 +3817,55 @@ const T = {
     wsmse_pinned:       'Pinned tools',
     wsmse_demo_hint:    'Preview · create your own',
     wsh_premium_badge:  'Premium',
+    // WS.12 — Real Estate Portfolio Pro
+    wsre_n:             'Real Estate Portfolio Pro',
+    wsre_d:             'Manage your full real estate portfolio.',
+    wsre_save:          'Save portfolio',
+    wsre_unit:          'properties',
+    wsre_permonth:      '/mo',
+    wsre_grid_title:    'Properties',
+    wsre_kpi_equity:    'Equity',
+    wsre_kpi_cashflow:  'Cashflow',
+    wsre_kpi_yield:     'Yield',
+    wsre_kpi_value:     'Current value',
+    wsre_kpi_mortgage:  'Mortgage',
+    wsre_kpi_cf_annual: 'Annual cashflow',
+    wsre_kpi_buy:       'Purchase value',
+    wsre_add:           'New property',
+    wsre_edit:          'Edit property',
+    wsre_add_btn:       'Add property',
+    wsre_f_name:        'Name',
+    wsre_f_type:        'Type',
+    wsre_f_city:        'City',
+    wsre_f_photo:       'Photo',
+    wsre_f_buy:         'Purchase price',
+    wsre_f_value:       'Current value',
+    wsre_f_rent:        'Monthly rent',
+    wsre_f_expenses:    'Monthly expenses',
+    wsre_f_mortgage:    'Mortgage balance',
+    wsre_f_payment:     'Mortgage payment',
+    wsre_f_date:        'Purchase date',
+    wsre_f_notes:       'Notes',
+    wsre_t_flat:        'Flat',
+    wsre_t_house:       'House',
+    wsre_t_local:       'Retail',
+    wsre_t_office:      'Office',
+    wsre_t_warehouse:   'Warehouse',
+    wsre_t_garage:      'Garage',
+    wsre_back_portfolio:'Back to portfolio',
+    wsre_d_finance:     'Financial summary',
+    wsre_d_gross:       'Gross yield',
+    wsre_d_roi:         'Simple ROI',
+    wsre_d_timeline:    'Timeline',
+    wsre_tl_buy:        'Purchase',
+    wsre_tl_reform:     'Renovation',
+    wsre_tl_rent_up:    'Rent increase',
+    wsre_tl_incident:   'Incident',
+    wsre_tl_note:       'Note',
+    wsre_tl_ph:         'Description…',
+    wsre_tl_date:       'Date',
+    wsre_tl_empty:      'No events yet',
+    wsre_empty:         'Demo view · add your first property',
     // WS.5C — delete confirm modal
     wsmodal_del_title: 'Delete item',
     wsmodal_del_text:  'This action cannot be undone.',
@@ -11210,6 +11308,8 @@ const AURIX_WS6_TOOL = true;
 const AURIX_WS7_TOOL = true;
 // WS.8 ACTIVE — Trade Journal tool released (third real Workspace tool).
 const AURIX_WS8_TOOL = true;
+// WS.12 ACTIVE — Real Estate Portfolio Pro (first differential, portfolio-first tool).
+const AURIX_WS12_TOOL = true;
 // WS.11A — Workspace is AUTONOMOUS: it must not auto-read Dashboard/portfolio/
 // liquidity/health/intelligence. The real-data bridges (_ws4Real / _wsbBaseline /
 // _wspInitialWealth) are DORMANT behind this flag; "Usar datos de Aurix" will be
@@ -11222,6 +11322,9 @@ let _wsToolEditId  = null;   // saved project id when editing an existing one
 let _wsToolDirty   = false;
 let _wsJrnDraft    = null;   // WS.8 — in-progress add/edit trade form
 let _wsJrnEditId   = null;   // WS.8 — trade id being edited (null = adding new)
+let _wsReDraft     = null;   // WS.12 — in-progress add/edit property form
+let _wsReEditId    = null;   // WS.12 — property id being edited (null = adding new)
+let _wsReDetailId  = null;   // WS.12 — property detail open (null = portfolio main)
 // WS.5A P5 — real save model (editar ≠ guardar). Working copies hold unsaved
 // edits; nothing persists until the user confirms "Guardar".
 let _wsgWorking = {};      // goalId -> working goal (unsaved edits)
@@ -11285,7 +11388,7 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -11319,6 +11422,12 @@ function _wshWireOnce() {
     if (t.hasAttribute('data-wsjrn-add')) { _wsJrnAdd(); return; }
     const jAct = t.getAttribute('data-wsjrn-act'); if (jAct) { _wsJrnAct(jAct, t.getAttribute('data-wsjrn-id')); return; }
     if (t.hasAttribute('data-wsjrn-cancel')) { _wsJrnCancel(); return; }
+    // WS.12 — Real Estate Portfolio: add/save, per-property act, cancel, back, timeline add.
+    if (t.hasAttribute('data-wsre-add')) { _wsReAdd(); return; }
+    const reAct = t.getAttribute('data-wsre-act'); if (reAct) { _wsReAct(reAct, t.getAttribute('data-wsre-id')); return; }
+    if (t.hasAttribute('data-wsre-cancel')) { _wsReCancel(); return; }
+    if (t.hasAttribute('data-wsre-back')) { _wsReBack(); return; }
+    if (t.hasAttribute('data-wsre-tl-add')) { _wsReTimelineAdd(); return; }
     // WS.9 — open the Goal Funding modal for a goal.
     const fOpen = t.getAttribute('data-wsfund-open'); if (fOpen) { _wsFundModal(fOpen); return; }
     const ws4mode = t.getAttribute('data-ws4-mode');
@@ -11339,7 +11448,10 @@ function _wshWireOnce() {
     if (el.getAttribute('data-wsg-form')) { _wsgFormPreview(); return; }
     if (el.getAttribute('data-wstool-input')) { _wsToolOnInput(el); return; }
     if (el.getAttribute('data-wsjrn-input')) { _wsJrnOnInput(el); return; }
+    if (el.getAttribute('data-wsre-input')) { _wsReOnInput(el); return; }
   });
+  // WS.12 — property photo upload (file input → downscaled data URL).
+  document.addEventListener('change', e => { const el = e.target; if (el && el.getAttribute && el.hasAttribute('data-wsre-photo')) _wsRePhoto(el); });
   // WS.10A — natural editing + thousands formatting on numeric Workspace inputs.
   // ws4-num is a Workspace-only class; only decimal-mode money/qty fields, never
   // the year field or text fields (asset/notes have no inputmode). Strip
@@ -11505,6 +11617,7 @@ function _wsTypeLabel(type) {
   if (type === 'compound_growth') return t('wstool_compound_n');
   if (type === 'monthly_budget')  return t('wstool_budget_n');
   if (type === 'trade_journal')   return t('wstool_journal_n');
+  if (type === 'real_estate_portfolio') return t('wsre_n');
   return t('wsh_ws_' + type);
 }
 function _wsLabel(kind, item) {
@@ -11547,13 +11660,13 @@ function _wsPinOpen(ref) {
 // pinned/active tool restores this; editing inputs updates it; only "Guardar
 // proyecto" creates a real project in aurix_ws_projects_v1.
 const _WSH_TOOL_STATE_KEY = 'aurix_ws_tool_state_v1';
-function _wsToolStateType(key) { return key === 'budget' ? 'monthly_budget' : key === 'journal' ? 'trade_journal' : 'compound_growth'; }
+function _wsToolStateType(key) { return key === 'budget' ? 'monthly_budget' : key === 'journal' ? 'trade_journal' : key === 'realestate' ? 'real_estate_portfolio' : 'compound_growth'; }
 function _wsToolStateRead() { try { const raw = localStorage.getItem(_WSH_TOOL_STATE_KEY); const v = raw ? JSON.parse(raw) : {}; return (v && typeof v === 'object') ? v : {}; } catch (_) { return {}; } }
 function _wsToolStateGet(key) { const v = _wsToolStateRead()[_wsToolStateType(key)]; return (v && typeof v === 'object') ? v : null; }
 function _wsToolStateSet(key, inputs) { const s = _wsToolStateRead(); s[_wsToolStateType(key)] = Object.assign({}, inputs); try { localStorage.setItem(_WSH_TOOL_STATE_KEY, JSON.stringify(s)); } catch (_) {} }
 
 // WS.7A — mini-preview viz selection for Mi Espacio cards (reuses _wsTplViz).
-const _WS_TYPE_VIZ = { budget: 'budget', monthly_budget: 'budget', networth: 'donut', investment: 'bars', property: 'house', business: 'bars', fire: 'curve', compound_growth: 'curve', trade_journal: 'journal' };
+const _WS_TYPE_VIZ = { budget: 'budget', monthly_budget: 'budget', networth: 'donut', investment: 'bars', property: 'house', business: 'bars', fire: 'curve', compound_growth: 'curve', trade_journal: 'journal', real_estate_portfolio: 'house' };
 function _wsRefViz(ref) {
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), key = ref.slice(i + 1);
   if (kind === 'tool') return key === 'budget' ? 'budget' : key === 'journal' ? 'journal' : 'curve';
@@ -11652,6 +11765,7 @@ function _wsToolPreviewHtml(toolKey) {
 
 // WS.10.2/10.6 — distinct preview per template category (no "everything is a curve").
 function _wsCatPreviewHtml(cat) {
+  if (cat === 'realestate-pro') return `<div class="wspv wspv-re wspv-re-tpl"><div class="wspv-re-ov"><span class="wspv-re-eq">${_intccEsc(t('wsre_n'))}</span><span class="wspv-re-lbl">${_intccEsc(t('wstplg_realestate'))}</span></div></div>`;
   if (cat === 'budget') return _wsToolPreviewHtml('budget');
   if (cat === 'projection') return `<div class="wspv wspv-viz is-blue">${_wsTplViz('curve')}</div>`;
   if (cat === 'scenario')   return `<div class="wspv wspv-viz is-blue">${_wsTplViz('compare')}</div>`;
@@ -11685,6 +11799,12 @@ function _wsProjPreviewHtml(p) {
     const np = r.netProfit || 0;
     return `<div class="wspv wspv-jsum"><span class="wspv-jsum-v is-${np >= 0 ? 'win' : 'loss'}">${esc((np >= 0 ? '+' : '') + formatBase(np))}</span><span class="wspv-jsum-k">${r.winRate != null ? r.winRate + '% ' + esc(t('wsjrn_sum_winrate')) : esc(t('wsjrn_sum_net'))}</span></div>`;
   }
+  if (p.type === 'real_estate_portfolio') {
+    const cover = (p.inputs && Array.isArray(p.inputs.properties) && p.inputs.properties.find(x => x && x.photo)) || null;
+    const cf = r.cashflowMonthly || 0;
+    const coverStyle = cover ? `background-image:url(${cover.photo})` : '';
+    return `<div class="wspv wspv-re${cover ? ' has-photo' : ''}"${cover ? ` style="${coverStyle}"` : ''}><div class="wspv-re-ov"><span class="wspv-re-eq">${esc(formatBase(r.equityTotal || 0))}</span><span class="wspv-re-lbl">${esc(t('wsre_kpi_equity'))}</span></div><div class="wspv-re-foot"><span>${(r.count != null ? r.count : 0)} ${esc(t('wsre_unit'))}</span><span class="is-${cf >= 0 ? 'win' : 'loss'}">${esc((cf >= 0 ? '+' : '') + formatBase(cf))}${esc(t('wsre_permonth'))}</span></div></div>`;
+  }
   if (p.kind === 'scenario') return `<div class="wspv wspv-viz is-blue">${_wsTplViz('compare')}</div>`;
   const A = _WS_ARCH[p.type] || { accent: 'blue', glyph: 'portfolio' };
   return _wsGlyphTile(A.glyph, A.accent);
@@ -11701,7 +11821,7 @@ function _wsSmartTab() {
 function _wshAllProjects() {
   const out = [];
   try { _wshReadStore(_WSH_GOALS_KEY).forEach(g => { if (g) out.push({ kind: 'goal', id: g.id, gtype: g.type, target: g.target, current: g.current, name: _wsLabel('goal', g), typeLabel: t('wsg_type_' + (g.type || 'free')), ts: g.updatedAt || g.createdAt || 0, ref: 'goal:' + g.id }); }); } catch (_) {}
-  try { _wshReadStore(_WSH_PROJECTS_KEY).forEach(p => { if (p) out.push({ kind: 'workspace', id: p.id, type: p.type, results: p.results, name: _wsLabel('workspace', p), typeLabel: _wsTypeLabel(p.type), ts: p.updatedAt || p.createdAt || 0, ref: 'workspace:' + p.id }); }); } catch (_) {}
+  try { _wshReadStore(_WSH_PROJECTS_KEY).forEach(p => { if (p) out.push({ kind: 'workspace', id: p.id, type: p.type, results: p.results, inputs: p.inputs, name: _wsLabel('workspace', p), typeLabel: _wsTypeLabel(p.type), ts: p.updatedAt || p.createdAt || 0, ref: 'workspace:' + p.id }); }); } catch (_) {}
   try { _wshReadStore(_WSH_SCENARIOS_KEY).forEach(s => { if (s) { const id = s.scenarioId || s.id; out.push({ kind: 'scenario', id, name: _wsLabel('scenario', s), typeLabel: t('wsh_scenario_title'), ts: s.createdAt || 0, ref: 'scenario:' + id }); } }); } catch (_) {}
   return out;
 }
@@ -11711,7 +11831,7 @@ function _wsxOpen(ref) {
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
   if (kind === 'goal') { _wshView = 'goals'; renderWorkspaceHome(); }
   else if (kind === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); }
-  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else if (p.type === 'monthly_budget') { _wsOpenTool('budget', id); } else if (p.type === 'trade_journal') { _wsOpenTool('journal', id); } else { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
+  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else if (p.type === 'monthly_budget') { _wsOpenTool('budget', id); } else if (p.type === 'trade_journal') { _wsOpenTool('journal', id); } else if (p.type === 'real_estate_portfolio') { _wsOpenTool('realestate', id); } else { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
 }
 function _wsxAct(act, ref) {
   if (!ref) return;
@@ -11826,7 +11946,7 @@ function _renderWorkspaceHome(metrics) {
     // WS.10 — visual-first card: dominant data/archetype preview, name + CTA, no
     // descriptive sentence. The preview communicates the category in <1s.
     const card = it => `
-      <div class="wsh-tpl wsh-cardv" role="button" tabindex="0" data-wsh-cta="${esc(it.cta)}"${it.arg ? ' data-ws4-type="' + esc(it.arg) + '"' : ''}>
+      <div class="wsh-tpl wsh-cardv" role="button" tabindex="0" data-wsh-cta="${esc(it.cta)}"${it.arg ? (it.cta === 'tool' ? ' data-wstool="' + esc(it.arg) + '"' : ' data-ws4-type="' + esc(it.arg) + '"') : ''}>
         ${pinBtn(it.ref)}
         <div class="wsh-pv-wrap">${_wsCatPreviewHtml(it.cat)}</div>
         <div class="wsh-cardv-foot">
@@ -11844,7 +11964,7 @@ function _renderWorkspaceHome(metrics) {
       ] },
       { title: t('wstplg_daily'), items: [ T2('budget'), T2('networth') ] },
       { title: t('wstplg_investing'), items: [ T2('investment') ] },
-      { title: t('wstplg_realestate'), items: [ T2('property'), T2('business') ] },
+      { title: t('wstplg_realestate'), items: [ { cta: 'tool', arg: 'realestate', ref: 'tpl:realestate', cat: 'realestate-pro', name: t('wsre_n') }, T2('property'), T2('business') ] },
     ];
     panel = groups.map(g => `
       <section class="wsh-card">
@@ -12871,17 +12991,19 @@ function _wsToolDefaults() {
 
 // WS.7 — tool registry: maps a tool key to its gate, defaults, project type and
 // renderer so the shared open/input/save plumbing stays tool-agnostic.
-function _wsToolDefaultsFor(key) { return key === 'budget' ? _wsBudgetDefaults() : key === 'journal' ? _wsJournalDefaults() : _wsToolDefaults(); }
-function _wsRenderTool() { return _wsToolActive === 'budget' ? _renderBudgetTool() : _wsToolActive === 'journal' ? _renderJournalTool() : _renderCompoundTool(); }
+function _wsToolDefaultsFor(key) { return key === 'budget' ? _wsBudgetDefaults() : key === 'journal' ? _wsJournalDefaults() : key === 'realestate' ? _wsReDefaults() : _wsToolDefaults(); }
+function _wsRenderTool() { return _wsToolActive === 'budget' ? _renderBudgetTool() : _wsToolActive === 'journal' ? _renderJournalTool() : _wsToolActive === 'realestate' ? _renderRealEstateTool() : _renderCompoundTool(); }
 function _wsToolOutHtmlFor(key, inp) { return key === 'budget' ? _wsBudgetOutHtml(inp) : _wsToolOutHtml(inp); }
 
 function _wsOpenTool(toolKey, projectId) {
-  const key = (toolKey === 'budget' || toolKey === 'journal') ? toolKey : 'compound';
-  if (key === 'compound' && !AURIX_WS6_TOOL) return;   // WS.6 gate
-  if (key === 'budget'   && !AURIX_WS7_TOOL) return;   // WS.7 gate
-  if (key === 'journal'  && !AURIX_WS8_TOOL) return;   // WS.8 gate
+  const key = (toolKey === 'budget' || toolKey === 'journal' || toolKey === 'realestate') ? toolKey : 'compound';
+  if (key === 'compound'   && !AURIX_WS6_TOOL) return;   // WS.6 gate
+  if (key === 'budget'     && !AURIX_WS7_TOOL) return;   // WS.7 gate
+  if (key === 'journal'    && !AURIX_WS8_TOOL) return;   // WS.8 gate
+  if (key === 'realestate' && !AURIX_WS12_TOOL) return;  // WS.12 gate
   _wsToolActive = key;
   _wsJrnDraft = (key === 'journal') ? _wsJrnNewDraft() : null; _wsJrnEditId = null;  // reset trade form
+  _wsReDraft = (key === 'realestate') ? _wsReNewDraft() : null; _wsReEditId = null; _wsReDetailId = null;  // reset property form/detail
   if (projectId) {
     // Open a saved project for editing (its inputs, tracked by edit id).
     const p = _ws4Projects().find(x => x && x.id === projectId);
@@ -12915,7 +13037,11 @@ function _wsToolSave() {
   const list = _ws4Projects();
   const existing = _wsToolEditId ? list.find(p => p && p.id === _wsToolEditId) : null;
   let type, results;
-  if (_wsToolActive === 'journal') {
+  if (_wsToolActive === 'realestate') {
+    const r = calculateRealEstatePortfolio(_wsToolInputs.properties);
+    type = 'real_estate_portfolio';
+    results = { count: r.count, valueTotal: Math.round(r.valueTotal), equityTotal: Math.round(r.equityTotal), cashflowMonthly: Math.round(r.cashflowMonthly), avgYield: Math.round(r.avgYield * 10) / 10 };
+  } else if (_wsToolActive === 'journal') {
     const r = calculateTradeJournal(_wsToolInputs.trades);
     type = 'trade_journal';
     results = { netProfit: Math.round(r.netProfit), avgReturn: Math.round(r.avgReturn * 10) / 10, winRate: Math.round(r.winRate), closedCount: r.closedCount, count: r.list.length };
@@ -12947,7 +13073,7 @@ function _wsToolSaveBarHtml() {
   const state = _wsToolEditId ? (_wsToolDirty ? 'dirty' : 'saved') : 'unsaved';
   const lbl = { unsaved: t('wsg_save_unsaved'), dirty: t('wsg_save_pending'), saved: t('wsg_save_done') }[state];
   const canSave = !_wsToolEditId || _wsToolDirty;
-  const saveLabel = _wsToolActive === 'journal' ? t('wstool_save_journal') : t('wstool_save');
+  const saveLabel = _wsToolActive === 'journal' ? t('wstool_save_journal') : _wsToolActive === 'realestate' ? t('wsre_save') : t('wstool_save');
   return `
     <span class="wsg-savestate is-${state}">${esc(lbl)}</span>
     <button type="button" class="wsh-cta is-primary wsg-savebtn" data-wstool-save${canSave ? '' : ' disabled'}>${esc(saveLabel)}</button>`;
@@ -13403,6 +13529,306 @@ function _renderJournalTool() {
       </section>
       ${_wsJrnFormHtml()}
       ${_wsJrnListHtml(res)}
+      <section class="wsh-card wsg-foot-card">
+        <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
+      </section>
+    </div>`;
+}
+
+// ── WS.12 — Real Estate Portfolio Pro ────────────────────────────────────────
+// Portfolio-first: the portfolio is the protagonist, properties are components.
+// 100% autonomous (WS.11A): NO Dashboard/wealthEngine/portfolio reads. Pure.
+const _WSRE_TYPES = ['flat', 'house', 'local', 'office', 'warehouse', 'garage'];
+const _WSRE_COVER = { flat: '#4d8dff', house: '#2fd98e', local: '#e0a85c', office: '#8a7dff', warehouse: '#37c7b8', garage: '#7c89a3' };
+function calculateRealEstatePortfolio(properties) {
+  const list = (Array.isArray(properties) ? properties : []).map(p => {
+    const buy = Math.max(0, Number(p.buy) || 0);
+    const value = Math.max(0, Number(p.value) || 0) || buy;
+    const rent = Math.max(0, Number(p.rent) || 0);
+    const expenses = Math.max(0, Number(p.expenses) || 0);
+    const mortgage = Math.max(0, Number(p.mortgage) || 0);
+    const payment = Math.max(0, Number(p.payment) || 0);
+    const cashflowMonthly = rent - expenses - payment;
+    const cashflowAnnual = cashflowMonthly * 12;
+    const grossYield = buy > 0 ? (rent * 12) / buy * 100 : 0;
+    const netYield = buy > 0 ? ((rent - expenses) * 12) / buy * 100 : 0;
+    const equity = value - mortgage;
+    const roi = equity > 0 ? cashflowAnnual / equity * 100 : 0;
+    const status = cashflowMonthly < 0 ? 'red' : (cashflowMonthly > 0 && netYield >= 5 ? 'green' : 'amber');
+    return Object.assign({}, p, { buy, value, rent, expenses, mortgage, payment, cashflowMonthly, cashflowAnnual, grossYield, netYield, equity, roi, status });
+  });
+  const n = list.length, sum = k => list.reduce((s, x) => s + x[k], 0);
+  const valueTotal = sum('value'), mortgageTotal = sum('mortgage');
+  const cashflowMonthly = sum('cashflowMonthly');
+  let best = null, worst = null;
+  for (const x of list) { if (best === null || x.cashflowMonthly > best.cashflowMonthly) best = x; if (worst === null || x.cashflowMonthly < worst.cashflowMonthly) worst = x; }
+  return {
+    list, count: n,
+    buyTotal: sum('buy'), valueTotal, mortgageTotal,
+    equityTotal: valueTotal - mortgageTotal,
+    cashflowMonthly, cashflowAnnual: cashflowMonthly * 12,
+    avgYield: n ? list.reduce((s, x) => s + x.netYield, 0) / n : 0,
+    best, worst,
+    ranking: list.slice().sort((a, b) => b.cashflowMonthly - a.cashflowMonthly),
+  };
+}
+function _wsReNewDraft() {
+  // WS.12 §10 — future-prep fields carried (no logic yet).
+  return { name: '', ptype: 'flat', city: '', photo: '', buy: '', value: '', rent: '', expenses: '', mortgage: '', payment: '', buyDate: '', notes: '', timeline: [], tenantId: null, maintenanceId: null, vacancyRate: 0, insuranceCost: 0, propertyTax: 0, communityFees: 0 };
+}
+function _wsReDemo() {
+  const base = (o) => Object.assign(_wsReNewDraft(), o);
+  return [
+    base({ id: 'pr_d1', name: 'Piso Centro', ptype: 'flat', city: 'Madrid', buy: 240000, value: 295000, rent: 1250, expenses: 180, mortgage: 150000, payment: 620, buyDate: '2021', timeline: [{ id: 't1', kind: 'buy', label: 'Compra', date: '2021' }] }),
+    base({ id: 'pr_d2', name: 'Apartamento Playa', ptype: 'flat', city: 'Valencia', buy: 175000, value: 205000, rent: 950, expenses: 140, mortgage: 95000, payment: 430, buyDate: '2022' }),
+    base({ id: 'pr_d3', name: 'Local Comercial', ptype: 'local', city: 'Málaga', buy: 130000, value: 160000, rent: 880, expenses: 90, mortgage: 60000, payment: 300, buyDate: '2020' }),
+  ];
+}
+function _wsReDefaults() { return { properties: _wsReDemo() }; }
+function _wsReCoverStyle(p) {
+  if (p && p.photo) return `background-image:url(${p.photo})`;
+  const c = _WSRE_COVER[p && p.ptype] || '#4d8dff';
+  return `background-image:linear-gradient(150deg, ${c}33, rgba(10,16,30,0.85) 78%), radial-gradient(120% 90% at 80% 0%, ${c}40, transparent 60%)`;
+}
+function _wsReOnInput(el) {
+  if (!_wsReDraft) _wsReDraft = _wsReNewDraft();
+  _wsReDraft[el.getAttribute('data-wsre-input')] = el.value;
+  const root = document.querySelector('.wsh-tool-view');
+  const pv = root && root.querySelector('[data-wsre-pv]');
+  if (pv) pv.innerHTML = _wsRePreviewLine(_wsReDraft);
+}
+function _wsRePreviewLine(d) {
+  const esc = _intccEsc;
+  const one = calculateRealEstatePortfolio([d]).list[0];
+  if (!one || (one.buy <= 0 && one.rent <= 0)) return '';
+  const cf = one.cashflowMonthly;
+  return `<span class="wsre-prev is-${cf >= 0 ? 'win' : 'loss'}">${esc((cf >= 0 ? '+' : '') + formatBase(cf))}${esc(t('wsre_permonth'))} · ${esc(_wsJrnPct(one.netYield))} · ${esc(t('wsre_kpi_equity'))} ${esc(formatBase(one.equity))}</span>`;
+}
+function _wsRePhoto(input) {
+  const f = input && input.files && input.files[0]; if (!f) return;
+  try {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 640; let w = img.width, h = img.height;
+        if (w > max) { h = Math.round(h * max / w); w = max; }
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        if (!_wsReDraft) _wsReDraft = _wsReNewDraft();
+        _wsReDraft.photo = cv.toDataURL('image/jpeg', 0.72);
+        const root = document.querySelector('.wsh-tool-view');
+        const box = root && root.querySelector('[data-wsre-photo-pv]');
+        if (box) { box.style.backgroundImage = `url(${_wsReDraft.photo})`; box.classList.add('has-photo'); }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(f);
+  } catch (_) {}
+}
+function _wsReRerender() { const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderRealEstateTool(); _wshReveal(c); } }
+function _wsReProps() { if (!_wsToolInputs || !Array.isArray(_wsToolInputs.properties)) _wsToolInputs = _wsReDefaults(); return _wsToolInputs.properties; }
+function _wsReAdd() {
+  const d = _wsReDraft || _wsReNewDraft();
+  const name = (d.name || '').trim();
+  if (!name && _wsNum(d.buy) <= 0) return;   // need at least a name or a price
+  const prop = Object.assign(_wsReNewDraft(), {
+    id: _wsReEditId || ('pr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6)),
+    name: name || t('wsre_n'), ptype: d.ptype || 'flat', city: (d.city || '').trim(), photo: d.photo || '',
+    buy: _wsNum(d.buy), value: _wsNum(d.value), rent: _wsNum(d.rent), expenses: _wsNum(d.expenses),
+    mortgage: _wsNum(d.mortgage), payment: _wsNum(d.payment), buyDate: d.buyDate || '', notes: (d.notes || '').trim(),
+    timeline: Array.isArray(d.timeline) ? d.timeline : [],
+  });
+  const list = _wsReProps();
+  if (_wsReEditId) { const i = list.findIndex(x => x && x.id === _wsReEditId); if (i >= 0) prop.timeline = list[i].timeline || []; if (i >= 0) list[i] = prop; else list.push(prop); }
+  else list.push(prop);
+  _wsToolInputs.properties = list; _wsToolDirty = true; _wsToolStateSet('realestate', _wsToolInputs);
+  _wsReDraft = _wsReNewDraft(); _wsReEditId = null;
+  _wsReRerender();
+}
+function _wsReAct(act, id) {
+  const list = _wsReProps();
+  const p = list.find(x => x && x.id === id); if (!p) return;
+  if (act === 'detail') { _wsReDetailId = id; _wsReRerender(); return; }
+  if (act === 'edit') {
+    _wsReEditId = id; _wsReDetailId = null;
+    _wsReDraft = Object.assign(_wsReNewDraft(), p, { buy: String(p.buy || ''), value: String(p.value || ''), rent: String(p.rent || ''), expenses: String(p.expenses || ''), mortgage: String(p.mortgage || ''), payment: String(p.payment || '') });
+    _wsReRerender(); return;
+  }
+  if (act === 'dup') { list.push(Object.assign({}, p, { id: 'pr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), timeline: (p.timeline || []).slice() })); _wsToolDirty = true; _wsToolStateSet('realestate', _wsToolInputs); _wsReRerender(); return; }
+  if (act === 'del') {
+    _wsConfirm(() => {
+      const i = list.findIndex(x => x && x.id === id); if (i >= 0) list.splice(i, 1);
+      if (_wsReDetailId === id) _wsReDetailId = null;
+      if (_wsReEditId === id) { _wsReEditId = null; _wsReDraft = _wsReNewDraft(); }
+      _wsToolDirty = true; _wsToolStateSet('realestate', _wsToolInputs); _wsReRerender();
+    });
+  }
+}
+function _wsReCancel() { _wsReEditId = null; _wsReDraft = _wsReNewDraft(); _wsReRerender(); }
+function _wsReBack() { _wsReDetailId = null; _wsReRerender(); }
+function _wsReTimelineAdd() {
+  if (_wsReDetailId == null) return;
+  const root = document.querySelector('.wsh-tool-view');
+  const kindEl = root && root.querySelector('[data-wsre-tl-kind]');
+  const txtEl = root && root.querySelector('[data-wsre-tl-text]');
+  const dateEl = root && root.querySelector('[data-wsre-tl-date]');
+  const label = txtEl ? (txtEl.value || '').trim() : '';
+  if (!label) return;
+  const list = _wsReProps(); const p = list.find(x => x && x.id === _wsReDetailId); if (!p) return;
+  if (!Array.isArray(p.timeline)) p.timeline = [];
+  p.timeline.push({ id: 'tl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5), kind: (kindEl && kindEl.value) || 'note', label, date: (dateEl && dateEl.value) || '' });
+  _wsToolDirty = true; _wsToolStateSet('realestate', _wsToolInputs); _wsReRerender();
+}
+
+function _wsReSummaryHtml(r) {
+  const esc = _intccEsc;
+  const cfCls = r.cashflowMonthly >= 0 ? 'is-pos' : 'is-neg';
+  return `
+    <div class="wsre-summary">
+      <div class="wsre-sum-head"><span class="wsre-sum-count">${r.count} ${esc(t('wsre_unit'))}</span><span class="wsre-sum-value">${esc(formatBase(r.valueTotal))}</span><span class="wsre-sum-vlbl">${esc(t('wsre_kpi_value'))}</span></div>
+      <div class="wsre-kpis">
+        <div class="wsre-kpi is-equity"><span class="wsre-kpi-v">${esc(formatBase(r.equityTotal))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_equity'))}</span></div>
+        <div class="wsre-kpi is-cf"><span class="wsre-kpi-v ${cfCls}">${esc((r.cashflowMonthly >= 0 ? '+' : '') + formatBase(r.cashflowMonthly))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_cashflow'))}</span></div>
+        <div class="wsre-kpi is-yield"><span class="wsre-kpi-v">${esc(_wsJrnPct(r.avgYield))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_yield'))}</span></div>
+      </div>
+      <div class="wsre-subkpis">
+        <span class="wsre-subkpi"><b>${esc(formatBase(r.mortgageTotal))}</b><i>${esc(t('wsre_kpi_mortgage'))}</i></span>
+        <span class="wsre-subkpi"><b>${esc((r.cashflowAnnual >= 0 ? '+' : '') + formatBase(r.cashflowAnnual))}</b><i>${esc(t('wsre_kpi_cf_annual'))}</i></span>
+        <span class="wsre-subkpi"><b>${esc(formatBase(r.buyTotal))}</b><i>${esc(t('wsre_kpi_buy'))}</i></span>
+      </div>
+    </div>`;
+}
+function _wsRePropCard(p) {
+  const esc = _intccEsc;
+  const cf = p.cashflowMonthly;
+  return `
+    <div class="wsre-card" role="button" tabindex="0" data-wsre-act="detail" data-wsre-id="${esc(p.id)}">
+      <div class="wsre-cover" style="${_wsReCoverStyle(p)}"><span class="wsre-status is-${esc(p.status)}"></span></div>
+      <div class="wsre-card-body">
+        <div class="wsre-card-top"><p class="wsre-card-name">${esc(p.name)}</p><span class="wsre-card-city">${esc(p.city || t('wsre_t_' + p.ptype))}</span></div>
+        <div class="wsre-card-rows">
+          <span class="wsre-prow"><i>${esc(t('wsre_kpi_cashflow'))}</i><b class="is-${cf >= 0 ? 'win' : 'loss'}">${esc((cf >= 0 ? '+' : '') + formatBase(cf))}</b></span>
+          <span class="wsre-prow"><i>${esc(t('wsre_kpi_equity'))}</i><b>${esc(formatBase(p.equity))}</b></span>
+          <span class="wsre-prow"><i>${esc(t('wsre_kpi_yield'))}</i><b>${esc(_wsJrnPct(p.netYield))}</b></span>
+        </div>
+        <div class="wsre-card-acts">
+          <button type="button" class="wsre-mini" data-wsre-act="edit" data-wsre-id="${esc(p.id)}" title="${esc(t('wsjrn_edit'))}" aria-label="${esc(t('wsjrn_edit'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M14 6l4 4"/></svg></button>
+          <button type="button" class="wsre-mini" data-wsre-act="dup" data-wsre-id="${esc(p.id)}" title="${esc(t('wsg_act_dup'))}" aria-label="${esc(t('wsg_act_dup'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg></button>
+          <button type="button" class="wsre-mini is-danger" data-wsre-act="del" data-wsre-id="${esc(p.id)}" title="${esc(t('wsg_act_del'))}" aria-label="${esc(t('wsg_act_del'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/></svg></button>
+        </div>
+      </div>
+    </div>`;
+}
+function _wsReFormHtml() {
+  const esc = _intccEsc;
+  const d = _wsReDraft || _wsReNewDraft();
+  const editing = !!_wsReEditId;
+  const txt = (k, label) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" autocomplete="off" data-wsre-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"></span></label>`;
+  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsre-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}"><span class="ws4-field-unit">${esc(unit || '')}</span></span></label>`;
+  const typeOpts = _WSRE_TYPES.map(ty => `<option value="${ty}"${d.ptype === ty ? ' selected' : ''}>${esc(t('wsre_t_' + ty))}</option>`).join('');
+  return `
+    <section class="wsh-card wsre-form-card">
+      <header class="wsh-head"><h3 class="wsh-title">${esc(editing ? t('wsre_edit') : t('wsre_add'))}</h3></header>
+      <div class="wsre-form-photo">
+        <div class="wsre-photo-pv${d.photo ? ' has-photo' : ''}" data-wsre-photo-pv${d.photo ? ` style="background-image:url(${d.photo})"` : ''}></div>
+        <label class="wsre-photo-btn">${esc(t('wsre_f_photo'))}<input type="file" accept="image/*" data-wsre-photo hidden></label>
+      </div>
+      <div class="wsre-form-grid">
+        ${txt('name', t('wsre_f_name'))}
+        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsre_f_type'))}</span><span class="ws4-field-input"><select class="ws4-num wsjrn-select" data-wsre-input="ptype">${typeOpts}</select></span></label>
+        ${txt('city', t('wsre_f_city'))}
+        ${num('buy', t('wsre_f_buy'), '€')}
+        ${num('value', t('wsre_f_value'), '€')}
+        ${num('rent', t('wsre_f_rent'), '€')}
+        ${num('expenses', t('wsre_f_expenses'), '€')}
+        ${num('mortgage', t('wsre_f_mortgage'), '€')}
+        ${num('payment', t('wsre_f_payment'), '€')}
+        ${txt('buyDate', t('wsre_f_date'))}
+        ${txt('notes', t('wsre_f_notes'))}
+      </div>
+      <div class="wsre-form-foot">
+        <span class="wsre-prev-wrap" data-wsre-pv>${_wsRePreviewLine(d)}</span>
+        <div class="wsre-form-btns">
+          ${editing ? `<button type="button" class="wsg-act" data-wsre-cancel>${esc(t('wsjrn_cancel'))}</button>` : ''}
+          <button type="button" class="wsh-cta is-primary" data-wsre-add>${esc(editing ? t('wsjrn_save_edit') : t('wsre_add_btn'))}</button>
+        </div>
+      </div>
+    </section>`;
+}
+function _wsReDetailHtml(p) {
+  const esc = _intccEsc;
+  const one = calculateRealEstatePortfolio([p]).list[0];
+  const row = (label, val, cls) => `<div class="wsre-d-row"><span>${esc(label)}</span><b class="${cls || ''}">${esc(val)}</b></div>`;
+  const cf = one.cashflowMonthly;
+  const tlKinds = ['buy', 'reform', 'rent_up', 'incident', 'note'];
+  const tlItems = (p.timeline || []).slice().reverse().map(ev => `<li class="wsre-tl-item"><span class="wsre-tl-dot is-${esc(ev.kind || 'note')}"></span><span class="wsre-tl-label">${esc(ev.label)}</span>${ev.date ? `<span class="wsre-tl-date">${esc(ev.date)}</span>` : ''}</li>`).join('');
+  return `
+    <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
+      <section class="wsh-card wsb-header">
+        <button type="button" class="wsb-back" data-wsre-back>‹ ${esc(t('wsre_back_portfolio'))}</button>
+        <h2 class="wsb-title">${esc(p.name)}</h2>
+        <p class="wsb-subtitle">${esc(p.city || '')}${p.city ? ' · ' : ''}${esc(t('wsre_t_' + p.ptype))}</p>
+      </section>
+      <section class="wsh-card wsre-detail-hero">
+        <div class="wsre-detail-cover" style="${_wsReCoverStyle(p)}"><span class="wsre-status is-${esc(one.status)}"></span></div>
+        <div class="wsre-detail-kpis">
+          <div class="wsre-kpi is-cf"><span class="wsre-kpi-v ${cf >= 0 ? 'is-pos' : 'is-neg'}">${esc((cf >= 0 ? '+' : '') + formatBase(cf))}${esc(t('wsre_permonth'))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_cashflow'))}</span></div>
+          <div class="wsre-kpi is-equity"><span class="wsre-kpi-v">${esc(formatBase(one.equity))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_equity'))}</span></div>
+          <div class="wsre-kpi is-yield"><span class="wsre-kpi-v">${esc(_wsJrnPct(one.netYield))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_yield'))}</span></div>
+        </div>
+      </section>
+      <section class="wsh-card">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsre_d_finance'))}</h3></header>
+        <div class="wsre-d-rows">
+          ${row(t('wsre_f_buy'), formatBase(one.buy))}
+          ${row(t('wsre_f_value'), formatBase(one.value))}
+          ${row(t('wsre_kpi_mortgage'), formatBase(one.mortgage))}
+          ${row(t('wsre_kpi_equity'), formatBase(one.equity))}
+          ${row(t('wsre_d_gross'), _wsJrnPct(one.grossYield))}
+          ${row(t('wsre_d_roi'), _wsJrnPct(one.roi))}
+        </div>
+        ${p.notes ? `<p class="wsre-d-notes">${esc(p.notes)}</p>` : ''}
+      </section>
+      <section class="wsh-card">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsre_d_timeline'))}</h3></header>
+        <div class="wsre-tl-form">
+          <select class="ws4-num wsjrn-select" data-wsre-tl-kind>${tlKinds.map(k => `<option value="${k}">${esc(t('wsre_tl_' + k))}</option>`).join('')}</select>
+          <input class="ws4-num" type="text" autocomplete="off" data-wsre-tl-text placeholder="${esc(t('wsre_tl_ph'))}">
+          <input class="ws4-num wsre-tl-datein" type="text" autocomplete="off" data-wsre-tl-date placeholder="${esc(t('wsre_tl_date'))}">
+          <button type="button" class="wsh-cta is-primary" data-wsre-tl-add>${esc(t('wsjrn_add'))}</button>
+        </div>
+        ${tlItems ? `<ul class="wsre-tl-list">${tlItems}</ul>` : `<p class="wsh-empty">${esc(t('wsre_tl_empty'))}</p>`}
+      </section>
+    </div>`;
+}
+function _renderRealEstateTool() {
+  const esc = _intccEsc;
+  const props = _wsReProps();
+  if (!_wsReDraft) _wsReDraft = _wsReNewDraft();
+  // Detail sub-view.
+  if (_wsReDetailId != null) {
+    const p = props.find(x => x && x.id === _wsReDetailId);
+    if (p) return _wsReDetailHtml(p);
+    _wsReDetailId = null;
+  }
+  const r = calculateRealEstatePortfolio(props);
+  const gridOrEmpty = props.length
+    ? `<div class="wsre-grid">${r.list.map(_wsRePropCard).join('')}</div>`
+    : `<div class="wsre-grid is-premium-preview">${_wsReDemo().map(d => _wsRePropCard(calculateRealEstatePortfolio([d]).list[0])).join('')}</div><p class="wsre-empty-hint">${esc(t('wsre_empty'))}</p>`;
+  return `
+    <div class="aurix-wsh wsh-tool-view wsh-re-view is-revealed" data-wsh-view="tool">
+      <section class="wsh-card wsb-header">
+        <button type="button" class="wsb-back" data-wsh-nav="templates">‹ ${esc(t('wstool_back'))}</button>
+        <h2 class="wsb-title">${esc(t('wsre_n'))}</h2>
+        <p class="wsb-subtitle">${esc(t('wsre_d'))}</p>
+      </section>
+      <section class="wsh-card wsre-summary-card">${_wsReSummaryHtml(r)}</section>
+      <section class="wsh-card">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsre_grid_title'))}</h3></header>
+        ${gridOrEmpty}
+      </section>
+      ${_wsReFormHtml()}
       <section class="wsh-card wsg-foot-card">
         <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
       </section>
