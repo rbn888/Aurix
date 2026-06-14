@@ -12906,7 +12906,7 @@ function _ws4SetMode(mode) {
 
 function _ws4OnInput(el) {
   const p = _ws4Get(); if (!p) return;
-  p.inputs[el.getAttribute('data-ws4-input')] = _wsNum(el.value);
+  p.inputs[el.getAttribute('data-ws4-input')] = el.value;  // WS.15A raw value during edit
   _ws4Dirty = true;
   const root = document.querySelector('.wsh-ws4');
   const out  = root && root.querySelector('[data-ws4-out]');
@@ -13045,14 +13045,14 @@ function _wsgPersist(g) { const list = _wsgGoals(); const i = list.findIndex(x =
 
 // Deterministic progress. currentWealth is the real read-only figure (for sync).
 function calculateGoalProgress(goal, currentWealth) {
-  const target = Math.max(0, Number(goal.target) || 0);
-  const cur = goal.mode === 'sync' ? Math.max(0, Number(currentWealth) || 0) : Math.max(0, Number(goal.current) || 0);
+  const target = Math.max(0, _wsNum(goal.target));
+  const cur = goal.mode === 'sync' ? Math.max(0, Number(currentWealth) || 0) : Math.max(0, _wsNum(goal.current));
   if (target <= 0) return { state: 'no-data', pct: 0, remaining: 0, months: null, etaYear: null, requiredMonthly: null, current: cur, target };
   if (cur >= target) return { state: 'reached', pct: 100, remaining: 0, months: 0, etaYear: _wsgThisYear(), requiredMonthly: 0, current: cur, target };
   const pct = Math.min(99, Math.round(cur / target * 100));
   const remaining = target - cur;
   const r = 0.05 / 12;
-  const monthly = Math.max(0, Number(goal.monthly) || 0);
+  const monthly = Math.max(0, _wsNum(goal.monthly));
   let months = null;
   if (monthly > 0 || cur > 0) {
     for (let n = 1; n <= 600; n++) {
@@ -13141,7 +13141,7 @@ function _wsgSetMode(id, mode) {
 function _wsgOnInput(el) {
   const id = el.getAttribute('data-wsg-id'); const k = el.getAttribute('data-wsg-input');
   const g = _wsgEnsureWorking(id); if (!g) return;
-  g[k] = _wsNum(el.value); _wsgDirty[id] = true;
+  g[k] = el.value; _wsgDirty[id] = true;  // WS.15A raw value during edit
   const card = el.closest('.wsg-card'); if (!card) return;
   const out = card.querySelector('[data-wsg-out]');
   if (out) out.innerHTML = _wsgCardOutHtml(g, calculateGoalProgress(g, _ws4Real().wealth));
@@ -13421,9 +13421,9 @@ function _renderGoals() {
 // Deterministic: initial compounded monthly + monthly contributions (ordinary
 // annuity). No APIs, no AI, no wealthEngine.
 function calculateCompoundGrowth(initial, monthly, annualReturn, years) {
-  const init = Math.max(0, Number(initial) || 0);
-  const m    = Math.max(0, Number(monthly) || 0);
-  const yrs  = Math.max(0, Math.round(Number(years) || 0));
+  const init = Math.max(0, _wsNum(initial));        // WS.15A tolerant parse
+  const m    = Math.max(0, _wsNum(monthly));
+  const yrs  = Math.max(0, Math.round(_wsNum(years)));
   const r    = (Number(annualReturn) || 0) / 12;
   const fv = (nn) => init * Math.pow(1 + r, nn) + (r > 0 ? m * ((Math.pow(1 + r, nn) - 1) / r) : m * nn);
   const n = yrs * 12;
@@ -13476,7 +13476,7 @@ function _wsOpenTool(toolKey, projectId) {
 
 function _wsToolOnInput(el) {
   if (!_wsToolInputs) return;
-  _wsToolInputs[el.getAttribute('data-wstool-input')] = _wsNum(el.value);
+  _wsToolInputs[el.getAttribute('data-wstool-input')] = el.value;  // WS.15A raw value during edit (empty stays empty)
   _wsToolDirty = true;
   // WS.7A — keep the tool's last local state in sync; this never creates a project.
   _wsToolStateSet(_wsToolActive, _wsToolInputs);
@@ -13660,7 +13660,7 @@ const _WSBUD_EXPENSES = [
 
 function calculateMonthlyBudget(inp) {
   inp = inp || {};
-  const num = k => Math.max(0, Number(inp[k]) || 0);
+  const num = k => Math.max(0, _wsNum(inp[k]));  // WS.15A tolerant parse
   const income = _WSBUD_INCOME.reduce((s, f) => s + num(f.k), 0);
   const items = _WSBUD_EXPENSES.map(f => ({ k: f.k, label: f.label, color: f.color, value: num(f.k) }));
   const expenses = items.reduce((s, it) => s + it.value, 0);
