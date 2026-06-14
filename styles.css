@@ -20184,6 +20184,58 @@ body.gs-open { overflow: hidden; }
   .wsh-tool-grid { grid-template-columns: 1fr; }
 }
 
+/* ════════ WS.11B — Mi Espacio professional desktop ═══════════════════════════ */
+.wsh-mse { display: flex; flex-direction: column; gap: 14px; }
+.wsh-premium-badge { margin-left: auto; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #f3cf9a; padding: 3px 9px; border-radius: 999px; background: rgba(233,168,87,0.12); border: 1px solid rgba(233,168,87,0.32); }
+.wsh-mse-block .wsh-head { display: flex; align-items: center; }
+/* (1) Trabajo diario — big project cards */
+.wsh-daily-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.wsh-dcard { display: flex; flex-direction: column; border-radius: 14px; border: 1px solid rgba(120,160,255,0.14); background: rgba(255,255,255,0.022); overflow: hidden; transition: border-color 180ms ease, transform 180ms ease; }
+.wsh-dcard:hover { border-color: rgba(77,141,255,0.34); transform: translateY(-2px); }
+.wsh-dcard-pv { height: 116px; display: flex; }
+.wsh-dcard-pv > .wspv { flex: 1 1 auto; }
+.wsh-dcard-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-top: 1px solid rgba(120,160,255,0.10); }
+.wsh-dcard-txt { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.wsh-dcard-name { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-bright); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wsh-dcard-type { font-size: 11px; color: var(--text-muted); }
+.wsh-dcard-acts { display: flex; align-items: center; gap: 7px; flex: none; }
+.wsh-dcard.is-demo { cursor: pointer; }
+.wsh-dcard.is-demo .wsh-dcard-type { color: rgba(159,194,255,0.8); }
+/* premium-preview prep (NOT locking anything now) */
+.is-premium-preview { position: relative; }
+.is-premium-preview .wsh-dcard.is-demo { opacity: 0.97; }
+.is-locked { pointer-events: none; filter: grayscale(0.25) brightness(0.85); }
+/* progress preview (goals) */
+.wspv-goal { gap: 10px; }
+.wspv-goal-top { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.wspv-goal-glyph { color: #f3cf9a; }
+.wspv-goal-glyph svg { width: 30px; height: 30px; }
+.wspv-goal-pct { font-size: 22px; font-weight: 800; color: var(--text-bright); font-variant-numeric: tabular-nums; }
+.wspv-goal-track { width: 100%; height: 8px; border-radius: 99px; background: rgba(255,255,255,0.07); overflow: hidden; }
+.wspv-goal-fill { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #4d8dff, #7fb0ff); }
+/* journal summary preview */
+.wspv-jsum { background: linear-gradient(165deg, rgba(120,160,255,0.06), rgba(255,255,255,0.012)); }
+.wspv-jsum-v { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.wspv-jsum-v.is-win { color: #7ef0b8; }
+.wspv-jsum-v.is-loss { color: #f0897f; }
+.wspv-jsum-k { font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); font-weight: 600; }
+/* (2) Herramientas fijadas — compact toolbox */
+.wsh-tool-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.wsh-tchip { display: flex; align-items: center; gap: 9px; padding: 8px 10px 8px 8px; border-radius: 12px; border: 1px solid rgba(224,177,92,0.28); border-style: dashed; background: rgba(224,177,92,0.05); }
+.wsh-tchip-ic { width: 34px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 8px; background: rgba(74,130,240,0.10); color: #9fc2ff; }
+.wsh-tchip-ic .wsh-tpl-viz-svg { width: 30px; height: 18px; }
+.wsh-tchip-name { font-size: 13px; font-weight: 700; color: var(--text-bright); }
+.wsh-tchip-open { font: inherit; cursor: pointer; font-size: 12px; font-weight: 700; color: #cfe0ff; padding: 6px 11px; border-radius: 8px; border: 1px solid rgba(74,130,240,0.30); background: rgba(74,130,240,0.14); }
+.wsh-tchip-open:hover { background: rgba(74,130,240,0.24); }
+.wsh-tchip-x { flex: none; width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 7px; cursor: pointer; color: var(--text-muted); background: transparent; border: 1px solid rgba(120,160,255,0.16); }
+.wsh-tchip-x:hover { color: #cfe0ff; }
+.wsh-tchip-x svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; }
+@media (max-width: 920px) { .wsh-daily-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) {
+  .wsh-daily-grid { grid-template-columns: 1fr; }
+  .wsh-tchip { flex: 1 1 100%; }
+}
+
 /* ════════ WS.2 — Financial Tools Hub (dedicated tools) ═══════════════════════
    Premium interactive tools that open inside Workspace templates mode (never
    the Sheet). Encapsulated under ws2-* classes; responsive. */

@@ -1993,6 +1993,11 @@ const T = {
     wsfund_yesterday:   'Ayer',
     wsfund_days_ago:    n => `Hace ${n} días`,
     wsfund_updated:     'Fondos asignados actualizados',
+    // WS.11B — My Space professional desktop
+    wsmse_daily:        'Trabajo diario',
+    wsmse_pinned:       'Herramientas fijadas',
+    wsmse_demo_hint:    'Vista previa · crea el tuyo',
+    wsh_premium_badge:  'Premium',
     // WS.5C — delete confirm modal
     wsmodal_del_title: 'Eliminar elemento',
     wsmodal_del_text:  'Esta acción no se puede deshacer.',
@@ -3758,6 +3763,11 @@ const T = {
     wsfund_yesterday:   'Yesterday',
     wsfund_days_ago:    n => `${n} days ago`,
     wsfund_updated:     'Assigned funds updated',
+    // WS.11B — My Space professional desktop
+    wsmse_daily:        'Daily work',
+    wsmse_pinned:       'Pinned tools',
+    wsmse_demo_hint:    'Preview · create your own',
+    wsh_premium_badge:  'Premium',
     // WS.5C — delete confirm modal
     wsmodal_del_title: 'Delete item',
     wsmodal_del_text:  'This action cannot be undone.',
@@ -11651,6 +11661,35 @@ function _wsCatPreviewHtml(cat) {
   return _wsGlyphTile(A.glyph, A.accent);
 }
 
+// WS.11B — saved-project preview built from the project's OWN stored data
+// (reuses the WS.10 visual language). Used in Mi Espacio > Trabajo diario.
+function _wsProjPreviewHtml(p) {
+  const esc = _intccEsc;
+  if (p.kind === 'goal') {
+    const tgt = Math.max(0, Number(p.target) || 0), cur = Math.max(0, Number(p.current) || 0);
+    const pct = tgt > 0 ? Math.min(100, Math.round(cur / tgt * 100)) : 0;
+    return `<div class="wspv wspv-goal"><div class="wspv-goal-top"><span class="wspv-goal-glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsGlyph(_wsGoalGlyph(p.gtype || 'free'))}</svg></span><span class="wspv-goal-pct">${pct}%</span></div><div class="wspv-goal-track"><span class="wspv-goal-fill" style="width:${pct}%"></span></div></div>`;
+  }
+  const r = p.results || {};
+  if (p.type === 'compound_growth') {
+    return `<div class="wspv wspv-compound"><div class="wspv-fig"><span class="wspv-num">${esc(formatBase(r.final || 0))}</span><span class="wspv-lbl">${esc(t('wstool_res_final'))}</span></div><svg class="wspv-spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"><polygon class="wspv-spark-area" points="0,30 6,26 40,16 80,8 114,3 120,2 120,30"/><polyline class="wspv-spark-line" points="0,28 40,16 80,8 120,2"/></svg></div>`;
+  }
+  if (p.type === 'monthly_budget') {
+    return `<div class="wspv wspv-budget"><div class="wspv-rows">
+      <span class="wspv-row"><b class="wspv-row-v">${esc(formatBase(r.income || 0))}</b><i class="wspv-row-k">${esc(t('wstool_budget_sec_income'))}</i></span>
+      <span class="wspv-row"><b class="wspv-row-v">${esc(formatBase(r.expenses || 0))}</b><i class="wspv-row-k">${esc(t('wstool_budget_sec_expenses'))}</i></span>
+      <span class="wspv-row is-free"><b class="wspv-row-v">${esc(formatBase(r.free || 0))}</b><i class="wspv-row-k">${esc(t('wstool_bud_free'))}</i></span>
+    </div></div>`;
+  }
+  if (p.type === 'trade_journal') {
+    const np = r.netProfit || 0;
+    return `<div class="wspv wspv-jsum"><span class="wspv-jsum-v is-${np >= 0 ? 'win' : 'loss'}">${esc((np >= 0 ? '+' : '') + formatBase(np))}</span><span class="wspv-jsum-k">${r.winRate != null ? r.winRate + '% ' + esc(t('wsjrn_sum_winrate')) : esc(t('wsjrn_sum_net'))}</span></div>`;
+  }
+  if (p.kind === 'scenario') return `<div class="wspv wspv-viz is-blue">${_wsTplViz('compare')}</div>`;
+  const A = _WS_ARCH[p.type] || { accent: 'blue', glyph: 'portfolio' };
+  return _wsGlyphTile(A.glyph, A.accent);
+}
+
 // WS.6A — smart entry tab: never land on an empty "Mi espacio".
 function _wsSmartTab() {
   const hasSaved = _wshAllProjects().length > 0 || _wsPinned().length > 0;
@@ -11661,7 +11700,7 @@ function _wsSmartTab() {
 // WS.5A P3/P4 — unified view of saved items across the 3 stores.
 function _wshAllProjects() {
   const out = [];
-  try { _wshReadStore(_WSH_GOALS_KEY).forEach(g => { if (g) out.push({ kind: 'goal', id: g.id, name: _wsLabel('goal', g), typeLabel: t('wsg_type_' + (g.type || 'free')), ts: g.updatedAt || g.createdAt || 0, ref: 'goal:' + g.id }); }); } catch (_) {}
+  try { _wshReadStore(_WSH_GOALS_KEY).forEach(g => { if (g) out.push({ kind: 'goal', id: g.id, gtype: g.type, target: g.target, current: g.current, name: _wsLabel('goal', g), typeLabel: t('wsg_type_' + (g.type || 'free')), ts: g.updatedAt || g.createdAt || 0, ref: 'goal:' + g.id }); }); } catch (_) {}
   try { _wshReadStore(_WSH_PROJECTS_KEY).forEach(p => { if (p) out.push({ kind: 'workspace', id: p.id, type: p.type, results: p.results, name: _wsLabel('workspace', p), typeLabel: _wsTypeLabel(p.type), ts: p.updatedAt || p.createdAt || 0, ref: 'workspace:' + p.id }); }); } catch (_) {}
   try { _wshReadStore(_WSH_SCENARIOS_KEY).forEach(s => { if (s) { const id = s.scenarioId || s.id; out.push({ kind: 'scenario', id, name: _wsLabel('scenario', s), typeLabel: t('wsh_scenario_title'), ts: s.createdAt || 0, ref: 'scenario:' + id }); } }); } catch (_) {}
   return out;
@@ -11713,9 +11752,65 @@ function _renderWorkspaceHome(metrics) {
 
   let panel = '';
   if (tab === 'space') {
+    // WS.11B — Mi Espacio = professional financial desktop, three blocks:
+    // (1) Trabajo diario (saved projects, big visual cards),
+    // (2) Herramientas fijadas (pinned quick-access toolbox, compact),
+    // (3) Continuar (last edited). Premium UI is prepared (classes/badge) but
+    // NOTHING is locked — functionality is fully open.
+    const ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    const ICON_TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/></svg>';
+    const saved = _wshAllProjects().sort((a, b) => b.ts - a.ts);
+    const pinned = _wsPinned();
     const last = _wshLastEdited();
-    const continueHtml = last ? `
-      <section class="wsh-card wsh-continue">
+
+    // (1) Trabajo diario — big project cards with WS.10 data previews.
+    const dailyCard = p => `
+      <div class="wsh-dcard">
+        <div class="wsh-dcard-pv">${_wsProjPreviewHtml(p)}</div>
+        <div class="wsh-dcard-foot">
+          <div class="wsh-dcard-txt"><p class="wsh-dcard-name">${esc(p.name)}</p><span class="wsh-dcard-type">${esc(p.typeLabel)} · ${esc(_intccDate(p.ts))}</span></div>
+          <div class="wsh-dcard-acts">
+            <button type="button" class="wsh-scard-open" data-wsx-open="${esc(p.ref)}">${esc(t('wsh_proj_open'))}</button>
+            <button type="button" class="wsh-scard-x is-danger" data-wsx-act="del" data-wsx-ref="${esc(p.ref)}" title="${esc(t('wsg_act_del'))}" aria-label="${esc(t('wsg_act_del'))}">${ICON_TRASH}</button>
+          </div>
+        </div>
+      </div>`;
+    // Demo preview when there's nothing saved yet (premium, never a poor blank).
+    const demoTiles = [
+      { tool: 'budget',   name: t('wstool_budget_n') },
+      { tool: 'compound', name: t('wstool_compound_n') },
+      { tool: 'journal',  name: t('wstool_journal_n') },
+    ];
+    const dailyInner = saved.length
+      ? `<div class="wsh-daily-grid">${saved.map(dailyCard).join('')}</div>`
+      : `<div class="wsh-daily-grid is-premium-preview">${demoTiles.map(d => `
+          <div class="wsh-dcard is-demo" role="button" tabindex="0" data-wsh-cta="tool" data-wstool="${esc(d.tool)}">
+            <div class="wsh-dcard-pv">${_wsToolPreviewHtml(d.tool)}</div>
+            <div class="wsh-dcard-foot"><div class="wsh-dcard-txt"><p class="wsh-dcard-name">${esc(d.name)}</p><span class="wsh-dcard-type">${esc(t('wsmse_demo_hint'))}</span></div></div>
+          </div>`).join('')}</div>`;
+    const dailyBlock = `
+      <section class="wsh-card wsh-mse-block" data-ws-block="daily">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsmse_daily'))}</h3><span class="wsh-premium-badge">${esc(t('wsh_premium_badge'))}</span></header>
+        ${dailyInner}
+      </section>`;
+
+    // (2) Herramientas fijadas — compact toolbox row (quick access, NOT projects).
+    const pinChip = ref => `
+      <div class="wsh-tchip">
+        <span class="wsh-tchip-ic">${_wsTplViz(_wsRefViz(ref))}</span>
+        <span class="wsh-tchip-name">${esc(_wsPinLabel(ref))}</span>
+        <button type="button" class="wsh-tchip-open" data-wspinopen="${esc(ref)}">${esc(t('wsh_proj_open'))}</button>
+        <button type="button" class="wsh-tchip-x" data-wspin="${esc(ref)}" title="${esc(t('wspin_remove'))}" aria-label="${esc(t('wspin_remove'))}">${ICON_X}</button>
+      </div>`;
+    const pinnedBlock = pinned.length ? `
+      <section class="wsh-card wsh-mse-block" data-ws-block="pinned">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsmse_pinned'))}</h3></header>
+        <div class="wsh-tool-row">${pinned.map(p => pinChip(p.ref)).join('')}</div>
+      </section>` : '';
+
+    // (3) Continuar — last edited, compact premium row (hidden if no activity).
+    const continueBlock = last ? `
+      <section class="wsh-card wsh-continue wsh-mse-block" data-ws-block="continue">
         <div class="wsh-cont-info">
           <span class="wsh-cont-eyebrow">${esc(t('wsh_continue_title'))}</span>
           <p class="wsh-cont-name">${esc(last.name)}</p>
@@ -11723,34 +11818,8 @@ function _renderWorkspaceHome(metrics) {
         </div>
         <button type="button" class="wsh-cta is-primary" data-wsx-open="${esc(last.ref)}">${esc(t('wsh_continue_btn'))}</button>
       </section>` : '';
-    const saved = _wshAllProjects().sort((a, b) => b.ts - a.ts);
-    const pinned = _wsPinned();
-    // WS.7A — visual grid cards (mini preview + name + type + Abrir + secondary).
-    const ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-    const ICON_TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/></svg>';
-    const spaceCard = o => `
-      <div class="wsh-scard${o.pinned ? ' is-pinned' : ''}">
-        <span class="wsb-pill ${o.pinned ? 'is-pinned' : 'is-saved'}">${esc(o.pinned ? t('wsstate_pinned') : t('wsstate_saved'))}</span>
-        <div class="wsh-scard-viz">${_wsTplViz(o.viz)}</div>
-        <p class="wsh-scard-name">${esc(o.name)}</p>
-        <span class="wsh-scard-type">${esc(o.typeLabel)}</span>
-        ${o.meta ? `<span class="wsh-scard-meta">${esc(o.meta)}</span>` : ''}
-        <div class="wsh-scard-acts">
-          <button type="button" class="wsh-scard-open" data-${o.pinned ? 'wspinopen' : 'wsx-open'}="${esc(o.ref)}">${esc(t('wsh_proj_open'))}</button>
-          ${o.pinned
-            ? `<button type="button" class="wsh-scard-x" data-wspin="${esc(o.ref)}" title="${esc(t('wspin_remove'))}" aria-label="${esc(t('wspin_remove'))}">${ICON_X}</button>`
-            : `<button type="button" class="wsh-scard-x is-danger" data-wsx-act="del" data-wsx-ref="${esc(o.ref)}" title="${esc(t('wsg_act_del'))}" aria-label="${esc(t('wsg_act_del'))}">${ICON_TRASH}</button>`}
-        </div>
-      </div>`;
-    const savedCards = saved.map(p => spaceCard({ pinned: false, ref: p.ref, name: p.name, typeLabel: p.typeLabel, viz: _wsProjViz(p), meta: _wsProjMeta(p) || _intccDate(p.ts) })).join('');
-    const pinnedCards = pinned.map(p => spaceCard({ pinned: true, ref: p.ref, name: _wsPinLabel(p.ref), typeLabel: _wsPinKindLabel(p.ref), viz: _wsRefViz(p.ref), meta: '' })).join('');
-    const spaceHtml = (saved.length || pinned.length) ? `
-      <section class="wsh-card wsh-projects">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_space'))}</h3></header>
-        <div class="wsh-space-grid">${savedCards}${pinnedCards}</div>
-      </section>`
-      : `<section class="wsh-card"><div class="wsh-space-empty"><p class="wsh-empty">${esc(t('wsh_space_empty'))}</p><button type="button" class="wsh-cta is-primary" data-wstab="templates">${esc(t('wsh_space_cta'))}</button></div></section>`;
-    panel = continueHtml + spaceHtml;
+
+    panel = `<div class="wsh-mse">${dailyBlock}${pinnedBlock}${continueBlock}</div>`;
   } else if (tab === 'templates') {
     // Organized by real utility (not by technical structure). 'cta'+'arg' decide
     // how each card opens; 'ref' is the pinnable identifier.
