@@ -20327,6 +20327,64 @@ body.gs-open { overflow: hidden; }
   .wsre-detail-kpis { grid-template-columns: 1fr; }
 }
 
+/* ════════ WS.12 (v2) — Workspace Operating System ═══════════════════════════ */
+/* Mi Espacio — per-card ⋮ context menu + desktop variable (featured) grid. */
+.wsh-dcard-menu { flex: none; width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 9px; cursor: pointer; color: var(--text-muted); background: transparent; border: 1px solid rgba(120,160,255,0.16); transition: color 150ms ease, border-color 150ms ease; }
+.wsh-dcard-menu:hover { color: #cfe0ff; border-color: rgba(120,160,255,0.34); }
+.wsh-dcard-menu svg { width: 16px; height: 16px; fill: currentColor; }
+.wsh-daily-grid .wsh-dcard.is-featured { grid-column: span 2; }
+.wsh-daily-grid .wsh-dcard.is-featured .wsh-dcard-pv { height: 150px; }
+.wsmse-menu { position: fixed; z-index: 1300; min-width: 184px; padding: 6px; border-radius: 13px; border: 1px solid rgba(120,160,255,0.22); background: linear-gradient(165deg, rgba(28,38,64,0.98), rgba(15,21,37,0.99)); box-shadow: 0 24px 60px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 2px; }
+.wsmse-menu-item { font: inherit; text-align: left; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-bright); padding: 10px 12px; border: 0; border-radius: 9px; background: transparent; }
+.wsmse-menu-item:hover { background: rgba(74,130,240,0.16); }
+.wsmse-menu-item.is-danger { color: #f0897f; }
+.wsmse-menu-item.is-danger:hover { background: rgba(240,137,127,0.14); }
+.wsmse-rename-in { width: 100%; box-sizing: border-box; margin: 4px 0 4px; font-size: 15px; }
+.wsmse-empty-cta { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin-top: 16px; }
+.wsmse-empty-title { margin: 0; font-size: 14px; color: var(--text-bright); }
+/* Plantillas — premium gallery (large image-led cards). */
+.wsh-gallery { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.wsh-gallery .wsh-pv-wrap { height: 132px; }
+.wsh-tpl.is-soon { cursor: default; opacity: 0.92; }
+.wsh-tpl.is-soon:hover { transform: none; border-color: rgba(120,160,255,0.13); }
+/* Herramientas — compact operative toolbox with per-tool accent. */
+.wsh-toolbox { grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.wsh-toolcard { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 9px; padding: 16px 14px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.14); background: rgba(255,255,255,0.025); cursor: pointer; transition: border-color 160ms ease, transform 160ms ease, background 160ms ease; }
+.wsh-toolcard:hover { transform: translateY(-2px); }
+.wsh-toolcard.is-soon { cursor: default; opacity: 0.85; }
+.wsh-toolcard.is-soon:hover { transform: none; }
+.wsh-toolcard-ic { width: 46px; height: 38px; display: grid; place-items: center; border-radius: 10px; background: rgba(74,130,240,0.10); color: #9fc2ff; }
+.wsh-toolcard-ic .wsh-tpl-viz-svg { width: 44px; height: 26px; }
+.wsh-toolcard .wsh-tool-name { font-size: 13px; line-height: 1.25; }
+.wsh-toolcard.is-blue:hover    { border-color: rgba(77,141,255,0.42); background: rgba(74,130,240,0.08); }
+.wsh-toolcard.is-blue    .wsh-toolcard-ic { color: #7fb0ff; background: rgba(74,130,240,0.12); }
+.wsh-toolcard.is-violet:hover  { border-color: rgba(138,125,255,0.42); }
+.wsh-toolcard.is-violet  .wsh-toolcard-ic { color: #b9a6ff; background: rgba(138,125,255,0.12); }
+.wsh-toolcard.is-amber:hover   { border-color: rgba(240,168,92,0.42); }
+.wsh-toolcard.is-amber   .wsh-toolcard-ic { color: #ffb169; background: rgba(240,168,92,0.12); }
+.wsh-toolcard.is-green   .wsh-toolcard-ic { color: #7ef0b8; background: rgba(47,217,142,0.12); }
+.wsh-toolcard.is-navy    .wsh-toolcard-ic { color: #8fb4ff; background: rgba(40,70,150,0.18); }
+/* Receivables + asset-prices previews */
+.wspv-recv, .wspv-assets { gap: 6px; align-items: stretch; justify-content: center; padding: 12px 16px; }
+.wspv-recv-row, .wspv-asset-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+.wspv-recv-row b, .wspv-asset-row b { color: var(--text-bright); font-weight: 700; }
+.wspv-recv-row i, .wspv-asset-row i { color: var(--text-muted); font-style: normal; font-variant-numeric: tabular-nums; }
+.wspv-recv-row em { font-style: normal; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
+.wspv-recv-row em.is-paid { color: #7ef0b8; background: rgba(47,217,142,0.14); }
+.wspv-recv-row em.is-pending { color: #ffd089; background: rgba(240,168,92,0.14); }
+.wspv-recv-row em.is-overdue { color: #f0897f; background: rgba(240,137,127,0.14); }
+.wspv-asset-row em { font-style: normal; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.wspv-asset-row em.is-win { color: #7ef0b8; } .wspv-asset-row em.is-loss { color: #f0897f; }
+@media (max-width: 1100px) { .wsh-toolbox { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 920px) { .wsh-gallery { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) {
+  .wsh-gallery { grid-template-columns: 1fr 1fr; }
+  .wsh-toolbox { grid-template-columns: 1fr 1fr; }
+  .wsh-daily-grid .wsh-dcard.is-featured { grid-column: span 1; }
+  .wsh-daily-grid .wsh-dcard.is-featured .wsh-dcard-pv { height: 96px; }
+  .wsmse-menu { left: 12px !important; right: 12px; min-width: 0; }
+}
+
 /* ════════ WS.2 — Financial Tools Hub (dedicated tools) ═══════════════════════
    Premium interactive tools that open inside Workspace templates mode (never
    the Sheet). Encapsulated under ws2-* classes; responsive. */

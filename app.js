@@ -1896,7 +1896,7 @@ const T = {
     wsh_space_cta:     'Crear desde plantilla',
     wstpl_use:         'Usar plantilla',
     wstpl_plans_title: 'Planes',
-    wstool_compound_n: 'Interés compuesto',
+    wstool_compound_n: 'Calculadora de interés compuesto',
     wstool_compound_d: 'Proyecta capital, aportaciones y crecimiento.',
     wstool_budget_n:   'Presupuesto mensual',
     wstool_budget_d:   'Controla ingresos, gastos y ahorro libre.',
@@ -1998,6 +1998,25 @@ const T = {
     wsmse_pinned:       'Herramientas fijadas',
     wsmse_demo_hint:    'Vista previa · crea el tuyo',
     wsh_premium_badge:  'Premium',
+    // WS.12 (v2) — Mi Espacio context menu + modals + new apps
+    wsmse_menu_top:     'Fijar arriba',
+    wsmse_remove_title: 'Quitar de Mi Espacio',
+    wsmse_remove_text:  'Esta aplicación dejará de aparecer en tu espacio. Sus datos guardados permanecerán intactos.',
+    wsmse_remove_ok:    'Quitar',
+    wsmse_del_title:    'Eliminar proyecto',
+    wsmse_del_text:     'Esta acción eliminará permanentemente los datos guardados.',
+    wsmse_del_ok:       'Eliminar',
+    wsmse_rename_title: 'Renombrar',
+    wsmse_rename_save:  'Guardar',
+    wsmse_empty_title:  'Empieza creando tu primer espacio financiero.',
+    wsmse_empty_cta:    'Explorar plantillas',
+    wsapp_receivables_n:'Pendientes de cobro',
+    wsapp_assets_n:     'Precios de activos',
+    wstool_financial_n: 'Calculadora financiera',
+    wstool_analyzer_n:  'Analizador de inversiones',
+    wstpl_recv_paid:    'Pagado',
+    wstpl_recv_pending: 'Pendiente',
+    wstpl_recv_overdue: 'Vencido',
     // WS.12 — Real Estate Portfolio Pro
     wsre_n:             'Portfolio Inmobiliario Pro',
     wsre_d:             'Gestiona tu cartera inmobiliaria completa.',
@@ -3715,7 +3734,7 @@ const T = {
     wsh_space_cta:     'Create from template',
     wstpl_use:         'Use template',
     wstpl_plans_title: 'Plans',
-    wstool_compound_n: 'Compound Growth',
+    wstool_compound_n: 'Compound Interest Calculator',
     wstool_compound_d: 'Project capital, contributions and growth.',
     wstool_budget_n:   'Monthly Budget',
     wstool_budget_d:   'Track income, expenses and free savings.',
@@ -3817,6 +3836,25 @@ const T = {
     wsmse_pinned:       'Pinned tools',
     wsmse_demo_hint:    'Preview · create your own',
     wsh_premium_badge:  'Premium',
+    // WS.12 (v2) — Mi Espacio context menu + modals + new apps
+    wsmse_menu_top:     'Pin to top',
+    wsmse_remove_title: 'Remove from My Space',
+    wsmse_remove_text:  'This app will no longer appear in your space. Its saved data stays intact.',
+    wsmse_remove_ok:    'Remove',
+    wsmse_del_title:    'Delete project',
+    wsmse_del_text:     'This permanently deletes the saved data.',
+    wsmse_del_ok:       'Delete',
+    wsmse_rename_title: 'Rename',
+    wsmse_rename_save:  'Save',
+    wsmse_empty_title:  'Start by creating your first financial space.',
+    wsmse_empty_cta:    'Explore templates',
+    wsapp_receivables_n:'Receivables',
+    wsapp_assets_n:     'Asset prices',
+    wstool_financial_n: 'Financial calculator',
+    wstool_analyzer_n:  'Investment analyzer',
+    wstpl_recv_paid:    'Paid',
+    wstpl_recv_pending: 'Pending',
+    wstpl_recv_overdue: 'Overdue',
     // WS.12 — Real Estate Portfolio Pro
     wsre_n:             'Real Estate Portfolio Pro',
     wsre_d:             'Manage your full real estate portfolio.',
@@ -11388,12 +11426,15 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
     const tab = t.getAttribute('data-wstab');
     if (tab) { _wsTab = tab; _wshView = 'home'; const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } return; }
+    // WS.12 (v2) — Mi Espacio per-card context menu (⋮).
+    const wsMenu = t.getAttribute('data-wsmenu');
+    if (wsMenu) { _wsSpaceMenu(wsMenu, t); return; }
     // WS.6A — pin toggle / open pinned (rebuild Home in place)
     const pin = t.getAttribute('data-wspin');
     if (pin) { _wsTogglePin(pin); const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } return; }
@@ -11594,6 +11635,108 @@ function _wsConfirm(onConfirm) {
   requestAnimationFrame(() => ov.classList.add('is-open'));
 }
 
+// WS.12 (v2) — generic Aurix modal (custom title/text/ok-label/danger). Used for
+// "Quitar de Mi Espacio" (not danger) and "Eliminar proyecto" (danger).
+function _wsModal2(o) {
+  const esc = _intccEsc;
+  const prev = document.getElementById('wsConfirmModal'); if (prev) prev.remove();
+  const ov = document.createElement('div');
+  ov.id = 'wsConfirmModal'; ov.className = 'ws-modal-overlay';
+  ov.innerHTML = `
+    <div class="ws-modal" role="dialog" aria-modal="true" aria-labelledby="wsModalTitle">
+      <h3 class="ws-modal-title" id="wsModalTitle">${esc(o.title)}</h3>
+      <p class="ws-modal-text">${esc(o.text)}</p>
+      <div class="ws-modal-actions">
+        <button type="button" class="ws-modal-btn is-cancel" data-wsmodal="cancel">${esc(t('wsmodal_cancel'))}</button>
+        <button type="button" class="ws-modal-btn ${o.danger ? 'is-danger' : 'is-primary'}" data-wsmodal="ok">${esc(o.okLabel)}</button>
+      </div>
+    </div>`;
+  const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  ov.addEventListener('click', e => {
+    if (e.target === ov) { close(); return; }
+    const b = e.target.closest ? e.target.closest('[data-wsmodal]') : null; if (!b) return;
+    if (b.getAttribute('data-wsmodal') === 'ok') { close(); try { o.onOk(); } catch (_) {} } else { close(); }
+  });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => ov.classList.add('is-open'));
+}
+// WS.12 (v2) — rename prompt modal (single text input).
+function _wsPrompt(o) {
+  const esc = _intccEsc;
+  const prev = document.getElementById('wsConfirmModal'); if (prev) prev.remove();
+  const ov = document.createElement('div');
+  ov.id = 'wsConfirmModal'; ov.className = 'ws-modal-overlay';
+  ov.innerHTML = `
+    <div class="ws-modal" role="dialog" aria-modal="true" aria-labelledby="wsModalTitle">
+      <h3 class="ws-modal-title" id="wsModalTitle">${esc(o.title)}</h3>
+      <input class="wsg-text wsmse-rename-in" id="wsRenameInput" type="text" autocomplete="off" value="${esc(o.current || '')}">
+      <div class="ws-modal-actions">
+        <button type="button" class="ws-modal-btn is-cancel" data-wsmodal="cancel">${esc(t('wsmodal_cancel'))}</button>
+        <button type="button" class="ws-modal-btn is-primary" data-wsmodal="ok">${esc(o.okLabel)}</button>
+      </div>
+    </div>`;
+  const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = e => { if (e.key === 'Escape') close(); if (e.key === 'Enter') doOk(); };
+  const doOk = () => { const v = (ov.querySelector('#wsRenameInput') || {}).value || ''; close(); try { o.onOk(v.trim()); } catch (_) {} };
+  ov.addEventListener('click', e => {
+    if (e.target === ov) { close(); return; }
+    const b = e.target.closest ? e.target.closest('[data-wsmodal]') : null; if (!b) return;
+    if (b.getAttribute('data-wsmodal') === 'ok') doOk(); else close();
+  });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => { ov.classList.add('is-open'); const inp = ov.querySelector('#wsRenameInput'); if (inp) { inp.focus(); inp.select(); } });
+}
+// WS.12 (v2) — rename a saved item (project customName / goal / scenario name).
+function _wsRename(ref, name) {
+  if (!name) return;
+  const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
+  if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { p.customName = name; p.updatedAt = Date.now(); _ws4Persist(p); } }
+  else if (kind === 'goal') { const l = _wsgGoals(); const g = l.find(x => x && x.id === id); if (g) { g.name = name; g.updatedAt = Date.now(); _wsgSaveAll(l); delete _wsgWorking[id]; } }
+  else if (kind === 'scenario') { try { const arr = _wshReadStore(_WSH_SCENARIOS_KEY); const s = arr.find(x => (x.scenarioId || x.id) === id); if (s) { s.name = name; localStorage.setItem(_WSH_SCENARIOS_KEY, JSON.stringify(arr)); } } catch (_) {} }
+}
+// WS.12 (v2) — per-card context menu popover (Abrir / Renombrar / Fijar arriba /
+// Quitar de Mi Espacio / Eliminar proyecto). Pinned tools: Abrir / Fijar / Quitar.
+function _wsSpaceMenu(ref, anchor) {
+  const esc = _intccEsc;
+  const prev = document.getElementById('wsSpaceMenu'); if (prev) prev.remove();
+  const isPinned = ref.indexOf('tool:') === 0 || ref.indexOf('tpl:') === 0;
+  const reb = () => { const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } };
+  const items = [];
+  items.push({ k: 'open', label: t('wsh_proj_open') });
+  if (!isPinned) items.push({ k: 'rename', label: t('wsg_act_rename') });
+  items.push({ k: 'top', label: t('wsmse_menu_top') });
+  items.push({ k: 'remove', label: t('wspin_remove'), cls: '' });
+  if (!isPinned) items.push({ k: 'delete', label: t('wsmse_del_ok'), cls: 'is-danger' });
+  const menu = document.createElement('div');
+  menu.id = 'wsSpaceMenu'; menu.className = 'wsmse-menu';
+  menu.innerHTML = items.map(it => `<button type="button" class="wsmse-menu-item ${it.cls || ''}" data-wsmenu-act="${it.k}">${esc(it.label)}</button>`).join('');
+  const close = () => { menu.remove(); document.removeEventListener('keydown', onKey); document.removeEventListener('click', onDoc, true); };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  const onDoc = e => { if (!menu.contains(e.target)) close(); };
+  menu.addEventListener('click', e => {
+    const b = e.target.closest ? e.target.closest('[data-wsmenu-act]') : null; if (!b) return;
+    const act = b.getAttribute('data-wsmenu-act'); close();
+    if (act === 'open') { isPinned ? _wsPinOpen(ref) : _wsxOpen(ref); }
+    else if (act === 'top') { _wsSpaceToggleTop(ref); reb(); }
+    else if (act === 'rename') { const cur = (_wshAllProjects().find(x => x.ref === ref) || {}).name || ''; _wsPrompt({ title: t('wsmse_rename_title'), current: cur, okLabel: t('wsmse_rename_save'), onOk: v => { _wsRename(ref, v); reb(); } }); }
+    else if (act === 'remove') { if (isPinned) { _wsTogglePin(ref); reb(); } else { _wsModal2({ title: t('wsmse_remove_title'), text: t('wsmse_remove_text'), okLabel: t('wsmse_remove_ok'), danger: false, onOk: () => { _wsSpaceHide(ref); reb(); } }); } }
+    else if (act === 'delete') { _wsModal2({ title: t('wsmse_del_title'), text: t('wsmse_del_text'), okLabel: t('wsmse_del_ok'), danger: true, onOk: () => { _wsxAct('del', ref); } }); }
+  });
+  document.body.appendChild(menu);
+  try {
+    const r = anchor.getBoundingClientRect();
+    const mw = menu.offsetWidth || 180, mh = menu.offsetHeight || 200;
+    let left = r.right - mw; if (left < 8) left = 8;
+    let top = r.bottom + 6; if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 6);
+    menu.style.left = left + 'px'; menu.style.top = top + 'px';
+  } catch (_) {}
+  setTimeout(() => document.addEventListener('click', onDoc, true), 0);
+  document.addEventListener('keydown', onKey);
+}
+
 // WS.5B P6 — always-translated display label. Workspace names defaulted to the
 // template name (English before the ES fix), so we derive from the type via i18n
 // unless the user set a custom name. Goals/scenarios use their user-entered name.
@@ -11627,6 +11770,35 @@ function _wsLabel(kind, item) {
   if (kind === 'scenario') return item.name || t('wsh_scenario_title');
   return item.name || '';
 }
+
+// ── WS.12 (v2) — Workspace App Identity Registry ─────────────────────────────
+// Central source of truth for each app's personality. The visual identity
+// belongs to the APP, not to Workspace. Used for accent/preview/labels and as
+// the seed for premium tiers & the future profession mode. Pure metadata.
+const _WS_APP_IDENTITY = {
+  monthly_budget:        { type: 'app',  category: 'daily',      visualTone: 'monthly-control',  accentColor: 'teal',     previewType: 'financial-sheet',  layoutType: 'tool', canPin: true, canSaveToSpace: true,  isDailyUse: true,  premiumTier: 'free' },
+  real_estate_portfolio: { type: 'app',  category: 'realestate', visualTone: 'physical-assets',  accentColor: 'gold',     previewType: 'property-photo',   layoutType: 'tool', canPin: true, canSaveToSpace: true,  isDailyUse: true,  premiumTier: 'free' },
+  trade_journal:         { type: 'app',  category: 'investing',  visualTone: 'trading-desk',     accentColor: 'graphite', previewType: 'trades',           layoutType: 'tool', canPin: true, canSaveToSpace: true,  isDailyUse: true,  premiumTier: 'free' },
+  receivables:           { type: 'app',  category: 'operations', visualTone: 'payment-control',  accentColor: 'bordeaux', previewType: 'receivables-list', layoutType: 'tool', canPin: true, canSaveToSpace: true,  isDailyUse: true,  premiumTier: 'free' },
+  asset_prices:          { type: 'app',  category: 'investing',  visualTone: 'market-watch',     accentColor: 'blue',     previewType: 'price-table',      layoutType: 'tool', canPin: true, canSaveToSpace: true,  isDailyUse: true,  premiumTier: 'free' },
+  compound_growth:       { type: 'tool', category: 'planning',   visualTone: 'future-growth',    accentColor: 'blue',     previewType: 'growth-curve',     layoutType: 'tool', canPin: true, canSaveToSpace: true,  isDailyUse: false, premiumTier: 'free' },
+  scenario:              { type: 'tool', category: 'planning',   visualTone: 'comparison',       accentColor: 'violet',   previewType: 'compare',          layoutType: 'view', canPin: true, canSaveToSpace: false, isDailyUse: false, premiumTier: 'free' },
+  goal:                  { type: 'tool', category: 'planning',   visualTone: 'milestones',       accentColor: 'amber',    previewType: 'progress',         layoutType: 'view', canPin: true, canSaveToSpace: true,  isDailyUse: true,  premiumTier: 'free' },
+  financial_calc:        { type: 'tool', category: 'utility',    visualTone: 'control',          accentColor: 'green',    previewType: 'inputs',           layoutType: 'tool', canPin: true, canSaveToSpace: false, isDailyUse: false, premiumTier: 'soon' },
+  investment_analyzer:   { type: 'tool', category: 'investing',  visualTone: 'risk-return',      accentColor: 'navy',     previewType: 'risk',             layoutType: 'tool', canPin: true, canSaveToSpace: false, isDailyUse: false, premiumTier: 'soon' },
+};
+function _wsAppIdentity(id) { return _WS_APP_IDENTITY[id] || { type: 'app', category: 'misc', visualTone: 'neutral', accentColor: 'blue', previewType: 'glyph', layoutType: 'tool', canPin: true, canSaveToSpace: true, isDailyUse: true, premiumTier: 'free' }; }
+
+// WS.12 (v2) — Mi Espacio personalisation: hide a saved app from the space
+// (keeps its data) and pin apps to the top. Refs match _wshAllProjects/_wsPinned.
+const _WSH_SPACE_HIDDEN_KEY = 'aurix_ws_space_hidden_v1';
+const _WSH_SPACE_TOP_KEY    = 'aurix_ws_space_top_v1';
+function _wsSpaceHidden() { return _wshReadStore(_WSH_SPACE_HIDDEN_KEY); }
+function _wsSpaceIsHidden(ref) { return _wsSpaceHidden().indexOf(ref) >= 0; }
+function _wsSpaceHide(ref) { const l = _wsSpaceHidden(); if (l.indexOf(ref) < 0) l.push(ref); try { localStorage.setItem(_WSH_SPACE_HIDDEN_KEY, JSON.stringify(l)); } catch (_) {} }
+function _wsSpaceTop() { return _wshReadStore(_WSH_SPACE_TOP_KEY); }
+function _wsSpaceToggleTop(ref) { const l = _wsSpaceTop(); const i = l.indexOf(ref); if (i >= 0) l.splice(i, 1); else l.unshift(ref); try { localStorage.setItem(_WSH_SPACE_TOP_KEY, JSON.stringify(l)); } catch (_) {} }
+function _wsSpaceTopRank(ref) { const i = _wsSpaceTop().indexOf(ref); return i < 0 ? 9999 : i; }
 
 // WS.6A — pinned quick-access items (tools/templates). Separate from saved
 // projects: pinning never creates a project nor touches the project counters.
@@ -11763,10 +11935,29 @@ function _wsToolPreviewHtml(toolKey) {
   return '';
 }
 
+// WS.12 (v2) — receivables-list preview (operativa: cliente / importe / estado).
+function _wsReceivablesPreview() {
+  const esc = _intccEsc;
+  const rows = [
+    { c: 'Cliente A', v: '1.200 €', s: 'paid', l: t('wstpl_recv_paid') },
+    { c: 'Cliente B', v: '850 €', s: 'pending', l: t('wstpl_recv_pending') },
+    { c: 'Cliente C', v: '600 €', s: 'overdue', l: t('wstpl_recv_overdue') },
+  ];
+  return `<div class="wspv wspv-recv">${rows.map(r => `<span class="wspv-recv-row"><b>${esc(r.c)}</b><i>${esc(r.v)}</i><em class="is-${r.s}">${esc(r.l)}</em></span>`).join('')}</div>`;
+}
+// WS.12 (v2) — asset-prices preview (tabla activo / cantidad / compra / actual).
+function _wsAssetsPreview() {
+  const esc = _intccEsc;
+  const rows = [['BTC', '0,5', '52.000', '61.000', 'win'], ['NVDA', '20', '90', '119', 'win'], ['SPY', '8', '480', '455', 'loss']];
+  return `<div class="wspv wspv-assets">${rows.map(r => `<span class="wspv-asset-row"><b>${esc(r[0])}</b><i>${esc(r[3])} €</i><em class="is-${r[4]}">${esc(r[2])}→${esc(r[3])}</em></span>`).join('')}</div>`;
+}
 // WS.10.2/10.6 — distinct preview per template category (no "everything is a curve").
 function _wsCatPreviewHtml(cat) {
   if (cat === 'realestate-pro') return `<div class="wspv wspv-re wspv-re-tpl"><div class="wspv-re-ov"><span class="wspv-re-eq">${_intccEsc(t('wsre_n'))}</span><span class="wspv-re-lbl">${_intccEsc(t('wstplg_realestate'))}</span></div></div>`;
+  if (cat === 'receivables') return _wsReceivablesPreview();
+  if (cat === 'assets') return _wsAssetsPreview();
   if (cat === 'budget') return _wsToolPreviewHtml('budget');
+  if (cat === 'journal') return _wsToolPreviewHtml('journal');
   if (cat === 'projection') return `<div class="wspv wspv-viz is-blue">${_wsTplViz('curve')}</div>`;
   if (cat === 'scenario')   return `<div class="wspv wspv-viz is-blue">${_wsTplViz('compare')}</div>`;
   if (cat === 'networth')   return `<div class="wspv wspv-viz is-violet">${_wsTplViz('donut')}</div>`;
@@ -11878,36 +12069,41 @@ function _renderWorkspaceHome(metrics) {
     // (3) Continuar (last edited). Premium UI is prepared (classes/badge) but
     // NOTHING is locked — functionality is fully open.
     const ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-    const ICON_TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/></svg>';
-    const saved = _wshAllProjects().sort((a, b) => b.ts - a.ts);
+    const ICON_DOTS = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>';
+    // WS.12 (v2) — hide "removed-from-space" apps; "fijar arriba" sorts first.
+    const saved = _wshAllProjects().filter(p => !_wsSpaceIsHidden(p.ref))
+      .sort((a, b) => (_wsSpaceTopRank(a.ref) - _wsSpaceTopRank(b.ref)) || (b.ts - a.ts));
     const pinned = _wsPinned();
     const last = _wshLastEdited();
 
-    // (1) Trabajo diario — big project cards with WS.10 data previews.
-    const dailyCard = p => `
-      <div class="wsh-dcard">
+    // (1) Trabajo diario — big app cards (each keeps its own visual identity) with
+    // a ⋮ context menu (Abrir / Renombrar / Fijar arriba / Quitar / Eliminar).
+    const dailyCard = (p, featured) => `
+      <div class="wsh-dcard${featured ? ' is-featured' : ''}" data-wsre-swipe>
         <div class="wsh-dcard-pv">${_wsProjPreviewHtml(p)}</div>
         <div class="wsh-dcard-foot">
-          <div class="wsh-dcard-txt"><p class="wsh-dcard-name">${esc(p.name)}</p><span class="wsh-dcard-type">${esc(p.typeLabel)} · ${esc(_intccDate(p.ts))}</span></div>
+          <div class="wsh-dcard-txt"><p class="wsh-dcard-name">${esc(p.name)}</p><span class="wsh-dcard-type">${esc(p.typeLabel)}</span></div>
           <div class="wsh-dcard-acts">
             <button type="button" class="wsh-scard-open" data-wsx-open="${esc(p.ref)}">${esc(t('wsh_proj_open'))}</button>
-            <button type="button" class="wsh-scard-x is-danger" data-wsx-act="del" data-wsx-ref="${esc(p.ref)}" title="${esc(t('wsg_act_del'))}" aria-label="${esc(t('wsg_act_del'))}">${ICON_TRASH}</button>
+            <button type="button" class="wsh-dcard-menu" data-wsmenu="${esc(p.ref)}" aria-label="${esc(t('wsg_act_rename'))}" aria-haspopup="menu">${ICON_DOTS}</button>
           </div>
         </div>
       </div>`;
-    // Demo preview when there's nothing saved yet (premium, never a poor blank).
+    // Empty state (premium demo, never a poor blank): Presupuesto / Inmueble Pro /
+    // Pendientes de cobro + title + "Explorar plantillas" CTA.
     const demoTiles = [
-      { tool: 'budget',   name: t('wstool_budget_n') },
-      { tool: 'compound', name: t('wstool_compound_n') },
-      { tool: 'journal',  name: t('wstool_journal_n') },
+      { name: t('wstool_budget_n'),       open: ' data-wsh-cta="tool" data-wstool="budget"',     pv: _wsToolPreviewHtml('budget') },
+      { name: t('wsre_n'),                open: ' data-wsh-cta="tool" data-wstool="realestate"', pv: _wsCatPreviewHtml('realestate-pro') },
+      { name: t('wsapp_receivables_n'),   open: ' data-wstab="templates"',                       pv: _wsReceivablesPreview() },
     ];
     const dailyInner = saved.length
-      ? `<div class="wsh-daily-grid">${saved.map(dailyCard).join('')}</div>`
+      ? `<div class="wsh-daily-grid">${saved.map((p, i) => dailyCard(p, i === 0 && saved.length >= 3)).join('')}</div>`
       : `<div class="wsh-daily-grid is-premium-preview">${demoTiles.map(d => `
-          <div class="wsh-dcard is-demo" role="button" tabindex="0" data-wsh-cta="tool" data-wstool="${esc(d.tool)}">
-            <div class="wsh-dcard-pv">${_wsToolPreviewHtml(d.tool)}</div>
+          <div class="wsh-dcard is-demo" role="button" tabindex="0"${d.open}>
+            <div class="wsh-dcard-pv">${d.pv}</div>
             <div class="wsh-dcard-foot"><div class="wsh-dcard-txt"><p class="wsh-dcard-name">${esc(d.name)}</p><span class="wsh-dcard-type">${esc(t('wsmse_demo_hint'))}</span></div></div>
-          </div>`).join('')}</div>`;
+          </div>`).join('')}</div>
+        <div class="wsmse-empty-cta"><p class="wsmse-empty-title">${esc(t('wsmse_empty_title'))}</p><button type="button" class="wsh-cta is-primary" data-wstab="templates">${esc(t('wsmse_empty_cta'))}</button></div>`;
     const dailyBlock = `
       <section class="wsh-card wsh-mse-block" data-ws-block="daily">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsmse_daily'))}</h3><span class="wsh-premium-badge">${esc(t('wsh_premium_badge'))}</span></header>
@@ -11945,51 +12141,55 @@ function _renderWorkspaceHome(metrics) {
     // how each card opens; 'ref' is the pinnable identifier.
     // WS.10 — visual-first card: dominant data/archetype preview, name + CTA, no
     // descriptive sentence. The preview communicates the category in <1s.
-    const card = it => `
-      <div class="wsh-tpl wsh-cardv" role="button" tabindex="0" data-wsh-cta="${esc(it.cta)}"${it.arg ? (it.cta === 'tool' ? ' data-wstool="' + esc(it.arg) + '"' : ' data-ws4-type="' + esc(it.arg) + '"') : ''}>
-        ${pinBtn(it.ref)}
+    const card = it => {
+      const soon = it.cta === 'soon';
+      const openAttrs = soon ? '' : ` role="button" tabindex="0" data-wsh-cta="${esc(it.cta)}"${it.arg ? (it.cta === 'tool' ? ' data-wstool="' + esc(it.arg) + '"' : ' data-ws4-type="' + esc(it.arg) + '"') : ''}`;
+      return `
+      <div class="wsh-tpl wsh-cardv${soon ? ' is-soon' : ''}"${openAttrs}>
+        ${soon ? '' : pinBtn(it.ref)}
         <div class="wsh-pv-wrap">${_wsCatPreviewHtml(it.cat)}</div>
         <div class="wsh-cardv-foot">
           <p class="wsh-tpl-name">${esc(it.name)}</p>
-          <span class="wsh-tpl-go">${esc(t('wstpl_use'))} ›</span>
+          <span class="${soon ? 'wsh-pill' : 'wsh-tpl-go'}">${soon ? esc(t('wsh_soon')) : esc(t('wstpl_use')) + ' ›'}</span>
         </div>
       </div>`;
+    };
     const T2 = type => ({ cta: 'workspace', arg: type, ref: 'tpl:' + type, name: t('wsh_ws_' + type), cat: type });
-    const groups = [
-      { title: t('wstplg_planning'), items: [
-        { cta: 'goals',    ref: 'tpl:goals',      cat: 'goals',      name: t('wsg_title') },
-        { cta: 'scenario', ref: 'tpl:scenario',   cat: 'scenario',   name: t('wsh_scenario_title') },
-        { cta: 'planning', ref: 'tpl:projection', cat: 'projection', name: t('wsp_title') },
-        T2('fire'),
-      ] },
-      { title: t('wstplg_daily'), items: [ T2('budget'), T2('networth') ] },
-      { title: t('wstplg_investing'), items: [ T2('investment') ] },
-      { title: t('wstplg_realestate'), items: [ { cta: 'tool', arg: 'realestate', ref: 'tpl:realestate', cat: 'realestate-pro', name: t('wsre_n') }, T2('property'), T2('business') ] },
+    // WS.12 (v2) — single premium gallery, priority order. FIRE/abstract last.
+    const gallery = [
+      { cta: 'tool',     arg: 'budget',     ref: 'tpl:mbudget',    cat: 'budget',         name: t('wstool_budget_n') },
+      { cta: 'soon',     ref: 'tpl:assets',      cat: 'assets',         name: t('wsapp_assets_n') },
+      { cta: 'soon',     ref: 'tpl:receivables', cat: 'receivables',    name: t('wsapp_receivables_n') },
+      { cta: 'tool',     arg: 'realestate', ref: 'tpl:realestate', cat: 'realestate-pro', name: t('wsre_n') },
+      { cta: 'goals',    ref: 'tpl:goals',       cat: 'goals',          name: t('wsg_title') },
+      { cta: 'tool',     arg: 'journal',    ref: 'tpl:journal',    cat: 'journal',        name: t('wstool_journal_n') },
+      { cta: 'scenario', ref: 'tpl:scenario',    cat: 'scenario',       name: t('wsh_scenario_title') },
+      { cta: 'planning', ref: 'tpl:projection',  cat: 'projection',     name: t('wsp_title') },
+      T2('networth'), T2('property'), T2('business'),
+      T2('fire'),
     ];
-    panel = groups.map(g => `
-      <section class="wsh-card">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(g.title)}</h3></header>
-        <div class="wsh-tpl-grid">${g.items.map(card).join('')}</div>
-      </section>`).join('');
+    panel = `<section class="wsh-card"><header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_templates'))}</h3><span class="wsh-premium-badge">${esc(t('wsh_premium_badge'))}</span></header><div class="wsh-tpl-grid wsh-gallery">${gallery.map(card).join('')}</div></section>`;
   } else {
-    // Tools — visual cards; active tool featured + pinnable.
+    // WS.12 (v2) — Herramientas = compact, operative toolbox (quick utilities, NOT
+    // apps). Per-tool accent from the App Identity Registry. FIRE is not here.
     const tools = [
-      { k: 'compound', active: AURIX_WS6_TOOL, viz: 'curve',   icon: '<path d="M4 16l5-5 3 3 7-7"/><path d="M16 7h4v4"/>' },
-      { k: 'budget',   active: AURIX_WS7_TOOL, viz: 'budget',  icon: '<path d="M4 7h16v12H4z"/><path d="M4 11h16"/><circle cx="16" cy="15" r="1.3"/>' },
-      { k: 'journal',  active: AURIX_WS8_TOOL, viz: 'journal', icon: '<path d="M6 4h11a1 1 0 0 1 1 1v15l-3-2-3 2-3-2-3 2V5a1 1 0 0 1 1-1z"/>' },
+      { id: 'compound_growth',     name: t('wstool_compound_n'),  viz: 'curve',   open: ' role="button" tabindex="0" data-wsh-cta="tool" data-wstool="compound"', pinRef: 'tool:compound', soon: false },
+      { id: 'scenario',            name: t('wsh_scenario_title'), viz: 'compare', open: ' role="button" tabindex="0" data-wsh-cta="scenario"',                  pinRef: 'tpl:scenario',  soon: false },
+      { id: 'goal',                name: t('wsg_title'),          viz: 'target',  open: ' role="button" tabindex="0" data-wsh-cta="goals"',                     pinRef: 'tpl:goals',     soon: false },
+      { id: 'financial_calc',      name: t('wstool_financial_n'), viz: 'bars',    open: '', pinRef: '', soon: true },
+      { id: 'investment_analyzer', name: t('wstool_analyzer_n'),  viz: 'donut',   open: '', pinRef: '', soon: true },
     ];
+    const accent = id => 'is-' + (_wsAppIdentity(id).accentColor || 'blue');
     panel = `
       <section class="wsh-card">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_tools'))}</h3></header>
-        <div class="wsh-tool-grid">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_tools'))}</h3><span class="wsh-premium-badge">${esc(t('wsh_premium_badge'))}</span></header>
+        <div class="wsh-tool-grid wsh-toolbox">
           ${tools.map(tl => `
-            <div class="wsh-tool wsh-cardv${tl.active ? ' is-active is-featured' : ''}"${tl.active ? ' role="button" tabindex="0" data-wsh-cta="tool" data-wstool="' + esc(tl.k) + '"' : ''}>
-              ${tl.active ? pinBtn('tool:' + tl.k) : ''}
-              <div class="wsh-pv-wrap">${tl.active ? _wsToolPreviewHtml(tl.k) : '<div class="wspv wspv-viz is-blue">' + _wsTplViz(tl.viz) + '</div>'}</div>
-              <div class="wsh-cardv-foot">
-                <p class="wsh-tool-name">${esc(t('wstool_' + tl.k + '_n'))}</p>
-                <span class="${tl.active ? 'wsh-tool-go' : 'wsh-pill'}">${esc(tl.active ? t('wstpl_use') + ' ›' : t('wsh_soon'))}</span>
-              </div>
+            <div class="wsh-tool wsh-toolcard ${accent(tl.id)}${tl.soon ? ' is-soon' : ''}"${tl.open}>
+              ${tl.pinRef ? pinBtn(tl.pinRef) : ''}
+              <div class="wsh-toolcard-ic">${_wsTplViz(tl.viz)}</div>
+              <p class="wsh-tool-name">${esc(tl.name)}</p>
+              <span class="${tl.soon ? 'wsh-pill' : 'wsh-tool-go'}">${esc(tl.soon ? t('wsh_soon') : t('wstpl_use') + ' ›')}</span>
             </div>`).join('')}
         </div>
       </section>`;
