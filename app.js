@@ -12008,6 +12008,7 @@ const _WS_TPL_ASSET = {
   goals:            'template_goals',
   scenario:         'template_scenarios',
   projection:       'template_scenarios',
+  journal:          'template_trading_journal',
   'realestate-pro': 'realestate_apartment',
 };
 // Tool-card id → compact premium cover (keys match the Herramientas tool ids).

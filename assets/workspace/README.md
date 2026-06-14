@@ -28,6 +28,7 @@ Templates (Plantillas cards):
 - `template_receivables.webp`
 - `template_goals.webp`
 - `template_scenarios.webp`
+- `template_trading_journal.webp` (Plantillas › Diario de operaciones, cat `journal`)
 
 Tools (Herramientas covers):
 
