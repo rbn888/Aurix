@@ -1897,11 +1897,11 @@ const T = {
     wstpl_use:         'Usar plantilla',
     wstpl_plans_title: 'Planes',
     wstool_compound_n: 'Interés compuesto',
-    wstool_compound_d: 'Proyecta el crecimiento compuesto de una cantidad.',
+    wstool_compound_d: 'Proyecta capital, aportaciones y crecimiento.',
     wstool_budget_n:   'Presupuesto mensual',
-    wstool_budget_d:   'Organiza ingresos y gastos mensuales.',
+    wstool_budget_d:   'Controla ingresos, gastos y ahorro libre.',
     wstool_journal_n:  'Diario de operaciones',
-    wstool_journal_d:  'Registra y revisa tus operaciones.',
+    wstool_journal_d:  'Registra compras, ventas y rentabilidad.',
     // WS.6 — Compound Growth tool
     wstool_back:          'Volver a Herramientas',
     wstool_in_initial:    'Capital inicial',
@@ -1925,6 +1925,15 @@ const T = {
     wsmodal_del_text:  'Esta acción no se puede deshacer.',
     wsmodal_cancel:    'Cancelar',
     wsmodal_delete:    'Eliminar',
+    // WS.6A — pinned items, states, template groups
+    wspin:             'Fijar',
+    wspin_remove:      'Quitar de Mi espacio',
+    wsstate_saved:     'Guardado',
+    wsstate_pinned:    'Fijado',
+    wstplg_planning:   'Planificación',
+    wstplg_daily:      'Gestión diaria',
+    wstplg_investing:  'Inversión',
+    wstplg_realestate: 'Inmobiliario / empresa',
     // Status pills
     statusOpen:        'Abierto',
     statusClosed:      'Cerrado',
@@ -3578,11 +3587,11 @@ const T = {
     wstpl_use:         'Use template',
     wstpl_plans_title: 'Plans',
     wstool_compound_n: 'Compound Growth',
-    wstool_compound_d: 'Project the compound growth of an amount.',
+    wstool_compound_d: 'Project capital, contributions and growth.',
     wstool_budget_n:   'Monthly Budget',
-    wstool_budget_d:   'Organize monthly income and expenses.',
+    wstool_budget_d:   'Track income, expenses and free savings.',
     wstool_journal_n:  'Trade Journal',
-    wstool_journal_d:  'Log and review your trades.',
+    wstool_journal_d:  'Log buys, sells and returns.',
     // WS.6 — Compound Growth tool
     wstool_back:          'Back to Tools',
     wstool_in_initial:    'Initial capital',
@@ -3606,6 +3615,15 @@ const T = {
     wsmodal_del_text:  'This action cannot be undone.',
     wsmodal_cancel:    'Cancel',
     wsmodal_delete:    'Delete',
+    // WS.6A — pinned items, states, template groups
+    wspin:             'Pin',
+    wspin_remove:      'Remove from My Space',
+    wsstate_saved:     'Saved',
+    wsstate_pinned:    'Pinned',
+    wstplg_planning:   'Planning',
+    wstplg_daily:      'Daily management',
+    wstplg_investing:  'Investing',
+    wstplg_realestate: 'Real estate / business',
     // Status pills
     statusOpen:        'Open',
     statusClosed:      'Closed',
@@ -11022,7 +11040,7 @@ let _wshView    = 'home';
 let _wshWired   = false;
 let _ws4ActiveId = null;   // WS.4 — currently open workspace project id
 let _wsgPrefill = null;    // WS.5 — prefill the create-goal type when arriving from Home
-let _wsTab = 'space';      // WS.5B — Home internal tab: 'space' | 'templates' | 'tools'
+let _wsTab = null;         // WS.5B/WS.6A — Home tab; null = smart default on entry
 // WS.6 — Compound Growth tool working state.
 // WS.6 ACTIVE — Compound Growth tool released (card opens the tool, view reachable).
 // (Was gated false during the WS.5C-only deploy.)
@@ -11094,12 +11112,17 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
     const tab = t.getAttribute('data-wstab');
     if (tab) { _wsTab = tab; _wshView = 'home'; const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } return; }
+    // WS.6A — pin toggle / open pinned (rebuild Home in place)
+    const pin = t.getAttribute('data-wspin');
+    if (pin) { _wsTogglePin(pin); const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } return; }
+    const pinOpen = t.getAttribute('data-wspinopen');
+    if (pinOpen) { _wsPinOpen(pinOpen); return; }
     // P5/P4 — goal lifecycle
     const gSave = t.getAttribute('data-wsg-save-goal'); if (gSave) { _wsgSaveGoal(gSave); return; }
     const gAct = t.getAttribute('data-wsg-act'); if (gAct) { const id = t.getAttribute('data-wsg-id'); if (gAct === 'dup') _wsgDuplicate(id); else if (gAct === 'del') _wsgDelete(id); else if (gAct === 'rename') _wsgRename(id); return; }
@@ -11252,6 +11275,8 @@ function _wsTplViz(k) {
     compare: '<path class="v-dim" d="M18 34 V22"/><path d="M46 34 V8"/><path class="v-dim2" d="M30 14 h6 m-3 -3 v6"/>',
     house:   '<path d="M13 22 L32 9 L51 22"/><path d="M19 22 V35 H45 V22"/>',
     target:  '<circle class="v-track" cx="32" cy="20" r="13"/><circle class="v-track" cx="32" cy="20" r="7"/><circle class="v-dot" cx="32" cy="20" r="2.4"/>',
+    table:   '<path class="v-track" d="M10 11 h44 M10 20 h44 M10 29 h44"/><path d="M10 20 h26"/><path class="v-dot2" d="M10 29 h16"/>',
+    journal: '<path class="v-track" d="M10 12 h44 M10 22 h44 M10 32 h44"/><path class="v-up" d="M44 9 l3 3 l-3 3"/><path class="v-down" d="M44 29 l3 3 l-3 3"/>',
   };
   return `<svg class="wsh-tpl-viz-svg is-${k}" viewBox="0 0 64 40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${V[k] || V.bars}</svg>`;
 }
@@ -11263,6 +11288,41 @@ function _wsLabel(kind, item) {
   if (kind === 'goal') return item.name || t('wsg_type_' + (item.type || 'free'));
   if (kind === 'scenario') return item.name || t('wsh_scenario_title');
   return item.name || '';
+}
+
+// WS.6A — pinned quick-access items (tools/templates). Separate from saved
+// projects: pinning never creates a project nor touches the project counters.
+const _WSH_PINNED_KEY = 'aurix_ws_pinned_v1';
+function _wsPinned() { return _wshReadStore(_WSH_PINNED_KEY); }
+function _wsIsPinned(ref) { return _wsPinned().some(p => p && p.ref === ref); }
+function _wsTogglePin(ref) {
+  const list = _wsPinned();
+  const i = list.findIndex(p => p && p.ref === ref);
+  if (i >= 0) list.splice(i, 1); else list.push({ ref, ts: Date.now() });
+  try { localStorage.setItem(_WSH_PINNED_KEY, JSON.stringify(list)); } catch (_) {}
+}
+// Display label + open dispatch for a pinned ref ('tool:<k>' | 'tpl:<type>').
+function _wsPinLabel(ref) {
+  const i = ref.indexOf(':'); const kind = ref.slice(0, i), key = ref.slice(i + 1);
+  if (kind === 'tool') return t('wstool_' + key + '_n');
+  if (key === 'goals') return t('wsg_title');
+  if (key === 'scenario') return t('wsh_scenario_title');
+  if (key === 'projection') return t('wsp_title');
+  return t('wsh_ws_' + key);
+}
+function _wsPinOpen(ref) {
+  const i = ref.indexOf(':'); const kind = ref.slice(0, i), key = ref.slice(i + 1);
+  if (kind === 'tool') { _wsOpenTool(key); return; }
+  if (key === 'goals') { _wshView = 'goals'; renderWorkspaceHome(); return; }
+  if (key === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); return; }
+  if (key === 'projection') { _wshView = 'planning'; renderWorkspaceHome(); return; }
+  _ws4OpenOrCreate(key);
+}
+// WS.6A — smart entry tab: never land on an empty "Mi espacio".
+function _wsSmartTab() {
+  const hasSaved = _wshAllProjects().length > 0 || _wsPinned().length > 0;
+  if (hasSaved) return 'space';
+  return AURIX_WS6_TOOL ? 'tools' : 'templates';
 }
 
 // WS.5A P3/P4 — unified view of saved items across the 3 stores.
@@ -11303,7 +11363,7 @@ function _wsxAct(act, ref) {
 
 function _renderWorkspaceHome(metrics) {
   const esc = (typeof _intccEsc === 'function') ? _intccEsc : (s => String(s == null ? '' : s));
-  const tab = (_wsTab === 'templates' || _wsTab === 'tools') ? _wsTab : 'space';
+  const tab = (_wsTab === 'space' || _wsTab === 'templates' || _wsTab === 'tools') ? _wsTab : _wsSmartTab();
 
   // WS.5C — no hero. Workspace opens directly on the internal tabs.
 
@@ -11314,9 +11374,12 @@ function _renderWorkspaceHome(metrics) {
       ${TABS.map(([k, lk]) => `<button type="button" class="wsh-tab${tab === k ? ' is-active' : ''}" data-wstab="${k}">${esc(t(lk))}</button>`).join('')}
     </nav>`;
 
+  // Small pin/star toggle for tool & template cards (stops the card's open click
+  // because the delegated handler matches [data-wspin] before [data-wsh-cta]).
+  const pinBtn = ref => { const on = _wsIsPinned(ref); return `<button type="button" class="wsh-pin${on ? ' is-on' : ''}" data-wspin="${esc(ref)}" title="${esc(on ? t('wspin_remove') : t('wspin'))}" aria-label="${esc(on ? t('wspin_remove') : t('wspin'))}"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3.5l2.6 5.5 6 .6-4.5 4.1 1.3 5.9L12 16.9 6.6 19.6l1.3-5.9L3.4 9.6l6-.6z"/></svg></button>`; };
+
   let panel = '';
   if (tab === 'space') {
-    // P3 Continuar + P4 (renamed) Mi espacio.
     const last = _wshLastEdited();
     const continueHtml = last ? `
       <section class="wsh-card wsh-continue">
@@ -11327,72 +11390,83 @@ function _renderWorkspaceHome(metrics) {
         </div>
         <button type="button" class="wsh-cta is-primary" data-wsx-open="${esc(last.ref)}">${esc(t('wsh_continue_btn'))}</button>
       </section>` : '';
-    const all = _wshAllProjects().sort((a, b) => b.ts - a.ts);
-    const spaceHtml = `
+    const saved = _wshAllProjects().sort((a, b) => b.ts - a.ts);
+    const pinned = _wsPinned();
+    const savedRows = saved.map(p => `
+      <div class="wsh-proj">
+        <div class="wsh-proj-info">
+          <span class="wsb-pill is-saved">${esc(t('wsstate_saved'))}</span>
+          <span class="wsh-proj-type">${esc(p.typeLabel)}</span>
+          <p class="wsh-proj-name">${esc(p.name)}</p>
+          <span class="wsh-proj-meta">${esc(_intccDate(p.ts))}</span>
+        </div>
+        <div class="wsh-proj-acts">
+          <button type="button" class="wsg-act" data-wsx-open="${esc(p.ref)}">${esc(t('wsh_proj_open'))}</button>
+          <button type="button" class="wsg-act" data-wsx-act="dup" data-wsx-ref="${esc(p.ref)}">${esc(t('wsg_act_dup'))}</button>
+          <button type="button" class="wsg-act is-danger" data-wsx-act="del" data-wsx-ref="${esc(p.ref)}">${esc(t('wsg_act_del'))}</button>
+        </div>
+      </div>`).join('');
+    const pinnedRows = pinned.map(p => `
+      <div class="wsh-proj is-pinned">
+        <div class="wsh-proj-info">
+          <span class="wsb-pill is-pinned">${esc(t('wsstate_pinned'))}</span>
+          <p class="wsh-proj-name">${esc(_wsPinLabel(p.ref))}</p>
+        </div>
+        <div class="wsh-proj-acts">
+          <button type="button" class="wsg-act" data-wspinopen="${esc(p.ref)}">${esc(t('wsh_proj_open'))}</button>
+          <button type="button" class="wsg-act" data-wspin="${esc(p.ref)}">${esc(t('wspin_remove'))}</button>
+        </div>
+      </div>`).join('');
+    const spaceHtml = (saved.length || pinned.length) ? `
       <section class="wsh-card wsh-projects">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_space'))}</h3></header>
-        ${all.length ? `<div class="wsh-proj-grid">${all.map(p => `
-          <div class="wsh-proj">
-            <div class="wsh-proj-info">
-              <span class="wsb-pill is-dynamic">${esc(p.typeLabel)}</span>
-              <p class="wsh-proj-name">${esc(p.name)}</p>
-              <span class="wsh-proj-meta">${esc(_intccDate(p.ts))}</span>
-            </div>
-            <div class="wsh-proj-acts">
-              <button type="button" class="wsg-act" data-wsx-open="${esc(p.ref)}">${esc(t('wsh_proj_open'))}</button>
-              <button type="button" class="wsg-act" data-wsx-act="dup" data-wsx-ref="${esc(p.ref)}">${esc(t('wsg_act_dup'))}</button>
-              <button type="button" class="wsg-act is-danger" data-wsx-act="del" data-wsx-ref="${esc(p.ref)}">${esc(t('wsg_act_del'))}</button>
-            </div>
-          </div>`).join('')}</div>`
-        : `<div class="wsh-space-empty"><p class="wsh-empty">${esc(t('wsh_space_empty'))}</p><button type="button" class="wsh-cta is-primary" data-wstab="templates">${esc(t('wsh_space_cta'))}</button></div>`}
-      </section>`;
+        <div class="wsh-proj-grid">${savedRows}${pinnedRows}</div>
+      </section>`
+      : `<section class="wsh-card"><div class="wsh-space-empty"><p class="wsh-empty">${esc(t('wsh_space_empty'))}</p><button type="button" class="wsh-cta is-primary" data-wstab="templates">${esc(t('wsh_space_cta'))}</button></div></section>`;
     panel = continueHtml + spaceHtml;
   } else if (tab === 'templates') {
-    const wsViz = { investment: 'donut', budget: 'bars', property: 'house', business: 'bars', networth: 'donut', fire: 'curve' };
-    const wsItems = ['investment', 'budget', 'property', 'business', 'networth', 'fire'];
-    const tplCards = wsItems.map(k => `
-      <div class="wsh-tpl" role="button" tabindex="0" data-wsh-cta="workspace" data-ws4-type="${esc(k)}">
-        <div class="wsh-tpl-viz">${_wsTplViz(wsViz[k])}</div>
-        <p class="wsh-tpl-name">${esc(t('wsh_ws_' + k))}</p>
-        <p class="wsh-tpl-desc">${esc(t('ws4_sub_' + k))}</p>
+    // Organized by real utility (not by technical structure). 'cta'+'arg' decide
+    // how each card opens; 'ref' is the pinnable identifier.
+    const card = it => `
+      <div class="wsh-tpl" role="button" tabindex="0" data-wsh-cta="${esc(it.cta)}"${it.arg ? ' data-ws4-type="' + esc(it.arg) + '"' : ''}>
+        ${pinBtn(it.ref)}
+        <div class="wsh-tpl-viz">${_wsTplViz(it.viz)}</div>
+        <p class="wsh-tpl-name">${esc(it.name)}</p>
+        <p class="wsh-tpl-desc">${esc(it.desc)}</p>
         <span class="wsh-tpl-go">${esc(t('wstpl_use'))} ›</span>
-      </div>`).join('');
-    // Plans (goals / scenario / projection) — also creatable, kept reachable.
-    const plans = [
-      { cta: 'goals',    viz: 'target',  name: t('wsg_title'),          desc: t('wsg_subtitle') },
-      { cta: 'scenario', viz: 'compare', name: t('wsh_scenario_title'), desc: t('wsb_subtitle') },
-      { cta: 'planning', viz: 'curve',   name: t('wsp_title'),          desc: t('wsp_subtitle') },
+      </div>`;
+    const T2 = type => ({ cta: 'workspace', arg: type, ref: 'tpl:' + type, name: t('wsh_ws_' + type), desc: t('ws4_sub_' + type) });
+    const groups = [
+      { title: t('wstplg_planning'), items: [
+        { cta: 'goals',    ref: 'tpl:goals',      viz: 'target',  name: t('wsg_title'),          desc: t('wsg_subtitle') },
+        { cta: 'scenario', ref: 'tpl:scenario',   viz: 'compare', name: t('wsh_scenario_title'), desc: t('wsb_subtitle') },
+        { cta: 'planning', ref: 'tpl:projection', viz: 'curve',   name: t('wsp_title'),          desc: t('wsp_subtitle') },
+        Object.assign(T2('fire'), { viz: 'curve' }),
+      ] },
+      { title: t('wstplg_daily'), items: [ Object.assign(T2('budget'), { viz: 'table' }), Object.assign(T2('networth'), { viz: 'donut' }) ] },
+      { title: t('wstplg_investing'), items: [ Object.assign(T2('investment'), { viz: 'bars' }) ] },
+      { title: t('wstplg_realestate'), items: [ Object.assign(T2('property'), { viz: 'house' }), Object.assign(T2('business'), { viz: 'bars' }) ] },
     ];
-    const planCards = plans.map(p => `
-      <div class="wsh-tpl" role="button" tabindex="0" data-wsh-cta="${esc(p.cta)}">
-        <div class="wsh-tpl-viz">${_wsTplViz(p.viz)}</div>
-        <p class="wsh-tpl-name">${esc(p.name)}</p>
-        <p class="wsh-tpl-desc">${esc(p.desc)}</p>
-        <span class="wsh-tpl-go">${esc(t('wstpl_use'))} ›</span>
-      </div>`).join('');
-    panel = `
+    panel = groups.map(g => `
       <section class="wsh-card">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstpl_plans_title'))}</h3></header>
-        <div class="wsh-tpl-grid">${planCards}</div>
-      </section>
-      <section class="wsh-card">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsh_workspaces_title'))}</h3></header>
-        <div class="wsh-tpl-grid">${tplCards}</div>
-      </section>`;
+        <header class="wsh-head"><h3 class="wsh-title">${esc(g.title)}</h3></header>
+        <div class="wsh-tpl-grid">${g.items.map(card).join('')}</div>
+      </section>`).join('');
   } else {
-    // Tools — visual cards (placeholder state where not implemented).
+    // Tools — visual cards; active tool featured + pinnable.
     const tools = [
-      { k: 'compound', active: AURIX_WS6_TOOL, icon: '<path d="M4 16l5-5 3 3 7-7"/><path d="M16 7h4v4"/>' },
-      { k: 'budget',   active: false, icon: '<path d="M4 7h16v12H4z"/><path d="M4 11h16"/><circle cx="16" cy="15" r="1.3"/>' },
-      { k: 'journal',  active: false, icon: '<path d="M6 4h11a1 1 0 0 1 1 1v15l-3-2-3 2-3-2-3 2V5a1 1 0 0 1 1-1z"/>' },
+      { k: 'compound', active: AURIX_WS6_TOOL, viz: 'curve',   icon: '<path d="M4 16l5-5 3 3 7-7"/><path d="M16 7h4v4"/>' },
+      { k: 'budget',   active: false,          viz: 'table',   icon: '<path d="M4 7h16v12H4z"/><path d="M4 11h16"/><circle cx="16" cy="15" r="1.3"/>' },
+      { k: 'journal',  active: false,          viz: 'journal', icon: '<path d="M6 4h11a1 1 0 0 1 1 1v15l-3-2-3 2-3-2-3 2V5a1 1 0 0 1 1-1z"/>' },
     ];
     panel = `
       <section class="wsh-card">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_tools'))}</h3></header>
         <div class="wsh-tool-grid">
           ${tools.map(tl => `
-            <div class="wsh-tool${tl.active ? ' is-active' : ''}"${tl.active ? ' role="button" tabindex="0" data-wsh-cta="tool" data-wstool="' + esc(tl.k) + '"' : ''}>
-              <span class="wsh-tool-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${tl.icon}</svg></span>
+            <div class="wsh-tool${tl.active ? ' is-active is-featured' : ''}"${tl.active ? ' role="button" tabindex="0" data-wsh-cta="tool" data-wstool="' + esc(tl.k) + '"' : ''}>
+              ${tl.active ? pinBtn('tool:' + tl.k) : ''}
+              <div class="wsh-tpl-viz wsh-tool-viz">${_wsTplViz(tl.viz)}</div>
               <p class="wsh-tool-name">${esc(t('wstool_' + tl.k + '_n'))}</p>
               <p class="wsh-tool-desc">${esc(t('wstool_' + tl.k + '_d'))}</p>
               <span class="${tl.active ? 'wsh-tool-go' : 'wsh-pill'}">${esc(tl.active ? t('wstpl_use') + ' ›' : t('wsh_soon'))}</span>

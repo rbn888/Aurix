@@ -19863,6 +19863,23 @@ body.gs-open { overflow: hidden; }
   .wsg-actions { justify-content: flex-end; }
 }
 
+/* ── WS.6A — pinned items, saved/pinned states, featured tool, viz extras ── */
+.wsh-tpl, .wsh-tool { position: relative; }
+.wsh-pin { position: absolute; top: 10px; right: 10px; z-index: 2; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border-radius: 8px; cursor: pointer; color: rgba(159,194,255,0.55); background: rgba(255,255,255,0.04); border: 1px solid rgba(120,160,255,0.14); transition: color 150ms ease, background 150ms ease, border-color 150ms ease; }
+.wsh-pin svg { width: 15px; height: 15px; fill: none; }
+.wsh-pin:hover { color: #aecbff; background: rgba(74,130,240,0.16); }
+.wsh-pin.is-on { color: #f3cf9a; border-color: rgba(233,168,87,0.42); background: rgba(233,168,87,0.12); }
+.wsh-pin.is-on svg { fill: currentColor; }
+.wsb-pill.is-saved  { color: #8fe6b6; background: rgba(63,191,127,0.12); border-color: rgba(63,191,127,0.30); }
+.wsb-pill.is-pinned { color: #f3cf9a; background: rgba(233,168,87,0.12); border-color: rgba(233,168,87,0.30); }
+.wsh-proj-type { font-size: 11px; color: var(--text-muted); }
+.wsh-proj.is-pinned { border-style: dashed; }
+.wsh-tool.is-featured { border-color: rgba(77,141,255,0.34); background: radial-gradient(130% 150% at 85% 0%, rgba(92,156,255,0.14), transparent 60%), linear-gradient(165deg, rgba(34,52,92,0.52), rgba(15,21,37,0.6)); box-shadow: 0 0 24px rgba(77,141,255,0.10); }
+.wsh-tool-viz { height: 52px; margin-bottom: 8px; }
+.wsh-tpl-viz-svg .v-up   { stroke: #8fe6b6; }
+.wsh-tpl-viz-svg .v-down { stroke: #e0746f; }
+.wsh-tpl-viz-svg .v-dot2 { stroke: #8fe6b6; }
+
 /* ── WS.5C — Aurix delete modal + template visual previews ── */
 .ws-modal-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(5,8,16,0.66); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); opacity: 0; transition: opacity 160ms ease; }
 .ws-modal-overlay.is-open { opacity: 1; }
