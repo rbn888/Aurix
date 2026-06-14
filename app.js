@@ -11983,6 +11983,47 @@ function _wsSpaceMenu(ref, anchor) {
 // template name (English before the ES fix), so we derive from the type via i18n
 // unless the user set a custom name. Goals/scenarios use their user-entered name.
 // WS.5C — stylized mini-mockup per template (pure stroke SVG, Aurix blue).
+// ── WS.17 — Premium visual asset system ──────────────────────────────────────
+// Local WebP covers under assets/workspace/ (no remote URLs, no generation). The
+// rule: if the local file exists it overlays the existing CSS scene/glyph; if it
+// is missing the <img> 404s and removes itself (onerror), revealing the original
+// scene/glyph underneath. So every cover upgrades automatically the moment the
+// founder drops the real WebP in, and falls back gracefully until then.
+const _WS_ASSET_BASE = 'assets/workspace/';
+// Real-estate property type → realistic cover (ptype keys match _WSRE_TYPES).
+const _WSRE_ASSET = {
+  flat:      'realestate_apartment',
+  house:     'realestate_house',
+  chalet:    'realestate_chalet',
+  local:     'realestate_commercial',
+  office:    'realestate_office',
+  warehouse: 'realestate_industrial',
+  garage:    'realestate_garage',
+};
+// Template-card category → realistic cover (keys match _wsCatPreviewHtml cats).
+const _WS_TPL_ASSET = {
+  budget:           'template_budget',
+  assets:           'template_assets',
+  receivables:      'template_receivables',
+  goals:            'template_goals',
+  scenario:         'template_scenarios',
+  projection:       'template_scenarios',
+  'realestate-pro': 'realestate_apartment',
+};
+// Tool-card id → compact premium cover (keys match the Herramientas tool ids).
+const _WS_TOOL_ASSET = {
+  compound_growth:     'tool_compound',
+  loan_simulation:     'tool_loans',
+  financial_calc:      'tool_financial',
+  investment_analyzer: 'tool_investment',
+};
+// Self-removing overlay <img>: covers its (position:relative, overflow:hidden)
+// host when the WebP loads, removes itself on error so the CSS scene/glyph shows.
+function _wsAssetImg(name, alt) {
+  if (!name) return '';
+  return `<img class="ws-asset-img" src="${_WS_ASSET_BASE}${name}.webp" alt="${_intccEsc(alt || '')}" loading="lazy" decoding="async" onload="this.classList.add('is-loaded')" onerror="this.remove()">`;
+}
+
 function _wsTplViz(k) {
   const V = {
     bars:    '<path d="M11 34 V22"/><path d="M25 34 V16"/><path d="M39 34 V11"/><path d="M53 34 V6"/>',
@@ -12199,7 +12240,7 @@ function _wsAssetsPreview() {
   return `<div class="wspv wspv-assets">${rows.map(r => `<span class="wspv-asset-row"><b>${esc(r[0])}</b><i>${esc(r[3])} €</i><em class="is-${r[4]}">${esc(r[2])}→${esc(r[3])}</em></span>`).join('')}</div>`;
 }
 // WS.10.2/10.6 — distinct preview per template category (no "everything is a curve").
-function _wsCatPreviewHtml(cat) {
+function _wsCatPreviewBaseHtml(cat) {
   if (cat === 'realestate-pro') return `<div class="wspv wspv-re wspv-re-tpl"><div class="wspv-re-ov"><span class="wspv-re-eq">${_intccEsc(t('wsre_n'))}</span><span class="wspv-re-lbl">${_intccEsc(t('wstplg_realestate'))}</span></div></div>`;
   if (cat === 'receivables') return _wsReceivablesPreview();
   if (cat === 'assets') return _wsAssetsPreview();
@@ -12211,6 +12252,14 @@ function _wsCatPreviewHtml(cat) {
   if (cat === 'investment') return `<div class="wspv wspv-viz is-blue">${_wsTplViz('bars')}</div>`;
   const A = _WS_ARCH[cat] || { accent: 'gold', glyph: 'flag' };
   return _wsGlyphTile(A.glyph, A.accent);
+}
+// WS.17 — overlay a realistic WebP cover when one exists for this category; the
+// base preview (CSS scene/glyph/data) stays underneath as the graceful fallback.
+function _wsCatPreviewHtml(cat) {
+  const base = _wsCatPreviewBaseHtml(cat);
+  const asset = _WS_TPL_ASSET[cat];
+  if (!asset) return base;
+  return `<div class="wspv-asset-host">${base}${_wsAssetImg(asset, '')}</div>`;
 }
 
 // WS.11B — saved-project preview built from the project's OWN stored data
@@ -12448,7 +12497,7 @@ function _renderWorkspaceHome(metrics) {
           ${tools.map(tl => `
             <div class="wsh-tool wsh-toolcard ${accent(tl.id)}${tl.soon ? ' is-soon' : ''}"${tl.open}>
               ${tl.pinRef ? pinBtn(tl.pinRef) : ''}
-              <div class="wsh-toolcard-ic">${_wsTplViz(tl.viz)}</div>
+              <div class="wsh-toolcard-ic${_WS_TOOL_ASSET[tl.id] ? ' has-asset' : ''}">${_wsTplViz(tl.viz)}${_wsAssetImg(_WS_TOOL_ASSET[tl.id], '')}</div>
               <p class="wsh-tool-name">${esc(tl.name)}</p>
               <span class="${tl.soon ? 'wsh-pill' : 'wsh-tool-go'}">${esc(tl.soon ? t('wsh_soon') : t('wsh_proj_open') + ' ›')}</span>
             </div>`).join('')}
@@ -14038,7 +14087,8 @@ function _wsReCoverHtml(p, big) {
   const cls = photo ? 'has-photo' : ('is-' + ptype);
   const style = photo ? ` style="background-image:url(${p.photo})"` : '';
   const glyph = photo ? '' : `<svg class="wsre-cover-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsReTypeGlyph(ptype)}</svg>`;
-  return `<div class="wsre-cover${big ? ' is-big' : ''} ${cls}"${style}>${glyph}<span class="wsre-status is-${esc(p.status || 'green')}"></span></div>`;
+  const asset = photo ? '' : _wsAssetImg(_WSRE_ASSET[ptype], t('wsre_t_' + ptype));
+  return `<div class="wsre-cover${big ? ' is-big' : ''} ${cls}"${style}>${glyph}${asset}<span class="wsre-status is-${esc(p.status || 'green')}"></span></div>`;
 }
 function calculateRealEstatePortfolio(properties) {
   const list = (Array.isArray(properties) ? properties : []).map(p => {
@@ -14119,7 +14169,7 @@ function _wsRePhoto(input) {
         _wsReDraft.photo = cv.toDataURL('image/jpeg', 0.72);
         const root = document.querySelector('.wsh-tool-view');
         const box = root && root.querySelector('[data-wsre-photo-pv]');
-        if (box) { box.style.backgroundImage = `url(${_wsReDraft.photo})`; box.classList.add('has-photo'); }
+        if (box) { box.style.backgroundImage = `url(${_wsReDraft.photo})`; box.classList.add('has-photo'); const ai = box.querySelector('.ws-asset-img'); if (ai) ai.remove(); }
       };
       img.src = e.target.result;
     };
@@ -14237,7 +14287,7 @@ function _wsReFormHtml() {
       <div class="wsre-form-section">
         <span class="wsre-form-sec-t">${esc(t('wsre_sec_identity'))}</span>
         <div class="wsre-form-photo">
-          <div class="wsre-photo-pv${d.photo ? ' has-photo' : ' is-' + (d.ptype || 'flat')}" data-wsre-photo-pv${d.photo ? ` style="background-image:url(${d.photo})"` : ''}>${d.photo ? '' : `<svg class="wsre-cover-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsReTypeGlyph(d.ptype)}</svg>`}</div>
+          <div class="wsre-photo-pv${d.photo ? ' has-photo' : ' is-' + (d.ptype || 'flat')}" data-wsre-photo-pv${d.photo ? ` style="background-image:url(${d.photo})"` : ''}>${d.photo ? '' : `<svg class="wsre-cover-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsReTypeGlyph(d.ptype)}</svg>` + _wsAssetImg(_WSRE_ASSET[d.ptype || 'flat'], '')}</div>
           <label class="wsre-photo-btn">${esc(t('wsre_f_photo'))}<input type="file" accept="image/*" data-wsre-photo hidden></label>
         </div>
         <div class="wsre-form-grid">
@@ -14286,7 +14336,7 @@ function _wsReDetailHtml(p) {
         <p class="wsb-subtitle">${esc(p.city || '')}${p.city ? ' · ' : ''}${esc(t('wsre_t_' + p.ptype))}</p>
       </section>
       <section class="wsh-card wsre-detail-hero">
-        <div class="wsre-detail-cover ${p.photo ? 'has-photo' : 'is-' + (p.ptype || 'flat')}"${p.photo ? ` style="background-image:url(${p.photo})"` : ''}>${p.photo ? '' : `<svg class="wsre-cover-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsReTypeGlyph(p.ptype)}</svg>`}<span class="wsre-status is-${esc(one.status)}"></span></div>
+        <div class="wsre-detail-cover ${p.photo ? 'has-photo' : 'is-' + (p.ptype || 'flat')}"${p.photo ? ` style="background-image:url(${p.photo})"` : ''}>${p.photo ? '' : `<svg class="wsre-cover-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsReTypeGlyph(p.ptype)}</svg>` + _wsAssetImg(_WSRE_ASSET[p.ptype || 'flat'], esc(p.name || ''))}<span class="wsre-status is-${esc(one.status)}"></span></div>
         <div class="wsre-detail-kpis">
           <div class="wsre-kpi is-cf"><span class="wsre-kpi-v ${cf >= 0 ? 'is-pos' : 'is-neg'}">${esc((cf >= 0 ? '+' : '') + formatBase(cf))}${esc(t('wsre_permonth'))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_cashflow'))}</span></div>
           <div class="wsre-kpi is-equity"><span class="wsre-kpi-v">${esc(formatBase(one.equity))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_equity'))}</span></div>

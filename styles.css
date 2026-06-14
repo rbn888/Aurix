@@ -20533,6 +20533,24 @@ body.gs-open { overflow: hidden; }
 .wsre-cover-glyph { position: absolute; right: -10px; bottom: -16px; width: 92px; height: 92px; color: rgba(255,255,255,0.12); pointer-events: none; }
 .wsre-detail-cover .wsre-cover-glyph { width: 150px; height: 150px; right: -16px; bottom: -24px; }
 .wsre-photo-pv .wsre-cover-glyph { width: 56px; height: 56px; right: -6px; bottom: -10px; }
+
+/* ════════ WS.17 — Premium visual asset system (local WebP covers) ══════════ */
+/* Self-removing overlay <img>: fills its (relative, overflow:hidden) host when the
+   WebP loads, removed on error so the underlying CSS scene/glyph/preview shows. */
+.ws-asset-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; display: block; z-index: 1; border-radius: inherit;
+  opacity: 0; transition: opacity 360ms ease;
+}
+.ws-asset-img.is-loaded { opacity: 1; }
+/* Real-estate covers already are position:relative; keep status dot above photo. */
+.wsre-status { z-index: 2; }
+/* Template-card cover host: positioned slot so the overlay fills the preview. */
+.wspv-asset-host { position: relative; display: flex; width: 100%; height: 100%; overflow: hidden; }
+.wspv-asset-host > .wspv { flex: 1 1 auto; }
+.wsh-pv-wrap > .wspv-asset-host, .wsh-dcard-pv > .wspv-asset-host { flex: 1 1 auto; }
+/* Tool-card icon tile: compact premium cover fills the tile (icon is the fallback). */
+.wsh-toolcard-ic { position: relative; overflow: hidden; }
 /* card type chip + restructured top */
 .wsre-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .wsre-card-id { min-width: 0; }
