@@ -19988,6 +19988,57 @@ body.gs-open { overflow: hidden; }
   .wsbud-split { grid-template-columns: 1fr; }
 }
 
+/* ── WS.8 — Trade Journal tool (wsjrn-* namespace, reuses wstool-* result) ── */
+.wstool-result.wsjrn-summary { grid-template-columns: 1fr; gap: 16px; }
+.wsjrn-summary .wstool-res-main { align-items: flex-start; padding: 22px 24px; }
+.wsjrn-summary .wstool-res-final { font-size: 46px; line-height: 1.02; }
+.wstool-res-v.is-up { color: #7ef0b8; }
+.wstool-res-v.is-down { color: #f0897f; }
+.wsjrn-sum-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.wsjrn-chartbox { align-items: stretch; gap: 10px; }
+.wsjrn-chart-svg { width: 100%; max-width: 480px; height: auto; }
+.wsjrn-axis { stroke: rgba(150,180,240,0.25); stroke-width: 1; }
+.wsjrn-bar.is-win { fill: #2fd98e; filter: drop-shadow(0 0 5px rgba(47,217,142,0.4)); }
+.wsjrn-bar.is-loss { fill: #f0897f; filter: drop-shadow(0 0 5px rgba(240,137,127,0.35)); }
+.wsjrn-bar-lbl { fill: var(--text-muted); font-size: 9px; font-weight: 700; }
+/* add/edit form */
+.wsjrn-form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.wsjrn-select { width: 100%; cursor: pointer; }
+.wsjrn-form-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.wsjrn-form-btns { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.wsjrn-preview { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.wsjrn-preview.is-win { color: #7ef0b8; }
+.wsjrn-preview.is-loss { color: #f0897f; }
+.wsjrn-preview.is-open { color: rgba(159,194,255,0.85); }
+/* trade list */
+.wsjrn-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 12px; }
+.wsjrn-card { position: relative; display: flex; flex-direction: column; gap: 9px; padding: 14px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.13); background: rgba(255,255,255,0.025); border-left-width: 3px; }
+.wsjrn-card.is-win { border-left-color: #2fd98e; }
+.wsjrn-card.is-loss { border-left-color: #f0897f; }
+.wsjrn-card.is-open { border-left-color: rgba(150,180,240,0.5); }
+.wsjrn-card-top { display: flex; align-items: center; gap: 8px; }
+.wsjrn-asset { font-size: 15px; font-weight: 800; color: var(--text-bright); }
+.wsjrn-type-chip { font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; color: #aecbff; padding: 2px 8px; border-radius: 999px; background: rgba(74,130,240,0.14); border: 1px solid rgba(74,130,240,0.26); }
+.wsjrn-ccy { font-size: 10.5px; font-weight: 700; color: var(--text-muted); padding: 2px 7px; border-radius: 999px; border: 1px solid rgba(120,160,255,0.2); }
+.wsjrn-card-rows { display: flex; flex-direction: column; gap: 4px; }
+.wsjrn-row { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-muted); }
+.wsjrn-row b { color: var(--text-bright); font-variant-numeric: tabular-nums; font-weight: 700; }
+.wsjrn-card-pl { display: flex; align-items: baseline; gap: 10px; }
+.wsjrn-ret { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.wsjrn-pl { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.wsjrn-ret.is-win, .wsjrn-pl.is-win { color: #7ef0b8; }
+.wsjrn-ret.is-loss, .wsjrn-pl.is-loss { color: #f0897f; }
+.wsjrn-status.is-open { font-size: 12.5px; font-weight: 700; color: rgba(159,194,255,0.85); }
+.wsjrn-card-acts { display: flex; align-items: center; gap: 7px; margin-top: 2px; }
+@media (max-width: 720px) {
+  .wsjrn-form-grid { grid-template-columns: 1fr 1fr; }
+  .wsjrn-sum-grid { grid-template-columns: 1fr; }
+  .wsjrn-summary .wstool-res-final { font-size: 38px; }
+}
+@media (max-width: 640px) {
+  .wsjrn-list { grid-template-columns: 1fr; }
+}
+
 /* ── WS.5B — studio layout: compact hero, internal tabs, templates, tools ── */
 .wsh-hero.is-studio { padding: 14px 22px; gap: 22px; }
 .wsh-hero.is-studio .wsh-hero-main { display: flex; flex-direction: column; justify-content: center; }

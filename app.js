@@ -1944,6 +1944,36 @@ const T = {
     wstool_bud_read_mid:  r => `Ahorras el ${r}% de tus ingresos. Vas por buen camino.`,
     wstool_bud_read_low:  r => `Ahorras el ${r}% de tus ingresos. Hay margen para mejorar.`,
     wstool_bud_read_none: 'No te queda margen este mes. Revisa los gastos mayores.',
+    // WS.8 — Trade Journal tool
+    wstool_save_journal:  'Guardar diario',
+    wsjrn_add_title:   'Nueva operación',
+    wsjrn_edit:        'Editar operación',
+    wsjrn_f_asset:     'Activo',
+    wsjrn_f_type:      'Tipo',
+    wsjrn_f_buy:       'Precio compra',
+    wsjrn_f_sell:      'Precio venta',
+    wsjrn_f_qty:       'Cantidad',
+    wsjrn_f_fee:       'Comisión',
+    wsjrn_f_ccy:       'Divisa',
+    wsjrn_f_notes:     'Notas',
+    wsjrn_type_stock:  'Acción',
+    wsjrn_type_etf:    'ETF',
+    wsjrn_type_crypto: 'Cripto',
+    wsjrn_type_other:  'Otro',
+    wsjrn_add:         'Añadir operación',
+    wsjrn_save_edit:   'Guardar cambios',
+    wsjrn_cancel:      'Cancelar',
+    wsjrn_buy:         'Compra',
+    wsjrn_sell:        'Venta',
+    wsjrn_st_win:      'Operación ganadora',
+    wsjrn_st_loss:     'Operación perdedora',
+    wsjrn_st_open:     'Operación abierta',
+    wsjrn_sum_net:     'Beneficio neto',
+    wsjrn_sum_avg:     'Rentabilidad media',
+    wsjrn_sum_winrate: 'Operaciones ganadoras',
+    wsjrn_sum_best:    'Mejor operación',
+    wsjrn_chart_title: 'Rentabilidad por operación',
+    wsjrn_empty:       'Añade tu primera operación.',
     // WS.5C — delete confirm modal
     wsmodal_del_title: 'Eliminar elemento',
     wsmodal_del_text:  'Esta acción no se puede deshacer.',
@@ -3660,6 +3690,36 @@ const T = {
     wstool_bud_read_mid:  r => `You save ${r}% of your income. On the right track.`,
     wstool_bud_read_low:  r => `You save ${r}% of your income. Room to improve.`,
     wstool_bud_read_none: 'No margin left this month. Review your biggest expenses.',
+    // WS.8 — Trade Journal tool
+    wstool_save_journal:  'Save journal',
+    wsjrn_add_title:   'New trade',
+    wsjrn_edit:        'Edit trade',
+    wsjrn_f_asset:     'Asset',
+    wsjrn_f_type:      'Type',
+    wsjrn_f_buy:       'Buy price',
+    wsjrn_f_sell:      'Sell price',
+    wsjrn_f_qty:       'Quantity',
+    wsjrn_f_fee:       'Fee',
+    wsjrn_f_ccy:       'Currency',
+    wsjrn_f_notes:     'Notes',
+    wsjrn_type_stock:  'Stock',
+    wsjrn_type_etf:    'ETF',
+    wsjrn_type_crypto: 'Crypto',
+    wsjrn_type_other:  'Other',
+    wsjrn_add:         'Add trade',
+    wsjrn_save_edit:   'Save changes',
+    wsjrn_cancel:      'Cancel',
+    wsjrn_buy:         'Buy',
+    wsjrn_sell:        'Sell',
+    wsjrn_st_win:      'Winning trade',
+    wsjrn_st_loss:     'Losing trade',
+    wsjrn_st_open:     'Open trade',
+    wsjrn_sum_net:     'Net profit',
+    wsjrn_sum_avg:     'Average return',
+    wsjrn_sum_winrate: 'Winning trades',
+    wsjrn_sum_best:    'Best trade',
+    wsjrn_chart_title: 'Return by trade',
+    wsjrn_empty:       'Add your first trade.',
     // WS.5C — delete confirm modal
     wsmodal_del_title: 'Delete item',
     wsmodal_del_text:  'This action cannot be undone.',
@@ -11099,10 +11159,14 @@ let _wsTab = null;         // WS.5B/WS.6A — Home tab; null = smart default on 
 const AURIX_WS6_TOOL = true;
 // WS.7 ACTIVE — Monthly Budget tool released (second real Workspace tool).
 const AURIX_WS7_TOOL = true;
-let _wsToolActive  = 'compound'; // 'compound' | 'budget'
-let _wsToolInputs  = null;   // compound: { initial, monthly, ret, years } | budget: income/expense fields
+// WS.8 ACTIVE — Trade Journal tool released (third real Workspace tool).
+const AURIX_WS8_TOOL = true;
+let _wsToolActive  = 'compound'; // 'compound' | 'budget' | 'journal'
+let _wsToolInputs  = null;   // compound/budget: flat fields | journal: { trades: [...] }
 let _wsToolEditId  = null;   // saved project id when editing an existing one
 let _wsToolDirty   = false;
+let _wsJrnDraft    = null;   // WS.8 — in-progress add/edit trade form
+let _wsJrnEditId   = null;   // WS.8 — trade id being edited (null = adding new)
 // WS.5A P5 — real save model (editar ≠ guardar). Working copies hold unsaved
 // edits; nothing persists until the user confirms "Guardar".
 let _wsgWorking = {};      // goalId -> working goal (unsaved edits)
@@ -11166,7 +11230,7 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -11196,6 +11260,10 @@ function _wshWireOnce() {
     if (nav === 'tools') { _wshView = 'home'; _wsTab = 'tools'; const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } return; }
     if (nav === 'home') { _wshView = 'home'; _ws4ActiveId = null; renderWorkspaceHome(); return; }
     if (t.hasAttribute('data-wstool-save')) { _wsToolSave(); return; }
+    // WS.8 — Trade Journal: add/save trade, per-trade act, cancel edit.
+    if (t.hasAttribute('data-wsjrn-add')) { _wsJrnAdd(); return; }
+    const jAct = t.getAttribute('data-wsjrn-act'); if (jAct) { _wsJrnAct(jAct, t.getAttribute('data-wsjrn-id')); return; }
+    if (t.hasAttribute('data-wsjrn-cancel')) { _wsJrnCancel(); return; }
     const ws4mode = t.getAttribute('data-ws4-mode');
     if (ws4mode) { _ws4SetMode(ws4mode); return; }
     const wsgMode = t.getAttribute('data-wsg-mode');
@@ -11213,6 +11281,7 @@ function _wshWireOnce() {
     if (el.getAttribute('data-wsg-input')) { _wsgOnInput(el); return; }
     if (el.getAttribute('data-wsg-form')) { _wsgFormPreview(); return; }
     if (el.getAttribute('data-wstool-input')) { _wsToolOnInput(el); return; }
+    if (el.getAttribute('data-wsjrn-input')) { _wsJrnOnInput(el); return; }
   });
 }
 
@@ -11339,6 +11408,7 @@ function _wsTplViz(k) {
 function _wsTypeLabel(type) {
   if (type === 'compound_growth') return t('wstool_compound_n');
   if (type === 'monthly_budget')  return t('wstool_budget_n');
+  if (type === 'trade_journal')   return t('wstool_journal_n');
   return t('wsh_ws_' + type);
 }
 function _wsLabel(kind, item) {
@@ -11381,13 +11451,13 @@ function _wsPinOpen(ref) {
 // pinned/active tool restores this; editing inputs updates it; only "Guardar
 // proyecto" creates a real project in aurix_ws_projects_v1.
 const _WSH_TOOL_STATE_KEY = 'aurix_ws_tool_state_v1';
-function _wsToolStateType(key) { return key === 'budget' ? 'monthly_budget' : 'compound_growth'; }
+function _wsToolStateType(key) { return key === 'budget' ? 'monthly_budget' : key === 'journal' ? 'trade_journal' : 'compound_growth'; }
 function _wsToolStateRead() { try { const raw = localStorage.getItem(_WSH_TOOL_STATE_KEY); const v = raw ? JSON.parse(raw) : {}; return (v && typeof v === 'object') ? v : {}; } catch (_) { return {}; } }
 function _wsToolStateGet(key) { const v = _wsToolStateRead()[_wsToolStateType(key)]; return (v && typeof v === 'object') ? v : null; }
 function _wsToolStateSet(key, inputs) { const s = _wsToolStateRead(); s[_wsToolStateType(key)] = Object.assign({}, inputs); try { localStorage.setItem(_WSH_TOOL_STATE_KEY, JSON.stringify(s)); } catch (_) {} }
 
 // WS.7A — mini-preview viz selection for Mi Espacio cards (reuses _wsTplViz).
-const _WS_TYPE_VIZ = { budget: 'budget', monthly_budget: 'budget', networth: 'donut', investment: 'bars', property: 'house', business: 'bars', fire: 'curve', compound_growth: 'curve' };
+const _WS_TYPE_VIZ = { budget: 'budget', monthly_budget: 'budget', networth: 'donut', investment: 'bars', property: 'house', business: 'bars', fire: 'curve', compound_growth: 'curve', trade_journal: 'journal' };
 function _wsRefViz(ref) {
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), key = ref.slice(i + 1);
   if (kind === 'tool') return key === 'budget' ? 'budget' : key === 'journal' ? 'journal' : 'curve';
@@ -11406,6 +11476,7 @@ function _wsProjMeta(p) {
   const r = p.results; if (!r) return '';
   if (p.type === 'compound_growth' && r.final != null) return formatBase(r.final);
   if (p.type === 'monthly_budget' && r.saveRate != null) return r.saveRate + '%';
+  if (p.type === 'trade_journal' && r.netProfit != null) return (r.netProfit >= 0 ? '+' : '') + formatBase(r.netProfit);
   return '';
 }
 
@@ -11430,7 +11501,7 @@ function _wsxOpen(ref) {
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
   if (kind === 'goal') { _wshView = 'goals'; renderWorkspaceHome(); }
   else if (kind === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); }
-  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else if (p.type === 'monthly_budget') { _wsOpenTool('budget', id); } else { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
+  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else if (p.type === 'monthly_budget') { _wsOpenTool('budget', id); } else if (p.type === 'trade_journal') { _wsOpenTool('journal', id); } else { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
 }
 function _wsxAct(act, ref) {
   if (!ref) return;
@@ -11542,7 +11613,7 @@ function _renderWorkspaceHome(metrics) {
     const tools = [
       { k: 'compound', active: AURIX_WS6_TOOL, viz: 'curve',   icon: '<path d="M4 16l5-5 3 3 7-7"/><path d="M16 7h4v4"/>' },
       { k: 'budget',   active: AURIX_WS7_TOOL, viz: 'budget',  icon: '<path d="M4 7h16v12H4z"/><path d="M4 11h16"/><circle cx="16" cy="15" r="1.3"/>' },
-      { k: 'journal',  active: false,          viz: 'journal', icon: '<path d="M6 4h11a1 1 0 0 1 1 1v15l-3-2-3 2-3-2-3 2V5a1 1 0 0 1 1-1z"/>' },
+      { k: 'journal',  active: AURIX_WS8_TOOL, viz: 'journal', icon: '<path d="M6 4h11a1 1 0 0 1 1 1v15l-3-2-3 2-3-2-3 2V5a1 1 0 0 1 1-1z"/>' },
     ];
     panel = `
       <section class="wsh-card">
@@ -12439,15 +12510,17 @@ function _wsToolDefaults() {
 
 // WS.7 — tool registry: maps a tool key to its gate, defaults, project type and
 // renderer so the shared open/input/save plumbing stays tool-agnostic.
-function _wsToolDefaultsFor(key) { return key === 'budget' ? _wsBudgetDefaults() : _wsToolDefaults(); }
-function _wsRenderTool() { return _wsToolActive === 'budget' ? _renderBudgetTool() : _renderCompoundTool(); }
+function _wsToolDefaultsFor(key) { return key === 'budget' ? _wsBudgetDefaults() : key === 'journal' ? _wsJournalDefaults() : _wsToolDefaults(); }
+function _wsRenderTool() { return _wsToolActive === 'budget' ? _renderBudgetTool() : _wsToolActive === 'journal' ? _renderJournalTool() : _renderCompoundTool(); }
 function _wsToolOutHtmlFor(key, inp) { return key === 'budget' ? _wsBudgetOutHtml(inp) : _wsToolOutHtml(inp); }
 
 function _wsOpenTool(toolKey, projectId) {
-  const key = toolKey === 'budget' ? 'budget' : 'compound';
+  const key = (toolKey === 'budget' || toolKey === 'journal') ? toolKey : 'compound';
   if (key === 'compound' && !AURIX_WS6_TOOL) return;   // WS.6 gate
   if (key === 'budget'   && !AURIX_WS7_TOOL) return;   // WS.7 gate
+  if (key === 'journal'  && !AURIX_WS8_TOOL) return;   // WS.8 gate
   _wsToolActive = key;
+  _wsJrnDraft = (key === 'journal') ? _wsJrnNewDraft() : null; _wsJrnEditId = null;  // reset trade form
   if (projectId) {
     // Open a saved project for editing (its inputs, tracked by edit id).
     const p = _ws4Projects().find(x => x && x.id === projectId);
@@ -12481,7 +12554,11 @@ function _wsToolSave() {
   const list = _ws4Projects();
   const existing = _wsToolEditId ? list.find(p => p && p.id === _wsToolEditId) : null;
   let type, results;
-  if (_wsToolActive === 'budget') {
+  if (_wsToolActive === 'journal') {
+    const r = calculateTradeJournal(_wsToolInputs.trades);
+    type = 'trade_journal';
+    results = { netProfit: Math.round(r.netProfit), avgReturn: Math.round(r.avgReturn * 10) / 10, winRate: Math.round(r.winRate), closedCount: r.closedCount, count: r.list.length };
+  } else if (_wsToolActive === 'budget') {
     const r = calculateMonthlyBudget(_wsToolInputs);
     type = 'monthly_budget';
     results = { income: Math.round(r.income), expenses: Math.round(r.expenses), free: Math.round(r.free), saveRate: Math.round(r.saveRate) };
@@ -12509,9 +12586,10 @@ function _wsToolSaveBarHtml() {
   const state = _wsToolEditId ? (_wsToolDirty ? 'dirty' : 'saved') : 'unsaved';
   const lbl = { unsaved: t('wsg_save_unsaved'), dirty: t('wsg_save_pending'), saved: t('wsg_save_done') }[state];
   const canSave = !_wsToolEditId || _wsToolDirty;
+  const saveLabel = _wsToolActive === 'journal' ? t('wstool_save_journal') : t('wstool_save');
   return `
     <span class="wsg-savestate is-${state}">${esc(lbl)}</span>
-    <button type="button" class="wsh-cta is-primary wsg-savebtn" data-wstool-save${canSave ? '' : ' disabled'}>${esc(t('wstool_save'))}</button>`;
+    <button type="button" class="wsh-cta is-primary wsg-savebtn" data-wstool-save${canSave ? '' : ' disabled'}>${esc(saveLabel)}</button>`;
 }
 
 function _wsToolMilestones(res) {
@@ -12717,6 +12795,253 @@ function _renderBudgetTool() {
       <section class="wsh-card wstool-out-card">
         <div class="wstool-out" data-wstool-out>${_wsBudgetOutHtml(inp)}</div>
       </section>
+      <section class="wsh-card wsg-foot-card">
+        <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
+      </section>
+    </div>`;
+}
+
+// ── WS.8 — Trade Journal tool ────────────────────────────────────────────────
+// "How much did I make or lose on each trade?" Replaces the simple buy/sell
+// Excels. Deterministic, pure, no APIs, no live prices, no real portfolio.
+function calculateTradeJournal(trades) {
+  const list = (Array.isArray(trades) ? trades : []).map(tr => {
+    const qty = Math.max(0, Number(tr.qty) || 0);
+    const buy = Math.max(0, Number(tr.buy) || 0);
+    const fee = Math.max(0, Number(tr.fee) || 0);
+    const sellEmpty = (tr.sell === '' || tr.sell == null);
+    const sell = sellEmpty ? null : Math.max(0, Number(tr.sell) || 0);
+    const invested = buy * qty + fee;
+    const open = sellEmpty || qty <= 0;
+    let exit = null, pl = null, ret = null, status = 'open';
+    if (!open) {
+      exit = sell * qty;
+      pl = exit - invested;
+      ret = invested > 0 ? (pl / invested) * 100 : 0;
+      status = pl >= 0 ? 'win' : 'loss';
+    }
+    return Object.assign({}, tr, { invested, exit, pl, ret, status, open });
+  });
+  const closed = list.filter(x => !x.open);
+  const totalInvested = list.reduce((s, x) => s + x.invested, 0);
+  const netProfit = closed.reduce((s, x) => s + x.pl, 0);
+  const avgReturn = closed.length ? closed.reduce((s, x) => s + x.ret, 0) / closed.length : 0;
+  const winners = closed.filter(x => x.pl >= 0).length;
+  const winRate = closed.length ? (winners / closed.length) * 100 : 0;
+  let best = null, worst = null;
+  for (const x of closed) { if (best === null || x.ret > best.ret) best = x; if (worst === null || x.ret < worst.ret) worst = x; }
+  return { list, totalInvested, netProfit, avgReturn, winners, closedCount: closed.length, winRate, best, worst };
+}
+
+function _wsJrnNewDraft() { return { asset: '', atype: 'stock', buy: '', sell: '', qty: '', fee: '', currency: 'EUR', notes: '', buyDate: '', sellDate: '' }; }
+function _wsJournalDefaults() {
+  return { trades: [
+    { id: 'tr_seed1', asset: 'BTC',  atype: 'crypto', buy: 52000, sell: 61000, qty: 0.5, fee: 20, currency: 'EUR', notes: '', buyDate: '', sellDate: '' },
+    { id: 'tr_seed2', asset: 'NVDA', atype: 'stock',  buy: 90,    sell: 119,   qty: 20,  fee: 5,  currency: 'EUR', notes: '', buyDate: '', sellDate: '' },
+    { id: 'tr_seed3', asset: 'SPY',  atype: 'etf',    buy: 480,   sell: 455,   qty: 8,   fee: 3,  currency: 'EUR', notes: '', buyDate: '', sellDate: '' },
+  ] };
+}
+
+function _wsJrnPct(v) {
+  const s = (Math.round(v * 10) / 10).toFixed(1);
+  const sep = (typeof lang !== 'undefined' && lang === 'en') ? '.' : ',';
+  return (v >= 0 ? '+' : '') + s.replace('.', sep) + '%';
+}
+function _wsJrnMoney(v, ccy, signed) { return ((signed && v >= 0) ? '+' : '') + formatBase(v); }
+
+function _wsJrnPreviewHtml(d) {
+  const esc = _intccEsc;
+  const buy = _wsNum(d.buy), qty = _wsNum(d.qty), fee = _wsNum(d.fee);
+  if (buy <= 0 || qty <= 0) return '';
+  const invested = buy * qty + fee;
+  const sellRaw = (d.sell == null ? '' : String(d.sell)).trim();
+  if (sellRaw === '') return `<span class="wsjrn-prev is-open">${esc(t('wsjrn_st_open'))} · ${esc(formatBase(invested))}</span>`;
+  const exit = _wsNum(sellRaw) * qty, pl = exit - invested, ret = invested > 0 ? pl / invested * 100 : 0;
+  const cls = pl >= 0 ? 'is-win' : 'is-loss';
+  return `<span class="wsjrn-prev ${cls}">${esc(_wsJrnMoney(pl, d.currency, true))} · ${esc(_wsJrnPct(ret))}</span>`;
+}
+
+function _wsJrnOnInput(el) {
+  if (!_wsJrnDraft) _wsJrnDraft = _wsJrnNewDraft();
+  _wsJrnDraft[el.getAttribute('data-wsjrn-input')] = el.value;
+  const root = document.querySelector('.wsh-tool-view');
+  const pv = root && root.querySelector('[data-wsjrn-preview]');
+  if (pv) pv.innerHTML = _wsJrnPreviewHtml(_wsJrnDraft);
+}
+
+function _wsJrnRerender() { const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderJournalTool(); _wshReveal(c); } }
+
+function _wsJrnAdd() {
+  if (!_wsToolInputs) return;
+  const d = _wsJrnDraft || _wsJrnNewDraft();
+  const asset = (d.asset || '').trim();
+  const buy = _wsNum(d.buy), qty = _wsNum(d.qty);
+  if (!asset || buy <= 0 || qty <= 0) return;   // need a real entry to add
+  const sellRaw = (d.sell == null ? '' : String(d.sell)).trim();
+  const trade = {
+    id: _wsJrnEditId || ('tr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6)),
+    asset, atype: d.atype || 'stock',
+    buy, sell: sellRaw === '' ? '' : _wsNum(sellRaw),
+    qty, fee: _wsNum(d.fee), currency: d.currency || 'EUR',
+    notes: (d.notes || '').trim(), buyDate: d.buyDate || '', sellDate: d.sellDate || '',
+  };
+  const list = Array.isArray(_wsToolInputs.trades) ? _wsToolInputs.trades : [];
+  if (_wsJrnEditId) { const i = list.findIndex(x => x && x.id === _wsJrnEditId); if (i >= 0) list[i] = trade; else list.push(trade); }
+  else list.push(trade);
+  _wsToolInputs.trades = list;
+  _wsToolDirty = true;
+  _wsToolStateSet('journal', _wsToolInputs);
+  _wsJrnDraft = _wsJrnNewDraft(); _wsJrnEditId = null;
+  _wsJrnRerender();
+}
+
+function _wsJrnAct(act, id) {
+  if (!_wsToolInputs || !Array.isArray(_wsToolInputs.trades)) return;
+  const list = _wsToolInputs.trades;
+  const tr = list.find(x => x && x.id === id); if (!tr) return;
+  if (act === 'edit') {
+    _wsJrnEditId = id;
+    _wsJrnDraft = { asset: tr.asset, atype: tr.atype, buy: tr.buy, sell: tr.sell, qty: tr.qty, fee: tr.fee, currency: tr.currency, notes: tr.notes || '', buyDate: tr.buyDate || '', sellDate: tr.sellDate || '' };
+    _wsJrnRerender();
+  } else if (act === 'dup') {
+    list.push(Object.assign({}, tr, { id: 'tr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) }));
+    _wsToolDirty = true; _wsToolStateSet('journal', _wsToolInputs); _wsJrnRerender();
+  } else if (act === 'del') {
+    _wsConfirm(() => {
+      const i = list.findIndex(x => x && x.id === id); if (i >= 0) list.splice(i, 1);
+      _wsToolDirty = true; _wsToolStateSet('journal', _wsToolInputs);
+      if (_wsJrnEditId === id) { _wsJrnEditId = null; _wsJrnDraft = _wsJrnNewDraft(); }
+      _wsJrnRerender();
+    });
+  }
+}
+
+function _wsJrnCancel() { _wsJrnEditId = null; _wsJrnDraft = _wsJrnNewDraft(); _wsJrnRerender(); }
+
+function _wsJrnChartHtml(res) {
+  const esc = _intccEsc;
+  const closed = res.list.filter(x => !x.open);
+  if (!closed.length) return '';
+  const W = 360, H = 140, padX = 16, midY = H / 2;
+  const maxAbs = Math.max.apply(null, closed.map(x => Math.abs(x.ret)).concat([1]));
+  const n = closed.length, slot = (W - 2 * padX) / n, bw = Math.min(30, slot * 0.55);
+  const bars = closed.map((x, i) => {
+    const cx = padX + slot * i + slot / 2;
+    const h = Math.max(2, (Math.abs(x.ret) / maxAbs) * (H / 2 - 20));
+    const y = x.pl >= 0 ? midY - h : midY;
+    const cls = x.pl >= 0 ? 'is-win' : 'is-loss';
+    return `<rect class="wsjrn-bar ${cls}" x="${(cx - bw / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3"/><text class="wsjrn-bar-lbl" x="${cx.toFixed(1)}" y="${H - 3}" text-anchor="middle">${esc(String(x.asset || '').slice(0, 4))}</text>`;
+  }).join('');
+  return `<svg class="wsjrn-chart-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('wsjrn_chart_title'))}"><line class="wsjrn-axis" x1="${padX}" y1="${midY}" x2="${W - padX}" y2="${midY}"/>${bars}</svg>`;
+}
+
+function _wsJrnSummaryHtml(res) {
+  const esc = _intccEsc;
+  const hasClosed = res.closedCount > 0;
+  const npCls = res.netProfit >= 0 ? 'is-pos' : 'is-neg';
+  const best = res.best ? `${res.best.asset} ${_wsJrnPct(res.best.ret)}` : '—';
+  return `
+    <div class="wstool-result wsjrn-summary">
+      <div class="wstool-res-main">
+        <span class="wstool-res-label">${esc(t('wsjrn_sum_net'))}</span>
+        <span class="wstool-res-final ${npCls}">${esc((res.netProfit >= 0 ? '+' : '') + formatBase(res.netProfit))}</span>
+      </div>
+      <div class="wsjrn-sum-grid">
+        <div class="wstool-res-cell"><span class="wstool-res-v ${res.avgReturn >= 0 ? 'is-up' : 'is-down'}">${esc(hasClosed ? _wsJrnPct(res.avgReturn) : '—')}</span><span class="wstool-res-k">${esc(t('wsjrn_sum_avg'))}</span></div>
+        <div class="wstool-res-cell"><span class="wstool-res-v">${esc(hasClosed ? Math.round(res.winRate) + '%' : '—')}</span><span class="wstool-res-k">${esc(t('wsjrn_sum_winrate'))}</span></div>
+        <div class="wstool-res-cell"><span class="wstool-res-v">${esc(best)}</span><span class="wstool-res-k">${esc(t('wsjrn_sum_best'))}</span></div>
+      </div>
+    </div>`;
+}
+
+function _wsJrnFormHtml() {
+  const esc = _intccEsc;
+  const d = _wsJrnDraft || _wsJrnNewDraft();
+  const editing = !!_wsJrnEditId;
+  const txt = (k, label) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" autocomplete="off" data-wsjrn-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"></span></label>`;
+  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsjrn-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"><span class="ws4-field-unit">${esc(unit || '')}</span></span></label>`;
+  const sel = (k, label, opts) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><select class="ws4-num wsjrn-select" data-wsjrn-input="${k}">${opts.map(o => `<option value="${esc(o.v)}"${d[k] === o.v ? ' selected' : ''}>${esc(o.l)}</option>`).join('')}</select></span></label>`;
+  const types = [['stock', 'wsjrn_type_stock'], ['etf', 'wsjrn_type_etf'], ['crypto', 'wsjrn_type_crypto'], ['other', 'wsjrn_type_other']].map(([v, lk]) => ({ v, l: t(lk) }));
+  const ccys = ['EUR', 'USD', 'GBP'].map(c => ({ v: c, l: c }));
+  return `
+    <section class="wsh-card wsjrn-form-card">
+      <header class="wsh-head"><h3 class="wsh-title">${esc(editing ? t('wsjrn_edit') : t('wsjrn_add_title'))}</h3></header>
+      <div class="wsjrn-form-grid">
+        ${txt('asset', t('wsjrn_f_asset'))}
+        ${sel('atype', t('wsjrn_f_type'), types)}
+        ${num('buy', t('wsjrn_f_buy'), '€')}
+        ${num('sell', t('wsjrn_f_sell'), '€')}
+        ${num('qty', t('wsjrn_f_qty'))}
+        ${num('fee', t('wsjrn_f_fee'), '€')}
+        ${sel('currency', t('wsjrn_f_ccy'), ccys)}
+        ${txt('notes', t('wsjrn_f_notes'))}
+      </div>
+      <div class="wsjrn-form-foot">
+        <span class="wsjrn-preview" data-wsjrn-preview>${_wsJrnPreviewHtml(d)}</span>
+        <div class="wsjrn-form-btns">
+          ${editing ? `<button type="button" class="wsg-act" data-wsjrn-cancel>${esc(t('wsjrn_cancel'))}</button>` : ''}
+          <button type="button" class="wsh-cta is-primary" data-wsjrn-add>${esc(editing ? t('wsjrn_save_edit') : t('wsjrn_add'))}</button>
+        </div>
+      </div>
+    </section>`;
+}
+
+function _wsJrnListHtml(res) {
+  const esc = _intccEsc;
+  if (!res.list.length) return `<section class="wsh-card"><p class="wsh-empty">${esc(t('wsjrn_empty'))}</p></section>`;
+  const ICON_EDIT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M14 6l4 4"/></svg>';
+  const ICON_DUP = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg>';
+  const ICON_TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/></svg>';
+  const typeKey = a => ({ stock: 'wsjrn_type_stock', etf: 'wsjrn_type_etf', crypto: 'wsjrn_type_crypto', other: 'wsjrn_type_other' })[a] || 'wsjrn_type_other';
+  const cards = res.list.map(tr => {
+    const st = tr.open ? 'open' : (tr.pl >= 0 ? 'win' : 'loss');
+    const stLbl = tr.open ? t('wsjrn_st_open') : (tr.pl >= 0 ? t('wsjrn_st_win') : t('wsjrn_st_loss'));
+    const ccyChip = (tr.currency && tr.currency !== 'EUR') ? `<span class="wsjrn-ccy">${esc(tr.currency)}</span>` : '';
+    return `
+      <div class="wsjrn-card is-${st}" title="${esc(stLbl)}">
+        <div class="wsjrn-card-top">
+          <span class="wsjrn-asset">${esc(tr.asset || '—')}</span>
+          <span class="wsjrn-type-chip">${esc(t(typeKey(tr.atype)))}</span>
+          ${ccyChip}
+        </div>
+        <div class="wsjrn-card-rows">
+          <span class="wsjrn-row"><i>${esc(t('wsjrn_buy'))}</i><b>${esc(formatBase(tr.buy))}</b></span>
+          <span class="wsjrn-row"><i>${esc(t('wsjrn_sell'))}</i><b>${tr.open ? '—' : esc(formatBase(tr.sell))}</b></span>
+          <span class="wsjrn-row"><i>${esc(t('wsjrn_f_qty'))}</i><b>${esc(String(tr.qty))}</b></span>
+        </div>
+        <div class="wsjrn-card-pl">
+          ${tr.open
+            ? `<span class="wsjrn-status is-open">${esc(t('wsjrn_st_open'))}</span>`
+            : `<span class="wsjrn-ret is-${st}">${esc(_wsJrnPct(tr.ret))}</span><span class="wsjrn-pl is-${st}">${esc((tr.pl >= 0 ? '+' : '') + formatBase(tr.pl))}</span>`}
+        </div>
+        <div class="wsjrn-card-acts">
+          <button type="button" class="wsh-scard-x" data-wsjrn-act="edit" data-wsjrn-id="${esc(tr.id)}" title="${esc(t('wsjrn_edit'))}" aria-label="${esc(t('wsjrn_edit'))}">${ICON_EDIT}</button>
+          <button type="button" class="wsh-scard-x" data-wsjrn-act="dup" data-wsjrn-id="${esc(tr.id)}" title="${esc(t('wsg_act_dup'))}" aria-label="${esc(t('wsg_act_dup'))}">${ICON_DUP}</button>
+          <button type="button" class="wsh-scard-x is-danger" data-wsjrn-act="del" data-wsjrn-id="${esc(tr.id)}" title="${esc(t('wsg_act_del'))}" aria-label="${esc(t('wsg_act_del'))}">${ICON_TRASH}</button>
+        </div>
+      </div>`;
+  }).join('');
+  return `<section class="wsh-card"><header class="wsh-head"><h3 class="wsh-title">${esc(t('wstool_journal_n'))}</h3></header><div class="wsjrn-list">${cards}</div></section>`;
+}
+
+function _renderJournalTool() {
+  const esc = _intccEsc;
+  if (!_wsToolInputs || !Array.isArray(_wsToolInputs.trades)) _wsToolInputs = _wsJournalDefaults();
+  if (!_wsJrnDraft) _wsJrnDraft = _wsJrnNewDraft();
+  const res = calculateTradeJournal(_wsToolInputs.trades);
+  return `
+    <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
+      <section class="wsh-card wsb-header">
+        <button type="button" class="wsb-back" data-wsh-nav="tools">‹ ${esc(t('wstool_back'))}</button>
+        <h2 class="wsb-title">${esc(t('wstool_journal_n'))}</h2>
+        <p class="wsb-subtitle">${esc(t('wstool_journal_d'))}</p>
+      </section>
+      <section class="wsh-card wstool-out-card">
+        ${_wsJrnSummaryHtml(res)}
+        ${res.closedCount ? `<div class="wstool-chart wsjrn-chartbox"><span class="wsbud-chart-title">${esc(t('wsjrn_chart_title'))}</span>${_wsJrnChartHtml(res)}</div>` : ''}
+      </section>
+      ${_wsJrnFormHtml()}
+      ${_wsJrnListHtml(res)}
       <section class="wsh-card wsg-foot-card">
         <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
       </section>
