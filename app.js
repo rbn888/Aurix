@@ -2010,7 +2010,7 @@ const T = {
     wsmse_rename_save:  'Guardar',
     wsmse_empty_title:  'Empieza creando tu primer espacio financiero.',
     wsmse_empty_cta:    'Explorar plantillas',
-    wsapp_receivables_n:'Pendientes de cobro',
+    wsapp_receivables_n:'Control de cobros',
     wsapp_assets_n:     'Precios de activos',
     wstool_financial_n: 'Calculadora financiera',
     wstool_analyzer_n:  'Analizador de inversiones',
@@ -2019,7 +2019,11 @@ const T = {
     wstpl_recv_overdue: 'Vencido',
     // WS.13 — Receivables Pro (Pendientes de cobro)
     wsrecv_sub:         'Controla el dinero que te deben.',
-    wsrecv_save:        'Guardar pendientes',
+    wsrecv_save:        'Guardar control de cobros',
+    wsrecv_kpi_total:   'Total',
+    wsrecv_search:      'Buscar persona, empresa o concepto…',
+    wsrecv_no_results:  'Sin resultados.',
+    wsrecv_overdue_badge: n => `${n} vencidos`,
     wsrecv_unit:        'registros',
     wsrecv_kpi_pending: 'Pendiente total',
     wsrecv_kpi_collected:'Cobrado',
@@ -2044,7 +2048,7 @@ const T = {
     wsrecv_f_due:       'Fecha vencimiento',
     wsrecv_f_notes:     'Notas',
     // WS.14 — Loan Simulator Pro (Préstamos Pro)
-    wsloan_n:           'Préstamos Pro',
+    wsloan_n:           'Simulador de préstamos',
     wsloan_sub:         'Simula cualquier financiación y entiende su coste real.',
     wsloan_save:        'Guardar simulación',
     wsloan_in_amount:   'Importe solicitado',
@@ -2114,7 +2118,7 @@ const T = {
     wsap_st_perdedora:'Perdedora',
     wsap_st_cerrada: 'Cerrada',
     // WS.12 — Real Estate Portfolio Pro
-    wsre_n:             'Portfolio Inmobiliario Pro',
+    wsre_n:             'Portfolio inmobiliario',
     wsre_d:             'Gestiona tu cartera inmobiliaria completa.',
     wsre_save:          'Guardar cartera',
     wsre_unit:          'inmuebles',
@@ -3950,7 +3954,7 @@ const T = {
     wsmse_rename_save:  'Save',
     wsmse_empty_title:  'Start by creating your first financial space.',
     wsmse_empty_cta:    'Explore templates',
-    wsapp_receivables_n:'Receivables',
+    wsapp_receivables_n:'Payment Control',
     wsapp_assets_n:     'Asset prices',
     wstool_financial_n: 'Financial calculator',
     wstool_analyzer_n:  'Investment analyzer',
@@ -3959,7 +3963,11 @@ const T = {
     wstpl_recv_overdue: 'Overdue',
     // WS.13 — Receivables Pro
     wsrecv_sub:         'Track the money owed to you.',
-    wsrecv_save:        'Save receivables',
+    wsrecv_save:        'Save payment control',
+    wsrecv_kpi_total:   'Total',
+    wsrecv_search:      'Search person, company or concept…',
+    wsrecv_no_results:  'No results.',
+    wsrecv_overdue_badge: n => `${n} overdue`,
     wsrecv_unit:        'records',
     wsrecv_kpi_pending: 'Total pending',
     wsrecv_kpi_collected:'Collected',
@@ -3984,7 +3992,7 @@ const T = {
     wsrecv_f_due:       'Due date',
     wsrecv_f_notes:     'Notes',
     // WS.14 — Loan Simulator Pro
-    wsloan_n:           'Loan Simulator Pro',
+    wsloan_n:           'Loan Simulator',
     wsloan_sub:         'Simulate any financing and understand its real cost.',
     wsloan_save:        'Save simulation',
     wsloan_in_amount:   'Loan amount',
@@ -4054,7 +4062,7 @@ const T = {
     wsap_st_perdedora:'Losing',
     wsap_st_cerrada: 'Closed',
     // WS.12 — Real Estate Portfolio Pro
-    wsre_n:             'Real Estate Portfolio Pro',
+    wsre_n:             'Real estate portfolio',
     wsre_d:             'Manage your full real estate portfolio.',
     wsre_save:          'Save portfolio',
     wsre_unit:          'properties',
@@ -11576,6 +11584,7 @@ let _wsReEditId    = null;   // WS.12 — property id being edited (null = addin
 let _wsReDetailId  = null;   // WS.12 — property detail open (null = portfolio main)
 let _wsRecvDraft   = null;   // WS.13 — in-progress add/edit receivable form
 let _wsRecvEditId  = null;   // WS.13 — receivable id being edited (null = adding new)
+let _wsRecvQuery   = '';     // WS.16 — receivables local search query
 let _wsApDraft     = null;   // WS.15 — in-progress add/edit asset row
 let _wsApEditId    = null;   // WS.15 — asset row id being edited (null = adding new)
 // WS.5A P5 — real save model (editar ≠ guardar). Working copies hold unsaved
@@ -11720,6 +11729,7 @@ function _wshWireOnce() {
     if (el.getAttribute('data-wsjrn-input')) { _wsJrnOnInput(el); return; }
     if (el.getAttribute('data-wsre-input')) { _wsReOnInput(el); return; }
     if (el.getAttribute('data-wsrecv-input')) { _wsRecvOnInput(el); return; }
+    if (el.hasAttribute('data-wsrecv-search')) { _wsRecvSearch(el); return; }
     if (el.getAttribute('data-wsloan-cmp-input')) { _wsLoanCmpInput(el); return; }
     if (el.getAttribute('data-wsap-input')) { _wsApOnInput(el); return; }
   });
@@ -12440,7 +12450,7 @@ function _renderWorkspaceHome(metrics) {
               ${tl.pinRef ? pinBtn(tl.pinRef) : ''}
               <div class="wsh-toolcard-ic">${_wsTplViz(tl.viz)}</div>
               <p class="wsh-tool-name">${esc(tl.name)}</p>
-              <span class="${tl.soon ? 'wsh-pill' : 'wsh-tool-go'}">${esc(tl.soon ? t('wsh_soon') : t('wstpl_use') + ' ›')}</span>
+              <span class="${tl.soon ? 'wsh-pill' : 'wsh-tool-go'}">${esc(tl.soon ? t('wsh_soon') : t('wsh_proj_open') + ' ›')}</span>
             </div>`).join('')}
         </div>
       </section>`;
@@ -13458,7 +13468,7 @@ function _wsOpenTool(toolKey, projectId) {
   _wsToolActive = key;
   _wsJrnDraft = (key === 'journal') ? _wsJrnNewDraft() : null; _wsJrnEditId = null;  // reset trade form
   _wsReDraft = (key === 'realestate') ? _wsReNewDraft() : null; _wsReEditId = null; _wsReDetailId = null;  // reset property form/detail
-  _wsRecvDraft = (key === 'receivables') ? _wsRecvNewDraft() : null; _wsRecvEditId = null;  // reset receivable form
+  _wsRecvDraft = (key === 'receivables') ? _wsRecvNewDraft() : null; _wsRecvEditId = null; if (key === 'receivables') _wsRecvQuery = '';  // reset receivable form
   _wsApDraft = (key === 'assets') ? _wsApNewDraft() : null; _wsApEditId = null;  // reset asset form
   if (projectId) {
     // Open a saved project for editing (its inputs, tracked by edit id).
@@ -14325,7 +14335,7 @@ function _renderRealEstateTool() {
     <div class="aurix-wsh wsh-tool-view wsh-re-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
         <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
-        <h2 class="wsb-title">${esc(t('wsre_n'))}</h2>
+        <h2 class="wsb-title">${esc(t('wsre_n'))} <span class="wsh-pro-badge">Pro</span></h2>
         <p class="wsb-subtitle">${esc(t('wsre_d'))}</p>
       </section>
       <section class="wsh-card wsre-summary-card">${_wsReSummaryHtml(r)}</section>
@@ -14343,6 +14353,14 @@ function _renderRealEstateTool() {
 // ── WS.13 — Receivables Pro (Pendientes de cobro) ────────────────────────────
 // Control money owed to you (freelancers, companies, rentals, private sales,
 // personal loans...). 100% autonomous: no Dashboard/wealthEngine/real data. Pure.
+function _wsDateAutoFormat(v) {
+  // WS.16 — dd/mm/aaaa autoformat from digits; tolerant (allows clearing/empty).
+  const d = String(v == null ? '' : v).replace(/[^0-9]/g, '').slice(0, 8);
+  if (!d) return '';
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return d.slice(0, 2) + '/' + d.slice(2);
+  return d.slice(0, 2) + '/' + d.slice(2, 4) + '/' + d.slice(4);
+}
 function _wsRecvStatus(total, paid, dueDate) {
   if (total > 0 && paid >= total) return 'cobrado';
   const pending = Math.max(0, total - paid);
@@ -14384,7 +14402,9 @@ function _wsRecvProps() { if (!_wsToolInputs || !Array.isArray(_wsToolInputs.ite
 function _wsRecvRerender() { const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderReceivablesTool(); _wshReveal(c); } }
 function _wsRecvOnInput(el) {
   if (!_wsRecvDraft) _wsRecvDraft = _wsRecvNewDraft();
-  _wsRecvDraft[el.getAttribute('data-wsrecv-input')] = el.value;
+  const key = el.getAttribute('data-wsrecv-input');
+  if (key === 'dueDate') { el.value = _wsDateAutoFormat(el.value); }  // WS.16 dd/mm/aaaa
+  _wsRecvDraft[key] = el.value;
   const root = document.querySelector('.wsh-tool-view');
   const pv = root && root.querySelector('[data-wsrecv-pv]');
   if (pv) pv.innerHTML = _wsRecvPreviewLine(_wsRecvDraft);
@@ -14443,12 +14463,12 @@ function _wsRecvSummaryHtml(r) {
   return `
     <div class="wsrecv-summary">
       <div class="wsrecv-kpis">
-        <div class="wsrecv-kpi is-pending"><span class="wsrecv-kpi-v">${esc(formatBase(r.totalPendiente))}</span><span class="wsrecv-kpi-k">${esc(t('wsrecv_kpi_pending'))}</span></div>
+        <div class="wsrecv-kpi is-total"><span class="wsrecv-kpi-v">${esc(formatBase(r.grand))}</span><span class="wsrecv-kpi-k">${esc(t('wsrecv_kpi_total'))}</span></div>
         <div class="wsrecv-kpi is-collected"><span class="wsrecv-kpi-v">${esc(formatBase(r.totalCobrado))}</span><span class="wsrecv-kpi-k">${esc(t('wsrecv_kpi_collected'))}</span></div>
-        <div class="wsrecv-kpi is-overdue"><span class="wsrecv-kpi-v">${esc(formatBase(r.totalVencido))}</span><span class="wsrecv-kpi-k">${esc(t('wsrecv_kpi_overdue'))}</span></div>
+        <div class="wsrecv-kpi is-pending"><span class="wsrecv-kpi-v">${esc(formatBase(r.totalPendiente))}</span><span class="wsrecv-kpi-k">${esc(t('wsrecv_kpi_pending'))}</span></div>
       </div>
       <div class="wsrecv-sumbar"><span class="wsrecv-sumbar-fill" style="width:${Math.round(r.porcentajeCobrado)}%"></span></div>
-      <span class="wsrecv-sumbar-lbl">${Math.round(r.porcentajeCobrado)}% ${esc(t('wsrecv_kpi_collected').toLowerCase())} · ${r.count} ${esc(t('wsrecv_unit'))}</span>
+      <div class="wsrecv-sumbar-row"><span class="wsrecv-sumbar-lbl">${Math.round(r.porcentajeCobrado)}% ${esc(t('wsrecv_kpi_collected').toLowerCase())} · ${r.count} ${esc(t('wsrecv_unit'))}</span>${r.numeroVencidos ? `<span class="wsrecv-overdue-badge">${esc(t('wsrecv_overdue_badge')(r.numeroVencidos))}</span>` : ''}</div>
     </div>`;
 }
 function _wsRecvCardHtml(it) {
@@ -14501,6 +14521,21 @@ function _wsRecvFormHtml() {
       </div>
     </section>`;
 }
+function _wsRecvListHtml(r) {
+  const esc = _intccEsc;
+  if (!r.list.length) return `<p class="wsh-empty">${esc(t('wsrecv_empty'))}</p>`;
+  const q = (_wsRecvQuery || '').trim().toLowerCase();
+  let list = r.list;
+  if (q) list = list.filter(it => ((String(it.personOrCompany || '') + ' ' + String(it.concept || '') + ' ' + t('wsrecv_st_' + it.status)).toLowerCase().indexOf(q) >= 0));
+  if (!list.length) return `<p class="wsh-empty">${esc(t('wsrecv_no_results'))}</p>`;
+  return `<div class="wsrecv-grid">${list.map(_wsRecvCardHtml).join('')}</div>`;
+}
+function _wsRecvSearch(el) {
+  _wsRecvQuery = el.value || '';
+  const root = document.querySelector('.wsh-tool-view');
+  const box = root && root.querySelector('[data-wsrecv-list]');
+  if (box) box.innerHTML = _wsRecvListHtml(calculateReceivables(_wsRecvProps()));
+}
 function _renderReceivablesTool() {
   const esc = _intccEsc;
   const items = _wsRecvProps();
@@ -14516,7 +14551,8 @@ function _renderReceivablesTool() {
       <section class="wsh-card wsrecv-summary-card">${_wsRecvSummaryHtml(r)}</section>
       <section class="wsh-card">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsrecv_list_title'))}</h3></header>
-        ${r.list.length ? `<div class="wsrecv-grid">${r.list.map(_wsRecvCardHtml).join('')}</div>` : `<p class="wsh-empty">${esc(t('wsrecv_empty'))}</p>`}
+        ${r.list.length ? `<input class="wsg-text wsrecv-search" type="text" autocomplete="off" data-wsrecv-search placeholder="${esc(t('wsrecv_search'))}" value="${esc(_wsRecvQuery)}">` : ''}
+        <div data-wsrecv-list>${_wsRecvListHtml(r)}</div>
       </section>
       ${_wsRecvFormHtml()}
       <section class="wsh-card wsg-foot-card">
@@ -14668,7 +14704,7 @@ function _renderLoanTool() {
     <div class="aurix-wsh wsh-tool-view wsh-loan-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
         <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
-        <h2 class="wsb-title">${esc(t('wsloan_n'))}</h2>
+        <h2 class="wsb-title">${esc(t('wsloan_n'))} <span class="wsh-pro-badge">Pro</span></h2>
         <p class="wsb-subtitle">${esc(t('wsloan_sub'))}</p>
       </section>
       <section class="wsh-card wsloan-inputs-card">

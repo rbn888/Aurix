@@ -20607,6 +20607,50 @@ body.gs-open { overflow: hidden; }
   .wsap-card-acts { display: flex; gap: 7px; }
 }
 
+/* ════════ WS.16 — Mobile density + renames (Pro badge, payment control) ═════ */
+.wsh-pro-badge { display: inline-block; vertical-align: middle; font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #f3cf9a; background: rgba(233,168,87,0.14); border: 1px solid rgba(233,168,87,0.30); padding: 1px 7px; border-radius: 999px; margin-left: 6px; }
+/* Control de cobros — Total KPI + overdue badge + search */
+.wsrecv-kpi.is-total { border-color: rgba(120,160,255,0.26); }
+.wsrecv-kpi.is-total .wsrecv-kpi-v { color: var(--text-bright); }
+.wsrecv-sumbar-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.wsrecv-overdue-badge { font-size: 11px; font-weight: 800; color: #f0897f; background: rgba(240,137,127,0.14); border: 1px solid rgba(240,137,127,0.28); padding: 2px 9px; border-radius: 999px; flex: none; }
+.wsrecv-search { width: 100%; box-sizing: border-box; margin: 12px 0 4px; }
+/* ── Mobile density: more useful info per screen, still premium ── */
+@media (max-width: 640px) {
+  .aurix-wsh.wsh-tool-view, .aurix-wsh.wsh-wsg, .aurix-wsh.wsh-wsp, .aurix-wsh.wsh-ws4 { gap: 10px; }
+  .aurix-wsh .wsh-card { padding: 13px 14px; }
+  .wsh-mse { gap: 10px; }
+  .wsh-head { margin-bottom: 8px; }
+  /* tighter forms */
+  .wsre-form-section { padding: 10px 0; }
+  .wsre-form-grid, .wsrecv-form-grid, .wsap-form-grid, .wstool-fields, .wsloan-fields, .wsg-form { gap: 9px; }
+  .ws4-num, .wsg-text, .wsg-select { padding-top: 9px; padding-bottom: 9px; }
+  /* receivables compact rows (≤140px) */
+  .wsrecv-card { gap: 7px; padding: 11px 12px; }
+  .wsrecv-amounts { gap: 12px; }
+  .wsrecv-amt b { font-size: 14px; }
+  .wsrecv-who { font-size: 14px; }
+  .wsrecv-kpis { gap: 8px; }
+  .wsrecv-kpi { padding: 12px 13px; }
+  .wsrecv-kpi-v { font-size: 20px; }
+  /* asset cards tighter */
+  .wsap-card { padding: 11px 12px; gap: 7px; }
+  /* RE summary + cards tighter */
+  .wsre-kpi { padding: 13px 14px; }
+  .wsre-kpi-v { font-size: 20px; }
+  .wsre-cover { height: 92px; }
+  .wsre-card-body { padding: 11px 13px; gap: 7px; }
+  /* compound/loan hero a touch smaller already handled; tighten KPI cards */
+  .wsloan-kpi, .wstool-res-cell { padding: 12px 13px; }
+  /* tool cards (toolbox + gallery) lower, CTA not cut */
+  .wsh-pv-wrap { height: 90px; }
+  .wsh-cardv-foot { padding: 10px 12px; }
+  .wsh-tpl-name, .wsh-tool-name { font-size: 13px; line-height: 1.2; }
+  .wsh-tpl-go, .wsh-tool-go { white-space: nowrap; }
+  .wsh-toolcard { padding: 13px 12px; gap: 7px; }
+  .wsh-toolcard-ic { width: 40px; height: 32px; }
+}
+
 /* ════════ WS.2 — Financial Tools Hub (dedicated tools) ═══════════════════════
    Premium interactive tools that open inside Workspace templates mode (never
    the Sheet). Encapsulated under ws2-* classes; responsive. */
