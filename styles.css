@@ -19921,6 +19921,7 @@ body.gs-open { overflow: hidden; }
 .wstool-res-cell { display: flex; flex-direction: column; gap: 3px; padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(120,160,255,0.13); background: rgba(255,255,255,0.025); }
 .wstool-res-v { font-size: 20px; font-weight: 800; color: var(--text-bright); font-variant-numeric: tabular-nums; }
 .wstool-res-cell.is-gain .wstool-res-v { color: #8fe6b6; }
+.wstool-res-cell.is-neg .wstool-res-v { color: #f0897f; }
 .wstool-res-k { font-size: 11.5px; color: var(--text-muted); }
 .wstool-chart { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .wstool-chart-svg { width: 100%; max-width: 480px; height: auto; }
@@ -19936,6 +19937,30 @@ body.gs-open { overflow: hidden; }
 @media (max-width: 720px) {
   .wstool-fields { grid-template-columns: 1fr 1fr; }
   .wstool-result { grid-template-columns: 1fr; }
+}
+
+/* ── WS.7 — Monthly Budget tool (wsbud-* namespace, reuses wstool-* result) ── */
+.wstool-result.wsbud-result { grid-template-columns: 1fr; gap: 16px; }
+.wsbud-result .wstool-res-main { align-items: flex-start; padding: 22px 24px; }
+.wsbud-result .wstool-res-final { font-size: 46px; line-height: 1.02; }
+.wstool-res-final.is-pos { color: #7ef0b8; }
+.wstool-res-final.is-neg { color: #f0897f; }
+.wsbud-split { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.wsbud-chartbox { align-items: stretch; gap: 12px; }
+.wsbud-chart-title { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(159,194,255,0.9); }
+.wsbud-chart-wrap { display: flex; flex-direction: column; gap: 12px; }
+.wsbud-bar { display: flex; width: 100%; height: 20px; border-radius: 10px; overflow: hidden; background: rgba(255,255,255,0.05); border: 1px solid rgba(120,160,255,0.14); }
+.wsbud-seg { height: 100%; transition: width 220ms ease; }
+.wsbud-seg.is-free { background: linear-gradient(90deg, #2fd98e, #57e6a6); box-shadow: inset 0 0 8px rgba(47,217,142,0.4); }
+.wsbud-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.wsbud-leg { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+.wsbud-leg i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.wsbud-leg i.is-free { background: #2fd98e; }
+.wsbud-leg b { color: var(--text-bright); font-variant-numeric: tabular-nums; font-weight: 700; }
+.wsbud-reading { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-bright); padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(120,160,255,0.14); background: rgba(74,130,240,0.07); }
+@media (max-width: 720px) {
+  .wsbud-result .wstool-res-final { font-size: 38px; }
+  .wsbud-split { grid-template-columns: 1fr; }
 }
 
 /* ── WS.5B — studio layout: compact hero, internal tabs, templates, tools ── */

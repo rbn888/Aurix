@@ -1920,6 +1920,30 @@ const T = {
     wstool_ms_cross:      (amt, y) => `Superas ${amt} en el año ${y}`,
     wstool_ms_crossover:  y => `El crecimiento generado supera tus aportaciones en el año ${y}`,
     wstool_save:          'Guardar proyecto',
+    // WS.7 — Monthly Budget tool
+    wstool_budget_sec_income:   'Ingresos',
+    wstool_budget_sec_expenses: 'Gastos',
+    wstool_bud_salary:    'Nómina',
+    wstool_bud_extra:     'Ingresos extra',
+    wstool_bud_otherinc:  'Otros ingresos',
+    wstool_bud_housing:   'Vivienda',
+    wstool_bud_food:      'Alimentación',
+    wstool_bud_transport: 'Transporte',
+    wstool_bud_utilities: 'Suministros',
+    wstool_bud_leisure:   'Ocio',
+    wstool_bud_education: 'Formación',
+    wstool_bud_other:     'Otros',
+    wstool_bud_avail:     'Disponible este mes',
+    wstool_bud_saverate:  'Tasa de ahorro',
+    wstool_bud_income_t:  'Ingresos totales',
+    wstool_bud_expenses_t:'Gastos totales',
+    wstool_bud_free:      'Dinero libre',
+    wstool_bud_chart_title: 'Reparto del mes',
+    wstool_bud_overspend: 'Gastas más de lo que ingresas',
+    wstool_bud_read_high: r => `Ahorras el ${r}% de tus ingresos. Margen sólido.`,
+    wstool_bud_read_mid:  r => `Ahorras el ${r}% de tus ingresos. Vas por buen camino.`,
+    wstool_bud_read_low:  r => `Ahorras el ${r}% de tus ingresos. Hay margen para mejorar.`,
+    wstool_bud_read_none: 'No te queda margen este mes. Revisa los gastos mayores.',
     // WS.5C — delete confirm modal
     wsmodal_del_title: 'Eliminar elemento',
     wsmodal_del_text:  'Esta acción no se puede deshacer.',
@@ -3610,6 +3634,30 @@ const T = {
     wstool_ms_cross:      (amt, y) => `You pass ${amt} in year ${y}`,
     wstool_ms_crossover:  y => `Growth generated exceeds your contributions in year ${y}`,
     wstool_save:          'Save project',
+    // WS.7 — Monthly Budget tool
+    wstool_budget_sec_income:   'Income',
+    wstool_budget_sec_expenses: 'Expenses',
+    wstool_bud_salary:    'Salary',
+    wstool_bud_extra:     'Extra income',
+    wstool_bud_otherinc:  'Other income',
+    wstool_bud_housing:   'Housing',
+    wstool_bud_food:      'Food',
+    wstool_bud_transport: 'Transport',
+    wstool_bud_utilities: 'Utilities',
+    wstool_bud_leisure:   'Leisure',
+    wstool_bud_education: 'Education',
+    wstool_bud_other:     'Other',
+    wstool_bud_avail:     'Available this month',
+    wstool_bud_saverate:  'Savings rate',
+    wstool_bud_income_t:  'Total income',
+    wstool_bud_expenses_t:'Total expenses',
+    wstool_bud_free:      'Free money',
+    wstool_bud_chart_title: 'Monthly breakdown',
+    wstool_bud_overspend: 'You spend more than you earn',
+    wstool_bud_read_high: r => `You save ${r}% of your income. Solid margin.`,
+    wstool_bud_read_mid:  r => `You save ${r}% of your income. On the right track.`,
+    wstool_bud_read_low:  r => `You save ${r}% of your income. Room to improve.`,
+    wstool_bud_read_none: 'No margin left this month. Review your biggest expenses.',
     // WS.5C — delete confirm modal
     wsmodal_del_title: 'Delete item',
     wsmodal_del_text:  'This action cannot be undone.',
@@ -11045,8 +11093,10 @@ let _wsTab = null;         // WS.5B/WS.6A — Home tab; null = smart default on 
 // WS.6 ACTIVE — Compound Growth tool released (card opens the tool, view reachable).
 // (Was gated false during the WS.5C-only deploy.)
 const AURIX_WS6_TOOL = true;
-let _wsToolActive  = 'compound';
-let _wsToolInputs  = null;   // { initial, monthly, ret, years }
+// WS.7 ACTIVE — Monthly Budget tool released (second real Workspace tool).
+const AURIX_WS7_TOOL = true;
+let _wsToolActive  = 'compound'; // 'compound' | 'budget'
+let _wsToolInputs  = null;   // compound: { initial, monthly, ret, years } | budget: income/expense fields
 let _wsToolEditId  = null;   // saved project id when editing an existing one
 let _wsToolDirty   = false;
 // WS.5A P5 — real save model (editar ≠ guardar). Working copies hold unsaved
@@ -11095,7 +11145,7 @@ function renderWorkspaceHome(container) {
   }
   if (_wshView === 'tool') {
     if (shown === 'tool') return;
-    container.innerHTML = _renderCompoundTool();
+    container.innerHTML = _wsRenderTool();
     _wshReveal(container);
     return;
   }
@@ -11281,7 +11331,11 @@ function _wsTplViz(k) {
   return `<svg class="wsh-tpl-viz-svg is-${k}" viewBox="0 0 64 40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${V[k] || V.bars}</svg>`;
 }
 
-function _wsTypeLabel(type) { return type === 'compound_growth' ? t('wstool_compound_n') : t('wsh_ws_' + type); }
+function _wsTypeLabel(type) {
+  if (type === 'compound_growth') return t('wstool_compound_n');
+  if (type === 'monthly_budget')  return t('wstool_budget_n');
+  return t('wsh_ws_' + type);
+}
 function _wsLabel(kind, item) {
   if (!item) return '';
   if (kind === 'workspace') return item.customName || _wsTypeLabel(item.type);
@@ -11339,7 +11393,7 @@ function _wsxOpen(ref) {
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
   if (kind === 'goal') { _wshView = 'goals'; renderWorkspaceHome(); }
   else if (kind === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); }
-  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
+  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else if (p.type === 'monthly_budget') { _wsOpenTool('budget', id); } else { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
 }
 function _wsxAct(act, ref) {
   if (!ref) return;
@@ -11456,7 +11510,7 @@ function _renderWorkspaceHome(metrics) {
     // Tools — visual cards; active tool featured + pinnable.
     const tools = [
       { k: 'compound', active: AURIX_WS6_TOOL, viz: 'curve',   icon: '<path d="M4 16l5-5 3 3 7-7"/><path d="M16 7h4v4"/>' },
-      { k: 'budget',   active: false,          viz: 'table',   icon: '<path d="M4 7h16v12H4z"/><path d="M4 11h16"/><circle cx="16" cy="15" r="1.3"/>' },
+      { k: 'budget',   active: AURIX_WS7_TOOL, viz: 'table',   icon: '<path d="M4 7h16v12H4z"/><path d="M4 11h16"/><circle cx="16" cy="15" r="1.3"/>' },
       { k: 'journal',  active: false,          viz: 'journal', icon: '<path d="M6 4h11a1 1 0 0 1 1 1v15l-3-2-3 2-3-2-3 2V5a1 1 0 0 1 1-1z"/>' },
     ];
     panel = `
@@ -12352,15 +12406,22 @@ function _wsToolDefaults() {
   return { initial, monthly: 300, ret: 6, years: 20 };
 }
 
+// WS.7 — tool registry: maps a tool key to its gate, defaults, project type and
+// renderer so the shared open/input/save plumbing stays tool-agnostic.
+function _wsToolDefaultsFor(key) { return key === 'budget' ? _wsBudgetDefaults() : _wsToolDefaults(); }
+function _wsRenderTool() { return _wsToolActive === 'budget' ? _renderBudgetTool() : _renderCompoundTool(); }
+function _wsToolOutHtmlFor(key, inp) { return key === 'budget' ? _wsBudgetOutHtml(inp) : _wsToolOutHtml(inp); }
+
 function _wsOpenTool(toolKey, projectId) {
-  if (!AURIX_WS6_TOOL) return;                      // WS.6 gated until release
-  if (toolKey && toolKey !== 'compound') return;   // only Compound Growth is implemented
-  _wsToolActive = 'compound';
+  const key = toolKey === 'budget' ? 'budget' : 'compound';
+  if (key === 'compound' && !AURIX_WS6_TOOL) return;   // WS.6 gate
+  if (key === 'budget'   && !AURIX_WS7_TOOL) return;   // WS.7 gate
+  _wsToolActive = key;
   if (projectId) {
     const p = _ws4Projects().find(x => x && x.id === projectId);
-    if (p && p.inputs) { _wsToolInputs = Object.assign(_wsToolDefaults(), p.inputs); _wsToolEditId = projectId; _wsToolDirty = false; }
-    else { _wsToolInputs = _wsToolDefaults(); _wsToolEditId = null; _wsToolDirty = false; }
-  } else { _wsToolInputs = _wsToolDefaults(); _wsToolEditId = null; _wsToolDirty = false; }
+    if (p && p.inputs) { _wsToolInputs = Object.assign(_wsToolDefaultsFor(key), p.inputs); _wsToolEditId = projectId; _wsToolDirty = false; }
+    else { _wsToolInputs = _wsToolDefaultsFor(key); _wsToolEditId = null; _wsToolDirty = false; }
+  } else { _wsToolInputs = _wsToolDefaultsFor(key); _wsToolEditId = null; _wsToolDirty = false; }
   _wshView = 'tool'; renderWorkspaceHome();
 }
 
@@ -12370,29 +12431,38 @@ function _wsToolOnInput(el) {
   _wsToolDirty = true;
   const root = document.querySelector('.wsh-tool-view');
   const out = root && root.querySelector('[data-wstool-out]');
-  if (out) out.innerHTML = _wsToolOutHtml(_wsToolInputs);
+  if (out) out.innerHTML = _wsToolOutHtmlFor(_wsToolActive, _wsToolInputs);
   const bar = root && root.querySelector('[data-wstool-savebar]');
   if (bar) bar.innerHTML = _wsToolSaveBarHtml();
 }
 
 function _wsToolSave() {
   if (!_wsToolInputs) return;
-  const res = calculateCompoundGrowth(_wsToolInputs.initial, _wsToolInputs.monthly, _wsToolInputs.ret / 100, _wsToolInputs.years);
   const now = Date.now();
   const list = _ws4Projects();
   const existing = _wsToolEditId ? list.find(p => p && p.id === _wsToolEditId) : null;
+  let type, results;
+  if (_wsToolActive === 'budget') {
+    const r = calculateMonthlyBudget(_wsToolInputs);
+    type = 'monthly_budget';
+    results = { income: Math.round(r.income), expenses: Math.round(r.expenses), free: Math.round(r.free), saveRate: Math.round(r.saveRate) };
+  } else {
+    const r = calculateCompoundGrowth(_wsToolInputs.initial, _wsToolInputs.monthly, _wsToolInputs.ret / 100, _wsToolInputs.years);
+    type = 'compound_growth';
+    results = { final: Math.round(r.final), contributed: Math.round(r.contributed), interest: Math.round(r.interest) };
+  }
   const proj = {
     id: existing ? existing.id : ('ws4_' + now),
-    type: 'compound_growth',
+    type,
     customName: existing ? existing.customName : undefined,
     inputs: Object.assign({}, _wsToolInputs),
-    results: { final: Math.round(res.final), contributed: Math.round(res.contributed), interest: Math.round(res.interest) },
+    results,
     createdAt: existing ? (existing.createdAt || now) : now,
     updatedAt: now,
   };
   _ws4Persist(proj);
   _wsToolEditId = proj.id; _wsToolDirty = false;
-  const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderCompoundTool(); _wshReveal(c); }
+  const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _wsRenderTool(); _wshReveal(c); }
 }
 
 function _wsToolSaveBarHtml() {
@@ -12495,6 +12565,122 @@ function _renderCompoundTool() {
         <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
       </section>
       <p class="wsb-disclaimer">${esc(t('wsb_disclaimer'))}</p>
+    </div>`;
+}
+
+// ── WS.7 — Monthly Budget tool ───────────────────────────────────────────────
+// "How much money do I actually have left each month?" Deterministic, pure, no
+// APIs, no AI, no wealthEngine. Income − expenses → free money + savings rate.
+const _WSBUD_INCOME = [
+  { k: 'salary',   label: 'wstool_bud_salary' },
+  { k: 'extra',    label: 'wstool_bud_extra' },
+  { k: 'otherinc', label: 'wstool_bud_otherinc' },
+];
+const _WSBUD_EXPENSES = [
+  { k: 'housing',   label: 'wstool_bud_housing',   color: '#4D8DFF' },
+  { k: 'food',      label: 'wstool_bud_food',      color: '#37c7b8' },
+  { k: 'transport', label: 'wstool_bud_transport', color: '#8a7dff' },
+  { k: 'utilities', label: 'wstool_bud_utilities', color: '#e0b15c' },
+  { k: 'leisure',   label: 'wstool_bud_leisure',   color: '#e07a9f' },
+  { k: 'education', label: 'wstool_bud_education', color: '#6fcf97' },
+  { k: 'otherexp',  label: 'wstool_bud_other',     color: '#7c89a3' },
+];
+
+function calculateMonthlyBudget(inp) {
+  inp = inp || {};
+  const num = k => Math.max(0, Number(inp[k]) || 0);
+  const income = _WSBUD_INCOME.reduce((s, f) => s + num(f.k), 0);
+  const items = _WSBUD_EXPENSES.map(f => ({ k: f.k, label: f.label, color: f.color, value: num(f.k) }));
+  const expenses = items.reduce((s, it) => s + it.value, 0);
+  const free = income - expenses;
+  const saveRate = income > 0 ? (free / income) * 100 : 0;
+  return { income, expenses, free, saveRate, items };
+}
+
+function _wsBudgetDefaults() {
+  return { salary: 2500, extra: 0, otherinc: 0, housing: 700, food: 350, transport: 120, utilities: 110, leisure: 150, education: 50, otherexp: 100 };
+}
+
+function _wsBudgetChartHtml(res) {
+  const esc = _intccEsc;
+  const denom = Math.max(res.income, res.expenses, 1);
+  const pct = v => (v / denom * 100).toFixed(2);
+  const segs = res.items.filter(it => it.value > 0).map(it =>
+    `<span class="wsbud-seg" style="width:${pct(it.value)}%;background:${it.color}" title="${esc(t(it.label))}"></span>`).join('');
+  const freeSeg = res.free > 0 ? `<span class="wsbud-seg is-free" style="width:${pct(res.free)}%"></span>` : '';
+  const legend = res.items.filter(it => it.value > 0).map(it =>
+    `<span class="wsbud-leg"><i style="background:${it.color}"></i>${esc(t(it.label))} <b>${esc(formatBase(it.value))}</b></span>`).join('');
+  const freeLeg = res.free > 0 ? `<span class="wsbud-leg"><i class="is-free"></i>${esc(t('wstool_bud_free'))} <b>${esc(formatBase(res.free))}</b></span>` : '';
+  return `
+    <div class="wsbud-chart-wrap">
+      <div class="wsbud-bar" role="img" aria-label="${esc(t('wstool_bud_chart_title'))}">${segs}${freeSeg}</div>
+      <div class="wsbud-legend">${legend}${freeLeg}</div>
+    </div>`;
+}
+
+function _wsBudgetOutHtml(inp) {
+  const esc = _intccEsc;
+  const res = calculateMonthlyBudget(inp);
+  const rate = Math.round(res.saveRate);
+  const reading = res.income <= 0 ? ''
+    : res.free < 0 ? t('wstool_bud_overspend')
+    : rate >= 30 ? t('wstool_bud_read_high')(rate)
+    : rate >= 10 ? t('wstool_bud_read_mid')(rate)
+    : rate > 0   ? t('wstool_bud_read_low')(rate)
+    : t('wstool_bud_read_none');
+  return `
+    <div class="wstool-result wsbud-result">
+      <div class="wstool-res-main">
+        <span class="wstool-res-label">${esc(t('wstool_bud_avail'))}</span>
+        <span class="wstool-res-final ${res.free < 0 ? 'is-neg' : 'is-pos'}">${esc(formatBase(res.free))}</span>
+        <span class="wstool-res-orient">${esc(t('wstool_bud_saverate'))} · ${rate}%</span>
+      </div>
+      <div class="wsbud-split">
+        <div class="wstool-res-cell"><span class="wstool-res-v">${esc(formatBase(res.income))}</span><span class="wstool-res-k">${esc(t('wstool_bud_income_t'))}</span></div>
+        <div class="wstool-res-cell"><span class="wstool-res-v">${esc(formatBase(res.expenses))}</span><span class="wstool-res-k">${esc(t('wstool_bud_expenses_t'))}</span></div>
+        <div class="wstool-res-cell ${res.free < 0 ? 'is-neg' : 'is-gain'}"><span class="wstool-res-v">${rate}%</span><span class="wstool-res-k">${esc(t('wstool_bud_saverate'))}</span></div>
+      </div>
+    </div>
+    <div class="wstool-chart wsbud-chartbox">
+      <span class="wsbud-chart-title">${esc(t('wstool_bud_chart_title'))}</span>
+      ${_wsBudgetChartHtml(res)}
+    </div>
+    ${reading ? `<p class="wsbud-reading">${esc(reading)}</p>` : ''}`;
+}
+
+function _renderBudgetTool() {
+  const esc = _intccEsc;
+  if (!_wsToolInputs) _wsToolInputs = _wsBudgetDefaults();
+  const inp = _wsToolInputs;
+  const field = (k, label) => `
+    <label class="ws4-field">
+      <span class="ws4-field-name">${esc(label)}</span>
+      <span class="ws4-field-input">
+        <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(inp[k] != null ? inp[k] : 0)}">
+        <span class="ws4-field-unit">€</span>
+      </span>
+    </label>`;
+  return `
+    <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
+      <section class="wsh-card wsb-header">
+        <button type="button" class="wsb-back" data-wsh-nav="tools">‹ ${esc(t('wstool_back'))}</button>
+        <h2 class="wsb-title">${esc(t('wstool_budget_n'))}</h2>
+        <p class="wsb-subtitle">${esc(t('wstool_budget_d'))}</p>
+      </section>
+      <section class="wsh-card wstool-inputs-card">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstool_budget_sec_income'))}</h3></header>
+        <div class="wstool-fields">${_WSBUD_INCOME.map(f => field(f.k, t(f.label))).join('')}</div>
+      </section>
+      <section class="wsh-card wstool-inputs-card">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstool_budget_sec_expenses'))}</h3></header>
+        <div class="wstool-fields">${_WSBUD_EXPENSES.map(f => field(f.k, t(f.label))).join('')}</div>
+      </section>
+      <section class="wsh-card wstool-out-card">
+        <div class="wstool-out" data-wstool-out>${_wsBudgetOutHtml(inp)}</div>
+      </section>
+      <section class="wsh-card wsg-foot-card">
+        <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
+      </section>
     </div>`;
 }
 
