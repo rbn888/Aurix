@@ -20167,6 +20167,17 @@ body.gs-open { overflow: hidden; }
   .wsh-pv-wrap { height: 96px; }
 }
 
+/* WS.10A — iOS zooms when a focused input has font-size < 16px. Force 16px on
+   mobile for every Workspace + assign-funds-modal field (desktop unchanged). */
+@media (max-width: 768px) {
+  .aurix-workspace input,
+  .aurix-workspace select,
+  .aurix-workspace textarea,
+  .ws-modal input,
+  .ws-modal select,
+  .ws-modal textarea { font-size: 16px; }
+}
+
 @media (max-width: 720px) {
   .wsh-tabs { position: sticky; top: 6px; z-index: 6; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
   .wsh-tpl-grid { grid-template-columns: 1fr; }

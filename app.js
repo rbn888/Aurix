@@ -11323,6 +11323,15 @@ function _wshWireOnce() {
     if (el.getAttribute('data-wstool-input')) { _wsToolOnInput(el); return; }
     if (el.getAttribute('data-wsjrn-input')) { _wsJrnOnInput(el); return; }
   });
+  // WS.10A — natural editing + thousands formatting on numeric Workspace inputs.
+  // ws4-num is a Workspace-only class; only decimal-mode money/qty fields, never
+  // the year field or text fields (asset/notes have no inputmode). Strip
+  // separators on focus (cursor-safe editing), reformat with thousands on blur.
+  const _wsFmtTarget = el => el && el.classList && el.classList.contains('ws4-num')
+    && el.getAttribute('inputmode') === 'decimal'
+    && el.getAttribute('data-wsg-form') !== 'year';
+  document.addEventListener('focusin', e => { const el = e.target; if (_wsFmtTarget(el)) el.value = _wsStripThousands(el.value); });
+  document.addEventListener('focusout', e => { const el = e.target; if (_wsFmtTarget(el) && String(el.value).trim() !== '') el.value = _wsFormatInputNumber(el.value); });
 }
 
 function _wshRefreshMetrics(root, metrics) {
@@ -11396,7 +11405,37 @@ function _wshFuturePathHtml() {
 // WS.5B P7 — lenient numeric parse. Empty/partial/invalid → 0 for computation,
 // but the input is never overwritten while typing (handlers only update outputs),
 // so deleting / clearing / pasting all work; normalization happens on save.
-function _wsNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
+// WS.10A — locale-aware tolerant numeric parser. Accepts ES (10.000 / 10.000,50)
+// and EN (10,000 / 10,000.50) plus raw (10000). Returns a JS number.
+function _wsNum(v) {
+  if (v == null) return 0;
+  if (typeof v === 'number') return isFinite(v) ? v : 0;   // already a JS number (render values)
+  let s = String(v).trim().replace(/[^\d.,\-]/g, '');
+  if (!s || s === '-') return 0;
+  const en = (typeof lang !== 'undefined' && lang === 'en');
+  if (en) s = s.replace(/,/g, '');                     // EN: ',' = thousands, '.' = decimal
+  else s = s.replace(/\./g, '').replace(',', '.');     // ES: '.' = thousands, ',' = decimal
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+// WS.10A — strip thousands separators (for natural editing while focused).
+function _wsStripThousands(str) {
+  if (str == null) return '';
+  const en = (typeof lang !== 'undefined' && lang === 'en');
+  return String(str).replace(en ? /,/g : /\./g, '');
+}
+// WS.10A — format a numeric value with locale thousands separators (on blur).
+// Empty stays empty; preserves up to 2 decimals when present.
+function _wsFormatInputNumber(value) {
+  if (value === '' || value == null || String(value).trim() === '') return '';
+  const n = _wsNum(value);
+  if (!isFinite(n)) return '';
+  const en = (typeof lang !== 'undefined' && lang === 'en');
+  const frac = Math.abs(n % 1) > 1e-9 ? 2 : 0;
+  // useGrouping:'always' so 4-digit amounts also group (1000 -> 1.000), per spec.
+  try { return n.toLocaleString(en ? 'en-US' : 'es-ES', { minimumFractionDigits: 0, maximumFractionDigits: frac, useGrouping: 'always' }); }
+  catch (_) { try { return n.toLocaleString(en ? 'en-US' : 'es-ES', { maximumFractionDigits: frac, useGrouping: true }); } catch (_2) { return String(n); } }
+}
 
 // WS.5C — premium Aurix confirm modal (replaces window.confirm). Runs onConfirm
 // only when the user presses Eliminar; closes on Cancelar / backdrop / Esc.
@@ -12291,7 +12330,7 @@ function _renderWorkspaceDetail() {
     <label class="ws4-field">
       <span class="ws4-field-name">${esc(f.label)}</span>
       <span class="ws4-field-input">
-        <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-ws4-input="${esc(f.k)}" value="${esc(p.inputs[f.k])}">
+        <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-ws4-input="${esc(f.k)}" value="${esc(_wsFormatInputNumber(p.inputs[f.k]))}">
         <span class="ws4-field-unit">${esc(f.unit)}</span>
       </span>
     </label>`).join('');
@@ -12697,8 +12736,8 @@ function _renderGoals() {
         <div class="wsg-card-edit">
           ${isSync
             ? `<div class="wsg-sync-note">${esc(real.hasReal ? t('wsg_sync_on')(formatBase(real.wealth)) : t('ws4_sync_none'))}</div>`
-            : `<label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_r_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="current" data-wsg-id="${esc(g.id)}" value="${esc(g.current)}" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>`}
-          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="monthly" data-wsg-id="${esc(g.id)}" value="${esc(g.monthly)}" min="0" step="50"><span class="ws4-field-unit">€</span></span></label>
+            : `<label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_r_current'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="current" data-wsg-id="${esc(g.id)}" value="${esc(_wsFormatInputNumber(g.current))}" min="0" step="1000"><span class="ws4-field-unit">€</span></span></label>`}
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="monthly" data-wsg-id="${esc(g.id)}" value="${esc(_wsFormatInputNumber(g.monthly))}" min="0" step="50"><span class="ws4-field-unit">€</span></span></label>
         </div>
         <div class="wsg-out" data-wsg-out>${_wsgCardOutHtml(g, prog)}</div>
         ${_wsFundBlockHtml(g)}
@@ -12900,7 +12939,7 @@ function _renderCompoundTool() {
     <label class="ws4-field">
       <span class="ws4-field-name">${esc(label)}</span>
       <span class="ws4-field-input">
-        <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(inp[k])}">
+        <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(_wsFormatInputNumber(inp[k]))}">
         <span class="ws4-field-unit">${esc(unit)}</span>
       </span>
     </label>`;
@@ -13018,7 +13057,7 @@ function _renderBudgetTool() {
     <label class="ws4-field">
       <span class="ws4-field-name">${esc(label)}</span>
       <span class="ws4-field-input">
-        <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(inp[k] != null ? inp[k] : 0)}">
+        <input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : 0))}">
         <span class="ws4-field-unit">€</span>
       </span>
     </label>`;
@@ -13204,7 +13243,7 @@ function _wsJrnFormHtml() {
   const d = _wsJrnDraft || _wsJrnNewDraft();
   const editing = !!_wsJrnEditId;
   const txt = (k, label) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" autocomplete="off" data-wsjrn-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"></span></label>`;
-  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsjrn-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"><span class="ws4-field-unit">${esc(unit || '')}</span></span></label>`;
+  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsjrn-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}"><span class="ws4-field-unit">${esc(unit || '')}</span></span></label>`;
   const sel = (k, label, opts) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><select class="ws4-num wsjrn-select" data-wsjrn-input="${k}">${opts.map(o => `<option value="${esc(o.v)}"${d[k] === o.v ? ' selected' : ''}>${esc(o.l)}</option>`).join('')}</select></span></label>`;
   const types = [['stock', 'wsjrn_type_stock'], ['etf', 'wsjrn_type_etf'], ['crypto', 'wsjrn_type_crypto'], ['other', 'wsjrn_type_other']].map(([v, lk]) => ({ v, l: t(lk) }));
   const ccys = ['EUR', 'USD', 'GBP'].map(c => ({ v: c, l: c }));
