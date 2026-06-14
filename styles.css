@@ -20385,6 +20385,68 @@ body.gs-open { overflow: hidden; }
   .wsmse-menu { left: 12px !important; right: 12px; min-width: 0; }
 }
 
+/* ════════ WS.13 — Receivables Pro (bordeaux CRM identity) ═══════════════════ */
+.wsrecv-summary { display: flex; flex-direction: column; gap: 14px; }
+.wsrecv-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.wsrecv-kpi { display: flex; flex-direction: column; gap: 3px; padding: 16px 18px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.14); background: rgba(255,255,255,0.025); }
+.wsrecv-kpi.is-pending { border-color: rgba(199,91,122,0.34); background: radial-gradient(130% 150% at 85% 0%, rgba(199,91,122,0.16), transparent 60%), rgba(255,255,255,0.022); }
+.wsrecv-kpi.is-collected { border-color: rgba(47,217,142,0.26); }
+.wsrecv-kpi.is-overdue { border-color: rgba(240,137,127,0.30); }
+.wsrecv-kpi-v { font-size: 24px; font-weight: 800; color: var(--text-bright); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.wsrecv-kpi.is-pending .wsrecv-kpi-v { color: #f3a3bb; }
+.wsrecv-kpi.is-collected .wsrecv-kpi-v { color: #7ef0b8; }
+.wsrecv-kpi.is-overdue .wsrecv-kpi-v { color: #f0897f; }
+.wsrecv-kpi-k { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); font-weight: 600; }
+.wsrecv-sumbar { width: 100%; height: 8px; border-radius: 99px; background: rgba(255,255,255,0.07); overflow: hidden; }
+.wsrecv-sumbar-fill { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #8e2d49, #c75b7a); }
+.wsrecv-sumbar-lbl { font-size: 11.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.wsrecv-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.wsrecv-card { display: flex; flex-direction: column; gap: 11px; padding: 16px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.13); background: rgba(255,255,255,0.022); border-left-width: 3px; }
+.wsrecv-card.is-pendiente { border-left-color: rgba(150,180,240,0.5); }
+.wsrecv-card.is-parcial { border-left-color: #e0a85c; }
+.wsrecv-card.is-vencido { border-left-color: #f0897f; }
+.wsrecv-card.is-cobrado { border-left-color: #2fd98e; }
+.wsrecv-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.wsrecv-card-id { min-width: 0; }
+.wsrecv-who { margin: 0; font-size: 15px; font-weight: 800; color: var(--text-bright); }
+.wsrecv-concept { font-size: 12px; color: var(--text-muted); }
+.wsrecv-status { flex: none; font-size: 10.5px; font-weight: 800; letter-spacing: 0.02em; padding: 3px 10px; border-radius: 999px; }
+.wsrecv-status.is-pendiente { color: #aecbff; background: rgba(74,130,240,0.14); }
+.wsrecv-status.is-parcial { color: #ffd089; background: rgba(240,168,92,0.16); }
+.wsrecv-status.is-vencido { color: #f0897f; background: rgba(240,137,127,0.16); }
+.wsrecv-status.is-cobrado { color: #7ef0b8; background: rgba(47,217,142,0.16); }
+.wsrecv-amounts { display: flex; gap: 18px; }
+.wsrecv-amt { display: flex; flex-direction: column; gap: 1px; }
+.wsrecv-amt i { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); font-style: normal; }
+.wsrecv-amt b { font-size: 16px; font-weight: 800; color: var(--text-bright); font-variant-numeric: tabular-nums; }
+.wsrecv-amt.is-pending b { color: #f3a3bb; }
+.wsrecv-bar { width: 100%; height: 6px; border-radius: 99px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.wsrecv-bar-fill { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #8e2d49, #c75b7a); }
+.wsrecv-bar-fill.is-cobrado { background: linear-gradient(90deg, #2fd98e, #57e6a6); }
+.wsrecv-bar-fill.is-vencido { background: linear-gradient(90deg, #c0392b, #f0897f); }
+.wsrecv-card-acts { display: flex; gap: 7px; }
+.wsrecv-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.wsrecv-form-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.wsrecv-form-btns { display: flex; gap: 8px; margin-left: auto; }
+.wsrecv-prev { font-size: 13px; font-weight: 700; color: var(--text-muted); }
+.wsrecv-prev em { font-style: normal; }
+.wsrecv-prev em.is-vencido { color: #f0897f; } .wsrecv-prev em.is-cobrado { color: #7ef0b8; } .wsrecv-prev em.is-parcial { color: #ffd089; }
+/* Mi Espacio widget */
+.wspv-recvw { gap: 8px; align-items: stretch; padding: 14px 16px; background: linear-gradient(165deg, rgba(142,45,73,0.16), rgba(255,255,255,0.012)); }
+.wspv-recvw-top { display: flex; flex-direction: column; gap: 1px; }
+.wspv-recvw-amt { font-size: 22px; font-weight: 800; color: #f3a3bb; font-variant-numeric: tabular-nums; }
+.wspv-recvw-lbl { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+.wspv-recvw-bar { width: 100%; height: 6px; border-radius: 99px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.wspv-recvw-fill { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #8e2d49, #c75b7a); }
+.wspv-recvw-foot { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); }
+.wspv-recvw-foot .is-overdue { color: #f0897f; font-weight: 700; }
+@media (max-width: 920px) { .wsrecv-form-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) {
+  .wsrecv-kpis { grid-template-columns: 1fr; }
+  .wsrecv-grid { grid-template-columns: 1fr; }
+  .wsrecv-form-grid { grid-template-columns: 1fr 1fr; }
+}
+
 /* ════════ WS.2 — Financial Tools Hub (dedicated tools) ═══════════════════════
    Premium interactive tools that open inside Workspace templates mode (never
    the Sheet). Encapsulated under ws2-* classes; responsive. */

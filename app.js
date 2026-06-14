@@ -2017,6 +2017,32 @@ const T = {
     wstpl_recv_paid:    'Pagado',
     wstpl_recv_pending: 'Pendiente',
     wstpl_recv_overdue: 'Vencido',
+    // WS.13 — Receivables Pro (Pendientes de cobro)
+    wsrecv_sub:         'Controla el dinero que te deben.',
+    wsrecv_save:        'Guardar pendientes',
+    wsrecv_unit:        'registros',
+    wsrecv_kpi_pending: 'Pendiente total',
+    wsrecv_kpi_collected:'Cobrado',
+    wsrecv_kpi_overdue: 'Vencido',
+    wsrecv_list_title:  'Pendientes',
+    wsrecv_total:       'Total',
+    wsrecv_paid:        'Pagado',
+    wsrecv_pending:     'Pendiente',
+    wsrecv_st_pendiente:'Pendiente',
+    wsrecv_st_parcial:  'Parcial',
+    wsrecv_st_vencido:  'Vencido',
+    wsrecv_st_cobrado:  'Cobrado',
+    wsrecv_add:         'Nuevo pendiente',
+    wsrecv_add_btn:     'Añadir pendiente',
+    wsrecv_mark_paid:   'Marcar como cobrado',
+    wsrecv_empty:       'Añade tu primer pendiente.',
+    wsrecv_f_who:       'Persona / empresa',
+    wsrecv_f_concept:   'Concepto',
+    wsrecv_f_units:     'Unidades',
+    wsrecv_f_unitprice: 'Precio unidad',
+    wsrecv_f_paid:      'Importe pagado',
+    wsrecv_f_due:       'Fecha vencimiento',
+    wsrecv_f_notes:     'Notas',
     // WS.12 — Real Estate Portfolio Pro
     wsre_n:             'Portfolio Inmobiliario Pro',
     wsre_d:             'Gestiona tu cartera inmobiliaria completa.',
@@ -3855,6 +3881,32 @@ const T = {
     wstpl_recv_paid:    'Paid',
     wstpl_recv_pending: 'Pending',
     wstpl_recv_overdue: 'Overdue',
+    // WS.13 — Receivables Pro
+    wsrecv_sub:         'Track the money owed to you.',
+    wsrecv_save:        'Save receivables',
+    wsrecv_unit:        'records',
+    wsrecv_kpi_pending: 'Total pending',
+    wsrecv_kpi_collected:'Collected',
+    wsrecv_kpi_overdue: 'Overdue',
+    wsrecv_list_title:  'Receivables',
+    wsrecv_total:       'Total',
+    wsrecv_paid:        'Paid',
+    wsrecv_pending:     'Pending',
+    wsrecv_st_pendiente:'Pending',
+    wsrecv_st_parcial:  'Partial',
+    wsrecv_st_vencido:  'Overdue',
+    wsrecv_st_cobrado:  'Collected',
+    wsrecv_add:         'New receivable',
+    wsrecv_add_btn:     'Add receivable',
+    wsrecv_mark_paid:   'Mark as collected',
+    wsrecv_empty:       'Add your first receivable.',
+    wsrecv_f_who:       'Person / company',
+    wsrecv_f_concept:   'Concept',
+    wsrecv_f_units:     'Units',
+    wsrecv_f_unitprice: 'Unit price',
+    wsrecv_f_paid:      'Amount paid',
+    wsrecv_f_due:       'Due date',
+    wsrecv_f_notes:     'Notes',
     // WS.12 — Real Estate Portfolio Pro
     wsre_n:             'Real Estate Portfolio Pro',
     wsre_d:             'Manage your full real estate portfolio.',
@@ -11348,6 +11400,8 @@ const AURIX_WS7_TOOL = true;
 const AURIX_WS8_TOOL = true;
 // WS.12 ACTIVE — Real Estate Portfolio Pro (first differential, portfolio-first tool).
 const AURIX_WS12_TOOL = true;
+// WS.13 ACTIVE — Receivables Pro (Pendientes de cobro).
+const AURIX_WS13_TOOL = true;
 // WS.11A — Workspace is AUTONOMOUS: it must not auto-read Dashboard/portfolio/
 // liquidity/health/intelligence. The real-data bridges (_ws4Real / _wsbBaseline /
 // _wspInitialWealth) are DORMANT behind this flag; "Usar datos de Aurix" will be
@@ -11363,6 +11417,8 @@ let _wsJrnEditId   = null;   // WS.8 — trade id being edited (null = adding ne
 let _wsReDraft     = null;   // WS.12 — in-progress add/edit property form
 let _wsReEditId    = null;   // WS.12 — property id being edited (null = adding new)
 let _wsReDetailId  = null;   // WS.12 — property detail open (null = portfolio main)
+let _wsRecvDraft   = null;   // WS.13 — in-progress add/edit receivable form
+let _wsRecvEditId  = null;   // WS.13 — receivable id being edited (null = adding new)
 // WS.5A P5 — real save model (editar ≠ guardar). Working copies hold unsaved
 // edits; nothing persists until the user confirms "Guardar".
 let _wsgWorking = {};      // goalId -> working goal (unsaved edits)
@@ -11426,7 +11482,7 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -11469,6 +11525,10 @@ function _wshWireOnce() {
     if (t.hasAttribute('data-wsre-cancel')) { _wsReCancel(); return; }
     if (t.hasAttribute('data-wsre-back')) { _wsReBack(); return; }
     if (t.hasAttribute('data-wsre-tl-add')) { _wsReTimelineAdd(); return; }
+    // WS.13 — Receivables: add/save, per-item act, cancel.
+    if (t.hasAttribute('data-wsrecv-add')) { _wsRecvAdd(); return; }
+    const recvAct = t.getAttribute('data-wsrecv-act'); if (recvAct) { _wsRecvAct(recvAct, t.getAttribute('data-wsrecv-id')); return; }
+    if (t.hasAttribute('data-wsrecv-cancel')) { _wsRecvCancel(); return; }
     // WS.9 — open the Goal Funding modal for a goal.
     const fOpen = t.getAttribute('data-wsfund-open'); if (fOpen) { _wsFundModal(fOpen); return; }
     const ws4mode = t.getAttribute('data-ws4-mode');
@@ -11490,6 +11550,7 @@ function _wshWireOnce() {
     if (el.getAttribute('data-wstool-input')) { _wsToolOnInput(el); return; }
     if (el.getAttribute('data-wsjrn-input')) { _wsJrnOnInput(el); return; }
     if (el.getAttribute('data-wsre-input')) { _wsReOnInput(el); return; }
+    if (el.getAttribute('data-wsrecv-input')) { _wsRecvOnInput(el); return; }
   });
   // WS.12 — property photo upload (file input → downscaled data URL).
   document.addEventListener('change', e => { const el = e.target; if (el && el.getAttribute && el.hasAttribute('data-wsre-photo')) _wsRePhoto(el); });
@@ -11761,6 +11822,7 @@ function _wsTypeLabel(type) {
   if (type === 'monthly_budget')  return t('wstool_budget_n');
   if (type === 'trade_journal')   return t('wstool_journal_n');
   if (type === 'real_estate_portfolio') return t('wsre_n');
+  if (type === 'receivables_app') return t('wsapp_receivables_n');
   return t('wsh_ws_' + type);
 }
 function _wsLabel(kind, item) {
@@ -11832,13 +11894,13 @@ function _wsPinOpen(ref) {
 // pinned/active tool restores this; editing inputs updates it; only "Guardar
 // proyecto" creates a real project in aurix_ws_projects_v1.
 const _WSH_TOOL_STATE_KEY = 'aurix_ws_tool_state_v1';
-function _wsToolStateType(key) { return key === 'budget' ? 'monthly_budget' : key === 'journal' ? 'trade_journal' : key === 'realestate' ? 'real_estate_portfolio' : 'compound_growth'; }
+function _wsToolStateType(key) { return key === 'budget' ? 'monthly_budget' : key === 'journal' ? 'trade_journal' : key === 'realestate' ? 'real_estate_portfolio' : key === 'receivables' ? 'receivables_app' : 'compound_growth'; }
 function _wsToolStateRead() { try { const raw = localStorage.getItem(_WSH_TOOL_STATE_KEY); const v = raw ? JSON.parse(raw) : {}; return (v && typeof v === 'object') ? v : {}; } catch (_) { return {}; } }
 function _wsToolStateGet(key) { const v = _wsToolStateRead()[_wsToolStateType(key)]; return (v && typeof v === 'object') ? v : null; }
 function _wsToolStateSet(key, inputs) { const s = _wsToolStateRead(); s[_wsToolStateType(key)] = Object.assign({}, inputs); try { localStorage.setItem(_WSH_TOOL_STATE_KEY, JSON.stringify(s)); } catch (_) {} }
 
 // WS.7A — mini-preview viz selection for Mi Espacio cards (reuses _wsTplViz).
-const _WS_TYPE_VIZ = { budget: 'budget', monthly_budget: 'budget', networth: 'donut', investment: 'bars', property: 'house', business: 'bars', fire: 'curve', compound_growth: 'curve', trade_journal: 'journal', real_estate_portfolio: 'house' };
+const _WS_TYPE_VIZ = { budget: 'budget', monthly_budget: 'budget', networth: 'donut', investment: 'bars', property: 'house', business: 'bars', fire: 'curve', compound_growth: 'curve', trade_journal: 'journal', real_estate_portfolio: 'house', receivables_app: 'table' };
 function _wsRefViz(ref) {
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), key = ref.slice(i + 1);
   if (kind === 'tool') return key === 'budget' ? 'budget' : key === 'journal' ? 'journal' : 'curve';
@@ -11996,6 +12058,10 @@ function _wsProjPreviewHtml(p) {
     const coverStyle = cover ? `background-image:url(${cover.photo})` : '';
     return `<div class="wspv wspv-re${cover ? ' has-photo' : ''}"${cover ? ` style="${coverStyle}"` : ''}><div class="wspv-re-ov"><span class="wspv-re-eq">${esc(formatBase(r.equityTotal || 0))}</span><span class="wspv-re-lbl">${esc(t('wsre_kpi_equity'))}</span></div><div class="wspv-re-foot"><span>${(r.count != null ? r.count : 0)} ${esc(t('wsre_unit'))}</span><span class="is-${cf >= 0 ? 'win' : 'loss'}">${esc((cf >= 0 ? '+' : '') + formatBase(cf))}${esc(t('wsre_permonth'))}</span></div></div>`;
   }
+  if (p.type === 'receivables_app') {
+    const pct = r.porcentajeCobrado != null ? Math.max(0, Math.min(100, r.porcentajeCobrado)) : 0;
+    return `<div class="wspv wspv-recvw"><div class="wspv-recvw-top"><span class="wspv-recvw-amt">${esc(formatBase(r.totalPendiente || 0))}</span><span class="wspv-recvw-lbl">${esc(t('wsrecv_kpi_pending'))}</span></div><div class="wspv-recvw-bar"><span class="wspv-recvw-fill" style="width:${pct}%"></span></div><div class="wspv-recvw-foot"><span>${(r.count != null ? r.count : 0)} · ${pct}% ${esc(t('wsrecv_kpi_collected').toLowerCase())}</span>${r.totalVencido ? `<span class="is-overdue">${esc(formatBase(r.totalVencido))} ${esc(t('wsrecv_st_vencido').toLowerCase())}</span>` : ''}</div></div>`;
+  }
   if (p.kind === 'scenario') return `<div class="wspv wspv-viz is-blue">${_wsTplViz('compare')}</div>`;
   const A = _WS_ARCH[p.type] || { accent: 'blue', glyph: 'portfolio' };
   return _wsGlyphTile(A.glyph, A.accent);
@@ -12022,7 +12088,7 @@ function _wsxOpen(ref) {
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
   if (kind === 'goal') { _wshView = 'goals'; renderWorkspaceHome(); }
   else if (kind === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); }
-  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else if (p.type === 'monthly_budget') { _wsOpenTool('budget', id); } else if (p.type === 'trade_journal') { _wsOpenTool('journal', id); } else if (p.type === 'real_estate_portfolio') { _wsOpenTool('realestate', id); } else { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
+  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else if (p.type === 'monthly_budget') { _wsOpenTool('budget', id); } else if (p.type === 'trade_journal') { _wsOpenTool('journal', id); } else if (p.type === 'real_estate_portfolio') { _wsOpenTool('realestate', id); } else if (p.type === 'receivables_app') { _wsOpenTool('receivables', id); } else { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
 }
 function _wsxAct(act, ref) {
   if (!ref) return;
@@ -12094,7 +12160,7 @@ function _renderWorkspaceHome(metrics) {
     const demoTiles = [
       { name: t('wstool_budget_n'),       open: ' data-wsh-cta="tool" data-wstool="budget"',     pv: _wsToolPreviewHtml('budget') },
       { name: t('wsre_n'),                open: ' data-wsh-cta="tool" data-wstool="realestate"', pv: _wsCatPreviewHtml('realestate-pro') },
-      { name: t('wsapp_receivables_n'),   open: ' data-wstab="templates"',                       pv: _wsReceivablesPreview() },
+      { name: t('wsapp_receivables_n'),   open: ' data-wsh-cta="tool" data-wstool="receivables"', pv: _wsReceivablesPreview() },
     ];
     const dailyInner = saved.length
       ? `<div class="wsh-daily-grid">${saved.map((p, i) => dailyCard(p, i === 0 && saved.length >= 3)).join('')}</div>`
@@ -12159,7 +12225,7 @@ function _renderWorkspaceHome(metrics) {
     const gallery = [
       { cta: 'tool',     arg: 'budget',     ref: 'tpl:mbudget',    cat: 'budget',         name: t('wstool_budget_n') },
       { cta: 'soon',     ref: 'tpl:assets',      cat: 'assets',         name: t('wsapp_assets_n') },
-      { cta: 'soon',     ref: 'tpl:receivables', cat: 'receivables',    name: t('wsapp_receivables_n') },
+      { cta: 'tool',     arg: 'receivables', ref: 'tpl:receivables', cat: 'receivables', name: t('wsapp_receivables_n') },
       { cta: 'tool',     arg: 'realestate', ref: 'tpl:realestate', cat: 'realestate-pro', name: t('wsre_n') },
       { cta: 'goals',    ref: 'tpl:goals',       cat: 'goals',          name: t('wsg_title') },
       { cta: 'tool',     arg: 'journal',    ref: 'tpl:journal',    cat: 'journal',        name: t('wstool_journal_n') },
@@ -13191,19 +13257,21 @@ function _wsToolDefaults() {
 
 // WS.7 — tool registry: maps a tool key to its gate, defaults, project type and
 // renderer so the shared open/input/save plumbing stays tool-agnostic.
-function _wsToolDefaultsFor(key) { return key === 'budget' ? _wsBudgetDefaults() : key === 'journal' ? _wsJournalDefaults() : key === 'realestate' ? _wsReDefaults() : _wsToolDefaults(); }
-function _wsRenderTool() { return _wsToolActive === 'budget' ? _renderBudgetTool() : _wsToolActive === 'journal' ? _renderJournalTool() : _wsToolActive === 'realestate' ? _renderRealEstateTool() : _renderCompoundTool(); }
+function _wsToolDefaultsFor(key) { return key === 'budget' ? _wsBudgetDefaults() : key === 'journal' ? _wsJournalDefaults() : key === 'realestate' ? _wsReDefaults() : key === 'receivables' ? _wsReceivablesDefaults() : _wsToolDefaults(); }
+function _wsRenderTool() { return _wsToolActive === 'budget' ? _renderBudgetTool() : _wsToolActive === 'journal' ? _renderJournalTool() : _wsToolActive === 'realestate' ? _renderRealEstateTool() : _wsToolActive === 'receivables' ? _renderReceivablesTool() : _renderCompoundTool(); }
 function _wsToolOutHtmlFor(key, inp) { return key === 'budget' ? _wsBudgetOutHtml(inp) : _wsToolOutHtml(inp); }
 
 function _wsOpenTool(toolKey, projectId) {
-  const key = (toolKey === 'budget' || toolKey === 'journal' || toolKey === 'realestate') ? toolKey : 'compound';
-  if (key === 'compound'   && !AURIX_WS6_TOOL) return;   // WS.6 gate
-  if (key === 'budget'     && !AURIX_WS7_TOOL) return;   // WS.7 gate
-  if (key === 'journal'    && !AURIX_WS8_TOOL) return;   // WS.8 gate
-  if (key === 'realestate' && !AURIX_WS12_TOOL) return;  // WS.12 gate
+  const key = (toolKey === 'budget' || toolKey === 'journal' || toolKey === 'realestate' || toolKey === 'receivables') ? toolKey : 'compound';
+  if (key === 'compound'    && !AURIX_WS6_TOOL) return;   // WS.6 gate
+  if (key === 'budget'      && !AURIX_WS7_TOOL) return;   // WS.7 gate
+  if (key === 'journal'     && !AURIX_WS8_TOOL) return;   // WS.8 gate
+  if (key === 'realestate'  && !AURIX_WS12_TOOL) return;  // WS.12 gate
+  if (key === 'receivables' && !AURIX_WS13_TOOL) return;  // WS.13 gate
   _wsToolActive = key;
   _wsJrnDraft = (key === 'journal') ? _wsJrnNewDraft() : null; _wsJrnEditId = null;  // reset trade form
   _wsReDraft = (key === 'realestate') ? _wsReNewDraft() : null; _wsReEditId = null; _wsReDetailId = null;  // reset property form/detail
+  _wsRecvDraft = (key === 'receivables') ? _wsRecvNewDraft() : null; _wsRecvEditId = null;  // reset receivable form
   if (projectId) {
     // Open a saved project for editing (its inputs, tracked by edit id).
     const p = _ws4Projects().find(x => x && x.id === projectId);
@@ -13237,7 +13305,11 @@ function _wsToolSave() {
   const list = _ws4Projects();
   const existing = _wsToolEditId ? list.find(p => p && p.id === _wsToolEditId) : null;
   let type, results;
-  if (_wsToolActive === 'realestate') {
+  if (_wsToolActive === 'receivables') {
+    const r = calculateReceivables(_wsToolInputs.items);
+    type = 'receivables_app';
+    results = { count: r.count, totalPendiente: Math.round(r.totalPendiente), totalCobrado: Math.round(r.totalCobrado), totalVencido: Math.round(r.totalVencido), numeroVencidos: r.numeroVencidos, porcentajeCobrado: Math.round(r.porcentajeCobrado) };
+  } else if (_wsToolActive === 'realestate') {
     const r = calculateRealEstatePortfolio(_wsToolInputs.properties);
     type = 'real_estate_portfolio';
     results = { count: r.count, valueTotal: Math.round(r.valueTotal), equityTotal: Math.round(r.equityTotal), cashflowMonthly: Math.round(r.cashflowMonthly), avgYield: Math.round(r.avgYield * 10) / 10 };
@@ -13273,7 +13345,7 @@ function _wsToolSaveBarHtml() {
   const state = _wsToolEditId ? (_wsToolDirty ? 'dirty' : 'saved') : 'unsaved';
   const lbl = { unsaved: t('wsg_save_unsaved'), dirty: t('wsg_save_pending'), saved: t('wsg_save_done') }[state];
   const canSave = !_wsToolEditId || _wsToolDirty;
-  const saveLabel = _wsToolActive === 'journal' ? t('wstool_save_journal') : _wsToolActive === 'realestate' ? t('wsre_save') : t('wstool_save');
+  const saveLabel = _wsToolActive === 'journal' ? t('wstool_save_journal') : _wsToolActive === 'realestate' ? t('wsre_save') : _wsToolActive === 'receivables' ? t('wsrecv_save') : t('wstool_save');
   return `
     <span class="wsg-savestate is-${state}">${esc(lbl)}</span>
     <button type="button" class="wsh-cta is-primary wsg-savebtn" data-wstool-save${canSave ? '' : ' disabled'}>${esc(saveLabel)}</button>`;
@@ -14029,6 +14101,191 @@ function _renderRealEstateTool() {
         ${gridOrEmpty}
       </section>
       ${_wsReFormHtml()}
+      <section class="wsh-card wsg-foot-card">
+        <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
+      </section>
+    </div>`;
+}
+
+// ── WS.13 — Receivables Pro (Pendientes de cobro) ────────────────────────────
+// Control money owed to you (freelancers, companies, rentals, private sales,
+// personal loans...). 100% autonomous: no Dashboard/wealthEngine/real data. Pure.
+function _wsRecvStatus(total, paid, dueDate) {
+  if (total > 0 && paid >= total) return 'cobrado';
+  const pending = Math.max(0, total - paid);
+  if (dueDate) { const d = Date.parse(dueDate); if (!isNaN(d) && d < Date.now() && pending > 0) return 'vencido'; }
+  if (paid > 0) return 'parcial';
+  return 'pendiente';
+}
+function calculateReceivables(items) {
+  const list = (Array.isArray(items) ? items : []).map(it => {
+    const units = Math.max(0, Number(it.units) || 0);
+    const unitPrice = Math.max(0, Number(it.unitPrice) || 0);
+    const totalAmount = units * unitPrice;
+    const paidAmount = Math.max(0, Number(it.paidAmount) || 0);
+    const pendingAmount = Math.max(0, totalAmount - paidAmount);
+    const status = _wsRecvStatus(totalAmount, paidAmount, it.dueDate);
+    return Object.assign({}, it, { units, unitPrice, totalAmount, paidAmount, pendingAmount, status });
+  });
+  let totalCobrado = 0, totalPendiente = 0, totalVencido = 0, grand = 0, numeroPendientes = 0, numeroVencidos = 0;
+  for (const x of list) {
+    grand += x.totalAmount;
+    totalCobrado += Math.min(x.paidAmount, x.totalAmount);
+    if (x.status !== 'cobrado') { totalPendiente += x.pendingAmount; numeroPendientes++; }
+    if (x.status === 'vencido') { totalVencido += x.pendingAmount; numeroVencidos++; }
+  }
+  return { list, count: list.length, grand, totalCobrado, totalPendiente, totalVencido, numeroPendientes, numeroVencidos, porcentajeCobrado: grand > 0 ? totalCobrado / grand * 100 : 0 };
+}
+function _wsRecvNewDraft() { return { personOrCompany: '', concept: '', units: '', unitPrice: '', paidAmount: '', dueDate: '', notes: '' }; }
+function _wsRecvDemo() {
+  const yr = (typeof _intccDate === 'function') ? '' : '';
+  return [
+    { id: 'rc_d1', personOrCompany: 'Hamburguesas Celestiales', concept: 'Pedido palés', units: 1, unitPrice: 6000, paidAmount: 2000, dueDate: '', notes: '' },
+    { id: 'rc_d2', personOrCompany: 'Cliente B', concept: 'Diseño web', units: 1, unitPrice: 2400, paidAmount: 0, dueDate: '', notes: '' },
+    { id: 'rc_d3', personOrCompany: 'Inquilino Piso 2', concept: 'Alquiler', units: 1, unitPrice: 1250, paidAmount: 0, dueDate: '2024-01-15', notes: '' },
+    { id: 'rc_d4', personOrCompany: 'Préstamo Marcos', concept: 'Préstamo personal', units: 1, unitPrice: 3200, paidAmount: 3200, dueDate: '', notes: '' },
+  ];
+}
+function _wsReceivablesDefaults() { return { items: _wsRecvDemo() }; }
+function _wsRecvProps() { if (!_wsToolInputs || !Array.isArray(_wsToolInputs.items)) _wsToolInputs = _wsReceivablesDefaults(); return _wsToolInputs.items; }
+function _wsRecvRerender() { const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderReceivablesTool(); _wshReveal(c); } }
+function _wsRecvOnInput(el) {
+  if (!_wsRecvDraft) _wsRecvDraft = _wsRecvNewDraft();
+  _wsRecvDraft[el.getAttribute('data-wsrecv-input')] = el.value;
+  const root = document.querySelector('.wsh-tool-view');
+  const pv = root && root.querySelector('[data-wsrecv-pv]');
+  if (pv) pv.innerHTML = _wsRecvPreviewLine(_wsRecvDraft);
+}
+function _wsRecvPreviewLine(d) {
+  const esc = _intccEsc;
+  const total = (Number(_wsNum(d.units)) || 0) * (Number(_wsNum(d.unitPrice)) || 0);
+  if (total <= 0) return '';
+  const paid = _wsNum(d.paidAmount);
+  const pending = Math.max(0, total - paid);
+  const st = _wsRecvStatus(total, paid, d.dueDate);
+  return `<span class="wsrecv-prev"><b>${esc(formatBase(total))}</b> · ${esc(t('wsrecv_pending'))} ${esc(formatBase(pending))} · <em class="is-${st}">${esc(t('wsrecv_st_' + st))}</em></span>`;
+}
+function _wsRecvAdd() {
+  const d = _wsRecvDraft || _wsRecvNewDraft();
+  const who = (d.personOrCompany || '').trim();
+  const total = _wsNum(d.units) * _wsNum(d.unitPrice);
+  if (!who && total <= 0) return;
+  const now = Date.now();
+  const item = {
+    id: _wsRecvEditId || ('rc_' + now + '_' + Math.random().toString(36).slice(2, 6)),
+    personOrCompany: who || t('wsapp_receivables_n'), concept: (d.concept || '').trim(),
+    units: _wsNum(d.units) || 1, unitPrice: _wsNum(d.unitPrice), paidAmount: _wsNum(d.paidAmount),
+    dueDate: d.dueDate || '', notes: (d.notes || '').trim(),
+    createdAt: now, updatedAt: now,
+  };
+  const list = _wsRecvProps();
+  if (_wsRecvEditId) { const i = list.findIndex(x => x && x.id === _wsRecvEditId); if (i >= 0) { item.createdAt = list[i].createdAt || now; list[i] = item; } else list.push(item); }
+  else list.push(item);
+  _wsToolInputs.items = list; _wsToolDirty = true; _wsToolStateSet('receivables', _wsToolInputs);
+  _wsRecvDraft = _wsRecvNewDraft(); _wsRecvEditId = null;
+  _wsRecvRerender();
+}
+function _wsRecvAct(act, id) {
+  const list = _wsRecvProps();
+  const it = list.find(x => x && x.id === id); if (!it) return;
+  if (act === 'edit') {
+    _wsRecvEditId = id;
+    _wsRecvDraft = { personOrCompany: it.personOrCompany, concept: it.concept, units: String(it.units || ''), unitPrice: String(it.unitPrice || ''), paidAmount: String(it.paidAmount || ''), dueDate: it.dueDate || '', notes: it.notes || '' };
+    _wsRecvRerender(); return;
+  }
+  if (act === 'dup') { list.push(Object.assign({}, it, { id: 'rc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) })); _wsToolDirty = true; _wsToolStateSet('receivables', _wsToolInputs); _wsRecvRerender(); return; }
+  if (act === 'paid') { it.paidAmount = Math.max(0, (Number(it.units) || 0) * (Number(it.unitPrice) || 0)); it.updatedAt = Date.now(); _wsToolDirty = true; _wsToolStateSet('receivables', _wsToolInputs); _wsRecvRerender(); return; }
+  if (act === 'del') {
+    _wsConfirm(() => {
+      const i = list.findIndex(x => x && x.id === id); if (i >= 0) list.splice(i, 1);
+      if (_wsRecvEditId === id) { _wsRecvEditId = null; _wsRecvDraft = _wsRecvNewDraft(); }
+      _wsToolDirty = true; _wsToolStateSet('receivables', _wsToolInputs); _wsRecvRerender();
+    });
+  }
+}
+function _wsRecvCancel() { _wsRecvEditId = null; _wsRecvDraft = _wsRecvNewDraft(); _wsRecvRerender(); }
+
+function _wsRecvSummaryHtml(r) {
+  const esc = _intccEsc;
+  return `
+    <div class="wsrecv-summary">
+      <div class="wsrecv-kpis">
+        <div class="wsrecv-kpi is-pending"><span class="wsrecv-kpi-v">${esc(formatBase(r.totalPendiente))}</span><span class="wsrecv-kpi-k">${esc(t('wsrecv_kpi_pending'))}</span></div>
+        <div class="wsrecv-kpi is-collected"><span class="wsrecv-kpi-v">${esc(formatBase(r.totalCobrado))}</span><span class="wsrecv-kpi-k">${esc(t('wsrecv_kpi_collected'))}</span></div>
+        <div class="wsrecv-kpi is-overdue"><span class="wsrecv-kpi-v">${esc(formatBase(r.totalVencido))}</span><span class="wsrecv-kpi-k">${esc(t('wsrecv_kpi_overdue'))}</span></div>
+      </div>
+      <div class="wsrecv-sumbar"><span class="wsrecv-sumbar-fill" style="width:${Math.round(r.porcentajeCobrado)}%"></span></div>
+      <span class="wsrecv-sumbar-lbl">${Math.round(r.porcentajeCobrado)}% ${esc(t('wsrecv_kpi_collected').toLowerCase())} · ${r.count} ${esc(t('wsrecv_unit'))}</span>
+    </div>`;
+}
+function _wsRecvCardHtml(it) {
+  const esc = _intccEsc;
+  const pct = it.totalAmount > 0 ? Math.round(Math.min(100, it.paidAmount / it.totalAmount * 100)) : 0;
+  return `
+    <div class="wsrecv-card is-${esc(it.status)}">
+      <div class="wsrecv-card-top">
+        <div class="wsrecv-card-id"><p class="wsrecv-who">${esc(it.personOrCompany)}</p>${it.concept ? `<span class="wsrecv-concept">${esc(it.concept)}</span>` : ''}</div>
+        <span class="wsrecv-status is-${esc(it.status)}">${esc(t('wsrecv_st_' + it.status))}</span>
+      </div>
+      <div class="wsrecv-amounts">
+        <span class="wsrecv-amt"><i>${esc(t('wsrecv_total'))}</i><b>${esc(formatBase(it.totalAmount))}</b></span>
+        <span class="wsrecv-amt"><i>${esc(t('wsrecv_paid'))}</i><b>${esc(formatBase(it.paidAmount))}</b></span>
+        <span class="wsrecv-amt is-pending"><i>${esc(t('wsrecv_pending'))}</i><b>${esc(formatBase(it.pendingAmount))}</b></span>
+      </div>
+      <div class="wsrecv-bar"><span class="wsrecv-bar-fill is-${esc(it.status)}" style="width:${pct}%"></span></div>
+      <div class="wsrecv-card-acts">
+        <button type="button" class="wsre-mini" data-wsrecv-act="edit" data-wsrecv-id="${esc(it.id)}" title="${esc(t('wsjrn_edit'))}" aria-label="${esc(t('wsjrn_edit'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M14 6l4 4"/></svg></button>
+        <button type="button" class="wsre-mini" data-wsrecv-act="paid" data-wsrecv-id="${esc(it.id)}" title="${esc(t('wsrecv_mark_paid'))}" aria-label="${esc(t('wsrecv_mark_paid'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg></button>
+        <button type="button" class="wsre-mini" data-wsrecv-act="dup" data-wsrecv-id="${esc(it.id)}" title="${esc(t('wsg_act_dup'))}" aria-label="${esc(t('wsg_act_dup'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg></button>
+        <button type="button" class="wsre-mini is-danger" data-wsrecv-act="del" data-wsrecv-id="${esc(it.id)}" title="${esc(t('wsg_act_del'))}" aria-label="${esc(t('wsg_act_del'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/></svg></button>
+      </div>
+    </div>`;
+}
+function _wsRecvFormHtml() {
+  const esc = _intccEsc;
+  const d = _wsRecvDraft || _wsRecvNewDraft();
+  const editing = !!_wsRecvEditId;
+  const txt = (k, label) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" autocomplete="off" data-wsrecv-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"></span></label>`;
+  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsrecv-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}"><span class="ws4-field-unit">${esc(unit || '')}</span></span></label>`;
+  return `
+    <section class="wsh-card wsrecv-form-card">
+      <header class="wsh-head"><h3 class="wsh-title">${esc(editing ? t('wsjrn_edit') : t('wsrecv_add'))}</h3></header>
+      <div class="wsrecv-form-grid">
+        ${txt('personOrCompany', t('wsrecv_f_who'))}
+        ${txt('concept', t('wsrecv_f_concept'))}
+        ${num('units', t('wsrecv_f_units'), '')}
+        ${num('unitPrice', t('wsrecv_f_unitprice'), '€')}
+        ${num('paidAmount', t('wsrecv_f_paid'), '€')}
+        ${txt('dueDate', t('wsrecv_f_due'))}
+        ${txt('notes', t('wsrecv_f_notes'))}
+      </div>
+      <div class="wsrecv-form-foot">
+        <span class="wsrecv-prev-wrap" data-wsrecv-pv>${_wsRecvPreviewLine(d)}</span>
+        <div class="wsrecv-form-btns">
+          ${editing ? `<button type="button" class="wsg-act" data-wsrecv-cancel>${esc(t('wsjrn_cancel'))}</button>` : ''}
+          <button type="button" class="wsh-cta is-primary" data-wsrecv-add>${esc(editing ? t('wsjrn_save_edit') : t('wsrecv_add_btn'))}</button>
+        </div>
+      </div>
+    </section>`;
+}
+function _renderReceivablesTool() {
+  const esc = _intccEsc;
+  const items = _wsRecvProps();
+  if (!_wsRecvDraft) _wsRecvDraft = _wsRecvNewDraft();
+  const r = calculateReceivables(items);
+  return `
+    <div class="aurix-wsh wsh-tool-view wsh-recv-view is-revealed" data-wsh-view="tool">
+      <section class="wsh-card wsb-header">
+        <button type="button" class="wsb-back" data-wsh-nav="templates">‹ ${esc(t('wstool_back'))}</button>
+        <h2 class="wsb-title">${esc(t('wsapp_receivables_n'))}</h2>
+        <p class="wsb-subtitle">${esc(t('wsrecv_sub'))}</p>
+      </section>
+      <section class="wsh-card wsrecv-summary-card">${_wsRecvSummaryHtml(r)}</section>
+      <section class="wsh-card">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsrecv_list_title'))}</h3></header>
+        ${r.list.length ? `<div class="wsrecv-grid">${r.list.map(_wsRecvCardHtml).join('')}</div>` : `<p class="wsh-empty">${esc(t('wsrecv_empty'))}</p>`}
+      </section>
+      ${_wsRecvFormHtml()}
       <section class="wsh-card wsg-foot-card">
         <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
       </section>
