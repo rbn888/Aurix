@@ -1954,6 +1954,8 @@ const T = {
     wspin_remove:      'Quitar de Mi espacio',
     wsstate_saved:     'Guardado',
     wsstate_pinned:    'Fijado',
+    wsh_kind_tool:     'Herramienta',
+    wsh_kind_template: 'Plantilla',
     wstplg_planning:   'Planificación',
     wstplg_daily:      'Gestión diaria',
     wstplg_investing:  'Inversión',
@@ -3668,6 +3670,8 @@ const T = {
     wspin_remove:      'Remove from My Space',
     wsstate_saved:     'Saved',
     wsstate_pinned:    'Pinned',
+    wsh_kind_tool:     'Tool',
+    wsh_kind_template: 'Template',
     wstplg_planning:   'Planning',
     wstplg_daily:      'Daily management',
     wstplg_investing:  'Investing',
@@ -11327,6 +11331,7 @@ function _wsTplViz(k) {
     target:  '<circle class="v-track" cx="32" cy="20" r="13"/><circle class="v-track" cx="32" cy="20" r="7"/><circle class="v-dot" cx="32" cy="20" r="2.4"/>',
     table:   '<path class="v-track" d="M10 11 h44 M10 20 h44 M10 29 h44"/><path d="M10 20 h26"/><path class="v-dot2" d="M10 29 h16"/>',
     journal: '<path class="v-track" d="M10 12 h44 M10 22 h44 M10 32 h44"/><path class="v-up" d="M44 9 l3 3 l-3 3"/><path class="v-down" d="M44 29 l3 3 l-3 3"/>',
+    budget:  '<path d="M14 34 V12"/><path d="M32 34 V19"/><path class="v-dot2" d="M50 34 V25"/>',
   };
   return `<svg class="wsh-tpl-viz-svg is-${k}" viewBox="0 0 64 40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${V[k] || V.bars}</svg>`;
 }
@@ -11372,6 +11377,38 @@ function _wsPinOpen(ref) {
   if (key === 'projection') { _wshView = 'planning'; renderWorkspaceHome(); return; }
   _ws4OpenOrCreate(key);
 }
+// WS.7A — per-tool last state (quick-access scratch). NOT a project: opening a
+// pinned/active tool restores this; editing inputs updates it; only "Guardar
+// proyecto" creates a real project in aurix_ws_projects_v1.
+const _WSH_TOOL_STATE_KEY = 'aurix_ws_tool_state_v1';
+function _wsToolStateType(key) { return key === 'budget' ? 'monthly_budget' : 'compound_growth'; }
+function _wsToolStateRead() { try { const raw = localStorage.getItem(_WSH_TOOL_STATE_KEY); const v = raw ? JSON.parse(raw) : {}; return (v && typeof v === 'object') ? v : {}; } catch (_) { return {}; } }
+function _wsToolStateGet(key) { const v = _wsToolStateRead()[_wsToolStateType(key)]; return (v && typeof v === 'object') ? v : null; }
+function _wsToolStateSet(key, inputs) { const s = _wsToolStateRead(); s[_wsToolStateType(key)] = Object.assign({}, inputs); try { localStorage.setItem(_WSH_TOOL_STATE_KEY, JSON.stringify(s)); } catch (_) {} }
+
+// WS.7A — mini-preview viz selection for Mi Espacio cards (reuses _wsTplViz).
+const _WS_TYPE_VIZ = { budget: 'budget', monthly_budget: 'budget', networth: 'donut', investment: 'bars', property: 'house', business: 'bars', fire: 'curve', compound_growth: 'curve' };
+function _wsRefViz(ref) {
+  const i = ref.indexOf(':'); const kind = ref.slice(0, i), key = ref.slice(i + 1);
+  if (kind === 'tool') return key === 'budget' ? 'budget' : key === 'journal' ? 'journal' : 'curve';
+  if (key === 'goals') return 'target';
+  if (key === 'scenario') return 'compare';
+  if (key === 'projection') return 'curve';
+  return _WS_TYPE_VIZ[key] || 'bars';
+}
+function _wsPinKindLabel(ref) { return ref.slice(0, ref.indexOf(':')) === 'tool' ? t('wsh_kind_tool') : t('wsh_kind_template'); }
+function _wsProjViz(p) {
+  if (p.kind === 'goal') return 'target';
+  if (p.kind === 'scenario') return 'compare';
+  return _WS_TYPE_VIZ[p.type] || 'bars';
+}
+function _wsProjMeta(p) {
+  const r = p.results; if (!r) return '';
+  if (p.type === 'compound_growth' && r.final != null) return formatBase(r.final);
+  if (p.type === 'monthly_budget' && r.saveRate != null) return r.saveRate + '%';
+  return '';
+}
+
 // WS.6A — smart entry tab: never land on an empty "Mi espacio".
 function _wsSmartTab() {
   const hasSaved = _wshAllProjects().length > 0 || _wsPinned().length > 0;
@@ -11383,7 +11420,7 @@ function _wsSmartTab() {
 function _wshAllProjects() {
   const out = [];
   try { _wshReadStore(_WSH_GOALS_KEY).forEach(g => { if (g) out.push({ kind: 'goal', id: g.id, name: _wsLabel('goal', g), typeLabel: t('wsg_type_' + (g.type || 'free')), ts: g.updatedAt || g.createdAt || 0, ref: 'goal:' + g.id }); }); } catch (_) {}
-  try { _wshReadStore(_WSH_PROJECTS_KEY).forEach(p => { if (p) out.push({ kind: 'workspace', id: p.id, name: _wsLabel('workspace', p), typeLabel: _wsTypeLabel(p.type), ts: p.updatedAt || p.createdAt || 0, ref: 'workspace:' + p.id }); }); } catch (_) {}
+  try { _wshReadStore(_WSH_PROJECTS_KEY).forEach(p => { if (p) out.push({ kind: 'workspace', id: p.id, type: p.type, results: p.results, name: _wsLabel('workspace', p), typeLabel: _wsTypeLabel(p.type), ts: p.updatedAt || p.createdAt || 0, ref: 'workspace:' + p.id }); }); } catch (_) {}
   try { _wshReadStore(_WSH_SCENARIOS_KEY).forEach(s => { if (s) { const id = s.scenarioId || s.id; out.push({ kind: 'scenario', id, name: _wsLabel('scenario', s), typeLabel: t('wsh_scenario_title'), ts: s.createdAt || 0, ref: 'scenario:' + id }); } }); } catch (_) {}
   return out;
 }
@@ -11446,35 +11483,29 @@ function _renderWorkspaceHome(metrics) {
       </section>` : '';
     const saved = _wshAllProjects().sort((a, b) => b.ts - a.ts);
     const pinned = _wsPinned();
-    const savedRows = saved.map(p => `
-      <div class="wsh-proj">
-        <div class="wsh-proj-info">
-          <span class="wsb-pill is-saved">${esc(t('wsstate_saved'))}</span>
-          <span class="wsh-proj-type">${esc(p.typeLabel)}</span>
-          <p class="wsh-proj-name">${esc(p.name)}</p>
-          <span class="wsh-proj-meta">${esc(_intccDate(p.ts))}</span>
+    // WS.7A — visual grid cards (mini preview + name + type + Abrir + secondary).
+    const ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    const ICON_TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/></svg>';
+    const spaceCard = o => `
+      <div class="wsh-scard${o.pinned ? ' is-pinned' : ''}">
+        <span class="wsb-pill ${o.pinned ? 'is-pinned' : 'is-saved'}">${esc(o.pinned ? t('wsstate_pinned') : t('wsstate_saved'))}</span>
+        <div class="wsh-scard-viz">${_wsTplViz(o.viz)}</div>
+        <p class="wsh-scard-name">${esc(o.name)}</p>
+        <span class="wsh-scard-type">${esc(o.typeLabel)}</span>
+        ${o.meta ? `<span class="wsh-scard-meta">${esc(o.meta)}</span>` : ''}
+        <div class="wsh-scard-acts">
+          <button type="button" class="wsh-scard-open" data-${o.pinned ? 'wspinopen' : 'wsx-open'}="${esc(o.ref)}">${esc(t('wsh_proj_open'))}</button>
+          ${o.pinned
+            ? `<button type="button" class="wsh-scard-x" data-wspin="${esc(o.ref)}" title="${esc(t('wspin_remove'))}" aria-label="${esc(t('wspin_remove'))}">${ICON_X}</button>`
+            : `<button type="button" class="wsh-scard-x is-danger" data-wsx-act="del" data-wsx-ref="${esc(o.ref)}" title="${esc(t('wsg_act_del'))}" aria-label="${esc(t('wsg_act_del'))}">${ICON_TRASH}</button>`}
         </div>
-        <div class="wsh-proj-acts">
-          <button type="button" class="wsg-act" data-wsx-open="${esc(p.ref)}">${esc(t('wsh_proj_open'))}</button>
-          <button type="button" class="wsg-act" data-wsx-act="dup" data-wsx-ref="${esc(p.ref)}">${esc(t('wsg_act_dup'))}</button>
-          <button type="button" class="wsg-act is-danger" data-wsx-act="del" data-wsx-ref="${esc(p.ref)}">${esc(t('wsg_act_del'))}</button>
-        </div>
-      </div>`).join('');
-    const pinnedRows = pinned.map(p => `
-      <div class="wsh-proj is-pinned">
-        <div class="wsh-proj-info">
-          <span class="wsb-pill is-pinned">${esc(t('wsstate_pinned'))}</span>
-          <p class="wsh-proj-name">${esc(_wsPinLabel(p.ref))}</p>
-        </div>
-        <div class="wsh-proj-acts">
-          <button type="button" class="wsg-act" data-wspinopen="${esc(p.ref)}">${esc(t('wsh_proj_open'))}</button>
-          <button type="button" class="wsg-act" data-wspin="${esc(p.ref)}">${esc(t('wspin_remove'))}</button>
-        </div>
-      </div>`).join('');
+      </div>`;
+    const savedCards = saved.map(p => spaceCard({ pinned: false, ref: p.ref, name: p.name, typeLabel: p.typeLabel, viz: _wsProjViz(p), meta: _wsProjMeta(p) || _intccDate(p.ts) })).join('');
+    const pinnedCards = pinned.map(p => spaceCard({ pinned: true, ref: p.ref, name: _wsPinLabel(p.ref), typeLabel: _wsPinKindLabel(p.ref), viz: _wsRefViz(p.ref), meta: '' })).join('');
     const spaceHtml = (saved.length || pinned.length) ? `
       <section class="wsh-card wsh-projects">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_space'))}</h3></header>
-        <div class="wsh-proj-grid">${savedRows}${pinnedRows}</div>
+        <div class="wsh-space-grid">${savedCards}${pinnedCards}</div>
       </section>`
       : `<section class="wsh-card"><div class="wsh-space-empty"><p class="wsh-empty">${esc(t('wsh_space_empty'))}</p><button type="button" class="wsh-cta is-primary" data-wstab="templates">${esc(t('wsh_space_cta'))}</button></div></section>`;
     panel = continueHtml + spaceHtml;
@@ -11497,7 +11528,7 @@ function _renderWorkspaceHome(metrics) {
         { cta: 'planning', ref: 'tpl:projection', viz: 'curve',   name: t('wsp_title'),          desc: t('wsp_subtitle') },
         Object.assign(T2('fire'), { viz: 'curve' }),
       ] },
-      { title: t('wstplg_daily'), items: [ Object.assign(T2('budget'), { viz: 'table' }), Object.assign(T2('networth'), { viz: 'donut' }) ] },
+      { title: t('wstplg_daily'), items: [ Object.assign(T2('budget'), { viz: 'budget' }), Object.assign(T2('networth'), { viz: 'donut' }) ] },
       { title: t('wstplg_investing'), items: [ Object.assign(T2('investment'), { viz: 'bars' }) ] },
       { title: t('wstplg_realestate'), items: [ Object.assign(T2('property'), { viz: 'house' }), Object.assign(T2('business'), { viz: 'bars' }) ] },
     ];
@@ -11510,7 +11541,7 @@ function _renderWorkspaceHome(metrics) {
     // Tools — visual cards; active tool featured + pinnable.
     const tools = [
       { k: 'compound', active: AURIX_WS6_TOOL, viz: 'curve',   icon: '<path d="M4 16l5-5 3 3 7-7"/><path d="M16 7h4v4"/>' },
-      { k: 'budget',   active: AURIX_WS7_TOOL, viz: 'table',   icon: '<path d="M4 7h16v12H4z"/><path d="M4 11h16"/><circle cx="16" cy="15" r="1.3"/>' },
+      { k: 'budget',   active: AURIX_WS7_TOOL, viz: 'budget',  icon: '<path d="M4 7h16v12H4z"/><path d="M4 11h16"/><circle cx="16" cy="15" r="1.3"/>' },
       { k: 'journal',  active: false,          viz: 'journal', icon: '<path d="M6 4h11a1 1 0 0 1 1 1v15l-3-2-3 2-3-2-3 2V5a1 1 0 0 1 1-1z"/>' },
     ];
     panel = `
@@ -12418,10 +12449,16 @@ function _wsOpenTool(toolKey, projectId) {
   if (key === 'budget'   && !AURIX_WS7_TOOL) return;   // WS.7 gate
   _wsToolActive = key;
   if (projectId) {
+    // Open a saved project for editing (its inputs, tracked by edit id).
     const p = _ws4Projects().find(x => x && x.id === projectId);
     if (p && p.inputs) { _wsToolInputs = Object.assign(_wsToolDefaultsFor(key), p.inputs); _wsToolEditId = projectId; _wsToolDirty = false; }
     else { _wsToolInputs = _wsToolDefaultsFor(key); _wsToolEditId = null; _wsToolDirty = false; }
-  } else { _wsToolInputs = _wsToolDefaultsFor(key); _wsToolEditId = null; _wsToolDirty = false; }
+  } else {
+    // WS.7A — quick access: restore the tool's last local state (NOT a project).
+    const last = _wsToolStateGet(key);
+    _wsToolInputs = last ? Object.assign(_wsToolDefaultsFor(key), last) : _wsToolDefaultsFor(key);
+    _wsToolEditId = null; _wsToolDirty = false;
+  }
   _wshView = 'tool'; renderWorkspaceHome();
 }
 
@@ -12429,6 +12466,8 @@ function _wsToolOnInput(el) {
   if (!_wsToolInputs) return;
   _wsToolInputs[el.getAttribute('data-wstool-input')] = _wsNum(el.value);
   _wsToolDirty = true;
+  // WS.7A — keep the tool's last local state in sync; this never creates a project.
+  _wsToolStateSet(_wsToolActive, _wsToolInputs);
   const root = document.querySelector('.wsh-tool-view');
   const out = root && root.querySelector('[data-wstool-out]');
   if (out) out.innerHTML = _wsToolOutHtmlFor(_wsToolActive, _wsToolInputs);
@@ -12452,7 +12491,7 @@ function _wsToolSave() {
     results = { final: Math.round(r.final), contributed: Math.round(r.contributed), interest: Math.round(r.interest) };
   }
   const proj = {
-    id: existing ? existing.id : ('ws4_' + now),
+    id: existing ? existing.id : ('ws4_' + now + '_' + Math.random().toString(36).slice(2, 7)),
     type,
     customName: existing ? existing.customName : undefined,
     inputs: Object.assign({}, _wsToolInputs),
