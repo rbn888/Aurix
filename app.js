@@ -1974,6 +1974,25 @@ const T = {
     wsjrn_sum_best:    'Mejor operación',
     wsjrn_chart_title: 'Rentabilidad por operación',
     wsjrn_empty:       'Añade tu primera operación.',
+    // WS.9 — Goal Funding (Asignación de fondos)
+    wsfund_assigned:    'Fondos asignados',
+    wsfund_assign:      'Asignar fondos',
+    wsfund_add:         'Añadir',
+    wsfund_remove:      'Retirar',
+    wsfund_amount:      'Importe',
+    wsfund_note:        'Nota (opcional)',
+    wsfund_note_ph:     'Aportación mensual…',
+    wsfund_disclaimer:  'Esto no modifica tu patrimonio. Solo etiqueta parte de tu liquidez para este objetivo.',
+    wsfund_save:        'Guardar asignación',
+    wsfund_progress_by: 'Progreso por fondos asignados',
+    wsfund_last_lbl:    'Último movimiento',
+    wsfund_none:        'Sin movimientos todavía',
+    wsfund_mv_default:  'Movimiento',
+    wsfund_more:        n => `+${n} movimientos más`,
+    wsfund_today:       'Hoy',
+    wsfund_yesterday:   'Ayer',
+    wsfund_days_ago:    n => `Hace ${n} días`,
+    wsfund_updated:     'Fondos asignados actualizados',
     // WS.5C — delete confirm modal
     wsmodal_del_title: 'Eliminar elemento',
     wsmodal_del_text:  'Esta acción no se puede deshacer.',
@@ -3720,6 +3739,25 @@ const T = {
     wsjrn_sum_best:    'Best trade',
     wsjrn_chart_title: 'Return by trade',
     wsjrn_empty:       'Add your first trade.',
+    // WS.9 — Goal Funding
+    wsfund_assigned:    'Assigned funds',
+    wsfund_assign:      'Assign funds',
+    wsfund_add:         'Add',
+    wsfund_remove:      'Remove',
+    wsfund_amount:      'Amount',
+    wsfund_note:        'Note (optional)',
+    wsfund_note_ph:     'Monthly contribution…',
+    wsfund_disclaimer:  'This does not change your net worth. It only tags part of your liquidity for this goal.',
+    wsfund_save:        'Save assignment',
+    wsfund_progress_by: 'Progress by assigned funds',
+    wsfund_last_lbl:    'Last movement',
+    wsfund_none:        'No movements yet',
+    wsfund_mv_default:  'Movement',
+    wsfund_more:        n => `+${n} more movements`,
+    wsfund_today:       'Today',
+    wsfund_yesterday:   'Yesterday',
+    wsfund_days_ago:    n => `${n} days ago`,
+    wsfund_updated:     'Assigned funds updated',
     // WS.5C — delete confirm modal
     wsmodal_del_title: 'Delete item',
     wsmodal_del_text:  'This action cannot be undone.',
@@ -11230,7 +11268,7 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -11264,6 +11302,8 @@ function _wshWireOnce() {
     if (t.hasAttribute('data-wsjrn-add')) { _wsJrnAdd(); return; }
     const jAct = t.getAttribute('data-wsjrn-act'); if (jAct) { _wsJrnAct(jAct, t.getAttribute('data-wsjrn-id')); return; }
     if (t.hasAttribute('data-wsjrn-cancel')) { _wsJrnCancel(); return; }
+    // WS.9 — open the Goal Funding modal for a goal.
+    const fOpen = t.getAttribute('data-wsfund-open'); if (fOpen) { _wsFundModal(fOpen); return; }
     const ws4mode = t.getAttribute('data-ws4-mode');
     if (ws4mode) { _ws4SetMode(ws4mode); return; }
     const wsgMode = t.getAttribute('data-wsg-mode');
@@ -12407,6 +12447,121 @@ function _wsgCardOutHtml(g, prog) {
     <div class="ws4-reading">${esc(_wsgReading(g, prog))}</div>`;
 }
 
+// ── WS.9 — Goal Funding (Asignación de fondos) ───────────────────────────────
+// Tags part of the user's liquidity toward a goal. A Workspace-only ledger:
+// NEVER writes to portfolio / liquidez real / wealthEngine / Supabase.
+const _WSH_FUNDING_KEY = 'aurix_ws_goal_funding_v1';
+function _wsFundRead() { return _wshReadStore(_WSH_FUNDING_KEY); }
+function _wsFundSaveAll(list) { try { localStorage.setItem(_WSH_FUNDING_KEY, JSON.stringify(list)); } catch (_) {} }
+function _wsFundAdd(goalId, amount, type, note) {
+  const list = _wsFundRead();
+  list.push({ id: 'fnd_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), goalId, amount: Math.max(0, Number(amount) || 0), type: type === 'remove' ? 'remove' : 'add', note: note || '', createdAt: Date.now() });
+  _wsFundSaveAll(list);
+}
+function calculateGoalFunding(goalId) {
+  const all = _wsFundRead().filter(m => m && m.goalId === goalId);
+  // Sort most-recent first; tie-break by insertion order so equal timestamps are stable.
+  const movements = all.map((m, i) => ({ m, i })).sort((a, b) => ((b.m.createdAt || 0) - (a.m.createdAt || 0)) || (b.i - a.i)).map(x => x.m);
+  let net = 0;
+  for (const m of all) { const amt = Math.max(0, Number(m.amount) || 0); net += (m.type === 'remove' ? -amt : amt); }
+  let monthlyAverage = 0;
+  if (all.length) {
+    const times = all.map(m => m.createdAt || 0).filter(Boolean);
+    const span = times.length ? (Math.max.apply(null, times) - Math.min.apply(null, times)) : 0;
+    const months = Math.max(1, Math.round(span / (30 * 24 * 3600 * 1000)) || 1);
+    monthlyAverage = net / months;
+  }
+  return { totalAssigned: Math.max(0, net), lastMovement: movements[0] || null, movements, monthlyAverage: Math.max(0, monthlyAverage), movementCount: all.length };
+}
+function _wsFundAgo(ts) {
+  if (!ts) return '';
+  const days = Math.max(0, Math.floor((Date.now() - ts) / 86400000));
+  if (days === 0) return t('wsfund_today');
+  if (days === 1) return t('wsfund_yesterday');
+  return t('wsfund_days_ago')(days);
+}
+function _wsFundSignAmt(m) {
+  const esc = _intccEsc;
+  return (m.type === 'remove' ? '−' : '+') + esc(formatBase(Math.max(0, Number(m.amount) || 0)));
+}
+
+// Separate "Fondos asignados" block inside each goal card. Does NOT mix with the
+// patrimonial progress above; uses its own funding ledger + progress-by-funds.
+function _wsFundBlockHtml(g) {
+  const esc = _intccEsc;
+  const f = calculateGoalFunding(g.id);
+  const target = Math.max(0, Number(g.target) || 0);
+  const pct = target > 0 ? Math.max(0, Math.min(100, Math.round(f.totalAssigned / target * 100))) : 0;
+  const last = f.lastMovement;
+  const lastHtml = last
+    ? `<div class="wsfund-last"><span class="wsfund-last-lbl">${esc(t('wsfund_last_lbl'))}</span><span class="wsfund-last-amt is-${last.type === 'remove' ? 'neg' : 'pos'}">${_wsFundSignAmt(last)}</span><span class="wsfund-last-meta">${esc(_wsFundAgo(last.createdAt))}${last.note ? ' · ' + esc(last.note) : ''}</span></div>`
+    : `<div class="wsfund-last is-empty">${esc(t('wsfund_none'))}</div>`;
+  const hist = f.movements.slice(0, 3).map(m => `<li class="wsfund-mv"><span class="wsfund-mv-amt is-${m.type === 'remove' ? 'neg' : 'pos'}">${_wsFundSignAmt(m)}</span><span class="wsfund-mv-note">${esc(m.note || t('wsfund_mv_default'))}</span></li>`).join('');
+  const more = f.movementCount > 3 ? `<li class="wsfund-more">${esc(t('wsfund_more')(f.movementCount - 3))}</li>` : '';
+  return `
+    <div class="wsfund-block">
+      <div class="wsfund-head">
+        <span class="wsfund-title">${esc(t('wsfund_assigned'))}</span>
+        <span class="wsfund-amount">${esc(formatBase(f.totalAssigned))}</span>
+      </div>
+      <div class="wsfund-progress"><div class="wsfund-bar-track"><span class="wsfund-bar-fill" style="width:${pct}%"></span></div><span class="wsfund-pct">${pct}%</span></div>
+      <span class="wsfund-sub">${esc(t('wsfund_progress_by'))}</span>
+      ${lastHtml}
+      ${f.movementCount ? `<ul class="wsfund-list">${hist}${more}</ul>` : ''}
+      <button type="button" class="wsh-cta is-primary wsfund-btn" data-wsfund-open="${esc(g.id)}">${esc(t('wsfund_assign'))}</button>
+    </div>`;
+}
+
+function _wsgRerenderGoals() { const c = document.getElementById('aurixWorkspace'); if (c && _wshView === 'goals') { c.innerHTML = _renderGoals(); _wshReveal(c); } }
+
+function _wsFundToast() {
+  const prev = document.getElementById('wsFundToast'); if (prev) prev.remove();
+  const el = document.createElement('div'); el.id = 'wsFundToast'; el.className = 'wsfund-toast'; el.textContent = t('wsfund_updated');
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('is-on'));
+  setTimeout(() => { el.classList.remove('is-on'); setTimeout(() => { if (el.parentNode) el.remove(); }, 300); }, 2000);
+}
+
+// Aurix modal to assign/withdraw funds for a goal. Workspace-only ledger.
+function _wsFundModal(goalId) {
+  const esc = _intccEsc;
+  const prev = document.getElementById('wsFundModal'); if (prev) prev.remove();
+  const ov = document.createElement('div');
+  ov.id = 'wsFundModal'; ov.className = 'ws-modal-overlay';
+  ov.innerHTML = `
+    <div class="ws-modal wsfund-modal" role="dialog" aria-modal="true" aria-labelledby="wsFundTitle">
+      <h3 class="ws-modal-title" id="wsFundTitle">${esc(t('wsfund_assign'))}</h3>
+      <div class="wsfund-types" role="group">
+        <button type="button" class="wsfund-type is-active" data-wsfund-type="add">${esc(t('wsfund_add'))}</button>
+        <button type="button" class="wsfund-type" data-wsfund-type="remove">${esc(t('wsfund_remove'))}</button>
+      </div>
+      <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsfund_amount'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" id="wsFundAmount" value=""><span class="ws4-field-unit">€</span></span></label>
+      <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsfund_note'))}</span><input class="wsg-text" type="text" id="wsFundNote" placeholder="${esc(t('wsfund_note_ph'))}"></label>
+      <p class="wsfund-disclaimer">${esc(t('wsfund_disclaimer'))}</p>
+      <div class="ws-modal-actions">
+        <button type="button" class="ws-modal-btn is-cancel" data-wsfund="cancel">${esc(t('wsmodal_cancel'))}</button>
+        <button type="button" class="ws-modal-btn is-primary" data-wsfund="ok">${esc(t('wsfund_save'))}</button>
+      </div>
+    </div>`;
+  let type = 'add';
+  const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  ov.addEventListener('click', e => {
+    if (e.target === ov) { close(); return; }
+    const tb = e.target.closest ? e.target.closest('[data-wsfund-type]') : null;
+    if (tb) { type = tb.getAttribute('data-wsfund-type'); ov.querySelectorAll('[data-wsfund-type]').forEach(x => x.classList.toggle('is-active', x === tb)); return; }
+    const b = e.target.closest ? e.target.closest('[data-wsfund]') : null; if (!b) return;
+    if (b.getAttribute('data-wsfund') === 'ok') {
+      const amt = _wsNum((ov.querySelector('#wsFundAmount') || {}).value);
+      const note = ((ov.querySelector('#wsFundNote') || {}).value || '').trim();
+      if (amt > 0) { _wsFundAdd(goalId, amt, type, note); close(); _wsgRerenderGoals(); _wsFundToast(); } else { close(); }
+    } else { close(); }
+  });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => ov.classList.add('is-open'));
+}
+
 function _renderGoals() {
   const esc = _intccEsc;
   const goals = _wsgGoals();
@@ -12457,6 +12612,7 @@ function _renderGoals() {
           <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsg_f_monthly'))}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsg-input="monthly" data-wsg-id="${esc(g.id)}" value="${esc(g.monthly)}" min="0" step="50"><span class="ws4-field-unit">€</span></span></label>
         </div>
         <div class="wsg-out" data-wsg-out>${_wsgCardOutHtml(g, prog)}</div>
+        ${_wsFundBlockHtml(g)}
         <div class="wsg-card-foot">
           <div class="wsg-savebar" data-wsg-savebar>${_wsgSaveBarHtml(g.id)}</div>
           <div class="wsg-actions">
