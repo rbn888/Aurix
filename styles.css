@@ -20544,6 +20544,69 @@ body.gs-open { overflow: hidden; }
 .wsre-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 @media (max-width: 640px) { .wsre-form-grid { grid-template-columns: 1fr; } }
 
+/* ════════ WS.15 — Asset Price Tracker (petrol-blue trading table) ═══════════ */
+.wstool-result.wsap-result { grid-template-columns: 1.1fr 1.4fr; gap: 16px; }
+.wsap-result .wstool-res-main { border-color: rgba(47,143,158,0.32); background: radial-gradient(130% 150% at 82% 0%, rgba(79,179,196,0.18), transparent 60%), linear-gradient(165deg, rgba(20,52,60,0.55), rgba(12,20,30,0.62)); }
+.wsap-result .wstool-res-final { font-size: 40px; }
+.wsap-sum-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+/* ranking */
+.wsap-ranking { display: flex; flex-direction: column; gap: 8px; }
+.wsap-ranking-t { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(120,200,214,0.9); margin-bottom: 2px; }
+.wsap-rank-row { display: flex; align-items: center; gap: 10px; }
+.wsap-rank-t { width: 54px; flex: none; font-size: 12px; font-weight: 700; color: var(--text-bright); }
+.wsap-rank-track { flex: 1 1 auto; height: 9px; border-radius: 99px; background: rgba(255,255,255,0.05); overflow: hidden; }
+.wsap-rank-bar { display: block; height: 100%; border-radius: 99px; }
+.wsap-rank-bar.is-ganadora { background: linear-gradient(90deg, #2fd98e, #57e6a6); }
+.wsap-rank-bar.is-perdedora { background: linear-gradient(90deg, #c0392b, #f0897f); }
+.wsap-rank-bar.is-cerrada { background: rgba(120,160,255,0.4); }
+.wsap-rank-v { width: 56px; flex: none; text-align: right; font-size: 12.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.wsap-rank-v.is-win { color: #7ef0b8; } .wsap-rank-v.is-loss { color: #f0897f; }
+/* desktop table */
+.wsap-tablewrap { overflow-x: auto; }
+.wsap-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.wsap-table th { text-align: right; padding: 8px 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); border-bottom: 1px solid rgba(79,179,196,0.16); }
+.wsap-table th:first-child, .wsap-table td:first-child { text-align: left; }
+.wsap-table td { text-align: right; padding: 9px 10px; color: var(--text-bright); border-bottom: 1px solid rgba(120,160,255,0.07); }
+.wsap-table tr.is-ganadora td:first-child, .wsap-table tr.is-perdedora td:first-child { box-shadow: inset 3px 0 0 transparent; }
+.wsap-asset b { font-weight: 700; } .wsap-asset i { font-style: normal; color: var(--text-muted); margin-left: 6px; font-size: 11.5px; }
+.wsap-table td.is-win { color: #7ef0b8; font-weight: 700; } .wsap-table td.is-loss { color: #f0897f; font-weight: 700; } .wsap-table td.is-open { color: var(--text-muted); }
+.wsap-open-pill { font-size: 10.5px; font-weight: 700; color: #8fd3df; background: rgba(79,179,196,0.16); padding: 2px 8px; border-radius: 999px; }
+.wsap-row-acts { display: inline-flex; gap: 5px; }
+.wsap-cards { display: none; }
+/* form */
+.wsap-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.wsap-form-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.wsap-form-btns { display: flex; gap: 8px; margin-left: auto; }
+.wsap-prev { font-size: 13px; font-weight: 700; color: var(--text-muted); }
+.wsap-prev.is-ganadora { color: #7ef0b8; } .wsap-prev.is-perdedora { color: #f0897f; } .wsap-prev.is-abierta { color: #8fd3df; }
+/* Mi Espacio preview */
+.wspv-ap { gap: 8px; align-items: stretch; padding: 14px 16px; background: linear-gradient(165deg, rgba(47,143,158,0.16), rgba(255,255,255,0.012)); }
+.wspv-ap-top { display: flex; flex-direction: column; gap: 1px; }
+.wspv-ap-amt { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.wspv-ap-amt.is-win { color: #7ef0b8; } .wspv-ap-amt.is-loss { color: #f0897f; }
+.wspv-ap-lbl { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+.wspv-ap-foot { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); }
+.wspv-ap-foot .is-win { color: #7ef0b8; font-weight: 700; }
+@media (max-width: 920px) { .wstool-result.wsap-result { grid-template-columns: 1fr; } .wsap-form-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) {
+  .wsap-sum-grid { grid-template-columns: 1fr; }
+  .wsap-form-grid { grid-template-columns: 1fr 1fr; }
+  .wsap-tablewrap { display: none; }
+  .wsap-cards { display: flex; flex-direction: column; gap: 10px; }
+  .wsap-card { display: flex; flex-direction: column; gap: 9px; padding: 14px; border-radius: 13px; border: 1px solid rgba(79,179,196,0.16); background: rgba(255,255,255,0.022); border-left-width: 3px; }
+  .wsap-card.is-ganadora { border-left-color: #2fd98e; } .wsap-card.is-perdedora { border-left-color: #f0897f; } .wsap-card.is-abierta, .wsap-card.is-cerrada { border-left-color: rgba(120,160,255,0.45); }
+  .wsap-card-top { display: flex; justify-content: space-between; align-items: center; }
+  .wsap-card-a { font-size: 14px; font-weight: 800; color: var(--text-bright); }
+  .wsap-card-type { font-size: 11px; color: #8fd3df; }
+  .wsap-card-rows { display: flex; gap: 16px; }
+  .wsap-card-rows span { display: flex; flex-direction: column; gap: 1px; }
+  .wsap-card-rows i { font-size: 10px; text-transform: uppercase; color: var(--text-muted); font-style: normal; }
+  .wsap-card-rows b { font-size: 13px; font-weight: 700; color: var(--text-bright); font-variant-numeric: tabular-nums; }
+  .wsap-card-pl { display: flex; gap: 12px; font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .wsap-card-pl .is-win { color: #7ef0b8; } .wsap-card-pl .is-loss { color: #f0897f; }
+  .wsap-card-acts { display: flex; gap: 7px; }
+}
+
 /* ════════ WS.2 — Financial Tools Hub (dedicated tools) ═══════════════════════
    Premium interactive tools that open inside Workspace templates mode (never
    the Sheet). Encapsulated under ws2-* classes; responsive. */

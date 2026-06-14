@@ -2076,6 +2076,43 @@ const T = {
     wsloan_cmp_dyears:  'Diferencia plazo',
     wsloan_cmp_insight: (int, cuota) => `Ahorras ${int} en intereses a cambio de pagar ${cuota} más al mes.`,
     wsloan_cmp_insight_save: int => `Ahorras ${int} en intereses.`,
+    // WS.15 — Asset Price Tracker (Precios de activos)
+    wsap_sub:        'Registra precios de compra y venta y entiende tu resultado.',
+    wsap_save:       'Guardar seguimiento',
+    wsap_list_title: 'Activos',
+    wsap_ranking_title: 'Ranking de activos',
+    wsap_kpi_net:    'Resultado neto',
+    wsap_kpi_avg:    'Rentabilidad media',
+    wsap_kpi_open:   'Operaciones abiertas',
+    wsap_kpi_best:   'Mejor activo',
+    wsap_add:        'Nuevo activo',
+    wsap_add_btn:    'Añadir activo',
+    wsap_empty:      'Añade tu primer activo.',
+    wsap_c_asset:    'Activo',
+    wsap_c_type:     'Tipo',
+    wsap_c_buy:      'Compra',
+    wsap_c_sell:     'Venta',
+    wsap_c_qty:      'Cantidad',
+    wsap_c_result:   'Resultado',
+    wsap_f_name:     'Nombre activo',
+    wsap_f_type:     'Tipo activo',
+    wsap_f_ticker:   'Ticker',
+    wsap_f_buy:      'Precio compra',
+    wsap_f_sell:     'Precio venta',
+    wsap_f_qty:      'Cantidad',
+    wsap_f_fees:     'Comisiones',
+    wsap_f_ccy:      'Divisa',
+    wsap_f_notes:    'Notas',
+    wsap_t_stock:    'Acción',
+    wsap_t_etf:      'ETF',
+    wsap_t_crypto:   'Cripto',
+    wsap_t_fund:     'Fondo',
+    wsap_t_commodity:'Materia prima',
+    wsap_t_other:    'Otro',
+    wsap_st_abierta: 'Abierta',
+    wsap_st_ganadora:'Ganadora',
+    wsap_st_perdedora:'Perdedora',
+    wsap_st_cerrada: 'Cerrada',
     // WS.12 — Real Estate Portfolio Pro
     wsre_n:             'Portfolio Inmobiliario Pro',
     wsre_d:             'Gestiona tu cartera inmobiliaria completa.',
@@ -3979,6 +4016,43 @@ const T = {
     wsloan_cmp_dyears:  'Term difference',
     wsloan_cmp_insight: (int, cuota) => `You save ${int} in interest in exchange for paying ${cuota} more per month.`,
     wsloan_cmp_insight_save: int => `You save ${int} in interest.`,
+    // WS.15 — Asset Price Tracker
+    wsap_sub:        'Track buy and sell prices and understand your result.',
+    wsap_save:       'Save tracker',
+    wsap_list_title: 'Assets',
+    wsap_ranking_title: 'Asset ranking',
+    wsap_kpi_net:    'Net result',
+    wsap_kpi_avg:    'Average return',
+    wsap_kpi_open:   'Open positions',
+    wsap_kpi_best:   'Best asset',
+    wsap_add:        'New asset',
+    wsap_add_btn:    'Add asset',
+    wsap_empty:      'Add your first asset.',
+    wsap_c_asset:    'Asset',
+    wsap_c_type:     'Type',
+    wsap_c_buy:      'Buy',
+    wsap_c_sell:     'Sell',
+    wsap_c_qty:      'Quantity',
+    wsap_c_result:   'Result',
+    wsap_f_name:     'Asset name',
+    wsap_f_type:     'Asset type',
+    wsap_f_ticker:   'Ticker',
+    wsap_f_buy:      'Buy price',
+    wsap_f_sell:     'Sell price',
+    wsap_f_qty:      'Quantity',
+    wsap_f_fees:     'Fees',
+    wsap_f_ccy:      'Currency',
+    wsap_f_notes:    'Notes',
+    wsap_t_stock:    'Stock',
+    wsap_t_etf:      'ETF',
+    wsap_t_crypto:   'Crypto',
+    wsap_t_fund:     'Fund',
+    wsap_t_commodity:'Commodity',
+    wsap_t_other:    'Other',
+    wsap_st_abierta: 'Open',
+    wsap_st_ganadora:'Winning',
+    wsap_st_perdedora:'Losing',
+    wsap_st_cerrada: 'Closed',
     // WS.12 — Real Estate Portfolio Pro
     wsre_n:             'Real Estate Portfolio Pro',
     wsre_d:             'Manage your full real estate portfolio.',
@@ -11483,6 +11557,8 @@ const AURIX_WS12_TOOL = true;
 const AURIX_WS13_TOOL = true;
 // WS.14 ACTIVE — Loan Simulator Pro (Préstamos Pro).
 const AURIX_WS14_TOOL = true;
+// WS.15 ACTIVE — Asset Price Tracker (Precios de activos).
+const AURIX_WS15_TOOL = true;
 // WS.11A — Workspace is AUTONOMOUS: it must not auto-read Dashboard/portfolio/
 // liquidity/health/intelligence. The real-data bridges (_ws4Real / _wsbBaseline /
 // _wspInitialWealth) are DORMANT behind this flag; "Usar datos de Aurix" will be
@@ -11500,6 +11576,8 @@ let _wsReEditId    = null;   // WS.12 — property id being edited (null = addin
 let _wsReDetailId  = null;   // WS.12 — property detail open (null = portfolio main)
 let _wsRecvDraft   = null;   // WS.13 — in-progress add/edit receivable form
 let _wsRecvEditId  = null;   // WS.13 — receivable id being edited (null = adding new)
+let _wsApDraft     = null;   // WS.15 — in-progress add/edit asset row
+let _wsApEditId    = null;   // WS.15 — asset row id being edited (null = adding new)
 // WS.5A P5 — real save model (editar ≠ guardar). Working copies hold unsaved
 // edits; nothing persists until the user confirms "Guardar".
 let _wsgWorking = {};      // goalId -> working goal (unsaved edits)
@@ -11563,7 +11641,7 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp],[data-wsap-add],[data-wsap-act],[data-wsap-cancel]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -11616,6 +11694,10 @@ function _wshWireOnce() {
     if (t.hasAttribute('data-wsrecv-cancel')) { _wsRecvCancel(); return; }
     // WS.14 — Loan comparator toggle.
     if (t.hasAttribute('data-wsloan-cmp')) { _wsLoanCmpToggle(); return; }
+    // WS.15 — Asset Prices: add/save, per-row act, cancel.
+    if (t.hasAttribute('data-wsap-add')) { _wsApAdd(); return; }
+    const apAct = t.getAttribute('data-wsap-act'); if (apAct) { _wsApAct(apAct, t.getAttribute('data-wsap-id')); return; }
+    if (t.hasAttribute('data-wsap-cancel')) { _wsApCancel(); return; }
     // WS.9 — open the Goal Funding modal for a goal.
     const fOpen = t.getAttribute('data-wsfund-open'); if (fOpen) { _wsFundModal(fOpen); return; }
     const ws4mode = t.getAttribute('data-ws4-mode');
@@ -11639,6 +11721,7 @@ function _wshWireOnce() {
     if (el.getAttribute('data-wsre-input')) { _wsReOnInput(el); return; }
     if (el.getAttribute('data-wsrecv-input')) { _wsRecvOnInput(el); return; }
     if (el.getAttribute('data-wsloan-cmp-input')) { _wsLoanCmpInput(el); return; }
+    if (el.getAttribute('data-wsap-input')) { _wsApOnInput(el); return; }
   });
   // WS.12 — property photo upload (file input → downscaled data URL).
   document.addEventListener('change', e => { const el = e.target; if (el && el.getAttribute && el.hasAttribute('data-wsre-photo')) _wsRePhoto(el); });
@@ -11912,6 +11995,7 @@ function _wsTypeLabel(type) {
   if (type === 'real_estate_portfolio') return t('wsre_n');
   if (type === 'receivables_app') return t('wsapp_receivables_n');
   if (type === 'loan_simulation') return t('wsloan_n');
+  if (type === 'asset_prices') return t('wsapp_assets_n');
   return t('wsh_ws_' + type);
 }
 function _wsLabel(kind, item) {
@@ -11931,7 +12015,7 @@ const _WS_APP_IDENTITY = {
   real_estate_portfolio: { type: 'app',  category: 'realestate', visualTone: 'physical-assets',  accentColor: 'gold',     previewType: 'property-photo',   layoutType: 'tool', canPin: true, canSaveToSpace: true,  isDailyUse: true,  premiumTier: 'free' },
   trade_journal:         { type: 'app',  category: 'investing',  visualTone: 'trading-desk',     accentColor: 'graphite', previewType: 'trades',           layoutType: 'tool', canPin: true, canSaveToSpace: true,  isDailyUse: true,  premiumTier: 'free' },
   receivables:           { type: 'app',  category: 'operations', visualTone: 'payment-control',  accentColor: 'bordeaux', previewType: 'receivables-list', layoutType: 'tool', canPin: true, canSaveToSpace: true,  isDailyUse: true,  premiumTier: 'free' },
-  asset_prices:          { type: 'app',  category: 'investing',  visualTone: 'market-watch',     accentColor: 'blue',     previewType: 'price-table',      layoutType: 'tool', canPin: true, canSaveToSpace: true,  isDailyUse: true,  premiumTier: 'free' },
+  asset_prices:          { type: 'app',  category: 'investment',  visualTone: 'portfolio-tracking', accentColor: 'petrol-blue', previewType: 'asset-table',   layoutType: 'tracker', canPin: true, canSaveToSpace: true,  isDailyUse: true,  premiumTier: 'core' },
   compound_growth:       { type: 'tool', category: 'planning',   visualTone: 'future-growth',    accentColor: 'blue',     previewType: 'growth-curve',     layoutType: 'tool', canPin: true, canSaveToSpace: true,  isDailyUse: false, premiumTier: 'free' },
   scenario:              { type: 'tool', category: 'planning',   visualTone: 'comparison',       accentColor: 'violet',   previewType: 'compare',          layoutType: 'view', canPin: true, canSaveToSpace: false, isDailyUse: false, premiumTier: 'free' },
   goal:                  { type: 'tool', category: 'planning',   visualTone: 'milestones',       accentColor: 'amber',    previewType: 'progress',         layoutType: 'view', canPin: true, canSaveToSpace: true,  isDailyUse: true,  premiumTier: 'free' },
@@ -11985,13 +12069,13 @@ function _wsPinOpen(ref) {
 // pinned/active tool restores this; editing inputs updates it; only "Guardar
 // proyecto" creates a real project in aurix_ws_projects_v1.
 const _WSH_TOOL_STATE_KEY = 'aurix_ws_tool_state_v1';
-function _wsToolStateType(key) { return key === 'budget' ? 'monthly_budget' : key === 'journal' ? 'trade_journal' : key === 'realestate' ? 'real_estate_portfolio' : key === 'receivables' ? 'receivables_app' : key === 'loan' ? 'loan_simulation' : 'compound_growth'; }
+function _wsToolStateType(key) { return key === 'budget' ? 'monthly_budget' : key === 'journal' ? 'trade_journal' : key === 'realestate' ? 'real_estate_portfolio' : key === 'receivables' ? 'receivables_app' : key === 'loan' ? 'loan_simulation' : key === 'assets' ? 'asset_prices' : 'compound_growth'; }
 function _wsToolStateRead() { try { const raw = localStorage.getItem(_WSH_TOOL_STATE_KEY); const v = raw ? JSON.parse(raw) : {}; return (v && typeof v === 'object') ? v : {}; } catch (_) { return {}; } }
 function _wsToolStateGet(key) { const v = _wsToolStateRead()[_wsToolStateType(key)]; return (v && typeof v === 'object') ? v : null; }
 function _wsToolStateSet(key, inputs) { const s = _wsToolStateRead(); s[_wsToolStateType(key)] = Object.assign({}, inputs); try { localStorage.setItem(_WSH_TOOL_STATE_KEY, JSON.stringify(s)); } catch (_) {} }
 
 // WS.7A — mini-preview viz selection for Mi Espacio cards (reuses _wsTplViz).
-const _WS_TYPE_VIZ = { budget: 'budget', monthly_budget: 'budget', networth: 'donut', investment: 'bars', property: 'house', business: 'bars', fire: 'curve', compound_growth: 'curve', trade_journal: 'journal', real_estate_portfolio: 'house', receivables_app: 'table', loan_simulation: 'donut' };
+const _WS_TYPE_VIZ = { budget: 'budget', monthly_budget: 'budget', networth: 'donut', investment: 'bars', property: 'house', business: 'bars', fire: 'curve', compound_growth: 'curve', trade_journal: 'journal', real_estate_portfolio: 'house', receivables_app: 'table', loan_simulation: 'donut', asset_prices: 'table' };
 function _wsRefViz(ref) {
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), key = ref.slice(i + 1);
   if (kind === 'tool') return key === 'budget' ? 'budget' : key === 'journal' ? 'journal' : 'curve';
@@ -12153,6 +12237,10 @@ function _wsProjPreviewHtml(p) {
     const pct = r.porcentajeCobrado != null ? Math.max(0, Math.min(100, r.porcentajeCobrado)) : 0;
     return `<div class="wspv wspv-recvw"><div class="wspv-recvw-top"><span class="wspv-recvw-amt">${esc(formatBase(r.totalPendiente || 0))}</span><span class="wspv-recvw-lbl">${esc(t('wsrecv_kpi_pending'))}</span></div><div class="wspv-recvw-bar"><span class="wspv-recvw-fill" style="width:${pct}%"></span></div><div class="wspv-recvw-foot"><span>${(r.count != null ? r.count : 0)} · ${pct}% ${esc(t('wsrecv_kpi_collected').toLowerCase())}</span>${r.totalVencido ? `<span class="is-overdue">${esc(formatBase(r.totalVencido))} ${esc(t('wsrecv_st_vencido').toLowerCase())}</span>` : ''}</div></div>`;
   }
+  if (p.type === 'asset_prices') {
+    const np = r.netProfitLoss || 0;
+    return `<div class="wspv wspv-ap"><div class="wspv-ap-top"><span class="wspv-ap-amt is-${np >= 0 ? 'win' : 'loss'}">${esc((np >= 0 ? '+' : '') + formatBase(np))}</span><span class="wspv-ap-lbl">${esc(t('wsap_kpi_net'))}</span></div><div class="wspv-ap-foot"><span>${(r.openCount != null ? r.openCount : 0)} ${esc(t('wsap_kpi_open').toLowerCase())}</span>${r.bestName ? `<span class="is-win">${esc(r.bestName)} ${esc((r.bestPct >= 0 ? '+' : '') + r.bestPct)}%</span>` : ''}</div></div>`;
+  }
   if (p.type === 'loan_simulation') {
     const sep = (typeof lang !== 'undefined' && lang === 'en') ? '.' : ',';
     return `<div class="wspv wspv-loan"><div class="wspv-loan-top"><span class="wspv-loan-amt">${esc(formatBase(r.monthlyPayment || 0))}${esc(t('wsre_permonth'))}</span><span class="wspv-loan-lbl">${esc(t('wsloan_kpi_monthly'))}</span></div><div class="wspv-loan-foot"><span>${esc(t('wsloan_kpi_interest'))} ${esc(formatBase(r.totalInterest || 0))}</span><span>${esc(String((r.annual != null ? r.annual : 0)).replace('.', sep))}%</span></div></div>`;
@@ -12184,7 +12272,7 @@ function _wsxOpen(ref) {
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
   if (kind === 'goal') { _wshView = 'goals'; renderWorkspaceHome(); }
   else if (kind === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); }
-  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else if (p.type === 'monthly_budget') { _wsOpenTool('budget', id); } else if (p.type === 'trade_journal') { _wsOpenTool('journal', id); } else if (p.type === 'real_estate_portfolio') { _wsOpenTool('realestate', id); } else if (p.type === 'receivables_app') { _wsOpenTool('receivables', id); } else if (p.type === 'loan_simulation') { _wsOpenTool('loan', id); } else { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
+  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else if (p.type === 'monthly_budget') { _wsOpenTool('budget', id); } else if (p.type === 'trade_journal') { _wsOpenTool('journal', id); } else if (p.type === 'real_estate_portfolio') { _wsOpenTool('realestate', id); } else if (p.type === 'receivables_app') { _wsOpenTool('receivables', id); } else if (p.type === 'loan_simulation') { _wsOpenTool('loan', id); } else if (p.type === 'asset_prices') { _wsOpenTool('assets', id); } else { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
 }
 function _wsxAct(act, ref) {
   if (!ref) return;
@@ -12320,7 +12408,7 @@ function _renderWorkspaceHome(metrics) {
     // WS.12 (v2) — single premium gallery, priority order. FIRE/abstract last.
     const gallery = [
       { cta: 'tool',     arg: 'budget',     ref: 'tpl:mbudget',    cat: 'budget',         name: t('wstool_budget_n') },
-      { cta: 'soon',     ref: 'tpl:assets',      cat: 'assets',         name: t('wsapp_assets_n') },
+      { cta: 'tool',     arg: 'assets',      ref: 'tpl:assets',     cat: 'assets',         name: t('wsapp_assets_n') },
       { cta: 'tool',     arg: 'receivables', ref: 'tpl:receivables', cat: 'receivables', name: t('wsapp_receivables_n') },
       { cta: 'tool',     arg: 'realestate', ref: 'tpl:realestate', cat: 'realestate-pro', name: t('wsre_n') },
       { cta: 'goals',    ref: 'tpl:goals',       cat: 'goals',          name: t('wsg_title') },
@@ -13354,22 +13442,24 @@ function _wsToolDefaults() {
 
 // WS.7 — tool registry: maps a tool key to its gate, defaults, project type and
 // renderer so the shared open/input/save plumbing stays tool-agnostic.
-function _wsToolDefaultsFor(key) { return key === 'budget' ? _wsBudgetDefaults() : key === 'journal' ? _wsJournalDefaults() : key === 'realestate' ? _wsReDefaults() : key === 'receivables' ? _wsReceivablesDefaults() : key === 'loan' ? _wsLoanDefaults() : _wsToolDefaults(); }
-function _wsRenderTool() { return _wsToolActive === 'budget' ? _renderBudgetTool() : _wsToolActive === 'journal' ? _renderJournalTool() : _wsToolActive === 'realestate' ? _renderRealEstateTool() : _wsToolActive === 'receivables' ? _renderReceivablesTool() : _wsToolActive === 'loan' ? _renderLoanTool() : _renderCompoundTool(); }
+function _wsToolDefaultsFor(key) { return key === 'budget' ? _wsBudgetDefaults() : key === 'journal' ? _wsJournalDefaults() : key === 'realestate' ? _wsReDefaults() : key === 'receivables' ? _wsReceivablesDefaults() : key === 'loan' ? _wsLoanDefaults() : key === 'assets' ? _wsAssetPricesDefaults() : _wsToolDefaults(); }
+function _wsRenderTool() { return _wsToolActive === 'budget' ? _renderBudgetTool() : _wsToolActive === 'journal' ? _renderJournalTool() : _wsToolActive === 'realestate' ? _renderRealEstateTool() : _wsToolActive === 'receivables' ? _renderReceivablesTool() : _wsToolActive === 'loan' ? _renderLoanTool() : _wsToolActive === 'assets' ? _renderAssetPricesTool() : _renderCompoundTool(); }
 function _wsToolOutHtmlFor(key, inp) { return key === 'budget' ? _wsBudgetOutHtml(inp) : key === 'loan' ? _wsLoanOutHtml(inp) : _wsToolOutHtml(inp); }
 
 function _wsOpenTool(toolKey, projectId) {
-  const key = (toolKey === 'budget' || toolKey === 'journal' || toolKey === 'realestate' || toolKey === 'receivables' || toolKey === 'loan') ? toolKey : 'compound';
+  const key = (toolKey === 'budget' || toolKey === 'journal' || toolKey === 'realestate' || toolKey === 'receivables' || toolKey === 'loan' || toolKey === 'assets') ? toolKey : 'compound';
   if (key === 'compound'    && !AURIX_WS6_TOOL) return;   // WS.6 gate
   if (key === 'budget'      && !AURIX_WS7_TOOL) return;   // WS.7 gate
   if (key === 'journal'     && !AURIX_WS8_TOOL) return;   // WS.8 gate
   if (key === 'realestate'  && !AURIX_WS12_TOOL) return;  // WS.12 gate
   if (key === 'receivables' && !AURIX_WS13_TOOL) return;  // WS.13 gate
   if (key === 'loan'        && !AURIX_WS14_TOOL) return;  // WS.14 gate
+  if (key === 'assets'      && !AURIX_WS15_TOOL) return;  // WS.15 gate
   _wsToolActive = key;
   _wsJrnDraft = (key === 'journal') ? _wsJrnNewDraft() : null; _wsJrnEditId = null;  // reset trade form
   _wsReDraft = (key === 'realestate') ? _wsReNewDraft() : null; _wsReEditId = null; _wsReDetailId = null;  // reset property form/detail
   _wsRecvDraft = (key === 'receivables') ? _wsRecvNewDraft() : null; _wsRecvEditId = null;  // reset receivable form
+  _wsApDraft = (key === 'assets') ? _wsApNewDraft() : null; _wsApEditId = null;  // reset asset form
   if (projectId) {
     // Open a saved project for editing (its inputs, tracked by edit id).
     const p = _ws4Projects().find(x => x && x.id === projectId);
@@ -13403,7 +13493,11 @@ function _wsToolSave() {
   const list = _ws4Projects();
   const existing = _wsToolEditId ? list.find(p => p && p.id === _wsToolEditId) : null;
   let type, results;
-  if (_wsToolActive === 'loan') {
+  if (_wsToolActive === 'assets') {
+    const r = calculateAssetPrices(_wsToolInputs.rows);
+    type = 'asset_prices';
+    results = { count: r.count, netProfitLoss: Math.round(r.netProfitLoss), averageReturnPct: Math.round(r.averageReturnPct * 10) / 10, openCount: r.openCount, bestName: r.best ? r.best.assetName : '', bestPct: r.best ? Math.round(r.best.returnPct) : null };
+  } else if (_wsToolActive === 'loan') {
     const r = calculateLoan(_wsToolInputs);
     type = 'loan_simulation';
     results = { monthlyPayment: Math.round(r.monthlyPayment), totalInterest: Math.round(r.totalInterest), totalPaid: Math.round(r.totalPaid), principal: Math.round(r.principal), annual: r.annual, years: r.years };
@@ -13447,7 +13541,7 @@ function _wsToolSaveBarHtml() {
   const state = _wsToolEditId ? (_wsToolDirty ? 'dirty' : 'saved') : 'unsaved';
   const lbl = { unsaved: t('wsg_save_unsaved'), dirty: t('wsg_save_pending'), saved: t('wsg_save_done') }[state];
   const canSave = !_wsToolEditId || _wsToolDirty;
-  const saveLabel = _wsToolActive === 'journal' ? t('wstool_save_journal') : _wsToolActive === 'realestate' ? t('wsre_save') : _wsToolActive === 'receivables' ? t('wsrecv_save') : _wsToolActive === 'loan' ? t('wsloan_save') : t('wstool_save');
+  const saveLabel = _wsToolActive === 'journal' ? t('wstool_save_journal') : _wsToolActive === 'realestate' ? t('wsre_save') : _wsToolActive === 'receivables' ? t('wsrecv_save') : _wsToolActive === 'loan' ? t('wsloan_save') : _wsToolActive === 'assets' ? t('wsap_save') : t('wstool_save');
   return `
     <span class="wsg-savestate is-${state}">${esc(lbl)}</span>
     <button type="button" class="wsh-cta is-primary wsg-savebtn" data-wstool-save${canSave ? '' : ' disabled'}>${esc(saveLabel)}</button>`;
@@ -14591,6 +14685,197 @@ function _renderLoanTool() {
         <div class="wsloan-out" data-wstool-out>${_wsLoanOutHtml(inp)}</div>
       </section>
       <section class="wsh-card wsloan-cmp-card" data-wsloan-cmp-card>${_wsLoanCmpInner(inp)}</section>
+      <section class="wsh-card wsg-foot-card">
+        <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
+      </section>
+    </div>`;
+}
+
+// ── WS.15 — Asset Price Tracker (Precios de activos) ─────────────────────────
+// Manual buy/sell price tracking (stocks/ETF/crypto/funds/commodities). Pure,
+// deterministic, no APIs/Market/live prices/real portfolio. Distinct from the
+// Trade Journal (narrative) — this is a practical price/result table.
+const _WSAP_TYPES = ['stock', 'etf', 'crypto', 'fund', 'commodity', 'other'];
+function calculateAssetPrices(rows) {
+  const list = (Array.isArray(rows) ? rows : []).map(rw => {
+    const qty = Math.max(0, Number(rw.quantity) || 0);
+    const buy = Math.max(0, Number(rw.buyPrice) || 0);
+    const fees = Math.max(0, Number(rw.fees) || 0);
+    const sellEmpty = (rw.sellPrice === '' || rw.sellPrice == null);
+    const sell = sellEmpty ? null : Math.max(0, Number(rw.sellPrice) || 0);
+    const investment = buy * qty + fees;
+    const open = sellEmpty;
+    let saleValue = null, profitLoss = null, returnPct = null, status = 'abierta';
+    if (!open) { saleValue = sell * qty; profitLoss = saleValue - investment; returnPct = investment > 0 ? profitLoss / investment * 100 : 0; status = profitLoss > 0 ? 'ganadora' : (profitLoss < 0 ? 'perdedora' : 'cerrada'); }
+    return Object.assign({}, rw, { qty, buy, fees, sell, investment, saleValue, profitLoss, returnPct, status, open });
+  });
+  const closed = list.filter(x => !x.open);
+  let best = null, worst = null;
+  for (const x of closed) { if (best === null || x.returnPct > best.returnPct) best = x; if (worst === null || x.returnPct < worst.returnPct) worst = x; }
+  return {
+    list, count: list.length,
+    totalInvested: list.reduce((s, x) => s + x.investment, 0),
+    totalSaleValue: closed.reduce((s, x) => s + x.saleValue, 0),
+    netProfitLoss: closed.reduce((s, x) => s + x.profitLoss, 0),
+    averageReturnPct: closed.length ? closed.reduce((s, x) => s + x.returnPct, 0) / closed.length : 0,
+    winningCount: closed.filter(x => x.profitLoss > 0).length,
+    losingCount: closed.filter(x => x.profitLoss < 0).length,
+    openCount: list.filter(x => x.open).length,
+    best, worst,
+  };
+}
+function _wsApNewDraft() { return { assetName: '', assetType: 'stock', ticker: '', buyPrice: '', sellPrice: '', quantity: '', fees: '', currency: 'EUR', notes: '' }; }
+function _wsApDemo() {
+  return [
+    { id: 'ap_d1', assetName: 'Bitcoin', assetType: 'crypto', ticker: 'BTC', buyPrice: 52000, sellPrice: 61000, quantity: 0.1, fees: 20, currency: 'EUR', notes: '' },
+    { id: 'ap_d2', assetName: 'NVIDIA', assetType: 'stock', ticker: 'NVDA', buyPrice: 90, sellPrice: 119, quantity: 20, fees: 5, currency: 'EUR', notes: '' },
+    { id: 'ap_d3', assetName: 'S&P 500', assetType: 'etf', ticker: 'SPY', buyPrice: 480, sellPrice: 455, quantity: 8, fees: 3, currency: 'EUR', notes: '' },
+    { id: 'ap_d4', assetName: 'Ethereum', assetType: 'crypto', ticker: 'ETH', buyPrice: 3000, sellPrice: '', quantity: 1, fees: 0, currency: 'EUR', notes: '' },
+  ];
+}
+function _wsAssetPricesDefaults() { return { rows: _wsApDemo() }; }
+function _wsApRows() { if (!_wsToolInputs || !Array.isArray(_wsToolInputs.rows)) _wsToolInputs = _wsAssetPricesDefaults(); return _wsToolInputs.rows; }
+function _wsApRerender() { const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderAssetPricesTool(); _wshReveal(c); } }
+function _wsApOnInput(el) {
+  if (!_wsApDraft) _wsApDraft = _wsApNewDraft();
+  _wsApDraft[el.getAttribute('data-wsap-input')] = el.value;
+  const root = document.querySelector('.wsh-tool-view');
+  const pv = root && root.querySelector('[data-wsap-pv]');
+  if (pv) pv.innerHTML = _wsApPreviewLine(_wsApDraft);
+}
+function _wsApPreviewLine(d) {
+  const esc = _intccEsc;
+  const one = calculateAssetPrices([d]).list[0];
+  if (!one || (one.buy <= 0 && one.qty <= 0)) return '';
+  if (one.open) return `<span class="wsap-prev is-abierta">${esc(t('wsap_st_abierta'))} · ${esc(formatBase(one.investment))}</span>`;
+  return `<span class="wsap-prev is-${one.status}">${esc((one.profitLoss >= 0 ? '+' : '') + formatBase(one.profitLoss))} · ${esc(_wsJrnPct(one.returnPct))}</span>`;
+}
+function _wsApAdd() {
+  const d = _wsApDraft || _wsApNewDraft();
+  const name = (d.assetName || '').trim();
+  if (!name && _wsNum(d.buyPrice) <= 0) return;
+  const now = Date.now();
+  const sellRaw = (d.sellPrice == null ? '' : String(d.sellPrice)).trim();
+  const row = {
+    id: _wsApEditId || ('ap_' + now + '_' + Math.random().toString(36).slice(2, 6)),
+    assetName: name || (d.ticker || '—'), assetType: d.assetType || 'stock', ticker: (d.ticker || '').trim().toUpperCase(),
+    buyPrice: _wsNum(d.buyPrice), sellPrice: sellRaw === '' ? '' : _wsNum(sellRaw), quantity: _wsNum(d.quantity), fees: _wsNum(d.fees),
+    currency: d.currency || 'EUR', notes: (d.notes || '').trim(), createdAt: now, updatedAt: now,
+  };
+  const list = _wsApRows();
+  if (_wsApEditId) { const i = list.findIndex(x => x && x.id === _wsApEditId); if (i >= 0) { row.createdAt = list[i].createdAt || now; list[i] = row; } else list.push(row); }
+  else list.push(row);
+  _wsToolInputs.rows = list; _wsToolDirty = true; _wsToolStateSet('assets', _wsToolInputs);
+  _wsApDraft = _wsApNewDraft(); _wsApEditId = null;
+  _wsApRerender();
+}
+function _wsApAct(act, id) {
+  const list = _wsApRows();
+  const rw = list.find(x => x && x.id === id); if (!rw) return;
+  if (act === 'edit') {
+    _wsApEditId = id;
+    _wsApDraft = { assetName: rw.assetName, assetType: rw.assetType, ticker: rw.ticker, buyPrice: String(rw.buyPrice || ''), sellPrice: rw.sellPrice === '' ? '' : String(rw.sellPrice), quantity: String(rw.quantity || ''), fees: String(rw.fees || ''), currency: rw.currency || 'EUR', notes: rw.notes || '' };
+    _wsApRerender(); return;
+  }
+  if (act === 'dup') { list.push(Object.assign({}, rw, { id: 'ap_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) })); _wsToolDirty = true; _wsToolStateSet('assets', _wsToolInputs); _wsApRerender(); return; }
+  if (act === 'del') {
+    _wsConfirm(() => {
+      const i = list.findIndex(x => x && x.id === id); if (i >= 0) list.splice(i, 1);
+      if (_wsApEditId === id) { _wsApEditId = null; _wsApDraft = _wsApNewDraft(); }
+      _wsToolDirty = true; _wsToolStateSet('assets', _wsToolInputs); _wsApRerender();
+    });
+  }
+}
+function _wsApCancel() { _wsApEditId = null; _wsApDraft = _wsApNewDraft(); _wsApRerender(); }
+
+function _wsApSummaryHtml(r) {
+  const esc = _intccEsc;
+  const npCls = r.netProfitLoss >= 0 ? 'is-pos' : 'is-neg';
+  const best = r.best ? `${r.best.ticker || r.best.assetName} ${_wsJrnPct(r.best.returnPct)}` : '—';
+  const hasClosed = r.count - r.openCount > 0;
+  return `
+    <div class="wsap-summary">
+      <div class="wstool-result wsap-result">
+        <div class="wstool-res-main"><span class="wstool-res-label">${esc(t('wsap_kpi_net'))}</span><span class="wstool-res-final ${npCls}">${esc((r.netProfitLoss >= 0 ? '+' : '') + formatBase(r.netProfitLoss))}</span></div>
+        <div class="wsap-sum-grid">
+          <div class="wstool-res-cell"><span class="wstool-res-v ${r.averageReturnPct >= 0 ? 'is-up' : 'is-down'}">${esc(hasClosed ? _wsJrnPct(r.averageReturnPct) : '—')}</span><span class="wstool-res-k">${esc(t('wsap_kpi_avg'))}</span></div>
+          <div class="wstool-res-cell"><span class="wstool-res-v">${r.openCount}</span><span class="wstool-res-k">${esc(t('wsap_kpi_open'))}</span></div>
+          <div class="wstool-res-cell is-gain"><span class="wstool-res-v">${esc(best)}</span><span class="wstool-res-k">${esc(t('wsap_kpi_best'))}</span></div>
+        </div>
+      </div>
+    </div>`;
+}
+function _wsApRankingHtml(r) {
+  const esc = _intccEsc;
+  const closed = r.list.filter(x => !x.open);
+  if (!closed.length) return '';
+  const maxAbs = Math.max.apply(null, closed.map(x => Math.abs(x.returnPct)).concat([1]));
+  const rows = closed.slice().sort((a, b) => b.returnPct - a.returnPct).map(x => {
+    const w = Math.max(4, Math.abs(x.returnPct) / maxAbs * 100);
+    return `<div class="wsap-rank-row"><span class="wsap-rank-t">${esc(x.ticker || String(x.assetName).slice(0, 6))}</span><div class="wsap-rank-track"><span class="wsap-rank-bar is-${x.status}" style="width:${w.toFixed(0)}%"></span></div><span class="wsap-rank-v is-${x.profitLoss >= 0 ? 'win' : 'loss'}">${esc(_wsJrnPct(x.returnPct))}</span></div>`;
+  }).join('');
+  return `<div class="wsap-ranking"><span class="wsap-ranking-t">${esc(t('wsap_ranking_title'))}</span>${rows}</div>`;
+}
+function _wsApTypeLabel(at) { return t('wsap_t_' + at) || t('wsap_t_other'); }
+function _wsApRowsHtml(r) {
+  const esc = _intccEsc;
+  if (!r.list.length) return `<p class="wsh-empty">${esc(t('wsap_empty'))}</p>`;
+  const head = `<tr><th>${esc(t('wsap_c_asset'))}</th><th>${esc(t('wsap_c_type'))}</th><th>${esc(t('wsap_c_buy'))}</th><th>${esc(t('wsap_c_sell'))}</th><th>${esc(t('wsap_c_qty'))}</th><th>${esc(t('wsap_c_result'))}</th><th>%</th><th></th></tr>`;
+  const acts = id => `<span class="wsap-row-acts"><button type="button" class="wsre-mini" data-wsap-act="edit" data-wsap-id="${esc(id)}" aria-label="${esc(t('wsjrn_edit'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M14 6l4 4"/></svg></button><button type="button" class="wsre-mini" data-wsap-act="dup" data-wsap-id="${esc(id)}" aria-label="${esc(t('wsg_act_dup'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg></button><button type="button" class="wsre-mini is-danger" data-wsap-act="del" data-wsap-id="${esc(id)}" aria-label="${esc(t('wsg_act_del'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/></svg></button></span>`;
+  const trs = r.list.map(x => `<tr class="is-${x.status}"><td class="wsap-asset"><b>${esc(x.assetName)}</b>${x.ticker ? `<i>${esc(x.ticker)}</i>` : ''}</td><td>${esc(_wsApTypeLabel(x.assetType))}</td><td>${esc(formatBase(x.buy))}</td><td>${x.open ? '—' : esc(formatBase(x.sell))}</td><td>${esc(String(x.qty))}</td><td class="is-${x.open ? 'open' : (x.profitLoss >= 0 ? 'win' : 'loss')}">${x.open ? '—' : esc((x.profitLoss >= 0 ? '+' : '') + formatBase(x.profitLoss))}</td><td class="is-${x.open ? 'open' : (x.profitLoss >= 0 ? 'win' : 'loss')}">${x.open ? '<span class="wsap-open-pill">' + esc(t('wsap_st_abierta')) + '</span>' : esc(_wsJrnPct(x.returnPct))}</td><td>${acts(x.id)}</td></tr>`).join('');
+  const cards = r.list.map(x => `<div class="wsap-card is-${x.status}"><div class="wsap-card-top"><span class="wsap-card-a">${esc(x.assetName)}${x.ticker ? ` · ${esc(x.ticker)}` : ''}</span><span class="wsap-card-type">${esc(_wsApTypeLabel(x.assetType))}</span></div><div class="wsap-card-rows"><span><i>${esc(t('wsap_c_buy'))}</i><b>${esc(formatBase(x.buy))}</b></span><span><i>${esc(t('wsap_c_sell'))}</i><b>${x.open ? '—' : esc(formatBase(x.sell))}</b></span><span><i>${esc(t('wsap_c_qty'))}</i><b>${esc(String(x.qty))}</b></span></div><div class="wsap-card-pl">${x.open ? `<span class="wsap-open-pill">${esc(t('wsap_st_abierta'))}</span>` : `<span class="is-${x.profitLoss >= 0 ? 'win' : 'loss'}">${esc((x.profitLoss >= 0 ? '+' : '') + formatBase(x.profitLoss))}</span><span class="is-${x.profitLoss >= 0 ? 'win' : 'loss'}">${esc(_wsJrnPct(x.returnPct))}</span>`}</div><div class="wsap-card-acts">${acts(x.id)}</div></div>`).join('');
+  return `<div class="wsap-tablewrap"><table class="wsap-table"><thead>${head}</thead><tbody>${trs}</tbody></table></div><div class="wsap-cards">${cards}</div>`;
+}
+function _wsApFormHtml() {
+  const esc = _intccEsc;
+  const d = _wsApDraft || _wsApNewDraft();
+  const editing = !!_wsApEditId;
+  const txt = (k, label) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" autocomplete="off" data-wsap-input="${k}" value="${esc(d[k] != null ? d[k] : '')}"></span></label>`;
+  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsap-input="${k}" value="${esc(_wsFormatInputNumber(d[k] != null ? d[k] : ''))}"><span class="ws4-field-unit">${esc(unit || '')}</span></span></label>`;
+  const typeOpts = _WSAP_TYPES.map(ty => `<option value="${ty}"${d.assetType === ty ? ' selected' : ''}>${esc(t('wsap_t_' + ty))}</option>`).join('');
+  const ccyOpts = ['EUR', 'USD', 'GBP'].map(c => `<option value="${c}"${d.currency === c ? ' selected' : ''}>${c}</option>`).join('');
+  return `
+    <section class="wsh-card wsap-form-card">
+      <header class="wsh-head"><h3 class="wsh-title">${esc(editing ? t('wsjrn_edit') : t('wsap_add'))}</h3></header>
+      <div class="wsap-form-grid">
+        ${txt('assetName', t('wsap_f_name'))}
+        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsap_f_type'))}</span><span class="ws4-field-input"><select class="ws4-num wsjrn-select" data-wsap-input="assetType">${typeOpts}</select></span></label>
+        ${txt('ticker', t('wsap_f_ticker'))}
+        ${num('buyPrice', t('wsap_f_buy'), '€')}
+        ${num('sellPrice', t('wsap_f_sell'), '€')}
+        ${num('quantity', t('wsap_f_qty'))}
+        ${num('fees', t('wsap_f_fees'), '€')}
+        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsap_f_ccy'))}</span><span class="ws4-field-input"><select class="ws4-num wsjrn-select" data-wsap-input="currency">${ccyOpts}</select></span></label>
+        ${txt('notes', t('wsap_f_notes'))}
+      </div>
+      <div class="wsap-form-foot">
+        <span class="wsap-prev-wrap" data-wsap-pv>${_wsApPreviewLine(d)}</span>
+        <div class="wsap-form-btns">
+          ${editing ? `<button type="button" class="wsg-act" data-wsap-cancel>${esc(t('wsjrn_cancel'))}</button>` : ''}
+          <button type="button" class="wsh-cta is-primary" data-wsap-add>${esc(editing ? t('wsjrn_save_edit') : t('wsap_add_btn'))}</button>
+        </div>
+      </div>
+    </section>`;
+}
+function _renderAssetPricesTool() {
+  const esc = _intccEsc;
+  const rows = _wsApRows();
+  if (!_wsApDraft) _wsApDraft = _wsApNewDraft();
+  const r = calculateAssetPrices(rows);
+  return `
+    <div class="aurix-wsh wsh-tool-view wsh-ap-view is-revealed" data-wsh-view="tool">
+      <section class="wsh-card wsb-header">
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
+        <h2 class="wsb-title">${esc(t('wsapp_assets_n'))}</h2>
+        <p class="wsb-subtitle">${esc(t('wsap_sub'))}</p>
+      </section>
+      <section class="wsh-card wsap-summary-card">${_wsApSummaryHtml(r)}</section>
+      ${r.count - r.openCount > 0 ? `<section class="wsh-card">${_wsApRankingHtml(r)}</section>` : ''}
+      <section class="wsh-card">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsap_list_title'))}</h3></header>
+        ${_wsApRowsHtml(r)}
+      </section>
+      ${_wsApFormHtml()}
       <section class="wsh-card wsg-foot-card">
         <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
       </section>
