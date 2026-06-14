@@ -11520,6 +11520,91 @@ function _wsProjMeta(p) {
   return '';
 }
 
+// ── WS.10 — Visual Identity System ───────────────────────────────────────────
+// Each category gets its own visual DNA so the user identifies a tool/template
+// in <1s without reading. Pure presentation: no logic, no real-portfolio access.
+// Archetype map (accent + glyph). Also the seed for the future "profession mode".
+const _WS_ARCH = {
+  goals:      { accent: 'gold',   glyph: 'flag' },
+  scenario:   { accent: 'blue',   glyph: 'compare' },
+  projection: { accent: 'blue',   glyph: 'curve' },
+  fire:       { accent: 'amber',  glyph: 'flame' },
+  budget:     { accent: 'teal',   glyph: 'budget' },
+  networth:   { accent: 'violet', glyph: 'donut' },
+  investment: { accent: 'blue',   glyph: 'portfolio' },
+  property:   { accent: 'green',  glyph: 'house' },
+  business:   { accent: 'cyan',   glyph: 'cashflow' },
+};
+// WS.10.7 — profession archetypes. PREP ONLY: reusable mapping, no logic/UI wired.
+const _WS_PROFESSION = {
+  indexed:    ['compound', 'fire', 'budget'],
+  trader:     ['journal', 'scenario', 'projection'],
+  realestate: ['property', 'networth'],
+  business:   ['business', 'networth'],
+};
+function _wsGlyph(k) {
+  const G = {
+    flag:     '<path d="M7 21V4"/><path d="M7 5h11l-2.4 3.5L18 12H7"/>',
+    flame:    '<path d="M12 3c2.5 3.5 4.5 5.5 4.5 8.5a4.5 4.5 0 0 1-9 0c0-1.4.7-2.7 1.8-3.6 0 1.8.9 2.6 1.7 2.6 0-2.6-.8-4.5 1-7.5z"/>',
+    house:    '<path d="M4 12 12 5l8 7"/><path d="M6 11v8h12v-8"/>',
+    shield:   '<path d="M12 3l7 3v5c0 4.6-3 7.6-7 9.5C8 18.6 5 15.6 5 11V6z"/>',
+    target:   '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1.3"/>',
+    cashflow: '<path d="M3 17l5-5 4 3 6-7"/><path d="M5 20h14"/><path d="M18 5h3v3"/>',
+    portfolio:'<path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M22 19H2"/>',
+  };
+  return G[k] || G.target;
+}
+function _wsGoalGlyph(type) { return ({ wealth: 'target', emergency: 'shield', home: 'house', fire: 'flame', free: 'flag' })[type] || 'flag'; }
+function _wsGlyphTile(glyph, accent) {
+  return `<div class="wspv wspv-glyph is-${accent}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsGlyph(glyph)}</svg></div>`;
+}
+
+// WS.10.1 — data-backed tool preview (shows the real result, not an abstract viz).
+function _wsToolPreviewHtml(toolKey) {
+  const esc = _intccEsc;
+  try {
+    if (toolKey === 'compound') {
+      const inp = _wsToolStateGet('compound') || _wsToolDefaults();
+      const r = calculateCompoundGrowth(inp.initial, inp.monthly, (inp.ret || 0) / 100, inp.years);
+      const W = 120, H = 30, n = r.series.length, max = Math.max.apply(null, r.series.map(s => s.total).concat([1]));
+      const pts = r.series.map((s, i) => `${((i / ((n - 1) || 1)) * W).toFixed(1)},${(H - (s.total / max) * (H - 4) - 2).toFixed(1)}`).join(' ');
+      return `<div class="wspv wspv-compound"><div class="wspv-fig"><span class="wspv-num">${esc(formatBase(r.final))}</span><span class="wspv-lbl">${esc(t('wstool_res_final'))}</span></div><svg class="wspv-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polygon class="wspv-spark-area" points="0,${H} ${pts} ${W},${H}"/><polyline class="wspv-spark-line" points="${pts}"/></svg></div>`;
+    }
+    if (toolKey === 'budget') {
+      const inp = _wsToolStateGet('budget') || _wsBudgetDefaults();
+      const r = calculateMonthlyBudget(inp);
+      const denom = Math.max(r.income, r.expenses, 1);
+      return `<div class="wspv wspv-budget">
+        <div class="wspv-rows">
+          <span class="wspv-row"><b class="wspv-row-v">${esc(formatBase(r.income))}</b><i class="wspv-row-k">${esc(t('wstool_budget_sec_income'))}</i></span>
+          <span class="wspv-row"><b class="wspv-row-v">${esc(formatBase(r.expenses))}</b><i class="wspv-row-k">${esc(t('wstool_budget_sec_expenses'))}</i></span>
+          <span class="wspv-row is-free"><b class="wspv-row-v">${esc(formatBase(r.free))}</b><i class="wspv-row-k">${esc(t('wstool_bud_free'))}</i></span>
+        </div>
+        <div class="wspv-budbar"><span class="wspv-budseg is-exp" style="width:${(r.expenses / denom * 100).toFixed(1)}%"></span><span class="wspv-budseg is-free" style="width:${(Math.max(0, r.free) / denom * 100).toFixed(1)}%"></span></div>
+      </div>`;
+    }
+    if (toolKey === 'journal') {
+      const inp = _wsToolStateGet('journal') || _wsJournalDefaults();
+      const r = calculateTradeJournal(inp.trades);
+      const rows = r.list.filter(x => !x.open).slice(0, 3);
+      const list = rows.map(x => `<span class="wspv-tk"><b class="wspv-tk-a">${esc(String(x.asset || '').slice(0, 5))}</b><b class="wspv-tk-r is-${x.pl >= 0 ? 'win' : 'loss'}">${esc(_wsJrnPct(x.ret))}</b></span>`).join('');
+      return `<div class="wspv wspv-journal">${list}</div>`;
+    }
+  } catch (_) {}
+  return '';
+}
+
+// WS.10.2/10.6 — distinct preview per template category (no "everything is a curve").
+function _wsCatPreviewHtml(cat) {
+  if (cat === 'budget') return _wsToolPreviewHtml('budget');
+  if (cat === 'projection') return `<div class="wspv wspv-viz is-blue">${_wsTplViz('curve')}</div>`;
+  if (cat === 'scenario')   return `<div class="wspv wspv-viz is-blue">${_wsTplViz('compare')}</div>`;
+  if (cat === 'networth')   return `<div class="wspv wspv-viz is-violet">${_wsTplViz('donut')}</div>`;
+  if (cat === 'investment') return `<div class="wspv wspv-viz is-blue">${_wsTplViz('bars')}</div>`;
+  const A = _WS_ARCH[cat] || { accent: 'gold', glyph: 'flag' };
+  return _wsGlyphTile(A.glyph, A.accent);
+}
+
 // WS.6A — smart entry tab: never land on an empty "Mi espacio".
 function _wsSmartTab() {
   const hasSaved = _wshAllProjects().length > 0 || _wsPinned().length > 0;
@@ -11623,25 +11708,28 @@ function _renderWorkspaceHome(metrics) {
   } else if (tab === 'templates') {
     // Organized by real utility (not by technical structure). 'cta'+'arg' decide
     // how each card opens; 'ref' is the pinnable identifier.
+    // WS.10 — visual-first card: dominant data/archetype preview, name + CTA, no
+    // descriptive sentence. The preview communicates the category in <1s.
     const card = it => `
-      <div class="wsh-tpl" role="button" tabindex="0" data-wsh-cta="${esc(it.cta)}"${it.arg ? ' data-ws4-type="' + esc(it.arg) + '"' : ''}>
+      <div class="wsh-tpl wsh-cardv" role="button" tabindex="0" data-wsh-cta="${esc(it.cta)}"${it.arg ? ' data-ws4-type="' + esc(it.arg) + '"' : ''}>
         ${pinBtn(it.ref)}
-        <div class="wsh-tpl-viz">${_wsTplViz(it.viz)}</div>
-        <p class="wsh-tpl-name">${esc(it.name)}</p>
-        <p class="wsh-tpl-desc">${esc(it.desc)}</p>
-        <span class="wsh-tpl-go">${esc(t('wstpl_use'))} ›</span>
+        <div class="wsh-pv-wrap">${_wsCatPreviewHtml(it.cat)}</div>
+        <div class="wsh-cardv-foot">
+          <p class="wsh-tpl-name">${esc(it.name)}</p>
+          <span class="wsh-tpl-go">${esc(t('wstpl_use'))} ›</span>
+        </div>
       </div>`;
-    const T2 = type => ({ cta: 'workspace', arg: type, ref: 'tpl:' + type, name: t('wsh_ws_' + type), desc: t('ws4_sub_' + type) });
+    const T2 = type => ({ cta: 'workspace', arg: type, ref: 'tpl:' + type, name: t('wsh_ws_' + type), cat: type });
     const groups = [
       { title: t('wstplg_planning'), items: [
-        { cta: 'goals',    ref: 'tpl:goals',      viz: 'target',  name: t('wsg_title'),          desc: t('wsg_subtitle') },
-        { cta: 'scenario', ref: 'tpl:scenario',   viz: 'compare', name: t('wsh_scenario_title'), desc: t('wsb_subtitle') },
-        { cta: 'planning', ref: 'tpl:projection', viz: 'curve',   name: t('wsp_title'),          desc: t('wsp_subtitle') },
-        Object.assign(T2('fire'), { viz: 'curve' }),
+        { cta: 'goals',    ref: 'tpl:goals',      cat: 'goals',      name: t('wsg_title') },
+        { cta: 'scenario', ref: 'tpl:scenario',   cat: 'scenario',   name: t('wsh_scenario_title') },
+        { cta: 'planning', ref: 'tpl:projection', cat: 'projection', name: t('wsp_title') },
+        T2('fire'),
       ] },
-      { title: t('wstplg_daily'), items: [ Object.assign(T2('budget'), { viz: 'budget' }), Object.assign(T2('networth'), { viz: 'donut' }) ] },
-      { title: t('wstplg_investing'), items: [ Object.assign(T2('investment'), { viz: 'bars' }) ] },
-      { title: t('wstplg_realestate'), items: [ Object.assign(T2('property'), { viz: 'house' }), Object.assign(T2('business'), { viz: 'bars' }) ] },
+      { title: t('wstplg_daily'), items: [ T2('budget'), T2('networth') ] },
+      { title: t('wstplg_investing'), items: [ T2('investment') ] },
+      { title: t('wstplg_realestate'), items: [ T2('property'), T2('business') ] },
     ];
     panel = groups.map(g => `
       <section class="wsh-card">
@@ -11660,12 +11748,13 @@ function _renderWorkspaceHome(metrics) {
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_tools'))}</h3></header>
         <div class="wsh-tool-grid">
           ${tools.map(tl => `
-            <div class="wsh-tool${tl.active ? ' is-active is-featured' : ''}"${tl.active ? ' role="button" tabindex="0" data-wsh-cta="tool" data-wstool="' + esc(tl.k) + '"' : ''}>
+            <div class="wsh-tool wsh-cardv${tl.active ? ' is-active is-featured' : ''}"${tl.active ? ' role="button" tabindex="0" data-wsh-cta="tool" data-wstool="' + esc(tl.k) + '"' : ''}>
               ${tl.active ? pinBtn('tool:' + tl.k) : ''}
-              <div class="wsh-tpl-viz wsh-tool-viz">${_wsTplViz(tl.viz)}</div>
-              <p class="wsh-tool-name">${esc(t('wstool_' + tl.k + '_n'))}</p>
-              <p class="wsh-tool-desc">${esc(t('wstool_' + tl.k + '_d'))}</p>
-              <span class="${tl.active ? 'wsh-tool-go' : 'wsh-pill'}">${esc(tl.active ? t('wstpl_use') + ' ›' : t('wsh_soon'))}</span>
+              <div class="wsh-pv-wrap">${tl.active ? _wsToolPreviewHtml(tl.k) : '<div class="wspv wspv-viz is-blue">' + _wsTplViz(tl.viz) + '</div>'}</div>
+              <div class="wsh-cardv-foot">
+                <p class="wsh-tool-name">${esc(t('wstool_' + tl.k + '_n'))}</p>
+                <span class="${tl.active ? 'wsh-tool-go' : 'wsh-pill'}">${esc(tl.active ? t('wstpl_use') + ' ›' : t('wsh_soon'))}</span>
+              </div>
             </div>`).join('')}
         </div>
       </section>`;
@@ -12599,7 +12688,7 @@ function _renderGoals() {
     return `
       <div class="wsg-card" data-wsg-cardid="${esc(g.id)}">
         <div class="wsg-card-head">
-          <div class="wsg-card-id"><span class="wsb-pill is-dynamic">${esc(t('wsg_type_' + g.type))}</span><p class="wsg-card-name">${esc(g.name)}</p></div>
+          <div class="wsg-card-id"><span class="wsg-glyph is-${esc(g.type)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsGlyph(_wsGoalGlyph(g.type))}</svg></span><div class="wsg-card-idtxt"><span class="wsb-pill is-dynamic">${esc(t('wsg_type_' + g.type))}</span><p class="wsg-card-name">${esc(g.name)}</p></div></div>
           <div class="ws4-modes wsg-modes">
             <button type="button" class="ws4-mode${!isSync ? ' is-active' : ''}" data-wsg-mode="manual" data-wsg-id="${esc(g.id)}">${esc(t('ws4_mode_manual'))}</button>
             <button type="button" class="ws4-mode${isSync ? ' is-active' : ''}" data-wsg-mode="sync" data-wsg-id="${esc(g.id)}">${esc(t('ws4_mode_sync'))}</button>
