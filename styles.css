@@ -20518,6 +20518,32 @@ body.gs-open { overflow: hidden; }
   .wsloan-amort-card b { color: var(--text-bright); }
 }
 
+/* ════════ WS.14A — Real Estate Pro premium upgrade (per-type scene covers) ══ */
+.wsre-cover, .wsre-detail-cover, .wsre-photo-pv { position: relative; overflow: hidden; }
+.wsre-cover:not(.has-photo), .wsre-detail-cover:not(.has-photo), .wsre-photo-pv:not(.has-photo) {
+  background: radial-gradient(120% 130% at 80% -12%, rgba(var(--wsre-c, 74,130,240), 0.42), transparent 58%), linear-gradient(155deg, rgba(var(--wsre-c, 74,130,240), 0.20), rgba(9,14,26,0.94) 84%);
+}
+.wsre-cover.is-flat, .wsre-detail-cover.is-flat, .wsre-photo-pv.is-flat { --wsre-c: 74,130,240; }
+.wsre-cover.is-house, .wsre-detail-cover.is-house, .wsre-photo-pv.is-house { --wsre-c: 47,200,140; }
+.wsre-cover.is-chalet, .wsre-detail-cover.is-chalet, .wsre-photo-pv.is-chalet { --wsre-c: 55,199,184; }
+.wsre-cover.is-local, .wsre-detail-cover.is-local, .wsre-photo-pv.is-local { --wsre-c: 224,168,92; }
+.wsre-cover.is-office, .wsre-detail-cover.is-office, .wsre-photo-pv.is-office { --wsre-c: 138,125,255; }
+.wsre-cover.is-warehouse, .wsre-detail-cover.is-warehouse, .wsre-photo-pv.is-warehouse { --wsre-c: 80,200,210; }
+.wsre-cover.is-garage, .wsre-detail-cover.is-garage, .wsre-photo-pv.is-garage { --wsre-c: 150,165,188; }
+.wsre-cover-glyph { position: absolute; right: -10px; bottom: -16px; width: 92px; height: 92px; color: rgba(255,255,255,0.12); pointer-events: none; }
+.wsre-detail-cover .wsre-cover-glyph { width: 150px; height: 150px; right: -16px; bottom: -24px; }
+.wsre-photo-pv .wsre-cover-glyph { width: 56px; height: 56px; right: -6px; bottom: -10px; }
+/* card type chip + restructured top */
+.wsre-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.wsre-card-id { min-width: 0; }
+.wsre-type-chip { flex: none; font-size: 10px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; color: #e6c483; background: rgba(224,177,92,0.14); border: 1px solid rgba(224,177,92,0.28); padding: 2px 8px; border-radius: 999px; }
+/* form sections */
+.wsre-form-section { padding: 14px 0; border-top: 1px solid rgba(120,160,255,0.09); }
+.wsre-form-section:first-of-type { border-top: 0; padding-top: 4px; }
+.wsre-form-sec-t { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: rgba(224,177,92,0.85); margin-bottom: 10px; }
+.wsre-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 640px) { .wsre-form-grid { grid-template-columns: 1fr; } }
+
 /* ════════ WS.2 — Financial Tools Hub (dedicated tools) ═══════════════════════
    Premium interactive tools that open inside Workspace templates mode (never
    the Sheet). Encapsulated under ws2-* classes; responsive. */

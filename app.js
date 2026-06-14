@@ -2111,6 +2111,12 @@ const T = {
     wsre_t_office:      'Oficina',
     wsre_t_warehouse:   'Nave',
     wsre_t_garage:      'Garaje',
+    wsre_t_chalet:      'Chalet',
+    wsre_sec_identity:  'Identidad',
+    wsre_sec_purchase:  'Compra y valor',
+    wsre_sec_income:    'Rentas y gastos',
+    wsre_sec_financing: 'Financiación',
+    wsre_sec_notes:     'Notas',
     wsre_back_portfolio:'Volver a la cartera',
     wsre_d_finance:     'Resumen financiero',
     wsre_d_gross:       'Rentabilidad bruta',
@@ -4008,6 +4014,12 @@ const T = {
     wsre_t_office:      'Office',
     wsre_t_warehouse:   'Warehouse',
     wsre_t_garage:      'Garage',
+    wsre_t_chalet:      'Chalet',
+    wsre_sec_identity:  'Identity',
+    wsre_sec_purchase:  'Purchase & value',
+    wsre_sec_income:    'Rent & expenses',
+    wsre_sec_financing: 'Financing',
+    wsre_sec_notes:     'Notes',
     wsre_back_portfolio:'Back to portfolio',
     wsre_d_finance:     'Financial summary',
     wsre_d_gross:       'Gross yield',
@@ -11456,6 +11468,7 @@ let _wshWired   = false;
 let _ws4ActiveId = null;   // WS.4 — currently open workspace project id
 let _wsgPrefill = null;    // WS.5 — prefill the create-goal type when arriving from Home
 let _wsTab = null;         // WS.5B/WS.6A — Home tab; null = smart default on entry
+let _wsReturnTab = 'tools'; // WS.14A — tab to return to from a tool/app/view ("Volver")
 // WS.6 — Compound Growth tool working state.
 // WS.6 ACTIVE — Compound Growth tool released (card opens the tool, view reachable).
 // (Was gated false during the WS.5C-only deploy.)
@@ -11575,12 +11588,16 @@ function _wshWireOnce() {
     const xAct = t.getAttribute('data-wsx-act'); if (xAct) { _wsxAct(xAct, t.getAttribute('data-wsx-ref')); return; }
     const cta = t.getAttribute('data-wsh-cta');
     const nav = t.getAttribute('data-wsh-nav');
+    // WS.14A — remember the tab the user came from so "Volver" always returns there.
+    if (cta) { _wsReturnTab = (_wsTab === 'space' || _wsTab === 'templates' || _wsTab === 'tools') ? _wsTab : _wsSmartTab(); }
     if (cta === 'scenario' || nav === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); return; }
     if (cta === 'planning' || nav === 'planning') { _wshView = 'planning'; renderWorkspaceHome(); return; }
     if (cta === 'goals' || nav === 'goals') { const ty = t.getAttribute('data-wsg-type'); if (ty) _wsgPrefill = ty; _wshView = 'goals'; renderWorkspaceHome(); return; }
     if (cta === 'workspace') { const type = t.getAttribute('data-ws4-type'); if (type) { _ws4OpenOrCreate(type); return; } }
     if (cta === 'tool') { _wsOpenTool(t.getAttribute('data-wstool') || 'compound'); return; }
-    if (nav === 'tools') { _wshView = 'home'; _wsTab = 'tools'; const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } return; }
+    // WS.14A — universal back: return to the origin tab (Mi espacio / Plantillas / Herramientas).
+    if (nav === 'back') { _wshView = 'home'; _ws4ActiveId = null; _wsTab = (_wsReturnTab === 'space' || _wsReturnTab === 'templates' || _wsReturnTab === 'tools') ? _wsReturnTab : 'tools'; const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } return; }
+    if (nav === 'tools' || nav === 'templates') { _wshView = 'home'; _wsTab = nav; const c = document.getElementById('aurixWorkspace'); if (c) { c.innerHTML = _renderWorkspaceHome(_wshMetrics()); _wshReveal(c); } return; }
     if (nav === 'home') { _wshView = 'home'; _ws4ActiveId = null; renderWorkspaceHome(); return; }
     if (t.hasAttribute('data-wstool-save')) { _wsToolSave(); return; }
     // WS.8 — Trade Journal: add/save trade, per-trade act, cancel edit.
@@ -11956,6 +11973,7 @@ function _wsPinLabel(ref) {
   return t('wsh_ws_' + key);
 }
 function _wsPinOpen(ref) {
+  _wsReturnTab = 'space';   // WS.14A — pinned items live in Mi Espacio
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), key = ref.slice(i + 1);
   if (kind === 'tool') { _wsOpenTool(key); return; }
   if (key === 'goals') { _wshView = 'goals'; renderWorkspaceHome(); return; }
@@ -12162,6 +12180,7 @@ function _wshAllProjects() {
 function _wshLastEdited() { const all = _wshAllProjects(); return all.length ? all.reduce((a, b) => (b.ts > a.ts ? b : a), all[0]) : null; }
 
 function _wsxOpen(ref) {
+  _wsReturnTab = 'space';   // WS.14A — opened from Mi Espacio → "Volver" returns there
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
   if (kind === 'goal') { _wshView = 'goals'; renderWorkspaceHome(); }
   else if (kind === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); }
@@ -12488,7 +12507,7 @@ function _renderScenarioBuilder() {
   return `
     <div class="aurix-wsh wsh-sb is-revealed" data-wsh-view="scenario">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="home">‹ ${esc(t('wsb_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wsb_back'))}</button>
         <h2 class="wsb-title">${esc(t('wsb_title'))}</h2>
         <p class="wsb-subtitle">${esc(t('wsb_subtitle'))}</p>
       </section>
@@ -12671,7 +12690,7 @@ function _renderWealthProjection() {
   return `
     <div class="aurix-wsh wsh-wsp is-revealed" data-wsh-view="planning">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="home">‹ ${esc(t('wsb_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wsb_back'))}</button>
         <h2 class="wsb-title">${esc(t('wsp_title'))}</h2>
         <p class="wsb-subtitle">${esc(t('wsp_subtitle'))}</p>
       </section>
@@ -12886,7 +12905,7 @@ function _renderWorkspaceDetail() {
   return `
     <div class="aurix-wsh wsh-ws4 is-revealed" data-wsh-view="workspace" data-ws4-id="${esc(p.id)}">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="home">‹ ${esc(t('wsb_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wsb_back'))}</button>
         <h2 class="wsb-title">${esc(_wsLabel('workspace', p))}</h2>
         <p class="wsb-subtitle">${esc(tmpl.sub)}</p>
       </section>
@@ -13297,7 +13316,7 @@ function _renderGoals() {
   return `
     <div class="aurix-wsh wsh-wsg is-revealed" data-wsh-view="goals">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="home">‹ ${esc(t('wsb_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wsb_back'))}</button>
         <h2 class="wsb-title">${esc(t('wsg_title'))}</h2>
         <p class="wsb-subtitle">${esc(t('wsg_subtitle'))}</p>
       </section>
@@ -13504,7 +13523,7 @@ function _renderCompoundTool() {
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="tools">‹ ${esc(t('wstool_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
         <h2 class="wsb-title">${esc(t('wstool_compound_n'))}</h2>
         <p class="wsb-subtitle">${esc(t('wstool_compound_d'))}</p>
       </section>
@@ -13622,7 +13641,7 @@ function _renderBudgetTool() {
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="tools">‹ ${esc(t('wstool_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
         <h2 class="wsb-title">${esc(t('wstool_budget_n'))}</h2>
         <p class="wsb-subtitle">${esc(t('wstool_budget_d'))}</p>
       </section>
@@ -13874,7 +13893,7 @@ function _renderJournalTool() {
   return `
     <div class="aurix-wsh wsh-tool-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="tools">‹ ${esc(t('wstool_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
         <h2 class="wsb-title">${esc(t('wstool_journal_n'))}</h2>
         <p class="wsb-subtitle">${esc(t('wstool_journal_d'))}</p>
       </section>
@@ -13893,8 +13912,30 @@ function _renderJournalTool() {
 // ── WS.12 — Real Estate Portfolio Pro ────────────────────────────────────────
 // Portfolio-first: the portfolio is the protagonist, properties are components.
 // 100% autonomous (WS.11A): NO Dashboard/wealthEngine/portfolio reads. Pure.
-const _WSRE_TYPES = ['flat', 'house', 'local', 'office', 'warehouse', 'garage'];
-const _WSRE_COVER = { flat: '#4d8dff', house: '#2fd98e', local: '#e0a85c', office: '#8a7dff', warehouse: '#37c7b8', garage: '#7c89a3' };
+const _WSRE_TYPES = ['flat', 'house', 'chalet', 'local', 'office', 'warehouse', 'garage'];
+const _WSRE_COVER = { flat: '#4d8dff', house: '#2fd98e', chalet: '#37c7b8', local: '#e0a85c', office: '#8a7dff', warehouse: '#37c7b8', garage: '#7c89a3' };
+// WS.14A — per-type glyph watermark (premium scene cover when no user photo).
+function _wsReTypeGlyph(ptype) {
+  const G = {
+    flat:      '<path d="M5 21V8l7-4 7 4v13"/><path d="M9.5 21v-5h5v5"/><path d="M8 11h.01M16 11h.01"/>',
+    house:     '<path d="M4 12 12 5l8 7"/><path d="M6 11v9h12v-9"/><path d="M10 20v-5h4v5"/>',
+    chalet:    '<path d="M3 12 12 4l9 8"/><path d="M5.5 11v9h13v-9"/><path d="M9.5 20v-6h5v6"/>',
+    local:     '<path d="M4.5 9l1-4h13l1 4"/><path d="M5 9v11h14V9"/><path d="M9.5 20v-6h5v6"/>',
+    office:    '<path d="M5 21V4h9v17"/><path d="M14 21V9h5v12"/><path d="M8 8h.01M11 8h.01M8 12h.01M11 12h.01M17 13h.01"/>',
+    warehouse: '<path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-7h10v7"/><path d="M7 17h10"/>',
+    garage:    '<path d="M4 11l2-5h12l2 5"/><path d="M5 11v9M19 11v9M4 20h16"/><circle cx="8.5" cy="15" r="1.3"/><circle cx="15.5" cy="15" r="1.3"/>',
+  };
+  return G[ptype] || G.flat;
+}
+function _wsReCoverHtml(p, big) {
+  const esc = _intccEsc;
+  const ptype = (p && p.ptype) || 'flat';
+  const photo = p && p.photo;
+  const cls = photo ? 'has-photo' : ('is-' + ptype);
+  const style = photo ? ` style="background-image:url(${p.photo})"` : '';
+  const glyph = photo ? '' : `<svg class="wsre-cover-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsReTypeGlyph(ptype)}</svg>`;
+  return `<div class="wsre-cover${big ? ' is-big' : ''} ${cls}"${style}>${glyph}<span class="wsre-status is-${esc(p.status || 'green')}"></span></div>`;
+}
 function calculateRealEstatePortfolio(properties) {
   const list = (Array.isArray(properties) ? properties : []).map(p => {
     const buy = Math.max(0, Number(p.buy) || 0);
@@ -14059,13 +14100,17 @@ function _wsRePropCard(p) {
   const cf = p.cashflowMonthly;
   return `
     <div class="wsre-card" role="button" tabindex="0" data-wsre-act="detail" data-wsre-id="${esc(p.id)}">
-      <div class="wsre-cover" style="${_wsReCoverStyle(p)}"><span class="wsre-status is-${esc(p.status)}"></span></div>
+      ${_wsReCoverHtml(p)}
       <div class="wsre-card-body">
-        <div class="wsre-card-top"><p class="wsre-card-name">${esc(p.name)}</p><span class="wsre-card-city">${esc(p.city || t('wsre_t_' + p.ptype))}</span></div>
+        <div class="wsre-card-top">
+          <div class="wsre-card-id"><p class="wsre-card-name">${esc(p.name)}</p><span class="wsre-card-city">${esc(p.city || '')}${p.city ? ' · ' : ''}${esc(t('wsre_t_' + p.ptype))}</span></div>
+          <span class="wsre-type-chip">${esc(t('wsre_t_' + p.ptype))}</span>
+        </div>
         <div class="wsre-card-rows">
           <span class="wsre-prow"><i>${esc(t('wsre_kpi_cashflow'))}</i><b class="is-${cf >= 0 ? 'win' : 'loss'}">${esc((cf >= 0 ? '+' : '') + formatBase(cf))}</b></span>
           <span class="wsre-prow"><i>${esc(t('wsre_kpi_equity'))}</i><b>${esc(formatBase(p.equity))}</b></span>
           <span class="wsre-prow"><i>${esc(t('wsre_kpi_yield'))}</i><b>${esc(_wsJrnPct(p.netYield))}</b></span>
+          <span class="wsre-prow"><i>${esc(t('wsre_kpi_mortgage'))}</i><b>${esc(formatBase(p.mortgage))}</b></span>
         </div>
         <div class="wsre-card-acts">
           <button type="button" class="wsre-mini" data-wsre-act="edit" data-wsre-id="${esc(p.id)}" title="${esc(t('wsjrn_edit'))}" aria-label="${esc(t('wsjrn_edit'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M14 6l4 4"/></svg></button>
@@ -14085,22 +14130,33 @@ function _wsReFormHtml() {
   return `
     <section class="wsh-card wsre-form-card">
       <header class="wsh-head"><h3 class="wsh-title">${esc(editing ? t('wsre_edit') : t('wsre_add'))}</h3></header>
-      <div class="wsre-form-photo">
-        <div class="wsre-photo-pv${d.photo ? ' has-photo' : ''}" data-wsre-photo-pv${d.photo ? ` style="background-image:url(${d.photo})"` : ''}></div>
-        <label class="wsre-photo-btn">${esc(t('wsre_f_photo'))}<input type="file" accept="image/*" data-wsre-photo hidden></label>
+      <div class="wsre-form-section">
+        <span class="wsre-form-sec-t">${esc(t('wsre_sec_identity'))}</span>
+        <div class="wsre-form-photo">
+          <div class="wsre-photo-pv${d.photo ? ' has-photo' : ' is-' + (d.ptype || 'flat')}" data-wsre-photo-pv${d.photo ? ` style="background-image:url(${d.photo})"` : ''}>${d.photo ? '' : `<svg class="wsre-cover-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsReTypeGlyph(d.ptype)}</svg>`}</div>
+          <label class="wsre-photo-btn">${esc(t('wsre_f_photo'))}<input type="file" accept="image/*" data-wsre-photo hidden></label>
+        </div>
+        <div class="wsre-form-grid">
+          ${txt('name', t('wsre_f_name'))}
+          <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsre_f_type'))}</span><span class="ws4-field-input"><select class="ws4-num wsjrn-select" data-wsre-input="ptype">${typeOpts}</select></span></label>
+          ${txt('city', t('wsre_f_city'))}
+        </div>
       </div>
-      <div class="wsre-form-grid">
-        ${txt('name', t('wsre_f_name'))}
-        <label class="ws4-field"><span class="ws4-field-name">${esc(t('wsre_f_type'))}</span><span class="ws4-field-input"><select class="ws4-num wsjrn-select" data-wsre-input="ptype">${typeOpts}</select></span></label>
-        ${txt('city', t('wsre_f_city'))}
-        ${num('buy', t('wsre_f_buy'), '€')}
-        ${num('value', t('wsre_f_value'), '€')}
-        ${num('rent', t('wsre_f_rent'), '€')}
-        ${num('expenses', t('wsre_f_expenses'), '€')}
-        ${num('mortgage', t('wsre_f_mortgage'), '€')}
-        ${num('payment', t('wsre_f_payment'), '€')}
-        ${txt('buyDate', t('wsre_f_date'))}
-        ${txt('notes', t('wsre_f_notes'))}
+      <div class="wsre-form-section">
+        <span class="wsre-form-sec-t">${esc(t('wsre_sec_purchase'))}</span>
+        <div class="wsre-form-grid">${num('buy', t('wsre_f_buy'), '€')}${num('value', t('wsre_f_value'), '€')}${txt('buyDate', t('wsre_f_date'))}</div>
+      </div>
+      <div class="wsre-form-section">
+        <span class="wsre-form-sec-t">${esc(t('wsre_sec_income'))}</span>
+        <div class="wsre-form-grid">${num('rent', t('wsre_f_rent'), '€')}${num('expenses', t('wsre_f_expenses'), '€')}</div>
+      </div>
+      <div class="wsre-form-section">
+        <span class="wsre-form-sec-t">${esc(t('wsre_sec_financing'))}</span>
+        <div class="wsre-form-grid">${num('mortgage', t('wsre_f_mortgage'), '€')}${num('payment', t('wsre_f_payment'), '€')}</div>
+      </div>
+      <div class="wsre-form-section">
+        <span class="wsre-form-sec-t">${esc(t('wsre_sec_notes'))}</span>
+        <div class="wsre-form-grid">${txt('notes', t('wsre_f_notes'))}</div>
       </div>
       <div class="wsre-form-foot">
         <span class="wsre-prev-wrap" data-wsre-pv>${_wsRePreviewLine(d)}</span>
@@ -14126,7 +14182,7 @@ function _wsReDetailHtml(p) {
         <p class="wsb-subtitle">${esc(p.city || '')}${p.city ? ' · ' : ''}${esc(t('wsre_t_' + p.ptype))}</p>
       </section>
       <section class="wsh-card wsre-detail-hero">
-        <div class="wsre-detail-cover" style="${_wsReCoverStyle(p)}"><span class="wsre-status is-${esc(one.status)}"></span></div>
+        <div class="wsre-detail-cover ${p.photo ? 'has-photo' : 'is-' + (p.ptype || 'flat')}"${p.photo ? ` style="background-image:url(${p.photo})"` : ''}>${p.photo ? '' : `<svg class="wsre-cover-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsReTypeGlyph(p.ptype)}</svg>`}<span class="wsre-status is-${esc(one.status)}"></span></div>
         <div class="wsre-detail-kpis">
           <div class="wsre-kpi is-cf"><span class="wsre-kpi-v ${cf >= 0 ? 'is-pos' : 'is-neg'}">${esc((cf >= 0 ? '+' : '') + formatBase(cf))}${esc(t('wsre_permonth'))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_cashflow'))}</span></div>
           <div class="wsre-kpi is-equity"><span class="wsre-kpi-v">${esc(formatBase(one.equity))}</span><span class="wsre-kpi-k">${esc(t('wsre_kpi_equity'))}</span></div>
@@ -14174,7 +14230,7 @@ function _renderRealEstateTool() {
   return `
     <div class="aurix-wsh wsh-tool-view wsh-re-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="templates">‹ ${esc(t('wstool_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
         <h2 class="wsb-title">${esc(t('wsre_n'))}</h2>
         <p class="wsb-subtitle">${esc(t('wsre_d'))}</p>
       </section>
@@ -14359,7 +14415,7 @@ function _renderReceivablesTool() {
   return `
     <div class="aurix-wsh wsh-tool-view wsh-recv-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="templates">‹ ${esc(t('wstool_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
         <h2 class="wsb-title">${esc(t('wsapp_receivables_n'))}</h2>
         <p class="wsb-subtitle">${esc(t('wsrecv_sub'))}</p>
       </section>
@@ -14517,7 +14573,7 @@ function _renderLoanTool() {
   return `
     <div class="aurix-wsh wsh-tool-view wsh-loan-view is-revealed" data-wsh-view="tool">
       <section class="wsh-card wsb-header">
-        <button type="button" class="wsb-back" data-wsh-nav="tools">‹ ${esc(t('wstool_back'))}</button>
+        <button type="button" class="wsb-back" data-wsh-nav="back">‹ ${esc(t('wstool_back'))}</button>
         <h2 class="wsb-title">${esc(t('wsloan_n'))}</h2>
         <p class="wsb-subtitle">${esc(t('wsloan_sub'))}</p>
       </section>
