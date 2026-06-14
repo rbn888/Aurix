@@ -11173,7 +11173,8 @@ function _wshReadStore(key) {
 // Dashboard/Intelligence use (read-only); counts come from the WS stores.
 function _wshMetrics() {
   let wealth = '—';
-  try { if (typeof investableValueBase === 'function') wealth = formatBase(investableValueBase()); } catch (_) {}
+  // WS.11A — Workspace is decoupled; do not auto-read Dashboard wealth (dormant).
+  try { if (AURIX_WS_USE_REAL_DATA && typeof investableValueBase === 'function') wealth = formatBase(investableValueBase()); } catch (_) {}
   return {
     wealth,
     goals:     _wshReadStore(_WSH_GOALS_KEY).length,
@@ -11199,6 +11200,12 @@ const AURIX_WS6_TOOL = true;
 const AURIX_WS7_TOOL = true;
 // WS.8 ACTIVE — Trade Journal tool released (third real Workspace tool).
 const AURIX_WS8_TOOL = true;
+// WS.11A — Workspace is AUTONOMOUS: it must not auto-read Dashboard/portfolio/
+// liquidity/health/intelligence. The real-data bridges (_ws4Real / _wsbBaseline /
+// _wspInitialWealth) are DORMANT behind this flag; "Usar datos de Aurix" will be
+// a future explicit toggle. While false, every tool runs on its own defaults and
+// works even with an empty Dashboard. Do NOT flip without building the toggle UX.
+const AURIX_WS_USE_REAL_DATA = false;
 let _wsToolActive  = 'compound'; // 'compound' | 'budget' | 'journal'
 let _wsToolInputs  = null;   // compound/budget: flat fields | journal: { trades: [...] }
 let _wsToolEditId  = null;   // saved project id when editing an existing one
@@ -11842,6 +11849,7 @@ function _wsbScenarios() {
 
 // Real, read-only baseline for the "Escenario actual" block.
 function _wsbBaseline() {
+  if (!AURIX_WS_USE_REAL_DATA) return { wealth: 0, wealthFmt: '—', liq: null, top: null };  // WS.11A — decoupled (dormant)
   let wealth = 0, wealthFmt = '—', liq = null, top = null;
   try { if (typeof investableValueBase === 'function') { wealth = investableValueBase() || 0; wealthFmt = formatBase(wealth); } } catch (_) {}
   try { const lv = (typeof buildLiquidityView === 'function') ? buildLiquidityView() : null; if (lv && typeof lv.cashPct === 'number') liq = Math.round(lv.cashPct); } catch (_) {}
@@ -11954,11 +11962,11 @@ function _renderScenarioBuilder() {
 
       ${impactHtml}
 
-      <section class="wsh-card wsb-current">
+      ${AURIX_WS_USE_REAL_DATA ? `<section class="wsh-card wsb-current">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb_current_title'))}</h3><span class="wsb-horizon">${esc(t('wsb_horizon'))}</span></header>
         <p class="wsb-note">${esc(t('wsb_current_note'))}</p>
         <div class="wsb-bl-grid">${blMetrics.join('')}</div>
-      </section>
+      </section>` : ''}
 
       <section class="wsh-card wsb-scenarios">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsb_scenarios_title'))}</h3></header>
@@ -12026,7 +12034,7 @@ function _wspReadInputs() {
   return { monthly: 300, years: 10, ret: 6 };
 }
 function _wspWriteInputs(o) { try { localStorage.setItem(_WSP_KEY, JSON.stringify(o)); } catch (_) {} }
-function _wspInitialWealth() { try { if (typeof investableValueBase === 'function') return investableValueBase() || 0; } catch (_) {} return 0; }
+function _wspInitialWealth() { if (!AURIX_WS_USE_REAL_DATA) return 0; try { if (typeof investableValueBase === 'function') return investableValueBase() || 0; } catch (_) {} return 0; }  // WS.11A — decoupled (dormant)
 
 // Pure-SVG multi-line projection chart (Conservador / Base / Optimista). No libs.
 function _wspChartHtml(scns, years) {
@@ -12136,7 +12144,7 @@ function _renderWealthProjection() {
       </section>
 
       <section class="wsh-card wsp-inputs-card">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsp_inputs_title'))}</h3><span class="wsb-horizon">${esc(formatBase(initial))}</span></header>
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsp_inputs_title'))}</h3>${AURIX_WS_USE_REAL_DATA ? `<span class="wsb-horizon">${esc(formatBase(initial))}</span>` : ''}</header>
         <div class="wsp-inputs">
           ${field('monthly', t('wsp_in_monthly'), formatBase(inp.monthly), 0, 2000, 50)}
           ${field('years',   t('wsp_in_years'),   t('wsp_unit_years')(inp.years), 1, 40, 1)}
@@ -12157,6 +12165,7 @@ function _renderWealthProjection() {
 // Read-only: Aurix Sync precharges real wealth/liquidity but never writes to the
 // portfolio. Deterministic per-template helpers, no heavy architecture.
 function _ws4Real() {
+  if (!AURIX_WS_USE_REAL_DATA) return { wealth: 0, liqPct: 0, liquidity: 0, hasReal: false };  // WS.11A — decoupled (dormant)
   let wealth = 0, liqPct = 0;
   try { if (typeof investableValueBase === 'function') wealth = investableValueBase() || 0; } catch (_) {}
   try { const lv = (typeof buildLiquidityView === 'function') ? buildLiquidityView() : null; if (lv && typeof lv.cashPct === 'number') liqPct = lv.cashPct; } catch (_) {}
@@ -12323,7 +12332,7 @@ function _renderWorkspaceDetail() {
   const tmpl = _ws4Templates()[p.type];
   const real = _ws4Real();
   const c = tmpl.compute(p.inputs, real);
-  const isSync = p.mode === 'sync';
+  const isSync = AURIX_WS_USE_REAL_DATA && p.mode === 'sync';  // WS.11A — manual unless real-data toggle is on
   const hasSyncField = tmpl.fields.some(f => f.sync);
 
   const fieldHtml = tmpl.fields.map(f => `
@@ -12349,13 +12358,13 @@ function _renderWorkspaceDetail() {
         <p class="wsb-subtitle">${esc(tmpl.sub)}</p>
       </section>
 
-      <section class="wsh-card ws4-modes-card">
+      ${AURIX_WS_USE_REAL_DATA ? `<section class="wsh-card ws4-modes-card">
         <div class="ws4-modes" role="tablist">
           <button type="button" class="ws4-mode${!isSync ? ' is-active' : ''}" data-ws4-mode="manual">${esc(t('ws4_mode_manual'))}</button>
           <button type="button" class="ws4-mode${isSync ? ' is-active' : ''}" data-ws4-mode="sync">${esc(t('ws4_mode_sync'))}</button>
         </div>
         ${syncCtx}
-      </section>
+      </section>` : ''}
 
       <div class="ws4-detail-grid">
         <section class="wsh-card ws4-inputs-card">
@@ -12723,15 +12732,15 @@ function _renderGoals() {
   const listInner = goals.length ? goals.map(stored => {
     const g = _wsgWorking[stored.id] || stored;
     const prog = calculateGoalProgress(g, real.wealth);
-    const isSync = g.mode === 'sync';
+    const isSync = AURIX_WS_USE_REAL_DATA && g.mode === 'sync';  // WS.11A — manual unless real-data toggle is on
     return `
       <div class="wsg-card" data-wsg-cardid="${esc(g.id)}">
         <div class="wsg-card-head">
           <div class="wsg-card-id"><span class="wsg-glyph is-${esc(g.type)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${_wsGlyph(_wsGoalGlyph(g.type))}</svg></span><div class="wsg-card-idtxt"><span class="wsb-pill is-dynamic">${esc(t('wsg_type_' + g.type))}</span><p class="wsg-card-name">${esc(g.name)}</p></div></div>
-          <div class="ws4-modes wsg-modes">
+          ${AURIX_WS_USE_REAL_DATA ? `<div class="ws4-modes wsg-modes">
             <button type="button" class="ws4-mode${!isSync ? ' is-active' : ''}" data-wsg-mode="manual" data-wsg-id="${esc(g.id)}">${esc(t('ws4_mode_manual'))}</button>
             <button type="button" class="ws4-mode${isSync ? ' is-active' : ''}" data-wsg-mode="sync" data-wsg-id="${esc(g.id)}">${esc(t('ws4_mode_sync'))}</button>
-          </div>
+          </div>` : ''}
         </div>
         <div class="wsg-card-edit">
           ${isSync
@@ -12787,9 +12796,8 @@ function calculateCompoundGrowth(initial, monthly, annualReturn, years) {
 }
 
 function _wsToolDefaults() {
-  let initial = 1000;
-  try { if (typeof investableValueBase === 'function') { const w = investableValueBase(); if (w > 0) initial = Math.round(w); } } catch (_) {}
-  return { initial, monthly: 300, ret: 6, years: 20 };
+  // WS.11A — autonomous defaults; NO Dashboard/portfolio read. Capital inicial 1.000 €.
+  return { initial: 1000, monthly: 300, ret: 6, years: 20 };
 }
 
 // WS.7 — tool registry: maps a tool key to its gate, defaults, project type and
