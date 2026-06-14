@@ -20551,6 +20551,19 @@ body.gs-open { overflow: hidden; }
 .wsh-pv-wrap > .wspv-asset-host, .wsh-dcard-pv > .wspv-asset-host { flex: 1 1 auto; }
 /* Tool-card icon tile: compact premium cover fills the tile (icon is the fallback). */
 .wsh-toolcard-ic { position: relative; overflow: hidden; }
+
+/* ════════ WS.17C — visual card polish (image-led covers, no redundant CTA) ═══ */
+/* Discrete affordance instead of a "Usar plantilla" CTA: the whole card is the
+   click target and the hover (border + lift + bg) already signals it. */
+.wsh-tpl-chev { flex: none; font-size: 19px; font-weight: 700; line-height: 1; color: rgba(159,194,255,0.5); transition: color 180ms ease, transform 180ms ease; }
+.wsh-cardv:hover .wsh-tpl-chev { color: #aecbff; transform: translateX(2px); }
+/* Covers breathe more — image acts as a premium portada. */
+.wsh-gallery .wsh-pv-wrap { height: 150px; }
+.wsh-cardv .ws-asset-img { transition: opacity 360ms ease, transform 320ms ease; }
+.wsh-cardv:hover .ws-asset-img.is-loaded { transform: scale(1.03); }
+@media (max-width: 640px) {
+  .wsh-gallery .wsh-pv-wrap { height: 132px; }
+}
 /* card type chip + restructured top */
 .wsre-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .wsre-card-id { min-width: 0; }

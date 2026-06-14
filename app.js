@@ -12241,7 +12241,9 @@ function _wsAssetsPreview() {
 }
 // WS.10.2/10.6 — distinct preview per template category (no "everything is a curve").
 function _wsCatPreviewBaseHtml(cat) {
-  if (cat === 'realestate-pro') return `<div class="wspv wspv-re wspv-re-tpl"><div class="wspv-re-ov"><span class="wspv-re-eq">${_intccEsc(t('wsre_n'))}</span><span class="wspv-re-lbl">${_intccEsc(t('wstplg_realestate'))}</span></div></div>`;
+  // WS.17C — clean cover: no text overlay inside the premium image (title is shown
+  // below the card). The WebP covers this; the gradient is the graceful fallback.
+  if (cat === 'realestate-pro') return `<div class="wspv wspv-re wspv-re-tpl"></div>`;
   if (cat === 'receivables') return _wsReceivablesPreview();
   if (cat === 'assets') return _wsAssetsPreview();
   if (cat === 'budget') return _wsToolPreviewHtml('budget');
@@ -12459,7 +12461,7 @@ function _renderWorkspaceHome(metrics) {
         <div class="wsh-pv-wrap">${_wsCatPreviewHtml(it.cat)}</div>
         <div class="wsh-cardv-foot">
           <p class="wsh-tpl-name">${esc(it.name)}</p>
-          <span class="${soon ? 'wsh-pill' : 'wsh-tpl-go'}">${soon ? esc(t('wsh_soon')) : esc(t('wstpl_use')) + ' ›'}</span>
+          ${soon ? `<span class="wsh-pill">${esc(t('wsh_soon'))}</span>` : `<span class="wsh-tpl-chev" aria-hidden="true">›</span>`}
         </div>
       </div>`;
     };
