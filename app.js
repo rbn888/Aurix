@@ -11024,9 +11024,9 @@ let _ws4ActiveId = null;   // WS.4 — currently open workspace project id
 let _wsgPrefill = null;    // WS.5 — prefill the create-goal type when arriving from Home
 let _wsTab = 'space';      // WS.5B — Home internal tab: 'space' | 'templates' | 'tools'
 // WS.6 — Compound Growth tool working state.
-// WS.5C deploy gate: the tool code ships but stays DORMANT (card = "Próximamente",
-// view unreachable) until WS.6 is integrated + released. Flip to true to deploy WS.6.
-const AURIX_WS6_TOOL = false;
+// WS.6 ACTIVE — Compound Growth tool released (card opens the tool, view reachable).
+// (Was gated false during the WS.5C-only deploy.)
+const AURIX_WS6_TOOL = true;
 let _wsToolActive  = 'compound';
 let _wsToolInputs  = null;   // { initial, monthly, ret, years }
 let _wsToolEditId  = null;   // saved project id when editing an existing one
