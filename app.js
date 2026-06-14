@@ -2043,6 +2043,39 @@ const T = {
     wsrecv_f_paid:      'Importe pagado',
     wsrecv_f_due:       'Fecha vencimiento',
     wsrecv_f_notes:     'Notas',
+    // WS.14 — Loan Simulator Pro (Préstamos Pro)
+    wsloan_n:           'Préstamos Pro',
+    wsloan_sub:         'Simula cualquier financiación y entiende su coste real.',
+    wsloan_save:        'Guardar simulación',
+    wsloan_in_amount:   'Importe solicitado',
+    wsloan_in_rate:     'Interés anual',
+    wsloan_in_years:    'Plazo',
+    wsloan_in_fees:     'Gastos iniciales',
+    wsloan_in_insurance:'Seguro mensual',
+    wsloan_kpi_monthly: 'Cuota mensual',
+    wsloan_kpi_interest:'Total intereses',
+    wsloan_kpi_total:   'Total devuelto',
+    wsloan_kpi_rate:    'Interés medio',
+    wsloan_kpi_years:   'Duración',
+    wsloan_capital:     'Capital',
+    wsloan_donut_aria:  'Capital vs intereses',
+    wsloan_insights_title: 'Lectura rápida Aurix',
+    wsloan_ins_interest: pct => `Más del ${pct}% del coste total serán intereses.`,
+    wsloan_ins_term:    (y, amt) => `Reducir ${y} años el plazo ahorra aproximadamente ${amt}.`,
+    wsloan_ins_rate:    amt => `Un aumento del 1% en el tipo incrementa la cuota en ${amt}/mes.`,
+    wsloan_amort_title: 'Tabla de amortización',
+    wsloan_am_month:    'Mes',
+    wsloan_am_payment:  'Cuota',
+    wsloan_am_capital:  'Capital',
+    wsloan_am_interest: 'Interés',
+    wsloan_am_balance:  'Pendiente',
+    wsloan_cmp_btn:     'Comparar escenario',
+    wsloan_cmp_title:   'Escenario B',
+    wsloan_cmp_dcuota:  'Diferencia cuota',
+    wsloan_cmp_dint:    'Diferencia intereses',
+    wsloan_cmp_dyears:  'Diferencia plazo',
+    wsloan_cmp_insight: (int, cuota) => `Ahorras ${int} en intereses a cambio de pagar ${cuota} más al mes.`,
+    wsloan_cmp_insight_save: int => `Ahorras ${int} en intereses.`,
     // WS.12 — Real Estate Portfolio Pro
     wsre_n:             'Portfolio Inmobiliario Pro',
     wsre_d:             'Gestiona tu cartera inmobiliaria completa.',
@@ -3907,6 +3940,39 @@ const T = {
     wsrecv_f_paid:      'Amount paid',
     wsrecv_f_due:       'Due date',
     wsrecv_f_notes:     'Notes',
+    // WS.14 — Loan Simulator Pro
+    wsloan_n:           'Loan Simulator Pro',
+    wsloan_sub:         'Simulate any financing and understand its real cost.',
+    wsloan_save:        'Save simulation',
+    wsloan_in_amount:   'Loan amount',
+    wsloan_in_rate:     'Annual rate',
+    wsloan_in_years:    'Term',
+    wsloan_in_fees:     'Upfront fees',
+    wsloan_in_insurance:'Monthly insurance',
+    wsloan_kpi_monthly: 'Monthly payment',
+    wsloan_kpi_interest:'Total interest',
+    wsloan_kpi_total:   'Total repaid',
+    wsloan_kpi_rate:    'Average rate',
+    wsloan_kpi_years:   'Duration',
+    wsloan_capital:     'Principal',
+    wsloan_donut_aria:  'Principal vs interest',
+    wsloan_insights_title: 'Aurix quick read',
+    wsloan_ins_interest: pct => `More than ${pct}% of the total cost will be interest.`,
+    wsloan_ins_term:    (y, amt) => `Cutting ${y} years off the term saves about ${amt}.`,
+    wsloan_ins_rate:    amt => `A 1% rate increase raises the payment by ${amt}/mo.`,
+    wsloan_amort_title: 'Amortization table',
+    wsloan_am_month:    'Month',
+    wsloan_am_payment:  'Payment',
+    wsloan_am_capital:  'Principal',
+    wsloan_am_interest: 'Interest',
+    wsloan_am_balance:  'Balance',
+    wsloan_cmp_btn:     'Compare scenario',
+    wsloan_cmp_title:   'Scenario B',
+    wsloan_cmp_dcuota:  'Payment difference',
+    wsloan_cmp_dint:    'Interest difference',
+    wsloan_cmp_dyears:  'Term difference',
+    wsloan_cmp_insight: (int, cuota) => `You save ${int} in interest in exchange for paying ${cuota} more per month.`,
+    wsloan_cmp_insight_save: int => `You save ${int} in interest.`,
     // WS.12 — Real Estate Portfolio Pro
     wsre_n:             'Real Estate Portfolio Pro',
     wsre_d:             'Manage your full real estate portfolio.',
@@ -11402,6 +11468,8 @@ const AURIX_WS8_TOOL = true;
 const AURIX_WS12_TOOL = true;
 // WS.13 ACTIVE — Receivables Pro (Pendientes de cobro).
 const AURIX_WS13_TOOL = true;
+// WS.14 ACTIVE — Loan Simulator Pro (Préstamos Pro).
+const AURIX_WS14_TOOL = true;
 // WS.11A — Workspace is AUTONOMOUS: it must not auto-read Dashboard/portfolio/
 // liquidity/health/intelligence. The real-data bridges (_ws4Real / _wsbBaseline /
 // _wspInitialWealth) are DORMANT behind this flag; "Usar datos de Aurix" will be
@@ -11482,7 +11550,7 @@ function _wshWireOnce() {
   _wshWired = true;
   document.addEventListener('click', e => {
     const t = e.target && e.target.closest
-      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel]')
+      ? e.target.closest('[data-wstab],[data-wspin],[data-wspinopen],[data-wsh-cta],[data-wsh-nav],[data-wsh-save],[data-ws4-mode],[data-wsg-create],[data-wsg-mode],[data-wsg-save-goal],[data-wsg-act],[data-ws4-save],[data-ws4-act],[data-wsx-open],[data-wsx-act],[data-wstool-save],[data-wsjrn-add],[data-wsjrn-act],[data-wsjrn-cancel],[data-wsfund-open],[data-wsre-add],[data-wsre-act],[data-wsre-cancel],[data-wsre-back],[data-wsre-tl-add],[data-wsmenu],[data-wsrecv-add],[data-wsrecv-act],[data-wsrecv-cancel],[data-wsloan-cmp]')
       : null;
     if (!t) return;
     // WS.5B — internal Home tab switch (rebuild Home directly; dispatcher is idempotent)
@@ -11529,6 +11597,8 @@ function _wshWireOnce() {
     if (t.hasAttribute('data-wsrecv-add')) { _wsRecvAdd(); return; }
     const recvAct = t.getAttribute('data-wsrecv-act'); if (recvAct) { _wsRecvAct(recvAct, t.getAttribute('data-wsrecv-id')); return; }
     if (t.hasAttribute('data-wsrecv-cancel')) { _wsRecvCancel(); return; }
+    // WS.14 — Loan comparator toggle.
+    if (t.hasAttribute('data-wsloan-cmp')) { _wsLoanCmpToggle(); return; }
     // WS.9 — open the Goal Funding modal for a goal.
     const fOpen = t.getAttribute('data-wsfund-open'); if (fOpen) { _wsFundModal(fOpen); return; }
     const ws4mode = t.getAttribute('data-ws4-mode');
@@ -11551,6 +11621,7 @@ function _wshWireOnce() {
     if (el.getAttribute('data-wsjrn-input')) { _wsJrnOnInput(el); return; }
     if (el.getAttribute('data-wsre-input')) { _wsReOnInput(el); return; }
     if (el.getAttribute('data-wsrecv-input')) { _wsRecvOnInput(el); return; }
+    if (el.getAttribute('data-wsloan-cmp-input')) { _wsLoanCmpInput(el); return; }
   });
   // WS.12 — property photo upload (file input → downscaled data URL).
   document.addEventListener('change', e => { const el = e.target; if (el && el.getAttribute && el.hasAttribute('data-wsre-photo')) _wsRePhoto(el); });
@@ -11823,6 +11894,7 @@ function _wsTypeLabel(type) {
   if (type === 'trade_journal')   return t('wstool_journal_n');
   if (type === 'real_estate_portfolio') return t('wsre_n');
   if (type === 'receivables_app') return t('wsapp_receivables_n');
+  if (type === 'loan_simulation') return t('wsloan_n');
   return t('wsh_ws_' + type);
 }
 function _wsLabel(kind, item) {
@@ -11847,7 +11919,8 @@ const _WS_APP_IDENTITY = {
   scenario:              { type: 'tool', category: 'planning',   visualTone: 'comparison',       accentColor: 'violet',   previewType: 'compare',          layoutType: 'view', canPin: true, canSaveToSpace: false, isDailyUse: false, premiumTier: 'free' },
   goal:                  { type: 'tool', category: 'planning',   visualTone: 'milestones',       accentColor: 'amber',    previewType: 'progress',         layoutType: 'view', canPin: true, canSaveToSpace: true,  isDailyUse: true,  premiumTier: 'free' },
   financial_calc:        { type: 'tool', category: 'utility',    visualTone: 'control',          accentColor: 'green',    previewType: 'inputs',           layoutType: 'tool', canPin: true, canSaveToSpace: false, isDailyUse: false, premiumTier: 'soon' },
-  investment_analyzer:   { type: 'tool', category: 'investing',  visualTone: 'risk-return',      accentColor: 'navy',     previewType: 'risk',             layoutType: 'tool', canPin: true, canSaveToSpace: false, isDailyUse: false, premiumTier: 'soon' },
+  investment_analyzer:   { type: 'tool', category: 'investing',  visualTone: 'risk-return',      accentColor: 'navy',     previewType: 'risk',             layoutType: 'tool',       canPin: true, canSaveToSpace: false, isDailyUse: false, premiumTier: 'soon' },
+  loan_simulation:       { type: 'tool', category: 'financing',  visualTone: 'banking',          accentColor: 'steel-blue', previewType: 'loan-summary',   layoutType: 'calculator', canPin: true, canSaveToSpace: true,  isDailyUse: false, premiumTier: 'core' },
 };
 function _wsAppIdentity(id) { return _WS_APP_IDENTITY[id] || { type: 'app', category: 'misc', visualTone: 'neutral', accentColor: 'blue', previewType: 'glyph', layoutType: 'tool', canPin: true, canSaveToSpace: true, isDailyUse: true, premiumTier: 'free' }; }
 
@@ -11894,13 +11967,13 @@ function _wsPinOpen(ref) {
 // pinned/active tool restores this; editing inputs updates it; only "Guardar
 // proyecto" creates a real project in aurix_ws_projects_v1.
 const _WSH_TOOL_STATE_KEY = 'aurix_ws_tool_state_v1';
-function _wsToolStateType(key) { return key === 'budget' ? 'monthly_budget' : key === 'journal' ? 'trade_journal' : key === 'realestate' ? 'real_estate_portfolio' : key === 'receivables' ? 'receivables_app' : 'compound_growth'; }
+function _wsToolStateType(key) { return key === 'budget' ? 'monthly_budget' : key === 'journal' ? 'trade_journal' : key === 'realestate' ? 'real_estate_portfolio' : key === 'receivables' ? 'receivables_app' : key === 'loan' ? 'loan_simulation' : 'compound_growth'; }
 function _wsToolStateRead() { try { const raw = localStorage.getItem(_WSH_TOOL_STATE_KEY); const v = raw ? JSON.parse(raw) : {}; return (v && typeof v === 'object') ? v : {}; } catch (_) { return {}; } }
 function _wsToolStateGet(key) { const v = _wsToolStateRead()[_wsToolStateType(key)]; return (v && typeof v === 'object') ? v : null; }
 function _wsToolStateSet(key, inputs) { const s = _wsToolStateRead(); s[_wsToolStateType(key)] = Object.assign({}, inputs); try { localStorage.setItem(_WSH_TOOL_STATE_KEY, JSON.stringify(s)); } catch (_) {} }
 
 // WS.7A — mini-preview viz selection for Mi Espacio cards (reuses _wsTplViz).
-const _WS_TYPE_VIZ = { budget: 'budget', monthly_budget: 'budget', networth: 'donut', investment: 'bars', property: 'house', business: 'bars', fire: 'curve', compound_growth: 'curve', trade_journal: 'journal', real_estate_portfolio: 'house', receivables_app: 'table' };
+const _WS_TYPE_VIZ = { budget: 'budget', monthly_budget: 'budget', networth: 'donut', investment: 'bars', property: 'house', business: 'bars', fire: 'curve', compound_growth: 'curve', trade_journal: 'journal', real_estate_portfolio: 'house', receivables_app: 'table', loan_simulation: 'donut' };
 function _wsRefViz(ref) {
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), key = ref.slice(i + 1);
   if (kind === 'tool') return key === 'budget' ? 'budget' : key === 'journal' ? 'journal' : 'curve';
@@ -12062,6 +12135,10 @@ function _wsProjPreviewHtml(p) {
     const pct = r.porcentajeCobrado != null ? Math.max(0, Math.min(100, r.porcentajeCobrado)) : 0;
     return `<div class="wspv wspv-recvw"><div class="wspv-recvw-top"><span class="wspv-recvw-amt">${esc(formatBase(r.totalPendiente || 0))}</span><span class="wspv-recvw-lbl">${esc(t('wsrecv_kpi_pending'))}</span></div><div class="wspv-recvw-bar"><span class="wspv-recvw-fill" style="width:${pct}%"></span></div><div class="wspv-recvw-foot"><span>${(r.count != null ? r.count : 0)} · ${pct}% ${esc(t('wsrecv_kpi_collected').toLowerCase())}</span>${r.totalVencido ? `<span class="is-overdue">${esc(formatBase(r.totalVencido))} ${esc(t('wsrecv_st_vencido').toLowerCase())}</span>` : ''}</div></div>`;
   }
+  if (p.type === 'loan_simulation') {
+    const sep = (typeof lang !== 'undefined' && lang === 'en') ? '.' : ',';
+    return `<div class="wspv wspv-loan"><div class="wspv-loan-top"><span class="wspv-loan-amt">${esc(formatBase(r.monthlyPayment || 0))}${esc(t('wsre_permonth'))}</span><span class="wspv-loan-lbl">${esc(t('wsloan_kpi_monthly'))}</span></div><div class="wspv-loan-foot"><span>${esc(t('wsloan_kpi_interest'))} ${esc(formatBase(r.totalInterest || 0))}</span><span>${esc(String((r.annual != null ? r.annual : 0)).replace('.', sep))}%</span></div></div>`;
+  }
   if (p.kind === 'scenario') return `<div class="wspv wspv-viz is-blue">${_wsTplViz('compare')}</div>`;
   const A = _WS_ARCH[p.type] || { accent: 'blue', glyph: 'portfolio' };
   return _wsGlyphTile(A.glyph, A.accent);
@@ -12088,7 +12165,7 @@ function _wsxOpen(ref) {
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), id = ref.slice(i + 1);
   if (kind === 'goal') { _wshView = 'goals'; renderWorkspaceHome(); }
   else if (kind === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); }
-  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else if (p.type === 'monthly_budget') { _wsOpenTool('budget', id); } else if (p.type === 'trade_journal') { _wsOpenTool('journal', id); } else if (p.type === 'real_estate_portfolio') { _wsOpenTool('realestate', id); } else if (p.type === 'receivables_app') { _wsOpenTool('receivables', id); } else { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
+  else if (kind === 'workspace') { const p = _ws4Projects().find(x => x && x.id === id); if (p) { if (p.type === 'compound_growth') { _wsOpenTool('compound', id); } else if (p.type === 'monthly_budget') { _wsOpenTool('budget', id); } else if (p.type === 'trade_journal') { _wsOpenTool('journal', id); } else if (p.type === 'real_estate_portfolio') { _wsOpenTool('realestate', id); } else if (p.type === 'receivables_app') { _wsOpenTool('receivables', id); } else if (p.type === 'loan_simulation') { _wsOpenTool('loan', id); } else { _ws4Draft = Object.assign({}, p, { inputs: Object.assign({}, p.inputs) }); _ws4ActiveId = id; _ws4Dirty = false; _wshView = 'workspace'; renderWorkspaceHome(); } } }
 }
 function _wsxAct(act, ref) {
   if (!ref) return;
@@ -12240,6 +12317,7 @@ function _renderWorkspaceHome(metrics) {
     // apps). Per-tool accent from the App Identity Registry. FIRE is not here.
     const tools = [
       { id: 'compound_growth',     name: t('wstool_compound_n'),  viz: 'curve',   open: ' role="button" tabindex="0" data-wsh-cta="tool" data-wstool="compound"', pinRef: 'tool:compound', soon: false },
+      { id: 'loan_simulation',     name: t('wsloan_n'),           viz: 'donut',   open: ' role="button" tabindex="0" data-wsh-cta="tool" data-wstool="loan"',     pinRef: 'tool:loan',     soon: false },
       { id: 'scenario',            name: t('wsh_scenario_title'), viz: 'compare', open: ' role="button" tabindex="0" data-wsh-cta="scenario"',                  pinRef: 'tpl:scenario',  soon: false },
       { id: 'goal',                name: t('wsg_title'),          viz: 'target',  open: ' role="button" tabindex="0" data-wsh-cta="goals"',                     pinRef: 'tpl:goals',     soon: false },
       { id: 'financial_calc',      name: t('wstool_financial_n'), viz: 'bars',    open: '', pinRef: '', soon: true },
@@ -13257,17 +13335,18 @@ function _wsToolDefaults() {
 
 // WS.7 — tool registry: maps a tool key to its gate, defaults, project type and
 // renderer so the shared open/input/save plumbing stays tool-agnostic.
-function _wsToolDefaultsFor(key) { return key === 'budget' ? _wsBudgetDefaults() : key === 'journal' ? _wsJournalDefaults() : key === 'realestate' ? _wsReDefaults() : key === 'receivables' ? _wsReceivablesDefaults() : _wsToolDefaults(); }
-function _wsRenderTool() { return _wsToolActive === 'budget' ? _renderBudgetTool() : _wsToolActive === 'journal' ? _renderJournalTool() : _wsToolActive === 'realestate' ? _renderRealEstateTool() : _wsToolActive === 'receivables' ? _renderReceivablesTool() : _renderCompoundTool(); }
-function _wsToolOutHtmlFor(key, inp) { return key === 'budget' ? _wsBudgetOutHtml(inp) : _wsToolOutHtml(inp); }
+function _wsToolDefaultsFor(key) { return key === 'budget' ? _wsBudgetDefaults() : key === 'journal' ? _wsJournalDefaults() : key === 'realestate' ? _wsReDefaults() : key === 'receivables' ? _wsReceivablesDefaults() : key === 'loan' ? _wsLoanDefaults() : _wsToolDefaults(); }
+function _wsRenderTool() { return _wsToolActive === 'budget' ? _renderBudgetTool() : _wsToolActive === 'journal' ? _renderJournalTool() : _wsToolActive === 'realestate' ? _renderRealEstateTool() : _wsToolActive === 'receivables' ? _renderReceivablesTool() : _wsToolActive === 'loan' ? _renderLoanTool() : _renderCompoundTool(); }
+function _wsToolOutHtmlFor(key, inp) { return key === 'budget' ? _wsBudgetOutHtml(inp) : key === 'loan' ? _wsLoanOutHtml(inp) : _wsToolOutHtml(inp); }
 
 function _wsOpenTool(toolKey, projectId) {
-  const key = (toolKey === 'budget' || toolKey === 'journal' || toolKey === 'realestate' || toolKey === 'receivables') ? toolKey : 'compound';
+  const key = (toolKey === 'budget' || toolKey === 'journal' || toolKey === 'realestate' || toolKey === 'receivables' || toolKey === 'loan') ? toolKey : 'compound';
   if (key === 'compound'    && !AURIX_WS6_TOOL) return;   // WS.6 gate
   if (key === 'budget'      && !AURIX_WS7_TOOL) return;   // WS.7 gate
   if (key === 'journal'     && !AURIX_WS8_TOOL) return;   // WS.8 gate
   if (key === 'realestate'  && !AURIX_WS12_TOOL) return;  // WS.12 gate
   if (key === 'receivables' && !AURIX_WS13_TOOL) return;  // WS.13 gate
+  if (key === 'loan'        && !AURIX_WS14_TOOL) return;  // WS.14 gate
   _wsToolActive = key;
   _wsJrnDraft = (key === 'journal') ? _wsJrnNewDraft() : null; _wsJrnEditId = null;  // reset trade form
   _wsReDraft = (key === 'realestate') ? _wsReNewDraft() : null; _wsReEditId = null; _wsReDetailId = null;  // reset property form/detail
@@ -13305,7 +13384,11 @@ function _wsToolSave() {
   const list = _ws4Projects();
   const existing = _wsToolEditId ? list.find(p => p && p.id === _wsToolEditId) : null;
   let type, results;
-  if (_wsToolActive === 'receivables') {
+  if (_wsToolActive === 'loan') {
+    const r = calculateLoan(_wsToolInputs);
+    type = 'loan_simulation';
+    results = { monthlyPayment: Math.round(r.monthlyPayment), totalInterest: Math.round(r.totalInterest), totalPaid: Math.round(r.totalPaid), principal: Math.round(r.principal), annual: r.annual, years: r.years };
+  } else if (_wsToolActive === 'receivables') {
     const r = calculateReceivables(_wsToolInputs.items);
     type = 'receivables_app';
     results = { count: r.count, totalPendiente: Math.round(r.totalPendiente), totalCobrado: Math.round(r.totalCobrado), totalVencido: Math.round(r.totalVencido), numeroVencidos: r.numeroVencidos, porcentajeCobrado: Math.round(r.porcentajeCobrado) };
@@ -13345,7 +13428,7 @@ function _wsToolSaveBarHtml() {
   const state = _wsToolEditId ? (_wsToolDirty ? 'dirty' : 'saved') : 'unsaved';
   const lbl = { unsaved: t('wsg_save_unsaved'), dirty: t('wsg_save_pending'), saved: t('wsg_save_done') }[state];
   const canSave = !_wsToolEditId || _wsToolDirty;
-  const saveLabel = _wsToolActive === 'journal' ? t('wstool_save_journal') : _wsToolActive === 'realestate' ? t('wsre_save') : _wsToolActive === 'receivables' ? t('wsrecv_save') : t('wstool_save');
+  const saveLabel = _wsToolActive === 'journal' ? t('wstool_save_journal') : _wsToolActive === 'realestate' ? t('wsre_save') : _wsToolActive === 'receivables' ? t('wsrecv_save') : _wsToolActive === 'loan' ? t('wsloan_save') : t('wstool_save');
   return `
     <span class="wsg-savestate is-${state}">${esc(lbl)}</span>
     <button type="button" class="wsh-cta is-primary wsg-savebtn" data-wstool-save${canSave ? '' : ' disabled'}>${esc(saveLabel)}</button>`;
@@ -14286,6 +14369,172 @@ function _renderReceivablesTool() {
         ${r.list.length ? `<div class="wsrecv-grid">${r.list.map(_wsRecvCardHtml).join('')}</div>` : `<p class="wsh-empty">${esc(t('wsrecv_empty'))}</p>`}
       </section>
       ${_wsRecvFormHtml()}
+      <section class="wsh-card wsg-foot-card">
+        <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
+      </section>
+    </div>`;
+}
+
+// ── WS.14 — Loan Simulator Pro (Préstamos Pro) ───────────────────────────────
+// French amortization (constant payment). Deterministic, pure, no APIs/banks.
+function calculateLoan(o) {
+  o = o || {};
+  const P = Math.max(0, Number(o.principal) || 0);
+  const annual = Math.max(0, Number(o.rate != null ? o.rate : o.interestRate) || 0);
+  const years = Math.max(0, Number(o.years) || 0);
+  const fees = Math.max(0, Number(o.fees) || 0);
+  const ins = Math.max(0, Number(o.insurance != null ? o.insurance : o.insuranceMonthly) || 0);
+  const n = Math.round(years * 12);
+  const r = annual / 12 / 100;
+  let base = 0;
+  if (n > 0) base = (r > 0) ? (P * r / (1 - Math.pow(1 + r, -n))) : (P / n);
+  const totalBase = base * n;
+  const totalInterest = Math.max(0, totalBase - P);
+  const totalInsurance = ins * n;
+  const monthlyPayment = base + ins;
+  const totalPaid = P + totalInterest + totalInsurance + fees;
+  const denom = P + totalInterest;
+  const table = [];
+  let bal = P;
+  for (let m = 1; m <= n; m++) {
+    const interest = bal * r;
+    let principalPart = base - interest;
+    if (m === n) principalPart = bal;
+    bal = Math.max(0, bal - principalPart);
+    table.push({ month: m, payment: base, principal: principalPart, interest, balance: bal });
+  }
+  return { base, monthlyPayment, totalInterest, totalInsurance, totalPaid, fees, principal: P, years, annual, n, principalShare: denom > 0 ? P / denom * 100 : 0, interestShare: denom > 0 ? totalInterest / denom * 100 : 0, table };
+}
+function _wsLoanDefaults() { return { principal: 180000, rate: 3.25, years: 30, fees: 0, insurance: 0, cmpOpen: false, bPrincipal: 180000, bRate: 3.25, bYears: 20 }; }
+function _wsLoanPct(v) { const s = (Math.round(v * 100) / 100).toString(); return s.replace('.', (typeof lang !== 'undefined' && lang === 'en') ? '.' : ','); }
+
+function _wsLoanDonutHtml(res) {
+  const esc = _intccEsc;
+  const C = 2 * Math.PI * 52;
+  const capLen = (res.principalShare / 100) * C;
+  return `<svg class="wsloan-donut" viewBox="0 0 140 140" role="img" aria-label="${esc(t('wsloan_donut_aria'))}">
+    <circle class="wsloan-donut-track" cx="70" cy="70" r="52"></circle>
+    <circle class="wsloan-donut-int" cx="70" cy="70" r="52" transform="rotate(-90 70 70)"></circle>
+    <circle class="wsloan-donut-cap" cx="70" cy="70" r="52" transform="rotate(-90 70 70)" stroke-dasharray="${capLen.toFixed(1)} ${(C - capLen).toFixed(1)}"></circle>
+    <text class="wsloan-donut-c" x="70" y="66" text-anchor="middle">${Math.round(res.interestShare)}%</text>
+    <text class="wsloan-donut-l" x="70" y="84" text-anchor="middle">${esc(t('wsloan_kpi_interest'))}</text>
+  </svg>`;
+}
+function _wsLoanInsights(res) {
+  const out = [];
+  const costInterestPct = res.totalPaid > 0 ? Math.round(res.totalInterest / (res.principal + res.totalInterest) * 100) : 0;
+  if (costInterestPct >= 30) out.push(t('wsloan_ins_interest')(costInterestPct));
+  if (res.years > 5) { const less = calculateLoan({ principal: res.principal, rate: res.annual, years: res.years - 5 }); const saved = res.totalInterest - less.totalInterest; if (saved > 0) out.push(t('wsloan_ins_term')(5, formatBase(saved))); }
+  const up = calculateLoan({ principal: res.principal, rate: res.annual + 1, years: res.years }); const diff = up.base - res.base; if (diff > 0) out.push(t('wsloan_ins_rate')(formatBase(diff)));
+  return out.slice(0, 3);
+}
+function _wsLoanAmortHtml(res) {
+  const esc = _intccEsc;
+  if (!res.table.length) return '';
+  const rows = res.table.map(x => `<tr><td>${x.month}</td><td>${esc(formatBase(x.payment))}</td><td>${esc(formatBase(x.principal))}</td><td>${esc(formatBase(x.interest))}</td><td>${esc(formatBase(x.balance))}</td></tr>`).join('');
+  const cards = res.table.map(x => `<div class="wsloan-amort-card"><span class="wsloan-amort-m">${esc(t('wsloan_am_month'))} ${x.month}</span><span><i>${esc(t('wsloan_am_capital'))}</i> <b>${esc(formatBase(x.principal))}</b></span><span><i>${esc(t('wsloan_am_interest'))}</i> <b>${esc(formatBase(x.interest))}</b></span><span><i>${esc(t('wsloan_am_balance'))}</i> <b>${esc(formatBase(x.balance))}</b></span></div>`).join('');
+  return `<details class="wsloan-amort"><summary>${esc(t('wsloan_amort_title'))}</summary>
+    <div class="wsloan-amort-tablewrap"><table class="wsloan-amort-table"><thead><tr><th>${esc(t('wsloan_am_month'))}</th><th>${esc(t('wsloan_am_payment'))}</th><th>${esc(t('wsloan_am_capital'))}</th><th>${esc(t('wsloan_am_interest'))}</th><th>${esc(t('wsloan_am_balance'))}</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="wsloan-amort-cards">${cards}</div>
+  </details>`;
+}
+function _wsLoanOutHtml(inp) {
+  const esc = _intccEsc;
+  const res = calculateLoan(inp);
+  const insights = _wsLoanInsights(res);
+  return `
+    <div class="wsloan-hero">
+      <span class="wsloan-hero-lbl">${esc(t('wsloan_kpi_monthly'))}</span>
+      <span class="wsloan-hero-v">${esc(formatBase(res.monthlyPayment))}${esc(t('wsre_permonth'))}</span>
+    </div>
+    <div class="wsloan-kpis">
+      <div class="wsloan-kpi"><span class="wsloan-kpi-v">${esc(formatBase(res.totalInterest))}</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_interest'))}</span></div>
+      <div class="wsloan-kpi"><span class="wsloan-kpi-v">${esc(formatBase(res.totalPaid))}</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_total'))}</span></div>
+      <div class="wsloan-kpi"><span class="wsloan-kpi-v">${_wsLoanPct(res.annual)}%</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_rate'))}</span></div>
+      <div class="wsloan-kpi"><span class="wsloan-kpi-v">${res.years}</span><span class="wsloan-kpi-k">${esc(t('wsloan_kpi_years'))}</span></div>
+    </div>
+    <div class="wsloan-split">
+      ${_wsLoanDonutHtml(res)}
+      <div class="wsloan-legend">
+        <span class="wsloan-leg is-cap"><i></i>${esc(t('wsloan_capital'))} <b>${esc(formatBase(res.principal))}</b></span>
+        <span class="wsloan-leg is-int"><i></i>${esc(t('wsloan_kpi_interest'))} <b>${esc(formatBase(res.totalInterest))}</b></span>
+      </div>
+    </div>
+    ${insights.length ? `<div class="wsloan-insights"><span class="wsloan-insights-t">${esc(t('wsloan_insights_title'))}</span><ul>${insights.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>` : ''}
+    ${_wsLoanAmortHtml(res)}`;
+}
+// Comparator (own card outside [data-wstool-out] so its inputs keep focus).
+function _wsLoanCmpToggle() {
+  if (!_wsToolInputs) return;
+  _wsToolInputs.cmpOpen = !_wsToolInputs.cmpOpen;
+  _wsToolStateSet('loan', _wsToolInputs);
+  const root = document.querySelector('.wsh-tool-view');
+  const card = root && root.querySelector('[data-wsloan-cmp-card]');
+  if (card) card.innerHTML = _wsLoanCmpInner(_wsToolInputs);
+}
+function _wsLoanCmpInput(el) {
+  if (!_wsToolInputs) return;
+  _wsToolInputs[el.getAttribute('data-wsloan-cmp-input')] = _wsNum(el.value);
+  _wsToolStateSet('loan', _wsToolInputs);
+  const root = document.querySelector('.wsh-tool-view');
+  const out = root && root.querySelector('[data-wsloan-cmp-out]');
+  if (out) out.innerHTML = _wsLoanCmpOutHtml(_wsToolInputs);
+}
+function _wsLoanCmpOutHtml(inp) {
+  const esc = _intccEsc;
+  const A = calculateLoan(inp);
+  const B = calculateLoan({ principal: inp.bPrincipal, rate: inp.bRate, years: inp.bYears });
+  const dCuota = B.monthlyPayment - A.monthlyPayment;
+  const dInt = B.totalInterest - A.totalInterest;
+  const dYears = A.years - B.years;
+  const intSaved = -dInt;
+  const insight = (intSaved > 0 && dCuota > 0)
+    ? t('wsloan_cmp_insight')(formatBase(intSaved), formatBase(dCuota))
+    : (intSaved > 0 ? t('wsloan_cmp_insight_save')(formatBase(intSaved)) : '');
+  const row = (label, val, cls) => `<div class="wsloan-cmp-row"><span>${esc(label)}</span><b class="${cls || ''}">${esc(val)}</b></div>`;
+  return `
+    <div class="wsloan-cmp-rows">
+      ${row(t('wsloan_cmp_dcuota'), (dCuota >= 0 ? '+' : '') + formatBase(dCuota), dCuota > 0 ? 'is-neg' : 'is-pos')}
+      ${row(t('wsloan_cmp_dint'), (dInt >= 0 ? '+' : '') + formatBase(dInt), dInt > 0 ? 'is-neg' : 'is-pos')}
+      ${row(t('wsloan_cmp_dyears'), (dYears >= 0 ? '−' : '+') + Math.abs(dYears) + ' ' + t('wstool_unit_years'), '')}
+    </div>
+    ${insight ? `<p class="wsloan-cmp-insight">${esc(insight)}</p>` : ''}`;
+}
+function _wsLoanCmpInner(inp) {
+  const esc = _intccEsc;
+  if (!inp.cmpOpen) return `<button type="button" class="wsh-cta wsloan-cmp-btn" data-wsloan-cmp>${esc(t('wsloan_cmp_btn'))}</button>`;
+  const num = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wsloan-cmp-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : ''))}"><span class="ws4-field-unit">${esc(unit)}</span></span></label>`;
+  return `
+    <div class="wsloan-cmp-head"><h3 class="wsh-title">${esc(t('wsloan_cmp_title'))}</h3><button type="button" class="wsre-mini" data-wsloan-cmp aria-label="${esc(t('wsjrn_cancel'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="wsloan-cmp-grid">${num('bPrincipal', t('wsloan_in_amount'), '€')}${num('bRate', t('wsloan_in_rate'), '%')}${num('bYears', t('wsloan_in_years'), t('wstool_unit_years'))}</div>
+    <div class="wsloan-cmp-out" data-wsloan-cmp-out>${_wsLoanCmpOutHtml(inp)}</div>`;
+}
+function _renderLoanTool() {
+  const esc = _intccEsc;
+  if (!_wsToolInputs) _wsToolInputs = _wsLoanDefaults();
+  const inp = _wsToolInputs;
+  const field = (k, label, unit) => `<label class="ws4-field"><span class="ws4-field-name">${esc(label)}</span><span class="ws4-field-input"><input class="ws4-num" type="text" inputmode="decimal" autocomplete="off" data-wstool-input="${k}" value="${esc(_wsFormatInputNumber(inp[k] != null ? inp[k] : ''))}"><span class="ws4-field-unit">${esc(unit)}</span></span></label>`;
+  return `
+    <div class="aurix-wsh wsh-tool-view wsh-loan-view is-revealed" data-wsh-view="tool">
+      <section class="wsh-card wsb-header">
+        <button type="button" class="wsb-back" data-wsh-nav="tools">‹ ${esc(t('wstool_back'))}</button>
+        <h2 class="wsb-title">${esc(t('wsloan_n'))}</h2>
+        <p class="wsb-subtitle">${esc(t('wsloan_sub'))}</p>
+      </section>
+      <section class="wsh-card wsloan-inputs-card">
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('ws4_inputs_title'))}</h3></header>
+        <div class="wsloan-fields">
+          ${field('principal', t('wsloan_in_amount'), '€')}
+          ${field('rate', t('wsloan_in_rate'), '%')}
+          ${field('years', t('wsloan_in_years'), t('wstool_unit_years'))}
+          ${field('fees', t('wsloan_in_fees'), '€')}
+          ${field('insurance', t('wsloan_in_insurance'), '€')}
+        </div>
+      </section>
+      <section class="wsh-card wsloan-out-card">
+        <div class="wsloan-out" data-wstool-out>${_wsLoanOutHtml(inp)}</div>
+      </section>
+      <section class="wsh-card wsloan-cmp-card" data-wsloan-cmp-card>${_wsLoanCmpInner(inp)}</section>
       <section class="wsh-card wsg-foot-card">
         <div class="wsg-savebar" data-wstool-savebar>${_wsToolSaveBarHtml()}</div>
       </section>
