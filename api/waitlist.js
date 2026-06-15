@@ -185,7 +185,7 @@ async function sendWelcomeEmail({ email, locale }) {
   return true;
 }
 
-// Exact copy per spec. Premium, minimal, no hype, no promises.
+// Premium, minimal, no hype, no promises. One email, localized by locale.
 function welcomeContent(locale) {
   const COPY = {
     en: {
@@ -195,9 +195,9 @@ function welcomeContent(locale) {
         'Your request has been received and you are now part of the Aurix early access list.',
         'Aurix is currently in private beta as we continue building the future of Wealth Intelligence.',
         'We will contact selected users as new access waves become available.',
-        'Thank you for joining us early.',
       ],
-      sign: '— The Aurix Team',
+      closing: 'Welcome to the next generation of Wealth Intelligence.',
+      sign: 'The Aurix Team',
       tagline: 'Wealth Intelligence Platform',
       footer: 'You are receiving this because you requested access at aurixsystem.io.',
     },
@@ -208,19 +208,19 @@ function welcomeContent(locale) {
         'Hemos recibido tu solicitud y ya formas parte de la lista de acceso anticipado de Aurix.',
         'Aurix se encuentra actualmente en beta privada mientras seguimos construyendo el futuro de la Inteligencia Patrimonial.',
         'Nos pondremos en contacto contigo cuando se abran nuevas fases de acceso.',
-        'Gracias por acompañarnos desde el principio.',
       ],
-      sign: '— Equipo Aurix',
+      closing: 'Bienvenido a la próxima generación de Inteligencia Patrimonial.',
+      sign: 'Equipo Aurix',
       tagline: 'Plataforma de inteligencia patrimonial',
       footer: 'Recibes este correo porque solicitaste acceso en aurixsystem.io.',
     },
   };
   const c = COPY[locale] || COPY.en;
 
-  const text = `${c.heading}\n\n${c.paras.join('\n\n')}\n\n${c.sign}\nAurix · ${c.tagline}\n\n${c.footer}`;
+  const text = `${c.heading}\n\n${c.paras.join('\n\n')}\n\n${c.closing}\n\n${c.sign}\nAurix · ${c.tagline}\n\n${c.footer}`;
 
   const paraHtml = c.paras
-    .map(p => `<p style="font:400 15px/1.65 Arial,sans-serif;color:#b9c6e0;margin:0 0 14px;">${p}</p>`)
+    .map(p => `<p style="font:400 15px/1.7 Arial,sans-serif;color:#b9c6e0;margin:0 0 16px;">${p}</p>`)
     .join('');
 
   const html = `<!doctype html><html><body style="margin:0;padding:0;background:#05070f;">
@@ -228,16 +228,17 @@ function welcomeContent(locale) {
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#05070f;padding:32px 16px;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#0b1020;border:1px solid rgba(138,178,255,.18);border-radius:18px;overflow:hidden;">
-        <tr><td style="padding:30px 34px 8px;">
+        <tr><td style="padding:32px 36px 10px;">
           <div style="font:800 20px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif;letter-spacing:.22em;color:#ffffff;">AURIX</div>
           <div style="font:600 11px/1 Arial,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#7db8ff;margin-top:8px;">${c.tagline}</div>
         </td></tr>
-        <tr><td style="padding:18px 34px 6px;">
-          <p style="font:700 19px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif;color:#f4f7fc;margin:0 0 16px;">${c.heading}</p>
+        <tr><td style="padding:20px 36px 8px;">
+          <p style="font:700 20px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Arial,sans-serif;color:#f4f7fc;margin:0 0 18px;">${c.heading}</p>
           ${paraHtml}
-          <p style="font:500 15px/1.6 Arial,sans-serif;color:#f4f7fc;margin:18px 0 4px;">${c.sign}</p>
+          <p style="font:500 15px/1.7 Arial,sans-serif;color:#dfe9fb;margin:22px 0 0;">${c.closing}</p>
+          <p style="font:600 15px/1.6 Arial,sans-serif;color:#ffffff;margin:26px 0 2px;">${c.sign}</p>
         </td></tr>
-        <tr><td style="padding:18px 34px 26px;border-top:1px solid rgba(255,255,255,.07);">
+        <tr><td style="padding:20px 36px 28px;border-top:1px solid rgba(255,255,255,.07);">
           <p style="font:400 12px/1.6 Arial,sans-serif;color:#6f7d99;margin:0;">${c.footer}</p>
         </td></tr>
       </table>
