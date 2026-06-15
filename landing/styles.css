@@ -764,16 +764,16 @@ body.modal-open{ overflow:hidden; }
 }
 
 /* ════ AURIX-LANDING-LEAN-1 ═══════════════════════════════════════════
-   Latest platform updates (compact proof-of-momentum strip) + Founder
-   Access card. Additive — new classes only, reusing existing tokens. */
+   Platform Tools strip (was "Latest updates"). Compact premium chips. */
 
-/* ── Latest platform updates ───────────────────────────── */
+/* ── Platform tools ────────────────────────────────────── */
 .section--updates{ border-top:1px solid var(--border); padding:64px 0; }
 .updates-inner{ text-align:center; }
 .updates-inner .section-title{ max-width:none; margin:0 auto; }
+.updates-inner .section-lead{ margin-left:auto; margin-right:auto; }
 .updates-grid{
   display:flex; flex-wrap:wrap; justify-content:center; gap:10px;
-  margin:30px auto 0; max-width:840px;
+  margin:34px auto 0; max-width:860px;
 }
 .update-chip{
   font-size:13.5px; font-weight:600; color:var(--muted);
@@ -783,26 +783,45 @@ body.modal-open{ overflow:hidden; }
 }
 .update-chip:hover{ border-color:var(--border-hi); color:var(--text); background:rgba(79,142,247,.07); }
 
-/* ── Founder Access card ───────────────────────────────── */
-.founder-card{
-  max-width:560px; margin:0 auto 22px; text-align:center;
-  padding:26px 30px; border:1px solid var(--border-hi); border-radius:18px;
-  background:
-    radial-gradient(120% 120% at 50% 0%, rgba(244,196,90,.10), transparent 62%),
-    linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.012));
-  box-shadow:0 30px 70px -50px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.05);
-}
-.founder-mark{
-  display:inline-flex; align-items:center; justify-content:center;
-  width:40px; height:40px; margin-bottom:14px; border-radius:12px;
-  border:1px solid rgba(244,196,90,.34); background:rgba(244,196,90,.10);
-}
-.founder-mark svg{ width:22px; height:22px; fill:none; stroke:#f4c45a; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
-.founder-title{ font-size:19px; font-weight:800; letter-spacing:-.02em; color:var(--text); }
-.founder-text{ color:var(--muted); font-size:15px; line-height:1.6; margin:10px auto 0; max-width:46ch; }
-
 @media (max-width:560px){
   .section--updates{ padding:48px 0; }
-  .updates-grid{ margin-top:22px; }
-  .founder-card{ padding:22px 20px; }
+  .updates-grid{ margin-top:24px; }
+}
+
+/* ════ AURIX-LANDING-POLISH-2 ═════════════════════════════════════════
+   Structure polish: premium asset chips, stacked Intelligence layout,
+   unified Private Beta + Founder Access card. Additive overrides. */
+
+/* ── Premium asset chips (merged unified-view section) ──── */
+.section--solution .asset-grid{ margin:26px 0 36px; }
+.section--solution .asset{
+  transition:border-color .2s var(--ease), background .2s var(--ease), transform .2s var(--ease);
+}
+.section--solution .asset:hover{ border-color:var(--border-hi); background:rgba(79,142,247,.07); transform:translateY(-2px); }
+
+/* ── Intelligence section: stacked + centred header, balanced grid ── */
+.ws-stacked{ display:block; }
+.ws-head{ max-width:760px; margin:0 auto 38px; text-align:center; }
+.ws-head .eyebrow{ margin-bottom:16px; }
+.ws-head .section-title{ margin-top:0; }
+.ws-head .section-lead{ margin-left:auto; margin-right:auto; }
+.ws-stacked .ws-cards{ grid-template-columns:repeat(3,1fr); gap:16px; }
+@media (min-width:861px){
+  /* 7 cards in 3 columns → place the lone 7th card in the centre column. */
+  .ws-stacked .ws-cards > :last-child{ grid-column:2; }
+}
+@media (max-width:860px){
+  .ws-stacked .ws-cards{ grid-template-columns:repeat(2,1fr); }
+}
+@media (max-width:560px){
+  .ws-head{ margin-bottom:26px; }
+  .ws-stacked .ws-cards{ grid-template-columns:repeat(2,1fr); gap:9px; }
+}
+
+/* ── Unified Private Beta + Founder Access card ─────────── */
+.early-card .early-sub{ margin-bottom:14px; }
+.early-founder{
+  max-width:46ch; margin:0 auto;
+  color:var(--dim); font-size:14px; line-height:1.6;
+  padding-top:14px; border-top:1px solid var(--border);
 }

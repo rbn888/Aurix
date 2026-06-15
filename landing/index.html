@@ -41,7 +41,7 @@
     <div class="container header-inner">
       <a class="brand" href="#top" aria-label="Aurix">AURIX</a>
       <nav class="nav-center" aria-label="Primary">
-        <a href="#product"   data-i18n="nav.product">Product</a>
+        <a href="#product"   data-i18n="nav.product">Platform</a>
         <a href="#workspace" data-i18n="nav.workspace">Intelligence</a>
         <a href="#roadmap"   data-i18n="nav.roadmap">Roadmap</a>
         <a href="#early-access" data-i18n="nav.early">Early Access</a>
@@ -83,7 +83,7 @@
       <div class="hero-bg" aria-hidden="true"></div>
       <div class="container hero-inner">
         <div class="hero-copy">
-          <span class="eyebrow reveal" data-i18n="hero.eyebrow">Private Wealth OS</span>
+          <span class="eyebrow reveal" data-i18n="hero.eyebrow">Wealth Operating System</span>
           <h1 class="hero-title reveal"><span data-i18n="hero.h1a">Your entire wealth.</span><br><span data-i18n="hero.h1b">One operating system.</span></h1>
           <p class="hero-sub reveal" data-i18n="hero.sub">Aurix brings stocks, funds, crypto, metals, real estate and cash into one clear, private interface.</p>
         </div>
@@ -135,19 +135,31 @@
           <div class="frag-card reveal"><svg class="frag-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h20v12H2zM2 10h20M6 18v2m12-2v2"/></svg><h3 data-i18n="frag.cash.t">Cash</h3><p data-i18n="frag.cash.d">Liquidity position</p></div>
         </div>
         <div class="pain-row">
-          <div class="pain-card reveal"><svg class="pain-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7zM4 4l16 16"/></svg><div><h3 data-i18n="pain.1.t">No visibility</h3><p data-i18n="pain.1.d">You never see the real total of your wealth.</p></div></div>
-          <div class="pain-card reveal"><svg class="pain-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h10M4 19h7"/></svg><div><h3 data-i18n="pain.2.t">No clarity</h3><p data-i18n="pain.2.d">You don’t know how it’s distributed.</p></div></div>
-          <div class="pain-card reveal"><svg class="pain-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 100-18 9 9 0 000 18zM15 9l-2 5-4 1 2-5 4-1z"/></svg><div><h3 data-i18n="pain.3.t">No context</h3><p data-i18n="pain.3.d">The numbers don’t explain what they mean.</p></div></div>
+          <div class="pain-card reveal"><svg class="pain-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7zM4 4l16 16"/></svg><div><h3 data-i18n="pain.1.t">No visibility</h3><p data-i18n="pain.1.d">You never see your full financial picture.</p></div></div>
+          <div class="pain-card reveal"><svg class="pain-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h10M4 19h7"/></svg><div><h3 data-i18n="pain.2.t">No clarity</h3><p data-i18n="pain.2.d">You don’t know how everything is distributed.</p></div></div>
+          <div class="pain-card reveal"><svg class="pain-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 100-18 9 9 0 000 18zM15 9l-2 5-4 1 2-5 4-1z"/></svg><div><h3 data-i18n="pain.3.t">No context</h3><p data-i18n="pain.3.d">Your numbers don’t explain what they mean.</p></div></div>
         </div>
       </div>
     </section>
 
-    <!-- ─────────────── ONE UNIFIED VIEW ─────────────── -->
-    <section class="section section--solution">
+    <!-- ─────────────── UNIFIED VIEW (merged: was "One unified view" + "Built to see") ─────────────── -->
+    <!-- Single strong section: statement → premium asset chips → the Total Value /
+         Allocation / Evolution metric cards. The old duplicate "showcase" mock was
+         removed to eliminate two sections saying the same thing. -->
+    <section class="section section--solution" id="solution">
       <div class="container">
-        <h2 class="section-title reveal" data-i18n="solution.title">One unified view.</h2>
-        <p class="section-lead reveal" data-i18n="solution.lead">Aurix centralizes every asset class into a single interface, with the context you need to decide.</p>
-        <p class="asset-line reveal" data-i18n="solution.assets">Stocks · ETFs · Funds · Crypto · Real Estate · Metals · Cash</p>
+        <h2 class="section-title reveal" data-i18n="solution.title">Built to see your entire wealth as one system.</h2>
+        <p class="section-lead reveal" data-i18n="solution.lead">Aurix centralizes every asset class into one clear interface, giving you control, context and clarity over your financial life.</p>
+        <!-- Asset classes as premium pills, not loose small text. -->
+        <div class="asset-grid reveal">
+          <span class="asset" data-i18n="asset.stocks">Stocks</span>
+          <span class="asset" data-i18n="asset.etfs">ETFs</span>
+          <span class="asset" data-i18n="asset.funds">Funds</span>
+          <span class="asset" data-i18n="asset.crypto">Crypto</span>
+          <span class="asset" data-i18n="asset.realestate">Real Estate</span>
+          <span class="asset" data-i18n="asset.metals">Metals</span>
+          <span class="asset" data-i18n="asset.cash">Cash</span>
+        </div>
         <!-- B5: metrics hierarchy — Total value is the protagonist; allocation +
              evolution sit below in two columns (stack on mobile). -->
         <div class="metrics">
@@ -181,11 +193,11 @@
     <!-- Intelligence layer (distinct from the Personal Financial Workspace product).
          Badge reads INTELLIGENCE; anchor id kept as #workspace for stable links. -->
     <section class="section section--workspace" id="workspace">
-      <div class="container ws-inner">
-        <div class="ws-copy">
+      <div class="container ws-inner ws-stacked">
+        <div class="ws-copy ws-head">
           <span class="eyebrow reveal" data-i18n="ws.eyebrow">Intelligence</span>
           <h2 class="section-title reveal"><span data-i18n="ws.title1">More than tracking.</span><br><span class="accent" data-i18n="ws.title2">Understanding.</span></h2>
-          <p class="section-lead reveal" data-i18n="ws.lead">The intelligence layer of Aurix. It interprets your portfolio and helps you understand what is behind the numbers.</p>
+          <p class="section-lead reveal" data-i18n="ws.lead">The intelligence layer of Aurix interprets your portfolio and helps you understand what is behind the numbers.</p>
         </div>
         <div class="ws-cards">
           <div class="ws-card reveal"><svg class="ws-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg><h3 data-i18n="ws.c1.t">Concentration</h3><p data-i18n="ws.c1.d">Balanced</p><i class="ws-ind"><b style="width:64%"></b></i></div>
@@ -214,67 +226,9 @@
         <h2 class="positioning-title reveal">
           <span data-i18n="pos.title1">Centralize your wealth.</span>
           <span data-i18n="pos.title2">Understand its evolution.</span>
-          <span data-i18n="pos.title3">Discover what is driving your financial growth.</span>
+          <span data-i18n="pos.title3">Discover what drives your financial future.</span>
         </h2>
         <p class="positioning-lead reveal" data-i18n="pos.lead">Aurix transforms fragmented financial data into clarity, context and actionable understanding.</p>
-        <p class="positioning-lead positioning-lead--dim reveal" data-i18n="pos.lead2">Because building wealth is not only about tracking assets. It is about understanding the decisions, trends and forces shaping your financial future.</p>
-      </div>
-    </section>
-
-    <!-- ─────────────── SHOWCASE ─────────────── -->
-    <section class="section section--showcase">
-      <div class="container">
-        <h2 class="section-title reveal" data-i18n="show.title">Built to see your entire wealth as one system.</h2>
-        <p class="section-lead reveal" data-i18n="show.lead">Control, context and clarity in a single interface.</p>
-        <div class="showcase reveal" aria-hidden="true">
-          <!-- Desktop: one dominant dashboard mock -->
-          <div class="shot shot--desktop">
-            <span class="preview-chip" data-i18n="preview.label">Product preview</span>
-            <div class="shot-top"><span class="pv-dot"></span><span class="pv-dot"></span><span class="pv-dot"></span>
-              <div class="shot-nav"><span class="is-active">Dashboard</span><span>Intelligence</span><span>Market</span></div>
-            </div>
-            <div class="shot-body">
-              <div class="shot-main">
-                <span class="mock-label" data-i18n="mock.total">Total Wealth</span>
-                <div class="mock-value-row"><span class="mock-value" data-i18n="mock.value">$4.82M</span><span class="mock-delta" data-i18n="mock.delta">+8.4% YTD</span></div>
-                <div class="shot-chart"><svg viewBox="0 0 520 180" preserveAspectRatio="none">
-                  <path d="M0,140 C70,128 110,70 170,82 C230,94 280,40 340,52 C400,64 450,28 520,36 L520,180 L0,180 Z" fill="url(#lg)"/>
-                  <path class="draw-line" d="M0,140 C70,128 110,70 170,82 C230,94 280,40 340,52 C400,64 450,28 520,36" fill="none" stroke="#7db8ff" stroke-width="2.5"/>
-                </svg></div>
-              </div>
-              <div class="shot-side">
-                <div class="shot-side-card anim-bars">
-                  <span class="mock-label" data-i18n="feat.alloc.t">Allocation</span>
-                  <div class="mock-row"><span data-i18n="asset.stocks">Stocks</span><i class="mock-bar"><b style="width:42%"></b></i></div>
-                  <div class="mock-row"><span data-i18n="asset.funds">Funds</span><i class="mock-bar"><b style="width:24%;background:#7db8ff"></b></i></div>
-                  <div class="mock-row"><span data-i18n="asset.crypto">Crypto</span><i class="mock-bar"><b style="width:16%;background:#9b8cff"></b></i></div>
-                  <div class="mock-row"><span data-i18n="asset.cash">Cash</span><i class="mock-bar"><b style="width:6%;background:#27c768"></b></i></div>
-                </div>
-                <div class="shot-stats">
-                  <div class="mock-stat"><span class="mock-stat-k" data-i18n="mock.health">Health Score</span><span class="mock-stat-v good" data-i18n="mock.health.v">Strong</span></div>
-                  <div class="mock-stat"><span class="mock-stat-k" data-i18n="mock.risk">Risk</span><span class="mock-stat-v" data-i18n="mock.risk.v">Balanced</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <!-- Mobile: iPhone-framed mock -->
-          <div class="phone">
-            <div class="phone-screen">
-              <span class="preview-chip" data-i18n="preview.label">Product preview</span>
-              <span class="mock-label" data-i18n="mock.total">Total Wealth</span>
-              <div class="mock-value-row"><span class="mock-value" data-i18n="mock.value">$4.82M</span><span class="mock-delta" data-i18n="mock.delta">+8.4% YTD</span></div>
-              <div class="mock-chart"><svg viewBox="0 0 280 90" preserveAspectRatio="none">
-                <path d="M0,72 C40,62 70,34 110,40 C150,46 180,20 220,26 C250,30 270,16 280,20 L280,90 L0,90 Z" fill="url(#lg)"/>
-                <path class="draw-line" d="M0,72 C40,62 70,34 110,40 C150,46 180,20 220,26 C250,30 270,16 280,20" fill="none" stroke="#7db8ff" stroke-width="2"/>
-              </svg></div>
-              <div class="mock-alloc anim-bars">
-                <div class="mock-row"><span data-i18n="asset.stocks">Stocks</span><i class="mock-bar"><b style="width:42%"></b></i></div>
-                <div class="mock-row"><span data-i18n="asset.crypto">Crypto</span><i class="mock-bar"><b style="width:16%;background:#9b8cff"></b></i></div>
-                <div class="mock-row"><span data-i18n="asset.cash">Cash</span><i class="mock-bar"><b style="width:6%;background:#27c768"></b></i></div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -320,45 +274,39 @@
       </div>
     </section>
 
-    <!-- ─────────────── LATEST PLATFORM UPDATES ─────────────── -->
-    <!-- Compact "what shipped" strip. Quiet chips, no CTA — proof of momentum. -->
-    <section class="section section--updates" id="updates">
+    <!-- ─────────────── PLATFORM TOOLS / WORKSPACE ─────────────── -->
+    <!-- Sells the Workspace as a real, useful part of Aurix — not a changelog.
+         Compact premium chips, no CTA, no large imagery. -->
+    <section class="section section--updates" id="tools">
       <div class="container updates-inner">
-        <h2 class="section-title reveal" data-i18n="updates.title">Latest platform updates</h2>
+        <h2 class="section-title reveal" data-i18n="updates.title">Professional tools for your financial life.</h2>
+        <p class="section-lead reveal" data-i18n="updates.sub">Plan, simulate and organize key parts of your wealth with practical tools built into Aurix.</p>
         <div class="updates-grid reveal">
           <span class="update-chip" data-i18n="updates.1">Personal Financial Workspace</span>
           <span class="update-chip" data-i18n="updates.2">Real Estate Portfolio</span>
-          <span class="update-chip" data-i18n="updates.3">Goals System</span>
-          <span class="update-chip" data-i18n="updates.4">Compound Interest Calculator</span>
-          <span class="update-chip" data-i18n="updates.5">Scenario Simulator</span>
-          <span class="update-chip" data-i18n="updates.6">Loan Simulator</span>
+          <span class="update-chip" data-i18n="updates.3">Portfolio Goals</span>
+          <span class="update-chip" data-i18n="updates.4">Wealth Growth Tools</span>
+          <span class="update-chip" data-i18n="updates.5">Scenario Analysis</span>
+          <span class="update-chip" data-i18n="updates.6">Financing Analysis</span>
           <span class="update-chip" data-i18n="updates.7">Investment Journal</span>
-          <span class="update-chip" data-i18n="updates.8">Receivables Manager</span>
-          <span class="update-chip" data-i18n="updates.9">Asset Price Tracker</span>
+          <span class="update-chip" data-i18n="updates.8">Cash Flow Management</span>
+          <span class="update-chip" data-i18n="updates.9">Market Monitoring</span>
         </div>
       </div>
     </section>
 
-    <!-- ─────────────── EARLY ACCESS ─────────────── -->
+    <!-- ─────────────── PRIVATE BETA + FOUNDER ACCESS (unified) ─────────────── -->
+    <!-- One premium card. Founder Access is folded in as a benefit line — no
+         second card, no duplicate "Founder Access" heading, single CTA. -->
     <section class="section section--early" id="early-access">
       <div class="container">
-        <!-- Founder Access — small premium card. Benefit framing, no CTA
-             (CTA rule: Request Access only in Hero + Private Beta). -->
-        <div class="founder-card reveal">
-          <span class="founder-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19h14M6 9l3.5 3L12 6l2.5 6L18 9l-1 8H7L6 9z"/></svg>
-          </span>
-          <h3 class="founder-title" data-i18n="founder.title">Founder Access</h3>
-          <p class="founder-text" data-i18n="founder.text">Early users will receive exclusive benefits and opportunities before public launch.</p>
-        </div>
-
-        <!-- Private Beta -->
         <div class="early-card reveal">
           <span class="early-eyebrow" data-i18n="early.eyebrow">Private Beta</span>
           <h2 class="early-title" data-i18n="early.title">Invitation only.</h2>
-          <p class="early-sub" data-i18n="early.sub">Private access for selected early users.</p>
+          <p class="early-sub" data-i18n="early.sub">Aurix is currently opening access to selected early users before public launch.</p>
+          <p class="early-founder" data-i18n="early.founder">Founder Access will be available for early members with exclusive benefits, priority access and permanent founder recognition.</p>
           <button class="btn btn-primary btn-lg" id="openModal" data-i18n="cta.request">Request Access</button>
-          <p class="early-trust" data-i18n="early.trust">Limited Founder Access available.</p>
+          <p class="early-trust" data-i18n="early.trust">Invite-only · No financial promises</p>
         </div>
       </div>
     </section>
@@ -413,16 +361,16 @@
     <div class="container footer-inner">
       <div class="footer-brand">
         <span class="brand">AURIX</span>
-        <p class="footer-tag" data-i18n="footer.tag">Private Wealth OS</p>
+        <p class="footer-tag" data-i18n="footer.tag">Wealth Intelligence Platform</p>
         <!-- AURIX-WEBSITE-MESSAGING-1: footer description — turns the footer into
              a credibility surface that restates the Wealth Intelligence Platform
              positioning. -->
-        <p class="footer-desc" data-i18n="footer.desc">Aurix is a Wealth Intelligence Platform designed to help people centralize their wealth, interpret its evolution and understand what is really driving their financial growth.</p>
+        <p class="footer-desc" data-i18n="footer.desc">Aurix is a Wealth Intelligence Platform designed to help people centralize their wealth, understand its evolution and gain clarity over their financial future.</p>
       </div>
       <div class="footer-cols">
         <div class="footer-col">
-          <h4 data-i18n="footer.product">Product</h4>
-          <a href="#product" data-i18n="nav.product">Product</a>
+          <h4 data-i18n="footer.product">Platform</h4>
+          <a href="#product" data-i18n="nav.product">Platform</a>
           <a href="#workspace" data-i18n="nav.workspace">Intelligence</a>
           <a href="#roadmap" data-i18n="nav.roadmap">Roadmap</a>
         </div>
