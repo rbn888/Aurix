@@ -8,7 +8,7 @@
   /* ── Translations ───────────────────────────────────── */
   var I18N = {
     es: {
-      'nav.product': 'Producto', 'nav.workspace': 'Workspace', 'nav.roadmap': 'Roadmap', 'nav.early': 'Acceso anticipado',
+      'nav.product': 'Producto', 'nav.workspace': 'Inteligencia', 'nav.roadmap': 'Roadmap', 'nav.early': 'Acceso anticipado',
       'cta.enter': 'Entrar en Aurix', 'cta.request': 'Solicitar acceso',
 
       'hero.eyebrow': 'Sistema privado de patrimonio',
@@ -48,9 +48,9 @@
       'show.title': 'Diseñado para ver todo tu patrimonio como un único sistema.',
       'show.lead': 'Control, contexto y claridad en una sola interfaz.',
 
-      'ws.eyebrow': 'Workspace',
+      'ws.eyebrow': 'Inteligencia',
       'ws.title1': 'Más que seguimiento.', 'ws.title2': 'Comprensión.',
-      'ws.lead': 'La capa de inteligencia de Aurix.',
+      'ws.lead': 'La capa de inteligencia de Aurix. Interpreta tu cartera y te ayuda a entender qué hay detrás de los números.',
       'ws.tag.health': 'Health Score', 'ws.tag.risk': 'Señales de riesgo', 'ws.tag.analysis': 'Análisis de cartera', 'ws.tag.actions': 'Insights accionables',
       'ws.c1.t': 'Concentración', 'ws.c1.d': 'Equilibrada',
       'ws.c2.t': 'Diversificación', 'ws.c2.d': 'Amplia',
@@ -62,18 +62,27 @@
 
       'roadmap.title': 'Hacia dónde va Aurix.',
       'roadmap.now': 'Ahora', 'roadmap.next': 'Próximo', 'roadmap.later': 'Después',
-      'rm.now.1': 'Dashboard de patrimonio', 'rm.now.2': 'Inteligencia de asignación', 'rm.now.3': 'Seguimiento de mercado', 'rm.now.4': 'Workspace',
-      'rm.next.1': 'Métricas avanzadas', 'rm.next.2': 'Salud de cartera ampliada', 'rm.next.3': 'Seguimiento de objetivos', 'rm.next.4': 'Planificación patrimonial',
-      'rm.later.1': 'App nativa iOS', 'rm.later.2': 'App nativa Android', 'rm.later.3': 'Insights asistidos por IA', 'rm.later.4': 'Capa de automatización',
+      'rm.now.1': 'Dashboard de patrimonio', 'rm.now.2': 'Seguimiento de mercado', 'rm.now.3': 'Workspace financiero personal', 'rm.now.4': 'Cartera inmobiliaria', 'rm.now.5': 'Sistema de objetivos', 'rm.now.6': 'Herramientas de seguimiento patrimonial',
+      'rm.next.1': 'Centro de inteligencia', 'rm.next.2': 'Salud de cartera', 'rm.next.3': 'Acceso Fundador', 'rm.next.4': 'Membresía premium',
+      'rm.later.1': 'Automatización avanzada', 'rm.later.2': 'Insights asistidos por IA', 'rm.later.3': 'Integraciones ampliadas', 'rm.later.4': 'Herramientas de planificación patrimonial',
+
+      'updates.title': 'Últimas novedades de la plataforma',
+      'updates.1': 'Workspace financiero personal', 'updates.2': 'Cartera inmobiliaria', 'updates.3': 'Sistema de objetivos',
+      'updates.4': 'Calculadora de interés compuesto', 'updates.5': 'Simulador de escenarios', 'updates.6': 'Simulador de préstamos',
+      'updates.7': 'Diario de inversiones', 'updates.8': 'Gestor de cobros', 'updates.9': 'Seguimiento de precios de activos',
+
+      'founder.eyebrow': 'Acceso Fundador',
+      'founder.title': 'Acceso Fundador',
+      'founder.text': 'Los primeros usuarios recibirán beneficios y oportunidades exclusivas antes del lanzamiento público.',
 
       'early.eyebrow': 'Beta privada',
       'early.title': 'Solo por invitación.',
-      'early.sub': 'Acceso privado para usuarios seleccionados.',
+      'early.sub': 'Acceso privado para los primeros usuarios seleccionados.',
       'early.name': 'Nombre', 'early.email': 'Email', 'early.button': 'Solicitar acceso',
       'early.note': 'No compartiremos tu información. Beta privada · plazas limitadas.',
       'early.invalid': 'Revisa tu nombre y un email válido.',
       'early.success': 'Solicitud recibida. Te contactaremos pronto.',
-      'early.trust': 'Acceso por invitación · Sin promesas financieras',
+      'early.trust': 'Plazas de Acceso Fundador limitadas.',
       'modal.title': 'Solicita acceso privado.',
       'modal.sub': 'Déjanos tus datos y contactaremos con usuarios seleccionados.',
       'footer.tag': 'Private Wealth OS',
@@ -97,7 +106,7 @@
       'meta.desc': 'Controla, entiende y gestiona todo tu patrimonio — acciones, fondos, cripto, inmuebles, metales y liquidez — desde una sola plataforma.'
     },
     en: {
-      'nav.product': 'Product', 'nav.workspace': 'Workspace', 'nav.roadmap': 'Roadmap', 'nav.early': 'Early Access',
+      'nav.product': 'Product', 'nav.workspace': 'Intelligence', 'nav.roadmap': 'Roadmap', 'nav.early': 'Early Access',
       'cta.enter': 'Enter Aurix', 'cta.request': 'Request Access',
 
       'hero.eyebrow': 'Private Wealth OS',
@@ -137,9 +146,9 @@
       'show.title': 'Built to see your entire wealth as one system.',
       'show.lead': 'Control, context and clarity in a single interface.',
 
-      'ws.eyebrow': 'Workspace',
+      'ws.eyebrow': 'Intelligence',
       'ws.title1': 'More than tracking.', 'ws.title2': 'Understanding.',
-      'ws.lead': 'The intelligence layer of Aurix.',
+      'ws.lead': 'The intelligence layer of Aurix. It interprets your portfolio and helps you understand what is behind the numbers.',
       'ws.tag.health': 'Health Score', 'ws.tag.risk': 'Risk signals', 'ws.tag.analysis': 'Portfolio analysis', 'ws.tag.actions': 'Actionable insights',
       'ws.c1.t': 'Concentration', 'ws.c1.d': 'Balanced',
       'ws.c2.t': 'Diversification', 'ws.c2.d': 'Broad',
@@ -151,18 +160,27 @@
 
       'roadmap.title': 'Where Aurix is heading.',
       'roadmap.now': 'Now', 'roadmap.next': 'Next', 'roadmap.later': 'Later',
-      'rm.now.1': 'Portfolio Dashboard', 'rm.now.2': 'Allocation Intelligence', 'rm.now.3': 'Market Tracking', 'rm.now.4': 'Workspace',
-      'rm.next.1': 'Advanced Metrics', 'rm.next.2': 'Portfolio Health Expansion', 'rm.next.3': 'Goal Tracking', 'rm.next.4': 'Wealth Planning',
-      'rm.later.1': 'Native iOS App', 'rm.later.2': 'Native Android App', 'rm.later.3': 'AI Assisted Insights', 'rm.later.4': 'Automation Layer',
+      'rm.now.1': 'Portfolio Dashboard', 'rm.now.2': 'Market Tracking', 'rm.now.3': 'Personal Financial Workspace', 'rm.now.4': 'Real Estate Portfolio', 'rm.now.5': 'Goals System', 'rm.now.6': 'Wealth Tracking Tools',
+      'rm.next.1': 'Intelligence Center', 'rm.next.2': 'Portfolio Health', 'rm.next.3': 'Founder Access', 'rm.next.4': 'Premium Membership',
+      'rm.later.1': 'Advanced Automation', 'rm.later.2': 'AI-Assisted Insights', 'rm.later.3': 'Expanded Integrations', 'rm.later.4': 'Wealth Planning Tools',
+
+      'updates.title': 'Latest platform updates',
+      'updates.1': 'Personal Financial Workspace', 'updates.2': 'Real Estate Portfolio', 'updates.3': 'Goals System',
+      'updates.4': 'Compound Interest Calculator', 'updates.5': 'Scenario Simulator', 'updates.6': 'Loan Simulator',
+      'updates.7': 'Investment Journal', 'updates.8': 'Receivables Manager', 'updates.9': 'Asset Price Tracker',
+
+      'founder.eyebrow': 'Founder Access',
+      'founder.title': 'Founder Access',
+      'founder.text': 'Early users will receive exclusive benefits and opportunities before public launch.',
 
       'early.eyebrow': 'Private Beta',
       'early.title': 'Invitation only.',
-      'early.sub': 'Private access for selected users.',
+      'early.sub': 'Private access for selected early users.',
       'early.name': 'Name', 'early.email': 'Email', 'early.button': 'Request Access',
       'early.note': 'We will not share your information. Private beta · limited spots.',
       'early.invalid': 'Please check your name and a valid email.',
       'early.success': 'Request received. We’ll be in touch.',
-      'early.trust': 'Invite-only · No financial promises',
+      'early.trust': 'Limited Founder Access available.',
       'modal.title': 'Request private access.',
       'modal.sub': 'Leave your details and we’ll contact selected users.',
       'footer.tag': 'Private Wealth OS',
@@ -188,14 +206,15 @@
   };
 
   var LS_KEY = 'aurix_lang';
-  var lang = 'es';
+  var lang = 'en';
 
   function detectLang() {
+    // English by default. Spanish stays available via the ES/EN toggle and is
+    // remembered once chosen — we no longer auto-switch from the browser locale.
     var stored;
     try { stored = localStorage.getItem(LS_KEY); } catch (_) {}
     if (stored === 'es' || stored === 'en') return stored;
-    var nav = ((navigator.language || navigator.userLanguage || 'en') + '').toLowerCase();
-    return nav.indexOf('es') === 0 ? 'es' : 'en';
+    return 'en';
   }
 
   function applyLang(next) {
