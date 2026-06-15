@@ -156,6 +156,11 @@
     // Keep the document language in sync for a11y; the splash itself is
     // now text-only (just the wordmark) so there is no status copy to set.
     try {
+      // AURIX-WAITLIST-1: honor a cross-origin ?lang= handoff from the landing
+      // (localStorage is not shared across origins). Persist it so the app and
+      // a login bounce both render in the chosen language.
+      var _p = new URLSearchParams(location.search).get('lang');
+      if (_p === 'en' || _p === 'es') localStorage.setItem('portfolio_lang', _p);
       var lang = localStorage.getItem('portfolio_lang') || 'es';
       document.documentElement.lang = lang;
     } catch (_) {}

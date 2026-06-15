@@ -79,6 +79,10 @@
       'early.name': 'Nombre', 'early.email': 'Email', 'early.button': 'Solicitar acceso',
       'early.note': 'No compartiremos tu información. Beta privada · plazas limitadas.',
       'early.invalid': 'Revisa tu nombre y un email válido.',
+      'early.sending': 'Enviando…',
+      'early.dup': 'Ya estás en la lista de espera de Aurix.',
+      'early.rate': 'Demasiados intentos. Inténtalo de nuevo más tarde.',
+      'early.error': 'Algo salió mal. Inténtalo de nuevo.',
       'early.success': 'Solicitud recibida. Te contactaremos pronto.',
       'early.trust': 'Acceso por invitación · Sin promesas financieras',
       'modal.title': 'Solicita acceso privado.',
@@ -175,6 +179,10 @@
       'early.name': 'Name', 'early.email': 'Email', 'early.button': 'Request Access',
       'early.note': 'We will not share your information. Private beta · limited spots.',
       'early.invalid': 'Please check your name and a valid email.',
+      'early.sending': 'Sending…',
+      'early.dup': 'You’re already on the Aurix waitlist.',
+      'early.rate': 'Too many attempts. Please try again later.',
+      'early.error': 'Something went wrong. Please try again.',
       'early.success': 'Request received. We’ll be in touch.',
       'early.trust': 'Invite-only · No financial promises',
       'modal.title': 'Request private access.',
@@ -245,6 +253,9 @@
     // Keep the animated wealth figure in the active language (final value).
     var cv = document.getElementById('countValue');
     if (cv && !cv.dataset.counting) cv.textContent = fmtWealth(WEALTH_TARGET);
+
+    // Keep "Enter Aurix" links carrying the active language across origins.
+    updateAppLinks();
   }
 
   // Fictional headline wealth figure (labelled "Product preview"). ES: 4,82 M€ · EN: $4.82M
@@ -261,13 +272,24 @@
   // live (the HTML href is the same live fallback for no-JS).
   var APP_URL = 'https://rbn888.github.io/Aurix/';
 
+  // AURIX-WAITLIST-1: lead-capture endpoint (Vercel, same backend as the app API).
+  var WAITLIST_ENDPOINT = 'https://isa-portfolio-ten.vercel.app/api/waitlist';
+
+  // Cross-origin language handoff: localStorage is NOT shared between
+  // aurixsystem.io and the app origin, so we pass ?lang= on every "Enter Aurix"
+  // link; login.html / index.html read it into their own 'portfolio_lang'.
+  function appUrlForLang() { return APP_URL + '?lang=' + (lang === 'en' ? 'en' : 'es'); }
+  function updateAppLinks() {
+    var links = document.querySelectorAll('[data-app-link]');
+    for (var i = 0; i < links.length; i++) links[i].setAttribute('href', appUrlForLang());
+  }
+
   /* ── Init ───────────────────────────────────────────── */
   function init() {
     applyLang(detectLang());
 
-    // Point every "Enter Aurix" CTA at the canonical app URL.
-    var appLinks = document.querySelectorAll('[data-app-link]');
-    for (var a = 0; a < appLinks.length; a++) appLinks[a].setAttribute('href', APP_URL);
+    // Point every "Enter Aurix" CTA at the canonical app URL (with ?lang=).
+    updateAppLinks();
 
     // Language toggle
     document.addEventListener('click', function (e) {
@@ -375,7 +397,8 @@
       if (e.key === 'Escape' && modal && modal.classList.contains('open')) closeModal();
     });
 
-    // Early-access form — placeholder behavior (no backend yet)
+    // AURIX-WAITLIST-1: Request Access form — persists the lead to the
+    // /api/waitlist endpoint (Supabase) and triggers one welcome email.
     var form = document.getElementById('earlyForm');
     if (form) {
       form.addEventListener('submit', function (e) {
@@ -383,6 +406,7 @@
         var name = form.querySelector('#ea-name');
         var email = form.querySelector('#ea-email');
         var note = document.getElementById('earlyNote');
+        var submit = form.querySelector('button[type="submit"]');
         var emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((email.value || '').trim());
         var nameOk = (name.value || '').trim().length >= 2;
         name.classList.toggle('invalid', !nameOk);
@@ -392,10 +416,42 @@
           note.textContent = t('early.invalid');
           return;
         }
-        note.classList.add('ok');
-        note.textContent = t('early.success');
-        form.querySelector('button[type="submit"]').disabled = true;
-        // TODO: POST to early-access endpoint when the backend exists.
+
+        // In-flight UI
+        note.classList.remove('ok');
+        note.textContent = t('early.sending');
+        submit.disabled = true;
+
+        fetch(WAITLIST_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name.value.trim(),
+            email: email.value.trim(),
+            locale: lang,
+            source: 'landing'
+          })
+        }).then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (data) {
+            return { ok: r.ok && data && data.ok, status: r.status, data: data };
+          });
+        }).then(function (res) {
+          if (res.ok) {
+            note.classList.add('ok');
+            // Friendly message when the email is already on the waitlist.
+            note.textContent = (res.data && res.data.duplicate) ? t('early.dup') : t('early.success');
+            // submit stays disabled — nothing more to do
+          } else {
+            note.classList.remove('ok');
+            // 429 = rate limited → friendly "too many attempts" message.
+            note.textContent = (res.status === 429) ? t('early.rate') : t('early.error');
+            submit.disabled = false; // allow retry
+          }
+        }).catch(function () {
+          note.classList.remove('ok');
+          note.textContent = t('early.error');
+          submit.disabled = false;
+        });
       });
     }
 

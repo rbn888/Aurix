@@ -275,14 +275,14 @@
     </div>
 
     <div class="beta-card">
-      <div class="beta-access-label">Acceso privado</div>
-      <p class="beta-hint">Aurix se encuentra actualmente en beta privada. Introduce tu código de invitación para continuar.</p>
+      <div class="beta-access-label" data-i18n="lg.access">Acceso privado</div>
+      <p class="beta-hint" data-i18n="lg.hint">Aurix se encuentra actualmente en beta privada. Introduce tu código de invitación para continuar.</p>
 
       <!-- Invite gate -->
       <div class="invite-section">
         <div class="invite-row">
           <input id="inviteCode" class="auth-input" type="text"
-                 placeholder="Código de invitación"
+                 placeholder="Código de invitación" data-i18n-ph="lg.invitePh"
                  autocomplete="off" spellcheck="false">
           <svg id="inviteCheck" class="invite-check" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
@@ -292,29 +292,29 @@
 
       <!-- Email step (locked until invite) -->
       <div id="authSection" class="auth-section locked">
-        <h2 class="auth-title">Acceder</h2>
+        <h2 class="auth-title" data-i18n="lg.signin">Acceder</h2>
         <input id="email" type="email" class="auth-input"
-               placeholder="correo electrónico"
+               placeholder="correo electrónico" data-i18n-ph="lg.emailPh"
                autocomplete="email" disabled>
-        <button id="auth-submit" class="auth-btn" disabled>Enviar código de acceso</button>
+        <button id="auth-submit" class="auth-btn" data-i18n="lg.sendCode" disabled>Enviar código de acceso</button>
         <p id="auth-error" class="auth-error"></p>
       </div>
 
       <!-- OTP step (shown after email is sent) -->
       <div id="otpSection" class="auth-section" style="display:none">
-        <h2 class="auth-title">Verificar código</h2>
-        <p class="otp-hint">Estamos enviando el código de acceso a:</p>
+        <h2 class="auth-title" data-i18n="lg.verify">Verificar código</h2>
+        <p class="otp-hint" data-i18n="lg.otpHint">Estamos enviando el código de acceso a:</p>
         <p class="otp-dest" id="otpDestEmail"></p>
         <input id="otp-code" type="text" inputmode="numeric" pattern="[0-9]*"
                class="auth-input otp-input" placeholder="00000000"
                maxlength="8" autocomplete="one-time-code">
-        <button id="otp-submit" class="auth-btn">Verificar código</button>
+        <button id="otp-submit" class="auth-btn" data-i18n="lg.verify">Verificar código</button>
         <p id="otp-error" class="auth-error"></p>
-        <button id="otp-resend" type="button" class="auth-link">Reenviar código</button>
-        <p class="auth-link" id="otp-back">Usar otro email</p>
+        <button id="otp-resend" type="button" class="auth-link" data-i18n="lg.resend">Reenviar código</button>
+        <p class="auth-link" id="otp-back" data-i18n="lg.otherEmail">Usar otro email</p>
       </div>
 
-      <p class="beta-version">Private Beta &bull; v0.1</p>
+      <p class="beta-version"><span data-i18n="lg.privateBeta">Private Beta</span> &bull; v0.1</p>
     </div>
 
   </div>
@@ -407,6 +407,87 @@
       client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     }
 
+    // ── i18n (EN/ES) ───────────────────────────────────────────
+    // Language resolution: ?lang= handoff from the landing (cross-origin, since
+    // localStorage is not shared) → else the shared 'portfolio_lang' key → else
+    // Spanish. The choice is persisted so index.html stays in the same language
+    // after sign-in. No more hardcoded Spanish on this screen.
+    const LOGIN_LANG = (function () {
+      try {
+        const p = new URLSearchParams(location.search).get('lang');
+        if (p === 'en' || p === 'es') { localStorage.setItem('portfolio_lang', p); return p; }
+        const s = localStorage.getItem('portfolio_lang');
+        if (s === 'en' || s === 'es') return s;
+      } catch (_) {}
+      return 'es';
+    })();
+    document.documentElement.lang = LOGIN_LANG;
+    const LOGIN_I18N = {
+      es: {
+        'lg.title': 'AURIX — Acceso',
+        'lg.access': 'Acceso privado',
+        'lg.hint': 'Aurix se encuentra actualmente en beta privada. Introduce tu código de invitación para continuar.',
+        'lg.invitePh': 'Código de invitación',
+        'lg.signin': 'Acceder',
+        'lg.emailPh': 'correo electrónico',
+        'lg.sendCode': 'Enviar código de acceso',
+        'lg.verify': 'Verificar código',
+        'lg.otpHint': 'Estamos enviando el código de acceso a:',
+        'lg.resend': 'Reenviar código',
+        'lg.otherEmail': 'Usar otro email',
+        'lg.privateBeta': 'Beta privada',
+        'lg.err.email': 'Introduce un email válido',
+        'lg.err.otpFormat': 'Introduce un código válido (6-8 dígitos).',
+        'lg.err.rate': 'Demasiados intentos. Espera unos segundos.',
+        'lg.err.otp-invalid': 'Código incorrecto o caducado.',
+        'lg.err.network': 'No se pudo conectar. Revisa tu conexión.',
+        'lg.err.generic': 'No se pudo completar la operación. Inténtalo de nuevo.',
+        'lg.btn.sending': 'Enviando código...',
+        'lg.btn.verifying': 'Verificando...',
+        'lg.btn.resending': 'Reenviando...',
+        'lg.otp.resent': 'Nuevo código enviado. Revisa tu email.',
+        'lg.cooldown': 'Demasiados intentos. Espera {n}s',
+        'lg.resendIn': 'Reenviar en {n}s'
+      },
+      en: {
+        'lg.title': 'AURIX — Access',
+        'lg.access': 'Private access',
+        'lg.hint': 'Aurix is currently in private beta. Enter your invitation code to continue.',
+        'lg.invitePh': 'Invitation code',
+        'lg.signin': 'Sign in',
+        'lg.emailPh': 'email address',
+        'lg.sendCode': 'Send access code',
+        'lg.verify': 'Verify code',
+        'lg.otpHint': 'We’re sending the access code to:',
+        'lg.resend': 'Resend code',
+        'lg.otherEmail': 'Use another email',
+        'lg.privateBeta': 'Private Beta',
+        'lg.err.email': 'Enter a valid email',
+        'lg.err.otpFormat': 'Enter a valid code (6–8 digits).',
+        'lg.err.rate': 'Too many attempts. Please wait a few seconds.',
+        'lg.err.otp-invalid': 'Incorrect or expired code.',
+        'lg.err.network': 'Could not connect. Check your connection.',
+        'lg.err.generic': 'Something went wrong. Please try again.',
+        'lg.btn.sending': 'Sending code…',
+        'lg.btn.verifying': 'Verifying…',
+        'lg.btn.resending': 'Resending…',
+        'lg.otp.resent': 'New code sent. Check your email.',
+        'lg.cooldown': 'Too many attempts. Wait {n}s',
+        'lg.resendIn': 'Resend in {n}s'
+      }
+    };
+    function tL(k) { return (LOGIN_I18N[LOGIN_LANG] && LOGIN_I18N[LOGIN_LANG][k]) || LOGIN_I18N.es[k] || ''; }
+    function applyLoginI18n() {
+      const tt = tL('lg.title'); if (tt) document.title = tt;
+      document.querySelectorAll('[data-i18n]').forEach(function (n) {
+        const v = tL(n.getAttribute('data-i18n')); if (v) n.textContent = v;
+      });
+      document.querySelectorAll('[data-i18n-ph]').forEach(function (n) {
+        const v = tL(n.getAttribute('data-i18n-ph')); if (v) n.setAttribute('placeholder', v);
+      });
+    }
+    applyLoginI18n();
+
     const _SAFE_REDIRECT_TARGETS = new Set([
       'index.html',
       'login.html',
@@ -460,12 +541,7 @@
     // We never show raw Supabase error text to the user — every error
     // is classified into one of the known buckets below. Generic stays
     // as the safe fallback so a future SDK error string never leaks.
-    const AUTH_ERROR_TEXT = {
-      rate:          'Demasiados intentos. Espera unos segundos.',
-      'otp-invalid': 'Código incorrecto o caducado.',
-      network:       'No se pudo conectar. Revisa tu conexión.',
-      generic:       'No se pudo completar la operación. Inténtalo de nuevo.',
-    };
+    function authErr(cls) { return tL('lg.err.' + cls) || tL('lg.err.generic'); }
     function _classifyAuthError(err) {
       const msg    = ((err && (err.message || err.error_description)) || '').toLowerCase();
       const status = (err && (err.status || err.statusCode)) || 0;
@@ -475,7 +551,7 @@
       return 'generic';
     }
     function _authErrorText(err) {
-      return AUTH_ERROR_TEXT[_classifyAuthError(err)] || AUTH_ERROR_TEXT.generic;
+      return authErr(_classifyAuthError(err));
     }
 
     // ── Invite gate ────────────────────────────────────────────
@@ -577,7 +653,7 @@
       otpCodeEl.value            = '';
       otpErrorEl.innerText       = '';
       otpSubmitBtn.disabled      = true;
-      otpSubmitBtn.innerText     = 'Verificar código';
+      otpSubmitBtn.innerText     = tL('lg.verify');
       otpCodeEl.focus();
     }
 
@@ -610,12 +686,12 @@
     function updateSubmitState() {
       if (cooldown) {
         submitBtn.disabled  = true;
-        submitBtn.innerText = 'Enviar código de acceso';
+        submitBtn.innerText = tL('lg.sendCode');
         return;
       }
       const validEmail = _isValidEmail(emailEl.value);
       submitBtn.disabled  = !validEmail;
-      submitBtn.innerText = 'Enviar código de acceso';
+      submitBtn.innerText = tL('lg.sendCode');
     }
 
     function clearTimer() {
@@ -644,7 +720,7 @@
         const remaining = Math.ceil((until - Date.now()) / 1000);
         if (remaining <= 0) { resetCooldownState(); return; }
         errorEl.style.color = 'orange';
-        errorEl.innerText = `Demasiados intentos. Espera ${remaining}s`;
+        errorEl.innerText = tL('lg.cooldown').replace('{n}', remaining);
       };
 
       tick();
@@ -674,7 +750,7 @@
         const email = emailEl.value.trim();
         if (!_isValidEmail(email)) {
           errorEl.style.color = 'var(--red)';
-          errorEl.innerText = 'Introduce un email válido';
+          errorEl.innerText = tL('lg.err.email');
           return;
         }
 
@@ -686,7 +762,7 @@
         }
 
         errorEl.innerText = '';
-        window.setButtonBusy(submitBtn, true, 'Enviando código...');
+        window.setButtonBusy(submitBtn, true, tL('lg.btn.sending'));
 
         console.log('OTP REQUEST FIRED');
 
@@ -754,12 +830,12 @@
 
         if (!/^\d{6,8}$/.test(code)) {
           otpErrorEl.style.color = 'var(--red)';
-          otpErrorEl.innerText   = 'Introduce un código válido (6-8 dígitos).';
+          otpErrorEl.innerText   = tL('lg.err.otpFormat');
           return;
         }
 
         otpErrorEl.innerText = '';
-        window.setButtonBusy(otpSubmitBtn, true, 'Verificando...');
+        window.setButtonBusy(otpSubmitBtn, true, tL('lg.btn.verifying'));
 
         let verifyErr = null;
         try {
@@ -782,9 +858,7 @@
           // error object without a clear class — verifyOtp failures
           // are almost always wrong/expired codes.
           const cls = _classifyAuthError(verifyErr);
-          const txt = (cls === 'network' || cls === 'rate')
-            ? AUTH_ERROR_TEXT[cls]
-            : AUTH_ERROR_TEXT['otp-invalid'];
+          const txt = authErr((cls === 'network' || cls === 'rate') ? cls : 'otp-invalid');
           // Skip the two normal-user-feedback buckets ('otp-invalid' = wrong
           // or expired code, 'rate' = throttled). Only network/generic
           // failures reach the reporter.
@@ -819,7 +893,7 @@
     function _resetResendButton() {
       _clearResendTimer();
       otpResendEl.disabled  = false;
-      otpResendEl.innerText = 'Reenviar código';
+      otpResendEl.innerText = tL('lg.resend');
     }
     function _startResendCooldown(seconds) {
       _clearResendTimer();
@@ -828,7 +902,7 @@
       const tick = () => {
         const remaining = Math.ceil((until - Date.now()) / 1000);
         if (remaining <= 0) { _resetResendButton(); return; }
-        otpResendEl.innerText = `Reenviar en ${remaining}s`;
+        otpResendEl.innerText = tL('lg.resendIn').replace('{n}', remaining);
       };
       tick();
       _resendTimer = setInterval(tick, 1000);
@@ -841,7 +915,7 @@
 
       isResending = true;
       otpErrorEl.innerText = '';
-      window.setButtonBusy(otpResendEl, true, 'Reenviando...');
+      window.setButtonBusy(otpResendEl, true, tL('lg.btn.resending'));
 
       let resendErr = null;
       try {
@@ -867,7 +941,7 @@
         }
       } else {
         otpErrorEl.style.color = 'var(--text-muted)';
-        otpErrorEl.innerText   = 'Nuevo código enviado. Revisa tu email.';
+        otpErrorEl.innerText   = tL('lg.otp.resent');
         _startResendCooldown(30);
       }
       isResending = false;
