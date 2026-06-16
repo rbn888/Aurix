@@ -8,7 +8,7 @@
   /* ── Translations ───────────────────────────────────── */
   var I18N = {
     es: {
-      'nav.product': 'Plataforma', 'nav.workspace': 'Inteligencia', 'nav.roadmap': 'Roadmap', 'nav.early': 'Acceso anticipado',
+      'nav.product': 'Plataforma', 'nav.market': 'Mercado', 'nav.workspace': 'Inteligencia', 'nav.roadmap': 'Roadmap', 'nav.early': 'Acceso anticipado',
       'cta.enter': 'Entrar en Aurix', 'cta.request': 'Solicitar acceso',
 
       'hero.eyebrow': 'Sistema operativo del patrimonio',
@@ -60,6 +60,12 @@
       'ws.c6.t': 'Insights', 'ws.c6.d': 'Accionables',
       'ws.c7.t': 'Inteligencia', 'ws.c7.d': 'Contexto patrimonial',
 
+      'market.eyebrow': 'Mercado',
+      'market.title': 'Consulta los mercados desde un único lugar.',
+      'market.lead': 'Sigue cualquier activo relevante desde una interfaz profesional: el contexto de mercado que necesitas para entender qué ocurre con tus inversiones, no solo tu patrimonio.',
+      'market.1': 'Acciones', 'market.2': 'ETFs', 'market.3': 'Fondos', 'market.4': 'Cripto',
+      'market.5': 'Materias primas', 'market.6': 'Índices', 'market.7': 'Mercados globales',
+
       'roadmap.title': 'Hacia dónde va Aurix.',
       'roadmap.now': 'Ahora', 'roadmap.next': 'Próximo', 'roadmap.later': 'Después',
       'rm.now.1': 'Dashboard de patrimonio', 'rm.now.2': 'Seguimiento de mercado', 'rm.now.3': 'Workspace financiero personal', 'rm.now.4': 'Cartera inmobiliaria', 'rm.now.5': 'Sistema de objetivos', 'rm.now.6': 'Herramientas de seguimiento patrimonial',
@@ -108,7 +114,7 @@
       'meta.desc': 'Controla, entiende y gestiona todo tu patrimonio — acciones, fondos, cripto, inmuebles, metales y liquidez — desde una sola plataforma.'
     },
     en: {
-      'nav.product': 'Platform', 'nav.workspace': 'Intelligence', 'nav.roadmap': 'Roadmap', 'nav.early': 'Early Access',
+      'nav.product': 'Platform', 'nav.market': 'Market', 'nav.workspace': 'Intelligence', 'nav.roadmap': 'Roadmap', 'nav.early': 'Early Access',
       'cta.enter': 'Enter Aurix', 'cta.request': 'Request Access',
 
       'hero.eyebrow': 'Wealth Operating System',
@@ -159,6 +165,12 @@
       'ws.c5.t': 'Portfolio health', 'ws.c5.d': 'Strong',
       'ws.c6.t': 'Insights', 'ws.c6.d': 'Actionable',
       'ws.c7.t': 'Intelligence', 'ws.c7.d': 'Wealth context',
+
+      'market.eyebrow': 'Market',
+      'market.title': 'Follow the markets from one place.',
+      'market.lead': 'Track any relevant asset from a professional interface — the market context you need to understand what is happening with your investments, not just your wealth.',
+      'market.1': 'Stocks', 'market.2': 'ETFs', 'market.3': 'Funds', 'market.4': 'Crypto',
+      'market.5': 'Commodities', 'market.6': 'Indices', 'market.7': 'Global markets',
 
       'roadmap.title': 'Where Aurix is heading.',
       'roadmap.now': 'Now', 'roadmap.next': 'Next', 'roadmap.later': 'Later',

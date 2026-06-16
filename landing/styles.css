@@ -802,6 +802,13 @@ body.modal-open{ overflow:hidden; }
   .update-chip{ padding:14px 16px; font-size:14px; }
 }
 
+/* ── Market ─────────────────────────────────────────────
+   Reuses .updates-inner / .updates-grid / .update-chip; only needs the
+   section frame (border-top + rhythm). Eyebrow sits centered above title. */
+.section--market{ border-top:1px solid var(--border); padding:64px 0; }
+.section--market .eyebrow{ display:inline-block; margin-bottom:14px; }
+@media (max-width:560px){ .section--market{ padding:48px 0; } }
+
 /* ── Fragmentation consequences — one elegant conclusion line ─────────── */
 .section--problem .frag-grid{ margin-bottom:36px; }
 .pain-line{
