@@ -16445,7 +16445,7 @@ body.gs-open { overflow: hidden; }
   .hero-left .summary-footer {
     order: 1;
     position: relative;
-    padding-top: 22px;
+    padding-top: 34px;   /* AURIX-DASH-V4.1: more air between the separator and the buttons (was 22) */
     padding-left: 4px;   /* AURIX-DASH-V4: tiny right-nudge so the buttons balance optically with the wealth block (not flush to the edge) */
   }
   /* AURIX-DASH-V3: premium 1px Aurix-gradient separator between the wealth
@@ -16460,7 +16460,7 @@ body.gs-open { overflow: hidden; }
   /* The health pill now lives INSIDE the capsule — keep its gap from the meta
      row; order/align-self are no-ops in the (block) capsule but harmless. */
   .hero-left .aurix-signal {
-    margin-top: var(--space-4);   /* meta → health gap inside the capsule */
+    margin-top: 30px;   /* AURIX-DASH-V4.1: more air between patrimonial info and the intelligence pill (was var(--space-4)=20) */
     align-self: flex-start;
     width: fit-content;
     max-width: 100%;
@@ -16513,10 +16513,10 @@ body.gs-open { overflow: hidden; }
      to a distinct lower "intelligence" layer — leaving a bottom gap that
      optically matches the top margin above "VALOR TOTAL" (padding-top ==
      padding-bottom == --space-5). Buttons + pill themselves are untouched. */
-  .hero-left { padding-bottom: var(--space-5); }
+  .hero-left { padding-bottom: 34px; }   /* AURIX-DASH-V4.1: bottom cushion so the block breathes (was var(--space-5)=24) */
   /* AURIX-DASH-V3: buttons sit just below the capsule (with the gradient divider
      between), not floated to the column bottom. Health pill is inside the capsule. */
-  .hero-left .summary-footer { margin-top: 22px; }
+  .hero-left .summary-footer { margin-top: 30px; }   /* AURIX-DASH-V4.1: lower the separator a touch (was 22) */
   /* "Añadir liquidez" — equal-weight contrast at desktop. Stays NEUTRAL
      (not Aurix-blue), so it reads as an equal action, never a second primary. */
   .summary-footer .btn-summary-action.btn-secondary {
