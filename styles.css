@@ -9652,15 +9652,30 @@ main { padding-bottom: 72px; }
     display: block;
     margin: var(--space-1) 0;
     padding: var(--slide-pad-top) var(--slide-pad-x) var(--space-2) !important;
-    background: var(--surface-2);
-    border: 1px solid var(--border-subtle);
+    /* AURIX-MOBILE-HERO-V1: mobile chart card on the Intelligence/Hero blue-glass
+       system (was flat --surface-2 that read dark/old). */
+    background:
+      radial-gradient(130% 120% at 10% 0%, rgba(74,130,240,0.10), transparent 58%),
+      linear-gradient(165deg, rgba(30,44,74,0.44), rgba(15,21,37,0.52));
+    border: 1px solid rgba(74,130,240,0.16);
     border-radius: var(--radius-lg);
     overflow: hidden;
-    box-shadow: var(--shadow);
-    transition: border-color var(--dur-med) var(--ease-premium);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.05),
+      0 8px 24px -16px rgba(0,0,0,0.55),
+      0 0 22px -12px rgba(74,130,240,0.16);
+    transition: border-color var(--dur-med) var(--ease-premium),
+                box-shadow var(--dur-med) var(--ease-out);
   }
 
-  .portfolio-slider-card:hover { border-color: var(--border-hi); }
+  .portfolio-slider-card:hover,
+  .portfolio-slider-card:active {
+    border-color: rgba(74,130,240,0.40);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.05),
+      0 12px 30px -16px rgba(0,0,0,0.5),
+      0 0 26px -10px rgba(74,130,240,0.18);
+  }
 
   /* Slider: adaptive height, padding-bottom reserves space for dots */
   .portfolio-mobile-slider {
@@ -9672,7 +9687,7 @@ main { padding-bottom: 72px; }
        AURIX-CHART-RELIABILITY-GATE-1 · PARTE D: +20px (232→252) to give the
        premium curve more useful vertical presence on mobile without pushing the
        category list meaningfully below the fold. */
-    min-height: 252px;
+    min-height: 240px;   /* AURIX-MOBILE-HERO-V1: ~5% shorter to give the wealth hero more room */
     height: auto;
     position: relative;
     padding-bottom: var(--slide-pad-bottom) !important;
@@ -9693,7 +9708,7 @@ main { padding-bottom: 72px; }
   /* Each slide: no padding — card provides it */
   .mobile-slide {
     width: 50%;
-    min-height: 252px;
+    min-height: 240px;   /* AURIX-MOBILE-HERO-V1: matches the ~5%-shorter slider */
     flex-shrink: 0;
     box-sizing: border-box;
     padding: 0;
@@ -9723,6 +9738,8 @@ main { padding-bottom: 72px; }
     margin-top: 0;
     position: relative;
     overflow: hidden;
+    /* AURIX-MOBILE-HERO-V1: subtle blue depth so the chart well matches the system. */
+    background: linear-gradient(180deg, rgba(74,130,240,0.06), transparent 70%);
   }
 
   /* Donut slide: title starts at the SAME Y as the chart title (#11.1) — no extra
@@ -9822,8 +9839,10 @@ main { padding-bottom: 72px; }
     width: 32px;
     height: 32px;
     border-radius: 9px;
-    background: rgba(74, 130, 240, 0.15);
-    border: 1px solid rgba(74, 130, 240, 0.35);
+    /* AURIX-MOBILE-HERO-V1: lit-glass + glow + relief so the "+" reads as part of
+       the premium system, not a flat floating chip. Same size/function. */
+    background: linear-gradient(180deg, rgba(74,130,240,0.22), rgba(74,130,240,0.12));
+    border: 1px solid rgba(74,130,240,0.38);
     color: var(--aurix-blue);
     font-size: 17px;
     line-height: 1;
@@ -9832,7 +9851,10 @@ main { padding-bottom: 72px; }
     justify-content: center;
     cursor: pointer;
     backdrop-filter: blur(6px);
-    transition: opacity 0.15s ease;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.12),
+      0 2px 10px -4px rgba(74,130,240,0.45);
+    transition: opacity 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
   }
 
   .fab-trigger:active { opacity: 0.7; }
@@ -12582,7 +12604,7 @@ body.workspace-active .header {
        and the removed floating label to make the curve the protagonist (#13). */
     padding: 12px 8px 10px !important;
     border-radius: 14px;
-    border: 1px solid rgba(255,255,255,0.07);
+    border: 1px solid rgba(74,130,240,0.16);   /* AURIX-MOBILE-HERO-V1: keep the electric border on small phones */
   }
 
   /* Chart container: fit viewport, never clip horizontally. width:100%
@@ -16610,6 +16632,47 @@ body.gs-open { overflow: hidden; }
 .aurix-signal--health .aurix-signal-cta:hover {
   background: rgba(74, 130, 240, 0.10);
   color: #fff;
+}
+
+/* AURIX-MOBILE-HERO-V1 — mobile only (≤768px), desktop untouched:
+   (1) flatten the inner wealth capsule so the hero CARD is the single premium
+       surface (no box-in-box); (2) turn the health teaser into a compact
+       blue-glass pill ("Salud sólida · Ver análisis →") that reads as an
+       intelligence layer, not loose text. Placed after the base/health rules so
+       it wins by source order; .aurix-signal--health beats the generic mobile
+       signal-bar rules by specificity. */
+@media (max-width: 768px) {
+  .summary-hero-zone {
+    background: none;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+    width: auto;
+    max-width: none;
+    margin: 0;
+  }
+  .hero-left .aurix-signal--health {
+    align-self: flex-start;
+    width: fit-content;
+    max-width: 100%;
+    margin-top: 14px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    background:
+      radial-gradient(140% 200% at 0% 0%, rgba(74,130,240,0.18), transparent 72%),
+      linear-gradient(180deg, rgba(40,56,94,0.42), rgba(20,28,48,0.34));
+    border: 1px solid rgba(74,130,240,0.26);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.06),
+      0 0 18px -6px rgba(74,130,240,0.30);
+  }
+  .hero-left .aurix-signal--health:active {
+    background:
+      radial-gradient(140% 200% at 0% 0%, rgba(74,130,240,0.24), transparent 72%),
+      linear-gradient(180deg, rgba(46,64,104,0.50), rgba(22,30,52,0.40));
+    border-color: rgba(74,130,240,0.40);
+  }
 }
 
 /* Mobile — premium single-row signal bar:
