@@ -769,21 +769,12 @@ button[aria-busy="true"] {
 /* AURIX-DASH-V1: elevated interior zone — the most important surface on the
    platform. Wraps label → value → meta in a slightly more luminous, raised
    panel with relief + a soft blue glow so the user's wealth reads instantly. */
+/* AURIX-DASH-V4: the inner capsule is GONE — no chrome. The wealth content lives
+   directly on the hero card (one premium surface, no box-in-box) at every size.
+   Pure layout wrapper now; spacing comes from the label/figure/meta margins and
+   the hero-left padding. */
 .summary-hero-zone {
   position: relative;
-  padding: 12px 22px 16px;   /* AURIX-DASH-V2: top trimmed so label aligns with the chart title */
-  margin-bottom: 6px;
-  border-radius: 16px;
-  border: 1px solid rgba(74,130,240,0.18);
-  background:
-    radial-gradient(120% 140% at 0% 0%, rgba(74,130,240,0.12), transparent 60%),
-    linear-gradient(165deg, rgba(40,56,94,0.42), rgba(18,26,46,0.28));
-  /* AURIX-DASH-V3: softer shadow so the capsule reads as integrated into the
-     hero, not a second card floating on top. Keep relief (inset), border + glow. */
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.06),
-    0 4px 16px -14px rgba(0,0,0,0.45),
-    0 0 24px -14px rgba(74,130,240,0.16);
 }
 /* Figure gets more presence inside the zone — a tighter, bluer glow than the
    global soft white text-shadow. */
@@ -791,17 +782,17 @@ button[aria-busy="true"] {
   text-shadow: 0 0 18px rgba(74,130,240,0.30), 0 0 8px rgba(255,255,255,0.12);
 }
 .summary-hero-zone .summary-meta { color: var(--text-muted); }
-/* AURIX-DASH-V3: the capsule IS the hero. Wide (~88% of the left block, capped),
-   taller, generously spaced and CENTERED within the column (balanced margins).
-   Content stays left-aligned/institutional. Desktop only (≥769) — mobile keeps
-   the full-width capsule with its inline FAB. */
+/* AURIX-DASH-V4: the two hero titles ("VALOR TOTAL DE CARTERA" / "EVOLUCIÓN DEL
+   PATRIMONIO") are one system — identical card-title typography (size/weight/
+   tracking) + a single slightly-brighter premium tone (~12% over --text-muted,
+   not white, not grey). They already share .card-title; this only lifts colour. */
+.summary-label.card-title,
+.chart-title.card-title {
+  color: rgba(214, 221, 235, 0.74);
+}
+/* AURIX-DASH-V4: capsule removed — content fills the left panel directly (more
+   amplitude). Just the vertical breathing so the figure dominates. Desktop only. */
 @media (min-width: 769px) {
-  .summary-hero-zone {
-    width: 88%;
-    max-width: 540px;
-    margin-inline: auto;        /* centered in the left block — balanced L/R margins */
-    padding: 12px 32px 24px;    /* taller + wider breathing; top kept for title baseline */
-  }
   .summary-hero-zone .summary-label { margin-bottom: 20px; }   /* label → figure breathes */
   .summary-hero-zone .summary-total { margin-bottom: 18px; }   /* figure → meta separation */
 }
@@ -3090,7 +3081,7 @@ body:not(.hero-active) #orb-canvas {
 
 /* ── Hero left (total value + actions) ─────────────────── */
 .hero-left {
-  padding: 12px var(--space-5) 28px var(--space-5); /* AURIX-DASH-V3: symmetric sides so the centered capsule has balanced L/R margins; top 12 keeps the label baseline aligned with the chart title */
+  padding: var(--space-5) var(--space-5) 28px var(--space-5); /* AURIX-DASH-V4: capsule removed → top matches hero-right (var(--space-5)) so the "Valor total" and "Evolución" titles align on the same baseline */
   position: relative;
   z-index: 1;
   border-right: 1px solid rgba(255,255,255,.055);
@@ -16455,6 +16446,7 @@ body.gs-open { overflow: hidden; }
     order: 1;
     position: relative;
     padding-top: 22px;
+    padding-left: 4px;   /* AURIX-DASH-V4: tiny right-nudge so the buttons balance optically with the wealth block (not flush to the edge) */
   }
   /* AURIX-DASH-V3: premium 1px Aurix-gradient separator between the wealth
      capsule (hero) and the operational buttons. Visual only. */
@@ -16512,7 +16504,7 @@ body.gs-open { overflow: hidden; }
      colour, position) + a layered shadow that lifts it off the surface (depth,
      not neon). 45/42 ≈ +7%. */
   .hero-left .summary-total {
-    font-size: clamp(30px, 4.3vw, 45px);
+    font-size: clamp(32px, 4.6vw, 48px);   /* AURIX-DASH-V4: ~7% more presence — the figure dominates the screen */
     text-shadow: 0 1px 1px rgba(0,0,0,0.22), 0 0 18px rgba(255,255,255,0.16);
   }
   /* 2/3/6. Vertical balance via dual auto-margins: the free space splits EQUALLY
