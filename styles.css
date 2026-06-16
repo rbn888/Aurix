@@ -19156,18 +19156,23 @@ body.gs-open { overflow: hidden; }
 .intcc-hero:hover .intcc-orb-core { transform: translateY(-2px); box-shadow: 0 0 36px rgba(var(--orb-c),0.98), inset 0 0 14px rgba(255,255,255,0.5), inset 0 -4px 10px rgba(var(--orb-c),0.6); }
 
 /* INT.2S Bloque 1 — institutional 3-zone hero: SCORE · MESSAGE · ORB */
-/* AURIX-INTCC-V1.3: Salud becomes a premium blue-glass micro-card (mini version
-   of the Dashboard cards) so it reads as an integrated module, not a piece resting
-   on the background. Quality, not dominance — contents/size/position unchanged. */
+/* AURIX-INTCC-V1.4: Salud — same premium visual FAMILY as the Inteligencia
+   sub-card (blue-glass + diffuse Aurix halo + slightly brighter border) and a
+   touch wider (+24px via horizontal padding) for more score presence. Tuned to
+   stay BELOW Inteligencia's prominence (weaker glow spread/alpha) — same family,
+   not same importance. Height/structure/score/proportions unchanged. */
 .intcc-hero-score {
   flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 7px;
-  padding: 12px 16px;
+  padding: 12px 28px;   /* +24px width vs V1.3's 16 — only horizontal padding */
   border-radius: 16px;
-  border: 1px solid rgba(74,130,240,0.18);
+  border: 1px solid rgba(120,160,255,0.20);   /* slightly brighter, Inteligencia-family hue */
   background:
-    radial-gradient(130% 130% at 12% 0%, rgba(74,130,240,0.10), transparent 60%),
-    linear-gradient(165deg, rgba(34,48,80,0.42), rgba(15,21,37,0.30));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 20px -12px rgba(74,130,240,0.18);
+    radial-gradient(130% 130% at 12% 0%, rgba(74,130,240,0.11), transparent 60%),
+    linear-gradient(165deg, rgba(34,48,80,0.46), rgba(15,21,37,0.32));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 8px 26px -18px rgba(77,141,255,0.5),   /* diffuse halo — Inteligencia family, weaker spread */
+    0 0 22px -14px rgba(77,141,255,0.38);    /* soft outer glow */
 }
 .intcc-hero .intcc-score-ring { position: relative; width: 116px; height: 116px; display: grid; place-items: center; }
 .intcc-hero .intcc-score-svg  { width: 116px; height: 116px; }
