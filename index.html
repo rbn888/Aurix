@@ -56,7 +56,7 @@
     // serve a half-cached app. Same user + same account must render the
     // same code on Safari mobile, the iOS home-screen PWA, and desktop.
     (function() {
-      window.AURIX_BUILD = 'v261-ws17d-realestate-tools-assets';
+      window.AURIX_BUILD = 'v262-dashboard-v1-design-unification';
       try {
         var KEY     = 'aurix_build';
         var RELOAD  = 'aurix_build_reload';
@@ -114,7 +114,7 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=258">
+  <link rel="stylesheet" href="styles.css?v=259">
 </head>
 <body style="background:#070a14">
 
@@ -213,6 +213,8 @@
       <section class="dashboard-top hero-card">
 
         <div class="hero-left">
+          <!-- AURIX-DASH-V1: elevated interior zone (label → value → meta) -->
+          <div class="summary-hero-zone">
           <div class="summary-label card-title" data-i18n="totalValue">Valor total de cartera</div>
           <div class="summary-total" id="totalValue">$0.00</div>
           <div class="summary-perf" id="summaryPerf" style="display:none"></div>
@@ -235,6 +237,7 @@
               <button class="fab-trigger" id="portfolioFab">+</button>
             </div>
           </div>
+          </div><!-- /.summary-hero-zone -->
           <!-- AURIX-DESKTOP-HERO-ALLOCATION-PREMIUM-1: hero-left order is now
                label → value → meta → HEALTH → actions. The health teaser sits
                directly under the meta row (grouped with the status info) and

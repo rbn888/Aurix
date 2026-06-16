@@ -40,10 +40,10 @@ select:focus-visible {
   --green-dim:   rgba(63, 191, 127,.09);
   --red:         var(--aurix-danger);  /* AURIX-DESIGN-SYSTEM-1: → canonical danger */
   --orange:      #e0904a;
-  --text:        #e2e2e2;
-  --text-bright: rgba(255,255,255,0.92);
-  --text-muted:  #a0a0a0;
-  --text-dim:    #484848;
+  --text:        #e6e6e8;
+  --text-bright: rgba(255,255,255,0.94);
+  --text-muted:  #b0b4bd;  /* AURIX-DASH-V1: was #a0a0a0 — lift secondary text toward soft white for low-brightness legibility */
+  --text-dim:    #686c75;  /* AURIX-DASH-V1: was #484848 — tertiary (dates/prices/inactive) now readable, not near-invisible */
   --radius:      12px;
   --radius-sm:   8px;
   --radius-xs:   6px;
@@ -765,6 +765,30 @@ button[aria-busy="true"] {
   }
 }
 
+/* AURIX-DASH-V1: elevated interior zone — the most important surface on the
+   platform. Wraps label → value → meta in a slightly more luminous, raised
+   panel with relief + a soft blue glow so the user's wealth reads instantly. */
+.summary-hero-zone {
+  position: relative;
+  padding: 18px 22px 16px;
+  margin-bottom: 6px;
+  border-radius: 16px;
+  border: 1px solid rgba(74,130,240,0.18);
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(74,130,240,0.12), transparent 60%),
+    linear-gradient(165deg, rgba(40,56,94,0.42), rgba(18,26,46,0.28));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    0 10px 30px -18px rgba(0,0,0,0.65),
+    0 0 32px -10px rgba(74,130,240,0.20);
+}
+/* Figure gets more presence inside the zone — a tighter, bluer glow than the
+   global soft white text-shadow. */
+.summary-hero-zone .summary-total {
+  text-shadow: 0 0 18px rgba(74,130,240,0.30), 0 0 8px rgba(255,255,255,0.12);
+}
+.summary-hero-zone .summary-meta { color: var(--text-muted); }
+
 /* ── Assets Section ────────────────────────────────────── */
 .section-header h2 {
   font-size: 11px;
@@ -782,10 +806,16 @@ button[aria-busy="true"] {
 }
 
 /* ── Asset Card ────────────────────────────────────────── */
+/* AURIX-DASH-V1: aligned to the Intelligence card material — blue-glass
+   (radial+linear gradient), electric-blue border, inset top highlight and a
+   soft contact shadow — so holdings never read as flat dark rows. */
 .asset-card {
-  background: var(--surface-2);
-  border: 1px solid var(--border-subtle);
+  background:
+    radial-gradient(130% 130% at 10% 0%, rgba(74,130,240,0.08), transparent 58%),
+    linear-gradient(165deg, rgba(28,40,68,0.42), rgba(15,21,37,0.50));
+  border: 1px solid rgba(74,130,240,0.14);
   border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 20px -12px rgba(0,0,0,0.55);
   cursor: pointer;
   padding: 18px var(--space-4) 18px 18px;
   display: grid;
@@ -794,11 +824,13 @@ button[aria-busy="true"] {
   gap: 0 var(--space-4);
   transition: border-color var(--dur-med) var(--ease-premium),
               transform var(--dur-med) var(--ease-premium),
+              box-shadow var(--dur-med) var(--ease-out),
               opacity 200ms var(--ease-out);
 }
 .asset-card:hover {
-  border-color: var(--border-strong);
-  transform: translateY(-1px);
+  border-color: rgba(74,130,240,0.40);
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(0,0,0,0.30), 0 0 0 1px rgba(74,130,240,0.10), 0 0 24px rgba(74,130,240,0.10);
 }
 .asset-card:active {
   transform: scale(.98);
@@ -2995,25 +3027,36 @@ body:not(.hero-active) #orb-canvas {
   margin-bottom: 28px;
 }
 
+/* AURIX-DASH-V1: hero card raised to the Intelligence hero material — deep
+   blue dual-radial + linear backdrop, electric-blue border, inset highlight and
+   a layered glow. Dashboard, Market and Intelligence now share one look. */
 .hero-card {
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.02), transparent 40%),
-    var(--surface-3);
-  border: 1px solid var(--border);
+    radial-gradient(120% 150% at 8% 8%, rgba(77,141,255,0.16), transparent 56%),
+    radial-gradient(120% 150% at 92% 92%, rgba(37,99,235,0.12), transparent 60%),
+    linear-gradient(165deg, rgba(30,46,82,0.62), rgba(13,19,36,0.66));
+  border: 1px solid rgba(77,141,255,0.30);
   border-radius: var(--radius-lg);
   box-shadow:
-    0 10px 40px rgba(0,0,0,0.35),
-    0 0 0 1px rgba(255,255,255,0.03),
-    0 0 20px rgba(74, 130, 240,0.06);
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 18px 50px rgba(0,0,0,0.40),
+    0 0 44px rgba(77,141,255,0.10);
   position: relative;
   overflow: hidden;
   display: grid;
   grid-template-columns: 1fr 1.5fr;
   align-items: stretch;   /* both columns fill full height — keeps divider intact */
-  transition: border-color var(--dur-med) var(--ease-premium);
+  transition: border-color var(--dur-med) var(--ease-premium),
+              box-shadow var(--dur-med) var(--ease-out);
 }
 
-.hero-card:hover { border-color: var(--border-hi); }
+.hero-card:hover {
+  border-color: rgba(77,141,255,0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    0 22px 62px rgba(0,0,0,0.46),
+    0 0 52px rgba(77,141,255,0.16);
+}
 
 .hero-card::before {
   content: "";
@@ -3021,7 +3064,7 @@ body:not(.hero-active) #orb-canvas {
   inset: 0;
   background: radial-gradient(
     circle at 20% 0%,
-    rgba(74, 130, 240,0.15),
+    rgba(74, 130, 240,0.10),
     transparent 60%
   );
   pointer-events: none;
@@ -3248,15 +3291,17 @@ body:not(.hero-active) #orb-canvas {
   /* no-op: chart lives inside .hero-right */
 }
 
+/* AURIX-DASH-V1: bluer, glassier line glow to match the Aurix palette
+   (was a neutral white drop-shadow). */
 .chart-line {
-  stroke-width: 2.2;
+  stroke-width: 2.4;
   filter:
-    drop-shadow(0 0 6px rgba(255,255,255,0.25))
-    drop-shadow(0 0 12px rgba(255,255,255,0.15));
+    drop-shadow(0 0 6px rgba(74,130,240,0.45))
+    drop-shadow(0 0 14px rgba(74,130,240,0.25));
 }
 
 .chart-grid line {
-  opacity: 0.15;
+  opacity: 0.22;   /* AURIX-DASH-V1: was 0.15 — a touch more grid contrast */
 }
 
 .chart-header {
@@ -3423,12 +3468,12 @@ body:not(.hero-active) #orb-canvas {
 }
 .chart-loading-skin__stroke {
   fill: none;
-  stroke: rgba(138,166,255,0.22);   /* Aurix blue, tenue — clearly not real data */
+  stroke: rgba(138,166,255,0.30);   /* AURIX-DASH-V1: slightly brighter Aurix blue, still clearly not real data */
   stroke-width: 1.4;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
 }
-.chart-loading-skin__area { fill: rgba(138,166,255,0.05); }
+.chart-loading-skin__area { fill: rgba(138,166,255,0.08); }   /* AURIX-DASH-V1: deeper gradient fill */
 
 /* Very calm breathing so it feels alive without an aggressive shimmer. */
 @keyframes chart-ghost-breathe {
@@ -3488,9 +3533,11 @@ body:not(.hero-active) #orb-canvas {
 @media (min-width: 1024px) {
   .chart-wrap {
     height: 240px;
+    /* AURIX-DASH-V1: deeper blue base so the chart well integrates with the
+       Intelligence-grade surfaces around it. */
     background: linear-gradient(to bottom,
-      rgba(138, 166, 255, 0.055) 0%,
-      rgba(255, 255, 255, 0.018) 42%,
+      rgba(74, 130, 240, 0.10) 0%,
+      rgba(138, 166, 255, 0.03) 42%,
       rgba(255, 255, 255, 0) 100%);
   }
   .chart-header { margin-bottom: 14px; }
@@ -8436,8 +8483,12 @@ main { padding-bottom: 72px; }
   gap: 5px;
   /* MARKET-1A: ~12% tighter — premium-compact, not cramped. */
   padding: 12px 14px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
+  /* AURIX-DASH-V1: Market cards share the Intelligence blue-glass material. */
+  background:
+    radial-gradient(130% 130% at 10% 0%, rgba(74,130,240,0.08), transparent 58%),
+    linear-gradient(165deg, rgba(28,40,68,0.40), rgba(15,21,37,0.48));
+  border: 1px solid rgba(74,130,240,0.14);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
   border-radius: 12px;
   color: #e8e8ea;
   text-align: left;
@@ -8447,9 +8498,12 @@ main { padding-bottom: 72px; }
   min-height: 84px;
 }
 .funds-card:hover {
-  background: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.18);
-  box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+  background:
+    radial-gradient(130% 130% at 10% 0%, rgba(74,130,240,0.13), transparent 58%),
+    linear-gradient(165deg, rgba(34,48,80,0.52), rgba(16,23,40,0.55));
+  border-color: rgba(74,130,240,0.40);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.28), 0 0 0 1px rgba(74,130,240,0.10), 0 0 24px rgba(74,130,240,0.10);
 }
 .funds-card:active { transform: scale(0.985); }
 .funds-card-head {
@@ -8667,9 +8721,10 @@ main { padding-bottom: 72px; }
   transition: background 140ms ease, box-shadow 220ms ease, transform 160ms ease;
 }
 .market-row:hover {
-  background: rgba(255,255,255,0.035);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06),
-              0 6px 20px rgba(0,0,0,0.18);
+  /* AURIX-DASH-V1: blue-tinted hover to match the unified design system. */
+  background: rgba(74,130,240,0.06);
+  box-shadow: inset 0 0 0 1px rgba(74,130,240,0.14),
+              0 6px 20px rgba(0,0,0,0.20);
   /* MARKET-1B: rows are now clickable (open preview). The pointer
      cursor reinforces the affordance — falls back to default if the
      flag ever disables the click handler in a future build. */
@@ -16093,12 +16148,23 @@ body.gs-open { overflow: hidden; }
      evenly between the hero card and the distribution section. */
   margin: 12px 0;
   border-radius: 14px;
+  /* AURIX-DASH-V1: reads as a mini Intelligence module embedded in the hero —
+     same blue-glass material, electric-blue border and soft glow as .intcc-card,
+     so Intelligence feels integrated into the Dashboard. */
   background:
-    linear-gradient(180deg, rgba(74, 130, 240, 0.08) 0%, rgba(12, 18, 32, 0.0) 75%),
-    rgba(14, 20, 32, 0.62);
-  border: 1px solid rgba(74, 130, 240, 0.12);
-  box-shadow: 0 4px 16px -10px rgba(0, 0, 0, 0.50);
+    radial-gradient(120% 140% at 6% 0%, rgba(74,130,240,0.14), transparent 60%),
+    linear-gradient(165deg, rgba(30,44,74,0.50), rgba(14,20,34,0.55));
+  border: 1px solid rgba(74, 130, 240, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 8px 24px -14px rgba(0,0,0,0.60),
+    0 0 22px -6px rgba(74,130,240,0.16);
+  backdrop-filter: blur(8px);
   animation: aurix-signal-in .32s var(--ease-premium);
+}
+/* The icon becomes a small glowing core — a nod to the Intelligence orb. */
+.aurix-signal--health .aurix-signal-icon {
+  box-shadow: 0 0 16px -2px rgba(74,130,240,0.5), inset 0 0 8px rgba(74,130,240,0.30);
 }
 /* Rotation cross-fade — dims body + cta while the text swaps.
    SIGNAL-MOBILE-2: adds a 2px translateY so the message slides as it
