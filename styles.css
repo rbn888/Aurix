@@ -590,12 +590,13 @@ button[aria-busy="true"] {
      gradient (same brightness envelope as the old flat 0.14 fill), a 1px inset
      top highlight, and a tighter contact + ambient shadow. Reads crafted and
      "expensive" without being larger, brighter or louder. */
-  background: linear-gradient(180deg, rgba(74,130,240,0.18), rgba(74,130,240,0.11));
-  border-color: rgba(74, 130, 240,0.30);
+  /* AURIX-DASH-V2: quieter operational CTA — dropped the blue ambient glow so
+     the wealth figure dominates and the Intelligence pill reads as the layer above. */
+  background: linear-gradient(180deg, rgba(74,130,240,0.14), rgba(74,130,240,0.09));
+  border-color: rgba(74, 130, 240,0.24);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.08),
-    0 1px 2px rgba(0,0,0,0.18),
-    0 4px 14px -6px rgba(74,130,240,0.22);
+    inset 0 1px 0 rgba(255,255,255,0.07),
+    0 1px 2px rgba(0,0,0,0.18);
 }
 .btn-summary-action.btn-primary:hover {
   /* Scoped hover (more specific than the generic .btn-primary:hover that zeroes
@@ -770,7 +771,7 @@ button[aria-busy="true"] {
    panel with relief + a soft blue glow so the user's wealth reads instantly. */
 .summary-hero-zone {
   position: relative;
-  padding: 18px 22px 16px;
+  padding: 12px 22px 16px;   /* AURIX-DASH-V2: top trimmed so label aligns with the chart title */
   margin-bottom: 6px;
   border-radius: 16px;
   border: 1px solid rgba(74,130,240,0.18);
@@ -814,10 +815,10 @@ button[aria-busy="true"] {
     radial-gradient(130% 130% at 10% 0%, rgba(74,130,240,0.08), transparent 58%),
     linear-gradient(165deg, rgba(28,40,68,0.42), rgba(15,21,37,0.50));
   border: 1px solid rgba(74,130,240,0.14);
-  border-radius: var(--radius);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 20px -12px rgba(0,0,0,0.55);
+  border-radius: 14px;   /* AURIX-DASH-V2: unify card-family radius (was --radius 12) */
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 20px -12px rgba(0,0,0,0.55), 0 0 20px -12px rgba(74,130,240,0.14);
   cursor: pointer;
-  padding: 18px var(--space-4) 18px 18px;
+  padding: 20px var(--space-4) 20px 18px;   /* AURIX-DASH-V2: more vertical air */
   display: grid;
   grid-template-columns: auto 1fr minmax(160px, auto) auto;
   align-items: center;
@@ -914,7 +915,7 @@ button[aria-busy="true"] {
 .asset-meta {
   display: inline-flex;
   align-items: center;
-  margin-top: 5px;
+  margin-top: 6px;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: .07em;
@@ -939,7 +940,7 @@ button[aria-busy="true"] {
   grid-template-columns: 1fr auto;
   grid-template-rows: auto auto;
   column-gap: 22px;
-  row-gap: 5px;
+  row-gap: 7px;   /* AURIX-DASH-V2: separate amount from change/participation */
   align-items: center;
 }
 
@@ -3073,7 +3074,7 @@ body:not(.hero-active) #orb-canvas {
 
 /* ── Hero left (total value + actions) ─────────────────── */
 .hero-left {
-  padding: var(--space-5) var(--space-4) 28px 36px; /* top matches hero-right so titles align */
+  padding: 12px var(--space-4) 28px 36px; /* AURIX-DASH-V2: lower top so the elevated zone's label baseline aligns with the right chart title (zone adds ~12px+border) */
   position: relative;
   z-index: 1;
   border-right: 1px solid rgba(255,255,255,.055);
@@ -3612,8 +3613,12 @@ body:not(.hero-active) #orb-canvas {
 .cat-card {
   position: relative;
   overflow: hidden;
-  background: var(--surface-2);
-  border: 1px solid var(--border-subtle);
+  /* AURIX-DASH-V2: raised to the Intelligence blue-glass material (was flat
+     --surface-2 that read dark/old) — deep blue gradient + electric border. */
+  background:
+    radial-gradient(130% 130% at 12% 0%, rgba(74,130,240,0.10), transparent 58%),
+    linear-gradient(165deg, rgba(30,44,74,0.46), rgba(15,21,37,0.54));
+  border: 1px solid rgba(74,130,240,0.16);
   border-radius: 18px;
   padding: var(--space-4) 22px 18px;
   min-height: 130px;
@@ -3621,7 +3626,7 @@ body:not(.hero-active) #orb-canvas {
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;   /* AURIX-DASH-V2: slightly more breathing between name/value/pct */
   cursor: pointer;
   text-align: left;
   touch-action: auto;
@@ -3630,8 +3635,9 @@ body:not(.hero-active) #orb-canvas {
   user-select: none;
   -webkit-user-select: none;
   box-shadow:
-    0 6px 18px rgba(0,0,0,0.18),
-    inset 0 1px 1px rgba(255,255,255,0.04);
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 8px 24px -14px rgba(0,0,0,0.55),
+    0 0 22px -10px rgba(74,130,240,0.16);
   transition: border-color var(--dur-med) var(--ease-premium),
               transform     var(--dur-med) var(--ease-premium),
               box-shadow    var(--dur-med) var(--ease-premium),
@@ -3645,10 +3651,11 @@ body:not(.hero-active) #orb-canvas {
   cursor: grabbing;
 }
 .cat-card:hover {
-  border-color: var(--border-strong);
+  border-color: rgba(74,130,240,0.42);
   transform: translateY(-3px) scale(1.01);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.25),
-              0 0 10px rgba(255,255,255,0.05),
+  box-shadow: 0 14px 34px rgba(0,0,0,0.30),
+              0 0 0 1px rgba(74,130,240,0.12),
+              0 0 26px rgba(74,130,240,0.12),
               inset 0 1px 0 rgba(255,255,255,0.07);
 }
 .cat-card:active,
@@ -3843,7 +3850,12 @@ body:not(.hero-active) #orb-canvas {
   }
 }
 @media (max-width: 767px) {
-  .cat-card { background: var(--surface-2); }
+  /* AURIX-DASH-V2: mobile (no blur) gets the same blue-glass as desktop. */
+  .cat-card {
+    background:
+      radial-gradient(130% 130% at 12% 0%, rgba(74,130,240,0.10), transparent 58%),
+      linear-gradient(165deg, rgba(30,44,74,0.46), rgba(15,21,37,0.60));
+  }
 }
 
 /* ── Category card content wrapper (sits above visual) ──── */
@@ -8488,8 +8500,8 @@ main { padding-bottom: 72px; }
     radial-gradient(130% 130% at 10% 0%, rgba(74,130,240,0.08), transparent 58%),
     linear-gradient(165deg, rgba(28,40,68,0.40), rgba(15,21,37,0.48));
   border: 1px solid rgba(74,130,240,0.14);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
-  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 0 20px -12px rgba(74,130,240,0.14);   /* AURIX-DASH-V2: unified resting blue glow */
+  border-radius: 14px;   /* AURIX-DASH-V2: card-family radius */
   color: #e8e8ea;
   text-align: left;
   cursor: pointer;
@@ -8703,7 +8715,7 @@ main { padding-bottom: 72px; }
 
 .market-type {
   font-size: 11px;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.55);   /* AURIX-DASH-V2: lift market-state legibility at low brightness */
   margin-top: 2px;
 }
 
@@ -16367,16 +16379,27 @@ body.gs-open { overflow: hidden; }
     align-self: flex-start;
     width: fit-content;
     max-width: 100%;
-    padding: 7px 13px 7px 11px;
+    padding: 7px 14px 7px 12px;
     gap: 8px;
-    background: rgba(74,130,240,0.06);
-    border: 1px solid rgba(74,130,240,0.14);
+    /* AURIX-DASH-V2: mini Intelligence module — blue-glass + soft glow so it
+       reads as a diagnostic badge, NOT another button like the add CTAs. */
+    background:
+      radial-gradient(140% 200% at 0% 0%, rgba(74,130,240,0.18), transparent 72%),
+      linear-gradient(180deg, rgba(40,56,94,0.42), rgba(20,28,48,0.34));
+    border: 1px solid rgba(74,130,240,0.26);
     border-radius: 999px;
-    box-shadow: none;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.06),
+      0 0 18px -6px rgba(74,130,240,0.30);
   }
   .hero-left .aurix-signal:hover {
-    background: rgba(74,130,240,0.10);
-    border-color: rgba(74,130,240,0.24);
+    background:
+      radial-gradient(140% 200% at 0% 0%, rgba(74,130,240,0.24), transparent 72%),
+      linear-gradient(180deg, rgba(46,64,104,0.50), rgba(22,30,52,0.40));
+    border-color: rgba(74,130,240,0.40);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      0 0 24px -6px rgba(74,130,240,0.40);
   }
 }
 
@@ -16418,11 +16441,11 @@ body.gs-open { overflow: hidden; }
      bottom inset edge so both actions feel tactile/premium. Additive to the
      existing material; no size/function/hierarchy change. Whisper-subtle. */
   .summary-footer .btn-summary-action.btn-primary {
+    /* AURIX-DASH-V2: keep the tactile relief, drop the blue ambient glow. */
     box-shadow:
       inset 0 1px 0 rgba(255,255,255,0.12),
       inset 0 -1px 0 rgba(0,0,0,0.16),
-      0 1px 2px rgba(0,0,0,0.20),
-      0 4px 14px -6px rgba(74,130,240,0.22);
+      0 1px 2px rgba(0,0,0,0.20);
   }
   .summary-footer .btn-summary-action.btn-secondary {
     box-shadow:
@@ -16453,8 +16476,8 @@ body.gs-open { overflow: hidden; }
 }
 .hero-left .aurix-signal .aurix-signal-icon::after { display: none; }
 .hero-left .aurix-signal .aurix-signal-dot {
-  width: 6px; height: 6px;
-  box-shadow: none;
+  width: 7px; height: 7px;
+  box-shadow: 0 0 6px currentColor;   /* AURIX-DASH-V2: small glowing status core (nods to the Intelligence orb) */
 }
 /* The state text reuses .aurix-signal-msg styling but should hug the title
    rather than stretch, so the line reads "PORTFOLIO HEALTH · State". */
