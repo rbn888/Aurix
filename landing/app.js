@@ -49,32 +49,28 @@
       'show.lead': 'Control, contexto y claridad en una sola interfaz.',
 
       'ws.eyebrow': 'Inteligencia',
-      'ws.title1': 'Más que seguimiento.', 'ws.title2': 'Comprensión.',
-      'ws.lead': 'La capa de inteligencia de Aurix interpreta tu cartera y te ayuda a entender qué hay detrás de los números.',
-      'ws.tag.health': 'Health Score', 'ws.tag.risk': 'Señales de riesgo', 'ws.tag.analysis': 'Análisis de cartera', 'ws.tag.actions': 'Insights accionables',
-      'ws.c1.t': 'Concentración', 'ws.c1.d': 'Equilibrada',
-      'ws.c2.t': 'Diversificación', 'ws.c2.d': 'Amplia',
-      'ws.c3.t': 'Liquidez', 'ws.c3.d': 'Disponible',
-      'ws.c4.t': 'Riesgo', 'ws.c4.d': 'Equilibrado',
-      'ws.c5.t': 'Salud patrimonial', 'ws.c5.d': 'Sólida',
-      'ws.c6.t': 'Insights', 'ws.c6.d': 'Accionables',
-      'ws.c7.t': 'Inteligencia', 'ws.c7.d': 'Contexto patrimonial',
+      'ws.title': 'Plataforma de Inteligencia Patrimonial',
+      'ws.lead': 'Centralizar tu patrimonio es solo el comienzo. Aurix transforma datos dispersos en comprensión accionable para ayudarte a entender qué está cambiando, qué importa y qué requiere tu atención.',
+      'ws.b1': 'Cambios relevantes detectados automáticamente',
+      'ws.b2': 'Salud de cartera en tiempo real',
+      'ws.b3': 'Contexto de mercado aplicado a tu patrimonio',
+      'ws.b4': 'Insights accionables impulsados por IA',
 
       'market.eyebrow': 'Mercado',
       'market.title': 'Consulta los mercados desde un único lugar.',
       'market.lead': 'Sigue cualquier activo relevante desde una interfaz profesional: el contexto de mercado que necesitas para entender qué ocurre con tus inversiones, no solo tu patrimonio.',
-      'market.1': 'Acciones', 'market.2': 'ETFs', 'market.3': 'Fondos', 'market.4': 'Cripto',
-      'market.5': 'Materias primas', 'market.6': 'Índices', 'market.7': 'Mercados globales',
+      'market.1': 'Acciones', 'market.2': 'ETFs y Fondos', 'market.3': 'Cripto',
+      'market.4': 'Materias primas', 'market.5': 'Índices', 'market.6': 'Mercados globales',
 
       'roadmap.title': 'Hacia dónde va Aurix.',
       'roadmap.now': 'Ahora', 'roadmap.next': 'Próximo', 'roadmap.later': 'Después',
-      'rm.now.1': 'Dashboard de patrimonio', 'rm.now.2': 'Seguimiento de mercado', 'rm.now.3': 'Workspace financiero personal', 'rm.now.4': 'Cartera inmobiliaria', 'rm.now.5': 'Sistema de objetivos', 'rm.now.6': 'Herramientas de seguimiento patrimonial',
-      'rm.next.1': 'Centro de inteligencia', 'rm.next.2': 'Salud de cartera', 'rm.next.3': 'Acceso Fundador', 'rm.next.4': 'Membresía premium',
-      'rm.later.1': 'Automatización avanzada', 'rm.later.2': 'Insights asistidos por IA', 'rm.later.3': 'Integraciones ampliadas', 'rm.later.4': 'Herramientas de planificación patrimonial',
+      'rm.now.1': 'Dashboard patrimonial', 'rm.now.2': 'Seguimiento de mercado', 'rm.now.3': 'Centro financiero personal', 'rm.now.4': 'Cartera inmobiliaria',
+      'rm.next.1': 'Centro de inteligencia', 'rm.next.2': 'Salud de cartera', 'rm.next.3': 'Acceso Fundador', 'rm.next.4': 'Herramientas inteligentes',
+      'rm.later.1': 'Automatización avanzada', 'rm.later.2': 'Insights asistidos por IA', 'rm.later.3': 'Integraciones ampliadas', 'rm.later.4': 'Planificación patrimonial avanzada',
 
-      'updates.title': 'Herramientas profesionales para tu vida financiera.',
-      'updates.sub': 'Planifica, simula y organiza partes clave de tu patrimonio con herramientas prácticas integradas en Aurix.',
-      'updates.1': 'Workspace financiero personal', 'updates.2': 'Cartera inmobiliaria', 'updates.3': 'Objetivos de cartera',
+      'updates.title': 'Centro financiero personal.',
+      'updates.sub': 'Planifica, simula y organiza las áreas más importantes de tu patrimonio desde una única zona de trabajo.',
+      'updates.1': 'Planificación financiera', 'updates.2': 'Cartera inmobiliaria', 'updates.3': 'Objetivos financieros',
       'updates.4': 'Herramientas de crecimiento patrimonial', 'updates.5': 'Análisis de escenarios', 'updates.6': 'Análisis de financiación',
       'updates.7': 'Diario de inversiones', 'updates.8': 'Gestión de flujo de caja', 'updates.9': 'Seguimiento de mercado',
 
@@ -90,7 +86,7 @@
       'early.rate': 'Demasiados intentos. Inténtalo de nuevo más tarde.',
       'early.error': 'Algo salió mal. Inténtalo de nuevo.',
       'early.success': 'Solicitud recibida. Te contactaremos pronto.',
-      'early.trust': 'Acceso por invitación · Sin promesas financieras',
+      'early.trust': 'Primeras plazas disponibles por invitación',
       'modal.title': 'Solicita acceso privado.',
       'modal.sub': 'Déjanos tus datos y contactaremos con usuarios seleccionados.',
       'footer.tag': 'Plataforma de inteligencia patrimonial',
@@ -155,32 +151,28 @@
       'show.lead': 'Control, context and clarity in a single interface.',
 
       'ws.eyebrow': 'Intelligence',
-      'ws.title1': 'More than tracking.', 'ws.title2': 'Understanding.',
-      'ws.lead': 'The intelligence layer of Aurix interprets your portfolio and helps you understand what is behind the numbers.',
-      'ws.tag.health': 'Health Score', 'ws.tag.risk': 'Risk signals', 'ws.tag.analysis': 'Portfolio analysis', 'ws.tag.actions': 'Actionable insights',
-      'ws.c1.t': 'Concentration', 'ws.c1.d': 'Balanced',
-      'ws.c2.t': 'Diversification', 'ws.c2.d': 'Broad',
-      'ws.c3.t': 'Liquidity', 'ws.c3.d': 'Available',
-      'ws.c4.t': 'Risk', 'ws.c4.d': 'Balanced',
-      'ws.c5.t': 'Portfolio health', 'ws.c5.d': 'Strong',
-      'ws.c6.t': 'Insights', 'ws.c6.d': 'Actionable',
-      'ws.c7.t': 'Intelligence', 'ws.c7.d': 'Wealth context',
+      'ws.title': 'Wealth Intelligence Platform',
+      'ws.lead': 'Centralizing your wealth is only the beginning. Aurix turns scattered data into actionable understanding — helping you see what is changing, what matters and what needs your attention.',
+      'ws.b1': 'Relevant changes detected automatically',
+      'ws.b2': 'Real-time portfolio health',
+      'ws.b3': 'Market context applied to your wealth',
+      'ws.b4': 'AI-driven actionable insights',
 
       'market.eyebrow': 'Market',
       'market.title': 'Follow the markets from one place.',
       'market.lead': 'Track any relevant asset from a professional interface — the market context you need to understand what is happening with your investments, not just your wealth.',
-      'market.1': 'Stocks', 'market.2': 'ETFs', 'market.3': 'Funds', 'market.4': 'Crypto',
-      'market.5': 'Commodities', 'market.6': 'Indices', 'market.7': 'Global markets',
+      'market.1': 'Stocks', 'market.2': 'ETFs & Funds', 'market.3': 'Crypto',
+      'market.4': 'Commodities', 'market.5': 'Indices', 'market.6': 'Global markets',
 
       'roadmap.title': 'Where Aurix is heading.',
       'roadmap.now': 'Now', 'roadmap.next': 'Next', 'roadmap.later': 'Later',
-      'rm.now.1': 'Portfolio Dashboard', 'rm.now.2': 'Market Tracking', 'rm.now.3': 'Personal Financial Workspace', 'rm.now.4': 'Real Estate Portfolio', 'rm.now.5': 'Goals System', 'rm.now.6': 'Wealth Tracking Tools',
-      'rm.next.1': 'Intelligence Center', 'rm.next.2': 'Portfolio Health', 'rm.next.3': 'Founder Access', 'rm.next.4': 'Premium Membership',
-      'rm.later.1': 'Advanced Automation', 'rm.later.2': 'AI-Assisted Insights', 'rm.later.3': 'Expanded Integrations', 'rm.later.4': 'Wealth Planning Tools',
+      'rm.now.1': 'Portfolio Dashboard', 'rm.now.2': 'Market Tracking', 'rm.now.3': 'Personal Financial Center', 'rm.now.4': 'Real Estate Portfolio',
+      'rm.next.1': 'Intelligence Center', 'rm.next.2': 'Portfolio Health', 'rm.next.3': 'Founder Access', 'rm.next.4': 'Smart Tools',
+      'rm.later.1': 'Advanced Automation', 'rm.later.2': 'AI-Assisted Insights', 'rm.later.3': 'Expanded Integrations', 'rm.later.4': 'Advanced Wealth Planning',
 
-      'updates.title': 'Professional tools for your financial life.',
-      'updates.sub': 'Plan, simulate and organize key parts of your wealth with practical tools built into Aurix.',
-      'updates.1': 'Personal Financial Workspace', 'updates.2': 'Real Estate Portfolio', 'updates.3': 'Portfolio Goals',
+      'updates.title': 'Personal financial center.',
+      'updates.sub': 'Plan, simulate and organize the most important areas of your wealth from a single workspace.',
+      'updates.1': 'Financial Planning', 'updates.2': 'Real Estate Portfolio', 'updates.3': 'Financial Goals',
       'updates.4': 'Wealth Growth Tools', 'updates.5': 'Scenario Analysis', 'updates.6': 'Financing Analysis',
       'updates.7': 'Investment Journal', 'updates.8': 'Cash Flow Management', 'updates.9': 'Market Monitoring',
 
@@ -196,7 +188,7 @@
       'early.rate': 'Too many attempts. Please try again later.',
       'early.error': 'Something went wrong. Please try again.',
       'early.success': 'Request received. We’ll be in touch.',
-      'early.trust': 'Invite-only · No financial promises',
+      'early.trust': 'Limited early invitations available',
       'modal.title': 'Request private access.',
       'modal.sub': 'Leave your details and we’ll contact selected users.',
       'footer.tag': 'Wealth Intelligence Platform',
@@ -277,6 +269,109 @@
   }
 
   function t(key) { return (I18N[lang] && I18N[lang][key]) || (I18N.es[key]) || ''; }
+
+  /* ── Market preview (illustrative) ──────────────────── */
+  // Datasets are clearly a product preview — no real-time data, brands or return
+  // promises. `line` is an SVG path over a 640×200 viewBox; the area is closed to
+  // the baseline. The symbol label mirrors the active (localized) tab.
+  var MK_DATA = [
+    { val:5432.18, dec:2, pre:'', delta:'+1.24%', up:true,
+      line:'M0,150 C60,140 110,150 170,120 C230,92 280,108 340,78 C400,52 460,70 520,44 C580,24 610,34 640,26' },
+    { val:318.40, dec:2, pre:'', delta:'+0.86%', up:true,
+      line:'M0,140 C70,138 120,120 180,118 C250,116 300,96 360,92 C430,88 480,70 540,64 C590,60 620,52 640,50' },
+    { val:67920, dec:0, pre:'$', delta:'+3.10%', up:true,
+      line:'M0,162 C50,150 90,172 140,120 C190,72 240,140 300,96 C360,54 410,122 470,70 C520,30 590,52 640,28' },
+    { val:2384.50, dec:2, pre:'$', delta:'−0.42%', up:false,
+      line:'M0,70 C60,66 110,84 170,90 C230,96 280,86 340,104 C400,120 460,110 520,128 C580,144 610,138 640,150' },
+    { val:17210, dec:0, pre:'', delta:'+0.92%', up:true,
+      line:'M0,150 C70,146 120,130 180,126 C250,120 300,104 360,100 C430,94 480,72 540,66 C600,60 620,52 640,46' },
+    { val:3480.75, dec:2, pre:'', delta:'+0.54%', up:true,
+      line:'M0,138 C70,134 120,128 180,118 C250,108 300,108 360,96 C430,84 480,80 540,68 C600,58 620,58 640,52' }
+  ];
+
+  function initMarket() {
+    var panel = document.getElementById('marketPanel');
+    if (!panel) return;
+    var symEl = document.getElementById('mkSymbol');
+    var priceEl = document.getElementById('mkPrice');
+    var deltaEl = document.getElementById('mkDelta');
+    var lineEl = document.getElementById('mkLine');
+    var areaEl = document.getElementById('mkArea');
+    var tabs = panel.querySelectorAll('.mk-tab');
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var current = -1, rafId = 0;
+
+    // Locale-aware grouping/decimal separators (EN 1,234.5 · ES 1.234,5).
+    function fmt(n, dec, pre) {
+      var fixed = dec ? n.toFixed(dec) : String(Math.round(n));
+      var parts = fixed.split('.');
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, lang === 'en' ? ',' : '.');
+      return pre + (parts.length > 1 ? parts[0] + (lang === 'en' ? '.' : ',') + parts[1] : parts[0]);
+    }
+    function countTo(target, dec, pre) {
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+      if (reduce) { priceEl.textContent = fmt(target, dec, pre); return; }
+      var dur = 720, start = null;
+      function step(ts) {
+        if (start === null) start = ts;
+        var p = Math.min(1, (ts - start) / dur);
+        var eased = 1 - Math.pow(1 - p, 3);
+        priceEl.textContent = fmt(target * eased, dec, pre);
+        if (p < 1) rafId = requestAnimationFrame(step);
+        else { priceEl.textContent = fmt(target, dec, pre); rafId = 0; }
+      }
+      rafId = requestAnimationFrame(step);
+    }
+    function drawLine() {
+      if (reduce || !lineEl.getTotalLength) return;
+      var len = lineEl.getTotalLength();
+      lineEl.style.transition = 'none';
+      lineEl.style.strokeDasharray = len;
+      lineEl.style.strokeDashoffset = len;
+      void lineEl.getBoundingClientRect(); // reflow so the reset takes effect
+      lineEl.style.transition = 'stroke-dashoffset 1.1s var(--ease)';
+      lineEl.style.strokeDashoffset = '0';
+    }
+    function select(i, animate) {
+      if (i === current) return;
+      current = i;
+      var d = MK_DATA[i];
+      for (var k = 0; k < tabs.length; k++) {
+        tabs[k].classList.toggle('is-active', k === i);
+        tabs[k].setAttribute('aria-selected', k === i ? 'true' : 'false');
+      }
+      symEl.textContent = tabs[i] ? tabs[i].textContent : '';
+      deltaEl.textContent = d.delta;
+      deltaEl.classList.toggle('up', d.up);
+      deltaEl.classList.toggle('down', !d.up);
+      lineEl.setAttribute('d', d.line);
+      areaEl.setAttribute('d', d.line + ' L640,200 L0,200 Z');
+      if (animate) { countTo(d.val, d.dec, d.pre); drawLine(); }
+      else { priceEl.textContent = fmt(d.val, d.dec, d.pre); }
+    }
+
+    for (var k = 0; k < tabs.length; k++) {
+      (function (btn) {
+        btn.addEventListener('click', function () {
+          select(parseInt(btn.getAttribute('data-mk'), 10) || 0, true);
+        });
+      })(tabs[k]);
+    }
+
+    select(0, false); // static first paint
+    if (reduce || !('IntersectionObserver' in window)) {
+      countTo(MK_DATA[0].val, MK_DATA[0].dec, MK_DATA[0].pre);
+    } else {
+      var mio = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (!en.isIntersecting) return;
+          mio.unobserve(en.target);
+          current = -1; select(0, true); // animate on first entry
+        });
+      }, { threshold: 0.4 });
+      mio.observe(panel);
+    }
+  }
 
   // AURIX-LANDING-PREMIUM-PASS-1: single source of truth for the private-app
   // URL. Every "Enter Aurix" link ([data-app-link]) points here.
@@ -466,6 +561,11 @@
         });
       });
     }
+
+    // ── Market preview: tabs + animated chart ──────────────
+    // Illustrative product preview (labelled, no real-time data): six tabs over a
+    // chart that draws on viewport entry, with figures that count up on switch.
+    initMarket();
 
     // Footer year (no Date pinning needed for a static label)
     var y = document.getElementById('year');

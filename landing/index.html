@@ -98,7 +98,7 @@
             <div class="mock-total">
               <span class="mock-label" data-i18n="mock.total">Total Wealth</span>
               <div class="mock-value-row">
-                <span class="mock-value" data-i18n="mock.value">$4.82M</span>
+                <span class="mock-value" id="countValue">$4.82M</span>
                 <span class="mock-delta" data-i18n="mock.delta">+8.4% YTD</span>
               </div>
             </div>
@@ -145,135 +145,95 @@
       </div>
     </section>
 
-    <!-- ─────────────── UNIFIED VIEW (merged: was "One unified view" + "Built to see") ─────────────── -->
-    <!-- Single strong section: statement → premium asset chips → the Total Value /
-         Allocation / Evolution metric cards. The old duplicate "showcase" mock was
-         removed to eliminate two sections saying the same thing. -->
-    <section class="section section--solution" id="solution">
-      <div class="container">
-        <h2 class="section-title reveal" data-i18n="solution.title">Built to see your entire wealth as one system.</h2>
-        <p class="section-lead reveal" data-i18n="solution.lead">Aurix centralizes every asset class into one clear interface, giving you control, context and clarity over your financial life.</p>
-        <!-- Asset classes as premium pills, not loose small text. -->
-        <div class="asset-grid reveal">
-          <span class="asset" data-i18n="asset.stocks">Stocks</span>
-          <span class="asset" data-i18n="asset.etfs">ETFs</span>
-          <span class="asset" data-i18n="asset.funds">Funds</span>
-          <span class="asset" data-i18n="asset.crypto">Crypto</span>
-          <span class="asset" data-i18n="asset.realestate">Real Estate</span>
-          <span class="asset" data-i18n="asset.metals">Metals</span>
-          <span class="asset" data-i18n="asset.cash">Cash</span>
-        </div>
-        <!-- B5: metrics hierarchy — Total value is the protagonist; allocation +
-             evolution sit below in two columns (stack on mobile). -->
-        <div class="metrics">
-          <div class="feature feature--value reveal">
-            <h3 data-i18n="feat.value.t">Total value</h3>
-            <div class="fv-figure" aria-hidden="true">
-              <span class="fv-num" id="countValue" data-count="4.82">$4.82M</span>
-              <span class="fv-delta" data-i18n="mock.delta">+8.4% YTD</span>
-            </div>
-            <p data-i18n="feat.value.d">Unified across asset classes.</p>
-          </div>
-          <div class="metrics-row">
-            <div class="feature feature--viz reveal">
-              <h3 data-i18n="feat.alloc.t">Allocation</h3>
-              <div class="fv-bars anim-bars" aria-hidden="true">
-                <i><b style="width:42%"></b></i><i><b style="width:24%;background:#7db8ff"></b></i><i><b style="width:16%;background:#9b8cff"></b></i><i><b style="width:12%;background:#f4c45a"></b></i><i><b style="width:6%;background:#27c768"></b></i>
-              </div>
-              <p data-i18n="feat.alloc.d">How it is split across asset classes.</p>
-            </div>
-            <div class="feature feature--viz reveal">
-              <h3 data-i18n="feat.evo.t">Evolution</h3>
-              <div class="fv-spark" aria-hidden="true"><svg viewBox="0 0 200 44" preserveAspectRatio="none"><path class="draw-line" d="M0,34 C30,30 45,14 70,20 C95,26 120,8 150,14 C175,19 190,10 200,12" fill="none" stroke="#7db8ff" stroke-width="2"/></svg></div>
-              <p data-i18n="feat.evo.d">Your wealth’s journey over time.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <!-- ─────────────── MARKET ─────────────── -->
     <!-- Sits between centralization and intelligence: once you can see your whole
-         wealth, the next thing you want is the market context around it. Reuses
-         the premium module-chip grid (.updates-grid / .update-chip) — no new
-         component, just a distinct section with its own copy and anchor. -->
+         wealth, the next thing you want is the market context around it. The panel
+         is an illustrative product preview (labelled, no real data / brands /
+         return promises): six balanced tabs over an animated chart that draws on
+         viewport entry, with figures that count up on tab switch. JS in app.js. -->
     <section class="section section--market" id="market">
       <div class="container updates-inner">
         <span class="eyebrow reveal" data-i18n="market.eyebrow">Market</span>
         <h2 class="section-title reveal" data-i18n="market.title">Follow the markets from one place.</h2>
         <p class="section-lead reveal" data-i18n="market.lead">Track any relevant asset from a professional interface — the market context you need to understand what is happening with your investments, not just your wealth.</p>
-        <div class="updates-grid reveal">
-          <span class="update-chip" data-i18n="market.1">Stocks</span>
-          <span class="update-chip" data-i18n="market.2">ETFs</span>
-          <span class="update-chip" data-i18n="market.3">Funds</span>
-          <span class="update-chip" data-i18n="market.4">Crypto</span>
-          <span class="update-chip" data-i18n="market.5">Commodities</span>
-          <span class="update-chip" data-i18n="market.6">Indices</span>
-          <span class="update-chip" data-i18n="market.7">Global markets</span>
+        <div class="market-panel reveal mock" id="marketPanel" aria-hidden="true">
+          <span class="preview-chip" data-i18n="preview.label">Product preview</span>
+          <div class="market-tabs" role="tablist">
+            <button class="mk-tab is-active" type="button" data-mk="0" data-i18n="market.1">Stocks</button>
+            <button class="mk-tab" type="button" data-mk="1" data-i18n="market.2">ETFs &amp; Funds</button>
+            <button class="mk-tab" type="button" data-mk="2" data-i18n="market.3">Crypto</button>
+            <button class="mk-tab" type="button" data-mk="3" data-i18n="market.4">Commodities</button>
+            <button class="mk-tab" type="button" data-mk="4" data-i18n="market.5">Indices</button>
+            <button class="mk-tab" type="button" data-mk="5" data-i18n="market.6">Global markets</button>
+          </div>
+          <div class="market-quote">
+            <div class="mk-quote-main">
+              <span class="mk-live"><i></i></span>
+              <span class="mk-symbol" id="mkSymbol">—</span>
+            </div>
+            <div class="mk-quote-fig">
+              <span class="mk-price" id="mkPrice">—</span>
+              <span class="mk-delta" id="mkDelta">—</span>
+            </div>
+          </div>
+          <div class="market-chart">
+            <svg viewBox="0 0 640 200" preserveAspectRatio="none">
+              <defs><linearGradient id="mklg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(79,142,247,.26)"/><stop offset="1" stop-color="rgba(79,142,247,0)"/></linearGradient></defs>
+              <path class="mk-area" id="mkArea" d="" fill="url(#mklg)"></path>
+              <path class="mk-line" id="mkLine" d="" fill="none" stroke="#7db8ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- ─────────────── INTELLIGENCE ─────────────── -->
-    <!-- Intelligence layer (distinct from the Personal Financial Workspace product).
-         Badge reads INTELLIGENCE; anchor id kept as #workspace for stable links. -->
+    <!-- ─────────────── WEALTH INTELLIGENCE PLATFORM ─────────────── -->
+    <!-- The strongest section on the page: Aurix's real differentiator. Two-column
+         — copy + benefits on one side, the premium intelligence orb on the other.
+         Anchor id kept as #workspace for stable nav links. -->
     <section class="section section--workspace" id="workspace">
-      <div class="container ws-inner ws-stacked">
-        <div class="ws-copy ws-head">
+      <div class="container ws-inner">
+        <div class="ws-copy">
           <span class="eyebrow reveal" data-i18n="ws.eyebrow">Intelligence</span>
-          <h2 class="section-title reveal"><span data-i18n="ws.title1">More than tracking.</span><br><span class="accent" data-i18n="ws.title2">Understanding.</span></h2>
-          <p class="section-lead reveal" data-i18n="ws.lead">The intelligence layer of Aurix interprets your portfolio and helps you understand what is behind the numbers.</p>
+          <h2 class="section-title reveal" data-i18n="ws.title">Wealth Intelligence Platform</h2>
+          <p class="section-lead reveal" data-i18n="ws.lead">Centralizing your wealth is only the beginning. Aurix turns scattered data into actionable understanding — helping you see what is changing, what matters and what needs your attention.</p>
+          <ul class="intel-benefits reveal">
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="ws.b1">Relevant changes detected automatically</span></li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="ws.b2">Real-time portfolio health</span></li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="ws.b3">Market context applied to your wealth</span></li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="ws.b4">AI-driven actionable insights</span></li>
+          </ul>
         </div>
-        <div class="ws-cards">
-          <div class="ws-card reveal"><svg class="ws-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg><h3 data-i18n="ws.c1.t">Concentration</h3><p data-i18n="ws.c1.d">Balanced</p><i class="ws-ind"><b style="width:64%"></b></i></div>
-          <div class="ws-card reveal"><svg class="ws-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v9l7 4M12 21a9 9 0 100-18"/></svg><h3 data-i18n="ws.c2.t">Diversification</h3><p data-i18n="ws.c2.d">Broad</p><i class="ws-ind"><b style="width:78%;background:#7db8ff"></b></i></div>
-          <div class="ws-card reveal"><svg class="ws-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c4 5 6 8 6 11a6 6 0 01-12 0c0-3 2-6 6-11z"/></svg><h3 data-i18n="ws.c3.t">Liquidity</h3><p data-i18n="ws.c3.d">Available</p><i class="ws-ind"><b style="width:52%;background:#27c768"></b></i></div>
-          <div class="ws-card reveal"><svg class="ws-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z"/></svg><h3 data-i18n="ws.c4.t">Risk</h3><p data-i18n="ws.c4.d">Balanced</p><i class="ws-ind"><b style="width:46%;background:#f4c45a"></b></i></div>
-          <div class="ws-card reveal"><svg class="ws-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg><h3 data-i18n="ws.c5.t">Portfolio health</h3><p data-i18n="ws.c5.d">Strong</p><i class="ws-ind"><b style="width:82%;background:#27c768"></b></i></div>
-          <div class="ws-card reveal"><svg class="ws-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/></svg><h3 data-i18n="ws.c7.t">Intelligence</h3><p data-i18n="ws.c7.d">Wealth context</p><i class="ws-ind"><b style="width:88%;background:#7db8ff"></b></i></div>
+        <div class="ws-visual reveal" aria-hidden="true">
+          <div class="intel-orb">
+            <span class="io-glow"></span>
+            <span class="io-ring io-ring--1"></span>
+            <span class="io-ring io-ring--2"></span>
+            <span class="io-core"></span>
+            <svg class="io-ecg" viewBox="0 0 240 240" preserveAspectRatio="none">
+              <path class="draw-line" d="M20,120 L70,120 L88,120 L100,86 L116,150 L132,104 L146,128 L164,120 L220,120" fill="none" stroke="#bdecff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- ─────────────── POSITIONING (AURIX-WEBSITE-MESSAGING-1) ─────────────── -->
-    <!-- Strategic positioning: reframes Aurix as a Wealth Intelligence Platform.
-         Placed after the product is understood (problem → solution → intelligence)
-         and before the visual showcase. Additive; nothing existing was moved. -->
-    <section class="section section--positioning">
-      <div class="container positioning-inner">
-        <span class="eyebrow reveal" data-i18n="pos.eyebrow">Wealth Intelligence Platform</span>
-        <!-- AURIX-WEBSITE-HERO-COPY-RHYTHM-1: same words, same <h2>/class/styles
-             — only split into three logical lines so the value prop reads as
-             three clean steps (Centralize / Understand / Discover) instead of
-             wrapping at unnatural points. data-i18n sets textContent, so each
-             line is its own keyed span (no <br>, survives language switch). -->
-        <h2 class="positioning-title reveal">
-          <span data-i18n="pos.title1">Centralize your wealth.</span>
-          <span data-i18n="pos.title2">Understand its evolution.</span>
-          <span data-i18n="pos.title3">Discover what drives your financial future.</span>
-        </h2>
-        <p class="positioning-lead reveal" data-i18n="pos.lead">Aurix transforms fragmented financial data into clarity, context and actionable understanding.</p>
-      </div>
-    </section>
-
-    <!-- ─────────────── PLATFORM TOOLS / WORKSPACE ─────────────── -->
-    <!-- Current product value, placed before the roadmap so the roadmap reads as
-         the final strategic direction right before the access section.
-         Sells the Workspace as a real product capability — not a changelog. -->
+    <!-- ─────────────── PERSONAL FINANCIAL CENTER ─────────────── -->
+    <!-- Professional tools and templates. Placed before the roadmap so the roadmap
+         reads as the final strategic direction right before the access section. -->
     <section class="section section--updates" id="tools">
       <div class="container updates-inner">
-        <h2 class="section-title reveal" data-i18n="updates.title">Professional tools for your financial life.</h2>
-        <p class="section-lead reveal" data-i18n="updates.sub">Plan, simulate and organize key parts of your wealth with practical tools built into Aurix.</p>
+        <h2 class="section-title reveal" data-i18n="updates.title">Personal financial center.</h2>
+        <p class="section-lead reveal" data-i18n="updates.sub">Plan, simulate and organize the most important areas of your wealth from a single workspace.</p>
         <div class="updates-grid reveal">
-          <span class="update-chip" data-i18n="updates.1">Personal Financial Workspace</span>
+          <span class="update-chip" data-i18n="updates.1">Financial Planning</span>
           <span class="update-chip" data-i18n="updates.2">Real Estate Portfolio</span>
-          <span class="update-chip" data-i18n="updates.3">Portfolio Goals</span>
-          <span class="update-chip" data-i18n="updates.4">Wealth Growth Tools</span>
           <span class="update-chip" data-i18n="updates.5">Scenario Analysis</span>
+          <span class="update-chip" data-i18n="updates.8">Cash Flow Management</span>
+          <span class="update-chip" data-i18n="updates.3">Financial Goals</span>
+          <span class="update-chip" data-i18n="updates.9">Market Monitoring</span>
           <span class="update-chip" data-i18n="updates.6">Financing Analysis</span>
           <span class="update-chip" data-i18n="updates.7">Investment Journal</span>
-          <span class="update-chip" data-i18n="updates.8">Cash Flow Management</span>
-          <span class="update-chip" data-i18n="updates.9">Market Monitoring</span>
         </div>
       </div>
     </section>
@@ -290,10 +250,8 @@
             <ul>
               <li data-i18n="rm.now.1">Portfolio Dashboard</li>
               <li data-i18n="rm.now.2">Market Tracking</li>
-              <li data-i18n="rm.now.3">Personal Financial Workspace</li>
+              <li data-i18n="rm.now.3">Personal Financial Center</li>
               <li data-i18n="rm.now.4">Real Estate Portfolio</li>
-              <li data-i18n="rm.now.5">Goals System</li>
-              <li data-i18n="rm.now.6">Wealth Tracking Tools</li>
             </ul>
           </div>
           <div class="phase">
@@ -303,7 +261,7 @@
               <li data-i18n="rm.next.1">Intelligence Center</li>
               <li data-i18n="rm.next.2">Portfolio Health</li>
               <li data-i18n="rm.next.3">Founder Access</li>
-              <li data-i18n="rm.next.4">Premium Membership</li>
+              <li data-i18n="rm.next.4">Smart Tools</li>
             </ul>
           </div>
           <div class="phase">
@@ -313,7 +271,7 @@
               <li data-i18n="rm.later.1">Advanced Automation</li>
               <li data-i18n="rm.later.2">AI-Assisted Insights</li>
               <li data-i18n="rm.later.3">Expanded Integrations</li>
-              <li data-i18n="rm.later.4">Wealth Planning Tools</li>
+              <li data-i18n="rm.later.4">Advanced Wealth Planning</li>
             </ul>
           </div>
         </div>
@@ -331,7 +289,7 @@
           <p class="early-sub" data-i18n="early.sub">Aurix is currently opening access to selected early users before public launch.</p>
           <p class="early-founder" data-i18n="early.founder">Founder Access will be available for early members with exclusive benefits, priority access and permanent founder recognition.</p>
           <button class="btn btn-primary btn-lg" id="openModal" data-i18n="cta.request">Request Access</button>
-          <p class="early-trust" data-i18n="early.trust">Invite-only · No financial promises</p>
+          <p class="early-trust" data-i18n="early.trust">Limited early invitations available</p>
         </div>
       </div>
     </section>

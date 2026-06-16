@@ -803,22 +803,95 @@ body.modal-open{ overflow:hidden; }
 }
 
 /* ── Market ─────────────────────────────────────────────
-   Reuses .updates-inner / .updates-grid / .update-chip; only needs the
-   section frame (border-top + rhythm). Eyebrow sits centered above title. */
+   Centered intro (reuses .updates-inner) + a premium preview panel: six tabs
+   over an animated chart. Eyebrow sits centered above the title. */
 .section--market{ border-top:1px solid var(--border); padding:64px 0; }
 .section--market .eyebrow{ display:inline-block; margin-bottom:14px; }
 @media (max-width:560px){ .section--market{ padding:48px 0; } }
 
+.market-panel{
+  position:relative; max-width:880px; margin:40px auto 0; text-align:left;
+  border:1px solid var(--border-hi); border-radius:18px; overflow:hidden;
+  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.014));
+  box-shadow:0 40px 90px -50px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.06);
+  padding:20px 22px 8px;
+}
+.market-panel::after{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(70% 50% at 75% 0%, rgba(79,142,247,.10), transparent 60%);
+}
+.market-tabs{ display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 18px; position:relative; z-index:1; }
+.mk-tab{
+  font:inherit; font-size:13.5px; font-weight:600; color:var(--muted); cursor:pointer;
+  padding:8px 14px; border-radius:999px; border:1px solid var(--border);
+  background:rgba(255,255,255,.02);
+  transition:color .2s var(--ease), border-color .2s var(--ease), background .2s var(--ease);
+}
+.mk-tab:hover{ color:var(--text); border-color:var(--border-hi); }
+.mk-tab.is-active{ color:#fff; border-color:var(--accent); background:rgba(79,142,247,.16); }
+.market-quote{ display:flex; align-items:flex-end; justify-content:space-between; gap:16px; position:relative; z-index:1; }
+.mk-quote-main{ display:flex; align-items:center; gap:9px; }
+.mk-live{ position:relative; width:8px; height:8px; flex:0 0 auto; }
+.mk-live i{ position:absolute; inset:0; border-radius:50%; background:#27c768; animation:mkPulse 2.2s var(--ease) infinite; }
+@keyframes mkPulse{ 0%{ box-shadow:0 0 0 0 rgba(39,199,104,.45) } 70%{ box-shadow:0 0 0 7px rgba(39,199,104,0) } 100%{ box-shadow:0 0 0 0 rgba(39,199,104,0) } }
+.mk-symbol{ font-size:15px; font-weight:700; letter-spacing:-.01em; color:var(--text); }
+.mk-quote-fig{ display:flex; align-items:baseline; gap:10px; }
+.mk-price{ font-size:clamp(26px,3.4vw,34px); font-weight:800; letter-spacing:-.02em; color:#fff; font-variant-numeric:tabular-nums; }
+.mk-delta{ font-size:14px; font-weight:700; color:var(--muted); }
+.mk-delta.up{ color:#27c768; }
+.mk-delta.down{ color:#f4776a; }
+.market-chart{ margin:14px -22px 0; height:200px; position:relative; z-index:1; }
+.market-chart svg{ width:100%; height:100%; display:block; }
+@media (max-width:560px){
+  .market-panel{ padding:16px 16px 6px; }
+  .market-chart{ margin:12px -16px 0; height:150px; }
+  .mk-tab{ font-size:12.5px; padding:7px 11px; }
+}
+@media (prefers-reduced-motion: reduce){ .mk-live i{ animation:none; } }
+
+/* ── Intelligence: benefits + premium orb ───────────────── */
+.intel-benefits{ list-style:none; margin:26px 0 0; padding:0; display:grid; gap:14px; }
+.intel-benefits li{ display:flex; align-items:flex-start; gap:12px; font-size:16px; font-weight:500; color:var(--text); }
+.intel-benefits svg{
+  flex:0 0 auto; box-sizing:border-box; width:24px; height:24px; margin-top:1px; padding:3px;
+  border-radius:50%; background:rgba(79,142,247,.12);
+  fill:none; stroke:var(--accent); stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round;
+}
+.ws-visual{ display:flex; align-items:center; justify-content:center; }
+.intel-orb{ position:relative; width:min(360px,78vw); aspect-ratio:1/1; }
+.io-glow{
+  position:absolute; inset:0; border-radius:50%; filter:blur(4px);
+  background:radial-gradient(circle at 50% 45%, rgba(77,141,255,.5), rgba(77,141,255,.12) 46%, transparent 70%);
+}
+.io-ring{ position:absolute; inset:8%; border-radius:50%; border:1px solid rgba(120,170,255,.22); }
+.io-ring--1{ animation:ioPulse 4.2s var(--ease) infinite; }
+.io-ring--2{ inset:0; border-color:rgba(120,170,255,.12); animation:ioPulse 4.2s var(--ease) .9s infinite; }
+.io-core{
+  position:absolute; inset:24%; border-radius:50%;
+  background:radial-gradient(circle at 38% 32%, #9cc4ff, #4d8dff 42%, #1c4fb0 78%, #0f2f73);
+  box-shadow:inset 0 6px 22px rgba(255,255,255,.32), inset 0 -16px 30px rgba(8,20,60,.7), 0 24px 60px -20px rgba(77,141,255,.7);
+  animation:ioFloat 7s var(--ease) infinite;
+}
+.io-ecg{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; opacity:.92; mix-blend-mode:screen; }
+@keyframes ioFloat{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-8px) } }
+@keyframes ioPulse{ 0%{ transform:scale(.96); opacity:.5 } 50%{ transform:scale(1.02); opacity:.9 } 100%{ transform:scale(.96); opacity:.5 } }
+@media (max-width:860px){ .ws-visual{ order:-1; } .intel-orb{ width:min(300px,66vw); } }
+@media (prefers-reduced-motion: reduce){
+  .io-core, .io-ring--1, .io-ring--2{ animation:none; }
+}
+
 /* ── Fragmentation consequences — one elegant conclusion line ─────────── */
-.section--problem .frag-grid{ margin-bottom:36px; }
+/* No divider: the asset list and this conclusion read as one continuous
+   problem block, not two separate sections. */
+.section--problem .frag-grid{ margin-bottom:24px; }
 .pain-line{
-  margin:0; padding-top:28px; border-top:1px solid var(--border);
+  margin:0; padding-top:4px;
   text-align:center; color:var(--dim); font-size:15px; font-weight:500; letter-spacing:.01em;
 }
 .pain-line span{ white-space:nowrap; }
 .pain-line span + span::before{ content:'•'; margin:0 14px; color:var(--accent-2); opacity:.55; }
 @media (max-width:560px){
-  .pain-line{ font-size:13.5px; padding-top:22px; }
+  .pain-line{ font-size:13.5px; padding-top:2px; }
   .pain-line span + span::before{ margin:0 9px; }
 }
 
