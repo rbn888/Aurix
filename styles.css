@@ -761,8 +761,8 @@ button[aria-busy="true"] {
    ghost secondary. Desktop only (the buttons are hidden ≤768px). */
 @media (min-width: 769px) {
   .summary-footer .btn-summary-action {
-    font-size: 12.5px;
-    padding: 8px 16px;
+    font-size: 12px;            /* AURIX-DASH-V3: slightly quieter than the wealth hero */
+    padding: 7px 14px;
   }
 }
 
@@ -778,10 +778,12 @@ button[aria-busy="true"] {
   background:
     radial-gradient(120% 140% at 0% 0%, rgba(74,130,240,0.12), transparent 60%),
     linear-gradient(165deg, rgba(40,56,94,0.42), rgba(18,26,46,0.28));
+  /* AURIX-DASH-V3: softer shadow so the capsule reads as integrated into the
+     hero, not a second card floating on top. Keep relief (inset), border + glow. */
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.07),
-    0 10px 30px -18px rgba(0,0,0,0.65),
-    0 0 32px -10px rgba(74,130,240,0.20);
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 4px 16px -14px rgba(0,0,0,0.45),
+    0 0 24px -14px rgba(74,130,240,0.16);
 }
 /* Figure gets more presence inside the zone — a tighter, bluer glow than the
    global soft white text-shadow. */
@@ -789,19 +791,19 @@ button[aria-busy="true"] {
   text-shadow: 0 0 18px rgba(74,130,240,0.30), 0 0 8px rgba(255,255,255,0.12);
 }
 .summary-hero-zone .summary-meta { color: var(--text-muted); }
-/* AURIX-DASH-V2-FIX: desktop composition — the zone hugs its content so the
-   figure is not pinned to a far-too-wide panel with dead air on the right.
-   Stays left-aligned/institutional (no text-align center); balanced padding.
-   Desktop only (≥769: FAB is hidden, hero is side-by-side) — mobile untouched. */
+/* AURIX-DASH-V3: the capsule IS the hero. Wide (~88% of the left block, capped),
+   taller, generously spaced and CENTERED within the column (balanced margins).
+   Content stays left-aligned/institutional. Desktop only (≥769) — mobile keeps
+   the full-width capsule with its inline FAB. */
 @media (min-width: 769px) {
   .summary-hero-zone {
-    align-self: flex-start;
-    width: fit-content;
-    min-width: 264px;
-    max-width: 100%;
-    padding-left: 24px;
-    padding-right: 28px;
+    width: 88%;
+    max-width: 540px;
+    margin-inline: auto;        /* centered in the left block — balanced L/R margins */
+    padding: 12px 32px 24px;    /* taller + wider breathing; top kept for title baseline */
   }
+  .summary-hero-zone .summary-label { margin-bottom: 20px; }   /* label → figure breathes */
+  .summary-hero-zone .summary-total { margin-bottom: 18px; }   /* figure → meta separation */
 }
 
 /* ── Assets Section ────────────────────────────────────── */
@@ -3088,7 +3090,7 @@ body:not(.hero-active) #orb-canvas {
 
 /* ── Hero left (total value + actions) ─────────────────── */
 .hero-left {
-  padding: 12px var(--space-4) 28px 36px; /* AURIX-DASH-V2: lower top so the elevated zone's label baseline aligns with the right chart title (zone adds ~12px+border) */
+  padding: 12px var(--space-5) 28px var(--space-5); /* AURIX-DASH-V3: symmetric sides so the centered capsule has balanced L/R margins; top 12 keeps the label baseline aligned with the chart title */
   position: relative;
   z-index: 1;
   border-right: 1px solid rgba(255,255,255,.055);
@@ -8358,7 +8360,12 @@ main { padding-bottom: 72px; }
   min-width: 120px;
   padding: var(--space-2);
   border-radius: 14px;
-  background: rgba(255,255,255,0.05);
+  /* AURIX-DASH-V3: Market featured cards join the blue-glass system. */
+  background:
+    radial-gradient(130% 130% at 10% 0%, rgba(74,130,240,0.08), transparent 58%),
+    linear-gradient(165deg, rgba(28,40,68,0.40), rgba(15,21,37,0.48));
+  border: 1px solid rgba(74,130,240,0.14);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 0 20px -12px rgba(74,130,240,0.14);
   flex-shrink: 0;
 }
 
@@ -9552,6 +9559,20 @@ main { padding-bottom: 72px; }
 .value-flash-up   { animation: flash-up   0.45s ease forwards; }
 .value-flash-down { animation: flash-down 0.45s ease forwards; }
 
+/* AURIX-DASH-V3: the wealth figure must never flash red/garnet on a drop — it
+   reads as a bug/alert. Both up AND down get the SAME calm Aurix-blue glow
+   (~360ms): "data updated", not "alarm". Id-scoped so other price flashes are
+   untouched; wins by specificity regardless of source order. */
+@keyframes aurixWealthUpdate {
+  0%   { background: rgba(74,130,240,0.16); }
+  100% { background: transparent; }
+}
+#totalValue.value-flash-up,
+#totalValue.value-flash-down {
+  animation: aurixWealthUpdate 360ms var(--ease-out);
+  border-radius: 8px;
+}
+
 .market-metric-card .value,
 .market-row-price,
 .market-row-change {
@@ -9571,7 +9592,12 @@ main { padding-bottom: 72px; }
   .featured-card:hover {
     transform: translateY(-2px);
     transition: transform 0.2s ease;
-    background: rgba(255,255,255,0.08);
+    /* AURIX-DASH-V3: blue-glass hover + glow to match the system. */
+    background:
+      radial-gradient(130% 130% at 10% 0%, rgba(74,130,240,0.13), transparent 58%),
+      linear-gradient(165deg, rgba(34,48,80,0.52), rgba(16,23,40,0.55));
+    border-color: rgba(74,130,240,0.40);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.28), 0 0 24px rgba(74,130,240,0.10);
   }
 }
 
@@ -16403,10 +16429,24 @@ body.gs-open { overflow: hidden; }
      value → actions → health WITHOUT touching the DOM. The actions (order:1)
      follow the info block; the health pill (order:2) drops below them as a
      secondary layer. */
-  .hero-left .summary-footer { order: 1; }
+  .hero-left .summary-footer {
+    order: 1;
+    position: relative;
+    padding-top: 22px;
+  }
+  /* AURIX-DASH-V3: premium 1px Aurix-gradient separator between the wealth
+     capsule (hero) and the operational buttons. Visual only. */
+  .hero-left .summary-footer::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(74,130,240,0.32), transparent);
+  }
+  /* The health pill now lives INSIDE the capsule — keep its gap from the meta
+     row; order/align-self are no-ops in the (block) capsule but harmless. */
   .hero-left .aurix-signal {
-    order: 2;
-    margin-top: var(--space-4);   /* premium gap below the actions */
+    margin-top: var(--space-4);   /* meta → health gap inside the capsule */
     align-self: flex-start;
     width: fit-content;
     max-width: 100%;
@@ -16460,8 +16500,9 @@ body.gs-open { overflow: hidden; }
      optically matches the top margin above "VALOR TOTAL" (padding-top ==
      padding-bottom == --space-5). Buttons + pill themselves are untouched. */
   .hero-left { padding-bottom: var(--space-5); }
-  .hero-left .summary-footer { margin-top: auto; }
-  .hero-left .aurix-signal   { margin-top: auto; }
+  /* AURIX-DASH-V3: buttons sit just below the capsule (with the gradient divider
+     between), not floated to the column bottom. Health pill is inside the capsule. */
+  .hero-left .summary-footer { margin-top: 22px; }
   /* "Añadir liquidez" — equal-weight contrast at desktop. Stays NEUTRAL
      (not Aurix-blue), so it reads as an equal action, never a second primary. */
   .summary-footer .btn-summary-action.btn-secondary {

@@ -56,7 +56,7 @@
     // serve a half-cached app. Same user + same account must render the
     // same code on Safari mobile, the iOS home-screen PWA, and desktop.
     (function() {
-      window.AURIX_BUILD = 'v265-hero-subcard-balance-market-consistency';
+      window.AURIX_BUILD = 'v266-hero-v3-wealth-capsule';
       try {
         var KEY     = 'aurix_build';
         var RELOAD  = 'aurix_build_reload';
@@ -114,7 +114,7 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=262">
+  <link rel="stylesheet" href="styles.css?v=263">
 </head>
 <body style="background:#070a14">
 
@@ -237,13 +237,10 @@
               <button class="fab-trigger" id="portfolioFab">+</button>
             </div>
           </div>
-          </div><!-- /.summary-hero-zone -->
-          <!-- AURIX-DESKTOP-HERO-ALLOCATION-PREMIUM-1: hero-left order is now
-               label → value → meta → HEALTH → actions. The health teaser sits
-               directly under the meta row (grouped with the status info) and
-               the single divider above the add buttons separates status from
-               actions. The whole row opens Workspace; renderAurixSignal()
-               fills the state + tone and hides it on empty / drill-down. -->
+          <!-- AURIX-DASH-V3: the health signal now lives INSIDE the wealth
+               capsule — structure: label → value → meta → health. A premium
+               gradient divider (CSS) separates the capsule from the add buttons.
+               renderAurixSignal() fills state/tone and hides it on empty. -->
           <section class="aurix-signal aurix-signal--health" id="aurixSignal" role="button" tabindex="0" hidden>
             <div class="aurix-signal-icon" aria-hidden="true">
               <span class="aurix-signal-dot"></span>
@@ -256,6 +253,7 @@
               <span class="aurix-signal-cta-arrow" aria-hidden="true">›</span>
             </button>
           </section>
+          </div><!-- /.summary-hero-zone -->
 
           <div class="summary-footer">
             <div class="summary-actions">
