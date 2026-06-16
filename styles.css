@@ -789,6 +789,20 @@ button[aria-busy="true"] {
   text-shadow: 0 0 18px rgba(74,130,240,0.30), 0 0 8px rgba(255,255,255,0.12);
 }
 .summary-hero-zone .summary-meta { color: var(--text-muted); }
+/* AURIX-DASH-V2-FIX: desktop composition — the zone hugs its content so the
+   figure is not pinned to a far-too-wide panel with dead air on the right.
+   Stays left-aligned/institutional (no text-align center); balanced padding.
+   Desktop only (≥769: FAB is hidden, hero is side-by-side) — mobile untouched. */
+@media (min-width: 769px) {
+  .summary-hero-zone {
+    align-self: flex-start;
+    width: fit-content;
+    min-width: 264px;
+    max-width: 100%;
+    padding-left: 24px;
+    padding-right: 28px;
+  }
+}
 
 /* ── Assets Section ────────────────────────────────────── */
 .section-header h2 {
@@ -9332,12 +9346,17 @@ main { padding-bottom: 72px; }
   }
 
   /* ── Table surface: glass panel container */
+  /* AURIX-DASH-V2: Market section card aligned to the Intelligence/Dashboard
+     blue-glass material (was flat rgba(13,18,30,.40) + grey border). */
   .market-section {
-    background: rgba(13, 18, 30, 0.40);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background:
+      radial-gradient(130% 120% at 10% 0%, rgba(74,130,240,0.10), transparent 58%),
+      linear-gradient(165deg, rgba(30,44,74,0.42), rgba(13,19,34,0.50));
+    border: 1px solid rgba(74,130,240,0.16);
     border-radius: 14px;
     padding: 6px 20px 14px;
     margin: 0;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 0 22px -12px rgba(74,130,240,0.16);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
@@ -9346,7 +9365,7 @@ main { padding-bottom: 72px; }
     padding: 14px 0 8px;
     font-size: 11px;
     font-weight: 600;
-    color: rgba(220, 230, 250, 0.42);
+    color: rgba(220, 230, 250, 0.55);   /* AURIX-DASH-V2: lift secondary label */
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
@@ -9361,7 +9380,7 @@ main { padding-bottom: 72px; }
     column-gap: 10px;
     font-size: 11px;
     font-weight: 600;
-    color: rgba(220, 230, 250, 0.40);
+    color: rgba(220, 230, 250, 0.55);   /* AURIX-DASH-V2: lift table-header label */
     letter-spacing: 0.08em;
     text-transform: uppercase;
     padding: 8px 0;
@@ -9385,7 +9404,7 @@ main { padding-bottom: 72px; }
     transition: background 0.15s ease;
   }
   .market-row:hover {
-    background: rgba(255, 255, 255, 0.025);
+    background: rgba(74, 130, 240,0.06);   /* AURIX-DASH-V2: blue hover (flag-off fallback parity) */
   }
   .market-row:last-child {
     border-bottom: 0;
@@ -9542,7 +9561,9 @@ main { padding-bottom: 72px; }
 /* Step 3: hover depth (desktop only) */
 @media (hover: hover) {
   .market-row:hover {
-    background: rgba(255,255,255,0.06);
+    /* AURIX-DASH-V2: was rgba(255,255,255,0.06) white — this @media-hover rule
+       won by source order over the desktop blue hover on the active is-v4 rows. */
+    background: rgba(74,130,240,0.06);
     border-radius: 8px;
     transform: translateX(2px);
     transition: background 0.15s ease, transform 0.15s ease;
@@ -13549,7 +13570,7 @@ body.gs-open { overflow: hidden; }
   padding: 0 12px 8px;
   font-size: 10px;
   letter-spacing: 0.18em;
-  color: rgba(220,230,250,0.42);
+  color: rgba(220,230,250,0.58);   /* AURIX-DASH-V2: lift v3 table-header label */
   text-transform: uppercase;
   font-weight: 700;
 }
@@ -13563,8 +13584,8 @@ body.gs-open { overflow: hidden; }
   transition: background 160ms ease, box-shadow 220ms ease;
 }
 #marketList.is-v3 .market-row:hover {
-  background: rgba(74, 130, 240,0.045);
-  box-shadow: inset 0 0 0 1px rgba(74, 130, 240,0.10);
+  background: rgba(74, 130, 240,0.07);   /* AURIX-DASH-V2: align row hover to the dashboard blue */
+  box-shadow: inset 0 0 0 1px rgba(74, 130, 240,0.14);
 }
 
 /* Asset cell — stronger ticker hierarchy, calmer name. */
