@@ -19204,10 +19204,10 @@ body.gs-open { overflow: hidden; }
    block (sibling to the Salud module). Hidden hero (≤640) is unaffected; mobile
    uses the dedicated .intcc-m-* cards. */
 .intcc-hero-intel { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 20px; }
-.intcc-hero-body { flex: 1 1 auto; min-width: 0; padding-left: 16px; }   /* AURIX-INTCC-V1.3: nudge the insight toward the sphere (position only) */
+.intcc-hero-body { flex: 1 1 auto; min-width: 0; padding-left: 22px; }   /* AURIX-INTCC-V2.1: insight a touch further toward the sphere (was 16, position only) */
 .intcc-hero .intcc-score-val { font-size: 33px; }
 .intcc-hero .intcc-score-suffix { margin-top: 2px; }
-.intcc-hero-orb-wrap { flex: 0 0 auto; display: grid; place-items: center; margin-left: -16px; }   /* AURIX-INTCC-V1.3: pull the sphere slightly toward the insight (position only — same size/glow/animation) */
+.intcc-hero-orb-wrap { flex: 0 0 auto; display: grid; place-items: center; margin-left: -20px; }   /* AURIX-INTCC-V2.1: sphere a touch closer to the insight (was -16; position only — same size/glow/animation) */
 .intcc-hero-orb-wrap .intcc-orb { width: 112px; height: 112px; }
 .intcc-eyebrow {
   display: block; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase;
@@ -19505,7 +19505,7 @@ body.gs-open { overflow: hidden; }
   .intcc-hero-intel {
     align-self: stretch;
     display: flex; align-items: center; gap: 22px;
-    padding: 16px 24px;
+    padding: 16px 24px 16px 16px;   /* AURIX-INTCC-V2.1 CAMBIO 5: trim the left inner void (left 24→16) */
     background: linear-gradient(165deg, rgba(120,160,255,0.06), rgba(255,255,255,0.012));
     border: 1px solid rgba(120,160,255,0.13);
     border-radius: 16px;
@@ -19517,12 +19517,13 @@ body.gs-open { overflow: hidden; }
   .intcc-hero-body {
     flex: 1 1 auto; min-width: 0;
     display: flex; flex-direction: column; justify-content: center;
+    margin-top: -6px;   /* AURIX-INTCC-V2.1 CAMBIO 1/6: lift INTELIGENCIA onto SALUD's optical line */
   }
   /* Orb lives inside the Inteligencia card, vertically centred with the text; the
      card's right padding keeps it off the hero edge. */
   /* AURIX-INTCC-V1.3: pull the sphere slightly toward the insight (was margin:0) —
      reduces the central dead space inside the Inteligencia sub-card. Position only. */
-  .intcc-hero-orb-wrap { flex: 0 0 auto; align-self: center; margin: 0 0 0 -16px; }
+  .intcc-hero-orb-wrap { flex: 0 0 auto; align-self: center; margin: 0 0 0 -20px; }   /* AURIX-INTCC-V2.1: sphere closer (was -16) */
   .intcc-hero-body .intcc-eyebrow {
     font-size: 11px; letter-spacing: 0.16em; color: rgba(159,194,255,0.95);
     margin-bottom: 11px; font-weight: 700;
