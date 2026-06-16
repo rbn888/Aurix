@@ -19152,7 +19152,19 @@ body.gs-open { overflow: hidden; }
 .intcc-hero:hover .intcc-orb-core { transform: translateY(-2px); box-shadow: 0 0 36px rgba(var(--orb-c),0.98), inset 0 0 14px rgba(255,255,255,0.5), inset 0 -4px 10px rgba(var(--orb-c),0.6); }
 
 /* INT.2S Bloque 1 — institutional 3-zone hero: SCORE · MESSAGE · ORB */
-.intcc-hero-score { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 7px; }
+/* AURIX-INTCC-V1.3: Salud becomes a premium blue-glass micro-card (mini version
+   of the Dashboard cards) so it reads as an integrated module, not a piece resting
+   on the background. Quality, not dominance — contents/size/position unchanged. */
+.intcc-hero-score {
+  flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 7px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(74,130,240,0.18);
+  background:
+    radial-gradient(130% 130% at 12% 0%, rgba(74,130,240,0.10), transparent 60%),
+    linear-gradient(165deg, rgba(34,48,80,0.42), rgba(15,21,37,0.30));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 20px -12px rgba(74,130,240,0.18);
+}
 .intcc-hero .intcc-score-ring { position: relative; width: 116px; height: 116px; display: grid; place-items: center; }
 .intcc-hero .intcc-score-svg  { width: 116px; height: 116px; }
 .intcc-hero-score .intcc-health-badge { margin: 2px 0 0; }
@@ -19161,10 +19173,10 @@ body.gs-open { overflow: hidden; }
    block (sibling to the Salud module). Hidden hero (≤640) is unaffected; mobile
    uses the dedicated .intcc-m-* cards. */
 .intcc-hero-intel { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 20px; }
-.intcc-hero-body { flex: 1 1 auto; min-width: 0; }
+.intcc-hero-body { flex: 1 1 auto; min-width: 0; padding-left: 16px; }   /* AURIX-INTCC-V1.3: nudge the insight toward the sphere (position only) */
 .intcc-hero .intcc-score-val { font-size: 33px; }
 .intcc-hero .intcc-score-suffix { margin-top: 2px; }
-.intcc-hero-orb-wrap { flex: 0 0 auto; display: grid; place-items: center; }
+.intcc-hero-orb-wrap { flex: 0 0 auto; display: grid; place-items: center; margin-left: -16px; }   /* AURIX-INTCC-V1.3: pull the sphere slightly toward the insight (position only — same size/glow/animation) */
 .intcc-hero-orb-wrap .intcc-orb { width: 112px; height: 112px; }
 .intcc-eyebrow {
   display: block; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase;
@@ -19477,7 +19489,9 @@ body.gs-open { overflow: hidden; }
   }
   /* Orb lives inside the Inteligencia card, vertically centred with the text; the
      card's right padding keeps it off the hero edge. */
-  .intcc-hero-orb-wrap { flex: 0 0 auto; align-self: center; margin: 0; }
+  /* AURIX-INTCC-V1.3: pull the sphere slightly toward the insight (was margin:0) —
+     reduces the central dead space inside the Inteligencia sub-card. Position only. */
+  .intcc-hero-orb-wrap { flex: 0 0 auto; align-self: center; margin: 0 0 0 -16px; }
   .intcc-hero-body .intcc-eyebrow {
     font-size: 11px; letter-spacing: 0.16em; color: rgba(159,194,255,0.95);
     margin-bottom: 11px; font-weight: 700;
