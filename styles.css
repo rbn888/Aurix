@@ -13036,19 +13036,27 @@ body.gs-open { overflow: hidden; }
 @media (min-width: 1024px) {
 
   /* ── Dashboard ─────────────────────────────────────────────── */
-  /* Category cards — unify radius/border with the hero card system,
-     lighter inner gradient, calmer hover lift. */
+  /* AURIX-DASH-V2-FIX: this desktop override (equal specificity, later source)
+     was reverting .cat-card to the old white gradient and hiding the V2
+     blue-glass. Re-aligned to the Intelligence material so V2 shows on desktop. */
   .cat-card {
     border-radius: 18px;
-    border-color: rgba(255,255,255,0.06);
-    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.012));
+    border-color: rgba(74,130,240,0.16);
+    background:
+      radial-gradient(130% 130% at 12% 0%, rgba(74,130,240,0.10), transparent 58%),
+      linear-gradient(165deg, rgba(30,44,74,0.46), rgba(15,21,37,0.54));
     transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.22s ease;
   }
   .cat-card:hover {
     transform: translateY(-2px);
-    border-color: rgba(74, 130, 240,0.22);
-    background: linear-gradient(180deg, rgba(74, 130, 240,0.06), rgba(255,255,255,0.018));
-    box-shadow: 0 18px 36px -24px rgba(8,12,24,0.85);
+    border-color: rgba(74,130,240,0.42);
+    background:
+      radial-gradient(130% 130% at 12% 0%, rgba(74,130,240,0.16), transparent 58%),
+      linear-gradient(165deg, rgba(34,50,84,0.56), rgba(16,23,40,0.60));
+    box-shadow: 0 14px 34px rgba(0,0,0,0.30),
+                0 0 0 1px rgba(74,130,240,0.12),
+                0 0 26px rgba(74,130,240,0.12),
+                inset 0 1px 0 rgba(255,255,255,0.07);
   }
   .cat-card-name {
     font-weight: 600;
@@ -13334,12 +13342,14 @@ body.gs-open { overflow: hidden; }
   }
 
   /* ── Dashboard mobile — card cohesion ─────────────────────── */
-  /* Category cards on mobile inherit a touch of the desktop glass
-     surface so the lower dashboard reads as the same product. */
+  /* AURIX-DASH-V2-FIX: mobile override was also reverting to the white gradient.
+     Re-aligned to the V2 blue-glass so the lower dashboard matches on mobile. */
   .cat-card {
     border-radius: 16px;
-    border-color: rgba(255,255,255,0.07);
-    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.012));
+    border-color: rgba(74,130,240,0.16);
+    background:
+      radial-gradient(130% 130% at 12% 0%, rgba(74,130,240,0.10), transparent 58%),
+      linear-gradient(165deg, rgba(30,44,74,0.46), rgba(15,21,37,0.60));
   }
 
   /* ── Numbers + currency — guard rails ─────────────────────── */
