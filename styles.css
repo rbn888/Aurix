@@ -16514,6 +16514,13 @@ body.gs-open { overflow: hidden; }
      optically matches the top margin above "VALOR TOTAL" (padding-top ==
      padding-bottom == --space-5). Buttons + pill themselves are untouched. */
   .hero-left { padding-bottom: 34px; }   /* AURIX-DASH-V4.1: bottom cushion so the block breathes (was var(--space-5)=24) */
+  /* AURIX-DASH-V4.2: bring each module toward the central divider to trim the
+     dead space facing it. Divider/grid/widths UNTOUCHED — pure inner padding.
+     Left content shifts right (+12, padding-left 24→36). Right module shifts
+     left (-12): padding-left 20→8 + padding-right 24→36 keeps total horizontal
+     padding (44px) so the chart only TRANSLATES, never resizes. */
+  .hero-left  { padding-left: 36px; }
+  .hero-right { padding-left: 8px; padding-right: 36px; }
   /* AURIX-DASH-V3: buttons sit just below the capsule (with the gradient divider
      between), not floated to the column bottom. Health pill is inside the capsule. */
   .hero-left .summary-footer { margin-top: 30px; }   /* AURIX-DASH-V4.1: lower the separator a touch (was 22) */
