@@ -50,7 +50,8 @@
 
       'ws.eyebrow': 'Inteligencia',
       'ws.title': 'Plataforma de Inteligencia Patrimonial',
-      'ws.lead': 'Centralizar tu patrimonio es solo el comienzo. Aurix transforma datos dispersos en comprensión accionable para ayudarte a entender qué está cambiando, qué importa y qué requiere tu atención.',
+      'ws.lead': 'Centralizar tu patrimonio es solo el comienzo.',
+      'ws.lead2': 'Aurix transforma datos dispersos en comprensión accionable para ayudarte a entender qué está cambiando, qué importa y qué requiere tu atención.',
       'ws.b1': 'Cambios relevantes detectados automáticamente',
       'ws.b2': 'Salud de cartera en tiempo real',
       'ws.b3': 'Contexto de mercado aplicado a tu patrimonio',
@@ -73,6 +74,7 @@
       'updates.1': 'Planificación financiera', 'updates.2': 'Cartera inmobiliaria', 'updates.3': 'Objetivos financieros',
       'updates.4': 'Herramientas de crecimiento patrimonial', 'updates.5': 'Análisis de escenarios', 'updates.6': 'Análisis de financiación',
       'updates.7': 'Diario de inversiones', 'updates.8': 'Gestión de flujo de caja', 'updates.9': 'Seguimiento de mercado',
+      'updates.10': 'Calculadora de interés compuesto',
 
       'early.eyebrow': 'Beta privada',
       'early.title': 'Solo por invitación.',
@@ -152,7 +154,8 @@
 
       'ws.eyebrow': 'Intelligence',
       'ws.title': 'Wealth Intelligence Platform',
-      'ws.lead': 'Centralizing your wealth is only the beginning. Aurix turns scattered data into actionable understanding — helping you see what is changing, what matters and what needs your attention.',
+      'ws.lead': 'Centralizing your wealth is only the beginning.',
+      'ws.lead2': 'Aurix turns scattered data into actionable understanding — helping you see what is changing, what matters and what needs your attention.',
       'ws.b1': 'Relevant changes detected automatically',
       'ws.b2': 'Real-time portfolio health',
       'ws.b3': 'Market context applied to your wealth',
@@ -175,6 +178,7 @@
       'updates.1': 'Financial Planning', 'updates.2': 'Real Estate Portfolio', 'updates.3': 'Financial Goals',
       'updates.4': 'Wealth Growth Tools', 'updates.5': 'Scenario Analysis', 'updates.6': 'Financing Analysis',
       'updates.7': 'Investment Journal', 'updates.8': 'Cash Flow Management', 'updates.9': 'Market Monitoring',
+      'updates.10': 'Compound Interest Calculator',
 
       'early.eyebrow': 'Private Beta',
       'early.title': 'Invitation only.',
