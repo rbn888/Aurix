@@ -55,7 +55,7 @@
       'ws.b1': 'Cambios relevantes detectados automáticamente',
       'ws.b2': 'Salud de cartera en tiempo real',
       'ws.b3': 'Contexto de mercado aplicado a tu patrimonio',
-      'ws.b4': 'Insights accionables impulsados por IA',
+      'ws.b4': 'Recomendaciones accionables impulsadas por IA',
 
       'market.eyebrow': 'Mercado',
       'market.title': 'Consulta los mercados desde un único lugar.',

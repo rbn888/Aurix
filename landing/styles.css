@@ -107,8 +107,12 @@ img,svg{ display:block; max-width:100%; }
 
 .brand{
   font-weight:900; font-size:20px; letter-spacing:.26em; padding-left:.26em;
-  background:linear-gradient(96deg,#cfe6ff,#7db8ff 42%,#4f8ef7);
+  /* Electric-blue refinement: brighter highlight → vivid Aurix blue, with a
+     very subtle glow (drop-shadow works on clipped text where text-shadow can't).
+     Premium/institutional — not neon. */
+  background:linear-gradient(96deg,#eaf3ff,#7db8ff 38%,#3a86ff);
   -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent;
+  filter:drop-shadow(0 0 10px rgba(79,142,247,.28));
 }
 .nav-center{ display:flex; gap:34px; }
 .nav-center a{ font-size:14.5px; color:var(--muted); font-weight:500; transition:color .18s; }
@@ -118,11 +122,14 @@ img,svg{ display:block; max-width:100%; }
 .lang-toggle{ display:flex; align-items:center; gap:6px; }
 .lang-btn{
   background:none; border:none; cursor:pointer; padding:2px 4px;
-  font:inherit; font-size:13px; font-weight:600; color:var(--dim); transition:color .18s;
+  font:inherit; font-size:13px; font-weight:600; color:var(--dim);
+  transition:color .18s var(--ease), text-shadow .18s var(--ease);
 }
 .lang-btn:hover{ color:var(--text); }
-.lang-btn.active{ color:var(--accent-2); }
-.lang-sep{ color:var(--dim); font-size:12px; }
+/* Active language: electric Aurix blue + a very subtle glow so it reads as the
+   selected state at a glance; inactive stays premium grey (--dim). */
+.lang-btn.active{ color:var(--accent-2); font-weight:700; text-shadow:0 0 9px rgba(125,184,255,.42); }
+.lang-sep{ color:var(--dim); font-size:12px; opacity:.7; }
 
 .menu-toggle{ display:none; flex-direction:column; gap:5px; background:none; border:none; cursor:pointer; padding:8px; }
 .menu-toggle span{ width:22px; height:2px; background:var(--text); border-radius:2px; transition:.25s var(--ease); }
@@ -335,8 +342,15 @@ body.menu-open .mobile-menu{ opacity:1; transform:none; pointer-events:auto; }
   .feature-grid{ grid-template-columns:repeat(2,1fr); }
 }
 @media (max-width:860px){
-  .nav-center, .header-right .btn, .header-right .lang-toggle{ display:none; }
+  .nav-center, .header-right .btn{ display:none; }
   .menu-toggle{ display:flex; }
+  /* Keep the language toggle visible in the mobile header (it already sits
+     just left of the hamburger in DOM order). Reuses the existing toggle +
+     logic; the in-menu .mobile-lang stays in sync via applyLang(). */
+  .header-right{ gap:6px; }
+  .header-right .lang-toggle{ display:flex; gap:2px; margin-right:4px; }
+  .header-right .lang-toggle .lang-btn{ padding:8px 7px; font-size:13.5px; line-height:1; }
+  .header-right .lang-toggle .lang-sep{ font-size:13px; }
   .hero{ padding:120px 0 64px; }
   .hero-inner{ grid-template-columns:1fr; gap:44px; }
   .hero-copy{ max-width:none; }
@@ -844,6 +858,12 @@ body.modal-open{ overflow:hidden; }
 .market-chart svg{ width:100%; height:100%; display:block; }
 @media (max-width:560px){
   .market-panel{ padding:16px 16px 6px; }
+  /* Take the preview chip out of the absolute layer so it never overlaps the
+     category pills — it sits as its own right-aligned row above the tabs. */
+  .market-panel .preview-chip{
+    position:static; display:block; width:fit-content;
+    margin:0 0 12px auto;
+  }
   .market-chart{ margin:12px -16px 0; height:150px; }
   .mk-tab{ font-size:12.5px; padding:7px 11px; }
 }
@@ -875,7 +895,41 @@ body.modal-open{ overflow:hidden; }
 .io-ecg{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; opacity:.92; mix-blend-mode:screen; }
 @keyframes ioFloat{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-8px) } }
 @keyframes ioPulse{ 0%{ transform:scale(.96); opacity:.5 } 50%{ transform:scale(1.02); opacity:.9 } 100%{ transform:scale(.96); opacity:.5 } }
-@media (max-width:860px){ .ws-visual{ order:-1; } .intel-orb{ width:min(300px,66vw); } }
+@media (max-width:860px){
+  /* Read-first order: copy + benefits come first, the orb closes the section
+     as a visual reinforcement (was order:-1, which put the sphere before text). */
+  .ws-visual{ order:0; margin-top:4px; }
+  /* ~12% smaller so the orb accompanies the content instead of competing. */
+  .intel-orb{ width:min(264px,58vw); }
+  /* Premium glass treatment (mobile only — desktop orb untouched):
+     richer layered core, luminous highlight, optical depth + soft reflection. */
+  .io-glow{
+    filter:blur(6px);
+    background:radial-gradient(circle at 50% 42%, rgba(120,170,255,.55), rgba(77,141,255,.16) 44%, transparent 72%);
+  }
+  .io-core{
+    background:
+      radial-gradient(circle at 36% 28%, rgba(255,255,255,.92), rgba(190,224,255,0) 30%),
+      radial-gradient(circle at 38% 34%, #b9d4ff, #4d8dff 44%, #1c4fb0 76%, #0c2a6b);
+    box-shadow:
+      inset 0 8px 26px rgba(255,255,255,.40),
+      inset 0 -18px 34px rgba(8,20,60,.78),
+      inset 0 0 38px rgba(120,170,255,.22),
+      0 26px 64px -20px rgba(77,141,255,.7);
+  }
+  /* Soft glass reflection — top-left specular highlight. */
+  .io-core::before{
+    content:''; position:absolute; left:17%; top:12%; width:44%; height:33%;
+    border-radius:50%; pointer-events:none; filter:blur(2px);
+    background:radial-gradient(circle at 42% 38%, rgba(255,255,255,.6), transparent 72%);
+  }
+  /* Subtle inner layer for depth. */
+  .io-core::after{
+    content:''; position:absolute; inset:13%; border-radius:50%; pointer-events:none;
+    border:1px solid rgba(255,255,255,.10);
+    box-shadow:inset 0 0 22px rgba(150,190,255,.18);
+  }
+}
 @media (prefers-reduced-motion: reduce){
   .io-core, .io-ring--1, .io-ring--2{ animation:none; }
 }
