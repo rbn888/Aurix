@@ -396,6 +396,34 @@
   }
 
   /* ── Init ───────────────────────────────────────────── */
+  // WSPHERE.V3 #4 — desktop-only reflective sweep on the Intelligence orb. A soft
+  // highlight follows the cursor across the sphere (transform-moved, rAF-throttled)
+  // and fades when the pointer leaves. No-op on touch / reduced-motion / narrow screens.
+  function initOrbSheen() {
+    var orb = document.getElementById('intelOrb');
+    if (!orb) return;
+    var mq = window.matchMedia;
+    if (!mq || !mq('(min-width: 861px) and (pointer: fine)').matches) return;
+    if (mq('(prefers-reduced-motion: reduce)').matches) return;
+    var sheen = orb.querySelector('.io-sheen');
+    if (!sheen) return;
+    var raf = 0, x = 0, y = 0, bw = 0, bh = 0;
+    function apply() {
+      raf = 0;
+      // Centre the 62%-sized blob under the cursor (translate in px = GPU-cheap).
+      sheen.style.setProperty('--io-sx', (x - bw * 0.31) + 'px');
+      sheen.style.setProperty('--io-sy', (y - bh * 0.31) + 'px');
+      orb.classList.add('is-sheen');
+    }
+    orb.addEventListener('pointermove', function (e) {
+      var b = sheen.getBoundingClientRect();
+      if (!b.width) return;
+      x = e.clientX - b.left; y = e.clientY - b.top; bw = b.width; bh = b.height;
+      if (!raf) raf = requestAnimationFrame(apply);
+    });
+    orb.addEventListener('pointerleave', function () { orb.classList.remove('is-sheen'); });
+  }
+
   function init() {
     applyLang(detectLang());
 
@@ -570,6 +598,9 @@
     // Illustrative product preview (labelled, no real-time data): six tabs over a
     // chart that draws on viewport entry, with figures that count up on switch.
     initMarket();
+
+    // ── Intelligence orb: desktop cursor sheen (WSPHERE.V3 #4) ──
+    initOrbSheen();
 
     // Footer year (no Date pinning needed for a static label)
     var y = document.getElementById('year');

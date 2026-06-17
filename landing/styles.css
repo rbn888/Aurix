@@ -888,88 +888,91 @@ body.modal-open{ overflow:hidden; }
   fill:none; stroke:var(--accent); stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round;
 }
 .ws-visual{ display:flex; align-items:center; justify-content:center; }
+/* ───── WSPHERE.V3 — signature Intelligence orb (web + mobile, one language) ─────
+   Anchored sphere (no float) + subtle breath, electric-blue core, traveling ECG
+   tracer, quieter rings, desktop cursor sheen. transform/opacity only. */
 .intel-orb{ position:relative; width:min(360px,78vw); aspect-ratio:1/1; }
+/* Electric falloff glow — breathes in lockstep with the core (opacity+scale only). */
 .io-glow{
-  position:absolute; inset:0; border-radius:50%; filter:blur(4px);
-  background:radial-gradient(circle at 50% 45%, rgba(77,141,255,.5), rgba(77,141,255,.12) 46%, transparent 70%);
+  position:absolute; inset:0; border-radius:50%; filter:blur(6px);
+  background:radial-gradient(circle at 50% 44%, rgba(95,160,255,.6), rgba(77,141,255,.18) 46%, transparent 72%);
+  animation:ioGlow 4s ease-in-out infinite; will-change:transform,opacity;
 }
-.io-ring{ position:absolute; inset:8%; border-radius:50%; border:1px solid rgba(120,170,255,.22); }
-.io-ring--1{ animation:ioPulse 4.2s var(--ease) infinite; }
-.io-ring--2{ inset:0; border-color:rgba(120,170,255,.12); animation:ioPulse 4.2s var(--ease) .9s infinite; }
+/* (#6) Orbital rings — quieter (~30% less movement), clearly secondary. */
+.io-ring{ position:absolute; inset:8%; border-radius:50%; border:1px solid rgba(120,170,255,.16); }
+.io-ring--1{ animation:ioPulse 5s var(--ease) infinite; will-change:transform,opacity; }
+.io-ring--2{ inset:0; border-color:rgba(120,170,255,.10); animation:ioPulse 5s var(--ease) 1s infinite; will-change:transform,opacity; }
+/* (#3) Electric Aurix core: bright electric-blue center → deep sapphire → dark rim.
+   (#1/#2) Anchored — micro breath only (scale 1→1.03), no translate. */
 .io-core{
   position:absolute; inset:24%; border-radius:50%;
-  background:radial-gradient(circle at 38% 32%, #9cc4ff, #4d8dff 42%, #1c4fb0 78%, #0f2f73);
-  box-shadow:inset 0 6px 22px rgba(255,255,255,.32), inset 0 -16px 30px rgba(8,20,60,.7), 0 24px 60px -20px rgba(77,141,255,.7);
-  animation:ioFloat 7s var(--ease) infinite;
+  background:radial-gradient(circle at 50% 40%, #eaf4ff 0%, #bcdcff 12%, #5aa0ff 36%, #2f6ae0 60%, #16408c 80%, #0a2a66 100%);
+  box-shadow:
+    inset 0 6px 20px rgba(255,255,255,.34),
+    inset 0 -20px 38px rgba(6,16,46,.82),
+    inset 0 0 36px rgba(60,120,230,.30),
+    0 24px 60px -18px rgba(77,141,255,.7);
+  animation:ioBreathe 4s ease-in-out infinite; will-change:transform;
 }
-.io-ecg{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; opacity:.92; mix-blend-mode:screen; }
-.io-ecg-live{ display:none; }   /* mobile-only live ECG; static .draw-line stays on desktop */
-@keyframes ioFloat{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-8px) } }
-@keyframes ioPulse{ 0%{ transform:scale(.96); opacity:.5 } 50%{ transform:scale(1.02); opacity:.9 } 100%{ transform:scale(.96); opacity:.5 } }
-/* Breathing = internal energy (scale only, never vertical float). Glow pulses in
-   lockstep (+5%) on the same 5s period so the orb reads as one living core. */
+/* Subtle centered top highlight (depth, not glass). */
+.io-core::before{
+  content:''; position:absolute; left:50%; top:9%; transform:translateX(-50%);
+  width:54%; height:30%; border-radius:50%; pointer-events:none; filter:blur(5px);
+  background:radial-gradient(ellipse at 50% 40%, rgba(255,255,255,.5), rgba(255,255,255,0) 72%);
+}
+/* Darker outer rim — smooth layer transition / volume. */
+.io-core::after{
+  content:''; position:absolute; inset:0; border-radius:50%; pointer-events:none;
+  background:radial-gradient(circle at 50% 50%, transparent 55%, rgba(6,16,46,.5) 100%);
+}
+/* (#4) Cursor sheen — soft highlight following the pointer over the sphere.
+   Desktop only (enabled via JS on fine pointers); fades when idle; transform-moved. */
+.io-sheen{
+  position:absolute; inset:24%; border-radius:50%; overflow:hidden;
+  pointer-events:none; opacity:0; transition:opacity .45s ease; z-index:1;
+}
+.io-sheen::before{
+  content:''; position:absolute; top:0; left:0; width:62%; height:62%; border-radius:50%;
+  background:radial-gradient(circle at 50% 50%, rgba(255,255,255,.22), rgba(255,255,255,0) 70%);
+  transform:translate(var(--io-sx,-50%), var(--io-sy,-50%)); will-change:transform;
+}
+.intel-orb.is-sheen .io-sheen{ opacity:1; }
+/* (#5) ECG — full line visible (dim base) + a bright tracer travelling L→R,
+   illuminating peaks as it passes, then pausing. pathLength=100 normalizes the dash. */
+.io-ecg{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; mix-blend-mode:screen; }
+.io-ecg-base{ stroke:rgba(130,200,255,.28); stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+.io-ecg-trace{
+  stroke:#cdeeff; stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round;
+  filter:drop-shadow(0 0 3px rgba(150,210,255,.85));
+  stroke-dasharray:14 100; stroke-dashoffset:14;
+  animation:ecgTrace 3s ease-in-out infinite; will-change:stroke-dashoffset,opacity;
+}
 @keyframes ioBreathe{ 0%,100%{ transform:scale(1) } 50%{ transform:scale(1.03) } }
-@keyframes ioGlow{ 0%,100%{ transform:scale(1); opacity:.92 } 50%{ transform:scale(1.05); opacity:1 } }
-/* Seamless leftward scroll by exactly one tile (120 user units). */
-@keyframes ecgScroll{ from{ transform:translateX(0) } to{ transform:translateX(-120px) } }
+@keyframes ioGlow{ 0%,100%{ transform:scale(1); opacity:.9 } 50%{ transform:scale(1.04); opacity:1 } }
+@keyframes ioPulse{ 0%{ transform:scale(.99); opacity:.55 } 50%{ transform:scale(1.008); opacity:.8 } 100%{ transform:scale(.99); opacity:.55 } }
+@keyframes ecgTrace{
+  0%   { stroke-dashoffset:14;   opacity:0 }   /* hidden, entering at left */
+  8%   { opacity:1 }
+  60%  { stroke-dashoffset:-114; opacity:1 }   /* travelled across, exits right */
+  70%  { stroke-dashoffset:-114; opacity:0 }
+  100% { stroke-dashoffset:-114; opacity:0 }   /* pause before repeat */
+}
 @media (max-width:860px){
-  /* Read-first order: copy + benefits come first, the orb closes the section
-     as a visual reinforcement (was order:-1, which put the sphere before text). */
+  /* Read-first order: copy + benefits come first, the orb closes the section. */
   .ws-visual{ order:0; margin-top:4px; }
-  /* Smaller so the orb accompanies the content instead of competing (per breakpoint). */
-  .intel-orb{ width:min(240px,52vw); }
-  /* Responsive glow — stronger + softer diffusion so it survives on mobile panels;
-     breathes +5% in lockstep with the core. */
-  .io-glow{
-    filter:blur(8px);
-    background:radial-gradient(circle at 50% 44%, rgba(125,180,255,.6), rgba(77,141,255,.18) 46%, transparent 72%);
-    animation:ioGlow 5s var(--ease) infinite;
-  }
-  /* Realistic intelligence core (NOT glass): bright center → deep dark rim, with a
-     smooth multi-stop radial for volume. Breathes (scale) — no vertical float. */
-  .io-core{
-    background:radial-gradient(circle at 50% 40%, #ffffff 0%, #d8eaff 8%, #79b0ff 34%, #3f7ee0 58%, #1d4ea8 78%, #0c2c6e 100%);
-    box-shadow:
-      inset 0 6px 20px rgba(255,255,255,.30),
-      inset 0 -20px 38px rgba(6,16,46,.85),
-      inset 0 0 34px rgba(40,96,196,.30),
-      0 24px 60px -18px rgba(77,141,255,.65);
-    animation:ioBreathe 5s var(--ease) infinite;
-  }
-  /* Very subtle TOP highlight (soft, centered — not a glass reflection). */
-  .io-core::before{
-    content:''; position:absolute; left:50%; top:9%; transform:translateX(-50%);
-    width:54%; height:30%; border-radius:50%; pointer-events:none; filter:blur(5px);
-    background:radial-gradient(ellipse at 50% 40%, rgba(255,255,255,.5), rgba(255,255,255,0) 72%);
-  }
-  /* Darker outer rim + smooth transition between layers (adds depth/volume). */
-  .io-core::after{
-    content:''; position:absolute; inset:0; border-radius:50%; pointer-events:none;
-    background:radial-gradient(circle at 50% 50%, transparent 55%, rgba(6,16,46,.5) 100%);
-  }
-  /* Rings breathe on the same 5s rhythm so nothing competes. */
-  .io-ring--1, .io-ring--2{ animation-duration:5s; }
-  /* Live ECG: hide static line, scroll the tiled waveform continuously. Clip to the
-     orb + fade the edges so it reads as real-time activity, not a hard-cut strip.
-     -1.25s phase puts an R-spike at the core's max expansion (sync with breathing). */
-  .io-ecg{
-    overflow:hidden;
-    /* Fade fixed at the orb edges (mask on the static svg, NOT the moving path). */
-    -webkit-mask:linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
-            mask:linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
-  }
-  .io-ecg .draw-line{ display:none; }
-  .io-ecg-live{
-    display:block;
-    animation:ecgScroll 2.5s linear -1.25s infinite;
-  }
+  /* (#7) Smaller on mobile (−13% vs V2) — better section balance. Desktop unchanged. */
+  .intel-orb{ width:min(208px,46vw); }
+  /* Cursor sheen is desktop-only. */
+  .io-sheen{ display:none; }
 }
 @media (max-width:560px){
-  /* One step smaller again on phones. */
-  .intel-orb{ width:min(200px,54vw); }
+  /* (#7) One step smaller again on phones (−14%). */
+  .intel-orb{ width:min(172px,48vw); }
 }
 @media (prefers-reduced-motion: reduce){
-  .io-core, .io-ring--1, .io-ring--2, .io-glow, .io-ecg-live{ animation:none; }
+  .io-core, .io-ring--1, .io-ring--2, .io-glow{ animation:none; }
+  /* Show the full signal, no travelling tracer. */
+  .io-ecg-trace{ animation:none; stroke-dasharray:none; stroke-dashoffset:0; opacity:1; }
 }
 
 /* ── Fragmentation consequences — one elegant conclusion line ─────────── */

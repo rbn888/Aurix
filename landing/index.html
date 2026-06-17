@@ -206,17 +206,18 @@
           </ul>
         </div>
         <div class="ws-visual reveal" aria-hidden="true">
-          <div class="intel-orb">
+          <div class="intel-orb" id="intelOrb">
             <span class="io-glow"></span>
             <span class="io-ring io-ring--1"></span>
             <span class="io-ring io-ring--2"></span>
             <span class="io-core"></span>
-            <svg class="io-ecg" viewBox="0 0 240 240" preserveAspectRatio="none">
-              <!-- Desktop: static drawn line (unchanged). -->
-              <path class="draw-line" d="M20,120 L70,120 L88,120 L100,86 L116,150 L132,104 L146,128 L164,120 L220,120" fill="none" stroke="#bdecff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-              <!-- Mobile: continuously scrolling ECG — a seamless 120-unit tile repeated
-                   3× (0→360) so the 0→240 viewport is always filled while it translates -120. -->
-              <path class="io-ecg-live" d="M0,120 L22,120 L30,116 L38,108 L46,120 L52,120 L56,140 L60,86 L64,150 L70,118 L78,120 L90,112 L100,120 L120,120 L142,120 L150,116 L158,108 L166,120 L172,120 L176,140 L180,86 L184,150 L190,118 L198,120 L210,112 L220,120 L240,120 L262,120 L270,116 L278,108 L286,120 L292,120 L296,140 L300,86 L304,150 L310,118 L318,120 L330,112 L340,120 L360,120" fill="none" stroke="#bdecff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- Desktop-only reflective sweep: a soft highlight that follows the cursor (JS). -->
+            <span class="io-sheen"></span>
+            <svg class="io-ecg" viewBox="0 0 240 240" preserveAspectRatio="none" aria-hidden="true">
+              <!-- Full waveform stays visible (dim); a bright tracer travels left→right across it,
+                   illuminating each peak as it passes — the same signal language as the app. -->
+              <path class="io-ecg-base" d="M22,120 L66,120 L78,120 L86,108 L94,120 L108,120 L118,150 L126,70 L134,150 L142,116 L152,120 L168,120 L178,110 L188,120 L218,120" fill="none"/>
+              <path class="io-ecg-trace" pathLength="100" d="M22,120 L66,120 L78,120 L86,108 L94,120 L108,120 L118,150 L126,70 L134,150 L142,116 L152,120 L168,120 L178,110 L188,120 L218,120" fill="none"/>
             </svg>
           </div>
         </div>
