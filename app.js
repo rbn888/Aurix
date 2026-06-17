@@ -12007,9 +12007,15 @@ const _WS_TPL_ASSET = {
   receivables:      'template_receivables',
   goals:            'template_goals',
   scenario:         'template_scenarios',
-  projection:       'template_scenarios',
+  projection:       'template_projection',   // WS.F1 — own cover (was sharing template_scenarios)
   journal:          'template_trading_journal',
   'realestate-pro': 'realestate_apartment',
+  // WS.F1 — unique cover names so each template auto-upgrades the moment its WebP
+  // is dropped into assets/workspace/; until then the distinct CSS scene is the identity.
+  networth:         'template_networth',
+  property:         'template_property',
+  business:         'template_business',
+  fire:             'template_fire',
 };
 // Tool-card id → compact premium cover (keys match the Herramientas tool ids).
 const _WS_TOOL_ASSET = {
@@ -12201,16 +12207,28 @@ function _wsToolPreviewHtml(toolKey) {
       return `<div class="wspv wspv-compound"><div class="wspv-fig"><span class="wspv-num">${esc(formatBase(r.final))}</span><span class="wspv-lbl">${esc(t('wstool_res_final'))}</span></div><svg class="wspv-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polygon class="wspv-spark-area" points="0,${H} ${pts} ${W},${H}"/><polyline class="wspv-spark-line" points="${pts}"/></svg></div>`;
     }
     if (toolKey === 'budget') {
+      // WS.F1 — premium donut: expenses + free arcs over income, free money centered.
       const inp = _wsToolStateGet('budget') || _wsBudgetDefaults();
       const r = calculateMonthlyBudget(inp);
-      const denom = Math.max(r.income, r.expenses, 1);
-      return `<div class="wspv wspv-budget">
-        <div class="wspv-rows">
-          <span class="wspv-row"><b class="wspv-row-v">${esc(formatBase(r.income))}</b><i class="wspv-row-k">${esc(t('wstool_budget_sec_income'))}</i></span>
-          <span class="wspv-row"><b class="wspv-row-v">${esc(formatBase(r.expenses))}</b><i class="wspv-row-k">${esc(t('wstool_budget_sec_expenses'))}</i></span>
-          <span class="wspv-row is-free"><b class="wspv-row-v">${esc(formatBase(r.free))}</b><i class="wspv-row-k">${esc(t('wstool_bud_free'))}</i></span>
+      const free = Math.max(0, r.free);
+      const total = Math.max(r.income, r.expenses + free, 1);
+      const R = 33, C = 2 * Math.PI * R;
+      const expLen = Math.min(C, (r.expenses / total) * C);
+      const freeLen = Math.min(C - expLen, (free / total) * C);
+      const seg = (len, off, cls) => `<circle class="wspv-dn-seg ${cls}" cx="44" cy="44" r="${R}" stroke-dasharray="${len.toFixed(1)} ${(C - len).toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/>`;
+      return `<div class="wspv wspv-budget wspv-bud-donut">
+        <div class="wspv-dn-wrap">
+          <svg class="wspv-dn" viewBox="0 0 88 88" aria-hidden="true">
+            <circle class="wspv-dn-track" cx="44" cy="44" r="${R}"/>
+            ${seg(expLen, 0, 'is-exp')}
+            ${seg(freeLen, -expLen, 'is-free')}
+          </svg>
+          <div class="wspv-dn-center"><b class="wspv-dn-v">${esc(formatBase(r.free))}</b><i class="wspv-dn-k">${esc(t('wstool_bud_free'))}</i></div>
         </div>
-        <div class="wspv-budbar"><span class="wspv-budseg is-exp" style="width:${(r.expenses / denom * 100).toFixed(1)}%"></span><span class="wspv-budseg is-free" style="width:${(Math.max(0, r.free) / denom * 100).toFixed(1)}%"></span></div>
+        <div class="wspv-dn-legend">
+          <span class="wspv-dn-li"><i class="wspv-dn-dot is-inc"></i>${esc(t('wstool_budget_sec_income'))}<b>${esc(formatBase(r.income))}</b></span>
+          <span class="wspv-dn-li"><i class="wspv-dn-dot is-exp"></i>${esc(t('wstool_budget_sec_expenses'))}<b>${esc(formatBase(r.expenses))}</b></span>
+        </div>
       </div>`;
     }
     if (toolKey === 'journal') {
@@ -12226,19 +12244,57 @@ function _wsToolPreviewHtml(toolKey) {
 
 // WS.12 (v2) — receivables-list preview (operativa: cliente / importe / estado).
 function _wsReceivablesPreview() {
+  // WS.F1 — dashboard-style status indicators (● paid / pending / overdue) + total.
   const esc = _intccEsc;
   const rows = [
-    { c: 'Cliente A', v: '1.200 €', s: 'paid', l: t('wstpl_recv_paid') },
-    { c: 'Cliente B', v: '850 €', s: 'pending', l: t('wstpl_recv_pending') },
-    { c: 'Cliente C', v: '600 €', s: 'overdue', l: t('wstpl_recv_overdue') },
+    { k: 'paid',    l: t('wstpl_recv_paid'),    v: '1.200 €' },
+    { k: 'pending', l: t('wstpl_recv_pending'), v: '850 €' },
+    { k: 'overdue', l: t('wstpl_recv_overdue'), v: '600 €' },
   ];
-  return `<div class="wspv wspv-recv">${rows.map(r => `<span class="wspv-recv-row"><b>${esc(r.c)}</b><i>${esc(r.v)}</i><em class="is-${r.s}">${esc(r.l)}</em></span>`).join('')}</div>`;
+  return `<div class="wspv wspv-recvi">
+    <div class="wspv-recvi-total"><b>2.650 €</b><i>${esc(t('wsrecv_kpi_total'))}</i></div>
+    <div class="wspv-recvi-rows">${rows.map(r => `<span class="wspv-recvi-row"><i class="wspv-recvi-dot is-${r.k}"></i><em>${esc(r.l)}</em><b>${esc(r.v)}</b></span>`).join('')}</div>
+  </div>`;
 }
 // WS.12 (v2) — asset-prices preview (tabla activo / cantidad / compra / actual).
 function _wsAssetsPreview() {
   const esc = _intccEsc;
   const rows = [['BTC', '0,5', '52.000', '61.000', 'win'], ['NVDA', '20', '90', '119', 'win'], ['SPY', '8', '480', '455', 'loss']];
   return `<div class="wspv wspv-assets">${rows.map(r => `<span class="wspv-asset-row"><b>${esc(r[0])}</b><i>${esc(r[3])} €</i><em class="is-${r[4]}">${esc(r[2])}→${esc(r[3])}</em></span>`).join('')}</div>`;
+}
+// WS.F1 — distinct premium CSS/SVG "scenes" so each template is recognizable
+// before reading the title. Each sits under its (future) WebP cover as the
+// graceful fallback identity.
+function _wsSceneHtml(cat) {
+  const S = {
+    projection: `<svg viewBox="0 0 120 70" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <defs><linearGradient id="wsfP" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgba(77,141,255,.42)"/><stop offset="1" stop-color="rgba(77,141,255,0)"/></linearGradient></defs>
+      <path d="M6,56 C28,52 44,42 64,31 C82,21 100,13 114,7 L114,62 L6,62 Z" fill="url(#wsfP)"/>
+      <path d="M6,56 C28,52 44,42 64,31 C82,21 100,13 114,7" fill="none" stroke="#7db8ff" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M100,7 L114,7 L114,21" fill="none" stroke="#bdecff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    networth: `<svg viewBox="0 0 120 70" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <rect x="22" y="40" width="44" height="22" rx="3" fill="rgba(125,184,255,.5)"/>
+      <rect x="22" y="30" width="44" height="8.5" rx="3" fill="rgba(155,140,255,.6)"/>
+      <rect x="22" y="21" width="44" height="7.5" rx="3" fill="rgba(110,224,210,.6)"/>
+      <rect x="80" y="14" width="22" height="48" rx="3" fill="#7db8ff"/></svg>`,
+    property: `<svg viewBox="0 0 120 70" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <rect x="42" y="14" width="36" height="48" rx="2.5" fill="rgba(125,184,255,.32)" stroke="#7db8ff" stroke-width="1.8"/>
+      <g fill="#bdecff"><rect x="48" y="21" width="6" height="6"/><rect x="57" y="21" width="6" height="6"/><rect x="66" y="21" width="6" height="6"/>
+      <rect x="48" y="31" width="6" height="6"/><rect x="57" y="31" width="6" height="6"/><rect x="66" y="31" width="6" height="6"/>
+      <rect x="48" y="41" width="6" height="6"/><rect x="66" y="41" width="6" height="6"/></g>
+      <rect x="55" y="51" width="10" height="11" rx="1" fill="rgba(189,236,255,.92)"/></svg>`,
+    business: `<svg viewBox="0 0 120 70" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <rect x="14" y="9" width="92" height="52" rx="6" fill="rgba(125,184,255,.07)" stroke="rgba(125,184,255,.26)" stroke-width="1.2"/>
+      <polyline points="22,38 36,29 50,33 64,21 80,25 98,15" fill="none" stroke="#7db8ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <g fill="rgba(110,224,210,.72)"><rect x="23" y="46" width="9" height="8" rx="1"/><rect x="38" y="42" width="9" height="12" rx="1"/><rect x="53" y="45" width="9" height="9" rx="1"/><rect x="68" y="40" width="9" height="14" rx="1"/></g></svg>`,
+    fire: `<svg viewBox="0 0 120 70" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <defs><radialGradient id="wsfF" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="rgba(243,207,154,.6)"/><stop offset="1" stop-color="rgba(243,207,154,0)"/></radialGradient></defs>
+      <circle cx="60" cy="38" r="20" fill="url(#wsfF)"/>
+      <circle cx="60" cy="38" r="9.5" fill="#f3cf9a"/>
+      <line x1="16" y1="54" x2="104" y2="54" stroke="rgba(189,236,255,.5)" stroke-width="2" stroke-linecap="round"/>
+      <path d="M30,54 Q60,28 90,54" fill="none" stroke="#7db8ff" stroke-width="2.2" stroke-linecap="round"/></svg>`,
+  };
+  return `<div class="wspv wspv-scene is-${cat}">${S[cat] || ''}</div>`;
 }
 // WS.10.2/10.6 — distinct preview per template category (no "everything is a curve").
 function _wsCatPreviewBaseHtml(cat) {
@@ -12249,9 +12305,12 @@ function _wsCatPreviewBaseHtml(cat) {
   if (cat === 'assets') return _wsAssetsPreview();
   if (cat === 'budget') return _wsToolPreviewHtml('budget');
   if (cat === 'journal') return _wsToolPreviewHtml('journal');
-  if (cat === 'projection') return `<div class="wspv wspv-viz is-blue">${_wsTplViz('curve')}</div>`;
+  if (cat === 'projection') return _wsSceneHtml('projection');
   if (cat === 'scenario')   return `<div class="wspv wspv-viz is-blue">${_wsTplViz('compare')}</div>`;
-  if (cat === 'networth')   return `<div class="wspv wspv-viz is-violet">${_wsTplViz('donut')}</div>`;
+  if (cat === 'networth')   return _wsSceneHtml('networth');
+  if (cat === 'property')   return _wsSceneHtml('property');
+  if (cat === 'business')   return _wsSceneHtml('business');
+  if (cat === 'fire')       return _wsSceneHtml('fire');
   if (cat === 'investment') return `<div class="wspv wspv-viz is-blue">${_wsTplViz('bars')}</div>`;
   const A = _WS_ARCH[cat] || { accent: 'gold', glyph: 'flag' };
   return _wsGlyphTile(A.glyph, A.accent);
@@ -12408,17 +12467,19 @@ function _renderWorkspaceHome(metrics) {
       { name: t('wsre_n'),                open: ' data-wsh-cta="tool" data-wstool="realestate"', pv: _wsCatPreviewHtml('realestate-pro') },
       { name: t('wsapp_receivables_n'),   open: ' data-wsh-cta="tool" data-wstool="receivables"', pv: _wsReceivablesPreview() },
     ];
+    // WS.F1 — Mi Espacio default: three equal-height feature columns
+    // (Presupuesto · Inmobiliario · Cobros). No "Explorar plantillas" CTA, no
+    // empty-state title — Workspace reads as the premium product by default.
     const dailyInner = saved.length
       ? `<div class="wsh-daily-grid">${saved.map((p, i) => dailyCard(p, i === 0 && saved.length >= 3)).join('')}</div>`
       : `<div class="wsh-daily-grid is-premium-preview">${demoTiles.map(d => `
           <div class="wsh-dcard is-demo" role="button" tabindex="0"${d.open}>
             <div class="wsh-dcard-pv">${d.pv}</div>
             <div class="wsh-dcard-foot"><div class="wsh-dcard-txt"><p class="wsh-dcard-name">${esc(d.name)}</p><span class="wsh-dcard-type">${esc(t('wsmse_demo_hint'))}</span></div></div>
-          </div>`).join('')}</div>
-        <div class="wsmse-empty-cta"><p class="wsmse-empty-title">${esc(t('wsmse_empty_title'))}</p><button type="button" class="wsh-cta is-primary" data-wstab="templates">${esc(t('wsmse_empty_cta'))}</button></div>`;
+          </div>`).join('')}</div>`;
     const dailyBlock = `
       <section class="wsh-card wsh-mse-block" data-ws-block="daily">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsmse_daily'))}</h3><span class="wsh-premium-badge">${esc(t('wsh_premium_badge'))}</span></header>
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsmse_daily'))}</h3></header>
         ${dailyInner}
       </section>`;
 
@@ -12480,7 +12541,7 @@ function _renderWorkspaceHome(metrics) {
       T2('networth'), T2('property'), T2('business'),
       T2('fire'),
     ];
-    panel = `<section class="wsh-card"><header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_templates'))}</h3><span class="wsh-premium-badge">${esc(t('wsh_premium_badge'))}</span></header><div class="wsh-tpl-grid wsh-gallery">${gallery.map(card).join('')}</div></section>`;
+    panel = `<section class="wsh-card"><header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_templates'))}</h3></header><div class="wsh-tpl-grid wsh-gallery">${gallery.map(card).join('')}</div></section>`;
   } else {
     // WS.12 (v2) — Herramientas = compact, operative toolbox (quick utilities, NOT
     // apps). Per-tool accent from the App Identity Registry. FIRE is not here.
@@ -12495,7 +12556,7 @@ function _renderWorkspaceHome(metrics) {
     const accent = id => 'is-' + (_wsAppIdentity(id).accentColor || 'blue');
     panel = `
       <section class="wsh-card">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_tools'))}</h3><span class="wsh-premium-badge">${esc(t('wsh_premium_badge'))}</span></header>
+        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_tools'))}</h3></header>
         <div class="wsh-tool-grid wsh-toolbox">
           ${tools.map(tl => `
             <div class="wsh-tool wsh-toolcard ${accent(tl.id)}${tl.soon ? ' is-soon' : ''}"${tl.open}>

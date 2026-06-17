@@ -21070,3 +21070,68 @@ body.gs-open { overflow: hidden; }
   .ws2-back { order: 1; }
   .ws2-tool-actions { order: 3; }
 }
+
+/* ════════════════ WS.F1 — Workspace premium polish (visual only) ════════════════ */
+/* #2 Mi Espacio — three equal-height feature columns (Presupuesto · Inmobiliario · Cobros) */
+.wsh-daily-grid { gap: 14px; }
+.wsh-daily-grid.is-premium-preview { align-items: stretch; }
+.wsh-daily-grid.is-premium-preview .wsh-dcard { height: 100%; }
+.wsh-daily-grid.is-premium-preview .wsh-dcard-pv { height: 132px; }
+.wsh-daily-grid.is-premium-preview .wsh-dcard-foot { min-height: 54px; }
+.wsh-mse { gap: 16px; }
+
+/* #3 Presupuesto mensual — premium donut (income/expense arcs, free money centered) */
+.wspv-bud-donut { flex-direction: row; align-items: center; justify-content: center; gap: 14px; padding: 10px 16px; }
+.wspv-dn-wrap { position: relative; width: 84px; height: 84px; flex: none; }
+.wspv-dn { width: 100%; height: 100%; transform: rotate(-90deg); }
+.wspv-dn-track { fill: none; stroke: rgba(255,255,255,0.07); stroke-width: 9; }
+.wspv-dn-seg { fill: none; stroke-width: 9; stroke-linecap: round; }
+.wspv-dn-seg.is-exp { stroke: rgba(120,160,255,0.55); }
+.wspv-dn-seg.is-free { stroke: #2fd98e; filter: drop-shadow(0 0 5px rgba(47,217,142,0.4)); }
+.wspv-dn-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
+.wspv-dn-v { font-size: 15px; font-weight: 800; color: #7ef0b8; font-variant-numeric: tabular-nums; line-height: 1; }
+.wspv-dn-k { font-size: 7.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.wspv-dn-legend { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.wspv-dn-li { display: flex; align-items: center; gap: 7px; font-size: 10.5px; color: var(--text-muted); white-space: nowrap; }
+.wspv-dn-li b { margin-left: auto; color: var(--text-bright); font-weight: 700; font-variant-numeric: tabular-nums; }
+.wspv-dn-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.wspv-dn-dot.is-inc { background: #7db8ff; }
+.wspv-dn-dot.is-exp { background: rgba(120,160,255,0.6); }
+
+/* #4 Control de cobros — dashboard status indicators (● paid/pending/overdue) + total */
+.wspv-recvi { gap: 9px; align-items: stretch; justify-content: center; padding: 12px 16px; }
+.wspv-recvi-total { display: flex; flex-direction: column; gap: 0; }
+.wspv-recvi-total b { font-size: 22px; font-weight: 800; color: var(--text-bright); font-variant-numeric: tabular-nums; line-height: 1.05; }
+.wspv-recvi-total i { font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-style: normal; }
+.wspv-recvi-rows { display: flex; flex-direction: column; gap: 5px; }
+.wspv-recvi-row { display: flex; align-items: center; gap: 8px; font-size: 11.5px; }
+.wspv-recvi-row em { font-style: normal; color: var(--text-muted); }
+.wspv-recvi-row b { margin-left: auto; color: var(--text-bright); font-weight: 700; font-variant-numeric: tabular-nums; }
+.wspv-recvi-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.wspv-recvi-dot.is-paid { background: #2fd98e; box-shadow: 0 0 5px rgba(47,217,142,0.5); }
+.wspv-recvi-dot.is-pending { background: #f0a85c; box-shadow: 0 0 5px rgba(240,168,92,0.45); }
+.wspv-recvi-dot.is-overdue { background: #f0897f; box-shadow: 0 0 5px rgba(240,137,127,0.45); }
+
+/* #5 Herramientas fijadas — real mini-cards (icon · name · Abrir), not dashed tags */
+.wsh-tool-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 10px; }
+.wsh-tchip { position: relative; flex-direction: column; align-items: flex-start; gap: 10px; padding: 14px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.16); border-style: solid; background: rgba(255,255,255,0.025); transition: border-color 180ms ease, transform 180ms ease, background 180ms ease; }
+.wsh-tchip:hover { border-color: rgba(77,141,255,0.36); transform: translateY(-2px); background: rgba(74,130,240,0.06); }
+.wsh-tchip-ic { width: 44px; height: 44px; border-radius: 12px; background: rgba(74,130,240,0.12); color: #9fc2ff; }
+.wsh-tchip-ic .wsh-tpl-viz-svg { width: 30px; height: 20px; }
+.wsh-tchip-name { font-size: 13.5px; line-height: 1.2; }
+.wsh-tchip-open { width: 100%; text-align: center; padding: 8px 11px; border-radius: 10px; }
+.wsh-tchip-x { position: absolute; top: 9px; right: 9px; }
+
+/* #6/#7 Template identity scenes (premium CSS fallback; auto-upgrades to WebP) */
+.wspv-scene { padding: 10px 12px; background: linear-gradient(165deg, rgba(74,130,240,0.09), rgba(255,255,255,0.012)); }
+.wspv-scene svg { width: 100%; height: 100%; display: block; }
+.wspv-scene.is-property { background: linear-gradient(165deg, rgba(125,184,255,0.10), rgba(255,255,255,0.012)); }
+.wspv-scene.is-networth { background: linear-gradient(165deg, rgba(138,125,255,0.09), rgba(255,255,255,0.012)); }
+.wspv-scene.is-business { background: linear-gradient(165deg, rgba(110,224,210,0.08), rgba(255,255,255,0.012)); }
+.wspv-scene.is-fire { background: linear-gradient(165deg, rgba(243,207,154,0.10), rgba(255,255,255,0.012)); }
+
+/* #8 Herramientas — more presence + premium hover (no size increase) */
+.wsh-toolcard { background: linear-gradient(165deg, rgba(255,255,255,0.038), rgba(255,255,255,0.012)); }
+.wsh-toolcard:hover { box-shadow: 0 12px 30px -20px rgba(0,0,0,0.8); }
+.wsh-toolcard-ic { width: 50px; height: 42px; border-radius: 12px; }
+.wsh-toolcard-ic .wsh-tpl-viz-svg { width: 46px; height: 28px; }
