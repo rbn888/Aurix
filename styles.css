@@ -21562,15 +21562,19 @@ body.gs-open { overflow: hidden; }
 }
 
 /* ════════ MK.F9A — Market column shift (PRECIO + 24H to the left) ════════════
-   Single Market-only change: narrow ACTIVO and grow the right columns so PRECIO and
-   24H move clearly left and the central void shrinks. Founder distribution
-   40 / 18 / 14 / 22 / 6 — expressed in fr (same ratio) so the existing 10px grid gap
-   is absorbed without overflow (literal % + gap would push the last column out).
-   Header + rows share the grid, so each header moves WITH its values. Nothing else
-   is touched (search, card height, tabs, filters, sparkline form, favourites). */
+   Single Market-only change (no new columns): narrow ACTIVO and pull PRECIO + 24H
+   clearly left to kill the central void, keeping the 5-col structure
+   ACTIVO | PRECIO | 24H | GRÁFICO | FAVORITO. Ratio 34 / 16 / 13 / 31 / 6 in fr
+   (so the 10px gap is absorbed without overflow). The wide GRÁFICO track holds the
+   air after 24H while the svg itself is narrowed — sparkline reads small + separated,
+   never dominant. Header + rows share the grid, so each header moves WITH its values.
+   Nothing else touched (search, card height, tabs, filters, favourites, mobile). */
 @media (min-width: 769px) {
   #marketList.is-v3 .market-table-header,
   #marketList.is-v3 .market-row {
-    grid-template-columns: 40fr 18fr 14fr 22fr 6fr;
+    grid-template-columns: 34fr 16fr 13fr 31fr 6fr;
   }
+  /* §7 — narrower sparkline svg (38→32px) so the graph supports, not dominates;
+     right-aligned in its track → clear air between the 24H % and the chart. */
+  #marketList.is-v3 .col-chart svg { width: 32px; }
 }
