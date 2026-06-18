@@ -1423,6 +1423,11 @@ const T = {
     mktCat_index:     'Índice',
     mktCat_commodity: 'Materia prima',
     mktCat_metal:     'Metal',
+    // MK.F5 — specific commodity context badges
+    mktCmd_gold:   'Oro',
+    mktCmd_silver: 'Plata',
+    mktCmd_oil:    'Petróleo',
+    mktCmd_gas:    'Gas natural',
     discovery_add_cta:      '+ Añadir',
     // MC-9A: curated funds catalog category labels
     fundCat_msci_world:        'MSCI World',
@@ -3376,6 +3381,11 @@ const T = {
     mktCat_index:     'Index',
     mktCat_commodity: 'Commodity',
     mktCat_metal:     'Metal',
+    // MK.F5 — specific commodity context badges
+    mktCmd_gold:   'Gold',
+    mktCmd_silver: 'Silver',
+    mktCmd_oil:    'Oil',
+    mktCmd_gas:    'Natural Gas',
     discovery_add_cta:      '+ Add',
     // MC-9A: curated funds catalog category labels
     fundCat_msci_world:        'MSCI World',
@@ -23779,7 +23789,9 @@ function renderCurrentMarketView() {
   }
   // MARKET-2: prepend the explorer controls bar. Empty string when the
   // V2 flag is off, so the legacy layout ships exactly as before.
-  html = _aurixMktExpControlsHtml() + html;
+  // MK.F5 §8 — discrete market-status line above the controls (no-op on
+  // watchlist/all and on classes without honest session data).
+  html = _mktStatusLineHtml() + _aurixMktExpControlsHtml() + html;
 
   // Aggregate tabs (All / Watchlist) skip the lastKey short-circuit so
   // every render reflects the freshest composed dataset — the html
@@ -23823,6 +23835,21 @@ function initMarketSearch() {
     _marketSearchQuery = e.target.value.trim().toLowerCase();
     renderCurrentMarketView();
   });
+}
+
+// MK.F5 §8 — discrete market-status microindicator for the current tab. Reuses the
+// existing getMarketStatus / getMarketLabel + the .market-status dot styling. Returns
+// '' for aggregate tabs (watchlist/all) and for classes with no honest session data
+// (indices/commodities → no invented hours). Never per-row — one calm line at the top.
+function _mktStatusLineHtml() {
+  try {
+    const type = _TAB_TO_TYPE[currentMarketTab];
+    if (!type) return '';
+    const st = getMarketStatus(type === 'etfs' ? 'etf' : type);
+    if (!st) return '';
+    const cls = st === '24/7' ? 'crypto' : st;
+    return `<div class="mkt-status-line market-status ${cls}"><span class="dot"></span>${escHtml(getMarketLabel(st))}</div>`;
+  } catch (_) { return ''; }
 }
 
 function updateMarketHeader() {
@@ -24903,7 +24930,12 @@ function renderSparkline(points, isUp = true) {
     return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
   const color = isUp ? '#00ff88' : '#ff4d4d';
-  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><path d="${path}" stroke="${color}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  // MK.F5 §4 — subtle ~7% area fill under the line (green up / red down) for a
+  // Bloomberg-lite read. (The V2 engine already draws its own gradient fill; this
+  // only affects the legacy fallback SVG.) Data generation is untouched.
+  const fill = isUp ? 'rgba(0,255,136,0.07)' : 'rgba(255,77,77,0.07)';
+  const area = `${path} L${width},${height} L0,${height} Z`;
+  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><path d="${area}" fill="${fill}" stroke="none"/><path d="${path}" stroke="${color}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 
 function normalizeMarketData(raw, type, symbol) {
@@ -25255,37 +25287,27 @@ function renderMarketItem(item, idx) {
   const normSym = normalizeSymbol(item.symbol);
   const watched = isInWatchlist(normSym);
   const chart   = renderSparkline(generateSparkline(chg ?? live24 ?? 0), (chg ?? live24 ?? 0) >= 0);
-  // MC-11A: compact type badge in the asset cell. Uses the same pill
-  // language as MC-10 fund cards so the visual system stays unified.
-  // Only renders when item.type is one of the known kinds — never invents.
-  const kind = String(item.type || '').toLowerCase();
-  const KIND_KEY = {
-    crypto:    'market_badge_crypto',
-    stock:     'market_badge_stock',
-    etf:       'market_badge_etf',
-    index:     'market_badge_index',
-    commodity: 'market_badge_commodity',
-    fund:      'market_badge_fund',
-    metal:     'market_badge_metal',
-  };
-  const badgeLabel = KIND_KEY[kind] ? t(KIND_KEY[kind]) : null;
-  const badgeHtml  = badgeLabel
-    ? `<span class="market-row-badge is-${kind}">${badgeLabel}</span>`
-    : '';
-  // MK.F2 — lightweight category metadata appended to the name line
-  // ("Bitcoin · Cripto"). Tertiary hierarchy; falls back to Market's main
-  // category (item.type). Never a pill; the legacy badge is hidden via CSS.
+  // MK.F5 — discrete context badge on the ticker line (Cripto / Acción / ETF /
+  // Índice / Fondo, or a specific commodity Oro · Plata · Petróleo · Gas). The full
+  // asset name now sits ALONE on the subline (§1 — the "· categoría" text was
+  // redundant, especially where name === ticker). `kind` canonicalizes the list's
+  // plural types (etfs/indices/commodities) + metal. Never invents — only renders
+  // when the category is known.
+  const kind = ({ etfs: 'etf', indices: 'index', commodities: 'commodity', metal: 'commodity' })[String(item.type || '').toLowerCase()] || String(item.type || '').toLowerCase();
   const CAT_KEY = {
-    crypto:    'mktCat_crypto',
-    stock:     'mktCat_stock',
-    etf:       'mktCat_etf',
-    index:     'mktCat_index',
-    commodity: 'mktCat_commodity',
-    fund:      'mktCat_fund',
-    metal:     'mktCat_metal',
+    crypto: 'mktCat_crypto', stock: 'mktCat_stock', etf: 'mktCat_etf',
+    index: 'mktCat_index', commodity: 'mktCat_commodity', fund: 'mktCat_fund', metal: 'mktCat_metal',
   };
-  const catLabel = CAT_KEY[kind] ? t(CAT_KEY[kind]) : null;
-  const catHtml  = catLabel ? ` <span class="asset-cat">· ${catLabel}</span>` : '';
+  let badgeLabel = null;
+  if (kind === 'commodity') {
+    const ck = (typeof _aurixCommodityKey === 'function') ? _aurixCommodityKey(item.symbol, name) : null;
+    badgeLabel = ck ? t('mktCmd_' + ck) : t('mktCat_commodity');
+  } else if (CAT_KEY[kind]) {
+    badgeLabel = t(CAT_KEY[kind]);
+  }
+  const badgeHtml = badgeLabel
+    ? `<span class="market-row-badge is-${kind}">${escHtml(badgeLabel)}</span>`
+    : '';
   // MC-11A: directional indicator paired with the existing safeChange
   // output. Colors stay on the .is-up / .is-down classes; the arrow is
   // a CSS pseudo-element driven off those classes (no inline text).
@@ -25299,7 +25321,7 @@ function renderMarketItem(item, idx) {
               <span class="asset-symbol">${item.symbol}</span>
               ${badgeHtml}
             </div>
-            <div class="asset-name">${name}${catHtml}</div>
+            <div class="asset-name">${name}</div>
           </div>
         </div>
       </div>
@@ -27067,7 +27089,13 @@ function _aurixCommodityIcon(sym, name) {
   return `<span class="aicon-cmd aicon-cmd--${key}">${svgs[key]}</span>`;
 }
 function _aurixPremiumFallback(asset, initialSource) {
-  const type = String((asset && asset.type) || '').toLowerCase();
+  const rawType = String((asset && asset.type) || '').toLowerCase();
+  // MK.F4 — the Market list normalizes asset types to PLURALS (etfs / indices /
+  // commodities) via _TAB_TO_TYPE, so the premium provider / index / commodity
+  // badges below were never reached (every row fell to a bare initial → the
+  // "placeholder" look in Fondos/Índices/Materias). Canonicalize to singular so
+  // each class gets its designed badge.
+  const type = ({ etfs: 'etf', indices: 'index', commodities: 'commodity' })[rawType] || rawType;
   const sym  = String((asset && (asset.symbol || asset.ticker)) || initialSource || '').trim();
   const name = String((asset && asset.name) || '').trim();
   if (type === 'commodity' || type === 'metal') {

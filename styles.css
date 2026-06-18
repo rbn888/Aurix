@@ -21387,3 +21387,90 @@ body.gs-open { overflow: hidden; }
      Shape/colour/height/data untouched. */
   #marketList.is-v3 .col-chart svg { width: 58px; }
 }
+
+/* ════════ MK.F4 — Market fixed structure + premium iconography ═══════════════
+   Stable layout across categories, tighter right-side sequence, more refined
+   pills, and (via the app.js type-normalization fix) real provider/index/
+   commodity badges in Fondos/Índices/Materias. Visual/alignment only.
+   Desktop ≥769; tablet/mobile (≤768) keep their current geometry. */
+@media (min-width: 769px) {
+  /* §6/§7 — compact right-side sequence ACTIVO → PRECIO → 24H → GRÁFICO. Narrow
+     the sparkline column so the (right-aligned) chart sits ~24-32px from the 24H
+     figure, and shrink the svg ~14% (58→50px). Header + rows share the grid. */
+  #marketList.is-v3 .market-table-header,
+  #marketList.is-v3 .market-row {
+    /* fixed sparkline track → the 24H↔chart gap stays ~30px at any width (§6),
+       instead of widening on large monitors as a fr track would. */
+    grid-template-columns: 3.5fr 1.15fr 1.0fr 70px 44px;
+  }
+  #marketList.is-v3 .col-chart svg { width: 50px; }
+
+  /* §3 — secondary filters read as professional filters, not buttons:
+     shorter, tighter padding, slightly squarer radius, uniform gap. */
+  #marketList .funds-cats { gap: 6px; }
+  #marketList .funds-cat {
+    padding: 5px 11px; font-size: 11.5px; line-height: 1.1; border-radius: 8px;
+  }
+
+  /* §4 — guarantee a visual dead-zone so a row's hover never touches the next
+     row's icon. Small, so density is preserved. */
+  #marketList.is-v3 .market-row { margin-bottom: 2px; }
+
+  /* §5 — table glued to the filters: trim residual padding under the pills so the
+     list starts right below them (Cripto-style) on every category. */
+  #marketList .funds-discover { padding: 2px 0 6px; }
+}
+
+/* ════════ MK.F5 — Market asset-row perceived quality ═════════════════════════
+   More value per row without turning rows into cards: clean name subline + a
+   discrete context badge, stronger favourites, sparkline fill (legacy path), a
+   touch more breathing room, uniform 40px icons, clearer type hierarchy, and a
+   discrete market-status line. Visual only. Desktop is-v3 (applies all viewports
+   where noted); ≤768 keeps its row geometry. */
+
+/* §2 — discrete context badge on the ticker line (un-hides MK.F2's hidden pill,
+   neutralises the old strong per-type colours → one calm, uniform chip). */
+#marketList.is-v3 .market-row-badge {
+  display: inline-flex; align-items: center;
+  margin-left: 8px; padding: 1px 7px; border-radius: 6px;
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.03em; text-transform: none;
+  color: rgba(200,214,245,0.60);
+  background: rgba(138,166,255,0.08);
+  border: 1px solid rgba(138,166,255,0.12);
+}
+
+/* §3 + §9 — favourites: faint when idle, soft glow + scale on hover, premium gold
+   when active, with a 180ms transition so toggling feels smooth (not instant). */
+#marketList.is-v3 .watchlist-btn {
+  color: rgba(220,230,250,0.28);
+  transition: color 180ms ease, transform 180ms cubic-bezier(0.22,1,0.36,1), text-shadow 180ms ease;
+}
+#marketList.is-v3 .watchlist-btn:hover { color: rgba(244,196,90,0.85); transform: scale(1.12); }
+#marketList.is-v3 .watchlist-btn.active { color: #f4c44a; text-shadow: 0 0 9px rgba(244,196,90,0.55); }
+#marketList.is-v3 .watchlist-btn:active { transform: scale(0.92); }
+
+/* §5 + §6 — desktop only (≤768 keeps its tuned is-v4 geometry untouched):
+   a little more breathing room + a uniform 40×40 circular icon for EVERY class. */
+@media (min-width: 769px) {
+  #marketList.is-v3 .market-row { padding: 16px 12px; }
+  #marketList.is-v3 .asset-icon { width: 40px; height: 40px; font-size: 14px; }
+}
+
+/* §7 — typographic hierarchy: ticker 700, name 400, price 700, 24H 700. */
+#marketList.is-v3 .asset-symbol { font-weight: 700; }
+#marketList.is-v3 .asset-name   { font-weight: 400; }
+#marketList.is-v3 .col-price    { font-weight: 700; }
+#marketList.is-v3 .col-change   { font-weight: 700; }
+
+/* §8 — discrete market-status microindicator (one calm line at the top, never
+   per-row). Reuses the .market-status dot; styled here as an inline status line. */
+#marketList .mkt-status-line {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin: 0 0 10px; padding: 0; background: none; border: 0;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+  color: rgba(200,214,245,0.62);
+}
+#marketList .mkt-status-line .dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(200,214,245,0.5); }
+#marketList .mkt-status-line.open .dot   { background: #3fbf7f; box-shadow: 0 0 6px rgba(63,191,127,0.6); }
+#marketList .mkt-status-line.closed .dot { background: rgba(224,90,90,0.85); }
+#marketList .mkt-status-line.crypto .dot { background: #9a6cf0; box-shadow: 0 0 6px rgba(154,108,240,0.5); }
