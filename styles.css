@@ -19622,6 +19622,160 @@ body.gs-open { overflow: hidden; }
   .intcc-id-name { font-size: 15px; }
 }
 
+/* ════════ INT.F2 — Mobile Intelligence premium refinement ════════════════════
+   Density, hierarchy and premium perception only — no architecture/nav/logic.
+   Sphere V3 is global (one design system; sizes unchanged); the rest is scoped
+   to ≤640 mobile so the validated desktop grid stays frozen. Additive overrides. */
+
+/* ── 8. Sphere V3 integration (global) — approved landing sphere language:
+   fixed core (no vertical movement), full-redraw ECG, top-left crystal reflection,
+   electric AURIX blue, premium inner halo, deeper volume. Sizes untouched. */
+.intcc-orb-core {
+  background: radial-gradient(circle at 34% 26%, rgba(232,244,255,1), rgba(var(--orb-c),0.99) 44%, rgba(var(--orb-c),0.34) 100%);
+  box-shadow:
+    0 0 38px rgba(var(--orb-c),0.96),
+    inset 0 2px 12px rgba(220,238,255,0.60),
+    inset 0 0 18px rgba(var(--orb-c),0.50),     /* soft inner halo */
+    inset 0 -7px 16px rgba(8,24,68,0.72);        /* darker base — depth */
+  animation: none;                                /* fixed sphere: no breathing / vertical movement */
+}
+/* Top-left crystal reflection. */
+.intcc-orb-core::before {
+  content: ''; position: absolute; left: 24%; top: 15%;
+  width: 42%; height: 31%; border-radius: 50%;
+  transform: rotate(-14deg); filter: blur(1px); pointer-events: none;
+  background: radial-gradient(ellipse at 42% 40%, rgba(255,255,255,0.62), rgba(255,255,255,0) 70%);
+}
+/* Keep the sphere anchored on hover too (was a -2px lift). */
+.intcc-hero:hover .intcc-orb-core { transform: none; }
+/* ECG — single trace, full redraw each cycle: invisible → draw L→R → hold → soft
+   fade → clean reset. Never a partial/static line between cycles (pathLength=100). */
+.intcc-orb-ecg path {
+  stroke-dasharray: 100; stroke-dashoffset: 100;
+  animation: intccEcgF2 3.4s cubic-bezier(0.45,0,0.55,1) infinite;
+}
+@keyframes intccEcgF2 {
+  0%   { stroke-dashoffset: 100; opacity: 0; }
+  5%   { opacity: 1; }
+  48%  { stroke-dashoffset: 0;   opacity: 1; }
+  72%  { stroke-dashoffset: 0;   opacity: 1; }
+  86%  { stroke-dashoffset: 0;   opacity: 0; }
+  87%  { stroke-dashoffset: 100; opacity: 0; }
+  100% { stroke-dashoffset: 100; opacity: 0; }
+}
+
+@media (max-width: 640px) {
+  /* ── 7. Title consistency — all 7 titles share one signature exactly.
+     They already use .intcc-card-title; align the hero's margin to the rest. */
+  .intcc-m-hero .intcc-card-title { margin: 0 0 10px; }
+
+  /* ── 1. Key Drivers premium — focus on Asset → %, EXPOSURE secondary.
+     Thinner bars (−18%), wider useful bar (+~8% via column ratio + tighter gap),
+     larger % (+~10%), de-emphasised EXPOSURE kind label. */
+  .intcc-drv-row { grid-template-columns: 20px minmax(56px, 0.9fr) 2.1fr auto; gap: 8px; }
+  .intcc-drv-track { height: 5.7px; }
+  .intcc-drv-name { font-size: 13px; font-weight: 600; }
+  .intcc-drv-kind { font-size: 7.5px; letter-spacing: 0.05em; color: rgba(150,180,240,0.42); }
+  .intcc-drv-pct  { font-size: 13.5px; font-weight: 800; min-width: 38px; }
+  .intcc-drv-rank { width: 20px; height: 20px; }
+
+  /* ── 2. Explore your wealth — denser rows, smaller expand button.
+     Same width / functionality / order. */
+  .intcc-explore-list { gap: 7px; }
+  .intcc-x-q { padding: 7px 13px; }
+  .intcc-x-caret { width: 18px; height: 18px; }
+  .intcc-x-caret svg { width: 10px; height: 10px; }
+
+  /* ── 3. Areas to watch — risk panel, not a text list.
+     Tighter rows, smaller status bullets, stronger title, softer description. */
+  .intcc-watch-list { gap: 9px; }
+  .intcc-watch-mark { width: 6px; height: 6px; margin-top: 6px; }
+  .intcc-watch-name { font-size: 13.5px; font-weight: 700; color: #ffffff; }
+  .intcc-watch-desc { color: rgba(255,255,255,0.52); }
+
+  /* ── 4. Timeline — more terminal / Bloomberg.
+     −8% vertical separation, node↔text alignment, brighter dates. */
+  .intcc-tl-item { padding-bottom: 13px; }
+  .intcc-tl-node { top: 3px; }
+  .intcc-tl-text { margin: 0 0 3px; }
+  .intcc-tl-date { color: rgba(174,200,255,0.82); }
+
+  /* ── 5. Radar — better read, no added noise.
+     Dimmer secondary mesh, brighter main polygon, +10% active dots. */
+  .intcc-radar-ring, .intcc-radar-axis { stroke: rgba(150,180,240,0.07); }
+  .intcc-radar-area {
+    fill: rgba(92,156,255,0.27);
+    stroke: #8ab6ff;
+    filter: drop-shadow(0 0 6px rgba(92,156,255,0.7));
+  }
+  .intcc-radar-dot { r: 2.86px; fill: #e2edff; }
+
+  /* ── 6. Health card — more premium and compact.
+     Truly-centred score, higher-contrast checks, −8% badge height. */
+  .intcc-m-health .intcc-score-num { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+  .intcc-m-concl-check {
+    color: #abf0cc; background: rgba(63,191,127,0.20); border-color: rgba(63,191,127,0.46);
+  }
+  .intcc-m-health .intcc-health-badge { padding: 2px 10px; }
+}
+
+/* ════════ INT.F2-WEB — Intelligence desktop/tablet polish (≥641px only) ════════
+   Rebalance the hero into one unit, kill dead space, lift premium feel. Mobile
+   (≤640) is fully untouched. Visual/positioning only — no logic/data/architecture. */
+
+/* Watch-card footer (§6) is desktop/tablet only — keep mobile visually intact. */
+@media (max-width: 640px) { .intcc-watch-foot { display: none; } }
+
+@media (min-width: 641px) {
+  /* §1A — SALUD and INTELIGENCIA modules equal height + content top-aligned, so
+     both titles start on the exact same visual line (sizes unchanged). */
+  .intcc-hero { align-items: stretch; }
+  .intcc-hero-score { justify-content: flex-start; }
+  .intcc-hero-body  { justify-content: flex-start; }
+
+  /* §1D — keep the descriptive line from sprawling across the hero. */
+  .intcc-hero-sub { max-width: 520px; }
+
+  /* §2 — more air between the description and the green badges. */
+  .intcc-chips { margin-top: 22px; }
+
+  /* §4A — Factores: thinner bars (less graphic weight). */
+  .intcc-drv-track { height: 6px; }
+  /* §4B — figures lead (weight only, no size change). */
+  .intcc-drv-pct { font-weight: 800; }
+
+  /* §5 — Áreas a vigilar: tighter rows + trimmed bottom (less dead space). */
+  .intcc-watch { display: flex; flex-direction: column; padding-bottom: 13px; }
+  .intcc-watch-list { gap: 10px; }
+
+  /* §6 — informative footer that closes the card. */
+  .intcc-watch-foot {
+    margin: 14px 0 0; font-size: 12px; font-weight: 500;
+    color: rgba(150,180,240,0.55); letter-spacing: 0.01em;
+  }
+
+  /* §7 — Timeline: tighter node↔text vertical alignment. */
+  .intcc-tl-node { top: 3px; }
+}
+
+/* Desktop (≥1024) — precise hero rebalance + footer pinned to close the
+   grid-stretched watch card. */
+@media (min-width: 1024px) {
+  .intcc-hero-score { padding-top: 16px; }   /* §1A — match Inteligencia card top so titles level */
+  .intcc-hero-body {
+    justify-content: flex-start; margin-top: 0;   /* drop the -6px lift → eyebrow tops align with SALUD */
+    transform: translateX(24px);                   /* §1B — text block +24px toward the sphere */
+  }
+  .intcc-hero-orb-wrap { transform: translateX(-32px); }   /* §1C/§3 — sphere -32px into the content */
+  .intcc-watch-foot { margin-top: auto; padding-top: 14px; }  /* §5/§6 — sink footer to card bottom */
+}
+
+/* Tablet (641–1023) — same rebalance with smaller deltas. */
+@media (min-width: 641px) and (max-width: 1023px) {
+  .intcc-hero-body     { padding-top: 12px; transform: translateX(16px); }  /* §1A align + §1B +16px */
+  .intcc-hero-orb-wrap { transform: translateX(-20px); }                    /* §1C/§3 -20px */
+}
+
 /* Reduced-motion — calm everything, keep it readable */
 @media (prefers-reduced-motion: reduce) {
   .aurix-intcc > * { opacity: 1 !important; transform: none !important; transition: none !important; }
@@ -21135,3 +21289,54 @@ body.gs-open { overflow: hidden; }
 .wsh-toolcard:hover { box-shadow: 0 12px 30px -20px rgba(0,0,0,0.8); }
 .wsh-toolcard-ic { width: 50px; height: 42px; border-radius: 12px; }
 .wsh-toolcard-ic .wsh-tpl-viz-svg { width: 46px; height: 28px; }
+
+/* ════════ MK.F1 — Market web premium rebuild (DESKTOP ≥769px only) ════════════
+   Turn Market from "promo cards + table below" into a premium asset terminal: the
+   list becomes the protagonist. Scoped to ≥769px so tablet/mobile stay identical.
+   Visual + light structure only — no data/price/search/watchlist/API logic touched.
+   (i18n ES label fixes + extending the existing pill filter to desktop live in app.js.) */
+@media (min-width: 769px) {
+  /* §2/§13 — hide the large suggested-asset discovery cards on desktop; keep the
+     subcategory pills (now real list filters via the extended _aurixMktMobileCategoryFilter).
+     The cards' markup/handlers are untouched — only hidden, so nothing breaks internally. */
+  #marketList .funds-grid,
+  #marketList .funds-show-more { display: none; }
+  /* §11/§12 — with the cards gone, collapse the discovery block to just the pills row
+     so the list rises naturally and leaves no dead space. */
+  #marketList .funds-discover { gap: 0; padding: 2px 0 10px; }
+  #marketList .funds-cats { align-items: center; padding: 2px 2px 4px; }
+
+  /* §3 — pills: compact, premium, subtle blue glow only when active. */
+  #marketList .funds-cat { padding: 6px 13px; font-size: 12px; line-height: 1.1; }
+  #marketList .funds-cat.active {
+    box-shadow: 0 0 0 1px rgba(74,130,240,0.30), 0 0 14px -4px rgba(74,130,240,0.55);
+  }
+
+  /* §5/§6 — restructure the table columns (Activo ≈40% / Precio ≈21% / 24H ≈17% /
+     Sparkline ≈21% / Favorito 44px) so the price sits close to the asset and the big
+     asset↔price gap disappears. Header + rows share the EXACT same grid → perfect
+     Bloomberg-style column alignment. */
+  #marketList.is-v3 .market-table-header,
+  #marketList.is-v3 .market-row {
+    grid-template-columns: 2.9fr 1.5fr 1.2fr 1.45fr 44px;
+  }
+
+  /* §7 — sparkline is a secondary indicator: ~18% shorter (svg has a viewBox so it
+     scales cleanly), kept calm via the existing opacity. Shape/colour/trend intact. */
+  #marketList.is-v3 .col-chart svg { width: 66px; }
+
+  /* §10 — search reads as part of the module: height closer to the tabs/pills,
+     higher-contrast placeholder. Position & size otherwise unchanged. */
+  .market-search-wrap input { height: 38px; }
+  .market-search-wrap input::placeholder { color: rgba(228,236,255,0.52); }
+
+  /* §11/§12 — tighter vertical rhythm between tabs, pills, header and the list. */
+  .market-screen { padding-top: 8px; }
+  .market-tabs { padding-top: 8px; padding-bottom: 4px; margin: 4px 0; }
+  #marketList.market-section { margin-top: 10px; }
+}
+
+/* §3/§13 — TODO (deferred per spec §14, no logic invented): optional crypto pills
+   Memecoins / RWA / DEX need category entries in _CRYPTO_CATALOG with tagged items.
+   Add the catalog data + discCat_crypto_* labels first; the pill UI then renders
+   automatically through _renderDiscoveryCatalog. Not forced here. */

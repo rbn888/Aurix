@@ -1423,7 +1423,7 @@ const T = {
     fundCat_bonds:             'Bonos',
     fundCat_gold:              'Oro',
     fundCat_europe:            'Europa',
-    fundCat_dividend:          'Dividendo',
+    fundCat_dividend:          'Dividendos',
     fundCat_small_cap:         'Small Cap',
     // MC-11B: per-asset-class discovery category labels (tab-prefixed)
     fundCat_popular:                  'Populares',
@@ -1431,9 +1431,9 @@ const T = {
     discCat_crypto_top:               'Top',
     discCat_indices_major:            'Principales',
     discCat_commodities_popular:      'Populares',
-    discCat_stocks_magnificent_7:     'Magnificent 7',
+    discCat_stocks_magnificent_7:     'Siete Magníficas',
     discCat_stocks_ai_leaders:        'Líderes IA',
-    discCat_stocks_dividend_stocks:   'Dividendo',
+    discCat_stocks_dividend_stocks:   'Dividendos',
     discCat_stocks_financials:        'Financieras',
     discCat_stocks_healthcare:        'Salud',
     discCat_stocks_energy:            'Energía',
@@ -1675,6 +1675,7 @@ const T = {
     intcc_id_hybrid_x:     'Es un perfil flexible, todavía sin un sesgo claro que lo defina.',
     intcc_watch_title: 'Áreas a vigilar',
     intcc_watch_clean: 'No se observan señales prioritarias. Aurix seguirá vigilando liquidez, concentración y diversificación.',
+    intcc_watch_foot:  n => `${n} ${n === 1 ? 'área detectada' : 'áreas detectadas'} por Aurix Intelligence`,
     intcc_w_dep_t:    'Dependencia de activo principal',
     intcc_w_dep_b:    name => `Buena parte de tu patrimonio invertible se apoya en ${name}.`,
     intcc_w_liq_t:    'Liquidez reducida',
@@ -3619,6 +3620,7 @@ const T = {
     intcc_id_hybrid_x:     'A flexible profile, still without a clear defining bias.',
     intcc_watch_title: 'Areas to watch',
     intcc_watch_clean: 'No priority signals right now. Aurix will keep watching liquidity, concentration and diversification.',
+    intcc_watch_foot:  n => `${n} ${n === 1 ? 'area' : 'areas'} detected by Aurix Intelligence`,
     intcc_w_dep_t:    'Dependence on the main asset',
     intcc_w_dep_b:    name => `A large part of your investable wealth rests on ${name}.`,
     intcc_w_liq_t:    'Reduced liquidity',
@@ -24326,16 +24328,16 @@ function _openAddAssetWithFund(item) {
   }, 60);
 }
 
-// MARKET-MOBILE-1: on MOBILE only, the subcategory chips (Top / Layer 1 / DeFi…)
-// act as real list filters — web behaviour is intentionally unchanged. Returns a
-// Set of normalized tickers for the ACTIVE NON-DEFAULT category of the current
-// tab, or null when no filter should apply (desktop, default category, or no
-// catalog). The caller falls back to the full list when the set yields nothing,
-// so the list can never end up empty. No data is fetched, created or mutated —
-// this only narrows which already-loaded rows are shown.
+// MARKET-MOBILE-1 / MK.F1: the subcategory chips (Top / Layer 1 / DeFi…) act as
+// real list filters. MK.F1 extends this to web/desktop too (was mobile-only) so the
+// pills stay meaningful once the big discovery cards are hidden on desktop — the
+// premium "terminal" behaviour. Returns a Set of normalized tickers for the ACTIVE
+// NON-DEFAULT category of the current tab, or null when no filter should apply
+// (default category, or no catalog). The caller falls back to the full list when the
+// set yields nothing, so the list can never end up empty. No data is fetched, created
+// or mutated — this only narrows which already-loaded rows are shown.
 function _aurixMktMobileCategoryFilter() {
   try {
-    if (!window.matchMedia || !window.matchMedia('(max-width: 768px)').matches) return null;
     const reg = _DISCOVERY_CATALOGS[currentMarketTab];
     if (!reg || !Array.isArray(reg.catalog) || !reg.catalog.length) return null;
     const activeId  = reg.get();
@@ -26056,7 +26058,7 @@ function _intccOrbHtml() {
       <span class="intcc-orb-ring intcc-orb-ring--2"></span>
       <span class="intcc-orb-core"></span>
       <svg class="intcc-orb-ecg" viewBox="0 0 120 40" preserveAspectRatio="none">
-        <path d="M0 20 H28 L33 20 L38 7 L44 33 L50 20 L62 20 L68 20 L73 13 L79 27 L85 20 H120"/>
+        <path pathLength="100" d="M0 20 H28 L33 20 L38 7 L44 33 L50 20 L62 20 L68 20 L73 13 L79 27 L85 20 H120"/>
       </svg>
     </div>`;
 }
@@ -26315,7 +26317,8 @@ function _renderIntelligenceCommandCenter() {
               <span class="intcc-watch-mark" aria-hidden="true"></span>
               <div><p class="intcc-watch-name">${esc(w.title)}</p><p class="intcc-watch-desc">${esc(w.body)}</p></div>
             </li>`).join('')}
-        </ul>`
+        </ul>
+        <p class="intcc-watch-foot">${esc(t('intcc_watch_foot')(watch.length))}</p>`
         : `<div class="intcc-watch-ok">
             <span class="intcc-watch-ok-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
