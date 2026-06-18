@@ -1414,6 +1414,15 @@ const T = {
     market_badge_index:     'ÍNDICE',
     market_badge_commodity: 'MP',
     market_badge_metal:     'METAL',
+    // MK.F2 — proper-case category as lightweight row metadata ("Bitcoin · Cripto"),
+    // not a pill. Tertiary level under ticker + name.
+    mktCat_crypto:    'Cripto',
+    mktCat_stock:     'Acción',
+    mktCat_etf:       'ETF',
+    mktCat_fund:      'Fondo',
+    mktCat_index:     'Índice',
+    mktCat_commodity: 'Materia prima',
+    mktCat_metal:     'Metal',
     discovery_add_cta:      '+ Añadir',
     // MC-9A: curated funds catalog category labels
     fundCat_msci_world:        'MSCI World',
@@ -3359,6 +3368,14 @@ const T = {
     market_badge_index:     'INDEX',
     market_badge_commodity: 'COMM',
     market_badge_metal:     'METAL',
+    // MK.F2 — proper-case category as lightweight row metadata ("Bitcoin · Crypto").
+    mktCat_crypto:    'Crypto',
+    mktCat_stock:     'Stock',
+    mktCat_etf:       'ETF',
+    mktCat_fund:      'Fund',
+    mktCat_index:     'Index',
+    mktCat_commodity: 'Commodity',
+    mktCat_metal:     'Metal',
     discovery_add_cta:      '+ Add',
     // MC-9A: curated funds catalog category labels
     fundCat_msci_world:        'MSCI World',
@@ -25255,6 +25272,20 @@ function renderMarketItem(item, idx) {
   const badgeHtml  = badgeLabel
     ? `<span class="market-row-badge is-${kind}">${badgeLabel}</span>`
     : '';
+  // MK.F2 — lightweight category metadata appended to the name line
+  // ("Bitcoin · Cripto"). Tertiary hierarchy; falls back to Market's main
+  // category (item.type). Never a pill; the legacy badge is hidden via CSS.
+  const CAT_KEY = {
+    crypto:    'mktCat_crypto',
+    stock:     'mktCat_stock',
+    etf:       'mktCat_etf',
+    index:     'mktCat_index',
+    commodity: 'mktCat_commodity',
+    fund:      'mktCat_fund',
+    metal:     'mktCat_metal',
+  };
+  const catLabel = CAT_KEY[kind] ? t(CAT_KEY[kind]) : null;
+  const catHtml  = catLabel ? ` <span class="asset-cat">· ${catLabel}</span>` : '';
   // MC-11A: directional indicator paired with the existing safeChange
   // output. Colors stay on the .is-up / .is-down classes; the arrow is
   // a CSS pseudo-element driven off those classes (no inline text).
@@ -25268,7 +25299,7 @@ function renderMarketItem(item, idx) {
               <span class="asset-symbol">${item.symbol}</span>
               ${badgeHtml}
             </div>
-            <div class="asset-name">${name}</div>
+            <div class="asset-name">${name}${catHtml}</div>
           </div>
         </div>
       </div>

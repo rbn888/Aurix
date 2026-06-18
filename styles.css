@@ -21340,3 +21340,24 @@ body.gs-open { overflow: hidden; }
    Memecoins / RWA / DEX need category entries in _CRYPTO_CATALOG with tagged items.
    Add the catalog data + discCat_crypto_* labels first; the pill UI then renders
    automatically through _renderDiscoveryCatalog. Not forced here. */
+
+/* ════════ MK.F2 — Market asset-row premium hierarchy ═════════════════════════
+   Two-level asset cell: ticker (dominant) → name (secondary) → category (tertiary
+   metadata text, e.g. "Bitcoin · Cripto"). Builds on MK.F1. Visual/hierarchy only —
+   no API/price/data/favorites/search/nav/filter logic. The category text replaces
+   the per-row badge pill (§5/§15: metadata, not pills) consistently on every viewport,
+   so it's never shown twice. Row height is unchanged (category shares the name line). */
+
+/* §2/§5 — category as lightweight tertiary metadata; retire the per-row pill. */
+#marketList .asset-cat { color: rgba(200,214,245,0.42); font-weight: 500; letter-spacing: 0.005em; }
+#marketList .market-row-badge { display: none; }
+
+/* §3 — refine desktop columns toward MK.F2 ratios: narrower 24H, asset ~42%, price
+   sitting close to the asset (less dead space). Header + rows share the EXACT grid →
+   aligned columns. Tablet/mobile (≤768) keep their current geometry untouched. */
+@media (min-width: 769px) {
+  #marketList.is-v3 .market-table-header,
+  #marketList.is-v3 .market-row {
+    grid-template-columns: 2.9fr 1.45fr 1.0fr 1.5fr 44px;
+  }
+}
