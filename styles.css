@@ -21560,3 +21560,17 @@ body.gs-open { overflow: hidden; }
      calm blue-glass, no scale, no shift. */
   #marketList.is-v3 .market-row { margin-bottom: 3px; }
 }
+
+/* ════════ MK.F9A — Market column shift (PRECIO + 24H to the left) ════════════
+   Single Market-only change: narrow ACTIVO and grow the right columns so PRECIO and
+   24H move clearly left and the central void shrinks. Founder distribution
+   40 / 18 / 14 / 22 / 6 — expressed in fr (same ratio) so the existing 10px grid gap
+   is absorbed without overflow (literal % + gap would push the last column out).
+   Header + rows share the grid, so each header moves WITH its values. Nothing else
+   is touched (search, card height, tabs, filters, sparkline form, favourites). */
+@media (min-width: 769px) {
+  #marketList.is-v3 .market-table-header,
+  #marketList.is-v3 .market-row {
+    grid-template-columns: 40fr 18fr 14fr 22fr 6fr;
+  }
+}
