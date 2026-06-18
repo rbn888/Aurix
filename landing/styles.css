@@ -1055,3 +1055,87 @@ body.modal-open{ overflow:hidden; }
   .updates-grid.is-visible .update-chip,
   .timeline.is-visible .phase{ animation:none; opacity:1; transform:none; }
 }
+
+/* ════════ LP.F9 — Fragmentation map + Sphere premium final ════════════════════
+   Visual/animation only. Additive overrides (later source order wins). No layout,
+   navigation, typography, responsive or external-spacing changes. */
+
+/* ── 1. Fragmentation — icon + title only, compact 3×2 map ───────────────────
+   Descriptions removed in markup; cards become tighter tiles so the conclusion
+   line ("No visibility • No clarity • No context") carries the message. */
+.frag-grid{ gap:18px; }
+.frag-card{ padding:20px 20px; gap:10px; justify-content:center; }
+.frag-card h3{ margin:0; }
+@media (max-width:560px){
+  .frag-grid{ gap:12px; }
+  .frag-card{ padding:16px 16px; gap:8px; }
+}
+
+/* ── 2-5. Intelligence sphere ─────────────────────────────────────────────────
+   Central sphere is fully anchored (no translate, no breathing). Only the outer
+   halo breathes and the orbital rings rotate slowly. */
+
+/* Outer halo — minimal breath only (allowed external motion). */
+.io-glow{ animation:ioGlow 5s ease-in-out infinite; }
+
+/* (#2) Orbital rings — slow rotation of tilted orbits (opposite directions,
+   different speeds). Elliptical so the rotation reads as orbital, never a
+   spinning disc; very slow so it stays premium, never "gaming". */
+.io-ring{ inset:6%; border-color:rgba(120,170,255,.16); }
+.io-ring--1{ animation:lpf9Orbit1 48s linear infinite; }
+.io-ring--2{ inset:6%; border-color:rgba(120,170,255,.10); animation:lpf9Orbit2 66s linear infinite; }
+@keyframes lpf9Orbit1{ from{ transform:rotate(0deg) scaleY(.74) } to{ transform:rotate(360deg) scaleY(.74) } }
+@keyframes lpf9Orbit2{ from{ transform:rotate(360deg) scaleY(.64) } to{ transform:rotate(0deg) scaleY(.64) } }
+
+/* (#1) Central core — COMPLETELY FIXED: no breathing, no vertical movement. */
+.io-core{
+  animation:none;
+  /* (#4) More electric AURIX central gradient; brightness not raised globally. */
+  background:radial-gradient(circle at 50% 40%, #eef6ff 0%, #c6e1ff 11%, #5ea6ff 34%, #2f6ae0 58%, #163d8c 80%, #08245c 100%);
+  box-shadow:
+    inset 0 6px 20px rgba(255,255,255,.30),
+    inset 0 -22px 40px rgba(5,14,42,.86),
+    inset 0 0 30px rgba(70,130,240,.26),       /* (#4) soft inner halo */
+    0 24px 60px -18px rgba(77,141,255,.66);
+}
+/* (#4) Top-LEFT glass reflection (crystal), replacing the centered highlight. */
+.io-core::before{
+  left:34%; top:12%; transform:translateX(-50%) rotate(-14deg);
+  width:48%; height:27%; filter:blur(5px);
+  background:radial-gradient(ellipse at 44% 40%, rgba(255,255,255,.55), rgba(255,255,255,0) 70%);
+}
+/* (#4) Darker outer rim — slightly deeper for volume. */
+.io-core::after{
+  background:radial-gradient(circle at 50% 50%, transparent 52%, rgba(4,12,38,.62) 100%);
+}
+
+/* (#3) ECG — single trace, full redraw each cycle. Invisible → draw L→R → hold →
+   soft fade → clean reset. No partial/cut/static line between cycles. */
+.io-ecg-base{ display:none; }
+.io-ecg-trace{
+  stroke-dasharray:100; stroke-dashoffset:100;
+  animation:lpf9Ecg 4.6s var(--ease) infinite;
+}
+@keyframes lpf9Ecg{
+  0%   { stroke-dashoffset:100; opacity:0 }   /* invisible */
+  4%   { opacity:1 }                           /* appears at the left edge */
+  46%  { stroke-dashoffset:0;   opacity:1 }    /* fully drawn left→right */
+  72%  { stroke-dashoffset:0;   opacity:1 }    /* held visible */
+  86%  { stroke-dashoffset:0;   opacity:0 }    /* soft fade out */
+  87%  { stroke-dashoffset:100; opacity:0 }    /* clean reset while invisible */
+  100% { stroke-dashoffset:100; opacity:0 }    /* pause before redraw */
+}
+
+/* (#5) Hover — premium crystal micro-flash that follows the cursor (desktop).
+   Bluish-white, very low intensity, quick 250ms fade. Not neon, not gaming. */
+.io-sheen{ transition:opacity .25s ease; }
+.io-sheen::before{
+  background:radial-gradient(circle at 50% 50%, rgba(206,228,255,.20), rgba(206,228,255,0) 70%);
+}
+.intel-orb.is-sheen .io-sheen{ opacity:.9; }
+
+@media (prefers-reduced-motion: reduce){
+  /* Static, fully-drawn signal; rings/halo/core already still. */
+  .io-ring--1, .io-ring--2{ animation:none; transform:scaleY(.74) }
+  .io-ecg-trace{ animation:none; stroke-dasharray:none; stroke-dashoffset:0; opacity:1; }
+}
