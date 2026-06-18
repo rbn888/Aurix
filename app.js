@@ -23175,33 +23175,33 @@ function renderMarket() {
         <div class="market-title">${t('tabMarket')}</div>
         <div class="market-subtitle">${t('market_subtitle')}</div>
       </div>
-      <!-- MK.F7 §1/§8 — search + status chip. At ≥1024 the .market-screen grid
-           (grid-areas "tabs search" / "body body") already pins these in a fixed
-           top row with the body always on row 2, so the search never shifts and the
-           list always starts at the same Y. The status chip lives inside the search
-           cell (out of the per-category list flow). -->
-      <div class="market-search-wrap">
-        <span class="mkt-status-line" id="mktStatus" aria-hidden="true"></span>
-        <svg class="market-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5l-4.6-4.6"/></svg>
-        <input
-          type="text"
-          id="marketSearchInput"
-          placeholder="${t('market_search_ph')}"
-          autocomplete="off"
-          spellcheck="false"
-        />
-      </div>
-      <div class="market-tabs">
-        <button class="market-tab ${currentMarketTab==='watchlist'?'active':''}" data-market="watchlist">${t('tab_watchlist')}</button>
-        <button class="market-tab ${currentMarketTab==='all'?'active':''}" data-market="all">${t('tab_all')}</button>
-        <button class="market-tab ${currentMarketTab==='crypto'?'active':''}" data-market="crypto">${t('tab_crypto')}</button>
-        <button class="market-tab ${currentMarketTab==='stocks'?'active':''}" data-market="stocks">${t('tab_stocks')}</button>
-        <!-- MC-9A.1: ETFs + Funds merged into a single "Funds & ETFs" tab.
-             data-market="etfs" stays so existing currentMarketTab state and
-             hydrateMarket('etfs') pipeline keep working unchanged. -->
-        <button class="market-tab ${currentMarketTab==='etfs'?'active':''}" data-market="etfs">${t('tab_etfs')}</button>
-        <button class="market-tab ${currentMarketTab==='indices'?'active':''}" data-market="indices">${t('tab_indices')}</button>
-        <button class="market-tab ${currentMarketTab==='commodities'?'active':''}" data-market="commodities">${t('tab_commodities')}</button>
+      <!-- MK.F8 §1/§2 — fixed toolbar: tabs (left) + search (right), OUTSIDE the
+           per-category content. Fixed height/position so the search never moves and
+           the list (.market-body) always starts at the same Y across categories.
+           No market open/closed indicator (§1 — removed entirely). -->
+      <div class="market-toolbar">
+        <div class="market-tabs">
+          <button class="market-tab ${currentMarketTab==='watchlist'?'active':''}" data-market="watchlist">${t('tab_watchlist')}</button>
+          <button class="market-tab ${currentMarketTab==='all'?'active':''}" data-market="all">${t('tab_all')}</button>
+          <button class="market-tab ${currentMarketTab==='crypto'?'active':''}" data-market="crypto">${t('tab_crypto')}</button>
+          <button class="market-tab ${currentMarketTab==='stocks'?'active':''}" data-market="stocks">${t('tab_stocks')}</button>
+          <!-- MC-9A.1: ETFs + Funds merged into a single "Funds & ETFs" tab.
+               data-market="etfs" stays so existing currentMarketTab state and
+               hydrateMarket('etfs') pipeline keep working unchanged. -->
+          <button class="market-tab ${currentMarketTab==='etfs'?'active':''}" data-market="etfs">${t('tab_etfs')}</button>
+          <button class="market-tab ${currentMarketTab==='indices'?'active':''}" data-market="indices">${t('tab_indices')}</button>
+          <button class="market-tab ${currentMarketTab==='commodities'?'active':''}" data-market="commodities">${t('tab_commodities')}</button>
+        </div>
+        <div class="market-search-wrap">
+          <svg class="market-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5l-4.6-4.6"/></svg>
+          <input
+            type="text"
+            id="marketSearchInput"
+            placeholder="${t('market_search_ph')}"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
       </div>
       <div class="market-body">
         <div class="market-main">
@@ -23843,23 +23843,11 @@ function initMarketSearch() {
   });
 }
 
-// MK.F5 §8 / MK.F7 §1 — discrete market-status microindicator. Now lives in the
-// FIXED top row (#mktStatus), updated per tab here, so it never shifts the list.
-// Reuses getMarketStatus / getMarketLabel. Empty for aggregate tabs (watchlist/all)
-// and for classes with no honest session data (indices/commodities → no invented hours).
-function _mktUpdateStatus() {
-  try {
-    const el = document.getElementById('mktStatus');
-    if (!el) return;
-    const type = _TAB_TO_TYPE[currentMarketTab];
-    const st = type ? getMarketStatus(type === 'etfs' ? 'etf' : type) : null;
-    el.className = 'mkt-status-line' + (st ? ' ' + (st === '24/7' ? 'crypto' : st) : '');
-    el.innerHTML = st ? `<span class="dot"></span>${escHtml(getMarketLabel(st))}` : '';
-  } catch (_) {}
-}
+// MK.F8 §1 — the market open/closed/24-7 indicator was removed entirely from
+// Market (it wasn't reliable and caused confusion). getMarketStatus/getMarketLabel
+// stay for other surfaces; Market simply no longer renders any status chip.
 
 function updateMarketHeader() {
-  try { _mktUpdateStatus(); } catch (_) {}
   try {
     const config = MARKET_HEADER_CONFIG[currentMarketTab];
     if (!config) return;

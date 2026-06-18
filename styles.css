@@ -21513,15 +21513,50 @@ body.gs-open { overflow: hidden; }
   }
 }
 
-/* §1/§8 — status chip lives in the search cell: top-right at ≥1024 (grid pins the
-   search), centred next to the search below 1024. Discrete, hidden when empty. */
-.market-search-wrap .mkt-status-line {
-  display: inline-flex; align-items: center; gap: 6px; margin-right: 12px;
-  font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
-  color: rgba(200,214,245,0.62); white-space: nowrap; flex: 0 0 auto;
+/* (MK.F8 §1 — market-status chip removed entirely; styling deleted.) */
+
+/* ════════ MK.F8 — definitive Market layout ═══════════════════════════════════
+   Real fixed toolbar (search never moves), card always same start, no market
+   status, columns pulled left, shorter sparkline. Structure/visual only. */
+
+/* §1/§2/§3 — fixed toolbar OUTSIDE the dynamic content. Replaces the old ≥1024
+   grid-area layout (which kept tabs/search as direct grid children) with an explicit
+   flex toolbar, so the search holds the exact same Y and the list (.market-body)
+   always starts at the same coordinate regardless of category / filters / row count. */
+@media (min-width: 1024px) {
+  .market-screen { display: block; }            /* override grid-areas layout */
+  .market-screen .market-header { display: none; }
+  .market-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; min-height: 44px; margin: 0 0 14px;
+  }
+  .market-toolbar .market-tabs {
+    flex: 1 1 auto; min-width: 0; margin: 0; padding: 0; overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .market-toolbar .market-tabs::-webkit-scrollbar { display: none; }
+  .market-toolbar .market-search-wrap { flex: 0 0 auto; margin: 0; padding: 0; justify-content: flex-end; }
+  .market-toolbar .market-search-wrap input { width: 240px; max-width: 240px; height: 36px; }
+  .market-body { margin-top: 0; }
+  #marketList.market-section { margin-top: 0; }  /* §3/§4 — card (pills+table) starts right after the toolbar gap */
 }
-.market-search-wrap .mkt-status-line:empty { display: none; }
-.market-search-wrap .mkt-status-line .dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(200,214,245,0.5); }
-.market-search-wrap .mkt-status-line.open .dot   { background: #3fbf7f; box-shadow: 0 0 6px rgba(63,191,127,0.6); }
-.market-search-wrap .mkt-status-line.closed .dot { background: rgba(224,90,90,0.85); }
-.market-search-wrap .mkt-status-line.crypto .dot { background: #9a6cf0; box-shadow: 0 0 6px rgba(154,108,240,0.5); }
+/* Tablet/mobile: toolbar stacks; column-reverse keeps the search ABOVE the tabs
+   (the original pre-MK.F8 order), so no mobile regression. */
+@media (max-width: 1023px) {
+  .market-toolbar { display: flex; flex-direction: column-reverse; gap: 8px; }
+}
+
+/* §5/§6/§7 — columns pulled left + shorter sparkline. Price + 24H sit in compact
+   columns near the asset; the (right-aligned) sparkline keeps clear air after 24H
+   (§6 ≥28px) and is ~14% shorter (44→38px). Header + rows share the grid. */
+@media (min-width: 769px) {
+  #marketList.is-v3 .market-table-header,
+  #marketList.is-v3 .market-row {
+    grid-template-columns: 3.0fr 1.0fr 0.82fr 1.1fr 40px;
+  }
+  #marketList.is-v3 .col-chart svg { width: 38px; }
+
+  /* §9 — hover stays inside the row with ≥6px air (16px row padding + 3px margin);
+     calm blue-glass, no scale, no shift. */
+  #marketList.is-v3 .market-row { margin-bottom: 3px; }
+}
