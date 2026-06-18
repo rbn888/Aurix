@@ -21474,3 +21474,54 @@ body.gs-open { overflow: hidden; }
 #marketList .mkt-status-line.open .dot   { background: #3fbf7f; box-shadow: 0 0 6px rgba(63,191,127,0.6); }
 #marketList .mkt-status-line.closed .dot { background: rgba(224,90,90,0.85); }
 #marketList .mkt-status-line.crypto .dot { background: #9a6cf0; box-shadow: 0 0 6px rgba(154,108,240,0.5); }
+
+/* ════════ MK.F7 — Market final premium fix ═══════════════════════════════════
+   Fixed top row (search never moves), consistent list start across categories,
+   no redundant row badges (handled in app.js), tighter columns, finer header.
+   Visual/structure only. */
+
+/* §1/§2 — the search position + the list start are ALREADY fixed at ≥1024 by the
+   existing .market-screen grid (areas "tabs search" / "body body" → search pinned
+   top-right, body always row 2). MK.F7's real fix was moving the MK.F5 status line
+   OUT of the per-category list flow into the search cell (below) so nothing shifts. */
+@media (min-width: 769px) {
+  /* §5 — tighter columns: Activo ~42 / Precio ~16 / 24H ~13 / Sparkline ~20 / ★.
+     Price + 24H pulled left (compact A→P→24H), sparkline separated on the right. */
+  #marketList.is-v3 .market-table-header,
+  #marketList.is-v3 .market-row {
+    grid-template-columns: 2.95fr 1.12fr 0.9fr 1.35fr 44px;
+  }
+  /* §6 — sparkline ~12% narrower again (50→44px); supports, never dominates. */
+  #marketList.is-v3 .col-chart svg { width: 44px; }
+
+  /* §7 — hover stays inside the row (the 16px row padding already gives a ≥6px
+     dead-zone to neighbouring icons); calm blue-glass, no scale, no shift. */
+  #marketList.is-v3 .market-row { margin-bottom: 3px; }
+  #marketList.is-v3 .market-row:hover {
+    background: rgba(74,130,240,0.06);
+    box-shadow: inset 0 0 0 1px rgba(74,130,240,0.12);
+  }
+
+  /* §8 — secondary filters: finer, calmer. */
+  #marketList .funds-cat { padding: 4px 10px; font-size: 11px; }
+  #marketList .funds-cat.active { box-shadow: 0 0 0 1px rgba(74,130,240,0.28); }
+
+  /* §11 — table header more discreet (must not compete with the data). */
+  #marketList.is-v3 .market-table-header {
+    font-size: 9.5px; font-weight: 600; letter-spacing: 0.16em;
+    color: rgba(220,230,250,0.42);
+  }
+}
+
+/* §1/§8 — status chip lives in the search cell: top-right at ≥1024 (grid pins the
+   search), centred next to the search below 1024. Discrete, hidden when empty. */
+.market-search-wrap .mkt-status-line {
+  display: inline-flex; align-items: center; gap: 6px; margin-right: 12px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+  color: rgba(200,214,245,0.62); white-space: nowrap; flex: 0 0 auto;
+}
+.market-search-wrap .mkt-status-line:empty { display: none; }
+.market-search-wrap .mkt-status-line .dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(200,214,245,0.5); }
+.market-search-wrap .mkt-status-line.open .dot   { background: #3fbf7f; box-shadow: 0 0 6px rgba(63,191,127,0.6); }
+.market-search-wrap .mkt-status-line.closed .dot { background: rgba(224,90,90,0.85); }
+.market-search-wrap .mkt-status-line.crypto .dot { background: #9a6cf0; box-shadow: 0 0 6px rgba(154,108,240,0.5); }

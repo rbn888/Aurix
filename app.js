@@ -23175,7 +23175,13 @@ function renderMarket() {
         <div class="market-title">${t('tabMarket')}</div>
         <div class="market-subtitle">${t('market_subtitle')}</div>
       </div>
+      <!-- MK.F7 §1/§8 — search + status chip. At ≥1024 the .market-screen grid
+           (grid-areas "tabs search" / "body body") already pins these in a fixed
+           top row with the body always on row 2, so the search never shifts and the
+           list always starts at the same Y. The status chip lives inside the search
+           cell (out of the per-category list flow). -->
       <div class="market-search-wrap">
+        <span class="mkt-status-line" id="mktStatus" aria-hidden="true"></span>
         <svg class="market-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5l-4.6-4.6"/></svg>
         <input
           type="text"
@@ -23789,9 +23795,9 @@ function renderCurrentMarketView() {
   }
   // MARKET-2: prepend the explorer controls bar. Empty string when the
   // V2 flag is off, so the legacy layout ships exactly as before.
-  // MK.F5 §8 — discrete market-status line above the controls (no-op on
-  // watchlist/all and on classes without honest session data).
-  html = _mktStatusLineHtml() + _aurixMktExpControlsHtml() + html;
+  // MK.F7 §2 — the market-status line moved OUT to the fixed top row, so the list
+  // now always starts at the same Y across categories (no per-tab vertical shift).
+  html = _aurixMktExpControlsHtml() + html;
 
   // Aggregate tabs (All / Watchlist) skip the lastKey short-circuit so
   // every render reflects the freshest composed dataset — the html
@@ -23837,22 +23843,23 @@ function initMarketSearch() {
   });
 }
 
-// MK.F5 §8 — discrete market-status microindicator for the current tab. Reuses the
-// existing getMarketStatus / getMarketLabel + the .market-status dot styling. Returns
-// '' for aggregate tabs (watchlist/all) and for classes with no honest session data
-// (indices/commodities → no invented hours). Never per-row — one calm line at the top.
-function _mktStatusLineHtml() {
+// MK.F5 §8 / MK.F7 §1 — discrete market-status microindicator. Now lives in the
+// FIXED top row (#mktStatus), updated per tab here, so it never shifts the list.
+// Reuses getMarketStatus / getMarketLabel. Empty for aggregate tabs (watchlist/all)
+// and for classes with no honest session data (indices/commodities → no invented hours).
+function _mktUpdateStatus() {
   try {
+    const el = document.getElementById('mktStatus');
+    if (!el) return;
     const type = _TAB_TO_TYPE[currentMarketTab];
-    if (!type) return '';
-    const st = getMarketStatus(type === 'etfs' ? 'etf' : type);
-    if (!st) return '';
-    const cls = st === '24/7' ? 'crypto' : st;
-    return `<div class="mkt-status-line market-status ${cls}"><span class="dot"></span>${escHtml(getMarketLabel(st))}</div>`;
-  } catch (_) { return ''; }
+    const st = type ? getMarketStatus(type === 'etfs' ? 'etf' : type) : null;
+    el.className = 'mkt-status-line' + (st ? ' ' + (st === '24/7' ? 'crypto' : st) : '');
+    el.innerHTML = st ? `<span class="dot"></span>${escHtml(getMarketLabel(st))}` : '';
+  } catch (_) {}
 }
 
 function updateMarketHeader() {
+  try { _mktUpdateStatus(); } catch (_) {}
   try {
     const config = MARKET_HEADER_CONFIG[currentMarketTab];
     if (!config) return;
@@ -25263,6 +25270,25 @@ function _aurixPreloadMarketIcons(visibleData) {
   } catch (_) { /* never break a render on a preload hiccup */ }
 }
 
+// MK.F7 §4 — curated display names so the subline shows a real name even when the
+// live feed returns name === ticker. Keyed by normalizeSymbol() (uppercased, no
+// exchange suffix / ^ prefix). Pure UI labels — no prices/data/calculations.
+const _MKT_DISPLAY_NAMES = {
+  // Stocks
+  AAPL: 'Apple Inc.', MSFT: 'Microsoft Corp.', NVDA: 'NVIDIA Corp.', AMZN: 'Amazon.com Inc.',
+  GOOGL: 'Alphabet Inc.', GOOG: 'Alphabet Inc.', META: 'Meta Platforms', TSLA: 'Tesla Inc.',
+  // Crypto
+  BTC: 'Bitcoin', ETH: 'Ethereum', SOL: 'Solana', BNB: 'BNB', XRP: 'XRP',
+  USDC: 'USD Coin', USDT: 'Tether', ADA: 'Cardano', AVAX: 'Avalanche', DOGE: 'Dogecoin',
+  // ETFs
+  SPY: 'SPDR S&P 500 ETF', VOO: 'Vanguard S&P 500 ETF', QQQ: 'Invesco QQQ',
+  VTI: 'Vanguard Total Stock Market', URTH: 'iShares MSCI World',
+  // Indices
+  DJI: 'Dow Jones', GSPC: 'S&P 500', IXIC: 'Nasdaq',
+  // Commodities
+  WTI: 'Oil (WTI)', XAGUSD: 'Silver', XAUUSD: 'Gold',
+};
+
 // `idx` arrives from the .map(renderMarketItem) callsites; the first
 // _AURIX_MKT_EAGER_ICONS rows get an eager icon (no first-viewport pop-in).
 function renderMarketItem(item, idx) {
@@ -25283,31 +25309,15 @@ function renderMarketItem(item, idx) {
     : null;
   const chg = isPeriodSelected ? cachedChg : live24;
   const isLoading = isPeriodSelected && (cachedChg == null);
-  const name    = item.name || item.symbol;
   const normSym = normalizeSymbol(item.symbol);
+  // MK.F7 §4 — prefer a real feed name; if it's missing or just the ticker, fall
+  // back to the curated display name. Empty when neither exists → no subline (§3).
+  const _dataName = (item.name && item.name !== item.symbol) ? item.name : null;
+  const name    = _dataName || _MKT_DISPLAY_NAMES[normSym] || '';
   const watched = isInWatchlist(normSym);
   const chart   = renderSparkline(generateSparkline(chg ?? live24 ?? 0), (chg ?? live24 ?? 0) >= 0);
-  // MK.F5 — discrete context badge on the ticker line (Cripto / Acción / ETF /
-  // Índice / Fondo, or a specific commodity Oro · Plata · Petróleo · Gas). The full
-  // asset name now sits ALONE on the subline (§1 — the "· categoría" text was
-  // redundant, especially where name === ticker). `kind` canonicalizes the list's
-  // plural types (etfs/indices/commodities) + metal. Never invents — only renders
-  // when the category is known.
-  const kind = ({ etfs: 'etf', indices: 'index', commodities: 'commodity', metal: 'commodity' })[String(item.type || '').toLowerCase()] || String(item.type || '').toLowerCase();
-  const CAT_KEY = {
-    crypto: 'mktCat_crypto', stock: 'mktCat_stock', etf: 'mktCat_etf',
-    index: 'mktCat_index', commodity: 'mktCat_commodity', fund: 'mktCat_fund', metal: 'mktCat_metal',
-  };
-  let badgeLabel = null;
-  if (kind === 'commodity') {
-    const ck = (typeof _aurixCommodityKey === 'function') ? _aurixCommodityKey(item.symbol, name) : null;
-    badgeLabel = ck ? t('mktCmd_' + ck) : t('mktCat_commodity');
-  } else if (CAT_KEY[kind]) {
-    badgeLabel = t(CAT_KEY[kind]);
-  }
-  const badgeHtml = badgeLabel
-    ? `<span class="market-row-badge is-${kind}">${escHtml(badgeLabel)}</span>`
-    : '';
+  // MK.F7 §3 — no per-row category badge: the category already lives in the
+  // tabs/filters, so "AAPL [Acción] / AAPL" was redundant. Row = ticker + name only.
   // MC-11A: directional indicator paired with the existing safeChange
   // output. Colors stay on the .is-up / .is-down classes; the arrow is
   // a CSS pseudo-element driven off those classes (no inline text).
@@ -25319,9 +25329,8 @@ function renderMarketItem(item, idx) {
           <div class="asset-text">
             <div class="asset-symbol-row">
               <span class="asset-symbol">${item.symbol}</span>
-              ${badgeHtml}
             </div>
-            <div class="asset-name">${name}</div>
+            ${name && name !== item.symbol ? `<div class="asset-name">${escHtml(name)}</div>` : ''}
           </div>
         </div>
       </div>
