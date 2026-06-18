@@ -21361,3 +21361,29 @@ body.gs-open { overflow: hidden; }
     grid-template-columns: 2.9fr 1.45fr 1.0fr 1.5fr 44px;
   }
 }
+
+/* ════════ MK.F3 — Market web alignment + header cleanup ══════════════════════
+   Polish after MK.F1/MK.F2: drop the redundant in-table section title, rebalance
+   columns (price closer to the asset, 24H separated from the sparkline), and keep
+   the layout stable across categories. Visual/alignment only — no API/data/price/
+   favorites/filter/search/nav logic. ES labels + pills already handled in MK.F1/F2.
+
+   §1 — remove the redundant section title ("Seguimiento / Cripto / …") inside the
+   container; it just repeats the active tab. Mobile (.is-v4) already hid it — this
+   matches desktop to it so the only label left is the functional column header. */
+#marketList .market-section-header { display: none; }
+
+@media (min-width: 769px) {
+  /* §4/§5/§6 — rebalanced desktop columns: asset dominant (~45%), price + 24H pulled
+     into compact columns (right-aligned text sits closer to the asset → less dead
+     space), sparkline narrowed. Header + rows share the EXACT grid → aligned. */
+  #marketList.is-v3 .market-table-header,
+  #marketList.is-v3 .market-row {
+    grid-template-columns: 3.5fr 1.15fr 1.0fr 1.45fr 44px;
+  }
+
+  /* §7 — sparkline ~12% narrower again (58px). Right-aligned, so the extra room
+     falls on its LEFT → §6's clear separation between the 24H figure and the chart.
+     Shape/colour/height/data untouched. */
+  #marketList.is-v3 .col-chart svg { width: 58px; }
+}
