@@ -21589,13 +21589,16 @@ body.gs-open { overflow: hidden; }
 .perf-snapshot { display: none; }
 
 @media (min-width: 769px) {
-  /* erase the old chart surface + redundant header title inside the hero */
+  /* erase the old chart surface; KEEP the title (it is the section eyebrow,
+     "EVOLUCIÓN DEL PATRIMONIO", sharing .card-title with the left "VALOR TOTAL
+     DE CARTERA" → identical size/weight/tracking, one system). */
   .hero-right .chart-wrap          { display: none !important; }
   .hero-right .chart-change,
-  .hero-right .chart-baseline-note,
-  .hero-right .chart-title         { display: none !important; }
+  .hero-right .chart-baseline-note { display: none !important; }
   #distributionSection             { display: none !important; }
-  .hero-right .chart-header        { margin-bottom: 10px; min-height: 26px; }
+  /* header row: title left, controls (%/$ + ranges) right — one line */
+  .hero-right .chart-header        { margin-bottom: 16px; align-items: center; }
+  .hero-right .chart-title         { margin-bottom: 0; }
 
   .perf-snapshot {
     display: flex;
@@ -21648,9 +21651,12 @@ body.gs-open { overflow: hidden; }
     border-top: 1px solid rgba(255,255,255,0.05);
   }
   .perf-ind:first-child { border-top: none; }
-  .perf-ind-icon { width: 17px; height: 17px; flex-shrink: 0; color: var(--aurix-blue); opacity: .92; }
+  .perf-ind-icon { width: 17px; height: 17px; flex-shrink: 0; color: var(--aurix-blue); opacity: .9; }
   .perf-ind-label { flex: 1; min-width: 0; font-size: 12.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .perf-ind-value { font-size: 13.5px; font-weight: 700; color: var(--text-bright); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .perf-ind-value { font-size: 13px; font-weight: 700; color: var(--text-bright); font-variant-numeric: tabular-nums; letter-spacing: -.01em; white-space: nowrap; max-width: 56%; overflow: hidden; text-overflow: ellipsis; }
+  .perf-ind-value .pos { color: var(--green); }
+  .perf-ind-value .neg { color: var(--red); }
+  .perf-ind-value .perf-ind-sub { color: var(--text-muted); font-weight: 700; }
 
   /* ── right 35%: title + small investable donut ── */
   .perf-compo {
@@ -21665,7 +21671,7 @@ body.gs-open { overflow: hidden; }
     font-size: 9.5px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
     color: var(--text-dim);
   }
-  .perf-donut { position: relative; width: 104px; height: 104px; flex-shrink: 0; }
+  .perf-donut { position: relative; width: 92px; height: 92px; flex-shrink: 0; }
   .perf-donut-svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); }
   .perf-donut-seg { transition: opacity .2s ease; }
   .perf-donut-center {
@@ -21703,7 +21709,7 @@ body.gs-open { overflow: hidden; }
   .perf-skel-sub  { width: 30%; height: 16px; margin-bottom: 12px; }
   .perf-metrics-skel { display: flex; flex-direction: column; gap: 10px; }
   .perf-skel-cell { height: 20px; border-radius: 6px; }
-  .perf-skel-donut { width: 104px; height: 104px; border-radius: 50%; align-self: center; margin: auto; }
+  .perf-skel-donut { width: 92px; height: 92px; border-radius: 50%; align-self: center; margin: auto; }
 }
 
 /* tablet (≥769 ≤1024): scale the hero number down so nothing crowds */
@@ -21711,7 +21717,7 @@ body.gs-open { overflow: hidden; }
   .perf-info { flex-basis: 60%; }
   .perf-hero-money { font-size: 40px; }
   .perf-hero-pct   { font-size: 18px; }
-  .perf-donut { width: 92px; height: 92px; }
+  .perf-donut { width: 82px; height: 82px; }
   .perf-context { font-size: 12px; }
 }
 

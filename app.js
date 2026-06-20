@@ -1117,7 +1117,11 @@ const T = {
     rangeMed:        'Medio',
     rangeHigh:       'Alto',
     compoInvertible: 'Composición invertible',
-    centerInvertible:'Invertible',
+    centerInvertible:'Inversión',
+    insBest:         'Mejor activo',
+    insWorst:        'Peor activo',
+    insPosition:     'Mayor posición',
+    insContributor:  'Mayor contribuidor',
     ctxStable:       'Patrimonio prácticamente estable',
     ctxUpLight:      'Ligero avance',
     ctxUpSolid:      'Avance sólido',
@@ -3126,7 +3130,11 @@ const T = {
     rangeMed:        'Medium',
     rangeHigh:       'High',
     compoInvertible: 'Liquid composition',
-    centerInvertible:'Liquid',
+    centerInvertible:'Invested',
+    insBest:         'Top mover',
+    insWorst:        'Worst mover',
+    insPosition:     'Largest position',
+    insContributor:  'Top contributor',
     ctxStable:       'Wealth essentially flat',
     ctxUpLight:      'Slight gain',
     ctxUpSolid:      'Solid gain',
@@ -16314,11 +16322,12 @@ function updateDonut() {
 // slider keeps its own chart + donut (swipe).
 // ════════════════════════════════════════════════════════════════════════
 
-// Premium monochrome inline icons (no emoji). 18px, stroke = currentColor so
-// they inherit the Aurix-blue indicator colour; identical size + weight.
-const _DSH_ICON_MAX  = '<svg class="perf-ind-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-7 4 4 4-6 5 7"/></svg>';
-const _DSH_ICON_CONS = '<svg class="perf-ind-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.2-3 7.4-7 9-4-1.6-7-4.8-7-9V6z"/></svg>';
-const _DSH_ICON_RANGE = '<svg class="perf-ind-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19V11M12 19V5M19 19v-5"/></svg>';
+// Premium monochrome inline icons (no emoji). stroke = currentColor so they
+// inherit the Aurix-blue indicator colour; identical size + weight + grosor.
+const _DSH_ICON_BEST    = '<svg class="perf-ind-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6"/><path d="M6 12l6-6 6 6"/></svg>';
+const _DSH_ICON_WORST   = '<svg class="perf-ind-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v13"/><path d="M6 12l6 6 6-6"/></svg>';
+const _DSH_ICON_POS     = '<svg class="perf-ind-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6"/></svg>';
+const _DSH_ICON_CONTRIB = '<svg class="perf-ind-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.6 5.7 6.2.6-4.7 4.1 1.4 6.1L12 17l-5.5 3.1 1.4-6.1L3.2 9.8l6.2-.6z"/></svg>';
 
 // Signed money with NO decimals — the premium hero number + clean count-up.
 // Locale-correct currency token (es → "346.590 US$", en → "$346,590").
@@ -16455,6 +16464,47 @@ function _dshComputePerfSnapshot(range) {
   };
 }
 
+// Live portfolio signals (real, current — answer "what's leading / hurting /
+// where am I concentrated"). The only honest per-asset signal is the live 24h
+// change + current values, so movers/contributor are 24h-based (not range-bound)
+// and any row without real data is simply omitted. Mayor posición uses the
+// current snapshot over TOTAL wealth (inmuebles included — that's why it can
+// surface here even though the donut is investable-only). No invention.
+function _dshComputeInsights() {
+  if (!Array.isArray(assets) || !assets.length) return null;
+  const totUSD = (typeof totalValueUSD === 'function') ? totalValueUSD() : 0;
+
+  const rows = assets.map(a => {
+    const valUSD = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : 0;
+    const ch = (typeof a.change24h === 'number' && isFinite(a.change24h)) ? a.change24h : null;
+    return {
+      name: a.name || normalizeSymbol(a.ticker || a.symbol || '') || '—',
+      ch, valUSD,
+      contribBase: ch != null ? toBase((ch / 100) * valUSD, 'USD') : null,
+    };
+  }).filter(r => r.valUSD > 0);
+  if (!rows.length) return null;
+
+  // Largest position over total wealth — always real (current snapshot).
+  let top = rows[0];
+  rows.forEach(r => { if (r.valUSD > top.valUSD) top = r; });
+  const position = totUSD > 0 ? { name: top.name, pct: (top.valUSD / totUSD) * 100 } : null;
+
+  // 24h movers + top contributor — only from assets that actually carry a live
+  // 24h change; if none do, these rows are omitted (never faked).
+  const withCh = rows.filter(r => r.ch != null);
+  let best = null, worst = null, contributor = null;
+  if (withCh.length) {
+    best = worst = contributor = withCh[0];
+    withCh.forEach(r => {
+      if (r.ch > best.ch) best = r;
+      if (r.ch < worst.ch) worst = r;
+      if (r.contribBase > contributor.contribBase) contributor = r;
+    });
+  }
+  return { position, best, worst, contributor };
+}
+
 // Right-side context: INVESTABLE composition only (real estate excluded — it
 // keeps its own card below). Small donut + compact legend; centre shows the
 // liquid share of total wealth. Percentages only, no amounts (no duplication).
@@ -16464,14 +16514,13 @@ function _dshBuildCompoHtml() {
   const centerVal = Number.isFinite(invShare) ? `${invShare.toFixed(1)}%` : '—';
 
   if (!dist || !dist.length) {
-    return `<div class="perf-compo-title">${t('compoInvertible')}</div>
-      <div class="perf-donut perf-donut--empty">
-        <svg class="perf-donut-svg" viewBox="0 0 150 150" aria-hidden="true"><circle cx="75" cy="75" r="67" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="16"/></svg>
+    return `<div class="perf-donut perf-donut--empty">
+        <svg class="perf-donut-svg" viewBox="0 0 150 150" aria-hidden="true"><circle cx="75" cy="75" r="69" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="13"/></svg>
         <div class="perf-donut-center"><div class="perf-donut-center-sub">${t('emptyDonutLabel')}</div></div>
       </div>`;
   }
 
-  const size = 150, sw = 16, r = (size - sw) / 2, c = size / 2, C = 2 * Math.PI * r;
+  const size = 150, sw = 13, r = (size - sw) / 2, c = size / 2, C = 2 * Math.PI * r;
   let acc = 0;
   const segs = dist.map(seg => {
     const frac = Math.max(0, seg.pct) / 100;
@@ -16488,7 +16537,6 @@ function _dshBuildCompoHtml() {
   }).join('');
 
   return `
-    <div class="perf-compo-title">${t('compoInvertible')}</div>
     <div class="perf-donut">
       <svg class="perf-donut-svg" viewBox="0 0 ${size} ${size}" aria-hidden="true"><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="${sw}"/>${segs}</svg>
       <div class="perf-donut-center"><div class="perf-donut-center-val">${centerVal}</div><div class="perf-donut-center-sub">${t('centerInvertible')}</div></div>
@@ -16517,60 +16565,65 @@ function _dshCountUp(el, from, to, fmt) {
 // shown value (user range/unit change); silent on background refreshes.
 function _dshPaintPerfSnapshot(root, doCountUp) {
   const snap = _dshComputePerfSnapshot(activeRange);
-  const mode = activePerfMode === 'curr' ? 'curr' : 'pct';
 
   let infoHtml;
   if (!snap) {
-    infoHtml = `<div class="perf-eyebrow">${t('evolution')}</div><div class="perf-empty">${t('perfEmpty')}</div>`;
+    infoHtml = `<div class="perf-empty">${t('perfEmpty')}</div>`;
   } else {
     const pct  = Number.isFinite(snap.deltaPct) ? snap.deltaPct : 0;
     const abs  = Number.isFinite(snap.deltaAbs) ? snap.deltaAbs : 0;
     const tone = pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat';
-    const pctFmt    = _dshFmtPct(pct);
+    // Money ALWAYS leads, % always secondary (capped so it never blows up).
     const moneyText = _dshFmtMoney0(abs);
-    // Money leads in $ mode, % leads in % mode; the other value sits below.
-    const primaryText   = mode === 'curr' ? moneyText  : pctFmt.text;
-    const secondaryText = mode === 'curr' ? pctFmt.text : moneyText;
-    const primaryTitle  = (mode === 'pct' && pctFmt.capped) ? ` title="${pctFmt.raw}"` : '';
+    const pctFmt    = _dshFmtPct(pct);
+    const secTitle  = pctFmt.capped ? ` title="${pctFmt.raw}"` : '';
+    const ctxLine   = _dshContextLine(snap, activeRange);
 
-    const ctxLine  = _dshContextLine(snap, activeRange);
-    const consVal  = Number.isFinite(snap.consistencyPct) ? `${Math.round(snap.consistencyPct)}%` : '—';
-    const rangeVal = snap.rangeBand ? snap.rangeBand.label : '—';
-    const maxVal   = _dshMoneyCompact(snap.max);
+    // Live insight rows — only those backed by real data are emitted.
+    const ins = _dshComputeInsights();
+    let rows = '';
+    if (ins) {
+      if (ins.best) {
+        const v = ins.best.ch;
+        rows += `<div class="perf-ind">${_DSH_ICON_BEST}<span class="perf-ind-label">${t('insBest')}</span><span class="perf-ind-value">${ins.best.name} <span class="${v >= 0 ? 'pos' : 'neg'}">${v >= 0 ? '+' : ''}${v.toFixed(2)}%</span></span></div>`;
+      }
+      if (ins.worst) {
+        const v = ins.worst.ch;
+        rows += `<div class="perf-ind">${_DSH_ICON_WORST}<span class="perf-ind-label">${t('insWorst')}</span><span class="perf-ind-value">${ins.worst.name} <span class="${v >= 0 ? 'pos' : 'neg'}">${v >= 0 ? '+' : ''}${v.toFixed(2)}%</span></span></div>`;
+      }
+      if (ins.position) {
+        rows += `<div class="perf-ind">${_DSH_ICON_POS}<span class="perf-ind-label">${t('insPosition')}</span><span class="perf-ind-value">${ins.position.name} <span class="perf-ind-sub">${ins.position.pct.toFixed(1)}%</span></span></div>`;
+      }
+      if (ins.contributor && Number.isFinite(ins.contributor.contribBase)) {
+        const c = ins.contributor.contribBase;
+        rows += `<div class="perf-ind">${_DSH_ICON_CONTRIB}<span class="perf-ind-label">${t('insContributor')}</span><span class="perf-ind-value">${ins.contributor.name} <span class="${c >= 0 ? 'pos' : 'neg'}">${c >= 0 ? '+' : ''}${_dshMoneyCompact(c)}</span></span></div>`;
+      }
+    }
+    const insightsHtml = rows ? `<div class="perf-indicators">${rows}</div>` : '';
 
     infoHtml = `
-      <div class="perf-eyebrow">${t('evolution')}</div>
       <div class="perf-hero">
-        <div class="perf-hero-money ${tone}"${primaryTitle}>${primaryText}</div>
-        <div class="perf-hero-pct ${tone}">${secondaryText}</div>
+        <div class="perf-hero-money ${tone}">${moneyText}</div>
+        <div class="perf-hero-pct ${tone}"${secTitle}>${pctFmt.text}</div>
       </div>
       <div class="perf-context">${ctxLine}</div>
-      <div class="perf-indicators">
-        <div class="perf-ind">${_DSH_ICON_MAX}<span class="perf-ind-label">${t('indMaxWealth')}</span><span class="perf-ind-value">${maxVal}</span></div>
-        <div class="perf-ind">${_DSH_ICON_CONS}<span class="perf-ind-label">${t('perfConsistency')}</span><span class="perf-ind-value">${consVal}</span></div>
-        <div class="perf-ind">${_DSH_ICON_RANGE}<span class="perf-ind-label">${t('indRange')}</span><span class="perf-ind-value">${rangeVal}</span></div>
-      </div>`;
+      ${insightsHtml}`;
   }
 
   root.innerHTML = `<div class="perf-info">${infoHtml}</div><div class="perf-compo">${_dshBuildCompoHtml()}</div>`;
 
+  // Count-up the hero money (always the primary number).
   if (snap) {
-    const el  = root.querySelector('.perf-hero-money');
-    const val = mode === 'curr'
-      ? (Number.isFinite(snap.deltaAbs) ? snap.deltaAbs : 0)
-      : (Number.isFinite(snap.deltaPct) ? snap.deltaPct : 0);
-    const fmt    = mode === 'curr' ? _dshFmtMoney0 : (v => _dshFmtPct(v).text);
-    const capped = mode === 'pct' && _dshFmtPct(val).capped;
+    const el = root.querySelector('.perf-hero-money');
+    const val = Number.isFinite(snap.deltaAbs) ? snap.deltaAbs : 0;
     if (el) {
-      if (doCountUp && _dshLastPrimary && _dshLastPrimary.mode === mode &&
-          Number.isFinite(_dshLastPrimary.value) && _dshLastPrimary.value !== val &&
-          !capped && !_dshReducedMotion()) {
-        _dshCountUp(el, _dshLastPrimary.value, val, fmt);
+      if (doCountUp && _dshLastPrimary !== null && _dshLastPrimary !== val && !_dshReducedMotion()) {
+        _dshCountUp(el, _dshLastPrimary, val, _dshFmtMoney0);
       } else {
-        el.textContent = fmt(val);
+        el.textContent = _dshFmtMoney0(val);
       }
     }
-    _dshLastPrimary = { mode, value: val };
+    _dshLastPrimary = val;
   } else {
     _dshLastPrimary = null;
   }
