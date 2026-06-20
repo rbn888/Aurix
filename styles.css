@@ -21608,46 +21608,49 @@ body.gs-open { overflow: hidden; }
   }
   .perf-snapshot.perf-fading { opacity: 0; transition: opacity .12s var(--ease-out); }
 
-  /* ── left 70%: dominant money → % → 2x2 insight blocks ── */
+  /* ── left 70%: highlight value → % → 2x2 insight blocks ── */
   .perf-info {
     flex: 0 0 68%;
     min-width: 0;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 22px;
+    gap: 18px;
   }
-  .perf-hero { display: flex; flex-direction: column; gap: 2px; }
+  /* Highlight (not hero) number — reduced so it never competes with the left
+     "Valor total" figure (clamp 28–42px). Active unit leads; glow kept. */
+  .perf-hero { display: flex; flex-direction: column; gap: 1px; }
   .perf-hero-money {
-    font-size: 56px; font-weight: 800; line-height: 1.02;
-    letter-spacing: -.03em; font-variant-numeric: tabular-nums;
+    font-size: 38px; font-weight: 800; line-height: 1.05;
+    letter-spacing: -.025em; font-variant-numeric: tabular-nums;
     color: var(--text-bright);
   }
-  .perf-hero-money.up   { color: var(--green); text-shadow: 0 0 24px rgba(63,191,127,.24); }
-  .perf-hero-money.down { color: var(--red);   text-shadow: 0 0 24px rgba(224,90,90,.22); }
+  .perf-hero-money.up   { color: var(--green); text-shadow: 0 0 18px rgba(63,191,127,.22); }
+  .perf-hero-money.down { color: var(--red);   text-shadow: 0 0 18px rgba(224,90,90,.20); }
   .perf-hero-pct {
-    font-size: 17px; font-weight: 700; line-height: 1.2;
+    font-size: 15px; font-weight: 600; line-height: 1.2;
     letter-spacing: -.01em; font-variant-numeric: tabular-nums;
     color: var(--text-muted);
   }
 
-  /* 2x2 premium insight blocks — integrated cards (no boxes/borders), pure
-     hierarchy + air. Title → name → value. Executive briefing, not a table. */
+  /* 2x2 premium insight blocks — integrated (no boxes/borders), pure hierarchy.
+     The ASSET is the protagonist: NAME → description → value. */
   .perf-insights-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    row-gap: 18px; column-gap: 26px;
+    row-gap: 14px; column-gap: 22px;
   }
-  .perf-block { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-  .perf-block-title {
-    font-size: 9.5px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase;
-    color: var(--text-dim);
-  }
+  .perf-block { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
   .perf-block-name {
-    font-size: 15px; font-weight: 700; color: var(--text-bright);
-    letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-size: 14px; font-weight: 700; color: var(--text-bright);
+    letter-spacing: .2px; text-transform: uppercase;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .perf-block-sub { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .perf-block-desc {
+    font-size: 10px; font-weight: 500; color: var(--text-dim);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .perf-block-sub { margin-top: 2px; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
   .perf-block-sub.pos { color: var(--green); }
   .perf-block-sub.neg { color: var(--red); }
   .perf-block-sub.perf-block-neutral { color: var(--text-muted); }
@@ -21665,7 +21668,7 @@ body.gs-open { overflow: hidden; }
     font-size: 9.5px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
     color: var(--text-dim);
   }
-  .perf-donut { position: relative; width: 78px; height: 78px; flex-shrink: 0; }
+  .perf-donut { position: relative; width: 70px; height: 70px; flex-shrink: 0; }
   .perf-donut-svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); }
   .perf-donut-seg { transition: opacity .2s ease; }
   .perf-donut-center {
@@ -21673,14 +21676,14 @@ body.gs-open { overflow: hidden; }
     display: flex; flex-direction: column;
     align-items: center; justify-content: center; pointer-events: none;
   }
-  .perf-donut-center-val { font-size: 16px; font-weight: 800; color: var(--text-bright); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-  .perf-donut-center-sub { margin-top: 1px; font-size: 7.5px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--text-dim); }
+  .perf-donut-center-val { font-size: 15px; font-weight: 800; color: var(--text-bright); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .perf-donut-center-sub { margin-top: 1px; font-size: 7px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--text-dim); }
   .perf-donut-legend { width: 100%; display: flex; flex-direction: column; gap: 4px; }
-  .perf-legend-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 10px; }
+  .perf-legend-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 9px; }
   .perf-legend-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
-  .perf-legend-dot { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
+  .perf-legend-dot { width: 6px; height: 6px; border-radius: 2px; flex-shrink: 0; }
   .perf-legend-label { color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .perf-legend-pct { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .perf-legend-pct { color: var(--text-muted); font-weight: 600; font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
   .perf-empty {
     flex: 1; display: flex; align-items: center; justify-content: center;
@@ -21703,15 +21706,15 @@ body.gs-open { overflow: hidden; }
   .perf-skel-sub  { width: 30%; height: 16px; margin-bottom: 12px; }
   .perf-metrics-skel { display: flex; flex-direction: column; gap: 10px; }
   .perf-skel-cell { height: 20px; border-radius: 6px; }
-  .perf-skel-donut { width: 78px; height: 78px; border-radius: 50%; align-self: center; margin: auto; }
+  .perf-skel-donut { width: 70px; height: 70px; border-radius: 50%; align-self: center; margin: auto; }
 }
 
 /* tablet (≥769 ≤1024): scale the hero number down so nothing crowds */
 @media (min-width: 769px) and (max-width: 1024px) {
-  .perf-info { flex-basis: 60%; }
-  .perf-hero-money { font-size: 40px; }
-  .perf-hero-pct   { font-size: 18px; }
-  .perf-donut { width: 72px; height: 72px; }
+  .perf-info { flex-basis: 62%; }
+  .perf-hero-money { font-size: 32px; }
+  .perf-hero-pct   { font-size: 14px; }
+  .perf-donut { width: 64px; height: 64px; }
 }
 
 @keyframes perfShimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }

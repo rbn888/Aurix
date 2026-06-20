@@ -1121,6 +1121,7 @@ const T = {
     insBest:         'Mejor activo',
     insWorst:        'Mayor retroceso',
     insPosition:     'Mayor posición',
+    insExposure:     'Mayor exposición',
     insContributor:  'Mayor contribuidor',
     ctxStable:       'Patrimonio prácticamente estable',
     ctxUpLight:      'Ligero avance',
@@ -3134,6 +3135,7 @@ const T = {
     insBest:         'Top mover',
     insWorst:        'Largest drop',
     insPosition:     'Largest position',
+    insExposure:     'Top exposure',
     insContributor:  'Top contributor',
     ctxStable:       'Wealth essentially flat',
     ctxUpLight:      'Slight gain',
@@ -16464,34 +16466,39 @@ function _dshComputePerfSnapshot(range) {
   };
 }
 
-// Live portfolio signals (real, current — answer "what's leading / hurting /
-// where am I concentrated"). The only honest per-asset signal is the live 24h
-// change + current values, so movers/contributor are 24h-based (not range-bound)
-// and any row without real data is simply omitted. Mayor posición uses the
-// current snapshot over TOTAL wealth (inmuebles included — that's why it can
-// surface here even though the donut is investable-only). No invention.
+// Live portfolio signals (real, current). Movers/contributor use the live 24h
+// change + current values (only honest per-asset signal), real estate excluded
+// entirely. Mayor exposición = dominant investable class. Any block without real
+// data is omitted. No invention.
 function _dshComputeInsights() {
   if (!Array.isArray(assets) || !assets.length) return null;
-  const totUSD = (typeof totalValueUSD === 'function') ? totalValueUSD() : 0;
 
-  const rows = assets.map(a => {
-    const valUSD = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : 0;
-    const ch = (typeof a.change24h === 'number' && isFinite(a.change24h)) ? a.change24h : null;
-    return {
-      name: a.name || normalizeSymbol(a.ticker || a.symbol || '') || '—',
-      ch, valUSD,
-      contribBase: ch != null ? toBase((ch / 100) * valUSD, 'USD') : null,
-    };
-  }).filter(r => r.valUSD > 0);
-  if (!rows.length) return null;
+  // Movers/contributor consider only NON-real-estate assets carrying a live 24h
+  // change (real estate has none → naturally excluded; we never reference it).
+  const rows = assets
+    .filter(a => isInvestableAsset(a))
+    .map(a => {
+      const valUSD = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : 0;
+      const ch = (typeof a.change24h === 'number' && isFinite(a.change24h)) ? a.change24h : null;
+      return {
+        name: a.name || normalizeSymbol(a.ticker || a.symbol || '') || '—',
+        ch, valUSD,
+        contribBase: ch != null ? toBase((ch / 100) * valUSD, 'USD') : null,
+      };
+    })
+    .filter(r => r.valUSD > 0);
 
-  // Largest position over total wealth — always real (current snapshot).
-  let top = rows[0];
-  rows.forEach(r => { if (r.valUSD > top.valUSD) top = r; });
-  const position = totUSD > 0 ? { name: top.name, pct: (top.valUSD / totUSD) * 100 } : null;
+  // Mayor exposición — dominant INVESTABLE class (real estate excluded), share
+  // of investable wealth. Investment context, not inventory.
+  let exposure = null;
+  const inv = (typeof getInvestableDistribution === 'function') ? getInvestableDistribution() : null;
+  if (inv && inv.length) {
+    const m = TYPE_META[inv[0].type] || TYPE_META.other;
+    exposure = { name: (m.donutLabel || m.label), pct: inv[0].pct };
+  }
 
-  // 24h movers + top contributor — only from assets that actually carry a live
-  // 24h change; if none do, these rows are omitted (never faked).
+  // 24h movers + top contributor — only from assets that carry a live 24h
+  // change; if none do, those blocks are omitted (never faked).
   const withCh = rows.filter(r => r.ch != null);
   let best = null, worst = null, contributor = null;
   if (withCh.length) {
@@ -16502,7 +16509,8 @@ function _dshComputeInsights() {
       if (r.contribBase > contributor.contribBase) contributor = r;
     });
   }
-  return { position, best, worst, contributor };
+  if (!exposure && !best) return null;
+  return { exposure, best, worst, contributor };
 }
 
 // Right-side context: INVESTABLE composition only (real estate excluded — it
@@ -16515,12 +16523,12 @@ function _dshBuildCompoHtml() {
 
   if (!dist || !dist.length) {
     return `<div class="perf-donut perf-donut--empty">
-        <svg class="perf-donut-svg" viewBox="0 0 150 150" aria-hidden="true"><circle cx="75" cy="75" r="70" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="11"/></svg>
+        <svg class="perf-donut-svg" viewBox="0 0 150 150" aria-hidden="true"><circle cx="75" cy="75" r="71" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="9"/></svg>
         <div class="perf-donut-center"><div class="perf-donut-center-sub">${t('emptyDonutLabel')}</div></div>
       </div>`;
   }
 
-  const size = 150, sw = 11, r = (size - sw) / 2, c = size / 2, C = 2 * Math.PI * r;
+  const size = 150, sw = 9, r = (size - sw) / 2, c = size / 2, C = 2 * Math.PI * r;
   let acc = 0;
   const segs = dist.map(seg => {
     const frac = Math.max(0, seg.pct) / 100;
@@ -16573,50 +16581,63 @@ function _dshPaintPerfSnapshot(root, doCountUp) {
     const pct  = Number.isFinite(snap.deltaPct) ? snap.deltaPct : 0;
     const abs  = Number.isFinite(snap.deltaAbs) ? snap.deltaAbs : 0;
     const tone = pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat';
-    // Money ALWAYS leads, % always secondary (capped so it never blows up).
+    // The %/$ toggle drives the hierarchy: the active unit leads (large), the
+    // other sits below (small). % is capped so it never blows up the headline.
+    const mode      = activePerfMode === 'curr' ? 'curr' : 'pct';
     const moneyText = _dshFmtMoney0(abs);
     const pctFmt    = _dshFmtPct(pct);
-    const secTitle  = pctFmt.capped ? ` title="${pctFmt.raw}"` : '';
-    // Live insight blocks (title / name / value) — executive briefing, not a
-    // table. Only blocks backed by real data are emitted (no faking).
+    const primaryText   = mode === 'curr' ? moneyText  : pctFmt.text;
+    const secondaryText = mode === 'curr' ? pctFmt.text : moneyText;
+    const primaryTitle  = (mode === 'pct' && pctFmt.capped) ? ` title="${pctFmt.raw}"` : '';
+
+    // Insight blocks — the ASSET is the protagonist: NAME → description → value.
+    // Only blocks backed by real data are emitted (no faking, no real estate).
     const ins = _dshComputeInsights();
-    const block = (title, name, subHtml) =>
-      `<div class="perf-block"><span class="perf-block-title">${title}</span><span class="perf-block-name">${name}</span>${subHtml}</div>`;
+    const block = (name, desc, subHtml) =>
+      `<div class="perf-block"><span class="perf-block-name">${name}</span><span class="perf-block-desc">${desc}</span>${subHtml}</div>`;
     const pctSub = v => `<span class="perf-block-sub ${v >= 0 ? 'pos' : 'neg'}">${v >= 0 ? '+' : ''}${v.toFixed(2)}%</span>`;
     const blocks = [];
     if (ins) {
-      if (ins.best) blocks.push(block(t('insBest'), ins.best.name, pctSub(ins.best.ch)));
+      if (ins.best) blocks.push(block(ins.best.name, t('insBest'), pctSub(ins.best.ch)));
       if (ins.contributor && Number.isFinite(ins.contributor.contribBase)) {
         const c = ins.contributor.contribBase;
-        blocks.push(block(t('insContributor'), ins.contributor.name, `<span class="perf-block-sub ${c >= 0 ? 'pos' : 'neg'}">${c >= 0 ? '+' : ''}${_dshMoneyCompact(c)}</span>`));
+        blocks.push(block(ins.contributor.name, t('insContributor'), `<span class="perf-block-sub ${c >= 0 ? 'pos' : 'neg'}">${c >= 0 ? '+' : ''}${_dshMoneyCompact(c)}</span>`));
       }
-      if (ins.position) blocks.push(block(t('insPosition'), ins.position.name, `<span class="perf-block-sub perf-block-neutral">${ins.position.pct.toFixed(1)}%</span>`));
-      if (ins.worst) blocks.push(block(t('insWorst'), ins.worst.name, pctSub(ins.worst.ch)));
+      if (ins.exposure) blocks.push(block(ins.exposure.name, t('insExposure'), `<span class="perf-block-sub perf-block-neutral">${ins.exposure.pct.toFixed(1)}%</span>`));
+      if (ins.worst) blocks.push(block(ins.worst.name, t('insWorst'), pctSub(ins.worst.ch)));
     }
     const insightsHtml = blocks.length ? `<div class="perf-insights-grid">${blocks.join('')}</div>` : '';
 
     infoHtml = `
       <div class="perf-hero">
-        <div class="perf-hero-money ${tone}">${moneyText}</div>
-        <div class="perf-hero-pct ${tone}"${secTitle}>${pctFmt.text}</div>
+        <div class="perf-hero-money ${tone}"${primaryTitle}>${primaryText}</div>
+        <div class="perf-hero-pct ${tone}">${secondaryText}</div>
       </div>
       ${insightsHtml}`;
   }
 
   root.innerHTML = `<div class="perf-info">${infoHtml}</div><div class="perf-compo">${_dshBuildCompoHtml()}</div>`;
 
-  // Count-up the hero money (always the primary number).
+  // Count-up the primary number (active unit). Skip across a unit switch or a
+  // capped %, where counting is meaningless.
   if (snap) {
-    const el = root.querySelector('.perf-hero-money');
-    const val = Number.isFinite(snap.deltaAbs) ? snap.deltaAbs : 0;
+    const el   = root.querySelector('.perf-hero-money');
+    const mode = activePerfMode === 'curr' ? 'curr' : 'pct';
+    const val  = mode === 'curr'
+      ? (Number.isFinite(snap.deltaAbs) ? snap.deltaAbs : 0)
+      : (Number.isFinite(snap.deltaPct) ? snap.deltaPct : 0);
+    const fmt    = mode === 'curr' ? _dshFmtMoney0 : (v => _dshFmtPct(v).text);
+    const capped = mode === 'pct' && _dshFmtPct(val).capped;
     if (el) {
-      if (doCountUp && _dshLastPrimary !== null && _dshLastPrimary !== val && !_dshReducedMotion()) {
-        _dshCountUp(el, _dshLastPrimary, val, _dshFmtMoney0);
+      if (doCountUp && _dshLastPrimary && _dshLastPrimary.mode === mode &&
+          Number.isFinite(_dshLastPrimary.value) && _dshLastPrimary.value !== val &&
+          !capped && !_dshReducedMotion()) {
+        _dshCountUp(el, _dshLastPrimary.value, val, fmt);
       } else {
-        el.textContent = _dshFmtMoney0(val);
+        el.textContent = fmt(val);
       }
     }
-    _dshLastPrimary = val;
+    _dshLastPrimary = { mode, value: val };
   } else {
     _dshLastPrimary = null;
   }
