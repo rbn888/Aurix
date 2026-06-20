@@ -1119,7 +1119,7 @@ const T = {
     compoInvertible: 'Composición invertible',
     centerInvertible:'Inversión',
     insBest:         'Mejor activo',
-    insWorst:        'Peor activo',
+    insWorst:        'Mayor retroceso',
     insPosition:     'Mayor posición',
     insContributor:  'Mayor contribuidor',
     ctxStable:       'Patrimonio prácticamente estable',
@@ -3132,7 +3132,7 @@ const T = {
     compoInvertible: 'Liquid composition',
     centerInvertible:'Invested',
     insBest:         'Top mover',
-    insWorst:        'Worst mover',
+    insWorst:        'Largest drop',
     insPosition:     'Largest position',
     insContributor:  'Top contributor',
     ctxStable:       'Wealth essentially flat',
@@ -16515,12 +16515,12 @@ function _dshBuildCompoHtml() {
 
   if (!dist || !dist.length) {
     return `<div class="perf-donut perf-donut--empty">
-        <svg class="perf-donut-svg" viewBox="0 0 150 150" aria-hidden="true"><circle cx="75" cy="75" r="69" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="13"/></svg>
+        <svg class="perf-donut-svg" viewBox="0 0 150 150" aria-hidden="true"><circle cx="75" cy="75" r="70" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="11"/></svg>
         <div class="perf-donut-center"><div class="perf-donut-center-sub">${t('emptyDonutLabel')}</div></div>
       </div>`;
   }
 
-  const size = 150, sw = 13, r = (size - sw) / 2, c = size / 2, C = 2 * Math.PI * r;
+  const size = 150, sw = 11, r = (size - sw) / 2, c = size / 2, C = 2 * Math.PI * r;
   let acc = 0;
   const segs = dist.map(seg => {
     const frac = Math.max(0, seg.pct) / 100;
@@ -16577,36 +16577,29 @@ function _dshPaintPerfSnapshot(root, doCountUp) {
     const moneyText = _dshFmtMoney0(abs);
     const pctFmt    = _dshFmtPct(pct);
     const secTitle  = pctFmt.capped ? ` title="${pctFmt.raw}"` : '';
-    const ctxLine   = _dshContextLine(snap, activeRange);
-
-    // Live insight rows — only those backed by real data are emitted.
+    // Live insight blocks (title / name / value) — executive briefing, not a
+    // table. Only blocks backed by real data are emitted (no faking).
     const ins = _dshComputeInsights();
-    let rows = '';
+    const block = (title, name, subHtml) =>
+      `<div class="perf-block"><span class="perf-block-title">${title}</span><span class="perf-block-name">${name}</span>${subHtml}</div>`;
+    const pctSub = v => `<span class="perf-block-sub ${v >= 0 ? 'pos' : 'neg'}">${v >= 0 ? '+' : ''}${v.toFixed(2)}%</span>`;
+    const blocks = [];
     if (ins) {
-      if (ins.best) {
-        const v = ins.best.ch;
-        rows += `<div class="perf-ind">${_DSH_ICON_BEST}<span class="perf-ind-label">${t('insBest')}</span><span class="perf-ind-value">${ins.best.name} <span class="${v >= 0 ? 'pos' : 'neg'}">${v >= 0 ? '+' : ''}${v.toFixed(2)}%</span></span></div>`;
-      }
-      if (ins.worst) {
-        const v = ins.worst.ch;
-        rows += `<div class="perf-ind">${_DSH_ICON_WORST}<span class="perf-ind-label">${t('insWorst')}</span><span class="perf-ind-value">${ins.worst.name} <span class="${v >= 0 ? 'pos' : 'neg'}">${v >= 0 ? '+' : ''}${v.toFixed(2)}%</span></span></div>`;
-      }
-      if (ins.position) {
-        rows += `<div class="perf-ind">${_DSH_ICON_POS}<span class="perf-ind-label">${t('insPosition')}</span><span class="perf-ind-value">${ins.position.name} <span class="perf-ind-sub">${ins.position.pct.toFixed(1)}%</span></span></div>`;
-      }
+      if (ins.best) blocks.push(block(t('insBest'), ins.best.name, pctSub(ins.best.ch)));
       if (ins.contributor && Number.isFinite(ins.contributor.contribBase)) {
         const c = ins.contributor.contribBase;
-        rows += `<div class="perf-ind">${_DSH_ICON_CONTRIB}<span class="perf-ind-label">${t('insContributor')}</span><span class="perf-ind-value">${ins.contributor.name} <span class="${c >= 0 ? 'pos' : 'neg'}">${c >= 0 ? '+' : ''}${_dshMoneyCompact(c)}</span></span></div>`;
+        blocks.push(block(t('insContributor'), ins.contributor.name, `<span class="perf-block-sub ${c >= 0 ? 'pos' : 'neg'}">${c >= 0 ? '+' : ''}${_dshMoneyCompact(c)}</span>`));
       }
+      if (ins.position) blocks.push(block(t('insPosition'), ins.position.name, `<span class="perf-block-sub perf-block-neutral">${ins.position.pct.toFixed(1)}%</span>`));
+      if (ins.worst) blocks.push(block(t('insWorst'), ins.worst.name, pctSub(ins.worst.ch)));
     }
-    const insightsHtml = rows ? `<div class="perf-indicators">${rows}</div>` : '';
+    const insightsHtml = blocks.length ? `<div class="perf-insights-grid">${blocks.join('')}</div>` : '';
 
     infoHtml = `
       <div class="perf-hero">
         <div class="perf-hero-money ${tone}">${moneyText}</div>
         <div class="perf-hero-pct ${tone}"${secTitle}>${pctFmt.text}</div>
       </div>
-      <div class="perf-context">${ctxLine}</div>
       ${insightsHtml}`;
   }
 
