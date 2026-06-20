@@ -56,7 +56,7 @@
     // serve a half-cached app. Same user + same account must render the
     // same code on Safari mobile, the iOS home-screen PWA, and desktop.
     (function() {
-      window.AURIX_BUILD = 'v280-market-mkf9a-v2';
+      window.AURIX_BUILD = 'v281-dsh07-perf-snapshot';
       try {
         var KEY     = 'aurix_build';
         var RELOAD  = 'aurix_build_reload';
@@ -114,7 +114,7 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=277">
+  <link rel="stylesheet" href="styles.css?v=278">
 </head>
 <body style="background:#070a14">
 
@@ -266,7 +266,7 @@
         <div class="hero-right">
           <div class="chart-header">
             <div>
-              <div class="chart-title card-title" data-i18n="evolution">Evolución del patrimonio</div>
+              <div class="chart-title card-title" data-i18n="perfSnapshotTitle">Resumen de rendimiento</div>
               <span class="chart-change" id="chartChange"></span>
               <span class="chart-baseline-note" id="chartBaselineNote" hidden></span>
             </div>
@@ -303,6 +303,28 @@
             <div class="chart-tooltip" id="chartTooltip">
               <div class="chart-tooltip-time"></div>
               <div class="chart-tooltip-val"></div>
+            </div>
+          </div>
+
+          <!-- DSH.07 — PERFORMANCE SNAPSHOT (desktop ≥769 only). Replaces the
+               legacy evolution chart's VISUAL surface. The .chart-wrap above is
+               kept in the DOM (canvas drives mobile V2 sync + boot gate) but is
+               hidden on desktop via CSS; this module is the visible content.
+               Filled by _dshRenderPerfSnapshot(); starts as an elegant skeleton
+               so the area is never an empty rectangle while data loads. -->
+          <div class="perf-snapshot" id="perfSnapshot">
+            <div class="perf-info">
+              <div class="perf-skel perf-skel-head"></div>
+              <div class="perf-skel perf-skel-sub"></div>
+              <div class="perf-metrics-skel">
+                <div class="perf-skel perf-skel-cell"></div>
+                <div class="perf-skel perf-skel-cell"></div>
+                <div class="perf-skel perf-skel-cell"></div>
+                <div class="perf-skel perf-skel-cell"></div>
+              </div>
+            </div>
+            <div class="perf-compo">
+              <div class="perf-skel perf-skel-donut"></div>
             </div>
           </div>
         </div>
@@ -1250,7 +1272,7 @@
   <script defer src="services/portfolio-price-layer.js?v=2"></script>
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
-  <script src="app.js?v=290"></script>
+  <script src="app.js?v=291"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
        Loads after app.js so it can read its primitives. No consumers yet. -->
   <script src="services/wealth-engine.js?v=2"></script>

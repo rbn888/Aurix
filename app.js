@@ -1097,6 +1097,13 @@ const T = {
     // Sections
     distribution:    'Distribución del patrimonio',
     evolution:       'Evolución del patrimonio',
+    perfSnapshotTitle: 'Resumen de rendimiento',
+    perfMax:         'Máximo',
+    perfMin:         'Mínimo',
+    perfRange:       'Amplitud',
+    perfDays:        'Días +/−',
+    perfTramos:      'Tramos +/−',
+    perfEmpty:       'Necesitamos más histórico para mostrar este periodo.',
     myAssets:        'Mis activos',
     chartNoData:     'Añade activos para ver la evolución',
     donutTotal:      'total',
@@ -3073,6 +3080,13 @@ const T = {
     // Sections
     distribution:    'Portfolio distribution',
     evolution:       'Portfolio evolution',
+    perfSnapshotTitle: 'Performance snapshot',
+    perfMax:         'High',
+    perfMin:         'Low',
+    perfRange:       'Range',
+    perfDays:        'Days +/−',
+    perfTramos:      'Moves +/−',
+    perfEmpty:       'Not enough history to show this period yet.',
     myAssets:        'My assets',
     chartNoData:     'Add assets to see the evolution',
     donutTotal:      'total',
@@ -16156,6 +16170,7 @@ function updateDonut() {
       donutChartMobile.update('none');
     }
     updateCategoryCards();
+    try { _dshRenderPerfSnapshot(); } catch (_) {}
     return;
   }
 
@@ -16225,6 +16240,156 @@ function updateDonut() {
   // Sync donut visual state and rebuild category cards
   _applyDonutState();
   updateCategoryCards();
+  // DSH.07 — keep the desktop Performance Snapshot in step with every data
+  // refresh / holdings change (donut composition + period metrics).
+  try { _dshRenderPerfSnapshot(); } catch (_) {}
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// DSH.07 — PERFORMANCE SNAPSHOT (desktop ≥769 only)
+// Institutional performance module that replaces the legacy evolution chart's
+// visual surface inside .hero-right. Driven 100% by REAL data:
+//   • period stats  → getChartData(range) over portfolioHistory (total wealth)
+//   • composition   → getDistribution() (current snapshot, incl. real estate)
+// No per-asset estimates, no fabricated points. When a range lacks enough real
+// history it shows an honest empty state — never a placeholder or guessed value.
+// Mobile is untouched: the whole .hero-right is display:none ≤768 and the mobile
+// slider keeps its own chart.
+// ════════════════════════════════════════════════════════════════════════
+
+// Pure: derive period stats from the SAME validated series the chart consumes.
+// Returns null when there are < 2 real points for the active range, so the
+// caller renders an honest empty state instead of inventing numbers.
+function _dshComputePerfSnapshot(range) {
+  let d;
+  try { d = getChartData(range); } catch (_) { return null; }
+  if (!d || !Array.isArray(d.values)) return null;
+
+  const vals = [], ts = [];
+  for (let i = 0; i < d.values.length; i++) {
+    const v = d.values[i];
+    if (Number.isFinite(v) && v > 0) { vals.push(v); ts.push(d.timestamps[i]); }
+  }
+  if (vals.length < 2) return null;
+
+  const first = Number.isFinite(d.firstValue) ? d.firstValue : vals[0];
+  const last  = Number.isFinite(d.lastValue)  ? d.lastValue  : vals[vals.length - 1];
+  const max   = Math.max(...vals);
+  const min   = Math.min(...vals);
+  const deltaAbs     = last - first;
+  const deltaPct     = first > 0 ? (deltaAbs / first) * 100 : null;
+  const amplitudeAbs = max - min;
+  const amplitudePct = min > 0 ? (amplitudeAbs / min) * 100 : null;
+
+  // Positive vs negative periods. For multi-day ranges collapse to one close
+  // per calendar day (true "días"); for 24h compare the intraday samples.
+  let series = vals, dayBased = false;
+  if (range !== '24h') {
+    const byDay = new Map();
+    for (let i = 0; i < ts.length; i++) {
+      const dt = new Date(ts[i]);
+      byDay.set(`${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`, vals[i]);
+    }
+    if (byDay.size >= 2) { series = [...byDay.values()]; dayBased = true; }
+  }
+  let up = 0, down = 0;
+  for (let i = 1; i < series.length; i++) {
+    if (series[i] > series[i - 1]) up++;
+    else if (series[i] < series[i - 1]) down++;
+  }
+
+  return { first, last, max, min, deltaAbs, deltaPct, amplitudeAbs, amplitudePct, up, down, dayBased };
+}
+
+// Composition donut (SVG) — current snapshot over TOTAL wealth (real estate
+// included, per spec). Percentages only; monetary amounts live in the cards.
+function _dshBuildCompoHtml() {
+  const dist = (typeof getDistribution === 'function') ? getDistribution() : null;
+  if (!dist || !dist.length) {
+    return `<div class="perf-donut perf-donut--empty">
+        <svg class="perf-donut-svg" viewBox="0 0 150 150" aria-hidden="true"><circle cx="75" cy="75" r="66" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="18"/></svg>
+        <div class="perf-donut-center"><div class="perf-donut-center-sub">${t('emptyDonutLabel')}</div></div>
+      </div>`;
+  }
+
+  const size = 150, sw = 18, r = (size - sw) / 2, c = size / 2, C = 2 * Math.PI * r;
+  let acc = 0;
+  const segs = dist.map(seg => {
+    const frac = Math.max(0, seg.pct) / 100;
+    const len  = frac * C;
+    const col  = (TYPE_META[seg.type] || TYPE_META.other).color;
+    const html = `<circle class="perf-donut-seg" cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-acc * C).toFixed(2)}"/>`;
+    acc += frac;
+    return html;
+  }).join('');
+
+  const top    = dist[0];
+  const topM   = TYPE_META[top.type] || TYPE_META.other;
+  const legend = dist.map(seg => {
+    const m = TYPE_META[seg.type] || TYPE_META.other;
+    return `<div class="perf-legend-item"><span class="perf-legend-left"><span class="perf-legend-dot" style="background:${m.color}"></span><span class="perf-legend-label">${m.label}</span></span><span class="perf-legend-pct">${seg.pct.toFixed(1)}%</span></div>`;
+  }).join('');
+
+  return `
+    <div class="perf-donut">
+      <svg class="perf-donut-svg" viewBox="0 0 ${size} ${size}" aria-hidden="true"><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="${sw}"/>${segs}</svg>
+      <div class="perf-donut-center"><div class="perf-donut-center-val">${top.pct.toFixed(1)}%</div><div class="perf-donut-center-sub">${topM.label}</div></div>
+    </div>
+    <div class="perf-donut-legend">${legend}</div>`;
+}
+
+// Render the whole module for the active range + unit. Cheap; safe to call on
+// every data refresh and on every range/unit toggle. No-op off the dashboard.
+function _dshRenderPerfSnapshot() {
+  const root = document.getElementById('perfSnapshot');
+  if (!root) return;
+
+  const snap    = _dshComputePerfSnapshot(activeRange);
+  const curMode = activePerfMode === 'curr';
+
+  let infoHtml;
+  if (!snap) {
+    infoHtml = `<div class="perf-empty">${t('perfEmpty')}</div>`;
+  } else {
+    const pct  = Number.isFinite(snap.deltaPct) ? snap.deltaPct : 0;
+    const abs  = Number.isFinite(snap.deltaAbs) ? snap.deltaAbs : 0;
+    const tone = pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat';
+    const pctStr = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+    const absStr = `${abs >= 0 ? '+' : ''}${formatBase(abs)}`;
+    const primary   = curMode ? absStr : pctStr;
+    const secondary = curMode ? pctStr : absStr;
+
+    const ampStr = curMode
+      ? formatBase(snap.amplitudeAbs)
+      : (Number.isFinite(snap.amplitudePct) ? `${snap.amplitudePct.toFixed(2)}%` : '—');
+    const daysLabel = activeRange === '24h' ? t('perfTramos') : t('perfDays');
+
+    infoHtml = `
+      <div class="perf-headline">
+        <div class="perf-headline-primary ${tone}">${primary}</div>
+        <div class="perf-headline-secondary">${secondary}</div>
+      </div>
+      <div class="perf-metrics">
+        <div class="perf-metric">
+          <span class="perf-metric-label">${t('perfMax')}</span>
+          <span class="perf-metric-value">${formatBase(snap.max)}</span>
+        </div>
+        <div class="perf-metric">
+          <span class="perf-metric-label">${t('perfMin')}</span>
+          <span class="perf-metric-value">${formatBase(snap.min)}</span>
+        </div>
+        <div class="perf-metric">
+          <span class="perf-metric-label">${t('perfRange')}</span>
+          <span class="perf-metric-value">${ampStr}</span>
+        </div>
+        <div class="perf-metric">
+          <span class="perf-metric-label">${daysLabel}</span>
+          <span class="perf-metric-value perf-days"><span class="pos">${snap.up}&#8593;</span><span class="perf-days-sep">·</span><span class="neg">${snap.down}&#8595;</span></span>
+        </div>
+      </div>`;
+  }
+
+  root.innerHTML = `<div class="perf-info">${infoHtml}</div><div class="perf-compo">${_dshBuildCompoHtml()}</div>`;
 }
 
 // ── Chart ──────────────────────────────────────────────────
@@ -19832,6 +19997,7 @@ document.querySelectorAll('.range-btn').forEach(btn => {
     activeRange = btn.dataset.range;
     updateChart(true);
     updatePerformance();
+    try { _dshRenderPerfSnapshot(); } catch (_) {}   // DSH.07: re-derive period metrics
   });
 });
 
@@ -19841,6 +20007,7 @@ document.querySelectorAll('.perf-btn').forEach(btn => {
     btn.classList.add('active');
     activePerfMode = btn.dataset.perf;
     updateChart();
+    try { _dshRenderPerfSnapshot(); } catch (_) {}   // DSH.07: switch %/€ unit
   });
 });
 

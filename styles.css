@@ -21578,3 +21578,196 @@ body.gs-open { overflow: hidden; }
      right-aligned in its track → clear air between the 24H % and the chart. */
   #marketList.is-v3 .col-chart svg { width: 32px; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   DSH.07 — PERFORMANCE SNAPSHOT (desktop ≥769 only)
+   Replaces the legacy "Evolución del patrimonio" chart's VISUAL surface inside
+   .hero-right with an institutional performance module: 63% period info / 37%
+   composition donut. The chart machinery (.chart-wrap canvas, V2 host) stays in
+   the DOM for mobile-sync + boot safety but is hidden on desktop. Mobile is
+   untouched (.hero-right is display:none ≤768; the slider keeps its own chart).
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* hidden by default — only revealed on desktop (mobile never shows this) */
+.perf-snapshot { display: none; }
+
+@media (min-width: 769px) {
+  /* erase every visual trace of the old chart inside the hero card */
+  .hero-right .chart-wrap          { display: none !important; }
+  .hero-right .chart-change,
+  .hero-right .chart-baseline-note { display: none !important; }
+  /* the standalone distribution donut is now redundant — composition lives
+     inside this module. (Its watchlist child is already display:none.) */
+  #distributionSection             { display: none !important; }
+
+  .perf-snapshot {
+    display: flex;
+    gap: var(--space-5);
+    align-items: stretch;
+    min-height: 196px;
+  }
+
+  /* ── left 63%: headline + metric grid ── */
+  .perf-info {
+    flex: 0 0 61%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--space-4);
+    animation: perfFadeIn .22s var(--ease-out) both;
+  }
+
+  .perf-headline { display: flex; flex-direction: column; gap: 4px; }
+  .perf-headline-primary {
+    font-size: 54px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -.03em;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-bright);
+    transition: color .2s ease;
+  }
+  .perf-headline-primary.up   { color: var(--green); }
+  .perf-headline-primary.down { color: var(--red); }
+  .perf-headline-primary.flat { color: var(--text-muted); }
+  .perf-headline-secondary {
+    font-size: 17px;
+    font-weight: 600;
+    opacity: .7;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.01em;
+  }
+
+  /* metric grid — hairline dividers via 1px gap over a subtle border fill */
+  .perf-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border-subtle);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  .perf-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 14px;
+    background: var(--surface-1);
+  }
+  .perf-metric-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .perf-metric-value {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -.01em;
+    color: var(--text-bright);
+    font-variant-numeric: tabular-nums;
+  }
+  .perf-days .pos { color: var(--green); }
+  .perf-days .neg { color: var(--red); }
+  .perf-days-sep  { color: var(--text-dim); margin: 0 7px; }
+
+  /* ── right 37%: composition donut + legend ── */
+  .perf-compo {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    padding-left: var(--space-5);
+    border-left: 1px solid var(--border-subtle);
+    animation: perfFadeIn .22s var(--ease-out) both;
+  }
+  /* Deliberately subordinate to the headline metric — the donut is a quiet
+     reference ring, never a second protagonist (founder: must not compete). */
+  .perf-donut { position: relative; width: 132px; height: 132px; flex-shrink: 0; }
+  .perf-donut-svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); }
+  .perf-donut-seg { transition: opacity .2s ease; }
+  .perf-donut-center {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .perf-donut-center-val {
+    font-size: 17px; font-weight: 800;
+    color: var(--text-bright);
+    letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .perf-donut-center-sub {
+    margin-top: 2px;
+    font-size: 9px; font-weight: 700;
+    letter-spacing: .6px; text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .perf-donut-legend {
+    width: 100%;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .perf-legend-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    font-size: 11px;
+  }
+  .perf-legend-left { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .perf-legend-dot  { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+  .perf-legend-label {
+    color: var(--text-muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .perf-legend-pct {
+    color: var(--text); font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+
+  /* honest empty state — shown when a range lacks enough real history */
+  .perf-empty {
+    flex: 1;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px; line-height: 1.5;
+    padding: 20px;
+  }
+
+  /* ── loading skeleton (never an empty rectangle, never fake copy) ── */
+  .perf-skel {
+    background: linear-gradient(90deg,
+      rgba(255,255,255,.04) 25%, rgba(255,255,255,.08) 37%, rgba(255,255,255,.04) 63%);
+    background-size: 400% 100%;
+    animation: perfShimmer 1.4s ease infinite;
+    border-radius: 6px;
+  }
+  .perf-skel-head  { width: 46%; height: 48px; margin-bottom: 4px; }
+  .perf-skel-sub   { width: 30%; height: 16px; margin-bottom: 8px; }
+  .perf-metrics-skel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .perf-skel-cell  { height: 52px; border-radius: var(--radius-sm); }
+  .perf-skel-donut {
+    width: 132px; height: 132px; border-radius: 50%;
+    align-self: center; margin: auto;
+  }
+}
+
+@keyframes perfFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes perfShimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .perf-info, .perf-compo { animation: none; }
+  .perf-skel { animation: none; }
+}
