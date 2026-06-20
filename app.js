@@ -1111,6 +1111,25 @@ const T = {
     volLow:          'Baja',
     volMed:          'Media',
     volHigh:         'Alta',
+    indMaxWealth:    'Patrimonio máximo',
+    indRange:        'Rango del periodo',
+    rangeLow:        'Bajo',
+    rangeMed:        'Medio',
+    rangeHigh:       'Alto',
+    compoInvertible: 'Composición invertible',
+    centerInvertible:'Invertible',
+    ctxStable:       'Patrimonio prácticamente estable',
+    ctxUpLight:      'Ligero avance',
+    ctxUpSolid:      'Avance sólido',
+    ctxUpStrong:     'Fuerte avance',
+    ctxDownLight:    'Ligero retroceso',
+    ctxDownMod:      'Retroceso moderado',
+    ctxDownStrong:   'Fuerte retroceso',
+    ctxIn24h:        'en 24H',
+    ctxIn7d:         'en 7D',
+    ctxIn30d:        'en 30D',
+    ctxIn1y:         'en el último año',
+    ctxInAll:        'desde el inicio',
     myAssets:        'Mis activos',
     chartNoData:     'Añade activos para ver la evolución',
     donutTotal:      'total',
@@ -3101,6 +3120,25 @@ const T = {
     volLow:          'Low',
     volMed:          'Medium',
     volHigh:         'High',
+    indMaxWealth:    'Peak wealth',
+    indRange:        'Period range',
+    rangeLow:        'Low',
+    rangeMed:        'Medium',
+    rangeHigh:       'High',
+    compoInvertible: 'Liquid composition',
+    centerInvertible:'Liquid',
+    ctxStable:       'Wealth essentially flat',
+    ctxUpLight:      'Slight gain',
+    ctxUpSolid:      'Solid gain',
+    ctxUpStrong:     'Strong gain',
+    ctxDownLight:    'Slight pullback',
+    ctxDownMod:      'Moderate pullback',
+    ctxDownStrong:   'Strong decline',
+    ctxIn24h:        'in 24H',
+    ctxIn7d:         'in 7D',
+    ctxIn30d:        'in 30D',
+    ctxIn1y:         'over the past year',
+    ctxInAll:        'since inception',
     myAssets:        'My assets',
     chartNoData:     'Add assets to see the evolution',
     donutTotal:      'total',
@@ -16260,22 +16298,30 @@ function updateDonut() {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// DSH.08 — PERFORMANCE SNAPSHOT V2 · Premium Wealth Command Center (desktop ≥769)
-// Replaces the legacy evolution chart's visual surface inside .hero-right with a
-// wealth command center: money is the protagonist (big, glow), % secondary, the
-// technical stats become premium widgets, the donut is a small context ring.
+// DSH.09 — PERFORMANCE SNAPSHOT V3 · Wealth Management Standard (desktop ≥769)
+// Executive wealth-performance centre inside .hero-right. Eyebrow → primary
+// metric (money in $ mode, % in % mode; % capped so it never blows up) →
+// short human context line → 3 horizontal premium indicators (monochrome SVG,
+// no emoji). Right: small INVESTABLE-only donut (real estate excluded).
 // Driven 100% by REAL data:
 //   • period stats  → getChartData(range) over portfolioHistory (total wealth)
-//   • composition   → getDistribution() (current snapshot, incl. real estate)
-// No per-asset estimates, no fabricated points, no AI. When a range lacks enough
-// real history it shows an honest empty state — never a placeholder/guess.
+//   • composition   → getInvestableDistribution() (liquid wealth, real estate
+//     excluded — inmuebles keeps its own card below, never this module's donut)
+// No per-asset estimates, no fabricated points, no AI, no debug wording. When a
+// range lacks enough real history it shows an honest "Datos insuficientes" state
+// — never "Generando histórico fiable", never a placeholder/guess.
 // Mobile is untouched: the whole .hero-right is display:none ≤768 and the mobile
 // slider keeps its own chart + donut (swipe).
 // ════════════════════════════════════════════════════════════════════════
 
+// Premium monochrome inline icons (no emoji). 18px, stroke = currentColor so
+// they inherit the Aurix-blue indicator colour; identical size + weight.
+const _DSH_ICON_MAX  = '<svg class="perf-ind-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-7 4 4 4-6 5 7"/></svg>';
+const _DSH_ICON_CONS = '<svg class="perf-ind-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.2-3 7.4-7 9-4-1.6-7-4.8-7-9V6z"/></svg>';
+const _DSH_ICON_RANGE = '<svg class="perf-ind-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19V11M12 19V5M19 19v-5"/></svg>';
+
 // Signed money with NO decimals — the premium hero number + clean count-up.
-// Active base currency + locale. e.g. +$346,590 / -8.420 € / +1.86M handled
-// separately by formatShort for the secondary widgets.
+// Locale-correct currency token (es → "346.590 US$", en → "$346,590").
 function _dshFmtMoney0(n) {
   const locale = (typeof lang !== 'undefined' && lang === 'en') ? 'en-US' : 'es-ES';
   try {
@@ -16288,23 +16334,82 @@ function _dshFmtMoney0(n) {
   }
 }
 
+// Currency token + placement, derived once from Intl so the compact formatter
+// uses the SAME representation as the hero (no "$1.86M" vs "1.86M US$" mismatch).
+function _dshCurParts() {
+  const locale = (typeof lang !== 'undefined' && lang === 'en') ? 'en-US' : 'es-ES';
+  try {
+    const parts = new Intl.NumberFormat(locale, { style: 'currency', currency: baseCurrency, maximumFractionDigits: 0 }).formatToParts(1);
+    const cur = (parts.find(p => p.type === 'currency') || {}).value || '$';
+    return { cur, prefix: !!(parts[0] && parts[0].type === 'currency'), locale };
+  } catch (_) { return { cur: '$', prefix: true, locale: 'es-ES' }; }
+}
+
+// Compact money (K/M) with the SAME currency token as the hero. e.g. 444.5K US$.
+function _dshMoneyCompact(n) {
+  const { cur, prefix, locale } = _dshCurParts();
+  const a = Math.abs(n), sign = n < 0 ? '-' : '';
+  let num;
+  if (a >= 1e6) num = (a / 1e6).toFixed(2) + 'M';
+  else if (a >= 1e3) num = (a / 1e3).toFixed(1) + 'K';
+  else num = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(a);
+  return prefix ? `${sign}${cur}${num}` : `${sign}${num} ${cur}`;
+}
+
+// Percentage, capped so an extreme TOTAL never becomes a giant "+22902.25%"
+// titular. Returns the clean text, the capped flag, and the real value (for a
+// tooltip / secondary line).
+function _dshFmtPct(p) {
+  if (!Number.isFinite(p)) return { text: '—', capped: false, raw: '—' };
+  const sign = p > 0 ? '+' : (p < 0 ? '-' : '');
+  const a = Math.abs(p);
+  const raw = `${sign}${a.toFixed(2)}%`;
+  if (a > 999) return { text: `${sign}999%+`, capped: true, raw };
+  return { text: raw, capped: false, raw };
+}
+
 function _dshReducedMotion() {
   try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
   catch (_) { return false; }
 }
 
-// Volatility band derived PURELY from the measured period amplitude
-// ((max-min)/min). A human reading of a real swing — not an estimate.
-function _dshVolatilityBand(amplitudePct) {
+// Period range band — sober reading of the measured amplitude ((max-min)/min).
+// "Bajo / Medio / Alto". Real data, not an estimate.
+function _dshRangeBand(amplitudePct) {
   if (!Number.isFinite(amplitudePct)) return null;
-  if (amplitudePct < 8)  return { key: 'low',  label: t('volLow')  };
-  if (amplitudePct < 20) return { key: 'med',  label: t('volMed')  };
-  return { key: 'high', label: t('volHigh') };
+  if (amplitudePct < 8)  return { key: 'low',  label: t('rangeLow')  };
+  if (amplitudePct < 20) return { key: 'med',  label: t('rangeMed')  };
+  return { key: 'high', label: t('rangeHigh') };
+}
+
+// Liquid/investable share of TOTAL wealth (investable ÷ total). Real metric for
+// the donut centre — distinct from the inmuebles card, never duplicated.
+function _dshInvestableShare() {
+  try {
+    if (typeof investableValueUSD !== 'function' || typeof totalValueUSD !== 'function') return null;
+    const tot = totalValueUSD();
+    if (!(tot > 0)) return null;
+    return (investableValueUSD() / tot) * 100;
+  } catch (_) { return null; }
+}
+
+// Short, human, deterministic reading of the period — derived from direction +
+// magnitude of the real change + the selected range. No AI, no invention.
+function _dshContextLine(snap, range) {
+  if (!snap) return '';
+  const p = Number.isFinite(snap.deltaPct) ? snap.deltaPct : 0;
+  const a = Math.abs(p);
+  const perKey = ({ '24h': 'ctxIn24h', '7d': 'ctxIn7d', '30d': 'ctxIn30d', '1y': 'ctxIn1y', 'all': 'ctxInAll' })[range] || 'ctxInAll';
+  let phraseKey;
+  if (a < 0.5) phraseKey = 'ctxStable';
+  else if (p > 0) phraseKey = a < 3 ? 'ctxUpLight' : a < 10 ? 'ctxUpSolid' : 'ctxUpStrong';
+  else phraseKey = a < 3 ? 'ctxDownLight' : a < 10 ? 'ctxDownMod' : 'ctxDownStrong';
+  return `${t(phraseKey)} ${t(perKey)}`;
 }
 
 // Pure: derive period stats from the SAME validated series the chart consumes.
 // Returns null when there are < 2 real points for the active range, so the
-// caller renders an honest empty state instead of inventing numbers.
+// caller renders an honest "Datos insuficientes" state instead of inventing.
 function _dshComputePerfSnapshot(range) {
   let d;
   try { d = getChartData(range); } catch (_) { return null; }
@@ -16323,11 +16428,10 @@ function _dshComputePerfSnapshot(range) {
   const min   = Math.min(...vals);
   const deltaAbs     = last - first;
   const deltaPct     = first > 0 ? (deltaAbs / first) * 100 : null;
-  const amplitudeAbs = max - min;
-  const amplitudePct = min > 0 ? (amplitudeAbs / min) * 100 : null;
+  const amplitudePct = min > 0 ? ((max - min) / min) * 100 : null;
 
   // Per-period series: collapse to one close per calendar day for multi-day
-  // ranges (true "periods"); for 24h use the intraday samples.
+  // ranges; for 24h use the intraday samples. Powers the consistency read.
   let series = vals;
   if (range !== '24h') {
     const byDay = new Map();
@@ -16337,33 +16441,31 @@ function _dshComputePerfSnapshot(range) {
     }
     if (byDay.size >= 2) series = [...byDay.values()];
   }
-  let up = 0, down = 0, bestPeriodPct = null;
+  let up = 0, down = 0;
   for (let i = 1; i < series.length; i++) {
-    const prev = series[i - 1];
-    if (series[i] > prev) up++;
-    else if (series[i] < prev) down++;
-    if (prev > 0) {
-      const step = ((series[i] - prev) / prev) * 100;
-      if (bestPeriodPct === null || step > bestPeriodPct) bestPeriodPct = step;
-    }
+    if (series[i] > series[i - 1]) up++;
+    else if (series[i] < series[i - 1]) down++;
   }
   const moves = up + down;
   const consistencyPct = moves > 0 ? (up / moves) * 100 : null;
 
   return {
-    first, last, max, min, deltaAbs, deltaPct, amplitudeAbs, amplitudePct,
-    up, down, consistencyPct, bestPeriodPct,
-    volatility: _dshVolatilityBand(amplitudePct),
+    first, last, max, min, deltaAbs, deltaPct, amplitudePct,
+    up, down, consistencyPct, rangeBand: _dshRangeBand(amplitudePct),
   };
 }
 
-// Composition donut (SVG) — current snapshot over TOTAL wealth (real estate
-// included). Percentages only; amounts live elsewhere. Deliberately small +
-// secondary: this is context, never a second protagonist (DSH.08).
+// Right-side context: INVESTABLE composition only (real estate excluded — it
+// keeps its own card below). Small donut + compact legend; centre shows the
+// liquid share of total wealth. Percentages only, no amounts (no duplication).
 function _dshBuildCompoHtml() {
-  const dist = (typeof getDistribution === 'function') ? getDistribution() : null;
+  const dist = (typeof getInvestableDistribution === 'function') ? getInvestableDistribution() : null;
+  const invShare = _dshInvestableShare();
+  const centerVal = Number.isFinite(invShare) ? `${invShare.toFixed(1)}%` : '—';
+
   if (!dist || !dist.length) {
-    return `<div class="perf-donut perf-donut--empty">
+    return `<div class="perf-compo-title">${t('compoInvertible')}</div>
+      <div class="perf-donut perf-donut--empty">
         <svg class="perf-donut-svg" viewBox="0 0 150 150" aria-hidden="true"><circle cx="75" cy="75" r="67" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="16"/></svg>
         <div class="perf-donut-center"><div class="perf-donut-center-sub">${t('emptyDonutLabel')}</div></div>
       </div>`;
@@ -16380,114 +16482,103 @@ function _dshBuildCompoHtml() {
     return html;
   }).join('');
 
-  const top  = dist[0];
-  const topM = TYPE_META[top.type] || TYPE_META.other;
-  // Compact legend: top 4 slices; remainder folded into "Otros" so it reads
-  // like a glance, not a technical report.
-  const shown   = dist.slice(0, 4);
-  const restPct = dist.slice(4).reduce((s, x) => s + x.pct, 0);
-  let legend = shown.map(seg => {
+  const legend = dist.slice(0, 5).map(seg => {
     const m = TYPE_META[seg.type] || TYPE_META.other;
-    return `<div class="perf-legend-item"><span class="perf-legend-left"><span class="perf-legend-dot" style="background:${m.color}"></span><span class="perf-legend-label">${m.label}</span></span><span class="perf-legend-pct">${seg.pct.toFixed(1)}%</span></div>`;
+    return `<div class="perf-legend-item"><span class="perf-legend-left"><span class="perf-legend-dot" style="background:${m.color}"></span><span class="perf-legend-label">${m.donutLabel || m.label}</span></span><span class="perf-legend-pct">${seg.pct.toFixed(1)}%</span></div>`;
   }).join('');
-  if (restPct > 0.05) {
-    legend += `<div class="perf-legend-item"><span class="perf-legend-left"><span class="perf-legend-dot" style="background:${TYPE_META.other.color}"></span><span class="perf-legend-label">${TYPE_META.other.label}</span></span><span class="perf-legend-pct">${restPct.toFixed(1)}%</span></div>`;
-  }
 
   return `
+    <div class="perf-compo-title">${t('compoInvertible')}</div>
     <div class="perf-donut">
       <svg class="perf-donut-svg" viewBox="0 0 ${size} ${size}" aria-hidden="true"><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="${sw}"/>${segs}</svg>
-      <div class="perf-donut-center"><div class="perf-donut-center-val">${top.pct.toFixed(1)}%</div><div class="perf-donut-center-sub">${topM.label}</div></div>
+      <div class="perf-donut-center"><div class="perf-donut-center-val">${centerVal}</div><div class="perf-donut-center-sub">${t('centerInvertible')}</div></div>
     </div>
     <div class="perf-donut-legend">${legend}</div>`;
 }
 
-// Smooth count-up of the hero money value (easeOutCubic, ~520ms).
-let _dshLastMoney = null;
-function _dshCountUp(el, from, to) {
+// Smooth count-up of the primary number (easeOutCubic, ~520ms). fmt formats
+// each frame (money or %), so the same routine drives both toggle modes.
+let _dshLastPrimary = null;
+function _dshCountUp(el, from, to, fmt) {
   const dur = 520;
   let startTs = null;
   const ease = x => 1 - Math.pow(1 - x, 3);
   function frame(ts) {
     if (startTs === null) startTs = ts;
     const p = Math.min(1, (ts - startTs) / dur);
-    el.textContent = _dshFmtMoney0(from + (to - from) * ease(p));
+    el.textContent = fmt(from + (to - from) * ease(p));
     if (p < 1) requestAnimationFrame(frame);
-    else el.textContent = _dshFmtMoney0(to);
+    else el.textContent = fmt(to);
   }
   requestAnimationFrame(frame);
 }
 
-// Build + paint the module. doCountUp animates the hero money from its last
+// Build + paint the module. doCountUp animates the primary number from its last
 // shown value (user range/unit change); silent on background refreshes.
 function _dshPaintPerfSnapshot(root, doCountUp) {
   const snap = _dshComputePerfSnapshot(activeRange);
+  const mode = activePerfMode === 'curr' ? 'curr' : 'pct';
 
   let infoHtml;
   if (!snap) {
-    infoHtml = `<div class="perf-empty">${t('perfEmpty')}</div>`;
+    infoHtml = `<div class="perf-eyebrow">${t('evolution')}</div><div class="perf-empty">${t('perfEmpty')}</div>`;
   } else {
     const pct  = Number.isFinite(snap.deltaPct) ? snap.deltaPct : 0;
     const abs  = Number.isFinite(snap.deltaAbs) ? snap.deltaAbs : 0;
     const tone = pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat';
-    const pctStr = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+    const pctFmt    = _dshFmtPct(pct);
+    const moneyText = _dshFmtMoney0(abs);
+    // Money leads in $ mode, % leads in % mode; the other value sits below.
+    const primaryText   = mode === 'curr' ? moneyText  : pctFmt.text;
+    const secondaryText = mode === 'curr' ? pctFmt.text : moneyText;
+    const primaryTitle  = (mode === 'pct' && pctFmt.capped) ? ` title="${pctFmt.raw}"` : '';
 
-    // Insight bar — one luminous line, no boxes/borders. Two narrative stats
-    // only; "Máximo patrimonio" lives in its dedicated card below, so the line
-    // never clips (even on tablet) and stays a clean, fast read.
-    const ins = [];
-    if (Number.isFinite(snap.bestPeriodPct)) {
-      const bp = snap.bestPeriodPct;
-      ins.push(`<span class="perf-insight-item"><span class="perf-insight-arrow">↗</span> ${t('perfBestPeriod')} <b>${bp >= 0 ? '+' : ''}${bp.toFixed(2)}%</b></span>`);
-    }
-    if (Number.isFinite(snap.consistencyPct)) {
-      ins.push(`<span class="perf-insight-item">${t('perfConsistency')} <b>${Math.round(snap.consistencyPct)}%</b></span>`);
-    }
-    const insightHtml = ins.join('<span class="perf-insight-sep"></span>');
-
-    // Premium metric cards (real-data widgets — never a table).
-    const consStr = `<span class="up">${snap.up}&#8593;</span> / <span class="down">${snap.down}&#8595;</span>`;
-    const bpCard  = Number.isFinite(snap.bestPeriodPct)
-      ? `<span class="${snap.bestPeriodPct >= 0 ? 'up' : 'down'}">${snap.bestPeriodPct >= 0 ? '+' : ''}${snap.bestPeriodPct.toFixed(2)}%</span>`
-      : '—';
-    const volLabel = snap.volatility ? snap.volatility.label : '—';
+    const ctxLine  = _dshContextLine(snap, activeRange);
+    const consVal  = Number.isFinite(snap.consistencyPct) ? `${Math.round(snap.consistencyPct)}%` : '—';
+    const rangeVal = snap.rangeBand ? snap.rangeBand.label : '—';
+    const maxVal   = _dshMoneyCompact(snap.max);
 
     infoHtml = `
       <div class="perf-eyebrow">${t('evolution')}</div>
       <div class="perf-hero">
-        <div class="perf-hero-money ${tone}">${_dshFmtMoney0(abs)}</div>
-        <div class="perf-hero-pct ${tone}">${pctStr}</div>
+        <div class="perf-hero-money ${tone}"${primaryTitle}>${primaryText}</div>
+        <div class="perf-hero-pct ${tone}">${secondaryText}</div>
       </div>
-      <div class="perf-insight">${insightHtml}</div>
-      <div class="perf-cards">
-        <div class="perf-card"><span class="perf-card-icon">💎</span><span class="perf-card-body"><span class="perf-card-label">${t('perfMaxWealth')}</span><span class="perf-card-value">${formatShort(snap.max)}</span></span></div>
-        <div class="perf-card"><span class="perf-card-icon">🛡️</span><span class="perf-card-body"><span class="perf-card-label">${t('perfConsistency')}</span><span class="perf-card-value">${consStr}</span></span></div>
-        <div class="perf-card"><span class="perf-card-icon">⚡</span><span class="perf-card-body"><span class="perf-card-label">${t('perfVolatility')}</span><span class="perf-card-value">${volLabel}</span></span></div>
-        <div class="perf-card"><span class="perf-card-icon">📈</span><span class="perf-card-body"><span class="perf-card-label">${t('perfBestPeriod')}</span><span class="perf-card-value">${bpCard}</span></span></div>
+      <div class="perf-context">${ctxLine}</div>
+      <div class="perf-indicators">
+        <div class="perf-ind">${_DSH_ICON_MAX}<span class="perf-ind-label">${t('indMaxWealth')}</span><span class="perf-ind-value">${maxVal}</span></div>
+        <div class="perf-ind">${_DSH_ICON_CONS}<span class="perf-ind-label">${t('perfConsistency')}</span><span class="perf-ind-value">${consVal}</span></div>
+        <div class="perf-ind">${_DSH_ICON_RANGE}<span class="perf-ind-label">${t('indRange')}</span><span class="perf-ind-value">${rangeVal}</span></div>
       </div>`;
   }
 
   root.innerHTML = `<div class="perf-info">${infoHtml}</div><div class="perf-compo">${_dshBuildCompoHtml()}</div>`;
 
   if (snap) {
-    const moneyEl = root.querySelector('.perf-hero-money');
-    const to = Number.isFinite(snap.deltaAbs) ? snap.deltaAbs : 0;
-    if (moneyEl) {
-      if (doCountUp && _dshLastMoney !== null && _dshLastMoney !== to && !_dshReducedMotion()) {
-        _dshCountUp(moneyEl, _dshLastMoney, to);
+    const el  = root.querySelector('.perf-hero-money');
+    const val = mode === 'curr'
+      ? (Number.isFinite(snap.deltaAbs) ? snap.deltaAbs : 0)
+      : (Number.isFinite(snap.deltaPct) ? snap.deltaPct : 0);
+    const fmt    = mode === 'curr' ? _dshFmtMoney0 : (v => _dshFmtPct(v).text);
+    const capped = mode === 'pct' && _dshFmtPct(val).capped;
+    if (el) {
+      if (doCountUp && _dshLastPrimary && _dshLastPrimary.mode === mode &&
+          Number.isFinite(_dshLastPrimary.value) && _dshLastPrimary.value !== val &&
+          !capped && !_dshReducedMotion()) {
+        _dshCountUp(el, _dshLastPrimary.value, val, fmt);
       } else {
-        moneyEl.textContent = _dshFmtMoney0(to);
+        el.textContent = fmt(val);
       }
     }
-    _dshLastMoney = to;
+    _dshLastPrimary = { mode, value: val };
   } else {
-    _dshLastMoney = null;
+    _dshLastPrimary = null;
   }
 }
 
-// Public entry. animate=true on a user range/unit change (fade-out → recalc →
-// fade-in + count-up, ~150ms); false on background refresh (silent repaint).
-// No-op off the dashboard. Safe to call on every data refresh.
+// Public entry. animate=true on a user range/unit change: fade-out 120ms →
+// recalc → count-up + fade-in 180ms + indicators slide 4px. false on background
+// refresh (silent repaint). No-op off the dashboard.
 function _dshRenderPerfSnapshot(animate) {
   const root = document.getElementById('perfSnapshot');
   if (!root) return;
@@ -16495,8 +16586,10 @@ function _dshRenderPerfSnapshot(animate) {
     root.classList.add('perf-fading');
     setTimeout(() => {
       _dshPaintPerfSnapshot(root, true);
-      requestAnimationFrame(() => root.classList.remove('perf-fading'));
-    }, 150);
+      root.classList.remove('perf-fading');
+      root.classList.add('perf-anim-in');
+      setTimeout(() => root.classList.remove('perf-anim-in'), 300);
+    }, 120);
   } else {
     _dshPaintPerfSnapshot(root, false);
   }

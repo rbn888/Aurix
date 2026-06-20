@@ -21580,10 +21580,10 @@ body.gs-open { overflow: hidden; }
 }
 
 /* ════════════════════════════════════════════════════════════════════════
-   DSH.08 — PERFORMANCE SNAPSHOT V2 · Premium Wealth Command Center
-   Desktop-only (≥769; mobile slider untouched). Money is the protagonist,
-   percentage secondary; technical stats become premium widgets; donut is a
-   small context ring. Lives inside .hero-right (display:none ≤768).
+   DSH.09 — PERFORMANCE SNAPSHOT V3 · Wealth Management Standard
+   Desktop-only (≥769; mobile slider untouched). Executive layout: eyebrow →
+   primary metric → human context line → 3 horizontal premium indicators
+   (monochrome SVG, no emoji) · right: small investable-only donut.
    ════════════════════════════════════════════════════════════════════════ */
 
 .perf-snapshot { display: none; }
@@ -21595,106 +21595,77 @@ body.gs-open { overflow: hidden; }
   .hero-right .chart-baseline-note,
   .hero-right .chart-title         { display: none !important; }
   #distributionSection             { display: none !important; }
-  /* tighten the (now title-less) header so the controls sit compactly top-right */
   .hero-right .chart-header        { margin-bottom: 10px; min-height: 26px; }
 
   .perf-snapshot {
     display: flex;
-    gap: var(--space-4);
+    gap: var(--space-5);
     align-items: stretch;
-    transition: opacity .15s var(--ease-out);
+    transition: opacity .18s var(--ease-out);
   }
-  .perf-snapshot.perf-fading { opacity: 0; }
+  .perf-snapshot.perf-fading { opacity: 0; transition: opacity .12s var(--ease-out); }
 
-  /* ── left ~70%: eyebrow → money → % → insight → cards ── */
+  /* ── left 65%: eyebrow → metric → context → indicators ── */
   .perf-info {
-    flex: 0 0 68%;
+    flex: 0 0 64%;
     min-width: 0;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 9px;
+    gap: 10px;
   }
   .perf-eyebrow {
     font-size: 10.5px; font-weight: 700;
-    letter-spacing: 1.3px; text-transform: uppercase;
+    letter-spacing: 1.4px; text-transform: uppercase;
     color: var(--text-dim);
   }
-  .perf-hero { display: flex; flex-direction: column; gap: 0; }
+  .perf-hero { display: flex; flex-direction: column; gap: 1px; }
   .perf-hero-money {
-    font-size: 50px; font-weight: 800; line-height: 1.04;
-    letter-spacing: -.03em; font-variant-numeric: tabular-nums;
+    font-size: 48px; font-weight: 800; line-height: 1.05;
+    letter-spacing: -.025em; font-variant-numeric: tabular-nums;
     color: var(--text-bright);
   }
-  .perf-hero-money.up   { color: var(--green); text-shadow: 0 0 24px rgba(63,191,127,.30); }
-  .perf-hero-money.down { color: var(--red);   text-shadow: 0 0 24px rgba(224,90,90,.26); }
+  .perf-hero-money.up   { color: var(--green); text-shadow: 0 0 22px rgba(63,191,127,.26); }
+  .perf-hero-money.down { color: var(--red);   text-shadow: 0 0 22px rgba(224,90,90,.24); }
   .perf-hero-pct {
-    font-size: 23px; font-weight: 700; line-height: 1.15;
+    font-size: 20px; font-weight: 700; line-height: 1.2;
     letter-spacing: -.01em; font-variant-numeric: tabular-nums;
     color: var(--text-muted);
   }
-  .perf-hero-pct.up   { color: var(--green); }
-  .perf-hero-pct.down { color: var(--red); }
 
-  /* insight bar — one luminous line, no boxes/borders/noise */
-  .perf-insight {
-    display: flex; align-items: center;
-    font-size: 11.5px; color: var(--text-muted);
+  /* human context line — sober, one short sentence */
+  .perf-context {
+    font-size: 13px; font-weight: 500;
+    color: var(--text-muted);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .perf-insight-item { display: inline-flex; align-items: center; gap: 4px; }
-  .perf-insight-item b { color: var(--text-bright); font-weight: 700; font-variant-numeric: tabular-nums; }
-  .perf-insight-arrow { color: var(--green); font-weight: 800; }
-  .perf-insight-sep {
-    width: 3px; height: 3px; border-radius: 50%;
-    margin: 0 10px; flex-shrink: 0;
-    background: var(--aurix-blue);
-    box-shadow: 0 0 6px var(--aurix-blue-glow), 0 0 2px var(--aurix-blue);
-  }
 
-  /* premium metric cards — widgets, never a table */
-  .perf-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .perf-card {
-    display: flex; align-items: center; gap: 9px;
-    padding: 8px 10px; border-radius: 10px;
-    background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
-    border: 1px solid var(--border-subtle);
-    transition: border-color .2s var(--ease-out), transform .2s var(--ease-out), background .2s var(--ease-out);
-    min-width: 0;
+  /* 3 horizontal premium indicators — executive list, not a 2x2 table */
+  .perf-indicators { display: flex; flex-direction: column; margin-top: 2px; }
+  .perf-ind {
+    display: flex; align-items: center; gap: 11px;
+    padding: 8px 2px;
+    border-top: 1px solid rgba(255,255,255,0.05);
   }
-  .perf-card:hover {
-    border-color: var(--aurix-blue-border);
-    background: linear-gradient(180deg, rgba(74,130,240,.10), rgba(255,255,255,.02));
-    transform: translateY(-1px);
-  }
-  .perf-card-icon {
-    width: 27px; height: 27px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px; border-radius: 8px;
-    background: var(--aurix-blue-soft);
-  }
-  .perf-card-body { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
-  .perf-card-label {
-    font-size: 9px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
-    color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .perf-card-value {
-    font-size: 14px; font-weight: 700; color: var(--text-bright);
-    font-variant-numeric: tabular-nums; white-space: nowrap;
-    overflow: hidden; text-overflow: ellipsis;
-  }
-  .perf-card-value .up   { color: var(--green); }
-  .perf-card-value .down { color: var(--red); }
+  .perf-ind:first-child { border-top: none; }
+  .perf-ind-icon { width: 17px; height: 17px; flex-shrink: 0; color: var(--aurix-blue); opacity: .92; }
+  .perf-ind-label { flex: 1; min-width: 0; font-size: 12.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .perf-ind-value { font-size: 13.5px; font-weight: 700; color: var(--text-bright); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
 
-  /* ── right ~30%: small context donut ── */
+  /* ── right 35%: title + small investable donut ── */
   .perf-compo {
     flex: 1 1 0; min-width: 0;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    gap: 10px; padding-left: var(--space-4);
+    gap: 10px; padding-left: var(--space-5);
     border-left: 1px solid var(--border-subtle);
   }
-  .perf-donut { position: relative; width: 106px; height: 106px; flex-shrink: 0; }
+  .perf-compo-title {
+    align-self: stretch; text-align: center;
+    font-size: 9.5px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .perf-donut { position: relative; width: 104px; height: 104px; flex-shrink: 0; }
   .perf-donut-svg { width: 100%; height: 100%; display: block; transform: rotate(-90deg); }
   .perf-donut-seg { transition: opacity .2s ease; }
   .perf-donut-center {
@@ -21702,8 +21673,8 @@ body.gs-open { overflow: hidden; }
     display: flex; flex-direction: column;
     align-items: center; justify-content: center; pointer-events: none;
   }
-  .perf-donut-center-val { font-size: 15px; font-weight: 800; color: var(--text-bright); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-  .perf-donut-center-sub { margin-top: 1px; font-size: 8px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--text-dim); }
+  .perf-donut-center-val { font-size: 16px; font-weight: 800; color: var(--text-bright); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .perf-donut-center-sub { margin-top: 1px; font-size: 7.5px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--text-dim); }
   .perf-donut-legend { width: 100%; display: flex; flex-direction: column; gap: 4px; }
   .perf-legend-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 10px; }
   .perf-legend-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -21716,29 +21687,39 @@ body.gs-open { overflow: hidden; }
     text-align: center; color: var(--text-dim); font-size: 13px; line-height: 1.5; padding: 20px;
   }
 
-  /* loading skeleton (never an empty rectangle / fake copy) */
+  /* entrance micro-animation on range/unit change (no bounce/overshoot) */
+  .perf-anim-in .perf-hero,
+  .perf-anim-in .perf-context { animation: perfFadeUp .18s var(--ease-out) both; }
+  .perf-anim-in .perf-ind { animation: perfIndSlide .2s var(--ease-out) both; }
+  .perf-anim-in .perf-ind:nth-child(2) { animation-delay: .04s; }
+  .perf-anim-in .perf-ind:nth-child(3) { animation-delay: .08s; }
+
+  /* loading skeleton */
   .perf-skel {
     background: linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.08) 37%, rgba(255,255,255,.04) 63%);
     background-size: 400% 100%; animation: perfShimmer 1.4s ease infinite; border-radius: 6px;
   }
-  .perf-skel-head { width: 42%; height: 50px; margin-bottom: 6px; }
-  .perf-skel-sub  { width: 26%; height: 20px; margin-bottom: 10px; }
-  .perf-metrics-skel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .perf-skel-cell { height: 44px; border-radius: 10px; }
-  .perf-skel-donut { width: 106px; height: 106px; border-radius: 50%; align-self: center; margin: auto; }
+  .perf-skel-head { width: 42%; height: 46px; margin-bottom: 8px; }
+  .perf-skel-sub  { width: 30%; height: 16px; margin-bottom: 12px; }
+  .perf-metrics-skel { display: flex; flex-direction: column; gap: 10px; }
+  .perf-skel-cell { height: 20px; border-radius: 6px; }
+  .perf-skel-donut { width: 104px; height: 104px; border-radius: 50%; align-self: center; margin: auto; }
 }
 
-/* tablet (≥769 and ≤1024): scale the hero number down so nothing crowds */
+/* tablet (≥769 ≤1024): scale the hero number down so nothing crowds */
 @media (min-width: 769px) and (max-width: 1024px) {
-  .perf-info { flex-basis: 64%; }
-  .perf-hero-money { font-size: 43px; }
-  .perf-hero-pct   { font-size: 20px; }
-  .perf-donut { width: 94px; height: 94px; }
-  .perf-insight { font-size: 11px; }
+  .perf-info { flex-basis: 60%; }
+  .perf-hero-money { font-size: 40px; }
+  .perf-hero-pct   { font-size: 18px; }
+  .perf-donut { width: 92px; height: 92px; }
+  .perf-context { font-size: 12px; }
 }
 
 @keyframes perfShimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+@keyframes perfFadeUp { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes perfIndSlide { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
   .perf-snapshot { transition: none; }
+  .perf-anim-in .perf-hero, .perf-anim-in .perf-context, .perf-anim-in .perf-ind { animation: none; }
   .perf-skel { animation: none; }
 }
