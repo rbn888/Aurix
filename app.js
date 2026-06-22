@@ -1099,6 +1099,7 @@ const T = {
     evolution:       'Evolución del patrimonio',
     wscBuildingTitle:'Construyendo historial patrimonial',
     wscBuildingBody: 'Aurix está recopilando snapshots validados para mostrar tu evolución.',
+    wscExcludesContrib: 'Excluye aportaciones/importaciones',
     perfSnapshotTitle: 'Resumen de rendimiento',
     perfMax:         'Máximo',
     perfMin:         'Mínimo',
@@ -3115,6 +3116,7 @@ const T = {
     evolution:       'Portfolio evolution',
     wscBuildingTitle:'Building your wealth history',
     wscBuildingBody: 'Aurix is collecting validated snapshots to chart your evolution.',
+    wscExcludesContrib: 'Excludes contributions/imports',
     perfSnapshotTitle: 'Performance snapshot',
     perfMax:         'High',
     perfMin:         'Low',
@@ -16949,28 +16951,13 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   const last     = Number.isFinite(d.lastValue)  ? d.lastValue  : vals[vals.length - 1];
   const deltaAbs = Number.isFinite(d.deltaAbs) ? d.deltaAbs : (last - first);
   const deltaPct = Number.isFinite(d.deltaPct) ? d.deltaPct : (first > 0 ? (deltaAbs / first) * 100 : 0);
-  const tone     = deltaPct > 0.005 ? 'up' : deltaPct < -0.005 ? 'down' : 'flat';
-
-  // Range-change metric under the title — drives off the %/divisa toggle.
-  if (changeEl) {
-    const mode = activePerfMode === 'curr' ? 'curr' : 'pct';
-    const pf   = _dshFmtPct(deltaPct);
-    changeEl.textContent = mode === 'curr' ? _dshFmtMoney0(deltaAbs) : pf.text;
-    changeEl.className    = `chart-change ${tone}`;
-    if (mode === 'pct' && pf.capped) changeEl.title = pf.raw;
-    else changeEl.removeAttribute('title');
-  }
-
-  // ── Institutional render (REAL DATA ONLY — no synthetic movement). X spaced
-  //    by real time inside a narrower plot region; Y mapped by the per-timeframe
-  //    robust viewport; curve drawn with monotone-cubic interpolation.
-  const W = _WSC_VIEW_W, H = _WSC_VIEW_H;
-  const padX = W * _WSC_PAD_X, plotW = W - 2 * padX;
 
   // Capital-event normalization (WN.1): neutralise import / construction / large
   // deposit jumps so the curve shows ORGANIC movement, focused on the most recent
-  // organic regime. Real values at real timestamps (a slice) — raw history and the
-  // displayed metric above are unchanged. Dev-only: expose the detected events.
+  // organic regime. Real values at real timestamps (a slice) — raw history is never
+  // mutated. Dev-only: expose the detected events.
+  const W = _WSC_VIEW_W, H = _WSC_VIEW_H;
+  const padX = W * _WSC_PAD_X, plotW = W - 2 * padX;
   const norm  = normalizeWealthSeriesForVisualization(vals, ts, activeRange);
   const rVals = norm.values.length >= 2 ? norm.values : vals;        // never blank a valid series
   const rTs   = norm.values.length >= 2 ? norm.timestamps : ts;
@@ -16981,6 +16968,28 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
       console.debug('[wsc-capital]', activeRange, 'events:', norm.capitalEvents,
         'organicΔ%:', norm.normalizedDeltaPct == null ? null : +norm.normalizedDeltaPct.toFixed(2));
     } catch (_) {}
+  }
+
+  // WN.2 — when capital events are excluded from the curve, the metric must tell
+  // the SAME story: show the ORGANIC normalized movement (not the raw total
+  // portfolio jump), with a subtle "excludes contributions" note. Raw total
+  // wealth / portfolio value are unchanged — this is only the chart metric.
+  const useOrganic = norm.capitalEvents.length > 0 && norm.values.length >= 2 && Number.isFinite(norm.normalizedDeltaPct);
+  const dispPct = useOrganic ? norm.normalizedDeltaPct : deltaPct;
+  const dispAbs = useOrganic ? norm.normalizedDeltaAbs : deltaAbs;
+  const tone    = dispPct > 0.005 ? 'up' : dispPct < -0.005 ? 'down' : 'flat';
+
+  // Range-change metric under the title — drives off the %/divisa toggle, and the
+  // curve uses the SAME tone, so number and line never contradict each other.
+  if (changeEl) {
+    const mode = activePerfMode === 'curr' ? 'curr' : 'pct';
+    const pf   = _dshFmtPct(dispPct);
+    const valText = mode === 'curr' ? _dshFmtMoney0(dispAbs) : pf.text;
+    const note = useOrganic ? `<span class="wsc-metric-note">${t('wscExcludesContrib')}</span>` : '';
+    changeEl.innerHTML = `<span class="wsc-metric-val">${valText}</span>${note}`;
+    changeEl.className  = `chart-change ${tone}`;
+    if (mode === 'pct' && pf.capped) changeEl.title = pf.raw;
+    else changeEl.removeAttribute('title');
   }
 
   // Endpoint + isolated-spike protection: Hampel despike of REAL values, so a

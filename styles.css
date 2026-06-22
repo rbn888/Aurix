@@ -21764,6 +21764,19 @@ body.gs-open { overflow: hidden; }
    labels): institutional grounding only. */
 .wsc-grid { stroke: rgba(255,255,255,.045); stroke-width: 1; }
 
+/* WN.2 — organic chart metric + subtle "excludes contributions" note. The note
+   stays muted (does not inherit the up/down tone colour) and small/premium. */
+.wsc-metric-val { color: inherit; }
+.wsc-metric-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .2px;
+  line-height: 1.2;
+  color: var(--text-dim, #8a96aa);
+}
+
 /* WSC.3 — area fill and end dot removed: a clean continuous institutional line
    (no rectangles, no decorative dot). */
 
