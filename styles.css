@@ -21747,22 +21747,44 @@ body.gs-open { overflow: hidden; }
 }
 .wsc-svg { display: block; width: 100%; height: 100%; }
 
-/* line tone — calm, desaturated, thin; the metric under the title carries the
-   sign. No glow — institutional, not trading. */
+/* WN.5 — premium institutional line (value chart): 2.6px, rounded, no glow. */
 .wsc-line {
   stroke: var(--accent, #4a82f0);
-  stroke-width: 1.6;
+  stroke-width: 2.6;
   stroke-linecap: round;
   stroke-linejoin: round;
-  opacity: .95;
+  opacity: .98;
 }
 .wsc-up   .wsc-line { stroke: var(--green, #3fbf7f); }
 .wsc-down .wsc-line { stroke: var(--red,   #e05a5a); }
 .wsc-flat .wsc-line { stroke: var(--text-muted, #9aa7bd); }
 
-/* WSC.5 — two ultra-subtle horizontal reference lines (no vertical grid, no
-   labels): institutional grounding only. */
-.wsc-grid { stroke: rgba(255,255,255,.045); stroke-width: 1; }
+/* WN.5 — subtle institutional grid: horizontal value lines + lighter vertical
+   time markers. Low opacity, premium (never heavy). */
+.wsc-grid   { stroke: rgba(255,255,255,.05);  stroke-width: 1; }
+.wsc-grid-v { stroke: rgba(255,255,255,.032); stroke-width: 1; }
+
+/* WN.5 — very subtle gradient area fill under the line (fades to transparent,
+   no block). */
+.wsc-area-0 { stop-color: var(--accent, #4a82f0); stop-opacity: .10; }
+.wsc-area-1 { stop-color: var(--accent, #4a82f0); stop-opacity: 0; }
+.wsc-up   .wsc-area-0 { stop-color: var(--green, #3fbf7f); stop-opacity: .10; }
+.wsc-down .wsc-area-0 { stop-color: var(--red,   #e05a5a); stop-opacity: .09; }
+.wsc-flat .wsc-area-0 { stop-color: var(--text-muted, #9aa7bd); stop-opacity: .06; }
+
+/* WN.5 — axis labels (positioned HTML, crisp): real investable values on the
+   right, range-specific time labels along the bottom. */
+.wsc-ylabs, .wsc-xlabs { position: absolute; inset: 0; pointer-events: none; }
+.wsc-ylab {
+  position: absolute; right: 5px; transform: translateY(-50%);
+  font: 700 9px/1 ui-monospace, SFMono-Regular, monospace;
+  color: var(--text-dim, #8a96aa); opacity: .65; font-variant-numeric: tabular-nums;
+}
+.wsc-xlab {
+  position: absolute; bottom: 1px; transform: translateX(-50%);
+  font: 700 9px/1 ui-monospace, SFMono-Regular, monospace;
+  color: var(--text-dim, #8a96aa); opacity: .6; white-space: nowrap;
+}
 
 /* WN.2 — organic chart metric + subtle "excludes contributions" note. The note
    stays muted (does not inherit the up/down tone colour) and small/premium. */
@@ -21776,9 +21798,6 @@ body.gs-open { overflow: hidden; }
   line-height: 1.2;
   color: var(--text-dim, #8a96aa);
 }
-
-/* WSC.3 — area fill and end dot removed: a clean continuous institutional line
-   (no rectangles, no decorative dot). */
 
 /* empty / building state */
 .wsc--empty { display: flex; align-items: center; justify-content: center; }
@@ -21795,43 +21814,55 @@ body.gs-open { overflow: hidden; }
   font-size: 12.5px; font-weight: 500; line-height: 1.5; color: var(--text-dim, #8a96aa);
 }
 
-/* desktop hover tooltip (added to .wsc-plot only when tooltip:true) */
+/* WN.5 — crosshair (vertical + horizontal dashed) + cursor marker + tooltip. */
 .wsc-hair {
   position: absolute; top: 0; bottom: 0; left: 0; width: 1px;
-  background: rgba(255,255,255,.18);
+  border-left: 1px dashed rgba(255,255,255,.22);
+  opacity: 0; transition: opacity .12s var(--ease-out, ease);
+  pointer-events: none;
+}
+.wsc-hair-h {
+  position: absolute; left: 0; right: 0; top: 0; height: 0;
+  border-top: 1px dashed rgba(255,255,255,.14);
   opacity: 0; transition: opacity .12s var(--ease-out, ease);
   pointer-events: none;
 }
 .wsc-cursor {
   position: absolute; top: 0; left: 0;
-  width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%;
+  width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%;
   background: var(--text-bright, #fff);
-  box-shadow: 0 0 8px rgba(255,255,255,.5);
+  box-shadow: 0 0 0 3px rgba(255,255,255,.14), 0 0 9px rgba(255,255,255,.45);
   opacity: 0; transition: opacity .12s var(--ease-out, ease);
   pointer-events: none;
 }
 .wsc-tip {
   position: absolute; top: 6px; left: 0;
   transform: translateX(0);
-  display: flex; flex-direction: column; align-items: center; gap: 1px;
-  padding: 5px 9px; border-radius: 8px;
-  background: rgba(16,20,30,.92);
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+  padding: 6px 10px; border-radius: 9px;
+  background: rgba(16,20,30,.94);
   border: 1px solid rgba(255,255,255,.10);
-  box-shadow: 0 6px 20px rgba(0,0,0,.4);
-  margin-left: -48px; /* centre under the cursor (half of min-width) */
-  min-width: 96px;
+  box-shadow: 0 6px 22px rgba(0,0,0,.45);
+  margin-left: -57px; /* centre under the cursor (half of min-width) */
+  min-width: 114px;
   opacity: 0; transition: opacity .12s var(--ease-out, ease);
   pointer-events: none; white-space: nowrap;
 }
 .wsc-plot.wsc-hot .wsc-hair,
+.wsc-plot.wsc-hot .wsc-hair-h,
 .wsc-plot.wsc-hot .wsc-cursor,
 .wsc-plot.wsc-hot .wsc-tip { opacity: 1; }
-.wsc-tip-v { font-size: 13px; font-weight: 800; color: var(--text-bright, #fff); font-variant-numeric: tabular-nums; }
-.wsc-tip-t { font-size: 10px; font-weight: 600; color: var(--text-dim, #8a96aa); letter-spacing: .2px; }
+.wsc-tip-date { font-size: 11px; font-weight: 700; color: var(--text-bright, #fff); }
+.wsc-tip-time { font-size: 10px; font-weight: 600; color: var(--text-dim, #8a96aa); }
+.wsc-tip-lbl  { font-size: 8.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--text-dim, #8a96aa); margin-top: 4px; }
+.wsc-tip-v    { font-size: 14px; font-weight: 800; color: var(--text-bright, #fff); font-variant-numeric: tabular-nums; }
+.wsc-tip-chg  { font-size: 10px; font-weight: 700; color: var(--text-muted, #9aa7bd); margin-top: 1px; font-variant-numeric: tabular-nums; }
+.wsc-tip-chg.pos { color: var(--green, #3fbf7f); }
+.wsc-tip-chg.neg { color: var(--red,   #e05a5a); }
 
 /* entrance micro-animation on range / unit change */
 .wsc-in .wsc-line  { animation: wscDraw .46s var(--ease-out, ease) both; }
-@keyframes wscDraw { from { opacity: 0; } to { opacity: .92; } }
+@keyframes wscDraw { from { opacity: 0; } to { opacity: .98; } }
 
 /* mobile host: REPLACES the legacy canvas / V2 chart inside .mobile-chart-wrap.
    The old layers stay mounted (boot / sync safety) but are hidden so they never

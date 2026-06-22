@@ -1100,6 +1100,7 @@ const T = {
     wscBuildingTitle:'Construyendo historial patrimonial',
     wscBuildingBody: 'Aurix está recopilando snapshots validados para mostrar tu evolución.',
     wscExcludesContrib: 'Excluye aportaciones/importaciones',
+    chartTipValue:   'Valor cartera',
     perfSnapshotTitle: 'Resumen de rendimiento',
     perfMax:         'Máximo',
     perfMin:         'Mínimo',
@@ -3117,6 +3118,7 @@ const T = {
     wscBuildingTitle:'Building your wealth history',
     wscBuildingBody: 'Aurix is collecting validated snapshots to chart your evolution.',
     wscExcludesContrib: 'Excludes contributions/imports',
+    chartTipValue:   'Portfolio value',
     perfSnapshotTitle: 'Performance snapshot',
     perfMax:         'High',
     perfMin:         'Low',
@@ -6543,6 +6545,14 @@ function isInvestableAsset(a) { return _aurixCategoryBucket(a) !== 'real_estate'
 function investableAssets()   { return activeAssets().filter(isInvestableAsset); }
 function investableValueUSD()  { return investableAssets().reduce((sum, a) => { const v = assetValueUSD(a); return Number.isFinite(v) ? sum + v : sum; }, 0); }
 function investableValueBase() { return toBase(investableValueUSD(), 'USD'); }
+
+// WN.5 — canonical investable portfolio value (USD). The Dashboard chart, its
+// tooltip and its metric must all speak about THIS base (stocks + ETFs + crypto
+// + cash/liquidity + metals + other; real estate EXCLUDED). Matches the Hero
+// "Valor total de cartera", which renders investableValueBase = toBase of this.
+function getInvestablePortfolioValue() {
+  try { return investableValueUSD(); } catch (_) { return 0; }
+}
 
 // ── P&L calculations ────────────────────────────────────────
 function assetPnLBase(asset) {
@@ -17047,18 +17057,16 @@ function _wscMonotonePath(pts) {
 function _wscViewport(values, range) {
   const H = _WSC_VIEW_H, center = H / 2;
   const sorted = values.slice().sort((a, b) => a - b);
-  const n = sorted.length;
-  // Percentile clip: trim ~one extreme each side once there are enough points,
-  // so a single anomaly cannot set the scale (robust, not min/max).
-  const pClip = n >= 12 ? 0.06 : n >= 6 ? 0.10 : 0;
-  let lo = _wscPercentile(sorted, pClip);
-  let hi = _wscPercentile(sorted, 1 - pClip);
+  // WN.5 — VALUE chart: use the true min/max so the y-axis labels are accurate
+  // (the data is now clean investable value; isolated spikes are already removed
+  // by the despike stage upstream, so min/max is honest here).
+  let lo = sorted[0], hi = sorted[sorted.length - 1];
   const median = _wscPercentile(sorted, 0.5);
   let span = hi - lo;
   if (!(span > 0)) { span = Math.abs(median) * 1e-4 || 1; lo = median - span / 2; hi = median + span / 2; }
 
-  // Adaptive occupancy within the range's own band: robust relative spread →
-  // fraction of vertical space. Tiny real moves still fill ≥minOcc (visible),
+  // Adaptive occupancy within the range's own band: relative spread → fraction
+  // of vertical space. Tiny moves still fill ≥minOcc (visible) but stay calm;
   // large moves cap at maxOcc (controlled, never touching the borders).
   const [minOcc, maxOcc] = _WSC_OCC[range] || _WSC_OCC['30d'];
   const relSpread = span / (Math.abs(median) || hi || 1);
@@ -17066,11 +17074,9 @@ function _wscViewport(values, range) {
     minOcc + (maxOcc - minOcc) * Math.tanh(relSpread / _WSC_OCC_SCALE)));
   const band = occ * H, top = center - band / 2, bot = center + band / 2;
 
-  const yOf = v => {
-    const frac = Math.min(1, Math.max(0, (v - lo) / span));   // clamp outliers to the band edges
-    return bot - frac * band;
-  };
-  return { yOf, top, bot };
+  const yOf  = v => bot - Math.min(1, Math.max(0, (v - lo) / span)) * band;
+  const valAt = y => lo + ((bot - y) / band) * span;     // invert: y → value (for axis labels)
+  return { yOf, valAt, lo, hi, top, bot, band };
 }
 
 // ── Institutional Wealth Normalization Layer (WN.1) ─────────────────────────
@@ -17196,6 +17202,91 @@ function _wscResample(values, timestamps, range) {
   return { values: outV, timestamps: outT };
 }
 
+// ── WN.5 — Investable Portfolio Value datasource ────────────────────────────
+// The Dashboard chart shows INVESTABLE value over time (stocks + ETFs + crypto
+// + cash + metals + other; real estate EXCLUDED), in BASE currency to match the
+// Hero. Reconstructed from categoryHistory (investable = total − real_estate per
+// snapshot) so it is CLEAN even though legacy portfolioHistory stored total net
+// worth incl. real estate. Raw history is never mutated. Windowed, epoch-filtered.
+function _aurixInvestableSnapshots(range) {
+  try {
+    if (typeof categoryHistory === 'undefined' || !Array.isArray(categoryHistory)) return [];
+    const epoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
+    const now = Date.now();
+    const ms = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '1y': 31536e6 };
+    const start = range === 'all' ? 0 : now - (ms[range] || 2592e6);
+    const out = [];
+    for (const p of categoryHistory) {
+      if (!p || typeof p.ts !== 'number') continue;
+      if (epoch && p.ts < epoch) continue;
+      if (p.ts < start) continue;
+      const total = Number(p.total), re = Number(p.real_estate) || 0;
+      const invUSD = (Number.isFinite(total) ? total : 0) - re;     // investable = total − real estate
+      if (!Number.isFinite(invUSD) || invUSD <= 0) continue;
+      out.push({ ts: p.ts, value: toBase(invUSD, 'USD') });          // base currency, matches the Hero
+    }
+    return out.sort((a, b) => a.ts - b.ts);
+  } catch (_) { return []; }
+}
+
+// Compact axis value label, e.g. 61.2k / 1.84M. No currency token (clean).
+function _wscFmtAxisVal(v) {
+  const a = Math.abs(v);
+  if (a >= 1e6) return (v / 1e6).toFixed(2) + 'M';
+  if (a >= 1e3) return (v / 1e3).toFixed(1) + 'k';
+  return Math.round(v).toString();
+}
+
+// X-axis ticks (5) across [t0, t1] formatted per range.
+function _wscXTicks(t0, t1, range) {
+  const span = (t1 - t0) || 1, N = 5, ticks = [];
+  const fmt = ts => {
+    const d = new Date(ts);
+    if (range === '24h') return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    if (range === '7d')  return d.toLocaleDateString('es-ES', { weekday: 'short' });
+    if (range === '30d') return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+    if (range === '1y')  return d.toLocaleDateString('es-ES', { month: 'short' });
+    return d.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
+  };
+  for (let i = 0; i < N; i++) ticks.push({ frac: i / (N - 1), label: fmt(t0 + span * (i / (N - 1))) });
+  return ticks;
+}
+
+// Dev audit of the chart datasource — proves the chart speaks INVESTABLE value,
+// not total net worth, and reports any legacy polluted snapshots excluded.
+if (typeof window !== 'undefined') {
+  window.debugAurixChartDataSource = () => {
+    const info = {};
+    try {
+      info.dashboardTotalBase = (typeof investableValueBase === 'function') ? +investableValueBase().toFixed(2) : null;
+      info.investableUSD       = (typeof getInvestablePortfolioValue === 'function') ? +getInvestablePortfolioValue().toFixed(2) : null;
+      const re = (Array.isArray(assets) ? assets : [])
+        .filter(a => a && _aurixCategoryBucket(a) === 'real_estate')
+        .reduce((s, a) => { const v = assetValueUSD(a); return Number.isFinite(v) ? s + v : s; }, 0);
+      info.realEstateUSD = +re.toFixed(2);
+      info.realEstateIncludedInChart = false;
+      info.chartSource = 'investable_category_history';
+      const snaps = _aurixInvestableSnapshots(activeRange);
+      info.range = activeRange;
+      info.chartPoints = snaps.length;
+      if (snaps.length) {
+        const vs = snaps.map(s => s.value);
+        info.chartFirst = +snaps[0].value.toFixed(2);
+        info.chartLast  = +snaps[snaps.length - 1].value.toFixed(2);
+        info.chartMin   = +Math.min(...vs).toFixed(2);
+        info.chartMax   = +Math.max(...vs).toFixed(2);
+      }
+      const ph = Array.isArray(portfolioHistory) ? portfolioHistory.length : 0;
+      const ch = Array.isArray(categoryHistory) ? categoryHistory.length : 0;
+      info.portfolioHistoryPoints = ph;     // legacy TOTAL-net-worth series (NOT used by chart)
+      info.categoryHistoryPoints  = ch;     // clean per-category series (chart source)
+      info.legacyTotalSnapshotsNotUsed = ph; // all total-only points are excluded from the chart
+      try { console.table(info); } catch (_) { console.log(info); }
+    } catch (e) { info.error = String(e); console.log(info); }
+    return info;
+  };
+}
+
 // Format a snapshot timestamp for the tooltip, scaled to the active range.
 function _wscFmtTs(ts) {
   const dt = new Date(ts);
@@ -17209,26 +17300,36 @@ function _wscFmtTs(ts) {
 // Skipped on mobile so slider swipe is never absorbed.
 function _wscAttachTooltip(plot, model) {
   if (!plot || _dshReducedMotion()) return;
-  const hair = document.createElement('div');   hair.className   = 'wsc-hair';
-  const cur  = document.createElement('div');   cur.className    = 'wsc-cursor';
-  const tip  = document.createElement('div');   tip.className    = 'wsc-tip';
-  plot.appendChild(hair); plot.appendChild(cur); plot.appendChild(tip);
+  const hairV = document.createElement('div'); hairV.className = 'wsc-hair';
+  const hairH = document.createElement('div'); hairH.className = 'wsc-hair-h';
+  const cur   = document.createElement('div'); cur.className   = 'wsc-cursor';
+  const tip   = document.createElement('div'); tip.className   = 'wsc-tip';
+  plot.appendChild(hairV); plot.appendChild(hairH); plot.appendChild(cur); plot.appendChild(tip);
+  const pf = _dshFmtPct(Number.isFinite(model.deltaPct) ? model.deltaPct : 0);
+  const rangeLabel = ({ '24h': '24H', '7d': '7D', '30d': '30D', '1y': '1A', all: 'TOTAL' })[model.range] || '';
+  const showTime = model.range === '24h' || model.range === '7d';
+  const chgTone = model.deltaPct > 0.005 ? 'pos' : model.deltaPct < -0.005 ? 'neg' : '';
   const move = (e) => {
     const r = plot.getBoundingClientRect();
     if (!r.width) return;
     const vx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * _WSC_VIEW_W;
-    // nearest REAL snapshot along the time axis
-    let idx = 0, best = Infinity;
+    let idx = 0, best = Infinity;     // nearest REAL snapshot along the time axis
     for (let i = 0; i < model.n; i++) { const dd = Math.abs(model.realX[i] - vx); if (dd < best) { best = dd; idx = i; } }
     const px = (model.realX[idx] / _WSC_VIEW_W) * r.width;
     const py = (model.realY[idx] / _WSC_VIEW_H) * r.height;
-    hair.style.transform = `translateX(${px}px)`;
-    cur.style.transform  = `translate(${px}px, ${py}px)`;
-    // Tooltip shows the measured wealth value at that snapshot (base currency),
-    // which is the meaningful read in both % and divisa modes.
-    tip.innerHTML = `<span class="wsc-tip-v">${formatBase(model.vals[idx])}</span><span class="wsc-tip-t">${_wscFmtTs(model.ts[idx])}</span>`;
-    // clamp horizontally so the bubble never overflows the plot
-    const tw = tip.offsetWidth || 96;
+    hairV.style.transform = `translateX(${px}px)`;
+    hairH.style.transform = `translateY(${py}px)`;
+    cur.style.transform   = `translate(${px}px, ${py}px)`;
+    const dt = new Date(model.ts[idx]);
+    const dateStr = dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+    const timeStr = showTime ? `<span class="wsc-tip-time">${dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>` : '';
+    // Real investable portfolio value at this snapshot (base currency).
+    tip.innerHTML =
+      `<span class="wsc-tip-date">${dateStr}</span>${timeStr}` +
+      `<span class="wsc-tip-lbl">${t('chartTipValue')}</span>` +
+      `<span class="wsc-tip-v">${formatBase(model.vals[idx])}</span>` +
+      `<span class="wsc-tip-chg ${chgTone}">${rangeLabel} ${pf.text}</span>`;
+    const tw = tip.offsetWidth || 110;
     const tx = Math.min(Math.max(px, tw / 2 + 4), r.width - tw / 2 - 4);
     tip.style.transform = `translateX(${tx}px)`;
     plot.classList.add('wsc-hot');
@@ -17244,130 +17345,94 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   if (!hostEl) return;
   opts = opts || {};
 
-  let d = null;
-  try { d = (typeof getChartData === 'function') ? getChartData(activeRange) : null; } catch (_) { d = null; }
+  // WN.5 — the Dashboard chart is the INVESTABLE PORTFOLIO VALUE over time (base
+  // currency, real estate EXCLUDED), reconstructed clean from categoryHistory —
+  // NOT the polluted total-net-worth portfolioHistory. The tooltip, curve, metric
+  // and Hero "Valor total de cartera" all speak the same base. The TWR engine
+  // (computeAurixTWRSeries) stays headless for a future Performance mode.
+  const snaps = _aurixInvestableSnapshots(activeRange);
+  const vals = snaps.map(s => s.value), ts = snaps.map(s => s.ts);
 
-  // Defensive re-validation (getChartData already filters; never trust blind).
-  const vals = [], ts = [];
-  if (d && Array.isArray(d.values)) {
-    for (let i = 0; i < d.values.length; i++) {
-      const v = d.values[i], tt = d.timestamps[i];
-      if (Number.isFinite(v) && v > 0 && Number.isFinite(tt)) { vals.push(v); ts.push(tt); }
-    }
+  if (typeof window !== 'undefined') {
+    window._aurixChartMode = { range: activeRange, mode: 'INVESTABLE_VALUE', source: 'category_history', realEstateIncluded: false, points: vals.length };
   }
 
-  // < 2 valid points → premium "building history" empty state. Never a fake line.
+  // < 2 clean points → honest building state. Never show polluted/fake values.
   if (vals.length < 2) {
     if (changeEl) { changeEl.textContent = ''; changeEl.className = 'chart-change'; changeEl.removeAttribute('title'); }
     hostEl.innerHTML =
-      `<div class="wsc wsc--empty">
-         <div class="wsc-empty">
-           <div class="wsc-empty-title">${t('wscBuildingTitle')}</div>
-           <div class="wsc-empty-body">${t('wscBuildingBody')}</div>
-         </div>
-       </div>`;
+      `<div class="wsc wsc--empty"><div class="wsc-empty"><div class="wsc-empty-title">${t('wscBuildingTitle')}</div><div class="wsc-empty-body">${t('wscBuildingBody')}</div></div></div>`;
     return;
   }
 
-  const first    = Number.isFinite(d.firstValue) ? d.firstValue : vals[0];
-  const last     = Number.isFinite(d.lastValue)  ? d.lastValue  : vals[vals.length - 1];
-  const deltaAbs = Number.isFinite(d.deltaAbs) ? d.deltaAbs : (last - first);
-  const deltaPct = Number.isFinite(d.deltaPct) ? d.deltaPct : (first > 0 ? (deltaAbs / first) * 100 : 0);
-
-  // WN.1 fallback source + WN.2 organic $ metric. Real-value focused slice;
-  // never mutates raw history.
   const W = _WSC_VIEW_W, H = _WSC_VIEW_H;
   const padX = W * _WSC_PAD_X, plotW = W - 2 * padX;
-  const norm  = normalizeWealthSeriesForVisualization(vals, ts, activeRange);
-  const rVals = norm.values.length >= 2 ? norm.values : vals;        // never blank a valid series
-  const rTs   = norm.values.length >= 2 ? norm.timestamps : ts;
-  const useOrganic = norm.capitalEvents.length > 0 && norm.values.length >= 2 && Number.isFinite(norm.normalizedDeltaPct);
-  if (typeof IS_DEV !== 'undefined' && IS_DEV && norm.capitalEvents.length) {
-    try { window._wscCapitalEvents = norm.capitalEvents; } catch (_) {}
-  }
 
-  // WN.4D — prefer the headless TWR engine when VALID (flows recorded / coverage
-  // sufficient). TWR is flow-neutral: deposits / withdrawals / imports are
-  // excluded from performance, so the curve + % metric show PURE performance with
-  // no capital walls or distributed-inflow artifacts. When TWR is invalid
-  // (insufficient flow coverage, <2 snaps, …) fall back to WN.1–3 exactly.
-  let twr = null;
-  try { twr = (typeof computeAurixTWRSeries === 'function') ? computeAurixTWRSeries(activeRange) : null; } catch (_) { twr = null; }
-  const twrValid = !!(twr && twr.valid && Array.isArray(twr.values) && twr.values.length >= 2 && Number.isFinite(twr.deltaPct));
-  if (typeof window !== 'undefined') {
-    window._aurixChartMode = { range: activeRange, mode: twrValid ? 'TWR' : 'WN_FALLBACK', twrValid, fallbackReason: twr ? twr.fallbackReason : 'no_engine', flowsUsed: twr ? twr.flowsUsed : 0 };
-  }
-  if (typeof IS_DEV !== 'undefined' && IS_DEV) { try { console.debug('[wsc-mode]', window._aurixChartMode); } catch (_) {} }
+  // Range change of INVESTABLE value (raw — this is a value chart, not TWR).
+  const first = vals[0], last = vals[vals.length - 1];
+  const deltaAbs = last - first;
+  const deltaPct = first > 0 ? (deltaAbs / first) * 100 : 0;
+  const tone = deltaPct > 0.005 ? 'up' : deltaPct < -0.005 ? 'down' : 'flat';
 
-  // Curve source: TWR index (base 100) when valid, else the WN.1 organic slice.
-  const srcVals = twrValid ? twr.values : rVals;
-  const srcTs   = twrValid ? twr.timestamps : rTs;
-
-  // Metric: % follows the curve engine (TWR deltaPct when valid). Currency mode
-  // keeps the WN.2 organic USD figure (NEVER index dollars). The "excludes
-  // contributions" note shows whenever capital is being excluded. Curve + metric
-  // share one `tone`, so number and line never contradict each other.
-  const pctMetric = twrValid ? twr.deltaPct : (useOrganic ? norm.normalizedDeltaPct : deltaPct);
-  const absMetric = useOrganic ? norm.normalizedDeltaAbs : deltaAbs;
-  const excludes  = twrValid ? (twr.flowsUsed > 0) : useOrganic;
-  const tone = pctMetric > 0.005 ? 'up' : pctMetric < -0.005 ? 'down' : 'flat';
-
+  // Metric: % / currency change of investable value. No "excludes" note (this is
+  // a value chart; TWR/performance mode is not active here).
   if (changeEl) {
     const mode = activePerfMode === 'curr' ? 'curr' : 'pct';
-    const pf   = _dshFmtPct(pctMetric);
-    const valText = mode === 'curr' ? _dshFmtMoney0(absMetric) : pf.text;
-    const note = excludes ? `<span class="wsc-metric-note">${t('wscExcludesContrib')}</span>` : '';
-    changeEl.innerHTML = `<span class="wsc-metric-val">${valText}</span>${note}`;
+    const pf   = _dshFmtPct(deltaPct);
+    const valText = mode === 'curr' ? _dshFmtMoney0(deltaAbs) : pf.text;
+    changeEl.innerHTML = `<span class="wsc-metric-val">${valText}</span>`;
     changeEl.className  = `chart-change ${tone}`;
     if (mode === 'pct' && pf.capped) changeEl.title = pf.raw;
     else changeEl.removeAttribute('title');
   }
 
-  // WN.3 — build a UNIFORM temporal series from the chosen source (TWR index or
-  // WN.1 organic slice): bucket-median aggregation → evenly spaced timeline →
-  // gap-filling resample → continuous institutional curve.
-  const series = _wscResample(srcVals, srcTs, activeRange);
+  // WN.3 — uniform temporal series from the CLEAN investable snapshots
+  // (aggregate → resample → gap-fill), then gentle despike + smoothing.
+  const series = _wscResample(vals, ts, activeRange);
   const uVals = series.values, uTs = series.timestamps, uN = uVals.length;
-
-  // Light despike + smoothing of the uniform series (the resample already
-  // densified/levelled it, so smoothing is gentle now — just rounds bucket joins).
   const despiked = _wscDespike(uVals, 3, 3);
   const smoothWin = activeRange === 'all' ? 3 : activeRange === '1y' ? 3 : activeRange === '30d' ? 2 : activeRange === '7d' ? 2 : 1;
   const plotVals  = _wscMovingAvg(despiked, smoothWin);
 
-  // Robust, outlier-aware vertical viewport (independent per timeframe).
+  // Viewport with a REAL value domain (drives accurate y-axis labels).
   const vp = _wscViewport(plotVals, activeRange);
-
-  // X over the uniform timeline; monotone-cubic path (no overshoot).
   const uT0 = uTs[0], uSpan = (uTs[uN - 1] - uT0) || 1;
   const xOf = (tt, i) => padX + (uSpan > 1 ? (tt - uT0) / uSpan : i / (uN - 1)) * plotW;
   const pts = plotVals.map((v, i) => ({ x: xOf(uTs[i], i), y: vp.yOf(v) }));
-
   const linePath = _wscMonotonePath(pts);
+  const areaPath = `${linePath} L${pts[pts.length - 1].x.toFixed(2)},${vp.bot.toFixed(2)} L${pts[0].x.toFixed(2)},${vp.bot.toFixed(2)} Z`;
 
-  // Two ultra-subtle horizontal reference lines framing the plot (no vertical
-  // grid, no labels) — institutional grounding, opacity handled in CSS.
+  // Premium grid: 4 horizontal (at the value ticks) + 5 vertical (at x ticks).
+  const uid = opts.uid || 'd';
   const gx1 = padX.toFixed(1), gx2 = (W - padX).toFixed(1);
-  const grid = `<line class="wsc-grid" x1="${gx1}" y1="${(H * 0.30).toFixed(1)}" x2="${gx2}" y2="${(H * 0.30).toFixed(1)}" vector-effect="non-scaling-stroke"/>`
-             + `<line class="wsc-grid" x1="${gx1}" y1="${(H * 0.70).toFixed(1)}" x2="${gx2}" y2="${(H * 0.70).toFixed(1)}" vector-effect="non-scaling-stroke"/>`;
+  const yTicks = [0, 1, 2, 3].map(i => { const f = i / 3, y = vp.top + (vp.bot - vp.top) * f; return { y, val: vp.hi - (vp.hi - vp.lo) * f }; });
+  const xTicks = _wscXTicks(uT0, uTs[uN - 1], activeRange);
+  let grid = '';
+  yTicks.forEach(tk => { grid += `<line class="wsc-grid" x1="${gx1}" y1="${tk.y.toFixed(1)}" x2="${gx2}" y2="${tk.y.toFixed(1)}" vector-effect="non-scaling-stroke"/>`; });
+  xTicks.forEach(tk => { const x = (padX + tk.frac * plotW).toFixed(1); grid += `<line class="wsc-grid wsc-grid-v" x1="${x}" y1="${vp.top.toFixed(1)}" x2="${x}" y2="${vp.bot.toFixed(1)}" vector-effect="non-scaling-stroke"/>`; });
+
+  // Axis labels as positioned HTML (crisp despite the stretched SVG): y on the
+  // right (real investable values), x along the bottom (range-specific).
+  const yLabels = yTicks.map(tk => `<span class="wsc-ylab" style="top:${(tk.y / H * 100).toFixed(2)}%">${_wscFmtAxisVal(tk.val)}</span>`).join('');
+  const xLabels = xTicks.map(tk => `<span class="wsc-xlab" style="left:${((padX + tk.frac * plotW) / W * 100).toFixed(2)}%">${tk.label}</span>`).join('');
 
   hostEl.innerHTML = `
     <div class="wsc wsc-${tone}">
       <div class="wsc-plot">
         <svg class="wsc-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+          <defs><linearGradient id="wscArea-${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" class="wsc-area-0"/><stop offset="100%" class="wsc-area-1"/></linearGradient></defs>
           ${grid}
+          <path class="wsc-area" d="${areaPath}" fill="url(#wscArea-${uid})"/>
           <path class="wsc-line" d="${linePath}" fill="none" vector-effect="non-scaling-stroke"/>
         </svg>
+        <div class="wsc-ylabs">${yLabels}</div>
+        <div class="wsc-xlabs">${xLabels}</div>
       </div>
     </div>`;
 
   if (opts.tooltip) {
-    // Tooltip stays truthful: it shows REAL portfolio wealth at its REAL
-    // timestamp, positioned on the rendered curve. In TWR mode the plotted y is
-    // the performance index but the tooltip value is real wealth (full real
-    // series); in WN fallback it's the focused real slice (unchanged behavior).
-    const tipVals = twrValid ? vals : rVals;
-    const tipTs   = twrValid ? ts   : rTs;
+    // Tooltip = REAL investable value (same base as the curve + Hero) at the REAL
+    // snapshot timestamp, positioned on the rendered curve. Never real-estate.
     const yAtX = px => {
       if (px <= pts[0].x) return pts[0].y;
       if (px >= pts[pts.length - 1].x) return pts[pts.length - 1].y;
@@ -17375,10 +17440,10 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
       const f = (px - pts[k].x) / ((pts[k + 1].x - pts[k].x) || 1);
       return pts[k].y + (pts[k + 1].y - pts[k].y) * f;
     };
-    const realX = tipTs.map(tt => padX + Math.min(1, Math.max(0, uSpan > 1 ? (tt - uT0) / uSpan : 0)) * plotW);
+    const realX = ts.map(tt => padX + Math.min(1, Math.max(0, uSpan > 1 ? (tt - uT0) / uSpan : 0)) * plotW);
     const realY = realX.map(yAtX);
     const plot = hostEl.querySelector('.wsc-plot');
-    _wscAttachTooltip(plot, { realX, realY, vals: tipVals, ts: tipTs, n: tipVals.length });
+    _wscAttachTooltip(plot, { realX, realY, vals, ts, n: vals.length, deltaPct, range: activeRange });
   }
 }
 
