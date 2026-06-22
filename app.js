@@ -16671,14 +16671,109 @@ function _dshPaintPerfSnapshot(root, doCountUp) {
 const _WSC_VIEW_W = 1000;
 const _WSC_VIEW_H = 240;
 const _WSC_PAD_X  = 0.06;   // horizontal breathing room (fraction of width, each side)
-// Executive projection (PRESENTATION ONLY — never alters the metric). The line
-// is projected around a stable baseline through a bounded, saturating transfer
-// so movement stays a calm central band:
-//   tanh maps baseline-relative % → vertical offset (viewBox units, ≈0.8px ea):
-//   ±1% ≈ 5u, ±3% ≈ 16u, ±10% ≈ 40u, ≥30% → ~max. Huge import/reset artifacts
-//   saturate instead of becoming walls; the path is always continuous.
-const _WSC_MAX_OFFSET = 50;  // max vertical excursion from centre (viewBox units; band ≈ ±50 of 120)
-const _WSC_AMP_SCALE  = 9;   // % that maps to ~tanh(1); larger = calmer mid-range
+// Visual Wealth Trajectory (PRESENTATION ONLY — never alters the metric). The
+// rendered curve is a synthesised continuous trajectory, not raw snapshots:
+//   • a TREND backbone (smootherstep S) whose amplitude is tanh(real deltaPct)
+//     → bounded & coherent with the %; huge import/reset artifacts saturate into
+//     an elegant rise instead of a wall;
+//   • a bounded real TEXTURE overlay (high-pass of the interpolated snapshots)
+//     so genuine intra-period movement shows as gentle ripples, never a cliff;
+//   • a deterministic MICROVARIATION so a near-zero change is alive, not a dead
+//     flat line. All in viewBox units (≈0.8px each at the desktop panel).
+const _WSC_MAX_OFFSET = 50;  // half-band; max excursion from centre (viewBox units, of 120)
+const _WSC_AMP_SCALE  = 9;   // % mapping to ~tanh(1); larger = calmer mid-range
+const _WSC_MAX_TREND  = 60;  // peak trend excursion (±30 around centre) for saturated moves
+const _WSC_TX_MAX     = 13;  // max bounded real-texture ripple (viewBox units)
+
+// Perlin smootherstep — S-curve 0→1 with zero 1st/2nd derivative at the ends
+// (no kinks at start/finish). Drives the elegant trend backbone.
+function _wscSmoothStep(u) { const x = Math.min(1, Math.max(0, u)); return x * x * x * (x * (x * 6 - 15) + 10); }
+
+// Catmull-Rom sample of (t,o) knots at normalized position u∈[0,1]. Smooth,
+// continuous, never a step or a long straight run between snapshots.
+function _wscSampleCatmull(knots, u) {
+  const m = knots.length;
+  if (u <= knots[0].t)     return knots[0].o;
+  if (u >= knots[m - 1].t) return knots[m - 1].o;
+  let i = 0; while (i < m - 1 && knots[i + 1].t < u) i++;
+  const p1 = knots[i], p2 = knots[i + 1];
+  const p0 = knots[i - 1] || p1, p3 = knots[i + 2] || p2;
+  const s = (u - p1.t) / ((p2.t - p1.t) || 1), s2 = s * s, s3 = s2 * s;
+  return 0.5 * (2 * p1.o + (-p0.o + p2.o) * s
+    + (2 * p0.o - 5 * p1.o + 4 * p2.o - p3.o) * s2
+    + (-p0.o + 3 * p1.o - 3 * p2.o + p3.o) * s3);
+}
+
+// Centred moving average (window win) — spreads any sharp transition into a
+// gradual ramp and yields the low-frequency component for the texture high-pass.
+function _wscMovingAvg(arr, win) {
+  const m = arr.length, half = Math.floor(win / 2), out = new Array(m);
+  for (let i = 0; i < m; i++) {
+    let sum = 0, cnt = 0;
+    for (let j = i - half; j <= i + half; j++) if (j >= 0 && j < m) { sum += arr[j]; cnt++; }
+    out[i] = sum / (cnt || 1);
+  }
+  return out;
+}
+
+// Deterministic phases from the first timestamp + range (NEVER Math.random, so
+// the microvariation is stable across renders and never appears as real data).
+function _wscSeed(ts, range) {
+  const r = ({ '24h': 1, '7d': 2, '30d': 3, '1y': 4, all: 5 })[range] || 1;
+  const x = (Math.abs(Math.round(ts || 0)) % 100000) / 100000;     // 0..1
+  return { p1: x * Math.PI * 2, p2: (((x * 1.7 + r * 0.31) % 1) * Math.PI * 2) };
+}
+
+// ── Visual Wealth Trajectory ────────────────────────────────────────────────
+// Turn validated snapshots into a dense (N≈90–120), continuous, institutional
+// visual trajectory of vertical offsets (viewBox units from centre). Inputs are
+// the source of truth; the output is the rendered SHAPE only.
+function buildVisualWealthTrajectory(points, range, deltaPct) {
+  const vals = points.map(p => p.value), ts = points.map(p => p.ts);
+  const n = vals.length;
+  const N = range === '24h' ? 90 : range === '7d' ? 100 : 120;
+  const dpct = Number.isFinite(deltaPct) ? deltaPct : 0;
+
+  // Robust baseline (median resists a lone creation/import/reset spike) and the
+  // bounded real offsets that carry intra-period texture.
+  const sorted   = vals.slice().sort((a, b) => a - b);
+  const median   = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+  const baseline = median || vals[0] || 1;
+  const realOff  = vals.map(v => _WSC_MAX_OFFSET * Math.tanh((((v - baseline) / baseline) * 100) / _WSC_AMP_SCALE));
+
+  // Temporal interpolation: knots spaced by REAL time, resampled uniformly in X.
+  const t0 = ts[0], tspan = (ts[n - 1] - t0) || 1;
+  const knots = realOff.map((o, i) => ({ t: (ts[i] - t0) / tspan, o }));
+  const dense = [];
+  for (let s = 0; s < N; s++) dense.push(_wscSampleCatmull(knots, s / (N - 1)));
+
+  // Texture = bounded high-pass of the interpolated real series (intra-period
+  // ripples), so real movement shows without ever forming a wall.
+  const low = _wscMovingAvg(dense, Math.max(3, Math.round(N * 0.30)));
+  const texture = dense.map((o, i) => Math.max(-_WSC_TX_MAX, Math.min(_WSC_TX_MAX, o - low[i])));
+
+  // Trend backbone — coherent with the real %, bounded (no wall on +999%).
+  const tAmp = _WSC_MAX_TREND * Math.tanh(dpct / _WSC_AMP_SCALE);
+
+  // Deterministic microvariation — keeps near-zero changes alive; decays as the
+  // real move grows so it never competes with a genuine trend.
+  const baseMicro = range === '24h' ? 4 : range === '7d' ? 6 : 3;
+  const microAmp  = baseMicro / (1 + Math.abs(dpct) * 0.25);
+  const seed = _wscSeed(t0, range);
+  const w1 = 2 * Math.PI * 2.3, w2 = 2 * Math.PI * 5.1;
+
+  const out = new Array(N);
+  for (let i = 0; i < N; i++) {
+    const u = i / (N - 1);
+    const trend = tAmp * (_wscSmoothStep(u) - 0.5);
+    const env   = 0.5 + 0.5 * Math.sin(Math.PI * u);          // mild taper, never fully 0
+    const micro = microAmp * env * (0.62 * Math.sin(u * w1 + seed.p1) + 0.38 * Math.sin(u * w2 + seed.p2));
+    out[i] = trend + texture[i] + micro;
+  }
+  return out;
+}
+
+// Smoothed path (Catmull-Rom → cubic bézier, low tension = gentle, no overshoot).
 
 // Smoothed path (Catmull-Rom → cubic bézier, low tension = gentle, no overshoot).
 function _wscSmoothPath(pts) {
@@ -16718,10 +16813,12 @@ function _wscAttachTooltip(plot, model) {
   const move = (e) => {
     const r = plot.getBoundingClientRect();
     if (!r.width) return;
-    const rel = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
-    const idx = Math.round(rel * (model.n - 1));
-    const px  = (model.pts[idx].x / _WSC_VIEW_W) * r.width;
-    const py  = (model.pts[idx].y / _WSC_VIEW_H) * r.height;
+    const vx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * _WSC_VIEW_W;
+    // nearest REAL snapshot along the time axis
+    let idx = 0, best = Infinity;
+    for (let i = 0; i < model.n; i++) { const dd = Math.abs(model.realX[i] - vx); if (dd < best) { best = dd; idx = i; } }
+    const px = (model.realX[idx] / _WSC_VIEW_W) * r.width;
+    const py = (model.realY[idx] / _WSC_VIEW_H) * r.height;
     hair.style.transform = `translateX(${px}px)`;
     cur.style.transform  = `translate(${px}px, ${py}px)`;
     // Tooltip shows the measured wealth value at that snapshot (base currency),
@@ -16785,64 +16882,38 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
     else changeEl.removeAttribute('title');
   }
 
-  // ── Executive projection (PRESENTATION ONLY — the metric above is the real
-  //    figure). The line is projected around a stable baseline through a
-  //    bounded, saturating transfer, so the curve always lives in a calm
-  //    central band: small moves are gentle, large historical artifacts (asset
-  //    creation / import / reset) COMPRESS instead of becoming walls, and the
-  //    path is ALWAYS continuous (no segmented breaks, no blocky fills).
+  // ── Visual Wealth Trajectory (PRESENTATION ONLY — the metric above is the
+  //    real figure). The dense synthesised trajectory is continuous, lives in a
+  //    calm central band, compresses artifacts and is never flat/vertical/stepped.
   const W = _WSC_VIEW_W, H = _WSC_VIEW_H;
   const padX = W * _WSC_PAD_X, plotW = W - 2 * padX, center = H / 2;
   const n = vals.length;
 
-  // Robust baseline = median (resists a lone creation/import/reset spike).
-  const sorted   = vals.slice().sort((a, b) => a - b);
-  const median   = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
-  const baseline = median || first || 1;
-
-  // Baseline-relative % → bounded vertical offset (tanh saturates large moves).
-  const offsetOf = v => _WSC_MAX_OFFSET * Math.tanh((((v - baseline) / baseline) * 100) / _WSC_AMP_SCALE);
-  let offsets = vals.map(offsetOf);
-
-  // Light 3-tap moving average — eases a lone artifact into the calm band and
-  // removes sharp single-point steps (presentation smoothing; no data change).
-  if (offsets.length >= 3) {
-    const sm = offsets.slice();
-    for (let i = 1; i < offsets.length - 1; i++) {
-      sm[i] = offsets[i - 1] * 0.25 + offsets[i] * 0.5 + offsets[i + 1] * 0.25;
-    }
-    offsets = sm;
-  }
-
-  const pts = offsets.map((o, i) => ({
-    x: padX + (n === 1 ? 0 : (i / (n - 1)) * plotW),
-    y: center - o,
-  }));
+  const offsets = buildVisualWealthTrajectory(vals.map((v, i) => ({ ts: ts[i], value: v })), activeRange, deltaPct);
+  const N = offsets.length;
+  const pts = offsets.map((o, i) => ({ x: padX + (i / (N - 1)) * plotW, y: center - o }));
 
   const linePath = _wscSmoothPath(pts);                       // one continuous smooth path
-  const areaPath = `${linePath} L${pts[pts.length - 1].x.toFixed(2)},${H} L${pts[0].x.toFixed(2)},${H} Z`;
   const uid      = opts.uid || 'd';
 
   hostEl.innerHTML = `
     <div class="wsc wsc-${tone}">
       <div class="wsc-plot">
         <svg class="wsc-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
-          <defs>
-            <linearGradient id="wscFill-${uid}" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   class="wsc-fill-0"/>
-              <stop offset="100%" class="wsc-fill-1"/>
-            </linearGradient>
-          </defs>
-          <line class="wsc-baseline" x1="${padX.toFixed(1)}" y1="${center}" x2="${(W - padX).toFixed(1)}" y2="${center}" vector-effect="non-scaling-stroke"/>
-          <path class="wsc-area" d="${areaPath}" fill="url(#wscFill-${uid})"/>
           <path class="wsc-line" d="${linePath}" fill="none" vector-effect="non-scaling-stroke"/>
         </svg>
       </div>
     </div>`;
 
   if (opts.tooltip) {
+    // Tooltip snaps to REAL snapshots (true value/time), positioned on the
+    // visual curve. realX in viewBox units along the time axis; realY sampled
+    // from the dense trajectory at each snapshot's normalized time.
+    const tspan = (ts[n - 1] - ts[0]) || 1;
+    const realX = ts.map(tt => padX + ((tt - ts[0]) / tspan) * plotW);
+    const realY = ts.map(tt => center - offsets[Math.round(((tt - ts[0]) / tspan) * (N - 1))]);
     const plot = hostEl.querySelector('.wsc-plot');
-    _wscAttachTooltip(plot, { pts, vals, ts, n });
+    _wscAttachTooltip(plot, { realX, realY, vals, ts, n });
   }
 }
 

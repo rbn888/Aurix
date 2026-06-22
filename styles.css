@@ -21760,21 +21760,9 @@ body.gs-open { overflow: hidden; }
 .wsc-down .wsc-line { stroke: var(--red,   #e05a5a); }
 .wsc-flat .wsc-line { stroke: var(--text-muted, #9aa7bd); }
 
-/* whisper area fill — extremely subtle, fades to nothing (no block, no rectangle) */
-.wsc-fill-0 { stop-color: var(--accent, #4a82f0); stop-opacity: .06; }
-.wsc-fill-1 { stop-color: var(--accent, #4a82f0); stop-opacity: 0; }
-.wsc-up   .wsc-fill-0 { stop-color: var(--green, #3fbf7f); stop-opacity: .06; }
-.wsc-down .wsc-fill-0 { stop-color: var(--red,   #e05a5a); stop-opacity: .05; }
-.wsc-flat .wsc-fill-0 { stop-color: var(--text-muted, #9aa7bd); stop-opacity: .04; }
-
-/* discrete reference line at the period start */
-.wsc-baseline {
-  stroke: rgba(255,255,255,.07);
-  stroke-width: 1;
-  stroke-dasharray: 2 5;
-}
-
-/* WSC.1R — decorative end-of-series dot removed (calmer, institutional). */
+/* WSC.3 — area fill, baseline reference and end dot all removed: just a clean,
+   continuous institutional trajectory line (no rectangles, no flat horizontal
+   reference, no decorative dot). */
 
 /* empty / building state */
 .wsc--empty { display: flex; align-items: center; justify-content: center; }
@@ -21827,8 +21815,6 @@ body.gs-open { overflow: hidden; }
 
 /* entrance micro-animation on range / unit change */
 .wsc-in .wsc-line  { animation: wscDraw .46s var(--ease-out, ease) both; }
-.wsc-in .wsc-area  { animation: wscFade .46s var(--ease-out, ease) both; }
-@keyframes wscFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes wscDraw { from { opacity: 0; } to { opacity: .92; } }
 
 /* mobile host: REPLACES the legacy canvas / V2 chart inside .mobile-chart-wrap.
@@ -21862,5 +21848,5 @@ body.gs-open { overflow: hidden; }
 .mobile-slide-chart .chart-header > div:first-child { padding-left: 3%; }
 
 @media (prefers-reduced-motion: reduce) {
-  .wsc-in .wsc-line, .wsc-in .wsc-area { animation: none; }
+  .wsc-in .wsc-line { animation: none; }
 }
