@@ -5798,6 +5798,85 @@ if (typeof window !== 'undefined') {
   };
 }
 
+// ── WN.4B — Historical capital-flow backfill (local, one-time, idempotent) ──
+// WN.4A captures NEW user-driven flows; existing portfolioHistory still holds
+// OLD construction/import jumps. This converts only the OBVIOUS historical ones
+// into import_baseline flows so the ledger reflects past capital events too.
+// Read-only on portfolioHistory (never mutated); writes only to the local
+// aurixCapitalFlows ledger via the idempotent _aurixCaptureFlow. Detection is
+// STRICTER than WN.1 (≥50% adjacent jump OR prev < 25% of the post-jump median
+// regime, AND the new level is sustained, AND it's an inflow) so ordinary market
+// movement is never inferred as capital. Epoch-filtered → never backfills
+// pre-reset history the app would otherwise ignore.
+function _aurixDetectHistoricalConstruction() {
+  const out = [];
+  try {
+    if (typeof portfolioHistory === 'undefined' || !Array.isArray(portfolioHistory)) return out;
+    const epoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
+    const pts = portfolioHistory
+      .filter(p => p && typeof p.ts === 'number' && typeof p.value === 'number' && isFinite(p.value) && p.value > 0)
+      .filter(p => !epoch || p.ts >= epoch)
+      .sort((a, b) => a.ts - b.ts);
+    const n = pts.length;
+    if (n < 3) return out;
+    const SUSTAIN = 4;
+    const med = arr => { const s = arr.slice().sort((a, b) => a - b); return s.length ? s[(s.length - 1) >> 1] : 0; };
+    for (let i = 1; i < n; i++) {
+      const prev = pts[i - 1].value, cur = pts[i].value;
+      if (!(cur > prev)) continue;                         // construction / import = inflow (up only)
+      const jumpPct = (cur / prev - 1) * 100;
+      const postMed = med(pts.slice(i, Math.min(n, i + SUSTAIN + 1)).map(p => p.value));
+      if (!(postMed > 0)) continue;
+      const sustained = postMed >= cur * 0.70;             // the new level holds (not a transient spike)
+      const smallBase = prev < 0.25 * postMed;             // tiny base → large regime
+      if (sustained && (jumpPct >= 50 || smallBase)) {
+        out.push({ ts: pts[i].ts, prevValue: prev, nextValue: cur, amountUSD: +(cur - prev).toFixed(2), jumpPct: +jumpPct.toFixed(2) });
+      }
+    }
+  } catch (_) {}
+  return out;
+}
+
+function backfillHistoricalCapitalFlowsFromPortfolioHistory() {
+  const events = _aurixDetectHistoricalConstruction();
+  const before = _aurixLoadCapitalFlows().length;
+  events.forEach(e => {
+    _aurixCaptureFlow('import_baseline', e.amountUSD, e.ts, null,
+      'Inferred historical portfolio construction/import event', 'inferred');
+  });
+  const added = _aurixLoadCapitalFlows().length - before;
+  if (typeof IS_DEV !== 'undefined' && IS_DEV) { try { console.debug('[capital-backfill] detected:', events.length, 'added:', added); } catch (_) {} }
+  return { detected: events.length, added, events };
+}
+
+if (typeof window !== 'undefined') {
+  window.backfillAurixCapitalFlows = () => backfillHistoricalCapitalFlowsFromPortfolioHistory();
+  // Preview: what WOULD be added (after dedupe) — never writes.
+  window.previewAurixCapitalFlowBackfill = () => {
+    const events = _aurixDetectHistoricalConstruction();
+    let existing = [];
+    try { existing = _aurixLoadCapitalFlows(); } catch (_) {}
+    const rows = events.map(e => {
+      const id = `import_baseline:cash:${e.ts}:${Math.round(Math.abs(e.amountUSD))}`;
+      return { ...e, when: new Date(e.ts).toLocaleString(), alreadyPresent: existing.some(f => f.id === id) };
+    });
+    try { console.table(rows); console.log('[capital-backfill preview] new:', rows.filter(r => !r.alreadyPresent).length, 'of', rows.length); } catch (_) {}
+    return rows;
+  };
+}
+
+// One-time, idempotent auto-backfill: enrich the local ledger from existing
+// history a few seconds after boot (history is loaded by then). Dedupe makes
+// re-runs harmless and the chart does NOT consume flows yet, so this is invisible.
+let _aurixBackfillDone = false;
+try {
+  setTimeout(() => {
+    if (_aurixBackfillDone) return;
+    _aurixBackfillDone = true;
+    try { backfillHistoricalCapitalFlowsFromPortfolioHistory(); } catch (_) {}
+  }, 5000);
+} catch (_) {}
+
 // ── Aurix Data Layer — Phase 1 + SPEC B ───────────────────
 function inferPriceSource(a) {
   if (a.type === 'cash')         return 'fx';
