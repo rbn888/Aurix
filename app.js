@@ -18003,7 +18003,7 @@ function detectVerticalRegimes(values, timestamps, range) {
   // slow swing whose period exceeds the drift window reads as alternating trends,
   // but its half-waves share a level → collapse to one consolidation regime. A
   // real ramp has rising medians → its segments stay distinct.
-  const MERGE_THR = 0.07;
+  const MERGE_THR = 0.12;
   let bnds = runs.map(r => r[0]); bnds.push(n);
   let merged = true;
   while (merged && bnds.length > 2) {
