@@ -16957,19 +16957,16 @@ const _WSC_VIEW_H = 240;
 // no decorative oscillation. Only the visual SCALE adapts (robust statistics +
 // adaptive occupancy) so real movement is always legible and outliers never
 // dictate the chart height. Metric / % / gain stay the real figures.
-const _WSC_PAD_X    = 0.11;   // horizontal inset each side — narrower plot, ≥10–12% margins
+const _WSC_PAD_X    = 0.075;  // WN.6 — slightly wider plot (smaller horizontal inset)
 const _WSC_OCC_SCALE = 0.05;  // robust relative-spread that maps to ~mid occupancy
-// Per-timeframe vertical occupancy band [min, max] of the panel height. Small
-// real moves stay visible at the floor; large moves are capped (never > 0.60,
-// so top/bottom margins are always ≥ ~20%). Independent per range.
-// Occupancy stabilizer V2 (WN.3): the curve always fills a healthy 30–70% band
-// (never hugs a border, never crushed). Adaptive per timeframe within that range.
+// WN.6 — taller plot: grid/line occupy ~62–77% of the chart height (never hug a
+// border, never crushed), adaptive per timeframe within that range.
 const _WSC_OCC = {
-  '24h': [0.30, 0.55],
-  '7d':  [0.32, 0.58],
-  '30d': [0.35, 0.62],
-  '1y':  [0.38, 0.66],
-  'all': [0.38, 0.68],
+  '24h': [0.60, 0.74],
+  '7d':  [0.62, 0.75],
+  '30d': [0.62, 0.76],
+  '1y':  [0.64, 0.77],
+  'all': [0.64, 0.77],
 };
 // Per-range adjacent-jump threshold (%) above which a SUSTAINED level shift is
 // treated as a capital / import / construction event (not market performance).
@@ -17229,6 +17226,54 @@ function _aurixInvestableSnapshots(range) {
   } catch (_) { return []; }
 }
 
+// WN.6 — chart eligibility filter + active-window focus. Anchored on the CURRENT
+// investable value, it drops a LEADING prefix of snapshots that are structurally
+// incompatible with today's portfolio (old construction/import baselines, values
+// wildly outside the investable family — e.g. 1.13M or 1.9k when current ≈ 61k),
+// then trims a long dead-flat lead-in. This stops 1A/TOTAL showing −94% off an
+// old baseline and 30D pinning to the floor. Raw history is never mutated;
+// filtering happens at data-selection time. Returns { series, meta }.
+function _aurixEligibleInvestableSeries(range) {
+  const raw = _aurixInvestableSnapshots(range);
+  const meta = {
+    raw: raw.length, eligible: 0, excluded: 0,
+    reasons: { realEstatePolluted: 0, incompatibleScale: 0, constructionBaseline: 0, staleFlatSection: 0, insufficientCleanData: 0 },
+    anchor: null, activeWindowStart: null, activeWindowEnd: null,
+  };
+  if (raw.length < 2) { meta.eligible = raw.length; if (raw.length < 2) meta.reasons.insufficientCleanData = 1; return { series: raw.slice(), meta }; }
+
+  // Anchor = current investable value (base currency); fall back to last snapshot.
+  let anchor = 0;
+  try { anchor = (typeof investableValueBase === 'function') ? investableValueBase() : 0; } catch (_) {}
+  if (!(anchor > 0)) anchor = raw[raw.length - 1].value;
+  meta.anchor = +anchor.toFixed(2);
+  const LOW = anchor * 0.35, HIGH = anchor * 4.0, CONSTRUCTION = anchor * 0.15;
+
+  // 1. Drop the LEADING incompatible-scale prefix (old/polluted/construction).
+  let s = 0;
+  while (s < raw.length && (raw[s].value < LOW || raw[s].value > HIGH)) {
+    const v = raw[s].value;
+    if (v < CONSTRUCTION) meta.reasons.constructionBaseline++;
+    else meta.reasons.incompatibleScale++;
+    meta.excluded++; s++;
+  }
+  let series = raw.slice(s);
+
+  // 2. Trim a long leading DEAD-FLAT run (truly stale/repeated values) so the
+  //    chart never opens with a dead line, then real movement.
+  if (series.length >= 6) {
+    const flatTol = Math.max(anchor * 0.0015, 1e-9);   // ~0.15% of investable = "flat"
+    let f = 0;
+    while (f < series.length - 3 && Math.abs(series[f].value - series[0].value) <= flatTol) f++;
+    if (f >= 4 && f >= series.length * 0.15) { meta.reasons.staleFlatSection += f; meta.excluded += f; series = series.slice(f); }
+  }
+
+  meta.eligible = series.length;
+  if (series.length) { meta.activeWindowStart = series[0].ts; meta.activeWindowEnd = series[series.length - 1].ts; }
+  if (series.length < 2) meta.reasons.insufficientCleanData = 1;
+  return { series, meta };
+}
+
 // Compact axis value label, e.g. 61.2k / 1.84M. No currency token (clean).
 function _wscFmtAxisVal(v) {
   const a = Math.abs(v);
@@ -17266,22 +17311,26 @@ if (typeof window !== 'undefined') {
       info.realEstateUSD = +re.toFixed(2);
       info.realEstateIncludedInChart = false;
       info.chartSource = 'investable_category_history';
-      const snaps = _aurixInvestableSnapshots(activeRange);
+      info.currentInvestable = info.investableUSD;
+      info.realEstate = info.realEstateUSD;
       info.range = activeRange;
-      info.chartPoints = snaps.length;
-      if (snaps.length) {
-        const vs = snaps.map(s => s.value);
-        info.chartFirst = +snaps[0].value.toFixed(2);
-        info.chartLast  = +snaps[snaps.length - 1].value.toFixed(2);
-        info.chartMin   = +Math.min(...vs).toFixed(2);
-        info.chartMax   = +Math.max(...vs).toFixed(2);
+      const raw = _aurixInvestableSnapshots(activeRange);
+      const elig = _aurixEligibleInvestableSeries(activeRange);
+      info.rawSnapshotCount      = raw.length;
+      info.eligibleSnapshotCount = elig.meta.eligible;
+      info.excludedSnapshotCount = elig.meta.excluded;
+      info.excludedReasons       = elig.meta.reasons;          // realEstatePolluted/incompatibleScale/constructionBaseline/staleFlatSection/insufficientCleanData
+      info.activeWindowStart = elig.meta.activeWindowStart ? new Date(elig.meta.activeWindowStart).toISOString() : null;
+      info.activeWindowEnd   = elig.meta.activeWindowEnd   ? new Date(elig.meta.activeWindowEnd).toISOString()   : null;
+      const es = elig.series.map(s => s.value);
+      if (es.length) {
+        info.renderedMin = +Math.min(...es).toFixed(2);
+        info.renderedMax = +Math.max(...es).toFixed(2);
+        info.renderedDeltaPct = es[0] > 0 ? +(((es[es.length - 1] - es[0]) / es[0]) * 100).toFixed(2) : null;
       }
       const ph = Array.isArray(portfolioHistory) ? portfolioHistory.length : 0;
-      const ch = Array.isArray(categoryHistory) ? categoryHistory.length : 0;
-      info.portfolioHistoryPoints = ph;     // legacy TOTAL-net-worth series (NOT used by chart)
-      info.categoryHistoryPoints  = ch;     // clean per-category series (chart source)
-      info.legacyTotalSnapshotsNotUsed = ph; // all total-only points are excluded from the chart
-      try { console.table(info); } catch (_) { console.log(info); }
+      info.legacyTotalSnapshotsNotUsed = ph; // total-only points are never used by the chart
+      try { console.table(info); console.log('[chart-source] excludedReasons:', info.excludedReasons); } catch (_) { console.log(info); }
     } catch (e) { info.error = String(e); console.log(info); }
     return info;
   };
@@ -17350,11 +17399,14 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   // NOT the polluted total-net-worth portfolioHistory. The tooltip, curve, metric
   // and Hero "Valor total de cartera" all speak the same base. The TWR engine
   // (computeAurixTWRSeries) stays headless for a future Performance mode.
-  const snaps = _aurixInvestableSnapshots(activeRange);
+  // WN.6 — eligibility filter + active-window focus on the clean investable
+  // history (drops old/polluted/construction prefix + dead-flat lead-in).
+  const elig = _aurixEligibleInvestableSeries(activeRange);
+  const snaps = elig.series;
   const vals = snaps.map(s => s.value), ts = snaps.map(s => s.ts);
 
   if (typeof window !== 'undefined') {
-    window._aurixChartMode = { range: activeRange, mode: 'INVESTABLE_VALUE', source: 'category_history', realEstateIncluded: false, points: vals.length };
+    window._aurixChartMode = { range: activeRange, mode: 'INVESTABLE_VALUE', source: 'category_history', realEstateIncluded: false, points: vals.length, eligible: elig.meta };
   }
 
   // < 2 clean points → honest building state. Never show polluted/fake values.

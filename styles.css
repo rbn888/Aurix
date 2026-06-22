@@ -21750,7 +21750,7 @@ body.gs-open { overflow: hidden; }
 /* WN.5 — premium institutional line (value chart): 2.6px, rounded, no glow. */
 .wsc-line {
   stroke: var(--accent, #4a82f0);
-  stroke-width: 2.6;
+  stroke-width: 2.9;
   stroke-linecap: round;
   stroke-linejoin: round;
   opacity: .98;
@@ -21761,8 +21761,8 @@ body.gs-open { overflow: hidden; }
 
 /* WN.5 — subtle institutional grid: horizontal value lines + lighter vertical
    time markers. Low opacity, premium (never heavy). */
-.wsc-grid   { stroke: rgba(255,255,255,.05);  stroke-width: 1; }
-.wsc-grid-v { stroke: rgba(255,255,255,.032); stroke-width: 1; }
+.wsc-grid   { stroke: rgba(255,255,255,.07);  stroke-width: 1; }
+.wsc-grid-v { stroke: rgba(255,255,255,.045); stroke-width: 1; }
 
 /* WN.5 — very subtle gradient area fill under the line (fades to transparent,
    no block). */
@@ -21882,17 +21882,19 @@ body.gs-open { overflow: hidden; }
 @media (min-width: 769px) {
   .perf-snapshot {
     display: block !important;
-    height: 190px;
+    height: 255px;          /* WN.6 — taller plot, real financial-chart feel */
     padding: 0;
     gap: 0;
   }
-  /* WSC.5 — align the title + metric with the actual chart plotting origin
-     (the curve starts inset by _WSC_PAD_X = 11% of the plot width). */
-  .hero-right .chart-header > div:first-child { padding-left: 10%; }
+  /* WN.6 — tighten the chart card's vertical padding so the plot dominates. */
+  .hero-right { padding-top: var(--space-4); padding-bottom: 12px; }
+  .hero-right .chart-header { margin-bottom: 10px; }
+  /* WN.6 — move the title + metric LEFT (closer to the card edge). */
+  .hero-right .chart-header > div:first-child { padding-left: 6%; }
 }
 
-/* mobile: align the title with the curve's plotting origin */
-.mobile-slide-chart .chart-header > div:first-child { padding-left: 9%; }
+/* mobile: modest title indent toward the plotting origin */
+.mobile-slide-chart .chart-header > div:first-child { padding-left: 5%; }
 
 @media (prefers-reduced-motion: reduce) {
   .wsc-in .wsc-line { animation: none; }
