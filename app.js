@@ -16684,12 +16684,14 @@ const _WSC_OCC_SCALE = 0.05;  // robust relative-spread that maps to ~mid occupa
 // Per-timeframe vertical occupancy band [min, max] of the panel height. Small
 // real moves stay visible at the floor; large moves are capped (never > 0.60,
 // so top/bottom margins are always ≥ ~20%). Independent per range.
+// Occupancy stabilizer V2 (WN.3): the curve always fills a healthy 30–70% band
+// (never hugs a border, never crushed). Adaptive per timeframe within that range.
 const _WSC_OCC = {
-  '24h': [0.18, 0.32],
-  '7d':  [0.25, 0.40],
-  '30d': [0.30, 0.50],
-  '1y':  [0.35, 0.55],
-  'all': [0.35, 0.55],
+  '24h': [0.30, 0.55],
+  '7d':  [0.32, 0.58],
+  '30d': [0.35, 0.62],
+  '1y':  [0.38, 0.66],
+  'all': [0.38, 0.68],
 };
 // Per-range adjacent-jump threshold (%) above which a SUSTAINED level shift is
 // treated as a capital / import / construction event (not market performance).
@@ -16874,6 +16876,58 @@ function normalizeWealthSeriesForVisualization(values, timestamps, range) {
   };
 }
 
+// ── Institutional Time-Series Engine (WN.3) ─────────────────────────────────
+// Sparse, session-clustered snapshots render as shelves / steps / walls. Real
+// platforms never plot raw sparse points — they build a UNIFORM temporal series
+// first. This does: per-range bucket aggregation (robust median) → an evenly
+// spaced timeline → deterministic linear resampling that gap-fills the inactive
+// periods between sessions as smooth ramps (no flat-then-wall). It only
+// interpolates/aggregates REAL levels — no Math.random, no synthetic returns, no
+// fabricated volatility. Endpoints are preserved exactly so the curve's net
+// direction stays aligned with the (organic) metric.
+const _WSC_BUCKET_MS = { '24h': 15 * 6e4, '7d': 2 * 36e5, '30d': 6 * 36e5, '1y': 864e5, 'all': 3 * 864e5 };
+const _WSC_SAMPLES   = { '24h': 120, '7d': 140, '30d': 160, '1y': 180, 'all': 200 };
+function _wscResample(values, timestamps, range) {
+  const n = values.length;
+  const pass = { values: values.slice(), timestamps: timestamps.slice() };
+  if (n < 2) return pass;
+
+  // 1. Aggregate to time buckets using the robust median (collapses session
+  //    clusters + intra-bucket noise into one representative level per bucket).
+  const bucketMs = _WSC_BUCKET_MS[range] || 36e5;
+  const t0 = timestamps[0], tLast = timestamps[n - 1];
+  const buckets = new Map();
+  for (let i = 0; i < n; i++) {
+    const b = Math.floor((timestamps[i] - t0) / bucketMs);
+    if (!buckets.has(b)) buckets.set(b, []);
+    buckets.get(b).push(values[i]);
+  }
+  const aggT = [], aggV = [];
+  [...buckets.keys()].sort((a, b) => a - b).forEach(b => {
+    const arr = buckets.get(b).sort((x, y) => x - y);
+    aggT.push(t0 + (b + 0.5) * bucketMs);
+    aggV.push(arr[(arr.length - 1) >> 1]);
+  });
+  if (aggT.length < 2) return pass;
+  // Preserve real endpoints exactly (levels + net direction → metric alignment).
+  aggT[0] = t0;            aggV[0] = values[0];
+  aggT[aggT.length - 1] = tLast; aggV[aggV.length - 1] = values[n - 1];
+
+  // 2. Uniform timeline + 3. linear resample (gap-fill as smooth ramps).
+  const N = _WSC_SAMPLES[range] || 150;
+  const span = (aggT[aggT.length - 1] - aggT[0]) || 1;
+  const outV = new Array(N), outT = new Array(N);
+  let j = 0;
+  for (let s = 0; s < N; s++) {
+    const tt = aggT[0] + span * (s / (N - 1));
+    while (j < aggT.length - 2 && aggT[j + 1] < tt) j++;
+    const f = (tt - aggT[j]) / ((aggT[j + 1] - aggT[j]) || 1);
+    outV[s] = aggV[j] + (aggV[j + 1] - aggV[j]) * Math.min(1, Math.max(0, f));
+    outT[s] = tt;
+  }
+  return { values: outV, timestamps: outT };
+}
+
 // Format a snapshot timestamp for the tooltip, scaled to the active range.
 function _wscFmtTs(ts) {
   const dt = new Date(ts);
@@ -16992,23 +17046,26 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
     else changeEl.removeAttribute('title');
   }
 
-  // Endpoint + isolated-spike protection: Hampel despike of REAL values, so a
-  // lone live-tick outlier (the 24H right-edge hook) or a blip can't create a
-  // spike/shelf. Then honest moving-average aggregation — stronger on the macro
-  // views (rounds stair-step shelves on 30D/1A/TOTAL), none on 24H (fine real
-  // movement). Both operate on real values only; metric + tooltip are untouched.
-  const despiked = _wscDespike(rVals, 3, 3);
-  const smoothWin = activeRange === 'all' ? 8 : activeRange === '1y' ? 6 : activeRange === '30d' ? 4 : activeRange === '7d' ? 2 : 1;
+  // WN.3 — build a UNIFORM temporal series from the (organic) real points:
+  // bucket-median aggregation → evenly spaced timeline → gap-filling linear
+  // resample. This is what turns session-clustered, shelf/step/wall data into a
+  // continuous institutional curve. Truthful: interpolation of real levels only.
+  const series = _wscResample(rVals, rTs, activeRange);
+  const uVals = series.values, uTs = series.timestamps, uN = uVals.length;
+
+  // Light despike + smoothing of the uniform series (the resample already
+  // densified/levelled it, so smoothing is gentle now — just rounds bucket joins).
+  const despiked = _wscDespike(uVals, 3, 3);
+  const smoothWin = activeRange === 'all' ? 3 : activeRange === '1y' ? 3 : activeRange === '30d' ? 2 : activeRange === '7d' ? 2 : 1;
   const plotVals  = _wscMovingAvg(despiked, smoothWin);
 
   // Robust, outlier-aware vertical viewport (independent per timeframe).
   const vp = _wscViewport(plotVals, activeRange);
 
-  // X by real time so gaps reflect reality; fall back to index if timestamps
-  // collapse. Monotone-cubic path through the real points (no overshoot).
-  const tspan = (rTs[n - 1] - rTs[0]) || 1;
-  const xOf = (tt, i) => padX + (tspan > 1 ? (tt - rTs[0]) / tspan : i / (n - 1)) * plotW;
-  const pts = plotVals.map((v, i) => ({ x: xOf(rTs[i], i), y: vp.yOf(v) }));
+  // X over the uniform timeline; monotone-cubic path (no overshoot).
+  const uT0 = uTs[0], uSpan = (uTs[uN - 1] - uT0) || 1;
+  const xOf = (tt, i) => padX + (uSpan > 1 ? (tt - uT0) / uSpan : i / (uN - 1)) * plotW;
+  const pts = plotVals.map((v, i) => ({ x: xOf(uTs[i], i), y: vp.yOf(v) }));
 
   const linePath = _wscMonotonePath(pts);
 
@@ -17029,12 +17086,21 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
     </div>`;
 
   if (opts.tooltip) {
-    // Tooltip snaps to REAL snapshots (true value + time) on the rendered curve.
-    // rVals/rTs are real values at real timestamps (the focused organic regime).
-    const realX = pts.map(p => p.x);
-    const realY = pts.map(p => p.y);
+    // Tooltip stays truthful: it shows the REAL snapshot value at its REAL
+    // timestamp (rVals/rTs), positioned on the rendered (resampled) curve by
+    // mapping the real timestamp onto the uniform X domain and sampling the
+    // curve's y there.
+    const yAtX = px => {
+      if (px <= pts[0].x) return pts[0].y;
+      if (px >= pts[pts.length - 1].x) return pts[pts.length - 1].y;
+      let k = 0; while (k < pts.length - 1 && pts[k + 1].x < px) k++;
+      const f = (px - pts[k].x) / ((pts[k + 1].x - pts[k].x) || 1);
+      return pts[k].y + (pts[k + 1].y - pts[k].y) * f;
+    };
+    const realX = rTs.map(tt => padX + Math.min(1, Math.max(0, uSpan > 1 ? (tt - uT0) / uSpan : 0)) * plotW);
+    const realY = realX.map(yAtX);
     const plot = hostEl.querySelector('.wsc-plot');
-    _wscAttachTooltip(plot, { realX, realY, vals: rVals, ts: rTs, n });
+    _wscAttachTooltip(plot, { realX, realY, vals: rVals, ts: rTs, n: rVals.length });
   }
 }
 
