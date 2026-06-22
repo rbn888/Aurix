@@ -5696,6 +5696,17 @@ function save() {
 // Trade events reuse the shared deterministic id so a captured buy/sell and any
 // later backfill of the same transaction collapse to one event (dedup).
 function _ledgerTrade(asset, type, qty, price, ts, realized) {
+  // WN.4A: capture the capital flow locally FIRST, independent of the (optional)
+  // wealthLedger — a buy adds invested capital, a sell removes it.
+  try {
+    if (asset) {
+      const usd = _nativeToUSD((Number(qty) || 0) * (Number(price) || 0), asset.assetCurrency);
+      if (Number.isFinite(usd) && usd > 0) {
+        _aurixCaptureFlow(type === 'sell' ? 'asset_remove' : 'asset_add',
+          type === 'sell' ? -usd : usd, ts, asset.id, null, 'user');
+      }
+    }
+  } catch (_) {}
   try {
     const WL = window.wealthLedger;
     if (!WL || !WL.record || !asset) return;
@@ -5710,6 +5721,15 @@ function _ledgerTrade(asset, type, qty, price, ts, realized) {
   } catch (_) {}
 }
 function _ledgerCashFlow(type, asset, amount, currency, ts, source) {
+  // WN.4A: capture the capital flow locally FIRST, independent of whether the
+  // (optional) wealthLedger is present — deposits add capital, withdrawals remove it.
+  try {
+    const usd = _nativeToUSD(Number(amount) || 0, currency);
+    if (Number.isFinite(usd) && usd > 0) {
+      _aurixCaptureFlow(type === 'withdrawal' ? 'withdrawal' : 'deposit',
+        type === 'withdrawal' ? -usd : usd, ts, asset && asset.id, null, source || 'user');
+    }
+  } catch (_) {}
   try {
     const WL = window.wealthLedger;
     if (!WL || !WL.record) return;
@@ -5718,6 +5738,64 @@ function _ledgerCashFlow(type, asset, amount, currency, ts, source) {
     if (source) ev.source = source;
     WL.record(ev);
   } catch (_) {}
+}
+
+// ── WN.4A — Local capital-flow ledger (localStorage only) ───────────────────
+// Explicit, append-only record of USER-DRIVEN capital movements. Foundation for
+// future TWR performance accounting. LOCAL ONLY for now: no Supabase, no chart
+// change. Raw portfolioHistory + valuation are untouched — this only OBSERVES
+// the existing user-action hooks (_ledgerTrade / _ledgerCashFlow), which never
+// fire on price refresh / market movement / currency-rate updates. amountUSD is
+// signed: + capital entering the portfolio, − capital leaving.
+const _AURIX_CAPITAL_FLOWS_KEY = 'aurixCapitalFlows';
+
+function _aurixLoadCapitalFlows() {
+  try {
+    const raw = localStorage.getItem(_AURIX_CAPITAL_FLOWS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(arr)) return [];
+    // Reset support: a portfolio/history reset bumps the epoch; drop any flow
+    // recorded before it (mirrors portfolioHistory's epoch guard).
+    const epoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
+    return arr.filter(f => f && typeof f.ts === 'number' && Number.isFinite(f.amountUSD) && (!epoch || f.ts >= epoch));
+  } catch (_) { return []; }
+}
+
+function _aurixSaveCapitalFlows(arr) {
+  try { localStorage.setItem(_AURIX_CAPITAL_FLOWS_KEY, JSON.stringify(arr)); } catch (_) {}
+}
+
+// Append a flow, idempotent by a deterministic id (kind + asset/currency + ts +
+// rounded amount) so repeated saves/clicks for the same action collapse to one.
+function _aurixCaptureFlow(kind, amountUSD, ts, assetId, note, source) {
+  try {
+    if (!Number.isFinite(amountUSD) || Math.round(Math.abs(amountUSD) * 100) === 0) return; // never NaN / ~0
+    const t  = Number.isFinite(ts) ? ts : Date.now();
+    const id = `${kind}:${assetId || 'cash'}:${t}:${Math.round(Math.abs(amountUSD))}`;
+    const flows = _aurixLoadCapitalFlows();
+    if (flows.some(f => f.id === id)) return;                       // idempotent
+    const flow = { id, ts: t, amountUSD: +amountUSD.toFixed(2), kind, source: source || 'user' };
+    if (assetId) flow.assetId = assetId;
+    if (note)    flow.note = note;
+    flows.push(flow);
+    _aurixSaveCapitalFlows(flows);
+    if (typeof IS_DEV !== 'undefined' && IS_DEV) { try { console.debug('[capital-flow]', flow); } catch (_) {} }
+  } catch (_) {}
+}
+
+if (typeof window !== 'undefined') {
+  // Audit helpers (read-only): the raw ledger + a summarised table.
+  window.getAurixCapitalFlows = () => _aurixLoadCapitalFlows();
+  window.debugAurixCapitalFlows = () => {
+    const f = _aurixLoadCapitalFlows();
+    try {
+      const inUSD  = f.filter(x => x.amountUSD > 0).reduce((s, x) => s + x.amountUSD, 0);
+      const outUSD = f.filter(x => x.amountUSD < 0).reduce((s, x) => s + x.amountUSD, 0);
+      console.table(f);
+      console.log('[capital-flows] count:', f.length, '| in:', +inUSD.toFixed(2), '| out:', +outUSD.toFixed(2), '| net:', +(inUSD + outUSD).toFixed(2));
+    } catch (_) {}
+    return f;
+  };
 }
 
 // ── Aurix Data Layer — Phase 1 + SPEC B ───────────────────
