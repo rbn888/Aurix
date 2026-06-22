@@ -17249,7 +17249,11 @@ function _aurixEligibleInvestableSeries(range) {
   try { anchor = (typeof investableValueBase === 'function') ? investableValueBase() : 0; } catch (_) {}
   if (!(anchor > 0)) anchor = raw[raw.length - 1].value;
   meta.anchor = +anchor.toFixed(2);
-  const LOW = anchor * 0.35, HIGH = anchor * 4.0, CONSTRUCTION = anchor * 0.15;
+  // WN.9 trust boundary — tighter than WN.6: a snapshot > 2.5× current investable
+  // (without a valid external-deposit trail) or < 0.25× (without a valid external-
+  // withdrawal trail) is an old/polluted/contaminated regime and is excluded from
+  // the chart (this is what removes the −85% / 480k history on 1A/TOTAL).
+  const LOW = anchor * 0.25, HIGH = anchor * 2.5, CONSTRUCTION = anchor * 0.15;
 
   // 1. Drop the LEADING incompatible-scale prefix (old/polluted/construction).
   let s = 0;
@@ -17312,43 +17316,65 @@ function _aurixFlowIntent(kind) {
   return _aurixFlowIsInternal(kind) ? 'internal_transfer' : 'manual_adjustment';
 }
 
-// WN.7/WN.8 — flow-aware visual continuity for the INVESTABLE-VALUE chart (NOT
-// TWR). Only INTERNAL transfers are neutralised: their value STEP is removed and
-// the curve continues smoothly across the event, anchored so the LAST point still
-// equals the real current investable value (Hero-consistent). External cash flows
-// pass through untouched (they legitimately move the value). Tooltip keeps REAL
-// values. adjusted(i) = real(i) − offset(ts_i) + totalOffset, offset(t)=Σ internal
-// flow.base for flow.ts ≤ t.
+// WN.9 — SHAPE-BASED reconciliation (the WN.7/8 recorded-flow neutralization was
+// blind to internal transfers that predate the WN.4A flow ledger — e.g. the
+// June-16 BTC sale — so they still rendered as crashes). A large, SUSTAINED
+// adjacent step in investable value is an internal transfer (asset sold into
+// cash, rebalance, swap) UNLESS a recorded EXTERNAL deposit/withdrawal near that
+// timestamp proves real money moved. Internal transfers are neutralised (the step
+// is removed; the curve continues smoothly, anchored to the real current value =
+// Hero-consistent); external flows and ordinary market moves pass through. Tooltip
+// keeps REAL values; raw history is never mutated. adjusted(i) = real(i) − cum(i)
+// + cum(last), where cum accumulates only the neutralised (internal) step deltas.
 function _aurixFlowNeutralize(series, range) {
-  const out = { adjusted: series.map(s => s.value), flowsInRange: 0, neutralized: 0, totalOffset: 0, internalCount: 0, externalCount: 0 };
-  if (series.length < 2) return out;
-  const t0 = series[0].ts, t1 = series[series.length - 1].ts;
+  const n = series.length;
+  const out = { adjusted: series.map(s => s.value), flowsInRange: 0, neutralized: 0, totalOffset: 0,
+                internalCount: 0, externalCount: 0, shapeTransfers: 0, externalWithdrawals: 0, externalDeposits: 0 };
+  if (n < 2) return out;
+  const t0 = series[0].ts, t1 = series[n - 1].ts;
   let anchor = 0;
   try { anchor = (typeof investableValueBase === 'function') ? investableValueBase() : 0; } catch (_) {}
-  if (!(anchor > 0)) anchor = series[series.length - 1].value;
-  const material = Math.max(anchor * 0.03, 1);
+  if (!(anchor > 0)) anchor = series[n - 1].value;
+
+  // Recorded flows near the window. EXTERNAL deposits/withdrawals are the ONLY
+  // proof that a value step is real money in/out; everything else is internal.
   let flows = [];
   try { flows = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : []; } catch (_) {}
-  const span = flows.filter(f => f && Number.isFinite(f.ts) && Number.isFinite(f.amountUSD) && f.ts > t0 && f.ts <= t1);
-  out.flowsInRange = span.length;
+  const NEAR = 36 * 36e5;   // 36h proof window
+  const span = flows.filter(f => f && Number.isFinite(f.ts) && Number.isFinite(f.amountUSD) && f.ts > t0 - NEAR && f.ts <= t1 + NEAR);
+  out.flowsInRange = span.filter(f => f.ts > t0 && f.ts <= t1).length;
   out.internalCount = span.filter(f => _aurixFlowIsInternal(f.kind)).length;
-  out.externalCount = span.length - out.internalCount;
-  // Only MATERIAL INTERNAL flows are neutralised (value-preserving transfers).
-  // External deposits/withdrawals are intentionally left in so the value chart
-  // reflects real money entering/leaving.
-  const matFlows = span
-    .filter(f => _aurixFlowIsInternal(f.kind))
+  const externalFlows = span
+    .filter(f => f.kind === 'deposit' || f.kind === 'withdrawal')
     .map(f => ({ ts: f.ts, base: toBase(f.amountUSD, 'USD') }))
-    .filter(f => Number.isFinite(f.base) && Math.abs(f.base) >= material);
-  out.neutralized = matFlows.length;
-  if (!matFlows.length) return out;
-  const totalOffset = matFlows.reduce((s, f) => s + f.base, 0);
-  out.totalOffset = totalOffset;
-  out.adjusted = series.map(s => {
-    let off = 0;
-    for (const f of matFlows) if (f.ts <= s.ts) off += f.base;
-    return s.value - off + totalOffset;
-  });
+    .filter(f => Number.isFinite(f.base));
+  out.externalCount   = externalFlows.length;
+  out.externalDeposits    = externalFlows.filter(f => f.base > 0).length;
+  out.externalWithdrawals = externalFlows.filter(f => f.base < 0).length;
+
+  const vals = series.map(s => s.value), ts = series.map(s => s.ts);
+  const med = arr => { const a = arr.slice().sort((x, y) => x - y); return a.length ? a[(a.length - 1) >> 1] : 0; };
+  const STEP_THR = 0.18, SUSTAIN = 3;
+  const cum = new Array(n).fill(0);
+  let run = 0;
+  for (let i = 1; i < n; i++) {
+    const d = vals[i] - vals[i - 1];
+    const rel = Math.abs(d) / Math.max(vals[i - 1], anchor * 0.2, 1);
+    const preMed = med(vals.slice(Math.max(0, i - SUSTAIN), i));
+    const postMed = med(vals.slice(i, Math.min(n, i + SUSTAIN + 1)));
+    const sustained = Math.abs(postMed - preMed) >= Math.abs(d) * 0.55;   // the shift holds (not a transient spike)
+    let stepOff = 0;
+    if (rel >= STEP_THR && sustained) {
+      const provenExternal = externalFlows.some(f =>
+        Math.abs(f.ts - ts[i]) <= NEAR && Math.sign(f.base) === Math.sign(d) && Math.abs(f.base) >= Math.abs(d) * 0.40);
+      if (!provenExternal) { stepOff = d; out.shapeTransfers++; }   // internal transfer → neutralise
+    }
+    run += stepOff;
+    cum[i] = run;
+  }
+  out.totalOffset = run;
+  out.neutralized = out.shapeTransfers;
+  if (run !== 0) out.adjusted = vals.map((v, i) => v - cum[i] + run);
   return out;
 }
 
@@ -17417,7 +17443,11 @@ if (typeof window !== 'undefined') {
       info.transactionEventsInRange = neutral.flowsInRange;
       info.internalTransfersInRange = neutral.internalCount;
       info.externalFlowsInRange     = neutral.externalCount;
-      info.virtualCashSettlements   = neutral.neutralized;   // internal sells/buys settled visually
+      info.shapeTransfersNeutralized = neutral.shapeTransfers;       // WN.9 large sustained steps neutralised
+      info.externalWithdrawalsDetected = neutral.externalWithdrawals;
+      info.externalDepositsDetected    = neutral.externalDeposits;
+      info.unmatchedAssetRemovals   = neutral.shapeTransfers;
+      info.virtualCashSettlements   = neutral.shapeTransfers;        // internal transfers settled visually
       info.rawInvestableValue       = info.investableUSD;
       info.correctedInvestableValue = info.investableUSD;     // value level unchanged; only the chart SHAPE is reconciled
       info.reconciliationDelta      = 0;
@@ -17434,6 +17464,38 @@ if (typeof window !== 'undefined') {
       try { console.table(info); console.log('[chart-source] excludedReasons:', info.excludedReasons); } catch (_) { console.log(info); }
     } catch (e) { info.error = String(e); console.log(info); }
     return info;
+  };
+
+  // WN.9 — per-range proof: raw vs cleaned vs rendered (corrected) first/last/
+  // min/max + the large adjacent steps responsible for any drop, with their
+  // internal/external classification. Shows EXACTLY what the chart corrected.
+  window.debugAurixChartRange = (range) => {
+    const r = range || activeRange;
+    const o = { range: r };
+    try {
+      const raw = _aurixInvestableSnapshots(r);
+      const elig = _aurixEligibleInvestableSeries(r);
+      const neutral = _aurixFlowNeutralize(elig.series, r);
+      const stat = (arr, key) => arr.length ? { first: +(key ? arr[0][key] : arr[0]).toFixed(0), last: +(key ? arr[arr.length - 1][key] : arr[arr.length - 1]).toFixed(0), min: +Math.min(...arr.map(x => key ? x[key] : x)).toFixed(0), max: +Math.max(...arr.map(x => key ? x[key] : x)).toFixed(0), n: arr.length } : { n: 0 };
+      o.raw      = stat(raw, 'value');
+      o.cleaned  = stat(elig.series, 'value');
+      o.rendered = stat(neutral.adjusted);
+      o.excluded = elig.meta.excluded;
+      o.excludedReasons = elig.meta.reasons;
+      o.shapeTransfersNeutralized = neutral.shapeTransfers;
+      o.externalWithdrawals = neutral.externalWithdrawals;
+      o.metricPct = neutral.adjusted.length && neutral.adjusted[0] > 0
+        ? +(((neutral.adjusted[neutral.adjusted.length - 1] - neutral.adjusted[0]) / neutral.adjusted[0]) * 100).toFixed(2) : null;
+      // large adjacent steps in the CLEANED series (the rows that caused drops)
+      const es = elig.series; const drops = [];
+      for (let i = 1; i < es.length; i++) {
+        const d = es[i].value - es[i - 1].value, rel = Math.abs(d) / (es[i - 1].value || 1);
+        if (rel >= 0.18) drops.push({ when: new Date(es[i].ts).toISOString(), from: +es[i - 1].value.toFixed(0), to: +es[i].value.toFixed(0), pct: +(rel * 100 * Math.sign(d)).toFixed(1) });
+      }
+      o.largeSteps = drops;
+      try { console.log('[chart-range]', r, o); if (drops.length) console.table(drops); } catch (_) {}
+    } catch (e) { o.error = String(e); }
+    return o;
   };
 
   // WN.8 — transaction accounting audit: classify every capital flow in range as
