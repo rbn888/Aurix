@@ -21593,11 +21593,13 @@ body.gs-open { overflow: hidden; }
      "EVOLUCIÓN DEL PATRIMONIO", sharing .card-title with the left "VALOR TOTAL
      DE CARTERA" → identical size/weight/tracking, one system). */
   .hero-right .chart-wrap          { display: none !important; }
-  .hero-right .chart-change,
   .hero-right .chart-baseline-note { display: none !important; }
+  /* WealthSnapshotCurve: the range-change metric now lives under the title. */
+  .hero-right .chart-change        { display: block; margin-top: 4px; }
   #distributionSection             { display: none !important; }
-  /* header row: title left, controls (%/$ + ranges) right — one line */
-  .hero-right .chart-header        { margin-bottom: 16px; align-items: center; }
+  /* header row: title left, controls (%/$ + ranges) right — top-aligned so the
+     metric can sit on the next line under the title without shifting controls */
+  .hero-right .chart-header        { margin-bottom: 14px; align-items: flex-start; }
   .hero-right .chart-title         { margin-bottom: 0; }
 
   .perf-snapshot {
@@ -21724,4 +21726,147 @@ body.gs-open { overflow: hidden; }
   .perf-snapshot { transition: none; }
   .perf-anim-in .perf-hero, .perf-anim-in .perf-block { animation: none; }
   .perf-skel { animation: none; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   WealthSnapshotCurve — single responsive premium wealth curve. Shared by
+   desktop (#perfSnapshot) and mobile (#wealthCurveMobile). Thin smooth line,
+   generous negative space, no heavy grid, no trading fill — institutional.
+   ════════════════════════════════════════════════════════════════════════ */
+.wsc {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.wsc-plot {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.wsc-svg { display: block; width: 100%; height: 100%; }
+
+/* line tone — calm, desaturated; the metric under the title carries the sign */
+.wsc-line {
+  stroke: var(--accent, #4a82f0);
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: .96;
+}
+.wsc-up   .wsc-line { stroke: var(--green, #3fbf7f); }
+.wsc-down .wsc-line { stroke: var(--red,   #e05a5a); }
+.wsc-flat .wsc-line { stroke: var(--text-muted, #9aa7bd); }
+
+/* faint area fill — soft, fades to nothing (no aggressive block) */
+.wsc-fill-0 { stop-color: var(--accent, #4a82f0); stop-opacity: .12; }
+.wsc-fill-1 { stop-color: var(--accent, #4a82f0); stop-opacity: 0; }
+.wsc-up   .wsc-fill-0 { stop-color: var(--green, #3fbf7f); stop-opacity: .12; }
+.wsc-down .wsc-fill-0 { stop-color: var(--red,   #e05a5a); stop-opacity: .10; }
+.wsc-flat .wsc-fill-0 { stop-color: var(--text-muted, #9aa7bd); stop-opacity: .07; }
+
+/* discrete reference line at the period start */
+.wsc-baseline {
+  stroke: rgba(255,255,255,.07);
+  stroke-width: 1;
+  stroke-dasharray: 2 5;
+}
+
+/* glowing end-of-series dot (HTML → stays a perfect circle despite stretch) */
+.wsc-dot {
+  position: absolute;
+  width: 7px; height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: var(--accent, #4a82f0);
+  box-shadow: 0 0 0 3px rgba(74,130,240,.16), 0 0 10px rgba(74,130,240,.5);
+  pointer-events: none;
+}
+.wsc-up   .wsc-dot { background: var(--green, #3fbf7f); box-shadow: 0 0 0 3px rgba(63,191,127,.16), 0 0 10px rgba(63,191,127,.5); }
+.wsc-down .wsc-dot { background: var(--red,   #e05a5a); box-shadow: 0 0 0 3px rgba(224,90,90,.16), 0 0 10px rgba(224,90,90,.5); }
+.wsc-flat .wsc-dot { background: var(--text-muted, #9aa7bd); box-shadow: 0 0 0 3px rgba(154,167,189,.14); }
+
+/* empty / building state */
+.wsc--empty { display: flex; align-items: center; justify-content: center; }
+.wsc-empty {
+  text-align: center;
+  max-width: 320px;
+  padding: 20px;
+}
+.wsc-empty-title {
+  font-size: 14px; font-weight: 700; color: var(--text-bright, #eef2f8);
+  letter-spacing: -.01em; margin-bottom: 6px;
+}
+.wsc-empty-body {
+  font-size: 12.5px; font-weight: 500; line-height: 1.5; color: var(--text-dim, #8a96aa);
+}
+
+/* desktop hover tooltip (added to .wsc-plot only when tooltip:true) */
+.wsc-hair {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 1px;
+  background: rgba(255,255,255,.18);
+  opacity: 0; transition: opacity .12s var(--ease-out, ease);
+  pointer-events: none;
+}
+.wsc-cursor {
+  position: absolute; top: 0; left: 0;
+  width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%;
+  background: var(--text-bright, #fff);
+  box-shadow: 0 0 8px rgba(255,255,255,.5);
+  opacity: 0; transition: opacity .12s var(--ease-out, ease);
+  pointer-events: none;
+}
+.wsc-tip {
+  position: absolute; top: 6px; left: 0;
+  transform: translateX(0);
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 5px 9px; border-radius: 8px;
+  background: rgba(16,20,30,.92);
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow: 0 6px 20px rgba(0,0,0,.4);
+  margin-left: -48px; /* centre under the cursor (half of min-width) */
+  min-width: 96px;
+  opacity: 0; transition: opacity .12s var(--ease-out, ease);
+  pointer-events: none; white-space: nowrap;
+}
+.wsc-plot.wsc-hot .wsc-hair,
+.wsc-plot.wsc-hot .wsc-cursor,
+.wsc-plot.wsc-hot .wsc-tip { opacity: 1; }
+.wsc-tip-v { font-size: 13px; font-weight: 800; color: var(--text-bright, #fff); font-variant-numeric: tabular-nums; }
+.wsc-tip-t { font-size: 10px; font-weight: 600; color: var(--text-dim, #8a96aa); letter-spacing: .2px; }
+
+/* entrance micro-animation on range / unit change */
+.wsc-in .wsc-line  { animation: wscDraw .46s var(--ease-out, ease) both; }
+.wsc-in .wsc-area,
+.wsc-in .wsc-dot   { animation: wscFade .46s var(--ease-out, ease) both; }
+@keyframes wscFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes wscDraw { from { opacity: 0; } to { opacity: .96; } }
+
+/* mobile host: REPLACES the legacy canvas / V2 chart inside .mobile-chart-wrap.
+   The old layers stay mounted (boot / sync safety) but are hidden so they never
+   bleed through the curve's negative space; the wrap's own subtle gradient is
+   the curve backdrop. */
+.wsc-host { display: none; }
+.mobile-chart-wrap .wsc-host {
+  display: block;
+  position: absolute; inset: 0; z-index: 4;
+  background: transparent;
+}
+.mobile-chart-wrap > canvas,
+.mobile-chart-wrap > .chart-loading-skin,
+.mobile-chart-wrap > [data-aurix-dash] { visibility: hidden !important; }
+
+/* desktop: #perfSnapshot becomes the curve host (override the old flex module) */
+@media (min-width: 769px) {
+  .perf-snapshot {
+    display: block !important;
+    height: 190px;
+    padding: 0;
+    gap: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wsc-in .wsc-line, .wsc-in .wsc-area, .wsc-in .wsc-dot { animation: none; }
 }

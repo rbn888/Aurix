@@ -1097,6 +1097,8 @@ const T = {
     // Sections
     distribution:    'Distribución del patrimonio',
     evolution:       'Evolución del patrimonio',
+    wscBuildingTitle:'Construyendo historial patrimonial',
+    wscBuildingBody: 'Aurix está recopilando snapshots validados para mostrar tu evolución.',
     perfSnapshotTitle: 'Resumen de rendimiento',
     perfMax:         'Máximo',
     perfMin:         'Mínimo',
@@ -3111,6 +3113,8 @@ const T = {
     // Sections
     distribution:    'Portfolio distribution',
     evolution:       'Portfolio evolution',
+    wscBuildingTitle:'Building your wealth history',
+    wscBuildingBody: 'Aurix is collecting validated snapshots to chart your evolution.',
     perfSnapshotTitle: 'Performance snapshot',
     perfMax:         'High',
     perfMin:         'Low',
@@ -16643,23 +16647,200 @@ function _dshPaintPerfSnapshot(root, doCountUp) {
   }
 }
 
-// Public entry. animate=true on a user range/unit change: fade-out 120ms →
-// recalc → count-up + fade-in 180ms + indicators slide 4px. false on background
-// refresh (silent repaint). No-op off the dashboard.
-function _dshRenderPerfSnapshot(animate) {
-  const root = document.getElementById('perfSnapshot');
-  if (!root) return;
-  if (animate && !_dshReducedMotion()) {
-    root.classList.add('perf-fading');
-    setTimeout(() => {
-      _dshPaintPerfSnapshot(root, true);
-      root.classList.remove('perf-fading');
-      root.classList.add('perf-anim-in');
-      setTimeout(() => root.classList.remove('perf-anim-in'), 300);
-    }, 120);
-  } else {
-    _dshPaintPerfSnapshot(root, false);
+// ════════════════════════════════════════════════════════════════════════
+// WealthSnapshotCurve — a single, responsive, premium wealth curve shared by
+// desktop (.hero-right → #perfSnapshot) and mobile (slider slide 1 →
+// #wealthCurveMobile). It REPLACES the old desktop Performance-Snapshot module
+// (mejor activo / mayor contribuidor / mayor exposición / mayor retroceso /
+// donut) AND the old mobile chart engine's visible surface.
+//
+// DATA: validated INTERNAL snapshots only, via getChartData(activeRange) — the
+// canonical portfolioHistory pipeline. That function already discards points
+// that are null/undefined/NaN/zero/negative or carry an invalid timestamp,
+// applies the post-reset epoch filter, strips corrupt spikes, and returns the
+// empty shape when fewer than 2 valid points remain. So this component never
+// invents, interpolates or draws a defective point. NO CoinGecko, NO PCE, NO
+// external/historical price APIs, NO per-asset history. Each point is wealth as
+// Aurix measured it at a moment — the SAME canonical "Valor total de cartera"
+// total the left hero block shows (toBase(value,'USD') in base currency).
+//
+// VISUAL: thin smooth line, generous negative space, no heavy grid, no trading
+// fill — institutional, calm. Pure inline SVG, zero new dependencies.
+// ════════════════════════════════════════════════════════════════════════
+
+const _WSC_VIEW_W = 1000;
+const _WSC_VIEW_H = 240;
+const _WSC_PAD_Y  = 0.20;   // fraction of height kept empty top + bottom
+
+// Smoothed path (Catmull-Rom → cubic bézier, low tension = gentle, no overshoot).
+function _wscSmoothPath(pts) {
+  if (!pts || pts.length < 2) return '';
+  if (pts.length === 2) return `M${pts[0].x},${pts[0].y} L${pts[1].x},${pts[1].y}`;
+  const T = 0.16;
+  let d = `M${pts[0].x.toFixed(2)},${pts[0].y.toFixed(2)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] || p2;
+    const c1x = p1.x + (p2.x - p0.x) * T, c1y = p1.y + (p2.y - p0.y) * T;
+    const c2x = p2.x - (p3.x - p1.x) * T, c2y = p2.y - (p3.y - p1.y) * T;
+    d += ` C${c1x.toFixed(2)},${c1y.toFixed(2)} ${c2x.toFixed(2)},${c2y.toFixed(2)} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}`;
   }
+  return d;
+}
+
+// Format a snapshot timestamp for the tooltip, scaled to the active range.
+function _wscFmtTs(ts) {
+  const dt = new Date(ts);
+  if (activeRange === '24h') return dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  if (activeRange === 'all') return dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: '2-digit' });
+  return dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
+
+// Lightweight desktop hover tooltip (crosshair + cursor dot + value/time). Pure
+// DOM over the SVG; recreated on every repaint (old nodes GC with innerHTML).
+// Skipped on mobile so slider swipe is never absorbed.
+function _wscAttachTooltip(plot, model) {
+  if (!plot || _dshReducedMotion()) return;
+  const hair = document.createElement('div');   hair.className   = 'wsc-hair';
+  const cur  = document.createElement('div');   cur.className    = 'wsc-cursor';
+  const tip  = document.createElement('div');   tip.className    = 'wsc-tip';
+  plot.appendChild(hair); plot.appendChild(cur); plot.appendChild(tip);
+  const move = (e) => {
+    const r = plot.getBoundingClientRect();
+    if (!r.width) return;
+    const rel = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    const idx = Math.round(rel * (model.n - 1));
+    const px  = (model.pts[idx].x / _WSC_VIEW_W) * r.width;
+    const py  = (model.pts[idx].y / _WSC_VIEW_H) * r.height;
+    hair.style.transform = `translateX(${px}px)`;
+    cur.style.transform  = `translate(${px}px, ${py}px)`;
+    // Tooltip shows the measured wealth value at that snapshot (base currency),
+    // which is the meaningful read in both % and divisa modes.
+    tip.innerHTML = `<span class="wsc-tip-v">${formatBase(model.vals[idx])}</span><span class="wsc-tip-t">${_wscFmtTs(model.ts[idx])}</span>`;
+    // clamp horizontally so the bubble never overflows the plot
+    const tw = tip.offsetWidth || 96;
+    const tx = Math.min(Math.max(px, tw / 2 + 4), r.width - tw / 2 - 4);
+    tip.style.transform = `translateX(${tx}px)`;
+    plot.classList.add('wsc-hot');
+  };
+  plot.addEventListener('pointermove', move);
+  plot.addEventListener('pointerleave', () => plot.classList.remove('wsc-hot'));
+}
+
+// Paint one surface: write the range-change metric into changeEl (the span
+// under the title) and render the SVG curve into hostEl. opts.tooltip enables
+// the desktop hover read; opts.uid namespaces the gradient id.
+function _wscPaintSurface(changeEl, hostEl, opts) {
+  if (!hostEl) return;
+  opts = opts || {};
+
+  let d = null;
+  try { d = (typeof getChartData === 'function') ? getChartData(activeRange) : null; } catch (_) { d = null; }
+
+  // Defensive re-validation (getChartData already filters; never trust blind).
+  const vals = [], ts = [];
+  if (d && Array.isArray(d.values)) {
+    for (let i = 0; i < d.values.length; i++) {
+      const v = d.values[i], tt = d.timestamps[i];
+      if (Number.isFinite(v) && v > 0 && Number.isFinite(tt)) { vals.push(v); ts.push(tt); }
+    }
+  }
+
+  // < 2 valid points → premium "building history" empty state. Never a fake line.
+  if (vals.length < 2) {
+    if (changeEl) { changeEl.textContent = ''; changeEl.className = 'chart-change'; changeEl.removeAttribute('title'); }
+    hostEl.innerHTML =
+      `<div class="wsc wsc--empty">
+         <div class="wsc-empty">
+           <div class="wsc-empty-title">${t('wscBuildingTitle')}</div>
+           <div class="wsc-empty-body">${t('wscBuildingBody')}</div>
+         </div>
+       </div>`;
+    return;
+  }
+
+  const first    = Number.isFinite(d.firstValue) ? d.firstValue : vals[0];
+  const last     = Number.isFinite(d.lastValue)  ? d.lastValue  : vals[vals.length - 1];
+  const deltaAbs = Number.isFinite(d.deltaAbs) ? d.deltaAbs : (last - first);
+  const deltaPct = Number.isFinite(d.deltaPct) ? d.deltaPct : (first > 0 ? (deltaAbs / first) * 100 : 0);
+  const tone     = deltaPct > 0.005 ? 'up' : deltaPct < -0.005 ? 'down' : 'flat';
+
+  // Range-change metric under the title — drives off the %/divisa toggle.
+  if (changeEl) {
+    const mode = activePerfMode === 'curr' ? 'curr' : 'pct';
+    const pf   = _dshFmtPct(deltaPct);
+    changeEl.textContent = mode === 'curr' ? _dshFmtMoney0(deltaAbs) : pf.text;
+    changeEl.className    = `chart-change ${tone}`;
+    if (mode === 'pct' && pf.capped) changeEl.title = pf.raw;
+    else changeEl.removeAttribute('title');
+  }
+
+  // Normalize → SVG space. X stretches across the full width; Y maps into a
+  // padded band so the line floats with negative space above and below.
+  const W = _WSC_VIEW_W, H = _WSC_VIEW_H, padY = H * _WSC_PAD_Y;
+  let mn = Infinity, mx = -Infinity;
+  for (const v of vals) { if (v < mn) mn = v; if (v > mx) mx = v; }
+  const flat = (mx === mn);
+  const span = (mx - mn) || 1;
+  const n    = vals.length;
+  const yOf  = v => flat ? H / 2 : padY + (1 - (v - mn) / span) * (H - 2 * padY);
+  const pts  = vals.map((v, i) => ({ x: (i / (n - 1)) * W, y: yOf(v) }));
+
+  const linePath = _wscSmoothPath(pts);
+  const areaPath = `${linePath} L${W.toFixed(2)},${H} L0,${H} Z`;
+  const endPt    = pts[pts.length - 1];
+  const baseY    = yOf(first);                 // subtle reference at the period start
+  const uid      = opts.uid || 'd';
+
+  hostEl.innerHTML = `
+    <div class="wsc wsc-${tone}">
+      <div class="wsc-plot">
+        <svg class="wsc-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="wscFill-${uid}" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   class="wsc-fill-0"/>
+              <stop offset="100%" class="wsc-fill-1"/>
+            </linearGradient>
+          </defs>
+          <line class="wsc-baseline" x1="0" y1="${baseY.toFixed(1)}" x2="${W}" y2="${baseY.toFixed(1)}" vector-effect="non-scaling-stroke"/>
+          <path class="wsc-area" d="${areaPath}" fill="url(#wscFill-${uid})"/>
+          <path class="wsc-line" d="${linePath}" fill="none" vector-effect="non-scaling-stroke"/>
+        </svg>
+        <span class="wsc-dot" style="left:${(endPt.x / W * 100).toFixed(2)}%;top:${(endPt.y / H * 100).toFixed(2)}%"></span>
+      </div>
+    </div>`;
+
+  if (opts.tooltip) {
+    const plot = hostEl.querySelector('.wsc-plot');
+    _wscAttachTooltip(plot, { pts, vals, ts, n });
+  }
+}
+
+// Repaint BOTH surfaces from the single shared component. Driven by every data
+// refresh and every range / unit toggle (same global activeRange/activePerfMode).
+function renderWealthCurve(animate) {
+  const paint = () => {
+    try { _wscPaintSurface(document.getElementById('chartChange'),       document.getElementById('perfSnapshot'),     { uid: 'd', tooltip: true  }); } catch (_) {}
+    try { _wscPaintSurface(document.getElementById('chartChangeMobile'), document.getElementById('wealthCurveMobile'), { uid: 'm', tooltip: false }); } catch (_) {}
+  };
+  if (animate && !_dshReducedMotion()) {
+    paint();
+    [document.getElementById('perfSnapshot'), document.getElementById('wealthCurveMobile')].forEach(el => {
+      if (!el) return;
+      el.classList.remove('wsc-in'); void el.offsetWidth; el.classList.add('wsc-in');
+      setTimeout(() => el.classList.remove('wsc-in'), 460);
+    });
+  } else {
+    paint();
+  }
+}
+
+// Public entry — kept under its historical name so every existing call site
+// (data refresh, range change, unit toggle) now drives the wealth curve.
+function _dshRenderPerfSnapshot(animate) {
+  renderWealthCurve(animate);
 }
 
 // ── Chart ──────────────────────────────────────────────────
