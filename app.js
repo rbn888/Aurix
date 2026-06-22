@@ -17159,7 +17159,7 @@ function normalizeWealthSeriesForVisualization(values, timestamps, range) {
 // fabricated volatility. Endpoints are preserved exactly so the curve's net
 // direction stays aligned with the (organic) metric.
 const _WSC_BUCKET_MS = { '24h': 15 * 6e4, '7d': 2 * 36e5, '30d': 6 * 36e5, '1y': 864e5, 'all': 3 * 864e5 };
-const _WSC_SAMPLES   = { '24h': 120, '7d': 140, '30d': 160, '1y': 180, 'all': 200 };
+const _WSC_SAMPLES   = { '24h': 216, '7d': 192, '30d': 200, '1y': 216, 'all': 220 };  // WN.10 — dense interaction
 function _wscResample(values, timestamps, range) {
   const n = values.length;
   const pass = { values: values.slice(), timestamps: timestamps.slice() };
@@ -17477,9 +17477,16 @@ if (typeof window !== 'undefined') {
       const elig = _aurixEligibleInvestableSeries(r);
       const neutral = _aurixFlowNeutralize(elig.series, r);
       const stat = (arr, key) => arr.length ? { first: +(key ? arr[0][key] : arr[0]).toFixed(0), last: +(key ? arr[arr.length - 1][key] : arr[arr.length - 1]).toFixed(0), min: +Math.min(...arr.map(x => key ? x[key] : x)).toFixed(0), max: +Math.max(...arr.map(x => key ? x[key] : x)).toFixed(0), n: arr.length } : { n: 0 };
-      o.raw      = stat(raw, 'value');
+      o.rawSeries      = stat(raw, 'value');
+      o.adjustedSeries = stat(neutral.adjusted);
       o.cleaned  = stat(elig.series, 'value');
-      o.rendered = stat(neutral.adjusted);
+      o.rendered = o.adjustedSeries;
+      o.renderedInteractionSamples = _WSC_SAMPLES[r] || 200;
+      o.tooltipSource = 'ADJUSTED';
+      o.leadInTrimApplied = !!elig.meta.staleLeadInRemoved;
+      o.internalTransferStitches = neutral.shapeTransfers;
+      o.segmentReturnPreserved = true;   // additive stitch preserves intra-segment fluctuation shape
+      o.excludedTooltipRawValues = elig.meta.excluded;  // excluded snapshots never reach the (adjusted) tooltip
       o.excluded = elig.meta.excluded;
       o.excludedReasons = elig.meta.reasons;
       o.shapeTransfersNeutralized = neutral.shapeTransfers;
@@ -17543,29 +17550,41 @@ function _wscAttachTooltip(plot, model) {
   const rangeLabel = ({ '24h': '24H', '7d': '7D', '30d': '30D', '1y': '1A', all: 'TOTAL' })[model.range] || '';
   const showTime = model.range === '24h' || model.range === '7d';
   const chgTone = model.deltaPct > 0.005 ? 'pos' : model.deltaPct < -0.005 ? 'neg' : '';
+  const sx = model.sampleX, sy = model.sampleY, sv = model.sampleVal, st = model.sampleTs, N = model.n;
   const move = (e) => {
     const r = plot.getBoundingClientRect();
-    if (!r.width) return;
+    if (!r.width || N < 2) return;
     const vx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * _WSC_VIEW_W;
-    let idx = 0, best = Infinity;     // nearest REAL snapshot along the time axis
-    for (let i = 0; i < model.n; i++) { const dd = Math.abs(model.realX[i] - vx); if (dd < best) { best = dd; idx = i; } }
-    const px = (model.realX[idx] / _WSC_VIEW_W) * r.width;
-    const py = (model.realY[idx] / _WSC_VIEW_H) * r.height;
+    // Interpolate between the two bracketing dense samples → pixel-smooth hover.
+    let k = 0; while (k < N - 2 && sx[k + 1] < vx) k++;
+    const f = Math.min(1, Math.max(0, (vx - sx[k]) / ((sx[k + 1] - sx[k]) || 1)));
+    const vbX = sx[k] + (sx[k + 1] - sx[k]) * f;
+    const vbY = sy[k] + (sy[k + 1] - sy[k]) * f;
+    const val = sv[k] + (sv[k + 1] - sv[k]) * f;      // ADJUSTED value the line represents
+    const tts = st[k] + (st[k + 1] - st[k]) * f;
+    const px = (vbX / _WSC_VIEW_W) * r.width;
+    const py = (vbY / _WSC_VIEW_H) * r.height;
     hairV.style.transform = `translateX(${px}px)`;
     hairH.style.transform = `translateY(${py}px)`;
     cur.style.transform   = `translate(${px}px, ${py}px)`;
-    const dt = new Date(model.ts[idx]);
+    const dt = new Date(tts);
     const dateStr = dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
     const timeStr = showTime ? `<span class="wsc-tip-time">${dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>` : '';
-    // Real investable portfolio value at this snapshot (base currency).
     tip.innerHTML =
       `<span class="wsc-tip-date">${dateStr}</span>${timeStr}` +
       `<span class="wsc-tip-lbl">${t('chartTipValue')}</span>` +
-      `<span class="wsc-tip-v">${formatBase(model.vals[idx])}</span>` +
+      `<span class="wsc-tip-v">${formatBase(val)}</span>` +
       `<span class="wsc-tip-chg ${chgTone}">${rangeLabel} ${pf.text}</span>`;
-    const tw = tip.offsetWidth || 110;
-    const tx = Math.min(Math.max(px, tw / 2 + 4), r.width - tw / 2 - 4);
-    tip.style.transform = `translateX(${tx}px)`;
+    // WN.10 — smart placement: offset 20px from the marker so it NEVER covers it;
+    // flip near right/top edges; always stay inside the plot card.
+    const tw = tip.offsetWidth || 120, th = tip.offsetHeight || 64, OFF = 20;
+    let tx = px + OFF;
+    if (tx + tw > r.width - 4) tx = px - OFF - tw;     // flip left near the right edge
+    tx = Math.min(Math.max(tx, 4), Math.max(4, r.width - tw - 4));
+    let ty = py - th - OFF;                            // above the marker by default
+    if (ty < 4) ty = py + OFF;                         // below if near the top / controls
+    ty = Math.min(Math.max(ty, 4), Math.max(4, r.height - th - 4));
+    tip.style.left = `${tx}px`; tip.style.top = `${ty}px`; tip.style.transform = 'none';
     plot.classList.add('wsc-hot');
   };
   plot.addEventListener('pointermove', move);
@@ -17675,19 +17694,19 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
     </div>`;
 
   if (opts.tooltip) {
-    // Tooltip = REAL investable value (same base as the curve + Hero) at the REAL
-    // snapshot timestamp, positioned on the rendered curve. Never real-estate.
-    const yAtX = px => {
-      if (px <= pts[0].x) return pts[0].y;
-      if (px >= pts[pts.length - 1].x) return pts[pts.length - 1].y;
-      let k = 0; while (k < pts.length - 1 && pts[k + 1].x < px) k++;
-      const f = (px - pts[k].x) / ((pts[k + 1].x - pts[k].x) || 1);
-      return pts[k].y + (pts[k + 1].y - pts[k].y) * f;
-    };
-    const realX = ts.map(tt => padX + Math.min(1, Math.max(0, uSpan > 1 ? (tt - uT0) / uSpan : 0)) * plotW);
-    const realY = realX.map(yAtX);
+    // WN.10 — tooltip rides the DENSE rendered samples (≈200+/range) and shows
+    // the ADJUSTED (flow-neutral) value the LINE represents — so it can never
+    // contradict the line (no old raw 97k while the line is ~65k) and never
+    // surfaces an excluded/polluted old value. Hover interpolates between samples
+    // for pixel-smooth updates. Same base as the Hero; real estate never enters.
     const plot = hostEl.querySelector('.wsc-plot');
-    _wscAttachTooltip(plot, { realX, realY, vals, ts, n: vals.length, deltaPct, range: activeRange });
+    _wscAttachTooltip(plot, {
+      sampleX: pts.map(p => p.x),
+      sampleY: pts.map(p => p.y),
+      sampleVal: plotVals,         // adjusted values the line is drawn from
+      sampleTs: uTs,               // resampled timestamps
+      n: pts.length, deltaPct, range: activeRange,
+    });
   }
 }
 

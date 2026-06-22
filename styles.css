@@ -21836,16 +21836,15 @@ body.gs-open { overflow: hidden; }
   pointer-events: none;
 }
 .wsc-tip {
-  position: absolute; top: 6px; left: 0;
-  transform: translateX(0);
-  display: flex; flex-direction: column; align-items: center; gap: 0;
+  /* WN.10 — left/top set by JS (smart placement); never covers the marker. */
+  position: absolute; top: 0; left: 0;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0;
   padding: 6px 10px; border-radius: 9px;
   background: rgba(16,20,30,.94);
   border: 1px solid rgba(255,255,255,.10);
   box-shadow: 0 6px 22px rgba(0,0,0,.45);
-  margin-left: -57px; /* centre under the cursor (half of min-width) */
   min-width: 114px;
-  opacity: 0; transition: opacity .12s var(--ease-out, ease);
+  opacity: 0; transition: opacity .1s var(--ease-out, ease);
   pointer-events: none; white-space: nowrap;
 }
 .wsc-plot.wsc-hot .wsc-hair,
