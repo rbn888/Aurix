@@ -16959,14 +16959,15 @@ const _WSC_VIEW_H = 240;
 // dictate the chart height. Metric / % / gain stay the real figures.
 const _WSC_PAD_X    = 0.075;  // WN.6 — slightly wider plot (smaller horizontal inset)
 const _WSC_OCC_SCALE = 0.05;  // robust relative-spread that maps to ~mid occupancy
-// WN.6 — taller plot: grid/line occupy ~62–77% of the chart height (never hug a
-// border, never crushed), adaptive per timeframe within that range.
+// WN.7 — line occupancy (no-floor/no-ceiling): the data line fills ~54–66% of
+// the chart height, centred inside a taller grid, so it never hugs the top or
+// bottom (≥ ~17% margin each). Adaptive per timeframe within this range.
 const _WSC_OCC = {
-  '24h': [0.60, 0.74],
-  '7d':  [0.62, 0.75],
-  '30d': [0.62, 0.76],
-  '1y':  [0.64, 0.77],
-  'all': [0.64, 0.77],
+  '24h': [0.54, 0.62],
+  '7d':  [0.55, 0.63],
+  '30d': [0.56, 0.64],
+  '1y':  [0.58, 0.66],
+  'all': [0.58, 0.66],
 };
 // Per-range adjacent-jump threshold (%) above which a SUSTAINED level shift is
 // treated as a capital / import / construction event (not market performance).
@@ -17054,26 +17055,27 @@ function _wscMonotonePath(pts) {
 function _wscViewport(values, range) {
   const H = _WSC_VIEW_H, center = H / 2;
   const sorted = values.slice().sort((a, b) => a - b);
-  // WN.5 — VALUE chart: use the true min/max so the y-axis labels are accurate
-  // (the data is now clean investable value; isolated spikes are already removed
-  // by the despike stage upstream, so min/max is honest here).
+  // VALUE chart: true min/max → accurate labels (data is clean investable value;
+  // isolated spikes already removed upstream by despike).
   let lo = sorted[0], hi = sorted[sorted.length - 1];
   const median = _wscPercentile(sorted, 0.5);
   let span = hi - lo;
   if (!(span > 0)) { span = Math.abs(median) * 1e-4 || 1; lo = median - span / 2; hi = median + span / 2; }
 
-  // Adaptive occupancy within the range's own band: relative spread → fraction
-  // of vertical space. Tiny moves still fill ≥minOcc (visible) but stay calm;
-  // large moves cap at maxOcc (controlled, never touching the borders).
+  // Adaptive occupancy of the LINE within a no-floor/no-ceiling band (WN.7):
+  // the data line occupies ~54–66% of the chart height, centred, so it never
+  // hugs the top or bottom (≥ ~17% margin each). The GRID region is generous
+  // (taller) and the data line sits comfortably inside it.
   const [minOcc, maxOcc] = _WSC_OCC[range] || _WSC_OCC['30d'];
   const relSpread = span / (Math.abs(median) || hi || 1);
   const occ = Math.min(maxOcc, Math.max(minOcc,
     minOcc + (maxOcc - minOcc) * Math.tanh(relSpread / _WSC_OCC_SCALE)));
-  const band = occ * H, top = center - band / 2, bot = center + band / 2;
+  const lineBand = occ * H, lineTop = center - lineBand / 2, lineBot = center + lineBand / 2;
+  const gridTop = H * 0.10, gridBot = H * 0.88;          // generous grid, away from host edges
 
-  const yOf  = v => bot - Math.min(1, Math.max(0, (v - lo) / span)) * band;
-  const valAt = y => lo + ((bot - y) / band) * span;     // invert: y → value (for axis labels)
-  return { yOf, valAt, lo, hi, top, bot, band };
+  const yOf  = v => lineBot - Math.min(1, Math.max(0, (v - lo) / span)) * lineBand;
+  const valAt = y => lo + ((lineBot - y) / lineBand) * span;   // padded headroom at the grid edges
+  return { yOf, valAt, lo, hi, top: gridTop, bot: gridBot, lineTop, lineBot, occ };
 }
 
 // ── Institutional Wealth Normalization Layer (WN.1) ─────────────────────────
@@ -17259,19 +17261,73 @@ function _aurixEligibleInvestableSeries(range) {
   }
   let series = raw.slice(s);
 
-  // 2. Trim a long leading DEAD-FLAT run (truly stale/repeated values) so the
-  //    chart never opens with a dead line, then real movement.
+  // 2. Trim a long LOW-INFORMATION lead-in (flat OR slow stale diagonal) so the
+  //    chart never opens with dead time before the real movement. The lead-in is
+  //    trimmed only if it eats > 30% of the x-width yet contributes < 10% of the
+  //    total variation (WN.7); a little context is preserved. No fabrication.
+  meta.staleLeadInRemoved = false;
+  meta.activeTrimApplied = false;
   if (series.length >= 6) {
-    const flatTol = Math.max(anchor * 0.0015, 1e-9);   // ~0.15% of investable = "flat"
-    let f = 0;
-    while (f < series.length - 3 && Math.abs(series[f].value - series[0].value) <= flatTol) f++;
-    if (f >= 4 && f >= series.length * 0.15) { meta.reasons.staleFlatSection += f; meta.excluded += f; series = series.slice(f); }
+    const vals = series.map(s => s.value);
+    let totalVar = 0; for (let i = 1; i < vals.length; i++) totalVar += Math.abs(vals[i] - vals[i - 1]);
+    if (totalVar > 0) {
+      let leadVar = 0, f = 0;
+      while (f < series.length - 3) {
+        const dv = Math.abs(vals[f + 1] - vals[f]);
+        if (leadVar + dv > totalVar * 0.10) break;   // lead-in would exceed 10% of variation
+        leadVar += dv; f++;
+      }
+      if (f > series.length * 0.30 && (series.length - f) >= 3) {
+        const trimTo = Math.max(0, f - 2);            // keep ~2 points of context
+        if (trimTo > 0) {
+          meta.reasons.staleFlatSection += trimTo; meta.excluded += trimTo;
+          meta.staleLeadInRemoved = true; meta.activeTrimApplied = true;
+          series = series.slice(trimTo);
+        }
+      }
+    }
   }
 
   meta.eligible = series.length;
   if (series.length) { meta.activeWindowStart = series[0].ts; meta.activeWindowEnd = series[series.length - 1].ts; }
   if (series.length < 2) meta.reasons.insufficientCleanData = 1;
   return { series, meta };
+}
+
+// WN.7 — flow-aware visual continuity for the INVESTABLE-VALUE chart (NOT TWR).
+// A user portfolio action recorded in capitalFlows (e.g. the June-16 BTC
+// asset_remove) causes a large value STEP that is NOT market performance. This
+// additively rebases the series so those recorded MATERIAL flow steps are
+// removed and the curve continues smoothly across the event, anchored so the
+// LAST point still equals the real current investable value. Returns the
+// adjusted (visual) values; the tooltip keeps the REAL values. adjusted(i) =
+// real(i) − offset(ts_i) + totalOffset, offset(t)=Σ flow.base for flow.ts ≤ t.
+function _aurixFlowNeutralize(series, range) {
+  const out = { adjusted: series.map(s => s.value), flowsInRange: 0, neutralized: 0, totalOffset: 0 };
+  if (series.length < 2) return out;
+  const t0 = series[0].ts, t1 = series[series.length - 1].ts;
+  let anchor = 0;
+  try { anchor = (typeof investableValueBase === 'function') ? investableValueBase() : 0; } catch (_) {}
+  if (!(anchor > 0)) anchor = series[series.length - 1].value;
+  const material = Math.max(anchor * 0.03, 1);
+  let flows = [];
+  try { flows = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : []; } catch (_) {}
+  const span = flows.filter(f => f && Number.isFinite(f.ts) && Number.isFinite(f.amountUSD) && f.ts > t0 && f.ts <= t1);
+  out.flowsInRange = span.length;
+  // Material flows only (small ones don't cause rug-pull shapes); base currency.
+  const matFlows = span
+    .map(f => ({ ts: f.ts, base: toBase(f.amountUSD, 'USD') }))
+    .filter(f => Number.isFinite(f.base) && Math.abs(f.base) >= material);
+  out.neutralized = matFlows.length;
+  if (!matFlows.length) return out;
+  const totalOffset = matFlows.reduce((s, f) => s + f.base, 0);
+  out.totalOffset = totalOffset;
+  out.adjusted = series.map(s => {
+    let off = 0;
+    for (const f of matFlows) if (f.ts <= s.ts) off += f.base;
+    return s.value - off + totalOffset;
+  });
+  return out;
 }
 
 // Compact axis value label, e.g. 61.2k / 1.84M. No currency token (clean).
@@ -17322,11 +17378,26 @@ if (typeof window !== 'undefined') {
       info.excludedReasons       = elig.meta.reasons;          // realEstatePolluted/incompatibleScale/constructionBaseline/staleFlatSection/insufficientCleanData
       info.activeWindowStart = elig.meta.activeWindowStart ? new Date(elig.meta.activeWindowStart).toISOString() : null;
       info.activeWindowEnd   = elig.meta.activeWindowEnd   ? new Date(elig.meta.activeWindowEnd).toISOString()   : null;
+      info.activeTrimApplied   = !!elig.meta.activeTrimApplied;
+      info.staleLeadInRemoved  = !!elig.meta.staleLeadInRemoved;
       const es = elig.series.map(s => s.value);
       if (es.length) {
         info.renderedMin = +Math.min(...es).toFixed(2);
         info.renderedMax = +Math.max(...es).toFixed(2);
         info.renderedDeltaPct = es[0] > 0 ? +(((es[es.length - 1] - es[0]) / es[0]) * 100).toFixed(2) : null;
+      }
+      // WN.7 — flow neutralization + visual domain (no-floor/no-ceiling).
+      const neutral = _aurixFlowNeutralize(elig.series, activeRange);
+      info.flowEventsInRange     = neutral.flowsInRange;
+      info.flowNeutralizedEvents = neutral.neutralized;
+      info.noFloorNoCeilingApplied = true;
+      if (neutral.adjusted.length) {
+        const av = neutral.adjusted;
+        info.visualDomainMin = +Math.min(...av).toFixed(2);
+        info.visualDomainMax = +Math.max(...av).toFixed(2);
+        const vp = _wscViewport(av, activeRange);
+        info.visualOccupancyPct = +(vp.occ * 100).toFixed(1);
+        info.organicDeltaPct = av[0] > 0 ? +(((av[av.length - 1] - av[0]) / av[0]) * 100).toFixed(2) : null;
       }
       const ph = Array.isArray(portfolioHistory) ? portfolioHistory.length : 0;
       info.legacyTotalSnapshotsNotUsed = ph; // total-only points are never used by the chart
@@ -17406,7 +17477,7 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   const vals = snaps.map(s => s.value), ts = snaps.map(s => s.ts);
 
   if (typeof window !== 'undefined') {
-    window._aurixChartMode = { range: activeRange, mode: 'INVESTABLE_VALUE', source: 'category_history', realEstateIncluded: false, points: vals.length, eligible: elig.meta };
+    window._aurixChartMode = { range: activeRange, mode: 'INVESTABLE_VALUE', source: 'category_history', realEstateIncluded: false, points: vals.length, eligible: elig.meta, noFloorNoCeilingApplied: true };
   }
 
   // < 2 clean points → honest building state. Never show polluted/fake values.
@@ -17420,14 +17491,21 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   const W = _WSC_VIEW_W, H = _WSC_VIEW_H;
   const padX = W * _WSC_PAD_X, plotW = W - 2 * padX;
 
-  // Range change of INVESTABLE value (raw — this is a value chart, not TWR).
-  const first = vals[0], last = vals[vals.length - 1];
+  // WN.7 — flow-aware visual continuity: neutralise recorded MATERIAL capital
+  // flows (e.g. a BTC asset_remove) so a portfolio action is not drawn as a
+  // market crash. `adjVals` (flow-neutral, anchored to the current value) drives
+  // the CURVE + metric (organic movement); `vals` (real) drives the tooltip.
+  const neutral = _aurixFlowNeutralize(snaps, activeRange);
+  const adjVals = neutral.adjusted;
+
+  // Range change of organic (flow-neutral) investable value — not the capital
+  // added/removed. Still a value chart (not TWR).
+  const first = adjVals[0], last = adjVals[adjVals.length - 1];
   const deltaAbs = last - first;
   const deltaPct = first > 0 ? (deltaAbs / first) * 100 : 0;
   const tone = deltaPct > 0.005 ? 'up' : deltaPct < -0.005 ? 'down' : 'flat';
 
-  // Metric: % / currency change of investable value. No "excludes" note (this is
-  // a value chart; TWR/performance mode is not active here).
+  // Metric: % / currency change of organic investable value. No "excludes" note.
   if (changeEl) {
     const mode = activePerfMode === 'curr' ? 'curr' : 'pct';
     const pf   = _dshFmtPct(deltaPct);
@@ -17438,9 +17516,9 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
     else changeEl.removeAttribute('title');
   }
 
-  // WN.3 — uniform temporal series from the CLEAN investable snapshots
+  // WN.3 — uniform temporal series from the flow-neutral investable curve
   // (aggregate → resample → gap-fill), then gentle despike + smoothing.
-  const series = _wscResample(vals, ts, activeRange);
+  const series = _wscResample(adjVals, ts, activeRange);
   const uVals = series.values, uTs = series.timestamps, uN = uVals.length;
   const despiked = _wscDespike(uVals, 3, 3);
   const smoothWin = activeRange === 'all' ? 3 : activeRange === '1y' ? 3 : activeRange === '30d' ? 2 : activeRange === '7d' ? 2 : 1;
@@ -17457,7 +17535,7 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   // Premium grid: 4 horizontal (at the value ticks) + 5 vertical (at x ticks).
   const uid = opts.uid || 'd';
   const gx1 = padX.toFixed(1), gx2 = (W - padX).toFixed(1);
-  const yTicks = [0, 1, 2, 3].map(i => { const f = i / 3, y = vp.top + (vp.bot - vp.top) * f; return { y, val: vp.hi - (vp.hi - vp.lo) * f }; });
+  const yTicks = [0, 1, 2, 3].map(i => { const f = i / 3, y = vp.top + (vp.bot - vp.top) * f; return { y, val: vp.valAt(y) }; });
   const xTicks = _wscXTicks(uT0, uTs[uN - 1], activeRange);
   let grid = '';
   yTicks.forEach(tk => { grid += `<line class="wsc-grid" x1="${gx1}" y1="${tk.y.toFixed(1)}" x2="${gx2}" y2="${tk.y.toFixed(1)}" vector-effect="non-scaling-stroke"/>`; });
