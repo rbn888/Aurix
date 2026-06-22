@@ -21751,10 +21751,10 @@ body.gs-open { overflow: hidden; }
    sign. No glow — institutional, not trading. */
 .wsc-line {
   stroke: var(--accent, #4a82f0);
-  stroke-width: 1.5;
+  stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
-  opacity: .92;
+  opacity: .95;
 }
 .wsc-up   .wsc-line { stroke: var(--green, #3fbf7f); }
 .wsc-down .wsc-line { stroke: var(--red,   #e05a5a); }
@@ -21839,13 +21839,13 @@ body.gs-open { overflow: hidden; }
     padding: 0;
     gap: 0;
   }
-  /* WSC.2 — nudge the title + metric right so they align with the chart's left
-     margin (the curve starts inset by _WSC_PAD_X). */
-  .hero-right .chart-header > div:first-child { padding-left: 4%; }
+  /* WSC.4 — align the title + metric with the actual chart plotting origin
+     (the curve starts inset by _WSC_PAD_X = 10% of the plot width). */
+  .hero-right .chart-header > div:first-child { padding-left: 9%; }
 }
 
-/* mobile: same understated indent so the title aligns with the curve margin */
-.mobile-slide-chart .chart-header > div:first-child { padding-left: 3%; }
+/* mobile: align the title with the curve's plotting origin */
+.mobile-slide-chart .chart-header > div:first-child { padding-left: 8%; }
 
 @media (prefers-reduced-motion: reduce) {
   .wsc-in .wsc-line { animation: none; }
