@@ -17265,24 +17265,23 @@ function _aurixEligibleInvestableSeries(range) {
   }
   let series = raw.slice(s);
 
-  // 2. Trim a long LOW-INFORMATION lead-in (flat OR slow stale diagonal) so the
-  //    chart never opens with dead time before the real movement. The lead-in is
-  //    trimmed only if it eats > 30% of the x-width yet contributes < 10% of the
-  //    total variation (WN.7); a little context is preserved. No fabrication.
+  // 2. WN.12 — trim a long NEAR-LINEAR lead-in (low CURVATURE: flat OR a steady
+  //    straight ramp — both are low-information) so the chart never opens with a
+  //    dead/linear segment. Detected via second differences (curvature), so even a
+  //    steep-but-straight ramp is caught (the WN.7 |Δ| metric missed those). Trim
+  //    only if the lead-in eats > 25% of the x-width; keep 1 context point.
   meta.staleLeadInRemoved = false;
   meta.activeTrimApplied = false;
-  if (series.length >= 6) {
+  if (series.length >= 8) {
     const vals = series.map(s => s.value);
-    let totalVar = 0; for (let i = 1; i < vals.length; i++) totalVar += Math.abs(vals[i] - vals[i - 1]);
-    if (totalVar > 0) {
-      let leadVar = 0, f = 0;
-      while (f < series.length - 3) {
-        const dv = Math.abs(vals[f + 1] - vals[f]);
-        if (leadVar + dv > totalVar * 0.12) break;   // WN.11 — lead-in < 12% of total variation
-        leadVar += dv; f++;
-      }
-      if (f > series.length * 0.35 && (series.length - f) >= 3) {   // ...and consuming > 35% of x-width
-        const trimTo = Math.max(0, f - 2);            // keep ~2 points of context
+    const m = vals.length;
+    let sdMax = 0; const sd = new Array(m).fill(0);
+    for (let i = 1; i < m - 1; i++) { sd[i] = Math.abs(vals[i + 1] - 2 * vals[i] + vals[i - 1]); if (sd[i] > sdMax) sdMax = sd[i]; }
+    if (sdMax > 0) {
+      const thr = sdMax * 0.20;
+      let f = 1; while (f < m - 3 && sd[f] < thr) f++;   // walk the low-curvature lead-in
+      if (f > m * 0.25 && (m - f) >= 3) {
+        const trimTo = Math.max(0, f - 1);               // keep ~1 point of context
         if (trimTo > 0) {
           meta.reasons.staleFlatSection += trimTo; meta.excluded += trimTo;
           meta.staleLeadInRemoved = true; meta.activeTrimApplied = true;
@@ -17332,7 +17331,7 @@ function _aurixFlowNeutralize(series, range) {
   const n = series.length;
   const out = { adjusted: series.map(s => s.value), flowsInRange: 0, neutralized: 0, totalOffset: 0,
                 internalCount: 0, externalCount: 0, shapeTransfers: 0, externalWithdrawals: 0, externalDeposits: 0,
-                internalNeutralized: 0, externalNeutralized: 0 };
+                internalNeutralized: 0, externalNeutralized: 0, recordedNeutralized: 0 };
   if (n < 2) return out;
   const t0 = series[0].ts, t1 = series[n - 1].ts;
   let anchor = 0;
@@ -17358,27 +17357,47 @@ function _aurixFlowNeutralize(series, range) {
   const vals = series.map(s => s.value), ts = series.map(s => s.ts);
   const med = arr => { const a = arr.slice().sort((x, y) => x - y); return a.length ? a[(a.length - 1) >> 1] : 0; };
   const STEP_THR = 0.18, SUSTAIN = 3;
-  const cum = new Array(n).fill(0);
-  let run = 0;
+  const stepOff = new Array(n).fill(0);
+
+  // Pass A — SHAPE: large, sustained adjacent steps = capital events (catches
+  // PRE-ledger events like the June-16 BTC sale). Neutralise the whole step.
   for (let i = 1; i < n; i++) {
     const d = vals[i] - vals[i - 1];
     const rel = Math.abs(d) / Math.max(vals[i - 1], anchor * 0.2, 1);
     const preMed = med(vals.slice(Math.max(0, i - SUSTAIN), i));
     const postMed = med(vals.slice(i, Math.min(n, i + SUSTAIN + 1)));
-    const sustained = Math.abs(postMed - preMed) >= Math.abs(d) * 0.55;   // the shift holds (not a transient spike)
-    let stepOff = 0;
+    const sustained = Math.abs(postMed - preMed) >= Math.abs(d) * 0.55;
     if (rel >= STEP_THR && sustained) {
-      // Capital event → neutralise (performance excludes ALL flows). Label it.
-      stepOff = d; out.shapeTransfers++;
+      stepOff[i] = d; out.shapeTransfers++;
       const provenExternal = externalFlows.some(f =>
         Math.abs(f.ts - ts[i]) <= NEAR && Math.sign(f.base) === Math.sign(d) && Math.abs(f.base) >= Math.abs(d) * 0.40);
       if (provenExternal) out.externalNeutralized++; else out.internalNeutralized++;
     }
-    run += stepOff;
-    cum[i] = run;
   }
+
+  // Pass B — RECORDED LEDGER: every material recorded flow (deposit/withdrawal/
+  // asset_add/asset_remove) is a capital event and must be neutralised too, even
+  // when it is NOT a single big adjacent step (small or spread across sparse
+  // snapshots). Applied at the snapshot just after the flow, de-duped against a
+  // shape step already neutralised nearby. This is what makes WN.11 actually fire
+  // on real recorded data instead of being a no-op.
+  const RECORD_MAT = Math.max(anchor * 0.02, 1);
+  span.forEach(f => {
+    const base = toBase(f.amountUSD, 'USD');
+    if (!Number.isFinite(base) || Math.abs(base) < RECORD_MAT) return;
+    if (f.ts <= t0 || f.ts > t1) return;                 // only inside the rendered window
+    let i = ts.findIndex(tt => tt >= f.ts);
+    if (i <= 0) return;
+    if (stepOff[i] || stepOff[i - 1] || (i + 1 < n && stepOff[i + 1])) return;  // already covered by a shape step
+    stepOff[i] += base; out.recordedNeutralized++;
+    if (_aurixFlowIsInternal(f.kind)) out.internalNeutralized++; else out.externalNeutralized++;
+  });
+
+  const cum = new Array(n).fill(0);
+  let run = 0;
+  for (let i = 0; i < n; i++) { run += stepOff[i]; cum[i] = run; }
   out.totalOffset = run;
-  out.neutralized = out.shapeTransfers;
+  out.neutralized = out.shapeTransfers + out.recordedNeutralized;
   if (run !== 0) out.adjusted = vals.map((v, i) => v - cum[i] + run);
   return out;
 }
@@ -17469,6 +17488,43 @@ if (typeof window !== 'undefined') {
       try { console.table(info); console.log('[chart-source] excludedReasons:', info.excludedReasons); } catch (_) { console.log(info); }
     } catch (e) { info.error = String(e); console.log(info); }
     return info;
+  };
+
+  // WN.12 — PROOF of the exact series the SVG path is drawn from. Replicates the
+  // live render pipeline (eligible → performance-neutralize → resample → despike →
+  // smooth) and dumps the final plotted values + every source label.
+  window.debugAurixRenderedChart = (range) => {
+    const r = range || activeRange;
+    const o = { range: r };
+    try {
+      const raw  = _aurixInvestableSnapshots(r);
+      const elig = _aurixEligibleInvestableSeries(r);
+      const neutral = _aurixFlowNeutralize(elig.series, r);
+      const adj = neutral.adjusted;
+      const ts  = elig.series.map(s => s.ts);
+      const series = _wscResample(adj, ts, r);
+      const despiked = _wscDespike(series.values, 3, 3);
+      const sw = r === 'all' ? 3 : r === '1y' ? 2 : r === '30d' ? 2 : 1;
+      const plotVals = _wscMovingAvg(despiked, sw);
+      o.renderMode = 'PERFORMANCE_ADJUSTED';
+      o.actualPathSource = 'performanceAdjusted → resample → despike → MA → plotVals';
+      o.metricSource = 'performanceAdjusted';
+      o.tooltipSource = 'ADJUSTED';
+      o.rawValuesCount = raw.length;
+      o.cleanValuesCount = elig.series.length;
+      o.performanceAdjustedCount = adj.length;
+      o.finalRenderedCount = plotVals.length;
+      o.flowsNeutralized = neutral.neutralized;
+      o.shapeTransfers = neutral.shapeTransfers;
+      o.recordedNeutralized = neutral.recordedNeutralized;
+      o.first10 = plotVals.slice(0, 10).map(v => +v.toFixed(0));
+      o.last10  = plotVals.slice(-10).map(v => +v.toFixed(0));
+      o.renderedMin = plotVals.length ? +Math.min(...plotVals).toFixed(0) : null;
+      o.renderedMax = plotVals.length ? +Math.max(...plotVals).toFixed(0) : null;
+      o.renderedDeltaPct = plotVals.length && plotVals[0] > 0 ? +(((plotVals[plotVals.length - 1] - plotVals[0]) / plotVals[0]) * 100).toFixed(2) : null;
+      try { console.log('[rendered-chart]', o); } catch (_) {}
+    } catch (e) { o.error = String(e); }
+    return o;
   };
 
   // WN.9 — per-range proof: raw vs cleaned vs rendered (corrected) first/last/
