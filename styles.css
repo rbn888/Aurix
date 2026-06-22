@@ -21760,12 +21760,12 @@ body.gs-open { overflow: hidden; }
 .wsc-down .wsc-line { stroke: var(--red,   #e05a5a); }
 .wsc-flat .wsc-line { stroke: var(--text-muted, #9aa7bd); }
 
-/* faint area fill — soft, fades to nothing (no aggressive block) */
-.wsc-fill-0 { stop-color: var(--accent, #4a82f0); stop-opacity: .12; }
+/* whisper area fill — extremely subtle, fades to nothing (no block, no rectangle) */
+.wsc-fill-0 { stop-color: var(--accent, #4a82f0); stop-opacity: .06; }
 .wsc-fill-1 { stop-color: var(--accent, #4a82f0); stop-opacity: 0; }
-.wsc-up   .wsc-fill-0 { stop-color: var(--green, #3fbf7f); stop-opacity: .12; }
-.wsc-down .wsc-fill-0 { stop-color: var(--red,   #e05a5a); stop-opacity: .10; }
-.wsc-flat .wsc-fill-0 { stop-color: var(--text-muted, #9aa7bd); stop-opacity: .07; }
+.wsc-up   .wsc-fill-0 { stop-color: var(--green, #3fbf7f); stop-opacity: .06; }
+.wsc-down .wsc-fill-0 { stop-color: var(--red,   #e05a5a); stop-opacity: .05; }
+.wsc-flat .wsc-fill-0 { stop-color: var(--text-muted, #9aa7bd); stop-opacity: .04; }
 
 /* discrete reference line at the period start */
 .wsc-baseline {
@@ -21853,7 +21853,13 @@ body.gs-open { overflow: hidden; }
     padding: 0;
     gap: 0;
   }
+  /* WSC.2 — nudge the title + metric right so they align with the chart's left
+     margin (the curve starts inset by _WSC_PAD_X). */
+  .hero-right .chart-header > div:first-child { padding-left: 4%; }
 }
+
+/* mobile: same understated indent so the title aligns with the curve margin */
+.mobile-slide-chart .chart-header > div:first-child { padding-left: 3%; }
 
 @media (prefers-reduced-motion: reduce) {
   .wsc-in .wsc-line, .wsc-in .wsc-area { animation: none; }

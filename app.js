@@ -16670,12 +16670,15 @@ function _dshPaintPerfSnapshot(root, doCountUp) {
 
 const _WSC_VIEW_W = 1000;
 const _WSC_VIEW_H = 240;
-const _WSC_PAD_Y  = 0.26;   // vertical breathing room (fraction of height, each side)
-const _WSC_PAD_X  = 0.038;  // horizontal breathing room (fraction of width, each side)
-// Visual-scale normalization (PRESENTATION ONLY — never alters the metric).
-const _WSC_MIN_AMP = 0.05;  // min visual domain (× ref) → tiny % moves stay calm, not a crash
-const _WSC_MAX_AMP = 1.40;  // max visual domain (× ref) → genuine huge spans fill; artifacts clamp
-const _WSC_BREAK   = 0.55;  // single-step jump (× ref) above which the path breaks (no vertical cliff)
+const _WSC_PAD_X  = 0.06;   // horizontal breathing room (fraction of width, each side)
+// Executive projection (PRESENTATION ONLY — never alters the metric). The line
+// is projected around a stable baseline through a bounded, saturating transfer
+// so movement stays a calm central band:
+//   tanh maps baseline-relative % → vertical offset (viewBox units, ≈0.8px ea):
+//   ±1% ≈ 5u, ±3% ≈ 16u, ±10% ≈ 40u, ≥30% → ~max. Huge import/reset artifacts
+//   saturate instead of becoming walls; the path is always continuous.
+const _WSC_MAX_OFFSET = 50;  // max vertical excursion from centre (viewBox units; band ≈ ±50 of 120)
+const _WSC_AMP_SCALE  = 9;   // % that maps to ~tanh(1); larger = calmer mid-range
 
 // Smoothed path (Catmull-Rom → cubic bézier, low tension = gentle, no overshoot).
 function _wscSmoothPath(pts) {
@@ -16693,28 +16696,6 @@ function _wscSmoothPath(pts) {
     d += ` C${c1x.toFixed(2)},${c1y.toFixed(2)} ${c2x.toFixed(2)},${c2y.toFixed(2)} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}`;
   }
   return d;
-}
-
-// Build line + area paths from normalized points, BREAKING both at artifact
-// discontinuities (indices in `breaks`) so a corrupt single-step jump never
-// renders as a hard vertical cliff. Lone points isolated between two breaks are
-// dropped from the line. If breaking would leave nothing drawable (e.g. only 2
-// points that jumped), fall back to one continuous smoothed path.
-function _wscBuildPaths(pts, breaks, H) {
-  const segs = [];
-  let cur = [pts[0]];
-  for (let i = 1; i < pts.length; i++) {
-    if (breaks.has(i)) { segs.push(cur); cur = [pts[i]]; }
-    else cur.push(pts[i]);
-  }
-  segs.push(cur);
-  let drawable = segs.filter(s => s.length >= 2);
-  if (!drawable.length) drawable = [pts];   // never blank out a valid ≥2-point series
-  const areaOf = s => `${_wscSmoothPath(s)} L${s[s.length - 1].x.toFixed(2)},${H} L${s[0].x.toFixed(2)},${H} Z`;
-  return {
-    line: drawable.map(s => _wscSmoothPath(s)).join(' '),
-    area: drawable.map(areaOf).join(' '),
-  };
 }
 
 // Format a snapshot timestamp for the tooltip, scaled to the active range.
@@ -16804,44 +16785,43 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
     else changeEl.removeAttribute('title');
   }
 
-  // ── Visual normalization (PRESENTATION ONLY — the metric above is the real
-  //    figure). Robust, calm projection so small moves never read as a crash
-  //    and corrupt spikes never become a vertical cliff:
-  //      • the scale domain is built from a TRIMMED range (drop the single most
-  //        extreme low/high when n is large) so one bad point can't flatten the
-  //        rest of the series;
-  //      • domain is clamped to [MIN_AMP, MAX_AMP] × ref, so a tiny % move stays
-  //        subtle and a huge span stays bounded (no +999% wall);
-  //      • the series is CENTRED vertically → 24H never sticks to the top;
-  //      • every plotted y is clamped inside the padded band;
-  //      • added left/right padding → the line never touches the edges.
+  // ── Executive projection (PRESENTATION ONLY — the metric above is the real
+  //    figure). The line is projected around a stable baseline through a
+  //    bounded, saturating transfer, so the curve always lives in a calm
+  //    central band: small moves are gentle, large historical artifacts (asset
+  //    creation / import / reset) COMPRESS instead of becoming walls, and the
+  //    path is ALWAYS continuous (no segmented breaks, no blocky fills).
   const W = _WSC_VIEW_W, H = _WSC_VIEW_H;
-  const padY = H * _WSC_PAD_Y, padX = W * _WSC_PAD_X;
-  const plotH = H - 2 * padY, plotW = W - 2 * padX, midY = H / 2;
+  const padX = W * _WSC_PAD_X, plotW = W - 2 * padX, center = H / 2;
   const n = vals.length;
 
-  const sorted = vals.slice().sort((a, b) => a - b);
-  const k    = n >= 8 ? 1 : 0;                 // trim one extreme each side when dense
-  const loP  = sorted[k], hiP = sorted[n - 1 - k];
-  const mid  = (loP + hiP) / 2;
-  const ref  = mid || first || Math.abs(last) || 1;
-  const rawSpan = Math.max(0, hiP - loP);
-  const domain  = Math.min(Math.max(rawSpan, ref * _WSC_MIN_AMP), ref * _WSC_MAX_AMP) || 1;
-  const clampY  = y => Math.min(H - padY, Math.max(padY, y));
-  const yOf     = v => clampY(midY - ((v - mid) / domain) * plotH);
-  const pts     = vals.map((v, i) => ({ x: padX + (n === 1 ? 0 : (i / (n - 1)) * plotW), y: yOf(v) }));
+  // Robust baseline = median (resists a lone creation/import/reset spike).
+  const sorted   = vals.slice().sort((a, b) => a - b);
+  const median   = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+  const baseline = median || first || 1;
 
-  // Discontinuity guard: a single step jumping more than _WSC_BREAK × ref is an
-  // artifact (or an already-edge-clamped outlier) — break the path there rather
-  // than draw a vertical cliff spanning the panel.
-  const breaks = new Set();
-  for (let i = 1; i < n; i++) {
-    if (Math.abs(vals[i] - vals[i - 1]) > ref * _WSC_BREAK) breaks.add(i);
+  // Baseline-relative % → bounded vertical offset (tanh saturates large moves).
+  const offsetOf = v => _WSC_MAX_OFFSET * Math.tanh((((v - baseline) / baseline) * 100) / _WSC_AMP_SCALE);
+  let offsets = vals.map(offsetOf);
+
+  // Light 3-tap moving average — eases a lone artifact into the calm band and
+  // removes sharp single-point steps (presentation smoothing; no data change).
+  if (offsets.length >= 3) {
+    const sm = offsets.slice();
+    for (let i = 1; i < offsets.length - 1; i++) {
+      sm[i] = offsets[i - 1] * 0.25 + offsets[i] * 0.5 + offsets[i + 1] * 0.25;
+    }
+    offsets = sm;
   }
 
-  const { line: linePath, area: areaPath } = _wscBuildPaths(pts, breaks, H);
-  const baseY = yOf(first);                    // subtle reference at the period start
-  const uid   = opts.uid || 'd';
+  const pts = offsets.map((o, i) => ({
+    x: padX + (n === 1 ? 0 : (i / (n - 1)) * plotW),
+    y: center - o,
+  }));
+
+  const linePath = _wscSmoothPath(pts);                       // one continuous smooth path
+  const areaPath = `${linePath} L${pts[pts.length - 1].x.toFixed(2)},${H} L${pts[0].x.toFixed(2)},${H} Z`;
+  const uid      = opts.uid || 'd';
 
   hostEl.innerHTML = `
     <div class="wsc wsc-${tone}">
@@ -16853,7 +16833,7 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
               <stop offset="100%" class="wsc-fill-1"/>
             </linearGradient>
           </defs>
-          <line class="wsc-baseline" x1="${padX.toFixed(1)}" y1="${baseY.toFixed(1)}" x2="${(W - padX).toFixed(1)}" y2="${baseY.toFixed(1)}" vector-effect="non-scaling-stroke"/>
+          <line class="wsc-baseline" x1="${padX.toFixed(1)}" y1="${center}" x2="${(W - padX).toFixed(1)}" y2="${center}" vector-effect="non-scaling-stroke"/>
           <path class="wsc-area" d="${areaPath}" fill="url(#wscFill-${uid})"/>
           <path class="wsc-line" d="${linePath}" fill="none" vector-effect="non-scaling-stroke"/>
         </svg>
