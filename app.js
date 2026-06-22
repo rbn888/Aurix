@@ -17692,11 +17692,39 @@ if (typeof window !== 'undefined') {
       o.activeWidthPct = aw.activePct;    // active-zone share
       o.idleCapPct = p.r === '24h' ? 20 : 35;
       o.compressionApplied = !!(aw.frac && aw.frac.length === p.plotVals.length);
+      // WN.15 — warp guardrails
+      o.xWarpMinSpacingPx = p.r === '24h' ? 2.5 : 2.5;   // desktop target (mobile 1.5)
+      o.xWarpMinGapFrac = aw.minGapFrac;
+      o.xWarpSlopeGuardApplied = !!aw.slopeGuardApplied;
+      o.xWarpLeadIdleFloorApplied = !!aw.leadIdleFloorApplied;
       // widest single gap between adjacent warped samples (straight-segment check)
       const f = aw.frac || [];
-      let maxGap = 0; for (let i = 1; i < f.length; i++) maxGap = Math.max(maxGap, f[i] - f[i - 1]);
+      let maxGap = 0, minGap = 1; for (let i = 1; i < f.length; i++) { const g = f[i] - f[i - 1]; maxGap = Math.max(maxGap, g); minGap = Math.min(minGap, g); }
       o.maxSegmentWidthPct = +(maxGap * 100).toFixed(2);
+      o.minSegmentWidthPct = +(minGap * 100).toFixed(3);
+      // leading-context width (first idle run) — 24H must keep ≥18%
+      let L = 0; for (let i = 1; i < p.plotVals.length; i++) { if (p.plotVals[i - 1] > 0 && Math.abs(p.plotVals[i] / p.plotVals[i - 1] - 1) < 0.0015) L++; else break; }
+      o.leadingContextWidthPct = f.length > L ? +((f[L] - f[0]) * 100).toFixed(1) : null;
       try { console.log('[viz-compression]', o.range, o); } catch (_) {}
+    } catch (e) { o.error = String(e); }
+    return o;
+  };
+
+  window.debugAurixRegimeScaling = (range) => {
+    const o = { range: range || activeRange };
+    try {
+      const p = _vizPipeline(range);
+      const sc = _wscRegimeYScale(p.plotVals, p.r);
+      o.visualScaleMode = sc.mode;
+      o.yTransformFallbackReason = sc.fallbackReason;
+      o.linearDomain = [sc.lo, sc.hi].map(v => +v.toFixed(0));
+      o.visualDomain = sc.visualDomain.map(v => +v.toFixed(0));
+      o.currentRegimeDomain = sc.currentRegimeDomain.map(v => +v.toFixed(0));
+      o.currentRegime = sc.current ? { type: sc.current.type, spanPct: sc.current.spanPct, samples: sc.current.endIndex - sc.current.startIndex } : null;
+      o.verticalRegimes = sc.regimes.map(r => ({ type: r.type, samples: r.endIndex - r.startIndex, spanPct: r.spanPct, volatilityPct: r.volatilityPct, median: +r.median.toFixed(0) }));
+      o.regimeAmplitudeAllocation = sc.allocation.map(a => ({ type: a.type, visualPct: a.visualPct, isCurrent: a.isCurrent, isTransition: a.isTransition, valueBand: a.valueBand }));
+      o.postEventAmplitudePct = sc.postEventPct;
+      try { console.log('[viz-regime-scaling]', o.range, o.visualScaleMode, '| postEvent%:', o.postEventAmplitudePct); console.table(o.regimeAmplitudeAllocation); } catch (_) {}
     } catch (e) { o.error = String(e); }
     return o;
   };
@@ -17718,14 +17746,30 @@ if (typeof window !== 'undefined') {
 
   window.debugAurixVisualEngine = (range) => {
     const r = range || activeRange;
-    const o = { range: r, layer: 'WN.14 Institutional Visualization Engine' };
+    const o = { range: r, layer: 'WN.15 Regime Relative Scaling Engine' };
     try {
-      o.regimes = window.debugAurixRegimes(r);
-      o.compression = window.debugAurixCompression(r);
-      o.occupancy = window.debugAurixOccupancy(r);
+      const sc = window.debugAurixRegimeScaling(r);
+      const comp = window.debugAurixCompression(r);
+      const occ = window.debugAurixOccupancy(r);
+      o.marketRegimes = window.debugAurixRegimes(r);
+      // PART 9 — explicit fields
+      o.verticalRegimes = sc.verticalRegimes;
+      o.currentRegime = sc.currentRegime;
+      o.visualScaleMode = sc.visualScaleMode;
+      o.linearDomain = sc.linearDomain;
+      o.visualDomain = sc.visualDomain;
+      o.currentRegimeDomain = sc.currentRegimeDomain;
+      o.regimeAmplitudeAllocation = sc.regimeAmplitudeAllocation;
+      o.postEventAmplitudePct = sc.postEventAmplitudePct;
+      o.xWarpMinSpacingPx = comp.xWarpMinSpacingPx;
+      o.xWarpSlopeGuardApplied = comp.xWarpSlopeGuardApplied;
+      o.xWarpLeadIdleFloorApplied = comp.xWarpLeadIdleFloorApplied;
+      o.leadingContextWidthPct = comp.leadingContextWidthPct;
+      o.yTransformFallbackReason = sc.yTransformFallbackReason;
+      o.occupancyPct = occ.occupancyPct;
       o.smoothingWindow = _vizPipeline(r).smoothWin;
-      o.pipeline = 'eligible → flow-neutral → resample → despike → MA → regime → activity-warp → monotone-spline → SVG';
-      try { console.log('[viz-engine]', r, '| regimes:', o.regimes.regimeCount, '| idle%:', o.compression.idleWidthPct, '| occ%:', o.occupancy.occupancyPct); } catch (_) {}
+      o.pipeline = 'eligible → flow-neutral → resample → despike → MA → vertical-regime → y-remap + activity-warp(guarded) → monotone-spline → SVG';
+      try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| postEvent%:', o.postEventAmplitudePct, '| idle%:', comp.idleWidthPct, '| occ%:', o.occupancyPct); } catch (_) {}
     } catch (e) { o.error = String(e); }
     return o;
   };
@@ -17832,12 +17876,31 @@ function detectMarketRegimes(values, timestamps) {
   return regimes;
 }
 
+// Water-fill a set of interval gaps so every gap ≥ minGap while keeping the
+// total at 1 (the surplus above-floor gaps shrink proportionally). Prevents a
+// near-zero gap from rendering as a vertical wall. (WN.15 warp guardrail.)
+function _wscEnforceMinGap(gaps, minGap) {
+  const out = gaps.slice();
+  for (let it = 0; it < 8; it++) {
+    let deficit = 0, surplus = 0;
+    for (const g of out) { if (g < minGap) deficit += minGap - g; else surplus += g - minGap; }
+    if (deficit <= 1e-9 || surplus <= 1e-9) break;
+    const k = Math.max(0, (surplus - deficit) / surplus);
+    for (let i = 0; i < out.length; i++) out[i] = out[i] < minGap ? minGap : minGap + (out[i] - minGap) * k;
+  }
+  const s = out.reduce((a, b) => a + b, 0) || 1; return out.map(g => g / s);
+}
+
 // Activity-weighted cumulative x-fraction per sample. Idle intervals get a small
 // weight (compressed); active ones scale with volatility (clamped 1–4). The idle
 // total is hard-capped (24H ≤20%, others ≤35%) so dead zones never dominate.
-function _wscActivityWeights(values, range) {
+// WN.15 — warp guardrails: a per-interval minimum spacing (no vertical wall /
+// max-slope guard) and, on 24H, a ≥18% width floor on the leading idle context
+// run so it can't be crushed into a left wall.
+function _wscActivityWeights(values, range, opts) {
+  opts = opts || {};
   const n = values.length;
-  if (n < 2) return { frac: values.map((_, i) => (n < 2 ? 0 : i / (n - 1))) };
+  if (n < 2) return { frac: values.map((_, i) => (n < 2 ? 0 : i / (n - 1))), idlePct: 0, activePct: 100 };
   const ret = []; for (let i = 1; i < n; i++) ret.push(values[i - 1] > 0 ? Math.abs(values[i] / values[i - 1] - 1) : 0);
   const sorted = ret.slice().sort((a, b) => a - b);
   const medR = sorted[sorted.length >> 1] || 0.001;
@@ -17846,17 +17909,234 @@ function _wscActivityWeights(values, range) {
   // Hard-cap idle total width.
   const idleMax = range === '24h' ? 0.20 : 0.35;
   let idleW = 0, total = 0; w.forEach((x, i) => { total += x; if (isIdle[i]) idleW += x; });
-  if (total > 0 && idleW / total > idleMax) {
+  if (total > 0 && (total - idleW) > 1e-9 && idleW / total > idleMax) {   // skip if all-idle (no active budget)
     const activeW = total - idleW;
     const targetIdle = (idleMax / (1 - idleMax)) * activeW;     // idleW' / activeW = idleMax/(1-idleMax)
     const factor = idleW > 0 ? targetIdle / idleW : 1;
     w = w.map((x, i) => isIdle[i] ? x * factor : x);
   }
   const sum = w.reduce((a, b) => a + b, 0) || 1;
-  const frac = new Array(n); frac[0] = 0; let c = 0;
-  for (let i = 1; i < n; i++) { c += w[i - 1]; frac[i] = c / sum; }
-  const idleFinal = w.reduce((a, x, i) => a + (isIdle[i] ? x : 0), 0) / sum;
-  return { frac, idlePct: +(idleFinal * 100).toFixed(1), activePct: +((1 - idleFinal) * 100).toFixed(1) };
+  let gaps = w.map(x => x / sum);                                 // n-1 interval widths, Σ=1
+
+  // WN.15 — no vertical wall: floor every interval (≈2.5px desktop / 1.5px mobile).
+  const isMobile = !!opts.mobile;
+  const minGap = range === '24h' ? (isMobile ? 0.0016 : 0.0024) : (isMobile ? 0.0011 : 0.0016);
+  const minBefore = Math.min(...gaps);
+  gaps = _wscEnforceMinGap(gaps, minGap);
+  const slopeGuardApplied = minBefore < minGap - 1e-9;
+
+  // WN.15 — 24H leading idle context must keep ≥18% of the width (no left wall).
+  let leadIdleFloorApplied = false;
+  if (range === '24h') {
+    let L = 0; while (L < isIdle.length && isIdle[L]) L++;
+    if (L > 0 && L < gaps.length) {
+      let lead = 0; for (let i = 0; i < L; i++) lead += gaps[i];
+      if (lead > 0 && lead < 0.18) {
+        const rest = 1 - lead, need = 0.18 - lead, k = Math.max(0, (rest - need) / rest), sc = 0.18 / lead;
+        for (let i = 0; i < gaps.length; i++) gaps[i] = i < L ? gaps[i] * sc : gaps[i] * k;
+        leadIdleFloorApplied = true;
+      }
+    }
+  }
+  const gt = gaps.reduce((a, b) => a + b, 0) || 1; gaps = gaps.map(g => g / gt);
+
+  const frac = new Array(n); frac[0] = 0; for (let i = 1; i < n; i++) frac[i] = frac[i - 1] + gaps[i - 1];
+  frac[n - 1] = 1;
+  const idleFinal = gaps.reduce((a, g, i) => a + (isIdle[i] ? g : 0), 0);
+  return { frac, idlePct: +(idleFinal * 100).toFixed(1), activePct: +((1 - idleFinal) * 100).toFixed(1),
+    minGapFrac: minGap, slopeGuardApplied, leadIdleFloorApplied };
+}
+
+// ── WN.15 — Regime Relative Scaling Engine ──────────────────────────────────
+// After WN.14 fixed horizontal weighting, a single dominant structural move
+// still flattened everything else vertically (flat → huge move → flat). This
+// layer segments the series into VERTICAL regimes (stable local levels) and
+// remaps value→y so each meaningful regime is legible: large transitions are
+// compressed, low-base and current-consolidation regimes are expanded. The
+// transform is a MONOTONE function of value — it can never reverse order or
+// direction, invent a local high/low, or hide a drawdown — and it falls back to
+// plain linear whenever it could be misleading (non-monotone macro shape, too
+// few points). Tooltip values, metric, and timestamps are untouched; only the
+// SVG y-mapping changes.
+function detectVerticalRegimes(values, timestamps, range) {
+  const n = values.length, out = [];
+  const med = arr => { const s = arr.slice().sort((a, b) => a - b); return s.length ? s[(s.length - 1) >> 1] : 0; };
+  const mk = (s, e) => {
+    const seg = values.slice(s, e), sd = seg.slice().sort((a, b) => a - b);
+    const mn = sd[0], mx = sd[sd.length - 1], md = sd[(sd.length - 1) >> 1];
+    const fv = seg[0], lv = seg[seg.length - 1];
+    const ret = []; let dsum = 0, dc = 0;
+    for (let i = s + 1; i < e; i++) { if (values[i - 1] > 0) { ret.push(Math.abs(values[i] / values[i - 1] - 1)); dsum += Math.sign(values[i] - values[i - 1]); dc++; } }
+    const vol = ret.length ? Math.sqrt(ret.reduce((a, r) => a + r * r, 0) / ret.length) : 0;
+    const dirRatio = dc ? Math.abs(dsum) / dc : 0;                 // 1 = monotone ramp, ~0 = mean-reverting
+    return { startIndex: s, endIndex: e, min: mn, max: mx, median: md, first: fv, last: lv,
+      volatilityPct: +(vol * 100).toFixed(3), spanPct: md > 0 ? +(((mx - mn) / md) * 100).toFixed(2) : 0,
+      netPct: md > 0 ? +(((lv - fv) / md) * 100).toFixed(2) : 0,   // net directional move (sign matters)
+      dirRatio: +dirRatio.toFixed(3),
+      startTs: timestamps ? timestamps[s] : null, endTs: timestamps ? timestamps[Math.min(e, n - 1)] : null, type: null };
+  };
+  if (n < 2) { if (n) out.push(mk(0, n)); return _wscRegimeTypes(out); }
+  const SUS = Math.max(2, Math.round(n * 0.05));
+  const MINLEN = Math.max(3, Math.round(n * 0.05));
+  const ACTIVE = 0.004;                                               // per-step drift that marks a ramp/jump
+  const drift = (s, e) => { let a = 0, c = 0; for (let i = s + 1; i < e; i++) { if (values[i - 1] > 0) { a += values[i] / values[i - 1] - 1; c++; } } return c ? a / c : 0; };
+  // Per-index activity class from windowed drift. An oscillating-but-stable
+  // regime averages to FLAT (so it stays ONE regime — micro-volatility is
+  // preserved, not split); ramps/jumps read as sustained UP/DOWN runs.
+  const cls = new Array(n);
+  for (let i = 0; i < n; i++) { const d = drift(Math.max(0, i - SUS), Math.min(n, i + SUS + 1)); cls[i] = Math.abs(d) < ACTIVE ? 'FLAT' : (d > 0 ? 'UP' : 'DOWN'); }
+  let runs = []; let s = 0;
+  for (let i = 1; i <= n; i++) { if (i === n || cls[i] !== cls[s]) { runs.push([s, i, cls[s]]); s = i; } }
+  // Merge runs shorter than MINLEN into a neighbour (kills oscillation specks).
+  let changed = true;
+  while (changed && runs.length > 1) {
+    changed = false;
+    for (let k = 0; k < runs.length; k++) {
+      if (runs[k][1] - runs[k][0] < MINLEN) {
+        if (k > 0) { runs[k - 1][1] = runs[k][1]; runs.splice(k, 1); }
+        else { runs[k + 1][0] = runs[k][0]; runs.splice(k, 1); }
+        changed = true; break;
+      }
+    }
+  }
+  // Merge adjacent segments whose median LEVEL is close (within MERGE_THR): a
+  // slow swing whose period exceeds the drift window reads as alternating trends,
+  // but its half-waves share a level → collapse to one consolidation regime. A
+  // real ramp has rising medians → its segments stay distinct.
+  const MERGE_THR = 0.07;
+  let bnds = runs.map(r => r[0]); bnds.push(n);
+  let merged = true;
+  while (merged && bnds.length > 2) {
+    merged = false;
+    for (let k = 0; k < bnds.length - 2; k++) {
+      const m1 = med(values.slice(bnds[k], bnds[k + 1])), m2 = med(values.slice(bnds[k + 1], bnds[k + 2]));
+      if (m1 > 0 && m2 > 0 && Math.abs(m2 / m1 - 1) < MERGE_THR) { bnds.splice(k + 1, 1); merged = true; break; }
+    }
+  }
+  for (let k = 0; k < bnds.length - 1; k++) out.push(mk(bnds[k], bnds[k + 1]));
+  return _wscRegimeTypes(out);
+}
+// Classify by NET directional move (not range): a ramp/jump nets a large move
+// (→ EXPANSION / CORRECTION, a "transition" to compress); a consolidation nets
+// ≈0 even when its range is wide (→ CONSOLIDATION, a "focus" lane to expand).
+function _wscRegimeTypes(out) {
+  const N = out.length;
+  out.forEach((r, k) => {
+    const next = out[k + 1];
+    // A transition is a SUSTAINED directional move (net large AND mostly one
+    // direction). A wide-but-mean-reverting consolidation (low dirRatio) is not.
+    if (Math.abs(r.netPct) > 6 && r.dirRatio > 0.5) r.type = r.netPct > 0 ? 'EXPANSION' : 'CORRECTION';
+    else if (k === N - 1) r.type = 'CURRENT_CONSOLIDATION';
+    else if (k === 0 && next && next.median > r.median * 1.05) r.type = 'LOW_BASE';
+    else r.type = 'CONSOLIDATION';
+  });
+  return out;
+}
+
+// Water-fill allocator: distribute `total` (default 1) across items honouring
+// each item's floor while preserving the relative size of the "want" budget.
+function _wscAllocate(wants, floors, total) {
+  total = total == null ? 1 : total;
+  const N = wants.length; if (!N) return [];
+  let fsum = floors.reduce((a, b) => a + b, 0), f = floors.slice();
+  if (fsum > total) { const k = total / (fsum || 1); f = f.map(x => x * k); }
+  const wsum = wants.reduce((a, b) => a + b, 0) || 1;
+  let vis = wants.map(w => (w / wsum) * total);
+  for (let it = 0; it < 10; it++) {
+    let deficit = 0, surplus = 0;
+    for (let i = 0; i < N; i++) { if (vis[i] < f[i]) deficit += f[i] - vis[i]; else surplus += vis[i] - f[i]; }
+    if (deficit <= 1e-9 || surplus <= 1e-9) break;
+    const k = Math.max(0, (surplus - deficit) / surplus);
+    for (let i = 0; i < N; i++) vis[i] = vis[i] < f[i] ? f[i] : f[i] + (vis[i] - f[i]) * k;
+  }
+  const s = vis.reduce((a, b) => a + b, 0) || 1; return vis.map(v => (v / s) * total);
+}
+
+// Build a monotone value→[0,1] visual mapping (and its inverse) that gives each
+// meaningful regime a visible vertical lane. gFrac(lo)=0, gFrac(hi)=1, strictly
+// non-decreasing. Returns mode:'linear' (identity remap) when a regime transform
+// would be unsafe/unhelpful.
+function _wscRegimeYScale(values, range) {
+  const n = values.length;
+  const sorted = values.slice().sort((a, b) => a - b);
+  const lo = sorted[0], hi = sorted[sorted.length - 1], span = hi - lo;
+  const linear = (reason, regimes) => ({ mode: 'linear',
+    gFrac: v => span > 0 ? Math.min(1, Math.max(0, (v - lo) / span)) : 0.5,
+    inv: f => lo + Math.max(0, Math.min(1, f)) * span, lo, hi, span, regimes: regimes || [], current: null,
+    allocation: [], visualDomain: [lo, hi], currentRegimeDomain: [lo, hi], postEventPct: null, fallbackReason: reason || null });
+  if (n < 8 || !(span > 0)) return linear(n < 8 ? 'insufficient_points' : 'degenerate_span');
+  const regimes = detectVerticalRegimes(values, null, range);
+  if (regimes.length < 2) return linear('single_regime', regimes);
+  // Honest only when the macro shape is monotone-increasing-ish (time order ≈
+  // value order) with a real climb to compress. Corrections / oscillation → linear.
+  let monotone = true;
+  for (let k = 1; k < regimes.length; k++) if (regimes[k].median < regimes[k - 1].median * 0.95) { monotone = false; break; }
+  const climb = regimes[regimes.length - 1].median > regimes[0].median * 1.08;
+  if (!monotone) return linear('non_monotone_macro', regimes);
+  if (!climb) return linear('no_macro_climb', regimes);
+  // Only amplify when the CURRENT regime is a (near-)stable consolidation that
+  // would otherwise read as dead. If it is an active move (still climbing or in a
+  // live drawdown), linear already shows it faithfully — never compress it.
+  const lastType = regimes[regimes.length - 1].type;
+  if (lastType === 'EXPANSION' || lastType === 'CORRECTION') return linear('current_regime_in_transition', regimes);
+  // Increasing value knots; segment k is owned by regime k.
+  const knots = [lo];
+  for (let k = 0; k < regimes.length - 1; k++) {
+    let b = (regimes[k].max + regimes[k + 1].min) / 2;
+    b = Math.min(Math.max(b, knots[knots.length - 1] + span * 1e-3), hi - span * 1e-3);
+    knots.push(b);
+  }
+  knots.push(hi);
+  const curVal = values[n - 1], curK = regimes.length - 1;
+  const wants = [], floors = [], alloc = [];
+  for (let k = 0; k < regimes.length; k++) {
+    const a = knots[k], b = knots[k + 1], linShare = (b - a) / span, r = regimes[k];
+    const isCurrent = (curVal >= a - 1e-9 && curVal <= b + 1e-9) || k === curK;
+    const moves = r.spanPct >= (isCurrent ? 0.15 : 0.2);          // real internal movement (PART 2 / PART 6)
+    const isTransition = r.type === 'EXPANSION' || r.type === 'CORRECTION';   // net directional move → compress
+    let want, floor;
+    if (isTransition)      { want = linShare;                  floor = 0.04; }   // compressed via the group budget
+    else if (isCurrent)    { want = Math.max(linShare, 0.22);  floor = moves ? 0.22 : 0.06; }
+    else if (moves)        { want = Math.max(linShare, 0.16);  floor = 0.16; }
+    else                   { want = Math.max(linShare, 0.05);  floor = 0.05; }
+    wants.push(want); floors.push(floor);
+    alloc.push({ k, type: r.type, valueBand: [+a.toFixed(0), +b.toFixed(0)], spanPct: r.spanPct, isCurrent, isTransition, moves });
+  }
+  // Two-group allocation: transitions share a CAPPED budget (so the dominant
+  // move can't swallow the height); focus lanes (base / consolidation / current)
+  // split the rest with floors so each stays legible.
+  const transKeys = [], focusKeys = [];
+  alloc.forEach((al, k) => (al.isTransition ? transKeys : focusKeys).push(k));
+  const vis = new Array(regimes.length).fill(0);
+  const transTotal = transKeys.length ? (focusKeys.length ? Math.min(0.45, transKeys.length * 0.36) : 1) : 0;
+  if (transKeys.length) {
+    const ta = _wscAllocate(transKeys.map(k => Math.abs(regimes[k].netPct) + 1), transKeys.map(() => 0.05), transTotal);
+    transKeys.forEach((k, i) => { vis[k] = ta[i]; });
+  }
+  if (focusKeys.length) {
+    const used = transKeys.reduce((s, k) => s + vis[k], 0);
+    const fa = _wscAllocate(focusKeys.map(k => wants[k]), focusKeys.map(k => floors[k]), Math.max(0, 1 - used));
+    focusKeys.forEach((k, i) => { vis[k] = fa[i]; });
+  }
+  const vsum = vis.reduce((a, b) => a + b, 0) || 1; for (let k = 0; k < vis.length; k++) vis[k] /= vsum;
+  const cum = [0]; for (let k = 0; k < vis.length; k++) cum.push(cum[k] + vis[k]);
+  alloc.forEach((al, k) => { al.visualPct = +(vis[k] * 100).toFixed(1); });
+  const gFrac = v => {
+    if (v <= knots[0]) return 0; if (v >= knots[knots.length - 1]) return 1;
+    let k = 1; while (k < knots.length && knots[k] < v) k++;
+    const a = knots[k - 1], b = knots[k], r = b > a ? (v - a) / (b - a) : 0;
+    return cum[k - 1] + (cum[k] - cum[k - 1]) * r;
+  };
+  const inv = f => {
+    if (f <= 0) return lo; if (f >= 1) return hi;
+    let k = 1; while (k < cum.length && cum[k] < f) k++;
+    const a = cum[k - 1], b = cum[k], r = b > a ? (f - a) / (b - a) : 0;
+    return knots[k - 1] + (knots[k] - knots[k - 1]) * r;
+  };
+  return { mode: 'regime-relative', gFrac, inv, lo, hi, span, regimes, current: regimes[curK],
+    allocation: alloc, knots, cum, visualDomain: [lo, hi],
+    currentRegimeDomain: [regimes[curK].min, regimes[curK].max],
+    postEventPct: alloc[curK] ? alloc[curK].visualPct : null, fallbackReason: null };
 }
 
 // Paint one surface: write the range-change metric into changeEl (the span
@@ -17929,10 +18209,19 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
 
   // Viewport with a REAL value domain (drives accurate y-axis labels).
   const vp = _wscViewport(plotVals, activeRange);
+  // WN.15 — regime-relative vertical scaling: monotone value→y remap so each
+  // meaningful regime is legible (big transition compressed, base + current
+  // consolidation expanded). Honest (monotone) or it falls back to linear.
+  const rscale = _wscRegimeYScale(plotVals, activeRange);
+  const lineBand = vp.lineBot - vp.lineTop;
+  const yOf = v => vp.lineBot - rscale.gFrac(v) * lineBand;
+  const valAtY = rscale.mode === 'regime-relative'
+    ? y => rscale.inv(Math.max(0, Math.min(1, (vp.lineBot - y) / (lineBand || 1))))
+    : y => vp.valAt(y);
   const uT0 = uTs[0], uSpan = (uTs[uN - 1] - uT0) || 1;
   // WN.14 — activity-weighted horizontal warp: idle zones compress, volatile
-  // zones expand. Falls back to uniform time if degenerate. Order/values intact.
-  const aw = _wscActivityWeights(plotVals, activeRange);
+  // zones expand. WN.15 — warp guardrails (min spacing / 24H lead floor).
+  const aw = _wscActivityWeights(plotVals, activeRange, { mobile: opts.uid === 'm' });
   const xfrac = (aw.frac && aw.frac.length === uN) ? aw.frac : plotVals.map((_, i) => (uN > 1 ? i / (uN - 1) : 0));
   // Map a real timestamp → warped x-fraction (interpolate across uTs↔xfrac).
   const warpFracAt = (tt) => {
@@ -17944,14 +18233,19 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
     return xfrac[i - 1] + (xfrac[i] - xfrac[i - 1]) * r;
   };
   const xOf = (tt, i) => padX + xfrac[i] * plotW;
-  const pts = plotVals.map((v, i) => ({ x: xOf(uTs[i], i), y: vp.yOf(v) }));
+  const pts = plotVals.map((v, i) => ({ x: xOf(uTs[i], i), y: yOf(v) }));
+  if (typeof window !== 'undefined' && window._aurixChartMode) {
+    window._aurixChartMode.visualScaleMode = rscale.mode;
+    window._aurixChartMode.yTransformFallbackReason = rscale.fallbackReason;
+    window._aurixChartMode.xWarpSlopeGuardApplied = !!aw.slopeGuardApplied;
+  }
   const linePath = _wscMonotonePath(pts);
   const areaPath = `${linePath} L${pts[pts.length - 1].x.toFixed(2)},${vp.bot.toFixed(2)} L${pts[0].x.toFixed(2)},${vp.bot.toFixed(2)} Z`;
 
   // Premium grid: 4 horizontal (at the value ticks) + 5 vertical (at x ticks).
   const uid = opts.uid || 'd';
   const gx1 = padX.toFixed(1), gx2 = (W - padX).toFixed(1);
-  const yTicks = [0, 1, 2, 3].map(i => { const f = i / 3, y = vp.top + (vp.bot - vp.top) * f; return { y, val: vp.valAt(y) }; });
+  const yTicks = [0, 1, 2, 3].map(i => { const f = i / 3, y = vp.top + (vp.bot - vp.top) * f; return { y, val: valAtY(y) }; });
   // WN.14 — ticks are positioned at the WARPED x of their timestamp, so labels
   // stay temporally truthful even though spacing is activity-weighted.
   const xTicks = _wscXTicks(uT0, uTs[uN - 1], activeRange).map(tk => {
