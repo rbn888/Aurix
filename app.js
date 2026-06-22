@@ -17222,7 +17222,9 @@ function _aurixInvestableSnapshots(range) {
       const total = Number(p.total), re = Number(p.real_estate) || 0;
       const invUSD = (Number.isFinite(total) ? total : 0) - re;     // investable = total − real estate
       if (!Number.isFinite(invUSD) || invUSD <= 0) continue;
-      out.push({ ts: p.ts, value: toBase(invUSD, 'USD') });          // base currency, matches the Hero
+      // base currency, matches the Hero. `re`/`total` carried so the trust filter
+      // can tell a RE-polluted / pre-investable-split point from a clean one.
+      out.push({ ts: p.ts, value: toBase(invUSD, 'USD'), re: toBase(re, 'USD'), total: toBase(Number.isFinite(total) ? total : 0, 'USD') });
     }
     return out.sort((a, b) => a.ts - b.ts);
   } catch (_) { return []; }
@@ -17239,10 +17241,10 @@ function _aurixEligibleInvestableSeries(range) {
   const raw = _aurixInvestableSnapshots(range);
   const meta = {
     raw: raw.length, eligible: 0, excluded: 0,
-    reasons: { realEstatePolluted: 0, incompatibleScale: 0, constructionBaseline: 0, staleFlatSection: 0, insufficientCleanData: 0 },
+    reasons: { real_estate_polluted: 0, pre_investable_split: 0, incompatible_regime: 0, construction_baseline: 0, stale_low_information: 0, insufficient_clean_data: 0 },
     anchor: null, activeWindowStart: null, activeWindowEnd: null,
   };
-  if (raw.length < 2) { meta.eligible = raw.length; if (raw.length < 2) meta.reasons.insufficientCleanData = 1; return { series: raw.slice(), meta }; }
+  if (raw.length < 2) { meta.eligible = raw.length; if (raw.length < 2) meta.reasons.insufficient_clean_data = 1; return { series: raw.slice(), meta }; }
 
   // Anchor = current investable value (base currency); fall back to last snapshot.
   let anchor = 0;
@@ -17255,15 +17257,32 @@ function _aurixEligibleInvestableSeries(range) {
   // the chart (this is what removes the −85% / 480k history on 1A/TOTAL).
   const LOW = anchor * 0.25, HIGH = anchor * 2.5, CONSTRUCTION = anchor * 0.15;
 
-  // 1. Drop the LEADING incompatible-scale prefix (old/polluted/construction).
-  let s = 0;
-  while (s < raw.length && (raw[s].value < LOW || raw[s].value > HIGH)) {
-    const v = raw[s].value;
-    if (v < CONSTRUCTION) meta.reasons.constructionBaseline++;
-    else meta.reasons.incompatibleScale++;
-    meta.excluded++; s++;
+  // 1. WN.13 trust boundary — EXCLUDE EVERY out-of-band point, wherever it sits
+  //    (not just a leading prefix). Scattered/mid-series RE-polluted or
+  //    pre-investable-split snapshots (e.g. an old 444k total-incl-real-estate
+  //    point among clean ~64k ones) used to survive and produce the −85% / 400k
+  //    collapse on 1A/TOTAL. Now they are dropped everywhere; the uniform resample
+  //    later interpolates across the resulting gaps. Reasons are classified for
+  //    debug. A point is trusted only if its investable value sits within
+  //    [0.25×, 2.5×] the current investable value.
+  let series = [];
+  for (const p of raw) {
+    const v = p.value;
+    if (v >= LOW && v <= HIGH) { series.push(p); continue; }
+    meta.excluded++;
+    if (v > HIGH) {
+      // High outlier: real-estate still inside the total (re==0 ⇒ pre-split) or
+      // an old RE-inclusive regime ⇒ real-estate contamination.
+      if (!(p.re > 0)) meta.reasons.pre_investable_split++;
+      else meta.reasons.real_estate_polluted++;
+    } else if (v < CONSTRUCTION) {
+      meta.reasons.construction_baseline++;
+    } else {
+      meta.reasons.incompatible_regime++;
+    }
   }
-  let series = raw.slice(s);
+  // real-estate polluted is the dominant intent for any high outlier
+  meta.realEstateExcludedFromChart = true;
 
   // 2. WN.12 — trim a long NEAR-LINEAR lead-in (low CURVATURE: flat OR a steady
   //    straight ramp — both are low-information) so the chart never opens with a
@@ -17283,7 +17302,7 @@ function _aurixEligibleInvestableSeries(range) {
       if (f > m * 0.25 && (m - f) >= 3) {
         const trimTo = Math.max(0, f - 1);               // keep ~1 point of context
         if (trimTo > 0) {
-          meta.reasons.staleFlatSection += trimTo; meta.excluded += trimTo;
+          meta.reasons.stale_low_information += trimTo; meta.excluded += trimTo;
           meta.staleLeadInRemoved = true; meta.activeTrimApplied = true;
           series = series.slice(trimTo);
         }
@@ -17293,8 +17312,14 @@ function _aurixEligibleInvestableSeries(range) {
 
   meta.eligible = series.length;
   if (series.length) { meta.activeWindowStart = series[0].ts; meta.activeWindowEnd = series[series.length - 1].ts; }
-  if (series.length < 2) meta.reasons.insufficientCleanData = 1;
+  if (series.length < 2) meta.reasons.insufficient_clean_data = 1;
   return { series, meta };
+}
+
+// WN.13 — public named entry: the trusted investable history regime for a range
+// (real estate purged, polluted/pre-split/incompatible regimes excluded).
+function getTrustedInvestableHistory(range) {
+  return _aurixEligibleInvestableSeries(range || activeRange);
 }
 
 // WN.8 — flow CLASSIFICATION. INTERNAL transfers (asset buys/sells, construction
@@ -17447,7 +17472,7 @@ if (typeof window !== 'undefined') {
       info.rawSnapshotCount      = raw.length;
       info.eligibleSnapshotCount = elig.meta.eligible;
       info.excludedSnapshotCount = elig.meta.excluded;
-      info.excludedReasons       = elig.meta.reasons;          // realEstatePolluted/incompatibleScale/constructionBaseline/staleFlatSection/insufficientCleanData
+      info.excludedReasons       = elig.meta.reasons;          // real_estate_polluted/pre_investable_split/incompatible_regime/construction_baseline/stale_low_information/insufficient_clean_data
       info.activeWindowStart = elig.meta.activeWindowStart ? new Date(elig.meta.activeWindowStart).toISOString() : null;
       info.activeWindowEnd   = elig.meta.activeWindowEnd   ? new Date(elig.meta.activeWindowEnd).toISOString()   : null;
       info.activeTrimApplied   = !!elig.meta.activeTrimApplied;
@@ -17488,6 +17513,35 @@ if (typeof window !== 'undefined') {
       try { console.table(info); console.log('[chart-source] excludedReasons:', info.excludedReasons); } catch (_) { console.log(info); }
     } catch (e) { info.error = String(e); console.log(info); }
     return info;
+  };
+
+  // WN.13 — investable-vs-real-estate audit across every range: proves whether
+  // any real-estate-contaminated point still reaches the chart, with the RE
+  // component and per-reason exclusion counts.
+  window.debugAurixInvestableHistory = () => {
+    const o = { currentInvestable: null, currentRealEstate: null, ranges: {} };
+    try {
+      o.currentInvestable = (typeof getInvestablePortfolioValue === 'function') ? +getInvestablePortfolioValue().toFixed(2) : null;
+      o.currentRealEstate = (Array.isArray(assets) ? assets : [])
+        .filter(a => a && _aurixCategoryBucket(a) === 'real_estate')
+        .reduce((s, a) => { const v = assetValueUSD(a); return Number.isFinite(v) ? s + v : s; }, 0);
+      const stat = (arr, k) => arr.length ? { first: +(arr[0][k]).toFixed(0), last: +(arr[arr.length - 1][k]).toFixed(0), min: +Math.min(...arr.map(x => x[k])).toFixed(0), max: +Math.max(...arr.map(x => x[k])).toFixed(0), n: arr.length } : { n: 0 };
+      ['24h', '7d', '30d', '1y', 'all'].forEach(r => {
+        const raw = _aurixInvestableSnapshots(r);
+        const elig = _aurixEligibleInvestableSeries(r);
+        o.ranges[r] = {
+          rawInvestable: stat(raw, 'value'),
+          realEstateComponent: stat(raw, 're'),
+          totalWithRE: stat(raw, 'total'),
+          trustedInvestable: stat(elig.series, 'value'),
+          excluded: elig.meta.excluded,
+          reasons: elig.meta.reasons,
+          anyREContaminationReaching: elig.series.some(p => p.re > 0 && p.value > (o.currentInvestable || 1) * 2.5),
+        };
+      });
+      try { console.log('[investable-history]', o); } catch (_) {}
+    } catch (e) { o.error = String(e); }
+    return o;
   };
 
   // WN.12 — PROOF of the exact series the SVG path is drawn from. Replicates the
