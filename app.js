@@ -16689,6 +16689,9 @@ const _WSC_OCC = {
   '1y':  [0.35, 0.55],
   'all': [0.35, 0.55],
 };
+// Per-range adjacent-jump threshold (%) above which a SUSTAINED level shift is
+// treated as a capital / import / construction event (not market performance).
+const _WSC_CAPITAL_JUMP = { '24h': 8, '7d': 15, '30d': 25, '1y': 35, 'all': 35 };
 
 // Linear-interpolated percentile of an ascending-sorted array (p ∈ [0,1]).
 function _wscPercentile(sortedAsc, p) {
@@ -16798,12 +16801,75 @@ function _wscViewport(values, range) {
   return { yOf, top, bot };
 }
 
-// Format a snapshot timestamp for the tooltip, scaled to the active range.
-function _wscFmtTs(ts) {
-  const dt = new Date(ts);
-  if (activeRange === '24h') return dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-  if (activeRange === 'all') return dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: '2-digit' });
-  return dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+// ── Institutional Wealth Normalization Layer (WN.1) ─────────────────────────
+// Distinguish ORGANIC wealth movement from CAPITAL events (import / portfolio
+// construction / large manual deposit-withdrawal). A massive one-snapshot level
+// shift (e.g. 5,692 → 386,135 = +6683%) is NOT market performance and must not
+// be drawn as such. This layer sits between getChartData and the curve. It NEVER
+// mutates raw portfolioHistory; it returns a VISUAL series (a real-value slice
+// focused on the most recent organic regime) plus capital-event metadata and an
+// optional organic normalizedDeltaPct/Abs (exposed for future use, not shown).
+function normalizeWealthSeriesForVisualization(values, timestamps, range) {
+  const n = values.length;
+  const pass = {
+    values: values.slice(), timestamps: timestamps.slice(),
+    capitalEvents: [], focusedFromIndex: 0,
+    normalizedDeltaPct: null, normalizedDeltaAbs: null,
+  };
+  if (n < 4) return pass;   // too short to safely distinguish a regime shift
+
+  const thr = _WSC_CAPITAL_JUMP[range] || 25;
+  const med = arr => { const s = arr.slice().sort((a, b) => a - b); return s.length ? s[(s.length - 1) >> 1] : 0; };
+  const SUSTAIN = 4;        // points confirming the new level holds (not a revert spike)
+
+  // 1. Detect capital events on adjacent steps. A real capital event is a large
+  //    adjacent jump that is ALSO a sustained regime shift — the LOCAL MEDIAN
+  //    before vs after differs substantially. Comparing medians (not raw values)
+  //    means a transient spike that reverts (preMed ≈ postMed) is NOT flagged —
+  //    that's the despike layer's job — while a true level change (5,692 →
+  //    386,135) is. Small-base→large is captured via the medians too.
+  const events = [];
+  for (let i = 1; i < n; i++) {
+    const prev = values[i - 1], cur = values[i];
+    if (!(prev > 0) || !(cur > 0)) continue;
+    const jumpPct = Math.abs(cur / prev - 1) * 100;
+    const preMed  = med(values.slice(Math.max(0, i - SUSTAIN), i));
+    const postMed = med(values.slice(i, Math.min(n, i + SUSTAIN + 1)));
+    if (!(preMed > 0) || !(postMed > 0)) continue;
+    const levelDiffPct = Math.abs(postMed / preMed - 1) * 100;          // sustained regime change
+    const smallBase    = Math.min(preMed, postMed) < 0.20 * Math.max(preMed, postMed);
+    if (jumpPct >= thr && (levelDiffPct >= thr * 0.6 || smallBase)) {
+      events.push({ index: i, timestamp: timestamps[i], prevValue: prev, nextValue: cur, jumpPct: +jumpPct.toFixed(2), range });
+    }
+  }
+  if (!events.length) return pass;
+
+  // 2. Split into organic regimes at the event boundaries and FOCUS the visual
+  //    on the most recent regime with enough points (≥3); fall back to the
+  //    longest regime, then to the full series. This drops the construction
+  //    wall + pre-construction seed so the curve shows post-import organic
+  //    movement only. The slice is REAL values at REAL timestamps.
+  const bounds = [0, ...events.map(e => e.index), n];
+  let seg = null;
+  for (let k = bounds.length - 2; k >= 0; k--) {
+    if (bounds[k + 1] - bounds[k] >= 3) { seg = [bounds[k], bounds[k + 1]]; break; }
+  }
+  if (!seg) {
+    let bestLen = -1;
+    for (let k = 0; k < bounds.length - 1; k++) {
+      const len = bounds[k + 1] - bounds[k];
+      if (len > bestLen) { bestLen = len; seg = [bounds[k], bounds[k + 1]]; }
+    }
+  }
+  const [s, e] = seg;
+  const fv = values.slice(s, e), ft = timestamps.slice(s, e);
+  if (fv.length < 2) return { ...pass, capitalEvents: events };   // nothing focusable → keep raw
+
+  const ndp = fv[0] > 0 ? (fv[fv.length - 1] / fv[0] - 1) * 100 : null;
+  return {
+    values: fv, timestamps: ft, capitalEvents: events, focusedFromIndex: s,
+    normalizedDeltaPct: ndp, normalizedDeltaAbs: fv[fv.length - 1] - fv[0],
+  };
 }
 
 // Format a snapshot timestamp for the tooltip, scaled to the active range.
@@ -16900,14 +16966,29 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   //    robust viewport; curve drawn with monotone-cubic interpolation.
   const W = _WSC_VIEW_W, H = _WSC_VIEW_H;
   const padX = W * _WSC_PAD_X, plotW = W - 2 * padX;
-  const n = vals.length;
+
+  // Capital-event normalization (WN.1): neutralise import / construction / large
+  // deposit jumps so the curve shows ORGANIC movement, focused on the most recent
+  // organic regime. Real values at real timestamps (a slice) — raw history and the
+  // displayed metric above are unchanged. Dev-only: expose the detected events.
+  const norm  = normalizeWealthSeriesForVisualization(vals, ts, activeRange);
+  const rVals = norm.values.length >= 2 ? norm.values : vals;        // never blank a valid series
+  const rTs   = norm.values.length >= 2 ? norm.timestamps : ts;
+  const n     = rVals.length;
+  if (typeof IS_DEV !== 'undefined' && IS_DEV && norm.capitalEvents.length) {
+    try {
+      window._wscCapitalEvents = norm.capitalEvents;
+      console.debug('[wsc-capital]', activeRange, 'events:', norm.capitalEvents,
+        'organicΔ%:', norm.normalizedDeltaPct == null ? null : +norm.normalizedDeltaPct.toFixed(2));
+    } catch (_) {}
+  }
 
   // Endpoint + isolated-spike protection: Hampel despike of REAL values, so a
   // lone live-tick outlier (the 24H right-edge hook) or a blip can't create a
   // spike/shelf. Then honest moving-average aggregation — stronger on the macro
   // views (rounds stair-step shelves on 30D/1A/TOTAL), none on 24H (fine real
   // movement). Both operate on real values only; metric + tooltip are untouched.
-  const despiked = _wscDespike(vals, 3, 3);
+  const despiked = _wscDespike(rVals, 3, 3);
   const smoothWin = activeRange === 'all' ? 8 : activeRange === '1y' ? 6 : activeRange === '30d' ? 4 : activeRange === '7d' ? 2 : 1;
   const plotVals  = _wscMovingAvg(despiked, smoothWin);
 
@@ -16916,9 +16997,9 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
 
   // X by real time so gaps reflect reality; fall back to index if timestamps
   // collapse. Monotone-cubic path through the real points (no overshoot).
-  const tspan = (ts[n - 1] - ts[0]) || 1;
-  const xOf = (tt, i) => padX + (tspan > 1 ? (tt - ts[0]) / tspan : i / (n - 1)) * plotW;
-  const pts = plotVals.map((v, i) => ({ x: xOf(ts[i], i), y: vp.yOf(v) }));
+  const tspan = (rTs[n - 1] - rTs[0]) || 1;
+  const xOf = (tt, i) => padX + (tspan > 1 ? (tt - rTs[0]) / tspan : i / (n - 1)) * plotW;
+  const pts = plotVals.map((v, i) => ({ x: xOf(rTs[i], i), y: vp.yOf(v) }));
 
   const linePath = _wscMonotonePath(pts);
 
@@ -16940,10 +17021,11 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
 
   if (opts.tooltip) {
     // Tooltip snaps to REAL snapshots (true value + time) on the rendered curve.
+    // rVals/rTs are real values at real timestamps (the focused organic regime).
     const realX = pts.map(p => p.x);
     const realY = pts.map(p => p.y);
     const plot = hostEl.querySelector('.wsc-plot');
-    _wscAttachTooltip(plot, { realX, realY, vals, ts, n });
+    _wscAttachTooltip(plot, { realX, realY, vals: rVals, ts: rTs, n });
   }
 }
 
