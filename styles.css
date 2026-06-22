@@ -21760,9 +21760,12 @@ body.gs-open { overflow: hidden; }
 .wsc-down .wsc-line { stroke: var(--red,   #e05a5a); }
 .wsc-flat .wsc-line { stroke: var(--text-muted, #9aa7bd); }
 
-/* WSC.3 — area fill, baseline reference and end dot all removed: just a clean,
-   continuous institutional trajectory line (no rectangles, no flat horizontal
-   reference, no decorative dot). */
+/* WSC.5 — two ultra-subtle horizontal reference lines (no vertical grid, no
+   labels): institutional grounding only. */
+.wsc-grid { stroke: rgba(255,255,255,.045); stroke-width: 1; }
+
+/* WSC.3 — area fill and end dot removed: a clean continuous institutional line
+   (no rectangles, no decorative dot). */
 
 /* empty / building state */
 .wsc--empty { display: flex; align-items: center; justify-content: center; }
@@ -21839,13 +21842,13 @@ body.gs-open { overflow: hidden; }
     padding: 0;
     gap: 0;
   }
-  /* WSC.4 — align the title + metric with the actual chart plotting origin
-     (the curve starts inset by _WSC_PAD_X = 10% of the plot width). */
-  .hero-right .chart-header > div:first-child { padding-left: 9%; }
+  /* WSC.5 — align the title + metric with the actual chart plotting origin
+     (the curve starts inset by _WSC_PAD_X = 11% of the plot width). */
+  .hero-right .chart-header > div:first-child { padding-left: 10%; }
 }
 
 /* mobile: align the title with the curve's plotting origin */
-.mobile-slide-chart .chart-header > div:first-child { padding-left: 8%; }
+.mobile-slide-chart .chart-header > div:first-child { padding-left: 9%; }
 
 @media (prefers-reduced-motion: reduce) {
   .wsc-in .wsc-line { animation: none; }

@@ -16677,10 +16677,18 @@ const _WSC_VIEW_H = 240;
 // no decorative oscillation. Only the visual SCALE adapts (robust statistics +
 // adaptive occupancy) so real movement is always legible and outliers never
 // dictate the chart height. Metric / % / gain stay the real figures.
-const _WSC_PAD_X    = 0.10;   // horizontal inset each side — narrower plot (≈20% off full width)
-const _WSC_MIN_OCC  = 0.20;   // min vertical occupancy (small real moves stay visible)
-const _WSC_MAX_OCC  = 0.65;   // max vertical occupancy (large moves controlled, never edge)
+const _WSC_PAD_X    = 0.11;   // horizontal inset each side — narrower plot, ≥10–12% margins
 const _WSC_OCC_SCALE = 0.05;  // robust relative-spread that maps to ~mid occupancy
+// Per-timeframe vertical occupancy band [min, max] of the panel height. Small
+// real moves stay visible at the floor; large moves are capped (never > 0.60,
+// so top/bottom margins are always ≥ ~20%). Independent per range.
+const _WSC_OCC = {
+  '24h': [0.18, 0.32],
+  '7d':  [0.25, 0.40],
+  '30d': [0.30, 0.50],
+  '1y':  [0.35, 0.55],
+  'all': [0.35, 0.55],
+};
 
 // Linear-interpolated percentile of an ascending-sorted array (p ∈ [0,1]).
 function _wscPercentile(sortedAsc, p) {
@@ -16701,6 +16709,27 @@ function _wscMovingAvg(arr, win) {
     let sum = 0, cnt = 0;
     for (let j = i - half; j <= i + half; j++) if (j >= 0 && j < m) { sum += arr[j]; cnt++; }
     out[i] = sum / (cnt || 1);
+  }
+  return out;
+}
+
+// Hampel despike — replace isolated outliers with their local median (window
+// ±k) using a robust median+MAD test, with a small relative floor so an
+// endpoint spike is caught even when the recent neighbourhood is near-flat.
+// Operates on REAL values only (visual position); the metric and tooltip keep
+// the true figures. Removes 24H right-edge hooks and stair-causing blips.
+function _wscDespike(vals, k, nSig) {
+  const n = vals.length;
+  if (n < 5) return vals.slice();
+  const med = arr => { const s = arr.slice().sort((a, b) => a - b); return s[(s.length - 1) >> 1]; };
+  const out = vals.slice();
+  for (let i = 0; i < n; i++) {
+    const lo = Math.max(0, i - k), hi = Math.min(n - 1, i + k);
+    const win = vals.slice(lo, hi + 1);
+    const m = med(win);
+    const mad = med(win.map(x => Math.abs(x - m)));
+    const sigma = Math.max(1.4826 * mad, Math.abs(m) * 0.002);   // relative floor
+    if (sigma > 0 && Math.abs(vals[i] - m) > nSig * sigma) out[i] = m;
   }
   return out;
 }
@@ -16740,7 +16769,7 @@ function _wscMonotonePath(pts) {
 // adaptive occupancy band. Outliers (creation/import/reset/anomalies) are
 // excluded from the scale via percentile clipping, so they never flatten valid
 // movement nor determine the height. Each call is independent per timeframe.
-function _wscViewport(values) {
+function _wscViewport(values, range) {
   const H = _WSC_VIEW_H, center = H / 2;
   const sorted = values.slice().sort((a, b) => a - b);
   const n = sorted.length;
@@ -16753,12 +16782,13 @@ function _wscViewport(values) {
   let span = hi - lo;
   if (!(span > 0)) { span = Math.abs(median) * 1e-4 || 1; lo = median - span / 2; hi = median + span / 2; }
 
-  // Adaptive occupancy: robust relative spread → fraction of vertical space.
-  // Tiny real moves still fill ≥MIN_OCC (visible), large moves cap at MAX_OCC
-  // (controlled, never touching the borders).
+  // Adaptive occupancy within the range's own band: robust relative spread →
+  // fraction of vertical space. Tiny real moves still fill ≥minOcc (visible),
+  // large moves cap at maxOcc (controlled, never touching the borders).
+  const [minOcc, maxOcc] = _WSC_OCC[range] || _WSC_OCC['30d'];
   const relSpread = span / (Math.abs(median) || hi || 1);
-  const occ  = Math.min(_WSC_MAX_OCC, Math.max(_WSC_MIN_OCC,
-    _WSC_MIN_OCC + (_WSC_MAX_OCC - _WSC_MIN_OCC) * Math.tanh(relSpread / _WSC_OCC_SCALE)));
+  const occ = Math.min(maxOcc, Math.max(minOcc,
+    minOcc + (maxOcc - minOcc) * Math.tanh(relSpread / _WSC_OCC_SCALE)));
   const band = occ * H, top = center - band / 2, bot = center + band / 2;
 
   const yOf = v => {
@@ -16872,14 +16902,17 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   const padX = W * _WSC_PAD_X, plotW = W - 2 * padX;
   const n = vals.length;
 
-  // Per-timeframe aggregation: honest noise reduction of REAL values for the
-  // macro views (1A / TOTAL ignore insignificant fluctuations), none for the
-  // micro/weekly views. Never invents a point — only averages real ones.
-  const smoothWin = activeRange === 'all' ? 5 : activeRange === '1y' ? 3 : activeRange === '30d' ? 2 : 1;
-  const plotVals  = _wscMovingAvg(vals, smoothWin);
+  // Endpoint + isolated-spike protection: Hampel despike of REAL values, so a
+  // lone live-tick outlier (the 24H right-edge hook) or a blip can't create a
+  // spike/shelf. Then honest moving-average aggregation — stronger on the macro
+  // views (rounds stair-step shelves on 30D/1A/TOTAL), none on 24H (fine real
+  // movement). Both operate on real values only; metric + tooltip are untouched.
+  const despiked = _wscDespike(vals, 3, 3);
+  const smoothWin = activeRange === 'all' ? 8 : activeRange === '1y' ? 6 : activeRange === '30d' ? 4 : activeRange === '7d' ? 2 : 1;
+  const plotVals  = _wscMovingAvg(despiked, smoothWin);
 
   // Robust, outlier-aware vertical viewport (independent per timeframe).
-  const vp = _wscViewport(plotVals);
+  const vp = _wscViewport(plotVals, activeRange);
 
   // X by real time so gaps reflect reality; fall back to index if timestamps
   // collapse. Monotone-cubic path through the real points (no overshoot).
@@ -16889,10 +16922,17 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
 
   const linePath = _wscMonotonePath(pts);
 
+  // Two ultra-subtle horizontal reference lines framing the plot (no vertical
+  // grid, no labels) — institutional grounding, opacity handled in CSS.
+  const gx1 = padX.toFixed(1), gx2 = (W - padX).toFixed(1);
+  const grid = `<line class="wsc-grid" x1="${gx1}" y1="${(H * 0.30).toFixed(1)}" x2="${gx2}" y2="${(H * 0.30).toFixed(1)}" vector-effect="non-scaling-stroke"/>`
+             + `<line class="wsc-grid" x1="${gx1}" y1="${(H * 0.70).toFixed(1)}" x2="${gx2}" y2="${(H * 0.70).toFixed(1)}" vector-effect="non-scaling-stroke"/>`;
+
   hostEl.innerHTML = `
     <div class="wsc wsc-${tone}">
       <div class="wsc-plot">
         <svg class="wsc-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+          ${grid}
           <path class="wsc-line" d="${linePath}" fill="none" vector-effect="non-scaling-stroke"/>
         </svg>
       </div>
