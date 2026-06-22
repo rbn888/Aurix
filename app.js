@@ -17294,16 +17294,33 @@ function _aurixEligibleInvestableSeries(range) {
   return { series, meta };
 }
 
-// WN.7 — flow-aware visual continuity for the INVESTABLE-VALUE chart (NOT TWR).
-// A user portfolio action recorded in capitalFlows (e.g. the June-16 BTC
-// asset_remove) causes a large value STEP that is NOT market performance. This
-// additively rebases the series so those recorded MATERIAL flow steps are
-// removed and the curve continues smoothly across the event, anchored so the
-// LAST point still equals the real current investable value. Returns the
-// adjusted (visual) values; the tooltip keeps the REAL values. adjusted(i) =
-// real(i) − offset(ts_i) + totalOffset, offset(t)=Σ flow.base for flow.ts ≤ t.
+// WN.8 — flow CLASSIFICATION. INTERNAL transfers (asset buys/sells, construction
+// imports) change portfolio COMPOSITION but not total value → neutralise them so
+// the chart reads as a value-preserving transfer (no rug-pull). EXTERNAL cash
+// flows (deposit / withdrawal) move money in/out of the portfolio → they DO change
+// the value and are NOT neutralised (the value chart reflects them, like CMC/
+// Kubera). Aurix's sell handler keeps proceeds conceptually in the portfolio (no
+// auto cash leg), so a sell is treated as INTERNAL by default.
+const _WSC_INTERNAL_KINDS = { asset_add: 1, asset_remove: 1, import_baseline: 1, internal_buy: 1, internal_sell: 1, internal_transfer: 1, qty_edit: 1 };
+function _aurixFlowIsInternal(kind) { return !!_WSC_INTERNAL_KINDS[kind]; }
+function _aurixFlowIntent(kind) {
+  if (kind === 'asset_remove') return 'internal_sell';
+  if (kind === 'asset_add')    return 'internal_buy';
+  if (kind === 'import_baseline') return 'import_baseline';
+  if (kind === 'deposit')    return 'external_deposit';
+  if (kind === 'withdrawal') return 'external_withdrawal';
+  return _aurixFlowIsInternal(kind) ? 'internal_transfer' : 'manual_adjustment';
+}
+
+// WN.7/WN.8 — flow-aware visual continuity for the INVESTABLE-VALUE chart (NOT
+// TWR). Only INTERNAL transfers are neutralised: their value STEP is removed and
+// the curve continues smoothly across the event, anchored so the LAST point still
+// equals the real current investable value (Hero-consistent). External cash flows
+// pass through untouched (they legitimately move the value). Tooltip keeps REAL
+// values. adjusted(i) = real(i) − offset(ts_i) + totalOffset, offset(t)=Σ internal
+// flow.base for flow.ts ≤ t.
 function _aurixFlowNeutralize(series, range) {
-  const out = { adjusted: series.map(s => s.value), flowsInRange: 0, neutralized: 0, totalOffset: 0 };
+  const out = { adjusted: series.map(s => s.value), flowsInRange: 0, neutralized: 0, totalOffset: 0, internalCount: 0, externalCount: 0 };
   if (series.length < 2) return out;
   const t0 = series[0].ts, t1 = series[series.length - 1].ts;
   let anchor = 0;
@@ -17314,8 +17331,13 @@ function _aurixFlowNeutralize(series, range) {
   try { flows = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : []; } catch (_) {}
   const span = flows.filter(f => f && Number.isFinite(f.ts) && Number.isFinite(f.amountUSD) && f.ts > t0 && f.ts <= t1);
   out.flowsInRange = span.length;
-  // Material flows only (small ones don't cause rug-pull shapes); base currency.
+  out.internalCount = span.filter(f => _aurixFlowIsInternal(f.kind)).length;
+  out.externalCount = span.length - out.internalCount;
+  // Only MATERIAL INTERNAL flows are neutralised (value-preserving transfers).
+  // External deposits/withdrawals are intentionally left in so the value chart
+  // reflects real money entering/leaving.
   const matFlows = span
+    .filter(f => _aurixFlowIsInternal(f.kind))
     .map(f => ({ ts: f.ts, base: toBase(f.amountUSD, 'USD') }))
     .filter(f => Number.isFinite(f.base) && Math.abs(f.base) >= material);
   out.neutralized = matFlows.length;
@@ -17391,6 +17413,14 @@ if (typeof window !== 'undefined') {
       info.flowEventsInRange     = neutral.flowsInRange;
       info.flowNeutralizedEvents = neutral.neutralized;
       info.noFloorNoCeilingApplied = true;
+      // WN.8 — transaction accounting (internal transfer vs external flow).
+      info.transactionEventsInRange = neutral.flowsInRange;
+      info.internalTransfersInRange = neutral.internalCount;
+      info.externalFlowsInRange     = neutral.externalCount;
+      info.virtualCashSettlements   = neutral.neutralized;   // internal sells/buys settled visually
+      info.rawInvestableValue       = info.investableUSD;
+      info.correctedInvestableValue = info.investableUSD;     // value level unchanged; only the chart SHAPE is reconciled
+      info.reconciliationDelta      = 0;
       if (neutral.adjusted.length) {
         const av = neutral.adjusted;
         info.visualDomainMin = +Math.min(...av).toFixed(2);
@@ -17404,6 +17434,28 @@ if (typeof window !== 'undefined') {
       try { console.table(info); console.log('[chart-source] excludedReasons:', info.excludedReasons); } catch (_) { console.log(info); }
     } catch (e) { info.error = String(e); console.log(info); }
     return info;
+  };
+
+  // WN.8 — transaction accounting audit: classify every capital flow in range as
+  // internal transfer (value-preserving) vs external cash flow (value-moving), and
+  // surface unmatched asset removals (sells with no recorded cash leg, treated as
+  // virtual settlements by the chart).
+  window.debugAurixTransactionAccounting = () => {
+    const o = { range: activeRange, internal: [], external: [], unmatchedAssetRemovals: 0, virtualCashSettlements: 0 };
+    try {
+      const flows = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
+      const elig = _aurixEligibleInvestableSeries(activeRange);
+      const t0 = elig.series.length ? elig.series[0].ts : 0;
+      const t1 = elig.series.length ? elig.series[elig.series.length - 1].ts : Date.now();
+      flows.filter(f => f && f.ts > t0 && f.ts <= t1).forEach(f => {
+        const row = { ts: new Date(f.ts).toISOString(), kind: f.kind, intent: _aurixFlowIntent(f.kind), amountUSD: f.amountUSD, source: f.source };
+        if (_aurixFlowIsInternal(f.kind)) o.internal.push(row); else o.external.push(row);
+        if (f.kind === 'asset_remove') { o.unmatchedAssetRemovals++; o.virtualCashSettlements++; }
+        if (f.kind === 'asset_add')    o.virtualCashSettlements++;
+      });
+      try { console.log('[tx-accounting]', o.range, '| internal:', o.internal.length, '| external:', o.external.length, '| unmatchedAssetRemovals:', o.unmatchedAssetRemovals); console.table([...o.internal, ...o.external]); } catch (_) {}
+    } catch (e) { o.error = String(e); }
+    return o;
   };
 }
 
@@ -30836,6 +30888,15 @@ reduceForm.addEventListener('submit', e => {
   asset.realizedPnL = Number(asset.realizedPnL || 0) + (Number.isFinite(realized) ? realized : 0);
   // AURIX-WEALTH-LEDGER-CAPTURE-1: cash reductions are withdrawals; everything
   // else is a sell (with durable realized PnL on the event).
+  // WN.8 AUDIT: a NON-cash sell here only REDUCES/CLOSES the asset — it does NOT
+  // add the proceeds to any cash/liquidity asset. So selling ~30k of BTC drops
+  // investable value by ~30k with no offsetting cash leg, which is why the chart
+  // showed a 7D crash. WN.8 classifies this as an INTERNAL_SELL (proceeds assumed
+  // to stay in the portfolio) and the chart's flow layer neutralises the
+  // asset_remove so it reads as a value-preserving transfer, not a market loss.
+  // (Real assets are NOT auto-mutated here — too risky / could double-count if
+  // the user later records the cash manually; the reconciliation is visual +
+  // metric only, anchored to the real current value.)
   if (asset.type === 'cash') {
     _ledgerCashFlow('withdrawal', asset, amount, (asset.assetCurrency || 'USD'), _sellTs, asset.source || null);
   } else {
