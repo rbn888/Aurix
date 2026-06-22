@@ -17274,51 +17274,59 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   const deltaAbs = Number.isFinite(d.deltaAbs) ? d.deltaAbs : (last - first);
   const deltaPct = Number.isFinite(d.deltaPct) ? d.deltaPct : (first > 0 ? (deltaAbs / first) * 100 : 0);
 
-  // Capital-event normalization (WN.1): neutralise import / construction / large
-  // deposit jumps so the curve shows ORGANIC movement, focused on the most recent
-  // organic regime. Real values at real timestamps (a slice) — raw history is never
-  // mutated. Dev-only: expose the detected events.
+  // WN.1 fallback source + WN.2 organic $ metric. Real-value focused slice;
+  // never mutates raw history.
   const W = _WSC_VIEW_W, H = _WSC_VIEW_H;
   const padX = W * _WSC_PAD_X, plotW = W - 2 * padX;
   const norm  = normalizeWealthSeriesForVisualization(vals, ts, activeRange);
   const rVals = norm.values.length >= 2 ? norm.values : vals;        // never blank a valid series
   const rTs   = norm.values.length >= 2 ? norm.timestamps : ts;
-  const n     = rVals.length;
+  const useOrganic = norm.capitalEvents.length > 0 && norm.values.length >= 2 && Number.isFinite(norm.normalizedDeltaPct);
   if (typeof IS_DEV !== 'undefined' && IS_DEV && norm.capitalEvents.length) {
-    try {
-      window._wscCapitalEvents = norm.capitalEvents;
-      console.debug('[wsc-capital]', activeRange, 'events:', norm.capitalEvents,
-        'organicΔ%:', norm.normalizedDeltaPct == null ? null : +norm.normalizedDeltaPct.toFixed(2));
-    } catch (_) {}
+    try { window._wscCapitalEvents = norm.capitalEvents; } catch (_) {}
   }
 
-  // WN.2 — when capital events are excluded from the curve, the metric must tell
-  // the SAME story: show the ORGANIC normalized movement (not the raw total
-  // portfolio jump), with a subtle "excludes contributions" note. Raw total
-  // wealth / portfolio value are unchanged — this is only the chart metric.
-  const useOrganic = norm.capitalEvents.length > 0 && norm.values.length >= 2 && Number.isFinite(norm.normalizedDeltaPct);
-  const dispPct = useOrganic ? norm.normalizedDeltaPct : deltaPct;
-  const dispAbs = useOrganic ? norm.normalizedDeltaAbs : deltaAbs;
-  const tone    = dispPct > 0.005 ? 'up' : dispPct < -0.005 ? 'down' : 'flat';
+  // WN.4D — prefer the headless TWR engine when VALID (flows recorded / coverage
+  // sufficient). TWR is flow-neutral: deposits / withdrawals / imports are
+  // excluded from performance, so the curve + % metric show PURE performance with
+  // no capital walls or distributed-inflow artifacts. When TWR is invalid
+  // (insufficient flow coverage, <2 snaps, …) fall back to WN.1–3 exactly.
+  let twr = null;
+  try { twr = (typeof computeAurixTWRSeries === 'function') ? computeAurixTWRSeries(activeRange) : null; } catch (_) { twr = null; }
+  const twrValid = !!(twr && twr.valid && Array.isArray(twr.values) && twr.values.length >= 2 && Number.isFinite(twr.deltaPct));
+  if (typeof window !== 'undefined') {
+    window._aurixChartMode = { range: activeRange, mode: twrValid ? 'TWR' : 'WN_FALLBACK', twrValid, fallbackReason: twr ? twr.fallbackReason : 'no_engine', flowsUsed: twr ? twr.flowsUsed : 0 };
+  }
+  if (typeof IS_DEV !== 'undefined' && IS_DEV) { try { console.debug('[wsc-mode]', window._aurixChartMode); } catch (_) {} }
 
-  // Range-change metric under the title — drives off the %/divisa toggle, and the
-  // curve uses the SAME tone, so number and line never contradict each other.
+  // Curve source: TWR index (base 100) when valid, else the WN.1 organic slice.
+  const srcVals = twrValid ? twr.values : rVals;
+  const srcTs   = twrValid ? twr.timestamps : rTs;
+
+  // Metric: % follows the curve engine (TWR deltaPct when valid). Currency mode
+  // keeps the WN.2 organic USD figure (NEVER index dollars). The "excludes
+  // contributions" note shows whenever capital is being excluded. Curve + metric
+  // share one `tone`, so number and line never contradict each other.
+  const pctMetric = twrValid ? twr.deltaPct : (useOrganic ? norm.normalizedDeltaPct : deltaPct);
+  const absMetric = useOrganic ? norm.normalizedDeltaAbs : deltaAbs;
+  const excludes  = twrValid ? (twr.flowsUsed > 0) : useOrganic;
+  const tone = pctMetric > 0.005 ? 'up' : pctMetric < -0.005 ? 'down' : 'flat';
+
   if (changeEl) {
     const mode = activePerfMode === 'curr' ? 'curr' : 'pct';
-    const pf   = _dshFmtPct(dispPct);
-    const valText = mode === 'curr' ? _dshFmtMoney0(dispAbs) : pf.text;
-    const note = useOrganic ? `<span class="wsc-metric-note">${t('wscExcludesContrib')}</span>` : '';
+    const pf   = _dshFmtPct(pctMetric);
+    const valText = mode === 'curr' ? _dshFmtMoney0(absMetric) : pf.text;
+    const note = excludes ? `<span class="wsc-metric-note">${t('wscExcludesContrib')}</span>` : '';
     changeEl.innerHTML = `<span class="wsc-metric-val">${valText}</span>${note}`;
     changeEl.className  = `chart-change ${tone}`;
     if (mode === 'pct' && pf.capped) changeEl.title = pf.raw;
     else changeEl.removeAttribute('title');
   }
 
-  // WN.3 — build a UNIFORM temporal series from the (organic) real points:
-  // bucket-median aggregation → evenly spaced timeline → gap-filling linear
-  // resample. This is what turns session-clustered, shelf/step/wall data into a
-  // continuous institutional curve. Truthful: interpolation of real levels only.
-  const series = _wscResample(rVals, rTs, activeRange);
+  // WN.3 — build a UNIFORM temporal series from the chosen source (TWR index or
+  // WN.1 organic slice): bucket-median aggregation → evenly spaced timeline →
+  // gap-filling resample → continuous institutional curve.
+  const series = _wscResample(srcVals, srcTs, activeRange);
   const uVals = series.values, uTs = series.timestamps, uN = uVals.length;
 
   // Light despike + smoothing of the uniform series (the resample already
@@ -17354,10 +17362,12 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
     </div>`;
 
   if (opts.tooltip) {
-    // Tooltip stays truthful: it shows the REAL snapshot value at its REAL
-    // timestamp (rVals/rTs), positioned on the rendered (resampled) curve by
-    // mapping the real timestamp onto the uniform X domain and sampling the
-    // curve's y there.
+    // Tooltip stays truthful: it shows REAL portfolio wealth at its REAL
+    // timestamp, positioned on the rendered curve. In TWR mode the plotted y is
+    // the performance index but the tooltip value is real wealth (full real
+    // series); in WN fallback it's the focused real slice (unchanged behavior).
+    const tipVals = twrValid ? vals : rVals;
+    const tipTs   = twrValid ? ts   : rTs;
     const yAtX = px => {
       if (px <= pts[0].x) return pts[0].y;
       if (px >= pts[pts.length - 1].x) return pts[pts.length - 1].y;
@@ -17365,10 +17375,10 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
       const f = (px - pts[k].x) / ((pts[k + 1].x - pts[k].x) || 1);
       return pts[k].y + (pts[k + 1].y - pts[k].y) * f;
     };
-    const realX = rTs.map(tt => padX + Math.min(1, Math.max(0, uSpan > 1 ? (tt - uT0) / uSpan : 0)) * plotW);
+    const realX = tipTs.map(tt => padX + Math.min(1, Math.max(0, uSpan > 1 ? (tt - uT0) / uSpan : 0)) * plotW);
     const realY = realX.map(yAtX);
     const plot = hostEl.querySelector('.wsc-plot');
-    _wscAttachTooltip(plot, { realX, realY, vals: rVals, ts: rTs, n: rVals.length });
+    _wscAttachTooltip(plot, { realX, realY, vals: tipVals, ts: tipTs, n: tipVals.length });
   }
 }
 
