@@ -5877,6 +5877,117 @@ try {
   }, 5000);
 } catch (_) {}
 
+// ── WN.4C — Headless Time-Weighted Return engine ────────────────────────────
+// PURE CALCULATION. Reads USD snapshots (raw portfolioHistory, windowed to the
+// range — kept in USD to match the USD capitalFlows ledger) + capitalFlows, and
+// returns a flow-neutral performance INDEX (starts at 100) using a Modified-
+// Dietz subperiod calculation chained time-weighted (TWR). NOT wired to any
+// chart/metric/UI yet. Inputs are never mutated.
+
+// USD snapshots for a range (raw portfolioHistory, epoch-filtered, windowed,
+// ascending). USD (not base currency) so the math lines up with USD flows.
+function _aurixUsdSnapshotsForRange(range) {
+  try {
+    if (typeof portfolioHistory === 'undefined' || !Array.isArray(portfolioHistory)) return [];
+    const epoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
+    const now = Date.now();
+    const ms = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '1y': 31536e6 };
+    const start = range === 'all' ? 0 : now - (ms[range] || 2592e6);
+    return portfolioHistory
+      .filter(p => p && typeof p.ts === 'number' && typeof p.value === 'number' && isFinite(p.value) && p.value > 0)
+      .filter(p => !epoch || p.ts >= epoch)
+      .filter(p => p.ts >= start)
+      .map(p => ({ ts: p.ts, value: p.value }))
+      .sort((a, b) => a.ts - b.ts);
+  } catch (_) { return []; }
+}
+
+const _AURIX_TWR_COVERAGE_JUMP = 40;   // % single no-flow interval move ⇒ likely an UNRECORDED capital event
+
+function computeAurixTWRSeries(range) {
+  const out = { timestamps: [], values: [], deltaPct: null, deltaAbsSynthetic: null, flowsUsed: 0, fallbackReason: null, valid: false };
+  try {
+    const snaps = _aurixUsdSnapshotsForRange(range);
+    if (snaps.length < 2) { out.fallbackReason = 'insufficient_snapshots'; return out; }
+
+    const all = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
+    const tFirst = snaps[0].ts, tLast = snaps[snaps.length - 1].ts;
+    // Flows strictly after the first snapshot and up to/including the last — a
+    // flow exactly on a boundary is assigned to the interval ENDING at it.
+    const flows = all.filter(f => f && Number.isFinite(f.ts) && Number.isFinite(f.amountUSD) && f.ts > tFirst && f.ts <= tLast);
+
+    let idx = 100, badDenom = 0, maxNoFlowJump = 0, used = 0;
+    const ts = [snaps[0].ts], vals = [100];
+    for (let i = 1; i < snaps.length; i++) {
+      const startV = snaps[i - 1].value, endV = snaps[i].value;
+      const t0 = snaps[i - 1].ts, t1 = snaps[i].ts, dur = (t1 - t0) || 1;
+      const seg = flows.filter(f => f.ts > t0 && f.ts <= t1);
+      used += seg.length;
+      let r;
+      if (seg.length) {
+        const netFlow  = seg.reduce((s, f) => s + f.amountUSD, 0);
+        const weighted = seg.reduce((s, f) => s + f.amountUSD * ((t1 - f.ts) / dur), 0);
+        const denom = startV + weighted;
+        if (denom > 0 && Number.isFinite(denom)) r = (endV - startV - netFlow) / denom;
+        else { r = 0; badDenom++; }                       // guard: non-positive denominator
+      } else {
+        r = startV > 0 ? (endV / startV - 1) : 0;
+        const jp = Math.abs(r) * 100;
+        if (jp > maxNoFlowJump) maxNoFlowJump = jp;        // track unaccounted jumps
+      }
+      if (!Number.isFinite(r)) r = 0;
+      idx = idx * (1 + r);
+      if (!Number.isFinite(idx) || idx <= 0) idx = vals[vals.length - 1];  // guard
+      ts.push(t1); vals.push(+idx.toFixed(6));
+    }
+
+    out.timestamps = ts;
+    out.values = vals;
+    out.flowsUsed = used;
+    out.deltaPct = +(vals[vals.length - 1] - 100).toFixed(4);        // index based at 100
+    out.deltaAbsSynthetic = +(vals[vals.length - 1] - vals[0]).toFixed(4);
+
+    // Coverage guard: a large no-flow interval almost certainly hides an
+    // UNRECORDED capital event → TWR cannot neutralise it, so mark invalid and
+    // let the caller fall back (WN.1–3). This is what keeps TWR honest.
+    if (maxNoFlowJump >= _AURIX_TWR_COVERAGE_JUMP) {
+      out.fallbackReason = 'flow_coverage_insufficient';
+      out.valid = false;
+      return out;
+    }
+    out.valid = true;
+    if (badDenom) out.fallbackReason = 'interval_fallback:' + badDenom;
+    return out;
+  } catch (e) {
+    out.fallbackReason = 'error:' + ((e && e.message) || e);
+    return out;
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.computeAurixTWRSeries = (range) => computeAurixTWRSeries(range || activeRange || '30d');
+  window.debugAurixTWRSeries = (range) => {
+    const r = range || (typeof activeRange !== 'undefined' ? activeRange : '30d');
+    const snaps = _aurixUsdSnapshotsForRange(r);
+    const res = computeAurixTWRSeries(r);
+    try {
+      const all = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
+      const used = snaps.length ? all.filter(f => f && f.ts > snaps[0].ts && f.ts <= snaps[snaps.length - 1].ts) : [];
+      console.log('[TWR]', r,
+        '| snapshots:', snaps.length,
+        '| rawStartUSD:', snaps.length ? Math.round(snaps[0].value) : null,
+        '| rawEndUSD:', snaps.length ? Math.round(snaps[snaps.length - 1].value) : null,
+        '| intervals:', Math.max(0, res.values.length - 1),
+        '| flowsUsed:', res.flowsUsed,
+        '| deltaPct:', res.deltaPct,
+        '| valid:', res.valid,
+        '| fallbackReason:', res.fallbackReason);
+      if (used.length) console.table(used);
+    } catch (_) {}
+    return res;
+  };
+}
+
 // ── Aurix Data Layer — Phase 1 + SPEC B ───────────────────
 function inferPriceSource(a) {
   if (a.type === 'cash')         return 'fx';
