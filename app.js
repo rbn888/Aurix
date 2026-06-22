@@ -17652,6 +17652,83 @@ if (typeof window !== 'undefined') {
     } catch (e) { o.error = String(e); }
     return o;
   };
+
+  // WN.14 — visualization-layer introspection. These reflect the EXACT pipeline
+  // the renderer runs (eligible → flow-neutral → resample → despike → MA →
+  // regime/warp), so what they report is what's drawn.
+  const _vizPipeline = (range) => {
+    const r = range || activeRange;
+    const elig = _aurixEligibleInvestableSeries(r);
+    const neutral = _aurixFlowNeutralize(elig.series, r);
+    const ts = elig.series.map(s => s.ts);
+    const series = _wscResample(neutral.adjusted, ts, r);
+    const despiked = _wscDespike(series.values, 3, 3);
+    const sw = r === 'all' ? 3 : r === '1y' ? 2 : r === '30d' ? 2 : 1;
+    const plotVals = _wscMovingAvg(despiked, sw);
+    return { r, plotVals, uTs: series.timestamps, smoothWin: sw };
+  };
+
+  window.debugAurixRegimes = (range) => {
+    const o = { range: range || activeRange };
+    try {
+      const p = _vizPipeline(range);
+      const regimes = detectMarketRegimes(p.plotVals, p.uTs);
+      o.sampleCount = p.plotVals.length;
+      o.regimeCount = regimes.length;
+      o.regimes = regimes.map(g => ({ type: g.type, samples: g.end - g.start, volatility: g.volatility, from: new Date(g.startTs).toISOString(), to: new Date(g.endTs).toISOString() }));
+      o.byType = regimes.reduce((m, g) => { m[g.type] = (m[g.type] || 0) + (g.end - g.start); return m; }, {});
+      try { console.log('[viz-regimes]', o.range, o.byType); console.table(o.regimes); } catch (_) {}
+    } catch (e) { o.error = String(e); }
+    return o;
+  };
+
+  window.debugAurixCompression = (range) => {
+    const o = { range: range || activeRange };
+    try {
+      const p = _vizPipeline(range);
+      const aw = _wscActivityWeights(p.plotVals, p.r);
+      o.sampleCount = p.plotVals.length;
+      o.idleWidthPct = aw.idlePct;        // dead-zone share of horizontal width
+      o.activeWidthPct = aw.activePct;    // active-zone share
+      o.idleCapPct = p.r === '24h' ? 20 : 35;
+      o.compressionApplied = !!(aw.frac && aw.frac.length === p.plotVals.length);
+      // widest single gap between adjacent warped samples (straight-segment check)
+      const f = aw.frac || [];
+      let maxGap = 0; for (let i = 1; i < f.length; i++) maxGap = Math.max(maxGap, f[i] - f[i - 1]);
+      o.maxSegmentWidthPct = +(maxGap * 100).toFixed(2);
+      try { console.log('[viz-compression]', o.range, o); } catch (_) {}
+    } catch (e) { o.error = String(e); }
+    return o;
+  };
+
+  window.debugAurixOccupancy = (range) => {
+    const o = { range: range || activeRange };
+    try {
+      const p = _vizPipeline(range);
+      const vp = _wscViewport(p.plotVals, p.r);
+      o.occupancyPct = +(vp.occ * 100).toFixed(1);
+      o.target = '45–70%';
+      o.inTarget = vp.occ >= 0.45 && vp.occ <= 0.70;
+      o.valueMin = p.plotVals.length ? +Math.min(...p.plotVals).toFixed(0) : null;
+      o.valueMax = p.plotVals.length ? +Math.max(...p.plotVals).toFixed(0) : null;
+      try { console.log('[viz-occupancy]', o.range, o.occupancyPct + '%', o.inTarget ? 'OK' : 'OUT'); } catch (_) {}
+    } catch (e) { o.error = String(e); }
+    return o;
+  };
+
+  window.debugAurixVisualEngine = (range) => {
+    const r = range || activeRange;
+    const o = { range: r, layer: 'WN.14 Institutional Visualization Engine' };
+    try {
+      o.regimes = window.debugAurixRegimes(r);
+      o.compression = window.debugAurixCompression(r);
+      o.occupancy = window.debugAurixOccupancy(r);
+      o.smoothingWindow = _vizPipeline(r).smoothWin;
+      o.pipeline = 'eligible → flow-neutral → resample → despike → MA → regime → activity-warp → monotone-spline → SVG';
+      try { console.log('[viz-engine]', r, '| regimes:', o.regimes.regimeCount, '| idle%:', o.compression.idleWidthPct, '| occ%:', o.occupancy.occupancyPct); } catch (_) {}
+    } catch (e) { o.error = String(e); }
+    return o;
+  };
 }
 
 // Format a snapshot timestamp for the tooltip, scaled to the active range.
@@ -17715,6 +17792,71 @@ function _wscAttachTooltip(plot, model) {
   };
   plot.addEventListener('pointermove', move);
   plot.addEventListener('pointerleave', () => plot.classList.remove('wsc-hot'));
+}
+
+// ── WN.14 — Institutional Visualization Layer ───────────────────────────────
+// Rendering-only (no financial change). Classifies the series into market
+// regimes and re-allocates horizontal width by ACTIVITY: idle/dead zones are
+// compressed, volatile/active zones are expanded, so the chart reads as a
+// narrative (accumulation → expansion → consolidation) instead of flat→jump→flat.
+// Real start/end values and chronological order are preserved — only x-spacing
+// changes. The monotone-cubic spline (no overshoot) + adaptive smoothing handle
+// transitions and micro-volatility.
+function detectMarketRegimes(values, timestamps) {
+  const n = values.length, regimes = [];
+  if (n < 3) return regimes;
+  const ret = []; for (let i = 1; i < n; i++) ret.push(values[i - 1] > 0 ? (values[i] / values[i - 1] - 1) : 0);
+  const WIN = Math.max(3, Math.round(n * 0.08));
+  const cls = [];
+  for (let i = 0; i < ret.length; i++) {
+    const w = ret.slice(Math.max(0, i - WIN), Math.min(ret.length, i + WIN + 1));
+    const vol = Math.sqrt(w.reduce((s, r) => s + r * r, 0) / (w.length || 1));
+    const drift = w.reduce((s, r) => s + r, 0) / (w.length || 1);
+    let type;
+    if (vol < 0.0015) type = 'IDLE';
+    else if (vol > 0.02) type = Math.abs(drift) > vol * 0.5 ? 'EXPANSION' : 'CONSOLIDATION';
+    else if (drift > vol * 0.6) type = 'TREND';
+    else if (drift < -vol * 0.6) type = 'CORRECTION';
+    else if (drift > 0) type = 'ACCUMULATION';
+    else type = 'CONSOLIDATION';
+    cls.push({ type, vol });
+  }
+  let s = 0;
+  for (let i = 1; i <= cls.length; i++) {
+    if (i === cls.length || cls[i].type !== cls[s].type) {
+      const seg = cls.slice(s, i), vol = seg.reduce((a, b) => a + b.vol, 0) / seg.length;
+      regimes.push({ start: s, end: i, startTs: timestamps[s], endTs: timestamps[Math.min(i, n - 1)], volatility: +(vol * 100).toFixed(3), type: cls[s].type });
+      s = i;
+    }
+  }
+  return regimes;
+}
+
+// Activity-weighted cumulative x-fraction per sample. Idle intervals get a small
+// weight (compressed); active ones scale with volatility (clamped 1–4). The idle
+// total is hard-capped (24H ≤20%, others ≤35%) so dead zones never dominate.
+function _wscActivityWeights(values, range) {
+  const n = values.length;
+  if (n < 2) return { frac: values.map((_, i) => (n < 2 ? 0 : i / (n - 1))) };
+  const ret = []; for (let i = 1; i < n; i++) ret.push(values[i - 1] > 0 ? Math.abs(values[i] / values[i - 1] - 1) : 0);
+  const sorted = ret.slice().sort((a, b) => a - b);
+  const medR = sorted[sorted.length >> 1] || 0.001;
+  const isIdle = ret.map(r => r < 0.0015);
+  let w = ret.map((r, i) => isIdle[i] ? 0.35 : Math.min(4, Math.max(1, 1 + (r / (medR || 0.001)) * 0.8)));
+  // Hard-cap idle total width.
+  const idleMax = range === '24h' ? 0.20 : 0.35;
+  let idleW = 0, total = 0; w.forEach((x, i) => { total += x; if (isIdle[i]) idleW += x; });
+  if (total > 0 && idleW / total > idleMax) {
+    const activeW = total - idleW;
+    const targetIdle = (idleMax / (1 - idleMax)) * activeW;     // idleW' / activeW = idleMax/(1-idleMax)
+    const factor = idleW > 0 ? targetIdle / idleW : 1;
+    w = w.map((x, i) => isIdle[i] ? x * factor : x);
+  }
+  const sum = w.reduce((a, b) => a + b, 0) || 1;
+  const frac = new Array(n); frac[0] = 0; let c = 0;
+  for (let i = 1; i < n; i++) { c += w[i - 1]; frac[i] = c / sum; }
+  const idleFinal = w.reduce((a, x, i) => a + (isIdle[i] ? x : 0), 0) / sum;
+  return { frac, idlePct: +(idleFinal * 100).toFixed(1), activePct: +((1 - idleFinal) * 100).toFixed(1) };
 }
 
 // Paint one surface: write the range-change metric into changeEl (the span
@@ -17788,7 +17930,20 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   // Viewport with a REAL value domain (drives accurate y-axis labels).
   const vp = _wscViewport(plotVals, activeRange);
   const uT0 = uTs[0], uSpan = (uTs[uN - 1] - uT0) || 1;
-  const xOf = (tt, i) => padX + (uSpan > 1 ? (tt - uT0) / uSpan : i / (uN - 1)) * plotW;
+  // WN.14 — activity-weighted horizontal warp: idle zones compress, volatile
+  // zones expand. Falls back to uniform time if degenerate. Order/values intact.
+  const aw = _wscActivityWeights(plotVals, activeRange);
+  const xfrac = (aw.frac && aw.frac.length === uN) ? aw.frac : plotVals.map((_, i) => (uN > 1 ? i / (uN - 1) : 0));
+  // Map a real timestamp → warped x-fraction (interpolate across uTs↔xfrac).
+  const warpFracAt = (tt) => {
+    if (uN < 2) return 0;
+    if (tt <= uTs[0]) return xfrac[0];
+    if (tt >= uTs[uN - 1]) return xfrac[uN - 1];
+    let i = 1; while (i < uN && uTs[i] < tt) i++;
+    const t0 = uTs[i - 1], t1 = uTs[i], r = t1 > t0 ? (tt - t0) / (t1 - t0) : 0;
+    return xfrac[i - 1] + (xfrac[i] - xfrac[i - 1]) * r;
+  };
+  const xOf = (tt, i) => padX + xfrac[i] * plotW;
   const pts = plotVals.map((v, i) => ({ x: xOf(uTs[i], i), y: vp.yOf(v) }));
   const linePath = _wscMonotonePath(pts);
   const areaPath = `${linePath} L${pts[pts.length - 1].x.toFixed(2)},${vp.bot.toFixed(2)} L${pts[0].x.toFixed(2)},${vp.bot.toFixed(2)} Z`;
@@ -17797,15 +17952,20 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   const uid = opts.uid || 'd';
   const gx1 = padX.toFixed(1), gx2 = (W - padX).toFixed(1);
   const yTicks = [0, 1, 2, 3].map(i => { const f = i / 3, y = vp.top + (vp.bot - vp.top) * f; return { y, val: vp.valAt(y) }; });
-  const xTicks = _wscXTicks(uT0, uTs[uN - 1], activeRange);
+  // WN.14 — ticks are positioned at the WARPED x of their timestamp, so labels
+  // stay temporally truthful even though spacing is activity-weighted.
+  const xTicks = _wscXTicks(uT0, uTs[uN - 1], activeRange).map(tk => {
+    const ts = uT0 + tk.frac * (uSpan);
+    return { ...tk, xfrac: warpFracAt(ts) };
+  });
   let grid = '';
   yTicks.forEach(tk => { grid += `<line class="wsc-grid" x1="${gx1}" y1="${tk.y.toFixed(1)}" x2="${gx2}" y2="${tk.y.toFixed(1)}" vector-effect="non-scaling-stroke"/>`; });
-  xTicks.forEach(tk => { const x = (padX + tk.frac * plotW).toFixed(1); grid += `<line class="wsc-grid wsc-grid-v" x1="${x}" y1="${vp.top.toFixed(1)}" x2="${x}" y2="${vp.bot.toFixed(1)}" vector-effect="non-scaling-stroke"/>`; });
+  xTicks.forEach(tk => { const x = (padX + tk.xfrac * plotW).toFixed(1); grid += `<line class="wsc-grid wsc-grid-v" x1="${x}" y1="${vp.top.toFixed(1)}" x2="${x}" y2="${vp.bot.toFixed(1)}" vector-effect="non-scaling-stroke"/>`; });
 
   // Axis labels as positioned HTML (crisp despite the stretched SVG): y on the
   // right (real investable values), x along the bottom (range-specific).
   const yLabels = yTicks.map(tk => `<span class="wsc-ylab" style="top:${(tk.y / H * 100).toFixed(2)}%">${_wscFmtAxisVal(tk.val)}</span>`).join('');
-  const xLabels = xTicks.map(tk => `<span class="wsc-xlab" style="left:${((padX + tk.frac * plotW) / W * 100).toFixed(2)}%">${tk.label}</span>`).join('');
+  const xLabels = xTicks.map(tk => `<span class="wsc-xlab" style="left:${((padX + tk.xfrac * plotW) / W * 100).toFixed(2)}%">${tk.label}</span>`).join('');
 
   hostEl.innerHTML = `
     <div class="wsc wsc-${tone}">
