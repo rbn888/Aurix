@@ -17278,10 +17278,10 @@ function _aurixEligibleInvestableSeries(range) {
       let leadVar = 0, f = 0;
       while (f < series.length - 3) {
         const dv = Math.abs(vals[f + 1] - vals[f]);
-        if (leadVar + dv > totalVar * 0.10) break;   // lead-in would exceed 10% of variation
+        if (leadVar + dv > totalVar * 0.12) break;   // WN.11 — lead-in < 12% of total variation
         leadVar += dv; f++;
       }
-      if (f > series.length * 0.30 && (series.length - f) >= 3) {
+      if (f > series.length * 0.35 && (series.length - f) >= 3) {   // ...and consuming > 35% of x-width
         const trimTo = Math.max(0, f - 2);            // keep ~2 points of context
         if (trimTo > 0) {
           meta.reasons.staleFlatSection += trimTo; meta.excluded += trimTo;
@@ -17316,31 +17316,34 @@ function _aurixFlowIntent(kind) {
   return _aurixFlowIsInternal(kind) ? 'internal_transfer' : 'manual_adjustment';
 }
 
-// WN.9 — SHAPE-BASED reconciliation (the WN.7/8 recorded-flow neutralization was
-// blind to internal transfers that predate the WN.4A flow ledger — e.g. the
-// June-16 BTC sale — so they still rendered as crashes). A large, SUSTAINED
-// adjacent step in investable value is an internal transfer (asset sold into
-// cash, rebalance, swap) UNLESS a recorded EXTERNAL deposit/withdrawal near that
-// timestamp proves real money moved. Internal transfers are neutralised (the step
-// is removed; the curve continues smoothly, anchored to the real current value =
-// Hero-consistent); external flows and ordinary market moves pass through. Tooltip
-// keeps REAL values; raw history is never mutated. adjusted(i) = real(i) − cum(i)
-// + cum(last), where cum accumulates only the neutralised (internal) step deltas.
+// WN.11 — PERFORMANCE-ADJUSTED series. The Dashboard curve + metric show portfolio
+// PERFORMANCE (market price movement), not raw value-delta: adding/removing money
+// (deposits, withdrawals) and internal transfers (asset sold into cash, rebalance)
+// must NOT count as gain/loss. Every large, SUSTAINED adjacent step is a capital
+// event and is neutralised — INTERNAL transfers (no external proof) AND EXTERNAL
+// deposits/withdrawals alike (a deposit raises value but is not a return). The step
+// is removed so the curve continues smoothly, anchored to the real current value
+// (Hero-consistent); ordinary (gradual) market moves are preserved. The recorded
+// flow ledger is used to LABEL each neutralised step internal vs external (debug);
+// shape detection also catches pre-ledger events (e.g. the June-16 BTC sale).
+// Tooltip uses these adjusted values; raw history is never mutated.
+// adjusted(i) = real(i) − cum(i) + cum(last), cum = Σ neutralised step deltas.
 function _aurixFlowNeutralize(series, range) {
   const n = series.length;
   const out = { adjusted: series.map(s => s.value), flowsInRange: 0, neutralized: 0, totalOffset: 0,
-                internalCount: 0, externalCount: 0, shapeTransfers: 0, externalWithdrawals: 0, externalDeposits: 0 };
+                internalCount: 0, externalCount: 0, shapeTransfers: 0, externalWithdrawals: 0, externalDeposits: 0,
+                internalNeutralized: 0, externalNeutralized: 0 };
   if (n < 2) return out;
   const t0 = series[0].ts, t1 = series[n - 1].ts;
   let anchor = 0;
   try { anchor = (typeof investableValueBase === 'function') ? investableValueBase() : 0; } catch (_) {}
   if (!(anchor > 0)) anchor = series[n - 1].value;
 
-  // Recorded flows near the window. EXTERNAL deposits/withdrawals are the ONLY
-  // proof that a value step is real money in/out; everything else is internal.
+  // Recorded flows near the window — used to LABEL a neutralised step external
+  // (recorded deposit/withdrawal nearby) vs internal (everything else).
   let flows = [];
   try { flows = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : []; } catch (_) {}
-  const NEAR = 36 * 36e5;   // 36h proof window
+  const NEAR = 36 * 36e5;
   const span = flows.filter(f => f && Number.isFinite(f.ts) && Number.isFinite(f.amountUSD) && f.ts > t0 - NEAR && f.ts <= t1 + NEAR);
   out.flowsInRange = span.filter(f => f.ts > t0 && f.ts <= t1).length;
   out.internalCount = span.filter(f => _aurixFlowIsInternal(f.kind)).length;
@@ -17365,9 +17368,11 @@ function _aurixFlowNeutralize(series, range) {
     const sustained = Math.abs(postMed - preMed) >= Math.abs(d) * 0.55;   // the shift holds (not a transient spike)
     let stepOff = 0;
     if (rel >= STEP_THR && sustained) {
+      // Capital event → neutralise (performance excludes ALL flows). Label it.
+      stepOff = d; out.shapeTransfers++;
       const provenExternal = externalFlows.some(f =>
         Math.abs(f.ts - ts[i]) <= NEAR && Math.sign(f.base) === Math.sign(d) && Math.abs(f.base) >= Math.abs(d) * 0.40);
-      if (!provenExternal) { stepOff = d; out.shapeTransfers++; }   // internal transfer → neutralise
+      if (provenExternal) out.externalNeutralized++; else out.internalNeutralized++;
     }
     run += stepOff;
     cum[i] = run;
@@ -17477,16 +17482,27 @@ if (typeof window !== 'undefined') {
       const elig = _aurixEligibleInvestableSeries(r);
       const neutral = _aurixFlowNeutralize(elig.series, r);
       const stat = (arr, key) => arr.length ? { first: +(key ? arr[0][key] : arr[0]).toFixed(0), last: +(key ? arr[arr.length - 1][key] : arr[arr.length - 1]).toFixed(0), min: +Math.min(...arr.map(x => key ? x[key] : x)).toFixed(0), max: +Math.max(...arr.map(x => key ? x[key] : x)).toFixed(0), n: arr.length } : { n: 0 };
-      o.rawSeries      = stat(raw, 'value');
-      o.adjustedSeries = stat(neutral.adjusted);
-      o.cleaned  = stat(elig.series, 'value');
-      o.rendered = o.adjustedSeries;
-      o.renderedInteractionSamples = _WSC_SAMPLES[r] || 200;
+      o.rawInvestable     = stat(raw, 'value');
+      o.cleanInvestable   = stat(elig.series, 'value');
+      o.performanceAdjusted = stat(neutral.adjusted);
+      o.rawSeries      = o.rawInvestable;       // back-compat aliases
+      o.adjustedSeries = o.performanceAdjusted;
+      o.cleaned  = o.cleanInvestable;
+      o.rendered = o.performanceAdjusted;
+      const av = neutral.adjusted;
+      o.performanceDeltaPct = av.length && av[0] > 0 ? +(((av[av.length - 1] - av[0]) / av[0]) * 100).toFixed(2) : null;
+      o.performanceDeltaAbsEquivalent = av.length ? +(av[av.length - 1] - av[0]).toFixed(2) : null;
+      o.flowsNeutralized = neutral.shapeTransfers;
+      o.internalTransfersNeutralized = neutral.internalNeutralized;
+      o.externalFlowsNeutralized = neutral.externalNeutralized;
+      o.leadInCompressed = !!elig.meta.staleLeadInRemoved;
+      o.fallbackReason = elig.series.length < 2 ? 'insufficient_clean_history' : null;
+      o.metricSource = 'performanceAdjusted';
       o.tooltipSource = 'ADJUSTED';
-      o.leadInTrimApplied = !!elig.meta.staleLeadInRemoved;
-      o.internalTransferStitches = neutral.shapeTransfers;
-      o.segmentReturnPreserved = true;   // additive stitch preserves intra-segment fluctuation shape
-      o.excludedTooltipRawValues = elig.meta.excluded;  // excluded snapshots never reach the (adjusted) tooltip
+      o.smoothingLevel = r === 'all' ? 3 : r === '1y' ? 2 : r === '30d' ? 2 : 1;
+      o.renderedInteractionSamples = _WSC_SAMPLES[r] || 200;
+      o.occupancyPct = (() => { try { return +(_wscViewport(neutral.adjusted, r).occ * 100).toFixed(1); } catch (_) { return null; } })();
+      o.excludedTooltipRawValues = elig.meta.excluded;
       o.excluded = elig.meta.excluded;
       o.excludedReasons = elig.meta.reasons;
       o.shapeTransfersNeutralized = neutral.shapeTransfers;
@@ -17610,7 +17626,7 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   const vals = snaps.map(s => s.value), ts = snaps.map(s => s.ts);
 
   if (typeof window !== 'undefined') {
-    window._aurixChartMode = { range: activeRange, mode: 'INVESTABLE_VALUE', source: 'category_history', realEstateIncluded: false, points: vals.length, eligible: elig.meta, noFloorNoCeilingApplied: true };
+    window._aurixChartMode = { range: activeRange, mode: 'PERFORMANCE_ADJUSTED', base: 'INVESTABLE_VALUE', source: 'category_history', realEstateIncluded: false, points: vals.length, eligible: elig.meta, metricSource: 'performanceAdjusted', noFloorNoCeilingApplied: true };
   }
 
   // < 2 clean points → honest building state. Never show polluted/fake values.
@@ -17624,21 +17640,21 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   const W = _WSC_VIEW_W, H = _WSC_VIEW_H;
   const padX = W * _WSC_PAD_X, plotW = W - 2 * padX;
 
-  // WN.7 — flow-aware visual continuity: neutralise recorded MATERIAL capital
-  // flows (e.g. a BTC asset_remove) so a portfolio action is not drawn as a
-  // market crash. `adjVals` (flow-neutral, anchored to the current value) drives
-  // the CURVE + metric (organic movement); `vals` (real) drives the tooltip.
+  // WN.11 — PERFORMANCE-ADJUSTED series drives the curve AND the metric: every
+  // capital event (deposit/withdrawal/internal transfer) is neutralised so only
+  // market movement remains, anchored to the current value. `adjVals` is the
+  // performance-adjusted series; `vals` (real) is used only in debug.
   const neutral = _aurixFlowNeutralize(snaps, activeRange);
   const adjVals = neutral.adjusted;
 
-  // Range change of organic (flow-neutral) investable value — not the capital
-  // added/removed. Still a value chart (not TWR).
+  // Performance return over the range (NOT capital added/removed). deltaAbs is the
+  // performance gain/loss EQUIVALENT in the current-capital base.
   const first = adjVals[0], last = adjVals[adjVals.length - 1];
   const deltaAbs = last - first;
   const deltaPct = first > 0 ? (deltaAbs / first) * 100 : 0;
   const tone = deltaPct > 0.005 ? 'up' : deltaPct < -0.005 ? 'down' : 'flat';
 
-  // Metric: % / currency change of organic investable value. No "excludes" note.
+  // Metric: % performance return / currency performance equivalent (same series).
   if (changeEl) {
     const mode = activePerfMode === 'curr' ? 'curr' : 'pct';
     const pf   = _dshFmtPct(deltaPct);
@@ -17653,8 +17669,10 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   // (aggregate → resample → gap-fill), then gentle despike + smoothing.
   const series = _wscResample(adjVals, ts, activeRange);
   const uVals = series.values, uTs = series.timestamps, uN = uVals.length;
+  // WN.11 — adaptive smoothing that PRESERVES micro-fluctuation (never flattens a
+  // real segment into a shelf): light on 24H/7D, medium on 30D/1A/TOTAL.
   const despiked = _wscDespike(uVals, 3, 3);
-  const smoothWin = activeRange === 'all' ? 3 : activeRange === '1y' ? 3 : activeRange === '30d' ? 2 : activeRange === '7d' ? 2 : 1;
+  const smoothWin = activeRange === 'all' ? 3 : activeRange === '1y' ? 2 : activeRange === '30d' ? 2 : 1;
   const plotVals  = _wscMovingAvg(despiked, smoothWin);
 
   // Viewport with a REAL value domain (drives accurate y-axis labels).
