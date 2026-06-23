@@ -17769,9 +17769,22 @@ if (typeof window !== 'undefined') {
     return o;
   };
 
+  window.debugAurixEventDominance = (range) => {
+    const r = range || activeRange;
+    const o = { range: r, layer: 'WN.20 Universal Event Dominance Control' };
+    try {
+      const p = _vizPipeline(r);
+      const rs = _wscRegimeYScale(p.plotVals, r, p.uTs);
+      const aw2 = _wscActivityWeights(p.plotVals, r);
+      Object.assign(o, _wscEventDominanceModel(rs, p.plotVals, aw2, r));
+      try { console.log('[viz-event-dominance]', r, '| score:', o.eventDominanceScore, 'passed:', o.dominantEventPolicyPassed, '| events:', o.dominantEventCount, 'maxDom:', o.maxEventDominanceScore, '| thr:', o.rangeDominanceThreshold + '%', 'pre→post:', o.preCompressionDominance + '→' + o.postCompressionDominance, '| spike:', o.spikeType, 'needle:', o.needleDetected, 'cliff:', o.cliffDetected, '| curState:', o.totalCurrentStateVisibilityPct + '%', o.dominantEventFailures.length ? '| FAILS: ' + o.dominantEventFailures.join('; ') : ''); } catch (_) {}
+    } catch (e) { o.error = String(e); }
+    return o;
+  };
+
   window.debugAurixVisualEngine = (range) => {
     const r = range || activeRange;
-    const o = { range: r, layer: 'WN.18 Institutional Narrative Engine' };
+    const o = { range: r, layer: 'WN.20 Universal Event Dominance Control' };
     try {
       const sc = window.debugAurixRegimeScaling(r);
       const comp = window.debugAurixCompression(r);
@@ -17850,7 +17863,13 @@ if (typeof window !== 'undefined') {
       o.deadZonePct = o.narrative.deadZonePct;
       o.consolidationWidthPct = o.narrative.consolidationWidthPct;
 
-      try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| narrative:', o.visualNarrativeMode, '| visualScore:', o.visualNarrativeScore, '| dead%:', o.deadZonePct, 'consol%:', o.consolidationWidthPct, '| eventDom%:', o.narrative.eventDominancePct, 'capped:', o.narrative.eventDominanceCapped, '| wealth:', o.narrative.wealthNarrativeScore, o.narrative.institutionalProfileMatch, '| staticGrid:', o.staticGrid, '| occ%:', o.occupancyPct); } catch (_) {}
+      // ── WN.20 — universal event-dominance control (PART 1–8) ─────────────
+      o.eventDominance = window.debugAurixEventDominance(r);
+      o.eventDominanceScore = o.eventDominance.eventDominanceScore;
+      o.rangeDominanceThreshold = o.eventDominance.rangeDominanceThreshold;
+      o.dominantEventPolicyPassed = o.eventDominance.dominantEventPolicyPassed;
+
+      try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| narrative:', o.visualNarrativeMode, '| visualScore:', o.visualNarrativeScore, '| eventDomScore:', o.eventDominanceScore, 'thr:', o.rangeDominanceThreshold + '%', 'passed:', o.dominantEventPolicyPassed, '| dead%:', o.deadZonePct, 'consol%:', o.consolidationWidthPct, '| staticGrid:', o.staticGrid, '| occ%:', o.occupancyPct); } catch (_) {}
     } catch (e) { o.error = String(e); }
     return o;
   };
@@ -18240,6 +18259,57 @@ function _wscAllocate(wants, floors, total) {
   const s = vis.reduce((a, b) => a + b, 0) || 1; return vis.map(v => (v / s) * total);
 }
 
+// ── WN.20 — Universal Event Dominance Control (geometry pass) ───────────────
+// Generalizes WN.16's terminal-spike cap to EVERY range and EVERY transition
+// (event) regime, with stricter range-specific thresholds. Runs after the
+// WN.15/16 allocation: any event whose VISUAL HEIGHT exceeds its range policy is
+// softly compressed to the cap and the freed budget is redistributed to the
+// surrounding regimes — current consolidation first (PART 4). It only re-weights
+// per-regime visual height on the SAME monotone gFrac, so order, direction,
+// drawdowns, endpoints and tooltip values are all preserved; reverts on anomaly.
+// This GENERALIZES WN.16 (does not replace it) — WN.16's spike detection &
+// protection still run first; WN.20 then enforces the tighter universal cap.
+const _WN20_EVENT_CAP = { '24h': 0.22, '7d': 0.24, '30d': 0.25, '1y': 0.22, 'all': 0.19 };
+function _wscApplyEventDominanceControl(vis, regimes, range) {
+  const out = { rangeDominanceThreshold: null, dominancePolicy: null,
+    eventCompressionApplied: false, eventCompressionRatio: 1,
+    preCompressionDominance: null, postCompressionDominance: null,
+    contextRecovered: false, currentRegimeRecoveredPct: 0, cappedRegimeCount: 0,
+    totalEventSuppressed: false, totalNarrativeRecovered: false, totalCurrentStateVisibilityPct: null };
+  const cap = _WN20_EVENT_CAP[range];
+  if (cap != null) { out.rangeDominanceThreshold = +(cap * 100).toFixed(0); out.dominancePolicy = range === 'all' ? 'STRICT_TOTAL' : range === '1y' ? 'TREND_FIRST' : 'BALANCED'; }
+  if (cap == null || !vis || vis.length < 2 || !regimes || regimes.length !== vis.length) return out;
+  const n = vis.length, curK = n - 1;
+  const isEvent = regimes.map(r => r.type === 'EXPANSION' || r.type === 'CORRECTION');
+  let pre = 0; for (let k = 0; k < n; k++) if (isEvent[k] && vis[k] > pre) pre = vis[k];
+  out.preCompressionDominance = +(pre * 100).toFixed(1);
+  if (!(pre > cap + 1e-9)) { out.postCompressionDominance = out.preCompressionDominance; out.totalCurrentStateVisibilityPct = +(vis[curK] * 100).toFixed(1); return out; }
+  const before = vis.slice();
+  let freed = 0, capped = 0;
+  for (let k = 0; k < n; k++) if (isEvent[k] && vis[k] > cap) { freed += vis[k] - cap; vis[k] = cap; capped++; }
+  const recv = []; for (let k = 0; k < n; k++) if (!isEvent[k]) recv.push(k);
+  if (!recv.length || !(freed > 0)) { for (let k = 0; k < n; k++) vis[k] = before[k]; return out; }
+  // PART 4 — redistribute, current regime prioritized (×2), then by current share.
+  const wts = recv.map(k => (k === curK ? 2 : 1) * Math.max(vis[k], 0.02));
+  const ws = wts.reduce((a, b) => a + b, 0) || 1;
+  const curBefore = vis[curK];
+  recv.forEach((k, i) => { vis[k] += freed * (wts[i] / ws); });
+  const s = vis.reduce((a, b) => a + b, 0) || 1; for (let k = 0; k < n; k++) vis[k] /= s;
+  if (!vis.every(x => Number.isFinite(x) && x >= -1e-9 && x <= 1 + 1e-9)) {
+    for (let k = 0; k < n; k++) vis[k] = before[k]; const s2 = vis.reduce((a, b) => a + b, 0) || 1; for (let k = 0; k < n; k++) vis[k] /= s2; return out;
+  }
+  let post = 0; for (let k = 0; k < n; k++) if (isEvent[k] && vis[k] > post) post = vis[k];
+  out.postCompressionDominance = +(post * 100).toFixed(1);
+  out.eventCompressionApplied = true;
+  out.eventCompressionRatio = pre > 0 ? +(post / pre).toFixed(3) : 1;
+  out.cappedRegimeCount = capped;
+  out.contextRecovered = true;
+  out.currentRegimeRecoveredPct = +((vis[curK] - curBefore) * 100).toFixed(1);
+  out.totalCurrentStateVisibilityPct = +(vis[curK] * 100).toFixed(1);
+  if (range === 'all') { out.totalEventSuppressed = true; out.totalNarrativeRecovered = true; }
+  return out;
+}
+
 // ── WN.18 PART 3 — Drawdown Context Engine ──────────────────────────────────
 // Peak-to-current interpretation so a healthy correction inside an uptrend
 // (e.g. 64k → 62.8k ≈ -1.9%) reads as a NORMAL correction, NOT a collapse. Pure
@@ -18289,6 +18359,77 @@ function _wscVisualNarrativeScore(narrative, aw, range) {
     out.components = { deadScore: +deadScore.toFixed(0), eventScore: +eventScore.toFixed(0), consolScore: +consolScore.toFixed(0), balanceScore: +balanceScore.toFixed(0), persistScore: +persistScore.toFixed(0), continuityScore };
     out.score = +score.toFixed(1);
   } catch (_) {}
+  return out;
+}
+
+// ── WN.20 — Event Dominance Model (detection + scoring, analysis-only) ──────
+// Reads the FINAL geometry (post WN.16/WN.19/WN.20) and reports, per event
+// regime, its visual height/width, isolation and dominance, plus needle/cliff
+// classification and a range-level control score (0–100, higher = better
+// controlled). Pure measurement — no value/geometry change. PART 1, 5, 8, 10.
+function _wscEventDominanceModel(rscale, values, aw, range) {
+  const out = {
+    range, dominantEvents: [], dominantEventCount: 0, maxEventDominanceScore: 0,
+    rangeDominanceThreshold: null, dominancePolicy: null,
+    eventCompressionApplied: false, eventCompressionRatio: 1, preCompressionDominance: null, postCompressionDominance: null,
+    contextRecovered: false, currentRegimeRecoveredPct: 0, totalCurrentStateVisibilityPct: null,
+    needleDetected: false, cliffDetected: false, spikeType: 'NONE', needleSuppressionApplied: false, cliffContextApplied: false,
+    totalEventSuppressed: false, totalNarrativeRecovered: false,
+    eventDominanceScore: null, dominantEventPolicyPassed: true, dominantEventFailures: [],
+  };
+  const w20 = (rscale && rscale.wn20) || {};
+  Object.assign(out, {
+    rangeDominanceThreshold: w20.rangeDominanceThreshold, dominancePolicy: w20.dominancePolicy,
+    eventCompressionApplied: !!w20.eventCompressionApplied, eventCompressionRatio: w20.eventCompressionRatio,
+    preCompressionDominance: w20.preCompressionDominance, postCompressionDominance: w20.postCompressionDominance,
+    contextRecovered: !!w20.contextRecovered, currentRegimeRecoveredPct: w20.currentRegimeRecoveredPct,
+    totalCurrentStateVisibilityPct: w20.totalCurrentStateVisibilityPct,
+    totalEventSuppressed: !!w20.totalEventSuppressed, totalNarrativeRecovered: !!w20.totalNarrativeRecovered,
+  });
+  const regimes = (rscale && rscale.regimes) || [];
+  const alloc = (rscale && rscale.allocation) || [];
+  const n = values.length;
+  const thr = (w20.rangeDominanceThreshold != null ? w20.rangeDominanceThreshold : 25);     // % cap
+  const frac = (aw && aw.frac && aw.frac.length === n) ? aw.frac : null;
+  const widthPctOf = (r) => frac ? +((frac[Math.min(r.endIndex, n - 1)] - frac[r.startIndex]) * 100).toFixed(1) : +(((r.endIndex - r.startIndex) / (n || 1)) * 100).toFixed(1);
+  let maxScore = 0;
+  regimes.forEach((r, k) => {
+    if (r.type !== 'EXPANSION' && r.type !== 'CORRECTION') return;
+    const heightPct = alloc[k] && alloc[k].visualPct != null ? alloc[k].visualPct : 0;
+    const widthPct = widthPctOf(r);
+    const isolationScore = Math.min(100, (Math.abs(r.netPct) / Math.max(widthPct, 2)) * 12);  // big move / short width = isolated
+    const dominanceScore = Math.min(100, Math.round((heightPct / Math.max(thr, 1)) * 55 + Math.min(35, isolationScore * 0.35) + Math.max(0, 10 - widthPct)));
+    out.dominantEvents.push({ index: k, type: r.type, netPct: r.netPct, eventVisualHeightPct: heightPct, eventVisualWidthPct: widthPct, eventNarrativeWeight: heightPct, eventIsolationScore: +isolationScore.toFixed(1), eventDominanceScore: dominanceScore });
+    if (dominanceScore > maxScore) maxScore = dominanceScore;
+    // PART 5 — needle / cliff classification.
+    if (widthPct < 5 && Math.abs(r.netPct) > 8) out.needleDetected = true;
+    if (widthPct < 9 && Math.abs(r.netPct) > 15) out.cliffDetected = true;
+  });
+  out.dominantEventCount = out.dominantEvents.length;
+  out.maxEventDominanceScore = maxScore;
+  // PART 5 — spike type from peak/trough position + last-event direction.
+  if (out.dominantEvents.length) {
+    const last = out.dominantEvents[out.dominantEvents.length - 1];
+    const peakIdx = values.indexOf(Math.max(...values)), troughIdx = values.indexOf(Math.min(...values));
+    const lateFrac = 0.7 * (n - 1);
+    if (last.index === regimes.length - 2 && (out.needleDetected || out.cliffDetected)) out.spikeType = last.netPct >= 0 ? 'TERMINAL_NEEDLE' : 'TERMINAL_CLIFF';
+    else if (peakIdx > lateFrac && troughIdx < peakIdx) out.spikeType = out.needleDetected ? 'V_SPIKE' : 'CLIFF_RECOVERY';
+    else if (troughIdx > lateFrac) out.spikeType = 'INVERTED_V';
+    else if (out.cliffDetected) out.spikeType = last.netPct >= 0 ? 'CLIFF_RECOVERY' : 'CLIFF_DROP';
+    else if (out.needleDetected) out.spikeType = 'ISOLATED_PEAK';
+  }
+  out.needleSuppressionApplied = !!(out.needleDetected && (w20.eventCompressionApplied || (rscale && rscale.wn16 && rscale.wn16.terminalSpikeDetected)));
+  out.cliffContextApplied = !!(out.cliffDetected && w20.contextRecovered);
+  // PART 8 — range-level control score (higher = better controlled).
+  const curShare = alloc.length ? (alloc[alloc.length - 1].visualPct || 0) : 100;
+  let score = 100; const fails = [];
+  out.dominantEvents.forEach(e => { if (e.eventVisualHeightPct > thr + 0.5) { score -= (e.eventVisualHeightPct - thr) * 4; fails.push(`event#${e.index} height ${e.eventVisualHeightPct}% > ${thr}%`); } });
+  const minVis = 22;
+  if (curShare != null && curShare < minVis && rscale.mode === 'regime-relative') { score -= (minVis - curShare) * 2.5; fails.push(`current regime visibility ${curShare}% < ${minVis}%`); }
+  if (out.needleDetected && !out.needleSuppressionApplied) { score -= 8; fails.push('needle not suppressed'); }
+  out.eventDominanceScore = +Math.max(0, Math.min(100, score)).toFixed(1);
+  out.dominantEventPolicyPassed = fails.length === 0;
+  out.dominantEventFailures = fails;
   return out;
 }
 
@@ -18398,11 +18539,16 @@ function _wscRegimeYScale(values, range, timestamps) {
     consolidationVisualHeightPct: null, plateauBreathingFactor: 1, totalHistoricalBalanceApplied: false,
     finalRegimeHeightAllocations: null, drawdown: null, consolidationPromotedByDuration: false };
   let wn16 = { ...wn16Default };                                  // function-scoped; populated below for regime-relative mode
+  const wn20Default = { rangeDominanceThreshold: _WN20_EVENT_CAP[range] != null ? +(_WN20_EVENT_CAP[range] * 100).toFixed(0) : null,
+    dominancePolicy: range === 'all' ? 'STRICT_TOTAL' : range === '1y' ? 'TREND_FIRST' : 'BALANCED',
+    eventCompressionApplied: false, eventCompressionRatio: 1, preCompressionDominance: null, postCompressionDominance: null,
+    contextRecovered: false, currentRegimeRecoveredPct: 0, cappedRegimeCount: 0,
+    totalEventSuppressed: false, totalNarrativeRecovered: false, totalCurrentStateVisibilityPct: null };
   const linear = (reason, regimes) => ({ mode: 'linear',
     gFrac: v => span > 0 ? Math.min(1, Math.max(0, (v - lo) / span)) : 0.5,
     inv: f => lo + Math.max(0, Math.min(1, f)) * span, lo, hi, span, regimes: regimes || [], current: null,
     allocation: [], visualDomain: [lo, hi], currentRegimeDomain: [lo, hi], postEventPct: null, fallbackReason: reason || null,
-    wn16: { ...wn16Default } });
+    wn16: { ...wn16Default }, wn20: { ...wn20Default } });
   if (n < 8 || !(span > 0)) return linear(n < 8 ? 'insufficient_points' : 'degenerate_span');
   const regimes = detectVerticalRegimes(values, null, range);
   if (regimes.length < 2) return linear('single_regime', regimes);
@@ -18583,6 +18729,19 @@ function _wscRegimeYScale(values, range, timestamps) {
     }
   }
 
+  // ── WN.20 — universal event-dominance cap (all regime-relative ranges) ──────
+  // Final per-range cap on event visual height, with context redistribution.
+  // Self-gating + revert-safe; generalizes the WN.16 protection to every range.
+  let wn20 = { rangeDominanceThreshold: null, dominancePolicy: null, eventCompressionApplied: false,
+    eventCompressionRatio: 1, preCompressionDominance: null, postCompressionDominance: null,
+    contextRecovered: false, currentRegimeRecoveredPct: 0, cappedRegimeCount: 0,
+    totalEventSuppressed: false, totalNarrativeRecovered: false, totalCurrentStateVisibilityPct: null };
+  try {
+    const visB4 = vis.slice();
+    wn20 = _wscApplyEventDominanceControl(vis, regimes, range);
+    if (!vis.every(x => Number.isFinite(x))) { for (let k = 0; k < vis.length; k++) vis[k] = visB4[k]; }
+  } catch (_) { /* keep pre-WN.20 vis */ }
+
   const cum = [0]; for (let k = 0; k < vis.length; k++) cum.push(cum[k] + vis[k]);
   alloc.forEach((al, k) => { al.visualPct = +(vis[k] * 100).toFixed(1); });
   const gFrac = v => {
@@ -18601,7 +18760,7 @@ function _wscRegimeYScale(values, range, timestamps) {
     allocation: alloc, knots, cum, visualDomain: [lo, hi],
     currentRegimeDomain: [regimes[curK].min, regimes[curK].max],
     postEventPct: alloc[curK] ? alloc[curK].visualPct : null,
-    fallbackReason: wn16.fallbackReason || null, wn16 };
+    fallbackReason: wn16.fallbackReason || null, wn16, wn20 };
 }
 
 // Paint one surface: write the range-change metric into changeEl (the span
@@ -18710,6 +18869,8 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
       && w16.spikeVisualBudgetAfter != null && w16.spikeVisualBudgetAfter < w16.spikeVisualBudgetBefore - 0.05);
     // WN.18/19 — narrative interpretation snapshot (analysis-only; reads the geometry + warp).
     try { window._aurixChartMode.narrative = _wscNarrativeModel(rscale, plotVals, uTs, activeRange, aw); } catch (_) { window._aurixChartMode.narrative = null; }
+    // WN.20 — event-dominance control snapshot.
+    try { window._aurixChartMode.eventDominance = _wscEventDominanceModel(rscale, plotVals, aw, activeRange); } catch (_) { window._aurixChartMode.eventDominance = null; }
   }
   const linePath = _wscMonotonePath(pts);
   const areaPath = `${linePath} L${pts[pts.length - 1].x.toFixed(2)},${vp.bot.toFixed(2)} L${pts[0].x.toFixed(2)},${vp.bot.toFixed(2)} Z`;
