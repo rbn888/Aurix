@@ -22373,3 +22373,59 @@ body.aurix-premium-lock{ overflow:hidden; }
 /* Settings → Preferencias: language/currency toggles sit on the right of the row. */
 .settings-pref-item{ align-items:center; }
 .settings-pref-item .menu-pref-opts{ flex:0 0 auto; }
+
+/* ── DSH.SETTINGS.01 — Configuración: desktop/tablet side-nav layout ──────────
+   Left rail of section tabs + a single visible pane on the right (Revolut /
+   Linear / Apple Settings feel). Mobile (≤768) hides the rail and stacks every
+   section vertically. Reorganization only — no auth/lang/currency/premium logic
+   is touched. */
+.settings-nav-item{
+  appearance:none; -webkit-appearance:none;
+  text-align:left; width:100%;
+  padding:10px 12px; border-radius:10px; border:none; background:transparent;
+  color:rgba(220,230,250,.60); font-size:13px; font-weight:600; letter-spacing:.01em;
+  cursor:pointer; transition:background 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+.settings-nav-item:hover{ background:rgba(255,255,255,.045); color:var(--text-bright,#fff); }
+.settings-nav-item.is-current{
+  background:rgba(77,141,255,.13); color:#eaf2ff;
+  box-shadow:inset 2px 0 0 #4D8DFF;
+}
+
+@media (min-width: 769px){
+  .modal--settings{ max-width:760px; }
+  .settings-body--nav{
+    flex-direction:row; gap:0; padding:0; align-items:stretch; overflow:hidden;
+  }
+  .settings-nav{
+    display:flex; flex-direction:column; gap:2px;
+    flex:0 0 198px; padding:18px 12px;
+    border-right:1px solid var(--aurix-border);
+    background:linear-gradient(180deg, rgba(28,42,74,.16), rgba(12,18,32,0));
+  }
+  .settings-panes{
+    flex:1 1 auto; min-width:0; padding:20px 24px 26px;
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
+  }
+  .settings-body--nav .settings-panes > .settings-section{ display:none; }
+  .settings-body--nav .settings-panes > .settings-section.is-active{ display:flex; }
+}
+
+/* Mobile / small tablet: no rail, every section stacked. */
+@media (max-width: 768px){
+  .settings-nav{ display:none; }
+  .settings-body--nav{ flex-direction:column; }
+  .settings-panes{ display:flex; flex-direction:column; gap:22px; }
+  .settings-body--nav .settings-panes > .settings-section{ display:flex; }
+}
+
+/* Destructive action isolated in its own danger zone. */
+.settings-danger-zone{
+  margin-top:6px; padding-top:14px;
+  border-top:1px solid rgba(224,90,90,.22);
+  display:flex; flex-direction:column; gap:8px;
+}
+.settings-danger-label{
+  font-size:10.5px; font-weight:800; letter-spacing:.16em; text-transform:uppercase;
+  color:rgba(224,90,90,.80);
+}

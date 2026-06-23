@@ -2755,7 +2755,7 @@ const T = {
     settingsPlanCurrent:      'Plan actual',
     settingsAssetsUsed:       'Activos usados',
     settingsAssetsSoftWarn:   'Estás cerca del límite del plan Free.',
-    settingsFounderName:      'Aurix Founder',
+    settingsFounderName:      'Aurix Premium',
     menuPremium:              '✨ Aurix Premium',
     menuLangLabel:            'Idioma',
     menuCurrLabel:            'Moneda',
@@ -2827,8 +2827,8 @@ const T = {
     ap_trust_2:        'Tus activos, tus datos y tu acceso seguirán siendo siempre tuyos.',
     ap_close:          'Cerrar',
     settingsFounderPrice:     '14,99€ / año',
-    settingsFounderDesc:      'Acceso anticipado. Sin límite de activos. Precio fundador de por vida.',
-    settingsFounderCta:       'Conocer Aurix Founder',
+    settingsFounderDesc:      'Acceso anticipado, herramientas avanzadas y ventajas premium.',
+    settingsFounderCta:       'Conocer Aurix Premium',
     settingsFounderSoon:      'Próximamente',
     // AURIX-MONETIZATION-1 — Founder page
     founderTitle:             'Aurix Founder',
@@ -2848,6 +2848,7 @@ const T = {
     upgradeLead:              'Esta herramienta forma parte del plan premium de Aurix.',
     upgradeSeeFounder:        'Ver Aurix Founder',
     settingsData:             'Datos y seguridad',
+    settingsDangerZone:       'Zona peligrosa',
     settingsExport:           'Exportar datos',
     settingsExportSub:        'Descarga un JSON con toda tu cartera',
     settingsImport:           'Importar datos',
@@ -4806,7 +4807,7 @@ const T = {
     settingsPlanCurrent:      'Current plan',
     settingsAssetsUsed:       'Assets used',
     settingsAssetsSoftWarn:   "You're close to the Free plan limit.",
-    settingsFounderName:      'Aurix Founder',
+    settingsFounderName:      'Aurix Premium',
     menuPremium:              '✨ Aurix Premium',
     menuLangLabel:            'Language',
     menuCurrLabel:            'Currency',
@@ -4878,8 +4879,8 @@ const T = {
     ap_trust_2:        'Your assets, your data and your access remain always yours.',
     ap_close:          'Close',
     settingsFounderPrice:     '€14.99 / year',
-    settingsFounderDesc:      'Early access. Unlimited assets. Founder price for life.',
-    settingsFounderCta:       'About Aurix Founder',
+    settingsFounderDesc:      'Early access, advanced tools and premium perks.',
+    settingsFounderCta:       'Discover Aurix Premium',
     settingsFounderSoon:      'Coming soon',
     // AURIX-MONETIZATION-1 — Founder page
     founderTitle:             'Aurix Founder',
@@ -4899,6 +4900,7 @@ const T = {
     upgradeLead:              'This tool is part of Aurix premium.',
     upgradeSeeFounder:        'See Aurix Founder',
     settingsData:             'Data & security',
+    settingsDangerZone:       'Danger zone',
     settingsExport:           'Export data',
     settingsExportSub:        'Download a JSON file with your portfolio',
     settingsImport:           'Import data',
@@ -39015,10 +39017,36 @@ if (typeof document !== 'undefined') {
     if (a) { _settingsSaveProfile({ ageBand: a.dataset.settingsAge }); return; }
   });
 }
+// DSH.SETTINGS.01 — desktop/tablet side-nav: show one pane at a time. On mobile
+// the rail is hidden (CSS) and every section is shown, so this is a no-op there.
+function _settingsSelectPane(pane) {
+  if (!pane) return;
+  document.querySelectorAll('.settings-nav-item').forEach(btn => {
+    const on = btn.dataset.settingsPane === pane;
+    btn.classList.toggle('is-current', on);
+    btn.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  document.querySelectorAll('.settings-panes > .settings-section').forEach(sec => {
+    sec.classList.toggle('is-active', sec.dataset.pane === pane);
+  });
+  // Reset the pane scroll so each section opens from the top.
+  const panes = document.querySelector('.settings-panes');
+  if (panes) { try { panes.scrollTop = 0; } catch (_) {} }
+}
+// Single delegated listener for the rail (attached once).
+if (typeof window !== 'undefined' && !window.__aurixSettingsNavWired) {
+  window.__aurixSettingsNavWired = true;
+  document.addEventListener('click', e => {
+    const item = e.target.closest && e.target.closest('.settings-nav-item');
+    if (item && item.dataset.settingsPane) _settingsSelectPane(item.dataset.settingsPane);
+  });
+}
+
 function openSettingsPanel() {
   const ov = document.getElementById('settingsOverlay');
   if (!ov) return;
   _settingsPopulate();
+  _settingsSelectPane('account');   // always open on Cuenta
   ov.classList.add('open');
   document.body.classList.add('modal-open');
 }
@@ -39675,8 +39703,17 @@ try {
       if (typeof window !== 'undefined' && window.openAurixPremiumModal) window.openAurixPremiumModal({ source: 'settings-menu' });
       return;
     }
-    // Settings plan card CTA → Founder page.
-    if (e.target.closest && e.target.closest('#planFounderCta')) { openFounderPage(); return; }
+    // Settings membership card CTA → canonical Aurix Premium modal (same surface
+    // as the menu). DSH.SETTINGS.01 visual naming alignment; premium logic and
+    // entitlements untouched. Founder page kept as fallback if the modal is absent.
+    if (e.target.closest && e.target.closest('#planFounderCta')) {
+      if (typeof window !== 'undefined' && window.openAurixPremiumModal) {
+        window.openAurixPremiumModal({ source: 'settings-membership' });
+      } else {
+        openFounderPage();
+      }
+      return;
+    }
     // Upgrade modal → Founder page.
     if (e.target.closest && e.target.closest('#upgradeFounderBtn')) {
       closeUpgradeModal(); openFounderPage(); return;

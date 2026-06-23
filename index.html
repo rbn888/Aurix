@@ -1431,12 +1431,22 @@
 <div class="modal-overlay" id="settingsOverlay">
   <div class="modal modal--settings" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
     <div class="modal-header">
-      <h3 id="settingsTitle" data-i18n="settingsTitle">General</h3>
+      <h3 id="settingsTitle" data-i18n="settingsTitle">Configuración</h3>
       <button class="modal-close" id="settingsClose" aria-label="Close">✕</button>
     </div>
-    <div class="modal-body settings-body">
+    <!-- DSH.SETTINGS.01 — desktop/tablet: left nav rail + single visible pane.
+         Mobile collapses the rail and stacks every section vertically (CSS). -->
+    <div class="modal-body settings-body settings-body--nav">
+      <nav class="settings-nav" role="tablist" aria-label="Configuración">
+        <button type="button" class="settings-nav-item is-current" role="tab" data-settings-pane="account" data-i18n="settingsAccount">Cuenta</button>
+        <button type="button" class="settings-nav-item" role="tab" data-settings-pane="plan" data-i18n="settingsPlanTitle">Membresía</button>
+        <button type="button" class="settings-nav-item" role="tab" data-settings-pane="profile" data-i18n="settingsProfileTitle">Perfil inversor</button>
+        <button type="button" class="settings-nav-item" role="tab" data-settings-pane="prefs" data-i18n="settingsPrefs">Preferencias</button>
+        <button type="button" class="settings-nav-item" role="tab" data-settings-pane="data" data-i18n="settingsData">Datos y seguridad</button>
+      </nav>
+      <div class="settings-panes">
 
-      <section class="settings-section" id="settingsSectionAccount">
+      <section class="settings-section is-active" data-pane="account" id="settingsSectionAccount">
         <h4 class="settings-section-title" data-i18n="settingsAccount">Cuenta</h4>
         <div class="settings-row">
           <span class="settings-row-label" data-i18n="settingsDisplayName">Nombre visible</span>
@@ -1456,8 +1466,8 @@
         </div>
       </section>
 
-      <section class="settings-section" id="settingsSectionPlan">
-        <h4 class="settings-section-title" data-i18n="settingsPlanTitle">Plan</h4>
+      <section class="settings-section" data-pane="plan" id="settingsSectionPlan">
+        <h4 class="settings-section-title" data-i18n="settingsPlanTitle">Membresía</h4>
         <div class="plan-card" id="planCardCurrent">
           <div class="plan-card-head">
             <span class="plan-card-tier" id="planTierName">Aurix Free</span>
@@ -1471,12 +1481,12 @@
 
         <div class="plan-card plan-card--offer" id="planCardOffer">
           <div class="plan-card-head">
-            <span class="plan-card-tier" data-i18n="settingsFounderName">Aurix Founder</span>
+            <span class="plan-card-tier" data-i18n="settingsFounderName">Aurix Premium</span>
             <span class="plan-card-price" id="planFounderPrice" data-i18n="settingsFounderPrice">14,99€ / año</span>
           </div>
           <div class="plan-card-body">
-            <p class="plan-card-desc" data-i18n="settingsFounderDesc">Acceso anticipado. Sin límite de activos. Precio fundador de por vida.</p>
-            <button type="button" class="btn-submit btn-submit--plan" id="planFounderCta" data-i18n="settingsFounderCta">Conocer Aurix Founder</button>
+            <p class="plan-card-desc" data-i18n="settingsFounderDesc">Acceso anticipado, herramientas avanzadas y ventajas premium.</p>
+            <button type="button" class="btn-submit btn-submit--plan" id="planFounderCta" data-i18n="settingsFounderCta">Conocer Aurix Premium</button>
             <p class="plan-card-note" data-i18n="settingsFounderSoon">Próximamente</p>
           </div>
         </div>
@@ -1487,7 +1497,7 @@
            tonal signal context without re-running the flow. Reuses
            the existing AurixOnboarding.savePreferences API so the
            persisted shape stays identical to the onboarding step. -->
-      <section class="settings-section" id="settingsSectionProfile">
+      <section class="settings-section" data-pane="profile" id="settingsSectionProfile">
         <h4 class="settings-section-title" data-i18n="settingsProfileTitle">Perfil inversor</h4>
         <p class="settings-section-sub" data-i18n="settingsProfileSub">Ajusta cómo Aurix interpreta las señales de tu cartera.</p>
 
@@ -1523,7 +1533,7 @@
         </div>
       </section>
 
-      <section class="settings-section" id="settingsSectionPrefs">
+      <section class="settings-section" data-pane="prefs" id="settingsSectionPrefs">
         <h4 class="settings-section-title" data-i18n="settingsPrefs">Preferencias</h4>
         <div class="settings-prefs-list">
           <div class="settings-pref-item">
@@ -1553,7 +1563,7 @@
 
       <!-- DSH.SETTINGS.02 — Datos y seguridad always last; reset is destructive
            and visually separated (settings-action--danger). -->
-      <section class="settings-section" id="settingsSectionData">
+      <section class="settings-section" data-pane="data" id="settingsSectionData">
         <h4 class="settings-section-title" data-i18n="settingsData">Datos y seguridad</h4>
         <div class="settings-actions">
           <button type="button" class="settings-action" id="settingsExportBtn">
@@ -1564,6 +1574,10 @@
             <span class="settings-action-label" data-i18n="settingsImport">Importar datos</span>
             <span class="settings-action-sub" data-i18n="settingsImportSub">Próximamente</span>
           </button>
+        </div>
+        <!-- DSH.SETTINGS.01 — destructive action isolated in its own danger zone. -->
+        <div class="settings-danger-zone">
+          <span class="settings-danger-label" data-i18n="settingsDangerZone">Zona peligrosa</span>
           <button type="button" class="settings-action settings-action--danger" id="settingsResetBtn">
             <span class="settings-action-label" data-i18n="settingsReset">Resetear cartera</span>
             <span class="settings-action-sub" data-i18n="settingsResetSub">Borra activos, historial y seguimiento</span>
@@ -1571,6 +1585,7 @@
         </div>
       </section>
 
+      </div>
     </div>
   </div>
 </div>
