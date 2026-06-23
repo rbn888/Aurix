@@ -2744,13 +2744,14 @@ const T = {
     wsTplFutureValue:        'Valor futuro',
     // SETTINGS-1
     settingsGeneral:          '⚙ Configuración',
-    settingsTitle:            'General',
+    settingsTitle:            'Configuración',
     settingsAccount:          'Cuenta',
+    settingsDisplayName:      'Nombre visible',
     settingsEmail:            'Email',
     settingsStatus:           'Estado',
     settingsStatusLocal:      'Local · sin sesión',
     settingsBuild:            'Build',
-    settingsPlanTitle:        'Plan',
+    settingsPlanTitle:        'Membresía',
     settingsPlanCurrent:      'Plan actual',
     settingsAssetsUsed:       'Activos usados',
     settingsAssetsSoftWarn:   'Estás cerca del límite del plan Free.',
@@ -2846,7 +2847,7 @@ const T = {
     upgradeTitle:             'Función premium',
     upgradeLead:              'Esta herramienta forma parte del plan premium de Aurix.',
     upgradeSeeFounder:        'Ver Aurix Founder',
-    settingsData:             'Datos',
+    settingsData:             'Datos y seguridad',
     settingsExport:           'Exportar datos',
     settingsExportSub:        'Descarga un JSON con toda tu cartera',
     settingsImport:           'Importar datos',
@@ -4794,13 +4795,14 @@ const T = {
     wsTplFutureValue:        'Future Value',
     // SETTINGS-1
     settingsGeneral:          '⚙ Settings',
-    settingsTitle:            'General',
+    settingsTitle:            'Settings',
     settingsAccount:          'Account',
+    settingsDisplayName:      'Display name',
     settingsEmail:            'Email',
     settingsStatus:           'Status',
     settingsStatusLocal:      'Local · no session',
     settingsBuild:            'Build',
-    settingsPlanTitle:        'Plan',
+    settingsPlanTitle:        'Membership',
     settingsPlanCurrent:      'Current plan',
     settingsAssetsUsed:       'Assets used',
     settingsAssetsSoftWarn:   "You're close to the Free plan limit.",
@@ -4896,7 +4898,7 @@ const T = {
     upgradeTitle:             'Premium feature',
     upgradeLead:              'This tool is part of Aurix premium.',
     upgradeSeeFounder:        'See Aurix Founder',
-    settingsData:             'Data',
+    settingsData:             'Data & security',
     settingsExport:           'Export data',
     settingsExportSub:        'Download a JSON file with your portfolio',
     settingsImport:           'Import data',
@@ -38937,6 +38939,19 @@ function _settingsPopulate() {
     statusEl.textContent = session
       ? (lang === 'es' ? 'Sesión activa' : 'Active session')
       : (lang === 'es' ? 'Sin sesión' : 'No session');
+  }
+
+  // DSH.SETTINGS.02 — "Nombre visible" (display name, same rule as the menu
+  // identity header) + a membership tier chip on the plan card. Display-only.
+  const nameEl = document.getElementById('settingsAccountName');
+  if (nameEl) nameEl.textContent = (typeof _aurixMenuDisplayName === 'function')
+    ? _aurixMenuDisplayName()
+    : (session && session.email && session.email.indexOf('@') > 0 ? session.email.split('@')[0] : '—');
+  const tierChip = document.getElementById('settingsTierChip');
+  if (tierChip) {
+    const tk = plan.tier;
+    tierChip.setAttribute('data-tier', tk);
+    tierChip.textContent = tk === 'founder' ? 'FOUNDER' : tk === 'premium' ? 'PREMIUM' : 'FREE';
   }
 
   // SETTINGS-INVESTOR-PROFILE-1 — paint the three investor-profile

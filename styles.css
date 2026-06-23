@@ -22342,3 +22342,15 @@ body.aurix-premium-lock{ overflow:hidden; }
 
 /* Logout — soft red, calm, never competing with Premium/Configuración. */
 .menu-item--danger{ font-weight:var(--font-weight-medium); }
+
+/* ── DSH.SETTINGS.02 — Configuración reorg (tier chip + meta row weight) ─────
+   Visual-only. Membership tier chip on the plan card; Build row de-emphasized. */
+.settings-tier-chip{
+  display:inline-flex; align-items:center; height:20px; padding:0 9px; border-radius:999px;
+  font-size:9.5px; font-weight:900; letter-spacing:.1em; margin-left:8px;
+}
+.settings-tier-chip[data-tier="premium"]{ color:#0a1124; background:linear-gradient(180deg,#6ba4ff,#3f74e6); }
+.settings-tier-chip[data-tier="founder"]{ color:#1a1206; background:linear-gradient(180deg,#ecd592,#d4af5d); }
+.settings-tier-chip[data-tier="free"]{ color:#cdd9ec; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); }
+/* Build = lowest visual weight in Cuenta. */
+.settings-row-value--meta{ font-size:11px; color:var(--text-dim,#8a96aa); opacity:.8; }

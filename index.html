@@ -1453,6 +1453,10 @@
       <section class="settings-section" id="settingsSectionAccount">
         <h4 class="settings-section-title" data-i18n="settingsAccount">Cuenta</h4>
         <div class="settings-row">
+          <span class="settings-row-label" data-i18n="settingsDisplayName">Nombre visible</span>
+          <span class="settings-row-value" id="settingsAccountName">—</span>
+        </div>
+        <div class="settings-row">
           <span class="settings-row-label" data-i18n="settingsEmail">Email</span>
           <span class="settings-row-value" id="settingsAccountEmail">—</span>
         </div>
@@ -1460,9 +1464,9 @@
           <span class="settings-row-label" data-i18n="settingsStatus">Estado</span>
           <span class="settings-row-value" id="settingsAccountStatus" data-i18n="settingsStatusLocal">Local · sin sesión</span>
         </div>
-        <div class="settings-row">
+        <div class="settings-row settings-row--meta">
           <span class="settings-row-label" data-i18n="settingsBuild">Build</span>
-          <span class="settings-row-value" id="settingsBuildVersion">v1.0 · 2026.05</span>
+          <span class="settings-row-value settings-row-value--meta" id="settingsBuildVersion">v1.0 · 2026.05</span>
         </div>
       </section>
 
@@ -1471,6 +1475,7 @@
         <div class="plan-card" id="planCardCurrent">
           <div class="plan-card-head">
             <span class="plan-card-tier" id="planTierName">Aurix Free</span>
+            <span class="settings-tier-chip" id="settingsTierChip" data-tier="free">FREE</span>
             <span class="plan-card-badge" id="planTierBadge" data-i18n="settingsPlanCurrent">Plan actual</span>
           </div>
           <div class="plan-card-body">
@@ -1488,24 +1493,6 @@
             <button type="button" class="btn-submit btn-submit--plan" id="planFounderCta" data-i18n="settingsFounderCta">Conocer Aurix Founder</button>
             <p class="plan-card-note" data-i18n="settingsFounderSoon">Próximamente</p>
           </div>
-        </div>
-      </section>
-
-      <section class="settings-section" id="settingsSectionData">
-        <h4 class="settings-section-title" data-i18n="settingsData">Datos</h4>
-        <div class="settings-actions">
-          <button type="button" class="settings-action" id="settingsExportBtn">
-            <span class="settings-action-label" data-i18n="settingsExport">Exportar datos</span>
-            <span class="settings-action-sub" data-i18n="settingsExportSub">Descarga un JSON con toda tu cartera</span>
-          </button>
-          <button type="button" class="settings-action" id="settingsImportBtn" disabled>
-            <span class="settings-action-label" data-i18n="settingsImport">Importar datos</span>
-            <span class="settings-action-sub" data-i18n="settingsImportSub">Próximamente</span>
-          </button>
-          <button type="button" class="settings-action settings-action--danger" id="settingsResetBtn">
-            <span class="settings-action-label" data-i18n="settingsReset">Resetear cartera</span>
-            <span class="settings-action-sub" data-i18n="settingsResetSub">Borra activos, historial y seguimiento</span>
-          </button>
         </div>
       </section>
 
@@ -1569,6 +1556,26 @@
             <span class="settings-pref-label" data-i18n="settingsSupport">Soporte</span>
             <span class="settings-pref-value settings-pref-soon" data-i18n="settingsSoon">Próximamente</span>
           </div>
+        </div>
+      </section>
+
+      <!-- DSH.SETTINGS.02 — Datos y seguridad always last; reset is destructive
+           and visually separated (settings-action--danger). -->
+      <section class="settings-section" id="settingsSectionData">
+        <h4 class="settings-section-title" data-i18n="settingsData">Datos y seguridad</h4>
+        <div class="settings-actions">
+          <button type="button" class="settings-action" id="settingsExportBtn">
+            <span class="settings-action-label" data-i18n="settingsExport">Exportar datos</span>
+            <span class="settings-action-sub" data-i18n="settingsExportSub">Descarga un JSON con toda tu cartera</span>
+          </button>
+          <button type="button" class="settings-action" id="settingsImportBtn" disabled>
+            <span class="settings-action-label" data-i18n="settingsImport">Importar datos</span>
+            <span class="settings-action-sub" data-i18n="settingsImportSub">Próximamente</span>
+          </button>
+          <button type="button" class="settings-action settings-action--danger" id="settingsResetBtn">
+            <span class="settings-action-label" data-i18n="settingsReset">Resetear cartera</span>
+            <span class="settings-action-sub" data-i18n="settingsResetSub">Borra activos, historial y seguimiento</span>
+          </button>
         </div>
       </section>
 
