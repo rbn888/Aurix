@@ -39730,7 +39730,6 @@ try {
             <span class="aurix-premium-compare-tier">${esc(t('ap_premium_tier'))}</span>
             <p class="aurix-premium-card-desc">${esc(t('ap_std_text'))}</p>
             <ul class="aurix-premium-list is-2col">${li(PREM_K, 'is-prem')}</ul>
-            <p class="aurix-premium-pos-foot">${esc(t('ap_pos_text'))}</p>
           </div>
         </div>
 
@@ -39746,10 +39745,9 @@ try {
 
           <div class="aurix-premium-plan aurix-premium-founder">
             <div class="aurix-premium-plan-top">
-              <span class="aurix-premium-kicker">${esc(t('ap_eyebrow'))}</span>
+              <h3 class="aurix-premium-plan-title">${esc(t('ap_founder_title'))}</h3>
               <span class="aurix-premium-badge">${esc(t('ap_founder_badge'))}</span>
             </div>
-            <h3 class="aurix-premium-plan-title">${esc(t('ap_founder_title'))}</h3>
             <span class="aurix-premium-seat">${esc(t('ap_founder_seat')).replace('{n}', tk).replace('{tot}', tot)}</span>
             <p class="aurix-premium-plan-desc">${esc(t('ap_founder_text'))}</p>
             <ul class="aurix-premium-benefits">${li(FND_B, 'is-founder')}</ul>
