@@ -17714,7 +17714,7 @@ if (typeof window !== 'undefined') {
     const o = { range: range || activeRange };
     try {
       const p = _vizPipeline(range);
-      const sc = _wscRegimeYScale(p.plotVals, p.r);
+      const sc = _wscRegimeYScale(p.plotVals, p.r, p.uTs);
       o.visualScaleMode = sc.mode;
       o.yTransformFallbackReason = sc.fallbackReason;
       o.linearDomain = [sc.lo, sc.hi].map(v => +v.toFixed(0));
@@ -17724,7 +17724,19 @@ if (typeof window !== 'undefined') {
       o.verticalRegimes = sc.regimes.map(r => ({ type: r.type, samples: r.endIndex - r.startIndex, spanPct: r.spanPct, volatilityPct: r.volatilityPct, median: +r.median.toFixed(0) }));
       o.regimeAmplitudeAllocation = sc.allocation.map(a => ({ type: a.type, visualPct: a.visualPct, isCurrent: a.isCurrent, isTransition: a.isTransition, valueBand: a.valueBand }));
       o.postEventAmplitudePct = sc.postEventPct;
-      try { console.log('[viz-regime-scaling]', o.range, o.visualScaleMode, '| postEvent%:', o.postEventAmplitudePct); console.table(o.regimeAmplitudeAllocation); } catch (_) {}
+      // WN.16 — long-range regime balance introspection
+      const w = sc.wn16 || {};
+      o.terminalSpikeDetected = w.terminalSpikeDetected;
+      o.spikeRegimeIndex = w.spikeRegimeIndex;
+      o.spikeDetectionReason = w.spikeReason;
+      o.spikeVisualBudgetBefore = w.spikeVisualBudgetBefore;
+      o.spikeVisualBudgetAfter = w.spikeVisualBudgetAfter;
+      o.currentConsolidationFloorApplied = w.currentConsolidationFloorApplied;
+      o.consolidationVisualHeightPct = w.consolidationVisualHeightPct;
+      o.plateauBreathingFactor = w.plateauBreathingFactor;
+      o.totalHistoricalBalanceApplied = w.totalHistoricalBalanceApplied;
+      o.finalRegimeHeightAllocations = w.finalRegimeHeightAllocations;
+      try { console.log('[viz-regime-scaling]', o.range, o.visualScaleMode, '| postEvent%:', o.postEventAmplitudePct, '| spike:', o.terminalSpikeDetected, '→', o.spikeVisualBudgetBefore, '→', o.spikeVisualBudgetAfter, '| consol%:', o.consolidationVisualHeightPct); console.table(o.regimeAmplitudeAllocation); } catch (_) {}
     } catch (e) { o.error = String(e); }
     return o;
   };
@@ -17746,7 +17758,7 @@ if (typeof window !== 'undefined') {
 
   window.debugAurixVisualEngine = (range) => {
     const r = range || activeRange;
-    const o = { range: r, layer: 'WN.15 Regime Relative Scaling Engine' };
+    const o = { range: r, layer: 'WN.16 Current Regime Balance Engine' };
     try {
       const sc = window.debugAurixRegimeScaling(r);
       const comp = window.debugAurixCompression(r);
@@ -17761,6 +17773,16 @@ if (typeof window !== 'undefined') {
       o.currentRegimeDomain = sc.currentRegimeDomain;
       o.regimeAmplitudeAllocation = sc.regimeAmplitudeAllocation;
       o.postEventAmplitudePct = sc.postEventAmplitudePct;
+      // WN.16 — terminal-spike balance fields
+      o.terminalSpikeDetected = sc.terminalSpikeDetected;
+      o.spikeRegimeIndex = sc.spikeRegimeIndex;
+      o.spikeVisualBudgetBefore = sc.spikeVisualBudgetBefore;
+      o.spikeVisualBudgetAfter = sc.spikeVisualBudgetAfter;
+      o.currentConsolidationFloorApplied = sc.currentConsolidationFloorApplied;
+      o.consolidationVisualHeightPct = sc.consolidationVisualHeightPct;
+      o.plateauBreathingFactor = sc.plateauBreathingFactor;
+      o.totalHistoricalBalanceApplied = sc.totalHistoricalBalanceApplied;
+      o.finalRegimeHeightAllocations = sc.finalRegimeHeightAllocations;
       o.xWarpMinSpacingPx = comp.xWarpMinSpacingPx;
       o.xWarpSlopeGuardApplied = comp.xWarpSlopeGuardApplied;
       o.xWarpLeadIdleFloorApplied = comp.xWarpLeadIdleFloorApplied;
@@ -18033,6 +18055,53 @@ function _wscRegimeTypes(out) {
   return out;
 }
 
+// ── WN.16 — Terminal spike detection (long-range only) ──────────────────────
+// On 1A / TOTAL a late onboarding/expansion move can read as a single terminal
+// spike that swallows the whole story (flat → huge spike → tiny plateau). This
+// flags that shape so the y-allocator can cap the spike and let the current
+// consolidation breathe. It NEVER touches values, order, or the metric — it only
+// informs visual-height budgeting, and is gated to monotone-up shapes upstream.
+// A spike is detected when a transition regime: (a) starts in the last 35% of
+// index-space OR last 25% of the time span, (b) has > 2.5× the median amplitude
+// of the regimes before it, (c) occupies < 20% of the total time span, and
+// (d) is followed by a consolidation / near-flat current regime.
+function detectTerminalSpike(regimes, values, timestamps, range) {
+  const out = { isTerminalSpike: false, spikeRegimeIndex: -1, followingConsolidationIndex: -1, reason: null };
+  if (range !== '1y' && range !== 'all') { out.reason = 'range_not_eligible'; return out; }
+  const N = regimes.length, n = values.length;
+  if (N < 3 || n < 8) { out.reason = 'too_few_regimes'; return out; }
+  const hasTs = !!(timestamps && timestamps.length === n);
+  const t0 = hasTs ? timestamps[0] : 0;
+  const tSpan = hasTs ? ((timestamps[n - 1] - timestamps[0]) || 1) : 1;
+  const amp = a => Math.max(0, a.max - a.min);                  // visual amplitude proxy (value range)
+  // Scan from the end inward — the LAST qualifying transition is the terminal one.
+  for (let k = N - 2; k >= 1; k--) {
+    const r = regimes[k];
+    if (r.type !== 'EXPANSION' && r.type !== 'CORRECTION') continue;
+    const next = regimes[k + 1];
+    const followFlat = !!next && (next.type === 'CONSOLIDATION' || next.type === 'CURRENT_CONSOLIDATION' || Math.abs(next.netPct) < 2);
+    if (!followFlat) continue;
+    const lateByIndex = (r.startIndex / n) >= 0.65;
+    const lateByTime = hasTs && ((timestamps[r.startIndex] - t0) / tSpan) >= 0.75;
+    if (!lateByIndex && !lateByTime) continue;
+    const spikeAmp = amp(r);
+    const prior = regimes.slice(0, k).map(amp).filter(x => x > 0).sort((a, b) => a - b);
+    const medPrior = prior.length ? prior[(prior.length - 1) >> 1] : 0;
+    if (!(medPrior > 0) || !(spikeAmp > 2.5 * medPrior)) continue;
+    const occ = hasTs
+      ? (timestamps[Math.min(r.endIndex, n - 1)] - timestamps[r.startIndex]) / tSpan
+      : (r.endIndex - r.startIndex) / n;
+    if (!(occ < 0.20)) continue;
+    out.isTerminalSpike = true;
+    out.spikeRegimeIndex = k;
+    out.followingConsolidationIndex = k + 1;
+    out.reason = `late_${range}_spike amp=${spikeAmp.toFixed(0)}>2.5x_medianPrior=${medPrior.toFixed(0)} occ=${(occ * 100).toFixed(1)}%`;
+    return out;
+  }
+  out.reason = 'no_terminal_spike';
+  return out;
+}
+
 // Water-fill allocator: distribute `total` (default 1) across items honouring
 // each item's floor while preserving the relative size of the "want" budget.
 function _wscAllocate(wants, floors, total) {
@@ -18056,14 +18125,22 @@ function _wscAllocate(wants, floors, total) {
 // meaningful regime a visible vertical lane. gFrac(lo)=0, gFrac(hi)=1, strictly
 // non-decreasing. Returns mode:'linear' (identity remap) when a regime transform
 // would be unsafe/unhelpful.
-function _wscRegimeYScale(values, range) {
+function _wscRegimeYScale(values, range, timestamps) {
   const n = values.length;
   const sorted = values.slice().sort((a, b) => a - b);
   const lo = sorted[0], hi = sorted[sorted.length - 1], span = hi - lo;
+  // WN.16 — neutral debug defaults so the introspection surface always resolves
+  // these fields, even on the linear fallback paths.
+  const wn16Default = { terminalSpikeDetected: false, spikeRegimeIndex: -1, spikeReason: null,
+    spikeVisualBudgetBefore: null, spikeVisualBudgetAfter: null, currentConsolidationFloorApplied: false,
+    consolidationVisualHeightPct: null, plateauBreathingFactor: 1, totalHistoricalBalanceApplied: false,
+    finalRegimeHeightAllocations: null };
+  let wn16 = { ...wn16Default };                                  // function-scoped; populated below for regime-relative mode
   const linear = (reason, regimes) => ({ mode: 'linear',
     gFrac: v => span > 0 ? Math.min(1, Math.max(0, (v - lo) / span)) : 0.5,
     inv: f => lo + Math.max(0, Math.min(1, f)) * span, lo, hi, span, regimes: regimes || [], current: null,
-    allocation: [], visualDomain: [lo, hi], currentRegimeDomain: [lo, hi], postEventPct: null, fallbackReason: reason || null });
+    allocation: [], visualDomain: [lo, hi], currentRegimeDomain: [lo, hi], postEventPct: null, fallbackReason: reason || null,
+    wn16: { ...wn16Default } });
   if (n < 8 || !(span > 0)) return linear(n < 8 ? 'insufficient_points' : 'degenerate_span');
   const regimes = detectVerticalRegimes(values, null, range);
   if (regimes.length < 2) return linear('single_regime', regimes);
@@ -18119,6 +18196,114 @@ function _wscRegimeYScale(values, range) {
     focusKeys.forEach((k, i) => { vis[k] = fa[i]; });
   }
   const vsum = vis.reduce((a, b) => a + b, 0) || 1; for (let k = 0; k < vis.length; k++) vis[k] /= vsum;
+
+  // ── WN.16 — long-range regime balance (rendering-only, 1A / TOTAL) ──────────
+  // The WN.15 split above is correct for short ranges, but on 1A / TOTAL a late
+  // expansion still over-dominates and the current consolidation reads as dead.
+  // This layer re-budgets the SAME normalized visual heights: it caps the
+  // terminal spike, floors + breathes the current consolidation, and (TOTAL only)
+  // dampens the most-recent move when the trusted timeline is long. It only ever
+  // re-weights per-regime VERTICAL HEIGHT — the value→y map stays the monotone
+  // gFrac, so order, direction, drawdowns and local extrema are all preserved by
+  // construction. On any anomaly it reverts to the exact WN.15 `vis`.
+  wn16 = { ...wn16Default };
+  if ((range === '1y' || range === 'all') && vis.length >= 2) {
+    const visWN15 = vis.slice();                                   // WN.15 snapshot for safe revert
+    try {
+      const renorm = a => { const s = a.reduce((x, y) => x + y, 0) || 1; for (let i = 0; i < a.length; i++) a[i] /= s; };
+      // Clamp each lane to [min,max] and renormalize until stable (water-level settle).
+      const clampNorm = (a, mins, maxs) => {
+        for (let it = 0; it < 16; it++) {
+          renorm(a); let viol = false;
+          for (let i = 0; i < a.length; i++) {
+            if (maxs[i] != null && a[i] > maxs[i] + 1e-9) { a[i] = maxs[i]; viol = true; }
+            if (mins[i] != null && a[i] < mins[i] - 1e-9) { a[i] = mins[i]; viol = true; }
+          }
+          if (!viol) break;
+        }
+        renorm(a);
+      };
+      const want = vis.slice();
+      const curReg = regimes[curK];
+      const curPts = curReg.endIndex - curReg.startIndex;
+      const curMoves = curReg.spanPct > 0.15;                      // real local movement (Part 3/4)
+      const curIdentical = curReg.min === curReg.max;
+      const curQualifies = curPts >= 4 && curMoves && !curIdentical;
+
+      // PART 1 — terminal spike detection.
+      const spike = detectTerminalSpike(regimes, values, timestamps, range);
+      wn16.terminalSpikeDetected = spike.isTerminalSpike;
+      wn16.spikeRegimeIndex = spike.spikeRegimeIndex;
+      wn16.spikeReason = spike.reason;
+      const si = spike.spikeRegimeIndex;
+      if (spike.isTerminalSpike && si >= 0) wn16.spikeVisualBudgetBefore = +(visWN15[si] * 100).toFixed(1);
+
+      // PART 5 — TOTAL historical balance: dampen the most-recent move and lift the
+      // current consolidation when the trusted timeline is long. Visual weight only.
+      if (range === 'all' && timestamps && timestamps.length === n) {
+        const days = (timestamps[n - 1] - timestamps[0]) / 86400000;
+        let exW = 1, coW = 1;
+        if (days > 90) { exW = 0.65; coW = 1.25; }
+        else if (days > 45) { exW = 0.75; coW = 1.15; }
+        if (exW !== 1 || coW !== 1) {
+          wn16.totalHistoricalBalanceApplied = true;
+          for (let k = 0; k < regimes.length; k++) {
+            const ty = regimes[k].type;
+            if (ty === 'EXPANSION' || ty === 'CORRECTION') want[k] *= exW;
+            else if (k === curK || ty === 'CURRENT_CONSOLIDATION') want[k] *= coW;
+          }
+        }
+      }
+
+      // PART 4 — plateau breathing: give the (flat-ish) current consolidation a
+      // little more vertical room so real 63k–67k movement reads. Implemented as a
+      // height multiplier on the SAME monotone lane → cannot invent highs/lows.
+      let breathe = 1;
+      if (curQualifies) {
+        breathe = curReg.spanPct < 0.5 ? 1.5 : curReg.spanPct < 1.5 ? 1.35 : 1.2;   // flatter → breathe more
+        want[curK] *= breathe;
+      }
+      wn16.plateauBreathingFactor = +breathe.toFixed(2);
+
+      // PART 2 / PART 3 / PART 6 — per-lane caps & floors, then settle.
+      const mins = new Array(regimes.length).fill(null);
+      const maxs = new Array(regimes.length).fill(null);
+      // Part 6 guardrail: no single terminal/transition regime may exceed 35%.
+      for (let k = 0; k < regimes.length; k++) {
+        if (regimes[k].type === 'EXPANSION' || regimes[k].type === 'CORRECTION') maxs[k] = 0.35;
+      }
+      // Part 2: cap the detected terminal spike harder (28% 1A / 24% TOTAL).
+      if (spike.isTerminalSpike && si >= 0) maxs[si] = range === 'all' ? 0.24 : 0.28;
+      // Part 3: floor the current consolidation that follows the spike
+      // (30% TOTAL / 26% 1A). Part 6: 22% floor whenever it has real movement.
+      let floorCur = curMoves ? 0.22 : 0;
+      if (spike.isTerminalSpike && curQualifies) {
+        floorCur = Math.max(floorCur, range === 'all' ? 0.30 : 0.26);
+        wn16.currentConsolidationFloorApplied = true;
+      }
+      if (floorCur > 0) mins[curK] = Math.min(floorCur, 0.6);      // never let a floor swallow the chart
+
+      clampNorm(want, mins, maxs);
+
+      // PART 6 — validate: finite, in-bounds, sums to 1, monotone-safe. Else revert.
+      const finiteOk = want.every(x => Number.isFinite(x) && x >= -1e-9 && x <= 1 + 1e-9);
+      const sumOk = Math.abs(want.reduce((a, b) => a + b, 0) - 1) < 1e-6;
+      if (finiteOk && sumOk) {
+        for (let k = 0; k < vis.length; k++) vis[k] = Math.max(0, want[k]);
+        renorm(vis);
+        if (spike.isTerminalSpike && si >= 0) wn16.spikeVisualBudgetAfter = +(vis[si] * 100).toFixed(1);
+        wn16.consolidationVisualHeightPct = +(vis[curK] * 100).toFixed(1);
+        wn16.finalRegimeHeightAllocations = regimes.map((r, k) => ({ type: r.type, visualPct: +(vis[k] * 100).toFixed(1) }));
+      } else {
+        for (let k = 0; k < vis.length; k++) vis[k] = visWN15[k];   // fallback to WN.15
+        wn16.fallbackReason = 'wn16_unsafe_reverted_to_wn15';
+      }
+    } catch (e) {
+      for (let k = 0; k < vis.length; k++) vis[k] = visWN15[k];
+      wn16.fallbackReason = 'wn16_exception_reverted_to_wn15:' + String(e && e.message || e);
+    }
+  }
+
   const cum = [0]; for (let k = 0; k < vis.length; k++) cum.push(cum[k] + vis[k]);
   alloc.forEach((al, k) => { al.visualPct = +(vis[k] * 100).toFixed(1); });
   const gFrac = v => {
@@ -18136,7 +18321,8 @@ function _wscRegimeYScale(values, range) {
   return { mode: 'regime-relative', gFrac, inv, lo, hi, span, regimes, current: regimes[curK],
     allocation: alloc, knots, cum, visualDomain: [lo, hi],
     currentRegimeDomain: [regimes[curK].min, regimes[curK].max],
-    postEventPct: alloc[curK] ? alloc[curK].visualPct : null, fallbackReason: null };
+    postEventPct: alloc[curK] ? alloc[curK].visualPct : null,
+    fallbackReason: wn16.fallbackReason || null, wn16 };
 }
 
 // Paint one surface: write the range-change metric into changeEl (the span
@@ -18212,7 +18398,7 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   // WN.15 — regime-relative vertical scaling: monotone value→y remap so each
   // meaningful regime is legible (big transition compressed, base + current
   // consolidation expanded). Honest (monotone) or it falls back to linear.
-  const rscale = _wscRegimeYScale(plotVals, activeRange);
+  const rscale = _wscRegimeYScale(plotVals, activeRange, uTs);
   const lineBand = vp.lineBot - vp.lineTop;
   const yOf = v => vp.lineBot - rscale.gFrac(v) * lineBand;
   const valAtY = rscale.mode === 'regime-relative'
