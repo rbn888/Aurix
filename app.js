@@ -2765,7 +2765,7 @@ const T = {
     ap_demo_risk_v:    'Moderado',
     ap_demo_div_v:     'Alta',
     ap_demo_liq_v:     'Correcta',
-    ap_founder_seat:   'Plaza Founder #{n}',
+    ap_founder_seat:   'Plaza Founder #{n} de {tot}',
     ap_pos_title:      'LA CAPA DE INTELIGENCIA PATRIMONIAL DE AURIX',
     ap_pos_text:       'Diseñada para ayudarte a comprender qué impulsa realmente tu patrimonio.',
     ap_ind_risk:       'Riesgo',
@@ -2774,6 +2774,7 @@ const T = {
     ap_ind_div:        'Diversificación',
     ap_ind_evo:        'Evolución',
     ap_free_tier:      'Aurix Free',
+    ap_free_desc:      'La base completa para visualizar y seguir tu patrimonio.',
     ap_f_dash:         'Dashboard Patrimonial',
     ap_f_evo:          'Evolución Patrimonial',
     ap_f_assets:       'Registro de Activos',
@@ -4811,7 +4812,7 @@ const T = {
     ap_demo_risk_v:    'Moderate',
     ap_demo_div_v:     'High',
     ap_demo_liq_v:     'Healthy',
-    ap_founder_seat:   'Founder seat #{n}',
+    ap_founder_seat:   'Founder seat #{n} of {tot}',
     ap_pos_title:      "AURIX'S WEALTH INTELLIGENCE LAYER",
     ap_pos_text:       'Designed to help you understand what truly drives your wealth.',
     ap_ind_risk:       'Risk',
@@ -4820,6 +4821,7 @@ const T = {
     ap_ind_div:        'Diversification',
     ap_ind_evo:        'Evolution',
     ap_free_tier:      'Aurix Free',
+    ap_free_desc:      'The complete foundation to view and track your wealth.',
     ap_f_dash:         'Wealth Dashboard',
     ap_f_evo:          'Wealth Evolution',
     ap_f_assets:       'Asset Registry',
@@ -39677,23 +39679,20 @@ try {
         <div class="aurix-premium-comparison">
           <div class="aurix-premium-compare-col is-free">
             <span class="aurix-premium-compare-tier">${esc(t('ap_free_tier'))}</span>
+            <p class="aurix-premium-card-desc">${esc(t('ap_free_desc'))}</p>
             <ul class="aurix-premium-list is-2col">${li(FREE_K, 'is-free')}</ul>
           </div>
           <div class="aurix-premium-compare-col is-premium">
-            <div class="aurix-premium-pos">
-              <span class="aurix-premium-pos-title">${esc(t('ap_pos_title'))}</span>
-              <p class="aurix-premium-pos-text">${esc(t('ap_pos_text'))}</p>
-              <div class="aurix-premium-demo" aria-hidden="true">${[['ap_p_health', 'ap_demo_health_v'], ['ap_ind_risk', 'ap_demo_risk_v'], ['ap_ind_div', 'ap_demo_div_v'], ['ap_ind_liq', 'ap_demo_liq_v']].map(([lk, vk]) => `<div class="aurix-premium-demo-chip"><span class="aurix-premium-demo-l">${esc(t(lk))}</span><span class="aurix-premium-demo-v">${esc(t(vk))}</span></div>`).join('')}</div>
-            </div>
             <span class="aurix-premium-compare-tier">${esc(t('ap_premium_tier'))}</span>
+            <p class="aurix-premium-card-desc">${esc(t('ap_std_text'))}</p>
             <ul class="aurix-premium-list is-2col">${li(PREM_K, 'is-prem')}</ul>
+            <p class="aurix-premium-pos-foot">${esc(t('ap_pos_text'))}</p>
           </div>
         </div>
 
         <div class="aurix-premium-plans">
           <div class="aurix-premium-plan aurix-premium-standard">
             <h3 class="aurix-premium-plan-title">${esc(t('ap_std_title'))}</h3>
-            <p class="aurix-premium-plan-desc">${esc(t('ap_std_text'))}</p>
             <ul class="aurix-premium-benefits">${li(STD_B, 'is-prem')}</ul>
             <div class="aurix-premium-price"><span class="aurix-premium-price-amount">59€</span><span class="aurix-premium-price-per">${esc(t('ap_per_year'))}</span></div>
             <p class="aurix-premium-plan-note">${esc(t('ap_std_sub'))}</p>
@@ -39707,7 +39706,7 @@ try {
               <span class="aurix-premium-badge">${esc(t('ap_founder_badge'))}</span>
             </div>
             <h3 class="aurix-premium-plan-title">${esc(t('ap_founder_title'))}</h3>
-            <span class="aurix-premium-seat">${esc(t('ap_founder_seat')).replace('{n}', tk)}</span>
+            <span class="aurix-premium-seat">${esc(t('ap_founder_seat')).replace('{n}', tk).replace('{tot}', tot)}</span>
             <p class="aurix-premium-plan-desc">${esc(t('ap_founder_text'))}</p>
             <ul class="aurix-premium-benefits">${li(FND_B, 'is-founder')}</ul>
             <div class="aurix-premium-price"><span class="aurix-premium-price-amount">39€</span><span class="aurix-premium-price-per">${esc(t('ap_per_year'))}</span></div>

@@ -22229,14 +22229,7 @@ body.aurix-premium-lock{ overflow:hidden; }
 .aurix-premium-plans{ gap:12px; }
 .aurix-premium-footer{ margin-top:14px; }
 
-/* PART 3 — static Premium value demo (institutional mock, non-interactive). */
-.aurix-premium-demo{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:11px; }
-.aurix-premium-demo-chip{
-  display:flex; flex-direction:column; gap:2px; padding:8px 10px;
-  border-radius:10px; background:rgba(77,141,255,.1); border:1px solid rgba(77,141,255,.26);
-}
-.aurix-premium-demo-l{ font-size:9.5px; letter-spacing:.05em; text-transform:uppercase; color:#9fb4d8; }
-.aurix-premium-demo-v{ font-size:15px; font-weight:800; color:#fff; letter-spacing:-.01em; }
+/* WN.P2 PART 1 — demo chips removed (block deleted). */
 
 /* PART 1 — Premium is the protagonist (≈+15% visual weight, brighter, dominant CTA). */
 .aurix-premium-standard{
@@ -22262,3 +22255,43 @@ body.aurix-premium-lock{ overflow:hidden; }
 
 /* PART 4 — de-emphasize Free so the two blue Premium blocks read as one family. */
 .aurix-premium-compare-col.is-free{ opacity:.82; }
+
+/* ══════════════════════════════════════════════════════════════
+   WN.P2 — Premium modal layout lock (titles, Free polish, compact)
+   Comparison titles top-aligned & equally deliberate; Free reads premium;
+   Premium positioning moved to card bottom; Founder seat compact; tighter
+   density. Hierarchy Premium > Founder > Free preserved. Later rules win.
+══════════════════════════════════════════════════════════════ */
+/* PART 2 — comparison card titles: top, aligned, premium, breathing room. */
+.aurix-premium-compare-col{ padding:16px 16px 14px; }
+.aurix-premium-compare-tier{ display:block; font-size:15px; font-weight:800; letter-spacing:.01em; color:#e7ecf5; }
+.aurix-premium-card-desc{ margin:5px 0 15px; font-size:12px; line-height:1.4; color:#9fb4d8; }
+
+/* PART 3 — Aurix Free looks premium (silver-blue), not crippled. */
+.aurix-premium-compare-col.is-free{ opacity:1; background:rgba(255,255,255,.025); }
+.aurix-premium-compare-col.is-free .aurix-premium-compare-tier{ color:#cdd9ec; }
+.aurix-premium-compare-col.is-free .aurix-premium-card-desc{ color:#93a2bb; }
+/* Premium card title/descriptor (blue family). */
+.aurix-premium-compare-col.is-premium .aurix-premium-compare-tier{ color:#fff; }
+.aurix-premium-compare-col.is-premium .aurix-premium-card-desc{ color:#bcd0ff; }
+
+/* PART 4 — positioning copy at the BOTTOM of the Premium card, muted/small. */
+.aurix-premium-pos-foot{ margin:13px 0 0; padding-top:10px; border-top:1px solid rgba(77,141,255,.16); font-size:11px; line-height:1.45; color:#8a96aa; }
+
+/* PART 5 — balanced two-column lists, tighter rhythm, -1px feature size. */
+.aurix-premium-list.is-2col{ gap:6px 14px; }
+.aurix-premium-list li{ font-size:11.5px; line-height:1.3; }
+
+/* PART 6 — compact modal (less hero padding, smaller gaps, card padding). */
+.aurix-premium-header{ margin-bottom:12px; }
+.aurix-premium-comparison{ margin-bottom:11px; }
+.aurix-premium-plans{ gap:11px; }
+.aurix-premium-plan{ padding:16px; }
+.aurix-premium-standard{ padding:18px; }
+
+/* PART 7 — Founder seat: compact gold chip (not a full-width yellow bar). */
+.aurix-premium-seat{
+  display:inline-block; margin:2px 0 7px; padding:3px 10px; border-radius:999px;
+  font-size:10.5px; font-weight:800; letter-spacing:.03em;
+  color:#e9cf8a; background:rgba(212,175,93,.12); border:1px solid rgba(212,175,93,.45);
+}
