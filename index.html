@@ -198,24 +198,10 @@
             <span class="menu-identity-badge" id="menuUserBadge" data-tier="free">FREE</span>
           </div>
           <div class="menu-divider"></div>
+          <!-- DSH.MENU.03 — two primary actions; Aurix Premium is the hero.
+               Language/currency moved to Configuración → Preferencias. -->
           <button id="menuGeneral" class="menu-item menu-item--general" data-i18n="settingsGeneral" role="menuitem">⚙ Configuración</button>
-          <button id="menuPremium" class="menu-item menu-item--founder" data-i18n="menuPremium" role="menuitem">✨ Aurix Premium</button>
-          <div class="menu-divider"></div>
-          <!-- Secondary preferences (compact) -->
-          <div class="menu-pref-row" role="group" aria-label="Language">
-            <span class="menu-pref-label" data-i18n="menuLangLabel">Idioma</span>
-            <div class="menu-pref-opts">
-              <button class="menu-item--lang menu-pref-opt" data-lang="es" role="menuitem">Español</button>
-              <button class="menu-item--lang menu-pref-opt" data-lang="en" role="menuitem">English</button>
-            </div>
-          </div>
-          <div class="menu-pref-row" role="group" aria-label="Currency" data-i18n-aria="ariaCurrency">
-            <span class="menu-pref-label" data-i18n="menuCurrLabel">Moneda</span>
-            <div class="menu-pref-opts">
-              <button class="menu-curr-btn menu-pref-opt" data-currency="USD" role="menuitem">USD</button>
-              <button class="menu-curr-btn menu-pref-opt" data-currency="EUR" role="menuitem">EUR</button>
-            </div>
-          </div>
+          <button id="menuPremium" class="menu-item menu-item--premium-cta" data-i18n="menuPremium" role="menuitem">✨ Aurix Premium</button>
           <div class="menu-divider"></div>
           <button id="menuExit" class="menu-item menu-item--danger" data-i18n="menuLogout" role="menuitem">Cerrar sesión</button>
         </div>
@@ -1542,11 +1528,17 @@
         <div class="settings-prefs-list">
           <div class="settings-pref-item">
             <span class="settings-pref-label" data-i18n="settingsLang">Idioma</span>
-            <span class="settings-pref-value" id="settingsLangValue">—</span>
+            <div class="menu-pref-opts" role="group" aria-label="Language">
+              <button class="menu-item--lang menu-pref-opt" data-lang="es">Español</button>
+              <button class="menu-item--lang menu-pref-opt" data-lang="en">English</button>
+            </div>
           </div>
           <div class="settings-pref-item">
             <span class="settings-pref-label" data-i18n="settingsCurrency">Moneda base</span>
-            <span class="settings-pref-value" id="settingsCurrencyValue">—</span>
+            <div class="menu-pref-opts" role="group" aria-label="Currency" data-i18n-aria="ariaCurrency">
+              <button class="menu-curr-btn menu-pref-opt" data-currency="USD">USD</button>
+              <button class="menu-curr-btn menu-pref-opt" data-currency="EUR">EUR</button>
+            </div>
           </div>
           <div class="settings-pref-item settings-pref-item--placeholder">
             <span class="settings-pref-label" data-i18n="settingsPrivacy">Privacidad</span>

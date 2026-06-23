@@ -22319,8 +22319,8 @@ body.aurix-premium-lock{ overflow:hidden; }
   display:inline-flex; align-items:center; height:24px; padding:0 11px; border-radius:999px;
   font-size:10.5px; font-weight:900; letter-spacing:.12em;
 }
-.menu-identity-badge[data-tier="premium"]{ color:#0a1124; background:linear-gradient(180deg,#6ba4ff,#3f74e6); }
-.menu-identity-badge[data-tier="founder"]{ color:#1a1206; background:linear-gradient(180deg,#ecd592,#d4af5d); }
+.menu-identity-badge[data-tier="premium"]{ color:#0a1124; background:linear-gradient(180deg,#6ba4ff,#3f74e6); box-shadow:0 0 14px rgba(107,164,255,.4); }
+.menu-identity-badge[data-tier="founder"]{ color:#1a1206; background:linear-gradient(180deg,#ecd592,#d4af5d); box-shadow:0 0 14px rgba(212,175,93,.34); }
 .menu-identity-badge[data-tier="free"]{ color:#cdd9ec; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); }
 
 /* More air between sections. */
@@ -22354,3 +22354,22 @@ body.aurix-premium-lock{ overflow:hidden; }
 .settings-tier-chip[data-tier="free"]{ color:#cdd9ec; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); }
 /* Build = lowest visual weight in Cuenta. */
 .settings-row-value--meta{ font-size:11px; color:var(--text-dim,#8a96aa); opacity:.8; }
+
+/* ── DSH.MENU.03 — Aurix Premium as the menu hero (gold, more separation) ───
+   Language/currency selectors removed from the menu (moved to Configuración →
+   Preferencias). Visual-only; logic untouched. */
+.menu-item--premium-cta{
+  margin:8px 2px;                 /* extra air above + below → feels special */
+  color:#e9cf8a;
+  background:linear-gradient(180deg, rgba(212,175,93,.13), rgba(212,175,93,.05));
+  border:1px solid rgba(212,175,93,.34);
+  font-weight:800;
+  box-shadow:0 0 18px rgba(212,175,93,.10);
+}
+.menu-item--premium-cta:hover{
+  background:linear-gradient(180deg, rgba(212,175,93,.22), rgba(212,175,93,.09));
+  color:#f4e3b0; transform:none;
+}
+/* Settings → Preferencias: language/currency toggles sit on the right of the row. */
+.settings-pref-item{ align-items:center; }
+.settings-pref-item .menu-pref-opts{ flex:0 0 auto; }
