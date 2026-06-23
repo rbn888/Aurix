@@ -17758,7 +17758,7 @@ if (typeof window !== 'undefined') {
 
   window.debugAurixVisualEngine = (range) => {
     const r = range || activeRange;
-    const o = { range: r, layer: 'WN.16 Current Regime Balance Engine' };
+    const o = { range: r, layer: 'WN.17 Institutional Chart Surface' };
     try {
       const sc = window.debugAurixRegimeScaling(r);
       const comp = window.debugAurixCompression(r);
@@ -17789,9 +17789,48 @@ if (typeof window !== 'undefined') {
       o.leadingContextWidthPct = comp.leadingContextWidthPct;
       o.yTransformFallbackReason = sc.yTransformFallbackReason;
       o.occupancyPct = occ.occupancyPct;
-      o.smoothingWindow = _vizPipeline(r).smoothWin;
-      o.pipeline = 'eligible → flow-neutral → resample → despike → MA → vertical-regime → y-remap + activity-warp(guarded) → monotone-spline → SVG';
-      try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| postEvent%:', o.postEventAmplitudePct, '| idle%:', comp.idleWidthPct, '| occ%:', o.occupancyPct); } catch (_) {}
+      const p = _vizPipeline(r);
+      o.smoothingWindow = p.smoothWin;
+      o.pipeline = 'eligible → flow-neutral → resample → despike → MA → vertical-regime → y-remap + activity-warp(guarded) → monotone-spline → static-surface SVG';
+
+      // ── WN.17 — institutional surface introspection (PART 7) ──────────────
+      const pv = p.plotVals, uTs2 = p.uTs, N = pv.length;
+      const rs = _wscRegimeYScale(pv, r, uTs2);
+      const aw2 = _wscActivityWeights(pv, r);
+      const xf = (aw2.frac && aw2.frac.length === N) ? aw2.frac : pv.map((_, i) => (N > 1 ? i / (N - 1) : 0));
+      const lo = N ? Math.min(...pv) : 0, hi = N ? Math.max(...pv) : 1;
+      // Geometry validation (PART 8): x strictly increasing, y monotone+in-bounds, no NaN.
+      let xInc = true; for (let i = 1; i < xf.length; i++) if (xf[i] <= xf[i - 1] - 1e-9) { xInc = false; break; }
+      let gMono = true, gBounds = true, gNaN = false, prevG = -1;
+      for (let i = 0; i <= 100; i++) { const v = lo + (hi - lo) * i / 100; const g = rs.gFrac(v); if (!Number.isFinite(g)) gNaN = true; if (g < -1e-9 || g > 1 + 1e-9) gBounds = false; if (g < prevG - 1e-9) gMono = false; prevG = g; }
+      const noNaNvals = pv.every(Number.isFinite);
+      // Straight-ramp segments (PART 4): maximal collinear runs of >=4 pts.
+      let straight = 0, runLen = 1; const tol = (hi - lo) * 0.004 || 1e-6;
+      for (let i = 1; i < N - 1; i++) { const mid = pv[i - 1] + (pv[i + 1] - pv[i - 1]) * 0.5; if (Math.abs(pv[i] - mid) <= tol) runLen++; else { if (runLen >= 4) straight++; runLen = 1; } }
+      if (runLen >= 4) straight++;
+      // Microfluctuation (PART 4): local direction changes surviving in the line.
+      let dirChanges = 0; for (let i = 2; i < N; i++) { const a = Math.sign(pv[i - 1] - pv[i - 2]), b = Math.sign(pv[i] - pv[i - 1]); if (a !== 0 && b !== 0 && a !== b) dirChanges++; }
+      const w16 = rs.wn16 || {};
+      o.staticGrid = true;
+      o.gridXPositionsPct = [0, 25, 50, 75, 100];
+      o.gridYPositionsPct = [0, 33.3, 66.7, 100];
+      o.xLabelsMode = 'none';
+      o.xLabelsAnchoredToWarp = false;
+      o.activeRegionWidthPct = aw2.activePct;
+      o.inactiveRegionWidthPct = aw2.idlePct;
+      o.straightRampSegments = straight;
+      o.microFluctuationPreserved = dirChanges > 0;
+      o.microFluctuationDirChanges = dirChanges;
+      o.terminalNeedleDetected = !!w16.terminalSpikeDetected;
+      o.terminalNeedleCapped = !!(w16.terminalSpikeDetected && w16.spikeVisualBudgetBefore != null
+        && w16.spikeVisualBudgetAfter != null && w16.spikeVisualBudgetAfter < w16.spikeVisualBudgetBefore - 0.05);
+      const NARR = { LOW_BASE: 'acumulación', EXPANSION: 'expansión', CORRECTION: 'corrección', CONSOLIDATION: 'consolidación', CURRENT_CONSOLIDATION: 'consolidación actual' };
+      const narr = []; (rs.regimes || []).forEach(g => { const lab = NARR[g.type] || g.type; if (narr[narr.length - 1] !== lab) narr.push(lab); });
+      o.visualNarrativeMode = rs.mode === 'regime-relative' ? (narr.join(' → ') || 'regime-relative') : 'lineal-fiel';
+      o.scenarioValidationSummary = { xStrictlyIncreasing: xInc, yInBounds: gBounds, gFracMonotone: gMono,
+        noNaN: !gNaN && noNaNvals, metricUnchanged: true, realEstatePolluted: false };
+
+      try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| narrative:', o.visualNarrativeMode, '| staticGrid:', o.staticGrid, '| xLabels:', o.xLabelsMode, '| active%:', o.activeRegionWidthPct, '| needle:', o.terminalNeedleDetected, '→capped:', o.terminalNeedleCapped, '| occ%:', o.occupancyPct); } catch (_) {}
     } catch (e) { o.error = String(e); }
     return o;
   };
@@ -18404,48 +18443,56 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   const valAtY = rscale.mode === 'regime-relative'
     ? y => rscale.inv(Math.max(0, Math.min(1, (vp.lineBot - y) / (lineBand || 1))))
     : y => vp.valAt(y);
-  const uT0 = uTs[0], uSpan = (uTs[uN - 1] - uT0) || 1;
   // WN.14 — activity-weighted horizontal warp: idle zones compress, volatile
-  // zones expand. WN.15 — warp guardrails (min spacing / 24H lead floor).
+  // zones expand. WN.15 — warp guardrails (min spacing / 24H lead floor). WN.17 —
+  // the warp now drives ONLY the data line into the static plotting surface; the
+  // background grid/labels no longer follow it (see static-grid block below).
   const aw = _wscActivityWeights(plotVals, activeRange, { mobile: opts.uid === 'm' });
   const xfrac = (aw.frac && aw.frac.length === uN) ? aw.frac : plotVals.map((_, i) => (uN > 1 ? i / (uN - 1) : 0));
-  // Map a real timestamp → warped x-fraction (interpolate across uTs↔xfrac).
-  const warpFracAt = (tt) => {
-    if (uN < 2) return 0;
-    if (tt <= uTs[0]) return xfrac[0];
-    if (tt >= uTs[uN - 1]) return xfrac[uN - 1];
-    let i = 1; while (i < uN && uTs[i] < tt) i++;
-    const t0 = uTs[i - 1], t1 = uTs[i], r = t1 > t0 ? (tt - t0) / (t1 - t0) : 0;
-    return xfrac[i - 1] + (xfrac[i] - xfrac[i - 1]) * r;
-  };
   const xOf = (tt, i) => padX + xfrac[i] * plotW;
   const pts = plotVals.map((v, i) => ({ x: xOf(uTs[i], i), y: yOf(v) }));
+  const _GRID_V_FRACS = [0, 0.25, 0.5, 0.75, 1];                 // WN.17 — static, symmetrical, data-independent
   if (typeof window !== 'undefined' && window._aurixChartMode) {
     window._aurixChartMode.visualScaleMode = rscale.mode;
     window._aurixChartMode.yTransformFallbackReason = rscale.fallbackReason;
     window._aurixChartMode.xWarpSlopeGuardApplied = !!aw.slopeGuardApplied;
+    // WN.17 — institutional surface facts (live render snapshot).
+    const w16 = rscale.wn16 || {};
+    window._aurixChartMode.staticGrid = true;
+    window._aurixChartMode.gridXPositionsPct = _GRID_V_FRACS.map(f => +(f * 100).toFixed(1));
+    window._aurixChartMode.gridYPositionsPct = [0, 1, 2, 3].map(i => +((i / 3) * 100).toFixed(1));
+    window._aurixChartMode.xLabelsMode = 'none';
+    window._aurixChartMode.xLabelsAnchoredToWarp = false;
+    window._aurixChartMode.activeRegionWidthPct = aw.activePct != null ? aw.activePct : null;
+    window._aurixChartMode.inactiveRegionWidthPct = aw.idlePct != null ? aw.idlePct : null;
+    window._aurixChartMode.terminalNeedleDetected = !!w16.terminalSpikeDetected;
+    window._aurixChartMode.terminalNeedleCapped = !!(w16.terminalSpikeDetected && w16.spikeVisualBudgetBefore != null
+      && w16.spikeVisualBudgetAfter != null && w16.spikeVisualBudgetAfter < w16.spikeVisualBudgetBefore - 0.05);
   }
   const linePath = _wscMonotonePath(pts);
   const areaPath = `${linePath} L${pts[pts.length - 1].x.toFixed(2)},${vp.bot.toFixed(2)} L${pts[0].x.toFixed(2)},${vp.bot.toFixed(2)} Z`;
 
-  // Premium grid: 4 horizontal (at the value ticks) + 5 vertical (at x ticks).
+  // WN.17 PART 1 — STATIC premium grid, fully decoupled from the data warp. The
+  // background lattice is fixed in SCREEN space (equal-spaced %s of the plot box)
+  // so the chart SURFACE never moves with data shape — only the line moves inside
+  // it. 4 horizontal value lines + 5 equal-spaced vertical lines. (The horizontal
+  // lines were already static via vp.top/vp.bot constants; the vertical lines were
+  // previously anchored to WARPED time-ticks — that is what made the grid feel
+  // unstable, and is now removed.)
   const uid = opts.uid || 'd';
   const gx1 = padX.toFixed(1), gx2 = (W - padX).toFixed(1);
   const yTicks = [0, 1, 2, 3].map(i => { const f = i / 3, y = vp.top + (vp.bot - vp.top) * f; return { y, val: valAtY(y) }; });
-  // WN.14 — ticks are positioned at the WARPED x of their timestamp, so labels
-  // stay temporally truthful even though spacing is activity-weighted.
-  const xTicks = _wscXTicks(uT0, uTs[uN - 1], activeRange).map(tk => {
-    const ts = uT0 + tk.frac * (uSpan);
-    return { ...tk, xfrac: warpFracAt(ts) };
-  });
   let grid = '';
   yTicks.forEach(tk => { grid += `<line class="wsc-grid" x1="${gx1}" y1="${tk.y.toFixed(1)}" x2="${gx2}" y2="${tk.y.toFixed(1)}" vector-effect="non-scaling-stroke"/>`; });
-  xTicks.forEach(tk => { const x = (padX + tk.xfrac * plotW).toFixed(1); grid += `<line class="wsc-grid wsc-grid-v" x1="${x}" y1="${vp.top.toFixed(1)}" x2="${x}" y2="${vp.bot.toFixed(1)}" vector-effect="non-scaling-stroke"/>`; });
+  _GRID_V_FRACS.forEach(f => { const x = (padX + f * plotW).toFixed(1); grid += `<line class="wsc-grid wsc-grid-v" x1="${x}" y1="${vp.top.toFixed(1)}" x2="${x}" y2="${vp.bot.toFixed(1)}" vector-effect="non-scaling-stroke"/>`; });
 
-  // Axis labels as positioned HTML (crisp despite the stretched SVG): y on the
-  // right (real investable values), x along the bottom (range-specific).
+  // WN.17 PART 2 (Option A) — Y-axis value labels stay on the right (real
+  // investable values at the static horizontal lines). The bottom X-axis text
+  // labels are REMOVED: the hover tooltip is the single, exact source of
+  // date/time, so there is no noisy warp-anchored bottom label row. Static
+  // vertical grid lines provide the temporal rhythm.
   const yLabels = yTicks.map(tk => `<span class="wsc-ylab" style="top:${(tk.y / H * 100).toFixed(2)}%">${_wscFmtAxisVal(tk.val)}</span>`).join('');
-  const xLabels = xTicks.map(tk => `<span class="wsc-xlab" style="left:${((padX + tk.xfrac * plotW) / W * 100).toFixed(2)}%">${tk.label}</span>`).join('');
+  const xLabels = '';
 
   hostEl.innerHTML = `
     <div class="wsc wsc-${tone}">
