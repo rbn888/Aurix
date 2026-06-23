@@ -2758,9 +2758,14 @@ const T = {
     menuPremium:              '✦ Aurix Premium',
     // WN.P1 refinement — Aurix Premium modal (fully localized)
     ap_eyebrow:        'AURIX PREMIUM',
-    ap_hero_title:     'LA INTELIGENCIA DETRÁS DE TU PATRIMONIO',
-    ap_hero_sub:       'Convierte datos financieros en decisiones más inteligentes.',
+    ap_hero_title:     'LA INTELIGENCIA DE TU PATRIMONIO',
+    ap_hero_sub:       'Comprende qué impulsa tu patrimonio, dónde existen riesgos y cómo evoluciona tu riqueza en el tiempo.',
     ap_hero_text:      'Aurix Premium te ayuda a comprender riesgos, concentración, liquidez y evolución patrimonial desde una única plataforma.',
+    ap_demo_health_v:  '82/100',
+    ap_demo_risk_v:    'Moderado',
+    ap_demo_div_v:     'Alta',
+    ap_demo_liq_v:     'Correcta',
+    ap_founder_seat:   'Plaza Founder #{n}',
     ap_pos_title:      'LA CAPA DE INTELIGENCIA PATRIMONIAL DE AURIX',
     ap_pos_text:       'Diseñada para ayudarte a comprender qué impulsa realmente tu patrimonio.',
     ap_ind_risk:       'Riesgo',
@@ -2794,7 +2799,7 @@ const T = {
     ap_p_reports:      'Informes Avanzados',
     ap_p_future:       'Futuras Funciones Premium',
     ap_std_title:      'Aurix Premium',
-    ap_std_text:       'La plataforma completa de inteligencia patrimonial.',
+    ap_std_text:       'La capa avanzada de inteligencia patrimonial de Aurix.',
     ap_std_b1:         'Todas las funciones Premium',
     ap_std_b2:         'Actualizaciones futuras incluidas',
     ap_std_b3:         'Acceso completo al Centro de Inteligencia',
@@ -2809,12 +2814,12 @@ const T = {
     ap_founder_b2:     'Insignia Founder',
     ap_founder_b3:     'Acceso anticipado a nuevas funciones',
     ap_founder_b4:     'Prioridad en futuras pruebas',
-    ap_founder_note:   'Tu precio nunca aumentará mientras mantengas la suscripción activa.',
+    ap_founder_note:   'Tu plaza Founder permanecerá activa mientras mantengas tu suscripción.',
     ap_founder_cta:    'Unirme como Founder',
     ap_per_year:       '/año',
     ap_scarcity:       '{taken} de {total} plazas ocupadas · Quedan {rem} plazas Founder',
-    ap_trust_1:        'Tus activos seguirán siendo tuyos.',
-    ap_trust_2:        'Aurix Premium añade inteligencia y contexto, no restricciones sobre tu patrimonio.',
+    ap_trust_1:        'Aurix Free te muestra tu patrimonio. Aurix Premium te ayuda a entenderlo.',
+    ap_trust_2:        'Tus activos, tus datos y tu acceso seguirán siendo siempre tuyos.',
     ap_close:          'Cerrar',
     settingsFounderPrice:     '14,99€ / año',
     settingsFounderDesc:      'Acceso anticipado. Sin límite de activos. Precio fundador de por vida.',
@@ -4799,9 +4804,14 @@ const T = {
     menuPremium:              '✦ Aurix Premium',
     // WN.P1 refinement — Aurix Premium modal (fully localized)
     ap_eyebrow:        'AURIX PREMIUM',
-    ap_hero_title:     'THE INTELLIGENCE BEHIND YOUR WEALTH',
-    ap_hero_sub:       'Turn financial data into smarter decisions.',
+    ap_hero_title:     'THE INTELLIGENCE OF YOUR WEALTH',
+    ap_hero_sub:       'Understand what drives your wealth, where risks exist and how your wealth evolves over time.',
     ap_hero_text:      'Aurix Premium helps you understand risk, concentration, liquidity and wealth evolution from a single platform.',
+    ap_demo_health_v:  '82/100',
+    ap_demo_risk_v:    'Moderate',
+    ap_demo_div_v:     'High',
+    ap_demo_liq_v:     'Healthy',
+    ap_founder_seat:   'Founder seat #{n}',
     ap_pos_title:      "AURIX'S WEALTH INTELLIGENCE LAYER",
     ap_pos_text:       'Designed to help you understand what truly drives your wealth.',
     ap_ind_risk:       'Risk',
@@ -4835,7 +4845,7 @@ const T = {
     ap_p_reports:      'Advanced Reports',
     ap_p_future:       'Future Premium Features',
     ap_std_title:      'Aurix Premium',
-    ap_std_text:       'The complete wealth intelligence platform.',
+    ap_std_text:       "Aurix's advanced wealth intelligence layer.",
     ap_std_b1:         'All Premium features',
     ap_std_b2:         'Future updates included',
     ap_std_b3:         'Full access to the Intelligence Center',
@@ -4850,12 +4860,12 @@ const T = {
     ap_founder_b2:     'Founder badge',
     ap_founder_b3:     'Early access to new features',
     ap_founder_b4:     'Priority in future tests',
-    ap_founder_note:   'Your price never increases while your subscription stays active.',
+    ap_founder_note:   'Your Founder seat stays active while you keep your subscription.',
     ap_founder_cta:    'Join as Founder',
     ap_per_year:       '/year',
     ap_scarcity:       '{taken} of {total} seats taken · {rem} Founder seats left',
-    ap_trust_1:        'Your assets remain yours.',
-    ap_trust_2:        'Aurix Premium adds intelligence and context, never restrictions over your wealth.',
+    ap_trust_1:        'Aurix Free shows you your wealth. Aurix Premium helps you understand it.',
+    ap_trust_2:        'Your assets, your data and your access remain always yours.',
     ap_close:          'Close',
     settingsFounderPrice:     '€14.99 / year',
     settingsFounderDesc:      'Early access. Unlimited assets. Founder price for life.',
@@ -39662,7 +39672,6 @@ try {
           <span class="aurix-premium-eyebrow">${esc(t('ap_eyebrow'))}</span>
           <h2 id="aurixPremiumTitle" class="aurix-premium-tagline">${esc(t('ap_hero_title'))}</h2>
           <p class="aurix-premium-sub">${esc(t('ap_hero_sub'))}</p>
-          <p class="aurix-premium-lede">${esc(t('ap_hero_text'))}</p>
         </header>
 
         <div class="aurix-premium-comparison">
@@ -39674,7 +39683,7 @@ try {
             <div class="aurix-premium-pos">
               <span class="aurix-premium-pos-title">${esc(t('ap_pos_title'))}</span>
               <p class="aurix-premium-pos-text">${esc(t('ap_pos_text'))}</p>
-              <div class="aurix-premium-indicators">${IND_K.map(k => `<span class="aurix-premium-ind">${esc(t(k))}</span>`).join('')}</div>
+              <div class="aurix-premium-demo" aria-hidden="true">${[['ap_p_health', 'ap_demo_health_v'], ['ap_ind_risk', 'ap_demo_risk_v'], ['ap_ind_div', 'ap_demo_div_v'], ['ap_ind_liq', 'ap_demo_liq_v']].map(([lk, vk]) => `<div class="aurix-premium-demo-chip"><span class="aurix-premium-demo-l">${esc(t(lk))}</span><span class="aurix-premium-demo-v">${esc(t(vk))}</span></div>`).join('')}</div>
             </div>
             <span class="aurix-premium-compare-tier">${esc(t('ap_premium_tier'))}</span>
             <ul class="aurix-premium-list is-2col">${li(PREM_K, 'is-prem')}</ul>
@@ -39698,6 +39707,7 @@ try {
               <span class="aurix-premium-badge">${esc(t('ap_founder_badge'))}</span>
             </div>
             <h3 class="aurix-premium-plan-title">${esc(t('ap_founder_title'))}</h3>
+            <span class="aurix-premium-seat">${esc(t('ap_founder_seat')).replace('{n}', tk)}</span>
             <p class="aurix-premium-plan-desc">${esc(t('ap_founder_text'))}</p>
             <ul class="aurix-premium-benefits">${li(FND_B, 'is-founder')}</ul>
             <div class="aurix-premium-price"><span class="aurix-premium-price-amount">39€</span><span class="aurix-premium-price-per">${esc(t('ap_per_year'))}</span></div>

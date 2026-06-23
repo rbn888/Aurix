@@ -22217,3 +22217,48 @@ body.aurix-premium-lock{ overflow:hidden; }
   .aurix-premium-list.is-2col{ grid-template-columns:1fr; }
   .aurix-premium-tagline{ font-size:23px; }
 }
+
+/* ── WN.27 premium refinement — Premium protagonist, density, demo, seat ────
+   Hierarchy Premium > Founder > Free. Premium gains visual weight; Founder
+   stays elegant but recessed; density tightened. Later rules override base. */
+
+/* PART 9 — tighter density (less dead space, less scroll). */
+.aurix-premium-modal{ padding:22px 26px 20px; }
+.aurix-premium-header{ margin-bottom:16px; }
+.aurix-premium-comparison{ margin-bottom:14px; }
+.aurix-premium-plans{ gap:12px; }
+.aurix-premium-footer{ margin-top:14px; }
+
+/* PART 3 — static Premium value demo (institutional mock, non-interactive). */
+.aurix-premium-demo{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:11px; }
+.aurix-premium-demo-chip{
+  display:flex; flex-direction:column; gap:2px; padding:8px 10px;
+  border-radius:10px; background:rgba(77,141,255,.1); border:1px solid rgba(77,141,255,.26);
+}
+.aurix-premium-demo-l{ font-size:9.5px; letter-spacing:.05em; text-transform:uppercase; color:#9fb4d8; }
+.aurix-premium-demo-v{ font-size:15px; font-weight:800; color:#fff; letter-spacing:-.01em; }
+
+/* PART 1 — Premium is the protagonist (≈+15% visual weight, brighter, dominant CTA). */
+.aurix-premium-standard{
+  border-color:rgba(77,141,255,.66);
+  background:linear-gradient(165deg, rgba(77,141,255,.15), rgba(77,141,255,.045));
+  box-shadow:0 0 42px rgba(77,141,255,.2), inset 0 1px 0 rgba(255,255,255,.08);
+  padding:20px;
+}
+.aurix-premium-standard .aurix-premium-plan-title{ font-size:18px; }
+.aurix-premium-standard .aurix-premium-price-amount{ font-size:34px; }
+.aurix-premium-standard .aurix-premium-cta.is-premium{ padding:14px; font-size:14.5px; box-shadow:0 12px 30px -12px rgba(77,141,255,.8); }
+
+/* PART 1/5 — Founder elegant but secondary (gold, quieter than Premium). */
+.aurix-premium-founder{ border-color:rgba(212,175,93,.4); box-shadow:0 0 18px rgba(212,175,93,.06), inset 0 1px 0 rgba(255,255,255,.04); }
+.aurix-premium-founder .aurix-premium-price-amount{ font-size:28px; }
+
+/* PART 5 — Founder seat (belonging, not discount). */
+.aurix-premium-seat{
+  display:inline-block; margin:3px 0 4px;
+  font-size:11px; font-weight:800; letter-spacing:.04em; padding:3px 11px; border-radius:999px;
+  color:#1a1206; background:linear-gradient(180deg,#ecd592,#d4af5d);
+}
+
+/* PART 4 — de-emphasize Free so the two blue Premium blocks read as one family. */
+.aurix-premium-compare-col.is-free{ opacity:.82; }
