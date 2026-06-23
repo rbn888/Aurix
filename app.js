@@ -2067,6 +2067,18 @@ const T = {
     wsmse_rename_save:  'Guardar',
     wsmse_empty_title:  'Empieza creando tu primer espacio financiero.',
     wsmse_empty_cta:    'Explorar plantillas',
+    // DSH.WORKSPACE.01 — Mi Espacio V2 (two-column personal operating centre)
+    wsmse2_tpl_title:   'Mis plantillas',
+    wsmse2_tpl_sub:     'Plantillas utilizadas recientemente',
+    wsmse2_tool_title:  'Mis herramientas',
+    wsmse2_tool_sub:    'Herramientas utilizadas recientemente',
+    wsmse2_last:        'Última apertura',
+    wsmse2_tpl_empty_t: 'Todavía no tienes plantillas.',
+    wsmse2_tpl_empty_b: 'Crea tu primera plantilla para empezar.',
+    wsmse2_tpl_empty_cta: 'Explorar plantillas',
+    wsmse2_tool_empty_t: 'Todavía no tienes herramientas recientes.',
+    wsmse2_tool_empty_b: 'Explora las herramientas disponibles.',
+    wsmse2_tool_empty_cta: 'Explorar herramientas',
     wsapp_receivables_n:'Control de cobros',
     wsapp_assets_n:     'Precios de activos',
     wstool_financial_n: 'Calculadora financiera',
@@ -4067,6 +4079,18 @@ const T = {
     wsmse_rename_save:  'Save',
     wsmse_empty_title:  'Start by creating your first financial space.',
     wsmse_empty_cta:    'Explore templates',
+    // DSH.WORKSPACE.01 — Mi Espacio V2 (two-column personal operating centre)
+    wsmse2_tpl_title:   'My templates',
+    wsmse2_tpl_sub:     'Recently used templates',
+    wsmse2_tool_title:  'My tools',
+    wsmse2_tool_sub:    'Recently used tools',
+    wsmse2_last:        'Last opened',
+    wsmse2_tpl_empty_t: "You don't have templates yet.",
+    wsmse2_tpl_empty_b: 'Create your first template to get started.',
+    wsmse2_tpl_empty_cta: 'Explore templates',
+    wsmse2_tool_empty_t: 'No recent tools yet.',
+    wsmse2_tool_empty_b: 'Explore the available tools.',
+    wsmse2_tool_empty_cta: 'Explore tools',
     wsapp_receivables_n:'Payment Control',
     wsapp_assets_n:     'Asset prices',
     wstool_financial_n: 'Financial calculator',
@@ -12065,7 +12089,12 @@ function _wshWireOnce() {
     const cta = t.getAttribute('data-wsh-cta');
     const nav = t.getAttribute('data-wsh-nav');
     // WS.14A — remember the tab the user came from so "Volver" always returns there.
-    if (cta) { _wsReturnTab = (_wsTab === 'space' || _wsTab === 'templates' || _wsTab === 'tools') ? _wsTab : _wsSmartTab(); }
+    if (cta) {
+      _wsReturnTab = (_wsTab === 'space' || _wsTab === 'templates' || _wsTab === 'tools') ? _wsTab : _wsSmartTab();
+      // DSH.WORKSPACE.01 — record real usage so Mi Espacio surfaces it at #1.
+      const _carg = cta === 'tool' ? (t.getAttribute('data-wstool') || 'compound') : cta === 'workspace' ? t.getAttribute('data-ws4-type') : '';
+      _wsTouch(_wsCanonRef(cta, _carg));
+    }
     if (cta === 'scenario' || nav === 'scenario') { _wshView = 'scenario'; renderWorkspaceHome(); return; }
     if (cta === 'planning' || nav === 'planning') { _wshView = 'planning'; renderWorkspaceHome(); return; }
     if (cta === 'goals' || nav === 'goals') { const ty = t.getAttribute('data-wsg-type'); if (ty) _wsgPrefill = ty; _wshView = 'goals'; renderWorkspaceHome(); return; }
@@ -12494,6 +12523,34 @@ function _wsTogglePin(ref) {
   if (i >= 0) list.splice(i, 1); else list.push({ ref, ts: Date.now() });
   try { localStorage.setItem(_WSH_PINNED_KEY, JSON.stringify(list)); } catch (_) {}
 }
+// ── DSH.WORKSPACE.01 — usage recency (Aurix learns from real behaviour) ─────
+// Every open records lastUsedAt for the item's canonical ref. Mi Espacio orders
+// templates & tools by this DESC, so the user's last action is always first.
+// The user organizes nothing — the space reorganizes itself from real use.
+const _WSH_RECENT_KEY = 'aurix_ws_recent_v1';
+function _wsRecentMap() { try { const raw = localStorage.getItem(_WSH_RECENT_KEY); const v = raw ? JSON.parse(raw) : {}; return (v && typeof v === 'object') ? v : {}; } catch (_) { return {}; } }
+function _wsRecentTs(ref) { const v = _wsRecentMap()[ref]; return typeof v === 'number' ? v : 0; }
+function _wsTouch(ref) { if (!ref) return; const m = _wsRecentMap(); m[ref] = Date.now(); try { localStorage.setItem(_WSH_RECENT_KEY, JSON.stringify(m)); } catch (_) {} }
+// Map an open (cta,arg) → the canonical ref used for pinning + recency.
+function _wsCanonRef(cta, arg) {
+  if (cta === 'tool') { const k = arg || 'compound'; return (k === 'compound' || k === 'loan') ? 'tool:' + k : 'tpl:' + (k === 'budget' ? 'mbudget' : k); }
+  if (cta === 'workspace') return 'tpl:' + arg;
+  if (cta === 'scenario') return 'tpl:scenario';
+  if (cta === 'goals') return 'tpl:goals';
+  if (cta === 'planning') return 'tpl:projection';
+  return '';
+}
+// Relative "hace 2 horas" / "2h ago" for the card timestamp.
+function _wsRelTime(ts) {
+  if (!ts) return '';
+  const d = Math.max(0, Date.now() - ts), es = (lang !== 'en');
+  const min = Math.floor(d / 60000), h = Math.floor(d / 3600000), day = Math.floor(d / 86400000);
+  if (min < 1) return es ? 'ahora mismo' : 'just now';
+  if (h < 1) return es ? `hace ${min} min` : `${min} min ago`;
+  if (day < 1) return es ? `hace ${h} h` : `${h}h ago`;
+  if (day < 30) return es ? `hace ${day} d` : `${day}d ago`;
+  const mo = Math.floor(day / 30); return es ? `hace ${mo} mes${mo > 1 ? 'es' : ''}` : `${mo}mo ago`;
+}
 // Display label + open dispatch for a pinned ref ('tool:<k>' | 'tpl:<type>').
 function _wsPinLabel(ref) {
   const i = ref.indexOf(':'); const kind = ref.slice(0, i), key = ref.slice(i + 1);
@@ -12823,81 +12880,68 @@ function _renderWorkspaceHome(metrics) {
 
   let panel = '';
   if (tab === 'space') {
-    // WS.11B — Mi Espacio = professional financial desktop, three blocks:
-    // (1) Trabajo diario (saved projects, big visual cards),
-    // (2) Herramientas fijadas (pinned quick-access toolbox, compact),
-    // (3) Continuar (last edited). Premium UI is prepared (classes/badge) but
-    // NOTHING is locked — functionality is fully open.
-    const ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-    const ICON_DOTS = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>';
-    // WS.12 (v2) — hide "removed-from-space" apps; "fijar arriba" sorts first.
-    const saved = _wshAllProjects().filter(p => !_wsSpaceIsHidden(p.ref))
-      .sort((a, b) => (_wsSpaceTopRank(a.ref) - _wsSpaceTopRank(b.ref)) || (b.ts - a.ts));
-    const pinned = _wsPinned();
-    const last = _wshLastEdited();
-
-    // (1) Trabajo diario — big app cards (each keeps its own visual identity) with
-    // a ⋮ context menu (Abrir / Renombrar / Fijar arriba / Quitar / Eliminar).
-    const dailyCard = (p, featured) => `
-      <div class="wsh-dcard${featured ? ' is-featured' : ''}" data-wsre-swipe>
-        <div class="wsh-dcard-pv">${_wsProjPreviewHtml(p)}</div>
-        <div class="wsh-dcard-foot">
-          <div class="wsh-dcard-txt"><p class="wsh-dcard-name">${esc(p.name)}</p><span class="wsh-dcard-type">${esc(p.typeLabel)}</span></div>
-          <div class="wsh-dcard-acts">
-            <button type="button" class="wsh-scard-open" data-wsx-open="${esc(p.ref)}">${esc(t('wsh_proj_open'))}</button>
-            <button type="button" class="wsh-dcard-menu" data-wsmenu="${esc(p.ref)}" aria-label="${esc(t('wsg_act_rename'))}" aria-haspopup="menu">${ICON_DOTS}</button>
-          </div>
-        </div>
-      </div>`;
-    // Empty state (premium demo, never a poor blank): Presupuesto / Inmueble Pro /
-    // Pendientes de cobro + title + "Explorar plantillas" CTA.
-    const demoTiles = [
-      { name: t('wstool_budget_n'),       open: ' data-wsh-cta="tool" data-wstool="budget"',     pv: _wsToolPreviewHtml('budget') },
-      { name: t('wsre_n'),                open: ' data-wsh-cta="tool" data-wstool="realestate"', pv: _wsCatPreviewHtml('realestate-pro') },
-      { name: t('wsapp_receivables_n'),   open: ' data-wsh-cta="tool" data-wstool="receivables"', pv: _wsReceivablesPreview() },
+    // DSH.WORKSPACE.01 — Mi Espacio = personal operating centre. Two equal
+    // columns (Mis plantillas | Mis herramientas), each ordered by REAL usage
+    // (lastUsedAt DESC). The user's last action is always #1. Aurix reorganizes
+    // the space from behaviour — the user organizes nothing. Items appear once a
+    // user has used or pinned them (created → used → recorded); else, empty state.
+    const pinTs = ref => { const p = _wsPinned().find(x => x && x.ref === ref); return p ? (p.ts || 1) : 0; };
+    // Canonical catalogs — each entry belongs to exactly one column. Opens reuse
+    // the existing cta mechanism (which records recency via the click handler).
+    const TPL_CAT = [
+      { ref: 'tpl:mbudget',     cta: 'tool',      arg: 'budget',      cat: 'budget',         name: t('wstool_budget_n') },
+      { ref: 'tpl:assets',      cta: 'tool',      arg: 'assets',      cat: 'assets',         name: t('wsapp_assets_n') },
+      { ref: 'tpl:receivables', cta: 'tool',      arg: 'receivables', cat: 'receivables',    name: t('wsapp_receivables_n') },
+      { ref: 'tpl:realestate',  cta: 'tool',      arg: 'realestate',  cat: 'realestate-pro', name: t('wsre_n') },
+      { ref: 'tpl:journal',     cta: 'tool',      arg: 'journal',     cat: 'journal',        name: t('wstool_journal_n') },
+      { ref: 'tpl:networth',    cta: 'workspace', arg: 'networth',    cat: 'networth',       name: t('wsh_ws_networth') },
+      { ref: 'tpl:property',    cta: 'workspace', arg: 'property',    cat: 'property',        name: t('wsh_ws_property') },
+      { ref: 'tpl:business',    cta: 'workspace', arg: 'business',    cat: 'business',        name: t('wsh_ws_business') },
+      { ref: 'tpl:fire',        cta: 'workspace', arg: 'fire',        cat: 'fire',            name: t('wsh_ws_fire') },
+      { ref: 'tpl:projection',  cta: 'planning',  arg: '',            cat: 'projection',      name: t('wsp_title') },
     ];
-    // WS.F1 — Mi Espacio default: three equal-height feature columns
-    // (Presupuesto · Inmobiliario · Cobros). No "Explorar plantillas" CTA, no
-    // empty-state title — Workspace reads as the premium product by default.
-    const dailyInner = saved.length
-      ? `<div class="wsh-daily-grid">${saved.map((p, i) => dailyCard(p, i === 0 && saved.length >= 3)).join('')}</div>`
-      : `<div class="wsh-daily-grid is-premium-preview">${demoTiles.map(d => `
-          <div class="wsh-dcard is-demo" role="button" tabindex="0"${d.open}>
-            <div class="wsh-dcard-pv">${d.pv}</div>
-            <div class="wsh-dcard-foot"><div class="wsh-dcard-txt"><p class="wsh-dcard-name">${esc(d.name)}</p><span class="wsh-dcard-type">${esc(t('wsmse_demo_hint'))}</span></div></div>
-          </div>`).join('')}</div>`;
-    const dailyBlock = `
-      <section class="wsh-card wsh-mse-block" data-ws-block="daily">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsmse_daily'))}</h3></header>
-        ${dailyInner}
+    const TOOL_CAT = [
+      { ref: 'tool:compound', cta: 'tool',     arg: 'compound', viz: 'curve',   name: t('wstool_compound_n') },
+      { ref: 'tool:loan',     cta: 'tool',     arg: 'loan',     viz: 'donut',   name: t('wsloan_n') },
+      { ref: 'tpl:scenario',  cta: 'scenario', arg: '',         viz: 'compare', name: t('wsh_scenario_title') },
+      { ref: 'tpl:goals',     cta: 'goals',    arg: '',         viz: 'target',  name: t('wsg_title') },
+    ];
+    // Keep only used/pinned items, ordered by most-recent activity (DESC).
+    const activate = arr => arr
+      .map(it => { const r = _wsRecentTs(it.ref), p = pinTs(it.ref); return Object.assign({}, it, { ts: Math.max(r, p), used: r > 0 }); })
+      .filter(x => x.ts > 0)
+      .sort((a, b) => b.ts - a.ts);
+    const tplList = activate(TPL_CAT), toolList = activate(TOOL_CAT);
+
+    const openAttrs = it => ` role="button" tabindex="0" data-wsh-cta="${esc(it.cta)}"${it.cta === 'tool' ? ' data-wstool="' + esc(it.arg) + '"' : it.cta === 'workspace' ? ' data-ws4-type="' + esc(it.arg) + '"' : ''}`;
+    const card = (it, preview) => `
+      <div class="wsh-mse2-card"${openAttrs(it)}>
+        <div class="wsh-mse2-pv">${preview}</div>
+        <div class="wsh-mse2-body">
+          <p class="wsh-mse2-name">${esc(it.name)}</p>
+          <span class="wsh-mse2-meta">${it.used ? esc(t('wsmse2_last')) + ': ' : ''}${esc(_wsRelTime(it.ts))}</span>
+        </div>
+        <span class="wsh-mse2-open" aria-hidden="true">${esc(t('wsh_proj_open'))} →</span>
+      </div>`;
+    const emptyState = (tk, bk, ck, gotoTab) => `
+      <div class="wsh-mse2-empty">
+        <p class="wsh-mse2-empty-t">${esc(t(tk))}</p>
+        <p class="wsh-mse2-empty-b">${esc(t(bk))}</p>
+        <button type="button" class="wsh-cta is-primary" data-wstab="${gotoTab}">${esc(t(ck))}</button>
+      </div>`;
+    const column = (titleK, subK, list, previewFn, emptyArgs) => `
+      <section class="wsh-card wsh-mse2-col">
+        <header class="wsh-mse2-head">
+          <h3 class="wsh-title">${esc(t(titleK))}</h3>
+          <span class="wsh-mse2-sub">${esc(t(subK))}</span>
+        </header>
+        ${list.length ? `<div class="wsh-mse2-list">${list.map(it => card(it, previewFn(it))).join('')}</div>` : emptyState.apply(null, emptyArgs)}
       </section>`;
 
-    // (2) Herramientas fijadas — compact toolbox row (quick access, NOT projects).
-    const pinChip = ref => `
-      <div class="wsh-tchip">
-        <span class="wsh-tchip-ic">${_wsTplViz(_wsRefViz(ref))}</span>
-        <span class="wsh-tchip-name">${esc(_wsPinLabel(ref))}</span>
-        <button type="button" class="wsh-tchip-open" data-wspinopen="${esc(ref)}">${esc(t('wsh_proj_open'))}</button>
-        <button type="button" class="wsh-tchip-x" data-wspin="${esc(ref)}" title="${esc(t('wspin_remove'))}" aria-label="${esc(t('wspin_remove'))}">${ICON_X}</button>
-      </div>`;
-    const pinnedBlock = pinned.length ? `
-      <section class="wsh-card wsh-mse-block" data-ws-block="pinned">
-        <header class="wsh-head"><h3 class="wsh-title">${esc(t('wsmse_pinned'))}</h3></header>
-        <div class="wsh-tool-row">${pinned.map(p => pinChip(p.ref)).join('')}</div>
-      </section>` : '';
-
-    // (3) Continuar — last edited, compact premium row (hidden if no activity).
-    const continueBlock = last ? `
-      <section class="wsh-card wsh-continue wsh-mse-block" data-ws-block="continue">
-        <div class="wsh-cont-info">
-          <span class="wsh-cont-eyebrow">${esc(t('wsh_continue_title'))}</span>
-          <p class="wsh-cont-name">${esc(last.name)}</p>
-          <span class="wsh-cont-meta">${esc(last.typeLabel)} · ${esc(_intccDate(last.ts))}</span>
-        </div>
-        <button type="button" class="wsh-cta is-primary" data-wsx-open="${esc(last.ref)}">${esc(t('wsh_continue_btn'))}</button>
-      </section>` : '';
-
-    panel = `<div class="wsh-mse">${dailyBlock}${pinnedBlock}${continueBlock}</div>`;
+    panel = `<div class="wsh-mse2">
+      ${column('wsmse2_tpl_title', 'wsmse2_tpl_sub', tplList, it => _wsCatPreviewHtml(it.cat), ['wsmse2_tpl_empty_t', 'wsmse2_tpl_empty_b', 'wsmse2_tpl_empty_cta', 'templates'])}
+      ${column('wsmse2_tool_title', 'wsmse2_tool_sub', toolList, it => _wsTplViz(it.viz), ['wsmse2_tool_empty_t', 'wsmse2_tool_empty_b', 'wsmse2_tool_empty_cta', 'tools'])}
+    </div>`;
   } else if (tab === 'templates') {
     // Organized by real utility (not by technical structure). 'cta'+'arg' decide
     // how each card opens; 'ref' is the pinnable identifier.

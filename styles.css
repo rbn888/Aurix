@@ -21956,3 +21956,94 @@ body.gs-open { overflow: hidden; }
   .mobile-chart-wrap .wsc-in .wsc-line { animation: none !important; }
   .mobile-chart-wrap .chart-loading-skin__line { animation: none !important; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   DSH.WORKSPACE.01 — Mi Espacio V2 (personal operating centre)
+   Two equal columns: Mis plantillas | Mis herramientas. Recency-ordered
+   cards (uniform height). Scoped to .wsh-mse2 — no other view touched.
+══════════════════════════════════════════════════════════════ */
+.wsh-mse2{
+  display:grid;
+  grid-template-columns:1fr 1fr;   /* 50/50 — same importance, same size */
+  gap:14px;
+  align-items:start;
+}
+.wsh-mse2-col{ display:flex; flex-direction:column; }
+.wsh-mse2-head{ margin-bottom:12px; }
+.wsh-mse2-head .wsh-title{ margin:0; }
+.wsh-mse2-sub{
+  display:block; margin-top:3px;
+  font-size:12px; color:var(--text-dim,#8a96aa); letter-spacing:.1px;
+}
+.wsh-mse2-list{ display:flex; flex-direction:column; gap:8px; }
+
+.wsh-mse2-card{
+  display:flex; align-items:center; gap:12px;
+  padding:10px 12px;
+  border:1px solid var(--border,rgba(255,255,255,.08));
+  border-radius:12px;
+  background:rgba(255,255,255,.02);
+  cursor:pointer;
+  transition:transform .18s var(--ease-premium,ease), border-color .18s ease,
+             box-shadow .18s ease, background .18s ease;
+}
+.wsh-mse2-card:hover{
+  transform:translateY(-2px);
+  border-color:rgba(77,141,255,.45);
+  background:rgba(77,141,255,.06);
+  box-shadow:0 10px 26px -14px rgba(0,0,0,.55), 0 0 22px rgba(77,141,255,.14);
+}
+.wsh-mse2-pv{
+  flex:0 0 auto; width:52px; height:52px;
+  border-radius:9px; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(255,255,255,.03);
+}
+.wsh-mse2-pv > *{ width:100%; height:100%; }
+.wsh-mse2-pv svg{ width:100%; height:100%; }
+.wsh-mse2-body{ flex:1 1 auto; min-width:0; }
+.wsh-mse2-name{
+  margin:0; font-size:13.5px; font-weight:700; color:var(--text,#e7ecf5);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.wsh-mse2-meta{
+  display:block; margin-top:2px;
+  font-size:11.5px; color:var(--text-dim,#8a96aa); font-variant-numeric:tabular-nums;
+}
+.wsh-mse2-open{
+  flex:0 0 auto; font-size:12px; font-weight:700;
+  color:var(--accent,#4d8dff); opacity:.85;
+  transition:transform .18s var(--ease-premium,ease), opacity .18s ease;
+}
+.wsh-mse2-card:hover .wsh-mse2-open{ opacity:1; transform:translateX(2px); }
+
+.wsh-mse2-empty{
+  display:flex; flex-direction:column; align-items:flex-start; gap:6px;
+  padding:18px 4px 6px;
+}
+.wsh-mse2-empty-t{ margin:0; font-size:14px; font-weight:700; color:var(--text,#e7ecf5); }
+.wsh-mse2-empty-b{ margin:0 0 8px; font-size:12.5px; color:var(--text-dim,#8a96aa); }
+
+/* Tablet — keep two columns while they fit, then stack. */
+@media (max-width:760px){
+  .wsh-mse2{ grid-template-columns:1fr; gap:12px; }
+}
+/* Mobile — columns stacked; each list becomes a horizontal scroll of tiles. */
+@media (max-width:640px){
+  .wsh-mse2-list{
+    flex-direction:row; overflow-x:auto; gap:10px;
+    padding-bottom:4px; scroll-snap-type:x proximity;
+    -webkit-overflow-scrolling:touch;
+  }
+  .wsh-mse2-card{
+    flex:0 0 78%; max-width:78%;
+    flex-direction:column; align-items:flex-start; gap:8px;
+    scroll-snap-align:start;
+  }
+  .wsh-mse2-pv{ width:100%; height:84px; }
+  .wsh-mse2-open{ align-self:flex-end; }
+}
+@media (prefers-reduced-motion: reduce){
+  .wsh-mse2-card{ transition:none; }
+  .wsh-mse2-card:hover{ transform:none; }
+}
