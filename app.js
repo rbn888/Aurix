@@ -33253,6 +33253,44 @@ document.querySelectorAll('.menu-curr-btn').forEach(btn => {
   btn.addEventListener('click', () => _applyCurrencyChange(btn.dataset.currency));
 });
 
+// ── DSH.SETTINGS.TOGGLE.01 — language/currency are real buttons everywhere ─────
+// The Idioma/Moneda buttons now live in the Settings modal, which is parsed in
+// index.html AFTER this <script> tag. The boot-time direct addEventListener calls
+// above therefore bound to ZERO elements (the old menu copies were removed), so
+// clicking did nothing. Delegate from document to the EXISTING switchLang /
+// _applyCurrencyChange (no parallel logic) so clicks work no matter when the
+// markup is parsed, and keep .active + aria-pressed in exact sync.
+function _aurixSyncLangCurrencyButtons() {
+  try {
+    document.querySelectorAll('[data-lang]').forEach(b => {
+      const on = b.dataset.lang === lang;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    document.querySelectorAll('.menu-curr-btn').forEach(b => {
+      const on = b.dataset.currency === baseCurrency;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  } catch (_) {}
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', e => {
+    const langBtn = e.target.closest && e.target.closest('[data-lang]');
+    if (langBtn && langBtn.dataset.lang) {
+      if (typeof switchLang === 'function') switchLang(langBtn.dataset.lang);
+      _aurixSyncLangCurrencyButtons();
+      return;
+    }
+    const curBtn = e.target.closest && e.target.closest('.menu-curr-btn');
+    if (curBtn && curBtn.dataset.currency) {
+      if (typeof _applyCurrencyChange === 'function') _applyCurrencyChange(curBtn.dataset.currency);
+      _aurixSyncLangCurrencyButtons();
+      return;
+    }
+  });
+}
+
 
 // ── Liquidity Modal ────────────────────────────────────────
 const liquidityOverlay  = document.getElementById('liquidityOverlay');
@@ -38966,15 +39004,10 @@ function _settingsPopulate() {
     }
   });
 
-  // DSH.SETTINGS.05 — repaint Idioma/Moneda active state on open so exactly one
-  // option is always lit (never both/neither). Persistence + switching are
-  // handled by the existing switchLang / _applyCurrencyChange click handlers.
-  document.querySelectorAll('#settingsSectionAccount [data-lang]').forEach(b => {
-    b.classList.toggle('active', b.dataset.lang === lang);
-  });
-  document.querySelectorAll('#settingsSectionAccount .menu-curr-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.currency === baseCurrency);
-  });
+  // DSH.SETTINGS.TOGGLE.01 — paint Idioma/Moneda active + aria-pressed on open so
+  // exactly one option is always lit (never both/neither). Clicks are handled by
+  // the delegated handler that calls switchLang / _applyCurrencyChange.
+  if (typeof _aurixSyncLangCurrencyButtons === 'function') _aurixSyncLangCurrencyButtons();
 
   // SETTINGS-INVESTOR-PROFILE-1 — paint the three investor-profile
   // chip rows from the current profile (or safe defaults if none is

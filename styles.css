@@ -22377,6 +22377,13 @@ body.aurix-premium-lock{ overflow:hidden; }
 .settings-row .menu-pref-opts{ flex:0 0 auto; }
 .settings-row .menu-curr-btn{ flex:0 0 auto; }
 .settings-row .menu-pref-opt{ padding:6px 12px; }
+/* DSH.SETTINGS.TOGGLE.01 — crisp active state: Aurix blue fill, bright border,
+   white text. Inactive keeps the dark-glass base above. */
+.settings-row .menu-pref-opt.active{
+  background:rgba(77,141,255,.20);
+  border-color:rgba(77,141,255,.55);
+  color:#eaf2ff;
+}
 
 /* ── DSH.SETTINGS.01 — Configuración: desktop/tablet side-nav layout ──────────
    Left rail of section tabs + a single visible pane on the right (Revolut /
