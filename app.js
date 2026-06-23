@@ -17684,7 +17684,7 @@ function _wscYAxisLabels(vp, rscale) {
 // dedup collapsed them to top+bottom only). Fallback ladder: 4 grid labels → 3
 // (top/middle/bottom) → 2 → 1, only when values are genuinely indistinguishable.
 // All values are real (inverse vertical scale); no fabricated round labels.
-function _wscGeneratePremiumYLabels(vp, rscale, range) {
+function _wscGeneratePremiumYLabels(vp, rscale, range, maxLabels) {
   const band = (vp.lineBot - vp.lineTop) || 1;
   const valAtY = (rscale && rscale.mode === 'regime-relative' && rscale.inv)
     ? y => rscale.inv(Math.max(0, Math.min(1, (vp.lineBot - y) / band)))
@@ -17704,8 +17704,12 @@ function _wscGeneratePremiumYLabels(vp, rscale, range) {
     }
     return null;
   };
-  let labels = build([0, 1 / 3, 2 / 3, 1]), strategy = 'grid-4';
-  if (!labels) { labels = build([0, 0.5, 1]); strategy = 'grid-3'; }
+  // WN.27 — mobile (maxLabels=3) starts at 3 grid lines so the narrow axis lane
+  // stays uncrowded; desktop prefers 4. Both fall back to fewer only if values
+  // are genuinely indistinguishable.
+  let labels, strategy;
+  if (maxLabels && maxLabels <= 3) { labels = build([0, 0.5, 1]); strategy = 'grid-3'; }
+  else { labels = build([0, 1 / 3, 2 / 3, 1]); strategy = 'grid-4'; if (!labels) { labels = build([0, 0.5, 1]); strategy = 'grid-3'; } }
   if (!labels) { labels = build([0, 1]); strategy = 'grid-2'; }
   if (!labels) { const y = gAt(0.5), v = valAtY(y); labels = [{ y, value: v, text: fmt(v, 0) }]; strategy = 'grid-1'; }
   let ratio = 1;
@@ -18292,6 +18296,18 @@ if (typeof window !== 'undefined') {
       o.longTransitionEased = false;
       o.transitionEasingReason = 'PCHIP path already C1-continuous + overshoot-free; source bends preserved through anchors (24H/7D unsmoothed). Added tension would risk overshoot / fabricated volatility → no change (safe).';
       o.overshootCheckPassed = true;
+
+      // ── WN.27 — mobile chart responsive lock (mobile render config) ──────
+      const _mLabels = _wscGeneratePremiumYLabels(_vp, _rs, r, 3).labels;
+      const _laneFrac = 0.15;
+      o.mobileChartMode = 'reserved-right-lane';
+      o.mobilePlotWidthPct = +((1 - _WSC_PAD_X - _laneFrac) * 100).toFixed(1);
+      o.mobileYAxisLaneWidthPct = +(_laneFrac * 100).toFixed(1);
+      o.mobileGridMode = '3v x 4h';
+      o.mobileShimmerDisabled = true;
+      o.mobileLabelsCount = _mLabels.length;
+      o.mobileLabelsInsidePlot = _mLabels.every(l => l.y >= _vp.top - 0.5 && l.y <= _vp.bot + 0.5);
+      o.mobileLayoutPassed = o.mobileLabelsCount <= 3 && o.mobileLabelsCount >= 2 && o.mobileLabelsInsidePlot && o.mobilePlotWidthPct >= 60;
 
       try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| visualScore:', o.visualNarrativeScore, '| eventDom:', o.eventDominanceScore, '| yScale:', o.institutionalYScaleScore, '| curve:', o.institutionalCurveScore, '| yLabels:', JSON.stringify(o.yLabelValues), o.yLabelStrategy, 'gapRatio:', o.yLabelLargestGapRatio, '| split:', o.desktopHeroChartSplit, '| staticGrid:', o.staticGrid); } catch (_) {}
     } catch (e) { o.error = String(e); }
@@ -19330,7 +19346,13 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   }
 
   const W = _WSC_VIEW_W, H = _WSC_VIEW_H;
-  const padX = W * _WSC_PAD_X, plotW = W - 2 * padX;
+  // WN.27 — mobile reserves a fixed RIGHT lane for the Y-axis labels so they
+  // never sit on the curve; desktop keeps the symmetric WN.25/26 padding intact.
+  const _isMobile = opts.uid === 'm';
+  const padL = W * _WSC_PAD_X;
+  const padR = _isMobile ? W * 0.15 : W * _WSC_PAD_X;
+  const padX = padL;                                              // left inset (curve origin)
+  const plotW = W - padL - padR;
 
   // WN.11 — PERFORMANCE-ADJUSTED series drives the curve AND the metric: every
   // capital event (deposit/withdrawal/internal transfer) is neutralised so only
@@ -19423,18 +19445,21 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   // previously anchored to WARPED time-ticks — that is what made the grid feel
   // unstable, and is now removed.)
   const uid = opts.uid || 'd';
-  const gx1 = padX.toFixed(1), gx2 = (W - padX).toFixed(1);
+  const gx1 = padL.toFixed(1), gx2 = (W - padR).toFixed(1);
   const yTicks = [0, 1, 2, 3].map(i => { const f = i / 3, y = vp.top + (vp.bot - vp.top) * f; return { y, val: valAtY(y) }; });
   let grid = '';
   yTicks.forEach(tk => { grid += `<line class="wsc-grid" x1="${gx1}" y1="${tk.y.toFixed(1)}" x2="${gx2}" y2="${tk.y.toFixed(1)}" vector-effect="non-scaling-stroke"/>`; });
-  _GRID_V_FRACS.forEach(f => { const x = (padX + f * plotW).toFixed(1); grid += `<line class="wsc-grid wsc-grid-v" x1="${x}" y1="${vp.top.toFixed(1)}" x2="${x}" y2="${vp.bot.toFixed(1)}" vector-effect="non-scaling-stroke"/>`; });
+  // WN.27 — mobile grid: 3 vertical divisions (4 lines) so it feels intentional,
+  // not squeezed; desktop keeps the 5-line lattice. Horizontal = 4 lines (shared).
+  const _gridV = _isMobile ? [0, 1 / 3, 2 / 3, 1] : _GRID_V_FRACS;
+  _gridV.forEach(f => { const x = (padL + f * plotW).toFixed(1); grid += `<line class="wsc-grid wsc-grid-v" x1="${x}" y1="${vp.top.toFixed(1)}" x2="${x}" y2="${vp.bot.toFixed(1)}" vector-effect="non-scaling-stroke"/>`; });
 
   // WN.17 PART 2 (Option A) — bottom X-axis text labels REMOVED (tooltip is the
   // exact date/time source); static vertical grid lines keep the temporal rhythm.
   // WN.25/WN.26 PART 1 — premium right-side Y labels: grid-anchored (even,
   // aligned, never collapsed) with adaptive-precision distinctness so no range
   // (notably 7D) shows a large empty gap. Real inverse-scale values only.
-  const _yAxis = _wscGeneratePremiumYLabels(vp, rscale, activeRange);
+  const _yAxis = _wscGeneratePremiumYLabels(vp, rscale, activeRange, _isMobile ? 3 : 4);
   const yLabels = _yAxis.labels.map(tk => `<span class="wsc-ylab" style="top:${(tk.y / H * 100).toFixed(2)}%">${tk.text}</span>`).join('');
   const xLabels = '';
 
@@ -19490,11 +19515,10 @@ function renderWealthCurve(animate) {
   };
   if (animate && !_dshReducedMotion()) {
     paint();
-    [document.getElementById('perfSnapshot'), document.getElementById('wealthCurveMobile')].forEach(el => {
-      if (!el) return;
-      el.classList.remove('wsc-in'); void el.offsetWidth; el.classList.add('wsc-in');
-      setTimeout(() => el.classList.remove('wsc-in'), 460);
-    });
+    // WN.27 — the draw/paint-in animation is DESKTOP-only. On mobile the chart
+    // renders directly (no left-to-right paint glow / shimmer on refresh).
+    const el = document.getElementById('perfSnapshot');
+    if (el) { el.classList.remove('wsc-in'); void el.offsetWidth; el.classList.add('wsc-in'); setTimeout(() => el.classList.remove('wsc-in'), 460); }
   } else {
     paint();
   }

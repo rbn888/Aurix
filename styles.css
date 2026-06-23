@@ -21919,3 +21919,40 @@ body.gs-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .wsc-in .wsc-line { animation: none; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   WN.27 — Mobile Chart Responsive Lock (mobile/tablet ≤768px only)
+   Scoped to .mobile-slide-chart + the mobile curve host so DESKTOP
+   (#perfSnapshot, ≥769px) is completely untouched. Visual/layout only.
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* PART 1/7 — clean vertical stack: title → metric → controls → plot,
+     with the title + percentage grouped as one premium header block. */
+  .mobile-slide-chart .chart-header {
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .mobile-slide-chart .chart-header > div:first-child { padding-left: 2%; }
+  .mobile-slide-chart .chart-title { margin-bottom: 1px; }
+
+  /* PART 4 — range controls: compact, single row, no wrap/crowding. */
+  .mobile-slide-chart .chart-controls { width: 100%; gap: 6px; flex-wrap: nowrap; justify-content: space-between; }
+  .mobile-slide-chart .range-toggle  { flex-wrap: nowrap; flex: 1; justify-content: space-between; padding: 2px; }
+  .mobile-slide-chart .range-btn     { padding: 5px 7px; font-size: 10.5px; letter-spacing: .3px; flex: 1 1 auto; }
+  .mobile-slide-chart .range-btn.active { font-weight: 800; }  /* active clear but compact */
+  .mobile-slide-chart .perf-toggle   { flex: 0 0 auto; }
+
+  /* PART 6 — give the plot breathing room (slightly taller). */
+  .mobile-slide-chart .chart-wrap { min-height: 244px; }
+
+  /* PART 2 — reserved right Y-label lane (curve/grid stop at ~85% in the SVG;
+     labels live in the remaining lane). Keep them readable + clear of the path. */
+  .mobile-chart-wrap .wsc-ylab { right: 7px; opacity: .8; font-size: 9px; }
+
+  /* PART 5 — no refresh shimmer / paint-glow on mobile: render directly. */
+  .mobile-chart-wrap .wsc-in .wsc-line { animation: none !important; }
+  .mobile-chart-wrap .chart-loading-skin__line { animation: none !important; }
+}
