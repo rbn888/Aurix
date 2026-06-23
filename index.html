@@ -1441,20 +1441,17 @@
         <button type="button" class="settings-nav-item is-current" role="tab" data-settings-pane="account" data-i18n="settingsAccount">Cuenta</button>
         <button type="button" class="settings-nav-item" role="tab" data-settings-pane="plan" data-i18n="settingsPlanTitle">Membresía</button>
         <button type="button" class="settings-nav-item" role="tab" data-settings-pane="profile" data-i18n="settingsProfileTitle">Perfil inversor</button>
-        <button type="button" class="settings-nav-item" role="tab" data-settings-pane="prefs" data-i18n="settingsPrefs">Preferencias</button>
         <button type="button" class="settings-nav-item" role="tab" data-settings-pane="data" data-i18n="settingsData">Datos y seguridad</button>
       </nav>
       <div class="settings-panes">
 
       <section class="settings-section is-active" data-pane="account" id="settingsSectionAccount">
         <h4 class="settings-section-title" data-i18n="settingsAccount">Cuenta</h4>
-        <!-- DSH.SETTINGS.04 — editable display name (localStorage 'aurix_display_name'). -->
-        <div class="settings-row settings-row--editable">
+        <!-- DSH.SETTINGS.05 — editable display name, inline in the row (no big
+             Save button). Saves on Enter and on blur-if-changed. -->
+        <div class="settings-row">
           <span class="settings-row-label" data-i18n="settingsDisplayName">Nombre visible</span>
-          <div class="settings-name-edit">
-            <input type="text" id="settingsNameInput" class="settings-name-input" maxlength="40" autocomplete="off" autocapitalize="words" spellcheck="false" aria-label="Nombre visible">
-            <button type="button" id="settingsNameSave" class="settings-name-save" data-i18n="settingsNameSave">Guardar</button>
-          </div>
+          <input type="text" id="settingsNameInput" class="settings-name-input" maxlength="40" autocomplete="off" autocapitalize="words" spellcheck="false" aria-label="Nombre visible">
         </div>
         <div class="settings-row">
           <span class="settings-row-label" data-i18n="settingsEmail">Email</span>
@@ -1463,6 +1460,27 @@
         <div class="settings-row">
           <span class="settings-row-label" data-i18n="settingsStatus">Estado</span>
           <span class="settings-row-value" id="settingsAccountStatus" data-i18n="settingsStatusLocal">Local · sin sesión</span>
+        </div>
+        <div class="settings-row">
+          <span class="settings-row-label" data-i18n="settingsAccountMembership">Membresía</span>
+          <span class="settings-tier-chip" id="settingsAccountTier" data-tier="free">FREE</span>
+        </div>
+        <!-- DSH.SETTINGS.05 — Idioma & Moneda live in Cuenta now (Preferencias
+             section removed). Reuse the existing switchLang / _applyCurrencyChange
+             handlers via data-lang / .menu-curr-btn; persistence unchanged. -->
+        <div class="settings-row">
+          <span class="settings-row-label" data-i18n="settingsLang">Idioma</span>
+          <div class="menu-pref-opts" role="group" aria-label="Language">
+            <button type="button" class="menu-item--lang menu-pref-opt" data-lang="es">Español</button>
+            <button type="button" class="menu-item--lang menu-pref-opt" data-lang="en">English</button>
+          </div>
+        </div>
+        <div class="settings-row">
+          <span class="settings-row-label" data-i18n="settingsCurrency">Moneda base</span>
+          <div class="menu-pref-opts" role="group" aria-label="Currency">
+            <button type="button" class="menu-curr-btn menu-pref-opt" data-currency="USD">USD</button>
+            <button type="button" class="menu-curr-btn menu-pref-opt" data-currency="EUR">EUR</button>
+          </div>
         </div>
         <div class="settings-row settings-row--meta">
           <span class="settings-row-label" data-i18n="settingsBuild">Build</span>
@@ -1537,36 +1555,8 @@
         </div>
       </section>
 
-      <section class="settings-section" data-pane="prefs" id="settingsSectionPrefs">
-        <h4 class="settings-section-title" data-i18n="settingsPrefs">Preferencias</h4>
-        <div class="settings-prefs-list">
-          <div class="settings-pref-item">
-            <span class="settings-pref-label" data-i18n="settingsLang">Idioma</span>
-            <div class="menu-pref-opts" role="group" aria-label="Language">
-              <button class="menu-item--lang menu-pref-opt" data-lang="es">Español</button>
-              <button class="menu-item--lang menu-pref-opt" data-lang="en">English</button>
-            </div>
-          </div>
-          <div class="settings-pref-item">
-            <span class="settings-pref-label" data-i18n="settingsCurrency">Moneda base</span>
-            <div class="menu-pref-opts" role="group" aria-label="Currency" data-i18n-aria="ariaCurrency">
-              <button class="menu-curr-btn menu-pref-opt" data-currency="USD">USD</button>
-              <button class="menu-curr-btn menu-pref-opt" data-currency="EUR">EUR</button>
-            </div>
-          </div>
-          <div class="settings-pref-item settings-pref-item--placeholder">
-            <span class="settings-pref-label" data-i18n="settingsPrivacy">Privacidad</span>
-            <span class="settings-pref-value settings-pref-soon" data-i18n="settingsSoon">Próximamente</span>
-          </div>
-          <div class="settings-pref-item settings-pref-item--placeholder">
-            <span class="settings-pref-label" data-i18n="settingsSupport">Soporte</span>
-            <span class="settings-pref-value settings-pref-soon" data-i18n="settingsSoon">Próximamente</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- DSH.SETTINGS.02 — Datos y seguridad always last; reset is destructive
-           and visually separated (settings-action--danger). -->
+      <!-- DSH.SETTINGS.05 — Preferencias section removed; Idioma/Moneda moved to
+           Cuenta. Datos y seguridad always last; reset stays destructive (red). -->
       <section class="settings-section" data-pane="data" id="settingsSectionData">
         <h4 class="settings-section-title" data-i18n="settingsData">Datos y seguridad</h4>
         <div class="settings-actions">
@@ -1578,10 +1568,7 @@
             <span class="settings-action-label" data-i18n="settingsImport">Importar datos</span>
             <span class="settings-action-sub" data-i18n="settingsImportSub">Próximamente</span>
           </button>
-        </div>
-        <!-- DSH.SETTINGS.01 — destructive action isolated in its own danger zone. -->
-        <div class="settings-danger-zone">
-          <span class="settings-danger-label" data-i18n="settingsDangerZone">Zona peligrosa</span>
+          <!-- DSH.SETTINGS.05 — reset stays last + red; no "Zona peligrosa" title. -->
           <button type="button" class="settings-action settings-action--danger" id="settingsResetBtn">
             <span class="settings-action-label" data-i18n="settingsReset">Resetear cartera</span>
             <span class="settings-action-sub" data-i18n="settingsResetSub">Borra activos, historial y seguimiento</span>

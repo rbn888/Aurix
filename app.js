@@ -2748,6 +2748,7 @@ const T = {
     settingsAccount:          'Cuenta',
     settingsDisplayName:      'Nombre visible',
     settingsNameSave:         'Guardar',
+    settingsAccountMembership:'Membresía',
     settingsEmail:            'Email',
     settingsStatus:           'Estado',
     settingsStatusLocal:      'Local · sin sesión',
@@ -4801,6 +4802,7 @@ const T = {
     settingsAccount:          'Account',
     settingsDisplayName:      'Display name',
     settingsNameSave:         'Save',
+    settingsAccountMembership:'Membership',
     settingsEmail:            'Email',
     settingsStatus:           'Status',
     settingsStatusLocal:      'Local · no session',
@@ -38907,14 +38909,10 @@ function _settingsPopulate() {
   const plan  = getPlan();
 
   const tierEl   = document.getElementById('planTierName');
-  const langEl   = document.getElementById('settingsLangValue');
-  const currEl   = document.getElementById('settingsCurrencyValue');
   const emailEl  = document.getElementById('settingsAccountEmail');
   const statusEl = document.getElementById('settingsAccountStatus');
 
   if (tierEl) tierEl.textContent = planTierName(plan.tier);
-  if (langEl) langEl.textContent = lang === 'es' ? 'Español' : 'English';
-  if (currEl) currEl.textContent = baseCurrency === 'EUR' ? '€ EUR' : '$ USD';
 
   // Tier-aware description for the current-plan card (replaces the old asset
   // usage meter, removed in AURIX-MONETIZATION-1 · Phase 7 — Aurix does not cap
@@ -38955,13 +38953,28 @@ function _settingsPopulate() {
     nameInput.value = (typeof _aurixMenuDisplayName === 'function')
       ? _aurixMenuDisplayName()
       : (session && session.email && session.email.indexOf('@') > 0 ? session.email.split('@')[0] : '');
+    // Baseline for blur-if-changed saving.
+    nameInput.dataset.baseline = nameInput.value;
   }
-  const tierChip = document.getElementById('settingsTierChip');
-  if (tierChip) {
-    const tk = plan.tier;
-    tierChip.setAttribute('data-tier', tk);
-    tierChip.textContent = tk === 'founder' ? 'FOUNDER' : tk === 'premium' ? 'PREMIUM' : 'FREE';
-  }
+  // Membership tier chips (plan card + the new Cuenta "Membresía" row).
+  ['settingsTierChip', 'settingsAccountTier'].forEach(id => {
+    const chip = document.getElementById(id);
+    if (chip) {
+      const tk = plan.tier;
+      chip.setAttribute('data-tier', tk);
+      chip.textContent = tk === 'founder' ? 'FOUNDER' : tk === 'premium' ? 'PREMIUM' : 'FREE';
+    }
+  });
+
+  // DSH.SETTINGS.05 — repaint Idioma/Moneda active state on open so exactly one
+  // option is always lit (never both/neither). Persistence + switching are
+  // handled by the existing switchLang / _applyCurrencyChange click handlers.
+  document.querySelectorAll('#settingsSectionAccount [data-lang]').forEach(b => {
+    b.classList.toggle('active', b.dataset.lang === lang);
+  });
+  document.querySelectorAll('#settingsSectionAccount .menu-curr-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.currency === baseCurrency);
+  });
 
   // SETTINGS-INVESTOR-PROFILE-1 — paint the three investor-profile
   // chip rows from the current profile (or safe defaults if none is
@@ -39011,11 +39024,11 @@ function _settingsSaveProfile(patch) {
   try { if (typeof renderAurixSignal === 'function') renderAurixSignal(); } catch (_) {}
 }
 
-// DSH.SETTINGS.04 — persist the editable display name. Saves to localStorage
+// DSH.SETTINGS.05 — persist the editable display name. Saves to localStorage
 // ('aurix_display_name', the same key _aurixMenuDisplayName reads), then repaints
-// the menu identity + settings so the new name shows everywhere immediately.
-// No auth/backend write.
-function _settingsSaveDisplayName() {
+// the menu identity so the new name shows everywhere immediately. Inline in the
+// row: no Save button — Enter saves, blur-if-changed saves. No auth/backend write.
+function _settingsSaveDisplayName(opts) {
   const input = document.getElementById('settingsNameInput');
   if (!input) return;
   const v = (input.value || '').trim().slice(0, 40);
@@ -39025,16 +39038,9 @@ function _settingsSaveDisplayName() {
   } catch (_) {}
   // Reflect the resolved value (empty input falls back to email-before-@).
   input.value = (typeof _aurixMenuDisplayName === 'function') ? _aurixMenuDisplayName() : v;
-  try { input.blur(); } catch (_) {}
+  input.dataset.baseline = input.value;
   try { if (typeof _aurixRenderMenuIdentity === 'function') _aurixRenderMenuIdentity(); } catch (_) {}
-  // Brief "Guardado" confirmation on the button.
-  const btn = document.getElementById('settingsNameSave');
-  if (btn) {
-    const orig = (typeof _settingsT === 'function') ? _settingsT('settingsNameSave') : 'Guardar';
-    btn.textContent = (typeof lang !== 'undefined' && lang === 'en') ? 'Saved' : 'Guardado';
-    btn.classList.add('is-saved');
-    setTimeout(() => { btn.textContent = orig; btn.classList.remove('is-saved'); }, 1400);
-  }
+  if (opts && opts.blur) { try { input.blur(); } catch (_) {} }
 }
 
 // Delegated click handler — wired once. Closes over no state.
@@ -39042,7 +39048,6 @@ if (typeof document !== 'undefined') {
   document.addEventListener('click', e => {
     const ov = document.getElementById('settingsOverlay');
     if (!ov || !ov.classList.contains('open')) return;
-    if (e.target.closest && e.target.closest('#settingsNameSave')) { _settingsSaveDisplayName(); return; }
     const r = e.target.closest && e.target.closest('[data-settings-risk]');
     if (r) { _settingsSaveProfile({ riskProfile: r.dataset.settingsRisk }); return; }
     const x = e.target.closest && e.target.closest('[data-settings-experience]');
@@ -39050,13 +39055,19 @@ if (typeof document !== 'undefined') {
     const a = e.target.closest && e.target.closest('[data-settings-age]');
     if (a) { _settingsSaveProfile({ ageBand: a.dataset.settingsAge }); return; }
   });
-  // Enter inside the name field saves (and never submits a form / reloads).
+  // Enter inside the name field saves + blurs (never submits a form / reloads).
   document.addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;
     if (e.target && e.target.id === 'settingsNameInput') {
       e.preventDefault();
-      _settingsSaveDisplayName();
+      _settingsSaveDisplayName({ blur: true });
     }
+  });
+  // Blur (focusout bubbles) saves the name only if it actually changed.
+  document.addEventListener('focusout', e => {
+    const input = e.target;
+    if (!input || input.id !== 'settingsNameInput') return;
+    if ((input.value || '').trim() !== (input.dataset.baseline || '')) _settingsSaveDisplayName();
   });
 }
 // DSH.SETTINGS.01 — desktop/tablet side-nav: show one pane at a time. On mobile

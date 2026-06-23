@@ -14537,10 +14537,12 @@ body.gs-open { overflow: hidden; }
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   padding: 10px 14px;
+  min-height: 46px;                 /* DSH.SETTINGS.05 — uniform institutional row height */
   border-radius: 10px;
-  background: var(--aurix-surface-2);
-  border: 1px solid rgba(74, 130, 240, 0.10);
+  background: rgba(255, 255, 255, 0.022);   /* dark glass, less solid blue */
+  border: 1px solid rgba(255, 255, 255, 0.07);
   font-size: 13px;
 }
 .settings-row-label { color: rgba(220, 230, 250, 0.60); }
@@ -22370,11 +22372,11 @@ body.aurix-premium-lock{ overflow:hidden; }
   background:linear-gradient(180deg, rgba(212,175,93,.22), rgba(212,175,93,.09));
   color:#f4e3b0; transform:none;
 }
-/* Settings → Preferencias: language/currency toggles sit on the right of the row. */
-.settings-pref-item{ align-items:center; }
-.settings-pref-item .menu-pref-opts{ flex:0 0 auto; }
-/* Currency pills carry flex:1 for the (removed) menu row; size to content here. */
-.settings-pref-item .menu-curr-btn{ flex:0 0 auto; }
+/* DSH.SETTINGS.05 — Idioma/Moneda toggles sit on the right of their Cuenta row.
+   Currency pills carry flex:1 for the (removed) menu row; size to content here. */
+.settings-row .menu-pref-opts{ flex:0 0 auto; }
+.settings-row .menu-curr-btn{ flex:0 0 auto; }
+.settings-row .menu-pref-opt{ padding:6px 12px; }
 
 /* ── DSH.SETTINGS.01 — Configuración: desktop/tablet side-nav layout ──────────
    Left rail of section tabs + a single visible pane on the right (Revolut /
@@ -22421,25 +22423,14 @@ body.aurix-premium-lock{ overflow:hidden; }
   .settings-body--nav .settings-panes > .settings-section{ display:flex; }
 }
 
-/* Destructive action isolated in its own danger zone. */
-.settings-danger-zone{
-  margin-top:6px; padding-top:14px;
-  border-top:1px solid rgba(224,90,90,.22);
-  display:flex; flex-direction:column; gap:8px;
-}
-.settings-danger-label{
-  font-size:10.5px; font-weight:800; letter-spacing:.16em; text-transform:uppercase;
-  color:rgba(224,90,90,.80);
-}
-
-/* ── DSH.SETTINGS.04 — editable display name (Cuenta) ─────────────────────────
-   Inline input + Guardar button. Reorganization/persistence only; no auth. */
-.settings-row--editable{ align-items:center; gap:12px; }
-.settings-name-edit{ display:flex; align-items:center; gap:8px; flex:0 1 auto; min-width:0; }
+/* ── DSH.SETTINGS.05 — inline editable display name (Cuenta) ──────────────────
+   Sits on the right of its row like the other values; saves on Enter / blur.
+   No Save button. Reorganization/persistence only; no auth. */
 .settings-name-input{
-  appearance:none; -webkit-appearance:none; min-width:0; width:172px;
-  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14); border-radius:9px;
-  padding:8px 11px; color:var(--text-bright,#fff); font-size:13.5px; font-weight:600;
+  appearance:none; -webkit-appearance:none;
+  flex:0 1 200px; min-width:0; width:200px; text-align:left;
+  background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.12); border-radius:9px;
+  padding:7px 11px; color:var(--text-bright,#fff); font-size:13.5px; font-weight:600;
   transition:border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
 }
 .settings-name-input::placeholder{ color:rgba(220,230,250,.32); font-weight:500; }
@@ -22447,20 +22438,6 @@ body.aurix-premium-lock{ overflow:hidden; }
   outline:none; border-color:rgba(77,141,255,.55);
   background:rgba(77,141,255,.07); box-shadow:0 0 0 3px rgba(77,141,255,.14);
 }
-.settings-name-save{
-  appearance:none; -webkit-appearance:none; cursor:pointer; flex:0 0 auto;
-  padding:8px 14px; border-radius:9px;
-  background:rgba(77,141,255,.14); border:1px solid rgba(77,141,255,.34);
-  color:#cfe1ff; font-size:12.5px; font-weight:700; letter-spacing:.01em;
-  transition:background 140ms ease, color 140ms ease, border-color 140ms ease;
-}
-.settings-name-save:hover{ background:rgba(77,141,255,.22); color:#eaf2ff; }
-.settings-name-save:active{ transform:scale(.98); }
-.settings-name-save.is-saved{ background:rgba(64,180,120,.18); border-color:rgba(64,180,120,.42); color:#bff0d2; }
-
-/* Narrow screens: stack the editor under the label, input grows to fill. */
 @media (max-width: 560px){
-  .settings-row--editable{ flex-direction:column; align-items:stretch; gap:9px; }
-  .settings-name-edit{ width:100%; }
-  .settings-name-input{ flex:1 1 auto; width:auto; }
+  .settings-name-input{ flex:1 1 auto; width:auto; max-width:58%; }
 }
