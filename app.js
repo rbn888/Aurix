@@ -17756,9 +17756,21 @@ if (typeof window !== 'undefined') {
     return o;
   };
 
+  window.debugAurixNarrative = (range) => {
+    const r = range || activeRange;
+    const o = { range: r, layer: 'WN.18 Institutional Narrative Engine' };
+    try {
+      const p = _vizPipeline(r);
+      const rs = _wscRegimeYScale(p.plotVals, r, p.uTs);
+      Object.assign(o, _wscNarrativeModel(rs, p.plotVals, p.uTs, r));
+      try { console.log('[viz-narrative]', r, '| anchor:', o.narrativeAnchor, '| dom:', o.dominantRegime, o.dominantRegimePct + '%', '| dd:', o.drawdownClassification, o.drawdownPct + '%', '| eventDom:', o.eventDominancePct + '% capped:', o.eventDominanceCapped, '| persist:', o.regimePersistenceScore, 'flips:', o.regimeFlipCount, '| wealth:', o.wealthNarrativeScore, o.institutionalProfileMatch, '|', o.visualNarrativeMode); } catch (_) {}
+    } catch (e) { o.error = String(e); }
+    return o;
+  };
+
   window.debugAurixVisualEngine = (range) => {
     const r = range || activeRange;
-    const o = { range: r, layer: 'WN.17 Institutional Chart Surface' };
+    const o = { range: r, layer: 'WN.18 Institutional Narrative Engine' };
     try {
       const sc = window.debugAurixRegimeScaling(r);
       const comp = window.debugAurixCompression(r);
@@ -17830,7 +17842,11 @@ if (typeof window !== 'undefined') {
       o.scenarioValidationSummary = { xStrictlyIncreasing: xInc, yInBounds: gBounds, gFracMonotone: gMono,
         noNaN: !gNaN && noNaNvals, metricUnchanged: true, realEstatePolluted: false };
 
-      try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| narrative:', o.visualNarrativeMode, '| staticGrid:', o.staticGrid, '| xLabels:', o.xLabelsMode, '| active%:', o.activeRegionWidthPct, '| needle:', o.terminalNeedleDetected, '→capped:', o.terminalNeedleCapped, '| occ%:', o.occupancyPct); } catch (_) {}
+      // ── WN.18 — narrative interpretation (PART 1–7) ──────────────────────
+      o.narrative = window.debugAurixNarrative(r);
+      o.visualNarrativeMode = o.narrative.visualNarrativeMode;
+
+      try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| narrative:', o.visualNarrativeMode, '| anchor:', o.narrative.narrativeAnchor, '| dd:', o.narrative.drawdownClassification, '| eventDom%:', o.narrative.eventDominancePct, 'capped:', o.narrative.eventDominanceCapped, '| wealth:', o.narrative.wealthNarrativeScore, o.narrative.institutionalProfileMatch, '| staticGrid:', o.staticGrid, '| occ%:', o.occupancyPct); } catch (_) {}
     } catch (e) { o.error = String(e); }
     return o;
   };
@@ -18160,6 +18176,115 @@ function _wscAllocate(wants, floors, total) {
   const s = vis.reduce((a, b) => a + b, 0) || 1; return vis.map(v => (v / s) * total);
 }
 
+// ── WN.18 PART 3 — Drawdown Context Engine ──────────────────────────────────
+// Peak-to-current interpretation so a healthy correction inside an uptrend
+// (e.g. 64k → 62.8k ≈ -1.9%) reads as a NORMAL correction, NOT a collapse. Pure
+// measurement on the rendered (adjusted) series — no value change, no geometry.
+function _wscClassifyDrawdown(values, timestamps) {
+  const n = values.length;
+  const out = { peak: null, peakIndex: -1, current: null, drawdownPct: 0, drawdownDuration: 0, drawdownClassification: 'NONE' };
+  if (n < 2) return out;
+  let peak = values[0], peakIdx = 0;
+  for (let i = 1; i < n; i++) { if (values[i] >= peak) { peak = values[i]; peakIdx = i; } }
+  const cur = values[n - 1];
+  out.peak = peak; out.peakIndex = peakIdx; out.current = cur;
+  const dd = peak > 0 ? Math.max(0, (1 - cur / peak) * 100) : 0;     // % below the running peak
+  out.drawdownPct = +dd.toFixed(2);
+  let durFrac = (n - 1 - peakIdx) / ((n - 1) || 1);
+  if (timestamps && timestamps.length === n && peakIdx >= 0) {
+    const span = (timestamps[n - 1] - timestamps[0]) || 1;
+    durFrac = (timestamps[n - 1] - timestamps[peakIdx]) / span;
+  }
+  out.drawdownDuration = +(durFrac * 100).toFixed(1);               // % of window elapsed since the peak
+  if (dd < 1.5) out.drawdownClassification = 'MINOR_PULLBACK';
+  else if (dd < 8) out.drawdownClassification = 'NORMAL_CORRECTION';
+  else if (dd < 20) out.drawdownClassification = 'DEEP_CORRECTION';
+  else out.drawdownClassification = 'REGIME_CHANGE';
+  return out;
+}
+
+// ── WN.18 — Institutional Narrative Engine (analysis layer) ─────────────────
+// Reads the already-built geometry (regimes + visual allocation from WN.15/16)
+// and interprets it as a PORTFOLIO STORY: base → expansion → consolidation →
+// current state. Pure measurement — it changes nothing about the curve, the
+// values, the tooltip or the metric; it exposes the narrative the geometry tells
+// so it can be validated and surfaced. Wealth platforms (Kubera, Bloomberg
+// Wealth, IBKR PortfolioAnalyst) lead with portfolio state and regime structure,
+// not with the single biggest event — these scores measure that alignment.
+function _wscNarrativeModel(rscale, values, timestamps, range) {
+  const LAB = { LOW_BASE: 'acumulación', EXPANSION: 'expansión', CORRECTION: 'corrección', CONSOLIDATION: 'consolidación', CURRENT_CONSOLIDATION: 'consolidación actual' };
+  const regimes = (rscale && rscale.regimes) || [];
+  const alloc = (rscale && rscale.allocation) || [];
+  const w16 = (rscale && rscale.wn16) || {};
+  const n = values.length;
+  const dd = w16.drawdown || _wscClassifyDrawdown(values, timestamps);
+  const out = {
+    mode: rscale ? rscale.mode : 'linear',
+    // PART 1
+    dominantRegime: null, dominantRegimePct: null, narrativeAnchor: null,
+    // PART 2
+    consolidationPromotion: false, currentRegimeVisualShare: null, consolidationDurationPct: null,
+    // PART 3
+    drawdownPct: dd.drawdownPct, drawdownDuration: dd.drawdownDuration, drawdownClassification: dd.drawdownClassification,
+    // PART 4
+    eventDominancePct: null, eventDominanceCapped: true, totalNarrativeBalance: null,
+    // PART 5
+    slopeNormalizationApplied: !!(rscale && rscale.mode === 'regime-relative'), straightRampSegments: 0, institutionalSlopeScore: null,
+    // PART 6
+    wealthNarrativeScore: null, institutionalProfileMatch: null,
+    // PART 7
+    regimePersistenceScore: null, regimeFlipCount: 0, hysteresisApplied: true,
+    visualNarrativeMode: null,
+  };
+  // PART 5 — straight-ramp count + institutional slope score (collinear runs ≥4).
+  if (n >= 3) {
+    const lo = Math.min(...values), hi = Math.max(...values), tol = (hi - lo) * 0.004 || 1e-6;
+    let run = 1; for (let i = 1; i < n - 1; i++) { const mid = values[i - 1] + (values[i + 1] - values[i - 1]) * 0.5; if (Math.abs(values[i] - mid) <= tol) run++; else { if (run >= 4) out.straightRampSegments++; run = 1; } } if (run >= 4) out.straightRampSegments++;
+    out.institutionalSlopeScore = +Math.max(0, 1 - out.straightRampSegments / Math.max(3, Math.ceil(n / 20))).toFixed(2);
+  }
+  if (!regimes.length) {
+    out.visualNarrativeMode = 'lineal-fiel';
+    out.institutionalProfileMatch = 'LINEAR_FAITHFUL';
+    out.wealthNarrativeScore = 0.6;
+    return out;
+  }
+  // PART 7 — regime flips / persistence (the detector already merges short runs
+  // and level-close neighbours → hysteresis is structurally applied).
+  let flips = 0; for (let k = 1; k < regimes.length; k++) if (regimes[k].type !== regimes[k - 1].type) flips++;
+  out.regimeFlipCount = flips;
+  out.regimePersistenceScore = +Math.max(0, Math.min(1, 1 - flips / Math.max(4, regimes.length))).toFixed(2);
+  // PART 1 — dominant regime by PERSISTENCE (time/sample share), so an isolated
+  // event can never own the interpretation of the whole chart.
+  let domK = 0, domShare = -1;
+  regimes.forEach((r, k) => { const sh = (r.endIndex - r.startIndex) / (n || 1); if (sh > domShare) { domShare = sh; domK = k; } });
+  out.dominantRegime = regimes[domK].type;
+  out.dominantRegimePct = +(domShare * 100).toFixed(1);
+  out.narrativeAnchor = LAB[regimes[domK].type] || regimes[domK].type;
+  const seq = []; regimes.forEach(r => { const l = LAB[r.type] || r.type; if (seq[seq.length - 1] !== l) seq.push(l); });
+  out.visualNarrativeMode = rscale.mode === 'regime-relative' ? seq.join(' → ') : 'lineal-fiel';
+  // PART 2 — current-state legibility.
+  const curReg = regimes[regimes.length - 1];
+  out.consolidationDurationPct = +(((curReg.endIndex - curReg.startIndex) / (n || 1)) * 100).toFixed(1);
+  const curAlloc = alloc[alloc.length - 1];
+  out.currentRegimeVisualShare = (curAlloc && curAlloc.visualPct != null) ? curAlloc.visualPct : null;
+  const curIsConsol = curReg.type === 'CURRENT_CONSOLIDATION' || curReg.type === 'CONSOLIDATION';
+  out.consolidationPromotion = !!(curIsConsol && (out.consolidationDurationPct > 35 || (out.currentRegimeVisualShare || 0) > 25));
+  // PART 4 — event (transition) dominance vs the per-range cap.
+  let eventDom = 0; alloc.forEach(a => { if (a.isTransition && a.visualPct > eventDom) eventDom = a.visualPct; });
+  out.eventDominancePct = +eventDom.toFixed(1);
+  const cap = range === 'all' ? 24 : range === '1y' ? 28 : 35;
+  out.eventDominanceCapped = eventDom <= cap + 0.5;
+  out.totalNarrativeBalance = +Math.max(0, Math.min(1, 1 - Math.max(0, eventDom - cap) / 100)).toFixed(2);
+  // PART 6 — composite institutional alignment: persistence, current-state
+  // visibility, event-not-dominating, organic slope. Portfolio first, events second.
+  const consVis = Math.min(1, (out.currentRegimeVisualShare || 0) / 100 / 0.30);
+  const eventOk = out.eventDominanceCapped ? 1 : Math.max(0, 1 - (eventDom - cap) / 40);
+  const slope = out.institutionalSlopeScore != null ? out.institutionalSlopeScore : 0.7;
+  out.wealthNarrativeScore = +Math.max(0, Math.min(1, 0.30 * out.regimePersistenceScore + 0.25 * consVis + 0.25 * eventOk + 0.20 * slope)).toFixed(2);
+  out.institutionalProfileMatch = out.wealthNarrativeScore > 0.75 ? 'HIGH' : out.wealthNarrativeScore > 0.5 ? 'MEDIUM' : 'DEVELOPING';
+  return out;
+}
+
 // Build a monotone value→[0,1] visual mapping (and its inverse) that gives each
 // meaningful regime a visible vertical lane. gFrac(lo)=0, gFrac(hi)=1, strictly
 // non-decreasing. Returns mode:'linear' (identity remap) when a regime transform
@@ -18173,7 +18298,7 @@ function _wscRegimeYScale(values, range, timestamps) {
   const wn16Default = { terminalSpikeDetected: false, spikeRegimeIndex: -1, spikeReason: null,
     spikeVisualBudgetBefore: null, spikeVisualBudgetAfter: null, currentConsolidationFloorApplied: false,
     consolidationVisualHeightPct: null, plateauBreathingFactor: 1, totalHistoricalBalanceApplied: false,
-    finalRegimeHeightAllocations: null };
+    finalRegimeHeightAllocations: null, drawdown: null, consolidationPromotedByDuration: false };
   let wn16 = { ...wn16Default };                                  // function-scoped; populated below for regime-relative mode
   const linear = (reason, regimes) => ({ mode: 'linear',
     gFrac: v => span > 0 ? Math.min(1, Math.max(0, (v - lo) / span)) : 0.5,
@@ -18294,12 +18419,20 @@ function _wscRegimeYScale(values, range, timestamps) {
         }
       }
 
+      // WN.18 PART 3 — drawdown context (peak→current), used to keep a healthy
+      // correction from being visually dramatized + surfaced to the narrative layer.
+      const dd = _wscClassifyDrawdown(values, timestamps);
+      wn16.drawdown = dd;
+
       // PART 4 — plateau breathing: give the (flat-ish) current consolidation a
       // little more vertical room so real 63k–67k movement reads. Implemented as a
       // height multiplier on the SAME monotone lane → cannot invent highs/lows.
       let breathe = 1;
       if (curQualifies) {
         breathe = curReg.spanPct < 0.5 ? 1.5 : curReg.spanPct < 1.5 ? 1.35 : 1.2;   // flatter → breathe more
+        // WN.18 PART 3 — when the current regime sits in a real pullback, cap the
+        // breathing so a NORMAL/DEEP correction is not exaggerated into a crash.
+        if (dd.drawdownClassification === 'NORMAL_CORRECTION' || dd.drawdownClassification === 'DEEP_CORRECTION') breathe = Math.min(breathe, 1.2);
         want[curK] *= breathe;
       }
       wn16.plateauBreathingFactor = +breathe.toFixed(2);
@@ -18319,6 +18452,15 @@ function _wscRegimeYScale(values, range, timestamps) {
       if (spike.isTerminalSpike && curQualifies) {
         floorCur = Math.max(floorCur, range === 'all' ? 0.30 : 0.26);
         wn16.currentConsolidationFloorApplied = true;
+      }
+      // WN.18 PART 2 — consolidation promotion: a long-lived current consolidation
+      // IS the portfolio's present state and should be legible. Gentle floor that
+      // never overrides the stronger spike-follow floors and stays within the
+      // guardrails (clampNorm + the 35% transition cap keep it from over-amplifying).
+      const curDurFrac = curPts / (n || 1);
+      if ((curReg.type === 'CURRENT_CONSOLIDATION' || curReg.type === 'CONSOLIDATION') && curDurFrac > 0.35 && curMoves) {
+        floorCur = Math.max(floorCur, 0.25);
+        wn16.consolidationPromotedByDuration = true;
       }
       if (floorCur > 0) mins[curK] = Math.min(floorCur, 0.6);      // never let a floor swallow the chart
 
@@ -18468,6 +18610,8 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
     window._aurixChartMode.terminalNeedleDetected = !!w16.terminalSpikeDetected;
     window._aurixChartMode.terminalNeedleCapped = !!(w16.terminalSpikeDetected && w16.spikeVisualBudgetBefore != null
       && w16.spikeVisualBudgetAfter != null && w16.spikeVisualBudgetAfter < w16.spikeVisualBudgetBefore - 0.05);
+    // WN.18 — narrative interpretation snapshot (analysis-only; reads the geometry).
+    try { window._aurixChartMode.narrative = _wscNarrativeModel(rscale, plotVals, uTs, activeRange); } catch (_) { window._aurixChartMode.narrative = null; }
   }
   const linePath = _wscMonotonePath(pts);
   const areaPath = `${linePath} L${pts[pts.length - 1].x.toFixed(2)},${vp.bot.toFixed(2)} L${pts[0].x.toFixed(2)},${vp.bot.toFixed(2)} Z`;
