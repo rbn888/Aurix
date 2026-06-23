@@ -17435,6 +17435,38 @@ function _wscFmtAxisVal(v) {
   return Math.round(v).toString();
 }
 
+// ── WN.21 PART 7 — premium Y-axis labels (nice rounded ticks) ───────────────
+// A "nice" tick step (1 / 2 / 2.5 / 5 × 10^k) so labels read 64k / 65k / 66k,
+// never 63.781k / 64.238k. Pure formatting — the tooltip stays the exact source.
+function _wscNiceStep(span, maxTicks) {
+  maxTicks = maxTicks || 4;
+  const rough = span / maxTicks;
+  if (!(rough > 0)) return span > 0 ? span : 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+  const norm = rough / mag;
+  const nice = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10;
+  return nice * mag;
+}
+// Nice tick VALUES within [lo,hi] (rounded to the nice step) — labels are then
+// placed at each value's mapped screen position, so they stay clean and distinct.
+function _wscNiceTicks(lo, hi, maxTicks) {
+  if (!(hi > lo)) return [lo];
+  const step = _wscNiceStep(hi - lo, maxTicks || 4);
+  const first = Math.ceil(lo / step - 1e-9) * step;
+  const ticks = [];
+  for (let v = first; v <= hi + step * 1e-6 && ticks.length < 14; v += step) ticks.push(+v.toFixed(6));
+  return ticks.length ? ticks : [lo, hi];
+}
+// Format a value at a given nice step — decimals derived from the STEP so the
+// ticks stay clean AND distinct even on a tight domain (24.8k / 25.0k / 25.2k).
+function _wscFmtAxisValStep(v, step) {
+  const a = Math.abs(v), s = Math.abs(step) || a || 1;
+  if (a >= 1e6) return s < 1e4 ? Math.round(v).toLocaleString('en-US') : (v / 1e6).toFixed(s >= 1e6 ? 0 : 1) + 'M';
+  if (a >= 1e3) return s < 100 ? Math.round(v).toLocaleString('en-US') : (v / 1e3).toFixed(s >= 1e3 ? 0 : 1) + 'k';   // tight domain → clean integer, no awkward k-decimals
+  if (a >= 1) return v.toFixed(s >= 1 ? 0 : 1);
+  return v.toFixed(2);
+}
+
 // X-axis ticks (5) across [t0, t1] formatted per range.
 function _wscXTicks(t0, t1, range) {
   const span = (t1 - t0) || 1, N = 5, ticks = [];
@@ -17782,9 +17814,22 @@ if (typeof window !== 'undefined') {
     return o;
   };
 
+  window.debugAurixYScale = (range) => {
+    const r = range || activeRange;
+    const o = { range: r, layer: 'WN.21 Institutional Y-Scale Engine' };
+    try {
+      const p = _vizPipeline(r);
+      const rs = _wscRegimeYScale(p.plotVals, r, p.uTs);
+      const vp = _wscViewport(p.plotVals, r);
+      Object.assign(o, _wscYScaleModel(rs, vp, p.plotVals, r));
+      try { console.log('[viz-yscale]', r, '| score:', o.institutionalYScaleScore, '| curRegime:', o.currentRegimeYShare + '%', 'protected:', o.currentRegimeProtected, '| dd:', o.drawdownDepth + '%', 'vis:', o.drawdownVisualShare + '%', 'honest:', o.drawdownHonestyPassed, '| outlierDom:', o.outlierDominancePct + '%', '| labels:', JSON.stringify(o.yLabelTicks), '| policy:', o.rangeYPolicy, o.yScaleFailures.length ? '| FAILS: ' + o.yScaleFailures.join('; ') : ''); } catch (_) {}
+    } catch (e) { o.error = String(e); }
+    return o;
+  };
+
   window.debugAurixVisualEngine = (range) => {
     const r = range || activeRange;
-    const o = { range: r, layer: 'WN.20 Universal Event Dominance Control' };
+    const o = { range: r, layer: 'WN.21 Institutional Y-Scale Engine' };
     try {
       const sc = window.debugAurixRegimeScaling(r);
       const comp = window.debugAurixCompression(r);
@@ -17869,7 +17914,13 @@ if (typeof window !== 'undefined') {
       o.rangeDominanceThreshold = o.eventDominance.rangeDominanceThreshold;
       o.dominantEventPolicyPassed = o.eventDominance.dominantEventPolicyPassed;
 
-      try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| narrative:', o.visualNarrativeMode, '| visualScore:', o.visualNarrativeScore, '| eventDomScore:', o.eventDominanceScore, 'thr:', o.rangeDominanceThreshold + '%', 'passed:', o.dominantEventPolicyPassed, '| dead%:', o.deadZonePct, 'consol%:', o.consolidationWidthPct, '| staticGrid:', o.staticGrid, '| occ%:', o.occupancyPct); } catch (_) {}
+      // ── WN.21 — institutional Y-scale engine (PART 1–8) ──────────────────
+      o.yScale = window.debugAurixYScale(r);
+      o.institutionalYScaleScore = o.yScale.institutionalYScaleScore;
+      o.currentRegimeProtected = o.yScale.currentRegimeProtected;
+      o.yLabelTicks = o.yScale.yLabelTicks;
+
+      try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| visualScore:', o.visualNarrativeScore, '| eventDomScore:', o.eventDominanceScore, 'passed:', o.dominantEventPolicyPassed, '| yScaleScore:', o.institutionalYScaleScore, 'curProtected:', o.currentRegimeProtected, 'labels:', JSON.stringify(o.yLabelTicks), '| dead%:', o.deadZonePct, '| staticGrid:', o.staticGrid, '| occ%:', o.occupancyPct); } catch (_) {}
     } catch (e) { o.error = String(e); }
     return o;
   };
@@ -18433,6 +18484,118 @@ function _wscEventDominanceModel(rscale, values, aw, range) {
   return out;
 }
 
+// ── WN.21 — Institutional Y-Scale Engine (analysis + scoring) ───────────────
+// Reads the FINAL vertical geometry (WN.15 regime remap + WN.16/20 caps) and
+// the viewport, and reports the institutional Y-domain, current-regime
+// protection, outlier resistance, drawdown honesty, sideways visibility, label
+// quality and a 0–100 institutionalYScaleScore. Pure measurement — it changes
+// no value, geometry, tooltip or metric. PART 1–8/10.
+const _WN21_CUR_MIN = { '24h': 35, '7d': 28, '30d': 25, '1y': 22, 'all': 22 };   // PART 2 — min current-regime Y share
+const _WN21_POLICY = { '24h': 'INTRADAY_VOLATILITY_FIRST', '7d': 'RALLY_AND_CONSOLIDATION', '30d': 'TREND_CORRECTION_STABILIZE', '1y': 'LONGTERM_TREND_FIRST', 'all': 'STRICT_LONGTERM_NO_SINGLE_EVENT' };
+function _wscYScaleModel(rscale, vp, values, range) {
+  const out = {
+    institutionalYDomain: null, linearYDomain: null, domainSource: null, domainOutliersExcluded: 0,
+    currentRegimeYShare: null, currentRegimeDomain: null, currentRegimeProtected: false,
+    yOutliers: 0, softIncludedOutliers: 0, outlierDominancePct: null,
+    drawdownDepth: null, drawdownVisualShare: null, drawdownHonestyPassed: true,
+    sidewaysRangePct: null, sidewaysVisibilityScore: null, microMovementPreserved: false,
+    rangeYPolicy: _WN21_POLICY[range] || null,
+    yLabelTicks: null, yLabelMode: 'nice-step', yLabelQualityScore: null,
+    institutionalYScaleScore: null, yScaleFailures: [],
+  };
+  try {
+    const n = values.length;
+    const sorted = values.slice().sort((a, b) => a - b);
+    const lo = sorted[0], hi = sorted[sorted.length - 1], span = (hi - lo) || 1;
+    out.linearYDomain = [+lo.toFixed(0), +hi.toFixed(0)];
+    const p2 = _wscPercentile(sorted, 0.02), p98 = _wscPercentile(sorted, 0.98);
+    out.institutionalYDomain = [+Math.min(p2, values[n - 1]).toFixed(0), +Math.max(p98, values[n - 1]).toFixed(0)];
+    out.domainSource = rscale.mode === 'regime-relative' ? 'regime-remap' : 'robust-linear';
+    out.domainOutliersExcluded = values.filter(v => v < p2 - 1e-9 || v > p98 + 1e-9).length;
+
+    // PART 3 — outliers (robust MAD) — soft-included (the monotone map keeps them visible).
+    const med = sorted[(n - 1) >> 1];
+    const dev = sorted.map(v => Math.abs(v - med)).sort((a, b) => a - b);
+    const mad = dev[(n - 1) >> 1] || (span * 0.001);
+    out.yOutliers = values.filter(v => Math.abs(v - med) > 6 * mad).length;
+    out.softIncludedOutliers = out.yOutliers;                         // all values map inside [0,1] via gFrac
+    const w20 = rscale.wn20 || {};
+    out.outlierDominancePct = w20.postCompressionDominance != null ? w20.postCompressionDominance
+      : (w20.preCompressionDominance != null ? w20.preCompressionDominance : null);
+
+    // PART 2 — current regime protection.
+    const regimes = rscale.regimes || [], alloc = rscale.allocation || [];
+    const curReg = regimes.length ? regimes[regimes.length - 1] : null;
+    if (curReg) out.currentRegimeDomain = [+curReg.min.toFixed(0), +curReg.max.toFixed(0)];
+    if (rscale.mode === 'regime-relative' && alloc.length) {
+      out.currentRegimeYShare = alloc[alloc.length - 1].visualPct;
+    } else if (curReg) {
+      out.currentRegimeYShare = +(((curReg.max - curReg.min) / span) * 100).toFixed(1);   // linear value share
+    }
+    const curMin = _WN21_CUR_MIN[range] || 22;
+    const curActive = curReg ? (curReg.spanPct || 0) > 0.15 : false;
+    // Protected if it meets the min share, OR it's a faithful linear render (nothing flattening it),
+    // OR it is genuinely flat (no movement to protect).
+    out.currentRegimeProtected = (out.currentRegimeYShare != null && out.currentRegimeYShare >= curMin - 0.6)
+      || rscale.mode === 'linear' || !curActive;
+
+    // PART 4 — drawdown honesty.
+    const dd = (rscale.wn16 && rscale.wn16.drawdown) || _wscClassifyDrawdown(values, null);
+    out.drawdownDepth = dd.drawdownPct;
+    if (dd.peak != null && rscale.gFrac) {
+      const vs = (rscale.gFrac(dd.peak) - rscale.gFrac(dd.current)) * 100;
+      out.drawdownVisualShare = +Math.max(0, vs).toFixed(1);
+    }
+    // Honest: a GENUINE fall (≥5%) must stay visible (not over-compressed). The
+    // "small pullback looks like a crash" guard only applies to an ACTIVE current
+    // regime (a real directional move) — a wide sideways CONSOLIDATION shown with
+    // its full range is the intended PART 5 breathing, not exaggeration.
+    const curIsTransition = curReg && (curReg.type === 'EXPANSION' || curReg.type === 'CORRECTION');
+    let ddOk = true;
+    if (dd.drawdownPct >= 5 && out.drawdownVisualShare != null && out.drawdownVisualShare < dd.drawdownPct * 0.25) ddOk = false;     // genuine loss over-compressed
+    if (curIsTransition && dd.drawdownPct < 1.5 && out.drawdownVisualShare != null && out.drawdownVisualShare > 35) ddOk = false;    // active tiny move overblown
+    out.drawdownHonestyPassed = ddOk;
+
+    // PART 5 — sideways visibility (current regime micro-movement).
+    out.sidewaysRangePct = curReg ? curReg.spanPct : null;
+    let dirChanges = 0; for (let i = 2; i < n; i++) { const a = Math.sign(values[i - 1] - values[i - 2]), b = Math.sign(values[i] - values[i - 1]); if (a !== 0 && b !== 0 && a !== b) dirChanges++; }
+    out.microMovementPreserved = dirChanges > 0;
+    const mv = out.sidewaysRangePct || 0;
+    // If movement exists it should be visible (current regime gets visible share); if flat, calm is fine.
+    out.sidewaysVisibilityScore = mv < 0.05 ? 100
+      : (out.currentRegimeYShare != null ? Math.max(0, Math.min(100, (out.currentRegimeYShare / curMin) * 100)) : (rscale.mode === 'linear' ? 100 : 80));
+
+    // PART 7 — label quality.
+    const ticks = _wscNiceTicks(lo, hi, 4);
+    out.yLabelTicks = ticks.map(v => _wscFmtAxisValStep(v, ticks.length > 1 ? ticks[1] - ticks[0] : span));
+    const distinct = new Set(out.yLabelTicks).size === out.yLabelTicks.length;
+    const countOk = ticks.length >= 2 && ticks.length <= 6;          // 2 clean labels is already premium
+    out.yLabelQualityScore = (distinct ? 60 : 30) + (countOk ? 40 : 15);
+
+    // PART 8 — composite institutional Y-scale score.
+    const curVisComp = out.currentRegimeProtected ? 100 : Math.max(0, Math.min(100, ((out.currentRegimeYShare || 0) / curMin) * 100));
+    const ddComp = out.drawdownHonestyPassed ? 100 : 55;
+    const cap = (range === 'all') ? 19 : (range === '24h' || range === '1y') ? 22 : (range === '7d') ? 24 : 25;
+    const outlierComp = out.outlierDominancePct == null ? 100 : Math.max(0, Math.min(100, 100 - Math.max(0, out.outlierDominancePct - cap) * 4));
+    const sideComp = out.sidewaysVisibilityScore != null ? out.sidewaysVisibilityScore : 90;
+    const labelComp = out.yLabelQualityScore;
+    const occ = vp && vp.occ != null ? vp.occ : 0.6;
+    const edgeComp = (occ >= 0.45 && occ <= 0.72) ? 100 : Math.max(0, 100 - Math.abs(occ - 0.58) * 200);
+    const rangeBalance = (rscale.mode === 'regime-relative' && alloc.length >= 2) ? 100 : 92;
+    const score = 0.24 * curVisComp + 0.16 * ddComp + 0.16 * outlierComp + 0.14 * sideComp + 0.12 * labelComp + 0.10 * edgeComp + 0.08 * rangeBalance;
+    out.institutionalYScaleScore = +Math.max(0, Math.min(100, score)).toFixed(1);
+    const fails = [];
+    if (curVisComp < 90) fails.push(`current regime visibility ${out.currentRegimeYShare}% < ${curMin}%`);
+    if (!out.drawdownHonestyPassed) fails.push(`drawdown honesty (depth ${out.drawdownDepth}% vs visual ${out.drawdownVisualShare}%)`);
+    if (outlierComp < 90) fails.push(`outlier dominance ${out.outlierDominancePct}% > cap ${cap}%`);
+    if (sideComp < 90) fails.push(`sideways visibility ${sideComp}`);
+    if (labelComp < 90) fails.push(`label quality ${labelComp}`);
+    if (edgeComp < 90) fails.push(`edge hugging occ ${(occ * 100).toFixed(0)}%`);
+    out.yScaleFailures = fails;
+  } catch (e) { out.error = String(e && e.message || e); }
+  return out;
+}
+
 // ── WN.18 — Institutional Narrative Engine (analysis layer) ─────────────────
 // Reads the already-built geometry (regimes + visual allocation from WN.15/16)
 // and interprets it as a PORTFOLIO STORY: base → expansion → consolidation →
@@ -18871,6 +19034,8 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
     try { window._aurixChartMode.narrative = _wscNarrativeModel(rscale, plotVals, uTs, activeRange, aw); } catch (_) { window._aurixChartMode.narrative = null; }
     // WN.20 — event-dominance control snapshot.
     try { window._aurixChartMode.eventDominance = _wscEventDominanceModel(rscale, plotVals, aw, activeRange); } catch (_) { window._aurixChartMode.eventDominance = null; }
+    // WN.21 — institutional Y-scale snapshot.
+    try { window._aurixChartMode.yScale = _wscYScaleModel(rscale, vp, plotVals, activeRange); } catch (_) { window._aurixChartMode.yScale = null; }
   }
   const linePath = _wscMonotonePath(pts);
   const areaPath = `${linePath} L${pts[pts.length - 1].x.toFixed(2)},${vp.bot.toFixed(2)} L${pts[0].x.toFixed(2)},${vp.bot.toFixed(2)} Z`;
@@ -18889,12 +19054,25 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   yTicks.forEach(tk => { grid += `<line class="wsc-grid" x1="${gx1}" y1="${tk.y.toFixed(1)}" x2="${gx2}" y2="${tk.y.toFixed(1)}" vector-effect="non-scaling-stroke"/>`; });
   _GRID_V_FRACS.forEach(f => { const x = (padX + f * plotW).toFixed(1); grid += `<line class="wsc-grid wsc-grid-v" x1="${x}" y1="${vp.top.toFixed(1)}" x2="${x}" y2="${vp.bot.toFixed(1)}" vector-effect="non-scaling-stroke"/>`; });
 
-  // WN.17 PART 2 (Option A) — Y-axis value labels stay on the right (real
-  // investable values at the static horizontal lines). The bottom X-axis text
-  // labels are REMOVED: the hover tooltip is the single, exact source of
-  // date/time, so there is no noisy warp-anchored bottom label row. Static
-  // vertical grid lines provide the temporal rhythm.
-  const yLabels = yTicks.map(tk => `<span class="wsc-ylab" style="top:${(tk.y / H * 100).toFixed(2)}%">${_wscFmtAxisVal(tk.val)}</span>`).join('');
+  // WN.17 PART 2 (Option A) — bottom X-axis text labels REMOVED (tooltip is the
+  // exact date/time source); static vertical grid lines keep the temporal rhythm.
+  // WN.21 PART 7 — premium right-side Y labels: nice rounded tick VALUES
+  // (64k / 65k / 66k, never 63.781k) placed at their mapped screen positions.
+  // The static grid lines above are unchanged; only the value labels are
+  // value-anchored. Falls back to the gridline labels if the domain is too tight.
+  const _niceTicks = _wscNiceTicks(vp.lo, vp.hi, 4);
+  const _yStep = _niceTicks.length > 1 ? _niceTicks[1] - _niceTicks[0] : ((vp.hi - vp.lo) || 1);
+  const _minLabelGapPx = H * 0.06;
+  const _yLabelPts = []; let _lastLabY = -1e9;
+  _niceTicks.forEach(tv => {
+    const y = yOf(tv);
+    if (y < vp.lineTop - 1 || y > vp.lineBot + 1) return;
+    if (Math.abs(y - _lastLabY) < _minLabelGapPx) return;
+    _lastLabY = y; _yLabelPts.push({ y, val: tv });
+  });
+  const _useNice = _yLabelPts.length >= 2;
+  const _labelSrc = _useNice ? _yLabelPts : yTicks;
+  const yLabels = _labelSrc.map(tk => `<span class="wsc-ylab" style="top:${(tk.y / H * 100).toFixed(2)}%">${_useNice ? _wscFmtAxisValStep(tk.val, _yStep) : _wscFmtAxisVal(tk.val)}</span>`).join('');
   const xLabels = '';
 
   hostEl.innerHTML = `
