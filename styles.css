@@ -22161,3 +22161,59 @@ body.aurix-premium-lock{ overflow:hidden; }
   .aurix-premium-overlay, .aurix-premium-modal{ transition:none; }
   .aurix-premium-modal{ transform:none; }
 }
+
+/* ── WN.P1 refinement — premium experience + visual hierarchy ───────────────
+   Hero emphasis, 2-column feature lists, Premium intelligence positioning band,
+   Premium dominant / Free de-emphasized, Founder framed as Premium·Founder.
+   Hierarchy: Premium > Founder > Free. Later rules override the base block. */
+.aurix-premium-tagline{ font-size:28px; line-height:1.15; letter-spacing:-.01em; }
+.aurix-premium-sub{ margin:0 0 8px; font-size:15px; font-weight:700; color:var(--accent,#4d8dff); }
+
+/* Two-column feature lists (less empty space, more institutional). */
+.aurix-premium-list.is-2col{ display:grid; grid-template-columns:1fr 1fr; gap:6px 16px; }
+
+/* Free de-emphasized; Premium comparison card dominant. */
+.aurix-premium-compare-col.is-free{ opacity:.9; background:rgba(255,255,255,.015); }
+.aurix-premium-compare-col.is-free .aurix-premium-compare-tier{ color:#9aa7bd; }
+.aurix-premium-compare-col.is-premium{
+  border-color:rgba(77,141,255,.42);
+  background:linear-gradient(165deg, rgba(77,141,255,.09), rgba(77,141,255,.03));
+  box-shadow:0 0 34px rgba(77,141,255,.1), inset 0 1px 0 rgba(255,255,255,.05);
+}
+
+/* Premium intelligence positioning band (above the Premium list). */
+.aurix-premium-pos{ margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid rgba(77,141,255,.18); }
+.aurix-premium-pos-title{ display:block; font-size:11.5px; font-weight:900; letter-spacing:.12em; color:var(--accent,#4d8dff); line-height:1.3; }
+.aurix-premium-pos-text{ margin:5px 0 9px; font-size:12px; color:#9aa7bd; line-height:1.45; }
+.aurix-premium-indicators{ display:flex; flex-wrap:wrap; gap:6px; }
+.aurix-premium-ind{
+  font-size:10.5px; font-weight:700; letter-spacing:.04em; padding:3px 9px; border-radius:999px;
+  color:#bcd0ff; background:rgba(77,141,255,.12); border:1px solid rgba(77,141,255,.28);
+}
+
+/* Plan benefit lists. */
+.aurix-premium-benefits{ list-style:none; margin:10px 0 12px; padding:0; display:flex; flex-direction:column; gap:6px; }
+.aurix-premium-benefits li{ position:relative; padding-left:20px; font-size:12.5px; color:#c2ccdd; line-height:1.35; }
+.aurix-premium-benefits li::before{ content:"✓"; position:absolute; left:0; top:0; font-weight:800; }
+.aurix-premium-benefits li.is-prem::before{ color:var(--accent,#4d8dff); }
+.aurix-premium-benefits li.is-founder::before{ color:#d4af5d; }
+
+/* Standard Premium = dominant pricing block (blue presence, strong CTA). */
+.aurix-premium-standard{
+  border-color:rgba(77,141,255,.5);
+  background:linear-gradient(165deg, rgba(77,141,255,.10), rgba(255,255,255,.02));
+  box-shadow:0 0 34px rgba(77,141,255,.12), inset 0 1px 0 rgba(255,255,255,.06);
+}
+.aurix-premium-standard .aurix-premium-cta.is-premium{ padding:13px 14px; font-size:14px; }
+
+/* Founder framed as an exclusive edition OF Premium (kicker + gold badge). */
+.aurix-premium-kicker{ font-size:10px; font-weight:900; letter-spacing:.2em; color:var(--accent,#4d8dff); }
+.aurix-premium-plan-top{ justify-content:space-between; }
+
+/* Trust block — reassuring, primary line emphasized. */
+.aurix-premium-trust-1{ font-size:13px !important; font-weight:700 !important; color:#e7ecf5 !important; }
+
+@media (max-width:720px){
+  .aurix-premium-list.is-2col{ grid-template-columns:1fr; }
+  .aurix-premium-tagline{ font-size:23px; }
+}

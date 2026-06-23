@@ -2756,6 +2756,66 @@ const T = {
     settingsAssetsSoftWarn:   'Estás cerca del límite del plan Free.',
     settingsFounderName:      'Aurix Founder',
     menuPremium:              '✦ Aurix Premium',
+    // WN.P1 refinement — Aurix Premium modal (fully localized)
+    ap_eyebrow:        'AURIX PREMIUM',
+    ap_hero_title:     'LA INTELIGENCIA DETRÁS DE TU PATRIMONIO',
+    ap_hero_sub:       'Convierte datos financieros en decisiones más inteligentes.',
+    ap_hero_text:      'Aurix Premium te ayuda a comprender riesgos, concentración, liquidez y evolución patrimonial desde una única plataforma.',
+    ap_pos_title:      'LA CAPA DE INTELIGENCIA PATRIMONIAL DE AURIX',
+    ap_pos_text:       'Diseñada para ayudarte a comprender qué impulsa realmente tu patrimonio.',
+    ap_ind_risk:       'Riesgo',
+    ap_ind_conc:       'Concentración',
+    ap_ind_liq:        'Liquidez',
+    ap_ind_div:        'Diversificación',
+    ap_ind_evo:        'Evolución',
+    ap_free_tier:      'Aurix Free',
+    ap_f_dash:         'Dashboard Patrimonial',
+    ap_f_evo:          'Evolución Patrimonial',
+    ap_f_assets:       'Registro de Activos',
+    ap_f_dist:         'Distribución Patrimonial',
+    ap_f_track:        'Seguimiento Patrimonial',
+    ap_f_market:       'Mercado',
+    ap_f_metals:       'Metales',
+    ap_f_re:           'Inmuebles',
+    ap_f_liq:          'Liquidez',
+    ap_f_wsbasic:      'Zona de Trabajo Básica',
+    ap_f_viz:          'Visualización Patrimonial',
+    ap_premium_tier:   'Aurix Premium',
+    ap_p_health:       'Salud Patrimonial',
+    ap_p_intel:        'Centro de Inteligencia',
+    ap_p_risk:         'Riesgos Detectados',
+    ap_p_conc:         'Concentración Patrimonial',
+    ap_p_div:          'Diversificación',
+    ap_p_drivers:      'Impulsores Patrimoniales',
+    ap_p_liq:          'Liquidez Avanzada',
+    ap_p_timeline:     'Línea Temporal Patrimonial',
+    ap_p_ws:           'Zona de Trabajo Avanzada',
+    ap_p_goals:        'Objetivos Patrimoniales',
+    ap_p_reports:      'Informes Avanzados',
+    ap_p_future:       'Futuras Funciones Premium',
+    ap_std_title:      'Aurix Premium',
+    ap_std_text:       'La plataforma completa de inteligencia patrimonial.',
+    ap_std_b1:         'Todas las funciones Premium',
+    ap_std_b2:         'Actualizaciones futuras incluidas',
+    ap_std_b3:         'Acceso completo al Centro de Inteligencia',
+    ap_std_b4:         'Informes y análisis avanzados',
+    ap_std_sub:        'Menos de 5€/mes.',
+    ap_std_cta:        'Desbloquear Premium',
+    ap_std_monthly:    '5,99€/mes',
+    ap_founder_title:  'Founder Edition',
+    ap_founder_badge:  'FOUNDER',
+    ap_founder_text:   'Acceso reservado para los primeros miembros de Aurix.',
+    ap_founder_b1:     'Precio fundador permanente',
+    ap_founder_b2:     'Insignia Founder',
+    ap_founder_b3:     'Acceso anticipado a nuevas funciones',
+    ap_founder_b4:     'Prioridad en futuras pruebas',
+    ap_founder_note:   'Tu precio nunca aumentará mientras mantengas la suscripción activa.',
+    ap_founder_cta:    'Unirme como Founder',
+    ap_per_year:       '/año',
+    ap_scarcity:       '{taken} de {total} plazas ocupadas · Quedan {rem} plazas Founder',
+    ap_trust_1:        'Tus activos seguirán siendo tuyos.',
+    ap_trust_2:        'Aurix Premium añade inteligencia y contexto, no restricciones sobre tu patrimonio.',
+    ap_close:          'Cerrar',
     settingsFounderPrice:     '14,99€ / año',
     settingsFounderDesc:      'Acceso anticipado. Sin límite de activos. Precio fundador de por vida.',
     settingsFounderCta:       'Conocer Aurix Founder',
@@ -4737,6 +4797,66 @@ const T = {
     settingsAssetsSoftWarn:   "You're close to the Free plan limit.",
     settingsFounderName:      'Aurix Founder',
     menuPremium:              '✦ Aurix Premium',
+    // WN.P1 refinement — Aurix Premium modal (fully localized)
+    ap_eyebrow:        'AURIX PREMIUM',
+    ap_hero_title:     'THE INTELLIGENCE BEHIND YOUR WEALTH',
+    ap_hero_sub:       'Turn financial data into smarter decisions.',
+    ap_hero_text:      'Aurix Premium helps you understand risk, concentration, liquidity and wealth evolution from a single platform.',
+    ap_pos_title:      "AURIX'S WEALTH INTELLIGENCE LAYER",
+    ap_pos_text:       'Designed to help you understand what truly drives your wealth.',
+    ap_ind_risk:       'Risk',
+    ap_ind_conc:       'Concentration',
+    ap_ind_liq:        'Liquidity',
+    ap_ind_div:        'Diversification',
+    ap_ind_evo:        'Evolution',
+    ap_free_tier:      'Aurix Free',
+    ap_f_dash:         'Wealth Dashboard',
+    ap_f_evo:          'Wealth Evolution',
+    ap_f_assets:       'Asset Registry',
+    ap_f_dist:         'Wealth Distribution',
+    ap_f_track:        'Wealth Tracking',
+    ap_f_market:       'Market',
+    ap_f_metals:       'Metals',
+    ap_f_re:           'Real Estate',
+    ap_f_liq:          'Liquidity',
+    ap_f_wsbasic:      'Basic Workspace',
+    ap_f_viz:          'Wealth Visualization',
+    ap_premium_tier:   'Aurix Premium',
+    ap_p_health:       'Portfolio Health',
+    ap_p_intel:        'Intelligence Center',
+    ap_p_risk:         'Risk Detection',
+    ap_p_conc:         'Wealth Concentration',
+    ap_p_div:          'Diversification',
+    ap_p_drivers:      'Wealth Drivers',
+    ap_p_liq:          'Advanced Liquidity',
+    ap_p_timeline:     'Wealth Timeline',
+    ap_p_ws:           'Advanced Workspace',
+    ap_p_goals:        'Wealth Goals',
+    ap_p_reports:      'Advanced Reports',
+    ap_p_future:       'Future Premium Features',
+    ap_std_title:      'Aurix Premium',
+    ap_std_text:       'The complete wealth intelligence platform.',
+    ap_std_b1:         'All Premium features',
+    ap_std_b2:         'Future updates included',
+    ap_std_b3:         'Full access to the Intelligence Center',
+    ap_std_b4:         'Advanced reports and analytics',
+    ap_std_sub:        'Less than 5€/month.',
+    ap_std_cta:        'Unlock Premium',
+    ap_std_monthly:    '5.99€/mo',
+    ap_founder_title:  'Founder Edition',
+    ap_founder_badge:  'FOUNDER',
+    ap_founder_text:   'Reserved access for the first members of Aurix.',
+    ap_founder_b1:     'Permanent founder price',
+    ap_founder_b2:     'Founder badge',
+    ap_founder_b3:     'Early access to new features',
+    ap_founder_b4:     'Priority in future tests',
+    ap_founder_note:   'Your price never increases while your subscription stays active.',
+    ap_founder_cta:    'Join as Founder',
+    ap_per_year:       '/year',
+    ap_scarcity:       '{taken} of {total} seats taken · {rem} Founder seats left',
+    ap_trust_1:        'Your assets remain yours.',
+    ap_trust_2:        'Aurix Premium adds intelligence and context, never restrictions over your wealth.',
+    ap_close:          'Close',
     settingsFounderPrice:     '€14.99 / year',
     settingsFounderDesc:      'Early access. Unlimited assets. Founder price for life.',
     settingsFounderCta:       'About Aurix Founder',
@@ -39522,62 +39642,77 @@ try {
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const log = (action, extra) => { try { console.log('[premium-modal]', Object.assign({ action, source: _lastSource }, extra || {})); } catch (_) {} };
 
-  const FREE = ['Dashboard principal', 'Evolución patrimonial', 'Registro de activos', 'Distribución básica', 'Seguimiento patrimonial'];
-  const PREM = ['Portfolio Health completo', 'Intelligence Center', 'Drivers patrimoniales', 'Riesgos detectados', 'Concentración', 'Diversificación', 'Liquidez avanzada', 'Timeline patrimonial', 'Workspace avanzado', 'Informes avanzados', 'Futuras funciones Premium'];
-  const li = (arr, cls) => arr.map(x => `<li class="${cls}">${esc(x)}</li>`).join('');
+  // All copy is i18n-keyed → the modal renders 100% in the active language
+  // (rebuilt on every open). Localized terms only (no hybrid ES/EN strings).
+  const FREE_K = ['ap_f_dash', 'ap_f_evo', 'ap_f_assets', 'ap_f_dist', 'ap_f_track', 'ap_f_market', 'ap_f_metals', 'ap_f_re', 'ap_f_liq', 'ap_f_wsbasic', 'ap_f_viz'];
+  const PREM_K = ['ap_p_health', 'ap_p_intel', 'ap_p_risk', 'ap_p_conc', 'ap_p_div', 'ap_p_drivers', 'ap_p_liq', 'ap_p_timeline', 'ap_p_ws', 'ap_p_goals', 'ap_p_reports', 'ap_p_future'];
+  const IND_K = ['ap_ind_risk', 'ap_ind_conc', 'ap_ind_liq', 'ap_ind_div', 'ap_ind_evo'];
+  const STD_B = ['ap_std_b1', 'ap_std_b2', 'ap_std_b3', 'ap_std_b4'];
+  const FND_B = ['ap_founder_b1', 'ap_founder_b2', 'ap_founder_b3', 'ap_founder_b4'];
+  const li = (keys, cls) => keys.map(k => `<li class="${cls}">${esc(t(k))}</li>`).join('');
 
   function _buildHtml() {
     const tk = FOUNDER.founderSlotsTaken, tot = FOUNDER.founderSlotsTotal, rem = FOUNDER.founderSlotsRemaining;
+    const pct = Math.round((tk / tot) * 100);
+    const scar = esc(t('ap_scarcity')).replace('{taken}', tk).replace('{total}', tot).replace('{rem}', rem);
     return `
       <div class="aurix-premium-modal" role="dialog" aria-modal="true" aria-labelledby="aurixPremiumTitle">
-        <button type="button" class="aurix-premium-close" aria-label="Cerrar">✕</button>
+        <button type="button" class="aurix-premium-close" aria-label="${esc(t('ap_close'))}">✕</button>
         <header class="aurix-premium-header">
-          <span class="aurix-premium-eyebrow">AURIX PREMIUM</span>
-          <h2 id="aurixPremiumTitle" class="aurix-premium-tagline">Entiende tu patrimonio, no solo míralo.</h2>
-          <p class="aurix-premium-lede">Desbloquea toda la inteligencia patrimonial de Aurix: análisis, riesgos, diversificación, liquidez, drivers y visión histórica avanzada.</p>
+          <span class="aurix-premium-eyebrow">${esc(t('ap_eyebrow'))}</span>
+          <h2 id="aurixPremiumTitle" class="aurix-premium-tagline">${esc(t('ap_hero_title'))}</h2>
+          <p class="aurix-premium-sub">${esc(t('ap_hero_sub'))}</p>
+          <p class="aurix-premium-lede">${esc(t('ap_hero_text'))}</p>
         </header>
 
         <div class="aurix-premium-comparison">
-          <div class="aurix-premium-compare-col">
-            <span class="aurix-premium-compare-tier">Aurix Free</span>
-            <span class="aurix-premium-compare-q">¿Cuánto tengo?</span>
-            <ul class="aurix-premium-list">${li(FREE, 'is-free')}</ul>
+          <div class="aurix-premium-compare-col is-free">
+            <span class="aurix-premium-compare-tier">${esc(t('ap_free_tier'))}</span>
+            <ul class="aurix-premium-list is-2col">${li(FREE_K, 'is-free')}</ul>
           </div>
           <div class="aurix-premium-compare-col is-premium">
-            <span class="aurix-premium-compare-tier">Aurix Premium</span>
-            <span class="aurix-premium-compare-q">¿Qué significa lo que tengo?</span>
-            <ul class="aurix-premium-list">${li(PREM, 'is-prem')}</ul>
+            <div class="aurix-premium-pos">
+              <span class="aurix-premium-pos-title">${esc(t('ap_pos_title'))}</span>
+              <p class="aurix-premium-pos-text">${esc(t('ap_pos_text'))}</p>
+              <div class="aurix-premium-indicators">${IND_K.map(k => `<span class="aurix-premium-ind">${esc(t(k))}</span>`).join('')}</div>
+            </div>
+            <span class="aurix-premium-compare-tier">${esc(t('ap_premium_tier'))}</span>
+            <ul class="aurix-premium-list is-2col">${li(PREM_K, 'is-prem')}</ul>
           </div>
         </div>
 
         <div class="aurix-premium-plans">
-          <div class="aurix-premium-plan aurix-premium-founder">
-            <div class="aurix-premium-plan-top">
-              <span class="aurix-premium-badge">FOUNDER</span>
-              <h3 class="aurix-premium-plan-title">Founder Edition</h3>
-            </div>
-            <p class="aurix-premium-plan-desc">Las primeras ${tot} plazas desbloquean Aurix Premium con precio Founder permanente.</p>
-            <div class="aurix-premium-price"><span class="aurix-premium-price-amount">39€</span><span class="aurix-premium-price-per">/año</span></div>
-            <p class="aurix-premium-plan-note">Tu precio nunca aumentará mientras mantengas la suscripción activa.</p>
-            <div class="aurix-premium-scarcity">
-              <div class="aurix-premium-scarcity-bar"><span style="width:${Math.round((tk / tot) * 100)}%"></span></div>
-              <span class="aurix-premium-scarcity-txt">${tk} de ${tot} plazas ocupadas · Quedan ${rem} plazas Founder</span>
-            </div>
-            <button type="button" class="aurix-premium-cta is-founder" data-premium-cta="founder">Unirme como Founder</button>
+          <div class="aurix-premium-plan aurix-premium-standard">
+            <h3 class="aurix-premium-plan-title">${esc(t('ap_std_title'))}</h3>
+            <p class="aurix-premium-plan-desc">${esc(t('ap_std_text'))}</p>
+            <ul class="aurix-premium-benefits">${li(STD_B, 'is-prem')}</ul>
+            <div class="aurix-premium-price"><span class="aurix-premium-price-amount">59€</span><span class="aurix-premium-price-per">${esc(t('ap_per_year'))}</span></div>
+            <p class="aurix-premium-plan-note">${esc(t('ap_std_sub'))}</p>
+            <button type="button" class="aurix-premium-cta is-premium" data-premium-cta="premium_annual">${esc(t('ap_std_cta'))}</button>
+            <button type="button" class="aurix-premium-cta is-monthly" data-premium-cta="premium_monthly">${esc(t('ap_std_monthly'))}</button>
           </div>
 
-          <div class="aurix-premium-plan aurix-premium-standard">
-            <h3 class="aurix-premium-plan-title">Aurix Premium</h3>
-            <div class="aurix-premium-price"><span class="aurix-premium-price-amount">59€</span><span class="aurix-premium-price-per">/año</span></div>
-            <p class="aurix-premium-plan-note">Menos de 5€/mes.</p>
-            <button type="button" class="aurix-premium-cta is-premium" data-premium-cta="premium_annual">Desbloquear Premium</button>
-            <button type="button" class="aurix-premium-cta is-monthly" data-premium-cta="premium_monthly">5,99€/mes</button>
+          <div class="aurix-premium-plan aurix-premium-founder">
+            <div class="aurix-premium-plan-top">
+              <span class="aurix-premium-kicker">${esc(t('ap_eyebrow'))}</span>
+              <span class="aurix-premium-badge">${esc(t('ap_founder_badge'))}</span>
+            </div>
+            <h3 class="aurix-premium-plan-title">${esc(t('ap_founder_title'))}</h3>
+            <p class="aurix-premium-plan-desc">${esc(t('ap_founder_text'))}</p>
+            <ul class="aurix-premium-benefits">${li(FND_B, 'is-founder')}</ul>
+            <div class="aurix-premium-price"><span class="aurix-premium-price-amount">39€</span><span class="aurix-premium-price-per">${esc(t('ap_per_year'))}</span></div>
+            <p class="aurix-premium-plan-note">${esc(t('ap_founder_note'))}</p>
+            <div class="aurix-premium-scarcity">
+              <div class="aurix-premium-scarcity-bar"><span style="width:${pct}%"></span></div>
+              <span class="aurix-premium-scarcity-txt">${scar}</span>
+            </div>
+            <button type="button" class="aurix-premium-cta is-founder" data-premium-cta="founder">${esc(t('ap_founder_cta'))}</button>
           </div>
         </div>
 
         <footer class="aurix-premium-footer">
-          <p>Aurix Free seguirá siendo útil. Premium desbloquea la capa de inteligencia avanzada.</p>
-          <p class="aurix-premium-microcopy">Sin cambios en tus datos. Sin pérdida de acceso a tu cartera.</p>
+          <p class="aurix-premium-trust-1">${esc(t('ap_trust_1'))}</p>
+          <p class="aurix-premium-microcopy">${esc(t('ap_trust_2'))}</p>
         </footer>
       </div>`;
   }
@@ -39585,8 +39720,7 @@ try {
   function _ctaState(btn) {
     if (!btn || btn.dataset.done === '1') return;
     btn.dataset.done = '1';
-    btn.dataset.label = btn.textContent;
-    btn.textContent = 'Te avisaremos pronto';
+    btn.textContent = (typeof lang !== 'undefined' && lang === 'en') ? "We'll notify you soon" : 'Te avisaremos pronto';
     btn.classList.add('is-done');
   }
 
@@ -39616,13 +39750,13 @@ try {
     if (!_el) {
       _el = document.createElement('div');
       _el.className = 'aurix-premium-overlay';
-      _el.innerHTML = _buildHtml();
       document.body.appendChild(_el);
-      _wire(_el);
+      _wire(_el);   // delegated listeners on _el persist across innerHTML rebuilds
     }
+    // Rebuild every open so the modal renders in the CURRENTLY active language
+    // (and starts from a fresh, un-clicked CTA state).
+    _el.innerHTML = _buildHtml();
     _el.style.display = 'flex';
-    // reset any prior CTA states for a fresh invitation each open
-    _el.querySelectorAll('.aurix-premium-cta.is-done').forEach(b => { if (b.dataset.label) b.textContent = b.dataset.label; b.classList.remove('is-done'); b.dataset.done = ''; });
     requestAnimationFrame(() => _el.classList.add('is-open'));
     document.body.classList.add('aurix-premium-lock');
     _open = true;
@@ -39643,6 +39777,10 @@ try {
 
   document.addEventListener('keydown', e => { if (_open && e.key === 'Escape') { e.stopPropagation(); closeAurixPremiumModal(); } });
 
+  // Canonical entry points (Part 10) — every future Premium button reuses these.
+  window.openPremiumModal = openAurixPremiumModal;
+  window.closePremiumModal = closeAurixPremiumModal;
+  // Back-compat aliases (settings-menu hook + earlier call sites).
   window.openAurixPremiumModal = openAurixPremiumModal;
   window.closeAurixPremiumModal = closeAurixPremiumModal;
   window.aurixPremiumModal = { open: openAurixPremiumModal, close: closeAurixPremiumModal };
