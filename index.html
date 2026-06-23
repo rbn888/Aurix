@@ -1448,9 +1448,13 @@
 
       <section class="settings-section is-active" data-pane="account" id="settingsSectionAccount">
         <h4 class="settings-section-title" data-i18n="settingsAccount">Cuenta</h4>
-        <div class="settings-row">
+        <!-- DSH.SETTINGS.04 — editable display name (localStorage 'aurix_display_name'). -->
+        <div class="settings-row settings-row--editable">
           <span class="settings-row-label" data-i18n="settingsDisplayName">Nombre visible</span>
-          <span class="settings-row-value" id="settingsAccountName">—</span>
+          <div class="settings-name-edit">
+            <input type="text" id="settingsNameInput" class="settings-name-input" maxlength="40" autocomplete="off" autocapitalize="words" spellcheck="false" aria-label="Nombre visible">
+            <button type="button" id="settingsNameSave" class="settings-name-save" data-i18n="settingsNameSave">Guardar</button>
+          </div>
         </div>
         <div class="settings-row">
           <span class="settings-row-label" data-i18n="settingsEmail">Email</span>
@@ -1482,7 +1486,7 @@
         <div class="plan-card plan-card--offer" id="planCardOffer">
           <div class="plan-card-head">
             <span class="plan-card-tier" data-i18n="settingsFounderName">Aurix Premium</span>
-            <span class="plan-card-price" id="planFounderPrice" data-i18n="settingsFounderPrice">14,99€ / año</span>
+            <!-- DSH.SETTINGS.04 — price removed; no price shown until it is final. -->
           </div>
           <div class="plan-card-body">
             <p class="plan-card-desc" data-i18n="settingsFounderDesc">Acceso anticipado, herramientas avanzadas y ventajas premium.</p>

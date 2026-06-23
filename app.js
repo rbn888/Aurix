@@ -2747,6 +2747,7 @@ const T = {
     settingsTitle:            'Configuración',
     settingsAccount:          'Cuenta',
     settingsDisplayName:      'Nombre visible',
+    settingsNameSave:         'Guardar',
     settingsEmail:            'Email',
     settingsStatus:           'Estado',
     settingsStatusLocal:      'Local · sin sesión',
@@ -4799,6 +4800,7 @@ const T = {
     settingsTitle:            'Settings',
     settingsAccount:          'Account',
     settingsDisplayName:      'Display name',
+    settingsNameSave:         'Save',
     settingsEmail:            'Email',
     settingsStatus:           'Status',
     settingsStatusLocal:      'Local · no session',
@@ -38945,10 +38947,15 @@ function _settingsPopulate() {
 
   // DSH.SETTINGS.02 — "Nombre visible" (display name, same rule as the menu
   // identity header) + a membership tier chip on the plan card. Display-only.
-  const nameEl = document.getElementById('settingsAccountName');
-  if (nameEl) nameEl.textContent = (typeof _aurixMenuDisplayName === 'function')
-    ? _aurixMenuDisplayName()
-    : (session && session.email && session.email.indexOf('@') > 0 ? session.email.split('@')[0] : '—');
+  // DSH.SETTINGS.04 — editable display name. The input shows the resolved name
+  // (displayName → saved local name → email-before-@); saving writes the local
+  // override and refreshes the menu identity. No auth write.
+  const nameInput = document.getElementById('settingsNameInput');
+  if (nameInput && document.activeElement !== nameInput) {
+    nameInput.value = (typeof _aurixMenuDisplayName === 'function')
+      ? _aurixMenuDisplayName()
+      : (session && session.email && session.email.indexOf('@') > 0 ? session.email.split('@')[0] : '');
+  }
   const tierChip = document.getElementById('settingsTierChip');
   if (tierChip) {
     const tk = plan.tier;
@@ -39004,17 +39011,52 @@ function _settingsSaveProfile(patch) {
   try { if (typeof renderAurixSignal === 'function') renderAurixSignal(); } catch (_) {}
 }
 
+// DSH.SETTINGS.04 — persist the editable display name. Saves to localStorage
+// ('aurix_display_name', the same key _aurixMenuDisplayName reads), then repaints
+// the menu identity + settings so the new name shows everywhere immediately.
+// No auth/backend write.
+function _settingsSaveDisplayName() {
+  const input = document.getElementById('settingsNameInput');
+  if (!input) return;
+  const v = (input.value || '').trim().slice(0, 40);
+  try {
+    if (v) localStorage.setItem('aurix_display_name', v);
+    else   localStorage.removeItem('aurix_display_name');
+  } catch (_) {}
+  // Reflect the resolved value (empty input falls back to email-before-@).
+  input.value = (typeof _aurixMenuDisplayName === 'function') ? _aurixMenuDisplayName() : v;
+  try { input.blur(); } catch (_) {}
+  try { if (typeof _aurixRenderMenuIdentity === 'function') _aurixRenderMenuIdentity(); } catch (_) {}
+  // Brief "Guardado" confirmation on the button.
+  const btn = document.getElementById('settingsNameSave');
+  if (btn) {
+    const orig = (typeof _settingsT === 'function') ? _settingsT('settingsNameSave') : 'Guardar';
+    btn.textContent = (typeof lang !== 'undefined' && lang === 'en') ? 'Saved' : 'Guardado';
+    btn.classList.add('is-saved');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('is-saved'); }, 1400);
+  }
+}
+
 // Delegated click handler — wired once. Closes over no state.
 if (typeof document !== 'undefined') {
   document.addEventListener('click', e => {
     const ov = document.getElementById('settingsOverlay');
     if (!ov || !ov.classList.contains('open')) return;
+    if (e.target.closest && e.target.closest('#settingsNameSave')) { _settingsSaveDisplayName(); return; }
     const r = e.target.closest && e.target.closest('[data-settings-risk]');
     if (r) { _settingsSaveProfile({ riskProfile: r.dataset.settingsRisk }); return; }
     const x = e.target.closest && e.target.closest('[data-settings-experience]');
     if (x) { _settingsSaveProfile({ experience: x.dataset.settingsExperience }); return; }
     const a = e.target.closest && e.target.closest('[data-settings-age]');
     if (a) { _settingsSaveProfile({ ageBand: a.dataset.settingsAge }); return; }
+  });
+  // Enter inside the name field saves (and never submits a form / reloads).
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    if (e.target && e.target.id === 'settingsNameInput') {
+      e.preventDefault();
+      _settingsSaveDisplayName();
+    }
   });
 }
 // DSH.SETTINGS.01 — desktop/tablet side-nav: show one pane at a time. On mobile

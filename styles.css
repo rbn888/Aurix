@@ -22373,6 +22373,8 @@ body.aurix-premium-lock{ overflow:hidden; }
 /* Settings → Preferencias: language/currency toggles sit on the right of the row. */
 .settings-pref-item{ align-items:center; }
 .settings-pref-item .menu-pref-opts{ flex:0 0 auto; }
+/* Currency pills carry flex:1 for the (removed) menu row; size to content here. */
+.settings-pref-item .menu-curr-btn{ flex:0 0 auto; }
 
 /* ── DSH.SETTINGS.01 — Configuración: desktop/tablet side-nav layout ──────────
    Left rail of section tabs + a single visible pane on the right (Revolut /
@@ -22428,4 +22430,37 @@ body.aurix-premium-lock{ overflow:hidden; }
 .settings-danger-label{
   font-size:10.5px; font-weight:800; letter-spacing:.16em; text-transform:uppercase;
   color:rgba(224,90,90,.80);
+}
+
+/* ── DSH.SETTINGS.04 — editable display name (Cuenta) ─────────────────────────
+   Inline input + Guardar button. Reorganization/persistence only; no auth. */
+.settings-row--editable{ align-items:center; gap:12px; }
+.settings-name-edit{ display:flex; align-items:center; gap:8px; flex:0 1 auto; min-width:0; }
+.settings-name-input{
+  appearance:none; -webkit-appearance:none; min-width:0; width:172px;
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14); border-radius:9px;
+  padding:8px 11px; color:var(--text-bright,#fff); font-size:13.5px; font-weight:600;
+  transition:border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+.settings-name-input::placeholder{ color:rgba(220,230,250,.32); font-weight:500; }
+.settings-name-input:focus{
+  outline:none; border-color:rgba(77,141,255,.55);
+  background:rgba(77,141,255,.07); box-shadow:0 0 0 3px rgba(77,141,255,.14);
+}
+.settings-name-save{
+  appearance:none; -webkit-appearance:none; cursor:pointer; flex:0 0 auto;
+  padding:8px 14px; border-radius:9px;
+  background:rgba(77,141,255,.14); border:1px solid rgba(77,141,255,.34);
+  color:#cfe1ff; font-size:12.5px; font-weight:700; letter-spacing:.01em;
+  transition:background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.settings-name-save:hover{ background:rgba(77,141,255,.22); color:#eaf2ff; }
+.settings-name-save:active{ transform:scale(.98); }
+.settings-name-save.is-saved{ background:rgba(64,180,120,.18); border-color:rgba(64,180,120,.42); color:#bff0d2; }
+
+/* Narrow screens: stack the editor under the label, input grows to fill. */
+@media (max-width: 560px){
+  .settings-row--editable{ flex-direction:column; align-items:stretch; gap:9px; }
+  .settings-name-edit{ width:100%; }
+  .settings-name-input{ flex:1 1 auto; width:auto; }
 }
