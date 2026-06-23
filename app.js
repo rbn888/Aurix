@@ -17762,8 +17762,9 @@ if (typeof window !== 'undefined') {
     try {
       const p = _vizPipeline(r);
       const rs = _wscRegimeYScale(p.plotVals, r, p.uTs);
-      Object.assign(o, _wscNarrativeModel(rs, p.plotVals, p.uTs, r));
-      try { console.log('[viz-narrative]', r, '| anchor:', o.narrativeAnchor, '| dom:', o.dominantRegime, o.dominantRegimePct + '%', '| dd:', o.drawdownClassification, o.drawdownPct + '%', '| eventDom:', o.eventDominancePct + '% capped:', o.eventDominanceCapped, '| persist:', o.regimePersistenceScore, 'flips:', o.regimeFlipCount, '| wealth:', o.wealthNarrativeScore, o.institutionalProfileMatch, '|', o.visualNarrativeMode); } catch (_) {}
+      const aw2 = _wscActivityWeights(p.plotVals, r);
+      Object.assign(o, _wscNarrativeModel(rs, p.plotVals, p.uTs, r, aw2));
+      try { console.log('[viz-narrative]', r, '| anchor:', o.narrativeAnchor, '| dom:', o.dominantRegime, o.dominantRegimePct + '%', '| dd:', o.drawdownClassification, o.drawdownPct + '%', '| eventDom:', o.eventDominancePct + '% capped:', o.eventDominanceCapped, '| dead%:', o.deadZonePct, 'consol%:', o.consolidationWidthPct, '| persist:', o.regimePersistenceScore, 'flips:', o.regimeFlipCount, '| visualScore:', o.visualNarrativeScore, '| wealth:', o.wealthNarrativeScore, o.institutionalProfileMatch, '|', o.visualNarrativeMode); } catch (_) {}
     } catch (e) { o.error = String(e); }
     return o;
   };
@@ -17842,11 +17843,14 @@ if (typeof window !== 'undefined') {
       o.scenarioValidationSummary = { xStrictlyIncreasing: xInc, yInBounds: gBounds, gFracMonotone: gMono,
         noNaN: !gNaN && noNaNvals, metricUnchanged: true, realEstatePolluted: false };
 
-      // ── WN.18 — narrative interpretation (PART 1–7) ──────────────────────
+      // ── WN.18/19 — narrative interpretation (PART 1–7) + visual story score ──
       o.narrative = window.debugAurixNarrative(r);
       o.visualNarrativeMode = o.narrative.visualNarrativeMode;
+      o.visualNarrativeScore = o.narrative.visualNarrativeScore;
+      o.deadZonePct = o.narrative.deadZonePct;
+      o.consolidationWidthPct = o.narrative.consolidationWidthPct;
 
-      try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| narrative:', o.visualNarrativeMode, '| anchor:', o.narrative.narrativeAnchor, '| dd:', o.narrative.drawdownClassification, '| eventDom%:', o.narrative.eventDominancePct, 'capped:', o.narrative.eventDominanceCapped, '| wealth:', o.narrative.wealthNarrativeScore, o.narrative.institutionalProfileMatch, '| staticGrid:', o.staticGrid, '| occ%:', o.occupancyPct); } catch (_) {}
+      try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| narrative:', o.visualNarrativeMode, '| visualScore:', o.visualNarrativeScore, '| dead%:', o.deadZonePct, 'consol%:', o.consolidationWidthPct, '| eventDom%:', o.narrative.eventDominancePct, 'capped:', o.narrative.eventDominanceCapped, '| wealth:', o.narrative.wealthNarrativeScore, o.narrative.institutionalProfileMatch, '| staticGrid:', o.staticGrid, '| occ%:', o.occupancyPct); } catch (_) {}
     } catch (e) { o.error = String(e); }
     return o;
   };
@@ -17968,32 +17972,90 @@ function _wscEnforceMinGap(gaps, minGap) {
   const s = out.reduce((a, b) => a + b, 0) || 1; return out.map(g => g / s);
 }
 
-// Activity-weighted cumulative x-fraction per sample. Idle intervals get a small
-// weight (compressed); active ones scale with volatility (clamped 1–4). The idle
-// total is hard-capped (24H ≤20%, others ≤35%) so dead zones never dominate.
-// WN.15 — warp guardrails: a per-interval minimum spacing (no vertical wall /
-// max-slope guard) and, on 24H, a ≥18% width floor on the leading idle context
-// run so it can't be crushed into a left wall.
+// ── WN.19 — Narrative X-Scale (significance-weighted horizontal warp) ───────
+// WN.14 warped x by raw volatility. WN.19 drives x-width by a NARRATIVE
+// SIGNIFICANCE score per interval — visualWidth = base + significance × scale —
+// so important phases (large moves, turning points, drawdowns/recoveries,
+// curvature/bends) become readable while dead flat zones compress. Three tiers:
+//   DEAD  — truly flat: progressively compressed (never to zero), hard-capped.
+//   CONSOL— quiet but meaningful: a readable floor so consolidations survive.
+//   ACTIVE— scaled by significance.
+// All WN.15 guardrails are preserved: per-interval min spacing (no vertical
+// wall), the dead-zone width cap, and the 24H leading-context floor. It only
+// redistributes horizontal attention — no value, order, timestamp or count
+// changes; x stays strictly increasing. PART 1–5.
 function _wscActivityWeights(values, range, opts) {
   opts = opts || {};
   const n = values.length;
-  if (n < 2) return { frac: values.map((_, i) => (n < 2 ? 0 : i / (n - 1))), idlePct: 0, activePct: 100 };
-  const ret = []; for (let i = 1; i < n; i++) ret.push(values[i - 1] > 0 ? Math.abs(values[i] / values[i - 1] - 1) : 0);
-  const sorted = ret.slice().sort((a, b) => a - b);
-  const medR = sorted[sorted.length >> 1] || 0.001;
-  const isIdle = ret.map(r => r < 0.0015);
-  let w = ret.map((r, i) => isIdle[i] ? 0.35 : Math.min(4, Math.max(1, 1 + (r / (medR || 0.001)) * 0.8)));
-  // Hard-cap idle total width.
+  if (n < 2) return { frac: values.map((_, i) => (n < 2 ? 0 : i / (n - 1))), idlePct: 0, activePct: 100,
+    deadZonePct: 0, consolidationPct: 100, narrativeModel: true, consolidationFloorApplied: false };
+
+  // Step returns (abs + signed) and the median step.
+  const retAbs = [], retSig = [];
+  for (let i = 1; i < n; i++) { const p = values[i - 1] > 0 ? values[i] / values[i - 1] - 1 : 0; retAbs.push(Math.abs(p)); retSig.push(Math.sign(p)); }
+  const m = retAbs.length;
+  const medR = (() => { const s = retAbs.slice().sort((a, b) => a - b); return s[s.length >> 1] || 0.001; })() || 0.001;
+
+  // PART 1 — significance factors: local volatility, trend-direction change,
+  // drawdown/recovery participation, and curvature (PART 5 — bends matter more
+  // than a perfectly straight ramp, so a ruler-like diagonal breaks up).
+  const Wv = 3, localVol = new Array(m).fill(0);
+  for (let i = 0; i < m; i++) { let s = 0, c = 0; for (let j = Math.max(0, i - Wv); j <= Math.min(m - 1, i + Wv); j++) { s += retAbs[j] * retAbs[j]; c++; } localVol[i] = Math.sqrt(s / (c || 1)); }
+  const peak = new Array(n), trough = new Array(n); peak[0] = values[0]; trough[0] = values[0];
+  for (let i = 1; i < n; i++) { peak[i] = Math.max(peak[i - 1], values[i]); trough[i] = Math.min(trough[i - 1], values[i]); }
+  const curv = new Array(m).fill(0);
+  for (let i = 1; i < m; i++) { const c = Math.abs(values[i + 1] - 2 * values[i] + values[i - 1]); curv[i] = values[i] > 0 ? c / values[i] : 0; }
+  const medCurv = (() => { const s = curv.slice().sort((a, b) => a - b); return s[s.length >> 1] || 1e-6; })() || 1e-6;
+
+  const sig = new Array(m);
+  for (let i = 0; i < m; i++) {
+    const volRel = retAbs[i] / medR;
+    const lvRel = localVol[i] / medR;
+    const turn = (i > 0 && retSig[i] !== 0 && retSig[i - 1] !== 0 && retSig[i] !== retSig[i - 1]) ? 1 : 0;
+    const ddPart = peak[i + 1] > 0 ? Math.min(1, ((peak[i + 1] - values[i + 1]) / peak[i + 1]) / 0.05) : 0;
+    const recPart = trough[i + 1] > 0 ? Math.min(1, ((values[i + 1] - trough[i + 1]) / trough[i + 1]) / 0.05) : 0;
+    const curvRel = Math.min(3, curv[i] / medCurv);
+    sig[i] = 0.42 * volRel + 0.22 * lvRel + 0.16 * turn + 0.10 * Math.max(ddPart, recPart) + 0.10 * curvRel;
+  }
+
+  // Tier classification + PART 2/3 weights (base + importance × scale).
+  const deadThr = 0.0012, consolHi = medR * 0.6, base = 0.6, scale = 0.85, maxW = 5;
+  const isDead = new Array(m), isConsol = new Array(m);
+  let w = new Array(m), deadRun = 0;
+  for (let i = 0; i < m; i++) {
+    const dead = retAbs[i] < deadThr && localVol[i] < medR * 0.5;
+    isDead[i] = dead;
+    if (dead) { deadRun++; isConsol[i] = false; w[i] = Math.max(0.12, 0.35 / (1 + 0.15 * (deadRun - 1))); }   // PART 3 — progressive
+    else {
+      deadRun = 0;
+      if (retAbs[i] < consolHi) { isConsol[i] = true; w[i] = Math.max(0.7, base + sig[i] * scale * 0.5); }     // PART 4 — readable floor
+      else { isConsol[i] = false; w[i] = Math.min(maxW, base + sig[i] * scale); }                              // ACTIVE
+    }
+  }
+
+  // PART 3 — hard-cap total DEAD width so flat zones never dominate.
   const idleMax = range === '24h' ? 0.20 : 0.35;
-  let idleW = 0, total = 0; w.forEach((x, i) => { total += x; if (isIdle[i]) idleW += x; });
-  if (total > 0 && (total - idleW) > 1e-9 && idleW / total > idleMax) {   // skip if all-idle (no active budget)
-    const activeW = total - idleW;
-    const targetIdle = (idleMax / (1 - idleMax)) * activeW;     // idleW' / activeW = idleMax/(1-idleMax)
-    const factor = idleW > 0 ? targetIdle / idleW : 1;
-    w = w.map((x, i) => isIdle[i] ? x * factor : x);
+  let deadW = 0, total = 0; w.forEach((x, i) => { total += x; if (isDead[i]) deadW += x; });
+  if (total > 0 && (total - deadW) > 1e-9 && deadW / total > idleMax) {
+    const activeW = total - deadW, targetDead = (idleMax / (1 - idleMax)) * activeW, factor = deadW > 0 ? targetDead / deadW : 1;
+    w = w.map((x, i) => isDead[i] ? x * factor : x);
   }
   const sum = w.reduce((a, b) => a + b, 0) || 1;
   let gaps = w.map(x => x / sum);                                 // n-1 interval widths, Σ=1
+
+  // PART 4 — consolidation preservation: guarantee the quiet-but-meaningful
+  // regions keep a readable minimum of the width (never crushed away).
+  let consolidationFloorApplied = false;
+  const consolExists = isConsol.some(Boolean), activeExists = w.some((_, i) => !isDead[i] && !isConsol[i]);
+  if (consolExists && activeExists) {
+    let consolW = 0; for (let i = 0; i < m; i++) if (isConsol[i]) consolW += gaps[i];
+    const consolMin = 0.14;
+    if (consolW > 0 && consolW < consolMin) {
+      const rest = 1 - consolW, need = consolMin - consolW, k = Math.max(0, (rest - need) / rest), sc = consolMin / consolW;
+      for (let i = 0; i < m; i++) gaps[i] = isConsol[i] ? gaps[i] * sc : gaps[i] * k;
+      consolidationFloorApplied = true;
+    }
+  }
 
   // WN.15 — no vertical wall: floor every interval (≈2.5px desktop / 1.5px mobile).
   const isMobile = !!opts.mobile;
@@ -18002,10 +18064,10 @@ function _wscActivityWeights(values, range, opts) {
   gaps = _wscEnforceMinGap(gaps, minGap);
   const slopeGuardApplied = minBefore < minGap - 1e-9;
 
-  // WN.15 — 24H leading idle context must keep ≥18% of the width (no left wall).
+  // WN.15 — 24H leading dead context must keep ≥18% of the width (no left wall).
   let leadIdleFloorApplied = false;
   if (range === '24h') {
-    let L = 0; while (L < isIdle.length && isIdle[L]) L++;
+    let L = 0; while (L < isDead.length && isDead[L]) L++;
     if (L > 0 && L < gaps.length) {
       let lead = 0; for (let i = 0; i < L; i++) lead += gaps[i];
       if (lead > 0 && lead < 0.18) {
@@ -18019,9 +18081,11 @@ function _wscActivityWeights(values, range, opts) {
 
   const frac = new Array(n); frac[0] = 0; for (let i = 1; i < n; i++) frac[i] = frac[i - 1] + gaps[i - 1];
   frac[n - 1] = 1;
-  const idleFinal = gaps.reduce((a, g, i) => a + (isIdle[i] ? g : 0), 0);
-  return { frac, idlePct: +(idleFinal * 100).toFixed(1), activePct: +((1 - idleFinal) * 100).toFixed(1),
-    minGapFrac: minGap, slopeGuardApplied, leadIdleFloorApplied };
+  const deadFinal = gaps.reduce((a, g, i) => a + (isDead[i] ? g : 0), 0);
+  const consolFinal = gaps.reduce((a, g, i) => a + (isConsol[i] ? g : 0), 0);
+  return { frac, idlePct: +(deadFinal * 100).toFixed(1), activePct: +((1 - deadFinal) * 100).toFixed(1),
+    deadZonePct: +(deadFinal * 100).toFixed(1), consolidationPct: +(consolFinal * 100).toFixed(1),
+    minGapFrac: minGap, slopeGuardApplied, leadIdleFloorApplied, consolidationFloorApplied, narrativeModel: true };
 }
 
 // ── WN.15 — Regime Relative Scaling Engine ──────────────────────────────────
@@ -18203,6 +18267,31 @@ function _wscClassifyDrawdown(values, timestamps) {
   return out;
 }
 
+// ── WN.19 PART 6 — Visual Story Score (0–100) ───────────────────────────────
+// Combines the horizontal (dead-zone occupancy) and vertical (event / current-
+// state visibility, narrative balance, regime stability) facts into one number.
+// Target ≥ 90 for a healthy institutional wealth curve. Pure measurement.
+function _wscVisualNarrativeScore(narrative, aw, range) {
+  const out = { score: null, components: null };
+  try {
+    const cap = range === 'all' ? 24 : range === '1y' ? 28 : 35;
+    const dead = (aw && aw.deadZonePct != null) ? aw.deadZonePct : ((aw && aw.idlePct) || 0);
+    const deadScore = Math.max(0, Math.min(100, 100 - Math.max(0, dead - 15) * 2));      // low dead occupancy = good
+    const eventDom = narrative.eventDominancePct != null ? narrative.eventDominancePct : 0;
+    const eventScore = narrative.eventDominanceCapped ? 100 : Math.max(0, 100 - (eventDom - cap) * 4);
+    const curShare = narrative.currentRegimeVisualShare;                                  // current-state visibility
+    const consolScore = curShare == null ? 90 : Math.max(0, Math.min(100, (curShare / 25) * 100));
+    const balanceScore = (narrative.totalNarrativeBalance != null ? narrative.totalNarrativeBalance : 1) * 100;
+    const flips = narrative.regimeFlipCount || 0;
+    const persistScore = flips <= 3 ? 100 : Math.max(0, 100 - (flips - 3) * 20);          // few transitions = stable story
+    const continuityScore = 100;                                                          // strictly-increasing x + no-wall guaranteed
+    const score = 0.22 * deadScore + 0.20 * eventScore + 0.22 * consolScore + 0.12 * balanceScore + 0.12 * persistScore + 0.12 * continuityScore;
+    out.components = { deadScore: +deadScore.toFixed(0), eventScore: +eventScore.toFixed(0), consolScore: +consolScore.toFixed(0), balanceScore: +balanceScore.toFixed(0), persistScore: +persistScore.toFixed(0), continuityScore };
+    out.score = +score.toFixed(1);
+  } catch (_) {}
+  return out;
+}
+
 // ── WN.18 — Institutional Narrative Engine (analysis layer) ─────────────────
 // Reads the already-built geometry (regimes + visual allocation from WN.15/16)
 // and interprets it as a PORTFOLIO STORY: base → expansion → consolidation →
@@ -18211,7 +18300,7 @@ function _wscClassifyDrawdown(values, timestamps) {
 // so it can be validated and surfaced. Wealth platforms (Kubera, Bloomberg
 // Wealth, IBKR PortfolioAnalyst) lead with portfolio state and regime structure,
 // not with the single biggest event — these scores measure that alignment.
-function _wscNarrativeModel(rscale, values, timestamps, range) {
+function _wscNarrativeModel(rscale, values, timestamps, range, aw) {
   const LAB = { LOW_BASE: 'acumulación', EXPANSION: 'expansión', CORRECTION: 'corrección', CONSOLIDATION: 'consolidación', CURRENT_CONSOLIDATION: 'consolidación actual' };
   const regimes = (rscale && rscale.regimes) || [];
   const alloc = (rscale && rscale.allocation) || [];
@@ -18235,6 +18324,11 @@ function _wscNarrativeModel(rscale, values, timestamps, range) {
     // PART 7
     regimePersistenceScore: null, regimeFlipCount: 0, hysteresisApplied: true,
     visualNarrativeMode: null,
+    // WN.19 — horizontal narrative + PART 6 visual story score
+    deadZonePct: (aw && aw.deadZonePct != null) ? aw.deadZonePct : null,
+    consolidationWidthPct: (aw && aw.consolidationPct != null) ? aw.consolidationPct : null,
+    narrativeXScaleApplied: !!(aw && aw.narrativeModel),
+    visualNarrativeScore: null, visualNarrativeComponents: null,
   };
   // PART 5 — straight-ramp count + institutional slope score (collinear runs ≥4).
   if (n >= 3) {
@@ -18246,6 +18340,8 @@ function _wscNarrativeModel(rscale, values, timestamps, range) {
     out.visualNarrativeMode = 'lineal-fiel';
     out.institutionalProfileMatch = 'LINEAR_FAITHFUL';
     out.wealthNarrativeScore = 0.6;
+    const vs0 = _wscVisualNarrativeScore(out, aw, range);
+    out.visualNarrativeScore = vs0.score; out.visualNarrativeComponents = vs0.components;
     return out;
   }
   // PART 7 — regime flips / persistence (the detector already merges short runs
@@ -18282,6 +18378,8 @@ function _wscNarrativeModel(rscale, values, timestamps, range) {
   const slope = out.institutionalSlopeScore != null ? out.institutionalSlopeScore : 0.7;
   out.wealthNarrativeScore = +Math.max(0, Math.min(1, 0.30 * out.regimePersistenceScore + 0.25 * consVis + 0.25 * eventOk + 0.20 * slope)).toFixed(2);
   out.institutionalProfileMatch = out.wealthNarrativeScore > 0.75 ? 'HIGH' : out.wealthNarrativeScore > 0.5 ? 'MEDIUM' : 'DEVELOPING';
+  const vs = _wscVisualNarrativeScore(out, aw, range);
+  out.visualNarrativeScore = vs.score; out.visualNarrativeComponents = vs.components;
   return out;
 }
 
@@ -18610,8 +18708,8 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
     window._aurixChartMode.terminalNeedleDetected = !!w16.terminalSpikeDetected;
     window._aurixChartMode.terminalNeedleCapped = !!(w16.terminalSpikeDetected && w16.spikeVisualBudgetBefore != null
       && w16.spikeVisualBudgetAfter != null && w16.spikeVisualBudgetAfter < w16.spikeVisualBudgetBefore - 0.05);
-    // WN.18 — narrative interpretation snapshot (analysis-only; reads the geometry).
-    try { window._aurixChartMode.narrative = _wscNarrativeModel(rscale, plotVals, uTs, activeRange); } catch (_) { window._aurixChartMode.narrative = null; }
+    // WN.18/19 — narrative interpretation snapshot (analysis-only; reads the geometry + warp).
+    try { window._aurixChartMode.narrative = _wscNarrativeModel(rscale, plotVals, uTs, activeRange, aw); } catch (_) { window._aurixChartMode.narrative = null; }
   }
   const linePath = _wscMonotonePath(pts);
   const areaPath = `${linePath} L${pts[pts.length - 1].x.toFixed(2)},${vp.bot.toFixed(2)} L${pts[0].x.toFixed(2)},${vp.bot.toFixed(2)} Z`;
