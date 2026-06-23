@@ -2755,6 +2755,7 @@ const T = {
     settingsAssetsUsed:       'Activos usados',
     settingsAssetsSoftWarn:   'Estás cerca del límite del plan Free.',
     settingsFounderName:      'Aurix Founder',
+    menuPremium:              '✦ Aurix Premium',
     settingsFounderPrice:     '14,99€ / año',
     settingsFounderDesc:      'Acceso anticipado. Sin límite de activos. Precio fundador de por vida.',
     settingsFounderCta:       'Conocer Aurix Founder',
@@ -4735,6 +4736,7 @@ const T = {
     settingsAssetsUsed:       'Assets used',
     settingsAssetsSoftWarn:   "You're close to the Free plan limit.",
     settingsFounderName:      'Aurix Founder',
+    menuPremium:              '✦ Aurix Premium',
     settingsFounderPrice:     '€14.99 / year',
     settingsFounderDesc:      'Early access. Unlimited assets. Founder price for life.',
     settingsFounderCta:       'About Aurix Founder',
@@ -39470,14 +39472,16 @@ try {
 (function _initFounderUI() {
   if (typeof document === 'undefined') return;
   document.addEventListener('click', e => {
-    // Menu entry → Founder page (also closes the hamburger menu).
-    if (e.target.closest && e.target.closest('#menuFounder')) {
+    // WN.P1 — Menu entry → Aurix Premium modal (also closes the hamburger menu).
+    // Repointed from the old Founder page; the Founder page stays reachable from
+    // the settings plan card and the upgrade modal (those entrypoints unchanged).
+    if (e.target.closest && e.target.closest('#menuPremium')) {
       e.stopPropagation();
       const panel = document.getElementById('menuPanel');
       const toggle = document.getElementById('menuToggle');
       if (panel && panel.classList.contains('open')) panel.classList.remove('open');
       if (toggle) toggle.setAttribute('aria-expanded', 'false');
-      openFounderPage();
+      if (typeof window !== 'undefined' && window.openAurixPremiumModal) window.openAurixPremiumModal({ source: 'settings-menu' });
       return;
     }
     // Settings plan card CTA → Founder page.
@@ -39502,6 +39506,151 @@ try {
     const fov = document.getElementById('founderOverlay');
     if (uov && uov.classList.contains('open')) { closeUpgradeModal(); return; }
     if (fov && fov.classList.contains('open')) { closeFounderPage();  return; }
+  });
+})();
+
+// ── WN.P1 — Aurix Premium modal (reusable conversion layer) ────────────────
+// Frontend-only. A centered premium dialog opened from the settings menu (and
+// later from any conversion point) via openAurixPremiumModal({source}). No
+// route change, no payment, no backend — just the reusable invitation UI.
+// Founder slot numbers are static placeholders wired so real values can be fed
+// in later. Self-contained: DOM is built lazily, all classes are .aurix-premium-*.
+(function _initAurixPremiumModal() {
+  if (typeof document === 'undefined') return;
+  const FOUNDER = { founderSlotsTotal: 50, founderSlotsTaken: 10, founderSlotsRemaining: 40 };
+  let _open = false, _lastSource = null, _trigger = null, _el = null;
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const log = (action, extra) => { try { console.log('[premium-modal]', Object.assign({ action, source: _lastSource }, extra || {})); } catch (_) {} };
+
+  const FREE = ['Dashboard principal', 'Evolución patrimonial', 'Registro de activos', 'Distribución básica', 'Seguimiento patrimonial'];
+  const PREM = ['Portfolio Health completo', 'Intelligence Center', 'Drivers patrimoniales', 'Riesgos detectados', 'Concentración', 'Diversificación', 'Liquidez avanzada', 'Timeline patrimonial', 'Workspace avanzado', 'Informes avanzados', 'Futuras funciones Premium'];
+  const li = (arr, cls) => arr.map(x => `<li class="${cls}">${esc(x)}</li>`).join('');
+
+  function _buildHtml() {
+    const tk = FOUNDER.founderSlotsTaken, tot = FOUNDER.founderSlotsTotal, rem = FOUNDER.founderSlotsRemaining;
+    return `
+      <div class="aurix-premium-modal" role="dialog" aria-modal="true" aria-labelledby="aurixPremiumTitle">
+        <button type="button" class="aurix-premium-close" aria-label="Cerrar">✕</button>
+        <header class="aurix-premium-header">
+          <span class="aurix-premium-eyebrow">AURIX PREMIUM</span>
+          <h2 id="aurixPremiumTitle" class="aurix-premium-tagline">Entiende tu patrimonio, no solo míralo.</h2>
+          <p class="aurix-premium-lede">Desbloquea toda la inteligencia patrimonial de Aurix: análisis, riesgos, diversificación, liquidez, drivers y visión histórica avanzada.</p>
+        </header>
+
+        <div class="aurix-premium-comparison">
+          <div class="aurix-premium-compare-col">
+            <span class="aurix-premium-compare-tier">Aurix Free</span>
+            <span class="aurix-premium-compare-q">¿Cuánto tengo?</span>
+            <ul class="aurix-premium-list">${li(FREE, 'is-free')}</ul>
+          </div>
+          <div class="aurix-premium-compare-col is-premium">
+            <span class="aurix-premium-compare-tier">Aurix Premium</span>
+            <span class="aurix-premium-compare-q">¿Qué significa lo que tengo?</span>
+            <ul class="aurix-premium-list">${li(PREM, 'is-prem')}</ul>
+          </div>
+        </div>
+
+        <div class="aurix-premium-plans">
+          <div class="aurix-premium-plan aurix-premium-founder">
+            <div class="aurix-premium-plan-top">
+              <span class="aurix-premium-badge">FOUNDER</span>
+              <h3 class="aurix-premium-plan-title">Founder Edition</h3>
+            </div>
+            <p class="aurix-premium-plan-desc">Las primeras ${tot} plazas desbloquean Aurix Premium con precio Founder permanente.</p>
+            <div class="aurix-premium-price"><span class="aurix-premium-price-amount">39€</span><span class="aurix-premium-price-per">/año</span></div>
+            <p class="aurix-premium-plan-note">Tu precio nunca aumentará mientras mantengas la suscripción activa.</p>
+            <div class="aurix-premium-scarcity">
+              <div class="aurix-premium-scarcity-bar"><span style="width:${Math.round((tk / tot) * 100)}%"></span></div>
+              <span class="aurix-premium-scarcity-txt">${tk} de ${tot} plazas ocupadas · Quedan ${rem} plazas Founder</span>
+            </div>
+            <button type="button" class="aurix-premium-cta is-founder" data-premium-cta="founder">Unirme como Founder</button>
+          </div>
+
+          <div class="aurix-premium-plan aurix-premium-standard">
+            <h3 class="aurix-premium-plan-title">Aurix Premium</h3>
+            <div class="aurix-premium-price"><span class="aurix-premium-price-amount">59€</span><span class="aurix-premium-price-per">/año</span></div>
+            <p class="aurix-premium-plan-note">Menos de 5€/mes.</p>
+            <button type="button" class="aurix-premium-cta is-premium" data-premium-cta="premium_annual">Desbloquear Premium</button>
+            <button type="button" class="aurix-premium-cta is-monthly" data-premium-cta="premium_monthly">5,99€/mes</button>
+          </div>
+        </div>
+
+        <footer class="aurix-premium-footer">
+          <p>Aurix Free seguirá siendo útil. Premium desbloquea la capa de inteligencia avanzada.</p>
+          <p class="aurix-premium-microcopy">Sin cambios en tus datos. Sin pérdida de acceso a tu cartera.</p>
+        </footer>
+      </div>`;
+  }
+
+  function _ctaState(btn) {
+    if (!btn || btn.dataset.done === '1') return;
+    btn.dataset.done = '1';
+    btn.dataset.label = btn.textContent;
+    btn.textContent = 'Te avisaremos pronto';
+    btn.classList.add('is-done');
+  }
+
+  function _wire(el) {
+    el.addEventListener('click', e => {
+      if (e.target === el) { closeAurixPremiumModal(); return; }                 // outside click
+      if (e.target.closest('.aurix-premium-close')) { closeAurixPremiumModal(); return; }
+      const cta = e.target.closest('[data-premium-cta]');
+      if (cta) { log('cta_click', { plan: cta.getAttribute('data-premium-cta') }); _ctaState(cta); return; }
+    });
+    // Focus trap (Tab cycles within the modal while open).
+    el.addEventListener('keydown', e => {
+      if (e.key !== 'Tab' || !_open) return;
+      const f = el.querySelectorAll('button, [href], [tabindex]:not([tabindex="-1"])');
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+  }
+
+  function openAurixPremiumModal(options) {
+    options = options || {};
+    _lastSource = options.source || 'unknown';
+    log('open');
+    _trigger = (document.activeElement && document.activeElement.focus) ? document.activeElement : null;
+    if (!_el) {
+      _el = document.createElement('div');
+      _el.className = 'aurix-premium-overlay';
+      _el.innerHTML = _buildHtml();
+      document.body.appendChild(_el);
+      _wire(_el);
+    }
+    _el.style.display = 'flex';
+    // reset any prior CTA states for a fresh invitation each open
+    _el.querySelectorAll('.aurix-premium-cta.is-done').forEach(b => { if (b.dataset.label) b.textContent = b.dataset.label; b.classList.remove('is-done'); b.dataset.done = ''; });
+    requestAnimationFrame(() => _el.classList.add('is-open'));
+    document.body.classList.add('aurix-premium-lock');
+    _open = true;
+    const closeBtn = _el.querySelector('.aurix-premium-close');
+    if (closeBtn) closeBtn.focus();
+  }
+
+  function closeAurixPremiumModal() {
+    if (!_el || !_open) return;
+    _open = false;
+    _el.classList.remove('is-open');
+    document.body.classList.remove('aurix-premium-lock');
+    log('close');
+    const el = _el;
+    setTimeout(() => { if (!_open && el) el.style.display = 'none'; }, 220);
+    if (_trigger && _trigger.focus) { try { _trigger.focus(); } catch (_) {} }
+  }
+
+  document.addEventListener('keydown', e => { if (_open && e.key === 'Escape') { e.stopPropagation(); closeAurixPremiumModal(); } });
+
+  window.openAurixPremiumModal = openAurixPremiumModal;
+  window.closeAurixPremiumModal = closeAurixPremiumModal;
+  window.aurixPremiumModal = { open: openAurixPremiumModal, close: closeAurixPremiumModal };
+  window.debugAurixPremiumModal = () => ({
+    installed: true, isOpen: _open, lastSource: _lastSource,
+    founderSlotsTotal: FOUNDER.founderSlotsTotal, founderSlotsTaken: FOUNDER.founderSlotsTaken, founderSlotsRemaining: FOUNDER.founderSlotsRemaining,
+    ctasAvailable: ['founder', 'premium_annual', 'premium_monthly'],
+    menuHookInstalled: !!document.getElementById('menuPremium'),
   });
 })();
 
