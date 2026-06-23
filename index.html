@@ -192,18 +192,32 @@
         </button>
 
         <div id="menuPanel" class="menu-panel" role="menu">
-          <button class="menu-item menu-item--lang" data-lang="es" role="menuitem">🇪🇸 Español</button>
-          <button class="menu-item menu-item--lang" data-lang="en" role="menuitem">🇬🇧 English</button>
-          <div class="menu-divider"></div>
-          <div class="menu-curr-row" role="group" aria-label="Currency" data-i18n-aria="ariaCurrency">
-            <button class="menu-curr-btn" data-currency="USD" role="menuitem">$ USD</button>
-            <button class="menu-curr-btn" data-currency="EUR" role="menuitem">€ EUR</button>
+          <!-- DSH.MENU.02 — personal identity header (dominant block) -->
+          <div class="menu-identity">
+            <span class="menu-identity-name" id="menuUserName">—</span>
+            <span class="menu-identity-badge" id="menuUserBadge" data-tier="free">FREE</span>
           </div>
           <div class="menu-divider"></div>
-          <button id="menuGeneral" class="menu-item menu-item--general" data-i18n="settingsGeneral" role="menuitem">⚙ General</button>
-          <button id="menuPremium" class="menu-item menu-item--founder" data-i18n="menuPremium" role="menuitem">✦ Aurix Premium</button>
+          <button id="menuGeneral" class="menu-item menu-item--general" data-i18n="settingsGeneral" role="menuitem">⚙ Configuración</button>
+          <button id="menuPremium" class="menu-item menu-item--founder" data-i18n="menuPremium" role="menuitem">✨ Aurix Premium</button>
           <div class="menu-divider"></div>
-          <button id="menuExit" class="menu-item menu-item--danger" data-i18n="exit" role="menuitem">Salir</button>
+          <!-- Secondary preferences (compact) -->
+          <div class="menu-pref-row" role="group" aria-label="Language">
+            <span class="menu-pref-label" data-i18n="menuLangLabel">Idioma</span>
+            <div class="menu-pref-opts">
+              <button class="menu-item--lang menu-pref-opt" data-lang="es" role="menuitem">Español</button>
+              <button class="menu-item--lang menu-pref-opt" data-lang="en" role="menuitem">English</button>
+            </div>
+          </div>
+          <div class="menu-pref-row" role="group" aria-label="Currency" data-i18n-aria="ariaCurrency">
+            <span class="menu-pref-label" data-i18n="menuCurrLabel">Moneda</span>
+            <div class="menu-pref-opts">
+              <button class="menu-curr-btn menu-pref-opt" data-currency="USD" role="menuitem">USD</button>
+              <button class="menu-curr-btn menu-pref-opt" data-currency="EUR" role="menuitem">EUR</button>
+            </div>
+          </div>
+          <div class="menu-divider"></div>
+          <button id="menuExit" class="menu-item menu-item--danger" data-i18n="menuLogout" role="menuitem">Cerrar sesión</button>
         </div>
       </div>
     </header>

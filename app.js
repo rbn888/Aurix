@@ -2743,7 +2743,7 @@ const T = {
     wsTplExpectedReturn:     'Rentabilidad esperada %',
     wsTplFutureValue:        'Valor futuro',
     // SETTINGS-1
-    settingsGeneral:          '⚙ General',
+    settingsGeneral:          '⚙ Configuración',
     settingsTitle:            'General',
     settingsAccount:          'Cuenta',
     settingsEmail:            'Email',
@@ -2755,7 +2755,10 @@ const T = {
     settingsAssetsUsed:       'Activos usados',
     settingsAssetsSoftWarn:   'Estás cerca del límite del plan Free.',
     settingsFounderName:      'Aurix Founder',
-    menuPremium:              '✦ Aurix Premium',
+    menuPremium:              '✨ Aurix Premium',
+    menuLangLabel:            'Idioma',
+    menuCurrLabel:            'Moneda',
+    menuLogout:               'Cerrar sesión',
     // WN.P1 refinement — Aurix Premium modal (fully localized)
     ap_eyebrow:        'AURIX PREMIUM',
     ap_hero_title:     'LA INTELIGENCIA DE TU PATRIMONIO',
@@ -4790,7 +4793,7 @@ const T = {
     wsTplExpectedReturn:     'Expected Return %',
     wsTplFutureValue:        'Future Value',
     // SETTINGS-1
-    settingsGeneral:          '⚙ General',
+    settingsGeneral:          '⚙ Settings',
     settingsTitle:            'General',
     settingsAccount:          'Account',
     settingsEmail:            'Email',
@@ -4802,7 +4805,10 @@ const T = {
     settingsAssetsUsed:       'Assets used',
     settingsAssetsSoftWarn:   "You're close to the Free plan limit.",
     settingsFounderName:      'Aurix Founder',
-    menuPremium:              '✦ Aurix Premium',
+    menuPremium:              '✨ Aurix Premium',
+    menuLangLabel:            'Language',
+    menuCurrLabel:            'Currency',
+    menuLogout:               'Sign out',
     // WN.P1 refinement — Aurix Premium modal (fully localized)
     ap_eyebrow:        'AURIX PREMIUM',
     ap_hero_title:     'THE INTELLIGENCE OF YOUR WEALTH',
@@ -36862,6 +36868,43 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   if (lang !== 'es') applyI18n();
 })();
 
+// ── DSH.MENU.02 — personal menu identity (display name + membership badge) ──
+// Display-only. Reads the auth user + existing plan tier; changes NO auth,
+// language, currency, permission or Premium logic. Name rule: user_metadata
+// display name → stored account name → text-before-@.
+function _aurixMenuDisplayName() {
+  try {
+    const u = (typeof currentUser !== 'undefined') ? currentUser : null;
+    const md = (u && u.user_metadata) || {};
+    const dn = md.display_name || md.full_name || md.name;
+    if (dn && String(dn).trim()) return String(dn).trim();
+    let stored = null; try { stored = localStorage.getItem('aurix_display_name'); } catch (_) {}
+    if (stored && stored.trim()) return stored.trim();
+    const email = (u && u.email) || '';
+    if (email.indexOf('@') > 0) return email.split('@')[0];
+    if (email) return email;
+  } catch (_) {}
+  return (typeof lang !== 'undefined' && lang === 'en') ? 'You' : 'Tú';
+}
+function _aurixMenuTier() {
+  try {
+    const p = window.aurixEntitlements && window.aurixEntitlements.getPlan && window.aurixEntitlements.getPlan();
+    const tier = p && p.tier;
+    if (tier === 'founder' || tier === 'premium' || tier === 'free') return tier;
+  } catch (_) {}
+  return 'free';
+}
+function _aurixRenderMenuIdentity() {
+  const nameEl = document.getElementById('menuUserName');
+  const badgeEl = document.getElementById('menuUserBadge');
+  if (nameEl) nameEl.textContent = _aurixMenuDisplayName();
+  if (badgeEl) {
+    const tier = _aurixMenuTier();
+    badgeEl.setAttribute('data-tier', tier);
+    badgeEl.textContent = tier === 'founder' ? 'FOUNDER' : tier === 'premium' ? 'PREMIUM' : 'FREE';
+  }
+}
+
 // ── Hamburger menu ─────────────────────────────────────────
 (function initMenu() {
   const toggle = document.getElementById('menuToggle');
@@ -36870,6 +36913,7 @@ setInterval(updateGoldTimestamps, 30_000);  // 30 s — lightweight text-only up
   if (!toggle || !panel) return;
 
   function openMenu()  {
+    try { _aurixRenderMenuIdentity(); } catch (_) {}   // DSH.MENU.02 — fresh name/badge each open
     panel.classList.add('open');
     toggle.classList.add('open');
     toggle.setAttribute('aria-expanded', 'true');
