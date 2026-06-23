@@ -16957,7 +16957,7 @@ const _WSC_VIEW_H = 240;
 // no decorative oscillation. Only the visual SCALE adapts (robust statistics +
 // adaptive occupancy) so real movement is always legible and outliers never
 // dictate the chart height. Metric / % / gain stay the real figures.
-const _WSC_PAD_X    = 0.075;  // WN.6 — slightly wider plot (smaller horizontal inset)
+const _WSC_PAD_X    = 0.06;   // WN.6/WN.25 — wider plot (smaller horizontal inset); WN.25 PART 3 panel density: 0.075→0.06 ≈ +3.5% usable width (right Y labels keep clearance: curve right edge ~94%)
 const _WSC_OCC_SCALE = 0.05;  // robust relative-spread that maps to ~mid occupancy
 // WN.7 — line occupancy (no-floor/no-ceiling): the data line fills ~54–66% of
 // the chart height, centred inside a taller grid, so it never hugs the top or
@@ -17622,15 +17622,90 @@ function _wscFmtAxisValStep(v, step) {
 // slightly sharper; long ranges (30D/1A/TOTAL) read smoother + quieter (lighter
 // area) for a Bloomberg/Kubera institutional feel. Pure presentation — drives
 // SVG stroke-width / filter / fill opacity only, never geometry, values or hover.
-function _wscRenderPolish(range, mobile) {
+function _wscRenderPolish(range, mobile, tone) {
   const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) ? Math.max(1, Math.min(3, window.devicePixelRatio)) : 1;
   const isLong = range === '30d' || range === '1y' || range === 'all';
   const sharp = range === '24h' || range === '7d';
   const strokeWidth = mobile ? (sharp ? 2.4 : 2.1) : (sharp ? 2.7 : isLong ? 2.35 : 2.5);
   const glowStrength = +((isLong ? 1.3 : 1.8) * (mobile ? 0.85 : 1)).toFixed(2);   // SVG blur stdDeviation (user units)
-  const glowAlpha = +Math.min(0.62, 0.42 + 0.10 * (dpr - 1)).toFixed(2);           // DPR-aware halo strength
+  // DPR-aware halo strength. WN.25 PART 5 — softer halo in the red (down) state
+  // so a negative day never reads arcade-bright.
+  const glowAlpha = +Math.min(0.62, (0.42 + 0.10 * (dpr - 1)) * (tone === 'down' ? 0.86 : 1)).toFixed(2);
   const areaOpacity = range === 'all' ? 0.62 : range === '1y' ? 0.72 : range === '30d' ? 0.84 : 1.0;
   return { visualFinishApplied: true, strokeWidth, glowStrength, glowAlpha, areaOpacity, devicePixelRatio: dpr, renderPolishMode: isLong ? 'institutional-smooth' : 'sharp-intraday' };
+}
+
+// ── WN.25 PART 1 — canonical value → plot-Y (viewBox units) ─────────────────
+// ONE coordinate system for the curve and the axis: maps a value through the
+// active vertical scale (regime-relative gFrac, else linear domain) into the
+// line band. Used for label-position verification and any value→pixel need so
+// no mixed coordinate systems can drift.
+function _wscValueToPlotY(value, vp, rscale) {
+  const band = (vp.lineBot - vp.lineTop) || 1;
+  let f = (rscale && rscale.mode === 'regime-relative' && rscale.gFrac) ? rscale.gFrac(value)
+    : ((vp.hi > vp.lo) ? (value - vp.lo) / (vp.hi - vp.lo) : 0.5);
+  f = Math.max(0, Math.min(1, f));
+  return vp.lineBot - f * band;
+}
+// WN.25 PART 1 — Y-axis labels ANCHORED to the static WN.17 grid lines: evenly
+// spaced (10/36/62/88% of plot), aligned with the visible grid, never collapsed.
+// Value at each grid line via the same vertical scale as the curve (clamped to
+// the data domain at the band edges), rounded to a clean nice step + de-duped.
+function _wscYAxisLabels(vp, rscale) {
+  const band = (vp.lineBot - vp.lineTop) || 1;
+  const valAtY = (rscale && rscale.mode === 'regime-relative' && rscale.inv)
+    ? y => rscale.inv(Math.max(0, Math.min(1, (vp.lineBot - y) / band)))
+    : y => (vp.valAt ? vp.valAt(Math.max(vp.lineTop, Math.min(vp.lineBot, y))) : (vp.lo + (vp.lineBot - y) / band * (vp.hi - vp.lo)));
+  const gridYs = [0, 1, 2, 3].map(i => vp.top + (vp.bot - vp.top) * (i / 3));
+  const vals = gridYs.map(valAtY);
+  // Step drives the DECIMAL PRECISION only — format the ACTUAL grid-line value
+  // (never snap to a coarse multiple, which could round a 10k domain-min to 0).
+  const step = _wscNiceStep(Math.abs(vals[0] - vals[vals.length - 1]) || (vp.hi - vp.lo) || 1, 4);
+  const seen = new Set(), out = [];
+  gridYs.forEach((gy, i) => {
+    const text = _wscFmtAxisValStep(vals[i], step);
+    if (seen.has(text)) return; seen.add(text);
+    out.push({ y: gy, value: vals[i], text });
+  });
+  return out;
+}
+
+// ── WN.25 PART 4 — long-decline naturality report (measurement-only) ────────
+// Detects the dominant downward run in screen space and reports whether the
+// rendered line preserves real intermediate source movement (so a decline reads
+// organic, not ruler-straight) — WITHOUT fabricating volatility. 24H/7D anchors
+// are unsmoothed (smoothWin=1), so their source bends are already drawn through;
+// a genuinely linear/sparse decline stays honestly calm.
+function _wscLongDeclineReport(pts, range) {
+  const out = { longDeclineDetected: false, longDeclineNaturalized: false, sourceDeviationPct: 0, declineStraightnessScore: 100 };
+  const n = pts.length; if (n < 5) return out;
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const totalW = (xs[n - 1] - xs[0]) || 1, totalH = (Math.max(...ys) - Math.min(...ys)) || 1;
+  const thr = range === '24h' ? 0.25 : range === '7d' ? 0.20 : 0.15;
+  let i = 0, best = null;
+  while (i < n - 1) {
+    let j = i;
+    while (j < n - 1 && ys[j + 1] >= ys[j] - 0.03 * totalH) j++;     // value descending (y rising), small up-wiggle tolerated
+    if (j > i) {
+      const wpct = (xs[j] - xs[i]) / totalW, drop = (ys[j] - ys[i]) / totalH;
+      if (drop > 0.10 && wpct >= thr && (!best || wpct > best.wpct)) best = { i, j, wpct };
+      i = j;
+    } else i++;
+  }
+  if (best) {
+    out.longDeclineDetected = true;
+    const { i: a, j: b } = best, fx = (xs[b] - xs[a]) || 1e-6;
+    let maxDev = 0, dc = 0;
+    for (let p = a + 1; p < b; p++) {
+      const chord = ys[a] + (ys[b] - ys[a]) * ((xs[p] - xs[a]) / fx);
+      maxDev = Math.max(maxDev, Math.abs(ys[p] - chord));
+      if (p > a + 1) { const s1 = Math.sign(ys[p - 1] - ys[p - 2]), s2 = Math.sign(ys[p] - ys[p - 1]); if (s1 && s2 && s1 !== s2) dc++; }
+    }
+    out.sourceDeviationPct = +((maxDev / totalH) * 100).toFixed(2);
+    out.declineStraightnessScore = +Math.max(0, Math.min(100, 100 - (maxDev / totalH) * 350)).toFixed(1);  // higher = straighter
+    out.longDeclineNaturalized = out.sourceDeviationPct > 0.6 || dc >= 2;    // real bends survive in the drawn line
+  }
+  return out;
 }
 
 // X-axis ticks (5) across [t0, t1] formatted per range.
@@ -18124,6 +18199,28 @@ if (typeof window !== 'undefined') {
       o.areaOpacity = rp.areaOpacity;
       o.devicePixelRatio = rp.devicePixelRatio;
       o.renderPolishMode = rp.renderPolishMode;
+
+      // ── WN.25 — axis alignment, panel density & long-decline report ──────
+      const _vp = _wscViewport(p.plotVals, r);
+      const _rs = _wscRegimeYScale(p.plotVals, r, p.uTs);
+      const _lab = _wscYAxisLabels(_vp, _rs);
+      o.yLabelPositionsPx = _lab.map(l => +l.y.toFixed(1));
+      o.yLabelInsidePlot = _lab.every(l => l.y >= _vp.top - 0.5 && l.y <= _vp.bot + 0.5);
+      let _minGap = Infinity; for (let i = 1; i < _lab.length; i++) _minGap = Math.min(_minGap, Math.abs(_lab[i].y - _lab[i - 1].y));
+      o.yLabelMinGapPx = _lab.length > 1 ? +_minGap.toFixed(1) : null;
+      o.yLabelAlignmentPassed = o.yLabelInsidePlot && _lab.length >= 2 && _minGap >= (_vp.bot - _vp.top) / 3 - 1;
+      o.chartPanelDensityMode = 'optimized';
+      o.plotUsableWidthPct = +((1 - 2 * _WSC_PAD_X) * 100).toFixed(1);
+      o.heroChartSpacingPx = 'unchanged (chart-internal padding only)';
+      const _aw = _wscActivityWeights(p.plotVals, r);
+      const _uN = p.plotVals.length, _xfr = (_aw.frac && _aw.frac.length === _uN) ? _aw.frac : p.plotVals.map((_, i) => (_uN > 1 ? i / (_uN - 1) : 0));
+      const _band = _vp.lineBot - _vp.lineTop, _pdx = _WSC_VIEW_W * _WSC_PAD_X, _pw = _WSC_VIEW_W - 2 * _pdx;
+      const _pts = p.plotVals.map((v, i) => ({ x: _pdx + _xfr[i] * _pw, y: _vp.lineBot - _rs.gFrac(v) * _band }));
+      const _dec = _wscLongDeclineReport(_pts, r);
+      o.longDeclineDetected = _dec.longDeclineDetected;
+      o.longDeclineNaturalized = _dec.longDeclineNaturalized;
+      o.sourceDeviationPct = _dec.sourceDeviationPct;
+      o.declineStraightnessScore = _dec.declineStraightnessScore;
 
       try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| visualScore:', o.visualNarrativeScore, '| eventDomScore:', o.eventDominanceScore, '| yScaleScore:', o.institutionalYScaleScore, '| curveScore:', o.institutionalCurveScore, '| labels:', JSON.stringify(o.yLabelTicks), '| staticGrid:', o.staticGrid, '| occ%:', o.occupancyPct); } catch (_) {}
     } catch (e) { o.error = String(e); }
@@ -19263,28 +19360,16 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
 
   // WN.17 PART 2 (Option A) — bottom X-axis text labels REMOVED (tooltip is the
   // exact date/time source); static vertical grid lines keep the temporal rhythm.
-  // WN.21 PART 7 — premium right-side Y labels: nice rounded tick VALUES
-  // (64k / 65k / 66k, never 63.781k) placed at their mapped screen positions.
-  // The static grid lines above are unchanged; only the value labels are
-  // value-anchored. Falls back to the gridline labels if the domain is too tight.
-  const _niceTicks = _wscNiceTicks(vp.lo, vp.hi, 4);
-  const _yStep = _niceTicks.length > 1 ? _niceTicks[1] - _niceTicks[0] : ((vp.hi - vp.lo) || 1);
-  const _minLabelGapPx = H * 0.06;
-  const _yLabelPts = []; let _lastLabY = -1e9;
-  _niceTicks.forEach(tv => {
-    const y = yOf(tv);
-    if (y < vp.lineTop - 1 || y > vp.lineBot + 1) return;
-    if (Math.abs(y - _lastLabY) < _minLabelGapPx) return;
-    _lastLabY = y; _yLabelPts.push({ y, val: tv });
-  });
-  const _useNice = _yLabelPts.length >= 2;
-  const _labelSrc = _useNice ? _yLabelPts : yTicks;
-  const yLabels = _labelSrc.map(tk => `<span class="wsc-ylab" style="top:${(tk.y / H * 100).toFixed(2)}%">${_useNice ? _wscFmtAxisValStep(tk.val, _yStep) : _wscFmtAxisVal(tk.val)}</span>`).join('');
+  // WN.25 PART 1 — premium right-side Y labels ANCHORED to the static grid lines
+  // (evenly spaced, aligned with the visible grid, never collapsed near the
+  // bottom). Nice-rounded real domain values via the canonical _wscYAxisLabels.
+  const _yAxis = _wscYAxisLabels(vp, rscale);
+  const yLabels = _yAxis.map(tk => `<span class="wsc-ylab" style="top:${(tk.y / H * 100).toFixed(2)}%">${tk.text}</span>`).join('');
   const xLabels = '';
 
   // WN.23 — premium visual finish (styling only: adaptive stroke / subtle
   // tone-coloured glow / quieter area on long ranges). No geometry/value change.
-  const _polish = _wscRenderPolish(activeRange, opts.uid === 'm');
+  const _polish = _wscRenderPolish(activeRange, opts.uid === 'm', tone);
   if (typeof window !== 'undefined' && window._aurixChartMode) window._aurixChartMode.renderPolish = _polish;
 
   hostEl.innerHTML = `
