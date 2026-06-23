@@ -3052,7 +3052,7 @@ body:not(.hero-active) #orb-canvas {
   position: relative;
   overflow: hidden;
   display: grid;
-  grid-template-columns: 1fr 1.5fr;
+  grid-template-columns: 1fr 1.72fr;   /* WN.26 PART 2 — desktop hero/chart split 40/60 → ~37/63 (chart wider, more institutional). Mobile/tablet override to flex column, unaffected. */
   align-items: stretch;   /* both columns fill full height — keeps divider intact */
   transition: border-color var(--dur-med) var(--ease-premium),
               box-shadow var(--dur-med) var(--ease-out);
@@ -3378,13 +3378,16 @@ body:not(.hero-active) #orb-canvas {
               opacity var(--dur-tap);
 }
 
-.chart-title { margin-bottom: 6px; }
+/* WN.26 PART 3 — group the chart title + metric as one premium title block:
+   tighter vertical gap so the percentage reads as part of the title group. */
+.chart-title { margin-bottom: 1px; }
 
 .chart-change {
   font-size: 15px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   letter-spacing: -.01em;
+  line-height: 1.05;
 }
 .chart-change.up   { color: var(--green); }
 .chart-change.down { color: var(--red); }
@@ -14295,15 +14298,22 @@ body.gs-open { overflow: hidden; }
     filter var(--dur-fast) var(--ease-premium),
     opacity var(--dur-fast);
 }
+/* WN.26 PART 4 — range controls premium state (final/winning rules):
+   inactive quieter, active clearer (brighter gradient + slightly stronger glow
+   + heavier weight). Shape, sizing and click behaviour unchanged. */
+.range-btn:not(.active)        { opacity: .82; }
 .range-btn:not(.active):hover {
   background: var(--aurix-blue-soft);
   color: #fff;
+  opacity: 1;
 }
 .range-btn.active {
-  background: linear-gradient(180deg, rgba(74,130,240,0.42), rgba(74,130,240,0.22));
+  background: linear-gradient(180deg, rgba(74,130,240,0.52), rgba(74,130,240,0.30));
   color: #fff;
+  font-weight: 800;
+  opacity: 1;
   box-shadow:
-    0 0 0 1px rgba(74, 130, 240,0.45) inset,
+    0 0 0 1px rgba(74, 130, 240,0.55) inset,
     var(--aurix-glow);
 }
 

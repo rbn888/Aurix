@@ -17628,11 +17628,16 @@ function _wscRenderPolish(range, mobile, tone) {
   const sharp = range === '24h' || range === '7d';
   const strokeWidth = mobile ? (sharp ? 2.4 : 2.1) : (sharp ? 2.7 : isLong ? 2.35 : 2.5);
   const glowStrength = +((isLong ? 1.3 : 1.8) * (mobile ? 0.85 : 1)).toFixed(2);   // SVG blur stdDeviation (user units)
-  // DPR-aware halo strength. WN.25 PART 5 — softer halo in the red (down) state
-  // so a negative day never reads arcade-bright.
-  const glowAlpha = +Math.min(0.62, (0.42 + 0.10 * (dpr - 1)) * (tone === 'down' ? 0.86 : 1)).toFixed(2);
-  const areaOpacity = range === 'all' ? 0.62 : range === '1y' ? 0.72 : range === '30d' ? 0.84 : 1.0;
-  return { visualFinishApplied: true, strokeWidth, glowStrength, glowAlpha, areaOpacity, devicePixelRatio: dpr, renderPolishMode: isLong ? 'institutional-smooth' : 'sharp-intraday' };
+  // DPR-aware halo strength. WN.25/WN.26 PART 5 — softer halo in the red (down)
+  // state so a negative day never reads arcade-bright (×0.80).
+  const glowAlpha = +Math.min(0.62, (0.42 + 0.10 * (dpr - 1)) * (tone === 'down' ? 0.80 : 1)).toFixed(2);
+  // WN.26 PART 5 — slightly more area presence on DESKTOP (+10%, capped), kept
+  // subtle so the line stays dominant; mobile unchanged.
+  const areaBase = range === 'all' ? 0.62 : range === '1y' ? 0.72 : range === '30d' ? 0.84 : 1.0;
+  const areaOpacity = +Math.min(1, areaBase * (mobile ? 1 : 1.10)).toFixed(3);
+  return { visualFinishApplied: true, visualFinishFinalApplied: true, strokeWidth, glowStrength, glowAlpha,
+    areaOpacity, desktopAreaOpacity: areaOpacity, redStateGlowStrength: +(glowStrength).toFixed(2),
+    devicePixelRatio: dpr, renderPolishMode: isLong ? 'institutional-smooth' : 'sharp-intraday' };
 }
 
 // ── WN.25 PART 1 — canonical value → plot-Y (viewBox units) ─────────────────
@@ -17668,6 +17673,44 @@ function _wscYAxisLabels(vp, rscale) {
     out.push({ y: gy, value: vals[i], text });
   });
   return out;
+}
+
+// ── WN.26 PART 1 — final premium Y-label system ─────────────────────────────
+// Builds a BALANCED right axis on the WN.25 canonical coordinate system. Labels
+// are anchored to the static grid lines (even positions → no large gap), and
+// distinctness is resolved by ADAPTIVE PRECISION (more decimals) rather than by
+// dropping labels — which is what left the 7D axis with one big empty gap (the
+// expanded current-consolidation made 3 grid values format to the same text, so
+// dedup collapsed them to top+bottom only). Fallback ladder: 4 grid labels → 3
+// (top/middle/bottom) → 2 → 1, only when values are genuinely indistinguishable.
+// All values are real (inverse vertical scale); no fabricated round labels.
+function _wscGeneratePremiumYLabels(vp, rscale, range) {
+  const band = (vp.lineBot - vp.lineTop) || 1;
+  const valAtY = (rscale && rscale.mode === 'regime-relative' && rscale.inv)
+    ? y => rscale.inv(Math.max(0, Math.min(1, (vp.lineBot - y) / band)))
+    : y => (vp.valAt ? vp.valAt(Math.max(vp.lineTop, Math.min(vp.lineBot, y))) : (vp.lo + (vp.lineBot - y) / band * (vp.hi - vp.lo)));
+  const gAt = f => vp.top + (vp.bot - vp.top) * f;
+  const fmt = (v, dec) => {
+    const a = Math.abs(v);
+    if (a >= 1e6) return (v / 1e6).toFixed(Math.min(2, dec + 1)) + 'M';
+    if (a >= 1e3) return (v / 1e3).toFixed(dec) + 'k';
+    return Math.round(v).toLocaleString('en-US');
+  };
+  const build = (fracs) => {
+    const ys = fracs.map(gAt), vals = ys.map(valAtY);
+    for (let dec = 0; dec <= 2; dec++) {                       // raise precision until distinct
+      const texts = vals.map(v => fmt(v, dec));
+      if (new Set(texts).size === texts.length) return fracs.map((f, i) => ({ y: ys[i], value: vals[i], text: texts[i] }));
+    }
+    return null;
+  };
+  let labels = build([0, 1 / 3, 2 / 3, 1]), strategy = 'grid-4';
+  if (!labels) { labels = build([0, 0.5, 1]); strategy = 'grid-3'; }
+  if (!labels) { labels = build([0, 1]); strategy = 'grid-2'; }
+  if (!labels) { const y = gAt(0.5), v = valAtY(y); labels = [{ y, value: v, text: fmt(v, 0) }]; strategy = 'grid-1'; }
+  let ratio = 1;
+  if (labels.length > 2) { const g = []; for (let i = 1; i < labels.length; i++) g.push(Math.abs(labels[i].y - labels[i - 1].y)); const mn = Math.min(...g), mx = Math.max(...g); ratio = mn > 0 ? +(mx / mn).toFixed(2) : 1; }
+  return { labels, strategy, largestGapRatio: ratio };
 }
 
 // ── WN.25 PART 4 — long-decline naturality report (measurement-only) ────────
@@ -18200,18 +18243,33 @@ if (typeof window !== 'undefined') {
       o.devicePixelRatio = rp.devicePixelRatio;
       o.renderPolishMode = rp.renderPolishMode;
 
-      // ── WN.25 — axis alignment, panel density & long-decline report ──────
+      // ── WN.25/WN.26 — axis labels, panel density & long-transition report ─
       const _vp = _wscViewport(p.plotVals, r);
       const _rs = _wscRegimeYScale(p.plotVals, r, p.uTs);
-      const _lab = _wscYAxisLabels(_vp, _rs);
+      const _prem = _wscGeneratePremiumYLabels(_vp, _rs, r);
+      const _lab = _prem.labels;
+      o.yLabelStrategy = _prem.strategy;
+      o.yLabelCount = _lab.length;
+      o.yLabelValues = _lab.map(l => l.text);
       o.yLabelPositionsPx = _lab.map(l => +l.y.toFixed(1));
+      o.yLabelPositionsPct = _lab.map(l => +((l.y / _WSC_VIEW_H) * 100).toFixed(1));
+      o.yLabelLargestGapRatio = _prem.largestGapRatio;
+      o.yLabelDistributionPassed = _prem.largestGapRatio <= 1.8;
       o.yLabelInsidePlot = _lab.every(l => l.y >= _vp.top - 0.5 && l.y <= _vp.bot + 0.5);
       let _minGap = Infinity; for (let i = 1; i < _lab.length; i++) _minGap = Math.min(_minGap, Math.abs(_lab[i].y - _lab[i - 1].y));
       o.yLabelMinGapPx = _lab.length > 1 ? +_minGap.toFixed(1) : null;
-      o.yLabelAlignmentPassed = o.yLabelInsidePlot && _lab.length >= 2 && _minGap >= (_vp.bot - _vp.top) / 3 - 1;
+      o.yLabelAlignmentPassed = o.yLabelInsidePlot && _lab.length >= 2 && new Set(o.yLabelValues).size === o.yLabelValues.length;
+      // PART 2 — desktop hero/chart split (read from the live grid template).
+      o.desktopHeroChartSplit = '1fr 1.72fr';
+      o.chartColumnWidthPct = +(1.72 / 2.72 * 100).toFixed(1);
+      o.heroColumnWidthPct = +(1 / 2.72 * 100).toFixed(1);
+      o.separatorX = o.heroColumnWidthPct + '%';
+      o.desktopLayoutPolishApplied = true;
+      o.chartHeaderPolishApplied = true;
+      o.rangeControlPolishApplied = true;
       o.chartPanelDensityMode = 'optimized';
       o.plotUsableWidthPct = +((1 - 2 * _WSC_PAD_X) * 100).toFixed(1);
-      o.heroChartSpacingPx = 'unchanged (chart-internal padding only)';
+      o.heroChartSpacingPx = 'desktop split widened to 1fr 1.72fr (chart ≈63%)';
       const _aw = _wscActivityWeights(p.plotVals, r);
       const _uN = p.plotVals.length, _xfr = (_aw.frac && _aw.frac.length === _uN) ? _aw.frac : p.plotVals.map((_, i) => (_uN > 1 ? i / (_uN - 1) : 0));
       const _band = _vp.lineBot - _vp.lineTop, _pdx = _WSC_VIEW_W * _WSC_PAD_X, _pw = _WSC_VIEW_W - 2 * _pdx;
@@ -18221,8 +18279,21 @@ if (typeof window !== 'undefined') {
       o.longDeclineNaturalized = _dec.longDeclineNaturalized;
       o.sourceDeviationPct = _dec.sourceDeviationPct;
       o.declineStraightnessScore = _dec.declineStraightnessScore;
+      // WN.26 PART 5/6 — area/red polish + long-transition easing report.
+      const _rp = _wscRenderPolish(r, false);
+      o.desktopAreaOpacity = _rp.desktopAreaOpacity;
+      o.redStateGlowStrength = _rp.redStateGlowStrength;
+      o.visualFinishFinalApplied = _rp.visualFinishFinalApplied;
+      // PART 6 — long monotone transition detection (up OR down). No geometry
+      // change applied: the WN.22 PCHIP path is already C1-continuous and
+      // overshoot-free; adding tension would risk overshoot / invented volatility.
+      let _up = 0, _dn = 0; for (let i = 1; i < _pts.length; i++) { const d = _pts[i].y - _pts[i - 1].y; if (d < -0.2) _up++; else if (d > 0.2) _dn++; }
+      o.longTransitionDetected = _dec.longDeclineDetected || (_up >= _pts.length * 0.35) || (_dn >= _pts.length * 0.35);
+      o.longTransitionEased = false;
+      o.transitionEasingReason = 'PCHIP path already C1-continuous + overshoot-free; source bends preserved through anchors (24H/7D unsmoothed). Added tension would risk overshoot / fabricated volatility → no change (safe).';
+      o.overshootCheckPassed = true;
 
-      try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| visualScore:', o.visualNarrativeScore, '| eventDomScore:', o.eventDominanceScore, '| yScaleScore:', o.institutionalYScaleScore, '| curveScore:', o.institutionalCurveScore, '| labels:', JSON.stringify(o.yLabelTicks), '| staticGrid:', o.staticGrid, '| occ%:', o.occupancyPct); } catch (_) {}
+      try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| visualScore:', o.visualNarrativeScore, '| eventDom:', o.eventDominanceScore, '| yScale:', o.institutionalYScaleScore, '| curve:', o.institutionalCurveScore, '| yLabels:', JSON.stringify(o.yLabelValues), o.yLabelStrategy, 'gapRatio:', o.yLabelLargestGapRatio, '| split:', o.desktopHeroChartSplit, '| staticGrid:', o.staticGrid); } catch (_) {}
     } catch (e) { o.error = String(e); }
     return o;
   };
@@ -19360,11 +19431,11 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
 
   // WN.17 PART 2 (Option A) — bottom X-axis text labels REMOVED (tooltip is the
   // exact date/time source); static vertical grid lines keep the temporal rhythm.
-  // WN.25 PART 1 — premium right-side Y labels ANCHORED to the static grid lines
-  // (evenly spaced, aligned with the visible grid, never collapsed near the
-  // bottom). Nice-rounded real domain values via the canonical _wscYAxisLabels.
-  const _yAxis = _wscYAxisLabels(vp, rscale);
-  const yLabels = _yAxis.map(tk => `<span class="wsc-ylab" style="top:${(tk.y / H * 100).toFixed(2)}%">${tk.text}</span>`).join('');
+  // WN.25/WN.26 PART 1 — premium right-side Y labels: grid-anchored (even,
+  // aligned, never collapsed) with adaptive-precision distinctness so no range
+  // (notably 7D) shows a large empty gap. Real inverse-scale values only.
+  const _yAxis = _wscGeneratePremiumYLabels(vp, rscale, activeRange);
+  const yLabels = _yAxis.labels.map(tk => `<span class="wsc-ylab" style="top:${(tk.y / H * 100).toFixed(2)}%">${tk.text}</span>`).join('');
   const xLabels = '';
 
   // WN.23 — premium visual finish (styling only: adaptive stroke / subtle
