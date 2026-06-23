@@ -17617,6 +17617,22 @@ function _wscFmtAxisValStep(v, step) {
   return v.toFixed(2);
 }
 
+// ── WN.23 — Premium Visual Finish parameters (styling only) ─────────────────
+// Range/DPR-adaptive stroke, glow and area opacity. Intraday (24H/7D) reads
+// slightly sharper; long ranges (30D/1A/TOTAL) read smoother + quieter (lighter
+// area) for a Bloomberg/Kubera institutional feel. Pure presentation — drives
+// SVG stroke-width / filter / fill opacity only, never geometry, values or hover.
+function _wscRenderPolish(range, mobile) {
+  const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) ? Math.max(1, Math.min(3, window.devicePixelRatio)) : 1;
+  const isLong = range === '30d' || range === '1y' || range === 'all';
+  const sharp = range === '24h' || range === '7d';
+  const strokeWidth = mobile ? (sharp ? 2.4 : 2.1) : (sharp ? 2.7 : isLong ? 2.35 : 2.5);
+  const glowStrength = +((isLong ? 1.3 : 1.8) * (mobile ? 0.85 : 1)).toFixed(2);   // SVG blur stdDeviation (user units)
+  const glowAlpha = +Math.min(0.62, 0.42 + 0.10 * (dpr - 1)).toFixed(2);           // DPR-aware halo strength
+  const areaOpacity = range === 'all' ? 0.62 : range === '1y' ? 0.72 : range === '30d' ? 0.84 : 1.0;
+  return { visualFinishApplied: true, strokeWidth, glowStrength, glowAlpha, areaOpacity, devicePixelRatio: dpr, renderPolishMode: isLong ? 'institutional-smooth' : 'sharp-intraday' };
+}
+
 // X-axis ticks (5) across [t0, t1] formatted per range.
 function _wscXTicks(t0, t1, range) {
   const span = (t1 - t0) || 1, N = 5, ticks = [];
@@ -18099,6 +18115,15 @@ if (typeof window !== 'undefined') {
       // ── WN.22 — institutional curve naturalization (PART 1–6) ────────────
       o.curve = window.debugAurixCurve(r);
       o.institutionalCurveScore = o.curve.institutionalCurveScore;
+
+      // ── WN.23 — premium visual finish (styling-only) ─────────────────────
+      const rp = _wscRenderPolish(r, false);
+      o.visualFinishApplied = rp.visualFinishApplied;
+      o.strokeWidth = rp.strokeWidth;
+      o.glowStrength = rp.glowStrength;
+      o.areaOpacity = rp.areaOpacity;
+      o.devicePixelRatio = rp.devicePixelRatio;
+      o.renderPolishMode = rp.renderPolishMode;
 
       try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| visualScore:', o.visualNarrativeScore, '| eventDomScore:', o.eventDominanceScore, '| yScaleScore:', o.institutionalYScaleScore, '| curveScore:', o.institutionalCurveScore, '| labels:', JSON.stringify(o.yLabelTicks), '| staticGrid:', o.staticGrid, '| occ%:', o.occupancyPct); } catch (_) {}
     } catch (e) { o.error = String(e); }
@@ -19257,14 +19282,26 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   const yLabels = _labelSrc.map(tk => `<span class="wsc-ylab" style="top:${(tk.y / H * 100).toFixed(2)}%">${_useNice ? _wscFmtAxisValStep(tk.val, _yStep) : _wscFmtAxisVal(tk.val)}</span>`).join('');
   const xLabels = '';
 
+  // WN.23 — premium visual finish (styling only: adaptive stroke / subtle
+  // tone-coloured glow / quieter area on long ranges). No geometry/value change.
+  const _polish = _wscRenderPolish(activeRange, opts.uid === 'm');
+  if (typeof window !== 'undefined' && window._aurixChartMode) window._aurixChartMode.renderPolish = _polish;
+
   hostEl.innerHTML = `
     <div class="wsc wsc-${tone}">
       <div class="wsc-plot">
         <svg class="wsc-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
-          <defs><linearGradient id="wscArea-${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" class="wsc-area-0"/><stop offset="100%" class="wsc-area-1"/></linearGradient></defs>
+          <defs>
+            <linearGradient id="wscArea-${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" class="wsc-area-0"/><stop offset="100%" class="wsc-area-1"/></linearGradient>
+            <filter id="wscGlow-${uid}" x="-4%" y="-60%" width="108%" height="220%" color-interpolation-filters="sRGB">
+              <feGaussianBlur stdDeviation="${_polish.glowStrength}" result="b"/>
+              <feComponentTransfer in="b" result="bf"><feFuncA type="linear" slope="${_polish.glowAlpha}"/></feComponentTransfer>
+              <feMerge><feMergeNode in="bf"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
           ${grid}
-          <path class="wsc-area" d="${areaPath}" fill="url(#wscArea-${uid})"/>
-          <path class="wsc-line" d="${linePath}" fill="none" vector-effect="non-scaling-stroke"/>
+          <path class="wsc-area" d="${areaPath}" fill="url(#wscArea-${uid})" style="opacity:${_polish.areaOpacity}"/>
+          <path class="wsc-line" d="${linePath}" fill="none" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision" style="stroke-width:${_polish.strokeWidth}px" filter="url(#wscGlow-${uid})"/>
         </svg>
         <div class="wsc-ylabs">${yLabels}</div>
         <div class="wsc-xlabs">${xLabels}</div>

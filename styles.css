@@ -21747,30 +21747,37 @@ body.gs-open { overflow: hidden; }
 }
 .wsc-svg { display: block; width: 100%; height: 100%; }
 
-/* WN.5 — premium institutional line (value chart): 2.6px, rounded, no glow. */
+/* WN.5/WN.23 — premium institutional line (value chart). Stroke width is set
+   inline per range (WN.23 adaptive); the value here is a fallback. Rounded
+   joins + geometricPrecision (set inline) keep turns smooth and edges crisp. */
 .wsc-line {
   stroke: var(--accent, #4a82f0);
-  stroke-width: 2.9;
+  stroke-width: 2.6;
   stroke-linecap: round;
   stroke-linejoin: round;
   opacity: .98;
 }
-.wsc-up   .wsc-line { stroke: var(--green, #3fbf7f); }
-.wsc-down .wsc-line { stroke: var(--red,   #e05a5a); }
-.wsc-flat .wsc-line { stroke: var(--text-muted, #9aa7bd); }
+/* WN.23 — refined institutional state colours: premium green, softened red
+   (not arcade neon), soft silver-blue neutral. Semantic up/down/flat preserved. */
+.wsc-up   .wsc-line { stroke: #2ebd85; }
+.wsc-down .wsc-line { stroke: #e25563; }
+.wsc-flat .wsc-line { stroke: #9fb0c7; }
 
-/* WN.5 — subtle institutional grid: horizontal value lines + lighter vertical
-   time markers. Low opacity, premium (never heavy). */
-.wsc-grid   { stroke: rgba(255,255,255,.07);  stroke-width: 1; }
-.wsc-grid-v { stroke: rgba(255,255,255,.045); stroke-width: 1; }
+/* WN.5/WN.23 — subtle institutional grid: horizontal value lines + lighter
+   vertical markers. Low opacity + crisp edges so the grid stays secondary to
+   the line (line dominant, grid present but quiet). */
+.wsc-grid   { stroke: rgba(255,255,255,.065); stroke-width: 1; shape-rendering: crispEdges; }
+.wsc-grid-v { stroke: rgba(255,255,255,.04);  stroke-width: 1; shape-rendering: crispEdges; }
 
 /* WN.5 — very subtle gradient area fill under the line (fades to transparent,
    no block). */
+/* WN.23 — refined area fill: present but quiet (Bloomberg/Kubera). Long ranges
+   are dimmed further via an inline opacity on the area path. */
 .wsc-area-0 { stop-color: var(--accent, #4a82f0); stop-opacity: .10; }
 .wsc-area-1 { stop-color: var(--accent, #4a82f0); stop-opacity: 0; }
-.wsc-up   .wsc-area-0 { stop-color: var(--green, #3fbf7f); stop-opacity: .10; }
-.wsc-down .wsc-area-0 { stop-color: var(--red,   #e05a5a); stop-opacity: .09; }
-.wsc-flat .wsc-area-0 { stop-color: var(--text-muted, #9aa7bd); stop-opacity: .06; }
+.wsc-up   .wsc-area-0 { stop-color: #2ebd85; stop-opacity: .10; }
+.wsc-down .wsc-area-0 { stop-color: #e25563; stop-opacity: .09; }
+.wsc-flat .wsc-area-0 { stop-color: #9fb0c7; stop-opacity: .055; }
 
 /* WN.5 — axis labels (positioned HTML, crisp): real investable values on the
    right, range-specific time labels along the bottom. */
