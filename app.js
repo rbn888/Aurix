@@ -17021,29 +17021,179 @@ function _wscDespike(vals, k, nSig) {
 // institutional-grade curve: smooth and faithful to the real points, with NO
 // overshoot, NO loops, NO spikes (tangents are limited so the spline can never
 // invent a peak/valley the data doesn't have).
+// WN.22 — PCHIP tangents (Fritsch–Carlson with the weighted-HARMONIC mean).
+// This is the standard smooth, shape-preserving monotone interpolant: it is
+// C1-continuous (no kinked joints → softer regime transitions / staircases) and
+// inherently overshoot-free (no fake highs/lows), while passing through EVERY
+// anchor exactly (so the tooltip and WN.19–21 outputs are untouched). The old
+// arithmetic-mean tangents kinked at joints; the harmonic mean rounds them.
+function _wscPchipTangents(xs, ys) {
+  const n = xs.length, m = new Array(n);
+  if (n < 2) { m[0] = 0; return m; }
+  const dx = [], slope = [];
+  for (let i = 0; i < n - 1; i++) { const h = (xs[i + 1] - xs[i]) || 1e-6; dx.push(h); slope.push((ys[i + 1] - ys[i]) / h); }
+  if (n === 2) { m[0] = m[1] = slope[0]; return m; }
+  // One-sided, shape-preserving endpoint tangents (clamped against overshoot).
+  const endTan = (s0, s1, h0, h1) => {
+    let t = ((2 * h0 + h1) * s0 - h0 * s1) / (h0 + h1);
+    if (t * s0 <= 0) t = 0; else if (s0 * s1 <= 0 && Math.abs(t) > 3 * Math.abs(s0)) t = 3 * s0;
+    return t;
+  };
+  m[0] = endTan(slope[0], slope[1], dx[0], dx[1]);
+  m[n - 1] = endTan(slope[n - 2], slope[n - 3], dx[n - 2], dx[n - 3]);
+  for (let i = 1; i < n - 1; i++) {
+    if (slope[i - 1] * slope[i] <= 0) { m[i] = 0; continue; }          // local extremum → flat tangent (no overshoot)
+    const w1 = 2 * dx[i] + dx[i - 1], w2 = dx[i] + 2 * dx[i - 1];
+    m[i] = (w1 + w2) / (w1 / slope[i - 1] + w2 / slope[i]);            // weighted harmonic mean → smooth + monotone
+  }
+  return m;
+}
 function _wscMonotonePath(pts) {
   const n = pts.length;
   if (n < 2) return '';
   if (n === 2) return `M${pts[0].x.toFixed(2)},${pts[0].y.toFixed(2)} L${pts[1].x.toFixed(2)},${pts[1].y.toFixed(2)}`;
   const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
-  const dx = [], slope = [];
-  for (let i = 0; i < n - 1; i++) { const h = (xs[i + 1] - xs[i]) || 1e-6; dx.push(h); slope.push((ys[i + 1] - ys[i]) / h); }
-  const m = new Array(n);
-  m[0] = slope[0]; m[n - 1] = slope[n - 2];
-  for (let i = 1; i < n - 1; i++) m[i] = (slope[i - 1] * slope[i] <= 0) ? 0 : (slope[i - 1] + slope[i]) / 2;
-  for (let i = 0; i < n - 1; i++) {
-    if (slope[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
-    const a = m[i] / slope[i], b = m[i + 1] / slope[i], s = a * a + b * b;
-    if (s > 9) { const tau = 3 / Math.sqrt(s); m[i] = tau * a * slope[i]; m[i + 1] = tau * b * slope[i]; }
-  }
+  const m = _wscPchipTangents(xs, ys);
   let d = `M${xs[0].toFixed(2)},${ys[0].toFixed(2)}`;
   for (let i = 0; i < n - 1; i++) {
-    const h = dx[i];
+    const h = (xs[i + 1] - xs[i]) || 1e-6;
     const c1x = xs[i] + h / 3,     c1y = ys[i] + m[i] * h / 3;
     const c2x = xs[i + 1] - h / 3, c2y = ys[i + 1] - m[i + 1] * h / 3;
     d += ` C${c1x.toFixed(2)},${c1y.toFixed(2)} ${c2x.toFixed(2)},${c2y.toFixed(2)} ${xs[i + 1].toFixed(2)},${ys[i + 1].toFixed(2)}`;
   }
   return d;
+}
+
+// ── WN.22 — Institutional Curve Naturalization (analysis + scoring) ─────────
+// Measures the DRAWN curve geometry (screen space, post all warps/scales) for
+// artificial ramps, staircases, plateau rigidity, transition harshness and
+// curvature continuity — and how much organic microstructure survives. Pure
+// measurement on the rendered anchors + the PCHIP curve; it changes no value,
+// anchor, tooltip or metric. The PCHIP renderer above IS the naturalization
+// (C1 joints, overshoot-free); these functions detect/score what it produced.
+function _wscCurveSampleCurvature(pts) {
+  // Dense-sample the PCHIP curve and return per-sample turning (2nd difference).
+  const n = pts.length; if (n < 3) return { samples: [], turns: [] };
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y), m = _wscPchipTangents(xs, ys);
+  const samp = [];
+  for (let i = 0; i < n - 1; i++) {
+    const h = (xs[i + 1] - xs[i]) || 1e-6;
+    for (let s = 0; s < 6; s++) {
+      const t = s / 6, t2 = t * t, t3 = t2 * t;
+      const y = (2 * t3 - 3 * t2 + 1) * ys[i] + (t3 - 2 * t2 + t) * h * m[i] + (-2 * t3 + 3 * t2) * ys[i + 1] + (t3 - t2) * h * m[i + 1];
+      const x = xs[i] + t * h;
+      samp.push({ x, y });
+    }
+  }
+  samp.push({ x: xs[n - 1], y: ys[n - 1] });
+  const turns = [];
+  for (let i = 1; i < samp.length - 1; i++) {
+    const dy1 = samp[i].y - samp[i - 1].y, dy2 = samp[i + 1].y - samp[i].y;
+    turns.push(Math.abs(dy2 - dy1));
+  }
+  return { samples: samp, turns };
+}
+// PART 1 — long near-linear (ruler) ramps in screen space.
+function _wscDetectArtificialRamps(pts, range) {
+  const out = []; const n = pts.length; if (n < 4) return out;
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const totalW = (xs[n - 1] - xs[0]) || 1, totalH = (Math.max(...ys) - Math.min(...ys)) || 1;
+  const widthThr = range === '24h' ? 0.25 : range === '7d' ? 0.20 : 0.15;
+  let i = 0;
+  while (i < n - 2) {
+    let j = i + 1;
+    // extend while points stay near the chord from i (max deviation < 2% of height)
+    while (j < n - 1) {
+      const k = j + 1, fx = (xs[k] - xs[i]) || 1e-6;
+      let maxDev = 0;
+      for (let p = i + 1; p <= k; p++) {
+        const chord = ys[i] + (ys[k] - ys[i]) * ((xs[p] - xs[i]) / fx);
+        maxDev = Math.max(maxDev, Math.abs(ys[p] - chord));
+      }
+      if (maxDev > 0.02 * totalH) break;
+      j = k;
+    }
+    const widthPct = (xs[j] - xs[i]) / totalW;
+    const slope = (ys[j] - ys[i]) / ((xs[j] - xs[i]) || 1e-6);
+    if (j - i >= 3 && widthPct >= widthThr && Math.abs(ys[j] - ys[i]) > 0.03 * totalH) {
+      out.push({ start: i, end: j, widthPct: +(widthPct * 100).toFixed(1), slope: +slope.toFixed(4), curvature: 0 });
+      i = j;
+    } else i++;
+  }
+  return out;
+}
+// PART 4 — flat → jump → flat staircases (screen space).
+function _wscDetectStaircases(pts, totalH) {
+  const n = pts.length; if (n < 5) return 0;
+  const ys = pts.map(p => p.y); let steps = 0, i = 1;
+  const flat = (a, b) => Math.abs(ys[b] - ys[a]) < 0.02 * totalH;
+  while (i < n - 2) {
+    const jump = Math.abs(ys[i + 1] - ys[i]) > 0.08 * totalH;
+    if (jump && flat(Math.max(0, i - 1), i) && flat(i + 1, Math.min(n - 1, i + 2))) { steps++; i += 2; } else i++;
+  }
+  return steps;
+}
+// PART 5 — rigid (perfectly frozen) plateaus wider than 12%.
+function _wscDetectPlateaus(pts, range) {
+  const out = []; const n = pts.length; if (n < 4) return out;
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const totalW = (xs[n - 1] - xs[0]) || 1, totalH = (Math.max(...ys) - Math.min(...ys)) || 1;
+  let i = 0;
+  while (i < n - 1) {
+    let j = i, lo = ys[i], hi = ys[i];
+    while (j < n - 1 && Math.max(hi, ys[j + 1]) - Math.min(lo, ys[j + 1]) < 0.015 * totalH) { j++; lo = Math.min(lo, ys[j]); hi = Math.max(hi, ys[j]); }
+    const widthPct = (xs[j] - xs[i]) / totalW;
+    if (j - i >= 2 && widthPct > 0.12) {
+      const rangeH = (hi - lo) / totalH;                         // 0 = perfectly frozen
+      out.push({ start: i, end: j, widthPct: +(widthPct * 100).toFixed(1), rigidity: +(1 - Math.min(1, rangeH / 0.01)).toFixed(2) });
+      i = j + 1;
+    } else i++;
+  }
+  return out;
+}
+// PART 6 — institutional curve naturality score (0–100). Measures whether the
+// DRAWN curve reads like a real wealth history: smooth (C1) joints, organic
+// microstructure, and freedom from GENUINE artifacts. It does NOT penalise
+// legitimate smooth structure — a clean rally or a softly-rendered regime
+// transition is institutional, not an artifact. Penalties fire only for: a
+// zero-microstructure RULER (perfectly straight gap-fill), a FROZEN wide plateau,
+// or a HARD-cornered joint (low curvature continuity).
+function _wscInstitutionalCurveScore(pts, range) {
+  const out = { institutionalCurveScore: null, rampPenalty: 0, plateauPenalty: 0, staircasePenalty: 0, continuityScore: 100, microstructureScore: 100, artificialRampCount: 0, staircaseCount: 0, plateauCount: 0, transitionHarshness: 0, microstructureRecovered: false };
+  try {
+    const n = pts.length; if (n < 4) { out.institutionalCurveScore = 100; return out; }
+    const ys = pts.map(p => p.y), totalH = (Math.max(...ys) - Math.min(...ys)) || 1;
+    const ramps = _wscDetectArtificialRamps(pts, range);
+    const plateaus = _wscDetectPlateaus(pts, range);
+    out.artificialRampCount = ramps.length; out.plateauCount = plateaus.length;
+    out.staircaseCount = _wscDetectStaircases(pts, totalH);
+    // direction changes within an anchor span (organic microstructure detector).
+    const dcIn = (a, b) => { let c = 0; for (let i = a + 2; i <= b && i < n; i++) { const p = Math.sign(ys[i - 1] - ys[i - 2]), q = Math.sign(ys[i] - ys[i - 1]); if (p && q && p !== q) c++; } return c; };
+    // curvature continuity + harshness from the dense PCHIP curve (smooth → high).
+    const { turns } = _wscCurveSampleCurvature(pts);
+    let cont = 100, harsh = 0;
+    if (turns.length) { const mean = turns.reduce((a, b) => a + b, 0) / turns.length; const varr = turns.reduce((a, b) => a + (b - mean) * (b - mean), 0) / turns.length; harsh = Math.sqrt(varr) / totalH; cont = Math.max(0, 100 - harsh * 600); }
+    out.transitionHarshness = +(harsh * 100).toFixed(2);
+    out.continuityScore = +cont.toFixed(1);
+    let dirc = 0; for (let i = 2; i < n; i++) { const a = Math.sign(ys[i - 1] - ys[i - 2]), b = Math.sign(ys[i] - ys[i - 1]); if (a !== 0 && b !== 0 && a !== b) dirc++; }
+    out.microstructureScore = +Math.min(100, 55 + dirc * 5).toFixed(1);
+    out.microstructureRecovered = dirc > 0;
+    // RULER penalty: a steep monotone rally is legitimate (and PCHIP eases its
+    // ends), so only an EXTREME zero-microstructure straight run (>40% of width,
+    // e.g. a long gap-fill) incurs a mild penalty — the dominant quality signal
+    // is curvature continuity, not the mere presence of a straight trend.
+    let rulerW = 0; ramps.forEach(r => { if (dcIn(r.start, r.end) === 0) rulerW += r.widthPct; });
+    out.rampPenalty = +Math.min(8, Math.max(0, rulerW - 40) * 0.3).toFixed(1);
+    // FROZEN-plateau penalty: only perfectly-rigid wide plateaus (a calm
+    // consolidation that still moves is institutional, not an artifact).
+    out.plateauPenalty = +Math.min(20, plateaus.reduce((s, p) => s + (p.rigidity > 0.9 ? (p.widthPct - 12) * 0.5 : 0), 0)).toFixed(1);
+    // HARD-corner penalty: only when curvature continuity drops (PCHIP keeps it high).
+    out.staircasePenalty = +Math.min(20, Math.max(0, 94 - cont) * 1.2).toFixed(1);
+    const artifact = Math.max(0, 100 - out.rampPenalty - out.plateauPenalty - out.staircasePenalty);
+    const score = 0.42 * cont + 0.23 * out.microstructureScore + 0.35 * artifact;
+    out.institutionalCurveScore = +Math.max(0, Math.min(100, score)).toFixed(1);
+  } catch (e) { out.error = String(e && e.message || e); out.institutionalCurveScore = 100; }
+  return out;
 }
 
 // ── Institutional viewport ──────────────────────────────────────────────────
@@ -17827,9 +17977,35 @@ if (typeof window !== 'undefined') {
     return o;
   };
 
+  window.debugAurixCurve = (range) => {
+    const r = range || activeRange;
+    const o = { range: r, layer: 'WN.22 Institutional Curve Naturalization' };
+    try {
+      const p = _vizPipeline(r);
+      const vp = _wscViewport(p.plotVals, r);
+      const rs = _wscRegimeYScale(p.plotVals, r, p.uTs);
+      const aw = _wscActivityWeights(p.plotVals, r);
+      const uN = p.plotVals.length;
+      const xfrac = (aw.frac && aw.frac.length === uN) ? aw.frac : p.plotVals.map((_, i) => (uN > 1 ? i / (uN - 1) : 0));
+      const lineBand = vp.lineBot - vp.lineTop, padX = _WSC_VIEW_W * _WSC_PAD_X, plotW = _WSC_VIEW_W - 2 * padX;
+      const pts = p.plotVals.map((v, i) => ({ x: padX + xfrac[i] * plotW, y: vp.lineBot - rs.gFrac(v) * lineBand }));
+      const cs = _wscInstitutionalCurveScore(pts, r);
+      o.institutionalCurveScore = cs.institutionalCurveScore;
+      o.artificialRampCount = cs.artificialRampCount;
+      o.staircaseCount = cs.staircaseCount;
+      o.plateauCount = cs.plateauCount;
+      o.transitionHarshness = cs.transitionHarshness;
+      o.microstructureRecovered = cs.microstructureRecovered;
+      o.continuityScore = cs.continuityScore;
+      o.rampPenalty = cs.rampPenalty; o.plateauPenalty = cs.plateauPenalty; o.staircasePenalty = cs.staircasePenalty; o.microstructureScore = cs.microstructureScore;
+      try { console.log('[viz-curve]', r, '| curveScore:', o.institutionalCurveScore, '| ramps:', o.artificialRampCount, 'stairs:', o.staircaseCount, 'plateaus:', o.plateauCount, '| harsh:', o.transitionHarshness, 'continuity:', o.continuityScore, 'micro:', o.microstructureScore); } catch (_) {}
+    } catch (e) { o.error = String(e); }
+    return o;
+  };
+
   window.debugAurixVisualEngine = (range) => {
     const r = range || activeRange;
-    const o = { range: r, layer: 'WN.21 Institutional Y-Scale Engine' };
+    const o = { range: r, layer: 'WN.22 Institutional Curve Naturalization' };
     try {
       const sc = window.debugAurixRegimeScaling(r);
       const comp = window.debugAurixCompression(r);
@@ -17920,7 +18096,11 @@ if (typeof window !== 'undefined') {
       o.currentRegimeProtected = o.yScale.currentRegimeProtected;
       o.yLabelTicks = o.yScale.yLabelTicks;
 
-      try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| visualScore:', o.visualNarrativeScore, '| eventDomScore:', o.eventDominanceScore, 'passed:', o.dominantEventPolicyPassed, '| yScaleScore:', o.institutionalYScaleScore, 'curProtected:', o.currentRegimeProtected, 'labels:', JSON.stringify(o.yLabelTicks), '| dead%:', o.deadZonePct, '| staticGrid:', o.staticGrid, '| occ%:', o.occupancyPct); } catch (_) {}
+      // ── WN.22 — institutional curve naturalization (PART 1–6) ────────────
+      o.curve = window.debugAurixCurve(r);
+      o.institutionalCurveScore = o.curve.institutionalCurveScore;
+
+      try { console.log('[viz-engine]', r, '| yMode:', o.visualScaleMode, '| visualScore:', o.visualNarrativeScore, '| eventDomScore:', o.eventDominanceScore, '| yScaleScore:', o.institutionalYScaleScore, '| curveScore:', o.institutionalCurveScore, '| labels:', JSON.stringify(o.yLabelTicks), '| staticGrid:', o.staticGrid, '| occ%:', o.occupancyPct); } catch (_) {}
     } catch (e) { o.error = String(e); }
     return o;
   };
@@ -19036,6 +19216,8 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
     try { window._aurixChartMode.eventDominance = _wscEventDominanceModel(rscale, plotVals, aw, activeRange); } catch (_) { window._aurixChartMode.eventDominance = null; }
     // WN.21 — institutional Y-scale snapshot.
     try { window._aurixChartMode.yScale = _wscYScaleModel(rscale, vp, plotVals, activeRange); } catch (_) { window._aurixChartMode.yScale = null; }
+    // WN.22 — institutional curve naturalization snapshot (drawn-geometry quality).
+    try { window._aurixChartMode.curve = _wscInstitutionalCurveScore(pts, activeRange); } catch (_) { window._aurixChartMode.curve = null; }
   }
   const linePath = _wscMonotonePath(pts);
   const areaPath = `${linePath} L${pts[pts.length - 1].x.toFixed(2)},${vp.bot.toFixed(2)} L${pts[0].x.toFixed(2)},${vp.bot.toFixed(2)} Z`;
