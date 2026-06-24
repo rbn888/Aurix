@@ -1099,6 +1099,12 @@ const T = {
     evolution:       'Evolución del patrimonio',
     wscBuildingTitle:'Construyendo historial patrimonial',
     wscBuildingBody: 'Aurix está recopilando snapshots validados para mostrar tu evolución.',
+    wscQualityGateTitle:'Histórico en construcción',
+    wscQualityGateBody: 'Aurix necesita más puntos recientes para mostrar esta ventana con precisión.',
+    wscQualityGateSub:  'Tu patrimonio está actualizado. La evolución se completará automáticamente conforme se registren nuevos snapshots.',
+    wscLowDensityBody:  'Mostrando los puntos recientes disponibles, sin trazar una curva continua todavía.',
+    wscLowDensityLabel: 'Datos recientes insuficientes',
+    wscLastReliable:    'Última evolución fiable',
     wscExcludesContrib: 'Excluye aportaciones/importaciones',
     chartTipValue:   'Valor cartera',
     perfSnapshotTitle: 'Resumen de rendimiento',
@@ -3203,6 +3209,12 @@ const T = {
     evolution:       'Portfolio evolution',
     wscBuildingTitle:'Building your wealth history',
     wscBuildingBody: 'Aurix is collecting validated snapshots to chart your evolution.',
+    wscQualityGateTitle:'History in progress',
+    wscQualityGateBody: 'Aurix needs more recent points to show this window accurately.',
+    wscQualityGateSub:  'Your wealth is up to date. The evolution will complete automatically as new snapshots are recorded.',
+    wscLowDensityBody:  'Showing the recent points available, without drawing a continuous curve yet.',
+    wscLowDensityLabel: 'Insufficient recent data',
+    wscLastReliable:    'Last reliable evolution',
     wscExcludesContrib: 'Excludes contributions/imports',
     chartTipValue:   'Portfolio value',
     perfSnapshotTitle: 'Performance snapshot',
@@ -7213,8 +7225,15 @@ function recordCategorySnapshot() {
 
   // 5-second upsert mirrors portfolioHistory so the two series stay
   // perfectly aligned timestamp-for-timestamp.
+  // AURIX-CHART-QUALITY-GATE-1 — material-change snapshot (> 1% wealth move within
+  // the 5 s window) is appended (not overwritten) and marked, mirroring
+  // recordSnapshot, so the investable chart gains real density on add/edit/delete.
   const last = categoryHistory[categoryHistory.length - 1];
-  const base = (last && now - last.ts < 5_000)
+  const _within5s   = !!(last && now - last.ts < 5_000);
+  const _isMaterial = !!(last && Number.isFinite(last.total) && last.total > 0 &&
+                         Math.abs(newPoint.total - last.total) / last.total > 0.01);
+  if (_within5s && _isMaterial) newPoint.material = true;
+  const base = (_within5s && !_isMaterial)
     ? categoryHistory.slice(0, -1)
     : categoryHistory;
 
@@ -7365,7 +7384,15 @@ function recordSnapshot() {
 
   // Dedup: upsert only if called within 5 s of the last point (same moment).
   // Otherwise strictly append so historyLength grows on every price refresh.
-  const base = (last && now - last.ts < 5_000)
+  // AURIX-CHART-QUALITY-GATE-1 — MATERIAL-CHANGE SNAPSHOT: a user add/edit/delete
+  // moves wealth > 1% within the 5 s window; that is a real density-improving
+  // event, so append it (do NOT overwrite the prior point) and mark it. Small
+  // price/FX noise (≤1%) still collapses via the normal upsert (no noise added).
+  const _within5s   = !!(last && now - last.ts < 5_000);
+  const _isMaterial = !!(last && Number.isFinite(last.value) && last.value > 0 &&
+                         Math.abs(val - last.value) / last.value > 0.01);
+  if (_within5s && _isMaterial) newPoint.material = true;
+  const base = (_within5s && !_isMaterial)
     ? portfolioHistory.slice(0, -1)
     : portfolioHistory;
 
@@ -17556,6 +17583,156 @@ function _wscResample(values, timestamps, range) {
   return { values: outV, timestamps: outT };
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// AURIX-CHART-QUALITY-GATE-1 — institutional series-quality gate (24H/7D).
+//
+// A premium continuous curve is drawn ONLY when the window has enough REAL
+// density + temporal coverage. Otherwise Aurix shows an honest protected state
+// instead of interpolating 2-4 real points up to 216/192 samples (the straight-
+// line artefact reported after asset add/remove/modify). PURE POLICY: it NEVER
+// touches neutralisation, percentages, pricing or financial logic — it only
+// decides RENDER vs PROTECT. 30D/1A/TOTAL keep current behaviour (only the
+// extreme-anomaly floor of <2 points blocks them).
+const _WSC_WINDOW_MS = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '1y': 31536e6, 'all': null };
+const _WSC_QUALITY = {
+  '24h': { minPoints: 6, minBuckets: 4, minCoveragePct: 35, maxGapPct: 75 },
+  '7d':  { minPoints: 8, minBuckets: 5, minCoveragePct: 30, maxGapPct: 80 },
+};
+// ≥ this many real eligible points → discrete "low-density" render; below → pure building state.
+const _WSC_LOWDENSITY_MIN = 3;
+
+function _wscAssessSeriesQuality(range, rawSeries, eligibleSeries, adjustedSeries) {
+  const r = String(range || '').toLowerCase();
+  const elig = Array.isArray(eligibleSeries) ? eligibleSeries : [];
+  const q = {
+    range: r,
+    realPointCount: elig.length,
+    distinctBucketCount: 0,
+    timeCoveragePct: 0,
+    largestGapPct: 0,
+    hasEnoughDensity: false,
+    hasEnoughCoverage: false,
+    institutionalRenderable: false,
+    reason: '',
+  };
+  if (elig.length < 2) { q.reason = 'insufficient_points(<2)'; return q; }
+
+  // distinct temporal buckets (same bucketing _wscResample uses to collapse clusters)
+  const bucketMs = _WSC_BUCKET_MS[r] || 36e5;
+  const t0 = elig[0].ts, tLast = elig[elig.length - 1].ts;
+  const seen = {};
+  let buckets = 0;
+  for (let i = 0; i < elig.length; i++) {
+    const b = Math.floor((elig[i].ts - t0) / bucketMs);
+    if (!seen[b]) { seen[b] = 1; buckets++; }
+  }
+  q.distinctBucketCount = buckets;
+
+  // coverage/gap vs the FIXED window for bounded ranges; vs the data span for 'all'
+  const windowMs = _WSC_WINDOW_MS[r];
+  const denom = (windowMs && windowMs > 0) ? windowMs : ((tLast - t0) || 1);
+  q.timeCoveragePct = +(((tLast - t0) / denom) * 100).toFixed(1);
+  let maxGap = 0;
+  for (let i = 1; i < elig.length; i++) { const g = elig[i].ts - elig[i - 1].ts; if (g > maxGap) maxGap = g; }
+  q.largestGapPct = +((maxGap / denom) * 100).toFixed(1);
+
+  const thr = _WSC_QUALITY[r];
+  if (!thr) {
+    // 30D / 1A / TOTAL — unchanged: renderable unless the extreme-anomaly floor (<2).
+    q.hasEnoughDensity = elig.length >= 2;
+    q.hasEnoughCoverage = true;
+    q.institutionalRenderable = elig.length >= 2;
+    q.reason = q.institutionalRenderable ? 'ok(long-range)' : 'insufficient_points(<2)';
+    return q;
+  }
+  q.hasEnoughDensity  = q.realPointCount >= thr.minPoints && q.distinctBucketCount >= thr.minBuckets;
+  q.hasEnoughCoverage = q.timeCoveragePct >= thr.minCoveragePct && q.largestGapPct <= thr.maxGapPct;
+  q.institutionalRenderable = q.hasEnoughDensity && q.hasEnoughCoverage;
+  if (q.institutionalRenderable) { q.reason = 'ok'; return q; }
+  const why = [];
+  if (q.realPointCount < thr.minPoints)      why.push('points ' + q.realPointCount + '<' + thr.minPoints);
+  if (q.distinctBucketCount < thr.minBuckets) why.push('buckets ' + q.distinctBucketCount + '<' + thr.minBuckets);
+  if (q.timeCoveragePct < thr.minCoveragePct) why.push('coverage ' + q.timeCoveragePct + '%<' + thr.minCoveragePct + '%');
+  if (q.largestGapPct > thr.maxGapPct)        why.push('gap ' + q.largestGapPct + '%>' + thr.maxGapPct + '%');
+  q.reason = why.join(', ');
+  return q;
+}
+
+// Last-Known-Good per range. When a window renders at institutional quality we
+// persist a compact record so a window that goes temporarily invalid right after
+// a modification can fall back to the last reliable curve (faint, labelled)
+// instead of a broken line. Never used when stale.
+const _WSC_LASTGOOD_KEY = 'aurixLastGoodChartByRange';
+const _WSC_LASTGOOD_MAX_AGE = { '24h': 6 * 36e5, '7d': 24 * 36e5, '30d': 7 * 864e5, '1y': 30 * 864e5, 'all': 30 * 864e5 };
+function _wscLoadLastGood() {
+  try { const raw = localStorage.getItem(_WSC_LASTGOOD_KEY); const o = raw ? JSON.parse(raw) : {}; return (o && typeof o === 'object') ? o : {}; }
+  catch (_) { return {}; }
+}
+function _wscSaveLastGood(range, payload) {
+  try { const all = _wscLoadLastGood(); all[String(range).toLowerCase()] = payload; localStorage.setItem(_WSC_LASTGOOD_KEY, JSON.stringify(all)); }
+  catch (_) {}
+}
+function _wscGetFreshLastGood(range, now) {
+  const r = String(range || '').toLowerCase();
+  const rec = _wscLoadLastGood()[r];
+  if (!rec || !Number.isFinite(rec.ts)) return null;
+  const age = now - rec.ts, maxAge = _WSC_LASTGOOD_MAX_AGE[r] || 6 * 36e5;
+  if (age < 0 || age > maxAge) return null;
+  return rec;
+}
+
+// Protected render: drawn into the chart area (hostEl) when the window is NOT
+// institutionally renderable. Reuses the existing .wsc--empty skin (no styles.css
+// change) and overlays an OPTIONAL faint reference — the last-known-good curve
+// ("Última evolución fiable") or, in low-density mode, the real points themselves.
+// The % badge (changeEl) is left untouched: the percentage is correct, only the
+// curve lacks density, so the number stays visible.
+function _wscRenderInsufficient(hostEl, q, opts) {
+  if (!hostEl) return;
+  opts = opts || {};
+  const W = _WSC_VIEW_W, H = _WSC_VIEW_H;
+  const lowDensity = opts.mode === 'lowdensity';
+  const eligible = Array.isArray(opts.eligible) ? opts.eligible : [];
+  const lastGood = opts.lastGood || null;
+
+  function polyline(pts, stroke, op, dots) {
+    const ok = pts.filter(p => p && Number.isFinite(p.v) && Number.isFinite(p.t));
+    if (ok.length < 2) return '';
+    let mn = Infinity, mx = -Infinity; const t0 = ok[0].t, t1 = ok[ok.length - 1].t;
+    ok.forEach(p => { if (p.v < mn) mn = p.v; if (p.v > mx) mx = p.v; });
+    const padX = W * _WSC_PAD_X, plotW = W - 2 * padX, top = H * 0.20, bot = H * 0.80, band = bot - top;
+    const span = (mx - mn) || 1, tspan = (t1 - t0) || 1;
+    const X = p => (padX + ((p.t - t0) / tspan) * plotW).toFixed(1);
+    const Y = p => (bot - ((p.v - mn) / span) * band).toFixed(1);
+    const line = `<polyline points="${ok.map(p => X(p) + ',' + Y(p)).join(' ')}" fill="none" stroke="${stroke}" stroke-width="2" stroke-opacity="${op}" stroke-linejoin="round"/>`;
+    const dotSvg = dots ? ok.map(p => `<circle cx="${X(p)}" cy="${Y(p)}" r="3" fill="${stroke}" fill-opacity="0.85"/>`).join('') : '';
+    return line + dotSvg;
+  }
+
+  let refSvg = '', refLabel = '';
+  if (lastGood && Array.isArray(lastGood.series) && Array.isArray(lastGood.tsArr) && lastGood.series.length >= 2) {
+    refSvg = polyline(lastGood.series.map((v, i) => ({ t: lastGood.tsArr[i], v })), '#4D8DFF', 0.22, false);
+    if (refSvg) refLabel = `<div class="wsc-empty-body" style="opacity:.6;font-size:.85em;margin-top:6px">${t('wscLastReliable')}</div>`;
+  } else if (lowDensity && eligible.length >= 2) {
+    refSvg = polyline(eligible.map(p => ({ t: p.ts, v: p.value })), '#9fb4d8', 0.5, true);
+    if (refSvg) refLabel = `<div class="wsc-empty-body" style="opacity:.6;font-size:.85em;margin-top:6px">${t('wscLowDensityLabel')}</div>`;
+  }
+
+  const grid = [0.20, 0.5, 0.80].map(f => `<line x1="0" y1="${(H * f).toFixed(0)}" x2="${W}" y2="${(H * f).toFixed(0)}" stroke="currentColor" stroke-opacity="0.06"/>`).join('');
+  const svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true" style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none">${grid}${refSvg}</svg>`;
+  const body = lowDensity ? t('wscLowDensityBody') : t('wscQualityGateBody');
+
+  hostEl.innerHTML =
+    `<div class="wsc wsc--empty" style="position:relative">${svg}` +
+      `<div class="wsc-empty" style="position:relative">` +
+        `<div class="wsc-empty-title">${t('wscQualityGateTitle')}</div>` +
+        `<div class="wsc-empty-body">${body}</div>` +
+        `<div class="wsc-empty-body" style="opacity:.7;margin-top:4px">${t('wscQualityGateSub')}</div>` +
+        refLabel +
+      `</div>` +
+    `</div>`;
+}
+
 // ── WN.5 — Investable Portfolio Value datasource ────────────────────────────
 // The Dashboard chart shows INVESTABLE value over time (stocks + ETFs + crypto
 // + cash + metals + other; real estate EXCLUDED), in BASE currency to match the
@@ -18162,6 +18339,49 @@ if (typeof window !== 'undefined') {
       try { console.log('[investable-history]', o); } catch (_) {}
     } catch (e) { o.error = String(e); }
     return o;
+  };
+
+  // AURIX-CHART-QUALITY-GATE-1 — per-range proof of the render decision: raw vs
+  // eligible vs adjusted vs rendered point counts, distinct buckets, coverage/gap,
+  // institutionalRenderable + reason, the resulting render mode, and last-good age.
+  window.debugAurixSeriesQuality = (range) => {
+    const r = range || activeRange;
+    const o = { range: r };
+    try {
+      const raw     = _aurixInvestableSnapshots(r);
+      const elig    = _aurixEligibleInvestableSeries(r);
+      const neutral = _aurixFlowNeutralize(elig.series, r);
+      const q       = _wscAssessSeriesQuality(r, raw, elig.series, neutral.adjusted);
+      const rendered = _wscResample(neutral.adjusted, elig.series.map(s => s.ts), r);
+      const lgFresh = _wscGetFreshLastGood(r, Date.now());
+      const lgAny   = _wscLoadLastGood()[String(r).toLowerCase()];
+      o.rawPoints              = raw.length;
+      o.eligiblePoints         = elig.series.length;
+      o.adjustedPoints         = neutral.adjusted.length;
+      o.renderedPoints         = rendered.values.length;
+      o.distinctBuckets        = q.distinctBucketCount;
+      o.coveragePct            = q.timeCoveragePct;
+      o.largestGapPct          = q.largestGapPct;
+      o.institutionalRenderable = q.institutionalRenderable;
+      o.reason                 = q.reason;
+      o.renderMode             = q.institutionalRenderable ? 'premium-curve'
+        : (q.realPointCount >= _WSC_LOWDENSITY_MIN ? 'low-density' : 'building');
+      o.fallbackUsed           = !q.institutionalRenderable && !!lgFresh;   // would a fresh last-good be shown?
+      o.lastGoodAgeMs          = (lgAny && Number.isFinite(lgAny.ts)) ? (Date.now() - lgAny.ts) : null;
+      try { console.log('[series-quality]', r, o); } catch (_) {}
+    } catch (e) { o.error = String(e); }
+    return o;
+  };
+  window.debugAurixSeriesQualityAll = () => {
+    const rows = ['24h', '7d', '30d', '1y', 'all'].map(r => window.debugAurixSeriesQuality(r));
+    try {
+      console.table(rows.map(x => ({
+        range: x.range, raw: x.rawPoints, elig: x.eligiblePoints, rendered: x.renderedPoints,
+        buckets: x.distinctBuckets, cov: x.coveragePct, gap: x.largestGapPct,
+        ok: x.institutionalRenderable, mode: x.renderMode, fallback: x.fallbackUsed, reason: x.reason,
+      })));
+    } catch (_) {}
+    return rows;
   };
 
   // WN.12 — PROOF of the exact series the SVG path is drawn from. Replicates the
@@ -19681,6 +19901,32 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
     if (mode === 'pct' && pf.capped) changeEl.title = pf.raw;
     else changeEl.removeAttribute('title');
   }
+
+  // AURIX-CHART-QUALITY-GATE-1 — decide RENDER vs PROTECT before drawing a
+  // continuous premium curve. The % badge above is already set and left intact
+  // (the percentage is correct; only the curve may lack density). 30D/1A/TOTAL
+  // pass unless they hit the <2-point floor, so they never regress.
+  const _rawQ = (typeof _aurixInvestableSnapshots === 'function') ? _aurixInvestableSnapshots(activeRange) : [];
+  const _quality = _wscAssessSeriesQuality(activeRange, _rawQ, snaps, adjVals);
+  if (typeof window !== 'undefined' && window._aurixChartMode) window._aurixChartMode.quality = _quality;
+  if (!_quality.institutionalRenderable) {
+    const _now = Date.now();
+    const _lg = _wscGetFreshLastGood(activeRange, _now);
+    const _lowDensity = _quality.realPointCount >= _WSC_LOWDENSITY_MIN;
+    _wscRenderInsufficient(hostEl, _quality, {
+      mode: _lowDensity ? 'lowdensity' : 'building',
+      eligible: snaps,
+      lastGood: _lg,
+    });
+    return;   // protected state drawn — never a continuous curve from too-few points
+  }
+  // Renderable at institutional quality → persist as Last-Known-Good for fallback.
+  try {
+    _wscSaveLastGood(activeRange, {
+      ts: Date.now(), qualityScore: _quality.realPointCount,
+      series: adjVals.slice(), tsArr: ts.slice(), percent: deltaPct,
+    });
+  } catch (_) {}
 
   // WN.3 — uniform temporal series from the flow-neutral investable curve
   // (aggregate → resample → gap-fill), then gentle despike + smoothing.
