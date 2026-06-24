@@ -21046,6 +21046,26 @@ function getDashboardChartRenderState(range) {
   const availOK = getRangeAvailability(range, series, epoch).available;
   const liveOK  = validateSeriesAgainstLive(range, series, live).valid;
   if (series.length >= 2 && availOK && liveOK) {
+    // AURIX-CHART-QUALITY-GATE-1 — the V2 lightweight-charts surface must obey the
+    // SAME institutional density/coverage gate as the WSC, so it never paints a
+    // continuous curve the WSC is refusing (the mobile .chart-wrap that showed a
+    // straight 7D line under the WSC overlay). Computed from the SAME eligible
+    // investable series the WSC uses → both engines reach one verdict. 30D/1A/TOTAL
+    // return institutionalRenderable=true (long-range rule) → never regressed.
+    // Pure read; never touches %, _aurixRangeReturn, PCE or WSC geometry. Defensive:
+    // any failure falls through to the previous 'ready' behaviour (never breaks render).
+    try {
+      const _elig = _aurixEligibleInvestableSeries(range);
+      const _q = _wscAssessSeriesQuality(
+        range,
+        _aurixInvestableSnapshots(range),
+        _elig.series,
+        _aurixFlowNeutralize(_elig.series, range).adjusted
+      );
+      if (_q && _q.institutionalRenderable === false) {
+        return { state: 'building', series: [], isRecon: false, qualityGated: true, qualityReason: _q.reason };
+      }
+    } catch (_) { /* gate inert on error → keep prior behaviour */ }
     _aurixLastGoodByRange[range] = series;   // remember ONLY a fully-validated series
     return { state: 'ready', series, isRecon };
   }
