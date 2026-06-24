@@ -18152,6 +18152,31 @@ function getAurixRenderSeries(range) {
   catch (_) { return []; }
 }
 
+// FASE 4 — adapter for the DORMANT legacy Chart.js fallback (used only if V2
+// lightweight-charts fails to mount). It builds the old getChartData object shape
+// ({labels,values,timestamps,...}) from the CANONICAL render series, so getChartData is
+// no longer a source of truth on ANY surface — every path resolves to the one canonical.
+function _aurixLegacyDataFromCanonical(range) {
+  const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '30d')).toLowerCase();
+  const pts = getAurixRenderSeries(r);
+  const fmtLbl = ts => { const d = new Date(ts);
+    if (r === '24h') return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    if (r === 'all') return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: '2-digit' });
+    return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }); };
+  let firstValue = null;
+  for (const p of pts) { if (Number.isFinite(p.value) && p.value > 0) { firstValue = p.value; break; } }
+  const lastValue = pts.length ? pts[pts.length - 1].value : null;
+  const deltaAbs = (Number.isFinite(firstValue) && Number.isFinite(lastValue)) ? +(lastValue - firstValue).toFixed(2) : null;
+  const deltaPct = (Number.isFinite(firstValue) && firstValue > 0 && Number.isFinite(lastValue)) ? +(((lastValue - firstValue) / firstValue) * 100).toFixed(4) : null;
+  return {
+    labels: pts.map(p => fmtLbl(p.time)),
+    values: pts.map(p => p.value),
+    timestamps: pts.map(p => p.time),
+    firstValue, lastValue, deltaAbs, deltaPct,
+    pointsCount: pts.length, isLowData: pts.length < 2, source: 'canonical-fallback',
+  };
+}
+
 // ════════════════════════════════════════════════════════════════════════
 // AURIX-RETURN-UNIFY-1 — SINGLE SOURCE OF TRUTH for the timeframe RETURN that
 // every surface shows (hero WSC badge, "Resumen de rendimiento", computeRangePnL).
@@ -23693,7 +23718,11 @@ function updateChart(animate = false) {
   // divergent from the live value) BEFORE the headline KPI + chart read the
   // series, so a mixed-regime snapshot can never paint a false vertical drop.
   // No-op outside 24H and when nothing diverges. Display-only; storage untouched.
-  const data = _aurixCleanIntradayData(getChartData(activeRange, _investableSnapshotSource()), activeRange);
+  // FASE 4 — even this DORMANT legacy fallback (reached only when V2 lightweight-charts
+  // failed to mount; the V2 path returned at the top) now draws the CANONICAL series, so
+  // getChartData is no longer a source of truth on ANY surface. Build the legacy {labels,
+  // values,timestamps} shape from getAurixRenderSeries (the single source).
+  const data = _aurixCleanIntradayData(_aurixLegacyDataFromCanonical(activeRange), activeRange);
 
   // AURIX-CHART-FINAL-FIX — validate+clean the legacy (fallback) series with the
   // SAME pass as the V2 path. Invalid (e.g. a 30D 2-point incompatible diagonal)

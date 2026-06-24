@@ -23,7 +23,7 @@ const sb={ console,
 sb.window=sb; vm.createContext(sb);
 [ obj('_WSC_INTERNAL_KINDS'),
   fn('_aurixFlowIsInternal'),fn('_aurixFlowNeutralize'),fn('_aurixRangeReturn'),
-  fn('getCanonicalPortfolioSeries'),fn('getInstitutionalPerformanceSeries'),fn('getInstitutionalSeries'),fn('_aurixDashSeries')
+  fn('getCanonicalPortfolioSeries'),fn('getInstitutionalPerformanceSeries'),fn('getInstitutionalSeries'),fn('getAurixRenderSeries'),fn('_aurixLegacyDataFromCanonical'),fn('_aurixDashSeries')
 ].forEach(c=>vm.runInContext(c,sb));
 
 let ok=true; const ck=(n,c,g)=>{console.log((c?'  ✓':'  ✗')+' '+n+(g!==undefined?'  ['+g+']':''));if(!c)ok=false;};
@@ -73,6 +73,17 @@ console.log('\nRELEASE GATE (Rule 15) — all deltas < 0.5%');
 { let gate=true; RANGES.forEach(r=>{ const s=sb.getInstitutionalSeries(r).renderSeries; const last=s[s.length-1].value;
    const d=Math.abs(last-LIVE)/LIVE; if(!(d<0.005)) gate=false; });
   ck('RELEASE GATE PASS (every timeframe = dashboard ±0.5%)', gate); }
+
+console.log('\nFASE 3/4 — every accessor resolves to the ONE canonical series');
+{ const r='30d';
+  const canon = sb.getInstitutionalSeries(r).renderSeries;
+  const render = sb.getAurixRenderSeries(r);
+  const v2 = sb._aurixDashSeries(r);
+  const legacy = sb._aurixLegacyDataFromCanonical(r);
+  ck('getAurixRenderSeries === renderSeries', render.length===canon.length && render.every((p,i)=>p.value===canon[i].value));
+  ck('_aurixDashSeries (V2) === renderSeries', v2.length===canon.length && v2.every((p,i)=>p.value===canon[i].value));
+  ck('legacy fallback values === renderSeries values', legacy.values.length===canon.length && legacy.values.every((v,i)=>v===canon[i].value));
+  ck('legacy fallback last === dashboard live', Math.abs(legacy.lastValue-LIVE)/LIVE<0.005, Math.round(legacy.lastValue)); }
 
 console.log('\nRESULT:', ok?'ALL CASES PASS ✓ — canonical value chart, no divergence':'FAIL ✗');
 process.exit(ok?0:1);
