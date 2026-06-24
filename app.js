@@ -7253,8 +7253,9 @@ function recordCategorySnapshot() {
   // excluded any uncovered holding from total + buckets (never invented), so
   // the point stays internally consistent (total == Σbuckets); fxPartial marks
   // it as NOT complete, fxApprox marks use of the static fallback rate.
-  if (_aurixFxUncovered(assets) > 0)  newPoint.fxPartial = true;
-  if (_aurixFxApproxUsed(assets))     newPoint.fxApprox  = true;
+  // FASE 2 — write-guard inputs (no longer flagged-and-kept; rejected below).
+  const _catFxPartial = _aurixFxUncovered(assets) > 0;
+  const _catFxApprox  = _aurixFxApproxUsed(assets);
 
   // AURIX-DATA-001 · F4 — capture-time integrity guard. Refuse to persist a
   // point that is impossible (non-finite total/bucket, or a total that does not
@@ -7278,6 +7279,10 @@ function recordCategorySnapshot() {
   const _within5s   = !!(last && now - last.ts < 5_000);
   const _isMaterial = !!(last && Number.isFinite(last.total) && last.total > 0 &&
                          Math.abs(newPoint.total - last.total) / last.total > 0.01);
+  // FASE 2 — WRITE GUARD (mirrors recordSnapshot): reject incomplete/anomalous category
+  // points so the canonical investable series never ingests a corrupt snapshot.
+  const _catReject = _aurixSnapshotRejectReason(newPoint.total, last && last.total, now, last && last.ts, _catFxPartial, _catFxApprox, _isMaterial);
+  if (_catReject) { try { console.warn('[AURIX] category snapshot rejected', _catReject, { total: Math.round(newPoint.total) }); } catch (_) {} return; }
   if (_within5s && _isMaterial) newPoint.material = true;
   const base = (_within5s && !_isMaterial)
     ? categoryHistory.slice(0, -1)
@@ -7406,37 +7411,45 @@ if (typeof window !== 'undefined') {
   };
 }
 
+// FASE 2 — snapshot WRITE GUARD. A snapshot is persisted ONLY when it is COMPLETE and
+// plausible. Returns a rejection reason (string) or null. Rejects: impossible value
+// (non-finite/≤0), partial coverage (fxPartial — a holding had no price/FX → the proven
+// cause of the false +12,651 jump), approximate FX (fxApprox — non-historical fallback),
+// and a rapid anomalous jump (>30% in <2 min) that is NOT a user-driven material change
+// (the price-feed-glitch signature). Real deposits/edits are material → allowed; genuine
+// volatility over time is allowed (the dt<2min window only catches transient glitches).
+function _aurixSnapshotRejectReason(val, lastValue, nowTs, lastTs, fxPartial, fxApprox, isMaterial) {
+  if (!Number.isFinite(val) || val <= 0) return 'impossible_value';
+  if (fxPartial) return 'fxPartial:incomplete_coverage';
+  if (fxApprox)  return 'fxApprox:non_historical_fx';
+  if (!isMaterial && Number.isFinite(lastValue) && lastValue > 0 && Number.isFinite(lastTs) && Number.isFinite(nowTs)) {
+    const dt = nowTs - lastTs;
+    if (dt >= 0 && dt < 120000 && Math.abs(val - lastValue) / lastValue > 0.30) {
+      return 'anomalous_jump:' + Math.round(Math.abs(val - lastValue) / lastValue * 100) + '%_in_' + Math.round(dt / 1000) + 's';
+    }
+  }
+  return null;
+}
+
 function recordSnapshot() {
   const now = Date.now();
   const val = totalValueUSD(); // always store in USD for consistent history
-  // PORTFOLIO-CHART-FIX-1: hard finite + positive guard so a transient
-  // NaN/Infinity from a partially-applied refresh can never sneak into
-  // localStorage. (val <= 0 alone was false for NaN.)
-  if (!Number.isFinite(val) || val <= 0) return;
-  // TODO(jump-guard): also skip when dt < 2 min and |Δ%| > 25 % vs. the
-  // previous valid point, BUT only when the change is not user-driven
-  // (add/edit/delete). Requires threading a "source" arg through
-  // onPortfolioChange so legitimate explicit adds aren't dropped;
-  // deferred until that plumbing lands.
+  const last = portfolioHistory[portfolioHistory.length - 1];
 
-  const last     = portfolioHistory[portfolioHistory.length - 1];
-  const newPoint = { ts: now, value: +(val.toFixed(2)) };
-  // F2-C: flag (never block) FX provenance. `val` already excludes any
-  // uncovered holding (covered portion only — never invented); fxPartial marks
-  // the point as NOT a complete snapshot, fxApprox marks use of the static
-  // fallback rate. Additive fields — readers/validators ignore them.
-  if (_aurixFxUncovered(activeAssets()) > 0)  newPoint.fxPartial = true;
-  if (_aurixFxApproxUsed(activeAssets()))     newPoint.fxApprox  = true;
-
-  // Dedup: upsert only if called within 5 s of the last point (same moment).
-  // Otherwise strictly append so historyLength grows on every price refresh.
-  // AURIX-CHART-QUALITY-GATE-1 — MATERIAL-CHANGE SNAPSHOT: a user add/edit/delete
-  // moves wealth > 1% within the 5 s window; that is a real density-improving
-  // event, so append it (do NOT overwrite the prior point) and mark it. Small
-  // price/FX noise (≤1%) still collapses via the normal upsert (no noise added).
+  // FASE 2 — WRITE GUARD: persist only complete, plausible snapshots. fxPartial/fxApprox
+  // are now REJECTED (not flagged-and-kept), so a corrupt point can never enter history.
+  const _fxPartial  = _aurixFxUncovered(activeAssets()) > 0;
+  const _fxApprox   = _aurixFxApproxUsed(activeAssets());
   const _within5s   = !!(last && now - last.ts < 5_000);
   const _isMaterial = !!(last && Number.isFinite(last.value) && last.value > 0 &&
                          Math.abs(val - last.value) / last.value > 0.01);
+  const _reject = _aurixSnapshotRejectReason(val, last && last.value, now, last && last.ts, _fxPartial, _fxApprox, _isMaterial);
+  if (_reject) { try { console.warn('[AURIX] snapshot rejected', _reject, { val: Number.isFinite(val) ? Math.round(val) : val }); } catch (_) {} return; }
+
+  const newPoint = { ts: now, value: +(val.toFixed(2)) };
+  // AURIX-CHART-QUALITY-GATE-1 — MATERIAL-CHANGE SNAPSHOT: a user add/edit/delete moves
+  // wealth > 1% within the 5 s window; append it (do NOT overwrite) and mark it. Small
+  // price/FX noise (≤1%) still collapses via the normal upsert (no noise added).
   if (_within5s && _isMaterial) newPoint.material = true;
   const base = (_within5s && !_isMaterial)
     ? portfolioHistory.slice(0, -1)

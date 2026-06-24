@@ -14,6 +14,7 @@ const sb={ console, Date:(()=>{const R=Date;return class extends R{static now(){
 Object.defineProperty(sb,'categoryHistory',{ get(){ return CH; } });   // live view of CH
 sb.window=sb; vm.createContext(sb);
 vm.runInContext(fn('_aurixInvestableSnapshots'), sb);
+vm.runInContext(fn('_aurixSnapshotRejectReason'), sb);
 
 let ok=true; const ck=(n,c,g)=>{console.log((c?'  ✓':'  ✗')+' '+n+(g!==undefined?'  ['+g+']':''));if(!c)ok=false;};
 
@@ -51,5 +52,18 @@ CH=[{ts:NOW-10*H,total:70000,real_estate:5000},{ts:NOW,total:72000,real_estate:5
 { const s=sb._aurixInvestableSnapshots('24h');
   ck('investable = total − real_estate (65000, 67000)', s.length===2 && Math.round(s[0].value)===65000 && Math.round(s[1].value)===67000, JSON.stringify(s.map(p=>Math.round(p.value)))); }
 
-console.log('\nRESULT:', ok?'ALL PASS ✓ (shipped _aurixInvestableSnapshots)':'FAIL ✗');
+console.log('\nFASE 2 — write guard (_aurixSnapshotRejectReason)');
+const R = sb._aurixSnapshotRejectReason;
+const N = NOW;
+ck('impossible value (NaN) rejected',      R(NaN,69000,N,N-60e3,false,false,false) === 'impossible_value');
+ck('impossible value (0) rejected',        R(0,69000,N,N-60e3,false,false,false) === 'impossible_value');
+ck('fxPartial rejected',                   /^fxPartial/.test(R(70000,69000,N,N-60e3,true,false,false)));
+ck('fxApprox rejected',                    /^fxApprox/.test(R(70000,69000,N,N-60e3,false,true,false)));
+ck('anomalous rapid jump (50%/30s) rejected', /^anomalous_jump/.test(R(90000,60000,N,N-30e3,false,false,false)));
+ck('MATERIAL jump allowed (real deposit)', R(90000,60000,N,N-30e3,false,false,true) === null);
+ck('slow real move allowed (50% over 3h)', R(90000,60000,N,N-3*36e5,false,false,false) === null);
+ck('clean small move allowed',             R(70500,70000,N,N-60e3,false,false,false) === null);
+ck('first snapshot (no last) allowed',     R(70000,undefined,N,undefined,false,false,false) === null);
+
+console.log('\nRESULT:', ok?'ALL PASS ✓ (shipped _aurixInvestableSnapshots + _aurixSnapshotRejectReason)':'FAIL ✗');
 process.exit(ok?0:1);
