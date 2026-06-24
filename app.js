@@ -18710,6 +18710,51 @@ if (typeof window !== 'undefined') {
   // raw-vs-render first points so it's explicit WHY the curve starts where it does.
   // GRAPH-V1 RULE 14/15 — the RELEASE GATE. Every timeframe's last point must equal the
   // dashboard value within 0.5%, and all must originate from getCanonicalPortfolioSeries.
+  // FASE 3 — per-surface source consistency table. Confirms every visible surface reads the
+  // canonical series and shares the dashboard's last value (±0.5%). Read-only.
+  window.debugAurixChartSources = () => {
+    let dash = NaN; try { dash = Number(investableValueBase()); } catch (_) {}
+    const vis = el => !!(el && el.offsetParent !== null && typeof el.getClientRects === 'function' && el.getClientRects().length);
+    const wscVisible = vis(document.getElementById('perfSnapshot')) || vis(document.getElementById('wealthCurveMobile'));
+    const v2Visible  = vis(document.querySelector('.hero-right .chart-wrap')) || vis(document.querySelector('.mobile-slide-chart .chart-wrap'));
+    const chartJsVisible = vis(document.getElementById('portfolioChart')) || vis(document.getElementById('portfolioChartMobile'));
+    const pceActive  = (typeof _aurixReconFlag === 'function') ? !!_aurixReconFlag() : false;
+    const last = a => (a && a.length ? a[a.length - 1] : null);
+    const near = (a, b) => (Number.isFinite(a) && Number.isFinite(b) && b > 0) ? (Math.abs(a - b) / b < 0.005) : false;
+    const rows = ['24h', '7d', '30d', '1y', 'all'].map(r => {
+      const perf = getInstitutionalPerformanceSeries(r);
+      const wsc = getAurixRenderSeries(r);
+      let v2 = []; try { const d = getDashboardChartRenderState(r); v2 = (d.state === 'ready' && Array.isArray(d.series)) ? d.series : []; } catch (_) {}
+      const legacy = _aurixLegacyDataFromCanonical(r);
+      const lp = last(perf.renderSeries);
+      const o = {
+        range: r,
+        dashboardValue: Number.isFinite(dash) ? +dash.toFixed(2) : null,
+        canonicalLast: lp ? +lp.value.toFixed(2) : null,
+        wscLast: last(wsc) ? +last(wsc).value.toFixed(2) : null,
+        v2Last: last(v2) ? +last(v2).value.toFixed(2) : null,
+        chartJsLast: legacy.lastValue != null ? +Number(legacy.lastValue).toFixed(2) : null,
+        tooltipLast: last(wsc) ? +last(wsc).value.toFixed(2) : null,   // tooltip reads the rendered series
+        wscPoints: wsc.length, v2Points: v2.length, chartJsPoints: legacy.values.length, canonicalPoints: perf.renderSeries.length,
+        wscSource: 'getInstitutionalPerformanceSeries', v2Source: 'getAurixRenderSeries',
+        chartJsSource: '_aurixLegacyDataFromCanonical', tooltipSource: 'renderSeries',
+        wscVisible, v2Visible, chartJsVisible, pceActive,
+      };
+      let pass = near(o.canonicalLast, o.dashboardValue) && near(o.tooltipLast, o.canonicalLast);
+      if (wscVisible) pass = pass && near(o.wscLast, o.canonicalLast);
+      if (v2Visible)  pass = pass && near(o.v2Last, o.canonicalLast);
+      if (chartJsVisible) pass = pass && near(o.chartJsLast, o.canonicalLast);
+      if (pceActive !== false) pass = false;
+      o.status = pass ? 'PASS' : 'FAIL';
+      return o;
+    });
+    try {
+      console.table(rows.map(x => ({ range: x.range, dash: x.dashboardValue, canon: x.canonicalLast, wsc: x.wscLast, v2: x.v2Last, chartJs: x.chartJsLast, tip: x.tooltipLast, pce: x.pceActive, status: x.status })));
+      console.log('[chart-sources] visible:', { wscVisible, v2Visible, chartJsVisible, pceActive }, rows);
+    } catch (_) {}
+    return rows;
+  };
+
   window.debugChartAudit = () => {
     let dashboardValue = NaN;
     try { dashboardValue = Number(investableValueBase()); } catch (_) {}
@@ -21635,7 +21680,10 @@ function _aurixDashSync(surface) {
       // visual mode per range.
       if (_dq.hasStructuralJump) _aurixChartStraightLatch[activeRange] = true;
       const _straight = _aurixChartStraightLatch[activeRange] === true;
-      ctrl.setData(_aurixDisplaySeries(series), {
+      // FASE 3 — V2 draws the EXACT canonical render series (no _aurixDisplaySeries median
+      // filter, a V2-only transform the WSC never applied). The series is already clean
+      // (FASE 1/2 + canonical), so there is no per-renderer divergence.
+      ctrl.setData(series, {
         source:       decision.isRecon ? 'reconstructed' : 'local-snapshot',
         currency:     baseCurrency || 'USD',
         granularity:  decision.isRecon ? ((_reconActive && _reconActive.granularity) || '5m') : '5m',
