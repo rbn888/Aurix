@@ -17586,7 +17586,10 @@ function normalizeWealthSeriesForVisualization(values, timestamps, range) {
 // interpolates/aggregates REAL levels — no Math.random, no synthetic returns, no
 // fabricated volatility. Endpoints are preserved exactly so the curve's net
 // direction stays aligned with the (organic) metric.
-const _WSC_BUCKET_MS = { '24h': 15 * 6e4, '7d': 2 * 36e5, '30d': 6 * 36e5, '1y': 864e5, 'all': 3 * 864e5 };
+// AURIX-PERFORMANCE-MODE-2 — 24H bucket 15min→5min: with ~140 real intraday points the
+// 15min median collapsed microstructure into a flat/artificial line; 5min preserves the
+// real shape (still bounded by _WSC_SAMPLES). Never fabricates — only aggregates real points.
+const _WSC_BUCKET_MS = { '24h': 5 * 6e4, '7d': 2 * 36e5, '30d': 6 * 36e5, '1y': 864e5, 'all': 3 * 864e5 };
 const _WSC_SAMPLES   = { '24h': 216, '7d': 192, '30d': 200, '1y': 216, 'all': 220 };  // WN.10 — dense interaction
 function _wscResample(values, timestamps, range) {
   const n = values.length;
@@ -18001,7 +18004,71 @@ function _aurixFlowNeutralize(series, range) {
   for (let i = 0; i < n; i++) { run += stepOff[i]; cum[i] = run; }
   out.totalOffset = run;
   out.neutralized = out.shapeTransfers + out.recordedNeutralized;
-  if (run !== 0) out.adjusted = vals.map((v, i) => v - cum[i] + run);
+  // AURIX-PERFORMANCE-MODE-2 — ANCHOR-TO-START (founder decision, institutional
+  // performance-since-inception). adjusted(i) = v(i) − cum(i): the series STARTS at
+  // the real first historical value (cum[0]=0 → adj[0]=v[0]) and removes each capital
+  // step as it occurs, so the curve shows ONLY market movement. The endpoint =
+  // v_last − Σflows (performance value, NOT current wealth — the hero shows current
+  // wealth separately). Previously we added +run (anchor-to-current), which lifted the
+  // start to ~v0+Σflows (~73k) — that was the reported "starts too high". No +run now.
+  if (run !== 0) out.adjusted = vals.map((v, i) => v - cum[i]);
+  return out;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// AURIX-PERFORMANCE-MODE-2 — THE SINGLE INSTITUTIONAL SOURCE for the dashboard
+// evolution chart. EVERY surface (WSC desktop #perfSnapshot, WSC mobile
+// #wealthCurveMobile, V2 lightweight-charts .chart-wrap, tooltip, headline %) reads
+// renderSeries from HERE. There is no other path that may paint a different curve.
+//
+//   • rawValueSeries   — eligible INVESTABLE values, no neutralisation (audit only)
+//   • flowNeutralSeries — Performance series (anchor-to-start; capital flows removed)
+//   • renderSeries     — what surfaces draw: flowNeutralSeries, or [] when 'building'
+//   • mode             — premium-curve | partial-curve | building (3-mode policy)
+//   • plus realPointCount / coveragePct / largestGapPct / first|lastRealPoint /
+//     hiddenOrExcludedPoints / excludedReasons / capitalFlowsUsed / reason
+//
+// PURE READ. Never mutates state, never touches PCE, never fabricates a point.
+function getInstitutionalPerformanceSeries(range) {
+  const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '30d')).toLowerCase();
+  const out = {
+    range: r,
+    rawValueSeries: [], flowNeutralSeries: [], renderSeries: [],
+    realPointCount: 0, coveragePct: 0, largestGapPct: 0,
+    firstRealPoint: null, lastRealPoint: null,
+    hiddenOrExcludedPoints: 0, excludedReasons: {}, capitalFlowsUsed: 0,
+    mode: 'building', reason: '',
+  };
+  let elig;
+  try { elig = _aurixEligibleInvestableSeries(r); } catch (_) { elig = { series: [], meta: {} }; }
+  const snaps = (elig && Array.isArray(elig.series)) ? elig.series : [];
+  out.hiddenOrExcludedPoints = (elig.meta && elig.meta.excluded) || 0;
+  out.excludedReasons        = (elig.meta && elig.meta.reasons) || {};
+  if (snaps.length < 2) { out.reason = 'insufficient_points(<2)'; return out; }
+
+  out.rawValueSeries = snaps.map(s => ({ time: s.ts, value: s.value }));
+  const neutral = _aurixFlowNeutralize(snaps, r);
+  const adj = Array.isArray(neutral.adjusted) ? neutral.adjusted : snaps.map(s => s.value);
+  out.flowNeutralSeries = snaps.map((s, i) => ({
+    time: s.ts, value: (Number.isFinite(adj[i]) && adj[i] > 0) ? adj[i] : s.value,
+  }));
+  out.realPointCount  = snaps.length;
+  out.capitalFlowsUsed = neutral.neutralized || 0;
+  out.firstRealPoint  = out.flowNeutralSeries[0];
+  out.lastRealPoint   = out.flowNeutralSeries[out.flowNeutralSeries.length - 1];
+
+  const q = _wscAssessSeriesQuality(r, out.rawValueSeries.map(p => ({ ts: p.time, value: p.value })), snaps, adj);
+  out.coveragePct   = q.timeCoveragePct;
+  out.largestGapPct = q.largestGapPct;
+  out.reason        = q.reason;
+
+  // 3-MODE POLICY: premium-curve (full institutional curve) → partial-curve (enough
+  // real points to draw an honest discrete line, but not full coverage) → building
+  // (truly too little data). Never a synthetic rectangle; never an empty message when
+  // a partial-but-honest line can be shown.
+  if (q.institutionalRenderable) { out.mode = 'premium-curve'; out.renderSeries = out.flowNeutralSeries; }
+  else if (out.realPointCount >= _WSC_LOWDENSITY_MIN) { out.mode = 'partial-curve'; out.renderSeries = out.flowNeutralSeries; }
+  else { out.mode = 'building'; out.renderSeries = []; }
   return out;
 }
 
@@ -18426,6 +18493,39 @@ if (typeof window !== 'undefined') {
         buckets: x.distinctBuckets, cov: x.coveragePct, gap: x.largestGapPct,
         ok: x.institutionalRenderable, mode: x.renderMode, fallback: x.fallbackUsed, reason: x.reason,
       })));
+    } catch (_) {}
+    return rows;
+  };
+
+  // AURIX-PERFORMANCE-MODE-2 — the mandatory institutional audit table. One row per
+  // range straight from the SINGLE source getInstitutionalPerformanceSeries, plus the
+  // raw-vs-render first points so it's explicit WHY the curve starts where it does.
+  window.debugAurixInstitutionalSeries = () => {
+    const rows = ['24h', '7d', '30d', '1y', 'all'].map(r => {
+      const p = getInstitutionalPerformanceSeries(r);
+      const raw = p.rawValueSeries, fn = p.flowNeutralSeries, rs = p.renderSeries;
+      const f = a => (a && a.length ? a[0] : null), l = a => (a && a.length ? a[a.length - 1] : null);
+      return {
+        range: r,
+        rawPoints: raw.length, eligiblePoints: raw.length, flowNeutralPoints: fn.length, renderPoints: rs.length,
+        firstRawTs: f(raw) && new Date(f(raw).time).toISOString(), firstRawValue: f(raw) && Math.round(f(raw).value),
+        firstFlowNeutralValue: f(fn) && Math.round(f(fn).value),
+        firstRenderedTs: f(rs) && new Date(f(rs).time).toISOString(), firstRenderedValue: f(rs) && Math.round(f(rs).value),
+        lastRenderedTs: l(rs) && new Date(l(rs).time).toISOString(), lastRenderedValue: l(rs) && Math.round(l(rs).value),
+        coveragePct: p.coveragePct, largestGapPct: p.largestGapPct,
+        capitalFlowsUsed: p.capitalFlowsUsed, excludedPointsCount: p.hiddenOrExcludedPoints,
+        excludedReasons: p.excludedReasons, renderMode: p.mode, reason: p.reason,
+        sourceUsedByWSC: 'getInstitutionalPerformanceSeries', sourceUsedByV2: 'getInstitutionalPerformanceSeries',
+      };
+    });
+    try {
+      console.table(rows.map(x => ({
+        range: x.range, raw: x.rawPoints, flowNeutral: x.flowNeutralPoints, render: x.renderPoints,
+        firstRaw: x.firstRawValue, firstRendered: x.firstRenderedValue, lastRendered: x.lastRenderedValue,
+        cov: x.coveragePct, gap: x.largestGapPct, flows: x.capitalFlowsUsed, excluded: x.excludedPointsCount,
+        mode: x.renderMode,
+      })));
+      console.log('[institutional-series] full rows (WSC & V2 both read getInstitutionalPerformanceSeries):', rows);
     } catch (_) {}
     return rows;
   };
@@ -19895,21 +19995,28 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   // (computeAurixTWRSeries) stays headless for a future Performance mode.
   // WN.6 — eligibility filter + active-window focus on the clean investable
   // history (drops old/polluted/construction prefix + dead-flat lead-in).
-  const elig = _aurixEligibleInvestableSeries(activeRange);
-  const snaps = elig.series;
-  const vals = snaps.map(s => s.value), ts = snaps.map(s => s.ts);
-
+  // AURIX-PERFORMANCE-MODE-2 — SINGLE SOURCE. The WSC draws exactly the renderSeries
+  // returned by getInstitutionalPerformanceSeries — the SAME series the V2 surface
+  // uses — so WSC and V2 can never diverge. snaps/ts/vals/adjVals derive from it; the
+  // series is already flow-neutral (anchor-to-start), so it is NOT re-neutralised.
+  const perf = getInstitutionalPerformanceSeries(activeRange);
   if (typeof window !== 'undefined') {
-    window._aurixChartMode = { range: activeRange, mode: 'PERFORMANCE_ADJUSTED', base: 'INVESTABLE_VALUE', source: 'category_history', realEstateIncluded: false, points: vals.length, eligible: elig.meta, metricSource: 'performanceAdjusted', noFloorNoCeilingApplied: true };
+    window._aurixChartMode = { range: activeRange, mode: 'PERFORMANCE_ANCHOR_START', base: 'INVESTABLE_VALUE',
+      source: 'getInstitutionalPerformanceSeries', realEstateIncluded: false, points: perf.realPointCount,
+      renderMode: perf.mode, coveragePct: perf.coveragePct, reason: perf.reason };
   }
 
-  // < 2 clean points → honest building state. Never show polluted/fake values.
-  if (vals.length < 2) {
+  // mode='building' → honest premium empty state (truly too little data).
+  if (perf.mode === 'building') {
     if (changeEl) { changeEl.textContent = ''; changeEl.className = 'chart-change'; changeEl.removeAttribute('title'); }
-    hostEl.innerHTML =
-      `<div class="wsc wsc--empty"><div class="wsc-empty"><div class="wsc-empty-title">${t('wscBuildingTitle')}</div><div class="wsc-empty-body">${t('wscBuildingBody')}</div></div></div>`;
+    _wscRenderInsufficient(hostEl, { realPointCount: perf.realPointCount, reason: perf.reason },
+      { mode: 'building', eligible: perf.rawValueSeries.map(p => ({ ts: p.time, value: p.value })),
+        lastGood: _wscGetFreshLastGood(activeRange, Date.now()) });
     return;
   }
+
+  const snaps = perf.renderSeries.map(p => ({ ts: p.time, value: p.value }));
+  const ts = snaps.map(s => s.ts), vals = snaps.map(s => s.value);
 
   const W = _WSC_VIEW_W, H = _WSC_VIEW_H;
   // WN.27 — mobile reserves a fixed RIGHT lane for the Y-axis labels so they
@@ -19920,12 +20027,9 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   const padX = padL;                                              // left inset (curve origin)
   const plotW = W - padL - padR;
 
-  // WN.11 — PERFORMANCE-ADJUSTED series drives the curve AND the metric: every
-  // capital event (deposit/withdrawal/internal transfer) is neutralised so only
-  // market movement remains, anchored to the current value. `adjVals` is the
-  // performance-adjusted series; `vals` (real) is used only in debug.
-  const neutral = _aurixFlowNeutralize(snaps, activeRange);
-  const adjVals = neutral.adjusted;
+  // AURIX-PERFORMANCE-MODE-2 — renderSeries is ALREADY the flow-neutral (anchor-to-
+  // start) performance series from the single source, so it is NOT re-neutralised here.
+  const adjVals = vals;
 
   // Performance return over the range (NOT capital added/removed). deltaAbs is the
   // performance gain/loss EQUIVALENT in the current-capital base.
@@ -19948,28 +20052,19 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
     else changeEl.removeAttribute('title');
   }
 
-  // AURIX-CHART-QUALITY-GATE-1 — decide RENDER vs PROTECT before drawing a
-  // continuous premium curve. The % badge above is already set and left intact
-  // (the percentage is correct; only the curve may lack density). 30D/1A/TOTAL
-  // pass unless they hit the <2-point floor, so they never regress.
-  const _rawQ = (typeof _aurixInvestableSnapshots === 'function') ? _aurixInvestableSnapshots(activeRange) : [];
-  const _quality = _wscAssessSeriesQuality(activeRange, _rawQ, snaps, adjVals);
-  if (typeof window !== 'undefined' && window._aurixChartMode) window._aurixChartMode.quality = _quality;
-  if (!_quality.institutionalRenderable) {
-    const _now = Date.now();
-    const _lg = _wscGetFreshLastGood(activeRange, _now);
-    const _lowDensity = _quality.realPointCount >= _WSC_LOWDENSITY_MIN;
-    _wscRenderInsufficient(hostEl, _quality, {
-      mode: _lowDensity ? 'lowdensity' : 'building',
-      eligible: snaps,
-      lastGood: _lg,
-    });
-    return;   // protected state drawn — never a continuous curve from too-few points
+  // AURIX-PERFORMANCE-MODE-2 — 3-MODE policy from the single source. 'partial-curve'
+  // → discrete real points (honest, no synthetic premium curve); 'premium-curve' →
+  // full institutional curve below. ('building' was handled at the top.) The % badge
+  // above stays intact (it is correct regardless of curve density).
+  if (perf.mode === 'partial-curve') {
+    _wscRenderInsufficient(hostEl, { realPointCount: perf.realPointCount, reason: perf.reason },
+      { mode: 'lowdensity', eligible: snaps, lastGood: _wscGetFreshLastGood(activeRange, Date.now()) });
+    return;
   }
-  // Renderable at institutional quality → persist as Last-Known-Good for fallback.
+  // premium-curve → persist Last-Known-Good for fallback, then draw the full curve.
   try {
     _wscSaveLastGood(activeRange, {
-      ts: Date.now(), qualityScore: _quality.realPointCount,
+      ts: Date.now(), qualityScore: perf.realPointCount,
       series: adjVals.slice(), tsArr: ts.slice(), percent: deltaPct,
     });
   } catch (_) {}
@@ -20507,26 +20602,12 @@ function _aurixSetChartNote(text) {
 }
 
 function _aurixDashSeries(range) {
-  // AURIX-PERFORMANCE-MODE-1 — the V2 lightweight-charts surface consumes the SAME
-  // flow-neutralised INVESTABLE series as the WSC (_wscPaintSurface): eligible
-  // investable history → _aurixFlowNeutralize → adjusted values at real timestamps.
-  // So capital flows (deposits / asset adds / construction) NEVER appear as a step
-  // in the V2 curve, and — because _aurixReconSyncHeadline reads series[0] — the V2
-  // headline % becomes flow-neutral too, matching _aurixRangeReturn and the WSC.
-  // Real estate excluded (eligible series is investable-only). PCE untouched.
-  let elig;
-  try { elig = _aurixEligibleInvestableSeries(range); } catch (_) { return []; }
-  const snaps = (elig && Array.isArray(elig.series)) ? elig.series : [];
-  if (snaps.length < 2) return [];
-  let adj;
-  try { adj = _aurixFlowNeutralize(snaps, range).adjusted; } catch (_) { adj = null; }
-  if (!Array.isArray(adj) || adj.length !== snaps.length) adj = snaps.map(s => s.value);
-  const out = new Array(snaps.length);
-  for (let i = 0; i < snaps.length; i++) {
-    const v = adj[i];
-    out[i] = { time: snaps[i].ts, value: (Number.isFinite(v) && v > 0) ? v : snaps[i].value };
-  }
-  return out;
+  // AURIX-PERFORMANCE-MODE-2 — the V2 lightweight-charts surface reads the renderSeries
+  // from the SINGLE institutional source (getInstitutionalPerformanceSeries), the exact
+  // same series the WSC draws. Flow-neutral, anchor-to-start; capital flows never appear
+  // as a step or as return. [] when mode='building'. PCE untouched.
+  try { return getInstitutionalPerformanceSeries(range).renderSeries || []; }
+  catch (_) { return []; }
 }
 
 // ── AURIX-CHART-RELIABILITY-GATE-1 ───────────────────────────────
@@ -21094,24 +21175,16 @@ function getDashboardChartRenderState(range) {
   const availOK = getRangeAvailability(range, series, epoch).available;
   const liveOK  = validateSeriesAgainstLive(range, series, live).valid;
   if (series.length >= 2 && availOK && liveOK) {
-    // AURIX-CHART-QUALITY-GATE-1 — the V2 lightweight-charts surface must obey the
-    // SAME institutional density/coverage gate as the WSC, so it never paints a
-    // continuous curve the WSC is refusing (the mobile .chart-wrap that showed a
-    // straight 7D line under the WSC overlay). Computed from the SAME eligible
-    // investable series the WSC uses → both engines reach one verdict. 30D/1A/TOTAL
-    // return institutionalRenderable=true (long-range rule) → never regressed.
-    // Pure read; never touches %, _aurixRangeReturn, PCE or WSC geometry. Defensive:
-    // any failure falls through to the previous 'ready' behaviour (never breaks render).
+    // AURIX-PERFORMANCE-MODE-2 — the V2 lightweight-charts surface draws a continuous
+    // line ONLY for mode 'premium-curve' (from the single institutional source). For
+    // 'partial-curve' and 'building' it goes to the V2 'building' state (empty / low_data
+    // skin), so it never paints a sparse false line; the WSC overlay owns the honest
+    // discrete (partial) / empty (building) rendering on the visible surface. One source,
+    // one verdict, desktop == mobile. Defensive: any failure keeps prior 'ready'.
     try {
-      const _elig = _aurixEligibleInvestableSeries(range);
-      const _q = _wscAssessSeriesQuality(
-        range,
-        _aurixInvestableSnapshots(range),
-        _elig.series,
-        _aurixFlowNeutralize(_elig.series, range).adjusted
-      );
-      if (_q && _q.institutionalRenderable === false) {
-        return { state: 'building', series: [], isRecon: false, qualityGated: true, qualityReason: _q.reason };
+      const _perf = getInstitutionalPerformanceSeries(range);
+      if (_perf && _perf.mode !== 'premium-curve') {
+        return { state: 'building', series: [], isRecon: false, qualityGated: true, qualityMode: _perf.mode, qualityReason: _perf.reason };
       }
     } catch (_) { /* gate inert on error → keep prior behaviour */ }
     _aurixLastGoodByRange[range] = series;   // remember ONLY a fully-validated series
@@ -21389,16 +21462,21 @@ function _aurixReconInvalidate() {
 // snapshot logic in updateChart, including the mobile mirror + perf-mode).
 function _aurixReconSyncHeadline(series) {
   if (!chartChangeEl) return;
-  const startValue   = (series && series.length) ? Number(series[0].value) : NaN;
-  const currentValue = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN;
-  const safeBase     = Number.isFinite(startValue) && startValue > 0 && Number.isFinite(currentValue);
-  const pct = safeBase ? ((currentValue - startValue) / startValue) * 100 : 0;
-  const cls = !safeBase ? 'flat' : (pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat');
-  if (!safeBase) {
+  // AURIX-PERFORMANCE-MODE-2 — the V2 headline % comes from the SINGLE canonical
+  // flow-neutral return (_aurixRangeReturn), identical to the WSC badge and
+  // "Resumen de rendimiento". It must NOT be (live − series[0])/series[0]: with the
+  // anchor-to-start performance series, series[0] is the real (low) inception value,
+  // so that formula would re-introduce the capital flow as return. _aurixRangeReturn
+  // is flow-neutral by construction.
+  const _ret = (typeof _aurixRangeReturn === 'function') ? _aurixRangeReturn(activeRange) : null;
+  const safe = _ret && _ret.valid && Number.isFinite(_ret.deltaPct);
+  const pct  = safe ? _ret.deltaPct : 0;
+  const abs  = safe && Number.isFinite(_ret.deltaAbs) ? _ret.deltaAbs : 0;
+  const cls  = !safe ? 'flat' : (pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat');
+  if (!safe) {
     chartChangeEl.textContent = '—';
   } else if (activePerfMode === 'curr') {
-    const absChange = currentValue - startValue;
-    chartChangeEl.textContent = `${absChange >= 0 ? '+' : ''}${formatBase(absChange)}`;
+    chartChangeEl.textContent = `${abs >= 0 ? '+' : ''}${formatBase(abs)}`;
   } else {
     chartChangeEl.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
   }

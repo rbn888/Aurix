@@ -48,7 +48,7 @@ sb.window = sb;
 vm.createContext(sb);
 [ obj('_WSC_BUCKET_MS'), obj('_WSC_WINDOW_MS'), obj('_WSC_QUALITY'),
   src.match(/const _WSC_LOWDENSITY_MIN = \d+;/)[0],
-  fn('_wscAssessSeriesQuality'), fn('getDashboardChartRenderState') ].forEach(c => vm.runInContext(c, sb));
+  fn('_wscAssessSeriesQuality'), fn('getInstitutionalPerformanceSeries'), fn('getDashboardChartRenderState') ].forEach(c => vm.runInContext(c, sb));
 
 let ok = true; const ck = (n,c,g) => { console.log((c?'  ✓':'  ✗')+' '+n+(g!==undefined?'  ['+g+']':'')); if(!c) ok=false; };
 const run = (range, elig) => { ELIG = elig; return sb.getDashboardChartRenderState(range); };

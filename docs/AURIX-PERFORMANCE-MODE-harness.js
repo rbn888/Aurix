@@ -35,7 +35,7 @@ vm.createContext(sb);
 [ obj('_WSC_INTERNAL_KINDS'), obj('_WSC_BUCKET_MS'), obj('_WSC_WINDOW_MS'), obj('_WSC_QUALITY'),
   src.match(/const _WSC_LOWDENSITY_MIN = \d+;/)[0],
   fn('_aurixFlowIsInternal'), fn('_aurixFlowNeutralize'), fn('_wscAssessSeriesQuality'),
-  fn('_aurixRangeReturn'), fn('_aurixDashSeries'), fn('_aurixCaptureFlow'),
+  fn('_aurixRangeReturn'), fn('getInstitutionalPerformanceSeries'), fn('_aurixDashSeries'), fn('_aurixCaptureFlow'),
   fn('_aurixBackfillFlowsFromTransactions') ].forEach(c=>vm.runInContext(c, sb));
 
 let ok=true; const ck=(n,c,g)=>{console.log((c?'  ✓':'  ✗')+' '+n+(g!==undefined?'  ['+g+']':'')); if(!c) ok=false;};
