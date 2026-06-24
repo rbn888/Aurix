@@ -18143,6 +18143,15 @@ function getInstitutionalPerformanceSeries(range) {
 // RULE 1 — public alias: getInstitutionalSeries(range) is the named single source.
 function getInstitutionalSeries(range) { return getInstitutionalPerformanceSeries(range); }
 
+// FASE 3 — THE single render accessor. WSC and V2 both consume EXACTLY this array, so
+// the same timeframe can never look different across surfaces. It is the canonical
+// renderSeries (already window-filtered + tail mark-to-market to live); NO surface
+// applies its own dropDivergent / validate / anchor pass on top.
+function getAurixRenderSeries(range) {
+  try { return getInstitutionalPerformanceSeries(range).renderSeries || []; }
+  catch (_) { return []; }
+}
+
 // ════════════════════════════════════════════════════════════════════════
 // AURIX-RETURN-UNIFY-1 — SINGLE SOURCE OF TRUTH for the timeframe RETURN that
 // every surface shows (hero WSC badge, "Resumen de rendimiento", computeRangePnL).
@@ -21254,21 +21263,19 @@ function getDashboardChartRenderState(range) {
   const epoch = (typeof _aurixInvestableChartEpoch === 'function') ? _aurixInvestableChartEpoch() : 0;
   const live  = ready ? Number(investableValueBase()) : NaN;
 
-  // Candidate series: snapshot, or a gated reconstruction matching (range,ccy).
-  let series = _aurixDashSeries(range);
+  // FASE 3 — V2 consumes EXACTLY getAurixRenderSeries(range) (= the WSC renderSeries).
+  // NO dropDivergent / validateChartSeries / anchorTail passes — those caused V2≠WSC.
+  // The series is already clean (FASE 1/2 removed corrupt snapshots) and tail-anchored
+  // to live. PCE stays isolated behind the flag (Fase 4): only overrides when ON.
+  let series = getAurixRenderSeries(range);
   let isRecon = false;
   if (_aurixReconFlag() && _reconActive && _reconActive.range === range
       && _reconActive.currency === (baseCurrency || 'USD')
       && Array.isArray(_reconActive.series) && _reconActive.series.length >= 2) {
-    series = _reconActive.series; isRecon = true;
+    series = _reconActive.series.slice(); isRecon = true;
   }
-  series = _aurixChartDropDivergent(series, range);
-  const vcs = validateChartSeries(range, series, live);
-  series = vcs.valid ? vcs.cleanedSeries : [];
 
-  // Not trustworthy yet (boot/refresh): keep a reusable last-good line, else a
-  // premium loading surface — NEVER a fresh (possibly contaminated) frame and
-  // never an empty container.
+  // Not trustworthy yet (boot/refresh): reusable last-good, else premium loading.
   if (!ready) {
     const lg = _aurixLastGoodByRange[range];
     if (Array.isArray(lg) && lg.length >= 2) return { state: 'ready', series: _aurixChartAnchorTail(lg), isRecon: false, fromLastGood: true };
@@ -21279,35 +21286,23 @@ function getDashboardChartRenderState(range) {
     const lg = _aurixLastGoodByRange[range];
     if (Array.isArray(lg) && lg.length >= 2) return { state: 'ready', series: _aurixChartAnchorTail(lg), isRecon: false, fromLastGood: true };
   }
-  // Ready: anchor the tail to live, then gate on availability AND live-compat.
-  if (series.length >= 2) series = _aurixChartAnchorTail(series);
-  const availOK = getRangeAvailability(range, series, epoch).available;
-  const liveOK  = validateSeriesAgainstLive(range, series, live).valid;
-  if (series.length >= 2 && availOK && liveOK) {
-    // AURIX-PERFORMANCE-MODE-2 — the V2 lightweight-charts surface draws a continuous
-    // line ONLY for mode 'premium-curve' (from the single institutional source). For
-    // 'partial-curve' and 'building' it goes to the V2 'building' state (empty / low_data
-    // skin), so it never paints a sparse false line; the WSC overlay owns the honest
-    // discrete (partial) / empty (building) rendering on the visible surface. One source,
-    // one verdict, desktop == mobile. Defensive: any failure keeps prior 'ready'.
-    try {
-      const _perf = getInstitutionalPerformanceSeries(range);
-      // GRAPH-V1 RULE 4/7 — V2 draws for premium AND partial (honest sparse line); only
-      // 'building' (<2 points) → empty state. Same verdict as the WSC (single source).
-      if (_perf && _perf.mode === 'building') {
-        return { state: 'building', series: [], isRecon: false, qualityGated: true, qualityMode: _perf.mode, qualityReason: _perf.reason };
-      }
-    } catch (_) { /* gate inert on error → keep prior behaviour */ }
-    _aurixLastGoodByRange[range] = series;   // remember ONLY a fully-validated series
-    return { state: 'ready', series, isRecon };
+
+  // PCE override path (isolated): if a reconstruction is active, draw it as-is.
+  if (isRecon) {
+    if (series.length >= 2) { _aurixLastGoodByRange[range] = series; return { state: 'ready', series, isRecon: true }; }
   }
-  // Candidate not renderable — reuse last-good only if it still passes everything.
-  const lg = _aurixLastGoodByRange[range];
-  if (_aurixLastGoodReusable(lg, range, live)) {
-    return { state: 'ready', series: _aurixChartAnchorTail(lg), isRecon: false, fromLastGood: true };
+
+  // Canonical path — state = the SAME mode the WSC uses (single source of verdict).
+  // building (<2 pts) → empty (reuse last-good if still valid); premium/partial → ready.
+  const _perf = getInstitutionalPerformanceSeries(range);
+  if (_perf.mode === 'building' || series.length < 2) {
+    const lg = _aurixLastGoodByRange[range];
+    if (_aurixLastGoodReusable(lg, range, live)) return { state: 'ready', series: _aurixChartAnchorTail(lg), isRecon: false, fromLastGood: true };
+    if (lg) delete _aurixLastGoodByRange[range];
+    return { state: 'building', series: [], isRecon: false, qualityMode: _perf.mode, qualityReason: _perf.reason };
   }
-  if (lg) delete _aurixLastGoodByRange[range];   // drop a stale/contaminated last-good
-  return { state: 'building', series: [], isRecon: false };
+  _aurixLastGoodByRange[range] = series;
+  return { state: 'ready', series, isRecon: false };
 }
 
 // AURIX-CHART-LOADING-PREMIUM-1 — visual-only loading/draw wiring. Mirrors the

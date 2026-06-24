@@ -48,7 +48,7 @@ sb.window = sb;
 vm.createContext(sb);
 [ obj('_WSC_BUCKET_MS'), obj('_WSC_WINDOW_MS'), obj('_WSC_QUALITY'),
   src.match(/const _WSC_LOWDENSITY_MIN = \d+;/)[0],
-  fn('_wscAssessSeriesQuality'), fn('getCanonicalPortfolioSeries'), fn('getInstitutionalPerformanceSeries'), fn('getDashboardChartRenderState') ].forEach(c => vm.runInContext(c, sb));
+  fn('_wscAssessSeriesQuality'), fn('getCanonicalPortfolioSeries'), fn('getInstitutionalPerformanceSeries'), fn('getAurixRenderSeries'), fn('_aurixLastGoodReusable'), fn('getDashboardChartRenderState') ].forEach(c => vm.runInContext(c, sb));
 
 let ok = true; const ck = (n,c,g) => { console.log((c?'  ✓':'  ✗')+' '+n+(g!==undefined?'  ['+g+']':'')); if(!c) ok=false; };
 const run = (range, elig) => { ELIG = elig; return sb.getDashboardChartRenderState(range); };
@@ -70,12 +70,20 @@ console.log('\n24H 2 pts — Rule 7: partial (≥2 draws), not building:');
   ck('state = ready (partial)', d.state === 'ready', d.state); }
 
 console.log('\nNo history — Rule 7: building (canonical = only the live point → <2 in window):');
-{ const d = run('24h', []);   // empty history; canonical appends live → 1 point → building
+{ sb._aurixLastGoodByRange = {};   // isolate: no stale last-good fallback from earlier cases
+  const d = run('24h', []);        // empty history; canonical appends live → 1 point → building
   ck('state = building', d.state === 'building', d.state); }
 
 console.log('\nNO REGRESSION — 30D / 1A / TOTAL with enough points stay ready:');
 { for (const r of ['30d','1y','all']) { const d = run(r, spread(25, (r==='30d'?28*D:r==='1y'?350*D:380*D), 50000));
     ck(r+' = ready (long-range rule, institutionalRenderable=true)', d.state === 'ready', d.state); } }
+
+console.log('\nFASE 3 — V2 ready series === getAurixRenderSeries (no dropDivergent/validate/anchor divergence):');
+{ const elig = spread(10, 6.8*D, 70000); const d = run('7d', elig);
+  const canon = sb.getAurixRenderSeries('7d');
+  const same = d.state==='ready' && Array.isArray(d.series) && d.series.length===canon.length &&
+               d.series.every((p,i)=>p.time===canon[i].time && Math.abs(p.value-canon[i].value)<1e-9);
+  ck('V2 getDashboardChartRenderState.series === getAurixRenderSeries', same, 'state='+d.state+' len '+(d.series||[]).length+'/'+canon.length); }
 
 console.log('\nDESKTOP == MOBILE — same function, same global activeRange/series → identical decision (no surface-specific branch).');
 
