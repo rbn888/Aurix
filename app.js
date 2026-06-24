@@ -17795,19 +17795,32 @@ function _aurixInvestableSnapshots(range) {
     const now = Date.now();
     const ms = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '1y': 31536e6 };
     const start = range === 'all' ? 0 : now - (ms[range] || 2592e6);
-    const out = [];
-    for (const p of categoryHistory) {
-      if (!p || typeof p.ts !== 'number') continue;
-      if (epoch && p.ts < epoch) continue;
-      if (p.ts < start) continue;
-      const total = Number(p.total), re = Number(p.real_estate) || 0;
-      const invUSD = (Number.isFinite(total) ? total : 0) - re;     // investable = total − real estate
-      if (!Number.isFinite(invUSD) || invUSD <= 0) continue;
-      // base currency, matches the Hero. `re`/`total` carried so the trust filter
-      // can tell a RE-polluted / pre-investable-split point from a clean one.
-      out.push({ ts: p.ts, value: toBase(invUSD, 'USD'), re: toBase(re, 'USD'), total: toBase(Number.isFinite(total) ? total : 0, 'USD') });
-    }
-    return out.sort((a, b) => a.ts - b.ts);
+    // FASE 1 — exclude INCOMPLETE snapshots (the main source of false vertical jumps:
+    // e.g. 62.886 → 75.538 with no deposit). fxPartial = a holding had no price/FX at
+    // capture (value undercounted); fxApprox = a non-historical FX fallback was used.
+    // Both are dropped so only COMPLETE snapshots feed the canonical series. Defensive
+    // fallback: if excluding fxApprox would leave < 2 points, keep approx (never starve
+    // the chart / hide all data) — fxPartial is ALWAYS dropped.
+    const build = (excludeApprox) => {
+      const out = [];
+      for (const p of categoryHistory) {
+        if (!p || typeof p.ts !== 'number') continue;
+        if (epoch && p.ts < epoch) continue;
+        if (p.ts < start) continue;
+        if (p.fxPartial === true) continue;                       // always drop partial-coverage
+        if (excludeApprox && p.fxApprox === true) continue;       // drop approx FX (with fallback)
+        const total = Number(p.total), re = Number(p.real_estate) || 0;
+        const invUSD = (Number.isFinite(total) ? total : 0) - re;   // investable = total − real estate
+        if (!Number.isFinite(invUSD) || invUSD <= 0) continue;
+        // base currency, matches the Hero. `re`/`total` carried so the trust filter
+        // can tell a RE-polluted / pre-investable-split point from a clean one.
+        out.push({ ts: p.ts, value: toBase(invUSD, 'USD'), re: toBase(re, 'USD'), total: toBase(Number.isFinite(total) ? total : 0, 'USD') });
+      }
+      return out.sort((a, b) => a.ts - b.ts);
+    };
+    let out = build(true);                       // exclude fxPartial + fxApprox (complete only)
+    if (out.length < 2) out = build(false);      // defensive: keep approx rather than empty the chart
+    return out;
   } catch (_) { return []; }
 }
 
