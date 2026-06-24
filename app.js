@@ -7279,10 +7279,15 @@ function recordCategorySnapshot() {
   const _within5s   = !!(last && now - last.ts < 5_000);
   const _isMaterial = !!(last && Number.isFinite(last.total) && last.total > 0 &&
                          Math.abs(newPoint.total - last.total) / last.total > 0.01);
-  // FASE 2 — WRITE GUARD (mirrors recordSnapshot): reject incomplete/anomalous category
-  // points so the canonical investable series never ingests a corrupt snapshot.
-  const _catReject = _aurixSnapshotRejectReason(newPoint.total, last && last.total, now, last && last.ts, _catFxPartial, _catFxApprox, _isMaterial);
-  if (_catReject) { try { console.warn('[AURIX] category snapshot rejected', _catReject, { total: Math.round(newPoint.total) }); } catch (_) {} return; }
+  // FASE 2 — WRITE GUARD (mirrors recordSnapshot): compare against the last VALID category
+  // snapshot; reject incomplete/anomalous points so the canonical investable series never
+  // ingests a corrupt snapshot. investable = total − real_estate.
+  const _catPrevValid = _aurixLastValidSnapshot(categoryHistory, 'total');
+  if (_aurixGuardSnapshot(
+        { ts: now, total: newPoint.total, investable: newPoint.total - (Number(newPoint.real_estate) || 0),
+          fxPartial: _catFxPartial, fxApprox: _catFxApprox },
+        _catPrevValid ? { ts: _catPrevValid.ts, total: _catPrevValid.total } : null,
+        'category')) return;
   if (_within5s && _isMaterial) newPoint.material = true;
   const base = (_within5s && !_isMaterial)
     ? categoryHistory.slice(0, -1)
@@ -7411,24 +7416,118 @@ if (typeof window !== 'undefined') {
   };
 }
 
-// FASE 2 — snapshot WRITE GUARD. A snapshot is persisted ONLY when it is COMPLETE and
-// plausible. Returns a rejection reason (string) or null. Rejects: impossible value
-// (non-finite/≤0), partial coverage (fxPartial — a holding had no price/FX → the proven
-// cause of the false +12,651 jump), approximate FX (fxApprox — non-historical fallback),
-// and a rapid anomalous jump (>30% in <2 min) that is NOT a user-driven material change
-// (the price-feed-glitch signature). Real deposits/edits are material → allowed; genuine
-// volatility over time is allowed (the dt<2min window only catches transient glitches).
-function _aurixSnapshotRejectReason(val, lastValue, nowTs, lastTs, fxPartial, fxApprox, isMaterial) {
-  if (!Number.isFinite(val) || val <= 0) return 'impossible_value';
-  if (fxPartial) return 'fxPartial:incomplete_coverage';
-  if (fxApprox)  return 'fxApprox:non_historical_fx';
-  if (!isMaterial && Number.isFinite(lastValue) && lastValue > 0 && Number.isFinite(lastTs) && Number.isFinite(nowTs)) {
-    const dt = nowTs - lastTs;
-    if (dt >= 0 && dt < 120000 && Math.abs(val - lastValue) / lastValue > 0.30) {
-      return 'anomalous_jump:' + Math.round(Math.abs(val - lastValue) / lastValue * 100) + '%_in_' + Math.round(dt / 1000) + 's';
-    }
+// ════════════════════════════════════════════════════════════════════════
+// FASE 2 (hardened) — snapshot WRITE GUARD. Persists ONLY complete, plausible snapshots
+// so a corrupt/partial point can never enter portfolio_history / category_history and
+// later draw a false vertical jump (e.g. 62.886 → 75.538). Data-WRITE only — does not
+// touch render / PCE / CSS / smoothing / stored data. Old snapshots are NOT modified.
+const _AURIX_SNAPSHOT_GUARD = Object.freeze({
+  fastMs: 30 * 60e3,  fastPct: 0.08,   // > 8 % in < 30 min → suspicious
+  slowMs: 6 * 36e5,   slowPct: 0.15,   // > 15 % in < 6 h   → suspicious
+  flowWindowMs: 10 * 60e3,             // ±10 min capital-flow tolerance for a JUMP
+});
+const _AURIX_SNAPSHOT_GUARD_MAX = 20;
+if (typeof window !== 'undefined' && !Array.isArray(window.__AURIX_REJECTED_SNAPSHOTS__)) {
+  window.__AURIX_REJECTED_SNAPSHOTS__ = [];
+}
+
+// Most recent snapshot that is NOT fxPartial/fxApprox — compare against a CLEAN baseline,
+// never against a partial one (so two partials in a row can't normalise corruption).
+function _aurixLastValidSnapshot(arr, totalKey) {
+  if (!Array.isArray(arr)) return null;
+  for (let i = arr.length - 1; i >= 0; i--) {
+    const p = arr[i];
+    if (!p || p.fxPartial === true || p.fxApprox === true) continue;
+    const t = Number(p[totalKey]);
+    if (Number.isFinite(t) && t > 0 && Number.isFinite(p.ts)) return p;
   }
   return null;
+}
+
+// True if a real capital flow (deposit/withdrawal/asset_add/asset_remove/import_baseline)
+// exists within ±windowMs of ts — i.e. a large jump is justified by capital, not a glitch.
+function _aurixHasCapitalFlowNear(ts, windowMs) {
+  try {
+    const flows = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
+    const KINDS = { deposit: 1, withdrawal: 1, asset_add: 1, asset_remove: 1, import_baseline: 1 };
+    return flows.some(f => f && KINDS[f.kind] && Number.isFinite(f.ts) && Math.abs(f.ts - ts) <= windowMs);
+  } catch (_) { return false; }
+}
+
+// _shouldRejectSnapshot(next, previousValidSnapshot, context) → { reject, reason, details }.
+//   next      : { ts, total, investable?, fxPartial?, fxApprox? }
+//   prevValid : { ts, total }  (the last CLEAN snapshot)
+// reasons: fx_partial · fx_approx · invalid_total · invalid_investable ·
+//          suspicious_drop_without_market_reason · suspicious_jump_without_capital_flow · ok
+function _shouldRejectSnapshot(next, prevValid, context) {
+  context = context || {};
+  const n = next || {};
+  const total = Number(n.total), investable = Number(n.investable);
+  const base = { ts: n.ts, total, investable, context: context.surface || null };
+  if (n.fxPartial === true) return { reject: true, reason: 'fx_partial', details: base };
+  if (n.fxApprox  === true) return { reject: true, reason: 'fx_approx',  details: base };
+  if (!Number.isFinite(total) || total <= 0) return { reject: true, reason: 'invalid_total', details: base };
+  if (n.investable != null && (!Number.isFinite(investable) || investable <= 0)) return { reject: true, reason: 'invalid_investable', details: base };
+  if (prevValid && Number.isFinite(prevValid.total) && prevValid.total > 0 && Number.isFinite(prevValid.ts) && Number.isFinite(n.ts)) {
+    const dt = n.ts - prevValid.ts;
+    const deltaPct = (total - prevValid.total) / prevValid.total;   // signed
+    const mag = Math.abs(deltaPct), G = _AURIX_SNAPSHOT_GUARD;
+    const suspicious = (dt >= 0 && dt < G.fastMs && mag > G.fastPct) || (dt >= 0 && dt < G.slowMs && mag > G.slowPct);
+    const det = Object.assign({}, base, { previousTotal: prevValid.total, dt, deltaPct: +(deltaPct * 100).toFixed(2) });
+    if (suspicious) {
+      if (deltaPct < 0) return { reject: true, reason: 'suspicious_drop_without_market_reason', details: det };
+      const hasFlow = _aurixHasCapitalFlowNear(n.ts, G.flowWindowMs);
+      det.capitalFlowNear = hasFlow;
+      if (!hasFlow) return { reject: true, reason: 'suspicious_jump_without_capital_flow', details: det };
+    }
+  }
+  return { reject: false, reason: 'ok', details: base };
+}
+
+function _aurixPushRejected(rec) {
+  try {
+    if (typeof window === 'undefined') return;
+    if (!Array.isArray(window.__AURIX_REJECTED_SNAPSHOTS__)) window.__AURIX_REJECTED_SNAPSHOTS__ = [];
+    window.__AURIX_REJECTED_SNAPSHOTS__.push(rec);
+    if (window.__AURIX_REJECTED_SNAPSHOTS__.length > _AURIX_SNAPSHOT_GUARD_MAX) {
+      window.__AURIX_REJECTED_SNAPSHOTS__ = window.__AURIX_REJECTED_SNAPSHOTS__.slice(-_AURIX_SNAPSHOT_GUARD_MAX);
+    }
+  } catch (_) {}
+}
+
+// Apply the guard + log + record. Returns TRUE when the snapshot must be skipped.
+function _aurixGuardSnapshot(next, prevValid, surface) {
+  const res = _shouldRejectSnapshot(next, prevValid, { surface: surface });
+  if (res.reject) {
+    const rec = { reason: res.reason, surface: surface, ts: next.ts,
+      total: Number.isFinite(next.total) ? Math.round(next.total) : next.total,
+      investable: Number.isFinite(next.investable) ? Math.round(next.investable) : next.investable,
+      previousTotal: prevValid && Number.isFinite(prevValid.total) ? Math.round(prevValid.total) : null,
+      deltaPct: res.details && res.details.deltaPct,
+      when: Number.isFinite(next.ts) ? new Date(next.ts).toISOString() : null };
+    _aurixPushRejected(rec);
+    try { console.warn('[AURIX][snapshot-guard] rejected', rec); } catch (_) {}
+    return true;
+  }
+  if (typeof window !== 'undefined' && window.AURIX_DEBUG_SNAPSHOTS === true) {
+    try { console.log('[AURIX][snapshot-guard] accepted', { surface: surface, ts: next.ts, total: Math.round(next.total) }); } catch (_) {}
+  }
+  return false;
+}
+
+if (typeof window !== 'undefined') {
+  window.debugAurixSnapshotGuard = () => {
+    const ph = (typeof portfolioHistory !== 'undefined' && Array.isArray(portfolioHistory)) ? portfolioHistory : [];
+    const ch = (typeof categoryHistory !== 'undefined' && Array.isArray(categoryHistory)) ? categoryHistory : [];
+    return {
+      lastPortfolioSnapshot: ph[ph.length - 1] || null,
+      lastCategorySnapshot: ch[ch.length - 1] || null,
+      lastValidPortfolioSnapshot: _aurixLastValidSnapshot(ph, 'value'),
+      lastValidCategorySnapshot: _aurixLastValidSnapshot(ch, 'total'),
+      recentRejectedSnapshots: (window.__AURIX_REJECTED_SNAPSHOTS__ || []).slice(),
+      guardConfig: _AURIX_SNAPSHOT_GUARD,
+    };
+  };
 }
 
 function recordSnapshot() {
@@ -7436,16 +7535,20 @@ function recordSnapshot() {
   const val = totalValueUSD(); // always store in USD for consistent history
   const last = portfolioHistory[portfolioHistory.length - 1];
 
-  // FASE 2 — WRITE GUARD: persist only complete, plausible snapshots. fxPartial/fxApprox
-  // are now REJECTED (not flagged-and-kept), so a corrupt point can never enter history.
+  // FASE 2 — WRITE GUARD: persist only complete, plausible snapshots. Compared against the
+  // last VALID (non-partial) snapshot, so a partial point can never enter history nor be
+  // used as a baseline. Rejects fx_partial/fx_approx/invalid/suspicious-move (see guard).
   const _fxPartial  = _aurixFxUncovered(activeAssets()) > 0;
   const _fxApprox   = _aurixFxApproxUsed(activeAssets());
+  const _prevValid  = _aurixLastValidSnapshot(portfolioHistory, 'value');
+  if (_aurixGuardSnapshot(
+        { ts: now, total: val, investable: val, fxPartial: _fxPartial, fxApprox: _fxApprox },
+        _prevValid ? { ts: _prevValid.ts, total: _prevValid.value } : null,
+        'portfolio')) return;
+
   const _within5s   = !!(last && now - last.ts < 5_000);
   const _isMaterial = !!(last && Number.isFinite(last.value) && last.value > 0 &&
                          Math.abs(val - last.value) / last.value > 0.01);
-  const _reject = _aurixSnapshotRejectReason(val, last && last.value, now, last && last.ts, _fxPartial, _fxApprox, _isMaterial);
-  if (_reject) { try { console.warn('[AURIX] snapshot rejected', _reject, { val: Number.isFinite(val) ? Math.round(val) : val }); } catch (_) {} return; }
-
   const newPoint = { ts: now, value: +(val.toFixed(2)) };
   // AURIX-CHART-QUALITY-GATE-1 — MATERIAL-CHANGE SNAPSHOT: a user add/edit/delete moves
   // wealth > 1% within the 5 s window; append it (do NOT overwrite) and mark it. Small
