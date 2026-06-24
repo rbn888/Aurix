@@ -6035,8 +6035,41 @@ function backfillHistoricalCapitalFlowsFromPortfolioHistory() {
   return { detected: events.length, added, events };
 }
 
+// ── AURIX-PERFORMANCE-MODE-1 — DETERMINISTIC capital-flow backfill from real
+// transactions. This is the PREFERRED, heuristic-free source: every recorded
+// transaction IS a capital event, so we derive the ledger directly from it —
+// buy/asset_add → +qty×price, sell/asset_remove → −qty×price, at the real tx ts,
+// in USD. Idempotent via _aurixCaptureFlow's deterministic id (kind:assetId:ts:amt),
+// which MATCHES the live _ledgerTrade capture exactly, so live + backfilled collapse
+// to one. No price-jump heuristic, so it can NEVER misclassify a market rally as a
+// flow. Reads assets only; never mutates holdings/history/PCE.
+function _aurixBackfillFlowsFromTransactions() {
+  let added = 0, scanned = 0;
+  try {
+    const list = (typeof activeAssets === 'function') ? activeAssets() : (Array.isArray(assets) ? assets : []);
+    const before = _aurixLoadCapitalFlows().length;
+    for (const a of list) {
+      if (!a || !Array.isArray(a.transactions)) continue;
+      for (const tx of a.transactions) {
+        if (!tx || !Number.isFinite(tx.ts) || !Number.isFinite(tx.qty) || !Number.isFinite(tx.price)) continue;
+        scanned++;
+        const native = Math.abs(Number(tx.qty) * Number(tx.price));
+        const usd = (typeof _nativeToUSD === 'function') ? _nativeToUSD(native, a.assetCurrency) : native;
+        if (!Number.isFinite(usd) || usd <= 0) continue;
+        const isSell = String(tx.type || '').toLowerCase() === 'sell';
+        // SAME (kind, assetId, ts, amount) as _ledgerTrade → idempotent with live flows.
+        _aurixCaptureFlow(isSell ? 'asset_remove' : 'asset_add', isSell ? -usd : usd, tx.ts, a.id, 'tx-backfill', 'tx-backfill');
+      }
+    }
+    added = _aurixLoadCapitalFlows().length - before;
+  } catch (_) {}
+  if (typeof IS_DEV !== 'undefined' && IS_DEV) { try { console.debug('[tx-backfill] scanned:', scanned, 'added:', added); } catch (_) {} }
+  return { added, scanned };
+}
+
 if (typeof window !== 'undefined') {
   window.backfillAurixCapitalFlows = () => backfillHistoricalCapitalFlowsFromPortfolioHistory();
+  window.backfillAurixFlowsFromTransactions = () => _aurixBackfillFlowsFromTransactions();
   // Preview: what WOULD be added (after dedupe) — never writes.
   window.previewAurixCapitalFlowBackfill = () => {
     const events = _aurixDetectHistoricalConstruction();
@@ -6051,15 +6084,28 @@ if (typeof window !== 'undefined') {
   };
 }
 
-// One-time, idempotent auto-backfill: enrich the local ledger from existing
-// history a few seconds after boot (history is loaded by then). Dedupe makes
-// re-runs harmless and the chart does NOT consume flows yet, so this is invisible.
+// One-time, idempotent auto-backfill a few seconds after boot (history + assets are
+// loaded by then). AURIX-PERFORMANCE-MODE-1 — DETERMINISTIC first: derive the flow
+// ledger from real transactions. The price-jump HEURISTIC (WN.4B) runs ONLY as a
+// fallback when there are NO transactions to derive from (e.g. an imported portfolio).
+// Dedupe makes re-runs harmless. The chart NOW consumes flows (flow-neutral curve),
+// so on a net change we trigger a light re-render to drop any stale capital step.
 let _aurixBackfillDone = false;
 try {
   setTimeout(() => {
     if (_aurixBackfillDone) return;
     _aurixBackfillDone = true;
-    try { backfillHistoricalCapitalFlowsFromPortfolioHistory(); } catch (_) {}
+    let res = { added: 0, scanned: 0 };
+    try {
+      res = _aurixBackfillFlowsFromTransactions();                     // preferred, heuristic-free
+      if (!res.scanned) backfillHistoricalCapitalFlowsFromPortfolioHistory();  // fallback ONLY w/o tx
+    } catch (_) {}
+    // Newly-derived flows change the flow-neutral series → repaint so the capital
+    // step disappears immediately instead of waiting for the next poll. Guarded.
+    if (res.added > 0) {
+      try { if (typeof renderWealthCurve === 'function') renderWealthCurve(false); } catch (_) {}
+      try { if (typeof updateChart === 'function') updateChart(); } catch (_) {}
+    }
   }, 5000);
 } catch (_) {}
 
@@ -20461,24 +20507,26 @@ function _aurixSetChartNote(text) {
 }
 
 function _aurixDashSeries(range) {
-  // AURIX-INVESTABLE-WEALTH-1 — Dashboard chart = investable wealth (excludes
-  // real estate), derived from categoryHistory. Snapshots remain the fallback.
-  const data = (typeof getChartData === 'function') ? getChartData(range, _investableSnapshotSource()) : null;
-  if (!data) return [];
-  const values     = Array.isArray(data.values)     ? data.values     : [];
-  const timestamps = Array.isArray(data.timestamps) ? data.timestamps : [];
-  if (values.length < 2 || timestamps.length !== values.length) return [];
-  const out = new Array(values.length);
-  for (let i = 0; i < values.length; i++) {
-    out[i] = { time: timestamps[i], value: values[i] };
+  // AURIX-PERFORMANCE-MODE-1 — the V2 lightweight-charts surface consumes the SAME
+  // flow-neutralised INVESTABLE series as the WSC (_wscPaintSurface): eligible
+  // investable history → _aurixFlowNeutralize → adjusted values at real timestamps.
+  // So capital flows (deposits / asset adds / construction) NEVER appear as a step
+  // in the V2 curve, and — because _aurixReconSyncHeadline reads series[0] — the V2
+  // headline % becomes flow-neutral too, matching _aurixRangeReturn and the WSC.
+  // Real estate excluded (eligible series is investable-only). PCE untouched.
+  let elig;
+  try { elig = _aurixEligibleInvestableSeries(range); } catch (_) { return []; }
+  const snaps = (elig && Array.isArray(elig.series)) ? elig.series : [];
+  if (snaps.length < 2) return [];
+  let adj;
+  try { adj = _aurixFlowNeutralize(snaps, range).adjusted; } catch (_) { adj = null; }
+  if (!Array.isArray(adj) || adj.length !== snaps.length) adj = snaps.map(s => s.value);
+  const out = new Array(snaps.length);
+  for (let i = 0; i < snaps.length; i++) {
+    const v = adj[i];
+    out[i] = { time: snaps[i].ts, value: (Number.isFinite(v) && v > 0) ? v : snaps[i].value };
   }
-  // AURIX-DASHBOARD-CHART-INSTITUTIONAL-1 — normalize at this single source so
-  // both surfaces AND the headline read one coherent, de-contaminated series.
-  const live = (typeof _aurixChartDataReady === 'function' && _aurixChartDataReady() && typeof investableValueBase === 'function')
-    ? Number(investableValueBase()) : NaN;
-  auditChartSeries(out, range);
-  const norm = normalizeChartRawSeries(out, { range, liveValue: live });
-  return norm.valid ? norm.series : [];
+  return out;
 }
 
 // ── AURIX-CHART-RELIABILITY-GATE-1 ───────────────────────────────
