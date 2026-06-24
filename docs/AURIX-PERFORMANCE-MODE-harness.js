@@ -16,6 +16,7 @@ const H=3600e3, D=86400e3, NOW=1000*D;
 let ELIG = [];                 // eligible investable series [{ts,value}]
 let FLOWS = [];                // capital flows ledger
 let STORE = [];               // mutable ledger for backfill test
+let LIVE = 0;                  // live dashboard value (0 → fall back to last ELIG)
 
 const sb = {
   console,
@@ -24,7 +25,7 @@ const sb = {
   assets: [],
   activeAssets: () => sb.assets,
   toBase: (v)=>v, _nativeToUSD: (v)=>v,
-  investableValueBase: () => (ELIG.length ? ELIG[ELIG.length-1].value : 0),
+  investableValueBase: () => (LIVE || (ELIG.length ? ELIG[ELIG.length-1].value : 0)),
   _aurixPortfolioEpoch: () => 0,
   _aurixEligibleInvestableSeries: () => ({ series: ELIG, meta:{} }),
   _aurixLoadCapitalFlows: () => FLOWS.slice(),
@@ -35,7 +36,7 @@ vm.createContext(sb);
 [ obj('_WSC_INTERNAL_KINDS'), obj('_WSC_BUCKET_MS'), obj('_WSC_WINDOW_MS'), obj('_WSC_QUALITY'),
   src.match(/const _WSC_LOWDENSITY_MIN = \d+;/)[0],
   fn('_aurixFlowIsInternal'), fn('_aurixFlowNeutralize'), fn('_wscAssessSeriesQuality'),
-  fn('_aurixRangeReturn'), fn('getInstitutionalPerformanceSeries'), fn('_aurixDashSeries'), fn('_aurixCaptureFlow'),
+  fn('_aurixRangeReturn'), fn('getCanonicalPortfolioSeries'), fn('getInstitutionalPerformanceSeries'), fn('_aurixDashSeries'), fn('_aurixCaptureFlow'),
   fn('_aurixBackfillFlowsFromTransactions') ].forEach(c=>vm.runInContext(c, sb));
 
 let ok=true; const ck=(n,c,g)=>{console.log((c?'  ✓':'  ✗')+' '+n+(g!==undefined?'  ['+g+']':'')); if(!c) ok=false;};
@@ -72,12 +73,12 @@ console.log('\nCASE 4 — 7D low-density still protected (quality gate intact)')
   const q = sb._wscAssessSeriesQuality('7d', ELIG, ELIG, ELIG.map(p=>p.value));
   ck('7D low-density not renderable', q.institutionalRenderable===false, q.reason); }
 
-console.log('\nCASE 5 — 30D renders WITHOUT the false step (flow-neutralised dash series)');
+console.log('\nCASE 5 — GRAPH-V1 FINAL: the LINE is a VALUE chart ending at the live value');
 { ELIG = [{ts:NOW-20*D,value:54809},{ts:NOW-11*D,value:55000},{ts:NOW-9*D,value:74506},{ts:NOW-4*D,value:74800},{ts:NOW,value:75651}];
-  FLOWS = [{ts:NOW-10*D, kind:'asset_add', amountUSD:19697}];
+  FLOWS = [{ts:NOW-10*D, kind:'asset_add', amountUSD:19697}]; LIVE = 75651;
   const ds = sb._aurixDashSeries('30d');
-  let maxStep=0; for(let i=1;i<ds.length;i++){const a=ds[i-1].value,b=ds[i].value; if(a>0)maxStep=Math.max(maxStep,Math.abs(b/a-1));}
-  ck('no ≥18% step in the V2 dash series (capital step removed)', maxStep < 0.18, '+'+(maxStep*100).toFixed(1)+'%'); }
+  ck('V2 line ends at the live/dashboard value (Rule 2/3)', Math.abs(ds[ds.length-1].value-LIVE)/LIVE<0.005, Math.round(ds[ds.length-1].value));
+  ck('V2 line is RAW value (contains real 54809, NOT rebased)', ds.some(p=>Math.round(p.value)===54809)); }
 
 console.log('\nCASE 6 — grossReturnPct includes the flow, netReturnPct shown does NOT');
 { ELIG = [{ts:NOW-20*D,value:54809},{ts:NOW-9*D,value:74506},{ts:NOW,value:75651}];
@@ -85,14 +86,13 @@ console.log('\nCASE 6 — grossReturnPct includes the flow, netReturnPct shown d
   const r = sb._aurixRangeReturn('30d');
   ck('grossDeltaPct > net/ shown deltaPct', r.grossDeltaPct > r.deltaPct + 20, 'gross '+r.grossDeltaPct+' vs net '+r.deltaPct); }
 
-console.log('\nCASE 7 — V2 (_aurixDashSeries) and WSC share the SAME flow-neutral source');
+console.log('\nCASE 7 — V2 (_aurixDashSeries) === the single canonical source renderSeries');
 { ELIG = [{ts:NOW-20*D,value:54809},{ts:NOW-9*D,value:74506},{ts:NOW,value:75651}];
-  FLOWS = [{ts:NOW-10*D, kind:'asset_add', amountUSD:19697}];
-  const ds = sb._aurixDashSeries('30d');                                  // V2 source
-  const wscAdj = sb._aurixFlowNeutralize(ELIG, '30d').adjusted;           // WSC source
-  const same = ds.length===wscAdj.length && ds.every((p,i)=>Math.abs(p.value-wscAdj[i])<1e-6);
-  ck('V2 dash series === WSC adjusted (identical flow-neutral values)', same,
-     'V2['+ds.map(p=>Math.round(p.value))+'] WSC['+wscAdj.map(v=>Math.round(v))+']'); }
+  FLOWS = [{ts:NOW-10*D, kind:'asset_add', amountUSD:19697}]; LIVE = 75651;
+  const ds = sb._aurixDashSeries('30d');                                       // V2 source
+  const canon = sb.getInstitutionalPerformanceSeries('30d').renderSeries;      // single source
+  const same = ds.length===canon.length && ds.every((p,i)=>p.time===canon[i].time && Math.abs(p.value-canon[i].value)<1e-6);
+  ck('V2 dash series === canonical renderSeries (no divergence)', same, 'len '+ds.length+'/'+canon.length); }
 
 console.log('\nDESKTOP == MOBILE — _aurixDashSeries is range-based (no surface branch); _aurixDashSync feeds both ctrls from it.');
 console.log('\nRESULT:', ok ? 'ALL CASES PASS ✓ (against shipped app.js code)' : 'FAIL ✗');

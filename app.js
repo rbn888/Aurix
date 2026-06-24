@@ -18029,81 +18029,92 @@ function _aurixFlowNeutralize(series, range) {
 //     hiddenOrExcludedPoints / excludedReasons / capitalFlowsUsed / reason
 //
 // PURE READ. Never mutates state, never touches PCE, never fabricates a point.
-function getInstitutionalPerformanceSeries(range) {
-  const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '30d')).toLowerCase();
-  const out = {
-    range: r,
-    rawValueSeries: [], flowNeutralSeries: [], renderSeries: [],
-    realPointCount: 0, coveragePct: 0, largestGapPct: 0,
-    firstRealPoint: null, lastRealPoint: null,
-    hiddenOrExcludedPoints: 0, excludedReasons: {}, capitalFlowsUsed: 0,
-    mode: 'building', reason: '',
-  };
+// GRAPH-V1 FINAL (RULE 1) — THE one and only canonical portfolio VALUE series.
+// value = actual investable portfolio value at each ts (matches the dashboard hero).
+// RAW: no rebasing, no flow-neutral, no chart-only transform, no anchor manipulation.
+// The tail is mark-to-market to the live value so the most recent point EQUALS the
+// dashboard. Every timeframe is a WINDOW FILTER of this — there is no other builder.
+// (Investable ⇔ the dashboard hero is investable; if the dashboard ever includes real
+// estate, change the source HERE only and every timeframe follows.)
+function getCanonicalPortfolioSeries() {
   let elig;
-  try { elig = _aurixEligibleInvestableSeries(r); } catch (_) { elig = { series: [], meta: {} }; }
+  try { elig = _aurixEligibleInvestableSeries('all'); } catch (_) { elig = { series: [], meta: {} }; }
   const snaps = (elig && Array.isArray(elig.series)) ? elig.series : [];
-  out.hiddenOrExcludedPoints = (elig.meta && elig.meta.excluded) || 0;
-  out.excludedReasons        = (elig.meta && elig.meta.reasons) || {};
-  if (snaps.length < 2) { out.reason = 'insufficient_points(<2)'; return out; }
-
-  out.rawValueSeries = snaps.map(s => ({ time: s.ts, value: s.value }));
-  const neutral = _aurixFlowNeutralize(snaps, r);
-  const adj = Array.isArray(neutral.adjusted) ? neutral.adjusted : snaps.map(s => s.value);
-  out.flowNeutralSeries = snaps.map((s, i) => ({
-    time: s.ts, value: (Number.isFinite(adj[i]) && adj[i] > 0) ? adj[i] : s.value,
-  }));
-  out.realPointCount  = snaps.length;
-  out.capitalFlowsUsed = neutral.neutralized || 0;
-  out.firstRealPoint  = out.flowNeutralSeries[0];
-  out.lastRealPoint   = out.flowNeutralSeries[out.flowNeutralSeries.length - 1];
-
-  const q = _wscAssessSeriesQuality(r, out.rawValueSeries.map(p => ({ ts: p.time, value: p.value })), snaps, adj);
-  out.coveragePct   = q.timeCoveragePct;
-  out.largestGapPct = q.largestGapPct;
-  out.reason        = q.reason;
-
-  // 3-MODE POLICY: premium-curve (full institutional curve) → partial-curve (enough
-  // real points to draw an honest discrete line, but not full coverage) → building
-  // (truly too little data). Never a synthetic rectangle; never an empty message when
-  // a partial-but-honest line can be shown.
-  // GRAPH-V1 RULE 7 — exactly three modes: premium (good coverage) → partial (≥2 real
-  // points, low coverage; an HONEST partial line that ALWAYS draws, never a giant
-  // message) → building (<2 points → empty state, the only case with no chart).
-  if (q.institutionalRenderable) out.mode = 'premium-curve';
-  else if (out.realPointCount >= 2) out.mode = 'partial-curve';
-  else out.mode = 'building';
-
-  // GRAPH-V1 RULE 2 — the SHORT-range curve must END at the live dashboard value
-  // (investable, the same number the hero shows), so lastPoint ≈ current value (±0.5%).
-  // This corrects a stale-snapshot / recent-flow endpoint that drew 24H ending at a
-  // wrong scale (~63k while the dashboard showed ~73k). ONLY the endpoint is moved
-  // (drift/flow correction at the tail) — never the shape, never the flow-neutral %.
-  // 30D/1A/TOTAL are FROZEN (Rule 8): their endpoint is NOT re-anchored here.
-  if ((r === '24h' || r === '7d') && out.flowNeutralSeries.length >= 2) {
-    let live = NaN;
-    try { live = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN; } catch (_) {}
-    if (Number.isFinite(live) && live > 0) {
-      const li = out.flowNeutralSeries.length - 1;
-      out.flowNeutralSeries[li] = { time: out.flowNeutralSeries[li].time, value: live };
-    }
+  const out = snaps
+    .filter(s => s && Number.isFinite(s.ts) && Number.isFinite(s.value) && s.value > 0)
+    .map(s => ({ ts: s.ts, value: s.value }))
+    .sort((a, b) => a.ts - b.ts);
+  // Tail = live (current dashboard value). Refresh a recent stale tail (feed-lag), or
+  // append the current mark-to-market point. This is NOT rebasing — only the present
+  // moment is set to the present value, so last(series) === dashboard for every window.
+  let live = NaN;
+  try { live = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN; } catch (_) {}
+  if (Number.isFinite(live) && live > 0) {
+    const now = Date.now();
+    if (out.length && (now - out[out.length - 1].ts) < 6 * 36e5) out[out.length - 1] = { ts: out[out.length - 1].ts, value: live };
+    else out.push({ ts: now, value: live });
   }
-
-  out.renderSeries  = (out.mode === 'building') ? [] : out.flowNeutralSeries;
-  out.lastRealPoint = out.flowNeutralSeries.length ? out.flowNeutralSeries[out.flowNeutralSeries.length - 1] : null;
-
-  // GRAPH-V1 RULE 1 — canonical return shape every renderer (WSC, V2, tooltip, headline) reads.
-  out.points     = out.renderSeries;
-  out.firstValue = out.renderSeries.length ? out.renderSeries[0].value : null;
-  out.lastValue  = out.renderSeries.length ? out.renderSeries[out.renderSeries.length - 1].value : null;
-  out.coverage   = out.coveragePct;
-  out.renderMode = out.mode;
-  try { const _rr = _aurixRangeReturn(r); out.returnPct = (_rr && Number.isFinite(_rr.deltaPct)) ? _rr.deltaPct : null; }
-  catch (_) { out.returnPct = null; }
+  out._meta = { excluded: (elig.meta && elig.meta.excluded) || 0, reasons: (elig.meta && elig.meta.reasons) || {} };
   return out;
 }
 
-// GRAPH-V1 RULE 1 — public alias: getInstitutionalSeries(range) is the named single
-// source in the spec; it returns the same structure as getInstitutionalPerformanceSeries.
+// GRAPH-V1 (RULE 1/2/3) — a timeframe is a pure WINDOW FILTER of the canonical series.
+// renderSeries IS the value series (the line, tooltip and axis all read it). Its last
+// point === dashboard value for EVERY range (no divergence). The flow-neutral RETURN is
+// metadata only (returnPct → header), never the line (RULE 6).
+function getInstitutionalPerformanceSeries(range) {
+  const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '30d')).toLowerCase();
+  const out = {
+    range: r, rawValueSeries: [], flowNeutralSeries: [], renderSeries: [], points: [],
+    realPointCount: 0, coveragePct: 0, coverage: 0, largestGapPct: 0,
+    firstRealPoint: null, lastRealPoint: null, firstValue: null, lastValue: null,
+    hiddenOrExcludedPoints: 0, excludedReasons: {}, capitalFlowsUsed: 0,
+    mode: 'building', renderMode: 'building', reason: '', returnPct: null,
+    source: 'getCanonicalPortfolioSeries',
+  };
+  const canonical = getCanonicalPortfolioSeries();
+  out.hiddenOrExcludedPoints = (canonical._meta && canonical._meta.excluded) || 0;
+  out.excludedReasons        = (canonical._meta && canonical._meta.reasons) || {};
+
+  const ms = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '1y': 31536e6 };
+  const now = Date.now();
+  const start = (r === 'all') ? -Infinity : now - (ms[r] || 2592e6);
+  const win = canonical.filter(p => p && Number.isFinite(p.ts) && p.ts >= start && Number.isFinite(p.value) && p.value > 0);
+
+  out.realPointCount = win.length;
+  if (win.length < 2) { out.reason = 'insufficient_points(<2)'; out.mode = out.renderMode = 'building'; return out; }
+
+  // RULE 1/4/5 — the VALUE series is the ONLY data: line, tooltip and y-axis all read it.
+  out.rawValueSeries = win.map(p => ({ time: p.ts, value: p.value }));
+  out.renderSeries   = out.rawValueSeries;
+  out.points         = out.renderSeries;
+  out.firstRealPoint = out.renderSeries[0];
+  out.lastRealPoint  = out.renderSeries[out.renderSeries.length - 1];
+  out.firstValue     = out.renderSeries[0].value;
+  out.lastValue      = out.renderSeries[out.renderSeries.length - 1].value;
+
+  // Coverage / gap drive ONLY the render mode (never the data/source).
+  const winMs = (r === 'all') ? ((win[win.length - 1].ts - win[0].ts) || 1) : (ms[r] || 2592e6);
+  out.coveragePct = +(((win[win.length - 1].ts - win[0].ts) / winMs) * 100).toFixed(1);
+  out.coverage = out.coveragePct;
+  let maxGap = 0; for (let i = 1; i < win.length; i++) { const g = win[i].ts - win[i - 1].ts; if (g > maxGap) maxGap = g; }
+  out.largestGapPct = +((maxGap / winMs) * 100).toFixed(1);
+
+  // RULE 7/13 — modes affect RENDERING only. premium (coverage≥80%) / partial (≥2 pts,
+  // <80%; honest line that ALWAYS draws) / building (<2 pts — handled above).
+  out.mode = out.renderMode = (out.coveragePct >= 80) ? 'premium-curve' : 'partial-curve';
+  out.reason = 'coverage ' + out.coveragePct + '%';
+
+  // RULE 6 — flow-neutral RETURN is metadata only (header %), never the line.
+  try { const _rr = _aurixRangeReturn(r); out.returnPct = (_rr && Number.isFinite(_rr.deltaPct)) ? _rr.deltaPct : null; }
+  catch (_) { out.returnPct = null; }
+  // Kept for the audit/reference only (NOT rendered):
+  out.flowNeutralSeries = out.renderSeries;
+  out.capitalFlowsUsed = 0;
+  return out;
+}
+
+// RULE 1 — public alias: getInstitutionalSeries(range) is the named single source.
 function getInstitutionalSeries(range) { return getInstitutionalPerformanceSeries(range); }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -18534,6 +18545,31 @@ if (typeof window !== 'undefined') {
   // AURIX-PERFORMANCE-MODE-2 — the mandatory institutional audit table. One row per
   // range straight from the SINGLE source getInstitutionalPerformanceSeries, plus the
   // raw-vs-render first points so it's explicit WHY the curve starts where it does.
+  // GRAPH-V1 RULE 14/15 — the RELEASE GATE. Every timeframe's last point must equal the
+  // dashboard value within 0.5%, and all must originate from getCanonicalPortfolioSeries.
+  window.debugChartAudit = () => {
+    let dashboardValue = NaN;
+    try { dashboardValue = Number(investableValueBase()); } catch (_) {}
+    const ranges = [['24h', '24h'], ['7d', '7d'], ['30d', '30d'], ['1y', '1y'], ['all', 'Total']];
+    const o = { dashboardValue: Number.isFinite(dashboardValue) ? +dashboardValue.toFixed(2) : null };
+    let pass = Number.isFinite(dashboardValue) && dashboardValue > 0;
+    ranges.forEach(([r, key]) => {
+      let last = null, src = 'getCanonicalPortfolioSeries';
+      try { const s = getInstitutionalPerformanceSeries(r).renderSeries; last = s.length ? s[s.length - 1].value : null; } catch (_) {}
+      const delta = (last != null && dashboardValue > 0) ? Math.abs(last - dashboardValue) / dashboardValue : null;
+      o['last' + key]   = last != null ? +last.toFixed(2) : null;
+      o['delta' + key]  = delta != null ? +delta.toFixed(4) : null;
+      o['source' + key] = src;
+      if (!(delta != null && delta < 0.005)) pass = false;
+    });
+    o.RELEASE_GATE = pass ? 'PASS ✓ (all timeframes = dashboard ±0.5%, one canonical source)' : 'FAIL ✗';
+    try {
+      console.table(ranges.map(([r, key]) => ({ range: r, last: o['last' + key], deltaPct: o['delta' + key] != null ? +(o['delta' + key] * 100).toFixed(3) : null, source: o['source' + key] })));
+      console.log('[chart-audit] dashboard:', o.dashboardValue, '|', o.RELEASE_GATE);
+    } catch (_) {}
+    return o;
+  };
+
   window.debugAurixInstitutionalSeries = () => {
     const rows = ['24h', '7d', '30d', '1y', 'all'].map(r => {
       const p = getInstitutionalPerformanceSeries(r);

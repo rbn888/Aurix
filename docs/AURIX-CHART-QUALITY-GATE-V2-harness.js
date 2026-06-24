@@ -48,7 +48,7 @@ sb.window = sb;
 vm.createContext(sb);
 [ obj('_WSC_BUCKET_MS'), obj('_WSC_WINDOW_MS'), obj('_WSC_QUALITY'),
   src.match(/const _WSC_LOWDENSITY_MIN = \d+;/)[0],
-  fn('_wscAssessSeriesQuality'), fn('getInstitutionalPerformanceSeries'), fn('getDashboardChartRenderState') ].forEach(c => vm.runInContext(c, sb));
+  fn('_wscAssessSeriesQuality'), fn('getCanonicalPortfolioSeries'), fn('getInstitutionalPerformanceSeries'), fn('getDashboardChartRenderState') ].forEach(c => vm.runInContext(c, sb));
 
 let ok = true; const ck = (n,c,g) => { console.log((c?'  ✓':'  ✗')+' '+n+(g!==undefined?'  ['+g+']':'')); if(!c) ok=false; };
 const run = (range, elig) => { ELIG = elig; return sb.getDashboardChartRenderState(range); };
@@ -69,8 +69,8 @@ console.log('\n24H 2 pts — Rule 7: partial (≥2 draws), not building:');
 { const d = run('24h', cluster(2, 70000));
   ck('state = ready (partial)', d.state === 'ready', d.state); }
 
-console.log('\n1 pt — Rule 7: building (the only no-chart case):');
-{ const d = run('24h', cluster(1, 70000));
+console.log('\nNo history — Rule 7: building (canonical = only the live point → <2 in window):');
+{ const d = run('24h', []);   // empty history; canonical appends live → 1 point → building
   ck('state = building', d.state === 'building', d.state); }
 
 console.log('\nNO REGRESSION — 30D / 1A / TOTAL with enough points stay ready:');
