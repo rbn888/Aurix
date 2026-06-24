@@ -18066,11 +18066,45 @@ function getInstitutionalPerformanceSeries(range) {
   // real points to draw an honest discrete line, but not full coverage) → building
   // (truly too little data). Never a synthetic rectangle; never an empty message when
   // a partial-but-honest line can be shown.
-  if (q.institutionalRenderable) { out.mode = 'premium-curve'; out.renderSeries = out.flowNeutralSeries; }
-  else if (out.realPointCount >= _WSC_LOWDENSITY_MIN) { out.mode = 'partial-curve'; out.renderSeries = out.flowNeutralSeries; }
-  else { out.mode = 'building'; out.renderSeries = []; }
+  // GRAPH-V1 RULE 7 — exactly three modes: premium (good coverage) → partial (≥2 real
+  // points, low coverage; an HONEST partial line that ALWAYS draws, never a giant
+  // message) → building (<2 points → empty state, the only case with no chart).
+  if (q.institutionalRenderable) out.mode = 'premium-curve';
+  else if (out.realPointCount >= 2) out.mode = 'partial-curve';
+  else out.mode = 'building';
+
+  // GRAPH-V1 RULE 2 — the SHORT-range curve must END at the live dashboard value
+  // (investable, the same number the hero shows), so lastPoint ≈ current value (±0.5%).
+  // This corrects a stale-snapshot / recent-flow endpoint that drew 24H ending at a
+  // wrong scale (~63k while the dashboard showed ~73k). ONLY the endpoint is moved
+  // (drift/flow correction at the tail) — never the shape, never the flow-neutral %.
+  // 30D/1A/TOTAL are FROZEN (Rule 8): their endpoint is NOT re-anchored here.
+  if ((r === '24h' || r === '7d') && out.flowNeutralSeries.length >= 2) {
+    let live = NaN;
+    try { live = (typeof investableValueBase === 'function') ? Number(investableValueBase()) : NaN; } catch (_) {}
+    if (Number.isFinite(live) && live > 0) {
+      const li = out.flowNeutralSeries.length - 1;
+      out.flowNeutralSeries[li] = { time: out.flowNeutralSeries[li].time, value: live };
+    }
+  }
+
+  out.renderSeries  = (out.mode === 'building') ? [] : out.flowNeutralSeries;
+  out.lastRealPoint = out.flowNeutralSeries.length ? out.flowNeutralSeries[out.flowNeutralSeries.length - 1] : null;
+
+  // GRAPH-V1 RULE 1 — canonical return shape every renderer (WSC, V2, tooltip, headline) reads.
+  out.points     = out.renderSeries;
+  out.firstValue = out.renderSeries.length ? out.renderSeries[0].value : null;
+  out.lastValue  = out.renderSeries.length ? out.renderSeries[out.renderSeries.length - 1].value : null;
+  out.coverage   = out.coveragePct;
+  out.renderMode = out.mode;
+  try { const _rr = _aurixRangeReturn(r); out.returnPct = (_rr && Number.isFinite(_rr.deltaPct)) ? _rr.deltaPct : null; }
+  catch (_) { out.returnPct = null; }
   return out;
 }
+
+// GRAPH-V1 RULE 1 — public alias: getInstitutionalSeries(range) is the named single
+// source in the spec; it returns the same structure as getInstitutionalPerformanceSeries.
+function getInstitutionalSeries(range) { return getInstitutionalPerformanceSeries(range); }
 
 // ════════════════════════════════════════════════════════════════════════
 // AURIX-RETURN-UNIFY-1 — SINGLE SOURCE OF TRUTH for the timeframe RETURN that
@@ -20056,28 +20090,31 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   // → discrete real points (honest, no synthetic premium curve); 'premium-curve' →
   // full institutional curve below. ('building' was handled at the top.) The % badge
   // above stays intact (it is correct regardless of curve density).
-  if (perf.mode === 'partial-curve') {
-    _wscRenderInsufficient(hostEl, { realPointCount: perf.realPointCount, reason: perf.reason },
-      { mode: 'lowdensity', eligible: snaps, lastGood: _wscGetFreshLastGood(activeRange, Date.now()) });
-    return;
+  // GRAPH-V1 RULE 4/5/7 — 'partial-curve' DRAWS an honest line through the real points
+  // (positioned by real timestamp below); it is NEVER replaced by a giant message —
+  // only 'building' (<2 points, handled at the top) shows the empty state. Premium also
+  // persists Last-Known-Good. Both fall through to the draw.
+  if (perf.mode === 'premium-curve') {
+    try {
+      _wscSaveLastGood(activeRange, {
+        ts: Date.now(), qualityScore: perf.realPointCount,
+        series: adjVals.slice(), tsArr: ts.slice(), percent: deltaPct,
+      });
+    } catch (_) {}
   }
-  // premium-curve → persist Last-Known-Good for fallback, then draw the full curve.
-  try {
-    _wscSaveLastGood(activeRange, {
-      ts: Date.now(), qualityScore: perf.realPointCount,
-      series: adjVals.slice(), tsArr: ts.slice(), percent: deltaPct,
-    });
-  } catch (_) {}
 
-  // WN.3 — uniform temporal series from the flow-neutral investable curve
-  // (aggregate → resample → gap-fill), then gentle despike + smoothing.
-  const series = _wscResample(adjVals, ts, activeRange);
-  const uVals = series.values, uTs = series.timestamps, uN = uVals.length;
-  // WN.11 — adaptive smoothing that PRESERVES micro-fluctuation (never flattens a
-  // real segment into a shelf): light on 24H/7D, medium on 30D/1A/TOTAL.
-  const despiked = _wscDespike(uVals, 3, 3);
+  // GRAPH-V1 RULE 3/6 — SHORT ranges (24H/7D) keep the REAL points (no bucket
+  // aggregation, no resample, no moving-average smoothing) so true microstructure is
+  // preserved — 141 snapshots stay 141, never collapsed to a few straight segments.
+  // LONG ranges (30D/1A/TOTAL) are FROZEN (Rule 8): unchanged aggregate→resample→smooth.
+  const _shortRange = (activeRange === '24h' || activeRange === '7d');
+  let uVals, uTs;
+  if (_shortRange) { uVals = adjVals.slice(); uTs = ts.slice(); }
+  else { const _rs = _wscResample(adjVals, ts, activeRange); uVals = _rs.values; uTs = _rs.timestamps; }
+  const uN = uVals.length;
+  const despiked = _wscDespike(uVals, 3, 3);   // removes only extreme 3σ glitches (kept for both)
   const smoothWin = activeRange === 'all' ? 3 : activeRange === '1y' ? 2 : activeRange === '30d' ? 2 : 1;
-  const plotVals  = _wscMovingAvg(despiked, smoothWin);
+  const plotVals  = _shortRange ? despiked : _wscMovingAvg(despiked, smoothWin);
 
   // Viewport with a REAL value domain (drives accurate y-axis labels).
   const vp = _wscViewport(plotVals, activeRange);
@@ -20095,7 +20132,17 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   // the warp now drives ONLY the data line into the static plotting surface; the
   // background grid/labels no longer follow it (see static-grid block below).
   const aw = _wscActivityWeights(plotVals, activeRange, { mobile: opts.uid === 'm' });
-  const xfrac = (aw.frac && aw.frac.length === uN) ? aw.frac : plotVals.map((_, i) => (uN > 1 ? i / (uN - 1) : 0));
+  // GRAPH-V1 RULE 6 — short ranges position every point by its REAL timestamp (x =
+  // (t − t0)/span), so recent points are NOT compacted to the right by the activity
+  // warp; if data only covers the last 15% of the window, that is shown honestly.
+  // Long ranges keep the premium activity warp (Rule 8 frozen).
+  let xfrac;
+  if (_shortRange) {
+    const _span = (uTs[uN - 1] - uTs[0]) || 1;
+    xfrac = uTs.map(tt => (tt - uTs[0]) / _span);
+  } else {
+    xfrac = (aw.frac && aw.frac.length === uN) ? aw.frac : plotVals.map((_, i) => (uN > 1 ? i / (uN - 1) : 0));
+  }
   const xOf = (tt, i) => padX + xfrac[i] * plotW;
   const pts = plotVals.map((v, i) => ({ x: xOf(uTs[i], i), y: yOf(v) }));
   const _GRID_V_FRACS = [0, 0.25, 0.5, 0.75, 1];                 // WN.17 — static, symmetrical, data-independent
@@ -21183,7 +21230,9 @@ function getDashboardChartRenderState(range) {
     // one verdict, desktop == mobile. Defensive: any failure keeps prior 'ready'.
     try {
       const _perf = getInstitutionalPerformanceSeries(range);
-      if (_perf && _perf.mode !== 'premium-curve') {
+      // GRAPH-V1 RULE 4/7 — V2 draws for premium AND partial (honest sparse line); only
+      // 'building' (<2 points) → empty state. Same verdict as the WSC (single source).
+      if (_perf && _perf.mode === 'building') {
         return { state: 'building', series: [], isRecon: false, qualityGated: true, qualityMode: _perf.mode, qualityReason: _perf.reason };
       }
     } catch (_) { /* gate inert on error → keep prior behaviour */ }

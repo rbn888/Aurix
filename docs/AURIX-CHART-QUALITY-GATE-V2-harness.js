@@ -53,21 +53,24 @@ vm.createContext(sb);
 let ok = true; const ck = (n,c,g) => { console.log((c?'  ✓':'  ✗')+' '+n+(g!==undefined?'  ['+g+']':'')); if(!c) ok=false; };
 const run = (range, elig) => { ELIG = elig; return sb.getDashboardChartRenderState(range); };
 
-console.log('PROOF — V2 getDashboardChartRenderState now shares the WSC gate\n');
+console.log('PROOF — V2 getDashboardChartRenderState shares the single source (GRAPH-V1 3-mode)\n');
 
-console.log('7D low-density (3 pts clustered in ~15min of a 7-day window):');
+console.log('7D partial (3 pts) — GRAPH-V1 Rule 4/7: DRAWS (partial), never a giant message:');
 { const d = run('7d', cluster(3, 70000));
-  ck('state = building (NOT ready)', d.state === 'building', d.state);
-  ck('qualityGated flag set', d.qualityGated === true, d.qualityGated);
-  ck('series empty → _aurixDashSync hits setData([],low_data), no continuous line', (d.series||[]).length === 0, (d.series||[]).length); }
+  ck('state = ready (partial-curve draws)', d.state === 'ready', d.state);
+  ck('series non-empty (honest partial line)', (d.series||[]).length >= 2, (d.series||[]).length); }
 
 console.log('\n7D high-density (10 pts spread across the 7 days):');
 { const d = run('7d', spread(10, 6.8*D, 70000));
-  ck('state = ready (continuous curve allowed)', d.state === 'ready', d.state);
+  ck('state = ready (premium curve)', d.state === 'ready', d.state);
   ck('series drawn', (d.series||[]).length >= 2, (d.series||[]).length); }
 
-console.log('\n24H low-density (2 pts):');
+console.log('\n24H 2 pts — Rule 7: partial (≥2 draws), not building:');
 { const d = run('24h', cluster(2, 70000));
+  ck('state = ready (partial)', d.state === 'ready', d.state); }
+
+console.log('\n1 pt — Rule 7: building (the only no-chart case):');
+{ const d = run('24h', cluster(1, 70000));
   ck('state = building', d.state === 'building', d.state); }
 
 console.log('\nNO REGRESSION — 30D / 1A / TOTAL with enough points stay ready:');
