@@ -6873,17 +6873,18 @@ function computeRangePnL(range) {
     return { abs: currentBase - invested, pct: ((currentBase - invested) / invested) * 100 };
   }
 
-  const data = getChartData(range);
-  if (!data || data.values.length < 2) {
-    // Post-epoch path with no history yet: explicit neutral so the
-    // hero PnL reads 0.00 / 0.0% instead of falling through to the
-    // (stale) cost-basis branch.
-    if (epoch) return { abs: 0, pct: 0 };
-    return null;
+  // AURIX-RETURN-UNIFY-1 — flow-neutral, investable-sourced return (identical to
+  // the hero badge + "Resumen de rendimiento"). Replaces the old raw
+  // (currentBase − firstSnapshot)/firstSnapshot, which counted a capital flow
+  // (deposit/withdrawal/asset add/remove) as market return.
+  const _ret = _aurixRangeReturn(range);
+  if (_ret && _ret.valid && Number.isFinite(_ret.deltaPct)) {
+    return { abs: _ret.deltaAbs, pct: _ret.deltaPct };
   }
-  const past = data.values[0];
-  if (past <= 0) return null;
-  return { abs: currentBase - past, pct: ((currentBase - past) / past) * 100 };
+  // Insufficient clean history for the range. Post-epoch: explicit neutral so the
+  // hero PnL reads 0.00 / 0.0% instead of falling through to the cost-basis branch.
+  if (epoch) return { abs: 0, pct: 0 };
+  return null;
 }
 
 function formatQty(n) {
@@ -16894,27 +16895,39 @@ function _dshContextLine(snap, range) {
   return `${t(phraseKey)} ${t(perKey)}`;
 }
 
-// Pure: derive period stats from the SAME validated series the chart consumes.
-// Returns null when there are < 2 real points for the active range, so the
-// caller renders an honest "Datos insuficientes" state instead of inventing.
+// Pure: derive period stats from the SAME flow-neutral investable series the hero
+// curve consumes. Returns null when there are < 2 real points for the active range,
+// so the caller renders an honest "Datos insuficientes" state instead of inventing.
+//
+// AURIX-RETURN-UNIFY-1 — previously this read getChartData(range) (RAW total net
+// worth) and computed (last−first)/first, so a capital flow (e.g. adding 0.20 BTC)
+// inflated this module's % to ~+19% while the hero — neutralising the same flow —
+// showed ~+0.2%. It now sources the eligible INVESTABLE series + WN.11 flow
+// neutralisation (identical to the hero), so the number matches the badge exactly
+// and a deposit can never read as market return.
 function _dshComputePerfSnapshot(range) {
-  let d;
-  try { d = getChartData(range); } catch (_) { return null; }
-  if (!d || !Array.isArray(d.values)) return null;
+  let elig = null;
+  try { elig = _aurixEligibleInvestableSeries(range); } catch (_) { return null; }
+  const snaps = (elig && Array.isArray(elig.series)) ? elig.series : [];
+  if (snaps.length < 2) return null;
 
+  const neutral = _aurixFlowNeutralize(snaps, range);
+  const adj = neutral.adjusted;
   const vals = [], ts = [];
-  for (let i = 0; i < d.values.length; i++) {
-    const v = d.values[i];
-    if (Number.isFinite(v) && v > 0) { vals.push(v); ts.push(d.timestamps[i]); }
+  for (let i = 0; i < adj.length; i++) {
+    const v = adj[i];
+    if (Number.isFinite(v) && v > 0) { vals.push(v); ts.push(snaps[i].ts); }
   }
   if (vals.length < 2) return null;
 
-  const first = Number.isFinite(d.firstValue) ? d.firstValue : vals[0];
-  const last  = Number.isFinite(d.lastValue)  ? d.lastValue  : vals[vals.length - 1];
+  // Canonical flow-neutral return (shared with hero + computeRangePnL).
+  const _ret = _aurixRangeReturn(range);
+  const first = vals[0];
+  const last  = vals[vals.length - 1];
   const max   = Math.max(...vals);
   const min   = Math.min(...vals);
-  const deltaAbs     = last - first;
-  const deltaPct     = first > 0 ? (deltaAbs / first) * 100 : null;
+  const deltaAbs     = (_ret && Number.isFinite(_ret.deltaAbs)) ? _ret.deltaAbs : (last - first);
+  const deltaPct     = (_ret && Number.isFinite(_ret.deltaPct)) ? _ret.deltaPct : (first > 0 ? ((last - first) / first) * 100 : null);
   const amplitudePct = min > 0 ? ((max - min) / min) * 100 : null;
 
   // Per-period series: collapse to one close per calendar day for multi-day
@@ -17767,6 +17780,101 @@ function _aurixFlowNeutralize(series, range) {
   out.neutralized = out.shapeTransfers + out.recordedNeutralized;
   if (run !== 0) out.adjusted = vals.map((v, i) => v - cum[i] + run);
   return out;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// AURIX-RETURN-UNIFY-1 — SINGLE SOURCE OF TRUTH for the timeframe RETURN that
+// every surface shows (hero WSC badge, "Resumen de rendimiento", computeRangePnL).
+//
+// Forensic context (Wealth-Evolution audit, 2026-06-24): the hero curve already
+// neutralised capital flows (WN.11 _aurixFlowNeutralize over the eligible
+// INVESTABLE series), but "Resumen de rendimiento" computed its % from the RAW
+// total-net-worth series via getChartData(range) — so a $12.5k BTC add read as
+// ~+19% "return" on one surface while the hero (correctly) showed ~+0.2%, and the
+// five timeframes were mutually incompatible. This function makes all surfaces
+// consume the SAME eligible investable series + the SAME flow neutralisation, so:
+//   • a capital flow (deposit/withdrawal/asset add/remove) is NEVER counted as
+//     market return on ANY range (24H/7D/30D/1A/TOTAL),
+//   • Desktop and Mobile read an identical series (the WSC is shared; this is too),
+//   • the window baseline is the first eligible in-window snapshot and no longer
+//     jumps when a flow lands (the step is neutralised, not re-based).
+// PURE READ. Never mutates assets / history / snapshots / storage.
+function _aurixRangeReturn(range) {
+  const r = range || (typeof activeRange !== 'undefined' ? activeRange : '30d');
+  const out = {
+    range: r, valid: false, deltaPct: null, deltaAbs: null,
+    startValue: null, endValue: null, baselineTs: null, lastTs: null,
+    points: 0, netFlowsNeutralized: 0, grossDeltaPct: null, basis: 'insufficient',
+  };
+  let elig = null;
+  try { elig = (typeof _aurixEligibleInvestableSeries === 'function') ? _aurixEligibleInvestableSeries(r) : null; }
+  catch (_) { elig = null; }
+  const snaps = (elig && Array.isArray(elig.series)) ? elig.series : [];
+  if (snaps.length < 2) return out;
+
+  const rawFirst = snaps[0].value, rawLast = snaps[snaps.length - 1].value;
+  const neutral = _aurixFlowNeutralize(snaps, r);
+  const adj = neutral.adjusted;
+  const first = adj[0], last = adj[adj.length - 1];
+
+  out.points     = snaps.length;
+  out.baselineTs = snaps[0].ts;
+  out.lastTs     = snaps[snaps.length - 1].ts;
+  out.startValue = Number.isFinite(first) ? +first.toFixed(2) : null;
+  out.endValue   = Number.isFinite(last)  ? +last.toFixed(2)  : null;
+  out.deltaAbs   = (Number.isFinite(first) && Number.isFinite(last)) ? +(last - first).toFixed(2) : null;
+  out.deltaPct   = (Number.isFinite(first) && first > 0 && Number.isFinite(last)) ? +(((last - first) / first) * 100).toFixed(4) : null;
+  out.grossDeltaPct = (rawFirst > 0) ? +(((rawLast - rawFirst) / rawFirst) * 100).toFixed(4) : null;
+  out.netFlowsNeutralized = +((neutral.totalOffset || 0)).toFixed(2);
+  out.valid = out.deltaPct != null;
+  out.basis = (neutral.neutralized > 0) ? 'flow-neutral' : 'flow-neutral(no-flows-in-window)';
+
+  // OBJETIVO 5 — audit instrumentation. Opt-in (window.AURIX_DEBUG_RETURN === true)
+  // so production stays quiet; window.auditAurixReturn(s) below are always callable.
+  try {
+    if (typeof window !== 'undefined' && window.AURIX_DEBUG_RETURN === true) {
+      console.log('[RETURN-AUDIT]', r,
+        '| baseline:', out.baselineTs ? new Date(out.baselineTs).toISOString() : null, '=', out.startValue,
+        '| final:', out.lastTs ? new Date(out.lastTs).toISOString() : null, '=', out.endValue,
+        '| netFlowsNeutralized:', out.netFlowsNeutralized,
+        '| grossPct:', out.grossDeltaPct, '| shownPct(flow-neutral):', out.deltaPct,
+        '| basis:', out.basis, '| points:', out.points);
+    }
+  } catch (_) {}
+
+  return out;
+}
+
+// AURIX-RETURN-UNIFY-1 — full audit record for one range (OBJETIVO 5). Returns the
+// initial snapshot, final snapshot, every cashflow detected inside the window, the
+// gross (raw) vs net (flow-neutral) return and the % actually shown. Read-only.
+function _aurixAuditRangeReturn(range) {
+  const r = _aurixRangeReturn(range);
+  let flows = [];
+  try {
+    const all = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
+    flows = all.filter(f => f && Number.isFinite(f.ts) && Number.isFinite(f.amountUSD) &&
+      r.baselineTs != null && f.ts > r.baselineTs && f.ts <= r.lastTs);
+  } catch (_) { flows = []; }
+  const netCashflowUSD = flows.reduce((s, f) => s + (Number(f.amountUSD) || 0), 0);
+  return {
+    range: r.range,
+    initialSnapshot: r.baselineTs != null ? { ts: r.baselineTs, when: new Date(r.baselineTs).toISOString(), value: r.startValue } : null,
+    finalSnapshot:   r.lastTs != null     ? { ts: r.lastTs,     when: new Date(r.lastTs).toISOString(),     value: r.endValue }   : null,
+    cashflowsDetected: flows.length,
+    netCashflowUSD: +netCashflowUSD.toFixed(2),
+    cashflows: flows.map(f => ({ kind: f.kind, amountUSD: f.amountUSD, when: new Date(f.ts).toISOString() })),
+    grossReturnPct: r.grossDeltaPct,   // raw value-delta — a deposit WOULD inflate this
+    netReturnPct:   r.deltaPct,        // flow-neutral market return — what is SHOWN
+    displayedPct:   r.deltaPct,
+    points: r.points,
+    basis: r.basis,
+  };
+}
+
+if (typeof window !== 'undefined') {
+  window.auditAurixReturn  = (range) => { const a = _aurixAuditRangeReturn(range || (typeof activeRange !== 'undefined' ? activeRange : '30d')); try { console.log('[RETURN-AUDIT]', a); if (a.cashflows && a.cashflows.length) console.table(a.cashflows); } catch (_) {} return a; };
+  window.auditAurixReturns = () => { const rows = ['24h', '7d', '30d', '1y', 'all'].map(_aurixAuditRangeReturn); try { console.table(rows.map(x => ({ range: x.range, gross: x.grossReturnPct, shown: x.netReturnPct, flows: x.cashflowsDetected, netUSD: x.netCashflowUSD, basis: x.basis }))); } catch (_) {} return rows; };
 }
 
 // Compact axis value label, e.g. 61.2k / 1.84M. No currency token (clean).
@@ -19555,9 +19663,12 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
 
   // Performance return over the range (NOT capital added/removed). deltaAbs is the
   // performance gain/loss EQUIVALENT in the current-capital base.
-  const first = adjVals[0], last = adjVals[adjVals.length - 1];
-  const deltaAbs = last - first;
-  const deltaPct = first > 0 ? (deltaAbs / first) * 100 : 0;
+  // AURIX-RETURN-UNIFY-1 — the METRIC is taken from the single canonical return
+  // function so this badge, "Resumen de rendimiento" and computeRangePnL are
+  // byte-identical. The CURVE below still uses adjVals (the same neutralised series).
+  const _ret = _aurixRangeReturn(activeRange);
+  const deltaAbs = (_ret && Number.isFinite(_ret.deltaAbs)) ? _ret.deltaAbs : (adjVals[adjVals.length - 1] - adjVals[0]);
+  const deltaPct = (_ret && Number.isFinite(_ret.deltaPct)) ? _ret.deltaPct : (adjVals[0] > 0 ? ((adjVals[adjVals.length - 1] - adjVals[0]) / adjVals[0]) * 100 : 0);
   const tone = deltaPct > 0.005 ? 'up' : deltaPct < -0.005 ? 'down' : 'flat';
 
   // Metric: % performance return / currency performance equivalent (same series).
