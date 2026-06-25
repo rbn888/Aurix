@@ -18891,10 +18891,12 @@ function downsampleAurixLTTB(points, targetPointCount) {
 
 // §4 — real timestamp scale. x is proportional to the real timestamp (NEVER the
 // array index): equal durations map to equal pixel distances.
-function computeAurixTimeScale(points, viewportWidth) {
+function computeAurixTimeScale(points, viewportWidth, box) {
   const vw = Math.max(240, Math.min(4000, Number(viewportWidth) || 390));
-  const pad = vw * _AURIX_RC_PAD_FRAC;
-  const left = pad, right = Math.max(left + 1, vw - pad), width = right - left;
+  let left, right;
+  if (box && Number.isFinite(box.left) && Number.isFinite(box.right)) { left = box.left; right = Math.max(box.left + 1, box.right); }
+  else { const pad = vw * _AURIX_RC_PAD_FRAC; left = pad; right = Math.max(left + 1, vw - pad); }
+  const width = right - left;
   const xMin = points.length ? points[0].time : 0;
   const xMax = points.length ? points[points.length - 1].time : 1;
   const span = (xMax - xMin) || 1;
@@ -18904,10 +18906,12 @@ function computeAurixTimeScale(points, viewportWidth) {
 // §5 — value scale. Adds a visual margin so the real max/min are never clipped,
 // keeps the last point legible, and never artificially exaggerates volatility
 // (plain linear domain — no regime-relative zoom here).
-function computeAurixValueScale(points, viewportHeight) {
+function computeAurixValueScale(points, viewportHeight, box) {
   const vh = Math.max(120, Math.min(2000, Number(viewportHeight) || 220));
-  const vpad = vh * _AURIX_IR_VPAD_FRAC;
-  const top = vpad, bottom = vh - vpad, band = Math.max(1, bottom - top);
+  let top, bottom;
+  if (box && Number.isFinite(box.top) && Number.isFinite(box.bottom)) { top = box.top; bottom = Math.max(box.top + 1, box.bottom); }
+  else { const vpad = vh * _AURIX_IR_VPAD_FRAC; top = vpad; bottom = vh - vpad; }
+  const band = Math.max(1, bottom - top);
   let vMin = Infinity, vMax = -Infinity;
   for (const p of points) { if (p.value < vMin) vMin = p.value; if (p.value > vMax) vMax = p.value; }
   if (!Number.isFinite(vMin)) { vMin = 0; vMax = 1; }
@@ -18992,7 +18996,7 @@ function _aurixSplitAtGaps(points, gaps) {
 
 // §2 — MAIN. Reads ONLY prepareAurixVisualSeries(range, viewportWidth) and turns
 // the PreparedSeries into an institutional curve object. Pure / deterministic.
-function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight) {
+function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, layout) {
   const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '30d')).toLowerCase();
   let vw = Number(viewportWidth);
   if (!(vw > 0)) { try { vw = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 390; } catch (_) { vw = 390; } }
@@ -19003,8 +19007,11 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight) {
   const srcPts = Array.isArray(prepared.preparedPoints) ? prepared.preparedPoints : [];
   const target = prepared.targetPointCount;
   const visiblePoints = downsampleAurixLTTB(srcPts, target);
-  const xScale = computeAurixTimeScale(visiblePoints, vw);
-  const yScale = computeAurixValueScale(visiblePoints, vh);
+  // SPEC 4 — optional pixel box (left/right/top/bottom) so a host surface (WSC)
+  // can have the engine map straight into its own plot box. Backward compatible:
+  // without `layout`, the engine uses its own padding (SPEC 3 behaviour).
+  const xScale = computeAurixTimeScale(visiblePoints, vw, layout);
+  const yScale = computeAurixValueScale(visiblePoints, vh, layout);
   const scale = { xMin: xScale.xMin, xMax: xScale.xMax, yMin: yScale.yMin, yMax: yScale.yMax,
     x: xScale.x, y: yScale.y, top: yScale.top, bottom: yScale.bottom };
 
@@ -19066,12 +19073,20 @@ if (typeof window !== 'undefined') {
     const m = rc.renderMeta;
     const status = (m.lastDeltaPct != null && Math.abs(m.lastDeltaPct) <= 0.5) ? 'ok'
       : (m.pointCountAfter < 2 ? 'building' : 'review');
+    // SPEC 4 §9 — live WSC integration state (from the last paint of this range, if any).
+    let st = null;
+    try { const all = window._aurixWscRenderState || {}; const d = all.d; if (d && d.range === rc.range) st = d; } catch (_) {}
     return {
       range: rc.range, pointCountBefore: m.pointCountBefore, pointCountAfter: m.pointCountAfter,
       targetPointCount: m.targetPointCount, downsampling: m.downsampling, interpolation: m.interpolation,
       gaps: rc.gapSegments.length, eventMarkers: rc.eventMarkers.length,
       lastValue: m.lastValue, dashboardValue: m.dashboardValue, lastDeltaPct: m.lastDeltaPct,
       scaleYMin: rc.scale.yMin, scaleYMax: rc.scale.yMax, status,
+      visibleEnabled: _aurixInstitutionalRenderVisible(),
+      usedFallback: st ? st.usedFallback : null, fallbackReason: st ? (st.fallbackReason || '') : null,
+      pathAppliedToWSC: st ? st.pathAppliedToWSC : null, areaAppliedToWSC: st ? st.areaAppliedToWSC : null,
+      gapSegmentsRendered: st ? st.gapSegmentsRendered : rc.gapSegments.length,
+      eventMarkersRendered: st ? st.eventMarkersRendered : 0,
     };
   };
   window.debugAurixInstitutionalRender = (range) => {
@@ -21069,6 +21084,65 @@ function _wscRegimeYScale(values, range, timestamps) {
 // Paint one surface: write the range-change metric into changeEl (the span
 // under the title) and render the SVG curve into hostEl. opts.tooltip enables
 // the desktop hover read; opts.uid namespaces the gradient id.
+// ════════════════════════════════════════════════════════════════════════
+// AURIX — SPEC 4: VISIBLE INTEGRATION OF THE INSTITUTIONAL RENDER ENGINE
+//
+// Connects renderAurixInstitutionalChart() to the visible WSC surfaces (desktop
+// #perfSnapshot + mobile #wealthCurveMobile) — SAFELY, behind a reversible flag,
+// with an automatic fallback to the legacy WSC geometry. It improves ONLY the
+// drawing path (line/area/Y-labels/tooltip-source); it NEVER touches the canonical
+// series, snapshots, write guard, PCE, dashboard value, pricing or financial logic,
+// and it does NOT modify global CSS. V2 / legacy Chart.js are untouched.
+const AURIX_INSTITUTIONAL_RENDER_VISIBLE = true;
+function _aurixInstitutionalRenderVisible() {
+  try { if (typeof window !== 'undefined' && typeof window.AURIX_INSTITUTIONAL_RENDER_VISIBLE === 'boolean') return window.AURIX_INSTITUTIONAL_RENDER_VISIBLE; } catch (_) {}
+  return AURIX_INSTITUTIONAL_RENDER_VISIBLE;
+}
+
+// Pure decision: should the WSC draw the engine path, and is it valid? Returns the
+// path to use (engine or the legacy fallback) plus the reporting flags. NEVER throws
+// (any failure → safe fallback + reason). Kept separate from _wscPaintSurface so the
+// harness can validate the integration logic without a DOM.
+function _aurixWscInstitutionalSelect(range, W, H, box, fallback) {
+  const out = {
+    visibleEnabled: false, usedFallback: false, fallbackReason: '',
+    pathAppliedToWSC: false, areaAppliedToWSC: false,
+    gapSegmentsRendered: 0, eventMarkersRendered: 0,
+    linePath: fallback ? fallback.linePath : '', areaPath: fallback ? fallback.areaPath : '', rendered: null,
+  };
+  if (!_aurixInstitutionalRenderVisible()) return out;           // flag off → legacy geometry
+  out.visibleEnabled = true;
+  try {
+    const rendered = renderAurixInstitutionalChart(range, W, H, box);
+    const okPath = rendered && typeof rendered.pathData === 'string' && rendered.pathData.length >= 4 &&
+      typeof rendered.areaPathData === 'string' && rendered.areaPathData.length >= 4 &&
+      Array.isArray(rendered.visiblePoints) && rendered.visiblePoints.length >= 2;
+    if (!okPath) { out.usedFallback = true; out.fallbackReason = rendered ? 'invalid_path' : 'no_result'; return out; }
+    const ld = rendered.renderMeta ? rendered.renderMeta.lastDeltaPct : null;
+    if (ld != null && Math.abs(ld) > 0.5) { out.usedFallback = true; out.fallbackReason = 'last_point_diverged'; return out; }
+    out.rendered = rendered;
+    out.linePath = rendered.pathData; out.areaPath = rendered.areaPathData;
+    out.pathAppliedToWSC = true; out.areaAppliedToWSC = true;
+    out.gapSegmentsRendered = (rendered.gapSegments || []).length;
+    out.eventMarkersRendered = 0;   // §6 — markers prepared (in rendered.eventMarkers) but NOT drawn this phase
+  } catch (e) { out.usedFallback = true; out.fallbackReason = 'exception:' + ((e && e.message) || 'err'); }
+  return out;
+}
+
+// Y-axis labels from the engine's LINEAR scale (rendered.scale), placed at the
+// static WSC grid positions so labels and the engine curve stay aligned.
+function _wscEngineYLabels(scale, vp, H, maxLabels) {
+  const top = vp.top, bot = vp.bot, band = (bot - top) || 1;
+  const yMin = scale.yMin, yMax = scale.yMax, dom = (yMax - yMin) || 1;
+  const valAt = y => yMin + ((bot - y) / band) * dom;
+  const fracs = (maxLabels && maxLabels <= 3) ? [0, 0.5, 1] : [0, 1 / 3, 2 / 3, 1];
+  const ys = fracs.map(f => top + band * f), vals = ys.map(valAt);
+  const step = _wscNiceStep(Math.abs(vals[0] - vals[vals.length - 1]) || dom, fracs.length);
+  const seen = new Set(), out = [];
+  ys.forEach((y, i) => { const text = _wscFmtAxisValStep(vals[i], step); if (seen.has(text)) return; seen.add(text); out.push({ y, value: vals[i], text }); });
+  return { labels: out };
+}
+
 function _wscPaintSurface(changeEl, hostEl, opts) {
   if (!hostEl) return;
   opts = opts || {};
@@ -21256,6 +21330,46 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   const _polish = _wscRenderPolish(activeRange, opts.uid === 'm', tone);
   if (typeof window !== 'undefined' && window._aurixChartMode) window._aurixChartMode.renderPolish = _polish;
 
+  // ── SPEC 4 — Institutional Render Engine (visible, flagged, reversible) ──────
+  // When enabled, the engine maps the canonical series into THIS plot box and the
+  // line/area/Y-labels/tooltip ride its premium output (real-timestamp X, LTTB,
+  // monotone no-overshoot, gap-broken subpaths). On any failure → legacy geometry.
+  // Grid, glow, CSS and the financial pipeline above are untouched.
+  let _linePathFinal = linePath, _areaPathFinal = areaPath, _yLabelsFinal = yLabels;
+  let _ttSampleX = pts.map(p => p.x), _ttSampleY = pts.map(p => p.y), _ttVal = plotVals, _ttTs = uTs;
+  const _instBox = { left: padL, right: W - padR, top: vp.top, bottom: vp.bot };
+  const _inst = _aurixWscInstitutionalSelect(activeRange, W, H, _instBox, { linePath, areaPath });
+  if (_inst.usedFallback) { try { console.warn('[AURIX][institutional-render] fallback', { range: activeRange, reason: _inst.fallbackReason }); } catch (_) {} }
+  if (_inst.rendered) {
+    _linePathFinal = _inst.linePath; _areaPathFinal = _inst.areaPath;
+    const sc = _inst.rendered.scale;
+    try { _yLabelsFinal = _wscEngineYLabels(sc, vp, H, _isMobile ? 3 : 4).labels
+      .map(tk => `<span class="wsc-ylab" style="top:${(tk.y / H * 100).toFixed(2)}%">${tk.text}</span>`).join(''); } catch (_) {}
+    // Tooltip rides the engine's REAL visible points (mapped through the same box).
+    const bw = (_instBox.right - _instBox.left), bh = (_instBox.bottom - _instBox.top);
+    const dx = (sc.xMax - sc.xMin) || 1, dy = (sc.yMax - sc.yMin) || 1;
+    _ttSampleX = _inst.rendered.visiblePoints.map(p => _instBox.left + ((p.time - sc.xMin) / dx) * bw);
+    _ttSampleY = _inst.rendered.visiblePoints.map(p => _instBox.bottom - ((p.value - sc.yMin) / dy) * bh);
+    _ttVal = _inst.rendered.visiblePoints.map(p => p.value);
+    _ttTs  = _inst.rendered.visiblePoints.map(p => p.time);
+    if (typeof window !== 'undefined' && window._aurixChartMode) {
+      window._aurixChartMode.institutionalRender = {
+        applied: true, pointCountAfter: _inst.rendered.renderMeta.pointCountAfter,
+        interpolation: _inst.rendered.renderMeta.interpolation, gapSegments: _inst.gapSegmentsRendered,
+        overshoot: !!_inst.rendered.renderMeta.overshootDetected,
+      };
+    }
+  }
+  if (typeof window !== 'undefined') {
+    window._aurixWscRenderState = window._aurixWscRenderState || {};
+    window._aurixWscRenderState[opts.uid || 'd'] = {
+      range: activeRange, visibleEnabled: _inst.visibleEnabled, usedFallback: _inst.usedFallback,
+      fallbackReason: _inst.fallbackReason, pathAppliedToWSC: _inst.pathAppliedToWSC,
+      areaAppliedToWSC: _inst.areaAppliedToWSC, gapSegmentsRendered: _inst.gapSegmentsRendered,
+      eventMarkersRendered: _inst.eventMarkersRendered,
+    };
+  }
+
   hostEl.innerHTML = `
     <div class="wsc wsc-${tone}">
       <div class="wsc-plot">
@@ -21269,10 +21383,10 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
             </filter>
           </defs>
           ${grid}
-          <path class="wsc-area" d="${areaPath}" fill="url(#wscArea-${uid})" style="opacity:${_polish.areaOpacity}"/>
-          <path class="wsc-line" d="${linePath}" fill="none" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision" style="stroke-width:${_polish.strokeWidth}px" filter="url(#wscGlow-${uid})"/>
+          <path class="wsc-area" d="${_areaPathFinal}" fill="url(#wscArea-${uid})" style="opacity:${_polish.areaOpacity}"/>
+          <path class="wsc-line" d="${_linePathFinal}" fill="none" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision" style="stroke-width:${_polish.strokeWidth}px" filter="url(#wscGlow-${uid})"/>
         </svg>
-        <div class="wsc-ylabs">${yLabels}</div>
+        <div class="wsc-ylabs">${_yLabelsFinal}</div>
         <div class="wsc-xlabs">${xLabels}</div>
       </div>
     </div>`;
@@ -21285,11 +21399,11 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
     // for pixel-smooth updates. Same base as the Hero; real estate never enters.
     const plot = hostEl.querySelector('.wsc-plot');
     _wscAttachTooltip(plot, {
-      sampleX: pts.map(p => p.x),
-      sampleY: pts.map(p => p.y),
-      sampleVal: plotVals,         // adjusted values the line is drawn from
-      sampleTs: uTs,               // resampled timestamps
-      n: pts.length, deltaPct, range: activeRange,
+      sampleX: _ttSampleX,
+      sampleY: _ttSampleY,
+      sampleVal: _ttVal,           // values the drawn line represents (engine: real visible points)
+      sampleTs: _ttTs,             // matching timestamps
+      n: _ttSampleX.length, deltaPct, range: activeRange,
     });
   }
 }
@@ -21316,6 +21430,13 @@ function renderWealthCurve(animate) {
 // (data refresh, range change, unit toggle) now drives the wealth curve.
 function _dshRenderPerfSnapshot(animate) {
   renderWealthCurve(animate);
+}
+
+// SPEC 4 — console controls to flip the visible Institutional Render on/off and
+// repaint immediately (compare on-device with NO redeploy, fully data-safe).
+if (typeof window !== 'undefined') {
+  window.enableAurixInstitutionalRender = () => { window.AURIX_INSTITUTIONAL_RENDER_VISIBLE = true; try { renderWealthCurve(false); } catch (_) {} console.log('[AURIX][institutional-render] VISIBLE = true'); return true; };
+  window.disableAurixInstitutionalRender = () => { window.AURIX_INSTITUTIONAL_RENDER_VISIBLE = false; try { renderWealthCurve(false); } catch (_) {} console.log('[AURIX][institutional-render] VISIBLE = false (legacy WSC geometry)'); return false; };
 }
 
 // ── Chart ──────────────────────────────────────────────────
