@@ -18991,7 +18991,19 @@ function _aurixSplitAtGaps(points, gaps) {
       points[i - 1].time <= g.start && points[i].time >= g.end);
     if (brk) { runs.push(cur); cur = [points[i]]; } else cur.push(points[i]);
   }
-  runs.push(cur); return runs;
+  runs.push(cur);
+  // Coalesce singleton runs into a neighbour: a lone point can't be a line/area
+  // subpath (it would emit an invisible M-only path with no matching area), and an
+  // isolated FINAL point would leave the dashboard point undrawn. Merging keeps the
+  // last point connected+visible and the area an exact mirror of the line. Edge case
+  // only (a point bracketed by two real gaps); does not change any value/timestamp.
+  for (let i = runs.length - 1; i >= 0; i--) {
+    if (runs[i].length === 1) {
+      if (i > 0) { runs[i - 1] = runs[i - 1].concat(runs[i]); runs.splice(i, 1); }
+      else if (runs.length > 1) { runs[1] = runs[i].concat(runs[1]); runs.splice(i, 1); }
+    }
+  }
+  return runs;
 }
 
 // §2 — MAIN. Reads ONLY prepareAurixVisualSeries(range, viewportWidth) and turns
@@ -19098,6 +19110,74 @@ if (typeof window !== 'undefined') {
   window.debugAurixInstitutionalRenderAll = () => {
     const rows = ['24h', '7d', '30d', '1y', 'all'].map(r => renderAurixInstitutionalChart(r));
     try { console.table(rows.map(_irRow)); } catch (_) {}
+    return rows;
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// AURIX — SPEC 5: RENDER POLISH (precision audit — render layer ONLY)
+//
+// Verifies the VISUAL PRECISION invariants of the Institutional Render Engine
+// output. PURE READ of the render layer — it NEVER touches the canonical series,
+// snapshots, write guard, dashboard, PCE, pricing or financial logic. It covers
+// every precision item that is provable in code (last-point alignment, area ===
+// line base, start/end closure, monotone no-overshoot, in-plot/no-clipping,
+// dashboard-locked last point, tooltip knots on the path). The remaining SPEC 5
+// items (Retina scaling, antialiasing, glow uniformity, FPS) are visual/on-device
+// checks for SPEC 7 — this audit is the objective, automatable half.
+const _AURIX_RP_AUDIT_BOX = { left: 60, right: 940, top: 24, bottom: 211.2 };   // representative WSC desktop box
+function auditAurixRenderPrecision(range, viewportWidth, viewportHeight, box) {
+  const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '30d')).toLowerCase();
+  const W = Number(viewportWidth) || 1000, H = Number(viewportHeight) || 240;
+  const bx = box || _AURIX_RP_AUDIT_BOX;
+  const out = { range: r, box: bx, checks: {}, failures: [], status: 'building' };
+  let rendered;
+  try { rendered = renderAurixInstitutionalChart(r, W, H, bx); }
+  catch (e) { out.failures.push('render_threw:' + ((e && e.message) || 'err')); out.status = 'fail'; return out; }
+  const vp = rendered.visiblePoints || [], sc = rendered.scale, m = rendered.renderMeta;
+  if (vp.length < 2 || !rendered.pathData) { out.failures.push('insufficient_points'); return out; }
+
+  const dx = (sc.xMax - sc.xMin) || 1, dy = (sc.yMax - sc.yMin) || 1, bw = bx.right - bx.left, bh = bx.bottom - bx.top;
+  const xPix = t => bx.left + ((t - sc.xMin) / dx) * bw;             // SAME map the WSC tooltip uses
+  const yPix = v => bx.bottom - ((v - sc.yMin) / dy) * bh;
+  const nums = (rendered.pathData.match(/-?\d+(?:\.\d+)?/g) || []).map(Number);
+  const firstX = nums[0], firstY = nums[1], lastX = nums[nums.length - 2], lastY = nums[nums.length - 1];
+  const near = (a, b, e) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= (e == null ? 0.06 : e);
+  const first = vp[0], last = vp[vp.length - 1];
+
+  out.checks.lastXAtRightEdge   = near(xPix(last.time), bx.right);
+  out.checks.lastValueIsDashboard = (m.lastValue === m.dashboardValue) && (m.lastDeltaPct == null || Math.abs(m.lastDeltaPct) <= 0.5);
+  out.checks.lastKnotOnPath     = near(lastX, xPix(last.time)) && near(lastY, yPix(last.value));
+  out.checks.pathStartsWithMove = /^M /.test(rendered.pathData);
+  out.checks.firstKnotOnPath    = near(firstX, xPix(first.time)) && near(firstY, yPix(first.value));
+  const subpaths = rendered.pathData.split(/(?=M )/).map(s => s.trim()).filter(Boolean);
+  out.checks.areaSharesLineBase = subpaths.every(sp => rendered.areaPathData.indexOf(sp) >= 0);
+  out.checks.areaClosed         = /Z\s*$/.test(rendered.areaPathData.trim());
+  out.checks.noOvershoot        = m.overshootDetected === false;
+  let within = true;
+  for (const p of vp) { const x = xPix(p.time), y = yPix(p.value); if (x < bx.left - 0.5 || x > bx.right + 0.5 || y < bx.top - 0.5 || y > bx.bottom + 0.5) { within = false; break; } }
+  out.checks.knotsWithinPlot    = within;
+  out.checks.tooltipKnotsOnPath = out.checks.firstKnotOnPath && out.checks.lastKnotOnPath;
+
+  Object.keys(out.checks).forEach(k => { if (!out.checks[k]) out.failures.push(k); });
+  out.status = out.failures.length === 0 ? 'institutional-precision' : 'imprecise';
+  return out;
+}
+if (typeof window !== 'undefined') {
+  window.debugAurixRenderPrecision = (range) => {
+    const a = auditAurixRenderPrecision(range || (typeof activeRange !== 'undefined' ? activeRange : '30d'));
+    try { console.table([Object.assign({ range: a.range, status: a.status, failures: (a.failures || []).join('|') || '—' }, a.checks)]); } catch (_) {}
+    return a;
+  };
+  window.debugAurixRenderPrecisionAll = () => {
+    const rows = ['24h', '7d', '30d', '1y', 'all'].map(r => auditAurixRenderPrecision(r));
+    try {
+      console.table(rows.map(a => ({
+        range: a.range, status: a.status, lastDash: a.checks.lastValueIsDashboard, lastAligned: a.checks.lastKnotOnPath,
+        areaEqPath: a.checks.areaSharesLineBase, closed: a.checks.areaClosed, noOvershoot: a.checks.noOvershoot,
+        inPlot: a.checks.knotsWithinPlot, fails: (a.failures || []).join('|') || '—',
+      })));
+    } catch (_) {}
     return rows;
   };
 }
@@ -20108,13 +20188,22 @@ function _wscAttachTooltip(plot, model) {
     const r = plot.getBoundingClientRect();
     if (!r.width || N < 2) return;
     const vx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * _WSC_VIEW_W;
-    // Interpolate between the two bracketing dense samples → pixel-smooth hover.
     let k = 0; while (k < N - 2 && sx[k + 1] < vx) k++;
-    const f = Math.min(1, Math.max(0, (vx - sx[k]) / ((sx[k + 1] - sx[k]) || 1)));
-    const vbX = sx[k] + (sx[k + 1] - sx[k]) * f;
-    const vbY = sy[k] + (sy[k + 1] - sy[k]) * f;
-    const val = sv[k] + (sv[k + 1] - sv[k]) * f;      // ADJUSTED value the line represents
-    const tts = st[k] + (st[k + 1] - st[k]) * f;
+    let vbX, vbY, val, tts;
+    if (model.snapToPoint) {
+      // SPEC 5 — institutional precision: snap the cursor to the NEAREST real point,
+      // so the dot sits EXACTLY on a true data point and on the rendered path knot
+      // (no mid-segment chord drift). Used when the engine path drives the curve.
+      if (k < N - 1 && Math.abs(sx[k + 1] - vx) < Math.abs(sx[k] - vx)) k++;
+      vbX = sx[k]; vbY = sy[k]; val = sv[k]; tts = st[k];
+    } else {
+      // Legacy: interpolate between the two bracketing dense samples → pixel-smooth hover.
+      const f = Math.min(1, Math.max(0, (vx - sx[k]) / ((sx[k + 1] - sx[k]) || 1)));
+      vbX = sx[k] + (sx[k + 1] - sx[k]) * f;
+      vbY = sy[k] + (sy[k + 1] - sy[k]) * f;
+      val = sv[k] + (sv[k + 1] - sv[k]) * f;      // ADJUSTED value the line represents
+      tts = st[k] + (st[k + 1] - st[k]) * f;
+    }
     const px = (vbX / _WSC_VIEW_W) * r.width;
     const py = (vbY / _WSC_VIEW_H) * r.height;
     hairV.style.transform = `translateX(${px}px)`;
@@ -21386,7 +21475,7 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
             </filter>
           </defs>
           ${grid}
-          <path class="wsc-area" d="${_areaPathFinal}" fill="url(#wscArea-${uid})" style="opacity:${_polish.areaOpacity}"/>
+          <path class="wsc-area" d="${_areaPathFinal}" fill="url(#wscArea-${uid})" shape-rendering="geometricPrecision" style="opacity:${_polish.areaOpacity}"/>
           <path class="wsc-line" d="${_linePathFinal}" fill="none" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision" style="stroke-width:${_polish.strokeWidth}px" filter="url(#wscGlow-${uid})"/>
         </svg>
         <div class="wsc-ylabs">${_yLabelsFinal}</div>
@@ -21407,6 +21496,7 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
       sampleVal: _ttVal,           // values the drawn line represents (engine: real visible points)
       sampleTs: _ttTs,             // matching timestamps
       n: _ttSampleX.length, deltaPct, range: activeRange,
+      snapToPoint: !!(_inst && _inst.rendered),   // SPEC 5 — exact on-point cursor when engine drives the path
     });
   }
 }
