@@ -22,15 +22,9 @@ function decideOld(build, store) {            // store: {local, sReload}
   } else if (!stored) { store.local = build; }
   return false;
 }
-function decideNew(build, store) {             // store: {local, sCount}
-  const stored = store.local;
-  if (stored && stored !== build) {
-    const rc = store.sCount || 0;
-    store.local = build;                       // always converge the stored build
-    if (rc < 1) { store.sCount = rc + 1; return true; }
-    return false;                             // cap reached → proceed (never loop)
-  } else if (!stored) { store.local = build; }
-  return false;
+function decideNew(build, store) {             // v355 hardfix: NEVER reload (record only)
+  store.local = build;                         // record the build; best-effort cleanup is non-blocking
+  return false;                                // → the app always boots; no reload, no loop possible
 }
 
 // simulate loads: buildSeq(i) returns the AURIX_BUILD the page reports on load i
@@ -52,34 +46,33 @@ console.log('AURIX P0 — Mobile boot reload guard\n');
 // stale-cached index.html flip-flops between fresh v354 and cached v353
 const flip = i => (i % 2 === 0) ? 'v354' : 'v353';
 
-console.log('FLIP-FLOP (stale cache) — OLD guard loops, NEW guard boots:');
+console.log('FLIP-FLOP (stale cache) — OLD guard loops forever, NEW guard never reloads:');
 { const old = simulate(decideOld, { local: 'v352', sReload: null }, flip, 60);
   ck('OLD never boots (infinite reload)', old.booted === false && old.reloads >= 60, 'reloads=' + old.reloads + ' booted=' + old.booted);
-  const neu = simulate(decideNew, { local: 'v352', sCount: 0 }, flip, 60);
-  ck('NEW boots', neu.booted === true);
-  ck('NEW reloads <= 1 (loop-proof)', neu.reloads <= 1, 'reloads=' + neu.reloads); }
+  const neu = simulate(decideNew, { local: 'v352' }, flip, 60);
+  ck('NEW boots on first load', neu.booted === true);
+  ck('NEW never reloads (no loop possible by construction)', neu.reloads === 0, 'reloads=' + neu.reloads); }
 
-console.log('\nNORMAL UPGRADE (stable fresh build) — exactly one reload, then boots:');
-{ const neu = simulate(decideNew, { local: 'v352', sCount: 0 }, () => 'v354', 10);
-  ck('boots', neu.booted === true);
-  ck('exactly 1 reload (cache purge once)', neu.reloads === 1, 'reloads=' + neu.reloads); }
+console.log('\nNORMAL UPGRADE / FIRST VISIT / SAME BUILD — always boots, never reloads:');
+{ for (const [label, store, seq] of [
+    ['upgrade', { local: 'v354' }, () => 'v355'],
+    ['first visit', { local: null }, () => 'v355'],
+    ['same build', { local: 'v355' }, () => 'v355'],
+  ]) {
+    const neu = simulate(decideNew, store, seq, 10);
+    ck(label + ' → boots, 0 reloads', neu.booted === true && neu.reloads === 0, 'reloads=' + neu.reloads);
+  } }
 
-console.log('\nFIRST-EVER VISIT (no stored build) — no reload:');
-{ const neu = simulate(decideNew, { local: null, sCount: 0 }, () => 'v354', 10);
-  ck('boots immediately', neu.booted === true && neu.reloads === 0, 'reloads=' + neu.reloads); }
-
-console.log('\nSAME BUILD (no change) — no reload:');
-{ const neu = simulate(decideNew, { local: 'v354', sCount: 0 }, () => 'v354', 10);
-  ck('boots immediately', neu.booted === true && neu.reloads === 0); }
-
-console.log('\nLIVE FILES — loop-proof guard present, old per-build guard removed:');
+console.log('\nLIVE FILES — no reload in the boot guard; old guards removed; diagnostic present:');
 { const root = path.join(__dirname, '..');
   for (const f of ['index.html', 'login.html', 'reset-password.html', 'reset.html']) {
     const s = fs.readFileSync(path.join(root, f), 'utf8');
-    const hasCap = s.indexOf('aurix_build_reload_count') >= 0 && /rc\s*<\s*1/.test(s);
-    const noOld = s.indexOf("'aurix_build_reload'") < 0 && s.indexOf('alreadyReloaded') < 0;
-    ck(f + ' has reload-count cap + old guard removed', hasCap && noOld, hasCap ? (noOld ? 'ok' : 'old guard remains') : 'cap missing');
-  } }
+    const noReload = s.indexOf('window.location.reload') < 0;
+    const noOld = s.indexOf("'aurix_build_reload'") < 0 && s.indexOf('alreadyReloaded') < 0 && s.indexOf('aurix_build_reload_count') < 0;
+    ck(f + ' no reload + old guards gone', noReload && noOld, noReload ? (noOld ? 'ok' : 'old guard remains') : 'reload remains');
+  }
+  const idx = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  ck('index.html has visible boot diagnostic', idx.indexOf('__AURIX_BOOT_ERRORS') >= 0 && idx.indexOf("getElementById('bootLoader')") >= 0); }
 
 console.log('\nRESULT:', ok ? 'ALL PASS ✓ — mobile boot can no longer hang in a reload loop' : 'FAIL ✗');
 process.exit(ok ? 0 : 1);

@@ -28,42 +28,18 @@
       window.AURIX_BUILD = 'pwa-consistency-1';
       try {
         var KEY     = 'aurix_build';
-        var RCOUNT  = 'aurix_build_reload_count';
-        var stored  = null;
-        try { stored = localStorage.getItem(KEY); } catch (_) {}
-        if (stored && stored !== window.AURIX_BUILD) {
-          // P0 MOBILE-BOOT-FIX: loop-proof — at most ONE reload per session (a stale
-          // cached page flip-flopping the build value must never infinite-reload).
-          var rc = 0;
-          try { rc = parseInt(sessionStorage.getItem(RCOUNT) || '0', 10) || 0; } catch (_) {}
-          try { localStorage.setItem(KEY, window.AURIX_BUILD); } catch (_) {}
-          if (rc < 1) {
-            try { sessionStorage.setItem(RCOUNT, String(rc + 1)); } catch (_) {}
-            var done = false;
-            var finish = function() {
-              if (done) return;
-              done = true;
-              try { window.location.reload(); } catch (_) {}
-            };
-            // Hard-cap the reset so a slow caches/SW API never hangs boot.
-            setTimeout(finish, 1500);
-            var jobs = [];
-            if (typeof caches !== 'undefined' && caches.keys) {
-              jobs.push(caches.keys().then(function(keys) {
-                return Promise.all(keys.map(function(k) { return caches.delete(k); }));
-              }).catch(function() {}));
-            }
-            if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
-              jobs.push(navigator.serviceWorker.getRegistrations().then(function(regs) {
-                return Promise.all(regs.map(function(r) { return r.unregister(); }));
-              }).catch(function() {}));
-            }
-            Promise.all(jobs).then(finish, finish);
-            return; // halt further script execution on this load
+        // P0 MOBILE-BOOT-HARDFIX — NO reload on build change (the purge+reload could
+        // infinite-loop on a stale-cached page). Just record the build + best-effort,
+        // non-blocking cleanup of any legacy service worker / cache. Always boots.
+        try { localStorage.setItem(KEY, window.AURIX_BUILD); } catch (_) {}
+        try {
+          if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) { regs.forEach(function(r) { try { r.unregister(); } catch (_) {} }); }).catch(function() {});
           }
-        } else if (!stored) {
-          try { localStorage.setItem(KEY, window.AURIX_BUILD); } catch (_) {}
-        }
+          if (typeof caches !== 'undefined' && caches.keys) {
+            caches.keys().then(function(keys) { keys.forEach(function(k) { try { caches.delete(k); } catch (_) {} }); }).catch(function() {});
+          }
+        } catch (_) {}
         // Standalone detection — iOS Safari + modern display-mode media query.
         var iosStandalone = window.navigator.standalone === true;
         var mqStandalone  = false;

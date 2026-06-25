@@ -52,55 +52,42 @@
   <link rel="apple-touch-startup-image" media="(device-width:440px) and (device-height:956px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)" href="splash/launch-1320x2868.png">
   <script>
     // PWA-CONSISTENCY-1: global build identifier + standalone detection.
-    // Runs synchronously before any other script so a stale build cannot
-    // serve a half-cached app. Same user + same account must render the
-    // same code on Safari mobile, the iOS home-screen PWA, and desktop.
+    // Runs synchronously before any other script.
     (function() {
-      window.AURIX_BUILD = 'v354-mobile-boot-fix';
+      window.AURIX_BUILD = 'v355-mobile-boot-hardfix';
+
+      // P0 MOBILE-BOOT-HARDFIX — visible boot diagnostic. Registered BEFORE app.js so
+      // it captures even parse/early errors. If the splash never clears (boot truly
+      // failed), it surfaces the build + the real error ON SCREEN so a device with no
+      // console can report it. Never affects a healthy boot (the splash is gone first).
+      window.__AURIX_BOOT_ERRORS = [];
       try {
-        var KEY     = 'aurix_build';
-        var RCOUNT  = 'aurix_build_reload_count';
-        var stored  = null;
-        try { stored = localStorage.getItem(KEY); } catch (_) {}
-        if (stored && stored !== window.AURIX_BUILD) {
-          // P0 MOBILE-BOOT-FIX: LOOP-PROOF reset. At most ONE purge+reload per browser
-          // session, regardless of how AURIX_BUILD changes between loads. A stale-cached
-          // index.html (mobile caches it aggressively) can flip-flop the build value
-          // between the cached and fresh copies; the previous per-build guard granted a
-          // fresh reload for EACH distinct value → infinite reload → app.js never boots
-          // and the splash hangs on the logo. We now cap by a session reload COUNT and,
-          // once spent, PROCEED with whatever loaded rather than reload again.
-          var rc = 0;
-          try { rc = parseInt(sessionStorage.getItem(RCOUNT) || '0', 10) || 0; } catch (_) {}
-          try { localStorage.setItem(KEY, window.AURIX_BUILD); } catch (_) {}
-          if (rc < 1) {
-            try { sessionStorage.setItem(RCOUNT, String(rc + 1)); } catch (_) {}
-            var done = false;
-            var finish = function() {
-              if (done) return;
-              done = true;
-              try { window.location.reload(); } catch (_) {}
-            };
-            // Hard-cap the reset so a slow caches/SW API never hangs boot.
-            setTimeout(finish, 1500);
-            var jobs = [];
-            if (typeof caches !== 'undefined' && caches.keys) {
-              jobs.push(caches.keys().then(function(keys) {
-                return Promise.all(keys.map(function(k) { return caches.delete(k); }));
-              }).catch(function() {}));
-            }
-            if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
-              jobs.push(navigator.serviceWorker.getRegistrations().then(function(regs) {
-                return Promise.all(regs.map(function(r) { return r.unregister(); }));
-              }).catch(function() {}));
-            }
-            Promise.all(jobs).then(finish, finish);
-            return; // halt further script execution on this load
+        window.addEventListener('error', function(e) {
+          try { window.__AURIX_BOOT_ERRORS.push(((e && (e.message || (e.error && e.error.message))) || 'error') + ' @ ' + ((e && e.filename) || '').split('/').pop() + ':' + ((e && e.lineno) || '')); } catch (_) {}
+        }, true);
+        window.addEventListener('unhandledrejection', function(e) {
+          try { var r = e && e.reason; window.__AURIX_BOOT_ERRORS.push('promise: ' + ((r && r.message) || r)); } catch (_) {}
+        });
+      } catch (_) {}
+
+      try {
+        // P0 MOBILE-BOOT-HARDFIX — NO reload on build change. The previous purge+reload
+        // could infinite-loop on a stale-cached index.html that flip-flops AURIX_BUILD,
+        // so the splash hung on mobile and the device could never even fetch the fix.
+        // There is no service worker to purge and assets are cache-busted via
+        // app.js?v= / styles.css?v=, so the reload is obsolete. We just record the build
+        // and do a best-effort, NON-blocking cleanup of any LEGACY service worker / cache.
+        // The app ALWAYS boots — at worst with a slightly stale index.html until the CDN
+        // refreshes, never hung.
+        try { localStorage.setItem('aurix_build', window.AURIX_BUILD); } catch (_) {}
+        try {
+          if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) { regs.forEach(function(r) { try { r.unregister(); } catch (_) {} }); }).catch(function() {});
           }
-          // cap reached → fall through and boot with whatever is loaded (never loop)
-        } else if (!stored) {
-          try { localStorage.setItem(KEY, window.AURIX_BUILD); } catch (_) {}
-        }
+          if (typeof caches !== 'undefined' && caches.keys) {
+            caches.keys().then(function(keys) { keys.forEach(function(k) { try { caches.delete(k); } catch (_) {} }); }).catch(function() {});
+          }
+        } catch (_) {}
         // Standalone detection — iOS Safari + modern display-mode media query.
         var iosStandalone = window.navigator.standalone === true;
         var mqStandalone  = false;
@@ -111,6 +98,22 @@
         document.documentElement.setAttribute('data-standalone', isStandalone ? 'true' : 'false');
         if (iosStandalone) document.documentElement.setAttribute('data-ios-standalone', 'true');
       } catch (_) { /* boot guard must never throw */ }
+
+      // Diagnostic surface — fires AFTER app.js's own 9s splash failsafe. If #bootLoader
+      // is still present at 10s, the app's failsafe never ran (app.js failed to parse/run),
+      // so show the build + captured error. Healthy boots have removed the splash already.
+      setTimeout(function() {
+        try {
+          var bl = document.getElementById('bootLoader');
+          if (!bl || bl.getAttribute('data-diag')) return;
+          bl.setAttribute('data-diag', '1');
+          var errs = window.__AURIX_BOOT_ERRORS || [];
+          var d = document.createElement('div');
+          d.style.cssText = 'margin-top:16px;max-width:90vw;font:11px/1.45 ui-monospace,Menlo,monospace;color:#9fb4d8;opacity:.85;white-space:pre-wrap;word-break:break-word;padding:0 14px;text-align:center';
+          d.textContent = 'AURIX ' + window.AURIX_BUILD + (errs.length ? ('\n' + errs.slice(0, 5).join('\n')) : '\n(boot stalled — no JS error captured)');
+          bl.appendChild(d);
+        } catch (_) {}
+      }, 10000);
     })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
