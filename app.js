@@ -36937,6 +36937,18 @@ function _aurixPreloadBootIcons() {
   window.__APP_BOOTED__ = true;
   try { if (window.__AURIX_BOOT) { window.__AURIX_BOOT.bootstrapStarted = true; window.__AURIX_BOOT.mark('bootstrap_start'); } } catch (_) {}
 
+  // P0 BOOT BISECTION — ?boot_bisect=<phase> cuts the pipeline after a named phase,
+  // shows the shell + hides the splash, so we can locate the exact blocking phase on
+  // the real device. Phases: core | auth | portfolio | dashboard | full(default).
+  const _bootBisect = (function () { try { return new URLSearchParams(location.search).get('boot_bisect'); } catch (_) { return null; } })();
+  const _bm = function (s) { try { if (window.__AURIX_BOOT && window.__AURIX_BOOT.mark) window.__AURIX_BOOT.mark(s); } catch (_) {} };
+  const _bootShellHide = function (reason) {
+    try { var ar = document.getElementById('appRoot'); if (ar) ar.style.opacity = '1'; } catch (_) {}
+    try { if (window.hideSplashSafe) window.hideSplashSafe(reason); else _aurixHideLoader(); } catch (_) {}
+  };
+  const _yield = function () { return new Promise(function (r) { setTimeout(r, 0); }); };
+  if (_bootBisect === 'core') { _bm('bisect:core'); _bootShellHide('bisect:core'); return; }
+
   // hideLoader / maybeFinishBoot live at module scope (AURIX-READY-FIRST-1) so
   // the chart's animation onComplete and the icon-preload promise can flip
   // readiness flags too. The splash clears via _aurixMaybeFinishBoot() once
@@ -36957,6 +36969,7 @@ function _aurixPreloadBootIcons() {
     if (window.location.hash) {
       history.replaceState(null, '', window.location.pathname);
     }
+    if (_bootBisect === 'auth') { _bm('bisect:auth'); _bootShellHide('bisect:auth'); return; }
 
     // 2 + 3. PORTFOLIO + EXCHANGE RATE — run in parallel (SPEC 3.2 BLOCK D).
     // They are independent: FX only drives number formatting; the portfolio
@@ -36974,6 +36987,13 @@ function _aurixPreloadBootIcons() {
     assets = convertFromNewToFlat(portfolioData.assets, portfolioData.holdings);
     if (portfolioData.assets.length > 0) {
       saveData({ assets: portfolioData.assets, holdings: portfolioData.holdings });
+    }
+    if (_bootBisect === 'portfolio') {
+      _bm('bisect:portfolio');
+      try { recomputeDerivedFinancialState('boot'); } catch (_) {}
+      try { recomputeFinancialFormulas('boot'); } catch (_) {}
+      try { render(true); } catch (_) {}
+      _bootShellHide('bisect:portfolio'); return;
     }
 
     // AURIX-WEALTH-LEDGER-1: portfolio is hydrated — signal so the (invisible)
@@ -37000,34 +37020,35 @@ function _aurixPreloadBootIcons() {
     try { recomputeDerivedFinancialState('boot'); } catch (_) {}
     try { recomputeFinancialFormulas('boot'); } catch (_) {}
 
-    // 5. RENDER — dashboard from cached/local/Supabase data.
-    document.getElementById('appRoot').style.opacity = '';
-    render(true);
+    // 5. RENDER the dashboard shell from cached/local data.
+    try { document.getElementById('appRoot').style.opacity = ''; } catch (_) {}
+    try { render(true); } catch (e) { _reportSafe('render', (e && e.message) || 'render failed', (e && e.stack) || ''); }
     window.__aurixBootReady.dashboard = true;
-    // P0 BOOT-WATCHDOG — the dashboard DOM has rendered: signal the inline watchdog
-    // so it stands down (a healthy boot is reached well before the 8s deadline).
     try { if (window.__AURIX_BOOT) { window.__AURIX_BOOT.dashboardReady = true; window.__AURIX_BOOT.mark('dashboard_rendered'); } } catch (_) {}
 
-    // BLOCK C — preload the initial-viewport icons (holdings) while the splash
-    // is still up, then release the icon gate. Runs against the gate without
-    // blocking the rest of boot; the failsafe covers a stalled CDN.
-    _aurixPreloadBootIcons().then(() => {
-      window.__aurixBootReady.icons = true;
-      _aurixMaybeFinishBoot();
-    });
+    // P0 MOBILE FIX — HIDE THE SPLASH AS SOON AS THE SHELL EXISTS, then YIELD so the
+    // browser PAINTS the dashboard + splash removal BEFORE any heavy chart work.
+    // Previously render()+chart init (incl. the mobile-only branch below) ran as one
+    // long synchronous block AFTER which the splash hid; on a slow iPhone that block
+    // exceeded iOS Safari's long-script watchdog, which killed the page JS → every
+    // timer died → frozen splash (desktop ran it in <1s and skipped the mobile branch).
+    try { if (window.hideSplashSafe) window.hideSplashSafe('dashboard_shell'); else _aurixHideLoader(); } catch (_) {}
+    await _yield();
+    if (_bootBisect === 'dashboard') { _bm('bisect:dashboard'); return; }
 
-    // 6. CHARTS — destroy+recreate so a recycled DOM (PWA tab restore)
-    //    never paints into a stale host.
-    initChart();
-    initDonut();
-    updateChart();
-    updateDonut();
+    // BLOCK C — preload the initial-viewport icons (async, non-blocking).
+    _aurixPreloadBootIcons().then(() => { window.__aurixBootReady.icons = true; _aurixMaybeFinishBoot(); });
+
+    // 6. CHARTS — DEFERRED + chunked with yields so no single synchronous segment can
+    //    trip the iOS script-time watchdog, and the dashboard is already painted. Each
+    //    step is guarded: a chart failure can never block the (already-shown) dashboard.
+    await _yield();
+    try { initChart(); initDonut(); updateChart(); updateDonut(); } catch (e) { _reportSafe('chart', (e && e.message) || 'chart init failed', (e && e.stack) || ''); }
     if (window.innerWidth <= 768) {
-      initMobileCharts();
-      updateChart();
-      updateDonut();
-      initMobileSlider();
+      await _yield();   // separate yield before the heavier mobile-only chart branch
+      try { initMobileCharts(); updateChart(); updateDonut(); initMobileSlider(); } catch (e) { _reportSafe('chart-mobile', (e && e.message) || 'mobile chart init failed', (e && e.stack) || ''); }
     }
+    _bm('charts_done');
 
     // 7. PRICES — SPEC 3.2 / CTO decision (ready-first): run the first live
     //    refresh BEFORE clearing the splash, capped at ~2.5s, so the chart
