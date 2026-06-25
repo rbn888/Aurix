@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es" style="background:#070a14">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>AURIX · index-no-app (watchdog isolation)</title>
+  <style>
+    html,body{margin:0;height:100%;background:#070a14}
+    #bootLoader{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#070a14;z-index:10}
+    /* NOTE: this splash uses inset for its own layout; the WATCHDOG panel below does NOT. */
+    #bootLoader .w{font:900 34px/1 -apple-system,system-ui;letter-spacing:2px;color:#7fb0ff}
+  </style>
+</head>
+<body>
+  <div id="bootLoader"><div class="w">AURIX</div></div>
+  <script>
+    // ISOLATION TEST (Fase 4): same splash + same watchdog as index.html, but NO app.js,
+    // NO services, NO styles.css. If on iPhone the diagnostic panel APPEARS at 8s, then
+    // timers + DOM insertion + panel CSS all work on the device → the freeze in the real
+    // app is caused by app.js (blocking the thread or failing). If it does NOT appear,
+    // the watchdog/HTML/CSS/iOS itself is the problem.
+    (function () {
+      var BUILD = 'v359-watchdog-visible';
+      var HTML_TS = '2026-06-25T19:09:17Z';
+      var T0 = (new Date()).getTime();
+      var B = { tickCount: 0, lastTick: T0, errors: [] };
+      window.__AURIX_BOOT_WATCHDOG_STARTED = true;
+      try { setInterval(function () { B.tickCount++; B.lastTick = (new Date()).getTime(); }, 500); } catch (_) {}
+      try { window.addEventListener('error', function (e) { try { B.errors.push((e && e.message) || 'error'); } catch (_) {} }, true); } catch (_) {}
+      // visible stamp (left/right/bottom — not inset)
+      try {
+        var s = document.createElement('div');
+        s.style.cssText = 'position:fixed;left:0;right:0;bottom:12px;text-align:center;font:10px/1.5 ui-monospace,Menlo,monospace;color:#5e7bb0;z-index:2147483646;padding:0 10px;white-space:pre-wrap';
+        s.textContent = BUILD + ' · NO app.js · ' + HTML_TS + '\nwatchdog timer started · panel en 8s';
+        document.getElementById('bootLoader').appendChild(s);
+      } catch (_) {}
+      function show() {
+        try {
+          if (document.getElementById('diag')) return;
+          var info = { page: 'index-no-app.html', build: BUILD, htmlTs: HTML_TS, tickCount: B.tickCount, lastTickAgeMs: (new Date()).getTime() - B.lastTick, errors: B.errors, ua: navigator.userAgent, ts: new Date().toISOString() };
+          var bl = document.getElementById('bootLoader'); if (bl) bl.style.display = 'none';
+          var p = document.createElement('div'); p.id = 'diag';
+          p.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;z-index:2147483647;background:#03210f;color:#bfe6cf;font:13px/1.6 ui-monospace,Menlo,monospace;padding:22px 16px;overflow:auto';
+          p.innerHTML = '<div style="font:700 17px/1.3 -apple-system,system-ui;color:#5bd6a0;margin-bottom:10px">WATCHDOG OK (timers funcionan en este dispositivo)</div>'
+            + '<div style="white-space:pre-wrap;word-break:break-word">' + JSON.stringify(info, null, 2).replace(/[<>&]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; }) + '</div>';
+          document.body.appendChild(p);
+        } catch (_) {}
+      }
+      setTimeout(show, 8000);
+      setTimeout(function () { if (!document.getElementById('diag')) show(); }, 14000);
+    })();
+  </script>
+</body>
+</html>

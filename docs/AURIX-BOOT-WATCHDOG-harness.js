@@ -102,8 +102,14 @@ console.log('\nLIVE FILES — watchdog + instrumentation present:');
   ck('index.html: recoverable diagnostic panel + retry', idx.indexOf('aurixBootDiag') >= 0 && idx.indexOf('aurixBootRetry') >= 0);
   ck('index.html: NO reload in boot guard (loop impossible)', idx.indexOf('window.location.reload') < 0);
   ck('index.html: app.js tag has onerror + v=364', /app\.js\?v=364/.test(idx) && idx.indexOf('app_js_load_error') >= 0);
-  ck('index.html: visible build stamp in splash', idx.indexOf('aurixBuildStamp') >= 0 && idx.indexOf('watchdog armed') >= 0);
+  ck('index.html: visible build stamp + "watchdog timer started"', idx.indexOf('aurixBuildStamp') >= 0 && idx.indexOf('watchdog timer started') >= 0);
   ck('index.html: no-cache meta tags', /http-equiv="Cache-Control"/.test(idx) && /no-store/.test(idx));
+  // P0 v359 — the panel must be VISIBLE on iOS: explicit positioning (no `inset:0`,
+  // unsupported < iOS 14.5) + max z-index. This was why v356/v358 showed no panel.
+  ck('index.html: panel explicit positioning (no inset:0) + max z-index', idx.indexOf('z-index:2147483647') >= 0 && idx.indexOf('top:0;left:0;right:0;bottom:0') >= 0);
+  ck('index.html: panel does NOT use inset:0', idx.indexOf('inset:0;z-index') < 0);
+  ck('index.html: heartbeat (event-loop block detection)', idx.indexOf('__AURIX_LAST_TICK') >= 0 && idx.indexOf('tickCount') >= 0);
+  ck('index.html: watchdog-started flag', idx.indexOf('__AURIX_BOOT_WATCHDOG_STARTED') >= 0);
   const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
   ck('app.js: first-line execution mark (appJsExecuted)', app.indexOf("window.__AURIX_BOOT.appJsExecuted = true") >= 0);
   ck('app.js: bootstrap_start mark', app.indexOf("'bootstrap_start'") >= 0);
@@ -122,6 +128,24 @@ console.log('\nBOOT-CHECK PAGE — standalone (no app.js), shows build + storage
     ck('boot-check: reads deployed index build', bc.indexOf('deployedIndexBuild') >= 0 && /fetch\(/.test(bc));
     ck('boot-check: cache-buster button to open Aurix', bc.indexOf('openFresh') >= 0 && /index\.html\?fresh=/.test(bc));
     ck('boot-check: userAgent shown', bc.indexOf('userAgent') >= 0);
+    ck('boot-check: heartbeat (tickCount + eventLoopAlive)', bc.indexOf('tickCount') >= 0 && bc.indexOf('eventLoopAlive') >= 0);
+  } }
+
+console.log('\nISOLATION PAGES (Fase 4/5) — exist + correct isolation:');
+{ const naPath = path.join(root, 'index-no-app.html'), apPath = path.join(root, 'index-app-probe.html');
+  ck('index-no-app.html exists', fs.existsSync(naPath));
+  if (fs.existsSync(naPath)) {
+    const na = fs.readFileSync(naPath, 'utf8');
+    ck('index-no-app: NO app.js (proves timers/panel independent of app.js)', !/<script[^>]+src=["']app\.js/.test(na));
+    ck('index-no-app: watchdog panel max z-index (explicit pos)', na.indexOf('2147483647') >= 0);
+    ck('index-no-app: heartbeat + 8s panel', na.indexOf('tickCount') >= 0 && na.indexOf('8000') >= 0);
+  }
+  ck('index-app-probe.html exists', fs.existsSync(apPath));
+  if (fs.existsSync(apPath)) {
+    const ap = fs.readFileSync(apPath, 'utf8');
+    ck('index-app-probe: loads app.js (controlled) + skips boot pipeline', /app\.js\?v=/.test(ap) && ap.indexOf('__APP_BOOTED__ = true') >= 0);
+    ck('index-app-probe: reports appJsRequested/Loaded/Executed', ap.indexOf('appJsRequested') >= 0 && ap.indexOf('appJsLoaded') >= 0 && ap.indexOf('appJsExecuted') >= 0);
+    ck('index-app-probe: heartbeat (thread-block detection)', ap.indexOf('tickCount') >= 0 && ap.indexOf('eventLoopBlockedNow') >= 0);
   } }
 
 console.log('\nRESULT:', ok ? 'ALL PASS ✓ — splash can never remain permanent; the break point is always reported' : 'FAIL ✗');

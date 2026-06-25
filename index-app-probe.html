@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es" style="background:#070a14">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>AURIX · index-app-probe (app.js isolation)</title>
+  <style>html,body{margin:0;height:100%;background:#070a14;color:#cdd9ef;font:13px/1.6 ui-monospace,Menlo,monospace}</style>
+</head>
+<body>
+  <div id="status" style="padding:20px 14px;white-space:pre-wrap;word-break:break-word">probing app.js…</div>
+  <script>
+    // ISOLATION TEST (Fase 5): loads ONLY app.js (no config/supabase/services) with full
+    // instrumentation, and SKIPS app.js's boot pipeline via __APP_BOOTED__ so it can't
+    // redirect/hang — it measures purely: does app.js LOAD, does it EXECUTE (first-line
+    // mark), and does its synchronous top-level execution BLOCK the main thread
+    // (heartbeat gap). This pinpoints whether app.js is the freeze cause.
+    (function () {
+      var BUILD = 'v359-watchdog-visible';
+      var APPJS_V = '364';
+      var T0 = (new Date()).getTime();
+      var B = window.__AURIX_BOOT = {
+        appJsRequested: false, appJsLoaded: false, appJsExecuted: false,
+        tickCount: 0, lastTick: T0, errors: [], steps: [],
+        mark: function (s) { try { B.steps.push(s + '(' + ((new Date()).getTime() - T0) + 'ms)'); } catch (_) {} }
+      };
+      // Skip app.js's main boot pipeline (no auth, no redirect, no dashboard render).
+      window.__APP_BOOTED__ = true;
+      try { setInterval(function () { B.tickCount++; B.lastTick = (new Date()).getTime(); }, 250); } catch (_) {}
+      try { window.addEventListener('error', function (e) { try { B.errors.push(((e && e.message) || 'error') + ' @ ' + ((e && e.filename) || '').split('/').pop() + ':' + ((e && e.lineno) || '')); } catch (_) {} }, true); } catch (_) {}
+      try { window.addEventListener('unhandledrejection', function (e) { try { B.errors.push('promise: ' + ((e && e.reason && (e.reason.message || e.reason)) || '?')); } catch (_) {} }, true); } catch (_) {}
+
+      var tickBefore = B.tickCount, tBefore = (new Date()).getTime();
+      B.appJsRequested = true; B.mark('app_js_requested');
+
+      var sc = document.createElement('script');
+      sc.src = 'app.js?v=' + APPJS_V;
+      sc.onload = function () { B.appJsLoaded = true; B.mark('app_js_loaded'); };
+      sc.onerror = function () { B.mark('app_js_load_error'); B.errors.push('app.js failed to load (network/404/parse)'); };
+      document.body.appendChild(sc);
+
+      function render() {
+        var tAfter = (new Date()).getTime();
+        var info = {
+          page: 'index-app-probe.html', build: BUILD, appJs: 'app.js?v=' + APPJS_V,
+          appJsRequested: B.appJsRequested, appJsLoaded: B.appJsLoaded, appJsExecuted: B.appJsExecuted,
+          tickCountNow: B.tickCount, tickBeforeAppInsert: tickBefore,
+          lastTickAgeMs: tAfter - B.lastTick,
+          eventLoopBlockedNow: (tAfter - B.lastTick) > 1200,
+          firstSteps: B.steps.slice(0, 10),
+          errors: B.errors.slice(0, 8),
+          ua: navigator.userAgent, ts: new Date().toISOString(),
+          verdict: B.appJsLoaded
+            ? (B.appJsExecuted ? 'app.js LOADS + EXECUTES' : 'app.js LOADS but does NOT execute (parse error?)')
+            : 'app.js did NOT load'
+        };
+        var el = document.getElementById('status');
+        if (el) el.textContent = JSON.stringify(info, null, 2);
+      }
+      setTimeout(render, 2500);
+      setTimeout(render, 6000);
+      setTimeout(render, 12000);
+    })();
+  </script>
+</body>
+</html>

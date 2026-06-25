@@ -31,10 +31,13 @@
   </div>
   <script>
     (function () {
-      var BUILD = 'v358-bootcheck2';
-      var HTML_TS = '2026-06-25T18:54:08Z';
+      var BUILD = 'v359-watchdog-visible';
+      var HTML_TS = '2026-06-25T19:09:17Z';
       var EXPECT_APPJS = '364';
       var EXPECT_CSS = '312';
+      // Heartbeat — proves the event loop runs on this device (Fase 3).
+      var __t0 = Date.now(), __tick = 0, __lastTick = __t0;
+      try { setInterval(function () { __tick++; __lastTick = Date.now(); }, 500); } catch (_) {}
       // Aggressively shed any legacy service worker / cache for this phase.
       try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){try{r.unregister();}catch(_){}});}).catch(function(){}); } catch (_) {}
       try { if (typeof caches !== 'undefined' && caches.keys) caches.keys().then(function(ks){ks.forEach(function(k){try{caches.delete(k);}catch(_){}});}).catch(function(){}); } catch (_) {}
@@ -53,6 +56,9 @@
         sessionStorage: probe('sessionStorage'),
         cachesAPI: (typeof caches !== 'undefined'),
         serviceWorkerAPI: !!(navigator.serviceWorker),
+        tickCount: __tick,
+        lastTickAgeMs: Date.now() - __lastTick,
+        eventLoopAlive: (Date.now() - __lastTick) < 1500,
         userAgent: navigator.userAgent
       };
       document.getElementById('local').innerHTML = Object.keys(info).map(function (k) {
