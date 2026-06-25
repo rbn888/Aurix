@@ -75,13 +75,13 @@ const ck = (n, c, g) => { console.log((c ? '  ✓' : '  ✗') + ' ' + n + (g !==
 
 console.log('AURIX SPEC 4 — Institutional Render Engine: visible integration\n');
 
-console.log('CASE 0 — shipped default flag (deploy decision = OFF):');
+console.log('CASE 0 — shipped default flag (' + (FLAG_DEFAULT ? 'ON' : 'OFF') + '):');
 { setFlag(undefined);   // no runtime override → reads the shipped const
-  ck('const default is OFF (legacy WSC ships live)', FLAG_DEFAULT === false, FLAG_CONST);
-  ck('_aurixInstitutionalRenderVisible() === false by default', sb._aurixInstitutionalRenderVisible() === false);
+  ck('default flag resolves to the shipped const', sb._aurixInstitutionalRenderVisible() === FLAG_DEFAULT, FLAG_CONST);
   const s = healthy(40, DAY, 70000, 18, 120); SERIES = s; DASH = lastV(s);
   const r = sel('24h');
-  ck('default → legacy geometry (no engine path)', r.pathAppliedToWSC === false && r.linePath === FALLBACK.linePath); }
+  if (FLAG_DEFAULT) ck('default ON → engine path applied', r.pathAppliedToWSC === true && r.linePath !== FALLBACK.linePath);
+  else ck('default OFF → legacy geometry', r.pathAppliedToWSC === false && r.linePath === FALLBACK.linePath); }
 
 console.log('\nCASE 1 — feature flag ON → WSC uses engine pathData:');
 { setFlag(true); const s = healthy(40, DAY, 70000, 18, 120); SERIES = s; DASH = lastV(s); FLOWS = [];

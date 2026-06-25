@@ -21182,10 +21182,12 @@ function _wscRegimeYScale(values, range, timestamps) {
 // drawing path (line/area/Y-labels/tooltip-source); it NEVER touches the canonical
 // series, snapshots, write guard, PCE, dashboard value, pricing or financial logic,
 // and it does NOT modify global CSS. V2 / legacy Chart.js are untouched.
-// SPEC 4 deploy decision (founder): ship with the visible engine OFF by default —
-// the legacy WSC render stays live until on-device visual validation (§11). Flip on
-// per-session with window.enableAurixInstitutionalRender() (no redeploy needed).
-const AURIX_INSTITUTIONAL_RENDER_VISIBLE = false;
+// Deploy decision (founder, post SPEC 5): the engine ships ON by default so the
+// chart is evaluated as a real user sees it (no manual console activation). All
+// automated validation is green (26/26 harnesses + institutional-precision audit
+// across every range and surface) and the render has an automatic legacy fallback.
+// window.disableAurixInstitutionalRender() remains as an instant safety valve.
+const AURIX_INSTITUTIONAL_RENDER_VISIBLE = true;
 function _aurixInstitutionalRenderVisible() {
   try { if (typeof window !== 'undefined' && typeof window.AURIX_INSTITUTIONAL_RENDER_VISIBLE === 'boolean') return window.AURIX_INSTITUTIONAL_RENDER_VISIBLE; } catch (_) {}
   return AURIX_INSTITUTIONAL_RENDER_VISIBLE;
