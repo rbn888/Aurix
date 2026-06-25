@@ -18281,6 +18281,313 @@ function _aurixLegacyDataFromCanonical(range) {
 }
 
 // ════════════════════════════════════════════════════════════════════════
+// AURIX — SPEC 1: RENDER CONTRACT & VISUAL QUALITY GATE
+//
+// The DEFINITIVE, measurable contract that decides whether a canonical series is
+// fit to be drawn as an INSTITUTIONAL chart — BEFORE any new render algorithm
+// (LTTB / monotone curve / gap render) is implemented. It is a PURE READ:
+//   • it NEVER mutates assets / history / snapshots / storage,
+//   • it NEVER changes financial values, %, pricing or PCE,
+//   • it NEVER touches the canonical series (it only MEASURES getAurixRenderSeries).
+//
+// Principle: the render cannot decide freely. It receives a series and produces a
+// VALIDATABLE result. If quality < threshold → it returns concrete `failures`, not
+// "se ve mejor". Five measurable scores (0–100, higher = better) capture the visual
+// pathologies reported on the current chart (clusters, vertical walls, ruler-straight
+// runs, sparse density, untreated gaps); qualityScore aggregates them, and a hard
+// rule asserts the last point still equals the dashboard (±0.5%).
+//
+// NON-NEGOTIABLE RULES enforced here (measurement only — no rendering performed):
+//   1. lastPoint.value ≈ dashboardValue (tol 0.5%) — else immediate FAIL.
+//   2. X axis is built on real timestamps (the contract maps p.time, never index).
+//   3. Every visible point originates from the canonical render series.
+//   4. No fabricated max/min — the contract reads the real value range only.
+//   5. Visual quality is measurable (the five scores below).
+const _AURIX_RC_QUALITY_THRESHOLD = { '24h': 85, '7d': 85, '30d': 90, '1y': 90, 'all': 90 };
+const _AURIX_RC_WINDOW_MS = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '1y': 31536e6 };
+const _AURIX_RC_DASHBOARD_TOL = 0.005;   // 0.5% — rule 1
+const _AURIX_RC_ASPECT = 0.42;           // plotHeight = plotWidth × aspect (constant aspect →
+                                         // the SAME series scores identically on any viewport;
+                                         // only the px magnitudes scale → desktop == mobile verdict)
+const _AURIX_RC_PAD_FRAC = 0.04;         // horizontal padding (fraction of viewport)
+const _AURIX_RC_VPAD_FRAC = 0.08;        // vertical padding (fraction of plot height)
+
+// Scale-invariant projection of {time,value} → {x,y} px. Because both plotW and
+// plotH scale linearly with the viewport, every RATIO used by the metrics (dy/dx,
+// gap/width, deviation/height) is viewport-independent — so the contract's logical
+// verdict is identical desktop vs mobile (rule for harness case 8).
+function _aurixRenderContractGeometry(series, viewportWidth) {
+  const vw = Math.max(240, Math.min(4000, Number(viewportWidth) || 390));
+  const pad = vw * _AURIX_RC_PAD_FRAC;
+  const plotW = Math.max(1, vw - 2 * pad);
+  const plotH = Math.max(1, plotW * _AURIX_RC_ASPECT);
+  const vpad = plotH * _AURIX_RC_VPAD_FRAC;
+  const band = Math.max(1, plotH - 2 * vpad);
+  const t0 = series[0].time, t1 = series[series.length - 1].time;
+  const tspan = (t1 - t0) || 1;
+  let vMin = Infinity, vMax = -Infinity;
+  for (const p of series) { if (p.value < vMin) vMin = p.value; if (p.value > vMax) vMax = p.value; }
+  const vspan = (vMax - vMin) || 1;
+  const pts = series.map(p => ({
+    t: p.time, v: p.value,
+    x: pad + ((p.time - t0) / tspan) * plotW,
+    y: (plotH - vpad) - ((p.value - vMin) / vspan) * band,
+  }));
+  return { pts, plotW, plotH, band, t0, t1, vMin, vMax };
+}
+
+// METRIC 1 — clusterScore. Penalises points jammed into few pixels, concentrated
+// only at the right edge, or leaving huge untreated whitespace.
+function _aurixRcClusterScore(g) {
+  const pts = g.pts, n = pts.length;
+  if (n < 4) return { score: 100, failure: null, warning: null, detail: { points: n } };
+  const gaps = []; for (let i = 1; i < n; i++) gaps.push(pts[i].x - pts[i - 1].x);
+  const totalW = (pts[n - 1].x - pts[0].x) || 1;
+  const mean = totalW / (n - 1);
+  const variance = gaps.reduce((s, x) => s + (x - mean) * (x - mean), 0) / gaps.length;
+  const cv = mean > 0 ? Math.sqrt(variance) / mean : 0;                  // 0 = perfectly even
+  const crammed = gaps.filter(x => x < mean * 0.25).length / gaps.length; // share of near-touching pairs
+  const xThresh = pts[0].x + 0.82 * totalW;
+  const rightShare = pts.filter(p => p.x >= xThresh).length / n;          // share past 82% of width
+  const maxGapFrac = Math.max.apply(null, gaps) / totalW;                 // largest empty horizontal span
+  let score = 100, failure = null, warning = null;
+  score -= Math.min(40, cv * 45);
+  score -= Math.min(35, crammed * 70);
+  if (rightShare > 0.5 && maxGapFrac > 0.25) { score -= 25; failure = 'clustered_points_right_edge'; }
+  else if (cv > 0.9 && crammed > 0.3) { warning = 'uneven_point_distribution'; }
+  else if (maxGapFrac > 0.4) { warning = 'large_horizontal_whitespace'; }
+  return { score: Math.max(0, Math.round(score)), failure, warning,
+    detail: { cv: +cv.toFixed(2), crammedFrac: +crammed.toFixed(2), rightShare: +rightShare.toFixed(2), maxGapFrac: +maxGapFrac.toFixed(2) } };
+}
+
+// METRIC 2 — straightnessScore. Penalises long ruler-straight runs (segments with
+// no microstructure, artificial horizontals, perfectly linear declines).
+function _aurixRcStraightnessScore(g) {
+  const pts = g.pts, n = pts.length;
+  if (n < 4) return { score: 100, failure: null, warning: null, detail: { points: n } };
+  const totalW = (pts[n - 1].x - pts[0].x) || 1;
+  const eps = g.plotH * 0.012;             // collinearity tolerance (~1.2% of plot height)
+  let longestSpanFrac = 0, straightCoverage = 0, runs = 0;
+  let i = 0;
+  while (i < n - 1) {
+    let j = i + 1;
+    while (j < n - 1) {                     // extend run while interior stays on the chord(i, j+1)
+      const a = pts[i], b = pts[j + 1], dx = (b.x - a.x) || 1e-6;
+      let maxDev = 0;
+      for (let k = i + 1; k <= j; k++) {
+        const cy = a.y + (b.y - a.y) * ((pts[k].x - a.x) / dx);
+        const d = Math.abs(pts[k].y - cy); if (d > maxDev) maxDev = d;
+      }
+      if (maxDev > eps) break;
+      j++;
+    }
+    if (j > i + 1) {                        // a straight run = ≥3 points (≥2 collinear segments)
+      const spanFrac = (pts[j].x - pts[i].x) / totalW;
+      if (spanFrac > 0.12) { straightCoverage += spanFrac; runs++; }
+      if (spanFrac > longestSpanFrac) longestSpanFrac = spanFrac;
+    }
+    i = Math.max(j, i + 1);
+  }
+  let score = 100, failure = null, warning = null;
+  score -= Math.min(70, Math.max(0, longestSpanFrac - 0.25) * 140);
+  score -= Math.min(25, Math.max(0, straightCoverage - 0.4) * 60);
+  if (longestSpanFrac > 0.55) failure = 'too_many_straight_segments';
+  else if (longestSpanFrac > 0.35) warning = 'mild_straight_segment';
+  return { score: Math.max(0, Math.round(score)), failure, warning,
+    detail: { longestStraightSpanFrac: +longestSpanFrac.toFixed(3), straightCoverage: +straightCoverage.toFixed(3), straightRuns: runs } };
+}
+
+// METRIC 3 — verticalJumpScore. Penalises near-vertical walls: a large value move
+// over a step where time barely advances (incompatible with an institutional curve
+// unless segmented/annotated — which the current pipeline does not do).
+function _aurixRcVerticalJumpScore(g) {
+  const pts = g.pts, n = pts.length;
+  if (n < 2) return { score: 100, failure: null, warning: null, detail: { points: n } };
+  const totalW = (pts[n - 1].x - pts[0].x) || 1;
+  const meanGapFrac = 1 / (n - 1);
+  let worst = 0, walls = 0, penalty = 0;
+  for (let i = 1; i < n; i++) {
+    const dyFrac = Math.abs(pts[i].y - pts[i - 1].y) / g.plotH;
+    const dxFrac = Math.abs(pts[i].x - pts[i - 1].x) / totalW;
+    if (dyFrac > 0.18 && dxFrac < Math.min(0.04, meanGapFrac * 0.5)) {
+      walls++;
+      const severity = (dyFrac - 0.18) + (0.04 - dxFrac);
+      penalty += Math.min(60, 30 + severity * 150);
+      if (dyFrac > worst) worst = dyFrac;
+    }
+  }
+  let score = Math.max(0, Math.round(100 - penalty)), failure = null, warning = null;
+  if (walls > 0 && worst > 0.30) failure = 'vertical_jump_unclassified';
+  else if (walls > 0) warning = 'minor_vertical_step';
+  return { score, failure, warning, detail: { wallCount: walls, worstJumpFrac: +worst.toFixed(3) } };
+}
+
+// METRIC 4 — densityScore. Is the visible point count adequate for the range? Kept
+// viewport-INDEPENDENT (range minimums + temporal coverage), so desktop and mobile
+// reach the same verdict; an extreme-overcrowding guard is the only mild px factor.
+function _aurixRcDensityScore(range, n, coveragePct, g) {
+  const minPts = (_WSC_QUALITY[range] && _WSC_QUALITY[range].minPoints) || 6;
+  const ideal = minPts * 2.5;
+  let score = 100, failure = null, warning = null;
+  if (n < minPts) { score -= 55; failure = 'insufficient_density'; }
+  else if (n < ideal) { score -= (1 - (n - minPts) / (ideal - minPts)) * 25; warning = 'sparse_for_range'; }
+  if (coveragePct < 35) score -= 20;
+  else if (coveragePct < 60) score -= 8;
+  // extreme overcrowding (sub-pixel point spacing) — independent of the above
+  if (n > 3 && g && g.plotW) {
+    const pxPerPoint = g.plotW / (n - 1);
+    if (pxPerPoint < 1.5) { score -= 15; warning = warning || 'overcrowded_points'; }
+  }
+  return { score: Math.max(0, Math.round(score)), failure, warning, detail: { points: n, minPts, coveragePct } };
+}
+
+// METRIC 5 — continuityScore. Does the curve tell a continuous visual story?
+// Penalises untreated large temporal gaps and low window coverage (abrupt/partial
+// curve). A gap is "untreated" because the current pipeline neither annotates nor
+// segments regime changes — exactly what later phases will address.
+function _aurixRcContinuityScore(coveragePct, largestGapPct) {
+  let score = 100, failure = null, warning = null;
+  if (largestGapPct > 60) { score -= 55; failure = 'untreated_large_gap'; }
+  else if (largestGapPct > 40) { score -= 30; warning = 'large_gap'; }
+  else if (largestGapPct > 25) { score -= 12; warning = 'moderate_gap'; }
+  if (coveragePct < 35) { score -= 25; failure = failure || 'low_time_coverage'; }
+  else if (coveragePct < 60) { score -= 10; warning = warning || 'partial_time_coverage'; }
+  return { score: Math.max(0, Math.round(score)), failure, warning, detail: { coveragePct, largestGapPct } };
+}
+
+// PURE core — measures an already-resolved (range, series, dashboardValue, viewport)
+// and returns the full render contract. Separated from getAurixRenderContract so the
+// harness can drive it with synthetic series without any DOM.
+function _aurixComputeRenderContract(range, series, dashboardValue, viewportWidth) {
+  const r = String(range || '30d').toLowerCase();
+  const pts = Array.isArray(series) ? series.filter(p => p && Number.isFinite(p.time) && Number.isFinite(p.value)) : [];
+  const dash = Number.isFinite(dashboardValue) ? +dashboardValue : null;
+  const thr = _AURIX_RC_QUALITY_THRESHOLD[r] || 90;
+
+  const out = {
+    range: r, viewportWidth: Math.max(240, Math.min(4000, Number(viewportWidth) || 390)),
+    canonicalPoints: pts, visiblePoints: pts,         // no downsampling yet → visible === canonical
+    firstPoint: pts.length ? { time: pts[0].time, value: +pts[0].value.toFixed(2) } : null,
+    lastPoint: pts.length ? { time: pts[pts.length - 1].time, value: +pts[pts.length - 1].value.toFixed(2) } : null,
+    dashboardValue: dash != null ? +dash.toFixed(2) : null,
+    lastPointDeltaPct: null,
+    pointCount: pts.length, visiblePointCount: pts.length,
+    timeCoveragePct: 0, largestGapPct: 0, largestGapMs: 0,
+    clusterScore: 0, straightnessScore: 0, verticalJumpScore: 0, densityScore: 0, continuityScore: 0,
+    renderMode: 'building', qualityThreshold: thr, qualityScore: 0,
+    failures: [], warnings: [],
+  };
+
+  // RULE — < 2 points cannot be a curve.
+  if (pts.length < 2) {
+    out.renderMode = 'building';
+    out.failures.push('insufficient_points');
+    return out;
+  }
+
+  // Coverage / gap on REAL timestamps (rule 2).
+  const t0 = pts[0].time, t1 = pts[pts.length - 1].time;
+  const span = (t1 - t0) || 1;
+  const denom = (r === 'all') ? span : (_AURIX_RC_WINDOW_MS[r] || 2592e6);
+  out.timeCoveragePct = +((span / denom) * 100).toFixed(1);
+  let maxGapMs = 0; for (let i = 1; i < pts.length; i++) { const gp = pts[i].time - pts[i - 1].time; if (gp > maxGapMs) maxGapMs = gp; }
+  out.largestGapMs = maxGapMs;
+  out.largestGapPct = +((maxGapMs / denom) * 100).toFixed(1);
+
+  // RULE 1 (NON-NEGOTIABLE) — last point must equal the dashboard within 0.5%.
+  if (dash != null && dash > 0) {
+    out.lastPointDeltaPct = +(((out.lastPoint.value - dash) / dash) * 100).toFixed(4);
+    if (Math.abs(out.lastPoint.value - dash) / dash > _AURIX_RC_DASHBOARD_TOL) {
+      out.failures.push('last_point_not_dashboard');
+    }
+  }
+
+  // Visual scores on the scale-invariant geometry.
+  const g = _aurixRenderContractGeometry(pts, out.viewportWidth);
+  const mCluster   = _aurixRcClusterScore(g);
+  const mStraight  = _aurixRcStraightnessScore(g);
+  const mJump      = _aurixRcVerticalJumpScore(g);
+  const mDensity   = _aurixRcDensityScore(r, pts.length, out.timeCoveragePct, g);
+  const mContinu   = _aurixRcContinuityScore(out.timeCoveragePct, out.largestGapPct);
+  out.clusterScore = mCluster.score; out.straightnessScore = mStraight.score;
+  out.verticalJumpScore = mJump.score; out.densityScore = mDensity.score; out.continuityScore = mContinu.score;
+  [mCluster, mStraight, mJump, mDensity, mContinu].forEach(m => {
+    if (m.failure && out.failures.indexOf(m.failure) < 0) out.failures.push(m.failure);
+    if (m.warning && out.warnings.indexOf(m.warning) < 0) out.warnings.push(m.warning);
+  });
+  out._detail = { cluster: mCluster.detail, straightness: mStraight.detail, verticalJump: mJump.detail, density: mDensity.detail, continuity: mContinu.detail };
+
+  // qualityScore = blend of average and WORST dimension, so a single concrete
+  // pathology drags the score down (an institutional chart is only as good as its
+  // weakest visual property). Hard dashboard divergence forces 0 (rule 1).
+  const scores = [out.clusterScore, out.straightnessScore, out.verticalJumpScore, out.densityScore, out.continuityScore];
+  const avg = scores.reduce((s, x) => s + x, 0) / scores.length;
+  const min = Math.min.apply(null, scores);
+  let quality = Math.round(0.55 * avg + 0.45 * min);
+  if (out.failures.indexOf('last_point_not_dashboard') >= 0) quality = 0;          // rule 1 override
+  else if (out.failures.length > 0) quality = Math.min(quality, thr - 6);          // any concrete failure ⇒ sub-threshold
+  out.qualityScore = Math.max(0, Math.min(100, quality));
+
+  // renderMode verdict (this contract decides RENDER-READINESS; it does NOT render).
+  if (out.failures.indexOf('last_point_not_dashboard') >= 0) out.renderMode = 'fail-dashboard-divergence';
+  else if (out.qualityScore >= thr) out.renderMode = 'institutional';
+  else out.renderMode = 'sub-institutional';
+  return out;
+}
+
+// SPEC 1 ENTRY — getAurixRenderContract(range, viewportWidth). Resolves the canonical
+// render series + the live dashboard value + the viewport, then measures. PURE READ.
+function getAurixRenderContract(range, viewportWidth) {
+  const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '30d')).toLowerCase();
+  let series = [];
+  try { series = getAurixRenderSeries(r) || []; } catch (_) { series = []; }
+  let dash = NaN;
+  try { dash = Number(investableValueBase()); } catch (_) {}
+  let vw = Number(viewportWidth);
+  if (!(vw > 0)) { try { vw = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 390; } catch (_) { vw = 390; } }
+  return _aurixComputeRenderContract(r, series, dash, vw);
+}
+
+// SPEC 1 DEBUG — single range + all ranges, printing the mandated table.
+if (typeof window !== 'undefined') {
+  window.debugAurixRenderContract = (range) => {
+    const r = range || (typeof activeRange !== 'undefined' ? activeRange : '30d');
+    const c = getAurixRenderContract(r);
+    try {
+      console.table([{
+        range: c.range, dashboardValue: c.dashboardValue,
+        lastPoint: c.lastPoint ? c.lastPoint.value : null, lastDeltaPct: c.lastPointDeltaPct,
+        canonicalPoints: c.pointCount, visiblePoints: c.visiblePointCount,
+        coveragePct: c.timeCoveragePct, largestGapPct: c.largestGapPct,
+        clusterScore: c.clusterScore, straightnessScore: c.straightnessScore,
+        verticalJumpScore: c.verticalJumpScore, densityScore: c.densityScore, continuityScore: c.continuityScore,
+        qualityScore: c.qualityScore, renderMode: c.renderMode,
+        failures: (c.failures || []).join(' | ') || '—',
+      }]);
+      if (c.warnings && c.warnings.length) console.log('[render-contract] warnings:', c.warnings.join(', '));
+      console.log('[render-contract] detail:', c._detail);
+    } catch (_) {}
+    return c;
+  };
+  window.debugAurixRenderContractAll = () => {
+    const rows = ['24h', '7d', '30d', '1y', 'all'].map(r => getAurixRenderContract(r));
+    try {
+      console.table(rows.map(c => ({
+        range: c.range, dashboardValue: c.dashboardValue,
+        lastPoint: c.lastPoint ? c.lastPoint.value : null, lastDeltaPct: c.lastPointDeltaPct,
+        canonicalPoints: c.pointCount, visiblePoints: c.visiblePointCount,
+        coveragePct: c.timeCoveragePct, largestGapPct: c.largestGapPct,
+        cluster: c.clusterScore, straight: c.straightnessScore, vJump: c.verticalJumpScore,
+        density: c.densityScore, continuity: c.continuityScore,
+        quality: c.qualityScore, threshold: c.qualityThreshold, mode: c.renderMode,
+        failures: (c.failures || []).join('|') || '—',
+      })));
+    } catch (_) {}
+    return rows;
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════
 // AURIX-RETURN-UNIFY-1 — SINGLE SOURCE OF TRUTH for the timeframe RETURN that
 // every surface shows (hero WSC badge, "Resumen de rendimiento", computeRangePnL).
 //
