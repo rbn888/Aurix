@@ -53,6 +53,12 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
   } catch (_) {}
 })();
 
+// P0 MOBILE-SAFE — on phones, ALL heavy chart/Chart.js work is disabled so it can
+// NEVER block the interactive dashboard. Every chart entry point early-returns when
+// this is true. Temporary: the chart shows a "temporalmente desactivado" placeholder
+// on mobile until the mobile chart path is re-enabled. Desktop is unaffected.
+try { window.AURIX_MOBILE_SAFE = (typeof window !== 'undefined') && (window.innerWidth <= 768); } catch (_) { window.AURIX_MOBILE_SAFE = false; }
+
 const IS_DEV =
   location.hostname === 'localhost' ||
   location.hostname === '127.0.0.1';
@@ -16834,6 +16840,7 @@ function donutHandleClick(idx) {
 }
 
 function initDonut() {
+  if (typeof window !== 'undefined' && window.AURIX_MOBILE_SAFE) return;   // P0 mobile-safe
   const canvas = document.getElementById('donutChart');
   if (!canvas) return;
   // PWA-CONSISTENCY-1: destroy any prior instance instead of patching it.
@@ -16904,6 +16911,7 @@ function initDonut() {
 let _donutHasData = false;   // track whether donut has been populated before
 
 function updateDonut() {
+  if (typeof window !== 'undefined' && window.AURIX_MOBILE_SAFE) return;   // P0 mobile-safe
   // AURIX-INVESTABLE-WEALTH-1 — the donut + legend show the INVESTABLE
   // distribution (real estate excluded; it lives in its own card). % are over
   // investable wealth so a 98%-house portfolio no longer flattens every slice.
@@ -21883,6 +21891,7 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
 // Repaint BOTH surfaces from the single shared component. Driven by every data
 // refresh and every range / unit toggle (same global activeRange/activePerfMode).
 function renderWealthCurve(animate) {
+  if (typeof window !== 'undefined' && window.AURIX_MOBILE_SAFE) return;   // P0 mobile-safe: chart disabled on phones
   const paint = () => {
     try { _wscPaintSurface(document.getElementById('chartChange'),       document.getElementById('perfSnapshot'),     { uid: 'd', tooltip: true  }); } catch (_) {}
     try { _wscPaintSurface(document.getElementById('chartChangeMobile'), document.getElementById('wealthCurveMobile'), { uid: 'm', tooltip: false }); } catch (_) {}
@@ -24734,6 +24743,7 @@ function _aurixMktOpenSymbol(symbol, itemOverride) {
 })();
 
 function initChart() {
+  if (typeof window !== 'undefined' && window.AURIX_MOBILE_SAFE) return;   // P0 mobile-safe
   const canvas = document.getElementById('portfolioChart');
   if (!canvas) return;
   // PWA-CONSISTENCY-1: destroy + rebuild. Also tear down the Aurix V2
@@ -25220,6 +25230,7 @@ function _setChartNoData(el, state) {
 }
 
 function updateChart(animate = false) {
+  if (typeof window !== 'undefined' && window.AURIX_MOBILE_SAFE) return;   // P0 mobile-safe
   if (!portfolioChart) return;
   // AURIX-CHART-VISIBLE-ENGINE-CLOSEOUT — auto-diagnostic (debug only). Scheduled on
   // the next frame so it reads POST-render sizes + the actual visible logical range.
@@ -36609,6 +36620,7 @@ document.addEventListener('keydown', e => {
 // ── Mobile portfolio slider ────────────────────────────────
 
 function initMobileCharts() {
+  if (typeof window !== 'undefined' && window.AURIX_MOBILE_SAFE) return;   // P0 mobile-safe: heavy Chart.js disabled on phones
   const mCanvas = document.getElementById('portfolioChartMobile');
   if (mCanvas) {
     // PWA-CONSISTENCY-1: destroy + rebuild on every mount.
@@ -36760,6 +36772,7 @@ function _teardownMobileCharts() {
 }
 
 function initMobileSlider() {
+  if (typeof window !== 'undefined' && window.AURIX_MOBILE_SAFE) return;   // P0 mobile-safe: slider disabled on phones
   const track = document.getElementById('mobileSliderTrack');
   if (!track) return;
 
@@ -37036,22 +37049,25 @@ function _aurixPreloadBootIcons() {
     // BLOCK C — preload the initial-viewport icons (async, non-blocking).
     _aurixPreloadBootIcons().then(() => { window.__aurixBootReady.icons = true; _aurixMaybeFinishBoot(); });
 
-    // 6. CHARTS — FULLY DETACHED from the interactive path (P0.12). The dashboard is
-    //    already shown + interactive; charts init on a LATER macrotask, each guarded, so
-    //    a heavy/failing chart — especially the mobile-only branch, which desktop never
-    //    runs — can never block, freeze or kill the interactive dashboard. Navigation
-    //    works regardless of chart state (degraded mode). Errors land in debugAurixBoot().
-    setTimeout(function () {
-      try { initChart(); initDonut(); updateChart(); updateDonut(); }
-      catch (e) { _reportSafe('chart', (e && e.message) || 'chart init failed', (e && e.stack) || ''); try { if (window.__AURIX_BOOT) window.__AURIX_BOOT.errors.push('chart: ' + ((e && e.message) || 'failed')); } catch (_) {} }
-      if (window.innerWidth <= 768) {
-        setTimeout(function () {
-          try { initMobileCharts(); updateChart(); updateDonut(); initMobileSlider(); }
-          catch (e) { _reportSafe('chart-mobile', (e && e.message) || 'mobile chart init failed', (e && e.stack) || ''); try { if (window.__AURIX_BOOT) window.__AURIX_BOOT.errors.push('chart-mobile: ' + ((e && e.message) || 'failed')); } catch (_) {} }
-          _bm('charts_done');
-        }, 120);
-      } else { _bm('charts_done'); }
-    }, 250);
+    // 6. CHARTS — P0 MOBILE-SAFE. On phones ALL chart/Chart.js work is DISABLED (the
+    //    chart functions early-return) so heavy rendering can never freeze the interactive
+    //    dashboard; a lightweight placeholder is shown instead. Desktop initialises charts
+    //    normally, detached on a later macrotask + guarded so it never blocks the shell.
+    if (window.AURIX_MOBILE_SAFE) {
+      try {
+        ['perfSnapshot', 'wealthCurveMobile'].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:120px;color:#5e7bb0;font:13px/1.4 -apple-system,system-ui;text-align:center;padding:16px">Gráfico temporalmente desactivado en móvil</div>';
+        });
+      } catch (_) {}
+      _bm('charts_skipped_mobile_safe');
+    } else {
+      setTimeout(function () {
+        try { initChart(); initDonut(); updateChart(); updateDonut(); }
+        catch (e) { _reportSafe('chart', (e && e.message) || 'chart init failed', (e && e.stack) || ''); try { if (window.__AURIX_BOOT) window.__AURIX_BOOT.errors.push('chart: ' + ((e && e.message) || 'failed')); } catch (_) {} }
+        _bm('charts_done');
+      }, 250);
+    }
 
     // 7. PRICES — SPEC 3.2 / CTO decision (ready-first): run the first live
     //    refresh BEFORE clearing the splash, capped at ~2.5s, so the chart

@@ -90,12 +90,12 @@ console.log('\nLIVE FILE — app.js boot restructure (hide-before-charts + bisec
   ck('boot_bisect read from query', app.indexOf("get('boot_bisect')") >= 0);
   const iHide = app.indexOf("hideSplashSafe('dashboard_shell')");
   const iInitChart = app.indexOf('try { initChart(); initDonut(); updateChart(); updateDonut(); }');
-  const iMobile = app.indexOf('initMobileCharts(); updateChart(); updateDonut(); initMobileSlider();');
   ck('splash hidden BEFORE chart init', iHide > 0 && iInitChart > 0 && iHide < iInitChart, 'hide@' + iHide + ' < charts@' + iInitChart);
-  ck('mobile chart branch is AFTER the splash hide', iMobile > 0 && iHide < iMobile);
-  ck('chart init guarded (try/catch) + detached (setTimeout)', iInitChart > 0 && /setTimeout\(function \(\) \{\s*try \{ initChart\(\)/.test(app));
-  ck('mobile chart branch guarded (try/catch)', /initMobileCharts\(\); updateChart\(\); updateDonut\(\); initMobileSlider\(\); \}\s*catch/.test(app));
-  ck('render(true) is guarded (shell render can fail safely)', /try \{ render\(true\); \} catch/.test(app)); }
+  ck('desktop chart init detached (setTimeout)', iInitChart > 0 && /setTimeout\(function \(\) \{\s*try \{ initChart\(\)/.test(app));
+  // P0 mobile-safe: chart functions are gated; the mobile chart init is not run at all
+  ck('mobile-safe gates chart functions', (app.match(/AURIX_MOBILE_SAFE\) return;/g) || []).length >= 7);
+  ck('mobile boot skips charts + placeholder', app.indexOf('charts_skipped_mobile_safe') >= 0 && app.indexOf('Gráfico temporalmente desactivado en móvil') >= 0);
+  ck('render(true) is guarded (shell render can fail safely)', /try \{ render\(true\); \}/.test(app)); }
 
 console.log('\nRESULT:', ok ? 'ALL PASS ✓ — shell-first boot; heavy/mobile chart work deferred after splash hide' : 'FAIL ✗');
 process.exit(ok ? 0 : 1);

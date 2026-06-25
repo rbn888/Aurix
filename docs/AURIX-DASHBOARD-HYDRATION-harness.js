@@ -68,10 +68,10 @@ console.log('\nLIVE FILE — app.js hydration wiring:');
   // chart init must be DETACHED (inside a setTimeout), not awaited inline on the boot path
   ck('chart init detached (setTimeout, not inline awaited)',
      /setTimeout\(function \(\) \{\s*try \{ initChart\(\); initDonut\(\); updateChart\(\); updateDonut\(\); \}/.test(app));
-  ck('mobile chart branch also detached', /if \(window\.innerWidth <= 768\) \{\s*setTimeout\(function/.test(app));
+  ck('mobile DISABLES charts entirely (mobile-safe, not just detached)', app.indexOf('charts_skipped_mobile_safe') >= 0);
   ck('render(true) guarded (degraded mode)', /try \{ render\(true\); \}\s*\n?\s*catch/.test(app));
   ck('render error captured to debugAurixBoot', app.indexOf("__AURIX_BOOT.errors.push('render: '") >= 0);
-  ck('chart errors captured to debugAurixBoot', app.indexOf("__AURIX_BOOT.errors.push('chart: '") >= 0 && app.indexOf("__AURIX_BOOT.errors.push('chart-mobile: '") >= 0);
+  ck('chart error captured to debugAurixBoot', app.indexOf("__AURIX_BOOT.errors.push('chart: '") >= 0);
   // nav listeners bind at top-level, BEFORE the boot IIFE (so they never depend on it)
   const iNav = app.indexOf("document.querySelectorAll('#bottomNav .item[data-tab]')");
   const iBootIIFE = app.indexOf('if (window.__APP_BOOTED__) return;');
@@ -79,7 +79,13 @@ console.log('\nLIVE FILE — app.js hydration wiring:');
   // boot_bisect=dashboard returns BEFORE chart init (isolates render vs charts)
   const iBisectDash = app.indexOf("_bootBisect === 'dashboard'");
   const iChart = app.indexOf('try { initChart(); initDonut(); updateChart(); updateDonut(); }');
-  ck('?boot_bisect=dashboard cuts BEFORE chart init', iBisectDash > 0 && iChart > 0 && iBisectDash < iChart); }
+  ck('?boot_bisect=dashboard cuts BEFORE chart init', iBisectDash > 0 && iChart > 0 && iBisectDash < iChart);
+
+  // P0 MOBILE-SAFE — every chart entry point early-returns on phones (no Chart.js can run)
+  ck('window.AURIX_MOBILE_SAFE flag defined', /window\.AURIX_MOBILE_SAFE = /.test(app));
+  const guards = (app.match(/AURIX_MOBILE_SAFE\) return;/g) || []).length;
+  ck('all chart functions mobile-gated (>=7 entry guards)', guards >= 7, guards + ' guards');
+  ck('mobile boot shows chart placeholder + skips init', app.indexOf('Gráfico temporalmente desactivado en móvil') >= 0 && /if \(window\.AURIX_MOBILE_SAFE\) \{[\s\S]*?charts_skipped_mobile_safe/.test(app)); }
 
 console.log('\nRESULT:', ok ? 'ALL PASS ✓ — dashboard stays interactive regardless of chart/pricing/secondary failures' : 'FAIL ✗');
 process.exit(ok ? 0 : 1);
