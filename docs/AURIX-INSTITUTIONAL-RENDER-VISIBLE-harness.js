@@ -29,8 +29,9 @@ function block(startStr, endStr){ const i=src.indexOf(startStr); if(i<0)throw ne
 const RC_CONSTS = block('const _AURIX_RC_QUALITY_THRESHOLD', 'const _AURIX_RC_VPAD_FRAC = 0.08;');
 const VP_CONSTS = block('const _AURIX_VP_DENSITY', 'const _AURIX_VP_VALUE_EPS = 0.004;');
 const IR_CONSTS = block('const _AURIX_IR_VALUE_MARGIN', '= 0.08;');
-const FLAG_CONST = (src.match(/const AURIX_INSTITUTIONAL_RENDER_VISIBLE = true;/) || [])[0];
+const FLAG_CONST = (src.match(/const AURIX_INSTITUTIONAL_RENDER_VISIBLE = (?:true|false);/) || [])[0];
 if (!FLAG_CONST) throw new Error('missing AURIX_INSTITUTIONAL_RENDER_VISIBLE flag');
+const FLAG_DEFAULT = /= true;/.test(FLAG_CONST);   // shipped default of the const
 
 const DAY = 86400e3, HOUR = 36e5, NOW = 1000 * DAY;
 
@@ -74,8 +75,16 @@ const ck = (n, c, g) => { console.log((c ? '  ✓' : '  ✗') + ' ' + n + (g !==
 
 console.log('AURIX SPEC 4 — Institutional Render Engine: visible integration\n');
 
-console.log('CASE 1 — feature flag ON → WSC uses engine pathData:');
-{ setFlag(undefined); const s = healthy(40, DAY, 70000, 18, 120); SERIES = s; DASH = lastV(s); FLOWS = [];
+console.log('CASE 0 — shipped default flag (deploy decision = OFF):');
+{ setFlag(undefined);   // no runtime override → reads the shipped const
+  ck('const default is OFF (legacy WSC ships live)', FLAG_DEFAULT === false, FLAG_CONST);
+  ck('_aurixInstitutionalRenderVisible() === false by default', sb._aurixInstitutionalRenderVisible() === false);
+  const s = healthy(40, DAY, 70000, 18, 120); SERIES = s; DASH = lastV(s);
+  const r = sel('24h');
+  ck('default → legacy geometry (no engine path)', r.pathAppliedToWSC === false && r.linePath === FALLBACK.linePath); }
+
+console.log('\nCASE 1 — feature flag ON → WSC uses engine pathData:');
+{ setFlag(true); const s = healthy(40, DAY, 70000, 18, 120); SERIES = s; DASH = lastV(s); FLOWS = [];
   const r = sel('24h');
   ck('visibleEnabled', r.visibleEnabled === true);
   ck('pathAppliedToWSC', r.pathAppliedToWSC === true);
@@ -90,10 +99,10 @@ console.log('\nCASE 2 — feature flag OFF → WSC uses legacy render:');
   ck('legacy line kept', r.linePath === FALLBACK.linePath);
   ck('legacy area kept', r.areaPath === FALLBACK.areaPath);
   ck('pathAppliedToWSC = false', r.pathAppliedToWSC === false);
-  setFlag(undefined); }
+  setFlag(true); }
 
 console.log('\nCASE 3 — fallback (invalid path → legacy, no throw):');
-{ setFlag(undefined); SERIES = [{ time: NOW, value: 70000 }]; DASH = 70000;  // 1 point → engine can't draw
+{ setFlag(true); SERIES = [{ time: NOW, value: 70000 }]; DASH = 70000;  // 1 point → engine can't draw
   let threw = false, r; try { r = sel('24h'); } catch (_) { threw = true; }
   ck('did not throw', !threw);
   ck('usedFallback', r && r.usedFallback === true, r && r.fallbackReason);
@@ -101,21 +110,21 @@ console.log('\nCASE 3 — fallback (invalid path → legacy, no throw):');
   ck('legacy geometry kept', r && r.linePath === FALLBACK.linePath); }
 
 console.log('\nCASE 4 — 24H (path applied, last == dashboard, no overshoot):');
-{ setFlag(undefined); const s = healthy(60, DAY, 70000, 15, 140); SERIES = s; DASH = lastV(s);
+{ setFlag(true); const s = healthy(60, DAY, 70000, 15, 140); SERIES = s; DASH = lastV(s);
   const r = sel('24h');
   ck('pathAppliedToWSC', r.pathAppliedToWSC === true);
   ck('last point == dashboard (±0.5%)', Math.abs(r.rendered.renderMeta.lastDeltaPct) <= 0.5, r.rendered.renderMeta.lastDeltaPct);
   ck('no overshoot', r.rendered.renderMeta.overshootDetected === false); }
 
 console.log('\nCASE 5 — 7D (path applied, downsampled, not "building"):');
-{ setFlag(undefined); const s = healthy(220, 7 * DAY, 60000, 4, 300); SERIES = s; DASH = lastV(s);
+{ setFlag(true); const s = healthy(220, 7 * DAY, 60000, 4, 300); SERIES = s; DASH = lastV(s);
   const r = sel('7d');
   ck('pathAppliedToWSC', r.pathAppliedToWSC === true);
   ck('downsampled toward target (clusters reduced)', r.rendered.renderMeta.pointCountAfter <= r.rendered.renderMeta.targetPointCount + 2 && r.rendered.renderMeta.pointCountAfter < 220, r.rendered.renderMeta.pointCountAfter + '/' + r.rendered.renderMeta.targetPointCount);
   ck('not building (>=2 visible points)', r.rendered.visiblePoints.length >= 2, r.rendered.visiblePoints.length); }
 
 console.log('\nCASE 6/7/8 — 30D / 1A / TOTAL (no regression):');
-{ setFlag(undefined);
+{ setFlag(true);
   for (const [r, days] of [['30d', 30], ['1y', 360], ['all', 380]]) {
     const s = healthy(180, days * DAY, 50000, 6, 250); SERIES = s; DASH = lastV(s);
     const out = sel(r);
@@ -124,7 +133,7 @@ console.log('\nCASE 6/7/8 — 30D / 1A / TOTAL (no regression):');
   } }
 
 console.log('\nCASE 9 — desktop/mobile (both use the engine when flag on):');
-{ setFlag(undefined); const s = healthy(150, 30 * DAY, 50000, 6, 250); SERIES = s; DASH = lastV(s);
+{ setFlag(true); const s = healthy(150, 30 * DAY, 50000, 6, 250); SERIES = s; DASH = lastV(s);
   const d = sel('30d', BOX_DESK), m = sel('30d', BOX_MOB);
   ck('desktop path applied', d.pathAppliedToWSC === true);
   ck('mobile path applied', m.pathAppliedToWSC === true);
@@ -132,14 +141,14 @@ console.log('\nCASE 9 — desktop/mobile (both use the engine when flag on):');
   ck('paths differ by box (different right edge)', d.linePath !== m.linePath); }
 
 console.log('\nCASE 10 — debug (flags + fallback reported):');
-{ setFlag(undefined); const s = healthy(40, DAY, 70000, 18, 120); SERIES = s; DASH = lastV(s);
+{ setFlag(true); const s = healthy(40, DAY, 70000, 18, 120); SERIES = s; DASH = lastV(s);
   const r = sel('24h');
   const fields = ['visibleEnabled','usedFallback','fallbackReason','pathAppliedToWSC','areaAppliedToWSC','gapSegmentsRendered','eventMarkersRendered'];
   ck('all reporting fields present', fields.every(f => f in r), fields.filter(f => !(f in r)).join(',') || 'all');
   ck('eventMarkers prepared-not-drawn (0 this phase)', r.eventMarkersRendered === 0); }
 
 console.log('\nPURITY — selector never mutates the canonical series:');
-{ setFlag(undefined); const s = healthy(40, DAY, 70000, 18, 120); const before = JSON.stringify(s);
+{ setFlag(true); const s = healthy(40, DAY, 70000, 18, 120); const before = JSON.stringify(s);
   SERIES = s; DASH = lastV(s); sel('24h'); sel('24h', BOX_MOB);
   ck('canonical series unchanged', JSON.stringify(s) === before); }
 
