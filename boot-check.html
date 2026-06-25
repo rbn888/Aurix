@@ -31,8 +31,10 @@
   </div>
   <script>
     (function () {
-      var BUILD = 'v357-bootcheck';
-      var HTML_TS = '2026-06-25T18:21:27Z';
+      var BUILD = 'v358-bootcheck2';
+      var HTML_TS = '2026-06-25T18:54:08Z';
+      var EXPECT_APPJS = '364';
+      var EXPECT_CSS = '312';
       // Aggressively shed any legacy service worker / cache for this phase.
       try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){try{r.unregister();}catch(_){}});}).catch(function(){}); } catch (_) {}
       try { if (typeof caches !== 'undefined' && caches.keys) caches.keys().then(function(ks){ks.forEach(function(k){try{caches.delete(k);}catch(_){}});}).catch(function(){}); } catch (_) {}
@@ -59,19 +61,33 @@
         return '<span class="k">' + k + ':</span> <span class="' + cls + '">' + val.replace(/</g,'&lt;') + '</span>';
       }).join('\n');
 
-      // Fetch the LIVE deployed index.html (cache-busted) and report its build, so you
-      // can compare "what is deployed" vs "what your app shows".
-      var u = 'index.html?cb=' + Date.now();
-      fetch(u, { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (html) {
-        var b = (html.match(/var BUILD = '([^']+)'/) || [])[1] || (html.match(/AURIX_BUILD = '([^']+)'/) || [])[1] || '(not found)';
-        var ts = (html.match(/HTML_TS = '([^']+)'/) || [])[1] || '(none)';
-        var appv = (html.match(/app\.js\?v=([0-9]+)/) || [])[1] || '(none)';
-        var hasWatchdog = html.indexOf('window.__AURIX_BOOT') >= 0;
-        document.getElementById('deployed').innerHTML =
-          '<span class="k">deployedIndexBuild:</span> <span class="ok">' + b + '</span>\n' +
-          '<span class="k">deployedHtmlTimestamp:</span> ' + ts + '\n' +
-          '<span class="k">deployedAppJs:</span> app.js?v=' + appv + '\n' +
-          '<span class="k">deployedHasWatchdog:</span> <span class="' + (hasWatchdog ? 'ok' : 'bad') + '">' + hasWatchdog + '</span>';
+      // Fetch the LIVE deployed resources (cache-busted) and report HTTP status + build,
+      // so "what is deployed" vs "what your device shows" is unambiguous (Fase 3).
+      var bust = '?cb=' + Date.now();
+      fetch('index.html' + bust, { cache: 'no-store' }).then(function (r) {
+        return r.text().then(function (html) {
+          var b = (html.match(/var BUILD = '([^']+)'/) || [])[1] || (html.match(/AURIX_BUILD = '([^']+)'/) || [])[1] || '(not found)';
+          var ts = (html.match(/HTML_TS = '([^']+)'/) || [])[1] || '(none)';
+          var appv = (html.match(/app\.js\?v=([0-9]+)/) || [])[1] || '(none)';
+          var hasWatchdog = html.indexOf('window.__AURIX_BOOT') >= 0;
+          var rows = [
+            '<span class="k">index.html HTTP:</span> <span class="' + (r.status === 200 ? 'ok' : 'bad') + '">' + r.status + '</span>',
+            '<span class="k">deployedIndexBuild:</span> <span class="ok">' + b + '</span>',
+            '<span class="k">deployedHtmlTimestamp:</span> ' + ts,
+            '<span class="k">deployedAppJs:</span> app.js?v=' + appv,
+            '<span class="k">deployedHasWatchdog:</span> <span class="' + (hasWatchdog ? 'ok' : 'bad') + '">' + hasWatchdog + '</span>'
+          ];
+          // status of app.js?v and styles.css?v
+          function head(url, label) {
+            return fetch(url + bust, { cache: 'no-store', method: 'GET' }).then(function (rr) {
+              rows.push('<span class="k">' + label + ' HTTP:</span> <span class="' + (rr.status === 200 ? 'ok' : 'bad') + '">' + rr.status + '</span>');
+            }).catch(function (e) { rows.push('<span class="k">' + label + ' HTTP:</span> <span class="bad">FAIL ' + ((e && e.message) || e) + '</span>'); });
+          }
+          return Promise.all([
+            head('app.js?v=' + EXPECT_APPJS, 'app.js?v=' + EXPECT_APPJS),
+            head('styles.css?v=' + EXPECT_CSS, 'styles.css?v=' + EXPECT_CSS)
+          ]).then(function () { document.getElementById('deployed').innerHTML = rows.join('\n'); });
+        });
       }).catch(function (e) {
         document.getElementById('deployed').innerHTML = '<span class="bad">no se pudo leer index.html desplegado: ' + ((e && e.message) || e) + '</span>';
       });
