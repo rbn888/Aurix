@@ -27,6 +27,7 @@ const RC_CONSTS = block('const _AURIX_RC_QUALITY_THRESHOLD', 'const _AURIX_RC_VP
 const VP_CONSTS = block('const _AURIX_VP_DENSITY', 'const _AURIX_VP_VALUE_EPS = 0.004;');
 const IR_CONSTS = block('const _AURIX_IR_VALUE_MARGIN', '= 0.08;');
 const Y_CONSTS  = block('const _AURIX_Y_JUMP_DOMINANCE', 'const _AURIX_Y_LEGIBLE_ALPHA  = 0.35;');
+const X_CONSTS  = block('const _AURIX_X_FILL_BETA', '};');
 const RP_BOX    = block('const _AURIX_RP_AUDIT_BOX', '};');
 
 const DAY = 86400e3, HOUR = 36e5, MIN = 60e3, NOW = 1000 * DAY;
@@ -35,9 +36,9 @@ let SERIES = [], DASH = null, FLOWS = [];
 const sb = { console, activeRange: '30d', getAurixRenderSeries: () => SERIES, investableValueBase: () => DASH, _aurixLoadCapitalFlows: () => FLOWS };
 sb.window = sb; sb.window.innerWidth = 1440;
 vm.createContext(sb);
-vm.runInContext(RC_CONSTS, sb); vm.runInContext(VP_CONSTS, sb); vm.runInContext(IR_CONSTS, sb); vm.runInContext(Y_CONSTS, sb); vm.runInContext(RP_BOX, sb);
+vm.runInContext(RC_CONSTS, sb); vm.runInContext(VP_CONSTS, sb); vm.runInContext(IR_CONSTS, sb); vm.runInContext(Y_CONSTS, sb); vm.runInContext(X_CONSTS, sb); vm.runInContext(RP_BOX, sb);
 [ fn('_aurixRenderContractGeometry'), fn('_aurixVpTargetPointCount'), fn('_aurixComputeVisualPreparation'),
-  fn('prepareAurixVisualSeries'), fn('downsampleAurixLTTB'), fn('_aurixSignificantLocalExtrema'), fn('downsampleAurixAdaptive'), fn('computeAurixTimeScale'),
+  fn('prepareAurixVisualSeries'), fn('downsampleAurixLTTB'), fn('_aurixSignificantLocalExtrema'), fn('downsampleAurixAdaptive'), fn('computeAurixTimeScale'), fn('computeAurixAdaptiveXScale'),
   fn('computeAurixValueScale'), fn('_aurixMonotonePath'), fn('buildAurixMonotonicPath'),
   fn('buildAurixAreaPath'), fn('_aurixSplitAtGaps'), fn('renderAurixInstitutionalChart'),
   fn('auditAurixRenderPrecision') ].forEach(c => vm.runInContext(c, sb));

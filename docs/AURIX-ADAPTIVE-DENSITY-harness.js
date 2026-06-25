@@ -24,6 +24,7 @@ const RC_CONSTS = block('const _AURIX_RC_QUALITY_THRESHOLD', 'const _AURIX_RC_VP
 const VP_CONSTS = block('const _AURIX_VP_DENSITY', 'const _AURIX_VP_VALUE_EPS = 0.004;');
 const IR_CONSTS = block('const _AURIX_IR_VALUE_MARGIN', '= 0.08;');
 const Y_CONSTS  = block('const _AURIX_Y_JUMP_DOMINANCE', 'const _AURIX_Y_LEGIBLE_ALPHA  = 0.35;');
+const X_CONSTS  = block('const _AURIX_X_FILL_BETA', '};');
 
 const DAY = 86400e3, HOUR = 36e5, NOW = 1000 * DAY;
 
@@ -32,10 +33,10 @@ const sb = { console, activeRange: '30d', getAurixRenderSeries: () => SERIES, in
   _wscFmtAxisVal: v => { const a = Math.abs(v); if (a >= 1e6) return (v / 1e6).toFixed(2) + 'M'; if (a >= 1e3) return (v / 1e3).toFixed(1) + 'k'; return Math.round(v).toString(); } };
 sb.window = sb; sb.window.innerWidth = 1440;
 vm.createContext(sb);
-vm.runInContext(RC_CONSTS, sb); vm.runInContext(VP_CONSTS, sb); vm.runInContext(IR_CONSTS, sb); vm.runInContext(Y_CONSTS, sb);
+vm.runInContext(RC_CONSTS, sb); vm.runInContext(VP_CONSTS, sb); vm.runInContext(IR_CONSTS, sb); vm.runInContext(Y_CONSTS, sb); vm.runInContext(X_CONSTS, sb);
 [ fn('_aurixRenderContractGeometry'), fn('_aurixVpTargetPointCount'), fn('_aurixComputeVisualPreparation'),
   fn('prepareAurixVisualSeries'), fn('downsampleAurixLTTB'), fn('_aurixSignificantLocalExtrema'),
-  fn('downsampleAurixAdaptive'), fn('computeAurixTimeScale'), fn('computeAurixValueScale'),
+  fn('downsampleAurixAdaptive'), fn('computeAurixTimeScale'), fn('computeAurixAdaptiveXScale'), fn('computeAurixValueScale'),
   fn('_aurixMonotonePath'), fn('buildAurixMonotonicPath'), fn('buildAurixAreaPath'), fn('_aurixSplitAtGaps'),
   fn('renderAurixInstitutionalChart'), fn('_aurixCompareRenderToCanonical'), fn('auditAurixRenderVsCanonical') ].forEach(c => vm.runInContext(c, sb));
 
@@ -101,6 +102,28 @@ console.log('\nEQUIVALENCE GATE — auditAurixRenderVsCanonical PASS for every r
     '1y': (() => { const t0 = NOW - 360 * DAY, n = 240, p = []; for (let i = 0; i < n; i++) p.push({ time: t0 + Math.round(i * 360 * DAY / (n - 1)), value: (i < 80 ? 8000 : 52000) + 400 * Math.sin(i) }); p[n - 1].time = NOW; return p; })(),
     'all': cont(380, 700 * DAY, 30000) };
   for (const r of ['24h', '7d', '30d', '1y', 'all']) { setSeries(shapes[r]); const a = auditAurixRenderVsCanonical(r); ck(r + ' faithful', faithful(a) && a.diffs.length === 0, a.status); allFaithful = allFaithful && faithful(a); } }
+
+console.log('\nPERCEPTUAL X DISTRIBUTION — no empty islands; line walkable across full width:');
+{ // sparse early (monthly) + dense recent — the classic "island" shape on 1A
+  const t0 = NOW - 300 * DAY, denseStart = NOW - 30 * DAY, pts = [];
+  for (let tt = t0; tt < denseStart - DAY; tt += 30 * DAY) pts.push({ time: tt, value: 40000 + ((tt - t0) / DAY) * 5 });
+  for (let i = 0; i < 200; i++) pts.push({ time: denseStart + Math.round(i * 30 * DAY / 199), value: 60000 + 500 * Math.sin(i * 0.5) });
+  pts[pts.length - 1].time = NOW; pts.sort((a, b) => a.time - b.time);
+  setSeries(pts);
+  const rc = renderAurixInstitutionalChart('1y', 1000, 240, { left: 60, right: 940, top: 24, bottom: 211.2 });
+  const a = auditAurixRenderVsCanonical('1y');
+  const px = rc.visiblePixels, W = 940 - 60;
+  // largest consecutive horizontal gap under the engine's perceptual X (fill-blend)
+  let maxGapFill = 0; for (let i = 1; i < px.length; i++) maxGapFill = Math.max(maxGapFill, (px[i].x - px[i - 1].x) / W);
+  // largest consecutive horizontal gap under PURE real-time spacing (what made islands)
+  const vts = rc.visiblePoints, span = vts[vts.length - 1].time - vts[0].time;
+  let maxGapTime = 0; for (let i = 1; i < vts.length; i++) maxGapTime = Math.max(maxGapTime, (vts[i].time - vts[i - 1].time) / span);
+  ck('xScaleMode = fill-blend', rc.renderMeta.xScaleMode === 'fill-blend', 'β=' + rc.renderMeta.xFillBeta);
+  ck('no empty island (max x-gap < 25% of width)', maxGapFill < 0.25, (maxGapFill * 100).toFixed(1) + '%');
+  ck('fill-blend much more even than pure time', maxGapFill < maxGapTime * 0.6, 'fill ' + (maxGapFill * 100).toFixed(1) + '% vs time ' + (maxGapTime * 100).toFixed(1) + '%');
+  ck('equivalence still faithful (data untouched)', faithful(a) && a.diffs.length === 0, a.status);
+  ck('x strictly increasing (order preserved, no overlap)', px.every((p, i) => i === 0 || p.x > px[i - 1].x));
+  ck('first at left edge, last at right edge', Math.abs(px[0].x - 60) < 0.5 && Math.abs(px[px.length - 1].x - 940) < 0.5); }
 
 console.log('\nDETERMINISM:');
 { setSeries(cont(300, 7 * DAY, 65000));

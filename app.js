@@ -18957,8 +18957,52 @@ function downsampleAurixAdaptive(points, targetPointCount) {
   return base.concat(extra).sort((a, b) => a.time - b.time);
 }
 
+// SPEC 6.1 — PERCEPTUAL X DISTRIBUTION (fill-blend). Premium charts (TradingView /
+// Wealthica) do NOT space points strictly by real time — that leaves "islands" of
+// activity separated by big empty zones (recent detail crammed right, sparse history
+// spread thin and smooth on the left). This maps each point's x to a BLEND of its
+// real-time position and its ordinal (equal-spacing) position: idle gaps compress,
+// active/dense regions expand, so the whole line is rich and the cursor finds a real
+// point almost everywhere. PURE RENDER: points/timestamps/values are unchanged (the
+// tooltip shows the real time/value); equivalence with the canonical series is
+// unaffected — only the on-screen x of each REAL point changes. Monotone in time →
+// order preserved, no overlaps. β per range (more fill on long ranges where islands
+// appear). β=0 would be pure real-time.
+const _AURIX_X_FILL_BETA = { '24h': 0.30, '7d': 0.40, '30d': 0.50, '1y': 0.65, 'all': 0.70 };
+function computeAurixAdaptiveXScale(points, viewportWidth, box, range) {
+  const vw = Math.max(240, Math.min(4000, Number(viewportWidth) || 390));
+  let left, right;
+  if (box && Number.isFinite(box.left) && Number.isFinite(box.right)) { left = box.left; right = Math.max(box.left + 1, box.right); }
+  else { const pad = vw * _AURIX_RC_PAD_FRAC; left = pad; right = Math.max(left + 1, vw - pad); }
+  const width = right - left;
+  const pts = Array.isArray(points) ? points : [];
+  const n = pts.length;
+  const xMin = n ? pts[0].time : 0, xMax = n ? pts[n - 1].time : 1, span = (xMax - xMin) || 1;
+  const beta = Math.max(0, Math.min(1, (range && _AURIX_X_FILL_BETA[range] != null) ? _AURIX_X_FILL_BETA[range] : 0.5));
+  const xs = new Array(n);
+  if (n <= 1) { for (let i = 0; i < n; i++) xs[i] = left; return { xMin, xMax, left, right, width, xs, beta, mode: 'fill-blend', x: () => left }; }
+  const equal = 1 / (n - 1);
+  const shares = new Array(n - 1); let sum = 0;
+  for (let i = 0; i < n - 1; i++) { const tw = (pts[i + 1].time - pts[i].time) / span; const s = (1 - beta) * tw + beta * equal; shares[i] = s; sum += s; }
+  if (!(sum > 0)) sum = 1;
+  xs[0] = left; let acc = 0;
+  for (let i = 0; i < n - 1; i++) { acc += shares[i] / sum; xs[i + 1] = left + acc * width; }
+  xs[n - 1] = right;                                   // pin the last point exactly to the right edge
+  // x(t) — interpolate within the bracketing real points (for gap markers / arbitrary t).
+  const x = t => {
+    if (t <= pts[0].time) return left;
+    if (t >= pts[n - 1].time) return right;
+    let lo = 0, hi = n - 1;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (pts[m].time <= t) lo = m; else hi = m; }
+    const seg = (pts[hi].time - pts[lo].time) || 1;
+    return xs[lo] + (xs[hi] - xs[lo]) * ((t - pts[lo].time) / seg);
+  };
+  return { xMin, xMax, left, right, width, xs, beta, mode: beta > 0 ? 'fill-blend' : 'time-linear', x };
+}
+
 // §4 — real timestamp scale. x is proportional to the real timestamp (NEVER the
-// array index): equal durations map to equal pixel distances.
+// array index): equal durations map to equal pixel distances. (Kept for reference /
+// direct callers; the engine uses computeAurixAdaptiveXScale for the visible chart.)
 function computeAurixTimeScale(points, viewportWidth, box) {
   const vw = Math.max(240, Math.min(4000, Number(viewportWidth) || 390));
   let left, right;
@@ -19136,7 +19180,7 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
   // SPEC 4 — optional pixel box (left/right/top/bottom) so a host surface (WSC)
   // can have the engine map straight into its own plot box. Backward compatible:
   // without `layout`, the engine uses its own padding (SPEC 3 behaviour).
-  const xScale = computeAurixTimeScale(visiblePoints, vw, layout);
+  const xScale = computeAurixAdaptiveXScale(visiblePoints, vw, layout, r);   // SPEC 6.1 — perceptual X
   const yScale = computeAurixValueScale(visiblePoints, vh, layout);
   const scale = { xMin: xScale.xMin, xMax: xScale.xMax, yMin: yScale.yMin, yMax: yScale.yMax,
     x: xScale.x, y: yScale.y, top: yScale.top, bottom: yScale.bottom };
@@ -19189,7 +19233,7 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
       source: 'prepared-series', deterministic: true,
       pointCountBefore: srcPts.length, pointCountAfter: visiblePoints.length,
       targetPointCount: target, interpolation: 'monotonic', downsampling: 'lttb+local-extrema',
-      yScaleMode: yScale.mode,
+      yScaleMode: yScale.mode, xScaleMode: xScale.mode, xFillBeta: xScale.beta,
       lastValue: lastV != null ? +lastV.toFixed(2) : null,
       dashboardValue: prepared.meta.dashboardValue,
       lastDeltaPct: prepared.meta.lastDeltaPct,
@@ -19287,28 +19331,27 @@ function auditAurixRenderPrecision(range, viewportWidth, viewportHeight, box) {
   let rendered;
   try { rendered = renderAurixInstitutionalChart(r, W, H, bx); }
   catch (e) { out.failures.push('render_threw:' + ((e && e.message) || 'err')); out.status = 'fail'; return out; }
-  const vp = rendered.visiblePoints || [], sc = rendered.scale, m = rendered.renderMeta;
-  if (vp.length < 2 || !rendered.pathData) { out.failures.push('insufficient_points'); return out; }
+  const vp = rendered.visiblePoints || [], px = rendered.visiblePixels || [], m = rendered.renderMeta;
+  if (vp.length < 2 || !rendered.pathData || px.length !== vp.length) { out.failures.push('insufficient_points'); return out; }
 
-  const dx = (sc.xMax - sc.xMin) || 1, dy = (sc.yMax - sc.yMin) || 1, bw = bx.right - bx.left, bh = bx.bottom - bx.top;
-  const xPix = t => bx.left + ((t - sc.xMin) / dx) * bw;             // SAME map the WSC tooltip uses
-  const yPix = v => bx.bottom - ((v - sc.yMin) / dy) * bh;
+  // SPEC 6.1 — audit the ACTUAL rendered pixels (scale-mode-agnostic: works under
+  // perceptual X + linear/legible Y), not a recomputed linear mapping.
   const nums = (rendered.pathData.match(/-?\d+(?:\.\d+)?/g) || []).map(Number);
   const firstX = nums[0], firstY = nums[1], lastX = nums[nums.length - 2], lastY = nums[nums.length - 1];
   const near = (a, b, e) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= (e == null ? 0.06 : e);
-  const first = vp[0], last = vp[vp.length - 1];
+  const pFirst = px[0], pLast = px[px.length - 1];
 
-  out.checks.lastXAtRightEdge   = near(xPix(last.time), bx.right);
+  out.checks.lastXAtRightEdge   = near(pLast.x, bx.right);
   out.checks.lastValueIsDashboard = (m.lastValue === m.dashboardValue) && (m.lastDeltaPct == null || Math.abs(m.lastDeltaPct) <= 0.5);
-  out.checks.lastKnotOnPath     = near(lastX, xPix(last.time)) && near(lastY, yPix(last.value));
+  out.checks.lastKnotOnPath     = near(lastX, pLast.x) && near(lastY, pLast.y);
   out.checks.pathStartsWithMove = /^M /.test(rendered.pathData);
-  out.checks.firstKnotOnPath    = near(firstX, xPix(first.time)) && near(firstY, yPix(first.value));
+  out.checks.firstKnotOnPath    = near(firstX, pFirst.x) && near(firstY, pFirst.y);
   const subpaths = rendered.pathData.split(/(?=M )/).map(s => s.trim()).filter(Boolean);
   out.checks.areaSharesLineBase = subpaths.every(sp => rendered.areaPathData.indexOf(sp) >= 0);
   out.checks.areaClosed         = /Z\s*$/.test(rendered.areaPathData.trim());
   out.checks.noOvershoot        = m.overshootDetected === false;
   let within = true;
-  for (const p of vp) { const x = xPix(p.time), y = yPix(p.value); if (x < bx.left - 0.5 || x > bx.right + 0.5 || y < bx.top - 0.5 || y > bx.bottom + 0.5) { within = false; break; } }
+  for (const p of px) { if (p.x < bx.left - 0.5 || p.x > bx.right + 0.5 || p.y < bx.top - 0.5 || p.y > bx.bottom + 0.5) { within = false; break; } }
   out.checks.knotsWithinPlot    = within;
   out.checks.tooltipKnotsOnPath = out.checks.firstKnotOnPath && out.checks.lastKnotOnPath;
 
@@ -19442,7 +19485,7 @@ if (typeof window !== 'undefined') {
         droppedByDownsampling: a.droppedByDownsampling,
         preservedExtremes: !!(a.maxMatch && a.minMatch),
         firstPreserved: !!a.firstMatch, lastPreserved: !!a.lastMatch,
-        yScaleMode: rc.renderMeta.yScaleMode,
+        yScaleMode: rc.renderMeta.yScaleMode, xScaleMode: rc.renderMeta.xScaleMode, xFillBeta: rc.renderMeta.xFillBeta,
         equivalence: a.status,
       };
     });
