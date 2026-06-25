@@ -60,13 +60,12 @@ function clusterEnd() {
   for (let i = 0; i < 20; i++) pts.push({ time: t0 + (0.995 + (i / 19) * 0.005) * span, value: 70040 + i });
   return pts;
 }
-// 24H with a 3-hour hole in the middle (> the 90-min threshold).
+// 24H with a real 12-hour hole in the middle (exceeds the adaptive gap threshold).
 function withGap() {
-  const t1 = NOW, t0 = NOW - DAY, pts = [];
-  for (let i = 0; i < 10; i++) pts.push({ time: t0 + i * 40 * MIN, value: 70000 + i * 8 });        // 0 .. 6h
-  const after = t0 + 9 * 40 * MIN + 3 * HOUR;                                                        // +3h hole
-  for (let i = 0; i < 10; i++) pts.push({ time: after + i * 40 * MIN, value: 70100 + i * 8 });
-  pts[pts.length - 1].time = t1;
+  const t0 = NOW - DAY, pts = [];
+  for (let i = 0; i < 9; i++) pts.push({ time: t0 + i * 30 * MIN, value: 70000 + i * 8 });        // 0 .. 4h
+  const after = t0 + 16 * HOUR;                                                                    // 12h hole (4h..16h)
+  for (let i = 0; i < 16; i++) pts.push({ time: after + i * 30 * MIN, value: 70100 + i * 8 });     // 16h .. 23.5h
   return pts;
 }
 // sharp climb then a long flat plateau (plateau interior = redundant: tiny delta vs big span).

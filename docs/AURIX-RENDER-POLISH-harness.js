@@ -49,12 +49,11 @@ function healthy(n, spanMs, base, drift, amp) {
   const t0 = NOW - spanMs;
   return Array.from({ length: n }, (_, i) => ({ time: t0 + Math.round(i * spanMs / (n - 1)), value: base + i * drift + amp * Math.sin(i * 0.7) }));
 }
-function withGap() {
+function withGap() {   // 24H with a real 12-hour hole (exceeds the adaptive gap threshold)
   const t0 = NOW - DAY, pts = [];
-  for (let i = 0; i < 14; i++) pts.push({ time: t0 + i * 30 * MIN, value: 70000 + i * 8 });
-  const after = t0 + 13 * 30 * MIN + 3 * HOUR;
-  for (let i = 0; i < 14; i++) pts.push({ time: after + i * 30 * MIN, value: 70120 + i * 8 });
-  pts[pts.length - 1].time = NOW;
+  for (let i = 0; i < 9; i++) pts.push({ time: t0 + i * 30 * MIN, value: 70000 + i * 8 });
+  const after = t0 + 16 * HOUR;
+  for (let i = 0; i < 16; i++) pts.push({ time: after + i * 30 * MIN, value: 70120 + i * 8 });
   return pts;
 }
 const lastV = s => s[s.length - 1].value;

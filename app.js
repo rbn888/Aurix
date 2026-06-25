@@ -18641,13 +18641,22 @@ const _AURIX_VP_DENSITY = {
   '1y':  { min: 140, max: 220 },
   'all': { min: 140, max: 250 },
 };
-const _AURIX_VP_GAP_MS = {
-  '24h': 90 * 60e3,    // 90 min
-  '7d':  8 * 36e5,     // 8 h
-  '30d': 36 * 36e5,    // 36 h
-  '1y':  21 * 864e5,   // 21 d
-  // 'all' → adaptive (computed from total span)
+// BUGFIX P0 — gap thresholds are ADAPTIVE, not fixed absolutes. The previous fixed
+// values (24h:90min, 7d:8h, 30d:36h, 1y:21d) were far smaller than real snapshot
+// cadence, so ordinary sampling intervals (overnight quiet, weekends, sparser old
+// history) were misclassified as gaps and fragmented every range — and shattered
+// the early 1A/TOTAL history into stubs (it read as "missing"). A gap now requires a
+// hole that DWARFS the data's own rhythm (≥ MEDIAN_MULT × the median interval) AND
+// exceeds a generous absolute floor — so continuous data is drawn continuous and
+// only a genuine, large, documented outage breaks the line.
+const _AURIX_VP_GAP_FLOOR_MS = {
+  '24h': 8 * 36e5,     // 8 h   — an 8h+ hole in a 24h window
+  '7d':  2 * 864e5,    // 2 d
+  '30d': 7 * 864e5,    // 7 d
+  '1y':  45 * 864e5,   // 45 d
+  'all': 45 * 864e5,   // 45 d  (also floored to span/8 below)
 };
+const _AURIX_VP_GAP_MEDIAN_MULT = 8;   // a real gap is ≥ 8× the median inter-point interval
 const _AURIX_VP_CAPITAL_KINDS = { deposit: 1, withdrawal: 1, asset_add: 1, asset_remove: 1, import_baseline: 1 };
 const _AURIX_VP_CLUSTER_WIDTH_PX = 5;   // a band of ≤5px …
 const _AURIX_VP_CLUSTER_MIN_PTS  = 4;   // … holding ≥4 points is a visual cluster
@@ -18679,6 +18688,7 @@ function _aurixComputeVisualPreparation(range, series, dashboardValue, viewportW
     sourcePoints: src,
     preparedPoints: src.map(p => ({ time: p.time, value: p.value })),   // SPEC 2: real points only, no removal
     gaps: [], clusters: [], redundantPoints: [], capitalEvents: [],
+    gapThresholdMs: 0, medianIntervalMs: 0,
     targetPointCount: _aurixVpTargetPointCount(r, vw),
     actualPointCount: src.length,
     firstPoint: src.length ? { time: src[0].time, value: +src[0].value.toFixed(2) } : null,
@@ -18699,12 +18709,23 @@ function _aurixComputeVisualPreparation(range, series, dashboardValue, viewportW
   const t0 = src[0].time, t1 = src[n - 1].time, totalSpan = (t1 - t0) || 1;
 
   // ── §3 GAPS (real temporal holes; detect + report, do NOT cut) ─────────────
-  const gapThr = (r === 'all') ? Math.max(3 * 864e5, totalSpan / 12) : (_AURIX_VP_GAP_MS[r] || 36 * 36e5);
+  // BUGFIX P0 — adaptive threshold: a gap must be ≥ MEDIAN_MULT × the median
+  // inter-point interval AND exceed the per-range absolute floor. This keeps a
+  // continuous (even if irregularly sampled) series continuous and only cuts on a
+  // genuine, large outage. Every cut is reported with its threshold for debug.
+  const intervals = []; for (let i = 1; i < n; i++) intervals.push(src[i].time - src[i - 1].time);
+  const ivSorted = intervals.slice().sort((a, b) => a - b);
+  const medianIv = ivSorted.length ? ivSorted[ivSorted.length >> 1] : 0;
+  const floor = (r === 'all')
+    ? Math.max(_AURIX_VP_GAP_FLOOR_MS.all, totalSpan / 8)
+    : (_AURIX_VP_GAP_FLOOR_MS[r] || 7 * 864e5);
+  const gapThr = Math.max(floor, medianIv * _AURIX_VP_GAP_MEDIAN_MULT);
+  out.gapThresholdMs = gapThr; out.medianIntervalMs = medianIv;
   const gapAdjacent = new Set();
   for (let i = 1; i < n; i++) {
     const dur = src[i].time - src[i - 1].time;
     if (dur > gapThr) {
-      out.gaps.push({ start: src[i - 1].time, end: src[i].time, durationMs: dur, reason: 'time_gap' });
+      out.gaps.push({ start: src[i - 1].time, end: src[i].time, durationMs: dur, threshold: gapThr, reason: 'time_gap' });
       gapAdjacent.add(i - 1); gapAdjacent.add(i);
     }
   }
@@ -18982,7 +19003,7 @@ function buildAurixAreaPath(linePathData, points, scale) {
 
 // §8 — split the visible points into runs at real gaps (read from PreparedSeries)
 // so the line is NOT drawn solid-continuous across a temporal hole.
-function _aurixSplitAtGaps(points, gaps) {
+function _aurixSplitAtGaps(points, gaps, diag) {
   if (!points.length) return [];
   const gs = Array.isArray(gaps) ? gaps : [];
   const runs = []; let cur = [points[0]];
@@ -18992,6 +19013,7 @@ function _aurixSplitAtGaps(points, gaps) {
     if (brk) { runs.push(cur); cur = [points[i]]; } else cur.push(points[i]);
   }
   runs.push(cur);
+  if (diag) { diag.preCoalesceSubpaths = runs.length; diag.isolatedPoints = runs.filter(rn => rn.length === 1).length; }
   // Coalesce singleton runs into a neighbour: a lone point can't be a line/area
   // subpath (it would emit an invisible M-only path with no matching area), and an
   // isolated FINAL point would leave the dashboard point undrawn. Merging keeps the
@@ -19003,6 +19025,7 @@ function _aurixSplitAtGaps(points, gaps) {
       else if (runs.length > 1) { runs[1] = runs[i].concat(runs[1]); runs.splice(i, 1); }
     }
   }
+  if (diag) diag.subpaths = runs.length;
   return runs;
 }
 
@@ -19027,14 +19050,15 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
   const scale = { xMin: xScale.xMin, xMax: xScale.xMax, yMin: yScale.yMin, yMax: yScale.yMax,
     x: xScale.x, y: yScale.y, top: yScale.top, bottom: yScale.bottom };
 
-  const runs = _aurixSplitAtGaps(visiblePoints, prepared.gaps);
-  let overshoot = false, fallbacks = 0; const linePieces = [], areaPieces = [];
+  const _splitDiag = {};
+  const runs = _aurixSplitAtGaps(visiblePoints, prepared.gaps, _splitDiag);
+  let overshoot = false, fallbacks = 0, droppedSubpaths = 0; const linePieces = [], areaPieces = [];
   runs.forEach(run => {
-    if (!run.length) return;
+    if (run.length < 2) { droppedSubpaths++; return; }   // never happens post-coalesce; guard only
     const mp = _aurixMonotonePath(run, xScale, yScale);
     if (mp.overshoot) overshoot = true; fallbacks += mp.lineFallbacks || 0;
     if (mp.d) linePieces.push(mp.d);
-    if (run.length >= 2 && mp.d) areaPieces.push(buildAurixAreaPath(mp.d, run, scale));
+    if (mp.d) areaPieces.push(buildAurixAreaPath(mp.d, run, scale));
   });
   const pathData = linePieces.join(' ');
   const areaPathData = areaPieces.join(' ');
@@ -19048,6 +19072,8 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
     amountUSD: e.amountUSD, visualPriority: e.visualPriority,
   }));
   const lastV = visiblePoints.length ? visiblePoints[visiblePoints.length - 1].value : null;
+  const sp = prepared.sourcePoints || [];
+  const ptMin = (a, i) => (a && a.length ? { time: a[i].time, value: +a[i].value.toFixed(2) } : null);
 
   return {
     range: r, viewportWidth: vw, viewportHeight: vh,
@@ -19062,6 +19088,23 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
       dashboardValue: prepared.meta.dashboardValue,
       lastDeltaPct: prepared.meta.lastDeltaPct,
       overshootDetected: overshoot, lineFallbackSegments: fallbacks,
+    },
+    // BUGFIX P0 — full render diagnostics (continuity / gap accountability).
+    diagnostics: {
+      sourcePoints: sp.length,
+      preparedPoints: srcPts.length,
+      visiblePoints: visiblePoints.length,
+      gapCount: (prepared.gaps || []).length,
+      gapThresholdMs: prepared.gapThresholdMs || 0,
+      medianIntervalMs: prepared.medianIntervalMs || 0,
+      renderedSubpaths: linePieces.length,
+      droppedSubpaths,
+      isolatedPoints: _splitDiag.isolatedPoints || 0,
+      preCoalesceSubpaths: _splitDiag.preCoalesceSubpaths || 0,
+      firstSourcePoint: ptMin(sp, 0),
+      firstRenderedPoint: ptMin(visiblePoints, 0),
+      lastSourcePoint: sp.length ? ptMin(sp, sp.length - 1) : null,
+      lastRenderedPoint: visiblePoints.length ? ptMin(visiblePoints, visiblePoints.length - 1) : null,
     },
   };
 }
@@ -19082,23 +19125,27 @@ if (typeof window !== 'undefined') {
     return rc;   // visible WSC/V2 render is NOT touched in SPEC 3 (deferred to SPEC 4)
   };
   const _irRow = rc => {
-    const m = rc.renderMeta;
+    const m = rc.renderMeta, dg = rc.diagnostics || {};
     const status = (m.lastDeltaPct != null && Math.abs(m.lastDeltaPct) <= 0.5) ? 'ok'
       : (m.pointCountAfter < 2 ? 'building' : 'review');
     // SPEC 4 §9 — live WSC integration state (from the last paint of this range, if any).
     let st = null;
     try { const all = window._aurixWscRenderState || {}; const d = all.d; if (d && d.range === rc.range) st = d; } catch (_) {}
+    const v = p => p ? p.value : null;
     return {
-      range: rc.range, pointCountBefore: m.pointCountBefore, pointCountAfter: m.pointCountAfter,
-      targetPointCount: m.targetPointCount, downsampling: m.downsampling, interpolation: m.interpolation,
-      gaps: rc.gapSegments.length, eventMarkers: rc.eventMarkers.length,
+      range: rc.range,
+      // BUGFIX P0 — continuity accountability (criteria §7)
+      sourcePoints: dg.sourcePoints, preparedPoints: dg.preparedPoints, visiblePoints: dg.visiblePoints,
+      gapCount: dg.gapCount, gapThresholdMs: dg.gapThresholdMs, medianIntervalMs: dg.medianIntervalMs,
+      renderedSubpaths: dg.renderedSubpaths, droppedSubpaths: dg.droppedSubpaths, isolatedPoints: dg.isolatedPoints,
+      firstSourcePoint: v(dg.firstSourcePoint), firstRenderedPoint: v(dg.firstRenderedPoint),
+      lastSourcePoint: v(dg.lastSourcePoint), lastRenderedPoint: v(dg.lastRenderedPoint),
+      targetPointCount: m.targetPointCount, interpolation: m.interpolation,
       lastValue: m.lastValue, dashboardValue: m.dashboardValue, lastDeltaPct: m.lastDeltaPct,
-      scaleYMin: rc.scale.yMin, scaleYMax: rc.scale.yMax, status,
+      overshoot: m.overshootDetected, status,
       visibleEnabled: _aurixInstitutionalRenderVisible(),
-      usedFallback: st ? st.usedFallback : null, fallbackReason: st ? (st.fallbackReason || '') : null,
-      pathAppliedToWSC: st ? st.pathAppliedToWSC : null, areaAppliedToWSC: st ? st.areaAppliedToWSC : null,
-      gapSegmentsRendered: st ? st.gapSegmentsRendered : rc.gapSegments.length,
-      eventMarkersRendered: st ? st.eventMarkersRendered : 0,
+      fallbackUsed: st ? st.usedFallback : null, reason: st ? (st.fallbackReason || '') : '',
+      pathAppliedToWSC: st ? st.pathAppliedToWSC : null,
     };
   };
   window.debugAurixInstitutionalRender = (range) => {

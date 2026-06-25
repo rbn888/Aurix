@@ -60,12 +60,11 @@ function dense(n, spanMs, base) {
   const t0 = NOW - spanMs;
   return Array.from({ length: n }, (_, i) => ({ time: t0 + Math.round(i * spanMs / (n - 1)), value: base + 200 * Math.sin(i * 0.3) }));
 }
-function withGap() {
+function withGap() {   // 24H with a real 12-hour hole (exceeds the adaptive gap threshold)
   const t0 = NOW - DAY, pts = [];
-  for (let i = 0; i < 10; i++) pts.push({ time: t0 + i * 40 * MIN, value: 70000 + i * 8 });
-  const after = t0 + 9 * 40 * MIN + 3 * HOUR;
-  for (let i = 0; i < 10; i++) pts.push({ time: after + i * 40 * MIN, value: 70100 + i * 8 });
-  pts[pts.length - 1].time = NOW;
+  for (let i = 0; i < 9; i++) pts.push({ time: t0 + i * 30 * MIN, value: 70000 + i * 8 });
+  const after = t0 + 16 * HOUR;
+  for (let i = 0; i < 16; i++) pts.push({ time: after + i * 30 * MIN, value: 70100 + i * 8 });
   return pts;
 }
 const lastV = s => s[s.length - 1].value;
