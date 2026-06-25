@@ -146,6 +146,15 @@ console.log('\nISOLATION PAGES (Fase 4/5) — exist + correct isolation:');
     ck('index-app-probe: loads app.js (controlled) + skips boot pipeline', /app\.js\?v=/.test(ap) && ap.indexOf('__APP_BOOTED__ = true') >= 0);
     ck('index-app-probe: reports appJsRequested/Loaded/Executed', ap.indexOf('appJsRequested') >= 0 && ap.indexOf('appJsLoaded') >= 0 && ap.indexOf('appJsExecuted') >= 0);
     ck('index-app-probe: heartbeat (thread-block detection)', ap.indexOf('tickCount') >= 0 && ap.indexOf('eventLoopBlockedNow') >= 0);
+  }
+  const tpPath = path.join(root, 'timer-proof.html');
+  ck('timer-proof.html exists', fs.existsSync(tpPath));
+  if (fs.existsSync(tpPath)) {
+    const tp = fs.readFileSync(tpPath, 'utf8');
+    ck('timer-proof: minimal — no fixed/inset/z-index/overlay', !/position:fixed/.test(tp) && tp.indexOf('inset') < 0 && tp.indexOf('z-index') < 0);
+    ck('timer-proof: no app.js / no external css', !/<script[^>]+src=/.test(tp) && !/<link[^>]+stylesheet/.test(tp));
+    ck('timer-proof: TIMER PROOF LOADED + tick + TIMER FIRED', tp.indexOf('TIMER PROOF LOADED') >= 0 && tp.indexOf("'tick: '") >= 0 && tp.indexOf('TIMER FIRED') >= 0);
+    ck('timer-proof: setInterval + setTimeout', tp.indexOf('setInterval(') >= 0 && tp.indexOf('setTimeout(') >= 0);
   } }
 
 console.log('\nRESULT:', ok ? 'ALL PASS ✓ — splash can never remain permanent; the break point is always reported' : 'FAIL ✗');
