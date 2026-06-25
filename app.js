@@ -19230,6 +19230,101 @@ if (typeof window !== 'undefined') {
 }
 
 // ════════════════════════════════════════════════════════════════════════
+// AURIX — RENDER ↔ CANONICAL EQUIVALENCE AUDIT (objective proof — render layer ONLY)
+//
+// Proves the Institutional Render represents the canonical series EXACTLY: every
+// rendered point is a real canonical point (same timestamp + identical value), the
+// first/last/global-max/global-min are preserved, order is chronological, nothing is
+// invented, and the ONLY reduction is documented LTTB downsampling (intermediate,
+// non-extremal points) — never a value/timestamp modification. PURE READ. Any
+// difference is reported with the exact point/timestamp/segment and the reason.
+// This isolates "visual difference" to the DRAWING algorithm (scale / monotone curve
+// / downsampling), proving the DATA is untouched.
+function _aurixCompareRenderToCanonical(rendered, canon) {
+  const R = (Array.isArray(rendered) ? rendered : []).filter(p => p && Number.isFinite(p.time) && Number.isFinite(p.value));
+  const C = (Array.isArray(canon) ? canon : []).filter(p => p && Number.isFinite(p.time) && Number.isFinite(p.value));
+  const out = {
+    pointsCanonical: C.length, pointsRendered: R.length, droppedByDownsampling: 0,
+    firstMatch: false, lastMatch: false, maxMatch: false, minMatch: false,
+    timestampsSubset: false, noInvented: false, monotonicTime: false,
+    diffs: [], status: 'unknown',
+  };
+  if (C.length < 1 || R.length < 1) { out.status = 'insufficient'; return out; }
+  const cByTs = new Map(); C.forEach(p => cByTs.set(p.time, p.value));
+  const eqV = (a, b) => Math.abs(a - b) <= Math.max(1e-6, Math.abs(b) * 1e-9);   // exact (float tol)
+  let invented = 0, monoOk = true, valueAltered = 0;
+  for (let i = 0; i < R.length; i++) {
+    if (i > 0 && R[i].time <= R[i - 1].time) monoOk = false;
+    if (!cByTs.has(R[i].time)) { invented++; out.diffs.push({ kind: 'invented_point', index: i, time: R[i].time, value: +R[i].value.toFixed(2), reason: 'rendered timestamp not present in canonical series' }); }
+    else if (!eqV(R[i].value, cByTs.get(R[i].time))) { valueAltered++; out.diffs.push({ kind: 'value_altered', index: i, time: R[i].time, rendered: +R[i].value.toFixed(4), canonical: +cByTs.get(R[i].time).toFixed(4), reason: 'rendered value differs from canonical at the same timestamp' }); }
+  }
+  out.noInvented = invented === 0 && valueAltered === 0;
+  out.timestampsSubset = R.every(p => cByTs.has(p.time));
+  out.monotonicTime = monoOk;
+  out.firstMatch = R[0].time === C[0].time && eqV(R[0].value, C[0].value);
+  out.lastMatch = R[R.length - 1].time === C[C.length - 1].time && eqV(R[R.length - 1].value, C[C.length - 1].value);
+  if (!out.firstMatch) out.diffs.push({ kind: 'first_point', rendered: { time: R[0].time, value: +R[0].value.toFixed(2) }, canonical: { time: C[0].time, value: +C[0].value.toFixed(2) }, reason: 'first rendered point != first canonical point' });
+  if (!out.lastMatch) out.diffs.push({ kind: 'last_point', rendered: { time: R[R.length - 1].time, value: +R[R.length - 1].value.toFixed(2) }, canonical: { time: C[C.length - 1].time, value: +C[C.length - 1].value.toFixed(2) }, reason: 'last rendered point != last canonical point' });
+  const cMax = C.reduce((a, b) => b.value > a.value ? b : a), cMin = C.reduce((a, b) => b.value < a.value ? b : a);
+  const rMax = R.reduce((a, b) => b.value > a.value ? b : a), rMin = R.reduce((a, b) => b.value < a.value ? b : a);
+  out.maxMatch = eqV(rMax.value, cMax.value) && rMax.time === cMax.time;
+  out.minMatch = eqV(rMin.value, cMin.value) && rMin.time === cMin.time;
+  if (!out.maxMatch) out.diffs.push({ kind: 'global_max', canonical: { time: cMax.time, value: +cMax.value.toFixed(2) }, rendered: { time: rMax.time, value: +rMax.value.toFixed(2) }, reason: 'global maximum not preserved in the rendered series' });
+  if (!out.minMatch) out.diffs.push({ kind: 'global_min', canonical: { time: cMin.time, value: +cMin.value.toFixed(2) }, rendered: { time: rMin.time, value: +rMin.value.toFixed(2) }, reason: 'global minimum not preserved in the rendered series' });
+  out.droppedByDownsampling = Math.max(0, C.length - R.length);
+  const exact = out.firstMatch && out.lastMatch && out.maxMatch && out.minMatch &&
+    out.timestampsSubset && out.noInvented && out.monotonicTime && out.diffs.length === 0;
+  out.status = exact ? (out.droppedByDownsampling > 0 ? 'faithful-downsampled' : 'exact') : 'divergent';
+  return out;
+}
+
+// Per-range audit: rendered visible points vs the canonical series the render
+// consumes (getAurixRenderSeries(range) = the windowed canonical). Adds gap/jump
+// accountability so a discontinuity or a vertical move is proven to be REAL data.
+function auditAurixRenderVsCanonical(range) {
+  const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '30d')).toLowerCase();
+  let canon = [];
+  try { canon = (getAurixRenderSeries(r) || []).map(p => ({ time: p.time, value: p.value })); } catch (_) { canon = []; }
+  let rc;
+  try { rc = renderAurixInstitutionalChart(r); } catch (e) { return { range: r, status: 'render_error', error: String(e && e.message), diffs: [] }; }
+  const cmp = _aurixCompareRenderToCanonical(rc.visiblePoints, canon);
+  cmp.range = r;
+  cmp.gapCount = (rc.gaps || []).length;
+  cmp.gapThresholdMs = rc.diagnostics ? rc.diagnostics.gapThresholdMs : null;
+  cmp.medianIntervalMs = rc.diagnostics ? rc.diagnostics.medianIntervalMs : null;
+  cmp.gaps = (rc.gaps || []).map(g => ({ start: g.start, end: g.end, durationMs: g.durationMs, threshold: g.threshold, reason: g.reason }));
+  // largest consecutive value move among RENDERED points + proof both ends are real
+  let bigJump = null;
+  const R = rc.visiblePoints || [];
+  for (let i = 1; i < R.length; i++) {
+    const d = Math.abs(R[i].value - R[i - 1].value);
+    if (!bigJump || d > bigJump.deltaAbs) bigJump = { deltaAbs: +d.toFixed(2), fromTs: R[i - 1].time, toTs: R[i].time, fromValue: +R[i - 1].value.toFixed(2), toValue: +R[i].value.toFixed(2), dtMs: R[i].time - R[i - 1].time };
+  }
+  cmp.largestRenderedJump = bigJump;
+  cmp.dashboardValue = rc.renderMeta.dashboardValue;
+  cmp.lastValue = rc.renderMeta.lastValue;
+  cmp.overshootDetected = rc.renderMeta.overshootDetected;
+  return cmp;
+}
+
+if (typeof window !== 'undefined') {
+  window.auditAurixRenderVsCanonical = (range) => auditAurixRenderVsCanonical(range || (typeof activeRange !== 'undefined' ? activeRange : '30d'));
+  window.auditAurixRenderVsCanonicalAll = () => {
+    const rows = ['24h', '7d', '30d', '1y', 'all'].map(auditAurixRenderVsCanonical);
+    try {
+      console.table(rows.map(a => ({
+        range: a.range, status: a.status, canonical: a.pointsCanonical, rendered: a.pointsRendered,
+        droppedDownsample: a.droppedByDownsampling, gaps: a.gapCount,
+        first: a.firstMatch, last: a.lastMatch, max: a.maxMatch, min: a.minMatch,
+        tsSubset: a.timestampsSubset, noInvented: a.noInvented, diffs: (a.diffs || []).length,
+      })));
+      rows.forEach(a => { if (a.diffs && a.diffs.length) console.log('[render-equivalence] ' + a.range + ' DIFFS:', a.diffs); });
+    } catch (_) {}
+    return rows;
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════
 // AURIX-RETURN-UNIFY-1 — SINGLE SOURCE OF TRUTH for the timeframe RETURN that
 // every surface shows (hero WSC badge, "Resumen de rendimiento", computeRangePnL).
 //
@@ -21556,6 +21651,18 @@ function renderWealthCurve(animate) {
   const paint = () => {
     try { _wscPaintSurface(document.getElementById('chartChange'),       document.getElementById('perfSnapshot'),     { uid: 'd', tooltip: true  }); } catch (_) {}
     try { _wscPaintSurface(document.getElementById('chartChangeMobile'), document.getElementById('wealthCurveMobile'), { uid: 'm', tooltip: false }); } catch (_) {}
+    // AUTOMATIC render↔canonical equivalence audit (read-only). Caches the verdict
+    // for the active range on window._aurixRenderEquivalence and warns ONLY on a real
+    // divergence (a fabricated/altered/lost-as-corrupted point) — a faithful downsample
+    // is expected and not flagged. Never throws / never affects the paint.
+    try {
+      if (_aurixInstitutionalRenderVisible()) {
+        const a = auditAurixRenderVsCanonical(activeRange);
+        window._aurixRenderEquivalence = window._aurixRenderEquivalence || {};
+        window._aurixRenderEquivalence[activeRange] = a;
+        if (a && a.status === 'divergent') console.warn('[AURIX][render-equivalence] DIVERGENT', { range: activeRange, diffs: a.diffs });
+      }
+    } catch (_) {}
   };
   if (animate && !_dshReducedMotion()) {
     paint();
