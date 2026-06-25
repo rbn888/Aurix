@@ -101,12 +101,28 @@ console.log('\nLIVE FILES — watchdog + instrumentation present:');
   ck('index.html: 8s deadline + 14s backstop', idx.indexOf('8000') >= 0 && idx.indexOf('14000') >= 0);
   ck('index.html: recoverable diagnostic panel + retry', idx.indexOf('aurixBootDiag') >= 0 && idx.indexOf('aurixBootRetry') >= 0);
   ck('index.html: NO reload in boot guard (loop impossible)', idx.indexOf('window.location.reload') < 0);
-  ck('index.html: app.js tag has onerror + v=363', /app\.js\?v=363/.test(idx) && idx.indexOf('app_js_load_error') >= 0);
+  ck('index.html: app.js tag has onerror + v=364', /app\.js\?v=364/.test(idx) && idx.indexOf('app_js_load_error') >= 0);
+  ck('index.html: visible build stamp in splash', idx.indexOf('aurixBuildStamp') >= 0 && idx.indexOf('watchdog armed') >= 0);
+  ck('index.html: no-cache meta tags', /http-equiv="Cache-Control"/.test(idx) && /no-store/.test(idx));
   const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
   ck('app.js: first-line execution mark (appJsExecuted)', app.indexOf("window.__AURIX_BOOT.appJsExecuted = true") >= 0);
   ck('app.js: bootstrap_start mark', app.indexOf("'bootstrap_start'") >= 0);
   ck('app.js: dashboard_rendered → dashboardReady', app.indexOf("'dashboard_rendered'") >= 0);
   ck('app.js: splash_hidden mark', app.indexOf("'splash_hidden'") >= 0); }
+
+console.log('\nBOOT-CHECK PAGE — standalone (no app.js), shows build + storage probes:');
+{ const bcPath = path.join(root, 'boot-check.html');
+  ck('boot-check.html exists', fs.existsSync(bcPath));
+  if (fs.existsSync(bcPath)) {
+    const bc = fs.readFileSync(bcPath, 'utf8');
+    ck('boot-check: independent of app.js', bc.indexOf('app.js') >= 0 ? /index\.html\?fresh=/.test(bc) : true, 'no <script src=app.js>');
+    ck('boot-check: no <script src="app.js">', !/<script[^>]+src=["']app\.js/.test(bc));
+    ck('boot-check: shows build + html timestamp', bc.indexOf('bootCheckBuild') >= 0 && bc.indexOf('bootCheckHtmlTimestamp') >= 0);
+    ck('boot-check: storage probes (local + session)', bc.indexOf("probe('localStorage')") >= 0 && bc.indexOf("probe('sessionStorage')") >= 0);
+    ck('boot-check: reads deployed index build', bc.indexOf('deployedIndexBuild') >= 0 && /fetch\(/.test(bc));
+    ck('boot-check: cache-buster button to open Aurix', bc.indexOf('openFresh') >= 0 && /index\.html\?fresh=/.test(bc));
+    ck('boot-check: userAgent shown', bc.indexOf('userAgent') >= 0);
+  } }
 
 console.log('\nRESULT:', ok ? 'ALL PASS ✓ — splash can never remain permanent; the break point is always reported' : 'FAIL ✗');
 process.exit(ok ? 0 : 1);

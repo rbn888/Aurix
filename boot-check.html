@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es" style="background:#070a14">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>AURIX · boot-check</title>
+  <style>
+    html,body{margin:0;background:#070a14;color:#cdd9ef;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}
+    .wrap{padding:22px 16px;max-width:760px;margin:0 auto}
+    h1{font:700 17px/1.2 -apple-system,system-ui;color:#7fb0ff;margin:0 0 4px}
+    .sub{color:#9fb4d8;margin:0 0 16px}
+    .box{background:#0c1426;border:1px solid #1c2b49;border-radius:10px;padding:14px;white-space:pre-wrap;word-break:break-word;margin:0 0 14px}
+    .k{color:#6f8bbf}
+    .ok{color:#5bd6a0}.bad{color:#ff8a8a}
+    button{display:block;width:100%;margin:8px 0;padding:13px 16px;background:#1b3a6b;color:#fff;border:0;border-radius:9px;font:600 15px/1 -apple-system,system-ui}
+    button.alt{background:#102136;border:1px solid #244067}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>AURIX · boot-check</h1>
+    <p class="sub">Página independiente de app.js. Si la ves, tu dispositivo SÍ recibe HTML fresco del servidor.</p>
+    <div class="box" id="local">cargando…</div>
+    <div class="box" id="deployed">comprobando build desplegado…</div>
+    <button id="openFresh">Abrir Aurix (cache-buster)</button>
+    <button id="resetOpen" class="alt">Borrar almacenamiento + abrir Aurix</button>
+    <button id="reloadCheck" class="alt">Recargar este boot-check</button>
+  </div>
+  <script>
+    (function () {
+      var BUILD = 'v357-bootcheck';
+      var HTML_TS = '2026-06-25T18:21:27Z';
+      // Aggressively shed any legacy service worker / cache for this phase.
+      try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){try{r.unregister();}catch(_){}});}).catch(function(){}); } catch (_) {}
+      try { if (typeof caches !== 'undefined' && caches.keys) caches.keys().then(function(ks){ks.forEach(function(k){try{caches.delete(k);}catch(_){}});}).catch(function(){}); } catch (_) {}
+
+      function probe(kind) {
+        try { var s = window[kind]; var key = '__aurix_probe__'; s.setItem(key, '1'); var v = s.getItem(key); s.removeItem(key); return v === '1' ? 'OK' : 'FAIL'; }
+        catch (e) { return 'THROWS (' + ((e && e.name) || 'err') + ')'; }
+      }
+      var info = {
+        bootCheckBuild: BUILD,
+        bootCheckHtmlTimestamp: HTML_TS,
+        now: new Date().toISOString(),
+        url: location.href,
+        standalonePWA: (window.navigator.standalone === true) || (function(){try{return window.matchMedia('(display-mode: standalone)').matches;}catch(_){return false;}})(),
+        localStorage: probe('localStorage'),
+        sessionStorage: probe('sessionStorage'),
+        cachesAPI: (typeof caches !== 'undefined'),
+        serviceWorkerAPI: !!(navigator.serviceWorker),
+        userAgent: navigator.userAgent
+      };
+      document.getElementById('local').innerHTML = Object.keys(info).map(function (k) {
+        var val = String(info[k]);
+        var cls = (k === 'localStorage' || k === 'sessionStorage') ? (val === 'OK' ? 'ok' : 'bad') : '';
+        return '<span class="k">' + k + ':</span> <span class="' + cls + '">' + val.replace(/</g,'&lt;') + '</span>';
+      }).join('\n');
+
+      // Fetch the LIVE deployed index.html (cache-busted) and report its build, so you
+      // can compare "what is deployed" vs "what your app shows".
+      var u = 'index.html?cb=' + Date.now();
+      fetch(u, { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (html) {
+        var b = (html.match(/var BUILD = '([^']+)'/) || [])[1] || (html.match(/AURIX_BUILD = '([^']+)'/) || [])[1] || '(not found)';
+        var ts = (html.match(/HTML_TS = '([^']+)'/) || [])[1] || '(none)';
+        var appv = (html.match(/app\.js\?v=([0-9]+)/) || [])[1] || '(none)';
+        var hasWatchdog = html.indexOf('window.__AURIX_BOOT') >= 0;
+        document.getElementById('deployed').innerHTML =
+          '<span class="k">deployedIndexBuild:</span> <span class="ok">' + b + '</span>\n' +
+          '<span class="k">deployedHtmlTimestamp:</span> ' + ts + '\n' +
+          '<span class="k">deployedAppJs:</span> app.js?v=' + appv + '\n' +
+          '<span class="k">deployedHasWatchdog:</span> <span class="' + (hasWatchdog ? 'ok' : 'bad') + '">' + hasWatchdog + '</span>';
+      }).catch(function (e) {
+        document.getElementById('deployed').innerHTML = '<span class="bad">no se pudo leer index.html desplegado: ' + ((e && e.message) || e) + '</span>';
+      });
+
+      document.getElementById('openFresh').onclick = function () { location.href = 'index.html?fresh=' + Date.now(); };
+      document.getElementById('resetOpen').onclick = function () {
+        try { localStorage.clear(); } catch (_) {}
+        try { sessionStorage.clear(); } catch (_) {}
+        location.href = 'index.html?fresh=' + Date.now();
+      };
+      document.getElementById('reloadCheck').onclick = function () { location.href = 'boot-check.html?cb=' + Date.now(); };
+    })();
+  </script>
+</body>
+</html>

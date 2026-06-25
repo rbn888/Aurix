@@ -5,6 +5,11 @@
 <html lang="es" style="background:#070a14">
 <head>
   <meta charset="UTF-8">
+  <!-- P0 BOOT-CHECK: discourage stale-HTML caching on mobile (Safari/PWA). The real
+       cache-bust is the per-asset ?v= query + the never-cached /boot-check.html. -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <!-- AURIX-APP-DOMAIN-READY-1: no <base href>. Every asset/page link in this
        app is relative, so it resolves correctly both under the GitHub Pages
@@ -59,10 +64,27 @@
     // diagnostic panel (build, app.js version, last step reached, exception, whether
     // app.js executed, UA, timestamp) + a Retry. Runs synchronously before app.js.
     (function() {
-      var BUILD = 'v356-boot-watchdog';
-      var APPJS_V = '363';
+      var BUILD = 'v357-bootcheck';
+      var APPJS_V = '364';
+      var HTML_TS = '2026-06-25T18:21:27Z';     // baked at deploy — proves which HTML the device loaded
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
+      window.AURIX_HTML_TS = HTML_TS;
+      // Visible build stamp in the splash (proves which index.html the device actually
+      // loaded). If you see the blue logo with NO stamp, the device is on OLD cached HTML.
+      function _aurixStampSplash() {
+        try {
+          var bl = document.getElementById('bootLoader');
+          if (!bl || document.getElementById('aurixBuildStamp')) return false;
+          var s = document.createElement('div'); s.id = 'aurixBuildStamp';
+          s.style.cssText = 'position:fixed;left:0;right:0;bottom:14px;text-align:center;font:10px/1.4 ui-monospace,Menlo,monospace;color:#5e7bb0;opacity:.9;z-index:99998;padding:0 10px;white-space:pre-wrap';
+          s.textContent = BUILD + ' · app.js?v=' + APPJS_V + ' · ' + HTML_TS + ' · watchdog armed';
+          bl.appendChild(s);
+          return true;
+        } catch (_) { return false; }
+      }
+      if (document.getElementById('bootLoader')) _aurixStampSplash();
+      else document.addEventListener('DOMContentLoaded', _aurixStampSplash);
       var B = window.__AURIX_BOOT = {
         build: BUILD, appJsVersion: APPJS_V, t0: T0,
         steps: [], errors: [],
@@ -152,7 +174,7 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=311">
+  <link rel="stylesheet" href="styles.css?v=312">
 </head>
 <body style="background:#070a14">
 
@@ -1314,7 +1336,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=363"
+  <script src="app.js?v=364"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
