@@ -4,6 +4,55 @@
 // (⇒ app.js failed to load/parse). Pure instrumentation; never throws.
 try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX_BOOT.appJsExecuted = true; window.__AURIX_BOOT.mark('app_js_executing'); } } catch (_) {}
 
+// ════════════════════════════════════════════════════════════════════════
+// P0 BOOT PIPELINE — EARLY SPLASH GUARANTEE. This is the FIRST app.js logic, BEFORE
+// any migration / wiring / bootstrap. The previous splash failsafe lived ~36k lines
+// down, so ANY earlier top-level throw (e.g. a malformed-data migration) aborted
+// execution before the failsafe registered → infinite splash, iPhone-only when the
+// throw was data/environment-dependent. We now register an idempotent splash-hide +
+// a global 4.5s timeout + an error boundary up front, so a throw or finite hang
+// anywhere later can NEVER leave the AURIX logo permanent. (A true synchronous
+// infinite loop is the only unrecoverable case; the boot marks below localise it.)
+(function () {
+  if (typeof window === 'undefined') return;
+  try {
+    if (!window.__AURIX_BOOT) window.__AURIX_BOOT = { steps: [], errors: [], mark: function (s) { try { this.steps.push(s); } catch (_) {} } };
+    var B = window.__AURIX_BOOT;
+    window.__AURIX_SPLASH_HIDDEN = false;
+    window.hideSplashSafe = function (reason) {
+      try {
+        if (window.__AURIX_SPLASH_HIDDEN) return;
+        window.__AURIX_SPLASH_HIDDEN = true;
+        try { B.splashHideReason = reason; if (B.mark) B.mark('splash_hidden:' + reason); } catch (_) {}
+        try { var ar = document.getElementById('appRoot'); if (ar) ar.style.opacity = '1'; } catch (_) {}
+        var bl = document.getElementById('bootLoader');
+        if (bl) { bl.style.opacity = '0'; bl.style.pointerEvents = 'none'; setTimeout(function () { try { bl.remove(); } catch (_) {} }, 350); }
+      } catch (_) {}
+    };
+    // GLOBAL BOOT TIMEOUT — the splash is never up past ~4.5s. If the dashboard
+    // rendered first, app.js already hid it; otherwise we hide it here (revealing the
+    // shell) and the index.html watchdog (8s) shows the recoverable diagnostic.
+    try { setTimeout(function () { if (!window.__AURIX_SPLASH_HIDDEN && !(B && B.dashboardReady)) window.hideSplashSafe('global_boot_timeout_4500ms'); }, 4500); } catch (_) {}
+    // Error boundary (record; never leave the splash up on a fatal early error).
+    try {
+      window.addEventListener('error', function (e) { try { B.errors.push('win:' + ((e && e.message) || 'err')); } catch (_) {} });
+      window.addEventListener('unhandledrejection', function (e) { try { B.errors.push('rej:' + ((e && e.reason && (e.reason.message || e.reason)) || '?')); } catch (_) {} });
+    } catch (_) {}
+    // Fase 10 — integrated boot diagnostic, queryable from the real app.
+    window.debugAurixBoot = function () {
+      var b = window.__AURIX_BOOT || {};
+      return {
+        build: window.AURIX_BUILD || null, appVersion: b.appJsVersion || null, userAgent: navigator.userAgent,
+        bootStartedAt: b.t0 || null, currentStep: (b.last && b.last()) || (b.steps && b.steps.length ? b.steps[b.steps.length - 1] : null),
+        completedSteps: b.steps || [], errors: b.errors || [],
+        splashHidden: !!window.__AURIX_SPLASH_HIDDEN, splashHideReason: b.splashHideReason || null,
+        dashboardReady: !!b.dashboardReady, appJsExecuted: !!b.appJsExecuted, bootstrapStarted: !!b.bootstrapStarted,
+        degradedMode: !!b.degradedMode, lastFatalError: (b.errors && b.errors.length) ? b.errors[b.errors.length - 1] : null
+      };
+    };
+  } catch (_) {}
+})();
+
 const IS_DEV =
   location.hostname === 'localhost' ||
   location.hostname === '127.0.0.1';
@@ -5485,19 +5534,23 @@ const CLEAN_LOGO_OVERRIDE = {
 // One-time migration: backfill costBasis for existing assets that predate this field.
 // Sets costBasis = qty × price at migration time — P&L starts at 0 and grows honestly.
 (function migrateCostBasis() {
-  let dirty = false;
-  assets.forEach(a => {
-    if (Object.prototype.hasOwnProperty.call(a, 'costBasis')) return;
-    const qty = a.qty || 0, price = a.price || 0;
-    if (a.ticker === 'XAU' && a.karat) {
-      const grams = a.goldUnit === 'oz' ? qty * 31.1035 : qty;
-      a.costBasis = grams * (a.karat / 24) * (price / 31.1035);
-    } else {
-      a.costBasis = qty * price;
-    }
-    dirty = true;
-  });
-  if (dirty) save();
+  // P0: a top-level migration must NEVER abort app.js boot (it runs before the boot
+  // pipeline). Guarded so malformed data can't leave the splash up.
+  try {
+    let dirty = false;
+    (Array.isArray(assets) ? assets : []).forEach(a => {
+      if (!a || Object.prototype.hasOwnProperty.call(a, 'costBasis')) return;
+      const qty = a.qty || 0, price = a.price || 0;
+      if (a.ticker === 'XAU' && a.karat) {
+        const grams = a.goldUnit === 'oz' ? qty * 31.1035 : qty;
+        a.costBasis = grams * (a.karat / 24) * (price / 31.1035);
+      } else {
+        a.costBasis = qty * price;
+      }
+      dirty = true;
+    });
+    if (dirty) save();
+  } catch (e) { try { window.__AURIX_BOOT && window.__AURIX_BOOT.errors.push('migrateCostBasis: ' + (e && e.message)); } catch (_) {} }
 })();
 
 // Versioned migration system — replaces migrateV2 + migrateSpecB.
@@ -36813,6 +36866,7 @@ window.__aurixBootReady = {
 let _aurixBootFinished = false;
 function _aurixHideLoader() {
   try { if (window.__AURIX_BOOT) { window.__AURIX_BOOT.splashHidden = true; window.__AURIX_BOOT.dashboardReady = true; window.__AURIX_BOOT.mark('splash_hidden'); } } catch (_) {}
+  try { window.__AURIX_SPLASH_HIDDEN = true; } catch (_) {}   // unify with the early global guarantee (idempotent)
   const loader = document.getElementById('bootLoader');
   if (loader) {
     loader.style.opacity = '0';
