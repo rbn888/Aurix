@@ -18,7 +18,7 @@
   <div id="status" style="font-size:30px;font-weight:bold;color:#0a58ca">esperando 5s…</div>
   <script>
     // Absolute minimal proof that Safari iPhone runs inline JS + timers + DOM updates.
-    // No CSS file, no app.js, no fixed/inset/z-index/overlays/animations. Normal flow.
+    // Plain document flow only; no external CSS, no app.js, no overlays, no animations.
     try { document.getElementById('ts').textContent = 'timestamp: ' + new Date().toISOString(); } catch (e) {}
     try { document.getElementById('ua').textContent = 'userAgent: ' + navigator.userAgent; } catch (e) {}
     var n = 0;
