@@ -51,35 +51,45 @@
   <link rel="apple-touch-startup-image" media="(device-width:402px) and (device-height:874px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)" href="splash/launch-1206x2622.png">
   <link rel="apple-touch-startup-image" media="(device-width:440px) and (device-height:956px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)" href="splash/launch-1320x2868.png">
   <script>
-    // PWA-CONSISTENCY-1: global build identifier + standalone detection.
-    // Runs synchronously before any other script.
+    // ════════════════════════════════════════════════════════════════════════
+    // AURIX — P0 BOOT WATCHDOG (self-contained; lives in index.html, NOT app.js).
+    // Guarantees the splash can NEVER stay permanent: this runs even if app.js
+    // fails to load, parse or execute. It records each boot milestone, captures
+    // errors, and at a hard deadline force-clears the splash and shows a recoverable
+    // diagnostic panel (build, app.js version, last step reached, exception, whether
+    // app.js executed, UA, timestamp) + a Retry. Runs synchronously before app.js.
     (function() {
-      window.AURIX_BUILD = 'v355-mobile-boot-hardfix';
+      var BUILD = 'v356-boot-watchdog';
+      var APPJS_V = '363';
+      var T0 = (new Date()).getTime();
+      window.AURIX_BUILD = BUILD;
+      var B = window.__AURIX_BOOT = {
+        build: BUILD, appJsVersion: APPJS_V, t0: T0,
+        steps: [], errors: [],
+        appJsRequested: false, appJsLoaded: false, appJsExecuted: false,
+        domContentLoaded: false, windowLoad: false, bootstrapStarted: false,
+        dashboardReady: false, splashHidden: false,
+        mark: function(s) { try { B.steps.push(s + '(' + ((new Date()).getTime() - T0) + 'ms)'); } catch (_) {} },
+        last: function() { return B.steps.length ? B.steps[B.steps.length - 1] : '(none)'; }
+      };
+      B.mark('index_html_parsed');
 
-      // P0 MOBILE-BOOT-HARDFIX — visible boot diagnostic. Registered BEFORE app.js so
-      // it captures even parse/early errors. If the splash never clears (boot truly
-      // failed), it surfaces the build + the real error ON SCREEN so a device with no
-      // console can report it. Never affects a healthy boot (the splash is gone first).
-      window.__AURIX_BOOT_ERRORS = [];
+      // 1) Error capture (registered first so it catches app.js parse/early errors).
       try {
         window.addEventListener('error', function(e) {
-          try { window.__AURIX_BOOT_ERRORS.push(((e && (e.message || (e.error && e.error.message))) || 'error') + ' @ ' + ((e && e.filename) || '').split('/').pop() + ':' + ((e && e.lineno) || '')); } catch (_) {}
+          try { var f = (e && e.filename) || ''; if (f.indexOf('extension://') >= 0) return;
+            B.errors.push(((e && (e.message || (e.error && e.error.message))) || 'error') + ' @ ' + f.split('/').pop() + ':' + ((e && e.lineno) || '')); } catch (_) {}
         }, true);
         window.addEventListener('unhandledrejection', function(e) {
-          try { var r = e && e.reason; window.__AURIX_BOOT_ERRORS.push('promise: ' + ((r && r.message) || r)); } catch (_) {}
+          try { var r = e && e.reason; B.errors.push('promise: ' + ((r && r.message) || r)); } catch (_) {}
         });
       } catch (_) {}
 
+      // 2) Build record + standalone detection + NON-blocking legacy SW/cache cleanup.
+      //    NO reload on build change (obsolete + caused the mobile reload loop).
       try {
-        // P0 MOBILE-BOOT-HARDFIX — NO reload on build change. The previous purge+reload
-        // could infinite-loop on a stale-cached index.html that flip-flops AURIX_BUILD,
-        // so the splash hung on mobile and the device could never even fetch the fix.
-        // There is no service worker to purge and assets are cache-busted via
-        // app.js?v= / styles.css?v=, so the reload is obsolete. We just record the build
-        // and do a best-effort, NON-blocking cleanup of any LEGACY service worker / cache.
-        // The app ALWAYS boots — at worst with a slightly stale index.html until the CDN
-        // refreshes, never hung.
-        try { localStorage.setItem('aurix_build', window.AURIX_BUILD); } catch (_) {}
+        try { localStorage.setItem('aurix_build', BUILD); B.mark('localStorage_ok'); } catch (_) { B.errors.push('localStorage unavailable'); }
+        try { sessionStorage.getItem('x'); B.mark('sessionStorage_ok'); } catch (_) { B.errors.push('sessionStorage unavailable'); }
         try {
           if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
             navigator.serviceWorker.getRegistrations().then(function(regs) { regs.forEach(function(r) { try { r.unregister(); } catch (_) {} }); }).catch(function() {});
@@ -88,32 +98,50 @@
             caches.keys().then(function(keys) { keys.forEach(function(k) { try { caches.delete(k); } catch (_) {} }); }).catch(function() {});
           }
         } catch (_) {}
-        // Standalone detection — iOS Safari + modern display-mode media query.
         var iosStandalone = window.navigator.standalone === true;
-        var mqStandalone  = false;
-        try { mqStandalone = window.matchMedia('(display-mode: standalone)').matches; } catch (_) {}
-        var isStandalone  = iosStandalone || mqStandalone;
-        window.IS_STANDALONE     = isStandalone;
+        var mqStandalone = false; try { mqStandalone = window.matchMedia('(display-mode: standalone)').matches; } catch (_) {}
+        window.IS_STANDALONE = iosStandalone || mqStandalone;
         window.IS_IOS_STANDALONE = iosStandalone;
-        document.documentElement.setAttribute('data-standalone', isStandalone ? 'true' : 'false');
+        document.documentElement.setAttribute('data-standalone', window.IS_STANDALONE ? 'true' : 'false');
         if (iosStandalone) document.documentElement.setAttribute('data-ios-standalone', 'true');
       } catch (_) { /* boot guard must never throw */ }
 
-      // Diagnostic surface — fires AFTER app.js's own 9s splash failsafe. If #bootLoader
-      // is still present at 10s, the app's failsafe never ran (app.js failed to parse/run),
-      // so show the build + captured error. Healthy boots have removed the splash already.
-      setTimeout(function() {
+      document.addEventListener('DOMContentLoaded', function() { B.domContentLoaded = true; B.mark('DOMContentLoaded'); });
+      window.addEventListener('load', function() { B.windowLoad = true; B.mark('window_load'); });
+
+      // 3) WATCHDOG — splash can NEVER be permanent. If the dashboard hasn't rendered
+      //    by the deadline, force-clear the splash and show a recoverable diagnostic.
+      function esc(s) { return String(s).replace(/[<>&]/g, function(c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; }); }
+      function showDiag(reason) {
         try {
-          var bl = document.getElementById('bootLoader');
-          if (!bl || bl.getAttribute('data-diag')) return;
-          bl.setAttribute('data-diag', '1');
-          var errs = window.__AURIX_BOOT_ERRORS || [];
-          var d = document.createElement('div');
-          d.style.cssText = 'margin-top:16px;max-width:90vw;font:11px/1.45 ui-monospace,Menlo,monospace;color:#9fb4d8;opacity:.85;white-space:pre-wrap;word-break:break-word;padding:0 14px;text-align:center';
-          d.textContent = 'AURIX ' + window.AURIX_BUILD + (errs.length ? ('\n' + errs.slice(0, 5).join('\n')) : '\n(boot stalled — no JS error captured)');
-          bl.appendChild(d);
+          if (document.getElementById('aurixBootDiag')) return;
+          var info = {
+            reason: reason, build: B.build, appJs: 'app.js?v=' + B.appJsVersion,
+            lastStep: B.last(), appJsRequested: B.appJsRequested, appJsLoaded: B.appJsLoaded,
+            appJsExecuted: B.appJsExecuted, bootstrapStarted: B.bootstrapStarted,
+            dashboardReady: B.dashboardReady, domContentLoaded: B.domContentLoaded, windowLoad: B.windowLoad,
+            errors: B.errors.slice(0, 6), steps: B.steps,
+            ua: navigator.userAgent, ts: new Date().toISOString()
+          };
+          var bl = document.getElementById('bootLoader'); if (bl) bl.style.display = 'none';
+          var p = document.createElement('div'); p.id = 'aurixBootDiag';
+          p.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#070a14;color:#cdd9ef;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;padding:22px 16px;overflow:auto;-webkit-overflow-scrolling:touch';
+          p.innerHTML = '<div style="font:700 15px/1.3 -apple-system,system-ui;color:#7fb0ff;margin-bottom:6px">AURIX</div>'
+            + '<div style="color:#9fb4d8;margin-bottom:12px">No se pudo abrir el dashboard. Diagnóstico de arranque:</div>'
+            + '<div style="white-space:pre-wrap;word-break:break-word;background:#0c1426;border:1px solid #1c2b49;border-radius:8px;padding:12px">' + esc(JSON.stringify(info, null, 2)) + '</div>'
+            + '<button id="aurixBootRetry" style="margin-top:16px;padding:11px 18px;background:#1b3a6b;color:#fff;border:0;border-radius:8px;font:600 14px/1 -apple-system,system-ui">Reintentar (recarga limpia)</button>';
+          document.body.appendChild(p);
+          var btn = document.getElementById('aurixBootRetry');
+          if (btn) btn.onclick = function() {
+            try { sessionStorage.clear(); } catch (_) {}
+            try { location.replace(location.pathname + '?fresh=' + (new Date()).getTime()); } catch (_) { try { location.reload(); } catch (_) {} }
+          };
         } catch (_) {}
-      }, 10000);
+      }
+      // Hard deadline 8s. A healthy boot sets dashboardReady (≈2-3s) → watchdog stands down.
+      setTimeout(function() { if (!B.dashboardReady && !B.splashHidden) showDiag('watchdog_8s_no_dashboard'); }, 8000);
+      // Absolute backstop 14s — even if anything above mis-fired, never leave the logo.
+      setTimeout(function() { if (!B.dashboardReady && !B.splashHidden && !document.getElementById('aurixBootDiag')) showDiag('watchdog_14s_backstop'); }, 14000);
     })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1285,7 +1313,10 @@
   <script defer src="services/portfolio-price-layer.js?v=2"></script>
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
-  <script src="app.js?v=362"></script>
+  <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
+  <script src="app.js?v=363"
+    onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
+    onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
        Loads after app.js so it can read its primitives. No consumers yet. -->
   <script src="services/wealth-engine.js?v=2"></script>

@@ -1,4 +1,8 @@
 'use strict';
+// P0 BOOT-WATCHDOG — first executable line: prove app.js actually started running.
+// If this never fires, the inline index.html watchdog reports appJsExecuted=false
+// (⇒ app.js failed to load/parse). Pure instrumentation; never throws.
+try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX_BOOT.appJsExecuted = true; window.__AURIX_BOOT.mark('app_js_executing'); } } catch (_) {}
 
 const IS_DEV =
   location.hostname === 'localhost' ||
@@ -36808,6 +36812,7 @@ window.__aurixBootReady = {
 };
 let _aurixBootFinished = false;
 function _aurixHideLoader() {
+  try { if (window.__AURIX_BOOT) { window.__AURIX_BOOT.splashHidden = true; window.__AURIX_BOOT.dashboardReady = true; window.__AURIX_BOOT.mark('splash_hidden'); } } catch (_) {}
   const loader = document.getElementById('bootLoader');
   if (loader) {
     loader.style.opacity = '0';
@@ -36876,6 +36881,7 @@ function _aurixPreloadBootIcons() {
 (async () => {
   if (window.__APP_BOOTED__) return;
   window.__APP_BOOTED__ = true;
+  try { if (window.__AURIX_BOOT) { window.__AURIX_BOOT.bootstrapStarted = true; window.__AURIX_BOOT.mark('bootstrap_start'); } } catch (_) {}
 
   // hideLoader / maybeFinishBoot live at module scope (AURIX-READY-FIRST-1) so
   // the chart's animation onComplete and the icon-preload promise can flip
@@ -36892,6 +36898,7 @@ function _aurixPreloadBootIcons() {
     }
     currentUser = session.user;
     window.__aurixBootReady.auth = true;
+    try { if (window.__AURIX_BOOT) window.__AURIX_BOOT.mark('auth_done'); } catch (_) {}
     if (IS_DEV) console.log('[AUTH] session restored:', currentUser?.email);
     if (window.location.hash) {
       history.replaceState(null, '', window.location.pathname);
@@ -36909,6 +36916,7 @@ function _aurixPreloadBootIcons() {
     ]);
     window.__aurixBootReady.portfolio = true;
     window.__aurixBootReady.fx = true;
+    try { if (window.__AURIX_BOOT) window.__AURIX_BOOT.mark('portfolio_fx_done'); } catch (_) {}
     assets = convertFromNewToFlat(portfolioData.assets, portfolioData.holdings);
     if (portfolioData.assets.length > 0) {
       saveData({ assets: portfolioData.assets, holdings: portfolioData.holdings });
@@ -36942,6 +36950,9 @@ function _aurixPreloadBootIcons() {
     document.getElementById('appRoot').style.opacity = '';
     render(true);
     window.__aurixBootReady.dashboard = true;
+    // P0 BOOT-WATCHDOG — the dashboard DOM has rendered: signal the inline watchdog
+    // so it stands down (a healthy boot is reached well before the 8s deadline).
+    try { if (window.__AURIX_BOOT) { window.__AURIX_BOOT.dashboardReady = true; window.__AURIX_BOOT.mark('dashboard_rendered'); } } catch (_) {}
 
     // BLOCK C — preload the initial-viewport icons (holdings) while the splash
     // is still up, then release the icon gate. Runs against the gate without

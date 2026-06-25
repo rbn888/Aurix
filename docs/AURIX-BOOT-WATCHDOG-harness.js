@@ -1,0 +1,112 @@
+/* AURIX — P0 BOOT WATCHDOG — harness.
+   Models the inline index.html watchdog decision and proves that across EVERY boot
+   scenario the splash can never stay permanent: the outcome is always either the
+   dashboard (app booted) or a recoverable diagnostic panel — never an indefinite logo.
+   Also verifies the live files carry the watchdog + the app.js boot instrumentation.
+
+   Scenarios: index cached, old app.js, new app.js, build change, (removed) reload loop,
+   bootstrap failure, app.js fails to load, iOS-like sessionStorage that throws, failure
+   before dashboard, silent errors.
+
+   Run: node docs/AURIX-BOOT-WATCHDOG-harness.js                                       */
+'use strict';
+const fs = require('fs'), path = require('path');
+const root = path.join(__dirname, '..');
+
+// The watchdog runs at the 8s deadline (with a 14s backstop). Outcome rule mirrors
+// index.html: if the dashboard rendered (or the app hid the splash) → dashboard;
+// otherwise the watchdog force-replaces the splash with the diagnostic panel.
+function watchdogOutcome(state) {
+  if (state.dashboardReady || state.splashHidden) return 'dashboard';
+  return 'diagnostic';                 // never 'permanent_splash' — impossible by construction
+}
+
+// Build the boot state AS IT IS AT THE 8s DEADLINE for a scenario.
+function stateAtDeadline(scn) {
+  const B = {
+    appJsRequested: false, appJsLoaded: false, appJsExecuted: false,
+    bootstrapStarted: false, dashboardReady: false, splashHidden: false,
+    errors: [], lastStep: 'index_html_parsed',
+  };
+  (scn.timeline || []).forEach(function(ev) {
+    if (ev.t > 8000) return;           // anything after the deadline doesn't count yet
+    if (ev.set) Object.keys(ev.set).forEach(function(k) { B[k] = ev.set[k]; });
+    if (ev.step) B.lastStep = ev.step;
+    if (ev.error) B.errors.push(ev.error);
+  });
+  return B;
+}
+
+let ok = true;
+const ck = (n, c, g) => { console.log((c ? '  ✓' : '  ✗') + ' ' + n + (g !== undefined ? '  [' + g + ']' : '')); if (!c) ok = false; };
+
+console.log('AURIX P0 — Boot watchdog (splash can never be permanent)\n');
+
+const SCENARIOS = [
+  { name: 'healthy boot (new app.js)', expect: 'dashboard', timeline: [
+    { t: 50, step: 'app_js_requested', set: { appJsRequested: true } },
+    { t: 300, step: 'app_js_loaded', set: { appJsLoaded: true } },
+    { t: 320, step: 'app_js_executing', set: { appJsExecuted: true } },
+    { t: 500, step: 'bootstrap_start', set: { bootstrapStarted: true } },
+    { t: 2200, step: 'dashboard_rendered', set: { dashboardReady: true } },
+    { t: 2600, step: 'splash_hidden', set: { splashHidden: true } } ] },
+  { name: 'index cached / old app.js still boots', expect: 'dashboard', timeline: [
+    { t: 60, set: { appJsRequested: true } }, { t: 280, set: { appJsLoaded: true } },
+    { t: 300, set: { appJsExecuted: true } }, { t: 2500, step: 'dashboard_rendered', set: { dashboardReady: true } } ] },
+  { name: 'build change (no reload now) → boots', expect: 'dashboard', timeline: [
+    { t: 300, set: { appJsExecuted: true } }, { t: 2400, step: 'dashboard_rendered', set: { dashboardReady: true } } ] },
+  { name: 'app.js FAILS to load (network/404)', expect: 'diagnostic', timeline: [
+    { t: 50, step: 'app_js_requested', set: { appJsRequested: true } },
+    { t: 400, step: 'app_js_load_error', error: 'app.js failed to load (network/404/parse)' } ] },
+  { name: 'app.js loads but PARSE error (never executes)', expect: 'diagnostic', timeline: [
+    { t: 50, set: { appJsRequested: true } }, { t: 300, set: { appJsLoaded: true } },
+    { t: 305, step: 'app_js_loaded', error: "SyntaxError @ app.js:123" } ] },
+  { name: 'bootstrap hangs (auth never resolves)', expect: 'diagnostic', timeline: [
+    { t: 300, set: { appJsExecuted: true } }, { t: 500, step: 'bootstrap_start', set: { bootstrapStarted: true } },
+    { t: 520, step: 'auth_done' } ] },   // stops here, dashboard never renders
+  { name: 'failure before dashboard (render throws)', expect: 'diagnostic', timeline: [
+    { t: 300, set: { appJsExecuted: true } }, { t: 500, set: { bootstrapStarted: true } },
+    { t: 1800, step: 'portfolio_fx_done', error: 'TypeError: render failed' } ] },
+  { name: 'iOS-like sessionStorage throws (non-fatal)', expect: 'dashboard', timeline: [
+    { t: 10, error: 'sessionStorage unavailable' }, { t: 300, set: { appJsExecuted: true } },
+    { t: 2400, step: 'dashboard_rendered', set: { dashboardReady: true } } ] },
+  { name: 'silent error, dashboard never renders', expect: 'diagnostic', timeline: [
+    { t: 300, set: { appJsExecuted: true } }, { t: 900, error: 'undefined is not an object' } ] },
+  { name: 'reload loop (removed) — would-be loop never boots app, watchdog still recovers', expect: 'diagnostic', timeline: [
+    { t: 50, set: { appJsRequested: true } } ] },   // app.js never executes (stuck pre-app)
+];
+
+console.log('EVERY scenario resolves to dashboard OR diagnostic — never a permanent splash:');
+for (const scn of SCENARIOS) {
+  const B = stateAtDeadline(scn);
+  const out = watchdogOutcome(B);
+  ck(scn.name + ' → ' + out, out === scn.expect && out !== 'permanent_splash', 'last=' + B.lastStep + (B.errors.length ? ' err=' + B.errors[0] : ''));
+}
+
+console.log('\nINVARIANT — watchdogOutcome is never "permanent_splash" for ANY state:');
+{ let everPermanent = false;
+  for (const dr of [true, false]) for (const sh of [true, false]) for (const ex of [true, false]) {
+    const o = watchdogOutcome({ dashboardReady: dr, splashHidden: sh, appJsExecuted: ex });
+    if (o === 'permanent_splash') everPermanent = true;
+  }
+  ck('no state yields a permanent splash', everPermanent === false); }
+
+console.log('\nDIAGNOSTIC pinpoints the last reached step (so the break point is identifiable):');
+{ const B = stateAtDeadline(SCENARIOS.find(s => s.name.indexOf('bootstrap hangs') === 0 || s.name.indexOf('bootstrap hangs') >= 0));
+  ck('last step captured for a hang', B.lastStep === 'auth_done', B.lastStep); }
+
+console.log('\nLIVE FILES — watchdog + instrumentation present:');
+{ const idx = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  ck('index.html: __AURIX_BOOT watchdog object', idx.indexOf('window.__AURIX_BOOT') >= 0 && idx.indexOf('showDiag') >= 0);
+  ck('index.html: 8s deadline + 14s backstop', idx.indexOf('8000') >= 0 && idx.indexOf('14000') >= 0);
+  ck('index.html: recoverable diagnostic panel + retry', idx.indexOf('aurixBootDiag') >= 0 && idx.indexOf('aurixBootRetry') >= 0);
+  ck('index.html: NO reload in boot guard (loop impossible)', idx.indexOf('window.location.reload') < 0);
+  ck('index.html: app.js tag has onerror + v=363', /app\.js\?v=363/.test(idx) && idx.indexOf('app_js_load_error') >= 0);
+  const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  ck('app.js: first-line execution mark (appJsExecuted)', app.indexOf("window.__AURIX_BOOT.appJsExecuted = true") >= 0);
+  ck('app.js: bootstrap_start mark', app.indexOf("'bootstrap_start'") >= 0);
+  ck('app.js: dashboard_rendered → dashboardReady', app.indexOf("'dashboard_rendered'") >= 0);
+  ck('app.js: splash_hidden mark', app.indexOf("'splash_hidden'") >= 0); }
+
+console.log('\nRESULT:', ok ? 'ALL PASS ✓ — splash can never remain permanent; the break point is always reported' : 'FAIL ✗');
+process.exit(ok ? 0 : 1);

@@ -72,7 +72,7 @@ console.log('\nLIVE FILES — no reload in the boot guard; old guards removed; d
     ck(f + ' no reload + old guards gone', noReload && noOld, noReload ? (noOld ? 'ok' : 'old guard remains') : 'reload remains');
   }
   const idx = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-  ck('index.html has visible boot diagnostic', idx.indexOf('__AURIX_BOOT_ERRORS') >= 0 && idx.indexOf("getElementById('bootLoader')") >= 0); }
+  ck('index.html has visible boot diagnostic/watchdog', idx.indexOf('window.__AURIX_BOOT') >= 0 && idx.indexOf('aurixBootDiag') >= 0); }
 
 console.log('\nRESULT:', ok ? 'ALL PASS ✓ — mobile boot can no longer hang in a reload loop' : 'FAIL ✗');
 process.exit(ok ? 0 : 1);
