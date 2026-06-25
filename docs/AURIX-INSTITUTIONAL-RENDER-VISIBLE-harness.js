@@ -29,6 +29,7 @@ function block(startStr, endStr){ const i=src.indexOf(startStr); if(i<0)throw ne
 const RC_CONSTS = block('const _AURIX_RC_QUALITY_THRESHOLD', 'const _AURIX_RC_VPAD_FRAC = 0.08;');
 const VP_CONSTS = block('const _AURIX_VP_DENSITY', 'const _AURIX_VP_VALUE_EPS = 0.004;');
 const IR_CONSTS = block('const _AURIX_IR_VALUE_MARGIN', '= 0.08;');
+const Y_CONSTS  = block('const _AURIX_Y_JUMP_DOMINANCE', 'const _AURIX_Y_LEGIBLE_ALPHA  = 0.35;');
 const FLAG_CONST = (src.match(/const AURIX_INSTITUTIONAL_RENDER_VISIBLE = (?:true|false);/) || [])[0];
 if (!FLAG_CONST) throw new Error('missing AURIX_INSTITUTIONAL_RENDER_VISIBLE flag');
 const FLAG_DEFAULT = /= true;/.test(FLAG_CONST);   // shipped default of the const
@@ -48,10 +49,10 @@ vm.createContext(sb);
 
 vm.runInContext(RC_CONSTS, sb);
 vm.runInContext(VP_CONSTS, sb);
-vm.runInContext(IR_CONSTS, sb);
+vm.runInContext(IR_CONSTS, sb); vm.runInContext(Y_CONSTS, sb);
 vm.runInContext(FLAG_CONST, sb);
 [ fn('_aurixRenderContractGeometry'), fn('_aurixVpTargetPointCount'), fn('_aurixComputeVisualPreparation'),
-  fn('prepareAurixVisualSeries'), fn('downsampleAurixLTTB'), fn('computeAurixTimeScale'),
+  fn('prepareAurixVisualSeries'), fn('downsampleAurixLTTB'), fn('_aurixSignificantLocalExtrema'), fn('downsampleAurixAdaptive'), fn('computeAurixTimeScale'),
   fn('computeAurixValueScale'), fn('_aurixMonotonePath'), fn('buildAurixMonotonicPath'),
   fn('buildAurixAreaPath'), fn('_aurixSplitAtGaps'), fn('renderAurixInstitutionalChart'),
   fn('_aurixInstitutionalRenderVisible'), fn('_aurixWscInstitutionalSelect') ].forEach(c => vm.runInContext(c, sb));

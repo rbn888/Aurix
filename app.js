@@ -18634,12 +18634,15 @@ if (typeof window !== 'undefined') {
 // Detects: temporal GAPS, visual CLUSTERS (timestamp + viewport px), REDUNDANT
 // points (low shape contribution), CAPITAL EVENTS (read-only ledger) for future
 // annotation, and the optimal targetPointCount per range × viewport.
+// SPEC 6 — Adaptive Density: higher caps so more REAL local detail survives the
+// downsample (less over-smoothing on 1A/TOTAL, richer microstructure on 24H/7D).
+// Still bounded so the chart never becomes a noisy/over-dense mess. Pure render.
 const _AURIX_VP_DENSITY = {
-  '24h': { min: 60,  max: 110 },
-  '7d':  { min: 90,  max: 150 },
-  '30d': { min: 110, max: 180 },
-  '1y':  { min: 140, max: 220 },
-  'all': { min: 140, max: 250 },
+  '24h': { min: 80,  max: 180 },
+  '7d':  { min: 120, max: 240 },
+  '30d': { min: 140, max: 300 },
+  '1y':  { min: 180, max: 400 },
+  'all': { min: 200, max: 450 },
 };
 // BUGFIX P0 — gap thresholds are ADAPTIVE, not fixed absolutes. The previous fixed
 // values (24h:90min, 7d:8h, 30d:36h, 1y:21d) were far smaller than real snapshot
@@ -18662,12 +18665,13 @@ const _AURIX_VP_CLUSTER_WIDTH_PX = 5;   // a band of ≤5px …
 const _AURIX_VP_CLUSTER_MIN_PTS  = 4;   // … holding ≥4 points is a visual cluster
 const _AURIX_VP_VALUE_EPS = 0.004;      // 0.4% of value span = "minimal value delta"
 
-// targetPointCount ≈ viewport/6 (within the viewport/5..viewport/7 band), clamped
-// to the per-range [min,max]. Deterministic in (range, viewportWidth).
+// SPEC 6 — targetPointCount ≈ viewport/5 (denser end of the viewport/5..viewport/7
+// band → ~1 candidate point per 5 CSS px), clamped to the per-range [min,max].
+// Deterministic in (range, viewportWidth). Pure render; never affects data.
 function _aurixVpTargetPointCount(range, viewportWidth) {
   const band = _AURIX_VP_DENSITY[range] || _AURIX_VP_DENSITY['30d'];
   const vw = Math.max(240, Math.min(4000, Number(viewportWidth) || 390));
-  const raw = Math.round(vw / 6);
+  const raw = Math.round(vw / 5);
   return Math.max(band.min, Math.min(band.max, raw));
 }
 
@@ -18910,6 +18914,49 @@ function downsampleAurixLTTB(points, targetPointCount) {
     .sort((x, y) => x.time - y.time);
 }
 
+// SPEC 6 — significant LOCAL extrema (real points): a local max/min whose prominence
+// (drop to the lower/higher neighbour) is ≥ minProminenceFrac × the value range. Used
+// to guarantee relevant peaks/dips survive the downsample (anti over-smoothing).
+function _aurixSignificantLocalExtrema(src, valueRange, minProminenceFrac) {
+  const out = [];
+  const thr = (valueRange || 1) * (minProminenceFrac || 0.03);
+  for (let i = 1; i < src.length - 1; i++) {
+    const v = src[i].value, a = src[i - 1].value, b = src[i + 1].value;
+    if (v > a && v >= b && (v - Math.min(a, b)) >= thr) out.push(i);
+    else if (v < a && v <= b && (Math.max(a, b) - v) >= thr) out.push(i);
+  }
+  return out;
+}
+
+// SPEC 6 — Adaptive Density downsampler. LTTB (shape-preserving) PLUS guaranteed
+// significant local extrema, so high-movement zones keep their detail while quiet
+// zones stay sparse. Returns ONLY real points; preserves first/last/global-max/min
+// (LTTB) and significant local peaks/dips; never invents/alters a point. If the
+// source already fits the target, returns the full sorted copy (no reduction).
+function downsampleAurixAdaptive(points, targetPointCount) {
+  const src = (Array.isArray(points) ? points : [])
+    .filter(p => p && Number.isFinite(p.time) && Number.isFinite(p.value))
+    .map(p => ({ time: p.time, value: p.value }))
+    .sort((a, b) => a.time - b.time);
+  const n = src.length;
+  const target = Math.max(2, Math.floor(Number(targetPointCount) || n));
+  if (n <= target) return src;                       // full detail, nothing to drop
+  const base = downsampleAurixLTTB(src, target);
+  let vMin = Infinity, vMax = -Infinity;
+  for (const p of src) { if (p.value < vMin) vMin = p.value; if (p.value > vMax) vMax = p.value; }
+  const range = (vMax - vMin) || 1;
+  const extremaIdx = _aurixSignificantLocalExtrema(src, range, 0.03);
+  const present = new Set(base.map(p => p.time));
+  const extra = [];
+  const maxExtra = Math.ceil(target * 0.5);          // bound so the curve never over-densifies
+  for (const i of extremaIdx) {
+    if (extra.length >= maxExtra) break;
+    if (!present.has(src[i].time)) { extra.push(src[i]); present.add(src[i].time); }
+  }
+  if (!extra.length) return base;
+  return base.concat(extra).sort((a, b) => a.time - b.time);
+}
+
 // §4 — real timestamp scale. x is proportional to the real timestamp (NEVER the
 // array index): equal durations map to equal pixel distances.
 function computeAurixTimeScale(points, viewportWidth, box) {
@@ -18924,23 +18971,67 @@ function computeAurixTimeScale(points, viewportWidth, box) {
   return { xMin, xMax, left, right, width, x: ts => left + ((ts - xMin) / span) * width };
 }
 
-// §5 — value scale. Adds a visual margin so the real max/min are never clipped,
-// keeps the last point legible, and never artificially exaggerates volatility
-// (plain linear domain — no regime-relative zoom here).
+// SPEC 6 — Legible Y scale. DEFAULT is plain linear (honest, no distortion). ONLY
+// when a single time-consecutive value move dominates the range (a real regime
+// jump that would otherwise flatten everything else to a line) does it switch to a
+// CONSERVATIVE monotone blend of the linear position and the value-distribution
+// (quantile) position. The blend is:
+//   • monotone & order-preserving (never reorders or hides a move),
+//   • bounded (α small → the jump stays the dominant visual feature, never hidden),
+//   • PURELY VISUAL — it maps value→pixel only; it never changes any value, and the
+//     tooltip still shows the real value. The axis stays honest: labels are REAL
+//     values placed at their true (possibly non-uniform) positions via invValueAtY.
+const _AURIX_Y_JUMP_DOMINANCE = 0.45;   // a consecutive move ≥45% of range = "dominant"
+const _AURIX_Y_LEGIBLE_ALPHA  = 0.35;   // blend weight toward quantile spread (conservative)
 function computeAurixValueScale(points, viewportHeight, box) {
   const vh = Math.max(120, Math.min(2000, Number(viewportHeight) || 220));
   let top, bottom;
   if (box && Number.isFinite(box.top) && Number.isFinite(box.bottom)) { top = box.top; bottom = Math.max(box.top + 1, box.bottom); }
   else { const vpad = vh * _AURIX_IR_VPAD_FRAC; top = vpad; bottom = vh - vpad; }
   const band = Math.max(1, bottom - top);
+  const pts = Array.isArray(points) ? points : [];
   let vMin = Infinity, vMax = -Infinity;
-  for (const p of points) { if (p.value < vMin) vMin = p.value; if (p.value > vMax) vMax = p.value; }
+  for (const p of pts) { if (p.value < vMin) vMin = p.value; if (p.value > vMax) vMax = p.value; }
   if (!Number.isFinite(vMin)) { vMin = 0; vMax = 1; }
   let span = vMax - vMin; if (!(span > 0)) span = Math.abs(vMax) || 1;
   const margin = span * _AURIX_IR_VALUE_MARGIN;
   const yMin = vMin - margin, yMax = vMax + margin, domain = (yMax - yMin) || 1;
-  return { yMin, yMax, dataMin: vMin, dataMax: vMax, top, bottom, height: band,
-    y: v => bottom - ((v - yMin) / domain) * band };
+
+  // Detect a dominant consecutive jump (in time order).
+  let maxJump = 0;
+  for (let i = 1; i < pts.length; i++) { const d = Math.abs(pts[i].value - pts[i - 1].value); if (d > maxJump) maxJump = d; }
+  const dominant = (span > 0) && (maxJump / span >= _AURIX_Y_JUMP_DOMINANCE);
+  const alpha = dominant ? _AURIX_Y_LEGIBLE_ALPHA : 0;
+  const mode = alpha > 0 ? 'legible-blend' : 'linear';
+
+  const linFrac = v => Math.max(0, Math.min(1, (v - yMin) / domain));
+  if (alpha <= 0) {
+    return { yMin, yMax, dataMin: vMin, dataMax: vMax, top, bottom, height: band, mode,
+      y: v => bottom - linFrac(v) * band,
+      invValueAtY: y => yMin + Math.max(0, Math.min(1, (bottom - y) / band)) * domain };
+  }
+
+  // Quantile (value-distribution) position — monotone non-decreasing in v.
+  const sv = pts.map(p => p.value).sort((a, b) => a - b);
+  const L = sv.length;
+  const rankFrac = v => {
+    if (v <= sv[0]) return 0;
+    if (v >= sv[L - 1]) return 1;
+    let lo = 0, hi = L - 1;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (sv[mid] <= v) lo = mid; else hi = mid; }
+    const seg = (sv[hi] - sv[lo]) || 1;
+    return (lo + (v - sv[lo]) / seg) / (L - 1);
+  };
+  const frac = v => Math.max(0, Math.min(1, (1 - alpha) * linFrac(v) + alpha * rankFrac(v)));   // strictly monotone (linFrac strict, α<1)
+  const y = v => bottom - frac(v) * band;
+  // exact-enough inverse via bisection (monotone) — used for honest axis labels.
+  const invValueAtY = yPix => {
+    const tf = Math.max(0, Math.min(1, (bottom - yPix) / band));
+    let lo = yMin, hi = yMax;
+    for (let it = 0; it < 40; it++) { const mid = (lo + hi) / 2; if (frac(mid) < tf) lo = mid; else hi = mid; }
+    return (lo + hi) / 2;
+  };
+  return { yMin, yMax, dataMin: vMin, dataMax: vMax, top, bottom, height: band, mode, y, invValueAtY };
 }
 
 // §6 — monotone (Fritsch–Carlson) cubic path with a per-segment overshoot guard.
@@ -19041,7 +19132,7 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
   const prepared = prepareAurixVisualSeries(r, vw);            // the ONLY input source
   const srcPts = Array.isArray(prepared.preparedPoints) ? prepared.preparedPoints : [];
   const target = prepared.targetPointCount;
-  const visiblePoints = downsampleAurixLTTB(srcPts, target);
+  const visiblePoints = downsampleAurixAdaptive(srcPts, target);   // SPEC 6 — LTTB + local-extrema preservation
   // SPEC 4 — optional pixel box (left/right/top/bottom) so a host surface (WSC)
   // can have the engine map straight into its own plot box. Backward compatible:
   // without `layout`, the engine uses its own padding (SPEC 3 behaviour).
@@ -19049,6 +19140,20 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
   const yScale = computeAurixValueScale(visiblePoints, vh, layout);
   const scale = { xMin: xScale.xMin, xMax: xScale.xMax, yMin: yScale.yMin, yMax: yScale.yMax,
     x: xScale.x, y: yScale.y, top: yScale.top, bottom: yScale.bottom };
+  // SPEC 6 — Y-axis ticks from the scale's INVERSE so labels are REAL values placed
+  // at their true positions (honest under both linear and legible-blend modes).
+  const _yTicks = [];
+  { const seen = new Set();
+    [0, 1 / 3, 2 / 3, 1].forEach(f => {
+      const yPix = yScale.top + (yScale.bottom - yScale.top) * f;
+      const val = (typeof yScale.invValueAtY === 'function') ? yScale.invValueAtY(yPix) : (yScale.yMin + (1 - f) * (yScale.yMax - yScale.yMin));
+      const text = (typeof _wscFmtAxisVal === 'function') ? _wscFmtAxisVal(val) : String(Math.round(val));
+      if (!seen.has(text)) { seen.add(text); _yTicks.push({ y: +yPix.toFixed(2), value: +val.toFixed(2), text }); }
+    });
+  }
+  // SPEC 6 — per-point PIXELS in the box coordinate system, so a host (WSC) can place
+  // the tooltip cursor EXACTLY on the curve knot under ANY y-scale mode (incl. legible).
+  const visiblePixels = visiblePoints.map(p => ({ x: +xScale.x(p.time).toFixed(3), y: +yScale.y(p.value).toFixed(3) }));
 
   const _splitDiag = {};
   const runs = _aurixSplitAtGaps(visiblePoints, prepared.gaps, _splitDiag);
@@ -19077,13 +19182,14 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
 
   return {
     range: r, viewportWidth: vw, viewportHeight: vh,
-    prepared, visiblePoints, pathData, areaPathData,
-    gaps: prepared.gaps, gapSegments, eventMarkers,
-    scale: { xMin: scale.xMin, xMax: scale.xMax, yMin: +scale.yMin.toFixed(4), yMax: +scale.yMax.toFixed(4) },
+    prepared, visiblePoints, visiblePixels, pathData, areaPathData,
+    gaps: prepared.gaps, gapSegments, eventMarkers, yTicks: _yTicks,
+    scale: { xMin: scale.xMin, xMax: scale.xMax, yMin: +scale.yMin.toFixed(4), yMax: +scale.yMax.toFixed(4), mode: yScale.mode },
     renderMeta: {
       source: 'prepared-series', deterministic: true,
       pointCountBefore: srcPts.length, pointCountAfter: visiblePoints.length,
-      targetPointCount: target, interpolation: 'monotonic', downsampling: 'lttb-or-equivalent',
+      targetPointCount: target, interpolation: 'monotonic', downsampling: 'lttb+local-extrema',
+      yScaleMode: yScale.mode,
       lastValue: lastV != null ? +lastV.toFixed(2) : null,
       dashboardValue: prepared.meta.dashboardValue,
       lastDeltaPct: prepared.meta.lastDeltaPct,
@@ -19320,6 +19426,27 @@ if (typeof window !== 'undefined') {
       })));
       rows.forEach(a => { if (a.diffs && a.diffs.length) console.log('[render-equivalence] ' + a.range + ' DIFFS:', a.diffs); });
     } catch (_) {}
+    return rows;
+  };
+  // SPEC 6 — Adaptive Density + Y-scale debug: before/after density, extremes, scale
+  // mode and the equivalence verdict, per range. Pure read.
+  window.debugAurixAdaptiveDensity = (range) => {
+    const ranges = range ? [String(range).toLowerCase()] : ['24h', '7d', '30d', '1y', 'all'];
+    const rows = ranges.map(r => {
+      const rc = renderAurixInstitutionalChart(r);
+      const a = auditAurixRenderVsCanonical(r);
+      const d = rc.diagnostics || {};
+      return {
+        range: rc.range,
+        sourcePoints: d.sourcePoints, renderedPoints: d.visiblePoints, targetPointCount: rc.renderMeta.targetPointCount,
+        droppedByDownsampling: a.droppedByDownsampling,
+        preservedExtremes: !!(a.maxMatch && a.minMatch),
+        firstPreserved: !!a.firstMatch, lastPreserved: !!a.lastMatch,
+        yScaleMode: rc.renderMeta.yScaleMode,
+        equivalence: a.status,
+      };
+    });
+    try { console.table(rows); } catch (_) {}
     return rows;
   };
 }
@@ -21578,14 +21705,22 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   if (_inst.usedFallback) { try { console.warn('[AURIX][institutional-render] fallback', { range: activeRange, reason: _inst.fallbackReason }); } catch (_) {} }
   if (_inst.rendered) {
     _linePathFinal = _inst.linePath; _areaPathFinal = _inst.areaPath;
-    const sc = _inst.rendered.scale;
-    try { _yLabelsFinal = _wscEngineYLabels(sc, vp, H, _isMobile ? 3 : 4).labels
-      .map(tk => `<span class="wsc-ylab" style="top:${(tk.y / H * 100).toFixed(2)}%">${tk.text}</span>`).join(''); } catch (_) {}
-    // Tooltip rides the engine's REAL visible points (mapped through the same box).
-    const bw = (_instBox.right - _instBox.left), bh = (_instBox.bottom - _instBox.top);
-    const dx = (sc.xMax - sc.xMin) || 1, dy = (sc.yMax - sc.yMin) || 1;
-    _ttSampleX = _inst.rendered.visiblePoints.map(p => _instBox.left + ((p.time - sc.xMin) / dx) * bw);
-    _ttSampleY = _inst.rendered.visiblePoints.map(p => _instBox.bottom - ((p.value - sc.yMin) / dy) * bh);
+    // SPEC 6 — labels are the engine's yTicks (REAL values from the scale inverse →
+    // honest under linear AND legible-blend). Fallback to the linear label helper.
+    try {
+      const tk = _inst.rendered.yTicks;
+      if (Array.isArray(tk) && tk.length) {
+        _yLabelsFinal = tk.map(t => `<span class="wsc-ylab" style="top:${(t.y / H * 100).toFixed(2)}%">${t.text}</span>`).join('');
+      } else {
+        _yLabelsFinal = _wscEngineYLabels(_inst.rendered.scale, vp, H, _isMobile ? 3 : 4).labels
+          .map(t => `<span class="wsc-ylab" style="top:${(t.y / H * 100).toFixed(2)}%">${t.text}</span>`).join('');
+      }
+    } catch (_) {}
+    // Tooltip rides the engine's REAL visible points at their EXACT rendered pixels
+    // (works under any y-scale mode — the cursor sits precisely on the curve knot).
+    const vpx = _inst.rendered.visiblePixels || [];
+    _ttSampleX = vpx.map(p => p.x);
+    _ttSampleY = vpx.map(p => p.y);
     _ttVal = _inst.rendered.visiblePoints.map(p => p.value);
     _ttTs  = _inst.rendered.visiblePoints.map(p => p.time);
     if (typeof window !== 'undefined' && window._aurixChartMode) {

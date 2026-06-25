@@ -89,7 +89,7 @@ console.log('CASE 1 — healthy 24H (no critical gaps, reasonable clusters, targ
 { const s = healthy(30, DAY, 70000, 18, 120); const p = run('24h', s, lastV(s), [], 1440);
   ck('no critical gaps', p.gaps.length === 0, p.gaps.length);
   ck('clusters reasonable (0)', p.clusters.length === 0, p.clusters.length);
-  ck('targetPointCount in [60,110]', p.targetPointCount >= 60 && p.targetPointCount <= 110, p.targetPointCount); }
+  ck('targetPointCount in [80,180]', p.targetPointCount >= 80 && p.targetPointCount <= 180, p.targetPointCount); }
 
 console.log('\nCASE 2 — cluster at end (cluster detected):');
 { const s = clusterEnd(); const p = run('24h', s, lastV(s), [], 1440);
@@ -117,7 +117,7 @@ console.log('\nCASE 5 — capital event (detected + line NOT altered):');
 
 console.log('\nCASE 6 — 7D many points (targetPointCount within range):');
 { const s = healthy(200, 7 * DAY, 60000, 4, 300); const p = run('7d', s, lastV(s), [], 1440);
-  ck('targetPointCount in [90,150]', p.targetPointCount >= 90 && p.targetPointCount <= 150, p.targetPointCount);
+  ck('targetPointCount in [120,240]', p.targetPointCount >= 120 && p.targetPointCount <= 240, p.targetPointCount);
   ck('actualPointCount = 200', p.actualPointCount === 200, p.actualPointCount); }
 
 console.log('\nCASE 7 — 30D / 1A / TOTAL deterministic preparation:');
