@@ -37020,18 +37020,15 @@ function _aurixPreloadBootIcons() {
     try { recomputeDerivedFinancialState('boot'); } catch (_) {}
     try { recomputeFinancialFormulas('boot'); } catch (_) {}
 
-    // 5. RENDER the dashboard shell from cached/local data.
+    // 5. RENDER the dashboard shell from cached/local data. Guarded so a data-dependent
+    //    throw inside render() can never abort boot or kill interactivity (degraded mode).
     try { document.getElementById('appRoot').style.opacity = ''; } catch (_) {}
-    try { render(true); } catch (e) { _reportSafe('render', (e && e.message) || 'render failed', (e && e.stack) || ''); }
+    try { render(true); }
+    catch (e) { _reportSafe('render', (e && e.message) || 'render failed', (e && e.stack) || ''); try { if (window.__AURIX_BOOT) window.__AURIX_BOOT.errors.push('render: ' + ((e && e.message) || 'failed')); } catch (_) {} }
     window.__aurixBootReady.dashboard = true;
     try { if (window.__AURIX_BOOT) { window.__AURIX_BOOT.dashboardReady = true; window.__AURIX_BOOT.mark('dashboard_rendered'); } } catch (_) {}
 
-    // P0 MOBILE FIX — HIDE THE SPLASH AS SOON AS THE SHELL EXISTS, then YIELD so the
-    // browser PAINTS the dashboard + splash removal BEFORE any heavy chart work.
-    // Previously render()+chart init (incl. the mobile-only branch below) ran as one
-    // long synchronous block AFTER which the splash hid; on a slow iPhone that block
-    // exceeded iOS Safari's long-script watchdog, which killed the page JS → every
-    // timer died → frozen splash (desktop ran it in <1s and skipped the mobile branch).
+    // HIDE THE SPLASH as soon as the shell exists + yield so the browser paints it.
     try { if (window.hideSplashSafe) window.hideSplashSafe('dashboard_shell'); else _aurixHideLoader(); } catch (_) {}
     await _yield();
     if (_bootBisect === 'dashboard') { _bm('bisect:dashboard'); return; }
@@ -37039,16 +37036,22 @@ function _aurixPreloadBootIcons() {
     // BLOCK C — preload the initial-viewport icons (async, non-blocking).
     _aurixPreloadBootIcons().then(() => { window.__aurixBootReady.icons = true; _aurixMaybeFinishBoot(); });
 
-    // 6. CHARTS — DEFERRED + chunked with yields so no single synchronous segment can
-    //    trip the iOS script-time watchdog, and the dashboard is already painted. Each
-    //    step is guarded: a chart failure can never block the (already-shown) dashboard.
-    await _yield();
-    try { initChart(); initDonut(); updateChart(); updateDonut(); } catch (e) { _reportSafe('chart', (e && e.message) || 'chart init failed', (e && e.stack) || ''); }
-    if (window.innerWidth <= 768) {
-      await _yield();   // separate yield before the heavier mobile-only chart branch
-      try { initMobileCharts(); updateChart(); updateDonut(); initMobileSlider(); } catch (e) { _reportSafe('chart-mobile', (e && e.message) || 'mobile chart init failed', (e && e.stack) || ''); }
-    }
-    _bm('charts_done');
+    // 6. CHARTS — FULLY DETACHED from the interactive path (P0.12). The dashboard is
+    //    already shown + interactive; charts init on a LATER macrotask, each guarded, so
+    //    a heavy/failing chart — especially the mobile-only branch, which desktop never
+    //    runs — can never block, freeze or kill the interactive dashboard. Navigation
+    //    works regardless of chart state (degraded mode). Errors land in debugAurixBoot().
+    setTimeout(function () {
+      try { initChart(); initDonut(); updateChart(); updateDonut(); }
+      catch (e) { _reportSafe('chart', (e && e.message) || 'chart init failed', (e && e.stack) || ''); try { if (window.__AURIX_BOOT) window.__AURIX_BOOT.errors.push('chart: ' + ((e && e.message) || 'failed')); } catch (_) {} }
+      if (window.innerWidth <= 768) {
+        setTimeout(function () {
+          try { initMobileCharts(); updateChart(); updateDonut(); initMobileSlider(); }
+          catch (e) { _reportSafe('chart-mobile', (e && e.message) || 'mobile chart init failed', (e && e.stack) || ''); try { if (window.__AURIX_BOOT) window.__AURIX_BOOT.errors.push('chart-mobile: ' + ((e && e.message) || 'failed')); } catch (_) {} }
+          _bm('charts_done');
+        }, 120);
+      } else { _bm('charts_done'); }
+    }, 250);
 
     // 7. PRICES — SPEC 3.2 / CTO decision (ready-first): run the first live
     //    refresh BEFORE clearing the splash, capped at ~2.5s, so the chart

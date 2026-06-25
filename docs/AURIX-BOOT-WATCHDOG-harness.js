@@ -101,7 +101,7 @@ console.log('\nLIVE FILES — watchdog + instrumentation present:');
   ck('index.html: 8s deadline + 14s backstop', idx.indexOf('8000') >= 0 && idx.indexOf('14000') >= 0);
   ck('index.html: recoverable diagnostic panel + retry', idx.indexOf('aurixBootDiag') >= 0 && idx.indexOf('aurixBootRetry') >= 0);
   ck('index.html: NO reload in boot guard (loop impossible)', idx.indexOf('window.location.reload') < 0);
-  ck('index.html: app.js tag has onerror + v=366', /app\.js\?v=366/.test(idx) && idx.indexOf('app_js_load_error') >= 0);
+  ck('index.html: app.js tag has onerror + v=367', /app\.js\?v=367/.test(idx) && idx.indexOf('app_js_load_error') >= 0);
   ck('index.html: visible build stamp + "watchdog timer started"', idx.indexOf('aurixBuildStamp') >= 0 && idx.indexOf('watchdog timer started') >= 0);
   ck('index.html: no-cache meta tags', /http-equiv="Cache-Control"/.test(idx) && /no-store/.test(idx));
   // P0 v359 — the panel must be VISIBLE on iOS: explicit positioning (no `inset:0`,

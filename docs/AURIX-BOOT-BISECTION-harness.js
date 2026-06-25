@@ -93,8 +93,8 @@ console.log('\nLIVE FILE — app.js boot restructure (hide-before-charts + bisec
   const iMobile = app.indexOf('initMobileCharts(); updateChart(); updateDonut(); initMobileSlider();');
   ck('splash hidden BEFORE chart init', iHide > 0 && iInitChart > 0 && iHide < iInitChart, 'hide@' + iHide + ' < charts@' + iInitChart);
   ck('mobile chart branch is AFTER the splash hide', iMobile > 0 && iHide < iMobile);
-  ck('chart init is guarded (try/catch) + yielded', iInitChart > 0 && app.indexOf('await _yield();') >= 0);
-  ck('mobile chart branch guarded (try/catch)', /initMobileCharts\(\); updateChart\(\); updateDonut\(\); initMobileSlider\(\); \} catch/.test(app));
+  ck('chart init guarded (try/catch) + detached (setTimeout)', iInitChart > 0 && /setTimeout\(function \(\) \{\s*try \{ initChart\(\)/.test(app));
+  ck('mobile chart branch guarded (try/catch)', /initMobileCharts\(\); updateChart\(\); updateDonut\(\); initMobileSlider\(\); \}\s*catch/.test(app));
   ck('render(true) is guarded (shell render can fail safely)', /try \{ render\(true\); \} catch/.test(app)); }
 
 console.log('\nRESULT:', ok ? 'ALL PASS ✓ — shell-first boot; heavy/mobile chart work deferred after splash hide' : 'FAIL ✗');
