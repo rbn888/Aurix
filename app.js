@@ -18545,7 +18545,22 @@ function getAurixRenderContract(range, viewportWidth) {
   try { dash = Number(investableValueBase()); } catch (_) {}
   let vw = Number(viewportWidth);
   if (!(vw > 0)) { try { vw = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 390; } catch (_) { vw = 390; } }
-  return _aurixComputeRenderContract(r, series, dash, vw);
+  const contract = _aurixComputeRenderContract(r, series, dash, vw);
+  // SPEC 2 (section 9) — NON-SCORING enrichment. Surface the visual-preparation
+  // summary (gaps/clusters/redundancy/target vs actual density) WITHOUT touching
+  // qualityScore / renderMode / failures. Guarded by a typeof check so it is a
+  // no-op where prepareAurixVisualSeries is absent (keeps SPEC-1 harness green).
+  try {
+    if (typeof prepareAurixVisualSeries === 'function') {
+      const prep = prepareAurixVisualSeries(r, vw);
+      contract.preparation = {
+        gaps: prep.gaps.length, clusters: prep.clusters.length,
+        redundantPoints: prep.redundantPoints.length, capitalEvents: prep.capitalEvents.length,
+        targetPointCount: prep.targetPointCount, actualPointCount: prep.actualPointCount,
+      };
+    }
+  } catch (_) {}
+  return contract;
 }
 
 // SPEC 1 DEBUG — single range + all ranges, printing the mandated table.
@@ -18582,6 +18597,208 @@ if (typeof window !== 'undefined') {
         quality: c.qualityScore, threshold: c.qualityThreshold, mode: c.renderMode,
         failures: (c.failures || []).join('|') || '—',
       })));
+    } catch (_) {}
+    return rows;
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// AURIX — SPEC 2: VISUAL PREPARATION ENGINE
+//
+// A PURE preparation layer between the canonical series and the (future)
+// Institutional Render Engine. It does NOT beautify the curve — it only MEASURES
+// and CLASSIFIES so a later phase can draw a premium line without ever touching
+// financial data. PURE READ: NEVER mutates assets / history / snapshots / write
+// guard / PCE / dashboard / pricing / CSS / the canonical series.
+//
+// Output `preparedPoints` contains ONLY real existing points (no fabricated
+// values, no aggressive deletion in this phase) → last point still == dashboard.
+//
+// Detects: temporal GAPS, visual CLUSTERS (timestamp + viewport px), REDUNDANT
+// points (low shape contribution), CAPITAL EVENTS (read-only ledger) for future
+// annotation, and the optimal targetPointCount per range × viewport.
+const _AURIX_VP_DENSITY = {
+  '24h': { min: 60,  max: 110 },
+  '7d':  { min: 90,  max: 150 },
+  '30d': { min: 110, max: 180 },
+  '1y':  { min: 140, max: 220 },
+  'all': { min: 140, max: 250 },
+};
+const _AURIX_VP_GAP_MS = {
+  '24h': 90 * 60e3,    // 90 min
+  '7d':  8 * 36e5,     // 8 h
+  '30d': 36 * 36e5,    // 36 h
+  '1y':  21 * 864e5,   // 21 d
+  // 'all' → adaptive (computed from total span)
+};
+const _AURIX_VP_CAPITAL_KINDS = { deposit: 1, withdrawal: 1, asset_add: 1, asset_remove: 1, import_baseline: 1 };
+const _AURIX_VP_CLUSTER_WIDTH_PX = 5;   // a band of ≤5px …
+const _AURIX_VP_CLUSTER_MIN_PTS  = 4;   // … holding ≥4 points is a visual cluster
+const _AURIX_VP_VALUE_EPS = 0.004;      // 0.4% of value span = "minimal value delta"
+
+// targetPointCount ≈ viewport/6 (within the viewport/5..viewport/7 band), clamped
+// to the per-range [min,max]. Deterministic in (range, viewportWidth).
+function _aurixVpTargetPointCount(range, viewportWidth) {
+  const band = _AURIX_VP_DENSITY[range] || _AURIX_VP_DENSITY['30d'];
+  const vw = Math.max(240, Math.min(4000, Number(viewportWidth) || 390));
+  const raw = Math.round(vw / 6);
+  return Math.max(band.min, Math.min(band.max, raw));
+}
+
+// PURE core — measures a resolved (range, series, dashboard, viewport, flows).
+// Separated from prepareAurixVisualSeries so the harness can drive it DOM-free.
+function _aurixComputeVisualPreparation(range, series, dashboardValue, viewportWidth, capitalFlows) {
+  const r = String(range || '30d').toLowerCase();
+  const vw = Math.max(240, Math.min(4000, Number(viewportWidth) || 390));
+  // Defensive copy + sanity filter — NEVER mutate the caller's array.
+  const src = (Array.isArray(series) ? series : [])
+    .filter(p => p && Number.isFinite(p.time) && Number.isFinite(p.value))
+    .map(p => ({ time: p.time, value: p.value }))
+    .sort((a, b) => a.time - b.time);
+  const dash = Number.isFinite(dashboardValue) ? +dashboardValue : null;
+
+  const out = {
+    range: r, viewportWidth: vw,
+    sourcePoints: src,
+    preparedPoints: src.map(p => ({ time: p.time, value: p.value })),   // SPEC 2: real points only, no removal
+    gaps: [], clusters: [], redundantPoints: [], capitalEvents: [],
+    targetPointCount: _aurixVpTargetPointCount(r, vw),
+    actualPointCount: src.length,
+    firstPoint: src.length ? { time: src[0].time, value: +src[0].value.toFixed(2) } : null,
+    lastPoint:  src.length ? { time: src[src.length - 1].time, value: +src[src.length - 1].value.toFixed(2) } : null,
+    meta: {
+      source: 'canonical', deterministic: true,
+      lastValue: src.length ? +src[src.length - 1].value.toFixed(2) : null,
+      dashboardValue: dash != null ? +dash.toFixed(2) : null,
+      lastDeltaPct: null,
+    },
+  };
+  if (out.lastPoint && dash != null && dash > 0) {
+    out.meta.lastDeltaPct = +(((out.lastPoint.value - dash) / dash) * 100).toFixed(4);
+  }
+  const n = src.length;
+  if (n < 2) return out;
+
+  const t0 = src[0].time, t1 = src[n - 1].time, totalSpan = (t1 - t0) || 1;
+
+  // ── §3 GAPS (real temporal holes; detect + report, do NOT cut) ─────────────
+  const gapThr = (r === 'all') ? Math.max(3 * 864e5, totalSpan / 12) : (_AURIX_VP_GAP_MS[r] || 36 * 36e5);
+  const gapAdjacent = new Set();
+  for (let i = 1; i < n; i++) {
+    const dur = src[i].time - src[i - 1].time;
+    if (dur > gapThr) {
+      out.gaps.push({ start: src[i - 1].time, end: src[i].time, durationMs: dur, reason: 'time_gap' });
+      gapAdjacent.add(i - 1); gapAdjacent.add(i);
+    }
+  }
+
+  // ── §4 CLUSTERS (too many points in few px; real timestamp + viewport) ─────
+  const g = _aurixRenderContractGeometry(src.map(p => ({ time: p.time, value: p.value })), vw);
+  let ci = 0;
+  while (ci < n) {
+    let cj = ci;
+    while (cj + 1 < n && (g.pts[cj + 1].x - g.pts[ci].x) <= _AURIX_VP_CLUSTER_WIDTH_PX) cj++;
+    const count = cj - ci + 1;
+    if (count >= _AURIX_VP_CLUSTER_MIN_PTS) {
+      const widthPx = g.pts[cj].x - g.pts[ci].x;
+      out.clusters.push({
+        start: src[ci].time, end: src[cj].time, pointCount: count,
+        widthPx: +widthPx.toFixed(2), density: +(count / Math.max(widthPx, 0.5)).toFixed(2),
+        reason: 'visual_cluster',
+      });
+      ci = cj + 1;
+    } else ci++;
+  }
+
+  // ── §7 CAPITAL EVENTS (read-only ledger; near the window → future annotation) ─
+  const evPad = totalSpan * 0.05;
+  const flows = Array.isArray(capitalFlows) ? capitalFlows : [];
+  flows.forEach(f => {
+    if (!f || !Number.isFinite(f.ts) || !Number.isFinite(f.amountUSD)) return;
+    if (!_AURIX_VP_CAPITAL_KINDS[f.kind]) return;
+    if (f.ts < t0 - evPad || f.ts > t1 + evPad) return;
+    const relMag = (dash && dash > 0) ? Math.abs(f.amountUSD) / dash : 0;
+    const visualPriority = (f.kind === 'import_baseline' || relMag >= 0.05) ? 'high' : (relMag >= 0.01 ? 'medium' : 'low');
+    out.capitalEvents.push({ timestamp: f.ts, type: f.kind, amountUSD: +Number(f.amountUSD).toFixed(2), visualPriority });
+  });
+  out.capitalEvents.sort((a, b) => a.timestamp - b.timestamp);
+  const eventNearMs = gapThr;
+
+  // ── §5 REDUNDANT POINTS (classify only — never delete in SPEC 2) ───────────
+  // A point contributes no visual shape when it is collinear with its neighbours
+  // AND its value barely moves — provided it is not an extremum, endpoint, near a
+  // capital event, or adjacent to a gap (those carry meaning even if "flat").
+  const vspan = (g.vMax - g.vMin) || 1;
+  const eps = g.plotH * 0.012;
+  for (let i = 1; i < n - 1; i++) {
+    const vPrev = src[i - 1].value, v = src[i].value, vNext = src[i + 1].value;
+    const isMax = v > vPrev && v > vNext;
+    const isMin = v < vPrev && v < vNext;
+    if (isMax || isMin) continue;
+    if (gapAdjacent.has(i)) continue;
+    const valDelta = Math.max(Math.abs(v - vPrev), Math.abs(vNext - v)) / vspan;
+    const dx = (g.pts[i + 1].x - g.pts[i - 1].x) || 1e-6;
+    const chordY = g.pts[i - 1].y + (g.pts[i + 1].y - g.pts[i - 1].y) * ((g.pts[i].x - g.pts[i - 1].x) / dx);
+    const chordDevPx = Math.abs(g.pts[i].y - chordY);
+    const nearEvent = out.capitalEvents.some(e => Math.abs(e.timestamp - src[i].time) <= eventNearMs);
+    if (nearEvent) continue;
+    if (valDelta < _AURIX_VP_VALUE_EPS && chordDevPx < eps) {
+      out.redundantPoints.push({ index: i, time: src[i].time, value: +v.toFixed(2), reason: 'low_shape_contribution' });
+    }
+  }
+
+  return out;
+}
+
+// SPEC 2 ENTRY — prepareAurixVisualSeries(range, viewportWidth). Resolves the
+// canonical render series + live dashboard + viewport + capital ledger, then
+// measures. PURE READ — input series is never mutated.
+function prepareAurixVisualSeries(range, viewportWidth) {
+  const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '30d')).toLowerCase();
+  let series = [];
+  try { series = getAurixRenderSeries(r) || []; } catch (_) { series = []; }
+  let dash = NaN;
+  try { dash = Number(investableValueBase()); } catch (_) {}
+  let vw = Number(viewportWidth);
+  if (!(vw > 0)) { try { vw = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 390; } catch (_) { vw = 390; } }
+  let flows = [];
+  try { flows = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : []; } catch (_) { flows = []; }
+  return _aurixComputeVisualPreparation(r, series, dash, vw, flows);
+}
+
+// SPEC 2 DEBUG — single range + all ranges.
+if (typeof window !== 'undefined') {
+  window.debugAurixVisualPreparation = (range) => {
+    const r = range || (typeof activeRange !== 'undefined' ? activeRange : '30d');
+    const p = prepareAurixVisualSeries(r);
+    const status = (p.lastPoint && p.meta.lastDeltaPct != null && Math.abs(p.meta.lastDeltaPct) <= 0.5) ? 'ok'
+      : (p.preparedPoints.length < 2 ? 'building' : 'review');
+    try {
+      console.table([{
+        range: p.range, sourcePoints: p.sourcePoints.length, preparedPoints: p.preparedPoints.length,
+        targetPointCount: p.targetPointCount, gaps: p.gaps.length, clusters: p.clusters.length,
+        redundantPoints: p.redundantPoints.length, capitalEvents: p.capitalEvents.length,
+        firstPoint: p.firstPoint ? p.firstPoint.value : null, lastPoint: p.lastPoint ? p.lastPoint.value : null,
+        lastDeltaPct: p.meta.lastDeltaPct, status,
+      }]);
+      console.log('[visual-prep] gaps:', p.gaps, '| clusters:', p.clusters, '| capitalEvents:', p.capitalEvents);
+    } catch (_) {}
+    return p;
+  };
+  window.debugAurixVisualPreparationAll = () => {
+    const rows = ['24h', '7d', '30d', '1y', 'all'].map(r => prepareAurixVisualSeries(r));
+    try {
+      console.table(rows.map(p => {
+        const status = (p.lastPoint && p.meta.lastDeltaPct != null && Math.abs(p.meta.lastDeltaPct) <= 0.5) ? 'ok'
+          : (p.preparedPoints.length < 2 ? 'building' : 'review');
+        return {
+          range: p.range, sourcePoints: p.sourcePoints.length, preparedPoints: p.preparedPoints.length,
+          targetPointCount: p.targetPointCount, gaps: p.gaps.length, clusters: p.clusters.length,
+          redundantPoints: p.redundantPoints.length, capitalEvents: p.capitalEvents.length,
+          firstPoint: p.firstPoint ? p.firstPoint.value : null, lastPoint: p.lastPoint ? p.lastPoint.value : null,
+          lastDeltaPct: p.meta.lastDeltaPct, status,
+        };
+      }));
     } catch (_) {}
     return rows;
   };
