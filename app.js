@@ -18560,6 +18560,23 @@ function getAurixRenderContract(range, viewportWidth) {
       };
     }
   } catch (_) {}
+  // SPEC 3 (section 12) — NON-SCORING enrichment from the Institutional Render
+  // Engine (if present): point count after downsampling, interpolation, gap
+  // segments, event markers, whether a path was generated, and overshoot. Same
+  // typeof guard → never alters scoring, no-op where the engine is absent.
+  try {
+    if (typeof renderAurixInstitutionalChart === 'function') {
+      const rc = renderAurixInstitutionalChart(r, vw);
+      contract.institutionalRender = {
+        pointCountAfter: rc.renderMeta.pointCountAfter,
+        interpolation: rc.renderMeta.interpolation,
+        gapSegments: rc.gapSegments.length,
+        eventMarkers: rc.eventMarkers.length,
+        pathGenerated: !!(rc.pathData && rc.pathData.length),
+        overshootDetected: !!rc.renderMeta.overshootDetected,
+      };
+    }
+  } catch (_) {}
   return contract;
 }
 
@@ -18800,6 +18817,272 @@ if (typeof window !== 'undefined') {
         };
       }));
     } catch (_) {}
+    return rows;
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// AURIX — SPEC 3: INSTITUTIONAL RENDER ENGINE
+//
+// Converts the output of prepareAurixVisualSeries() into a clean, premium,
+// INSTITUTIONAL curve. This is the first phase allowed to improve the curve
+// VISUALLY — but it still NEVER touches financial data.
+//
+// HARD INPUT CONTRACT: the engine reads ONLY the PreparedSeries object. It must
+// NOT read localStorage / portfolio_history / category_history / wealth ledger /
+// PCE / getChartData. It NEVER mutates assets / snapshots / write guard / PCE /
+// dashboard / pricing / financial logic / global CSS. Pure & deterministic:
+// downsampling returns only REAL points; timestamps & values are never altered;
+// monotone interpolation cannot overshoot (falls back to a safe segment); the
+// last point stays == dashboard.
+//
+// SAFE INTEGRATION (sections 10/14): this phase keeps the engine in PREVIEW/DEBUG
+// only — it does NOT replace the visible WSC/V2 render (that is intentionally
+// deferred to SPEC 4 to avoid production-visual risk). window.previewAurix* and
+// debug accessors expose the rendered object for validation.
+const _AURIX_IR_VALUE_MARGIN = 0.10;   // value-domain margin so real extrema never touch the edge
+const _AURIX_IR_VPAD_FRAC    = 0.08;   // top/bottom plot padding (fraction of height)
+
+// §3 — LTTB downsampling. Returns ONLY real existing points; preserves first,
+// last and the global max/min; never alters a timestamp or value. If the source
+// already fits the target it returns a sorted copy.
+function downsampleAurixLTTB(points, targetPointCount) {
+  const src = (Array.isArray(points) ? points : [])
+    .filter(p => p && Number.isFinite(p.time) && Number.isFinite(p.value))
+    .map(p => ({ time: p.time, value: p.value }))
+    .sort((a, b) => a.time - b.time);
+  const n = src.length;
+  const target = Math.max(2, Math.floor(Number(targetPointCount) || n));
+  if (n <= target) return src.slice();
+
+  const t0 = src[0].time;                       // normalise x for stable triangle areas
+  const tx = i => src[i].time - t0;
+  const sampled = [src[0]];
+  const bucketSize = (n - 2) / (target - 2);
+  let a = 0;
+  for (let i = 0; i < target - 2; i++) {
+    let avgStart = Math.floor((i + 1) * bucketSize) + 1;
+    let avgEnd = Math.min(Math.floor((i + 2) * bucketSize) + 1, n);
+    let avgX = 0, avgY = 0; const avgLen = Math.max(1, avgEnd - avgStart);
+    for (let j = avgStart; j < avgEnd; j++) { avgX += (src[j].time - t0); avgY += src[j].value; }
+    avgX /= avgLen; avgY /= avgLen;
+    const rangeStart = Math.floor(i * bucketSize) + 1;
+    const rangeEnd = Math.min(Math.floor((i + 1) * bucketSize) + 1, n);
+    const pax = tx(a), pay = src[a].value;
+    let maxArea = -1, chosen = rangeStart;
+    for (let j = rangeStart; j < rangeEnd; j++) {
+      const area = Math.abs((pax - avgX) * (src[j].value - pay) - (pax - (src[j].time - t0)) * (avgY - pay)) * 0.5;
+      if (area > maxArea) { maxArea = area; chosen = j; }
+    }
+    sampled.push(src[chosen]); a = chosen;
+  }
+  sampled.push(src[n - 1]);
+
+  // Force-preserve the global extrema (LTTB usually keeps them, but guarantee it).
+  let miIdx = 0, maIdx = 0;
+  for (let i = 1; i < n; i++) { if (src[i].value < src[miIdx].value) miIdx = i; if (src[i].value > src[maIdx].value) maIdx = i; }
+  const present = new Set(sampled.map(p => p.time));
+  [miIdx, maIdx].forEach(idx => { if (!present.has(src[idx].time)) { sampled.push(src[idx]); present.add(src[idx].time); } });
+  // de-dup by timestamp + sort (all entries are real points)
+  const seen = new Set();
+  return sampled.filter(p => { if (seen.has(p.time)) return false; seen.add(p.time); return true; })
+    .sort((x, y) => x.time - y.time);
+}
+
+// §4 — real timestamp scale. x is proportional to the real timestamp (NEVER the
+// array index): equal durations map to equal pixel distances.
+function computeAurixTimeScale(points, viewportWidth) {
+  const vw = Math.max(240, Math.min(4000, Number(viewportWidth) || 390));
+  const pad = vw * _AURIX_RC_PAD_FRAC;
+  const left = pad, right = Math.max(left + 1, vw - pad), width = right - left;
+  const xMin = points.length ? points[0].time : 0;
+  const xMax = points.length ? points[points.length - 1].time : 1;
+  const span = (xMax - xMin) || 1;
+  return { xMin, xMax, left, right, width, x: ts => left + ((ts - xMin) / span) * width };
+}
+
+// §5 — value scale. Adds a visual margin so the real max/min are never clipped,
+// keeps the last point legible, and never artificially exaggerates volatility
+// (plain linear domain — no regime-relative zoom here).
+function computeAurixValueScale(points, viewportHeight) {
+  const vh = Math.max(120, Math.min(2000, Number(viewportHeight) || 220));
+  const vpad = vh * _AURIX_IR_VPAD_FRAC;
+  const top = vpad, bottom = vh - vpad, band = Math.max(1, bottom - top);
+  let vMin = Infinity, vMax = -Infinity;
+  for (const p of points) { if (p.value < vMin) vMin = p.value; if (p.value > vMax) vMax = p.value; }
+  if (!Number.isFinite(vMin)) { vMin = 0; vMax = 1; }
+  let span = vMax - vMin; if (!(span > 0)) span = Math.abs(vMax) || 1;
+  const margin = span * _AURIX_IR_VALUE_MARGIN;
+  const yMin = vMin - margin, yMax = vMax + margin, domain = (yMax - yMin) || 1;
+  return { yMin, yMax, dataMin: vMin, dataMax: vMax, top, bottom, height: band,
+    y: v => bottom - ((v - yMin) / domain) * band };
+}
+
+// §6 — monotone (Fritsch–Carlson) cubic path with a per-segment overshoot guard.
+// Monotone tangent limiting keeps every interval monotone → the curve stays
+// within the two endpoints' [min,max]. As a belt-and-braces guarantee, each
+// cubic is sampled; if it would ever leave the endpoint band it is replaced by a
+// safe straight segment for that span. Returns { d, overshoot, lineFallbacks,
+// segments } — segments expose control points so quality can be re-verified.
+function _aurixMonotonePath(points, xScale, yScale) {
+  const n = points.length;
+  const out = { d: '', overshoot: false, lineFallbacks: 0, segments: [] };
+  if (n === 0) return out;
+  const sx = points.map(p => xScale.x(p.time)), sy = points.map(p => yScale.y(p.value));
+  if (n === 1) { out.d = `M ${sx[0].toFixed(2)} ${sy[0].toFixed(2)}`; return out; }
+  const dseg = []; for (let i = 0; i < n - 1; i++) { const h = (sx[i + 1] - sx[i]) || 1e-6; dseg.push((sy[i + 1] - sy[i]) / h); }
+  const m = new Array(n);
+  m[0] = dseg[0]; m[n - 1] = dseg[n - 2];
+  for (let i = 1; i < n - 1; i++) m[i] = (dseg[i - 1] * dseg[i] <= 0) ? 0 : (dseg[i - 1] + dseg[i]) / 2;
+  for (let i = 0; i < n - 1; i++) {
+    if (dseg[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+    const a = m[i] / dseg[i], b = m[i + 1] / dseg[i];
+    if (a < 0) m[i] = 0;
+    if (b < 0) m[i + 1] = 0;
+    const s = a * a + b * b;
+    if (s > 9) { const tau = 3 / Math.sqrt(s); m[i] = tau * a * dseg[i]; m[i + 1] = tau * b * dseg[i]; }
+  }
+  let d = `M ${sx[0].toFixed(2)} ${sy[0].toFixed(2)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const dx = sx[i + 1] - sx[i];
+    const c1x = sx[i] + dx / 3, c1y = sy[i] + m[i] * dx / 3;
+    const c2x = sx[i + 1] - dx / 3, c2y = sy[i + 1] - m[i + 1] * dx / 3;
+    const lo = Math.min(sy[i], sy[i + 1]), hi = Math.max(sy[i], sy[i + 1]);
+    const eps = Math.max(0.5, (hi - lo) * 0.001);
+    let bad = false;
+    for (let s2 = 1; s2 <= 7; s2++) { const t = s2 / 8, mt = 1 - t;
+      const by = mt * mt * mt * sy[i] + 3 * mt * mt * t * c1y + 3 * mt * t * t * c2y + t * t * t * sy[i + 1];
+      if (by < lo - eps || by > hi + eps) { bad = true; break; }
+    }
+    if (bad) {
+      out.overshoot = true; out.lineFallbacks++;
+      d += ` L ${sx[i + 1].toFixed(2)} ${sy[i + 1].toFixed(2)}`;
+      out.segments.push({ type: 'L', x0: sx[i], y0: sy[i], x1: sx[i + 1], y1: sy[i + 1] });
+    } else {
+      d += ` C ${c1x.toFixed(2)} ${c1y.toFixed(2)} ${c2x.toFixed(2)} ${c2y.toFixed(2)} ${sx[i + 1].toFixed(2)} ${sy[i + 1].toFixed(2)}`;
+      out.segments.push({ type: 'C', x0: sx[i], y0: sy[i], c1x, c1y, c2x, c2y, x1: sx[i + 1], y1: sy[i + 1] });
+    }
+  }
+  out.d = d; return out;
+}
+function buildAurixMonotonicPath(points, xScale, yScale) { return _aurixMonotonePath(points, xScale, yScale).d; }
+
+// §7 — area path. Built from the EXACT line path (no second, smoother path): the
+// fill follows the line precisely, then closes down to the baseline.
+function buildAurixAreaPath(linePathData, points, scale) {
+  if (!linePathData || !points || points.length < 2) return '';
+  const firstX = scale.x(points[0].time), lastX = scale.x(points[points.length - 1].time);
+  const baseY = scale.bottom;
+  return `${linePathData} L ${lastX.toFixed(2)} ${baseY.toFixed(2)} L ${firstX.toFixed(2)} ${baseY.toFixed(2)} Z`;
+}
+
+// §8 — split the visible points into runs at real gaps (read from PreparedSeries)
+// so the line is NOT drawn solid-continuous across a temporal hole.
+function _aurixSplitAtGaps(points, gaps) {
+  if (!points.length) return [];
+  const gs = Array.isArray(gaps) ? gaps : [];
+  const runs = []; let cur = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    const brk = gs.some(g => g && Number.isFinite(g.start) && Number.isFinite(g.end) &&
+      points[i - 1].time <= g.start && points[i].time >= g.end);
+    if (brk) { runs.push(cur); cur = [points[i]]; } else cur.push(points[i]);
+  }
+  runs.push(cur); return runs;
+}
+
+// §2 — MAIN. Reads ONLY prepareAurixVisualSeries(range, viewportWidth) and turns
+// the PreparedSeries into an institutional curve object. Pure / deterministic.
+function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight) {
+  const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '30d')).toLowerCase();
+  let vw = Number(viewportWidth);
+  if (!(vw > 0)) { try { vw = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 390; } catch (_) { vw = 390; } }
+  let vh = Number(viewportHeight);
+  if (!(vh > 0)) vh = Math.max(160, Math.round(vw * _AURIX_RC_ASPECT));
+
+  const prepared = prepareAurixVisualSeries(r, vw);            // the ONLY input source
+  const srcPts = Array.isArray(prepared.preparedPoints) ? prepared.preparedPoints : [];
+  const target = prepared.targetPointCount;
+  const visiblePoints = downsampleAurixLTTB(srcPts, target);
+  const xScale = computeAurixTimeScale(visiblePoints, vw);
+  const yScale = computeAurixValueScale(visiblePoints, vh);
+  const scale = { xMin: xScale.xMin, xMax: xScale.xMax, yMin: yScale.yMin, yMax: yScale.yMax,
+    x: xScale.x, y: yScale.y, top: yScale.top, bottom: yScale.bottom };
+
+  const runs = _aurixSplitAtGaps(visiblePoints, prepared.gaps);
+  let overshoot = false, fallbacks = 0; const linePieces = [], areaPieces = [];
+  runs.forEach(run => {
+    if (!run.length) return;
+    const mp = _aurixMonotonePath(run, xScale, yScale);
+    if (mp.overshoot) overshoot = true; fallbacks += mp.lineFallbacks || 0;
+    if (mp.d) linePieces.push(mp.d);
+    if (run.length >= 2 && mp.d) areaPieces.push(buildAurixAreaPath(mp.d, run, scale));
+  });
+  const pathData = linePieces.join(' ');
+  const areaPathData = areaPieces.join(' ');
+
+  const gapSegments = (prepared.gaps || []).map(g => ({
+    start: g.start, end: g.end, durationMs: g.durationMs,
+    xStart: +xScale.x(g.start).toFixed(2), xEnd: +xScale.x(g.end).toFixed(2), style: 'dashed',
+  }));
+  const eventMarkers = (prepared.capitalEvents || []).map(e => ({
+    x: +xScale.x(e.timestamp).toFixed(2), timestamp: e.timestamp, type: e.type,
+    amountUSD: e.amountUSD, visualPriority: e.visualPriority,
+  }));
+  const lastV = visiblePoints.length ? visiblePoints[visiblePoints.length - 1].value : null;
+
+  return {
+    range: r, viewportWidth: vw, viewportHeight: vh,
+    prepared, visiblePoints, pathData, areaPathData,
+    gaps: prepared.gaps, gapSegments, eventMarkers,
+    scale: { xMin: scale.xMin, xMax: scale.xMax, yMin: +scale.yMin.toFixed(4), yMax: +scale.yMax.toFixed(4) },
+    renderMeta: {
+      source: 'prepared-series', deterministic: true,
+      pointCountBefore: srcPts.length, pointCountAfter: visiblePoints.length,
+      targetPointCount: target, interpolation: 'monotonic', downsampling: 'lttb-or-equivalent',
+      lastValue: lastV != null ? +lastV.toFixed(2) : null,
+      dashboardValue: prepared.meta.dashboardValue,
+      lastDeltaPct: prepared.meta.lastDeltaPct,
+      overshootDetected: overshoot, lineFallbackSegments: fallbacks,
+    },
+  };
+}
+
+// §10/§11 — preview (data-only; visible production render UNCHANGED) + debug.
+if (typeof window !== 'undefined') {
+  window.previewAurixInstitutionalRender = (range) => {
+    const r = range || (typeof activeRange !== 'undefined' ? activeRange : '30d');
+    const rc = renderAurixInstitutionalChart(r);
+    try {
+      console.log('[institutional-render preview]', r, {
+        pointsBefore: rc.renderMeta.pointCountBefore, pointsAfter: rc.renderMeta.pointCountAfter,
+        target: rc.renderMeta.targetPointCount, gaps: rc.gapSegments.length,
+        events: rc.eventMarkers.length, overshoot: rc.renderMeta.overshootDetected,
+        lastDeltaPct: rc.renderMeta.lastDeltaPct, pathChars: rc.pathData.length,
+      });
+    } catch (_) {}
+    return rc;   // visible WSC/V2 render is NOT touched in SPEC 3 (deferred to SPEC 4)
+  };
+  const _irRow = rc => {
+    const m = rc.renderMeta;
+    const status = (m.lastDeltaPct != null && Math.abs(m.lastDeltaPct) <= 0.5) ? 'ok'
+      : (m.pointCountAfter < 2 ? 'building' : 'review');
+    return {
+      range: rc.range, pointCountBefore: m.pointCountBefore, pointCountAfter: m.pointCountAfter,
+      targetPointCount: m.targetPointCount, downsampling: m.downsampling, interpolation: m.interpolation,
+      gaps: rc.gapSegments.length, eventMarkers: rc.eventMarkers.length,
+      lastValue: m.lastValue, dashboardValue: m.dashboardValue, lastDeltaPct: m.lastDeltaPct,
+      scaleYMin: rc.scale.yMin, scaleYMax: rc.scale.yMax, status,
+    };
+  };
+  window.debugAurixInstitutionalRender = (range) => {
+    const r = range || (typeof activeRange !== 'undefined' ? activeRange : '30d');
+    const rc = renderAurixInstitutionalChart(r);
+    try { console.table([_irRow(rc)]); console.log('[institutional-render] gapSegments:', rc.gapSegments, '| eventMarkers:', rc.eventMarkers); } catch (_) {}
+    return rc;
+  };
+  window.debugAurixInstitutionalRenderAll = () => {
+    const rows = ['24h', '7d', '30d', '1y', 'all'].map(r => renderAurixInstitutionalChart(r));
+    try { console.table(rows.map(_irRow)); } catch (_) {}
     return rows;
   };
 }
