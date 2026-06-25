@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AURIX app-load-test</title>
+</head>
+<body style="background:#ffffff;color:#000000;font-family:-apple-system,system-ui,sans-serif;padding:18px;line-height:1.4">
+  <div style="font-size:22px;font-weight:bold">APP LOAD TEST</div>
+  <div style="font-size:13px;word-break:break-word" id="ua">ua…</div>
+  <hr>
+  <div style="font-size:16px">contador (debe subir siempre):</div>
+  <div id="counter" style="font-size:64px;font-weight:bold">0</div>
+  <div id="phase" style="font-size:18px;color:#0a58ca">1) contador solo (1.5s)…</div>
+  <div id="result" style="font-size:18px;font-weight:bold;margin-top:8px"></div>
+  <script>
+    // DECISIVE BISECTION: a 100ms counter runs continuously. Then app.js is loaded with
+    // its boot pipeline SKIPPED (__APP_BOOTED__=true). The ONLY thing under test is
+    // app.js's synchronous TOP-LEVEL execution (migrations/wiring/defs/recompute).
+    //   • Counter keeps rising + "app.js LOADED+EXECUTED" → top-level does NOT block;
+    //     the freeze is in the async boot pipeline.
+    //   • Counter FREEZES when app.js loads (and no "LOADED") → app.js top-level blocks
+    //     the main thread (or iOS Safari killed the long script). The frozen number ≈
+    //     when the block started.
+    try { document.getElementById('ua').textContent = navigator.userAgent; } catch (e) {}
+    var n = 0;
+    setInterval(function () { n++; var c = document.getElementById('counter'); if (c) c.textContent = n; }, 100);
+    // Skip app.js's main boot pipeline + provide the boot object app.js expects.
+    window.__APP_BOOTED__ = true;
+    window.__AURIX_BOOT = { steps: [], errors: [], appJsExecuted: false, mark: function (s) { try { this.steps.push(s); } catch (_) {} } };
+    // Start app.js ~1.5s in, so you first SEE the counter rising before the test.
+    setTimeout(function () {
+      document.getElementById('phase').textContent = '2) cargando app.js (mira si el contador se congela)…';
+      var t = Date.now();
+      var sc = document.createElement('script');
+      sc.src = 'app.js?v=365';
+      sc.onload = function () {
+        document.getElementById('result').textContent =
+          '✅ app.js LOADED+EXECUTED en ' + (Date.now() - t) + 'ms · contador=' + n +
+          ' · appJsExecuted=' + (window.__AURIX_BOOT && window.__AURIX_BOOT.appJsExecuted);
+        document.getElementById('result').style.color = '#198754';
+      };
+      sc.onerror = function () {
+        document.getElementById('result').textContent = '❌ app.js FAILED to load (network/404/parse)';
+        document.getElementById('result').style.color = '#dc3545';
+      };
+      document.body.appendChild(sc);
+    }, 1500);
+  </script>
+</body>
+</html>

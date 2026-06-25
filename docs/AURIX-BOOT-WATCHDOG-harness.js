@@ -155,6 +155,14 @@ console.log('\nISOLATION PAGES (Fase 4/5) — exist + correct isolation:');
     ck('timer-proof: no app.js / no external css', !/<script[^>]+src=/.test(tp) && !/<link[^>]+stylesheet/.test(tp));
     ck('timer-proof: TIMER PROOF LOADED + tick + TIMER FIRED', tp.indexOf('TIMER PROOF LOADED') >= 0 && tp.indexOf("'tick: '") >= 0 && tp.indexOf('TIMER FIRED') >= 0);
     ck('timer-proof: setInterval + setTimeout', tp.indexOf('setInterval(') >= 0 && tp.indexOf('setTimeout(') >= 0);
+  }
+  const altPath = path.join(root, 'app-load-test.html');
+  ck('app-load-test.html exists', fs.existsSync(altPath));
+  if (fs.existsSync(altPath)) {
+    const alt = fs.readFileSync(altPath, 'utf8');
+    ck('app-load-test: continuous counter (setInterval)', alt.indexOf('setInterval(') >= 0 && alt.indexOf("getElementById('counter')") >= 0);
+    ck('app-load-test: loads app.js with boot pipeline skipped', /app\.js\?v=/.test(alt) && alt.indexOf('window.__APP_BOOTED__ = true') >= 0);
+    ck('app-load-test: reports LOADED vs freeze', alt.indexOf('LOADED+EXECUTED') >= 0 && alt.indexOf('onerror') >= 0);
   } }
 
 console.log('\nRESULT:', ok ? 'ALL PASS ✓ — splash can never remain permanent; the break point is always reported' : 'FAIL ✗');
