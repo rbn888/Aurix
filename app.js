@@ -19046,7 +19046,11 @@ function downsampleAurixAdaptive(points, targetPointCount) {
 // unaffected — only the on-screen x of each REAL point changes. Monotone in time →
 // order preserved, no overlaps. β per range (more fill on long ranges where islands
 // appear). β=0 would be pure real-time.
-const _AURIX_X_FILL_BETA = { '24h': 0.30, '7d': 0.40, '30d': 0.50, '1y': 0.65, 'all': 0.70 };
+// RC1-B increment 2 (Fase 3 personality / Fase 5 fill): raise 24H perceptual-X fill
+// 0.30→0.48 so the short range reads alive & never empty (overnight idle no longer
+// leaves a flat gap). Calibration constant only — X-PIXEL mapping; values/last-point
+// (pinned to the right edge)/max/min/timestamps untouched (equivalence invariant).
+const _AURIX_X_FILL_BETA = { '24h': 0.48, '7d': 0.40, '30d': 0.50, '1y': 0.65, 'all': 0.70 };
 function computeAurixAdaptiveXScale(points, viewportWidth, box, range) {
   const vw = Math.max(240, Math.min(4000, Number(viewportWidth) || 390));
   let left, right;
