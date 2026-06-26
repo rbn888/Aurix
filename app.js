@@ -21862,12 +21862,26 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
     };
   }
 
+  // RC1-A — TradingView-style glowing end marker at the LAST real point. Presentation
+  // only: positioned in % from the already-computed render samples (no engine/coord
+  // change). Rendered as an HTML element so the non-uniform viewBox never distorts it
+  // (an in-SVG circle would stretch into an ellipse). Desktop surface only.
+  let _lastDotHtml = '';
+  try {
+    const _n = _ttSampleX.length;
+    if (!_isMobile && _n >= 2) {
+      const _lx = (_ttSampleX[_n - 1] / W) * 100;
+      const _ly = (_ttSampleY[_n - 1] / H) * 100;
+      if (isFinite(_lx) && isFinite(_ly)) _lastDotHtml = `<div class="wsc-last-dot" style="left:${_lx.toFixed(2)}%;top:${_ly.toFixed(2)}%" aria-hidden="true"></div>`;
+    }
+  } catch (_) {}
+
   hostEl.innerHTML = `
     <div class="wsc wsc-${tone}">
       <div class="wsc-plot">
         <svg class="wsc-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
           <defs>
-            <linearGradient id="wscArea-${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" class="wsc-area-0"/><stop offset="100%" class="wsc-area-1"/></linearGradient>
+            <linearGradient id="wscArea-${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" class="wsc-area-0"/><stop offset="58%" class="wsc-area-mid"/><stop offset="100%" class="wsc-area-1"/></linearGradient>
             <filter id="wscGlow-${uid}" x="-4%" y="-60%" width="108%" height="220%" color-interpolation-filters="sRGB">
               <feGaussianBlur stdDeviation="${_polish.glowStrength}" result="b"/>
               <feComponentTransfer in="b" result="bf"><feFuncA type="linear" slope="${_polish.glowAlpha}"/></feComponentTransfer>
@@ -21880,6 +21894,7 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
         </svg>
         <div class="wsc-ylabs">${_yLabelsFinal}</div>
         <div class="wsc-xlabs">${xLabels}</div>
+        ${_lastDotHtml}
       </div>
     </div>`;
 
