@@ -21891,7 +21891,10 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
 // Repaint BOTH surfaces from the single shared component. Driven by every data
 // refresh and every range / unit toggle (same global activeRange/activePerfMode).
 function renderWealthCurve(animate) {
-  if (typeof window !== 'undefined' && window.AURIX_MOBILE_SAFE) return;   // P0 mobile-safe: chart disabled on phones
+  // P1 mobile-safe: never run the heavy Chart.js/WSC paint on phones. Instead hand off
+  // to the deferred, budgeted, cancelable lightweight SVG renderer (Fase B). This keeps
+  // the mobile chart fresh on every data refresh / range toggle without ever blocking.
+  if (typeof window !== 'undefined' && window.AURIX_MOBILE_SAFE) { try { scheduleAurixMobileChart(activeRange); } catch (_) {} return; }
   const paint = () => {
     try { _wscPaintSurface(document.getElementById('chartChange'),       document.getElementById('perfSnapshot'),     { uid: 'd', tooltip: true  }); } catch (_) {}
     try { _wscPaintSurface(document.getElementById('chartChangeMobile'), document.getElementById('wealthCurveMobile'), { uid: 'm', tooltip: false }); } catch (_) {}
@@ -21924,6 +21927,94 @@ function renderWealthCurve(animate) {
 function _dshRenderPerfSnapshot(animate) {
   renderWealthCurve(animate);
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// P1 — MOBILE SAFE RENDERING CONTRACT (Fase B, non-critical)
+// ════════════════════════════════════════════════════════════════════════════
+// A lightweight NATIVE-SVG wealth curve for phones. It exists to honour the eight
+// permanent invariants: it NEVER uses Chart.js, NEVER runs during boot/hydration,
+// NEVER blocks a click, NEVER throws, is fully budgeted (100ms) and cancelable
+// (token). On ANY failure / timeout / empty data / cancellation it leaves a
+// placeholder and the rest of the app is untouched. It reuses the SAME canonical
+// series via the pure render engine (renderAurixInstitutionalChart → pathData),
+// so it touches no data, no series, no pricing, no snapshots, no desktop render.
+let _aurixMobileChartToken = 0;
+let _aurixMobileChartTimer = null;
+function _aurixNow() { try { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); } catch (_) { return Date.now(); } }
+function _aurixMobileChartHosts() {
+  const ids = ['wealthCurveMobile', 'perfSnapshot'];
+  const out = [];
+  for (let i = 0; i < ids.length; i++) { try { const el = document.getElementById(ids[i]); if (el) out.push(el); } catch (_) {} }
+  return out;
+}
+function _aurixMobileChartPlaceholder(msg) {
+  const html = '<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:120px;color:#5e7bb0;font:500 12.5px/1.4 -apple-system,system-ui;text-align:center;padding:14px">' + msg + '</div>';
+  const hosts = _aurixMobileChartHosts();
+  for (let i = 0; i < hosts.length; i++) { try { hosts[i].innerHTML = html; } catch (_) {} }
+}
+// The actual paint. Synchronous + bounded (pure O(n) engine over a few hundred
+// downsampled points — no canvas, no layout thrash, no animation loop). Always
+// invoked from a deferred macrotask via scheduleAurixMobileChart, never inline.
+function renderAurixMobileChartNow(range, token) {
+  try {
+    if (token !== _aurixMobileChartToken) return;                 // canceled — a newer render was scheduled
+    const hosts = _aurixMobileChartHosts();
+    if (!hosts.length) return;                                    // nothing visible to draw into
+    const VBW = 1000, VBH = 260, box = { left: 6, right: 994, top: 16, bottom: 244 };
+    const t0 = _aurixNow();
+    let rc = null;
+    try { rc = renderAurixInstitutionalChart(range, VBW, VBH, box); }
+    catch (e) { _aurixMobileChartPlaceholder('Gráfico no disponible'); try { _reportSafe('mobile-chart', 'engine: ' + ((e && e.message) || e)); } catch (_) {} return; }
+    const dt = _aurixNow() - t0;
+    try { window.__aurixMobileChartMs = Math.round(dt); } catch (_) {}
+    if (token !== _aurixMobileChartToken) return;                 // canceled mid-compute → do not paint
+    if (!rc || !rc.pathData || rc.pathData.length < 6 || !rc.visiblePoints || rc.visiblePoints.length < 2) {
+      _aurixMobileChartPlaceholder((rc && rc.visiblePoints && rc.visiblePoints.length === 1) ? 'Aún no hay suficiente historial' : 'Gráfico no disponible');
+      return;
+    }
+    if (dt > 100) {                                               // performance budget exceeded → cancel + placeholder
+      _aurixMobileChartPlaceholder('Gráfico no disponible');
+      try { _reportSafe('mobile-chart', 'budget exceeded ' + Math.round(dt) + 'ms (' + rc.visiblePoints.length + ' pts)'); } catch (_) {}
+      return;
+    }
+    const up = !(rc.renderMeta && rc.renderMeta.lastDeltaPct != null && rc.renderMeta.lastDeltaPct < 0);
+    const stroke = up ? '#34d39e' : '#ff6b6b';
+    const fillTop = up ? 'rgba(52,211,158,0.20)' : 'rgba(255,107,107,0.18)';
+    const gid = 'aurixMobFill_' + (up ? 'u' : 'd');
+    const svg =
+      '<svg viewBox="0 0 ' + VBW + ' ' + VBH + '" preserveAspectRatio="none" width="100%" height="100%" style="display:block" aria-hidden="true">' +
+        '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0" stop-color="' + fillTop + '"/><stop offset="1" stop-color="rgba(0,0,0,0)"/>' +
+        '</linearGradient></defs>' +
+        '<path d="' + rc.areaPathData + '" fill="url(#' + gid + ')" stroke="none"/>' +
+        '<path d="' + rc.pathData + '" fill="none" stroke="' + stroke + '" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>' +
+      '</svg>';
+    if (token !== _aurixMobileChartToken) return;                 // canceled just before paint
+    for (let i = 0; i < hosts.length; i++) { try { hosts[i].innerHTML = svg; } catch (_) {} }
+  } catch (e) {
+    try { _aurixMobileChartPlaceholder('Gráfico no disponible'); } catch (_) {}
+    try { _reportSafe('mobile-chart', 'fatal: ' + ((e && e.message) || e)); } catch (_) {}
+  }
+}
+// Fase B trigger. ALWAYS defers the paint to a macrotask (+rAF) so it can never run
+// inside the boot/hydration critical path or block an interaction. Debounced and
+// token-cancelable, so orientation change / price refresh / tab churn collapse to a
+// single latest render. No-op off mobile-safe. Never throws.
+function scheduleAurixMobileChart(range) {
+  try {
+    if (typeof window === 'undefined' || !window.AURIX_MOBILE_SAFE) return;
+    const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '30d')).toLowerCase();
+    const token = ++_aurixMobileChartToken;
+    if (_aurixMobileChartTimer) { try { clearTimeout(_aurixMobileChartTimer); } catch (_) {} }
+    _aurixMobileChartTimer = setTimeout(function () {
+      try {
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(function () { renderAurixMobileChartNow(r, token); });
+        else renderAurixMobileChartNow(r, token);
+      } catch (_) { try { renderAurixMobileChartNow(r, token); } catch (__) {} }
+    }, 60);
+  } catch (_) {}
+}
+if (typeof window !== 'undefined') { window.scheduleAurixMobileChart = scheduleAurixMobileChart; window.renderAurixMobileChartNow = renderAurixMobileChartNow; }
 
 // SPEC 4 — console controls to flip the visible Institutional Render on/off and
 // repaint immediately (compare on-device with NO redeploy, fully data-safe).
@@ -37061,6 +37152,12 @@ function _aurixPreloadBootIcons() {
         });
       } catch (_) {}
       _bm('charts_skipped_mobile_safe');
+      // Fase B (non-critical) hand-off: the lightweight SVG curve is SCHEDULED here but
+      // EXECUTES later in a deferred macrotask — after the splash is gone and the
+      // dashboard is fully interactive. It can never block boot/hydration; if it is slow,
+      // throws, times out or has no data, the placeholder above simply stays. Invariants
+      // 1-8 hold: the UI never depends on it and it never runs during boot.
+      try { scheduleAurixMobileChart(); } catch (_) {}
     } else {
       setTimeout(function () {
         try { initChart(); initDonut(); updateChart(); updateDonut(); }
