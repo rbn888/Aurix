@@ -145,7 +145,7 @@ console.log('\nEXECUTION — 17 mandated cases (real renderer, fake carousel DOM
 
 // 12) no llama initChart/updateChart/initMobileCharts (runtime + block has no refs)
 { const env = makeEnv(engineOK(S30, DASH)); cycle(env, '30d');
-  const clean = ['initChart', 'updateChart', 'initDonut', 'updateDonut', 'initMobileCharts', 'initMobileSlider', 'new Chart'].every(t => block.indexOf(t) < 0);
+  const clean = [/\binitChart\(/, /\bupdateChart\(/, /\binitDonut\(/, /\bupdateDonut\(/, /\binitMobileCharts\(/, /\binitMobileSlider\(/, /new Chart\b/].every(re => !re.test(block));
   ck('12. never calls heavy chart fns (runtime 0 + no block refs)', env.chartJsCalls === 0 && clean); }
 
 // 13) navegación sigue activa después de render

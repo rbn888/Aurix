@@ -83,11 +83,11 @@ function runContract(opts) {
 console.log('\nEXECUTION — lightweight SVG donut (no Chart.js):');
 const donutSrc = fnSrc('renderAurixMobileDonutLite');
 function runDonut(dist) {
-  const wrap = makeNode(null); const cv = makeNode('donutCenterValMobile'); const cs = makeNode('donutCenterSubMobile');
-  const nodes = { donutCenterValMobile: cv, donutCenterSubMobile: cs };
+  const wrap = makeNode(null); const cv = makeNode('donutCenterValMobile'); const cs = makeNode('donutCenterSubMobile'); const legend = makeNode('distributionLegendMobile');
+  const nodes = { donutCenterValMobile: cv, donutCenterSubMobile: cs, distributionLegendMobile: legend };
   const sandbox = {
     console, Math,
-    TYPE_META: { crypto: { color: '#2563EB' }, stock: { color: '#EA580C' }, cash: { color: '#16A34A' } },
+    TYPE_META: { crypto: { label: 'Cripto', color: '#2563EB' }, stock: { label: 'Acciones', color: '#EA580C' }, cash: { label: 'Liquidez', color: '#16A34A' }, other: { label: 'Otros', color: '#6b7280' } },
     getInvestableDistribution: () => dist,
     investableValueBase: () => 12345, formatShort: (v) => '$' + v,
     document: { querySelector: (sel) => sel === '.mobile-donut-wrap' ? wrap : null, getElementById: (id) => nodes[id] || wrap.kids.find(k => k.id === id) || null, createElement: () => makeNode(null) },
@@ -96,12 +96,15 @@ function runDonut(dist) {
   vm.createContext(sandbox);
   vm.runInContext(donutSrc + '\nthis.__run = renderAurixMobileDonutLite;', sandbox);
   sandbox.__run();
-  return { wrap, cv, cs, host: wrap.kids.find(k => k.id === 'mobileDonutLiteHost') };
+  return { wrap, cv, cs, legend, host: wrap.kids.find(k => k.id === 'mobileDonutLiteHost') };
 }
 
 { const d = runDonut([{ type: 'crypto', valueBase: 6000, pct: 60 }, { type: 'cash', valueBase: 4000, pct: 40 }]);
-  ck('7. donut renders native SVG (no Chart.js) from canonical distribution + center value',
-     !!d.host && d.host.innerHTML.indexOf('<svg') > -1 && /<circle /.test(d.host.innerHTML) && d.cv.textContent === '$12345'); }
+  ck('5. donut shows the total (center value from canonical investable base)', d.cv.textContent === '$12345');
+  ck('7. donut renders native SVG ring (no Chart.js) from canonical distribution',
+     !!d.host && d.host.innerHTML.indexOf('<svg') > -1 && /<circle /.test(d.host.innerHTML));
+  ck('6. donut LEGEND restored — categories + colours', /legend-item/.test(d.legend.innerHTML) && d.legend.innerHTML.indexOf('Cripto') > -1 && d.legend.innerHTML.indexOf('#2563EB') > -1);
+  ck('7c. donut legend shows PERCENTAGES per category', /60\.0%/.test(d.legend.innerHTML) && /40\.0%/.test(d.legend.innerHTML)); }
 { const d = runDonut(null);
   ck('7b. donut with no data → placeholder visible (slide never looks broken)',
      !!d.host && d.host.innerHTML.indexOf('Distribución no disponible') > -1 && d.host.innerHTML.indexOf('<svg') < 0); }
@@ -128,6 +131,16 @@ ck('§5 swipe drives translateX + bound exactly once (no listener duplication)',
    /translateX\(/.test(sliderFn) && sliderFn.indexOf('__AURIX_MOBILE_SLIDER_BOUND__') >= 0 && /_aurixMobileSliderBoot/.test(app));
 ck('§6 dots updated by the slider (goTo toggles .m-dot active)',
    /dots\.forEach\([\s\S]{0,90}toggle\('active'/.test(sliderFn));
+// Cards inferiores (category grid) — updateDonut is gated on mobile, so its mobile branch
+// must drive updateCategoryCards (which OWNS #categoriesSection visibility); + the boot
+// scheduler also rebuilds them. updateCategoryCards itself carries NO mobile-safe gate.
+const updateDonutFn = fnSrc('updateDonut');
+ck('CARDS: updateDonut mobile branch drives renderAurixMobileDonutLite + updateCategoryCards',
+   /AURIX_MOBILE_SAFE\) \{[\s\S]{0,400}renderAurixMobileDonutLite\(\)[\s\S]{0,200}updateCategoryCards\(\)[\s\S]{0,80}return;/.test(updateDonutFn));
+ck('CARDS: boot/scheduler deferred pass rebuilds the category cards',
+   /renderAurixMobileDonutLite\(\); \} catch \(_\) \{\}\s*\n\s*try \{ updateCategoryCards\(\)/.test(app));
+ck('CARDS: updateCategoryCards has NO mobile-safe gate (safe to run on phones)',
+   fnSrc('updateCategoryCards').indexOf('AURIX_MOBILE_SAFE') < 0);
 ck('§8 Chart.js still blocked on mobile (6 heavy fns hard-gated)', (app.match(/AURIX_MOBILE_SAFE\) return;/g) || []).length >= 6);
 ck('§9 carousel boot does NOT call initMobileCharts / updateChart / updateDonut',
    app.indexOf('function _aurixMobileSliderBoot') >= 0 &&

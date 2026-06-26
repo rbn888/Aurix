@@ -16916,7 +16916,15 @@ function initDonut() {
 let _donutHasData = false;   // track whether donut has been populated before
 
 function updateDonut() {
-  if (typeof window !== 'undefined' && window.AURIX_MOBILE_SAFE) return;   // P0 mobile-safe
+  if (typeof window !== 'undefined' && window.AURIX_MOBILE_SAFE) {
+    // P0 mobile-safe: the heavy Chart.js donut is disabled on phones. updateDonut is the
+    // canonical "distribution changed" trigger, so on mobile drive the lightweight
+    // equivalents it used to own: the SVG donut (ring + legend) and the category cards
+    // (the lower dashboard cards). No Chart.js. Never throws.
+    try { renderAurixMobileDonutLite(); } catch (_) {}
+    try { updateCategoryCards(); } catch (_) {}
+    return;
+  }
   // AURIX-INVESTABLE-WEALTH-1 — the donut + legend show the INVESTABLE
   // distribution (real estate excluded; it lives in its own card). % are over
   // investable wealth so a 98%-house portfolio no longer flattens every slice.
@@ -22069,6 +22077,7 @@ function scheduleAurixMobileLite(range) {
       const paint = function () {
         renderAurixMobileLiteChart(r, token);
         try { renderAurixMobileDonutLite(); } catch (_) {}   // donut slide rides the same deferred pass
+        try { updateCategoryCards(); } catch (_) {}           // + the lower category cards (updateDonut is gated on mobile)
       };
       try {
         if (typeof requestAnimationFrame === 'function') requestAnimationFrame(paint);
@@ -22121,6 +22130,22 @@ function renderAurixMobileDonutLite() {
       const cs = document.getElementById('donutCenterSubMobile');
       if (cv && typeof investableValueBase === 'function' && typeof formatShort === 'function') cv.textContent = formatShort(investableValueBase());
       if (cs && !cs.textContent) cs.textContent = 'Inversión';
+    } catch (_) {}
+    // LEGEND — restore the previous breakdown (category · colour · %) using the SAME
+    // .legend-item markup the desktop donut used, so existing CSS styles it. This is the
+    // distribution detail that was lost when the Chart.js updateDonut was gated on mobile.
+    try {
+      const legend = document.getElementById('distributionLegendMobile');
+      if (legend) {
+        legend.innerHTML = dist.map(function (d, i) {
+          const meta = (typeof TYPE_META !== 'undefined' && (TYPE_META[d.type] || TYPE_META.other)) || { label: d.type, color: '#6b7280' };
+          const label = meta.donutLabel || meta.label || d.type;
+          return '<div class="legend-item" data-idx="' + i + '">' +
+            '<span class="legend-left"><span class="legend-dot" style="background:' + meta.color + '"></span>' +
+            '<span class="legend-label">' + label + '</span></span>' +
+            '<span class="legend-percent">' + (d.pct > 0 ? d.pct : 0).toFixed(1) + '%</span></div>';
+        }).join('');
+      }
     } catch (_) {}
   } catch (_) {}
 }
