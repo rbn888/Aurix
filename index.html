@@ -66,9 +66,9 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v366-mobile-lite-chart';
-      var APPJS_V = '371';
-      var HTML_TS = '2026-06-26T06:04:57Z';
+      var BUILD = 'v367-mobile-dashboard-clean';
+      var APPJS_V = '372';
+      var HTML_TS = '2026-06-26T15:49:24Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
       window.AURIX_HTML_TS = HTML_TS;
@@ -117,25 +117,16 @@
         if (iosStandalone) document.documentElement.setAttribute('data-ios-standalone', 'true');
       } catch (_) {}
 
-      document.addEventListener('DOMContentLoaded', function() { B.domContentLoaded = true; B.mark('DOMContentLoaded'); _aurixStampSplash(); });
+      document.addEventListener('DOMContentLoaded', function() { B.domContentLoaded = true; B.mark('DOMContentLoaded'); });
       window.addEventListener('load', function() { B.windowLoad = true; B.mark('window_load'); });
 
-      // Visible build stamp + "watchdog timer started" (uses left/right/bottom — NOT inset).
-      function _aurixStampSplash() {
-        try {
-          var bl = document.getElementById('bootLoader');
-          if (!bl || document.getElementById('aurixBuildStamp')) return;
-          var s = document.createElement('div'); s.id = 'aurixBuildStamp';
-          s.style.cssText = 'position:fixed;left:0;right:0;bottom:12px;text-align:center;font:10px/1.5 ui-monospace,Menlo,monospace;color:#5e7bb0;opacity:.92;z-index:2147483646;padding:0 10px;white-space:pre-wrap';
-          s.textContent = BUILD + ' · app.js?v=' + APPJS_V + ' · ' + HTML_TS + '\nwatchdog timer started · panel en 8s si no entra';
-          bl.appendChild(s);
-        } catch (_) {}
-      }
-      if (document.getElementById('bootLoader')) _aurixStampSplash();
+      // PRODUCTION-CLEAN SPLASH: the splash shows ONLY the AURIX wordmark. The build /
+      // app.js / timestamp / "watchdog" diagnostics live on window.__AURIX_BOOT (read via
+      // debugAurixBoot()) and are NEVER painted into the UI. No visible stamp.
 
-      // WATCHDOG PANEL — explicit positioning (no `inset`), max z-index, inline styles,
-      // appended to <body> directly. Visible even if app.js fails, CSS fails, or the
-      // splash is still up.
+      // WATCHDOG PANEL — internal safety net. Shown ONLY on a genuine fatal: app.js never
+      // EXECUTED (network/404/parse) after a long grace, with the splash still up. A slow-
+      // but-working boot (app.js executed, app-side failsafe owns the splash) never shows it.
       function esc(s) { return String(s).replace(/[<>&]/g, function(c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; }); }
       function showDiag(reason) {
         try {
@@ -163,8 +154,14 @@
           if (btn) btn.onclick = function() { try { sessionStorage.clear(); } catch (_) {} try { location.replace(location.pathname + '?fresh=' + (new Date()).getTime()); } catch (_) { try { location.reload(); } catch (_) {} } };
         } catch (_) {}
       }
-      setTimeout(function() { if (!B.dashboardReady && !B.splashHidden) showDiag('watchdog_8s_no_dashboard'); }, 8000);
-      setTimeout(function() { if (!B.dashboardReady && !B.splashHidden && !document.getElementById('aurixBootDiag')) showDiag('watchdog_14s_backstop'); }, 14000);
+      // Single genuine-fatal backstop: only if app.js NEVER executed AND the splash is
+      // still up AND the dashboard never became ready. App.js executes in ~tens of ms, so
+      // this cannot fire on a working (even slow) boot — only when the app truly never ran.
+      setTimeout(function() {
+        if (!B.appJsExecuted && !B.dashboardReady && !B.splashHidden && !document.getElementById('aurixBootDiag')) {
+          showDiag(B.appJsLoaded ? 'app_js_loaded_but_never_executed' : 'app_js_never_loaded');
+        }
+      }, 12000);
     })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1337,7 +1334,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=371"
+  <script src="app.js?v=372"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).

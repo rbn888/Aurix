@@ -21950,11 +21950,14 @@ function _dshRenderPerfSnapshot(animate) {
 //     (renderAurixInstitutionalChart → getAurixRenderSeries). No data is created,
 //     modified or interpolated as real; last point = dashboard (engine guarantees it).
 const _aurixMobileChartState = {
-  enabled: true, rendered: false, failed: false,
+  enabled: true, scheduled: false, hostFound: false, seriesPoints: 0,
+  rendered: false, failed: false, placeholderReason: null,
   durationMs: null, pointCount: 0, range: null, lastError: null, fallbackUsed: false,
+  timestamp: null,
 };
 let _aurixMobileLiteToken = 0;
 let _aurixMobileLiteTimer = null;
+let _aurixMobileLiteEmptyRetries = 0;
 function _aurixLiteNow() { try { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); } catch (_) { return Date.now(); } }
 function _aurixLiteEnabled() { try { return typeof window === 'undefined' || window.AURIX_MOBILE_CHART_LITE_ENABLED !== false; } catch (_) { return true; } }
 // The dedicated host — created exactly once via createElement+appendChild (never by
@@ -21985,6 +21988,7 @@ function _aurixMobileLiteFallback(reason, err) {
   const st = _aurixMobileChartState;
   st.rendered = false;
   st.fallbackUsed = true;
+  st.placeholderReason = reason || 'unknown';   // NEVER a silent placeholder — debug always explains why
   if (reason === 'timeout' || reason === 'exception' || reason === 'data') st.failed = true;
   if (err) { try { st.lastError = (err && err.message) || String(err); } catch (_) { st.lastError = 'error'; } }
   else if (reason && !st.lastError) st.lastError = reason;
@@ -22004,9 +22008,11 @@ function renderAurixMobileLiteChart(range, token) {
     st.enabled = _aurixLiteEnabled();
     if (!st.enabled) { _aurixMobileLiteFallback('disabled'); return; }
     const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '30d')).toLowerCase();
-    st.range = r; st.lastError = null;
+    st.range = r; st.lastError = null; st.placeholderReason = null;
+    try { st.timestamp = Date.now(); } catch (_) {}
     const host = _aurixMobileLiteHost();
-    if (!host) return;                                                           // no chart area yet — silent, app intact
+    st.hostFound = !!host;
+    if (!host) { _aurixMobileLiteFallback('no-host'); return; }                  // chart area not in DOM yet
     const VBW = 1000, VBH = 260, box = { left: 6, right: 994, top: 16, bottom: 244 };
     const t0 = _aurixLiteNow();
     // DATA — canonical series only, via the approved engine (no mutation).
@@ -22016,9 +22022,17 @@ function renderAurixMobileLiteChart(range, token) {
     const dur = _aurixLiteNow() - t0;
     st.durationMs = Math.round(dur * 100) / 100;
     st.pointCount = (rc && rc.visiblePoints) ? rc.visiblePoints.length : 0;
+    st.seriesPoints = (rc && rc.diagnostics && typeof rc.diagnostics.sourcePoints === 'number') ? rc.diagnostics.sourcePoints : st.pointCount;
     if (typeof token === 'number' && token !== _aurixMobileLiteToken) return;    // superseded mid-compute
     if (!rc || !rc.pathData || rc.pathData.length < 6 || !rc.visiblePoints || rc.visiblePoints.length < 2) {
-      _aurixMobileLiteFallback('empty'); return;
+      _aurixMobileLiteFallback('empty');
+      // The series may still be hydrating (snapshots/pricing). Retry a few times with
+      // backoff so the curve appears once data lands — without depending on renderWealthCurve.
+      if (_aurixMobileLiteEmptyRetries < 6) {
+        _aurixMobileLiteEmptyRetries++;
+        try { setTimeout(function () { scheduleAurixMobileLite(r); }, 1300); } catch (_) {}
+      }
+      return;
     }
     if (dur > 100) { st.lastError = 'render ' + Math.round(dur) + 'ms > 100ms budget'; _aurixMobileLiteFallback('timeout'); return; }
     const up = !(rc.renderMeta && rc.renderMeta.lastDeltaPct != null && rc.renderMeta.lastDeltaPct < 0);
@@ -22035,7 +22049,8 @@ function renderAurixMobileLiteChart(range, token) {
       '</svg>';
     if (typeof token === 'number' && token !== _aurixMobileLiteToken) return;    // superseded just before paint
     host.innerHTML = svg;                                                        // ONLY the dedicated leaf
-    st.rendered = true; st.failed = false; st.fallbackUsed = false;
+    st.rendered = true; st.failed = false; st.fallbackUsed = false; st.placeholderReason = null;
+    _aurixMobileLiteEmptyRetries = 0;                                            // success — reset the hydration retry budget
   } catch (e) {
     _aurixMobileLiteFallback('exception', e);
   }
@@ -22047,6 +22062,7 @@ function scheduleAurixMobileLite(range) {
   try {
     if (typeof window === 'undefined' || !window.AURIX_MOBILE_SAFE) return;
     const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '30d')).toLowerCase();
+    _aurixMobileChartState.scheduled = true;
     const token = ++_aurixMobileLiteToken;
     if (_aurixMobileLiteTimer) { try { clearTimeout(_aurixMobileLiteTimer); } catch (_) {} }
     _aurixMobileLiteTimer = setTimeout(function () {
@@ -22062,9 +22078,21 @@ if (typeof window !== 'undefined') {
   window.scheduleAurixMobileLite = scheduleAurixMobileLite;
   window.debugAurixMobileChart = function () {
     const st = _aurixMobileChartState;
-    return { enabled: _aurixLiteEnabled(), rendered: st.rendered, failed: st.failed,
-      durationMs: st.durationMs, pointCount: st.pointCount, range: st.range,
-      lastError: st.lastError, fallbackUsed: st.fallbackUsed };
+    return {
+      enabled: _aurixLiteEnabled(),
+      scheduled: st.scheduled,
+      hostFound: st.hostFound,
+      seriesPoints: st.seriesPoints,
+      rendered: st.rendered,
+      failed: st.failed,
+      placeholderReason: st.placeholderReason,
+      durationMs: st.durationMs,
+      pointCount: st.pointCount,
+      lastError: st.lastError,
+      fallbackUsed: st.fallbackUsed,
+      range: st.range,
+      timestamp: st.timestamp,
+    };
   };
 }
 
@@ -37227,6 +37255,11 @@ function _aurixPreloadBootIcons() {
         });
       } catch (_) {}
       _bm('charts_skipped_mobile_safe');
+      // Step 6 of the mobile hydration order: now that the shell + cards are rendered and
+      // the splash is hidden, hand off to the deferred, budgeted, cancelable lite SVG
+      // renderer (writes ONLY #mobileChartLiteHost; never blocks, never touches carousel).
+      // This is the reliable first-paint trigger; renderWealthCurve covers later updates.
+      try { scheduleAurixMobileLite(); } catch (_) {}
     } else {
       setTimeout(function () {
         try { initChart(); initDonut(); updateChart(); updateDonut(); }

@@ -98,11 +98,15 @@ console.log('\nDIAGNOSTIC pinpoints the last reached step (so the break point is
 console.log('\nLIVE FILES — watchdog + instrumentation present:');
 { const idx = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   ck('index.html: __AURIX_BOOT watchdog object', idx.indexOf('window.__AURIX_BOOT') >= 0 && idx.indexOf('showDiag') >= 0);
-  ck('index.html: 8s deadline + 14s backstop', idx.indexOf('8000') >= 0 && idx.indexOf('14000') >= 0);
+  // CLOSURE SPEC §1/§5/§8 — production-clean splash: NO visible stamp, panel only on a
+  // genuine fatal (app.js never executed), at a single long backstop (not 8s).
+  ck('index.html: single genuine-fatal backstop (12s, gated on appJsExecuted)',
+     idx.indexOf('12000') >= 0 && /!B\.appJsExecuted/.test(idx) && idx.indexOf('8000') < 0 && idx.indexOf('14000') < 0);
   ck('index.html: recoverable diagnostic panel + retry', idx.indexOf('aurixBootDiag') >= 0 && idx.indexOf('aurixBootRetry') >= 0);
   ck('index.html: NO reload in boot guard (loop impossible)', idx.indexOf('window.location.reload') < 0);
-  ck('index.html: app.js tag has onerror + v=371', /app\.js\?v=371/.test(idx) && idx.indexOf('app_js_load_error') >= 0);
-  ck('index.html: visible build stamp + "watchdog timer started"', idx.indexOf('aurixBuildStamp') >= 0 && idx.indexOf('watchdog timer started') >= 0);
+  ck('index.html: app.js tag has onerror + v=372', /app\.js\?v=372/.test(idx) && idx.indexOf('app_js_load_error') >= 0);
+  ck('index.html: NO visible build stamp / debug text in splash (production-clean)',
+     idx.indexOf('aurixBuildStamp') < 0 && idx.indexOf('_aurixStampSplash') < 0 && idx.indexOf('watchdog timer started') < 0);
   ck('index.html: no-cache meta tags', /http-equiv="Cache-Control"/.test(idx) && /no-store/.test(idx));
   // P0 v359 — the panel must be VISIBLE on iOS: explicit positioning (no `inset:0`,
   // unsupported < iOS 14.5) + max z-index. This was why v356/v358 showed no panel.

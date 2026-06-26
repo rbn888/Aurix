@@ -169,11 +169,53 @@ console.log('\nEXECUTION — 17 mandated cases (real renderer, fake carousel DOM
 { const env = makeEnv(function () { throw new Error('chart dead'); }); cycle(env, '30d');
   ck('17. chart failure never propagates (boot/app independent)', env.threw === false && env.dom.nav.navAlive === true && hostHtml(env).indexOf('no disponible') > -1); }
 
-// debug contract shape
+// debug contract shape (CLOSURE SPEC §5 — extended fields)
 { const env = makeEnv(engineOK(S30, DASH)); cycle(env, '30d');
   const d = env.sandbox.debugAurixMobileChart();
-  const keys = ['enabled', 'rendered', 'failed', 'durationMs', 'pointCount', 'range', 'lastError', 'fallbackUsed'];
-  ck('debugAurixMobileChart() exposes the full contract', keys.every(k => k in d) && d.rendered === true && d.range === '30d'); }
+  const keys = ['enabled', 'scheduled', 'hostFound', 'seriesPoints', 'rendered', 'failed',
+                'placeholderReason', 'durationMs', 'pointCount', 'lastError', 'fallbackUsed', 'range', 'timestamp'];
+  ck('debugAurixMobileChart() exposes the full extended contract', keys.every(k => k in d) && d.rendered === true && d.range === '30d' && d.scheduled === true && d.hostFound === true); }
+
+// ── CLOSURE SPEC §8 — production-clean splash, no silent placeholder, cards-first ──
+console.log('\nCLOSURE SPEC §8 — splash clean / placeholder reason / cards-first:');
+const idx = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+
+// §8.1 / §8.8 — splash production limpio: only the AURIX wordmark, NO visible technical text
+ck('§1 splash shows ONLY the wordmark (no visible build/app.js/watchdog/timestamp text)',
+   idx.indexOf('aurixBuildStamp') < 0 && idx.indexOf('_aurixStampSplash') < 0 &&
+   idx.indexOf('watchdog timer started') < 0 && /<div class="boot-wordmark">AURIX<\/div>/.test(idx));
+ck('§8 debug not painted into UI (no visible diag/stamp in normal flow; panel gated on fatal)',
+   /!B\.appJsExecuted/.test(idx) && idx.indexOf('12000') >= 0);
+
+// §8.5 — placeholder ALWAYS carries an internal reason (no silent placeholder)
+{ const reasons = [];
+  // empty
+  let e1 = makeEnv(function () { return { pathData: '', areaPathData: '', visiblePoints: [] }; }); cycle(e1, '30d'); reasons.push(e1.sandbox.debugAurixMobileChart().placeholderReason);
+  // exception
+  let e2 = makeEnv(function () { throw new Error('x'); }); cycle(e2, '30d'); reasons.push(e2.sandbox.debugAurixMobileChart().placeholderReason);
+  // timeout
+  let e3 = null; e3 = makeEnv(function () { e3.clock += 350; return engineOK(S30, DASH)(); }); cycle(e3, '30d'); reasons.push(e3.sandbox.debugAurixMobileChart().placeholderReason);
+  // disabled
+  let e4 = makeEnv(engineOK(S30, DASH), { liteEnabled: false }); cycle(e4, '30d'); reasons.push(e4.sandbox.debugAurixMobileChart().placeholderReason);
+  ck('§5 every placeholder has a non-null internal reason', reasons.every(r => typeof r === 'string' && r.length > 0) && reasons.indexOf('empty') >= 0 && reasons.indexOf('exception') >= 0 && reasons.indexOf('timeout') >= 0 && reasons.indexOf('disabled') >= 0, reasons.join(',')); }
+
+// §8.6 — renderer finds the host when the area exists
+{ const env = makeEnv(engineOK(S30, DASH)); cycle(env, '30d');
+  ck('§6 renderer finds #mobileChartLiteHost when area present', env.sandbox.debugAurixMobileChart().hostFound === true && env.dom.hostCount() === 1); }
+
+// §8.7 — renderer paints when a series is present
+{ const env = makeEnv(engineOK(S30, DASH)); cycle(env, '30d');
+  ck('§7 renderer paints SVG when series present', hostHtml(env).indexOf('<svg') > -1 && env.sandbox.debugAurixMobileChart().rendered === true); }
+
+// LIVE FILE — cards-first hydration order (chart is step 6, after shell/cards/splash)
+{ const app2 = app;
+  const iRender = app2.indexOf('render(true);', app2.indexOf('// 5. RENDER the dashboard shell'));
+  const iHide = app2.indexOf("hideSplashSafe('dashboard_shell')");
+  const iLite = app2.indexOf('try { scheduleAurixMobileLite(); } catch (_) {}');
+  ck('§2/§3/§4 boot order: render(true) [cards] → hideSplash → lite chart (chart never blocks cards/nav)',
+     iRender > 0 && iHide > iRender && iLite > iHide);
+  ck('§3 render() carries NO chart dependency (cards independent of chart)',
+     app2.indexOf('function render(') >= 0 && /scheduleAurixMobileLite\(\);/.test(app2)); }
 
 // ── LIVE FILE — architecture wiring & invariants ──
 console.log('\nLIVE FILE — wiring & permanent invariants in app.js:');
@@ -194,9 +236,10 @@ console.log('\nLIVE FILE — wiring & permanent invariants in app.js:');
   ck('debugAurixMobileChart exported', app.indexOf('window.debugAurixMobileChart = function') >= 0);
   ck('autostart is TOP-LEVEL (after btnAdd binding, not inside boot IIFE)',
      app.indexOf('_aurixMobileLiteAutostart') > app.indexOf("btnAdd.addEventListener('click', openModal)"));
-  ck('boot mobile block UNCHANGED (still placeholder + charts_skipped_mobile_safe, no renderer call)',
-     app.indexOf('Gráfico temporalmente desactivado en móvil') >= 0 && app.indexOf('charts_skipped_mobile_safe') >= 0 &&
-     app.indexOf('renderAurixMobileLiteChart()') < 0);
+  ck('boot mobile block: placeholder + charts_skipped + DEFERRED scheduleAurixMobileLite (never inline render)',
+     app.indexOf('charts_skipped_mobile_safe') >= 0 &&
+     /charts_skipped_mobile_safe[\s\S]{0,400}try \{ scheduleAurixMobileLite\(\); \}/.test(app) &&
+     app.indexOf('renderAurixMobileLiteChart();') < 0);
   ck('6 heavy chart fns remain hard-gated on mobile', (app.match(/AURIX_MOBILE_SAFE\) return;/g) || []).length >= 6);
 }
 
