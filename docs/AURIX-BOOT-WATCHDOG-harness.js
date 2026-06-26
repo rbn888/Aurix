@@ -104,7 +104,7 @@ console.log('\nLIVE FILES — watchdog + instrumentation present:');
      idx.indexOf('12000') >= 0 && /!B\.appJsExecuted/.test(idx) && idx.indexOf('8000') < 0 && idx.indexOf('14000') < 0);
   ck('index.html: recoverable diagnostic panel + retry', idx.indexOf('aurixBootDiag') >= 0 && idx.indexOf('aurixBootRetry') >= 0);
   ck('index.html: NO reload in boot guard (loop impossible)', idx.indexOf('window.location.reload') < 0);
-  ck('index.html: app.js tag has onerror + v=377', /app\.js\?v=377/.test(idx) && idx.indexOf('app_js_load_error') >= 0);
+  ck('index.html: app.js tag has onerror + v=378', /app\.js\?v=378/.test(idx) && idx.indexOf('app_js_load_error') >= 0);
   ck('index.html: NO visible build stamp / debug text in splash (production-clean)',
      idx.indexOf('aurixBuildStamp') < 0 && idx.indexOf('_aurixStampSplash') < 0 && idx.indexOf('watchdog timer started') < 0);
   ck('index.html: no-cache meta tags', /http-equiv="Cache-Control"/.test(idx) && /no-store/.test(idx));
