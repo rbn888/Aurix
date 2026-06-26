@@ -18715,12 +18715,18 @@ if (typeof window !== 'undefined') {
 // SPEC 6 — Adaptive Density: higher caps so more REAL local detail survives the
 // downsample (less over-smoothing on 1A/TOTAL, richer microstructure on 24H/7D).
 // Still bounded so the chart never becomes a noisy/over-dense mess. Pure render.
+// RC1-B increment 4 (Fase 5 density): target = clamp(round(vw/5)=~200, min, max), so the
+// long ranges were all floored at ~200 pts. Raise the long-range MIN (1y 180→280, all
+// 200→320) so 1A reads "evolución consistente" and TOTAL reads a rich "historia de
+// patrimonio" — never compressed. Calibration constant only: a FAITHFUL downsample keeps
+// MORE real points (LTTB + local-extrema); first/last/extrema/values/timestamps invariant
+// (equivalence holds); never fabricates points (users with less history render what exists).
 const _AURIX_VP_DENSITY = {
   '24h': { min: 80,  max: 180 },
   '7d':  { min: 120, max: 240 },
   '30d': { min: 140, max: 300 },
-  '1y':  { min: 180, max: 400 },
-  'all': { min: 200, max: 450 },
+  '1y':  { min: 280, max: 400 },
+  'all': { min: 320, max: 450 },
 };
 // BUGFIX P0 — gap thresholds are ADAPTIVE, not fixed absolutes. The previous fixed
 // values (24h:90min, 7d:8h, 30d:36h, 1y:21d) were far smaller than real snapshot
