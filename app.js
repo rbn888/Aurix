@@ -22048,6 +22048,7 @@ function renderAurixMobileLiteChart(range, token) {
     const host = _aurixMobileLiteHost();
     st.hostFound = !!host;
     if (!host) { _aurixMobileLiteFallback('no-host'); return; }                  // chart area not in DOM yet
+    try { if (typeof _aurixMobInspectorHide === 'function') _aurixMobInspectorHide(); } catch (_) {}  // RC2 Fase 8: fresh data → close any open inspector
     const VBW = 1000, VBH = 260, box = { left: 6, right: 994, top: 16, bottom: 244 };
     const t0 = _aurixLiteNow();
     // DATA — canonical series only, via the approved engine (no mutation).
@@ -22079,6 +22080,11 @@ function renderAurixMobileLiteChart(range, token) {
         '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
           '<stop offset="0" stop-color="' + fillTop + '"/><stop offset="1" stop-color="rgba(0,0,0,0)"/>' +
         '</linearGradient></defs>' +
+        // RC2 Fase 7 — mobile-specific premium grid (3 horizontal + 3 vertical, very faint).
+        '<g class="mob-chart-grid">' +
+          '<line x1="6" y1="73" x2="994" y2="73"/><line x1="6" y1="130.5" x2="994" y2="130.5"/><line x1="6" y1="187" x2="994" y2="187"/>' +
+          '<line x1="253" y1="16" x2="253" y2="244"/><line x1="500" y1="16" x2="500" y2="244"/><line x1="747" y1="16" x2="747" y2="244"/>' +
+        '</g>' +
         '<path d="' + rc.areaPathData + '" fill="url(#' + gid + ')" stroke="none"/>' +
         '<path d="' + rc.pathData + '" fill="none" stroke="' + stroke + '" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>' +
       '</svg>';
@@ -22086,6 +22092,15 @@ function renderAurixMobileLiteChart(range, token) {
     host.innerHTML = svg;                                                        // ONLY the dedicated leaf
     st.rendered = true; st.failed = false; st.fallbackUsed = false; st.placeholderReason = null;
     _aurixMobileLiteEmptyRetries = 0;                                            // success — reset the hydration retry budget
+    // RC2 — cache the REAL rendered points (viewBox px + real time/value) for the touch
+    // inspector. SELECTION-ONLY data: never interpolated, never fabricated (Fase 6).
+    try {
+      const _vpx = rc.visiblePixels || [];
+      _aurixMobChartPts = rc.visiblePoints.map(function (p, i) { const q = _vpx[i] || {}; return { t: p.time, v: p.value, x: q.x, y: q.y }; })
+        .filter(function (p) { return typeof p.x === 'number' && typeof p.y === 'number'; });
+      _aurixMobChartMeta = { range: r, deltaPct: rc.renderMeta ? rc.renderMeta.lastDeltaPct : null, up: up };
+    } catch (_) { _aurixMobChartPts = null; }
+    try { _aurixInitMobileChartInspector(); } catch (_) {}   // bind once (idempotent)
   } catch (e) {
     _aurixMobileLiteFallback('exception', e);
   }
@@ -22113,6 +22128,115 @@ function scheduleAurixMobileLite(range) {
     }, 50);
   } catch (_) {}
 }
+// ════════════════════════════════════════════════════════════════════════════
+// RC2 — MOBILE CHART INSTITUTIONAL INSPECTOR (touch exploration, mobile layer only)
+// ════════════════════════════════════════════════════════════════════════════
+// Long-press the mobile wealth curve → a Bloomberg/TradingView-style inspector: a
+// vertical hair + a glowing cursor that SNAPS to the nearest REAL point by X (free
+// vertical movement; no need to trace the thin line), plus a glass tooltip with smart
+// placement. SELECTION ONLY — never interpolates/fabricates value/time (Fase 6). Fully
+// isolated: lives on #wealthCurveMobile + dedicated nodes, never touches the engine,
+// the carousel structure, the desktop chart, or Chart.js. Coexists with the swipe: a
+// horizontal/vertical drag before the long-press fires lets the carousel/scroll win;
+// once the long-press claims the gesture it blocks the swipe until the finger lifts.
+let _aurixMobChartPts = null;     // [{t,v,x,y}] — x/y in the 1000×260 viewBox; set by the lite render
+let _aurixMobChartMeta = null;    // { range, deltaPct, up }
+let _aurixMobInspectorBound = false;
+let _aurixMobInspectorActive = false;
+function _aurixMobInspectorNodes() {
+  let area = null; try { area = document.getElementById('wealthCurveMobile'); } catch (_) {}
+  if (!area) return null;
+  let cur = null; try { cur = document.getElementById('mobChartCursor'); } catch (_) {}
+  if (!cur) {
+    try {
+      const hair = document.createElement('div'); hair.id = 'mobChartHair'; hair.className = 'mob-chart-hair'; hair.setAttribute('aria-hidden', 'true');
+      cur = document.createElement('div'); cur.id = 'mobChartCursor'; cur.className = 'mob-chart-cursor'; cur.setAttribute('aria-hidden', 'true');
+      const tip = document.createElement('div'); tip.id = 'mobChartTip'; tip.className = 'mob-chart-tip'; tip.setAttribute('aria-hidden', 'true');
+      area.appendChild(hair); area.appendChild(cur); area.appendChild(tip);   // dedicated leaves; never the carousel
+    } catch (_) { return null; }
+  }
+  return { area, hair: document.getElementById('mobChartHair'), cur: document.getElementById('mobChartCursor'), tip: document.getElementById('mobChartTip') };
+}
+function _aurixMobInspectorHide() {
+  _aurixMobInspectorActive = false;
+  try { const a = document.getElementById('wealthCurveMobile'); if (a) { a.classList.remove('mob-inspecting'); a.style.touchAction = ''; } } catch (_) {}
+}
+function _aurixMobInspectorUpdate(clientX) {
+  try {
+    const pts = _aurixMobChartPts;
+    if (!Array.isArray(pts) || pts.length < 2) return;
+    const n = _aurixMobInspectorNodes(); if (!n) return;
+    const rect = n.area.getBoundingClientRect(); if (!rect.width) return;
+    const VBW = 1000, VBH = 260;
+    const fx = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)) * VBW;   // finger X in viewBox units
+    // Fase 5/6 — nearest REAL point by X ONLY (free vertical movement; pure selection).
+    let k = 0, best = Infinity;
+    for (let i = 0; i < pts.length; i++) { const d = Math.abs(pts[i].x - fx); if (d < best) { best = d; k = i; } }
+    const p = pts[k];
+    const lxPct = (p.x / VBW) * 100, lyPct = (p.y / VBH) * 100;
+    n.hair.style.left = lxPct.toFixed(3) + '%';
+    n.cur.style.left = lxPct.toFixed(3) + '%'; n.cur.style.top = lyPct.toFixed(3) + '%';
+    // Fase 3 — tooltip from REAL values only: value (protagonist) · date · time · % from start.
+    let pctTxt = '', tone = '';
+    const v0 = pts[0].v;
+    if (typeof v0 === 'number' && v0 !== 0 && typeof p.v === 'number') { const pc = ((p.v - v0) / Math.abs(v0)) * 100; tone = pc > 0.005 ? 'pos' : pc < -0.005 ? 'neg' : ''; pctTxt = (pc > 0 ? '+' : '') + pc.toFixed(2) + '%'; }
+    let dateStr = '', timeStr = '';
+    try {
+      const dt = new Date(p.t);
+      dateStr = dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+      if (_aurixMobChartMeta && (_aurixMobChartMeta.range === '24h' || _aurixMobChartMeta.range === '7d')) timeStr = '<span class="mob-tip-time">' + dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + '</span>';
+    } catch (_) {}
+    const valStr = (typeof formatBase === 'function') ? formatBase(p.v) : String(Math.round(p.v));
+    n.tip.innerHTML = '<span class="mob-tip-v">' + valStr + '</span><span class="mob-tip-date">' + dateStr + '</span>' + timeStr + (pctTxt ? '<span class="mob-tip-chg ' + tone + '">' + pctTxt + '</span>' : '');
+    // Fase 4 — smart placement: never cover the point/curve; flip by quadrant; clamp inside.
+    const tw = n.tip.offsetWidth || 116, th = n.tip.offsetHeight || 54, OFF = 14;
+    const px = (lxPct / 100) * rect.width, py = (lyPct / 100) * rect.height;
+    let tx = px + OFF; if (tx + tw > rect.width - 4) tx = px - OFF - tw; tx = Math.min(Math.max(tx, 4), Math.max(4, rect.width - tw - 4));
+    let ty = py - th - OFF; if (ty < 4) ty = py + OFF; ty = Math.min(Math.max(ty, 4), Math.max(4, rect.height - th - 4));
+    n.tip.style.left = tx.toFixed(1) + 'px'; n.tip.style.top = ty.toFixed(1) + 'px';
+    n.area.classList.add('mob-inspecting');
+  } catch (_) {}
+}
+function _aurixInitMobileChartInspector() {
+  try {
+    if (typeof window === 'undefined' || !window.AURIX_MOBILE_SAFE) return;
+    if (_aurixMobInspectorBound) return;                       // bind exactly once (no duplicate listeners)
+    const n = _aurixMobInspectorNodes(); if (!n) return;
+    _aurixMobInspectorBound = true;
+    const area = n.area;
+    let startX = 0, startY = 0, lpTimer = null, claimed = false, rafOn = false, lastX = 0;
+    const clearLp = function () { if (lpTimer) { try { clearTimeout(lpTimer); } catch (_) {} lpTimer = null; } };
+    const schedule = function () { if (!rafOn) { rafOn = true; try { requestAnimationFrame(function () { rafOn = false; _aurixMobInspectorUpdate(lastX); }); } catch (_) { rafOn = false; _aurixMobInspectorUpdate(lastX); } } };
+    area.addEventListener('touchstart', function (e) {
+      if (!e.touches || !e.touches.length) return;
+      const t = e.touches[0]; startX = t.clientX; startY = t.clientY; claimed = false; clearLp();
+      lpTimer = setTimeout(function () {            // Fase 1 — long-press (~280ms) claims the gesture
+        claimed = true; _aurixMobInspectorActive = true; lastX = startX;
+        try { area.style.touchAction = 'none'; } catch (_) {}   // block browser pan/scroll while inspecting
+        schedule();
+      }, 280);
+    }, { passive: true });
+    area.addEventListener('touchmove', function (e) {
+      if (!e.touches || !e.touches.length) return;
+      const t = e.touches[0];
+      if (!claimed) {                              // before claim: a real drag → carousel/scroll wins
+        if (Math.abs(t.clientX - startX) > 10 || Math.abs(t.clientY - startY) > 12) clearLp();
+        return;
+      }
+      e.preventDefault(); e.stopPropagation();     // inspector owns the gesture (swipe/scroll blocked)
+      lastX = t.clientX; schedule();
+    }, { passive: false });
+    const end = function (e) {
+      clearLp();
+      if (claimed) { try { e.stopPropagation(); } catch (_) {} }   // don't let the slider snap on release
+      claimed = false; _aurixMobInspectorHide();   // lift → swipe restored immediately (Fase 1)
+    };
+    area.addEventListener('touchend', end);
+    area.addEventListener('touchcancel', end);
+  } catch (_) {}
+}
+if (typeof window !== 'undefined') { window._aurixInitMobileChartInspector = _aurixInitMobileChartInspector; window._aurixMobInspectorUpdate = _aurixMobInspectorUpdate; }
+
 // P1 carousel — lightweight NATIVE-SVG donut for the mobile distribution slide. NO
 // Chart.js. Writes ONLY into a dedicated #mobileDonutLiteHost created once inside
 // .mobile-donut-wrap (never rebuilds the carousel/slide structure). Reads the SAME

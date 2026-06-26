@@ -21961,6 +21961,40 @@ body.aurix-skeleton #totalValue::after {
   body.aurix-skeleton #totalValue::after, .aurix-skel-ico, .aurix-skel-bar { animation: none; }
 }
 
+/* ══════════════════════════════════════════════════════════════
+   RC2 — Mobile chart institutional inspector + premium grid (mobile only).
+   Grid: faint, mobile-specific (NOT the desktop grid). Cursor/hair/tooltip: hidden
+   until #wealthCurveMobile.mob-inspecting (long-press); pointer-events:none so they
+   never intercept touch; positioned by JS. ══════════════════════════════════════ */
+.mob-chart-grid line { stroke: rgba(255,255,255,.05); stroke-width: 1; vector-effect: non-scaling-stroke; shape-rendering: crispEdges; }
+.mob-chart-hair, .mob-chart-cursor, .mob-chart-tip {
+  position: absolute; pointer-events: none; opacity: 0; transition: opacity .12s ease; z-index: 6;
+}
+.mob-chart-hair { top: 0; bottom: 0; width: 0; border-left: 1px dashed rgba(255,255,255,.26); }
+.mob-chart-cursor {
+  width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.16), 0 0 12px rgba(255,255,255,.5);
+}
+.mob-chart-tip {
+  display: flex; flex-direction: column; gap: 1px; padding: 7px 11px; border-radius: 11px;
+  background: linear-gradient(180deg, rgba(20,26,38,.97), rgba(12,16,24,.97));
+  border: 1px solid rgba(255,255,255,.12); box-shadow: 0 10px 30px rgba(0,0,0,.5);
+  -webkit-backdrop-filter: blur(7px); backdrop-filter: blur(7px);
+  white-space: nowrap; min-width: 96px; max-width: 70%;
+}
+#wealthCurveMobile.mob-inspecting .mob-chart-hair,
+#wealthCurveMobile.mob-inspecting .mob-chart-cursor,
+#wealthCurveMobile.mob-inspecting .mob-chart-tip { opacity: 1; }
+.mob-tip-v    { font: 800 15px/1.15 -apple-system, system-ui, sans-serif; color: #fff; font-variant-numeric: tabular-nums; }
+.mob-tip-date { font: 600 10px/1.2 -apple-system, system-ui, sans-serif; color: #8a96aa; }
+.mob-tip-time { font: 600 9.5px/1.2 -apple-system, system-ui, sans-serif; color: #8a96aa; }
+.mob-tip-chg  { font: 700 10.5px/1.2 -apple-system, system-ui, sans-serif; color: #9aa7bd; margin-top: 1px; font-variant-numeric: tabular-nums; }
+.mob-tip-chg.pos { color: #34d39e; }
+.mob-tip-chg.neg { color: #ff6b6b; }
+@media (prefers-reduced-motion: reduce) {
+  .mob-chart-hair, .mob-chart-cursor, .mob-chart-tip { transition: none; }
+}
+
 /* mobile host: REPLACES the legacy canvas / V2 chart inside .mobile-chart-wrap.
    The old layers stay mounted (boot / sync safety) but are hidden so they never
    bleed through the curve's negative space; the wrap's own subtle gradient is
