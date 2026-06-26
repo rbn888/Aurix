@@ -18943,7 +18943,7 @@ if (typeof window !== 'undefined') {
 // only — it does NOT replace the visible WSC/V2 render (that is intentionally
 // deferred to SPEC 4 to avoid production-visual risk). window.previewAurix* and
 // debug accessors expose the rendered object for validation.
-const _AURIX_IR_VALUE_MARGIN = 0.10;   // value-domain margin so real extrema never touch the edge
+const _AURIX_IR_VALUE_MARGIN = 0.13;   // RC1-B increment 1 (Fase 2, perceptual scale): more institutional vertical air (0.10→0.13) so the curve never reads wall-to-wall. Calibration constant only — value-domain margin for Y-pixel mapping; point VALUES are untouched (equivalence/last-point/max-min invariant).
 const _AURIX_IR_VPAD_FRAC    = 0.08;   // top/bottom plot padding (fraction of height)
 
 // §3 — LTTB downsampling. Returns ONLY real existing points; preserves first,
