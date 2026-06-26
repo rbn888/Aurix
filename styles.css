@@ -21886,6 +21886,31 @@ body.gs-open { overflow: hidden; }
 .wsc-in .wsc-line  { animation: wscDraw .46s var(--ease-out, ease) both; }
 @keyframes wscDraw { from { opacity: 0; } to { opacity: .98; } }
 
+/* ══════════════════════════════════════════════════════════════
+   AURIX RENDER CONTRACT — card skeleton (shown only while body.aurix-skeleton,
+   which is added on mobile shell-first reveal and removed on first data hydrate).
+   Pure visual; never paints when the class is absent (desktop/normal flow). */
+body.aurix-skeleton #totalValue { color: transparent; position: relative; }
+body.aurix-skeleton #totalValue::after {
+  content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 168px; height: 30px; border-radius: 9px;
+  background: linear-gradient(90deg, #0e1830 25%, #18254400 37%, #0e1830 63%);
+  background-size: 300% 100%; animation: aurixSkelShimmer 1.25s ease-in-out infinite;
+}
+.aurix-skel-row { display: flex; align-items: center; gap: 12px; padding: 14px 12px; }
+.aurix-skel-ico { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; }
+.aurix-skel-lines { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.aurix-skel-ico, .aurix-skel-bar {
+  background: linear-gradient(90deg, #0e1830 25%, #16223f 37%, #0e1830 63%);
+  background-size: 300% 100%; animation: aurixSkelShimmer 1.25s ease-in-out infinite;
+}
+.aurix-skel-bar { height: 11px; border-radius: 6px; display: block; }
+.aurix-skel-bar.w55 { width: 55%; } .aurix-skel-bar.w35 { width: 35%; } .aurix-skel-bar.w22 { width: 52px; }
+@keyframes aurixSkelShimmer { 0% { background-position: 150% 0; } 100% { background-position: -150% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  body.aurix-skeleton #totalValue::after, .aurix-skel-ico, .aurix-skel-bar { animation: none; }
+}
+
 /* mobile host: REPLACES the legacy canvas / V2 chart inside .mobile-chart-wrap.
    The old layers stay mounted (boot / sync safety) but are hidden so they never
    bleed through the curve's negative space; the wrap's own subtle gradient is

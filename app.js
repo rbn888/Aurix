@@ -22066,13 +22066,65 @@ function scheduleAurixMobileLite(range) {
     const token = ++_aurixMobileLiteToken;
     if (_aurixMobileLiteTimer) { try { clearTimeout(_aurixMobileLiteTimer); } catch (_) {} }
     _aurixMobileLiteTimer = setTimeout(function () {
+      const paint = function () {
+        renderAurixMobileLiteChart(r, token);
+        try { renderAurixMobileDonutLite(); } catch (_) {}   // donut slide rides the same deferred pass
+      };
       try {
-        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(function () { renderAurixMobileLiteChart(r, token); });
-        else renderAurixMobileLiteChart(r, token);
-      } catch (_) { try { renderAurixMobileLiteChart(r, token); } catch (__) {} }
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(paint);
+        else paint();
+      } catch (_) { try { paint(); } catch (__) {} }
     }, 50);
   } catch (_) {}
 }
+// P1 carousel — lightweight NATIVE-SVG donut for the mobile distribution slide. NO
+// Chart.js. Writes ONLY into a dedicated #mobileDonutLiteHost created once inside
+// .mobile-donut-wrap (never rebuilds the carousel/slide structure). Reads the SAME
+// canonical investable distribution (getInvestableDistribution). Never throws; on no
+// data it shows a small placeholder so the slide always looks intentional.
+function renderAurixMobileDonutLite() {
+  try {
+    if (typeof window === 'undefined' || !window.AURIX_MOBILE_SAFE) return;
+    const wrap = document.querySelector('.mobile-donut-wrap');
+    if (!wrap) return;
+    let host = document.getElementById('mobileDonutLiteHost');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'mobileDonutLiteHost';
+      host.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:1;';
+      wrap.insertBefore(host, wrap.firstChild);   // behind the absolutely-centred .donut-center-label
+    }
+    let dist = null;
+    try { dist = (typeof getInvestableDistribution === 'function') ? getInvestableDistribution() : null; } catch (_) { dist = null; }
+    if (!Array.isArray(dist) || !dist.length) {
+      host.innerHTML = '<div style="color:#5e7bb0;font:500 12px/1.4 -apple-system,system-ui;text-align:center;padding:12px">Distribución no disponible</div>';
+      return;
+    }
+    const totalPct = dist.reduce(function (s, d) { return s + (d.pct > 0 ? d.pct : 0); }, 0) || 100;
+    const R = 52, CX = 60, CY = 60, SW = 14, C = 2 * Math.PI * R;
+    let offset = 0, segs = '';
+    dist.forEach(function (d) {
+      const frac = (d.pct > 0 ? d.pct : 0) / totalPct;
+      if (frac <= 0) return;
+      const len = frac * C;
+      const meta = (typeof TYPE_META !== 'undefined' && TYPE_META[d.type]) ? TYPE_META[d.type] : null;
+      const color = meta ? meta.color : '#6b7280';
+      segs += '<circle cx="' + CX + '" cy="' + CY + '" r="' + R + '" fill="none" stroke="' + color + '" stroke-width="' + SW +
+        '" stroke-dasharray="' + len.toFixed(2) + ' ' + (C - len).toFixed(2) + '" stroke-dashoffset="' + (-offset).toFixed(2) +
+        '" transform="rotate(-90 ' + CX + ' ' + CY + ')"/>';
+      offset += len;
+    });
+    host.innerHTML = '<svg viewBox="0 0 120 120" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display:block;max-width:160px;max-height:160px" aria-hidden="true">' +
+      '<circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="14"/>' + segs + '</svg>';
+    try {
+      const cv = document.getElementById('donutCenterValMobile');
+      const cs = document.getElementById('donutCenterSubMobile');
+      if (cv && typeof investableValueBase === 'function' && typeof formatShort === 'function') cv.textContent = formatShort(investableValueBase());
+      if (cs && !cs.textContent) cs.textContent = 'Inversión';
+    } catch (_) {}
+  } catch (_) {}
+}
+if (typeof window !== 'undefined') { window.renderAurixMobileDonutLite = renderAurixMobileDonutLite; }
 if (typeof window !== 'undefined') {
   window.renderAurixMobileLiteChart = renderAurixMobileLiteChart;
   window.scheduleAurixMobileLite = scheduleAurixMobileLite;
@@ -36546,6 +36598,19 @@ btnAdd.addEventListener('click', openModal);
   } catch (_) {}
 })();
 
+// P1 carousel — bind the lightweight swipe/dots handler once on phones (the heavy
+// chart paths stay gated; this is touch-only). Top-level, retries until the static
+// slider DOM is present, then attaches exactly once. Never blocks, never throws.
+(function _aurixMobileSliderBoot() {
+  try {
+    if (typeof window === 'undefined' || !window.AURIX_MOBILE_SAFE) return;
+    if (window.__AURIX_MOBILE_SLIDER_BOUND__) return;
+    const track = document.getElementById('mobileSliderTrack');
+    if (!track) { try { setTimeout(_aurixMobileSliderBoot, 400); } catch (_) {} return; }
+    try { initMobileSlider(); } catch (_) {}
+  } catch (_) {}
+})();
+
 // GLOBAL-SEARCH-1: top-right search icon opens Global Search overlay.
 document.getElementById('headerSearch')?.addEventListener('click', openGlobalSearch);
 document.getElementById('btnAddContext')?.addEventListener('click', () => {
@@ -36966,9 +37031,13 @@ function _teardownMobileCharts() {
 }
 
 function initMobileSlider() {
-  if (typeof window !== 'undefined' && window.AURIX_MOBILE_SAFE) return;   // P0 mobile-safe: slider disabled on phones
+  // P1 carousel: the slider is a LIGHTWEIGHT touch handler (translateX + dots) — NO
+  // Chart.js, no heavy renderer — so it is SAFE under AURIX_MOBILE_SAFE and re-enabled
+  // on phones. Bind exactly once (it attaches direct listeners with no cleanup).
+  if (typeof window !== 'undefined' && window.__AURIX_MOBILE_SLIDER_BOUND__) return;
   const track = document.getElementById('mobileSliderTrack');
   if (!track) return;
+  try { if (typeof window !== 'undefined') window.__AURIX_MOBILE_SLIDER_BOUND__ = true; } catch (_) {}
 
   const container = document.getElementById('portfolioMobileSlider');
   const dots = document.querySelectorAll('.m-dot');
@@ -37056,6 +37125,72 @@ document.querySelectorAll('.menu-curr-btn')
 _syncPerfCurrencyButtons();
 
 document.getElementById('appRoot').style.opacity = '0';
+
+// ════════════════════════════════════════════════════════════════════════════
+// AURIX RENDER CONTRACT (permanent) — _aurixApplyRenderContract()
+// ════════════════════════════════════════════════════════════════════════════
+// THE function that defines when the dashboard becomes visible. The splash now
+// represents ONLY the time to build the app SHELL — NEVER Supabase / pricing /
+// chart latency. On phones the shell + skeleton cards are painted and the splash
+// is cleared IMMEDIATELY (<300ms target), with navigation already live (its
+// listeners bind at module scope above). auth / portfolio / pricing then HYDRATE
+// the card DATA through the normal render() — they never gate the first paint and
+// never rebuild the shell/nav. The mobile chart (lite) + secondary modules stay
+// fully decoupled and lazy. Desktop is unchanged. This contract is what prevents a
+// future web-chart (or any data/network) change from EVER again coupling the mobile
+// dashboard's first paint to data readiness — the regression that caused this
+// incident is now structurally impossible on mobile.
+let _aurixRenderContractApplied = false;
+function _aurixHasCachedSession() {
+  // Synchronous best-effort: a Supabase auth token in localStorage means the user is
+  // (very likely) signed in, so revealing the shell first won't flash before a login
+  // redirect. Logged-out users keep the splash until auth resolves → login.
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && /^sb-.*-auth-token$/.test(k)) { const v = localStorage.getItem(k); if (v && v.length > 20) return true; }
+    }
+  } catch (_) {}
+  return false;
+}
+function _aurixPaintCardSkeleton() {
+  try {
+    document.body.classList.add('aurix-skeleton');
+    const list = document.getElementById('assetsList');
+    if (list && list.getAttribute('data-aurix-skel') !== '1') {
+      let rows = '';
+      for (let i = 0; i < 4; i++) rows += '<div class="aurix-skel-row" aria-hidden="true"><span class="aurix-skel-ico"></span><span class="aurix-skel-lines"><span class="aurix-skel-bar w55"></span><span class="aurix-skel-bar w35"></span></span><span class="aurix-skel-bar w22"></span></div>';
+      list.setAttribute('data-aurix-skel', '1');
+      list.innerHTML = rows;
+    }
+  } catch (_) {}
+}
+function _aurixClearCardSkeleton() {
+  // Called once the first real render() has hydrated the card DATA. render() rebuilds
+  // #assetsList + #totalValue itself, so this only drops the skeleton state class.
+  try {
+    document.body.classList.remove('aurix-skeleton');
+    const list = document.getElementById('assetsList');
+    if (list) list.removeAttribute('data-aurix-skel');
+  } catch (_) {}
+}
+function _aurixApplyRenderContract() {
+  if (_aurixRenderContractApplied) return;
+  if (typeof window === 'undefined' || !window.AURIX_MOBILE_SAFE) return;            // desktop: unchanged
+  if (!_aurixHasCachedSession()) return;                                             // logged-out: no dashboard flash before login
+  try { if (location.pathname.indexOf('login') >= 0) return; } catch (_) {}
+  _aurixRenderContractApplied = true;
+  try {
+    _aurixPaintCardSkeleton();                                                       // 3. skeleton cards immediately
+    const ar = document.getElementById('appRoot'); if (ar) ar.style.opacity = '1';   // 1. shell visible
+    if (window.hideSplashSafe) window.hideSplashSafe('shell_first'); else _aurixHideLoader();   // 2. splash gone (<300ms)
+    try { if (window.__AURIX_BOOT && window.__AURIX_BOOT.mark) window.__AURIX_BOOT.mark('shell_first_reveal'); } catch (_) {}
+  } catch (_) {}
+}
+if (typeof window !== 'undefined') { window._aurixApplyRenderContract = _aurixApplyRenderContract; window._aurixClearCardSkeleton = _aurixClearCardSkeleton; }
+// Apply NOW — app.js loads at the end of <body> so the shell DOM is parsed and the
+// nav listeners are already bound; the shell is interactive the instant it appears.
+_aurixApplyRenderContract();
 
 // ── AURIX-READY-FIRST-1 (SPEC 3.2) ──────────────────────────────────────────
 // READY GATE: the premium splash (#bootLoader) must clear ONLY when the first
@@ -37232,6 +37367,9 @@ function _aurixPreloadBootIcons() {
     try { document.getElementById('appRoot').style.opacity = ''; } catch (_) {}
     try { render(true); }
     catch (e) { _reportSafe('render', (e && e.message) || 'render failed', (e && e.stack) || ''); try { if (window.__AURIX_BOOT) window.__AURIX_BOOT.errors.push('render: ' + ((e && e.message) || 'failed')); } catch (_) {} }
+    // RENDER CONTRACT step 5: the first real render hydrated the card DATA — drop the
+    // skeleton state (render() already rebuilt #assetsList + #totalValue with real values).
+    try { _aurixClearCardSkeleton(); } catch (_) {}
     window.__aurixBootReady.dashboard = true;
     try { if (window.__AURIX_BOOT) { window.__AURIX_BOOT.dashboardReady = true; window.__AURIX_BOOT.mark('dashboard_rendered'); } } catch (_) {}
 
