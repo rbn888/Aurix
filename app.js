@@ -58,6 +58,11 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // this is true. Temporary: the chart shows a "temporalmente desactivado" placeholder
 // on mobile until the mobile chart path is re-enabled. Desktop is unaffected.
 try { window.AURIX_MOBILE_SAFE = (typeof window !== 'undefined') && (window.innerWidth <= 768); } catch (_) { window.AURIX_MOBILE_SAFE = false; }
+// P1 SPEC — Mobile Chart Lite. The ONLY chart renderer permitted on phones is the
+// lightweight non-blocking SVG one (renderAurixMobileLiteChart). Heavy Chart.js paths
+// stay hard-gated by AURIX_MOBILE_SAFE. Flip this to false to fall straight back to the
+// placeholder with zero other code changes (the renderer self-disables).
+try { if (typeof window !== 'undefined' && typeof window.AURIX_MOBILE_CHART_LITE_ENABLED === 'undefined') window.AURIX_MOBILE_CHART_LITE_ENABLED = true; } catch (_) {}
 
 const IS_DEV =
   location.hostname === 'localhost' ||
@@ -21891,7 +21896,10 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
 // Repaint BOTH surfaces from the single shared component. Driven by every data
 // refresh and every range / unit toggle (same global activeRange/activePerfMode).
 function renderWealthCurve(animate) {
-  if (typeof window !== 'undefined' && window.AURIX_MOBILE_SAFE) return;   // P0 mobile-safe: chart disabled on phones
+  // P1 mobile-safe: never run the heavy WSC/Chart.js paint on phones. Hand off to the
+  // deferred, budgeted, cancelable lite SVG renderer (writes ONLY #mobileChartLiteHost).
+  // Covers range/unit toggles and data refreshes; never blocks, never touches carousel.
+  if (typeof window !== 'undefined' && window.AURIX_MOBILE_SAFE) { try { scheduleAurixMobileLite(activeRange); } catch (_) {} return; }
   const paint = () => {
     try { _wscPaintSurface(document.getElementById('chartChange'),       document.getElementById('perfSnapshot'),     { uid: 'd', tooltip: true  }); } catch (_) {}
     try { _wscPaintSurface(document.getElementById('chartChangeMobile'), document.getElementById('wealthCurveMobile'), { uid: 'm', tooltip: false }); } catch (_) {}
@@ -21923,6 +21931,141 @@ function renderWealthCurve(animate) {
 // (data refresh, range change, unit toggle) now drives the wealth curve.
 function _dshRenderPerfSnapshot(animate) {
   renderWealthCurve(animate);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// P1 SPEC — MOBILE CHART LITE  (renderAurixMobileLiteChart)
+// ════════════════════════════════════════════════════════════════════════════
+// A guest inside the dashboard, never a dependency of it. If the guest fails the
+// house keeps working exactly like v365-mobile-safe. Hard rules enforced here:
+//   • NEVER Chart.js / initChart / updateChart / initDonut / initMobileCharts /
+//     initMobileSlider / the heavy WSC paint.
+//   • NEVER touch the carousel / cards / slides / dots / parent containers.
+//   • Writes ONLY inside a dedicated leaf node #mobileChartLiteHost, created once
+//     inside the mobile chart area (#wealthCurveMobile, which is position:absolute
+//     inset:0 — so SVG updates can never reflow the slide or disturb scroll).
+//   • Deferred (setTimeout/rAF), try/catch wrapped, hard 100ms budget, token-
+//     cancelable. On ANY failure/empty/timeout/disabled → placeholder, app intact.
+//   • Reads ONLY the canonical series via the approved render engine
+//     (renderAurixInstitutionalChart → getAurixRenderSeries). No data is created,
+//     modified or interpolated as real; last point = dashboard (engine guarantees it).
+const _aurixMobileChartState = {
+  enabled: true, rendered: false, failed: false,
+  durationMs: null, pointCount: 0, range: null, lastError: null, fallbackUsed: false,
+};
+let _aurixMobileLiteToken = 0;
+let _aurixMobileLiteTimer = null;
+function _aurixLiteNow() { try { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); } catch (_) { return Date.now(); } }
+function _aurixLiteEnabled() { try { return typeof window === 'undefined' || window.AURIX_MOBILE_CHART_LITE_ENABLED !== false; } catch (_) { return true; } }
+// The dedicated host — created exactly once via createElement+appendChild (never by
+// rewriting the area's innerHTML), so the carousel DOM is never reconstructed.
+function _aurixMobileLiteHost() {
+  let area = null;
+  try { area = document.getElementById('wealthCurveMobile'); } catch (_) { return null; }
+  if (!area) return null;
+  let host = null;
+  try { host = document.getElementById('mobileChartLiteHost'); } catch (_) {}
+  if (!host) {
+    try {
+      host = document.createElement('div');
+      host.id = 'mobileChartLiteHost';
+      host.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;overflow:hidden;pointer-events:none;';
+      area.appendChild(host);
+      // Remove ONLY the boot placeholder text node(s) that are siblings of the host —
+      // a targeted removeChild loop, NOT an innerHTML rewrite of the area.
+      let guard = 0;
+      while (area.firstChild && area.firstChild !== host && guard++ < 8) {
+        try { area.removeChild(area.firstChild); } catch (_) { break; }
+      }
+    } catch (_) { return null; }
+  }
+  return host;
+}
+function _aurixMobileLiteFallback(reason, err) {
+  const st = _aurixMobileChartState;
+  st.rendered = false;
+  st.fallbackUsed = true;
+  if (reason === 'timeout' || reason === 'exception' || reason === 'data') st.failed = true;
+  if (err) { try { st.lastError = (err && err.message) || String(err); } catch (_) { st.lastError = 'error'; } }
+  else if (reason && !st.lastError) st.lastError = reason;
+  try {
+    const host = _aurixMobileLiteHost();
+    if (host) host.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:120px;color:#5e7bb0;font:500 12.5px/1.4 -apple-system,system-ui;text-align:center;padding:14px">Gráfico temporalmente no disponible en móvil</div>';
+  } catch (_) {}
+  if (st.failed) { try { _reportSafe('mobile-lite-chart', reason + (st.lastError ? ': ' + st.lastError : '')); } catch (_) {} }
+}
+// The actual lite paint. Synchronous + bounded; always invoked from a deferred
+// macrotask via scheduleAurixMobileLite, never inline on boot/hydration.
+function renderAurixMobileLiteChart(range, token) {
+  const st = _aurixMobileChartState;
+  try {
+    if (typeof token === 'number' && token !== _aurixMobileLiteToken) return;   // superseded
+    if (typeof window === 'undefined' || !window.AURIX_MOBILE_SAFE) return;      // phones only
+    st.enabled = _aurixLiteEnabled();
+    if (!st.enabled) { _aurixMobileLiteFallback('disabled'); return; }
+    const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '30d')).toLowerCase();
+    st.range = r; st.lastError = null;
+    const host = _aurixMobileLiteHost();
+    if (!host) return;                                                           // no chart area yet — silent, app intact
+    const VBW = 1000, VBH = 260, box = { left: 6, right: 994, top: 16, bottom: 244 };
+    const t0 = _aurixLiteNow();
+    // DATA — canonical series only, via the approved engine (no mutation).
+    let rc = null;
+    try { rc = renderAurixInstitutionalChart(r, VBW, VBH, box); }
+    catch (e) { _aurixMobileLiteFallback('exception', e); return; }
+    const dur = _aurixLiteNow() - t0;
+    st.durationMs = Math.round(dur * 100) / 100;
+    st.pointCount = (rc && rc.visiblePoints) ? rc.visiblePoints.length : 0;
+    if (typeof token === 'number' && token !== _aurixMobileLiteToken) return;    // superseded mid-compute
+    if (!rc || !rc.pathData || rc.pathData.length < 6 || !rc.visiblePoints || rc.visiblePoints.length < 2) {
+      _aurixMobileLiteFallback('empty'); return;
+    }
+    if (dur > 100) { st.lastError = 'render ' + Math.round(dur) + 'ms > 100ms budget'; _aurixMobileLiteFallback('timeout'); return; }
+    const up = !(rc.renderMeta && rc.renderMeta.lastDeltaPct != null && rc.renderMeta.lastDeltaPct < 0);
+    const stroke = up ? '#34d39e' : '#ff6b6b';
+    const fillTop = up ? 'rgba(52,211,158,0.18)' : 'rgba(255,107,107,0.16)';
+    const gid = 'aurixLiteFill_' + (up ? 'u' : 'd');
+    const svg =
+      '<svg viewBox="0 0 ' + VBW + ' ' + VBH + '" preserveAspectRatio="none" width="100%" height="100%" style="display:block" aria-hidden="true">' +
+        '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0" stop-color="' + fillTop + '"/><stop offset="1" stop-color="rgba(0,0,0,0)"/>' +
+        '</linearGradient></defs>' +
+        '<path d="' + rc.areaPathData + '" fill="url(#' + gid + ')" stroke="none"/>' +
+        '<path d="' + rc.pathData + '" fill="none" stroke="' + stroke + '" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>' +
+      '</svg>';
+    if (typeof token === 'number' && token !== _aurixMobileLiteToken) return;    // superseded just before paint
+    host.innerHTML = svg;                                                        // ONLY the dedicated leaf
+    st.rendered = true; st.failed = false; st.fallbackUsed = false;
+  } catch (e) {
+    _aurixMobileLiteFallback('exception', e);
+  }
+}
+// Trigger. ALWAYS defers the paint to a macrotask (+rAF), debounced + token-cancelable,
+// no-op off mobile-safe. Can never run during boot/hydration or block a click; range
+// changes / refreshes collapse to one latest render. Never throws.
+function scheduleAurixMobileLite(range) {
+  try {
+    if (typeof window === 'undefined' || !window.AURIX_MOBILE_SAFE) return;
+    const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '30d')).toLowerCase();
+    const token = ++_aurixMobileLiteToken;
+    if (_aurixMobileLiteTimer) { try { clearTimeout(_aurixMobileLiteTimer); } catch (_) {} }
+    _aurixMobileLiteTimer = setTimeout(function () {
+      try {
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(function () { renderAurixMobileLiteChart(r, token); });
+        else renderAurixMobileLiteChart(r, token);
+      } catch (_) { try { renderAurixMobileLiteChart(r, token); } catch (__) {} }
+    }, 50);
+  } catch (_) {}
+}
+if (typeof window !== 'undefined') {
+  window.renderAurixMobileLiteChart = renderAurixMobileLiteChart;
+  window.scheduleAurixMobileLite = scheduleAurixMobileLite;
+  window.debugAurixMobileChart = function () {
+    const st = _aurixMobileChartState;
+    return { enabled: _aurixLiteEnabled(), rendered: st.rendered, failed: st.failed,
+      durationMs: st.durationMs, pointCount: st.pointCount, range: st.range,
+      lastError: st.lastError, fallbackUsed: st.fallbackUsed };
+  };
 }
 
 // SPEC 4 — console controls to flip the visible Institutional Render on/off and
@@ -36352,6 +36495,29 @@ document.querySelectorAll('.header-tab[data-tab]').forEach(el => {
 document.getElementById('assetsBackBtn')
   ?.addEventListener('click', () => setActiveCategory(null));
 btnAdd.addEventListener('click', openModal);
+
+// P1 SPEC — Mobile Chart Lite autostart. Top-level (NOT inside the boot IIFE, so it
+// never touches the boot pipeline) deferred kick that paints the first lite curve once
+// the dashboard area + canonical series are ready. Retries briefly, then gives up and
+// leaves the placeholder. Fully isolated: never blocks, never throws, never depends on
+// boot. Subsequent updates come from renderWealthCurve (range/unit toggles, refreshes).
+(function _aurixMobileLiteAutostart() {
+  try {
+    if (typeof window === 'undefined' || !window.AURIX_MOBILE_SAFE) return;
+    let tries = 0;
+    const kick = function () {
+      tries++;
+      try {
+        const area = document.getElementById('wealthCurveMobile');
+        const ready = area && (typeof getAurixRenderSeries === 'function');
+        if (ready) { scheduleAurixMobileLite(typeof activeRange !== 'undefined' ? activeRange : '30d'); return; }
+      } catch (_) {}
+      if (tries < 12) { try { setTimeout(kick, 500); } catch (_) {} }   // up to ~6s, then placeholder stays
+    };
+    try { setTimeout(kick, 700); } catch (_) {}
+  } catch (_) {}
+})();
+
 // GLOBAL-SEARCH-1: top-right search icon opens Global Search overlay.
 document.getElementById('headerSearch')?.addEventListener('click', openGlobalSearch);
 document.getElementById('btnAddContext')?.addEventListener('click', () => {

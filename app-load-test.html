@@ -35,7 +35,7 @@
       document.getElementById('phase').textContent = '2) cargando app.js (mira si el contador se congela)…';
       var t = Date.now();
       var sc = document.createElement('script');
-      sc.src = 'app.js?v=370';
+      sc.src = 'app.js?v=371';
       sc.onload = function () {
         document.getElementById('result').textContent =
           '✅ app.js LOADED+EXECUTED en ' + (Date.now() - t) + 'ms · contador=' + n +
