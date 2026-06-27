@@ -63,11 +63,11 @@ function dense(n, spanMs, base) {
   const t0 = NOW - spanMs;
   return Array.from({ length: n }, (_, i) => ({ time: t0 + Math.round(i * spanMs / (n - 1)), value: base + 200 * Math.sin(i * 0.3) }));
 }
-function withGap() {   // 24H with a real 16-hour hole (> RC3-INC3 visual-bridge 14h → still SPLITS)
+function withGap() {   // 24H with a real 20-hour hole (> RC3-INC3C extreme-outage 18h → still SPLITS)
   const t0 = NOW - DAY, pts = [];
-  for (let i = 0; i < 9; i++) pts.push({ time: t0 + i * 30 * MIN, value: 70000 + i * 8 });   // 0..4h
-  const after = t0 + 20 * HOUR;                                                              // 16h hole
-  for (let i = 0; i < 8; i++) pts.push({ time: after + i * 30 * MIN, value: 70100 + i * 8 }); // 20..23.5h
+  for (let i = 0; i < 6; i++) pts.push({ time: t0 + i * 20 * MIN, value: 70000 + i * 8 });    // 0..1.7h
+  const after = t0 + 21 * HOUR;                                                               // 20h+ hole
+  for (let i = 0; i < 8; i++) pts.push({ time: after + i * 20 * MIN, value: 70100 + i * 8 }); // 21..23.3h
   return pts;
 }
 const lastV = s => s[s.length - 1].value;

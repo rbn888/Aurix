@@ -92,13 +92,13 @@ console.log('\nCASE 10 — gaps not crossed:');
 // continuous, NOT solid-broken), but the gap is still DETECTED; a LARGE gap (>14h)
 // still splits. Non-24H always splits. Render-only (data/last point untouched).
 const sgap=build('24h-gap'); const rgap=render('24h-gap', sgap);   // ~10h overnight gap
-ok('10 24H short overnight gap (≤14h) BRIDGED: continuous path, gap still detected', (rgap.gaps||[]).length>=1 && rgap.diagnostics.bridgedGapCount>=1 && rgap.diagnostics.renderedSubpaths===1 && (rgap.gapSegments||[]).length===0, 'gaps='+(rgap.gaps||[]).length+' bridged='+rgap.diagnostics.bridgedGapCount+' subpaths='+rgap.diagnostics.renderedSubpaths);
-// large gap (>14h) still splits — build inline: NOW-24h..NOW-20h then NOW-2h..NOW (18h hole)
+ok('10 24H normal pause BRIDGED: continuous path, gap still detected', (rgap.gaps||[]).length>=1 && rgap.diagnostics.bridgedGapCount>=1 && rgap.diagnostics.renderedSubpaths===1 && (rgap.gapSegments||[]).length===0, 'gaps='+(rgap.gaps||[]).length+' bridged='+rgap.diagnostics.bridgedGapCount+' subpaths='+rgap.diagnostics.renderedSubpaths);
+// extreme outage (>18h) still splits — build inline: NOW-24h..NOW-22h then NOW-2h..NOW (20h hole)
 (function(){ const v0=72000; const pts=[]; let k=0;
-  for(let t=NOW-24*HOUR;t<=NOW-20*HOUR;t+=5*MIN,k++) pts.push({time:t,value:Math.round(v0+120*Math.sin(k*0.7))});
+  for(let t=NOW-24*HOUR;t<=NOW-22*HOUR;t+=5*MIN,k++) pts.push({time:t,value:Math.round(v0+120*Math.sin(k*0.7))});
   for(let t=NOW-2*HOUR;t<=NOW;t+=5*MIN,k++) pts.push({time:t,value:Math.round(v0+150*Math.sin(k*0.7))});
   const rbig=render('24h', pts);
-  ok('10b 24H large gap (>14h) still SPLITS (not bridged)', (rbig.gaps||[]).length>=1 && rbig.diagnostics.bridgedGapCount===0 && rbig.diagnostics.renderedSubpaths>=2, 'bridged='+rbig.diagnostics.bridgedGapCount+' subpaths='+rbig.diagnostics.renderedSubpaths);
+  ok('10b 24H extreme outage (>18h) still SPLITS (not bridged)', (rbig.gaps||[]).length>=1 && rbig.diagnostics.bridgedGapCount===0 && rbig.diagnostics.renderedSubpaths>=2, 'bridged='+rbig.diagnostics.bridgedGapCount+' subpaths='+rbig.diagnostics.renderedSubpaths);
   ok('10c bridged + large gap: last point still = path end (connected)', (function(){ const lp=lastCoord(rbig.pathData), l=rbig.visiblePixels[rbig.visiblePixels.length-1]; return lp&&Math.hypot(lp.x-l.x,lp.y-l.y)<=0.5; })());
 })();
 

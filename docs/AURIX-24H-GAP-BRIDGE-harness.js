@@ -1,11 +1,11 @@
 'use strict';
 // ════════════════════════════════════════════════════════════════════════════
-// AURIX-24H-GAP-BRIDGE-harness — RC3-INC3B definitive 24H visual gap bridge
+// AURIX-24H-GAP-BRIDGE-harness — RC3-INC3C conservative 24H visual gap bridge
 // ════════════════════════════════════════════════════════════════════════════
-// Proves the surgical 24H bridge: a NORMAL nocturnal pause is drawn continuous (no
-// split, no invented points), while real outages / daytime / anomalous-jump / event /
-// non-isolated-block gaps stay split. Other ranges and all data contracts untouched.
-// Executes the REAL engine against synthetic series with timestamps at known LOCAL hours.
+// Policy: in 24H the path is drawn CONTINUOUS across EVERY internal gap (no point
+// invented), splitting ONLY for an EXTREME OUTAGE (gap > 18h) or an EXTREME wealth jump
+// (> 8%). Hour-independent (no nocturnal/min/final-block conditions). Other ranges and
+// all data contracts untouched. Executes the REAL engine against synthetic series.
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const src = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 function fn(name){ const s='function '+name+'('; const i=src.indexOf(s); if(i<0)throw new Error('missing '+name);
@@ -37,7 +37,7 @@ function build(sA, eA, sB, eB, jumpPct) {
   for (let t = sB; t <= eB; t += 15 * MIN) pts.push({ time: t, value: Math.round(vb + 80 * Math.sin(t / MIN * 0.3)) });
   return pts;
 }
-function render(sb, range, series, vbw, vbh, bx) { sb.__set(series); return vm.runInContext(`renderAurixInstitutionalChart('${range}', ${vbw || 1000}, ${vbh || 260}, ${JSON.stringify(bx || box)})`, sb); }
+function render(sb, range, series) { sb.__set(series); return vm.runInContext(`renderAurixInstitutionalChart('${range}', 1000, 260, ${JSON.stringify(box)})`, sb); }
 function dec0(rc) { return (rc.gapBridgeDecisions && rc.gapBridgeDecisions[0]) || {}; }
 function lastCoord(d) { const m = String(d).trim().match(/([-\d.]+)\s+([-\d.]+)\s*$/); return m ? { x: +m[1], y: +m[2] } : null; }
 function connected(rc) { const lp = lastCoord(rc.pathData), px = rc.visiblePixels; if (!lp || !px.length) return false; const l = px[px.length - 1]; return Math.hypot(lp.x - l.x, lp.y - l.y) <= 0.5; }
@@ -45,68 +45,65 @@ function connected(rc) { const lp = lastCoord(rc.pathData), px = rc.visiblePixel
 let pass = 0, fail = 0;
 function ok(name, cond, info) { if (cond) { pass++; console.log('  ✓ ' + name + (info ? '  [' + info + ']' : '')); } else { fail++; console.log('  ✗ ' + name + (info ? '  [' + info + ']' : '')); } }
 
-console.log('AURIX-24H-GAP-BRIDGE — RC3-INC3B definitive\n');
-
-// 1. nocturnal 10h (23:00→09:00) → BRIDGE
+console.log('AURIX-24H-GAP-BRIDGE — RC3-INC3C conservative default\n');
+console.log('BRIDGE BY DEFAULT (split only on extreme outage):');
+// 1. normal pause 10h (nocturnal hours) → BRIDGE
 { const rc = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));
-  ok('1 nocturnal 10h gap → BRIDGE (continuous path)', dec0(rc).bridged === true && rc.diagnostics.renderedSubpaths === 1, dec0(rc).reason); }
-// 2. nocturnal 12h (21:00→09:00) → BRIDGE
-{ const rc = render(SB, '24h', build(T(2026,5,14,9,0),T(2026,5,14,21,0),T(2026,5,15,9,0),T(2026,5,15,10,30),0));
-  ok('2 nocturnal 12h gap → BRIDGE', dec0(rc).bridged === true && rc.diagnostics.renderedSubpaths === 1, dec0(rc).reason + ' durH=' + dec0(rc).durationH); }
-// 3. 18h gap → NO bridge
-{ const rc = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,15,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));
-  ok('3 18h gap → NO bridge (outage_too_long), path split', dec0(rc).bridged === false && dec0(rc).reason === 'outage_too_long' && rc.diagnostics.renderedSubpaths >= 2); }
-// 4. daytime 10h (11:00→21:00) → NO bridge
+  ok('1 normal 10h pause → BRIDGE (continuous)', dec0(rc).bridged === true && rc.diagnostics.renderedSubpaths === 1, dec0(rc).reason); }
+// 2. normal pause 14h → BRIDGE (no 14h cap anymore; 14 ≤ 18)
+{ const rc = render(SB, '24h', build(T(2026,5,14,8,0),T(2026,5,14,18,0),T(2026,5,15,8,0),T(2026,5,15,10,0),0));
+  ok('2 normal 14h pause → BRIDGE', dec0(rc).bridged === true && rc.diagnostics.renderedSubpaths === 1, dec0(rc).reason + ' durH=' + dec0(rc).durationH); }
+// 3. extreme outage 20h (>18h) → NO bridge (split)
+{ const rc = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,13,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));
+  ok('3 extreme outage 20h (>18h) → NO bridge (split)', dec0(rc).bridged === false && dec0(rc).reason === 'outage_too_long' && rc.diagnostics.renderedSubpaths >= 2, 'durH=' + dec0(rc).durationH); }
+// 4. DAYTIME 10h pause → BRIDGE (hour-independent robust default)
 { const rc = render(SB, '24h', build(T(2026,5,14,23,0),T(2026,5,15,11,0),T(2026,5,15,21,0),T(2026,5,15,23,0),0));
-  ok('4 daytime gap → NO bridge (not_nocturnal)', dec0(rc).bridged === false && dec0(rc).reason === 'not_nocturnal'); }
-// 5. nocturnal 10h with +8% jump → NO bridge
-{ const rc = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0.08));
-  ok('5 anomalous jump >5% → NO bridge (anomalous_jump)', dec0(rc).bridged === false && dec0(rc).reason === 'anomalous_jump', 'disp%=' + dec0(rc).dispPct); }
-// 6. nocturnal gap leaving a small isolated final block → BRIDGE
-{ const rc = render(SB, '24h', build(T(2026,5,14,10,0),T(2026,5,14,23,0),T(2026,5,15,8,0),T(2026,5,15,9,0),0));
-  ok('6 isolated final block (small) → BRIDGE', dec0(rc).bridged === true, 'fb%=' + dec0(rc).finalBlockPct); }
+  ok('4 daytime 10h pause → BRIDGE (no nocturnal condition)', dec0(rc).bridged === true && rc.diagnostics.renderedSubpaths === 1, dec0(rc).reason); }
+// 5. extreme wealth jump >8% → NO bridge
+{ const rc = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0.10));
+  ok('5 extreme jump >8% → NO bridge (extreme_jump)', dec0(rc).bridged === false && dec0(rc).reason === 'extreme_jump', 'disp%=' + dec0(rc).dispPct); }
+// 6. moderate jump ≤8% → BRIDGE
+{ const rc = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0.05));
+  ok('6 moderate jump 5% (≤8%) → BRIDGE', dec0(rc).bridged === true, 'disp%=' + dec0(rc).dispPct); }
 // 7. last marker connected (bridge case)
 { const rc = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));
   ok('7 last point connected to path (bridge)', connected(rc) === true); }
-// 8. pathSegmentCount reduces when bridge applies (1 vs >=2 unbridged)
+// 8. pathSegmentCount: 1 when bridged, ≥2 on extreme outage
 { const sB = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));   // bridged
-  const sU = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,15,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));   // 18h split
+  const sU = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,13,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));   // 20h split
   const segB = (sB.pathData.match(/M /g) || []).length, segU = (sU.pathData.match(/M /g) || []).length;
-  ok('8 pathSegmentCount reduces when bridge applies', segB < segU && segB === 1, 'bridged=' + segB + ' split=' + segU); }
+  ok('8 pathSegmentCount = 1 bridged, ≥2 outage', segB === 1 && segU >= 2, 'bridged=' + segB + ' outage=' + segU); }
 
 console.log('\nOTHER RANGES UNCHANGED (never bridge):');
-function gapSeries(range, days) { const pts = []; const now = T(2026,5,15,12,0); const span = days * DAY; const half = Math.floor(span/2);
+function gapSeries(days) { const pts = []; const now = T(2026,5,15,12,0); const span = days * DAY, half = Math.floor(span/2);
   for (let i = 0; i < 30; i++) pts.push({ time: now - span + i * (half/30), value: 70000 + i * 5 });
-  for (let i = 0; i < 30; i++) pts.push({ time: now - Math.floor(half*0.2) + i * ((half*0.2)/30), value: 71000 + i * 5 });   // big hole in the middle
+  for (let i = 0; i < 30; i++) pts.push({ time: now - Math.floor(half*0.2) + i * ((half*0.2)/30), value: 71000 + i * 5 });
   return pts; }
 ['7d','30d','1y','all'].forEach((rg, i) => { const days = { '7d':7,'30d':30,'1y':365,'all':900 }[rg];
-  const rc = render(SB, rg, gapSeries(rg, days));
+  const rc = render(SB, rg, gapSeries(days));
   const anyBridged = (rc.gapBridgeDecisions || []).some(g => g.bridged);
   ok((9 + i) + ' ' + rg + ' never bridges (range-gated)', !anyBridged && rc.diagnostics.bridgedGapCount === 0); });
 
 console.log('\nDATA CONTRACTS:');
-// 13. tooltip/inspector source = full visiblePoints (ARR/bridge don't shrink it)
 { const s = build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0); const rc = render(SB, '24h', s);
   const dsCount = vm.runInContext(`downsampleAurixAdaptive(${JSON.stringify(s)}, _aurixVpTargetPointCount('24h',1000)).length`, SB);
   ok('13 tooltip source: visiblePoints == full downsampled set', rc.visiblePoints.length === dsCount);
   ok('14 inspector source: visiblePixels == visiblePoints (full)', rc.visiblePixels.length === rc.visiblePoints.length); }
-// 15. equivalence
 { render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));
   const a = vm.runInContext("auditAurixRenderVsCanonical('24h')", SB);
   ok('15 render↔canonical equivalence (not divergent, no invented points)', a.status !== 'divergent' && a.noInvented !== false, a.status); }
-// 16. bridge is render-only — no Chart.js / data mutation in the bridge code
-{ const bridgeFn = fn('_aurix24hGapBridgeDecision') + fn('_aurixGapBridgeIsNight') + fn('_aurixGapPointValueAt');
-  ok('16 bridge code is render-only (no Chart.js / no snapshot/pricing writes)', ['new Chart','localStorage','portfolio_history','category_history','.push('].every(s => bridgeFn.indexOf(s) < 0) || bridgeFn.indexOf('out.push') < 0); }
+{ const bridgeFn = fn('_aurix24hGapBridgeDecision') + fn('_aurixGapPointValueAt');
+  ok('16 bridge code is render-only (no Chart.js / snapshot / pricing writes)', ['new Chart','localStorage','portfolio_history','category_history'].every(s => bridgeFn.indexOf(s) < 0)); }
 
-console.log('\nROLLBACK:');
-// 17. ENABLED=false → no bridge
+console.log('\nROLLBACK / KNOBS:');
+// 17. ENABLED=false → no bridge (prior split restored)
 { const sbOff = mkSandbox(CONST_BLOCK.replace('_AURIX_GAP_BRIDGE_24H_ENABLED = true', '_AURIX_GAP_BRIDGE_24H_ENABLED = false'));
   const rc = render(sbOff, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));
   ok('17 ENABLED=false → NO bridge (split restored)', dec0(rc).bridged === false && dec0(rc).reason === 'disabled' && rc.diagnostics.renderedSubpaths >= 2); }
-// 18. MAX_MS=0 → no bridge
-{ const sbZero = mkSandbox(CONST_BLOCK.replace('_AURIX_GAP_BRIDGE_24H_MAX_MS = 14 * 60 * 60 * 1000', '_AURIX_GAP_BRIDGE_24H_MAX_MS = 0'));
-  const rc = render(sbZero, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));
-  ok('18 MAX_MS=0 → NO bridge (split restored)', dec0(rc).bridged === false && dec0(rc).reason === 'maxms_0' && rc.diagnostics.renderedSubpaths >= 2); }
+// 18. OUTAGE_MS knob: lower it so a normal 10h gap is treated as outage → splits
+{ const sbLow = mkSandbox(CONST_BLOCK.replace('_AURIX_GAP_BRIDGE_24H_OUTAGE_MS = 18 * 60 * 60 * 1000', '_AURIX_GAP_BRIDGE_24H_OUTAGE_MS = 1 * 60 * 60 * 1000'));
+  const rc = render(sbLow, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));
+  ok('18 OUTAGE_MS knob (1h) → 10h gap splits (outage_too_long)', dec0(rc).bridged === false && dec0(rc).reason === 'outage_too_long' && rc.diagnostics.renderedSubpaths >= 2); }
 
 console.log('\nRESULT: ' + (fail === 0 ? 'ALL PASS ✓' : 'FAIL ✗') + '  (' + pass + ' passed, ' + fail + ' failed)');
 process.exit(fail === 0 ? 0 : 1);

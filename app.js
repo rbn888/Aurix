@@ -19227,33 +19227,18 @@ const _AURIX_ARR_SHAPE = { calm: 1.0, volatile: 0.45, initial: 0.55 };
 const _AURIX_ARR_BURST_DELTA_FRAC = 0.09;
 const _AURIX_ARR_BURST_WIN = 3;
 // ════════════════════════════════════════════════════════════════════════════
-// RC3-INC3B — 24H VISUAL GAP BRIDGE (render-only, surgical). A NORMAL overnight pause
-// (no snapshots) in a 24h window is detected as a gap and would split the line, leaving
-// the recent block isolated → "broken chart". When (and ONLY when) the gap is a normal
-// nocturnal pause, the path is drawn CONTINUOUS across it — the curve connects the two
-// REAL bracketing points. NO point is invented/interpolated; visiblePoints/visiblePixels/
-// timestamps/values/tooltip/inspector/equivalence are untouched. A real outage (too long,
-// daytime, anomalous price jump, around a capital event, or leaving a large standalone
-// block) is NOT bridged → stays split. ONLY 24H; other ranges never bridge.
-// ROLLBACK: _AURIX_GAP_BRIDGE_24H_ENABLED=false OR _AURIX_GAP_BRIDGE_24H_MAX_MS=0.
-const _AURIX_GAP_BRIDGE_24H_ENABLED = true;
-const _AURIX_GAP_BRIDGE_24H_MIN_MS = 8 * 60 * 60 * 1000;    // ≥ 8h (a real pause, not a tiny hole)
-const _AURIX_GAP_BRIDGE_24H_MAX_MS = 14 * 60 * 60 * 1000;   // ≤ 14h (longer = real outage). 0 ⇒ disabled
-const _AURIX_GAP_BRIDGE_24H_NIGHT_START_H = 22;             // night window start (local hour)
-const _AURIX_GAP_BRIDGE_24H_NIGHT_END_H = 8;                // night window end (local hour)
-const _AURIX_GAP_BRIDGE_24H_NIGHT_MARGIN_MIN = 90;          // tolerance around the window
-const _AURIX_GAP_BRIDGE_24H_MAX_DISP_PCT = 0.05;            // |after-before|/before must be ≤ 5%
-const _AURIX_GAP_BRIDGE_24H_MIN_FINAL_BLOCK_PCT = 0.12;     // bridge only if the post-gap block is a small isolated stub (< 12% width)
-
-// true if the timestamp's LOCAL time-of-day is inside the night window ± margin (wraps
-// midnight). Pure read of the real timestamp; never mutated.
-function _aurixGapBridgeIsNight(ts) {
-  let d; try { d = new Date(ts); } catch (_) { return false; }
-  const mins = d.getHours() * 60 + d.getMinutes();
-  const startM = _AURIX_GAP_BRIDGE_24H_NIGHT_START_H * 60 - _AURIX_GAP_BRIDGE_24H_NIGHT_MARGIN_MIN;
-  const endM = _AURIX_GAP_BRIDGE_24H_NIGHT_END_H * 60 + _AURIX_GAP_BRIDGE_24H_NIGHT_MARGIN_MIN;
-  return mins >= startM || mins <= endM;   // night wraps midnight
-}
+// RC3-INC3C — 24H VISUAL GAP BRIDGE (render-only, CONSERVATIVE DEFAULT). Product/eng
+// decision: 24H must NEVER look "broken" because of a normal pause without snapshots.
+// So in 24H the path is drawn CONTINUOUS across EVERY internal gap by default — the curve
+// connects the two REAL bracketing points (NO point invented/interpolated; visiblePoints/
+// visiblePixels/timestamps/values/tooltip/inspector/equivalence untouched). It splits ONLY
+// for an EXTREME OUTAGE: gap > _OUTAGE_MS (18h) OR an extreme wealth jump > _OUTAGE_DISP_PCT
+// (8%) across the gap. No nocturnal/min-duration/final-block conditions (they could leave
+// a normal pause split). The gap is still DETECTED + reported. ONLY 24H; other ranges
+// never bridge. ROLLBACK: _AURIX_GAP_BRIDGE_24H_ENABLED=false (restores prior split).
+const _AURIX_GAP_BRIDGE_24H_ENABLED = true;                       // false ⇒ rollback (split as before)
+const _AURIX_GAP_BRIDGE_24H_OUTAGE_MS = 18 * 60 * 60 * 1000;      // split ONLY if gap > 18h (extreme outage)
+const _AURIX_GAP_BRIDGE_24H_OUTAGE_DISP_PCT = 0.08;              // OR if |after-before|/before > 8% (extreme wealth jump)
 // value of the real point at (or bracketing) a timestamp — for the displacement check.
 function _aurixGapPointValueAt(points, ts) {
   if (!Array.isArray(points)) return null;
@@ -19264,33 +19249,22 @@ function _aurixGapPointValueAt(points, ts) {
   }
   return before ? before.value : (after ? after.value : null);
 }
-// Per-gap 24H bridge decision (render-only). Returns {bridged, reason, dispPct, finalBlockPct}.
-// ctx: { srcPoints, visiblePoints, xScale, events }. ALL 8 conditions must hold to bridge.
+// Per-gap 24H bridge decision (render-only). Conservative: BRIDGE every internal 24H gap
+// EXCEPT an extreme outage (>18h) or extreme wealth jump (>8%). ctx: { srcPoints }.
 function _aurix24hGapBridgeDecision(gap, range, ctx) {
-  const out = { bridged: false, reason: '', dispPct: null, finalBlockPct: null };
+  const out = { bridged: false, reason: '', dispPct: null, durationH: null };
   ctx = ctx || {};
-  if (!_AURIX_GAP_BRIDGE_24H_ENABLED) { out.reason = 'disabled'; return out; }           // rollback
-  if (!(_AURIX_GAP_BRIDGE_24H_MAX_MS > 0)) { out.reason = 'maxms_0'; return out; }        // rollback
   if (String(range || '').toLowerCase() !== '24h') { out.reason = 'not_24h'; return out; }
   if (!gap || !Number.isFinite(gap.durationMs)) { out.reason = 'no_gap'; return out; }
-  const dur = gap.durationMs;
-  if (dur > _AURIX_GAP_BRIDGE_24H_MAX_MS) { out.reason = 'outage_too_long'; return out; }
-  if (dur < _AURIX_GAP_BRIDGE_24H_MIN_MS) { out.reason = 'too_short'; return out; }
-  if (!_aurixGapBridgeIsNight(gap.start) || !_aurixGapBridgeIsNight(gap.end)) { out.reason = 'not_nocturnal'; return out; }
+  out.durationH = +(gap.durationMs / 36e5).toFixed(2);
+  if (!_AURIX_GAP_BRIDGE_24H_ENABLED) { out.reason = 'disabled'; return out; }            // rollback → split
+  if (gap.durationMs > _AURIX_GAP_BRIDGE_24H_OUTAGE_MS) { out.reason = 'outage_too_long'; return out; }
   const vb = _aurixGapPointValueAt(ctx.srcPoints, gap.start), va = _aurixGapPointValueAt(ctx.srcPoints, gap.end);
   if (vb != null && va != null && vb !== 0) {
     const disp = Math.abs(va - vb) / Math.abs(vb); out.dispPct = +(disp * 100).toFixed(2);
-    if (disp > _AURIX_GAP_BRIDGE_24H_MAX_DISP_PCT) { out.reason = 'anomalous_jump'; return out; }
+    if (disp > _AURIX_GAP_BRIDGE_24H_OUTAGE_DISP_PCT) { out.reason = 'extreme_jump'; return out; }
   }
-  if (Array.isArray(ctx.events) && ctx.events.some(e => e && Number.isFinite(e.timestamp) && e.timestamp > gap.start && e.timestamp < gap.end)) { out.reason = 'event_inside'; return out; }
-  if (ctx.xScale && Array.isArray(ctx.visiblePoints) && ctx.visiblePoints.length > 1) {
-    const pts = ctx.visiblePoints, xs = ctx.xScale;
-    const xFirst = xs.x(pts[0].time), xLast = xs.x(pts[pts.length - 1].time), w = (xLast - xFirst) || 1;
-    let afterT = null; for (let i = 0; i < pts.length; i++) { if (pts[i].time >= gap.end) { afterT = pts[i].time; break; } }
-    if (afterT != null) out.finalBlockPct = +(((xLast - xs.x(afterT)) / w) * 100).toFixed(1);
-    if (out.finalBlockPct != null && out.finalBlockPct >= _AURIX_GAP_BRIDGE_24H_MIN_FINAL_BLOCK_PCT * 100) { out.reason = 'final_block_not_isolated'; return out; }
-  }
-  out.bridged = true; out.reason = 'nocturnal_pause';
+  out.bridged = true; out.reason = 'normal_pause';   // default: a normal 24H pause is bridged
   return out;
 }
 // Resuelve el contrato ARR por rango (puro). Devuelve null ⇒ no-op (spacing 0).
@@ -19514,12 +19488,12 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
     start: g.start, end: g.end, durationMs: g.durationMs,
     xStart: +xScale.x(g.start).toFixed(2), xEnd: +xScale.x(g.end).toFixed(2), bridged: true,
   }));
-  // RC3-INC3B — per-gap bridge decision (with reason) for the diagnostic / guardrails.
+  // RC3-INC3C — per-gap bridge decision (with reason) for the diagnostic / guardrails.
   const gapBridgeDecisions = _allGaps.map((g, i) => ({
     start: g.start, end: g.end, durationMs: g.durationMs,
     durationH: +(g.durationMs / 36e5).toFixed(2),
     bridged: _gapDecisions[i].bridged, reason: _gapDecisions[i].reason,
-    dispPct: _gapDecisions[i].dispPct, finalBlockPct: _gapDecisions[i].finalBlockPct,
+    dispPct: _gapDecisions[i].dispPct,
   }));
   const eventMarkers = (prepared.capitalEvents || []).map(e => ({
     x: +xScale.x(e.timestamp).toFixed(2), timestamp: e.timestamp, type: e.type,
@@ -19866,7 +19840,8 @@ if (typeof window !== 'undefined') {
         baseSpacing: cfg ? cfg.base : 0, prominence: cfg ? cfg.prom : null, lastN: cfg ? cfg.lastN : null,
         initialNarrativeFrac: cfg ? cfg.initialFrac : null,
         burstFrac: cfg ? cfg.burstFrac : null, burstWin: cfg ? cfg.burstWin : null,
-        gapBridge24hMaxH: +(_AURIX_GAP_BRIDGE_24H_MAX_MS / 36e5).toFixed(1),
+        gapBridge24hOutageH: +(_AURIX_GAP_BRIDGE_24H_OUTAGE_MS / 36e5).toFixed(1),
+        gapBridge24hOutageDispPct: _AURIX_GAP_BRIDGE_24H_OUTAGE_DISP_PCT * 100,
         engine: (typeof window !== 'undefined' && window.__AURIX_ARR_ENGINE) ? window.__AURIX_ARR_ENGINE : 'range-shape-aware-v2',
         equivalence: (() => { try { return auditAurixRenderVsCanonical(r).status; } catch (_) { return '?'; } })(),
       }, tel);
