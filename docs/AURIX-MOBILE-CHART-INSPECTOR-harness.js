@@ -59,6 +59,9 @@ const PTS = [
 ];
 function setPtsAndUpdate(env, clientX, range) {
   vm.runInContext('_aurixMobChartPts = ' + JSON.stringify(PTS) + '; _aurixMobChartMeta = ' + JSON.stringify({ range: range || '30d', deltaPct: 18, up: true }) + ';', env.sandbox);
+  // RC3-INC3: update no-ops unless the inspector is active (long-press sets this before
+  // the first rAF update in real use). Activate so the selection core runs.
+  vm.runInContext('_aurixMobInspectorActive = true;', env.sandbox);
   env.sandbox._aurixMobInspectorUpdate(clientX);
 }
 

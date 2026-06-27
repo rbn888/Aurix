@@ -19226,6 +19226,14 @@ const _AURIX_ARR_SHAPE = { calm: 1.0, volatile: 0.45, initial: 0.55 };
 // alto para no re-proteger el ruido que la prominencia 24H ya descartó.
 const _AURIX_ARR_BURST_DELTA_FRAC = 0.09;
 const _AURIX_ARR_BURST_WIN = 3;
+// RC3-INC3 — VISUAL GAP BRIDGE (solo 24H, SOLO representación). Una pausa nocturna/baja
+// actividad normal en una ventana de 24h se detecta como gap y partiría la línea,
+// aislando el bloque reciente ("gráfico roto"). Si el gap dura ≤ este umbral, el PATH se
+// dibuja CONTINUO a través de él (la curva conecta los dos puntos reales; NO se inventa
+// ningún punto; serie/valores/timestamps/tooltip/inspector/visiblePoints intactos). El
+// gap se SIGUE detectando y reportando en diagnostics (honestidad). 0 ⇒ desactivado
+// (rollback). Solo 24H; los demás rangos nunca puentean.
+const _AURIX_GAP_BRIDGE_24H_MAX_MS = 14 * 36e5;   // 14h — cubre una pausa nocturna normal
 // Resuelve el contrato ARR por rango (puro). Devuelve null ⇒ no-op (spacing 0).
 function _aurixArrConfig(range) {
   const r = String(range || '').toLowerCase();
@@ -19413,8 +19421,16 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
   // the tooltip cursor EXACTLY on the curve knot under ANY y-scale mode (incl. legible).
   const visiblePixels = visiblePoints.map(p => ({ x: +xScale.x(p.time).toFixed(3), y: +yScale.y(p.value).toFixed(3) }));
 
+  // RC3-INC3 — Visual Gap Bridge (24H only): a short overnight pause is bridged (drawn
+  // continuous) instead of splitting the line. Render-only; the gap stays detected and
+  // is still reported (bridged=true). All gaps split for non-24H or when disabled.
+  const _allGaps = prepared.gaps || [];
+  const _bridge24h = (r === '24h' && _AURIX_GAP_BRIDGE_24H_MAX_MS > 0);
+  const _isBridged = g => _bridge24h && g && (g.durationMs <= _AURIX_GAP_BRIDGE_24H_MAX_MS);
+  const _splitGaps = _allGaps.filter(g => !_isBridged(g));   // only these break the visible path
+  const _bridgedGaps = _allGaps.filter(_isBridged);
   const _splitDiag = {};
-  const runs = _aurixSplitAtGaps(visiblePoints, prepared.gaps, _splitDiag);
+  const runs = _aurixSplitAtGaps(visiblePoints, _splitGaps, _splitDiag);
   let overshoot = false, fallbacks = 0, droppedSubpaths = 0, drawnVertexCount = 0; const linePieces = [], areaPieces = [];
   const _arrCfg = _aurixArrConfig(r);   // RC3-INC2 — range + shape aware ARR contract (null ⇒ no-op)
   runs.forEach(run => {
@@ -19430,9 +19446,14 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
   const pathData = linePieces.join(' ');
   const areaPathData = areaPieces.join(' ');
 
-  const gapSegments = (prepared.gaps || []).map(g => ({
+  // Dashed gap markers ONLY for gaps that actually break the path (bridged gaps draw none).
+  const gapSegments = _splitGaps.map(g => ({
     start: g.start, end: g.end, durationMs: g.durationMs,
     xStart: +xScale.x(g.start).toFixed(2), xEnd: +xScale.x(g.end).toFixed(2), style: 'dashed',
+  }));
+  const bridgedGapSegments = _bridgedGaps.map(g => ({
+    start: g.start, end: g.end, durationMs: g.durationMs,
+    xStart: +xScale.x(g.start).toFixed(2), xEnd: +xScale.x(g.end).toFixed(2), bridged: true,
   }));
   const eventMarkers = (prepared.capitalEvents || []).map(e => ({
     x: +xScale.x(e.timestamp).toFixed(2), timestamp: e.timestamp, type: e.type,
@@ -19445,7 +19466,7 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
   return {
     range: r, viewportWidth: vw, viewportHeight: vh,
     prepared, visiblePoints, visiblePixels, pathData, areaPathData,
-    gaps: prepared.gaps, gapSegments, eventMarkers, yTicks: _yTicks,
+    gaps: prepared.gaps, gapSegments, bridgedGapSegments, eventMarkers, yTicks: _yTicks,
     scale: { xMin: scale.xMin, xMax: scale.xMax, yMin: +scale.yMin.toFixed(4), yMax: +scale.yMax.toFixed(4), mode: yScale.mode },
     renderMeta: {
       source: 'prepared-series', deterministic: true,
@@ -19464,6 +19485,8 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
       visiblePoints: visiblePoints.length,
       drawnVertexCount,                          // ARR — vertices actually sent to the path (≤ visiblePoints)
       gapCount: (prepared.gaps || []).length,
+      bridgedGapCount: _bridgedGaps.length,      // RC3-INC3 — gaps drawn continuous (24H render-only bridge)
+      splitGapCount: _splitGaps.length,          // gaps that actually break the visible path
       gapThresholdMs: prepared.gapThresholdMs || 0,
       medianIntervalMs: prepared.medianIntervalMs || 0,
       renderedSubpaths: linePieces.length,
@@ -19730,22 +19753,39 @@ if (typeof window !== 'undefined') {
       let vMin = Infinity, vMax = -Infinity; vp.forEach(p => { if (p.value < vMin) vMin = p.value; if (p.value > vMax) vMax = p.value; });
       let sig = 0; try { sig = _aurixSignificantLocalExtrema(vp, (vMax - vMin) || 1, (_AURIX_ARR_PROMINENCE_BY_RANGE[r] != null ? _AURIX_ARR_PROMINENCE_BY_RANGE[r] : 0.03)).length; } catch (_) {}
       const cfg = _aurixArrConfig(r);
+      const d = rc.diagnostics || {};
+      // FASE 3 — gap detail: duration, start/end, bridged?, final-block isolation.
+      const bridgeMax = (r === '24h') ? _AURIX_GAP_BRIDGE_24H_MAX_MS : 0;
+      const gapDetail = (rc.gaps || []).map(g => ({
+        durationH: +(g.durationMs / 36e5).toFixed(2),
+        start: (() => { try { return new Date(g.start).toISOString(); } catch (_) { return g.start; } })(),
+        end: (() => { try { return new Date(g.end).toISOString(); } catch (_) { return g.end; } })(),
+        bridged: bridgeMax > 0 && g.durationMs <= bridgeMax,
+      }));
+      // final block = points drawn AFTER the last gap that still splits the path.
+      const splitSegs = rc.gapSegments || [];
+      const lastSplitXEnd = splitSegs.length ? splitSegs[splitSegs.length - 1].xEnd : null;
+      const finalBlockPct = (lastSplitXEnd != null && w) ? +(((xMax - lastSplitXEnd) / w) * 100).toFixed(1) : null;
+      const finalBlockIsolated = finalBlockPct != null && finalBlockPct < 30;   // small recent stub after a hard break
       return {
         range: r, visiblePoints: vp.length, drawnVertexCount: dv,
         ratio: dv != null && vp.length ? +(dv / vp.length).toFixed(2) : null,
         effSpacingVB: dv && dv > 1 ? +(w / (dv - 1)).toFixed(2) : null,
-        gaps: (rc.gaps || []).length, lastSegDelta: Number.isFinite(lastSegΔ) ? +lastSegΔ.toFixed(3) : null,
+        gaps: (rc.gaps || []).length, bridgedGaps: d.bridgedGapCount != null ? d.bridgedGapCount : 0,
+        splitGaps: d.splitGapCount != null ? d.splitGapCount : (rc.gapSegments || []).length,
+        finalBlockPct, finalBlockIsolated, gapDetail,
+        lastSegDelta: Number.isFinite(lastSegΔ) ? +lastSegΔ.toFixed(3) : null,
         connected: Number.isFinite(lastSegΔ) ? lastSegΔ <= 0.5 : null,
         vtxFirst15: f15, vtxLast10: l10, sigPct: vp.length ? Math.round(100 * sig / vp.length) : null,
         baseSpacing: cfg ? cfg.base : 0, prominence: cfg ? cfg.prom : null, lastN: cfg ? cfg.lastN : null,
         initialNarrativeFrac: cfg ? cfg.initialFrac : null,
         burstFrac: cfg ? cfg.burstFrac : null, burstWin: cfg ? cfg.burstWin : null,
-        shape: cfg ? cfg.shape : null,
+        gapBridge24hMaxH: +(_AURIX_GAP_BRIDGE_24H_MAX_MS / 36e5).toFixed(1),
         engine: (typeof window !== 'undefined' && window.__AURIX_ARR_ENGINE) ? window.__AURIX_ARR_ENGINE : 'range-shape-aware-v2',
         equivalence: (() => { try { return auditAurixRenderVsCanonical(r).status; } catch (_) { return '?'; } })(),
       };
     });
-    try { console.table(rows); } catch (_) {}
+    try { console.table(rows.map(r => { const c = Object.assign({}, r); delete c.gapDetail; delete c.shape; return c; })); console.log('[gapDetail]', rows.map(r => ({ range: r.range, gaps: r.gapDetail }))); } catch (_) {}
     return rows;
   };
 }
@@ -22370,10 +22410,22 @@ function _aurixMobInspectorNodes() {
 }
 function _aurixMobInspectorHide() {
   _aurixMobInspectorActive = false;
-  try { const a = document.getElementById('wealthCurveMobile'); if (a) { a.classList.remove('mob-inspecting'); a.style.touchAction = ''; } } catch (_) {}
+  try {
+    const a = document.getElementById('wealthCurveMobile');
+    if (a) { a.classList.remove('mob-inspecting'); a.style.touchAction = ''; }
+    // RC3-INC3 — explicitly clear cursor + hairline + tooltip on release so nothing
+    // persists (inline opacity:0 beats the .mob-inspecting rule AND any late rAF; it is
+    // cleared again on the next active update so re-show always works). Tip content
+    // emptied too. Resets state. Data sources (visiblePoints/tooltip) untouched.
+    ['mobChartHair', 'mobChartCursor', 'mobChartTip'].forEach(function (id) {
+      const el = document.getElementById(id); if (el) el.style.opacity = '0';
+    });
+    const tip = document.getElementById('mobChartTip'); if (tip) tip.innerHTML = '';
+  } catch (_) {}
 }
 function _aurixMobInspectorUpdate(clientX) {
   try {
+    if (!_aurixMobInspectorActive) return;   // RC3-INC3 — ignore a late rAF fired AFTER release (never re-show)
     const pts = _aurixMobChartPts;
     if (!Array.isArray(pts) || pts.length < 2) return;
     const n = _aurixMobInspectorNodes(); if (!n) return;
@@ -22405,6 +22457,9 @@ function _aurixMobInspectorUpdate(clientX) {
     let tx = px + OFF; if (tx + tw > rect.width - 4) tx = px - OFF - tw; tx = Math.min(Math.max(tx, 4), Math.max(4, rect.width - tw - 4));
     let ty = py - th - OFF; if (ty < 4) ty = py + OFF; ty = Math.min(Math.max(ty, 4), Math.max(4, rect.height - th - 4));
     n.tip.style.left = tx.toFixed(1) + 'px'; n.tip.style.top = ty.toFixed(1) + 'px';
+    // RC3-INC3 — clear any force-hide left by a previous _aurixMobInspectorHide() so the
+    // .mob-inspecting rule drives visibility again (re-show after release works).
+    n.hair.style.opacity = ''; n.cur.style.opacity = ''; n.tip.style.opacity = '';
     n.area.classList.add('mob-inspecting');
   } catch (_) {}
 }
@@ -22444,6 +22499,13 @@ function _aurixInitMobileChartInspector() {
     };
     area.addEventListener('touchend', end);
     area.addEventListener('touchcancel', end);
+    // RC3-INC3 — pointer-event safety net (idempotent with touchend): guarantees the
+    // inspector clears on release across engines. window-level so a release that lands
+    // outside the chart area still tears down. clearInspector === _aurixMobInspectorHide.
+    const endP = function () { clearLp(); claimed = false; _aurixMobInspectorHide(); };
+    area.addEventListener('pointerup', endP);
+    area.addEventListener('pointercancel', endP);
+    try { window.addEventListener('pointerup', endP); window.addEventListener('touchend', endP); } catch (_) {}
   } catch (_) {}
 }
 if (typeof window !== 'undefined') { window._aurixInitMobileChartInspector = _aurixInitMobileChartInspector; window._aurixMobInspectorUpdate = _aurixMobInspectorUpdate; }

@@ -86,8 +86,36 @@ conectado, marcador nunca huérfano, último punto = dashboard.
 Desplazamiento neto |v[i+win]−v[i−win]| / rango ≥ frac ⇒ zona volátil ⇒ spacing ×0.45.
 
 ## Gaps (Fase 6)
-No cruzar; no suavizar bordes. Se preservan primer/último punto de cada run y los bordes
-de gap. La lógica de gap (`_AURIX_VP_GAP_FLOOR_MS`) NO se toca en INC2.
+No suavizar bordes. Se preservan primer/último punto de cada run y los bordes de gap. La
+lógica de DETECCIÓN de gap (`_AURIX_VP_GAP_FLOOR_MS`) NO se toca.
+
+### RC3-INC3 — Visual Gap Bridge (24H, render-only)
+LECCIÓN: el defecto visual dominante de 24H NO era ARR/spacing sino la **fragmentación
+por gap nocturno**. Una pausa normal de madrugada (sin snapshots) se detectaba como gap
+y `_aurixSplitAtGaps` partía la línea, dejando el bloque reciente aislado → "gráfico roto".
+- `_AURIX_GAP_BRIDGE_24H_MAX_MS` (14h por defecto): **solo 24H**, si el gap dura ≤ umbral,
+  el PATH se dibuja CONTINUO a través del hueco (la curva monótona conecta los dos puntos
+  reales; NO se inventa ningún punto). Gaps > umbral o de otros rangos siguen partiendo.
+- El gap SE SIGUE detectando y se reporta (`diagnostics.bridgedGapCount` / `splitGapCount`,
+  `rc.bridgedGapSegments`); tooltip/inspector/visiblePoints/equivalencia intactos.
+- REGLA: solo 24H · solo gap ≤ umbral · marcador final siempre conectado · rollback
+  `_AURIX_GAP_BRIDGE_24H_MAX_MS=0`.
+- Decisión del floor de detección 24H: NO tocada; el bridge resuelve la percepción sin
+  reclasificar el dato.
+
+## RC3-INC3 — Inspector Lifecycle (tooltip persistente)
+LECCIÓN: el tooltip/cursor quedaba fijo al soltar por una **race**: `touchmove` programa un
+`requestAnimationFrame`; al soltar, `touchend → _aurixMobInspectorHide()` quita la clase,
+pero el rAF pendiente dispara DESPUÉS y `_aurixMobInspectorUpdate` volvía a añadir
+`.mob-inspecting` → reaparecía. Fixes:
+- `_aurixMobInspectorUpdate` early-return si `!_aurixMobInspectorActive` (un rAF tardío
+  tras soltar es no-op).
+- `_aurixMobInspectorHide` fuerza `opacity:0` en cursor/hair/tip + vacía el tooltip +
+  resetea estado y `touchAction` (swipe restaurado). La opacidad inline se limpia en el
+  siguiente update activo (re-show OK).
+- Red de seguridad `pointerup`/`pointercancel` (+ window-level) además de touchend/cancel.
+REGLA permanente: el inspector debe DESAPARECER al soltar; ningún rAF/tardío puede
+re-mostrarlo.
 
 ## Rollback
 - `_AURIX_RENDER_SPACING_BY_RANGE[rango]=0` ⇒ ARR no-op en ese rango (cae al fallback).
