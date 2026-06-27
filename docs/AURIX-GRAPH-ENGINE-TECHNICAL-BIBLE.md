@@ -114,6 +114,31 @@ final grande, etc.) → 24H seguía partido para el usuario. Regla nueva, **cons
 - Telemetría completa read-only: `_aurixGapTelemetry(rc)` alimenta `window.__AURIX_ARR_LAST`
   (render real) y `debugAurixGraphQuality()` con los mismos campos.
 
+## RC3-INC4 — RULE 0 + Institutional Polish (PERMANENT)
+
+**RULE 0 (CRITICAL, permanent contract):** el path de 24H NUNCA se divide por una pausa.
+Es un único subpath a través de TODO gap interno con punto siguiente válido. Sólo puede
+romperse por motivo ESTRUCTURAL: serie inválida (<2 pts) / datos corruptos (no finitos) /
+no hay punto siguiente — gestionado por `_aurixSplitAtGaps`. Eliminadas las condiciones de
+duración/salto de INC3C (un >18h o >8% YA NO parte 24H). Rollback `_AURIX_GAP_BRIDGE_24H_ENABLED=false`.
+Guardado por `docs/AURIX-24H-NO-SPLIT-harness.js`. Otros rangos siguen partiendo en gaps reales.
+
+**Pulido institucional (PURE GEOMETRY; nunca toca datos/visiblePoints/tooltip/inspector/
+equivalencia). Master rollback `_AURIX_POLISH_ENABLED=false`:**
+- **INC4-A/D — `_aurixPolishSimplify`** (RDP en píxeles, eps `_AURIX_SIMPLIFY_EPS_PX`=0.8 viewBox
+  px ≈ sub-píxel de pantalla): elimina dientes inútiles + microángulos, BLOQUEANDO un set de
+  anclas (primer, último, máx global, mín global por valor). Devuelve un SUBCONJUNTO de los
+  puntos reales (nunca inventa/mueve). Reduce vértices (p.ej. 7D 156→95, 1A 149→24 en datos
+  suaves) preservando forma/extremos/endpoints/cambio neto.
+- **INC4-B — Last Marker Lock**: `rc.lastRenderedVertex` = último vértice EXACTO del path
+  (parseado de pathData). El marcador `.wsc-last-dot` se posiciona desde ahí (NO de una
+  coordenada recalculada). Contrato <0.25 px. Harness `AURIX-LAST-MARKER-LOCK` (Δ≤0.002).
+- **INC4-C — `_aurixDensifyPathSegments`** (subdivisión por distancia, `_AURIX_MAX_SEGMENT_PX`=46):
+  cualquier segmento cuya cuerda > maxPx se sub-muestrea EXACTAMENTE SOBRE la curva (bezier
+  eval / lerp) → ningún segmento gigante (la "línea enorme" de 1A/TOTAL: 641px→≤47px). NO
+  inventa datos (visiblePoints intacto). Harness `AURIX-MAX-SEGMENT-LENGTH`.
+- Orden en el run: ARR → `_aurixPolishSimplify` → `_aurixMonotonePath` → `_aurixDensifyPathSegments`.
+
 ## RC3-INC3 — Inspector Lifecycle (tooltip persistente)
 LECCIÓN: el tooltip/cursor quedaba fijo al soltar por una **race**: `touchmove` programa un
 `requestAnimationFrame`; al soltar, `touchend → _aurixMobInspectorHide()` quita la clase,

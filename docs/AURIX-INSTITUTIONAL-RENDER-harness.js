@@ -63,11 +63,12 @@ function dense(n, spanMs, base) {
   const t0 = NOW - spanMs;
   return Array.from({ length: n }, (_, i) => ({ time: t0 + Math.round(i * spanMs / (n - 1)), value: base + 200 * Math.sin(i * 0.3) }));
 }
-function withGap() {   // 24H with a real 20-hour hole (> RC3-INC3C extreme-outage 18h → still SPLITS)
-  const t0 = NOW - DAY, pts = [];
-  for (let i = 0; i < 6; i++) pts.push({ time: t0 + i * 20 * MIN, value: 70000 + i * 8 });    // 0..1.7h
-  const after = t0 + 21 * HOUR;                                                               // 20h+ hole
-  for (let i = 0; i < 8; i++) pts.push({ time: after + i * 20 * MIN, value: 70100 + i * 8 }); // 21..23.3h
+function withGap() {   // 30D with a real 10-DAY hole (> 30d gap floor 7d → SPLITS). NB: 24H never
+  // splits (RULE 0 bridge); gap-splitting is therefore tested on a NON-24H range.
+  const t0 = NOW - 30 * DAY, pts = [];
+  for (let i = 0; i < 12; i++) pts.push({ time: t0 + i * (DAY / 2), value: 70000 + i * 8 });   // first ~6 days
+  const after = t0 + 16 * DAY;                                                                  // 10-day hole
+  for (let i = 0; i < 12; i++) pts.push({ time: after + i * DAY, value: 70100 + i * 8 });       // remaining days
   return pts;
 }
 const lastV = s => s[s.length - 1].value;
@@ -136,7 +137,7 @@ console.log('\nCASE 5 — area path (shares exact line base path):');
 
 console.log('\nCASE 6 — gaps (gapSegments generated, line broken across the gap):');
 { SERIES = withGap(); DASH = lastV(SERIES); FLOWS = [];
-  const rc = renderAurixInstitutionalChart('24h', 1000, 300);
+  const rc = renderAurixInstitutionalChart('30d', 1000, 300);   // 24H bridges (RULE 0) → split tested on 30D
   ck('gapSegments generated', rc.gapSegments.length >= 1, rc.gapSegments.length);
   ck('gapSegment style provided', rc.gapSegments[0] && rc.gapSegments[0].style === 'dashed', rc.gapSegments[0] && rc.gapSegments[0].style);
   ck('line broken (>=2 subpaths, not solid across gap)', (rc.pathData.match(/M /g) || []).length >= 2, (rc.pathData.match(/M /g)||[]).length); }

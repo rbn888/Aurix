@@ -23,8 +23,8 @@ const ENGINE_FNS = ['renderAurixInstitutionalChart', 'computeAurixAdaptiveXScale
 console.log('AURIX-WEB-CHART-RC1A — desktop presentation finish');
 
 console.log('\nPRESENTATION — premium additions present (desktop):');
-ck('end marker computed in _wscPaintSurface (% from render samples, HTML element)',
-   /wsc-last-dot/.test(paint) && /_ttSampleX\[_n - 1\] \/ W/.test(paint));
+ck('end marker computed in _wscPaintSurface (% from the LAST RENDERED VERTEX, HTML element)',
+   /wsc-last-dot/.test(paint) && /lastRenderedVertex/.test(paint) && /_vx \/ W/.test(paint));
 ck('end marker is DESKTOP-only (gated !_isMobile)', /!_isMobile && _n >= 2/.test(paint));
 ck('.wsc-last-dot styled + tone variants + pulse', css.indexOf('.wsc-last-dot') >= 0 && /@keyframes wscDotPulse/.test(css) && css.indexOf('.wsc-up   .wsc-last-dot') >= 0);
 ck('end-dot pulse disabled under reduced motion', /prefers-reduced-motion[\s\S]{0,200}\.wsc-last-dot::after \{ animation: none/.test(css));

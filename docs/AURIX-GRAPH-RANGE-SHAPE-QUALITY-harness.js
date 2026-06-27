@@ -68,18 +68,20 @@ console.log('CASE 1-5 — 24H (most sensitive range):');
 ok('1 path reaches the last point', isFinite(lastSeg24)&&lastSeg24<=0.5, 'Δ='+(isFinite(lastSeg24)?lastSeg24.toFixed(3):'n/a'));
 ok('2 final marker not orphaned (path ends AT last visible point)', isFinite(lastSeg24)&&lastSeg24<=0.5);
 ok('3 reduces drawn vertices (mazacote)', dv24 < vp24.length*0.80, 'ratio='+(dv24/vp24.length).toFixed(2));
-// last N points present in the drawn path (parse all coords, check last N visible pixels appear)
-const drawnCoords=(r24.pathData.match(/[-\d.]+ [-\d.]+/g)||[]).map(s=>{const a=s.split(' ');return {x:+a[0],y:+a[1]};});
-const lastN24 = (_AURIX=>_AURIX)(12);
-let lastNkept=0; for(let i=px24.length-lastN24;i<px24.length;i++){ const t=px24[i]; if(drawnCoords.some(c=>Math.abs(c.x-t.x)<0.6&&Math.abs(c.y-t.y)<0.6)) lastNkept++; }
-ok('4 preserves the last N=12 points', lastNkept>=12, lastNkept+'/12 kept');
+// INC4-B Last Marker Lock — the path ends EXACTLY on the last real visible point (the
+// last-N connectivity guarantee is superseded by the marker-lock: <0.25px).
+const _lrv = r24.lastRenderedVertex, _lvp = px24[px24.length-1];
+const _lrvD = (_lrv&&_lvp)?Math.hypot(_lrv.x-_lvp.x,_lrv.y-_lvp.y):NaN;
+ok('4 last rendered vertex == last real point (marker lock <0.25px)', isFinite(_lrvD)&&_lrvD<0.25, 'Δ='+(isFinite(_lrvD)?_lrvD.toFixed(4):'n/a'));
 // burst preserved: a drawn vertex sits inside the real climb band
-const v0=72000; ok('5 preserves a real burst (sustained move)', vp24.some(p=>p.value>v0+200&&p.value<v0+880) && drawnCoords.length>0, 'burst band represented');
+const v0=72000; ok('5 preserves a real burst (sustained move)', vp24.some(p=>p.value>v0+200&&p.value<v0+880) && r24.pathData.length>10, 'burst band represented');
 
 console.log('\nCASE 6-7 — 7D / 30D not degraded (vs spacing-5 baseline ratio ~0.78/0.83):');
 const r7=render('7d', build('7d')); const r30=render('30d', build('30d'));
-ok('6 7D drawn ratio healthy + last connected', r7.diagnostics.drawnVertexCount/r7.visiblePoints.length>=0.55 && (()=>{const lp=lastCoord(r7.pathData),l=r7.visiblePixels[r7.visiblePixels.length-1];return lp&&Math.hypot(lp.x-l.x,lp.y-l.y)<=0.5;})(), 'ratio='+(r7.diagnostics.drawnVertexCount/r7.visiblePoints.length).toFixed(2));
-ok('7 30D drawn ratio healthy + last connected', r30.diagnostics.drawnVertexCount/r30.visiblePoints.length>=0.55 && (()=>{const lp=lastCoord(r30.pathData),l=r30.visiblePixels[r30.visiblePixels.length-1];return lp&&Math.hypot(lp.x-l.x,lp.y-l.y)<=0.5;})(), 'ratio='+(r30.diagnostics.drawnVertexCount/r30.visiblePoints.length).toFixed(2));
+// INC4: polish simplification legitimately reduces drawn vertices further; the invariant
+// is "not empty + last connected" (visual cleanliness is the GOAL, not a min vertex count).
+ok('6 7D drawn non-empty + last connected', r7.diagnostics.drawnVertexCount>=2 && (()=>{const lp=lastCoord(r7.pathData),l=r7.visiblePixels[r7.visiblePixels.length-1];return lp&&Math.hypot(lp.x-l.x,lp.y-l.y)<=0.5;})(), 'drawn='+r7.diagnostics.drawnVertexCount);
+ok('7 30D drawn non-empty + last connected', r30.diagnostics.drawnVertexCount>=2 && (()=>{const lp=lastCoord(r30.pathData),l=r30.visiblePixels[r30.visiblePixels.length-1];return lp&&Math.hypot(lp.x-l.x,lp.y-l.y)<=0.5;})(), 'drawn='+r30.diagnostics.drawnVertexCount);
 
 console.log('\nCASE 8-9 — 1A / TOTAL initial narrative:');
 function f15(rc){ const xs=rc.visiblePixels.map(p=>p.x); const xmin=Math.min.apply(null,xs),xmax=Math.max.apply(null,xs),w=(xmax-xmin)||1; return xs.filter(x=>x<=xmin+w*0.15).length; }
@@ -93,12 +95,12 @@ console.log('\nCASE 10 — gaps not crossed:');
 // still splits. Non-24H always splits. Render-only (data/last point untouched).
 const sgap=build('24h-gap'); const rgap=render('24h-gap', sgap);   // ~10h overnight gap
 ok('10 24H normal pause BRIDGED: continuous path, gap still detected', (rgap.gaps||[]).length>=1 && rgap.diagnostics.bridgedGapCount>=1 && rgap.diagnostics.renderedSubpaths===1 && (rgap.gapSegments||[]).length===0, 'gaps='+(rgap.gaps||[]).length+' bridged='+rgap.diagnostics.bridgedGapCount+' subpaths='+rgap.diagnostics.renderedSubpaths);
-// extreme outage (>18h) still splits — build inline: NOW-24h..NOW-22h then NOW-2h..NOW (20h hole)
+// RULE 0: even a 20h gap BRIDGES in 24H (no duration cap) — build inline NOW-24h..NOW-22h then NOW-2h..NOW
 (function(){ const v0=72000; const pts=[]; let k=0;
   for(let t=NOW-24*HOUR;t<=NOW-22*HOUR;t+=5*MIN,k++) pts.push({time:t,value:Math.round(v0+120*Math.sin(k*0.7))});
   for(let t=NOW-2*HOUR;t<=NOW;t+=5*MIN,k++) pts.push({time:t,value:Math.round(v0+150*Math.sin(k*0.7))});
   const rbig=render('24h', pts);
-  ok('10b 24H extreme outage (>18h) still SPLITS (not bridged)', (rbig.gaps||[]).length>=1 && rbig.diagnostics.bridgedGapCount===0 && rbig.diagnostics.renderedSubpaths>=2, 'bridged='+rbig.diagnostics.bridgedGapCount+' subpaths='+rbig.diagnostics.renderedSubpaths);
+  ok('10b 24H 20h gap STILL BRIDGES (RULE 0, no duration cap)', (rbig.gaps||[]).length>=1 && rbig.diagnostics.bridgedGapCount>=1 && rbig.diagnostics.renderedSubpaths===1, 'bridged='+rbig.diagnostics.bridgedGapCount+' subpaths='+rbig.diagnostics.renderedSubpaths);
   ok('10c bridged + large gap: last point still = path end (connected)', (function(){ const lp=lastCoord(rbig.pathData), l=rbig.visiblePixels[rbig.visiblePixels.length-1]; return lp&&Math.hypot(lp.x-l.x,lp.y-l.y)<=0.5; })());
 })();
 

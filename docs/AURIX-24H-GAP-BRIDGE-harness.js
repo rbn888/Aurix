@@ -46,33 +46,37 @@ let pass = 0, fail = 0;
 function ok(name, cond, info) { if (cond) { pass++; console.log('  ✓ ' + name + (info ? '  [' + info + ']' : '')); } else { fail++; console.log('  ✗ ' + name + (info ? '  [' + info + ']' : '')); } }
 
 console.log('AURIX-24H-GAP-BRIDGE — RC3-INC3C conservative default\n');
-console.log('BRIDGE BY DEFAULT (split only on extreme outage):');
+console.log('RULE 0 — 24H NEVER SPLITS FOR A PAUSE:');
 // 1. normal pause 10h (nocturnal hours) → BRIDGE
 { const rc = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));
   ok('1 normal 10h pause → BRIDGE (continuous)', dec0(rc).bridged === true && rc.diagnostics.renderedSubpaths === 1, dec0(rc).reason); }
 // 2. normal pause 14h → BRIDGE (no 14h cap anymore; 14 ≤ 18)
 { const rc = render(SB, '24h', build(T(2026,5,14,8,0),T(2026,5,14,18,0),T(2026,5,15,8,0),T(2026,5,15,10,0),0));
   ok('2 normal 14h pause → BRIDGE', dec0(rc).bridged === true && rc.diagnostics.renderedSubpaths === 1, dec0(rc).reason + ' durH=' + dec0(rc).durationH); }
-// 3. extreme outage 20h (>18h) → NO bridge (split)
+// 3. RULE 0 — even a 20h pause BRIDGES (no duration cap; only structural reasons split)
 { const rc = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,13,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));
-  ok('3 extreme outage 20h (>18h) → NO bridge (split)', dec0(rc).bridged === false && dec0(rc).reason === 'outage_too_long' && rc.diagnostics.renderedSubpaths >= 2, 'durH=' + dec0(rc).durationH); }
+  ok('3 20h pause → BRIDGE (RULE 0, no duration cap)', dec0(rc).bridged === true && rc.diagnostics.renderedSubpaths === 1, dec0(rc).reason + ' durH=' + dec0(rc).durationH); }
 // 4. DAYTIME 10h pause → BRIDGE (hour-independent robust default)
 { const rc = render(SB, '24h', build(T(2026,5,14,23,0),T(2026,5,15,11,0),T(2026,5,15,21,0),T(2026,5,15,23,0),0));
   ok('4 daytime 10h pause → BRIDGE (no nocturnal condition)', dec0(rc).bridged === true && rc.diagnostics.renderedSubpaths === 1, dec0(rc).reason); }
-// 5. extreme wealth jump >8% → NO bridge
+// 5. RULE 0 — even a 10% jump BRIDGES (dispPct reported as telemetry, never splits)
 { const rc = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0.10));
-  ok('5 extreme jump >8% → NO bridge (extreme_jump)', dec0(rc).bridged === false && dec0(rc).reason === 'extreme_jump', 'disp%=' + dec0(rc).dispPct); }
-// 6. moderate jump ≤8% → BRIDGE
+  ok('5 10% jump → BRIDGE (RULE 0; dispPct telemetry only)', dec0(rc).bridged === true && dec0(rc).dispPct > 8, 'disp%=' + dec0(rc).dispPct); }
+// 6. small jump → BRIDGE
 { const rc = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0.05));
-  ok('6 moderate jump 5% (≤8%) → BRIDGE', dec0(rc).bridged === true, 'disp%=' + dec0(rc).dispPct); }
+  ok('6 5% jump → BRIDGE', dec0(rc).bridged === true, 'disp%=' + dec0(rc).dispPct); }
 // 7. last marker connected (bridge case)
 { const rc = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));
   ok('7 last point connected to path (bridge)', connected(rc) === true); }
-// 8. pathSegmentCount: 1 when bridged, ≥2 on extreme outage
-{ const sB = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));   // bridged
-  const sU = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,13,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));   // 20h split
-  const segB = (sB.pathData.match(/M /g) || []).length, segU = (sU.pathData.match(/M /g) || []).length;
-  ok('8 pathSegmentCount = 1 bridged, ≥2 outage', segB === 1 && segU >= 2, 'bridged=' + segB + ' outage=' + segU); }
+// 8. 24H bridged path = 1 subpath; a NON-24H detected gap still splits (≥2)
+{ const sB = render(SB, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));   // 24h bridged
+  // 30d series with a >7d hole → splits (range-gated; only 24H bridges)
+  const now = T(2026,5,15,12,0), pts = [];
+  for (let i = 0; i < 12; i++) pts.push({ time: now - 30*DAY + i*(DAY/2), value: 70000 + i*8 });
+  for (let i = 0; i < 12; i++) pts.push({ time: now - 14*DAY + i*DAY, value: 70100 + i*8 });
+  const s30 = render(SB, '30d', pts);
+  const segB = (sB.pathData.match(/M /g) || []).length, seg30 = (s30.pathData.match(/M /g) || []).length;
+  ok('8 24H bridged = 1 subpath; 30D gap still splits (≥2)', segB === 1 && seg30 >= 2, '24h=' + segB + ' 30d=' + seg30); }
 
 console.log('\nOTHER RANGES UNCHANGED (never bridge):');
 function gapSeries(days) { const pts = []; const now = T(2026,5,15,12,0); const span = days * DAY, half = Math.floor(span/2);
@@ -100,10 +104,9 @@ console.log('\nROLLBACK / KNOBS:');
 { const sbOff = mkSandbox(CONST_BLOCK.replace('_AURIX_GAP_BRIDGE_24H_ENABLED = true', '_AURIX_GAP_BRIDGE_24H_ENABLED = false'));
   const rc = render(sbOff, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));
   ok('17 ENABLED=false → NO bridge (split restored)', dec0(rc).bridged === false && dec0(rc).reason === 'disabled' && rc.diagnostics.renderedSubpaths >= 2); }
-// 18. OUTAGE_MS knob: lower it so a normal 10h gap is treated as outage → splits
-{ const sbLow = mkSandbox(CONST_BLOCK.replace('_AURIX_GAP_BRIDGE_24H_OUTAGE_MS = 18 * 60 * 60 * 1000', '_AURIX_GAP_BRIDGE_24H_OUTAGE_MS = 1 * 60 * 60 * 1000'));
-  const rc = render(sbLow, '24h', build(T(2026,5,14,11,0),T(2026,5,14,23,0),T(2026,5,15,9,0),T(2026,5,15,11,0),0));
-  ok('18 OUTAGE_MS knob (1h) → 10h gap splits (outage_too_long)', dec0(rc).bridged === false && dec0(rc).reason === 'outage_too_long' && rc.diagnostics.renderedSubpaths >= 2); }
+// 18. RULE 0 — a 17h pause still BRIDGES (no duration cap exists anymore)
+{ const rc = render(SB, '24h', build(T(2026,5,14,18,0),T(2026,5,14,20,0),T(2026,5,15,13,0),T(2026,5,15,15,0),0));
+  ok('18 17h pause → BRIDGE (no duration cap; only ENABLED rollback splits)', dec0(rc).bridged === true && rc.diagnostics.renderedSubpaths === 1, dec0(rc).reason + ' durH=' + dec0(rc).durationH); }
 
 console.log('\nRESULT: ' + (fail === 0 ? 'ALL PASS ✓' : 'FAIL ✗') + '  (' + pass + ' passed, ' + fail + ' failed)');
 process.exit(fail === 0 ? 0 : 1);

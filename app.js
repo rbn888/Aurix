@@ -19227,19 +19227,17 @@ const _AURIX_ARR_SHAPE = { calm: 1.0, volatile: 0.45, initial: 0.55 };
 const _AURIX_ARR_BURST_DELTA_FRAC = 0.09;
 const _AURIX_ARR_BURST_WIN = 3;
 // ════════════════════════════════════════════════════════════════════════════
-// RC3-INC3C — 24H VISUAL GAP BRIDGE (render-only, CONSERVATIVE DEFAULT). Product/eng
-// decision: 24H must NEVER look "broken" because of a normal pause without snapshots.
-// So in 24H the path is drawn CONTINUOUS across EVERY internal gap by default — the curve
-// connects the two REAL bracketing points (NO point invented/interpolated; visiblePoints/
-// visiblePixels/timestamps/values/tooltip/inspector/equivalence untouched). It splits ONLY
-// for an EXTREME OUTAGE: gap > _OUTAGE_MS (18h) OR an extreme wealth jump > _OUTAGE_DISP_PCT
-// (8%) across the gap. No nocturnal/min-duration/final-block conditions (they could leave
-// a normal pause split). The gap is still DETECTED + reported. ONLY 24H; other ranges
-// never bridge. ROLLBACK: _AURIX_GAP_BRIDGE_24H_ENABLED=false (restores prior split).
+// RC3-INC4 RULE 0 (CRITICAL, PERMANENT CONTRACT) — 24H NEVER SPLITS for a pause.
+// In 24H the path is drawn CONTINUOUS across EVERY internal gap that has a valid next
+// point. It may break ONLY for a STRUCTURAL reason: no next point / corrupted (non-finite)
+// data / invalid series (<2 points) — handled by _aurixSplitAtGaps run/coalesce. NEVER by
+// a normal (nocturnal or any-duration) pause. The curve connects the two REAL bracketing
+// points (NO point invented/interpolated; visiblePoints/visiblePixels/timestamps/values/
+// tooltip/inspector/equivalence untouched). Gap stays DETECTED + reported. ONLY 24H; other
+// ranges never bridge. ROLLBACK: _AURIX_GAP_BRIDGE_24H_ENABLED=false (restores prior split).
+// Guarded permanently by docs/AURIX-24H-NO-SPLIT-harness.js.
 const _AURIX_GAP_BRIDGE_24H_ENABLED = true;                       // false ⇒ rollback (split as before)
-const _AURIX_GAP_BRIDGE_24H_OUTAGE_MS = 18 * 60 * 60 * 1000;      // split ONLY if gap > 18h (extreme outage)
-const _AURIX_GAP_BRIDGE_24H_OUTAGE_DISP_PCT = 0.08;              // OR if |after-before|/before > 8% (extreme wealth jump)
-// value of the real point at (or bracketing) a timestamp — for the displacement check.
+// value of the real point at (or bracketing) a timestamp — for the displacement telemetry.
 function _aurixGapPointValueAt(points, ts) {
   if (!Array.isArray(points)) return null;
   let before = null, after = null;
@@ -19249,8 +19247,9 @@ function _aurixGapPointValueAt(points, ts) {
   }
   return before ? before.value : (after ? after.value : null);
 }
-// Per-gap 24H bridge decision (render-only). Conservative: BRIDGE every internal 24H gap
-// EXCEPT an extreme outage (>18h) or extreme wealth jump (>8%). ctx: { srcPoints }.
+// Per-gap 24H bridge decision (render-only). RULE 0: BRIDGE every internal 24H gap whose
+// bracketing points are valid (finite). Splits happen ONLY structurally (invalid data / no
+// next point), never for a pause. ctx: { srcPoints }. dispPct kept for telemetry only.
 function _aurix24hGapBridgeDecision(gap, range, ctx) {
   const out = { bridged: false, reason: '', dispPct: null, durationH: null };
   ctx = ctx || {};
@@ -19258,14 +19257,78 @@ function _aurix24hGapBridgeDecision(gap, range, ctx) {
   if (!gap || !Number.isFinite(gap.durationMs)) { out.reason = 'no_gap'; return out; }
   out.durationH = +(gap.durationMs / 36e5).toFixed(2);
   if (!_AURIX_GAP_BRIDGE_24H_ENABLED) { out.reason = 'disabled'; return out; }            // rollback → split
-  if (gap.durationMs > _AURIX_GAP_BRIDGE_24H_OUTAGE_MS) { out.reason = 'outage_too_long'; return out; }
   const vb = _aurixGapPointValueAt(ctx.srcPoints, gap.start), va = _aurixGapPointValueAt(ctx.srcPoints, gap.end);
-  if (vb != null && va != null && vb !== 0) {
-    const disp = Math.abs(va - vb) / Math.abs(vb); out.dispPct = +(disp * 100).toFixed(2);
-    if (disp > _AURIX_GAP_BRIDGE_24H_OUTAGE_DISP_PCT) { out.reason = 'extreme_jump'; return out; }
-  }
-  out.bridged = true; out.reason = 'normal_pause';   // default: a normal 24H pause is bridged
+  if (!(Number.isFinite(vb) && Number.isFinite(va))) { out.reason = 'invalid_data'; return out; }   // structural → split
+  if (vb !== 0) out.dispPct = +(Math.abs(va - vb) / Math.abs(vb) * 100).toFixed(2);                  // telemetry only
+  out.bridged = true; out.reason = 'normal_pause';   // RULE 0: every valid 24H pause is bridged
   return out;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// RC3-INC4 — INSTITUTIONAL POLISH PASSES (PURE GEOMETRY). These act ONLY on the drawn
+// vertex set / SVG path. They NEVER touch the canonical series, visiblePoints,
+// visiblePixels, timestamps, values, tooltip, inspector or equivalence. Master rollback:
+// _AURIX_POLISH_ENABLED=false (or each px constant to 0).
+const _AURIX_POLISH_ENABLED = true;
+const _AURIX_SIMPLIFY_EPS_PX = 0.8;    // INC4-A/D: drop a vertex within this px of the local chord (teeth + microangles). Extremes/endpoints LOCKED. 0 ⇒ off
+const _AURIX_MAX_SEGMENT_PX = 46;      // INC4-C: cap rendered segment length (px) by sampling ON the existing curve. 0 ⇒ off
+
+// INC4-A/D — Adaptive Local Simplification + microangle removal. Pixel-space Douglas-
+// Peucker that KEEPS a locked anchor set (first, last, global max, global min by value)
+// and drops only near-collinear vertices (within eps px of the chord) — removing useless
+// teeth and microangles while preserving exact shape, extremes, endpoints and net change.
+// Returns a SUBSET of `drawn` (real points only; never invents/moves a point).
+function _aurixPolishSimplify(drawn, xScale, yScale) {
+  const n = Array.isArray(drawn) ? drawn.length : 0;
+  if (n <= 4) return drawn;
+  const eps = _AURIX_SIMPLIFY_EPS_PX;
+  if (!(eps > 0)) return drawn;
+  const pix = drawn.map(p => ({ x: xScale.x(p.time), y: yScale.y(p.value) }));
+  let miIdx = 0, maIdx = 0;
+  for (let i = 1; i < n; i++) { if (drawn[i].value < drawn[miIdx].value) miIdx = i; if (drawn[i].value > drawn[maIdx].value) maIdx = i; }
+  const keep = new Array(n).fill(false);
+  keep[0] = keep[n - 1] = keep[miIdx] = keep[maIdx] = true;
+  const anchors = []; for (let i = 0; i < n; i++) if (keep[i]) anchors.push(i);
+  const stack = []; for (let a = 0; a < anchors.length - 1; a++) stack.push([anchors[a], anchors[a + 1]]);
+  while (stack.length) {
+    const seg = stack.pop(), lo = seg[0], hi = seg[1];
+    if (hi - lo < 2) continue;
+    const ax = pix[lo].x, ay = pix[lo].y, dx = pix[hi].x - ax, dy = pix[hi].y - ay, len = Math.hypot(dx, dy) || 1;
+    let maxD = -1, idx = -1;
+    for (let i = lo + 1; i < hi; i++) { const d = Math.abs((pix[i].x - ax) * dy - (pix[i].y - ay) * dx) / len; if (d > maxD) { maxD = d; idx = i; } }
+    if (maxD >= eps) { keep[idx] = true; stack.push([lo, idx]); stack.push([idx, hi]); }
+  }
+  const out = []; for (let i = 0; i < n; i++) if (keep[i]) out.push(drawn[i]);
+  return out;
+}
+
+// INC4-C — Distance-aware subdivision. Walks the monotone path's segments and, for any
+// segment whose endpoint chord > maxPx, emits intermediate points sampled EXACTLY ON the
+// segment geometry (cubic bezier eval / line lerp). The curve shape is unchanged — it only
+// inserts collinear/on-curve GEOMETRIC vertices so no single rendered segment is huge
+// (the "giant line" on 1A/TOTAL). No data/series/tooltip/visiblePoints change. Returns a
+// path `d` string. Short segments keep their original (smooth) C/L command.
+function _aurixDensifyPathSegments(segments, maxPx) {
+  if (!Array.isArray(segments) || !segments.length) return '';
+  const f = n => n.toFixed(2);
+  const bez = (t, p0, c1, c2, p1) => { const mt = 1 - t; return mt * mt * mt * p0 + 3 * mt * mt * t * c1 + 3 * mt * t * t * c2 + t * t * t * p1; };
+  let d = 'M ' + f(segments[0].x0) + ' ' + f(segments[0].y0);
+  for (let s = 0; s < segments.length; s++) {
+    const sg = segments[s], chord = Math.hypot(sg.x1 - sg.x0, sg.y1 - sg.y0);
+    if (!(maxPx > 0) || chord <= maxPx) {
+      if (sg.type === 'C') d += ' C ' + f(sg.c1x) + ' ' + f(sg.c1y) + ' ' + f(sg.c2x) + ' ' + f(sg.c2y) + ' ' + f(sg.x1) + ' ' + f(sg.y1);
+      else d += ' L ' + f(sg.x1) + ' ' + f(sg.y1);
+    } else {
+      const steps = Math.ceil(chord / maxPx);
+      for (let k = 1; k <= steps; k++) {
+        const t = k / steps; let x, y;
+        if (sg.type === 'C') { x = bez(t, sg.x0, sg.c1x, sg.c2x, sg.x1); y = bez(t, sg.y0, sg.c1y, sg.c2y, sg.y1); }
+        else { x = sg.x0 + (sg.x1 - sg.x0) * t; y = sg.y0 + (sg.y1 - sg.y0) * t; }
+        d += ' L ' + f(x) + ' ' + f(y);
+      }
+    }
+  }
+  return d;
 }
 // Resuelve el contrato ARR por rango (puro). Devuelve null ⇒ no-op (spacing 0).
 function _aurixArrConfig(range) {
@@ -19469,15 +19532,24 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
   runs.forEach(run => {
     if (run.length < 2) { droppedSubpaths++; return; }   // never happens post-coalesce; guard only
     // ARR — optimise ONLY the drawn vertex set (visiblePoints/visiblePixels stay full).
-    const drawn = _aurixArrRepresentVertices(run, xScale, _arrCfg);
+    let drawn = _aurixArrRepresentVertices(run, xScale, _arrCfg);
+    // INC4-A/D — perceptual simplification (teeth + microangles), extremes/endpoints locked.
+    if (_AURIX_POLISH_ENABLED) drawn = _aurixPolishSimplify(drawn, xScale, yScale);
     drawnVertexCount += drawn.length;
     const mp = _aurixMonotonePath(drawn, xScale, yScale);
     if (mp.overshoot) overshoot = true; fallbacks += mp.lineFallbacks || 0;
-    if (mp.d) linePieces.push(mp.d);
-    if (mp.d) areaPieces.push(buildAurixAreaPath(mp.d, drawn, scale));
+    // INC4-C — distance-aware subdivision of long segments (pure geometry on the curve).
+    const dLine = (_AURIX_POLISH_ENABLED && _AURIX_MAX_SEGMENT_PX > 0 && mp.segments && mp.segments.length)
+      ? _aurixDensifyPathSegments(mp.segments, _AURIX_MAX_SEGMENT_PX) : mp.d;
+    if (dLine) linePieces.push(dLine);
+    if (dLine) areaPieces.push(buildAurixAreaPath(dLine, drawn, scale));
   });
   const pathData = linePieces.join(' ');
   const areaPathData = areaPieces.join(' ');
+  // INC4-B — Last Marker Lock: the end marker MUST sit on the actual last rendered vertex
+  // of the SVG path (parsed from pathData), NOT a recomputed coordinate. < 0.25px contract.
+  const _lrvMatch = String(pathData).trim().match(/([-\d.]+)\s+([-\d.]+)\s*$/);
+  const lastRenderedVertex = _lrvMatch ? { x: +(+_lrvMatch[1]).toFixed(3), y: +(+_lrvMatch[2]).toFixed(3) } : null;
 
   // Dashed gap markers ONLY for gaps that actually break the path (bridged gaps draw none).
   const gapSegments = _splitGaps.map(g => ({
@@ -19505,7 +19577,7 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
 
   return {
     range: r, viewportWidth: vw, viewportHeight: vh,
-    prepared, visiblePoints, visiblePixels, pathData, areaPathData,
+    prepared, visiblePoints, visiblePixels, pathData, areaPathData, lastRenderedVertex,
     gaps: prepared.gaps, gapSegments, bridgedGapSegments, gapBridgeDecisions, eventMarkers, yTicks: _yTicks,
     scale: { xMin: scale.xMin, xMax: scale.xMax, yMin: +scale.yMin.toFixed(4), yMax: +scale.yMax.toFixed(4), mode: yScale.mode },
     renderMeta: {
@@ -19840,8 +19912,7 @@ if (typeof window !== 'undefined') {
         baseSpacing: cfg ? cfg.base : 0, prominence: cfg ? cfg.prom : null, lastN: cfg ? cfg.lastN : null,
         initialNarrativeFrac: cfg ? cfg.initialFrac : null,
         burstFrac: cfg ? cfg.burstFrac : null, burstWin: cfg ? cfg.burstWin : null,
-        gapBridge24hOutageH: +(_AURIX_GAP_BRIDGE_24H_OUTAGE_MS / 36e5).toFixed(1),
-        gapBridge24hOutageDispPct: _AURIX_GAP_BRIDGE_24H_OUTAGE_DISP_PCT * 100,
+        gapBridge24hEnabled: _AURIX_GAP_BRIDGE_24H_ENABLED,   // RULE 0: 24H bridges all valid pauses
         engine: (typeof window !== 'undefined' && window.__AURIX_ARR_ENGINE) ? window.__AURIX_ARR_ENGINE : 'range-shape-aware-v2',
         equivalence: (() => { try { return auditAurixRenderVsCanonical(r).status; } catch (_) { return '?'; } })(),
       }, tel);
@@ -22168,9 +22239,15 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   let _lastDotHtml = '';
   try {
     const _n = _ttSampleX.length;
+    // INC4-B Last Marker Lock — derive the dot from the ACTUAL last rendered vertex of the
+    // SVG path (engine's lastRenderedVertex), NOT a recomputed sample. Falls back to the
+    // last tooltip sample only if the engine path isn't driving this surface.
+    const _lrv = (_inst && _inst.rendered && _inst.rendered.lastRenderedVertex) ? _inst.rendered.lastRenderedVertex : null;
     if (!_isMobile && _n >= 2) {
-      const _lx = (_ttSampleX[_n - 1] / W) * 100;
-      const _ly = (_ttSampleY[_n - 1] / H) * 100;
+      const _vx = _lrv ? _lrv.x : _ttSampleX[_n - 1];
+      const _vy = _lrv ? _lrv.y : _ttSampleY[_n - 1];
+      const _lx = (_vx / W) * 100;
+      const _ly = (_vy / H) * 100;
       if (isFinite(_lx) && isFinite(_ly)) _lastDotHtml = `<div class="wsc-last-dot" style="left:${_lx.toFixed(2)}%;top:${_ly.toFixed(2)}%" aria-hidden="true"></div>`;
     }
   } catch (_) {}
