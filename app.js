@@ -19338,6 +19338,30 @@ function _aurixDensifyPathSegments(segments, maxPx) {
   }
   return d;
 }
+
+// RC3-INC7 — VISUAL PATH SAMPLES. Samples the ACTUAL drawn curve (monotone cubic segments)
+// into a dense polyline in viewBox px, so the mobile inspector cursor can ride the VISIBLE
+// line (post simplify/densify/bridge) instead of snapping to noisy real points. PURE geometry
+// derived from the drawn path; NOT data. Step ≈ _AURIX_VISUAL_SAMPLE_STEP_PX px.
+const _AURIX_VISUAL_SAMPLE_STEP_PX = 4;
+function _aurixSampleSegments(segments, stepPx) {
+  const out = [];
+  if (!Array.isArray(segments) || !segments.length) return out;
+  const bez = (t, p0, c1, c2, p1) => { const m = 1 - t; return m * m * m * p0 + 3 * m * m * t * c1 + 3 * m * t * t * c2 + t * t * t * p1; };
+  const step = stepPx > 0 ? stepPx : 4;
+  out.push({ x: +segments[0].x0.toFixed(2), y: +segments[0].y0.toFixed(2) });
+  for (let s = 0; s < segments.length; s++) {
+    const sg = segments[s], chord = Math.hypot(sg.x1 - sg.x0, sg.y1 - sg.y0);
+    const n = Math.max(1, Math.ceil(chord / step));
+    for (let k = 1; k <= n; k++) {
+      const t = k / n; let x, y;
+      if (sg.type === 'C') { x = bez(t, sg.x0, sg.c1x, sg.c2x, sg.x1); y = bez(t, sg.y0, sg.c1y, sg.c2y, sg.y1); }
+      else { x = sg.x0 + (sg.x1 - sg.x0) * t; y = sg.y0 + (sg.y1 - sg.y0) * t; }
+      out.push({ x: +x.toFixed(2), y: +y.toFixed(2) });
+    }
+  }
+  return out;
+}
 // Resuelve el contrato ARR por rango (puro). Devuelve null ⇒ no-op (spacing 0).
 function _aurixArrConfig(range) {
   const r = String(range || '').toLowerCase();
@@ -19536,6 +19560,7 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
   const _splitDiag = {};
   const runs = _aurixSplitAtGaps(visiblePoints, _splitGaps, _splitDiag);
   let overshoot = false, fallbacks = 0, droppedSubpaths = 0, drawnVertexCount = 0; const linePieces = [], areaPieces = [];
+  const visualSamples = [];   // RC3-INC7 — dense polyline of the DRAWN curve (for inspector cursor snap)
   const _arrCfg = _aurixArrConfig(r);   // RC3-INC2 — range + shape aware ARR contract (null ⇒ no-op)
   runs.forEach(run => {
     if (run.length < 2) { droppedSubpaths++; return; }   // never happens post-coalesce; guard only
@@ -19552,6 +19577,8 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
       ? _aurixDensifyPathSegments(mp.segments, _AURIX_MAX_SEGMENT_PX) : mp.d;
     if (dLine) linePieces.push(dLine);
     if (dLine) areaPieces.push(buildAurixAreaPath(dLine, drawn, scale));
+    // RC3-INC7 — sample THIS run's drawn curve for the inspector visual snap.
+    if (mp.segments && mp.segments.length) { const ss = _aurixSampleSegments(mp.segments, _AURIX_VISUAL_SAMPLE_STEP_PX); for (let i = 0; i < ss.length; i++) visualSamples.push(ss[i]); }
   });
   const pathData = linePieces.join(' ');
   const areaPathData = areaPieces.join(' ');
@@ -19586,7 +19613,7 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
 
   return {
     range: r, viewportWidth: vw, viewportHeight: vh,
-    prepared, visiblePoints, visiblePixels, pathData, areaPathData, lastRenderedVertex,
+    prepared, visiblePoints, visiblePixels, pathData, areaPathData, lastRenderedVertex, visualSamples,
     gaps: prepared.gaps, gapSegments, bridgedGapSegments, gapBridgeDecisions, eventMarkers, yTicks: _yTicks,
     scale: { xMin: scale.xMin, xMax: scale.xMax, yMin: +scale.yMin.toFixed(4), yMax: +scale.yMax.toFixed(4), mode: yScale.mode },
     renderMeta: {
@@ -19629,8 +19656,10 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
 function _aurixGapTelemetry(rc) {
   const t = { gapCount: 0, bridgedGaps: 0, splitGaps: 0, pathSegmentCount: 0,
     lastSegDelta: null, lastPointConnected: null, finalMarkerOrphan: null,
-    finalBlockPct: null, gapBridgeDecisions: [], gapDetail: [] };
+    finalBlockPct: null, gapBridgeDecisions: [], gapDetail: [],
+    inspectorSnapMode: 'visual-path', visualSampleCount: 0 };   // RC3-INC7
   if (!rc) return t;
+  t.visualSampleCount = Array.isArray(rc.visualSamples) ? rc.visualSamples.length : 0;
   const gd = Array.isArray(rc.gapBridgeDecisions) ? rc.gapBridgeDecisions : [];
   const diag = rc.diagnostics || {};
   const px = Array.isArray(rc.visiblePixels) ? rc.visiblePixels : [];
@@ -22483,6 +22512,7 @@ function renderAurixMobileLiteChart(range, token) {
       const _vpx = rc.visiblePixels || [];
       _aurixMobChartPts = rc.visiblePoints.map(function (p, i) { const q = _vpx[i] || {}; return { t: p.time, v: p.value, x: q.x, y: q.y }; })
         .filter(function (p) { return typeof p.x === 'number' && typeof p.y === 'number'; });
+      _aurixMobChartVisual = Array.isArray(rc.visualSamples) ? rc.visualSamples : null;   // RC3-INC7 — drawn-curve samples for cursor snap
       _aurixMobChartMeta = { range: r, deltaPct: rc.renderMeta ? rc.renderMeta.lastDeltaPct : null, up: up };
     } catch (_) { _aurixMobChartPts = null; }
     try { _aurixInitMobileChartInspector(); } catch (_) {}   // bind once (idempotent)
@@ -22524,7 +22554,8 @@ function scheduleAurixMobileLite(range) {
 // the carousel structure, the desktop chart, or Chart.js. Coexists with the swipe: a
 // horizontal/vertical drag before the long-press fires lets the carousel/scroll win;
 // once the long-press claims the gesture it blocks the swipe until the finger lifts.
-let _aurixMobChartPts = null;     // [{t,v,x,y}] — x/y in the 1000×260 viewBox; set by the lite render
+let _aurixMobChartPts = null;     // [{t,v,x,y}] — REAL points (data: value/date/%); set by the lite render
+let _aurixMobChartVisual = null;  // RC3-INC7 — [{x,y}] dense samples of the DRAWN curve (cursor visual snap)
 let _aurixMobChartMeta = null;    // { range, deltaPct, up }
 let _aurixMobInspectorBound = false;
 let _aurixMobInspectorActive = false;
@@ -22571,6 +22602,18 @@ function _aurixMobInspectorHide() {
     const tip = document.getElementById('mobChartTip'); if (tip) tip.innerHTML = '';
   } catch (_) {}
 }
+// RC3-INC7 — point ON the drawn curve at finger X (linear interp between dense visual
+// samples; x monotone). Cursor rides the VISIBLE line, not the noisy real points.
+function _aurixVisualPointAtX(samples, fx) {
+  if (!Array.isArray(samples) || !samples.length) return null;
+  if (fx <= samples[0].x) return { x: samples[0].x, y: samples[0].y };
+  const last = samples[samples.length - 1];
+  if (fx >= last.x) return { x: last.x, y: last.y };
+  let lo = 0, hi = samples.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (samples[m].x <= fx) lo = m; else hi = m; }
+  const a = samples[lo], b = samples[hi], seg = (b.x - a.x) || 1;
+  return { x: fx, y: a.y + (b.y - a.y) * ((fx - a.x) / seg) };
+}
 function _aurixMobInspectorUpdate(clientX) {
   try {
     if (!_aurixMobInspectorActive) return;   // RC3-INC3 — ignore a late rAF fired AFTER release (never re-show)
@@ -22580,13 +22623,17 @@ function _aurixMobInspectorUpdate(clientX) {
     const rect = n.area.getBoundingClientRect(); if (!rect.width) return;
     const VBW = 1000, VBH = 260;
     const fx = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)) * VBW;   // finger X in viewBox units
-    // Fase 5/6 — nearest REAL point by X ONLY (free vertical movement; pure selection).
+    // dataPoint — nearest REAL point by X (tooltip value/date/% — NEVER interpolated/fabricated).
     let k = 0, best = Infinity;
     for (let i = 0; i < pts.length; i++) { const d = Math.abs(pts[i].x - fx); if (d < best) { best = d; k = i; } }
     const p = pts[k];
-    const lxPct = (p.x / VBW) * 100, lyPct = (p.y / VBH) * 100;
+    // RC3-INC7 — visualPoint: ON the DRAWN curve at the finger X (continuous, premium). The
+    // cursor rides the visible line; falls back to the real point only if no visual samples.
+    const vpt = _aurixVisualPointAtX(_aurixMobChartVisual, fx) || { x: p.x, y: p.y };
+    const lxPct = (vpt.x / VBW) * 100, lyPct = (vpt.y / VBH) * 100;
     n.hair.style.left = lxPct.toFixed(3) + '%';
     n.cur.style.left = lxPct.toFixed(3) + '%'; n.cur.style.top = lyPct.toFixed(3) + '%';
+    try { window.__aurixInspectorSnap = { mode: 'visual-path', dataPointIndex: k, fingerX: +fx.toFixed(2), visualPointProjection: { x: +vpt.x.toFixed(2), y: +vpt.y.toFixed(2) }, visualSamples: _aurixMobChartVisual ? _aurixMobChartVisual.length : 0 }; } catch (_) {}
     // Fase 3 — tooltip from REAL values only: value (protagonist) · date · time · % from start.
     let pctTxt = '', tone = '';
     const v0 = pts[0].v;
