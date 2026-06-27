@@ -19738,6 +19738,10 @@ if (typeof window !== 'undefined') {
         connected: Number.isFinite(lastSegΔ) ? lastSegΔ <= 0.5 : null,
         vtxFirst15: f15, vtxLast10: l10, sigPct: vp.length ? Math.round(100 * sig / vp.length) : null,
         baseSpacing: cfg ? cfg.base : 0, prominence: cfg ? cfg.prom : null, lastN: cfg ? cfg.lastN : null,
+        initialNarrativeFrac: cfg ? cfg.initialFrac : null,
+        burstFrac: cfg ? cfg.burstFrac : null, burstWin: cfg ? cfg.burstWin : null,
+        shape: cfg ? cfg.shape : null,
+        engine: (typeof window !== 'undefined' && window.__AURIX_ARR_ENGINE) ? window.__AURIX_ARR_ENGINE : 'range-shape-aware-v2',
         equivalence: (() => { try { return auditAurixRenderVsCanonical(r).status; } catch (_) { return '?'; } })(),
       };
     });
@@ -22026,6 +22030,31 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
       };
     }
   }
+  // ── RC3-INC2 TEMP VERIFICATION LOG ───────────────────────────────────────────
+  // Unambiguous proof of WHICH engine actually drew THIS surface: the Range+Shape
+  // ARR v2 path (engine) or the legacy fallback (no ARR). Reports the live ARR config
+  // + counts. Deduped per (surface,range,engine,drawn) so it never spams. TEMPORARY —
+  // remove once production execution is confirmed. (console only; no UI/data change.)
+  try {
+    if (typeof window !== 'undefined') {
+      const _arr = _aurixArrConfig(activeRange);
+      const _eng = _inst.rendered ? 'ARR-RANGE-SHAPE-AWARE-v2' : 'LEGACY-FALLBACK';
+      const _dvc = _inst.rendered && _inst.rendered.diagnostics ? _inst.rendered.diagnostics.drawnVertexCount : null;
+      const _vpc = _inst.rendered ? _inst.rendered.visiblePoints.length : null;
+      window.__AURIX_ARR_ENGINE = _inst.rendered ? 'range-shape-aware-v2' : 'legacy-fallback';
+      window.__AURIX_ARR_LAST = { surface: opts.uid === 'm' ? 'mobile' : 'desktop', range: activeRange,
+        engine: _eng, usedFallback: _inst.usedFallback, fallbackReason: _inst.fallbackReason || null,
+        arrConfig: _arr, visiblePoints: _vpc, drawnVertexCount: _dvc };
+      const _sig = (opts.uid || 'd') + '|' + activeRange + '|' + _eng + '|' + _dvc;
+      if (window.__AURIX_ARR_VERIFY_LAST !== _sig) {
+        window.__AURIX_ARR_VERIFY_LAST = _sig;
+        console.info('%c[AURIX][RC3-INC2 verify]', 'color:#4D8DFF;font-weight:700',
+          (opts.uid === 'm' ? 'MOBILE' : 'DESKTOP') + ' ' + activeRange + ' → ' + _eng,
+          { usedFallback: _inst.usedFallback, fallbackReason: _inst.fallbackReason || null,
+            arrConfig: _arr, visiblePoints: _vpc, drawnVertexCount: _dvc });
+      }
+    }
+  } catch (_) {}
   if (typeof window !== 'undefined') {
     window._aurixWscRenderState = window._aurixWscRenderState || {};
     window._aurixWscRenderState[opts.uid || 'd'] = {
@@ -22233,6 +22262,26 @@ function renderAurixMobileLiteChart(range, token) {
       return;
     }
     if (dur > 100) { st.lastError = 'render ' + Math.round(dur) + 'ms > 100ms budget'; _aurixMobileLiteFallback('timeout'); return; }
+    // ── RC3-INC2 TEMP VERIFICATION LOG (mobile lite) ─────────────────────────────
+    // Mobile lite has NO legacy fallback: a valid rc means the Range+Shape ARR v2 path
+    // drew this curve. Reports the live ARR config + counts (deduped). TEMPORARY.
+    try {
+      if (typeof window !== 'undefined') {
+        const _arr = _aurixArrConfig(r);
+        const _dvc = rc.diagnostics ? rc.diagnostics.drawnVertexCount : null;
+        window.__AURIX_ARR_ENGINE = 'range-shape-aware-v2';
+        window.__AURIX_ARR_LAST = { surface: 'mobile-lite', range: r, engine: 'ARR-RANGE-SHAPE-AWARE-v2',
+          usedFallback: false, fallbackReason: null, arrConfig: _arr,
+          visiblePoints: rc.visiblePoints.length, drawnVertexCount: _dvc };
+        const _sig = 'mlite|' + r + '|' + _dvc;
+        if (window.__AURIX_ARR_VERIFY_LAST_M !== _sig) {
+          window.__AURIX_ARR_VERIFY_LAST_M = _sig;
+          console.info('%c[AURIX][RC3-INC2 verify]', 'color:#4D8DFF;font-weight:700',
+            'MOBILE-LITE ' + r + ' → ARR-RANGE-SHAPE-AWARE-v2',
+            { arrConfig: _arr, visiblePoints: rc.visiblePoints.length, drawnVertexCount: _dvc });
+        }
+      }
+    } catch (_) {}
     const up = !(rc.renderMeta && rc.renderMeta.lastDeltaPct != null && rc.renderMeta.lastDeltaPct < 0);
     const stroke = up ? '#34d39e' : '#ff6b6b';
     const fillTop = up ? 'rgba(52,211,158,0.18)' : 'rgba(255,107,107,0.16)';
