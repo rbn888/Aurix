@@ -19168,6 +19168,54 @@ function computeAurixValueScale(points, viewportHeight, box) {
   return { yMin, yMax, dataMin: vMin, dataMax: vMax, top, bottom, height: band, mode, y, invValueAtY };
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// AURIX — ADAPTIVE RENDER REPRESENTATION (ARR)
+//
+// PRINCIPIO PERMANENTE DEL MOTOR:
+//   «Nunca se sacrificarán datos financieros para mejorar la apariencia visual.
+//    La serie canónica permanecerá siempre completa.
+//    Únicamente podrá optimizarse la representación gráfica.»
+//
+// ARR no reduce información: optimiza la REPRESENTACIÓN visual del trazo. Cuando
+// varias muestras caerían sobre los mismos píxeles (el efecto "mazacote"), ARR
+// dibuja un subconjunto de vértices con un espaciado mínimo, conservando SIEMPRE
+// los puntos significativos (endpoints del run, máximo/mínimo del run y extremos
+// locales significativos). La serie preparada, `visiblePoints`, `visiblePixels`,
+// el tooltip, el inspector móvil y la equivalencia render↔canónica conservan TODOS
+// los puntos reales — ARR solo afecta al conjunto de vértices que se envían a
+// _aurixMonotonePath / buildAurixAreaPath. Devuelve únicamente puntos reales del
+// `run` (jamás inventa, mueve ni altera un punto).
+//
+// _AURIX_PATH_RENDER_SPACING — espaciado mínimo en UNIDADES DE VIEWBOX (no px de
+// pantalla). El SVG usa viewBox=1000 + preserveAspectRatio="none", así que un
+// umbral fijo en unidades viewBox se calibra al caso más estrecho (móvil) y cubre
+// también desktop. Parámetro CALIBRABLE: 3.5 / 4 / 4.5 / 5 / 5.5 sin tocar la
+// arquitectura. 0 (o inválido) ⇒ ARR no-op (path byte-idéntico al previo = rollback).
+const _AURIX_PATH_RENDER_SPACING = 5;
+function _aurixArrRepresentVertices(run, xScale, spacing) {
+  const n = Array.isArray(run) ? run.length : 0;
+  if (n <= 2) return run;                                   // nothing to thin
+  const sp = Number(spacing);
+  if (!(sp > 0)) return run;                                // disabled / invalid → no-op (rollback)
+  // Significant set (inamovible): run endpoints + run max/min + significant local extrema.
+  // Preserving each run's max/min also preserves the GLOBAL max/min (they live in some run).
+  let miIdx = 0, maIdx = 0, vMin = run[0].value, vMax = run[0].value;
+  for (let i = 1; i < n; i++) { const v = run[i].value; if (v < vMin) { vMin = v; miIdx = i; } if (v > vMax) { vMax = v; maIdx = i; } }
+  const valueRange = (vMax - vMin) || 1;
+  const sig = new Set([0, n - 1, miIdx, maIdx]);
+  _aurixSignificantLocalExtrema(run, valueRange, 0.03).forEach(i => sig.add(i));
+  // Greedy min-spacing walk over the REAL on-screen x. Keep a point iff it is
+  // significant OR it is ≥ spacing from the last kept vertex. First/last always kept.
+  const out = [run[0]];
+  let lastX = xScale.x(run[0].time);
+  for (let i = 1; i < n - 1; i++) {
+    const x = xScale.x(run[i].time);
+    if (sig.has(i) || (x - lastX) >= sp) { out.push(run[i]); lastX = x; }
+  }
+  out.push(run[n - 1]);
+  return out;
+}
+
 // §6 — monotone (Fritsch–Carlson) cubic path with a per-segment overshoot guard.
 // Monotone tangent limiting keeps every interval monotone → the curve stays
 // within the two endpoints' [min,max]. As a belt-and-braces guarantee, each
@@ -19291,13 +19339,16 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
 
   const _splitDiag = {};
   const runs = _aurixSplitAtGaps(visiblePoints, prepared.gaps, _splitDiag);
-  let overshoot = false, fallbacks = 0, droppedSubpaths = 0; const linePieces = [], areaPieces = [];
+  let overshoot = false, fallbacks = 0, droppedSubpaths = 0, drawnVertexCount = 0; const linePieces = [], areaPieces = [];
   runs.forEach(run => {
     if (run.length < 2) { droppedSubpaths++; return; }   // never happens post-coalesce; guard only
-    const mp = _aurixMonotonePath(run, xScale, yScale);
+    // ARR — optimise ONLY the drawn vertex set (visiblePoints/visiblePixels stay full).
+    const drawn = _aurixArrRepresentVertices(run, xScale, _AURIX_PATH_RENDER_SPACING);
+    drawnVertexCount += drawn.length;
+    const mp = _aurixMonotonePath(drawn, xScale, yScale);
     if (mp.overshoot) overshoot = true; fallbacks += mp.lineFallbacks || 0;
     if (mp.d) linePieces.push(mp.d);
-    if (mp.d) areaPieces.push(buildAurixAreaPath(mp.d, run, scale));
+    if (mp.d) areaPieces.push(buildAurixAreaPath(mp.d, drawn, scale));
   });
   const pathData = linePieces.join(' ');
   const areaPathData = areaPieces.join(' ');
@@ -19334,6 +19385,7 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
       sourcePoints: sp.length,
       preparedPoints: srcPts.length,
       visiblePoints: visiblePoints.length,
+      drawnVertexCount,                          // ARR — vertices actually sent to the path (≤ visiblePoints)
       gapCount: (prepared.gaps || []).length,
       gapThresholdMs: prepared.gapThresholdMs || 0,
       medianIntervalMs: prepared.medianIntervalMs || 0,

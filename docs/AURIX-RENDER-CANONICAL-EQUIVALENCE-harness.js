@@ -33,10 +33,11 @@ let SERIES = [], DASH = null, FLOWS = [];
 const sb = { console, activeRange: '30d', getAurixRenderSeries: () => SERIES, investableValueBase: () => DASH, _aurixLoadCapitalFlows: () => FLOWS };
 sb.window = sb; sb.window.innerWidth = 1440;
 vm.createContext(sb);
+vm.runInContext((src.match(/const _AURIX_PATH_RENDER_SPACING = [\d.]+;/)||["const _AURIX_PATH_RENDER_SPACING = 0;"])[0], sb);  // ARR — calibratable render spacing
 vm.runInContext(RC_CONSTS, sb); vm.runInContext(VP_CONSTS, sb); vm.runInContext(IR_CONSTS, sb); vm.runInContext(Y_CONSTS, sb); vm.runInContext(X_CONSTS, sb);
 [ fn('_aurixRenderContractGeometry'), fn('_aurixVpTargetPointCount'), fn('_aurixComputeVisualPreparation'),
   fn('prepareAurixVisualSeries'), fn('downsampleAurixLTTB'), fn('_aurixSignificantLocalExtrema'), fn('downsampleAurixAdaptive'), fn('computeAurixTimeScale'), fn('computeAurixAdaptiveXScale'),
-  fn('computeAurixValueScale'), fn('_aurixMonotonePath'), fn('buildAurixMonotonicPath'),
+  fn('computeAurixValueScale'), fn('_aurixArrRepresentVertices'), fn('_aurixMonotonePath'), fn('buildAurixMonotonicPath'),
   fn('buildAurixAreaPath'), fn('_aurixSplitAtGaps'), fn('renderAurixInstitutionalChart'),
   fn('_aurixCompareRenderToCanonical'), fn('auditAurixRenderVsCanonical') ].forEach(c => vm.runInContext(c, sb));
 

@@ -47,6 +47,7 @@ const sb = {
 };
 sb.window = sb; sb.window.innerWidth = 1440;
 vm.createContext(sb);
+vm.runInContext((src.match(/const _AURIX_PATH_RENDER_SPACING = [\d.]+;/)||["const _AURIX_PATH_RENDER_SPACING = 0;"])[0], sb);  // ARR — calibratable render spacing
 
 vm.runInContext(RC_CONSTS, sb);
 vm.runInContext(VP_CONSTS, sb);
@@ -54,7 +55,7 @@ vm.runInContext(IR_CONSTS, sb); vm.runInContext(Y_CONSTS, sb); vm.runInContext(X
 vm.runInContext(FLAG_CONST, sb);
 [ fn('_aurixRenderContractGeometry'), fn('_aurixVpTargetPointCount'), fn('_aurixComputeVisualPreparation'),
   fn('prepareAurixVisualSeries'), fn('downsampleAurixLTTB'), fn('_aurixSignificantLocalExtrema'), fn('downsampleAurixAdaptive'), fn('computeAurixTimeScale'), fn('computeAurixAdaptiveXScale'),
-  fn('computeAurixValueScale'), fn('_aurixMonotonePath'), fn('buildAurixMonotonicPath'),
+  fn('computeAurixValueScale'), fn('_aurixArrRepresentVertices'), fn('_aurixMonotonePath'), fn('buildAurixMonotonicPath'),
   fn('buildAurixAreaPath'), fn('_aurixSplitAtGaps'), fn('renderAurixInstitutionalChart'),
   fn('_aurixInstitutionalRenderVisible'), fn('_aurixWscInstitutionalSelect') ].forEach(c => vm.runInContext(c, sb));
 
