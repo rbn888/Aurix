@@ -21904,13 +21904,14 @@ body.gs-open { overflow: hidden; }
   /* WN.10 — left/top set by JS (smart placement); never covers the marker. */
   position: absolute; top: 0; left: 0;
   display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
-  padding: 8px 12px 8px 13px; border-radius: 11px;
-  background: linear-gradient(180deg, rgba(20,26,38,.97), rgba(12,16,24,.97));
-  border: 1px solid rgba(255,255,255,.12);
-  box-shadow: 0 10px 34px rgba(0,0,0,.5), 0 1px 0 rgba(255,255,255,.05) inset;
-  -webkit-backdrop-filter: blur(7px); backdrop-filter: blur(7px);
+  padding: 8px 12px 8px 13px; border-radius: 12px;
+  /* RC4-A — premium glass card: layered soft shadow + fine top highlight + more blur. */
+  background: linear-gradient(180deg, rgba(22,28,40,.975), rgba(11,15,23,.975));
+  border: 1px solid rgba(255,255,255,.11);
+  box-shadow: 0 8px 28px rgba(0,0,0,.46), 0 2px 8px rgba(0,0,0,.34), 0 1px 0 rgba(255,255,255,.06) inset;
+  -webkit-backdrop-filter: blur(11px) saturate(1.15); backdrop-filter: blur(11px) saturate(1.15);
   min-width: 122px;
-  opacity: 0; transition: opacity .12s var(--ease-out, ease);
+  opacity: 0; transition: opacity .1s var(--ease-out, ease);
   pointer-events: none; white-space: nowrap; overflow: hidden;
 }
 .wsc-tip::before {
@@ -21989,10 +21990,12 @@ body.aurix-skeleton #totalValue::after {
   50%      { transform: scale(1.10); opacity: .16; }
 }
 .mob-chart-tip {
-  display: flex; flex-direction: column; gap: 1px; padding: 7px 11px; border-radius: 11px;
-  background: linear-gradient(180deg, rgba(20,26,38,.97), rgba(12,16,24,.97));
-  border: 1px solid rgba(255,255,255,.12); box-shadow: 0 10px 30px rgba(0,0,0,.5);
-  -webkit-backdrop-filter: blur(7px); backdrop-filter: blur(7px);
+  /* RC4-A — premium glass card: layered soft shadow + fine top highlight + more blur. */
+  display: flex; flex-direction: column; gap: 1px; padding: 7px 11px; border-radius: 12px;
+  background: linear-gradient(180deg, rgba(22,28,40,.975), rgba(11,15,23,.975));
+  border: 1px solid rgba(255,255,255,.11);
+  box-shadow: 0 8px 26px rgba(0,0,0,.46), 0 2px 8px rgba(0,0,0,.34), 0 1px 0 rgba(255,255,255,.06) inset;
+  -webkit-backdrop-filter: blur(11px) saturate(1.15); backdrop-filter: blur(11px) saturate(1.15);
   white-space: nowrap; min-width: 96px; max-width: 70%;
 }
 #wealthCurveMobile.mob-inspecting .mob-chart-hair,

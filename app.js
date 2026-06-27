@@ -20998,16 +20998,11 @@ function _wscAttachTooltip(plot, model) {
       `<span class="wsc-tip-lbl">${t('chartTipValue')}</span>` +
       `<span class="wsc-tip-v">${formatBase(val)}</span>` +
       `<span class="wsc-tip-chg ${chgTone}">${rangeLabel} ${pf.text}</span>`;
-    // WN.10 — smart placement: offset 20px from the marker so it NEVER covers it;
-    // flip near right/top edges; always stay inside the plot card.
-    const tw = tip.offsetWidth || 120, th = tip.offsetHeight || 64, OFF = 20;
-    let tx = px + OFF;
-    if (tx + tw > r.width - 4) tx = px - OFF - tw;     // flip left near the right edge
-    tx = Math.min(Math.max(tx, 4), Math.max(4, r.width - tw - 4));
-    let ty = py - th - OFF;                            // above the marker by default
-    if (ty < 4) ty = py + OFF;                         // below if near the top / controls
-    ty = Math.min(Math.max(ty, 4), Math.max(4, r.height - th - 4));
-    tip.style.left = `${tx}px`; tip.style.top = `${ty}px`; tip.style.transform = 'none';
+    // RC4-A — premium placement (shared helper): centered above the marker so it NEVER covers
+    // the active point; flips below only if there's no room above; always inside the card.
+    const tw = tip.offsetWidth || 120, th = tip.offsetHeight || 64;
+    const pl = _aurixPlaceTooltip(px, py, tw, th, r.width, r.height, _AURIX_TOOLTIP_MARGIN_DESKTOP, false);
+    tip.style.left = `${pl.tx}px`; tip.style.top = `${pl.ty}px`; tip.style.transform = 'none';
     plot.classList.add('wsc-hot');
   };
   plot.addEventListener('pointermove', move);
@@ -22589,6 +22584,21 @@ function _aurixVisualPointAtX(samples, fx) {
   const a = samples[lo], b = samples[hi], seg = (b.x - a.x) || 1;
   return { x: fx, y: a.y + (b.y - a.y) * ((fx - a.x) / seg) };
 }
+// RC4-A — PREMIUM TOOLTIP PLACEMENT (shared desktop + mobile). Centered over the point,
+// ABOVE it by `margin` (off the active line AND off the finger on mobile); flips below only
+// when there is no room above (extra clearance for the finger). Always clamped inside the
+// plot; never covers the active point. Pure geometry; margin is configurable per surface.
+const _AURIX_TOOLTIP_MARGIN_DESKTOP = 18;
+const _AURIX_TOOLTIP_MARGIN_MOBILE = 18;
+function _aurixPlaceTooltip(px, py, tw, th, W, H, margin, finger) {
+  const pad = 4;
+  let tx = px - tw / 2;                                              // centered over the point
+  tx = Math.min(Math.max(tx, pad), Math.max(pad, W - tw - pad));
+  let ty = py - th - margin, below = false;                         // prefer ABOVE (off the finger)
+  if (ty < pad) { ty = py + margin + (finger ? margin : 0); below = true; }   // flip below w/ finger clearance
+  ty = Math.min(Math.max(ty, pad), Math.max(pad, H - th - pad));
+  return { tx: tx, ty: ty, below: below };
+}
 function _aurixMobInspectorUpdate(clientX) {
   try {
     if (!_aurixMobInspectorActive) return;   // RC3-INC3 — ignore a late rAF fired AFTER release (never re-show)
@@ -22620,12 +22630,12 @@ function _aurixMobInspectorUpdate(clientX) {
     } catch (_) {}
     const valStr = (typeof formatBase === 'function') ? formatBase(p.v) : String(Math.round(p.v));
     n.tip.innerHTML = '<span class="mob-tip-v">' + valStr + '</span><span class="mob-tip-date">' + dateStr + '</span>' + timeStr + (pctTxt ? '<span class="mob-tip-chg ' + tone + '">' + pctTxt + '</span>' : '');
-    // Fase 4 — smart placement: never cover the point/curve; flip by quadrant; clamp inside.
-    const tw = n.tip.offsetWidth || 116, th = n.tip.offsetHeight || 54, OFF = 14;
-    const px = (lxPct / 100) * rect.width, py = (lyPct / 100) * rect.height;
-    let tx = px + OFF; if (tx + tw > rect.width - 4) tx = px - OFF - tw; tx = Math.min(Math.max(tx, 4), Math.max(4, rect.width - tw - 4));
-    let ty = py - th - OFF; if (ty < 4) ty = py + OFF; ty = Math.min(Math.max(ty, 4), Math.max(4, rect.height - th - 4));
-    n.tip.style.left = tx.toFixed(1) + 'px'; n.tip.style.top = ty.toFixed(1) + 'px';
+    // RC4-A — premium placement: centered above the point (off the finger), flips below only
+    // if needed; never covers the active point; clamped inside. Configurable margin.
+    const tw = n.tip.offsetWidth || 116, th = n.tip.offsetHeight || 54;
+    const ptx = (lxPct / 100) * rect.width, pty = (lyPct / 100) * rect.height;
+    const pl = _aurixPlaceTooltip(ptx, pty, tw, th, rect.width, rect.height, _AURIX_TOOLTIP_MARGIN_MOBILE, true);
+    n.tip.style.left = pl.tx.toFixed(1) + 'px'; n.tip.style.top = pl.ty.toFixed(1) + 'px';
     // RC3-INC3 — clear any force-hide left by a previous _aurixMobInspectorHide() so the
     // .mob-inspecting rule drives visibility again (re-show after release works).
     n.hair.style.opacity = ''; n.cur.style.opacity = ''; n.tip.style.opacity = '';
