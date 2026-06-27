@@ -19271,6 +19271,11 @@ function _aurix24hGapBridgeDecision(gap, range, ctx) {
 // _AURIX_POLISH_ENABLED=false (or each px constant to 0).
 const _AURIX_POLISH_ENABLED = true;
 const _AURIX_SIMPLIFY_EPS_PX = 0.8;    // INC4-A/D: drop a vertex within this px of the local chord (teeth + microangles). Extremes/endpoints LOCKED. 0 ⇒ off
+// RC3-INC5 — 24H micro-zigzag suppression: a STRONGER per-range simplify epsilon ONLY for
+// 24H (its intraday micro up/downs are too dense). ≈1.2 screen px on mobile (×0.34) / ≈2.4
+// on desktop (×0.70) — clears micro teeth while bursts/max/min/last stay locked. Other
+// ranges keep _AURIX_SIMPLIFY_EPS_PX (unchanged). Calibrable; rollback = set 24h back to 0.8.
+const _AURIX_SIMPLIFY_EPS_PX_BY_RANGE = { '24h': 3.5 };
 const _AURIX_MAX_SEGMENT_PX = 46;      // INC4-C: cap rendered segment length (px) by sampling ON the existing curve. 0 ⇒ off
 
 // INC4-A/D — Adaptive Local Simplification + microangle removal. Pixel-space Douglas-
@@ -19278,10 +19283,13 @@ const _AURIX_MAX_SEGMENT_PX = 46;      // INC4-C: cap rendered segment length (p
 // and drops only near-collinear vertices (within eps px of the chord) — removing useless
 // teeth and microangles while preserving exact shape, extremes, endpoints and net change.
 // Returns a SUBSET of `drawn` (real points only; never invents/moves a point).
-function _aurixPolishSimplify(drawn, xScale, yScale) {
+function _aurixPolishSimplify(drawn, xScale, yScale, range) {
   const n = Array.isArray(drawn) ? drawn.length : 0;
   if (n <= 4) return drawn;
-  const eps = _AURIX_SIMPLIFY_EPS_PX;
+  const r = String(range || '').toLowerCase();
+  // RC3-INC5 — per-range epsilon override (24H stronger); others use the global value.
+  const eps = (_AURIX_SIMPLIFY_EPS_PX_BY_RANGE && _AURIX_SIMPLIFY_EPS_PX_BY_RANGE[r] != null)
+    ? _AURIX_SIMPLIFY_EPS_PX_BY_RANGE[r] : _AURIX_SIMPLIFY_EPS_PX;
   if (!(eps > 0)) return drawn;
   const pix = drawn.map(p => ({ x: xScale.x(p.time), y: yScale.y(p.value) }));
   let miIdx = 0, maIdx = 0;
@@ -19534,7 +19542,8 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
     // ARR — optimise ONLY the drawn vertex set (visiblePoints/visiblePixels stay full).
     let drawn = _aurixArrRepresentVertices(run, xScale, _arrCfg);
     // INC4-A/D — perceptual simplification (teeth + microangles), extremes/endpoints locked.
-    if (_AURIX_POLISH_ENABLED) drawn = _aurixPolishSimplify(drawn, xScale, yScale);
+    // INC5 — range-aware epsilon (24H stronger to suppress micro-zigzag).
+    if (_AURIX_POLISH_ENABLED) drawn = _aurixPolishSimplify(drawn, xScale, yScale, r);
     drawnVertexCount += drawn.length;
     const mp = _aurixMonotonePath(drawn, xScale, yScale);
     if (mp.overshoot) overshoot = true; fallbacks += mp.lineFallbacks || 0;

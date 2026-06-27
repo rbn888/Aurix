@@ -68,6 +68,11 @@ console.log('CASE 1-5 — 24H (most sensitive range):');
 ok('1 path reaches the last point', isFinite(lastSeg24)&&lastSeg24<=0.5, 'Δ='+(isFinite(lastSeg24)?lastSeg24.toFixed(3):'n/a'));
 ok('2 final marker not orphaned (path ends AT last visible point)', isFinite(lastSeg24)&&lastSeg24<=0.5);
 ok('3 reduces drawn vertices (mazacote)', dv24 < vp24.length*0.80, 'ratio='+(dv24/vp24.length).toFixed(2));
+// RC3-INC5 — 24H micro-zigzag suppression: 24H simplify epsilon must be STRONGER than the
+// global default (and 24H must stay continuous). Guards against a future reset to 0.8.
+{ const eps24 = vm.runInContext("(_AURIX_SIMPLIFY_EPS_PX_BY_RANGE && _AURIX_SIMPLIFY_EPS_PX_BY_RANGE['24h']!=null)?_AURIX_SIMPLIFY_EPS_PX_BY_RANGE['24h']:_AURIX_SIMPLIFY_EPS_PX", sb);
+  const epsG = vm.runInContext('_AURIX_SIMPLIFY_EPS_PX', sb);
+  ok('3b INC5: 24H simplify eps > global default (micro-zigzag override)', eps24 > epsG, '24h='+eps24+' global='+epsG); }
 // INC4-B Last Marker Lock — the path ends EXACTLY on the last real visible point (the
 // last-N connectivity guarantee is superseded by the marker-lock: <0.25px).
 const _lrv = r24.lastRenderedVertex, _lvp = px24[px24.length-1];
