@@ -22528,6 +22528,19 @@ let _aurixMobChartPts = null;     // [{t,v,x,y}] — x/y in the 1000×260 viewBo
 let _aurixMobChartMeta = null;    // { range, deltaPct, up }
 let _aurixMobInspectorBound = false;
 let _aurixMobInspectorActive = false;
+// RC3-INC6 — Inspector Gesture Lock: while inspecting (and for a short cooldown after
+// release) the gesture belongs to the CHART, not the carousel. The slider reads these
+// shared flags so a swipe is never triggered by an inspector gesture or its release.
+// Mobile interaction layer ONLY — does NOT touch the chart engine/data/tooltip.
+const _AURIX_INSPECTOR_COOLDOWN_MS = 220;   // 150–250ms window where the carousel ignores the just-ended gesture
+// Pure decision: should a carousel swipe fire? false if the gesture came from / was during
+// the inspector, or within the post-inspector cooldown; else require a clear swipe
+// (distance OR velocity threshold). Testable in isolation.
+function _aurixSliderShouldSwipe(dx, dt, fromInspector, cooldownActive, distThresh, velThresh) {
+  if (fromInspector || cooldownActive) return false;            // gesture belongs to the inspector
+  const v = (dt > 0) ? Math.abs(dx) / dt : 0;
+  return Math.abs(dx) > distThresh || v > velThresh;            // clear horizontal swipe
+}
 function _aurixMobInspectorNodes() {
   let area = null; try { area = document.getElementById('wealthCurveMobile'); } catch (_) {}
   if (!area) return null;
@@ -22544,6 +22557,7 @@ function _aurixMobInspectorNodes() {
 }
 function _aurixMobInspectorHide() {
   _aurixMobInspectorActive = false;
+  try { if (typeof window !== 'undefined') window.__aurixInspectorActive = false; } catch (_) {}   // RC3-INC6 gesture lock
   try {
     const a = document.getElementById('wealthCurveMobile');
     if (a) { a.classList.remove('mob-inspecting'); a.style.touchAction = ''; }
@@ -22612,6 +22626,7 @@ function _aurixInitMobileChartInspector() {
       const t = e.touches[0]; startX = t.clientX; startY = t.clientY; claimed = false; clearLp();
       lpTimer = setTimeout(function () {            // Fase 1 — long-press (~280ms) claims the gesture
         claimed = true; _aurixMobInspectorActive = true; lastX = startX;
+        try { window.__aurixInspectorActive = true; } catch (_) {}   // RC3-INC6 — gesture belongs to the chart
         try { area.style.touchAction = 'none'; } catch (_) {}   // block browser pan/scroll while inspecting
         schedule();
       }, 280);
@@ -22626,17 +22641,22 @@ function _aurixInitMobileChartInspector() {
       e.preventDefault(); e.stopPropagation();     // inspector owns the gesture (swipe/scroll blocked)
       lastX = t.clientX; schedule();
     }, { passive: false });
+    // RC3-INC6 — on release, open a short cooldown so the carousel ignores THIS gesture's
+    // touchend (the swipe-to-donut must only fire on a NEW, later gesture).
+    const _startCooldown = function (wasClaimed) { try { if (wasClaimed) window.__aurixInspectorCooldownUntil = Date.now() + _AURIX_INSPECTOR_COOLDOWN_MS; } catch (_) {} };
     const end = function (e) {
       clearLp();
+      const wasClaimed = claimed;
       if (claimed) { try { e.stopPropagation(); } catch (_) {} }   // don't let the slider snap on release
       claimed = false; _aurixMobInspectorHide();   // lift → swipe restored immediately (Fase 1)
+      _startCooldown(wasClaimed);
     };
     area.addEventListener('touchend', end);
     area.addEventListener('touchcancel', end);
     // RC3-INC3 — pointer-event safety net (idempotent with touchend): guarantees the
     // inspector clears on release across engines. window-level so a release that lands
     // outside the chart area still tears down. clearInspector === _aurixMobInspectorHide.
-    const endP = function () { clearLp(); claimed = false; _aurixMobInspectorHide(); };
+    const endP = function () { const wasClaimed = claimed; clearLp(); claimed = false; _aurixMobInspectorHide(); _startCooldown(wasClaimed); };
     area.addEventListener('pointerup', endP);
     area.addEventListener('pointercancel', endP);
     try { window.addEventListener('pointerup', endP); window.addEventListener('touchend', endP); } catch (_) {}
@@ -37639,6 +37659,7 @@ function initMobileSlider() {
   let isDragging   = false;
   let isHorizontal = null;
   let slideW       = 0;  // container width captured on touchstart
+  let fromInspector = false;  // RC3-INC6 — this gesture was (partly) an inspector long-press
 
   function goTo(idx) {
     currentIndex = Math.max(0, Math.min(idx, lastIndex));
@@ -37655,12 +37676,17 @@ function initMobileSlider() {
     isDragging   = true;
     isHorizontal = null;
     slideW = container.offsetWidth;
+    // RC3-INC6 — if the inspector is already active at touchstart, this gesture is the chart's.
+    fromInspector = !!(typeof window !== 'undefined' && window.__aurixInspectorActive);
     track.style.transition = 'none';
   }, { passive: true });
 
   // non-passive — preventDefault() needed to block scroll on horizontal swipe
   track.addEventListener('touchmove', e => {
     if (!isDragging) return;
+    // RC3-INC6 — if the inspector claims mid-gesture (long-press), mark this gesture as the
+    // chart's so its release can never switch to the donut.
+    if (typeof window !== 'undefined' && window.__aurixInspectorActive) fromInspector = true;
     const t  = e.touches[0];
     const dx = t.clientX - startX;
     const dy = t.clientY - startY;
@@ -37685,16 +37711,20 @@ function initMobileSlider() {
     isDragging   = false;
     isHorizontal = null;
 
-    const dx       = e.changedTouches[0].clientX - startX;
-    const dt       = Date.now() - startTime;
-    const velocity = dx / dt; // px/ms
-
+    const dx = e.changedTouches[0].clientX - startX;
+    const dt = Date.now() - startTime;
+    // RC3-INC6 — Inspector Gesture Lock + cooldown: a gesture that was (or became) an
+    // inspector long-press, or one inside the post-inspector cooldown, NEVER switches the
+    // carousel. Only a clear NEW swipe does. Vertical scroll is unaffected (we only act on
+    // horizontal intent). The cooldown release flag is consumed here.
+    const cooldownActive = (typeof window !== 'undefined') && (Date.now() < (window.__aurixInspectorCooldownUntil || 0));
     let nextIndex = currentIndex;
-    if (Math.abs(dx) > DISTANCE_THRESHOLD || Math.abs(velocity) > VELOCITY_THRESHOLD) {
+    if (_aurixSliderShouldSwipe(dx, dt, fromInspector, cooldownActive, DISTANCE_THRESHOLD, VELOCITY_THRESHOLD)) {
       if (dx < 0) nextIndex++;
       else        nextIndex--;
     }
-
+    fromInspector = false;
+    try { if (cooldownActive && typeof window !== 'undefined') window.__aurixInspectorCooldownUntil = 0; } catch (_) {}   // consume cooldown
     goTo(nextIndex);
   }, { passive: true });
 }

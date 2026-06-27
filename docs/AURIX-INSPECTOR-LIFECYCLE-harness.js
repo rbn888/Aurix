@@ -95,5 +95,23 @@ ck('12. still bound exactly once (no duplicate listeners)', /_aurixMobInspectorB
 ck('13. inspector still uses the FULL real points (visiblePoints/visiblePixels), no fabrication', /_aurixMobChartPts = rc\.visiblePoints\.map/.test(app));
 ck('14. no Chart.js / engine calls in the inspector block', ['new Chart', 'initChart(', 'renderAurixInstitutionalChart(', '_aurixMonotonePath('].every(s => block.indexOf(s) < 0));
 
+console.log('\nRC3-INC6 — Inspector Gesture Lock (carousel vs chart):');
+// _aurixSliderShouldSwipe lives in the extracted inspector block → callable in the sandbox.
+const env = makeEnv();
+const should = (dx,dt,fromInsp,cool) => vm.runInContext(`_aurixSliderShouldSwipe(${dx},${dt},${fromInsp},${cool},50,0.3)`, env.sandbox);
+ck('15. drag LEFT inside the chart (inspector gesture) → NO donut switch', should(-180, 400, true, false) === false);
+ck('16. release after inspector (cooldown active) → NO donut switch', should(-180, 400, false, true) === false);
+ck('17. NEW clear swipe (not inspector, no cooldown) → switches to donut', should(-140, 220, false, false) === true);
+ck('18. tiny near-vertical gesture → NO switch (vertical scroll unaffected)', should(-8, 300, false, false) === false);
+ck('19. fast new flick still switches (velocity threshold honoured)', should(-40, 90, false, false) === true);
+// wiring: inspector sets the shared flag on claim + cooldown on release; slider reads them
+ck('20. inspector claim sets window.__aurixInspectorActive', /window\.__aurixInspectorActive = true;/.test(initFn));
+ck('21. release opens cooldown (window.__aurixInspectorCooldownUntil)', /__aurixInspectorCooldownUntil = Date\.now\(\) \+ _AURIX_INSPECTOR_COOLDOWN_MS/.test(initFn));
+ck('22. hide clears the shared active flag', /window\.__aurixInspectorActive = false/.test(fnSrc('_aurixMobInspectorHide')));
+const slider = fnSrc('initMobileSlider');
+ck('23. slider marks fromInspector at touchstart + during move', /fromInspector = !!\(typeof window/.test(slider) && /window\.__aurixInspectorActive\) fromInspector = true;/.test(slider));
+ck('24. slider touchend uses _aurixSliderShouldSwipe + cooldown gate', /_aurixSliderShouldSwipe\(dx, dt, fromInspector, cooldownActive/.test(slider) && /__aurixInspectorCooldownUntil/.test(slider));
+ck('25. cooldown is configurable (150–250ms)', /_AURIX_INSPECTOR_COOLDOWN_MS = (1[5-9]\d|2[0-5]\d);/.test(app));
+
 console.log('\nRESULT: ' + (fail === 0 ? 'PASS ✓' : 'FAIL ✗') + '  (' + pass + ' passed, ' + fail + ' failed)');
 process.exit(fail === 0 ? 0 : 1);
