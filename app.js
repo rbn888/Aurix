@@ -19186,31 +19186,107 @@ function computeAurixValueScale(points, viewportHeight, box) {
 // _aurixMonotonePath / buildAurixAreaPath. Devuelve únicamente puntos reales del
 // `run` (jamás inventa, mueve ni altera un punto).
 //
-// _AURIX_PATH_RENDER_SPACING — espaciado mínimo en UNIDADES DE VIEWBOX (no px de
-// pantalla). El SVG usa viewBox=1000 + preserveAspectRatio="none", así que un
-// umbral fijo en unidades viewBox se calibra al caso más estrecho (móvil) y cubre
-// también desktop. Parámetro CALIBRABLE: 3.5 / 4 / 4.5 / 5 / 5.5 sin tocar la
-// arquitectura. 0 (o inválido) ⇒ ARR no-op (path byte-idéntico al previo = rollback).
+// RC3-INC2 — RANGE + SHAPE AWARE ARR. Un spacing global único mejora rangos largos
+// pero rompe 24H (ver docs/AURIX-GRAPH-ENGINE-TECHNICAL-BIBLE.md). ARR v2 es:
+//   • range-aware  — cada temporalidad tiene su propio contrato visual (spacing,
+//     prominencia de extremos, longitud del tramo final protegido);
+//   • shape-aware  — el spacing varía por zona (calma / volatilidad / tramo final /
+//     narrativa inicial) según la geometría REAL de la serie;
+//   • contract-safe — sigue siendo representación pura: datos/visiblePoints/tooltip/
+//     inspector/equivalencia conservan TODOS los puntos reales.
+//
+// _AURIX_PATH_RENDER_SPACING — fallback global (unidades VIEWBOX; viewBox=1000 +
+// preserveAspectRatio="none" ⇒ se calibra al caso más estrecho, móvil). Calibrable
+// 3.5..5.5. Usado cuando un rango no está en _AURIX_RENDER_SPACING_BY_RANGE.
 const _AURIX_PATH_RENDER_SPACING = 5;
-function _aurixArrRepresentVertices(run, xScale, spacing) {
+// Fase 2 — spacing base POR RANGO. CALIBRACIÓN (sondas): el mazacote 24H venía de
+// ~223 puntos visibles a ~3.96 viewBox de media → un spacing ≤5 apenas adelgazaba.
+// 24H necesita spacing base MÁS ALTO (8) para limpiar el ruido de calma, con burst
+// (×0.45) preservando los dientes reales y last-segment garantizando el final. 7D/30D
+// sin cambio; 1A/TOTAL algo mayor + narrativa inicial. ROLLBACK: poner un rango (o
+// todos) a 0 ⇒ ARR no-op en ese rango; _AURIX_PATH_RENDER_SPACING=0 ⇒ no-op total.
+const _AURIX_RENDER_SPACING_BY_RANGE = { '24h': 8, '7d': 5, '30d': 5, '1y': 5.5, 'all': 5.5 };
+// Fase 4 — prominencia (fracción del rango) para marcar "extremo local significativo".
+// 24H sube 0.03→0.15: el ruido intradía de alta frecuencia / baja amplitud deja de
+// protegerse como extremo (era el 79% de los puntos → impedía adelgazar = mazacote);
+// solo los swings grandes sobreviven como significativos. Resto = 0.03.
+const _AURIX_ARR_PROMINENCE_BY_RANGE = { '24h': 0.15, '7d': 0.03, '30d': 0.03, '1y': 0.03, 'all': 0.03 };
+// Fase 3 — Last Segment Protection: nº de puntos finales del run preservados SIEMPRE
+// (tramo final conectado, marcador jamás huérfano). 24H=12, resto=6. Configurable.
+const _AURIX_ARR_LAST_SEGMENT_N = { '24h': 12, '_default': 6 };
+// Fase 5 — Initial Narrative Protection: fracción inicial del run protegida en rangos
+// largos (más vértices → el inicio cuenta la historia, no una recta artificial).
+const _AURIX_ARR_INITIAL_NARRATIVE_FRAC = { '1y': 0.15, 'all': 0.15 };
+// Fase 7 — Shape-Aware multiplicadores de spacing por zona (× spacing base).
+const _AURIX_ARR_SHAPE = { calm: 1.0, volatile: 0.45, initial: 0.55 };
+// Fase 4 — Burst: DESPLAZAMIENTO NETO direccional sobre ±_AURIX_ARR_BURST_WIN puntos
+// ≥ esta fracción del rango total = movimiento real sostenido (diente) → spacing local
+// ×volatile (lo preserva). Se usa el NETO (no max-min) a propósito: el ruido oscila y
+// su desplazamiento neto ≈ 0, así que NO se marca volátil; un burst real sí. Umbral
+// alto para no re-proteger el ruido que la prominencia 24H ya descartó.
+const _AURIX_ARR_BURST_DELTA_FRAC = 0.09;
+const _AURIX_ARR_BURST_WIN = 3;
+// Resuelve el contrato ARR por rango (puro). Devuelve null ⇒ no-op (spacing 0).
+function _aurixArrConfig(range) {
+  const r = String(range || '').toLowerCase();
+  const byR = (_AURIX_RENDER_SPACING_BY_RANGE && _AURIX_RENDER_SPACING_BY_RANGE[r] != null) ? _AURIX_RENDER_SPACING_BY_RANGE[r] : null;
+  const base = (byR != null) ? byR : _AURIX_PATH_RENDER_SPACING;
+  if (!(base > 0)) return null;
+  const prom = (_AURIX_ARR_PROMINENCE_BY_RANGE && _AURIX_ARR_PROMINENCE_BY_RANGE[r] != null) ? _AURIX_ARR_PROMINENCE_BY_RANGE[r] : 0.03;
+  const lastN = (_AURIX_ARR_LAST_SEGMENT_N && _AURIX_ARR_LAST_SEGMENT_N[r] != null) ? _AURIX_ARR_LAST_SEGMENT_N[r] : _AURIX_ARR_LAST_SEGMENT_N['_default'];
+  const initialFrac = (_AURIX_ARR_INITIAL_NARRATIVE_FRAC && _AURIX_ARR_INITIAL_NARRATIVE_FRAC[r] != null) ? _AURIX_ARR_INITIAL_NARRATIVE_FRAC[r] : 0;
+  return { base, prom, lastN: Math.max(2, lastN || 6), initialFrac,
+    shape: _AURIX_ARR_SHAPE, burstFrac: _AURIX_ARR_BURST_DELTA_FRAC, burstWin: _AURIX_ARR_BURST_WIN };
+}
+// ARR v2 — devuelve un subconjunto de `run` (puntos reales) para el path. cfg null ⇒
+// no-op (rollback). Preserva SIEMPRE: endpoints del run, máx/mín del run (⇒ máx/mín
+// globales), extremos locales significativos (prominencia por rango) y los últimos N
+// puntos (tramo final conectado). Spacing local shape-aware: tramo final = todos los
+// últimos N (denso), narrativa inicial ×0.55, zonas volátiles ×0.45, calma ×1.0.
+function _aurixArrRepresentVertices(run, xScale, cfg) {
   const n = Array.isArray(run) ? run.length : 0;
   if (n <= 2) return run;                                   // nothing to thin
-  const sp = Number(spacing);
-  if (!(sp > 0)) return run;                                // disabled / invalid → no-op (rollback)
-  // Significant set (inamovible): run endpoints + run max/min + significant local extrema.
-  // Preserving each run's max/min also preserves the GLOBAL max/min (they live in some run).
+  if (!cfg || !(Number(cfg.base) > 0)) return run;          // disabled / invalid → no-op (rollback)
+  const base = Number(cfg.base);
+  const prom = cfg.prom != null ? cfg.prom : 0.03;
+  const lastN = Math.max(2, cfg.lastN || 6);
+  const initialFrac = cfg.initialFrac || 0;
+  const shape = cfg.shape || { calm: 1, volatile: 0.45, initial: 0.55 };
+  const burstFrac = cfg.burstFrac != null ? cfg.burstFrac : 0.09;
+  const burstWin = Math.max(1, cfg.burstWin || 3);
+  // Significant set (inamovible).
   let miIdx = 0, maIdx = 0, vMin = run[0].value, vMax = run[0].value;
   for (let i = 1; i < n; i++) { const v = run[i].value; if (v < vMin) { vMin = v; miIdx = i; } if (v > vMax) { vMax = v; maIdx = i; } }
   const valueRange = (vMax - vMin) || 1;
   const sig = new Set([0, n - 1, miIdx, maIdx]);
-  _aurixSignificantLocalExtrema(run, valueRange, 0.03).forEach(i => sig.add(i));
-  // Greedy min-spacing walk over the REAL on-screen x. Keep a point iff it is
-  // significant OR it is ≥ spacing from the last kept vertex. First/last always kept.
+  _aurixSignificantLocalExtrema(run, valueRange, prom).forEach(i => sig.add(i));
+  // Fase 3 — Last Segment Protection: force-keep the last N real points.
+  const lastSegFrom = Math.max(0, n - lastN);
+  for (let i = lastSegFrom; i < n; i++) sig.add(i);
+  // x positions (real on-screen) + zone bounds.
+  const xs = new Array(n); for (let i = 0; i < n; i++) xs[i] = xScale.x(run[i].time);
+  const x0 = xs[0], xSpan = (xs[n - 1] - xs[0]) || 1;
+  const initialX = x0 + xSpan * initialFrac;
+  // Fase 4 — burst flags: NET directional displacement over the window vs total range
+  // (oscillating noise nets ≈0 → not flagged; a sustained real move → flagged).
+  const volatile = new Array(n).fill(false);
+  if (burstFrac > 0) {
+    for (let i = 0; i < n; i++) {
+      const a = run[Math.max(0, i - burstWin)].value, b = run[Math.min(n - 1, i + burstWin)].value;
+      if (Math.abs(b - a) / valueRange >= burstFrac) volatile[i] = true;
+    }
+  }
+  // Fase 7 — local spacing chooser.
+  const localSpacing = i => {
+    if (initialFrac > 0 && xs[i] <= initialX) return base * (shape.initial || 0.55);   // narrativa inicial
+    if (volatile[i]) return base * (shape.volatile || 0.45);                            // burst real
+    return base * (shape.calm || 1);                                                    // calma
+  };
+  // Greedy walk: keep iff significant OR ≥ local spacing from the last kept vertex.
   const out = [run[0]];
-  let lastX = xScale.x(run[0].time);
+  let lastX = xs[0];
   for (let i = 1; i < n - 1; i++) {
-    const x = xScale.x(run[i].time);
-    if (sig.has(i) || (x - lastX) >= sp) { out.push(run[i]); lastX = x; }
+    if (sig.has(i) || (xs[i] - lastX) >= localSpacing(i)) { out.push(run[i]); lastX = xs[i]; }
   }
   out.push(run[n - 1]);
   return out;
@@ -19340,10 +19416,11 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
   const _splitDiag = {};
   const runs = _aurixSplitAtGaps(visiblePoints, prepared.gaps, _splitDiag);
   let overshoot = false, fallbacks = 0, droppedSubpaths = 0, drawnVertexCount = 0; const linePieces = [], areaPieces = [];
+  const _arrCfg = _aurixArrConfig(r);   // RC3-INC2 — range + shape aware ARR contract (null ⇒ no-op)
   runs.forEach(run => {
     if (run.length < 2) { droppedSubpaths++; return; }   // never happens post-coalesce; guard only
     // ARR — optimise ONLY the drawn vertex set (visiblePoints/visiblePixels stay full).
-    const drawn = _aurixArrRepresentVertices(run, xScale, _AURIX_PATH_RENDER_SPACING);
+    const drawn = _aurixArrRepresentVertices(run, xScale, _arrCfg);
     drawnVertexCount += drawn.length;
     const mp = _aurixMonotonePath(drawn, xScale, yScale);
     if (mp.overshoot) overshoot = true; fallbacks += mp.lineFallbacks || 0;
@@ -19629,6 +19706,39 @@ if (typeof window !== 'undefined') {
         firstPreserved: !!a.firstMatch, lastPreserved: !!a.lastMatch,
         yScaleMode: rc.renderMeta.yScaleMode, xScaleMode: rc.renderMeta.xScaleMode, xFillBeta: rc.renderMeta.xFillBeta,
         equivalence: a.status,
+      };
+    });
+    try { console.table(rows); } catch (_) {}
+    return rows;
+  };
+
+  // RC3-INC2 — Range + Shape render-quality audit on the LIVE series. READ-ONLY:
+  // renders each range and reports the metrics that drive the ARR contract
+  // (drawn/visible ratio, effective spacing, gaps, last-segment connection, vertices
+  // in the first 15% / last 10%, significant-extrema fraction). Used to calibrate the
+  // per-range constants and to decide the deferred 24H gap treatment with real data.
+  window.debugAurixGraphQuality = (range) => {
+    const ranges = range ? [String(range).toLowerCase()] : ['24h', '7d', '30d', '1y', 'all'];
+    const lastCoord = d => { const m = String(d || '').trim().match(/([-\d.]+)\s+([-\d.]+)\s*$/); return m ? { x: +m[1], y: +m[2] } : null; };
+    const rows = ranges.map(r => {
+      let rc; try { rc = renderAurixInstitutionalChart(r); } catch (e) { return { range: r, error: String(e && e.message) }; }
+      const vp = rc.visiblePoints || [], px = rc.visiblePixels || [], dv = rc.diagnostics ? rc.diagnostics.drawnVertexCount : null;
+      const lp = lastCoord(rc.pathData), lvp = px.length ? px[px.length - 1] : null;
+      const lastSegΔ = (lp && lvp) ? Math.hypot(lp.x - lvp.x, lp.y - lvp.y) : NaN;
+      const xs = px.map(p => p.x), xMin = xs.length ? Math.min.apply(null, xs) : 0, xMax = xs.length ? Math.max.apply(null, xs) : 1, w = (xMax - xMin) || 1;
+      const f15 = xs.filter(x => x <= xMin + w * 0.15).length, l10 = xs.filter(x => x >= xMin + w * 0.90).length;
+      let vMin = Infinity, vMax = -Infinity; vp.forEach(p => { if (p.value < vMin) vMin = p.value; if (p.value > vMax) vMax = p.value; });
+      let sig = 0; try { sig = _aurixSignificantLocalExtrema(vp, (vMax - vMin) || 1, (_AURIX_ARR_PROMINENCE_BY_RANGE[r] != null ? _AURIX_ARR_PROMINENCE_BY_RANGE[r] : 0.03)).length; } catch (_) {}
+      const cfg = _aurixArrConfig(r);
+      return {
+        range: r, visiblePoints: vp.length, drawnVertexCount: dv,
+        ratio: dv != null && vp.length ? +(dv / vp.length).toFixed(2) : null,
+        effSpacingVB: dv && dv > 1 ? +(w / (dv - 1)).toFixed(2) : null,
+        gaps: (rc.gaps || []).length, lastSegDelta: Number.isFinite(lastSegΔ) ? +lastSegΔ.toFixed(3) : null,
+        connected: Number.isFinite(lastSegΔ) ? lastSegΔ <= 0.5 : null,
+        vtxFirst15: f15, vtxLast10: l10, sigPct: vp.length ? Math.round(100 * sig / vp.length) : null,
+        baseSpacing: cfg ? cfg.base : 0, prominence: cfg ? cfg.prom : null, lastN: cfg ? cfg.lastN : null,
+        equivalence: (() => { try { return auditAurixRenderVsCanonical(r).status; } catch (_) { return '?'; } })(),
       };
     });
     try { console.table(rows); } catch (_) {}
