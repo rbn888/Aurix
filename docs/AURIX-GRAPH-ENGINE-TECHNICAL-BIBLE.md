@@ -89,19 +89,28 @@ Desplazamiento neto |v[i+win]−v[i−win]| / rango ≥ frac ⇒ zona volátil �
 No suavizar bordes. Se preservan primer/último punto de cada run y los bordes de gap. La
 lógica de DETECCIÓN de gap (`_AURIX_VP_GAP_FLOOR_MS`) NO se toca.
 
-### RC3-INC3 — Visual Gap Bridge (24H, render-only)
+### RC3-INC3 / INC3B — 24H Visual Gap Bridge (render-only, condicional)
 LECCIÓN: el defecto visual dominante de 24H NO era ARR/spacing sino la **fragmentación
 por gap nocturno**. Una pausa normal de madrugada (sin snapshots) se detectaba como gap
 y `_aurixSplitAtGaps` partía la línea, dejando el bloque reciente aislado → "gráfico roto".
-- `_AURIX_GAP_BRIDGE_24H_MAX_MS` (14h por defecto): **solo 24H**, si el gap dura ≤ umbral,
-  el PATH se dibuja CONTINUO a través del hueco (la curva monótona conecta los dos puntos
-  reales; NO se inventa ningún punto). Gaps > umbral o de otros rangos siguen partiendo.
-- El gap SE SIGUE detectando y se reporta (`diagnostics.bridgedGapCount` / `splitGapCount`,
-  `rc.bridgedGapSegments`); tooltip/inspector/visiblePoints/equivalencia intactos.
-- REGLA: solo 24H · solo gap ≤ umbral · marcador final siempre conectado · rollback
-  `_AURIX_GAP_BRIDGE_24H_MAX_MS=0`.
-- Decisión del floor de detección 24H: NO tocada; el bridge resuelve la percepción sin
-  reclasificar el dato.
+
+INC3 introdujo un bridge simple (cualquier gap 24H ≤14h). **INC3B** lo hizo CONDICIONAL
+(`_aurix24hGapBridgeDecision`) — un gap 24H se puentea SOLO si cumple las 8 condiciones:
+1. rango = 24H; 2. `dur ≤ _AURIX_GAP_BRIDGE_24H_MAX_MS` (14h); 3. `dur ≥ _MIN_MS` (8h);
+4. ambos extremos en ventana **nocturna** local [22:00–08:00] ± 90min (`_aurixGapBridgeIsNight`);
+5. desplazamiento `|after−before|/before ≤ _MAX_DISP_PCT` (5%) — sin salto anómalo;
+6. ningún evento de capital dentro del gap; 7. no es un outage real (= conjunción de las
+anteriores); 8. el bloque final quedaría aislado (`finalBlockPct < _MIN_FINAL_BLOCK_PCT`=12%).
+- Si se puentea: el PATH se dibuja CONTINUO (la curva monótona conecta los dos puntos
+  reales; **NO se inventa ningún punto**). Si no: comportamiento actual (path partido).
+- El gap SE SIGUE detectando y se reporta con su MOTIVO (`rc.gapBridgeDecisions[]` con
+  `reason`/`dispPct`/`finalBlockPct`; `diagnostics.bridgedGapCount`/`splitGapCount`).
+  tooltip/inspector/visiblePoints/equivalencia intactos.
+- Constantes calibrables (`_AURIX_GAP_BRIDGE_24H_*`). ROLLBACK: `ENABLED=false` o `MAX_MS=0`.
+- La lógica de DETECCIÓN de gap (`_AURIX_VP_GAP_FLOOR_MS`) NO se toca; el bridge solo
+  decide la POLÍTICA VISUAL, sin reclasificar el dato.
+- La nocturnidad se lee del timestamp en hora LOCAL → los tests construyen gaps con
+  `new Date(y,mo,d,h,mi)` (hora local) para ser deterministas.
 
 ## RC3-INC3 — Inspector Lifecycle (tooltip persistente)
 LECCIÓN: el tooltip/cursor quedaba fijo al soltar por una **race**: `touchmove` programa un

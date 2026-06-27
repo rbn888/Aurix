@@ -39,9 +39,10 @@ function build(range, opts){ opts=opts||{}; let pts=[];
   if(range==='24h'){ const v0=72000; let k=0;
     for(let t=NOW-24*HOUR;t<=NOW;t+=5*MIN,k++){ const noise=90*Math.sin(k*1.1)+60*Math.cos(k*2.3);
       const climb=(t>NOW-6*HOUR&&t<NOW-5*HOUR)?((t-(NOW-6*HOUR))/HOUR)*900:(t>=NOW-5*HOUR?900:0); pts.push({time:t,value:Math.round(v0+noise+climb)}); }
-  } else if(range==='24h-gap'){ const v0=72000; let k=0;
-    for(let t=NOW-24*HOUR;t<=NOW-14*HOUR;t+=5*MIN,k++) pts.push({time:t,value:Math.round(v0+120*Math.sin(k*0.7))});
-    for(let t=NOW-4*HOUR;t<=NOW;t+=5*MIN,k++) pts.push({time:t,value:Math.round(v0+150*Math.sin(k*0.7))});   // 10h overnight gap
+  } else if(range==='24h-gap'){ const v0=72000; let k=0;   // RC3-INC3B: NOCTURNAL 10h gap (23:00→09:00 local) → bridgeable
+    const T=(h,mi)=>new Date(2026,5,15,h,mi||0,0).getTime(), DY=86400e3;
+    for(let t=T(11,0)-DY;t<=T(23,0)-DY;t+=15*MIN,k++) pts.push({time:t,value:Math.round(v0+80*Math.sin(k*0.3))});  // prev day 11:00→23:00
+    for(let t=T(9,0);t<=T(11,0);t+=15*MIN,k++) pts.push({time:t,value:Math.round(v0+80*Math.sin(k*0.3))});          // 09:00→11:00 (after 10h nocturnal gap)
   } else if(range==='7d'){ for(let i=0;i<400;i++){ const t=NOW-(7*DAY)+i*(7*DAY/399); pts.push({time:Math.round(t),value:Math.round(70000+i*8+300*Math.sin(i*0.18))}); }
   } else if(range==='30d'){ for(let i=0;i<600;i++){ const t=NOW-(30*DAY)+i*(30*DAY/599); pts.push({time:Math.round(t),value:Math.round(66000+i*6+500*Math.sin(i*0.12))}); }
   } else if(range==='1y'){ for(let i=0;i<1000;i++){ const t=NOW-(365*DAY)+i*(365*DAY/999); const f=i/999; const base=f<0.2?30000+60*Math.sin(i*0.05):30000+(f-0.2)/0.8*45000; pts.push({time:Math.round(t),value:Math.round(base+250*Math.sin(i*0.07))}); }
