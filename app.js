@@ -19567,6 +19567,40 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
   };
 }
 
+// RC3-INC3B telemetry — PURE read-only extraction of the full gap diagnostic from a
+// render result (rc). Used by the live render markers (__AURIX_ARR_LAST, real surface
+// box) AND by debugAurixGraphQuality, so both expose the SAME fields. Reads only; never
+// mutates rc, data, ARR, gap bridge, path or constants.
+function _aurixGapTelemetry(rc) {
+  const t = { gapCount: 0, bridgedGaps: 0, splitGaps: 0, pathSegmentCount: 0,
+    lastSegDelta: null, lastPointConnected: null, finalMarkerOrphan: null,
+    finalBlockPct: null, gapBridgeDecisions: [], gapDetail: [] };
+  if (!rc) return t;
+  const gd = Array.isArray(rc.gapBridgeDecisions) ? rc.gapBridgeDecisions : [];
+  const diag = rc.diagnostics || {};
+  const px = Array.isArray(rc.visiblePixels) ? rc.visiblePixels : [];
+  const segs = Array.isArray(rc.gapSegments) ? rc.gapSegments : [];
+  t.gapCount = Array.isArray(rc.gaps) ? rc.gaps.length : 0;
+  t.bridgedGaps = (diag.bridgedGapCount != null) ? diag.bridgedGapCount : gd.filter(g => g && g.bridged).length;
+  t.splitGaps = (diag.splitGapCount != null) ? diag.splitGapCount : segs.length;
+  t.pathSegmentCount = (String(rc.pathData || '').match(/M /g) || []).length;
+  const m = String(rc.pathData || '').trim().match(/([-\d.]+)\s+([-\d.]+)\s*$/);
+  if (m && px.length) {
+    const d = Math.hypot(+m[1] - px[px.length - 1].x, +m[2] - px[px.length - 1].y);
+    t.lastSegDelta = +d.toFixed(3); t.lastPointConnected = d <= 0.5; t.finalMarkerOrphan = !(d <= 0.5);
+  }
+  if (segs.length && px.length > 1) {   // width fraction after the last VISIBLE break (split gap)
+    const xs = px.map(p => p.x), xMin = Math.min.apply(null, xs), xMax = Math.max.apply(null, xs), w = (xMax - xMin) || 1;
+    t.finalBlockPct = +(((xMax - segs[segs.length - 1].xEnd) / w) * 100).toFixed(1);
+  }
+  t.gapBridgeDecisions = gd;
+  t.gapDetail = gd.map(g => ({ durationH: g.durationH,
+    start: (() => { try { return new Date(g.start).toISOString(); } catch (_) { return g.start; } })(),
+    end: (() => { try { return new Date(g.end).toISOString(); } catch (_) { return g.end; } })(),
+    bridged: g.bridged, reason: g.reason, dispPct: g.dispPct, finalBlockPct: g.finalBlockPct }));
+  return t;
+}
+
 // §10/§11 — preview (data-only; visible production render UNCHANGED) + debug.
 if (typeof window !== 'undefined') {
   window.previewAurixInstitutionalRender = (range) => {
@@ -19819,26 +19853,14 @@ if (typeof window !== 'undefined') {
       let vMin = Infinity, vMax = -Infinity; vp.forEach(p => { if (p.value < vMin) vMin = p.value; if (p.value > vMax) vMax = p.value; });
       let sig = 0; try { sig = _aurixSignificantLocalExtrema(vp, (vMax - vMin) || 1, (_AURIX_ARR_PROMINENCE_BY_RANGE[r] != null ? _AURIX_ARR_PROMINENCE_BY_RANGE[r] : 0.03)).length; } catch (_) {}
       const cfg = _aurixArrConfig(r);
-      const d = rc.diagnostics || {};
-      // RC3-INC3B — gap detail straight from the engine's per-gap bridge decisions
-      // (duration, start/end, bridged, reason, displacement, finalBlockPct).
-      const gapDetail = (rc.gapBridgeDecisions || []).map(g => ({
-        durationH: g.durationH,
-        start: (() => { try { return new Date(g.start).toISOString(); } catch (_) { return g.start; } })(),
-        end: (() => { try { return new Date(g.end).toISOString(); } catch (_) { return g.end; } })(),
-        bridged: g.bridged, reason: g.reason, dispPct: g.dispPct, finalBlockPct: g.finalBlockPct,
-      }));
-      const pathSegmentCount = (rc.pathData.match(/M /g) || []).length;
-      const lastPointConnected = Number.isFinite(lastSegΔ) ? lastSegΔ <= 0.5 : null;
-      const finalMarkerOrphan = lastPointConnected === false;   // path doesn't end at the last real point
-      return {
+      // RC3-INC3B — full gap telemetry from the SAME helper as __AURIX_ARR_LAST (field
+      // parity): gapCount/bridgedGaps/splitGaps/pathSegmentCount/lastPointConnected/
+      // finalMarkerOrphan/finalBlockPct/gapBridgeDecisions/gapDetail (reason per gap).
+      const tel = _aurixGapTelemetry(rc);
+      return Object.assign({
         range: r, visiblePoints: vp.length, drawnVertexCount: dv,
         ratio: dv != null && vp.length ? +(dv / vp.length).toFixed(2) : null,
         effSpacingVB: dv && dv > 1 ? +(w / (dv - 1)).toFixed(2) : null,
-        gapCount: (rc.gaps || []).length, bridgedGaps: d.bridgedGapCount != null ? d.bridgedGapCount : 0,
-        splitGaps: d.splitGapCount != null ? d.splitGapCount : (rc.gapSegments || []).length,
-        pathSegmentCount, lastPointConnected, finalMarkerOrphan, gapDetail,
-        lastSegDelta: Number.isFinite(lastSegΔ) ? +lastSegΔ.toFixed(3) : null,
         connected: Number.isFinite(lastSegΔ) ? lastSegΔ <= 0.5 : null,
         vtxFirst15: f15, vtxLast10: l10, sigPct: vp.length ? Math.round(100 * sig / vp.length) : null,
         baseSpacing: cfg ? cfg.base : 0, prominence: cfg ? cfg.prom : null, lastN: cfg ? cfg.lastN : null,
@@ -19847,9 +19869,13 @@ if (typeof window !== 'undefined') {
         gapBridge24hMaxH: +(_AURIX_GAP_BRIDGE_24H_MAX_MS / 36e5).toFixed(1),
         engine: (typeof window !== 'undefined' && window.__AURIX_ARR_ENGINE) ? window.__AURIX_ARR_ENGINE : 'range-shape-aware-v2',
         equivalence: (() => { try { return auditAurixRenderVsCanonical(r).status; } catch (_) { return '?'; } })(),
-      };
+      }, tel);
     });
-    try { console.table(rows.map(r => { const c = Object.assign({}, r); delete c.gapDetail; delete c.shape; return c; })); console.log('[gapDetail]', rows.map(r => ({ range: r.range, gaps: r.gapDetail }))); } catch (_) {}
+    try {
+      console.table(rows.map(r => { const c = Object.assign({}, r); delete c.gapDetail; delete c.gapBridgeDecisions; return c; }));
+      rows.forEach(r => console.log('[gapDetail ' + r.range + ']', r.gapDetail));
+      console.log('NOTA: debugAurixGraphQuality usa geometría por defecto; finalBlockPct/pathSegmentCount EXACTOS de tu pantalla están en window.__AURIX_ARR_LAST (render real).');
+    } catch (_) {}
     return rows;
   };
 }
@@ -22140,12 +22166,14 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   try {
     if (typeof window !== 'undefined') {
       window.__AURIX_ARR_ENGINE = _inst.rendered ? 'range-shape-aware-v2' : 'legacy-fallback';
-      window.__AURIX_ARR_LAST = { surface: opts.uid === 'm' ? 'mobile' : 'desktop', range: activeRange,
+      window.__AURIX_ARR_LAST = Object.assign({
+        surface: opts.uid === 'm' ? 'mobile' : 'desktop', range: activeRange,
         engine: _inst.rendered ? 'ARR-RANGE-SHAPE-AWARE-v2' : 'LEGACY-FALLBACK',
         usedFallback: _inst.usedFallback, fallbackReason: _inst.fallbackReason || null,
         arrConfig: _aurixArrConfig(activeRange),
         visiblePoints: _inst.rendered ? _inst.rendered.visiblePoints.length : null,
-        drawnVertexCount: _inst.rendered && _inst.rendered.diagnostics ? _inst.rendered.diagnostics.drawnVertexCount : null };
+        drawnVertexCount: _inst.rendered && _inst.rendered.diagnostics ? _inst.rendered.diagnostics.drawnVertexCount : null,
+      }, _aurixGapTelemetry(_inst.rendered));   // RC3-INC3B — full gap telemetry of the REAL render
     }
   } catch (_) {}
   if (typeof window !== 'undefined') {
@@ -22360,9 +22388,11 @@ function renderAurixMobileLiteChart(range, token) {
     try {
       if (typeof window !== 'undefined') {
         window.__AURIX_ARR_ENGINE = 'range-shape-aware-v2';
-        window.__AURIX_ARR_LAST = { surface: 'mobile-lite', range: r, engine: 'ARR-RANGE-SHAPE-AWARE-v2',
+        window.__AURIX_ARR_LAST = Object.assign({
+          surface: 'mobile-lite', range: r, engine: 'ARR-RANGE-SHAPE-AWARE-v2',
           usedFallback: false, fallbackReason: null, arrConfig: _aurixArrConfig(r),
-          visiblePoints: rc.visiblePoints.length, drawnVertexCount: rc.diagnostics ? rc.diagnostics.drawnVertexCount : null };
+          visiblePoints: rc.visiblePoints.length, drawnVertexCount: rc.diagnostics ? rc.diagnostics.drawnVertexCount : null,
+        }, _aurixGapTelemetry(rc));   // RC3-INC3B — full gap telemetry of the REAL mobile render
       }
     } catch (_) {}
     const up = !(rc.renderMeta && rc.renderMeta.lastDeltaPct != null && rc.renderMeta.lastDeltaPct < 0);
