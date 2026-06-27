@@ -22070,29 +22070,18 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
       };
     }
   }
-  // ── RC3-INC2 TEMP VERIFICATION LOG ───────────────────────────────────────────
-  // Unambiguous proof of WHICH engine actually drew THIS surface: the Range+Shape
-  // ARR v2 path (engine) or the legacy fallback (no ARR). Reports the live ARR config
-  // + counts. Deduped per (surface,range,engine,drawn) so it never spams. TEMPORARY —
-  // remove once production execution is confirmed. (console only; no UI/data change.)
+  // RC3 — passive engine markers (no console output). Lets the founder inspect which
+  // engine drew each surface via window.__AURIX_ARR_LAST during visual validation.
+  // (The noisy per-render console.info verification log was removed post-confirmation.)
   try {
     if (typeof window !== 'undefined') {
-      const _arr = _aurixArrConfig(activeRange);
-      const _eng = _inst.rendered ? 'ARR-RANGE-SHAPE-AWARE-v2' : 'LEGACY-FALLBACK';
-      const _dvc = _inst.rendered && _inst.rendered.diagnostics ? _inst.rendered.diagnostics.drawnVertexCount : null;
-      const _vpc = _inst.rendered ? _inst.rendered.visiblePoints.length : null;
       window.__AURIX_ARR_ENGINE = _inst.rendered ? 'range-shape-aware-v2' : 'legacy-fallback';
       window.__AURIX_ARR_LAST = { surface: opts.uid === 'm' ? 'mobile' : 'desktop', range: activeRange,
-        engine: _eng, usedFallback: _inst.usedFallback, fallbackReason: _inst.fallbackReason || null,
-        arrConfig: _arr, visiblePoints: _vpc, drawnVertexCount: _dvc };
-      const _sig = (opts.uid || 'd') + '|' + activeRange + '|' + _eng + '|' + _dvc;
-      if (window.__AURIX_ARR_VERIFY_LAST !== _sig) {
-        window.__AURIX_ARR_VERIFY_LAST = _sig;
-        console.info('%c[AURIX][RC3-INC2 verify]', 'color:#4D8DFF;font-weight:700',
-          (opts.uid === 'm' ? 'MOBILE' : 'DESKTOP') + ' ' + activeRange + ' → ' + _eng,
-          { usedFallback: _inst.usedFallback, fallbackReason: _inst.fallbackReason || null,
-            arrConfig: _arr, visiblePoints: _vpc, drawnVertexCount: _dvc });
-      }
+        engine: _inst.rendered ? 'ARR-RANGE-SHAPE-AWARE-v2' : 'LEGACY-FALLBACK',
+        usedFallback: _inst.usedFallback, fallbackReason: _inst.fallbackReason || null,
+        arrConfig: _aurixArrConfig(activeRange),
+        visiblePoints: _inst.rendered ? _inst.rendered.visiblePoints.length : null,
+        drawnVertexCount: _inst.rendered && _inst.rendered.diagnostics ? _inst.rendered.diagnostics.drawnVertexCount : null };
     }
   } catch (_) {}
   if (typeof window !== 'undefined') {
@@ -22302,24 +22291,14 @@ function renderAurixMobileLiteChart(range, token) {
       return;
     }
     if (dur > 100) { st.lastError = 'render ' + Math.round(dur) + 'ms > 100ms budget'; _aurixMobileLiteFallback('timeout'); return; }
-    // ── RC3-INC2 TEMP VERIFICATION LOG (mobile lite) ─────────────────────────────
-    // Mobile lite has NO legacy fallback: a valid rc means the Range+Shape ARR v2 path
-    // drew this curve. Reports the live ARR config + counts (deduped). TEMPORARY.
+    // RC3 — passive engine marker (no console output). Mobile lite has NO legacy
+    // fallback: a valid rc means the Range+Shape ARR v2 path drew this curve.
     try {
       if (typeof window !== 'undefined') {
-        const _arr = _aurixArrConfig(r);
-        const _dvc = rc.diagnostics ? rc.diagnostics.drawnVertexCount : null;
         window.__AURIX_ARR_ENGINE = 'range-shape-aware-v2';
         window.__AURIX_ARR_LAST = { surface: 'mobile-lite', range: r, engine: 'ARR-RANGE-SHAPE-AWARE-v2',
-          usedFallback: false, fallbackReason: null, arrConfig: _arr,
-          visiblePoints: rc.visiblePoints.length, drawnVertexCount: _dvc };
-        const _sig = 'mlite|' + r + '|' + _dvc;
-        if (window.__AURIX_ARR_VERIFY_LAST_M !== _sig) {
-          window.__AURIX_ARR_VERIFY_LAST_M = _sig;
-          console.info('%c[AURIX][RC3-INC2 verify]', 'color:#4D8DFF;font-weight:700',
-            'MOBILE-LITE ' + r + ' → ARR-RANGE-SHAPE-AWARE-v2',
-            { arrConfig: _arr, visiblePoints: rc.visiblePoints.length, drawnVertexCount: _dvc });
-        }
+          usedFallback: false, fallbackReason: null, arrConfig: _aurixArrConfig(r),
+          visiblePoints: rc.visiblePoints.length, drawnVertexCount: rc.diagnostics ? rc.diagnostics.drawnVertexCount : null };
       }
     } catch (_) {}
     const up = !(rc.renderMeta && rc.renderMeta.lastDeltaPct != null && rc.renderMeta.lastDeltaPct < 0);
