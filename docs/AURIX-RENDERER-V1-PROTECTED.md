@@ -1,8 +1,11 @@
 # AURIX Institutional Renderer — v1 (PROTECTED COMPONENT)
 
 **Checkpoint:** `aurix-renderer-v1` · backup branch `backup/aurix-renderer-v1`
-**Stable commit base:** RC5-A (`v399-rc5a-premium-motion`, `app.js?v=401`, `styles.css?v=319`)
-**Status:** Founder-validated on web + iPhone (RC4-G spike discipline + RC4-G desktop snap + RC5-A premium motion all approved).
+**Stable commit base:** RC5-D (`v402-rc5d-header-lock`, `app.js?v=402`, `styles.css?v=322`)
+**Status:** DEFINITIVE FREEZE — founder-validated on web + iPhone through the full RC5 line
+(RC4-G spike discipline + desktop snap · RC5-A premium motion · RC5-B vertical step softening +
+header gain placement · RC5-C header micro-tuning · RC5-D header lock & selector compactness).
+No further visual/functional changes to the chart after this checkpoint.
 
 This document freezes the institutional wealth chart renderer as a **protected component**. It is the single source of truth for the chart shown in:
 - Desktop "Resumen de rendimiento" (`#perfSnapshot`, `renderWealthCurve` / `_wscAttachTooltip`).
@@ -22,11 +25,15 @@ From this checkpoint, the following are **locked**. No edits without an approved
 | **ARR** (adaptive render representation) | `_aurixArrConfig`, `_aurixArrRepresentVertices`, `_AURIX_*` ARR/VP tuning constants |
 | **Spike guard** | `_aurixSpikeReduce`, `_aurixSpikeParams`, `_aurixSpikeDiscipline`, `_aurix24hSpikeGuard`, `_AURIX_24H_SPIKE_GUARD_V2_ENABLED`, `_AURIX_SPIKE_DISCIPLINE_BY_RANGE`, `_AURIX_SPIKE_DISCIPLINE_LEVELS` |
 | **Volatility polish** | `_aurixVolatilityPolish` (delegates to `_aurixSpikeDiscipline`) |
+| **Vertical step softening** (RC5-B) | `_aurixSoftenVerticalSteps`, `_AURIX_VERTICAL_STEP_SOFTENING_ENABLED`, `_AURIX_VERTICAL_STEP_SOFTENING` |
 | **Gap bridge** | `_aurixSplitAtGaps` + the 24H no-split RULE 0 (24H always renders ONE subpath) |
 | **visualSamples** | `_aurixSampleSegments`, `_aurixDensifyPathSegments`, the `visualSamples` output array |
 | **Inspector** | mobile `_aurixVisualPointAtX(_aurixMobChartVisual, …)` long-press snap, gesture lock |
 | **Tooltip** | `_wscAttachTooltip` data source (real `dataPoint` for value; `visualPoint` only for cursor) |
 | **Marker lock** | end-dot `.wsc-last-dot` / cursor position (JS-positioned; never re-derived) |
+| **Premium motion** (RC5-A) | `_AURIX_PREMIUM_MOTION_ENABLED`, `_aurixPremiumMotionOn`, the `.aurix-pm` CSS (line draw / area reveal / dot fade) |
+| **Path geometry** | `_aurixMonotonePath` / `buildAurixMonotonicPath` / `buildAurixAreaPath` (Fritsch–Carlson tangents; no overshoot) |
+| **Mobile header layout** (RC5-B…D) | `.mobile-slide-chart .perf-unit-block` fixed `flex: 0 0 92px`; `#chartChangeMobile` below the %/€ selector; range-toggle `flex:1; min-width:0` (no %/€ toggle layout shift) |
 
 ### Invariants that must always hold (verified by the suite)
 1. **Data untouched:** `visiblePoints` == canonical downsample; `visiblePixels.length === visiblePoints.length`.
@@ -49,8 +56,10 @@ From this checkpoint, the following are **locked**. No edits without an approved
 | Lever | Effect |
 |---|---|
 | `_AURIX_PREMIUM_MOTION_ENABLED = false` (or `window.AURIX_PREMIUM_MOTION = false`) | Disable premium motion ⇒ exact RC4 behaviour |
+| `_AURIX_VERTICAL_STEP_SOFTENING_ENABLED = false` | Disable vertical step softening ⇒ exact RC5-A path |
 | `_AURIX_24H_SPIKE_GUARD_V2_ENABLED = false` | Spike discipline ⇒ legacy guard/polish params |
 | `_AURIX_SPIKE_DISCIPLINE_BY_RANGE[range] = { strict: 'off' }` | Disable spike discipline for one range |
+| Delete the `RC5-D` / `RC5-C` CSS blocks in `styles.css` | Revert the mobile header tuning step-by-step (each block restores the previous) |
 | `window.disableAurixInstitutionalRender()` | Fall back to legacy WSC geometry |
 | **Full restore** | `git checkout aurix-renderer-v1` (or `git checkout backup/aurix-renderer-v1`) |
 
@@ -58,9 +67,10 @@ From this checkpoint, the following are **locked**. No edits without an approved
 
 ## Verification harnesses (run before ANY future renderer change)
 
-- Full suite: `for h in docs/*harness*.js; do node "$h"; done` — **41/41 PASS** at this checkpoint.
+- Full suite: `for h in docs/*harness*.js; do node "$h"; done` — **42/42 PASS** at this checkpoint.
 - Mobile guardrails: `node docs/AURIX-MOBILE-GUARDRAILS-harness.js` — **40/40**.
-- Key renderer harnesses: `AURIX-SPIKE-DISCIPLINE-RC4G`, `AURIX-VOLATILITY-PARITY-RC4E`, `AURIX-24H-SPIKE-GUARD`, `AURIX-MOBILE-LAYOUT-RC4B`, `AURIX-MOBILE-LITE-CHART`, `AURIX-PREMIUM-MOTION-RC5A`, `AURIX-BOOT-WATCHDOG`.
+- Equivalence: `auditAurixRenderVsCanonical(r)` = `faithful-downsampled` for `24h/7d/30d/1y/all`.
+- Key renderer harnesses: `AURIX-SPIKE-DISCIPLINE-RC4G`, `AURIX-VOLATILITY-PARITY-RC4E`, `AURIX-24H-SPIKE-GUARD`, `AURIX-MOBILE-LAYOUT-RC4B`, `AURIX-MOBILE-LITE-CHART`, `AURIX-PREMIUM-MOTION-RC5A`, `AURIX-VERTICAL-SOFTENING-RC5B` (incl. RC5-C/RC5-D header), `AURIX-BOOT-WATCHDOG`.
 
 ---
 
