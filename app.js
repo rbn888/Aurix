@@ -433,6 +433,20 @@ async function autoSaveToBackend(attempt = 1) {
   const assets   = safe.assets;
   const holdings = safe.holdings;
 
+  // P0-DATA-INTEGRITY-LOCK — never propagate a REDUCED set to Supabase over the last-good local
+  // state unless an explicit destructive action just occurred (delete/sell/reset within 5s) or
+  // it's an explicit reset push. Protects remote even if a reduced set reached in-memory.
+  if (_AURIX_BLOCK_DESTRUCTIVE_SAVES && safe.reason !== 'reset') {
+    const prev = _aurixReadPersistedCounts();
+    const next = _aurixCountModel(assets, holdings);
+    const recentlyDestructive = (Date.now() - _aurixLastDestructiveSaveAt) < 5000;
+    if (prev && !recentlyDestructive && (next.assets < prev.assets || next.holdings < prev.holdings || next.transactions < prev.transactions)) {
+      try { console.error('[DATA][SAVE_BLOCKED_DESTRUCTIVE] backend push skipped (reduction vs local last-good)', { prev, next }); } catch (_) {}
+      _aurixAuditSave({ allowed: false, destructive: true, reason: 'backend reduction without explicit destructive context', previous: prev, next: next }, 'backend-sync');
+      return;
+    }
+  }
+
   try {
     _isSaving = true;
     _persistDebug('[persist-save-backend] upsert →', {
@@ -5355,6 +5369,59 @@ function switchLang(newLang) {
 
 // ── State ──────────────────────────────────────────────────
 const STORAGE_KEY    = 'portfolio_assets';
+
+// ══════════════════════════════════════════════════════════════════════════════
+// P0-DATA-INTEGRITY-LOCK — no save may REDUCE assets/holdings/transactions unless an
+// explicit user-destructive action says so. This turns a read/migration/sync bug (which can
+// produce a reduced in-memory set) from PERMANENT LOSS into a blocked no-op that preserves the
+// last valid portfolio. Defined here (before the boot migration IIFEs that call save()) so the
+// consts are initialised ahead of first use. Kill switch: _AURIX_BLOCK_DESTRUCTIVE_SAVES=false.
+const _AURIX_BLOCK_DESTRUCTIVE_SAVES = true;
+const _AURIX_DESTRUCTIVE_CONTEXTS = ['delete-asset','sell','reduce-position','reset','edit-transaction','migration-confirmed'];
+const _aurixSaveAuditLog = [];
+let _aurixLastDestructiveSaveAt = 0;   // ms — set when an explicit destructive write is permitted
+function _aurixCountModel(catalogAssets, holdings) {
+  const a = Array.isArray(catalogAssets) ? catalogAssets.length : 0;
+  const h = Array.isArray(holdings) ? holdings.length : 0;
+  let tx = 0; if (Array.isArray(holdings)) holdings.forEach(x => { if (x && Array.isArray(x.transactions)) tx += x.transactions.length; });
+  return { assets: a, holdings: h, transactions: tx };
+}
+// Last-good persisted counts (new model first, legacy mirror fallback). null = nothing persisted.
+function _aurixReadPersistedCounts() {
+  try {
+    const ca = JSON.parse(localStorage.getItem('aurix_assets')   || 'null');
+    const hd = JSON.parse(localStorage.getItem('aurix_holdings') || 'null');
+    if (Array.isArray(ca) || Array.isArray(hd)) return _aurixCountModel(ca || [], hd || []);
+  } catch (_) {}
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    const arr = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.assets) ? raw.assets : null);
+    if (Array.isArray(arr)) { let tx = 0; arr.forEach(x => { if (x && Array.isArray(x.transactions)) tx += x.transactions.length; }); return { assets: arr.length, holdings: arr.length, transactions: tx }; }
+  } catch (_) {}
+  return null;
+}
+// THE guard: is `next` a safe (non-destructive, or explicitly-authorised) replacement for `previous`?
+function assertNonDestructivePortfolioSave(previous, next, context) {
+  const ctx = String(context || '').toLowerCase();
+  const explicit = _AURIX_DESTRUCTIVE_CONTEXTS.indexOf(ctx) !== -1;
+  if (!previous) return { allowed: true, destructive: false, reason: 'no prior persisted state (first/empty)', previous: null, next: next, context: ctx };
+  const drops = (next.assets < previous.assets) || (next.holdings < previous.holdings) || (next.transactions < previous.transactions);
+  if (!drops) return { allowed: true, destructive: false, reason: 'non-reducing save', previous: previous, next: next, context: ctx };
+  if (explicit) return { allowed: true, destructive: true, reason: 'explicit destructive action: ' + ctx, previous: previous, next: next, context: ctx };
+  return { allowed: false, destructive: true, context: ctx,
+    reason: 'reduction without explicit destructive context (assets ' + previous.assets + '→' + next.assets + ', holdings ' + previous.holdings + '→' + next.holdings + ', tx ' + previous.transactions + '→' + next.transactions + ')',
+    previous: previous, next: next };
+}
+function _aurixAuditSave(verdict, context) {
+  try {
+    const entry = { ts: new Date().toISOString(), lastSaveContext: context || null,
+      previousCounts: verdict.previous, nextCounts: verdict.next,
+      destructiveAllowed: !!(verdict.allowed && verdict.destructive), blocked: !verdict.allowed, reason: verdict.reason };
+    _aurixSaveAuditLog.push(entry); while (_aurixSaveAuditLog.length > 50) _aurixSaveAuditLog.shift();
+    try { window.__aurixLastSave = entry; window.__aurixSaveAudit = _aurixSaveAuditLog; } catch (_) {}
+    if (verdict.allowed && verdict.destructive) { try { _aurixLastDestructiveSaveAt = Date.now(); } catch (_) {} }
+  } catch (_) {}
+}
 // AURIX-APP-DOMAIN-READY-1: derived from the single API-origin source of truth
 // (window.AURIX_API_BASE, set in index.html). All other API URLs in app.js are
 // built from PRICES_PROXY via .replace('/api/prices', ...), so this one switch
@@ -5575,15 +5642,18 @@ const CLEAN_LOGO_OVERRIDE = {
   if (IS_DEV) console.log('[DATA] migration start');
 
   // Backup before any changes
-  try {
-    localStorage.setItem(BACKUP_KEY, JSON.stringify({
-      portfolio_assets: localStorage.getItem('portfolio_assets'),
-      aurix_assets:     localStorage.getItem('aurix_assets'),
-      aurix_holdings:   localStorage.getItem('aurix_holdings'),
-    }));
-  } catch (e) {
-    console.warn('[MIGRATE] Backup failed:', e.message);
-  }
+  const _preMigrationSnapshot = {
+    portfolio_assets: localStorage.getItem('portfolio_assets'),
+    aurix_assets:     localStorage.getItem('aurix_assets'),
+    aurix_holdings:   localStorage.getItem('aurix_holdings'),
+  };
+  try { localStorage.setItem(BACKUP_KEY, JSON.stringify(_preMigrationSnapshot)); }
+  catch (e) { console.warn('[MIGRATE] Backup failed:', e.message); }
+  // P0-DATA-INTEGRITY-LOCK — timestamped, non-overwriting backup so a destructive migration is
+  // always recoverable, plus pre-migration counts for validation.
+  const _preCounts = _aurixReadPersistedCounts();
+  try { localStorage.setItem('aurix_portfolio_backup_before_migration_' + Date.now(), JSON.stringify(_preMigrationSnapshot)); }
+  catch (e) { console.warn('[MIGRATE] timestamped backup failed:', e.message); }
 
   // v1 → v2: ensure aurix_assets + aurix_holdings with price_source + provider_id
   try {
@@ -5601,7 +5671,18 @@ const CLEAN_LOGO_OVERRIDE = {
       localStorage.setItem('aurix_assets', JSON.stringify(catalogAssets));
     } else {
       // Legacy path: build aurix_assets + aurix_holdings from in-memory assets
-      save();
+      save('migration-confirmed');
+    }
+    // P0-DATA-INTEGRITY-LOCK — validate counts didn't shrink; if they did, restore the backup.
+    const _postCounts = _aurixReadPersistedCounts();
+    if (_preCounts && _postCounts && (_postCounts.assets < _preCounts.assets || _postCounts.holdings < _preCounts.holdings || _postCounts.transactions < _preCounts.transactions)) {
+      console.error('[DATA][SAVE_BLOCKED_DESTRUCTIVE] migration reduced counts — restoring backup', { pre: _preCounts, post: _postCounts });
+      try {
+        if (_preMigrationSnapshot.aurix_assets   != null) localStorage.setItem('aurix_assets',   _preMigrationSnapshot.aurix_assets);
+        if (_preMigrationSnapshot.aurix_holdings != null) localStorage.setItem('aurix_holdings', _preMigrationSnapshot.aurix_holdings);
+        if (_preMigrationSnapshot.portfolio_assets != null) localStorage.setItem('portfolio_assets', _preMigrationSnapshot.portfolio_assets);
+      } catch (_) {}
+      return;   // do NOT stamp version — retry migration next boot rather than lock in a loss
     }
     localStorage.setItem(VERSION_KEY, '2');
     if (IS_DEV) console.log('[DATA] migration success → version 2');
@@ -5903,10 +5984,18 @@ let _aurixPrevAssetCount = (() => {
   return 0;
 })();
 
-function save() {
+function save(context) {
   try {
     const { assets: catalogAssets, holdings } = convertToNewModel(assets);
-    saveData({ assets: catalogAssets, holdings });
+    const _res = saveData({ assets: catalogAssets, holdings }, context);
+    if (_res && _res.blocked) {
+      // P0-DATA-INTEGRITY-LOCK — destructive reduction without explicit context was blocked on
+      // disk. Restore the in-memory set from the last valid persisted state so the debounced
+      // backend push (which reads in-memory assets) can never propagate the reduced set either.
+      try { assets = load(); } catch (_) {}
+      try { window.dispatchEvent(new CustomEvent('aurix:save-blocked', { detail: _res.verdict })); } catch (_) {}
+      return;
+    }
     scheduleSave();
     // Portfolio mutation invariant: derived financial state must reflect
     // the new asset set immediately so workspace PORTFOLIO.* / EXPOSURE /
@@ -6464,7 +6553,18 @@ function convertToLegacyFormat(catalogAssets, holdings) {
   return convertFromNewToFlat(catalogAssets, holdings);
 }
 
-function saveData({ assets: catalogAssets, holdings }) {
+function saveData({ assets: catalogAssets, holdings }, context) {
+  // P0-DATA-INTEGRITY-LOCK — block a destructive local write (fewer assets/holdings/tx) unless an
+  // explicit user-destructive context authorises it. A blocked write leaves the last valid
+  // portfolio untouched on disk (no overwrite), so a bad load/migration/sync cannot become loss.
+  const previous = _aurixReadPersistedCounts();
+  const next = _aurixCountModel(catalogAssets, holdings);
+  const verdict = assertNonDestructivePortfolioSave(previous, next, context);
+  _aurixAuditSave(verdict, context);
+  if (!verdict.allowed && _AURIX_BLOCK_DESTRUCTIVE_SAVES) {
+    try { console.error('[DATA][SAVE_BLOCKED_DESTRUCTIVE]', verdict.reason, { context: context || null }); } catch (_) {}
+    return { blocked: true, verdict };
+  }
   localStorage.setItem('aurix_assets',   JSON.stringify(catalogAssets));
   localStorage.setItem('aurix_holdings', JSON.stringify(holdings));
   const legacy = convertToLegacyFormat(catalogAssets, holdings);
@@ -6474,6 +6574,7 @@ function saveData({ assets: catalogAssets, holdings }) {
     aurix_holdings: Array.isArray(holdings) ? holdings.length : (holdings && typeof holdings === 'object' ? Object.keys(holdings).length : 0),
     symbols: Array.isArray(catalogAssets) ? catalogAssets.map(a => a && (a.symbol || a.ticker)) : [],
   });
+  return { blocked: false, verdict };
 }
 
 // ── P0-DATA-RECOVERY — Asset Doctor (console-only; NO UI, read-first) ──────────
@@ -37359,7 +37460,7 @@ document.getElementById('adTxList').addEventListener('click', e => {
     if (isNaN(idx) || idx < 0 || idx >= asset.transactions.length) return;
     asset.transactions.splice(idx, 1);
     syncCostBasisFromTransactions(asset);
-    save();
+    save('edit-transaction');
     render();
     onPortfolioChange(true);
     openAssetDetailModal(assetId);
@@ -37444,7 +37545,7 @@ async function _mngDelete() {
   const delType = a.type;
   assets = assets.filter(x => x.id !== id);
   try { _persistEmptyPortfolioIfNeeded('delete'); } catch (_) {}
-  save(); closeAssetManage(); render(true);
+  save('delete-asset'); closeAssetManage(); render(true);
   try { _flashCategoryCard(delType); } catch (_) {}
   onPortfolioChange(true);
 }
@@ -37578,7 +37679,7 @@ async function _adsDeleteActive() {
   const delType = a.type;
   assets = assets.filter(x => x.id !== id);
   try { _persistEmptyPortfolioIfNeeded('delete'); } catch (_) {}
-  save();
+  save('delete-asset');
   closeAssetDetail();
   try { _flashCategoryCard(delType); } catch (_) {}
   onPortfolioChange(true);
@@ -38404,7 +38505,10 @@ function _aurixPreloadBootIcons() {
     // CRITICAL-FIX: salvage orphaned holdings (never drop) + recover metadata from legacy mirror.
     assets = convertFromNewToFlat(portfolioData.assets, portfolioData.holdings, _aurixLegacyFallbackById());
     if (portfolioData.assets.length > 0) {
-      saveData({ assets: portfolioData.assets, holdings: portfolioData.holdings });
+      // P0-DATA-INTEGRITY-LOCK — 'boot-load' is a non-destructive context: the guard blocks this
+      // reconciliation write if it would REDUCE the last-good local set (e.g. a BTC-less remote
+      // over a BTC-bearing local), preserving the fuller portfolio on disk.
+      saveData({ assets: portfolioData.assets, holdings: portfolioData.holdings }, 'boot-load');
     }
     if (_bootBisect === 'portfolio') {
       _bm('bisect:portfolio');
@@ -43001,7 +43105,7 @@ function performSafeReset() {
 
   // Persist the empty state via the canonical save path so the
   // schema-version flag and migration vars stay consistent.
-  try { if (typeof save === 'function') save(); } catch (_) {}
+  try { if (typeof save === 'function') save('reset'); } catch (_) {}
 
   // Fire-and-forget remote wipe — does not block UI. Tombstone above
   // is the real safety net; this is the happy-path acceleration.
