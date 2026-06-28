@@ -5882,7 +5882,9 @@ const qtyLabelEl      = document.getElementById('qtyLabel');
 function load() {
   try {
     const data = getPortfolioData();
-    if (data.source === 'new') return convertFromNewToFlat(data.assets, data.holdings);
+    // CRITICAL-FIX: pass the legacy mirror as a recovery fallback so an orphaned holding
+    // (catalog entry missing) is salvaged WITH its display metadata, never dropped.
+    if (data.source === 'new') return convertFromNewToFlat(data.assets, data.holdings, _aurixLegacyFallbackById());
     return data.legacy;
   } catch {
     return [];
@@ -6375,13 +6377,62 @@ function convertToNewModel(flatAssets) {
   return { assets: catalogAssets, holdings };
 }
 
-function convertFromNewToFlat(catalogAssets, holdings) {
-  const assetMap = new Map(catalogAssets.map(a => [a.id, a]));
-  return holdings.map(h => {
+// ── CRITICAL-FIX (P0 asset persistence) ───────────────────────────────────────
+// A holding whose catalog asset entry is missing must NEVER be silently dropped — that is a
+// data-loss vector (the position vanishes on load, then the next save() persists the reduced
+// set, propagating the loss to localStorage + Supabase). Instead we SALVAGE the holding so the
+// user's position survives: prefer full metadata from the legacy mirror (`portfolio_assets`),
+// otherwise preserve the authoritative financials (qty/costBasis/realizedPnL/transactions) with
+// a degraded display. Only a genuinely EMPTY orphan (no qty, no transactions, no cost) is
+// dropped. Intentionally-deleted assets have no holding row, so they are never resurrected.
+function _aurixSalvageHolding(h, fallbackById) {
+  const qty  = Number(h.quantity) || 0;
+  const cost = Number(h.costBasis) || 0;
+  const tx   = Array.isArray(h.transactions) ? h.transactions : [];
+  const fb   = fallbackById && (fallbackById[h.asset_id] || fallbackById[h.id]);
+  if (!fb && qty === 0 && cost === 0 && tx.length === 0) return null;   // nothing to preserve
+  if (fb) {
+    // Full recovery from the legacy mirror; the holding stays authoritative for the financials.
+    return Object.assign({}, fb, {
+      id: h.id, qty: qty, costBasis: cost,
+      realizedPnL: h.realizedPnL != null ? h.realizedPnL : (fb.realizedPnL || 0),
+      transactions: tx.length ? tx : (Array.isArray(fb.transactions) ? fb.transactions : []),
+      _recovered: true,
+    });
+  }
+  return {
+    id: h.id, name: 'Activo recuperado',
+    ticker: h.asset_id ? String(h.asset_id).slice(0, 12) : 'N/D',
+    type: 'other', qty: qty, price: 0, assetCurrency: 'USD',
+    change24h: null, prevPrice: null, costBasis: cost, realizedPnL: h.realizedPnL || 0,
+    transactions: tx, coinId: null, marketSymbol: null, image: null, logo: null,
+    karat: null, goldUnit: null, isin: null, rent: null, location: null,
+    _recovered: true, _orphanAssetId: h.asset_id || null,
+  };
+}
+
+// Build an id→asset lookup from the legacy `portfolio_assets` mirror (best-effort recovery
+// metadata for orphaned holdings). Read-only; never throws.
+function _aurixLegacyFallbackById() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    const arr = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.assets) ? raw.assets : []);
+    const map = {};
+    arr.forEach(a => { if (a && a.id != null) map[a.id] = a; });
+    return map;
+  } catch (_) { return {}; }
+}
+
+function convertFromNewToFlat(catalogAssets, holdings, fallbackById) {
+  const assetMap = new Map((Array.isArray(catalogAssets) ? catalogAssets : []).map(a => [a.id, a]));
+  return (Array.isArray(holdings) ? holdings : []).map(h => {
     const asset = assetMap.get(h.asset_id);
     if (!asset) {
-      if (IS_DEV) console.warn('[DATA] Missing asset for holding:', h.asset_id);
-      return null;
+      // CRITICAL-FIX: salvage instead of dropping (see _aurixSalvageHolding).
+      const salvaged = _aurixSalvageHolding(h, fallbackById);
+      if (!salvaged) return null;   // genuinely empty orphan only
+      try { console.warn('[DATA][RECOVERED] Orphaned holding salvaged (missing catalog asset):', h.asset_id, salvaged._recovered ? '(metadata ' + (fallbackById && (fallbackById[h.asset_id] || fallbackById[h.id]) ? 'from legacy mirror' : 'degraded') + ')' : ''); } catch (_) {}
+      return salvaged;
     }
     return {
       id:            h.id,
@@ -38225,7 +38276,8 @@ function _aurixPreloadBootIcons() {
     window.__aurixBootReady.portfolio = true;
     window.__aurixBootReady.fx = true;
     try { if (window.__AURIX_BOOT) window.__AURIX_BOOT.mark('portfolio_fx_done'); } catch (_) {}
-    assets = convertFromNewToFlat(portfolioData.assets, portfolioData.holdings);
+    // CRITICAL-FIX: salvage orphaned holdings (never drop) + recover metadata from legacy mirror.
+    assets = convertFromNewToFlat(portfolioData.assets, portfolioData.holdings, _aurixLegacyFallbackById());
     if (portfolioData.assets.length > 0) {
       saveData({ assets: portfolioData.assets, holdings: portfolioData.holdings });
     }
