@@ -86,10 +86,29 @@ ok('16 hover scale ≤1.05 + glow + 160ms; ~10s breathing (≤1.02); reduced-mot
    /@keyframes aurixMcdBreath \{ 0%, 90%, 100% \{ transform: scale\(1\); \} 95% \{ transform: scale\(1\.02\); \} \}/.test(css) &&
    /\.mcd-ring \{[^}]*animation: aurixMcdBreath 10s/.test(css) &&
    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.mcd-track \{ animation: none; stroke-dashoffset: 0; \}/.test(css));
-ok('16b independent premium 54px donut (own glass/border/shadow; .aurix-signal-row 16–20px gap)',
-   /\.micro-composition-donut \{[^}]*width: 54px; height: 54px/.test(css) && /\.aurix-signal-row \{ gap: 18px; \}/.test(css));
-ok('16c modal is a compact premium window: grouped donut + legend (row), reduced width',
-   /\.modal--composition \{ max-width: 560px; \}/.test(css) && /\.aurix-composition-body \{ flex-direction: row;/.test(css));
+ok('16b independent premium 54px donut, moved ~60px right of the pill',
+   /\.micro-composition-donut \{[^}]*width: 54px; height: 54px/.test(css) && /\.aurix-signal-row \{ gap: 60px; \}/.test(css));
+
+console.log('\nDSH.DONUT.03 — final UX:');
+ok('21 mini: outer ring removed + crisp butt-cap segments (no round/blur)',
+   /\.mcd-track \{ display: none; \}/.test(css) && /stroke-linecap="butt"/.test(fnSrc('_aurixDonutSegmentsSVG')) && /\.mcd-segs circle \{ transform: none; \}/.test(css));
+ok('22 segments draw ONE BY ONE (progressive sweep) + mini animates ONCE per load',
+   /@keyframes aurixSegDraw \{ to \{ stroke-dashoffset: 0; \} \}/.test(css) &&
+   /animation: aurixSegDraw ' \+ durMs \+ 'ms linear ' \+ delayMs/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
+   /const animate = entries\.length > 0 && !_aurixMiniDonutDrawn;/.test(fnSrc('renderMiniCompositionDonut')) &&
+   /if \(entries\.length\) _aurixMiniDonutDrawn = true;/.test(fnSrc('renderMiniCompositionDonut')));
+ok('23 modal: compact centred panel (420px, column) + fade+scale .98 / 180ms',
+   /\.modal--composition \{ max-width: 420px; transform: scale\(\.98\); transition: opacity \.18s ease, transform \.18s ease; \}/.test(css) &&
+   /\.aurix-composition-body \{ flex-direction: column;/.test(css));
+ok('24 big donut 280px, rebuilds + draws each open (900ms)',
+   /\.aurix-composition-chart \{ width: 280px; height: 280px; \}/.test(css) && /_aurixDonutSegmentsSVG\(entries, 72, 100, 100, 22, 1\.8, \{ animate: true, dur: 900 \}\)/.test(app));
+ok('25 legend single column, name+% together (NOT far-right) + donut↔legend hover sync (brightness)',
+   /\.aurix-composition-legend \.acl-label \{ flex: 0 0 auto; min-width: 96px; \}/.test(css) && !/acl-pct \{ margin-left: auto/.test(css) &&
+   /function _aurixCompositionHover\(/.test(app) && /_aurixCompositionWireHover\(\);/.test(app) &&
+   /\.aurix-composition-chart\.hot \.mcd-seg\.is-hot \{ opacity: 1; filter: brightness/.test(css));
+ok('26 close fade+scale via .modal--composition (X / Cerrar / Escape / backdrop all → closeCompositionModal)',
+   /id="compositionClose"/.test(html) && /id="compositionCloseBtn"/.test(html) &&
+   /getElementById\('compositionClose'\); if \(x\) x\.addEventListener\('click', closeCompositionModal\)/.test(app));
 
 console.log('\nModal close (3 ways) + scroll lock + focus return:');
 ok('17 close via button(s) + backdrop click + Escape',

@@ -17547,7 +17547,7 @@ function updateDonut() {
 // with the REAL portfolio composition (percentages from getInvestableDistribution — no invented
 // data). Localized, additive; touches no other chart/data/mobile surface.
 // ════════════════════════════════════════════════════════════════════════
-let _aurixCompositionOpener = null, _aurixCompositionInit = false;
+let _aurixCompositionOpener = null, _aurixCompositionInit = false, _aurixMiniDonutDrawn = false;
 // Real composition entries (incl. real estate), share computed over the displayed total.
 function _aurixCompositionEntries() {
   let dist = null;
@@ -17563,23 +17563,55 @@ function _aurixCompositionEntries() {
 // Segmented ring as <circle> strings (pathLength=100 ⇒ dasharray in % units). `gap` (% units)
 // leaves a clean separation between segments. Real % share is preserved (gap is purely visual:
 // the slot keeps its full width, only the drawn arc is trimmed).
-function _aurixDonutSegmentsSVG(entries, r, cx, cy, w, gap) {
-  let acc = 0, out = ''; const g = gap || 0;
-  entries.forEach(e => {
+function _aurixDonutSegmentsSVG(entries, r, cx, cy, w, gap, opts) {
+  // Each segment positioned by a rotate() ATTRIBUTE (so CSS stroke-dashoffset stays free for the
+  // draw animation); butt caps + small `gap` ⇒ crisp, clearly-separated slices. opts.animate ⇒
+  // each slice draws progressively (sequential sweep) over opts.dur ms; else rendered static.
+  opts = opts || {};
+  const animate = !!opts.animate, total = opts.dur || 800, g = gap || 0;
+  let accFrac = 0, out = '';
+  entries.forEach((e, i) => {
     const slot = Math.max(0, Math.min(100, e.pct));
-    const len = Math.max(0.4, slot - g);   // trimmed arc (visual gap after); never below a hairline
-    out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" pathLength="100" fill="none" stroke="' + e.color +
-      '" stroke-width="' + w + '" stroke-linecap="round" stroke-dasharray="' + len.toFixed(2) + ' ' + (100 - len).toFixed(2) + '" stroke-dashoffset="' + (-acc).toFixed(2) + '"></circle>';
-    acc += slot;
+    const len = Math.max(0.4, slot - g);
+    const startDeg = (-90 + accFrac * 360).toFixed(2);
+    const dash = len.toFixed(2) + ' ' + (100 - len).toFixed(2);
+    let style;
+    if (animate) {
+      const delayMs = Math.round(accFrac * total);
+      const durMs = Math.max(60, Math.round((slot / 100) * total));   // sweep proportional to share
+      style = 'stroke-dashoffset:' + len.toFixed(2) + '; animation: aurixSegDraw ' + durMs + 'ms linear ' + delayMs + 'ms both;';
+    } else { style = 'stroke-dashoffset:0;'; }
+    out += '<circle class="mcd-seg" data-idx="' + i + '" transform="rotate(' + startDeg + ' ' + cx + ' ' + cy + ')" cx="' + cx + '" cy="' + cy + '" r="' + r +
+      '" pathLength="100" fill="none" stroke="' + e.color + '" stroke-width="' + w + '" stroke-linecap="butt" stroke-dasharray="' + dash + '" style="' + style + '"></circle>';
+    accFrac += slot / 100;
   });
   return out;
+}
+// Donut ↔ legend hover sync (brightness only).
+function _aurixCompositionHover(idx, on) {
+  const chart = document.getElementById('compositionChart'), legend = document.getElementById('compositionLegend');
+  if (!chart || !legend) return;
+  chart.classList.toggle('hot', !!on);
+  chart.querySelectorAll('.mcd-seg').forEach(s => s.classList.toggle('is-hot', !!on && +s.getAttribute('data-idx') === idx));
+  legend.querySelectorAll('li').forEach(li => li.classList.toggle('is-hot', !!on && +li.getAttribute('data-idx') === idx));
+}
+function _aurixCompositionWireHover() {
+  const chart = document.getElementById('compositionChart'), legend = document.getElementById('compositionLegend');
+  if (chart) chart.querySelectorAll('.mcd-seg').forEach(s => { const i = +s.getAttribute('data-idx'); s.addEventListener('mouseenter', () => _aurixCompositionHover(i, true)); s.addEventListener('mouseleave', () => _aurixCompositionHover(i, false)); });
+  if (legend) legend.querySelectorAll('li').forEach(li => { const i = +li.getAttribute('data-idx'); li.addEventListener('mouseenter', () => _aurixCompositionHover(i, true)); li.addEventListener('mouseleave', () => _aurixCompositionHover(i, false)); });
 }
 function renderMiniCompositionDonut() {
   if (typeof document === 'undefined') return;
   const btn = document.getElementById('microCompositionDonut'); if (!btn) return;
   const entries = _aurixCompositionEntries();
   const segG = btn.querySelector('.mcd-segs');
-  if (segG) segG.innerHTML = entries.length ? _aurixDonutSegmentsSVG(entries, 16.5, 22, 22, 5.5, 1.6) : '';
+  if (segG) {
+    // Draw animation runs ONCE per load (first render with data); later updateDonut() ticks
+    // (e.g. price refreshes) re-render the slices statically — never re-animate.
+    const animate = entries.length > 0 && !_aurixMiniDonutDrawn;
+    segG.innerHTML = entries.length ? _aurixDonutSegmentsSVG(entries, 16.5, 22, 22, 5.5, 2.0, { animate: animate, dur: 850 }) : '';
+    if (entries.length) _aurixMiniDonutDrawn = true;
+  }
   // entries → defer to CSS (desktop-only ≥769px); no data → hide on both.
   btn.style.display = entries.length ? '' : 'none';
   _aurixInitCompositionModalOnce();
@@ -17593,14 +17625,15 @@ function renderCompositionModalDonut() {
   const esc = (typeof escHtml === 'function') ? escHtml : (s => String(s));
   const sub = (typeof t === 'function' && typeof t('compositionCenterSub') === 'string') ? t('compositionCenterSub') : 'Cartera';
   chart.innerHTML =
-    '<svg viewBox="0 0 200 200" width="200" height="200" aria-hidden="true">' +
-      '<circle cx="100" cy="100" r="72" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="24"></circle>' +
-      '<g transform="rotate(-90 100 100)">' + _aurixDonutSegmentsSVG(entries, 72, 100, 100, 24, 1.6) + '</g>' +
+    '<svg viewBox="0 0 200 200" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' +
+      '<circle cx="100" cy="100" r="72" fill="none" stroke="rgba(255,255,255,.045)" stroke-width="22"></circle>' +
+      _aurixDonutSegmentsSVG(entries, 72, 100, 100, 22, 1.8, { animate: true, dur: 900 }) +
     '</svg>' +
     '<div class="aurix-composition-center"><span class="aurix-composition-center-val">100%</span><span class="aurix-composition-center-sub">' + esc(sub) + '</span></div>';
-  legend.innerHTML = entries.map(e =>
-    '<li><span class="acl-dot" style="background:' + e.color + '"></span><span class="acl-label">' + esc(e.label) + '</span><span class="acl-pct">' + e.pct.toFixed(1) + '%</span></li>'
+  legend.innerHTML = entries.map((e, i) =>
+    '<li data-idx="' + i + '"><span class="acl-dot" style="background:' + e.color + '"></span><span class="acl-label">' + esc(e.label) + '</span><span class="acl-pct">' + e.pct.toFixed(1) + '%</span></li>'
   ).join('');
+  _aurixCompositionWireHover();   // donut ↔ legend brightness sync
 }
 function openCompositionModal() {
   try {
