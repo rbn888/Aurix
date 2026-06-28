@@ -54,7 +54,8 @@ console.log('\nMerge rule (NEVER loses assets):');
   // equal count, local newer
   G(sb,'_aurixWritePortfolioMeta')({version:9, updatedAt:new Date(isoNew).getTime(), syncedAt:new Date(isoOld).getTime()});
   ok('7 equal count + local NEWER → keep local', M(model(5), Object.assign(model(5),{updated_at:isoOld})).apply==='local');
-  ok('8 remote empty → keep local', M(model(3), Object.assign(model(0),{updated_at:isoNew})).apply==='local'); }
+  // remote null/unavailable → never wipe local (a fresh, authoritative empty propagates as a reset — see test 20)
+  ok('8 remote null/unavailable → keep local (never wipe on failed load)', M(model(3), null).apply==='local'); }
 
 console.log('\nReset tombstone newer than remote → distrust remote (keep local):');
 { const sb=makeEnv(new Date('2027-01-01T00:00:00Z').getTime());   // tombstone in the future vs remote
@@ -77,8 +78,8 @@ ok('10 foreground re-sync hooks (visibilitychange/focus/pageshow/online → resy
 ok('11 boot merge routed through the safe merge (not naive length-based)',
    /const decision = _aurixMergePortfolio\(localModel, backendData\);/.test(fnSrc('initPortfolioData')) &&
    !/backendData\.assets\.length > 0 && !distrustRemote/.test(fnSrc('initPortfolioData')));
-ok('12 resync applies remote via saveData(remote-sync) + refreshes existing views',
-   /assets = flat;/.test(fnSrc('_aurixResyncFromRemote')) && /saveData\(convertToNewModel\(assets\), 'remote-sync'\);/.test(fnSrc('_aurixResyncFromRemote')) &&
+ok('12 resync applies remote via saveData(reset-aware context) + refreshes existing views',
+   /assets = flat;/.test(fnSrc('_aurixResyncFromRemote')) && /saveData\(convertToNewModel\(assets\), _ctx\);/.test(fnSrc('_aurixResyncFromRemote')) &&
    /scheduleAurixMobileLite\(/.test(fnSrc('_aurixResyncFromRemote')) && /render\(true\)/.test(fnSrc('_aurixResyncFromRemote')));
 ok('13 throttled + non-concurrent + auth/boot guarded',
    /_aurixResyncInFlight/.test(fnSrc('_aurixResyncFromRemote')) && /now - _aurixLastResyncAt < 1500/.test(fnSrc('_aurixResyncFromRemote')) && /!_bootLoadComplete/.test(fnSrc('_aurixResyncFromRemote')));
@@ -98,6 +99,31 @@ ok('18 institutional renderer + mini-chart removal intact',
    /function renderAurixInstitutionalChart\(/.test(app) && /const _AURIX_CATEGORY_PERF_CHART_ENABLED = false;/.test(app));
 ok('19 localStorage treated as cache: shared key user_portfolios by user_id (both devices)',
    /\.from\('user_portfolios'\)[\s\S]{0,120}\.eq\('user_id', userId\)/.test(app) && /user_id:    currentUser\.id/.test(app));
+
+console.log('\nP0-SYNC-PIPELINE-TRACE — reset propagation + tracer:');
+{ const sb = makeEnv(); const M = G(sb,'_aurixMergePortfolio');
+  // remote row exists, empty, written AFTER our last sync → propagate reset
+  G(sb,'_aurixWritePortfolioMeta')({version:3, updatedAt:new Date(isoOld).getTime(), syncedAt:new Date(isoOld).getTime()});
+  ok('20 remote authoritatively EMPTY + newer than syncedAt → apply (reset propagates)',
+     M(model(3), Object.assign(model(0),{updated_at:isoNew})).reason==='remote-reset');
+  // remote empty but NOT newer than synced → keep local (ambiguous/stale)
+  G(sb,'_aurixWritePortfolioMeta')({version:3, updatedAt:new Date(isoNew).getTime(), syncedAt:new Date(isoNew).getTime()});
+  ok('21 remote empty but stale (<= syncedAt) → keep local', M(model(3), Object.assign(model(0),{updated_at:isoOld})).apply==='local');
+  // remote null/failed load → never wipe local
+  ok('22 remote null/failed load → keep local (remote-unavailable)', M(model(3), null).reason==='remote-unavailable'); }
+ok('23 remote-reset is an allowed destructive context (integrity lock permits clearing local)',
+   /const _AURIX_DESTRUCTIVE_CONTEXTS = \[[^\]]*'remote-reset'\]/.test(app));
+ok('24 boot + resync apply a remote reset with the reset-aware context (not blocked)',
+   /_aurixBootMergeReason === 'remote-reset' \? 'remote-reset' : 'boot-load'/.test(app) &&
+   /decision\.reason === 'remote-reset'\) \? 'remote-reset' : 'remote-sync'/.test(app) &&
+   /if \(decision\.reason === 'remote-reset'\) \{[\s\S]*?_clearLocalUserState\(\);/.test(app));
+ok('25 window.aurixSyncTrace() exposes the full pipeline state',
+   /window\.aurixSyncTrace = async function/.test(app) &&
+   ['currentUserId','currentEmail','deviceId','localRevision','localUpdatedAt','remoteUpdatedAt','localAssetCount','remoteAssetCount','localSymbols','remoteSymbols','pendingSync','lastSaveContext','lastRemoteSaveStatus','lastRemoteLoadStatus','lastMergeDecision','lastAppliedSource','lastError','verdict']
+     .every(k => app.indexOf('out.' + k) !== -1));
+ok('26 status recorders wired (remote save OK/error, remote load OK/error, save context)',
+   /_aurixSyncState\.lastRemoteSaveStatus = 'ok:'/.test(app) && /_aurixSyncState\.lastRemoteSaveStatus = 'error: '/.test(app) &&
+   /_aurixSyncState\.lastRemoteLoadStatus = data \? \('ok:'/.test(app) && /_aurixSyncState\.lastSaveContext = context \|\| 'mutation'/.test(app));
 
 console.log('\nRESULT: '+(fail===0?'ALL PASS ✓':'FAIL ✗')+'  ('+pass+' passed, '+fail+' failed)');
 process.exit(fail===0?0:1);

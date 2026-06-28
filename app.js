@@ -469,6 +469,7 @@ async function autoSaveToBackend(attempt = 1) {
     if (IS_DEV) console.log('[DATA] autosave success');
     try { _aurixMarkSynced(new Date(_syncedAt).getTime()); } catch (_) {}   // local is now in sync with remote
     try { console.log('[SYNC][SAVE_OK]', { syncedAt: _syncedAt, assetCount: Array.isArray(assets) ? assets.length : 0 }); } catch (_) {}
+    try { if (typeof _aurixSyncState !== 'undefined') _aurixSyncState.lastRemoteSaveStatus = 'ok:' + (Array.isArray(assets) ? assets.length : 0) + '@' + _syncedAt; } catch (_) {}
     _setSaveStatus('saved');
     // Tombstone served its purpose — remote is now in sync with local.
     if (tombstone) {
@@ -478,6 +479,7 @@ async function autoSaveToBackend(attempt = 1) {
   } catch (e) {
     _persistDebug('[persist-save-backend] ERROR', e && e.message ? e.message : e);
     if (IS_DEV) console.error('[DATA] autosave error:', e);
+    try { if (typeof _aurixSyncState !== 'undefined') { _aurixSyncState.lastRemoteSaveStatus = 'error: ' + (e && e.message ? e.message : e); _aurixSyncState.lastError = (e && e.message) ? e.message : String(e); } } catch (_) {}
     const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
     if (attempt < 3) {
       _setSaveStatus(offline ? 'offline' : 'retrying');
@@ -969,6 +971,7 @@ async function loadPortfolioFromBackend(userId) {
     if (error) {
       _persistDebug('[persist-load-backend] ERROR', error.message);
       if (IS_DEV) console.warn('[DATA] Supabase load error:', error.message);
+      try { if (typeof _aurixSyncState !== 'undefined') { _aurixSyncState.lastRemoteLoadStatus = 'error: ' + error.message; _aurixSyncState.lastError = error.message; } } catch (_) {}
       return null;
     }
     _persistDebug('[persist-load-backend]', {
@@ -976,8 +979,10 @@ async function loadPortfolioFromBackend(userId) {
       symbols: (data && Array.isArray(data.assets)) ? data.assets.map(a => a && (a.symbol || a.ticker)) : [],
       updated_at: data && data.updated_at,
     });
+    try { if (typeof _aurixSyncState !== 'undefined') _aurixSyncState.lastRemoteLoadStatus = data ? ('ok:' + ((data.assets || []).length) + ' assets') : 'null'; } catch (_) {}
     return data || null;
   } catch (err) {
+    try { if (typeof _aurixSyncState !== 'undefined') { _aurixSyncState.lastRemoteLoadStatus = 'exception: ' + (err && err.message); _aurixSyncState.lastError = err && err.message; } } catch (_) {}
     if (IS_DEV) console.warn('[DATA] Supabase load exception:', err);
     return null;
   }
@@ -1002,13 +1007,22 @@ async function initPortfolioData(userId) {
   if (localData.source === 'new') localModel = { assets: localData.assets || [], holdings: localData.holdings || [] };
   else localModel = (localData.legacy && localData.legacy.length) ? convertToNewModel(localData.legacy) : { assets: [], holdings: [] };
   const decision = _aurixMergePortfolio(localModel, backendData);
+  try { _aurixSyncState.lastMergeDecision = 'boot:' + decision.apply + ':' + decision.reason; _aurixBootMergeReason = decision.reason; } catch (_) {}
   try { console.log('[SYNC][MERGE]', { phase: 'boot', apply: decision.apply, reason: decision.reason }); } catch (_) {}
   if (decision.apply === 'remote' && isValidPortfolioData(backendData)) {
+    // A remote RESET propagated from another device: purge the local cache so the empty state
+    // sticks (the boot writer skips empty sets), then re-stamp owner + synced marker.
+    if (decision.reason === 'remote-reset') {
+      try { _clearLocalUserState(); } catch (_) {}
+      try { _aurixStampCacheOwner(); } catch (_) {}
+    }
     _aurixMarkSynced(_aurixRemoteUpdatedMs(backendData));
+    try { _aurixSyncState.lastAppliedSource = 'remote(' + decision.reason + ')'; } catch (_) {}
     _persistDebug('[persist-merge] remote wins', { reason: decision.reason, assetCount: backendData.assets.length });
     if (IS_DEV) console.log('[DATA] loaded from Supabase');
     return backendData;
   }
+  try { _aurixSyncState.lastAppliedSource = 'local'; } catch (_) {}
   if (localModel.assets.length > 0) {
     _persistDebug('[persist-merge] local kept', { reason: decision.reason, assetCount: localModel.assets.length });
     if (IS_DEV) console.log('[DATA] loaded from localStorage');
@@ -5392,7 +5406,7 @@ const STORAGE_KEY    = 'portfolio_assets';
 // last valid portfolio. Defined here (before the boot migration IIFEs that call save()) so the
 // consts are initialised ahead of first use. Kill switch: _AURIX_BLOCK_DESTRUCTIVE_SAVES=false.
 const _AURIX_BLOCK_DESTRUCTIVE_SAVES = true;
-const _AURIX_DESTRUCTIVE_CONTEXTS = ['delete-asset','sell','reduce-position','reset','edit-transaction','migration-confirmed'];
+const _AURIX_DESTRUCTIVE_CONTEXTS = ['delete-asset','sell','reduce-position','reset','edit-transaction','migration-confirmed','remote-reset'];
 const _aurixSaveAuditLog = [];
 let _aurixLastDestructiveSaveAt = 0;   // ms — set when an explicit destructive write is permitted
 function _aurixCountModel(catalogAssets, holdings) {
@@ -5608,6 +5622,56 @@ function _aurixBumpPortfolioMeta() { const m = _aurixReadPortfolioMeta(); m.vers
 // revision = monotonic local version; pendingSync = local has changes not yet pushed to remote.
 function _aurixPortfolioRevision() { return _aurixReadPortfolioMeta().version || 0; }
 function _aurixPendingSync() { const m = _aurixReadPortfolioMeta(); return (m.updatedAt || 0) > (m.syncedAt || 0); }
+
+// P0-SYNC-PIPELINE-TRACE — live diagnostic state + window.aurixSyncTrace(). Read-only; records the
+// last outcome of each pipeline step so the EXACT break point is visible in production.
+const _aurixSyncState = { lastSaveContext: null, lastRemoteSaveStatus: null, lastRemoteLoadStatus: null, lastMergeDecision: null, lastAppliedSource: null, lastError: null };
+let _aurixBootMergeReason = null;   // set by initPortfolioData so the boot write can use the right (reset-aware) context
+function _aurixSymbolsOf(arr) { try { return (Array.isArray(arr) ? arr : []).map(a => a && (a.symbol || a.ticker)).filter(Boolean); } catch (_) { return []; } }
+window.aurixSyncTrace = async function () {
+  const out = {};
+  try {
+    out.currentUserId = (typeof currentUser !== 'undefined' && currentUser) ? currentUser.id : null;
+    out.currentEmail  = (typeof currentUser !== 'undefined' && currentUser) ? (currentUser.email || null) : null;
+    out.activeUserId  = _aurixActiveUserId;
+    out.cacheOwner    = _aurixCacheOwner();
+    out.deviceId      = _aurixDeviceId();
+    const meta = _aurixReadPortfolioMeta();
+    out.localRevision = meta.version || 0;
+    out.localUpdatedAt = meta.updatedAt || 0;
+    out.localSyncedAt = meta.syncedAt || 0;
+    out.pendingSync   = _aurixPendingSync();
+    // local
+    let lm = { assets: [], holdings: [] };
+    try { const d = getPortfolioData(); lm = (d.source === 'new') ? { assets: d.assets || [], holdings: d.holdings || [] } : convertToNewModel(d.legacy || []); } catch (_) {}
+    out.localAssetCount = lm.assets.length;
+    out.localSymbols = _aurixSymbolsOf(lm.assets);
+    out.inMemoryAssetCount = (typeof assets !== 'undefined' && Array.isArray(assets)) ? assets.length : null;
+    // remote (fresh read)
+    let remote = null;
+    if (supabaseClient && out.currentUserId) {
+      try { remote = await loadPortfolioFromBackend(out.currentUserId); out.lastRemoteLoadStatus = remote ? ('ok:' + ((remote.assets || []).length) + ' assets') : 'null (no row)'; }
+      catch (e) { out.lastRemoteLoadStatus = 'error: ' + (e && e.message); out.lastError = e && e.message; }
+    } else { out.lastRemoteLoadStatus = 'skipped (no client/user)'; }
+    out.remoteAssetCount = (remote && Array.isArray(remote.assets)) ? remote.assets.length : 0;
+    out.remoteSymbols = _aurixSymbolsOf(remote && remote.assets);
+    out.remoteUpdatedAt = (typeof _aurixRemoteUpdatedMs === 'function') ? _aurixRemoteUpdatedMs(remote) : 0;
+    out.remoteRevision = (remote && remote.holdings) ? out.remoteAssetCount : 0;   // no remote revision column ⇒ count proxy
+    // last recorded outcomes
+    out.lastSaveContext = _aurixSyncState.lastSaveContext;
+    out.lastRemoteSaveStatus = _aurixSyncState.lastRemoteSaveStatus;
+    out.lastMergeDecision = _aurixSyncState.lastMergeDecision;
+    out.lastAppliedSource = _aurixSyncState.lastAppliedSource;
+    out.lastError = out.lastError || _aurixSyncState.lastError;
+    // verdict — pinpoint the break
+    if (!out.currentUserId) out.verdict = 'NOT LOGGED IN (auth/userId missing) — sync cannot run';
+    else if (out.lastRemoteLoadStatus && out.lastRemoteLoadStatus.indexOf('error') === 0) out.verdict = 'REMOTE LOAD FAILS — check RLS/query/auth';
+    else if (out.remoteAssetCount !== out.localAssetCount) out.verdict = 'LOCAL ≠ REMOTE — run aurixResyncFromRemote() (foreground) to apply; if remote is behind, the other device has not pushed yet';
+    else out.verdict = 'local and remote in sync';
+  } catch (e) { out.error = e && e.message; }
+  try { console.log('%c[AURIX SYNC TRACE]', 'font-weight:700', out); } catch (_) {}
+  return out;
+};
 function _aurixMarkSynced(remoteUpdatedMs) { const m = _aurixReadPortfolioMeta(); m.syncedAt = remoteUpdatedMs || Date.now(); if (!(m.updatedAt > m.syncedAt)) m.updatedAt = m.syncedAt; _aurixWritePortfolioMeta(m); }
 function _aurixRemoteUpdatedMs(remote) { try { return (remote && remote.updated_at) ? new Date(remote.updated_at).getTime() : 0; } catch (_) { return 0; } }
 // Decide which side to apply (NEVER loses assets). Returns { apply:'remote'|'local', reason }.
@@ -5616,7 +5680,15 @@ function _aurixMergePortfolio(localModel, remote) {
   const rc = (remote && Array.isArray(remote.assets)) ? remote.assets.length : 0;
   const distrust = (typeof _shouldDistrustRemote === 'function') && _shouldDistrustRemote(remote);
   if (distrust) { try { console.log('[SYNC][CONFLICT_BLOCKED]', 'reset tombstone newer than remote'); } catch (_) {} return { apply: 'local', reason: 'tombstone' }; }
-  if (!remote || !Array.isArray(remote.assets) || (rc === 0 && lc > 0)) return { apply: 'local', reason: 'remote-empty' };
+  if (!remote || !Array.isArray(remote.assets)) return { apply: 'local', reason: 'remote-unavailable' };   // null/failed load ⇒ never wipe local
+  if (rc === 0 && lc > 0) {
+    // P0-SYNC-PIPELINE-TRACE — remote row EXISTS but is empty. Distinguish an authoritative RESET
+    // done on another device (remote written AFTER our last sync ⇒ propagate the reset) from a
+    // stale/ambiguous empty (keep local). updated_at is the signal.
+    const rMs0 = _aurixRemoteUpdatedMs(remote), syncedAt = (_aurixReadPortfolioMeta().syncedAt || 0);
+    if (rMs0 > syncedAt) { try { console.log('[SYNC][APPLIED_REMOTE]', { reason: 'remote-reset', rMs: rMs0, syncedAt }); } catch (_) {} return { apply: 'remote', reason: 'remote-reset' }; }
+    return { apply: 'local', reason: 'remote-empty-stale' };
+  }
   if (rc > lc) { try { console.log('[SYNC][APPLIED_REMOTE]', { reason: 'remote-more', lc, rc }); } catch (_) {} return { apply: 'remote', reason: 'remote-more' }; }
   if (lc > rc) { try { console.log('[SYNC][STALE_LOCAL]', { reason: 'local-more-keep', lc, rc }); } catch (_) {} return { apply: 'local', reason: 'local-more' }; }
   const meta = _aurixReadPortfolioMeta(); const rMs = _aurixRemoteUpdatedMs(remote);
@@ -5637,13 +5709,18 @@ async function _aurixResyncFromRemote(reason) {
     try { _mergeRemoteState(remote); } catch (_) {}   // history/watchlist reconcile (existing)
     let localModel; try { const d = getPortfolioData(); localModel = (d.source === 'new') ? { assets: d.assets || [], holdings: d.holdings || [] } : convertToNewModel(d.legacy || []); } catch (_) { localModel = { assets: [], holdings: [] }; }
     const decision = _aurixMergePortfolio(localModel, remote);
+    try { _aurixSyncState.lastMergeDecision = decision.apply + ':' + decision.reason; } catch (_) {}
     try { console.log('[SYNC][MERGE]', decision); } catch (_) {}
     if (decision.apply === 'remote' && isValidPortfolioData(remote)) {
       const flat = convertFromNewToFlat(remote.assets, remote.holdings, _aurixLegacyFallbackById());
       assets = flat;
-      try { saveData(convertToNewModel(assets), 'remote-sync'); } catch (_) {}   // merge guarantees rc>=lc ⇒ non-reducing
+      // A remote-originated RESET is a legitimate reduction → use the destructive 'remote-reset'
+      // context so the integrity lock permits clearing local; otherwise a non-reducing 'remote-sync'.
+      const _ctx = (decision.reason === 'remote-reset') ? 'remote-reset' : 'remote-sync';
+      try { saveData(convertToNewModel(assets), _ctx); } catch (_) {}
       _aurixMarkSynced(_aurixRemoteUpdatedMs(remote));
-      try { _aurixJournalAppend('remote_sync', null, { reason: reason || 'foreground', counts: _aurixCountModel(remote.assets, remote.holdings) }, { assets: remote.assets, holdings: remote.holdings }); } catch (_) {}
+      try { _aurixJournalAppend(decision.reason === 'remote-reset' ? 'reset_portfolio' : 'remote_sync', null, { reason: reason || 'foreground', counts: _aurixCountModel(remote.assets, remote.holdings) }, { assets: remote.assets, holdings: remote.holdings }); } catch (_) {}
+      try { _aurixSyncState.lastAppliedSource = 'remote(' + decision.reason + ')'; } catch (_) {}
       try { console.log('[SYNC][APPLIED_REMOTE]', 'portfolio updated from remote', { assets: flat.length }); } catch (_) {}
       try { if (typeof recomputeDerivedFinancialState === 'function') recomputeDerivedFinancialState('remote-sync'); } catch (_) {}
       try { if (typeof render === 'function') render(true); } catch (_) {}
@@ -6229,6 +6306,7 @@ let _aurixPrevAssetCount = (() => {
 
 function save(context) {
   try {
+    try { if (typeof _aurixSyncState !== 'undefined') _aurixSyncState.lastSaveContext = context || 'mutation'; } catch (_) {}
     const { assets: catalogAssets, holdings } = convertToNewModel(assets);
     const _res = saveData({ assets: catalogAssets, holdings }, context);
     if (_res && _res.blocked) {
@@ -38960,7 +39038,7 @@ function _aurixPreloadBootIcons() {
       // P0-DATA-INTEGRITY-LOCK — 'boot-load' is a non-destructive context: the guard blocks this
       // reconciliation write if it would REDUCE the last-good local set (e.g. a BTC-less remote
       // over a BTC-bearing local), preserving the fuller portfolio on disk.
-      saveData({ assets: portfolioData.assets, holdings: portfolioData.holdings }, 'boot-load');
+      saveData({ assets: portfolioData.assets, holdings: portfolioData.holdings }, _aurixBootMergeReason === 'remote-reset' ? 'remote-reset' : 'boot-load');
     }
     if (_bootBisect === 'portfolio') {
       _bm('bisect:portfolio');

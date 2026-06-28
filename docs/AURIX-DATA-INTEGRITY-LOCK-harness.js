@@ -86,8 +86,8 @@ ok('17 save() restores in-memory from last-good on block + emits aurix:save-bloc
    /const _res = saveData\(\{ assets: catalogAssets, holdings \}, context\);/.test(app) && /if \(_res && _res\.blocked\)/.test(app) && /assets = load\(\);/.test(fnSrc('save')) && /aurix:save-blocked/.test(app));
 ok('18 destructive call sites tagged (delete-asset / edit-transaction / reset)',
    /save\('delete-asset'\); closeAssetManage/.test(app) && /save\('delete-asset'\);\n  closeAssetDetail/.test(app) && /save\('edit-transaction'\);/.test(app) && /save\('reset'\);/.test(app));
-ok('19 boot reconciliation write tagged boot-load (reduction blocked vs local last-good)',
-   /saveData\(\{ assets: portfolioData\.assets, holdings: portfolioData\.holdings \}, 'boot-load'\);/.test(app));
+ok('19 boot reconciliation write tagged boot-load (reduction blocked vs local last-good; remote-reset propagates)',
+   /saveData\(\{ assets: portfolioData\.assets, holdings: portfolioData\.holdings \}, _aurixBootMergeReason === 'remote-reset' \? 'remote-reset' : 'boot-load'\);/.test(app));
 ok('20 migration: timestamped backup BEFORE write + post-count validation + restore-on-shrink',
    /aurix_portfolio_backup_before_migration_' \+ Date\.now\(\)/.test(app) && /migration reduced counts — restoring backup/.test(app) && /save\('migration-confirmed'\)/.test(app));
 ok('21 backend push guard: skip reduction vs local last-good unless recent explicit destructive',
