@@ -6476,6 +6476,131 @@ function saveData({ assets: catalogAssets, holdings }) {
   });
 }
 
+// ── P0-DATA-RECOVERY — Asset Doctor (console-only; NO UI, read-first) ──────────
+// The lost data only ever lived in the user's browser (localStorage) + their Supabase row, not
+// in the repo. These console helpers audit EXACTLY where a holding survives and restore it
+// surgically. Run in the logged-in browser console:
+//    await window.aurixAssetDoctor('BTC')      → read-only diagnosis across every source
+//    await window.aurixRecoverHolding('BTC')   → surgically restore a FOUND holding (no recalc)
+// Never fabricates a position: a holding is only restored from financials actually found in a
+// source. If nothing is found anywhere it reports "not recoverable" and changes nothing.
+function _aurixDoctorMatch(rec, q) {
+  if (!rec) return false;
+  const hay = [rec.ticker, rec.symbol, rec.name, rec.coinId, rec.id, rec.asset_id]
+    .filter(Boolean).map(x => String(x).toLowerCase());
+  return hay.some(h => h.includes(q));
+}
+function _aurixDoctorTx(rec) {
+  const tx = (rec && Array.isArray(rec.transactions)) ? rec.transactions : [];
+  const buys = tx.filter(x => x && (x.type === 'buy' || x.qty > 0));
+  const first = buys[0] || tx[0] || null;
+  return { count: tx.length, firstDate: first && first.ts ? new Date(first.ts).toISOString() : null,
+    firstQty: first ? first.qty : null, firstPrice: first ? first.price : null };
+}
+// Scan a {assets, holdings} pair: returns catalog hits, holding hits, and ORPHAN holdings
+// (holding rows whose catalog asset is missing — the historic data-loss case).
+function _aurixDoctorScanModel(model, q) {
+  const cat = Array.isArray(model && model.assets) ? model.assets : [];
+  const hold = Array.isArray(model && model.holdings) ? model.holdings : [];
+  const catMap = new Map(cat.map(a => [a.id, a]));
+  const catHits = cat.filter(a => _aurixDoctorMatch(a, q));
+  const holdHits = hold.filter(h => _aurixDoctorMatch(h, q) || (catMap.get(h.asset_id) && _aurixDoctorMatch(catMap.get(h.asset_id), q)));
+  const orphans = hold.filter(h => !catMap.has(h.asset_id));
+  const orphanHits = orphans.filter(h => _aurixDoctorMatch(h, q));
+  return { catHits, holdHits, orphans, orphanHits };
+}
+window.aurixAssetDoctor = async function (query) {
+  const q = String(query || 'BTC').toLowerCase();
+  const out = { query: query || 'BTC', when: new Date().toISOString(), sources: {}, verdict: '', recoverableFrom: null };
+  // 1) in-memory (what the app currently holds)
+  try {
+    const mem = (Array.isArray(assets) ? assets : []).filter(a => _aurixDoctorMatch(a, q));
+    out.sources.memory = { found: mem.length > 0, items: mem.map(a => ({ id: a.id, ticker: a.ticker, qty: a.qty, costBasis: a.costBasis, tx: _aurixDoctorTx(a) })) };
+  } catch (e) { out.sources.memory = { error: e.message }; }
+  // 2) localStorage new model (aurix_assets + aurix_holdings)
+  try {
+    const model = { assets: JSON.parse(localStorage.getItem('aurix_assets') || '[]'), holdings: JSON.parse(localStorage.getItem('aurix_holdings') || '[]') };
+    const s = _aurixDoctorScanModel(model, q);
+    out.sources.localNew = { catalogHit: s.catHits.length, holdingHit: s.holdHits.length, orphanHoldings: s.orphans.length, orphanMatches: s.orphanHits.length,
+      holdings: s.holdHits.concat(s.orphanHits).map(h => ({ id: h.id, asset_id: h.asset_id, qty: h.quantity, costBasis: h.costBasis, tx: _aurixDoctorTx(h), orphan: !model.assets.some(a => a.id === h.asset_id) })) };
+  } catch (e) { out.sources.localNew = { error: e.message }; }
+  // 3) legacy mirror (portfolio_assets)
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    const arr = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.assets) ? raw.assets : []);
+    const hits = arr.filter(a => _aurixDoctorMatch(a, q));
+    out.sources.legacyMirror = { found: hits.length > 0, items: hits.map(a => ({ id: a.id, ticker: a.ticker, qty: a.qty, costBasis: a.costBasis, tx: _aurixDoctorTx(a) })) };
+  } catch (e) { out.sources.legacyMirror = { error: e.message }; }
+  // 4) Supabase user_portfolios (the user's remote row)
+  try {
+    if (supabaseClient && currentUser && currentUser.id) {
+      const { data, error } = await supabaseClient.from('user_portfolios').select('assets,holdings,updated_at').eq('user_id', currentUser.id).single();
+      if (error) { out.sources.supabase = { error: error.message }; }
+      else {
+        const s = _aurixDoctorScanModel(data, q);
+        out.sources.supabase = { updated_at: data && data.updated_at, catalogHit: s.catHits.length, holdingHit: s.holdHits.length, orphanHoldings: s.orphans.length, orphanMatches: s.orphanHits.length,
+          holdings: s.holdHits.concat(s.orphanHits).map(h => ({ id: h.id, asset_id: h.asset_id, qty: h.quantity, costBasis: h.costBasis, tx: _aurixDoctorTx(h), orphan: !(Array.isArray(data.assets) && data.assets.some(a => a.id === h.asset_id)) })) };
+      }
+    } else { out.sources.supabase = { error: 'no supabase session / not logged in' }; }
+  } catch (e) { out.sources.supabase = { error: e.message }; }
+  // verdict — first source that holds real financials (qty/cost/tx) wins as recovery source
+  const hasFin = arr => Array.isArray(arr) && arr.some(h => (h.qty || h.quantity || 0) > 0 || (h.costBasis || 0) > 0 || (h.tx && h.tx.count > 0));
+  if (out.sources.memory.found) { out.verdict = 'PRESENT in memory (already loaded). If it does not render, check the category filter / a stale view.'; out.recoverableFrom = 'memory'; }
+  else if (out.sources.supabase && hasFin(out.sources.supabase.holdings)) { out.verdict = 'FOUND in Supabase — recoverable.'; out.recoverableFrom = 'supabase'; }
+  else if (out.sources.localNew && hasFin(out.sources.localNew.holdings)) { out.verdict = 'FOUND in localStorage holdings — recoverable.'; out.recoverableFrom = 'localNew'; }
+  else if (out.sources.legacyMirror && hasFin(out.sources.legacyMirror.items)) { out.verdict = 'FOUND in legacy mirror — recoverable.'; out.recoverableFrom = 'legacyMirror'; }
+  else { out.verdict = 'NOT FOUND in any accessible source (memory/localStorage/legacy/Supabase) — NOT recoverable automatically. Re-add manually; it will persist safely from now on.'; out.recoverableFrom = null; }
+  try { console.log('%c[AURIX ASSET DOCTOR] ' + out.query, 'font-weight:700'); console.log(out.verdict); console.log(JSON.parse(JSON.stringify(out.sources))); } catch (_) {}
+  return out;
+};
+// Surgical restore: pull the FOUND record from its source, ensure a flat asset exists in memory,
+// then save() (which rebuilds from the full in-memory set — every OTHER asset is preserved).
+// Idempotent; never fabricates financials; only static crypto metadata is filled when a known
+// symbol's catalog entry is missing. Returns a report.
+window.aurixRecoverHolding = async function (query) {
+  const diag = await window.aurixAssetDoctor(query);
+  if (diag.recoverableFrom === 'memory') return { restored: false, reason: 'already present in portfolio', diag };
+  if (!diag.recoverableFrom) return { restored: false, reason: 'not recoverable — not found in any source', diag };
+  const q = String(query || 'BTC').toLowerCase();
+  // Re-read the winning source to get the FULL records (assets + holdings).
+  let model = null;
+  if (diag.recoverableFrom === 'supabase') {
+    const { data } = await supabaseClient.from('user_portfolios').select('assets,holdings').eq('user_id', currentUser.id).single();
+    model = { assets: data.assets || [], holdings: data.holdings || [] };
+  } else if (diag.recoverableFrom === 'localNew') {
+    model = { assets: JSON.parse(localStorage.getItem('aurix_assets') || '[]'), holdings: JSON.parse(localStorage.getItem('aurix_holdings') || '[]') };
+  } else if (diag.recoverableFrom === 'legacyMirror') {
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    const arr = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.assets) ? raw.assets : []);
+    model = { assets: arr.map(a => ({ id: a.id, name: a.name, symbol: a.ticker, type: a.type, currentPrice: a.price, assetCurrency: a.assetCurrency, change24h: a.change24h, prevPrice: a.prevPrice, coinId: a.coinId, marketSymbol: a.marketSymbol, image: a.image, logo: a.logo, karat: a.karat, goldUnit: a.goldUnit, isin: a.isin, rent: a.rent, location: a.location })),
+      holdings: arr.map(a => ({ id: a.id, asset_id: a.id, quantity: a.qty, costBasis: a.costBasis, realizedPnL: a.realizedPnL, transactions: a.transactions })) };
+  }
+  // Build flat assets for the matching holdings, salvaging orphans (with the same protection
+  // as load) so a holding whose catalog entry is missing is still recovered.
+  const flat = convertFromNewToFlat(model.assets, model.holdings, _aurixLegacyFallbackById());
+  let target = flat.filter(a => _aurixDoctorMatch(a, q));
+  // Decorate a known-symbol orphan with static metadata (NOT financials) so it renders properly.
+  const KNOWN = { btc: { name: 'Bitcoin', ticker: 'BTC', type: 'crypto', coinId: 'bitcoin', image: 'https://assets.coingecko.com/coins/images/1/large/bitcoin.png' } };
+  target = target.map(a => {
+    if (a._recovered && KNOWN[q]) return Object.assign({}, a, KNOWN[q], { _recovered: true });
+    return a;
+  });
+  if (!target.length) return { restored: false, reason: 'source matched but no financial record resolved', diag };
+  const before = Array.isArray(assets) ? assets.length : 0;
+  let added = 0;
+  target.forEach(rec => {
+    const exists = assets.some(a => a.id === rec.id || (a.ticker && rec.ticker && a.ticker.toUpperCase() === rec.ticker.toUpperCase() && a.type === rec.type));
+    if (!exists) { assets.push(rec); added++; }
+  });
+  if (!added) return { restored: false, reason: 'already present (no change)', diag };
+  try { save(); } catch (e) { return { restored: false, reason: 'save failed: ' + e.message, diag }; }
+  try { if (typeof render === 'function') render(); } catch (_) {}
+  const report = { restored: true, source: diag.recoverableFrom, added, assetCountBefore: before, assetCountAfter: assets.length,
+    restoredItems: target.map(a => ({ id: a.id, ticker: a.ticker, type: a.type, qty: a.qty, costBasis: a.costBasis, tx: _aurixDoctorTx(a) })) };
+  try { console.log('%c[AURIX RECOVER] restored ' + added + ' holding(s) from ' + diag.recoverableFrom, 'color:#2ebd85;font-weight:700'); console.log(report); } catch (_) {}
+  return report;
+};
+
 // ── Input number formatting ────────────────────────────────
 // Parse an es-ES formatted string ("1.234,56") back to a JS float
 // INPUT-HARDEN-1: returns NaN (the existing sentinel) for:
