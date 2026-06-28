@@ -66,9 +66,9 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v408-sync-integrity';
-      var APPJS_V = '408';
-      var HTML_TS = '2026-07-01T20:00:00Z';
+      var BUILD = 'v409-dsh-composition-donut';
+      var APPJS_V = '409';
+      var HTML_TS = '2026-07-02T10:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
       window.AURIX_HTML_TS = HTML_TS;
@@ -172,7 +172,7 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=323">
+  <link rel="stylesheet" href="styles.css?v=324">
 </head>
 <body style="background:#070a14">
 
@@ -309,6 +309,15 @@
             <button type="button" class="aurix-signal-cta" id="aurixSignalCta">
               <span id="aurixSignalCtaLabel" data-i18n="signalHealthCta">Ver análisis</span>
               <span class="aurix-signal-cta-arrow" aria-hidden="true">›</span>
+            </button>
+            <!-- DSH.DONUT.01 — desktop-only micro-donut: a small premium button next to the
+                 analysis pill that opens the real composition modal. Hidden ≤768px (CSS). -->
+            <button type="button" class="micro-composition-donut" id="microCompositionDonut"
+                    aria-label="Ver composición de cartera" title="Ver composición de cartera">
+              <svg class="mcd-ring" viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
+                <circle class="mcd-track" cx="20" cy="20" r="15" pathLength="100"></circle>
+                <g class="mcd-segs"></g>
+              </svg>
             </button>
           </section>
           </div><!-- /.summary-hero-zone -->
@@ -1337,7 +1346,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=408"
+  <script src="app.js?v=409"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
@@ -1952,6 +1961,27 @@
         <button type="button" class="btn-submit btn-submit--ghost" id="healthCloseBtn" data-i18n="healthCtaClose">Cerrar</button>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- DSH.DONUT.01 — Portfolio composition modal (desktop only; opened by the micro-donut next
+     to the analysis pill). Reuses the .modal-overlay / .modal chrome. Real percentages from
+     getInvestableDistribution(); no invented data. -->
+<div class="modal-overlay" id="compositionOverlay" aria-hidden="true">
+  <div class="modal modal--composition" role="dialog" aria-modal="true" aria-labelledby="compositionTitle">
+    <div class="modal-header">
+      <div class="modal-title-block">
+        <h3 id="compositionTitle" data-i18n="compositionTitle">Composición de cartera</h3>
+      </div>
+      <button class="modal-close" id="compositionClose" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body aurix-composition-body">
+      <div class="aurix-composition-chart" id="compositionChart" aria-hidden="true"></div>
+      <ul class="aurix-composition-legend" id="compositionLegend"></ul>
+    </div>
+    <div class="health-actions">
+      <button type="button" class="btn-submit btn-submit--ghost" id="compositionCloseBtn" data-i18n="compositionClose">Cerrar</button>
     </div>
   </div>
 </div>

@@ -3184,6 +3184,9 @@ const T = {
     signalInsightsBodyMobile:    'Análisis disponible',
     signalInsightsCta:           'Ver análisis',
     signalHealthCta:             'Ver análisis',
+    compositionTitle:            'Composición de cartera',
+    compositionClose:            'Cerrar',
+    compositionCenterSub:        'Cartera',
     // AURIX-WORKSPACE-TEASER-POLISH-1: natural one-word-ish health states for
     // the dashboard teaser line (display only; Health Score logic unchanged).
     teaserHealthSolid:           'Salud sólida',
@@ -5222,6 +5225,9 @@ const T = {
     signalInsightsBodyMobile:    'Insights available',
     signalInsightsCta:           'View analysis',
     signalHealthCta:             'View analysis',
+    compositionTitle:            'Portfolio composition',
+    compositionClose:            'Close',
+    compositionCenterSub:        'Portfolio',
     teaserHealthSolid:           'Solid health',
     teaserHealthModerate:        'Moderate risk',
     teaserHealthElevated:        'Elevated risk',
@@ -17530,6 +17536,105 @@ function updateDonut() {
   // DSH.07 — keep the desktop Performance Snapshot in step with every data
   // refresh / holdings change (donut composition + period metrics).
   try { _dshRenderPerfSnapshot(); } catch (_) {}
+  // DSH.DONUT.01 — keep the desktop micro-composition donut in sync (no-op on mobile, which
+  // returns early above before reaching here). Pure additive; reuses getInvestableDistribution().
+  try { renderMiniCompositionDonut(); } catch (_) {}
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// DSH.DONUT.01 — Desktop micro-composition donut + real-composition modal.
+// A small premium button next to the analysis pill (desktop only) that opens a centred modal
+// with the REAL portfolio composition (percentages from getInvestableDistribution — no invented
+// data). Localized, additive; touches no other chart/data/mobile surface.
+// ════════════════════════════════════════════════════════════════════════
+let _aurixCompositionOpener = null, _aurixCompositionInit = false;
+// Real composition entries (incl. real estate), share computed over the displayed total.
+function _aurixCompositionEntries() {
+  let dist = null;
+  try { dist = (typeof getInvestableDistribution === 'function') ? getInvestableDistribution({ includeNonInvestable: true }) : null; } catch (_) { dist = null; }
+  if (!Array.isArray(dist) || !dist.length) return [];
+  const total = dist.reduce((s, d) => s + (Number(d.valueBase) || 0), 0);
+  if (!(total > 0)) return [];
+  return dist.map(d => {
+    const meta = (typeof TYPE_META !== 'undefined' && TYPE_META[d.type]) || { label: d.type, color: '#6b7280' };
+    return { type: d.type, label: meta.label || d.type, color: meta.color || '#6b7280', pct: (Number(d.valueBase) || 0) / total * 100 };
+  }).filter(e => e.pct > 0.05).sort((a, b) => b.pct - a.pct);
+}
+// Segmented ring as <circle> strings (pathLength=100 ⇒ dasharray in % units).
+function _aurixDonutSegmentsSVG(entries, r, cx, cy, w) {
+  let acc = 0, out = '';
+  entries.forEach(e => {
+    const len = Math.max(0, Math.min(100, e.pct));
+    out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" pathLength="100" fill="none" stroke="' + e.color +
+      '" stroke-width="' + w + '" stroke-dasharray="' + len.toFixed(2) + ' ' + (100 - len).toFixed(2) + '" stroke-dashoffset="' + (-acc).toFixed(2) + '"></circle>';
+    acc += len;
+  });
+  return out;
+}
+function renderMiniCompositionDonut() {
+  if (typeof document === 'undefined') return;
+  const btn = document.getElementById('microCompositionDonut'); if (!btn) return;
+  const entries = _aurixCompositionEntries();
+  const segG = btn.querySelector('.mcd-segs');
+  if (segG) segG.innerHTML = entries.length ? _aurixDonutSegmentsSVG(entries, 15, 20, 20, 6) : '';
+  // entries → defer to CSS (desktop-only ≥769px); no data → hide on both.
+  btn.style.display = entries.length ? '' : 'none';
+  _aurixInitCompositionModalOnce();
+}
+function renderCompositionModalDonut() {
+  const chart = document.getElementById('compositionChart');
+  const legend = document.getElementById('compositionLegend');
+  if (!chart || !legend) return;
+  const entries = _aurixCompositionEntries();
+  if (!entries.length) { chart.innerHTML = ''; legend.innerHTML = ''; return; }
+  const esc = (typeof escHtml === 'function') ? escHtml : (s => String(s));
+  const sub = (typeof t === 'function' && typeof t('compositionCenterSub') === 'string') ? t('compositionCenterSub') : 'Cartera';
+  chart.innerHTML =
+    '<svg viewBox="0 0 200 200" width="200" height="200" aria-hidden="true">' +
+      '<circle cx="100" cy="100" r="72" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="26"></circle>' +
+      '<g transform="rotate(-90 100 100)">' + _aurixDonutSegmentsSVG(entries, 72, 100, 100, 26) + '</g>' +
+    '</svg>' +
+    '<div class="aurix-composition-center"><span class="aurix-composition-center-val">100%</span><span class="aurix-composition-center-sub">' + esc(sub) + '</span></div>';
+  legend.innerHTML = entries.map(e =>
+    '<li><span class="acl-dot" style="background:' + e.color + '"></span><span class="acl-label">' + esc(e.label) + '</span><span class="acl-pct">' + e.pct.toFixed(1) + '%</span></li>'
+  ).join('');
+}
+function openCompositionModal() {
+  try {
+    if (typeof window !== 'undefined' && window.innerWidth <= 768) return;   // desktop only
+    const overlay = document.getElementById('compositionOverlay'); if (!overlay) return;
+    renderCompositionModalDonut();
+    _aurixCompositionOpener = document.getElementById('microCompositionDonut');
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+    try { document.body.classList.add('modal-open'); } catch (_) {}
+    const cb = document.getElementById('compositionCloseBtn'); if (cb) { try { cb.focus(); } catch (_) {} }
+  } catch (_) {}
+}
+function closeCompositionModal() {
+  try {
+    const overlay = document.getElementById('compositionOverlay'); if (!overlay) return;
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+    try { document.body.classList.remove('modal-open'); } catch (_) {}
+    if (_aurixCompositionOpener) { try { _aurixCompositionOpener.focus(); } catch (_) {} _aurixCompositionOpener = null; }
+  } catch (_) {}
+}
+function _aurixInitCompositionModalOnce() {
+  if (_aurixCompositionInit || typeof document === 'undefined') return;
+  _aurixCompositionInit = true;
+  try {
+    const btn = document.getElementById('microCompositionDonut');
+    if (btn) btn.addEventListener('click', openCompositionModal);
+    const overlay = document.getElementById('compositionOverlay');
+    if (overlay) overlay.addEventListener('click', (e) => { if (e.target === overlay) closeCompositionModal(); });
+    const x = document.getElementById('compositionClose'); if (x) x.addEventListener('click', closeCompositionModal);
+    const c = document.getElementById('compositionCloseBtn'); if (c) c.addEventListener('click', closeCompositionModal);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { const ov = document.getElementById('compositionOverlay'); if (ov && ov.classList.contains('open')) closeCompositionModal(); }
+    });
+    try { window.openCompositionModal = openCompositionModal; window.closeCompositionModal = closeCompositionModal; } catch (_) {}
+  } catch (_) {}
 }
 
 // ════════════════════════════════════════════════════════════════════════

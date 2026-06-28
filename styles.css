@@ -22668,3 +22668,68 @@ body.aurix-premium-lock{ overflow:hidden; }
 @media (max-width: 560px){
   .settings-name-input{ flex:1 1 auto; width:auto; max-width:58%; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   DSH.DONUT.01 — Desktop micro-composition donut + composition modal.
+   Micro-donut: DESKTOP ONLY (≥769px), a small premium button next to the
+   analysis pill. Mobile is untouched (button hidden). Modal reuses the
+   .modal-overlay / .modal chrome. ══════════════════════════════════════ */
+.micro-composition-donut { display: none; }          /* hidden by default ⇒ mobile never shows it */
+@media (min-width: 769px) {
+  .micro-composition-donut {
+    position: relative;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: 0 0 auto; margin-left: 10px; padding: 3px;
+    width: 46px; height: 46px; border-radius: 50%; cursor: pointer;
+    background: rgba(20, 30, 55, 0.55);
+    border: 1px solid rgba(120, 170, 255, 0.22);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.02) inset, 0 0 10px -2px rgba(74,130,240,0.35);
+    transition: transform .16s var(--ease-out, ease), box-shadow .16s var(--ease-out, ease), border-color .16s ease;
+    animation: aurixMcdIn .6s var(--ease-out, ease) both;   /* fade-in entrance */
+  }
+  .micro-composition-donut:hover {
+    transform: scale(1.04);                                  /* max 1.04 per spec */
+    border-color: rgba(120, 170, 255, 0.40);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 16px 1px rgba(74,130,240,0.50);
+  }
+  .micro-composition-donut:active { transform: scale(.985); transition-duration: 90ms; }
+  .micro-composition-donut:focus-visible { outline: 2px solid rgba(120,170,255,.55); outline-offset: 2px; }
+  /* very subtle periodic glow (pulse every several seconds; never aggressive) */
+  .micro-composition-donut::after {
+    content: ''; position: absolute; inset: -3px; border-radius: 50%; pointer-events: none;
+    animation: aurixMcdPulse 6.5s ease-in-out infinite;
+  }
+}
+.mcd-ring { width: 40px; height: 40px; display: block; }
+.mcd-track {
+  fill: none; stroke: rgba(120, 170, 255, 0.16); stroke-width: 6; stroke-linecap: round;
+  stroke-dasharray: 100; stroke-dashoffset: 100;
+  transform: rotate(-90deg); transform-origin: 50% 50%;
+  animation: aurixMcdDraw .72s var(--ease-out, ease) forwards;   /* ring draws 0→100% */
+}
+.mcd-segs { opacity: 0; animation: aurixMcdSegs .42s ease .42s forwards; }   /* colours reveal after */
+.mcd-segs circle { fill: none; stroke-width: 6; transform: rotate(-90deg); transform-origin: 50% 50%; }
+@keyframes aurixMcdIn   { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: scale(1); } }
+@keyframes aurixMcdDraw { to { stroke-dashoffset: 0; } }
+@keyframes aurixMcdSegs { to { opacity: 1; } }
+@keyframes aurixMcdPulse { 0%, 100% { box-shadow: 0 0 8px 0 rgba(74,130,240,0.0); } 50% { box-shadow: 0 0 13px 1px rgba(74,130,240,0.18); } }
+@media (prefers-reduced-motion: reduce) {
+  .micro-composition-donut { animation: none; }
+  .micro-composition-donut::after { animation: none; }
+  .mcd-track { animation: none; stroke-dashoffset: 0; }
+  .mcd-segs  { animation: none; opacity: 1; }
+}
+
+/* Composition modal — donut + legend */
+.modal--composition { max-width: 420px; }
+.aurix-composition-body { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 22px 24px 8px; }
+.aurix-composition-chart { position: relative; width: 200px; height: 200px; flex: 0 0 auto; }
+.aurix-composition-chart svg { width: 100%; height: 100%; display: block; }
+.aurix-composition-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+.aurix-composition-center-val { font-size: 24px; font-weight: 800; color: var(--text-bright, #fff); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.aurix-composition-center-sub { font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--text-dim, #8a96aa); margin-top: 2px; }
+.aurix-composition-legend { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 9px; }
+.aurix-composition-legend li { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.aurix-composition-legend .acl-dot { width: 11px; height: 11px; border-radius: 3px; flex: 0 0 auto; }
+.aurix-composition-legend .acl-label { color: var(--text, #d7e0f0); flex: 1; }
+.aurix-composition-legend .acl-pct { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--text-bright, #fff); }
