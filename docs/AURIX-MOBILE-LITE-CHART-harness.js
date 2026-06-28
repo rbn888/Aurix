@@ -64,6 +64,8 @@ function makeEnv(engine, opts) {
     initChart: () => { env.chartJsCalls++; }, updateChart: () => { env.chartJsCalls++; },
     initDonut: () => { env.chartJsCalls++; }, updateDonut: () => { env.chartJsCalls++; },
     initMobileCharts: () => { env.chartJsCalls++; }, initMobileSlider: () => { env.chartJsCalls++; },
+    // RC5-A — premium motion gate helpers referenced by the lite SVG class string.
+    _aurixPremiumMotionOn: () => true, _dshReducedMotion: () => false,
     activeRange: '30d',
   };
   sandbox.window = sandbox;

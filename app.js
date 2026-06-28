@@ -19377,6 +19377,21 @@ const _AURIX_SPIKE_DISCIPLINE_LEVELS = {
   medium: { aspect: 0.62, minProm: 4.0, passes: 3 },       // 7D/30D — inherited clusters
   soft:   { aspect: 0.88, minProm: 5.0, passes: 2 },       // 1A/TOTAL — gentle, narrative preserved
 };
+
+// ── RC5-A — Premium Motion Layer ──────────────────────────────────────────────
+// Purely VISUAL entrance/transition motion (line draws left→right via pathLength=1
+// stroke-dashoffset, area reveals after, end-dot fades in). Geometry/data/visualSamples
+// untouched. The CSS only paints under the `.aurix-pm` host class, so OFF (or no class)
+// ⇒ exactly the prior RC4 behaviour. Performance: no getTotalLength()/per-frame measure
+// (pathLength=1 normalises the path), no extra listeners, no reflow loops. Motion is gated
+// at the call sites to: first visible render + manual range/unit change only (NOT auto price
+// refresh / wealth update / redundant re-render), never when reduced-motion or tab hidden.
+const _AURIX_PREMIUM_MOTION_ENABLED = true;                 // rollback: false ⇒ no draw/reveal motion (RC4 behaviour)
+let _aurixWscFirstPaintDone = false;                        // RC5-A — one-shot: desktop draw on the first VISIBLE paint only
+function _aurixPremiumMotionOn() {
+  try { if (typeof window !== 'undefined' && window.AURIX_PREMIUM_MOTION === false) return false; } catch (_) {}
+  return _AURIX_PREMIUM_MOTION_ENABLED;
+}
 // Resolve the reducer params for a range (null ⇒ no polish). Honours the v2 discipline map
 // when enabled; otherwise the legacy gates/params (full rollback in both directions).
 function _aurixSpikeParams(range) {
@@ -22402,7 +22417,7 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
           </defs>
           ${grid}
           <path class="wsc-area" d="${_areaPathFinal}" fill="url(#wscArea-${uid})" shape-rendering="geometricPrecision" style="opacity:${_polish.areaOpacity}"/>
-          <path class="wsc-line" d="${_linePathFinal}" fill="none" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision" style="stroke-width:${_polish.strokeWidth}px" filter="url(#wscGlow-${uid})"/>
+          <path class="wsc-line" d="${_linePathFinal}" pathLength="1" fill="none" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision" style="stroke-width:${_polish.strokeWidth}px" filter="url(#wscGlow-${uid})"/>
         </svg>
         <div class="wsc-ylabs">${_yLabelsFinal}</div>
         <div class="wsc-xlabs">${xLabels}</div>
@@ -22452,14 +22467,25 @@ function renderWealthCurve(animate) {
       }
     } catch (_) {}
   };
-  if (animate && !_dshReducedMotion()) {
-    paint();
-    // WN.27 — the draw/paint-in animation is DESKTOP-only. On mobile the chart
-    // renders directly (no left-to-right paint glow / shimmer on refresh).
-    const el = document.getElementById('perfSnapshot');
-    if (el) { el.classList.remove('wsc-in'); void el.offsetWidth; el.classList.add('wsc-in'); setTimeout(() => el.classList.remove('wsc-in'), 460); }
-  } else {
-    paint();
+  const _reduced = _dshReducedMotion();
+  paint();
+  // WN.27 — the draw/paint-in animation is DESKTOP-only. On mobile the lite SVG
+  // handles its own entrance (aurix-lite-in). RC5-A — premium motion (line draws
+  // left→right + area reveal + end-dot fade) runs on a MANUAL range/unit change
+  // (animate) OR the first VISIBLE paint ("al cargar"); never on auto refresh,
+  // hidden tab, or reduced-motion. The first-paint reveal is an RC5-A feature, so
+  // it is gated on motion being ON ⇒ with the flag off the behaviour is exactly RC4.
+  const el = document.getElementById('perfSnapshot');
+  if (el && !_reduced && !(typeof document !== 'undefined' && document.hidden)) {
+    const _pm = _aurixPremiumMotionOn();
+    const _visible = (typeof el.offsetParent === 'undefined') || el.offsetParent !== null;
+    const _firstVisible = _pm && _visible && !_aurixWscFirstPaintDone;
+    if (_firstVisible) _aurixWscFirstPaintDone = true;
+    if ((animate || _firstVisible) && _visible) {
+      el.classList.remove('wsc-in', 'aurix-pm'); void el.offsetWidth;
+      el.classList.add('wsc-in'); if (_pm) el.classList.add('aurix-pm');
+      setTimeout(() => el.classList.remove('wsc-in', 'aurix-pm'), 620);
+    }
   }
 }
 
@@ -22587,7 +22613,7 @@ function renderAurixMobileLiteChart(range, token) {
     const fillTop = tone === 'down' ? 'rgba(226,85,99,0.15)' : (tone === 'flat' ? 'rgba(159,176,199,0.08)' : 'rgba(46,189,133,0.16)');
     const gid = 'aurixLiteFill_' + tone;
     const svg =
-      '<svg class="aurix-lite-svg' + (_aurixMobileLitePrevRange !== r ? ' aurix-lite-in' : '') + '" viewBox="0 0 ' + VBW + ' ' + VBH + '" preserveAspectRatio="none" width="100%" height="100%" style="display:block" aria-hidden="true">' +
+      '<svg class="aurix-lite-svg' + (_aurixMobileLitePrevRange !== r ? (' aurix-lite-in' + ((_aurixPremiumMotionOn() && !(typeof document !== 'undefined' && document.hidden) && !_dshReducedMotion()) ? ' aurix-pm' : '')) : '') + '" viewBox="0 0 ' + VBW + ' ' + VBH + '" preserveAspectRatio="none" width="100%" height="100%" style="display:block" aria-hidden="true">' +
         '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
           '<stop offset="0" stop-color="' + fillTop + '"/><stop offset="1" stop-color="rgba(0,0,0,0)"/>' +
         '</linearGradient></defs>' +
@@ -22597,8 +22623,8 @@ function renderAurixMobileLiteChart(range, token) {
           '<line class="h" x1="6" y1="73" x2="994" y2="73"/><line class="h" x1="6" y1="130.5" x2="994" y2="130.5"/><line class="h" x1="6" y1="187" x2="994" y2="187"/>' +
           '<line class="v" x1="253" y1="16" x2="253" y2="244"/><line class="v" x1="500" y1="16" x2="500" y2="244"/><line class="v" x1="747" y1="16" x2="747" y2="244"/>' +
         '</g>' +
-        '<path d="' + rc.areaPathData + '" fill="url(#' + gid + ')" stroke="none"/>' +
-        '<path d="' + rc.pathData + '" fill="none" stroke="' + stroke + '" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>' +
+        '<path class="aurix-lite-area" d="' + rc.areaPathData + '" fill="url(#' + gid + ')" stroke="none"/>' +
+        '<path class="aurix-lite-line" pathLength="1" d="' + rc.pathData + '" fill="none" stroke="' + stroke + '" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>' +
       '</svg>';
     if (typeof token === 'number' && token !== _aurixMobileLiteToken) return;    // superseded just before paint
     host.innerHTML = svg;                                                        // ONLY the dedicated leaf

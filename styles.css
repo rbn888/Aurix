@@ -21943,6 +21943,37 @@ body.gs-open { overflow: hidden; }
 @keyframes wscDraw { from { opacity: 0; } to { opacity: .98; } }
 
 /* ══════════════════════════════════════════════════════════════
+   RC5-A — Premium Motion Layer (VISUAL ONLY; geometry/data untouched).
+   Painted ONLY under the `.aurix-pm` host class (added by JS on first visible
+   render + manual range/unit change, never on auto refresh / hidden tab /
+   reduced-motion). Absent class ⇒ exactly the prior RC4 behaviour.
+   The line draws left→right via pathLength=1 + stroke-dashoffset (no
+   getTotalLength / per-frame measure). Area reveals AFTER the line (delay),
+   end-dot fades in (opacity only — marker lock position is JS, untouched). */
+@keyframes aurixLineDraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes aurixAreaReveal { from { opacity: 0; } }   /* implicit `to` = inline area opacity */
+@keyframes aurixDotIn     { from { opacity: 0; } }
+/* DESKTOP (.wsc-*) — higher specificity than `.wsc-in .wsc-line`, so it replaces wscDraw */
+.wsc-in.aurix-pm .wsc-line {
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+  animation: aurixLineDraw .42s cubic-bezier(.4, 0, .2, 1) forwards;   /* 420ms, no overshoot/bounce */
+}
+.wsc-in.aurix-pm .wsc-area     { animation: aurixAreaReveal .2s var(--ease-out, ease) .11s backwards; }   /* after the line: 110ms delay */
+.wsc-in.aurix-pm .wsc-last-dot { animation: aurixDotIn .22s var(--ease-out, ease) .3s backwards; }
+/* MOBILE lite (.aurix-lite-*) */
+.aurix-lite-in.aurix-pm .aurix-lite-line {
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+  animation: aurixLineDraw .4s cubic-bezier(.4, 0, .2, 1) forwards;
+}
+.aurix-lite-in.aurix-pm .aurix-lite-area { animation: aurixAreaReveal .2s var(--ease-out, ease) .1s backwards; }
+@media (prefers-reduced-motion: reduce) {
+  .wsc-in.aurix-pm .wsc-line,
+  .aurix-lite-in.aurix-pm .aurix-lite-line { animation: none; stroke-dasharray: none; stroke-dashoffset: 0; }
+  .wsc-in.aurix-pm .wsc-area, .wsc-in.aurix-pm .wsc-last-dot,
+  .aurix-lite-in.aurix-pm .aurix-lite-area { animation: none; }
+}
+
+/* ══════════════════════════════════════════════════════════════
    AURIX RENDER CONTRACT — card skeleton (shown only while body.aurix-skeleton,
    which is added on mobile shell-first reveal and removed on first data hydrate).
    Pure visual; never paints when the class is absent (desktop/normal flow). */
