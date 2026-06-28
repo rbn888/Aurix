@@ -17564,39 +17564,42 @@ function _aurixCompositionEntries() {
 // Segmented ring as <circle> strings (pathLength=100 ⇒ dasharray in % units). `gap` (% units)
 // leaves a clean separation between segments. Real % share is preserved (gap is purely visual:
 // the slot keeps its full width, only the drawn arc is trimmed).
-function _aurixDonutSegmentsSVG(entries, r, cx, cy, w, gap, opts) {
-  // Each segment positioned by a rotate() ATTRIBUTE (so CSS stroke-dashoffset stays free for the
-  // draw animation); butt caps + small `gap` ⇒ crisp, clearly-separated slices. opts.animate ⇒
-  // each slice draws progressively (sequential sweep) over opts.dur ms; else rendered static.
-  opts = opts || {};
-  const animate = !!opts.animate, total = opts.dur || 800, g = gap || 0;
-  let accFrac = 0, out = '';
+function _aurixDonutSegmentsSVG(entries, r, cx, cy, w, gap) {
+  // STATIC colored slices (the complete ring). Each slice positioned by an INLINE CSS transform
+  // (transform-box: fill-box ⇒ rotate around the circle's own centre) so it always beats any
+  // stylesheet transform rule (the DSH.05 fix). The clockwise REVEAL is done once, on top, by a
+  // single mask wipe (see _aurixDonutRevealSVG) — not per-slice — for a clean continuous sweep.
+  let accFrac = 0, out = ''; const g = gap || 0;
   entries.forEach((e, i) => {
     const slot = Math.max(0, Math.min(100, e.pct));
     const len = Math.max(0.4, slot - g);
     const startDeg = (-90 + accFrac * 360).toFixed(2);
     const dash = len.toFixed(2) + ' ' + (100 - len).toFixed(2);
-    // CRITICAL: position each slice with an INLINE CSS transform (transform-box: fill-box ⇒
-    // rotate around the circle's own centre). Inline beats any stylesheet `transform` rule, so the
-    // earlier `.mcd-segs circle { transform: none }` can no longer null the rotation (the bug that
-    // stacked every slice at the start and left the ring half-empty). dashoffset stays free for the
-    // draw; final state is dashoffset:0 ⇒ each slice fully closed.
-    const pos = 'transform: rotate(' + startDeg + 'deg); transform-box: fill-box; transform-origin: center; ';
-    let draw;
-    if (animate) {
-      // Premium ease-OUT sweep: time each slice along an eased timeline (positions stay geometric)
-      // so the single continuous draw — from 12:00, clockwise — decelerates smoothly to a complete
-      // ring. Contiguous windows ⇒ no gaps/pops between slices.
-      const eo = x => 1 - Math.pow(1 - x, 2.2);
-      const t0 = eo(accFrac) * total, t1 = eo(accFrac + slot / 100) * total;
-      const delayMs = Math.round(t0), durMs = Math.max(40, Math.round(t1 - t0));
-      draw = 'stroke-dashoffset:' + len.toFixed(2) + '; animation: aurixSegDraw ' + durMs + 'ms linear ' + delayMs + 'ms both;';
-    } else { draw = 'stroke-dashoffset:0;'; }
+    const pos = 'transform: rotate(' + startDeg + 'deg); transform-box: fill-box; transform-origin: center;';
     out += '<circle class="mcd-seg" data-idx="' + i + '" cx="' + cx + '" cy="' + cy + '" r="' + r +
-      '" pathLength="100" fill="none" stroke="' + e.color + '" stroke-width="' + w + '" stroke-linecap="butt" stroke-dasharray="' + dash + '" style="' + pos + draw + '"></circle>';
+      '" pathLength="100" fill="none" stroke="' + e.color + '" stroke-width="' + w + '" stroke-linecap="butt" stroke-dasharray="' + dash + '" style="' + pos + ' stroke-dashoffset:0;"></circle>';
     accFrac += slot / 100;
   });
   return out;
+}
+// Inner SVG content. opts.reveal ⇒ the static ring is wrapped in a <g> masked by a single white
+// wipe arc (pathLength=1, rotated -90° so it starts at 12:00) whose stroke-dashoffset animates
+// 1→0 CLOCKWISE — one fluid sweep that grows the ring from the top and closes back at the top.
+// Until `.donut-reveal` is added the wipe sits at dashoffset 1 (mask empty ⇒ ring hidden), so the
+// donut never flashes complete before animating. Without reveal ⇒ plain static complete ring.
+function _aurixDonutRevealSVG(entries, r, cx, cy, w, gap, opts) {
+  opts = opts || {};
+  const segs = _aurixDonutSegmentsSVG(entries, r, cx, cy, w, gap);
+  let inner = '';
+  if (opts.track) inner += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + opts.track + '" style="stroke-width:' + w + 'px;"></circle>';
+  if (opts.reveal) {
+    const uid = opts.uid || 'mcdMask', mw = w + 4, vb = opts.vb || (cx * 2);
+    inner += '<defs><mask id="' + uid + '" maskUnits="userSpaceOnUse" x="0" y="0" width="' + vb + '" height="' + vb + '">' +
+      '<circle class="mcd-wipe" cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="#fff" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" style="stroke-width:' + mw + 'px; transform: rotate(-90deg); transform-box: fill-box; transform-origin: center;"></circle>' +
+      '</mask></defs>' +
+      '<g mask="url(#' + uid + ')">' + segs + '</g>';
+  } else { inner += segs; }
+  return inner;
 }
 // Donut ↔ legend hover sync (brightness only).
 function _aurixCompositionHover(idx, on) {
@@ -17633,12 +17636,18 @@ function renderMiniCompositionDonut() {
     btn.style.display = entries.length ? '' : 'none'; _aurixInitCompositionModalOnce(); return;
   }
   _aurixMiniSig = sig;
+  const ring = btn.querySelector('.mcd-ring');
   if (segG) {
-    // Draw animation runs ONCE per load (first render with data); a later real composition change
-    // re-renders the slices statically — never re-animate. r18/w12 in a 50-viewBox ⇒ a solid,
+    // Reveal (mask wipe) runs ONCE per load (first render with data) and never on a refresh/hover;
+    // a later real composition change re-renders statically. r18/w12 in a 50-viewBox ⇒ a solid,
     // thick ~50px financial donut; gap 1.0 (~1px) ⇒ hairline separation, never holes.
-    const animate = entries.length > 0 && !_aurixMiniDonutDrawn;
-    segG.innerHTML = entries.length ? _aurixDonutSegmentsSVG(entries, 18, 25, 25, 12, 1.0, { animate: animate, dur: 950 }) : '';
+    const reveal = entries.length > 0 && !_aurixMiniDonutDrawn && !_dshReducedMotion();
+    if (ring) ring.classList.remove('donut-reveal', 'donut-ready');
+    segG.innerHTML = entries.length ? _aurixDonutRevealSVG(entries, 18, 25, 25, 12, 1.0, { reveal: reveal, uid: 'mcdMaskMini', vb: 50 }) : '';
+    if (reveal && ring) {
+      ring.classList.add('donut-ready');   // precomputed + hidden (mask empty) until the next frame
+      requestAnimationFrame(() => requestAnimationFrame(() => { try { ring.classList.add('donut-reveal'); } catch (_) {} }));
+    }
     if (entries.length) _aurixMiniDonutDrawn = true;
   }
   // entries → defer to CSS (desktop-only ≥769px); no data → hide on both.
@@ -17656,15 +17665,17 @@ function renderCompositionModalDonut() {
   const sub = (typeof t === 'function' && typeof t('compositionCenterSub') === 'string') ? t('compositionCenterSub') : 'Cartera';
   entries.forEach(e => { try { e.value = fmt(e.valueBase); } catch (_) { e.value = ''; } });
   _aurixModalEntries = entries;   // for the hover tooltip
+  const reveal = !_dshReducedMotion();
+  chart.classList.remove('donut-reveal', 'donut-ready');
   chart.innerHTML =
     '<svg viewBox="0 0 200 200" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' +
-      '<circle cx="100" cy="100" r="74" fill="none" stroke="rgba(255,255,255,.045)" stroke-width="26"></circle>' +
-      _aurixDonutSegmentsSVG(entries, 74, 100, 100, 26, 0.9, { animate: true, dur: 900 }) +
+      _aurixDonutRevealSVG(entries, 74, 100, 100, 26, 0.9, { reveal: reveal, uid: 'mcdMaskModal', vb: 200, track: 'rgba(255,255,255,.045)' }) +
     '</svg>' +
     '<div class="aurix-composition-center"><span class="aurix-composition-center-val">100%</span><span class="aurix-composition-center-sub">' + esc(sub) + '</span></div>';
   legend.innerHTML = entries.map((e, i) =>
     '<li data-idx="' + i + '"><span class="acl-dot" style="background:' + e.color + '"></span><span class="acl-label">' + esc(e.label) + '</span><span class="acl-pct">' + e.pct.toFixed(1) + '%</span></li>'
   ).join('');
+  if (reveal) { chart.classList.add('donut-ready'); requestAnimationFrame(() => requestAnimationFrame(() => { try { chart.classList.add('donut-reveal'); } catch (_) {} })); }
   _aurixCompositionWireHover();   // donut ↔ legend brightness sync + tooltip
 }
 function openCompositionModal() {

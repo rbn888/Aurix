@@ -92,20 +92,20 @@ ok('16b independent premium 54px donut, moved ~60px right of the pill',
 console.log('\nDSH.DONUT.03 — final UX:');
 ok('21 mini: outer ring removed + crisp butt-cap slices (no round/blur)',
    /\.mcd-track \{ display: none; \}/.test(css) && /stroke-linecap="butt"/.test(fnSrc('_aurixDonutSegmentsSVG')));
-ok('22 segments draw ONE BY ONE (progressive sweep) + mini animates ONCE per load',
-   /@keyframes aurixSegDraw \{ to \{ stroke-dashoffset: 0; \} \}/.test(css) &&
-   /animation: aurixSegDraw ' \+ durMs \+ 'ms linear ' \+ delayMs/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
-   /const animate = entries\.length > 0 && !_aurixMiniDonutDrawn;/.test(fnSrc('renderMiniCompositionDonut')) &&
+ok('22 single CLOCKWISE mask-wipe reveal (from 12:00) + mini reveals ONCE per load',
+   /@keyframes aurixDonutSweep \{ to \{ stroke-dashoffset: 0; \} \}/.test(css) &&
+   /\.donut-reveal \.mcd-wipe \{ animation: aurixDonutSweep 850ms cubic-bezier\(\.4, 0, \.2, 1\) forwards; \}/.test(css) &&
+   /const reveal = entries\.length > 0 && !_aurixMiniDonutDrawn && !_dshReducedMotion\(\);/.test(fnSrc('renderMiniCompositionDonut')) &&
    /if \(entries\.length\) _aurixMiniDonutDrawn = true;/.test(fnSrc('renderMiniCompositionDonut')));
-ok('23 modal: compact panel (≈490px) + fade+scale .96→1 / 150ms + centred title + X pinned',
-   /\.modal--composition \{ max-width: 490px; \}/.test(css) &&
+ok('23 modal: compact panel (≈480px) + fade+scale .96→1 / 150ms + centred title + X pinned',
+   /\.modal--composition \{ max-width: 480px; \}/.test(css) &&
    /\.modal--composition \{ max-width: 720px; transform: scale\(\.96\); transition: opacity \.15s ease, transform \.15s ease; \}/.test(css) &&
    /\.modal--composition \.modal-header \{ justify-content: center;/.test(css) &&
    /\.modal--composition \.modal-close \{ position: absolute; right: 12px;/.test(css));
-ok('24 big donut protagonist NOT smaller (234px), rebuilds + draws from 0 each open (900ms)',
-   /\.aurix-composition-chart \{ width: 234px; height: 234px; \}/.test(css) && /_aurixDonutSegmentsSVG\(entries, 74, 100, 100, 26, 0\.9, \{ animate: true, dur: 900 \}\)/.test(app));
+ok('24 big donut protagonist NOT smaller (234px), rebuilds + clockwise-reveals from 0 each open',
+   /\.aurix-composition-chart \{ width: 234px; height: 234px; \}/.test(css) && /_aurixDonutRevealSVG\(entries, 74, 100, 100, 26, 0\.9, \{ reveal: reveal, uid: 'mcdMaskModal', vb: 200, track:/.test(app));
 ok('25 legend TWO narrow columns (name+% close, not at modal edge) + clear column gap + hover sync',
-   /grid-template-columns: repeat\(2, minmax\(0, 184px\)\); gap: 8px 48px;/.test(css) &&
+   /grid-template-columns: repeat\(2, minmax\(0, 176px\)\); gap: 8px 56px;/.test(css) &&
    /\.aurix-composition-legend \.acl-label \{ flex: 1 1 auto; min-width: 0; \}/.test(css) &&
    /function _aurixCompositionHover\(/.test(app) && /_aurixCompositionWireHover\(\);/.test(app) &&
    /\.aurix-composition-chart\.hot \.mcd-seg\.is-hot \{ opacity: 1; filter: brightness/.test(css));
@@ -116,11 +116,11 @@ ok('26 close fade+scale via .modal--composition (X / Cerrar / Escape / backdrop 
 console.log('\nDSH.DONUT.04 — final premium pass:');
 ok('27 thicker SOLID mini ring (12px, smaller hole) + 50px svg',
    /\.mcd-segs circle \{ stroke-width: 12; \}/.test(css) && /\.mcd-ring \{ width: 50px; height: 50px; \}/.test(css) &&
-   /_aurixDonutSegmentsSVG\(entries, 18, 25, 25, 12, 1\.0, \{ animate: animate, dur: 950 \}\)/.test(app));
+   /_aurixDonutRevealSVG\(entries, 18, 25, 25, 12, 1\.0, \{ reveal: reveal, uid: 'mcdMaskMini', vb: 50 \}\)/.test(app));
 ok('28 mini repositioned: down ~18px + right ~24px; subtle halo, no dark frame',
    /\.micro-composition-donut \{[\s\S]*?margin-top: 18px; margin-left: 24px;[\s\S]*?background: transparent;/.test(css));
 ok('29 no holes / solid colours: ~1px gap (1.0 units), butt caps, plain hex stroke (no gradient)',
-   /_aurixDonutSegmentsSVG\(entries, 18, 25, 25, 12, 1\.0/.test(app) && /stroke-linecap="butt"/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
+   /_aurixDonutRevealSVG\(entries, 18, 25, 25, 12, 1\.0/.test(app) && /stroke-linecap="butt"/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
    /stroke="' \+ e\.color \+ '"/.test(fnSrc('_aurixDonutSegmentsSVG')) && !/linearGradient|url\(#/.test(fnSrc('_aurixDonutSegmentsSVG')));
 
 console.log('\nDSH.DONUT.05 — split-ring bug fix:');
@@ -128,8 +128,8 @@ ok('32 CAUSE FIXED: slices positioned by INLINE css transform (transform-box fil
    /transform: rotate\(' \+ startDeg \+ 'deg\); transform-box: fill-box; transform-origin: center;/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
    !/transform="rotate\(/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
    /\.mcd-seg \{ transform-box: fill-box; transform-origin: center; \}/.test(css));
-ok('33 final state complete (static slices dashoffset:0; animation ends at dashoffset:0 with both)',
-   /draw = 'stroke-dashoffset:0;'/.test(fnSrc('_aurixDonutSegmentsSVG')) && /@keyframes aurixSegDraw \{ to \{ stroke-dashoffset: 0; \} \}/.test(css));
+ok('33 final state complete (static slices at dashoffset:0; reveal is a separate mask wipe → 0)',
+   / stroke-dashoffset:0;/.test(fnSrc('_aurixDonutSegmentsSVG')) && /@keyframes aurixDonutSweep \{ to \{ stroke-dashoffset: 0; \} \}/.test(css));
 // behavioral: 6 slices, contiguous rotations covering the full ring (last start + its slot ≈ 360)
 { const sb = { Math }; vm.createContext(sb); vm.runInContext(fnSrc('_aurixDonutSegmentsSVG'), sb);
   const e = [{color:'#7C3AED',pct:47.7},{color:'#EA580C',pct:35.9},{color:'#2563EB',pct:13.1},{color:'#0891B2',pct:2.7},{color:'#16A34A',pct:0.4},{color:'#CA8A04',pct:0.2}];
@@ -165,24 +165,28 @@ ok('20 institutional renderer + mini-chart removal + persistence layers intact',
    /function renderAurixInstitutionalChart\(/.test(app) && /const _AURIX_CATEGORY_PERF_CHART_ENABLED = false;/.test(app) &&
    /const _AURIX_BLOCK_DESTRUCTIVE_SAVES = true;/.test(app) && /const _AURIX_JOURNAL_KEY = 'aurix_portfolio_events';/.test(app));
 
-console.log('\nDSH.DONUT.06 — fluid sweep, no flashes:');
-ok('35 ease-out sweep from 12:00 clockwise (eased timeline; first slice at -90°)',
-   /const eo = x => 1 - Math\.pow\(1 - x, 2\.2\);/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
-   /eo\(accFrac\) \* total, t1 = eo\(accFrac \+ slot \/ 100\) \* total/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
-   /-90 \+ accFrac \* 360/.test(fnSrc('_aurixDonutSegmentsSVG')));
-ok('36 no flashes on refresh: mini render is MEMOISED (skip rebuild when composition unchanged)',
-   /const sig = entries\.map\(e => e\.type \+ ':' \+ e\.pct\.toFixed\(1\)\)\.join\('\|'\);/.test(fnSrc('renderMiniCompositionDonut')) &&
+console.log('\nDONUT-PREMIUM-REVEAL — clockwise mask wipe + flicker fix:');
+ok('35 single mask-wipe reveal: white arc rotated -90° (starts 12:00), pathLength=1, dashoffset 1→0 clockwise',
+   /<circle class="mcd-wipe"[^>]*pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"[^>]*transform: rotate\(-90deg\); transform-box: fill-box/.test(fnSrc('_aurixDonutRevealSVG')) &&
+   /<mask id="' \+ uid \+ '"/.test(fnSrc('_aurixDonutRevealSVG')) && /<g mask="url\(#' \+ uid \+ '\)">' \+ segs/.test(fnSrc('_aurixDonutRevealSVG')));
+ok('36 ready→reveal gate (never flashes complete) + MEMOISED (refresh/hover never restart it)',
+   /ring\.classList\.add\('donut-ready'\);/.test(fnSrc('renderMiniCompositionDonut')) &&
+   /requestAnimationFrame\(\(\) => requestAnimationFrame\(\(\) => \{ try \{ ring\.classList\.add\('donut-reveal'\)/.test(fnSrc('renderMiniCompositionDonut')) &&
    /if \(segG && sig === _aurixMiniSig && segG\.childNodes\.length\) \{[\s\S]*?return;/.test(fnSrc('renderMiniCompositionDonut')));
-ok('37 periodic pulse "resplandor" removed (clean static halo + breathing kept)',
+ok('37 periodic pulse "resplandor" removed (clean static halo + breathing kept) + reduced-motion static ring',
    /\.micro-composition-donut::after \{ animation: none; box-shadow: none; content: none; \}/.test(css) &&
-   /@keyframes aurixMcdBreath/.test(css));
-// behavioral: eased timeline still covers the full ring and stays monotonic (no gaps/overlaps in time)
-{ const sb = { Math }; vm.createContext(sb); vm.runInContext(fnSrc('_aurixDonutSegmentsSVG'), sb);
+   /@keyframes aurixMcdBreath/.test(css) &&
+   /@media \(prefers-reduced-motion: reduce\) \{ \.mcd-wipe \{ animation: none; stroke-dashoffset: 0; \} \}/.test(css));
+ok('38 FLICKER FIX: .hero-card:hover no longer transitions box-shadow (only border-color animates)',
+   /\.hero-card \{ transition: border-color var\(--dur-med\) var\(--ease-premium\); \}/.test(css) &&
+   /\.hero-card:hover \{\s*border-color: rgba\(77,141,255,0\.40\);/.test(css));
+// behavioral: the static ring still covers 360° AND the reveal markup contains exactly one wipe + mask
+{ const sb = { Math }; vm.createContext(sb); vm.runInContext(fnSrc('_aurixDonutSegmentsSVG'), sb); vm.runInContext(fnSrc('_aurixDonutRevealSVG'), sb);
   const e = [{color:'#7C3AED',pct:47.7},{color:'#EA580C',pct:35.9},{color:'#2563EB',pct:13.1},{color:'#0891B2',pct:2.7},{color:'#16A34A',pct:0.4},{color:'#CA8A04',pct:0.2}];
-  const svg = sb._aurixDonutSegmentsSVG(e, 18, 25, 25, 12, 1.0, { animate: true, dur: 950 });
-  const delays = (svg.match(/aurixSegDraw \d+ms linear (\d+)ms/g) || []).map(s => +s.match(/linear (\d+)ms/)[1]);
-  ok('38 eased draw timeline is monotonic, starts at 0ms, within the duration (continuous sweep)',
-     delays.length===6 && delays[0]===0 && delays.every((v,i)=>i===0||v>=delays[i-1]) && delays[delays.length-1] <= 950, 'delays=' + delays.join(',')); }
+  const reveal = sb._aurixDonutRevealSVG(e, 18, 25, 25, 12, 1.0, { reveal: true, uid: 'm', vb: 50 });
+  ok('39 reveal markup = 1 mask + 1 wipe + 6 static slices under the masked group (ring complete)',
+     (reveal.match(/<mask /g)||[]).length===1 && (reveal.match(/class="mcd-wipe"/g)||[]).length===1 &&
+     (reveal.match(/class="mcd-seg"/g)||[]).length===6 && /<g mask="url\(#m\)">/.test(reveal)); }
 
 console.log('\nRESULT: '+(fail===0?'ALL PASS ✓':'FAIL ✗')+'  ('+pass+' passed, '+fail+' failed)');
 process.exit(fail===0?0:1);

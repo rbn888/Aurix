@@ -22874,3 +22874,31 @@ body.aurix-premium-lock{ overflow:hidden; }
   .micro-composition-donut { box-shadow: 0 0 13px -5px rgba(74,130,240,0.40); }          /* clean, subtle blue halo */
 }
 .modal--composition { max-width: 490px; }   /* ≈−12% lateral space; donut unchanged (protagonist) */
+
+/* ══════════════════════════════════════════════════════════════
+   DSH.DONUT.07 — clockwise mask-wipe REVEAL + dashboard flicker fix.
+   The colored ring is static (complete); a single white wipe arc (rotated -90° ⇒ starts at
+   12:00) grows clockwise via stroke-dashoffset 1→0, revealing it as one fluid sweep that closes
+   back at the top. .donut-ready holds it hidden (mask empty) until .donut-reveal triggers the
+   sweep on the next frame ⇒ never flashes complete. reduced-motion ⇒ static full ring. ════ */
+.mcd-wipe { stroke-dashoffset: 1; }
+.donut-reveal .mcd-wipe { animation: aurixDonutSweep 850ms cubic-bezier(.4, 0, .2, 1) forwards; }
+@keyframes aurixDonutSweep { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .mcd-wipe { animation: none; stroke-dashoffset: 0; } }
+
+/* FLICKER FIX — the donut, the analysis pill and the wealth chart all live INSIDE .hero-card,
+   whose :hover transitioned a large 52px box-shadow glow ⇒ a repaint flash every time the mouse
+   moved over them. Hover now only nudges the (cheap) border-colour; the box-shadow is identical
+   to the base (no transition), so nothing repaints. Only border-color animates. */
+.hero-card { transition: border-color var(--dur-med) var(--ease-premium); }
+.hero-card:hover {
+  border-color: rgba(77,141,255,0.40);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 18px 50px rgba(0,0,0,0.40),
+    0 0 44px rgba(77,141,255,0.10);
+}
+
+/* Modal — a touch narrower; legend columns separated a bit more */
+.modal--composition { max-width: 480px; }
+.aurix-composition-legend { grid-template-columns: repeat(2, minmax(0, 176px)); gap: 8px 56px; }
