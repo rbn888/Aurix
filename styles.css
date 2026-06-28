@@ -22114,11 +22114,23 @@ body.aurix-skeleton #totalValue::after {
   .mobile-slide-chart .chart-title { margin-bottom: 1px; }
 
   /* PART 4 — range controls: compact, single row, no wrap/crowding. */
-  .mobile-slide-chart .chart-controls { width: 100%; gap: 6px; flex-wrap: nowrap; justify-content: space-between; }
+  /* align-items:flex-start so the range buttons stay level with the %/€ selector while
+     the return indicator hangs below it (RC5-B FASE 2). */
+  .mobile-slide-chart .chart-controls { width: 100%; gap: 6px; flex-wrap: nowrap; justify-content: space-between; align-items: flex-start; }
   .mobile-slide-chart .range-toggle  { flex-wrap: nowrap; flex: 1; justify-content: space-between; padding: 2px; }
   .mobile-slide-chart .range-btn     { padding: 5px 7px; font-size: 10.5px; letter-spacing: .3px; flex: 1 1 auto; }
   .mobile-slide-chart .range-btn.active { font-weight: 800; }  /* active clear but compact */
   .mobile-slide-chart .perf-toggle   { flex: 0 0 auto; }
+
+  /* RC5-B FASE 2 — Header Gain Placement: %/€ selector on top, current return as a premium
+     micro-subtext directly below it. Touch area of the buttons is untouched; the indicator
+     reserves its line height so toggling/empty state never jumps the layout. */
+  .mobile-slide-chart .perf-unit-block { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; flex: 0 0 auto; }
+  .mobile-slide-chart .perf-unit-block .chart-change {
+    margin: 0; padding-left: 3px; min-height: 12px; line-height: 1;
+    font-size: 11px; font-weight: 800; letter-spacing: .2px; font-variant-numeric: tabular-nums;
+  }
+  .mobile-slide-chart .perf-unit-block .chart-change .wsc-metric-val { font-size: 11px; font-weight: 800; }
 
   /* PART 6 — give the plot breathing room (slightly taller). */
   .mobile-slide-chart .chart-wrap { min-height: 244px; }

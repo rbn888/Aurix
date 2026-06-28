@@ -19378,6 +19378,54 @@ const _AURIX_SPIKE_DISCIPLINE_LEVELS = {
   soft:   { aspect: 0.88, minProm: 5.0, passes: 2 },       // 1A/TOTAL — gentle, narrative preserved
 };
 
+// ── RC5-B FASE 1 — Vertical Step Softening ────────────────────────────────────
+// VISUAL-ONLY: a near-vertical LONG drawn segment (a real level jump) is redrawn with
+// premium eased shoulders by inserting smoothstep-distributed VISUAL vertices BETWEEN the
+// two real points. The real points (global max/min, endpoints, last) are NEVER moved or
+// removed; inserted points stay strictly inside the segment's value range (monotonic — no
+// overshoot, no new extrema, no new teeth). The jump is preserved, only its entry/exit are
+// eased. runs are already gap-split, so this never crosses a gap (24H stays one subpath).
+// visiblePoints/visiblePixels/tooltip data are untouched; visualSamples are sampled from the
+// resulting (softened) segments downstream, so the inspector stays glued to the visible line.
+const _AURIX_VERTICAL_STEP_SOFTENING_ENABLED = true;       // rollback: false ⇒ exact RC5-A path
+const _AURIX_VERTICAL_STEP_SOFTENING = {
+  maxVerticalSlope: 2.2,    // px/px — only segments steeper than this are candidates (a "wall")
+  minVerticalPx: 26,        // px — only jumps taller than this (skip micro-steps)
+  softeningRadiusPx: 8,     // px — perceptual shoulder width at each corner
+  rangeMultiplier: { '24h': 1.0, '7d': 0.78, '30d': 0.78, '1y': 0.5, 'all': 0.5 },   // 24H suave-medio · 7D/30D suave · 1A/TOTAL muy suave
+};
+function _aurixSoftenVerticalSteps(drawn, xScale, yScale, range, diag) {
+  if (!_AURIX_VERTICAL_STEP_SOFTENING_ENABLED) return drawn;
+  if (!Array.isArray(drawn) || drawn.length < 2) return drawn;
+  const C = _AURIX_VERTICAL_STEP_SOFTENING;
+  const r = String(range || '').toLowerCase();
+  const strength = (C.rangeMultiplier && typeof C.rangeMultiplier[r] === 'number') ? C.rangeMultiplier[r] : 0.6;
+  if (strength <= 0) return drawn;
+  const smooth = f => f * f * (3 - 2 * f);                  // smoothstep: horizontal tangents at 0 and 1
+  const out = [drawn[0]];
+  for (let i = 0; i < drawn.length - 1; i++) {
+    const a = drawn[i], b = drawn[i + 1];
+    const ax = xScale.x(a.time), bx = xScale.x(b.time);
+    const ay = yScale.y(a.value), by = yScale.y(b.value);
+    const dxPx = Math.abs(bx - ax), dyPx = Math.abs(by - ay);
+    const slope = dyPx / Math.max(dxPx, 0.5);
+    const isCandidate = dyPx >= C.minVerticalPx && dxPx >= 0.5 && slope >= C.maxVerticalSlope;
+    if (diag && dyPx >= C.minVerticalPx && slope >= C.maxVerticalSlope) diag.candidates++;
+    if (isCandidate) {
+      const fo = Math.max(0.12, Math.min(0.30, C.softeningRadiusPx / dxPx));   // shoulder ≈ softeningRadiusPx wide
+      const fr = [fo, 0.5, 1 - fo];
+      for (let k = 0; k < fr.length; k++) {
+        const f = fr[k];
+        const vf = (1 - strength) * f + strength * smooth(f);   // blend linear ↔ smoothstep
+        out.push({ time: a.time + f * (b.time - a.time), value: a.value + vf * (b.value - a.value), _soft: true });
+      }
+      if (diag) { diag.softenedSegments++; diag.insertedPoints += fr.length; }
+    }
+    out.push(b);
+  }
+  return out;
+}
+
 // ── RC5-A — Premium Motion Layer ──────────────────────────────────────────────
 // Purely VISUAL entrance/transition motion (line draws left→right via pathLength=1
 // stroke-dashoffset, area reveals after, end-dot fades in). Geometry/data/visualSamples
@@ -19673,6 +19721,7 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
   let overshoot = false, fallbacks = 0, droppedSubpaths = 0, drawnVertexCount = 0; const linePieces = [], areaPieces = [];
   const visualSamples = [];   // RC3-INC7 — dense polyline of the DRAWN curve (for inspector cursor snap)
   let _spikeDiag24h = null;   // RC4-G FASE 1 — read-only spike diagnostic (24H)
+  let _softDiag = _AURIX_VERTICAL_STEP_SOFTENING_ENABLED ? { candidates: 0, softenedSegments: 0, insertedPoints: 0 } : null;   // RC5-B FASE 1
   const _arrCfg = _aurixArrConfig(r);   // RC3-INC2 — range + shape aware ARR contract (null ⇒ no-op)
   runs.forEach(run => {
     if (run.length < 2) { droppedSubpaths++; return; }   // never happens post-coalesce; guard only
@@ -19687,7 +19736,10 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
     // INC4-A/D — perceptual simplification (teeth + microangles), extremes/endpoints locked.
     // INC5 — range-aware epsilon (24H stronger to suppress micro-zigzag).
     if (_AURIX_POLISH_ENABLED) drawn = _aurixPolishSimplify(drawn, xScale, yScale, r);
-    drawnVertexCount += drawn.length;
+    drawnVertexCount += drawn.length;   // ARR contract: real drawn vertices (≤ visiblePoints), counted BEFORE softening
+    // RC5-B FASE 1 — ease the entry/exit of near-vertical LONG jumps (visual-only; real points
+    // kept, monotonic insert, no new extrema/teeth). visualSamples below sample the softened path.
+    drawn = _aurixSoftenVerticalSteps(drawn, xScale, yScale, r, _softDiag);
     const mp = _aurixMonotonePath(drawn, xScale, yScale);
     if (mp.overshoot) overshoot = true; fallbacks += mp.lineFallbacks || 0;
     // INC4-C — distance-aware subdivision of long segments (pure geometry on the curve).
@@ -19751,6 +19803,7 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
       visiblePoints: visiblePoints.length,
       drawnVertexCount,                          // ARR — vertices actually sent to the path (≤ visiblePoints)
       spikeDiag: _spikeDiag24h,                  // RC4-G FASE 1 — read-only 24H spike audit (null off-24H)
+      softenDiag: _softDiag,                     // RC5-B FASE 1 — read-only vertical-step softening audit
       gapCount: (prepared.gaps || []).length,
       bridgedGapCount: _bridgedGaps.length,      // RC3-INC3 — gaps drawn continuous (24H render-only bridge)
       splitGapCount: _splitGaps.length,          // gaps that actually break the visible path

@@ -66,9 +66,9 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v399-rc5a-premium-motion';
-      var APPJS_V = '401';
-      var HTML_TS = '2026-06-29T12:00:00Z';
+      var BUILD = 'v400-rc5b-vertical-softening-header';
+      var APPJS_V = '402';
+      var HTML_TS = '2026-06-29T18:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
       window.AURIX_HTML_TS = HTML_TS;
@@ -172,7 +172,7 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=319">
+  <link rel="stylesheet" href="styles.css?v=320">
 </head>
 <body style="background:#070a14">
 
@@ -423,13 +423,16 @@
             <div class="chart-header">
               <div>
                 <div class="chart-title card-title" data-i18n="evolution">Evolución del patrimonio</div>
-                <span class="chart-change" id="chartChangeMobile"></span>
                 <span class="chart-baseline-note" id="chartBaselineNoteMobile" hidden></span>
               </div>
               <div class="chart-controls">
-                <div class="perf-toggle">
-                  <button class="perf-btn active" data-perf="%">%</button>
-                  <button class="perf-btn" data-perf="curr">€</button>
+                <!-- RC5-B FASE 2 — perf return moved BELOW the %/€ selector as premium micro-subtext -->
+                <div class="perf-unit-block">
+                  <div class="perf-toggle">
+                    <button class="perf-btn active" data-perf="%">%</button>
+                    <button class="perf-btn" data-perf="curr">€</button>
+                  </div>
+                  <span class="chart-change" id="chartChangeMobile"></span>
                 </div>
                 <div class="range-toggle">
                   <button class="range-btn active" data-range="24h">24H</button>
@@ -1334,7 +1337,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=401"
+  <script src="app.js?v=402"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
