@@ -22132,6 +22132,18 @@ body.aurix-skeleton #totalValue::after {
   }
   .mobile-slide-chart .perf-unit-block .chart-change .wsc-metric-val { font-size: 11px; font-weight: 800; }
 
+  /* RC5-C — Mobile header micro-tuning: invert hierarchy slightly. The %/€ selector reads as a
+     compact CONTROL; the return below reads as the important DATUM. CSS-only; tone colour, the
+     single-row temporalities and a comfortable touch target (≥26px) are preserved. The indicator
+     stays nowrap + content-sized so a longer money value never overflows the row.
+     Rollback: delete this RC5-C block (restores the RC5-B FASE 2 state exactly). */
+  .mobile-slide-chart .perf-toggle .perf-btn { padding: 3px 7px; min-height: 26px; font-size: 11px; line-height: 1; }
+  .mobile-slide-chart .perf-unit-block { gap: 2px; }
+  .mobile-slide-chart .perf-unit-block .chart-change {
+    font-size: 14px; min-height: 15px; line-height: 1.02; white-space: nowrap;
+  }
+  .mobile-slide-chart .perf-unit-block .chart-change .wsc-metric-val { font-size: 14px; font-weight: 800; }
+
   /* PART 6 — give the plot breathing room (slightly taller). */
   .mobile-slide-chart .chart-wrap { min-height: 244px; }
 

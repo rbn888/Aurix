@@ -92,9 +92,19 @@ ok('12 %/€ toggle updates the indicator (reads activePerfMode, writes #chartCh
      /\.mobile-slide-chart \.perf-unit-block \{ display: flex; flex-direction: column;/.test(css) &&
      /\.mobile-slide-chart \.perf-unit-block \.chart-change \{[\s\S]*?min-height: 12px;/.test(css) &&
      /align-items: flex-start;/.test(ctrlRule) && /flex-wrap: nowrap;/.test(ctrlRule)); }
-ok('14 buttons still tappable (perf-btn touch area untouched: min-height 28px)',
-   /\.portfolio-mobile-slider \.perf-btn  \{ padding: 4px 9px; min-height: 28px; \}/.test(css) &&
-   !/\.mobile-slide-chart \.perf-btn \{[^}]*min-height: (1\d|2[0-7])px/.test(css));
+ok('14 buttons still tappable (RC5-C compact selector keeps a comfortable ≥26px touch target)',
+   /\.mobile-slide-chart \.perf-toggle \.perf-btn \{ padding: 3px 7px; min-height: 26px;/.test(css));
+
+console.log('\nRC5-C — header micro-tuning (selector compact · return more visible):');
+{ const sel = (css.match(/\.mobile-slide-chart \.perf-toggle \.perf-btn \{[^}]*\}/)||[''])[0];
+  const ind = (css.match(/\.mobile-slide-chart \.perf-unit-block \.chart-change \{[^}]*font-size: 14px;[^}]*\}/)||[''])[0];
+  const selFs = +((sel.match(/font-size: (\d+)px/)||[])[1] || 0);
+  const indFs = +((ind.match(/font-size: (\d+)px/)||[])[1] || 0);
+  ok('15 hierarchy inverted: return font-size (14) > selector font-size (11), tone colour intact',
+     indFs >= 14 && selFs <= 11 && indFs > selFs && /\.chart-change\.up   \{ color: var\(--green\); \}/.test(css) && /\.chart-change\.down \{ color: var\(--red\); \}/.test(css), 'return='+indFs+'px selector='+selFs+'px');
+  ok('16 return stays nowrap + content-sized (no row overflow) and aligned under the selector',
+     /\.mobile-slide-chart \.perf-unit-block \.chart-change \{[^}]*white-space: nowrap;/.test(css) &&
+     /\.mobile-slide-chart \.perf-unit-block \{ display: flex; flex-direction: column; align-items: flex-start;/.test(css)); }
 
 console.log('\nRESULT: '+(fail===0?'ALL PASS ✓':'FAIL ✗')+'  ('+pass+' passed, '+fail+' failed)');
 process.exit(fail===0?0:1);
