@@ -19,7 +19,7 @@ console.log('AURIX-MOBILE-LAYOUT-RC4B — RC4-B\n');
 
 // ── FASE 1 — 24H spike polish (pure) ──
 const sb1 = { Math }; vm.createContext(sb1); vm.runInContext(CONST_BLOCK, sb1);
-const spike = sb1._aurix24hSpikePolish;
+const spike = function(d){ return sb1._aurix24hSpikeGuard(d, {x:t=>t}, {y:v=>v}, []); };
 const xs = { x: t => t }, ys = { y: v => v };   // identity scales → time=px, value=py units
 // build: smooth ramp + one NARROW REVERTING tooth + a real BURST (sustained) + extremes
 function build() {
@@ -45,14 +45,14 @@ ok('2 endpoints preserved', dP[0].time===d0[0].time && dP[dP.length-1].time===d0
 ok('4 sustained burst kept (real climb not dropped)', dP.some(p=>p.value===95) && dP.some(p=>p.value===130));
 ok('5 output is a subset of real points (no fabrication)', dP.every(p=>d0.some(q=>q.time===p.time&&q.value===p.value)));
 // gated: ENABLED=false → no-op
-{ const sbOff={Math}; vm.createContext(sbOff); vm.runInContext(CONST_BLOCK.replace('_AURIX_24H_SPIKE_POLISH_ENABLED = true','_AURIX_24H_SPIKE_POLISH_ENABLED = false'), sbOff);
+{ const sbOff={Math}; vm.createContext(sbOff); vm.runInContext(CONST_BLOCK.replace('_AURIX_24H_SPIKE_GUARD_ENABLED = true','_AURIX_24H_SPIKE_GUARD_ENABLED = false'), sbOff);
   // the gate is in the render wiring (r==='24h' && ENABLED); the helper itself always thins —
   // assert the live wiring gates it and is reversible by constant.
-  ok('6 spike polish gated by _AURIX_24H_SPIKE_POLISH_ENABLED + 24H-only (reversible)',
-     /_AURIX_24H_SPIKE_POLISH_ENABLED && r === '24h'/.test(app) && /_AURIX_24H_SPIKE_POLISH_ENABLED = (true|false)/.test(app)); }
+  ok('6 spike guard gated by _AURIX_24H_SPIKE_GUARD_ENABLED + 24H-only (reversible)',
+     /_AURIX_24H_SPIKE_GUARD_ENABLED && r === '24h'/.test(app) && /_AURIX_24H_SPIKE_GUARD_ENABLED = (true|false)/.test(app)); }
 
 // ── 24H render contract still holds (no split, extremes, last) ──
-const ENG = ['_aurixRenderContractGeometry','_aurixVpTargetPointCount','_aurixComputeVisualPreparation','prepareAurixVisualSeries','downsampleAurixLTTB','_aurixSignificantLocalExtrema','downsampleAurixAdaptive','computeAurixTimeScale','computeAurixAdaptiveXScale','computeAurixValueScale','_aurixArrConfig','_aurixArrRepresentVertices','_aurixPolishSimplify','_aurix24hSpikePolish','_aurixSampleSegments','_aurixDensifyPathSegments','_aurixMonotonePath','buildAurixMonotonicPath','buildAurixAreaPath','_aurixSplitAtGaps','_wscFmtAxisVal','auditAurixRenderVsCanonical','_aurixCompareRenderToCanonical','renderAurixInstitutionalChart'];
+const ENG = ['_aurixRenderContractGeometry','_aurixVpTargetPointCount','_aurixComputeVisualPreparation','prepareAurixVisualSeries','downsampleAurixLTTB','_aurixSignificantLocalExtrema','downsampleAurixAdaptive','computeAurixTimeScale','computeAurixAdaptiveXScale','computeAurixValueScale','_aurixArrConfig','_aurixArrRepresentVertices','_aurixPolishSimplify','_aurix24hSpikeGuard','_aurixSampleSegments','_aurixDensifyPathSegments','_aurixMonotonePath','buildAurixMonotonicPath','buildAurixAreaPath','_aurixSplitAtGaps','_wscFmtAxisVal','auditAurixRenderVsCanonical','_aurixCompareRenderToCanonical','renderAurixInstitutionalChart'];
 const AUX = ['_AURIX_RC_QUALITY_THRESHOLD','_AURIX_RC_WINDOW_MS','_AURIX_RC_DASHBOARD_TOL','_AURIX_RC_ASPECT','_AURIX_RC_PAD_FRAC','_AURIX_RC_VPAD_FRAC','_AURIX_IR_VALUE_MARGIN','_AURIX_IR_VPAD_FRAC','_AURIX_Y_JUMP_DOMINANCE','_AURIX_Y_LEGIBLE_ALPHA','_AURIX_X_FILL_BETA','_AURIX_VP_DENSITY','_AURIX_VP_GAP_FLOOR_MS','_AURIX_VP_GAP_MEDIAN_MULT','_AURIX_VP_CAPITAL_KINDS','_AURIX_VP_CLUSTER_WIDTH_PX','_AURIX_VP_CLUSTER_MIN_PTS','_AURIX_VP_VALUE_EPS'];
 let SER=[],DSH=null;
 const sbR = { console, getAurixRenderSeries:()=>SER, investableValueBase:()=>DSH, _aurixLoadCapitalFlows:()=>[], window:undefined, Math, JSON, Array, Number, isFinite, Infinity, Date, activeRange:'24h' };

@@ -19310,38 +19310,49 @@ function _aurixPolishSimplify(drawn, xScale, yScale, range) {
   return out;
 }
 
-// RC4-B FASE 1 — 24H SPIKE POLISH (render-only, 24H only). After simplification, 24H can
-// still show nervous narrow "teeth": a single drawn vertex that juts far then reverts
-// immediately (its two neighbours are close). Those are visually aggressive and add no
-// institutional information. This drops ONLY such narrow reverting spikes from the DRAWN
-// set — never the global max/min, never the endpoints, never a sustained burst (where the
-// neighbours genuinely progress). Returns a SUBSET of real points (no fabrication; values/
-// timestamps/visiblePoints/tooltip/inspector untouched). Rollback: ENABLED=false.
-const _AURIX_24H_SPIKE_POLISH_ENABLED = true;
-const _AURIX_24H_SPIKE_MAX_BASE_PX = 9;       // narrow base: px between the spike's two neighbours
-const _AURIX_24H_SPIKE_MIN_PROM_PX = 6;       // juts ≥ this far (px) from the SMALLER neighbour
-const _AURIX_24H_SPIKE_MAX_REVERT_PX = 4;     // neighbours within this (px) ⇒ the curve reverts (redundant tooth)
-function _aurix24hSpikePolish(drawn, xScale, yScale) {
-  const n = Array.isArray(drawn) ? drawn.length : 0;
-  if (n < 5) return drawn;
-  const px = new Array(n), py = new Array(n);
-  for (let i = 0; i < n; i++) { px[i] = xScale.x(drawn[i].time); py[i] = yScale.y(drawn[i].value); }
-  let miIdx = 0, maIdx = 0;
-  for (let i = 1; i < n; i++) { if (drawn[i].value < drawn[miIdx].value) miIdx = i; if (drawn[i].value > drawn[maIdx].value) maIdx = i; }
-  const drop = new Array(n).fill(false);
-  for (let i = 1; i < n - 1; i++) {
-    if (i === miIdx || i === maIdx) continue;          // never the global extremes
-    if (drop[i - 1]) continue;                          // don't collapse two in a row (keep a representative)
-    const a = py[i - 1], b = py[i + 1], c = py[i];
-    const isPeak = c < a && c < b, isTrough = c > a && c > b;   // y grows downward
-    if (!isPeak && !isTrough) continue;
-    const prom = Math.min(Math.abs(c - a), Math.abs(c - b));   // smaller excursion
-    const base = px[i + 1] - px[i - 1];                         // horizontal width of the tooth
-    const revert = Math.abs(a - b);                             // how close the neighbours are
-    if (base <= _AURIX_24H_SPIKE_MAX_BASE_PX && prom >= _AURIX_24H_SPIKE_MIN_PROM_PX && revert <= _AURIX_24H_SPIKE_MAX_REVERT_PX) drop[i] = true;
+// RC4-D — 24H SPIKE GUARD (render-only, 24H only). PERMANENT, robust replacement for the
+// RC4-B spike polish, whose absolute base/revert thresholds (≤9px / ≤4px) almost never
+// matched the real post-ARR/RDP geometry (kept-vertex spacing is larger) → it was an effective
+// no-op and the sharp vertical teeth came back. The guard is ASPECT-based (spacing-independent):
+// a redundant micro-spike is a SINGLE drawn vertex that is a strict local extreme, juts ≥
+// _MIN_PROM_PX, and is "tall & thin" (prominence / base ≥ _ASPECT). It is dropped from the
+// DRAWN path only — never the global max/min, endpoints, gap-edge points, or a sustained run
+// (a real burst is multiple vertices, so its members are not strict single-vertex extremes).
+// Iterates a few passes (removing a spike can expose another). Returns a SUBSET of real points
+// (no fabrication; visiblePoints/visualSamples-source/tooltip/inspector untouched). Rollback:
+// _AURIX_24H_SPIKE_GUARD_ENABLED=false.
+const _AURIX_24H_SPIKE_GUARD_ENABLED = true;
+const _AURIX_24H_SPIKE_MIN_PROM_PX = 4.5;     // min vertical excursion (px) to consider a spike
+const _AURIX_24H_SPIKE_ASPECT = 0.55;         // prominence / base ≥ this ⇒ "tall & thin" sharp tooth
+const _AURIX_24H_SPIKE_MAX_PASSES = 3;        // iterate (a removed spike can expose a neighbour)
+function _aurix24hSpikeGuard(drawn, xScale, yScale, gaps) {
+  if (!Array.isArray(drawn) || drawn.length < 5) return drawn;
+  const gapT = new Set(); (Array.isArray(gaps) ? gaps : []).forEach(g => { if (g) { gapT.add(g.start); gapT.add(g.end); } });
+  let pts = drawn;
+  for (let pass = 0; pass < _AURIX_24H_SPIKE_MAX_PASSES; pass++) {
+    const n = pts.length; if (n < 5) break;
+    const px = new Array(n), py = new Array(n);
+    for (let i = 0; i < n; i++) { px[i] = xScale.x(pts[i].time); py[i] = yScale.y(pts[i].value); }
+    let miIdx = 0, maIdx = 0;
+    for (let i = 1; i < n; i++) { if (pts[i].value < pts[miIdx].value) miIdx = i; if (pts[i].value > pts[maIdx].value) maIdx = i; }
+    const drop = new Array(n).fill(false);
+    for (let i = 1; i < n - 1; i++) {
+      if (i === miIdx || i === maIdx) continue;                                   // never the day's real high/low
+      if (drop[i - 1]) continue;                                                  // keep one representative if adjacent
+      if (gapT.has(pts[i].time) || gapT.has(pts[i - 1].time) || gapT.has(pts[i + 1].time)) continue;   // protect gap edges
+      const a = py[i - 1], b = py[i + 1], c = py[i];
+      const isPeak = c < a && c < b, isTrough = c > a && c > b;                    // strict single-vertex extreme (y down)
+      if (!isPeak && !isTrough) continue;
+      const prom = Math.min(Math.abs(c - a), Math.abs(c - b));                     // smaller excursion
+      const base = Math.abs(px[i + 1] - px[i - 1]) || 1;                          // horizontal width
+      if (prom >= _AURIX_24H_SPIKE_MIN_PROM_PX && (prom / base) >= _AURIX_24H_SPIKE_ASPECT) drop[i] = true;
+    }
+    let any = false; const out = [];
+    for (let i = 0; i < n; i++) { if (drop[i]) any = true; else out.push(pts[i]); }
+    if (!any || out.length < 2) break;
+    pts = out;
   }
-  const out = []; for (let i = 0; i < n; i++) if (!drop[i]) out.push(drawn[i]);
-  return out.length >= 2 ? out : drawn;
+  return pts.length >= 2 ? pts : drawn;
 }
 
 // INC4-C — Distance-aware subdivision. Walks the monotone path's segments and, for any
@@ -19600,11 +19611,13 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
     if (run.length < 2) { droppedSubpaths++; return; }   // never happens post-coalesce; guard only
     // ARR — optimise ONLY the drawn vertex set (visiblePoints/visiblePixels stay full).
     let drawn = _aurixArrRepresentVertices(run, xScale, _arrCfg);
+    // RC4-D — 24H spike guard (24H only): drop redundant sharp single-vertex teeth FIRST, on
+    // the finer ARR geometry, so the subsequent simplify smooths what's left. Extremes/
+    // endpoints/gap-edges kept; sustained bursts kept (multi-vertex). visiblePoints untouched.
+    if (_AURIX_24H_SPIKE_GUARD_ENABLED && r === '24h') drawn = _aurix24hSpikeGuard(drawn, xScale, yScale, prepared.gaps);
     // INC4-A/D — perceptual simplification (teeth + microangles), extremes/endpoints locked.
     // INC5 — range-aware epsilon (24H stronger to suppress micro-zigzag).
     if (_AURIX_POLISH_ENABLED) drawn = _aurixPolishSimplify(drawn, xScale, yScale, r);
-    // RC4-B FASE 1 — 24H spike polish: drop narrow reverting teeth (24H only; extremes kept).
-    if (_AURIX_24H_SPIKE_POLISH_ENABLED && r === '24h') drawn = _aurix24hSpikePolish(drawn, xScale, yScale);
     drawnVertexCount += drawn.length;
     const mp = _aurixMonotonePath(drawn, xScale, yScale);
     if (mp.overshoot) overshoot = true; fallbacks += mp.lineFallbacks || 0;
