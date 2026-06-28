@@ -22840,3 +22840,27 @@ body.aurix-premium-lock{ overflow:hidden; }
 .aurix-composition-legend li.is-hot { background: rgba(120,170,255,0.10); }
 .aurix-composition-legend .acl-label { flex: 1 1 auto; min-width: 0; }
 .aurix-composition-legend .acl-pct { flex: 0 0 auto; }
+
+/* ══════════════════════════════════════════════════════════════
+   DSH.DONUT.05 — final close (overrides). FIX: slices are positioned by an INLINE
+   transform; this rule only sets the transform-box/origin so the rotation pivots on
+   the donut centre (the earlier `transform:none` could blank the rotation → half-empty
+   ring). Thicker mini ring, smaller hole. Compact modal, centred title, tight 2-col
+   legend (name + % close together). Desktop only. ════════════════════════════════ */
+.mcd-seg { transform-box: fill-box; transform-origin: center; }
+.mcd-segs circle { stroke-width: 12; }                 /* fatter, clearly a donut (not a loader) */
+
+/* Modal — narrower compact panel (~−22%), donut stays the protagonist */
+.modal--composition { max-width: 560px; }
+.modal--composition .modal-header { justify-content: center; position: relative; text-align: center; }
+.modal--composition .modal-close { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
+.aurix-composition-chart { width: 234px; height: 234px; }   /* not smaller; slightly larger */
+
+/* Two columns; within each, name + % are CLOSE (narrow column) and aligned, never at the modal edge */
+.aurix-composition-legend {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 184px)); gap: 8px 48px;
+  justify-content: center; width: auto; max-width: 100%; margin: 0 auto;
+}
+.aurix-composition-legend li { justify-content: flex-start; gap: 9px; }
+.aurix-composition-legend .acl-label { flex: 1 1 auto; min-width: 0; }
+.aurix-composition-legend .acl-pct { flex: 0 0 auto; }

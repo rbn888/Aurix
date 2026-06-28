@@ -90,21 +90,22 @@ ok('16b independent premium 54px donut, moved ~60px right of the pill',
    /\.micro-composition-donut \{[^}]*width: 54px; height: 54px/.test(css) && /\.aurix-signal-row \{ gap: 60px; \}/.test(css));
 
 console.log('\nDSH.DONUT.03 — final UX:');
-ok('21 mini: outer ring removed + crisp butt-cap segments (no round/blur)',
-   /\.mcd-track \{ display: none; \}/.test(css) && /stroke-linecap="butt"/.test(fnSrc('_aurixDonutSegmentsSVG')) && /\.mcd-segs circle \{ transform: none; \}/.test(css));
+ok('21 mini: outer ring removed + crisp butt-cap slices (no round/blur)',
+   /\.mcd-track \{ display: none; \}/.test(css) && /stroke-linecap="butt"/.test(fnSrc('_aurixDonutSegmentsSVG')));
 ok('22 segments draw ONE BY ONE (progressive sweep) + mini animates ONCE per load',
    /@keyframes aurixSegDraw \{ to \{ stroke-dashoffset: 0; \} \}/.test(css) &&
    /animation: aurixSegDraw ' \+ durMs \+ 'ms linear ' \+ delayMs/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
    /const animate = entries\.length > 0 && !_aurixMiniDonutDrawn;/.test(fnSrc('renderMiniCompositionDonut')) &&
    /if \(entries\.length\) _aurixMiniDonutDrawn = true;/.test(fnSrc('renderMiniCompositionDonut')));
-ok('23 modal: wider compact executive panel (720px) + fade+scale .96→1 / 150ms',
+ok('23 modal: compact panel (≈−22% → 560px) + fade+scale .96→1 / 150ms + centred title',
+   /\.modal--composition \{ max-width: 560px; \}/.test(css) &&
    /\.modal--composition \{ max-width: 720px; transform: scale\(\.96\); transition: opacity \.15s ease, transform \.15s ease; \}/.test(css) &&
-   /\.modal-overlay\.open \.modal--composition \{ transform: scale\(1\); \}/.test(css) &&
-   /\.aurix-composition-body \{ flex-direction: column;/.test(css));
-ok('24 big donut 230px protagonist, rebuilds + draws from 0 each open (900ms)',
-   /\.aurix-composition-chart \{ width: 230px; height: 230px; \}/.test(css) && /_aurixDonutSegmentsSVG\(entries, 74, 100, 100, 26, 0\.9, \{ animate: true, dur: 900 \}\)/.test(app));
-ok('25 legend TWO columns + name/% aligned + donut↔legend hover sync (brightness)',
-   /\.aurix-composition-legend \{\s*display: grid; grid-template-columns: 1fr 1fr;/.test(css) &&
+   /\.modal--composition \.modal-header \{ justify-content: center;/.test(css) &&
+   /\.modal--composition \.modal-close \{ position: absolute; right: 12px;/.test(css));
+ok('24 big donut protagonist NOT smaller (234px), rebuilds + draws from 0 each open (900ms)',
+   /\.aurix-composition-chart \{ width: 234px; height: 234px; \}/.test(css) && /_aurixDonutSegmentsSVG\(entries, 74, 100, 100, 26, 0\.9, \{ animate: true, dur: 900 \}\)/.test(app));
+ok('25 legend TWO narrow columns (name+% close, not at modal edge) + clear column gap + hover sync',
+   /grid-template-columns: repeat\(2, minmax\(0, 184px\)\); gap: 8px 48px;/.test(css) &&
    /\.aurix-composition-legend \.acl-label \{ flex: 1 1 auto; min-width: 0; \}/.test(css) &&
    /function _aurixCompositionHover\(/.test(app) && /_aurixCompositionWireHover\(\);/.test(app) &&
    /\.aurix-composition-chart\.hot \.mcd-seg\.is-hot \{ opacity: 1; filter: brightness/.test(css));
@@ -113,14 +114,30 @@ ok('26 close fade+scale via .modal--composition (X / Cerrar / Escape / backdrop 
    /getElementById\('compositionClose'\); if \(x\) x\.addEventListener\('click', closeCompositionModal\)/.test(app));
 
 console.log('\nDSH.DONUT.04 — final premium pass:');
-ok('27 thicker SOLID mini ring (~9.5px, no CSS override starving it) + bigger 50px svg',
-   /\.mcd-segs circle \{ stroke-width: 9\.5; \}/.test(css) && /\.mcd-ring \{ width: 50px; height: 50px; \}/.test(css) &&
-   /_aurixDonutSegmentsSVG\(entries, 19, 25, 25, 9\.5, 0\.9, \{ animate: animate, dur: 850 \}\)/.test(app));
+ok('27 thicker SOLID mini ring (12px, smaller hole) + 50px svg',
+   /\.mcd-segs circle \{ stroke-width: 12; \}/.test(css) && /\.mcd-ring \{ width: 50px; height: 50px; \}/.test(css) &&
+   /_aurixDonutSegmentsSVG\(entries, 18, 25, 25, 12, 1\.0, \{ animate: animate, dur: 850 \}\)/.test(app));
 ok('28 mini repositioned: down ~18px + right ~24px; subtle halo, no dark frame',
    /\.micro-composition-donut \{[\s\S]*?margin-top: 18px; margin-left: 24px;[\s\S]*?background: transparent;/.test(css));
-ok('29 no holes / solid colours: ~1px gap (0.9 units), butt caps, plain hex stroke (no gradient)',
-   /_aurixDonutSegmentsSVG\(entries, 19, 25, 25, 9\.5, 0\.9/.test(app) && /stroke-linecap="butt"/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
+ok('29 no holes / solid colours: ~1px gap (1.0 units), butt caps, plain hex stroke (no gradient)',
+   /_aurixDonutSegmentsSVG\(entries, 18, 25, 25, 12, 1\.0/.test(app) && /stroke-linecap="butt"/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
    /stroke="' \+ e\.color \+ '"/.test(fnSrc('_aurixDonutSegmentsSVG')) && !/linearGradient|url\(#/.test(fnSrc('_aurixDonutSegmentsSVG')));
+
+console.log('\nDSH.DONUT.05 — split-ring bug fix:');
+ok('32 CAUSE FIXED: slices positioned by INLINE css transform (transform-box fill-box), NOT the SVG attribute (which was nulled by transform:none) → ring closes 100%',
+   /transform: rotate\(' \+ startDeg \+ 'deg\); transform-box: fill-box; transform-origin: center;/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
+   !/transform="rotate\(/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
+   /\.mcd-seg \{ transform-box: fill-box; transform-origin: center; \}/.test(css));
+ok('33 final state complete (static slices dashoffset:0; animation ends at dashoffset:0 with both)',
+   /draw = 'stroke-dashoffset:0;'/.test(fnSrc('_aurixDonutSegmentsSVG')) && /@keyframes aurixSegDraw \{ to \{ stroke-dashoffset: 0; \} \}/.test(css));
+// behavioral: 6 slices, contiguous rotations covering the full ring (last start + its slot ≈ 360)
+{ const sb = { Math }; vm.createContext(sb); vm.runInContext(fnSrc('_aurixDonutSegmentsSVG'), sb);
+  const e = [{color:'#7C3AED',pct:47.7},{color:'#EA580C',pct:35.9},{color:'#2563EB',pct:13.1},{color:'#0891B2',pct:2.7},{color:'#16A34A',pct:0.4},{color:'#CA8A04',pct:0.2}];
+  const svg = sb._aurixDonutSegmentsSVG(e, 18, 25, 25, 12, 1.0, { animate: false });
+  const rots = (svg.match(/rotate\(([-0-9.]+)deg\)/g) || []).map(s => parseFloat(s.match(/([-0-9.]+)/)[1]));
+  const cumAfterLast = rots[rots.length-1] + 90 + (e[e.length-1].pct/100*360);   // last start (rel to -90) + its slot
+  ok('34 slices fully cover the ring (no empty half): start angles ascend, last reaches ~360°',
+     (svg.match(/<circle /g)||[]).length===6 && rots[0]===-90 && rots.every((v,i)=>i===0||v>rots[i-1]) && Math.abs(cumAfterLast - 360) < 1.5, 'lastEnd=' + cumAfterLast.toFixed(1) + '°'); }
 ok('30 per-segment tooltip: name · % · REAL monetary value (from getInvestableDistribution)',
    /valueBase: \(Number\(d\.valueBase\) \|\| 0\)/.test(fnSrc('_aurixCompositionEntries')) &&
    /e\.value = fmt\(e\.valueBase\)/.test(app) && /act-val">' \+ esc\(e\.value/.test(fnSrc('_aurixCompositionHover')) &&

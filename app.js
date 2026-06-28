@@ -17576,14 +17576,20 @@ function _aurixDonutSegmentsSVG(entries, r, cx, cy, w, gap, opts) {
     const len = Math.max(0.4, slot - g);
     const startDeg = (-90 + accFrac * 360).toFixed(2);
     const dash = len.toFixed(2) + ' ' + (100 - len).toFixed(2);
-    let style;
+    // CRITICAL: position each slice with an INLINE CSS transform (transform-box: fill-box ⇒
+    // rotate around the circle's own centre). Inline beats any stylesheet `transform` rule, so the
+    // earlier `.mcd-segs circle { transform: none }` can no longer null the rotation (the bug that
+    // stacked every slice at the start and left the ring half-empty). dashoffset stays free for the
+    // draw; final state is dashoffset:0 ⇒ each slice fully closed.
+    const pos = 'transform: rotate(' + startDeg + 'deg); transform-box: fill-box; transform-origin: center; ';
+    let draw;
     if (animate) {
       const delayMs = Math.round(accFrac * total);
       const durMs = Math.max(60, Math.round((slot / 100) * total));   // sweep proportional to share
-      style = 'stroke-dashoffset:' + len.toFixed(2) + '; animation: aurixSegDraw ' + durMs + 'ms linear ' + delayMs + 'ms both;';
-    } else { style = 'stroke-dashoffset:0;'; }
-    out += '<circle class="mcd-seg" data-idx="' + i + '" transform="rotate(' + startDeg + ' ' + cx + ' ' + cy + ')" cx="' + cx + '" cy="' + cy + '" r="' + r +
-      '" pathLength="100" fill="none" stroke="' + e.color + '" stroke-width="' + w + '" stroke-linecap="butt" stroke-dasharray="' + dash + '" style="' + style + '"></circle>';
+      draw = 'stroke-dashoffset:' + len.toFixed(2) + '; animation: aurixSegDraw ' + durMs + 'ms linear ' + delayMs + 'ms both;';
+    } else { draw = 'stroke-dashoffset:0;'; }
+    out += '<circle class="mcd-seg" data-idx="' + i + '" cx="' + cx + '" cy="' + cy + '" r="' + r +
+      '" pathLength="100" fill="none" stroke="' + e.color + '" stroke-width="' + w + '" stroke-linecap="butt" stroke-dasharray="' + dash + '" style="' + pos + draw + '"></circle>';
     accFrac += slot / 100;
   });
   return out;
@@ -17622,7 +17628,7 @@ function renderMiniCompositionDonut() {
     const animate = entries.length > 0 && !_aurixMiniDonutDrawn;
     // r19/cx25/cy25 in a 50-viewBox + 9.5px stroke ⇒ a solid ~50px financial donut (not a loader);
     // gap 0.9 (~1px on this ring) ⇒ hairline separation, never visible holes.
-    segG.innerHTML = entries.length ? _aurixDonutSegmentsSVG(entries, 19, 25, 25, 9.5, 0.9, { animate: animate, dur: 850 }) : '';
+    segG.innerHTML = entries.length ? _aurixDonutSegmentsSVG(entries, 18, 25, 25, 12, 1.0, { animate: animate, dur: 850 }) : '';
     if (entries.length) _aurixMiniDonutDrawn = true;
   }
   // entries → defer to CSS (desktop-only ≥769px); no data → hide on both.
