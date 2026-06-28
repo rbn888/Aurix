@@ -22733,3 +22733,39 @@ body.aurix-premium-lock{ overflow:hidden; }
 .aurix-composition-legend .acl-dot { width: 11px; height: 11px; border-radius: 3px; flex: 0 0 auto; }
 .aurix-composition-legend .acl-label { color: var(--text, #d7e0f0); flex: 1; }
 .aurix-composition-legend .acl-pct { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--text-bright, #fff); }
+
+/* ══════════════════════════════════════════════════════════════
+   DSH.DONUT.02 — premium refinement (overrides DSH.DONUT.01).
+   Pill restored to original; micro-donut is an INDEPENDENT 54px premium
+   button to its right (own glass/border/shadow, never shared). Modal is a
+   compact premium window with donut + legend grouped. Desktop only. ═════ */
+.aurix-signal-row { display: flex; align-items: center; }
+@media (min-width: 769px) { .aurix-signal-row { gap: 18px; } }   /* 16–20px separation */
+
+@media (min-width: 769px) {
+  .micro-composition-donut {
+    width: 54px; height: 54px; margin-left: 0; padding: 5px;
+    background:
+      radial-gradient(120% 120% at 30% 18%, rgba(74,130,240,0.16), transparent 62%),
+      linear-gradient(165deg, rgba(22,32,56,0.72), rgba(11,16,28,0.78));
+    border: 1px solid rgba(120,170,255,0.20);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 22px -14px rgba(0,0,0,0.70), 0 0 16px -7px rgba(74,130,240,0.30);
+  }
+  .micro-composition-donut:hover {
+    transform: scale(1.05);                                  /* max 1.05 per spec */
+    border-color: rgba(120,170,255,0.42);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 0 18px 1px rgba(74,130,240,0.50);
+  }
+}
+.mcd-ring { width: 44px; height: 44px; transform-origin: 50% 50%; animation: aurixMcdBreath 10s ease-in-out 1.6s infinite; }
+.mcd-track { stroke-width: 5.5; }
+.mcd-segs circle { stroke-width: 5.5; }
+/* subtle "breathing" every ~10s (scale ≤1.02); no rotation, no aggressive motion */
+@keyframes aurixMcdBreath { 0%, 90%, 100% { transform: scale(1); } 95% { transform: scale(1.02); } }
+@media (prefers-reduced-motion: reduce) { .mcd-ring { animation: none; } }
+
+/* Compact premium window: donut + legend grouped side-by-side */
+.modal--composition { max-width: 560px; }
+.aurix-composition-body { flex-direction: row; align-items: center; justify-content: center; gap: 26px; padding: 20px 26px 10px; flex-wrap: wrap; }
+.aurix-composition-chart { width: 188px; height: 188px; }
+.aurix-composition-legend { width: auto; min-width: 210px; flex: 1 1 210px; gap: 10px; }

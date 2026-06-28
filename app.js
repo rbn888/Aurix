@@ -17560,14 +17560,17 @@ function _aurixCompositionEntries() {
     return { type: d.type, label: meta.label || d.type, color: meta.color || '#6b7280', pct: (Number(d.valueBase) || 0) / total * 100 };
   }).filter(e => e.pct > 0.05).sort((a, b) => b.pct - a.pct);
 }
-// Segmented ring as <circle> strings (pathLength=100 ⇒ dasharray in % units).
-function _aurixDonutSegmentsSVG(entries, r, cx, cy, w) {
-  let acc = 0, out = '';
+// Segmented ring as <circle> strings (pathLength=100 ⇒ dasharray in % units). `gap` (% units)
+// leaves a clean separation between segments. Real % share is preserved (gap is purely visual:
+// the slot keeps its full width, only the drawn arc is trimmed).
+function _aurixDonutSegmentsSVG(entries, r, cx, cy, w, gap) {
+  let acc = 0, out = ''; const g = gap || 0;
   entries.forEach(e => {
-    const len = Math.max(0, Math.min(100, e.pct));
+    const slot = Math.max(0, Math.min(100, e.pct));
+    const len = Math.max(0.4, slot - g);   // trimmed arc (visual gap after); never below a hairline
     out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" pathLength="100" fill="none" stroke="' + e.color +
-      '" stroke-width="' + w + '" stroke-dasharray="' + len.toFixed(2) + ' ' + (100 - len).toFixed(2) + '" stroke-dashoffset="' + (-acc).toFixed(2) + '"></circle>';
-    acc += len;
+      '" stroke-width="' + w + '" stroke-linecap="round" stroke-dasharray="' + len.toFixed(2) + ' ' + (100 - len).toFixed(2) + '" stroke-dashoffset="' + (-acc).toFixed(2) + '"></circle>';
+    acc += slot;
   });
   return out;
 }
@@ -17576,7 +17579,7 @@ function renderMiniCompositionDonut() {
   const btn = document.getElementById('microCompositionDonut'); if (!btn) return;
   const entries = _aurixCompositionEntries();
   const segG = btn.querySelector('.mcd-segs');
-  if (segG) segG.innerHTML = entries.length ? _aurixDonutSegmentsSVG(entries, 15, 20, 20, 6) : '';
+  if (segG) segG.innerHTML = entries.length ? _aurixDonutSegmentsSVG(entries, 16.5, 22, 22, 5.5, 1.6) : '';
   // entries → defer to CSS (desktop-only ≥769px); no data → hide on both.
   btn.style.display = entries.length ? '' : 'none';
   _aurixInitCompositionModalOnce();
@@ -17591,8 +17594,8 @@ function renderCompositionModalDonut() {
   const sub = (typeof t === 'function' && typeof t('compositionCenterSub') === 'string') ? t('compositionCenterSub') : 'Cartera';
   chart.innerHTML =
     '<svg viewBox="0 0 200 200" width="200" height="200" aria-hidden="true">' +
-      '<circle cx="100" cy="100" r="72" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="26"></circle>' +
-      '<g transform="rotate(-90 100 100)">' + _aurixDonutSegmentsSVG(entries, 72, 100, 100, 26) + '</g>' +
+      '<circle cx="100" cy="100" r="72" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="24"></circle>' +
+      '<g transform="rotate(-90 100 100)">' + _aurixDonutSegmentsSVG(entries, 72, 100, 100, 24, 1.6) + '</g>' +
     '</svg>' +
     '<div class="aurix-composition-center"><span class="aurix-composition-center-val">100%</span><span class="aurix-composition-center-sub">' + esc(sub) + '</span></div>';
   legend.innerHTML = entries.map(e =>
@@ -17625,7 +17628,9 @@ function _aurixInitCompositionModalOnce() {
   _aurixCompositionInit = true;
   try {
     const btn = document.getElementById('microCompositionDonut');
-    if (btn) btn.addEventListener('click', openCompositionModal);
+    // Own handler ONLY: stop the event so it can never reach the pill's delegated
+    // #aurixSignal → Intelligence navigation (the donut is now a sibling, but guard anyway).
+    if (btn) btn.addEventListener('click', (e) => { try { e.stopPropagation(); e.preventDefault(); } catch (_) {} openCompositionModal(); });
     const overlay = document.getElementById('compositionOverlay');
     if (overlay) overlay.addEventListener('click', (e) => { if (e.target === overlay) closeCompositionModal(); });
     const x = document.getElementById('compositionClose'); if (x) x.addEventListener('click', closeCompositionModal);

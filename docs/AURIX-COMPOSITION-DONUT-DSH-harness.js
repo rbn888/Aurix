@@ -16,11 +16,16 @@ let pass=0,fail=0; function ok(n,c,i){ if(c){pass++;console.log('  ✓ '+n+(i?' 
 
 console.log('AURIX-COMPOSITION-DONUT-DSH — DSH.DONUT.01\n');
 
-console.log('Markup (micro-donut in the pill + modal):');
-ok('1 micro-donut button inside #aurixSignal with aria-label + title',
-   /<button type="button" class="micro-composition-donut" id="microCompositionDonut"\s*\n?\s*aria-label="Ver composición de cartera" title="Ver composición de cartera">/.test(html) &&
-   html.indexOf('id="microCompositionDonut"') > html.indexOf('id="aurixSignal"') &&
-   html.indexOf('id="microCompositionDonut"') < html.indexOf('</section>', html.indexOf('id="aurixSignal"')));
+console.log('Markup (independent micro-donut beside the pill + modal):');
+ok('1 micro-donut is OUTSIDE the pill (independent), in .aurix-signal-row, with aria-label + title',
+   /aria-label="Ver composición de cartera" title="Ver composición de cartera"/.test(html) &&
+   /<div class="aurix-signal-row">/.test(html) &&
+   // donut comes AFTER the pill's closing </section> (not a descendant of #aurixSignal)
+   html.indexOf('id="microCompositionDonut"') > html.indexOf('</section>', html.indexOf('id="aurixSignal"')) &&
+   // and the pill itself no longer contains the donut
+   html.slice(html.indexOf('id="aurixSignal"'), html.indexOf('</section>', html.indexOf('id="aurixSignal"'))).indexOf('microCompositionDonut') === -1);
+ok('1b pill restored to original (icon + body + Ver análisis CTA, no donut/extra)',
+   /id="aurixSignalCta"[\s\S]*?data-i18n="signalHealthCta">Ver análisis/.test(html));
 ok('2 micro-donut SVG ring + track + segs group', /<svg class="mcd-ring"[\s\S]*?<circle class="mcd-track"[\s\S]*?<g class="mcd-segs">/.test(html));
 ok('3 composition modal overlay with title / close / close-btn / chart / legend',
    /id="compositionOverlay"/.test(html) && /id="compositionTitle"[^>]*>Composición de cartera/.test(html) &&
@@ -65,6 +70,9 @@ console.log('\nDesktop-only gating + mobile untouched:');
 ok('11 micro-donut CSS hidden by default + shown only ≥769px',
    /\.micro-composition-donut \{ display: none; \}/.test(css) && /@media \(min-width: 769px\) \{[\s\S]*?\.micro-composition-donut \{/.test(css));
 ok('12 openCompositionModal guards desktop (innerWidth<=768 returns)', /window\.innerWidth <= 768\) return;/.test(fnSrc('openCompositionModal')));
+ok('12b donut click is INDEPENDENT: stopPropagation + only opens modal (never switchTab/Intelligence)',
+   /btn\.addEventListener\('click', \(e\) => \{ try \{ e\.stopPropagation\(\); e\.preventDefault\(\); \} catch \(_\) \{\} openCompositionModal\(\); \}\)/.test(app) &&
+   !/switchTab|intelligence/i.test(fnSrc('openCompositionModal')) && !/switchTab|intelligence/i.test(fnSrc('closeCompositionModal')));
 ok('13 renderMiniCompositionDonut hook runs only on the DESKTOP path of updateDonut (after mobile early-return)',
    fnSrc('updateDonut').indexOf('renderAurixMobileDonutLite') < fnSrc('updateDonut').indexOf('renderMiniCompositionDonut()') &&
    /return;\s*\}\s*\/\/ AURIX-INVESTABLE-WEALTH-1/.test(fnSrc('updateDonut')));
@@ -73,9 +81,15 @@ ok('14 mobile donut/slider NOT referenced by the new code', !/portfolioMobileSli
 console.log('\nAnimation + interaction:');
 ok('15 entrance: fade-in + ring draws 0→100% + segs reveal after',
    /@keyframes aurixMcdIn/.test(css) && /@keyframes aurixMcdDraw \{ to \{ stroke-dashoffset: 0; \} \}/.test(css) && /\.mcd-track \{[\s\S]*?stroke-dashoffset: 100;[\s\S]*?animation: aurixMcdDraw/.test(css) && /\.mcd-segs \{ opacity: 0; animation: aurixMcdSegs/.test(css));
-ok('16 hover scale ≤1.04 + glow + 160ms; subtle pulse; reduced-motion disables',
-   /\.micro-composition-donut:hover \{[\s\S]*?transform: scale\(1\.04\)/.test(css) && /transition: transform \.16s/.test(css) && /@keyframes aurixMcdPulse/.test(css) &&
+ok('16 hover scale ≤1.05 + glow + 160ms; ~10s breathing (≤1.02); reduced-motion disables',
+   /\.micro-composition-donut:hover \{[\s\S]*?transform: scale\(1\.05\)/.test(css) && /transition: transform \.16s/.test(css) &&
+   /@keyframes aurixMcdBreath \{ 0%, 90%, 100% \{ transform: scale\(1\); \} 95% \{ transform: scale\(1\.02\); \} \}/.test(css) &&
+   /\.mcd-ring \{[^}]*animation: aurixMcdBreath 10s/.test(css) &&
    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.mcd-track \{ animation: none; stroke-dashoffset: 0; \}/.test(css));
+ok('16b independent premium 54px donut (own glass/border/shadow; .aurix-signal-row 16–20px gap)',
+   /\.micro-composition-donut \{[^}]*width: 54px; height: 54px/.test(css) && /\.aurix-signal-row \{ gap: 18px; \}/.test(css));
+ok('16c modal is a compact premium window: grouped donut + legend (row), reduced width',
+   /\.modal--composition \{ max-width: 560px; \}/.test(css) && /\.aurix-composition-body \{ flex-direction: row;/.test(css));
 
 console.log('\nModal close (3 ways) + scroll lock + focus return:');
 ok('17 close via button(s) + backdrop click + Escape',
