@@ -48,8 +48,8 @@ ok('5 output is a subset of real points (no fabrication)', dP.every(p=>d0.some(q
 { const sbOff={Math}; vm.createContext(sbOff); vm.runInContext(CONST_BLOCK.replace('_AURIX_24H_SPIKE_GUARD_ENABLED = true','_AURIX_24H_SPIKE_GUARD_ENABLED = false'), sbOff);
   // the gate is in the render wiring (r==='24h' && ENABLED); the helper itself always thins —
   // assert the live wiring gates it and is reversible by constant.
-  ok('6 spike guard gated by _AURIX_24H_SPIKE_GUARD_ENABLED + 24H-only (reversible)',
-     /_AURIX_24H_SPIKE_GUARD_ENABLED && _volOn\) drawn = _aurix24hSpikeGuard/.test(app) && /_AURIX_24H_SPIKE_GUARD_ENABLED = (true|false)/.test(app)); }
+  ok('6 spike discipline wired + reversible (24H strict)',
+     /drawn = _aurixSpikeDiscipline\(drawn, xScale, yScale, r, prepared\.gaps/.test(app) && /'24h': \{ strict: true \}/.test(app)); }
 
 // ── 24H render contract still holds (no split, extremes, last) ──
 const ENG = ['_aurixRenderContractGeometry','_aurixVpTargetPointCount','_aurixComputeVisualPreparation','prepareAurixVisualSeries','downsampleAurixLTTB','_aurixSignificantLocalExtrema','downsampleAurixAdaptive','computeAurixTimeScale','computeAurixAdaptiveXScale','computeAurixValueScale','_aurixArrConfig','_aurixArrRepresentVertices','_aurixPolishSimplify','_aurix24hSpikeGuard','_aurixSampleSegments','_aurixDensifyPathSegments','_aurixMonotonePath','buildAurixMonotonicPath','buildAurixAreaPath','_aurixSplitAtGaps','_wscFmtAxisVal','auditAurixRenderVsCanonical','_aurixCompareRenderToCanonical','renderAurixInstitutionalChart'];

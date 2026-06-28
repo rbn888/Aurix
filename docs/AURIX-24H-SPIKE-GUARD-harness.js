@@ -36,7 +36,7 @@ let pass=0,fail=0; function ok(n,c,i){ if(c){pass++;console.log('  ✓ '+n+(i?' 
 
 console.log('AURIX-24H-SPIKE-GUARD — RC4-D\n');
 const ON = mk(CONST_BLOCK);
-const OFF = mk(CONST_BLOCK.replace('_AURIX_24H_SPIKE_GUARD_ENABLED = true','_AURIX_24H_SPIKE_GUARD_ENABLED = false'));
+const OFF = mk(CONST_BLOCK.replace("'24h': { strict: true }", "'24h': { strict: 'off' }"));   // RC4-G rollback: disable 24H discipline
 const rOn = render(ON,'24h'), rOff = render(OFF,'24h');
 const s = build('24h'), srcMax=Math.max.apply(null,s.map(p=>p.value)), srcMin=Math.min.apply(null,s.map(p=>p.value));
 const teethOn=sharpTeeth(rOn.pathData), teethOff=sharpTeeth(rOff.pathData);
@@ -66,8 +66,8 @@ console.log('\nOTHER RANGES UNAFFECTED (guard is 24H-only):');
   ok((8+i)+' '+rg+' identical with guard ON/OFF (24H-only)', a.pathData===b.pathData && a.diagnostics.drawnVertexCount===b.diagnostics.drawnVertexCount); });
 
 console.log('\nROLLBACK + WIRING + NO REGRESSION:');
-ok('12 rollback ENABLED=false restores prior path (more teeth)', teethOff > teethOn);
-ok('13 guard wired 24H-only + gated', /r === '24h'\) \{ if \(_AURIX_24H_SPIKE_GUARD_ENABLED && _volOn\) drawn = _aurix24hSpikeGuard\(/.test(app) && /_AURIX_24H_SPIKE_GUARD_ENABLED = true/.test(app));
+ok('12 rollback (discipline 24h off) restores prior path (more teeth)', teethOff > teethOn);
+ok('13 spike discipline wired (single entry point, per-range)', /drawn = _aurixSpikeDiscipline\(drawn, xScale, yScale, r, prepared\.gaps/.test(app) && /_AURIX_24H_SPIKE_GUARD_V2_ENABLED = true/.test(app) && /'24h': \{ strict: true \}/.test(app));
 ok('14 reducer protects gap edges + global extremes (code)', /i === miIdx \|\| i === maIdx/.test(fn('_aurixSpikeReduce')) && /gapT\.has/.test(fn('_aurixSpikeReduce')));
 ok('15 inspector snap + tooltip + indicator paths intact', /_aurixVisualPointAtX\(_aurixMobChartVisual, fx\)/.test(app) && /_aurixMobileSetPerfIndicator\(\);/.test(app) && /out\.reason = 'normal_pause'/.test(app));
 

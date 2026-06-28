@@ -47,7 +47,7 @@ ok('5 indicator tone uses the same sign source (_aurixRangeReturn + ±0.005)', /
 console.log('\nFASE 2/3 — Global volatility polish (per-range cluster reduction):');
 const ON = mk(CONST_BLOCK);
 [['7d',0.70],['30d',0.70],['1y',0.88],['all',0.88]].forEach(([rg,asp])=>{
-  const OFF = mk(CONST_BLOCK.replace(new RegExp("('"+rg+"': )true","g"), "$1false"));   // disable volatility for this range
+  const OFF = mk(CONST_BLOCK.replace(new RegExp("'"+rg+"': \\{ strict: [^}]+\\}"), "'"+rg+"': { strict: 'off' }"));   // RC4-G per-range rollback: disable this range's discipline
   const s = clusterSeries(rg);
   const a = render(ON,rg,s), b = render(OFF,rg,s);
   const tOn=teeth(a.pathData,asp), tOff=teeth(b.pathData,asp);
@@ -63,9 +63,9 @@ const r24 = render(ON,'24h', (function(){const v0=72000,p=[];let k=0;for(let t=N
 ok('24H still ONE subpath (no split) + spike guard kept', r24.diagnostics.renderedSubpaths===1 && teeth(r24.pathData,0.55) <= 4);
 ok('equivalence render↔canonical not divergent (7d)', vm.runInContext("auditAurixRenderVsCanonical('7d').status",ON)!=='divergent');
 ok('visualSamples come from the polished path (inspector rides clean line)', Array.isArray(r24.visualSamples) && r24.visualSamples.length>0);
-ok('global rollback gate present', /_AURIX_VOLATILITY_POLISH_ENABLED = true/.test(app) && /_AURIX_VOLATILITY_POLISH_ENABLED && _AURIX_VOLATILITY_POLISH_BY_RANGE\[r\] !== false/.test(app));
-ok('per-range rollback map present', /_AURIX_VOLATILITY_POLISH_BY_RANGE = \{ '24h': true, '7d': true, '30d': true, '1y': true, 'all': true \}/.test(app));
-ok('shared core (no duplication): guard + polish call _aurixSpikeReduce', /return _aurixSpikeReduce\(/.test(fn('_aurix24hSpikeGuard')) && /return _aurixSpikeReduce\(/.test(fn('_aurixVolatilityPolish')));
+ok('global rollback gate present (v2 + single disciplined call)', /_AURIX_24H_SPIKE_GUARD_V2_ENABLED = true/.test(app) && /drawn = _aurixSpikeDiscipline\(drawn, xScale, yScale, r, prepared\.gaps/.test(app));
+ok('per-range discipline map present', /_AURIX_SPIKE_DISCIPLINE_BY_RANGE = \{[\s\S]*?'7d': \{ strict: false \}[\s\S]*?'1y': \{ strict: 'soft' \}/.test(app));
+ok('shared core (no duplication): wrappers + discipline call the same reducer', /return _aurixSpikeDiscipline\(/.test(fn('_aurix24hSpikeGuard')) && /return _aurixSpikeDiscipline\(/.test(fn('_aurixVolatilityPolish')) && /_aurixSpikeReduce\(/.test(fn('_aurixSpikeDiscipline')));
 ok('inspector snap + tooltip + indicator paths intact', /_aurixVisualPointAtX\(_aurixMobChartVisual, fx\)/.test(app) && /_aurixMobileSetPerfIndicator\(\);/.test(app) && /out\.reason = 'normal_pause'/.test(app));
 
 console.log('\nRESULT: '+(fail===0?'ALL PASS ✓':'FAIL ✗')+'  ('+pass+' passed, '+fail+' failed)');
