@@ -22144,6 +22144,18 @@ body.aurix-skeleton #totalValue::after {
   }
   .mobile-slide-chart .perf-unit-block .chart-change .wsc-metric-val { font-size: 14px; font-weight: 800; }
 
+  /* RC5-D — Header Lock & Selector Compactness. The left block gets a HARD fixed flex-basis so
+     the temporalities never move when toggling %/€ (the data width no longer affects layout —
+     0px shift). The %/€ selector becomes a narrow fixed-width control aligned in height with the
+     range buttons (comfortable ≥26px touch). The return below gets reserved width + breathing
+     (margin-top + line-height). Range group is flex:1/min-width:0 so it owns the rest of the row.
+     CSS-only, mobile-scoped; rollback: delete this RC5-D block (restores RC5-C exactly). */
+  .mobile-slide-chart .perf-unit-block { flex: 0 0 92px; width: 92px; min-width: 92px; gap: 2px; }
+  .mobile-slide-chart .perf-toggle { width: 62px; padding: 2px; gap: 2px; }
+  .mobile-slide-chart .perf-toggle .perf-btn { flex: 1 1 0; min-width: 0; padding: 4px 0; min-height: 26px; font-size: 11px; line-height: 1; }
+  .mobile-slide-chart .perf-unit-block .chart-change { width: 92px; min-width: 92px; margin-top: 4px; min-height: 16px; line-height: 1.2; }
+  .mobile-slide-chart .range-toggle { flex: 1; min-width: 0; }
+
   /* PART 6 — give the plot breathing room (slightly taller). */
   .mobile-slide-chart .chart-wrap { min-height: 244px; }
 

@@ -106,5 +106,22 @@ console.log('\nRC5-C — header micro-tuning (selector compact · return more vi
      /\.mobile-slide-chart \.perf-unit-block \.chart-change \{[^}]*white-space: nowrap;/.test(css) &&
      /\.mobile-slide-chart \.perf-unit-block \{ display: flex; flex-direction: column; align-items: flex-start;/.test(css)); }
 
+console.log('\nRC5-D — header lock & selector compactness (no layout shift on %/€ toggle):');
+ok('17 left block has a HARD fixed width (flex 0 0 92px) ⇒ temporalities never shift',
+   /\.mobile-slide-chart \.perf-unit-block \{ flex: 0 0 92px; width: 92px; min-width: 92px;/.test(css));
+ok('18 range group owns the rest of the row, decoupled from the data width (flex:1; min-width:0)',
+   /\.mobile-slide-chart \.range-toggle \{ flex: 1; min-width: 0; \}/.test(css));
+ok('19 selector compact: fixed-width control, buttons aligned in height (≥26px touch)',
+   /\.mobile-slide-chart \.perf-toggle \{ width: 62px;/.test(css) &&
+   /\.mobile-slide-chart \.perf-toggle \.perf-btn \{ flex: 1 1 0; min-width: 0;[^}]*min-height: 26px;/.test(css));
+ok('20 return reserved width + breathing (margin-top + comfortable line-height), tone unchanged',
+   /\.mobile-slide-chart \.perf-unit-block \.chart-change \{ width: 92px; min-width: 92px; margin-top: 4px;[^}]*line-height: 1\.2;/.test(css) &&
+   /\.chart-change\.up   \{ color: var\(--green\); \}/.test(css) && /\.chart-change\.down \{ color: var\(--red\); \}/.test(css));
+{ // before/after layout shift: BEFORE the left block was content-sized (flex:0 0 auto) ⇒ width
+  // changed with the % vs € string; AFTER it is flex:0 0 92px (fixed) ⇒ identical in both modes.
+  const blk = (css.match(/\.mobile-slide-chart \.perf-unit-block \{ flex: 0 0 92px;[^}]*\}/)||[''])[0];
+  ok('21 layout-shift eliminated: block flex-basis is a fixed length (not auto/content)',
+     blk.length>0 && !/auto/.test(blk.match(/flex: ([^;]+);/)[1])); }
+
 console.log('\nRESULT: '+(fail===0?'ALL PASS ✓':'FAIL ✗')+'  ('+pass+' passed, '+fail+' failed)');
 process.exit(fail===0?0:1);
