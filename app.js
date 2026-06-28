@@ -19310,26 +19310,19 @@ function _aurixPolishSimplify(drawn, xScale, yScale, range) {
   return out;
 }
 
-// RC4-D — 24H SPIKE GUARD (render-only, 24H only). PERMANENT, robust replacement for the
-// RC4-B spike polish, whose absolute base/revert thresholds (≤9px / ≤4px) almost never
-// matched the real post-ARR/RDP geometry (kept-vertex spacing is larger) → it was an effective
-// no-op and the sharp vertical teeth came back. The guard is ASPECT-based (spacing-independent):
+// RC4-D/E — SPIKE / VOLATILITY REDUCER (render-only). ASPECT-based, spacing-independent:
 // a redundant micro-spike is a SINGLE drawn vertex that is a strict local extreme, juts ≥
-// _MIN_PROM_PX, and is "tall & thin" (prominence / base ≥ _ASPECT). It is dropped from the
-// DRAWN path only — never the global max/min, endpoints, gap-edge points, or a sustained run
-// (a real burst is multiple vertices, so its members are not strict single-vertex extremes).
-// Iterates a few passes (removing a spike can expose another). Returns a SUBSET of real points
-// (no fabrication; visiblePoints/visualSamples-source/tooltip/inspector untouched). Rollback:
-// _AURIX_24H_SPIKE_GUARD_ENABLED=false.
-const _AURIX_24H_SPIKE_GUARD_ENABLED = true;
-const _AURIX_24H_SPIKE_MIN_PROM_PX = 4.5;     // min vertical excursion (px) to consider a spike
-const _AURIX_24H_SPIKE_ASPECT = 0.55;         // prominence / base ≥ this ⇒ "tall & thin" sharp tooth
-const _AURIX_24H_SPIKE_MAX_PASSES = 3;        // iterate (a removed spike can expose a neighbour)
-function _aurix24hSpikeGuard(drawn, xScale, yScale, gaps) {
-  if (!Array.isArray(drawn) || drawn.length < 5) return drawn;
+// minProm px, and is "tall & thin" (prominence / base ≥ aspect). Dropped from the DRAWN path
+// only — never the global max/min, endpoints, gap-edge points, or a sustained run (a real
+// burst is multiple vertices → its members aren't strict single-vertex extremes). Iterating
+// collapses a CLUSTER of compact teeth (RC4-E) while keeping its first/last/net trend. Returns
+// a SUBSET of real points (no fabrication; visiblePoints/tooltip/inspector untouched). PURE.
+function _aurixSpikeReduce(drawn, xScale, yScale, gaps, aspect, minProm, passes) {
+  if (!Array.isArray(drawn) || drawn.length < 5 || !(aspect > 0) || !(minProm >= 0)) return drawn;
   const gapT = new Set(); (Array.isArray(gaps) ? gaps : []).forEach(g => { if (g) { gapT.add(g.start); gapT.add(g.end); } });
   let pts = drawn;
-  for (let pass = 0; pass < _AURIX_24H_SPIKE_MAX_PASSES; pass++) {
+  const maxPasses = Math.max(1, passes || 1);
+  for (let pass = 0; pass < maxPasses; pass++) {
     const n = pts.length; if (n < 5) break;
     const px = new Array(n), py = new Array(n);
     for (let i = 0; i < n; i++) { px[i] = xScale.x(pts[i].time); py[i] = yScale.y(pts[i].value); }
@@ -19337,7 +19330,7 @@ function _aurix24hSpikeGuard(drawn, xScale, yScale, gaps) {
     for (let i = 1; i < n; i++) { if (pts[i].value < pts[miIdx].value) miIdx = i; if (pts[i].value > pts[maIdx].value) maIdx = i; }
     const drop = new Array(n).fill(false);
     for (let i = 1; i < n - 1; i++) {
-      if (i === miIdx || i === maIdx) continue;                                   // never the day's real high/low
+      if (i === miIdx || i === maIdx) continue;                                   // never the global high/low
       if (drop[i - 1]) continue;                                                  // keep one representative if adjacent
       if (gapT.has(pts[i].time) || gapT.has(pts[i - 1].time) || gapT.has(pts[i + 1].time)) continue;   // protect gap edges
       const a = py[i - 1], b = py[i + 1], c = py[i];
@@ -19345,7 +19338,7 @@ function _aurix24hSpikeGuard(drawn, xScale, yScale, gaps) {
       if (!isPeak && !isTrough) continue;
       const prom = Math.min(Math.abs(c - a), Math.abs(c - b));                     // smaller excursion
       const base = Math.abs(px[i + 1] - px[i - 1]) || 1;                          // horizontal width
-      if (prom >= _AURIX_24H_SPIKE_MIN_PROM_PX && (prom / base) >= _AURIX_24H_SPIKE_ASPECT) drop[i] = true;
+      if (prom >= minProm && (prom / base) >= aspect) drop[i] = true;
     }
     let any = false; const out = [];
     for (let i = 0; i < n; i++) { if (drop[i]) any = true; else out.push(pts[i]); }
@@ -19353,6 +19346,34 @@ function _aurix24hSpikeGuard(drawn, xScale, yScale, gaps) {
     pts = out;
   }
   return pts.length >= 2 ? pts : drawn;
+}
+// RC4-D — 24H SPIKE GUARD (24H only). PERMANENT validated path; thin wrapper over the shared
+// reducer with the 24H params (behaviour unchanged). Rollback: _AURIX_24H_SPIKE_GUARD_ENABLED=false.
+const _AURIX_24H_SPIKE_GUARD_ENABLED = true;
+const _AURIX_24H_SPIKE_MIN_PROM_PX = 4.5;     // min vertical excursion (px)
+const _AURIX_24H_SPIKE_ASPECT = 0.55;         // prominence / base ≥ this ⇒ sharp tooth (lower = more aggressive)
+const _AURIX_24H_SPIKE_MAX_PASSES = 3;
+function _aurix24hSpikeGuard(drawn, xScale, yScale, gaps) {
+  return _aurixSpikeReduce(drawn, xScale, yScale, gaps, _AURIX_24H_SPIKE_ASPECT, _AURIX_24H_SPIKE_MIN_PROM_PX, _AURIX_24H_SPIKE_MAX_PASSES);
+}
+// RC4-E — GLOBAL VOLATILITY POLISH (7D/30D/1A/TOTAL; 24H stays on its dedicated guard). Same
+// aspect reducer with per-range aggressiveness (lower aspect = more aggressive). Reduces
+// compact-tooth clusters (end-of-range / high-volatility) without flattening real moves or
+// the historical narrative. Rollback: global _AURIX_VOLATILITY_POLISH_ENABLED=false, or
+// per-range _AURIX_VOLATILITY_POLISH_BY_RANGE[range]=false.
+const _AURIX_VOLATILITY_POLISH_ENABLED = true;
+const _AURIX_VOLATILITY_POLISH_BY_RANGE = { '24h': true, '7d': true, '30d': true, '1y': true, 'all': true };
+const _AURIX_VOLATILITY_PARAMS_BY_RANGE = {
+  '24h': { aspect: 0.55, minProm: 4.5, passes: 3 },   // media-alta (handled by the 24H spike guard)
+  '7d':  { aspect: 0.70, minProm: 4.0, passes: 2 },   // media
+  '30d': { aspect: 0.70, minProm: 4.0, passes: 2 },   // media
+  '1y':  { aspect: 0.88, minProm: 5.0, passes: 2 },   // baja-media (preserve narrative)
+  'all': { aspect: 0.88, minProm: 5.0, passes: 2 },   // baja-media
+};
+function _aurixVolatilityPolish(drawn, xScale, yScale, range, gaps) {
+  const p = _AURIX_VOLATILITY_PARAMS_BY_RANGE[String(range || '').toLowerCase()];
+  if (!p) return drawn;
+  return _aurixSpikeReduce(drawn, xScale, yScale, gaps, p.aspect, p.minProm, p.passes);
 }
 
 // INC4-C — Distance-aware subdivision. Walks the monotone path's segments and, for any
@@ -19611,10 +19632,13 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
     if (run.length < 2) { droppedSubpaths++; return; }   // never happens post-coalesce; guard only
     // ARR — optimise ONLY the drawn vertex set (visiblePoints/visiblePixels stay full).
     let drawn = _aurixArrRepresentVertices(run, xScale, _arrCfg);
-    // RC4-D — 24H spike guard (24H only): drop redundant sharp single-vertex teeth FIRST, on
-    // the finer ARR geometry, so the subsequent simplify smooths what's left. Extremes/
-    // endpoints/gap-edges kept; sustained bursts kept (multi-vertex). visiblePoints untouched.
-    if (_AURIX_24H_SPIKE_GUARD_ENABLED && r === '24h') drawn = _aurix24hSpikeGuard(drawn, xScale, yScale, prepared.gaps);
+    // RC4-D/E — volatility polish (drop redundant sharp single-vertex teeth FIRST, on the finer
+    // ARR geometry, so simplify smooths what's left). 24H keeps its dedicated spike guard; the
+    // other ranges use the per-range volatility polish. Both gated globally + per-range; both
+    // keep extremes/endpoints/gap-edges + sustained bursts; visiblePoints untouched.
+    const _volOn = _AURIX_VOLATILITY_POLISH_ENABLED && _AURIX_VOLATILITY_POLISH_BY_RANGE[r] !== false;
+    if (r === '24h') { if (_AURIX_24H_SPIKE_GUARD_ENABLED && _volOn) drawn = _aurix24hSpikeGuard(drawn, xScale, yScale, prepared.gaps); }
+    else if (_volOn) { drawn = _aurixVolatilityPolish(drawn, xScale, yScale, r, prepared.gaps); }
     // INC4-A/D — perceptual simplification (teeth + microangles), extremes/endpoints locked.
     // INC5 — range-aware epsilon (24H stronger to suppress micro-zigzag).
     if (_AURIX_POLISH_ENABLED) drawn = _aurixPolishSimplify(drawn, xScale, yScale, r);
@@ -22507,10 +22531,17 @@ function renderAurixMobileLiteChart(range, token) {
     if (dur > 100) { st.lastError = 'render ' + Math.round(dur) + 'ms > 100ms budget'; _aurixMobileLiteFallback('timeout'); return; }
     // RC3 closed — temporary __AURIX_ARR_* validation markers removed (diagnostics on demand
     // via window.debugAurixGraphQuality()).
-    const up = !(rc.renderMeta && rc.renderMeta.lastDeltaPct != null && rc.renderMeta.lastDeltaPct < 0);
-    const stroke = up ? '#34d39e' : '#ff6b6b';
-    const fillTop = up ? 'rgba(52,211,158,0.18)' : 'rgba(255,107,107,0.16)';
-    const gid = 'aurixLiteFill_' + (up ? 'u' : 'd');
+    // RC4-E FASE 1 — Mobile Color Parity. Colour by the RANGE RETURN sign (the same canonical
+    // source as the desktop tone + the %/€ indicator), NOT by lastDeltaPct (≈0 vs dashboard →
+    // it stayed green even on a negative range). Read-only (consumes the existing sign). Web
+    // hexes for true parity: up #2ebd85 / down #e25563 / neutral #9fb0c7.
+    const _rr = (typeof _aurixRangeReturn === 'function') ? _aurixRangeReturn(r) : null;
+    const _rpct = (_rr && Number.isFinite(_rr.deltaPct)) ? _rr.deltaPct : null;
+    const tone = (_rpct == null) ? 'flat' : (_rpct > 0.005 ? 'up' : (_rpct < -0.005 ? 'down' : 'flat'));
+    const up = tone !== 'down';
+    const stroke = tone === 'down' ? '#e25563' : (tone === 'flat' ? '#9fb0c7' : '#2ebd85');
+    const fillTop = tone === 'down' ? 'rgba(226,85,99,0.15)' : (tone === 'flat' ? 'rgba(159,176,199,0.08)' : 'rgba(46,189,133,0.16)');
+    const gid = 'aurixLiteFill_' + tone;
     const svg =
       '<svg class="aurix-lite-svg' + (_aurixMobileLitePrevRange !== r ? ' aurix-lite-in' : '') + '" viewBox="0 0 ' + VBW + ' ' + VBH + '" preserveAspectRatio="none" width="100%" height="100%" style="display:block" aria-hidden="true">' +
         '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +

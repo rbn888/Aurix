@@ -67,8 +67,8 @@ console.log('\nOTHER RANGES UNAFFECTED (guard is 24H-only):');
 
 console.log('\nROLLBACK + WIRING + NO REGRESSION:');
 ok('12 rollback ENABLED=false restores prior path (more teeth)', teethOff > teethOn);
-ok('13 guard wired 24H-only + gated', /_AURIX_24H_SPIKE_GUARD_ENABLED && r === '24h'/.test(app) && /_AURIX_24H_SPIKE_GUARD_ENABLED = true/.test(app));
-ok('14 guard protects gap edges + global extremes (code)', /i === miIdx \|\| i === maIdx/.test(fn('_aurix24hSpikeGuard')) && /gapT\.has/.test(fn('_aurix24hSpikeGuard')));
+ok('13 guard wired 24H-only + gated', /r === '24h'\) \{ if \(_AURIX_24H_SPIKE_GUARD_ENABLED && _volOn\) drawn = _aurix24hSpikeGuard\(/.test(app) && /_AURIX_24H_SPIKE_GUARD_ENABLED = true/.test(app));
+ok('14 reducer protects gap edges + global extremes (code)', /i === miIdx \|\| i === maIdx/.test(fn('_aurixSpikeReduce')) && /gapT\.has/.test(fn('_aurixSpikeReduce')));
 ok('15 inspector snap + tooltip + indicator paths intact', /_aurixVisualPointAtX\(_aurixMobChartVisual, fx\)/.test(app) && /_aurixMobileSetPerfIndicator\(\);/.test(app) && /out\.reason = 'normal_pause'/.test(app));
 
 console.log('\nRESULT: '+(fail===0?'ALL PASS ✓':'FAIL ✗')+'  ('+pass+' passed, '+fail+' failed)');
