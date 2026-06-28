@@ -449,22 +449,26 @@ async function autoSaveToBackend(attempt = 1) {
 
   try {
     _isSaving = true;
+    const _syncedAt = new Date().toISOString();
     _persistDebug('[persist-save-backend] upsert →', {
       reason: safe.reason, assetCount: Array.isArray(assets) ? assets.length : 0,
       symbols: Array.isArray(assets) ? assets.map(a => a.symbol || a.ticker) : [],
     });
+    try { console.log('[SYNC][SAVE_START]', { reason: safe.reason, assetCount: Array.isArray(assets) ? assets.length : 0 }); } catch (_) {}
     const { error } = await supabaseClient
       .from('user_portfolios')
       .upsert({
         user_id:    currentUser.id,
         assets,
         holdings,
-        updated_at: new Date().toISOString()
+        updated_at: _syncedAt
       }, { onConflict: 'user_id' });
 
-    if (error) throw error;
+    if (error) throw error;   // never mark synced/OK if the remote write failed
     _persistDebug('[persist-save-backend] OK', { assetCount: Array.isArray(assets) ? assets.length : 0 });
     if (IS_DEV) console.log('[DATA] autosave success');
+    try { _aurixMarkSynced(new Date(_syncedAt).getTime()); } catch (_) {}   // local is now in sync with remote
+    try { console.log('[SYNC][SAVE_OK]', { syncedAt: _syncedAt, assetCount: Array.isArray(assets) ? assets.length : 0 }); } catch (_) {}
     _setSaveStatus('saved');
     // Tombstone served its purpose — remote is now in sync with local.
     if (tombstone) {
@@ -986,30 +990,26 @@ async function initPortfolioData(userId) {
   // watchlist into local memory/storage. Runs regardless of which source wins
   // for assets/holdings below; respects the reset epoch/tombstone internally.
   _mergeRemoteState(backendData);
-  const distrustRemote = (typeof _shouldDistrustRemote === 'function') && _shouldDistrustRemote(backendData);
-  if (isValidPortfolioData(backendData) && backendData.assets.length > 0 && !distrustRemote) {
-    _persistDebug('[persist-merge] remote wins', { assetCount: backendData.assets.length, symbols: backendData.assets.map(a => a && (a.symbol || a.ticker)) });
+  // P0-SYNC-INTEGRITY — version/timestamp + count-aware merge (NEVER loses assets), replacing the
+  // naive "remote wins if it has any assets" (which could let a smaller remote clobber a larger
+  // local). remote>local ⇒ remote · local>remote ⇒ keep local · equal ⇒ newer-by-updatedAt.
+  const localData = getPortfolioData();
+  let localModel;
+  if (localData.source === 'new') localModel = { assets: localData.assets || [], holdings: localData.holdings || [] };
+  else localModel = (localData.legacy && localData.legacy.length) ? convertToNewModel(localData.legacy) : { assets: [], holdings: [] };
+  const decision = _aurixMergePortfolio(localModel, backendData);
+  try { console.log('[SYNC][MERGE]', { phase: 'boot', apply: decision.apply, reason: decision.reason }); } catch (_) {}
+  if (decision.apply === 'remote' && isValidPortfolioData(backendData)) {
+    _aurixMarkSynced(_aurixRemoteUpdatedMs(backendData));
+    _persistDebug('[persist-merge] remote wins', { reason: decision.reason, assetCount: backendData.assets.length });
     if (IS_DEV) console.log('[DATA] loaded from Supabase');
     return backendData;
   }
-  _persistDebug('[persist-merge] remote NOT used for assets', {
-    distrustRemote, remoteAssetCount: (backendData && Array.isArray(backendData.assets)) ? backendData.assets.length : 0,
-  });
-  if (distrustRemote && IS_DEV) {
-    console.warn('[DATA] remote ignored — newer reset tombstone');
-  }
-
-  // 2. localStorage (fallback)
-  const localData = getPortfolioData();
-  if (localData.source === 'new' && localData.assets?.length > 0) {
+  if (localModel.assets.length > 0) {
+    _persistDebug('[persist-merge] local kept', { reason: decision.reason, assetCount: localModel.assets.length });
     if (IS_DEV) console.log('[DATA] loaded from localStorage');
-    return { assets: localData.assets, holdings: localData.holdings };
+    return localModel;
   }
-  if (localData.source === 'legacy' && localData.legacy?.length > 0) {
-    if (IS_DEV) console.log('[DATA] loaded from localStorage (legacy)');
-    return convertToNewModel(localData.legacy);
-  }
-
   // 3. Usuario nuevo
   if (IS_DEV) console.log('[DATA] empty portfolio initialized');
   return { assets: [], holdings: [] };
@@ -5519,6 +5519,9 @@ function _aurixRecoverFromJournalIfEmpty(flat) {
 // silent removal with the same count). Explicit destructive contexts bypass this.
 function _aurixJournalContradictsSave(nextCatalog, context) {
   try {
+    // remote-sync / boot-load adopt the shared source of truth (count-reduction is still guarded
+    // separately); the journal-contradiction check is for LOCAL silent id-swaps only.
+    if (context === 'remote-sync' || context === 'boot-load') return false;
     if (_AURIX_DESTRUCTIVE_CONTEXTS.indexOf(String(context || '')) !== -1) return false;
     const latest = _aurixJournalLatestSnapshot();
     if (!latest || latest.type === 'reset_portfolio' || !latest.snapshot) return false;
@@ -5529,6 +5532,77 @@ function _aurixJournalContradictsSave(nextCatalog, context) {
   } catch (_) { return false; }
 }
 try { if (typeof window !== 'undefined') { window.rebuildPortfolioFromEvents = rebuildPortfolioFromEvents; window.aurixPortfolioJournal = _aurixJournalRead; } } catch (_) {}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// P0-SYNC-INTEGRITY — Supabase is the shared source of truth across devices; localStorage is
+// only a local cache. (1) A local meta {version, updatedAt, syncedAt} tracks "is local ahead of
+// what we synced". (2) A version/timestamp + count-aware merge NEVER loses assets: remote>local
+// ⇒ apply remote; local>remote ⇒ keep local (not yet uploaded); equal ⇒ newer-by-updatedAt wins.
+// (3) Mobile/web RE-SYNC on foreground/focus/pageshow/online (the missing piece — assets were
+// only loaded once at boot), so an asset added on one device appears on the other after a
+// refresh/foreground. Respects the integrity lock + reset tombstone. Data-layer only.
+const _AURIX_PORTFOLIO_META_KEY = 'aurix_portfolio_meta';
+function _aurixReadPortfolioMeta() {
+  try { const m = JSON.parse(localStorage.getItem(_AURIX_PORTFOLIO_META_KEY) || 'null'); return (m && typeof m === 'object') ? m : { version: 0, updatedAt: 0, syncedAt: 0 }; }
+  catch (_) { return { version: 0, updatedAt: 0, syncedAt: 0 }; }
+}
+function _aurixWritePortfolioMeta(m) { try { localStorage.setItem(_AURIX_PORTFOLIO_META_KEY, JSON.stringify(m)); } catch (_) {} }
+function _aurixBumpPortfolioMeta() { const m = _aurixReadPortfolioMeta(); m.version = (m.version || 0) + 1; m.updatedAt = Date.now(); _aurixWritePortfolioMeta(m); return m; }
+function _aurixMarkSynced(remoteUpdatedMs) { const m = _aurixReadPortfolioMeta(); m.syncedAt = remoteUpdatedMs || Date.now(); if (!(m.updatedAt > m.syncedAt)) m.updatedAt = m.syncedAt; _aurixWritePortfolioMeta(m); }
+function _aurixRemoteUpdatedMs(remote) { try { return (remote && remote.updated_at) ? new Date(remote.updated_at).getTime() : 0; } catch (_) { return 0; } }
+// Decide which side to apply (NEVER loses assets). Returns { apply:'remote'|'local', reason }.
+function _aurixMergePortfolio(localModel, remote) {
+  const lc = (localModel && Array.isArray(localModel.assets)) ? localModel.assets.length : 0;
+  const rc = (remote && Array.isArray(remote.assets)) ? remote.assets.length : 0;
+  const distrust = (typeof _shouldDistrustRemote === 'function') && _shouldDistrustRemote(remote);
+  if (distrust) { try { console.log('[SYNC][CONFLICT_BLOCKED]', 'reset tombstone newer than remote'); } catch (_) {} return { apply: 'local', reason: 'tombstone' }; }
+  if (!remote || !Array.isArray(remote.assets) || (rc === 0 && lc > 0)) return { apply: 'local', reason: 'remote-empty' };
+  if (rc > lc) { try { console.log('[SYNC][APPLIED_REMOTE]', { reason: 'remote-more', lc, rc }); } catch (_) {} return { apply: 'remote', reason: 'remote-more' }; }
+  if (lc > rc) { try { console.log('[SYNC][STALE_LOCAL]', { reason: 'local-more-keep', lc, rc }); } catch (_) {} return { apply: 'local', reason: 'local-more' }; }
+  const meta = _aurixReadPortfolioMeta(); const rMs = _aurixRemoteUpdatedMs(remote);
+  if (rMs > (meta.updatedAt || 0)) { try { console.log('[SYNC][APPLIED_REMOTE]', { reason: 'remote-newer-equal-count', rMs, localUpdatedAt: meta.updatedAt }); } catch (_) {} return { apply: 'remote', reason: 'remote-newer' }; }
+  return { apply: 'local', reason: 'local-current' };
+}
+let _aurixResyncInFlight = false, _aurixLastResyncAt = 0;
+async function _aurixResyncFromRemote(reason) {
+  try {
+    if (typeof supabaseClient === 'undefined' || !supabaseClient || typeof currentUser === 'undefined' || !currentUser || !currentUser.id) return;
+    if (typeof _bootLoadComplete !== 'undefined' && !_bootLoadComplete) return;
+    if (_aurixResyncInFlight) return;
+    const now = (typeof Date !== 'undefined') ? Date.now() : 0;
+    if (now - _aurixLastResyncAt < 1500) return;   // collapse visibility+focus bursts
+    _aurixResyncInFlight = true; _aurixLastResyncAt = now;
+    try { console.log('[SYNC][REMOTE_LOAD]', { reason: reason || 'foreground' }); } catch (_) {}
+    const remote = await loadPortfolioFromBackend(currentUser.id);
+    try { _mergeRemoteState(remote); } catch (_) {}   // history/watchlist reconcile (existing)
+    let localModel; try { const d = getPortfolioData(); localModel = (d.source === 'new') ? { assets: d.assets || [], holdings: d.holdings || [] } : convertToNewModel(d.legacy || []); } catch (_) { localModel = { assets: [], holdings: [] }; }
+    const decision = _aurixMergePortfolio(localModel, remote);
+    try { console.log('[SYNC][MERGE]', decision); } catch (_) {}
+    if (decision.apply === 'remote' && isValidPortfolioData(remote)) {
+      const flat = convertFromNewToFlat(remote.assets, remote.holdings, _aurixLegacyFallbackById());
+      assets = flat;
+      try { saveData(convertToNewModel(assets), 'remote-sync'); } catch (_) {}   // merge guarantees rc>=lc ⇒ non-reducing
+      _aurixMarkSynced(_aurixRemoteUpdatedMs(remote));
+      try { _aurixJournalAppend('remote_sync', null, { reason: reason || 'foreground', counts: _aurixCountModel(remote.assets, remote.holdings) }, { assets: remote.assets, holdings: remote.holdings }); } catch (_) {}
+      try { console.log('[SYNC][APPLIED_REMOTE]', 'portfolio updated from remote', { assets: flat.length }); } catch (_) {}
+      try { if (typeof recomputeDerivedFinancialState === 'function') recomputeDerivedFinancialState('remote-sync'); } catch (_) {}
+      try { if (typeof render === 'function') render(true); } catch (_) {}
+      try { if (typeof updateDonut === 'function') updateDonut(); } catch (_) {}
+      try { if (typeof updateCategoryCards === 'function') updateCategoryCards(); } catch (_) {}
+      try { if (typeof scheduleAurixMobileLite === 'function') scheduleAurixMobileLite(typeof activeRange !== 'undefined' ? activeRange : '30d'); } catch (_) {}
+    }
+  } catch (e) { try { console.warn('[SYNC] resync failed', e && e.message); } catch (_) {} }
+  finally { _aurixResyncInFlight = false; }
+}
+try {
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    window.aurixResyncFromRemote = _aurixResyncFromRemote;   // manual trigger / debug
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') _aurixResyncFromRemote('visible'); });
+    window.addEventListener('focus',   () => _aurixResyncFromRemote('focus'));
+    window.addEventListener('pageshow', () => _aurixResyncFromRemote('pageshow'));
+    window.addEventListener('online',   () => _aurixResyncFromRemote('online'));
+  }
+} catch (_) {}
 
 // AURIX-APP-DOMAIN-READY-1: derived from the single API-origin source of truth
 // (window.AURIX_API_BASE, set in index.html). All other API URLs in app.js are
@@ -6112,6 +6186,9 @@ function save(context) {
       const _type = _aurixJournalTypeFromContext(context, (Array.isArray(catalogAssets) ? catalogAssets.length : 0) > _aurixJournalLatestAssetCount());
       _aurixJournalAppend(_type, null, { context: context || null, counts: _aurixCountModel(catalogAssets, holdings) }, { assets: catalogAssets, holdings: holdings });
     } catch (_) {}
+    // P0-SYNC-INTEGRITY — a local user change marks local ahead of the last synced state, so the
+    // cross-device merge knows this device has unuploaded edits. (remote-sync writes don't bump.)
+    if (context !== 'remote-sync' && context !== 'boot-load') { try { _aurixBumpPortfolioMeta(); } catch (_) {} }
     scheduleSave();
     // Portfolio mutation invariant: derived financial state must reflect
     // the new asset set immediately so workspace PORTFOLIO.* / EXPOSURE /
