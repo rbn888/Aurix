@@ -25216,6 +25216,13 @@ function _aurixCategoryMount(canvas) {
 // on 3M as they switch between categories — predictable, no surprise.
 let _aurixCategoryPerfEntry = null; // { type, ctrl, panel }
 let _aurixCategoryPerfRange = '30d';
+// ASSET-SECTIONS-CARDS-CLEANUP — Fase 1: the per-category detail panel no longer renders an
+// internal mini chart (nor its now-useless range selector). Only the premium textual header
+// (title + gain/loss) is kept. This is the SINGLE shared component for every category
+// (Acciones/Cripto/Fondos·ETF/Inmuebles/Liquidez/…), so flipping this one flag removes the
+// chart everywhere. The institutional dashboard chart is a different component and is untouched.
+// Rollback: set to true (restores the V2 mini chart + range pills exactly).
+const _AURIX_CATEGORY_PERF_CHART_ENABLED = false;
 const _AURIX_CATEGORY_PERF_RANGES = ['24h','7d','30d','3m','6m','ytd','1y','all'];
 const _AURIX_CATEGORY_PERF_RANGE_LABELS = {
   '24h': 'catRange_1d',
@@ -25264,6 +25271,9 @@ function _aurixCategoryPerfApplyRange(range) {
   if (!entry || !entry.panel) return;
   const { type, panel, ctrl } = entry;
   const series = _categorySeriesForRange(type, range);
+  // Chartless mode (ASSET-SECTIONS-CARDS-CLEANUP): no chart/empty-state to drive — just keep the
+  // textual gain/loss header in sync from the real series.
+  if (!_AURIX_CATEGORY_PERF_CHART_ENABLED) { _aurixCategoryPerfUpdateHeader(panel, series); return; }
   const emptyEl = panel.querySelector('.category-perf-empty');
   // No chart engine, or not enough history — both render the premium
   // empty state instead of leaving a blank chart area.
@@ -25283,6 +25293,23 @@ function _aurixCategoryPerfBuildPanel(type) {
   const meta    = (typeof TYPE_META !== 'undefined' && TYPE_META[type]) || { label: type, color: '#8aa6ff' };
   const titleFn = (typeof t === 'function') ? t('categoryPerfTitle') : null;
   const titleText = (typeof titleFn === 'function') ? titleFn(meta.label) : `${meta.label}`;
+  // ASSET-SECTIONS-CARDS-CLEANUP — chartless: compact header only (title + gain/loss), no chart,
+  // no range pills (useless without a chart), no empty-state container ⇒ no dead space.
+  if (!_AURIX_CATEGORY_PERF_CHART_ENABLED) {
+    const panel = document.createElement('section');
+    panel.className = 'category-perf-panel is-chartless';
+    panel.id = 'categoryPerfPanel';
+    panel.style.setProperty('--category-perf-color', meta.color || '#8aa6ff');
+    panel.innerHTML = `
+      <header class="category-perf-header">
+        <div class="category-perf-title-wrap">
+          <h3 class="category-perf-title">${escHtml(titleText)}</h3>
+          <span class="category-perf-change"></span>
+        </div>
+      </header>
+    `;
+    return panel;
+  }
   const pills = _AURIX_CATEGORY_PERF_RANGES.map(r => {
     const labelFn = (typeof t === 'function') ? t(_AURIX_CATEGORY_PERF_RANGE_LABELS[r]) : null;
     const label = (typeof labelFn === 'string' && labelFn) ? labelFn : r.toUpperCase();

@@ -5926,6 +5926,17 @@ body:not(.hero-active) #orb-canvas {
   flex-wrap: wrap;
   margin-bottom: 14px;
 }
+/* ASSET-SECTIONS-CARDS-CLEANUP — chartless category panel: a slim, premium textual summary
+   (title + gain/loss) with no internal chart and no dead space. Rollback: delete this block. */
+.category-perf-panel.is-chartless { margin: 0 0 12px; padding: 14px 18px; }
+.category-perf-panel.is-chartless .category-perf-header {
+  align-items: baseline; margin-bottom: 0; gap: 10px; flex-wrap: nowrap;
+}
+.category-perf-panel.is-chartless .category-perf-title-wrap {
+  flex-direction: row; align-items: baseline; justify-content: space-between;
+  gap: 10px; width: 100%;
+}
+.category-perf-panel.is-chartless .category-perf-change { font-size: 13px; white-space: nowrap; }
 .category-perf-title-wrap {
   display: flex;
   flex-direction: column;
