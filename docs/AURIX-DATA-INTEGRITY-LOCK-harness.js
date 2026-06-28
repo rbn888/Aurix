@@ -27,6 +27,9 @@ function makeEnv(block){
   vm.createContext(sb);
   vm.runInContext('const _AURIX_DESTRUCTIVE_CONTEXTS = ' + JSON.stringify(['delete-asset','sell','reduce-position','reset','edit-transaction','migration-confirmed']) + ';', sb);
   vm.runInContext('let _aurixSaveAuditLog = []; let _aurixLastDestructiveSaveAt = 0;', sb);
+  // P0-DATA-JOURNAL: saveData also consults the journal; this harness isolates the count-guard,
+  // so the journal-contradiction check is a no-op stub here (the journal has its own harness).
+  vm.runInContext('function _aurixJournalContradictsSave(){ return false; }', sb);
   ['inferPriceSource','inferProviderId','_aurixSalvageHolding','_aurixLegacyFallbackById','convertToNewModel','convertFromNewToFlat','convertToLegacyFormat',
    '_aurixCountModel','_aurixReadPersistedCounts','assertNonDestructivePortfolioSave','_aurixAuditSave','saveData']
     .forEach(n=>{ try{ vm.runInContext(fnSrc(n), sb); }catch(e){ console.log('load fail '+n+': '+e.message); } });

@@ -23,7 +23,10 @@ function makeStore(){
     removeItem:(k)=>{ delete mem[k]; },
   };
   const sb = { console, JSON, Array, Number, Object, Map, String, Boolean, localStorage,
-    IS_DEV:false, STORAGE_KEY:'portfolio_assets', _persistDebug:()=>{}, scheduleSave:()=>{}, _mem:mem };
+    IS_DEV:false, STORAGE_KEY:'portfolio_assets', _persistDebug:()=>{}, scheduleSave:()=>{}, _mem:mem,
+    // P0-DATA-JOURNAL: load() now runs journal-recovery; this harness tests the salvage layer in
+    // isolation, so the journal recovery is a pass-through stub here.
+    _aurixRecoverFromJournalIfEmpty:(x)=>x };
   vm.createContext(sb);
   ['inferPriceSource','inferProviderId','_aurixSalvageHolding','_aurixLegacyFallbackById',
    'convertToNewModel','convertFromNewToFlat','convertToLegacyFormat','getPortfolioData','load']

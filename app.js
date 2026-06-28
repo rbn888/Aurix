@@ -5422,6 +5422,114 @@ function _aurixAuditSave(verdict, context) {
     if (verdict.allowed && verdict.destructive) { try { _aurixLastDestructiveSaveAt = Date.now(); } catch (_) {} }
   } catch (_) {}
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// P0-DATA-JOURNAL — append-only portfolio event log. Every explicit action appends an
+// immutable event (with a full post-action snapshot) to `aurix_portfolio_events`. Events are
+// never modified; nothing is deleted except via an explicit reset (recorded AS a reset event).
+// The journal is the last line of defence: even if assets/holdings are lost, the portfolio can
+// be rebuilt from the latest non-reset snapshot. Data-layer only. NOT in PORTFOLIO_KEYS, so it
+// survives a reset as an immutable audit trail (the reset event is simply the latest one).
+const _AURIX_JOURNAL_KEY = 'aurix_portfolio_events';
+let _aurixJournalSeq = 0;
+function _aurixSnapshotHash(obj) {
+  try { const s = JSON.stringify(obj) || ''; let h = 0; for (let i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0; } return 'h' + (h >>> 0).toString(36) + '.' + s.length; }
+  catch (_) { return null; }
+}
+function _aurixJournalRead() {
+  try { const raw = JSON.parse(localStorage.getItem(_AURIX_JOURNAL_KEY) || '[]'); return Array.isArray(raw) ? raw : []; }
+  catch (_) { return []; }
+}
+function _aurixJournalLatestSnapshot() {
+  const evs = _aurixJournalRead();
+  for (let i = evs.length - 1; i >= 0; i--) { if (evs[i] && evs[i].snapshot) return { type: evs[i].type, snapshot: evs[i].snapshot, event: evs[i] }; }
+  return null;
+}
+function _aurixJournalLatestAssetCount() {
+  const l = _aurixJournalLatestSnapshot();
+  return (l && l.snapshot && Array.isArray(l.snapshot.assets)) ? l.snapshot.assets.length : 0;
+}
+// Append-only. Reads the existing log, pushes ONE new immutable event, writes back. Never edits
+// or removes prior entries. Failure is swallowed (the journal can never break a save).
+function _aurixJournalAppend(type, assetId, payload, snapshot) {
+  try {
+    const events = _aurixJournalRead();
+    const prev = events.length ? events[events.length - 1] : null;
+    const ev = {
+      eventId: (typeof Date !== 'undefined' ? Date.now() : 0) + '-' + (++_aurixJournalSeq) + '-' + String(type || 'event'),
+      timestamp: new Date().toISOString(),
+      userId: (typeof currentUser !== 'undefined' && currentUser && currentUser.id) ? currentUser.id : null,
+      type: String(type || 'event'),
+      assetId: assetId != null ? assetId : null,
+      payload: payload != null ? payload : null,
+      previousSnapshotHash: (prev && prev.snapshot) ? _aurixSnapshotHash(prev.snapshot) : null,
+      appVersion: (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null,
+    };
+    if (snapshot != null) ev.snapshot = snapshot;
+    events.push(ev);   // append-only: prior events untouched
+    localStorage.setItem(_AURIX_JOURNAL_KEY, JSON.stringify(events));
+    try { window.__aurixJournalLast = ev; } catch (_) {}
+    return ev;
+  } catch (_) { return null; }
+}
+function _aurixJournalTypeFromContext(ctx, assetCountUp) {
+  switch (String(ctx || '')) {
+    case 'delete-asset':        return 'delete_asset';
+    case 'reset':               return 'reset_portfolio';
+    case 'edit-transaction':    return 'edit_transaction';
+    case 'migration-confirmed': return 'migration';
+    case 'add-asset':           return 'add_asset';
+    case 'buy':                 return 'buy';
+    case 'sell':                return 'sell';
+    default:                    return assetCountUp ? 'add_asset' : 'update';
+  }
+}
+// Rebuild a flat portfolio from the journal: the latest event carrying a snapshot wins (unless
+// it's a reset → empty). Pure; reuses the salvage-aware converter.
+function rebuildPortfolioFromEvents(events) {
+  try {
+    const evs = Array.isArray(events) ? events : _aurixJournalRead();
+    for (let i = evs.length - 1; i >= 0; i--) {
+      const e = evs[i]; if (!e || !e.snapshot) continue;
+      if (e.type === 'reset_portfolio') return [];
+      const snap = e.snapshot;
+      return convertFromNewToFlat(snap.assets || [], snap.holdings || [], _aurixLegacyFallbackById());
+    }
+  } catch (_) {}
+  return [];
+}
+// Recovery: if the loaded portfolio is EMPTY but the journal proves assets existed (and the
+// latest snapshot isn't a reset), rebuild from the journal. Conservative: only fills a total
+// wipe — partial reductions are already blocked by the integrity lock.
+function _aurixRecoverFromJournalIfEmpty(flat) {
+  try {
+    if (Array.isArray(flat) && flat.length > 0) return flat;
+    const latest = _aurixJournalLatestSnapshot();
+    if (latest && latest.type !== 'reset_portfolio' && latest.snapshot && Array.isArray(latest.snapshot.assets) && latest.snapshot.assets.length > 0) {
+      const rebuilt = rebuildPortfolioFromEvents();
+      if (Array.isArray(rebuilt) && rebuilt.length > 0) {
+        try { console.warn('[DATA][RECOVERED] portfolio rebuilt from event journal:', rebuilt.length, 'assets'); } catch (_) {}
+        return rebuilt;
+      }
+    }
+  } catch (_) {}
+  return flat;
+}
+// Guardrail: a non-destructive save must not make a journal-proven asset disappear (id-swap /
+// silent removal with the same count). Explicit destructive contexts bypass this.
+function _aurixJournalContradictsSave(nextCatalog, context) {
+  try {
+    if (_AURIX_DESTRUCTIVE_CONTEXTS.indexOf(String(context || '')) !== -1) return false;
+    const latest = _aurixJournalLatestSnapshot();
+    if (!latest || latest.type === 'reset_portfolio' || !latest.snapshot) return false;
+    const prevAssets = Array.isArray(latest.snapshot.assets) ? latest.snapshot.assets : [];
+    if (!prevAssets.length) return false;
+    const nextIds = {}; (nextCatalog || []).forEach(a => { if (a && a.id != null) nextIds[a.id] = true; });
+    return prevAssets.some(a => a && a.id != null && !nextIds[a.id]);
+  } catch (_) { return false; }
+}
+try { if (typeof window !== 'undefined') { window.rebuildPortfolioFromEvents = rebuildPortfolioFromEvents; window.aurixPortfolioJournal = _aurixJournalRead; } } catch (_) {}
+
 // AURIX-APP-DOMAIN-READY-1: derived from the single API-origin source of truth
 // (window.AURIX_API_BASE, set in index.html). All other API URLs in app.js are
 // built from PRICES_PROXY via .replace('/api/prices', ...), so this one switch
@@ -5965,8 +6073,9 @@ function load() {
     const data = getPortfolioData();
     // CRITICAL-FIX: pass the legacy mirror as a recovery fallback so an orphaned holding
     // (catalog entry missing) is salvaged WITH its display metadata, never dropped.
-    if (data.source === 'new') return convertFromNewToFlat(data.assets, data.holdings, _aurixLegacyFallbackById());
-    return data.legacy;
+    // P0-DATA-JOURNAL: if the result is empty but the journal proves assets existed, rebuild.
+    if (data.source === 'new') return _aurixRecoverFromJournalIfEmpty(convertFromNewToFlat(data.assets, data.holdings, _aurixLegacyFallbackById()));
+    return _aurixRecoverFromJournalIfEmpty(data.legacy);
   } catch {
     return [];
   }
@@ -5996,6 +6105,13 @@ function save(context) {
       try { window.dispatchEvent(new CustomEvent('aurix:save-blocked', { detail: _res.verdict })); } catch (_) {}
       return;
     }
+    // P0-DATA-JOURNAL — append an immutable event (with the full post-save snapshot) so the
+    // portfolio is always reconstructable. Type from the explicit context, else add_asset when
+    // the catalog grew, else 'update'. Never blocks/throws.
+    try {
+      const _type = _aurixJournalTypeFromContext(context, (Array.isArray(catalogAssets) ? catalogAssets.length : 0) > _aurixJournalLatestAssetCount());
+      _aurixJournalAppend(_type, null, { context: context || null, counts: _aurixCountModel(catalogAssets, holdings) }, { assets: catalogAssets, holdings: holdings });
+    } catch (_) {}
     scheduleSave();
     // Portfolio mutation invariant: derived financial state must reflect
     // the new asset set immediately so workspace PORTFOLIO.* / EXPOSURE /
@@ -6041,6 +6157,10 @@ function save(context) {
 // Trade events reuse the shared deterministic id so a captured buy/sell and any
 // later backfill of the same transaction collapse to one event (dedup).
 function _ledgerTrade(asset, type, qty, price, ts, realized) {
+  // P0-DATA-JOURNAL — semantic buy/sell event FIRST (the WL block below can early-return when
+  // the optional wealthLedger is absent, so journal here to never miss a trade). The full
+  // snapshot rides the subsequent save()'s journal entry.
+  try { _aurixJournalAppend(type === 'sell' ? 'sell' : 'buy', asset && asset.id, { side: type, qty: qty, price: price, ts: ts, realized: realized != null ? realized : null }, null); } catch (_) {}
   // WN.4A: capture the capital flow locally FIRST, independent of the (optional)
   // wealthLedger — a buy adds invested capital, a sell removes it.
   try {
@@ -6564,6 +6684,13 @@ function saveData({ assets: catalogAssets, holdings }, context) {
   if (!verdict.allowed && _AURIX_BLOCK_DESTRUCTIVE_SAVES) {
     try { console.error('[DATA][SAVE_BLOCKED_DESTRUCTIVE]', verdict.reason, { context: context || null }); } catch (_) {}
     return { blocked: true, verdict };
+  }
+  // P0-DATA-JOURNAL guardrail: block a same-count save that drops a journal-proven asset
+  // (id-swap / silent removal) unless an explicit destructive context authorises it.
+  if (_AURIX_BLOCK_DESTRUCTIVE_SAVES && _aurixJournalContradictsSave(catalogAssets, context)) {
+    try { console.error('[DATA][SAVE_BLOCKED_DESTRUCTIVE] contradicts event journal (a recorded asset would vanish)', { context: context || null }); } catch (_) {}
+    _aurixAuditSave({ allowed: false, destructive: true, reason: 'contradicts event journal', previous: previous, next: next }, context);
+    return { blocked: true, verdict: { allowed: false, reason: 'contradicts event journal' } };
   }
   localStorage.setItem('aurix_assets',   JSON.stringify(catalogAssets));
   localStorage.setItem('aurix_holdings', JSON.stringify(holdings));
