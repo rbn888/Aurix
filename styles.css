@@ -22794,3 +22794,49 @@ body.aurix-premium-lock{ overflow:hidden; }
 .aurix-composition-legend li.is-hot { background: rgba(120,170,255,0.10); }
 .aurix-composition-legend .acl-label { flex: 0 0 auto; min-width: 96px; }   /* name + % together, soft column, NOT far-right */
 .aurix-composition-legend .acl-pct { flex: 0 0 auto; }
+
+/* ══════════════════════════════════════════════════════════════
+   DSH.DONUT.04 — final premium pass (overrides DSH.DONUT.01/02/03).
+   Mini: thicker solid ring (~9.5px), bigger (50px), dropped + nudged right,
+   subtle halo (no dark frame). Modal: wider compact executive panel, big donut
+   protagonist, 2-column legend, per-segment tooltip. Desktop only. ════════ */
+@media (min-width: 769px) {
+  .micro-composition-donut {
+    width: 54px; height: 54px; margin-top: 18px; margin-left: 24px;   /* down ~18px, right ~24px */
+    background: transparent;                                           /* no dark frame */
+    border: 1px solid rgba(120,170,255,0.14);                         /* barely-there ring */
+    box-shadow: 0 0 14px -4px rgba(74,130,240,0.34);                  /* subtle exterior halo only */
+  }
+  .micro-composition-donut:hover {
+    transform: scale(1.05);
+    border-color: rgba(120,170,255,0.40);
+    box-shadow: 0 0 18px 1px rgba(74,130,240,0.50);
+  }
+}
+.mcd-ring { width: 50px; height: 50px; }
+.mcd-segs circle { stroke-width: 9.5; }   /* solid financial ring, not a thin loader */
+
+/* Modal — wider compact executive panel; donut is the protagonist */
+.modal--composition { max-width: 720px; transform: scale(.96); transition: opacity .15s ease, transform .15s ease; }  /* open .96→1, close →.96; 150ms */
+.modal-overlay.open .modal--composition { transform: scale(1); }
+.aurix-composition-body { flex-direction: column; align-items: center; gap: 14px; padding: 6px 30px 4px; flex-wrap: nowrap; }
+.aurix-composition-chart { width: 230px; height: 230px; }   /* big donut dominates */
+/* per-segment tooltip (name · % · real value); reserves its line so layout never jumps */
+.aurix-composition-tip {
+  display: flex; align-items: center; gap: 8px; height: 24px; opacity: 0;
+  transition: opacity .12s ease; font-size: 12.5px; color: var(--text, #d7e0f0); font-variant-numeric: tabular-nums;
+}
+.aurix-composition-tip.show { opacity: 1; }
+.aurix-composition-tip .act-dot { width: 9px; height: 9px; border-radius: 3px; }
+.aurix-composition-tip .act-name { font-weight: 700; color: var(--text-bright, #fff); }
+.aurix-composition-tip .act-pct { color: var(--text-muted, #9aa7bd); }
+.aurix-composition-tip .act-val { margin-left: 6px; font-weight: 700; color: var(--text-bright, #fff); }
+/* two-column legend, tight, aligned */
+.aurix-composition-legend {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 34px;
+  width: 100%; max-width: 560px; margin: 0 auto; flex: none;
+}
+.aurix-composition-legend li { justify-content: flex-start; gap: 9px; padding: 3px 8px; border-radius: 8px; transition: background .12s ease; }
+.aurix-composition-legend li.is-hot { background: rgba(120,170,255,0.10); }
+.aurix-composition-legend .acl-label { flex: 1 1 auto; min-width: 0; }
+.aurix-composition-legend .acl-pct { flex: 0 0 auto; }

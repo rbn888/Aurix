@@ -17547,8 +17547,9 @@ function updateDonut() {
 // with the REAL portfolio composition (percentages from getInvestableDistribution — no invented
 // data). Localized, additive; touches no other chart/data/mobile surface.
 // ════════════════════════════════════════════════════════════════════════
-let _aurixCompositionOpener = null, _aurixCompositionInit = false, _aurixMiniDonutDrawn = false;
-// Real composition entries (incl. real estate), share computed over the displayed total.
+let _aurixCompositionOpener = null, _aurixCompositionInit = false, _aurixMiniDonutDrawn = false, _aurixModalEntries = [];
+// Real composition entries (incl. real estate), share computed over the displayed total. Carries
+// valueBase (for the tooltip's monetary figure). Always derived from the real portfolio.
 function _aurixCompositionEntries() {
   let dist = null;
   try { dist = (typeof getInvestableDistribution === 'function') ? getInvestableDistribution({ includeNonInvestable: true }) : null; } catch (_) { dist = null; }
@@ -17557,7 +17558,7 @@ function _aurixCompositionEntries() {
   if (!(total > 0)) return [];
   return dist.map(d => {
     const meta = (typeof TYPE_META !== 'undefined' && TYPE_META[d.type]) || { label: d.type, color: '#6b7280' };
-    return { type: d.type, label: meta.label || d.type, color: meta.color || '#6b7280', pct: (Number(d.valueBase) || 0) / total * 100 };
+    return { type: d.type, label: meta.label || d.type, color: meta.color || '#6b7280', valueBase: (Number(d.valueBase) || 0), pct: (Number(d.valueBase) || 0) / total * 100 };
   }).filter(e => e.pct > 0.05).sort((a, b) => b.pct - a.pct);
 }
 // Segmented ring as <circle> strings (pathLength=100 ⇒ dasharray in % units). `gap` (% units)
@@ -17594,6 +17595,16 @@ function _aurixCompositionHover(idx, on) {
   chart.classList.toggle('hot', !!on);
   chart.querySelectorAll('.mcd-seg').forEach(s => s.classList.toggle('is-hot', !!on && +s.getAttribute('data-idx') === idx));
   legend.querySelectorAll('li').forEach(li => li.classList.toggle('is-hot', !!on && +li.getAttribute('data-idx') === idx));
+  // Tooltip: name · % · real monetary value (from the live portfolio).
+  const tip = document.getElementById('compositionTip');
+  if (tip) {
+    const e = (on && _aurixModalEntries && _aurixModalEntries[idx]) ? _aurixModalEntries[idx] : null;
+    if (e) {
+      const esc = (typeof escHtml === 'function') ? escHtml : (s => String(s));
+      tip.innerHTML = '<span class="act-dot" style="background:' + e.color + '"></span><span class="act-name">' + esc(e.label) + '</span><span class="act-pct">' + e.pct.toFixed(1) + '%</span><span class="act-val">' + esc(e.value || '') + '</span>';
+      tip.classList.add('show');
+    } else { tip.classList.remove('show'); }
+  }
 }
 function _aurixCompositionWireHover() {
   const chart = document.getElementById('compositionChart'), legend = document.getElementById('compositionLegend');
@@ -17609,7 +17620,9 @@ function renderMiniCompositionDonut() {
     // Draw animation runs ONCE per load (first render with data); later updateDonut() ticks
     // (e.g. price refreshes) re-render the slices statically — never re-animate.
     const animate = entries.length > 0 && !_aurixMiniDonutDrawn;
-    segG.innerHTML = entries.length ? _aurixDonutSegmentsSVG(entries, 16.5, 22, 22, 5.5, 2.0, { animate: animate, dur: 850 }) : '';
+    // r19/cx25/cy25 in a 50-viewBox + 9.5px stroke ⇒ a solid ~50px financial donut (not a loader);
+    // gap 0.9 (~1px on this ring) ⇒ hairline separation, never visible holes.
+    segG.innerHTML = entries.length ? _aurixDonutSegmentsSVG(entries, 19, 25, 25, 9.5, 0.9, { animate: animate, dur: 850 }) : '';
     if (entries.length) _aurixMiniDonutDrawn = true;
   }
   // entries → defer to CSS (desktop-only ≥769px); no data → hide on both.
@@ -17621,19 +17634,22 @@ function renderCompositionModalDonut() {
   const legend = document.getElementById('compositionLegend');
   if (!chart || !legend) return;
   const entries = _aurixCompositionEntries();
-  if (!entries.length) { chart.innerHTML = ''; legend.innerHTML = ''; return; }
+  if (!entries.length) { chart.innerHTML = ''; legend.innerHTML = ''; _aurixModalEntries = []; return; }
   const esc = (typeof escHtml === 'function') ? escHtml : (s => String(s));
+  const fmt = (typeof formatBase === 'function') ? formatBase : (v => String(Math.round(v)));
   const sub = (typeof t === 'function' && typeof t('compositionCenterSub') === 'string') ? t('compositionCenterSub') : 'Cartera';
+  entries.forEach(e => { try { e.value = fmt(e.valueBase); } catch (_) { e.value = ''; } });
+  _aurixModalEntries = entries;   // for the hover tooltip
   chart.innerHTML =
     '<svg viewBox="0 0 200 200" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' +
-      '<circle cx="100" cy="100" r="72" fill="none" stroke="rgba(255,255,255,.045)" stroke-width="22"></circle>' +
-      _aurixDonutSegmentsSVG(entries, 72, 100, 100, 22, 1.8, { animate: true, dur: 900 }) +
+      '<circle cx="100" cy="100" r="74" fill="none" stroke="rgba(255,255,255,.045)" stroke-width="26"></circle>' +
+      _aurixDonutSegmentsSVG(entries, 74, 100, 100, 26, 0.9, { animate: true, dur: 900 }) +
     '</svg>' +
     '<div class="aurix-composition-center"><span class="aurix-composition-center-val">100%</span><span class="aurix-composition-center-sub">' + esc(sub) + '</span></div>';
   legend.innerHTML = entries.map((e, i) =>
     '<li data-idx="' + i + '"><span class="acl-dot" style="background:' + e.color + '"></span><span class="acl-label">' + esc(e.label) + '</span><span class="acl-pct">' + e.pct.toFixed(1) + '%</span></li>'
   ).join('');
-  _aurixCompositionWireHover();   // donut ↔ legend brightness sync
+  _aurixCompositionWireHover();   // donut ↔ legend brightness sync + tooltip
 }
 function openCompositionModal() {
   try {

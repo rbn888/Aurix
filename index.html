@@ -66,9 +66,9 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v411-dsh-donut-ux-final';
-      var APPJS_V = '411';
-      var HTML_TS = '2026-07-02T22:00:00Z';
+      var BUILD = 'v412-dsh-donut-premium-final';
+      var APPJS_V = '412';
+      var HTML_TS = '2026-07-03T10:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
       window.AURIX_HTML_TS = HTML_TS;
@@ -172,7 +172,7 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=326">
+  <link rel="stylesheet" href="styles.css?v=327">
 </head>
 <body style="background:#070a14">
 
@@ -317,8 +317,8 @@
           </section>
             <button type="button" class="micro-composition-donut" id="microCompositionDonut"
                     aria-label="Ver composición de cartera" title="Ver composición de cartera">
-              <svg class="mcd-ring" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
-                <circle class="mcd-track" cx="22" cy="22" r="16.5" pathLength="100"></circle>
+              <svg class="mcd-ring" viewBox="0 0 50 50" width="50" height="50" aria-hidden="true">
+                <circle class="mcd-track" cx="25" cy="25" r="19" pathLength="100"></circle>
                 <g class="mcd-segs"></g>
               </svg>
             </button>
@@ -1349,7 +1349,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=411"
+  <script src="app.js?v=412"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
@@ -1981,6 +1981,7 @@
     </div>
     <div class="modal-body aurix-composition-body">
       <div class="aurix-composition-chart" id="compositionChart" aria-hidden="true"></div>
+      <div class="aurix-composition-tip" id="compositionTip" aria-hidden="true"></div>
       <ul class="aurix-composition-legend" id="compositionLegend"></ul>
     </div>
     <div class="health-actions">

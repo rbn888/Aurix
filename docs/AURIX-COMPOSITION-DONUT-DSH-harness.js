@@ -97,18 +97,41 @@ ok('22 segments draw ONE BY ONE (progressive sweep) + mini animates ONCE per loa
    /animation: aurixSegDraw ' \+ durMs \+ 'ms linear ' \+ delayMs/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
    /const animate = entries\.length > 0 && !_aurixMiniDonutDrawn;/.test(fnSrc('renderMiniCompositionDonut')) &&
    /if \(entries\.length\) _aurixMiniDonutDrawn = true;/.test(fnSrc('renderMiniCompositionDonut')));
-ok('23 modal: compact centred panel (420px, column) + fade+scale .98 / 180ms',
-   /\.modal--composition \{ max-width: 420px; transform: scale\(\.98\); transition: opacity \.18s ease, transform \.18s ease; \}/.test(css) &&
+ok('23 modal: wider compact executive panel (720px) + fade+scale .96→1 / 150ms',
+   /\.modal--composition \{ max-width: 720px; transform: scale\(\.96\); transition: opacity \.15s ease, transform \.15s ease; \}/.test(css) &&
+   /\.modal-overlay\.open \.modal--composition \{ transform: scale\(1\); \}/.test(css) &&
    /\.aurix-composition-body \{ flex-direction: column;/.test(css));
-ok('24 big donut 280px, rebuilds + draws each open (900ms)',
-   /\.aurix-composition-chart \{ width: 280px; height: 280px; \}/.test(css) && /_aurixDonutSegmentsSVG\(entries, 72, 100, 100, 22, 1\.8, \{ animate: true, dur: 900 \}\)/.test(app));
-ok('25 legend single column, name+% together (NOT far-right) + donut↔legend hover sync (brightness)',
-   /\.aurix-composition-legend \.acl-label \{ flex: 0 0 auto; min-width: 96px; \}/.test(css) && !/acl-pct \{ margin-left: auto/.test(css) &&
+ok('24 big donut 230px protagonist, rebuilds + draws from 0 each open (900ms)',
+   /\.aurix-composition-chart \{ width: 230px; height: 230px; \}/.test(css) && /_aurixDonutSegmentsSVG\(entries, 74, 100, 100, 26, 0\.9, \{ animate: true, dur: 900 \}\)/.test(app));
+ok('25 legend TWO columns + name/% aligned + donut↔legend hover sync (brightness)',
+   /\.aurix-composition-legend \{\s*display: grid; grid-template-columns: 1fr 1fr;/.test(css) &&
+   /\.aurix-composition-legend \.acl-label \{ flex: 1 1 auto; min-width: 0; \}/.test(css) &&
    /function _aurixCompositionHover\(/.test(app) && /_aurixCompositionWireHover\(\);/.test(app) &&
    /\.aurix-composition-chart\.hot \.mcd-seg\.is-hot \{ opacity: 1; filter: brightness/.test(css));
 ok('26 close fade+scale via .modal--composition (X / Cerrar / Escape / backdrop all → closeCompositionModal)',
    /id="compositionClose"/.test(html) && /id="compositionCloseBtn"/.test(html) &&
    /getElementById\('compositionClose'\); if \(x\) x\.addEventListener\('click', closeCompositionModal\)/.test(app));
+
+console.log('\nDSH.DONUT.04 — final premium pass:');
+ok('27 thicker SOLID mini ring (~9.5px, no CSS override starving it) + bigger 50px svg',
+   /\.mcd-segs circle \{ stroke-width: 9\.5; \}/.test(css) && /\.mcd-ring \{ width: 50px; height: 50px; \}/.test(css) &&
+   /_aurixDonutSegmentsSVG\(entries, 19, 25, 25, 9\.5, 0\.9, \{ animate: animate, dur: 850 \}\)/.test(app));
+ok('28 mini repositioned: down ~18px + right ~24px; subtle halo, no dark frame',
+   /\.micro-composition-donut \{[\s\S]*?margin-top: 18px; margin-left: 24px;[\s\S]*?background: transparent;/.test(css));
+ok('29 no holes / solid colours: ~1px gap (0.9 units), butt caps, plain hex stroke (no gradient)',
+   /_aurixDonutSegmentsSVG\(entries, 19, 25, 25, 9\.5, 0\.9/.test(app) && /stroke-linecap="butt"/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
+   /stroke="' \+ e\.color \+ '"/.test(fnSrc('_aurixDonutSegmentsSVG')) && !/linearGradient|url\(#/.test(fnSrc('_aurixDonutSegmentsSVG')));
+ok('30 per-segment tooltip: name · % · REAL monetary value (from getInvestableDistribution)',
+   /valueBase: \(Number\(d\.valueBase\) \|\| 0\)/.test(fnSrc('_aurixCompositionEntries')) &&
+   /e\.value = fmt\(e\.valueBase\)/.test(app) && /act-val">' \+ esc\(e\.value/.test(fnSrc('_aurixCompositionHover')) &&
+   /id="compositionTip"/.test(html));
+{ // behavioral: entries carry real valueBase + share
+  const sb = { Math, Number, Array, String, JSON,
+    TYPE_META: { crypto:{label:'Cripto',color:'#2563EB'}, real_estate:{label:'Inmuebles',color:'#7C3AED'} },
+    getInvestableDistribution: () => ([ { type:'real_estate', valueBase:4770 }, { type:'crypto', valueBase:5230 } ]) };
+  vm.createContext(sb); vm.runInContext(fnSrc('_aurixCompositionEntries'), sb);
+  const e = vm.runInContext('_aurixCompositionEntries()', sb);
+  ok('31 entries expose real valueBase + correct share', e[0].valueBase===5230 && Math.abs(e[0].pct - 52.3) < 0.01 && e.find(x=>x.type==='real_estate').valueBase===4770); }
 
 console.log('\nModal close (3 ways) + scroll lock + focus return:');
 ok('17 close via button(s) + backdrop click + Escape',
