@@ -984,6 +984,10 @@ async function loadPortfolioFromBackend(userId) {
 }
 
 async function initPortfolioData(userId) {
+  // P0-RELIABILITY-GATE — IDENTITY: the moment we know who is logged in, purge any cache that
+  // belongs to a DIFFERENT user (shared-browser / no-logout case) and stamp the current owner, so
+  // the local fallback below can only ever be THIS user's data. Remote stays scoped by user_id.
+  _aurixEnforceCacheOwner(userId);
   // 1. Backend (fuente principal)
   const backendData = await loadPortfolioFromBackend(userId);
   // AURIX-PERSISTENCE-REMOTE-HISTORY-WATCHLIST-1: reconcile remote history +
@@ -1063,6 +1067,11 @@ const PORTFOLIO_KEYS = [
   'aurix_chart_cache',
   'aurix_portfolio_history',
   'aurix_category_history',
+  // P0-RELIABILITY-GATE — these MUST be cleared on logout / user switch too, or the next user
+  // inherits the previous user's sync state, event journal or cache-owner stamp (isolation leak).
+  'aurix_portfolio_meta',      // sync meta (revision/updatedAt/syncedAt/deviceId)
+  'aurix_portfolio_events',    // append-only journal (per-user)
+  'aurix_cache_owner',         // userId stamp guarding the local cache
 ];
 
 // AUTH-ISOLATION-1: auth-only locals (email autofill / OTP step
@@ -5470,6 +5479,8 @@ function _aurixJournalAppend(type, assetId, payload, snapshot) {
       payload: payload != null ? payload : null,
       previousSnapshotHash: (prev && prev.snapshot) ? _aurixSnapshotHash(prev.snapshot) : null,
       appVersion: (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null,
+      deviceId: (typeof _aurixDeviceId === 'function') ? _aurixDeviceId() : null,   // P0-RELIABILITY-GATE
+      revision: (typeof _aurixPortfolioRevision === 'function') ? _aurixPortfolioRevision() : null,
     };
     if (snapshot != null) ev.snapshot = snapshot;
     events.push(ev);   // append-only: prior events untouched
@@ -5548,12 +5559,55 @@ try { if (typeof window !== 'undefined') { window.rebuildPortfolioFromEvents = r
 // only loaded once at boot), so an asset added on one device appears on the other after a
 // refresh/foreground. Respects the integrity lock + reset tombstone. Data-layer only.
 const _AURIX_PORTFOLIO_META_KEY = 'aurix_portfolio_meta';
-function _aurixReadPortfolioMeta() {
-  try { const m = JSON.parse(localStorage.getItem(_AURIX_PORTFOLIO_META_KEY) || 'null'); return (m && typeof m === 'object') ? m : { version: 0, updatedAt: 0, syncedAt: 0 }; }
-  catch (_) { return { version: 0, updatedAt: 0, syncedAt: 0 }; }
+const _AURIX_CACHE_OWNER_KEY = 'aurix_cache_owner';
+const _AURIX_DEVICE_ID_KEY = 'aurix_device_id';   // device-level (NOT user state); survives logout
+// P0-RELIABILITY-GATE — IDENTITY. The current authenticated user, set the moment auth resolves.
+// Until then it's null and the cache is treated cautiously. Used to guard the local cache so user
+// B never reads user A's still-present localStorage on a shared browser.
+let _aurixActiveUserId = null;
+function _aurixDeviceId() {
+  try {
+    let id = localStorage.getItem(_AURIX_DEVICE_ID_KEY);
+    if (!id) { id = 'd-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8); localStorage.setItem(_AURIX_DEVICE_ID_KEY, id); }
+    return id;
+  } catch (_) { return 'd-unknown'; }
 }
-function _aurixWritePortfolioMeta(m) { try { localStorage.setItem(_AURIX_PORTFOLIO_META_KEY, JSON.stringify(m)); } catch (_) {} }
+// The cache owner stamp (userId the local cache belongs to). Mismatch ⇒ foreign cache.
+function _aurixCacheOwner() { try { return localStorage.getItem(_AURIX_CACHE_OWNER_KEY) || null; } catch (_) { return null; } }
+function _aurixStampCacheOwner() { try { if (_aurixActiveUserId) localStorage.setItem(_AURIX_CACHE_OWNER_KEY, _aurixActiveUserId); } catch (_) {} }
+// True if the local cache does NOT belong to the active user (so it must not be trusted/loaded).
+function _aurixCacheIsForeign() {
+  const owner = _aurixCacheOwner();
+  return !!(_aurixActiveUserId && owner && owner !== _aurixActiveUserId);
+}
+// Called the moment auth resolves: if the cache belongs to a DIFFERENT user, purge it (and the
+// in-memory set) so the next load can never surface the previous user's portfolio. Then stamp the
+// current owner. Returns true if it purged a foreign cache.
+function _aurixEnforceCacheOwner(userId) {
+  try {
+    _aurixActiveUserId = userId || _aurixActiveUserId;
+    const owner = _aurixCacheOwner();
+    if (_aurixActiveUserId && owner && owner !== _aurixActiveUserId) {
+      try { console.warn('[SYNC][USER_SWITCH] foreign cache purged', { was: owner, now: _aurixActiveUserId }); } catch (_) {}
+      try { _clearLocalUserState(); } catch (_) {}
+      try { assets = []; } catch (_) {}
+      try { _aurixMiniDonutDrawn = false; _aurixMiniSig = ''; } catch (_) {}
+      _aurixStampCacheOwner();
+      return true;
+    }
+    _aurixStampCacheOwner();
+    return false;
+  } catch (_) { return false; }
+}
+function _aurixReadPortfolioMeta() {
+  try { const m = JSON.parse(localStorage.getItem(_AURIX_PORTFOLIO_META_KEY) || 'null'); return (m && typeof m === 'object') ? m : { version: 0, updatedAt: 0, syncedAt: 0, deviceId: null }; }
+  catch (_) { return { version: 0, updatedAt: 0, syncedAt: 0, deviceId: null }; }
+}
+function _aurixWritePortfolioMeta(m) { try { m.deviceId = _aurixDeviceId(); localStorage.setItem(_AURIX_PORTFOLIO_META_KEY, JSON.stringify(m)); } catch (_) {} }
 function _aurixBumpPortfolioMeta() { const m = _aurixReadPortfolioMeta(); m.version = (m.version || 0) + 1; m.updatedAt = Date.now(); _aurixWritePortfolioMeta(m); return m; }
+// revision = monotonic local version; pendingSync = local has changes not yet pushed to remote.
+function _aurixPortfolioRevision() { return _aurixReadPortfolioMeta().version || 0; }
+function _aurixPendingSync() { const m = _aurixReadPortfolioMeta(); return (m.updatedAt || 0) > (m.syncedAt || 0); }
 function _aurixMarkSynced(remoteUpdatedMs) { const m = _aurixReadPortfolioMeta(); m.syncedAt = remoteUpdatedMs || Date.now(); if (!(m.updatedAt > m.syncedAt)) m.updatedAt = m.syncedAt; _aurixWritePortfolioMeta(m); }
 function _aurixRemoteUpdatedMs(remote) { try { return (remote && remote.updated_at) ? new Date(remote.updated_at).getTime() : 0; } catch (_) { return 0; } }
 // Decide which side to apply (NEVER loses assets). Returns { apply:'remote'|'local', reason }.
@@ -6604,6 +6658,10 @@ function inferProviderId(a) {
 }
 
 function getPortfolioData() {
+  // P0-RELIABILITY-GATE — never trust a cache that belongs to a DIFFERENT user. If the active
+  // user is known and the cache owner doesn't match, treat local as empty so only the remote
+  // (current user's) data is used. Prevents user B reading user A's localStorage on a shared device.
+  if (_aurixCacheIsForeign()) { try { console.warn('[SYNC][CONFLICT_BLOCKED] foreign cache ignored on load'); } catch (_) {} return { legacy: [], source: 'legacy' }; }
   try {
     const newAssets   = localStorage.getItem('aurix_assets');
     const newHoldings = localStorage.getItem('aurix_holdings');
@@ -6779,6 +6837,7 @@ function saveData({ assets: catalogAssets, holdings }, context) {
   localStorage.setItem('aurix_holdings', JSON.stringify(holdings));
   const legacy = convertToLegacyFormat(catalogAssets, holdings);
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ assets: legacy, lastUpdated: Date.now() }));
+  try { _aurixStampCacheOwner(); } catch (_) {}   // P0-RELIABILITY-GATE: mark this cache as the active user's
   _persistDebug('[persist-save-local]', {
     aurix_assets: Array.isArray(catalogAssets) ? catalogAssets.length : 0,
     aurix_holdings: Array.isArray(holdings) ? holdings.length : (holdings && typeof holdings === 'object' ? Object.keys(holdings).length : 0),
@@ -38871,6 +38930,9 @@ function _aurixPreloadBootIcons() {
       return;
     }
     currentUser = session.user;
+    // P0-RELIABILITY-GATE — set identity + purge any foreign cache as EARLY as auth resolves, so
+    // even a load() before initPortfolioData can't surface another user's portfolio.
+    try { _aurixActiveUserId = currentUser && currentUser.id; _aurixEnforceCacheOwner(_aurixActiveUserId); } catch (_) {}
     window.__aurixBootReady.auth = true;
     try { if (window.__AURIX_BOOT) window.__AURIX_BOOT.mark('auth_done'); } catch (_) {}
     if (IS_DEV) console.log('[AUTH] session restored:', currentUser?.email);

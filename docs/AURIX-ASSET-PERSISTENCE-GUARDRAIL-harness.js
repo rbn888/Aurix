@@ -26,7 +26,10 @@ function makeStore(){
     IS_DEV:false, STORAGE_KEY:'portfolio_assets', _persistDebug:()=>{}, scheduleSave:()=>{}, _mem:mem,
     // P0-DATA-JOURNAL: load() now runs journal-recovery; this harness tests the salvage layer in
     // isolation, so the journal recovery is a pass-through stub here.
-    _aurixRecoverFromJournalIfEmpty:(x)=>x };
+    _aurixRecoverFromJournalIfEmpty:(x)=>x,
+    // P0-RELIABILITY-GATE: getPortfolioData now consults the cache-owner guard; this harness tests
+    // the salvage layer in isolation, so the foreign-cache check is a pass-through stub here.
+    _aurixCacheIsForeign:()=>false };
   vm.createContext(sb);
   ['inferPriceSource','inferProviderId','_aurixSalvageHolding','_aurixLegacyFallbackById',
    'convertToNewModel','convertFromNewToFlat','convertToLegacyFormat','getPortfolioData','load']

@@ -21,6 +21,9 @@ function makeEnv(tombstone){
     console:{log:()=>{},warn:()=>{}}, _mem:mem, _aurixResetAt:()=> (tombstone||0) };
   vm.createContext(sb);
   vm.runInContext("const _AURIX_PORTFOLIO_META_KEY='aurix_portfolio_meta';", sb);
+  // P0-RELIABILITY-GATE: _aurixWritePortfolioMeta now stamps a deviceId; stub it here (this harness
+  // focuses on the merge/timestamp logic).
+  vm.runInContext("function _aurixDeviceId(){ return 'd-test'; }", sb);
   ['_aurixReadPortfolioMeta','_aurixWritePortfolioMeta','_aurixBumpPortfolioMeta','_aurixMarkSynced','_aurixRemoteUpdatedMs','_shouldDistrustRemote','_aurixMergePortfolio']
     .forEach(n=>{ try{ vm.runInContext(fnSrc(n), sb); }catch(e){ console.log('load fail '+n+': '+e.message); } });
   return sb;
