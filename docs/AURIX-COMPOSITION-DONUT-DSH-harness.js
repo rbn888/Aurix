@@ -97,8 +97,8 @@ ok('22 segments draw ONE BY ONE (progressive sweep) + mini animates ONCE per loa
    /animation: aurixSegDraw ' \+ durMs \+ 'ms linear ' \+ delayMs/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
    /const animate = entries\.length > 0 && !_aurixMiniDonutDrawn;/.test(fnSrc('renderMiniCompositionDonut')) &&
    /if \(entries\.length\) _aurixMiniDonutDrawn = true;/.test(fnSrc('renderMiniCompositionDonut')));
-ok('23 modal: compact panel (≈−22% → 560px) + fade+scale .96→1 / 150ms + centred title',
-   /\.modal--composition \{ max-width: 560px; \}/.test(css) &&
+ok('23 modal: compact panel (≈490px) + fade+scale .96→1 / 150ms + centred title + X pinned',
+   /\.modal--composition \{ max-width: 490px; \}/.test(css) &&
    /\.modal--composition \{ max-width: 720px; transform: scale\(\.96\); transition: opacity \.15s ease, transform \.15s ease; \}/.test(css) &&
    /\.modal--composition \.modal-header \{ justify-content: center;/.test(css) &&
    /\.modal--composition \.modal-close \{ position: absolute; right: 12px;/.test(css));
@@ -116,7 +116,7 @@ ok('26 close fade+scale via .modal--composition (X / Cerrar / Escape / backdrop 
 console.log('\nDSH.DONUT.04 — final premium pass:');
 ok('27 thicker SOLID mini ring (12px, smaller hole) + 50px svg',
    /\.mcd-segs circle \{ stroke-width: 12; \}/.test(css) && /\.mcd-ring \{ width: 50px; height: 50px; \}/.test(css) &&
-   /_aurixDonutSegmentsSVG\(entries, 18, 25, 25, 12, 1\.0, \{ animate: animate, dur: 850 \}\)/.test(app));
+   /_aurixDonutSegmentsSVG\(entries, 18, 25, 25, 12, 1\.0, \{ animate: animate, dur: 950 \}\)/.test(app));
 ok('28 mini repositioned: down ~18px + right ~24px; subtle halo, no dark frame',
    /\.micro-composition-donut \{[\s\S]*?margin-top: 18px; margin-left: 24px;[\s\S]*?background: transparent;/.test(css));
 ok('29 no holes / solid colours: ~1px gap (1.0 units), butt caps, plain hex stroke (no gradient)',
@@ -164,6 +164,25 @@ console.log('\nNo collateral damage:');
 ok('20 institutional renderer + mini-chart removal + persistence layers intact',
    /function renderAurixInstitutionalChart\(/.test(app) && /const _AURIX_CATEGORY_PERF_CHART_ENABLED = false;/.test(app) &&
    /const _AURIX_BLOCK_DESTRUCTIVE_SAVES = true;/.test(app) && /const _AURIX_JOURNAL_KEY = 'aurix_portfolio_events';/.test(app));
+
+console.log('\nDSH.DONUT.06 — fluid sweep, no flashes:');
+ok('35 ease-out sweep from 12:00 clockwise (eased timeline; first slice at -90°)',
+   /const eo = x => 1 - Math\.pow\(1 - x, 2\.2\);/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
+   /eo\(accFrac\) \* total, t1 = eo\(accFrac \+ slot \/ 100\) \* total/.test(fnSrc('_aurixDonutSegmentsSVG')) &&
+   /-90 \+ accFrac \* 360/.test(fnSrc('_aurixDonutSegmentsSVG')));
+ok('36 no flashes on refresh: mini render is MEMOISED (skip rebuild when composition unchanged)',
+   /const sig = entries\.map\(e => e\.type \+ ':' \+ e\.pct\.toFixed\(1\)\)\.join\('\|'\);/.test(fnSrc('renderMiniCompositionDonut')) &&
+   /if \(segG && sig === _aurixMiniSig && segG\.childNodes\.length\) \{[\s\S]*?return;/.test(fnSrc('renderMiniCompositionDonut')));
+ok('37 periodic pulse "resplandor" removed (clean static halo + breathing kept)',
+   /\.micro-composition-donut::after \{ animation: none; box-shadow: none; content: none; \}/.test(css) &&
+   /@keyframes aurixMcdBreath/.test(css));
+// behavioral: eased timeline still covers the full ring and stays monotonic (no gaps/overlaps in time)
+{ const sb = { Math }; vm.createContext(sb); vm.runInContext(fnSrc('_aurixDonutSegmentsSVG'), sb);
+  const e = [{color:'#7C3AED',pct:47.7},{color:'#EA580C',pct:35.9},{color:'#2563EB',pct:13.1},{color:'#0891B2',pct:2.7},{color:'#16A34A',pct:0.4},{color:'#CA8A04',pct:0.2}];
+  const svg = sb._aurixDonutSegmentsSVG(e, 18, 25, 25, 12, 1.0, { animate: true, dur: 950 });
+  const delays = (svg.match(/aurixSegDraw \d+ms linear (\d+)ms/g) || []).map(s => +s.match(/linear (\d+)ms/)[1]);
+  ok('38 eased draw timeline is monotonic, starts at 0ms, within the duration (continuous sweep)',
+     delays.length===6 && delays[0]===0 && delays.every((v,i)=>i===0||v>=delays[i-1]) && delays[delays.length-1] <= 950, 'delays=' + delays.join(',')); }
 
 console.log('\nRESULT: '+(fail===0?'ALL PASS ✓':'FAIL ✗')+'  ('+pass+' passed, '+fail+' failed)');
 process.exit(fail===0?0:1);

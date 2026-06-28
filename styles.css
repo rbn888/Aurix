@@ -22864,3 +22864,13 @@ body.aurix-premium-lock{ overflow:hidden; }
 .aurix-composition-legend li { justify-content: flex-start; gap: 9px; }
 .aurix-composition-legend .acl-label { flex: 1 1 auto; min-width: 0; }
 .aurix-composition-legend .acl-pct { flex: 0 0 auto; }
+
+/* ══════════════════════════════════════════════════════════════
+   DSH.DONUT.06 — fluid premium close (overrides). Remove the periodic pulse "resplandor"
+   (keep a clean static halo + the gentle breathing). Narrow the modal a touch more.
+   The donut draw is an ease-out sweep from 12:00 clockwise (timed in JS). Desktop only. */
+.micro-composition-donut::after { animation: none; box-shadow: none; content: none; }   /* no dirty pulse glow */
+@media (min-width: 769px) {
+  .micro-composition-donut { box-shadow: 0 0 13px -5px rgba(74,130,240,0.40); }          /* clean, subtle blue halo */
+}
+.modal--composition { max-width: 490px; }   /* ≈−12% lateral space; donut unchanged (protagonist) */

@@ -17547,7 +17547,7 @@ function updateDonut() {
 // with the REAL portfolio composition (percentages from getInvestableDistribution — no invented
 // data). Localized, additive; touches no other chart/data/mobile surface.
 // ════════════════════════════════════════════════════════════════════════
-let _aurixCompositionOpener = null, _aurixCompositionInit = false, _aurixMiniDonutDrawn = false, _aurixModalEntries = [];
+let _aurixCompositionOpener = null, _aurixCompositionInit = false, _aurixMiniDonutDrawn = false, _aurixModalEntries = [], _aurixMiniSig = '';
 // Real composition entries (incl. real estate), share computed over the displayed total. Carries
 // valueBase (for the tooltip's monetary figure). Always derived from the real portfolio.
 function _aurixCompositionEntries() {
@@ -17584,8 +17584,12 @@ function _aurixDonutSegmentsSVG(entries, r, cx, cy, w, gap, opts) {
     const pos = 'transform: rotate(' + startDeg + 'deg); transform-box: fill-box; transform-origin: center; ';
     let draw;
     if (animate) {
-      const delayMs = Math.round(accFrac * total);
-      const durMs = Math.max(60, Math.round((slot / 100) * total));   // sweep proportional to share
+      // Premium ease-OUT sweep: time each slice along an eased timeline (positions stay geometric)
+      // so the single continuous draw — from 12:00, clockwise — decelerates smoothly to a complete
+      // ring. Contiguous windows ⇒ no gaps/pops between slices.
+      const eo = x => 1 - Math.pow(1 - x, 2.2);
+      const t0 = eo(accFrac) * total, t1 = eo(accFrac + slot / 100) * total;
+      const delayMs = Math.round(t0), durMs = Math.max(40, Math.round(t1 - t0));
       draw = 'stroke-dashoffset:' + len.toFixed(2) + '; animation: aurixSegDraw ' + durMs + 'ms linear ' + delayMs + 'ms both;';
     } else { draw = 'stroke-dashoffset:0;'; }
     out += '<circle class="mcd-seg" data-idx="' + i + '" cx="' + cx + '" cy="' + cy + '" r="' + r +
@@ -17622,13 +17626,19 @@ function renderMiniCompositionDonut() {
   const btn = document.getElementById('microCompositionDonut'); if (!btn) return;
   const entries = _aurixCompositionEntries();
   const segG = btn.querySelector('.mcd-segs');
+  // MEMOISE: skip the innerHTML rebuild when the composition is unchanged (e.g. a price-only
+  // updateDonut tick) so a refresh never repaints/flashes the donut. Only re-render on real change.
+  const sig = entries.map(e => e.type + ':' + e.pct.toFixed(1)).join('|');
+  if (segG && sig === _aurixMiniSig && segG.childNodes.length) {
+    btn.style.display = entries.length ? '' : 'none'; _aurixInitCompositionModalOnce(); return;
+  }
+  _aurixMiniSig = sig;
   if (segG) {
-    // Draw animation runs ONCE per load (first render with data); later updateDonut() ticks
-    // (e.g. price refreshes) re-render the slices statically — never re-animate.
+    // Draw animation runs ONCE per load (first render with data); a later real composition change
+    // re-renders the slices statically — never re-animate. r18/w12 in a 50-viewBox ⇒ a solid,
+    // thick ~50px financial donut; gap 1.0 (~1px) ⇒ hairline separation, never holes.
     const animate = entries.length > 0 && !_aurixMiniDonutDrawn;
-    // r19/cx25/cy25 in a 50-viewBox + 9.5px stroke ⇒ a solid ~50px financial donut (not a loader);
-    // gap 0.9 (~1px on this ring) ⇒ hairline separation, never visible holes.
-    segG.innerHTML = entries.length ? _aurixDonutSegmentsSVG(entries, 18, 25, 25, 12, 1.0, { animate: animate, dur: 850 }) : '';
+    segG.innerHTML = entries.length ? _aurixDonutSegmentsSVG(entries, 18, 25, 25, 12, 1.0, { animate: animate, dur: 950 }) : '';
     if (entries.length) _aurixMiniDonutDrawn = true;
   }
   // entries → defer to CSS (desktop-only ≥769px); no data → hide on both.
