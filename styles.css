@@ -21967,7 +21967,11 @@ body.aurix-skeleton #totalValue::after {
    Grid: faint, mobile-specific (NOT the desktop grid). Cursor/hair/tooltip: hidden
    until #wealthCurveMobile.mob-inspecting (long-press); pointer-events:none so they
    never intercept touch; positioned by JS. ══════════════════════════════════════ */
+/* RC4-B Fase 3 — premium mobile grid: horizontals subtle, verticals fainter; never compete
+   with the curve, never darken the area. Base keeps the crisp 1px hairline. */
 .mob-chart-grid line { stroke: rgba(255,255,255,.05); stroke-width: 1; vector-effect: non-scaling-stroke; shape-rendering: crispEdges; }
+.mob-chart-grid line.h { stroke: rgba(255,255,255,.058); }
+.mob-chart-grid line.v { stroke: rgba(255,255,255,.028); }
 .mob-chart-hair, .mob-chart-cursor, .mob-chart-tip {
   position: absolute; pointer-events: none; opacity: 0; transition: opacity .12s ease; z-index: 6;
 }

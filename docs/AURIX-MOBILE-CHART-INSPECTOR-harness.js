@@ -115,8 +115,8 @@ ck('Fase 1 — release stops the slider snapping (stopPropagation on end when cl
 ck('no duplicate listeners (bound exactly once)', /_aurixMobInspectorBound\) return;/.test(initFn) && /_aurixMobInspectorBound = true;/.test(initFn));
 ck('Fase 9 — one update per frame via requestAnimationFrame', /requestAnimationFrame\(function \(\) \{ rafOn = false; _aurixMobInspectorUpdate/.test(initFn));
 ck('Fase 9 — does NOT re-render the SVG on hover (only moves cursor/tooltip)', fnSrc('_aurixMobInspectorUpdate').indexOf('innerHTML = svg') < 0 && fnSrc('_aurixMobInspectorUpdate').indexOf('renderAurixInstitutionalChart') < 0);
-ck('Fase 7 — mobile-specific grid drawn in the lite SVG (3h + 3v)',
-   /mob-chart-grid/.test(app) && (app.match(/<line x1="/g) || []).length >= 6 && css.indexOf('.mob-chart-grid line') >= 0);
+ck('Fase 7 / RC4-B Fase 3 — mobile-specific grid drawn in the lite SVG (3h + 3v, classed)',
+   /mob-chart-grid/.test(app) && (app.match(/<line class="[hv]" x1="/g) || []).length >= 6 && css.indexOf('.mob-chart-grid line') >= 0);
 ck('Fase 8 — a fresh lite render closes the inspector (range change)', /_aurixMobInspectorHide\(\); \} catch \(_\) \{\}\s*\/\/ RC2 Fase 8/.test(app));
 ck('Fase 6 — points cached from REAL render output (visiblePoints + visiblePixels), no fabrication',
    /_aurixMobChartPts = rc\.visiblePoints\.map/.test(app) && app.indexOf('rc.visiblePixels') >= 0);

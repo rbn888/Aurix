@@ -19310,6 +19310,40 @@ function _aurixPolishSimplify(drawn, xScale, yScale, range) {
   return out;
 }
 
+// RC4-B FASE 1 — 24H SPIKE POLISH (render-only, 24H only). After simplification, 24H can
+// still show nervous narrow "teeth": a single drawn vertex that juts far then reverts
+// immediately (its two neighbours are close). Those are visually aggressive and add no
+// institutional information. This drops ONLY such narrow reverting spikes from the DRAWN
+// set — never the global max/min, never the endpoints, never a sustained burst (where the
+// neighbours genuinely progress). Returns a SUBSET of real points (no fabrication; values/
+// timestamps/visiblePoints/tooltip/inspector untouched). Rollback: ENABLED=false.
+const _AURIX_24H_SPIKE_POLISH_ENABLED = true;
+const _AURIX_24H_SPIKE_MAX_BASE_PX = 9;       // narrow base: px between the spike's two neighbours
+const _AURIX_24H_SPIKE_MIN_PROM_PX = 6;       // juts ≥ this far (px) from the SMALLER neighbour
+const _AURIX_24H_SPIKE_MAX_REVERT_PX = 4;     // neighbours within this (px) ⇒ the curve reverts (redundant tooth)
+function _aurix24hSpikePolish(drawn, xScale, yScale) {
+  const n = Array.isArray(drawn) ? drawn.length : 0;
+  if (n < 5) return drawn;
+  const px = new Array(n), py = new Array(n);
+  for (let i = 0; i < n; i++) { px[i] = xScale.x(drawn[i].time); py[i] = yScale.y(drawn[i].value); }
+  let miIdx = 0, maIdx = 0;
+  for (let i = 1; i < n; i++) { if (drawn[i].value < drawn[miIdx].value) miIdx = i; if (drawn[i].value > drawn[maIdx].value) maIdx = i; }
+  const drop = new Array(n).fill(false);
+  for (let i = 1; i < n - 1; i++) {
+    if (i === miIdx || i === maIdx) continue;          // never the global extremes
+    if (drop[i - 1]) continue;                          // don't collapse two in a row (keep a representative)
+    const a = py[i - 1], b = py[i + 1], c = py[i];
+    const isPeak = c < a && c < b, isTrough = c > a && c > b;   // y grows downward
+    if (!isPeak && !isTrough) continue;
+    const prom = Math.min(Math.abs(c - a), Math.abs(c - b));   // smaller excursion
+    const base = px[i + 1] - px[i - 1];                         // horizontal width of the tooth
+    const revert = Math.abs(a - b);                             // how close the neighbours are
+    if (base <= _AURIX_24H_SPIKE_MAX_BASE_PX && prom >= _AURIX_24H_SPIKE_MIN_PROM_PX && revert <= _AURIX_24H_SPIKE_MAX_REVERT_PX) drop[i] = true;
+  }
+  const out = []; for (let i = 0; i < n; i++) if (!drop[i]) out.push(drawn[i]);
+  return out.length >= 2 ? out : drawn;
+}
+
 // INC4-C — Distance-aware subdivision. Walks the monotone path's segments and, for any
 // segment whose endpoint chord > maxPx, emits intermediate points sampled EXACTLY ON the
 // segment geometry (cubic bezier eval / line lerp). The curve shape is unchanged — it only
@@ -19569,6 +19603,8 @@ function renderAurixInstitutionalChart(range, viewportWidth, viewportHeight, lay
     // INC4-A/D — perceptual simplification (teeth + microangles), extremes/endpoints locked.
     // INC5 — range-aware epsilon (24H stronger to suppress micro-zigzag).
     if (_AURIX_POLISH_ENABLED) drawn = _aurixPolishSimplify(drawn, xScale, yScale, r);
+    // RC4-B FASE 1 — 24H spike polish: drop narrow reverting teeth (24H only; extremes kept).
+    if (_AURIX_24H_SPIKE_POLISH_ENABLED && r === '24h') drawn = _aurix24hSpikePolish(drawn, xScale, yScale);
     drawnVertexCount += drawn.length;
     const mp = _aurixMonotonePath(drawn, xScale, yScale);
     if (mp.overshoot) overshoot = true; fallbacks += mp.lineFallbacks || 0;
@@ -22464,10 +22500,11 @@ function renderAurixMobileLiteChart(range, token) {
         '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
           '<stop offset="0" stop-color="' + fillTop + '"/><stop offset="1" stop-color="rgba(0,0,0,0)"/>' +
         '</linearGradient></defs>' +
-        // RC2 Fase 7 — mobile-specific premium grid (3 horizontal + 3 vertical, very faint).
+        // RC2 Fase 7 / RC4-B Fase 3 — mobile premium grid (3 horizontal subtle + 3 vertical
+        // fainter; classed h/v so CSS tunes each without competing with the curve).
         '<g class="mob-chart-grid">' +
-          '<line x1="6" y1="73" x2="994" y2="73"/><line x1="6" y1="130.5" x2="994" y2="130.5"/><line x1="6" y1="187" x2="994" y2="187"/>' +
-          '<line x1="253" y1="16" x2="253" y2="244"/><line x1="500" y1="16" x2="500" y2="244"/><line x1="747" y1="16" x2="747" y2="244"/>' +
+          '<line class="h" x1="6" y1="73" x2="994" y2="73"/><line class="h" x1="6" y1="130.5" x2="994" y2="130.5"/><line class="h" x1="6" y1="187" x2="994" y2="187"/>' +
+          '<line class="v" x1="253" y1="16" x2="253" y2="244"/><line class="v" x1="500" y1="16" x2="500" y2="244"/><line class="v" x1="747" y1="16" x2="747" y2="244"/>' +
         '</g>' +
         '<path d="' + rc.areaPathData + '" fill="url(#' + gid + ')" stroke="none"/>' +
         '<path d="' + rc.pathData + '" fill="none" stroke="' + stroke + '" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>' +
@@ -22490,6 +22527,25 @@ function renderAurixMobileLiteChart(range, token) {
     _aurixMobileLiteFallback('exception', e);
   }
 }
+// RC4-B FASE 2 — mobile performance indicator. The mobile-safe path uses the lite renderer
+// and never runs the heavy _wscPaintSurface, so #chartChangeMobile (the green/red %/€ metric
+// next to the %/$ + range controls) was left empty. Repopulate it from the SAME canonical
+// return source the desktop badge uses (_aurixRangeReturn) — READ-ONLY (no data touch), same
+// tone classes (.chart-change up/down/flat) for a coherent premium look. Honours %/€ mode.
+function _aurixMobileSetPerfIndicator() {
+  try {
+    const el = document.getElementById('chartChangeMobile'); if (!el) return;
+    const ret = (typeof _aurixRangeReturn === 'function') ? _aurixRangeReturn(activeRange) : null;
+    if (!ret || !Number.isFinite(ret.deltaPct)) { el.textContent = ''; el.className = 'chart-change'; return; }
+    const deltaPct = ret.deltaPct, deltaAbs = Number.isFinite(ret.deltaAbs) ? ret.deltaAbs : 0;
+    const tone = deltaPct > 0.005 ? 'up' : deltaPct < -0.005 ? 'down' : 'flat';
+    let valText;
+    if (activePerfMode === 'curr') valText = (typeof _dshFmtMoney0 === 'function') ? _dshFmtMoney0(deltaAbs) : String(Math.round(deltaAbs));
+    else { const pf = (typeof _dshFmtPct === 'function') ? _dshFmtPct(deltaPct) : { text: deltaPct.toFixed(2) + '%' }; valText = pf.text; if (pf && pf.capped) el.title = pf.raw; else el.removeAttribute('title'); }
+    el.innerHTML = '<span class="wsc-metric-val">' + valText + '</span>';
+    el.className = 'chart-change ' + tone;
+  } catch (_) {}
+}
 // Trigger. ALWAYS defers the paint to a macrotask (+rAF), debounced + token-cancelable,
 // no-op off mobile-safe. Can never run during boot/hydration or block a click; range
 // changes / refreshes collapse to one latest render. Never throws.
@@ -22503,6 +22559,7 @@ function scheduleAurixMobileLite(range) {
     _aurixMobileLiteTimer = setTimeout(function () {
       const paint = function () {
         renderAurixMobileLiteChart(r, token);
+        try { _aurixMobileSetPerfIndicator(); } catch (_) {}  // RC4-B FASE 2 — green/red %/€ metric
         try { renderAurixMobileDonutLite(); } catch (_) {}   // donut slide rides the same deferred pass
         try { updateCategoryCards(); } catch (_) {}           // + the lower category cards (updateDonut is gated on mobile)
       };
