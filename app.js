@@ -20144,10 +20144,12 @@ function _wscRenderPolish(range, mobile, tone) {
   const isLong = range === '30d' || range === '1y' || range === 'all';
   const sharp = range === '24h' || range === '7d';
   const strokeWidth = mobile ? (sharp ? 2.4 : 2.1) : (sharp ? 2.7 : isLong ? 2.35 : 2.5);
-  const glowStrength = +((isLong ? 1.3 : 1.8) * (mobile ? 0.85 : 1)).toFixed(2);   // SVG blur stdDeviation (user units)
+  // RC4-C C3 — glow more uniform: slightly larger blur radius + lower intensity (natural
+  // illumination, no harsh halo). Visual-only render params (no geometry/data change).
+  const glowStrength = +((isLong ? 1.55 : 2.05) * (mobile ? 0.85 : 1)).toFixed(2);   // SVG blur stdDeviation (user units)
   // DPR-aware halo strength. WN.25/WN.26 PART 5 — softer halo in the red (down)
   // state so a negative day never reads arcade-bright (×0.80).
-  const glowAlpha = +Math.min(0.62, (0.42 + 0.10 * (dpr - 1)) * (tone === 'down' ? 0.80 : 1)).toFixed(2);
+  const glowAlpha = +Math.min(0.52, (0.36 + 0.09 * (dpr - 1)) * (tone === 'down' ? 0.80 : 1)).toFixed(2);
   // WN.26 PART 5 — slightly more area presence on DESKTOP (+10%, capped), kept
   // subtle so the line stays dominant; mobile unchanged.
   const areaBase = range === 'all' ? 0.62 : range === '1y' ? 0.72 : range === '30d' ? 0.84 : 1.0;
@@ -22411,6 +22413,7 @@ const _aurixMobileChartState = {
 let _aurixMobileLiteToken = 0;
 let _aurixMobileLiteTimer = null;
 let _aurixMobileLiteEmptyRetries = 0;
+let _aurixMobileLitePrevRange = null;   // RC4-C C4/C5 — fade-in only on range change / first paint (not on same-range refresh → C12 stability)
 function _aurixLiteNow() { try { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); } catch (_) { return Date.now(); } }
 function _aurixLiteEnabled() { try { return typeof window === 'undefined' || window.AURIX_MOBILE_CHART_LITE_ENABLED !== false; } catch (_) { return true; } }
 // The dedicated host — created exactly once via createElement+appendChild (never by
@@ -22496,7 +22499,7 @@ function renderAurixMobileLiteChart(range, token) {
     const fillTop = up ? 'rgba(52,211,158,0.18)' : 'rgba(255,107,107,0.16)';
     const gid = 'aurixLiteFill_' + (up ? 'u' : 'd');
     const svg =
-      '<svg viewBox="0 0 ' + VBW + ' ' + VBH + '" preserveAspectRatio="none" width="100%" height="100%" style="display:block" aria-hidden="true">' +
+      '<svg class="aurix-lite-svg' + (_aurixMobileLitePrevRange !== r ? ' aurix-lite-in' : '') + '" viewBox="0 0 ' + VBW + ' ' + VBH + '" preserveAspectRatio="none" width="100%" height="100%" style="display:block" aria-hidden="true">' +
         '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
           '<stop offset="0" stop-color="' + fillTop + '"/><stop offset="1" stop-color="rgba(0,0,0,0)"/>' +
         '</linearGradient></defs>' +
@@ -22511,6 +22514,7 @@ function renderAurixMobileLiteChart(range, token) {
       '</svg>';
     if (typeof token === 'number' && token !== _aurixMobileLiteToken) return;    // superseded just before paint
     host.innerHTML = svg;                                                        // ONLY the dedicated leaf
+    _aurixMobileLitePrevRange = r;                                               // RC4-C — fade fired; next same-range refresh won't re-animate (C12)
     st.rendered = true; st.failed = false; st.fallbackUsed = false; st.placeholderReason = null;
     _aurixMobileLiteEmptyRetries = 0;                                            // success — reset the hydration retry budget
     // RC2 — cache the REAL rendered points (viewBox px + real time/value) for the touch

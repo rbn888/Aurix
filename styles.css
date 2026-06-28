@@ -21767,6 +21767,7 @@ body.gs-open { overflow: hidden; }
   stroke-width: 2.6;
   stroke-linecap: round;
   stroke-linejoin: round;
+  shape-rendering: geometricPrecision;   /* RC4-C C1 — smooth Retina antialias, no join teeth */
   opacity: .98;
 }
 /* WN.23 — refined institutional state colours: premium green, softened red
@@ -21791,15 +21792,17 @@ body.gs-open { overflow: hidden; }
    are dimmed further via an inline opacity on the area path. */
 /* RC1-A — richer institutional area fill: a deeper top, a lingering mid-stop, then a
    clean fade to transparent (Wealthica/TradingView depth without a heavy block). */
-.wsc-area-0   { stop-color: var(--accent, #4a82f0); stop-opacity: .13; }
-.wsc-area-mid { stop-color: var(--accent, #4a82f0); stop-opacity: .035; }
+/* RC4-C C2 — area fill slightly lighter + smoother top→fade so the curve "floats"
+   (bottom invisible: .wsc-area-1 stop-opacity 0). Same corporate colours. */
+.wsc-area-0   { stop-color: var(--accent, #4a82f0); stop-opacity: .115; }
+.wsc-area-mid { stop-color: var(--accent, #4a82f0); stop-opacity: .032; }
 .wsc-area-1   { stop-color: var(--accent, #4a82f0); stop-opacity: 0; }
-.wsc-up   .wsc-area-0   { stop-color: #2ebd85; stop-opacity: .14; }
-.wsc-up   .wsc-area-mid { stop-color: #2ebd85; stop-opacity: .04; }
-.wsc-down .wsc-area-0   { stop-color: #e25563; stop-opacity: .12; }
-.wsc-down .wsc-area-mid { stop-color: #e25563; stop-opacity: .035; }
-.wsc-flat .wsc-area-0   { stop-color: #9fb0c7; stop-opacity: .07; }
-.wsc-flat .wsc-area-mid { stop-color: #9fb0c7; stop-opacity: .02; }
+.wsc-up   .wsc-area-0   { stop-color: #2ebd85; stop-opacity: .125; }
+.wsc-up   .wsc-area-mid { stop-color: #2ebd85; stop-opacity: .036; }
+.wsc-down .wsc-area-0   { stop-color: #e25563; stop-opacity: .105; }
+.wsc-down .wsc-area-mid { stop-color: #e25563; stop-opacity: .032; }
+.wsc-flat .wsc-area-0   { stop-color: #9fb0c7; stop-opacity: .062; }
+.wsc-flat .wsc-area-mid { stop-color: #9fb0c7; stop-opacity: .018; }
 
 /* RC1-A — TradingView-style glowing END marker at the last real point. Tone-coloured,
    soft outer ring + a gentle pulse. Desktop only (mobile uses the lite renderer). */
@@ -21875,29 +21878,31 @@ body.gs-open { overflow: hidden; }
 /* WN.5 — crosshair (vertical + horizontal dashed) + cursor marker + tooltip. */
 /* RC1-A — crosshair: finer, calmer dashes; a soft glide on the cursor for a
    premium magnetic feel (short enough to never trail the pointer). */
+/* RC4-C C8 — TradingView-style hairline: subtler, clean. */
 .wsc-hair {
   position: absolute; top: 0; bottom: 0; left: 0; width: 1px;
-  border-left: 1px dashed rgba(255,255,255,.20);
+  border-left: 1px dashed rgba(255,255,255,.15);
   opacity: 0; transition: opacity .14s var(--ease-out, ease), transform .06s linear;
   pointer-events: none;
 }
 .wsc-hair-h {
   position: absolute; left: 0; right: 0; top: 0; height: 0;
-  border-top: 1px dashed rgba(255,255,255,.12);
+  border-top: 1px dashed rgba(255,255,255,.09);
   opacity: 0; transition: opacity .14s var(--ease-out, ease), transform .06s linear;
   pointer-events: none;
 }
+/* RC4-C C7 — active point: finer ring + softer, slightly wider glow (natural light). */
 .wsc-cursor {
   position: absolute; top: 0; left: 0;
   width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%;
   background: var(--text-bright, #fff);
-  box-shadow: 0 0 0 3.5px rgba(255,255,255,.16), 0 0 12px rgba(255,255,255,.5);
+  box-shadow: 0 0 0 3px rgba(255,255,255,.14), 0 0 14px rgba(255,255,255,.42);
   opacity: 0; transition: opacity .14s var(--ease-out, ease), transform .06s linear;
   pointer-events: none;
 }
 /* cursor adopts the trend tone so the read matches the line */
-.wsc-up   .wsc-cursor { background: #2ebd85; box-shadow: 0 0 0 3.5px rgba(46,189,133,.18), 0 0 12px rgba(46,189,133,.5); }
-.wsc-down .wsc-cursor { background: #e25563; box-shadow: 0 0 0 3.5px rgba(226,85,99,.18), 0 0 12px rgba(226,85,99,.45); }
+.wsc-up   .wsc-cursor { background: #2ebd85; box-shadow: 0 0 0 3px rgba(46,189,133,.16), 0 0 14px rgba(46,189,133,.42); }
+.wsc-down .wsc-cursor { background: #e25563; box-shadow: 0 0 0 3px rgba(226,85,99,.16), 0 0 14px rgba(226,85,99,.40); }
 /* RC1-A — premium tooltip card: deeper glass, hairline border, layered shadow,
    backdrop blur, and a thin tone accent bar on the left edge. */
 .wsc-tip {
@@ -21961,6 +21966,12 @@ body.aurix-skeleton #totalValue::after {
 @media (prefers-reduced-motion: reduce) {
   body.aurix-skeleton #totalValue::after, .aurix-skel-ico, .aurix-skel-bar { animation: none; }
 }
+
+/* RC4-C C4/C5 — mobile lite chart fade-in on range change / first paint (NOT on a
+   same-range data refresh → render stability). Pure opacity, no overshoot/bounce. */
+@keyframes aurixLiteIn { from { opacity: .5; } to { opacity: 1; } }
+.aurix-lite-in { animation: aurixLiteIn .22s var(--ease-out, ease) both; }
+@media (prefers-reduced-motion: reduce) { .aurix-lite-in { animation: none; } }
 
 /* ══════════════════════════════════════════════════════════════
    RC2 — Mobile chart institutional inspector + premium grid (mobile only).
