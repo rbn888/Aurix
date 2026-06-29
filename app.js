@@ -21360,14 +21360,37 @@ function _aurixRangeReturn(range) {
   const snaps = (elig && Array.isArray(elig.series)) ? elig.series : [];
   if (snaps.length < 2) return out;
 
-  const rawFirst = snaps[0].value, rawLast = snaps[snaps.length - 1].value;
-  const neutral = _aurixFlowNeutralize(snaps, r);
+  // P0-PERFORMANCE-BASELINE-SELECTION-FIX — SELECT a comparable baseline: skip LEADING snapshots that belong
+  // to a different capital regime (old construction / pre-comparable) and start at the FIRST ECONOMICALLY
+  // COMPARABLE snapshot (value within the range's max plausible MARKET ratio of the current/last value).
+  // Before this, snaps[0] (e.g. a 5503 construction snapshot) was used as the baseline for an 8840 portfolio
+  // even though comparable ~8800 snapshots existed later in the window → the comparability gate then rejected
+  // it → permanent pending despite real comparable candidates. If ≥2 comparable snapshots exist, anchor there.
+  let work = snaps;
+  try {
+    const lastVal = snaps[snaps.length - 1].value;
+    const cmpMax = (typeof _AURIX_RETURN_COMPARABLE_RATIO !== 'undefined' && _AURIX_RETURN_COMPARABLE_RATIO[r]) ? _AURIX_RETURN_COMPARABLE_RATIO[r] : 3.0;
+    if (lastVal > 0) {
+      let b0 = 0;
+      while (b0 < snaps.length - 1) {
+        const v = snaps[b0].value;
+        const ratio = (v > 0) ? Math.max(v / lastVal, lastVal / v) : Infinity;
+        if (ratio <= cmpMax) break;                 // first comparable snapshot (chronological)
+        b0++;
+      }
+      if (b0 > 0 && (snaps.length - b0) >= 2) { work = snaps.slice(b0); out.leadingNonComparableTrimmed = b0; }
+      else out.leadingNonComparableTrimmed = 0;   // not enough comparable points to trim ⇒ baseline unchanged (gate handles pending)
+    }
+  } catch (_) {}
+
+  const rawFirst = work[0].value, rawLast = work[work.length - 1].value;
+  const neutral = _aurixFlowNeutralize(work, r);
   const adj = neutral.adjusted;
   const first = adj[0], last = adj[adj.length - 1];
 
-  out.points     = snaps.length;
-  out.baselineTs = snaps[0].ts;
-  out.lastTs     = snaps[snaps.length - 1].ts;
+  out.points     = work.length;
+  out.baselineTs = work[0].ts;
+  out.lastTs     = work[work.length - 1].ts;
   out.startValue = Number.isFinite(first) ? +first.toFixed(2) : null;
   out.endValue   = Number.isFinite(last)  ? +last.toFixed(2)  : null;
   out.deltaAbs   = (Number.isFinite(first) && Number.isFinite(last)) ? +(last - first).toFixed(2) : null;
