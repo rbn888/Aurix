@@ -727,10 +727,33 @@ function _mergeCategoryByTs(localArr, remoteArr) {
   return _aurixFilterAfterEpoch(deduped.sort((a, b) => a.ts - b.ts), 'ts');
 }
 
+// ── P0-HISTORY-SYNC-AUTHORITY ────────────────────────────────────────────────
+// The wealth history that drives the chart + return is shared remote state (the per-user
+// portfolios row holds category_history / portfolio_history). A device must NOT render a real
+// return from a LOCAL-ONLY series before it has reconciled the canonical remote history — that is
+// exactly how web and mobile produced divergent %/charts. This session flag flips true the first
+// time a remote row is reconciled (the canonical history has been downloaded + merged in). Until
+// then an authenticated/online device stays in "Calculando…". localStorage remains a CACHE of the
+// shared history (merged here), never a substitute. No new polling — set by the existing boot +
+// focus/visibility/pageshow reconcile path. Touches no holdings sync / integrity lock / journal.
+let _aurixCanonicalHistoryLoaded = false;
+function _aurixCanonicalHistoryReady() {
+  try {
+    // Anonymous / not signed in: no remote authority exists ⇒ local IS canonical (single device).
+    const authed = (typeof currentUser !== 'undefined' && currentUser && currentUser.id);
+    if (!authed) return true;
+  } catch (_) { return true; }
+  // Authenticated: require ≥1 successful remote reconcile this session (shared history downloaded).
+  return _aurixCanonicalHistoryLoaded === true;
+}
 // Reconcile remote state into local memory + localStorage at boot. Called
 // from initPortfolioData with the row from loadPortfolioFromBackend.
 function _mergeRemoteState(remoteRow) {
   try {
+    // P0-HISTORY-SYNC-AUTHORITY — a non-null remote row means the canonical history was reachable
+    // and is now reconciled into local cache (union-by-ts below). A null row = remote unavailable
+    // (offline / load failure) ⇒ leave the flag so the device stays in "Calculando…" (test 8).
+    if (remoteRow && typeof remoteRow === 'object') _aurixCanonicalHistoryLoaded = true;
     const distrust = (typeof _shouldDistrustRemote === 'function') && _shouldDistrustRemote(remoteRow);
 
     // ── History (union-by-ts). If the local reset tombstone is newer than
@@ -5603,6 +5626,7 @@ function _aurixEnforceCacheOwner(userId) {
     const owner = _aurixCacheOwner();
     if (_aurixActiveUserId && owner && owner !== _aurixActiveUserId) {
       try { console.warn('[SYNC][USER_SWITCH] foreign cache purged', { was: owner, now: _aurixActiveUserId }); } catch (_) {}
+      try { _aurixCanonicalHistoryLoaded = false; } catch (_) {}   // P0-HISTORY-SYNC-AUTHORITY — new user must re-download canonical history before showing return
       try { _clearLocalUserState(); } catch (_) {}
       try { assets = []; } catch (_) {}
       try { _aurixMiniDonutDrawn = false; _aurixMiniSig = ''; } catch (_) {}
@@ -21114,7 +21138,11 @@ function getValidReturnBaseline(range) {
   const windowMs = (Number.isFinite(baselineTs) && Number.isFinite(lastTs)) ? (lastTs - baselineTs) : 0;
   const netFlows = ret ? Math.abs(Number(ret.netFlowsNeutralized) || 0) : 0;
   let invalidReason = null;
-  if (!ret || !ret.valid || !Number.isFinite(ret.deltaPct) || !(baselineValue > 0)) invalidReason = 'no_valid_baseline';
+  // P0-HISTORY-SYNC-AUTHORITY — never render a real return from a LOCAL-ONLY series before the shared
+  // canonical remote history has been reconciled (else web/mobile diverge). Authenticated + not-yet-
+  // reconciled (or remote unavailable) ⇒ stay "Calculando…". Anonymous/offline-anon = local canonical.
+  if (typeof _aurixCanonicalHistoryReady === 'function' && !_aurixCanonicalHistoryReady()) invalidReason = 'awaiting_canonical_history';
+  else if (!ret || !ret.valid || !Number.isFinite(ret.deltaPct) || !(baselineValue > 0)) invalidReason = 'no_valid_baseline';
   else if (!(Number.isFinite(currentValue) && currentValue > 0)) invalidReason = 'no_current_value';
   else if (Number.isFinite(baselineTs) && baselineTs < lastResetAt) invalidReason = 'pre_reset';
   else if (windowMs < _AURIX_RETURN_MIN_HISTORY_MS) invalidReason = 'insufficient_history';
@@ -21280,7 +21308,8 @@ try {
         // historyMismatch = this device has local history not yet pushed to the shared canonical store
         // (⇒ may differ from the other device until it syncs). Compare historyHash across devices to confirm.
         historyMismatch:   pendingSync,
-        canonicalHistoryLoaded: !!(meta.syncedAt > 0) && remoteLoad !== 'error',
+        canonicalHistoryLoaded: (typeof _aurixCanonicalHistoryReady === 'function') ? _aurixCanonicalHistoryReady() : null,
+        remoteLoadStatus:  remoteLoad,
         duplicateSnapshots: dups,
         historyBuildReason: can.reason,
       };
