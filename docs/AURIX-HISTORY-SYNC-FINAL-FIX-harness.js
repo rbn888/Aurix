@@ -56,19 +56,19 @@ ok('7 a corrupt point (total != Σbuckets) is excluded',
   const b = BH([old(0,100), old(50,105), {ts:NOW-300000, total:5000, crypto:1, real_estate:1}]); // total 5000 != 2
   ok('7b body with a corrupt point === body without it (corrupt dropped)', a === b); }
 
-console.log('\nMerge wiring — remote-before, local-after, push-if-ahead (source):');
+console.log('\nMerge wiring — REMOTE is the display authority (set from the remote row, not the local union):');
 const merge = fnSrc('_mergeRemoteState');
-ok('8 remote canonical body hash computed from the remote row BEFORE adopting the union',
-   /_aurixRemoteCanonicalHash = _aurixCanonicalBodyHash\(remoteCat\);/.test(merge) &&
-   merge.indexOf('_aurixRemoteCanonicalHash = _aurixCanonicalBodyHash') < merge.indexOf('categoryHistory  = _mergeCategoryByTs'));
-ok('9 local canonical body hash computed AFTER adopting the reconciled union',
-   /categoryHistory  = _mergeCategoryByTs\(categoryHistory, remoteCat\);\s*_aurixLocalCanonicalHash = _aurixCanonicalBodyHash\(categoryHistory\);/.test(merge));
-ok('10 if local is more complete (hashes differ) → push the superset via the EXISTING throttled flush (#4/#6)',
-   /_aurixLocalCanonicalHash !== _aurixRemoteCanonicalHash && typeof scheduleStateFlush === 'function'\) scheduleStateFlush\(\)/.test(merge));
+ok('8 canonical display store set from the NORMALISED remote row (authority), then hashed',
+   /_aurixCanonicalCatHistory = _mergeCategoryByTs\(\[\], remoteCat\);\s*_aurixRemoteCanonicalHash = _aurixCanonicalBodyHash\(_aurixCanonicalCatHistory\);/.test(merge));
+ok('9 applied (display) hash == remote hash by construction; local categoryHistory kept as cache/push-buffer only',
+   /_aurixLocalCanonicalHash  = _aurixRemoteCanonicalHash;/.test(merge) &&
+   /categoryHistory  = _mergeCategoryByTs\(categoryHistory, remoteCat\);/.test(merge));
+ok('10 local-only settled points (cache ahead of remote) are pushed via the EXISTING throttled flush (#4/#6/#8)',
+   /_aurixCanonicalBodyHash\(categoryHistory\) !== _aurixRemoteCanonicalHash && typeof scheduleStateFlush === 'function'\) scheduleStateFlush\(\)/.test(merge));
 
-console.log('\nReadiness gate consumes hash equality (the real gate, not "loaded once"):');
-ok('11 _aurixCanonicalHistoryReady requires local hash === remote hash',
-   /_aurixCanonicalHistoryLoaded === true\s*&& _aurixLocalCanonicalHash != null\s*&& _aurixLocalCanonicalHash === _aurixRemoteCanonicalHash/.test(fnSrc('_aurixCanonicalHistoryReady')));
+console.log('\nReadiness gate — authed needs remote loaded + store present + applied===remote (hard lock):');
+ok('11 _aurixCanonicalHistoryReady requires loaded + canonical store present + applied hash === remote hash',
+   /_aurixCanonicalHistoryLoaded === true\s*&& Array\.isArray\(_aurixCanonicalCatHistory\)\s*&& _aurixLocalCanonicalHash != null\s*&& _aurixLocalCanonicalHash === _aurixRemoteCanonicalHash/.test(fnSrc('_aurixCanonicalHistoryReady')));
 ok('12 getValidReturnBaseline still gates first on canonical readiness (awaiting_canonical_history)',
    /if \(typeof _aurixCanonicalHistoryReady === 'function' && !_aurixCanonicalHistoryReady\(\)\) invalidReason = 'awaiting_canonical_history';/.test(app));
 

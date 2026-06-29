@@ -27,7 +27,7 @@ function makeEnv(){
   sb._aurixEligibleInvestableSeries = () => ({ series:[{ts:NOW-10*DAY,value:4000},{ts:NOW,value:4120}], meta:{anchor:4120,reasons:{}} });
   sb._aurixLoadCapitalFlows = () => [];
   vm.createContext(sb);
-  vm.runInContext('var currentUser = null; var _aurixCanonicalHistoryLoaded = false; var _aurixLocalCanonicalHash = null; var _aurixRemoteCanonicalHash = null;', sb);
+  vm.runInContext('var currentUser = null; var _aurixCanonicalHistoryLoaded = false; var _aurixLocalCanonicalHash = null; var _aurixRemoteCanonicalHash = null; var _aurixCanonicalCatHistory = [];', sb);
   vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS=90*1000; const _AURIX_RETURN_FLOW_DOMINANCE=0.5; const _AURIX_RETURN_ESTABLISHED_FRAC=0.80; const _AURIX_RETURN_STABLE_STEP=0.40;', sb);
   vm.runInContext(fnSrc('_aurixCanonicalHistoryReady'), sb);
   vm.runInContext(fnSrc('_aurixPortfolioCreatedAt'), sb);

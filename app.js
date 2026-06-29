@@ -746,8 +746,25 @@ function _mergeCategoryByTs(localArr, remoteArr) {
 // pushes its reconciled superset (via the existing throttled flush) so the other converges (#4/#6).
 let _aurixCanonicalHistoryLoaded = false;   // remote reachable + reconciled this session
 let _aurixRemoteCanonicalHash = null;       // body hash of the remote canonical history at last reconcile
-let _aurixLocalCanonicalHash  = null;       // body hash of the local (adopted/merged) history at last reconcile
+let _aurixLocalCanonicalHash  = null;       // body hash of the APPLIED (display) canonical history
 const _AURIX_CANONICAL_TAIL_MS = 120000;    // exclude the live tail (<2 min) from the parity body
+// P0-HISTORY-AUTHORITY-HARD-LOCK — THE single remote-authoritative history the chart + return read for an
+// authenticated user. It is set FROM the remote portfolios row (never the local union), so two devices
+// reading the same row build the same series. Local categoryHistory becomes a pure cache + push buffer:
+// its local-only points are flushed to remote but NEVER feed baseline/return until remote confirms them
+// (then a later reconcile, or a confirmed push, promotes them here). null until first reconcile.
+let _aurixCanonicalCatHistory = null;
+// The history SOURCE the display (chart + return, via _aurixInvestableSnapshots) must read. Authenticated
+// + remote canonical present ⇒ the remote-authoritative store. Anonymous/offline-anon ⇒ local cache
+// (single device, no cross-device divergence possible). Local history NEVER has final authority for an
+// authenticated user.
+function _aurixHistorySourceForDisplay() {
+  try {
+    const authed = (typeof currentUser !== 'undefined' && currentUser && currentUser.id);
+    if (authed && Array.isArray(_aurixCanonicalCatHistory)) return _aurixCanonicalCatHistory;
+  } catch (_) {}
+  return (typeof categoryHistory !== 'undefined' && Array.isArray(categoryHistory)) ? categoryHistory : [];
+}
 // Deterministic, device-independent hash of the SETTLED canonical history body: post-lifecycle, valid,
 // deduped-by-ts, sorted, live-tail excluded. Two devices holding the same shared history → same hash.
 function _aurixCanonicalBodyHash(arr) {
@@ -773,9 +790,13 @@ function _aurixCanonicalHistoryReady() {
     const authed = (typeof currentUser !== 'undefined' && currentUser && currentUser.id);
     if (!authed) return true;
   } catch (_) { return true; }
-  // Authenticated: reconciled this session AND the local canonical body matches the remote canonical
-  // body (the device has fully adopted the shared history — no divergent local-only body points).
+  // Authenticated: the remote canonical history must be reconciled AND present as the display store, and
+  // the APPLIED body hash (what the chart/return read) must equal the REMOTE body hash. Because the
+  // display reads _aurixCanonicalCatHistory (set from remote), this is true by construction once loaded —
+  // but we assert it so any inconsistency keeps the device in "Calculando…" rather than showing a
+  // divergent local-only return (P0-HISTORY-AUTHORITY-HARD-LOCK).
   return _aurixCanonicalHistoryLoaded === true
+      && Array.isArray(_aurixCanonicalCatHistory)
       && _aurixLocalCanonicalHash != null
       && _aurixLocalCanonicalHash === _aurixRemoteCanonicalHash;
 }
@@ -793,18 +814,22 @@ function _mergeRemoteState(remoteRow) {
     //    the remote row, ignore remote history so a reset never resurrects.
     const remoteHist = (!distrust && remoteRow && Array.isArray(remoteRow.portfolio_history)) ? remoteRow.portfolio_history : [];
     const remoteCat  = (!distrust && remoteRow && Array.isArray(remoteRow.category_history))  ? remoteRow.category_history  : [];
-    // P0-HISTORY-SYNC-FINAL-FIX — remote canonical body hash (the shared authority), then adopt the
-    // reconciled union locally and re-hash. Parity is decided by these two (see _aurixCanonicalHistoryReady).
-    _aurixRemoteCanonicalHash = _aurixCanonicalBodyHash(remoteCat);
+    // P0-HISTORY-AUTHORITY-HARD-LOCK — REMOTE is the single authority for the displayed history. Set the
+    // canonical display store = the NORMALISED remote category_history (valid + dedup-by-ts + sorted +
+    // post-lifecycle), NOT the local union. The chart + return read this store (via _aurixInvestableSnapshots),
+    // so two devices reading the same remote row build the same series. The local categoryHistory below stays
+    // a cache + push buffer ONLY — its local-only points reach baseline/return solely after remote confirms.
+    _aurixCanonicalCatHistory = _mergeCategoryByTs([], remoteCat);
+    _aurixRemoteCanonicalHash = _aurixCanonicalBodyHash(_aurixCanonicalCatHistory);
+    _aurixLocalCanonicalHash  = _aurixRemoteCanonicalHash;   // applied (display) == remote, by construction
     portfolioHistory = _mergeHistoryByTs(portfolioHistory, remoteHist);
-    categoryHistory  = _mergeCategoryByTs(categoryHistory, remoteCat);
-    _aurixLocalCanonicalHash = _aurixCanonicalBodyHash(categoryHistory);
+    categoryHistory  = _mergeCategoryByTs(categoryHistory, remoteCat);   // local CACHE + push buffer (not the display source)
     try { saveHistory(); } catch (_) {}
     try { saveCategoryHistory(); } catch (_) {}
-    // #4/#6 — if the adopted body is MORE complete than remote (local-only historical points), this
-    // device is the more-complete source: push the reconciled superset so remote becomes canonical and
-    // the other device converges to the same body. Uses the existing throttled flush (no holdings change).
-    try { if (_aurixCanonicalHistoryLoaded && _aurixLocalCanonicalHash !== _aurixRemoteCanonicalHash && typeof scheduleStateFlush === 'function') scheduleStateFlush(); } catch (_) {}
+    // #4/#6/#8 — if the local cache has settled points the remote authority lacks (local-only), push them
+    // so remote (and therefore the display store on the next reconcile / confirmed push) adopts them.
+    // Uses the existing throttled flush (no holdings change). Until confirmed, they do NOT affect return.
+    try { if (_aurixCanonicalHistoryLoaded && _aurixCanonicalBodyHash(categoryHistory) !== _aurixRemoteCanonicalHash && typeof scheduleStateFlush === 'function') scheduleStateFlush(); } catch (_) {}
 
     // ── Watchlist (last-write-wins, deletion-preserving).
     const remoteTs   = (!distrust && remoteRow && remoteRow.watchlist_updated_at)
@@ -995,6 +1020,18 @@ async function _flushStatePersistence(reason) {
       if (IS_DEV) console.warn('[STATE] ui_state/subscription columns not present yet — saved core only (' + (error.message || '') + ')');
     }
     if (IS_DEV) console.log('[STATE] flush ok (' + reason + ') hist=' + portfolioHistory.length + ' cat=' + categoryHistory.length);
+    // P0-HISTORY-AUTHORITY-HARD-LOCK — the push SUCCEEDED, so remote now == local categoryHistory. Promote
+    // the local cache to the canonical display store (remote-confirmed) so THIS device can show its own
+    // just-pushed points without waiting to re-pull. The other device adopts them on its next reconcile.
+    // appliedHash := remoteHash (both = this freshly-confirmed series) so the strict gate stays satisfied.
+    try {
+      if (typeof currentUser !== 'undefined' && currentUser && currentUser.id && typeof _mergeCategoryByTs === 'function') {
+        _aurixCanonicalCatHistory = _mergeCategoryByTs([], categoryHistory);
+        _aurixCanonicalHistoryLoaded = true;
+        _aurixRemoteCanonicalHash = _aurixCanonicalBodyHash(_aurixCanonicalCatHistory);
+        _aurixLocalCanonicalHash  = _aurixRemoteCanonicalHash;
+      }
+    } catch (_) {}
   } catch (e) {
     if (IS_DEV) console.warn('[STATE] flush failed (' + reason + ')', e && e.message);
   }
@@ -18890,7 +18927,11 @@ function _wscRenderInsufficient(hostEl, q, opts) {
 // worth incl. real estate. Raw history is never mutated. Windowed, epoch-filtered.
 function _aurixInvestableSnapshots(range) {
   try {
-    if (typeof categoryHistory === 'undefined' || !Array.isArray(categoryHistory)) return [];
+    // P0-HISTORY-AUTHORITY-HARD-LOCK — read the AUTHORITATIVE display source (remote canonical for an
+    // authenticated user; local cache only for anonymous/offline-anon). Local history never has final
+    // authority for an authenticated user — its unconfirmed local-only points never reach baseline/return.
+    const _src = (typeof _aurixHistorySourceForDisplay === 'function') ? _aurixHistorySourceForDisplay() : categoryHistory;
+    if (!Array.isArray(_src)) return [];
     const epoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
     const now = Date.now();
     const ms = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '1y': 31536e6 };
@@ -18903,7 +18944,7 @@ function _aurixInvestableSnapshots(range) {
     // the chart / hide all data) — fxPartial is ALWAYS dropped.
     const build = (excludeApprox) => {
       const out = [];
-      for (const p of categoryHistory) {
+      for (const p of _src) {
         if (!p || typeof p.ts !== 'number') continue;
         if (epoch && p.ts < epoch) continue;
         if (p.ts < start) continue;
@@ -21371,7 +21412,23 @@ try {
       // journal revision to compare. journalRevision = local event count (device-relative by design).
       let journalRevision = null;
       try { journalRevision = (typeof _aurixJournalRead === 'function') ? _aurixJournalRead().length : null; } catch (_) {}
+      // ── P0-HISTORY-AUTHORITY-HARD-LOCK — authority sources + hashes (item 9) ──
+      const _authedU = (typeof currentUser !== 'undefined' && currentUser && currentUser.id);
+      const _ready = (typeof _aurixCanonicalHistoryReady === 'function') ? _aurixCanonicalHistoryReady() : true;
+      const _srcLabel = !_authedU ? 'local' : (_ready ? 'remote' : 'pending');
+      let appliedHistoryHash = null, localCacheHash = null, pendingLocalOnly = 0;
+      try { appliedHistoryHash = (typeof _aurixCanonicalBodyHash === 'function') ? _aurixCanonicalBodyHash(_aurixHistorySourceForDisplay()) : null; } catch (_) {}
+      try { localCacheHash = (typeof _aurixCanonicalBodyHash === 'function') ? _aurixCanonicalBodyHash(typeof categoryHistory !== 'undefined' ? categoryHistory : []) : null; } catch (_) {}
+      try {
+        const _ep = (typeof _aurixPortfolioEpoch === 'function') ? (_aurixPortfolioEpoch() || 0) : 0;
+        const _cut = Date.now() - _AURIX_CANONICAL_TAIL_MS;
+        const _canonTs = new Set((Array.isArray(_aurixCanonicalCatHistory) ? _aurixCanonicalCatHistory : []).map(p => p && p.ts));
+        (Array.isArray(categoryHistory) ? categoryHistory : []).forEach(p => {
+          if (p && Number.isFinite(p.ts) && (!_ep || p.ts >= _ep) && p.ts <= _cut && !_canonTs.has(p.ts)) pendingLocalOnly++;
+        });
+      } catch (_) {}
       const out = {
+        build: (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null,
         userId:            (typeof _aurixActiveUserId !== 'undefined' && _aurixActiveUserId) ? _aurixActiveUserId : ((typeof currentUser !== 'undefined' && currentUser) ? currentUser.id : null),
         deviceId:          (typeof _aurixDeviceId === 'function') ? _aurixDeviceId() : null,
         portfolioRevision: meta.version || 0,
@@ -21396,11 +21453,21 @@ try {
         // (⇒ may differ from the other device until it syncs). Compare historyHash across devices to confirm.
         historyMismatch:   pendingSync,
         canonicalHistoryLoaded: (typeof _aurixCanonicalHistoryReady === 'function') ? _aurixCanonicalHistoryReady() : null,
-        // P0-HISTORY-SYNC-FINAL-FIX — the parity gate. When localCanonicalHash === remoteCanonicalHash on
-        // both devices, baseline/%/chart MUST match. Compare these between web and mobile for proof.
+        // ── P0-HISTORY-AUTHORITY-HARD-LOCK — remote authority proof (item 9). For an authenticated user,
+        // baselineSource/chartSource/returnSource MUST be "remote" before any real return is shown. ──
+        remoteHistoryLoaded: (typeof _aurixCanonicalHistoryLoaded !== 'undefined') ? _aurixCanonicalHistoryLoaded : null,
+        remoteHistoryHash:   (typeof _aurixRemoteCanonicalHash !== 'undefined') ? _aurixRemoteCanonicalHash : null,
+        appliedHistoryHash:  appliedHistoryHash,
+        localCacheHash:      localCacheHash,
+        pendingLocalOnlyCount: pendingLocalOnly,
+        quarantinedCount:    (typeof _aurixGuardTelemetry !== 'undefined' && _aurixGuardTelemetry) ? _aurixGuardTelemetry.snapshotQuarantined : null,
+        baselineSource:      _srcLabel,
+        chartSource:         _srcLabel,
+        returnSource:        _srcLabel,
+        // The strict gate: appliedHistoryHash === remoteHistoryHash (display reads the remote store).
         localCanonicalHash:  (typeof _aurixLocalCanonicalHash !== 'undefined') ? _aurixLocalCanonicalHash : null,
         remoteCanonicalHash: (typeof _aurixRemoteCanonicalHash !== 'undefined') ? _aurixRemoteCanonicalHash : null,
-        historyHashMatch:    (typeof _aurixLocalCanonicalHash !== 'undefined' && _aurixLocalCanonicalHash != null) ? (_aurixLocalCanonicalHash === _aurixRemoteCanonicalHash) : null,
+        historyHashMatch:    (typeof appliedHistoryHash !== 'undefined' && appliedHistoryHash != null) ? (appliedHistoryHash === _aurixRemoteCanonicalHash) : null,
         remoteLoadStatus:  remoteLoad,
         duplicateSnapshots: dups,
         historyBuildReason: can.reason,
