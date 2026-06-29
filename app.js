@@ -1155,23 +1155,89 @@ async function _flushStatePersistence(reason) {
 // A plain UPDATE of the existing user_portfolios row's performance_state column ONLY (never touches
 // assets/holdings/history), so performance_state sync is fully independent of the holdings/state merge.
 // RLS (auth.uid() = user_id) scopes it per user. Throttled with the state flush window.
+// ── P0-PERFORMANCE-STATE-WRITE-AUDIT ─────────────────────────────────────────────
+// FULL persistence audit of the dedicated performance_state write. Logs the exact payload hash, table, row,
+// WHERE clause, authenticated uid, rowsAffected (via .select()), the Supabase error object (status/code/
+// message/details/hint), the returned row, duration and retry path — then an IMMEDIATE VERIFY_READ that
+// SELECTs ONLY performance_state for the same row. rowsAffected===0 OR error!=null OR returned row lacking
+// performance_state OR VERIFY_READ null ⇒ FAILURE (we do NOT assume persistence). The last audit is exposed
+// via window.aurixPerfStateWriteAudit(). Audit-only: no calc/history/render/UI change. ALWAYS logs (not IS_DEV).
 let _aurixLastPerfFlushMs = 0;
+let _aurixPerfWriteAudit = null;
 async function _aurixFlushPerformanceState(reason) {
+  const audit = { reason: reason || null, startedAt: Date.now(), table: 'user_portfolios', where: 'user_id = <uid>',
+    uid: null, payloadHash: null, durationMs: null, rowsAffected: null, error: null, returnedHasPerformanceState: null,
+    verifyRead: null, retried: false, ok: false, failureReason: null };
   try {
-    if (!supabaseClient || !currentUser || !currentUser.id) return;
-    if (typeof _aurixResetInProgress !== 'undefined' && _aurixResetInProgress) return;
+    if (!supabaseClient || !currentUser || !currentUser.id) { audit.failureReason = 'no_client_or_user'; _aurixPerfWriteAudit = audit; return audit; }
+    if (typeof _aurixResetInProgress !== 'undefined' && _aurixResetInProgress) { audit.failureReason = 'reset_in_progress'; _aurixPerfWriteAudit = audit; return audit; }
     const now = Date.now();
-    if (reason !== 'lifecycle' && reason !== 'perf-now' && _aurixLastPerfFlushMs && now - _aurixLastPerfFlushMs < 30_000) return;
+    if (reason !== 'lifecycle' && reason !== 'perf-now' && _aurixLastPerfFlushMs && now - _aurixLastPerfFlushMs < 30_000) { audit.failureReason = 'throttled'; _aurixPerfWriteAudit = audit; return audit; }
     const ps = (typeof _aurixComputePerformanceStateCandidate === 'function') ? _aurixComputePerformanceStateCandidate() : null;
-    if (!ps || !ps.userId) return;
+    if (!ps || !ps.userId) { audit.failureReason = 'no_candidate'; _aurixPerfWriteAudit = audit; return audit; }
     _aurixLastPerfFlushMs = now;
-    const { error } = await supabaseClient.from('user_portfolios').update({ performance_state: ps }).eq('user_id', currentUser.id);
-    if (error) { if (IS_DEV) console.warn('[PERF-STATE] write failed (column missing? ' + (error.message || '') + ')'); return; }
+    audit.uid = currentUser.id; audit.where = "user_id = '" + currentUser.id + "'";
+    try { audit.payloadHash = (typeof _aurixHistoryHash === 'function') ? _aurixHistoryHash(Object.keys(ps.byRange || {}).map(k => k + ':' + (ps.byRange[k] && ps.byRange[k].performanceHash))) : null; } catch (_) {}
+    try { console.log('%c[PERF_STATE][WRITE_START]', 'font-weight:700;color:#4A82F0', { uid: audit.uid, table: audit.table, where: audit.where, portfolioRevision: ps.portfolioRevision, lifecycleId: ps.lifecycleId, payloadHash: audit.payloadHash, ranges: Object.keys(ps.byRange || {}) }); } catch (_) {}
+
+    const t0 = Date.now();
+    // .select() so we get the AFFECTED ROW(S) back — rowsAffected===0 (e.g. missing RLS UPDATE policy or a
+    // WHERE matching no row) returns data=[] with error=null, which would otherwise be a SILENT failure.
+    const res = await supabaseClient.from('user_portfolios').update({ performance_state: ps }).eq('user_id', currentUser.id).select('user_id, performance_state');
+    audit.durationMs = Date.now() - t0;
+    const error = res && res.error; const data = (res && Array.isArray(res.data)) ? res.data : [];
+    audit.rowsAffected = data.length;
+    if (error) {
+      audit.error = { status: res.status || null, code: error.code || null, message: error.message || null, details: error.details || null, hint: error.hint || null };
+      audit.failureReason = 'supabase_error';
+      try { console.error('%c[PERF_STATE][WRITE_ERROR]', 'font-weight:700;color:#e05a5a', audit.error); } catch (_) {}
+      _aurixPerfWriteAudit = audit; return audit;
+    }
+    if (data.length === 0) {
+      audit.failureReason = 'rows_affected_0';   // RLS UPDATE policy missing OR WHERE matched no row
+      try { console.error('%c[PERF_STATE][WRITE_ERROR]', 'font-weight:700;color:#e05a5a', { rowsAffected: 0, hint: 'UPDATE matched 0 rows — missing RLS UPDATE policy on user_portfolios, or no row for this user_id', uid: audit.uid }); } catch (_) {}
+      _aurixPerfWriteAudit = audit; return audit;
+    }
+    const returnedPs = data[0] && data[0].performance_state;
+    audit.returnedHasPerformanceState = !!(returnedPs && typeof returnedPs === 'object');
+    let returnedHash = null; try { returnedHash = (typeof _aurixHistoryHash === 'function' && returnedPs && returnedPs.byRange) ? _aurixHistoryHash(Object.keys(returnedPs.byRange).map(k => k + ':' + (returnedPs.byRange[k] && returnedPs.byRange[k].performanceHash))) : null; } catch (_) {}
+    if (!audit.returnedHasPerformanceState) {
+      audit.failureReason = 'returned_row_lacks_performance_state';
+      try { console.error('%c[PERF_STATE][WRITE_ERROR]', 'font-weight:700;color:#e05a5a', { rowsAffected: data.length, returnedHasPerformanceState: false }); } catch (_) {}
+      _aurixPerfWriteAudit = audit; return audit;
+    }
+    try { console.log('%c[PERF_STATE][WRITE_OK]', 'font-weight:700;color:#3fbf7f', { rowsAffected: audit.rowsAffected, returnedPerformanceHash: returnedHash, durationMs: audit.durationMs }); } catch (_) {}
+
+    // IMMEDIATE VERIFY_READ — SELECT ONLY performance_state for the same row. If null after WRITE_OK, STOP.
+    try {
+      const v = await supabaseClient.from('user_portfolios').select('performance_state').eq('user_id', currentUser.id).single();
+      const vps = v && v.data && v.data.performance_state;
+      audit.verifyRead = { error: v && v.error ? (v.error.message || true) : null, hasPerformanceState: !!(vps && typeof vps === 'object'),
+        lifecycleId: vps && vps.lifecycleId, portfolioRevision: vps && vps.portfolioRevision };
+      try { console.log('%c[PERF_STATE][VERIFY_READ]', 'font-weight:700;color:#4A82F0', audit.verifyRead); } catch (_) {}
+      if (!audit.verifyRead.hasPerformanceState) {
+        audit.failureReason = 'verify_read_null';
+        try { console.error('%c[PERF_STATE][VERIFY_READ_NULL] STOP — write reported OK but the row has no performance_state', 'font-weight:700;color:#e05a5a'); } catch (_) {}
+        _aurixPerfWriteAudit = audit; return audit;
+      }
+    } catch (ve) { audit.verifyRead = { error: (ve && ve.message) || true, hasPerformanceState: false }; audit.failureReason = 'verify_read_exception'; _aurixPerfWriteAudit = audit; return audit; }
+
+    audit.ok = true;
     try { _aurixSyncState.lastPerfStateWriteAt = now; } catch (_) {}
-    if (IS_DEV) console.log('[PERF-STATE] wrote performance_state (' + (reason || '') + ') ranges=' + (ps.byRange ? Object.keys(ps.byRange).length : 0));
-  } catch (e) { if (IS_DEV) console.warn('[PERF-STATE] write exception', e && e.message); }
+    _aurixPerfWriteAudit = audit;
+    return audit;
+  } catch (e) {
+    audit.failureReason = 'exception'; audit.error = { message: (e && e.message) || String(e) };
+    try { console.error('%c[PERF_STATE][WRITE_ERROR] exception', 'font-weight:700;color:#e05a5a', audit.error); } catch (_) {}
+    _aurixPerfWriteAudit = audit; return audit;
+  }
 }
-try { if (typeof window !== 'undefined') window.aurixFlushPerformanceStateNow = () => _aurixFlushPerformanceState('perf-now'); } catch (_) {}
+try {
+  if (typeof window !== 'undefined') {
+    window.aurixFlushPerformanceStateNow = () => _aurixFlushPerformanceState('perf-now');
+    window.aurixPerfStateWriteAudit = () => _aurixPerfWriteAudit;   // last write-audit record (read after a flush)
+  }
+} catch (_) {}
 
 function isValidPortfolioData(data) {
   return data &&
