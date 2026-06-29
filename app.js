@@ -6056,7 +6056,15 @@ async function _aurixResyncFromRemote(reason) {
     _aurixResyncInFlight = true; _aurixLastResyncAt = now;
     try { console.log('[SYNC][REMOTE_LOAD]', { reason: reason || 'foreground' }); } catch (_) {}
     const remote = await loadPortfolioFromBackend(currentUser.id);
+    // P0-UI-RENDER — capture the remote performance_state fingerprint across the reconcile. _mergeRemoteState
+    // adopts it even when the HOLDINGS merge keeps local (apply:"local"); the return badges (gated on
+    // getValidReturnBaseline().valid) must then be REPAINTED or they keep a stale "Calculando…".
+    let _psFpBefore = null;
+    try { const p = _aurixRemotePerformanceState; _psFpBefore = p ? ((p.portfolioRevision || 0) + ':' + (p.calculatedAt || 0) + ':' + (p.lifecycleId || '')) : null; } catch (_) {}
     try { _mergeRemoteState(remote); } catch (_) {}   // history/watchlist reconcile (existing)
+    let _psFpAfter = null;
+    try { const p = _aurixRemotePerformanceState; _psFpAfter = p ? ((p.portfolioRevision || 0) + ':' + (p.calculatedAt || 0) + ':' + (p.lifecycleId || '')) : null; } catch (_) {}
+    const _psChanged = _psFpBefore !== _psFpAfter;
     let localModel; try { const d = getPortfolioData(); localModel = (d.source === 'new') ? { assets: d.assets || [], holdings: d.holdings || [] } : convertToNewModel(d.legacy || []); } catch (_) { localModel = { assets: [], holdings: [] }; }
     const decision = _aurixMergePortfolio(localModel, remote);
     try { _aurixSyncState.lastMergeDecision = decision.apply + ':' + decision.reason; } catch (_) {}
@@ -6077,6 +6085,16 @@ async function _aurixResyncFromRemote(reason) {
       try { if (typeof updateDonut === 'function') updateDonut(); } catch (_) {}
       try { if (typeof updateCategoryCards === 'function') updateCategoryCards(); } catch (_) {}
       try { if (typeof scheduleAurixMobileLite === 'function') scheduleAurixMobileLite(typeof activeRange !== 'undefined' ? activeRange : '30d'); } catch (_) {}
+    } else if (_psChanged) {
+      // P0-UI-RENDER — the holdings merge kept local (apply:"local") but the remote performance_state CHANGED
+      // (e.g. arrived/updated/became "ready"). The apply:"remote" branch above is the only place that
+      // repaints, so the return badges would otherwise stay "Calculando…". Repaint the SAME return surfaces
+      // here (render trigger only — no data/logic change) so the ready value appears once performance_state is
+      // adopted, independent of the holdings decision.
+      try { if (typeof render === 'function') render(false); } catch (_) {}
+      try { if (typeof _dshRenderPerfSnapshot === 'function') _dshRenderPerfSnapshot(); } catch (_) {}
+      try { if (typeof scheduleAurixMobileLite === 'function') scheduleAurixMobileLite(typeof activeRange !== 'undefined' ? activeRange : '30d'); } catch (_) {}
+      try { console.log('[SYNC][PERF_STATE_REPAINT]', 'performance_state changed on apply:local → repainted return surfaces'); } catch (_) {}
     }
   } catch (e) { try { console.warn('[SYNC] resync failed', e && e.message); } catch (_) {} }
   finally { _aurixResyncInFlight = false; }
