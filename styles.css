@@ -41,7 +41,7 @@ select:focus-visible {
   --red:         var(--aurix-danger);  /* AURIX-DESIGN-SYSTEM-1: → canonical danger */
   --orange:      #e0904a;
   --text:        #e6e6e8;
-  --text-bright: rgba(255,255,255,0.94);
+  --text-bright: rgba(255,255,255,0.985);  /* AURIX-VISUAL-CLARITY-1: Level-1 crispness — the top tier (key numbers/emphasis) reads truly clean so the hierarchy gap below it widens, without brightening the UI overall */
   --text-muted:  #b0b4bd;  /* AURIX-DASH-V1: was #a0a0a0 — lift secondary text toward soft white for low-brightness legibility */
   --text-dim:    #686c75;  /* AURIX-DASH-V1: was #484848 — tertiary (dates/prices/inactive) now readable, not near-invisible */
   --radius:      12px;
@@ -83,7 +83,7 @@ select:focus-visible {
   --aurix-border:       var(--aurix-blue-border);
 
   --aurix-text:           rgba(255, 255, 255, 0.92);
-  --aurix-text-secondary: rgba(255, 255, 255, 0.62);
+  --aurix-text-secondary: rgba(255, 255, 255, 0.68);  /* AURIX-VISUAL-CLARITY-1: Level-2 secondary reads "without effort" at low brightness/OLED; still clearly below the primary tier */
 
   /* Legacy blue alias → canonical (the cyan #2bc8f2 is retired; do not assign
      new literals to --aurix-blue-light). */
@@ -126,7 +126,7 @@ select:focus-visible {
   --color-bg-elevated:  var(--bg-card-2);
 
   /* Borders — exact matches present in CSS */
-  --color-border-subtle:  rgba(255, 255, 255, 0.06);
+  --color-border-subtle:  rgba(255, 255, 255, 0.08);  /* AURIX-VISUAL-CLARITY-1: Level-4 card edges hold their separation at 20–50% brightness / OLED (was 0.06 → vanished); still a hairline at full brightness — depth without heavier shadows */
   --color-border-default: rgba(255, 255, 255, 0.10);
 
   /* Text */
@@ -143,7 +143,7 @@ select:focus-visible {
   --surface-1:  rgba(255,255,255,0.03);
   --surface-2:  rgba(255,255,255,0.05);
   --surface-3:  rgba(255,255,255,0.08);
-  --border-subtle: rgba(255,255,255,0.06);  /* alias of --color-border-subtle */
+  --border-subtle: rgba(255,255,255,0.08);  /* AURIX-VISUAL-CLARITY-1: kept in step with --color-border-subtle (0.06→0.08) — card edge separation at low brightness */
   --border-strong: rgba(255,255,255,0.10);  /* alias of --color-border-default */
   --accent:        var(--aurix-blue);  /* AURIX-DESIGN-SYSTEM-1: legacy accent → canonical blue */
   --text-primary:  #FFFFFF;
