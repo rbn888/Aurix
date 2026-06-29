@@ -840,6 +840,14 @@ function canDisplayCanonicalReturn(range) {
     const sourceLabel = (loaded && storeOk) ? 'remote' : 'pending';
     out.baselineSource = out.chartSource = out.returnSource = sourceLabel;
 
+    // P0-CALCULANDO-EXIT-BLOCKER — pendingLocalOnlyCount / historyMismatch are NO LONGER blockers. They
+    // describe the LOCAL CACHE (the device's own 30 s snapshots + unpushed edits), which the display NEVER
+    // reads — the chart/return read the remote canonical store (_aurixCanonicalCatHistory) deterministically
+    // (v429 + v431). So local-cache divergence cannot move the displayed baseline/%/colour, yet the old gate
+    // blocked on it → because a fresh local snapshot ages into "settled" before the next focus-reconcile,
+    // pendingLocalOnlyCount was ~always ≥1 → PERMANENT "Calculando…". They stay in the debug payload
+    // (informational) but never block. Parity is enforced structurally: both devices read the same remote
+    // canonical store + compute deterministically ⇒ identical output, else the conditions below hold.
     if (!loaded)                                              out.reason = 'remote_not_loaded';
     else if (!storeOk)                                        out.reason = 'no_remote_store';
     else if (out.remoteHistoryHash == null)                  out.reason = 'no_remote_hash';
@@ -847,8 +855,6 @@ function canDisplayCanonicalReturn(range) {
     else if (out.appliedHistoryHash !== out.remoteHistoryHash) out.reason = 'applied_neq_remote';
     else if (out.baselineSnapshotId == null)                 out.reason = 'no_baseline';
     else if (!out.chartReady)                                out.reason = 'no_chart';
-    else if (out.pendingLocalOnlyCount > 0)                  out.reason = 'pending_local_only';
-    else if (out.historyMismatch)                            out.reason = 'history_mismatch_local_ahead';
     else { out.ok = true; out.reason = 'remote_confirmed'; }
   } catch (e) { out.reason = 'error'; }
   return out;

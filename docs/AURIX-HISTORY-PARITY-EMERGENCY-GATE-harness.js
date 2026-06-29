@@ -39,14 +39,16 @@ console.log('Block conditions → "Calculando…" (ok=false):');
   const c=can(sb); ok('1 source not remote (not loaded) → BLOCKED', c.ok===false && c.returnSource!=='remote'); }
 { const sb=env(); confirmed(sb); vm.runInContext('_aurixRemoteCanonicalHash="DIFFERENT";', sb);
   const c=can(sb); ok('2 appliedHistoryHash !== remoteHistoryHash → BLOCKED', c.ok===false && c.reason==='applied_neq_remote'); }
-{ const sb=env(); confirmed(sb); vm.runInContext('categoryHistory=[{ts:1,total:100},{ts:2,total:110},{ts:'+(NOW-300000)+',total:9999}];', sb);
-  const c=can(sb); ok('3 pendingLocalOnlyCount > 0 → BLOCKED', c.ok===false && c.reason==='pending_local_only' && c.pendingLocalOnlyCount>0); }
 { const sb=env(); confirmed(sb); vm.runInContext('_aurixCanonicalHistoryLoaded=false;', sb);
   const c=can(sb); ok('4 baselineSource !== remote (not loaded) → BLOCKED', c.ok===false && c.baselineSource!=='remote'); }
 { const sb=env(); confirmed(sb); vm.runInContext('_aurixCanonicalCatHistory=null;', sb);
   const c=can(sb); ok('5 chartSource !== remote (no store) → BLOCKED', c.ok===false && c.chartSource!=='remote'); }
+
+console.log('\nP0-CALCULANDO-EXIT-BLOCKER — local-cache state must NOT block (it never reaches the display):');
+{ const sb=env(); confirmed(sb); vm.runInContext('categoryHistory=[{ts:1,total:100},{ts:2,total:110},{ts:'+(NOW-300000)+',total:9999}];', sb);
+  const c=can(sb); ok('3 pendingLocalOnlyCount > 0 does NOT block (display reads remote store) → still shows; count is informational', c.ok===true && c.reason==='remote_confirmed' && c.pendingLocalOnlyCount>0); }
 { const sb=env(); confirmed(sb); sb._pending=true;
-  const c=can(sb); ok('6 returnSource remote but local AHEAD (historyMismatch) → BLOCKED', c.ok===false && c.reason==='history_mismatch_local_ahead'); }
+  const c=can(sb); ok('6 historyMismatch (local pending-sync) does NOT block → still shows', c.ok===true && c.reason==='remote_confirmed'); }
 
 console.log('\nPass condition → real return allowed (ok=true):');
 { const sb=env(); confirmed(sb);
@@ -55,12 +57,15 @@ console.log('\nPass condition → real return allowed (ok=true):');
 { const sb=env();  // anonymous: single device, local canonical
   const c=can(sb); ok('8 anonymous → allowed (no cross-device divergence possible)', c.ok===true && c.reason==='anonymous_local_canonical'); }
 
-console.log('\nNever web-red / mobile-green: at most ONE device shows; a diverging device blocks:');
-{ // web has a local-only point remote lacks (it diverges) → web BLOCKS; mobile (clean, == remote) → shows
+console.log('\nNever web-red / mobile-green: parity comes from BOTH reading the same remote canonical store:');
+{ // web has a local-only CACHE point mobile lacks, but BOTH display from the SAME remote canonical store
+  // (_aurixCanonicalCatHistory). The local-only point is not in the display source ⇒ web shows the SAME as
+  // mobile. Both show (no permanent Calculando), and they cannot diverge because the displayed series is the
+  // shared remote store, not the local cache.
   const web=env(); confirmed(web); vm.runInContext('categoryHistory=[{ts:1,total:100},{ts:2,total:110},{ts:'+(NOW-300000)+',total:1}];', web);
   const mob=env(); confirmed(mob);
-  ok('9 the diverging device (local-only point) is pending while the clean device shows → no red-vs-green',
-     can(web).ok===false && can(mob).ok===true); }
+  ok('9 a local-only cache point does NOT diverge the display (both read the same remote store) → both show, identical',
+     can(web).ok===true && can(mob).ok===true && can(web).returnSource==='remote' && can(mob).returnSource==='remote'); }
 
 console.log('\nSingle authority — every consumer passes through the helper (source):');
 ok('10 getValidReturnBaseline gates first on canDisplayCanonicalReturn',
