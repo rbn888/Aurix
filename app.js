@@ -21029,9 +21029,77 @@ function _aurixRangeReturn(range) {
 // two genuinely comparable post-reset snapshots — "lo mínimo necesario", never inventing a return.
 const _AURIX_RETURN_MIN_HISTORY_MS = 90 * 1000;       // ≥90 s of real elapsed history (was 5 min)
 const _AURIX_RETURN_FLOW_DOMINANCE = 0.5;             // window flows ≥50% of value ⇒ baseline = capital construction, not return
+const _AURIX_RETURN_ESTABLISHED_FRAC = 0.80;          // a snapshot ≥80% of current value = construction essentially complete (established regime)
+const _AURIX_RETURN_STABLE_STEP = 0.40;               // consecutive post-anchor change >40% ⇒ unrecorded jump (possible hidden flow) — not "stable"
 function _aurixPortfolioCreatedAt() {
   // Oldest post-epoch baseline ≈ when this (post-reset) portfolio began. Best-effort, read-only.
   try { const a = _aurixRangeReturn('all'); return a && a.baselineTs ? a.baselineTs : 0; } catch (_) { return 0; }
+}
+// RETURN-BASELINE-EXIT — snapshot stats for the diagnosis (Fase 1). PURE READ; guarded so the
+// guard's unit sandbox (which stubs _aurixRangeReturn but not the series fns) never throws.
+function _aurixReturnSnapshotStats(range) {
+  const out = { snapshotCount: 0, validSnapshotCount: 0, firstValidTs: null, lastValidTs: null };
+  try {
+    if (typeof categoryHistory !== 'undefined' && Array.isArray(categoryHistory)) out.snapshotCount = categoryHistory.length;
+    const elig = (typeof _aurixEligibleInvestableSeries === 'function') ? _aurixEligibleInvestableSeries(range) : null;
+    const s = (elig && Array.isArray(elig.series)) ? elig.series : [];
+    out.validSnapshotCount = s.length;
+    if (s.length) { out.firstValidTs = s[0].ts; out.lastValidTs = s[s.length - 1].ts; }
+  } catch (_) {}
+  return out;
+}
+// RETURN-BASELINE-EXIT — the core fix. `flows_dominate_baseline` is a ONE-TIME onboarding/reset
+// artifact: a brand-new portfolio's value is ~100% freshly-formed capital, so the flow-neutral
+// window is "flow-dominated" — but that initial construction sits at the START of the lifecycle and
+// never ages out of the active range, so the guard would stay pending for 20–30 min+. This re-checks
+// whether the portfolio is ESTABLISHED: once there are ≥2 comparable snapshots AFTER construction
+// (value reached ≥80% of current), spanning ≥ the min-history floor, with a STABLE inter-snapshot
+// change (no unrecorded jump) and NO dominant ONGOING flow after that anchor, the flow-neutral return
+// is legitimate and pending must clear. Initial construction is allowed to be large; ongoing flows are
+// not. PURE READ — touches no data/sync/persistence/renderer. Returns the diagnosis either way.
+function _aurixPostConstructionBaseline(range, currentValue, lifecycleStart) {
+  const out = { ok: false, comparableCount: 0, anchorTs: null, ongoingFlows: 0, ongoingRatio: null, stable: false, reason: null };
+  try {
+    if (!(Number.isFinite(currentValue) && currentValue > 0)) { out.reason = 'no_current_value'; return out; }
+    const elig = (typeof _aurixEligibleInvestableSeries === 'function') ? _aurixEligibleInvestableSeries(range) : null;
+    const snaps = (elig && Array.isArray(elig.series)) ? elig.series : [];
+    if (snaps.length < 2) { out.reason = 'insufficient_snapshots'; return out; }
+    const ls = Number.isFinite(lifecycleStart) ? lifecycleStart : 0;
+    // Establishment anchor = first snapshot at/after the lifecycle start whose value has reached the
+    // established regime (≥80% of current). Construction (incremental onboarding adds) precedes it.
+    let k = -1;
+    for (let i = 0; i < snaps.length; i++) {
+      if (snaps[i].ts >= ls && snaps[i].value >= _AURIX_RETURN_ESTABLISHED_FRAC * currentValue) { k = i; break; }
+    }
+    if (k < 0) { out.reason = 'not_established_yet'; return out; }
+    const anchor = snaps[k];
+    out.anchorTs = anchor.ts;
+    const comp = snaps.slice(k);
+    out.comparableCount = comp.length;
+    if (comp.length < 2) { out.reason = 'need_2_comparable'; return out; }
+    if ((comp[comp.length - 1].ts - comp[0].ts) < _AURIX_RETURN_MIN_HISTORY_MS) { out.reason = 'comparable_span_too_short'; return out; }
+    // Ongoing capital flows AFTER the establishment anchor (the onboarding construction is before it).
+    let ongoing = 0;
+    try {
+      const flows = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
+      for (const f of flows) {
+        if (f && Number.isFinite(f.ts) && Number.isFinite(f.amountUSD) && f.ts > anchor.ts + 1000) ongoing += Math.abs(Number(f.amountUSD));
+      }
+    } catch (_) {}
+    out.ongoingFlows = +ongoing.toFixed(2);
+    out.ongoingRatio = +(ongoing / currentValue).toFixed(4);
+    // Stable = no consecutive comparable step looks like a hidden (unrecorded) flow.
+    let stable = true;
+    for (let i = 1; i < comp.length; i++) {
+      const a = comp[i - 1].value, b = comp[i].value;
+      if (a > 0 && Math.abs(b - a) / a > _AURIX_RETURN_STABLE_STEP) { stable = false; break; }
+    }
+    out.stable = stable;
+    if (!stable) { out.reason = 'unstable_comparable_change'; return out; }
+    if (ongoing >= _AURIX_RETURN_FLOW_DOMINANCE * currentValue) { out.reason = 'ongoing_flows_dominate'; return out; }
+    out.ok = true; out.reason = 'established';
+  } catch (_) {}
+  return out;
 }
 function getValidReturnBaseline(range) {
   const r = range || (typeof activeRange !== 'undefined' ? activeRange : '30d');
@@ -21051,12 +21119,32 @@ function getValidReturnBaseline(range) {
   else if (Number.isFinite(baselineTs) && baselineTs < lastResetAt) invalidReason = 'pre_reset';
   else if (windowMs < _AURIX_RETURN_MIN_HISTORY_MS) invalidReason = 'insufficient_history';
   else if (netFlows >= _AURIX_RETURN_FLOW_DOMINANCE * currentValue) invalidReason = 'flows_dominate_baseline';
+  // RETURN-BASELINE-EXIT — flows_dominate is a one-time onboarding/reset construction artifact. If the
+  // portfolio is now ESTABLISHED (≥2 stable comparable snapshots after construction, ≥min-history span,
+  // no dominant ONGOING flow), the flow-neutral return is legitimate ⇒ clear pending automatically.
+  // This NEVER fabricates a return: it only lifts the over-conservative dominance veto; the % shown is
+  // still the canonical flow-neutral _aurixRangeReturn.deltaPct (which already neutralised construction).
+  let postConstruction = null;
+  if (invalidReason === 'flows_dominate_baseline' && typeof _aurixPostConstructionBaseline === 'function') {
+    postConstruction = _aurixPostConstructionBaseline(r, currentValue, Math.max(lastResetAt || 0, createdAt || 0));
+    if (postConstruction && postConstruction.ok) invalidReason = null;
+  }
   const valid = !invalidReason;
+  // Fase-1 diagnostics — additive, PURE READ (guarded; never throws in the unit sandbox).
+  const stats = (typeof _aurixReturnSnapshotStats === 'function') ? _aurixReturnSnapshotStats(r) : { snapshotCount: 0, validSnapshotCount: 0, firstValidTs: null };
+  const flowDominanceRatio = (Number.isFinite(currentValue) && currentValue > 0) ? +(netFlows / currentValue).toFixed(4) : null;
+  const timeSinceFirstValidSnapshot = Number.isFinite(stats.firstValidTs) ? (Date.now() - stats.firstValidTs) : null;
   return {
     range: r, returnState: valid ? 'ready' : 'pending_baseline', valid: valid, invalidReason: invalidReason,
     deltaPct: valid ? ret.deltaPct : null, deltaAbs: valid ? ret.deltaAbs : null,
     baselineValue: baselineValue, baselineTs: baselineTs, currentValue: currentValue,
     portfolioCreatedAt: createdAt, lastResetAt: lastResetAt, windowMs: windowMs, netFlowsNeutralized: netFlows,
+    // Fase-1 diagnosis fields:
+    snapshotCount: stats.snapshotCount, validSnapshotCount: stats.validSnapshotCount,
+    comparableSnapshotCount: postConstruction ? postConstruction.comparableCount : null,
+    timeSinceFirstValidSnapshot: timeSinceFirstValidSnapshot, minHistoryMs: _AURIX_RETURN_MIN_HISTORY_MS,
+    flowDominanceRatio: flowDominanceRatio, postConstruction: postConstruction,
+    exitBlockedBy: valid ? null : invalidReason,
   };
 }
 // RETURN-PENDING-FINAL — the premium "Calculando…" state. Whenever the baseline is not yet valid
@@ -21079,7 +21167,14 @@ try {
         baselineValid: g.valid, invalidReason: g.invalidReason, returnState: g.returnState,
         netFlowsNeutralized: g.netFlowsNeutralized, windowMinutes: Math.round((g.windowMs || 0) / 60000),
         minHistorySeconds: Math.round(_AURIX_RETURN_MIN_HISTORY_MS / 1000),
-        exitCriterion: 'baselineValid===true (post-reset baseline>0, currentValue>0, ≥' + Math.round(_AURIX_RETURN_MIN_HISTORY_MS / 1000) + 's history, flows<50% of value)',
+        // RETURN-BASELINE-EXIT — Fase 1 diagnosis surface:
+        snapshotCount: g.snapshotCount, validSnapshotCount: g.validSnapshotCount,
+        comparableSnapshotCount: g.comparableSnapshotCount,
+        timeSinceFirstValidSnapshot: Number.isFinite(g.timeSinceFirstValidSnapshot) ? Math.round(g.timeSinceFirstValidSnapshot / 1000) + 's' : null,
+        flowDominanceRatio: g.flowDominanceRatio,
+        postConstruction: g.postConstruction,
+        exitBlockedBy: g.exitBlockedBy,
+        exitCriterion: 'baselineValid===true (post-reset baseline>0, currentValue>0, ≥' + Math.round(_AURIX_RETURN_MIN_HISTORY_MS / 1000) + 's history, ongoing flows<50% of value — initial onboarding/reset construction is exempt)',
         displayedReturn: g.valid ? { pct: g.deltaPct, abs: g.deltaAbs } : _AURIX_RETURN_PENDING_TEXT,
       };
       try { console.log('%c[AURIX RETURN DEBUG]', 'font-weight:700', out); } catch (_) {}
