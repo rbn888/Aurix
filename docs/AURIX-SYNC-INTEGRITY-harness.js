@@ -71,10 +71,11 @@ console.log('\nMulti-category: an asset added on web (remote +1) is applied on t
 
 console.log('\nWiring (source):');
 ok('10 foreground re-sync hooks (visibilitychange/focus/pageshow/online → resync)',
-   /document\.addEventListener\('visibilitychange', \(\) => \{ if \(document\.visibilityState === 'visible'\) _aurixResyncFromRemote\('visible'\); \}\);/.test(app) &&
-   /window\.addEventListener\('focus',   \(\) => _aurixResyncFromRemote\('focus'\)\);/.test(app) &&
-   /window\.addEventListener\('pageshow', \(\) => _aurixResyncFromRemote\('pageshow'\)\);/.test(app) &&
-   /window\.addEventListener\('online',   \(\) => _aurixResyncFromRemote\('online'\)\);/.test(app));
+   /const _aurixFg = \(reason\) => \{[\s\S]*?_aurixResyncFromRemote\(reason\);/.test(app) &&
+   /document\.addEventListener\('visibilitychange', \(\) => \{ if \(document\.visibilityState === 'visible'\) _aurixFg\('visible'\); \}\);/.test(app) &&
+   /window\.addEventListener\('focus',   \(\) => _aurixFg\('focus'\)\);/.test(app) &&
+   /window\.addEventListener\('pageshow', \(\) => _aurixFg\('pageshow'\)\);/.test(app) &&
+   /window\.addEventListener\('online',   \(\) => _aurixFg\('online'\)\);/.test(app));
 ok('11 boot merge routed through the safe merge (not naive length-based)',
    /const decision = _aurixMergePortfolio\(localModel, backendData\);/.test(fnSrc('initPortfolioData')) &&
    !/backendData\.assets\.length > 0 && !distrustRemote/.test(fnSrc('initPortfolioData')));

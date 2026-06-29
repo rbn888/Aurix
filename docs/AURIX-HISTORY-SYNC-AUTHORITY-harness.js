@@ -88,10 +88,11 @@ ok('10 history reconciled via union-by-ts merge of remote into local (cache), no
    /portfolioHistory = _mergeHistoryByTs\(portfolioHistory, remoteHist\)/.test(app));
 
 console.log('\nNo new polling — reconcile rides the EXISTING focus/visibility/pageshow + boot path:');
-ok('11 focus/visibilitychange/pageshow already reconcile remote (no new setInterval added)',
-   /document\.addEventListener\('visibilitychange', \(\) => \{ if \(document\.visibilityState === 'visible'\) _aurixResyncFromRemote\('visible'\); \}\);/.test(app) &&
-   /window\.addEventListener\('focus',   \(\) => _aurixResyncFromRemote\('focus'\)\);/.test(app) &&
-   /_aurixResyncFromRemote\('pageshow'\)/.test(app));
+ok('11 focus/visibilitychange/pageshow reconcile remote via _aurixFg (which calls _aurixResyncFromRemote; no new setInterval)',
+   /const _aurixFg = \(reason\) => \{[\s\S]*?_aurixResyncFromRemote\(reason\);/.test(app) &&
+   /document\.addEventListener\('visibilitychange', \(\) => \{ if \(document\.visibilityState === 'visible'\) _aurixFg\('visible'\); \}\);/.test(app) &&
+   /window\.addEventListener\('focus',   \(\) => _aurixFg\('focus'\)\);/.test(app) &&
+   /_aurixFg\('pageshow'\)/.test(app));
 ok('12 resync collapses focus+visibility bursts (≤1 per 1.5s) — no extra Supabase load',
    /now - _aurixLastResyncAt < 1500/.test(app));
 

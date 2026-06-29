@@ -6085,6 +6085,7 @@ async function _aurixResyncFromRemote(reason) {
       try { if (typeof updateDonut === 'function') updateDonut(); } catch (_) {}
       try { if (typeof updateCategoryCards === 'function') updateCategoryCards(); } catch (_) {}
       try { if (typeof scheduleAurixMobileLite === 'function') scheduleAurixMobileLite(typeof activeRange !== 'undefined' ? activeRange : '30d'); } catch (_) {}
+      try { if (typeof _aurixRepaintReturnBadges === 'function') _aurixRepaintReturnBadges('reconcile-remote'); } catch (_) {}   // P0-FINAL-UI-DOM-BINDING — authoritative last-writer
     } else if (_psChanged) {
       // P0-UI-RENDER — the holdings merge kept local (apply:"local") but the remote performance_state CHANGED
       // (e.g. arrived/updated/became "ready"). The apply:"remote" branch above is the only place that
@@ -6094,6 +6095,9 @@ async function _aurixResyncFromRemote(reason) {
       try { if (typeof render === 'function') render(false); } catch (_) {}
       try { if (typeof _dshRenderPerfSnapshot === 'function') _dshRenderPerfSnapshot(); } catch (_) {}
       try { if (typeof scheduleAurixMobileLite === 'function') scheduleAurixMobileLite(typeof activeRange !== 'undefined' ? activeRange : '30d'); } catch (_) {}
+      // P0-FINAL-UI-DOM-BINDING — direct authoritative last-writer on the visible badges (render() does not
+      // always re-reach #chartChange; this guarantees the ready value replaces a stale "Calculando…").
+      try { if (typeof _aurixRepaintReturnBadges === 'function') _aurixRepaintReturnBadges('reconcile-local'); } catch (_) {}
       try { console.log('[SYNC][PERF_STATE_REPAINT]', 'performance_state changed on apply:local → repainted return surfaces'); } catch (_) {}
     }
   } catch (e) { try { console.warn('[SYNC] resync failed', e && e.message); } catch (_) {} }
@@ -6102,10 +6106,14 @@ async function _aurixResyncFromRemote(reason) {
 try {
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     window.aurixResyncFromRemote = _aurixResyncFromRemote;   // manual trigger / debug
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') _aurixResyncFromRemote('visible'); });
-    window.addEventListener('focus',   () => _aurixResyncFromRemote('focus'));
-    window.addEventListener('pageshow', () => _aurixResyncFromRemote('pageshow'));
-    window.addEventListener('online',   () => _aurixResyncFromRemote('online'));
+    // P0-FINAL-UI-DOM-BINDING — on every foreground event, repaint the return badges from the CURRENT
+    // canonical state immediately (no waiting for the async resync), so a stale "Calculando…" can never
+    // out-live a ready state on screen. Then the resync runs (may also repaint after a fresh remote read).
+    const _aurixFg = (reason) => { try { _aurixRepaintReturnBadges('fg-' + reason); } catch (_) {} try { _aurixResyncFromRemote(reason); } catch (_) {} };
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') _aurixFg('visible'); });
+    window.addEventListener('focus',   () => _aurixFg('focus'));
+    window.addEventListener('pageshow', () => _aurixFg('pageshow'));
+    window.addEventListener('online',   () => _aurixFg('online'));
   }
 } catch (_) {}
 
@@ -21645,6 +21653,45 @@ const _AURIX_RETURN_PENDING_TEXT = 'Calculando…';
 function _aurixReturnPendingHTML() {
   return '<span class="wsc-metric-val wsc-metric-calc" aria-label="Calculando rendimiento">' + _AURIX_RETURN_PENDING_TEXT + '</span>';
 }
+// ── P0-FINAL-UI-DOM-BINDING-FIX ──────────────────────────────────────────────────
+// The SINGLE canonical return-badge painter — shared by desktop (#chartChange) and mobile
+// (#chartChangeMobile) so they use EXACTLY the same format + tone. It reads getValidReturnBaseline and
+// writes the visible node: ready ⇒ formatted %/€, else ⇒ "Calculando…". Called as the authoritative
+// last-writer on every reconcile/focus, so a stale "Calculando…" (painted earlier while pending) can never
+// survive once the state is ready. DOM/text only — no calc/baseline/performance_state/sync change.
+function _aurixFormatReturnText(g) {
+  try {
+    const mode = (typeof activePerfMode !== 'undefined' && activePerfMode === 'curr') ? 'curr' : 'pct';
+    if (mode === 'curr') return (typeof _dshFmtMoney0 === 'function') ? _dshFmtMoney0(g.deltaAbs) : ((g.deltaAbs >= 0 ? '+' : '') + Math.round(g.deltaAbs));
+    const pf = (typeof _dshFmtPct === 'function') ? _dshFmtPct(g.deltaPct) : null;
+    return pf ? pf.text : ((g.deltaPct >= 0 ? '+' : '') + g.deltaPct.toFixed(2) + '%');
+  } catch (_) { return ''; }
+}
+function _aurixPaintReturnBadge(el, surface) {
+  try {
+    if (!el) { try { console.log('[UI][RETURN_BADGE_PAINT]', { surface: surface, found: false }); } catch (_) {} return; }
+    const g = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(typeof activeRange !== 'undefined' ? activeRange : '24h') : { valid: false };
+    const textBefore = el.textContent;
+    if (g && g.valid && Number.isFinite(g.deltaPct)) {
+      const tone = g.deltaPct > 0.005 ? 'up' : (g.deltaPct < -0.005 ? 'down' : 'flat');
+      el.innerHTML = '<span class="wsc-metric-val">' + _aurixFormatReturnText(g) + '</span>';
+      el.className = 'chart-change ' + tone;
+    } else {
+      el.innerHTML = _aurixReturnPendingHTML();
+      el.className = 'chart-change calculating';
+    }
+    try { console.log('[UI][RETURN_BADGE_PAINT]', { surface: surface, found: true, returnState: g && g.returnState, displayedReturnPct: (g && g.valid) ? g.deltaPct : null, textBefore: textBefore, textAfter: el.textContent }); } catch (_) {}
+  } catch (_) {}
+}
+// Repaint BOTH return badges from the current canonical state — the authoritative last-writer.
+function _aurixRepaintReturnBadges(reason) {
+  try {
+    if (typeof document === 'undefined') return;
+    _aurixPaintReturnBadge(document.getElementById('chartChange'), 'desktop');
+    _aurixPaintReturnBadge(document.getElementById('chartChangeMobile'), 'mobile');
+  } catch (_) {}
+}
+try { if (typeof window !== 'undefined') window.aurixRepaintReturnBadges = _aurixRepaintReturnBadges; } catch (_) {}
 try {
   if (typeof window !== 'undefined') {
     window.aurixReturnDebug = function (range) {
