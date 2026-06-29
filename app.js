@@ -21183,6 +21183,113 @@ try {
   }
 } catch (_) {}
 
+// ── P0-CANONICAL-RETURN-HISTORY ─────────────────────────────────────────────────
+// The history that drives the chart + return must be IDENTICAL on every device for the same
+// account / lifecycle / range — never device-dependent. The return metric (getValidReturnBaseline →
+// _aurixRangeReturn) and the chart (renderAurixInstitutionalChart / getInstitutionalPerformanceSeries)
+// already read ONE canonical source: the per-user investable snapshot series (_aurixEligibleInvestable
+// Series over categoryHistory). This block adds the canonical accessor + a DETERMINISTIC, device-
+// independent hash so divergence is provable and locatable, and exposes window.aurixHistoryDebug().
+// PURE READ — touches no sync / persistence / Supabase / renderer / Integrity Lock / journal.
+function _aurixHistoryHash(parts) {
+  // FNV-1a (32-bit) over the joined canonical tokens. Order-sensitive and value-sensitive, so any
+  // difference in snapshot ts/value/order yields a different hash. Pure ⇒ same input → same hash
+  // on web and mobile.
+  let h = 0x811c9dc5 >>> 0;
+  const s = Array.isArray(parts) ? parts.join('|') : String(parts == null ? '' : parts);
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0; }
+  return ('00000000' + h.toString(16)).slice(-8);
+}
+// Lifecycle id — changes after every reset/onboarding epoch (new lifecycle ⇒ new history). Keyed on
+// the account + the reset/epoch boundary so it is identical across devices for the same lifecycle.
+function _aurixLifecycleId() {
+  try {
+    const uid = (typeof _aurixActiveUserId !== 'undefined' && _aurixActiveUserId) ? _aurixActiveUserId
+              : ((typeof currentUser !== 'undefined' && currentUser && currentUser.id) ? currentUser.id : 'anon');
+    const epoch = (typeof _aurixPortfolioEpoch === 'function') ? (_aurixPortfolioEpoch() || 0) : 0;
+    const reset = (typeof _aurixResetAt === 'function') ? (_aurixResetAt() || 0) : 0;
+    return 'lc-' + _aurixHistoryHash([uid, Math.max(epoch, reset)]);
+  } catch (_) { return 'lc-unknown'; }
+}
+// THE single canonical history accessor for a range: the per-user, trust-filtered investable snapshot
+// series — exactly what _aurixRangeReturn and the chart consume. Returns normalised {ts,value} points
+// plus the build reason. The device must never paint from anything else when this is available.
+function _aurixCanonicalHistory(range) {
+  const r = range || (typeof activeRange !== 'undefined' ? activeRange : '30d');
+  const out = { range: r, series: [], source: 'category_history.investable.eligible', reason: null, anchor: null };
+  try {
+    const elig = (typeof _aurixEligibleInvestableSeries === 'function') ? _aurixEligibleInvestableSeries(r) : null;
+    if (elig) {
+      out.series = (Array.isArray(elig.series) ? elig.series : []).map(s => ({ ts: s.ts, value: +(+s.value).toFixed(2) }));
+      if (elig.meta) {
+        out.anchor = elig.meta.anchor != null ? elig.meta.anchor : null;
+        const rs = elig.meta.reasons || {};
+        const fired = Object.keys(rs).filter(k => rs[k]);
+        out.reason = fired.length ? fired.join(',') : 'clean';
+      }
+    }
+  } catch (_) {}
+  return out;
+}
+try {
+  if (typeof window !== 'undefined') {
+    // Mandated cross-device diagnosis (Diagnóstico obligatorio). await window.aurixHistoryDebug().
+    // Compare historyHash / chartHash / baseline / snapshotIds between web and mobile: any field that
+    // differs is EXACTLY where the two devices diverge. PURE READ.
+    window.aurixHistoryDebug = async function (range) {
+      const r = range || (typeof activeRange !== 'undefined' ? activeRange : '30d');
+      const can = _aurixCanonicalHistory(r);
+      const ids = can.series.map(s => s.ts);
+      const dups = ids.length - new Set(ids).size;
+      const historyHash = _aurixHistoryHash(can.series.map(s => s.ts + ':' + s.value));
+      // Chart series = the canonical performance series that draws the curve (shared engine source).
+      let chartSeries = [];
+      try {
+        const perf = (typeof getInstitutionalPerformanceSeries === 'function') ? getInstitutionalPerformanceSeries(r) : null;
+        if (perf && Array.isArray(perf.renderSeries)) chartSeries = perf.renderSeries.map(p => ({ ts: p.time, value: +(+p.value).toFixed(2) }));
+      } catch (_) {}
+      const chartHash = _aurixHistoryHash(chartSeries.map(p => p.ts + ':' + p.value));
+      const g = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(r) : {};
+      const ret = (typeof _aurixRangeReturn === 'function') ? _aurixRangeReturn(r) : null;
+      const meta = (typeof _aurixReadPortfolioMeta === 'function') ? _aurixReadPortfolioMeta() : {};
+      // Color derives EXCLUSIVELY from the canonical return sign (never computed independently).
+      const color = !g.valid ? 'pending' : (g.deltaPct > 0.005 ? 'green' : (g.deltaPct < -0.005 ? 'red' : 'neutral'));
+      const pendingSync = (typeof _aurixPendingSync === 'function') ? _aurixPendingSync() : null;
+      const remoteLoad = (typeof _aurixSyncState !== 'undefined' && _aurixSyncState) ? _aurixSyncState.lastRemoteLoadStatus : null;
+      const out = {
+        userId:            (typeof _aurixActiveUserId !== 'undefined' && _aurixActiveUserId) ? _aurixActiveUserId : ((typeof currentUser !== 'undefined' && currentUser) ? currentUser.id : null),
+        deviceId:          (typeof _aurixDeviceId === 'function') ? _aurixDeviceId() : null,
+        portfolioRevision: meta.version || 0,
+        lifecycleId:       _aurixLifecycleId(),
+        historyRevision:   ids.length + ':' + (ids.length ? ids[ids.length - 1] : 0),
+        historyHash:       historyHash,
+        snapshotSource:    can.source,
+        snapshotCount:     ids.length,
+        snapshotIds:       ids,
+        baselineSnapshotId: ret ? ret.baselineTs : null,
+        baselineTimestamp: g.baselineTs ? new Date(g.baselineTs).toISOString() : null,
+        baselineValue:     g.baselineValue != null ? g.baselineValue : null,
+        currentValue:      g.currentValue != null ? g.currentValue : null,
+        displayedReturnPct:   g.valid ? g.deltaPct : null,
+        displayedReturnValue: g.valid ? g.deltaAbs : null,
+        displayedColor:    color,
+        chartPointCount:   chartSeries.length,
+        chartHash:         chartHash,
+        returnState:       g.returnState || null,
+        lastHistorySync:   meta.syncedAt ? new Date(meta.syncedAt).toISOString() : null,
+        // historyMismatch = this device has local history not yet pushed to the shared canonical store
+        // (⇒ may differ from the other device until it syncs). Compare historyHash across devices to confirm.
+        historyMismatch:   pendingSync,
+        canonicalHistoryLoaded: !!(meta.syncedAt > 0) && remoteLoad !== 'error',
+        duplicateSnapshots: dups,
+        historyBuildReason: can.reason,
+      };
+      try { console.log('%c[AURIX HISTORY DEBUG]', 'font-weight:700', out); } catch (_) {}
+      return out;
+    };
+  }
+} catch (_) {}
+
 // AURIX-RETURN-UNIFY-1 — full audit record for one range (OBJETIVO 5). Returns the
 // initial snapshot, final snapshot, every cashflow detected inside the window, the
 // gross (raw) vs net (flow-neutral) return and the % actually shown. Read-only.
