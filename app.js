@@ -765,6 +765,55 @@ function _aurixHistorySourceForDisplay() {
   } catch (_) {}
   return (typeof categoryHistory !== 'undefined' && Array.isArray(categoryHistory)) ? categoryHistory : [];
 }
+// ── P0-FINAL-PERFORMANCE-KILL-SWITCH-AND-SERVER-CANONICAL ────────────────────────
+// The single REMOTE canonical performance object (Supabase user_portfolios.performance_state). It is the
+// ONLY source an authenticated client may render REAL performance from. Set ONLY from a remote READ (in
+// _mergeRemoteState) — never from this device's local compute — so two devices render the exact same object.
+// null until reconciled (⇒ kill switch: authed users see "Calculando…"). Shape:
+//   { userId, lifecycleId, portfolioRevision, calculatedAt, byRange:{ '24h':{ baselineSnapshotId, baselineValue,
+//     displayedReturnPct, displayedReturnValue, displayedColor, returnState, chartSeriesHash, performanceHash }, … } }
+let _aurixRemotePerformanceState = null;
+function _aurixCurrentUserId() { try { return (typeof _aurixActiveUserId !== 'undefined' && _aurixActiveUserId) ? _aurixActiveUserId : ((typeof currentUser !== 'undefined' && currentUser) ? currentUser.id : null); } catch (_) { return null; } }
+function _aurixCurrentLifecycleId() { try { return (typeof _aurixLifecycleId === 'function') ? _aurixLifecycleId() : null; } catch (_) { return null; } }
+function _aurixCurrentRevision() { try { return (typeof _aurixPortfolioRevision === 'function') ? (_aurixPortfolioRevision() || 0) : 0; } catch (_) { return 0; } }
+// The per-range remote performance row IFF the remote performance_state matches THIS user + lifecycle +
+// portfolioRevision + range (not foreign / not pre-reset / not stale). Else null ⇒ Calculando.
+function _aurixRemotePerformanceForRange(range) {
+  try {
+    const ps = _aurixRemotePerformanceState;
+    if (!ps || typeof ps !== 'object') return null;
+    if (ps.userId !== _aurixCurrentUserId()) return null;                 // foreign account
+    if (ps.lifecycleId !== _aurixCurrentLifecycleId()) return null;       // old lifecycle (post-reset)
+    if ((ps.portfolioRevision || 0) !== _aurixCurrentRevision()) return null;   // stale vs current revision
+    const row = ps.byRange && ps.byRange[range];
+    if (!row || row.performanceHash == null) return null;
+    return row;
+  } catch (_) { return null; }
+}
+// Compute the LOCAL deterministic performance CANDIDATE for all ranges (writer only). Uses the raw local
+// engine (opts.raw bypasses the remote gate) — deterministic from the shared history (v431). This is what a
+// client UPLOADS as performance_state; it is NEVER displayed locally until read back from remote.
+function _aurixComputePerformanceStateCandidate() {
+  try {
+    const RANGES = ['24h', '7d', '30d', '1y', 'all'];
+    const byRange = {};
+    for (const rg of RANGES) {
+      const g = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(rg, { raw: true }) : null;
+      if (!g) continue;
+      let chartSeriesHash = null;
+      try { const p = (typeof _aurixCanonicalPerformance === 'function') ? _aurixCanonicalPerformance(rg) : null; chartSeriesHash = p ? p.chartSeriesHash : null; } catch (_) {}
+      const pct = g.valid ? g.deltaPct : null;
+      const color = !g.valid ? 'pending' : (pct > 0.005 ? 'green' : (pct < -0.005 ? 'red' : 'neutral'));
+      byRange[rg] = {
+        baselineSnapshotId: g.baselineTs != null ? g.baselineTs : null, baselineValue: g.baselineValue != null ? g.baselineValue : null,
+        displayedReturnPct: pct, displayedReturnValue: g.valid ? g.deltaAbs : null, displayedColor: color,
+        returnState: g.returnState || null, chartSeriesHash: chartSeriesHash,
+        performanceHash: (typeof _aurixHistoryHash === 'function') ? _aurixHistoryHash([rg, g.baselineTs, g.baselineValue, pct, color]) : null,
+      };
+    }
+    return { userId: _aurixCurrentUserId(), lifecycleId: _aurixCurrentLifecycleId(), portfolioRevision: _aurixCurrentRevision(), calculatedAt: Date.now(), byRange: byRange };
+  } catch (_) { return null; }
+}
 // Deterministic, device-independent hash of the SETTLED canonical history body: post-lifecycle, valid,
 // deduped-by-ts, sorted, live-tail excluded. Two devices holding the same shared history → same hash.
 function _aurixCanonicalBodyHash(arr) {
@@ -867,6 +916,10 @@ function _mergeRemoteState(remoteRow) {
     // and is now reconciled into local cache (union-by-ts below). A null row = remote unavailable
     // (offline / load failure) ⇒ leave the flag so the device stays in "Calculando…" (test 8).
     if (remoteRow && typeof remoteRow === 'object') _aurixCanonicalHistoryLoaded = true;
+    // P0-FINAL-PERFORMANCE-KILL-SWITCH — adopt the REMOTE canonical performance_state (the ONLY object an
+    // authed client may render real performance from). Set ONLY here (a remote READ), never from local
+    // compute. Absent column / null ⇒ stays null ⇒ authed users see "Calculando…" (no divergence possible).
+    try { _aurixRemotePerformanceState = (remoteRow && remoteRow.performance_state && typeof remoteRow.performance_state === 'object') ? remoteRow.performance_state : _aurixRemotePerformanceState; } catch (_) {}
     const distrust = (typeof _shouldDistrustRemote === 'function') && _shouldDistrustRemote(remoteRow);
 
     // ── History (union-by-ts). If the local reset tombstone is newer than
@@ -1056,6 +1109,10 @@ async function _flushStatePersistence(reason) {
       ui_state_updated_at:  localUiTs > 0 ? new Date(localUiTs).toISOString() : null,
       subscription:            _collectSubscription(),
       subscription_updated_at: localSubTs > 0 ? new Date(localSubTs).toISOString() : null,
+      // P0-FINAL-PERFORMANCE-KILL-SWITCH — upload the canonical performance_state candidate (deterministic
+      // from the shared history). Other devices READ it and render exactly it. If the column is absent the
+      // retry below strips it gracefully (rest still persists) ⇒ authed users stay in "Calculando…".
+      performance_state:    (typeof _aurixComputePerformanceStateCandidate === 'function') ? _aurixComputePerformanceStateCandidate() : null,
       updated_at:           new Date().toISOString(),
     };
     // Only touch assets/holdings when safe (see _aurixAssetsForBackend). Omitting
@@ -1073,7 +1130,7 @@ async function _flushStatePersistence(reason) {
       // retry WITHOUT them so core data (assets/history/watchlist/preferences)
       // still persists. Once the SQL is applied, the first branch succeeds and
       // this never runs. (AURIX-MONETIZATION-1 adds subscription to the strip.)
-      const { ui_state, ui_state_updated_at, subscription, subscription_updated_at, ...core } = payload;
+      const { ui_state, ui_state_updated_at, subscription, subscription_updated_at, performance_state, ...core } = payload;
       const retry = await supabaseClient.from('user_portfolios').upsert(core, { onConflict: 'user_id' });
       if (retry.error) throw retry.error;
       if (IS_DEV) console.warn('[STATE] ui_state/subscription columns not present yet — saved core only (' + (error.message || '') + ')');
@@ -21299,7 +21356,8 @@ function _aurixPostConstructionBaseline(range, currentValue, lifecycleStart) {
   } catch (_) {}
   return out;
 }
-function getValidReturnBaseline(range) {
+function getValidReturnBaseline(range, opts) {
+  opts = opts || {};   // opts.raw = the LOCAL deterministic result, bypassing the remote performance_state gate (used by the writer/candidate only)
   const r = range || (typeof activeRange !== 'undefined' ? activeRange : '30d');
   const lastResetAt = (typeof _aurixResetAt === 'function') ? (_aurixResetAt() || 0) : 0;
   const createdAt = _aurixPortfolioCreatedAt();
@@ -21337,6 +21395,44 @@ function getValidReturnBaseline(range) {
   const stats = (typeof _aurixReturnSnapshotStats === 'function') ? _aurixReturnSnapshotStats(r) : { snapshotCount: 0, validSnapshotCount: 0, firstValidTs: null };
   const flowDominanceRatio = (Number.isFinite(currentValue) && currentValue > 0) ? +(netFlows / currentValue).toFixed(4) : null;
   const timeSinceFirstValidSnapshot = Number.isFinite(stats.firstValidTs) ? (Date.now() - stats.firstValidTs) : null;
+  // ── P0-FINAL-PERFORMANCE-KILL-SWITCH ──────────────────────────────────────────────
+  // For an AUTHENTICATED user the REAL return is rendered ONLY from the confirmed REMOTE performance_state
+  // (read back from Supabase) — never from this device's local computation. If none is confirmed for this
+  // user/lifecycle/revision/range ⇒ KILL SWITCH: pending "Calculando…", no %/importe/colour. This is what
+  // makes web/mobile read the SAME object (no local-input divergence). opts.raw bypasses it (writer only).
+  // Guarded on the helper existing so the unit sandboxes (which don't load it / anon) are unaffected.
+  if (!opts.raw && typeof _aurixRemotePerformanceForRange === 'function'
+      && typeof _aurixCurrentUserId === 'function' && _aurixCurrentUserId()) {
+    const psRow = _aurixRemotePerformanceForRange(r);
+    const base = {
+      range: r, baselineValue: baselineValue, baselineTs: baselineTs, currentValue: currentValue,
+      portfolioCreatedAt: createdAt, lastResetAt: lastResetAt, windowMs: windowMs, netFlowsNeutralized: netFlows,
+      snapshotCount: stats.snapshotCount, validSnapshotCount: stats.validSnapshotCount,
+      comparableSnapshotCount: postConstruction ? postConstruction.comparableCount : null,
+      timeSinceFirstValidSnapshot: timeSinceFirstValidSnapshot, minHistoryMs: _AURIX_RETURN_MIN_HISTORY_MS,
+      flowDominanceRatio: flowDominanceRatio, postConstruction: postConstruction,
+    };
+    if (psRow && Number.isFinite(psRow.displayedReturnPct)) {
+      return Object.assign({}, base, {
+        returnState: 'ready', valid: true, invalidReason: null,
+        deltaPct: psRow.displayedReturnPct, deltaAbs: Number.isFinite(psRow.displayedReturnValue) ? psRow.displayedReturnValue : null,
+        baselineValue: psRow.baselineValue != null ? psRow.baselineValue : baselineValue,
+        baselineTs: psRow.baselineSnapshotId != null ? psRow.baselineSnapshotId : baselineTs,
+        renderedFromRemote: true, performanceSource: 'remote', displayedColor: psRow.displayedColor || null,
+        canDisplay: true, blockReason: null, baselineSource: 'remote', chartSource: 'remote', returnSource: 'remote',
+        exitBlockedBy: null,
+      });
+    }
+    // authed but NO confirmed remote performance_state (or it's pending) ⇒ Calculando.
+    return Object.assign({}, base, {
+      returnState: 'pending_baseline', valid: false,
+      invalidReason: psRow ? 'remote_performance_pending' : 'no_remote_performance_state',
+      deltaPct: null, deltaAbs: null, renderedFromRemote: false, performanceSource: 'pending',
+      canDisplay: false, blockReason: psRow ? 'remote_performance_pending' : 'no_remote_performance_state',
+      baselineSource: 'pending', chartSource: 'pending', returnSource: 'pending',
+      exitBlockedBy: psRow ? 'remote_performance_pending' : 'no_remote_performance_state',
+    });
+  }
   return {
     range: r, returnState: valid ? 'ready' : 'pending_baseline', valid: valid, invalidReason: invalidReason,
     deltaPct: valid ? ret.deltaPct : null, deltaAbs: valid ? ret.deltaAbs : null,
@@ -21352,6 +21448,7 @@ function getValidReturnBaseline(range) {
     canDisplay: _disp.ok, blockReason: _disp.ok ? null : _disp.reason,
     baselineSource: _disp.baselineSource, chartSource: _disp.chartSource, returnSource: _disp.returnSource,
     pendingLocalOnlyCount: _disp.pendingLocalOnlyCount,
+    renderedFromRemote: false, performanceSource: 'local',   // local deterministic path (anonymous / opts.raw)
   };
 }
 // RETURN-PENDING-FINAL — the premium "Calculando…" state. Whenever the baseline is not yet valid
@@ -21574,7 +21671,9 @@ try {
 // performanceHash fingerprints the per-range {baseline, last, pct} so parity is verifiable across devices.
 function _aurixCanonicalPerformance(range) {
   const r = range || (typeof activeRange !== 'undefined' ? activeRange : '24h');
-  const g = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(r) : {};
+  // RAW local deterministic result (bypass the remote performance_state gate) — this is the device's
+  // CANDIDATE computation, used by the writer + the local/debug view, never the authed display path.
+  const g = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(r, { raw: true }) : {};
   const ret = (typeof _aurixRangeReturn === 'function') ? _aurixRangeReturn(r) : null;     // deterministic (window/anchor from shared history)
   let chartSeries = [];
   try {
@@ -21637,6 +21736,44 @@ try {
         remoteHash: remoteHash,
       };
       try { console.log('%c[AURIX PERFORMANCE DEBUG]', 'font-weight:700', out); } catch (_) {}
+      return out;
+    };
+  }
+} catch (_) {}
+
+// ── P0-FINAL-PERFORMANCE-KILL-SWITCH — mandated debug (Fase 5) ───────────────────
+// await window.aurixPerformanceStateDebug('24h'). Proves whether the displayed return came from the
+// confirmed REMOTE performance_state. If renderedFromRemote !== true ⇒ NO real return is shown. PURE READ.
+try {
+  if (typeof window !== 'undefined') {
+    window.aurixPerformanceStateDebug = async function (range) {
+      const r = range || (typeof activeRange !== 'undefined' ? activeRange : '24h');
+      const g = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(r) : {};
+      const psRow = (typeof _aurixRemotePerformanceForRange === 'function') ? _aurixRemotePerformanceForRange(r) : null;
+      const ps = (typeof _aurixRemotePerformanceState !== 'undefined') ? _aurixRemotePerformanceState : null;
+      const authed = (typeof _aurixCurrentUserId === 'function') ? !!_aurixCurrentUserId() : false;
+      const meta = (typeof _aurixReadPortfolioMeta === 'function') ? _aurixReadPortfolioMeta() : {};
+      const renderedFromRemote = !!g.renderedFromRemote;
+      const isStale = !!(ps && (ps.portfolioRevision || 0) !== (typeof _aurixCurrentRevision === 'function' ? _aurixCurrentRevision() : 0));
+      const out = {
+        build: (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null,
+        userId: (typeof _aurixCurrentUserId === 'function') ? _aurixCurrentUserId() : null,
+        lifecycleId: (typeof _aurixLifecycleId === 'function') ? _aurixLifecycleId() : null,
+        portfolioRevision: meta.version || 0,
+        range: r,
+        hasRemotePerformanceState: !!psRow,
+        performanceSource: g.performanceSource || (authed ? 'pending' : 'local'),
+        performanceHash: psRow ? psRow.performanceHash : null,
+        chartSeriesHash: psRow ? psRow.chartSeriesHash : null,
+        displayedReturnPct: g.valid ? g.deltaPct : null,
+        displayedReturnValue: g.valid ? g.deltaAbs : null,
+        displayedColor: g.valid ? (g.displayedColor || (g.deltaPct > 0.005 ? 'green' : (g.deltaPct < -0.005 ? 'red' : 'neutral'))) : 'pending',
+        returnState: g.returnState || null,
+        isStale: isStale,
+        blockReason: g.valid ? null : (g.invalidReason || g.blockReason || null),
+        renderedFromRemote: renderedFromRemote,
+      };
+      try { console.log('%c[AURIX PERFORMANCE-STATE DEBUG]', 'font-weight:700', out); } catch (_) {}
       return out;
     };
   }

@@ -87,7 +87,7 @@ ok('14 window.aurixReturnDebug() exposes the required fields',
 console.log('\nNo touch to return math / sync / renderer:');
 ok('15 _aurixRangeReturn math unchanged (same deltaPct formula); getValidReturnBaseline is additive',
    /out\.deltaPct   = \(Number\.isFinite\(first\) && first > 0 && Number\.isFinite\(last\)\) \? \+\(\(\(last - first\) \/ first\) \* 100\)/.test(app) &&
-   /function getValidReturnBaseline\(range\)/.test(app));
+   /function getValidReturnBaseline\(range, opts\)/.test(app));
 ok('16 chart geometry / renderer / sync untouched', /function renderAurixInstitutionalChart\(/.test(app) && /function _aurixMergePortfolio\(/.test(app) && /const _AURIX_BLOCK_DESTRUCTIVE_SAVES = true;/.test(app));
 
 console.log('\nRESULT: '+(fail===0?'ALL PASS ✓':'FAIL ✗')+'  ('+pass+' passed, '+fail+' failed)');
