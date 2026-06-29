@@ -30,7 +30,7 @@ function makeEnv(){
   sb._aurixPortfolioEpoch = () => 0;
   vm.createContext(sb);
   vm.runInContext('var currentUser = null; var _aurixCanonicalHistoryLoaded = false; var _aurixLocalCanonicalHash = null; var _aurixRemoteCanonicalHash = null; var _aurixCanonicalCatHistory = [];', sb);
-  vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS=90*1000; const _AURIX_RETURN_FLOW_DOMINANCE=0.5; const _AURIX_RETURN_ESTABLISHED_FRAC=0.80; const _AURIX_RETURN_STABLE_STEP=0.40; const _AURIX_CANONICAL_TAIL_MS=120000;', sb);
+  vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS=90*1000; const _AURIX_RETURN_FLOW_DOMINANCE=0.5; const _AURIX_RETURN_ESTABLISHED_FRAC=0.80; const _AURIX_RETURN_STABLE_STEP=0.40; const _AURIX_RETURN_COMPARABLE_RATIO={"24h":1.5,"7d":2.0,"30d":3.0,"1y":5.0,"all":8.0}; const _AURIX_CANONICAL_TAIL_MS=120000;', sb);
   vm.runInContext(fnSrc('_aurixCanonicalHistoryReady'), sb);
   vm.runInContext(fnSrc('canDisplayCanonicalReturn'), sb);
   vm.runInContext(fnSrc('_aurixPortfolioCreatedAt'), sb);

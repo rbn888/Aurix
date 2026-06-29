@@ -27,7 +27,7 @@ function makeEnv(){
   sb._aurixResetAt = () => sb._resetAt;
   sb.totalValueBase = () => sb._total;
   vm.createContext(sb);
-  vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS = 90 * 1000; const _AURIX_RETURN_FLOW_DOMINANCE = 0.5;', sb);
+  vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS = 90 * 1000; const _AURIX_RETURN_FLOW_DOMINANCE = 0.5; const _AURIX_RETURN_COMPARABLE_RATIO = {"24h":1.5,"7d":2.0,"30d":3.0,"1y":5.0,"all":8.0};', sb);
   vm.runInContext(fnSrc('_aurixPortfolioCreatedAt'), sb);
   vm.runInContext(fnSrc('getValidReturnBaseline'), sb);
   return sb;

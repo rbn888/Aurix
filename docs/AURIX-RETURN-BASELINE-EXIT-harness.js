@@ -28,7 +28,7 @@ function makeEnv(){
   sb._aurixEligibleInvestableSeries = () => ({ series: sb._series, meta:{} });
   sb._aurixLoadCapitalFlows = () => sb._flows;
   vm.createContext(sb);
-  vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS = 90*1000; const _AURIX_RETURN_FLOW_DOMINANCE = 0.5; const _AURIX_RETURN_ESTABLISHED_FRAC = 0.80; const _AURIX_RETURN_STABLE_STEP = 0.40;', sb);
+  vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS = 90*1000; const _AURIX_RETURN_FLOW_DOMINANCE = 0.5; const _AURIX_RETURN_ESTABLISHED_FRAC = 0.80; const _AURIX_RETURN_STABLE_STEP = 0.40; const _AURIX_RETURN_COMPARABLE_RATIO = {"24h":1.5,"7d":2.0,"30d":3.0,"1y":5.0,"all":8.0};', sb);
   vm.runInContext(fnSrc('_aurixPortfolioCreatedAt'), sb);
   vm.runInContext(fnSrc('_aurixReturnSnapshotStats'), sb);
   vm.runInContext(fnSrc('_aurixPostConstructionBaseline'), sb);

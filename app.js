@@ -21408,6 +21408,12 @@ const _AURIX_RETURN_MIN_HISTORY_MS = 90 * 1000;       // ≥90 s of real elapsed
 const _AURIX_RETURN_FLOW_DOMINANCE = 0.5;             // window flows ≥50% of value ⇒ baseline = capital construction, not return
 const _AURIX_RETURN_ESTABLISHED_FRAC = 0.80;          // a snapshot ≥80% of current value = construction essentially complete (established regime)
 const _AURIX_RETURN_STABLE_STEP = 0.40;               // consecutive post-anchor change >40% ⇒ unrecorded jump (possible hidden flow) — not "stable"
+// P0-PERFORMANCE-STATE-CALCULATION-FIX — a baseline is ECONOMICALLY COMPARABLE only if its (flow-neutral)
+// value sits in the same capital regime as the current value. The max plausible MARKET ratio of baseline↔
+// current per range (a larger ratio ⇒ the baseline belongs to a different capital regime: construction /
+// onboarding / large inflow / import / restructuring ⇒ NOT market performance ⇒ pending_baseline). Recorded
+// flows are already neutralised (so they don't trip this); this catches UNRECORDED capital regime shifts.
+const _AURIX_RETURN_COMPARABLE_RATIO = { '24h': 1.5, '7d': 2.0, '30d': 3.0, '1y': 5.0, 'all': 8.0 };
 function _aurixPortfolioCreatedAt() {
   // Oldest post-epoch baseline ≈ when this (post-reset) portfolio began. Best-effort, read-only.
   try { const a = _aurixRangeReturn('all'); return a && a.baselineTs ? a.baselineTs : 0; } catch (_) { return 0; }
@@ -21442,11 +21448,17 @@ function _aurixPostConstructionBaseline(range, currentValue, lifecycleStart) {
     const snaps = (elig && Array.isArray(elig.series)) ? elig.series : [];
     if (snaps.length < 2) { out.reason = 'insufficient_snapshots'; return out; }
     const ls = Number.isFinite(lifecycleStart) ? lifecycleStart : 0;
-    // Establishment anchor = first snapshot at/after the lifecycle start whose value has reached the
-    // established regime (≥80% of current). Construction (incremental onboarding adds) precedes it.
+    // Establishment anchor = first snapshot at/after the lifecycle start whose value is in the COMPARABLE
+    // regime of the current value — i.e. within [0.80×, 1.25×]. P0-PERFORMANCE-STATE-CALCULATION-FIX: the
+    // old test (value ≥ 0.80×current, NO upper bound) wrongly picked a CONSTRUCTION PEAK for a portfolio that
+    // SHRANK (e.g. value 5503 when current is 1960: 5503 ≥ 0.8×1960 ⇒ selected) → it measured the decline
+    // from the peak (capital regime) as "market return" (−64%). A comparable baseline must sit near the
+    // current capital regime; a value 2.8× current belongs to a different (construction/inflow) regime.
+    const ESTAB_LO = _AURIX_RETURN_ESTABLISHED_FRAC * currentValue;          // 0.80×
+    const ESTAB_HI = currentValue / _AURIX_RETURN_ESTABLISHED_FRAC;          // 1.25×
     let k = -1;
     for (let i = 0; i < snaps.length; i++) {
-      if (snaps[i].ts >= ls && snaps[i].value >= _AURIX_RETURN_ESTABLISHED_FRAC * currentValue) { k = i; break; }
+      if (snaps[i].ts >= ls && snaps[i].value >= ESTAB_LO && snaps[i].value <= ESTAB_HI) { k = i; break; }
     }
     if (k < 0) { out.reason = 'not_established_yet'; return out; }
     const anchor = snaps[k];
@@ -21491,6 +21503,13 @@ function getValidReturnBaseline(range, opts) {
   const lastTs = ret ? ret.lastTs : null;
   const windowMs = (Number.isFinite(baselineTs) && Number.isFinite(lastTs)) ? (lastTs - baselineTs) : 0;
   const netFlows = ret ? Math.abs(Number(ret.netFlowsNeutralized) || 0) : 0;
+  // P0-PERFORMANCE-STATE-CALCULATION-FIX — baseline ECONOMIC COMPARABILITY. The (flow-neutral) baseline value
+  // must sit in the same capital regime as the current value, else it belongs to construction / onboarding /
+  // a large inflow / an import / restructuring (an UNRECORDED capital shift that flow-neutralisation missed)
+  // and the "return" would be capital movement, not market performance. Range-aware max plausible market ratio.
+  const _cmpMax = _AURIX_RETURN_COMPARABLE_RATIO[r] || 3.0;
+  const _baselineRatio = (baselineValue > 0 && Number.isFinite(currentValue) && currentValue > 0) ? Math.max(baselineValue / currentValue, currentValue / baselineValue) : null;
+  const _baselineComparable = (_baselineRatio != null) ? (_baselineRatio <= _cmpMax) : false;
   let invalidReason = null;
   // P0-HISTORY-PARITY-EMERGENCY-GATE — the SINGLE strict authority. Never render a real return unless the
   // displayed history is the CONFIRMED remote canonical with no divergent local-only state (else web/mobile
@@ -21501,6 +21520,7 @@ function getValidReturnBaseline(range, opts) {
   else if (!(Number.isFinite(currentValue) && currentValue > 0)) invalidReason = 'no_current_value';
   else if (Number.isFinite(baselineTs) && baselineTs < lastResetAt) invalidReason = 'pre_reset';
   else if (windowMs < _AURIX_RETURN_MIN_HISTORY_MS) invalidReason = 'insufficient_history';
+  else if (!_baselineComparable) invalidReason = 'baseline_not_comparable';   // construction/inflow/import regime ⇒ pending
   else if (netFlows >= _AURIX_RETURN_FLOW_DOMINANCE * currentValue) invalidReason = 'flows_dominate_baseline';
   // RETURN-BASELINE-EXIT — flows_dominate is a one-time onboarding/reset construction artifact. If the
   // portfolio is now ESTABLISHED (≥2 stable comparable snapshots after construction, ≥min-history span,
@@ -21512,6 +21532,9 @@ function getValidReturnBaseline(range, opts) {
     postConstruction = _aurixPostConstructionBaseline(r, currentValue, Math.max(lastResetAt || 0, createdAt || 0));
     if (postConstruction && postConstruction.ok) invalidReason = null;
   }
+  // P0-PERFORMANCE-STATE-CALCULATION-FIX — re-assert comparability AFTER the post-construction escape, so
+  // clearing flows_dominate can never re-admit a non-comparable (construction/inflow) baseline.
+  if (!invalidReason && !_baselineComparable) invalidReason = 'baseline_not_comparable';
   const valid = !invalidReason;
   // Fase-1 diagnostics — additive, PURE READ (guarded; never throws in the unit sandbox).
   const stats = (typeof _aurixReturnSnapshotStats === 'function') ? _aurixReturnSnapshotStats(r) : { snapshotCount: 0, validSnapshotCount: 0, firstValidTs: null };
@@ -21811,6 +21834,59 @@ function _aurixCanonicalPerformance(range) {
     chartSeries: chartSeries, chartSeriesHash: chartSeriesHash, lastSnapshotTs: ret ? ret.lastTs : null,
   };
 }
+// P0-PERFORMANCE-STATE-CALCULATION-FIX — full baseline/calculation diagnosis for aurixPerformanceStateDebug.
+// Answers: which snapshot became the baseline, is it economically comparable, is it a construction snapshot,
+// is it capital-flow dominated, what the raw vs final (gated) return is, and which candidates were rejected.
+function _aurixBaselineDiagnosis(range) {
+  const r = range || (typeof activeRange !== 'undefined' ? activeRange : '24h');
+  const out = { inputSeriesCount: 0, inputSeriesFirstSnapshot: null, inputSeriesLastSnapshot: null,
+    candidateBaselines: [], rejectedBaselineCandidates: [], selectedBaselineSnapshotId: null, selectedBaselineTimestamp: null,
+    selectedBaselineValue: null, selectedBaselineReason: null, currentCanonicalValue: null, netCapitalFlows: 0,
+    marketReturnOnlyValue: null, flowAdjustedValue: null, calculationFormula: '(lastFlowNeutral - baselineFlowNeutral) / baselineFlowNeutral',
+    rawReturnPct: null, rawReturnValue: null, finalReturnPct: null, finalReturnValue: null,
+    baselineRejectedReason: null, baselineAcceptedReason: null, baselineComparable: null, baselineDominatedByCapitalFlow: null,
+    baselineConstructionSnapshot: null, baselinePortfolioAge: null, baselineMarketComparable: null };
+  try {
+    const elig = (typeof _aurixEligibleInvestableSeries === 'function') ? _aurixEligibleInvestableSeries(r) : null;
+    const snaps = (elig && Array.isArray(elig.series)) ? elig.series : [];
+    out.inputSeriesCount = snaps.length;
+    if (snaps.length) { out.inputSeriesFirstSnapshot = { ts: snaps[0].ts, value: snaps[0].value }; out.inputSeriesLastSnapshot = { ts: snaps[snaps.length - 1].ts, value: snaps[snaps.length - 1].value }; }
+    let cur = null; try { cur = (typeof totalValueBase === 'function') ? totalValueBase() : null; } catch (_) {}
+    out.currentCanonicalValue = cur;
+    const ret = (typeof _aurixRangeReturn === 'function') ? _aurixRangeReturn(r) : null;
+    out.selectedBaselineSnapshotId = ret ? ret.baselineTs : null;
+    out.selectedBaselineTimestamp = (ret && Number.isFinite(ret.baselineTs)) ? new Date(ret.baselineTs).toISOString() : null;
+    out.selectedBaselineValue = ret ? ret.startValue : null;
+    out.flowAdjustedValue = ret ? ret.startValue : null;
+    out.netCapitalFlows = ret ? +((Number(ret.netFlowsNeutralized) || 0)).toFixed(2) : 0;
+    out.rawReturnPct = ret ? ret.deltaPct : null; out.rawReturnValue = ret ? ret.deltaAbs : null;
+    const cmpMax = (typeof _AURIX_RETURN_COMPARABLE_RATIO !== 'undefined' && _AURIX_RETURN_COMPARABLE_RATIO[r]) ? _AURIX_RETURN_COMPARABLE_RATIO[r] : 3.0;
+    const ratio = (out.selectedBaselineValue > 0 && Number.isFinite(cur) && cur > 0) ? Math.max(out.selectedBaselineValue / cur, cur / out.selectedBaselineValue) : null;
+    out.baselineComparable = (ratio != null) ? (ratio <= cmpMax) : false;
+    out.baselineMarketComparable = out.baselineComparable;
+    out.baselineDominatedByCapitalFlow = (ret && Number.isFinite(cur) && cur > 0) ? (Math.abs(Number(ret.netFlowsNeutralized) || 0) >= _AURIX_RETURN_FLOW_DOMINANCE * cur) : null;
+    const epoch = (typeof _aurixPortfolioEpoch === 'function') ? (_aurixPortfolioEpoch() || 0) : 0;
+    const reset = (typeof _aurixResetAt === 'function') ? (_aurixResetAt() || 0) : 0;
+    const createdAt = (typeof _aurixPortfolioCreatedAt === 'function') ? (_aurixPortfolioCreatedAt() || 0) : 0;
+    const ls = Math.max(epoch, reset, createdAt || 0);
+    out.baselinePortfolioAge = (ret && Number.isFinite(ret.baselineTs)) ? (Date.now() - ret.baselineTs) : null;
+    out.baselineConstructionSnapshot = (ret && Number.isFinite(ret.baselineTs) && ls) ? (ret.baselineTs <= ls + 5 * 60000) : null;
+    snaps.forEach(s => {
+      const rr = (s.value > 0 && Number.isFinite(cur) && cur > 0) ? Math.max(s.value / cur, cur / s.value) : null;
+      const comp = (rr != null) && (rr <= cmpMax);
+      const entry = { ts: s.ts, value: +(+s.value).toFixed(2), ratioVsCurrent: rr != null ? +rr.toFixed(2) : null, comparable: comp };
+      out.candidateBaselines.push(entry);
+      if (!comp) out.rejectedBaselineCandidates.push(Object.assign({ reason: 'not_comparable_capital_regime' }, entry));
+    });
+    const g = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(r, { raw: true }) : {};
+    out.finalReturnPct = g.valid ? g.deltaPct : null; out.finalReturnValue = g.valid ? g.deltaAbs : null;
+    out.marketReturnOnlyValue = g.valid ? g.deltaAbs : null;
+    out.selectedBaselineReason = g.valid ? 'accepted' : (g.invalidReason || 'pending_baseline');
+    out.baselineAcceptedReason = g.valid ? 'comparable_established_baseline' : null;
+    out.baselineRejectedReason = g.valid ? null : (g.invalidReason || null);
+  } catch (_) {}
+  return out;
+}
 try {
   if (typeof window !== 'undefined') {
     // P0-CANONICAL-PERFORMANCE-ENGINE — verifiable parity surface. Compare performanceHash + chartSeriesHash
@@ -21915,6 +21991,9 @@ try {
         consumerPathUsed: renderedFromRemote ? 'remote_performance_state' : (authed ? 'pending_kill_switch' : 'local_anonymous'),
         finalDisplayState: g.valid ? 'showing_return' : 'calculando',
       };
+      // P0-PERFORMANCE-STATE-CALCULATION-FIX — merge the full baseline/calculation diagnosis (the candidate
+      // generation pipeline, before performance_state is produced).
+      try { if (typeof _aurixBaselineDiagnosis === 'function') Object.assign(out, _aurixBaselineDiagnosis(r)); } catch (_) {}
       try { console.log('%c[AURIX PERFORMANCE-STATE DEBUG]', 'font-weight:700', out); } catch (_) {}
       return out;
     };
