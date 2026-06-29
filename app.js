@@ -800,6 +800,59 @@ function _aurixCanonicalHistoryReady() {
       && _aurixLocalCanonicalHash != null
       && _aurixLocalCanonicalHash === _aurixRemoteCanonicalHash;
 }
+// P0-HISTORY-PARITY-EMERGENCY-GATE — THE single authority every return/color/line consumer must pass before
+// painting a REAL return. It is deliberately strict: better "Calculando…" than a number that disagrees with
+// the other device. For an authenticated user it demands the displayed history be the CONFIRMED remote
+// canonical AND that this device carry no divergent local-only state. Anonymous = single device ⇒ allowed
+// (no cross-device divergence is possible). PURE READ.
+function canDisplayCanonicalReturn(range) {
+  const r = range || (typeof activeRange !== 'undefined' ? activeRange : '30d');
+  const out = {
+    ok: false, reason: null, authed: false,
+    baselineSource: 'local', chartSource: 'local', returnSource: 'local',
+    remoteHistoryHash: (typeof _aurixRemoteCanonicalHash !== 'undefined') ? _aurixRemoteCanonicalHash : null,
+    appliedHistoryHash: (typeof _aurixLocalCanonicalHash !== 'undefined') ? _aurixLocalCanonicalHash : null,
+    baselineSnapshotId: null, chartReady: false, pendingLocalOnlyCount: 0, historyMismatch: false,
+  };
+  try {
+    const authed = !!(typeof currentUser !== 'undefined' && currentUser && currentUser.id);
+    out.authed = authed;
+    out.historyMismatch = (typeof _aurixPendingSync === 'function') ? !!_aurixPendingSync() : false;
+    // settled local points (cache) NOT in the remote canonical store ⇒ this device is diverging from remote.
+    try {
+      const ep  = (typeof _aurixPortfolioEpoch === 'function') ? (_aurixPortfolioEpoch() || 0) : 0;
+      const cut = ((typeof Date !== 'undefined') ? Date.now() : 0) - _AURIX_CANONICAL_TAIL_MS;
+      const canonTs = new Set((Array.isArray(_aurixCanonicalCatHistory) ? _aurixCanonicalCatHistory : []).map(p => p && p.ts));
+      const cache = (typeof categoryHistory !== 'undefined' && Array.isArray(categoryHistory)) ? categoryHistory : [];
+      let pend = 0;
+      for (const p of cache) { if (p && Number.isFinite(p.ts) && (!ep || p.ts >= ep) && p.ts <= cut && !canonTs.has(p.ts)) pend++; }
+      out.pendingLocalOnlyCount = pend;
+    } catch (_) {}
+    const ret = (typeof _aurixRangeReturn === 'function') ? _aurixRangeReturn(r) : null;
+    out.baselineSnapshotId = (ret && Number.isFinite(ret.baselineTs)) ? ret.baselineTs : null;
+    out.chartReady = Array.isArray(_aurixCanonicalCatHistory) && _aurixCanonicalCatHistory.length >= 2;
+
+    // Anonymous / not signed in: local IS canonical (single device, no parity concern).
+    if (!authed) { out.ok = true; out.reason = 'anonymous_local_canonical'; return out; }
+
+    const loaded      = (typeof _aurixCanonicalHistoryLoaded !== 'undefined') && _aurixCanonicalHistoryLoaded === true;
+    const storeOk     = Array.isArray(_aurixCanonicalCatHistory);
+    const sourceLabel = (loaded && storeOk) ? 'remote' : 'pending';
+    out.baselineSource = out.chartSource = out.returnSource = sourceLabel;
+
+    if (!loaded)                                              out.reason = 'remote_not_loaded';
+    else if (!storeOk)                                        out.reason = 'no_remote_store';
+    else if (out.remoteHistoryHash == null)                  out.reason = 'no_remote_hash';
+    else if (out.appliedHistoryHash == null)                 out.reason = 'no_applied_hash';
+    else if (out.appliedHistoryHash !== out.remoteHistoryHash) out.reason = 'applied_neq_remote';
+    else if (out.baselineSnapshotId == null)                 out.reason = 'no_baseline';
+    else if (!out.chartReady)                                out.reason = 'no_chart';
+    else if (out.pendingLocalOnlyCount > 0)                  out.reason = 'pending_local_only';
+    else if (out.historyMismatch)                            out.reason = 'history_mismatch_local_ahead';
+    else { out.ok = true; out.reason = 'remote_confirmed'; }
+  } catch (e) { out.reason = 'error'; }
+  return out;
+}
 // Reconcile remote state into local memory + localStorage at boot. Called
 // from initPortfolioData with the row from loadPortfolioFromBackend.
 function _mergeRemoteState(remoteRow) {
@@ -1020,18 +1073,12 @@ async function _flushStatePersistence(reason) {
       if (IS_DEV) console.warn('[STATE] ui_state/subscription columns not present yet — saved core only (' + (error.message || '') + ')');
     }
     if (IS_DEV) console.log('[STATE] flush ok (' + reason + ') hist=' + portfolioHistory.length + ' cat=' + categoryHistory.length);
-    // P0-HISTORY-AUTHORITY-HARD-LOCK — the push SUCCEEDED, so remote now == local categoryHistory. Promote
-    // the local cache to the canonical display store (remote-confirmed) so THIS device can show its own
-    // just-pushed points without waiting to re-pull. The other device adopts them on its next reconcile.
-    // appliedHash := remoteHash (both = this freshly-confirmed series) so the strict gate stays satisfied.
-    try {
-      if (typeof currentUser !== 'undefined' && currentUser && currentUser.id && typeof _mergeCategoryByTs === 'function') {
-        _aurixCanonicalCatHistory = _mergeCategoryByTs([], categoryHistory);
-        _aurixCanonicalHistoryLoaded = true;
-        _aurixRemoteCanonicalHash = _aurixCanonicalBodyHash(_aurixCanonicalCatHistory);
-        _aurixLocalCanonicalHash  = _aurixRemoteCanonicalHash;
-      }
-    } catch (_) {}
+    // P0-HISTORY-PARITY-EMERGENCY-GATE — do NOT promote the local cache to the canonical display store on a
+    // flush. The earlier promotion re-granted LOCAL authority (display read the local union incl. local-only
+    // points) and made appliedHash===remoteHash a per-device tautology → web/mobile each showed their own
+    // union (−65% vs +4.9%). The canonical display store is set ONLY from the remote row (in _mergeRemoteState).
+    // The just-flushed points become canonical when this device next reconciles them back FROM remote; until
+    // then they are pending-local-only and the strict gate keeps the device in "Calculando…" (never divergent).
   } catch (e) {
     if (IS_DEV) console.warn('[STATE] flush failed (' + reason + ')', e && e.message);
   }
@@ -21250,10 +21297,11 @@ function getValidReturnBaseline(range) {
   const windowMs = (Number.isFinite(baselineTs) && Number.isFinite(lastTs)) ? (lastTs - baselineTs) : 0;
   const netFlows = ret ? Math.abs(Number(ret.netFlowsNeutralized) || 0) : 0;
   let invalidReason = null;
-  // P0-HISTORY-SYNC-AUTHORITY — never render a real return from a LOCAL-ONLY series before the shared
-  // canonical remote history has been reconciled (else web/mobile diverge). Authenticated + not-yet-
-  // reconciled (or remote unavailable) ⇒ stay "Calculando…". Anonymous/offline-anon = local canonical.
-  if (typeof _aurixCanonicalHistoryReady === 'function' && !_aurixCanonicalHistoryReady()) invalidReason = 'awaiting_canonical_history';
+  // P0-HISTORY-PARITY-EMERGENCY-GATE — the SINGLE strict authority. Never render a real return unless the
+  // displayed history is the CONFIRMED remote canonical with no divergent local-only state (else web/mobile
+  // diverge). Any block ⇒ "Calculando…", neutral line, no red/green. Anonymous = local canonical (allowed).
+  const _disp = (typeof canDisplayCanonicalReturn === 'function') ? canDisplayCanonicalReturn(r) : { ok: true, reason: 'helper_absent' };
+  if (!_disp.ok) invalidReason = 'awaiting_canonical_history';
   else if (!ret || !ret.valid || !Number.isFinite(ret.deltaPct) || !(baselineValue > 0)) invalidReason = 'no_valid_baseline';
   else if (!(Number.isFinite(currentValue) && currentValue > 0)) invalidReason = 'no_current_value';
   else if (Number.isFinite(baselineTs) && baselineTs < lastResetAt) invalidReason = 'pre_reset';
@@ -21285,6 +21333,10 @@ function getValidReturnBaseline(range) {
     timeSinceFirstValidSnapshot: timeSinceFirstValidSnapshot, minHistoryMs: _AURIX_RETURN_MIN_HISTORY_MS,
     flowDominanceRatio: flowDominanceRatio, postConstruction: postConstruction,
     exitBlockedBy: valid ? null : invalidReason,
+    // P0-HISTORY-PARITY-EMERGENCY-GATE — the strict display authority verdict (why a real return is/ isn't shown).
+    canDisplay: _disp.ok, blockReason: _disp.ok ? null : _disp.reason,
+    baselineSource: _disp.baselineSource, chartSource: _disp.chartSource, returnSource: _disp.returnSource,
+    pendingLocalOnlyCount: _disp.pendingLocalOnlyCount,
   };
 }
 // RETURN-PENDING-FINAL — the premium "Calculando…" state. Whenever the baseline is not yet valid
@@ -21412,10 +21464,9 @@ try {
       // journal revision to compare. journalRevision = local event count (device-relative by design).
       let journalRevision = null;
       try { journalRevision = (typeof _aurixJournalRead === 'function') ? _aurixJournalRead().length : null; } catch (_) {}
-      // ── P0-HISTORY-AUTHORITY-HARD-LOCK — authority sources + hashes (item 9) ──
-      const _authedU = (typeof currentUser !== 'undefined' && currentUser && currentUser.id);
-      const _ready = (typeof _aurixCanonicalHistoryReady === 'function') ? _aurixCanonicalHistoryReady() : true;
-      const _srcLabel = !_authedU ? 'local' : (_ready ? 'remote' : 'pending');
+      // ── P0-HISTORY-PARITY-EMERGENCY-GATE — the strict display verdict (item 9) ──
+      const _disp = (typeof canDisplayCanonicalReturn === 'function') ? canDisplayCanonicalReturn(r) : { ok: true, reason: 'helper_absent', baselineSource: 'local', chartSource: 'local', returnSource: 'local' };
+      const _srcLabel = _disp.returnSource;
       let appliedHistoryHash = null, localCacheHash = null, pendingLocalOnly = 0;
       try { appliedHistoryHash = (typeof _aurixCanonicalBodyHash === 'function') ? _aurixCanonicalBodyHash(_aurixHistorySourceForDisplay()) : null; } catch (_) {}
       try { localCacheHash = (typeof _aurixCanonicalBodyHash === 'function') ? _aurixCanonicalBodyHash(typeof categoryHistory !== 'undefined' ? categoryHistory : []) : null; } catch (_) {}
@@ -21429,6 +21480,8 @@ try {
       } catch (_) {}
       const out = {
         build: (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null,
+        canDisplayCanonicalReturn: _disp.ok,
+        blockReason: _disp.ok ? null : _disp.reason,
         userId:            (typeof _aurixActiveUserId !== 'undefined' && _aurixActiveUserId) ? _aurixActiveUserId : ((typeof currentUser !== 'undefined' && currentUser) ? currentUser.id : null),
         deviceId:          (typeof _aurixDeviceId === 'function') ? _aurixDeviceId() : null,
         portfolioRevision: meta.version || 0,
@@ -23960,8 +24013,12 @@ function renderAurixMobileLiteChart(range, token) {
     // source as the desktop tone + the %/€ indicator), NOT by lastDeltaPct (≈0 vs dashboard →
     // it stayed green even on a negative range). Read-only (consumes the existing sign). Web
     // hexes for true parity: up #2ebd85 / down #e25563 / neutral #9fb0c7.
-    const _rr = (typeof _aurixRangeReturn === 'function') ? _aurixRangeReturn(r) : null;
-    const _rpct = (_rr && Number.isFinite(_rr.deltaPct)) ? _rr.deltaPct : null;
+    // P0-HISTORY-PARITY-EMERGENCY-GATE — colour from the GATED canonical return (getValidReturnBaseline),
+    // NOT _aurixRangeReturn directly. When the strict display gate isn't satisfied the line stays NEUTRAL
+    // (no red/green) — never a divergent green/red vs the other device. This is the same source the mobile
+    // %/€ indicator + desktop badge use, so the curve colour can never disagree with them.
+    const _gret = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(r) : null;
+    const _rpct = (_gret && _gret.valid && Number.isFinite(_gret.deltaPct)) ? _gret.deltaPct : null;
     const tone = (_rpct == null) ? 'flat' : (_rpct > 0.005 ? 'up' : (_rpct < -0.005 ? 'down' : 'flat'));
     const up = tone !== 'down';
     const stroke = tone === 'down' ? '#e25563' : (tone === 'flat' ? '#9fb0c7' : '#2ebd85');

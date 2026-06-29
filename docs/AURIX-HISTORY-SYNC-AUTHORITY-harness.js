@@ -26,10 +26,13 @@ function makeEnv(){
   sb.totalValueBase = () => sb._total;
   sb._aurixEligibleInvestableSeries = () => ({ series:[{ts:NOW-10*DAY,value:4000},{ts:NOW,value:4120}], meta:{anchor:4120,reasons:{}} });
   sb._aurixLoadCapitalFlows = () => [];
+  sb._aurixPendingSync = () => false;
+  sb._aurixPortfolioEpoch = () => 0;
   vm.createContext(sb);
   vm.runInContext('var currentUser = null; var _aurixCanonicalHistoryLoaded = false; var _aurixLocalCanonicalHash = null; var _aurixRemoteCanonicalHash = null; var _aurixCanonicalCatHistory = [];', sb);
-  vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS=90*1000; const _AURIX_RETURN_FLOW_DOMINANCE=0.5; const _AURIX_RETURN_ESTABLISHED_FRAC=0.80; const _AURIX_RETURN_STABLE_STEP=0.40;', sb);
+  vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS=90*1000; const _AURIX_RETURN_FLOW_DOMINANCE=0.5; const _AURIX_RETURN_ESTABLISHED_FRAC=0.80; const _AURIX_RETURN_STABLE_STEP=0.40; const _AURIX_CANONICAL_TAIL_MS=120000;', sb);
   vm.runInContext(fnSrc('_aurixCanonicalHistoryReady'), sb);
+  vm.runInContext(fnSrc('canDisplayCanonicalReturn'), sb);
   vm.runInContext(fnSrc('_aurixPortfolioCreatedAt'), sb);
   vm.runInContext(fnSrc('_aurixReturnSnapshotStats'), sb);
   vm.runInContext(fnSrc('_aurixPostConstructionBaseline'), sb);
@@ -64,9 +67,9 @@ console.log('\nThe gate — return stays "Calculando…" until canonical history
   const g=G(sb);
   ok('5c authed + hash MISMATCH → still awaiting_canonical_history (no return until converged)',
      g.valid===false && g.invalidReason==='awaiting_canonical_history'); }
-{ const sb=makeEnv(); vm.runInContext('currentUser={id:"u1"}; _aurixCanonicalHistoryLoaded=true; _aurixLocalCanonicalHash="h"; _aurixRemoteCanonicalHash="h";', sb);
+{ const sb=makeEnv(); vm.runInContext('currentUser={id:"u1"}; _aurixCanonicalHistoryLoaded=true; _aurixLocalCanonicalHash="h"; _aurixRemoteCanonicalHash="h"; _aurixCanonicalCatHistory=[{ts:1,total:100},{ts:2,total:110}];', sb);
   const g=G(sb);
-  ok('6 hashes match → real return shows (valid, +3%)', g.valid===true && g.returnState==='ready' && g.deltaPct===3.0); }
+  ok('6 confirmed remote (loaded + store present + applied===remote, no pending) → real return shows (+3%)', g.valid===true && g.returnState==='ready' && g.deltaPct===3.0); }
 { const sb=makeEnv();   // anonymous proceeds straight to the normal canonical evaluation
   const g=G(sb);
   ok('7 anonymous → not gated by authority (valid from local canonical)', g.valid===true && g.deltaPct===3.0); }

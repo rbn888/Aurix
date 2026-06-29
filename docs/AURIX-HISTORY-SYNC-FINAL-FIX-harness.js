@@ -69,8 +69,8 @@ ok('10 local-only settled points (cache ahead of remote) are pushed via the EXIS
 console.log('\nReadiness gate — authed needs remote loaded + store present + applied===remote (hard lock):');
 ok('11 _aurixCanonicalHistoryReady requires loaded + canonical store present + applied hash === remote hash',
    /_aurixCanonicalHistoryLoaded === true\s*&& Array\.isArray\(_aurixCanonicalCatHistory\)\s*&& _aurixLocalCanonicalHash != null\s*&& _aurixLocalCanonicalHash === _aurixRemoteCanonicalHash/.test(fnSrc('_aurixCanonicalHistoryReady')));
-ok('12 getValidReturnBaseline still gates first on canonical readiness (awaiting_canonical_history)',
-   /if \(typeof _aurixCanonicalHistoryReady === 'function' && !_aurixCanonicalHistoryReady\(\)\) invalidReason = 'awaiting_canonical_history';/.test(app));
+ok('12 getValidReturnBaseline still gates first on the strict display authority (awaiting_canonical_history)',
+   /if \(!_disp\.ok\) invalidReason = 'awaiting_canonical_history';/.test(app));
 
 console.log('\nDiagnosis — before/after proof via window.aurixHistoryDebug():');
 ok('13 debug exposes localCanonicalHash / remoteCanonicalHash / historyHashMatch',

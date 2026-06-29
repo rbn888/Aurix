@@ -69,19 +69,21 @@ ok('7 display source = remote canonical for authed, local for anon (never local-
 console.log('\nMerge sets the store FROM remote; confirmed flush promotes local→canonical (own pushed points):');
 ok('8 _mergeRemoteState sets _aurixCanonicalCatHistory from the remote row (authority)',
    /_aurixCanonicalCatHistory = _mergeCategoryByTs\(\[\], remoteCat\);/.test(fnSrc('_mergeRemoteState')));
-ok('9 a confirmed flush promotes local categoryHistory to the canonical store (remote now == local)',
-   /_aurixCanonicalCatHistory = _mergeCategoryByTs\(\[\], categoryHistory\);[\s\S]*?_aurixRemoteCanonicalHash = _aurixCanonicalBodyHash\(_aurixCanonicalCatHistory\);/.test(fnSrc('_flushStatePersistence')));
+ok('9 a confirmed flush does NOT promote local→canonical (no local-union authority; canonical only from remote)',
+   !/_aurixCanonicalCatHistory = _mergeCategoryByTs\(\[\], categoryHistory\);/.test(fnSrc('_flushStatePersistence')));
 
 console.log('\nStrict gate + diagnosis (item 5/9):');
-ok('10 getValidReturnBaseline gates on canonical readiness (awaiting_canonical_history → "Calculando…")',
-   /if \(typeof _aurixCanonicalHistoryReady === 'function' && !_aurixCanonicalHistoryReady\(\)\) invalidReason = 'awaiting_canonical_history';/.test(app));
+ok('10 getValidReturnBaseline gates on canDisplayCanonicalReturn (awaiting_canonical_history → "Calculando…")',
+   /const _disp = \(typeof canDisplayCanonicalReturn === 'function'\) \? canDisplayCanonicalReturn\(r\)[\s\S]*?if \(!_disp\.ok\) invalidReason = 'awaiting_canonical_history';/.test(app));
 ok('11 readiness requires loaded + store present + appliedHash === remoteHash (hard lock)',
    /_aurixCanonicalHistoryLoaded === true\s*&& Array\.isArray\(_aurixCanonicalCatHistory\)\s*&& _aurixLocalCanonicalHash != null\s*&& _aurixLocalCanonicalHash === _aurixRemoteCanonicalHash/.test(fnSrc('_aurixCanonicalHistoryReady')));
 ok('12 aurixHistoryDebug exposes the item-9 authority fields',
    ['build','remoteHistoryLoaded','remoteHistoryHash','appliedHistoryHash','localCacheHash','pendingLocalOnlyCount','quarantinedCount','baselineSource','chartSource','returnSource']
      .every(k => app.indexOf(k + ':') !== -1));
-ok('13 sources labelled remote (authed+ready) / pending (authed+not) / local (anon)',
-   /const _srcLabel = !_authedU \? 'local' : \(_ready \? 'remote' : 'pending'\);/.test(app));
+ok('13 sources come from the strict verdict (remote when authed+confirmed, pending otherwise, local for anon)',
+   /const sourceLabel = \(loaded && storeOk\) \? 'remote' : 'pending';/.test(fnSrc('canDisplayCanonicalReturn')) &&
+   /out\.baselineSource = out\.chartSource = out\.returnSource = sourceLabel;/.test(fnSrc('canDisplayCanonicalReturn')) &&
+   /if \(!authed\) \{ out\.ok = true; out\.reason = 'anonymous_local_canonical';/.test(fnSrc('canDisplayCanonicalReturn')));
 
 console.log('\nNo-touch + corruption still blocked:');
 ok('14 renderer / holdings merge / pricing untouched; corruption guard intact',
