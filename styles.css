@@ -3393,6 +3393,35 @@ body:not(.hero-active) #orb-canvas {
 .chart-change.down { color: var(--red); }
 .chart-change.flat { color: var(--text-muted); }
 
+/* ── RETURN-PENDING-FINAL — premium "Calculando…" baseline-pending state ─────────────
+   Shown (web + mobile, identical markup) whenever the return baseline is not yet valid
+   (new / reset / onboarding / import). Electric-blue text with a subtle 1.5s shimmer
+   sweep — NEVER red/green, no %/$, no flash. Replaces the old dry "—" / false loss.
+   Degrades to static blue text under prefers-reduced-motion. */
+.chart-change.calculating       { color: var(--aurix-blue); font-weight: 700; }
+.perf-hero-money.calculating    { color: var(--aurix-blue); text-shadow: none; }
+.perf-hero-money.calculating .wsc-metric-calc { font-size: 26px; letter-spacing: -.01em; }
+.wsc-metric-calc {
+  color: #4A82F0;                                  /* fallback if background-clip text unsupported */
+  background-image: linear-gradient(100deg, #4A82F0 0%, #4A82F0 38%, #cfe0ff 50%, #4A82F0 62%, #4A82F0 100%);
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: aurixCalcShimmer 1.5s linear infinite;
+  font-variant-numeric: normal;
+  letter-spacing: .005em;
+}
+@keyframes aurixCalcShimmer { 0% { background-position: 120% 0; } 100% { background-position: -120% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .wsc-metric-calc {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: #4A82F0;
+    color: #4A82F0;
+  }
+}
+
 .range-toggle {
   display: flex;
   background: var(--bg-card-2);

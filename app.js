@@ -18133,6 +18133,12 @@ function _dshCountUp(el, from, to, fmt) {
 // shown value (user range/unit change); silent on background refreshes.
 function _dshPaintPerfSnapshot(root, doCountUp) {
   const snap = _dshComputePerfSnapshot(activeRange);
+  // RETURN-PENDING-FINAL — gate the return hero behind a VALID baseline. Same guard the header
+  // consumers use; pending ⇒ premium "Calculando…" (no %/$, no red/green) instead of a false -89%.
+  // The insights blocks (best/worst/contributor/exposure — current 24h asset facts, NOT a baseline
+  // return) and the composition donut keep rendering: they are real regardless of the baseline.
+  const _gret = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(activeRange) : { valid: true };
+  const _pending = !!snap && !_gret.valid;
 
   let infoHtml;
   if (!snap) {
@@ -18140,15 +18146,15 @@ function _dshPaintPerfSnapshot(root, doCountUp) {
   } else {
     const pct  = Number.isFinite(snap.deltaPct) ? snap.deltaPct : 0;
     const abs  = Number.isFinite(snap.deltaAbs) ? snap.deltaAbs : 0;
-    const tone = pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat';
+    const tone = _pending ? 'flat' : (pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat');
     // The %/$ toggle drives the hierarchy: the active unit leads (large), the
     // other sits below (small). % is capped so it never blows up the headline.
     const mode      = activePerfMode === 'curr' ? 'curr' : 'pct';
     const moneyText = _dshFmtMoney0(abs);
     const pctFmt    = _dshFmtPct(pct);
-    const primaryText   = mode === 'curr' ? moneyText  : pctFmt.text;
-    const secondaryText = mode === 'curr' ? pctFmt.text : moneyText;
-    const primaryTitle  = (mode === 'pct' && pctFmt.capped) ? ` title="${pctFmt.raw}"` : '';
+    const primaryText   = _pending ? _aurixReturnPendingHTML() : (mode === 'curr' ? moneyText  : pctFmt.text);
+    const secondaryText = _pending ? '' : (mode === 'curr' ? pctFmt.text : moneyText);
+    const primaryTitle  = (!_pending && mode === 'pct' && pctFmt.capped) ? ` title="${pctFmt.raw}"` : '';
 
     // Insight blocks — the ASSET is the protagonist: NAME → description → value.
     // Only blocks backed by real data are emitted (no faking, no real estate).
@@ -18170,7 +18176,7 @@ function _dshPaintPerfSnapshot(root, doCountUp) {
 
     infoHtml = `
       <div class="perf-hero">
-        <div class="perf-hero-money ${tone}"${primaryTitle}>${primaryText}</div>
+        <div class="perf-hero-money ${_pending ? 'calculating' : tone}"${primaryTitle}>${primaryText}</div>
         <div class="perf-hero-pct ${tone}">${secondaryText}</div>
       </div>
       ${insightsHtml}`;
@@ -18179,8 +18185,9 @@ function _dshPaintPerfSnapshot(root, doCountUp) {
   root.innerHTML = `<div class="perf-info">${infoHtml}</div><div class="perf-compo">${_dshBuildCompoHtml()}</div>`;
 
   // Count-up the primary number (active unit). Skip across a unit switch or a
-  // capped %, where counting is meaningless.
-  if (snap) {
+  // capped %, where counting is meaningless. RETURN-PENDING-FINAL — and skip entirely while
+  // pending, so the count-up never overwrites the "Calculando…" markup with a number.
+  if (snap && !_pending) {
     const el   = root.querySelector('.perf-hero-money');
     const mode = activePerfMode === 'curr' ? 'curr' : 'pct';
     const val  = mode === 'curr'
@@ -21013,9 +21020,14 @@ function _aurixRangeReturn(range) {
 // A brand-new / freshly-synced portfolio must NEVER show a false loss. The flow-neutral return is
 // only meaningful once there's a VALID baseline: real post-reset history, a positive baseline, and
 // a window NOT dominated by the initial capital construction. Otherwise we return a neutral
-// "pending_baseline" state and the header shows "—" (no %, no $, no red/green) — the chart keeps
-// drawing wealth, but the header never invents a loss. Read-only; touches no data/sync/renderer.
-const _AURIX_RETURN_MIN_HISTORY_MS = 5 * 60 * 1000;   // need ≥5 min of real elapsed history
+// "pending_baseline" state and the header shows a premium "Calculando…" (no %, no $, no red/green)
+// — the chart keeps drawing wealth, but the header never invents a loss. Read-only; touches no
+// data/sync/renderer.
+// RETURN-PENDING-FINAL — the min-history floor is the ONLY artificial delay this display gate owns
+// (the real false-loss protection is flow-dominance, below, which is independent of elapsed time).
+// Lowered 5min→90s so a legitimate, flow-neutral portfolio leaves "Calculando…" as soon as it has
+// two genuinely comparable post-reset snapshots — "lo mínimo necesario", never inventing a return.
+const _AURIX_RETURN_MIN_HISTORY_MS = 90 * 1000;       // ≥90 s of real elapsed history (was 5 min)
 const _AURIX_RETURN_FLOW_DOMINANCE = 0.5;             // window flows ≥50% of value ⇒ baseline = capital construction, not return
 function _aurixPortfolioCreatedAt() {
   // Oldest post-epoch baseline ≈ when this (post-reset) portfolio began. Best-effort, read-only.
@@ -21047,6 +21059,14 @@ function getValidReturnBaseline(range) {
     portfolioCreatedAt: createdAt, lastResetAt: lastResetAt, windowMs: windowMs, netFlowsNeutralized: netFlows,
   };
 }
+// RETURN-PENDING-FINAL — the premium "Calculando…" state. Whenever the baseline is not yet valid
+// (new / reset / onboarding / import), every header consumer renders THIS exact markup instead of a
+// dry "—" or a false loss. Identical on web + mobile; the shimmer/glow is CSS-only (.wsc-metric-calc)
+// and degrades to static text under prefers-reduced-motion. No %, no $, no red/green, no flash.
+const _AURIX_RETURN_PENDING_TEXT = 'Calculando…';
+function _aurixReturnPendingHTML() {
+  return '<span class="wsc-metric-val wsc-metric-calc" aria-label="Calculando rendimiento">' + _AURIX_RETURN_PENDING_TEXT + '</span>';
+}
 try {
   if (typeof window !== 'undefined') {
     window.aurixReturnDebug = function (range) {
@@ -21058,7 +21078,9 @@ try {
         lastResetAt: g.lastResetAt ? new Date(g.lastResetAt).toISOString() : null,
         baselineValid: g.valid, invalidReason: g.invalidReason, returnState: g.returnState,
         netFlowsNeutralized: g.netFlowsNeutralized, windowMinutes: Math.round((g.windowMs || 0) / 60000),
-        displayedReturn: g.valid ? { pct: g.deltaPct, abs: g.deltaAbs } : '—',
+        minHistorySeconds: Math.round(_AURIX_RETURN_MIN_HISTORY_MS / 1000),
+        exitCriterion: 'baselineValid===true (post-reset baseline>0, currentValue>0, ≥' + Math.round(_AURIX_RETURN_MIN_HISTORY_MS / 1000) + 's history, flows<50% of value)',
+        displayedReturn: g.valid ? { pct: g.deltaPct, abs: g.deltaAbs } : _AURIX_RETURN_PENDING_TEXT,
       };
       try { console.log('%c[AURIX RETURN DEBUG]', 'font-weight:700', out); } catch (_) {}
       return out;
@@ -23084,7 +23106,8 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
 
   // mode='building' → honest premium empty state (truly too little data).
   if (perf.mode === 'building') {
-    if (changeEl) { changeEl.textContent = ''; changeEl.className = 'chart-change'; changeEl.removeAttribute('title'); }
+    // RETURN-PENDING-FINAL — too little data yet ⇒ premium "Calculando…", never an empty/false metric.
+    if (changeEl) { changeEl.innerHTML = _aurixReturnPendingHTML(); changeEl.className = 'chart-change calculating'; changeEl.removeAttribute('title'); }
     _wscRenderInsufficient(hostEl, { realPointCount: perf.realPointCount, reason: perf.reason },
       { mode: 'building', eligible: perf.rawValueSeries.map(p => ({ ts: p.time, value: p.value })),
         lastGood: _wscGetFreshLastGood(activeRange, Date.now()) });
@@ -23123,8 +23146,9 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   // Metric: % performance return / currency performance equivalent (same series).
   if (changeEl) {
     if (!_gret.valid) {
-      changeEl.innerHTML = '<span class="wsc-metric-val">—</span>';
-      changeEl.className = 'chart-change flat';
+      // RETURN-PENDING-FINAL — no valid baseline ⇒ premium "Calculando…" (no %, no $, no red/green).
+      changeEl.innerHTML = _aurixReturnPendingHTML();
+      changeEl.className = 'chart-change calculating';
       changeEl.removeAttribute('title');
     } else {
       const mode = activePerfMode === 'curr' ? 'curr' : 'pct';
@@ -23576,9 +23600,9 @@ function renderAurixMobileLiteChart(range, token) {
 function _aurixMobileSetPerfIndicator() {
   try {
     const el = document.getElementById('chartChangeMobile'); if (!el) return;
-    // P0-RETURN-BASELINE-GUARD — no valid baseline ⇒ show "—" neutral, never a false loss.
+    // RETURN-PENDING-FINAL — no valid baseline ⇒ premium "Calculando…" (web/mobile parity), never a false loss.
     const ret = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(activeRange) : null;
-    if (!ret || !ret.valid || !Number.isFinite(ret.deltaPct)) { el.textContent = '—'; el.className = 'chart-change'; return; }
+    if (!ret || !ret.valid || !Number.isFinite(ret.deltaPct)) { el.innerHTML = _aurixReturnPendingHTML(); el.className = 'chart-change calculating'; el.removeAttribute('title'); return; }
     const deltaPct = ret.deltaPct, deltaAbs = Number.isFinite(ret.deltaAbs) ? ret.deltaAbs : 0;
     const tone = deltaPct > 0.005 ? 'up' : deltaPct < -0.005 ? 'down' : 'flat';
     let valText;
@@ -25135,15 +25159,16 @@ function _aurixReconSyncHeadline(series) {
   const abs  = safe && Number.isFinite(_ret.deltaAbs) ? _ret.deltaAbs : 0;
   const cls  = !safe ? 'flat' : (pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat');
   if (!safe) {
-    chartChangeEl.textContent = '—';
-  } else if (activePerfMode === 'curr') {
-    chartChangeEl.textContent = `${abs >= 0 ? '+' : ''}${formatBase(abs)}`;
+    // RETURN-PENDING-FINAL — no valid baseline ⇒ premium "Calculando…", never a false loss.
+    chartChangeEl.innerHTML = _aurixReturnPendingHTML();
+    chartChangeEl.className = 'chart-change calculating';
   } else {
-    chartChangeEl.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+    if (activePerfMode === 'curr') chartChangeEl.textContent = `${abs >= 0 ? '+' : ''}${formatBase(abs)}`;
+    else chartChangeEl.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+    chartChangeEl.className = `chart-change ${cls}`;
   }
-  chartChangeEl.className = `chart-change ${cls}`;
   const _mch = document.getElementById('chartChangeMobile');
-  if (_mch) { _mch.textContent = chartChangeEl.textContent; _mch.className = chartChangeEl.className; }
+  if (_mch) { _mch.innerHTML = chartChangeEl.innerHTML; _mch.className = chartChangeEl.className; }
 }
 
 // Decide whether to (re)compute a reconstruction for the current view, then do

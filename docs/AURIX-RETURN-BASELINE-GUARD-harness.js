@@ -22,7 +22,7 @@ function makeEnv(){
   sb._aurixResetAt = () => sb._resetAt;
   sb.totalValueBase = () => sb._total;
   vm.createContext(sb);
-  vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS = 5 * 60 * 1000; const _AURIX_RETURN_FLOW_DOMINANCE = 0.5;', sb);
+  vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS = 90 * 1000; const _AURIX_RETURN_FLOW_DOMINANCE = 0.5;', sb);
   vm.runInContext(fnSrc('_aurixPortfolioCreatedAt'), sb);
   vm.runInContext(fnSrc('getValidReturnBaseline'), sb);
   return sb;
@@ -47,8 +47,8 @@ console.log('\nBaseline validity gates:');
   sb._cfg = { valid:true, deltaPct:-40, deltaAbs:-1500, startValue:4000, baselineTs:NOW-10*DAY, lastTs:NOW, netFlowsNeutralized:10 };
   ok('4 snapshot BEFORE last reset → pre_reset (ignored)', G(sb).invalidReason==='pre_reset'); }
 { const sb = makeEnv(); sb._total = 4000;
-  sb._cfg = { valid:true, deltaPct:2, deltaAbs:80, startValue:4000, baselineTs:NOW-2*MIN, lastTs:NOW, netFlowsNeutralized:10 };
-  ok('5 < 5 min of real history → insufficient_history (Calculando…)', G(sb).invalidReason==='insufficient_history'); }
+  sb._cfg = { valid:true, deltaPct:2, deltaAbs:80, startValue:4000, baselineTs:NOW-30000, lastTs:NOW, netFlowsNeutralized:10 };
+  ok('5 < 90 s of real history → insufficient_history (Calculando…)', G(sb).invalidReason==='insufficient_history'); }
 { const sb = makeEnv(); sb._total = 0;
   sb._cfg = { valid:true, deltaPct:2, deltaAbs:80, startValue:4000, baselineTs:NOW-10*DAY, lastTs:NOW, netFlowsNeutralized:10 };
   ok('6 no current value → no_current_value', G(sb).invalidReason==='no_current_value'); }
@@ -66,15 +66,15 @@ console.log('\nReal return shows once the baseline is valid:');
   ok('9 second real snapshot, no move → valid 0% (neutral, not negative)', G(sb).valid===true && G(sb).deltaPct===0); }
 
 console.log('\nHeader consumers gated (source):');
-ok('10 desktop WSC header uses the guard → "—" + flat when invalid',
+ok('10 desktop WSC header uses the guard → "Calculando…" + calculating when invalid',
    /const _gret = \(typeof getValidReturnBaseline === 'function'\) \? getValidReturnBaseline\(activeRange\)/.test(app) &&
-   /if \(!_gret\.valid\) \{\s*changeEl\.innerHTML = '<span class="wsc-metric-val">—<\/span>';\s*changeEl\.className = 'chart-change flat';/.test(app));
-ok('11 desktop reconstructed headline gates on getValidReturnBaseline (shows "—")',
+   /if \(!_gret\.valid\) \{[\s\S]*?changeEl\.innerHTML = _aurixReturnPendingHTML\(\);\s*changeEl\.className = 'chart-change calculating';/.test(app));
+ok('11 desktop reconstructed headline gates on getValidReturnBaseline (shows "Calculando…")',
    /const _ret = \(typeof getValidReturnBaseline === 'function'\) \? getValidReturnBaseline\(activeRange\)/.test(fnSrc('_aurixReconSyncHeadline')) &&
-   /chartChangeEl\.textContent = '—';/.test(fnSrc('_aurixReconSyncHeadline')));
-ok('12 mobile indicator gates on getValidReturnBaseline (shows "—", no red/green)',
+   /chartChangeEl\.innerHTML = _aurixReturnPendingHTML\(\);/.test(fnSrc('_aurixReconSyncHeadline')));
+ok('12 mobile indicator gates on getValidReturnBaseline (shows "Calculando…", no red/green)',
    /const ret = \(typeof getValidReturnBaseline === 'function'\) \? getValidReturnBaseline\(activeRange\)/.test(fnSrc('_aurixMobileSetPerfIndicator')) &&
-   /if \(!ret \|\| !ret\.valid \|\| !Number\.isFinite\(ret\.deltaPct\)\) \{ el\.textContent = '—'; el\.className = 'chart-change'; return; \}/.test(fnSrc('_aurixMobileSetPerfIndicator')));
+   /if \(!ret \|\| !ret\.valid \|\| !Number\.isFinite\(ret\.deltaPct\)\) \{ el\.innerHTML = _aurixReturnPendingHTML\(\); el\.className = 'chart-change calculating';/.test(fnSrc('_aurixMobileSetPerfIndicator')));
 ok('13 %/$ toggle respects pending: both modes go through the same gate (mode read AFTER validity)',
    /if \(!_gret\.valid\)[\s\S]*?\} else \{\s*const mode = activePerfMode/.test(app));
 
