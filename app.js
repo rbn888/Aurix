@@ -21009,6 +21009,63 @@ function _aurixRangeReturn(range) {
   return out;
 }
 
+// ── P0-RETURN-BASELINE-GUARD ───────────────────────────────────────────────────
+// A brand-new / freshly-synced portfolio must NEVER show a false loss. The flow-neutral return is
+// only meaningful once there's a VALID baseline: real post-reset history, a positive baseline, and
+// a window NOT dominated by the initial capital construction. Otherwise we return a neutral
+// "pending_baseline" state and the header shows "—" (no %, no $, no red/green) — the chart keeps
+// drawing wealth, but the header never invents a loss. Read-only; touches no data/sync/renderer.
+const _AURIX_RETURN_MIN_HISTORY_MS = 5 * 60 * 1000;   // need ≥5 min of real elapsed history
+const _AURIX_RETURN_FLOW_DOMINANCE = 0.5;             // window flows ≥50% of value ⇒ baseline = capital construction, not return
+function _aurixPortfolioCreatedAt() {
+  // Oldest post-epoch baseline ≈ when this (post-reset) portfolio began. Best-effort, read-only.
+  try { const a = _aurixRangeReturn('all'); return a && a.baselineTs ? a.baselineTs : 0; } catch (_) { return 0; }
+}
+function getValidReturnBaseline(range) {
+  const r = range || (typeof activeRange !== 'undefined' ? activeRange : '30d');
+  const lastResetAt = (typeof _aurixResetAt === 'function') ? (_aurixResetAt() || 0) : 0;
+  const createdAt = _aurixPortfolioCreatedAt();
+  let currentValue = null;
+  try { currentValue = (typeof totalValueBase === 'function') ? totalValueBase() : null; } catch (_) { currentValue = null; }
+  const ret = (typeof _aurixRangeReturn === 'function') ? _aurixRangeReturn(r) : null;
+  const baselineValue = ret ? ret.startValue : null;
+  const baselineTs = ret ? ret.baselineTs : null;
+  const lastTs = ret ? ret.lastTs : null;
+  const windowMs = (Number.isFinite(baselineTs) && Number.isFinite(lastTs)) ? (lastTs - baselineTs) : 0;
+  const netFlows = ret ? Math.abs(Number(ret.netFlowsNeutralized) || 0) : 0;
+  let invalidReason = null;
+  if (!ret || !ret.valid || !Number.isFinite(ret.deltaPct) || !(baselineValue > 0)) invalidReason = 'no_valid_baseline';
+  else if (!(Number.isFinite(currentValue) && currentValue > 0)) invalidReason = 'no_current_value';
+  else if (Number.isFinite(baselineTs) && baselineTs < lastResetAt) invalidReason = 'pre_reset';
+  else if (windowMs < _AURIX_RETURN_MIN_HISTORY_MS) invalidReason = 'insufficient_history';
+  else if (netFlows >= _AURIX_RETURN_FLOW_DOMINANCE * currentValue) invalidReason = 'flows_dominate_baseline';
+  const valid = !invalidReason;
+  return {
+    range: r, returnState: valid ? 'ready' : 'pending_baseline', valid: valid, invalidReason: invalidReason,
+    deltaPct: valid ? ret.deltaPct : null, deltaAbs: valid ? ret.deltaAbs : null,
+    baselineValue: baselineValue, baselineTs: baselineTs, currentValue: currentValue,
+    portfolioCreatedAt: createdAt, lastResetAt: lastResetAt, windowMs: windowMs, netFlowsNeutralized: netFlows,
+  };
+}
+try {
+  if (typeof window !== 'undefined') {
+    window.aurixReturnDebug = function (range) {
+      const r = range || (typeof activeRange !== 'undefined' ? activeRange : '30d');
+      const g = getValidReturnBaseline(r);
+      const out = {
+        range: r, currentValue: g.currentValue, baselineValue: g.baselineValue, baselineTimestamp: g.baselineTs ? new Date(g.baselineTs).toISOString() : null,
+        portfolioCreatedAt: g.portfolioCreatedAt ? new Date(g.portfolioCreatedAt).toISOString() : null,
+        lastResetAt: g.lastResetAt ? new Date(g.lastResetAt).toISOString() : null,
+        baselineValid: g.valid, invalidReason: g.invalidReason, returnState: g.returnState,
+        netFlowsNeutralized: g.netFlowsNeutralized, windowMinutes: Math.round((g.windowMs || 0) / 60000),
+        displayedReturn: g.valid ? { pct: g.deltaPct, abs: g.deltaAbs } : '—',
+      };
+      try { console.log('%c[AURIX RETURN DEBUG]', 'font-weight:700', out); } catch (_) {}
+      return out;
+    };
+  }
+} catch (_) {}
+
 // AURIX-RETURN-UNIFY-1 — full audit record for one range (OBJETIVO 5). Returns the
 // initial snapshot, final snapshot, every cashflow detected inside the window, the
 // gross (raw) vs net (flow-neutral) return and the % actually shown. Read-only.
@@ -23055,20 +23112,29 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   // AURIX-RETURN-UNIFY-1 — the METRIC is taken from the single canonical return
   // function so this badge, "Resumen de rendimiento" and computeRangePnL are
   // byte-identical. The CURVE below still uses adjVals (the same neutralised series).
+  // P0-RETURN-BASELINE-GUARD — gate the metric behind a VALID baseline. Pending ⇒ "—" + neutral
+  // (no %, no $, no red/green); the curve below still draws (adjVals untouched).
+  const _gret = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(activeRange) : { valid: false };
   const _ret = _aurixRangeReturn(activeRange);
   const deltaAbs = (_ret && Number.isFinite(_ret.deltaAbs)) ? _ret.deltaAbs : (adjVals[adjVals.length - 1] - adjVals[0]);
   const deltaPct = (_ret && Number.isFinite(_ret.deltaPct)) ? _ret.deltaPct : (adjVals[0] > 0 ? ((adjVals[adjVals.length - 1] - adjVals[0]) / adjVals[0]) * 100 : 0);
-  const tone = deltaPct > 0.005 ? 'up' : deltaPct < -0.005 ? 'down' : 'flat';
+  const tone = !_gret.valid ? 'flat' : (deltaPct > 0.005 ? 'up' : deltaPct < -0.005 ? 'down' : 'flat');
 
   // Metric: % performance return / currency performance equivalent (same series).
   if (changeEl) {
-    const mode = activePerfMode === 'curr' ? 'curr' : 'pct';
-    const pf   = _dshFmtPct(deltaPct);
-    const valText = mode === 'curr' ? _dshFmtMoney0(deltaAbs) : pf.text;
-    changeEl.innerHTML = `<span class="wsc-metric-val">${valText}</span>`;
-    changeEl.className  = `chart-change ${tone}`;
-    if (mode === 'pct' && pf.capped) changeEl.title = pf.raw;
-    else changeEl.removeAttribute('title');
+    if (!_gret.valid) {
+      changeEl.innerHTML = '<span class="wsc-metric-val">—</span>';
+      changeEl.className = 'chart-change flat';
+      changeEl.removeAttribute('title');
+    } else {
+      const mode = activePerfMode === 'curr' ? 'curr' : 'pct';
+      const pf   = _dshFmtPct(deltaPct);
+      const valText = mode === 'curr' ? _dshFmtMoney0(deltaAbs) : pf.text;
+      changeEl.innerHTML = `<span class="wsc-metric-val">${valText}</span>`;
+      changeEl.className  = `chart-change ${tone}`;
+      if (mode === 'pct' && pf.capped) changeEl.title = pf.raw;
+      else changeEl.removeAttribute('title');
+    }
   }
 
   // AURIX-PERFORMANCE-MODE-2 — 3-MODE policy from the single source. 'partial-curve'
@@ -23510,8 +23576,9 @@ function renderAurixMobileLiteChart(range, token) {
 function _aurixMobileSetPerfIndicator() {
   try {
     const el = document.getElementById('chartChangeMobile'); if (!el) return;
-    const ret = (typeof _aurixRangeReturn === 'function') ? _aurixRangeReturn(activeRange) : null;
-    if (!ret || !Number.isFinite(ret.deltaPct)) { el.textContent = ''; el.className = 'chart-change'; return; }
+    // P0-RETURN-BASELINE-GUARD — no valid baseline ⇒ show "—" neutral, never a false loss.
+    const ret = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(activeRange) : null;
+    if (!ret || !ret.valid || !Number.isFinite(ret.deltaPct)) { el.textContent = '—'; el.className = 'chart-change'; return; }
     const deltaPct = ret.deltaPct, deltaAbs = Number.isFinite(ret.deltaAbs) ? ret.deltaAbs : 0;
     const tone = deltaPct > 0.005 ? 'up' : deltaPct < -0.005 ? 'down' : 'flat';
     let valText;
@@ -25060,7 +25127,9 @@ function _aurixReconSyncHeadline(series) {
   // anchor-to-start performance series, series[0] is the real (low) inception value,
   // so that formula would re-introduce the capital flow as return. _aurixRangeReturn
   // is flow-neutral by construction.
-  const _ret = (typeof _aurixRangeReturn === 'function') ? _aurixRangeReturn(activeRange) : null;
+  // P0-RETURN-BASELINE-GUARD — gate on a valid baseline (pre-reset / flow-dominated / insufficient
+  // history ⇒ pending ⇒ "—", never a false loss).
+  const _ret = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(activeRange) : null;
   const safe = _ret && _ret.valid && Number.isFinite(_ret.deltaPct);
   const pct  = safe ? _ret.deltaPct : 0;
   const abs  = safe && Number.isFinite(_ret.deltaAbs) ? _ret.deltaAbs : 0;

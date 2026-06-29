@@ -73,7 +73,10 @@ ok('9 equivalence render↔canonical not divergent', vm.runInContext("auditAurix
 function testIndicator(deltaPct, deltaAbs, mode) {
   const el = { className:'', innerHTML:'', textContent:'', title:'', removeAttribute(){ this.title=''; } };
   const sb = { document:{ getElementById:(id)=> id==='chartChangeMobile'?el:null }, activePerfMode:mode, activeRange:'24h',
-    _aurixRangeReturn:()=>({deltaPct,deltaAbs}), _dshFmtPct:(p)=>({text:(p>0?'+':'')+p.toFixed(2)+'%',capped:false}), _dshFmtMoney0:(v)=>'$'+Math.round(v), Number, Math };
+    _aurixRangeReturn:()=>({deltaPct,deltaAbs}),
+    // P0-RETURN-BASELINE-GUARD: the indicator now reads the gated baseline; stub it as valid here.
+    getValidReturnBaseline:()=>({valid:true,deltaPct,deltaAbs}),
+    _dshFmtPct:(p)=>({text:(p>0?'+':'')+p.toFixed(2)+'%',capped:false}), _dshFmtMoney0:(v)=>'$'+Math.round(v), Number, Math };
   vm.createContext(sb); vm.runInContext(fn('_aurixMobileSetPerfIndicator'), sb); sb._aurixMobileSetPerfIndicator();
   return el;
 }
@@ -83,7 +86,7 @@ function testIndicator(deltaPct, deltaAbs, mode) {
 { const e=testIndicator(3.21, 1234, 'curr'); ok('13 indicator honours €/curr mode', /\$1234/.test(e.innerHTML) && e.className==='chart-change up'); }
 ok('14 indicator wired into the lite paint (read-only, no _wscPaintSurface on mobile)',
    /_aurixMobileSetPerfIndicator\(\);/.test(app) && /renderAurixMobileLiteChart\(r, token\)/.test(app));
-ok('15 indicator reads canonical return (no data mutation)', /_aurixRangeReturn\(activeRange\)/.test(fn('_aurixMobileSetPerfIndicator')));
+ok('15 indicator reads the baseline-gated return (no data mutation)', /getValidReturnBaseline\(activeRange\)/.test(fn('_aurixMobileSetPerfIndicator')));
 
 // ── Layout (no overflow / pulsable): uses the EXISTING element + controls, no new markup ──
 ok('16 #chartChangeMobile element exists in the mobile chart header (no layout shift)', /id="chartChangeMobile"/.test(idx));

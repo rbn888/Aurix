@@ -42,7 +42,7 @@ ok('2b zero/na → neutral', toneToStroke(0) === '#9fb0c7' && toneToStroke(null)
 const liteFn = (()=>{ const s=app.indexOf('RC4-E FASE 1 — Mobile Color Parity'); return app.slice(s, s+900); })();
 ok('3 mobile lite colours from _aurixRangeReturn(r) sign (NOT lastDeltaPct)', /_aurixRangeReturn\(r\)/.test(liteFn) && /tone === 'down' \? '#e25563'/.test(liteFn) && !/lastDeltaPct < 0\)/.test(liteFn));
 ok('4 web/mobile parity: same hexes + same ±0.005 threshold', /> 0\.005 \? 'up'/.test(liteFn) && app.indexOf("'#e25563'")>=0 && app.indexOf("'#2ebd85'")>=0);
-ok('5 indicator tone uses the same sign source (_aurixRangeReturn + ±0.005)', /deltaPct > 0\.005 \? 'up' : deltaPct < -0\.005 \? 'down'/.test(fn('_aurixMobileSetPerfIndicator')) && /_aurixRangeReturn\(activeRange\)/.test(fn('_aurixMobileSetPerfIndicator')));
+ok('5 indicator tone uses the same sign source (baseline-gated return + ±0.005)', /deltaPct > 0\.005 \? 'up' : deltaPct < -0\.005 \? 'down'/.test(fn('_aurixMobileSetPerfIndicator')) && /getValidReturnBaseline\(activeRange\)/.test(fn('_aurixMobileSetPerfIndicator')));
 
 console.log('\nFASE 2/3 — Global volatility polish (per-range cluster reduction):');
 const ON = mk(CONST_BLOCK);
