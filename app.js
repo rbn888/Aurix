@@ -1109,10 +1109,10 @@ async function _flushStatePersistence(reason) {
       ui_state_updated_at:  localUiTs > 0 ? new Date(localUiTs).toISOString() : null,
       subscription:            _collectSubscription(),
       subscription_updated_at: localSubTs > 0 ? new Date(localSubTs).toISOString() : null,
-      // P0-FINAL-PERFORMANCE-KILL-SWITCH — upload the canonical performance_state candidate (deterministic
-      // from the shared history). Other devices READ it and render exactly it. If the column is absent the
-      // retry below strips it gracefully (rest still persists) ⇒ authed users stay in "Calculando…".
-      performance_state:    (typeof _aurixComputePerformanceStateCandidate === 'function') ? _aurixComputePerformanceStateCandidate() : null,
+      // P0-PERFORMANCE-STATE-PERSISTENCE-FIX — performance_state is NO LONGER in this coupled payload. The
+      // first upsert errors whenever ui_state/subscription columns are unmigrated, and the retry then STRIPPED
+      // performance_state too ⇒ it never persisted (the root cause of hasRemotePerformanceState:false). It now
+      // writes via its OWN dedicated, decoupled update (_aurixFlushPerformanceState) below.
       updated_at:           new Date().toISOString(),
     };
     // Only touch assets/holdings when safe (see _aurixAssetsForBackend). Omitting
@@ -1130,7 +1130,7 @@ async function _flushStatePersistence(reason) {
       // retry WITHOUT them so core data (assets/history/watchlist/preferences)
       // still persists. Once the SQL is applied, the first branch succeeds and
       // this never runs. (AURIX-MONETIZATION-1 adds subscription to the strip.)
-      const { ui_state, ui_state_updated_at, subscription, subscription_updated_at, performance_state, ...core } = payload;
+      const { ui_state, ui_state_updated_at, subscription, subscription_updated_at, ...core } = payload;
       const retry = await supabaseClient.from('user_portfolios').upsert(core, { onConflict: 'user_id' });
       if (retry.error) throw retry.error;
       if (IS_DEV) console.warn('[STATE] ui_state/subscription columns not present yet — saved core only (' + (error.message || '') + ')');
@@ -1145,7 +1145,33 @@ async function _flushStatePersistence(reason) {
   } catch (e) {
     if (IS_DEV) console.warn('[STATE] flush failed (' + reason + ')', e && e.message);
   }
+  // P0-PERFORMANCE-STATE-PERSISTENCE-FIX — write performance_state in its OWN decoupled update, AFTER (and
+  // independent of) the main flush. So a stripped/failed main upsert (unmigrated ui_state/subscription) can
+  // never drop it, and it persists even when the holdings merge decides apply:"local". Fire-and-forget.
+  try { _aurixFlushPerformanceState(reason); } catch (_) {}
 }
+
+// P0-PERFORMANCE-STATE-PERSISTENCE-FIX — dedicated, decoupled writer for the canonical performance_state.
+// A plain UPDATE of the existing user_portfolios row's performance_state column ONLY (never touches
+// assets/holdings/history), so performance_state sync is fully independent of the holdings/state merge.
+// RLS (auth.uid() = user_id) scopes it per user. Throttled with the state flush window.
+let _aurixLastPerfFlushMs = 0;
+async function _aurixFlushPerformanceState(reason) {
+  try {
+    if (!supabaseClient || !currentUser || !currentUser.id) return;
+    if (typeof _aurixResetInProgress !== 'undefined' && _aurixResetInProgress) return;
+    const now = Date.now();
+    if (reason !== 'lifecycle' && reason !== 'perf-now' && _aurixLastPerfFlushMs && now - _aurixLastPerfFlushMs < 30_000) return;
+    const ps = (typeof _aurixComputePerformanceStateCandidate === 'function') ? _aurixComputePerformanceStateCandidate() : null;
+    if (!ps || !ps.userId) return;
+    _aurixLastPerfFlushMs = now;
+    const { error } = await supabaseClient.from('user_portfolios').update({ performance_state: ps }).eq('user_id', currentUser.id);
+    if (error) { if (IS_DEV) console.warn('[PERF-STATE] write failed (column missing? ' + (error.message || '') + ')'); return; }
+    try { _aurixSyncState.lastPerfStateWriteAt = now; } catch (_) {}
+    if (IS_DEV) console.log('[PERF-STATE] wrote performance_state (' + (reason || '') + ') ranges=' + (ps.byRange ? Object.keys(ps.byRange).length : 0));
+  } catch (e) { if (IS_DEV) console.warn('[PERF-STATE] write exception', e && e.message); }
+}
+try { if (typeof window !== 'undefined') window.aurixFlushPerformanceStateNow = () => _aurixFlushPerformanceState('perf-now'); } catch (_) {}
 
 function isValidPortfolioData(data) {
   return data &&

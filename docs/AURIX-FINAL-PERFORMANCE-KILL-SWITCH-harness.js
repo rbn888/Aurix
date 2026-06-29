@@ -84,9 +84,11 @@ console.log('\nLocal divergence / Date.now / live price cannot affect the authed
 console.log('\nSource — reader/writer/gate/debug wired:');
 ok('9 reader: _mergeRemoteState adopts remoteRow.performance_state (remote READ only)',
    /_aurixRemotePerformanceState = \(remoteRow && remoteRow\.performance_state && typeof remoteRow\.performance_state === 'object'\)/.test(fnSrc('_mergeRemoteState')));
-ok('10 writer: flush uploads performance_state candidate + retry strips it gracefully if the column is absent',
-   /performance_state:    \(typeof _aurixComputePerformanceStateCandidate === 'function'\)/.test(app) &&
-   /const \{ ui_state, ui_state_updated_at, subscription, subscription_updated_at, performance_state, \.\.\.core \} = payload;/.test(app));
+ok('10 writer: performance_state written via its OWN decoupled UPDATE (NOT the coupled payload that gets stripped)',
+   /async function _aurixFlushPerformanceState\(reason\)/.test(app) &&
+   /\.from\('user_portfolios'\)\.update\(\{ performance_state: ps \}\)\.eq\('user_id', currentUser\.id\)/.test(fnSrc('_aurixFlushPerformanceState')) &&
+   !/performance_state:    \(typeof _aurixComputePerformanceStateCandidate/.test(app) &&
+   !/subscription_updated_at, performance_state, \.\.\.core/.test(app));
 ok('11 kill switch: getValidReturnBaseline renders authed real return ONLY from _aurixRemotePerformanceForRange',
    /if \(!opts\.raw && typeof _aurixRemotePerformanceForRange === 'function'[\s\S]*?_aurixCurrentUserId\(\)\) \{/.test(fnSrc('getValidReturnBaseline')) &&
    /invalidReason: psRow \? 'remote_performance_pending' : 'no_remote_performance_state'/.test(fnSrc('getValidReturnBaseline')));
@@ -96,6 +98,11 @@ ok('13 debug: aurixPerformanceStateDebug exposes renderedFromRemote + hasRemoteP
    /window\.aurixPerformanceStateDebug = async function/.test(app) &&
    ['renderedFromRemote','hasRemotePerformanceState','performanceSource','performanceHash','chartSeriesHash','isStale','blockReason']
      .every(k => app.indexOf(k + ':') !== -1));
+
+console.log('\nDecoupling — performance_state sync is independent of the holdings merge (apply:"local" cannot drop it):');
+ok('15 _flushStatePersistence invokes the decoupled perf writer; reader sets it BEFORE the distrust/merge decision',
+   /_aurixFlushPerformanceState\(reason\)/.test(fnSrc('_flushStatePersistence')) &&
+   (function(){ const m = fnSrc('_mergeRemoteState'); return m.indexOf('_aurixRemotePerformanceState = (remoteRow') < m.indexOf('_shouldDistrustRemote'); })());
 
 console.log('\nNo-touch (renderer / holdings / pricing / current value):');
 ok('14 renderer / holdings merge / pricing untouched',
