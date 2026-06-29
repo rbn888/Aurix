@@ -5478,8 +5478,15 @@ const _AURIX_DESTRUCTIVE_CONTEXTS = ['delete-asset','sell','reduce-position','re
 // Pure observation; the guards themselves are untouched.
 const _aurixGuardTelemetry = {
   snapshotRejected: 0, lastRejectReason: null, lastRejectTs: null,
+  snapshotQuarantined: 0, lastQuarantineReason: null, lastQuarantineTs: null,
   saveBlocked: 0, lastSaveBlockReason: null, lastSaveBlockAt: null,
 };
+// P0-SNAPSHOT-GUARD-PARITY-FIX — reasons that are device-RELATIVE heuristics (compared to THIS device's
+// last local snapshot). They must NOT permanently drop a point — that creates per-device history
+// divergence. They are QUARANTINED (kept + synced); the shared canonical history (union + trust filter),
+// not the local last snapshot, has final authority. Corruption/incomplete-data reasons (fx_partial /
+// fx_approx / invalid_total / invalid_investable) are device-INDEPENDENT bad data and stay hard-rejected.
+const _AURIX_GUARD_QUARANTINE_REASONS = { suspicious_drop_without_market_reason: 1, suspicious_jump_without_capital_flow: 1 };
 const _aurixSaveAuditLog = [];
 let _aurixLastDestructiveSaveAt = 0;   // ms — set when an explicit destructive write is permitted
 function _aurixCountModel(catalogAssets, holdings) {
@@ -8274,8 +8281,19 @@ function _aurixGuardSnapshot(next, prevValid, surface) {
       deltaPct: res.details && res.details.deltaPct,
       when: Number.isFinite(next.ts) ? new Date(next.ts).toISOString() : null };
     _aurixPushRejected(rec);
+    // P0-SNAPSHOT-GUARD-PARITY-FIX — a device-relative suspicious move is QUARANTINED, never dropped:
+    // the point is ALLOWED into local history (and therefore synced to the shared canonical store), so
+    // web and mobile converge to the same series. The shared canonical history (union-by-ts merge +
+    // the trust filter in _aurixEligibleInvestableSeries) — NOT this device's last local snapshot — has
+    // final authority over whether the point surfaces in the chart/return. Corruption stays dropped.
+    if (_AURIX_GUARD_QUARANTINE_REASONS[res.reason]) {
+      try { _aurixGuardTelemetry.snapshotQuarantined++; _aurixGuardTelemetry.lastQuarantineReason = res.reason; _aurixGuardTelemetry.lastQuarantineTs = next.ts; } catch (_) {}
+      try { if (next && typeof next === 'object') next.suspect = true; } catch (_) {}   // quarantine marker (informational)
+      try { console.warn('[AURIX][snapshot-guard] quarantined (kept + synced, not dropped — canonical decides)', rec); } catch (_) {}
+      return false;   // allow the write so the shared history can reconcile it
+    }
     try { _aurixGuardTelemetry.snapshotRejected++; _aurixGuardTelemetry.lastRejectReason = res.reason; _aurixGuardTelemetry.lastRejectTs = next.ts; } catch (_) {}
-    try { console.warn('[AURIX][snapshot-guard] rejected', rec); } catch (_) {}
+    try { console.warn('[AURIX][snapshot-guard] rejected (corruption/incomplete data — dropped)', rec); } catch (_) {}
     return true;
   }
   if (typeof window !== 'undefined' && window.AURIX_DEBUG_SNAPSHOTS === true) {
@@ -21388,6 +21406,9 @@ try {
         historyBuildReason: can.reason,
         // ── P0-HISTORY-PARITY-BLOCKER — guard / journal rejection telemetry (diagnosis only) ──
         snapshotGuardRejectedCount: _gt.snapshotRejected != null ? _gt.snapshotRejected : null,
+        snapshotQuarantinedCount: _gt.snapshotQuarantined != null ? _gt.snapshotQuarantined : null,
+        lastQuarantineReason: _gt.lastQuarantineReason != null ? _gt.lastQuarantineReason : null,
+        lastQuarantineTimestamp: Number.isFinite(_gt.lastQuarantineTs) ? new Date(_gt.lastQuarantineTs).toISOString() : null,
         saveBlockedDestructiveCount: _gt.saveBlocked != null ? _gt.saveBlocked : null,
         lastSnapshotRejectedReason: _gt.lastRejectReason != null ? _gt.lastRejectReason : null,
         lastRejectedTimestamp: Number.isFinite(_gt.lastRejectTs) ? new Date(_gt.lastRejectTs).toISOString() : null,
