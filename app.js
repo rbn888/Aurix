@@ -778,18 +778,41 @@ function _aurixCurrentLifecycleId() { try { return (typeof _aurixLifecycleId ===
 function _aurixCurrentRevision() { try { return (typeof _aurixPortfolioRevision === 'function') ? (_aurixPortfolioRevision() || 0) : 0; } catch (_) { return 0; } }
 // The per-range remote performance row IFF the remote performance_state matches THIS user + lifecycle +
 // portfolioRevision + range (not foreign / not pre-reset / not stale). Else null ⇒ Calculando.
-function _aurixRemotePerformanceForRange(range) {
+// P0-PERFORMANCE-STATE-CONSUMPTION-FIX — full structured selection + rejection diagnosis. Returns
+// { row, ok, reason, ...diag }. Range keys are NORMALISED to lowercase (canonical) so '24H'/'24h' match.
+// Revision is no longer STRICT-equality (that wrongly rejected a PS written at rev N once the benign meta
+// version bumped to N+1): accept when ps.portfolioRevision <= currentRevision AND (equal OR no pending local
+// changes) — i.e. the PS still reflects the current holdings. A FUTURE revision or an older PS with pending
+// local changes is rejected with an explicit reason. PURE READ.
+function _aurixSelectRemotePerformance(range) {
+  const out = { row: null, ok: false, reason: null, requestedRange: null, rangeKey: null, rangeEntryExists: false,
+    expectedLifecycleId: null, performanceLifecycleId: null, expectedPortfolioRevision: null, performancePortfolioRevision: null,
+    revisionComparisonMode: 'lte+no-pending', pendingSync: null };
   try {
+    const rk = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+    out.requestedRange = range; out.rangeKey = rk;
+    out.expectedLifecycleId = _aurixCurrentLifecycleId();
+    out.expectedPortfolioRevision = _aurixCurrentRevision();
+    out.pendingSync = (typeof _aurixPendingSync === 'function') ? !!_aurixPendingSync() : false;
     const ps = _aurixRemotePerformanceState;
-    if (!ps || typeof ps !== 'object') return null;
-    if (ps.userId !== _aurixCurrentUserId()) return null;                 // foreign account
-    if (ps.lifecycleId !== _aurixCurrentLifecycleId()) return null;       // old lifecycle (post-reset)
-    if ((ps.portfolioRevision || 0) !== _aurixCurrentRevision()) return null;   // stale vs current revision
-    const row = ps.byRange && ps.byRange[range];
-    if (!row || row.performanceHash == null) return null;
-    return row;
-  } catch (_) { return null; }
+    if (!ps || typeof ps !== 'object') { out.reason = 'no_remote_object'; return out; }
+    out.performanceLifecycleId = ps.lifecycleId; out.performancePortfolioRevision = (ps.portfolioRevision || 0);
+    if (ps.userId !== _aurixCurrentUserId()) { out.reason = 'user_mismatch'; return out; }
+    if (ps.lifecycleId !== out.expectedLifecycleId) { out.reason = 'lifecycle_mismatch'; return out; }
+    const psRev = ps.portfolioRevision || 0, cur = out.expectedPortfolioRevision || 0;
+    if (psRev > cur) { out.reason = 'revision_from_future'; return out; }                         // corrupt / clock-skew
+    if (psRev < cur && out.pendingSync) { out.reason = 'stale_revision_with_pending_changes'; return out; }  // local moved past the PS
+    // normalise byRange keys to lowercase before lookup
+    let row = ps.byRange && (ps.byRange[rk] || ps.byRange[range] || ps.byRange[String(range || '').toUpperCase()]);
+    if (!row && ps.byRange) { for (const k in ps.byRange) { if (String(k).toLowerCase() === rk) { row = ps.byRange[k]; break; } } }
+    out.rangeEntryExists = !!row;
+    if (!row) { out.reason = 'range_entry_missing'; return out; }
+    if (row.performanceHash == null) { out.reason = 'no_performance_hash'; return out; }
+    out.row = row; out.ok = true; out.reason = 'ok';
+    return out;
+  } catch (e) { out.reason = 'error'; return out; }
 }
+function _aurixRemotePerformanceForRange(range) { return _aurixSelectRemotePerformance(range).row; }
 // Compute the LOCAL deterministic performance CANDIDATE for all ranges (writer only). Uses the raw local
 // engine (opts.raw bypasses the remote gate) — deterministic from the shared history (v431). This is what a
 // client UPLOADS as performance_state; it is NEVER displayed locally until read back from remote.
@@ -1209,9 +1232,11 @@ async function _aurixFlushPerformanceState(reason) {
     try { console.log('%c[PERF_STATE][WRITE_OK]', 'font-weight:700;color:#3fbf7f', { rowsAffected: audit.rowsAffected, returnedPerformanceHash: returnedHash, durationMs: audit.durationMs }); } catch (_) {}
 
     // IMMEDIATE VERIFY_READ — SELECT ONLY performance_state for the same row. If null after WRITE_OK, STOP.
+    let verifiedPs = null;
     try {
       const v = await supabaseClient.from('user_portfolios').select('performance_state').eq('user_id', currentUser.id).single();
       const vps = v && v.data && v.data.performance_state;
+      verifiedPs = (vps && typeof vps === 'object') ? vps : null;
       audit.verifyRead = { error: v && v.error ? (v.error.message || true) : null, hasPerformanceState: !!(vps && typeof vps === 'object'),
         lifecycleId: vps && vps.lifecycleId, portfolioRevision: vps && vps.portfolioRevision };
       try { console.log('%c[PERF_STATE][VERIFY_READ]', 'font-weight:700;color:#4A82F0', audit.verifyRead); } catch (_) {}
@@ -1223,6 +1248,11 @@ async function _aurixFlushPerformanceState(reason) {
     } catch (ve) { audit.verifyRead = { error: (ve && ve.message) || true, hasPerformanceState: false }; audit.failureReason = 'verify_read_exception'; _aurixPerfWriteAudit = audit; return audit; }
 
     audit.ok = true;
+    // P0-PERFORMANCE-STATE-CONSUMPTION-FIX — adopt the VERIFIED-remote performance_state into the consumed
+    // var NOW, so the writing device renders from it immediately (it is confirmed in remote == what we read
+    // back). Other devices adopt it on their next reconcile. This closes the "wrote OK but UI still pending
+    // until a focus reconcile" gap. Sourced from the remote VERIFY_READ, never from the local candidate.
+    try { if (verifiedPs && typeof verifiedPs === 'object') { _aurixRemotePerformanceState = verifiedPs; if (typeof render === 'function') { try { render(false); } catch (_) {} } } } catch (_) {}
     try { _aurixSyncState.lastPerfStateWriteAt = now; } catch (_) {}
     _aurixPerfWriteAudit = audit;
     return audit;
@@ -21841,12 +21871,13 @@ try {
     window.aurixPerformanceStateDebug = async function (range) {
       const r = range || (typeof activeRange !== 'undefined' ? activeRange : '24h');
       const g = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(r) : {};
-      const psRow = (typeof _aurixRemotePerformanceForRange === 'function') ? _aurixRemotePerformanceForRange(r) : null;
+      const sel = (typeof _aurixSelectRemotePerformance === 'function') ? _aurixSelectRemotePerformance(r) : { ok:false, reason:'helper_absent' };
+      const psRow = sel.row;
       const ps = (typeof _aurixRemotePerformanceState !== 'undefined') ? _aurixRemotePerformanceState : null;
       const authed = (typeof _aurixCurrentUserId === 'function') ? !!_aurixCurrentUserId() : false;
       const meta = (typeof _aurixReadPortfolioMeta === 'function') ? _aurixReadPortfolioMeta() : {};
       const renderedFromRemote = !!g.renderedFromRemote;
-      const isStale = !!(ps && (ps.portfolioRevision || 0) !== (typeof _aurixCurrentRevision === 'function' ? _aurixCurrentRevision() : 0));
+      const _col = (p) => (!Number.isFinite(p)) ? 'pending' : (p > 0.005 ? 'positive' : (p < -0.005 ? 'negative' : 'neutral'));
       const out = {
         build: (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null,
         userId: (typeof _aurixCurrentUserId === 'function') ? _aurixCurrentUserId() : null,
@@ -21859,11 +21890,30 @@ try {
         chartSeriesHash: psRow ? psRow.chartSeriesHash : null,
         displayedReturnPct: g.valid ? g.deltaPct : null,
         displayedReturnValue: g.valid ? g.deltaAbs : null,
-        displayedColor: g.valid ? (g.displayedColor || (g.deltaPct > 0.005 ? 'green' : (g.deltaPct < -0.005 ? 'red' : 'neutral'))) : 'pending',
+        displayedColor: g.valid ? _col(g.deltaPct) : 'pending',
         returnState: g.returnState || null,
-        isStale: isStale,
         blockReason: g.valid ? null : (g.invalidReason || g.blockReason || null),
         renderedFromRemote: renderedFromRemote,
+        // ── P0-PERFORMANCE-STATE-CONSUMPTION-FIX — full selection diagnosis (the 18 fields) ──
+        remotePerformanceStateRawExists: !!(ps && typeof ps === 'object'),
+        remotePerformanceStateRanges: (ps && ps.byRange) ? Object.keys(ps.byRange) : [],
+        requestedRange: r,
+        rangeEntryExists: sel.rangeEntryExists,
+        rangeEntryObject: psRow || null,
+        validationPassed: sel.ok,
+        validationFailureReason: sel.ok ? null : sel.reason,
+        expectedLifecycleId: sel.expectedLifecycleId,
+        performanceLifecycleId: sel.performanceLifecycleId,
+        expectedPortfolioRevision: sel.expectedPortfolioRevision,
+        performancePortfolioRevision: sel.performancePortfolioRevision,
+        revisionComparisonMode: sel.revisionComparisonMode,
+        pendingSync: sel.pendingSync,
+        selectedPerformanceHash: psRow ? psRow.performanceHash : null,
+        selectedChartSeriesHash: psRow ? psRow.chartSeriesHash : null,
+        selectedDisplayedReturnPct: psRow ? psRow.displayedReturnPct : null,
+        selectedDisplayedColor: psRow ? psRow.displayedColor : null,
+        consumerPathUsed: renderedFromRemote ? 'remote_performance_state' : (authed ? 'pending_kill_switch' : 'local_anonymous'),
+        finalDisplayState: g.valid ? 'showing_return' : 'calculando',
       };
       try { console.log('%c[AURIX PERFORMANCE-STATE DEBUG]', 'font-weight:700', out); } catch (_) {}
       return out;

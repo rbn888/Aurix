@@ -32,9 +32,11 @@ function makeEnv(){
   vm.createContext(sb);
   vm.runInContext('var currentUser=null; var _aurixActiveUserId=null; var _aurixRemotePerformanceState=null;', sb);
   vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS=90*1000; const _AURIX_RETURN_FLOW_DOMINANCE=0.5; const _AURIX_RETURN_ESTABLISHED_FRAC=0.80; const _AURIX_RETURN_STABLE_STEP=0.40;', sb);
+  sb._aurixPendingSync = () => false;
   vm.runInContext(fnSrc('_aurixCurrentUserId'), sb);
   vm.runInContext(fnSrc('_aurixCurrentLifecycleId'), sb);
   vm.runInContext(fnSrc('_aurixCurrentRevision'), sb);
+  vm.runInContext(fnSrc('_aurixSelectRemotePerformance'), sb);
   vm.runInContext(fnSrc('_aurixRemotePerformanceForRange'), sb);
   vm.runInContext(fnSrc('_aurixPortfolioCreatedAt'), sb);
   vm.runInContext(fnSrc('_aurixReturnSnapshotStats'), sb);
@@ -62,9 +64,15 @@ console.log('\nRender ONLY from the remote object (both devices read the SAME �
   ok('2 valid remote performance_state → renders EXACTLY it (+3.3%, value 130, green), renderedFromRemote=true',
      g.valid===true && g.deltaPct===3.3 && g.deltaAbs===130 && g.displayedColor==='green' && g.renderedFromRemote===true && g.performanceSource==='remote'); }
 
-console.log('\nReject stale / foreign / old-lifecycle performance_state ⇒ Calculando:');
-{ const sb=makeEnv(); authed(sb); setPS(sb, Object.assign({}, VALID_PS, { portfolioRevision:6 }));
-  ok('3 stale (revision mismatch) → pending', G(sb).valid===false && G(sb).renderedFromRemote===false); }
+console.log('\nRevision: older PS is ACCEPTED when no pending local changes (relaxed <=), but BLOCKED if local moved past it:');
+{ const sb=makeEnv(); authed(sb); setPS(sb, Object.assign({}, VALID_PS, { portfolioRevision:6 }));  // older PS, no pending
+  ok('3a older revision (6 < current 7) + NO pending changes → ACCEPTED (no longer wrongly stale)', G(sb).valid===true && G(sb).renderedFromRemote===true); }
+{ const sb=makeEnv(); authed(sb); sb._aurixPendingSync=()=>true; setPS(sb, Object.assign({}, VALID_PS, { portfolioRevision:6 }));
+  ok('3b older revision + PENDING local changes → BLOCKED (stale_revision_with_pending_changes)', G(sb).valid===false && G(sb).invalidReason!=='remote_performance_pending'); }
+{ const sb=makeEnv(); authed(sb); setPS(sb, Object.assign({}, VALID_PS, { portfolioRevision:9 }));  // future
+  ok('3c FUTURE revision (9 > current 7) → BLOCKED (revision_from_future / corrupt)', G(sb).valid===false); }
+
+console.log('\nReject foreign / old-lifecycle performance_state ⇒ Calculando:');
 { const sb=makeEnv(); authed(sb); setPS(sb, Object.assign({}, VALID_PS, { lifecycleId:'lc-OLD' }));
   ok('4 old lifecycle → pending (reset invalidates prior performance)', G(sb).valid===false); }
 { const sb=makeEnv(); authed(sb); setPS(sb, Object.assign({}, VALID_PS, { userId:'u2' }));
@@ -92,11 +100,16 @@ ok('10 writer: performance_state written via its OWN decoupled UPDATE (NOT the c
 ok('11 kill switch: getValidReturnBaseline renders authed real return ONLY from _aurixRemotePerformanceForRange',
    /if \(!opts\.raw && typeof _aurixRemotePerformanceForRange === 'function'[\s\S]*?_aurixCurrentUserId\(\)\) \{/.test(fnSrc('getValidReturnBaseline')) &&
    /invalidReason: psRow \? 'remote_performance_pending' : 'no_remote_performance_state'/.test(fnSrc('getValidReturnBaseline')));
-ok('12 validity: remote performance rejected unless userId + lifecycleId + portfolioRevision + range match',
-   /if \(ps\.userId !== _aurixCurrentUserId\(\)\) return null;[\s\S]*?if \(ps\.lifecycleId !== _aurixCurrentLifecycleId\(\)\) return null;[\s\S]*?if \(\(ps\.portfolioRevision \|\| 0\) !== _aurixCurrentRevision\(\)\) return null;/.test(fnSrc('_aurixRemotePerformanceForRange')));
-ok('13 debug: aurixPerformanceStateDebug exposes renderedFromRemote + hasRemotePerformanceState + blockReason',
+ok('12 validity (in _aurixSelectRemotePerformance): user + lifecycle match, relaxed revision (<= + no-pending), normalized range key',
+   /if \(ps\.userId !== _aurixCurrentUserId\(\)\) \{ out\.reason = 'user_mismatch'/.test(fnSrc('_aurixSelectRemotePerformance')) &&
+   /if \(ps\.lifecycleId !== out\.expectedLifecycleId\) \{ out\.reason = 'lifecycle_mismatch'/.test(fnSrc('_aurixSelectRemotePerformance')) &&
+   /if \(psRev > cur\) \{ out\.reason = 'revision_from_future'/.test(fnSrc('_aurixSelectRemotePerformance')) &&
+   /if \(psRev < cur && out\.pendingSync\) \{ out\.reason = 'stale_revision_with_pending_changes'/.test(fnSrc('_aurixSelectRemotePerformance')) &&
+   /String\(range \|\| \(typeof activeRange/.test(fnSrc('_aurixSelectRemotePerformance')));
+ok('13 debug: aurixPerformanceStateDebug exposes the consumption diagnosis (renderedFromRemote + validation + selection)',
    /window\.aurixPerformanceStateDebug = async function/.test(app) &&
-   ['renderedFromRemote','hasRemotePerformanceState','performanceSource','performanceHash','chartSeriesHash','isStale','blockReason']
+   ['renderedFromRemote','hasRemotePerformanceState','performanceSource','performanceHash','chartSeriesHash','blockReason',
+    'validationPassed','validationFailureReason','rangeEntryExists','remotePerformanceStateRanges','consumerPathUsed','finalDisplayState']
      .every(k => app.indexOf(k + ':') !== -1));
 
 console.log('\nDecoupling — performance_state sync is independent of the holdings merge (apply:"local" cannot drop it):');
