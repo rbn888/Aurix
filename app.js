@@ -21683,15 +21683,71 @@ function _aurixPaintReturnBadge(el, surface) {
     try { console.log('[UI][RETURN_BADGE_PAINT]', { surface: surface, found: true, returnState: g && g.returnState, displayedReturnPct: (g && g.valid) ? g.deltaPct : null, textBefore: textBefore, textAfter: el.textContent }); } catch (_) {}
   } catch (_) {}
 }
-// Repaint BOTH return badges from the current canonical state — the authoritative last-writer.
+// P0-FINAL-VISIBLE-BADGE-BINDING — find EVERY return badge in the DOM, not just #chartChange/#chartChangeMobile.
+// The visible "Calculando…" turned out to be a DIFFERENT node (a duplicate / alternate badge) that the two
+// hard-coded ids never reached. Collect: the two ids, every .chart-change element (the badge class — desktop +
+// mobile + any duplicate), and the host of every .wsc-metric-calc span (our exact pending markup, wherever it
+// was rendered). De-duped. PURE READ of the DOM.
+function _aurixFindReturnBadgeNodes() {
+  const set = new Set();
+  try {
+    if (typeof document === 'undefined') return [];
+    const add = n => { if (n && n.nodeType === 1) set.add(n); };
+    document.querySelectorAll('#chartChange, #chartChangeMobile').forEach(add);   // ids (incl. accidental duplicates)
+    document.querySelectorAll('.chart-change').forEach(add);                       // the badge class (the canonical return surface)
+    document.querySelectorAll('.wsc-metric-calc').forEach(span => add(span.closest('.chart-change') || span.parentElement));  // any node currently showing OUR "Calculando…"
+  } catch (_) {}
+  return Array.from(set);
+}
+function _aurixNodeIsVisible(el) {
+  try {
+    if (!el || typeof window === 'undefined' || !window.getComputedStyle) return true;
+    const cs = window.getComputedStyle(el); const r = el.getBoundingClientRect();
+    return cs.display !== 'none' && cs.visibility !== 'hidden' && parseFloat(cs.opacity || '1') > 0.01 && (r.width > 0 || r.height > 0);
+  } catch (_) { return true; }
+}
+// Repaint ALL return badges from the current canonical state — the authoritative last-writer, every node.
 function _aurixRepaintReturnBadges(reason) {
   try {
     if (typeof document === 'undefined') return;
-    _aurixPaintReturnBadge(document.getElementById('chartChange'), 'desktop');
-    _aurixPaintReturnBadge(document.getElementById('chartChangeMobile'), 'mobile');
+    const nodes = _aurixFindReturnBadgeNodes();
+    nodes.forEach(n => { try { _aurixPaintReturnBadge(n, (n.id || ('.' + (String(n.className || '').split(' ')[0] || 'chart-change')))); } catch (_) {} });
+    // [UI][RETURN_BADGE_BINDING] — prove no visible node is left in "Calculando…" once ready.
+    try {
+      const pend = t => /calculando/i.test(String(t == null ? '' : t));
+      let visiblePending = 0, visibleReady = 0;
+      nodes.forEach(n => { const vis = _aurixNodeIsVisible(n); if (pend(n.textContent)) { if (vis) visiblePending++; } else if (vis) visibleReady++; });
+      console.log('[UI][RETURN_BADGE_BINDING]', { reason: reason || null, totalFound: nodes.length, visiblePendingNodes: visiblePending, visibleReadyNodes: visibleReady, paintedNodes: nodes.length, skippedNodes: 0 });
+    } catch (_) {}
   } catch (_) {}
 }
 try { if (typeof window !== 'undefined') window.aurixRepaintReturnBadges = _aurixRepaintReturnBadges; } catch (_) {}
+// P0-FINAL-VISIBLE-BADGE-BINDING — DOM diagnosis: every node showing "Calculando…" vs the formatted value,
+// with visibility, so a stray VISIBLE pending node (not #chartChange/#chartChangeMobile) is immediately found.
+try {
+  if (typeof window !== 'undefined') {
+    window.aurixReturnBadgeDomDebug = function () {
+      const pend = t => /calculando/i.test(String(t == null ? '' : t));
+      const desc = n => { try { return { id: n.id || null, className: n.className || null, textContent: (n.textContent || '').trim().slice(0, 40), outerHTML: (n.outerHTML || '').slice(0, 160), rect: (function(){ const r = n.getBoundingClientRect(); return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }; })(), display: getComputedStyle(n).display, visibility: getComputedStyle(n).visibility, opacity: getComputedStyle(n).opacity, isVisible: _aurixNodeIsVisible(n), isChartChange: n.id === 'chartChange', isChartChangeMobile: n.id === 'chartChangeMobile' }; } catch (_) { return { error: true }; } };
+      const all = Array.from(document.querySelectorAll('body *'));
+      const calc = all.filter(n => n.children.length === 0 || /wsc-metric-calc/.test(n.className || '')).filter(n => pend(n.textContent));
+      const val = all.filter(n => /chart-change|wsc-metric-val|perf-hero/.test(String(n.className || ''))).filter(n => !pend(n.textContent) && /[-+]?\d/.test(n.textContent || ''));
+      const g = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(typeof activeRange !== 'undefined' ? activeRange : '24h') : {};
+      const out = {
+        activeRange: (typeof activeRange !== 'undefined') ? activeRange : null,
+        returnState: g.returnState, displayedReturnPct: g.valid ? g.deltaPct : null,
+        allCalculandoNodes: calc.map(desc),
+        allReadyValueNodes: val.map(desc),
+        visibleCalculandoNodes: calc.filter(_aurixNodeIsVisible).map(desc),
+        visibleReadyValueNodes: val.filter(_aurixNodeIsVisible).map(desc),
+        chartChangeNode: (function(){ const n = document.getElementById('chartChange'); return n ? desc(n) : null; })(),
+        chartChangeMobileNode: (function(){ const n = document.getElementById('chartChangeMobile'); return n ? desc(n) : null; })(),
+      };
+      try { console.log('%c[UI][RETURN_BADGE_DOM_DEBUG]', 'font-weight:700', out); } catch (_) {}
+      return out;
+    };
+  }
+} catch (_) {}
 try {
   if (typeof window !== 'undefined') {
     window.aurixReturnDebug = function (range) {
