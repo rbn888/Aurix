@@ -5471,6 +5471,15 @@ const STORAGE_KEY    = 'portfolio_assets';
 // consts are initialised ahead of first use. Kill switch: _AURIX_BLOCK_DESTRUCTIVE_SAVES=false.
 const _AURIX_BLOCK_DESTRUCTIVE_SAVES = true;
 const _AURIX_DESTRUCTIVE_CONTEXTS = ['delete-asset','sell','reduce-position','reset','edit-transaction','migration-confirmed','remote-reset'];
+// P0-HISTORY-PARITY-BLOCKER — diagnosis-only telemetry. Counts (does NOT change) the two rejection
+// paths the founder is seeing, so aurixHistoryDebug() can prove whether they cause history divergence:
+//  • snapshot-guard rejects (a snapshot point dropped before it enters portfolio/category history),
+//  • destructive-save blocks (a catalog/holdings save refused by the integrity lock / event journal).
+// Pure observation; the guards themselves are untouched.
+const _aurixGuardTelemetry = {
+  snapshotRejected: 0, lastRejectReason: null, lastRejectTs: null,
+  saveBlocked: 0, lastSaveBlockReason: null, lastSaveBlockAt: null,
+};
 const _aurixSaveAuditLog = [];
 let _aurixLastDestructiveSaveAt = 0;   // ms — set when an explicit destructive write is permitted
 function _aurixCountModel(catalogAssets, holdings) {
@@ -6967,12 +6976,14 @@ function saveData({ assets: catalogAssets, holdings }, context) {
   _aurixAuditSave(verdict, context);
   if (!verdict.allowed && _AURIX_BLOCK_DESTRUCTIVE_SAVES) {
     try { console.error('[DATA][SAVE_BLOCKED_DESTRUCTIVE]', verdict.reason, { context: context || null }); } catch (_) {}
+    try { _aurixGuardTelemetry.saveBlocked++; _aurixGuardTelemetry.lastSaveBlockReason = verdict.reason || 'destructive_count_reduction'; _aurixGuardTelemetry.lastSaveBlockAt = Date.now(); } catch (_) {}
     return { blocked: true, verdict };
   }
   // P0-DATA-JOURNAL guardrail: block a same-count save that drops a journal-proven asset
   // (id-swap / silent removal) unless an explicit destructive context authorises it.
   if (_AURIX_BLOCK_DESTRUCTIVE_SAVES && _aurixJournalContradictsSave(catalogAssets, context)) {
     try { console.error('[DATA][SAVE_BLOCKED_DESTRUCTIVE] contradicts event journal (a recorded asset would vanish)', { context: context || null }); } catch (_) {}
+    try { _aurixGuardTelemetry.saveBlocked++; _aurixGuardTelemetry.lastSaveBlockReason = 'contradicts_event_journal'; _aurixGuardTelemetry.lastSaveBlockAt = Date.now(); } catch (_) {}
     _aurixAuditSave({ allowed: false, destructive: true, reason: 'contradicts event journal', previous: previous, next: next }, context);
     return { blocked: true, verdict: { allowed: false, reason: 'contradicts event journal' } };
   }
@@ -8263,6 +8274,7 @@ function _aurixGuardSnapshot(next, prevValid, surface) {
       deltaPct: res.details && res.details.deltaPct,
       when: Number.isFinite(next.ts) ? new Date(next.ts).toISOString() : null };
     _aurixPushRejected(rec);
+    try { _aurixGuardTelemetry.snapshotRejected++; _aurixGuardTelemetry.lastRejectReason = res.reason; _aurixGuardTelemetry.lastRejectTs = next.ts; } catch (_) {}
     try { console.warn('[AURIX][snapshot-guard] rejected', rec); } catch (_) {}
     return true;
   }
@@ -21325,6 +21337,22 @@ try {
       const color = !g.valid ? 'pending' : (g.deltaPct > 0.005 ? 'green' : (g.deltaPct < -0.005 ? 'red' : 'neutral'));
       const pendingSync = (typeof _aurixPendingSync === 'function') ? _aurixPendingSync() : null;
       const remoteLoad = (typeof _aurixSyncState !== 'undefined' && _aurixSyncState) ? _aurixSyncState.lastRemoteLoadStatus : null;
+      // P0-HISTORY-PARITY-BLOCKER — guard/journal rejection telemetry (diagnosis only).
+      const _gt = (typeof _aurixGuardTelemetry !== 'undefined') ? _aurixGuardTelemetry : {};
+      // The in-memory diagnostic ring of rejected snapshots (NOT a retry queue — these are discarded).
+      const _rejected = (typeof window !== 'undefined' && Array.isArray(window.__AURIX_REJECTED_SNAPSHOTS__)) ? window.__AURIX_REJECTED_SNAPSHOTS__ : [];
+      const rejectedIds = _rejected.map(x => x && x.ts).filter(t => Number.isFinite(t));
+      // ACCEPTED = the snapshots that passed the guard and entered local category history (post-epoch).
+      let acceptedIds = [];
+      try {
+        const epoch = (typeof _aurixPortfolioEpoch === 'function') ? (_aurixPortfolioEpoch() || 0) : 0;
+        acceptedIds = (typeof categoryHistory !== 'undefined' && Array.isArray(categoryHistory))
+          ? categoryHistory.filter(p => p && Number.isFinite(p.ts) && (!epoch || p.ts >= epoch)).map(p => p.ts) : [];
+      } catch (_) {}
+      // The append-only event journal is LOCAL-ONLY (never written to Supabase) → there is NO remote
+      // journal revision to compare. journalRevision = local event count (device-relative by design).
+      let journalRevision = null;
+      try { journalRevision = (typeof _aurixJournalRead === 'function') ? _aurixJournalRead().length : null; } catch (_) {}
       const out = {
         userId:            (typeof _aurixActiveUserId !== 'undefined' && _aurixActiveUserId) ? _aurixActiveUserId : ((typeof currentUser !== 'undefined' && currentUser) ? currentUser.id : null),
         deviceId:          (typeof _aurixDeviceId === 'function') ? _aurixDeviceId() : null,
@@ -21358,6 +21386,21 @@ try {
         remoteLoadStatus:  remoteLoad,
         duplicateSnapshots: dups,
         historyBuildReason: can.reason,
+        // ── P0-HISTORY-PARITY-BLOCKER — guard / journal rejection telemetry (diagnosis only) ──
+        snapshotGuardRejectedCount: _gt.snapshotRejected != null ? _gt.snapshotRejected : null,
+        saveBlockedDestructiveCount: _gt.saveBlocked != null ? _gt.saveBlocked : null,
+        lastSnapshotRejectedReason: _gt.lastRejectReason != null ? _gt.lastRejectReason : null,
+        lastRejectedTimestamp: Number.isFinite(_gt.lastRejectTs) ? new Date(_gt.lastRejectTs).toISOString() : null,
+        lastSaveBlockedReason: _gt.lastSaveBlockReason != null ? _gt.lastSaveBlockReason : null,
+        journalRevision: journalRevision,
+        // Journal is local-only (not synced to Supabase) ⇒ no remote journal revision exists.
+        remoteJournalRevision: null,
+        snapshotGuardState: (typeof _AURIX_SNAPSHOT_GUARD !== 'undefined') ? { enabled: true, config: _AURIX_SNAPSHOT_GUARD } : { enabled: true },
+        destructiveGuardState: { blockEnabled: (typeof _AURIX_BLOCK_DESTRUCTIVE_SAVES !== 'undefined') ? _AURIX_BLOCK_DESTRUCTIVE_SAVES : null, lastBlockedAt: Number.isFinite(_gt.lastSaveBlockAt) ? new Date(_gt.lastSaveBlockAt).toISOString() : null },
+        // These are DISCARDED, not queued — the count is the in-memory diagnostic ring, never retried/synced.
+        pendingRejectedSnapshots: rejectedIds.length,
+        rejectedSnapshotIds: rejectedIds,
+        acceptedSnapshotIds: acceptedIds,
       };
       try { console.log('%c[AURIX HISTORY DEBUG]', 'font-weight:700', out); } catch (_) {}
       return out;
