@@ -27459,15 +27459,25 @@ function updateChart(animate = false) {
   // the tooltip mode — the header always carries both figures.
   // AURIX-DASHBOARD-PREMIUM-POLISH-1: show ONLY the metric the toggle selects —
   // percent in '%' mode, money in '$/€' mode (never both). Colour by sign.
-  if (!safeBase) {
+  // RETURN-PENDING-FINAL — this legacy Chart.js path only paints the headline as a FALLBACK
+  // (V2 overlay not mounted). It still uses a raw (non-flow-neutral) formula, so gate it behind
+  // the SAME baseline guard: no valid baseline ⇒ premium "Calculando…", never a false loss.
+  const _gretLegacy = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(activeRange) : { valid: true };
+  if (!_gretLegacy.valid) {
+    chartChangeEl.innerHTML = _aurixReturnPendingHTML();
+    chartChangeEl.className = 'chart-change calculating';
+  } else if (!safeBase) {
     chartChangeEl.textContent = '—';
-  } else if (activePerfMode === 'curr') {
-    const absChange = currentValue - startValue;
-    chartChangeEl.textContent = `${absChange >= 0 ? '+' : ''}${formatBase(absChange)}`;
+    chartChangeEl.className = `chart-change ${cls}`;
   } else {
-    chartChangeEl.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+    if (activePerfMode === 'curr') {
+      const absChange = currentValue - startValue;
+      chartChangeEl.textContent = `${absChange >= 0 ? '+' : ''}${formatBase(absChange)}`;
+    } else {
+      chartChangeEl.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+    }
+    chartChangeEl.className = `chart-change ${cls}`;
   }
-  chartChangeEl.className = `chart-change ${cls}`;
 
   portfolioChart.data.labels = data.labels;
   portfolioChart.data.datasets[0].data = data.values;

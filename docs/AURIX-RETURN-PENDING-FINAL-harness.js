@@ -56,6 +56,9 @@ ok('7 "Resumen de rendimiento" hero is also gated — no false -89% loss in the 
    /const _gret = \(typeof getValidReturnBaseline === 'function'\) \? getValidReturnBaseline\(activeRange\)/.test(fnSrc('_dshPaintPerfSnapshot')) &&
    /const _pending = !!snap && !_gret\.valid;/.test(fnSrc('_dshPaintPerfSnapshot')) &&
    /_pending \? _aurixReturnPendingHTML\(\)/.test(fnSrc('_dshPaintPerfSnapshot')));
+ok('7b legacy Chart.js fallback headline (updateChart) is also gated — no raw false return',
+   /const _gretLegacy = \(typeof getValidReturnBaseline === 'function'\) \? getValidReturnBaseline\(activeRange\)/.test(fnSrc('updateChart')) &&
+   /if \(!_gretLegacy\.valid\) \{\s*chartChangeEl\.innerHTML = _aurixReturnPendingHTML\(\);\s*chartChangeEl\.className = 'chart-change calculating';/.test(fnSrc('updateChart')));
 
 console.log('\nWeb ⇄ mobile parity (same node content):');
 ok('8 recon headline mirrors innerHTML (not textContent) to #chartChangeMobile',
