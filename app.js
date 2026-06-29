@@ -1190,7 +1190,7 @@ let lang = localStorage.getItem(LANG_KEY) || 'es';
 const T = {
   es: {
     // Summary
-    totalValue:      'Valor total de cartera',
+    totalValue:      'Valor total',
     addAsset:        '+ Añadir activo',
     addLiquidity:    '+ Añadir liquidez',
     noPrices:        'precios no cargados',
@@ -3303,7 +3303,7 @@ const T = {
   },
   en: {
     // Summary
-    totalValue:      'Total portfolio value',
+    totalValue:      'Total value',
     addAsset:        '+ Add asset',
     addLiquidity:    '+ Add liquidity',
     noPrices:        'prices not loaded',

@@ -86,8 +86,8 @@ ok('16 hover scale ≤1.05 + glow + 160ms; ~10s breathing (≤1.02); reduced-mot
    /@keyframes aurixMcdBreath \{ 0%, 90%, 100% \{ transform: scale\(1\); \} 95% \{ transform: scale\(1\.02\); \} \}/.test(css) &&
    /\.mcd-ring \{[^}]*animation: aurixMcdBreath 10s/.test(css) &&
    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.mcd-track \{ animation: none; stroke-dashoffset: 0; \}/.test(css));
-ok('16b independent premium 54px donut, moved ~60px right of the pill',
-   /\.micro-composition-donut \{[^}]*width: 54px; height: 54px/.test(css) && /\.aurix-signal-row \{ gap: 60px; \}/.test(css));
+ok('16b independent premium donut (58px after HERO-PREMIUM-POLISH +~7%), moved ~60px right of the pill',
+   /\.micro-composition-donut \{[^}]*width: 58px; height: 58px/.test(css) && /\.aurix-signal-row \{ gap: 60px; \}/.test(css));
 
 console.log('\nDSH.DONUT.03 — final UX:');
 ok('21 mini: outer ring removed + crisp butt-cap slices (no round/blur)',
@@ -114,8 +114,8 @@ ok('26 close fade+scale via .modal--composition (X / Cerrar / Escape / backdrop 
    /getElementById\('compositionClose'\); if \(x\) x\.addEventListener\('click', closeCompositionModal\)/.test(app));
 
 console.log('\nDSH.DONUT.04 — final premium pass:');
-ok('27 thicker SOLID mini ring (12px, smaller hole) + 50px svg',
-   /\.mcd-segs circle \{ stroke-width: 12; \}/.test(css) && /\.mcd-ring \{ width: 50px; height: 50px; \}/.test(css) &&
+ok('27 thicker SOLID mini ring (12px, smaller hole) + 54px svg (HERO-PREMIUM-POLISH +8%)',
+   /\.mcd-segs circle \{ stroke-width: 12; \}/.test(css) && /\.mcd-ring \{ width: 54px; height: 54px;/.test(css) &&
    /_aurixDonutRevealSVG\(entries, 18, 25, 25, 12, 1\.0, \{ reveal: reveal, uid: 'mcdMaskMini', vb: 50 \}\)/.test(app));
 ok('28 mini repositioned: down ~18px + right ~24px; subtle halo, no dark frame',
    /\.micro-composition-donut \{[\s\S]*?margin-top: 18px; margin-left: 24px;[\s\S]*?background: transparent;/.test(css));

@@ -597,30 +597,37 @@ button[aria-busy="true"] {
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.07),
     0 1px 2px rgba(0,0,0,0.18);
+  /* P0-HERO-PREMIUM-POLISH: white label (was accent-on-accent, low contrast) so the
+     primary action reads instantly. Border + fill kept exactly as before. */
+  color: #fff;
 }
 .btn-summary-action.btn-primary:hover {
-  /* Scoped hover (more specific than the generic .btn-primary:hover that zeroes
-     the shadow) so the lit-glass material persists and lifts a touch. */
-  background: linear-gradient(180deg, rgba(74,130,240,0.22), rgba(74,130,240,0.14));
+  /* P0-HERO-PREMIUM-POLISH: hover fills with solid electric blue + white text so it
+     unmistakably reads as THE primary action. Scoped (beats the generic hover). */
+  background: linear-gradient(180deg, #4f8bff, #3f78ee);
+  border-color: rgba(74,130,240,0.70);
+  color: #fff;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.10),
-    0 2px 4px rgba(0,0,0,0.20),
-    0 6px 18px -6px rgba(74,130,240,0.28);
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    0 2px 6px rgba(0,0,0,0.22),
+    0 8px 20px -6px rgba(74,130,240,0.45);
 }
 .btn-summary-action.btn-secondary {
   /* AURIX-WEALTH-CARD-HIERARCHY-REFINEMENT-1: lift the secondary to the same
      visual level as the primary — brighter text, a present premium outline and
      a faint fill — so "Añadir liquidez" reads as an equal action, not a faded
      ghost. Stays neutral (vs the primary's Aurix-blue) to keep the hierarchy. */
-  background: rgba(255,255,255,0.04);
-  border-color: rgba(255,255,255,0.16);
-  color: var(--text);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+  /* P0-HERO-PREMIUM-POLISH: secondary = transparent fill + electric-blue outline +
+     white text. Clear contrast vs the dark hero, clear hierarchy vs the FILLED primary. */
+  background: transparent;
+  border-color: rgba(74,130,240,0.55);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
 }
 .btn-summary-action.btn-secondary:hover {
-  background: rgba(255,255,255,0.075);
-  border-color: rgba(255,255,255,0.28);
-  color: var(--text);
+  background: rgba(74,130,240,0.12);
+  border-color: rgba(74,130,240,0.85);
+  color: #fff;
 }
 .btn-primary:hover,
 .btn-secondary:hover {
@@ -795,6 +802,19 @@ button[aria-busy="true"] {
 @media (min-width: 769px) {
   .summary-hero-zone .summary-label { margin-bottom: 20px; }   /* label → figure breathes */
   .summary-hero-zone .summary-total { margin-bottom: 18px; }   /* figure → meta separation */
+  /* P0-HERO-PREMIUM-POLISH: a more relaxed vertical rhythm between the meta line
+     ("N activos · Actualizado…") and the analytic state row (Riesgo + Ver análisis).
+     Spacing only — typography/sizes untouched. */
+  .summary-hero-zone .aurix-signal-row { margin-top: 16px; }
+  /* P0-HERO-PREMIUM-POLISH: more solidity for the wealth figure WITHOUT enlarging it —
+     same Aurix family, semibold weight + lining tabular numerals + a hair tighter
+     tracking. DESKTOP ONLY (mobile figure untouched). */
+  .summary-hero-zone .summary-total {
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: -0.6px;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
 }
 
 /* ── Assets Section ────────────────────────────────────── */
@@ -3052,7 +3072,7 @@ body:not(.hero-active) #orb-canvas {
   position: relative;
   overflow: hidden;
   display: grid;
-  grid-template-columns: 1fr 1.72fr;   /* WN.26 PART 2 — desktop hero/chart split 40/60 → ~37/63 (chart wider, more institutional). Mobile/tablet override to flex column, unaffected. */
+  grid-template-columns: 1fr 1.58fr;   /* WN.26 PART 2 — desktop hero/chart split. P0-HERO-PREMIUM-POLISH: nudged ~37/63 → ~39/61 so the wealth block gains horizontal breathing and reads as the equal/primary protagonist (number size unchanged; balance via distribution only). Mobile/tablet override to flex column, unaffected. */
   align-items: stretch;   /* both columns fill full height — keeps divider intact */
   transition: border-color var(--dur-med) var(--ease-premium),
               box-shadow var(--dur-med) var(--ease-out);
@@ -22831,7 +22851,7 @@ body.aurix-premium-lock{ overflow:hidden; }
    protagonist, 2-column legend, per-segment tooltip. Desktop only. ════════ */
 @media (min-width: 769px) {
   .micro-composition-donut {
-    width: 54px; height: 54px; margin-top: 18px; margin-left: 24px;   /* down ~18px, right ~24px */
+    width: 58px; height: 58px; margin-top: 18px; margin-left: 24px;   /* P0-HERO-PREMIUM-POLISH: +~7% (54→58) — still a support element, never the protagonist; position/separation unchanged */
     background: transparent;                                           /* no dark frame */
     border: 1px solid rgba(120,170,255,0.14);                         /* barely-there ring */
     box-shadow: 0 0 14px -4px rgba(74,130,240,0.34);                  /* subtle exterior halo only */
@@ -22842,7 +22862,7 @@ body.aurix-premium-lock{ overflow:hidden; }
     box-shadow: 0 0 18px 1px rgba(74,130,240,0.50);
   }
 }
-.mcd-ring { width: 50px; height: 50px; }
+.mcd-ring { width: 54px; height: 54px; }   /* P0-HERO-PREMIUM-POLISH: +8% (50→54) in step with the 54→58 button; ring proportions unchanged */
 .mcd-segs circle { stroke-width: 9.5; }   /* solid financial ring, not a thin loader */
 
 /* Modal — wider compact executive panel; donut is the protagonist */
