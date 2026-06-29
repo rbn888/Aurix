@@ -736,15 +736,48 @@ function _mergeCategoryByTs(localArr, remoteArr) {
 // then an authenticated/online device stays in "Calculando…". localStorage remains a CACHE of the
 // shared history (merged here), never a substitute. No new polling — set by the existing boot +
 // focus/visibility/pageshow reconcile path. Touches no holdings sync / integrity lock / journal.
-let _aurixCanonicalHistoryLoaded = false;
+// P0-HISTORY-SYNC-FINAL-FIX — v425 gated only on "reconciled at least once", which was NOT enough:
+// the union merge KEEPS each device's local-only points, so two devices could hold DIFFERENT bodies
+// (⇒ different baseline ⇒ different %/chart) yet both report "loaded". The real gate is HASH EQUALITY:
+// a device leaves "Calculando…" only when its local canonical history BODY hash equals the remote
+// canonical body hash — i.e. it has fully adopted the same shared series. The "body" excludes the live
+// tail (<2 min) so the independent per-device 30 s snapshots never block parity forever; baseline +
+// chart shape live in the body, so body parity ⇒ same baseline/%/color. The more-complete device
+// pushes its reconciled superset (via the existing throttled flush) so the other converges (#4/#6).
+let _aurixCanonicalHistoryLoaded = false;   // remote reachable + reconciled this session
+let _aurixRemoteCanonicalHash = null;       // body hash of the remote canonical history at last reconcile
+let _aurixLocalCanonicalHash  = null;       // body hash of the local (adopted/merged) history at last reconcile
+const _AURIX_CANONICAL_TAIL_MS = 120000;    // exclude the live tail (<2 min) from the parity body
+// Deterministic, device-independent hash of the SETTLED canonical history body: post-lifecycle, valid,
+// deduped-by-ts, sorted, live-tail excluded. Two devices holding the same shared history → same hash.
+function _aurixCanonicalBodyHash(arr) {
+  try {
+    if (!Array.isArray(arr)) arr = [];
+    const epoch = (typeof _aurixPortfolioEpoch === 'function') ? (_aurixPortfolioEpoch() || 0) : 0;
+    const cutoff = ((typeof Date !== 'undefined') ? Date.now() : 0) - _AURIX_CANONICAL_TAIL_MS;
+    const seen = {};
+    for (const p of arr) {
+      if (!p || typeof p.ts !== 'number' || !Number.isFinite(p.ts)) continue;
+      if (epoch && p.ts < epoch) continue;                                   // post-lifecycle only (no pre-reset)
+      if (p.ts > cutoff) continue;                                           // exclude the live tail
+      if (typeof _aurixCategoryPointValid === 'function' && !_aurixCategoryPointValid(p)) continue;  // no corrupt/dup-schema
+      seen[p.ts] = (Number(p.total) || 0).toFixed(2);                        // dedup by ts (last wins)
+    }
+    const keys = Object.keys(seen).map(Number).sort((a, b) => a - b);        // canonical order
+    return _aurixHistoryHash(keys.map(ts => ts + ':' + seen[ts]));
+  } catch (_) { return null; }
+}
 function _aurixCanonicalHistoryReady() {
   try {
     // Anonymous / not signed in: no remote authority exists ⇒ local IS canonical (single device).
     const authed = (typeof currentUser !== 'undefined' && currentUser && currentUser.id);
     if (!authed) return true;
   } catch (_) { return true; }
-  // Authenticated: require ≥1 successful remote reconcile this session (shared history downloaded).
-  return _aurixCanonicalHistoryLoaded === true;
+  // Authenticated: reconciled this session AND the local canonical body matches the remote canonical
+  // body (the device has fully adopted the shared history — no divergent local-only body points).
+  return _aurixCanonicalHistoryLoaded === true
+      && _aurixLocalCanonicalHash != null
+      && _aurixLocalCanonicalHash === _aurixRemoteCanonicalHash;
 }
 // Reconcile remote state into local memory + localStorage at boot. Called
 // from initPortfolioData with the row from loadPortfolioFromBackend.
@@ -760,10 +793,18 @@ function _mergeRemoteState(remoteRow) {
     //    the remote row, ignore remote history so a reset never resurrects.
     const remoteHist = (!distrust && remoteRow && Array.isArray(remoteRow.portfolio_history)) ? remoteRow.portfolio_history : [];
     const remoteCat  = (!distrust && remoteRow && Array.isArray(remoteRow.category_history))  ? remoteRow.category_history  : [];
+    // P0-HISTORY-SYNC-FINAL-FIX — remote canonical body hash (the shared authority), then adopt the
+    // reconciled union locally and re-hash. Parity is decided by these two (see _aurixCanonicalHistoryReady).
+    _aurixRemoteCanonicalHash = _aurixCanonicalBodyHash(remoteCat);
     portfolioHistory = _mergeHistoryByTs(portfolioHistory, remoteHist);
     categoryHistory  = _mergeCategoryByTs(categoryHistory, remoteCat);
+    _aurixLocalCanonicalHash = _aurixCanonicalBodyHash(categoryHistory);
     try { saveHistory(); } catch (_) {}
     try { saveCategoryHistory(); } catch (_) {}
+    // #4/#6 — if the adopted body is MORE complete than remote (local-only historical points), this
+    // device is the more-complete source: push the reconciled superset so remote becomes canonical and
+    // the other device converges to the same body. Uses the existing throttled flush (no holdings change).
+    try { if (_aurixCanonicalHistoryLoaded && _aurixLocalCanonicalHash !== _aurixRemoteCanonicalHash && typeof scheduleStateFlush === 'function') scheduleStateFlush(); } catch (_) {}
 
     // ── Watchlist (last-write-wins, deletion-preserving).
     const remoteTs   = (!distrust && remoteRow && remoteRow.watchlist_updated_at)
@@ -21309,6 +21350,11 @@ try {
         // (⇒ may differ from the other device until it syncs). Compare historyHash across devices to confirm.
         historyMismatch:   pendingSync,
         canonicalHistoryLoaded: (typeof _aurixCanonicalHistoryReady === 'function') ? _aurixCanonicalHistoryReady() : null,
+        // P0-HISTORY-SYNC-FINAL-FIX — the parity gate. When localCanonicalHash === remoteCanonicalHash on
+        // both devices, baseline/%/chart MUST match. Compare these between web and mobile for proof.
+        localCanonicalHash:  (typeof _aurixLocalCanonicalHash !== 'undefined') ? _aurixLocalCanonicalHash : null,
+        remoteCanonicalHash: (typeof _aurixRemoteCanonicalHash !== 'undefined') ? _aurixRemoteCanonicalHash : null,
+        historyHashMatch:    (typeof _aurixLocalCanonicalHash !== 'undefined' && _aurixLocalCanonicalHash != null) ? (_aurixLocalCanonicalHash === _aurixRemoteCanonicalHash) : null,
         remoteLoadStatus:  remoteLoad,
         duplicateSnapshots: dups,
         historyBuildReason: can.reason,

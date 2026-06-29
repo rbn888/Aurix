@@ -27,7 +27,7 @@ function makeEnv(){
   sb._aurixEligibleInvestableSeries = () => ({ series:[{ts:NOW-10*DAY,value:4000},{ts:NOW,value:4120}], meta:{anchor:4120,reasons:{}} });
   sb._aurixLoadCapitalFlows = () => [];
   vm.createContext(sb);
-  vm.runInContext('var currentUser = null; var _aurixCanonicalHistoryLoaded = false;', sb);
+  vm.runInContext('var currentUser = null; var _aurixCanonicalHistoryLoaded = false; var _aurixLocalCanonicalHash = null; var _aurixRemoteCanonicalHash = null;', sb);
   vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS=90*1000; const _AURIX_RETURN_FLOW_DOMINANCE=0.5; const _AURIX_RETURN_ESTABLISHED_FRAC=0.80; const _AURIX_RETURN_STABLE_STEP=0.40;', sb);
   vm.runInContext(fnSrc('_aurixCanonicalHistoryReady'), sb);
   vm.runInContext(fnSrc('_aurixPortfolioCreatedAt'), sb);
@@ -43,23 +43,30 @@ const ready = (sb) => vm.runInContext('_aurixCanonicalHistoryReady()', sb);
 
 console.log('AURIX-HISTORY-SYNC-AUTHORITY — shared snapshot store\n');
 
-console.log('Readiness — authenticated devices must reconcile remote history first:');
+console.log('Readiness — authenticated devices need HASH-EQUAL local/remote canonical history:');
 { const sb=makeEnv(); vm.runInContext('currentUser={id:"u1"};', sb);
   ok('1 authenticated + remote NOT yet reconciled → not ready', ready(sb)===false); }
-{ const sb=makeEnv(); vm.runInContext('currentUser={id:"u1"}; _aurixCanonicalHistoryLoaded=true;', sb);
-  ok('2 authenticated + remote reconciled → ready', ready(sb)===true); }
+{ const sb=makeEnv(); vm.runInContext('currentUser={id:"u1"}; _aurixCanonicalHistoryLoaded=true; _aurixLocalCanonicalHash="abc12345"; _aurixRemoteCanonicalHash="abc12345";', sb);
+  ok('2 authenticated + local hash === remote hash → ready', ready(sb)===true); }
 { const sb=makeEnv();   // anonymous: no remote authority ⇒ local IS canonical (single device)
   ok('3 anonymous (no currentUser) → ready (local canonical, no cross-device divergence)', ready(sb)===true); }
+{ // THE v425 INSUFFICIENCY: reconciled "once" but bodies DIFFER ⇒ must NOT be ready (this is the fix)
+  const sb=makeEnv(); vm.runInContext('currentUser={id:"u1"}; _aurixCanonicalHistoryLoaded=true; _aurixLocalCanonicalHash="LOCAL_ahead"; _aurixRemoteCanonicalHash="remote_old";', sb);
+  ok('3b authed + loaded but local hash !== remote hash → NOT ready (divergent body blocked)', ready(sb)===false); }
 
-console.log('\nThe gate — return stays "Calculando…" until canonical history is loaded:');
+console.log('\nThe gate — return stays "Calculando…" until canonical history hashes match:');
 { const sb=makeEnv(); vm.runInContext('currentUser={id:"u1"};', sb);
   const g=G(sb);
-  ok('4 authed, history NOT loaded → awaiting_canonical_history (pending, no real return)',
+  ok('4 authed, history NOT reconciled → awaiting_canonical_history (pending, no real return)',
      g.valid===false && g.invalidReason==='awaiting_canonical_history' && g.returnState==='pending_baseline');
   ok('5 pending hides %/$ (deltaPct null) — never a divergent local-only return', g.deltaPct===null); }
-{ const sb=makeEnv(); vm.runInContext('currentUser={id:"u1"}; _aurixCanonicalHistoryLoaded=true;', sb);
+{ const sb=makeEnv(); vm.runInContext('currentUser={id:"u1"}; _aurixCanonicalHistoryLoaded=true; _aurixLocalCanonicalHash="x"; _aurixRemoteCanonicalHash="y";', sb);
   const g=G(sb);
-  ok('6 once reconciled → real return shows (valid, +3%)', g.valid===true && g.returnState==='ready' && g.deltaPct===3.0); }
+  ok('5c authed + hash MISMATCH → still awaiting_canonical_history (no return until converged)',
+     g.valid===false && g.invalidReason==='awaiting_canonical_history'); }
+{ const sb=makeEnv(); vm.runInContext('currentUser={id:"u1"}; _aurixCanonicalHistoryLoaded=true; _aurixLocalCanonicalHash="h"; _aurixRemoteCanonicalHash="h";', sb);
+  const g=G(sb);
+  ok('6 hashes match → real return shows (valid, +3%)', g.valid===true && g.returnState==='ready' && g.deltaPct===3.0); }
 { const sb=makeEnv();   // anonymous proceeds straight to the normal canonical evaluation
   const g=G(sb);
   ok('7 anonymous → not gated by authority (valid from local canonical)', g.valid===true && g.deltaPct===3.0); }
