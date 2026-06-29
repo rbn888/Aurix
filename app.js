@@ -18980,9 +18980,16 @@ function _aurixInvestableSnapshots(range) {
     const _src = (typeof _aurixHistorySourceForDisplay === 'function') ? _aurixHistorySourceForDisplay() : categoryHistory;
     if (!Array.isArray(_src)) return [];
     const epoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
-    const now = Date.now();
+    // P0-CANONICAL-PERFORMANCE-ENGINE — the range window is anchored on the SHARED history's LAST snapshot
+    // timestamp (canonical reference), NOT the device clock. Two devices reading the same canonical store
+    // therefore window an IDENTICAL set of snapshots → identical baseline/series/return (deterministic).
+    // Date.now() is only a defensive fallback when the source is empty. (Device-clock windowing was a
+    // root cause of web/mobile divergence: a few seconds of skew shifted the 24H baseline.)
+    let nowRef = 0;
+    for (const _p of _src) { if (_p && Number.isFinite(_p.ts) && _p.ts > nowRef) nowRef = _p.ts; }
+    if (!(nowRef > 0)) nowRef = Date.now();
     const ms = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '1y': 31536e6 };
-    const start = range === 'all' ? 0 : now - (ms[range] || 2592e6);
+    const start = range === 'all' ? 0 : nowRef - (ms[range] || 2592e6);
     // FASE 1 — exclude INCOMPLETE snapshots (the main source of false vertical jumps:
     // e.g. 62.886 → 75.538 with no deposit). fxPartial = a holding had no price/FX at
     // capture (value undercounted); fxApprox = a non-historical FX fallback was used.
@@ -19028,10 +19035,12 @@ function _aurixEligibleInvestableSeries(range) {
   };
   if (raw.length < 2) { meta.eligible = raw.length; if (raw.length < 2) meta.reasons.insufficient_clean_data = 1; return { series: raw.slice(), meta }; }
 
-  // Anchor = current investable value (base currency); fall back to last snapshot.
-  let anchor = 0;
-  try { anchor = (typeof investableValueBase === 'function') ? investableValueBase() : 0; } catch (_) {}
-  if (!(anchor > 0)) anchor = raw[raw.length - 1].value;
+  // P0-CANONICAL-PERFORMANCE-ENGINE — trust-filter anchor = the LAST SHARED SNAPSHOT value (canonical,
+  // identical across devices), NOT the device-local live investableValueBase() (which differs by price/FX
+  // capture timing and shifted the band → different points excluded → divergent baseline). The last shared
+  // snapshot ≈ the live value (snapshots are recorded from it every 30 s) but is deterministic.
+  let anchor = raw[raw.length - 1].value;
+  if (!(anchor > 0)) { try { anchor = (typeof investableValueBase === 'function') ? investableValueBase() : 0; } catch (_) {} }
   meta.anchor = +anchor.toFixed(2);
   // WN.9 trust boundary — tighter than WN.6: a snapshot > 2.5× current investable
   // (without a valid external-deposit trail) or < 0.25× (without a valid external-
@@ -21544,6 +21553,84 @@ try {
         acceptedSnapshotIds: acceptedIds,
       };
       try { console.log('%c[AURIX HISTORY DEBUG]', 'font-weight:700', out); } catch (_) {}
+      return out;
+    };
+  }
+} catch (_) {}
+
+// ── P0-CANONICAL-PERFORMANCE-ENGINE ─────────────────────────────────────────────
+// The canonical performance is now a PURE, DETERMINISTIC function of the shared remote history:
+// the range window is anchored on the shared history's last snapshot (not the device clock) and the
+// trust-filter anchor is the last shared snapshot value (not the device-local live value). So two
+// devices reading the same canonical store compute a BYTE-IDENTICAL chart series + baseline + return.
+// The clients no longer use device-local timing/live value to decide baseline/%/colour. The strict
+// canDisplayCanonicalReturn gate keeps both in "Calculando…" until the shared history is confirmed.
+// performanceHash fingerprints the per-range {baseline, last, pct} so parity is verifiable across devices.
+function _aurixCanonicalPerformance(range) {
+  const r = range || (typeof activeRange !== 'undefined' ? activeRange : '24h');
+  const g = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(r) : {};
+  const ret = (typeof _aurixRangeReturn === 'function') ? _aurixRangeReturn(r) : null;     // deterministic (window/anchor from shared history)
+  let chartSeries = [];
+  try {
+    const elig = (typeof _aurixEligibleInvestableSeries === 'function') ? _aurixEligibleInvestableSeries(r) : null;
+    if (elig && Array.isArray(elig.series)) chartSeries = elig.series.map(p => ({ ts: p.ts, value: +(+p.value).toFixed(2) }));
+  } catch (_) {}
+  const chartSeriesHash = (typeof _aurixHistoryHash === 'function') ? _aurixHistoryHash(chartSeries.map(p => p.ts + ':' + p.value)) : null;
+  const color = !g.valid ? 'pending' : (g.deltaPct > 0.005 ? 'green' : (g.deltaPct < -0.005 ? 'red' : 'neutral'));
+  return {
+    range: r, valid: !!g.valid, returnState: g.returnState || null,
+    baselineSnapshotId: ret ? ret.baselineTs : null, baselineValue: g.baselineValue != null ? g.baselineValue : null,
+    displayedReturnPct: g.valid ? g.deltaPct : null, displayedReturnValue: g.valid ? g.deltaAbs : null, displayedColor: color,
+    chartSeries: chartSeries, chartSeriesHash: chartSeriesHash, lastSnapshotTs: ret ? ret.lastTs : null,
+  };
+}
+try {
+  if (typeof window !== 'undefined') {
+    // P0-CANONICAL-PERFORMANCE-ENGINE — verifiable parity surface. Compare performanceHash + chartSeriesHash
+    // between web and mobile: for the same account/lifecycle/range they MUST be equal (deterministic from the
+    // shared history). await window.aurixPerformanceDebug(). PURE READ.
+    window.aurixPerformanceDebug = async function (range) {
+      const r = range || (typeof activeRange !== 'undefined' ? activeRange : '24h');
+      const RANGES = ['24h', '7d', '30d', '1y', 'all'];
+      const disp = (typeof canDisplayCanonicalReturn === 'function') ? canDisplayCanonicalReturn(r) : { ok: true, reason: 'helper_absent', returnSource: 'local' };
+      const perf = _aurixCanonicalPerformance(r);
+      const meta = (typeof _aurixReadPortfolioMeta === 'function') ? _aurixReadPortfolioMeta() : {};
+      const baselineByRange = {};
+      const perfFingerprint = [];
+      for (const rg of RANGES) {
+        const p = _aurixCanonicalPerformance(rg);
+        baselineByRange[rg] = { baselineSnapshotId: p.baselineSnapshotId, baselineValue: p.baselineValue, pct: p.displayedReturnPct, color: p.displayedColor };
+        perfFingerprint.push(rg + '|' + p.baselineSnapshotId + '|' + p.baselineValue + '|' + p.displayedReturnPct + '|' + p.displayedColor);
+      }
+      const performanceHash = (typeof _aurixHistoryHash === 'function') ? _aurixHistoryHash(perfFingerprint) : null;
+      let currentValue = null; try { currentValue = (typeof totalValueBase === 'function') ? totalValueBase() : null; } catch (_) {}
+      let localCacheHash = null, remoteHash = null;
+      try { localCacheHash = (typeof _aurixCanonicalBodyHash === 'function') ? _aurixCanonicalBodyHash(typeof categoryHistory !== 'undefined' ? categoryHistory : []) : null; } catch (_) {}
+      try { remoteHash = (typeof _aurixRemoteCanonicalHash !== 'undefined') ? _aurixRemoteCanonicalHash : null; } catch (_) {}
+      const canonicalUpdatedAt = Number.isFinite(perf.lastSnapshotTs) ? new Date(perf.lastSnapshotTs).toISOString() : null;
+      const out = {
+        build: (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null,
+        userId: (typeof _aurixActiveUserId !== 'undefined' && _aurixActiveUserId) ? _aurixActiveUserId : ((typeof currentUser !== 'undefined' && currentUser) ? currentUser.id : null),
+        lifecycleId: (typeof _aurixLifecycleId === 'function') ? _aurixLifecycleId() : null,
+        portfolioRevision: meta.version || 0,
+        canonicalRevision: meta.version || 0,                 // performance is derived from the shared history at this revision
+        performanceSource: disp.returnSource,                  // remote / pending / local(anon)
+        returnState: perf.returnState,
+        canonicalUpdatedAt: canonicalUpdatedAt,
+        isOutdated: !disp.ok,
+        chartSeriesHash: perf.chartSeriesHash,
+        performanceHash: performanceHash,
+        displayedReturnPct: perf.displayedReturnPct,
+        displayedReturnValue: perf.displayedReturnValue,
+        displayedColor: perf.displayedColor,
+        baselineByRange: baselineByRange,
+        currentValue: currentValue,
+        blockReason: disp.ok ? null : disp.reason,
+        deviceId: (typeof _aurixDeviceId === 'function') ? _aurixDeviceId() : null,
+        localCacheHash: localCacheHash,
+        remoteHash: remoteHash,
+      };
+      try { console.log('%c[AURIX PERFORMANCE DEBUG]', 'font-weight:700', out); } catch (_) {}
       return out;
     };
   }
