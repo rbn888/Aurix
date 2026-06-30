@@ -2081,16 +2081,25 @@ const T = {
     // ADD-V2.1: type picker (Step 1) — purely UI shell, routes to existing flows.
     addV2_picker_title:        '¿Qué quieres añadir?',
     addV2_picker_sub:          'Elige el tipo de patrimonio que quieres registrar.',
+    addV2_pick_stocks_title:   'Acciones',
+    addV2_pick_stocks_sub:     'Apple, Microsoft, Nvidia…',
+    addV2_pick_crypto_title:   'Criptomonedas',
+    addV2_pick_crypto_sub:     'Bitcoin, Ethereum, Solana…',
+    addV2_pick_fund_title:     'Fondos / ETF',
+    addV2_pick_fund_sub:       'Vanguard, iShares, SPDR…',
+    addV2_pick_metal_title:    'Metales',
+    addV2_pick_metal_sub:      'Oro, plata, lingotes, monedas y joyería',
+    addV2_pick_liquidity_title:'Liquidez',
+    addV2_pick_liquidity_sub:  'Efectivo, cuentas y capital disponible',
+    addV2_pick_re_title:       'Inmuebles',
+    addV2_pick_re_sub:         'Vivienda, propiedad o renta mensual',
+    addV2_pick_other_title:    'Otros activos',
+    addV2_pick_other_sub:      'Próximamente',
+    // legacy keys kept (referenced by older surfaces) — no longer in the picker
     addV2_pick_asset_title:    'Activo de inversión',
     addV2_pick_asset_sub:      'Acciones, ETFs, fondos, cripto e índices',
-    addV2_pick_liquidity_title:'Liquidez',
-    addV2_pick_liquidity_sub:  'Efectivo, cuenta bancaria o capital disponible',
-    addV2_pick_gold_title:     'Oro físico',
-    addV2_pick_gold_sub:       'Joyería, lingotes o monedas por peso y pureza',
-    addV2_pick_re_title:       'Inmueble',
-    addV2_pick_re_sub:         'Vivienda, propiedad o renta mensual',
-    addV2_pick_other_title:    'Otro activo',
-    addV2_pick_other_sub:      'Próximamente',
+    addV2_pick_gold_title:     'Metales',
+    addV2_pick_gold_sub:       'Oro, plata, lingotes, monedas y joyería',
     // AURIX-METALS-ADD-SHEET-FIX — metal selection sheet copy.
     metalPicker_title:         'Añadir metal',
     metalPicker_sub:           'Elige el metal que quieres registrar.',
@@ -4190,16 +4199,25 @@ const T = {
     // ADD-V2.1: type picker (Step 1) — purely UI shell, routes to existing flows.
     addV2_picker_title:        'What do you want to add?',
     addV2_picker_sub:          'Choose the type of wealth you want to record.',
-    addV2_pick_asset_title:    'Investment asset',
-    addV2_pick_asset_sub:      'Stocks, ETFs, funds, crypto & indices',
+    addV2_pick_stocks_title:   'Stocks',
+    addV2_pick_stocks_sub:     'Apple, Microsoft, Nvidia…',
+    addV2_pick_crypto_title:   'Crypto',
+    addV2_pick_crypto_sub:     'Bitcoin, Ethereum, Solana…',
+    addV2_pick_fund_title:     'Funds / ETF',
+    addV2_pick_fund_sub:       'Vanguard, iShares, SPDR…',
+    addV2_pick_metal_title:    'Metals',
+    addV2_pick_metal_sub:      'Gold, silver, bars, coins & jewelry',
     addV2_pick_liquidity_title:'Liquidity',
-    addV2_pick_liquidity_sub:  'Cash, bank account or available capital',
-    addV2_pick_gold_title:     'Physical gold',
-    addV2_pick_gold_sub:       'Jewelry, bars or coins by weight and purity',
+    addV2_pick_liquidity_sub:  'Cash, accounts & available capital',
     addV2_pick_re_title:       'Real estate',
     addV2_pick_re_sub:         'Home, property or monthly rent',
-    addV2_pick_other_title:    'Other asset',
+    addV2_pick_other_title:    'Other assets',
     addV2_pick_other_sub:      'Coming soon',
+    // legacy keys kept (older surfaces)
+    addV2_pick_asset_title:    'Investment asset',
+    addV2_pick_asset_sub:      'Stocks, ETFs, funds, crypto & indices',
+    addV2_pick_gold_title:     'Metals',
+    addV2_pick_gold_sub:       'Gold, silver, bars, coins & jewelry',
     // AURIX-METALS-ADD-SHEET-FIX — metal selection sheet copy.
     metalPicker_title:         'Add metal',
     metalPicker_sub:           'Choose the metal you want to record.',
@@ -40444,45 +40462,42 @@ function _addV4RenderPreview() {
     const card = e.target.closest && e.target.closest('[data-pick]');
     if (!card || card.classList.contains('is-disabled')) return;
     const pick = card.dataset.pick;
-    if (pick === 'asset') {
-      _addV2SetMode('asset');
-      _addV2Activate('form');
-      _addV2RefreshQuick();
-      if (typeof _updateSearchEmptyHint === 'function') _updateSearchEmptyHint();
-      return;
-    }
-    // ADD-FLOW-ARCH-1: defensive guard. The liquidity picker card is
-    // gone from the HTML — if a stale cached page still surfaces it,
-    // route through the dedicated liquidity flow and never contaminate
-    // asset state.
+
+    // ONBOARDING-V2 (FASE 1) — in-place category routing (the modal is already open; never re-open).
+    // The search box lives in Step 2 (form), so it only appears AFTER a category is chosen here.
+
+    // Liquidez → dedicated FORM (importe/divisa/tipo/nombre), NEVER straight to the success screen.
     if (pick === 'liquidity') {
       closeModal();
       if (typeof openLiquidityModal === 'function') openLiquidityModal();
       return;
     }
-    if (pick === 'gold') {
-      _addV2SetMode('gold');
-      _addV2Activate('form');
-      // Auto-select XAU through the canonical selectAsset pipeline so
-      // the gold section, karat selector and unit selector populate
-      // exactly as if the user had searched and tapped Gold themselves.
-      setTimeout(() => {
-        try {
-          if (typeof selectAsset === 'function') {
-            selectAsset({ ticker:'XAU', name:'Gold', type:'metal', marketSymbol:'GC=F' });
-          }
-        } catch (_) {}
-      }, 30);
+
+    // Metales / (legacy 'gold') → metal picker sheet: choose Oro/Plata first, then the type.
+    if (pick === 'metal' || pick === 'gold') {
+      try { _modalContext = 'metal-picker'; _modalAssetFilterContext = 'metal'; } catch (_) {}
+      try { if (typeof _aurixRenderMetalPicker === 'function') _aurixRenderMetalPicker(); } catch (_) {}
+      _addV2Activate('metal-picker');
       return;
     }
+
+    // Inmuebles → property form.
     if (pick === 'real_estate') {
       _addV2SetMode('real_estate');
       _addV2Activate('form');
-      // The existing helper hides search, reveals RE fields, and resets
-      // pending RE state — exactly what we want for this card.
       try { if (typeof enterRealEstateMode === 'function') enterRealEstateMode(); } catch (_) {}
       return;
     }
+
+    // Acciones / Criptomonedas / Fondos·ETF (and legacy 'asset') → asset search with the matching
+    // market filter pre-engaged, so "Acciones" means stocks, "Criptomonedas" means crypto, etc.
+    const filterKey = { stocks: 'stock', crypto: 'crypto', fund: 'etf', asset: null }[pick];
+    _addV2SetMode('asset');
+    try { _modalContext = 'asset'; _modalAssetFilterContext = filterKey || null; } catch (_) {}
+    _addV2Activate('form');
+    try { if (typeof _addV2RefreshQuick === 'function') _addV2RefreshQuick(); } catch (_) {}
+    try { if (typeof _updateSearchEmptyHint === 'function') _updateSearchEmptyHint(); } catch (_) {}
+    if (filterKey) { try { const btn = document.querySelector('.filter-btn[data-filter="' + filterKey + '"]'); if (btn) btn.click(); } catch (_) {} }
   });
 })();
 

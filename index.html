@@ -66,8 +66,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v453-final-chart-data-parity';
-      var APPJS_V = '453';
+      var BUILD = 'v454-onboarding-v2-fase1';
+      var APPJS_V = '454';
       var HTML_TS = '2026-07-05T18:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -657,47 +657,65 @@
           <button class="modal-close" id="addV2PickerClose" type="button" aria-label="Close">✕</button>
         </div>
         <p class="add-v2-picker-sub" data-i18n="addV2_picker_sub">Elige el tipo de patrimonio que quieres registrar.</p>
+        <!-- ONBOARDING-V2 (FASE 1) — premium category selector. The generic "Activo de inversión"
+             is split into Acciones / Criptomonedas / Fondos·ETF; "Oro físico" → "Metales". Shared by
+             the onboarding first-asset flow AND the dashboard "+" add modal. The search box only
+             appears AFTER a category is chosen (Step 2), never on this selector. -->
         <div class="add-v2-grid">
-          <button type="button" class="add-v2-card" data-pick="asset">
-            <span class="add-v2-icon">◆</span>
+          <button type="button" class="add-v2-card" data-pick="stocks" aria-label="Acciones">
+            <span class="add-v2-icon" aria-hidden="true">▤</span>
             <span class="add-v2-text">
-              <span class="add-v2-title" data-i18n="addV2_pick_asset_title">Activo de inversión</span>
-              <span class="add-v2-sub" data-i18n="addV2_pick_asset_sub">Acciones, ETFs, fondos, cripto e índices</span>
+              <span class="add-v2-title" data-i18n="addV2_pick_stocks_title">Acciones</span>
+              <span class="add-v2-sub" data-i18n="addV2_pick_stocks_sub">Apple, Microsoft, Nvidia…</span>
             </span>
             <span class="add-v2-chevron" aria-hidden="true">›</span>
           </button>
-          <!-- AURIX-MOBILE-ADD-FLOW-PREMIUM-1: liquidity restored to the picker.
-               data-pick="liquidity" routes through the existing dedicated flow
-               (openLiquidityModal / #liquidityOverlay) — the _addV2Wire handler
-               already has the liquidity case; no new flow created. -->
-          <button type="button" class="add-v2-card" data-pick="liquidity">
-            <span class="add-v2-icon">$</span>
+          <button type="button" class="add-v2-card" data-pick="crypto" aria-label="Criptomonedas">
+            <span class="add-v2-icon" aria-hidden="true">◈</span>
+            <span class="add-v2-text">
+              <span class="add-v2-title" data-i18n="addV2_pick_crypto_title">Criptomonedas</span>
+              <span class="add-v2-sub" data-i18n="addV2_pick_crypto_sub">Bitcoin, Ethereum, Solana…</span>
+            </span>
+            <span class="add-v2-chevron" aria-hidden="true">›</span>
+          </button>
+          <button type="button" class="add-v2-card" data-pick="fund" aria-label="Fondos / ETF">
+            <span class="add-v2-icon" aria-hidden="true">▦</span>
+            <span class="add-v2-text">
+              <span class="add-v2-title" data-i18n="addV2_pick_fund_title">Fondos / ETF</span>
+              <span class="add-v2-sub" data-i18n="addV2_pick_fund_sub">Vanguard, iShares, SPDR…</span>
+            </span>
+            <span class="add-v2-chevron" aria-hidden="true">›</span>
+          </button>
+          <button type="button" class="add-v2-card" data-pick="metal" aria-label="Metales">
+            <span class="add-v2-icon" aria-hidden="true">◉</span>
+            <span class="add-v2-text">
+              <span class="add-v2-title" data-i18n="addV2_pick_metal_title">Metales</span>
+              <span class="add-v2-sub" data-i18n="addV2_pick_metal_sub">Oro, plata, lingotes, monedas y joyería</span>
+            </span>
+            <span class="add-v2-chevron" aria-hidden="true">›</span>
+          </button>
+          <!-- data-pick="liquidity" routes through openLiquidityModal (a FORM — importe/divisa/tipo),
+               never straight to the success screen. -->
+          <button type="button" class="add-v2-card" data-pick="liquidity" aria-label="Liquidez">
+            <span class="add-v2-icon" aria-hidden="true">$</span>
             <span class="add-v2-text">
               <span class="add-v2-title" data-i18n="addV2_pick_liquidity_title">Liquidez</span>
-              <span class="add-v2-sub" data-i18n="addV2_pick_liquidity_sub">Efectivo, cuenta bancaria o capital disponible</span>
+              <span class="add-v2-sub" data-i18n="addV2_pick_liquidity_sub">Efectivo, cuentas y capital disponible</span>
             </span>
             <span class="add-v2-chevron" aria-hidden="true">›</span>
           </button>
-          <button type="button" class="add-v2-card" data-pick="gold">
-            <span class="add-v2-icon">◉</span>
+          <button type="button" class="add-v2-card" data-pick="real_estate" aria-label="Inmuebles">
+            <span class="add-v2-icon" aria-hidden="true">⌂</span>
             <span class="add-v2-text">
-              <span class="add-v2-title" data-i18n="addV2_pick_gold_title">Oro físico</span>
-              <span class="add-v2-sub" data-i18n="addV2_pick_gold_sub">Joyería, lingotes o monedas por peso y pureza</span>
-            </span>
-            <span class="add-v2-chevron" aria-hidden="true">›</span>
-          </button>
-          <button type="button" class="add-v2-card" data-pick="real_estate">
-            <span class="add-v2-icon">⌂</span>
-            <span class="add-v2-text">
-              <span class="add-v2-title" data-i18n="addV2_pick_re_title">Inmueble</span>
+              <span class="add-v2-title" data-i18n="addV2_pick_re_title">Inmuebles</span>
               <span class="add-v2-sub" data-i18n="addV2_pick_re_sub">Vivienda, propiedad o renta mensual</span>
             </span>
             <span class="add-v2-chevron" aria-hidden="true">›</span>
           </button>
-          <button type="button" class="add-v2-card is-disabled" data-pick="other" disabled aria-disabled="true">
-            <span class="add-v2-icon">⋯</span>
+          <button type="button" class="add-v2-card is-disabled" data-pick="other" disabled aria-disabled="true" aria-label="Otros activos (próximamente)">
+            <span class="add-v2-icon" aria-hidden="true">⋯</span>
             <span class="add-v2-text">
-              <span class="add-v2-title" data-i18n="addV2_pick_other_title">Otro activo</span>
+              <span class="add-v2-title" data-i18n="addV2_pick_other_title">Otros activos</span>
               <span class="add-v2-sub add-v2-soon" data-i18n="addV2_pick_other_sub">Próximamente</span>
             </span>
           </button>
@@ -1349,7 +1367,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=453"
+  <script src="app.js?v=454"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
