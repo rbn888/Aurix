@@ -28,6 +28,9 @@ function makeEnv(){
   sb._aurixEligibleInvestableSeries = () => ({ series: sb._series, meta:{} });
   sb._aurixLoadCapitalFlows = () => sb._flows;
   vm.createContext(sb);
+  // NOTE: this harness unit-tests the post-construction EXIT MECHANISM with scenarios calibrated to these
+  // (looser) thresholds, isolating the algorithm from the production threshold values. The STRICT production
+  // thresholds {24h:1.20,7d:1.35,30d:1.75,1y:3.00,all:3.00} are verified in AURIX-FINAL-CHART-PARITY.
   vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS = 90*1000; const _AURIX_RETURN_FLOW_DOMINANCE = 0.5; const _AURIX_RETURN_ESTABLISHED_FRAC = 0.80; const _AURIX_RETURN_STABLE_STEP = 0.40; const _AURIX_RETURN_COMPARABLE_RATIO = {"24h":1.5,"7d":2.0,"30d":3.0,"1y":5.0,"all":8.0};', sb);
   vm.runInContext(fnSrc('_aurixPortfolioCreatedAt'), sb);
   vm.runInContext(fnSrc('_aurixReturnSnapshotStats'), sb);

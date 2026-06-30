@@ -52,7 +52,7 @@ function makeAuthedEnv(byRange){
   const sb = { Math, Number, Date:{ now:()=>NOW }, console:{log:()=>{}} };
   vm.createContext(sb);
   vm.runInContext('var activeRange="24h";', sb);
-  vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS=90*1000; const _AURIX_RETURN_FLOW_DOMINANCE=0.5; const _AURIX_RETURN_COMPARABLE_RATIO={"24h":1.5,"7d":2.0,"30d":3.0,"1y":5.0,"all":8.0};', sb);
+  vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS=90*1000; const _AURIX_RETURN_FLOW_DOMINANCE=0.5; const _AURIX_RETURN_COMPARABLE_RATIO={"24h":1.20,"7d":1.35,"30d":1.75,"1y":3.00,"all":3.00};', sb);
   // deps
   sb._aurixResetAt = () => 0;
   sb._aurixPortfolioCreatedAt = () => NOW - 10*86400000;

@@ -1006,6 +1006,12 @@ function computePerformanceSnapshot(range) {
     ? seriesRes.renderSeries.map(p => ({ ts: p.time, value: +(+p.value).toFixed(2) })) : [];
   const chartPointCount = chartSeries.length;
   const chartHash = (typeof _aurixHistoryHash === 'function') ? _aurixHistoryHash(chartSeries.map(p => p.ts + ':' + p.value)) : null;
+  // P0-FINAL-CHART-DATA-PARITY (PART B/E) — honest range collapse: if the available history is shorter than
+  // the selected range, the long ranges (7d/30d/1y) legitimately reuse the same available history. Report it
+  // explicitly so the UI is honest, not "different history per range". ('all' is never a collapse.)
+  const _rangeMs = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '1y': 31536e6, 'all': Infinity }[r] || 2592e6;
+  const _histSpanMs = chartPointCount >= 2 ? (chartSeries[chartPointCount - 1].ts - chartSeries[0].ts) : 0;
+  const rangeCollapsedBecauseHistoryTooShort = (r !== 'all') && Number.isFinite(_rangeMs) && _histSpanMs > 0 && _histSpanMs < _rangeMs;
   let currentValue = null; try { currentValue = (typeof totalValueBase === 'function') ? totalValueBase() : null; } catch (_) {}
   const badgeOk = !!(g && g.valid && Number.isFinite(g.deltaPct));
   const graphOk = chartPointCount >= 2 && chartHash != null;
@@ -1038,7 +1044,8 @@ function computePerformanceSnapshot(range) {
     lifecycleId: lifecycleId, portfolioRevision: portfolioRevision, activeRange: r, range: r,
     renderState: state, state: state,
     displayedReturnPct: displayedReturnPct, displayedReturnValue: displayedReturnValue, displayedColor: tone, tone: tone,
-    chartSeries: chartSeries, chartHash: chartHash, chartPointCount: chartPointCount, chartMeta: chartMeta,
+    chartSeries: chartSeries, chartSeriesCanonical: chartSeries, chartHash: chartHash, chartPointCount: chartPointCount, chartMeta: chartMeta,
+    rangeSpanMs: _rangeMs, actualHistorySpanMs: _histSpanMs, rangeCollapsedBecauseHistoryTooShort: rangeCollapsedBecauseHistoryTooShort,
     graphReady: ready, badgeReady: ready, skeleton: !ready,
     baseline: baseline, baselineValue: baseline.value, baselineTs: baseline.ts, currentValue: currentValue,
     invalidReason: g ? g.invalidReason : null, performanceSource: g ? g.performanceSource : null,
@@ -1187,6 +1194,56 @@ try {
           : { detected: false, anchorSource: out.anchorSource };
       } catch (_) {}
       try { console.log('%c[CHART_SERIES_TRACE] ' + norm, 'font-weight:700;color:#4A82F0', out); try { console.table(out.stages); } catch (_) {} } catch (_) {}
+      return out;
+    };
+
+    // ── P0-FINAL-CHART-DATA-PARITY — desktop/mobile read ONE canonical series via KEY-ONLY adapters ──
+    window.aurixFinalChartParityDebug = function (range) {
+      const norm = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+      const desc = (a) => { const arr = Array.isArray(a) ? a : []; const f = arr[0] || null, l = arr[arr.length - 1] || null;
+        return { count: arr.length, first: f, last: l, shape: f ? Object.keys(f).sort().join(',') : null, keys: f ? Object.keys(f) : [] }; };
+      const out = { build: (typeof window !== 'undefined' && window.AURIX_BUILD) || null, range: (range == null ? null : range), normalizedRange: norm };
+      let snap = null; try { snap = computePerformanceSnapshot(norm); } catch (_) {}
+      const canonical = (snap && Array.isArray(snap.chartSeriesCanonical)) ? snap.chartSeriesCanonical : [];
+      // PART A — adapters: keys ONLY (no filter, no recompute, no readiness decision).
+      const desktopSeries = canonical.map(p => ({ time: p.ts, value: p.value }));
+      const mobileSeries = canonical.map(p => ({ ts: p.ts, value: p.value }));
+      const dHash = (typeof _aurixHistoryHash === 'function') ? _aurixHistoryHash(desktopSeries.map(p => p.time + ':' + p.value)) : null;
+      const mHash = (typeof _aurixHistoryHash === 'function') ? _aurixHistoryHash(mobileSeries.map(p => p.ts + ':' + p.value)) : null;
+      Object.assign(out, snap ? {
+        producerHash: snap.producerHash, chartSeriesHash: snap.chartHash,
+        displayedReturnPct: snap.displayedReturnPct, displayedReturnValue: snap.displayedReturnValue,
+        baselineSnapshotId: snap.baselineTs, baselineValue: snap.baselineValue, currentValue: snap.currentValue,
+        snapshotChartSeriesCount: canonical.length, snapshotChartSeriesFirst: canonical[0] || null, snapshotChartSeriesLast: canonical[canonical.length - 1] || null,
+        snapshotChartSeriesShape: (canonical[0] ? Object.keys(canonical[0]).sort().join(',') : null), snapshotChartSeriesKeys: (canonical[0] ? Object.keys(canonical[0]) : []),
+        rangeSpanMs: snap.rangeSpanMs, actualHistorySpanMs: snap.actualHistorySpanMs,
+        rangeUsesFullAvailableHistory: snap.rangeCollapsedBecauseHistoryTooShort || norm === 'all',
+        rangeCollapsedBecauseHistoryTooShort: snap.rangeCollapsedBecauseHistoryTooShort,
+      } : {});
+      // desktop / mobile inputs (after key-only adapter)
+      const dd = desc(desktopSeries), md = desc(mobileSeries);
+      out.desktopInputCount = dd.count; out.desktopInputFirst = dd.first; out.desktopInputLast = dd.last; out.desktopInputShape = dd.shape; out.desktopInputKeys = dd.keys;
+      out.mobileInputCount = md.count; out.mobileInputFirst = md.first; out.mobileInputLast = md.last; out.mobileInputShape = md.shape; out.mobileInputKeys = md.keys;
+      out.desktopCanDraw = !!(snap && snap.graphReady && dd.count >= 2);
+      out.desktopNoDrawReason = out.desktopCanDraw ? null : (!snap ? 'no_snapshot' : (!snap.graphReady ? 'snapshot_pending(' + (snap.invalidReason || 'graph_not_ready') + ')' : 'series_lt_2'));
+      out.mobileCanDraw = !!(snap && snap.graphReady && md.count >= 2);
+      out.mobileNoDrawReason = out.mobileCanDraw ? null : (!snap ? 'no_snapshot' : (!snap.graphReady ? 'snapshot_pending(' + (snap.invalidReason || 'graph_not_ready') + ')' : 'series_lt_2'));
+      out.desktopMobileSeriesSameHash = dHash != null && dHash === mHash ? true : (dd.count === md.count && dd.count === 0);   // same data, only keys differ → equal by value/count
+      out.desktopMobileSeriesSameCount = dd.count === md.count;
+      out.desktopMobileSeriesSameFirstLast = JSON.stringify([dd.first && dd.first.value, dd.last && dd.last.value]) === JSON.stringify([md.first && md.first.value, md.last && md.last.value]);
+      // pipeline counts (read-only)
+      try { const src = (typeof _aurixHistorySourceForDisplay === 'function') ? _aurixHistorySourceForDisplay() : (typeof categoryHistory !== 'undefined' ? categoryHistory : []); out.rawHistoryCount = Array.isArray(src) ? src.length : null; } catch (_) { out.rawHistoryCount = null; }
+      out.normalizedHistoryCount = out.rawHistoryCount;
+      try { const el = _aurixEligibleInvestableSeries(norm); out.eligibleHistoryCount = el && el.series ? el.series.length : null; out.rejectedConstructionSnapshotCount = el && el.meta && el.meta.reasons ? (el.meta.reasons.construction_baseline || 0) : null; out.rejectedCapitalRegimeSnapshotCount = el && el.meta && el.meta.reasons ? ((el.meta.reasons.incompatible_regime || 0) + (el.meta.reasons.real_estate_polluted || 0) + (el.meta.reasons.pre_investable_split || 0)) : null; out.constructionSnapshotCount = out.rejectedConstructionSnapshotCount; } catch (_) {}
+      try { const ip = getInstitutionalPerformanceSeries(norm); out.institutionalSeriesCount = ip ? ip.realPointCount : null; out.rangeFilteredCount = ip && ip.renderSeries ? ip.renderSeries.length : null; } catch (_) {}
+      try { const s = (typeof _aurixPerformanceSanityCheck === 'function') ? _aurixPerformanceSanityCheck(norm) : null; out.sanityPassed = s ? s.sanityPassed : null; out.sanityFailureReason = s ? s.sanityFailureReason : null; } catch (_) {}
+      // first bad stage (empty/invalid) + the headline contradiction (canDraw mismatch)
+      out.firstBadStage = (out.eligibleHistoryCount != null && out.eligibleHistoryCount < 2) ? 'eligible_investable(<2)'
+        : (out.rangeFilteredCount != null && out.rangeFilteredCount < 2) ? 'institutional_range_filtered(<2)'
+        : (out.snapshotChartSeriesCount < 2) ? 'snapshot.chartSeriesCanonical(<2)' : null;
+      out.firstBadReason = out.firstBadStage ? (out.firstBadStage + ' — insufficient points for this range' + (out.rangeCollapsedBecauseHistoryTooShort ? ' (history shorter than range)' : '')) : null;
+      out.desktopMobileCanDrawAgree = out.desktopCanDraw === out.mobileCanDraw;
+      try { console.log('%c[FINAL_CHART_PARITY] ' + norm + ' desktopCanDraw=' + out.desktopCanDraw + ' mobileCanDraw=' + out.mobileCanDraw, 'font-weight:700;color:' + (out.desktopMobileCanDrawAgree ? '#3FB950' : '#E0533D'), out); } catch (_) {}
       return out;
     };
   }
@@ -21858,7 +21915,10 @@ const _AURIX_RETURN_STABLE_STEP = 0.40;               // consecutive post-anchor
 // current per range (a larger ratio ⇒ the baseline belongs to a different capital regime: construction /
 // onboarding / large inflow / import / restructuring ⇒ NOT market performance ⇒ pending_baseline). Recorded
 // flows are already neutralised (so they don't trip this); this catches UNRECORDED capital regime shifts.
-const _AURIX_RETURN_COMPARABLE_RATIO = { '24h': 1.5, '7d': 2.0, '30d': 3.0, '1y': 5.0, 'all': 8.0 };
+// P0-FINAL-CHART-DATA-PARITY (PART C/E) — STRICT institutional comparability thresholds. A baseline whose
+// value/current ratio exceeds these belongs to a different capital regime (construction / large inflow /
+// import) and must be REJECTED → pending_baseline, never an absurd return (e.g. a 3× baseline → −67% on 7D).
+const _AURIX_RETURN_COMPARABLE_RATIO = { '24h': 1.20, '7d': 1.35, '30d': 1.75, '1y': 3.00, 'all': 3.00 };
 function _aurixPortfolioCreatedAt() {
   // Oldest post-epoch baseline ≈ when this (post-reset) portfolio began. Best-effort, read-only.
   try { const a = _aurixRangeReturn('all'); return a && a.baselineTs ? a.baselineTs : 0; } catch (_) { return 0; }
@@ -24955,11 +25015,18 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
       if (typeof _aurixPaintReturnBadge === 'function') _aurixPaintReturnBadge(changeEl, opts.uid === 'm' ? 'mobile' : 'desktop');
       else { changeEl.innerHTML = _aurixReturnPendingHTML(); changeEl.className = 'chart-change calculating'; changeEl.removeAttribute('title'); }
     }
+    // P0-FINAL-CHART-DATA-PARITY (PART F) — drive the .chart-wrap loading skin from the SAME snapshot
+    // readiness the chart uses, so the skeleton state is honest (never a stuck skeleton over a drawn line).
+    try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(opts.uid === 'm' ? 'mobile' : 'desktop', 'building'); } catch (_) {}
     _wscRenderInsufficient(hostEl, { realPointCount: perf.realPointCount, reason: perf.reason },
       { mode: 'building', eligible: perf.rawValueSeries.map(p => ({ ts: p.time, value: p.value })),
         lastGood: _wscGetFreshLastGood(activeRange, Date.now()) });
     return;
   }
+  // P0-FINAL-CHART-DATA-PARITY (PART F) — graphReady ⇒ dissolve the loading skin to 'ready' so the WSC line
+  // is never hidden behind a fake skeleton (the desktop "skeleton while mobile draws" bug: the WSC SVG drew
+  // but the .chart-wrap skin, owned by the V2 path, stayed 'loading' when the V2 ctrl was not mounted).
+  try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(opts.uid === 'm' ? 'mobile' : 'desktop', 'ready'); } catch (_) {}
 
   const snaps = perf.renderSeries.map(p => ({ ts: p.time, value: p.value }));
   const ts = snaps.map(s => s.ts), vals = snaps.map(s => s.value);

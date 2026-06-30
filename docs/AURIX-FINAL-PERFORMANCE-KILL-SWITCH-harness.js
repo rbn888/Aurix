@@ -31,7 +31,7 @@ function makeEnv(){
   sb._aurixPortfolioEpoch = () => 0;
   vm.createContext(sb);
   vm.runInContext('var currentUser=null; var _aurixActiveUserId=null; var _aurixRemotePerformanceState=null;', sb);
-  vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS=90*1000; const _AURIX_RETURN_FLOW_DOMINANCE=0.5; const _AURIX_RETURN_ESTABLISHED_FRAC=0.80; const _AURIX_RETURN_STABLE_STEP=0.40; const _AURIX_RETURN_COMPARABLE_RATIO={"24h":1.5,"7d":2.0,"30d":3.0,"1y":5.0,"all":8.0};', sb);
+  vm.runInContext('const _AURIX_RETURN_MIN_HISTORY_MS=90*1000; const _AURIX_RETURN_FLOW_DOMINANCE=0.5; const _AURIX_RETURN_ESTABLISHED_FRAC=0.80; const _AURIX_RETURN_STABLE_STEP=0.40; const _AURIX_RETURN_COMPARABLE_RATIO={"24h":1.20,"7d":1.35,"30d":1.75,"1y":3.00,"all":3.00};', sb);
   sb._aurixPendingSync = () => false;
   vm.runInContext(fnSrc('_aurixCurrentUserId'), sb);
   vm.runInContext(fnSrc('_aurixCurrentLifecycleId'), sb);

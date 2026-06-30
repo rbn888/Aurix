@@ -22,7 +22,7 @@ function env(series){
   // identity flow-neutraliser (no capital flows in these scenarios) → isolates the BASELINE SELECTION
   sb._aurixFlowNeutralize = (s) => ({ adjusted: s.map(p => p.value), totalOffset: 0, neutralized: 0 });
   vm.createContext(sb);
-  vm.runInContext('const _AURIX_RETURN_COMPARABLE_RATIO = {"24h":1.5,"7d":2.0,"30d":3.0,"1y":5.0,"all":8.0};', sb);
+  vm.runInContext('const _AURIX_RETURN_COMPARABLE_RATIO = {"24h":1.20,"7d":1.35,"30d":1.75,"1y":3.00,"all":3.00};', sb);
   vm.runInContext(fnSrc('_aurixRangeReturn'), sb);
   return sb;
 }
