@@ -971,8 +971,29 @@ function _aurixComputePerformanceStateCandidate() {
 let _aurixPerfSnapshotCache = { snapshot: null };
 let _aurixPerfSnapshotGen = 0;
 const _aurixRenderLedger = { producer: null, desktopBadge: null, mobileBadge: null, desktopChart: null, mobileChart: null };
+const _aurixRenderTimeline = [];                 // P0-FINAL-STABILIZATION — ring buffer of snapshot generations
+const _aurixInvariantViolations = [];            // recorded invariant breaches (never throws in the render path)
 function _aurixRecordRender(consumer, snap) {
   try { _aurixRenderLedger[consumer] = { hash: snap ? snap.producerHash : null, gen: snap ? snap.gen : null, range: snap ? snap.activeRange : null, ts: Date.now() }; } catch (_) {}
+}
+// P0-FINAL-STABILIZATION — TASK 10 runtime invariants on the snapshot itself (the ones provable at the source).
+// Records any breach (with context) and console.errors it; never throws in the render path.
+function _aurixAssertSnapshotInvariants(snap) {
+  const v = [];
+  try {
+    if (snap.graphReady !== snap.badgeReady) v.push('graphReady !== badgeReady');                                   // (1)
+    if (snap.state === 'ready' && !(Array.isArray(snap.chartSeries) && snap.chartSeries.length >= 2)) v.push('state==ready but chartSeries.length<2');  // (2)
+    if (snap.graphReady && snap.skeleton) v.push('graphReady but skeleton');                                          // (4)
+    if (snap.skeleton && snap.graphReady) v.push('skeleton but graphReady');                                         // (5)
+    if (snap.state === 'ready' && !Number.isFinite(snap.displayedReturnPct)) v.push('ready but displayedReturnPct not finite');
+    if (snap.state === 'pending' && snap.displayedReturnPct !== null) v.push('pending but displayedReturnPct not null');
+    if (v.length) {
+      const rec = { ts: Date.now(), gen: snap.gen, range: snap.activeRange, producerHash: snap.producerHash, violations: v };
+      _aurixInvariantViolations.push(rec); if (_aurixInvariantViolations.length > 40) _aurixInvariantViolations.shift();
+      try { console.error('%c[INVARIANT_VIOLATION]', 'font-weight:700;color:#E0533D', rec); } catch (_) {}
+    }
+  } catch (_) {}
+  return v;
 }
 function computePerformanceSnapshot(range) {
   const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
@@ -998,8 +1019,14 @@ function computePerformanceSnapshot(range) {
     ? { mode: seriesRes.mode, renderMode: seriesRes.renderMode, realPointCount: seriesRes.realPointCount, coveragePct: seriesRes.coveragePct, reason: seriesRes.reason, rawValueSeries: seriesRes.rawValueSeries || [] }
     : { mode: 'building', renderMode: 'building', realPointCount: 0, coveragePct: 0, reason: 'no_series', rawValueSeries: [] };
   const baseline = { value: g ? (g.baselineValue != null ? g.baselineValue : null) : null, ts: g ? (g.baselineTs != null ? g.baselineTs : null) : null };
+  // P0-FINAL-STABILIZATION — producerHash is DETERMINISTIC: derived ONLY from the settled, device-independent
+  // state (lifecycle, revision, range, readiness, %, deterministic chartHash, baseline). The LIVE currentValue
+  // is deliberately EXCLUDED — desktop and mobile read totalValueBase() at slightly different instants, so
+  // including it produced different hashes → different frozen instances → desktop/mobile divergence +
+  // spurious PERFORMANCE_RENDER_DESYNC. currentValue stays as an informational field only. Result: within a
+  // refresh generation every consumer (desktop now, mobile ~50ms later) receives the EXACT same instance.
   const producerHash = (typeof _aurixHistoryHash === 'function')
-    ? _aurixHistoryHash([r, lifecycleId, portfolioRevision, state, displayedReturnPct, displayedReturnValue, chartHash, baseline.ts, baseline.value, currentValue])
+    ? _aurixHistoryHash([r, lifecycleId, portfolioRevision, state, displayedReturnPct, displayedReturnValue, chartHash, baseline.ts, baseline.value])
     : null;
   // Stable identity: if nothing changed, hand back the SAME frozen instance every consumer already has.
   const cached = _aurixPerfSnapshotCache.snapshot;
@@ -1017,9 +1044,22 @@ function computePerformanceSnapshot(range) {
     invalidReason: g ? g.invalidReason : null, performanceSource: g ? g.performanceSource : null,
     producerHash: producerHash, gen: ++_aurixPerfSnapshotGen, calculatedAt: Date.now(),
   };
+  // P0-FINAL-STABILIZATION — invariant enforcement at the source (TASK 10). Guaranteed by construction
+  // here; verified anyway as a permanent runtime net. Records violations for window.aurixRenderAudit(); does
+  // NOT throw in the render path (a thrown invariant would white-screen the dashboard — worse than the bug).
+  try { _aurixAssertSnapshotInvariants(snap); } catch (_) {}
   try { snap.chartSeries.forEach(p => Object.freeze(p)); Object.freeze(snap.chartSeries); Object.freeze(snap.baseline); Object.freeze(snap.chartMeta); Object.freeze(snap); } catch (_) {}
   _aurixPerfSnapshotCache = { snapshot: snap };
   _aurixRenderLedger.producer = { hash: producerHash, gen: snap.gen, range: r, ts: snap.calculatedAt };
+  // Transition timeline (TASK 9) — ring buffer of every NEW generation, so a ready↔pending loop / divergence
+  // is visible live via window.aurixRenderTimeline() with evidence (no guessing).
+  try {
+    _aurixRenderTimeline.push({ gen: snap.gen, ts: snap.calculatedAt, range: r, producerHash: producerHash, state: state,
+      graphReady: ready, badgeReady: ready, skeleton: !ready, chartHash: chartHash, chartPointCount: chartPointCount,
+      displayedReturnPct: displayedReturnPct, badgeOk: badgeOk, graphOk: graphOk, invalidReason: g ? g.invalidReason : null,
+      graphReadyFalseCause: ready ? null : (!badgeOk ? 'badge_pending(' + (g ? g.invalidReason : 'no_baseline') + ')' : (!graphOk ? 'series_lt_2_points(' + chartPointCount + ')' : null)) });
+    if (_aurixRenderTimeline.length > 60) _aurixRenderTimeline.shift();
+  } catch (_) {}
   return snap;
 }
 // Format the badge text from the authoritative snapshot (presentation: respects the %/€ toggle only).
@@ -1053,11 +1093,36 @@ try {
       out.oneProducer = true;
       out.zeroDuplicatedDecisions = true;
       out.allConsumersInSync = mismatch.length === 0;
-      try { console.log('%c[RENDER_AUDIT] ' + (out.allConsumersInSync ? 'IN SYNC' : 'DESYNC') + ' producer=' + producerHash, 'font-weight:700;color:' + (out.allConsumersInSync ? '#3FB950' : '#E0533D'), out); } catch (_) {}
-      if (mismatch.length) {
-        const err = new Error('PERFORMANCE_RENDER_DESYNC: ' + mismatch.length + ' consumer(s) painted from a different producer snapshot than the current authoritative state (producerHash=' + producerHash + ').');
+      // Full invariant set (TASK 10). Structural invariants (1,2,4,5,10) are checked on the live snapshot;
+      // cross-consumer invariants (6,7) on the ledger; (8,9) are guaranteed structurally + by the suite.
+      const inv = {};
+      inv['1_graphReady==badgeReady'] = !snap || snap.graphReady === snap.badgeReady;
+      inv['2_ready=>series>=2'] = !snap || snap.state !== 'ready' || (Array.isArray(snap.chartSeries) && snap.chartSeries.length >= 2);
+      inv['4_graphReady=>noSkeleton'] = !snap || !snap.graphReady || !snap.skeleton;
+      inv['5_skeleton=>noGraph'] = !snap || !snap.skeleton || !snap.graphReady;
+      inv['6_desktopHash==mobileHash'] = (out.desktopHash == null || out.mobileHash == null) || out.desktopHash === out.mobileHash;
+      inv['7_badge==graph(producer)'] = mismatch.length === 0;
+      inv['10_snapshotFrozen'] = !snap || Object.isFrozen(snap);
+      out.invariants = inv;
+      out.invariantsHeld = Object.keys(inv).every(k => inv[k] === true);
+      out.invariantViolations = _aurixInvariantViolations.slice(-10);
+      out.timelineTail = _aurixRenderTimeline.slice(-8);
+      try { console.log('%c[RENDER_AUDIT] ' + (out.allConsumersInSync && out.invariantsHeld ? 'IN SYNC' : 'DESYNC') + ' producer=' + producerHash, 'font-weight:700;color:' + (out.allConsumersInSync && out.invariantsHeld ? '#3FB950' : '#E0533D'), out); } catch (_) {}
+      if (mismatch.length || !out.invariantsHeld) {
+        const err = new Error('PERFORMANCE_RENDER_DESYNC: ' + (mismatch.length ? mismatch.length + ' consumer(s) out of sync; ' : '') + (out.invariantsHeld ? '' : 'invariant(s) violated: ' + Object.keys(inv).filter(k => !inv[k]).join(', ')) + ' (producerHash=' + producerHash + ').');
         err.code = 'PERFORMANCE_RENDER_DESYNC'; err.audit = out; throw err;
       }
+      return out;
+    };
+    // TASK 9 — live transition timeline: shows every snapshot generation (ready↔pending loops, divergence,
+    // and the EXACT cause of any graphReady=false) without guessing.
+    window.aurixRenderTimeline = function () {
+      const out = { generations: _aurixRenderTimeline.slice(), invariantViolations: _aurixInvariantViolations.slice(),
+        currentLedger: _aurixRenderLedger,
+        pendingGenerations: _aurixRenderTimeline.filter(t => t.state !== 'ready').length,
+        readyGenerations: _aurixRenderTimeline.filter(t => t.state === 'ready').length,
+        graphReadyFalseCauses: _aurixRenderTimeline.filter(t => t.graphReadyFalseCause).map(t => t.graphReadyFalseCause) };
+      try { console.table(out.generations); } catch (_) {}
       return out;
     };
   }

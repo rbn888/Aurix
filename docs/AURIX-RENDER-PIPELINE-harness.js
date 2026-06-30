@@ -27,16 +27,20 @@ function env(scn){
   vm.runInContext("function _dshFmtPct(p){return {text:(p>=0?'+':'')+p.toFixed(2)+'%'};} function _dshFmtMoney0(v){return (v>=0?'+':'')+Math.round(v);} var activePerfMode='pct';", sb);
   vm.runInContext("var window={}; window.AURIX_BUILD='test';", sb);
   // real producer + ledger + audit + format helper
-  vm.runInContext("var _aurixPerfSnapshotCache={snapshot:null}; var _aurixPerfSnapshotGen=0; var _aurixRenderLedger={producer:null,desktopBadge:null,mobileBadge:null,desktopChart:null,mobileChart:null};", sb);
+  vm.runInContext("var _aurixPerfSnapshotCache={snapshot:null}; var _aurixPerfSnapshotGen=0; var _aurixRenderLedger={producer:null,desktopBadge:null,mobileBadge:null,desktopChart:null,mobileChart:null}; var _aurixRenderTimeline=[]; var _aurixInvariantViolations=[];", sb);
   vm.runInContext(fnSrc('_aurixRecordRender'), sb);
+  vm.runInContext(fnSrc('_aurixAssertSnapshotInvariants'), sb);
   vm.runInContext(fnSrc('_aurixFormatReturnText'), sb);
   vm.runInContext(fnSrc('_aurixFormatReturnFromSnapshot'), sb);
   vm.runInContext(fnSrc('computePerformanceSnapshot'), sb);
-  // the audit IIFE installs window.aurixRenderAudit — extract the function EXPRESSION (brace-matched) + run it
-  const ai = app.indexOf('window.aurixRenderAudit = function'); const as = app.indexOf('function', ai);
-  let ap = app.indexOf('(', as), apd = 0; for (; ap < app.length; ap++){ if(app[ap]==='(')apd++; else if(app[ap]===')'){apd--; if(!apd){ap++;break;}} }
-  let ak = app.indexOf('{', ap), ad = 0; for (; ak < app.length; ak++){ if(app[ak]==='{')ad++; else if(app[ak]==='}'){ad--; if(!ad){ak++;break;}} }
-  vm.runInContext('window.aurixRenderAudit = ' + app.slice(as, ak) + ';', sb);
+  // the audit IIFE installs window.aurixRenderAudit + window.aurixRenderTimeline — extract each function
+  // EXPRESSION (brace-matched) and run them in the sandbox.
+  const exprAfter = (marker) => { const i = app.indexOf(marker); const s = app.indexOf('function', i);
+    let p = app.indexOf('(', s), pd = 0; for (; p < app.length; p++){ if(app[p]==='(')pd++; else if(app[p]===')'){pd--; if(!pd){p++;break;}} }
+    let k = app.indexOf('{', p), d = 0; for (; k < app.length; k++){ if(app[k]==='{')d++; else if(app[k]==='}'){d--; if(!d){k++;break;}} }
+    return app.slice(s, k); };
+  vm.runInContext('window.aurixRenderAudit = ' + exprAfter('window.aurixRenderAudit = function') + ';', sb);
+  vm.runInContext('window.aurixRenderTimeline = ' + exprAfter('window.aurixRenderTimeline = function') + ';', sb);
   // scenario: ready by default
   const series = scn.series || (function(){ const s=[]; for(let i=0;i<10;i++) s.push({time:i,value:8000+i*10}); return s; })();
   vm.runInContext("_gv="+JSON.stringify(scn.gv || { valid:true, deltaPct:1.13, deltaAbs:90, baselineValue:8000, baselineTs:0, invalidReason:null, performanceSource:'remote' })+";", sb);
@@ -75,8 +79,12 @@ console.log('\nDeterminism — same state → same producerHash (refresh / live 
   // re-derive with identical inputs (a "reload"/"refresh" with the same data) → same hash
   const sb2=env(); const h2=snap(sb2).producerHash;
   ok('10 refresh/reload deterministic (same inputs → same producerHash)', h1===h2); }
-{ const sb=env(); const before=snap(sb).producerHash; vm.runInContext("_cur=8095;", sb); const after=snap(sb).producerHash;
-  ok('11 live price change → a NEW deterministic hash (data changed ⇒ state changed)', before!==after); }
+{ const sb=env(); const before=snap(sb).producerHash; vm.runInContext("_cur=8095;", sb); const afterLiveOnly=snap(sb).producerHash;
+  // P0-FINAL-STABILIZATION — a LIVE currentValue change that does NOT change the deterministic series/PS must
+  // NOT change the producerHash (else desktop & mobile, reading totalValueBase at different instants, diverge).
+  vm.runInContext("_series.renderSeries=_series.renderSeries.concat([{time:99,value:8200}]);", sb); const afterSeries=snap(sb).producerHash;
+  ok('11 producerHash is DETERMINISTIC: stable across a live currentValue tick, changes only when the series/PS changes',
+     before===afterLiveOnly && afterSeries!==before); }
 { const sb=env(); const a=snap(sb,'24h'); vm.runInContext("activeRange='7d';", sb); const b=snap(sb,'7d');
   ok('12 range switch deterministic (range is part of the producer key)', a.activeRange==='24h' && b.activeRange==='7d'); }
 { const sb=env(); const before=snap(sb).producerHash; vm.runInContext("_rev=8;", sb); const after=snap(sb).producerHash;
@@ -106,6 +114,25 @@ ok('20 mobile chart (renderAurixMobileLiteChart) reads the snapshot tone/graphRe
    /computePerformanceSnapshot\(r\)/.test(fnSrc('renderAurixMobileLiteChart')) && /_snap\.graphReady/.test(fnSrc('renderAurixMobileLiteChart')) && /const tone = _snap\.tone;/.test(fnSrc('renderAurixMobileLiteChart')));
 ok('21 ONLY the producer calls the engine: getInstitutionalPerformanceSeries + getValidReturnBaseline appear inside computePerformanceSnapshot',
    /getValidReturnBaseline\(r\)/.test(fnSrc('computePerformanceSnapshot')) && /getInstitutionalPerformanceSeries\(r\)/.test(fnSrc('computePerformanceSnapshot')));
+
+console.log('\nP0-FINAL-STABILIZATION — deterministic hash, runtime invariants, transition timeline:');
+ok('23 producerHash EXCLUDES live currentValue (source) — desktop/mobile can never diverge on a price tick',
+   !/_aurixHistoryHash\(\[r, lifecycleId, portfolioRevision, state, displayedReturnPct, displayedReturnValue, chartHash, baseline\.ts, baseline\.value, currentValue\]\)/.test(fnSrc('computePerformanceSnapshot')) &&
+   /_aurixHistoryHash\(\[r, lifecycleId, portfolioRevision, state, displayedReturnPct, displayedReturnValue, chartHash, baseline\.ts, baseline\.value\]\)/.test(fnSrc('computePerformanceSnapshot')));
+{ const sb=env(); snap(sb);   // a pending state should record a graphReadyFalseCause in the timeline
+  vm.runInContext("_gv={valid:false,deltaPct:null,invalidReason:'remote_performance_pending',performanceSource:'pending'};", sb); snap(sb,'24h');
+  const tl = vm.runInContext("window.aurixRenderTimeline()", sb);
+  ok('24 transition timeline records each generation + the EXACT graphReady=false cause (no guessing)',
+     Array.isArray(tl.generations) && tl.generations.length>=2 && tl.graphReadyFalseCauses.some(c=>/badge_pending/.test(c))); }
+{ const sb=env({ series:[{time:0,value:8000}] });   // 1 point → series cause
+  snap(sb,'24h'); const tl = vm.runInContext("window.aurixRenderTimeline()", sb);
+  ok('25 timeline distinguishes the series-too-short cause from badge-pending', tl.graphReadyFalseCauses.some(c=>/series_lt_2_points/.test(c))); }
+{ const sb=env(); snap(sb);
+  vm.runInContext("_aurixRecordRender('desktopBadge',computePerformanceSnapshot('24h')); _aurixRecordRender('mobileBadge',computePerformanceSnapshot('24h')); _aurixRecordRender('desktopChart',computePerformanceSnapshot('24h')); _aurixRecordRender('mobileChart',computePerformanceSnapshot('24h'));", sb);
+  const a = vm.runInContext("window.aurixRenderAudit()", sb);
+  ok('26 audit enforces the full invariant set (1,2,4,5,6,7,10) and reports invariantsHeld', a.invariantsHeld===true && a.invariants['1_graphReady==badgeReady']===true && a.invariants['2_ready=>series>=2']===true && a.invariants['10_snapshotFrozen']===true); }
+ok('27 the producer runs the runtime invariant check at the source (never throws in the render path)',
+   /_aurixAssertSnapshotInvariants\(snap\)/.test(fnSrc('computePerformanceSnapshot')) && /_aurixInvariantViolations\.push/.test(fnSrc('_aurixAssertSnapshotInvariants')));
 
 console.log('\nNo-touch (pixel-drawing + mobile guardrails preserved — ownership refactor only):');
 ok('22 chart renderer + mobile-safe guard + Chart.js-off-mobile preserved',
