@@ -50,7 +50,10 @@ console.log('\nRelaxed revision — the root-cause discard is gone:');
 { const sb=env(); setPS(sb, Object.assign({}, PROD_PS, { portfolioRevision:175 }));   // older, no pending
   ok('4 older revision (175 <= 176) + NO pending changes → ACCEPTED (was wrongly stale before)', sel(sb,'24h').ok===true); }
 { const sb=env(); sb._pending=true; setPS(sb, Object.assign({}, PROD_PS, { portfolioRevision:175 }));
-  const s=sel(sb,'24h'); ok('5 older revision + PENDING local changes → blocked (stale_revision_with_pending_changes)', s.ok===false && s.reason==='stale_revision_with_pending_changes'); }
+  // P0-STALE-REVISION-GATE-FIX — with no revision-reason helper in the sandbox, the gate defaults to treating
+  // the lag as a REAL holdings mutation → blocked (the new reason). (Acceptance of live-data-only lag is
+  // covered functionally in AURIX-STALE-REVISION-GATE.)
+  const s=sel(sb,'24h'); ok('5 older revision + PENDING (defaults to real mutation) → blocked (stale_revision_with_real_local_mutation)', s.ok===false && s.reason==='stale_revision_with_real_local_mutation'); }
 { const sb=env(); setPS(sb, Object.assign({}, PROD_PS, { portfolioRevision:200 }));   // future
   const s=sel(sb,'24h'); ok('6 FUTURE revision (200 > 176) → blocked (revision_from_future)', s.ok===false && s.reason==='revision_from_future'); }
 

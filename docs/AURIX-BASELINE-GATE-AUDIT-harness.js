@@ -48,7 +48,7 @@ ok('18 the tracer reassigns no gate global (activeRange / remote performance sta
 ok('19 the gate itself is unchanged (ordered chain + kill-switch intact)',
    /else if \(windowMs < _AURIX_RETURN_MIN_HISTORY_MS\) invalidReason = 'insufficient_history';/.test(app) &&
    /const psRow = _aurixRemotePerformanceForRange\(r\);/.test(app) &&
-   /out\.reason = 'stale_revision_with_pending_changes';/.test(app));
+   /out\.reason = 'stale_revision_with_real_local_mutation';/.test(app));
 
 console.log('\nRESULT: '+(fail===0?'ALL PASS ✓':'FAIL ✗')+'  ('+pass+' passed, '+fail+' failed)');
 process.exit(fail===0?0:1);

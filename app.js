@@ -784,10 +784,16 @@ function _aurixCurrentRevision() { try { return (typeof _aurixPortfolioRevision 
 // version bumped to N+1): accept when ps.portfolioRevision <= currentRevision AND (equal OR no pending local
 // changes) — i.e. the PS still reflects the current holdings. A FUTURE revision or an older PS with pending
 // local changes is rejected with an explicit reason. PURE READ.
+// P0-STALE-REVISION-GATE-FIX — a local revision bump is "live data" (price refresh / market tick / snapshot /
+// performance_state write / history maintenance) — NOT a holdings/capital mutation. Only a REAL unsynced
+// holdings/capital change may invalidate a ready remote performance_state. These reasons never count as a
+// real mutation, so they never flip a ready 24H to "Calculando…".
+const _AURIX_LIVE_DATA_REVISION_REASONS = ['price-refresh', 'market-update', 'snapshot', 'live-data', 'perf-state', 'price', 'history-maintenance'];
 function _aurixSelectRemotePerformance(range) {
   const out = { row: null, ok: false, reason: null, requestedRange: null, rangeKey: null, rangeEntryExists: false,
     expectedLifecycleId: null, performanceLifecycleId: null, expectedPortfolioRevision: null, performancePortfolioRevision: null,
-    revisionComparisonMode: 'lte+no-pending', pendingSync: null };
+    revisionComparisonMode: 'lte+no-real-mutation', pendingSync: null,
+    revisionDelta: null, localRevisionReason: null, hasRealUnsyncedHoldingsMutation: null, acceptedDespiteRevisionLag: false };
   try {
     const rk = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
     out.requestedRange = range; out.rangeKey = rk;
@@ -801,14 +807,31 @@ function _aurixSelectRemotePerformance(range) {
     if (ps.lifecycleId !== out.expectedLifecycleId) { out.reason = 'lifecycle_mismatch'; return out; }
     const psRev = ps.portfolioRevision || 0, cur = out.expectedPortfolioRevision || 0;
     if (psRev > cur) { out.reason = 'revision_from_future'; return out; }                         // corrupt / clock-skew
-    if (psRev < cur && out.pendingSync) { out.reason = 'stale_revision_with_pending_changes'; return out; }  // local moved past the PS
+    // P0-STALE-REVISION-GATE-FIX — the local revision is BEHIND the performance_state and there are unsynced
+    // local changes. Reject ONLY when those changes are a REAL holdings/capital mutation. A price refresh /
+    // market tick / snapshot bumps the revision too (save() at the refresh path), but it does NOT change
+    // holdings — it must NOT invalidate an otherwise-ready remote performance_state (that was the 24H
+    // ready↔Calculando oscillation). Backward-compatible: if the reason helper is absent (unit sandbox), the
+    // mutation flag defaults true ⇒ the original strict behaviour.
+    if (psRev < cur && out.pendingSync) {
+      out.revisionDelta = cur - psRev;
+      const _lr = (typeof _aurixLocalRevisionInfo === 'function') ? _aurixLocalRevisionInfo()
+        : { localRevisionReason: null, hasRealUnsyncedHoldingsMutation: true };
+      out.localRevisionReason = _lr.localRevisionReason;
+      out.hasRealUnsyncedHoldingsMutation = _lr.hasRealUnsyncedHoldingsMutation;
+      if (_lr.hasRealUnsyncedHoldingsMutation) { out.reason = 'stale_revision_with_real_local_mutation'; return out; }
+      // live-data / snapshot-only revision lag ⇒ ACCEPT the ready remote performance_state (fall through).
+      out.acceptedDespiteRevisionLag = true;
+      out.revisionAcceptanceReason = (_lr.localRevisionReason === 'snapshot' || _lr.localRevisionReason === 'live-data')
+        ? 'accepted_despite_snapshot_only_revision' : 'accepted_despite_live_data_revision';
+    }
     // normalise byRange keys to lowercase before lookup
     let row = ps.byRange && (ps.byRange[rk] || ps.byRange[range] || ps.byRange[String(range || '').toUpperCase()]);
     if (!row && ps.byRange) { for (const k in ps.byRange) { if (String(k).toLowerCase() === rk) { row = ps.byRange[k]; break; } } }
     out.rangeEntryExists = !!row;
     if (!row) { out.reason = 'range_entry_missing'; return out; }
     if (row.performanceHash == null) { out.reason = 'no_performance_hash'; return out; }
-    out.row = row; out.ok = true; out.reason = 'ok';
+    out.row = row; out.ok = true; out.reason = out.acceptedDespiteRevisionLag ? out.revisionAcceptanceReason : 'ok';
     return out;
   } catch (e) { out.reason = 'error'; return out; }
 }
@@ -5968,10 +5991,32 @@ function _aurixReadPortfolioMeta() {
   catch (_) { return { version: 0, updatedAt: 0, syncedAt: 0, deviceId: null }; }
 }
 function _aurixWritePortfolioMeta(m) { try { m.deviceId = _aurixDeviceId(); localStorage.setItem(_AURIX_PORTFOLIO_META_KEY, JSON.stringify(m)); } catch (_) {} }
-function _aurixBumpPortfolioMeta() { const m = _aurixReadPortfolioMeta(); m.version = (m.version || 0) + 1; m.updatedAt = Date.now(); _aurixWritePortfolioMeta(m); return m; }
+// P0-STALE-REVISION-GATE-FIX — record WHY the revision moved. A real holdings/capital mutation stamps
+// lastRealMutationAt; a live-data/snapshot/price-refresh bump does NOT (it only moves version/updatedAt for
+// sync bookkeeping). The performance gate reads lastRealMutationAt vs syncedAt to decide whether a stale
+// remote performance_state should be rejected. Sync-metadata only — no holdings values / persistence / schema.
+function _aurixBumpPortfolioMeta(reason) {
+  const m = _aurixReadPortfolioMeta();
+  m.version = (m.version || 0) + 1; m.updatedAt = Date.now();
+  const r = reason || 'mutation';
+  m.lastRevisionReason = r;
+  if (_AURIX_LIVE_DATA_REVISION_REASONS.indexOf(r) < 0) m.lastRealMutationAt = m.updatedAt;   // REAL holdings/capital mutation
+  _aurixWritePortfolioMeta(m); return m;
+}
 // revision = monotonic local version; pendingSync = local has changes not yet pushed to remote.
 function _aurixPortfolioRevision() { return _aurixReadPortfolioMeta().version || 0; }
 function _aurixPendingSync() { const m = _aurixReadPortfolioMeta(); return (m.updatedAt || 0) > (m.syncedAt || 0); }
+// P0-STALE-REVISION-GATE-FIX — classify the current local revision lag: is there a REAL unsynced
+// holdings/capital mutation (lastRealMutationAt newer than the last sync), or is the lag only live-data?
+function _aurixLocalRevisionInfo() {
+  const m = _aurixReadPortfolioMeta();
+  const syncedAt = m.syncedAt || 0, lastRealMutationAt = m.lastRealMutationAt || 0;
+  return {
+    localRevisionReason: m.lastRevisionReason || null,
+    hasRealUnsyncedHoldingsMutation: lastRealMutationAt > syncedAt,
+    lastRealMutationAt: lastRealMutationAt, syncedAt: syncedAt, updatedAt: m.updatedAt || 0, version: m.version || 0,
+  };
+}
 
 // P0-SYNC-PIPELINE-TRACE — live diagnostic state + window.aurixSyncTrace(). Read-only; records the
 // last outcome of each pipeline step so the EXACT break point is visible in production.
@@ -6702,7 +6747,7 @@ function save(context) {
     } catch (_) {}
     // P0-SYNC-INTEGRITY — a local user change marks local ahead of the last synced state, so the
     // cross-device merge knows this device has unuploaded edits. (remote-sync writes don't bump.)
-    if (context !== 'remote-sync' && context !== 'boot-load') { try { _aurixBumpPortfolioMeta(); } catch (_) {} }
+    if (context !== 'remote-sync' && context !== 'boot-load') { try { _aurixBumpPortfolioMeta(context || 'mutation'); } catch (_) {} }
     scheduleSave();
     // Portfolio mutation invariant: derived financial state must reflect
     // the new asset set immediately so workspace PORTFOLIO.* / EXPOSURE /
@@ -21679,6 +21724,15 @@ try {
           sameObjectAsPrevReturn: (res === _gvrbLastRes),   // always false → proves NO shared/cached verdict (each caller re-evaluates)
           stack: frames,
         };
+        // P0-STALE-REVISION-GATE-FIX — enrich with the selector's revision-lag classification (read-only)
+        try {
+          const _sel = (!(opts && opts.raw) && typeof _aurixSelectRemotePerformance === 'function') ? _aurixSelectRemotePerformance(rec.normalizedRange) : null;
+          if (_sel) {
+            rec.selectorReason = _sel.reason; rec.performancePortfolioRevision = _sel.performancePortfolioRevision;
+            rec.revisionDelta = _sel.revisionDelta; rec.localRevisionReason = _sel.localRevisionReason;
+            rec.hasRealUnsyncedHoldingsMutation = _sel.hasRealUnsyncedHoldingsMutation; rec.acceptedDespiteRevisionLag = _sel.acceptedDespiteRevisionLag;
+          }
+        } catch (_) {}
         _gvrbLastRes = res;
         _gvrbLog.push(rec);
         if (_gvrbLog.length > 500) _gvrbLog.shift();
@@ -21697,7 +21751,9 @@ try {
         const rows = _gvrbLog.filter(r => range == null || r.normalizedRange === String(range).toLowerCase());
         const t0 = rows.length ? rows[0].t : 0;
         const table = rows.map(r => ({ seq: r.seq, dtMs: +(r.t - t0).toFixed(2), range: r.normalizedRange, raw: r.raw,
-          rev: r.portfolioRevision, lifecycleId: r.lifecycleId, pendingSync: r.pendingSync,
+          rev: r.portfolioRevision, psRev: r.performancePortfolioRevision, revisionDelta: r.revisionDelta, lifecycleId: r.lifecycleId,
+          pendingSync: r.pendingSync, localRevisionReason: r.localRevisionReason, hasRealUnsyncedHoldingsMutation: r.hasRealUnsyncedHoldingsMutation,
+          acceptedDespiteRevisionLag: r.acceptedDespiteRevisionLag, selectorReason: r.selectorReason,
           valid: r.baselineValid, invalidReason: r.invalidReason, pct: r.displayedReturnPct, src: r.performanceSource, caller: r.caller }));
         // pinpoint the FLIP: first valid=true followed later by a valid=false for the same normalizedRange
         let firstTrue = null, firstFalseAfter = null;
@@ -21959,7 +22015,12 @@ try {
         out.performanceStateRangeEntry = { exists: !!row, selectReason: sel ? sel.reason : null, rangeKey: sel ? sel.rangeKey : norm,
           returnState: row ? row.returnState : null, baselineSnapshotId: row ? row.baselineSnapshotId : null, baselineValue: row ? row.baselineValue : null,
           displayedReturnPct: row ? row.displayedReturnPct : null, displayedReturnValue: row ? row.displayedReturnValue : null,
-          performanceHash: row ? row.performanceHash : null, chartSeriesHash: row ? row.chartSeriesHash : null };
+          performanceHash: row ? row.performanceHash : null, chartSeriesHash: row ? row.chartSeriesHash : null,
+          // P0-STALE-REVISION-GATE-FIX — revision-lag classification
+          pendingSync: sel ? sel.pendingSync : null, portfolioRevision: sel ? sel.expectedPortfolioRevision : null,
+          performancePortfolioRevision: sel ? sel.performancePortfolioRevision : null, revisionDelta: sel ? sel.revisionDelta : null,
+          localRevisionReason: sel ? sel.localRevisionReason : null, hasRealUnsyncedHoldingsMutation: sel ? sel.hasRealUnsyncedHoldingsMutation : null,
+          acceptedDespiteRevisionLag: sel ? sel.acceptedDespiteRevisionLag : null };
       } catch (e) { out.performanceStateRangeEntry = { error: String(e) }; }
       try {
         const g = getValidReturnBaseline(norm);
@@ -29681,7 +29742,10 @@ async function _refreshPricesImpl() {
   });
 
   // ── 5. Persist, render ────────────────────────────────────────────────
-  save();
+  // P0-STALE-REVISION-GATE-FIX — a price refresh updates a.price/a.prevPrice only (LIVE market data), NOT
+  // holdings/capital. Label the save so the revision bump is classified as live-data and never invalidates a
+  // ready remote performance_state (this was the 24H ready↔Calculando oscillation on every refresh).
+  save('price-refresh');
   lastRefreshAt = Date.now();
   render();
   // PORTFOLIO-BOOT-REFRESH-1: also refresh Workspace intelligence when

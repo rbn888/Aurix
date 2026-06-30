@@ -21,6 +21,7 @@ function makeEnv(tombstone){
     console:{log:()=>{},warn:()=>{}}, _mem:mem, _aurixResetAt:()=> (tombstone||0) };
   vm.createContext(sb);
   vm.runInContext("const _AURIX_PORTFOLIO_META_KEY='aurix_portfolio_meta';", sb);
+  vm.runInContext("const _AURIX_LIVE_DATA_REVISION_REASONS = ['price-refresh','market-update','snapshot','live-data','perf-state','price','history-maintenance'];", sb);
   // P0-RELIABILITY-GATE: _aurixWritePortfolioMeta now stamps a deviceId; stub it here (this harness
   // focuses on the merge/timestamp logic).
   vm.runInContext("function _aurixDeviceId(){ return 'd-test'; }", sb);
@@ -84,8 +85,8 @@ ok('12 resync applies remote via saveData(reset-aware context) + refreshes exist
    /scheduleAurixMobileLite\(/.test(fnSrc('_aurixResyncFromRemote')) && /render\(true\)/.test(fnSrc('_aurixResyncFromRemote')));
 ok('13 throttled + non-concurrent + auth/boot guarded',
    /_aurixResyncInFlight/.test(fnSrc('_aurixResyncFromRemote')) && /now - _aurixLastResyncAt < 1500/.test(fnSrc('_aurixResyncFromRemote')) && /!_bootLoadComplete/.test(fnSrc('_aurixResyncFromRemote')));
-ok('14 save() bumps local meta on user change (NOT on remote-sync / boot-load)',
-   /context !== 'remote-sync' && context !== 'boot-load'\) \{ try \{ _aurixBumpPortfolioMeta\(\)/.test(app));
+ok('14 save() bumps local meta on user change (NOT on remote-sync / boot-load), tagged with the context',
+   /context !== 'remote-sync' && context !== 'boot-load'\) \{ try \{ _aurixBumpPortfolioMeta\(context \|\| 'mutation'\)/.test(app));
 ok('15 autosave: SAVE_OK + markSynced ONLY after a successful upsert (error throws first)',
    /if \(error\) throw error;   \/\/ never mark synced\/OK if the remote write failed/.test(app) &&
    /_aurixMarkSynced\(new Date\(_syncedAt\)\.getTime\(\)\);/.test(app) && /\[SYNC\]\[SAVE_OK\]/.test(app) && /\[SYNC\]\[SAVE_START\]/.test(app));

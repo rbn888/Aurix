@@ -23,6 +23,7 @@ function makeStore(){
   vm.createContext(sb);
   vm.runInContext(PORTFOLIO_KEYS_SRC, sb);
   vm.runInContext('const AUTH_LOCAL_KEYS = []; let _aurixActiveUserId = null; let assets = []; let _aurixMiniDonutDrawn=false; let _aurixMiniSig="";', sb);
+  vm.runInContext("const _AURIX_LIVE_DATA_REVISION_REASONS = ['price-refresh','market-update','snapshot','live-data','perf-state','price','history-maintenance'];", sb);
   ['_clearLocalUserState','_aurixDeviceId','_aurixCacheOwner','_aurixStampCacheOwner','_aurixCacheIsForeign','_aurixEnforceCacheOwner',
    '_aurixReadPortfolioMeta','_aurixWritePortfolioMeta','_aurixBumpPortfolioMeta','_aurixMarkSynced','_aurixPortfolioRevision','_aurixPendingSync',
    'inferPriceSource','inferProviderId','convertToNewModel','convertFromNewToFlat','convertToLegacyFormat','_aurixSalvageHolding','_aurixLegacyFallbackById','getPortfolioData']

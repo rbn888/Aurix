@@ -100,11 +100,12 @@ ok('10 writer: performance_state written via its OWN decoupled UPDATE (NOT the c
 ok('11 kill switch: getValidReturnBaseline renders authed real return ONLY from _aurixRemotePerformanceForRange',
    /if \(!opts\.raw && typeof _aurixRemotePerformanceForRange === 'function'[\s\S]*?_aurixCurrentUserId\(\)\) \{/.test(fnSrc('getValidReturnBaseline')) &&
    /invalidReason: psRow \? 'remote_performance_pending' : 'no_remote_performance_state'/.test(fnSrc('getValidReturnBaseline')));
-ok('12 validity (in _aurixSelectRemotePerformance): user + lifecycle match, relaxed revision (<= + no-pending), normalized range key',
+ok('12 validity (in _aurixSelectRemotePerformance): user + lifecycle match, revision lag rejected ONLY for a real holdings mutation, normalized range key',
    /if \(ps\.userId !== _aurixCurrentUserId\(\)\) \{ out\.reason = 'user_mismatch'/.test(fnSrc('_aurixSelectRemotePerformance')) &&
    /if \(ps\.lifecycleId !== out\.expectedLifecycleId\) \{ out\.reason = 'lifecycle_mismatch'/.test(fnSrc('_aurixSelectRemotePerformance')) &&
    /if \(psRev > cur\) \{ out\.reason = 'revision_from_future'/.test(fnSrc('_aurixSelectRemotePerformance')) &&
-   /if \(psRev < cur && out\.pendingSync\) \{ out\.reason = 'stale_revision_with_pending_changes'/.test(fnSrc('_aurixSelectRemotePerformance')) &&
+   /if \(psRev < cur && out\.pendingSync\) \{/.test(fnSrc('_aurixSelectRemotePerformance')) &&
+   /if \(_lr\.hasRealUnsyncedHoldingsMutation\) \{ out\.reason = 'stale_revision_with_real_local_mutation'/.test(fnSrc('_aurixSelectRemotePerformance')) &&
    /String\(range \|\| \(typeof activeRange/.test(fnSrc('_aurixSelectRemotePerformance')));
 ok('13 debug: aurixPerformanceStateDebug exposes the consumption diagnosis (renderedFromRemote + validation + selection)',
    /window\.aurixPerformanceStateDebug = async function/.test(app) &&
