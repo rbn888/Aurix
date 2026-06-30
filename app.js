@@ -21645,6 +21645,84 @@ function getValidReturnBaseline(range, opts) {
     renderedFromRemote: false, performanceSource: 'local',   // local deterministic path (anonymous / opts.raw)
   };
 }
+// ── P0-DOUBLE-BASELINE-EVALUATION-AUDIT — transparent logging wrapper around getValidReturnBaseline ──
+// AUDIT-ONLY. Wraps the function so EVERY invocation is recorded (caller, stack, range, raw, the time-varying
+// inputs portfolioRevision/lifecycleId/pendingSync, and the verdict). It returns _gvrbCore's result UNCHANGED
+// (same object identity) — zero behaviour change. This reveals whether the "valid=true then valid=false" flip
+// is the SAME function re-evaluated with different inputs (e.g. pendingSync/revision changed by a refresh) and
+// WHICH caller produced each verdict. window.aurixGvrbCalls() returns the chronological table for one refresh.
+try {
+  if (typeof getValidReturnBaseline === 'function' && !getValidReturnBaseline.__gvrbWrapped) {
+    const _gvrbCore = getValidReturnBaseline;
+    const _gvrbLog = [];
+    let _gvrbSeq = 0, _gvrbLastRes = null;
+    getValidReturnBaseline = function (range, opts) {
+      const res = _gvrbCore.call(this, range, opts);
+      try {
+        const now = (typeof performance !== 'undefined' && performance.now) ? +performance.now().toFixed(2) : (typeof Date !== 'undefined' ? Date.now() : 0);
+        const frames = (new Error().stack || '').split('\n').map(s => s.trim())
+          .filter(s => /app\.js/.test(s) && !/getValidReturnBaseline|_gvrbCore|aurixGvrb/.test(s)).slice(0, 8);
+        const rec = {
+          seq: ++_gvrbSeq, t: now,
+          caller: frames[0] || '(unknown)',
+          range: (range == null ? null : range),
+          normalizedRange: String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase(),
+          raw: !!(opts && opts.raw),
+          portfolioRevision: (typeof _aurixCurrentRevision === 'function') ? _aurixCurrentRevision() : null,
+          lifecycleId: (typeof _aurixCurrentLifecycleId === 'function') ? _aurixCurrentLifecycleId() : null,
+          pendingSync: (typeof _aurixPendingSync === 'function') ? !!_aurixPendingSync() : null,
+          baselineValid: !!(res && res.valid),
+          invalidReason: res ? res.invalidReason : null,
+          displayedReturnPct: (res && res.valid) ? res.deltaPct : null,
+          performanceSource: res ? res.performanceSource : null,
+          renderedFromRemote: res ? !!res.renderedFromRemote : null,
+          sameObjectAsPrevReturn: (res === _gvrbLastRes),   // always false → proves NO shared/cached verdict (each caller re-evaluates)
+          stack: frames,
+        };
+        _gvrbLastRes = res;
+        _gvrbLog.push(rec);
+        if (_gvrbLog.length > 500) _gvrbLog.shift();
+        if (typeof window !== 'undefined' && window.__GVRB_TRACE_ON) {
+          try { console.log('%c[GVRB] #' + rec.seq + ' ' + rec.normalizedRange + ' raw=' + rec.raw + ' valid=' + rec.baselineValid + ' ' + (rec.invalidReason || '') + ' rev=' + rec.portfolioRevision + ' pendingSync=' + rec.pendingSync + ' ← ' + rec.caller, 'color:' + (rec.baselineValid ? '#3FB950' : '#E0533D')); } catch (_) {}
+        }
+      } catch (_) {}
+      return res;
+    };
+    getValidReturnBaseline.__gvrbWrapped = true;
+    if (typeof window !== 'undefined') {
+      window.__gvrbLog = _gvrbLog;
+      window.aurixGvrbTraceOn = function (on) { window.__GVRB_TRACE_ON = (on !== false); return window.__GVRB_TRACE_ON; };
+      window.aurixGvrbClear = function () { _gvrbLog.length = 0; _gvrbSeq = 0; return 'cleared'; };
+      window.aurixGvrbCalls = function (range) {
+        const rows = _gvrbLog.filter(r => range == null || r.normalizedRange === String(range).toLowerCase());
+        const t0 = rows.length ? rows[0].t : 0;
+        const table = rows.map(r => ({ seq: r.seq, dtMs: +(r.t - t0).toFixed(2), range: r.normalizedRange, raw: r.raw,
+          rev: r.portfolioRevision, lifecycleId: r.lifecycleId, pendingSync: r.pendingSync,
+          valid: r.baselineValid, invalidReason: r.invalidReason, pct: r.displayedReturnPct, src: r.performanceSource, caller: r.caller }));
+        // pinpoint the FLIP: first valid=true followed later by a valid=false for the same normalizedRange
+        let firstTrue = null, firstFalseAfter = null;
+        for (const r of rows) {
+          if (r.baselineValid && firstTrue == null) firstTrue = r;
+          else if (!r.baselineValid && firstTrue != null && firstFalseAfter == null) firstFalseAfter = r;
+        }
+        const flip = (firstTrue && firstFalseAfter) ? {
+          validCall: { seq: firstTrue.seq, caller: firstTrue.caller, raw: firstTrue.raw, rev: firstTrue.portfolioRevision, pendingSync: firstTrue.pendingSync, src: firstTrue.performanceSource },
+          invalidCall: { seq: firstFalseAfter.seq, caller: firstFalseAfter.caller, raw: firstFalseAfter.raw, rev: firstFalseAfter.portfolioRevision, pendingSync: firstFalseAfter.pendingSync, invalidReason: firstFalseAfter.invalidReason, stack: firstFalseAfter.stack },
+          inputsThatChanged: {
+            portfolioRevision: firstTrue.portfolioRevision !== firstFalseAfter.portfolioRevision ? (firstTrue.portfolioRevision + '→' + firstFalseAfter.portfolioRevision) : 'same',
+            pendingSync: firstTrue.pendingSync !== firstFalseAfter.pendingSync ? (firstTrue.pendingSync + '→' + firstFalseAfter.pendingSync) : 'same',
+            lifecycleId: firstTrue.lifecycleId !== firstFalseAfter.lifecycleId ? (firstTrue.lifecycleId + '→' + firstFalseAfter.lifecycleId) : 'same',
+            raw: firstTrue.raw !== firstFalseAfter.raw ? (firstTrue.raw + '→' + firstFalseAfter.raw) : 'same',
+          },
+        } : null;
+        const out = { totalCalls: rows.length, table: table, flip: flip };
+        try { console.table(table); } catch (_) {}
+        try { console.log('%c[GVRB][FLIP]', 'font-weight:700;color:#E0533D', flip); } catch (_) {}
+        return out;
+      };
+    }
+  }
+} catch (_) {}
 // RETURN-PENDING-FINAL — the premium "Calculando…" state. Whenever the baseline is not yet valid
 // (new / reset / onboarding / import), every header consumer renders THIS exact markup instead of a
 // dry "—" or a false loss. Identical on web + mobile; the shimmer/glow is CSS-only (.wsc-metric-calc)
