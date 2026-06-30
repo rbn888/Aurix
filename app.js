@@ -836,6 +836,88 @@ function _aurixSelectRemotePerformance(range) {
   } catch (e) { out.reason = 'error'; return out; }
 }
 function _aurixRemotePerformanceForRange(range) { return _aurixSelectRemotePerformance(range).row; }
+// ── P0-PERFORMANCE-STATE-SANITY-LOCK ─────────────────────────────────────────────
+// A performance_state[range] may be published as a numeric return ONLY if the maths is provable from
+// baseline + current + chart series + flows. Tolerances are deliberately tight; flow-neutral adjustments
+// are allowed but must be EXPLAINED by the registered flows (never an unexplained jump).
+const _AURIX_PERF_SANITY_PCT_TOL = 0.10;        // percentage points — displayedReturnPct vs (value/baseline)
+const _AURIX_PERF_SANITY_VALUE_REL_TOL = 0.01;  // 1% relative tolerance for value/current coherence
+const _AURIX_PERF_SANITY_VALUE_ABS_TOL = 1;     // absolute floor (base-currency units)
+const _AURIX_PERF_STATE_MAX_AGE_MS = 6 * 60 * 60 * 1000;  // a published ready state older than this is stale
+const _AURIX_PERF_RANGE_WINDOW_MS = { '24h': 86400000, '7d': 7 * 86400000, '30d': 30 * 86400000, '1y': 365 * 86400000, 'all': Infinity };
+function _aurixSeriesWithinRange(series, range) {
+  try {
+    if (!Array.isArray(series) || series.length < 2) return false;
+    const win = _AURIX_PERF_RANGE_WINDOW_MS[String(range).toLowerCase()];
+    if (!Number.isFinite(win)) return true;   // 'all' — no window
+    const ts = series.map(p => p.ts).filter(Number.isFinite);
+    if (!ts.length) return false;
+    return (Math.max.apply(null, ts) - Math.min.apply(null, ts)) <= win * 2;   // lenient: catches grossly out-of-range points only
+  } catch (_) { return false; }
+}
+// Strict mathematical coherence gate. Returns the full diagnosis + sanityPassed/sanityFailureReason.
+// opts.calculatedAt lets the staleness check be exercised (writer passes none ⇒ Date.now()).
+function _aurixPerformanceSanityCheck(range, opts) {
+  opts = opts || {};
+  const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+  const out = { range: r, sanityPassed: false, sanityFailureReason: null,
+    currentValueUsed: null, totalValueBase: null, baselineValueUsed: null, baselineSnapshotId: null, baselineTimestamp: null,
+    displayedReturnPct: null, displayedReturnValue: null, formulaExpectedPct: null, formulaExpectedValue: null,
+    pctDeltaVsFormula: null, valueDeltaVsFormula: null, netFlowsNeutralized: null, grossDeltaPct: null,
+    chartSeriesHash: null, chartPointCount: 0, firstChartPoint: null, lastChartPoint: null, chartLastValue: null,
+    chartMatchesCurrentValue: null, sourceSeriesHash: null, sourcePointCount: 0, webMobileDeterministicHash: null,
+    lastSnapshotTs: null, calculatedAt: (opts.calculatedAt != null ? opts.calculatedAt : Date.now()), ageMs: null };
+  try {
+    const canon = (typeof _aurixCanonicalPerformance === 'function') ? _aurixCanonicalPerformance(r) : null;
+    const ret = (typeof _aurixRangeReturn === 'function') ? _aurixRangeReturn(r) : null;
+    let curLive = null; try { curLive = (typeof totalValueBase === 'function') ? totalValueBase() : null; } catch (_) {}
+    const series = (canon && Array.isArray(canon.chartSeries)) ? canon.chartSeries : [];
+    out.chartPointCount = out.sourcePointCount = series.length;
+    out.chartSeriesHash = out.sourceSeriesHash = canon ? canon.chartSeriesHash : null;
+    out.firstChartPoint = series.length ? series[0] : null;
+    out.lastChartPoint = series.length ? series[series.length - 1] : null;
+    out.chartLastValue = out.lastChartPoint ? out.lastChartPoint.value : null;
+    out.baselineValueUsed = canon ? canon.baselineValue : null;
+    out.baselineSnapshotId = out.baselineTimestamp = canon ? canon.baselineSnapshotId : null;
+    out.displayedReturnPct = canon ? canon.displayedReturnPct : null;
+    out.displayedReturnValue = canon ? canon.displayedReturnValue : null;
+    out.netFlowsNeutralized = ret ? ret.netFlowsNeutralized : null;
+    out.grossDeltaPct = ret ? ret.grossDeltaPct : null;
+    out.lastSnapshotTs = canon ? canon.lastSnapshotTs : null;
+    out.totalValueBase = curLive;
+    out.currentValueUsed = (out.chartLastValue != null) ? out.chartLastValue : curLive;   // the deterministic anchor the return uses
+    out.ageMs = Math.max(0, Date.now() - out.calculatedAt);
+    if (out.baselineValueUsed > 0 && Number.isFinite(out.currentValueUsed)) {
+      out.formulaExpectedValue = +(out.currentValueUsed - out.baselineValueUsed).toFixed(2);
+      out.formulaExpectedPct = +(((out.currentValueUsed - out.baselineValueUsed) / out.baselineValueUsed) * 100).toFixed(4);
+    }
+    if (Number.isFinite(out.displayedReturnPct) && Number.isFinite(out.formulaExpectedPct)) out.pctDeltaVsFormula = +(out.displayedReturnPct - out.formulaExpectedPct).toFixed(4);
+    if (Number.isFinite(out.displayedReturnValue) && Number.isFinite(out.formulaExpectedValue)) out.valueDeltaVsFormula = +(out.displayedReturnValue - out.formulaExpectedValue).toFixed(2);
+    const valTol = Math.max(_AURIX_PERF_SANITY_VALUE_ABS_TOL, _AURIX_PERF_SANITY_VALUE_REL_TOL * (Number.isFinite(curLive) ? curLive : 0));
+    out.chartMatchesCurrentValue = (Number.isFinite(out.chartLastValue) && Number.isFinite(curLive) && curLive > 0)
+      ? (Math.abs(out.chartLastValue - curLive) <= valTol) : null;
+    out.webMobileDeterministicHash = (typeof _aurixHistoryHash === 'function')
+      ? _aurixHistoryHash([r, out.baselineSnapshotId, out.baselineValueUsed, out.displayedReturnPct, out.displayedReturnValue, out.chartSeriesHash]) : null;
+
+    // ── validations (first failure wins) ──
+    const flows = Math.abs(out.netFlowsNeutralized || 0);
+    const baseValTol = Math.max(_AURIX_PERF_SANITY_VALUE_ABS_TOL, _AURIX_PERF_SANITY_VALUE_REL_TOL * (out.baselineValueUsed || 0));
+    if (!Number.isFinite(out.displayedReturnPct)) { out.sanityFailureReason = 'no_displayed_pct'; return out; }      // not a ready candidate at all
+    if (out.ageMs > _AURIX_PERF_STATE_MAX_AGE_MS) { out.sanityFailureReason = 'stale_calculated_at'; return out; }   // (7)
+    if (out.chartSeriesHash == null || out.chartPointCount < 2) { out.sanityFailureReason = 'insufficient_chart_series'; return out; }   // (8)
+    if (!(out.baselineValueUsed > 0) || !(Number.isFinite(out.currentValueUsed) && out.currentValueUsed > 0)) { out.sanityFailureReason = 'no_valid_values'; return out; }
+    if (!(Number.isFinite(out.baselineSnapshotId) && series.some(p => p.ts === out.baselineSnapshotId))) { out.sanityFailureReason = 'baseline_not_in_series'; return out; }  // (4)
+    if (!_aurixSeriesWithinRange(series, r)) { out.sanityFailureReason = 'series_out_of_range'; return out; }        // (5)
+    if (out.chartMatchesCurrentValue === false) { out.sanityFailureReason = 'chart_current_mismatch'; return out; }  // (3)
+    const pctFromValue = (out.baselineValueUsed > 0) ? (out.displayedReturnValue / out.baselineValueUsed) * 100 : null;   // (1)+(2)
+    if (!(Number.isFinite(pctFromValue) && Math.abs(out.displayedReturnPct - pctFromValue) <= _AURIX_PERF_SANITY_PCT_TOL)) { out.sanityFailureReason = 'pct_value_baseline_incoherent'; return out; }
+    if (Math.abs(out.valueDeltaVsFormula || 0) > flows + baseValTol) { out.sanityFailureReason = 'return_unexplained_by_baseline_current_flows'; return out; }   // (9) — divergence from raw formula must be covered by registered flows
+    const cmpMax = (typeof _AURIX_RETURN_COMPARABLE_RATIO !== 'undefined') ? (_AURIX_RETURN_COMPARABLE_RATIO[r] || 3.0) : 3.0;
+    if (flows <= _AURIX_PERF_SANITY_VALUE_REL_TOL * out.currentValueUsed && Math.abs(out.displayedReturnPct) > (cmpMax - 1) * 100) { out.sanityFailureReason = 'absurd_return_no_flows'; return out; }   // (9) hard cap
+    out.sanityPassed = true;
+    return out;
+  } catch (e) { out.sanityFailureReason = 'error:' + String(e); return out; }
+}
 // Compute the LOCAL deterministic performance CANDIDATE for all ranges (writer only). Uses the raw local
 // engine (opts.raw bypasses the remote gate) — deterministic from the shared history (v431). This is what a
 // client UPLOADS as performance_state; it is NEVER displayed locally until read back from remote.
@@ -848,12 +930,28 @@ function _aurixComputePerformanceStateCandidate() {
       if (!g) continue;
       let chartSeriesHash = null;
       try { const p = (typeof _aurixCanonicalPerformance === 'function') ? _aurixCanonicalPerformance(rg) : null; chartSeriesHash = p ? p.chartSeriesHash : null; } catch (_) {}
+      // P0-PERFORMANCE-STATE-SANITY-LOCK — never publish a numeric return that can't be proven from
+      // baseline + current + chart series + flows. A ready candidate that fails sanity is published as
+      // pending_sanity (no %, no €, no colour) for THAT range only — the other ranges are unaffected.
+      const sane = (g.valid && typeof _aurixPerformanceSanityCheck === 'function') ? _aurixPerformanceSanityCheck(rg) : { sanityPassed: !g.valid ? false : true, sanityFailureReason: null };
+      if (g.valid && !sane.sanityPassed) {
+        byRange[rg] = {
+          baselineSnapshotId: (sane.baselineSnapshotId != null ? sane.baselineSnapshotId : (g.baselineTs != null ? g.baselineTs : null)),
+          baselineValue: g.baselineValue != null ? g.baselineValue : null,
+          displayedReturnPct: null, displayedReturnValue: null, displayedColor: 'pending',
+          returnState: 'pending_sanity', sanityFailureReason: sane.sanityFailureReason,
+          chartSeriesHash: (sane.chartSeriesHash != null ? sane.chartSeriesHash : chartSeriesHash),
+          performanceHash: (typeof _aurixHistoryHash === 'function') ? _aurixHistoryHash([rg, 'pending_sanity', sane.sanityFailureReason]) : 'pending_sanity',
+        };
+        continue;
+      }
       const pct = g.valid ? g.deltaPct : null;
       const color = !g.valid ? 'pending' : (pct > 0.005 ? 'green' : (pct < -0.005 ? 'red' : 'neutral'));
       byRange[rg] = {
         baselineSnapshotId: g.baselineTs != null ? g.baselineTs : null, baselineValue: g.baselineValue != null ? g.baselineValue : null,
         displayedReturnPct: pct, displayedReturnValue: g.valid ? g.deltaAbs : null, displayedColor: color,
-        returnState: g.returnState || null, chartSeriesHash: chartSeriesHash,
+        returnState: g.valid ? (g.returnState || 'ready') : (g.returnState || null), sanityFailureReason: null,
+        chartSeriesHash: chartSeriesHash,
         performanceHash: (typeof _aurixHistoryHash === 'function') ? _aurixHistoryHash([rg, g.baselineTs, g.baselineValue, pct, color]) : null,
       };
     }
@@ -22050,6 +22148,35 @@ try {
           visibleSeriesMatchesRequested: cm ? (String(cm.range).toLowerCase() === norm) : null };
       } catch (e) { out.domFinal = { error: String(e) }; }
       try { console.log('%c[UI][RANGE_PIPELINE_DEBUG] ' + norm, 'font-weight:700;color:#4A82F0', out); } catch (_) {}
+      return out;
+    };
+  }
+} catch (_) {}
+
+// ── P0-PERFORMANCE-STATE-SANITY-LOCK — READ-ONLY mathematical coherence trace ──
+// Shows, for one range, the live sanity verdict (the same gate the writer uses) PLUS the published remote
+// performance_state[range] revision/age — so an unexplainable % (e.g. -1.52% that doesn't reconcile with
+// baseline/current/series) is visible as sanityPassed:false + sanityFailureReason. Touches nothing.
+try {
+  if (typeof window !== 'undefined') {
+    window.aurixPerformanceSanityDebug = function (range) {
+      const norm = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+      let s = {}; try { s = _aurixPerformanceSanityCheck(norm); } catch (e) { s = { sanityFailureReason: 'error:' + String(e) }; }
+      const ps = (typeof _aurixRemotePerformanceState !== 'undefined') ? _aurixRemotePerformanceState : null;
+      const psRow = (ps && ps.byRange) ? (ps.byRange[norm] || null) : null;
+      const out = Object.assign({
+        build: (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null,
+        lifecycleId: (typeof _aurixCurrentLifecycleId === 'function') ? _aurixCurrentLifecycleId() : null,
+        portfolioRevision: (typeof _aurixCurrentRevision === 'function') ? _aurixCurrentRevision() : null,
+        performanceStateRevision: ps ? (ps.portfolioRevision || 0) : null,
+        publishedCalculatedAt: ps ? ps.calculatedAt : null,
+        publishedAgeMs: (ps && Number.isFinite(ps.calculatedAt)) ? Math.max(0, Date.now() - ps.calculatedAt) : null,
+        publishedReturnState: psRow ? psRow.returnState : null,
+        publishedReturnPct: psRow ? psRow.displayedReturnPct : null,
+        publishedSanityFailureReason: psRow ? (psRow.sanityFailureReason || null) : null,
+        publishedChartSeriesHash: psRow ? psRow.chartSeriesHash : null,
+      }, s);
+      try { console.log('%c[PERF_SANITY] ' + norm + ' → ' + (out.sanityPassed ? 'PASS' : 'FAIL:' + out.sanityFailureReason), 'font-weight:700;color:' + (out.sanityPassed ? '#3FB950' : '#E0533D'), out); } catch (_) {}
       return out;
     };
   }
