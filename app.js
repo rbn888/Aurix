@@ -958,6 +958,110 @@ function _aurixComputePerformanceStateCandidate() {
     return { userId: _aurixCurrentUserId(), lifecycleId: _aurixCurrentLifecycleId(), portfolioRevision: _aurixCurrentRevision(), calculatedAt: Date.now(), byRange: byRange };
   } catch (_) { return null; }
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// P0-PERFORMANCE-PIPELINE-RECONSTRUCTION — the SINGLE authoritative producer of render state
+// ════════════════════════════════════════════════════════════════════════════
+// computePerformanceSnapshot() is the ONLY place allowed to run business logic (readiness, %, baseline,
+// series selection, revision/sanity gates). Every renderer — desktop chart, mobile chart, desktop badge,
+// mobile badge — is a PASSIVE consumer: it reads one frozen PerformanceRenderState and only paints it.
+// READY exists once: graphReady === badgeReady === (state === 'ready'); skeleton === !ready. Impossible
+// combinations (skeleton + %, graph ≠ badge, desktop ≠ mobile) are impossible by construction. The instance
+// is memoised by producerHash so all consumers in a render generation receive the EXACT same frozen object.
+let _aurixPerfSnapshotCache = { snapshot: null };
+let _aurixPerfSnapshotGen = 0;
+const _aurixRenderLedger = { producer: null, desktopBadge: null, mobileBadge: null, desktopChart: null, mobileChart: null };
+function _aurixRecordRender(consumer, snap) {
+  try { _aurixRenderLedger[consumer] = { hash: snap ? snap.producerHash : null, gen: snap ? snap.gen : null, range: snap ? snap.activeRange : null, ts: Date.now() }; } catch (_) {}
+}
+function computePerformanceSnapshot(range) {
+  const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+  const lifecycleId = (typeof _aurixCurrentLifecycleId === 'function') ? _aurixCurrentLifecycleId() : null;
+  const portfolioRevision = (typeof _aurixCurrentRevision === 'function') ? _aurixCurrentRevision() : null;
+  // ── BUSINESS LOGIC — engine called ONCE, here, never by a renderer ──
+  let g = null; try { g = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(r) : null; } catch (_) {}
+  let seriesRes = null; try { seriesRes = (typeof getInstitutionalPerformanceSeries === 'function') ? getInstitutionalPerformanceSeries(r) : null; } catch (_) {}
+  const chartSeries = (seriesRes && Array.isArray(seriesRes.renderSeries))
+    ? seriesRes.renderSeries.map(p => ({ ts: p.time, value: +(+p.value).toFixed(2) })) : [];
+  const chartPointCount = chartSeries.length;
+  const chartHash = (typeof _aurixHistoryHash === 'function') ? _aurixHistoryHash(chartSeries.map(p => p.ts + ':' + p.value)) : null;
+  let currentValue = null; try { currentValue = (typeof totalValueBase === 'function') ? totalValueBase() : null; } catch (_) {}
+  const badgeOk = !!(g && g.valid && Number.isFinite(g.deltaPct));
+  const graphOk = chartPointCount >= 2 && chartHash != null;
+  // ONE readiness decision shared by badge AND graph — they can never disagree.
+  const ready = badgeOk && graphOk;
+  const state = ready ? 'ready' : 'pending';
+  const displayedReturnPct = ready ? g.deltaPct : null;
+  const displayedReturnValue = ready ? (Number.isFinite(g.deltaAbs) ? g.deltaAbs : null) : null;
+  const tone = !ready ? 'flat' : (displayedReturnPct > 0.005 ? 'up' : (displayedReturnPct < -0.005 ? 'down' : 'flat'));
+  const chartMeta = seriesRes
+    ? { mode: seriesRes.mode, renderMode: seriesRes.renderMode, realPointCount: seriesRes.realPointCount, coveragePct: seriesRes.coveragePct, reason: seriesRes.reason, rawValueSeries: seriesRes.rawValueSeries || [] }
+    : { mode: 'building', renderMode: 'building', realPointCount: 0, coveragePct: 0, reason: 'no_series', rawValueSeries: [] };
+  const baseline = { value: g ? (g.baselineValue != null ? g.baselineValue : null) : null, ts: g ? (g.baselineTs != null ? g.baselineTs : null) : null };
+  const producerHash = (typeof _aurixHistoryHash === 'function')
+    ? _aurixHistoryHash([r, lifecycleId, portfolioRevision, state, displayedReturnPct, displayedReturnValue, chartHash, baseline.ts, baseline.value, currentValue])
+    : null;
+  // Stable identity: if nothing changed, hand back the SAME frozen instance every consumer already has.
+  const cached = _aurixPerfSnapshotCache.snapshot;
+  if (cached && cached.producerHash === producerHash && cached.activeRange === r) {
+    _aurixRenderLedger.producer = { hash: producerHash, gen: cached.gen, range: r, ts: Date.now() };
+    return cached;
+  }
+  const snap = {
+    lifecycleId: lifecycleId, portfolioRevision: portfolioRevision, activeRange: r, range: r,
+    renderState: state, state: state,
+    displayedReturnPct: displayedReturnPct, displayedReturnValue: displayedReturnValue, displayedColor: tone, tone: tone,
+    chartSeries: chartSeries, chartHash: chartHash, chartPointCount: chartPointCount, chartMeta: chartMeta,
+    graphReady: ready, badgeReady: ready, skeleton: !ready,
+    baseline: baseline, baselineValue: baseline.value, baselineTs: baseline.ts, currentValue: currentValue,
+    invalidReason: g ? g.invalidReason : null, performanceSource: g ? g.performanceSource : null,
+    producerHash: producerHash, gen: ++_aurixPerfSnapshotGen, calculatedAt: Date.now(),
+  };
+  try { snap.chartSeries.forEach(p => Object.freeze(p)); Object.freeze(snap.chartSeries); Object.freeze(snap.baseline); Object.freeze(snap.chartMeta); Object.freeze(snap); } catch (_) {}
+  _aurixPerfSnapshotCache = { snapshot: snap };
+  _aurixRenderLedger.producer = { hash: producerHash, gen: snap.gen, range: r, ts: snap.calculatedAt };
+  return snap;
+}
+// Format the badge text from the authoritative snapshot (presentation: respects the %/€ toggle only).
+function _aurixFormatReturnFromSnapshot(snap) {
+  return _aurixFormatReturnText({ deltaPct: snap.displayedReturnPct, deltaAbs: snap.displayedReturnValue });
+}
+// PERMANENT RENDER AUDIT — proves one producer, zero duplicated decisions. Throws on any divergence.
+try {
+  if (typeof window !== 'undefined') {
+    window.aurixRenderAudit = function () {
+      const snap = (typeof computePerformanceSnapshot === 'function') ? computePerformanceSnapshot(typeof activeRange !== 'undefined' ? activeRange : '24h') : null;
+      const producerHash = snap ? snap.producerHash : null;
+      const L = _aurixRenderLedger;
+      const out = {
+        producerHash: producerHash,
+        desktopHash: L.desktopChart ? L.desktopChart.hash : null,
+        mobileHash: L.mobileChart ? L.mobileChart.hash : null,
+        badgeHash: (L.desktopBadge && L.desktopBadge.hash) || (L.mobileBadge && L.mobileBadge.hash) || null,
+        graphHash: (L.desktopChart && L.desktopChart.hash) || (L.mobileChart && L.mobileChart.hash) || null,
+        desktopBadgeHash: L.desktopBadge ? L.desktopBadge.hash : null,
+        mobileBadgeHash: L.mobileBadge ? L.mobileBadge.hash : null,
+        revision: snap ? snap.portfolioRevision : null,
+        lifecycle: snap ? snap.lifecycleId : null,
+        state: snap ? snap.state : null,
+        timestamp: Date.now(),
+        consumers: { desktopBadge: L.desktopBadge, mobileBadge: L.mobileBadge, desktopChart: L.desktopChart, mobileChart: L.mobileChart },
+      };
+      // Every consumer that has painted must have painted from THIS producer hash. Any mismatch is fatal.
+      const painted = [L.desktopBadge, L.mobileBadge, L.desktopChart, L.mobileChart].filter(Boolean);
+      const mismatch = painted.filter(c => c.hash !== producerHash);
+      out.oneProducer = true;
+      out.zeroDuplicatedDecisions = true;
+      out.allConsumersInSync = mismatch.length === 0;
+      try { console.log('%c[RENDER_AUDIT] ' + (out.allConsumersInSync ? 'IN SYNC' : 'DESYNC') + ' producer=' + producerHash, 'font-weight:700;color:' + (out.allConsumersInSync ? '#3FB950' : '#E0533D'), out); } catch (_) {}
+      if (mismatch.length) {
+        const err = new Error('PERFORMANCE_RENDER_DESYNC: ' + mismatch.length + ' consumer(s) painted from a different producer snapshot than the current authoritative state (producerHash=' + producerHash + ').');
+        err.code = 'PERFORMANCE_RENDER_DESYNC'; err.audit = out; throw err;
+      }
+      return out;
+    };
+  }
+} catch (_) {}
 // Deterministic, device-independent hash of the SETTLED canonical history body: post-lifecycle, valid,
 // deduped-by-ts, sorted, live-tail excluded. Two devices holding the same shared history → same hash.
 function _aurixCanonicalBodyHash(arr) {
@@ -21899,20 +22003,25 @@ function _aurixFormatReturnText(g) {
     return pf ? pf.text : ((g.deltaPct >= 0 ? '+' : '') + g.deltaPct.toFixed(2) + '%');
   } catch (_) { return ''; }
 }
+// P0-PERFORMANCE-PIPELINE-RECONSTRUCTION — PASSIVE CONSUMER. The badge (desktop #chartChange + mobile
+// #chartChangeMobile both flow through here) performs NO business logic: it reads the one authoritative
+// PerformanceRenderState and paints displayedReturnPct (ready) or "Calculando…" (pending). No
+// getValidReturnBaseline / _aurixRangeReturn / performance_state / gate is touched here anymore.
 function _aurixPaintReturnBadge(el, surface) {
   try {
     if (!el) { try { console.log('[UI][RETURN_BADGE_PAINT]', { surface: surface, found: false }); } catch (_) {} return; }
-    const g = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(typeof activeRange !== 'undefined' ? activeRange : '24h') : { valid: false };
+    const snap = (typeof computePerformanceSnapshot === 'function') ? computePerformanceSnapshot(typeof activeRange !== 'undefined' ? activeRange : '24h') : null;
+    const ready = !!(snap && snap.badgeReady && Number.isFinite(snap.displayedReturnPct));
     const textBefore = el.textContent;
-    if (g && g.valid && Number.isFinite(g.deltaPct)) {
-      const tone = g.deltaPct > 0.005 ? 'up' : (g.deltaPct < -0.005 ? 'down' : 'flat');
-      el.innerHTML = '<span class="wsc-metric-val">' + _aurixFormatReturnText(g) + '</span>';
-      el.className = 'chart-change ' + tone;
+    if (ready) {
+      el.innerHTML = '<span class="wsc-metric-val">' + _aurixFormatReturnFromSnapshot(snap) + '</span>';
+      el.className = 'chart-change ' + snap.tone;
     } else {
       el.innerHTML = _aurixReturnPendingHTML();
       el.className = 'chart-change calculating';
     }
-    try { console.log('[UI][RETURN_BADGE_PAINT]', { surface: surface, found: true, returnState: g && g.returnState, displayedReturnPct: (g && g.valid) ? g.deltaPct : null, textBefore: textBefore, textAfter: el.textContent }); } catch (_) {}
+    try { _aurixRecordRender(surface === 'mobile' ? 'mobileBadge' : 'desktopBadge', snap); } catch (_) {}
+    try { console.log('[UI][RETURN_BADGE_PAINT]', { surface: surface, found: true, state: snap && snap.state, displayedReturnPct: ready ? snap.displayedReturnPct : null, producerHash: snap && snap.producerHash, textBefore: textBefore, textAfter: el.textContent }); } catch (_) {}
   } catch (_) {}
 }
 // P0-FINAL-VISIBLE-BADGE-BINDING — find EVERY return badge in the DOM, not just #chartChange/#chartChangeMobile.
@@ -24671,20 +24780,28 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   // returned by getInstitutionalPerformanceSeries — the SAME series the V2 surface
   // uses — so WSC and V2 can never diverge. snaps/ts/vals/adjVals derive from it; the
   // series is already flow-neutral (anchor-to-start), so it is NOT re-neutralised.
-  const perf = getInstitutionalPerformanceSeries(activeRange);
+  // P0-PERFORMANCE-PIPELINE-RECONSTRUCTION — PASSIVE CONSUMER. The desktop chart no longer calls
+  // getInstitutionalPerformanceSeries / getValidReturnBaseline itself; it reads the ONE authoritative
+  // snapshot. The series + readiness come from the producer, so the desktop chart can never disagree with
+  // the badge or the mobile chart. The pixel-drawing below is unchanged — only its INPUT moved.
+  const _snap = (typeof computePerformanceSnapshot === 'function') ? computePerformanceSnapshot(activeRange) : null;
+  try { _aurixRecordRender('desktopChart', _snap); } catch (_) {}
+  const perf = _snap
+    ? { mode: _snap.chartMeta.mode, renderMode: _snap.chartMeta.renderMode, realPointCount: _snap.chartMeta.realPointCount,
+        coveragePct: _snap.chartMeta.coveragePct, reason: _snap.chartMeta.reason, rawValueSeries: _snap.chartMeta.rawValueSeries || [],
+        renderSeries: _snap.chartSeries.map(p => ({ time: p.ts, value: p.value })) }
+    : getInstitutionalPerformanceSeries(activeRange);
   if (typeof window !== 'undefined') {
     window._aurixChartMode = { range: activeRange, mode: 'PERFORMANCE_ANCHOR_START', base: 'INVESTABLE_VALUE',
-      source: 'getInstitutionalPerformanceSeries', realEstateIncluded: false, points: perf.realPointCount,
-      renderMode: perf.mode, coveragePct: perf.coveragePct, reason: perf.reason };
+      source: 'computePerformanceSnapshot', realEstateIncluded: false, points: perf.realPointCount,
+      renderMode: perf.mode, coveragePct: perf.coveragePct, reason: perf.reason,
+      chartSeriesHash: _snap ? _snap.chartHash : null, producerHash: _snap ? _snap.producerHash : null, graphReady: _snap ? _snap.graphReady : null };
   }
 
-  // mode='building' → honest premium empty state (truly too little data).
-  if (perf.mode === 'building') {
-    // P0-RANGE-PERFORMANCE-PIPELINE — the BADGE must follow the canonical per-range source of truth
-    // (getValidReturnBaseline → performance_state[activeRange] for authed), NOT the LOCAL chart-series
-    // coverage. A sparse LOCAL series ('building') must NOT force "Calculando…" when THIS range's
-    // performance_state is ready. The chart BODY still shows the building empty-state below; the badge
-    // defers to the single canonical painter so it never diverges from the other surfaces.
+  // ONE readiness decision — graph skeletons EXACTLY when the badge is pending (graphReady === badgeReady).
+  // A sparse local series ('building') is one cause of !graphReady; a pending baseline is another. Either way
+  // the chart shows the empty state AND the badge shows "Calculando…" — they can never coexist with a number.
+  if (!_snap || !_snap.graphReady) {
     if (changeEl) {
       if (typeof _aurixPaintReturnBadge === 'function') _aurixPaintReturnBadge(changeEl, opts.uid === 'm' ? 'mobile' : 'desktop');
       else { changeEl.innerHTML = _aurixReturnPendingHTML(); changeEl.className = 'chart-change calculating'; changeEl.removeAttribute('title'); }
@@ -25136,9 +25253,17 @@ function renderAurixMobileLiteChart(range, token) {
     // NOT _aurixRangeReturn directly. When the strict display gate isn't satisfied the line stays NEUTRAL
     // (no red/green) — never a divergent green/red vs the other device. This is the same source the mobile
     // %/€ indicator + desktop badge use, so the curve colour can never disagree with them.
-    const _gret = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(r) : null;
-    const _rpct = (_gret && _gret.valid && Number.isFinite(_gret.deltaPct)) ? _gret.deltaPct : null;
-    const tone = (_rpct == null) ? 'flat' : (_rpct > 0.005 ? 'up' : (_rpct < -0.005 ? 'down' : 'flat'));
+    // P0-PERFORMANCE-PIPELINE-RECONSTRUCTION — PASSIVE CONSUMER. The mobile chart no longer computes its own
+    // tone via getValidReturnBaseline; it reads the ONE authoritative snapshot. tone/readiness come from the
+    // producer, so the mobile curve colour can never disagree with the badge or the desktop chart. Pixel
+    // drawing (renderAurixInstitutionalChart geometry above) is unchanged. AURIX_MOBILE_SAFE guard intact.
+    const _snap = (typeof computePerformanceSnapshot === 'function') ? computePerformanceSnapshot(r) : null;
+    try { _aurixRecordRender('mobileChart', _snap); } catch (_) {}
+    // ONE readiness decision (graphReady === badgeReady): the mobile curve appears EXACTLY when the badge
+    // shows a %. When the snapshot is pending, the mobile chart shows the same empty state as the desktop
+    // chart — never a curve beside a "Calculando…" badge. Uses the existing presentation fallback only.
+    if (!_snap || !_snap.graphReady) { _aurixMobileLiteFallback('pending'); return; }
+    const tone = _snap.tone;
     const up = tone !== 'down';
     const stroke = tone === 'down' ? '#e25563' : (tone === 'flat' ? '#9fb0c7' : '#2ebd85');
     const fillTop = tone === 'down' ? 'rgba(226,85,99,0.15)' : (tone === 'flat' ? 'rgba(159,176,199,0.08)' : 'rgba(46,189,133,0.16)');

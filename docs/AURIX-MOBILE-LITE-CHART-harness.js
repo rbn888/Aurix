@@ -66,6 +66,11 @@ function makeEnv(engine, opts) {
     initMobileCharts: () => { env.chartJsCalls++; }, initMobileSlider: () => { env.chartJsCalls++; },
     // RC5-A — premium motion gate helpers referenced by the lite SVG class string.
     _aurixPremiumMotionOn: () => true, _dshReducedMotion: () => false,
+    // P0-PERFORMANCE-PIPELINE-RECONSTRUCTION — the mobile chart is now a PASSIVE consumer of the one
+    // authoritative snapshot (tone + graphReady). Stub the producer (ready) + ledger recorder. The empty/
+    // slow/exception fallbacks fire BEFORE the graphReady gate, so those cases are unaffected.
+    computePerformanceSnapshot: () => ({ graphReady: true, badgeReady: true, state: 'ready', tone: 'up', displayedReturnPct: 3.1, producerHash: 'h' }),
+    _aurixRecordRender: () => {},
     activeRange: '30d',
   };
   sandbox.window = sandbox;

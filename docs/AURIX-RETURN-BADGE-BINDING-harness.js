@@ -44,7 +44,12 @@ function buildEnv(nodes){
   sb._aurixReturnPendingHTML = () => PEND;
   sb._AURIX_RETURN_PENDING_TEXT = 'Calculando…';
   vm.createContext(sb);
+  // P0-PERFORMANCE-PIPELINE-RECONSTRUCTION — the painter is now a PASSIVE consumer of the one authoritative
+  // snapshot. Stub the producer (derived from the existing getValidReturnBaseline stub so the pending toggle
+  // below still drives it) + the ledger recorder. Load the real snapshot→badge formatter.
+  vm.runInContext("function computePerformanceSnapshot(r){ var g=getValidReturnBaseline(r); var ready=!!(g&&g.valid&&Number.isFinite(g.deltaPct)); return { badgeReady:ready, graphReady:ready, state:ready?'ready':'pending', displayedReturnPct:ready?g.deltaPct:null, displayedReturnValue:ready?g.deltaAbs:null, tone:ready?(g.deltaPct>0.005?'up':(g.deltaPct<-0.005?'down':'flat')):'flat', producerHash:'h' }; } function _aurixRecordRender(){}", sb);
   vm.runInContext(fnSrc('_aurixFormatReturnText'), sb);
+  vm.runInContext(fnSrc('_aurixFormatReturnFromSnapshot'), sb);
   vm.runInContext(fnSrc('_aurixNodeIsVisible'), sb);
   vm.runInContext(fnSrc('_aurixPaintReturnBadge'), sb);
   vm.runInContext(fnSrc('_aurixFindReturnBadgeNodes'), sb);

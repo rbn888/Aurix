@@ -39,9 +39,9 @@ const toneToStroke = pct => pct == null ? '#9fb0c7' : (pct > 0.005 ? '#2ebd85' :
 ok('1 mobile negative range → RED line', toneToStroke(-0.13) === '#e25563');
 ok('2 mobile positive range → GREEN line', toneToStroke(2.4) === '#2ebd85');
 ok('2b zero/na → neutral', toneToStroke(0) === '#9fb0c7' && toneToStroke(null) === '#9fb0c7');
-const liteFn = (()=>{ const s=app.indexOf('P0-HISTORY-PARITY-EMERGENCY-GATE — colour from the GATED'); return app.slice(s, s+900); })();
-ok('3 mobile lite colours from the GATED canonical return (getValidReturnBaseline, NOT lastDeltaPct/raw _aurixRangeReturn)', /getValidReturnBaseline\(r\)/.test(liteFn) && /_gret && _gret\.valid && Number\.isFinite\(_gret\.deltaPct\)/.test(liteFn) && /tone === 'down' \? '#e25563'/.test(liteFn) && !/lastDeltaPct < 0\)/.test(liteFn));
-ok('4 web/mobile parity: same hexes + same ±0.005 threshold', /> 0\.005 \? 'up'/.test(liteFn) && app.indexOf("'#e25563'")>=0 && app.indexOf("'#2ebd85'")>=0);
+const liteFn = fn('renderAurixMobileLiteChart');   // full function (brace-matched) — robust to comment/length changes
+ok('3 mobile lite colours from the ONE authoritative snapshot tone (NOT its own getValidReturnBaseline/raw _aurixRangeReturn)', /computePerformanceSnapshot\(r\)/.test(liteFn) && /const tone = _snap\.tone;/.test(liteFn) && /tone === 'down' \? '#e25563'/.test(liteFn) && !/getValidReturnBaseline\(r\)/.test(liteFn));
+ok('4 web/mobile parity: same hexes (lite) + the ±0.005 tone threshold lives in the ONE producer', app.indexOf("'#e25563'")>=0 && app.indexOf("'#2ebd85'")>=0 && /> 0\.005 \? 'up'/.test(fn('computePerformanceSnapshot')));
 ok('5 indicator tone uses the same sign source (baseline-gated return + ±0.005)', /deltaPct > 0\.005 \? 'up' : deltaPct < -0\.005 \? 'down'/.test(fn('_aurixMobileSetPerfIndicator')) && /getValidReturnBaseline\(activeRange\)/.test(fn('_aurixMobileSetPerfIndicator')));
 
 console.log('\nFASE 2/3 — Global volatility polish (per-range cluster reduction):');

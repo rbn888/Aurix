@@ -75,8 +75,8 @@ ok('11 desktop reconstructed headline gates on getValidReturnBaseline (shows "Ca
 ok('12 mobile indicator gates on getValidReturnBaseline (shows "Calculando…", no red/green)',
    /const ret = \(typeof getValidReturnBaseline === 'function'\) \? getValidReturnBaseline\(activeRange\)/.test(fnSrc('_aurixMobileSetPerfIndicator')) &&
    /if \(!ret \|\| !ret\.valid \|\| !Number\.isFinite\(ret\.deltaPct\)\) \{ el\.innerHTML = _aurixReturnPendingHTML\(\); el\.className = 'chart-change calculating';/.test(fnSrc('_aurixMobileSetPerfIndicator')));
-ok('13 %/$ toggle respects pending: the canonical painter gates validity BEFORE the unit (mode read only when valid)',
-   (function(){ const s=fnSrc('_aurixPaintReturnBadge'); return s.indexOf('_aurixFormatReturnText') > s.indexOf('g.valid'); })() &&
+ok('13 %/$ toggle respects pending: the painter gates readiness BEFORE the unit (format read only when ready)',
+   (function(){ const s=fnSrc('_aurixPaintReturnBadge'); return s.indexOf('_aurixFormatReturnFromSnapshot') > s.indexOf('snap.badgeReady'); })() &&
    /const mode = \(typeof activePerfMode/.test(fnSrc('_aurixFormatReturnText')));
 
 console.log('\nDiagnostic:');

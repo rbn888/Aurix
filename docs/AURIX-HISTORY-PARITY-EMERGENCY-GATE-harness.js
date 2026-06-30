@@ -70,8 +70,9 @@ console.log('\nNever web-red / mobile-green: parity comes from BOTH reading the 
 console.log('\nSingle authority — every consumer passes through the helper (source):');
 ok('10 getValidReturnBaseline gates first on canDisplayCanonicalReturn',
    /const _disp = \(typeof canDisplayCanonicalReturn === 'function'\) \? canDisplayCanonicalReturn\(r\)[\s\S]*?if \(!_disp\.ok\) invalidReason = 'awaiting_canonical_history';/.test(app));
-ok('11 mobile lite line colour derives from the gated getValidReturnBaseline (not raw _aurixRangeReturn)',
-   /const _gret = \(typeof getValidReturnBaseline === 'function'\) \? getValidReturnBaseline\(r\) : null;\s*const _rpct = \(_gret && _gret\.valid/.test(fnSrc('renderAurixMobileLiteChart')));
+ok('11 mobile lite line colour derives from the ONE authoritative snapshot (not its own getValidReturnBaseline/raw _aurixRangeReturn)',
+   /const _snap = \(typeof computePerformanceSnapshot === 'function'\) \? computePerformanceSnapshot\(r\)/.test(fnSrc('renderAurixMobileLiteChart')) &&
+   /const tone = _snap\.tone;/.test(fnSrc('renderAurixMobileLiteChart')));
 ok('12 desktop badge / recon headline / mobile indicator / perf hero all gate on getValidReturnBaseline',
    /getValidReturnBaseline\(activeRange\)/.test(fnSrc('_aurixReconSyncHeadline')) &&
    /getValidReturnBaseline\(activeRange\)/.test(fnSrc('_aurixMobileSetPerfIndicator')) &&

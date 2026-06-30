@@ -44,8 +44,8 @@ ok('2 pending text is "Calculando…", never a dry "—"',
    /const _AURIX_RETURN_PENDING_TEXT = 'Calculando…';/.test(app));
 
 console.log('\nAll header return consumers render the pending state (no false loss anywhere):');
-ok('3 desktop WSC — too-little-data ("building") shows Calculando, not an empty metric',
-   /perf\.mode === 'building'[\s\S]*?changeEl\.innerHTML = _aurixReturnPendingHTML\(\); changeEl\.className = 'chart-change calculating';/.test(app));
+ok('3 desktop WSC — chart-not-ready (skeleton) routes the badge through the canonical painter (Calculando)',
+   /if \(!_snap \|\| !_snap\.graphReady\) \{[\s\S]*?_aurixPaintReturnBadge\(changeEl,[\s\S]*?else \{ changeEl\.innerHTML = _aurixReturnPendingHTML\(\); changeEl\.className = 'chart-change calculating';/.test(app));
 ok('4 desktop WSC delegates badge to the canonical painter (Calculando when invalid)',
    /if \(typeof _aurixPaintReturnBadge === 'function'\) _aurixPaintReturnBadge\(changeEl, opts\.uid === 'm' \? 'mobile' : 'desktop'\);/.test(fnSrc('_wscPaintSurface')) &&
    /el\.innerHTML = _aurixReturnPendingHTML\(\);\s*el\.className = 'chart-change calculating';/.test(fnSrc('_aurixPaintReturnBadge')));
@@ -66,8 +66,8 @@ ok('8 recon headline mirrors innerHTML (not textContent) to #chartChangeMobile',
    /const _mch = document\.getElementById\('chartChangeMobile'\);\s*if \(_mch\) \{ _mch\.innerHTML = chartChangeEl\.innerHTML; _mch\.className = chartChangeEl\.className; \}/.test(fnSrc('_aurixReconSyncHeadline')));
 
 console.log('\n%/$ toggle never changes the pending state (gate read BEFORE the unit):');
-ok('9 the canonical painter reads the unit (activePerfMode) only AFTER validity (pending state is unit-independent)',
-   (function(){ const s=fnSrc('_aurixPaintReturnBadge'); return s.indexOf('_aurixFormatReturnText') > s.indexOf('g.valid'); })() &&
+ok('9 the painter reads the unit (activePerfMode) only AFTER readiness (pending state is unit-independent)',
+   (function(){ const s=fnSrc('_aurixPaintReturnBadge'); return s.indexOf('_aurixFormatReturnFromSnapshot') > s.indexOf('snap.badgeReady'); })() &&
    /const mode = \(typeof activePerfMode/.test(fnSrc('_aurixFormatReturnText')));
 ok('10 mobile gate returns before any activePerfMode read',
    (function(){ const s=fnSrc('_aurixMobileSetPerfIndicator'); return s.indexOf("el.innerHTML = _aurixReturnPendingHTML()") < s.indexOf('activePerfMode'); })());
