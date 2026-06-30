@@ -33,6 +33,7 @@ const sb = {
 };
 sb.window = sb;
 vm.createContext(sb);
+vm.runInContext("function computePerformanceSnapshot(r){ var rs=(getInstitutionalPerformanceSeries(r).renderSeries)||[]; return { graphReady: rs.length>=2, badgeReady: rs.length>=2, chartSeries: rs.map(function(p){return {ts:p.time,value:p.value};}), tone:'flat', displayedReturnPct:0 }; }", sb);
 [ obj('_WSC_INTERNAL_KINDS'), obj('_WSC_BUCKET_MS'), obj('_WSC_WINDOW_MS'), obj('_WSC_QUALITY'),
   src.match(/const _WSC_LOWDENSITY_MIN = \d+;/)[0],
   fn('_aurixFlowIsInternal'), fn('_aurixFlowNeutralize'), fn('_wscAssessSeriesQuality'),

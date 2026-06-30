@@ -69,12 +69,12 @@ console.log('\nHeader consumers gated (source):');
 ok('10 desktop WSC header delegates the badge to the canonical painter → "Calculando…" + calculating when invalid',
    /if \(typeof _aurixPaintReturnBadge === 'function'\) _aurixPaintReturnBadge\(changeEl, opts\.uid === 'm' \? 'mobile' : 'desktop'\);/.test(fnSrc('_wscPaintSurface')) &&
    /el\.innerHTML = _aurixReturnPendingHTML\(\);\s*el\.className = 'chart-change calculating';/.test(fnSrc('_aurixPaintReturnBadge')));
-ok('11 desktop reconstructed headline gates on getValidReturnBaseline (shows "Calculando…")',
-   /const _ret = \(typeof getValidReturnBaseline === 'function'\) \? getValidReturnBaseline\(activeRange\)/.test(fnSrc('_aurixReconSyncHeadline')) &&
-   /chartChangeEl\.innerHTML = _aurixReturnPendingHTML\(\);/.test(fnSrc('_aurixReconSyncHeadline')));
-ok('12 mobile indicator gates on getValidReturnBaseline (shows "Calculando…", no red/green)',
-   /const ret = \(typeof getValidReturnBaseline === 'function'\) \? getValidReturnBaseline\(activeRange\)/.test(fnSrc('_aurixMobileSetPerfIndicator')) &&
-   /if \(!ret \|\| !ret\.valid \|\| !Number\.isFinite\(ret\.deltaPct\)\) \{ el\.innerHTML = _aurixReturnPendingHTML\(\); el\.className = 'chart-change calculating';/.test(fnSrc('_aurixMobileSetPerfIndicator')));
+ok('11 desktop reconstructed headline DELEGATES to the single badge owner (Calculando comes from the painter)',
+   /_aurixPaintReturnBadge\(chartChangeEl, 'desktop'\)/.test(fnSrc('_aurixReconSyncHeadline')) &&
+   !/getValidReturnBaseline\(/.test(fnSrc('_aurixReconSyncHeadline')));
+ok('12 mobile indicator DELEGATES to the single badge owner (no own getValidReturnBaseline)',
+   /_aurixPaintReturnBadge\(el, 'mobile'\)/.test(fnSrc('_aurixMobileSetPerfIndicator')) &&
+   !/getValidReturnBaseline\(/.test(fnSrc('_aurixMobileSetPerfIndicator')));
 ok('13 %/$ toggle respects pending: the painter gates readiness BEFORE the unit (format read only when ready)',
    (function(){ const s=fnSrc('_aurixPaintReturnBadge'); return s.indexOf('_aurixFormatReturnFromSnapshot') > s.indexOf('snap.badgeReady'); })() &&
    /const mode = \(typeof activePerfMode/.test(fnSrc('_aurixFormatReturnText')));

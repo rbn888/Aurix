@@ -18834,13 +18834,15 @@ function _dshCountUp(el, from, to, fmt) {
 // Build + paint the module. doCountUp animates the primary number from its last
 // shown value (user range/unit change); silent on background refreshes.
 function _dshPaintPerfSnapshot(root, doCountUp) {
-  const snap = _dshComputePerfSnapshot(activeRange);
-  // RETURN-PENDING-FINAL — gate the return hero behind a VALID baseline. Same guard the header
-  // consumers use; pending ⇒ premium "Calculando…" (no %/$, no red/green) instead of a false -89%.
-  // The insights blocks (best/worst/contributor/exposure — current 24h asset facts, NOT a baseline
-  // return) and the composition donut keep rendering: they are real regardless of the baseline.
-  const _gret = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(activeRange) : { valid: true };
-  const _pending = !!snap && !_gret.valid;
+  // P0-FINAL-RENDER-OWNERSHIP-SURGERY (S1) — PASSIVE CONSUMER. The "Resumen de rendimiento" hero no longer
+  // computes its own return/pending (no _dshComputePerfSnapshot / getValidReturnBaseline). The return %/€ and
+  // the pending verdict come from the single producer (computePerformanceSnapshot). The insight blocks
+  // (best/worst/contributor/exposure — current 24h asset facts) + donut keep rendering: they are not the
+  // return and not the chart series.
+  const _ps = (typeof computePerformanceSnapshot === 'function') ? computePerformanceSnapshot(activeRange) : null;
+  const _hasData = !!(_ps && _ps.chartPointCount >= 2);
+  const snap = _hasData ? { deltaPct: (_ps.badgeReady ? _ps.displayedReturnPct : 0), deltaAbs: (_ps.badgeReady ? _ps.displayedReturnValue : 0) } : null;
+  const _pending = _hasData && !_ps.badgeReady;
 
   let infoHtml;
   if (!snap) {
@@ -24855,7 +24857,7 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
     ? { mode: _snap.chartMeta.mode, renderMode: _snap.chartMeta.renderMode, realPointCount: _snap.chartMeta.realPointCount,
         coveragePct: _snap.chartMeta.coveragePct, reason: _snap.chartMeta.reason, rawValueSeries: _snap.chartMeta.rawValueSeries || [],
         renderSeries: _snap.chartSeries.map(p => ({ time: p.ts, value: p.value })) }
-    : getInstitutionalPerformanceSeries(activeRange);
+    : { mode: 'building', renderMode: 'building', realPointCount: 0, coveragePct: 0, reason: 'no_snapshot', rawValueSeries: [], renderSeries: [] };
   if (typeof window !== 'undefined') {
     window._aurixChartMode = { range: activeRange, mode: 'PERFORMANCE_ANCHOR_START', base: 'INVESTABLE_VALUE',
       source: 'computePerformanceSnapshot', realEstateIncluded: false, points: perf.realPointCount,
@@ -24895,32 +24897,12 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
 
   // Performance return over the range (NOT capital added/removed). deltaAbs is the
   // performance gain/loss EQUIVALENT in the current-capital base.
-  // AURIX-RETURN-UNIFY-1 — the METRIC is taken from the single canonical return
-  // function so this badge, "Resumen de rendimiento" and computeRangePnL are
-  // byte-identical. The CURVE below still uses adjVals (the same neutralised series).
-  // P0-RETURN-BASELINE-GUARD — gate the metric behind a VALID baseline. Pending ⇒ "—" + neutral
-  // (no %, no $, no red/green); the curve below still draws (adjVals untouched).
-  // P0-RANGE-PERFORMANCE-PIPELINE — the badge VALUE and its VALIDITY must come from the SAME canonical
-  // per-range source. Previously validity was gated on getValidReturnBaseline(activeRange) but the NUMBER was
-  // taken from a LOCAL recompute (_aurixRangeReturn) — so for an authed user the badge could show a local 24h
-  // figure (e.g. +17%) that diverged from performance_state["24h"] and differed device-to-device. Delegate the
-  // badge ENTIRELY to the single canonical painter (reads getValidReturnBaseline → performance_state[range] for
-  // authed; the deterministic local series for anon). The CURVE geometry below is unchanged (uses adjVals).
+  // P0-FINAL-RENDER-OWNERSHIP-SURGERY — the badge is owned ONLY by the canonical painter (single producer).
+  // The CURVE geometry below is unchanged (uses adjVals from the snapshot-derived series).
   if (changeEl) {
+    // P0-FINAL-RENDER-OWNERSHIP-SURGERY — the badge has EXACTLY ONE owner: the canonical painter
+    // (_aurixPaintReturnBadge → computePerformanceSnapshot). No engine fallback here anymore.
     if (typeof _aurixPaintReturnBadge === 'function') _aurixPaintReturnBadge(changeEl, opts.uid === 'm' ? 'mobile' : 'desktop');
-    else {
-      const _gret = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(activeRange) : { valid: false };
-      if (!_gret.valid || !Number.isFinite(_gret.deltaPct)) { changeEl.innerHTML = _aurixReturnPendingHTML(); changeEl.className = 'chart-change calculating'; changeEl.removeAttribute('title'); }
-      else {
-        const mode = activePerfMode === 'curr' ? 'curr' : 'pct';
-        const pf = _dshFmtPct(_gret.deltaPct);
-        const valText = mode === 'curr' ? _dshFmtMoney0(_gret.deltaAbs) : pf.text;
-        const tone = _gret.deltaPct > 0.005 ? 'up' : _gret.deltaPct < -0.005 ? 'down' : 'flat';
-        changeEl.innerHTML = `<span class="wsc-metric-val">${valText}</span>`;
-        changeEl.className = `chart-change ${tone}`;
-        if (mode === 'pct' && pf.capped) changeEl.title = pf.raw; else changeEl.removeAttribute('title');
-      }
-    }
   }
 
   // AURIX-PERFORMANCE-MODE-2 — 3-MODE policy from the single source. 'partial-curve'
@@ -25284,11 +25266,22 @@ function renderAurixMobileLiteChart(range, token) {
     try { st.timestamp = Date.now(); } catch (_) {}
     const host = _aurixMobileLiteHost();
     st.hostFound = !!host;
-    if (!host) { _aurixMobileLiteFallback('no-host'); return; }                  // chart area not in DOM yet
+    if (!host) { _aurixMobileLiteFallback('no-host'); return; }                  // INFRA: chart area not in DOM yet
+    // P0-FINAL-RENDER-OWNERSHIP-SURGERY (S4) — the BUSINESS verdict (ready vs pending) comes ONLY from the
+    // single producer, BEFORE any drawing. Series length / history / visiblePoints NEVER decide rendering
+    // here. When pending, show the skeleton fallback (and retry so the curve appears once the snapshot turns
+    // ready). Only INFRASTRUCTURE failures below (no-host above, exception, perf budget) may block a draw.
+    const _snap = (typeof computePerformanceSnapshot === 'function') ? computePerformanceSnapshot(r) : null;
+    try { _aurixRecordRender('mobileChart', _snap); } catch (_) {}
+    if (!_snap || !_snap.graphReady) {
+      _aurixMobileLiteFallback('pending');
+      if (_aurixMobileLiteEmptyRetries < 6) { _aurixMobileLiteEmptyRetries++; try { setTimeout(function () { scheduleAurixMobileLite(r); }, 1300); } catch (_) {} }
+      return;
+    }
     try { if (typeof _aurixMobInspectorHide === 'function') _aurixMobInspectorHide(); } catch (_) {}  // RC2 Fase 8: fresh data → close any open inspector
     const VBW = 1000, VBH = 260, box = { left: 6, right: 994, top: 16, bottom: 244 };
     const t0 = _aurixLiteNow();
-    // DATA — canonical series only, via the approved engine (no mutation).
+    // DRAWING — pixel geometry via the shared renderer (no business decision; the series is already owned).
     let rc = null;
     try { rc = renderAurixInstitutionalChart(r, VBW, VBH, box); }
     catch (e) { _aurixMobileLiteFallback('exception', e); return; }
@@ -25297,14 +25290,10 @@ function renderAurixMobileLiteChart(range, token) {
     st.pointCount = (rc && rc.visiblePoints) ? rc.visiblePoints.length : 0;
     st.seriesPoints = (rc && rc.diagnostics && typeof rc.diagnostics.sourcePoints === 'number') ? rc.diagnostics.sourcePoints : st.pointCount;
     if (typeof token === 'number' && token !== _aurixMobileLiteToken) return;    // superseded mid-compute
+    // INFRA-only guard: the producer said ready (≥2 pts) yet the drawer produced no path → a geometry/render
+    // failure, NOT a business "insufficient series". Treat as an exception (never a business verdict).
     if (!rc || !rc.pathData || rc.pathData.length < 6 || !rc.visiblePoints || rc.visiblePoints.length < 2) {
-      _aurixMobileLiteFallback('empty');
-      // The series may still be hydrating (snapshots/pricing). Retry a few times with
-      // backoff so the curve appears once data lands — without depending on renderWealthCurve.
-      if (_aurixMobileLiteEmptyRetries < 6) {
-        _aurixMobileLiteEmptyRetries++;
-        try { setTimeout(function () { scheduleAurixMobileLite(r); }, 1300); } catch (_) {}
-      }
+      _aurixMobileLiteFallback('exception');
       return;
     }
     if (dur > 100) { st.lastError = 'render ' + Math.round(dur) + 'ms > 100ms budget'; _aurixMobileLiteFallback('timeout'); return; }
@@ -25322,12 +25311,7 @@ function renderAurixMobileLiteChart(range, token) {
     // tone via getValidReturnBaseline; it reads the ONE authoritative snapshot. tone/readiness come from the
     // producer, so the mobile curve colour can never disagree with the badge or the desktop chart. Pixel
     // drawing (renderAurixInstitutionalChart geometry above) is unchanged. AURIX_MOBILE_SAFE guard intact.
-    const _snap = (typeof computePerformanceSnapshot === 'function') ? computePerformanceSnapshot(r) : null;
-    try { _aurixRecordRender('mobileChart', _snap); } catch (_) {}
-    // ONE readiness decision (graphReady === badgeReady): the mobile curve appears EXACTLY when the badge
-    // shows a %. When the snapshot is pending, the mobile chart shows the same empty state as the desktop
-    // chart — never a curve beside a "Calculando…" badge. Uses the existing presentation fallback only.
-    if (!_snap || !_snap.graphReady) { _aurixMobileLiteFallback('pending'); return; }
+    // tone from the SAME authoritative snapshot computed at the top of this render (single producer).
     const tone = _snap.tone;
     const up = tone !== 'down';
     const stroke = tone === 'down' ? '#e25563' : (tone === 'flat' ? '#9fb0c7' : '#2ebd85');
@@ -25374,20 +25358,9 @@ function renderAurixMobileLiteChart(range, token) {
 function _aurixMobileSetPerfIndicator() {
   try {
     const el = document.getElementById('chartChangeMobile'); if (!el) return;
-    // P0-RANGE-PERFORMANCE-PIPELINE — delegate to the SINGLE canonical painter so the mobile badge is
-    // byte-identical to the desktop badge for the same activeRange (both → getValidReturnBaseline →
-    // performance_state[range] for authed). No separate local recompute or formatting can diverge.
-    if (typeof _aurixPaintReturnBadge === 'function') { _aurixPaintReturnBadge(el, 'mobile'); return; }
-    // RETURN-PENDING-FINAL — fallback (painter absent in unit sandbox): same canonical source, inline format.
-    const ret = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(activeRange) : null;
-    if (!ret || !ret.valid || !Number.isFinite(ret.deltaPct)) { el.innerHTML = _aurixReturnPendingHTML(); el.className = 'chart-change calculating'; el.removeAttribute('title'); return; }
-    const deltaPct = ret.deltaPct, deltaAbs = Number.isFinite(ret.deltaAbs) ? ret.deltaAbs : 0;
-    const tone = deltaPct > 0.005 ? 'up' : deltaPct < -0.005 ? 'down' : 'flat';
-    let valText;
-    if (activePerfMode === 'curr') valText = (typeof _dshFmtMoney0 === 'function') ? _dshFmtMoney0(deltaAbs) : String(Math.round(deltaAbs));
-    else { const pf = (typeof _dshFmtPct === 'function') ? _dshFmtPct(deltaPct) : { text: deltaPct.toFixed(2) + '%' }; valText = pf.text; if (pf && pf.capped) el.title = pf.raw; else el.removeAttribute('title'); }
-    el.innerHTML = '<span class="wsc-metric-val">' + valText + '</span>';
-    el.className = 'chart-change ' + tone;
+    // P0-FINAL-RENDER-OWNERSHIP-SURGERY — the mobile badge has EXACTLY ONE owner: the canonical painter
+    // (_aurixPaintReturnBadge → computePerformanceSnapshot). No engine fallback / inline recompute here.
+    if (typeof _aurixPaintReturnBadge === 'function') _aurixPaintReturnBadge(el, 'mobile');
   } catch (_) {}
 }
 // Trigger. ALWAYS defers the paint to a macrotask (+rAF), debounced + token-cancelable,
@@ -26072,12 +26045,13 @@ function _aurixSetChartNote(text) {
 }
 
 function _aurixDashSeries(range) {
-  // AURIX-PERFORMANCE-MODE-2 — the V2 lightweight-charts surface reads the renderSeries
-  // from the SINGLE institutional source (getInstitutionalPerformanceSeries), the exact
-  // same series the WSC draws. Flow-neutral, anchor-to-start; capital flows never appear
-  // as a step or as return. [] when mode='building'. PCE untouched.
-  try { return getInstitutionalPerformanceSeries(range).renderSeries || []; }
-  catch (_) { return []; }
+  // P0-FINAL-RENDER-OWNERSHIP-SURGERY (S3) — ONE chart series. The V2 surface reads the series straight from
+  // the single producer (snapshot.chartSeries) in {time,value} shape; it no longer rebuilds it via
+  // getInstitutionalPerformanceSeries. No renderer owns the series anymore.
+  try {
+    const snap = (typeof computePerformanceSnapshot === 'function') ? computePerformanceSnapshot(range) : null;
+    return (snap && snap.graphReady && Array.isArray(snap.chartSeries)) ? snap.chartSeries.map(p => ({ time: p.ts, value: p.value })) : [];
+  } catch (_) { return []; }
 }
 
 // ── AURIX-CHART-RELIABILITY-GATE-1 ───────────────────────────────
@@ -26608,53 +26582,15 @@ function _aurixLastGoodReusable(lg, range, liveValue) {
 // 'loading' | 'empty' | 'building' | 'ready' (mutually exclusive) plus the series
 // to draw when ready. Both surfaces + the legacy path read this, so a range can
 // never show two states at once.
+// P0-FINAL-RENDER-OWNERSHIP-SURGERY (S2) — PURE ADAPTER over the single producer. This function NO LONGER
+// decides graph visibility, builds a series, calls getInstitutionalPerformanceSeries, reuses last-good, or
+// emits building/loading/empty. Its ONLY verdict comes from computePerformanceSnapshot: state is 'ready'
+// (graphReady) or 'pending'; the series is snapshot.chartSeries. There is exactly ONE graph owner.
 function getDashboardChartRenderState(range) {
-  const hasAssets = Array.isArray(assets) && assets.length > 0;
-  if (!hasAssets) return { state: 'empty', series: [], isRecon: false };
-  const ready = (typeof _aurixChartDataReady === 'function') ? _aurixChartDataReady() : true;
-  const epoch = (typeof _aurixInvestableChartEpoch === 'function') ? _aurixInvestableChartEpoch() : 0;
-  const live  = ready ? Number(investableValueBase()) : NaN;
-
-  // FASE 3 — V2 consumes EXACTLY getAurixRenderSeries(range) (= the WSC renderSeries).
-  // NO dropDivergent / validateChartSeries / anchorTail passes — those caused V2≠WSC.
-  // The series is already clean (FASE 1/2 removed corrupt snapshots) and tail-anchored
-  // to live. PCE stays isolated behind the flag (Fase 4): only overrides when ON.
-  let series = getAurixRenderSeries(range);
-  let isRecon = false;
-  if (_aurixReconFlag() && _reconActive && _reconActive.range === range
-      && _reconActive.currency === (baseCurrency || 'USD')
-      && Array.isArray(_reconActive.series) && _reconActive.series.length >= 2) {
-    series = _reconActive.series.slice(); isRecon = true;
-  }
-
-  // Not trustworthy yet (boot/refresh): reusable last-good, else premium loading.
-  if (!ready) {
-    const lg = _aurixLastGoodByRange[range];
-    if (Array.isArray(lg) && lg.length >= 2) return { state: 'ready', series: _aurixChartAnchorTail(lg), isRecon: false, fromLastGood: true };
-    return { state: 'loading', series: [], isRecon: false };
-  }
-  // Holdings-transition settle window: freeze the last-good line (no teeth).
-  if (Date.now() < _aurixChartSettleUntil) {
-    const lg = _aurixLastGoodByRange[range];
-    if (Array.isArray(lg) && lg.length >= 2) return { state: 'ready', series: _aurixChartAnchorTail(lg), isRecon: false, fromLastGood: true };
-  }
-
-  // PCE override path (isolated): if a reconstruction is active, draw it as-is.
-  if (isRecon) {
-    if (series.length >= 2) { _aurixLastGoodByRange[range] = series; return { state: 'ready', series, isRecon: true }; }
-  }
-
-  // Canonical path — state = the SAME mode the WSC uses (single source of verdict).
-  // building (<2 pts) → empty (reuse last-good if still valid); premium/partial → ready.
-  const _perf = getInstitutionalPerformanceSeries(range);
-  if (_perf.mode === 'building' || series.length < 2) {
-    const lg = _aurixLastGoodByRange[range];
-    if (_aurixLastGoodReusable(lg, range, live)) return { state: 'ready', series: _aurixChartAnchorTail(lg), isRecon: false, fromLastGood: true };
-    if (lg) delete _aurixLastGoodByRange[range];
-    return { state: 'building', series: [], isRecon: false, qualityMode: _perf.mode, qualityReason: _perf.reason };
-  }
-  _aurixLastGoodByRange[range] = series;
-  return { state: 'ready', series, isRecon: false };
+  const snap = (typeof computePerformanceSnapshot === 'function') ? computePerformanceSnapshot(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')) : null;
+  if (!snap || !snap.graphReady) return { state: 'pending', series: [], isRecon: false };
+  // series in the V2 surface shape {time,value}; the source is snapshot.chartSeries ({ts,value}) — ONE owner.
+  return { state: 'ready', series: snap.chartSeries.map(p => ({ time: p.ts, value: p.value })), isRecon: false };
 }
 
 // AURIX-CHART-LOADING-PREMIUM-1 — visual-only loading/draw wiring. Mirrors the
@@ -26812,22 +26748,14 @@ function _aurixDashSync(surface) {
     if (ctrl.__aurixSyncFp === _syncFp) return;
     ctrl.__aurixSyncFp = _syncFp;
 
-    if (decision.state === 'loading') {
-      try { ctrl.setState('loading'); } catch (_) {}
-      _aurixSetChartSkin(surface, 'loading');
-      _aurixClearChartHeadline(); _aurixSetChartNote('');
-      return;
-    }
-    if (decision.state === 'empty') {
-      ctrl.setData([], { emptyReason: 'no_assets' });
-      _aurixSetChartSkin(surface, 'empty');
-      _aurixClearChartHeadline(); _aurixSetChartNote('');
-      return;
-    }
-    if (decision.state === 'building') {
-      ctrl.setData([], { emptyReason: 'low_data' });
+    // P0-FINAL-RENDER-OWNERSHIP-SURGERY (S2) — ONE non-ready branch. The snapshot owns the verdict; when it
+    // is not 'ready' the surface shows the skeleton skin and the badge is painted by the single badge owner
+    // (Calculando), never a separate building/loading/empty decision here.
+    if (decision.state !== 'ready') {
+      try { ctrl.setData([], { emptyReason: 'pending' }); } catch (_) {}
       _aurixSetChartSkin(surface, 'building');
-      _aurixClearChartHeadline(); _aurixSetChartNote('');
+      _aurixSetChartNote('');
+      try { _aurixReconSyncHeadline(); } catch (_) {}
       return;
     }
 
@@ -26921,30 +26849,13 @@ function _aurixReconInvalidate() {
 
 // Keep the headline KPI coherent with a reconstructed line (mirror of the
 // snapshot logic in updateChart, including the mobile mirror + perf-mode).
+// P0-FINAL-RENDER-OWNERSHIP-SURGERY (S1) — PASSIVE CONSUMER. The reconstructed/V2 headline no longer
+// computes its own return (no getValidReturnBaseline / _aurixRangeReturn). It delegates the badge entirely
+// to the single badge owner (_aurixPaintReturnBadge → computePerformanceSnapshot), then mirrors the painted
+// node to the mobile badge so both surfaces are byte-identical. `series` is unused (kept for call-site compat).
 function _aurixReconSyncHeadline(series) {
   if (!chartChangeEl) return;
-  // AURIX-PERFORMANCE-MODE-2 — the V2 headline % comes from the SINGLE canonical
-  // flow-neutral return (_aurixRangeReturn), identical to the WSC badge and
-  // "Resumen de rendimiento". It must NOT be (live − series[0])/series[0]: with the
-  // anchor-to-start performance series, series[0] is the real (low) inception value,
-  // so that formula would re-introduce the capital flow as return. _aurixRangeReturn
-  // is flow-neutral by construction.
-  // P0-RETURN-BASELINE-GUARD — gate on a valid baseline (pre-reset / flow-dominated / insufficient
-  // history ⇒ pending ⇒ "—", never a false loss).
-  const _ret = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(activeRange) : null;
-  const safe = _ret && _ret.valid && Number.isFinite(_ret.deltaPct);
-  const pct  = safe ? _ret.deltaPct : 0;
-  const abs  = safe && Number.isFinite(_ret.deltaAbs) ? _ret.deltaAbs : 0;
-  const cls  = !safe ? 'flat' : (pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat');
-  if (!safe) {
-    // RETURN-PENDING-FINAL — no valid baseline ⇒ premium "Calculando…", never a false loss.
-    chartChangeEl.innerHTML = _aurixReturnPendingHTML();
-    chartChangeEl.className = 'chart-change calculating';
-  } else {
-    if (activePerfMode === 'curr') chartChangeEl.textContent = `${abs >= 0 ? '+' : ''}${formatBase(abs)}`;
-    else chartChangeEl.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
-    chartChangeEl.className = `chart-change ${cls}`;
-  }
+  try { if (typeof _aurixPaintReturnBadge === 'function') _aurixPaintReturnBadge(chartChangeEl, 'desktop'); } catch (_) {}
   const _mch = document.getElementById('chartChangeMobile');
   if (_mch) { _mch.innerHTML = chartChangeEl.innerHTML; _mch.className = chartChangeEl.className; }
 }
@@ -29237,25 +29148,10 @@ function updateChart(animate = false) {
   // the tooltip mode — the header always carries both figures.
   // AURIX-DASHBOARD-PREMIUM-POLISH-1: show ONLY the metric the toggle selects —
   // percent in '%' mode, money in '$/€' mode (never both). Colour by sign.
-  // RETURN-PENDING-FINAL — this legacy Chart.js path only paints the headline as a FALLBACK
-  // (V2 overlay not mounted). It still uses a raw (non-flow-neutral) formula, so gate it behind
-  // the SAME baseline guard: no valid baseline ⇒ premium "Calculando…", never a false loss.
-  const _gretLegacy = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(activeRange) : { valid: true };
-  if (!_gretLegacy.valid) {
-    chartChangeEl.innerHTML = _aurixReturnPendingHTML();
-    chartChangeEl.className = 'chart-change calculating';
-  } else if (!safeBase) {
-    chartChangeEl.textContent = '—';
-    chartChangeEl.className = `chart-change ${cls}`;
-  } else {
-    if (activePerfMode === 'curr') {
-      const absChange = currentValue - startValue;
-      chartChangeEl.textContent = `${absChange >= 0 ? '+' : ''}${formatBase(absChange)}`;
-    } else {
-      chartChangeEl.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
-    }
-    chartChangeEl.className = `chart-change ${cls}`;
-  }
+  // P0-FINAL-RENDER-OWNERSHIP-SURGERY (S1) — PASSIVE CONSUMER. This legacy Chart.js headline no longer
+  // computes its own return; it delegates the badge to the single badge owner (_aurixPaintReturnBadge →
+  // computePerformanceSnapshot). No getValidReturnBaseline / raw formula here anymore.
+  try { if (typeof _aurixPaintReturnBadge === 'function') _aurixPaintReturnBadge(chartChangeEl, 'desktop'); } catch (_) {}
 
   portfolioChart.data.labels = data.labels;
   portfolioChart.data.datasets[0].data = data.values;

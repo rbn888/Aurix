@@ -21,6 +21,7 @@ const sb={ console,
   _aurixLoadCapitalFlows:()=>FLOWS.slice(),
 };
 sb.window=sb; vm.createContext(sb);
+vm.runInContext("function computePerformanceSnapshot(r){ var rs=(getInstitutionalPerformanceSeries(r).renderSeries)||[]; return { graphReady: rs.length>=2, badgeReady: rs.length>=2, chartSeries: rs.map(function(p){return {ts:p.time,value:p.value};}), tone:'flat', displayedReturnPct:0 }; }", sb);
 [ obj('_WSC_INTERNAL_KINDS'),
   fn('_aurixFlowIsInternal'),fn('_aurixFlowNeutralize'),fn('_aurixRangeReturn'),
   fn('getCanonicalPortfolioSeries'),fn('getInstitutionalPerformanceSeries'),fn('getInstitutionalSeries'),fn('getAurixRenderSeries'),fn('_aurixLegacyDataFromCanonical'),fn('_aurixDashSeries')

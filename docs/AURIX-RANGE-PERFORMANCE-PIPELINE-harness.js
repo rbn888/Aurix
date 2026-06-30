@@ -30,7 +30,7 @@ ok('2 desktop WSC no longer reads the badge number from the LOCAL _aurixRangeRet
 ok('3 the chart skeleton branch (graph not ready) ALSO routes the badge through the painter — graph + badge share ONE readiness',
    /if \(!_snap \|\| !_snap\.graphReady\) \{[\s\S]*?if \(typeof _aurixPaintReturnBadge === 'function'\) _aurixPaintReturnBadge\(changeEl,/.test(wsc));
 ok('4 mobile indicator delegates to the SAME canonical painter (web/mobile byte-identical)',
-   /if \(typeof _aurixPaintReturnBadge === 'function'\) \{ _aurixPaintReturnBadge\(el, 'mobile'\); return; \}/.test(fnSrc('_aurixMobileSetPerfIndicator')));
+   /if \(typeof _aurixPaintReturnBadge === 'function'\) _aurixPaintReturnBadge\(el, 'mobile'\);/.test(fnSrc('_aurixMobileSetPerfIndicator')));
 ok('5 the painter reads the ONE authoritative snapshot (computePerformanceSnapshot) — never the engine directly',
    /computePerformanceSnapshot\(typeof activeRange !== 'undefined' \? activeRange : '24h'\)/.test(fnSrc('_aurixPaintReturnBadge')) &&
    !/getValidReturnBaseline\(/.test(fnSrc('_aurixPaintReturnBadge')));

@@ -73,10 +73,10 @@ ok('10 getValidReturnBaseline gates first on canDisplayCanonicalReturn',
 ok('11 mobile lite line colour derives from the ONE authoritative snapshot (not its own getValidReturnBaseline/raw _aurixRangeReturn)',
    /const _snap = \(typeof computePerformanceSnapshot === 'function'\) \? computePerformanceSnapshot\(r\)/.test(fnSrc('renderAurixMobileLiteChart')) &&
    /const tone = _snap\.tone;/.test(fnSrc('renderAurixMobileLiteChart')));
-ok('12 desktop badge / recon headline / mobile indicator / perf hero all gate on getValidReturnBaseline',
-   /getValidReturnBaseline\(activeRange\)/.test(fnSrc('_aurixReconSyncHeadline')) &&
-   /getValidReturnBaseline\(activeRange\)/.test(fnSrc('_aurixMobileSetPerfIndicator')) &&
-   /getValidReturnBaseline\(activeRange\)/.test(fnSrc('_dshPaintPerfSnapshot')));
+ok('12 recon headline / mobile indicator / perf hero are PASSIVE consumers of the single producer (no own getValidReturnBaseline)',
+   /_aurixPaintReturnBadge\(/.test(fnSrc('_aurixReconSyncHeadline')) && !/getValidReturnBaseline\(/.test(fnSrc('_aurixReconSyncHeadline')) &&
+   /_aurixPaintReturnBadge\(/.test(fnSrc('_aurixMobileSetPerfIndicator')) && !/getValidReturnBaseline\(/.test(fnSrc('_aurixMobileSetPerfIndicator')) &&
+   /computePerformanceSnapshot\(/.test(fnSrc('_dshPaintPerfSnapshot')) && !/getValidReturnBaseline\(/.test(fnSrc('_dshPaintPerfSnapshot')));
 ok('13 toggle %/€ cannot flip the gate (canDisplayCanonicalReturn ignores activePerfMode)',
    !/activePerfMode/.test(fnSrc('canDisplayCanonicalReturn')));
 

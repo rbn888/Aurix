@@ -70,14 +70,21 @@ ok('7 24H still ONE subpath (no split — RULE 0 intact)', rc.diagnostics.render
 ok('9 equivalence render↔canonical not divergent', vm.runInContext("auditAurixRenderVsCanonical('24h').status",sbR)!=='divergent');
 
 // ── FASE 2 — mobile perf indicator (pure, fake DOM + stubs) ──
+// P0-FINAL-RENDER-OWNERSHIP-SURGERY — the mobile indicator is now a PASSIVE consumer: it delegates to the
+// single badge owner (_aurixPaintReturnBadge → computePerformanceSnapshot). Drive it via a stubbed snapshot.
 function testIndicator(deltaPct, deltaAbs, mode) {
   const el = { className:'', innerHTML:'', textContent:'', title:'', removeAttribute(){ this.title=''; } };
+  const tone = deltaPct > 0.005 ? 'up' : (deltaPct < -0.005 ? 'down' : 'flat');
   const sb = { document:{ getElementById:(id)=> id==='chartChangeMobile'?el:null }, activePerfMode:mode, activeRange:'24h',
-    _aurixRangeReturn:()=>({deltaPct,deltaAbs}),
-    // P0-RETURN-BASELINE-GUARD: the indicator now reads the gated baseline; stub it as valid here.
-    getValidReturnBaseline:()=>({valid:true,deltaPct,deltaAbs}),
-    _dshFmtPct:(p)=>({text:(p>0?'+':'')+p.toFixed(2)+'%',capped:false}), _dshFmtMoney0:(v)=>'$'+Math.round(v), Number, Math };
-  vm.createContext(sb); vm.runInContext(fn('_aurixMobileSetPerfIndicator'), sb); sb._aurixMobileSetPerfIndicator();
+    computePerformanceSnapshot:()=>({ badgeReady:true, displayedReturnPct:deltaPct, displayedReturnValue:deltaAbs, tone:tone, producerHash:'h' }),
+    _aurixRecordRender:()=>{}, _aurixReturnPendingHTML:()=>'<span class="wsc-metric-val wsc-metric-calc">Calculando…</span>',
+    _dshFmtPct:(p)=>({text:(p>0?'+':'')+p.toFixed(2)+'%',capped:false}), _dshFmtMoney0:(v)=>'$'+Math.round(v), Number, Math, console };
+  vm.createContext(sb);
+  vm.runInContext(fn('_aurixFormatReturnText'), sb);
+  vm.runInContext(fn('_aurixFormatReturnFromSnapshot'), sb);
+  vm.runInContext(fn('_aurixPaintReturnBadge'), sb);
+  vm.runInContext(fn('_aurixMobileSetPerfIndicator'), sb);
+  sb._aurixMobileSetPerfIndicator();
   return el;
 }
 { const e=testIndicator(3.21, 1234, '%'); ok('10 indicator appears (% mode) + green when positive', e.className==='chart-change up' && /3\.21%/.test(e.innerHTML)); }
@@ -86,7 +93,7 @@ function testIndicator(deltaPct, deltaAbs, mode) {
 { const e=testIndicator(3.21, 1234, 'curr'); ok('13 indicator honours €/curr mode', /\$1234/.test(e.innerHTML) && e.className==='chart-change up'); }
 ok('14 indicator wired into the lite paint (read-only, no _wscPaintSurface on mobile)',
    /_aurixMobileSetPerfIndicator\(\);/.test(app) && /renderAurixMobileLiteChart\(r, token\)/.test(app));
-ok('15 indicator reads the baseline-gated return (no data mutation)', /getValidReturnBaseline\(activeRange\)/.test(fn('_aurixMobileSetPerfIndicator')));
+ok('15 indicator delegates to the single badge owner (no own engine call / data mutation)', /_aurixPaintReturnBadge\(el, 'mobile'\)/.test(fn('_aurixMobileSetPerfIndicator')) && !/getValidReturnBaseline\(/.test(fn('_aurixMobileSetPerfIndicator')));
 
 // ── Layout (no overflow / pulsable): uses the EXISTING element + controls, no new markup ──
 ok('16 #chartChangeMobile element exists in the mobile chart header (no layout shift)', /id="chartChangeMobile"/.test(idx));

@@ -49,17 +49,18 @@ ok('3 desktop WSC — chart-not-ready (skeleton) routes the badge through the ca
 ok('4 desktop WSC delegates badge to the canonical painter (Calculando when invalid)',
    /if \(typeof _aurixPaintReturnBadge === 'function'\) _aurixPaintReturnBadge\(changeEl, opts\.uid === 'm' \? 'mobile' : 'desktop'\);/.test(fnSrc('_wscPaintSurface')) &&
    /el\.innerHTML = _aurixReturnPendingHTML\(\);\s*el\.className = 'chart-change calculating';/.test(fnSrc('_aurixPaintReturnBadge')));
-ok('5 desktop reconstructed headline shows Calculando',
-   /chartChangeEl\.innerHTML = _aurixReturnPendingHTML\(\);\s*chartChangeEl\.className = 'chart-change calculating';/.test(fnSrc('_aurixReconSyncHeadline')));
-ok('6 mobile indicator shows Calculando (parity)',
-   /el\.innerHTML = _aurixReturnPendingHTML\(\); el\.className = 'chart-change calculating';/.test(fnSrc('_aurixMobileSetPerfIndicator')));
-ok('7 "Resumen de rendimiento" hero is also gated — no false -89% loss in the module',
-   /const _gret = \(typeof getValidReturnBaseline === 'function'\) \? getValidReturnBaseline\(activeRange\)/.test(fnSrc('_dshPaintPerfSnapshot')) &&
-   /const _pending = !!snap && !_gret\.valid;/.test(fnSrc('_dshPaintPerfSnapshot')) &&
-   /_pending \? _aurixReturnPendingHTML\(\)/.test(fnSrc('_dshPaintPerfSnapshot')));
-ok('7b legacy Chart.js fallback headline (updateChart) is also gated — no raw false return',
-   /const _gretLegacy = \(typeof getValidReturnBaseline === 'function'\) \? getValidReturnBaseline\(activeRange\)/.test(fnSrc('updateChart')) &&
-   /if \(!_gretLegacy\.valid\) \{\s*chartChangeEl\.innerHTML = _aurixReturnPendingHTML\(\);\s*chartChangeEl\.className = 'chart-change calculating';/.test(fnSrc('updateChart')));
+ok('5 desktop reconstructed headline delegates to the single badge owner (Calculando from the painter)',
+   /_aurixPaintReturnBadge\(chartChangeEl, 'desktop'\)/.test(fnSrc('_aurixReconSyncHeadline')));
+ok('6 mobile indicator delegates to the single badge owner (parity, Calculando from the painter)',
+   /_aurixPaintReturnBadge\(el, 'mobile'\)/.test(fnSrc('_aurixMobileSetPerfIndicator')));
+ok('7 "Resumen de rendimiento" hero consumes the single producer — pending from snapshot, no own getValidReturnBaseline',
+   /computePerformanceSnapshot\(activeRange\)/.test(fnSrc('_dshPaintPerfSnapshot')) &&
+   /const _pending = _hasData && !_ps\.badgeReady;/.test(fnSrc('_dshPaintPerfSnapshot')) &&
+   /_pending \? _aurixReturnPendingHTML\(\)/.test(fnSrc('_dshPaintPerfSnapshot')) &&
+   !/getValidReturnBaseline\(/.test(fnSrc('_dshPaintPerfSnapshot')));
+ok('7b legacy Chart.js headline (updateChart) delegates to the single badge owner — no raw formula',
+   /_aurixPaintReturnBadge\(chartChangeEl, 'desktop'\)/.test(fnSrc('updateChart')) &&
+   !/getValidReturnBaseline\(/.test(fnSrc('updateChart')));
 
 console.log('\nWeb ⇄ mobile parity (same node content):');
 ok('8 recon headline mirrors innerHTML (not textContent) to #chartChangeMobile',
@@ -69,8 +70,8 @@ console.log('\n%/$ toggle never changes the pending state (gate read BEFORE the 
 ok('9 the painter reads the unit (activePerfMode) only AFTER readiness (pending state is unit-independent)',
    (function(){ const s=fnSrc('_aurixPaintReturnBadge'); return s.indexOf('_aurixFormatReturnFromSnapshot') > s.indexOf('snap.badgeReady'); })() &&
    /const mode = \(typeof activePerfMode/.test(fnSrc('_aurixFormatReturnText')));
-ok('10 mobile gate returns before any activePerfMode read',
-   (function(){ const s=fnSrc('_aurixMobileSetPerfIndicator'); return s.indexOf("el.innerHTML = _aurixReturnPendingHTML()") < s.indexOf('activePerfMode'); })());
+ok('10 mobile indicator contains NO unit logic at all (activePerfMode + pending markup live in the single owner)',
+   fnSrc('_aurixMobileSetPerfIndicator').indexOf('activePerfMode') === -1 && fnSrc('_aurixMobileSetPerfIndicator').indexOf('_aurixReturnPendingHTML') === -1);
 ok('11 perf-snapshot count-up is skipped while pending (Calculando markup not overwritten)',
    /if \(snap && !_pending\) \{/.test(fnSrc('_dshPaintPerfSnapshot')));
 

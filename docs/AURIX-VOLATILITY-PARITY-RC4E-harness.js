@@ -42,7 +42,7 @@ ok('2b zero/na → neutral', toneToStroke(0) === '#9fb0c7' && toneToStroke(null)
 const liteFn = fn('renderAurixMobileLiteChart');   // full function (brace-matched) — robust to comment/length changes
 ok('3 mobile lite colours from the ONE authoritative snapshot tone (NOT its own getValidReturnBaseline/raw _aurixRangeReturn)', /computePerformanceSnapshot\(r\)/.test(liteFn) && /const tone = _snap\.tone;/.test(liteFn) && /tone === 'down' \? '#e25563'/.test(liteFn) && !/getValidReturnBaseline\(r\)/.test(liteFn));
 ok('4 web/mobile parity: same hexes (lite) + the ±0.005 tone threshold lives in the ONE producer', app.indexOf("'#e25563'")>=0 && app.indexOf("'#2ebd85'")>=0 && /> 0\.005 \? 'up'/.test(fn('computePerformanceSnapshot')));
-ok('5 indicator tone uses the same sign source (baseline-gated return + ±0.005)', /deltaPct > 0\.005 \? 'up' : deltaPct < -0\.005 \? 'down'/.test(fn('_aurixMobileSetPerfIndicator')) && /getValidReturnBaseline\(activeRange\)/.test(fn('_aurixMobileSetPerfIndicator')));
+ok('5 indicator delegates to the single badge owner (tone/sign come from the producer, not a local recompute)', /_aurixPaintReturnBadge\(el, 'mobile'\)/.test(fn('_aurixMobileSetPerfIndicator')) && !/getValidReturnBaseline\(/.test(fn('_aurixMobileSetPerfIndicator')));
 
 console.log('\nFASE 2/3 — Global volatility polish (per-range cluster reduction):');
 const ON = mk(CONST_BLOCK);

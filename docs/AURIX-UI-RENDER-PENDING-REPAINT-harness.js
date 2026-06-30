@@ -36,9 +36,9 @@ ok('4 it repaints the SAME return surfaces (render + perf module + mobile lite)'
 ok('5 emits a traceable marker', /\[SYNC\]\[PERF_STATE_REPAINT\]/.test(R));
 
 console.log('\nNo business-logic / calculation / consumer-gate change (only the render TRIGGER added):');
-ok('6 the badges still gate on getValidReturnBaseline().valid → pending markup unchanged (the "Calculando…" source)',
-   /el\.innerHTML = _aurixReturnPendingHTML\(\); el\.className = 'chart-change calculating';/.test(fnSrc('_aurixMobileSetPerfIndicator')) &&
-   /changeEl\.innerHTML = _aurixReturnPendingHTML\(\);/.test(app));
+ok('6 the badge pending markup lives in the SINGLE owner (_aurixPaintReturnBadge); consumers delegate to it',
+   /el\.innerHTML = _aurixReturnPendingHTML\(\);/.test(fnSrc('_aurixPaintReturnBadge')) &&
+   /_aurixPaintReturnBadge\(el, 'mobile'\)/.test(fnSrc('_aurixMobileSetPerfIndicator')));
 ok('7 getValidReturnBaseline + performance_state read path + _aurixRangeReturn baseline selection untouched by this patch',
    /function getValidReturnBaseline\(range, opts\)/.test(app) &&
    /_aurixRemotePerformanceState = \(remoteRow && remoteRow\.performance_state/.test(fnSrc('_mergeRemoteState')) &&

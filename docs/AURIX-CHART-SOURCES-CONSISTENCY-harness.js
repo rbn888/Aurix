@@ -28,6 +28,10 @@ const sb={ console,
 };
 Object.defineProperty(sb,'_reconActive',{ get(){ return RECON_ACTIVE; } });
 sb.window=sb; vm.createContext(sb);
+// P0-FINAL-RENDER-OWNERSHIP-SURGERY — _aurixDashSeries + getDashboardChartRenderState are now PASSIVE
+// consumers of the single producer. Stub computePerformanceSnapshot to expose the canonical series as
+// snapshot.chartSeries ({ts,value}); the consumers map it back to {time,value}, so V2===canonical still holds.
+vm.runInContext("function computePerformanceSnapshot(r){ var rs=(getInstitutionalPerformanceSeries(r).renderSeries)||[]; return { graphReady: rs.length>=2, badgeReady: rs.length>=2, chartSeries: rs.map(function(p){return {ts:p.time,value:p.value};}), tone:'flat', displayedReturnPct:0 }; }", sb);
 [ fn('getCanonicalPortfolioSeries'),fn('getInstitutionalPerformanceSeries'),fn('getAurixRenderSeries'),
   fn('_aurixLegacyDataFromCanonical'),fn('_aurixDashSeries'),fn('getDashboardChartRenderState')
 ].forEach(c=>vm.runInContext(c,sb));
@@ -61,15 +65,17 @@ RANGES.forEach(r=>{
   ck(`${r}: last === dashboard ${LIVE}`, lastOK, last(canon)&&Math.round(last(canon).value));
 });
 
-console.log('\nCASE 6 — PCE OFF: getDashboardChartRenderState does NOT consume _reconActive');
+// P0-FINAL-RENDER-OWNERSHIP-SURGERY — getDashboardChartRenderState is now a PURE snapshot adapter: it owns
+// no series and consumes no _reconActive in EITHER flag state. The series is always the canonical
+// snapshot.chartSeries; isRecon is always false. (The recon/PCE override no longer lives in this renderer.)
+console.log('\nCASE 6 — getDashboardChartRenderState is a pure snapshot adapter (never consumes _reconActive)');
 RECON_FLAG=false; RECON_ACTIVE={ range:'30d', currency:'USD', series:[{time:NOW-10*D,value:999999},{time:NOW,value:999999}] };
 { const d=sb.getDashboardChartRenderState('30d');
-  ck('series is canonical (not the 999999 recon)', d.series.every(p=>p.value!==999999) && d.isRecon!==true, 'isRecon='+d.isRecon); }
-
-console.log('\nCASE 6b — PCE ON (explicit): recon IS used (isolated behind flag)');
+  ck('flag OFF → series is canonical (not the 999999 recon), isRecon false', d.series.every(p=>p.value!==999999) && d.isRecon!==true, 'isRecon='+d.isRecon); }
+console.log('\nCASE 6b — even with PCE flag ON the renderer does NOT inject recon (single series owner)');
 RECON_FLAG=true;
 { const d=sb.getDashboardChartRenderState('30d');
-  ck('with flag ON, recon series used (isolated)', d.isRecon===true, 'isRecon='+d.isRecon); }
+  ck('flag ON → still canonical snapshot.chartSeries, isRecon false (no duplicate series owner)', d.series.every(p=>p.value!==999999) && d.isRecon!==true, 'isRecon='+d.isRecon); }
 RECON_FLAG=false; RECON_ACTIVE=null;
 
 console.log('\nCASE 7 — getChartData does NOT feed the main visible chart');

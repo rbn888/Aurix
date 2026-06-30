@@ -83,10 +83,11 @@ const ctrl = html.slice(html.indexOf('mobile-slide-chart'), html.indexOf('mobile
 ok('11 indicator sits BELOW the %/€ selector (perf-unit-block: toggle then #chartChangeMobile)',
    /<div class="perf-unit-block">\s*<div class="perf-toggle">[\s\S]*?<\/div>\s*<span class="chart-change" id="chartChangeMobile">/.test(ctrl) &&
    ctrl.indexOf('perf-toggle') < ctrl.indexOf('id="chartChangeMobile"'));
-ok('12 %/€ toggle updates the indicator (reads activePerfMode, writes #chartChangeMobile, keeps tone)',
-   /activePerfMode === 'curr'/.test(fn('_aurixMobileSetPerfIndicator')) &&
+ok('12 %/€ toggle honored by the SINGLE badge owner; indicator delegates + targets #chartChangeMobile, painter keeps tone',
    /getElementById\('chartChangeMobile'\)/.test(fn('_aurixMobileSetPerfIndicator')) &&
-   /el\.className = 'chart-change ' \+ tone;/.test(fn('_aurixMobileSetPerfIndicator')));
+   /_aurixPaintReturnBadge\(el, 'mobile'\)/.test(fn('_aurixMobileSetPerfIndicator')) &&
+   /activePerfMode/.test(fn('_aurixFormatReturnText')) &&
+   /el\.className = 'chart-change ' \+ snap\.tone;/.test(fn('_aurixPaintReturnBadge')));
 { const ctrlRule = (css.match(/\.mobile-slide-chart \.chart-controls \{[^}]*\}/)||[''])[0];
   ok('13 no mobile overflow: column stack, reserved line-height, controls flex-start + nowrap',
      /\.mobile-slide-chart \.perf-unit-block \{ display: flex; flex-direction: column;/.test(css) &&

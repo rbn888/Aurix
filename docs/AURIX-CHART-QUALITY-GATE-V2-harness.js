@@ -46,6 +46,7 @@ const sb = {
 };
 sb.window = sb;
 vm.createContext(sb);
+vm.runInContext("function computePerformanceSnapshot(r){ var rs=(getInstitutionalPerformanceSeries(r).renderSeries)||[]; return { graphReady: rs.length>=2, badgeReady: rs.length>=2, chartSeries: rs.map(function(p){return {ts:p.time,value:p.value};}), tone:'flat', displayedReturnPct:0 }; }", sb);
 [ obj('_WSC_BUCKET_MS'), obj('_WSC_WINDOW_MS'), obj('_WSC_QUALITY'),
   src.match(/const _WSC_LOWDENSITY_MIN = \d+;/)[0],
   fn('_wscAssessSeriesQuality'), fn('getCanonicalPortfolioSeries'), fn('getInstitutionalPerformanceSeries'), fn('getAurixRenderSeries'), fn('_aurixLastGoodReusable'), fn('getDashboardChartRenderState') ].forEach(c => vm.runInContext(c, sb));
@@ -72,7 +73,8 @@ console.log('\n24H 2 pts — Rule 7: partial (≥2 draws), not building:');
 console.log('\nNo history — Rule 7: building (canonical = only the live point → <2 in window):');
 { sb._aurixLastGoodByRange = {};   // isolate: no stale last-good fallback from earlier cases
   const d = run('24h', []);        // empty history; canonical appends live → 1 point → building
-  ck('state = building', d.state === 'building', d.state); }
+  // P0-FINAL-RENDER-OWNERSHIP-SURGERY — getDashboardChartRenderState never emits 'building' now; <2 pts → 'pending'.
+  ck('state = pending (insufficient series → single producer verdict, not "building")', d.state === 'pending', d.state); }
 
 console.log('\nNO REGRESSION — 30D / 1A / TOTAL with enough points stay ready:');
 { for (const r of ['30d','1y','all']) { const d = run(r, spread(25, (r==='30d'?28*D:r==='1y'?350*D:380*D), 50000));

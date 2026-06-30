@@ -204,7 +204,14 @@ ck('§8 debug not painted into UI (no visible diag/stamp in normal flow; panel g
   let e3 = null; e3 = makeEnv(function () { e3.clock += 350; return engineOK(S30, DASH)(); }); cycle(e3, '30d'); reasons.push(e3.sandbox.debugAurixMobileChart().placeholderReason);
   // disabled
   let e4 = makeEnv(engineOK(S30, DASH), { liteEnabled: false }); cycle(e4, '30d'); reasons.push(e4.sandbox.debugAurixMobileChart().placeholderReason);
-  ck('§5 every placeholder has a non-null internal reason', reasons.every(r => typeof r === 'string' && r.length > 0) && reasons.indexOf('empty') >= 0 && reasons.indexOf('exception') >= 0 && reasons.indexOf('timeout') >= 0 && reasons.indexOf('disabled') >= 0, reasons.join(',')); }
+  // P0-FINAL-RENDER-OWNERSHIP-SURGERY (S4) — placeholder reasons are now INFRASTRUCTURE-only. Series length /
+  // history NEVER decide rendering (that is the snapshot's 'pending'); a sparse/empty rc despite a ready
+  // snapshot is an infra render failure → 'exception'. So 'empty'/'building'/'insufficient' must NOT appear.
+  const FORBIDDEN = ['empty','building','insufficient','low_data','no_chart'];
+  ck('§5 placeholder reasons are infra-only (exception/timeout/disabled), never a business series-length reason',
+     reasons.every(r => typeof r === 'string' && r.length > 0) &&
+     reasons.indexOf('exception') >= 0 && reasons.indexOf('timeout') >= 0 && reasons.indexOf('disabled') >= 0 &&
+     !reasons.some(r => FORBIDDEN.indexOf(r) >= 0), reasons.join(',')); }
 
 // §8.6 — renderer finds the host when the area exists
 { const env = makeEnv(engineOK(S30, DASH)); cycle(env, '30d');
