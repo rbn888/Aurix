@@ -21858,6 +21858,63 @@ try {
     } catch (_) {}
   }
 } catch (_) {}
+
+// ── P0-RANGE-PERFORMANCE-PIPELINE — single per-range coherence trace (READ-ONLY, never switches range) ──
+// For the requested range it returns, side by side: the performance_state[range] entry, getValidReturnBaseline(range),
+// getInstitutionalPerformanceSeries(range), what the badge painter decides, and the live DOM — so any divergence
+// between the selected range, the chart series, the baseline, performance_state and the visible % is visible at once.
+try {
+  if (typeof window !== 'undefined') {
+    window.aurixRangePipelineDebug = function (range) {
+      const norm = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+      const out = {
+        requestedRange: (range == null ? null : range), normalizedRange: norm,
+        activeRangeBefore: (typeof activeRange !== 'undefined') ? activeRange : null,
+        activeRangeAfter: (typeof activeRange !== 'undefined') ? activeRange : null,   // READ-ONLY: this helper NEVER changes activeRange
+        selectedButtonRange: null, performanceStateRangeEntry: null, getValidReturnBaseline: null,
+        getInstitutionalPerformanceSeries: null, wscPaintSurfaceInput: null, domFinal: null,
+      };
+      try { const b = document.querySelector('.range-btn.active'); out.selectedButtonRange = b ? (b.dataset.range || null) : null; } catch (_) {}
+      try {
+        const sel = (typeof _aurixSelectRemotePerformance === 'function') ? _aurixSelectRemotePerformance(norm) : null;
+        const row = sel ? sel.row : null;
+        out.performanceStateRangeEntry = { exists: !!row, selectReason: sel ? sel.reason : null, rangeKey: sel ? sel.rangeKey : norm,
+          returnState: row ? row.returnState : null, baselineSnapshotId: row ? row.baselineSnapshotId : null, baselineValue: row ? row.baselineValue : null,
+          displayedReturnPct: row ? row.displayedReturnPct : null, displayedReturnValue: row ? row.displayedReturnValue : null,
+          performanceHash: row ? row.performanceHash : null, chartSeriesHash: row ? row.chartSeriesHash : null };
+      } catch (e) { out.performanceStateRangeEntry = { error: String(e) }; }
+      try {
+        const g = getValidReturnBaseline(norm);
+        out.getValidReturnBaseline = { valid: g.valid, invalidReason: g.invalidReason, returnState: g.returnState, baselineSnapshotId: g.baselineTs,
+          baselineValue: g.baselineValue, displayedReturnPct: g.valid ? g.deltaPct : null, performanceSource: g.performanceSource, renderedFromRemote: g.renderedFromRemote };
+      } catch (e) { out.getValidReturnBaseline = { error: String(e) }; }
+      try {
+        const s = getInstitutionalPerformanceSeries(norm);
+        const cp = (typeof _aurixCanonicalPerformance === 'function') ? _aurixCanonicalPerformance(norm) : null;
+        out.getInstitutionalPerformanceSeries = { mode: s.mode, renderMode: s.renderMode, pointCount: s.realPointCount, coveragePct: s.coveragePct, reason: s.reason,
+          firstPoint: (s.renderSeries && s.renderSeries[0]) || null, lastPoint: (s.renderSeries && s.renderSeries[s.renderSeries.length - 1]) || null,
+          chartSeriesHash: cp ? cp.chartSeriesHash : null };
+      } catch (e) { out.getInstitutionalPerformanceSeries = { error: String(e) }; }
+      try {
+        const g = getValidReturnBaseline(norm); const s = getInstitutionalPerformanceSeries(norm);
+        const ready = !!(g.valid && Number.isFinite(g.deltaPct));
+        out.wscPaintSurfaceInput = { rangeReceived: 'activeRange(global)=' + ((typeof activeRange !== 'undefined') ? activeRange : null),
+          perfMode: s.mode, badgeSourceUsed: 'getValidReturnBaseline → performance_state[range] (single canonical painter)',
+          badgeDecision: ready ? 'value' : 'Calculando',
+          finalText: ready ? ((typeof _aurixFormatReturnText === 'function') ? _aurixFormatReturnText(g) : String(g.deltaPct)) : _AURIX_RETURN_PENDING_TEXT };
+      } catch (e) { out.wscPaintSurfaceInput = { error: String(e) }; }
+      try {
+        const cc = document.getElementById('chartChange'), ccm = document.getElementById('chartChangeMobile'), ab = document.querySelector('.range-btn.active');
+        const cm = (typeof window !== 'undefined') ? window._aurixChartMode : null;
+        out.domFinal = { visibleBadgeTextDesktop: cc ? cc.textContent : null, visibleBadgeTextMobile: ccm ? ccm.textContent : null,
+          activeRangeButton: ab ? (ab.dataset.range || null) : null, chartModeRange: cm ? cm.range : null,
+          visibleSeriesMatchesRequested: cm ? (String(cm.range).toLowerCase() === norm) : null };
+      } catch (e) { out.domFinal = { error: String(e) }; }
+      try { console.log('%c[UI][RANGE_PIPELINE_DEBUG] ' + norm, 'font-weight:700;color:#4A82F0', out); } catch (_) {}
+      return out;
+    };
+  }
+} catch (_) {}
 try {
   if (typeof window !== 'undefined') {
     window.aurixReturnDebug = function (range) {
@@ -24272,8 +24329,15 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
 
   // mode='building' → honest premium empty state (truly too little data).
   if (perf.mode === 'building') {
-    // RETURN-PENDING-FINAL — too little data yet ⇒ premium "Calculando…", never an empty/false metric.
-    if (changeEl) { changeEl.innerHTML = _aurixReturnPendingHTML(); changeEl.className = 'chart-change calculating'; changeEl.removeAttribute('title'); }
+    // P0-RANGE-PERFORMANCE-PIPELINE — the BADGE must follow the canonical per-range source of truth
+    // (getValidReturnBaseline → performance_state[activeRange] for authed), NOT the LOCAL chart-series
+    // coverage. A sparse LOCAL series ('building') must NOT force "Calculando…" when THIS range's
+    // performance_state is ready. The chart BODY still shows the building empty-state below; the badge
+    // defers to the single canonical painter so it never diverges from the other surfaces.
+    if (changeEl) {
+      if (typeof _aurixPaintReturnBadge === 'function') _aurixPaintReturnBadge(changeEl, opts.uid === 'm' ? 'mobile' : 'desktop');
+      else { changeEl.innerHTML = _aurixReturnPendingHTML(); changeEl.className = 'chart-change calculating'; changeEl.removeAttribute('title'); }
+    }
     _wscRenderInsufficient(hostEl, { realPointCount: perf.realPointCount, reason: perf.reason },
       { mode: 'building', eligible: perf.rawValueSeries.map(p => ({ ts: p.time, value: p.value })),
         lastGood: _wscGetFreshLastGood(activeRange, Date.now()) });
@@ -24303,27 +24367,26 @@ function _wscPaintSurface(changeEl, hostEl, opts) {
   // byte-identical. The CURVE below still uses adjVals (the same neutralised series).
   // P0-RETURN-BASELINE-GUARD — gate the metric behind a VALID baseline. Pending ⇒ "—" + neutral
   // (no %, no $, no red/green); the curve below still draws (adjVals untouched).
-  const _gret = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(activeRange) : { valid: false };
-  const _ret = _aurixRangeReturn(activeRange);
-  const deltaAbs = (_ret && Number.isFinite(_ret.deltaAbs)) ? _ret.deltaAbs : (adjVals[adjVals.length - 1] - adjVals[0]);
-  const deltaPct = (_ret && Number.isFinite(_ret.deltaPct)) ? _ret.deltaPct : (adjVals[0] > 0 ? ((adjVals[adjVals.length - 1] - adjVals[0]) / adjVals[0]) * 100 : 0);
-  const tone = !_gret.valid ? 'flat' : (deltaPct > 0.005 ? 'up' : deltaPct < -0.005 ? 'down' : 'flat');
-
-  // Metric: % performance return / currency performance equivalent (same series).
+  // P0-RANGE-PERFORMANCE-PIPELINE — the badge VALUE and its VALIDITY must come from the SAME canonical
+  // per-range source. Previously validity was gated on getValidReturnBaseline(activeRange) but the NUMBER was
+  // taken from a LOCAL recompute (_aurixRangeReturn) — so for an authed user the badge could show a local 24h
+  // figure (e.g. +17%) that diverged from performance_state["24h"] and differed device-to-device. Delegate the
+  // badge ENTIRELY to the single canonical painter (reads getValidReturnBaseline → performance_state[range] for
+  // authed; the deterministic local series for anon). The CURVE geometry below is unchanged (uses adjVals).
   if (changeEl) {
-    if (!_gret.valid) {
-      // RETURN-PENDING-FINAL — no valid baseline ⇒ premium "Calculando…" (no %, no $, no red/green).
-      changeEl.innerHTML = _aurixReturnPendingHTML();
-      changeEl.className = 'chart-change calculating';
-      changeEl.removeAttribute('title');
-    } else {
-      const mode = activePerfMode === 'curr' ? 'curr' : 'pct';
-      const pf   = _dshFmtPct(deltaPct);
-      const valText = mode === 'curr' ? _dshFmtMoney0(deltaAbs) : pf.text;
-      changeEl.innerHTML = `<span class="wsc-metric-val">${valText}</span>`;
-      changeEl.className  = `chart-change ${tone}`;
-      if (mode === 'pct' && pf.capped) changeEl.title = pf.raw;
-      else changeEl.removeAttribute('title');
+    if (typeof _aurixPaintReturnBadge === 'function') _aurixPaintReturnBadge(changeEl, opts.uid === 'm' ? 'mobile' : 'desktop');
+    else {
+      const _gret = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(activeRange) : { valid: false };
+      if (!_gret.valid || !Number.isFinite(_gret.deltaPct)) { changeEl.innerHTML = _aurixReturnPendingHTML(); changeEl.className = 'chart-change calculating'; changeEl.removeAttribute('title'); }
+      else {
+        const mode = activePerfMode === 'curr' ? 'curr' : 'pct';
+        const pf = _dshFmtPct(_gret.deltaPct);
+        const valText = mode === 'curr' ? _dshFmtMoney0(_gret.deltaAbs) : pf.text;
+        const tone = _gret.deltaPct > 0.005 ? 'up' : _gret.deltaPct < -0.005 ? 'down' : 'flat';
+        changeEl.innerHTML = `<span class="wsc-metric-val">${valText}</span>`;
+        changeEl.className = `chart-change ${tone}`;
+        if (mode === 'pct' && pf.capped) changeEl.title = pf.raw; else changeEl.removeAttribute('title');
+      }
     }
   }
 
@@ -24770,7 +24833,11 @@ function renderAurixMobileLiteChart(range, token) {
 function _aurixMobileSetPerfIndicator() {
   try {
     const el = document.getElementById('chartChangeMobile'); if (!el) return;
-    // RETURN-PENDING-FINAL — no valid baseline ⇒ premium "Calculando…" (web/mobile parity), never a false loss.
+    // P0-RANGE-PERFORMANCE-PIPELINE — delegate to the SINGLE canonical painter so the mobile badge is
+    // byte-identical to the desktop badge for the same activeRange (both → getValidReturnBaseline →
+    // performance_state[range] for authed). No separate local recompute or formatting can diverge.
+    if (typeof _aurixPaintReturnBadge === 'function') { _aurixPaintReturnBadge(el, 'mobile'); return; }
+    // RETURN-PENDING-FINAL — fallback (painter absent in unit sandbox): same canonical source, inline format.
     const ret = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(activeRange) : null;
     if (!ret || !ret.valid || !Number.isFinite(ret.deltaPct)) { el.innerHTML = _aurixReturnPendingHTML(); el.className = 'chart-change calculating'; el.removeAttribute('title'); return; }
     const deltaPct = ret.deltaPct, deltaAbs = Number.isFinite(ret.deltaAbs) ? ret.deltaAbs : 0;

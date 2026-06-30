@@ -46,8 +46,9 @@ ok('2 pending text is "Calculando…", never a dry "—"',
 console.log('\nAll header return consumers render the pending state (no false loss anywhere):');
 ok('3 desktop WSC — too-little-data ("building") shows Calculando, not an empty metric',
    /perf\.mode === 'building'[\s\S]*?changeEl\.innerHTML = _aurixReturnPendingHTML\(\); changeEl\.className = 'chart-change calculating';/.test(app));
-ok('4 desktop WSC — invalid baseline shows Calculando',
-   /if \(!_gret\.valid\) \{[\s\S]*?changeEl\.innerHTML = _aurixReturnPendingHTML\(\);\s*changeEl\.className = 'chart-change calculating';/.test(app));
+ok('4 desktop WSC delegates badge to the canonical painter (Calculando when invalid)',
+   /if \(typeof _aurixPaintReturnBadge === 'function'\) _aurixPaintReturnBadge\(changeEl, opts\.uid === 'm' \? 'mobile' : 'desktop'\);/.test(fnSrc('_wscPaintSurface')) &&
+   /el\.innerHTML = _aurixReturnPendingHTML\(\);\s*el\.className = 'chart-change calculating';/.test(fnSrc('_aurixPaintReturnBadge')));
 ok('5 desktop reconstructed headline shows Calculando',
    /chartChangeEl\.innerHTML = _aurixReturnPendingHTML\(\);\s*chartChangeEl\.className = 'chart-change calculating';/.test(fnSrc('_aurixReconSyncHeadline')));
 ok('6 mobile indicator shows Calculando (parity)',
@@ -65,8 +66,9 @@ ok('8 recon headline mirrors innerHTML (not textContent) to #chartChangeMobile',
    /const _mch = document\.getElementById\('chartChangeMobile'\);\s*if \(_mch\) \{ _mch\.innerHTML = chartChangeEl\.innerHTML; _mch\.className = chartChangeEl\.className; \}/.test(fnSrc('_aurixReconSyncHeadline')));
 
 console.log('\n%/$ toggle never changes the pending state (gate read BEFORE the unit):');
-ok('9 WSC reads activePerfMode only inside the else (valid) branch',
-   /if \(!_gret\.valid\) \{[\s\S]*?\} else \{\s*const mode = activePerfMode/.test(app));
+ok('9 the canonical painter reads the unit (activePerfMode) only AFTER validity (pending state is unit-independent)',
+   (function(){ const s=fnSrc('_aurixPaintReturnBadge'); return s.indexOf('_aurixFormatReturnText') > s.indexOf('g.valid'); })() &&
+   /const mode = \(typeof activePerfMode/.test(fnSrc('_aurixFormatReturnText')));
 ok('10 mobile gate returns before any activePerfMode read',
    (function(){ const s=fnSrc('_aurixMobileSetPerfIndicator'); return s.indexOf("el.innerHTML = _aurixReturnPendingHTML()") < s.indexOf('activePerfMode'); })());
 ok('11 perf-snapshot count-up is skipped while pending (Calculando markup not overwritten)',

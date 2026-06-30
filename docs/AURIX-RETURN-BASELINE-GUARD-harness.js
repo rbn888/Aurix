@@ -66,17 +66,18 @@ console.log('\nReal return shows once the baseline is valid:');
   ok('9 second real snapshot, no move → valid 0% (neutral, not negative)', G(sb).valid===true && G(sb).deltaPct===0); }
 
 console.log('\nHeader consumers gated (source):');
-ok('10 desktop WSC header uses the guard → "Calculando…" + calculating when invalid',
-   /const _gret = \(typeof getValidReturnBaseline === 'function'\) \? getValidReturnBaseline\(activeRange\)/.test(app) &&
-   /if \(!_gret\.valid\) \{[\s\S]*?changeEl\.innerHTML = _aurixReturnPendingHTML\(\);\s*changeEl\.className = 'chart-change calculating';/.test(app));
+ok('10 desktop WSC header delegates the badge to the canonical painter → "Calculando…" + calculating when invalid',
+   /if \(typeof _aurixPaintReturnBadge === 'function'\) _aurixPaintReturnBadge\(changeEl, opts\.uid === 'm' \? 'mobile' : 'desktop'\);/.test(fnSrc('_wscPaintSurface')) &&
+   /el\.innerHTML = _aurixReturnPendingHTML\(\);\s*el\.className = 'chart-change calculating';/.test(fnSrc('_aurixPaintReturnBadge')));
 ok('11 desktop reconstructed headline gates on getValidReturnBaseline (shows "Calculando…")',
    /const _ret = \(typeof getValidReturnBaseline === 'function'\) \? getValidReturnBaseline\(activeRange\)/.test(fnSrc('_aurixReconSyncHeadline')) &&
    /chartChangeEl\.innerHTML = _aurixReturnPendingHTML\(\);/.test(fnSrc('_aurixReconSyncHeadline')));
 ok('12 mobile indicator gates on getValidReturnBaseline (shows "Calculando…", no red/green)',
    /const ret = \(typeof getValidReturnBaseline === 'function'\) \? getValidReturnBaseline\(activeRange\)/.test(fnSrc('_aurixMobileSetPerfIndicator')) &&
    /if \(!ret \|\| !ret\.valid \|\| !Number\.isFinite\(ret\.deltaPct\)\) \{ el\.innerHTML = _aurixReturnPendingHTML\(\); el\.className = 'chart-change calculating';/.test(fnSrc('_aurixMobileSetPerfIndicator')));
-ok('13 %/$ toggle respects pending: both modes go through the same gate (mode read AFTER validity)',
-   /if \(!_gret\.valid\)[\s\S]*?\} else \{\s*const mode = activePerfMode/.test(app));
+ok('13 %/$ toggle respects pending: the canonical painter gates validity BEFORE the unit (mode read only when valid)',
+   (function(){ const s=fnSrc('_aurixPaintReturnBadge'); return s.indexOf('_aurixFormatReturnText') > s.indexOf('g.valid'); })() &&
+   /const mode = \(typeof activePerfMode/.test(fnSrc('_aurixFormatReturnText')));
 
 console.log('\nDiagnostic:');
 ok('14 window.aurixReturnDebug() exposes the required fields',
