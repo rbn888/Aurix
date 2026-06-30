@@ -1125,6 +1125,65 @@ try {
       try { console.table(out.generations); } catch (_) {}
       return out;
     };
+    // ── P0-CHART-SERIES-ROOT-CAUSE-TRACE — READ-ONLY pipeline trace, stage by stage, for one range ──
+    // Traces raw history → investable snapshots → eligible (trust filter) → canonical portfolio series →
+    // institutional perf series (the CHART) → snapshot.chartSeries → render state, reporting the full metric
+    // set per stage + the two windowing anchors. It calls the existing functions only; it mutates nothing.
+    window.aurixChartSeriesTrace = function (range) {
+      const norm = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+      const tsOf = p => (p == null ? null : (p.ts != null ? p.ts : (p.time != null ? p.time : null)));
+      const valOf = p => (p == null ? null : (p.value != null ? p.value : (p.total != null ? p.total : null)));
+      const metrics = (label, arr, extra) => {
+        const a = Array.isArray(arr) ? arr : [];
+        const ts = a.map(tsOf), vs = a.map(valOf);
+        const fin = vs.filter(v => Number.isFinite(v));
+        let dup = 0, ooo = 0; const seen = {};
+        for (let i = 0; i < ts.length; i++) { if (ts[i] != null && seen[ts[i]]) dup++; if (ts[i] != null) seen[ts[i]] = 1; if (i > 0 && Number.isFinite(ts[i]) && Number.isFinite(ts[i - 1]) && ts[i] < ts[i - 1]) ooo++; }
+        return Object.assign({ stage: label, pointCount: a.length,
+          firstTs: ts.length ? ts[0] : null, lastTs: ts.length ? ts[ts.length - 1] : null,
+          firstValue: vs.length ? vs[0] : null, lastValue: vs.length ? vs[vs.length - 1] : null,
+          minValue: fin.length ? Math.min.apply(null, fin) : null, maxValue: fin.length ? Math.max.apply(null, fin) : null,
+          hasNaN: vs.some(v => typeof v === 'number' && isNaN(v)), hasNull: vs.some(v => v == null),
+          hasZero: vs.some(v => v === 0), hasNegative: vs.some(v => Number.isFinite(v) && v < 0),
+          duplicateTsCount: dup, outOfOrderCount: ooo }, extra || {});
+      };
+      const out = { range: norm, deviceNow: Date.now(), stages: [] };
+      try {
+        const src = (typeof _aurixHistorySourceForDisplay === 'function') ? _aurixHistorySourceForDisplay() : (typeof categoryHistory !== 'undefined' ? categoryHistory : []);
+        let nowRef = 0; (Array.isArray(src) ? src : []).forEach(p => { if (p && Number.isFinite(p.ts) && p.ts > nowRef) nowRef = p.ts; });
+        out.lastSnapshotTs = nowRef || null;
+        out.snapshotToDeviceNowGapMs = nowRef ? (Date.now() - nowRef) : null;
+        out.returnWindowAnchor = 'lastSnapshotTs (_aurixInvestableSnapshots app.js:19514/19517)';
+        out.chartWindowAnchor = 'Date.now() (getInstitutionalPerformanceSeries app.js:19815-19817)';
+        out.stages.push(metrics('1_raw_category_history', src, { source: (typeof currentUser !== 'undefined' && currentUser) ? 'remote_canonical' : 'local',
+          fxPartialCount: (Array.isArray(src) ? src : []).filter(p => p && p.fxPartial === true).length,
+          fxApproxCount: (Array.isArray(src) ? src : []).filter(p => p && p.fxApprox === true).length }));
+      } catch (e) { out.stages.push({ stage: '1_raw_category_history', error: String(e) }); }
+      try { out.stages.push(metrics('2_canonical_cat_history', (typeof _aurixCanonicalCatHistory !== 'undefined' ? _aurixCanonicalCatHistory : null) || [])); } catch (e) { out.stages.push({ stage: '2_canonical_cat_history', error: String(e) }); }
+      try { out.stages.push(metrics('3_investable_snapshots[lastSnapAnchor]', _aurixInvestableSnapshots(norm))); } catch (e) { out.stages.push({ stage: '3_investable_snapshots', error: String(e) }); }
+      try { const el = _aurixEligibleInvestableSeries(norm); out.stages.push(metrics('4_eligible_investable[trustFilter]', el && el.series, { rejectedPointCount: el && el.meta ? el.meta.excluded : null, rejectionReasons: el && el.meta ? el.meta.reasons : null, trustAnchor: el && el.meta ? el.meta.anchor : null })); } catch (e) { out.stages.push({ stage: '4_eligible_investable', error: String(e) }); }
+      try { const cp = getCanonicalPortfolioSeries(); out.stages.push(metrics('5_canonical_portfolio_series[all+liveTail@DateNow]', cp, { excluded: cp && cp._meta ? cp._meta.excluded : null })); } catch (e) { out.stages.push({ stage: '5_canonical_portfolio_series', error: String(e) }); }
+      try { const ip = getInstitutionalPerformanceSeries(norm); out.stages.push(metrics('6_institutional_perf_series[DateNowAnchor]→CHART', ip && ip.renderSeries, { mode: ip ? ip.mode : null, coveragePct: ip ? ip.coveragePct : null, reason: ip ? ip.reason : null, realPointCount: ip ? ip.realPointCount : null })); } catch (e) { out.stages.push({ stage: '6_institutional_perf_series', error: String(e) }); }
+      try { const snap = computePerformanceSnapshot(norm); out.stages.push(metrics('7_snapshot.chartSeries', snap && snap.chartSeries, { chartSeriesHash: snap ? snap.chartHash : null, producerHash: snap ? snap.producerHash : null }));
+        out.renderState = { state: snap.state, graphReady: snap.graphReady, badgeReady: snap.badgeReady, skeleton: snap.skeleton,
+          baselineSnapshotId: snap.baselineTs, baselineValue: snap.baselineValue, currentValue: snap.currentValue,
+          displayedReturnPct: snap.displayedReturnPct, displayedReturnValue: snap.displayedReturnValue, chartSeriesHash: snap.chartHash, producerHash: snap.producerHash, invalidReason: snap.invalidReason }; } catch (e) { out.stages.push({ stage: '7_snapshot.chartSeries', error: String(e) }); }
+      try { const g = getValidReturnBaseline(norm); out.returnBaseline = { valid: g.valid, invalidReason: g.invalidReason, baselineSnapshotId: g.baselineTs, baselineValue: g.baselineValue, currentValue: g.currentValue, displayedReturnPct: g.valid ? g.deltaPct : null, displayedReturnValue: g.valid ? g.deltaAbs : null, performanceSource: g.performanceSource }; } catch (e) { out.returnBaseline = { error: String(e) }; }
+      // first stage that is empty/invalid/inconsistent
+      try {
+        const bad = out.stages.find(s => !s.error && (s.pointCount < 2 || s.hasNaN || s.hasNull || s.hasNegative || s.duplicateTsCount > 0 || s.outOfOrderCount > 0));
+        out.firstBadStage = bad ? { stage: bad.stage, pointCount: bad.pointCount,
+          reasons: [bad.pointCount < 2 ? 'pointCount<2' : null, bad.hasNaN ? 'hasNaN' : null, bad.hasNull ? 'hasNull' : null, bad.hasNegative ? 'hasNegative' : null, bad.duplicateTsCount > 0 ? 'duplicateTs(' + bad.duplicateTsCount + ')' : null, bad.outOfOrderCount > 0 ? 'outOfOrder(' + bad.outOfOrderCount + ')' : null].filter(Boolean) } : null;
+        const s4 = out.stages.find(s => /4_eligible/.test(s.stage)), s6 = out.stages.find(s => /6_institutional/.test(s.stage));
+        out.chartVsReturnDivergence = (s4 && s6 && !s4.error && !s6.error && s4.pointCount >= 2 && s6.pointCount < 2)
+          ? { detected: true, returnPathPoints: s4.pointCount, chartPathPoints: s6.pointCount, snapshotToDeviceNowGapMs: out.snapshotToDeviceNowGapMs,
+              reason: 'return/eligible window (lastSnapshotTs anchor) has ' + s4.pointCount + ' pts but chart window (Date.now anchor) has ' + s6.pointCount + ' → stale snapshot fell outside the Date.now() range window',
+              site: 'getInstitutionalPerformanceSeries app.js:19816 (Date.now() window) — inconsistent with _aurixInvestableSnapshots app.js:19517 (lastSnapshotTs window)' }
+          : { detected: false };
+      } catch (_) {}
+      try { console.log('%c[CHART_SERIES_TRACE] ' + norm, 'font-weight:700;color:#4A82F0', out); try { console.table(out.stages); } catch (_) {} } catch (_) {}
+      return out;
+    };
   }
 } catch (_) {}
 // Deterministic, device-independent hash of the SETTLED canonical history body: post-lifecycle, valid,
