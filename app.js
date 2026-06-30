@@ -21748,6 +21748,116 @@ try {
     };
   }
 } catch (_) {}
+
+// ── P0-RENDER-OWNER-ROOT-CAUSE-AUDIT — diagnosis-only instrumentation (NO business logic change) ──
+// Captures WHO writes the return badge and WHY: it wraps the badge nodes' innerHTML/textContent setters to
+// record the writer's synchronous stack + the getValidReturnBaseline state AT WRITE TIME (so a recurring
+// renderer that re-paints "Calculando…" after the manual repaint is caught), and a MutationObserver on the
+// chart card detects node replacement / parent rewrites. Every override calls the ORIGINAL setter unchanged
+// (pure observation). window.aurixRenderOwnerDebug() returns the findings.
+const _aurixRenderOwnerState = {
+  lastBadgePainterWrite: null, lastPendingWrite: null, lastParentRewrite: null, lastNodeReplacement: null,
+  chartChangeNodeIdentityStable: true, renderOwnerCandidates: {}, confirmedRenderOwner: null,
+  callStackOfLastCalculandoWrite: null, callStackOfLastParentRewrite: null, _ccRef: null, _mo: null,
+};
+function _aurixTopAppFrames(stack) {
+  try { return String(stack || '').split('\n').slice(1).map(s => s.trim())
+    .filter(s => /app\.js/.test(s) && !/_aurixInstrumentBadge|_aurixRenderOwner|_aurixTopAppFrames|aurixRenderOwnerDebug/.test(s))
+    .slice(0, 8); } catch (_) { return []; }
+}
+function _aurixSnapshotReturnState() {
+  let g = {}; try { g = (typeof getValidReturnBaseline === 'function') ? getValidReturnBaseline(typeof activeRange !== 'undefined' ? activeRange : '24h') : {}; } catch (_) {}
+  return { activeRange: (typeof activeRange !== 'undefined') ? activeRange : null, baselineValid: !!g.valid, returnState: g.returnState || null, displayedReturnPct: g.valid ? g.deltaPct : null };
+}
+const _aurixInstrumentedBadges = (typeof WeakSet !== 'undefined') ? new WeakSet() : null;
+function _aurixInstrumentBadge(node, surface) {
+  try {
+    if (!node || node.nodeType !== 1 || (_aurixInstrumentedBadges && _aurixInstrumentedBadges.has(node))) return;
+    if (_aurixInstrumentedBadges) _aurixInstrumentedBadges.add(node);
+    const ihDesc = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+    const tcDesc = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent');
+    const record = (kind, value, getCur) => {
+      try {
+        const isPending = /calculando|wsc-metric-calc/i.test(String(value));
+        const st = _aurixSnapshotReturnState();
+        const stack = new Error().stack;
+        const rec = { surface: surface, kind: kind, ts: Date.now(), textBefore: getCur(), valueWritten: String(value).slice(0, 140),
+          isPending: isPending, parentNode: node.parentNode ? (node.parentNode.id || node.parentNode.className || node.parentNode.tagName) : null,
+          appFrames: _aurixTopAppFrames(stack), activeRange: st.activeRange, baselineValid: st.baselineValid,
+          returnState: st.returnState, displayedReturnPct: st.displayedReturnPct };
+        if (isPending) {
+          _aurixRenderOwnerState.lastPendingWrite = rec; _aurixRenderOwnerState.callStackOfLastCalculandoWrite = stack;
+          (rec.appFrames || []).forEach(f => { const key = (f.split(/\s+/)[1] || f).slice(0, 60); _aurixRenderOwnerState.renderOwnerCandidates[key] = (_aurixRenderOwnerState.renderOwnerCandidates[key] || 0) + 1; });
+          const top = Object.entries(_aurixRenderOwnerState.renderOwnerCandidates).sort((a, b) => b[1] - a[1])[0];
+          _aurixRenderOwnerState.confirmedRenderOwner = top ? top[0] : null;
+          try { console.warn('[UI][RENDER_OWNER][PENDING_WRITE]', { surface: surface, baselineValid: st.baselineValid, returnState: st.returnState, activeRange: st.activeRange, appFrames: rec.appFrames }); } catch (_) {}
+        } else { _aurixRenderOwnerState.lastBadgePainterWrite = rec; }
+      } catch (_) {}
+    };
+    Object.defineProperty(node, 'innerHTML', { configurable: true, get() { return ihDesc.get.call(this); }, set(v) { try { record('innerHTML', v, () => ihDesc.get.call(node)); } catch (_) {} ihDesc.set.call(this, v); } });
+    Object.defineProperty(node, 'textContent', { configurable: true, get() { return tcDesc.get.call(this); }, set(v) { try { record('textContent', v, () => tcDesc.get.call(node)); } catch (_) {} tcDesc.set.call(this, v); } });
+  } catch (_) {}
+}
+function _aurixInstallRenderOwnerAudit() {
+  try {
+    if (typeof document === 'undefined') return;
+    const cc = document.getElementById('chartChange'); const ccm = document.getElementById('chartChangeMobile');
+    _aurixRenderOwnerState._ccRef = cc;
+    _aurixInstrumentBadge(cc, 'desktop'); _aurixInstrumentBadge(ccm, 'mobile');
+    const parent = (cc && cc.closest) ? (cc.closest('.chart-header') || cc.parentNode) : (ccm && ccm.parentNode);
+    if (parent && typeof MutationObserver !== 'undefined' && !_aurixRenderOwnerState._mo) {
+      const mo = new MutationObserver(muts => {
+        try {
+          const now = document.getElementById('chartChange');
+          if (now && now !== _aurixRenderOwnerState._ccRef) {
+            _aurixRenderOwnerState.chartChangeNodeIdentityStable = false;
+            _aurixRenderOwnerState.lastNodeReplacement = { ts: Date.now(),
+              oldOuter: ((_aurixRenderOwnerState._ccRef && _aurixRenderOwnerState._ccRef.outerHTML) || '').slice(0, 180),
+              newOuter: (now.outerHTML || '').slice(0, 180) };
+            _aurixRenderOwnerState._ccRef = now; _aurixInstrumentBadge(now, 'desktop');
+          }
+          muts.forEach(m => { if (m.type === 'childList' && (m.addedNodes.length || m.removedNodes.length)) {
+            _aurixRenderOwnerState.lastParentRewrite = { ts: Date.now(), target: (m.target.id || m.target.className || m.target.tagName), added: m.addedNodes.length, removed: m.removedNodes.length };
+          } });
+        } catch (_) {}
+      });
+      mo.observe(parent, { childList: true, subtree: true });
+      _aurixRenderOwnerState._mo = mo;
+    }
+  } catch (_) {}
+}
+try {
+  if (typeof window !== 'undefined') {
+    window.aurixInstallRenderOwnerAudit = _aurixInstallRenderOwnerAudit;
+    window.aurixRenderOwnerDebug = function () {
+      const cc = (typeof document !== 'undefined') ? document.getElementById('chartChange') : null;
+      const st = _aurixSnapshotReturnState();
+      const out = {
+        currentChartChangeNodeId: cc ? (cc.id || null) : null,
+        chartChangeNodeIdentityStable: cc ? (cc === _aurixRenderOwnerState._ccRef) : null,
+        currentOuterHTML: cc ? (cc.outerHTML || '').slice(0, 220) : null,
+        currentTextContent: cc ? cc.textContent : null,
+        lastBadgePainterWrite: _aurixRenderOwnerState.lastBadgePainterWrite,
+        lastPendingWrite: _aurixRenderOwnerState.lastPendingWrite,
+        lastParentRewrite: _aurixRenderOwnerState.lastParentRewrite,
+        lastNodeReplacement: _aurixRenderOwnerState.lastNodeReplacement,
+        renderOwnerCandidates: Object.entries(_aurixRenderOwnerState.renderOwnerCandidates).sort((a, b) => b[1] - a[1]),
+        confirmedRenderOwner: _aurixRenderOwnerState.confirmedRenderOwner,
+        callStackOfLastCalculandoWrite: _aurixRenderOwnerState.callStackOfLastCalculandoWrite,
+        callStackOfLastParentRewrite: _aurixRenderOwnerState.callStackOfLastParentRewrite,
+        activeRange: st.activeRange, baselineValid: st.baselineValid, returnState: st.returnState, displayedReturnPct: st.displayedReturnPct,
+      };
+      try { console.log('%c[UI][RENDER_OWNER_DEBUG]', 'font-weight:700', out); } catch (_) {}
+      return out;
+    };
+    try {
+      if (typeof document !== 'undefined') {
+        if (document.readyState !== 'loading') setTimeout(_aurixInstallRenderOwnerAudit, 1500);
+        else document.addEventListener('DOMContentLoaded', () => setTimeout(_aurixInstallRenderOwnerAudit, 1500));
+      }
+    } catch (_) {}
+  }
+} catch (_) {}
 try {
   if (typeof window !== 'undefined') {
     window.aurixReturnDebug = function (range) {
