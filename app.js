@@ -21915,6 +21915,91 @@ try {
     };
   }
 } catch (_) {}
+
+// ── P0-BASELINE-GATE-AUDIT — READ-ONLY trace of WHY getValidReturnBaseline(range) is invalid ──
+// Replays the two ordered gates without modifying them: (A) the LOCAL baseline chain inside
+// getValidReturnBaseline (via opts.raw), and (B) the authed CONSUMER kill-switch (_aurixSelectRemotePerformance).
+// It pins the single check that flips baselineValid → false, with every comparison value. Touches nothing.
+try {
+  if (typeof window !== 'undefined') {
+    window.aurixBaselineGateTrace = function (range) {
+      const norm = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+      const t = { range: (range == null ? null : range), normalizedRange: norm, authedPath: null,
+        finalInvalidReason: null, baselineValid: null, returnState: null, localChain: null, consumerChain: null, conclusion: null };
+      try { t.authedPath = !!(typeof _aurixCurrentUserId === 'function' && _aurixCurrentUserId()); } catch (_) {}
+      // (B) CONSUMER kill-switch — _aurixSelectRemotePerformance
+      try {
+        const sel = (typeof _aurixSelectRemotePerformance === 'function') ? _aurixSelectRemotePerformance(norm) : null;
+        const ps = (typeof _aurixRemotePerformanceState !== 'undefined') ? _aurixRemotePerformanceState : null;
+        const psRow = sel ? sel.row : null;
+        const psRev = sel ? (sel.performancePortfolioRevision || 0) : null, cur = sel ? (sel.expectedPortfolioRevision || 0) : null;
+        const dispFinite = !!(psRow && Number.isFinite(psRow.displayedReturnPct));
+        t.consumerChain = {
+          selectorReason: sel ? sel.reason : null, rangeKey: sel ? sel.rangeKey : norm,
+          expectedPortfolioRevision: cur, performancePortfolioRevision: psRev,           // (4)(5)
+          expectedLifecycleId: sel ? sel.expectedLifecycleId : null,                     // (6)
+          performanceLifecycleId: sel ? sel.performanceLifecycleId : null,
+          lifecycleMatch: sel ? (sel.expectedLifecycleId === sel.performanceLifecycleId) : null,
+          revisionFromFuture: (psRev != null && cur != null) ? (psRev > cur) : null,
+          pendingSync: sel ? sel.pendingSync : null,                                      // (10)
+          staleRevisionWithPendingChanges: (psRev != null && cur != null && sel) ? (psRev < cur && !!sel.pendingSync) : null,  // (9)
+          rangeEntryExists: sel ? sel.rangeEntryExists : null,
+          performanceHashPresent: !!(psRow && psRow.performanceHash != null),
+          displayedReturnPctFinite: dispFinite,
+          baselineSnapshotId: psRow ? psRow.baselineSnapshotId : null,                    // (7)
+          calculatedAt: ps ? ps.calculatedAt : null,                                      // (8)
+          userMatch: ps ? (typeof _aurixCurrentUserId === 'function' && ps.userId === _aurixCurrentUserId()) : null,
+          killSwitchVerdict: dispFinite ? 'ready' : (psRow ? 'remote_performance_pending' : 'no_remote_performance_state'),
+        };
+      } catch (e) { t.consumerChain = { error: String(e) }; }
+      // (A) LOCAL baseline chain — getValidReturnBaseline(range, {raw:true}) reports the pre-kill-switch verdict + values
+      try {
+        const gr = getValidReturnBaseline(norm, { raw: true });
+        const ratio = (gr.baselineValue > 0 && Number.isFinite(gr.currentValue) && gr.currentValue > 0)
+          ? +Math.max(gr.baselineValue / gr.currentValue, gr.currentValue / gr.baselineValue).toFixed(4) : null;
+        const cmpMax = (typeof _AURIX_RETURN_COMPARABLE_RATIO !== 'undefined') ? (_AURIX_RETURN_COMPARABLE_RATIO[norm] || 3.0) : null;
+        // ordered checks (same order as getValidReturnBaseline lines 21567–21586)
+        const checks = [
+          { gate: 'awaiting_canonical_history', failed: gr.blockReason === 'awaiting_canonical_history' || gr.canDisplay === false },
+          { gate: 'no_valid_baseline', failed: !(gr.baselineValue > 0) },
+          { gate: 'no_current_value', failed: !(Number.isFinite(gr.currentValue) && gr.currentValue > 0) },
+          { gate: 'pre_reset', failed: Number.isFinite(gr.baselineTs) && Number.isFinite(gr.lastResetAt) && gr.baselineTs < gr.lastResetAt },
+          { gate: 'insufficient_history', failed: Number.isFinite(gr.windowMs) && Number.isFinite(gr.minHistoryMs) && gr.windowMs < gr.minHistoryMs },
+          { gate: 'baseline_not_comparable', failed: (ratio != null && cmpMax != null) ? (ratio > cmpMax) : null },
+          { gate: 'flows_dominate_baseline', failed: gr.invalidReason === 'flows_dominate_baseline' },
+        ];
+        t.localChain = {
+          invalidReason: gr.invalidReason, valid: gr.valid, returnState: gr.returnState,
+          baselineValue: gr.baselineValue, baselineSnapshotId: gr.baselineTs, currentValue: gr.currentValue,
+          windowMs: gr.windowMs, minHistoryMs: gr.minHistoryMs,
+          comparableRatio: ratio, comparableMax: cmpMax,
+          netFlowsNeutralized: gr.netFlowsNeutralized, flowDominanceRatio: gr.flowDominanceRatio,
+          snapshotCount: gr.snapshotCount, validSnapshotCount: gr.validSnapshotCount,
+          lastResetAt: gr.lastResetAt, portfolioCreatedAt: gr.portfolioCreatedAt,
+          postConstructionEscapeOk: !!(gr.postConstruction && gr.postConstruction.ok),
+          firstFailingCheck: (checks.find(c => c.failed === true) || {}).gate || null,
+          orderedChecks: checks,
+        };
+      } catch (e) { t.localChain = { error: String(e) }; }
+      // FINAL verdict (authed kill-switch applied)
+      try { const gf = getValidReturnBaseline(norm); t.finalInvalidReason = gf.invalidReason; t.baselineValid = gf.valid; t.returnState = gf.returnState; }
+      catch (e) { t.finalInvalidReason = 'error:' + String(e); }
+      // CONCLUSION — the single condition that flipped baselineValid → false
+      try {
+        const cc = t.consumerChain || {}, lc = t.localChain || {};
+        if (t.baselineValid === true) t.conclusion = 'VALID — no failing gate';
+        else if (!t.authedPath) t.conclusion = 'ANON/local path: local gate fired → ' + (lc.invalidReason || 'unknown') + (lc.firstFailingCheck ? (' (first failing check: ' + lc.firstFailingCheck + ')') : '');
+        else if (t.finalInvalidReason === 'remote_performance_pending')
+          t.conclusion = 'AUTHED consumer gate: performance_state.byRange["' + norm + '"] EXISTS (hash present) but displayedReturnPct is NULL — the WRITER computed this range as pending at flush time. Underlying writer reason = the LOCAL baseline gate: ' + (lc.invalidReason || 'unknown') + (lc.firstFailingCheck ? (' → first failing check: ' + lc.firstFailingCheck) : '');
+        else if (t.finalInvalidReason === 'no_remote_performance_state')
+          t.conclusion = 'AUTHED consumer gate: no usable performance_state row (psRow null) → _aurixSelectRemotePerformance reason = "' + (cc.selectorReason || 'unknown') + '"' + (cc.staleRevisionWithPendingChanges ? ' [stale_revision_with_pending_changes: psRev<cur && pendingSync]' : '');
+        else t.conclusion = 'final invalidReason = ' + t.finalInvalidReason + '; selector reason = ' + (cc.selectorReason || 'n/a');
+      } catch (_) {}
+      try { console.log('%c[GATE_TRACE] ' + norm + ' → ' + t.finalInvalidReason, 'font-weight:700;color:#E0533D', t); } catch (_) {}
+      return t;
+    };
+  }
+} catch (_) {}
 try {
   if (typeof window !== 'undefined') {
     window.aurixReturnDebug = function (range) {
