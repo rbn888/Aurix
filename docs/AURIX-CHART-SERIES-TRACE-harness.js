@@ -22,9 +22,9 @@ console.log('The two window anchors exist verbatim in source (the inconsistency)
 ok('1 RETURN window anchored on the LAST SNAPSHOT ts (nowRef) — _aurixInvestableSnapshots',
    /for \(const _p of _src\) \{ if \(_p && Number\.isFinite\(_p\.ts\) && _p\.ts > nowRef\) nowRef = _p\.ts; \}/.test(fnSrc('_aurixInvestableSnapshots')) &&
    /const start = range === 'all' \? 0 : nowRef - \(ms\[range\] \|\| 2592e6\);/.test(fnSrc('_aurixInvestableSnapshots')));
-ok('2 CHART window anchored on Date.now() — getInstitutionalPerformanceSeries (the divergent site)',
-   /const now = Date\.now\(\);/.test(fnSrc('getInstitutionalPerformanceSeries')) &&
-   /const start = \(r === 'all'\) \? -Infinity : now - \(ms\[r\] \|\| 2592e6\);/.test(fnSrc('getInstitutionalPerformanceSeries')) &&
+ok('2 CHART window now anchored on last-snapshot ts (nowRef), NOT Date.now() — getInstitutionalPerformanceSeries [FIXED v452]',
+   /const start = \(r === 'all'\) \? -Infinity : nowRef - \(ms\[r\] \|\| 2592e6\);/.test(fnSrc('getInstitutionalPerformanceSeries')) &&
+   !/const start = \(r === 'all'\) \? -Infinity : now - \(ms\[r\] \|\| 2592e6\);/.test(fnSrc('getInstitutionalPerformanceSeries')) &&
    /const win = canonical\.filter\(p => p && Number\.isFinite\(p\.ts\) && p\.ts >= start/.test(fnSrc('getInstitutionalPerformanceSeries')));
 ok('3 getCanonicalPortfolioSeries appends a Date.now() live tail (widens the gap further)',
    /else out\.push\(\{ ts: now, value: live \}\);/.test(fnSrc('getCanonicalPortfolioSeries')));
@@ -60,8 +60,8 @@ ok('9 emits the full per-stage metric set',
 ok('10 exposes rejection reasons, baseline, current, %, hashes + the two window anchors',
    /rejectionReasons/.test(T) && /baselineSnapshotId/.test(T) && /currentValue/.test(T) && /displayedReturnPct/.test(T) &&
    /chartSeriesHash/.test(T) && /producerHash/.test(T) && /returnWindowAnchor/.test(T) && /chartWindowAnchor/.test(T));
-ok('11 detects the chart-vs-return divergence + names the exact site',
-   /chartVsReturnDivergence/.test(T) && /getInstitutionalPerformanceSeries app\.js:19816/.test(T) && /_aurixInvestableSnapshots app\.js:19517/.test(T));
+ok('11 exposes the divergence detector + anchorSource + before/after anchors',
+   /chartVsReturnDivergence/.test(T) && /out\.anchorSource = ip \? ip\.windowAnchorSource/.test(T) && /chartWindowAnchorBefore/.test(T) && /chartWindowAnchorAfter/.test(T));
 ok('12 READ-ONLY: the tracer assigns to no pipeline global / engine fn (only its local `out`)',
    !/_aurixCanonicalCatHistory\s*=[^=]/.test(T) && !/categoryHistory\s*=[^=]/.test(T) &&
    !/getInstitutionalPerformanceSeries\s*=[^=]/.test(T) && !/_aurixInvestableSnapshots\s*=[^=]/.test(T) &&

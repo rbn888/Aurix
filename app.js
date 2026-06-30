@@ -1153,8 +1153,9 @@ try {
         let nowRef = 0; (Array.isArray(src) ? src : []).forEach(p => { if (p && Number.isFinite(p.ts) && p.ts > nowRef) nowRef = p.ts; });
         out.lastSnapshotTs = nowRef || null;
         out.snapshotToDeviceNowGapMs = nowRef ? (Date.now() - nowRef) : null;
-        out.returnWindowAnchor = 'lastSnapshotTs (_aurixInvestableSnapshots app.js:19514/19517)';
-        out.chartWindowAnchor = 'Date.now() (getInstitutionalPerformanceSeries app.js:19815-19817)';
+        out.returnWindowAnchor = 'lastSnapshotTs (_aurixInvestableSnapshots)';
+        out.chartWindowAnchorBefore = 'Date.now() (pre-fix v451 — device clock)';
+        out.chartWindowAnchorAfter = 'lastSnapshotTs (post-fix v452 — getInstitutionalPerformanceSeries anchors on _aurixHistorySourceForDisplay max ts)';
         out.stages.push(metrics('1_raw_category_history', src, { source: (typeof currentUser !== 'undefined' && currentUser) ? 'remote_canonical' : 'local',
           fxPartialCount: (Array.isArray(src) ? src : []).filter(p => p && p.fxPartial === true).length,
           fxApproxCount: (Array.isArray(src) ? src : []).filter(p => p && p.fxApprox === true).length }));
@@ -1163,7 +1164,7 @@ try {
       try { out.stages.push(metrics('3_investable_snapshots[lastSnapAnchor]', _aurixInvestableSnapshots(norm))); } catch (e) { out.stages.push({ stage: '3_investable_snapshots', error: String(e) }); }
       try { const el = _aurixEligibleInvestableSeries(norm); out.stages.push(metrics('4_eligible_investable[trustFilter]', el && el.series, { rejectedPointCount: el && el.meta ? el.meta.excluded : null, rejectionReasons: el && el.meta ? el.meta.reasons : null, trustAnchor: el && el.meta ? el.meta.anchor : null })); } catch (e) { out.stages.push({ stage: '4_eligible_investable', error: String(e) }); }
       try { const cp = getCanonicalPortfolioSeries(); out.stages.push(metrics('5_canonical_portfolio_series[all+liveTail@DateNow]', cp, { excluded: cp && cp._meta ? cp._meta.excluded : null })); } catch (e) { out.stages.push({ stage: '5_canonical_portfolio_series', error: String(e) }); }
-      try { const ip = getInstitutionalPerformanceSeries(norm); out.stages.push(metrics('6_institutional_perf_series[DateNowAnchor]→CHART', ip && ip.renderSeries, { mode: ip ? ip.mode : null, coveragePct: ip ? ip.coveragePct : null, reason: ip ? ip.reason : null, realPointCount: ip ? ip.realPointCount : null })); } catch (e) { out.stages.push({ stage: '6_institutional_perf_series', error: String(e) }); }
+      try { const ip = getInstitutionalPerformanceSeries(norm); out.anchorSource = ip ? ip.windowAnchorSource : null; out.chartWindowAnchorTs = ip ? ip.windowAnchorTs : null; out.stages.push(metrics('6_institutional_perf_series[lastSnapAnchor]→CHART', ip && ip.renderSeries, { mode: ip ? ip.mode : null, coveragePct: ip ? ip.coveragePct : null, reason: ip ? ip.reason : null, realPointCount: ip ? ip.realPointCount : null, windowAnchorSource: ip ? ip.windowAnchorSource : null, windowAnchorTs: ip ? ip.windowAnchorTs : null })); } catch (e) { out.stages.push({ stage: '6_institutional_perf_series', error: String(e) }); }
       try { const snap = computePerformanceSnapshot(norm); out.stages.push(metrics('7_snapshot.chartSeries', snap && snap.chartSeries, { chartSeriesHash: snap ? snap.chartHash : null, producerHash: snap ? snap.producerHash : null }));
         out.renderState = { state: snap.state, graphReady: snap.graphReady, badgeReady: snap.badgeReady, skeleton: snap.skeleton,
           baselineSnapshotId: snap.baselineTs, baselineValue: snap.baselineValue, currentValue: snap.currentValue,
@@ -1175,11 +1176,15 @@ try {
         out.firstBadStage = bad ? { stage: bad.stage, pointCount: bad.pointCount,
           reasons: [bad.pointCount < 2 ? 'pointCount<2' : null, bad.hasNaN ? 'hasNaN' : null, bad.hasNull ? 'hasNull' : null, bad.hasNegative ? 'hasNegative' : null, bad.duplicateTsCount > 0 ? 'duplicateTs(' + bad.duplicateTsCount + ')' : null, bad.outOfOrderCount > 0 ? 'outOfOrder(' + bad.outOfOrderCount + ')' : null].filter(Boolean) } : null;
         const s4 = out.stages.find(s => /4_eligible/.test(s.stage)), s6 = out.stages.find(s => /6_institutional/.test(s.stage));
+        out.eligiblePointCount = s4 && !s4.error ? s4.pointCount : null;
+        out.institutionalPointCount = s6 && !s6.error ? s6.pointCount : null;
+        // Post-fix v452: both windows anchor on the last-snapshot ts, so this can only be true now if the
+        // points genuinely fall outside the deterministic window (real data gap), NOT the device clock.
         out.chartVsReturnDivergence = (s4 && s6 && !s4.error && !s6.error && s4.pointCount >= 2 && s6.pointCount < 2)
-          ? { detected: true, returnPathPoints: s4.pointCount, chartPathPoints: s6.pointCount, snapshotToDeviceNowGapMs: out.snapshotToDeviceNowGapMs,
-              reason: 'return/eligible window (lastSnapshotTs anchor) has ' + s4.pointCount + ' pts but chart window (Date.now anchor) has ' + s6.pointCount + ' → stale snapshot fell outside the Date.now() range window',
-              site: 'getInstitutionalPerformanceSeries app.js:19816 (Date.now() window) — inconsistent with _aurixInvestableSnapshots app.js:19517 (lastSnapshotTs window)' }
-          : { detected: false };
+          ? { detected: true, returnPathPoints: s4.pointCount, chartPathPoints: s6.pointCount, snapshotToDeviceNowGapMs: out.snapshotToDeviceNowGapMs, anchorSource: out.anchorSource,
+              reason: 'eligible window has ' + s4.pointCount + ' pts but chart window has ' + s6.pointCount + ' (anchorSource=' + out.anchorSource + ') — investigate if anchorSource is not last_snapshot_ts',
+              site: 'getInstitutionalPerformanceSeries (window now anchored on last_snapshot_ts, aligned with _aurixInvestableSnapshots)' }
+          : { detected: false, anchorSource: out.anchorSource };
       } catch (_) {}
       try { console.log('%c[CHART_SERIES_TRACE] ' + norm, 'font-weight:700;color:#4A82F0', out); try { console.table(out.stages); } catch (_) {} } catch (_) {}
       return out;
@@ -19871,8 +19876,26 @@ function getInstitutionalPerformanceSeries(range) {
   out.excludedReasons        = (canonical._meta && canonical._meta.reasons) || {};
 
   const ms = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '1y': 31536e6 };
-  const now = Date.now();
-  const start = (r === 'all') ? -Infinity : now - (ms[r] || 2592e6);
+  // P0-FIX-CHART-WINDOW-ANCHOR — anchor the range window on the DETERMINISTIC last-snapshot timestamp,
+  // the SAME anchor the return/baseline path uses (_aurixInvestableSnapshots: nowRef = max ts of
+  // _aurixHistorySourceForDisplay()). We DELIBERATELY anchor on the RAW shared history (not on `canonical`):
+  // getCanonicalPortfolioSeries appends a live-tail point at ts=Date.now() when the last snapshot is ≥6h
+  // stale, so anchoring on canonical's max ts would re-introduce the device clock. Anchoring on the raw
+  // shared-history last snapshot guarantees chart window === return window. The filter has no upper bound,
+  // so the appended live-tail point is still included (current value shown). Date.now() is only used when
+  // the shared history is empty. ('all' is unaffected — start stays -Infinity.)
+  // Identical to _aurixInvestableSnapshots: nowRef = max ts of the RAW shared history (NOT `canonical`,
+  // which would re-introduce Date.now via getCanonicalPortfolioSeries' live-tail append). Empty ⇒ Date.now.
+  let nowRef = 0;
+  try {
+    const _shared = (typeof _aurixHistorySourceForDisplay === 'function') ? _aurixHistorySourceForDisplay() : (typeof categoryHistory !== 'undefined' ? categoryHistory : null);
+    if (Array.isArray(_shared)) for (const _p of _shared) { if (_p && Number.isFinite(_p.ts) && _p.ts > nowRef) nowRef = _p.ts; }
+  } catch (_) {}
+  const _anchorFromSnapshot = nowRef > 0;
+  if (!_anchorFromSnapshot) nowRef = Date.now();   // empty-source fallback only
+  out.windowAnchorTs = nowRef;
+  out.windowAnchorSource = _anchorFromSnapshot ? 'last_snapshot_ts' : 'date_now_fallback';
+  const start = (r === 'all') ? -Infinity : nowRef - (ms[r] || 2592e6);
   const win = canonical.filter(p => p && Number.isFinite(p.ts) && p.ts >= start && Number.isFinite(p.value) && p.value > 0);
 
   out.realPointCount = win.length;
