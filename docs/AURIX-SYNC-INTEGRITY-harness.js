@@ -72,7 +72,8 @@ console.log('\nMulti-category: an asset added on web (remote +1) is applied on t
 
 console.log('\nWiring (source):');
 ok('10 foreground re-sync hooks (visibilitychange/focus/pageshow/online → resync)',
-   /const _aurixFg = \(reason\) => \{[\s\S]*?_aurixResyncFromRemote\(reason\);/.test(app) &&
+   /const _aurixFg = \(reason\) => scheduleForegroundRepaint\(reason\);/.test(app) &&
+   /scheduleForegroundRepaint = \(reason\) => \{[\s\S]*?_aurixResyncFromRemote\(rs\);/.test(app) &&
    /document\.addEventListener\('visibilitychange', \(\) => \{ if \(document\.visibilityState === 'visible'\) _aurixFg\('visible'\); \}\);/.test(app) &&
    /window\.addEventListener\('focus',   \(\) => _aurixFg\('focus'\)\);/.test(app) &&
    /window\.addEventListener\('pageshow', \(\) => _aurixFg\('pageshow'\)\);/.test(app) &&

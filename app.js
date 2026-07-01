@@ -1657,6 +1657,7 @@ async function _flushStatePersistence(reason) {
 // performance_state OR VERIFY_READ null ⇒ FAILURE (we do NOT assume persistence). The last audit is exposed
 // via window.aurixPerfStateWriteAudit(). Audit-only: no calc/history/render/UI change. ALWAYS logs (not IS_DEV).
 let _aurixLastPerfFlushMs = 0;
+let _aurixLastWrittenPerfPayloadHash = null;   // FIX 4 — last payload hash actually persisted (idempotent write guard)
 let _aurixPerfWriteAudit = null;
 async function _aurixFlushPerformanceState(reason) {
   const audit = { reason: reason || null, startedAt: Date.now(), table: 'user_portfolios', where: 'user_id = <uid>',
@@ -1672,6 +1673,14 @@ async function _aurixFlushPerformanceState(reason) {
     _aurixLastPerfFlushMs = now;
     audit.uid = currentUser.id; audit.where = "user_id = '" + currentUser.id + "'";
     try { audit.payloadHash = (typeof _aurixHistoryHash === 'function') ? _aurixHistoryHash(Object.keys(ps.byRange || {}).map(k => k + ':' + (ps.byRange[k] && ps.byRange[k].performanceHash))) : null; } catch (_) {}
+    // FIX 4 — idempotent write: if the payload is byte-identical to the last one we successfully persisted,
+    // skip WRITE_START/WRITE_OK/VERIFY_READ entirely. Nothing material changed ⇒ no DB write, no churn.
+    // ('lifecycle'/'perf-now' are explicit forced writes and bypass the guard.)
+    if (reason !== 'lifecycle' && reason !== 'perf-now' && audit.payloadHash != null && audit.payloadHash === _aurixLastWrittenPerfPayloadHash) {
+      audit.skipped = true; audit.failureReason = 'skipped_unchanged_payload';   // NOT audit.ok — no real write happened
+      try { if (typeof IS_DEV !== 'undefined' && IS_DEV) console.log('[PERF_STATE][SKIP] unchanged payload — no write', audit.payloadHash); } catch (_) {}
+      _aurixPerfWriteAudit = audit; return audit;
+    }
     try { console.log('%c[PERF_STATE][WRITE_START]', 'font-weight:700;color:#4A82F0', { uid: audit.uid, table: audit.table, where: audit.where, portfolioRevision: ps.portfolioRevision, lifecycleId: ps.lifecycleId, payloadHash: audit.payloadHash, ranges: Object.keys(ps.byRange || {}) }); } catch (_) {}
 
     const t0 = Date.now();
@@ -1719,6 +1728,7 @@ async function _aurixFlushPerformanceState(reason) {
     } catch (ve) { audit.verifyRead = { error: (ve && ve.message) || true, hasPerformanceState: false }; audit.failureReason = 'verify_read_exception'; _aurixPerfWriteAudit = audit; return audit; }
 
     audit.ok = true;
+    _aurixLastWrittenPerfPayloadHash = audit.payloadHash;   // FIX 4 — remember what we persisted so an identical next payload is skipped
     // P0-PERFORMANCE-STATE-CONSUMPTION-FIX — adopt the VERIFIED-remote performance_state into the consumed
     // var NOW, so the writing device renders from it immediately (it is confirmed in remote == what we read
     // back). Other devices adopt it on their next reconcile. This closes the "wrote OK but UI still pending
@@ -6632,7 +6642,27 @@ try {
     // P0-FINAL-UI-DOM-BINDING — on every foreground event, repaint the return badges from the CURRENT
     // canonical state immediately (no waiting for the async resync), so a stale "Calculando…" can never
     // out-live a ready state on screen. Then the resync runs (may also repaint after a fresh remote read).
-    const _aurixFg = (reason) => { try { _aurixRepaintReturnBadges('fg-' + reason); } catch (_) {} try { _aurixResyncFromRemote(reason); } catch (_) {} };
+    // FIX 6 — coalesce foreground events (visibilitychange/focus/pageshow/online). Fired together (e.g.
+    // focus + visible on tab return) they used to run the badge repaint + remote resync fan-out multiple
+    // times in a chain. scheduleForegroundRepaint debounces them into ONE repaint (~400 ms). The resync
+    // itself already no-ops when nothing changed, so this only removes the duplicate chained runs.
+    let _aurixFgTimer = null, _aurixFgReasons = [];
+    const scheduleForegroundRepaint = (reason) => {
+      try {
+        _aurixFgReasons.push(reason);
+        if (_aurixFgTimer) return;   // already scheduled within the window → coalesce
+        _aurixFgTimer = setTimeout(() => {
+          _aurixFgTimer = null;
+          const rs = _aurixFgReasons.join('+') || 'fg'; _aurixFgReasons = [];
+          try { _aurixRepaintReturnBadges('fg-' + rs); } catch (_) {}
+          try { _aurixResyncFromRemote(rs); } catch (_) {}
+        }, 400);
+      } catch (_) {
+        try { _aurixRepaintReturnBadges('fg-' + reason); } catch (__) {}
+        try { _aurixResyncFromRemote(reason); } catch (__) {}
+      }
+    };
+    const _aurixFg = (reason) => scheduleForegroundRepaint(reason);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') _aurixFg('visible'); });
     window.addEventListener('focus',   () => _aurixFg('focus'));
     window.addEventListener('pageshow', () => _aurixFg('pageshow'));
@@ -9642,9 +9672,19 @@ async function runReactivePortfolioRefresh() {
     PORTFOLIO_RUNTIME.lastReactiveRenderAt = Date.now();
 
     // Use EXISTING render path only — no custom pipeline.
-    if (typeof render === 'function') {
+    // FIX 2/3 — skip the reactive Dashboard render when (a) the direct price path already rendered this
+    // cycle (~within 3 s), or (b) the Dashboard is not the visible surface (e.g. a Market background
+    // refresh). Derived-state recompute below still runs (non-visual). Prevents the double render() per
+    // price tick and Market→Dashboard cross-repaints.
+    let _skipReactiveRender = false;
+    try {
+      const _recentDirect = (Date.now() - (window.__aurixLastDirectDashRenderAt || 0)) < 3000;
+      const _dashVisible = (typeof currentTab === 'undefined' || currentTab === 'dashboard') && !(typeof document !== 'undefined' && document.hidden);
+      _skipReactiveRender = _recentDirect || !_dashVisible;
+    } catch (_) {}
+    if (typeof render === 'function' && !_skipReactiveRender) {
       render();
-    }
+    } else if (IS_DEV) { console.log('[portfolio-reactive] render SKIPPED (dup/hidden guard)'); }
 
     if (IS_DEV) console.log('[portfolio-reactive] render committed');
 
@@ -25843,6 +25883,36 @@ function _wscEngineYLabels(scale, vp, H, maxLabels) {
 // Draws the EXACT emergency points (simple polyline + area, no rebuild/filter) with the tone tied to
 // the emergency return. Returns true when it fully handled the surface (ready-drawn OR pending), so
 // the caller returns without touching the legacy geometry.
+// GATED chart-update trace — silent in production; enable with `window.AURIX_CHART_LOG = true`.
+function _aurixChartUpdateLog(reason, emg) {
+  try {
+    if (typeof window === 'undefined' || !window.AURIX_CHART_LOG) return;
+    console.log('[CHART UPDATE]', {
+      reason: reason,
+      range: (emg && emg.range) || (typeof activeRange !== 'undefined' ? activeRange : null),
+      points: emg ? emg.pointCount : 0,
+      startValue: emg ? emg.firstValue : null,
+      endValue: emg ? emg.lastValue : null,
+      percent: emg ? emg.returnPct : null,
+      state: emg ? emg.state : null,
+      timestamp: Date.now(),
+    });
+  } catch (_) {}
+}
+
+// DSH.RENDER.STABILITY FIX 1 — VISUAL signature of the chart (NOT the timestamp hash). Depends only on
+// what the user actually sees: surface, range, state, tone, %/€ mode, currency, point count and the
+// rounded VALUES. A new snapshot with the same values but a newer ts produces the SAME signature ⇒ the
+// SVG is NOT rebuilt and no animation replays. Stored per surface in _aurixLastVisualSig.
+const _aurixLastVisualSig = {};
+function _aurixVisualChartSignature(emg, surface) {
+  try {
+    const vals = (emg && Array.isArray(emg.points)) ? emg.points.map(p => Math.round(p.value * 100)).join(',') : '';
+    const mode = (typeof activePerfMode !== 'undefined') ? activePerfMode : 'pct';
+    const cur = (typeof baseCurrency !== 'undefined') ? baseCurrency : '';
+    return surface + '|' + (emg && emg.range) + '|' + (emg && emg.state) + '|' + (emg && emg.color) + '|' + mode + '|' + cur + '|' + ((emg && emg.points) ? emg.points.length : 0) + '|' + vals;
+  } catch (_) { return 's' + Date.now() + Math.random(); }   // on error never collide → always repaints
+}
 function _wscPaintEmergency(changeEl, hostEl, opts) {
   if (!hostEl) return false;
   opts = opts || {};
@@ -25850,6 +25920,18 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
   const surface = uid === 'm' ? 'mobile' : 'desktop';
   const emg = buildProductionPortfolioChart(typeof activeRange !== 'undefined' ? activeRange : '24h');
   try { if (typeof window !== 'undefined') window._aurixEmergencyLast = emg; } catch (_) {}
+  _aurixChartUpdateLog(surface, emg);
+
+  // FIX 1 — repaint guard: if the VISUAL signature is unchanged and a line is already drawn, do NOT
+  // rewrite innerHTML, repaint the badge or replay animation (ts-only changes never repaint).
+  if (emg.state === 'ready') {
+    const _sig = _aurixVisualChartSignature(emg, surface);
+    let _hasLine = false; try { _hasLine = !!hostEl.querySelector('.wsc-line'); } catch (_) {}
+    if (_hasLine && _aurixLastVisualSig[surface] === _sig) return true;
+    _aurixLastVisualSig[surface] = _sig;
+  } else {
+    _aurixLastVisualSig[surface] = null;   // pending → force a fresh draw on the next ready
+  }
 
   // Badge — one source, always coherent with the line.
   if (changeEl) _aurixEmergencyPaintBadgeNode(changeEl, emg, surface);
@@ -26345,10 +26427,19 @@ function renderAurixMobileLiteChart(range, token) {
       try {
         const emg = buildProductionPortfolioChart(r);
         try { if (typeof window !== 'undefined') window._aurixEmergencyLastMobile = emg; } catch (_) {}
+        _aurixChartUpdateLog('mobile', emg);
         if (emg.state !== 'ready') {
+          _aurixLastVisualSig.mobile = null;   // FIX 1 — pending forces a fresh draw on the next ready
           _aurixMobileLiteFallback('pending');
           if (_aurixMobileLiteEmptyRetries < 6) { _aurixMobileLiteEmptyRetries++; try { setTimeout(function () { scheduleAurixMobileLite(r); }, 1300); } catch (_) {} }
           return;
+        }
+        // FIX 1 — mobile repaint guard: unchanged visual signature + existing line ⇒ no SVG rewrite / no anim.
+        {
+          const _sig = _aurixVisualChartSignature(emg, 'mobile');
+          let _hasLine = false; try { _hasLine = !!(host.querySelector && host.querySelector('.aurix-lite-line')); } catch (_) {}
+          if (_hasLine && _aurixLastVisualSig.mobile === _sig) { st.rendered = true; return; }
+          _aurixLastVisualSig.mobile = _sig;
         }
         const VBW = 1000, VBH = 260;
         const built = _aurixEmergencyBuildSvg(emg.points, { W: VBW, H: VBH, padL: 6, padR: 6, padT: 16, padB: 16 });
@@ -31079,6 +31170,7 @@ async function _refreshPricesImpl() {
   // ready remote performance_state (this was the 24H ready↔Calculando oscillation on every refresh).
   save('price-refresh');
   lastRefreshAt = Date.now();
+  try { window.__aurixLastDirectDashRenderAt = Date.now(); } catch (_) {}   // FIX 2 — this price tick renders directly; the reactive path must not render again
   render();
   // PORTFOLIO-BOOT-REFRESH-1: also refresh Workspace intelligence when
   // the user is sitting on that tab. render() targets the dashboard
@@ -31142,6 +31234,13 @@ function countUpTotalValue(targetBase) {
     })(t0);
     return;
   }
+
+  // FIX 5 — idempotent by VISIBLE text: if the formatted value the user already sees would not change,
+  // do NOT re-animate or touch the DOM (a sub-cent price fluctuation must never re-flash the card).
+  try {
+    const _finalText = formatBase(targetBase);
+    if (totalValueEl && totalValueEl.textContent === _finalText) { _countUpCurrent = targetBase; return; }
+  } catch (_) {}
 
   // Skip if value hasn't changed
   if (_countUpCurrent === targetBase) return;

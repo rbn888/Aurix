@@ -89,7 +89,8 @@ ok('10 history reconciled via union-by-ts merge of remote into local (cache), no
 
 console.log('\nNo new polling — reconcile rides the EXISTING focus/visibility/pageshow + boot path:');
 ok('11 focus/visibilitychange/pageshow reconcile remote via _aurixFg (which calls _aurixResyncFromRemote; no new setInterval)',
-   /const _aurixFg = \(reason\) => \{[\s\S]*?_aurixResyncFromRemote\(reason\);/.test(app) &&
+   /const _aurixFg = \(reason\) => scheduleForegroundRepaint\(reason\);/.test(app) &&
+   /scheduleForegroundRepaint = \(reason\) => \{[\s\S]*?_aurixResyncFromRemote\(rs\);/.test(app) &&
    /document\.addEventListener\('visibilitychange', \(\) => \{ if \(document\.visibilityState === 'visible'\) _aurixFg\('visible'\); \}\);/.test(app) &&
    /window\.addEventListener\('focus',   \(\) => _aurixFg\('focus'\)\);/.test(app) &&
    /_aurixFg\('pageshow'\)/.test(app));
