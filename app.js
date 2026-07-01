@@ -22449,6 +22449,130 @@ function buildEmergencyInstitutionalChart(range) {
 }
 try { if (typeof window !== 'undefined') window.buildEmergencyInstitutionalChart = buildEmergencyInstitutionalChart; } catch (_) {}
 
+// ════════════════════════════════════════════════════════════════════════════
+// P0-PRODUCTION-PORTFOLIO-CHART — buildProductionPortfolioChart(range)
+// ════════════════════════════════════════════════════════════════════════════
+// FINAL CUT. THE single source the VISIBLE dashboard chart (line + return %) reads. It builds on the
+// clean series produced by buildEmergencyInstitutionalChart (sort/dedupe/reject-invalid/strip-construction/
+// de-spike) and adds STRICT production gates so the chart is either premium+coherent OR an honest pending
+// — never a broken cliff/tower/flatline, never a % that disagrees with the line, never a construction %.
+// The visible return is ALWAYS ((lastValue − firstValue) / firstValue) × 100 of the FINAL drawn points.
+const _AURIX_PROD_GATE_PCT = { '24h': 10, '7d': 20, '30d': 30, '1y': 50, 'all': 50 };
+const _AURIX_PROD_MIN_POINTS = { '24h': 3, '7d': 6, '30d': 6, '1y': 6, 'all': 6 };
+
+// Rule 8 — collapse runs of ≥3 IDENTICAL consecutive values to their two endpoints (removes flat
+// telemetry plateaus / repeated construction values). Shape + endpoints preserved. Returns { points, removed }.
+function _aurixProdPlateauFilter(points) {
+  if (!Array.isArray(points) || points.length <= 2) return { points: (points || []).slice(), removed: 0 };
+  const out = []; let removed = 0, i = 0;
+  while (i < points.length) {
+    let j = i;
+    while (j + 1 < points.length && points[j + 1].value === points[i].value) j++;
+    out.push(points[i]);
+    if (j > i) { out.push(points[j]); removed += (j - i - 1); }   // keep run endpoints, drop the middle
+    i = j + 1;
+  }
+  return { points: out, removed: removed };
+}
+
+// Visual quality gate (Rules 6/7 visual). Rejects vertical walls, dominant cliffs, flatlines and
+// under-populated series. Proportion gates only apply once the series is well populated (≥6 points);
+// a 3–5 point 24H line is bounded by the plausibility gate instead. Returns { passed, reason }.
+function _aurixProdVisualGate(points, range) {
+  const n = points.length;
+  const min = _AURIX_PROD_MIN_POINTS[range] || 6;
+  if (n < min) return { passed: false, reason: 'insufficient_visual_points' };
+  const vals = points.map(p => p.value);
+  let mn = Infinity, mx = -Infinity;
+  for (const v of vals) { if (v < mn) mn = v; if (v > mx) mx = v; }
+  const span = mx - mn;
+  if (!(span > 0)) return { passed: false, reason: 'flatline_no_variation' };   // exact-flat = bad telemetry
+  const fracs = [];
+  for (let i = 1; i < n; i++) fracs.push(Math.abs(vals[i] - vals[i - 1]) / span);
+  if (n >= 6) {
+    if (fracs[0] > 0.5) return { passed: false, reason: 'first_segment_vertical_wall' };
+    if (fracs[fracs.length - 1] > 0.5) return { passed: false, reason: 'last_segment_vertical_wall' };
+    let maxFrac = 0; for (const f of fracs) if (f > maxFrac) maxFrac = f;
+    if (maxFrac > 0.35) return { passed: false, reason: 'segment_exceeds_35pct_height' };   // cliff w/o flow explanation
+  }
+  return { passed: true, reason: null };
+}
+
+function buildProductionPortfolioChart(range) {
+  const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+  const out = {
+    range: r, state: 'pending', reason: null, pendingReason: null,
+    points: [], pointCount: 0,
+    firstTs: null, lastTs: null, firstValue: null, lastValue: null,
+    baselineTs: null, baselineValue: null, currentTs: null, currentValue: null,
+    returnPct: null, returnValue: null, lineReturnPct: null, badgeReturnPct: null, color: 'flat',
+    chartHash: null, collapsedRange: false, rangeCollapsedBecauseHistoryTooShort: false,
+    rawPointCount: 0, cleanPointCount: 0, finalPointCount: 0,
+    rejectedInvalidCount: 0, rejectedConstructionCount: 0, rejectedSpikeCount: 0, rejectedPlateauCount: 0,
+    visualQualityPassed: false, visualRejectReason: null,
+  };
+  try {
+    const emg = buildEmergencyInstitutionalChart(r);   // sort/dedupe/reject-invalid/strip-construction/de-spike
+    out.rawPointCount = emg.rawPointCount || 0;
+    out.cleanPointCount = emg.cleanPointCount || 0;
+    out.rejectedInvalidCount = (emg.rejectedCount || 0) + (emg.rejectedDuplicateCount || 0);
+    out.rejectedConstructionCount = emg.rejectedConstructionPrefixCount || 0;
+    out.rejectedSpikeCount = emg.rejectedSpikeCount || 0;
+    out.collapsedRange = !!emg.collapsedRange;
+    out.rangeCollapsedBecauseHistoryTooShort = !!emg.rangeCollapsedBecauseHistoryTooShort;
+    if (emg.state !== 'ready' || !Array.isArray(emg.points) || emg.points.length < 2) {
+      out.reason = emg.reason || emg.pendingReason || 'pending'; out.pendingReason = out.reason; return out;
+    }
+
+    // Rule 8 — remove flat telemetry plateaus (endpoints preserved).
+    const plat = _aurixProdPlateauFilter(emg.points);
+    out.rejectedPlateauCount = plat.removed;
+    const pts = plat.points;
+    out.finalPointCount = pts.length;
+    if (pts.length < 2) { out.reason = 'insufficient_visual_points'; out.pendingReason = out.reason; return out; }
+
+    // Rules 9/10/11 — baseline = first FINAL point, current = last FINAL point, return from them ONLY.
+    const first = pts[0], last = pts[pts.length - 1];
+    const returnPct = ((last.value - first.value) / first.value) * 100;
+
+    // Hard plausibility gate (24h10/7d20/30d30/1y50/all50). No capital-flow explanation wired ⇒ reject.
+    const gate = _AURIX_PROD_GATE_PCT[r] || _AURIX_PROD_GATE_PCT.all;
+    if (!Number.isFinite(returnPct) || Math.abs(returnPct) > gate) {
+      out.reason = 'pending_sanity'; out.pendingReason = out.reason;
+      out.firstValue = first.value; out.lastValue = last.value; out.baselineValue = first.value; out.currentValue = last.value;
+      return out;
+    }
+
+    // Visual quality gate — no vertical walls / dominant cliffs / flatlines / under-populated series.
+    const vg = _aurixProdVisualGate(pts, r);
+    out.visualQualityPassed = vg.passed; out.visualRejectReason = vg.reason;
+    if (!vg.passed) {
+      out.reason = vg.reason; out.pendingReason = vg.reason;
+      out.firstValue = first.value; out.lastValue = last.value; out.baselineValue = first.value; out.currentValue = last.value;
+      return out;
+    }
+
+    // READY — the drawn line IS pts; the return is its first→last (line return === badge return).
+    out.state = 'ready';
+    out.reason = out.rangeCollapsedBecauseHistoryTooShort ? 'range_collapsed_history_short' : 'ok';
+    out.points = pts.map(p => ({ ts: p.ts, value: +p.value.toFixed(2) }));
+    out.pointCount = out.points.length; out.finalPointCount = out.points.length;
+    out.firstTs = out.points[0].ts; out.lastTs = out.points[out.pointCount - 1].ts;
+    out.firstValue = out.points[0].value; out.lastValue = out.points[out.pointCount - 1].value;
+    out.baselineTs = first.ts; out.baselineValue = +first.value.toFixed(2);
+    out.currentTs = last.ts; out.currentValue = +last.value.toFixed(2);
+    out.returnPct = +returnPct.toFixed(4); out.lineReturnPct = out.returnPct; out.badgeReturnPct = out.returnPct;
+    out.returnValue = +(last.value - first.value).toFixed(2);
+    out.color = returnPct > 0.05 ? 'up' : (returnPct < -0.05 ? 'down' : 'flat');
+    out.chartHash = _aurixEmergencyHash(out.points);
+    return out;
+  } catch (e) {
+    out.state = 'pending'; out.reason = 'exception:' + ((e && e.message) || 'err'); out.pendingReason = out.reason;
+    return out;
+  }
+}
+try { if (typeof window !== 'undefined') window.buildProductionPortfolioChart = buildProductionPortfolioChart; } catch (_) {}
+
 // Simple, deterministic pixel path from the EXACT emergency points (no smoothing, no downsampling,
 // no filtering — the visible line IS the points). Shared by desktop + mobile so the two surfaces
 // draw the identical shape. Returns { linePath, areaPath, pixels, W, H, plotBottom }.
@@ -22542,6 +22666,29 @@ try {
     };
     window.disableAurixEmergencyChart = function () { try { window.AURIX_EMERGENCY_CHART = false; } catch (_) {} try { if (typeof renderWealthCurve === 'function') renderWealthCurve(false); } catch (_) {} try { if (typeof scheduleAurixMobileLite === 'function') scheduleAurixMobileLite(); } catch (_) {} return false; };
     window.enableAurixEmergencyChart = function () { try { window.AURIX_EMERGENCY_CHART = true; } catch (_) {} try { if (typeof renderWealthCurve === 'function') renderWealthCurve(false); } catch (_) {} try { if (typeof scheduleAurixMobileLite === 'function') scheduleAurixMobileLite(); } catch (_) {} return true; };
+
+    // P0-PRODUCTION-PORTFOLIO-CHART — acceptance diagnostic for the VISIBLE chart (the function the
+    // desktop/mobile line + badge actually read). Proves desktop/mobile parity, the visual-quality
+    // verdict, and that the % equals the first→last of the drawn line. Read-only.
+    window.aurixProductionChartDebug = function (range) {
+      const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+      const p = buildProductionPortfolioChart(r);
+      const desktop = p.points.map(pt => ({ time: pt.ts, value: pt.value }));   // desktop adapter — rename only
+      const mobile = p.points.map(pt => ({ ts: pt.ts, value: pt.value }));       // mobile adapter — rename only
+      const desktopHash = _aurixEmergencyHash(desktop.map(pt => ({ ts: pt.time, value: pt.value })));
+      const mobileHash = _aurixEmergencyHash(mobile);
+      const out = {
+        range: r, state: p.state, reason: p.reason,
+        rawPointCount: p.rawPointCount, cleanPointCount: p.cleanPointCount, finalPointCount: p.finalPointCount,
+        rejectedInvalidCount: p.rejectedInvalidCount, rejectedConstructionCount: p.rejectedConstructionCount,
+        rejectedSpikeCount: p.rejectedSpikeCount, rejectedPlateauCount: p.rejectedPlateauCount,
+        firstValue: p.firstValue, lastValue: p.lastValue, returnPct: p.returnPct,
+        visualQualityPassed: p.visualQualityPassed,
+        desktopHash: desktopHash, mobileHash: mobileHash, desktopMobileParity: desktopHash === mobileHash,
+      };
+      try { console.log('%c[UI][PRODUCTION_CHART_DEBUG]', 'font-weight:700', out); } catch (_) {}
+      return out;
+    };
   }
 } catch (_) {}
 
@@ -22555,7 +22702,7 @@ function _aurixPaintReturnBadge(el, surface) {
     // P0-EMERGENCY-CHART-RECOVERY — the visible return badge is driven ONLY by the emergency chart
     // object (the same object that drives the visible line), so a % can never appear without a line.
     if (_aurixEmergencyChartOn()) {
-      _aurixEmergencyPaintBadgeNode(el, buildEmergencyInstitutionalChart(typeof activeRange !== 'undefined' ? activeRange : '24h'), surface);
+      _aurixEmergencyPaintBadgeNode(el, buildProductionPortfolioChart(typeof activeRange !== 'undefined' ? activeRange : '24h'), surface);
       return;
     }
     const snap = (typeof computePerformanceSnapshot === 'function') ? computePerformanceSnapshot(typeof activeRange !== 'undefined' ? activeRange : '24h') : null;
@@ -25322,7 +25469,7 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
   opts = opts || {};
   const uid = opts.uid || 'd';
   const surface = uid === 'm' ? 'mobile' : 'desktop';
-  const emg = buildEmergencyInstitutionalChart(typeof activeRange !== 'undefined' ? activeRange : '24h');
+  const emg = buildProductionPortfolioChart(typeof activeRange !== 'undefined' ? activeRange : '24h');
   try { if (typeof window !== 'undefined') window._aurixEmergencyLast = emg; } catch (_) {}
 
   // Badge — one source, always coherent with the line.
@@ -25787,7 +25934,12 @@ function _aurixMobileLiteFallback(reason, err) {
   else if (reason && !st.lastError) st.lastError = reason;
   try {
     const host = _aurixMobileLiteHost();
-    if (host) host.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:120px;color:#5e7bb0;font:500 12.5px/1.4 -apple-system,system-ui;text-align:center;padding:14px">Gráfico temporalmente no disponible en móvil</div>';
+    // P0-PRODUCTION-PORTFOLIO-CHART — this chart NEVER shows the old mobile "unavailable" message.
+    // A pending/insufficient series (or any transient render miss) renders the SAME premium
+    // "Histórico en construcción" state as desktop — no percentage, no fake line, no unavailable message.
+    let title = 'Histórico en construcción';
+    try { if (typeof t === 'function') title = t('wscQualityGateTitle') || title; } catch (_) {}
+    if (host) host.innerHTML = '<div class="wsc wsc--empty" style="display:flex;align-items:center;justify-content:center;height:100%;min-height:120px;text-align:center;padding:14px"><div class="wsc-empty-title" style="color:#5e7bb0;font:600 13px/1.4 -apple-system,system-ui">' + title + '</div></div>';
   } catch (_) {}
   if (st.failed) { try { _reportSafe('mobile-lite-chart', reason + (st.lastError ? ': ' + st.lastError : '')); } catch (_) {} }
 }
@@ -25812,7 +25964,7 @@ function renderAurixMobileLiteChart(range, token) {
     // Ready ⇒ clean line; pending ⇒ skeleton (no line, no %). No desktop/mobile mismatch possible.
     if (_aurixEmergencyChartOn()) {
       try {
-        const emg = buildEmergencyInstitutionalChart(r);
+        const emg = buildProductionPortfolioChart(r);
         try { if (typeof window !== 'undefined') window._aurixEmergencyLastMobile = emg; } catch (_) {}
         if (emg.state !== 'ready') {
           _aurixMobileLiteFallback('pending');

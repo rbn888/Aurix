@@ -126,17 +126,17 @@ console.log('\nEXECUTION — 17 mandated cases (real renderer, fake carousel DOM
 
 // 5) datos vacíos → placeholder
 { const env = makeEnv(function () { return { pathData: '', areaPathData: '', visiblePoints: [] }; }); cycle(env, '30d');
-  ck('5. empty data → placeholder, no <svg>', hostHtml(env).indexOf('no disponible') > -1 && hostHtml(env).indexOf('<svg') < 0); }
+  ck('5. empty data → placeholder, no <svg>', hostHtml(env).indexOf('construcci')> -1 && hostHtml(env).indexOf('<svg') < 0); }
 
 // 6) excepción en renderer → placeholder
 { const env = makeEnv(function () { throw new Error('boom'); }); cycle(env, '30d');
   const dbg = env.sandbox.debugAurixMobileChart();
-  ck('6. exception → placeholder + failed flag, no throw', hostHtml(env).indexOf('no disponible') > -1 && dbg.failed === true && env.threw === false); }
+  ck('6. exception → placeholder + failed flag, no throw', hostHtml(env).indexOf('construcci')> -1 && dbg.failed === true && env.threw === false); }
 
 // 7) renderer lento >100ms → placeholder
 { let ref = null; ref = makeEnv(function () { ref.clock += 350; return engineOK(S30, DASH)(); }); cycle(ref, '30d');
   const dbg = ref.sandbox.debugAurixMobileChart();
-  ck('7. render >100ms → placeholder (budget)', hostHtml(ref).indexOf('no disponible') > -1 && dbg.failed === true && /100ms/.test(String(dbg.lastError))); }
+  ck('7. render >100ms → placeholder (budget)', hostHtml(ref).indexOf('construcci')> -1 && dbg.failed === true && /100ms/.test(String(dbg.lastError))); }
 
 // 8) cambio de rango → actualiza solo host interno (area innerHTML never rewritten)
 { const env = makeEnv(engineOK(S30, DASH)); cycle(env, '30d'); cycle(env, '7d');
@@ -170,7 +170,7 @@ console.log('\nEXECUTION — 17 mandated cases (real renderer, fake carousel DOM
 // 15) mobile flag false → placeholder
 { const env = makeEnv(engineOK(S30, DASH), { liteEnabled: false }); cycle(env, '30d');
   const dbg = env.sandbox.debugAurixMobileChart();
-  ck('15. LITE_ENABLED=false → placeholder (disabled)', hostHtml(env).indexOf('no disponible') > -1 && dbg.enabled === false && dbg.rendered === false); }
+  ck('15. LITE_ENABLED=false → placeholder (disabled)', hostHtml(env).indexOf('construcci')> -1 && dbg.enabled === false && dbg.rendered === false); }
 
 // 16) desktop no cambia (AURIX_MOBILE_SAFE=false → renderer is a no-op, no host created)
 { const env = makeEnv(engineOK(S30, DASH), { mobileSafe: false }); cycle(env, '30d');
@@ -178,7 +178,7 @@ console.log('\nEXECUTION — 17 mandated cases (real renderer, fake carousel DOM
 
 // 17) app boot no depende del gráfico (engine throws ⇒ no propagation; placeholder; nav alive)
 { const env = makeEnv(function () { throw new Error('chart dead'); }); cycle(env, '30d');
-  ck('17. chart failure never propagates (boot/app independent)', env.threw === false && env.dom.nav.navAlive === true && hostHtml(env).indexOf('no disponible') > -1); }
+  ck('17. chart failure never propagates (boot/app independent)', env.threw === false && env.dom.nav.navAlive === true && hostHtml(env).indexOf('construcci')> -1); }
 
 // debug contract shape (CLOSURE SPEC §5 — extended fields)
 { const env = makeEnv(engineOK(S30, DASH)); cycle(env, '30d');
@@ -248,7 +248,7 @@ console.log('\nLIVE FILE — wiring & permanent invariants in app.js:');
   ck('paint deferred in a macrotask (setTimeout) — never inline in boot', /_aurixMobileLiteTimer = setTimeout\(function \(\)/.test(app));
   ck('hard 100ms budget enforced', /if \(dur > 100\)/.test(block));
   ck('cancelable via token (>=3 guards)', (block.match(/token !== _aurixMobileLiteToken/g) || []).length >= 3);
-  ck('failure fallback text present', block.indexOf('Gráfico temporalmente no disponible en móvil') >= 0);
+  ck('failure fallback text present', block.indexOf('Histórico en construcción') >= 0);
   ck('reads canonical series via approved engine only', block.indexOf('renderAurixInstitutionalChart(r, VBW, VBH, box)') >= 0);
   ck('AURIX_MOBILE_CHART_LITE_ENABLED flag defined + honoured', /AURIX_MOBILE_CHART_LITE_ENABLED = true/.test(app) && block.indexOf('_aurixLiteEnabled()') >= 0);
   ck('debugAurixMobileChart exported', app.indexOf('window.debugAurixMobileChart = function') >= 0);

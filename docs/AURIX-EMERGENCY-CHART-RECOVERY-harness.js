@@ -177,7 +177,7 @@ console.log('\nSVG builder draws the exact points (no rebuild/filter):');
 console.log('\nWiring present in app.js (visible surfaces routed to the emergency builder):');
 ok('W1 desktop _wscPaintSurface routes to _wscPaintEmergency', /if \(_aurixEmergencyChartOn\(\)\) \{\s*try \{\s*if \(_wscPaintEmergency\(changeEl, hostEl, opts\)\) return;/.test(app));
 ok('W2 mobile lite renderer routes to buildEmergencyInstitutionalChart', /VISIBLE mobile line is driven ONLY by/.test(app) && /const emg = buildEmergencyInstitutionalChart\(r\);/.test(app) && /host\.innerHTML = svg;/.test(app));
-ok('W3 return badge painter routes through the emergency object', /if \(_aurixEmergencyChartOn\(\)\) \{\s*_aurixEmergencyPaintBadgeNode\(el, buildEmergencyInstitutionalChart/.test(app));
+ok('W3 return badge painter routes through the production chart object', /if \(_aurixEmergencyChartOn\(\)\) \{\s*_aurixEmergencyPaintBadgeNode\(el, buildProductionPortfolioChart/.test(app));
 ok('W4 debug + rollback exposed', /window\.aurixEmergencyChartDebug\s*=/.test(app) && /window\.disableAurixEmergencyChart\s*=/.test(app));
 
 console.log('\n' + (fail === 0 ? '✅ ALL PASS' : '❌ ' + fail + ' FAILED') + '  (' + pass + '/' + (pass + fail) + ')');
