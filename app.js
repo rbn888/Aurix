@@ -22850,9 +22850,63 @@ function buildValidatedHistoricalSeries(range) {
 }
 try { if (typeof window !== 'undefined') window.buildValidatedHistoricalSeries = buildValidatedHistoricalSeries; } catch (_) {}
 
+// ── SPEC DSH.CHART.RETURNS.01 — flow-neutral REAL return for the chart badge ──
+// The line keeps showing WEALTH (patrimonio) — it may rise from contributions, asset-adds or market.
+// But the % shown above the chart must be REAL return, excluding capital added/removed in the period.
+// Adding assets or liquidity is NOT gain. When we cannot compute a trustworthy real return (new account,
+// contributions dominate, no meaningful start base, or the residual is implausible after neutralization),
+// we show an honest state (0%) — NEVER an artificial +288% / +518% / +1000%.
+const _AURIX_RET_MIN_BASE = 1;                                   // start value floor (base ccy) — below this there is no real return to speak of
+// Per-range sane residual band AFTER flow-neutralization. If capital flows are fully recorded the residual
+// is small; if it still exceeds this band the growth is unexplained capital (unrecorded contributions) →
+// honest state rather than a fabricated %. Backstop only — the ledger neutralization is the primary fix.
+const _AURIX_RET_SANE_PCT = { '24h': 25, '7d': 45, '30d': 80, '1y': 200, 'all': 250 };
+// Net capital added (deposits + asset_add + import_baseline) minus removed, in baseCurrency, for flows
+// STRICTLY after the baseline snapshot and up to/including the current snapshot. Flows are stored in USD.
+function _aurixNetFlowsInWindow(fromTs, toTs) {
+  try {
+    const flows = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
+    if (!Array.isArray(flows) || !flows.length) return { net: 0, count: 0, hasLedger: false };
+    let net = 0, count = 0;
+    for (const f of flows) {
+      if (!f || typeof f.ts !== 'number') continue;
+      if (f.ts <= fromTs || f.ts > toTs) continue;                // (baseline, current]
+      const b = (typeof toBase === 'function') ? toBase(Number(f.amountUSD), 'USD') : Number(f.amountUSD);
+      if (!Number.isFinite(b)) continue;                          // uncovered fx → never invent
+      net += b; count++;
+    }
+    return { net: +net.toFixed(2), count: count, hasLedger: true };
+  } catch (_) { return { net: 0, count: 0, hasLedger: false }; }
+}
+// Compute the flow-neutral period return for the badge. Returns an honest 'insufficient_return_history'
+// state (returnPct null) whenever a real return cannot be trusted, so the caller shows 0% not a fake %.
+function _aurixComputePeriodReturn(range, first, last) {
+  const out = { returnState: 'insufficient_return_history', returnPct: null, returnValue: 0, color: 'flat', netFlows: 0, grossPct: null };
+  try {
+    if (!first || !last || !Number.isFinite(first.value) || !Number.isFinite(last.value)) return out;
+    const r = String(range || 'all').toLowerCase();
+    const startV = first.value, endV = last.value;
+    const rawDelta = endV - startV;
+    out.grossPct = startV !== 0 ? +(((endV - startV) / startV) * 100).toFixed(4) : null;   // wealth growth (line), NOT return
+    const nf = _aurixNetFlowsInWindow(first.ts, last.ts);
+    out.netFlows = nf.net;
+    if (!(startV > _AURIX_RET_MIN_BASE)) return out;              // new account / no capital base at window start → honest
+    const neutralDelta = rawDelta - nf.net;                      // remove capital added/removed within the period
+    const neutralPct = (neutralDelta / startV) * 100;
+    const bound = _AURIX_RET_SANE_PCT[r] || _AURIX_RET_SANE_PCT.all;
+    if (!Number.isFinite(neutralPct) || Math.abs(neutralPct) > bound) return out;   // residual too large ⇒ unrecorded capital ⇒ honest
+    out.returnState = 'ok';
+    out.returnPct = +neutralPct.toFixed(4);
+    out.returnValue = +neutralDelta.toFixed(2);
+    out.color = neutralPct > 0.05 ? 'up' : (neutralPct < -0.05 ? 'down' : 'flat');
+    return out;
+  } catch (_) { return out; }
+}
+
 // PASSIVE CONSUMER. The visible chart reads the ALREADY-VALIDATED series. READY/PENDING is decided ONLY
 // by validated-point sufficiency (≥2 after quarantine). The visual gate is retained as a DIAGNOSTIC field
-// but NEVER rejects a range. Return is first→last of the validated range points (line return == badge).
+// but NEVER rejects a range. The LINE draws the validated wealth series; the badge % is the FLOW-NEUTRAL
+// real return (SPEC DSH.CHART.RETURNS.01) — contributions/withdrawals never read as return.
 function buildProductionPortfolioChart(range) {
   const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
   const out = {
@@ -22861,6 +22915,7 @@ function buildProductionPortfolioChart(range) {
     firstTs: null, lastTs: null, firstValue: null, lastValue: null,
     baselineTs: null, baselineValue: null, currentTs: null, currentValue: null,
     returnPct: null, returnValue: null, lineReturnPct: null, badgeReturnPct: null, color: 'flat',
+    returnState: 'insufficient_return_history', netFlows: 0,   // SPEC DSH.CHART.RETURNS.01 — flow-neutral badge return
     chartHash: null, collapsedRange: false, rangeCollapsedBecauseHistoryTooShort: false,
     rawPointCount: 0, cleanPointCount: 0, finalPointCount: 0,
     rejectedInvalidCount: 0, rejectedConstructionCount: 0, rejectedSpikeCount: 0, rejectedPlateauCount: 0,
@@ -22904,7 +22959,9 @@ function buildProductionPortfolioChart(range) {
     }
 
     const first = pts[0], last = pts[pts.length - 1];
-    const returnPct = ((last.value - first.value) / first.value) * 100;
+    // SPEC DSH.CHART.RETURNS.01 — the badge % is the FLOW-NEUTRAL real return (excludes capital
+    // added/removed in the period). The LINE still draws the wealth series (points below), unchanged.
+    const per = _aurixComputePeriodReturn(r, { ts: first.ts, value: first.value }, { ts: last.ts, value: last.value });
     // Visual quality — DIAGNOSTIC ONLY (never rejects; quarantine already removed cliffs/towers).
     try { const vg = _aurixProdVisualGate(pts.map(p => ({ value: p.value, ts: p.ts })), r); out.visualQualityPassed = vg.passed; out.visualRejectReason = vg.reason; } catch (_) {}
 
@@ -22920,9 +22977,18 @@ function buildProductionPortfolioChart(range) {
     out.currentTs = last.ts; out.currentValue = +last.value.toFixed(2);
     out.baselineSnapshot = { snapshotId: first.snapshotId || null, ts: first.ts, value: +first.value.toFixed(2) };
     out.currentSnapshot = { snapshotId: last.snapshotId || null, ts: last.ts, value: +last.value.toFixed(2) };
-    out.returnPct = +returnPct.toFixed(4); out.lineReturnPct = out.returnPct; out.badgeReturnPct = out.returnPct;
-    out.returnValue = +(last.value - first.value).toFixed(2);
-    out.color = returnPct > 0.05 ? 'up' : (returnPct < -0.05 ? 'down' : 'flat');
+    // lineReturnPct = GROSS wealth growth of the drawn line (informational; the line uses points, not this).
+    out.lineReturnPct = Number.isFinite(per.grossPct) ? per.grossPct : +(((last.value - first.value) / first.value) * 100).toFixed(4);
+    out.returnState = per.returnState;
+    out.netFlows = per.netFlows;
+    if (per.returnState === 'ok') {
+      out.returnPct = per.returnPct; out.badgeReturnPct = per.returnPct;
+      out.returnValue = per.returnValue; out.color = per.color;
+    } else {
+      // Honest state — line (wealth) is shown, but there is no trustworthy REAL return yet.
+      out.returnPct = null; out.badgeReturnPct = null;
+      out.returnValue = 0; out.color = 'flat';
+    }
     out.chartHash = _aurixEmergencyHash(out.points);
     return out;
   } catch (e) {
@@ -23017,6 +23083,16 @@ function _aurixEmergencyBadgeText(emg) {
     return pf ? pf.text : ((emg.returnPct >= 0 ? '+' : '') + emg.returnPct.toFixed(2) + '%');
   } catch (_) { return ''; }
 }
+// SPEC DSH.CHART.RETURNS.01 — honest "no real return yet" badge text (new account / contributions
+// dominate). The wealth line is still drawn; we show a neutral 0 (never an artificial %/€ from capital).
+function _aurixReturnInsufficientText() {
+  try {
+    const mode = (typeof activePerfMode !== 'undefined' && activePerfMode === 'curr') ? 'curr' : 'pct';
+    if (mode === 'curr') return (typeof _dshFmtMoney0 === 'function') ? _dshFmtMoney0(0) : '0';
+    const pf = (typeof _dshFmtPct === 'function') ? _dshFmtPct(0) : null;
+    return pf ? pf.text : '0.00%';
+  } catch (_) { return '0.00%'; }
+}
 // Paint ONE badge node from the emergency chart: ready ⇒ %/€ + tone; pending ⇒ "Calculando…".
 // Percentage is shown ONLY when a line exists (state==='ready') — the two can never diverge.
 function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
@@ -23025,11 +23101,16 @@ function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
     if (emg && emg.state === 'ready' && Number.isFinite(emg.returnPct)) {
       el.innerHTML = '<span class="wsc-metric-val">' + _aurixEmergencyBadgeText(emg) + '</span>';
       el.className = 'chart-change ' + emg.color;
+    } else if (emg && emg.state === 'ready' && emg.returnState === 'insufficient_return_history') {
+      // SPEC DSH.CHART.RETURNS.01 — the wealth line is drawn, but there is no trustworthy REAL return yet
+      // (new account / contributions dominate). Show an honest neutral 0, never a fabricated %/€.
+      el.innerHTML = '<span class="wsc-metric-val">' + _aurixReturnInsufficientText() + '</span>';
+      el.className = 'chart-change flat';
     } else {
       el.innerHTML = (typeof _aurixReturnPendingHTML === 'function') ? _aurixReturnPendingHTML() : '<span class="wsc-metric-calc">Calculando…</span>';
       el.className = 'chart-change calculating';
     }
-    try { console.log('[UI][EMERGENCY_BADGE]', { surface: surface || null, state: emg && emg.state, reason: emg && emg.reason, returnPct: emg && emg.returnPct, chartHash: emg && emg.chartHash }); } catch (_) {}
+    try { console.log('[UI][EMERGENCY_BADGE]', { surface: surface || null, state: emg && emg.state, returnState: emg && emg.returnState, reason: emg && emg.reason, returnPct: emg && emg.returnPct, netFlows: emg && emg.netFlows, chartHash: emg && emg.chartHash }); } catch (_) {}
   } catch (_) {}
 }
 
@@ -23126,6 +23207,9 @@ try {
         baselineSnapshot: p.baselineSnapshot,
         currentSnapshot: p.currentSnapshot,
         returnPct: p.returnPct,
+        // SPEC DSH.CHART.RETURNS.01 — flow-neutral badge return vs gross wealth growth (line).
+        returnState: p.returnState, badgeReturnPct: p.badgeReturnPct, lineReturnPct: p.lineReturnPct,
+        netFlows: p.netFlows, isArtificialReturnSuppressed: p.returnState === 'insufficient_return_history',
         desktopHash: desktopHash, mobileHash: mobileHash, desktopMobileParity: desktopHash === mobileHash,
         // convenience mirrors
         state: p.state, reason: p.reason, visualQualityPassed: p.visualQualityPassed,

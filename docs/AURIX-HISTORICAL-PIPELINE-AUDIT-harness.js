@@ -26,9 +26,11 @@ function makeEnv(hist) {
     isFinite: isFinite, parseFloat: parseFloat, Infinity: Infinity,
     console: { log: () => {} },
     activeRange: '30d', activePerfMode: 'pct', categoryHistory: hist || [], toBase: (v) => v, _aurixHistorySourceForDisplay: null,
+    _aurixLoadCapitalFlows: () => [],   // SPEC DSH.CHART.RETURNS.01 — no flows ⇒ flow-neutral == gross
   };
   sb._aurixHistorySourceForDisplay = () => sb.categoryHistory;
   vm.createContext(sb);
+  vm.runInContext('const _AURIX_RET_MIN_BASE = 1; const _AURIX_RET_SANE_PCT = {"24h":25,"7d":45,"30d":80,"1y":200,"all":250};', sb);
   vm.runInContext('const _AURIX_EMG_RANGE_MS = {"24h":864e5,"7d":6048e5,"30d":2592e6,"1y":31536e6,"all":Infinity};' +
     'const _AURIX_EMG_MAX_RATIO = {"24h":1.20,"7d":1.35,"30d":1.75,"1y":3.00,"all":3.00};' +
     'const _AURIX_EMG_ADJ_JUMP = {"24h":0.20,"7d":0.35,"30d":0.50,"1y":0.50,"all":0.50};' +
@@ -40,6 +42,7 @@ function makeEnv(hist) {
   ['_aurixEmergencyHash', '_aurixProdPlateauFilter', '_aurixProdVisualGate',
     '_aurixHpqIso', '_aurixHpqDiag', '_aurixHpqRangesContaining', '_aurixHpqRawStages',
     '_aurixHpqTrimConstruction', '_aurixHpqQuarantineSpikes', '_aurixHpqFirstInvalidStage',
+    '_aurixNetFlowsInWindow', '_aurixComputePeriodReturn',
     'buildValidatedHistoricalSeries', 'buildProductionPortfolioChart'].forEach(f => vm.runInContext(fnSrc(f), sb));
   return sb;
 }
