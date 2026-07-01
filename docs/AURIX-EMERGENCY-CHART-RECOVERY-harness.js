@@ -38,10 +38,13 @@ function makeEnv(hist, opts) {
   // The const thresholds the builder closes over.
   vm.runInContext('const _AURIX_EMG_RANGE_MS = {"24h":864e5,"7d":6048e5,"30d":2592e6,"1y":31536e6,"all":Infinity};' +
     'const _AURIX_EMG_MAX_RATIO = {"24h":1.20,"7d":1.35,"30d":1.75,"1y":3.00,"all":3.00};' +
-    'const _AURIX_EMG_SANITY_PCT = {"24h":25,"7d":40,"30d":75,"1y":150,"all":150};' +
+    'const _AURIX_EMG_ADJ_JUMP = {"24h":0.20,"7d":0.35,"30d":0.50,"1y":0.50,"all":0.50};' +
+    'const _AURIX_EMG_SANITY_PCT = {"24h":10,"7d":20,"30d":35,"1y":50,"all":50};' +
     'const _AURIX_EMG_MIN_POINTS = 2; const _AURIX_EMG_FALLBACK_TAIL = 8;', sb);
   vm.runInContext(fnSrc('_aurixEmergencyHash'), sb);
   vm.runInContext(fnSrc('_aurixEmergencyRawSeries'), sb);
+  vm.runInContext(fnSrc('_aurixEmergencyTrimPrefix'), sb);
+  vm.runInContext(fnSrc('_aurixEmergencyDeSpike'), sb);
   vm.runInContext(fnSrc('buildEmergencyInstitutionalChart'), sb);
   vm.runInContext(fnSrc('_aurixEmergencyBuildSvg'), sb);
   return sb;

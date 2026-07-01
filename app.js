@@ -22249,7 +22249,15 @@ function _aurixEmergencyChartOn() {
 // Emergency comparability + range + sanity thresholds (per the recovery spec).
 const _AURIX_EMG_RANGE_MS   = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '1y': 31536e6, 'all': Infinity };
 const _AURIX_EMG_MAX_RATIO  = { '24h': 1.20, '7d': 1.35, '30d': 1.75, '1y': 3.00, 'all': 3.00 };
-const _AURIX_EMG_SANITY_PCT = { '24h': 25,   '7d': 40,   '30d': 75,   '1y': 150,  'all': 150 };
+// P0-PREMIUM-CHART-SERIES — adjacent-jump thresholds used to strip the leading construction prefix
+// and interior mean-reverting spikes (Rule 2 / Rule 7). A leading point whose step to the next point
+// exceeds this (or an interior spike that mean-reverts) is a regime/construction artifact, not a
+// tradeable move — it must never become the baseline nor draw a vertical tower.
+const _AURIX_EMG_ADJ_JUMP   = { '24h': 0.20, '7d': 0.35, '30d': 0.50, '1y': 0.50, 'all': 0.50 };
+// P0-PREMIUM-CHART-SERIES — TIGHTENED institutional plausibility gate (Rule 6). Was 25/40/75/150/150
+// (which let +59/+60% construction returns through). An out-of-gate return with no recorded
+// capital-flow explanation ⇒ pending_sanity (no fabricated %, no −67%, no +60%).
+const _AURIX_EMG_SANITY_PCT = { '24h': 10,   '7d': 20,   '30d': 35,   '1y': 50,   'all': 50 };
 const _AURIX_EMG_MIN_POINTS = 2;
 const _AURIX_EMG_FALLBACK_TAIL = 8;
 
@@ -22293,7 +22301,49 @@ function _aurixEmergencyRawSeries() {
   const byTs = new Map();
   for (const p of clean) byTs.set(p.ts, p.value);
   const deduped = Array.from(byTs.entries()).map(e => ({ ts: e[0], value: e[1] })).sort((a, b) => a.ts - b.ts);
-  return { deduped: deduped, rejected: rejected, rejReasons: rejReasons, nowRef: nowRef };
+  const duplicates = clean.length - deduped.length;
+  return { deduped: deduped, rejected: rejected, rejReasons: rejReasons, nowRef: nowRef,
+    rejectedDuplicateCount: duplicates, firstRawValue: deduped.length ? deduped[0].value : null };
+}
+
+// P0-PREMIUM-CHART-SERIES — strip the LEADING construction / regime-change prefix (Rule 2). A leading
+// point is an artifact if it is outside the range comparability band vs the current value, OR it steps
+// to the next point by more than the range jump threshold (an isolated construction low/high before the
+// real regime). Keep trimming until the first REMAINING point is stable (in band AND a small step to its
+// neighbour). Returns { series, rejected, firstStable }.
+function _aurixEmergencyTrimPrefix(series, currentValue, maxRatio, jumpThreshold) {
+  const minRatio = 1 / maxRatio;
+  let start = 0, rejected = 0;
+  while (start < series.length - 1) {
+    const v = series[start].value;
+    const ratio = v / currentValue;
+    const outOfBand = ratio < minRatio || ratio > maxRatio;
+    const step = Math.abs(series[start + 1].value - v) / (v || 1);
+    if (outOfBand || step > jumpThreshold) { start++; rejected++; continue; }
+    break;   // first remaining point is in-band and steps gently into the regime → stable baseline
+  }
+  return { series: series.slice(start), rejected: rejected, firstStable: series[start] || null };
+}
+
+// P0-PREMIUM-CHART-SERIES — remove INTERIOR mean-reverting spikes (Rule 7): a point that jumps > the
+// range threshold from the previous kept point AND whose successor returns near that previous value is a
+// telemetry spike (incomplete snapshot, transient FX) — dropping it removes the vertical tower WITHOUT
+// touching real values. First and last points are ALWAYS preserved (Rule 11). Returns { kept, removed }.
+function _aurixEmergencyDeSpike(series, jumpThreshold) {
+  if (!Array.isArray(series) || series.length <= 2) return { kept: (series || []).slice(), removed: 0 };
+  const kept = [series[0]];
+  let removed = 0;
+  for (let i = 1; i < series.length - 1; i++) {
+    const prev = kept[kept.length - 1].value;
+    const cur = series[i].value;
+    const next = series[i + 1].value;
+    const jump = Math.abs(cur - prev) / (prev || 1);
+    const reverts = Math.abs(next - prev) / (prev || 1) < jumpThreshold * 0.6;
+    if (jump > jumpThreshold && reverts) { removed++; continue; }   // isolated spike that mean-reverts → drop
+    kept.push(series[i]);
+  }
+  kept.push(series[series.length - 1]);
+  return { kept: kept, removed: removed };
 }
 
 function buildEmergencyInstitutionalChart(range) {
@@ -22303,74 +22353,97 @@ function buildEmergencyInstitutionalChart(range) {
     points: [], pointCount: 0,
     firstTs: null, lastTs: null, firstValue: null, lastValue: null,
     baselineTs: null, baselineValue: null, currentTs: null, currentValue: null,
-    returnPct: null, returnValue: null, color: 'flat',
-    chartHash: null, collapsedRange: false, rejectedCount: 0, rejectionReasons: {},
+    returnPct: null, returnValue: null, lineReturnPct: null, badgeReturnPct: null, color: 'flat',
+    chartHash: null, collapsedRange: false, rangeCollapsedBecauseHistoryTooShort: false,
+    rejectedCount: 0, rejectionReasons: {},
+    // P0-PREMIUM-CHART-SERIES — series-quality accounting.
+    rawPointCount: 0, cleanPointCount: 0, visualPointCount: 0,
+    rejectedConstructionPrefixCount: 0, rejectedSpikeCount: 0, rejectedDuplicateCount: 0,
+    firstRawValue: null, firstCleanValue: null, lastCleanValue: null,
+    firstStablePointTs: null, firstStablePointValue: null,
+    leadingTrimmed: 0,
   };
   try {
     const raw = _aurixEmergencyRawSeries();
     out.rejectedCount = raw.rejected;
     out.rejectionReasons = raw.rejReasons;
+    out.rejectedDuplicateCount = raw.rejectedDuplicateCount || 0;
+    out.firstRawValue = raw.firstRawValue;
     const deduped = raw.deduped, nowRef = raw.nowRef;
-    if (deduped.length < 1) { out.reason = 'no_history'; return out; }
+    out.rawPointCount = deduped.length;
+    if (deduped.length < 1) { out.reason = 'no_history'; out.pendingReason = out.reason; return out; }
 
     const currentValue = deduped[deduped.length - 1].value;
-
-    // Remove leading construction / capital-regime garbage: drop leading points whose
-    // value/currentValue ratio is outside the range-specific comparability band, until the
-    // series enters a stable comparable regime. This rejects the fake -67% baseline (a peak /
-    // pre-withdrawal / construction value not comparable to today's portfolio).
     const maxRatio = _AURIX_EMG_MAX_RATIO[r] || _AURIX_EMG_MAX_RATIO.all;
-    const minRatio = 1 / maxRatio;
-    let li = 0;
-    while (li < deduped.length) {
-      const ratio = deduped[li].value / currentValue;
-      if (ratio >= minRatio && ratio <= maxRatio) break;
-      li++;
-    }
-    const trimmed = deduped.slice(li);
-    out.leadingTrimmed = li;
-    if (trimmed.length < 1) { out.reason = 'no_comparable_baseline'; return out; }
+    const jump = _AURIX_EMG_ADJ_JUMP[r] || _AURIX_EMG_ADJ_JUMP.all;
+
+    // Rule 2 — strip the leading construction / regime prefix (ratio band + adjacent-jump).
+    const trim = _aurixEmergencyTrimPrefix(deduped, currentValue, maxRatio, jump);
+    out.rejectedConstructionPrefixCount = trim.rejected;
+    out.leadingTrimmed = trim.rejected;   // back-compat field
+    if (trim.firstStable) { out.firstStablePointTs = trim.firstStable.ts; out.firstStablePointValue = +trim.firstStable.value.toFixed(2); }
+    if (trim.series.length < 1) { out.reason = 'no_stable_baseline'; out.pendingReason = out.reason; return out; }
+
+    // Rule 7 — remove interior mean-reverting spikes (endpoints preserved). The CLEAN series is the
+    // single truth for both the drawn line AND the return.
+    const spike = _aurixEmergencyDeSpike(trim.series, jump);
+    out.rejectedSpikeCount = spike.removed;
+    const cleanSeries = spike.kept;
+    out.cleanPointCount = cleanSeries.length;
+    out.firstCleanValue = cleanSeries.length ? +cleanSeries[0].value.toFixed(2) : null;
+    out.lastCleanValue = cleanSeries.length ? +cleanSeries[cleanSeries.length - 1].value.toFixed(2) : null;
+    if (cleanSeries.length < 1) { out.reason = 'no_stable_baseline'; out.pendingReason = out.reason; return out; }
 
     // Range filtering — anchored on nowRef (last snapshot ts), NEVER Date.now().
     const span = _AURIX_EMG_RANGE_MS[r];
     const startTs = (r === 'all' || !Number.isFinite(span)) ? -Infinity : nowRef - span;
-    let ranged = trimmed.filter(p => p.ts >= startTs);
+    // Rule 5 — range collapse honesty: if the clean history does not reach back to the requested window
+    // start, every long range shows the SAME available history (flagged, not hidden).
+    out.rangeCollapsedBecauseHistoryTooShort = (r !== 'all') && Number.isFinite(startTs) && cleanSeries[0].ts >= startTs;
+    let ranged = cleanSeries.filter(p => p.ts >= startTs);
     if (ranged.length < _AURIX_EMG_MIN_POINTS) {
-      // Fallback: use the last available safe points from the clean comparable series.
-      const tail = trimmed.slice(-_AURIX_EMG_FALLBACK_TAIL);
-      if (tail.length >= _AURIX_EMG_MIN_POINTS) { ranged = tail; out.collapsedRange = true; }
+      const tail = cleanSeries.slice(-_AURIX_EMG_FALLBACK_TAIL);
+      if (tail.length >= _AURIX_EMG_MIN_POINTS) { ranged = tail; out.collapsedRange = true; out.rangeCollapsedBecauseHistoryTooShort = true; }
     }
-    if (ranged.length < _AURIX_EMG_MIN_POINTS) { out.reason = 'insufficient_safe_points'; return out; }
+    if (ranged.length < _AURIX_EMG_MIN_POINTS) { out.reason = 'insufficient_safe_points'; out.pendingReason = out.reason; return out; }
 
-    // Return — baseline = first safe comparable point inside the displayed series; current = last.
+    // Rules 3+4 — baseline = FIRST clean visible point (never a rejected point); current = LAST. The
+    // return is computed ONLY from these two endpoints of the drawn line, so the badge and the line can
+    // never disagree (no external / stale / cached / performance_state baseline anywhere).
     const baseline = ranged[0], current = ranged[ranged.length - 1];
     const returnPct = ((current.value - baseline.value) / baseline.value) * 100;
     const returnValue = current.value - baseline.value;
 
-    // Institutional plausibility gate — prevents fake -67% (and any other absurd) returns.
+    // Rule 6 — tightened institutional plausibility gate. Out of gate ⇒ pending_sanity (no fabricated %).
     const sanity = _AURIX_EMG_SANITY_PCT[r] || _AURIX_EMG_SANITY_PCT.all;
     if (!Number.isFinite(returnPct) || Math.abs(returnPct) > sanity) {
-      out.reason = 'return_not_institutionally_plausible';
+      out.reason = 'pending_sanity'; out.pendingReason = out.reason;
+      out.baselineTs = baseline.ts; out.baselineValue = +baseline.value.toFixed(2);
+      out.currentTs = current.ts; out.currentValue = +current.value.toFixed(2);
       out.firstTs = baseline.ts; out.lastTs = current.ts; out.firstValue = baseline.value; out.lastValue = current.value;
       return out;
     }
 
-    // READY.
+    // READY — the visible line IS the clean ranged series (endpoints preserved ⇒ line return == badge return).
     out.state = 'ready';
-    out.reason = out.collapsedRange ? 'collapsed_range' : 'ok';
+    out.reason = out.collapsedRange ? 'collapsed_range' : (out.rangeCollapsedBecauseHistoryTooShort ? 'range_collapsed_history_short' : 'ok');
+    out.pendingReason = null;
     out.points = ranged.map(p => ({ ts: p.ts, value: +p.value.toFixed(2) }));
     out.pointCount = out.points.length;
+    out.visualPointCount = out.points.length;
     out.firstTs = out.points[0].ts; out.lastTs = out.points[out.pointCount - 1].ts;
     out.firstValue = out.points[0].value; out.lastValue = out.points[out.pointCount - 1].value;
     out.baselineTs = baseline.ts; out.baselineValue = +baseline.value.toFixed(2);
     out.currentTs = current.ts; out.currentValue = +current.value.toFixed(2);
     out.returnPct = +returnPct.toFixed(4);
+    out.lineReturnPct = out.returnPct;    // computed from first→last of the drawn points
+    out.badgeReturnPct = out.returnPct;   // same single value the badge paints
     out.returnValue = +returnValue.toFixed(2);
     out.color = returnPct > 0.05 ? 'up' : (returnPct < -0.05 ? 'down' : 'flat');
     out.chartHash = _aurixEmergencyHash(out.points);
     return out;
   } catch (e) {
-    out.state = 'pending'; out.reason = 'exception:' + ((e && e.message) || 'err');
+    out.state = 'pending'; out.reason = 'exception:' + ((e && e.message) || 'err'); out.pendingReason = out.reason;
     return out;
   }
 }
@@ -22454,10 +22527,14 @@ try {
         mobilePointCount: mobile.length,
         desktopHash: desktopHash,
         mobileHash: mobileHash,
+        desktopMobileParity: desktopHash === mobileHash,
         underlyingHash: _aurixEmergencyHash(underlying),
         visibleBadgeText: visibleBadgeText,
         visibleChartState: emg.state,
         overlayRemoved: ready,
+        // P0-PREMIUM-CHART-SERIES — the visible line return IS the badge return (single value).
+        lineReturnPct: emg.lineReturnPct,
+        badgeReturnPct: emg.badgeReturnPct,
         activeRange: (typeof activeRange !== 'undefined') ? activeRange : null,
       });
       try { console.log('%c[UI][EMERGENCY_CHART_DEBUG]', 'font-weight:700', out); } catch (_) {}
