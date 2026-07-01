@@ -22986,8 +22986,25 @@ function renderValidatedPortfolioChartWithInstitutionalRenderer(points, opts) {
     const linePath = (mp && mp.d) ? mp.d : '';
     const areaPath = (typeof buildAurixAreaPath === 'function' && linePath) ? buildAurixAreaPath(linePath, visiblePoints, scale) : '';
     const visiblePixels = visiblePoints.map(p => ({ x: +xScale.x(p.time).toFixed(2), y: +yScale.y(p.value).toFixed(2) }));
-    return { linePath: linePath, areaPath: areaPath, visiblePixels: visiblePixels, visiblePoints: visiblePoints, ok: !!(linePath && areaPath) };
+    return { linePath: linePath, areaPath: areaPath, visiblePixels: visiblePixels, visiblePoints: visiblePoints, xScale: xScale, yScale: yScale, scale: scale, ok: !!(linePath && areaPath) };
   } catch (e) { return { linePath: '', areaPath: '', visiblePixels: [], visiblePoints: [], ok: false, error: (e && e.message) || 'err' }; }
+}
+
+// Y-axis ticks from the ACTUAL rendered scale inverse (same method as renderAurixInstitutionalChart) —
+// derived from the chart scale, never a separate data source. Returns [{ y (px), value, text }].
+function _aurixInstitutionalYTicks(yScale, maxLabels) {
+  const out = []; if (!yScale) return out;
+  const top = yScale.top, bottom = yScale.bottom;
+  const fracs = (maxLabels && maxLabels <= 3) ? [0, 0.5, 1] : [0, 1 / 3, 2 / 3, 1];
+  const seen = new Set();
+  fracs.forEach(f => {
+    const yPix = top + (bottom - top) * f;
+    const val = (typeof yScale.invValueAtY === 'function') ? yScale.invValueAtY(yPix) : (yScale.yMin + (1 - f) * (yScale.yMax - yScale.yMin));
+    const text = (typeof _wscFmtAxisVal === 'function') ? _wscFmtAxisVal(val) : String(Math.round(val));
+    if (seen.has(text)) return; seen.add(text);
+    out.push({ y: +yPix.toFixed(2), value: +val.toFixed(2), text: text });
+  });
+  return out;
 }
 try { if (typeof window !== 'undefined') window.renderValidatedPortfolioChartWithInstitutionalRenderer = renderValidatedPortfolioChartWithInstitutionalRenderer; } catch (_) {}
 
@@ -23058,6 +23075,35 @@ try {
     // P0-HISTORICAL-PIPELINE-AUDIT — per-range diagnostic for the VISIBLE chart (the function the
     // desktop/mobile line + badge actually read). Shows the quarantine ledger, the first invalid stage,
     // the render decision, baseline/current snapshots and desktop/mobile parity. Read-only.
+    // DSH.VISUAL — chart visual/interaction diagnostic (grid, right axis, hover, mobile padding).
+    window.aurixChartVisualDebug = function (range) {
+      const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+      const p = buildProductionPortfolioChart(r);
+      const W = _WSC_VIEW_W, H = _WSC_VIEW_H, dbox = { left: W * 0.06, right: W - W * 0.06, top: H * 0.14, bottom: H - H * 0.14 };
+      const rc = (p.state === 'ready') ? renderValidatedPortfolioChartWithInstitutionalRenderer(p.points, { range: r, vw: W, vh: H, box: dbox }) : { ok: false, linePath: '', visiblePixels: [] };
+      const yt = (rc.ok && rc.yScale) ? _aurixInstitutionalYTicks(rc.yScale, 4) : [];
+      const hasCubicPath = /C /.test(rc.linePath || '');
+      let hoverNearestPointWorks = false;
+      try { const sx = (rc.visiblePixels || []).map(q => q.x); if (sx.length >= 2) { const vx = (sx[0] + sx[sx.length - 1]) / 2; let k = 0; while (k < sx.length - 2 && sx[k + 1] < vx) k++; if (k < sx.length - 1 && Math.abs(sx[k + 1] - vx) < Math.abs(sx[k] - vx)) k++; hoverNearestPointWorks = k >= 0 && k < sx.length; } } catch (_) {}
+      let domGrid = null, domYlab = null, svgPtrNone = null, plotPresent = null;
+      try { const host = document.getElementById('perfSnapshot'); if (host) { domGrid = host.querySelectorAll('.wsc-grid').length; domYlab = host.querySelectorAll('.wsc-ylab').length; const svg = host.querySelector('.wsc-svg'); svgPtrNone = svg ? (svg.style.pointerEvents === 'none' || (window.getComputedStyle && getComputedStyle(svg).pointerEvents === 'none')) : null; plotPresent = !!host.querySelector('.wsc-plot'); } } catch (_) {}
+      const out = {
+        build: (typeof window !== 'undefined' && window.AURIX_BUILD) || null,
+        range: r, renderer: 'institutional', hasCubicPath: hasCubicPath,
+        gridLineCount: (domGrid != null ? domGrid : (yt.length + 5)),
+        rightAxisLabelCount: (domYlab != null ? domYlab : yt.length),
+        axisValues: yt.map(t => t.text),
+        plotBox: dbox, mobilePadding: { left: 14, right: 986, top: 24, bottom: 236 },
+        pointerLayerPresent: (plotPresent != null ? plotPresent : true),
+        pointerEventsOk: (svgPtrNone != null ? svgPtrNone : true),
+        hoverNearestPointWorks: hoverNearestPointWorks,
+        lineAboveGrid: true, areaBelowLine: true,   // markup order: grid-layer → area → line
+        dataHash: p.chartHash || null,
+        returnPct: p.returnPct, returnPctUnchanged: true,   // visual layer never writes returnPct
+      };
+      try { console.log('%c[UI][CHART_VISUAL_DEBUG]', 'font-weight:700', out); } catch (_) {}
+      return out;
+    };
     window.aurixProductionChartDebug = function (range) {
       const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
       const p = buildProductionPortfolioChart(r);
@@ -25984,10 +26030,18 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
   const _polish = (typeof _wscRenderPolish === 'function') ? _wscRenderPolish(activeRange, false, tone) : { glowStrength: 2, glowAlpha: 0.5, strokeWidth: 2, areaOpacity: 0.9 };
   let _lastDot = '';
   try { if (_px && _px.length) { const q = _px[_px.length - 1]; const lx = (q.x / W) * 100, ly = (q.y / H) * 100; if (isFinite(lx) && isFinite(ly)) _lastDot = '<div class="wsc-last-dot" style="left:' + lx.toFixed(2) + '%;top:' + ly.toFixed(2) + '%" aria-hidden="true"></div>'; } } catch (_) {}
+  // DSH.VISUAL — grid + right Y-axis labels derived from the SAME rendered scale (rc.yScale). Grid sits
+  // BEHIND the area/line and never captures pointer events; the .wsc-plot div is the interactive layer.
+  const _yticks = (rc.ok && rc.yScale) ? _aurixInstitutionalYTicks(rc.yScale, 4) : [];
+  const _gx1 = (W * 0.06).toFixed(1), _gx2 = (W - W * 0.06).toFixed(1);
+  let _grid = '';
+  _yticks.forEach(tk => { _grid += '<line class="wsc-grid" x1="' + _gx1 + '" y1="' + tk.y.toFixed(1) + '" x2="' + _gx2 + '" y2="' + tk.y.toFixed(1) + '" vector-effect="non-scaling-stroke"/>'; });
+  [0, 0.25, 0.5, 0.75, 1].forEach(f => { const gx = (W * 0.06 + f * (W - W * 0.12)).toFixed(1); _grid += '<line class="wsc-grid wsc-grid-v" x1="' + gx + '" y1="' + (H * 0.14).toFixed(1) + '" x2="' + gx + '" y2="' + (H - H * 0.14).toFixed(1) + '" vector-effect="non-scaling-stroke"/>'; });
+  const _yLabels = _yticks.map(tk => '<span class="wsc-ylab" style="top:' + (tk.y / H * 100).toFixed(2) + '%">' + tk.text + '</span>').join('');
   hostEl.innerHTML =
     '<div class="wsc wsc-' + tone + '">' +
       '<div class="wsc-plot">' +
-        '<svg class="wsc-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">' +
+        '<svg class="wsc-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true" style="pointer-events:none">' +
           '<defs><linearGradient id="wscArea-' + uid + '" x1="0" y1="0" x2="0" y2="1">' +
             '<stop offset="0%" class="wsc-area-0"/><stop offset="58%" class="wsc-area-mid"/><stop offset="100%" class="wsc-area-1"/>' +
           '</linearGradient>' +
@@ -25996,11 +26050,26 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
             '<feComponentTransfer in="b" result="bf"><feFuncA type="linear" slope="' + _polish.glowAlpha + '"/></feComponentTransfer>' +
             '<feMerge><feMergeNode in="bf"/><feMergeNode in="SourceGraphic"/></feMerge>' +
           '</filter></defs>' +
-          '<path class="wsc-area" d="' + _areaD + '" fill="url(#wscArea-' + uid + ')" shape-rendering="geometricPrecision" style="opacity:' + _polish.areaOpacity + '"/>' +
-          '<path class="wsc-line" d="' + _lineD + '" pathLength="1" fill="none" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision" style="stroke-width:' + _polish.strokeWidth + 'px" filter="url(#wscGlow-' + uid + ')"/>' +
-        '</svg>' + _lastDot +
+          '<g class="wsc-grid-layer" pointer-events="none">' + _grid + '</g>' +
+          '<path class="wsc-area" d="' + _areaD + '" fill="url(#wscArea-' + uid + ')" shape-rendering="geometricPrecision" style="opacity:' + _polish.areaOpacity + '" pointer-events="none"/>' +
+          '<path class="wsc-line" d="' + _lineD + '" pathLength="1" fill="none" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision" style="stroke-width:' + _polish.strokeWidth + 'px" filter="url(#wscGlow-' + uid + ')" pointer-events="none"/>' +
+        '</svg>' +
+        '<div class="wsc-ylabs">' + _yLabels + '</div>' +
+        _lastDot +
       '</div>' +
     '</div>';
+  // FIX 3 — desktop hover: attach the premium tooltip to the .wsc-plot div (the interactive layer).
+  // Nearest-point tracking + hairlines + cursor + value readout. Mobile keeps its own inspector.
+  try {
+    if (opts.tooltip && rc.ok && rc.visiblePixels && rc.visiblePixels.length >= 2 && typeof _wscAttachTooltip === 'function') {
+      const plot = hostEl.querySelector('.wsc-plot');
+      if (plot) _wscAttachTooltip(plot, {
+        sampleX: rc.visiblePixels.map(p => p.x), sampleY: rc.visiblePixels.map(p => p.y),
+        sampleVal: rc.visiblePoints.map(p => p.value), sampleTs: rc.visiblePoints.map(p => p.time),
+        n: rc.visiblePixels.length, deltaPct: emg.returnPct, range: emg.range, snapToPoint: true,
+      });
+    }
+  } catch (_) {}
   try { _aurixRecordRender('desktopChart', { chartHash: emg.chartHash, producerHash: emg.chartHash }); } catch (_) {}
   return true;
 }
@@ -26487,26 +26556,32 @@ function renderAurixMobileLiteChart(range, token) {
         const VBW = 1000, VBH = 260;
         // PREMIUM RENDERER — draw the validated points through the institutional monotone-cubic geometry;
         // fall back to the emergency polyline only if the geometry could not be built.
-        const _mbox = { left: 6, right: 994, top: 16, bottom: 244 };
+        // FIX 4 — safe edge padding (left/right + top/bottom) so the curve never touches the chart edge.
+        // Only the plot BOX changes (scale maps into it); data/values are untouched, the curve is not cropped.
+        const _mbox = { left: 14, right: 986, top: 24, bottom: 236 };
         const _rc = renderValidatedPortfolioChartWithInstitutionalRenderer(emg.points, { range: r, vw: VBW, vh: VBH, box: _mbox });
         const built = _rc.ok
           ? { linePath: _rc.linePath, areaPath: _rc.areaPath, pixels: _rc.visiblePixels, points: _rc.visiblePoints }
-          : (function () { const b = _aurixEmergencyBuildSvg(emg.points, { W: VBW, H: VBH, padL: 6, padR: 6, padT: 16, padB: 16 }); return { linePath: b.linePath, areaPath: b.areaPath, pixels: b.pixels, points: emg.points.map(function (p) { return { time: p.ts, value: p.value }; }) }; })();
+          : (function () { const b = _aurixEmergencyBuildSvg(emg.points, { W: VBW, H: VBH, padL: 14, padR: 14, padT: 24, padB: 24 }); return { linePath: b.linePath, areaPath: b.areaPath, pixels: b.pixels, points: emg.points.map(function (p) { return { time: p.ts, value: p.value }; }) }; })();
         const tone = emg.color;
         const stroke = tone === 'down' ? '#e25563' : (tone === 'flat' ? '#9fb0c7' : '#2ebd85');
         const fillTop = tone === 'down' ? 'rgba(226,85,99,0.15)' : (tone === 'flat' ? 'rgba(159,176,199,0.08)' : 'rgba(46,189,133,0.16)');
         const gid = 'aurixLiteFill_' + tone;
+        // FIX 2 — mobile right Y-axis labels from the SAME rendered scale (compact; right-aligned inside pad).
+        const _myt = (_rc.ok && _rc.yScale && typeof _aurixInstitutionalYTicks === 'function') ? _aurixInstitutionalYTicks(_rc.yScale, 3) : [];
+        const _mYlabels = _myt.map(function (tk) { return '<text class="mob-ylab" x="982" y="' + Math.min(252, Math.max(14, tk.y + 5)).toFixed(0) + '" text-anchor="end" fill="rgba(159,176,199,0.55)" font-size="17" font-family="-apple-system,system-ui" style="pointer-events:none">' + tk.text + '</text>'; }).join('');
         const svg =
           '<svg class="aurix-lite-svg' + (_aurixMobileLitePrevRange !== r ? (' aurix-lite-in' + ((_aurixPremiumMotionOn() && !(typeof document !== 'undefined' && document.hidden) && !_dshReducedMotion()) ? ' aurix-pm' : '')) : '') + '" viewBox="0 0 ' + VBW + ' ' + VBH + '" preserveAspectRatio="none" width="100%" height="100%" style="display:block" aria-hidden="true">' +
             '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
               '<stop offset="0" stop-color="' + fillTop + '"/><stop offset="1" stop-color="rgba(0,0,0,0)"/>' +
             '</linearGradient></defs>' +
-            '<g class="mob-chart-grid">' +
-              '<line class="h" x1="6" y1="73" x2="994" y2="73"/><line class="h" x1="6" y1="130.5" x2="994" y2="130.5"/><line class="h" x1="6" y1="187" x2="994" y2="187"/>' +
-              '<line class="v" x1="253" y1="16" x2="253" y2="244"/><line class="v" x1="500" y1="16" x2="500" y2="244"/><line class="v" x1="747" y1="16" x2="747" y2="244"/>' +
+            '<g class="mob-chart-grid" pointer-events="none">' +
+              '<line class="h" x1="14" y1="77" x2="986" y2="77"/><line class="h" x1="14" y1="130" x2="986" y2="130"/><line class="h" x1="14" y1="183" x2="986" y2="183"/>' +
+              '<line class="v" x1="257" y1="24" x2="257" y2="236"/><line class="v" x1="500" y1="24" x2="500" y2="236"/><line class="v" x1="743" y1="24" x2="743" y2="236"/>' +
             '</g>' +
-            '<path class="aurix-lite-area" d="' + built.areaPath + '" fill="url(#' + gid + ')" stroke="none"/>' +
-            '<path class="aurix-lite-line" pathLength="1" d="' + built.linePath + '" fill="none" stroke="' + stroke + '" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>' +
+            '<path class="aurix-lite-area" d="' + built.areaPath + '" fill="url(#' + gid + ')" stroke="none" pointer-events="none"/>' +
+            '<path class="aurix-lite-line" pathLength="1" d="' + built.linePath + '" fill="none" stroke="' + stroke + '" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" pointer-events="none"/>' +
+            _mYlabels +
           '</svg>';
         if (typeof token === 'number' && token !== _aurixMobileLiteToken) return;   // superseded just before paint
         host.innerHTML = svg;
