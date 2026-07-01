@@ -22476,8 +22476,12 @@ function _aurixProdPlateauFilter(points) {
 }
 
 // Visual quality gate (Rules 6/7 visual). Rejects vertical walls, dominant cliffs, flatlines and
-// under-populated series. Proportion gates only apply once the series is well populated (≥6 points);
-// a 3–5 point 24H line is bounded by the plausibility gate instead. Returns { passed, reason }.
+// under-populated series. SCALE-STABLE: segment dominance is measured relative to the PREVIOUS point
+// value (|Δ|/prevValue), NOT relative to the window's (max−min) span. The old span denominator collapsed
+// on calm windows, so ordinary micro-noise on a quiet 24H/7D looked like a huge fraction of the chart
+// height and produced a FALSE "segment_exceeds_35pct_height" pending. A low-amplitude window is calm, not
+// broken — it is bypassed and drawn as a premium smooth line. True towers / one-directional cliffs / big
+// jumps still trip the per-value thresholds (same as the de-spike pass). Returns { passed, reason }.
 function _aurixProdVisualGate(points, range) {
   const n = points.length;
   const min = _AURIX_PROD_MIN_POINTS[range] || 6;
@@ -22487,14 +22491,19 @@ function _aurixProdVisualGate(points, range) {
   for (const v of vals) { if (v < mn) mn = v; if (v > mx) mx = v; }
   const span = mx - mn;
   if (!(span > 0)) return { passed: false, reason: 'flatline_no_variation' };   // exact-flat = bad telemetry
-  const fracs = [];
-  for (let i = 1; i < n; i++) fracs.push(Math.abs(vals[i] - vals[i - 1]) / span);
-  if (n >= 6) {
-    if (fracs[0] > 0.5) return { passed: false, reason: 'first_segment_vertical_wall' };
-    if (fracs[fracs.length - 1] > 0.5) return { passed: false, reason: 'last_segment_vertical_wall' };
-    let maxFrac = 0; for (const f of fracs) if (f > maxFrac) maxFrac = f;
-    if (maxFrac > 0.35) return { passed: false, reason: 'segment_exceeds_35pct_height' };   // cliff w/o flow explanation
-  }
+  const firstValue = vals[0];
+  // Calm-window bypass — amplitude vs the baseline VALUE (scale-stable). Below 2% the window is quiet;
+  // it must draw a clean smooth line, never a false "cliff" pending caused only by a tiny span denominator.
+  const amplitude = firstValue > 0 ? (span / firstValue) : Infinity;
+  if (amplitude < 0.02) return { passed: true, reason: null };
+  // Cliff/wall detection — |Δ| relative to the previous point value, against the range jump threshold
+  // (24h 0.20 / 7d 0.35 / 30d·1y·all 0.50). Micro-noise (tiny |Δ|/value) can never trip this; a genuine
+  // vertical tower or one-directional cliff still does.
+  const jump = _AURIX_EMG_ADJ_JUMP[range] || _AURIX_EMG_ADJ_JUMP.all;
+  const frac = i => Math.abs(vals[i] - vals[i - 1]) / (vals[i - 1] || 1);
+  if (frac(1) > jump) return { passed: false, reason: 'first_segment_vertical_wall' };
+  if (frac(n - 1) > jump) return { passed: false, reason: 'last_segment_vertical_wall' };
+  for (let i = 1; i < n; i++) { if (frac(i) > jump) return { passed: false, reason: 'segment_dominant_cliff' }; }
   return { passed: true, reason: null };
 }
 

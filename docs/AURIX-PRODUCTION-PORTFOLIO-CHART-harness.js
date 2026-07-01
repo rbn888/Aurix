@@ -113,6 +113,38 @@ console.log('\nParity + return integrity + pending honesty:');
   ok('12 no percentage when pending (returnPct null)', p.returnPct === null && p.lineReturnPct === null && p.badgeReturnPct === null);
   ok('13 no line when pending (points empty)', Array.isArray(p.points) && p.points.length === 0); }
 
+// ── Calm-window false-pending fix (scale-stable visual gate) ────────────────────────────────────
+console.log('\nCalm-window fix — low-amplitude windows draw (no false segment_exceeds pending):');
+const G = (sb, pts, r) => vm.runInContext('_aurixProdVisualGate(' + JSON.stringify(pts) + ',' + JSON.stringify(r) + ')', sb);
+// Healthy calm 24H: ~0.16% amplitude, hourly, with real micro-noise (would trip the OLD span gate).
+const calm24 = []; for (let k = 0; k <= 13; k++) calm24.push({ ts: LAST - (13 - k) * HOUR, total: 8680 + k * 1 + ((k * 37) % 7 - 3) * 1.5, real_estate: 0 });
+{ const p = P(makeEnv(calm24), '24h');
+  ok('C1 healthy calm 24H (small amplitude + micro-noise) → ready, visual gate passed, NOT segment_exceeds',
+    p.state === 'ready' && p.visualQualityPassed === true && Number.isFinite(p.returnPct) &&
+    p.reason !== 'segment_exceeds_35pct_height' && p.reason !== 'segment_dominant_cliff', p.state + '/' + p.reason + ' pct=' + p.returnPct); }
+const calm7 = []; for (let k = 0; k <= 40; k++) calm7.push({ ts: LAST - (40 - k) * 4 * HOUR, total: 8600 + k * 0.6 + ((k * 29) % 9 - 4) * 1.2, real_estate: 0 });
+{ const p = P(makeEnv(calm7), '7d');
+  ok('C2 healthy calm 7D → ready (visual gate passed, finite return)',
+    p.state === 'ready' && p.visualQualityPassed === true && Number.isFinite(p.returnPct), p.state + '/' + p.reason); }
+
+console.log('\nTrue cliffs / walls still blocked (scale-stable |Δ|/prevValue thresholds):');
+{ const sb = makeEnv([]);   // direct gate — isolates the visual gate from the plausibility gate
+  const cliff24 = [8000, 8010, 8020, 11230, 11240, 11250].map((v, i) => ({ ts: LAST - (5 - i) * HOUR, value: v }));   // +40% one-dir segment, amp≫2%
+  const cliff30 = [8000, 8010, 8020, 12850, 12860, 12870].map((v, i) => ({ ts: LAST - (5 - i) * DAY, value: v }));      // +60% one-dir segment
+  const g24 = G(sb, cliff24, '24h'), g30 = G(sb, cliff30, '30d');
+  ok('C3 true 40% single-segment jump in 24H → visual gate rejects (pending)', g24.passed === false && /wall|cliff/.test(g24.reason), g24.reason);
+  ok('C4 true 60% single-segment jump in 30D → visual gate rejects (pending)', g30.passed === false && /wall|cliff/.test(g30.reason), g30.reason); }
+{ // calm-bypass unit: amplitude <2% with noisy micro-steps must PASS (no false wall/cliff)
+  const sb = makeEnv([]);
+  const flatNoisy = []; for (let k = 0; k <= 10; k++) flatNoisy.push({ ts: LAST - (10 - k) * HOUR, value: 8000 + ((k * 41) % 5 - 2) * 2 });   // span ~8, amp ~0.1%
+  const g = G(sb, flatNoisy, '24h');
+  ok('C5 calm-window bypass: low-amplitude noisy window passes the visual gate', g.passed === true && g.reason === null, JSON.stringify(g)); }
+
+console.log('\nHard protections preserved after the fix:');
+{ ok('C6 +60% construction artifact still pending_sanity', (function () { const p = P(makeEnv(construction), '30d'); return p.state === 'pending' && p.reason === 'pending_sanity' && p.returnPct === null; })());
+  ok('C7 -67% regime baseline still rejected (baseline ≠ 5503)', (function () { const p = P(makeEnv(regimeHigh), '30d'); return p.baselineValue !== 5503 && (p.state !== 'ready' || p.returnPct > -30); })());
+  ok('C8 vertical tower still removed (not in points)', (function () { const p = P(makeEnv(towerData), '24h'); return p.rejectedSpikeCount >= 1 && (p.points || []).every(pt => pt.value !== 13500); })()); }
+
 console.log('\nWiring — visible surfaces read buildProductionPortfolioChart; "no disponible" removed:');
 ok('W1 desktop _wscPaintEmergency reads buildProductionPortfolioChart',
   /const surface = uid === 'm' \? 'mobile' : 'desktop';\s*const emg = buildProductionPortfolioChart\(/.test(app));
