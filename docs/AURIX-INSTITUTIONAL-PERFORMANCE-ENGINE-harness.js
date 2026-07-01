@@ -131,6 +131,25 @@ console.log('\nGraceful fallback decision model (3 modes):');
 { // genuinely insufficient (1 validated point) → pending
   const p = P(makeEnv([snap(LAST, 8000, { crypto: 8000 })], []), '30d');
   ok('MODE pending only when NOT enough validated points', p.mode === 'pending' && p.state === 'pending' && p.reason === 'insufficient_validated_points', p.mode + '/' + p.reason); }
+
+console.log('\nREGRESSION FIX (v463) — value fallback strips the construction prefix (no flat→wall→plateau):');
+{ // classic construction: flat low (~1500) → import wall → drifting plateau (~9000). The pre-v460 chart
+  // trimmed the leading construction prefix; v461 fallback drew it untrimmed → flat→wall→plateau.
+  const h = [];
+  for (let k = 0; k < 8; k++) h.push(snap(LAST - (40 - k) * DAY, 1500 + ((k * 13) % 3), { crypto: 1500 }));
+  for (let k = 0; k < 20; k++) h.push(snap(LAST - (30 - k * 1.5) * DAY, 9000 * (1 + 0.04 * k / 20), { crypto: 9000 }));
+  const p = P(makeEnv(h, []), 'all');
+  // wall removed: no leading low-regime point remains, and no dominant single-segment jump
+  let maxSeg = 0; for (let i = 1; i < p.points.length; i++) { const f = Math.abs(p.points[i].value - p.points[i - 1].value) / (p.points[i - 1].value || 1); if (f > maxSeg) maxSeg = f; }
+  ok('REG1 value_fallback trims the construction prefix (leading ~1500 regime removed)',
+    p.mode === 'value_fallback' && p.valueFallbackConstructionTrimmed >= 1 && p.points.every(x => x.value >= 2000), 'trimmed=' + p.valueFallbackConstructionTrimmed + ' first=' + (p.points[0] && p.points[0].value));
+  ok('REG2 value_fallback line is coherent (no vertical wall — max segment jump < 5%)',
+    maxSeg < 0.05, 'maxSeg=' + (maxSeg * 100).toFixed(2) + '%'); }
+{ // a clean series with NO construction prefix must be left intact (trim never removes real history)
+  const h = []; for (let k = 0; k <= 20; k++) h.push(snap(LAST - (20 - k) * DAY, 9000 * (1 + 0.06 * k / 20), { crypto: 9000 }));
+  const p = P(makeEnv(h, []), 'all');
+  ok('REG3 no-construction series is NOT trimmed (nothing suppressed)',
+    (p.valueFallbackConstructionTrimmed || 0) === 0 || p.mode === 'performance_index', 'mode=' + p.mode + ' trimmed=' + p.valueFallbackConstructionTrimmed); }
 { // Direct badge painter: value_fallback clears the % chip (line only); performance shows %; pending shows Calculando
   const sb = vm.createContext({ Math: Math, Number: Number, console: { log: () => {} }, activePerfMode: 'pct', lang: 'es',
     _dshFmtPct: (x) => ({ text: (x >= 0 ? '+' : '') + x.toFixed(2) + '%' }), _dshFmtMoney0: (v) => '$' + Math.round(v),

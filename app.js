@@ -22956,11 +22956,27 @@ function buildProductionPortfolioChart(range) {
     //    VALUE series (mode 'value_fallback', label 'Evolución del valor') — never presented as return,
     //    never fabricating performance. 3) else pending (construction).
     if (perf.state !== 'ready' || !Array.isArray(perf.performancePoints) || perf.performancePoints.length < 2) {
-      const rs = v.rangeSeries || [];
+      // P0-REGRESSION-FIX (v463) — the value fallback must draw the COHERENT wealth line, exactly as the
+      // pre-v460 chart did. v460 stopped invoking construction-prefix trimming on the displayed series (it
+      // delegated construction to the performance engine); v461's value fallback then drew that UNTRIMMED
+      // series → the leading construction/import prefix rendered as flat → vertical wall → flat plateau.
+      // Restore the pre-v460 behaviour FOR THE DISPLAY PATH ONLY (the performance engine still sees the full
+      // series, so its flow classification is unchanged): strip the leading construction/import prefix from
+      // the fallback value series using the EXISTING _aurixHpqTrimConstruction (no new heuristic).
+      const rsRaw = v.rangeSeries || [];
       const perfPending = perf.reason || 'insufficient_trusted_performance_data';
+      const _jump = _AURIX_EMG_ADJ_JUMP[r] || _AURIX_EMG_ADJ_JUMP.all;
+      let rs = rsRaw, _constructionTrimmed = 0;
+      try {
+        const _trim = _aurixHpqTrimConstruction(rsRaw, _jump);
+        if (_trim && Array.isArray(_trim.series) && _trim.series.length >= _AURIX_HPQ_MIN_POINTS && _trim.trimmed > 0) {
+          rs = _trim.series; _constructionTrimmed = _trim.trimmed;
+        }
+      } catch (_) {}
       // Value fallback only when the pending cause is missing/uncertain cashflow data AND we still have
       // enough validated raw points. Insufficient validated points → genuine pending (construction).
       if (rs.length >= _AURIX_HPQ_MIN_POINTS && perfPending !== 'insufficient_validated_points' && String(perfPending).indexOf('exception') !== 0) {
+        out.valueFallbackConstructionTrimmed = _constructionTrimmed;
         const first = rs[0], last = rs[rs.length - 1];
         const valueReturnPct = first.value ? ((last.value - first.value) / first.value) * 100 : 0;
         out.state = 'ready';
