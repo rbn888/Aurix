@@ -24,7 +24,7 @@ function node(id, className, innerHTML){
 }
 const PEND = '<span class="wsc-metric-val wsc-metric-calc">Calculando…</span>';
 function buildEnv(nodes){
-  const sb = { Math, Number, console:{log:()=>{},warn:()=>{}}, activeRange:'24h' };
+  const sb = { Math, Number, console:{log:()=>{},warn:()=>{}}, activeRange:'24h', _aurixEmergencyChartOn:()=>false /* legacy badge-binding path; emergency path covered by AURIX-EMERGENCY-CHART-RECOVERY */ };
   const byId = {}; nodes.forEach(n => { if(n.id) byId[n.id]=n; });
   sb.document = {
     getElementById: id => byId[id] || null,

@@ -22230,6 +22230,244 @@ function _aurixFormatReturnText(g) {
     return pf ? pf.text : ((g.deltaPct >= 0 ? '+' : '') + g.deltaPct.toFixed(2) + '%');
   } catch (_) { return ''; }
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// P0-EMERGENCY-CHART-RECOVERY — buildEmergencyInstitutionalChart(range)
+// ════════════════════════════════════════════════════════════════════════════
+// THE single deterministic source for the VISIBLE main-dashboard chart line + the visible chart
+// return. Short-term surgical recovery: the old complex pipeline stays in place internally but no
+// longer drives the visible "Evolución del patrimonio" card. This function is pure, defensive and
+// impossible to make produce a mixed state (line-without-%, %-without-line, -67% construction
+// baseline, or a desktop/mobile mismatch). It reads the SAME raw display history as everything
+// else (_aurixHistorySourceForDisplay), anchors the range window on the LAST snapshot ts (never
+// Date.now()), trims the construction/capital-regime prefix, and gates implausible returns.
+const AURIX_EMERGENCY_CHART = true;
+function _aurixEmergencyChartOn() {
+  try { if (typeof window !== 'undefined' && typeof window.AURIX_EMERGENCY_CHART === 'boolean') return window.AURIX_EMERGENCY_CHART; } catch (_) {}
+  return AURIX_EMERGENCY_CHART;
+}
+// Emergency comparability + range + sanity thresholds (per the recovery spec).
+const _AURIX_EMG_RANGE_MS   = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '1y': 31536e6, 'all': Infinity };
+const _AURIX_EMG_MAX_RATIO  = { '24h': 1.20, '7d': 1.35, '30d': 1.75, '1y': 3.00, 'all': 3.00 };
+const _AURIX_EMG_SANITY_PCT = { '24h': 25,   '7d': 40,   '30d': 75,   '1y': 150,  'all': 150 };
+const _AURIX_EMG_MIN_POINTS = 2;
+const _AURIX_EMG_FALLBACK_TAIL = 8;
+
+// Deterministic 32-bit hash of a point set (ts+value) — identical input ⇒ identical hash, so the
+// desktop and mobile adapters (which only rename keys) can be proven byte-equal.
+function _aurixEmergencyHash(points) {
+  try {
+    let h = 2166136261 >>> 0;
+    const s = (Array.isArray(points) ? points : []).map(p => p.ts + ':' + p.value).join('|');
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return ('00000000' + h.toString(16)).slice(-8);
+  } catch (_) { return null; }
+}
+
+// Build a clean, sorted, deduped investable-value series from the raw display history. Same base as
+// the Hero + old chart: investable = toBase(total − real_estate). Rejects non-finite / non-positive
+// / wildly-future points. Returns { deduped, rejected, rejReasons, nowRef }.
+function _aurixEmergencyRawSeries() {
+  const rejReasons = { non_finite_ts: 0, non_finite_value: 0, non_positive: 0, future_ts: 0 };
+  let rejected = 0;
+  const clean = [];
+  let src = [];
+  try { src = (typeof _aurixHistorySourceForDisplay === 'function') ? _aurixHistorySourceForDisplay() : (typeof categoryHistory !== 'undefined' ? categoryHistory : []); } catch (_) { src = []; }
+  if (!Array.isArray(src)) src = [];
+  let maxTs = 0;
+  for (const p of src) { if (p && Number.isFinite(p.ts) && p.ts > maxTs) maxTs = p.ts; }
+  const nowRef = maxTs > 0 ? maxTs : Date.now();
+  const futureLimit = nowRef + 864e5;   // 1-day tolerance above the last real snapshot
+  for (const p of src) {
+    if (!p || !Number.isFinite(p.ts)) { rejected++; rejReasons.non_finite_ts++; continue; }
+    if (p.ts > futureLimit) { rejected++; rejReasons.future_ts++; continue; }   // wildly in the future
+    const total = Number(p.total), re = Number(p.real_estate) || 0;
+    const invUSD = (Number.isFinite(total) ? total : NaN) - re;
+    let value; try { value = (typeof toBase === 'function') ? toBase(invUSD, 'USD') : invUSD; } catch (_) { value = invUSD; }
+    if (!Number.isFinite(value)) { rejected++; rejReasons.non_finite_value++; continue; }   // NaN / Infinity
+    if (!(value > 0)) { rejected++; rejReasons.non_positive++; continue; }                    // null / zero / negative
+    clean.push({ ts: p.ts, value: value });
+  }
+  clean.sort((a, b) => a.ts - b.ts);
+  // Deduplicate timestamps — keep the LAST valid value for a repeated ts.
+  const byTs = new Map();
+  for (const p of clean) byTs.set(p.ts, p.value);
+  const deduped = Array.from(byTs.entries()).map(e => ({ ts: e[0], value: e[1] })).sort((a, b) => a.ts - b.ts);
+  return { deduped: deduped, rejected: rejected, rejReasons: rejReasons, nowRef: nowRef };
+}
+
+function buildEmergencyInstitutionalChart(range) {
+  const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+  const out = {
+    range: r, state: 'pending', reason: null,
+    points: [], pointCount: 0,
+    firstTs: null, lastTs: null, firstValue: null, lastValue: null,
+    baselineTs: null, baselineValue: null, currentTs: null, currentValue: null,
+    returnPct: null, returnValue: null, color: 'flat',
+    chartHash: null, collapsedRange: false, rejectedCount: 0, rejectionReasons: {},
+  };
+  try {
+    const raw = _aurixEmergencyRawSeries();
+    out.rejectedCount = raw.rejected;
+    out.rejectionReasons = raw.rejReasons;
+    const deduped = raw.deduped, nowRef = raw.nowRef;
+    if (deduped.length < 1) { out.reason = 'no_history'; return out; }
+
+    const currentValue = deduped[deduped.length - 1].value;
+
+    // Remove leading construction / capital-regime garbage: drop leading points whose
+    // value/currentValue ratio is outside the range-specific comparability band, until the
+    // series enters a stable comparable regime. This rejects the fake -67% baseline (a peak /
+    // pre-withdrawal / construction value not comparable to today's portfolio).
+    const maxRatio = _AURIX_EMG_MAX_RATIO[r] || _AURIX_EMG_MAX_RATIO.all;
+    const minRatio = 1 / maxRatio;
+    let li = 0;
+    while (li < deduped.length) {
+      const ratio = deduped[li].value / currentValue;
+      if (ratio >= minRatio && ratio <= maxRatio) break;
+      li++;
+    }
+    const trimmed = deduped.slice(li);
+    out.leadingTrimmed = li;
+    if (trimmed.length < 1) { out.reason = 'no_comparable_baseline'; return out; }
+
+    // Range filtering — anchored on nowRef (last snapshot ts), NEVER Date.now().
+    const span = _AURIX_EMG_RANGE_MS[r];
+    const startTs = (r === 'all' || !Number.isFinite(span)) ? -Infinity : nowRef - span;
+    let ranged = trimmed.filter(p => p.ts >= startTs);
+    if (ranged.length < _AURIX_EMG_MIN_POINTS) {
+      // Fallback: use the last available safe points from the clean comparable series.
+      const tail = trimmed.slice(-_AURIX_EMG_FALLBACK_TAIL);
+      if (tail.length >= _AURIX_EMG_MIN_POINTS) { ranged = tail; out.collapsedRange = true; }
+    }
+    if (ranged.length < _AURIX_EMG_MIN_POINTS) { out.reason = 'insufficient_safe_points'; return out; }
+
+    // Return — baseline = first safe comparable point inside the displayed series; current = last.
+    const baseline = ranged[0], current = ranged[ranged.length - 1];
+    const returnPct = ((current.value - baseline.value) / baseline.value) * 100;
+    const returnValue = current.value - baseline.value;
+
+    // Institutional plausibility gate — prevents fake -67% (and any other absurd) returns.
+    const sanity = _AURIX_EMG_SANITY_PCT[r] || _AURIX_EMG_SANITY_PCT.all;
+    if (!Number.isFinite(returnPct) || Math.abs(returnPct) > sanity) {
+      out.reason = 'return_not_institutionally_plausible';
+      out.firstTs = baseline.ts; out.lastTs = current.ts; out.firstValue = baseline.value; out.lastValue = current.value;
+      return out;
+    }
+
+    // READY.
+    out.state = 'ready';
+    out.reason = out.collapsedRange ? 'collapsed_range' : 'ok';
+    out.points = ranged.map(p => ({ ts: p.ts, value: +p.value.toFixed(2) }));
+    out.pointCount = out.points.length;
+    out.firstTs = out.points[0].ts; out.lastTs = out.points[out.pointCount - 1].ts;
+    out.firstValue = out.points[0].value; out.lastValue = out.points[out.pointCount - 1].value;
+    out.baselineTs = baseline.ts; out.baselineValue = +baseline.value.toFixed(2);
+    out.currentTs = current.ts; out.currentValue = +current.value.toFixed(2);
+    out.returnPct = +returnPct.toFixed(4);
+    out.returnValue = +returnValue.toFixed(2);
+    out.color = returnPct > 0.05 ? 'up' : (returnPct < -0.05 ? 'down' : 'flat');
+    out.chartHash = _aurixEmergencyHash(out.points);
+    return out;
+  } catch (e) {
+    out.state = 'pending'; out.reason = 'exception:' + ((e && e.message) || 'err');
+    return out;
+  }
+}
+try { if (typeof window !== 'undefined') window.buildEmergencyInstitutionalChart = buildEmergencyInstitutionalChart; } catch (_) {}
+
+// Simple, deterministic pixel path from the EXACT emergency points (no smoothing, no downsampling,
+// no filtering — the visible line IS the points). Shared by desktop + mobile so the two surfaces
+// draw the identical shape. Returns { linePath, areaPath, pixels, W, H, plotBottom }.
+function _aurixEmergencyBuildSvg(points, opts) {
+  opts = opts || {};
+  const W = opts.W || 1000, H = opts.H || 240;
+  const padL = opts.padL != null ? opts.padL : W * 0.06;
+  const padR = opts.padR != null ? opts.padR : W * 0.06;
+  const padT = opts.padT != null ? opts.padT : H * 0.14;
+  const padB = opts.padB != null ? opts.padB : H * 0.14;
+  const plotW = W - padL - padR, plotH = H - padT - padB, plotBottom = padT + plotH;
+  const pts = Array.isArray(points) ? points : [];
+  const n = pts.length;
+  if (n < 2) return { linePath: '', areaPath: '', pixels: [], W: W, H: H, plotBottom: plotBottom };
+  const tMin = pts[0].ts, tMax = pts[n - 1].ts, tSpan = (tMax - tMin) || 1;
+  let vMin = Infinity, vMax = -Infinity;
+  for (const p of pts) { if (p.value < vMin) vMin = p.value; if (p.value > vMax) vMax = p.value; }
+  let vSpan = vMax - vMin;
+  if (!(vSpan > 0)) { const mag = Math.abs(vMax) || 1; vMin = vMax - mag * 0.5; vMax = vMax + mag * 0.5; vSpan = vMax - vMin; }
+  const padV = vSpan * 0.08; vMin -= padV; vMax += padV; vSpan = (vMax - vMin) || 1;
+  const xOf = t => padL + ((t - tMin) / tSpan) * plotW;
+  const yOf = v => padT + (1 - (v - vMin) / vSpan) * plotH;
+  const pixels = pts.map(p => ({ x: +xOf(p.ts).toFixed(2), y: +yOf(p.value).toFixed(2) }));
+  let line = '';
+  for (let i = 0; i < pixels.length; i++) line += (i === 0 ? 'M ' : 'L ') + pixels[i].x + ' ' + pixels[i].y + ' ';
+  line = line.trim();
+  const area = line + ' L ' + pixels[n - 1].x + ' ' + plotBottom + ' L ' + pixels[0].x + ' ' + plotBottom + ' Z';
+  return { linePath: line, areaPath: area, pixels: pixels, W: W, H: H, plotBottom: plotBottom };
+}
+
+// Emergency badge text/tone from the emergency chart object (honours %/€ mode).
+function _aurixEmergencyBadgeText(emg) {
+  try {
+    const mode = (typeof activePerfMode !== 'undefined' && activePerfMode === 'curr') ? 'curr' : 'pct';
+    if (mode === 'curr') return (typeof _dshFmtMoney0 === 'function') ? _dshFmtMoney0(emg.returnValue) : ((emg.returnValue >= 0 ? '+' : '') + Math.round(emg.returnValue));
+    const pf = (typeof _dshFmtPct === 'function') ? _dshFmtPct(emg.returnPct) : null;
+    return pf ? pf.text : ((emg.returnPct >= 0 ? '+' : '') + emg.returnPct.toFixed(2) + '%');
+  } catch (_) { return ''; }
+}
+// Paint ONE badge node from the emergency chart: ready ⇒ %/€ + tone; pending ⇒ "Calculando…".
+// Percentage is shown ONLY when a line exists (state==='ready') — the two can never diverge.
+function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
+  try {
+    if (!el) return;
+    if (emg && emg.state === 'ready' && Number.isFinite(emg.returnPct)) {
+      el.innerHTML = '<span class="wsc-metric-val">' + _aurixEmergencyBadgeText(emg) + '</span>';
+      el.className = 'chart-change ' + emg.color;
+    } else {
+      el.innerHTML = (typeof _aurixReturnPendingHTML === 'function') ? _aurixReturnPendingHTML() : '<span class="wsc-metric-calc">Calculando…</span>';
+      el.className = 'chart-change calculating';
+    }
+    try { console.log('[UI][EMERGENCY_BADGE]', { surface: surface || null, state: emg && emg.state, reason: emg && emg.reason, returnPct: emg && emg.returnPct, chartHash: emg && emg.chartHash }); } catch (_) {}
+  } catch (_) {}
+}
+
+// P0-EMERGENCY-CHART-RECOVERY — full acceptance diagnostic. Proves desktop/mobile parity (identical
+// points ⇒ identical hash) and that no forbidden mixed state exists (% only with a line; pending has
+// no %). Read-only. Instant rollback: window.disableAurixEmergencyChart().
+try {
+  if (typeof window !== 'undefined') {
+    window.aurixEmergencyChartDebug = function (range) {
+      const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+      const emg = buildEmergencyInstitutionalChart(r);
+      const underlying = emg.points.map(p => ({ ts: p.ts, value: p.value }));           // canonical (ts,value)
+      const desktop = emg.points.map(p => ({ time: p.ts, value: p.value }));            // desktop adapter — renames only
+      const mobile = emg.points.map(p => ({ ts: p.ts, value: p.value }));               // mobile adapter — renames only
+      const desktopHash = _aurixEmergencyHash(desktop.map(p => ({ ts: p.time, value: p.value })));
+      const mobileHash = _aurixEmergencyHash(mobile);
+      let visibleBadgeText = null;
+      try { const n = document.getElementById('chartChange') || document.querySelector('.chart-change'); visibleBadgeText = n ? (n.textContent || '').trim() : null; } catch (_) {}
+      const ready = emg.state === 'ready';
+      const out = Object.assign({}, emg, {
+        desktopCanDraw: ready && desktop.length >= 2,
+        mobileCanDraw: ready && mobile.length >= 2,
+        desktopPointCount: desktop.length,
+        mobilePointCount: mobile.length,
+        desktopHash: desktopHash,
+        mobileHash: mobileHash,
+        underlyingHash: _aurixEmergencyHash(underlying),
+        visibleBadgeText: visibleBadgeText,
+        visibleChartState: emg.state,
+        overlayRemoved: ready,
+        activeRange: (typeof activeRange !== 'undefined') ? activeRange : null,
+      });
+      try { console.log('%c[UI][EMERGENCY_CHART_DEBUG]', 'font-weight:700', out); } catch (_) {}
+      return out;
+    };
+    window.disableAurixEmergencyChart = function () { try { window.AURIX_EMERGENCY_CHART = false; } catch (_) {} try { if (typeof renderWealthCurve === 'function') renderWealthCurve(false); } catch (_) {} try { if (typeof scheduleAurixMobileLite === 'function') scheduleAurixMobileLite(); } catch (_) {} return false; };
+    window.enableAurixEmergencyChart = function () { try { window.AURIX_EMERGENCY_CHART = true; } catch (_) {} try { if (typeof renderWealthCurve === 'function') renderWealthCurve(false); } catch (_) {} try { if (typeof scheduleAurixMobileLite === 'function') scheduleAurixMobileLite(); } catch (_) {} return true; };
+  }
+} catch (_) {}
+
 // P0-PERFORMANCE-PIPELINE-RECONSTRUCTION — PASSIVE CONSUMER. The badge (desktop #chartChange + mobile
 // #chartChangeMobile both flow through here) performs NO business logic: it reads the one authoritative
 // PerformanceRenderState and paints displayedReturnPct (ready) or "Calculando…" (pending). No
@@ -22237,6 +22475,12 @@ function _aurixFormatReturnText(g) {
 function _aurixPaintReturnBadge(el, surface) {
   try {
     if (!el) { try { console.log('[UI][RETURN_BADGE_PAINT]', { surface: surface, found: false }); } catch (_) {} return; }
+    // P0-EMERGENCY-CHART-RECOVERY — the visible return badge is driven ONLY by the emergency chart
+    // object (the same object that drives the visible line), so a % can never appear without a line.
+    if (_aurixEmergencyChartOn()) {
+      _aurixEmergencyPaintBadgeNode(el, buildEmergencyInstitutionalChart(typeof activeRange !== 'undefined' ? activeRange : '24h'), surface);
+      return;
+    }
     const snap = (typeof computePerformanceSnapshot === 'function') ? computePerformanceSnapshot(typeof activeRange !== 'undefined' ? activeRange : '24h') : null;
     const ready = !!(snap && snap.badgeReady && Number.isFinite(snap.displayedReturnPct));
     const textBefore = el.textContent;
@@ -24992,9 +25236,60 @@ function _wscEngineYLabels(scale, vp, H, maxLabels) {
   return { labels: out };
 }
 
+// P0-EMERGENCY-CHART-RECOVERY — desktop painter for the visible "Evolución del patrimonio" card.
+// Draws the EXACT emergency points (simple polyline + area, no rebuild/filter) with the tone tied to
+// the emergency return. Returns true when it fully handled the surface (ready-drawn OR pending), so
+// the caller returns without touching the legacy geometry.
+function _wscPaintEmergency(changeEl, hostEl, opts) {
+  if (!hostEl) return false;
+  opts = opts || {};
+  const uid = opts.uid || 'd';
+  const surface = uid === 'm' ? 'mobile' : 'desktop';
+  const emg = buildEmergencyInstitutionalChart(typeof activeRange !== 'undefined' ? activeRange : '24h');
+  try { if (typeof window !== 'undefined') window._aurixEmergencyLast = emg; } catch (_) {}
+
+  // Badge — one source, always coherent with the line.
+  if (changeEl) _aurixEmergencyPaintBadgeNode(changeEl, emg, surface);
+
+  if (emg.state !== 'ready') {
+    try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'building'); } catch (_) {}
+    _wscRenderInsufficient(hostEl, { realPointCount: emg.pointCount, reason: emg.reason },
+      { mode: 'building', eligible: [], lastGood: null });
+    return true;
+  }
+
+  try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'ready'); } catch (_) {}
+  const built = _aurixEmergencyBuildSvg(emg.points, { W: _WSC_VIEW_W, H: _WSC_VIEW_H });
+  const tone = emg.color;   // up | down | flat — reuses the shipped .wsc-* tone CSS
+  hostEl.innerHTML =
+    '<div class="wsc wsc-' + tone + '">' +
+      '<div class="wsc-plot">' +
+        '<svg class="wsc-svg" viewBox="0 0 ' + built.W + ' ' + built.H + '" preserveAspectRatio="none" aria-hidden="true">' +
+          '<defs><linearGradient id="wscArea-' + uid + '" x1="0" y1="0" x2="0" y2="1">' +
+            '<stop offset="0%" class="wsc-area-0"/><stop offset="58%" class="wsc-area-mid"/><stop offset="100%" class="wsc-area-1"/>' +
+          '</linearGradient></defs>' +
+          '<path class="wsc-area" d="' + built.areaPath + '" fill="url(#wscArea-' + uid + ')" shape-rendering="geometricPrecision"/>' +
+          '<path class="wsc-line" d="' + built.linePath + '" pathLength="1" fill="none" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>' +
+        '</svg>' +
+      '</div>' +
+    '</div>';
+  try { _aurixRecordRender('desktopChart', { chartHash: emg.chartHash, producerHash: emg.chartHash }); } catch (_) {}
+  return true;
+}
+
 function _wscPaintSurface(changeEl, hostEl, opts) {
   if (!hostEl) return;
   opts = opts || {};
+
+  // P0-EMERGENCY-CHART-RECOVERY — the VISIBLE desktop card is driven ONLY by
+  // buildEmergencyInstitutionalChart. Ready ⇒ clean institutional line + %; pending ⇒ premium
+  // "Histórico en construcción" with NO percentage. Never a mixed state. The legacy geometry below
+  // stays intact as an instant rollback (window.disableAurixEmergencyChart() / flag off).
+  if (_aurixEmergencyChartOn()) {
+    try {
+      if (_wscPaintEmergency(changeEl, hostEl, opts)) return;
+    } catch (e) { try { console.log('[UI][EMERGENCY_CHART] desktop fell back to legacy:', (e && e.message) || e); } catch (_) {} }
+  }
 
   // WN.5 — the Dashboard chart is the INVESTABLE PORTFOLIO VALUE over time (base
   // currency, real estate EXCLUDED), reconstructed clean from categoryHistory —
@@ -25434,6 +25729,55 @@ function renderAurixMobileLiteChart(range, token) {
     const host = _aurixMobileLiteHost();
     st.hostFound = !!host;
     if (!host) { _aurixMobileLiteFallback('no-host'); return; }                  // INFRA: chart area not in DOM yet
+
+    // P0-EMERGENCY-CHART-RECOVERY — the VISIBLE mobile line is driven ONLY by
+    // buildEmergencyInstitutionalChart, drawing the EXACT same points as desktop (identical chartHash).
+    // Ready ⇒ clean line; pending ⇒ skeleton (no line, no %). No desktop/mobile mismatch possible.
+    if (_aurixEmergencyChartOn()) {
+      try {
+        const emg = buildEmergencyInstitutionalChart(r);
+        try { if (typeof window !== 'undefined') window._aurixEmergencyLastMobile = emg; } catch (_) {}
+        if (emg.state !== 'ready') {
+          _aurixMobileLiteFallback('pending');
+          if (_aurixMobileLiteEmptyRetries < 6) { _aurixMobileLiteEmptyRetries++; try { setTimeout(function () { scheduleAurixMobileLite(r); }, 1300); } catch (_) {} }
+          return;
+        }
+        const VBW = 1000, VBH = 260;
+        const built = _aurixEmergencyBuildSvg(emg.points, { W: VBW, H: VBH, padL: 6, padR: 6, padT: 16, padB: 16 });
+        const tone = emg.color;
+        const stroke = tone === 'down' ? '#e25563' : (tone === 'flat' ? '#9fb0c7' : '#2ebd85');
+        const fillTop = tone === 'down' ? 'rgba(226,85,99,0.15)' : (tone === 'flat' ? 'rgba(159,176,199,0.08)' : 'rgba(46,189,133,0.16)');
+        const gid = 'aurixLiteFill_' + tone;
+        const svg =
+          '<svg class="aurix-lite-svg' + (_aurixMobileLitePrevRange !== r ? (' aurix-lite-in' + ((_aurixPremiumMotionOn() && !(typeof document !== 'undefined' && document.hidden) && !_dshReducedMotion()) ? ' aurix-pm' : '')) : '') + '" viewBox="0 0 ' + VBW + ' ' + VBH + '" preserveAspectRatio="none" width="100%" height="100%" style="display:block" aria-hidden="true">' +
+            '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
+              '<stop offset="0" stop-color="' + fillTop + '"/><stop offset="1" stop-color="rgba(0,0,0,0)"/>' +
+            '</linearGradient></defs>' +
+            '<g class="mob-chart-grid">' +
+              '<line class="h" x1="6" y1="73" x2="994" y2="73"/><line class="h" x1="6" y1="130.5" x2="994" y2="130.5"/><line class="h" x1="6" y1="187" x2="994" y2="187"/>' +
+              '<line class="v" x1="253" y1="16" x2="253" y2="244"/><line class="v" x1="500" y1="16" x2="500" y2="244"/><line class="v" x1="747" y1="16" x2="747" y2="244"/>' +
+            '</g>' +
+            '<path class="aurix-lite-area" d="' + built.areaPath + '" fill="url(#' + gid + ')" stroke="none"/>' +
+            '<path class="aurix-lite-line" pathLength="1" d="' + built.linePath + '" fill="none" stroke="' + stroke + '" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>' +
+          '</svg>';
+        if (typeof token === 'number' && token !== _aurixMobileLiteToken) return;   // superseded just before paint
+        host.innerHTML = svg;
+        _aurixMobileLitePrevRange = r;
+        st.rendered = true; st.failed = false; st.fallbackUsed = false; st.placeholderReason = null;
+        st.pointCount = emg.pointCount; st.seriesPoints = emg.pointCount;
+        _aurixMobileLiteEmptyRetries = 0;
+        try {
+          _aurixMobChartPts = emg.points.map(function (p, i) { const q = built.pixels[i] || {}; return { t: p.ts, v: p.value, x: q.x, y: q.y }; })
+            .filter(function (p) { return typeof p.x === 'number' && typeof p.y === 'number'; });
+          _aurixMobChartVisual = null;
+          _aurixMobChartMeta = { range: r, deltaPct: emg.returnPct, up: tone !== 'down' };
+        } catch (_) { _aurixMobChartPts = null; }
+        try { _aurixInitMobileChartInspector(); } catch (_) {}
+        try { _aurixRecordRender('mobileChart', { chartHash: emg.chartHash, producerHash: emg.chartHash }); } catch (_) {}
+        return;
+      } catch (e) { try { console.log('[UI][EMERGENCY_CHART] mobile fell back to legacy:', (e && e.message) || e); } catch (_) {} }
+    }
+
     // P0-FINAL-RENDER-OWNERSHIP-SURGERY (S4) — the BUSINESS verdict (ready vs pending) comes ONLY from the
     // single producer, BEFORE any drawing. Series length / history / visiblePoints NEVER decide rendering
     // here. When pending, show the skeleton fallback (and retry so the curve appears once the snapshot turns

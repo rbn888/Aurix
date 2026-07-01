@@ -71,6 +71,10 @@ function makeEnv(engine, opts) {
     // slow/exception fallbacks fire BEFORE the graphReady gate, so those cases are unaffected.
     computePerformanceSnapshot: () => ({ graphReady: true, badgeReady: true, state: 'ready', tone: 'up', displayedReturnPct: 3.1, producerHash: 'h' }),
     _aurixRecordRender: () => {},
+    // This SPEC validates the LEGACY lite renderer (the rollback path). The visible production line is
+    // now driven by buildEmergencyInstitutionalChart; its parity/state invariants are covered by
+    // AURIX-EMERGENCY-CHART-RECOVERY. Force the emergency path off here so the legacy block is exercised.
+    _aurixEmergencyChartOn: () => false,
     activeRange: '30d',
   };
   sandbox.window = sandbox;

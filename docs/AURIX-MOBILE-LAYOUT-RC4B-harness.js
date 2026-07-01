@@ -76,6 +76,7 @@ function testIndicator(deltaPct, deltaAbs, mode) {
   const el = { className:'', innerHTML:'', textContent:'', title:'', removeAttribute(){ this.title=''; } };
   const tone = deltaPct > 0.005 ? 'up' : (deltaPct < -0.005 ? 'down' : 'flat');
   const sb = { document:{ getElementById:(id)=> id==='chartChangeMobile'?el:null }, activePerfMode:mode, activeRange:'24h',
+    _aurixEmergencyChartOn:()=>false,   // this test validates the LEGACY badge (rollback path); emergency path covered by AURIX-EMERGENCY-CHART-RECOVERY
     computePerformanceSnapshot:()=>({ badgeReady:true, displayedReturnPct:deltaPct, displayedReturnValue:deltaAbs, tone:tone, producerHash:'h' }),
     _aurixRecordRender:()=>{}, _aurixReturnPendingHTML:()=>'<span class="wsc-metric-val wsc-metric-calc">Calculando…</span>',
     _dshFmtPct:(p)=>({text:(p>0?'+':'')+p.toFixed(2)+'%',capped:false}), _dshFmtMoney0:(v)=>'$'+Math.round(v), Number, Math, console };
