@@ -471,20 +471,39 @@
       'reset.html',
       'reset-password.html',
     ]);
-    function safeRedirect(path) {
+    // P0-ROUTING-LOOP-BREAKER (mirror of app.js safeRedirect) — a shared sessionStorage redirect log
+    // stops an index⇄login ping-pong from flickering forever. Returns true if the nav was issued.
+    var _AURIX_REDIRECT_MAX = 3, _AURIX_REDIRECT_WINDOW_MS = 10000;
+    function safeRedirect(path, source) {
       const target  = _SAFE_REDIRECT_TARGETS.has(path) ? path : 'login.html';
+      try {
+        const now = Date.now();
+        let log = [];
+        try { log = JSON.parse(sessionStorage.getItem('aurix_redirect_log') || '[]'); } catch (_) { log = []; }
+        if (!Array.isArray(log)) log = [];
+        log = log.filter(function (e) { return e && (now - e.ts) < _AURIX_REDIRECT_WINDOW_MS; });
+        if (log.length >= _AURIX_REDIRECT_MAX) {
+          try { sessionStorage.setItem('aurix_redirect_broken', JSON.stringify({ at: now, target: target, source: source || null, bounces: log.length })); } catch (_) {}
+          try { console.warn('[AUTH][REDIRECT-LOOP-BREAK] login suppressed →' + target + ' after ' + log.length + ' bounces'); } catch (_) {}
+          return false;
+        }
+        log.push({ ts: now, target: target, from: window.location.pathname, source: source || null });
+        try { sessionStorage.setItem('aurix_redirect_log', JSON.stringify(log)); } catch (_) {}
+        try { sessionStorage.setItem('aurix_last_redirect', JSON.stringify({ target: target, source: source || null, ts: now })); } catch (_) {}
+      } catch (_) {}
       const onAurix = window.location.pathname.startsWith('/Aurix/');
       const base    = window.location.origin + (onAurix ? '/Aurix/' : '/');
       window.location.href = base + target;
+      return true;
     }
 
     if (client) {
       client.auth.getSession().then(({ data: { session } }) => {
-        if (session) safeRedirect('index.html');
+        if (session) safeRedirect('index.html', 'login:getSession');
       });
 
       client.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN' && session) safeRedirect('index.html');
+        if (event === 'SIGNED_IN' && session) safeRedirect('index.html', 'login:SIGNED_IN');
       });
     }
 

@@ -255,12 +255,72 @@ const _SAFE_REDIRECT_TARGETS = new Set([
   'reset.html',
   'reset-password.html',
 ]);
-function safeRedirect(path) {
+// P0-ROUTING-LOOP-BREAKER — a redirect ping-pong (index⇄login) must NEVER flicker forever. Every
+// redirect is logged in sessionStorage; if ≥ _AURIX_REDIRECT_MAX bounces happen within
+// _AURIX_REDIRECT_WINDOW_MS, further redirects are SUPPRESSED (returns false) and the reason is
+// recorded for window.aurixBootDiagnostic(). Returns true if the navigation was issued.
+const _AURIX_REDIRECT_MAX = 3;
+const _AURIX_REDIRECT_WINDOW_MS = 10000;
+function safeRedirect(path, source) {
   const target  = _SAFE_REDIRECT_TARGETS.has(path) ? path : 'login.html';
+  try {
+    const now = Date.now();
+    let log = [];
+    try { log = JSON.parse(sessionStorage.getItem('aurix_redirect_log') || '[]'); } catch (_) { log = []; }
+    if (!Array.isArray(log)) log = [];
+    log = log.filter(e => e && (now - e.ts) < _AURIX_REDIRECT_WINDOW_MS);
+    if (log.length >= _AURIX_REDIRECT_MAX) {
+      try { sessionStorage.setItem('aurix_redirect_broken', JSON.stringify({ at: now, target: target, source: source || null, bounces: log.length })); } catch (_) {}
+      try { console.warn('[AUTH][REDIRECT-LOOP-BREAK] suppressed →' + target + ' after ' + log.length + ' bounces in ' + _AURIX_REDIRECT_WINDOW_MS + 'ms (source=' + (source || '?') + ')'); } catch (_) {}
+      return false;
+    }
+    log.push({ ts: now, target: target, from: (typeof window !== 'undefined' ? window.location.pathname : ''), source: source || null });
+    try { sessionStorage.setItem('aurix_redirect_log', JSON.stringify(log)); } catch (_) {}
+    try { sessionStorage.setItem('aurix_last_redirect', JSON.stringify({ target: target, source: source || null, ts: now })); } catch (_) {}
+  } catch (_) {}
   const onAurix = window.location.pathname.startsWith('/Aurix/');
   const base    = window.location.origin + (onAurix ? '/Aurix/' : '/');
   window.location.href = base + target;
+  return true;
 }
+
+// P0-ROUTING/CACHE — live boot diagnostic. Async (queries getSession + serviceWorker + caches).
+// window.aurixBootDiagnostic().then(console.log)
+try {
+  if (typeof window !== 'undefined') {
+    window.aurixBootDiagnostic = async function () {
+      const j = (k, dflt) => { try { return JSON.parse(sessionStorage.getItem(k) || 'null') || dflt; } catch (_) { return dflt; } };
+      const out = {
+        servedAppVersion: (typeof window.__AURIX_SERVED_APPJS !== 'undefined') ? window.__AURIX_SERVED_APPJS : ((window.__AURIX_BOOT && window.__AURIX_BOOT.appJsVersion) || null),
+        expectedAppVersion: (typeof window.__AURIX_LATEST_APPJS !== 'undefined') ? window.__AURIX_LATEST_APPJS : null,
+        currentUrl: (function () { try { return location.href; } catch (_) { return null; } })(),
+        redirectCount: (function () { const l = j('aurix_redirect_log', []); return Array.isArray(l) ? l.length : 0; })(),
+        authGateState: 'unknown',
+        inviteGateState: 'n/a (invite gate is client-only on login.html)',
+        localStorageKeys: (function () { try { return Object.keys(localStorage); } catch (_) { return []; } })(),
+        sessionStorageKeys: (function () { try { return Object.keys(sessionStorage); } catch (_) { return []; } })(),
+        serviceWorkerActive: false,
+        cacheNames: [],
+        appJsUrlLoaded: (function () { try { const s = document.querySelector('script[src*="app.js"]'); return s ? s.getAttribute('src') : null; } catch (_) { return null; } })(),
+        appJsBuildTag: (typeof window.AURIX_BUILD !== 'undefined') ? window.AURIX_BUILD : null,
+        chartVersionTag: (typeof window.AURIX_BUILD !== 'undefined') ? window.AURIX_BUILD : null,
+        reasonForRedirect: (function () { const b = j('aurix_redirect_broken', null); const lr = j('aurix_last_redirect', null); return (b && ('loop-broken→' + b.target + ' after ' + b.bounces + ' bounces')) || (lr && ('→' + lr.target)) || null; })(),
+        lastRedirectSource: (function () { const lr = j('aurix_last_redirect', null); const b = j('aurix_redirect_broken', null); return (lr && lr.source) || (b && b.source) || null; })(),
+        redirectLoopBroken: !!j('aurix_redirect_broken', null),
+        staleReloadTarget: (function () { try { return sessionStorage.getItem('aurix_stale_reload_to'); } catch (_) { return null; } })(),
+        bundleStale: (typeof window.__AURIX_LATEST_APPJS === 'number' && typeof window.__AURIX_SERVED_APPJS === 'number') ? (window.__AURIX_LATEST_APPJS > window.__AURIX_SERVED_APPJS) : null,
+      };
+      try {
+        const sc = (typeof supabaseClient !== 'undefined') ? supabaseClient : null;
+        if (sc && sc.auth && sc.auth.getSession) { const { data } = await sc.auth.getSession(); out.authGateState = (data && data.session) ? 'authenticated' : 'anonymous'; }
+      } catch (_) { out.authGateState = 'error'; }
+      try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) { const regs = await navigator.serviceWorker.getRegistrations(); out.serviceWorkerActive = regs.length > 0; out.serviceWorkerCount = regs.length; } } catch (_) {}
+      try { if (typeof caches !== 'undefined' && caches.keys) out.cacheNames = await caches.keys(); } catch (_) {}
+      try { console.log('%c[BOOT][DIAGNOSTIC]', 'font-weight:700', out); } catch (_) {}
+      return out;
+    };
+  }
+} catch (_) {}
 
 async function getUserId() {
   if (!supabaseClient) return null;
@@ -1849,15 +1909,21 @@ function _clearLocalUserState() {
 if (supabaseClient && !window.__AUTH_LISTENER__) {
   window.__AUTH_LISTENER__ = true;
 
-  supabaseClient.auth.onAuthStateChange((event) => {
+  supabaseClient.auth.onAuthStateChange(async (event) => {
     if (event === 'SIGNED_IN') {
       if (!window.location.pathname.includes('index.html')) {
-        safeRedirect('index.html');
+        safeRedirect('index.html', 'onAuthStateChange:SIGNED_IN');
       }
     }
     if (event === 'SIGNED_OUT') {
+      // P0-ROUTING-FIX — a spurious SIGNED_OUT (flaky mobile token refresh) must NOT bounce an
+      // otherwise-valid session to login (a root cause of the index⇄login flicker). Confirm the
+      // session is genuinely gone via getSession() before clearing local state + redirecting.
+      let stillSignedIn = false;
+      try { const { data } = await supabaseClient.auth.getSession(); stillSignedIn = !!(data && data.session); } catch (_) {}
+      if (stillSignedIn) { try { console.warn('[AUTH] ignored spurious SIGNED_OUT — getSession still has a session'); } catch (_) {} return; }
       _clearLocalUserState();
-      safeRedirect('login.html');
+      safeRedirect('login.html', 'onAuthStateChange:SIGNED_OUT');
     }
   });
 }
@@ -1887,9 +1953,15 @@ const waitForSession = () => new Promise(resolve => {
       finish(null);
     }
   }, 5000);
-  const { data: { subscription: sub } } = supabaseClient.auth.onAuthStateChange((event, sess) => {
+  const { data: { subscription: sub } } = supabaseClient.auth.onAuthStateChange(async (event, sess) => {
     if (event === 'INITIAL_SESSION') {
-      finish(sess);
+      // P0-ROUTING-FIX — INITIAL_SESSION can fire with a NULL session BEFORE the session is restored
+      // from local storage (a cold-boot race). login.html reads getSession() (which awaits restoration)
+      // and sees the session ⇒ the two pages disagreed ⇒ index⇄login flicker. Confirm a null
+      // INITIAL_SESSION against getSession() before declaring the user logged out.
+      if (sess) { finish(sess); return; }
+      try { const { data } = await supabaseClient.auth.getSession(); finish((data && data.session) || null); }
+      catch (_) { finish(null); }
     } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
       finish(sess);
     } else if (event === 'SIGNED_OUT') {
@@ -42119,7 +42191,10 @@ function _aurixPreloadBootIcons() {
     const session = await waitForSession();
     if (!session) {
       if (!window.location.pathname.includes('login.html')) {
-        safeRedirect('login.html');
+        const issued = safeRedirect('login.html', 'boot:no-session');
+        // If the loop breaker suppressed the redirect, do NOT leave the splash spinning forever —
+        // hide the shell so the user sees the app rather than an infinite index⇄login flicker.
+        if (!issued) { try { _bootShellHide('auth-redirect-suppressed'); } catch (_) {} }
       }
       return;
     }

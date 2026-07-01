@@ -66,8 +66,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v463-value-fallback-construction-trim';
-      var APPJS_V = '463';
+      var BUILD = 'v464-routing-cache-fix';
+      var APPJS_V = '464';
       var HTML_TS = '2026-07-05T18:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -83,6 +83,37 @@
         last: function() { return B.steps.length ? B.steps[B.steps.length - 1] : '(none)'; }
       };
       B.mark('index_html_parsed');
+
+      // ── P0-STALE-BUNDLE GUARD ─────────────────────────────────────────────────────────────────
+      // A browser-cached OLD index.html keeps referencing an OLD app.js?v=… (mobile "stale chart").
+      // Fetch a cache-busted version.json (bypasses the HTTP cache) and, if the served index is
+      // behind the latest deploy, do ONE cache-busted reload to a fresh index. Guarded by
+      // sessionStorage so it can NEVER become an infinite reload loop.
+      try {
+        var _servedV = parseInt(APPJS_V, 10) || 0;
+        window.__AURIX_SERVED_APPJS = _servedV;
+        fetch('version.json?cb=' + T0, { cache: 'no-store' })
+          .then(function (r) { return r && r.ok ? r.json() : null; })
+          .then(function (j) {
+            if (!j || typeof j.appjs !== 'number') return;
+            window.__AURIX_LATEST_APPJS = j.appjs;
+            window.__AURIX_LATEST_BUILD = j.build || null;
+            if (j.appjs > _servedV) {
+              var guard = null; try { guard = sessionStorage.getItem('aurix_stale_reload_to'); } catch (_) {}
+              if (guard !== String(j.appjs)) {                       // reload to a given version at most ONCE
+                try { sessionStorage.setItem('aurix_stale_reload_to', String(j.appjs)); } catch (_) {}
+                try {
+                  if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { try { r.unregister(); } catch (_) {} }); }).catch(function () {});
+                  if (typeof caches !== 'undefined' && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { try { caches.delete(k); } catch (_) {} }); }).catch(function () {});
+                } catch (_) {}
+                var onAurix = location.pathname.indexOf('/Aurix/') === 0;
+                var base = location.origin + (onAurix ? '/Aurix/' : '/');
+                try { console.warn('[BOOT][STALE-BUNDLE] served app.js v' + _servedV + ' < latest v' + j.appjs + ' — one cache-busted reload'); } catch (_) {}
+                location.replace(base + 'index.html?fresh=' + j.appjs);
+              }
+            }
+          }).catch(function () {});
+      } catch (_) {}
 
       // HEARTBEAT — proves the event loop is alive. If it stops, the main thread is
       // blocked (a long synchronous task or loop, e.g. in app.js).
@@ -1367,7 +1398,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=463"
+  <script src="app.js?v=464"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
