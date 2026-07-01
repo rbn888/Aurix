@@ -22774,15 +22774,13 @@ function buildValidatedHistoricalSeries(range) {
   series = spk.kept;
   out.stages.push({ stage: 'SpikeDetection', outCount: series.length });
 
-  // Stage 8 — construction prefix: DELEGATED to the Institutional Performance Engine (flow layer).
-  // v459 trimmed a leading regime that ended in a sustained step — but that silently masked the
-  // "unexplained jump → PENDING" requirement (it dropped the pre-jump regime, fabricating continuity).
-  // Construction is now handled as a CASHFLOW: an explicit ledger event (import_baseline) or high-
-  // confidence structural change ⇒ neutralized; an unexplained construction step ⇒ PENDING. So the
-  // validated series KEEPS these points and the performance engine governs them. (_aurixHpqTrimConstruction
-  // is retained for reference/back-compat but no longer invoked in the pipeline.)
-  out.counts.constructionSnapshots = 0;
-  out.stages.push({ stage: 'ConstructionPrefix', outCount: series.length, note: 'delegated to performance-engine flow classification' });
+  // Stage 8 — construction prefix (on the de-spiked series): trim a leading regime that ends in a
+  // sustained step into the current regime.
+  const con = _aurixHpqTrimConstruction(series, jump);
+  out.counts.constructionSnapshots = con.trimmed;
+  for (let i = 0; i < con.trimmed; i++) out.quarantined.push(_aurixHpqDiag(r, series[i], series[i].index, i > 0 ? series[i - 1] : null, 'ConstructionPrefix', 'construction_prefix', jump, 'leading construction/regime point before a sustained ' + Math.round(jump * 100) + '% step into the current regime'));
+  series = con.series;
+  out.stages.push({ stage: 'ConstructionPrefix', outCount: series.length });
 
   // Stage 9 — plateau cleanup
   const plat = _aurixProdPlateauFilter(series);
@@ -22812,169 +22810,9 @@ function buildValidatedHistoricalSeries(range) {
 }
 try { if (typeof window !== 'undefined') window.buildValidatedHistoricalSeries = buildValidatedHistoricalSeries; } catch (_) {}
 
-// ════════════════════════════════════════════════════════════════════════════
-// P0-INSTITUTIONAL-PERFORMANCE-ENGINE — performance index, not raw balance
-// ════════════════════════════════════════════════════════════════════════════
-// The visible chart must show INVESTMENT PERFORMANCE, never raw portfolio balance. Deposits /
-// withdrawals / added assets / synchronization / construction change the BALANCE but are NOT
-// performance. This engine classifies every interval between validated snapshots, neutralizes ONLY
-// TRUSTED cashflows (explicit ledger events + high-confidence structural evidence — class appears/
-// disappears or a liquidity/cash jump; NEVER magnitude/price alone), and builds a normalized
-// performance index (start 100). If a material in-range interval is a low-confidence / unknown flow,
-// it refuses to guess: state = 'pending', reason = 'insufficient_trusted_performance_data'.
-const _AURIX_IPE_START_INDEX = 100;
-const _AURIX_IPE_FLOW_CANDIDATE_PCT = 0.15;   // an unexplained single-interval jump beyond ±15% is a cashflow CANDIDATE (untrusted unless proven)
-const _AURIX_IPE_LIQ_JUMP_FRAC = 0.15;        // a liquidity/cash change > 15% of prior investable = high-confidence flow (cash never appreciates)
-const _AURIX_IPE_STRUCT_MIN = 1;              // a bucket below this (base) is treated as "absent"
-const _AURIX_IPE_INVEST_BUCKETS = ['crypto', 'stock', 'etf', 'fund', 'metal', 'liquidity', 'other'];   // investable only (real_estate excluded)
-
-// Signed sum (base currency) of ledger cashflows strictly inside (aTs, bTs].
-function _aurixIpeFlowsInInterval(flows, aTs, bTs) {
-  let sumUSD = 0, n = 0;
-  for (const f of (flows || [])) {
-    if (!f || !Number.isFinite(f.ts) || !Number.isFinite(f.amountUSD)) continue;
-    if (f.ts > aTs && f.ts <= bTs) { sumUSD += f.amountUSD; n++; }
-  }
-  let base = sumUSD; try { if (typeof toBase === 'function') base = toBase(sumUSD, 'USD'); } catch (_) { base = sumUSD; }
-  return { base: base, count: n };
-}
-
-// High-confidence STRUCTURAL evidence between two raw snapshots. ONLY signals that cannot be produced
-// by price movement of existing holdings: an asset class appearing/disappearing, or a liquidity (cash)
-// jump. General allocation drift is deliberately NOT used (it is ambiguous with price → never a flow).
-function _aurixIpeStructuralEvidence(aRaw, bRaw, prevInvestable) {
-  if (!aRaw || !bRaw) return { isFlow: false, reason: null };
-  const min = _AURIX_IPE_STRUCT_MIN;
-  for (const k of _AURIX_IPE_INVEST_BUCKETS) {
-    const av = Number(aRaw[k]) || 0, bv = Number(bRaw[k]) || 0;
-    if (k === 'liquidity') continue;
-    if ((av < min && bv >= min)) return { isFlow: true, reason: 'asset class "' + k + '" appeared (new holding / synchronization)' };
-    if ((av >= min && bv < min)) return { isFlow: true, reason: 'asset class "' + k + '" disappeared (holding removed)' };
-  }
-  const aLiq = Number(aRaw.liquidity) || 0, bLiq = Number(bRaw.liquidity) || 0;
-  if (Math.abs(bLiq - aLiq) > _AURIX_IPE_LIQ_JUMP_FRAC * (prevInvestable || 1)) {
-    return { isFlow: true, reason: 'liquidity/cash moved ' + (+(((bLiq - aLiq) / (prevInvestable || 1)) * 100).toFixed(1)) + '% of portfolio (deposit/withdrawal — cash does not appreciate)' };
-  }
-  return { isFlow: false, reason: null };
-}
-
-// Classify ONE interval A→B. Returns the full flow-event diagnostic + { trusted, neutralizedAmount }.
-function _aurixIpeClassifyInterval(a, b, i, flows) {
-  const prev = a.value, cur = b.value;
-  const rawDelta = cur - prev;
-  const rawDeltaPct = prev ? (rawDelta / prev) * 100 : 0;
-  const ev = { intervalIndex: i, previousTimestamp: a.ts, currentTimestamp: b.ts,
-    previousValue: +prev.toFixed(2), currentValue: +cur.toFixed(2),
-    rawDelta: +rawDelta.toFixed(2), rawDeltaPct: +rawDeltaPct.toFixed(4),
-    flowClassification: 'market', confidence: 'n/a', evidence: [], neutralized: false,
-    neutralizedAmount: 0, performanceContribution: 0, decisionReason: '' };
-
-  const explicit = _aurixIpeFlowsInInterval(flows, a.ts, b.ts);
-  const struct = _aurixIpeStructuralEvidence(a.raw, b.raw, prev);
-  const bigJump = Math.abs(rawDeltaPct) > _AURIX_IPE_FLOW_CANDIDATE_PCT * 100;
-
-  if (explicit.count > 0) {
-    const residualPct = prev ? ((rawDelta - explicit.base) / prev) * 100 : 0;
-    ev.evidence.push('explicit ledger cashflow (' + explicit.count + ' event(s), ' + (+explicit.base.toFixed(2)) + ' base)');
-    if (Math.abs(residualPct) <= _AURIX_IPE_FLOW_CANDIDATE_PCT * 100) {
-      ev.flowClassification = 'explicit_cashflow'; ev.confidence = 'certain';
-      ev.neutralized = true; ev.neutralizedAmount = +explicit.base.toFixed(2);
-      ev.decisionReason = 'recorded cashflow neutralized; residual market move ' + (+residualPct.toFixed(2)) + '% is trusted';
-      return { ev: ev, trusted: true, neutralizedAmount: explicit.base };
-    }
-    // explicit flow present but a large UNEXPLAINED residual remains → cannot trust this interval.
-    ev.flowClassification = 'inferred_cashflow_low_confidence'; ev.confidence = 'insufficient';
-    ev.decisionReason = 'recorded cashflow does not explain a ' + (+residualPct.toFixed(2)) + '% residual jump — cannot prove it is market performance';
-    return { ev: ev, trusted: false, neutralizedAmount: 0 };
-  }
-
-  if (struct.isFlow) {
-    ev.evidence.push(struct.reason);
-    ev.flowClassification = 'inferred_cashflow_high_confidence'; ev.confidence = 'high';
-    ev.neutralized = true; ev.neutralizedAmount = +rawDelta.toFixed(2);   // structural event ⇒ interval is not performance
-    ev.decisionReason = 'structural evidence (not price) ⇒ full interval neutralized (marketReturn 0)';
-    return { ev: ev, trusted: true, neutralizedAmount: rawDelta };
-  }
-
-  if (bigJump) {
-    ev.evidence.push('unexplained ' + (+rawDeltaPct.toFixed(2)) + '% jump (no ledger event, no structural change)');
-    ev.flowClassification = 'unknown'; ev.confidence = 'unknown';
-    ev.decisionReason = 'large jump with no evidence of market vs cashflow — institutional policy: do not guess';
-    return { ev: ev, trusted: false, neutralizedAmount: 0 };
-  }
-
-  // Normal market interval — small move, no flow evidence → trusted performance.
-  ev.flowClassification = 'market'; ev.confidence = 'trusted'; ev.decisionReason = 'small move, no flow evidence → market performance';
-  return { ev: ev, trusted: true, neutralizedAmount: 0 };
-}
-
-// Build the normalized performance index for a range. Consumes the validated series; neutralizes only
-// trusted cashflows; refuses (PENDING) if any material in-range interval is untrusted.
-function buildInstitutionalPerformanceSeries(range) {
-  const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
-  const out = {
-    range: r, state: 'pending', reason: null,
-    performancePoints: [], returnPct: null, performanceValue: 0,
-    flowEvents: [], trustedPerformanceCoverage: 0,
-    firstRawValue: null, lastRawValue: null, rawReturnPct: null, flowAdjustedReturnPct: null,
-    validated: null, untrustedIntervals: 0,
-  };
-  try {
-    const v = buildValidatedHistoricalSeries(r);
-    out.validated = v;
-    const pts = v.rangeSeries || [];
-    if (pts.length < _AURIX_HPQ_MIN_POINTS) { out.reason = 'insufficient_validated_points'; return out; }
-    out.firstRawValue = +pts[0].value.toFixed(2);
-    out.lastRawValue = +pts[pts.length - 1].value.toFixed(2);
-    out.rawReturnPct = +(((pts[pts.length - 1].value - pts[0].value) / pts[0].value) * 100).toFixed(4);
-
-    let flows = [];
-    try { flows = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : []; } catch (_) { flows = []; }
-
-    // Classify every interval first (so the debug ledger is complete even when we end up PENDING).
-    const intervals = [];
-    for (let i = 1; i < pts.length; i++) intervals.push(_aurixIpeClassifyInterval(pts[i - 1], pts[i], i - 1, flows));
-    out.flowEvents = intervals.filter(x => x.ev.flowClassification !== 'market').map(x => x.ev);
-    const trustedCount = intervals.filter(x => x.trusted).length;
-    out.trustedPerformanceCoverage = intervals.length ? +(trustedCount / intervals.length).toFixed(4) : 1;
-    out.untrustedIntervals = intervals.length - trustedCount;
-
-    // Any untrusted (low-confidence / unknown) in-range interval materially breaks the chain → PENDING.
-    if (out.untrustedIntervals > 0) {
-      out.reason = 'insufficient_trusted_performance_data';
-      const firstBad = intervals.find(x => !x.trusted);
-      if (firstBad) out.firstUntrustedInterval = firstBad.ev;
-      return out;
-    }
-
-    // Build the performance index from trusted intervals (neutralizing trusted flows).
-    let index = _AURIX_IPE_START_INDEX, perfValue = 0;
-    const points = [{ ts: pts[0].ts, value: +index.toFixed(4) }];
-    for (let i = 0; i < intervals.length; i++) {
-      const a = pts[i], b = pts[i + 1], neutral = intervals[i].neutralizedAmount || 0;
-      const marketReturn = a.value ? (b.value - a.value - neutral) / a.value : 0;
-      intervals[i].ev.performanceContribution = +(marketReturn * 100).toFixed(4);
-      perfValue += marketReturn * a.value;
-      index *= (1 + marketReturn);
-      points.push({ ts: b.ts, value: +index.toFixed(4) });
-    }
-    out.state = 'ready';
-    out.reason = v.rangeCollapsedBecauseHistoryTooShort ? 'range_collapsed_history_short' : 'ok';
-    out.performancePoints = points;
-    out.returnPct = +(index - _AURIX_IPE_START_INDEX).toFixed(4);   // first index is 100 ⇒ % return
-    out.flowAdjustedReturnPct = out.returnPct;
-    out.performanceValue = +perfValue.toFixed(2);
-    return out;
-  } catch (e) {
-    out.state = 'pending'; out.reason = 'exception:' + ((e && e.message) || 'err');
-    return out;
-  }
-}
-try { if (typeof window !== 'undefined') window.buildInstitutionalPerformanceSeries = buildInstitutionalPerformanceSeries; } catch (_) {}
-
-// PASSIVE CONSUMER. The visible chart reads the PERFORMANCE INDEX (flow-neutral), never raw balance.
-// READY/PENDING is decided by the performance engine (validated points + trusted-flow coverage). The
-// visual gate is retained as a DIAGNOSTIC field but NEVER rejects. Return = first→last of the index.
+// PASSIVE CONSUMER. The visible chart reads the ALREADY-VALIDATED series. READY/PENDING is decided ONLY
+// by validated-point sufficiency (≥2 after quarantine). The visual gate is retained as a DIAGNOSTIC field
+// but NEVER rejects a range. Return is first→last of the validated range points (line return == badge).
 function buildProductionPortfolioChart(range) {
   const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
   const out = {
@@ -22993,15 +22831,9 @@ function buildProductionPortfolioChart(range) {
     firstInvalidStage: null, firstRejectedSnapshot: null,
     renderDecision: null, renderDecisionReason: null,
     baselineSnapshot: null, currentSnapshot: null,
-    // institutional performance fields
-    chartUsesPerformanceIndex: true, trustedPerformanceCoverage: null,
-    rawReturnPct: null, flowEventCount: 0,
-    // graceful-fallback fields
-    mode: 'pending', label: null, showReturnBadge: false,
   };
   try {
-    const perf = buildInstitutionalPerformanceSeries(r);
-    const v = perf.validated || buildValidatedHistoricalSeries(r);
+    const v = buildValidatedHistoricalSeries(r);
     const c = v.counts || {};
     out.rawPointCount = c.rawSnapshots || 0;
     out.quarantinedSnapshotCount = v.quarantined.length;
@@ -23018,97 +22850,40 @@ function buildProductionPortfolioChart(range) {
     out.rejectedInvalidCount = (c.invalidRecord || 0) + (c.nonFiniteValue || 0) + (c.futureSnapshots || 0) + (c.zeroValueSnapshots || 0) + (c.duplicateSnapshots || 0);
     out.collapsedRange = !!v.collapsedRange;
     out.rangeCollapsedBecauseHistoryTooShort = !!v.rangeCollapsedBecauseHistoryTooShort;
-    out.trustedPerformanceCoverage = perf.trustedPerformanceCoverage;
-    out.rawReturnPct = perf.rawReturnPct;
-    out.flowEventCount = (perf.flowEvents || []).length;
 
-    // ── GRACEFUL FALLBACK POLICY ──────────────────────────────────────────────────────────────
-    // 1) performance index (flow-neutral) when TRUSTED → mode 'performance_index', label 'Rentabilidad'.
-    // 2) else, if the v459 validated RAW VALUE series has ≥2 points → render it as a clearly-labelled
-    //    VALUE series (mode 'value_fallback', label 'Evolución del valor') — never presented as return,
-    //    never fabricating performance. 3) else pending (construction).
-    if (perf.state !== 'ready' || !Array.isArray(perf.performancePoints) || perf.performancePoints.length < 2) {
-      // P0-REGRESSION-FIX (v463) — the value fallback must draw the COHERENT wealth line, exactly as the
-      // pre-v460 chart did. v460 stopped invoking construction-prefix trimming on the displayed series (it
-      // delegated construction to the performance engine); v461's value fallback then drew that UNTRIMMED
-      // series → the leading construction/import prefix rendered as flat → vertical wall → flat plateau.
-      // Restore the pre-v460 behaviour FOR THE DISPLAY PATH ONLY (the performance engine still sees the full
-      // series, so its flow classification is unchanged): strip the leading construction/import prefix from
-      // the fallback value series using the EXISTING _aurixHpqTrimConstruction (no new heuristic).
-      const rsRaw = v.rangeSeries || [];
-      const perfPending = perf.reason || 'insufficient_trusted_performance_data';
-      const _jump = _AURIX_EMG_ADJ_JUMP[r] || _AURIX_EMG_ADJ_JUMP.all;
-      let rs = rsRaw, _constructionTrimmed = 0;
-      try {
-        const _trim = _aurixHpqTrimConstruction(rsRaw, _jump);
-        if (_trim && Array.isArray(_trim.series) && _trim.series.length >= _AURIX_HPQ_MIN_POINTS && _trim.trimmed > 0) {
-          rs = _trim.series; _constructionTrimmed = _trim.trimmed;
-        }
-      } catch (_) {}
-      // Value fallback only when the pending cause is missing/uncertain cashflow data AND we still have
-      // enough validated raw points. Insufficient validated points → genuine pending (construction).
-      if (rs.length >= _AURIX_HPQ_MIN_POINTS && perfPending !== 'insufficient_validated_points' && String(perfPending).indexOf('exception') !== 0) {
-        out.valueFallbackConstructionTrimmed = _constructionTrimmed;
-        const first = rs[0], last = rs[rs.length - 1];
-        const valueReturnPct = first.value ? ((last.value - first.value) / first.value) * 100 : 0;
-        out.state = 'ready';
-        out.mode = 'value_fallback';
-        out.label = 'Evolución del valor';
-        out.chartUsesPerformanceIndex = false;
-        out.showReturnBadge = false;   // value line only — no % chip (value change is not a return)
-        out.reason = 'performance_pending_cashflow_data_missing_value_fallback_used';
-        out.renderDecision = 'READY';
-        out.renderDecisionReason = 'performance pending (' + perfPending + ') → showing validated raw VALUE series (labelled "Evolución del valor", NOT return)';
-        out.points = rs.map(p => ({ ts: p.ts, value: +p.value.toFixed(2) }));   // RAW validated value series
-        out.pointCount = out.points.length; out.finalPointCount = out.points.length;
-        out.firstTs = out.points[0].ts; out.lastTs = out.points[out.pointCount - 1].ts;
-        out.firstValue = out.points[0].value; out.lastValue = out.points[out.pointCount - 1].value;
-        out.baselineTs = first.ts; out.baselineValue = +first.value.toFixed(2);
-        out.currentTs = last.ts; out.currentValue = +last.value.toFixed(2);
-        out.baselineSnapshot = { snapshotId: first.snapshotId || null, ts: first.ts, value: +first.value.toFixed(2) };
-        out.currentSnapshot = { snapshotId: last.snapshotId || null, ts: last.ts, value: +last.value.toFixed(2) };
-        // This % is the WEALTH VALUE change (may include contributions) — labelled as value, NOT return.
-        out.returnPct = +valueReturnPct.toFixed(4); out.lineReturnPct = out.returnPct; out.badgeReturnPct = out.returnPct;
-        out.returnValue = +(last.value - first.value).toFixed(2);
-        out.color = valueReturnPct > 0.05 ? 'up' : (valueReturnPct < -0.05 ? 'down' : 'flat');
-        out.chartHash = _aurixEmergencyHash(out.points);
-        return out;
-      }
-      // 3) genuine pending (not enough validated points, or engine exception).
-      out.state = 'pending'; out.mode = 'pending'; out.reason = perfPending; out.pendingReason = perfPending;
+    const pts = v.rangeSeries;
+    out.finalPointCount = pts.length;
+
+    // READY / PENDING — sufficiency of VALIDATED points ONLY (post-quarantine). No heuristic rejects here.
+    if (pts.length < _AURIX_HPQ_MIN_POINTS) {
+      out.state = 'pending'; out.reason = 'insufficient_validated_points'; out.pendingReason = out.reason;
       out.renderDecision = 'PENDING';
-      out.renderDecisionReason = perfPending === 'insufficient_trusted_performance_data'
-        ? ('a material in-range interval is an untrusted cashflow (' + perf.untrustedIntervals + ' untrusted) and too few validated points to fall back')
-        : perfPending;
-      if (rs.length >= 1) { out.baselineValue = +rs[0].value.toFixed(2); out.currentValue = +rs[rs.length - 1].value.toFixed(2); out.firstValue = out.baselineValue; out.lastValue = out.currentValue; }
+      out.renderDecisionReason = 'only ' + pts.length + ' validated point(s) remain after quarantine (need ' + _AURIX_HPQ_MIN_POINTS + ')';
+      if (pts.length >= 1) { out.baselineValue = +pts[0].value.toFixed(2); out.currentValue = +pts[pts.length - 1].value.toFixed(2); out.firstValue = out.baselineValue; out.lastValue = out.currentValue; }
       return out;
     }
 
-    // READY — the drawn line IS the performance index (flow-neutral), NOT raw balance.
-    out.mode = 'performance_index';
-    out.label = 'Rentabilidad';
-    out.showReturnBadge = true;   // true performance ⇒ show the % return chip
-    const pp = perf.performancePoints;
-    const rs = v.rangeSeries;
+    const first = pts[0], last = pts[pts.length - 1];
+    const returnPct = ((last.value - first.value) / first.value) * 100;
+    // Visual quality — DIAGNOSTIC ONLY (never rejects; quarantine already removed cliffs/towers).
+    try { const vg = _aurixProdVisualGate(pts.map(p => ({ value: p.value, ts: p.ts })), r); out.visualQualityPassed = vg.passed; out.visualRejectReason = vg.reason; } catch (_) {}
+
     out.state = 'ready';
-    out.reason = perf.reason || 'ok';
+    out.reason = out.rangeCollapsedBecauseHistoryTooShort ? 'range_collapsed_history_short' : 'ok';
     out.renderDecision = 'READY';
-    out.renderDecisionReason = pp.length + ' performance points (' + (perf.flowEvents || []).length + ' flow event(s) neutralized, coverage ' + Math.round((perf.trustedPerformanceCoverage || 1) * 100) + '%)';
-    out.points = pp.map(p => ({ ts: p.ts, value: +p.value.toFixed(4) }));   // performance INDEX values
+    out.renderDecisionReason = pts.length + ' validated points after quarantine';
+    out.points = pts.map(p => ({ ts: p.ts, value: +p.value.toFixed(2) }));
     out.pointCount = out.points.length; out.finalPointCount = out.points.length;
     out.firstTs = out.points[0].ts; out.lastTs = out.points[out.pointCount - 1].ts;
     out.firstValue = out.points[0].value; out.lastValue = out.points[out.pointCount - 1].value;
-    // baseline/current snapshots reference the RAW balance points (for audit); the % is the index return.
-    out.baselineTs = rs[0].ts; out.baselineValue = +rs[0].value.toFixed(2);
-    out.currentTs = rs[rs.length - 1].ts; out.currentValue = +rs[rs.length - 1].value.toFixed(2);
-    out.baselineSnapshot = { snapshotId: rs[0].snapshotId || null, ts: rs[0].ts, value: +rs[0].value.toFixed(2) };
-    out.currentSnapshot = { snapshotId: rs[rs.length - 1].snapshotId || null, ts: rs[rs.length - 1].ts, value: +rs[rs.length - 1].value.toFixed(2) };
-    out.returnPct = +perf.returnPct.toFixed(4); out.lineReturnPct = out.returnPct; out.badgeReturnPct = out.returnPct;
-    out.returnValue = +perf.performanceValue.toFixed(2);   // flow-neutral money gain (for €/curr mode)
-    out.color = out.returnPct > 0.05 ? 'up' : (out.returnPct < -0.05 ? 'down' : 'flat');
+    out.baselineTs = first.ts; out.baselineValue = +first.value.toFixed(2);
+    out.currentTs = last.ts; out.currentValue = +last.value.toFixed(2);
+    out.baselineSnapshot = { snapshotId: first.snapshotId || null, ts: first.ts, value: +first.value.toFixed(2) };
+    out.currentSnapshot = { snapshotId: last.snapshotId || null, ts: last.ts, value: +last.value.toFixed(2) };
+    out.returnPct = +returnPct.toFixed(4); out.lineReturnPct = out.returnPct; out.badgeReturnPct = out.returnPct;
+    out.returnValue = +(last.value - first.value).toFixed(2);
+    out.color = returnPct > 0.05 ? 'up' : (returnPct < -0.05 ? 'down' : 'flat');
     out.chartHash = _aurixEmergencyHash(out.points);
-    // Visual quality — DIAGNOSTIC ONLY (never rejects).
-    try { const vg = _aurixProdVisualGate(out.points.map(p => ({ value: p.value, ts: p.ts })), r); out.visualQualityPassed = vg.passed; out.visualRejectReason = vg.reason; } catch (_) {}
     return out;
   } catch (e) {
     out.state = 'pending'; out.reason = 'exception:' + ((e && e.message) || 'err'); out.pendingReason = out.reason;
@@ -23159,43 +22934,17 @@ function _aurixEmergencyBadgeText(emg) {
 }
 // Paint ONE badge node from the emergency chart: ready ⇒ %/€ + tone; pending ⇒ "Calculando…".
 // Percentage is shown ONLY when a line exists (state==='ready') — the two can never diverge.
-// Label the chart-title (sibling of the badge) per mode so a VALUE FALLBACK is never presented as
-// "Rentabilidad". performance_index → Rentabilidad; value_fallback → Evolución del valor patrimonial;
-// pending → the default "Evolución del patrimonio". DOM text only (no layout/CSS change).
-function _aurixSetChartModeLabel(el, emg) {
-  try {
-    if (!el || !el.parentElement) return;
-    const title = el.parentElement.querySelector('.chart-title');
-    if (!title) return;
-    const en = (typeof lang !== 'undefined' && lang === 'en');
-    const mode = emg && emg.mode;
-    let text;
-    if (mode === 'performance_index') text = en ? 'Return' : 'Rentabilidad';
-    else if (mode === 'value_fallback') text = en ? 'Portfolio value evolution' : 'Evolución del valor patrimonial';
-    else text = en ? 'Portfolio evolution' : 'Evolución del patrimonio';
-    title.textContent = text;
-    try { title.setAttribute('data-aurix-chart-mode', mode || 'pending'); } catch (_) {}
-  } catch (_) {}
-}
-
 function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
   try {
     if (!el) return;
-    const ready = !!(emg && emg.state === 'ready');
-    if (ready && emg.showReturnBadge && Number.isFinite(emg.returnPct)) {
-      // performance_index — show the % return chip.
+    if (emg && emg.state === 'ready' && Number.isFinite(emg.returnPct)) {
       el.innerHTML = '<span class="wsc-metric-val">' + _aurixEmergencyBadgeText(emg) + '</span>';
       el.className = 'chart-change ' + emg.color;
-    } else if (ready) {
-      // value_fallback — LINE ONLY: no % chip (a value change is not a return). Badge cleared.
-      el.innerHTML = '';
-      el.className = 'chart-change value-only';
     } else {
       el.innerHTML = (typeof _aurixReturnPendingHTML === 'function') ? _aurixReturnPendingHTML() : '<span class="wsc-metric-calc">Calculando…</span>';
       el.className = 'chart-change calculating';
     }
-    _aurixSetChartModeLabel(el, emg);   // performance vs value-fallback vs pending → explicit title
-    try { console.log('[UI][EMERGENCY_BADGE]', { surface: surface || null, state: emg && emg.state, mode: emg && emg.mode, showReturnBadge: emg && emg.showReturnBadge, reason: emg && emg.reason, returnPct: emg && emg.returnPct, chartHash: emg && emg.chartHash }); } catch (_) {}
+    try { console.log('[UI][EMERGENCY_BADGE]', { surface: surface || null, state: emg && emg.state, reason: emg && emg.reason, returnPct: emg && emg.returnPct, chartHash: emg && emg.chartHash }); } catch (_) {}
   } catch (_) {}
 }
 
@@ -23260,7 +23009,6 @@ try {
         firstRejectedSnapshot: p.firstRejectedSnapshot,
         renderDecision: p.renderDecision,
         renderDecisionReason: p.renderDecisionReason,
-        mode: p.mode, label: p.label, showReturnBadge: p.showReturnBadge, chartUsesPerformanceIndex: p.chartUsesPerformanceIndex,
         baselineSnapshot: p.baselineSnapshot,
         currentSnapshot: p.currentSnapshot,
         returnPct: p.returnPct,
@@ -23318,45 +23066,6 @@ try {
         },
       };
       try { console.log('%c[UI][HISTORICAL_PIPELINE_AUDIT]', 'font-weight:700', out); } catch (_) {}
-      return out;
-    };
-
-    // P0-INSTITUTIONAL-PERFORMANCE-ENGINE — the performance (flow-neutral) view of a range: what the
-    // visible chart actually draws (a normalized index, NOT raw balance), the cashflow ledger for the
-    // range, trusted coverage, and the raw-vs-flow-adjusted returns side by side. Read-only.
-    window.aurixInstitutionalPerformanceDebug = function (range) {
-      const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
-      const perf = buildInstitutionalPerformanceSeries(r);
-      const p = buildProductionPortfolioChart(r);
-      const v = perf.validated || {};
-      const desktop = p.points.map(pt => ({ time: pt.ts, value: pt.value }));
-      const mobile = p.points.map(pt => ({ ts: pt.ts, value: pt.value }));
-      const desktopHash = _aurixEmergencyHash(desktop.map(pt => ({ ts: pt.time, value: pt.value })));
-      const mobileHash = _aurixEmergencyHash(mobile);
-      const out = {
-        range: r,
-        rawSnapshotCount: (v.counts && v.counts.rawSnapshots) || 0,
-        validatedSnapshotCount: (v.validatedFull || []).length,
-        quarantinedSnapshotCount: (v.quarantined || []).length,
-        flowEventCount: (perf.flowEvents || []).length,
-        flowEvents: perf.flowEvents || [],
-        trustedPerformanceCoverage: perf.trustedPerformanceCoverage,
-        performancePointCount: (perf.performancePoints || []).length,
-        firstRawValue: perf.firstRawValue,
-        lastRawValue: perf.lastRawValue,
-        firstPerformanceIndex: (perf.performancePoints && perf.performancePoints.length) ? perf.performancePoints[0].value : null,
-        lastPerformanceIndex: (perf.performancePoints && perf.performancePoints.length) ? perf.performancePoints[perf.performancePoints.length - 1].value : null,
-        rawReturnPct: perf.rawReturnPct,
-        flowAdjustedReturnPct: perf.flowAdjustedReturnPct,
-        visibleReturnPct: p.returnPct,
-        chartUsesPerformanceIndex: p.chartUsesPerformanceIndex,
-        mode: p.mode, label: p.label, showReturnBadge: p.showReturnBadge,   // performance_index | value_fallback | pending
-        desktopMobileParity: desktopHash === mobileHash,
-        renderDecision: p.renderDecision,
-        pendingReason: p.state === 'pending' ? p.reason : null,
-        quarantinedSnapshots: (v.quarantined || []).map(q => ({ snapshotId: q.snapshotId, timestamp: q.timestamp, pipelineStage: q.pipelineStage, rejectionRule: q.rejectionRule, threshold: q.configuredThreshold, exactReason: q.exactReason })),
-      };
-      try { console.log('%c[UI][INSTITUTIONAL_PERFORMANCE_DEBUG]', 'font-weight:700', out); } catch (_) {}
       return out;
     };
   }
