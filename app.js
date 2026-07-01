@@ -23174,7 +23174,7 @@ try {
         gridLineCount: (domGrid != null ? domGrid : (yt.length + 5)),
         rightAxisLabelCount: (domYlab != null ? domYlab : yt.length),
         axisValues: yt.map(t => t.text),
-        plotBox: dbox, mobilePadding: { left: 14, right: 986, top: 24, bottom: 236 },
+        plotBox: dbox, mobilePadding: { left: 14, right: 900, top: 24, bottom: 236 },
         pointerLayerPresent: (plotPresent != null ? plotPresent : true),
         pointerEventsOk: (svgPtrNone != null ? svgPtrNone : true),
         hoverNearestPointWorks: hoverNearestPointWorks,
@@ -26642,7 +26642,10 @@ function renderAurixMobileLiteChart(range, token) {
         // fall back to the emergency polyline only if the geometry could not be built.
         // FIX 4 — safe edge padding (left/right + top/bottom) so the curve never touches the chart edge.
         // Only the plot BOX changes (scale maps into it); data/values are untouched, the curve is not cropped.
-        const _mbox = { left: 14, right: 986, top: 24, bottom: 236 };
+        // SPEC MOBILE.CHART.LAYOUT.01 — reserve a dedicated right gutter (900→1000) exclusively for the Y-axis
+        // labels so numbers breathe and never touch the card edge. Visual only: the value SCALE, data, tick
+        // positions and animations are unchanged; the curve/area/end simply map into the slightly narrower box.
+        const _mbox = { left: 14, right: 900, top: 24, bottom: 236 };
         const _rc = renderValidatedPortfolioChartWithInstitutionalRenderer(emg.points, { range: r, vw: VBW, vh: VBH, box: _mbox });
         const built = _rc.ok
           ? { linePath: _rc.linePath, areaPath: _rc.areaPath, pixels: _rc.visiblePixels, points: _rc.visiblePoints }
@@ -26653,14 +26656,16 @@ function renderAurixMobileLiteChart(range, token) {
         const gid = 'aurixLiteFill_' + tone;
         // FIX 2 — mobile right Y-axis labels from the SAME rendered scale (compact; right-aligned inside pad).
         const _myt = (_rc.ok && _rc.yScale && typeof _aurixInstitutionalYTicks === 'function') ? _aurixInstitutionalYTicks(_rc.yScale, 3) : [];
-        const _mYlabels = _myt.map(function (tk) { return '<text class="mob-ylab" x="982" y="' + Math.min(252, Math.max(14, tk.y + 5)).toFixed(0) + '" text-anchor="end" fill="rgba(159,176,199,0.55)" font-size="17" font-family="-apple-system,system-ui" style="pointer-events:none">' + tk.text + '</text>'; }).join('');
+        // SPEC MOBILE.CHART.LAYOUT.01 — labels right-aligned inside the reserved gutter with a constant margin
+        // from the card edge (x 982→966). Vertical position (tk.y), size, font, colour and opacity unchanged.
+        const _mYlabels = _myt.map(function (tk) { return '<text class="mob-ylab" x="966" y="' + Math.min(252, Math.max(14, tk.y + 5)).toFixed(0) + '" text-anchor="end" fill="rgba(159,176,199,0.55)" font-size="17" font-family="-apple-system,system-ui" style="pointer-events:none">' + tk.text + '</text>'; }).join('');
         const svg =
           '<svg class="aurix-lite-svg' + (_aurixMobileLitePrevRange !== r ? (' aurix-lite-in' + ((_aurixPremiumMotionOn() && !(typeof document !== 'undefined' && document.hidden) && !_dshReducedMotion()) ? ' aurix-pm' : '')) : '') + '" viewBox="0 0 ' + VBW + ' ' + VBH + '" preserveAspectRatio="none" width="100%" height="100%" style="display:block" aria-hidden="true">' +
             '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
               '<stop offset="0" stop-color="' + fillTop + '"/><stop offset="1" stop-color="rgba(0,0,0,0)"/>' +
             '</linearGradient></defs>' +
             '<g class="mob-chart-grid" pointer-events="none">' +
-              '<line class="h" x1="14" y1="77" x2="986" y2="77"/><line class="h" x1="14" y1="130" x2="986" y2="130"/><line class="h" x1="14" y1="183" x2="986" y2="183"/>' +
+              '<line class="h" x1="14" y1="77" x2="900" y2="77"/><line class="h" x1="14" y1="130" x2="900" y2="130"/><line class="h" x1="14" y1="183" x2="900" y2="183"/>' +
               '<line class="v" x1="257" y1="24" x2="257" y2="236"/><line class="v" x1="500" y1="24" x2="500" y2="236"/><line class="v" x1="743" y1="24" x2="743" y2="236"/>' +
             '</g>' +
             '<path class="aurix-lite-area" d="' + built.areaPath + '" fill="url(#' + gid + ')" stroke="none" pointer-events="none"/>' +

@@ -29,7 +29,7 @@ vm.runInContext(block('const _AURIX_X_FILL_BETA', '};'), sb);
 const DAY = 86400e3, HOUR = 36e5, NOW = 1000 * DAY;
 const N = 200, pts = Array.from({ length: N }, (_, i) => ({ ts: NOW - (N - 1 - i) * 3 * HOUR, value: +(9000 * (1 + 0.05 * i / (N - 1)) + Math.sin(i * 0.4) * 150).toFixed(2) }));
 const dbox = { left: 60, right: 940, top: 34, bottom: 206 };
-const mbox = { left: 14, right: 986, top: 24, bottom: 236 };
+const mbox = { left: 14, right: 900, top: 24, bottom: 236 };   // SPEC MOBILE.CHART.LAYOUT.01 — right gutter reserved for Y-axis labels
 const rcD = vm.runInContext('renderValidatedPortfolioChartWithInstitutionalRenderer(' + JSON.stringify(pts) + ',{range:"30d",vw:1000,vh:240,box:' + JSON.stringify(dbox) + '})', sb);
 const rcM = vm.runInContext('renderValidatedPortfolioChartWithInstitutionalRenderer(' + JSON.stringify(pts) + ',{range:"30d",vw:1000,vh:260,box:' + JSON.stringify(mbox) + '})', sb);
 // y-ticks computed INSIDE the sandbox (yScale carries invValueAtY as a live fn there)
@@ -72,8 +72,23 @@ ok('2 mobile grid layer preserved (mob-chart-grid)', /class="mob-chart-grid" poi
 ok('4 mobile right Y-axis labels present (mob-ylab from the same scale)', /_aurixInstitutionalYTicks\(_rc\.yScale, 3\)/.test(paintM) && /class="mob-ylab"/.test(paintM));
 ok('10 mobile padding — line never touches the chart edge (all pixels inside the padded box)', (function () {
   const xs = rcM.visiblePixels.map(q => q.x), ys = rcM.visiblePixels.map(q => q.y);
-  return Math.min.apply(null, xs) >= 14 - 0.5 && Math.max.apply(null, xs) <= 986 + 0.5 && Math.min.apply(null, ys) >= 24 - 0.5 && Math.max.apply(null, ys) <= 236 + 0.5;
+  return Math.min.apply(null, xs) >= 14 - 0.5 && Math.max.apply(null, xs) <= 900 + 0.5 && Math.min.apply(null, ys) >= 24 - 0.5 && Math.max.apply(null, ys) <= 236 + 0.5;
 })(), 'x[' + Math.min.apply(null, rcM.visiblePixels.map(q => q.x)).toFixed(0) + '..' + Math.max.apply(null, rcM.visiblePixels.map(q => q.x)).toFixed(0) + '] y[' + Math.min.apply(null, rcM.visiblePixels.map(q => q.y)).toFixed(0) + '..' + Math.max.apply(null, rcM.visiblePixels.map(q => q.y)).toFixed(0) + ']');
+
+console.log('\nSPEC MOBILE.CHART.LAYOUT.01 — premium right gutter for Y-axis labels (mobile only):');
+ok('L1 mobile plot box reserves a right gutter (right=900 of 1000 viewBox, ~100u for labels)',
+   /const _mbox = \{ left: 14, right: 900, top: 24, bottom: 236 \};/.test(paintM), 'right=900');
+ok('L2 curve/area map into the gutter box → all mobile pixels end at/inside x=900 (never over the labels)',
+   Math.max.apply(null, rcM.visiblePixels.map(q => q.x)) <= 900 + 0.5, 'maxX=' + Math.max.apply(null, rcM.visiblePixels.map(q => q.x)).toFixed(1));
+ok('L3 Y-labels right-aligned inside the gutter with a constant margin from the card edge (x=966, ~34u)',
+   /class="mob-ylab" x="966"[\s\S]{0,90}text-anchor="end"/.test(paintM));
+ok('L4 label gutter is clear of the curve (label right edge 966 sits inside 900..1000 gutter)',
+   966 > 900 && 966 < 1000);
+ok('L5 grid horizontal lines aligned to the plot right (x2=900, no lines running under the labels)',
+   /class="h" x1="14" y1="77" x2="900"/.test(paintM) && !/class="h"[^>]*x2="986"/.test(paintM));
+ok('L6 label typography/colour/opacity UNCHANGED (font-size 17, rgba(159,176,199,0.55))',
+   /class="mob-ylab"[\s\S]{0,120}fill="rgba\(159,176,199,0\.55\)" font-size="17"/.test(paintM));
+ok('L7 desktop plot box untouched (SPEC: no desktop change)', /W \* 0\.06/.test(paintD) && !/right: 900/.test(paintD));
 
 console.log('\nLine integrity + data/return untouched:');
 ok('11 visible path still contains cubic "C" commands (desktop + mobile)', /C /.test(rcD.linePath) && /C /.test(rcM.linePath), (rcD.linePath.match(/C /g) || []).length + ' / ' + (rcM.linePath.match(/C /g) || []).length);
