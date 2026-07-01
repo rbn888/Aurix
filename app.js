@@ -22507,6 +22507,240 @@ function _aurixProdVisualGate(points, range) {
   return { passed: true, reason: null };
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// P0-HISTORICAL-PIPELINE-AUDIT + SNAPSHOT QUARANTINE (root-cause layer)
+// ════════════════════════════════════════════════════════════════════════════
+// The historical pipeline is now fully observable and quarantines INDIVIDUAL corrupted snapshots
+// instead of rejecting whole ranges. If 99 snapshots are valid and 1 is corrupted, the corrupt one is
+// quarantined (with a structured diagnostic that names the exact snapshot + reason) and the other 99
+// render. A range is only PENDING when — AFTER quarantine — there are genuinely < 2 validated points.
+// No renderer heuristic decides validity; no magnitude-only ("plausibility"/"cliff") gate rejects a
+// range anymore (those were heuristic-only rejections). buildEmergencyInstitutionalChart is untouched.
+const _AURIX_HPQ_MIN_POINTS = 2;   // a line needs ≥2 validated points — the ONLY sufficiency floor
+// Snapshot validity is RANGE-INDEPENDENT: a mean-reverting / unconfirmed spike is corrupt on ANY range.
+// So spike quarantine uses a FIXED snapshot-level threshold, NOT the per-range visual-smoothness jump
+// (which is 0.50 on 30d/1y/all and would let a single +44% incomplete-sync snapshot through).
+const _AURIX_HPQ_SPIKE_JUMP = 0.20;         // a single-snapshot discontinuity beyond ±20% is suspect
+const _AURIX_HPQ_SPIKE_REVERT_FRAC = 0.5;   // …and a spike is confirmed when the next point returns within 10%
+
+function _aurixHpqIso(ts) { try { return new Date(ts).toISOString(); } catch (_) { return String(ts); } }
+
+// Structured per-snapshot quarantine diagnostic (never a generic reason).
+function _aurixHpqDiag(range, snap, index, prevSnap, stage, rule, threshold, why, decision) {
+  const prevV = prevSnap ? prevSnap.value : null;
+  const curV = snap ? snap.value : null;
+  const absD = (prevV != null && curV != null) ? +(curV - prevV).toFixed(2) : null;
+  const pctD = (prevV) ? +(((curV - prevV) / prevV) * 100).toFixed(2) : null;
+  const human = 'Snapshot ' + ((snap && snap.snapshotId) || ('#' + index))
+    + ' | ts ' + _aurixHpqIso(snap && snap.ts)
+    + (prevV != null ? (' | previous ' + prevV + ' -> current ' + curV + ' = ' + (pctD != null ? (pctD >= 0 ? '+' : '') + pctD + '%' : 'n/a') + ' jump')
+                     : (' | value ' + curV))
+    + (threshold != null ? (' | threshold ' + Math.round(threshold * 100) + '%') : '')
+    + ' | ' + why;
+  return {
+    range: range || null, snapshotIndex: index, snapshotId: (snap && snap.snapshotId) || ('#' + index),
+    timestamp: snap && snap.ts, previousTimestamp: prevSnap ? prevSnap.ts : null,
+    previousPortfolioValue: prevV, currentPortfolioValue: curV,
+    absoluteDelta: absD, percentageDelta: pctD,
+    pipelineStage: stage, rejectionRule: rule, configuredThreshold: threshold,
+    exactReason: human, rawSnapshot: (snap && snap.raw) || null,
+    quarantineDecision: decision || 'quarantined', downstreamImpact: null,
+  };
+}
+
+function _aurixHpqRangesContaining(ts, nowRef) {
+  const res = [];
+  ['24h', '7d', '30d', '1y', 'all'].forEach(rg => {
+    const span = _AURIX_EMG_RANGE_MS[rg];
+    const start = (rg === 'all' || !Number.isFinite(span)) ? -Infinity : nowRef - span;
+    if (Number.isFinite(ts) && ts >= start && ts <= nowRef + 864e5) res.push(rg);
+  });
+  return res;
+}
+
+// Stages 1–6: RawHistory → HistoryValidation → ChronologicalOrdering → DuplicateRemoval →
+// PortfolioNormalization → SnapshotValidation(zero/future). Per-snapshot instrumented. Never a range drop.
+const _AURIX_HPQ_FUTURE_MS = 365 * 864e5;   // a >365-day forward/backward gap at an endpoint = clock-skew outlier
+
+function _aurixHpqRawStages() {
+  let src = [];
+  try { src = (typeof _aurixHistorySourceForDisplay === 'function') ? _aurixHistorySourceForDisplay() : (typeof categoryHistory !== 'undefined' ? categoryHistory : []); } catch (_) { src = []; }
+  if (!Array.isArray(src)) src = [];
+  const counts = { rawSnapshots: src.length, invalidRecord: 0, nonFiniteValue: 0, futureSnapshots: 0, zeroValueSnapshots: 0, duplicateSnapshots: 0, staleSnapshots: 0 };
+  const quarantined = [];
+  const valid = [];
+  src.forEach((p, idx) => {
+    const id = 'snap#' + idx;
+    if (!p || !Number.isFinite(p.ts)) { counts.invalidRecord++; quarantined.push(_aurixHpqDiag(null, { ts: p && p.ts, value: null, snapshotId: id, raw: p }, idx, null, 'HistoryValidation', 'non_finite_timestamp', null, 'record has no finite timestamp')); return; }
+    const total = Number(p.total), re = Number(p.real_estate) || 0;
+    const invUSD = (Number.isFinite(total) ? total : NaN) - re;
+    let value; try { value = (typeof toBase === 'function') ? toBase(invUSD, 'USD') : invUSD; } catch (_) { value = invUSD; }
+    if (!Number.isFinite(value)) { counts.nonFiniteValue++; quarantined.push(_aurixHpqDiag(null, { ts: p.ts, value: value, snapshotId: id, raw: p }, idx, null, 'PortfolioNormalization', 'non_finite_value', null, 'normalized investable value is NaN/Infinity')); return; }
+    if (!(value > 0)) { counts.zeroValueSnapshots++; quarantined.push(_aurixHpqDiag(null, { ts: p.ts, value: value, snapshotId: id, raw: p }, idx, null, 'SnapshotValidation', 'zero_or_negative_value', null, 'normalized investable value is zero or negative')); return; }
+    valid.push({ ts: p.ts, value: value, index: idx, snapshotId: id, raw: p });
+  });
+  valid.sort((a, b) => a.ts - b.ts);
+  // Trailing FUTURE outliers — a lone final point >365d after its predecessor is clock-skew/corrupt.
+  // (nowRef must NOT be the corrupt point, else the whole range window shifts; anchor on real history.)
+  while (valid.length >= 2 && (valid[valid.length - 1].ts - valid[valid.length - 2].ts) > _AURIX_HPQ_FUTURE_MS) {
+    const last = valid[valid.length - 1], prev = valid[valid.length - 2];
+    counts.futureSnapshots++;
+    quarantined.push(_aurixHpqDiag(null, last, last.index, prev, 'SnapshotValidation', 'future_timestamp', null, 'timestamp is >365 days after the previous snapshot (clock skew / corrupt future record)'));
+    valid.pop();
+  }
+  // Leading STALE outliers — a lone first point >365d before the next is a stale/imported record.
+  while (valid.length >= 2 && (valid[1].ts - valid[0].ts) > _AURIX_HPQ_FUTURE_MS) {
+    const f0 = valid[0], f1 = valid[1];
+    counts.staleSnapshots++;
+    quarantined.push(_aurixHpqDiag(null, f0, f0.index, null, 'SnapshotValidation', 'stale_timestamp', null, 'leading snapshot is >365 days before the next (stale / imported record)'));
+    valid.shift();
+  }
+  const nowRef = valid.length ? valid[valid.length - 1].ts : (function () { try { return Date.now(); } catch (_) { return 0; } })();
+  const byTs = new Map();
+  valid.forEach(v => {
+    if (byTs.has(v.ts)) { counts.duplicateSnapshots++; const prev = byTs.get(v.ts); quarantined.push(_aurixHpqDiag(null, prev, prev.index, null, 'DuplicateRemoval', 'duplicate_timestamp', null, 'duplicate timestamp superseded by a later value for the same instant')); }
+    byTs.set(v.ts, v);
+  });
+  const deduped = Array.from(byTs.values()).sort((a, b) => a.ts - b.ts);
+  return { normalized: deduped, nowRef: nowRef, quarantined: quarantined, counts: counts };
+}
+
+// Stage 7 — construction-prefix quarantine: trim a leading regime that ends in a SUSTAINED step larger
+// than the range jump threshold (old construction/import baseline before the current regime). Returns
+// { series, trimmed }.
+function _aurixHpqTrimConstruction(series, jump) {
+  const n = series.length;
+  if (n < 3) return { series: series.slice(), trimmed: 0 };
+  let cut = 0;
+  const limit = Math.max(1, Math.floor(n * 0.5));
+  for (let i = 0; i < Math.min(n - 1, limit); i++) {
+    const a = series[i].value, b = series[i + 1].value;
+    const step = Math.abs(b - a) / (a || 1);
+    if (step > jump) {
+      let sustained = true;
+      for (let k = i + 1; k < Math.min(n, i + 4); k++) { if (Math.abs(series[k].value - b) / (b || 1) > jump) { sustained = false; break; } }
+      if (sustained) cut = i + 1;   // everything up to & including i is the construction prefix
+    }
+  }
+  return { series: series.slice(cut), trimmed: cut };
+}
+
+// Stage 8 — spike quarantine: individual snapshots that create a discontinuity > threshold and either
+// mean-revert (interior) or are unconfirmed at an endpoint (incomplete synchronization / valuation
+// spike). Returns { kept, quarantined:[diag] }. Never rejects the whole series.
+function _aurixHpqQuarantineSpikes(series, spikeJump, range) {
+  const quarantined = [];
+  const revertBand = spikeJump * _AURIX_HPQ_SPIKE_REVERT_FRAC;
+  if (!Array.isArray(series) || series.length <= 2) return { kept: (series || []).slice(), quarantined: quarantined };
+  const kept = [series[0]];
+  for (let i = 1; i < series.length - 1; i++) {
+    const prevSnap = kept[kept.length - 1], prev = prevSnap.value, cur = series[i].value, next = series[i + 1].value;
+    const up = Math.abs(cur - prev) / (prev || 1);
+    const revert = Math.abs(next - prev) / (prev || 1);
+    // A spike jumps > threshold AND its successor RETURNS near the pre-spike value (mean reversion) — a
+    // sustained step (real deposit/regime change) has a large revert and is kept.
+    if (up > spikeJump && revert < revertBand) {
+      quarantined.push(_aurixHpqDiag(range, series[i], series[i].index, prevSnap, 'SpikeDetection', 'spike_meanreverting', spikeJump, 'single snapshot created a ' + (+(up * 100).toFixed(2)) + '% discontinuity that mean-reverts on the next point (incomplete synchronization / transient valuation spike)'));
+      continue;
+    }
+    kept.push(series[i]);
+  }
+  kept.push(series[series.length - 1]);
+  // Endpoint: unconfirmed final jump (a lone corrupt "current" value) → quarantine, use prior as current.
+  if (kept.length >= 3) {
+    const L = kept.length, last = kept[L - 1], prevLast = kept[L - 2];
+    const up = Math.abs(last.value - prevLast.value) / (prevLast.value || 1);
+    if (up > spikeJump) { quarantined.push(_aurixHpqDiag(range, last, last.index, prevLast, 'SpikeDetection', 'endpoint_unconfirmed_final', spikeJump, 'final snapshot jumped ' + (+(up * 100).toFixed(2)) + '% with no following confirmation (likely incomplete sync); prior confirmed value used as current')); kept.pop(); }
+  }
+  // Endpoint: isolated leading jump while the following points form a stable regime → quarantine first.
+  if (kept.length >= 3) {
+    const f0 = kept[0], f1 = kept[1], f2 = kept[2];
+    const up = Math.abs(f1.value - f0.value) / (f0.value || 1);
+    const conf = Math.abs(f2.value - f1.value) / (f1.value || 1);
+    if (up > spikeJump && conf <= spikeJump) { quarantined.push(_aurixHpqDiag(range, f0, f0.index, null, 'SpikeDetection', 'endpoint_isolated_leading', spikeJump, 'leading snapshot isolated by a ' + (+(up * 100).toFixed(2)) + '% step while the following points form a stable regime (construction/sync artifact)')); kept.shift(); }
+  }
+  return { kept: kept, quarantined: quarantined };
+}
+
+function _aurixHpqFirstInvalidStage(counts) {
+  if (counts.invalidRecord || counts.nonFiniteValue) return 'HistoryValidation';
+  if (counts.duplicateSnapshots) return 'DuplicateRemoval';
+  if (counts.futureSnapshots || counts.zeroValueSnapshots) return 'SnapshotValidation';
+  if (counts.constructionSnapshots) return 'ConstructionPrefix';
+  if (counts.spikeRejectedSnapshots) return 'SpikeDetection';
+  if (counts.plateauCollapsed) return 'PlateauCleanup';
+  return null;
+}
+
+// THE validated historical series builder. Runs the full staged pipeline with snapshot-level quarantine
+// and returns the validated full-history series + the range-extracted series + complete diagnostics.
+// No renderer is allowed to repeat these steps.
+function buildValidatedHistoricalSeries(range) {
+  const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+  const jump = _AURIX_EMG_ADJ_JUMP[r] || _AURIX_EMG_ADJ_JUMP.all;
+  const out = {
+    range: r, stages: [], validatedFull: [], rangeSeries: [], quarantined: [], nowRef: 0,
+    counts: {}, firstInvalidStage: null, firstRejectedSnapshot: null,
+    collapsedRange: false, rangeCollapsedBecauseHistoryTooShort: false,
+  };
+  const rawS = _aurixHpqRawStages();
+  out.nowRef = rawS.nowRef;
+  out.counts = Object.assign({}, rawS.counts, { constructionSnapshots: 0, spikeRejectedSnapshots: 0, plateauCollapsed: 0 });
+  rawS.quarantined.forEach(q => { q.range = r; out.quarantined.push(q); });
+  let series = rawS.normalized;
+  out.stages.push({ stage: 'RawHistory', outCount: rawS.counts.rawSnapshots });
+  out.stages.push({ stage: 'HistoryValidation/Normalization/Dedup', outCount: series.length });
+  if (series.length < 1) { out.firstInvalidStage = _aurixHpqFirstInvalidStage(out.counts) || 'HistoryValidation'; return out; }
+
+  // Stage 7 — spike quarantine (interior + endpoints). Runs BEFORE construction detection so a local
+  // spike can never be mistaken for a "sustained regime change" and trigger wrongful prefix trimming.
+  // Uses the FIXED snapshot-level threshold (range-independent) so a single corrupted snapshot is caught
+  // on EVERY range, not just the tight-threshold short ranges.
+  const spk = _aurixHpqQuarantineSpikes(series, _AURIX_HPQ_SPIKE_JUMP, r);
+  spk.quarantined.forEach(d => out.quarantined.push(d));
+  out.counts.spikeRejectedSnapshots = spk.quarantined.length;
+  series = spk.kept;
+  out.stages.push({ stage: 'SpikeDetection', outCount: series.length });
+
+  // Stage 8 — construction prefix (on the de-spiked series): trim a leading regime that ends in a
+  // sustained step into the current regime.
+  const con = _aurixHpqTrimConstruction(series, jump);
+  out.counts.constructionSnapshots = con.trimmed;
+  for (let i = 0; i < con.trimmed; i++) out.quarantined.push(_aurixHpqDiag(r, series[i], series[i].index, i > 0 ? series[i - 1] : null, 'ConstructionPrefix', 'construction_prefix', jump, 'leading construction/regime point before a sustained ' + Math.round(jump * 100) + '% step into the current regime'));
+  series = con.series;
+  out.stages.push({ stage: 'ConstructionPrefix', outCount: series.length });
+
+  // Stage 9 — plateau cleanup
+  const plat = _aurixProdPlateauFilter(series);
+  out.counts.plateauCollapsed = plat.removed;
+  series = plat.points;
+  out.stages.push({ stage: 'PlateauCleanup', outCount: series.length });
+
+  out.validatedFull = series.slice();
+  out.stages.push({ stage: 'CleanHistoricalSeries', outCount: series.length });
+
+  // Stage 10 — range extraction (anchored on last snapshot ts, never Date.now())
+  const span = _AURIX_EMG_RANGE_MS[r];
+  const startTs = (r === 'all' || !Number.isFinite(span)) ? -Infinity : out.nowRef - span;
+  out.rangeCollapsedBecauseHistoryTooShort = (r !== 'all') && Number.isFinite(startTs) && series.length > 0 && series[0].ts >= startTs;
+  let ranged = series.filter(p => p.ts >= startTs);
+  if (ranged.length < _AURIX_HPQ_MIN_POINTS) {
+    const tail = series.slice(-_AURIX_EMG_FALLBACK_TAIL);
+    if (tail.length >= _AURIX_HPQ_MIN_POINTS) { ranged = tail; out.collapsedRange = true; out.rangeCollapsedBecauseHistoryTooShort = true; }
+  }
+  out.rangeSeries = ranged;
+  out.stages.push({ stage: 'RangeExtraction', outCount: ranged.length });
+
+  out.firstInvalidStage = _aurixHpqFirstInvalidStage(out.counts);
+  out.firstRejectedSnapshot = out.quarantined.length ? out.quarantined[0] : null;
+  out.quarantined.forEach(q => { q.downstreamImpact = _aurixHpqRangesContaining(q.timestamp, out.nowRef); });
+  return out;
+}
+try { if (typeof window !== 'undefined') window.buildValidatedHistoricalSeries = buildValidatedHistoricalSeries; } catch (_) {}
+
+// PASSIVE CONSUMER. The visible chart reads the ALREADY-VALIDATED series. READY/PENDING is decided ONLY
+// by validated-point sufficiency (≥2 after quarantine). The visual gate is retained as a DIAGNOSTIC field
+// but NEVER rejects a range. Return is first→last of the validated range points (line return == badge).
 function buildProductionPortfolioChart(range) {
   const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
   const out = {
@@ -22519,57 +22753,61 @@ function buildProductionPortfolioChart(range) {
     rawPointCount: 0, cleanPointCount: 0, finalPointCount: 0,
     rejectedInvalidCount: 0, rejectedConstructionCount: 0, rejectedSpikeCount: 0, rejectedPlateauCount: 0,
     visualQualityPassed: false, visualRejectReason: null,
+    // root-cause audit fields
+    quarantinedSnapshotCount: 0, quarantinedSnapshots: [],
+    cleanPointCountBeforeRange: 0, cleanPointCountAfterRange: 0, cleanPointCountAfterQuarantine: 0,
+    firstInvalidStage: null, firstRejectedSnapshot: null,
+    renderDecision: null, renderDecisionReason: null,
+    baselineSnapshot: null, currentSnapshot: null,
   };
   try {
-    const emg = buildEmergencyInstitutionalChart(r);   // sort/dedupe/reject-invalid/strip-construction/de-spike
-    out.rawPointCount = emg.rawPointCount || 0;
-    out.cleanPointCount = emg.cleanPointCount || 0;
-    out.rejectedInvalidCount = (emg.rejectedCount || 0) + (emg.rejectedDuplicateCount || 0);
-    out.rejectedConstructionCount = emg.rejectedConstructionPrefixCount || 0;
-    out.rejectedSpikeCount = emg.rejectedSpikeCount || 0;
-    out.collapsedRange = !!emg.collapsedRange;
-    out.rangeCollapsedBecauseHistoryTooShort = !!emg.rangeCollapsedBecauseHistoryTooShort;
-    if (emg.state !== 'ready' || !Array.isArray(emg.points) || emg.points.length < 2) {
-      out.reason = emg.reason || emg.pendingReason || 'pending'; out.pendingReason = out.reason; return out;
+    const v = buildValidatedHistoricalSeries(r);
+    const c = v.counts || {};
+    out.rawPointCount = c.rawSnapshots || 0;
+    out.quarantinedSnapshotCount = v.quarantined.length;
+    out.quarantinedSnapshots = v.quarantined;
+    out.cleanPointCountBeforeRange = v.validatedFull.length;
+    out.cleanPointCountAfterQuarantine = v.validatedFull.length;
+    out.cleanPointCount = v.validatedFull.length;
+    out.cleanPointCountAfterRange = v.rangeSeries.length;
+    out.firstInvalidStage = v.firstInvalidStage;
+    out.firstRejectedSnapshot = v.firstRejectedSnapshot;
+    out.rejectedConstructionCount = c.constructionSnapshots || 0;
+    out.rejectedSpikeCount = c.spikeRejectedSnapshots || 0;
+    out.rejectedPlateauCount = c.plateauCollapsed || 0;
+    out.rejectedInvalidCount = (c.invalidRecord || 0) + (c.nonFiniteValue || 0) + (c.futureSnapshots || 0) + (c.zeroValueSnapshots || 0) + (c.duplicateSnapshots || 0);
+    out.collapsedRange = !!v.collapsedRange;
+    out.rangeCollapsedBecauseHistoryTooShort = !!v.rangeCollapsedBecauseHistoryTooShort;
+
+    const pts = v.rangeSeries;
+    out.finalPointCount = pts.length;
+
+    // READY / PENDING — sufficiency of VALIDATED points ONLY (post-quarantine). No heuristic rejects here.
+    if (pts.length < _AURIX_HPQ_MIN_POINTS) {
+      out.state = 'pending'; out.reason = 'insufficient_validated_points'; out.pendingReason = out.reason;
+      out.renderDecision = 'PENDING';
+      out.renderDecisionReason = 'only ' + pts.length + ' validated point(s) remain after quarantine (need ' + _AURIX_HPQ_MIN_POINTS + ')';
+      if (pts.length >= 1) { out.baselineValue = +pts[0].value.toFixed(2); out.currentValue = +pts[pts.length - 1].value.toFixed(2); out.firstValue = out.baselineValue; out.lastValue = out.currentValue; }
+      return out;
     }
 
-    // Rule 8 — remove flat telemetry plateaus (endpoints preserved).
-    const plat = _aurixProdPlateauFilter(emg.points);
-    out.rejectedPlateauCount = plat.removed;
-    const pts = plat.points;
-    out.finalPointCount = pts.length;
-    if (pts.length < 2) { out.reason = 'insufficient_visual_points'; out.pendingReason = out.reason; return out; }
-
-    // Rules 9/10/11 — baseline = first FINAL point, current = last FINAL point, return from them ONLY.
     const first = pts[0], last = pts[pts.length - 1];
     const returnPct = ((last.value - first.value) / first.value) * 100;
+    // Visual quality — DIAGNOSTIC ONLY (never rejects; quarantine already removed cliffs/towers).
+    try { const vg = _aurixProdVisualGate(pts.map(p => ({ value: p.value, ts: p.ts })), r); out.visualQualityPassed = vg.passed; out.visualRejectReason = vg.reason; } catch (_) {}
 
-    // Hard plausibility gate (24h10/7d20/30d30/1y50/all50). No capital-flow explanation wired ⇒ reject.
-    const gate = _AURIX_PROD_GATE_PCT[r] || _AURIX_PROD_GATE_PCT.all;
-    if (!Number.isFinite(returnPct) || Math.abs(returnPct) > gate) {
-      out.reason = 'pending_sanity'; out.pendingReason = out.reason;
-      out.firstValue = first.value; out.lastValue = last.value; out.baselineValue = first.value; out.currentValue = last.value;
-      return out;
-    }
-
-    // Visual quality gate — no vertical walls / dominant cliffs / flatlines / under-populated series.
-    const vg = _aurixProdVisualGate(pts, r);
-    out.visualQualityPassed = vg.passed; out.visualRejectReason = vg.reason;
-    if (!vg.passed) {
-      out.reason = vg.reason; out.pendingReason = vg.reason;
-      out.firstValue = first.value; out.lastValue = last.value; out.baselineValue = first.value; out.currentValue = last.value;
-      return out;
-    }
-
-    // READY — the drawn line IS pts; the return is its first→last (line return === badge return).
     out.state = 'ready';
     out.reason = out.rangeCollapsedBecauseHistoryTooShort ? 'range_collapsed_history_short' : 'ok';
+    out.renderDecision = 'READY';
+    out.renderDecisionReason = pts.length + ' validated points after quarantine';
     out.points = pts.map(p => ({ ts: p.ts, value: +p.value.toFixed(2) }));
     out.pointCount = out.points.length; out.finalPointCount = out.points.length;
     out.firstTs = out.points[0].ts; out.lastTs = out.points[out.pointCount - 1].ts;
     out.firstValue = out.points[0].value; out.lastValue = out.points[out.pointCount - 1].value;
     out.baselineTs = first.ts; out.baselineValue = +first.value.toFixed(2);
     out.currentTs = last.ts; out.currentValue = +last.value.toFixed(2);
+    out.baselineSnapshot = { snapshotId: first.snapshotId || null, ts: first.ts, value: +first.value.toFixed(2) };
+    out.currentSnapshot = { snapshotId: last.snapshotId || null, ts: last.ts, value: +last.value.toFixed(2) };
     out.returnPct = +returnPct.toFixed(4); out.lineReturnPct = out.returnPct; out.badgeReturnPct = out.returnPct;
     out.returnValue = +(last.value - first.value).toFixed(2);
     out.color = returnPct > 0.05 ? 'up' : (returnPct < -0.05 ? 'down' : 'flat');
@@ -22577,6 +22815,7 @@ function buildProductionPortfolioChart(range) {
     return out;
   } catch (e) {
     out.state = 'pending'; out.reason = 'exception:' + ((e && e.message) || 'err'); out.pendingReason = out.reason;
+    out.renderDecision = 'PENDING'; out.renderDecisionReason = out.reason;
     return out;
   }
 }
@@ -22676,9 +22915,9 @@ try {
     window.disableAurixEmergencyChart = function () { try { window.AURIX_EMERGENCY_CHART = false; } catch (_) {} try { if (typeof renderWealthCurve === 'function') renderWealthCurve(false); } catch (_) {} try { if (typeof scheduleAurixMobileLite === 'function') scheduleAurixMobileLite(); } catch (_) {} return false; };
     window.enableAurixEmergencyChart = function () { try { window.AURIX_EMERGENCY_CHART = true; } catch (_) {} try { if (typeof renderWealthCurve === 'function') renderWealthCurve(false); } catch (_) {} try { if (typeof scheduleAurixMobileLite === 'function') scheduleAurixMobileLite(); } catch (_) {} return true; };
 
-    // P0-PRODUCTION-PORTFOLIO-CHART — acceptance diagnostic for the VISIBLE chart (the function the
-    // desktop/mobile line + badge actually read). Proves desktop/mobile parity, the visual-quality
-    // verdict, and that the % equals the first→last of the drawn line. Read-only.
+    // P0-HISTORICAL-PIPELINE-AUDIT — per-range diagnostic for the VISIBLE chart (the function the
+    // desktop/mobile line + badge actually read). Shows the quarantine ledger, the first invalid stage,
+    // the render decision, baseline/current snapshots and desktop/mobile parity. Read-only.
     window.aurixProductionChartDebug = function (range) {
       const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
       const p = buildProductionPortfolioChart(r);
@@ -22687,15 +22926,74 @@ try {
       const desktopHash = _aurixEmergencyHash(desktop.map(pt => ({ ts: pt.time, value: pt.value })));
       const mobileHash = _aurixEmergencyHash(mobile);
       const out = {
-        range: r, state: p.state, reason: p.reason,
-        rawPointCount: p.rawPointCount, cleanPointCount: p.cleanPointCount, finalPointCount: p.finalPointCount,
-        rejectedInvalidCount: p.rejectedInvalidCount, rejectedConstructionCount: p.rejectedConstructionCount,
-        rejectedSpikeCount: p.rejectedSpikeCount, rejectedPlateauCount: p.rejectedPlateauCount,
-        firstValue: p.firstValue, lastValue: p.lastValue, returnPct: p.returnPct,
-        visualQualityPassed: p.visualQualityPassed,
+        range: r,
+        rawPointCount: p.rawPointCount,
+        quarantinedSnapshotCount: p.quarantinedSnapshotCount,
+        quarantinedSnapshots: p.quarantinedSnapshots,
+        cleanPointCountBeforeRange: p.cleanPointCountBeforeRange,
+        cleanPointCountAfterRange: p.cleanPointCountAfterRange,
+        cleanPointCountAfterQuarantine: p.cleanPointCountAfterQuarantine,
+        firstInvalidStage: p.firstInvalidStage,
+        firstRejectedSnapshot: p.firstRejectedSnapshot,
+        renderDecision: p.renderDecision,
+        renderDecisionReason: p.renderDecisionReason,
+        baselineSnapshot: p.baselineSnapshot,
+        currentSnapshot: p.currentSnapshot,
+        returnPct: p.returnPct,
         desktopHash: desktopHash, mobileHash: mobileHash, desktopMobileParity: desktopHash === mobileHash,
+        // convenience mirrors
+        state: p.state, reason: p.reason, visualQualityPassed: p.visualQualityPassed,
       };
       try { console.log('%c[UI][PRODUCTION_CHART_DEBUG]', 'font-weight:700', out); } catch (_) {}
+      return out;
+    };
+
+    // P0-HISTORICAL-PIPELINE-AUDIT — GLOBAL audit over the whole history + all ranges, with an automatic
+    // ROOT CAUSE REPORT (first corrupted snapshot, why, which ranges it contaminates, whether quarantine
+    // solved it, whether READY became possible, whether renderer changes are still needed). Read-only.
+    window.aurixHistoricalPipelineAudit = function () {
+      const full = buildValidatedHistoricalSeries('all');
+      const c = full.counts || {};
+      const q = full.quarantined || [];
+      const by = rule => q.filter(x => x.rejectionRule === rule).length;
+      const rangeSummary = {};
+      ['24h', '7d', '30d', '1y', 'all'].forEach(rg => {
+        const p = buildProductionPortfolioChart(rg);
+        rangeSummary[rg] = {
+          renderDecision: p.renderDecision, reason: p.reason,
+          rawPointCount: p.rawPointCount, cleanPointCountAfterQuarantine: p.cleanPointCountAfterQuarantine,
+          cleanPointCountAfterRange: p.cleanPointCountAfterRange,
+          quarantinedSnapshotCount: p.quarantinedSnapshotCount,
+          firstInvalidStage: p.firstInvalidStage, returnPct: p.returnPct,
+        };
+      });
+      const firstCorrupt = q.length ? q[0] : null;
+      const contaminated = firstCorrupt ? (firstCorrupt.downstreamImpact || []) : [];
+      const readyRanges = Object.keys(rangeSummary).filter(k => rangeSummary[k].renderDecision === 'READY');
+      const out = {
+        rawSnapshots: c.rawSnapshots || 0,
+        validSnapshots: full.validatedFull.length,
+        quarantinedSnapshots: q.length,
+        duplicateSnapshots: c.duplicateSnapshots || 0,
+        constructionSnapshots: c.constructionSnapshots || 0,
+        staleSnapshots: c.staleSnapshots || 0,
+        zeroValueSnapshots: c.zeroValueSnapshots || 0,
+        futureSnapshots: c.futureSnapshots || 0,
+        baselineRejectedSnapshots: by('endpoint_isolated_leading'),
+        spikeRejectedSnapshots: c.spikeRejectedSnapshots || 0,
+        quarantineLedger: q,
+        rangeSummary: rangeSummary,
+        rootCauseReport: {
+          firstCorruptedSnapshot: firstCorrupt,
+          whyInvalid: firstCorrupt ? firstCorrupt.exactReason : 'no corrupted snapshot detected',
+          contaminatedRanges: contaminated,
+          quarantineSolved: q.length > 0,
+          readyBecamePossible: readyRanges,
+          rendererChangesNeeded: false,
+          note: 'READY/PENDING is decided ONLY by validated-point sufficiency (>=' + _AURIX_HPQ_MIN_POINTS + ' after quarantine). No renderer/plausibility/cliff heuristic can reject a range; every rejection names the exact snapshot(s) above.',
+        },
+      };
+      try { console.log('%c[UI][HISTORICAL_PIPELINE_AUDIT]', 'font-weight:700', out); } catch (_) {}
       return out;
     };
   }

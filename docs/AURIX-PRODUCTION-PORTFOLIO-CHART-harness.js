@@ -36,10 +36,13 @@ function makeEnv(hist) {
     'const _AURIX_EMG_SANITY_PCT = {"24h":10,"7d":20,"30d":35,"1y":50,"all":50};' +
     'const _AURIX_EMG_MIN_POINTS = 2; const _AURIX_EMG_FALLBACK_TAIL = 8;' +
     'const _AURIX_PROD_GATE_PCT = {"24h":10,"7d":20,"30d":30,"1y":50,"all":50};' +
-    'const _AURIX_PROD_MIN_POINTS = {"24h":3,"7d":6,"30d":6,"1y":6,"all":6};', sb);
+    'const _AURIX_PROD_MIN_POINTS = {"24h":3,"7d":6,"30d":6,"1y":6,"all":6};' +
+    'const _AURIX_HPQ_MIN_POINTS = 2; const _AURIX_HPQ_FUTURE_MS = 365*864e5; const _AURIX_HPQ_SPIKE_JUMP = 0.20; const _AURIX_HPQ_SPIKE_REVERT_FRAC = 0.5;', sb);
   ['_aurixEmergencyHash', '_aurixEmergencyRawSeries', '_aurixEmergencyTrimPrefix', '_aurixEmergencyDeSpike',
     'buildEmergencyInstitutionalChart', '_aurixProdPlateauFilter', '_aurixProdVisualGate',
-    'buildProductionPortfolioChart'].forEach(f => vm.runInContext(fnSrc(f), sb));
+    '_aurixHpqIso', '_aurixHpqDiag', '_aurixHpqRangesContaining', '_aurixHpqRawStages',
+    '_aurixHpqTrimConstruction', '_aurixHpqQuarantineSpikes', '_aurixHpqFirstInvalidStage',
+    'buildValidatedHistoricalSeries', 'buildProductionPortfolioChart'].forEach(f => vm.runInContext(fnSrc(f), sb));
   return sb;
 }
 const P = (sb, r) => vm.runInContext('buildProductionPortfolioChart(' + JSON.stringify(r) + ')', sb);
@@ -71,35 +74,36 @@ for (let k = 0; k < 8; k++) plateauData.push({ ts: LAST - (7 - k) * DAY, total: 
 
 console.log('AURIX-PRODUCTION-PORTFOLIO-CHART — P0 FINAL CUT\n');
 
-console.log('Rejection of bad baselines / bad points:');
+console.log('Root-cause behavior — corrupted snapshots quarantined, NOT whole-range rejected:');
 { const p = P(makeEnv(construction), 'all');
-  ok('1 +60% construction artifact rejected (pending, no %)', p.state === 'pending' && p.returnPct === null, p.reason); }
+  ok('1 +60% construction artifact quarantined at source (baseline ≠ 5503, no +60% shown)',
+    p.rejectedConstructionCount >= 1 && p.baselineValue !== 5503 && (p.returnPct === null || Math.abs(p.returnPct) <= 30), 'baseline=' + p.baselineValue + ' pct=' + p.returnPct); }
 { const p = P(makeEnv(regimeHigh), '30d');
-  ok('2 -67% regime baseline rejected (baseline ≠ 5503, no ≈ -67%)',
+  ok('2 -67% regime baseline quarantined (baseline ≠ 5503, no ≈ -67%)',
     p.baselineValue !== 5503 && (p.state !== 'ready' || p.returnPct > -30), 'baseline=' + p.baselineValue + ' pct=' + p.returnPct); }
 { const p = P(makeEnv(towerData), '24h');
-  ok('3 vertical one-point tower rejected (spike removed, not in points, chart stays clean)',
-    p.rejectedSpikeCount >= 1 && (p.points || []).every(pt => pt.value !== 13500), 'spikes=' + p.rejectedSpikeCount + ' state=' + p.state); }
+  ok('3 vertical one-point tower quarantined (spike removed, not in points, chart stays READY)',
+    p.rejectedSpikeCount >= 1 && (p.points || []).every(pt => pt.value !== 13500) && p.state === 'ready', 'spikes=' + p.rejectedSpikeCount + ' state=' + p.state); }
 { const p = P(makeEnv(plateauData), '30d');
-  ok('4 flat construction plateau rejected (plateau collapsed, pending, no %)',
-    p.rejectedPlateauCount >= 1 && p.state === 'pending' && p.returnPct === null, 'plateau=' + p.rejectedPlateauCount + ' ' + p.reason); }
+  ok('4 flat plateau collapsed (duplicate values removed at source)',
+    p.rejectedPlateauCount >= 1, 'plateau=' + p.rejectedPlateauCount + ' ' + p.reason); }
 
-console.log('\nValid smooth lines draw:');
+console.log('\nValid smooth lines draw (renderer is passive consumer of the validated series):');
 { const p = P(makeEnv(smooth(24, 23, 8600, 2)), '24h');
-  ok('5 24H valid smooth line draws (ready, visual gate passed, within 10%)',
-    p.state === 'ready' && p.visualQualityPassed === true && Math.abs(p.returnPct) <= 10 && p.points.length >= 3, 'pct=' + p.returnPct + ' n=' + p.points.length); }
+  ok('5 24H valid smooth line draws (READY, from validated series)',
+    p.state === 'ready' && p.renderDecision === 'READY' && Math.abs(p.returnPct) <= 10 && p.points.length >= 2, 'pct=' + p.returnPct + ' n=' + p.points.length); }
 { const p = P(makeEnv(smooth(40, 160, 8600, 3)), '7d');
-  ok('6 7D valid smooth line draws (ready, visual gate passed, within 20%)',
-    p.state === 'ready' && p.visualQualityPassed === true && Math.abs(p.returnPct) <= 20 && p.points.length >= 6, 'pct=' + p.returnPct + ' n=' + p.points.length); }
+  ok('6 7D valid smooth line draws (READY)',
+    p.state === 'ready' && p.renderDecision === 'READY' && Math.abs(p.returnPct) <= 20 && p.points.length >= 6, 'pct=' + p.returnPct + ' n=' + p.points.length); }
 
-console.log('\nInvalid construction long ranges → pending:');
+console.log('\nConstruction long ranges: the low regime is quarantined, the real regime renders:');
 { ['30d', '1y', 'all'].forEach((rg, idx) => { const p = P(makeEnv(construction), rg);
-  ok((7 + idx) + ' ' + rg.toUpperCase() + ' construction line becomes pending (no fabricated %)',
-    p.state === 'pending' && p.returnPct === null && p.points.length === 0, rg + ':' + p.reason); }); }
-{ // tighter 30d gate (30% < emergency 35%): a clean +32% over 30d must be pending_sanity
-  const p = P(makeEnv(smooth(10, 20 * 24, 6800, 240)), '30d');   // 6800→8960 ≈ +31.8%
-  ok('7b 30D clean +32% exceeds the tightened 30% gate → pending_sanity',
-    p.state === 'pending' && p.reason === 'pending_sanity' && p.returnPct === null, 'pct-would-be≈+31.8'); }
+  ok((7 + idx) + ' ' + rg.toUpperCase() + ' construction: baseline is the real regime (≠5503), no +60% fabricated',
+    p.baselineValue !== 5503 && (p.returnPct === null || Math.abs(p.returnPct) <= 30), rg + ':' + p.reason + ' base=' + p.baselineValue); }); }
+{ // a GENUINE +32% ramp with no artifact now RENDERS (trust the validated series — no heuristic gate)
+  const p = P(makeEnv(smooth(10, 20 * 24, 6800, 240)), '30d');   // 6800→8960 ≈ +31.8%, no corrupted snapshot
+  ok('7b 30D genuine +32% ramp (no artifact) → READY (validated series is trusted)',
+    p.state === 'ready' && p.returnPct > 30 && p.quarantinedSnapshotCount === 0, 'pct=' + p.returnPct); }
 
 console.log('\nParity + return integrity + pending honesty:');
 { const sb = makeEnv(smooth(24, 23, 8600, 2)); const p = P(sb, '24h');
@@ -109,8 +113,9 @@ console.log('\nParity + return integrity + pending honesty:');
   const expected = ((p.points[p.points.length - 1].value - p.points[0].value) / p.points[0].value) * 100;
   ok('11 return equals first→last of the visible line (line == badge)',
     p.lineReturnPct === p.badgeReturnPct && p.lineReturnPct === p.returnPct && Math.abs(p.returnPct - expected) < 0.01, 'pct=' + p.returnPct); }
-{ const p = P(makeEnv(construction), 'all');
-  ok('12 no percentage when pending (returnPct null)', p.returnPct === null && p.lineReturnPct === null && p.badgeReturnPct === null);
+{ // genuinely insufficient history (1 validated point after quarantine) → the ONLY pending class
+  const p = P(makeEnv([{ ts: LAST, total: 8000, real_estate: 0 }]), '30d');
+  ok('12 no percentage when pending (returnPct null)', p.state === 'pending' && p.reason === 'insufficient_validated_points' && p.returnPct === null && p.lineReturnPct === null && p.badgeReturnPct === null, p.reason);
   ok('13 no line when pending (points empty)', Array.isArray(p.points) && p.points.length === 0); }
 
 // ── Calm-window false-pending fix (scale-stable visual gate) ────────────────────────────────────
@@ -141,7 +146,7 @@ console.log('\nTrue cliffs / walls still blocked (scale-stable |Δ|/prevValue th
   ok('C5 calm-window bypass: low-amplitude noisy window passes the visual gate', g.passed === true && g.reason === null, JSON.stringify(g)); }
 
 console.log('\nHard protections preserved after the fix:');
-{ ok('C6 +60% construction artifact still pending_sanity', (function () { const p = P(makeEnv(construction), '30d'); return p.state === 'pending' && p.reason === 'pending_sanity' && p.returnPct === null; })());
+{ ok('C6 +60% construction artifact never shown as +60% (quarantined at source)', (function () { const p = P(makeEnv(construction), '30d'); return p.baselineValue !== 5503 && (p.returnPct === null || Math.abs(p.returnPct) <= 30); })());
   ok('C7 -67% regime baseline still rejected (baseline ≠ 5503)', (function () { const p = P(makeEnv(regimeHigh), '30d'); return p.baselineValue !== 5503 && (p.state !== 'ready' || p.returnPct > -30); })());
   ok('C8 vertical tower still removed (not in points)', (function () { const p = P(makeEnv(towerData), '24h'); return p.rejectedSpikeCount >= 1 && (p.points || []).every(pt => pt.value !== 13500); })()); }
 
