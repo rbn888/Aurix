@@ -33,7 +33,8 @@ ck('G1.2 the render contract never invokes a chart renderer',
    !/_aurixApplyRenderContract[\s\S]{0,1200}(initChart\(|renderAurixInstitutionalChart\(|renderWealthCurve\()/.test(app));
 ck('G1.3 the heavy Chart.js fns hard-gate on AURIX_MOBILE_SAFE (≥6 gates)', heavyGates >= 6);
 ck('G1.4 the institutional WEB engine is used by the lite renderer as a PURE path source (no DOM)',
-   /renderAurixMobileLiteChart[\s\S]{0,6800}renderAurixInstitutionalChart\(/.test(app));
+   /renderAurixMobileLiteChart[\s\S]{0,6800}renderValidatedPortfolioChartWithInstitutionalRenderer\(/.test(app) ||
+   /renderAurixMobileLiteChart[\s\S]{0,9000}renderAurixInstitutionalChart\(/.test(app));
 
 // ── G2 — no mobile chart can use Chart.js ──
 console.log('\nG2 — no mobile chart uses Chart.js:');

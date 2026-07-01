@@ -1,1 +1,1 @@
-{ "appjs": 466, "build": "v466-dash-render-stability", "note": "served-version source of truth for the stale-bundle guard in index.html" }
+{ "appjs": 467, "build": "v467-premium-renderer-reconnect", "note": "served-version source of truth for the stale-bundle guard in index.html" }

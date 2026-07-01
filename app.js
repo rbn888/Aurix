@@ -22963,6 +22963,34 @@ function _aurixEmergencyBuildSvg(points, opts) {
   return { linePath: line, areaPath: area, pixels: pixels, W: W, H: H, plotBottom: plotBottom };
 }
 
+// P0-PREMIUM-RENDERER-RECONNECTION — render the ALREADY-VALIDATED buildProductionPortfolioChart points
+// through the ORIGINAL institutional geometry (LTTB downsample → regime-aware scales → monotone-CUBIC
+// path → area). Values are NEVER modified: the only change is a ts→time shape rename. Returns a premium
+// path ({linePath with 'C' cubic commands, areaPath}); { ok:false } if the geometry could not be built
+// (caller then keeps the emergency polyline as a rollback-safe fallback).
+function renderValidatedPortfolioChartWithInstitutionalRenderer(points, opts) {
+  opts = opts || {};
+  try {
+    const r = String(opts.range || (typeof activeRange !== 'undefined' ? activeRange : '30d')).toLowerCase();
+    const vw = (Number(opts.vw) > 0) ? Number(opts.vw) : ((typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 390);
+    const vh = (Number(opts.vh) > 0) ? Number(opts.vh) : Math.max(160, Math.round(vw * _AURIX_RC_ASPECT));
+    const box = opts.box || null;
+    const src = (Array.isArray(points) ? points : []).map(p => ({ time: p.ts, value: p.value }));   // shape rename ONLY; values untouched
+    if (src.length < 2) return { linePath: '', areaPath: '', visiblePixels: [], visiblePoints: [], ok: false };
+    const target = (typeof _aurixVpTargetPointCount === 'function') ? _aurixVpTargetPointCount(r, vw) : src.length;
+    const visiblePoints = downsampleAurixAdaptive(src, target);                       // LTTB + local-extrema
+    const xScale = computeAurixAdaptiveXScale(visiblePoints, vw, box, r);             // perceptual X
+    const yScale = computeAurixValueScale(visiblePoints, vh, box);                    // regime-relative Y
+    const scale = { xMin: xScale.xMin, xMax: xScale.xMax, yMin: yScale.yMin, yMax: yScale.yMax, x: xScale.x, y: yScale.y, top: yScale.top, bottom: yScale.bottom };
+    const mp = _aurixMonotonePath(visiblePoints, xScale, yScale);                     // monotone-cubic
+    const linePath = (mp && mp.d) ? mp.d : '';
+    const areaPath = (typeof buildAurixAreaPath === 'function' && linePath) ? buildAurixAreaPath(linePath, visiblePoints, scale) : '';
+    const visiblePixels = visiblePoints.map(p => ({ x: +xScale.x(p.time).toFixed(2), y: +yScale.y(p.value).toFixed(2) }));
+    return { linePath: linePath, areaPath: areaPath, visiblePixels: visiblePixels, visiblePoints: visiblePoints, ok: !!(linePath && areaPath) };
+  } catch (e) { return { linePath: '', areaPath: '', visiblePixels: [], visiblePoints: [], ok: false, error: (e && e.message) || 'err' }; }
+}
+try { if (typeof window !== 'undefined') window.renderValidatedPortfolioChartWithInstitutionalRenderer = renderValidatedPortfolioChartWithInstitutionalRenderer; } catch (_) {}
+
 // Emergency badge text/tone from the emergency chart object (honours %/€ mode).
 function _aurixEmergencyBadgeText(emg) {
   try {
@@ -25944,18 +25972,33 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
   }
 
   try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'ready'); } catch (_) {}
-  const built = _aurixEmergencyBuildSvg(emg.points, { W: _WSC_VIEW_W, H: _WSC_VIEW_H });
   const tone = emg.color;   // up | down | flat — reuses the shipped .wsc-* tone CSS
+  const W = _WSC_VIEW_W, H = _WSC_VIEW_H;
+  // PREMIUM RENDERER — draw the validated points through the ORIGINAL institutional geometry
+  // (monotone-cubic + regime scale + LTTB). Fall back to the emergency polyline only if it fails.
+  const _box = { left: W * 0.06, right: W - W * 0.06, top: H * 0.14, bottom: H - H * 0.14 };
+  const rc = renderValidatedPortfolioChartWithInstitutionalRenderer(emg.points, { range: emg.range, vw: W, vh: H, box: _box });
+  let _lineD, _areaD, _px;
+  if (rc.ok) { _lineD = rc.linePath; _areaD = rc.areaPath; _px = rc.visiblePixels; }
+  else { const b = _aurixEmergencyBuildSvg(emg.points, { W: W, H: H }); _lineD = b.linePath; _areaD = b.areaPath; _px = b.pixels; }
+  const _polish = (typeof _wscRenderPolish === 'function') ? _wscRenderPolish(activeRange, false, tone) : { glowStrength: 2, glowAlpha: 0.5, strokeWidth: 2, areaOpacity: 0.9 };
+  let _lastDot = '';
+  try { if (_px && _px.length) { const q = _px[_px.length - 1]; const lx = (q.x / W) * 100, ly = (q.y / H) * 100; if (isFinite(lx) && isFinite(ly)) _lastDot = '<div class="wsc-last-dot" style="left:' + lx.toFixed(2) + '%;top:' + ly.toFixed(2) + '%" aria-hidden="true"></div>'; } } catch (_) {}
   hostEl.innerHTML =
     '<div class="wsc wsc-' + tone + '">' +
       '<div class="wsc-plot">' +
-        '<svg class="wsc-svg" viewBox="0 0 ' + built.W + ' ' + built.H + '" preserveAspectRatio="none" aria-hidden="true">' +
+        '<svg class="wsc-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">' +
           '<defs><linearGradient id="wscArea-' + uid + '" x1="0" y1="0" x2="0" y2="1">' +
             '<stop offset="0%" class="wsc-area-0"/><stop offset="58%" class="wsc-area-mid"/><stop offset="100%" class="wsc-area-1"/>' +
-          '</linearGradient></defs>' +
-          '<path class="wsc-area" d="' + built.areaPath + '" fill="url(#wscArea-' + uid + ')" shape-rendering="geometricPrecision"/>' +
-          '<path class="wsc-line" d="' + built.linePath + '" pathLength="1" fill="none" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision"/>' +
-        '</svg>' +
+          '</linearGradient>' +
+          '<filter id="wscGlow-' + uid + '" x="-4%" y="-60%" width="108%" height="220%" color-interpolation-filters="sRGB">' +
+            '<feGaussianBlur stdDeviation="' + _polish.glowStrength + '" result="b"/>' +
+            '<feComponentTransfer in="b" result="bf"><feFuncA type="linear" slope="' + _polish.glowAlpha + '"/></feComponentTransfer>' +
+            '<feMerge><feMergeNode in="bf"/><feMergeNode in="SourceGraphic"/></feMerge>' +
+          '</filter></defs>' +
+          '<path class="wsc-area" d="' + _areaD + '" fill="url(#wscArea-' + uid + ')" shape-rendering="geometricPrecision" style="opacity:' + _polish.areaOpacity + '"/>' +
+          '<path class="wsc-line" d="' + _lineD + '" pathLength="1" fill="none" vector-effect="non-scaling-stroke" shape-rendering="geometricPrecision" style="stroke-width:' + _polish.strokeWidth + 'px" filter="url(#wscGlow-' + uid + ')"/>' +
+        '</svg>' + _lastDot +
       '</div>' +
     '</div>';
   try { _aurixRecordRender('desktopChart', { chartHash: emg.chartHash, producerHash: emg.chartHash }); } catch (_) {}
@@ -26442,7 +26485,13 @@ function renderAurixMobileLiteChart(range, token) {
           _aurixLastVisualSig.mobile = _sig;
         }
         const VBW = 1000, VBH = 260;
-        const built = _aurixEmergencyBuildSvg(emg.points, { W: VBW, H: VBH, padL: 6, padR: 6, padT: 16, padB: 16 });
+        // PREMIUM RENDERER — draw the validated points through the institutional monotone-cubic geometry;
+        // fall back to the emergency polyline only if the geometry could not be built.
+        const _mbox = { left: 6, right: 994, top: 16, bottom: 244 };
+        const _rc = renderValidatedPortfolioChartWithInstitutionalRenderer(emg.points, { range: r, vw: VBW, vh: VBH, box: _mbox });
+        const built = _rc.ok
+          ? { linePath: _rc.linePath, areaPath: _rc.areaPath, pixels: _rc.visiblePixels, points: _rc.visiblePoints }
+          : (function () { const b = _aurixEmergencyBuildSvg(emg.points, { W: VBW, H: VBH, padL: 6, padR: 6, padT: 16, padB: 16 }); return { linePath: b.linePath, areaPath: b.areaPath, pixels: b.pixels, points: emg.points.map(function (p) { return { time: p.ts, value: p.value }; }) }; })();
         const tone = emg.color;
         const stroke = tone === 'down' ? '#e25563' : (tone === 'flat' ? '#9fb0c7' : '#2ebd85');
         const fillTop = tone === 'down' ? 'rgba(226,85,99,0.15)' : (tone === 'flat' ? 'rgba(159,176,199,0.08)' : 'rgba(46,189,133,0.16)');
@@ -26466,7 +26515,7 @@ function renderAurixMobileLiteChart(range, token) {
         st.pointCount = emg.pointCount; st.seriesPoints = emg.pointCount;
         _aurixMobileLiteEmptyRetries = 0;
         try {
-          _aurixMobChartPts = emg.points.map(function (p, i) { const q = built.pixels[i] || {}; return { t: p.ts, v: p.value, x: q.x, y: q.y }; })
+          _aurixMobChartPts = (built.points || []).map(function (p, i) { const q = (built.pixels && built.pixels[i]) || {}; return { t: p.time, v: p.value, x: q.x, y: q.y }; })
             .filter(function (p) { return typeof p.x === 'number' && typeof p.y === 'number'; });
           _aurixMobChartVisual = null;
           _aurixMobChartMeta = { range: r, deltaPct: emg.returnPct, up: tone !== 'down' };
