@@ -25,7 +25,7 @@ function makeEnv(hist) {
     Math: Math, Number: Number, Map: Map, Array: Array, String: String, JSON: JSON, Date: Date,
     isFinite: isFinite, parseFloat: parseFloat, Infinity: Infinity,
     console: { log: () => {} },
-    activeRange: '30d', activePerfMode: 'pct', categoryHistory: hist || [], toBase: (v) => v, _aurixHistorySourceForDisplay: null,
+    activeRange: '30d', activePerfMode: 'pct', categoryHistory: hist || [], _aurixLoadCapitalFlows: () => (typeof capitalFlows !== "undefined" ? capitalFlows : []), _aurixHistorySourceForDisplay: null,
   };
   sb._aurixHistorySourceForDisplay = () => sb.categoryHistory;
   vm.createContext(sb);
@@ -36,11 +36,11 @@ function makeEnv(hist) {
     'const _AURIX_EMG_MIN_POINTS = 2; const _AURIX_EMG_FALLBACK_TAIL = 8;' +
     'const _AURIX_PROD_GATE_PCT = {"24h":10,"7d":20,"30d":30,"1y":50,"all":50};' +
     'const _AURIX_PROD_MIN_POINTS = {"24h":3,"7d":6,"30d":6,"1y":6,"all":6};' +
-    'const _AURIX_HPQ_MIN_POINTS = 2; const _AURIX_HPQ_FUTURE_MS = 365*864e5; const _AURIX_HPQ_SPIKE_JUMP = 0.20; const _AURIX_HPQ_SPIKE_REVERT_FRAC = 0.5;', sb);
+    'const _AURIX_HPQ_MIN_POINTS = 2; const _AURIX_HPQ_FUTURE_MS = 365*864e5; const _AURIX_HPQ_SPIKE_JUMP = 0.20; const _AURIX_HPQ_SPIKE_REVERT_FRAC = 0.5; const _AURIX_IPE_START_INDEX = 100; const _AURIX_IPE_FLOW_CANDIDATE_PCT = 0.15; const _AURIX_IPE_LIQ_JUMP_FRAC = 0.15; const _AURIX_IPE_STRUCT_MIN = 1; const _AURIX_IPE_INVEST_BUCKETS = ["crypto","stock","etf","fund","metal","liquidity","other"];', sb);
   ['_aurixEmergencyHash', '_aurixProdPlateauFilter', '_aurixProdVisualGate',
     '_aurixHpqIso', '_aurixHpqDiag', '_aurixHpqRangesContaining', '_aurixHpqRawStages',
     '_aurixHpqTrimConstruction', '_aurixHpqQuarantineSpikes', '_aurixHpqFirstInvalidStage',
-    'buildValidatedHistoricalSeries', 'buildProductionPortfolioChart'].forEach(f => vm.runInContext(fnSrc(f), sb));
+    'buildValidatedHistoricalSeries', '_aurixIpeFlowsInInterval', '_aurixIpeStructuralEvidence', '_aurixIpeClassifyInterval', 'buildInstitutionalPerformanceSeries', 'buildProductionPortfolioChart'].forEach(f => vm.runInContext(fnSrc(f), sb));
   return sb;
 }
 const V = (sb, r) => vm.runInContext('buildValidatedHistoricalSeries(' + JSON.stringify(r) + ')', sb);
@@ -90,12 +90,14 @@ console.log('Individual corrupted snapshots are quarantined; the rest of the ser
   const h = series(12, 120, 8000, 3); h[6] = { ts: h[6].ts, total: 15000, real_estate: 0 };
   const v = V(makeEnv(h), 'all');
   ok('8 temporary valuation spike quarantined', v.counts.spikeRejectedSnapshots >= 1 && !has(v.validatedFull, 15000)); }
-{ // 9 — construction prefix (low regime then a sustained step into the current regime)
+{ // 9 — construction step is DELEGATED to the flow engine (no longer silently trimmed at validation).
+  // The points are kept in the validated series; with no ledger flow the construction step is unexplained
+  // ⇒ PENDING (never a fabricated +60%).
   const h = [{ ts: LAST - 20 * DAY, total: 5503, real_estate: 0 }, { ts: LAST - 19 * DAY, total: 5510, real_estate: 0 },
     { ts: LAST - 10 * DAY, total: 8790, real_estate: 0 }, { ts: LAST - 5 * DAY, total: 8810, real_estate: 0 }, { ts: LAST, total: 8820, real_estate: 0 }];
-  const v = V(makeEnv(h), 'all');
-  ok('9 construction prefix quarantined (5503/5510 removed, baseline is the real regime)',
-    v.counts.constructionSnapshots >= 1 && !has(v.validatedFull, 5503), 'construction=' + v.counts.constructionSnapshots); }
+  const sb = makeEnv(h); const v = V(sb, 'all'); const p = P(sb, 'all');
+  ok('9 construction kept in validated series + governed by flow engine (no flow ⇒ PENDING, no fake +60%)',
+    has(v.validatedFull, 5503) && p.state === 'pending' && p.reason === 'insufficient_trusted_performance_data' && p.returnPct === null, p.state + '/' + p.reason); }
 
 console.log('\nScale + multi-range + READY/PENDING correctness:');
 { // 10 — one corrupted snapshot inside 500 valid
