@@ -22925,7 +22925,7 @@ function buildProductionPortfolioChart(range) {
     chartUsesPerformanceIndex: true, trustedPerformanceCoverage: null,
     rawReturnPct: null, flowEventCount: 0,
     // graceful-fallback fields
-    mode: 'pending', label: null,
+    mode: 'pending', label: null, showReturnBadge: false,
   };
   try {
     const perf = buildInstitutionalPerformanceSeries(r);
@@ -22967,6 +22967,7 @@ function buildProductionPortfolioChart(range) {
         out.mode = 'value_fallback';
         out.label = 'Evolución del valor';
         out.chartUsesPerformanceIndex = false;
+        out.showReturnBadge = false;   // value line only — no % chip (value change is not a return)
         out.reason = 'performance_pending_cashflow_data_missing_value_fallback_used';
         out.renderDecision = 'READY';
         out.renderDecisionReason = 'performance pending (' + perfPending + ') → showing validated raw VALUE series (labelled "Evolución del valor", NOT return)';
@@ -22998,6 +22999,7 @@ function buildProductionPortfolioChart(range) {
     // READY — the drawn line IS the performance index (flow-neutral), NOT raw balance.
     out.mode = 'performance_index';
     out.label = 'Rentabilidad';
+    out.showReturnBadge = true;   // true performance ⇒ show the % return chip
     const pp = perf.performancePoints;
     const rs = v.rangeSeries;
     out.state = 'ready';
@@ -23091,15 +23093,21 @@ function _aurixSetChartModeLabel(el, emg) {
 function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
   try {
     if (!el) return;
-    if (emg && emg.state === 'ready' && Number.isFinite(emg.returnPct)) {
+    const ready = !!(emg && emg.state === 'ready');
+    if (ready && emg.showReturnBadge && Number.isFinite(emg.returnPct)) {
+      // performance_index — show the % return chip.
       el.innerHTML = '<span class="wsc-metric-val">' + _aurixEmergencyBadgeText(emg) + '</span>';
       el.className = 'chart-change ' + emg.color;
+    } else if (ready) {
+      // value_fallback — LINE ONLY: no % chip (a value change is not a return). Badge cleared.
+      el.innerHTML = '';
+      el.className = 'chart-change value-only';
     } else {
       el.innerHTML = (typeof _aurixReturnPendingHTML === 'function') ? _aurixReturnPendingHTML() : '<span class="wsc-metric-calc">Calculando…</span>';
       el.className = 'chart-change calculating';
     }
     _aurixSetChartModeLabel(el, emg);   // performance vs value-fallback vs pending → explicit title
-    try { console.log('[UI][EMERGENCY_BADGE]', { surface: surface || null, state: emg && emg.state, mode: emg && emg.mode, reason: emg && emg.reason, returnPct: emg && emg.returnPct, chartHash: emg && emg.chartHash }); } catch (_) {}
+    try { console.log('[UI][EMERGENCY_BADGE]', { surface: surface || null, state: emg && emg.state, mode: emg && emg.mode, showReturnBadge: emg && emg.showReturnBadge, reason: emg && emg.reason, returnPct: emg && emg.returnPct, chartHash: emg && emg.chartHash }); } catch (_) {}
   } catch (_) {}
 }
 
@@ -23164,7 +23172,7 @@ try {
         firstRejectedSnapshot: p.firstRejectedSnapshot,
         renderDecision: p.renderDecision,
         renderDecisionReason: p.renderDecisionReason,
-        mode: p.mode, label: p.label, chartUsesPerformanceIndex: p.chartUsesPerformanceIndex,
+        mode: p.mode, label: p.label, showReturnBadge: p.showReturnBadge, chartUsesPerformanceIndex: p.chartUsesPerformanceIndex,
         baselineSnapshot: p.baselineSnapshot,
         currentSnapshot: p.currentSnapshot,
         returnPct: p.returnPct,
@@ -23254,7 +23262,7 @@ try {
         flowAdjustedReturnPct: perf.flowAdjustedReturnPct,
         visibleReturnPct: p.returnPct,
         chartUsesPerformanceIndex: p.chartUsesPerformanceIndex,
-        mode: p.mode, label: p.label,   // performance_index | value_fallback | pending
+        mode: p.mode, label: p.label, showReturnBadge: p.showReturnBadge,   // performance_index | value_fallback | pending
         desktopMobileParity: desktopHash === mobileHash,
         renderDecision: p.renderDecision,
         pendingReason: p.state === 'pending' ? p.reason : null,

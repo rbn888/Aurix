@@ -120,17 +120,30 @@ console.log('\nGraceful fallback decision model (3 modes):');
 { // trusted performance → performance_index
   const h = []; for (let k = 0; k <= 20; k++) h.push(snap(LAST - (20 - k) * HOUR, 8000 * (1 + 0.05 * k / 20), { crypto: 8000 * (1 + 0.05 * k / 20) }));
   const p = P(makeEnv(h, []), 'all');
-  ok('MODE performance_index when trusted (label Rentabilidad, chartUsesPerformanceIndex=true)',
-    p.mode === 'performance_index' && p.label === 'Rentabilidad' && p.chartUsesPerformanceIndex === true && p.state === 'ready' && p.points[0].value === 100, p.mode); }
+  ok('MODE performance_index when trusted (label Rentabilidad, showReturnBadge=true, chartUsesPerformanceIndex=true)',
+    p.mode === 'performance_index' && p.label === 'Rentabilidad' && p.showReturnBadge === true && p.chartUsesPerformanceIndex === true && p.state === 'ready' && p.points[0].value === 100, p.mode); }
 { // construction, no flow, ≥2 validated → value_fallback (NOT pending, NOT performance)
   const h = [snap(LAST - 20 * DAY, 5503, { crypto: 5503 }), snap(LAST - 19 * DAY, 5510, { crypto: 5510 }),
     snap(LAST - 10 * DAY, 8790, { crypto: 8790 }), snap(LAST - 5 * DAY, 8810, { crypto: 8810 }), snap(LAST, 8820, { crypto: 8820 })];
   const p = P(makeEnv(h, []), 'all');
-  ok('MODE value_fallback when performance pending but v459 value series READY (no construction blocking)',
-    p.mode === 'value_fallback' && p.state === 'ready' && p.chartUsesPerformanceIndex === false && p.points.length >= 2, p.mode + '/' + p.reason); }
+  ok('MODE value_fallback: line drawn, showReturnBadge=false (no % chip), NOT pending/performance',
+    p.mode === 'value_fallback' && p.state === 'ready' && p.showReturnBadge === false && p.chartUsesPerformanceIndex === false && p.points.length >= 2, p.mode + '/' + p.reason); }
 { // genuinely insufficient (1 validated point) → pending
   const p = P(makeEnv([snap(LAST, 8000, { crypto: 8000 })], []), '30d');
   ok('MODE pending only when NOT enough validated points', p.mode === 'pending' && p.state === 'pending' && p.reason === 'insufficient_validated_points', p.mode + '/' + p.reason); }
+{ // Direct badge painter: value_fallback clears the % chip (line only); performance shows %; pending shows Calculando
+  const sb = vm.createContext({ Math: Math, Number: Number, console: { log: () => {} }, activePerfMode: 'pct', lang: 'es',
+    _dshFmtPct: (x) => ({ text: (x >= 0 ? '+' : '') + x.toFixed(2) + '%' }), _dshFmtMoney0: (v) => '$' + Math.round(v),
+    _aurixReturnPendingHTML: () => '<span class="wsc-metric-calc">Calculando…</span>' });
+  ['_aurixEmergencyBadgeText', '_aurixSetChartModeLabel', '_aurixEmergencyPaintBadgeNode'].forEach(f => vm.runInContext(fnSrc(f), sb));
+  const mkEl = () => { const title = { textContent: '', setAttribute() {} }; return { innerHTML: '', className: '', parentElement: { querySelector: (s) => s === '.chart-title' ? title : null }, _title: title }; };
+  sb.__perf = mkEl(); sb.__val = mkEl(); sb.__pend = mkEl();
+  vm.runInContext('_aurixEmergencyPaintBadgeNode(__perf, {state:"ready",showReturnBadge:true,returnPct:5,color:"up",mode:"performance_index",label:"Rentabilidad"}, "d")', sb);
+  vm.runInContext('_aurixEmergencyPaintBadgeNode(__val, {state:"ready",showReturnBadge:false,returnPct:60,color:"up",mode:"value_fallback",label:"Evolución del valor"}, "d")', sb);
+  vm.runInContext('_aurixEmergencyPaintBadgeNode(__pend, {state:"pending",mode:"pending"}, "d")', sb);
+  ok('BADGE performance_index shows the % chip', /5\.00%/.test(sb.__perf.innerHTML) && sb.__perf._title.textContent === 'Rentabilidad');
+  ok('BADGE value_fallback shows NO % (line only, empty badge)', sb.__val.innerHTML === '' && sb.__val.className === 'chart-change value-only' && sb.__val._title.textContent === 'Evolución del valor patrimonial');
+  ok('BADGE pending shows Calculando', /Calculando/.test(sb.__pend.innerHTML)); }
 
 console.log('\nSnapshot hygiene still applies (per earlier layers):');
 { const h = []; for (let k = 0; k <= 20; k++) h.push(snap(LAST - (20 - k) * HOUR, 8000 + k * 4, { crypto: 8000 + k * 4 }));
