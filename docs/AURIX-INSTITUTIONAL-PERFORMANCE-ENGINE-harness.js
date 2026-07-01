@@ -101,17 +101,36 @@ console.log('\nGenuine market performance stays visible:');
   const p = PERF(makeEnv(h, []), 'all');
   ok('Genuine market decline visible (≈ -8%)', p.state === 'ready' && p.returnPct < -6 && p.returnPct > -10, 'ret=' + p.returnPct); }
 
-console.log('\nUncertainty → PENDING (never fabricate):');
-{ // large unexplained jump: no ledger event, no structural change → unknown → PENDING
+console.log('\nUncertainty → performance PENDING; chart gracefully falls back to VALUE (never fake return):');
+{ // large unexplained jump: the PERFORMANCE engine itself refuses (never fabricates a return)
   const h = []; for (let k = 0; k < 6; k++) h.push(snap(LAST - (11 - k) * HOUR, 8000, { crypto: 8000 }));
   for (let k = 0; k < 6; k++) h.push(snap(LAST - (5 - k) * HOUR, 13000, { crypto: 13000 }));   // +62% jump, no evidence
   const p = PERF(makeEnv(h, []), 'all');
-  ok('Low-confidence / unknown interval → PENDING insufficient_trusted_performance_data',
+  ok('Performance engine: unknown interval → PENDING insufficient_trusted_performance_data (no fabricated return)',
     p.state === 'pending' && p.reason === 'insufficient_trusted_performance_data' && p.returnPct === null, p.state + '/' + p.reason); }
-{ const h = []; for (let k = 0; k < 6; k++) h.push(snap(LAST - (11 - k) * HOUR, 8000, { crypto: 8000 }));
+{ // …but the CHART falls back to the validated raw VALUE series (labelled value, not return) — availability
+  const h = []; for (let k = 0; k < 6; k++) h.push(snap(LAST - (11 - k) * HOUR, 8000, { crypto: 8000 }));
   for (let k = 0; k < 6; k++) h.push(snap(LAST - (5 - k) * HOUR, 20000, { crypto: 20000 }));
   const p = P(makeEnv(h, []), 'all');
-  ok('Unknown interval → chart PENDING (no line, no %)', p.state === 'pending' && p.reason === 'insufficient_trusted_performance_data' && p.points.length === 0 && p.returnPct === null, p.reason); }
+  ok('Chart falls back to VALUE series (mode value_fallback, labelled value, chartUsesPerformanceIndex=false, NOT pending)',
+    p.state === 'ready' && p.mode === 'value_fallback' && p.chartUsesPerformanceIndex === false && p.label === 'Evolución del valor' &&
+    p.reason === 'performance_pending_cashflow_data_missing_value_fallback_used' && p.points.length >= 2, p.mode + '/' + p.reason); }
+
+console.log('\nGraceful fallback decision model (3 modes):');
+{ // trusted performance → performance_index
+  const h = []; for (let k = 0; k <= 20; k++) h.push(snap(LAST - (20 - k) * HOUR, 8000 * (1 + 0.05 * k / 20), { crypto: 8000 * (1 + 0.05 * k / 20) }));
+  const p = P(makeEnv(h, []), 'all');
+  ok('MODE performance_index when trusted (label Rentabilidad, chartUsesPerformanceIndex=true)',
+    p.mode === 'performance_index' && p.label === 'Rentabilidad' && p.chartUsesPerformanceIndex === true && p.state === 'ready' && p.points[0].value === 100, p.mode); }
+{ // construction, no flow, ≥2 validated → value_fallback (NOT pending, NOT performance)
+  const h = [snap(LAST - 20 * DAY, 5503, { crypto: 5503 }), snap(LAST - 19 * DAY, 5510, { crypto: 5510 }),
+    snap(LAST - 10 * DAY, 8790, { crypto: 8790 }), snap(LAST - 5 * DAY, 8810, { crypto: 8810 }), snap(LAST, 8820, { crypto: 8820 })];
+  const p = P(makeEnv(h, []), 'all');
+  ok('MODE value_fallback when performance pending but v459 value series READY (no construction blocking)',
+    p.mode === 'value_fallback' && p.state === 'ready' && p.chartUsesPerformanceIndex === false && p.points.length >= 2, p.mode + '/' + p.reason); }
+{ // genuinely insufficient (1 validated point) → pending
+  const p = P(makeEnv([snap(LAST, 8000, { crypto: 8000 })], []), '30d');
+  ok('MODE pending only when NOT enough validated points', p.mode === 'pending' && p.state === 'pending' && p.reason === 'insufficient_validated_points', p.mode + '/' + p.reason); }
 
 console.log('\nSnapshot hygiene still applies (per earlier layers):');
 { const h = []; for (let k = 0; k <= 20; k++) h.push(snap(LAST - (20 - k) * HOUR, 8000 + k * 4, { crypto: 8000 + k * 4 }));

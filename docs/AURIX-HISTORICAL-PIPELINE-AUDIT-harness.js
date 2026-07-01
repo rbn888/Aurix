@@ -96,8 +96,8 @@ console.log('Individual corrupted snapshots are quarantined; the rest of the ser
   const h = [{ ts: LAST - 20 * DAY, total: 5503, real_estate: 0 }, { ts: LAST - 19 * DAY, total: 5510, real_estate: 0 },
     { ts: LAST - 10 * DAY, total: 8790, real_estate: 0 }, { ts: LAST - 5 * DAY, total: 8810, real_estate: 0 }, { ts: LAST, total: 8820, real_estate: 0 }];
   const sb = makeEnv(h); const v = V(sb, 'all'); const p = P(sb, 'all');
-  ok('9 construction kept in validated series + governed by flow engine (no flow ⇒ PENDING, no fake +60%)',
-    has(v.validatedFull, 5503) && p.state === 'pending' && p.reason === 'insufficient_trusted_performance_data' && p.returnPct === null, p.state + '/' + p.reason); }
+  ok('9 construction kept in validated series; performance pending ⇒ graceful VALUE fallback (no fake return)',
+    has(v.validatedFull, 5503) && p.state === 'ready' && p.mode === 'value_fallback' && p.chartUsesPerformanceIndex === false, p.state + '/' + p.mode); }
 
 console.log('\nScale + multi-range + READY/PENDING correctness:');
 { // 10 — one corrupted snapshot inside 500 valid

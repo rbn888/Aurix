@@ -75,13 +75,13 @@ for (let k = 0; k < 8; k++) plateauData.push({ ts: LAST - (7 - k) * DAY, total: 
 
 console.log('AURIX-PRODUCTION-PORTFOLIO-CHART — P0 FINAL CUT\n');
 
-console.log('Root-cause behavior — construction/regime steps governed by the flow engine (no fabrication):');
+console.log('Root-cause behavior — construction/regime: performance pending → graceful VALUE fallback:');
 { const p = P(makeEnv(construction), 'all');
-  ok('1 +60% construction (no ledger flow) → PENDING insufficient_trusted_performance_data (no +60% shown)',
-    p.state === 'pending' && p.reason === 'insufficient_trusted_performance_data' && p.returnPct === null, p.reason + ' pct=' + p.returnPct); }
+  ok('1 +60% construction (no ledger flow) → VALUE fallback (labelled value, chartUsesPerformanceIndex=false, not performance)',
+    p.state === 'ready' && p.mode === 'value_fallback' && p.chartUsesPerformanceIndex === false && p.reason === 'performance_pending_cashflow_data_missing_value_fallback_used', p.mode + '/' + p.reason); }
 { const p = P(makeEnv(regimeHigh), '30d');
-  ok('2 -67% regime step (no ledger flow) → PENDING (no ≈ -67% shown)',
-    p.state === 'pending' && p.reason === 'insufficient_trusted_performance_data' && p.returnPct === null, p.reason + ' pct=' + p.returnPct); }
+  ok('2 -67% regime step (no ledger flow) → VALUE fallback (not shown as return)',
+    p.state === 'ready' && p.mode === 'value_fallback' && p.chartUsesPerformanceIndex === false, p.mode + '/' + p.reason); }
 { const p = P(makeEnv(towerData), '24h');
   ok('3 vertical one-point tower quarantined (spike removed, not in points, chart stays READY)',
     p.rejectedSpikeCount >= 1 && (p.points || []).every(pt => pt.value !== 13500) && p.state === 'ready', 'spikes=' + p.rejectedSpikeCount + ' state=' + p.state); }
@@ -97,10 +97,10 @@ console.log('\nValid smooth lines draw (renderer is passive consumer of the vali
   ok('6 7D valid smooth line draws (READY)',
     p.state === 'ready' && p.renderDecision === 'READY' && Math.abs(p.returnPct) <= 20 && p.points.length >= 6, 'pct=' + p.returnPct + ' n=' + p.points.length); }
 
-console.log('\nConstruction long ranges (no ledger flow) → PENDING, never a fabricated +60%:');
+console.log('\nConstruction long ranges (no ledger flow) → VALUE fallback (available, not fake performance):');
 { ['30d', '1y', 'all'].forEach((rg, idx) => { const p = P(makeEnv(construction), rg);
-  ok((7 + idx) + ' ' + rg.toUpperCase() + ' construction (no flow) → PENDING insufficient_trusted_performance_data, no +60%',
-    p.state === 'pending' && p.reason === 'insufficient_trusted_performance_data' && p.returnPct === null, rg + ':' + p.reason); }); }
+  ok((7 + idx) + ' ' + rg.toUpperCase() + ' construction (no flow) → value_fallback READY (no construction/pending)',
+    p.state === 'ready' && p.mode === 'value_fallback' && p.chartUsesPerformanceIndex === false, rg + ':' + p.mode); }); }
 { // a construction step WITH a matching ledger flow (import_baseline) is neutralized → READY, ≈0% perf
   const flows = [{ ts: LAST - 15 * DAY, amountUSD: 3287, kind: 'import_baseline' }];   // ≈ 5510→8797
   const p = P(makeEnv(construction, flows), 'all');
@@ -152,8 +152,8 @@ console.log('\nTrue cliffs / walls still blocked (scale-stable |Δ|/prevValue th
   ok('C5 calm-window bypass: low-amplitude noisy window passes the visual gate', g.passed === true && g.reason === null, JSON.stringify(g)); }
 
 console.log('\nHard protections preserved after the fix:');
-{ ok('C6 +60% construction never shown as +60% (no flow ⇒ PENDING)', (function () { const p = P(makeEnv(construction), '30d'); return p.returnPct === null && (p.state !== 'ready'); })());
-  ok('C7 -67% regime never shown (no flow ⇒ PENDING, returnPct null)', (function () { const p = P(makeEnv(regimeHigh), '30d'); return p.returnPct === null && (p.state !== 'ready'); })());
+{ ok('C6 +60% construction never shown as RETURN (value_fallback, chartUsesPerformanceIndex=false)', (function () { const p = P(makeEnv(construction), '30d'); return p.mode === 'value_fallback' && p.chartUsesPerformanceIndex === false; })());
+  ok('C7 -67% regime never shown as RETURN (value_fallback)', (function () { const p = P(makeEnv(regimeHigh), '30d'); return p.mode === 'value_fallback' && p.chartUsesPerformanceIndex === false; })());
   ok('C8 vertical tower still removed (not in points)', (function () { const p = P(makeEnv(towerData), '24h'); return p.rejectedSpikeCount >= 1 && (p.points || []).every(pt => pt.value !== 13500); })()); }
 
 console.log('\nWiring — visible surfaces read buildProductionPortfolioChart; "no disponible" removed:');

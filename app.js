@@ -22924,6 +22924,8 @@ function buildProductionPortfolioChart(range) {
     // institutional performance fields
     chartUsesPerformanceIndex: true, trustedPerformanceCoverage: null,
     rawReturnPct: null, flowEventCount: 0,
+    // graceful-fallback fields
+    mode: 'pending', label: null,
   };
   try {
     const perf = buildInstitutionalPerformanceSeries(r);
@@ -22948,21 +22950,54 @@ function buildProductionPortfolioChart(range) {
     out.rawReturnPct = perf.rawReturnPct;
     out.flowEventCount = (perf.flowEvents || []).length;
 
-    // READY / PENDING — decided ENTIRELY by the performance engine (validated points + TRUSTED flows).
-    // The renderer never decides. PENDING reasons: insufficient_validated_points OR
-    // insufficient_trusted_performance_data (a material in-range interval could not be trusted).
+    // ── GRACEFUL FALLBACK POLICY ──────────────────────────────────────────────────────────────
+    // 1) performance index (flow-neutral) when TRUSTED → mode 'performance_index', label 'Rentabilidad'.
+    // 2) else, if the v459 validated RAW VALUE series has ≥2 points → render it as a clearly-labelled
+    //    VALUE series (mode 'value_fallback', label 'Evolución del valor') — never presented as return,
+    //    never fabricating performance. 3) else pending (construction).
     if (perf.state !== 'ready' || !Array.isArray(perf.performancePoints) || perf.performancePoints.length < 2) {
-      out.state = 'pending'; out.reason = perf.reason || 'insufficient_trusted_performance_data'; out.pendingReason = out.reason;
-      out.renderDecision = 'PENDING';
-      out.renderDecisionReason = out.reason === 'insufficient_trusted_performance_data'
-        ? ('a material in-range interval is an untrusted cashflow (' + perf.untrustedIntervals + ' untrusted of ' + ((v.rangeSeries || []).length - 1) + ') — refusing to fabricate performance')
-        : out.reason;
       const rs = v.rangeSeries || [];
+      const perfPending = perf.reason || 'insufficient_trusted_performance_data';
+      // Value fallback only when the pending cause is missing/uncertain cashflow data AND we still have
+      // enough validated raw points. Insufficient validated points → genuine pending (construction).
+      if (rs.length >= _AURIX_HPQ_MIN_POINTS && perfPending !== 'insufficient_validated_points' && String(perfPending).indexOf('exception') !== 0) {
+        const first = rs[0], last = rs[rs.length - 1];
+        const valueReturnPct = first.value ? ((last.value - first.value) / first.value) * 100 : 0;
+        out.state = 'ready';
+        out.mode = 'value_fallback';
+        out.label = 'Evolución del valor';
+        out.chartUsesPerformanceIndex = false;
+        out.reason = 'performance_pending_cashflow_data_missing_value_fallback_used';
+        out.renderDecision = 'READY';
+        out.renderDecisionReason = 'performance pending (' + perfPending + ') → showing validated raw VALUE series (labelled "Evolución del valor", NOT return)';
+        out.points = rs.map(p => ({ ts: p.ts, value: +p.value.toFixed(2) }));   // RAW validated value series
+        out.pointCount = out.points.length; out.finalPointCount = out.points.length;
+        out.firstTs = out.points[0].ts; out.lastTs = out.points[out.pointCount - 1].ts;
+        out.firstValue = out.points[0].value; out.lastValue = out.points[out.pointCount - 1].value;
+        out.baselineTs = first.ts; out.baselineValue = +first.value.toFixed(2);
+        out.currentTs = last.ts; out.currentValue = +last.value.toFixed(2);
+        out.baselineSnapshot = { snapshotId: first.snapshotId || null, ts: first.ts, value: +first.value.toFixed(2) };
+        out.currentSnapshot = { snapshotId: last.snapshotId || null, ts: last.ts, value: +last.value.toFixed(2) };
+        // This % is the WEALTH VALUE change (may include contributions) — labelled as value, NOT return.
+        out.returnPct = +valueReturnPct.toFixed(4); out.lineReturnPct = out.returnPct; out.badgeReturnPct = out.returnPct;
+        out.returnValue = +(last.value - first.value).toFixed(2);
+        out.color = valueReturnPct > 0.05 ? 'up' : (valueReturnPct < -0.05 ? 'down' : 'flat');
+        out.chartHash = _aurixEmergencyHash(out.points);
+        return out;
+      }
+      // 3) genuine pending (not enough validated points, or engine exception).
+      out.state = 'pending'; out.mode = 'pending'; out.reason = perfPending; out.pendingReason = perfPending;
+      out.renderDecision = 'PENDING';
+      out.renderDecisionReason = perfPending === 'insufficient_trusted_performance_data'
+        ? ('a material in-range interval is an untrusted cashflow (' + perf.untrustedIntervals + ' untrusted) and too few validated points to fall back')
+        : perfPending;
       if (rs.length >= 1) { out.baselineValue = +rs[0].value.toFixed(2); out.currentValue = +rs[rs.length - 1].value.toFixed(2); out.firstValue = out.baselineValue; out.lastValue = out.currentValue; }
       return out;
     }
 
     // READY — the drawn line IS the performance index (flow-neutral), NOT raw balance.
+    out.mode = 'performance_index';
+    out.label = 'Rentabilidad';
     const pp = perf.performancePoints;
     const rs = v.rangeSeries;
     out.state = 'ready';
@@ -23034,6 +23069,25 @@ function _aurixEmergencyBadgeText(emg) {
 }
 // Paint ONE badge node from the emergency chart: ready ⇒ %/€ + tone; pending ⇒ "Calculando…".
 // Percentage is shown ONLY when a line exists (state==='ready') — the two can never diverge.
+// Label the chart-title (sibling of the badge) per mode so a VALUE FALLBACK is never presented as
+// "Rentabilidad". performance_index → Rentabilidad; value_fallback → Evolución del valor patrimonial;
+// pending → the default "Evolución del patrimonio". DOM text only (no layout/CSS change).
+function _aurixSetChartModeLabel(el, emg) {
+  try {
+    if (!el || !el.parentElement) return;
+    const title = el.parentElement.querySelector('.chart-title');
+    if (!title) return;
+    const en = (typeof lang !== 'undefined' && lang === 'en');
+    const mode = emg && emg.mode;
+    let text;
+    if (mode === 'performance_index') text = en ? 'Return' : 'Rentabilidad';
+    else if (mode === 'value_fallback') text = en ? 'Portfolio value evolution' : 'Evolución del valor patrimonial';
+    else text = en ? 'Portfolio evolution' : 'Evolución del patrimonio';
+    title.textContent = text;
+    try { title.setAttribute('data-aurix-chart-mode', mode || 'pending'); } catch (_) {}
+  } catch (_) {}
+}
+
 function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
   try {
     if (!el) return;
@@ -23044,7 +23098,8 @@ function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
       el.innerHTML = (typeof _aurixReturnPendingHTML === 'function') ? _aurixReturnPendingHTML() : '<span class="wsc-metric-calc">Calculando…</span>';
       el.className = 'chart-change calculating';
     }
-    try { console.log('[UI][EMERGENCY_BADGE]', { surface: surface || null, state: emg && emg.state, reason: emg && emg.reason, returnPct: emg && emg.returnPct, chartHash: emg && emg.chartHash }); } catch (_) {}
+    _aurixSetChartModeLabel(el, emg);   // performance vs value-fallback vs pending → explicit title
+    try { console.log('[UI][EMERGENCY_BADGE]', { surface: surface || null, state: emg && emg.state, mode: emg && emg.mode, reason: emg && emg.reason, returnPct: emg && emg.returnPct, chartHash: emg && emg.chartHash }); } catch (_) {}
   } catch (_) {}
 }
 
@@ -23109,6 +23164,7 @@ try {
         firstRejectedSnapshot: p.firstRejectedSnapshot,
         renderDecision: p.renderDecision,
         renderDecisionReason: p.renderDecisionReason,
+        mode: p.mode, label: p.label, chartUsesPerformanceIndex: p.chartUsesPerformanceIndex,
         baselineSnapshot: p.baselineSnapshot,
         currentSnapshot: p.currentSnapshot,
         returnPct: p.returnPct,
@@ -23197,7 +23253,8 @@ try {
         rawReturnPct: perf.rawReturnPct,
         flowAdjustedReturnPct: perf.flowAdjustedReturnPct,
         visibleReturnPct: p.returnPct,
-        chartUsesPerformanceIndex: true,
+        chartUsesPerformanceIndex: p.chartUsesPerformanceIndex,
+        mode: p.mode, label: p.label,   // performance_index | value_fallback | pending
         desktopMobileParity: desktopHash === mobileHash,
         renderDecision: p.renderDecision,
         pendingReason: p.state === 'pending' ? p.reason : null,
