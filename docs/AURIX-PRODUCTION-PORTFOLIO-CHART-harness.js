@@ -21,14 +21,13 @@ function ok(n, c, i) { if (c) { pass++; console.log('  ✓ ' + n + (i ? '  [' + 
 const HOUR = 3600000, DAY = 86400000;
 const LAST = 1800000000000, FAKE_NOW = LAST + 100 * DAY;
 
-function makeEnv(hist, flows) {
+function makeEnv(hist) {
   const sb = {
     Math: Math, Number: Number, Map: Map, Array: Array, String: String, JSON: JSON,
     isFinite: isFinite, parseFloat: parseFloat, Infinity: Infinity,
     Date: { now: () => FAKE_NOW }, console: { log: () => {} },
-    activeRange: '30d', activePerfMode: 'pct', categoryHistory: hist || [], _flows: flows || [], _aurixLoadCapitalFlows: null, _aurixHistorySourceForDisplay: null,
+    activeRange: '30d', activePerfMode: 'pct', categoryHistory: hist || [], toBase: (v) => v, _aurixHistorySourceForDisplay: null,
   };
-  sb._aurixLoadCapitalFlows = () => sb._flows;
   sb._aurixHistorySourceForDisplay = () => sb.categoryHistory;
   vm.createContext(sb);
   vm.runInContext('const _AURIX_EMG_RANGE_MS = {"24h":864e5,"7d":6048e5,"30d":2592e6,"1y":31536e6,"all":Infinity};' +
@@ -38,12 +37,12 @@ function makeEnv(hist, flows) {
     'const _AURIX_EMG_MIN_POINTS = 2; const _AURIX_EMG_FALLBACK_TAIL = 8;' +
     'const _AURIX_PROD_GATE_PCT = {"24h":10,"7d":20,"30d":30,"1y":50,"all":50};' +
     'const _AURIX_PROD_MIN_POINTS = {"24h":3,"7d":6,"30d":6,"1y":6,"all":6};' +
-    'const _AURIX_HPQ_MIN_POINTS = 2; const _AURIX_HPQ_FUTURE_MS = 365*864e5; const _AURIX_HPQ_SPIKE_JUMP = 0.20; const _AURIX_HPQ_SPIKE_REVERT_FRAC = 0.5; const _AURIX_IPE_START_INDEX = 100; const _AURIX_IPE_FLOW_CANDIDATE_PCT = 0.15; const _AURIX_IPE_LIQ_JUMP_FRAC = 0.15; const _AURIX_IPE_STRUCT_MIN = 1; const _AURIX_IPE_INVEST_BUCKETS = ["crypto","stock","etf","fund","metal","liquidity","other"];', sb);
+    'const _AURIX_HPQ_MIN_POINTS = 2; const _AURIX_HPQ_FUTURE_MS = 365*864e5; const _AURIX_HPQ_SPIKE_JUMP = 0.20; const _AURIX_HPQ_SPIKE_REVERT_FRAC = 0.5;', sb);
   ['_aurixEmergencyHash', '_aurixEmergencyRawSeries', '_aurixEmergencyTrimPrefix', '_aurixEmergencyDeSpike',
     'buildEmergencyInstitutionalChart', '_aurixProdPlateauFilter', '_aurixProdVisualGate',
     '_aurixHpqIso', '_aurixHpqDiag', '_aurixHpqRangesContaining', '_aurixHpqRawStages',
     '_aurixHpqTrimConstruction', '_aurixHpqQuarantineSpikes', '_aurixHpqFirstInvalidStage',
-    'buildValidatedHistoricalSeries', '_aurixIpeFlowsInInterval', '_aurixIpeStructuralEvidence', '_aurixIpeClassifyInterval', 'buildInstitutionalPerformanceSeries', 'buildProductionPortfolioChart'].forEach(f => vm.runInContext(fnSrc(f), sb));
+    'buildValidatedHistoricalSeries', 'buildProductionPortfolioChart'].forEach(f => vm.runInContext(fnSrc(f), sb));
   return sb;
 }
 const P = (sb, r) => vm.runInContext('buildProductionPortfolioChart(' + JSON.stringify(r) + ')', sb);
@@ -75,13 +74,13 @@ for (let k = 0; k < 8; k++) plateauData.push({ ts: LAST - (7 - k) * DAY, total: 
 
 console.log('AURIX-PRODUCTION-PORTFOLIO-CHART — P0 FINAL CUT\n');
 
-console.log('Root-cause behavior — construction/regime: performance pending → graceful VALUE fallback:');
+console.log('Root-cause behavior — corrupted snapshots quarantined, NOT whole-range rejected:');
 { const p = P(makeEnv(construction), 'all');
-  ok('1 +60% construction (no ledger flow) → VALUE fallback (labelled value, chartUsesPerformanceIndex=false, not performance)',
-    p.state === 'ready' && p.mode === 'value_fallback' && p.chartUsesPerformanceIndex === false && p.reason === 'performance_pending_cashflow_data_missing_value_fallback_used', p.mode + '/' + p.reason); }
+  ok('1 +60% construction artifact quarantined at source (baseline ≠ 5503, no +60% shown)',
+    p.rejectedConstructionCount >= 1 && p.baselineValue !== 5503 && (p.returnPct === null || Math.abs(p.returnPct) <= 30), 'baseline=' + p.baselineValue + ' pct=' + p.returnPct); }
 { const p = P(makeEnv(regimeHigh), '30d');
-  ok('2 -67% regime step (no ledger flow) → VALUE fallback (not shown as return)',
-    p.state === 'ready' && p.mode === 'value_fallback' && p.chartUsesPerformanceIndex === false, p.mode + '/' + p.reason); }
+  ok('2 -67% regime baseline quarantined (baseline ≠ 5503, no ≈ -67%)',
+    p.baselineValue !== 5503 && (p.state !== 'ready' || p.returnPct > -30), 'baseline=' + p.baselineValue + ' pct=' + p.returnPct); }
 { const p = P(makeEnv(towerData), '24h');
   ok('3 vertical one-point tower quarantined (spike removed, not in points, chart stays READY)',
     p.rejectedSpikeCount >= 1 && (p.points || []).every(pt => pt.value !== 13500) && p.state === 'ready', 'spikes=' + p.rejectedSpikeCount + ' state=' + p.state); }
@@ -97,18 +96,13 @@ console.log('\nValid smooth lines draw (renderer is passive consumer of the vali
   ok('6 7D valid smooth line draws (READY)',
     p.state === 'ready' && p.renderDecision === 'READY' && Math.abs(p.returnPct) <= 20 && p.points.length >= 6, 'pct=' + p.returnPct + ' n=' + p.points.length); }
 
-console.log('\nConstruction long ranges (no ledger flow) → VALUE fallback (available, not fake performance):');
+console.log('\nConstruction long ranges: the low regime is quarantined, the real regime renders:');
 { ['30d', '1y', 'all'].forEach((rg, idx) => { const p = P(makeEnv(construction), rg);
-  ok((7 + idx) + ' ' + rg.toUpperCase() + ' construction (no flow) → value_fallback READY (no construction/pending)',
-    p.state === 'ready' && p.mode === 'value_fallback' && p.chartUsesPerformanceIndex === false, rg + ':' + p.mode); }); }
-{ // a construction step WITH a matching ledger flow (import_baseline) is neutralized → READY, ≈0% perf
-  const flows = [{ ts: LAST - 15 * DAY, amountUSD: 3287, kind: 'import_baseline' }];   // ≈ 5510→8797
-  const p = P(makeEnv(construction, flows), 'all');
-  ok('7d construction WITH matching ledger flow → neutralized → READY, no fake +60%',
-    p.state === 'ready' && Math.abs(p.returnPct) < 5, p.state + ' pct=' + p.returnPct); }
-{ // a GENUINE +32% ramp with no artifact RENDERS (trust the validated performance series)
-  const p = P(makeEnv(smooth(10, 20 * 24, 6800, 240)), '30d');   // 6800→8960 ≈ +31.8%, no corrupted snapshot, small steps
-  ok('7b 30D genuine +32% ramp (no artifact) → READY (validated performance series is trusted)',
+  ok((7 + idx) + ' ' + rg.toUpperCase() + ' construction: baseline is the real regime (≠5503), no +60% fabricated',
+    p.baselineValue !== 5503 && (p.returnPct === null || Math.abs(p.returnPct) <= 30), rg + ':' + p.reason + ' base=' + p.baselineValue); }); }
+{ // a GENUINE +32% ramp with no artifact now RENDERS (trust the validated series — no heuristic gate)
+  const p = P(makeEnv(smooth(10, 20 * 24, 6800, 240)), '30d');   // 6800→8960 ≈ +31.8%, no corrupted snapshot
+  ok('7b 30D genuine +32% ramp (no artifact) → READY (validated series is trusted)',
     p.state === 'ready' && p.returnPct > 30 && p.quarantinedSnapshotCount === 0, 'pct=' + p.returnPct); }
 
 console.log('\nParity + return integrity + pending honesty:');
@@ -152,8 +146,8 @@ console.log('\nTrue cliffs / walls still blocked (scale-stable |Δ|/prevValue th
   ok('C5 calm-window bypass: low-amplitude noisy window passes the visual gate', g.passed === true && g.reason === null, JSON.stringify(g)); }
 
 console.log('\nHard protections preserved after the fix:');
-{ ok('C6 +60% construction never shown as RETURN (value_fallback, chartUsesPerformanceIndex=false)', (function () { const p = P(makeEnv(construction), '30d'); return p.mode === 'value_fallback' && p.chartUsesPerformanceIndex === false; })());
-  ok('C7 -67% regime never shown as RETURN (value_fallback)', (function () { const p = P(makeEnv(regimeHigh), '30d'); return p.mode === 'value_fallback' && p.chartUsesPerformanceIndex === false; })());
+{ ok('C6 +60% construction artifact never shown as +60% (quarantined at source)', (function () { const p = P(makeEnv(construction), '30d'); return p.baselineValue !== 5503 && (p.returnPct === null || Math.abs(p.returnPct) <= 30); })());
+  ok('C7 -67% regime baseline still rejected (baseline ≠ 5503)', (function () { const p = P(makeEnv(regimeHigh), '30d'); return p.baselineValue !== 5503 && (p.state !== 'ready' || p.returnPct > -30); })());
   ok('C8 vertical tower still removed (not in points)', (function () { const p = P(makeEnv(towerData), '24h'); return p.rejectedSpikeCount >= 1 && (p.points || []).every(pt => pt.value !== 13500); })()); }
 
 console.log('\nWiring — visible surfaces read buildProductionPortfolioChart; "no disponible" removed:');
