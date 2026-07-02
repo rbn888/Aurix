@@ -28,6 +28,9 @@ const sb = { console, Math, Number, Array, JSON, isFinite, parseFloat, Infinity,
   _AURIX_LEDGER_SELF_HEAL: true,
   _AURIX_FLOW_CORROBORATE_MS: 3 * DAY,
   _AURIX_FLOW_CORROBORATE_FRAC: 0.4,
+  // SPEC DSH.CHART.RETURNS.RETIMING.01 — step-match constants (this harness uses histories with no
+  // matching structural step, so _aurixEffectiveFlowTs still falls back to base as before).
+  _AURIX_STEP_MATCH_LO: 0.6, _AURIX_STEP_MATCH_HI: 1.6, _AURIX_STEP_MATCH_MIN_CONF: 0.5, _AURIX_STEP_SUSTAIN: 4,
   portfolioHistory: [], categoryHistory: [],
   _aurixPortfolioEpoch: () => 0,
   _STORE: [],
@@ -46,6 +49,8 @@ vm.createContext(sb);
 // real helpers under test
 vm.runInContext(fn('_aurixEarliestTrackedTs'), sb);
 vm.runInContext(fn('_aurixFlowTsCorroboratedByHistory'), sb);
+vm.runInContext(fn('_aurixMatchHistoricalStep'), sb);
+vm.runInContext(fn('_aurixFlowRetimeDecision'), sb);
 vm.runInContext(fn('_aurixEffectiveFlowTs'), sb);
 vm.runInContext(fn('_aurixPurgeDerivedFlows'), sb);
 // real return engine (proves the end-to-end un-suppression)

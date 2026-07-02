@@ -7376,16 +7376,19 @@ function _aurixSaveCapitalFlows(arr) {
 
 // Append a flow, idempotent by a deterministic id (kind + asset/currency + ts +
 // rounded amount) so repeated saves/clicks for the same action collapse to one.
-function _aurixCaptureFlow(kind, amountUSD, ts, assetId, note, source) {
+function _aurixCaptureFlow(kind, amountUSD, ts, assetId, note, source, extra) {
   try {
     if (!Number.isFinite(amountUSD) || Math.round(Math.abs(amountUSD) * 100) === 0) return; // never NaN / ~0
     const t  = Number.isFinite(ts) ? ts : Date.now();
     const id = `${kind}:${assetId || 'cash'}:${t}:${Math.round(Math.abs(amountUSD))}`;
     const flows = _aurixLoadCapitalFlows();
-    if (flows.some(f => f.id === id)) return;                       // idempotent
+    if (flows.some(f => f.id === id)) return;                       // idempotent (id keyed on effective ts)
     const flow = { id, ts: t, amountUSD: +amountUSD.toFixed(2), kind, source: source || 'user' };
     if (assetId) flow.assetId = assetId;
     if (note)    flow.note = note;
+    // SPEC DSH.CHART.RETURNS.RETIMING.01 — optional re-time audit trail (originalTs/matchedStepTs/etc);
+    // never affects the id or the amount, so idempotency and neutralisation are unchanged.
+    if (extra && typeof extra === 'object') { for (const k in extra) { if (extra[k] !== undefined) flow[k] = extra[k]; } }
     flows.push(flow);
     _aurixSaveCapitalFlows(flows);
     if (typeof IS_DEV !== 'undefined' && IS_DEV) { try { console.debug('[capital-flow]', flow); } catch (_) {} }
@@ -7463,12 +7466,67 @@ function _aurixFlowTsCorroboratedByHistory(amountUSD, ts) {
   } catch (_) { return false; }
 }
 
-// The timestamp a DERIVED flow should carry: its real ts when history corroborates a step there,
-// else the base-capital anchor (earliest tracked ts − 1) so it never distorts in-window return.
-function _aurixEffectiveFlowTs(amountUSD, ts) {
-  if (!_AURIX_LEDGER_SELF_HEAL) return ts;
-  return _aurixFlowTsCorroboratedByHistory(amountUSD, ts) ? ts : _aurixEarliestTrackedTs();
+// ── SPEC DSH.CHART.RETURNS.RETIMING.01 — re-time (not just re-anchor) derived flows ──
+// A migration/import flow carries the right AMOUNT but a wrong (Date.now) TIMESTAMP. Anchoring it to
+// base fixed 24H but left 7D/30D/1A/TOTAL unable to neutralise the construction capital that sits INSIDE
+// their windows → gross growth read as return → sane-band veto → 0.00%. This searches the wealth history
+// for the REAL structural step that matches the flow's amount (ledger supplies the size, history supplies
+// the timing) and returns that step's ts. Reliable match ⇒ re-time; otherwise keep the honest base anchor.
+const _AURIX_STEP_MATCH_LO = 0.6;   // observed step must be ≥60% of |amount|
+const _AURIX_STEP_MATCH_HI = 1.6;   // and ≤160% of |amount| (FX/market noise around a real capital event)
+const _AURIX_STEP_MATCH_MIN_CONF = 0.5;   // confidence floor to trust a re-time (⇒ magnitude ratio ~[0.5,1.5])
+const _AURIX_STEP_SUSTAIN = 4;      // points after the jump used to confirm the new level HOLDS (structural)
+function _aurixMatchHistoricalStep(amountUSD, ts) {
+  const out = { ts: null, matchedStepTs: null, confidence: 0, reason: 'no_match', reliable: false, stepUSD: null };
+  try {
+    if (!Number.isFinite(amountUSD) || amountUSD === 0) { out.reason = 'invalid_amount'; return out; }
+    if (typeof portfolioHistory === 'undefined' || !Array.isArray(portfolioHistory)) { out.reason = 'no_history'; return out; }
+    const epoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
+    const pts = portfolioHistory
+      .filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value) && (!epoch || p.ts >= epoch))
+      .sort((a, b) => a.ts - b.ts);
+    if (pts.length < 2) { out.reason = 'insufficient_history'; return out; }
+    const want = Math.abs(amountUSD), sign = Math.sign(amountUSD);
+    const med = arr => { const s = arr.slice().sort((a, b) => a - b); return s.length ? s[(s.length - 1) >> 1] : 0; };
+    let best = null;
+    for (let i = 1; i < pts.length; i++) {
+      const prev = pts[i - 1].value, cur = pts[i].value, step = cur - prev;
+      if (Math.sign(step) !== sign) continue;                 // step must move in the flow's direction
+      const mag = Math.abs(step);
+      if (mag <= 0) continue;
+      const ratio = mag / want;
+      if (ratio < _AURIX_STEP_MATCH_LO || ratio > _AURIX_STEP_MATCH_HI) continue;   // magnitude compatible with the amount
+      // Sustained — the new level HOLDS afterwards (structural capital event, not a transient market spike).
+      const postMed = med(pts.slice(i, Math.min(pts.length, i + _AURIX_STEP_SUSTAIN + 1)).map(p => p.value));
+      const sustained = postMed > 0 && (sign > 0 ? postMed >= cur * 0.70 : postMed <= cur * 1.30);
+      if (!sustained) continue;
+      const conf = +(1 - Math.min(1, Math.abs(ratio - 1))).toFixed(3);   // 1 == perfect magnitude match
+      if (!best || conf > best.confidence) best = { ts: pts[i].ts, matchedStepTs: pts[i].ts, confidence: conf, stepUSD: +step.toFixed(2) };
+    }
+    if (!best) { out.reason = 'no_compatible_step'; return out; }
+    Object.assign(out, best);
+    out.reliable = best.confidence >= _AURIX_STEP_MATCH_MIN_CONF;
+    out.reason = out.reliable ? 'matched_structural_step' : 'low_confidence_step';
+    return out;
+  } catch (_) { return out; }
 }
+
+// Full re-time decision for a DERIVED flow (audit-friendly): corroborated at its own ts → keep it;
+// else re-time to a reliable matching structural step; else keep the honest base-capital anchor.
+function _aurixFlowRetimeDecision(amountUSD, ts) {
+  const d = { originalTs: ts, effectiveTs: ts, corroborated: false, matchedStepTs: null, confidence: 0, reason: 'self_heal_off' };
+  if (!_AURIX_LEDGER_SELF_HEAL) return d;
+  if (_aurixFlowTsCorroboratedByHistory(amountUSD, ts)) { d.corroborated = true; d.confidence = 1; d.reason = 'corroborated_at_original_ts'; return d; }
+  const step = _aurixMatchHistoricalStep(amountUSD, ts);
+  d.matchedStepTs = step.matchedStepTs; d.confidence = step.confidence;
+  if (step.reliable) { d.effectiveTs = step.ts; d.reason = 'retimed_to_structural_step'; return d; }
+  d.effectiveTs = _aurixEarliestTrackedTs();
+  d.reason = (step.reason === 'low_confidence_step') ? 'fallback_base_low_confidence' : 'fallback_base_no_step';
+  return d;
+}
+
+// The timestamp a DERIVED flow should carry (thin wrapper over the decision, unchanged signature).
+function _aurixEffectiveFlowTs(amountUSD, ts) { return _aurixFlowRetimeDecision(amountUSD, ts).effectiveTs; }
 
 // Drop the DERIVED portion of the ledger (tx-backfill + inferred) so it can be rebuilt from the
 // current transactions/history with corrected timestamps. User-authored live flows (source
@@ -7489,15 +7547,27 @@ if (typeof window !== 'undefined') {
   // are treated as in-window capital vs pre-existing base. Pairs with the AUDIT.02 console script.
   window.aurixLedgerDebug = () => {
     const earliest = _aurixEarliestTrackedTs();
+    const iso = t => { try { return Number.isFinite(t) ? new Date(t).toISOString() : null; } catch (_) { return null; } };
     const flows = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
     const rows = flows.map(f => {
-      const corroborated = _aurixFlowTsCorroboratedByHistory(f.amountUSD, f.ts);
-      const effTs = (f.source === 'tx-backfill') ? _aurixEffectiveFlowTs(f.amountUSD, f.ts) : f.ts;
+      // SPEC DSH.CHART.RETURNS.RETIMING.01 — read the persisted re-time audit trail; fall back to a live
+      // recompute for legacy rows written before the trail existed.
+      const originalTs = (f.originalTs != null) ? f.originalTs : f.ts;
+      const dec = (f.retimeReason != null) ? null : (f.source === 'tx-backfill' ? _aurixFlowRetimeDecision(f.amountUSD, originalTs) : null);
+      const effectiveTs = f.ts;
       return { id: f.id, kind: f.kind, source: f.source, amountUSD: f.amountUSD,
-        ts: f.ts, when: (() => { try { return new Date(f.ts).toISOString(); } catch (_) { return null; } })(),
-        corroborated, effTs, reAnchored: effTs !== f.ts, treatedAsBase: effTs <= earliest };
+        originalTs, effectiveTs, when: iso(effectiveTs),
+        matchedStepTs: (f.matchedStepTs != null) ? f.matchedStepTs : (dec ? dec.matchedStepTs : null),
+        confidence: (f.retimeConfidence != null) ? f.retimeConfidence : (dec ? dec.confidence : null),
+        reason: f.retimeReason || (dec ? dec.reason : (f.source === 'user' ? 'user_authored' : null)),
+        reAnchored: originalTs !== effectiveTs, treatedAsBase: effectiveTs <= earliest };
     });
-    try { console.table(rows); console.log('[ledger-debug] selfHeal:', _AURIX_LEDGER_SELF_HEAL, '| earliestTrackedTs:', earliest, '| flows:', flows.length); } catch (_) {}
+    try {
+      console.table(rows);
+      console.log('[ledger-debug] selfHeal:', _AURIX_LEDGER_SELF_HEAL, '| earliestTrackedTs:', earliest,
+        '| flows:', flows.length, '| retimed:', rows.filter(r => r.reason === 'retimed_to_structural_step').length,
+        '| treatedAsBase:', rows.filter(r => r.treatedAsBase).length);
+    } catch (_) {}
     return { selfHeal: _AURIX_LEDGER_SELF_HEAL, earliestTrackedTs: earliest, flows: rows };
   };
 }
@@ -7579,11 +7649,14 @@ function _aurixBackfillFlowsFromTransactions() {
         if (!Number.isFinite(usd) || usd <= 0) continue;
         const isSell = String(tx.type || '').toLowerCase() === 'sell';
         const signed = isSell ? -usd : usd;
-        // Re-anchor uncorroborated (migration/import) flows to base capital; keep real in-window ts.
-        const effTs = _aurixEffectiveFlowTs(signed, tx.ts);
+        // SPEC DSH.CHART.RETURNS.RETIMING.01 — corroborated → keep ts; else re-time to the matching
+        // structural history step; else honest base anchor. Ledger sizes it, history times it.
+        const dec = _aurixFlowRetimeDecision(signed, tx.ts);
+        const effTs = dec.effectiveTs;
         if (effTs !== tx.ts) reAnchored++;
         // SAME (kind, assetId, ts, amount) as _ledgerTrade → idempotent with live flows.
-        _aurixCaptureFlow(isSell ? 'asset_remove' : 'asset_add', signed, effTs, a.id, 'tx-backfill', 'tx-backfill');
+        _aurixCaptureFlow(isSell ? 'asset_remove' : 'asset_add', signed, effTs, a.id, 'tx-backfill', 'tx-backfill',
+          { originalTs: tx.ts, retimeReason: dec.reason, retimeConfidence: dec.confidence, matchedStepTs: dec.matchedStepTs });
       }
     }
     added = _aurixLoadCapitalFlows().length - before;

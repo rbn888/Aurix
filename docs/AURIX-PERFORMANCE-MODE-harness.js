@@ -34,6 +34,7 @@ const sb = {
   portfolioHistory: [], categoryHistory: [],
   _AURIX_LEDGER_SELF_HEAL: true,
   _AURIX_FLOW_CORROBORATE_MS: 3*D, _AURIX_FLOW_CORROBORATE_FRAC: 0.4,
+  _AURIX_STEP_MATCH_LO: 0.6, _AURIX_STEP_MATCH_HI: 1.6, _AURIX_STEP_MATCH_MIN_CONF: 0.5, _AURIX_STEP_SUSTAIN: 4,
 };
 sb.window = sb;
 vm.createContext(sb);
@@ -42,7 +43,7 @@ vm.runInContext("function computePerformanceSnapshot(r){ var rs=(getInstitutiona
   src.match(/const _WSC_LOWDENSITY_MIN = \d+;/)[0],
   fn('_aurixFlowIsInternal'), fn('_aurixFlowNeutralize'), fn('_wscAssessSeriesQuality'),
   fn('_aurixRangeReturn'), fn('getCanonicalPortfolioSeries'), fn('getInstitutionalPerformanceSeries'), fn('_aurixDashSeries'), fn('_aurixCaptureFlow'),
-  fn('_aurixEarliestTrackedTs'), fn('_aurixFlowTsCorroboratedByHistory'), fn('_aurixEffectiveFlowTs'), fn('_aurixPurgeDerivedFlows'),
+  fn('_aurixEarliestTrackedTs'), fn('_aurixFlowTsCorroboratedByHistory'), fn('_aurixMatchHistoricalStep'), fn('_aurixFlowRetimeDecision'), fn('_aurixEffectiveFlowTs'), fn('_aurixPurgeDerivedFlows'),
   fn('_aurixBackfillFlowsFromTransactions') ].forEach(c=>vm.runInContext(c, sb));
 
 let ok=true; const ck=(n,c,g)=>{console.log((c?'  ✓':'  ✗')+' '+n+(g!==undefined?'  ['+g+']':'')); if(!c) ok=false;};
