@@ -7407,6 +7407,101 @@ if (typeof window !== 'undefined') {
   };
 }
 
+// ── SPEC DSH.CHART.RETURNS.LEDGER.01 — deterministic flow-timestamp correction ──
+// ROOT CAUSE of "0.00% en todas las temporalidades": the flow-neutral badge subtracts
+// _aurixNetFlowsInWindow(baseline, current] from the wealth growth. When a LEGACY holding
+// (no real transaction log) is migrated, migrateLegacyAssetToTransactions synthesised a buy
+// stamped at Date.now(); the tx-backfill then recorded an asset_add flow at ≈boot time. That
+// flow lands INSIDE every window (which all end at the current snapshot), so the ENTIRE cost
+// basis of pre-existing holdings is wrongly counted as capital added *today* → neutralDelta
+// goes massively negative → |neutralPct| exceeds the sane band → insufficient_return_history
+// → badge forced to 0.00%. Fix: a derived (backfilled) flow keeps its timestamp ONLY when the
+// wealth history CORROBORATES a real value step near it; otherwise it is re-anchored to the
+// earliest tracked timestamp so it is treated as pre-existing BASE capital (excluded from the
+// (baseline, current] neutralisation window), never as an in-period inflow. Deterministic,
+// self-healing (re-derived each boot), never mutates user-authored transactions. Monotonic:
+// a genuine in-window buy with a corroborating step is still neutralised exactly as before.
+let _AURIX_LEDGER_SELF_HEAL = true;   // rollback: window.disableAurixLedgerSelfHeal()
+
+// Earliest tracked timestamp across the wealth + category history (epoch-filtered), used as the
+// "base capital" anchor. Falls back to the reset epoch, then to 0 (⇒ before any window baseline).
+function _aurixEarliestTrackedTs() {
+  let earliest = Infinity;
+  try {
+    const epoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
+    const scan = arr => { if (Array.isArray(arr)) for (const p of arr) { if (p && Number.isFinite(p.ts) && (!epoch || p.ts >= epoch) && p.ts < earliest) earliest = p.ts; } };
+    if (typeof portfolioHistory !== 'undefined') scan(portfolioHistory);
+    if (typeof categoryHistory !== 'undefined') scan(categoryHistory);
+    if (!Number.isFinite(earliest)) { const ep = epoch || 0; return ep; }
+    // Anchor STRICTLY before the earliest point so it is excluded from every (baseline, …] window.
+    return earliest - 1;
+  } catch (_) { return 0; }
+}
+
+// True when portfolioHistory shows a real value STEP near `ts` matching the flow's sign and a
+// meaningful fraction of its magnitude — i.e. the capital event actually happened then (vs a
+// migration/import artefact stamped at boot time). portfolioHistory values are USD, as are flows.
+const _AURIX_FLOW_CORROBORATE_MS = 3 * 86_400_000;   // straddle window: event must sit between adjacent snapshots ≤3d apart
+const _AURIX_FLOW_CORROBORATE_FRAC = 0.4;            // observed step ≥ 40% of |amount| ⇒ corroborated (allows market noise/FX)
+function _aurixFlowTsCorroboratedByHistory(amountUSD, ts) {
+  try {
+    if (!Number.isFinite(amountUSD) || !Number.isFinite(ts)) return false;
+    if (typeof portfolioHistory === 'undefined' || !Array.isArray(portfolioHistory)) return false;
+    const epoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
+    const pts = portfolioHistory
+      .filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value) && (!epoch || p.ts >= epoch))
+      .sort((a, b) => a.ts - b.ts);
+    if (pts.length < 2) return false;
+    // Nearest snapshot strictly before ts and nearest at/after ts.
+    let before = null, after = null;
+    for (const p of pts) { if (p.ts < ts) before = p; else { after = p; break; } }
+    if (!before || !after) return false;                       // event outside tracked span → treat as base capital
+    if ((after.ts - before.ts) > _AURIX_FLOW_CORROBORATE_MS) return false;  // gap too wide to attribute the step to this event
+    const step = after.value - before.value;                   // USD
+    if (Math.sign(step) !== Math.sign(amountUSD)) return false; // step must move in the flow's direction
+    return Math.abs(step) >= _AURIX_FLOW_CORROBORATE_FRAC * Math.abs(amountUSD);
+  } catch (_) { return false; }
+}
+
+// The timestamp a DERIVED flow should carry: its real ts when history corroborates a step there,
+// else the base-capital anchor (earliest tracked ts − 1) so it never distorts in-window return.
+function _aurixEffectiveFlowTs(amountUSD, ts) {
+  if (!_AURIX_LEDGER_SELF_HEAL) return ts;
+  return _aurixFlowTsCorroboratedByHistory(amountUSD, ts) ? ts : _aurixEarliestTrackedTs();
+}
+
+// Drop the DERIVED portion of the ledger (tx-backfill + inferred) so it can be rebuilt from the
+// current transactions/history with corrected timestamps. User-authored live flows (source
+// 'user') are the source of truth and are NEVER removed. Idempotent + reversible (re-derivable).
+function _aurixPurgeDerivedFlows() {
+  try {
+    const flows = _aurixLoadCapitalFlows();
+    const kept = flows.filter(f => f && f.source !== 'tx-backfill' && f.source !== 'inferred');
+    if (kept.length !== flows.length) _aurixSaveCapitalFlows(kept);
+    return flows.length - kept.length;
+  } catch (_) { return 0; }
+}
+
+if (typeof window !== 'undefined') {
+  window.disableAurixLedgerSelfHeal = () => { _AURIX_LEDGER_SELF_HEAL = false; return false; };
+  window.enableAurixLedgerSelfHeal  = () => { _AURIX_LEDGER_SELF_HEAL = true;  return true; };
+  // Read-only: per-flow corroboration + effective (re-anchored) timestamp — proves which flows
+  // are treated as in-window capital vs pre-existing base. Pairs with the AUDIT.02 console script.
+  window.aurixLedgerDebug = () => {
+    const earliest = _aurixEarliestTrackedTs();
+    const flows = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
+    const rows = flows.map(f => {
+      const corroborated = _aurixFlowTsCorroboratedByHistory(f.amountUSD, f.ts);
+      const effTs = (f.source === 'tx-backfill') ? _aurixEffectiveFlowTs(f.amountUSD, f.ts) : f.ts;
+      return { id: f.id, kind: f.kind, source: f.source, amountUSD: f.amountUSD,
+        ts: f.ts, when: (() => { try { return new Date(f.ts).toISOString(); } catch (_) { return null; } })(),
+        corroborated, effTs, reAnchored: effTs !== f.ts, treatedAsBase: effTs <= earliest };
+    });
+    try { console.table(rows); console.log('[ledger-debug] selfHeal:', _AURIX_LEDGER_SELF_HEAL, '| earliestTrackedTs:', earliest, '| flows:', flows.length); } catch (_) {}
+    return { selfHeal: _AURIX_LEDGER_SELF_HEAL, earliestTrackedTs: earliest, flows: rows };
+  };
+}
+
 // ── WN.4B — Historical capital-flow backfill (local, one-time, idempotent) ──
 // WN.4A captures NEW user-driven flows; existing portfolioHistory still holds
 // OLD construction/import jumps. This converts only the OBVIOUS historical ones
@@ -7467,9 +7562,12 @@ function backfillHistoricalCapitalFlowsFromPortfolioHistory() {
 // to one. No price-jump heuristic, so it can NEVER misclassify a market rally as a
 // flow. Reads assets only; never mutates holdings/history/PCE.
 function _aurixBackfillFlowsFromTransactions() {
-  let added = 0, scanned = 0;
+  let added = 0, scanned = 0, reAnchored = 0;
   try {
     const list = (typeof activeAssets === 'function') ? activeAssets() : (Array.isArray(assets) ? assets : []);
+    // SPEC DSH.CHART.RETURNS.LEDGER.01 — rebuild the derived ledger so previously mis-timestamped
+    // (e.g. migration Date.now()) tx-backfill flows are corrected, not duplicated. Live 'user' flows kept.
+    if (_AURIX_LEDGER_SELF_HEAL) _aurixPurgeDerivedFlows();
     const before = _aurixLoadCapitalFlows().length;
     for (const a of list) {
       if (!a || !Array.isArray(a.transactions)) continue;
@@ -7480,14 +7578,19 @@ function _aurixBackfillFlowsFromTransactions() {
         const usd = (typeof _nativeToUSD === 'function') ? _nativeToUSD(native, a.assetCurrency) : native;
         if (!Number.isFinite(usd) || usd <= 0) continue;
         const isSell = String(tx.type || '').toLowerCase() === 'sell';
+        const signed = isSell ? -usd : usd;
+        // Re-anchor uncorroborated (migration/import) flows to base capital; keep real in-window ts.
+        const effTs = _aurixEffectiveFlowTs(signed, tx.ts);
+        if (effTs !== tx.ts) reAnchored++;
         // SAME (kind, assetId, ts, amount) as _ledgerTrade → idempotent with live flows.
-        _aurixCaptureFlow(isSell ? 'asset_remove' : 'asset_add', isSell ? -usd : usd, tx.ts, a.id, 'tx-backfill', 'tx-backfill');
+        _aurixCaptureFlow(isSell ? 'asset_remove' : 'asset_add', signed, effTs, a.id, 'tx-backfill', 'tx-backfill');
       }
     }
     added = _aurixLoadCapitalFlows().length - before;
   } catch (_) {}
+  if (typeof IS_DEV !== 'undefined' && IS_DEV) { try { console.debug('[tx-backfill] re-anchored:', reAnchored); } catch (_) {} }
   if (typeof IS_DEV !== 'undefined' && IS_DEV) { try { console.debug('[tx-backfill] scanned:', scanned, 'added:', added); } catch (_) {} }
-  return { added, scanned };
+  return { added, scanned, reAnchored };
 }
 
 if (typeof window !== 'undefined') {
@@ -7525,7 +7628,7 @@ try {
     } catch (_) {}
     // Newly-derived flows change the flow-neutral series → repaint so the capital
     // step disappears immediately instead of waiting for the next poll. Guarded.
-    if (res.added > 0) {
+    if (res.added > 0 || res.reAnchored > 0) {   // re-anchor changes flow ts (not count) → still repaint
       try { if (typeof renderWealthCurve === 'function') renderWealthCurve(false); } catch (_) {}
       try { if (typeof updateChart === 'function') updateChart(); } catch (_) {}
     }

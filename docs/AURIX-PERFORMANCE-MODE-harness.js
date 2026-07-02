@@ -30,6 +30,10 @@ const sb = {
   _aurixEligibleInvestableSeries: () => ({ series: ELIG, meta:{} }),
   _aurixLoadCapitalFlows: () => FLOWS.slice(),
   _aurixSaveCapitalFlows: (a) => { STORE = a.slice(); FLOWS = a.slice(); },
+  // SPEC DSH.CHART.RETURNS.LEDGER.01 — deps for the corroboration/re-anchor logic in the backfill.
+  portfolioHistory: [], categoryHistory: [],
+  _AURIX_LEDGER_SELF_HEAL: true,
+  _AURIX_FLOW_CORROBORATE_MS: 3*D, _AURIX_FLOW_CORROBORATE_FRAC: 0.4,
 };
 sb.window = sb;
 vm.createContext(sb);
@@ -38,6 +42,7 @@ vm.runInContext("function computePerformanceSnapshot(r){ var rs=(getInstitutiona
   src.match(/const _WSC_LOWDENSITY_MIN = \d+;/)[0],
   fn('_aurixFlowIsInternal'), fn('_aurixFlowNeutralize'), fn('_wscAssessSeriesQuality'),
   fn('_aurixRangeReturn'), fn('getCanonicalPortfolioSeries'), fn('getInstitutionalPerformanceSeries'), fn('_aurixDashSeries'), fn('_aurixCaptureFlow'),
+  fn('_aurixEarliestTrackedTs'), fn('_aurixFlowTsCorroboratedByHistory'), fn('_aurixEffectiveFlowTs'), fn('_aurixPurgeDerivedFlows'),
   fn('_aurixBackfillFlowsFromTransactions') ].forEach(c=>vm.runInContext(c, sb));
 
 let ok=true; const ck=(n,c,g)=>{console.log((c?'  ✓':'  ✗')+' '+n+(g!==undefined?'  ['+g+']':'')); if(!c) ok=false;};
@@ -54,9 +59,12 @@ console.log('CASE 1 — large asset_add inside the window (deposit ~+19.7k on a 
 console.log('\nCASE 2 — construction 54k→75k WITHOUT a recorded flow → backfill from transactions, then neutralised');
 { sb.assets = [{ id:'btc', assetCurrency:'USD', transactions:[ {type:'buy', qty:0.2, price:62500, ts:NOW-10*D} ] }];
   FLOWS = []; STORE = [];
+  // SPEC DSH.CHART.RETURNS.LEDGER.01 — a REAL construction buy: portfolioHistory corroborates a
+  // matching +12.5k step at the tx ts, so the derived flow keeps its ts and is neutralised in-window.
+  sb.portfolioHistory = [{ts:NOW-11*D, value:55000},{ts:NOW-9*D, value:67500},{ts:NOW, value:67800}];
   const res = sb._aurixBackfillFlowsFromTransactions();
   ck('backfill derived 1 flow from the transaction', res.added === 1, 'added='+res.added);
-  ck('flow is asset_add +12500 at tx ts', STORE[0] && STORE[0].kind==='asset_add' && STORE[0].amountUSD===12500, JSON.stringify(STORE[0]));
+  ck('flow is asset_add +12500 at tx ts (corroborated)', STORE[0] && STORE[0].kind==='asset_add' && STORE[0].amountUSD===12500 && STORE[0].ts===NOW-10*D, JSON.stringify(STORE[0]));
   // now neutralisation can see it:
   ELIG = [{ts:NOW-20*D,value:54809},{ts:NOW-11*D,value:55000},{ts:NOW-9*D,value:67500},{ts:NOW-4*D,value:67700},{ts:NOW,value:67800}];
   const r = sb._aurixRangeReturn('30d');
