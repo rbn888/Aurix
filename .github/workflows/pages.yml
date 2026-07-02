@@ -1,0 +1,41 @@
+name: Deploy to GitHub Pages
+
+# SPEC DSH.DEPLOY.PAGES.01 — the legacy "deploy from branch" Pages build stalled on the deploy step
+# (10-min timeout) from v471 onward, leaving production stuck at v470. This publishes main's repo root
+# via the GitHub Actions Pages path (configure-pages → upload-pages-artifact → deploy-pages), which is
+# a different, reliable publish pipeline. No app code / chart / UI / finance logic is touched.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Least-privilege token scopes required by actions/deploy-pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One Pages deployment at a time; let an in-flight run finish (don't cancel a live deploy).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload artifact (repo root; .git/.github auto-excluded)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
