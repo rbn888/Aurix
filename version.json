@@ -1,1 +1,1 @@
-{ "appjs": 470, "build": "v470-mobile-chart-right-gutter", "note": "served-version source of truth for the stale-bundle guard in index.html" }
+{ "appjs": 471, "build": "v471-chart-returns-ledger-populate", "note": "served-version source of truth for the stale-bundle guard in index.html" }
