@@ -23394,6 +23394,172 @@ try {
       return out;
     };
 
+    // ════════════════════════════════════════════════════════════════════════════
+    // SPEC DSH.CHART.INSTITUTIONAL.LINE.01 — window.aurixChartForensics(range)
+    // ════════════════════════════════════════════════════════════════════════════
+    // READ-ONLY forensic dump for ONE range. Answers the three field questions:
+    //   1) why a long flat/straight segment appears in the middle/right of a range
+    //      (geometry: SPARSE_BRIDGE — a real temporal gap with too few snapshots,
+    //       drawn as one wide straight segment; NOT fabricated data),
+    //   2) why a range shows a neutral/suppressed 0.00% (RETURN_SUPPRESSED — the
+    //      flow-neutral residual left the sane band, so no % is trusted),
+    //   3) why a range shows an implausible negative like -52% (over-subtracted
+    //      capital flows: FLOW_DOUBLE_MATCH / RETIMING_LOW_CONFIDENCE / BASELINE_UNRELIABLE).
+    // Never mutates state, never logs secrets. Every number is derived from the SAME
+    // validated pipeline the visible chart reads, so it can never disagree with it.
+    function _aurixForensicsSegments(points) {
+      // points: [{ts,value}] in time order. Classifies each inter-point segment by
+      // temporal density + shape so a sparse "bridge" (wide gap, ~straight) is visible.
+      const segs = [];
+      const n = Array.isArray(points) ? points.length : 0;
+      if (n < 2) return { segments: segs, longestGapMs: 0, medianGapMs: 0, bridgeCount: 0, flatCount: 0 };
+      const gaps = [];
+      for (let i = 1; i < n; i++) gaps.push(points[i].ts - points[i - 1].ts);
+      const sortedGaps = gaps.slice().sort((a, b) => a - b);
+      const medianGapMs = sortedGaps.length ? sortedGaps[(sortedGaps.length - 1) >> 1] : 0;
+      const longestGapMs = sortedGaps.length ? sortedGaps[sortedGaps.length - 1] : 0;
+      // A segment is a "bridge" when its real duration dwarfs the typical cadence
+      // (≥6× the median gap and ≥30min absolute) — few/no snapshots span a wide time,
+      // so the renderer draws one long straight stretch that reads as artificial.
+      const bridgeFloorMs = Math.max(6 * (medianGapMs || 0), 30 * 60 * 1000);
+      let bridgeCount = 0, flatCount = 0;
+      for (let i = 1; i < n; i++) {
+        const dt = points[i].ts - points[i - 1].ts;
+        const dv = points[i].value - points[i - 1].value;
+        const pv = points[i - 1].value || 1;
+        const pct = +((dv / pv) * 100).toFixed(4);
+        const isBridge = dt >= bridgeFloorMs;
+        const isFlat = Math.abs(pct) < 0.05 && dt >= Math.max(2 * (medianGapMs || 0), 15 * 60 * 1000);
+        if (isBridge) bridgeCount++;
+        if (isFlat) flatCount++;
+        segs.push({
+          fromTs: points[i - 1].ts, toTs: points[i].ts,
+          durationMs: dt, durationMin: +(dt / 60000).toFixed(1),
+          deltaValue: +dv.toFixed(2), pctChange: pct,
+          pointCount: 2, isBridge: isBridge, isFlat: isFlat,
+          confidence: isBridge ? 'sparse_bridge' : (isFlat ? 'flat_low_variation' : 'dense_real'),
+        });
+      }
+      return { segments: segs, longestGapMs: longestGapMs, medianGapMs: medianGapMs, bridgeCount: bridgeCount, flatCount: flatCount };
+    }
+
+    window.aurixChartForensics = function (range) {
+      const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+      const warnings = [];
+      const iso = t => { try { return Number.isFinite(t) ? new Date(t).toISOString() : null; } catch (_) { return null; } };
+      const v = buildValidatedHistoricalSeries(r);
+      const p = buildProductionPortfolioChart(r);
+      const rangePts = (v.rangeSeries || []).map(pt => ({ ts: pt.ts, value: pt.value }));
+      const geo = _aurixForensicsSegments(rangePts);
+
+      // Requested vs actual temporal span (range collapse detection).
+      const span = _AURIX_EMG_RANGE_MS[r];
+      const requestedSpanMs = (r === 'all' || !Number.isFinite(span)) ? null : span;
+      const actualSpanMs = rangePts.length >= 2 ? (rangePts[rangePts.length - 1].ts - rangePts[0].ts) : 0;
+
+      // Flow forensics over the EXACT badge window (baseline, current].
+      const baselineTs = p.baselineTs, currentTs = p.currentTs;
+      let flowsInWindow = [], matchedStepCounts = {}, doubleMatch = [], lowConfInWindow = 0;
+      try {
+        const allFlows = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
+        flowsInWindow = allFlows
+          .filter(f => f && typeof f.ts === 'number' && baselineTs != null && currentTs != null && f.ts > baselineTs && f.ts <= currentTs)
+          .map(f => {
+            const b = (typeof toBase === 'function') ? toBase(Number(f.amountUSD), 'USD') : Number(f.amountUSD);
+            return {
+              id: f.id, kind: f.kind, source: f.source, amountUSD: f.amountUSD, amountBase: Number.isFinite(b) ? +b.toFixed(2) : null,
+              ts: f.ts, when: iso(f.ts), originalTs: (f.originalTs != null ? f.originalTs : f.ts),
+              matchedStepTs: f.matchedStepTs != null ? f.matchedStepTs : null,
+              retimeReason: f.retimeReason || null, retimeConfidence: (f.retimeConfidence != null ? f.retimeConfidence : null),
+            };
+          });
+        // FLOW_DOUBLE_MATCH — 2+ in-window flows re-timed onto the SAME structural step ts (over-subtraction risk).
+        flowsInWindow.forEach(f => { if (f.matchedStepTs != null) matchedStepCounts[f.matchedStepTs] = (matchedStepCounts[f.matchedStepTs] || 0) + 1; });
+        doubleMatch = Object.keys(matchedStepCounts).filter(k => matchedStepCounts[k] > 1).map(k => ({ matchedStepTs: Number(k), consumedByFlows: matchedStepCounts[k] }));
+        lowConfInWindow = flowsInWindow.filter(f => (f.retimeConfidence != null && f.retimeConfidence < 0.5) || f.retimeReason === 'fallback_base_low_confidence').length;
+      } catch (_) {}
+
+      // Baseline reliability — a baseline that sits far below the window's own median is a
+      // construction/low anchor that inflates gross growth and destabilises the residual.
+      let baselineUnreliable = false, windowMedian = null;
+      try {
+        if (rangePts.length >= 2) {
+          const sv = rangePts.map(pt => pt.value).sort((a, b) => a - b);
+          windowMedian = sv[(sv.length - 1) >> 1];
+          if (windowMedian > 0 && p.baselineValue != null && p.baselineValue < 0.55 * windowMedian) baselineUnreliable = true;
+        }
+      } catch (_) {}
+
+      // ── warnings ──
+      if (geo.bridgeCount > 0) warnings.push('SPARSE_BRIDGE');
+      if (p.collapsedRange || p.rangeCollapsedBecauseHistoryTooShort) warnings.push('RANGE_COLLAPSED');
+      if (doubleMatch.length > 0) warnings.push('FLOW_DOUBLE_MATCH');
+      if (baselineUnreliable) warnings.push('BASELINE_UNRELIABLE');
+      if (p.state === 'ready' && p.returnState !== 'ok') warnings.push('RETURN_SUPPRESSED');
+      if (lowConfInWindow > 0) warnings.push('RETIMING_LOW_CONFIDENCE');
+
+      const out = {
+        range: r,
+        // ── span / collapse ──
+        requestedSpanMs: requestedSpanMs, actualSpanMs: actualSpanMs,
+        collapsedRange: !!p.collapsedRange, rangeCollapsedBecauseHistoryTooShort: !!p.rangeCollapsedBecauseHistoryTooShort,
+        collapseReason: p.reason,
+        // ── point accounting (this pipeline NEVER fabricates points: real == final) ──
+        rawPointCount: p.rawPointCount,
+        cleanPointCountBeforeRange: p.cleanPointCountBeforeRange,
+        cleanPointCountAfterQuarantine: p.cleanPointCountAfterQuarantine,
+        finalPointCount: p.finalPointCount,
+        realPointCount: p.finalPointCount, syntheticPointCount: 0,
+        quarantinedSnapshotCount: p.quarantinedSnapshotCount,
+        firstInvalidStage: p.firstInvalidStage,
+        // ── geometry (flat/straight forensics) ──
+        firstTs: p.firstTs, lastTs: p.lastTs, firstWhen: iso(p.firstTs), lastWhen: iso(p.lastTs),
+        longestGapMs: geo.longestGapMs, longestGapMin: +(geo.longestGapMs / 60000).toFixed(1),
+        medianGapMs: geo.medianGapMs, medianGapMin: +(geo.medianGapMs / 60000).toFixed(1),
+        bridgeSegmentCount: geo.bridgeCount, flatSegmentCount: geo.flatCount,
+        segments: geo.segments,
+        points: rangePts.map(pt => ({ ts: pt.ts, when: iso(pt.ts), value: pt.value, source: 'real_snapshot', confidence: 'real' })),
+        // ── return / financial ──
+        baselineTs: baselineTs, baselineWhen: iso(baselineTs), baselineValue: p.baselineValue,
+        currentTs: currentTs, currentWhen: iso(currentTs), currentValue: p.currentValue,
+        windowMedianValue: windowMedian, baselineUnreliable: baselineUnreliable,
+        grossPct: p.lineReturnPct, netFlows: p.netFlows,
+        adjustedReturnPct: p.returnState === 'ok' ? p.returnPct : null,
+        badgeReturnPct: p.badgeReturnPct, lineReturnPct: p.lineReturnPct,
+        returnState: p.returnState, color: p.color,
+        saneBand: _AURIX_RET_SANE_PCT[r] || _AURIX_RET_SANE_PCT.all,
+        guardHit: (p.state === 'ready' && p.returnState !== 'ok') ? 'sane_band_or_min_base' : null,
+        // ── flow matches ──
+        flowsInWindowCount: flowsInWindow.length, flowsInWindow: flowsInWindow,
+        reTimedFlowCount: flowsInWindow.filter(f => f.retimeReason === 'retimed_to_structural_step').length,
+        treatedAsBaseFlowCount: flowsInWindow.filter(f => f.retimeReason && f.retimeReason.indexOf('fallback_base') === 0).length,
+        doubleMatchedSteps: doubleMatch, lowConfidenceRetimeCount: lowConfInWindow,
+        // ── verdicts ──
+        warnings: warnings,
+        state: p.state,
+      };
+      try { console.log('%c[UI][CHART_FORENSICS]', 'font-weight:700;color:#4da3ff', out); } catch (_) {}
+      return out;
+    };
+
+    // Phase-1 table across every range (24h/7d/30d/1y/all) — one row per range.
+    window.aurixChartForensicsAll = function () {
+      const rows = ['24h', '7d', '30d', '1y', 'all'].map(rg => {
+        const f = window.aurixChartForensics(rg);
+        return {
+          range: rg, state: f.state, finalPoints: f.finalPointCount, real: f.realPointCount, synthetic: f.syntheticPointCount,
+          bridges: f.bridgeSegmentCount, flats: f.flatSegmentCount, longestGapMin: f.longestGapMin,
+          collapsed: f.collapsedRange || f.rangeCollapsedBecauseHistoryTooShort,
+          baseline: f.baselineValue, current: f.currentValue, grossPct: f.grossPct, netFlows: f.netFlows,
+          badgePct: f.badgeReturnPct, returnState: f.returnState,
+          flowsInWindow: f.flowsInWindowCount, doubleMatched: f.doubleMatchedSteps.length,
+          warnings: (f.warnings || []).join(','),
+        };
+      });
+      try { console.table(rows); } catch (_) {}
+      return rows;
+    };
+
     // P0-HISTORICAL-PIPELINE-AUDIT — GLOBAL audit over the whole history + all ranges, with an automatic
     // ROOT CAUSE REPORT (first corrupted snapshot, why, which ranges it contaminates, whether quarantine
     // solved it, whether READY became possible, whether renderer changes are still needed). Read-only.
