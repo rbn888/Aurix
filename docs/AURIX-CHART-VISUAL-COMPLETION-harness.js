@@ -21,9 +21,11 @@ vm.runInContext(block('const _AURIX_VP_DENSITY', 'const _AURIX_VP_VALUE_EPS = 0.
 vm.runInContext(block('const _AURIX_IR_VALUE_MARGIN', '= 0.08;'), sb);
 vm.runInContext(block('const _AURIX_Y_JUMP_DOMINANCE', 'const _AURIX_Y_LEGIBLE_ALPHA  = 0.35;'), sb);
 vm.runInContext(block('const _AURIX_X_FILL_BETA', '};'), sb);
+vm.runInContext(block('const _AURIX_BRIDGE_SEG_ENABLED', "'all': 0.4 };"), sb);   // SPEC 24H.BRIDGE-SEGMENTATION.01 deps
 [ fn('_aurixVpTargetPointCount'), fn('downsampleAurixLTTB'), fn('_aurixSignificantLocalExtrema'), fn('downsampleAurixAdaptive'),
   fn('computeAurixTimeScale'), fn('computeAurixAdaptiveXScale'), fn('computeAurixValueScale'), fn('_wscFmtAxisVal'),
-  fn('_aurixMonotonePath'), fn('buildAurixAreaPath'), fn('renderValidatedPortfolioChartWithInstitutionalRenderer'),
+  fn('_aurixMonotonePath'), fn('buildAurixAreaPath'), fn('_aurixSplitAtGaps'), fn('_aurixConfirmedBridgeGaps'),
+  fn('renderValidatedPortfolioChartWithInstitutionalRenderer'),
   fn('_aurixInstitutionalYTicks') ].forEach(c => vm.runInContext(c, sb));
 
 const DAY = 86400e3, HOUR = 36e5, NOW = 1000 * DAY;

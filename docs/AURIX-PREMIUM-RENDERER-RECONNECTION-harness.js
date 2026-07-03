@@ -26,9 +26,10 @@ sb.window = sb; sb.window.innerWidth = 1440;
 vm.createContext(sb);
 vm.runInContext(src.slice(src.indexOf('const _AURIX_PATH_RENDER_SPACING'), src.indexOf('function _aurixArrConfig')), sb);
 vm.runInContext(RC_CONSTS, sb); vm.runInContext(VP_CONSTS, sb); vm.runInContext(IR_CONSTS, sb); vm.runInContext(Y_CONSTS, sb); vm.runInContext(X_CONSTS, sb);
+vm.runInContext(block('const _AURIX_BRIDGE_SEG_ENABLED', "'all': 0.4 };"), sb);   // SPEC 24H.BRIDGE-SEGMENTATION.01 deps
 [ fn('_aurixVpTargetPointCount'), fn('downsampleAurixLTTB'), fn('_aurixSignificantLocalExtrema'),
   fn('downsampleAurixAdaptive'), fn('computeAurixTimeScale'), fn('computeAurixAdaptiveXScale'), fn('computeAurixValueScale'),
-  fn('_aurixMonotonePath'), fn('buildAurixAreaPath'),
+  fn('_aurixMonotonePath'), fn('buildAurixAreaPath'), fn('_aurixSplitAtGaps'), fn('_aurixConfirmedBridgeGaps'),
   fn('renderValidatedPortfolioChartWithInstitutionalRenderer') ].forEach(c => vm.runInContext(c, sb));
 const ADAPT = (points, opts) => vm.runInContext('renderValidatedPortfolioChartWithInstitutionalRenderer(' + JSON.stringify(points) + ',' + JSON.stringify(opts) + ')', sb);
 

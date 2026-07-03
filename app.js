@@ -23231,6 +23231,42 @@ function _aurixEmergencyBuildSvg(points, opts) {
   return { linePath: line, areaPath: area, pixels: pixels, W: W, H: H, plotBottom: plotBottom };
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.24H.BRIDGE-SEGMENTATION.01 — break the VISIBLE line at a CONFIRMED sparse bridge
+// ════════════════════════════════════════════════════════════════════════════
+// The visible chart draws a single continuous monotone-cubic path; over a large temporal HOLE (e.g. a
+// >20h 24H outage) that reads as a premium line where there is actually no data. This breaks the path at
+// a CONFIRMED sparse bridge only — a hole that is BOTH a genuine outage by the engine's own gap rule
+// (≥ per-range floor AND ≥ 8× median cadence) AND a DOMINANT fraction of the shown window. The dense
+// premium curve WITHIN each run is unchanged (same points/scales/builder); only the connection ACROSS
+// the hole is removed. No point is invented; values/timestamps/returns are untouched. Ordinary pauses
+// stay continuous (below the dominance threshold). Rollback: _AURIX_BRIDGE_SEG_ENABLED = false.
+const _AURIX_BRIDGE_SEG_ENABLED = true;
+// A confirmed bridge must span at least this fraction of the visible window (dominance gate) — this is
+// what keeps normal overnight pauses continuous and only breaks a genuinely dominant hole.
+const _AURIX_BRIDGE_SEG_FRAC = { '24h': 0.5, '7d': 0.45, '30d': 0.4, '1y': 0.4, 'all': 0.4 };
+function _aurixConfirmedBridgeGaps(points, range) {
+  const out = [];
+  if (!_AURIX_BRIDGE_SEG_ENABLED) return out;
+  const n = Array.isArray(points) ? points.length : 0;
+  if (n < 2) return out;
+  const r = String(range || '').toLowerCase();
+  if (r === 'all') return out;                                    // ALL = all-history; no requested window to be "sparse" against
+  const t0 = points[0].time, t1 = points[n - 1].time, totalSpan = (t1 - t0) || 1;
+  const iv = []; for (let i = 1; i < n; i++) iv.push(points[i].time - points[i - 1].time);
+  iv.sort((a, b) => a - b);
+  const medianIv = iv.length ? iv[iv.length >> 1] : 0;
+  const floor = _AURIX_VP_GAP_FLOOR_MS[r] || (7 * 864e5);
+  const engineThr = Math.max(floor, medianIv * _AURIX_VP_GAP_MEDIAN_MULT);   // the codebase's "genuine outage" rule
+  const frac = (_AURIX_BRIDGE_SEG_FRAC[r] != null) ? _AURIX_BRIDGE_SEG_FRAC[r] : 0.5;
+  const thr = Math.max(engineThr, frac * totalSpan);              // confirmed = genuine outage AND dominant fraction
+  for (let i = 1; i < n; i++) {
+    const dur = points[i].time - points[i - 1].time;
+    if (dur >= thr) out.push({ start: points[i - 1].time, end: points[i].time, durationMs: dur, threshold: thr, reason: 'confirmed_sparse_bridge' });
+  }
+  return out;
+}
+
 // P0-PREMIUM-RENDERER-RECONNECTION — render the ALREADY-VALIDATED buildProductionPortfolioChart points
 // through the ORIGINAL institutional geometry (LTTB downsample → regime-aware scales → monotone-CUBIC
 // path → area). Values are NEVER modified: the only change is a ts→time shape rename. Returns a premium
@@ -23250,11 +23286,27 @@ function renderValidatedPortfolioChartWithInstitutionalRenderer(points, opts) {
     const xScale = computeAurixAdaptiveXScale(visiblePoints, vw, box, r);             // perceptual X
     const yScale = computeAurixValueScale(visiblePoints, vh, box);                    // regime-relative Y
     const scale = { xMin: xScale.xMin, xMax: xScale.xMax, yMin: yScale.yMin, yMax: yScale.yMax, x: xScale.x, y: yScale.y, top: yScale.top, bottom: yScale.bottom };
-    const mp = _aurixMonotonePath(visiblePoints, xScale, yScale);                     // monotone-cubic
-    const linePath = (mp && mp.d) ? mp.d : '';
-    const areaPath = (typeof buildAurixAreaPath === 'function' && linePath) ? buildAurixAreaPath(linePath, visiblePoints, scale) : '';
+    // SPEC DSH.CHART.24H.BRIDGE-SEGMENTATION.01 — split the path ONLY at a confirmed sparse bridge; else
+    // draw the single continuous premium curve exactly as before (byte-identical when there is no bridge).
+    const bridges = _aurixConfirmedBridgeGaps(visiblePoints, r);
+    let linePath = '', areaPath = '';
+    if (bridges.length) {
+      const runs = _aurixSplitAtGaps(visiblePoints, bridges);
+      const lineParts = [], areaParts = [];
+      for (const run of runs) {
+        if (!run || run.length < 1) continue;
+        const rp = _aurixMonotonePath(run, xScale, yScale);                            // dense premium curve, per run
+        if (rp && rp.d) { lineParts.push(rp.d); if (run.length >= 2) areaParts.push(buildAurixAreaPath(rp.d, run, scale)); }
+      }
+      linePath = lineParts.join(' ');                                                  // multiple 'M…' subpaths ⇒ visible break at the hole
+      areaPath = areaParts.join(' ');
+    } else {
+      const mp = _aurixMonotonePath(visiblePoints, xScale, yScale);                    // monotone-cubic (unchanged path)
+      linePath = (mp && mp.d) ? mp.d : '';
+      areaPath = (typeof buildAurixAreaPath === 'function' && linePath) ? buildAurixAreaPath(linePath, visiblePoints, scale) : '';
+    }
     const visiblePixels = visiblePoints.map(p => ({ x: +xScale.x(p.time).toFixed(2), y: +yScale.y(p.value).toFixed(2) }));
-    return { linePath: linePath, areaPath: areaPath, visiblePixels: visiblePixels, visiblePoints: visiblePoints, xScale: xScale, yScale: yScale, scale: scale, ok: !!(linePath && areaPath) };
+    return { linePath: linePath, areaPath: areaPath, visiblePixels: visiblePixels, visiblePoints: visiblePoints, xScale: xScale, yScale: yScale, scale: scale, segmentedBridgeCount: bridges.length, bridgeGaps: bridges, ok: !!(linePath && areaPath) };
   } catch (e) { return { linePath: '', areaPath: '', visiblePixels: [], visiblePoints: [], ok: false, error: (e && e.message) || 'err' }; }
 }
 

@@ -19,15 +19,16 @@ function fn(name) { const s = 'function ' + name + '('; const i = src.indexOf(s)
 
 const ENGINE_FNS = ['_aurixVpTargetPointCount', 'downsampleAurixLTTB', '_aurixSignificantLocalExtrema', 'downsampleAurixAdaptive',
   'computeAurixTimeScale', 'computeAurixAdaptiveXScale', 'computeAurixValueScale', '_aurixArrConfig', '_aurixArrRepresentVertices',
-  '_aurixMonotonePath', 'buildAurixMonotonicPath', 'buildAurixAreaPath', 'renderValidatedPortfolioChartWithInstitutionalRenderer'];
+  '_aurixMonotonePath', 'buildAurixMonotonicPath', 'buildAurixAreaPath', '_aurixSplitAtGaps', '_aurixConfirmedBridgeGaps',
+  'renderValidatedPortfolioChartWithInstitutionalRenderer'];
 const AUX_CONSTS = ['_AURIX_RC_ASPECT', '_AURIX_RC_PAD_FRAC', '_AURIX_RC_VPAD_FRAC', '_AURIX_IR_VALUE_MARGIN', '_AURIX_IR_VPAD_FRAC',
-  '_AURIX_Y_JUMP_DOMINANCE', '_AURIX_Y_LEGIBLE_ALPHA'];
+  '_AURIX_Y_JUMP_DOMINANCE', '_AURIX_Y_LEGIBLE_ALPHA', '_AURIX_VP_GAP_MEDIAN_MULT', '_AURIX_BRIDGE_SEG_ENABLED'];
 
 const sb = { console, Math, JSON, Array, Number, isFinite, Infinity, Date, activeRange: '24h', window: undefined };
 vm.createContext(sb);
 AUX_CONSTS.forEach(c => { const m = src.match(new RegExp('const ' + c + '\\s*=[^;]*?(\\{[\\s\\S]*?\\}\\s*;|[^;]*;)', 's')); if (m) { try { vm.runInContext(m[0], sb); } catch (_) {} } });
 // _AURIX_VP_DENSITY / _AURIX_X_FILL_BETA are object literals — grab them explicitly.
-['_AURIX_VP_DENSITY', '_AURIX_X_FILL_BETA'].forEach(c => { const i = src.indexOf('const ' + c + ' ='); if (i >= 0) { const j = src.indexOf('};', i); vm.runInContext(src.slice(i, j + 2), sb); } });
+['_AURIX_VP_DENSITY', '_AURIX_X_FILL_BETA', '_AURIX_VP_GAP_FLOOR_MS', '_AURIX_BRIDGE_SEG_FRAC'].forEach(c => { const i = src.indexOf('const ' + c + ' ='); if (i >= 0) { const j = src.indexOf('};', i); vm.runInContext(src.slice(i, j + 2), sb); } });
 ENGINE_FNS.forEach(n => { try { vm.runInContext(fn(n), sb); } catch (e) {} });
 
 const MIN = 60e3;
