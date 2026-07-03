@@ -550,6 +550,22 @@
       return authErr(_classifyAuthError(err));
     }
 
+    // SPEC AUTH.OTP.DIAGNOSE.01 (CASO A) — the Supabase auth fetch has no built-in
+    // timeout, so a stalled request (network blip / slow Auth backend) left the
+    // "Enviar código" spinner spinning forever and the OTP step never appeared.
+    // Race every auth call against a timeout that rejects with a 'network'-class
+    // error, so the loading state ALWAYS resolves and the user sees an actionable
+    // message instead of an infinite spinner. Purely a resiliency wrapper — it does
+    // not change the request itself.
+    const _AUTH_TIMEOUT_MS = 15000;
+    function _authWithTimeout(promise, ms) {
+      let timer = null;
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('network timeout')), ms || _AUTH_TIMEOUT_MS);
+      });
+      return Promise.race([promise, timeout]).finally(() => { if (timer) clearTimeout(timer); });
+    }
+
     // ── Invite gate ────────────────────────────────────────────
     // SUPABASE-RLS-CLIENT-MIGRATION: invite_codes is now RLS-locked away
     // from anon/authenticated. The validate_invite_code SECURITY DEFINER
@@ -768,18 +784,18 @@
         // failures throw, so we need both paths.
         let sendErr = null;
         try {
-          const { error } = await client.auth.signInWithOtp({
+          // CASO A — bounded so a stalled request can never hang the spinner forever.
+          const { error } = await _authWithTimeout(client.auth.signInWithOtp({
             email,
             options: { shouldCreateUser: true }
-          });
+          }));
           sendErr = error || null;
         } catch (e) {
-          sendErr = e;
+          sendErr = e;   // includes the timeout rejection above
         }
 
         if (sendErr) {
-          console.log('OTP error:', sendErr);
-          window.setButtonBusy(submitBtn, false);
+          console.log('[AUTH][otp-send] failed:', _classifyAuthError(sendErr));
           if (isRateLimitError(sendErr) || _classifyAuthError(sendErr) === 'rate') {
             handleRateLimit();
             return;
@@ -791,7 +807,7 @@
           return;
         }
 
-        console.log('OTP success → showing OTP step');
+        console.log('[AUTH][otp-send] ok → OTP step');
         localStorage.setItem('aurix_otp_email', email);
         localStorage.setItem('last_email', email);
         resetCooldownState();
@@ -799,6 +815,10 @@
 
       } finally {
         isSubmitting = false;
+        // CASO A — loading MUST always close (success, error, or timeout). On success
+        // the auth section is already hidden by showOtpStep(), so clearing is harmless;
+        // on any failure/timeout it guarantees the spinner never sticks.
+        window.setButtonBusy(submitBtn, false);
       }
     };
 
@@ -835,11 +855,12 @@
 
         let verifyErr = null;
         try {
-          const { error } = await client.auth.verifyOtp({
+          // CASO B — bounded like the send path so a stalled verify can't hang the spinner.
+          const { error } = await _authWithTimeout(client.auth.verifyOtp({
             email,
             token: code,
             type: 'email'
-          });
+          }));
           verifyErr = error || null;
         } catch (e) {
           // OTP-RESEND-1: a thrown fetch error (offline / DNS) is a
@@ -866,8 +887,24 @@
           return;
         }
 
+        // CASO B — a successful verifyOtp is an AUTHORITATIVE sign-in: the session is
+        // now persisted. The redirect loop-breaker (aurix_redirect_log) exists only to
+        // stop a null-session index⇄login ping-pong; it must NEVER suppress this
+        // legitimate post-auth navigation, or the user is left on the OTP screen with a
+        // valid session that "no entra". Reset the shared log, clear the spinner, then
+        // force the navigation with a hard fallback if safeRedirect is still suppressed.
+        console.log('[AUTH][otp-verify] ok → entering app');
         localStorage.removeItem('aurix_otp_email');
-        safeRedirect('index.html');
+        try {
+          sessionStorage.removeItem('aurix_redirect_log');
+          sessionStorage.removeItem('aurix_redirect_broken');
+        } catch (_) {}
+        window.setButtonBusy(otpSubmitBtn, false);
+        const issued = safeRedirect('index.html', 'login:otp-verified');
+        if (!issued) {
+          const onAurix = window.location.pathname.startsWith('/Aurix/');
+          window.location.href = window.location.origin + (onAurix ? '/Aurix/' : '/') + 'index.html';
+        }
 
       } finally {
         isVerifying = false;
@@ -915,10 +952,10 @@
 
       let resendErr = null;
       try {
-        const { error } = await client.auth.signInWithOtp({
+        const { error } = await _authWithTimeout(client.auth.signInWithOtp({
           email,
           options: { shouldCreateUser: true }
-        });
+        }));
         resendErr = error || null;
       } catch (e) {
         resendErr = e;
