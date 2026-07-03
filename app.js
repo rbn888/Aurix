@@ -814,6 +814,10 @@ const _AURIX_CANONICAL_TAIL_MS = 120000;    // exclude the live tail (<2 min) fr
 // its local-only points are flushed to remote but NEVER feed baseline/return until remote confirms them
 // (then a later reconcile, or a confirmed push, promotes them here). null until first reconcile.
 let _aurixCanonicalCatHistory = null;
+// SPEC LINE.02 Fase 2.2 — read-only forensic capture of the RAW remote category_history (BEFORE the
+// epoch filter), taken at reconcile time so window.aurixHistorySourceAudit() can prove whether older
+// snapshots exist-but-are-filtered vs genuinely-absent. Never read by any display/return path.
+let _aurixRemoteHistoryDiag = null;
 // The history SOURCE the display (chart + return, via _aurixInvestableSnapshots) must read. Authenticated
 // + remote canonical present ⇒ the remote-authoritative store. Anonymous/offline-anon ⇒ local cache
 // (single device, no cross-device divergence possible). Local history NEVER has final authority for an
@@ -1428,6 +1432,12 @@ function _mergeRemoteState(remoteRow) {
     _aurixCanonicalCatHistory = _mergeCategoryByTs([], remoteCat);
     _aurixRemoteCanonicalHash = _aurixCanonicalBodyHash(_aurixCanonicalCatHistory);
     _aurixLocalCanonicalHash  = _aurixRemoteCanonicalHash;   // applied (display) == remote, by construction
+    // SPEC LINE.02 Fase 2.2 — capture the RAW remote span (pre-epoch-filter) for the read-only audit.
+    try {
+      const rawTs = (Array.isArray(remoteCat) ? remoteCat : []).filter(p => p && Number.isFinite(p.ts)).map(p => ({ ts: p.ts })).sort((a, b) => a.ts - b.ts);
+      _aurixRemoteHistoryDiag = { capturedAt: (function () { try { return Date.now(); } catch (_) { return 0; } })(), rawCount: rawTs.length,
+        oldestTs: rawTs.length ? rawTs[0].ts : null, newestTs: rawTs.length ? rawTs[rawTs.length - 1].ts : null, samples: rawTs };
+    } catch (_) {}
     portfolioHistory = _mergeHistoryByTs(portfolioHistory, remoteHist);
     categoryHistory  = _mergeCategoryByTs(categoryHistory, remoteCat);   // local CACHE + push buffer (not the display source)
     try { saveHistory(); } catch (_) {}
@@ -23412,16 +23422,18 @@ try {
       // temporal density + shape so a sparse "bridge" (wide gap, ~straight) is visible.
       const segs = [];
       const n = Array.isArray(points) ? points.length : 0;
-      if (n < 2) return { segments: segs, longestGapMs: 0, medianGapMs: 0, bridgeCount: 0, flatCount: 0 };
+      if (n < 2) return { segments: segs, longestGapMs: 0, medianGapMs: 0, p90GapMs: 0, p95GapMs: 0, bridgeCount: 0, flatCount: 0, bridgeFloorMs: 0 };
       const gaps = [];
       for (let i = 1; i < n; i++) gaps.push(points[i].ts - points[i - 1].ts);
       const sortedGaps = gaps.slice().sort((a, b) => a - b);
-      const medianGapMs = sortedGaps.length ? sortedGaps[(sortedGaps.length - 1) >> 1] : 0;
+      const pctl = q => sortedGaps.length ? sortedGaps[Math.min(sortedGaps.length - 1, Math.floor(q * sortedGaps.length))] : 0;
+      const medianGapMs = pctl(0.5), p90GapMs = pctl(0.9), p95GapMs = pctl(0.95);
       const longestGapMs = sortedGaps.length ? sortedGaps[sortedGaps.length - 1] : 0;
-      // A segment is a "bridge" when its real duration dwarfs the typical cadence
-      // (≥6× the median gap and ≥30min absolute) — few/no snapshots span a wide time,
-      // so the renderer draws one long straight stretch that reads as artificial.
-      const bridgeFloorMs = Math.max(6 * (medianGapMs || 0), 30 * 60 * 1000);
+      // A segment is a "bridge" when its real duration dwarfs the typical cadence.
+      // ADAPTIVE floor (SPEC LINE.02 Fase 4/6 — no arbitrary hardcoded hours): the
+      // larger of 6× the median cadence and 4× the p95 cadence, with a 30-min absolute
+      // sanity floor so a single quiet dense window never mislabels an ordinary segment.
+      const bridgeFloorMs = Math.max(6 * (medianGapMs || 0), 4 * (p95GapMs || 0), 30 * 60 * 1000);
       let bridgeCount = 0, flatCount = 0;
       for (let i = 1; i < n; i++) {
         const dt = points[i].ts - points[i - 1].ts;
@@ -23433,14 +23445,16 @@ try {
         if (isBridge) bridgeCount++;
         if (isFlat) flatCount++;
         segs.push({
-          fromTs: points[i - 1].ts, toTs: points[i].ts,
+          startTs: points[i - 1].ts, endTs: points[i].ts,
           durationMs: dt, durationMin: +(dt / 60000).toFixed(1),
+          startValue: +points[i - 1].value.toFixed(2), endValue: +points[i].value.toFixed(2),
           deltaValue: +dv.toFixed(2), pctChange: pct,
           pointCount: 2, isBridge: isBridge, isFlat: isFlat,
+          bridgeReason: isBridge ? ('gap ' + (+(dt / 60000).toFixed(1)) + 'min ≥ adaptive floor ' + (+(bridgeFloorMs / 60000).toFixed(1)) + 'min (6×median / 4×p95)') : null,
           confidence: isBridge ? 'sparse_bridge' : (isFlat ? 'flat_low_variation' : 'dense_real'),
         });
       }
-      return { segments: segs, longestGapMs: longestGapMs, medianGapMs: medianGapMs, bridgeCount: bridgeCount, flatCount: flatCount };
+      return { segments: segs, longestGapMs: longestGapMs, medianGapMs: medianGapMs, p90GapMs: p90GapMs, p95GapMs: p95GapMs, bridgeCount: bridgeCount, flatCount: flatCount, bridgeFloorMs: bridgeFloorMs };
     }
 
     window.aurixChartForensics = function (range) {
@@ -23456,6 +23470,11 @@ try {
       const span = _AURIX_EMG_RANGE_MS[r];
       const requestedSpanMs = (r === 'all' || !Number.isFinite(span)) ? null : span;
       const actualSpanMs = rangePts.length >= 2 ? (rangePts[rangePts.length - 1].ts - rangePts[0].ts) : 0;
+      // SPEC LINE.02 — truthful coverage. INFORMATIONAL ONLY (read-only diagnostic; wired to
+      // NO display/return logic here). Thresholds are proposed, not yet adopted (Fase 3 gates them).
+      const coverageRatio = (requestedSpanMs && requestedSpanMs > 0) ? +(actualSpanMs / requestedSpanMs).toFixed(4) : null;
+      const historyCoverageState = (coverageRatio == null) ? 'full'
+        : (coverageRatio >= 0.95 ? 'full' : (coverageRatio >= 0.50 ? 'partial' : 'insufficient'));
 
       // Flow forensics over the EXACT badge window (baseline, current].
       const baselineTs = p.baselineTs, currentTs = p.currentTs;
@@ -23474,10 +23493,18 @@ try {
             };
           });
         // FLOW_DOUBLE_MATCH — 2+ in-window flows re-timed onto the SAME structural step ts (over-subtraction risk).
-        flowsInWindow.forEach(f => { if (f.matchedStepTs != null) matchedStepCounts[f.matchedStepTs] = (matchedStepCounts[f.matchedStepTs] || 0) + 1; });
-        doubleMatch = Object.keys(matchedStepCounts).filter(k => matchedStepCounts[k] > 1).map(k => ({ matchedStepTs: Number(k), consumedByFlows: matchedStepCounts[k] }));
+        const stepConsumed = {};
+        flowsInWindow.forEach(f => {
+          if (f.matchedStepTs != null) {
+            matchedStepCounts[f.matchedStepTs] = (matchedStepCounts[f.matchedStepTs] || 0) + 1;
+            stepConsumed[f.matchedStepTs] = (stepConsumed[f.matchedStepTs] || 0) + (Number.isFinite(f.amountBase) ? f.amountBase : 0);
+          }
+        });
+        doubleMatch = Object.keys(matchedStepCounts).filter(k => matchedStepCounts[k] > 1).map(k => ({ matchedStepTs: Number(k), consumedByFlows: matchedStepCounts[k], consumedAmount: +(stepConsumed[k] || 0).toFixed(2) }));
         lowConfInWindow = flowsInWindow.filter(f => (f.retimeConfidence != null && f.retimeConfidence < 0.5) || f.retimeReason === 'fallback_base_low_confidence').length;
       } catch (_) {}
+      const totalPositiveFlows = +flowsInWindow.filter(f => Number.isFinite(f.amountBase) && f.amountBase > 0).reduce((s, f) => s + f.amountBase, 0).toFixed(2);
+      const totalNegativeFlows = +flowsInWindow.filter(f => Number.isFinite(f.amountBase) && f.amountBase < 0).reduce((s, f) => s + f.amountBase, 0).toFixed(2);
 
       // Baseline reliability — a baseline that sits far below the window's own median is a
       // construction/low anchor that inflates gross growth and destabilises the residual.
@@ -23500,8 +23527,9 @@ try {
 
       const out = {
         range: r,
-        // ── span / collapse ──
+        // ── span / collapse / coverage (coverage fields are INFORMATIONAL only) ──
         requestedSpanMs: requestedSpanMs, actualSpanMs: actualSpanMs,
+        coverageRatio: coverageRatio, historyCoverageState: historyCoverageState,
         collapsedRange: !!p.collapsedRange, rangeCollapsedBecauseHistoryTooShort: !!p.rangeCollapsedBecauseHistoryTooShort,
         collapseReason: p.reason,
         // ── point accounting (this pipeline NEVER fabricates points: real == final) ──
@@ -23516,6 +23544,7 @@ try {
         firstTs: p.firstTs, lastTs: p.lastTs, firstWhen: iso(p.firstTs), lastWhen: iso(p.lastTs),
         longestGapMs: geo.longestGapMs, longestGapMin: +(geo.longestGapMs / 60000).toFixed(1),
         medianGapMs: geo.medianGapMs, medianGapMin: +(geo.medianGapMs / 60000).toFixed(1),
+        p90GapMs: geo.p90GapMs, p95GapMs: geo.p95GapMs, bridgeFloorMs: geo.bridgeFloorMs,
         bridgeSegmentCount: geo.bridgeCount, flatSegmentCount: geo.flatCount,
         segments: geo.segments,
         points: rangePts.map(pt => ({ ts: pt.ts, when: iso(pt.ts), value: pt.value, source: 'real_snapshot', confidence: 'real' })),
@@ -23531,9 +23560,10 @@ try {
         guardHit: (p.state === 'ready' && p.returnState !== 'ok') ? 'sane_band_or_min_base' : null,
         // ── flow matches ──
         flowsInWindowCount: flowsInWindow.length, flowsInWindow: flowsInWindow,
+        totalPositiveFlows: totalPositiveFlows, totalNegativeFlows: totalNegativeFlows,
         reTimedFlowCount: flowsInWindow.filter(f => f.retimeReason === 'retimed_to_structural_step').length,
         treatedAsBaseFlowCount: flowsInWindow.filter(f => f.retimeReason && f.retimeReason.indexOf('fallback_base') === 0).length,
-        doubleMatchedSteps: doubleMatch, lowConfidenceRetimeCount: lowConfInWindow,
+        doubleMatchedSteps: doubleMatch, matchedStepMultiplicity: matchedStepCounts, lowConfidenceRetimeCount: lowConfInWindow,
         // ── verdicts ──
         warnings: warnings,
         state: p.state,
@@ -23558,6 +23588,65 @@ try {
       });
       try { console.table(rows); } catch (_) {}
       return rows;
+    };
+
+    // SPEC LINE.02 Fase 1 — FULL JSON-safe forensic export (console.table truncates columns).
+    // Read-only. Usage: copy(JSON.stringify(aurixChartForensicsExport(), null, 2)) — or read the log.
+    window.aurixChartForensicsExport = function () {
+      const all = ['24h', '7d', '30d', '1y', 'all'].map(range => {
+        try { return JSON.parse(JSON.stringify(window.aurixChartForensics(range))); } catch (e) { return { range: range, error: (e && e.message) || 'err' }; }
+      });
+      try { console.log('[UI][CHART_FORENSICS_EXPORT_JSON]\n' + JSON.stringify(all, null, 2)); } catch (_) {}
+      return all;
+    };
+
+    // SPEC LINE.02 Fase 2.2 — HISTORY SOURCE AUDIT (read-only). Answers the decisive question:
+    // is the ~4-day ceiling because older snapshots DO NOT EXIST, or because they exist remotely
+    // but are FILTERED by an epoch? Compares the epoch-filtered DISPLAY source against the raw
+    // remote category_history captured at reconcile time (_aurixRemoteHistoryDiag). No writes.
+    window.aurixHistorySourceAudit = function () {
+      const iso = t => { try { return Number.isFinite(t) ? new Date(t).toISOString() : null; } catch (_) { return null; } };
+      const stats = arr => {
+        const a = (Array.isArray(arr) ? arr : []).filter(p => p && Number.isFinite(p.ts)).map(p => p.ts).sort((x, y) => x - y);
+        if (!a.length) return { count: 0, oldestTs: null, newestTs: null, spanMs: 0, spanDays: 0 };
+        const byDay = {};
+        a.forEach(t => { const d = iso(t); if (d) { const k = d.slice(0, 10); byDay[k] = (byDay[k] || 0) + 1; } });
+        return { count: a.length, oldestTs: a[0], oldestWhen: iso(a[0]), newestTs: a[a.length - 1], newestWhen: iso(a[a.length - 1]),
+          spanMs: a[a.length - 1] - a[0], spanDays: +((a[a.length - 1] - a[0]) / 864e5).toFixed(2), countByDay: byDay };
+      };
+      let authed = false; try { authed = !!(typeof currentUser !== 'undefined' && currentUser && currentUser.id); } catch (_) {}
+      const portfolioEpoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
+      const investableEpoch = (typeof _aurixInvestableChartEpoch === 'function') ? _aurixInvestableChartEpoch() : 0;
+      let resetAt = 0; try { resetAt = parseInt(localStorage.getItem('aurix_reset_at') || '0', 10) || 0; } catch (_) {}
+      const displaySrc = (typeof _aurixHistorySourceForDisplay === 'function') ? _aurixHistorySourceForDisplay() : [];
+      const rawRemote = (typeof _aurixRemoteHistoryDiag !== 'undefined' && _aurixRemoteHistoryDiag) ? _aurixRemoteHistoryDiag : null;
+      // How many raw-remote points fall BEFORE each epoch (i.e. would be filtered out)?
+      const beforeEpoch = (arr, ep) => (Array.isArray(arr) ? arr : []).filter(p => p && Number.isFinite(p.ts) && ep && p.ts < ep).length;
+      const out = {
+        authed: authed,
+        epochs: {
+          portfolioEpoch: portfolioEpoch, portfolioEpochWhen: iso(portfolioEpoch),
+          resetAt: resetAt, resetAtWhen: iso(resetAt),
+          investableChartEpoch: investableEpoch, investableChartEpochWhen: iso(investableEpoch),
+          constantBaseline: (typeof AURIX_INVESTABLE_CHART_EPOCH !== 'undefined') ? AURIX_INVESTABLE_CHART_EPOCH : null,
+          constantBaselineWhen: iso((typeof AURIX_INVESTABLE_CHART_EPOCH !== 'undefined') ? AURIX_INVESTABLE_CHART_EPOCH : null),
+        },
+        displaySource: Object.assign({ which: authed && Array.isArray(_aurixCanonicalCatHistory) ? '_aurixCanonicalCatHistory (remote)' : 'categoryHistory (local)' }, stats(displaySrc)),
+        localCategoryHistory: stats(typeof categoryHistory !== 'undefined' ? categoryHistory : []),
+        rawRemoteCategoryHistory: rawRemote ? rawRemote : { note: 'not captured yet — reconcile a remote row (authed) then re-run' },
+        // DECISIVE: if rawRemote has points older than the display span, the ceiling is an EPOCH FILTER,
+        // not missing data. If raw and display share the same oldest ts, older history genuinely does not exist.
+        olderRemotePointsFilteredByPortfolioEpoch: rawRemote ? beforeEpoch(rawRemote.samples, portfolioEpoch) : null,
+        olderRemotePointsBeforeResetAt: rawRemote ? beforeEpoch(rawRemote.samples, resetAt) : null,
+        verdict: (function () {
+          if (!rawRemote) return 'INCONCLUSIVE — raw remote not captured (run while authed after a reconcile)';
+          const d = stats(displaySrc), rr = stats(rawRemote.samples);
+          if (rr.oldestTs != null && d.oldestTs != null && rr.oldestTs < d.oldestTs - 60000) return 'EPOCH_FILTER — older remote snapshots EXIST but are filtered out (epoch cuts them)';
+          return 'GENUINELY_SHORT — remote history itself only spans ~' + rr.spanDays + ' days; no older snapshots exist to load';
+        })(),
+      };
+      try { console.log('%c[UI][HISTORY_SOURCE_AUDIT]', 'font-weight:700;color:#4da3ff', out); } catch (_) {}
+      return out;
     };
 
     // P0-HISTORICAL-PIPELINE-AUDIT — GLOBAL audit over the whole history + all ranges, with an automatic
