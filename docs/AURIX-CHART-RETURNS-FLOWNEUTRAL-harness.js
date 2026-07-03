@@ -107,7 +107,7 @@ console.log('\nStatic wiring (data fn produces the honest state + line stays):')
 ok('16 buildProductionPortfolioChart computes flow-neutral return via _aurixComputePeriodReturn',
    /_aurixComputePeriodReturn\(r, \{ ts: first\.ts/.test(fn('buildProductionPortfolioChart')));
 ok('17 ready branch sets returnState + null returnPct on insufficient (line still drawn on state===ready)',
-   /if \(per\.returnState === 'ok'\)/.test(fn('buildProductionPortfolioChart')) &&
+   /if \(out\.returnState === 'ok'\)/.test(fn('buildProductionPortfolioChart')) &&
    /out\.returnPct = null; out\.badgeReturnPct = null;/.test(fn('buildProductionPortfolioChart')));
 ok('18 line draw is gated on state==="ready" ONLY (not returnPct) — wealth line survives honest state',
    /if \(emg\.state !== 'ready'\) \{[\s\S]{0,200}_wscRenderInsufficient/.test(fn('_wscPaintEmergency')) &&

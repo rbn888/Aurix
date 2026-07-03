@@ -126,7 +126,9 @@ console.log('\nScale + multi-range + READY/PENDING correctness:');
 
 console.log('\nRenderer is a passive consumer of the validated series:');
 { // 14 — renderer receives READY only after validation (points ⊆ validated, ≥2)
-  const h = series(30, 20 * 24, 8000, 4);
+  // TRUTHFUL_RANGES.01: fixture spans >30d so the finite range has FULL coverage (not collapsed),
+  // otherwise the requested-period return is now truthfully suppressed. Purpose (READY-after-validation) intact.
+  const h = series(40, 34 * 24, 8000, 4);
   const p = P(makeEnv(h), '30d');
   ok('14 renderer receives READY only after validation (≥2 validated points, from clean series)',
     p.renderDecision === 'READY' && p.points.length >= 2 && p.cleanPointCountAfterQuarantine >= 2 && Number.isFinite(p.returnPct)); }

@@ -23167,11 +23167,27 @@ function buildProductionPortfolioChart(range) {
     out.lineReturnPct = Number.isFinite(per.grossPct) ? per.grossPct : +(((last.value - first.value) / first.value) * 100).toFixed(4);
     out.returnState = per.returnState;
     out.netFlows = per.netFlows;
-    if (per.returnState === 'ok') {
+    // SPEC DSH.CHART.TRUTHFUL_RANGES.01 — a FINITE requested range whose real history does not cover it
+    // must NOT publish a requested-period return (no fabricated -52%/+288%). Confirmed cause: the remote
+    // canonical history is GENUINELY_SHORT (~5 days), so 7D/30D/1Y collapse onto it. The LINE still draws
+    // the available real points (state stays 'ready'); only the BADGE % is suppressed to the existing
+    // honest 'insufficient_return_history' state (painted as a neutral 0.00% flat, never a numeric %/tone).
+    // 24H (full coverage, not collapsed) and ALL (all-history semantics) are unaffected.
+    const _reqSpanMs = _AURIX_EMG_RANGE_MS[r];
+    const _finiteRange = (r !== 'all') && Number.isFinite(_reqSpanMs) && _reqSpanMs > 0;
+    const _actualSpanMs = last.ts - first.ts;
+    out.coverageRatio = _finiteRange ? +(_actualSpanMs / _reqSpanMs).toFixed(4) : null;
+    out.historyTooShortForRange = !!(_finiteRange && (out.rangeCollapsedBecauseHistoryTooShort === true || (out.coverageRatio != null && out.coverageRatio < 0.8)));
+    if (out.historyTooShortForRange && per.returnState === 'ok') {
+      out.returnState = 'insufficient_return_history';                 // reuse the proven honest painter
+      out.returnSuppressedReason = 'insufficient_requested_range_history';
+      out.reason = 'range_collapsed_history_short';
+    }
+    if (out.returnState === 'ok') {
       out.returnPct = per.returnPct; out.badgeReturnPct = per.returnPct;
       out.returnValue = per.returnValue; out.color = per.color;
     } else {
-      // Honest state — line (wealth) is shown, but there is no trustworthy REAL return yet.
+      // Honest state — line (wealth) is shown, but there is no trustworthy REAL requested-period return.
       out.returnPct = null; out.badgeReturnPct = null;
       out.returnValue = 0; out.color = 'flat';
     }

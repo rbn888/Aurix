@@ -103,13 +103,14 @@ console.log('\nConstruction long ranges: the low regime is quarantined, the real
 { ['30d', '1y', 'all'].forEach((rg, idx) => { const p = P(makeEnv(construction), rg);
   ok((7 + idx) + ' ' + rg.toUpperCase() + ' construction: baseline is the real regime (≠5503), no +60% fabricated',
     p.baselineValue !== 5503 && (p.returnPct === null || Math.abs(p.returnPct) <= 30), rg + ':' + p.reason + ' base=' + p.baselineValue); }); }
-{ // a GENUINE +32% ramp with no artifact now RENDERS (trust the validated series — no heuristic gate)
-  const p = P(makeEnv(smooth(10, 20 * 24, 6800, 240)), '30d');   // 6800→8960 ≈ +31.8%, no corrupted snapshot
-  ok('7b 30D genuine +32% ramp (no artifact) → READY (validated series is trusted)',
+{ // a GENUINE ramp with no artifact + FULL 30d coverage now RENDERS (trust the validated series — no heuristic gate)
+  // TRUTHFUL_RANGES.01: span >30d so the range is NOT collapsed (a short-history 30D is truthfully suppressed).
+  const p = P(makeEnv(smooth(40, 34 * 24, 6800, 80)), '30d');   // dense full-coverage ramp, no corrupted snapshot
+  ok('7b 30D genuine ramp (full coverage, no artifact) → READY (validated series is trusted)',
     p.state === 'ready' && p.returnPct > 30 && p.quarantinedSnapshotCount === 0, 'pct=' + p.returnPct); }
 
 console.log('\nParity + return integrity + pending honesty:');
-{ const sb = makeEnv(smooth(24, 23, 8600, 2)); const p = P(sb, '24h');
+{ const sb = makeEnv(smooth(48, 30, 8600, 2)); const p = P(sb, '24h');   // TRUTHFUL_RANGES.01: span 30h > 24h ⇒ full-coverage, not collapsed
   const dHash = HASH(sb, p.points.map(pt => ({ ts: pt.ts, value: pt.value })));
   const mHash = HASH(sb, p.points.map(pt => ({ ts: pt.ts, value: pt.value })));
   ok('10 desktop/mobile hashes identical (adapters rename keys only)', dHash === mHash && dHash === p.chartHash, dHash);
@@ -125,12 +126,14 @@ console.log('\nParity + return integrity + pending honesty:');
 console.log('\nCalm-window fix — low-amplitude windows draw (no false segment_exceeds pending):');
 const G = (sb, pts, r) => vm.runInContext('_aurixProdVisualGate(' + JSON.stringify(pts) + ',' + JSON.stringify(r) + ')', sb);
 // Healthy calm 24H: ~0.16% amplitude, hourly, with real micro-noise (would trip the OLD span gate).
-const calm24 = []; for (let k = 0; k <= 13; k++) calm24.push({ ts: LAST - (13 - k) * HOUR, total: 8680 + k * 1 + ((k * 37) % 7 - 3) * 1.5, real_estate: 0 });
+// TRUTHFUL_RANGES.01: span 30h > 24h so the window has full coverage (not collapsed); the calm/visual-gate purpose is unchanged.
+const calm24 = []; for (let k = 0; k <= 30; k++) calm24.push({ ts: LAST - (30 - k) * HOUR, total: 8680 + k * 0.5 + ((k * 37) % 7 - 3) * 1.5, real_estate: 0 });
 { const p = P(makeEnv(calm24), '24h');
   ok('C1 healthy calm 24H (small amplitude + micro-noise) → ready, visual gate passed, NOT segment_exceeds',
     p.state === 'ready' && p.visualQualityPassed === true && Number.isFinite(p.returnPct) &&
     p.reason !== 'segment_exceeds_35pct_height' && p.reason !== 'segment_dominant_cliff', p.state + '/' + p.reason + ' pct=' + p.returnPct); }
-const calm7 = []; for (let k = 0; k <= 40; k++) calm7.push({ ts: LAST - (40 - k) * 4 * HOUR, total: 8600 + k * 0.6 + ((k * 29) % 9 - 4) * 1.2, real_estate: 0 });
+// TRUTHFUL_RANGES.01: span ~8.3d > 7d so the window has full coverage (not collapsed); calm/visual-gate purpose unchanged.
+const calm7 = []; for (let k = 0; k <= 50; k++) calm7.push({ ts: LAST - (50 - k) * 4 * HOUR, total: 8600 + k * 0.6 + ((k * 29) % 9 - 4) * 1.2, real_estate: 0 });
 { const p = P(makeEnv(calm7), '7d');
   ok('C2 healthy calm 7D → ready (visual gate passed, finite return)',
     p.state === 'ready' && p.visualQualityPassed === true && Number.isFinite(p.returnPct), p.state + '/' + p.reason); }
