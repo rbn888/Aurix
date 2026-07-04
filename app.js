@@ -874,7 +874,10 @@ const _AURIX_SNAP_NEAR_MS = 5 * 60000;           // a backend point within 5 min
 const _AURIX_SNAP_NEAR_FRAC = 0.002;             // …and within 0.2% value is a near-duplicate ⇒ drop backend (frontend wins where dense)
 // The read is OFF by default ⇒ ZERO extra query pre-activation (strict NO-OP, chart == v481). Activation
 // flips this true (or the user calls window.aurixLoadBackendSnapshots()). Never writes; RLS-safe select.
-const _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD = false;
+// SPEC ACTIVATE-READ.04 — ON: the read is now activated (table live, scheduler inserting). The load fires
+// ONLY after auth+client are ready (bounded poll below); if the table is missing / RLS blocks / offline,
+// the loader returns [] ⇒ the merge stays a strict NO-OP and the chart is unchanged. Reversible: set false.
+const _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD = true;
 const _AURIX_BACKEND_SNAPSHOT_LOOKBACK_DAYS = 400;
 // Normalize a backend snapshot row to the pipeline point shape {ts,total,real_estate,…}. Backend rows
 // store total_value_usd + real_estate (USD) + source/confidence/market_state.
@@ -935,9 +938,22 @@ try {
       const fe = src.filter(p => !p || p.source !== 'backend_snapshot');
       const span = a => { const t = a.filter(p => p && Number.isFinite(p.ts)).map(p => p.ts).sort((x, y) => x - y); return t.length ? { count: t.length, oldest: iso(t[0]), newest: iso(t[t.length - 1]), spanDays: +((t[t.length - 1] - t[0]) / 864e5).toFixed(2) } : { count: 0 }; };
       const marketStates = {}; be.forEach(p => { const k = p.market_state || 'unknown'; marketStates[k] = (marketStates[k] || 0) + 1; });
-      const out = { flag: _AURIX_BACKEND_SNAPSHOTS_ENABLED, backendLoaded: (_aurixBackendSnapshots || []).length,
-        total: span(src), frontend: span(fe), backend: span(be), backendMarketStates: marketStates,
-        note: (be.length ? null : 'no backend snapshots present yet — scheduler not activated (Fase 6)') };
+      // SPEC ACTIVATE-READ.04 — how many backend points fall INSIDE each range window (i.e. are actually used
+      // to fill that range), anchored on the latest snapshot ts (same as the chart). Read-only.
+      const perRange = {};
+      try {
+        const nowRef = src.length ? Math.max.apply(null, src.filter(p => p && Number.isFinite(p.ts)).map(p => p.ts)) : 0;
+        ['24h', '7d', '30d', '1y', 'all'].forEach(rg => {
+          const spanMs = _AURIX_EMG_RANGE_MS[rg];
+          const startTs = (rg === 'all' || !Number.isFinite(spanMs)) ? -Infinity : nowRef - spanMs;
+          const beIn = be.filter(p => p.ts >= startTs).length;
+          const feIn = fe.filter(p => p && Number.isFinite(p.ts) && p.ts >= startTs).length;
+          perRange[rg] = { backendInWindow: beIn, frontendInWindow: feIn };
+        });
+      } catch (_) {}
+      const out = { flag: _AURIX_BACKEND_SNAPSHOTS_ENABLED, autoload: _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD, backendLoaded: (_aurixBackendSnapshots || []).length,
+        total: span(src), frontend: span(fe), backend: span(be), backendMarketStates: marketStates, perRange: perRange,
+        note: (be.length ? null : 'no backend snapshots merged yet — autoload fires after auth; run aurixLoadBackendSnapshots() to force') };
       try { console.log('%c[UI][SNAPSHOT_SOURCE_AUDIT]', 'font-weight:700;color:#4da3ff', out); } catch (_) {}
       return out;
     };
@@ -987,7 +1003,22 @@ try {
       return _aurixBackendSnapshots.length;
     };
     // Guarded auto-load — OFF by default ⇒ no extra query until activation (strict NO-OP, chart == v481).
-    if (_AURIX_BACKEND_SNAPSHOTS_AUTOLOAD) { try { setTimeout(function () { try { window.aurixLoadBackendSnapshots(); } catch (_) {} }, 4000); } catch (_) {} }
+    // SPEC ACTIVATE-READ.04 — fire the load ONLY once auth + client are ready (not a blind timeout).
+    // Bounded auth-poll (≤ ~20s, every 1s) then load ONCE; gives up silently if never authed ⇒ NO-OP.
+    if (_AURIX_BACKEND_SNAPSHOTS_ENABLED && _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD) {
+      let _blTries = 0;
+      const _blTick = function () {
+        _blTries++;
+        try {
+          if (typeof currentUser !== 'undefined' && currentUser && currentUser.id && typeof supabaseClient !== 'undefined' && supabaseClient) {
+            window.aurixLoadBackendSnapshots();   // authed + client ready → load once (no-op on error/empty)
+            return;
+          }
+        } catch (_) {}
+        if (_blTries < 20) { try { setTimeout(_blTick, 1000); } catch (_) {} }   // bounded; never loops forever
+      };
+      try { setTimeout(_blTick, 3000); } catch (_) {}
+    }
   }
 } catch (_) {}
 // ── P0-FINAL-PERFORMANCE-KILL-SWITCH-AND-SERVER-CANONICAL ────────────────────────

@@ -111,7 +111,11 @@ async function fetchWith(clientResult, authed) {
   ok('edge function supports DRY_RUN (verify before real inserts)', /DRY_RUN/.test(edge));
   ok('frontend reads portfolio_snapshots via .select only (never insert/upsert/update/delete)',
     /from\('portfolio_snapshots'\)[\s\S]{0,80}\.select\(/.test(app) && !/from\('portfolio_snapshots'\)[\s\S]{0,120}\.(insert|upsert|update|delete)\(/.test(app));
-  ok('autoload OFF by default (no extra query pre-activation)', /const _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD = false;/.test(app));
+  // SPEC ACTIVATE-READ.04 — read now activated: autoload ON, but load fires ONLY after auth+client (bounded poll)
+  ok('autoload ACTIVATED (fires only after auth+client, bounded poll)', /const _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD = true;/.test(app));
+  ok('autoload waits for currentUser+supabaseClient then loads once (not a blind timeout)', /if \(typeof currentUser !== 'undefined' && currentUser && currentUser\.id && typeof supabaseClient !== 'undefined' && supabaseClient\)[\s\S]{0,80}aurixLoadBackendSnapshots\(\)/.test(app));
+  ok('autoload poll is bounded (never loops forever)', /_blTries < 20/.test(app));
+  ok('per-range backend-usage diagnostic exposed (perRange)', /perRange\[rg\] = \{ backendInWindow/.test(app));
   ok('window.aurixLoadBackendSnapshots exposed for manual/activation load', /window\.aurixLoadBackendSnapshots = async function/.test(app));
 
   console.log('\nSiblings remain green:');
