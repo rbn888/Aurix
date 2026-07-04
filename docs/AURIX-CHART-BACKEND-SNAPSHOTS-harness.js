@@ -78,11 +78,47 @@ ok('diagnostics exposed', /window\.aurixSnapshotSourceAudit = function/.test(app
 ok('no new table write from frontend (append-only backend table is service-role only)', !/from\('portfolio_snapshots'\)[\s\S]{0,40}\.(insert|upsert|update|delete)/.test(app));
 ok('migration file present (not applied)', fs.existsSync(path.join(root, 'db', 'portfolio_snapshots_1.sql')));
 
-console.log('\nSiblings remain green:');
-for (const [label, file] of [['auth stability freeze', 'AURIX-AUTH-MOBILE-STABILITY-FREEZE-harness.js'], ['desktop OTP', 'AURIX-AUTH-DESKTOP-OTP-WEB-ONLY-harness.js'], ['DATA-TRUTH', 'AURIX-CHART-INSTITUTIONAL-DATA-TRUTH-harness.js'], ['V480 cleanup', 'AURIX-CHART-V480-RUNTIME-CLEANUP-harness.js'], ['24H premium reference', 'AURIX-CHART-24H-PREMIUM-REFERENCE-harness.js'], ['TRUTHFUL_RANGES', 'AURIX-CHART-TRUTHFUL-RANGES-harness.js']]) {
-  let good = false; try { cp.execSync('node ' + JSON.stringify(path.join(__dirname, file)), { stdio: 'ignore' }); good = true; } catch (_) {}
-  ok(label + ' remains green', good);
+console.log('\nRead-only loader (NO-OP until activation) + security:');
+// behavioural: _aurixFetchBackendSnapshots with a mock supabase client
+const LS = { console, Math, JSON, Array, Number, isFinite, Infinity, Date };
+vm.createContext(LS);
+['_AURIX_BACKEND_SNAPSHOTS_ENABLED', '_AURIX_BACKEND_SNAPSHOT_LOOKBACK_DAYS'].forEach(c => vm.runInContext(konst(c), LS));
+vm.runInContext('async ' + fn('_aurixFetchBackendSnapshots'), LS);   // fn() extractor drops the async keyword
+function mockClient(result) {
+  const chain = {}; ['from', 'select', 'eq', 'gte', 'order', 'limit'].forEach(m => chain[m] = () => chain);
+  chain.then = (res) => res(result);   // awaitable → {data,error}
+  return { from: () => chain };
 }
+async function fetchWith(clientResult, authed) {
+  LS.supabaseClient = clientResult === null ? null : mockClient(clientResult);
+  LS.currentUser = authed ? { id: 'u1' } : null;
+  return vm.runInContext('_aurixFetchBackendSnapshots()', LS);
+}
+(async () => {
+  const iso = new Date(1_800_000_000_000).toISOString();
+  const rowsOk = await fetchWith({ data: [{ ts: iso, total_value_usd: 12345, real_estate: 0, category_values: {}, confidence: 'scheduled', market_state: 'crypto_24_7', price_staleness: 'live' }], error: null }, true);
+  ok('loader maps rows → pipeline shape (ts→ms, source tagged)', rowsOk.length === 1 && rowsOk[0].ts === 1_800_000_000_000 && rowsOk[0].source === 'backend_snapshot' && rowsOk[0].total_value_usd === 12345);
+  const rowsErr = await fetchWith({ data: null, error: { message: 'relation "portfolio_snapshots" does not exist' } }, true);
+  ok('loader on table-missing/error → [] (strict NO-OP, chart == v481)', Array.isArray(rowsErr) && rowsErr.length === 0);
+  const rowsAnon = await fetchWith({ data: [{ ts: iso, total_value_usd: 1 }], error: null }, false);
+  ok('loader when NOT authed → [] (no query result used)', Array.isArray(rowsAnon) && rowsAnon.length === 0);
 
-console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
-process.exit(fail === 0 ? 0 : 1);
+  // security (source): no service-role in frontend; edge fn uses env; frontend never writes the table
+  const loginTxt = fs.readFileSync(path.join(root, 'login.html'), 'utf8');
+  ok('no service_role key in app.js/login.html', !/service_role/i.test(app) && !/service_role/i.test(loginTxt));
+  const edge = fs.existsSync(path.join(root, 'supabase', 'functions', 'portfolio-snapshot', 'index.ts')) ? fs.readFileSync(path.join(root, 'supabase', 'functions', 'portfolio-snapshot', 'index.ts'), 'utf8') : '';
+  ok('edge function reads service-role from env (never hardcoded)', /Deno\.env\.get\('SUPABASE_SERVICE_ROLE_KEY'\)/.test(edge) && !/eyJ[A-Za-z0-9_-]{20,}/.test(edge));
+  ok('edge function supports DRY_RUN (verify before real inserts)', /DRY_RUN/.test(edge));
+  ok('frontend reads portfolio_snapshots via .select only (never insert/upsert/update/delete)',
+    /from\('portfolio_snapshots'\)[\s\S]{0,80}\.select\(/.test(app) && !/from\('portfolio_snapshots'\)[\s\S]{0,120}\.(insert|upsert|update|delete)\(/.test(app));
+  ok('autoload OFF by default (no extra query pre-activation)', /const _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD = false;/.test(app));
+  ok('window.aurixLoadBackendSnapshots exposed for manual/activation load', /window\.aurixLoadBackendSnapshots = async function/.test(app));
+
+  console.log('\nSiblings remain green:');
+  for (const [label, file] of [['auth stability freeze', 'AURIX-AUTH-MOBILE-STABILITY-FREEZE-harness.js'], ['desktop OTP', 'AURIX-AUTH-DESKTOP-OTP-WEB-ONLY-harness.js'], ['DATA-TRUTH', 'AURIX-CHART-INSTITUTIONAL-DATA-TRUTH-harness.js'], ['V480 cleanup', 'AURIX-CHART-V480-RUNTIME-CLEANUP-harness.js'], ['24H premium reference', 'AURIX-CHART-24H-PREMIUM-REFERENCE-harness.js'], ['TRUTHFUL_RANGES', 'AURIX-CHART-TRUTHFUL-RANGES-harness.js']]) {
+    let good = false; try { cp.execSync('node ' + JSON.stringify(path.join(__dirname, file)), { stdio: 'ignore' }); good = true; } catch (_) {}
+    ok(label + ' remains green', good);
+  }
+  console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
+  process.exit(fail === 0 ? 0 : 1);
+})();

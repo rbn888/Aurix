@@ -872,6 +872,10 @@ const _AURIX_BACKEND_SNAPSHOTS_ENABLED = true;
 let _aurixBackendSnapshots = [];                 // populated only by the future portfolio_snapshots read
 const _AURIX_SNAP_NEAR_MS = 5 * 60000;           // a backend point within 5 min of a frontend point…
 const _AURIX_SNAP_NEAR_FRAC = 0.002;             // …and within 0.2% value is a near-duplicate ⇒ drop backend (frontend wins where dense)
+// The read is OFF by default ⇒ ZERO extra query pre-activation (strict NO-OP, chart == v481). Activation
+// flips this true (or the user calls window.aurixLoadBackendSnapshots()). Never writes; RLS-safe select.
+const _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD = false;
+const _AURIX_BACKEND_SNAPSHOT_LOOKBACK_DAYS = 400;
 // Normalize a backend snapshot row to the pipeline point shape {ts,total,real_estate,…}. Backend rows
 // store total_value_usd + real_estate (USD) + source/confidence/market_state.
 function _aurixNormalizeBackendSnapshot(s) {
@@ -949,6 +953,41 @@ try {
       try { console.log('%c[UI][SNAPSHOT_MERGE_DEBUG]', 'font-weight:700;color:#4da3ff', out); } catch (_) {}
       return out;
     };
+  }
+} catch (_) {}
+
+// SPEC BACKEND-SNAPSHOTS.V1.01 — read-only loader for the backend portfolio_snapshots table. RLS-safe
+// (own rows only), never writes. On ANY error (table not migrated yet / offline) → keeps _aurixBackendSnapshots
+// empty ⇒ the merge stays a strict NO-OP. Maps timestamptz→epoch ms + the pipeline point shape.
+async function _aurixFetchBackendSnapshots() {
+  try {
+    if (!_AURIX_BACKEND_SNAPSHOTS_ENABLED) return [];
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return [];
+    if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) return [];   // authed only
+    const sinceIso = new Date(Date.now() - _AURIX_BACKEND_SNAPSHOT_LOOKBACK_DAYS * 864e5).toISOString();
+    const { data, error } = await supabaseClient.from('portfolio_snapshots')
+      .select('ts,total_value_usd,real_estate,category_values,source,confidence,market_state,price_staleness')
+      .eq('user_id', currentUser.id).gte('ts', sinceIso).order('ts', { ascending: true }).limit(5000);
+    if (error || !Array.isArray(data)) return [];
+    return data.map(r => ({
+      ts: (typeof r.ts === 'number') ? r.ts : Date.parse(r.ts),
+      total_value_usd: Number(r.total_value_usd), real_estate: Number(r.real_estate) || 0,
+      category_values: r.category_values || {}, source: 'backend_snapshot',
+      confidence: r.confidence || 'scheduled', market_state: r.market_state || null, price_staleness: r.price_staleness || null,
+    })).filter(p => Number.isFinite(p.ts) && Number.isFinite(p.total_value_usd));
+  } catch (_) { return []; }
+}
+try {
+  if (typeof window !== 'undefined') {
+    window.aurixLoadBackendSnapshots = async function () {
+      const rows = await _aurixFetchBackendSnapshots();
+      _aurixBackendSnapshots = Array.isArray(rows) ? rows : [];
+      try { if (typeof render === 'function') render(false); } catch (_) {}                 // repaint if a live render hook exists
+      try { console.log('[BACKEND-SNAPSHOTS] loaded ' + _aurixBackendSnapshots.length + ' backend snapshot(s)'); } catch (_) {}
+      return _aurixBackendSnapshots.length;
+    };
+    // Guarded auto-load — OFF by default ⇒ no extra query until activation (strict NO-OP, chart == v481).
+    if (_AURIX_BACKEND_SNAPSHOTS_AUTOLOAD) { try { setTimeout(function () { try { window.aurixLoadBackendSnapshots(); } catch (_) {} }, 4000); } catch (_) {} }
   }
 } catch (_) {}
 // ── P0-FINAL-PERFORMANCE-KILL-SWITCH-AND-SERVER-CANONICAL ────────────────────────
