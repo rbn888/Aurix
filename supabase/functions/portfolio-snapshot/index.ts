@@ -65,43 +65,56 @@ async function fetchPrices(symbols: string[]): Promise<Map<string, { price: numb
   return map;
 }
 
-// Value one user's portfolio in USD from stored holdings revalued at fresh prices.
-// MIRRORS app.js investable valuation (assetValueUSD): valueUSD = qty × freshPrice (USD-quoted).
-// NOTE (verify at deploy): non-USD-quoted instruments and the exact `assets` field names must match your
-// schema. FX for non-USD is applied via `fxUsdPerUnit` when the price endpoint returns a non-USD currency;
-// if no rate is available the asset is valued at its STORED price and marked price_staleness:'stale'.
+// USD per unit of a non-USD currency, best-effort from the price snapshot (e.g. "EUR/USD"). NaN if absent.
+function fxToUsd(cur: string, prices: Map<string, { price: number; currency: string }>): number {
+  const c = (cur || 'USD').toUpperCase();
+  if (c === 'USD') return 1;
+  const p = prices.get(`${c}/USD`);
+  return p && Number.isFinite(p.price) ? p.price : NaN;
+}
+
+// Value one user's portfolio in USD. AURIX stores the NEW model in user_portfolios as TWO columns:
+//   assets   = catalog: [{ id, symbol, type, currentPrice, assetCurrency, ... }]
+//   holdings = quantities: [{ id, asset_id, quantity, costBasis, ... }]
+// A position is holdings ⋈ assets on holdings.asset_id === assets.id — EXACTLY app.js convertFromNewToFlat
+// (qty=holding.quantity, price=asset.currentPrice, type=asset.type, ticker=asset.symbol,
+// assetCurrency=asset.assetCurrency). Revalued at fresh USD prices where available; else the catalog price.
 function valueUser(row: any, prices: Map<string, { price: number; currency: string }>, now: Date) {
-  const assets: any[] = Array.isArray(row.assets) ? row.assets : [];
+  const catalog: any[] = Array.isArray(row.assets) ? row.assets : [];
+  const holdings: any[] = Array.isArray(row.holdings) ? row.holdings : [];
+  const byId = new Map<any, any>(catalog.map((a: any) => [a && a.id, a]));   // catalog keyed by id
   const categories: Record<string, number> = {};
-  let total = 0, realEstate = 0, count = 0, anyStale = false, anyClosed = false, anyCrypto = false;
-  for (const a of assets) {
-    if (!a) continue;
-    const type = (a.type || 'other');
-    const bucket = bucketOf(type);
-    const qty = Number(a.qty);
-    if (!Number.isFinite(qty)) continue;
-    let valueUSD: number;
+  const warnings: string[] = [];
+  let total = 0, realEstate = 0, count = 0, priced = 0, unpriced = 0, fxCount = 0;
+  let anyStale = false, anyClosed = false, anyCrypto = false;
+  for (const h of holdings) {
+    if (!h) continue;
+    const asset = byId.get(h.asset_id);
+    if (!asset) { unpriced++; warnings.push('orphan_holding:' + h.asset_id); continue; }   // salvage not replicated server-side
+    const qty = Number(h.quantity);                                    // quantity lives on HOLDINGS
+    if (!Number.isFinite(qty) || qty === 0) continue;
+    const bucket = bucketOf(asset.type || 'other');
+    const cur = String(asset.assetCurrency || 'USD').toUpperCase();
+    const storedPrice = Number(asset.currentPrice);                    // catalog price field = currentPrice
+    let valueUSD: number = NaN;
     let staleness = 'live';
     if (bucket === 'liquidity') {
-      // cash/liquidity: qty is the amount in assetCurrency (no market price)
-      const cur = (a.assetCurrency || 'USD').toUpperCase();
-      valueUSD = cur === 'USD' ? qty : qty * (Number(a.fxUsdPerUnit) || Number(a.price) || NaN);
-      if (!Number.isFinite(valueUSD)) { valueUSD = Number(a.price) * qty; staleness = 'stale'; }
+      // cash: qty is the amount in assetCurrency (no market price)
+      if (cur === 'USD') valueUSD = qty;
+      else { const fx = fxToUsd(cur, prices); if (Number.isFinite(fx)) { valueUSD = qty * fx; fxCount++; } else { valueUSD = Number.isFinite(storedPrice) && storedPrice > 0 ? qty * storedPrice : NaN; staleness = 'stale'; warnings.push('fx_missing:' + cur); } }
     } else {
-      const sym = String(a.symbol || a.ticker || '').toUpperCase();
+      const sym = String(asset.symbol || asset.ticker || '').toUpperCase();
       const fresh = sym ? prices.get(sym) : undefined;
-      if (fresh) {
-        const native = qty * fresh.price;
-        valueUSD = fresh.currency === 'USD' ? native : native * (Number(a.fxUsdPerUnit) || NaN);
-        if (!Number.isFinite(valueUSD)) { valueUSD = qty * Number(a.price); staleness = 'stale'; }
-      } else {
-        valueUSD = qty * Number(a.price);   // no fresh price → stored (stale)
-        staleness = 'stale';
-      }
-      if (bucket === 'stock' || bucket === 'etf' || bucket === 'fund') { if (!isUsEquityOpenNow(now)) { staleness = staleness === 'live' ? 'last_close' : staleness; anyClosed = true; } }
+      const unit = fresh ? fresh.price : storedPrice;                  // price per unit in its quote currency
+      const quoteCur = fresh ? (fresh.currency || 'USD').toUpperCase() : cur;
+      if (fresh) priced++; else { staleness = 'stale'; unpriced++; }
+      const native = qty * unit;
+      if (quoteCur === 'USD') valueUSD = native;
+      else { const fx = fxToUsd(quoteCur, prices); if (Number.isFinite(fx)) { valueUSD = native * fx; fxCount++; } else { valueUSD = NaN; staleness = 'stale'; warnings.push('fx_missing:' + quoteCur); } }
+      if ((bucket === 'stock' || bucket === 'etf' || bucket === 'fund') && !isUsEquityOpenNow(now)) { staleness = staleness === 'live' ? 'last_close' : staleness; anyClosed = true; }
       if (bucket === 'crypto') anyCrypto = true;
     }
-    if (!Number.isFinite(valueUSD)) continue;
+    if (!Number.isFinite(valueUSD)) { unpriced++; warnings.push('unpriced:' + (asset.symbol || h.asset_id)); continue; }
     if (staleness !== 'live') anyStale = true;
     categories[bucket] = (categories[bucket] || 0) + valueUSD;
     total += valueUSD;
@@ -110,24 +123,39 @@ function valueUser(row: any, prices: Map<string, { price: number; currency: stri
   }
   const market_state = anyCrypto && !anyClosed ? 'crypto_24_7' : (anyClosed ? (anyCrypto ? 'mixed' : 'closed') : 'open');
   const price_staleness = anyStale ? (market_state === 'closed' ? 'last_close' : 'stale') : 'live';
-  return { total: +total.toFixed(2), realEstate: +realEstate.toFixed(2), categories, count, market_state, price_staleness };
+  return { total: +total.toFixed(2), realEstate: +realEstate.toFixed(2), categories, count,
+    priced_asset_count: priced, unpriced_asset_count: unpriced, fx_conversions: fxCount,
+    holdings_count: holdings.length, catalog_count: catalog.length, warnings: warnings.slice(0, 20),
+    market_state, price_staleness };
 }
 
 Deno.serve(async () => {
   if (!SUPABASE_URL || !SERVICE_ROLE) return new Response('missing env', { status: 500 });
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
   const now = new Date();
-  const { data: rows, error } = await admin.from('user_portfolios').select('user_id, assets');
+  const { data: rows, error } = await admin.from('user_portfolios').select('user_id, assets, holdings');
   if (error) return new Response('read error: ' + error.message, { status: 500 });
 
-  // Collect all symbols across users, fetch fresh prices once.
+  // Collect all symbols + non-USD FX pairs across users' CATALOGS, fetch fresh prices once.
   const allSymbols: string[] = [];
-  for (const r of rows ?? []) for (const a of (Array.isArray(r.assets) ? r.assets : [])) { const s = a && (a.symbol || a.ticker); if (s) allSymbols.push(String(s).toUpperCase()); }
+  for (const r of rows ?? []) for (const a of (Array.isArray(r.assets) ? r.assets : [])) {
+    if (!a) continue;
+    const s = a.symbol || a.ticker; if (s) allSymbols.push(String(s).toUpperCase());
+    const cur = String(a.assetCurrency || 'USD').toUpperCase(); if (cur !== 'USD') allSymbols.push(cur + '/USD');   // FX pair (best-effort)
+  }
   const prices = await fetchPrices(allSymbols);
 
   let inserted = 0, skipped = 0, empty = 0;
+  const dryRunSamples: any[] = [];
   for (const r of rows ?? []) {
     const v = valueUser(r, prices, now);
+    // DRY_RUN visibility WITHOUT `functions logs`: return a per-user, secrets-free sample in the response.
+    if (DRY_RUN) dryRunSamples.push({ user: String(r.user_id || '').slice(0, 8), valuationTs: now.toISOString(),
+      total_value_usd: v.total, real_estate: v.realEstate, asset_count: v.count,
+      holdings_count: v.holdings_count, catalog_count: v.catalog_count,
+      priced_asset_count: v.priced_asset_count, unpriced_asset_count: v.unpriced_asset_count,
+      fx_conversions: v.fx_conversions, category_values: v.categories,
+      market_state: v.market_state, price_staleness: v.price_staleness, warnings: v.warnings });
     if (!Number.isFinite(v.total) || v.total <= 0) { empty++; continue; }
 
     // near-duplicate guard: skip if the latest snapshot is within NEAR_MS and NEAR_FRAC value.
@@ -148,5 +176,6 @@ Deno.serve(async () => {
     });
     if (insErr) { console.error('[insert]', r.user_id, insErr.message); } else { inserted++; }
   }
-  return new Response(JSON.stringify({ ok: true, dryRun: DRY_RUN, users: (rows ?? []).length, inserted, skipped, empty }), { headers: { 'content-type': 'application/json' } });
+  return new Response(JSON.stringify({ ok: true, dryRun: DRY_RUN, users: (rows ?? []).length, inserted, skipped, empty,
+    ...(DRY_RUN ? { samples: dryRunSamples } : {}) }), { headers: { 'content-type': 'application/json' } });
 });
