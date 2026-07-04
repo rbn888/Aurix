@@ -17926,6 +17926,12 @@ function renderWorkspace() {
   const container = document.getElementById('aurixWorkspace');
   if (!container) return;
 
+  // AURIX PREMIUM — Launch-1 gate: non-premium users see the premium preview (owner bypasses).
+  if (typeof hasAurixPremiumAccess === 'function' && !hasAurixPremiumAccess(_aurixCurrentAuthUser())) {
+    container.innerHTML = _aurixPremiumPreviewHTML('workspace');
+    return;
+  }
+
   // WS.1 — route to the new planning Home; legacy path below is preserved.
   if (AURIX_WS_HOME) { renderWorkspaceHome(container); return; }
 
@@ -37378,12 +37384,59 @@ function _applyTab(tab) {
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// AURIX PREMIUM — Launch 1 preview gating + owner premium override
+// ════════════════════════════════════════════════════════════════════════════
+// Visual gating ONLY for Intelligence + Workspace. NO payments / pricing / Founder / charts / market /
+// financial calcs touched. Owner (rbn892@gmail.com, by AUTHENTICATED email — never a localStorage flag
+// or console-settable global secret) gets full access; everyone else sees the premium preview.
+function hasAurixPremiumAccess(user) {
+  const email = String(user && user.email || '').toLowerCase().trim();
+  if (email === 'rbn892@gmail.com') return true;
+  return Boolean(user && (user.premium || user.isPremium || user.subscriptionActive));
+}
+// The authenticated user this session (Supabase auth), or null. Read fresh each call so it always
+// reflects the real signed-in identity, not a cached/forgeable value.
+function _aurixCurrentAuthUser() {
+  try { return (typeof currentUser !== 'undefined' && currentUser) ? currentUser : null; } catch (_) { return null; }
+}
+// Launch-1 premium preview (Intelligence / Workspace). Honest "being prepared" framing — never "blocked",
+// never "access denied", no price, no Founder. CTA returns to the Dashboard. Responsive (mobile+desktop).
+function _aurixPremiumPreviewHTML(section) {
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const P = (section === 'workspace') ? {
+    title: 'Aurix Workspace se está preparando',
+    subtitle: 'Tus futuras herramientas patrimoniales estarán conectadas a tu cartera real.',
+    text: 'Aurix ya está preparando un espacio donde podrás planificar, simular escenarios y trabajar con tu patrimonio desde una única plataforma.',
+    bullets: ['Planificación patrimonial', 'Calculadoras financieras', 'Simuladores', 'Objetivos', 'Escenarios', 'Herramientas avanzadas'],
+  } : {
+    title: 'Aurix Intelligence se está preparando',
+    subtitle: 'Aurix ya está analizando tu información patrimonial.',
+    text: 'Aunque esta sección todavía no esté disponible visualmente, Aurix ya está organizando tus datos, calculando tu exposición y preparando la futura inteligencia personalizada de tu cartera.',
+    bullets: ['Salud patrimonial', 'Concentración y diversificación', 'Liquidez', 'Riesgos detectados', 'Drivers de evolución', 'Timeline patrimonial', 'Insights personalizados'],
+  };
+  const bullets = P.bullets.map(b => '<li style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid rgba(255,255,255,0.08);border-radius:12px;background:rgba(255,255,255,0.02);font-size:14px;color:rgba(255,255,255,0.82);">'
+    + '<span style="width:6px;height:6px;border-radius:50%;background:rgba(120,170,255,0.9);flex:0 0 auto;"></span>' + esc(b) + '</li>').join('');
+  return ''
+    + '<section class="aurix-premium-preview" style="max-width:760px;margin:0 auto;padding:40px 20px 48px;text-align:center;">'
+    +   '<div style="display:inline-block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(120,170,255,0.95);border:1px solid rgba(120,170,255,0.35);border-radius:999px;padding:6px 14px;margin-bottom:18px;">Aurix Premium</div>'
+    +   '<h2 style="font-size:26px;font-weight:800;color:rgba(255,255,255,0.985);margin:0 0 10px;">' + esc(P.title) + '</h2>'
+    +   '<p style="font-size:16px;color:rgba(255,255,255,0.72);margin:0 0 8px;">' + esc(P.subtitle) + '</p>'
+    +   '<p style="font-size:14px;line-height:1.6;color:rgba(255,255,255,0.6);max-width:560px;margin:0 auto 8px;">' + esc(P.text) + '</p>'
+    +   '<p style="font-size:13px;line-height:1.6;color:rgba(255,255,255,0.55);max-width:560px;margin:0 auto 24px;">Aurix ya está procesando tu información patrimonial y preparando tus futuras áreas Premium.</p>'
+    +   '<ul style="list-style:none;padding:0;margin:0 auto 28px;max-width:560px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">' + bullets + '</ul>'
+    +   '<button type="button" onclick="try{switchTab(\'home\')}catch(_){}" style="font-size:14px;font-weight:700;color:#0b0e14;background:rgba(255,255,255,0.94);border:none;border-radius:12px;padding:12px 22px;cursor:pointer;">Volver al Dashboard</button>'
+    + '</section>';
+}
+
 // IA.1 — render the Intelligence tab. The portfolio intelligence (health,
 // risk, diversification, liquidity, concentration, signals/score) was moved
 // out of Workspace into this dedicated tab. PURELY a move: it reuses the
 // EXISTING renderers (desktop exec layout / mobile cockpit) reading the live
 // `_aurixWorkspaceIntelligence()` payload. Read-only — no editable sheet here.
 function renderIntelligenceTab() {
+  // AURIX PREMIUM — Launch-1 gate: non-premium users see the premium preview (owner bypasses).
+  if (!hasAurixPremiumAccess(_aurixCurrentAuthUser())) return _aurixPremiumPreviewHTML('intelligence');
   // INT.1 — premium deterministic portfolio intelligence layer. Reads only
   // existing data (snapshot + distributions); no new APIs, no AI, no external
   // data. Responsive single markup (CSS handles desktop/mobile). The legacy
