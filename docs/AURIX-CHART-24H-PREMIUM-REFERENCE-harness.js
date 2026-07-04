@@ -20,9 +20,12 @@ function fn(name) { const s = 'function ' + name + '('; const i = src.indexOf(s)
 const ENGINE_FNS = ['_aurixVpTargetPointCount', 'downsampleAurixLTTB', '_aurixSignificantLocalExtrema', 'downsampleAurixAdaptive',
   'computeAurixTimeScale', 'computeAurixAdaptiveXScale', 'computeAurixValueScale', '_aurixArrConfig', '_aurixArrRepresentVertices',
   '_aurixMonotonePath', 'buildAurixMonotonicPath', 'buildAurixAreaPath', '_aurixSplitAtGaps', '_aurixConfirmedBridgeGaps',
+  '_aurixVerticalJumps', '_aurixCapitalStepBreaks', '_aurixSparseRampBreaks', '_aurixStructuralBreaks',
   'renderValidatedPortfolioChartWithInstitutionalRenderer'];
 const AUX_CONSTS = ['_AURIX_RC_ASPECT', '_AURIX_RC_PAD_FRAC', '_AURIX_RC_VPAD_FRAC', '_AURIX_IR_VALUE_MARGIN', '_AURIX_IR_VPAD_FRAC',
-  '_AURIX_Y_JUMP_DOMINANCE', '_AURIX_Y_LEGIBLE_ALPHA', '_AURIX_VP_GAP_MEDIAN_MULT', '_AURIX_BRIDGE_SEG_ENABLED'];
+  '_AURIX_Y_JUMP_DOMINANCE', '_AURIX_Y_LEGIBLE_ALPHA', '_AURIX_VP_GAP_MEDIAN_MULT', '_AURIX_BRIDGE_SEG_ENABLED',
+  '_AURIX_CAPITAL_STEP_SEG_ENABLED', '_AURIX_SPARSE_RAMP_SEG_ENABLED', '_AURIX_VJUMP_MIN_FRAC', '_AURIX_VJUMP_P95_MULT',
+  '_AURIX_CAPSTEP_RATIO_LO', '_AURIX_CAPSTEP_RATIO_HI', '_AURIX_CAPSTEP_TS_PAD_MS', '_AURIX_SPARSE_RAMP_MULT', '_AURIX_SPARSE_RAMP_MIN_MS'];
 
 const sb = { console, Math, JSON, Array, Number, isFinite, Infinity, Date, activeRange: '24h', window: undefined };
 vm.createContext(sb);

@@ -23310,6 +23310,41 @@ function buildProductionPortfolioChart(range) {
       out.returnSuppressedReason = 'insufficient_requested_range_history';
       out.reason = 'range_collapsed_history_short';
     }
+    // SPEC DATA-TRUTH.01 (Fase 2) — LINE honesty state (data/debug only; no visible copy invented).
+    // A finite range whose real history does not cover it is "partial_history": the line is available
+    // history, NOT a mature requested-period chart. Consumers/audit read this; the badge stays neutral.
+    out.displayedActualSpanMs = _actualSpanMs;
+    out.displayedRequestedSpanMs = _finiteRange ? _reqSpanMs : null;
+    out.displayedRangeState = out.historyTooShortForRange ? 'partial_history' : (_finiteRange ? 'full' : 'all_history');
+    // SPEC DATA-TRUTH.01 (Fase 3) — ALL return TRUST. ALL is all-history; if the ledger flow TIMING in
+    // its window is untrustworthy (a low-confidence retimed flow, a double-matched structural step) or the
+    // baseline is a construction low, a numeric ALL return (e.g. -21%) is not trustworthy → honest state.
+    // The wealth LINE is still drawn. Reliably-timed flows leave ALL unchanged (real return still shows).
+    out.allRangeReturnAllowed = (r === 'all') ? true : null;
+    if (r === 'all' && per.returnState === 'ok') {
+      const untrust = [];
+      let winFlows = [];
+      try {
+        const allF = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : [];
+        winFlows = allF.filter(f => f && typeof f.ts === 'number' && f.ts > first.ts && f.ts <= last.ts);
+      } catch (_) { winFlows = []; }
+      if (winFlows.some(f => (f.retimeConfidence != null && f.retimeConfidence < _AURIX_STEP_MATCH_MIN_CONF) || f.retimeReason === 'fallback_base_low_confidence')) untrust.push('low_confidence_flow_timing');
+      const stepCounts = {};
+      winFlows.forEach(f => { if (f.matchedStepTs != null) stepCounts[f.matchedStepTs] = (stepCounts[f.matchedStepTs] || 0) + 1; });
+      if (Object.keys(stepCounts).some(k => stepCounts[k] > 1)) untrust.push('double_matched_flow_step');
+      try {
+        const sv = pts.map(p => p.value).sort((a, b) => a - b);
+        const med = sv.length ? sv[(sv.length - 1) >> 1] : 0;
+        if (med > 0 && first.value < 0.55 * med) untrust.push('baseline_construction_low');
+      } catch (_) {}
+      out.allUntrustReasons = untrust;
+      out.allRangeReturnAllowed = untrust.length === 0;
+      if (!out.allRangeReturnAllowed) {
+        out.returnState = 'insufficient_return_history';
+        out.returnSuppressedReason = 'all_history_untrusted_construction_or_flow_timing';
+        out.reason = 'all_history_untrusted_construction_or_flow_timing';
+      }
+    }
     if (out.returnState === 'ok') {
       out.returnPct = per.returnPct; out.badgeReturnPct = per.returnPct;
       out.returnValue = per.returnValue; out.color = per.color;
@@ -23394,6 +23429,103 @@ function _aurixConfirmedBridgeGaps(points, range) {
   return out;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.INSTITUTIONAL.DATA-TRUTH.01 — capital-step + sparse-ramp geometry truth
+// ════════════════════════════════════════════════════════════════════════════
+// Missing data, capital construction and short-history artefacts must not be drawn as continuous
+// institutional MARKET performance. Two additional structural-break detectors (same philosophy as the
+// bridge segmentation, same _aurixSplitAtGaps machinery — NO point invented, values untouched):
+//   • capital step: an adjacent VERTICAL jump whose magnitude+sign+timing match a ledger capital flow
+//     (deposit/withdrawal/asset add/liquidity) → break the line so the deposit is not a market curve.
+//   • sparse ramp: a RUN of ≥2 consecutive LOW-DENSITY connections (each ≫ the dense cadence) → the
+//     overly-clean ramp from too-few points is broken off from the dense premium clusters.
+// A SINGLE sub-dominant pause between two dense clusters is NOT a sparse ramp (that stays continuous —
+// BRIDGE-SEGMENTATION.01 invariant). Dense uniform-cadence data trips NEITHER detector (dense 24H safe).
+const _AURIX_CAPITAL_STEP_SEG_ENABLED = true;    // rollback → false
+const _AURIX_SPARSE_RAMP_SEG_ENABLED  = true;    // rollback → false
+const _AURIX_VJUMP_MIN_FRAC   = 0.015;           // a vertical jump is ≥1.5% of the prior value
+const _AURIX_VJUMP_P95_MULT   = 5;               // …AND ≥5× the p95 absolute local delta (dominant vs normal motion)
+const _AURIX_CAPSTEP_RATIO_LO = 0.5;             // observed jump ≈ a known flow magnitude (lo)
+const _AURIX_CAPSTEP_RATIO_HI = 1.6;             // …(hi) — FX/market noise around the capital event
+const _AURIX_CAPSTEP_TS_PAD_MS = 864e5;          // the matching flow must sit within ±1 day of the jump
+const _AURIX_SPARSE_RAMP_MULT = 12;              // a connection ≥12× the DENSE cadence is low-density
+const _AURIX_SPARSE_RAMP_MIN_MS = 20 * 60000;    // …AND ≥20 min absolute (small-window guard)
+
+// Adjacent VERTICAL jumps: |Δ| ≥ max(_AURIX_VJUMP_P95_MULT × p95(|Δ|), _AURIX_VJUMP_MIN_FRAC × prev).
+function _aurixVerticalJumps(points) {
+  const n = Array.isArray(points) ? points.length : 0; const out = [];
+  if (n < 3) return out;
+  const d = []; for (let i = 1; i < n; i++) d.push(Math.abs(points[i].value - points[i - 1].value));
+  const s = d.slice().sort((a, b) => a - b);
+  const p95 = s.length ? s[Math.min(s.length - 1, Math.floor(0.95 * s.length))] : 0;
+  for (let i = 1; i < n; i++) {
+    const dv = points[i].value - points[i - 1].value, prev = Math.abs(points[i - 1].value) || 1, absd = Math.abs(dv);
+    if (absd >= Math.max(_AURIX_VJUMP_P95_MULT * p95, _AURIX_VJUMP_MIN_FRAC * prev) && (absd / prev) >= _AURIX_VJUMP_MIN_FRAC) {
+      out.push({ index: i, startTs: points[i - 1].time, endTs: points[i].time, deltaUsd: +dv.toFixed(2), deltaPct: +((dv / prev) * 100).toFixed(2) });
+    }
+  }
+  return out;
+}
+
+// Capital-step breaks: a vertical jump whose magnitude+sign+timing match a ledger flow (available data).
+function _aurixCapitalStepBreaks(points, range) {
+  if (!_AURIX_CAPITAL_STEP_SEG_ENABLED) return [];
+  if (typeof _aurixLoadCapitalFlows !== 'function') return [];
+  let flows = []; try { flows = _aurixLoadCapitalFlows() || []; } catch (_) { flows = []; }
+  if (!Array.isArray(flows) || !flows.length) return [];
+  const toB = v => { try { return (typeof toBase === 'function') ? toBase(v, 'USD') : v; } catch (_) { return v; } };
+  const out = [];
+  for (const j of _aurixVerticalJumps(points)) {
+    const matched = flows.some(f => {
+      if (!f || typeof f.ts !== 'number') return false;
+      const amt = toB(Number(f.amountUSD)); if (!Number.isFinite(amt) || amt === 0) return false;
+      if (Math.sign(amt) !== Math.sign(j.deltaUsd)) return false;
+      const ratio = Math.abs(amt) / (Math.abs(j.deltaUsd) || 1);
+      if (ratio < _AURIX_CAPSTEP_RATIO_LO || ratio > _AURIX_CAPSTEP_RATIO_HI) return false;
+      return f.ts >= (j.startTs - _AURIX_CAPSTEP_TS_PAD_MS) && f.ts <= (j.endTs + _AURIX_CAPSTEP_TS_PAD_MS);
+    });
+    if (matched) out.push({ start: j.startTs, end: j.endTs, reason: 'capital_step', deltaUsd: j.deltaUsd, deltaPct: j.deltaPct });
+  }
+  return out;
+}
+
+// Sparse-ramp breaks: a RUN of ≥2 consecutive low-density connections (each ≫ the dense cadence). A lone
+// large gap (a pause between two dense clusters) is NOT a ramp and is left to the bridge detector.
+function _aurixSparseRampBreaks(points, range) {
+  if (!_AURIX_SPARSE_RAMP_SEG_ENABLED) return [];
+  const n = Array.isArray(points) ? points.length : 0; if (n < 4) return [];
+  const gaps = []; for (let i = 1; i < n; i++) gaps.push(points[i].time - points[i - 1].time);
+  const s = gaps.slice().sort((a, b) => a - b);
+  const p25 = s.length ? s[Math.floor(0.25 * s.length)] : 0;
+  const dense = Math.max(p25, 1);
+  const thr = Math.max(_AURIX_SPARSE_RAMP_MULT * dense, _AURIX_SPARSE_RAMP_MIN_MS);
+  const sparse = gaps.map(g => g >= thr);                          // per-connection low-density flag
+  const out = [];
+  for (let k = 0; k < sparse.length; k++) {
+    if (sparse[k] && ((k > 0 && sparse[k - 1]) || (k < sparse.length - 1 && sparse[k + 1]))) {   // part of a ≥2 run
+      out.push({ start: points[k].time, end: points[k + 1].time, reason: 'sparse_low_density', durationMs: gaps[k] });
+    }
+  }
+  return out;
+}
+
+// The single set of structural breaks the visible line splits on: sparse bridge ∪ capital step ∪ sparse
+// ramp, de-duplicated by the (start,end) connection. Returns counts per category for observability.
+function _aurixStructuralBreaks(points, range) {
+  let bridges = [], capital = [], ramps = [];
+  try { bridges = _aurixConfirmedBridgeGaps(points, range) || []; } catch (_) {}
+  try { capital = _aurixCapitalStepBreaks(points, range) || []; } catch (_) {}
+  try { ramps = _aurixSparseRampBreaks(points, range) || []; } catch (_) {}
+  const seen = new Set(), breaks = [];
+  [].concat(bridges, capital, ramps).forEach(b => {
+    if (!b || !Number.isFinite(b.start) || !Number.isFinite(b.end)) return;
+    const key = b.start + ':' + b.end;
+    if (seen.has(key)) return; seen.add(key); breaks.push(b);
+  });
+  breaks.sort((a, b) => a.start - b.start);
+  return { breaks: breaks, bridgeCount: bridges.length, capitalStepCount: capital.length, sparseRampCount: ramps.length };
+}
+
 // P0-PREMIUM-RENDERER-RECONNECTION — render the ALREADY-VALIDATED buildProductionPortfolioChart points
 // through the ORIGINAL institutional geometry (LTTB downsample → regime-aware scales → monotone-CUBIC
 // path → area). Values are NEVER modified: the only change is a ts→time shape rename. Returns a premium
@@ -23413,19 +23545,21 @@ function renderValidatedPortfolioChartWithInstitutionalRenderer(points, opts) {
     const xScale = computeAurixAdaptiveXScale(visiblePoints, vw, box, r);             // perceptual X
     const yScale = computeAurixValueScale(visiblePoints, vh, box);                    // regime-relative Y
     const scale = { xMin: xScale.xMin, xMax: xScale.xMax, yMin: yScale.yMin, yMax: yScale.yMax, x: xScale.x, y: yScale.y, top: yScale.top, bottom: yScale.bottom };
-    // SPEC DSH.CHART.24H.BRIDGE-SEGMENTATION.01 — split the path ONLY at a confirmed sparse bridge; else
-    // draw the single continuous premium curve exactly as before (byte-identical when there is no bridge).
-    const bridges = _aurixConfirmedBridgeGaps(visiblePoints, r);
+    // SPEC BRIDGE-SEGMENTATION.01 + DATA-TRUTH.01 — split the path ONLY at STRUCTURAL breaks (sparse
+    // bridge ∪ capital step ∪ sparse ramp); else draw the single continuous premium curve exactly as
+    // before (byte-identical when there are no breaks — dense uniform data is untouched).
+    const sbrk = _aurixStructuralBreaks(visiblePoints, r);
+    const breaks = sbrk.breaks;
     let linePath = '', areaPath = '';
-    if (bridges.length) {
-      const runs = _aurixSplitAtGaps(visiblePoints, bridges);
+    if (breaks.length) {
+      const runs = _aurixSplitAtGaps(visiblePoints, breaks);
       const lineParts = [], areaParts = [];
       for (const run of runs) {
         if (!run || run.length < 1) continue;
         const rp = _aurixMonotonePath(run, xScale, yScale);                            // dense premium curve, per run
         if (rp && rp.d) { lineParts.push(rp.d); if (run.length >= 2) areaParts.push(buildAurixAreaPath(rp.d, run, scale)); }
       }
-      linePath = lineParts.join(' ');                                                  // multiple 'M…' subpaths ⇒ visible break at the hole
+      linePath = lineParts.join(' ');                                                  // multiple 'M…' subpaths ⇒ visible break at each structural discontinuity
       areaPath = areaParts.join(' ');
     } else {
       const mp = _aurixMonotonePath(visiblePoints, xScale, yScale);                    // monotone-cubic (unchanged path)
@@ -23433,7 +23567,9 @@ function renderValidatedPortfolioChartWithInstitutionalRenderer(points, opts) {
       areaPath = (typeof buildAurixAreaPath === 'function' && linePath) ? buildAurixAreaPath(linePath, visiblePoints, scale) : '';
     }
     const visiblePixels = visiblePoints.map(p => ({ x: +xScale.x(p.time).toFixed(2), y: +yScale.y(p.value).toFixed(2) }));
-    return { linePath: linePath, areaPath: areaPath, visiblePixels: visiblePixels, visiblePoints: visiblePoints, xScale: xScale, yScale: yScale, scale: scale, segmentedBridgeCount: bridges.length, bridgeGaps: bridges, ok: !!(linePath && areaPath) };
+    return { linePath: linePath, areaPath: areaPath, visiblePixels: visiblePixels, visiblePoints: visiblePoints, xScale: xScale, yScale: yScale, scale: scale,
+      segmentedBridgeCount: sbrk.bridgeCount, capitalStepSegmentCount: sbrk.capitalStepCount, sparseRampSegmentCount: sbrk.sparseRampCount,
+      structuralBreakCount: breaks.length, bridgeGaps: breaks, ok: !!(linePath && areaPath) };
   } catch (e) { return { linePath: '', areaPath: '', visiblePixels: [], visiblePoints: [], ok: false, error: (e && e.message) || 'err' }; }
 }
 
@@ -23793,6 +23929,88 @@ try {
       });
       try { console.log('[UI][CHART_FORENSICS_EXPORT_JSON]\n' + JSON.stringify(all, null, 2)); } catch (_) {}
       return all;
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // SPEC DSH.CHART.INSTITUTIONAL.DATA-TRUTH.01 — window.aurixInstitutionalChartAudit(range)
+    // ════════════════════════════════════════════════════════════════════════════
+    // READ-ONLY institutional chart audit: classifies every bad shape (vertical jumps / plateaus /
+    // sparse ramps / capital steps), the range-coverage honesty, and the return trust — from the SAME
+    // validated pipeline the visible chart reads. Never mutates; never logs a secret.
+    window.aurixInstitutionalChartAudit = function (range) {
+      const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+      const iso = t => { try { return Number.isFinite(t) ? new Date(t).toISOString() : null; } catch (_) { return null; } };
+      const p = buildProductionPortfolioChart(r);
+      const v = buildValidatedHistoricalSeries(r);
+      const pts = (v.rangeSeries || []).map(s => ({ time: s.ts, value: s.value }));
+      const f = (typeof window.aurixChartForensics === 'function') ? window.aurixChartForensics(r) : {};
+      const causes = [];
+
+      // ── geometry classifiers (read-only) ──
+      const jumps = (typeof _aurixVerticalJumps === 'function') ? _aurixVerticalJumps(pts) : [];
+      let largestPct = 0, largestUsd = 0;
+      jumps.forEach(j => { if (Math.abs(j.deltaPct) > Math.abs(largestPct)) largestPct = j.deltaPct; if (Math.abs(j.deltaUsd) > Math.abs(largestUsd)) largestUsd = j.deltaUsd; });
+      const capBreaks = (typeof _aurixCapitalStepBreaks === 'function') ? _aurixCapitalStepBreaks(pts, r) : [];
+      const rampBreaks = (typeof _aurixSparseRampBreaks === 'function') ? _aurixSparseRampBreaks(pts, r) : [];
+      // plateaus — runs of ≥3 near-flat points spanning a long, sparse time.
+      let flatPlateauCount = 0, longestPlateauMs = 0;
+      { let i = 0; const n = pts.length;
+        while (i < n - 1) { let j = i; while (j + 1 < n && Math.abs(pts[j + 1].value - pts[i].value) / (Math.abs(pts[i].value) || 1) < 0.002) j++;
+          if (j - i >= 2) { const span = pts[j].time - pts[i].time; if (span >= 30 * 60000) { flatPlateauCount++; if (span > longestPlateauMs) longestPlateauMs = span; } }
+          i = (j > i) ? j : i + 1; } }
+      // longest ramp — longest monotonic run.
+      let longestRampMs = 0, rampSegmentCount = 0;
+      { let i = 0; const n = pts.length;
+        while (i < n - 1) { let dir = Math.sign(pts[i + 1].value - pts[i].value), j = i + 1;
+          while (j + 1 < n && Math.sign(pts[j + 1].value - pts[j].value) === dir && dir !== 0) j++;
+          if (dir !== 0 && (j - i) >= 3) { rampSegmentCount++; const span = pts[j].time - pts[i].time; if (span > longestRampMs) longestRampMs = span; }
+          i = j; } }
+
+      const flowsInWindow = Array.isArray(f.flowsInWindow) ? f.flowsInWindow : [];
+      if (p.displayedRangeState === 'partial_history' || p.historyTooShortForRange) causes.push('RANGE_HISTORY_TOO_SHORT');
+      if (p.state === 'ready' && p.returnState !== 'ok') causes.push('RETURN_SUPPRESSED');
+      if (r === 'all' && p.allRangeReturnAllowed === false) causes.push('ALL_RETURN_UNTRUSTED');
+      if (jumps.length) causes.push('VERTICAL_STEP');
+      if (capBreaks.length) causes.push('CAPITAL_STEP_DRAWN_AS_MARKET_MOVE');
+      if (rampBreaks.length) causes.push('SPARSE_RAMP');
+      if (Array.isArray(f.doubleMatchedSteps) && f.doubleMatchedSteps.length) causes.push('FLOW_OVER_SUBTRACTION');
+      if ((f.medianGapMin || 0) > 0 && pts.length < 6) causes.push('LOW_DENSITY_WINDOW');
+      if ((f.coverageRatio != null && f.coverageRatio < 0.5)) causes.push('MISSING_BACKEND_HISTORY');
+
+      const out = {
+        range: r,
+        requestedSpanMs: f.requestedSpanMs, actualSpanMs: f.actualSpanMs, coverageRatio: f.coverageRatio, historyCoverageState: f.historyCoverageState,
+        displayedRangeState: p.displayedRangeState,
+        rawPointCount: p.rawPointCount, cleanPointCount: p.cleanPointCount, finalPointCount: p.finalPointCount, realPointCount: p.finalPointCount, syntheticPointCount: 0,
+        firstTs: p.firstTs, lastTs: p.lastTs, firstWhen: iso(p.firstTs), lastWhen: iso(p.lastTs),
+        medianGapMs: f.medianGapMs, p90GapMs: f.p90GapMs, p95GapMs: f.p95GapMs, longestGapMs: f.longestGapMs,
+        bridgeSegmentCount: f.bridgeSegmentCount,
+        verticalJumpCount: jumps.length, largestVerticalJumpPct: largestPct, largestVerticalJumpUsd: largestUsd, verticalJumps: jumps,
+        flatPlateauCount: flatPlateauCount, longestPlateauMin: +(longestPlateauMs / 60000).toFixed(1),
+        rampSegmentCount: rampSegmentCount, longestRampMin: +(longestRampMs / 60000).toFixed(1),
+        capitalStepBreakCount: capBreaks.length, capitalStepBreaks: capBreaks, sparseRampBreakCount: rampBreaks.length,
+        capitalFlowCountInWindow: flowsInWindow.length, netFlows: p.netFlows,
+        grossChange: (p.currentValue != null && p.baselineValue != null) ? +(p.currentValue - p.baselineValue).toFixed(2) : null,
+        flowNeutralChange: (p.baselineValue != null && p.currentValue != null) ? +((p.currentValue - p.baselineValue) - (p.netFlows || 0)).toFixed(2) : null,
+        lineReturnPct: p.lineReturnPct, badgeReturnPct: p.badgeReturnPct, returnState: p.returnState, returnReason: p.returnSuppressedReason || p.reason,
+        guardHit: (p.state === 'ready' && p.returnState !== 'ok') ? (p.returnSuppressedReason || 'suppressed') : null,
+        allRangeReturnAllowed: p.allRangeReturnAllowed, allUntrustReasons: p.allUntrustReasons || null,
+        suspectedShapeCauses: causes,
+        state: p.state,
+      };
+      try { console.log('%c[UI][INSTITUTIONAL_CHART_AUDIT]', 'font-weight:700;color:#4da3ff', out); } catch (_) {}
+      return out;
+    };
+    window.aurixInstitutionalChartAuditAll = function () {
+      const rows = ['24h', '7d', '30d', '1y', 'all'].map(rg => {
+        const a = window.aurixInstitutionalChartAudit(rg);
+        return { range: rg, state: a.state, cov: a.coverageRatio, displayedRangeState: a.displayedRangeState,
+          finalPts: a.finalPointCount, vJumps: a.verticalJumpCount, capSteps: a.capitalStepBreakCount, sparseRamps: a.sparseRampBreakCount,
+          plateaus: a.flatPlateauCount, badgePct: a.badgeReturnPct, returnState: a.returnState, allAllowed: a.allRangeReturnAllowed,
+          causes: (a.suspectedShapeCauses || []).join(',') };
+      });
+      try { console.table(rows); } catch (_) {}
+      return rows;
     };
 
     // SPEC LINE.02 Fase 2.2 — HISTORY SOURCE AUDIT (read-only). Answers the decisive question:
