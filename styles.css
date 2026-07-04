@@ -22641,6 +22641,31 @@ body.aurix-premium-lock{ overflow:hidden; }
   background:linear-gradient(180deg, rgba(212,175,93,.22), rgba(212,175,93,.09));
   color:#f4e3b0; transform:none;
 }
+/* PREMIUM-PREVIEW-FINAL — Free user intrigue/coming-soon state: subtly blurred golden, mysterious,
+   NOT clickable (no modal/navigation — the JS click handler no-ops). Never reads as broken or "pay now". */
+.menu-item--premium-locked{
+  color:#d9c48a;
+  opacity:.62;
+  filter:blur(.4px);
+  cursor:not-allowed;
+  box-shadow:0 0 14px rgba(212,175,93,.08);
+  transition:opacity .2s ease;
+}
+.menu-item--premium-locked:hover{
+  /* keep it calm — a barely-there lift, no strong hover */
+  background:linear-gradient(180deg, rgba(212,175,93,.13), rgba(212,175,93,.05));
+  color:#e2cf95; opacity:.72; transform:none;
+}
+.menu-premium-soon{
+  display:inline-block;
+  margin-left:8px;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.10em;
+  text-transform:uppercase;
+  color:rgba(212,175,93,.72);
+  opacity:.85;
+}
 /* DSH.SETTINGS.05 — Idioma/Moneda toggles sit on the right of their Cuenta row.
    Currency pills carry flex:1 for the (removed) menu row; size to content here. */
 .settings-row .menu-pref-opts{ flex:0 0 auto; }

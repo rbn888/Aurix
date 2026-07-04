@@ -37448,11 +37448,11 @@ function _aurixPremiumPreviewHTML(section) {
   const COPY = {
     es: { cta: 'Volver al Dashboard',
       workspace: { badge: 'ESPACIO DE TRABAJO', title: 'Aurix Workspace se está preparando', subtitle: 'Tus futuras herramientas patrimoniales estarán conectadas a tu cartera real.', text: 'Aurix está preparando un espacio donde podrás planificar, simular escenarios y trabajar con tu patrimonio desde una única plataforma.', keyMessage: 'Workspace no será una zona aislada. Estará conectado a tu patrimonio real, tus activos y tu evolución.', bullets: ['Planificación patrimonial', 'Calculadoras financieras', 'Simuladores', 'Objetivos', 'Escenarios', 'Herramientas avanzadas'] },
-      intelligence: { badge: 'CAPA INTELIGENTE', title: 'Aurix Intelligence se está preparando', subtitle: 'Aurix ya está analizando tu información patrimonial.', text: 'Aunque todavía no veas esta sección completa, Aurix ya está organizando tus datos, calculando tu exposición y preparando una inteligencia personalizada sobre tu cartera.', keyMessage: 'Tu análisis no empieza cuando se desbloquea la sección. Empieza desde el primer dato que registras en Aurix.', bullets: ['Salud patrimonial', 'Riesgo y concentración', 'Diversificación', 'Liquidez', 'Drivers de evolución', 'Timeline patrimonial', 'Insights personalizados'] },
+      intelligence: { badge: 'CAPA INTELIGENTE', title: 'Aurix Intelligence se está preparando', subtitle: 'Aurix ya está analizando tu información patrimonial.', text: 'Aunque todavía no veas esta sección completa, Aurix ya está organizando tus datos, calculando tu exposición y preparando una inteligencia personalizada sobre tu cartera.', keyMessage: 'Tu análisis no empieza cuando se desbloquea la sección. Empieza desde el primer dato que registras en Aurix.', bullets: ['Salud patrimonial', 'Riesgo y concentración', 'Diversificación', 'Liquidez', 'Drivers de evolución', 'Insights personalizados'] },
     },
     en: { cta: 'Back to Dashboard',
       workspace: { badge: 'WEALTH WORKSPACE', title: 'Aurix Workspace is getting ready', subtitle: 'Your future wealth tools will be connected to your real portfolio.', text: 'Aurix is preparing a space where you will be able to plan, simulate scenarios and work with your wealth from a single platform.', keyMessage: "Workspace won't be an isolated area. It will be connected to your real wealth, your assets and your evolution.", bullets: ['Wealth planning', 'Financial calculators', 'Simulators', 'Goals', 'Scenarios', 'Advanced tools'] },
-      intelligence: { badge: 'INTELLIGENCE LAYER', title: 'Aurix Intelligence is getting ready', subtitle: 'Aurix is already analyzing your wealth information.', text: "Even though you can't see this section in full yet, Aurix is already organizing your data, calculating your exposure and preparing personalized intelligence about your portfolio.", keyMessage: "Your analysis doesn't start when the section unlocks. It starts with the first piece of data you record in Aurix.", bullets: ['Portfolio Health', 'Risk and concentration', 'Diversification', 'Liquidity', 'Wealth drivers', 'Wealth timeline', 'Personalized insights'] },
+      intelligence: { badge: 'INTELLIGENCE LAYER', title: 'Aurix Intelligence is getting ready', subtitle: 'Aurix is already analyzing your wealth information.', text: "Even though you can't see this section in full yet, Aurix is already organizing your data, calculating your exposure and preparing personalized intelligence about your portfolio.", keyMessage: "Your analysis doesn't start when the section unlocks. It starts with the first piece of data you record in Aurix.", bullets: ['Portfolio Health', 'Risk and concentration', 'Diversification', 'Liquidity', 'Wealth drivers', 'Personalized insights'] },
     },
   };
   const dict = EN ? COPY.en : COPY.es;
@@ -37461,43 +37461,47 @@ function _aurixPremiumPreviewHTML(section) {
   const glyph = isWs
     ? '<svg width="30" height="30" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="2" fill="#e2ecff"/><rect x="16" y="4" width="8" height="8" rx="2" fill="#a9c6ff"/><rect x="4" y="16" width="8" height="8" rx="2" fill="#a9c6ff"/><rect x="16" y="16" width="8" height="8" rx="2" fill="#7ea6ff"/></svg>'
     : '<svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true"><path d="M15 7 7 20M15 7l8 13M7 20h16" stroke="rgba(200,220,255,0.55)" stroke-width="1.2"/><circle cx="15" cy="7" r="2.6" fill="#e2ecff"/><circle cx="7" cy="20" r="2.6" fill="#a9c6ff"/><circle cx="23" cy="20" r="2.6" fill="#a9c6ff"/></svg>';
-  const bullets = P.bullets.map((b, i) => '<li class="apx-bullet" style="animation-delay:' + (i * 40) + 'ms"><span class="apx-dot" aria-hidden="true"></span>' + esc(b) + '</li>').join('');
+  const bullets = P.bullets.map((b, i) => '<li class="premium-preview-bullet" style="animation-delay:' + (i * 40) + 'ms"><span class="pp-dot" aria-hidden="true"></span>' + esc(b) + '</li>').join('');
   const style = ''
     + '<style>'
-    + '.apx-wrap{position:relative;min-height:78vh;display:flex;align-items:center;justify-content:center;padding:36px 20px;overflow:hidden;background:radial-gradient(circle at 50% 36%,rgba(70,120,255,0.16),transparent 46%),linear-gradient(180deg,#080d18 0%,#050812 100%);}'
-    + '.apx-card{position:relative;z-index:1;width:100%;max-width:820px;border-radius:28px;border:1px solid rgba(90,140,255,0.28);background:rgba(12,18,34,0.72);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 0 80px rgba(60,110,255,0.12),inset 0 1px 0 rgba(255,255,255,0.06);padding:42px 42px 44px;text-align:center;animation:apxIn .22s ease-out both;}'
-    + '.apx-orb{position:relative;width:74px;height:74px;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;}'
-    + '.apx-orb::before{content:"";position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 45%,rgba(120,170,255,0.9),rgba(60,110,255,0.22) 60%,transparent 72%);box-shadow:0 0 34px rgba(80,140,255,0.5);animation:apxPulse 3.2s ease-in-out infinite;}'
-    + '.apx-orb::after{content:"";position:absolute;inset:-9px;border-radius:50%;border:1px solid rgba(120,170,255,0.35);animation:apxRing 3.2s ease-in-out infinite;}'
-    + '.apx-glyph{position:relative;z-index:1;}'
-    + '.apx-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(150,185,255,0.95);border:1px solid rgba(120,170,255,0.4);background:rgba(90,140,255,0.08);border-radius:999px;padding:6px 14px;margin-bottom:16px;}'
-    + '.apx-title{font-size:28px;font-weight:800;color:rgba(255,255,255,0.985);margin:0 0 10px;letter-spacing:-.01em;line-height:1.15;}'
-    + '.apx-sub{font-size:16px;color:rgba(255,255,255,0.74);margin:0 0 10px;}'
-    + '.apx-text{font-size:14px;line-height:1.65;color:rgba(255,255,255,0.6);max-width:600px;margin:0 auto 14px;}'
-    + '.apx-key{font-size:13.5px;line-height:1.6;color:rgba(150,185,255,0.9);max-width:600px;margin:0 auto 26px;font-weight:600;}'
-    + '.apx-bullets{list-style:none;padding:0;margin:0 auto 30px;max-width:640px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}'
-    + '.apx-bullet{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid rgba(120,160,255,0.18);border-radius:14px;background:rgba(255,255,255,0.035);font-size:13.5px;color:rgba(255,255,255,0.85);text-align:left;transition:border-color .2s,background .2s,transform .2s;animation:apxIn .3s ease-out both;}'
-    + '.apx-bullet:hover{border-color:rgba(120,170,255,0.45);background:rgba(90,140,255,0.08);transform:translateY(-1px);}'
-    + '.apx-dot{width:7px;height:7px;border-radius:50%;background:rgba(120,170,255,0.95);box-shadow:0 0 8px rgba(90,140,255,0.7);flex:0 0 auto;}'
-    + '.apx-cta{font-size:14px;font-weight:700;color:#fff;background:linear-gradient(180deg,#3d7bff,#2f63ff);border:none;border-radius:16px;height:48px;padding:0 26px;cursor:pointer;box-shadow:0 8px 24px rgba(60,110,255,0.35),inset 0 0 0 1px rgba(120,170,255,0.3);transition:filter .2s,transform .2s;}'
-    + '.apx-cta:hover{filter:brightness(1.08);transform:translateY(-1px);}'
-    + '@keyframes apxIn{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:scale(1)}}'
-    + '@keyframes apxPulse{0%,100%{transform:scale(1);opacity:.95}50%{transform:scale(1.08);opacity:1}}'
-    + '@keyframes apxRing{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.16);opacity:.14}}'
-    + '@media (max-width:640px){.apx-wrap{min-height:72vh;padding:20px 14px;}.apx-card{padding:28px 20px 30px;border-radius:22px;}.apx-title{font-size:22px;}.apx-sub{font-size:15px;}.apx-bullets{grid-template-columns:1fr;max-width:420px;}}'
-    + '@media (prefers-reduced-motion:reduce){.apx-card,.apx-bullet{animation:none;}.apx-orb::before,.apx-orb::after{animation:none;}.apx-cta,.apx-bullet{transition:none;}}'
+    // Clean premium-black stage with a very subtle central glow (no lateral blocks / dark rectangles).
+    + '.premium-preview-stage{position:relative;width:100%;min-height:calc(100dvh - 116px);display:flex;align-items:center;justify-content:center;padding:32px 20px;box-sizing:border-box;overflow:hidden;background:radial-gradient(circle at 50% 26%,rgba(70,120,255,0.10),transparent 60%),#05070e;}'
+    // Neutralize the host containers (Intelligence #tabPlaceholder / Workspace #aurixWorkspace) so BOTH
+    // previews render on the same clean field — no host padding/background/border framing the card.
+    + '.tab-placeholder:has(.premium-preview-stage),.aurix-workspace:has(.premium-preview-stage){background:transparent!important;padding:0!important;margin:0!important;border:none!important;box-shadow:none!important;min-height:calc(100dvh - 116px)!important;display:flex!important;align-items:stretch!important;justify-content:center!important;}'
+    + '.premium-preview-card{position:relative;z-index:1;width:100%;max-width:820px;border-radius:28px;border:1px solid rgba(90,140,255,0.28);background:rgba(12,18,34,0.72);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 0 80px rgba(60,110,255,0.12),inset 0 1px 0 rgba(255,255,255,0.06);padding:40px 42px 32px;text-align:center;animation:ppIn .22s ease-out both;}'
+    + '.premium-preview-orb{position:relative;width:74px;height:74px;margin:0 auto 18px;display:flex;align-items:center;justify-content:center;}'
+    + '.premium-preview-orb::before{content:"";position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 45%,rgba(120,170,255,0.9),rgba(60,110,255,0.22) 60%,transparent 72%);box-shadow:0 0 34px rgba(80,140,255,0.5);animation:ppPulse 3.2s ease-in-out infinite;}'
+    + '.premium-preview-orb::after{content:"";position:absolute;inset:-9px;border-radius:50%;border:1px solid rgba(120,170,255,0.35);animation:ppRing 3.2s ease-in-out infinite;}'
+    + '.pp-glyph{position:relative;z-index:1;}'
+    + '.premium-preview-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(150,185,255,0.95);border:1px solid rgba(120,170,255,0.4);background:rgba(90,140,255,0.08);border-radius:999px;padding:6px 14px;margin-bottom:16px;}'
+    + '.pp-title{font-size:28px;font-weight:800;color:rgba(255,255,255,0.985);margin:0 0 10px;letter-spacing:-.01em;line-height:1.15;}'
+    + '.pp-sub{font-size:16px;color:rgba(255,255,255,0.74);margin:0 0 10px;}'
+    + '.pp-text{font-size:14px;line-height:1.65;color:rgba(255,255,255,0.6);max-width:600px;margin:0 auto 14px;}'
+    + '.pp-key{font-size:13.5px;line-height:1.6;color:rgba(150,185,255,0.9);max-width:600px;margin:0 auto 22px;font-weight:600;}'
+    + '.premium-preview-grid{list-style:none;padding:0;margin:0 auto 22px;max-width:640px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}'
+    + '.premium-preview-bullet{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid rgba(120,160,255,0.18);border-radius:14px;background:rgba(255,255,255,0.035);font-size:13.5px;color:rgba(255,255,255,0.85);text-align:left;transition:border-color .2s,background .2s,transform .2s;animation:ppIn .3s ease-out both;}'
+    + '.premium-preview-bullet:hover{border-color:rgba(120,170,255,0.45);background:rgba(90,140,255,0.08);transform:translateY(-1px);}'
+    + '.pp-dot{width:7px;height:7px;border-radius:50%;background:rgba(120,170,255,0.95);box-shadow:0 0 8px rgba(90,140,255,0.7);flex:0 0 auto;}'
+    + '.premium-preview-cta{font-size:14px;font-weight:700;color:#fff;background:linear-gradient(180deg,#3d7bff,#2f63ff);border:none;border-radius:16px;height:48px;padding:0 26px;cursor:pointer;box-shadow:0 8px 24px rgba(60,110,255,0.35),inset 0 0 0 1px rgba(120,170,255,0.3);transition:filter .2s,transform .2s;}'
+    + '.premium-preview-cta:hover{filter:brightness(1.08);transform:translateY(-1px);}'
+    + '@keyframes ppIn{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:scale(1)}}'
+    + '@keyframes ppPulse{0%,100%{transform:scale(1);opacity:.95}50%{transform:scale(1.08);opacity:1}}'
+    + '@keyframes ppRing{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.16);opacity:.14}}'
+    + '@media (max-width:640px){.premium-preview-stage{padding:20px 14px;}.premium-preview-card{padding:28px 20px 26px;border-radius:22px;}.pp-title{font-size:22px;}.pp-sub{font-size:15px;}.premium-preview-grid{grid-template-columns:1fr;max-width:420px;}}'
+    + '@media (prefers-reduced-motion:reduce){.premium-preview-card,.premium-preview-bullet{animation:none;}.premium-preview-orb::before,.premium-preview-orb::after{animation:none;}.premium-preview-cta,.premium-preview-bullet{transition:none;}}'
     + '</style>';
   return ''
-    + '<div class="apx-wrap apx-' + (isWs ? 'workspace' : 'intelligence') + '">' + style
-    +   '<section class="apx-card" role="region" aria-label="' + esc(P.title) + '">'
-    +     '<div class="apx-orb"><span class="apx-glyph">' + glyph + '</span></div>'
-    +     '<div class="apx-badge">' + esc(P.badge) + '</div>'
-    +     '<h2 class="apx-title">' + esc(P.title) + '</h2>'
-    +     '<p class="apx-sub">' + esc(P.subtitle) + '</p>'
-    +     '<p class="apx-text">' + esc(P.text) + '</p>'
-    +     '<p class="apx-key">' + esc(P.keyMessage) + '</p>'
-    +     '<ul class="apx-bullets">' + bullets + '</ul>'
-    +     '<button type="button" class="apx-cta" onclick="try{switchTab(\'home\')}catch(_){}">' + esc(P.cta) + '</button>'
+    + '<div class="premium-preview-stage premium-preview-' + (isWs ? 'workspace' : 'intelligence') + '">' + style
+    +   '<section class="premium-preview-card" role="region" aria-label="' + esc(P.title) + '">'
+    +     '<div class="premium-preview-orb"><span class="pp-glyph">' + glyph + '</span></div>'
+    +     '<div class="premium-preview-badge">' + esc(P.badge) + '</div>'
+    +     '<h2 class="pp-title">' + esc(P.title) + '</h2>'
+    +     '<p class="pp-sub">' + esc(P.subtitle) + '</p>'
+    +     '<p class="pp-text">' + esc(P.text) + '</p>'
+    +     '<p class="pp-key">' + esc(P.keyMessage) + '</p>'
+    +     '<ul class="premium-preview-grid">' + bullets + '</ul>'
+    +     '<button type="button" class="premium-preview-cta" onclick="try{switchTab(\'home\')}catch(_){}">' + esc(P.cta) + '</button>'
     +   '</section>'
     + '</div>';
 }
@@ -45623,6 +45627,22 @@ function _aurixRenderMenuIdentity() {
     badgeEl.setAttribute('data-tier', tier);
     badgeEl.textContent = tier === 'founder' ? 'FOUNDER' : tier === 'premium' ? 'PREMIUM' : 'FREE';
   }
+  // PREMIUM-PREVIEW-FINAL — Aurix Premium menu item state. Owner (authenticated email) → normal, clickable.
+  // Free → intrigue/coming-soon: subtly blurred golden, not clickable, no modal/navigation (guarded above).
+  const premiumEl = document.getElementById('menuPremium');
+  if (premiumEl) {
+    const _premiumUser = (typeof hasAurixPremiumAccess === 'function') && hasAurixPremiumAccess(_aurixCurrentAuthUser());
+    const _en = (function () { try { return (typeof lang !== 'undefined' && lang === 'en'); } catch (_) { return false; } })();
+    if (_premiumUser) {
+      premiumEl.classList.remove('menu-item--premium-locked');
+      premiumEl.removeAttribute('aria-disabled');
+      premiumEl.textContent = (typeof t === 'function') ? t('menuPremium') : '✨ Aurix Premium';
+    } else {
+      premiumEl.classList.add('menu-item--premium-locked');
+      premiumEl.setAttribute('aria-disabled', 'true');
+      premiumEl.innerHTML = 'Aurix Premium <span class="menu-premium-soon">' + (_en ? 'coming soon' : 'próximamente') + '</span>';
+    }
+  }
 }
 
 // ── Hamburger menu ─────────────────────────────────────────
@@ -48456,6 +48476,10 @@ try {
     // the settings plan card and the upgrade modal (those entrypoints unchanged).
     if (e.target.closest && e.target.closest('#menuPremium')) {
       e.stopPropagation();
+      // PREMIUM-PREVIEW-FINAL — Free users see an intrigue/coming-soon state: clicking does NOTHING
+      // (no modal, no navigation, no error). Owner (authenticated email) gets the normal clickable item.
+      const _premiumUser = (typeof hasAurixPremiumAccess === 'function') && hasAurixPremiumAccess(_aurixCurrentAuthUser());
+      if (!_premiumUser) { e.preventDefault(); return; }
       const panel = document.getElementById('menuPanel');
       const toggle = document.getElementById('menuToggle');
       if (panel && panel.classList.contains('open')) panel.classList.remove('open');
