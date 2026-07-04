@@ -858,13 +858,99 @@ let _aurixRemoteHistoryDiag = null;
 // + remote canonical present ⇒ the remote-authoritative store. Anonymous/offline-anon ⇒ local cache
 // (single device, no cross-device divergence possible). Local history NEVER has final authority for an
 // authenticated user.
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.BACKEND-SNAPSHOTS.V1.01 — read-only backend snapshot merge (behind flag)
+// ════════════════════════════════════════════════════════════════════════════
+// The remote canonical history is GENUINELY_SHORT because snapshots are captured only while the app is
+// open. The fix is a scheduled BACKEND capture (separate `portfolio_snapshots` table — NEVER the
+// last-writer-wins user_portfolios.category_history array, which a frontend flush would clobber). This
+// is the SAFE frontend half: a deterministic read-only merge of frontend (dense, authoritative) + backend
+// (gap-filler) points, wired at the single display chokepoint behind a flag. `_aurixBackendSnapshots`
+// stays EMPTY until the table read is wired at ACTIVATION (Fase 6), so today the merge is a strict NO-OP
+// and the chart is byte-identical. Invents NO point; on any error returns the untouched frontend source.
+const _AURIX_BACKEND_SNAPSHOTS_ENABLED = true;
+let _aurixBackendSnapshots = [];                 // populated only by the future portfolio_snapshots read
+const _AURIX_SNAP_NEAR_MS = 5 * 60000;           // a backend point within 5 min of a frontend point…
+const _AURIX_SNAP_NEAR_FRAC = 0.002;             // …and within 0.2% value is a near-duplicate ⇒ drop backend (frontend wins where dense)
+// Normalize a backend snapshot row to the pipeline point shape {ts,total,real_estate,…}. Backend rows
+// store total_value_usd + real_estate (USD) + source/confidence/market_state.
+function _aurixNormalizeBackendSnapshot(s) {
+  if (!s || !Number.isFinite(s.ts)) return null;
+  const total = Number(s.total_value_usd != null ? s.total_value_usd : s.total);
+  if (!Number.isFinite(total)) return null;
+  return { ts: s.ts, total: total, real_estate: Number(s.real_estate) || 0,
+    source: 'backend_snapshot', confidence: (s.confidence != null ? s.confidence : 'scheduled'),
+    market_state: s.market_state || null, price_staleness: s.price_staleness || null };
+}
+// Deterministic merge: frontend ∪ backend, dedup near-duplicates (frontend wins where dense), sort by ts.
+function _aurixMergeSnapshotSources(frontend, backend, opts) {
+  opts = opts || {};
+  try {
+    const fe = (Array.isArray(frontend) ? frontend : []).filter(p => p && Number.isFinite(p.ts));
+    const beRaw = Array.isArray(backend) ? backend : [];
+    if (!beRaw.length) return fe;                                     // NO-OP fast path (no backend data yet)
+    const be = beRaw.map(_aurixNormalizeBackendSnapshot).filter(Boolean);
+    const nearMs = opts.nearMs != null ? opts.nearMs : _AURIX_SNAP_NEAR_MS;
+    const nearFrac = opts.nearFrac != null ? opts.nearFrac : _AURIX_SNAP_NEAR_FRAC;
+    const feSorted = fe.slice().sort((a, b) => a.ts - b.ts);
+    const near = (t, v) => feSorted.some(f => Math.abs(f.ts - t) <= nearMs && Math.abs(Number(f.total) - v) <= nearFrac * (Math.abs(v) || 1));
+    const kept = [];
+    for (const b of be.sort((a, b) => a.ts - b.ts)) {
+      const bv = Number(b.total);
+      if (near(b.ts, bv)) continue;                                   // frontend already covers this instant densely
+      const last = kept[kept.length - 1];
+      if (last && (b.ts - last.ts) <= nearMs && Math.abs(bv - Number(last.total)) <= nearFrac * (Math.abs(bv) || 1)) continue;  // backend near-dupe
+      kept.push(b);
+    }
+    return feSorted.concat(kept).sort((a, b) => a.ts - b.ts);
+  } catch (_) { return Array.isArray(frontend) ? frontend : []; }
+}
+
 function _aurixHistorySourceForDisplay() {
+  let base;
   try {
     const authed = (typeof currentUser !== 'undefined' && currentUser && currentUser.id);
-    if (authed && Array.isArray(_aurixCanonicalCatHistory)) return _aurixCanonicalCatHistory;
+    base = (authed && Array.isArray(_aurixCanonicalCatHistory)) ? _aurixCanonicalCatHistory
+      : ((typeof categoryHistory !== 'undefined' && Array.isArray(categoryHistory)) ? categoryHistory : []);
+  } catch (_) { base = (typeof categoryHistory !== 'undefined' && Array.isArray(categoryHistory)) ? categoryHistory : []; }
+  // SPEC BACKEND-SNAPSHOTS.V1.01 — merge backend gap-fillers behind the flag (NO-OP until activation).
+  try {
+    if (_AURIX_BACKEND_SNAPSHOTS_ENABLED && Array.isArray(_aurixBackendSnapshots) && _aurixBackendSnapshots.length) {
+      return _aurixMergeSnapshotSources(base, _aurixBackendSnapshots);
+    }
   } catch (_) {}
-  return (typeof categoryHistory !== 'undefined' && Array.isArray(categoryHistory)) ? categoryHistory : [];
+  return base;
 }
+try {
+  if (typeof window !== 'undefined') {
+    // SPEC BACKEND-SNAPSHOTS.V1.01 — read-only: how much of the DISPLAYED history is frontend vs backend.
+    window.aurixSnapshotSourceAudit = function () {
+      const iso = t => { try { return Number.isFinite(t) ? new Date(t).toISOString() : null; } catch (_) { return null; } };
+      let src = []; try { src = _aurixHistorySourceForDisplay() || []; } catch (_) {}
+      const be = src.filter(p => p && p.source === 'backend_snapshot');
+      const fe = src.filter(p => !p || p.source !== 'backend_snapshot');
+      const span = a => { const t = a.filter(p => p && Number.isFinite(p.ts)).map(p => p.ts).sort((x, y) => x - y); return t.length ? { count: t.length, oldest: iso(t[0]), newest: iso(t[t.length - 1]), spanDays: +((t[t.length - 1] - t[0]) / 864e5).toFixed(2) } : { count: 0 }; };
+      const marketStates = {}; be.forEach(p => { const k = p.market_state || 'unknown'; marketStates[k] = (marketStates[k] || 0) + 1; });
+      const out = { flag: _AURIX_BACKEND_SNAPSHOTS_ENABLED, backendLoaded: (_aurixBackendSnapshots || []).length,
+        total: span(src), frontend: span(fe), backend: span(be), backendMarketStates: marketStates,
+        note: (be.length ? null : 'no backend snapshots present yet — scheduler not activated (Fase 6)') };
+      try { console.log('%c[UI][SNAPSHOT_SOURCE_AUDIT]', 'font-weight:700;color:#4da3ff', out); } catch (_) {}
+      return out;
+    };
+    // SPEC BACKEND-SNAPSHOTS.V1.01 — read-only: the merge decision (frontend base ∪ backend gap-fillers).
+    window.aurixSnapshotMergeDebug = function () {
+      let base; try { const authed = (typeof currentUser !== 'undefined' && currentUser && currentUser.id); base = (authed && Array.isArray(_aurixCanonicalCatHistory)) ? _aurixCanonicalCatHistory : (Array.isArray(categoryHistory) ? categoryHistory : []); } catch (_) { base = []; }
+      const backend = _aurixBackendSnapshots || [];
+      const merged = _aurixMergeSnapshotSources(base, backend);
+      const out = { flag: _AURIX_BACKEND_SNAPSHOTS_ENABLED, frontendPoints: base.length, backendPointsRaw: backend.length,
+        mergedPoints: merged.length, backendKept: merged.filter(p => p && p.source === 'backend_snapshot').length,
+        backendDroppedNearDuplicate: Math.max(0, backend.length - merged.filter(p => p && p.source === 'backend_snapshot').length),
+        nearMs: _AURIX_SNAP_NEAR_MS, nearFrac: _AURIX_SNAP_NEAR_FRAC, deterministic: true, syntheticPoints: 0 };
+      try { console.log('%c[UI][SNAPSHOT_MERGE_DEBUG]', 'font-weight:700;color:#4da3ff', out); } catch (_) {}
+      return out;
+    };
+  }
+} catch (_) {}
 // ── P0-FINAL-PERFORMANCE-KILL-SWITCH-AND-SERVER-CANONICAL ────────────────────────
 // The single REMOTE canonical performance object (Supabase user_portfolios.performance_state). It is the
 // ONLY source an authenticated client may render REAL performance from. Set ONLY from a remote READ (in

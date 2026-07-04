@@ -64,7 +64,10 @@ ok('5 _aurixInvestableSnapshots reads _aurixHistorySourceForDisplay() (not categ
 ok('6 the chart (getCanonicalPortfolioSeries) and the return (_aurixRangeReturn) both flow through the eligible series',
    /_aurixEligibleInvestableSeries\(/.test(fnSrc('getCanonicalPortfolioSeries')) && /_aurixInvestableSnapshots\(range\)/.test(fnSrc('_aurixEligibleInvestableSeries')));
 ok('7 display source = remote canonical for authed, local for anon (never local-final for authed)',
-   /const authed = \(typeof currentUser !== 'undefined' && currentUser && currentUser\.id\);\s*if \(authed && Array\.isArray\(_aurixCanonicalCatHistory\)\) return _aurixCanonicalCatHistory;/.test(fnSrc('_aurixHistorySourceForDisplay')));
+   // SPEC BACKEND-SNAPSHOTS.V1.01: base selection unchanged (authed ⇒ remote canonical); a read-only
+   // backend gap-filler merge is layered on TOP behind a flag (never substitutes local for an authed user).
+   /base = \(authed && Array\.isArray\(_aurixCanonicalCatHistory\)\) \? _aurixCanonicalCatHistory/.test(fnSrc('_aurixHistorySourceForDisplay')) &&
+   /_AURIX_BACKEND_SNAPSHOTS_ENABLED && Array\.isArray\(_aurixBackendSnapshots\)/.test(fnSrc('_aurixHistorySourceForDisplay')));
 
 console.log('\nMerge sets the store FROM remote; confirmed flush promotes local→canonical (own pushed points):');
 ok('8 _mergeRemoteState sets _aurixCanonicalCatHistory from the remote row (authority)',
