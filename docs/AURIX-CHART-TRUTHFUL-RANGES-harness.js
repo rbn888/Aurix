@@ -71,8 +71,9 @@ ok('7 line still renders (points + ready) despite suppressed badge', d30.points.
 // 6. 24H full coverage (history extends past 24h) → NOT suppressed, real return shown.
 ok('6 24H full coverage → returnState ok + numeric return + not collapsed', d24.returnState === 'ok' && Number.isFinite(d24.returnPct) && d24.rangeCollapsedBecauseHistoryTooShort === false, 'rs=' + d24.returnState + ' pct=' + d24.returnPct + ' cov=' + d24.coverageRatio);
 ok('6b 24H return is the LOCAL last-24h slice, NOT the -52%', Math.abs(d24.returnPct) < 25, 'pct=' + d24.returnPct);
-// 8. ALL unchanged (all-history semantics; governed by existing sane band, not this guard).
-ok('8 ALL unchanged (not a finite requested range) → still computes', dall.returnState === 'ok' && Math.abs(dall.returnPct + 52.35) < 1.0 && dall.coverageRatio === null, 'rs=' + dall.returnState + ' pct=' + dall.returnPct);
+// 8. ALL over a genuinely-short (~4.94d) history is a NEW account → SPEC NEW-ACCOUNT.TOTAL-TRUST.06
+//    suppresses the false lifetime return (was -52.35%) → honest neutral. Gross still in lineReturnPct.
+ok('8 ALL short history → SUPPRESSED (new-account maturity gate, not -52%)', dall.returnState !== 'ok' && dall.badgeReturnPct === null && dall.coverageRatio === null && (dall.allUntrustReasons || []).includes('short_all_history') && Math.abs(dall.lineReturnPct + 52.35) < 1.0, 'rs=' + dall.returnState + ' pct=' + dall.returnPct + ' gross=' + dall.lineReturnPct + ' reasons=' + (dall.allUntrustReasons || []).join('|'));
 
 console.log('\n24H sign correctness (green/red still works on full-coverage 24H):');
 sb.__setHist(ramp(10000, 10800, 4.94));   // rising history → last-24h slice is positive

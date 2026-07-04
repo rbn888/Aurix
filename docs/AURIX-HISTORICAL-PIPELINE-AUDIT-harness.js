@@ -132,8 +132,9 @@ console.log('\nRenderer is a passive consumer of the validated series:');
   const p = P(makeEnv(h), '30d');
   ok('14 renderer receives READY only after validation (≥2 validated points, from clean series)',
     p.renderDecision === 'READY' && p.points.length >= 2 && p.cleanPointCountAfterQuarantine >= 2 && Number.isFinite(p.returnPct)); }
-{ // 15 — renderer never receives a corrupted series
-  const h = series(21, 20 * 24, 8000, 5); h[10] = { ts: h[10].ts, total: 16000, real_estate: 0 };
+{ // 15 — renderer never receives a corrupted series (span ≥21d so the ALL badge is trustworthy per
+  //       SPEC NEW-ACCOUNT.TOTAL-TRUST.06 → line==badge is a meaningful check on a mature history).
+  const h = series(21, 24 * 24, 8000, 5); h[10] = { ts: h[10].ts, total: 16000, real_estate: 0 };
   const p = P(makeEnv(h), 'all');
   ok('15 renderer never receives the corrupted snapshot (not in drawn points)',
     p.state === 'ready' && !has(p.points, 16000) && p.lineReturnPct === p.badgeReturnPct, 'q=' + p.quarantinedSnapshotCount); }

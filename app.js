@@ -23504,21 +23504,47 @@ function buildProductionPortfolioChart(range) {
         const med = sv.length ? sv[(sv.length - 1) >> 1] : 0;
         if (med > 0 && first.value < 0.55 * med) untrust.push('baseline_construction_low');
       } catch (_) {}
-      // V480 — the -21% persisted because a SHORT all-history whose flows are reliably-timed still passed.
-      // A short all-history that ALSO carries construction (a capital-step candidate in the drawn line) OR
-      // any DERIVED/re-timed capital flow is not a trustworthy period return, even with clean per-flow timing.
+      // ── SPEC DSH.CHART.NEW-ACCOUNT.TOTAL-TRUST.06 ────────────────────────────────
+      // Root cause of the false TOTAL -38.18%: a NEW account (assets added manually, no
+      // recorded capital flows) has a SHORT, freshly-constructed history whose baseline is
+      // an early construction value. The v480 gate only fired when a DERIVED flow or a
+      // flow-matched capital step existed in the window — a manual new account has NEITHER,
+      // so the raw gross change (construction value → settled value) leaked through as a
+      // "real" return. TOTAL must use the SAME maturity trust as long ranges: a lifetime
+      // return is only trustworthy once the history is old AND dense enough. Short life /
+      // few snapshots / construction jumps → honest neutral, whether or not flows exist.
       const allMinSpan = (typeof _AURIX_ALL_MIN_TRUST_SPAN_MS === 'number') ? _AURIX_ALL_MIN_TRUST_SPAN_MS : (21 * 864e5);
+      const allMinPts  = (typeof _AURIX_ALL_MIN_TRUST_POINTS === 'number') ? _AURIX_ALL_MIN_TRUST_POINTS : 8;
       const allShort = _actualSpanMs < allMinSpan;
-      let constructionInWindow = false;
-      try { constructionInWindow = _aurixCapitalStepBreaks(pts.map(p => ({ time: p.ts, value: p.value })), 'all').length > 0; } catch (_) {}
-      const derivedFlowInWindow = winFlows.some(f => f && (f.source === 'tx-backfill' || f.source === 'inferred' || f.retimeReason != null));
-      if (allShort && (constructionInWindow || derivedFlowInWindow)) untrust.push('short_all_history_with_construction_or_derived_flow');
+      let capitalStepBreakCount = 0, verticalJumpCount = 0;
+      try { capitalStepBreakCount = _aurixCapitalStepBreaks(pts.map(p => ({ time: p.ts, value: p.value })), 'all').length; } catch (_) {}
+      try { verticalJumpCount = _aurixVerticalJumps(pts.map(p => ({ time: p.ts, value: p.value }))).length; } catch (_) {}
+      // (8) new account even with several points added quickly → SHORT span catches it.
+      if (allShort) untrust.push('short_all_history');
+      // (9) too few snapshots for a trustworthy lifetime return.
+      if (out.finalPointCount < allMinPts) untrust.push('insufficient_all_points');
+      // (9) construction step / capital jump in the drawn line while still young → initial build
+      //     or batch asset add, even with NO ledger flow recorded.
+      if (allShort && (capitalStepBreakCount > 0 || verticalJumpCount > 0)) untrust.push('construction_step_in_window');
+      // diagnostics (12)
+      let accountAgeMs = null;
+      try { const _ca = (typeof currentUser !== 'undefined' && currentUser) ? currentUser.created_at : null; if (_ca) accountAgeMs = Date.now() - new Date(_ca).getTime(); } catch (_) {}
+      let backendLoaded = 0;
+      try { backendLoaded = (typeof _aurixBackendSnapshots !== 'undefined' && _aurixBackendSnapshots) ? _aurixBackendSnapshots.length : 0; } catch (_) {}
       out.allUntrustReasons = untrust;
+      out.accountAgeMs = accountAgeMs;
+      out.historySpanMs = _actualSpanMs;
+      out.backendLoaded = backendLoaded;
+      out.capitalStepBreakCount = capitalStepBreakCount;
+      out.verticalJumpCount = verticalJumpCount;
+      out.initialBuildDetected = allShort || (out.finalPointCount < allMinPts) || untrust.indexOf('baseline_construction_low') >= 0 || (capitalStepBreakCount > 0 || verticalJumpCount > 0);
       out.allRangeReturnAllowed = untrust.length === 0;
       if (!out.allRangeReturnAllowed) {
+        // (7) honest neutral state — never a giant construction-driven return.
         out.returnState = 'insufficient_return_history';
-        out.returnSuppressedReason = 'all_history_untrusted_construction_or_flow_timing';
-        out.reason = 'all_history_untrusted_construction_or_flow_timing';
+        out.returnSuppressedReason = out.initialBuildDetected ? 'all_history_new_account_or_initial_build' : 'all_history_untrusted_construction_or_flow_timing';
+        out.reason = out.returnSuppressedReason;
+        out.displayedRangeState = 'partial_history';   // displayedRangeState for all/total
       }
     }
     if (out.returnState === 'ok') {
@@ -23635,6 +23661,10 @@ const _AURIX_ORPHAN_MAX_PTS = 2;
 // V480 — ALL return needs ≥ this many real days to trust a period return WHEN the window also carries
 // construction / derived (re-timed) capital flows. Short history + construction/derived flow ⇒ untrusted.
 const _AURIX_ALL_MIN_TRUST_SPAN_MS = 21 * 864e5;
+// SPEC DSH.CHART.NEW-ACCOUNT.TOTAL-TRUST.06 — a trustworthy TOTAL/lifetime return also needs enough
+// snapshots; a just-built account with a handful of points (even added over 21+d of wall clock) is not
+// a real lifetime return. Below this → honest neutral (insufficient_return_history / partial_history).
+const _AURIX_ALL_MIN_TRUST_POINTS = 8;
 
 // Adjacent VERTICAL jumps: |Δ| ≥ max(_AURIX_VJUMP_P95_MULT × p95(|Δ|), _AURIX_VJUMP_MIN_FRAC × prev).
 function _aurixVerticalJumps(points) {

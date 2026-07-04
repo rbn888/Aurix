@@ -46,13 +46,14 @@ console.log('1. ALL trust:');
 // short all-history + DERIVED (tx-backfill) flow → suppressed (no red -21%)
 PS.__setHist(ramp(10000, 7833, 4.94));
 PS.__setLedger([{ ts: 1_800_000_000_000 + 2 * DAY, amountUSD: 300, source: 'tx-backfill', retimeReason: 'retimed_to_structural_step', retimeConfidence: 0.9, matchedStepTs: 1 }]);
-{ const p = build('all'); ok('ALL short + derived flow → suppressed (no red return)', p.returnState !== 'ok' && p.badgeReturnPct === null && p.color === 'flat' && (p.allUntrustReasons || []).includes('short_all_history_with_construction_or_derived_flow'), 'rs=' + p.returnState + ' badge=' + p.badgeReturnPct + ' reasons=' + (p.allUntrustReasons || []).join('|')); }
+{ const p = build('all'); ok('ALL short + derived flow → suppressed (no red return)', p.returnState !== 'ok' && p.badgeReturnPct === null && p.color === 'flat' && (p.allUntrustReasons || []).includes('short_all_history'), 'rs=' + p.returnState + ' badge=' + p.badgeReturnPct + ' reasons=' + (p.allUntrustReasons || []).join('|')); }
 // long trustworthy all-history, clean ledger → return still shown
 PS.__setHist(ramp(10000, 11000, 30)); PS.__setLedger([]);
 { const p = build('all'); ok('ALL long + trustworthy → return still shown', p.returnState === 'ok' && Number.isFinite(p.badgeReturnPct) && p.allRangeReturnAllowed === true, 'rs=' + p.returnState + ' badge=' + p.badgeReturnPct); }
-// short but CLEAN all-history (pure market, no derived/construction) → still allowed (no over-suppression)
+// SPEC NEW-ACCOUNT.TOTAL-TRUST.06: a SHORT all-history is a new account → neutral even if the line is
+// clean (poca vida real). Supersedes the old v480 "short but clean → allowed" (no false lifetime return).
 PS.__setHist(ramp(10000, 10500, 4.94)); PS.__setLedger([]);
-{ const p = build('all'); ok('ALL short but CLEAN (no derived/construction) → still allowed', p.returnState === 'ok' && Number.isFinite(p.badgeReturnPct), 'rs=' + p.returnState + ' badge=' + p.badgeReturnPct); }
+{ const p = build('all'); ok('ALL short but CLEAN → NEUTRAL (new-account maturity gate)', p.returnState !== 'ok' && p.badgeReturnPct === null && (p.allUntrustReasons || []).includes('short_all_history'), 'rs=' + p.returnState + ' badge=' + p.badgeReturnPct + ' reasons=' + (p.allUntrustReasons || []).join('|')); }
 
 console.log('\n2. Orphan micro-island cleanup:');
 // denseA(30) | +cap step | mid-island | -cap step | denseB(30). Long dense clusters keep p95 small so
