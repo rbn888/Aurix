@@ -37341,7 +37341,13 @@ function _applyTab(tab) {
   if (_marketInterval) { clearInterval(_marketInterval); _marketInterval = null; }
   // AW-6.1: opt the workspace tab out of the .app shell constraints so the
   // grid can run full-bleed. Pure presentation toggle, no logic side-effects.
-  document.body.classList.toggle('workspace-active', tab === 'workspace');
+  // PREMIUM-PREVIEW-V2 (header stability): the full-bleed shell shortens .header padding and drops the
+  // .app constraints (styles.css body.workspace-active .header/.app), which SHIFTS the AURIX logo. The
+  // non-premium Workspace PREVIEW must render in the SAME normal shell as Dashboard/Intelligence, so the
+  // logo never moves and both previews share the exact layout. Only the REAL (premium) workspace grid
+  // gets full-bleed.
+  const _wsFullBleed = (tab === 'workspace') && !(typeof hasAurixPremiumAccess === 'function' && !hasAurixPremiumAccess(_aurixCurrentAuthUser()));
+  document.body.classList.toggle('workspace-active', _wsFullBleed);
   const mainEl      = document.querySelector('main');
   const placeholder = document.getElementById('tabPlaceholder');
   const workspaceEl = document.getElementById('aurixWorkspace');
@@ -37400,40 +37406,70 @@ function hasAurixPremiumAccess(user) {
 function _aurixCurrentAuthUser() {
   try { return (typeof currentUser !== 'undefined' && currentUser) ? currentUser : null; } catch (_) { return null; }
 }
-// Launch-1 premium preview (Intelligence / Workspace). Honest "being prepared" framing — never "blocked",
-// never "access denied", no price, no Founder. CTA returns to the Dashboard. Responsive (mobile+desktop).
+// PREMIUM-PREVIEW-V2 — the SINGLE premium preview experience for Intelligence + Workspace. Aspirational
+// "being prepared for you" framing (never "blocked"/"access denied", no price, no Founder). Shared layout,
+// premium hero card on a subtle electric-blue field, animated orb, mini-card bullets, electric CTA.
+// Fully self-contained (embedded scoped <style>) so Intelligence and Workspace render byte-identically in
+// their respective containers. i18n by `lang` (ES default). Respects prefers-reduced-motion.
+const _AURIX_PREMIUM_PREVIEW_STYLE_ONCE = { done: false };
 function _aurixPremiumPreviewHTML(section) {
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  // i18n — follow the user's chosen language (portfolio_lang). ES = current copy; EN = equivalent.
   const EN = (function () { try { return (typeof lang !== 'undefined' && lang === 'en'); } catch (_) { return false; } })();
   const COPY = {
-    es: {
-      keyMessage: 'Aurix ya está procesando tu información patrimonial y preparando tus futuras áreas Premium.',
-      cta: 'Volver al Dashboard',
-      workspace: { title: 'Aurix Workspace se está preparando', subtitle: 'Tus futuras herramientas patrimoniales estarán conectadas a tu cartera real.', text: 'Aurix ya está preparando un espacio donde podrás planificar, simular escenarios y trabajar con tu patrimonio desde una única plataforma.', bullets: ['Planificación patrimonial', 'Calculadoras financieras', 'Simuladores', 'Objetivos', 'Escenarios', 'Herramientas avanzadas'] },
-      intelligence: { title: 'Aurix Intelligence se está preparando', subtitle: 'Aurix ya está analizando tu información patrimonial.', text: 'Aunque esta sección todavía no esté disponible visualmente, Aurix ya está organizando tus datos, calculando tu exposición y preparando la futura inteligencia personalizada de tu cartera.', bullets: ['Salud patrimonial', 'Concentración y diversificación', 'Liquidez', 'Riesgos detectados', 'Drivers de evolución', 'Timeline patrimonial', 'Insights personalizados'] },
+    es: { cta: 'Volver al Dashboard',
+      workspace: { badge: 'ESPACIO DE TRABAJO', title: 'Aurix Workspace se está preparando', subtitle: 'Tus futuras herramientas patrimoniales estarán conectadas a tu cartera real.', text: 'Aurix está preparando un espacio donde podrás planificar, simular escenarios y trabajar con tu patrimonio desde una única plataforma.', keyMessage: 'Workspace no será una zona aislada. Estará conectado a tu patrimonio real, tus activos y tu evolución.', bullets: ['Planificación patrimonial', 'Calculadoras financieras', 'Simuladores', 'Objetivos', 'Escenarios', 'Herramientas avanzadas'] },
+      intelligence: { badge: 'CAPA INTELIGENTE', title: 'Aurix Intelligence se está preparando', subtitle: 'Aurix ya está analizando tu información patrimonial.', text: 'Aunque todavía no veas esta sección completa, Aurix ya está organizando tus datos, calculando tu exposición y preparando una inteligencia personalizada sobre tu cartera.', keyMessage: 'Tu análisis no empieza cuando se desbloquea la sección. Empieza desde el primer dato que registras en Aurix.', bullets: ['Salud patrimonial', 'Riesgo y concentración', 'Diversificación', 'Liquidez', 'Drivers de evolución', 'Timeline patrimonial', 'Insights personalizados'] },
     },
-    en: {
-      keyMessage: 'Aurix is already processing your wealth information and preparing your future Premium areas.',
-      cta: 'Back to Dashboard',
-      workspace: { title: 'Aurix Workspace is getting ready', subtitle: 'Your future wealth tools will be connected to your real portfolio.', text: 'Aurix is preparing a space where you will be able to plan, simulate scenarios and work with your wealth from a single platform.', bullets: ['Wealth planning', 'Financial calculators', 'Simulators', 'Goals', 'Scenarios', 'Advanced tools'] },
-      intelligence: { title: 'Aurix Intelligence is getting ready', subtitle: 'Aurix is already analyzing your wealth information.', text: 'Even though this section is not visually available yet, Aurix is already organizing your data, calculating your exposure and preparing the future personalized intelligence layer of your portfolio.', bullets: ['Portfolio Health', 'Concentration and diversification', 'Liquidity', 'Detected risks', 'Wealth drivers', 'Wealth timeline', 'Personalized insights'] },
+    en: { cta: 'Back to Dashboard',
+      workspace: { badge: 'WEALTH WORKSPACE', title: 'Aurix Workspace is getting ready', subtitle: 'Your future wealth tools will be connected to your real portfolio.', text: 'Aurix is preparing a space where you will be able to plan, simulate scenarios and work with your wealth from a single platform.', keyMessage: "Workspace won't be an isolated area. It will be connected to your real wealth, your assets and your evolution.", bullets: ['Wealth planning', 'Financial calculators', 'Simulators', 'Goals', 'Scenarios', 'Advanced tools'] },
+      intelligence: { badge: 'INTELLIGENCE LAYER', title: 'Aurix Intelligence is getting ready', subtitle: 'Aurix is already analyzing your wealth information.', text: "Even though you can't see this section in full yet, Aurix is already organizing your data, calculating your exposure and preparing personalized intelligence about your portfolio.", keyMessage: "Your analysis doesn't start when the section unlocks. It starts with the first piece of data you record in Aurix.", bullets: ['Portfolio Health', 'Risk and concentration', 'Diversification', 'Liquidity', 'Wealth drivers', 'Wealth timeline', 'Personalized insights'] },
     },
   };
   const dict = EN ? COPY.en : COPY.es;
-  const P = Object.assign({ keyMessage: dict.keyMessage, cta: dict.cta }, (section === 'workspace') ? dict.workspace : dict.intelligence);
-  const bullets = P.bullets.map(b => '<li style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid rgba(255,255,255,0.08);border-radius:12px;background:rgba(255,255,255,0.02);font-size:14px;color:rgba(255,255,255,0.82);">'
-    + '<span style="width:6px;height:6px;border-radius:50%;background:rgba(120,170,255,0.9);flex:0 0 auto;"></span>' + esc(b) + '</li>').join('');
+  const isWs = (section === 'workspace');
+  const P = Object.assign({ cta: dict.cta }, isWs ? dict.workspace : dict.intelligence);
+  const glyph = isWs
+    ? '<svg width="30" height="30" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="2" fill="#e2ecff"/><rect x="16" y="4" width="8" height="8" rx="2" fill="#a9c6ff"/><rect x="4" y="16" width="8" height="8" rx="2" fill="#a9c6ff"/><rect x="16" y="16" width="8" height="8" rx="2" fill="#7ea6ff"/></svg>'
+    : '<svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true"><path d="M15 7 7 20M15 7l8 13M7 20h16" stroke="rgba(200,220,255,0.55)" stroke-width="1.2"/><circle cx="15" cy="7" r="2.6" fill="#e2ecff"/><circle cx="7" cy="20" r="2.6" fill="#a9c6ff"/><circle cx="23" cy="20" r="2.6" fill="#a9c6ff"/></svg>';
+  const bullets = P.bullets.map((b, i) => '<li class="apx-bullet" style="animation-delay:' + (i * 40) + 'ms"><span class="apx-dot" aria-hidden="true"></span>' + esc(b) + '</li>').join('');
+  const style = ''
+    + '<style>'
+    + '.apx-wrap{position:relative;min-height:78vh;display:flex;align-items:center;justify-content:center;padding:36px 20px;overflow:hidden;background:radial-gradient(circle at 50% 36%,rgba(70,120,255,0.16),transparent 46%),linear-gradient(180deg,#080d18 0%,#050812 100%);}'
+    + '.apx-card{position:relative;z-index:1;width:100%;max-width:820px;border-radius:28px;border:1px solid rgba(90,140,255,0.28);background:rgba(12,18,34,0.72);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 0 80px rgba(60,110,255,0.12),inset 0 1px 0 rgba(255,255,255,0.06);padding:42px 42px 44px;text-align:center;animation:apxIn .22s ease-out both;}'
+    + '.apx-orb{position:relative;width:74px;height:74px;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;}'
+    + '.apx-orb::before{content:"";position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 45%,rgba(120,170,255,0.9),rgba(60,110,255,0.22) 60%,transparent 72%);box-shadow:0 0 34px rgba(80,140,255,0.5);animation:apxPulse 3.2s ease-in-out infinite;}'
+    + '.apx-orb::after{content:"";position:absolute;inset:-9px;border-radius:50%;border:1px solid rgba(120,170,255,0.35);animation:apxRing 3.2s ease-in-out infinite;}'
+    + '.apx-glyph{position:relative;z-index:1;}'
+    + '.apx-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(150,185,255,0.95);border:1px solid rgba(120,170,255,0.4);background:rgba(90,140,255,0.08);border-radius:999px;padding:6px 14px;margin-bottom:16px;}'
+    + '.apx-title{font-size:28px;font-weight:800;color:rgba(255,255,255,0.985);margin:0 0 10px;letter-spacing:-.01em;line-height:1.15;}'
+    + '.apx-sub{font-size:16px;color:rgba(255,255,255,0.74);margin:0 0 10px;}'
+    + '.apx-text{font-size:14px;line-height:1.65;color:rgba(255,255,255,0.6);max-width:600px;margin:0 auto 14px;}'
+    + '.apx-key{font-size:13.5px;line-height:1.6;color:rgba(150,185,255,0.9);max-width:600px;margin:0 auto 26px;font-weight:600;}'
+    + '.apx-bullets{list-style:none;padding:0;margin:0 auto 30px;max-width:640px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}'
+    + '.apx-bullet{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid rgba(120,160,255,0.18);border-radius:14px;background:rgba(255,255,255,0.035);font-size:13.5px;color:rgba(255,255,255,0.85);text-align:left;transition:border-color .2s,background .2s,transform .2s;animation:apxIn .3s ease-out both;}'
+    + '.apx-bullet:hover{border-color:rgba(120,170,255,0.45);background:rgba(90,140,255,0.08);transform:translateY(-1px);}'
+    + '.apx-dot{width:7px;height:7px;border-radius:50%;background:rgba(120,170,255,0.95);box-shadow:0 0 8px rgba(90,140,255,0.7);flex:0 0 auto;}'
+    + '.apx-cta{font-size:14px;font-weight:700;color:#fff;background:linear-gradient(180deg,#3d7bff,#2f63ff);border:none;border-radius:16px;height:48px;padding:0 26px;cursor:pointer;box-shadow:0 8px 24px rgba(60,110,255,0.35),inset 0 0 0 1px rgba(120,170,255,0.3);transition:filter .2s,transform .2s;}'
+    + '.apx-cta:hover{filter:brightness(1.08);transform:translateY(-1px);}'
+    + '@keyframes apxIn{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:scale(1)}}'
+    + '@keyframes apxPulse{0%,100%{transform:scale(1);opacity:.95}50%{transform:scale(1.08);opacity:1}}'
+    + '@keyframes apxRing{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.16);opacity:.14}}'
+    + '@media (max-width:640px){.apx-wrap{min-height:72vh;padding:20px 14px;}.apx-card{padding:28px 20px 30px;border-radius:22px;}.apx-title{font-size:22px;}.apx-sub{font-size:15px;}.apx-bullets{grid-template-columns:1fr;max-width:420px;}}'
+    + '@media (prefers-reduced-motion:reduce){.apx-card,.apx-bullet{animation:none;}.apx-orb::before,.apx-orb::after{animation:none;}.apx-cta,.apx-bullet{transition:none;}}'
+    + '</style>';
   return ''
-    + '<section class="aurix-premium-preview" style="max-width:760px;margin:0 auto;padding:40px 20px 48px;text-align:center;">'
-    +   '<div style="display:inline-block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(120,170,255,0.95);border:1px solid rgba(120,170,255,0.35);border-radius:999px;padding:6px 14px;margin-bottom:18px;">Aurix Premium</div>'
-    +   '<h2 style="font-size:26px;font-weight:800;color:rgba(255,255,255,0.985);margin:0 0 10px;">' + esc(P.title) + '</h2>'
-    +   '<p style="font-size:16px;color:rgba(255,255,255,0.72);margin:0 0 8px;">' + esc(P.subtitle) + '</p>'
-    +   '<p style="font-size:14px;line-height:1.6;color:rgba(255,255,255,0.6);max-width:560px;margin:0 auto 8px;">' + esc(P.text) + '</p>'
-    +   '<p style="font-size:13px;line-height:1.6;color:rgba(255,255,255,0.55);max-width:560px;margin:0 auto 24px;">' + esc(P.keyMessage) + '</p>'
-    +   '<ul style="list-style:none;padding:0;margin:0 auto 28px;max-width:560px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">' + bullets + '</ul>'
-    +   '<button type="button" onclick="try{switchTab(\'home\')}catch(_){}" style="font-size:14px;font-weight:700;color:#0b0e14;background:rgba(255,255,255,0.94);border:none;border-radius:12px;padding:12px 22px;cursor:pointer;">' + esc(P.cta) + '</button>'
-    + '</section>';
+    + '<div class="apx-wrap apx-' + (isWs ? 'workspace' : 'intelligence') + '">' + style
+    +   '<section class="apx-card" role="region" aria-label="' + esc(P.title) + '">'
+    +     '<div class="apx-orb"><span class="apx-glyph">' + glyph + '</span></div>'
+    +     '<div class="apx-badge">' + esc(P.badge) + '</div>'
+    +     '<h2 class="apx-title">' + esc(P.title) + '</h2>'
+    +     '<p class="apx-sub">' + esc(P.subtitle) + '</p>'
+    +     '<p class="apx-text">' + esc(P.text) + '</p>'
+    +     '<p class="apx-key">' + esc(P.keyMessage) + '</p>'
+    +     '<ul class="apx-bullets">' + bullets + '</ul>'
+    +     '<button type="button" class="apx-cta" onclick="try{switchTab(\'home\')}catch(_){}">' + esc(P.cta) + '</button>'
+    +   '</section>'
+    + '</div>';
 }
 
 // IA.1 — render the Intelligence tab. The portfolio intelligence (health,
