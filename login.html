@@ -412,6 +412,96 @@
       window.aurixAuthDebugExport = function () { try { return JSON.stringify(JSON.parse(sessionStorage.getItem(_AURIX_AUTH_TRACE_KEY) || '[]'), null, 2); } catch (_) { return '[]'; } };
     } catch (_) {}
 
+    // ════════════════════════════════════════════════════════════════════════
+    // SPEC AUTH.DESKTOP.OTP.WEB-ONLY.FAILURE.01 — desktop diagnostics + scoped self-heal
+    // ════════════════════════════════════════════════════════════════════════
+    // Mobile OTP works; desktop can be blocked by desktop-side STATE: stale-cached login.html, a stale
+    // redirect breaker / pending-login state, or corrupt Supabase auth storage. These are read-only
+    // diagnostics + narrowly-scoped self-heal. They NEVER touch portfolio / holdings / chart / history
+    // data and NEVER log a secret. app.js already exposes aurixClearAuthRedirectState for the app page.
+    var AURIX_LOGIN_BUILD = 481;   // bumped ONLY when login.html changes (see version.json.loginhtml)
+    function _storageAvailable() {
+      try { var k = '__aurix_probe__'; localStorage.setItem(k, '1'); localStorage.removeItem(k); return true; } catch (_) { return false; }
+    }
+    function _breakerKeysPresent() {
+      try { return !!(sessionStorage.getItem('aurix_redirect_log') || sessionStorage.getItem('aurix_redirect_broken')); } catch (_) { return false; }
+    }
+    window.aurixAuthEnvironmentCheck = function () {
+      var iso = function (t) { try { return Number.isFinite(t) ? new Date(t).toISOString() : null; } catch (_) { return null; } };
+      var ua = ''; try { ua = navigator.userAgent || ''; } catch (_) {}
+      var isMobileUA = /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
+      var trace = []; try { trace = JSON.parse(sessionStorage.getItem(_AURIX_AUTH_TRACE_KEY) || '[]'); } catch (_) {}
+      var lastRedirect = null; try { lastRedirect = JSON.parse(sessionStorage.getItem('aurix_last_redirect') || 'null'); } catch (_) {}
+      var out = {
+        currentUrl: (function () { try { return location.href; } catch (_) { return null; } })(),
+        page: 'login.html', loginBuild: AURIX_LOGIN_BUILD,
+        loginMarkerPresent: true,   // this code IS the fresh login.html marker
+        uaCategory: isMobileUA ? 'mobile' : 'desktop',
+        localStorageAvailable: _storageAvailable(),
+        sessionStorageAvailable: (function () { try { sessionStorage.setItem('__p__', '1'); sessionStorage.removeItem('__p__'); return true; } catch (_) { return false; } })(),
+        supabaseAuthKeyPresent: _authStorageKeyPresent(),
+        redirectBreakerKeysPresent: _breakerKeysPresent(),
+        serviceWorkerRegistered: false,
+        authTraceCount: Array.isArray(trace) ? trace.length : 0,
+        lastAuthStage: (Array.isArray(trace) && trace.length) ? trace[trace.length - 1].stage : null,
+        lastRedirectReason: lastRedirect ? (lastRedirect.source || lastRedirect.target) : null,
+        sessionPresent: null, userPresent: null,
+        // cache suspicion — set once version.json is fetched (below)
+        servedLoginHtmlVersion: (window.__AURIX_SERVED_LOGINHTML != null) ? window.__AURIX_SERVED_LOGINHTML : null,
+        staleLoginHtml: (window.__AURIX_SERVED_LOGINHTML != null) ? (window.__AURIX_SERVED_LOGINHTML > AURIX_LOGIN_BUILD) : null,
+        versionMismatch: (window.__AURIX_SERVED_LOGINHTML != null) ? (window.__AURIX_SERVED_LOGINHTML !== AURIX_LOGIN_BUILD) : null,
+      };
+      try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function (r) { out.serviceWorkerRegistered = !!(r && r.length); }); } catch (_) {}
+      try { if (client && client.auth) { client.auth.getSession().then(function (r) { out.sessionPresent = !!(r && r.data && r.data.session); }); client.auth.getUser().then(function (r) { out.userPresent = !!(r && r.data && r.data.user); }); } } catch (_) {}
+      try { console.log('%c[UI][AUTH_ENV_CHECK]', 'font-weight:700;color:#4da3ff', out); } catch (_) {}
+      return out;
+    };
+    // Clears ONLY Aurix redirect/breaker/pending-login state + stale auth trace. Optional signOut.
+    // Never removes portfolio / holdings / chart / performance data.
+    window.aurixResetLoginState = function (opts) {
+      opts = opts || {};
+      try { sessionStorage.removeItem('aurix_redirect_log'); } catch (_) {}
+      try { sessionStorage.removeItem('aurix_redirect_broken'); } catch (_) {}
+      try { sessionStorage.removeItem('aurix_last_redirect'); } catch (_) {}
+      try { sessionStorage.removeItem(_AURIX_AUTH_TRACE_KEY); } catch (_) {}
+      try { sessionStorage.removeItem('aurix_login_stale_reloaded'); } catch (_) {}
+      var didSignOut = false;
+      if (opts.signOut === true) { try { if (client && client.auth) { client.auth.signOut(); didSignOut = true; } } catch (_) {} }
+      try { console.log('[AUTH][RESET_LOGIN_STATE] cleared redirect/breaker/trace (portfolio/chart data untouched)', { signOut: didSignOut }); } catch (_) {}
+      return { cleared: true, signOut: didSignOut };
+    };
+    // Hard auth reset: signOut + remove ONLY this project's Supabase auth storage keys + Aurix redirect/
+    // trace keys. Never removes portfolio / holdings / chart / performance data.
+    window.aurixHardAuthReset = function () {
+      try { if (client && client.auth) client.auth.signOut(); } catch (_) {}
+      var removed = [];
+      try { Object.keys(localStorage).forEach(function (k) { if (/^sb-.*-auth-token$/.test(k)) { localStorage.removeItem(k); removed.push(k); } }); } catch (_) {}
+      window.aurixResetLoginState();
+      try { console.log('%c[AUTH][HARD_AUTH_RESET] removed Supabase auth keys + redirect/trace ONLY. Portfolio/chart data NOT touched. Reload the page and log in again.', 'font-weight:700;color:#e6a100', { removedKeys: removed.length }); } catch (_) {}
+      return { signedOut: true, removedAuthKeys: removed.length };
+    };
+    // SPEC AUTH.DESKTOP.OTP.WEB-ONLY.FAILURE.01 (Phase 4) — stale login.html guard. index.html self-heals
+    // app.js staleness, but login.html deliberately never reloaded on build change (mobile loop safety), so
+    // a desktop browser can run an OLD login.html indefinitely. Compare the SERVED version.json.loginhtml to
+    // this file's AURIX_LOGIN_BUILD and, on DESKTOP ONLY, do a single cache-bust reload if stale. One-shot
+    // (sessionStorage guard) ⇒ can never loop. Mobile keeps its existing no-reload behaviour untouched.
+    (function _aurixLoginStaleGuard() {
+      try {
+        var isMobileUA = /Mobi|Android|iPhone|iPad|iPod/i.test((navigator.userAgent || ''));
+        fetch('version.json?cb=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+          var served = (j && typeof j.loginhtml === 'number') ? j.loginhtml : null;
+          window.__AURIX_SERVED_LOGINHTML = served;
+          if (served == null || served <= AURIX_LOGIN_BUILD) return;          // fresh (or field absent)
+          if (isMobileUA) return;                                             // mobile: intentional no-reload
+          var already = false; try { already = sessionStorage.getItem('aurix_login_stale_reloaded') === '1'; } catch (_) {}
+          if (already) return;                                                // one-shot — never loops
+          try { sessionStorage.setItem('aurix_login_stale_reloaded', '1'); } catch (_) {}
+          try { console.warn('[AUTH][STALE_LOGIN_HTML] served loginhtml ' + served + ' > built ' + AURIX_LOGIN_BUILD + ' — one-time cache-bust reload'); } catch (_) {}
+          try { location.replace('login.html?v=' + served); } catch (_) { try { location.reload(); } catch (__) {} }
+        }).catch(function () {});
+      } catch (_) {}
+    })();
+
     // ── i18n (EN/ES) ───────────────────────────────────────────
     // Language resolution: ?lang= handoff from the landing (cross-origin, since
     // localStorage is not shared) → else the shared 'portfolio_lang' key → else
@@ -884,6 +974,16 @@
         if (!/^\d{6,8}$/.test(code)) {
           otpErrorEl.style.color = 'var(--red)';
           otpErrorEl.innerText   = tL('lg.err.otpFormat');
+          return;
+        }
+
+        // SPEC AUTH.DESKTOP.OTP.WEB-ONLY.FAILURE.01 (Phase 3) — if browser storage is unavailable
+        // (private mode / blocked cookies / extension), verifyOtp cannot persist a session, so the app
+        // could never confirm one. Fail fast with a visible, actionable error — never an infinite spinner.
+        if (!_storageAvailable()) {
+          _authTrace('otp:storage-unavailable', { sessionPresent: false });
+          otpErrorEl.style.color = 'var(--red)';
+          otpErrorEl.innerText = authErr('generic');
           return;
         }
 
