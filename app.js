@@ -23337,6 +23337,15 @@ function buildProductionPortfolioChart(range) {
         const med = sv.length ? sv[(sv.length - 1) >> 1] : 0;
         if (med > 0 && first.value < 0.55 * med) untrust.push('baseline_construction_low');
       } catch (_) {}
+      // V480 — the -21% persisted because a SHORT all-history whose flows are reliably-timed still passed.
+      // A short all-history that ALSO carries construction (a capital-step candidate in the drawn line) OR
+      // any DERIVED/re-timed capital flow is not a trustworthy period return, even with clean per-flow timing.
+      const allMinSpan = (typeof _AURIX_ALL_MIN_TRUST_SPAN_MS === 'number') ? _AURIX_ALL_MIN_TRUST_SPAN_MS : (21 * 864e5);
+      const allShort = _actualSpanMs < allMinSpan;
+      let constructionInWindow = false;
+      try { constructionInWindow = _aurixCapitalStepBreaks(pts.map(p => ({ time: p.ts, value: p.value })), 'all').length > 0; } catch (_) {}
+      const derivedFlowInWindow = winFlows.some(f => f && (f.source === 'tx-backfill' || f.source === 'inferred' || f.retimeReason != null));
+      if (allShort && (constructionInWindow || derivedFlowInWindow)) untrust.push('short_all_history_with_construction_or_derived_flow');
       out.allUntrustReasons = untrust;
       out.allRangeReturnAllowed = untrust.length === 0;
       if (!out.allRangeReturnAllowed) {
@@ -23450,6 +23459,14 @@ const _AURIX_CAPSTEP_RATIO_HI = 1.6;             // …(hi) — FX/market noise 
 const _AURIX_CAPSTEP_TS_PAD_MS = 864e5;          // the matching flow must sit within ±1 day of the jump
 const _AURIX_SPARSE_RAMP_MULT = 12;              // a connection ≥12× the DENSE cadence is low-density
 const _AURIX_SPARSE_RAMP_MIN_MS = 20 * 60000;    // …AND ≥20 min absolute (small-window guard)
+// V480 — orphan micro-island cleanup: an INTERIOR run of ≤N points left between two structural breaks
+// (residual of cutting a capital/sparse event) is not drawn as its own island. First/last runs and
+// genuine clusters (> N points) are always kept. Source data is never deleted — only the tiny path skipped.
+const _AURIX_ORPHAN_CLEANUP_ENABLED = true;
+const _AURIX_ORPHAN_MAX_PTS = 2;
+// V480 — ALL return needs ≥ this many real days to trust a period return WHEN the window also carries
+// construction / derived (re-timed) capital flows. Short history + construction/derived flow ⇒ untrusted.
+const _AURIX_ALL_MIN_TRUST_SPAN_MS = 21 * 864e5;
 
 // Adjacent VERTICAL jumps: |Δ| ≥ max(_AURIX_VJUMP_P95_MULT × p95(|Δ|), _AURIX_VJUMP_MIN_FRAC × prev).
 function _aurixVerticalJumps(points) {
@@ -23490,7 +23507,10 @@ function _aurixCapitalStepBreaks(points, range) {
 }
 
 // Sparse-ramp breaks: a RUN of ≥2 consecutive low-density connections (each ≫ the dense cadence). A lone
-// large gap (a pause between two dense clusters) is NOT a ramp and is left to the bridge detector.
+// INTERIOR large gap (a pause between two dense clusters) is NOT a ramp and is left to the bridge detector.
+// EXCEPTION (V480): the TERMINAL connection alone — the current value sitting far after the last dense
+// point (dense cluster → hours-later current value) — is a terminal sparse ramp and IS broken, so it is
+// not drawn as a long premium curve to the tip. Never fires on uniform-cadence data (dense 24H safe).
 function _aurixSparseRampBreaks(points, range) {
   if (!_AURIX_SPARSE_RAMP_SEG_ENABLED) return [];
   const n = Array.isArray(points) ? points.length : 0; if (n < 4) return [];
@@ -23500,12 +23520,13 @@ function _aurixSparseRampBreaks(points, range) {
   const dense = Math.max(p25, 1);
   const thr = Math.max(_AURIX_SPARSE_RAMP_MULT * dense, _AURIX_SPARSE_RAMP_MIN_MS);
   const sparse = gaps.map(g => g >= thr);                          // per-connection low-density flag
-  const out = [];
+  const out = [], addedAt = new Set();
+  const push = k => { if (addedAt.has(k)) return; addedAt.add(k); out.push({ start: points[k].time, end: points[k + 1].time, reason: 'sparse_low_density', durationMs: gaps[k] }); };
   for (let k = 0; k < sparse.length; k++) {
-    if (sparse[k] && ((k > 0 && sparse[k - 1]) || (k < sparse.length - 1 && sparse[k + 1]))) {   // part of a ≥2 run
-      out.push({ start: points[k].time, end: points[k + 1].time, reason: 'sparse_low_density', durationMs: gaps[k] });
-    }
+    if (sparse[k] && ((k > 0 && sparse[k - 1]) || (k < sparse.length - 1 && sparse[k + 1]))) push(k);   // part of a ≥2 run
   }
+  const last = gaps.length - 1;                                    // V480 terminal single-gap ramp
+  if (last >= 1 && sparse[last]) push(last);
   return out;
 }
 
@@ -23553,9 +23574,16 @@ function renderValidatedPortfolioChartWithInstitutionalRenderer(points, opts) {
     let linePath = '', areaPath = '';
     if (breaks.length) {
       const runs = _aurixSplitAtGaps(visiblePoints, breaks);
+      const _orphanOn = (typeof _AURIX_ORPHAN_CLEANUP_ENABLED !== 'undefined') ? _AURIX_ORPHAN_CLEANUP_ENABLED : true;
+      const _orphanMax = (typeof _AURIX_ORPHAN_MAX_PTS === 'number') ? _AURIX_ORPHAN_MAX_PTS : 2;
       const lineParts = [], areaParts = [];
-      for (const run of runs) {
+      for (let ri = 0; ri < runs.length; ri++) {
+        const run = runs[ri];
         if (!run || run.length < 1) continue;
+        // V480 orphan cleanup — skip an INTERIOR micro-island (≤N points between two structural breaks).
+        // First/last runs and genuine clusters (> N points) always render; source data is untouched.
+        const isInterior = (ri > 0 && ri < runs.length - 1);
+        if (_orphanOn && isInterior && run.length <= _orphanMax) continue;
         const rp = _aurixMonotonePath(run, xScale, yScale);                            // dense premium curve, per run
         if (rp && rp.d) { lineParts.push(rp.d); if (run.length >= 2) areaParts.push(buildAurixAreaPath(rp.d, run, scale)); }
       }
