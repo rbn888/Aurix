@@ -23459,6 +23459,7 @@ const _AURIX_CAPSTEP_RATIO_HI = 1.6;             // …(hi) — FX/market noise 
 const _AURIX_CAPSTEP_TS_PAD_MS = 864e5;          // the matching flow must sit within ±1 day of the jump
 const _AURIX_SPARSE_RAMP_MULT = 12;              // a connection ≥12× the DENSE cadence is low-density
 const _AURIX_SPARSE_RAMP_MIN_MS = 20 * 60000;    // …AND ≥20 min absolute (small-window guard)
+// SPEC DSH.CHART.V480.RUNTIME-CLEANUP.01 — orphan micro-island cleanup + terminal sparse ramp + ALL trust.
 // V480 — orphan micro-island cleanup: an INTERIOR run of ≤N points left between two structural breaks
 // (residual of cutting a capital/sparse event) is not drawn as its own island. First/last runs and
 // genuine clusters (> N points) are always kept. Source data is never deleted — only the tiny path skipped.
