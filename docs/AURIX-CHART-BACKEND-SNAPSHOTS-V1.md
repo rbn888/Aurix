@@ -90,3 +90,51 @@ Deno.serve(async () => {
    and long ranges gain real coverage.
 
 **STOP:** steps 1–4 require DB migration + a service-role secret + a scheduler. Not performed here.
+
+## Exact activation commands (run manually when ready)
+Files now in the repo: `supabase/functions/portfolio-snapshot/index.ts` (Edge Function),
+`db/portfolio_snapshots_1.sql` (migration), frontend loader `window.aurixLoadBackendSnapshots()`.
+
+1. **Migration** — Supabase → SQL editor → paste `db/portfolio_snapshots_1.sql` → Run.
+2. **Deploy the Edge Function** (Supabase CLI; service-role stays in the Supabase env, never in code):
+   ```bash
+   supabase functions deploy portfolio-snapshot --project-ref ozcasyufbknnuemllwso
+   # SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are injected by the platform for Edge Functions.
+   # optional: set the price base if not the default Vercel origin
+   supabase secrets set AURIX_PRICE_API_BASE=https://isa-portfolio-ten.vercel.app
+   ```
+3. **DRY RUN first** (verify server valuation matches the app's "Valor total" before real inserts):
+   ```bash
+   supabase secrets set DRY_RUN=1
+   # invoke once; read logs; compare the logged total_value_usd to the app value; then:
+   supabase secrets unset DRY_RUN
+   ```
+4. **Schedule** every 15 min (Supabase dashboard → Edge Functions → Schedules, or pg_cron):
+   ```sql
+   select cron.schedule('aurix-portfolio-snapshot', '*/15 * * * *',
+     $$ select net.http_post(
+          url := 'https://ozcasyufbknnuemllwso.functions.supabase.co/portfolio-snapshot',
+          headers := '{"Content-Type":"application/json"}'::jsonb) $$);
+   ```
+5. **Turn on the frontend read** (choose ONE):
+   - quickest: run `aurixLoadBackendSnapshots()` in the console (loads once now); or
+   - permanent: flip `_AURIX_BACKEND_SNAPSHOTS_AUTOLOAD = true` in app.js, bump the app version, deploy.
+
+### Secrets required
+`SUPABASE_SERVICE_ROLE_KEY` (Edge Function env — platform-provided; NEVER in the repo/frontend).
+Optional: `AURIX_PRICE_API_BASE`, `DRY_RUN`.
+
+### How to verify backend snapshots fill 7D/30D
+After a few schedule ticks, in the app console:
+```js
+aurixSnapshotSourceAudit()   // backend.count > 0, backend.spanDays grows each day
+aurixSnapshotMergeDebug()    // backendKept > 0, syntheticPoints: 0
+aurixInstitutionalChartAudit('7d')   // coverageRatio rises → displayedRangeState 'partial_history' → 'full'
+```
+As coverage crosses 0.8 the TRUTHFUL_RANGES guard upgrades the range from `partial_history` to `full`
+and the real requested-period return can display.
+
+### Confirmation: with Supabase NOT activated, behaviour == v481
+No table ⇒ the loader is never auto-invoked (`_AURIX_BACKEND_SNAPSHOTS_AUTOLOAD = false`) ⇒ zero extra
+query; `_aurixBackendSnapshots` stays `[]` ⇒ `_aurixMergeSnapshotSources` returns the frontend source
+unchanged ⇒ the chart, 24H premium and every range are byte-identical to v481.
