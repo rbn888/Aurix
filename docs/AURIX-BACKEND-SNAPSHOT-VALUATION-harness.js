@@ -15,10 +15,15 @@ function fn(name) { const s = 'function ' + name + '('; const i = app.indexOf(s)
 let pass = 0, fail = 0;
 function ok(n, c, i) { if (c) { pass++; console.log('  ✓ ' + n + (i ? '  [' + i + ']' : '')); } else { fail++; console.log('  ✗ ' + n + (i ? '  [' + i + ']' : '')); } }
 
-// ── app.js canonical combiner (ground truth for the field mapping) ──
-const sb = { console: { warn() {} }, Map, Array };
+function konst(name) { const m = app.match(new RegExp('const ' + name + '\\s*=.*?;')); if (!m) throw new Error('missing ' + name); return m[0]; }
+// ── app.js canonical combiner + gold valuation (ground truth) ──
+const sb = { console: { warn() {} }, Map, Array, Number };
 vm.createContext(sb);
 vm.runInContext(fn('convertFromNewToFlat'), sb);
+vm.runInContext(konst('OZ_TO_G'), sb);
+vm.runInContext(konst('_PURITY_TABLE'), sb);
+vm.runInContext(fn('_goldPurity'), sb);
+vm.runInContext(fn('_goldGrams'), sb);
 
 // anonymized real-shape fixture: catalog (assets) + holdings (quantities), joined by asset_id → id
 const catalog = [
@@ -69,6 +74,30 @@ ok('FIXED key resolves EUR→USD (EURUSD=X → 1.08)', fxToUsdMirror('EUR', pric
 ok('OLD key would still FAIL (EUR/USD → NaN) — regression guard', Number.isNaN(fxToUsdMirror('EUR', priceMapOld)));
 ok('IWDA (EUR-quoted) values with FX: 10 × 100 EUR × 1.08 = 1080 USD', valueNonUsdEtf(10, 100, fxToUsdMirror('EUR', priceMapFixed)) === 1080);
 ok('EUR cash 5000 → 5400 USD via FX', 5000 * fxToUsdMirror('EUR', priceMapFixed) === 5400);
+
+console.log('\nMETAL/XAU fix — gold valued by grams × purity × (spot/OZ_TO_G), NOT qty × spotPerOz:');
+// app ground-truth gold value for a real-shape fixture: 50 g of 18k gold at spot 2400 USD/oz
+// (computed IN-context: OZ_TO_G/_PURITY_TABLE are vm lexical consts, not sandbox-object properties)
+const appGold = vm.runInContext('_goldGrams(50, "g") * _goldPurity(18) * (2400 / OZ_TO_G)', sb);
+const appOzToG = vm.runInContext('OZ_TO_G', sb);
+// EDGE port of the SAME formula (must equal the app) — mirrors valueUser's XAU branch
+const OZ_TO_G_edge = 31.1034768;
+const PURITY_edge = { '10': 0.4167, '14': 0.5833, '18': 0.7500, '21': 0.8750, '22': 0.9167, '24': 1.0000 };
+const goldPurityEdge = k => { const v = PURITY_edge[String(k)]; return v != null ? v : (Number(k) || 0) / 24; };
+const goldGramsEdge = (q, u) => u === 'oz' ? q * OZ_TO_G_edge : (u === 'kg' ? q * 1000 : q);
+const edgeGold = goldGramsEdge(50, 'g') * goldPurityEdge(18) * (2400 / OZ_TO_G_edge);
+ok('edge gold formula == app gold formula (byte-parity)', Math.abs(edgeGold - appGold) < 1e-9, 'app=' + appGold.toFixed(4) + ' edge=' + edgeGold.toFixed(4));
+ok('purity table byte-identical to app (18k=0.75, 24k=1.0)', vm.runInContext('_goldPurity(18)', sb) === 0.75 && vm.runInContext('_goldPurity(24)', sb) === 1.0 && PURITY_edge['18'] === 0.75);
+ok('OZ_TO_G byte-identical (31.1034768)', appOzToG === 31.1034768 && OZ_TO_G_edge === 31.1034768);
+ok('unit conversion: 1 oz == OZ_TO_G grams; 1 kg == 1000 g', goldGramsEdge(1, 'oz') === 31.1034768 && goldGramsEdge(1, 'kg') === 1000);
+// REGRESSION GUARD: the OLD wrong formula (qty × spotPerOz) grossly over-values grams-as-ounces
+const wrongGold = 50 * 2400;   // 120000
+ok('regression guard: wrong qty×spot (120000) ≫ correct — must NOT be used', wrongGold > edgeGold * 10 && Math.abs(wrongGold - edgeGold) > 100000, 'wrong=' + wrongGold + ' correct=' + edgeGold.toFixed(2));
+// source guards on the Edge Function
+ok('edge XAU branch uses grams×purity×(spot/OZ_TO_G)', /goldGrams\(qty, String\(asset\.goldUnit \|\| 'g'\)\)/.test(edge) && /goldPurity\(asset\.karat\)/.test(edge) && /\(spotPerOz \/ OZ_TO_G\)/.test(edge));
+ok('edge XAU branch condition mirrors app (symbol XAU && karat)', /symU === 'XAU' && asset\.karat/.test(edge));
+ok('edge XAU branch does NOT value gold as qty × fresh.price', !/XAU[\s\S]{0,400}qty \* freshXau\.price/.test(edge));
+ok('edge requests fresh XAU/USD spot (registry key)', /allSymbols\.push\('XAU\/USD'\)/.test(edge));
 
 console.log('\nNo frontend/app runtime change (this fix is Edge-Function-only):');
 ok('app.js autoload still OFF (backend snapshots NO-OP in prod)', /const _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD = false;/.test(app));

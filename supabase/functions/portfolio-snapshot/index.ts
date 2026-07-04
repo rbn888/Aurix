@@ -41,6 +41,14 @@ function bucketOf(type: string): string {
   return 'other';
 }
 
+// Physical-gold valuation constants — MIRROR app.js EXACTLY (assetNativeValue / _goldGrams / _goldPurity).
+// The backend must value XAU by grams × purity × (spot/OZ_TO_G), NOT qty × spotPerOz (which treats grams
+// as troy ounces at 24k and inflates gold ~31×). Keep these byte-identical to app.js.
+const OZ_TO_G = 31.1034768;
+const PURITY_TABLE: Record<string, number> = { '10': 0.4167, '14': 0.5833, '18': 0.7500, '21': 0.8750, '22': 0.9167, '24': 1.0000 };
+function goldPurity(k: any): number { const v = PURITY_TABLE[String(k)]; return (v != null) ? v : ((Number(k) || 0) / 24); }
+function goldGrams(qty: number, unit: string): number { if (unit === 'oz') return qty * OZ_TO_G; if (unit === 'kg') return qty * 1000; return qty; }
+
 // Market/staleness classification per bucket (crypto 24/7; equities/funds closed ⇒ last_close).
 function isUsEquityOpenNow(now: Date): boolean {
   // Rough US market-hours check in UTC (Mon–Fri, 13:30–20:00 UTC ≈ 09:30–16:00 ET, no holidays).
@@ -99,10 +107,23 @@ function valueUser(row: any, prices: Map<string, { price: number; currency: stri
     const storedPrice = Number(asset.currentPrice);                    // catalog price field = currentPrice
     let valueUSD: number = NaN;
     let staleness = 'live';
+    const symU = String(asset.symbol || asset.ticker || '').toUpperCase();
     if (bucket === 'liquidity') {
       // cash: qty is the amount in assetCurrency (no market price)
       if (cur === 'USD') valueUSD = qty;
       else { const fx = fxToUsd(cur, prices); if (Number.isFinite(fx)) { valueUSD = qty * fx; fxCount++; } else { valueUSD = Number.isFinite(storedPrice) && storedPrice > 0 ? qty * storedPrice : NaN; staleness = 'stale'; warnings.push('fx_missing:' + cur); } }
+    } else if (symU === 'XAU' && asset.karat) {
+      // PHYSICAL GOLD — MIRROR app.js assetNativeValue EXACTLY: grams(unit) × purity(karat) × (spotPerOz / OZ_TO_G).
+      // spotPerOz = fresh XAU/USD (registry key) if available (backend revalues while the app is closed),
+      // else the catalog currentPrice (the SAME input app.js uses) — so on a closed day this reconciles to the app.
+      const grams = goldGrams(qty, String(asset.goldUnit || 'g'));
+      const purity = goldPurity(asset.karat);
+      const freshXau = prices.get('XAU/USD') || prices.get('XAU');
+      const spotPerOz = (freshXau && Number.isFinite(freshXau.price)) ? freshXau.price : storedPrice;
+      if (freshXau) priced++; else { staleness = 'stale'; unpriced++; }
+      const nativeUSD = grams * purity * (spotPerOz / OZ_TO_G);   // XAU spot is USD/oz ⇒ nativeUSD is USD
+      // app currency step (XAU assetCurrency is normally USD; mirror the non-USD branch for parity)
+      valueUSD = (cur === 'USD') ? nativeUSD : (Number.isFinite(fxToUsd(cur, prices)) ? nativeUSD * fxToUsd(cur, prices) : NaN);
     } else {
       const sym = String(asset.symbol || asset.ticker || '').toUpperCase();
       const fresh = sym ? prices.get(sym) : undefined;
@@ -142,6 +163,7 @@ Deno.serve(async () => {
   for (const r of rows ?? []) for (const a of (Array.isArray(r.assets) ? r.assets : [])) {
     if (!a) continue;
     const s = a.symbol || a.ticker; if (s) allSymbols.push(String(s).toUpperCase());
+    if (String(s || '').toUpperCase() === 'XAU') allSymbols.push('XAU/USD');   // gold spot registry key (fresh USD/oz)
     const cur = String(a.assetCurrency || 'USD').toUpperCase(); if (cur !== 'USD') allSymbols.push(cur + 'USD=X');   // FX pair in the endpoint's Yahoo form (EURUSD=X)
   }
   const prices = await fetchPrices(allSymbols);
