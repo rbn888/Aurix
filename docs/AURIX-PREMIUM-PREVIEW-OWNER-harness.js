@@ -17,7 +17,8 @@ vm.createContext(sb);
 vm.runInContext(fn('hasAurixPremiumAccess'), sb);
 vm.runInContext(fn('_aurixPremiumPreviewHTML'), sb);
 const has = u => { sb.__u = u; return vm.runInContext('hasAurixPremiumAccess(__u)', sb); };
-const preview = s => vm.runInContext('_aurixPremiumPreviewHTML(' + JSON.stringify(s) + ')', sb);
+const preview = s => { sb.lang = 'es'; return vm.runInContext('_aurixPremiumPreviewHTML(' + JSON.stringify(s) + ')', sb); };   // default ES
+const previewLang = (s, l) => { sb.lang = l; return vm.runInContext('_aurixPremiumPreviewHTML(' + JSON.stringify(s) + ')', sb); };
 
 console.log('AURIX-PREMIUM-PREVIEW-OWNER\n');
 
@@ -57,7 +58,26 @@ console.log('\nForbidden content NOT present (no price/Founder/blocked/denied/ol
   ok('no "acceso denegado" / "bloqueado" / "access denied" / "locked"', !/acceso denegado|bloquead|access denied|\blocked\b/i.test(both));
   ok('the OLD (wrong) copy is gone', !/más precisa será tu inteligencia|Cuanto más patrimonio/i.test(both)); }
 
+console.log('\ni18n — EN preview follows the chosen language (lang="en"):');
+{ const hi = previewLang('intelligence', 'en');
+  ok('EN intelligence title', /Aurix Intelligence is getting ready/.test(hi));
+  ok('EN intelligence subtitle', /Aurix is already analyzing your wealth information\./.test(hi));
+  ok('EN intelligence text', /organizing your data, calculating your exposure/.test(hi));
+  ok('EN key message', /Aurix is already processing your wealth information and preparing your future Premium areas\./.test(hi));
+  ['Portfolio Health', 'Concentration and diversification', 'Liquidity', 'Detected risks', 'Wealth drivers', 'Wealth timeline', 'Personalized insights'].forEach(b => ok('EN intel bullet: ' + b, hi.indexOf(b) >= 0));
+  ok('EN CTA Back to Dashboard', /Back to Dashboard/.test(hi));
+  const hw = previewLang('workspace', 'en');
+  ok('EN workspace title', /Aurix Workspace is getting ready/.test(hw));
+  ok('EN workspace subtitle', /Your future wealth tools will be connected to your real portfolio\./.test(hw));
+  ok('EN workspace text', /plan, simulate scenarios and work with your wealth from a single platform/.test(hw));
+  ['Wealth planning', 'Financial calculators', 'Simulators', 'Goals', 'Scenarios', 'Advanced tools'].forEach(b => ok('EN ws bullet: ' + b, hw.indexOf(b) >= 0));
+  ok('EN preview has NO Spanish copy leaking', !/se está preparando|Volver al Dashboard|Salud patrimonial|Planificación patrimonial/.test(hi + hw)); }
+{ // ES still intact (default + explicit)
+  const es = previewLang('intelligence', 'es');
+  ok('ES still correct when lang=es (title + CTA + key message)', /Aurix Intelligence se está preparando/.test(es) && /Volver al Dashboard/.test(es) && /preparando tus futuras áreas Premium/.test(es)); }
+
 console.log('\nGate wiring (source):');
+ok('preview follows chosen language (reads lang, ES default)', /typeof lang !== 'undefined' && lang === 'en'/.test(app) && /const dict = EN \? COPY\.en : COPY\.es;/.test(app));
 ok('renderIntelligenceTab returns preview when NOT premium', /if \(!hasAurixPremiumAccess\(_aurixCurrentAuthUser\(\)\)\) return _aurixPremiumPreviewHTML\('intelligence'\);/.test(app));
 ok('renderWorkspace shows preview when NOT premium', /!hasAurixPremiumAccess\(_aurixCurrentAuthUser\(\)\)\) \{[\s\S]{0,120}_aurixPremiumPreviewHTML\('workspace'\)/.test(app));
 ok('reads the authenticated user (currentUser), not a flag', /function _aurixCurrentAuthUser\(\)[\s\S]{0,120}currentUser/.test(app));

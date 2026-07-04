@@ -37404,17 +37404,24 @@ function _aurixCurrentAuthUser() {
 // never "access denied", no price, no Founder. CTA returns to the Dashboard. Responsive (mobile+desktop).
 function _aurixPremiumPreviewHTML(section) {
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const P = (section === 'workspace') ? {
-    title: 'Aurix Workspace se está preparando',
-    subtitle: 'Tus futuras herramientas patrimoniales estarán conectadas a tu cartera real.',
-    text: 'Aurix ya está preparando un espacio donde podrás planificar, simular escenarios y trabajar con tu patrimonio desde una única plataforma.',
-    bullets: ['Planificación patrimonial', 'Calculadoras financieras', 'Simuladores', 'Objetivos', 'Escenarios', 'Herramientas avanzadas'],
-  } : {
-    title: 'Aurix Intelligence se está preparando',
-    subtitle: 'Aurix ya está analizando tu información patrimonial.',
-    text: 'Aunque esta sección todavía no esté disponible visualmente, Aurix ya está organizando tus datos, calculando tu exposición y preparando la futura inteligencia personalizada de tu cartera.',
-    bullets: ['Salud patrimonial', 'Concentración y diversificación', 'Liquidez', 'Riesgos detectados', 'Drivers de evolución', 'Timeline patrimonial', 'Insights personalizados'],
+  // i18n — follow the user's chosen language (portfolio_lang). ES = current copy; EN = equivalent.
+  const EN = (function () { try { return (typeof lang !== 'undefined' && lang === 'en'); } catch (_) { return false; } })();
+  const COPY = {
+    es: {
+      keyMessage: 'Aurix ya está procesando tu información patrimonial y preparando tus futuras áreas Premium.',
+      cta: 'Volver al Dashboard',
+      workspace: { title: 'Aurix Workspace se está preparando', subtitle: 'Tus futuras herramientas patrimoniales estarán conectadas a tu cartera real.', text: 'Aurix ya está preparando un espacio donde podrás planificar, simular escenarios y trabajar con tu patrimonio desde una única plataforma.', bullets: ['Planificación patrimonial', 'Calculadoras financieras', 'Simuladores', 'Objetivos', 'Escenarios', 'Herramientas avanzadas'] },
+      intelligence: { title: 'Aurix Intelligence se está preparando', subtitle: 'Aurix ya está analizando tu información patrimonial.', text: 'Aunque esta sección todavía no esté disponible visualmente, Aurix ya está organizando tus datos, calculando tu exposición y preparando la futura inteligencia personalizada de tu cartera.', bullets: ['Salud patrimonial', 'Concentración y diversificación', 'Liquidez', 'Riesgos detectados', 'Drivers de evolución', 'Timeline patrimonial', 'Insights personalizados'] },
+    },
+    en: {
+      keyMessage: 'Aurix is already processing your wealth information and preparing your future Premium areas.',
+      cta: 'Back to Dashboard',
+      workspace: { title: 'Aurix Workspace is getting ready', subtitle: 'Your future wealth tools will be connected to your real portfolio.', text: 'Aurix is preparing a space where you will be able to plan, simulate scenarios and work with your wealth from a single platform.', bullets: ['Wealth planning', 'Financial calculators', 'Simulators', 'Goals', 'Scenarios', 'Advanced tools'] },
+      intelligence: { title: 'Aurix Intelligence is getting ready', subtitle: 'Aurix is already analyzing your wealth information.', text: 'Even though this section is not visually available yet, Aurix is already organizing your data, calculating your exposure and preparing the future personalized intelligence layer of your portfolio.', bullets: ['Portfolio Health', 'Concentration and diversification', 'Liquidity', 'Detected risks', 'Wealth drivers', 'Wealth timeline', 'Personalized insights'] },
+    },
   };
+  const dict = EN ? COPY.en : COPY.es;
+  const P = Object.assign({ keyMessage: dict.keyMessage, cta: dict.cta }, (section === 'workspace') ? dict.workspace : dict.intelligence);
   const bullets = P.bullets.map(b => '<li style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid rgba(255,255,255,0.08);border-radius:12px;background:rgba(255,255,255,0.02);font-size:14px;color:rgba(255,255,255,0.82);">'
     + '<span style="width:6px;height:6px;border-radius:50%;background:rgba(120,170,255,0.9);flex:0 0 auto;"></span>' + esc(b) + '</li>').join('');
   return ''
@@ -37423,9 +37430,9 @@ function _aurixPremiumPreviewHTML(section) {
     +   '<h2 style="font-size:26px;font-weight:800;color:rgba(255,255,255,0.985);margin:0 0 10px;">' + esc(P.title) + '</h2>'
     +   '<p style="font-size:16px;color:rgba(255,255,255,0.72);margin:0 0 8px;">' + esc(P.subtitle) + '</p>'
     +   '<p style="font-size:14px;line-height:1.6;color:rgba(255,255,255,0.6);max-width:560px;margin:0 auto 8px;">' + esc(P.text) + '</p>'
-    +   '<p style="font-size:13px;line-height:1.6;color:rgba(255,255,255,0.55);max-width:560px;margin:0 auto 24px;">Aurix ya está procesando tu información patrimonial y preparando tus futuras áreas Premium.</p>'
+    +   '<p style="font-size:13px;line-height:1.6;color:rgba(255,255,255,0.55);max-width:560px;margin:0 auto 24px;">' + esc(P.keyMessage) + '</p>'
     +   '<ul style="list-style:none;padding:0;margin:0 auto 28px;max-width:560px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">' + bullets + '</ul>'
-    +   '<button type="button" onclick="try{switchTab(\'home\')}catch(_){}" style="font-size:14px;font-weight:700;color:#0b0e14;background:rgba(255,255,255,0.94);border:none;border-radius:12px;padding:12px 22px;cursor:pointer;">Volver al Dashboard</button>'
+    +   '<button type="button" onclick="try{switchTab(\'home\')}catch(_){}" style="font-size:14px;font-weight:700;color:#0b0e14;background:rgba(255,255,255,0.94);border:none;border-radius:12px;padding:12px 22px;cursor:pointer;">' + esc(P.cta) + '</button>'
     + '</section>';
 }
 
