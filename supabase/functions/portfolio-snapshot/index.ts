@@ -65,11 +65,12 @@ async function fetchPrices(symbols: string[]): Promise<Map<string, { price: numb
   return map;
 }
 
-// USD per unit of a non-USD currency, best-effort from the price snapshot (e.g. "EUR/USD"). NaN if absent.
+// USD per unit of a non-USD currency, from the price snapshot. The endpoint's registry resolves FX pairs
+// in the Yahoo form `<CUR>USD=X` (e.g. EURUSD=X → USD per 1 EUR) — NOT `<CUR>/USD`. NaN if absent.
 function fxToUsd(cur: string, prices: Map<string, { price: number; currency: string }>): number {
   const c = (cur || 'USD').toUpperCase();
   if (c === 'USD') return 1;
-  const p = prices.get(`${c}/USD`);
+  const p = prices.get(`${c}USD=X`);
   return p && Number.isFinite(p.price) ? p.price : NaN;
 }
 
@@ -141,7 +142,7 @@ Deno.serve(async () => {
   for (const r of rows ?? []) for (const a of (Array.isArray(r.assets) ? r.assets : [])) {
     if (!a) continue;
     const s = a.symbol || a.ticker; if (s) allSymbols.push(String(s).toUpperCase());
-    const cur = String(a.assetCurrency || 'USD').toUpperCase(); if (cur !== 'USD') allSymbols.push(cur + '/USD');   // FX pair (best-effort)
+    const cur = String(a.assetCurrency || 'USD').toUpperCase(); if (cur !== 'USD') allSymbols.push(cur + 'USD=X');   // FX pair in the endpoint's Yahoo form (EURUSD=X)
   }
   const prices = await fetchPrices(allSymbols);
 
