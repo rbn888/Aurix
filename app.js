@@ -1901,6 +1901,7 @@ async function initPortfolioData(userId) {
 // button (app.js:22401) depends on it.
 
 async function signOut() {
+  _explicitSignOut = true;   // SPEC POST-LOGIN-BOUNCE.03 — mark so the listener force-redirects (no guard)
   await supabaseClient.auth.signOut();
 }
 
@@ -1962,24 +1963,93 @@ function _clearLocalUserState() {
   try { sessionStorage.removeItem('otp_sent'); } catch (_) {}
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC AUTH.MOBILE.POST-LOGIN-BOUNCE.03 — single guarded login-redirect owner
+// ════════════════════════════════════════════════════════════════════════════
+// The user reported: on mobile the dashboard paints, then the app bounces back to login. Any late
+// redirect owner (a spurious SIGNED_OUT during a flaky token refresh, a NON-AUTH boot exception, a
+// visibility/focus re-check) could log a still-valid session out. This coalesces EVERY post-boot
+// login redirect through ONE owner that, unless it is an explicit user sign-out (force), REFUSES to
+// bounce a session that was confirmed within the recent window until getSession is re-checked with a
+// bounded retry sequence. A session that reappears cancels the pending redirect. Never grants access
+// without a session; never waits forever. Explicit signOut still redirects immediately.
+let _aurixRecentSessionUntil = 0;             // set whenever a real session is confirmed
+let _explicitSignOut = false;                 // set by signOut() so the listener force-redirects
+let _aurixLoginRedirectTimers = [];
+let _aurixLoginRedirectPending = false;
+function _aurixMarkSessionConfirmed() { try { _aurixRecentSessionUntil = Date.now() + 10000; } catch (_) {} }
+function _aurixCancelLoginRedirect(reason) {
+  _aurixLoginRedirectTimers.forEach(t => { try { clearTimeout(t); } catch (_) {} });
+  _aurixLoginRedirectTimers = []; _aurixLoginRedirectPending = false;
+  if (reason) { try { _aurixAuthTrace('index:redirect-login-blocked', { event: reason }); } catch (_) {} }
+}
+function _aurixDoLoginRedirect(reason, clearState) {
+  try { if (window.location.pathname.includes('login.html')) return false; } catch (_) {}
+  if (clearState) { try { _clearLocalUserState(); } catch (_) {} }
+  return safeRedirect('login.html', reason || 'auth');
+}
+// The ONE owner. opts.force = explicit logout (immediate). Returns a promise.
+async function aurixScheduleLoginRedirect(reason, opts) {
+  opts = opts || {};
+  try { _aurixAuthTrace('index:redirect-login-attempt', { event: reason || null, force: !!opts.force }); } catch (_) {}
+  if (opts.force) { _aurixCancelLoginRedirect(); return _aurixDoLoginRedirect(reason, true); }
+  // Cheap immediate check — a session in storage means this is a spurious/transient null → do not bounce.
+  try {
+    const { data } = await supabaseClient.auth.getSession();
+    if (data && data.session) { _aurixMarkSessionConfirmed(); _aurixCancelLoginRedirect((reason || '') + ':session-present'); return false; }
+  } catch (_) {}
+  if (_aurixLoginRedirectPending) return false;                     // coalesce — one owner, one pending sequence
+  _aurixLoginRedirectPending = true;
+  // Bounded retry sequence. A recently-confirmed session gets a longer grace (mobile token-refresh /
+  // storage-sync flake); a cold no-session gets a single short re-check before redirecting.
+  const delays = (Date.now() < _aurixRecentSessionUntil) ? [300, 800, 1500] : [500];
+  let i = 0;
+  const attempt = async () => {
+    try {
+      const { data } = await supabaseClient.auth.getSession();
+      if (data && data.session) { _aurixMarkSessionConfirmed(); _aurixCancelLoginRedirect((reason || '') + ':recovered'); return; }
+    } catch (_) {}
+    if (i < delays.length) { const d = delays[i++]; _aurixLoginRedirectTimers.push(setTimeout(attempt, d)); return; }
+    _aurixLoginRedirectPending = false;                             // grace exhausted → genuinely no session
+    _aurixDoLoginRedirect(reason, true);
+  };
+  attempt();
+  return true;
+}
+try {
+  if (typeof window !== 'undefined') {
+    // Phase 6 — clears ONLY the redirect loop/breaker state + any pending guarded redirect.
+    // Does NOT sign out and does NOT delete the Supabase session.
+    window.aurixClearAuthRedirectState = function () {
+      _aurixCancelLoginRedirect('manual-clear');
+      try { sessionStorage.removeItem('aurix_redirect_log'); } catch (_) {}
+      try { sessionStorage.removeItem('aurix_redirect_broken'); } catch (_) {}
+      return true;
+    };
+  }
+} catch (_) {}
+
 if (supabaseClient && !window.__AUTH_LISTENER__) {
   window.__AUTH_LISTENER__ = true;
 
   supabaseClient.auth.onAuthStateChange(async (event) => {
-    if (event === 'SIGNED_IN') {
-      if (!window.location.pathname.includes('index.html')) {
+    try { _aurixAuthTrace('index:auth-event', { event: event }); } catch (_) {}
+    if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      // A fresh/refreshed session cancels any pending guarded login-redirect and refreshes the recent window.
+      _aurixMarkSessionConfirmed();
+      _aurixCancelLoginRedirect(event + ':confirmed');
+      if (event === 'SIGNED_IN' && !window.location.pathname.includes('index.html')) {
         safeRedirect('index.html', 'onAuthStateChange:SIGNED_IN');
       }
     }
     if (event === 'SIGNED_OUT') {
-      // P0-ROUTING-FIX — a spurious SIGNED_OUT (flaky mobile token refresh) must NOT bounce an
-      // otherwise-valid session to login (a root cause of the index⇄login flicker). Confirm the
-      // session is genuinely gone via getSession() before clearing local state + redirecting.
-      let stillSignedIn = false;
-      try { const { data } = await supabaseClient.auth.getSession(); stillSignedIn = !!(data && data.session); } catch (_) {}
-      if (stillSignedIn) { try { console.warn('[AUTH] ignored spurious SIGNED_OUT — getSession still has a session'); } catch (_) {} return; }
-      _clearLocalUserState();
-      safeRedirect('login.html', 'onAuthStateChange:SIGNED_OUT');
+      // SPEC POST-LOGIN-BOUNCE.03 — an EXPLICIT user sign-out redirects immediately (force). A spurious
+      // SIGNED_OUT (flaky mobile token refresh) must NOT bounce an otherwise-valid session: route it
+      // through the single guarded owner, which re-checks getSession with bounded retries and only
+      // redirects if the session is genuinely gone (clearing local state at that point).
+      try { _aurixAuthTrace('index:auth-event-null', { event: 'SIGNED_OUT', force: !!_explicitSignOut }); } catch (_) {}
+      if (_explicitSignOut) { _explicitSignOut = false; aurixScheduleLoginRedirect('onAuthStateChange:SIGNED_OUT', { force: true }); return; }
+      aurixScheduleLoginRedirect('onAuthStateChange:SIGNED_OUT');
     }
   });
 }
@@ -1992,6 +2062,9 @@ const waitForSession = () => new Promise(resolve => {
     done = true;
     sub.unsubscribe();
     clearTimeout(t);
+    // SPEC POST-LOGIN-BOUNCE.03 — a confirmed boot session opens the recent window, so a later
+    // spurious null / non-auth boot exception cannot immediately bounce the freshly-logged-in user.
+    if (val) { try { _aurixMarkSessionConfirmed(); } catch (_) {} }
     try { _aurixAuthTrace(val ? 'index:session-ready' : 'index:no-session', { sessionPresent: !!val }); } catch (_) {}
     resolve(val ?? null);
   };
@@ -42766,7 +42839,9 @@ function _aurixPreloadBootIcons() {
     if (!session) {
       if (!window.location.pathname.includes('login.html')) {
         try { _aurixAuthTrace('index:no-session-redirect', { redirectAttempted: true }); } catch (_) {}
-        const issued = safeRedirect('login.html', 'boot:no-session');
+        // SPEC POST-LOGIN-BOUNCE.03 — route through the single guarded owner (waitForSession already
+        // applied its own bounded grace, so this only redirects if the session is still genuinely absent).
+        const issued = await aurixScheduleLoginRedirect('boot:no-session');
         // If the loop breaker suppressed the redirect, do NOT leave the splash spinning forever —
         // hide the shell so the user sees the app rather than an infinite index⇄login flicker.
         if (!issued) { try { _bootShellHide('auth-redirect-suppressed'); } catch (_) {} }
@@ -42962,7 +43037,10 @@ function _aurixPreloadBootIcons() {
     console.error('[BOOT ERROR]', e);
     _aurixMaybeFinishBoot(true);
     if (!window.location.pathname.includes('login.html')) {
-      safeRedirect('login.html');
+      // SPEC POST-LOGIN-BOUNCE.03 — a boot EXCEPTION is NOT proof of a lost session. Route through the
+      // guarded owner: if getSession still has the session (the common case right after login), the
+      // redirect is cancelled and the user stays in the app instead of being bounced to login.
+      aurixScheduleLoginRedirect('boot:exception');
     }
   }
 })();

@@ -71,10 +71,13 @@ ok('6 stale reload is one-time-guarded (guard !== target version → never an in
 console.log('\nAuth root-cause hardening + diagnostic wiring:');
 ok('9 waitForSession confirms a null INITIAL_SESSION via getSession (closes the cold-boot race)',
   /INITIAL_SESSION[\s\S]{0,240}getSession\(\)[\s\S]{0,80}finish/.test(app));
-ok('10 spurious SIGNED_OUT is ignored when getSession still has a session',
-  /ignored spurious SIGNED_OUT|stillSignedIn/.test(app));
+ok('10 spurious SIGNED_OUT is ignored when getSession still has a session (guarded owner re-checks)',
+  // SPEC POST-LOGIN-BOUNCE.03 — spurious SIGNED_OUT now routes through the single guarded owner
+  // (non-force), which re-checks getSession and refuses to bounce a session that is still present.
+  /aurixScheduleLoginRedirect\('onAuthStateChange:SIGNED_OUT'\);/.test(app) &&
+  /const \{ data \} = await supabaseClient\.auth\.getSession\(\);\s*if \(data && data\.session\) \{ _aurixMarkSessionConfirmed\(\)/.test(app));
 ok('11 boot gate hides the shell when a redirect is suppressed (no stuck splash)',
-  /const issued = safeRedirect\('login\.html', 'boot:no-session'\);[\s\S]{0,500}if \(!issued\)[\s\S]{0,120}auth-redirect-suppressed/.test(app));
+  /const issued = await aurixScheduleLoginRedirect\('boot:no-session'\);[\s\S]{0,500}if \(!issued\)[\s\S]{0,160}auth-redirect-suppressed/.test(app));
 ok('12 login.html mirrors the loop breaker (shared aurix_redirect_log)',
   /aurix_redirect_log/.test(login) && /REDIRECT-LOOP-BREAK/.test(login));
 ok('13 window.aurixBootDiagnostic exposed with the required fields', (function () {
