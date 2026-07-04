@@ -284,6 +284,42 @@ function safeRedirect(path, source) {
   return true;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC AUTH.MOBILE.OTP.E2E.02 — privacy-safe cross-page auth trace (ring buffer)
+// ════════════════════════════════════════════════════════════════════════════
+// A bounded sessionStorage ring buffer shared by login.html + app.js so the exact mobile OTP
+// break stage is provable on-device WITHOUT ever recording a secret. NEVER stores an OTP token,
+// invite secret, full email, access/refresh token or auth header — only booleans, stage names,
+// error CLASS/name, pathname, platform slice, visibility, event name. window.aurixAuthDebug() /
+// window.aurixAuthDebugExport() read it back (survives the login→index navigation, same tab).
+const _AURIX_AUTH_TRACE_KEY = 'aurix_auth_trace';
+function _aurixAuthTrace(stage, extra) {
+  try {
+    let arr = [];
+    try { arr = JSON.parse(sessionStorage.getItem(_AURIX_AUTH_TRACE_KEY) || '[]'); } catch (_) { arr = []; }
+    if (!Array.isArray(arr)) arr = [];
+    const e = Object.assign({
+      ts: (function () { try { return Date.now(); } catch (_) { return 0; } })(),
+      stage: String(stage || ''),
+      pathname: (function () { try { return location.pathname; } catch (_) { return null; } })(),
+      platform: (function () { try { return (navigator.userAgent || '').slice(0, 80); } catch (_) { return null; } })(),
+      visibility: (function () { try { return document.visibilityState; } catch (_) { return null; } })(),
+    }, extra || {});
+    arr.push(e); while (arr.length > 40) arr.shift();
+    try { sessionStorage.setItem(_AURIX_AUTH_TRACE_KEY, JSON.stringify(arr)); } catch (_) {}
+  } catch (_) {}
+}
+// Is a persisted Supabase auth session present in localStorage? (boolean only — never the token.)
+function _aurixAuthStorageKeyPresent() {
+  try { return Object.keys(localStorage).some(k => /^sb-.*-auth-token$/.test(k)); } catch (_) { return false; }
+}
+try {
+  if (typeof window !== 'undefined') {
+    window.aurixAuthDebug = function () { try { const a = JSON.parse(sessionStorage.getItem(_AURIX_AUTH_TRACE_KEY) || '[]'); console.table(a); return a; } catch (_) { return []; } };
+    window.aurixAuthDebugExport = function () { try { return JSON.stringify(JSON.parse(sessionStorage.getItem(_AURIX_AUTH_TRACE_KEY) || '[]'), null, 2); } catch (_) { return '[]'; } };
+  }
+} catch (_) {}
+
 // P0-ROUTING/CACHE — live boot diagnostic. Async (queries getSession + serviceWorker + caches).
 // window.aurixBootDiagnostic().then(console.log)
 try {
@@ -1950,11 +1986,13 @@ if (supabaseClient && !window.__AUTH_LISTENER__) {
 
 const waitForSession = () => new Promise(resolve => {
   let done = false;
+  try { _aurixAuthTrace('index:boot-start', { storageKeyPresent: _aurixAuthStorageKeyPresent() }); } catch (_) {}
   const finish = (val) => {
     if (done) return;
     done = true;
     sub.unsubscribe();
     clearTimeout(t);
+    try { _aurixAuthTrace(val ? 'index:session-ready' : 'index:no-session', { sessionPresent: !!val }); } catch (_) {}
     resolve(val ?? null);
   };
   // AUTH-RESTORE-1: on cold PWA boot / slow mobile network /
@@ -1966,6 +2004,7 @@ const waitForSession = () => new Promise(resolve => {
     try {
       const { data } = await supabaseClient.auth.getSession();
       if (done) return;
+      try { _aurixAuthTrace('index:get-session', { sessionPresent: !!(data && data.session), storageKeyPresent: _aurixAuthStorageKeyPresent(), source: 'timeout-5s' }); } catch (_) {}
       finish(data?.session || null);
     } catch (e) {
       if (IS_DEV) console.warn('[AUTH] getSession fallback failed:', e?.message || e);
@@ -1974,14 +2013,29 @@ const waitForSession = () => new Promise(resolve => {
     }
   }, 5000);
   const { data: { subscription: sub } } = supabaseClient.auth.onAuthStateChange(async (event, sess) => {
+    try { _aurixAuthTrace('index:auth-event', { event: event, sessionPresent: !!sess }); } catch (_) {}
     if (event === 'INITIAL_SESSION') {
       // P0-ROUTING-FIX — INITIAL_SESSION can fire with a NULL session BEFORE the session is restored
       // from local storage (a cold-boot race). login.html reads getSession() (which awaits restoration)
       // and sees the session ⇒ the two pages disagreed ⇒ index⇄login flicker. Confirm a null
       // INITIAL_SESSION against getSession() before declaring the user logged out.
       if (sess) { finish(sess); return; }
-      try { const { data } = await supabaseClient.auth.getSession(); finish((data && data.session) || null); }
-      catch (_) { finish(null); }
+      // SPEC AUTH.MOBILE.OTP.E2E.02 (Fase 5) — BOUNDED HYDRATION GRACE. Right after a mobile OTP
+      // verify, the session write from login.html can land a beat AFTER index's first getSession
+      // (write-flush / storage-sync race), so a single null read wrongly bounced the user back to
+      // login ("OTP aceptado pero no entra"). Re-check getSession a few times (~1.5s total) before
+      // declaring logged-out; a SIGNED_IN event during the grace wins immediately (finish is idempotent).
+      for (let i = 0; i < 5 && !done; i++) {
+        try {
+          const { data } = await supabaseClient.auth.getSession();
+          const s = data && data.session;
+          try { _aurixAuthTrace('index:get-session', { sessionPresent: !!s, storageKeyPresent: _aurixAuthStorageKeyPresent(), attempt: i }); } catch (_) {}
+          if (s) { finish(s); return; }
+        } catch (_) {}
+        if (done) return;
+        await new Promise(r => setTimeout(r, 300));
+      }
+      finish(null);   // ~1.5s of grace elapsed with no session — genuinely logged out
     } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
       finish(sess);
     } else if (event === 'SIGNED_OUT') {
@@ -42711,6 +42765,7 @@ function _aurixPreloadBootIcons() {
     const session = await waitForSession();
     if (!session) {
       if (!window.location.pathname.includes('login.html')) {
+        try { _aurixAuthTrace('index:no-session-redirect', { redirectAttempted: true }); } catch (_) {}
         const issued = safeRedirect('login.html', 'boot:no-session');
         // If the loop breaker suppressed the redirect, do NOT leave the splash spinning forever —
         // hide the shell so the user sees the app rather than an infinite index⇄login flicker.

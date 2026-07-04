@@ -384,6 +384,34 @@
       client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     }
 
+    // ── SPEC AUTH.MOBILE.OTP.E2E.02 — privacy-safe cross-page auth trace ──
+    // Bounded sessionStorage ring buffer shared with app.js (same key) so the exact mobile OTP
+    // break stage is provable on-device. NEVER records an OTP, invite secret, full email, or token —
+    // only booleans / stage names / error class / pathname / platform slice / visibility / event.
+    var _AURIX_AUTH_TRACE_KEY = 'aurix_auth_trace';
+    function _authTrace(stage, extra) {
+      try {
+        var arr = [];
+        try { arr = JSON.parse(sessionStorage.getItem(_AURIX_AUTH_TRACE_KEY) || '[]'); } catch (_) { arr = []; }
+        if (!Array.isArray(arr)) arr = [];
+        var e = Object.assign({
+          ts: Date.now(), stage: String(stage || ''),
+          pathname: (function () { try { return location.pathname; } catch (_) { return null; } })(),
+          platform: (function () { try { return (navigator.userAgent || '').slice(0, 80); } catch (_) { return null; } })(),
+          visibility: (function () { try { return document.visibilityState; } catch (_) { return null; } })(),
+        }, extra || {});
+        arr.push(e); while (arr.length > 40) arr.shift();
+        try { sessionStorage.setItem(_AURIX_AUTH_TRACE_KEY, JSON.stringify(arr)); } catch (_) {}
+      } catch (_) {}
+    }
+    function _authStorageKeyPresent() {
+      try { return Object.keys(localStorage).some(function (k) { return /^sb-.*-auth-token$/.test(k); }); } catch (_) { return false; }
+    }
+    try {
+      window.aurixAuthDebug = function () { try { var a = JSON.parse(sessionStorage.getItem(_AURIX_AUTH_TRACE_KEY) || '[]'); console.table(a); return a; } catch (_) { return []; } };
+      window.aurixAuthDebugExport = function () { try { return JSON.stringify(JSON.parse(sessionStorage.getItem(_AURIX_AUTH_TRACE_KEY) || '[]'), null, 2); } catch (_) { return '[]'; } };
+    } catch (_) {}
+
     // ── i18n (EN/ES) ───────────────────────────────────────────
     // Language resolution: ?lang= handoff from the landing (cross-origin, since
     // localStorage is not shared) → else the shared 'portfolio_lang' key → else
@@ -497,13 +525,19 @@
       return true;
     }
 
+    // SPEC AUTH.MOBILE.OTP.E2E.02 (Fase 4) — SINGLE NAVIGATION OWNER. When an OTP verify is in
+    // progress, the verify handler owns the post-auth navigation (it confirms the session first).
+    // These load-time listeners must NOT also fire a competing redirect for that same SIGNED_IN, or
+    // two navigations race into the redirect-loop breaker. They still handle the returning-user case
+    // (already-signed-in on page load) where no verify is running.
+    var _otpVerifyNavInProgress = false;
     if (client) {
       client.auth.getSession().then(({ data: { session } }) => {
-        if (session) safeRedirect('index.html', 'login:getSession');
+        if (session && !_otpVerifyNavInProgress) { _authTrace('login:already-signed-in', { sessionPresent: true }); safeRedirect('index.html', 'login:getSession'); }
       });
 
       client.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN' && session) safeRedirect('index.html', 'login:SIGNED_IN');
+        if (event === 'SIGNED_IN' && session && !_otpVerifyNavInProgress) safeRedirect('index.html', 'login:SIGNED_IN');
       });
     }
 
@@ -614,13 +648,14 @@
       _inviteTimer = setTimeout(async () => {
         const myCode = code;
         const seq    = ++_inviteSeq;
+        _authTrace('invite:start', {});
         const result = await validateInvite(myCode);
         // Race guard: ignore responses from older keystrokes and also
         // verify the user hasn't edited the input mid-flight.
         if (seq !== _inviteSeq) return;
         if (myCode !== inviteInput.value.trim().toUpperCase()) return;
-        if (result.valid) unlockAuth();
-        else              lockAuth();
+        if (result.valid) { _authTrace('invite:ok', { valid: true }); unlockAuth(); }
+        else              { _authTrace('invite:invalid', { valid: false, errorName: result.error || null }); lockAuth(); }
       }, 250);
     });
 
@@ -783,6 +818,7 @@
         // try/finally. Supabase resolves auth errors as data; fetch
         // failures throw, so we need both paths.
         let sendErr = null;
+        _authTrace('email:send-start', {});
         try {
           // CASO A — bounded so a stalled request can never hang the spinner forever.
           const { error } = await _authWithTimeout(client.auth.signInWithOtp({
@@ -793,6 +829,7 @@
         } catch (e) {
           sendErr = e;   // includes the timeout rejection above
         }
+        _authTrace(sendErr ? 'email:send-error' : 'email:send-ok', { errorName: sendErr ? _classifyAuthError(sendErr) : null });
 
         if (sendErr) {
           console.log('[AUTH][otp-send] failed:', _classifyAuthError(sendErr));
@@ -852,24 +889,28 @@
 
         otpErrorEl.innerText = '';
         window.setButtonBusy(otpSubmitBtn, true, tL('lg.btn.verifying'));
+        _otpVerifyNavInProgress = true;   // Fase 4 — this handler owns the post-OTP navigation
+        _authTrace('otp:verify-start', {});
 
-        let verifyErr = null;
+        let verifyErr = null, otpData = null;
         try {
           // CASO B — bounded like the send path so a stalled verify can't hang the spinner.
-          const { error } = await _authWithTimeout(client.auth.verifyOtp({
+          const { data, error } = await _authWithTimeout(client.auth.verifyOtp({
             email,
             token: code,
             type: 'email'
           }));
-          verifyErr = error || null;
+          verifyErr = error || null; otpData = data || null;
         } catch (e) {
           // OTP-RESEND-1: a thrown fetch error (offline / DNS) is a
           // 'network' class. Surface it via the classifier instead of
           // letting the unhandled promise reject silently.
           verifyErr = e;
         }
+        _authTrace('otp:verify-result', { errorName: verifyErr ? (verifyErr.name || _classifyAuthError(verifyErr)) : null, sessionPresent: !!(otpData && otpData.session) });
 
         if (verifyErr) {
+          _otpVerifyNavInProgress = false;
           otpErrorEl.style.color = 'var(--red)';
           // Force the OTP-invalid bucket when the SDK returned an
           // error object without a clear class — verifyOtp failures
@@ -887,24 +928,45 @@
           return;
         }
 
-        // CASO B — a successful verifyOtp is an AUTHORITATIVE sign-in: the session is
-        // now persisted. The redirect loop-breaker (aurix_redirect_log) exists only to
-        // stop a null-session index⇄login ping-pong; it must NEVER suppress this
-        // legitimate post-auth navigation, or the user is left on the OTP screen with a
-        // valid session that "no entra". Reset the shared log, clear the spinner, then
-        // force the navigation with a hard fallback if safeRedirect is still suppressed.
-        console.log('[AUTH][otp-verify] ok → entering app');
+        // SPEC AUTH.MOBILE.OTP.E2E.02 (Fase 3) — a verifyOtp with NO error is NOT sufficient to
+        // navigate: on mobile the returned/persisted session can lag a beat behind the resolved
+        // promise, so the old immediate redirect landed on index.html before the session was
+        // readable → index bounced back → "OTP aceptado pero no entra". CONFIRM a real session
+        // (returned session OR getSession, with a bounded grace for SIGNED_IN / storage flush)
+        // BEFORE the single navigation. Never redirect into an unconfirmed null session.
+        _authTrace('otp:session-returned', { sessionPresent: !!(otpData && otpData.session) });
+        let confirmed = (otpData && otpData.session) || null;
+        for (let i = 0; i <= 8 && !confirmed; i++) {          // ~2.4s bounded grace, never an infinite spin
+          try { const { data: s } = await client.auth.getSession(); confirmed = (s && s.session) || null; } catch (_) {}
+          _authTrace('otp:get-session-after-verify', { sessionPresent: !!confirmed, storageKeyPresent: _authStorageKeyPresent(), attempt: i });
+          if (confirmed) break;
+          await new Promise(r => setTimeout(r, 300));
+        }
+
+        if (!confirmed) {
+          // Recoverable: the code verified but no session materialised. Show an actionable error,
+          // clear the spinner, do NOT navigate into a null session.
+          _otpVerifyNavInProgress = false;
+          _authTrace('otp:no-session-after-verify', { sessionPresent: false, storageKeyPresent: _authStorageKeyPresent() });
+          otpErrorEl.style.color = 'var(--red)';
+          otpErrorEl.innerText = authErr('generic');
+          window.setButtonBusy(otpSubmitBtn, false);
+          return;
+        }
+
+        // Confirmed session → ONE deterministic navigation owner (location.replace). Reset the shared
+        // redirect-loop log so index boots clean; no competing safeRedirect + delayed href.
+        console.log('[AUTH][otp-verify] session confirmed → entering app');
         localStorage.removeItem('aurix_otp_email');
         try {
           sessionStorage.removeItem('aurix_redirect_log');
           sessionStorage.removeItem('aurix_redirect_broken');
         } catch (_) {}
         window.setButtonBusy(otpSubmitBtn, false);
-        const issued = safeRedirect('index.html', 'login:otp-verified');
-        if (!issued) {
-          const onAurix = window.location.pathname.startsWith('/Aurix/');
-          window.location.href = window.location.origin + (onAurix ? '/Aurix/' : '/') + 'index.html';
-        }
+        const onAurix = window.location.pathname.startsWith('/Aurix/');
+        const target  = window.location.origin + (onAurix ? '/Aurix/' : '/') + 'index.html';
+        _authTrace('otp:redirect-attempt', { redirectAttempted: true, sessionPresent: true });
+        window.location.replace(target);
 
       } finally {
         isVerifying = false;
