@@ -948,7 +948,12 @@ try {
           const startTs = (rg === 'all' || !Number.isFinite(spanMs)) ? -Infinity : nowRef - spanMs;
           const beIn = be.filter(p => p.ts >= startTs).length;
           const feIn = fe.filter(p => p && Number.isFinite(p.ts) && p.ts >= startTs).length;
-          perRange[rg] = { backendInWindow: beIn, frontendInWindow: feIn };
+          const totIn = beIn + feIn;
+          let cov = null, drs = null;
+          try { const p = buildProductionPortfolioChart(rg); cov = p.coverageRatio; drs = p.displayedRangeState; } catch (_) {}
+          perRange[rg] = { backendInWindow: beIn, frontendInWindow: feIn,
+            sourceMix: totIn ? { backendPct: +(beIn / totIn * 100).toFixed(1), frontendPct: +(feIn / totIn * 100).toFixed(1) } : null,
+            coverageRatio: cov, displayedRangeState: drs };
         });
       } catch (_) {}
       const out = { flag: _AURIX_BACKEND_SNAPSHOTS_ENABLED, autoload: _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD, backendLoaded: (_aurixBackendSnapshots || []).length,
