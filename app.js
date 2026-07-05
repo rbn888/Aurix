@@ -23201,13 +23201,55 @@ function _aurixTrustedChartSource(src) {
     return seg.length >= 2 ? seg : sorted.slice(-2);   // keep ≥ the current-epoch tail; the pipeline decides ready/pending
   } catch (_) { return Array.isArray(src) ? src : []; }
 }
-function _aurixHpqRawStages() {
+// SPEC DSH.CHART.24H.FRONTEND-SOURCE-AUTHORITY.11 — range-aware source-family authority (reversible).
+// v493's ±60min TIME-ONLY rule is range-agnostic, so a backend point temporally ISOLATED inside the 24H
+// window (far from the dense remote/frontend block) survived and became the FIRST plotted point → the badge
+// and line crossed backend(old 9550 @prev-day) → remote(now 9469) = a false ~−0.85% return. For 24H,
+// frontend/remote is the AUTHORITY: when ≥2 usable frontend-family points exist in the window, ALL
+// backend-family points are excluded from 24H (backend is a FALLBACK only when frontend/remote is absent).
+// Long ranges (7d/30d/1y/all) are untouched — backend stays legitimate long-history / gap-filler there
+// (v493 near-dup handling still applies). Never fabricates a point. Flag/helper absent ⇒ strict no-op.
+const _AURIX_CHART_24H_FE_AUTHORITY = true;
+function _aurixSourceFamily(p) {
+  const s = (p && p.source) ? String(p.source).toLowerCase() : '';
+  if (s === 'backend_snapshot' || s === 'backend' || s === 'portfolio_snapshots') return 'backend';
+  return 'frontend';   // remote_canonical / local / live / app history carry no source tag ⇒ frontend family
+}
+// Is the frontend family usable inside a range window? ≥2 valid positive-investable in-window points.
+function _aurixFrontendUsableInWindow(src, rangeMs, nowRef) {
+  if (!Array.isArray(src)) return false;
+  const start = (Number.isFinite(rangeMs) && rangeMs > 0) ? (nowRef - rangeMs) : 0;
+  let n = 0;
+  for (const p of src) {
+    if (!p || !Number.isFinite(p.ts) || p.ts < start) continue;
+    if (_aurixSourceFamily(p) === 'backend') continue;
+    const inv = Number(p.total) - (Number(p.real_estate) || 0);
+    if (Number.isFinite(inv) && inv > 0) n++;
+    if (n >= 2) return true;
+  }
+  return false;
+}
+function _aurixApplyRangeSourceAuthority(src, range) {
+  try {
+    const r = String(range || '').toLowerCase();
+    if (r !== '24h') return src;                                       // 24H ONLY — long ranges keep backend history
+    if (!Array.isArray(src) || src.length < 2) return src;
+    let nowRef = 0; for (const p of src) if (p && Number.isFinite(p.ts) && p.ts > nowRef) nowRef = p.ts;
+    if (!(nowRef > 0)) return src;
+    if (!_aurixFrontendUsableInWindow(src, 864e5, nowRef)) return src;  // frontend NOT usable ⇒ backend FALLBACK allowed
+    return src.filter(p => _aurixSourceFamily(p) !== 'backend');        // frontend authority ⇒ exclude ALL backend from 24H
+  } catch (_) { return Array.isArray(src) ? src : []; }
+}
+function _aurixHpqRawStages(range) {
   let src = [];
   try { src = (typeof _aurixHistorySourceForDisplay === 'function') ? _aurixHistorySourceForDisplay() : (typeof categoryHistory !== 'undefined' ? categoryHistory : []); } catch (_) { src = []; }
   if (!Array.isArray(src)) src = [];
   // SPEC DSH.CHART.POINT-LINEAGE.DISCONTINUITY.AUDIT.10 — trim to the current economic epoch before the
   // stages (flag-guarded; no-op where the flag/helper is absent, e.g. legacy sandboxes).
   try { if (typeof _AURIX_CHART_EPOCH_TRUST !== 'undefined' && _AURIX_CHART_EPOCH_TRUST && typeof _aurixTrustedChartSource === 'function') src = _aurixTrustedChartSource(src); } catch (_) {}
+  // SPEC DSH.CHART.24H.FRONTEND-SOURCE-AUTHORITY.11 — for 24H, frontend/remote family is the authority when
+  // usable; exclude backend so the line/badge never cross backend→remote. Range-aware (needs `range`).
+  try { if (typeof _AURIX_CHART_24H_FE_AUTHORITY !== 'undefined' && _AURIX_CHART_24H_FE_AUTHORITY && typeof _aurixApplyRangeSourceAuthority === 'function') src = _aurixApplyRangeSourceAuthority(src, range); } catch (_) {}
   const counts = { rawSnapshots: src.length, invalidRecord: 0, nonFiniteValue: 0, futureSnapshots: 0, zeroValueSnapshots: 0, duplicateSnapshots: 0, staleSnapshots: 0 };
   const quarantined = [];
   const valid = [];
@@ -23331,7 +23373,7 @@ function buildValidatedHistoricalSeries(range) {
     counts: {}, firstInvalidStage: null, firstRejectedSnapshot: null,
     collapsedRange: false, rangeCollapsedBecauseHistoryTooShort: false,
   };
-  const rawS = _aurixHpqRawStages();
+  const rawS = _aurixHpqRawStages(r);
   out.nowRef = rawS.nowRef;
   out.counts = Object.assign({}, rawS.counts, { constructionSnapshots: 0, spikeRejectedSnapshots: 0, plateauCollapsed: 0 });
   rawS.quarantined.forEach(q => { q.range = r; out.quarantined.push(q); });
@@ -24267,6 +24309,18 @@ try {
       // 24H return comparability (PASO 5): are first & last plotted points the SAME derived epoch?
       const firstPlot = finalPts[0] || null, lastPlot = finalPts[finalPts.length - 1] || null;
       const chart = safe(() => buildProductionPortfolioChart(r), null);
+      // SPEC DSH.CHART.24H.FRONTEND-SOURCE-AUTHORITY.11 — range source-family authority diagnostics.
+      const famOf = s => (String(s || '').toLowerCase() === 'backend') ? 'backend' : 'frontend';
+      const _nowRefAll = sorted.length ? sorted[sorted.length - 1].ts : 0;
+      const _winStart24 = _nowRefAll - 864e5;
+      const frontendUsableInRange = safe(() => (typeof _aurixFrontendUsableInWindow === 'function')
+        ? _aurixFrontendUsableInWindow(rawSrc, (r === '24h') ? 864e5 : Infinity, _nowRefAll) : null, null);
+      const backendExcludedByRangeAuthority = sorted.filter(pt => pt.source === 'backend' && (r !== '24h' || pt.ts >= _winStart24) && !plottedTs.has(pt.ts)).length;
+      const firstSourceFamily = firstPlot ? famOf(firstPlot.source) : null;
+      const lastSourceFamily = lastPlot ? famOf(lastPlot.source) : null;
+      const badgeSourceFamily = (chart && chart.returnState === 'ok') ? ((firstSourceFamily && firstSourceFamily === lastSourceFamily) ? firstSourceFamily : 'mixed') : null;
+      const sourceAuthorityMode = (r === '24h') ? (frontendUsableInRange ? 'frontend_authority_24h' : 'backend_fallback_24h') : 'mixed_long_range';
+      const returnCrossSourceFamilyBlocked = !!(r === '24h' && frontendUsableInRange && backendExcludedByRangeAuthority > 0);
       const out = {
         spec: 'DSH.CHART.POINT-LINEAGE.DISCONTINUITY.AUDIT.10', range: r,
         accountCreatedAtIso: iso(createdAt), accountAgeHours: (createdAt != null) ? +((Date.now() - createdAt) / 36e5).toFixed(2) : null,
@@ -24287,6 +24341,14 @@ try {
           badgeReturnPct: chart ? chart.badgeReturnPct : null, returnState: chart ? chart.returnState : null,
           firstPlottedBeforeAccountCreation: firstPlot ? firstPlot.beforeAccountCreation : null,
           verdict: (firstPlot && lastPlot && firstPlot.epochId !== lastPlot.epochId) ? 'RETURN_ACROSS_INCOMPATIBLE_EPOCHS' : 'same_epoch_or_insufficient' },
+        // SPEC DSH.CHART.24H.FRONTEND-SOURCE-AUTHORITY.11 — source-family authority for this range.
+        sourceAuthorityMode: sourceAuthorityMode,
+        frontendUsableInRange: frontendUsableInRange,
+        backendExcludedByRangeAuthority: backendExcludedByRangeAuthority,
+        firstSourceFamily: firstSourceFamily,
+        lastSourceFamily: lastSourceFamily,
+        badgeSourceFamily: badgeSourceFamily,
+        returnCrossSourceFamilyBlocked: returnCrossSourceFamilyBlocked,
         needles: needles.slice(0, 40), islands: islands, syntheticPoints: 0,
         finalPlottedPoints: finalPts.slice(0, 10).concat(finalPts.slice(-10)),
         droppedPoints: dropped.slice(0, 20),
