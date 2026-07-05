@@ -23171,7 +23171,13 @@ function _aurixHpqRawStages() {
     if (!(value > 0)) { counts.zeroValueSnapshots++; quarantined.push(_aurixHpqDiag(null, { ts: p.ts, value: value, snapshotId: id, raw: p }, idx, null, 'SnapshotValidation', 'zero_or_negative_value', null, 'normalized investable value is zero or negative')); return; }
     valid.push({ ts: p.ts, value: value, index: idx, snapshotId: id, raw: p });
   });
-  valid.sort((a, b) => a.ts - b.ts);
+  // SPEC DSH.CHART.DETERMINISM.NEW-ACCOUNT.09 — DETERMINISTIC ordering. The dedupe below keeps the LAST
+  // point for any exact-duplicate timestamp; because Array.sort is stable, that winner used to depend on
+  // the INPUT ARRIVAL ORDER (local-first vs backend-first between reloads) → two reloads resolved the same
+  // duplicated instant to different values → different chart shapes. Break ts ties by a canonical rule
+  // (value asc, then investable total asc) so the winner is identical regardless of arrival order. Distinct
+  // timestamps are unaffected (ts comparison decides). This is the "dedupe determinista por bucket" fix.
+  valid.sort((a, b) => (a.ts - b.ts) || (a.value - b.value) || ((Number(a.raw && a.raw.total) || 0) - (Number(b.raw && b.raw.total) || 0)));
   // Trailing FUTURE outliers — a lone final point >365d after its predecessor is clock-skew/corrupt.
   // (nowRef must NOT be the corrupt point, else the whole range window shifts; anchor on real history.)
   while (valid.length >= 2 && (valid[valid.length - 1].ts - valid[valid.length - 2].ts) > _AURIX_HPQ_FUTURE_MS) {
@@ -23383,6 +23389,15 @@ function _aurixComputePeriodReturn(range, first, last) {
   } catch (_) { return out; }
 }
 
+// SPEC DSH.CHART.DETERMINISM.NEW-ACCOUNT.09 — deterministic-source gate (reversible). The whole pipeline
+// below (raw stages → sort → dedup-by-ts → spike/construction/plateau → range extraction) is byte-for-byte
+// DETERMINISTIC given its input source; the ONLY cause of the "different shape on every refresh" on a new
+// account was PAINTING FROM AN UNRECONCILED SOURCE during boot. For an authenticated user the display source
+// reads the LOCAL cache (categoryHistory: initial construction points + 30 s live snapshots that accrete at
+// different rates every reload) UNTIL the remote canonical store is reconciled, then flips to canonical, then
+// re-merges backend snapshots asynchronously — so two reloads at the same instant catch different partial
+// sources and draw different lines. Setting this false restores the old (non-deterministic) behaviour.
+const _AURIX_CHART_RECONCILE_GATE = true;
 // PASSIVE CONSUMER. The visible chart reads the ALREADY-VALIDATED series. READY/PENDING is decided ONLY
 // by validated-point sufficiency (≥2 after quarantine). The visual gate is retained as a DIAGNOSTIC field
 // but NEVER rejects a range. The LINE draws the validated wealth series; the badge % is the FLOW-NEUTRAL
@@ -23408,6 +23423,23 @@ function buildProductionPortfolioChart(range) {
     baselineSnapshot: null, currentSnapshot: null,
   };
   try {
+    // SPEC DSH.CHART.DETERMINISM.NEW-ACCOUNT.09 — never build the line from an unreconciled source. For an
+    // authenticated user, wait until the remote canonical history is reconciled (the SAME authority the
+    // return badge already requires via canDisplayCanonicalReturn) so every reload reads the identical
+    // source ⇒ identical chartHash. Until then the chart shows its stable "building" placeholder (the line
+    // is NOT hidden — it draws as soon as the source is reconciled, which a mature account does at boot, so
+    // 24H/premium is unchanged). Anonymous users: local IS canonical (single device) ⇒ _aurixCanonicalHistoryReady
+    // returns true ⇒ this gate is a strict no-op. Also a no-op in any sandbox where the helper is absent.
+    if (typeof _AURIX_CHART_RECONCILE_GATE !== 'undefined' && _AURIX_CHART_RECONCILE_GATE) {
+      let reconciled = true;
+      try { reconciled = (typeof _aurixCanonicalHistoryReady === 'function') ? _aurixCanonicalHistoryReady() : true; } catch (_) { reconciled = true; }
+      if (!reconciled) {
+        out.state = 'pending'; out.reason = 'awaiting_canonical_reconcile'; out.pendingReason = out.reason;
+        out.renderDecision = 'PENDING';
+        out.renderDecisionReason = 'authenticated source not yet reconciled (remote canonical history loading) — stable building state, never an intermediate local shape';
+        return out;
+      }
+    }
     const v = buildValidatedHistoricalSeries(r);
     const c = v.counts || {};
     out.rawPointCount = c.rawSnapshots || 0;
@@ -23958,6 +23990,106 @@ try {
         state: p.state, reason: p.reason, visualQualityPassed: p.visualQualityPassed,
       };
       try { console.log('%c[UI][PRODUCTION_CHART_DEBUG]', 'font-weight:700', out); } catch (_) {}
+      return out;
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // SPEC DSH.CHART.DETERMINISM.NEW-ACCOUNT.09 — deterministic-render forensic audit (READ-ONLY, never
+    // throws). Proves whether two reloads at the same instant would draw the same chart: chartInputHash is
+    // the reconciled SOURCE feeding the pipeline; chartOutputHash is the final plotted points. Same inputs
+    // ⇒ same output. Also surfaces the source mix, ordering/dedupe hygiene and the boot reconciliation phase.
+    window.aurixChartDeterminismAudit = function (range) {
+      const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+      const num = v => (Number.isFinite(v) ? v : null);
+      const safe = fn => { try { return fn(); } catch (_) { return null; } };
+      // Raw display source (what the pipeline reads) — do NOT mutate it.
+      const src = safe(() => (typeof _aurixHistorySourceForDisplay === 'function' ? _aurixHistorySourceForDisplay() : (typeof categoryHistory !== 'undefined' ? categoryHistory : []))) || [];
+      const srcArr = Array.isArray(src) ? src : [];
+      // chartInputHash — hash the investable input points (ts + total − real_estate), sorted by ts, so it is
+      // order-independent: the SAME set of points arriving in any order hashes identically.
+      const inputPts = srcArr.filter(p => p && Number.isFinite(p.ts)).map(p => {
+        const total = Number(p.total), re = Number(p.real_estate) || 0;
+        return { ts: p.ts, value: Number.isFinite(total) ? +(total - re).toFixed(4) : null, source: p.source || 'local' };
+      }).sort((a, b) => a.ts - b.ts);
+      const chartInputHash = safe(() => (typeof _aurixEmergencyHash === 'function' ? _aurixEmergencyHash(inputPts.map(p => ({ ts: p.ts, value: p.value }))) : null));
+      // Ordering / dedupe hygiene, measured on the RAW (pre-sort) source.
+      let unsortedPointCount = 0, duplicateTimestampCount = 0, nearDuplicateCount = 0;
+      const rawTs = srcArr.filter(p => p && Number.isFinite(p.ts));
+      for (let i = 1; i < rawTs.length; i++) if (rawTs[i].ts < rawTs[i - 1].ts) unsortedPointCount++;
+      const seenTs = new Set();
+      for (const p of inputPts) { if (seenTs.has(p.ts)) duplicateTimestampCount++; else seenTs.add(p.ts); }
+      const nearMs = (typeof _AURIX_SNAP_NEAR_MS === 'number') ? _AURIX_SNAP_NEAR_MS : 3e5;
+      const nearFrac = (typeof _AURIX_SNAP_NEAR_FRAC === 'number') ? _AURIX_SNAP_NEAR_FRAC : 0.002;
+      for (let i = 1; i < inputPts.length; i++) {
+        const a = inputPts[i - 1], b = inputPts[i];
+        if (a.ts !== b.ts && (b.ts - a.ts) <= nearMs && Math.abs((b.value || 0) - (a.value || 0)) <= nearFrac * (Math.abs(b.value || 0) || 1)) nearDuplicateCount++;
+      }
+      // Source mix.
+      const backendCount = inputPts.filter(p => p.source === 'backend_snapshot').length;
+      const frontendCount = inputPts.length - backendCount;
+      const authed = safe(() => !!(typeof currentUser !== 'undefined' && currentUser && currentUser.id));
+      const remoteLoaded = safe(() => (typeof _aurixCanonicalHistoryLoaded !== 'undefined') ? !!_aurixCanonicalHistoryLoaded : null);
+      const reconciled = safe(() => (typeof _aurixCanonicalHistoryReady === 'function') ? !!_aurixCanonicalHistoryReady() : null);
+      const perfStatePresent = safe(() => !!(typeof _aurixRemotePerformanceState !== 'undefined' && _aurixRemotePerformanceState));
+      // The chart output (deterministic given the source).
+      const p = safe(() => buildProductionPortfolioChart(r)) || { points: [], state: 'pending', reason: 'audit_build_failed' };
+      const pts = Array.isArray(p.points) ? p.points : [];
+      const capitalStepBreakCount = safe(() => (typeof _aurixCapitalStepBreaks === 'function') ? _aurixCapitalStepBreaks(pts.map(q => ({ time: q.ts, value: q.value })), r).length : null);
+      const verticalJumpCount = safe(() => (typeof _aurixVerticalJumps === 'function') ? _aurixVerticalJumps(pts.map(q => ({ time: q.ts, value: q.value }))).length : null);
+      const suppression = [];
+      if (p.reason) suppression.push(p.reason);
+      if (p.returnSuppressedReason) suppression.push(p.returnSuppressedReason);
+      if (Array.isArray(p.allUntrustReasons)) p.allUntrustReasons.forEach(x => suppression.push('all:' + x));
+      if (p.pendingReason && suppression.indexOf(p.pendingReason) < 0) suppression.push(p.pendingReason);
+      const disp = safe(() => (typeof canDisplayCanonicalReturn === 'function') ? canDisplayCanonicalReturn(r) : null);
+      const srcOf = ts => { const m = inputPts.find(q => q.ts === ts); return m ? m.source : 'local'; };
+      const plotted = pts.map(q => ({ ts: q.ts, value: q.value, source: srcOf(q.ts), reason: 'plotted' }));
+      const first10 = plotted.slice(0, 10), last10 = plotted.slice(-10);
+      const out = {
+        appVersion: safe(() => (typeof window !== 'undefined' && window.AURIX_BUILD) || null),
+        userIdPrefix: safe(() => (authed && currentUser.id) ? String(currentUser.id).slice(0, 8) : null),
+        range: r,
+        selectedRange: safe(() => (typeof activeRange !== 'undefined' ? activeRange : null)),
+        portfolioRevision: safe(() => (typeof _aurixPortfolioRevision === 'function' ? _aurixPortfolioRevision() : (typeof portfolioRevision !== 'undefined' ? portfolioRevision : null))),
+        assetCount: safe(() => (typeof getAllHoldings === 'function') ? (getAllHoldings() || []).length : (typeof holdings !== 'undefined' && Array.isArray(holdings) ? holdings.length : null)),
+        currentTotalValue: safe(() => (typeof getTotalValue === 'function') ? num(getTotalValue()) : (typeof investableValueBase === 'function' ? num(investableValueBase()) : null)),
+        chartInputHash: chartInputHash,
+        chartOutputHash: p.chartHash || null,
+        renderedPointCount: pts.length,
+        pathCount: pts.length ? 1 : 0,
+        segmentCount: (Number.isFinite(capitalStepBreakCount) ? capitalStepBreakCount : 0) + (pts.length ? 1 : 0),
+        displayedRangeState: p.displayedRangeState || null,
+        badgeLabel: (p.returnState === 'ok') ? ((p.badgeReturnPct != null ? (p.badgeReturnPct >= 0 ? '+' : '') + p.badgeReturnPct.toFixed(2) + '%' : null)) : 'Calculando',
+        isCalculatingBadge: p.returnState !== 'ok',
+        sourceCounts: { liveLocal: frontendCount, remoteFrontend: frontendCount, backend: backendCount, performanceState: perfStatePresent ? 1 : 0 },
+        firstPointTs: plotted.length ? plotted[0].ts : null,
+        firstPointValue: plotted.length ? plotted[0].value : null,
+        firstPointSource: plotted.length ? plotted[0].source : null,
+        lastPointTs: plotted.length ? plotted[plotted.length - 1].ts : null,
+        lastPointValue: plotted.length ? plotted[plotted.length - 1].value : null,
+        lastPointSource: plotted.length ? plotted[plotted.length - 1].source : null,
+        duplicateTimestampCount: duplicateTimestampCount,
+        nearDuplicateCount: nearDuplicateCount,
+        unsortedPointCount: unsortedPointCount,
+        capitalStepBreakCount: capitalStepBreakCount,
+        verticalJumpCount: verticalJumpCount,
+        initialBuildDetected: !!p.initialBuildDetected,
+        suppressionReasons: suppression,
+        state: p.state, renderDecision: p.renderDecision, renderDecisionReason: p.renderDecisionReason,
+        finalPlottedPoints: { count: plotted.length, first10: first10, last10: last10 },
+        bootPhase: {
+          authed: authed,
+          beforeRemoteLoad: (remoteLoaded === null) ? null : !remoteLoaded,
+          afterRemoteLoad: remoteLoaded,
+          afterBackendLoad: backendCount > 0 || safe(() => (typeof _aurixBackendSnapshots !== 'undefined' && (_aurixBackendSnapshots || []).length > 0)),
+          reconciled: reconciled,
+          canDisplayCanonicalReturn: disp ? disp.ok : null,
+          reconcileGateActive: (typeof _AURIX_CHART_RECONCILE_GATE !== 'undefined') ? _AURIX_CHART_RECONCILE_GATE : null,
+          chartSource: disp ? disp.chartSource : (authed ? (reconciled ? 'remote' : 'pending') : 'local'),
+        },
+        syntheticPoints: 0,
+      };
+      try { console.log('%c[UI][CHART_DETERMINISM_AUDIT]', 'font-weight:700;color:#4da3ff', out); } catch (_) {}
       return out;
     };
 
