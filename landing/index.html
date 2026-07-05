@@ -32,7 +32,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=lpmob01">
+  <link rel="stylesheet" href="styles.css?v=lpmob02">
 </head>
 <body>
 
@@ -88,6 +88,12 @@
           <span class="eyebrow reveal" data-i18n="hero.eyebrow">Wealth Operating System</span>
           <h1 class="hero-title reveal"><span data-i18n="hero.h1a">Your entire wealth.</span><br><span data-i18n="hero.h1b">One operating system.</span></h1>
           <p class="hero-sub reveal" data-i18n="hero.sub">Aurix brings stocks, funds, crypto, metals, real estate and cash into one clear, private interface.</p>
+          <!-- Mobile-only primary CTA: on ≤860px the header "Request Access" is hidden and otherwise only
+               lives inside the hamburger. Same action (#early-access). Hidden ≥861px (navbar CTA present). -->
+          <div class="hero-cta-mobile reveal">
+            <a class="btn btn-primary btn-block" href="#early-access" data-i18n="cta.request">Request Access</a>
+            <a class="hero-cta-note" href="#early-access" data-i18n="cta.joinLaunch">Join before Launch 1</a>
+          </div>
         </div>
 
         <!-- Fictional UI, labelled "Product preview". No real data / brands / return promises. -->

@@ -9,7 +9,7 @@
   var I18N = {
     es: {
       'nav.product': 'Plataforma', 'nav.market': 'Mercado', 'nav.workspace': 'Inteligencia', 'nav.roadmap': 'Roadmap', 'nav.early': 'Acceso anticipado',
-      'cta.enter': 'Entrar en Aurix', 'cta.request': 'Solicitar acceso',
+      'cta.enter': 'Entrar en Aurix', 'cta.request': 'Solicitar acceso', 'cta.joinLaunch': 'Únete antes del Launch 1',
 
       'hero.eyebrow': 'Sistema operativo del patrimonio',
       'hero.h1a': 'Todo tu patrimonio.',
@@ -113,7 +113,7 @@
     },
     en: {
       'nav.product': 'Platform', 'nav.market': 'Market', 'nav.workspace': 'Intelligence', 'nav.roadmap': 'Roadmap', 'nav.early': 'Early Access',
-      'cta.enter': 'Enter Aurix', 'cta.request': 'Request Access',
+      'cta.enter': 'Enter Aurix', 'cta.request': 'Request Access', 'cta.joinLaunch': 'Join before Launch 1',
 
       'hero.eyebrow': 'Wealth Operating System',
       'hero.h1a': 'Your entire wealth.',

@@ -93,6 +93,18 @@ img,svg{ display:block; max-width:100%; }
 }
 .btn-ghost:hover{ border-color:var(--border-hi); background:rgba(138,178,255,.08); transform:translateY(-2px); }
 
+/* AURIX-LANDING-MOBILE-CTA — a visible primary "Request Access" on the mobile hero. The header CTA is
+   hidden ≤860px (.header-right .btn → display:none) and otherwise only lives inside the hamburger, so
+   mobile users never saw it. Same action (#early-access). Desktop is unchanged: hidden ≥861px. */
+.hero-cta-mobile{ display:none; }
+@media (max-width:860px){
+  .hero-cta-mobile{ display:flex; flex-direction:column; align-items:center; gap:9px; margin-top:22px; width:100%; }
+  .hero-cta-mobile .btn{ width:100%; max-width:420px; height:48px; font-size:15px; }
+  .hero-cta-note{ font-size:12.5px; letter-spacing:.01em; color:var(--accent-3); opacity:.82;
+    text-decoration:none; transition:opacity .18s var(--ease); }
+  .hero-cta-note:hover{ opacity:1; }
+}
+
 .eyebrow{
   display:inline-block; font-size:12px; font-weight:700; letter-spacing:.22em;
   text-transform:uppercase; color:var(--accent-2);
