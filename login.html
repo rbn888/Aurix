@@ -419,7 +419,7 @@
     // redirect breaker / pending-login state, or corrupt Supabase auth storage. These are read-only
     // diagnostics + narrowly-scoped self-heal. They NEVER touch portfolio / holdings / chart / history
     // data and NEVER log a secret. app.js already exposes aurixClearAuthRedirectState for the app page.
-    var AURIX_LOGIN_BUILD = 481;   // bumped ONLY when login.html changes (see version.json.loginhtml)
+    var AURIX_LOGIN_BUILD = 482;   // bumped ONLY when login.html changes (see version.json.loginhtml)
     function _storageAvailable() {
       try { var k = '__aurix_probe__'; localStorage.setItem(k, '1'); localStorage.removeItem(k); return true; } catch (_) { return false; }
     }
@@ -672,6 +672,18 @@
     }
     function _authErrorText(err) {
       return authErr(_classifyAuthError(err));
+    }
+    // SPEC AUTH.OTP.NEW-ACCOUNT.FAILURE.AUDIT.08 — distinguish a SERVER-SIDE auth failure (HTTP 5xx /
+    // "unexpected_failure" / "database error saving new user") from a wrong/expired OTP. Only a NEW
+    // account's verify also CREATES the user server-side, so these failures hit new accounts and never
+    // an already-created account like rbn892. Used so a new user is NEVER told "código incorrecto"
+    // when the backend actually failed to complete their sign-up. Never fabricates a class for a plain
+    // 4xx wrong/expired code (those stay 'otp-invalid').
+    function _isBackendAuthFailure(err) {
+      const msg    = ((err && (err.message || err.error_description)) || '').toLowerCase();
+      const status = (err && (err.status || err.statusCode)) || 0;
+      if (status >= 500) return true;
+      return /unexpected_failure|database error|saving new user|internal server error/.test(msg);
     }
 
     // SPEC AUTH.OTP.DIAGNOSE.01 (CASO A) — the Supabase auth fetch has no built-in
@@ -1016,12 +1028,23 @@
           // error object without a clear class — verifyOtp failures
           // are almost always wrong/expired codes.
           const cls = _classifyAuthError(verifyErr);
-          const txt = authErr((cls === 'network' || cls === 'rate') ? cls : 'otp-invalid');
-          // Skip the two normal-user-feedback buckets ('otp-invalid' = wrong
-          // or expired code, 'rate' = throttled). Only network/generic
-          // failures reach the reporter.
-          if (cls !== 'otp-invalid' && cls !== 'rate') {
-            _reportLoginSafe('otp-verify', (verifyErr.message || String(verifyErr)), verifyErr.stack || '');
+          // SPEC AUTH.OTP.NEW-ACCOUNT.FAILURE.AUDIT.08 — a NEW account's verify ALSO creates the user,
+          // so it can fail with a backend 5xx ("Database error saving new user", "unexpected_failure")
+          // that an existing account never triggers. That is NOT a wrong or expired code: showing
+          // "código incorrecto" here misleads a new user into re-typing a code that was actually fine.
+          // Route backend failures to the honest generic message; genuine wrong/expired codes stay
+          // 'otp-invalid'. Existing-account 4xx errors are unaffected → rbn892's UX is unchanged.
+          const backendFailure = _isBackendAuthFailure(verifyErr);
+          const txt = authErr(
+            (cls === 'network' || cls === 'rate') ? cls
+            : backendFailure ? 'generic'
+            : 'otp-invalid'
+          );
+          // Skip the two normal-user-feedback buckets ('otp-invalid' = wrong or expired code,
+          // 'rate' = throttled). Network, generic, and backend 5xx failures reach the reporter so a
+          // real server-side new-account failure is observable in /api/client-log.
+          if ((cls !== 'otp-invalid' && cls !== 'rate') || backendFailure) {
+            _reportLoginSafe(backendFailure ? 'otp-verify-backend' : 'otp-verify', (verifyErr.message || String(verifyErr)), verifyErr.stack || '');
           }
           otpErrorEl.innerText = txt;
           window.setButtonBusy(otpSubmitBtn, false);
@@ -1045,9 +1068,15 @@
 
         if (!confirmed) {
           // Recoverable: the code verified but no session materialised. Show an actionable error,
-          // clear the spinner, do NOT navigate into a null session.
+          // clear the spinner, do NOT navigate into a null session. NOTE: the message is deliberately
+          // NEUTRAL ('generic') and never claims the code was wrong — the code DID verify.
           _otpVerifyNavInProgress = false;
           _authTrace('otp:no-session-after-verify', { sessionPresent: false, storageKeyPresent: _authStorageKeyPresent() });
+          // SPEC AUTH.OTP.NEW-ACCOUNT.FAILURE.AUDIT.08 — this path was telemetry-blind. A NEW account
+          // whose verify returns 200 with NO session (or a session that never persists) lands here and
+          // the founder only saw the generic message with no server-side trace. Report it (privacy-safe:
+          // never an email/OTP/token) so the exact cause is observable in /api/client-log next time.
+          _reportLoginSafe('otp-no-session', 'verify returned no error but no session materialised', '');
           otpErrorEl.style.color = 'var(--red)';
           otpErrorEl.innerText = authErr('generic');
           window.setButtonBusy(otpSubmitBtn, false);
