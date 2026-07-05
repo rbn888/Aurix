@@ -23154,10 +23154,47 @@ function _aurixHpqRangesContaining(ts, nowRef) {
 // PortfolioNormalization → SnapshotValidation(zero/future). Per-snapshot instrumented. Never a range drop.
 const _AURIX_HPQ_FUTURE_MS = 365 * 864e5;   // a >365-day forward/backward gap at an endpoint = clock-skew outlier
 
+// SPEC DSH.CHART.POINT-LINEAGE.DISCONTINUITY.AUDIT.10 — economic-epoch trust gate (reversible). The audit
+// proved the VISIBLE pipeline drew from a source with NO account-age gate and NO value-band epoch filter
+// (both exist only in the RETURN path), so pre-account / foreign / multi-epoch points produced needles,
+// islands, pre-account history and the false 24H −0.99% (a pre-window point becoming the "first comparable").
+// This trims the raw display source to the CURRENT economic epoch BEFORE the existing stages, reusing the
+// SAME band the return path uses ([0.25×,2.5×] of the latest investable value) plus an account-age/epoch
+// floor. It NEVER fabricates a point and NEVER joins incompatible epochs; when the current epoch is too
+// short for a range the existing pipeline returns pending ("Calculando") — an honest gap beats a false line.
+// Set _AURIX_CHART_EPOCH_TRUST=false to revert. No-op in any sandbox where the flag/helpers are absent.
+const _AURIX_CHART_EPOCH_TRUST = true;
+const _AURIX_CHART_EPOCH_BAND_LO = 0.25, _AURIX_CHART_EPOCH_BAND_HI = 2.5;
+function _aurixTrustedChartSource(src) {
+  try {
+    if (!Array.isArray(src) || src.length < 2) return Array.isArray(src) ? src : [];
+    const inv = p => { const t = Number(p && p.total), re = Number(p && p.real_estate) || 0; return Number.isFinite(t) ? (t - re) : NaN; };
+    // 1. Account-age / epoch FLOOR — drop anything older than the account or an active re-baseline epoch.
+    let floor = 0;
+    try { const ca = (typeof currentUser !== 'undefined' && currentUser && currentUser.created_at) ? new Date(currentUser.created_at).getTime() : 0; if (Number.isFinite(ca) && ca > 0) floor = Math.max(floor, ca); } catch (_) {}
+    try { if (typeof _aurixInvestableChartEpoch === 'function') floor = Math.max(floor, _aurixInvestableChartEpoch() || 0); } catch (_) {}
+    try { if (typeof _aurixPortfolioEpoch === 'function') floor = Math.max(floor, _aurixPortfolioEpoch() || 0); } catch (_) {}
+    let aged = src.filter(p => p && Number.isFinite(p.ts) && (!floor || p.ts >= floor));
+    if (aged.length < 2) aged = src.filter(p => p && Number.isFinite(p.ts));   // never starve — fall through to band segmentation
+    // 2. CURRENT-epoch value-band segmentation — anchor on the LATEST investable value (deterministic),
+    //    keep the trailing run AFTER the last point that falls outside [LO×,HI×] anchor (an epoch boundary).
+    const sorted = aged.slice().sort((a, b) => (a.ts - b.ts) || ((inv(a) || 0) - (inv(b) || 0)));
+    const anchor = inv(sorted[sorted.length - 1]);
+    if (!(anchor > 0)) return sorted;
+    const LO = anchor * _AURIX_CHART_EPOCH_BAND_LO, HI = anchor * _AURIX_CHART_EPOCH_BAND_HI;
+    let startIdx = 0;
+    for (let i = sorted.length - 1; i >= 0; i--) { const v = inv(sorted[i]); if (!(v >= LO && v <= HI)) { startIdx = i + 1; break; } }
+    const seg = sorted.slice(startIdx);
+    return seg.length >= 2 ? seg : sorted.slice(-2);   // keep ≥ the current-epoch tail; the pipeline decides ready/pending
+  } catch (_) { return Array.isArray(src) ? src : []; }
+}
 function _aurixHpqRawStages() {
   let src = [];
   try { src = (typeof _aurixHistorySourceForDisplay === 'function') ? _aurixHistorySourceForDisplay() : (typeof categoryHistory !== 'undefined' ? categoryHistory : []); } catch (_) { src = []; }
   if (!Array.isArray(src)) src = [];
+  // SPEC DSH.CHART.POINT-LINEAGE.DISCONTINUITY.AUDIT.10 — trim to the current economic epoch before the
+  // stages (flag-guarded; no-op where the flag/helper is absent, e.g. legacy sandboxes).
+  try { if (typeof _AURIX_CHART_EPOCH_TRUST !== 'undefined' && _AURIX_CHART_EPOCH_TRUST && typeof _aurixTrustedChartSource === 'function') src = _aurixTrustedChartSource(src); } catch (_) {}
   const counts = { rawSnapshots: src.length, invalidRecord: 0, nonFiniteValue: 0, futureSnapshots: 0, zeroValueSnapshots: 0, duplicateSnapshots: 0, staleSnapshots: 0 };
   const quarantined = [];
   const valid = [];
