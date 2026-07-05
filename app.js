@@ -24094,6 +24094,158 @@ try {
     };
 
     // ════════════════════════════════════════════════════════════════════════════
+    // SPEC DSH.CHART.POINT-LINEAGE.DISCONTINUITY.AUDIT.10 — per-point lineage (READ-ONLY, never throws)
+    // ════════════════════════════════════════════════════════════════════════════
+    // Proves, point by point, WHERE every plotted/dropped point came from and WHY the line has needles,
+    // islands or pre-account history. Adds NOTHING to the render path — pure diagnosis. Privacy: IDs are
+    // short non-reversible hashes; never an email / OTP / token. NOTE (root-cause hint surfaced by this
+    // audit): history points carry NO per-point portfolioRevision/accountId, and the VISIBLE chart pipeline
+    // (_aurixHpqRawStages) applies NEITHER the reset-epoch filter NOR the value-band trust filter that the
+    // RETURN pipeline (_aurixEligibleInvestableSeries) applies — so epochId/beforeAccountCreation below are
+    // DERIVED, not stored, and out-of-band / pre-account / multi-epoch points survive into the drawn line.
+    window.aurixChartPointLineageAudit = function (range) {
+      const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+      const safe = (fn, d) => { try { const v = fn(); return v === undefined ? (d === undefined ? null : d) : v; } catch (_) { return (d === undefined ? null : d); } };
+      const iso = t => { try { return Number.isFinite(t) ? new Date(t).toISOString() : null; } catch (_) { return null; } };
+      const hashStr = s => { try { let h = 2166136261 >>> 0; s = String(s == null ? '' : s); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return ('00000000' + h.toString(16)).slice(-8); } catch (_) { return null; } };
+      // Authoritative account-age source (PASO 3): currentUser.created_at → ms. null when unknown/anon.
+      const createdAt = safe(() => { const ca = (typeof currentUser !== 'undefined' && currentUser) ? currentUser.created_at : null; return ca ? new Date(ca).getTime() : null; }, null);
+      const accountIdHash = safe(() => (typeof currentUser !== 'undefined' && currentUser && currentUser.id) ? hashStr(currentUser.id) : null, null);
+      const portfolioRevision = safe(() => (typeof _aurixPortfolioRevision === 'function') ? _aurixPortfolioRevision() : null, null);
+      const resetEpoch = safe(() => (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0, 0);
+      const chartEpoch = safe(() => (typeof _aurixInvestableChartEpoch === 'function') ? _aurixInvestableChartEpoch() : 0, 0);
+      const authed = safe(() => !!(typeof currentUser !== 'undefined' && currentUser && currentUser.id), false);
+      const canonicalLoaded = safe(() => (typeof _aurixCanonicalHistoryLoaded !== 'undefined') ? !!_aurixCanonicalHistoryLoaded : false, false);
+      const jump = safe(() => (typeof _AURIX_EMG_ADJ_JUMP !== 'undefined') ? (_AURIX_EMG_ADJ_JUMP[r] || _AURIX_EMG_ADJ_JUMP.all) : 0.3, 0.3);
+      const spikeJump = safe(() => (typeof _AURIX_HPQ_SPIKE_JUMP !== 'undefined') ? _AURIX_HPQ_SPIKE_JUMP : 0.25, 0.25);
+      const nearMs = safe(() => (typeof _AURIX_SNAP_NEAR_MS === 'number') ? _AURIX_SNAP_NEAR_MS : 3e5, 3e5);
+
+      const rawSrc = safe(() => (typeof _aurixHistorySourceForDisplay === 'function') ? (_aurixHistorySourceForDisplay() || []) : [], []);
+      // Normalize (ts, investable value = total − real_estate), tagging source + original values. No mutation.
+      const norm = (Array.isArray(rawSrc) ? rawSrc : []).map((p, i) => {
+        const total = Number(p && p.total), re = Number(p && p.real_estate) || 0;
+        const value = Number.isFinite(total) ? +(total - re).toFixed(4) : null;
+        const src = (p && p.source === 'backend_snapshot') ? 'backend' : (authed && canonicalLoaded ? 'remote_canonical' : 'local_cache');
+        return { ts: (p && Number.isFinite(p.ts)) ? p.ts : null, value: value, total: Number.isFinite(total) ? total : null, re: re,
+          source: src, sourceIndex: i, originalTs: (p && p.ts != null) ? p.ts : null, originalValue: value,
+          backendSnapshotIdHash: (p && p.source === 'backend_snapshot' && p.ts != null) ? hashStr('be:' + p.ts) : null,
+          localOrRemote: (src === 'backend') ? 'backend' : (src === 'remote_canonical' ? 'remote' : 'local'),
+          fxPartial: !!(p && p.fxPartial), fxApprox: !!(p && p.fxApprox) };
+      });
+      const sorted = norm.filter(p => Number.isFinite(p.ts)).slice().sort((a, b) => (a.ts - b.ts) || ((a.value || 0) - (b.value || 0)));
+
+      // Duplicate / near-duplicate groups (deterministic, order-independent).
+      const dupGroupByTs = {}; let dg = 0;
+      const tsCounts = {}; sorted.forEach(p => { tsCounts[p.ts] = (tsCounts[p.ts] || 0) + 1; });
+      Object.keys(tsCounts).forEach(ts => { if (tsCounts[ts] > 1) dupGroupByTs[ts] = ++dg; });
+      let ndGroup = 0; const ndByIdx = {};
+      for (let i = 1; i < sorted.length; i++) {
+        const a = sorted[i - 1], b = sorted[i];
+        if (a.ts !== b.ts && (b.ts - a.ts) <= nearMs) { if (!ndByIdx[i - 1]) ndByIdx[i - 1] = ++ndGroup; ndByIdx[i] = ndByIdx[i - 1]; }
+      }
+      // Derived economic-epoch segmentation (points are UNTAGGED — this is a diagnosis heuristic, not truth):
+      // a new epoch begins on a SUSTAINED value step > jump vs the running epoch anchor.
+      let epochId = 0, anchor = sorted.length ? sorted[0].value : 0;
+      const epochByIdx = [];
+      for (let i = 0; i < sorted.length; i++) {
+        const v = sorted[i].value;
+        if (i > 0 && anchor > 0 && Math.abs(v - anchor) / anchor > jump) {
+          const nxt = sorted[i + 1] ? sorted[i + 1].value : v;
+          if (Math.abs(nxt - anchor) / (anchor || 1) > jump) { epochId++; anchor = v; }   // sustained → new epoch
+        }
+        epochByIdx.push(epochId); if (epochId >= 0 && i === 0) anchor = v;
+      }
+      // Segments (islands) — new segment on epoch change OR a temporal gap > 6× median cadence.
+      const gaps = []; for (let i = 1; i < sorted.length; i++) gaps.push(sorted[i].ts - sorted[i - 1].ts);
+      const medGap = gaps.length ? gaps.slice().sort((a, b) => a - b)[gaps.length >> 1] : 0;
+      let segId = 0; const segByIdx = [];
+      for (let i = 0; i < sorted.length; i++) {
+        if (i > 0 && ((epochByIdx[i] !== epochByIdx[i - 1]) || (medGap > 0 && (sorted[i].ts - sorted[i - 1].ts) > 6 * medGap))) segId++;
+        segByIdx.push(segId);
+      }
+      const medVal = sorted.length ? sorted.map(p => p.value).sort((a, b) => a - b)[sorted.length >> 1] : 0;
+
+      // Run the SAME validated pipeline the visible chart reads → which points survive to the plotted line,
+      // which were quarantined and at what stage/reason, which fell outside the range window.
+      const v = safe(() => buildValidatedHistoricalSeries(r), null);
+      const plottedTs = new Set(safe(() => (v && Array.isArray(v.rangeSeries)) ? v.rangeSeries.map(p => p.ts) : [], []));
+      const validatedTs = new Set(safe(() => (v && Array.isArray(v.validatedFull)) ? v.validatedFull.map(p => p.ts) : [], []));
+      const quarByTs = {}; safe(() => (v && Array.isArray(v.quarantined)) ? v.quarantined : [], []).forEach(q => { if (q && q.timestamp != null) quarByTs[q.timestamp] = q; });
+
+      const idxByTs = {}; sorted.forEach((p, i) => { if (idxByTs[p.ts] == null) idxByTs[p.ts] = i; });
+      const lineage = sorted.map((p, i) => {
+        const prev = i > 0 ? sorted[i - 1] : null;
+        const deltaMs = prev ? (p.ts - prev.ts) : null;
+        const deltaVal = prev ? +(p.value - prev.value).toFixed(4) : null;
+        const deltaPct = (prev && prev.value) ? +(((p.value - prev.value) / prev.value) * 100).toFixed(4) : null;
+        let stageDropped = null, dropReason = null;
+        if (p.value == null || !(p.value > 0)) { stageDropped = 'PortfolioNormalization'; dropReason = (p.value == null ? 'non_finite_value' : 'zero_or_negative_value'); }
+        else if (quarByTs[p.ts]) { stageDropped = quarByTs[p.ts].stage || 'Quarantine'; dropReason = quarByTs[p.ts].reason || 'quarantined'; }
+        else if (!plottedTs.has(p.ts)) { stageDropped = validatedTs.has(p.ts) ? 'RangeExtraction' : 'DuplicateRemoval'; dropReason = validatedTs.has(p.ts) ? 'outside_requested_range_window' : 'superseded_or_deduped'; }
+        const capitalStepCandidate = !!(prev && prev.value > 0 && Math.abs(p.value - prev.value) / prev.value > jump);
+        const constructionCandidate = !!(medVal > 0 && p.value < 0.5 * medVal);
+        return {
+          ts: p.ts, iso: iso(p.ts), value: p.value, source: p.source, sourceIndex: p.sourceIndex,
+          originalTs: p.originalTs, originalValue: p.originalValue, accountIdHash: accountIdHash,
+          portfolioRevision: portfolioRevision, backendSnapshotIdHash: p.backendSnapshotIdHash, localOrRemote: p.localOrRemote,
+          stageEntered: 'RawHistory', stageDropped: stageDropped, dropReason: dropReason,
+          duplicateGroup: dupGroupByTs[p.ts] || null, nearDuplicateGroup: ndByIdx[i] || null,
+          deltaMsFromPrev: deltaMs, deltaValueFromPrev: deltaVal, deltaPctFromPrev: deltaPct,
+          segmentId: segByIdx[i], epochId: epochByIdx[i],
+          beforeAccountCreation: (createdAt != null && Number.isFinite(p.ts)) ? (p.ts < createdAt) : null,
+          afterAccountCreation: (createdAt != null && Number.isFinite(p.ts)) ? (p.ts >= createdAt) : null,
+          constructionCandidate: constructionCandidate, capitalStepCandidate: capitalStepCandidate,
+          plotted: plottedTs.has(p.ts),
+        };
+      });
+      const finalPts = lineage.filter(p => p.plotted);
+      const dropped = lineage.filter(p => !p.plotted);
+      // 24H needle pairs (PASO 5): consecutive PLOTTED points with |deltaPct| > spikeJump — print both ends.
+      const needles = [];
+      for (let i = 1; i < finalPts.length; i++) {
+        const a = finalPts[i - 1], b = finalPts[i];
+        if (b.deltaPctFromPrev != null && Math.abs(b.deltaPctFromPrev) > spikeJump * 100) {
+          needles.push({ fromTs: a.ts, fromIso: a.iso, fromValue: a.value, fromSource: a.source, fromEpoch: a.epochId,
+            toTs: b.ts, toIso: b.iso, toValue: b.value, toSource: b.source, toEpoch: b.epochId,
+            deltaMs: b.deltaMsFromPrev, deltaValue: b.deltaValueFromPrev, deltaPct: b.deltaPctFromPrev,
+            sameEpoch: a.epochId === b.epochId, sourceAlternation: a.source !== b.source, portfolioRevision: portfolioRevision });
+        }
+      }
+      // Islands (PASO 4): plotted segments and the gap between them.
+      const islands = []; let cur = null;
+      finalPts.forEach(p => { if (!cur || p.segmentId !== cur.segmentId) { cur = { segmentId: p.segmentId, epochId: p.epochId, startTs: p.ts, startIso: p.iso, startValue: p.value, count: 0, minValue: p.value, maxValue: p.value }; islands.push(cur); } cur.count++; cur.endTs = p.ts; cur.endIso = p.iso; cur.endValue = p.value; cur.minValue = Math.min(cur.minValue, p.value); cur.maxValue = Math.max(cur.maxValue, p.value); });
+      // 24H return comparability (PASO 5): are first & last plotted points the SAME derived epoch?
+      const firstPlot = finalPts[0] || null, lastPlot = finalPts[finalPts.length - 1] || null;
+      const chart = safe(() => buildProductionPortfolioChart(r), null);
+      const out = {
+        spec: 'DSH.CHART.POINT-LINEAGE.DISCONTINUITY.AUDIT.10', range: r,
+        accountCreatedAtIso: iso(createdAt), accountAgeHours: (createdAt != null) ? +((Date.now() - createdAt) / 36e5).toFixed(2) : null,
+        accountIdHash: accountIdHash, portfolioRevision: portfolioRevision, resetEpochIso: iso(resetEpoch), chartEpochIso: iso(chartEpoch),
+        note: 'history points are UNTAGGED (no per-point revision/accountId); epochId & beforeAccountCreation are DERIVED. The VISIBLE chart pipeline applies neither the reset-epoch nor the value-band trust filter.',
+        counts: { rawSource: norm.length, plotted: finalPts.length, dropped: dropped.length,
+          preAccountPlotted: finalPts.filter(p => p.beforeAccountCreation === true).length,
+          derivedEpochs: (sorted.length ? (Math.max.apply(null, epochByIdx) + 1) : 0),
+          plottedSegments: islands.length, needlePairs: needles.length,
+          duplicateTs: Object.keys(dupGroupByTs).length, nearDuplicateGroups: ndGroup,
+          backendPlotted: finalPts.filter(p => p.source === 'backend').length,
+          localPlotted: finalPts.filter(p => p.localOrRemote === 'local').length,
+          remotePlotted: finalPts.filter(p => p.localOrRemote === 'remote').length },
+        return24hComparability: {
+          firstPlottedTs: firstPlot ? firstPlot.ts : null, firstEpoch: firstPlot ? firstPlot.epochId : null, firstValue: firstPlot ? firstPlot.value : null,
+          lastPlottedTs: lastPlot ? lastPlot.ts : null, lastEpoch: lastPlot ? lastPlot.epochId : null, lastValue: lastPlot ? lastPlot.value : null,
+          sameEconomicEpoch: (firstPlot && lastPlot) ? (firstPlot.epochId === lastPlot.epochId) : null,
+          badgeReturnPct: chart ? chart.badgeReturnPct : null, returnState: chart ? chart.returnState : null,
+          firstPlottedBeforeAccountCreation: firstPlot ? firstPlot.beforeAccountCreation : null,
+          verdict: (firstPlot && lastPlot && firstPlot.epochId !== lastPlot.epochId) ? 'RETURN_ACROSS_INCOMPATIBLE_EPOCHS' : 'same_epoch_or_insufficient' },
+        needles: needles.slice(0, 40), islands: islands, syntheticPoints: 0,
+        finalPlottedPoints: finalPts.slice(0, 10).concat(finalPts.slice(-10)),
+        droppedPoints: dropped.slice(0, 20),
+      };
+      try { console.log('%c[UI][CHART_POINT_LINEAGE_AUDIT]', 'font-weight:700;color:#e6a100', out); } catch (_) {}
+      return out;
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
     // SPEC DSH.CHART.INSTITUTIONAL.LINE.01 — window.aurixChartForensics(range)
     // ════════════════════════════════════════════════════════════════════════════
     // READ-ONLY forensic dump for ONE range. Answers the three field questions:
