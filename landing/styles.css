@@ -713,7 +713,11 @@ body.modal-open{ overflow:hidden; }
 
 @media (max-width:860px){
   .section{ padding:44px 0; }
-  .hero{ padding:100px 0 44px; }
+  /* LP.MOB.02 — the mobile header is sticky (in flow, ~76px), so the hero doesn't need to reserve header
+     height on top. This last-winning ≤860 rule had re-inflated the top to 100px → dead space above the
+     "WEALTH OPERATING SYSTEM" eyebrow. Back to the intended tight top (48px); bottom + all internal hero
+     spacing (gap, copy, CTA) unchanged, so the whole block simply shifts up as one unit. */
+  .hero{ padding:48px 0 44px; }
   .metrics-row{ grid-template-columns:1fr 1fr; }
   .pain-row{ grid-template-columns:1fr; gap:10px; padding-top:24px; margin-top:26px; }
   .feature--value{ padding:24px 22px; }
