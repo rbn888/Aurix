@@ -32,7 +32,7 @@ const countM = s => (String(s).match(/M /g) || []).length;
 // ── MERGE sandbox ──
 const MS = { console, Math, JSON, Array, Number, isFinite, Infinity };
 vm.createContext(MS);
-['_AURIX_SNAP_NEAR_MS', '_AURIX_SNAP_NEAR_FRAC'].forEach(c => vm.runInContext(konst(c), MS));
+['_AURIX_SNAP_NEAR_MS', '_AURIX_SNAP_NEAR_FRAC', '_AURIX_SNAP_FE_AUTHORITY_MS'].forEach(c => vm.runInContext(konst(c), MS));
 ['_aurixNormalizeBackendSnapshot', '_aurixMergeSnapshotSources'].forEach(n => vm.runInContext(fn(n), MS));
 function merge(fe, be) { MS.__fe = fe; MS.__be = be; return vm.runInContext('_aurixMergeSnapshotSources(__fe, __be, {})', MS); }
 
@@ -72,7 +72,11 @@ console.log('\nMerge: backend fills gaps, no synthetic points, deterministic, no
   const be = []; for (let t = T0; t < T0 + 4 * DAY; t += 15 * MIN) be.push({ ts: t, total_value_usd: BASE, real_estate: 0, market_state: 'crypto_24_7' });
   const m = merge(fe, be);
   const inSet = new Set(fe.map(p => p.ts).concat(be.map(p => p.ts)));
-  ok('backend fills the older 4-day gap', m.filter(p => p.source === 'backend_snapshot').length > 100 && m.length === fe.length + be.length, 'merged=' + m.length);
+  // SPEC .10 — backend fills the older gap, but backend points within 60min of the frontend START are now
+  // dropped (frontend/remote is the sole authority in its span) → merged is fe + be MINUS that boundary overlap.
+  const beKept = m.filter(p => p.source === 'backend_snapshot').length;
+  const beNearFrontend = m.some(p => p.source === 'backend_snapshot' && p.ts > fe[0].ts - 60 * MIN);
+  ok('backend fills the older 4-day gap (boundary overlap with frontend excluded)', beKept > 100 && !beNearFrontend && m.length <= fe.length + be.length && m.length >= fe.length + be.length - 5, 'merged=' + m.length + ' beKept=' + beKept);
   ok('no synthetic points (every ts is real)', m.every(p => inSet.has(p.ts)));
   ok('deterministic', JSON.stringify(merge(fe, be)) === JSON.stringify(m));
   // near-duplicate backend (within 5min/0.2% of a frontend point) dropped ⇒ no visual duplicate

@@ -870,8 +870,17 @@ let _aurixRemoteHistoryDiag = null;
 // and the chart is byte-identical. Invents NO point; on any error returns the untouched frontend source.
 const _AURIX_BACKEND_SNAPSHOTS_ENABLED = true;
 let _aurixBackendSnapshots = [];                 // populated only by the future portfolio_snapshots read
-const _AURIX_SNAP_NEAR_MS = 5 * 60000;           // a backend point within 5 min of a frontend point…
-const _AURIX_SNAP_NEAR_FRAC = 0.002;             // …and within 0.2% value is a near-duplicate ⇒ drop backend (frontend wins where dense)
+const _AURIX_SNAP_NEAR_MS = 5 * 60000;           // backend-vs-backend near-dup window (time) for collapsing repeated backend rows
+const _AURIX_SNAP_NEAR_FRAC = 0.002;             // …within 0.2% value ⇒ backend-vs-backend near-duplicate
+// SPEC DSH.CHART.POINT-LINEAGE.DISCONTINUITY.AUDIT.10 — FRONTEND/REMOTE AUTHORITY WINDOW. Prod audit proved
+// 24H mixed backend + remote/frontend dense points that are NOT the same intraday source of truth and differ
+// ~0.5% at near-duplicate timestamps (backend 9508 @12:15:06 vs remote 9459 @12:15:14, 8 s apart) → teeth +
+// a cross-source badge. Backend is a GAP-FILLER, not an intraday competitor: wherever a frontend/remote point
+// is temporally present within ±this window, that family is the SOLE authority and the backend point there is
+// dropped REGARDLESS of value (the old rule also required 0.2% value proximity, so 0.5%-divergent near-dupes
+// survived). Backend still fills GENUINE gaps (>this window from any frontend) and the older-than-frontend
+// tail → intact for 7D/30D/1A/TOTAL history, but never intraday teeth in 24H where frontend/remote is dense.
+const _AURIX_SNAP_FE_AUTHORITY_MS = 60 * 60000;  // 60 min
 // The read is OFF by default ⇒ ZERO extra query pre-activation (strict NO-OP, chart == v481). Activation
 // flips this true (or the user calls window.aurixLoadBackendSnapshots()). Never writes; RLS-safe select.
 // SPEC ACTIVATE-READ.04 — ON: the read is now activated (table live, scheduler inserting). The load fires
@@ -899,12 +908,16 @@ function _aurixMergeSnapshotSources(frontend, backend, opts) {
     const be = beRaw.map(_aurixNormalizeBackendSnapshot).filter(Boolean);
     const nearMs = opts.nearMs != null ? opts.nearMs : _AURIX_SNAP_NEAR_MS;
     const nearFrac = opts.nearFrac != null ? opts.nearFrac : _AURIX_SNAP_NEAR_FRAC;
+    const feAuthMs = opts.feAuthorityMs != null ? opts.feAuthorityMs : _AURIX_SNAP_FE_AUTHORITY_MS;
     const feSorted = fe.slice().sort((a, b) => a.ts - b.ts);
-    const near = (t, v) => feSorted.some(f => Math.abs(f.ts - t) <= nearMs && Math.abs(Number(f.total) - v) <= nearFrac * (Math.abs(v) || 1));
+    // SPEC .10 — frontend/remote authority is TIME-ONLY (value-independent): if any frontend point is within
+    // ±feAuthMs, this instant belongs to the frontend/remote family → drop the backend point (no near-dup
+    // competition). Backend survives ONLY in genuine gaps (>feAuthMs from every frontend) and the older tail.
+    const near = (t) => feSorted.some(f => Math.abs(f.ts - t) <= feAuthMs);
     const kept = [];
     for (const b of be.sort((a, b) => a.ts - b.ts)) {
       const bv = Number(b.total);
-      if (near(b.ts, bv)) continue;                                   // frontend already covers this instant densely
+      if (near(b.ts)) continue;                                       // frontend/remote temporally present here ⇒ its authority (drop backend, any value)
       const last = kept[kept.length - 1];
       if (last && (b.ts - last.ts) <= nearMs && Math.abs(bv - Number(last.total)) <= nearFrac * (Math.abs(bv) || 1)) continue;  // backend near-dupe
       kept.push(b);

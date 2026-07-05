@@ -17,7 +17,7 @@ const MIN = 60e3, DAY = 864e5;
 // ── MERGE sandbox ──
 const MS = { console, Math, JSON, Array, Number, isFinite, Infinity };
 vm.createContext(MS);
-['_AURIX_SNAP_NEAR_MS', '_AURIX_SNAP_NEAR_FRAC'].forEach(c => vm.runInContext(konst(c), MS));
+['_AURIX_SNAP_NEAR_MS', '_AURIX_SNAP_NEAR_FRAC', '_AURIX_SNAP_FE_AUTHORITY_MS'].forEach(c => vm.runInContext(konst(c), MS));
 ['_aurixNormalizeBackendSnapshot', '_aurixMergeSnapshotSources'].forEach(n => vm.runInContext(fn(n), MS));
 function merge(fe, be, opts) { MS.__fe = fe; MS.__be = be; return vm.runInContext('_aurixMergeSnapshotSources(__fe, __be, ' + JSON.stringify(opts || {}) + ')', MS); }
 
@@ -59,6 +59,25 @@ const beOlder = []; for (let i = 1; i <= 4; i++) beOlder.push({ ts: T0 - i * DAY
   ok('no synthetic points (every ts is a real frontend/backend ts)', m.every(p => src.has(p.ts))); }
 // empty backend → strict no-op (identical to frontend)
 { const m = merge(feDense, []); ok('empty backend → NO-OP (frontend byte-identical)', JSON.stringify(m) === JSON.stringify(feDense)); }
+
+// SPEC DSH.CHART.POINT-LINEAGE.DISCONTINUITY.AUDIT.10 — the REAL prod near-duplicate: backend 9508.19 at
+// 12:15:06 and remote 9459.25 at 12:15:14 (8 s apart, 0.5% apart) must NOT both plot. The OLD rule (also
+// required 0.2% value proximity) let this survive → intraday teeth + cross-source badge.
+{ const remote = [{ ts: T0 + 8000, total: 9459.25, real_estate: 0 }];               // remote/frontend @12:15:14
+  const be = [{ ts: T0, total_value_usd: 9508.19, real_estate: 0 }];                 // backend @12:15:06 (0.5% higher)
+  const m = merge(remote, be);
+  ok('SPEC.10: backend 9508.19 near remote 9459.25 (8s, 0.5%) DROPPED — not both plotted', m.length === 1 && m[0].source !== 'backend_snapshot', 'n=' + m.length + ' src0=' + (m[0] && m[0].source)); }
+
+// SPEC.10 #8 — dense frontend/remote over 24H ⇒ ZERO backend plotted in that span (frontend authority),
+// while backend OLDER than the frontend span is still kept (long-range history).
+{ const feDay = []; for (let i = 0; i < 190; i++) feDay.push({ ts: T0 + i * 7.6 * MIN, total: 9450 + (i % 6) * 3, real_estate: 0 });  // ~188 pts / 24h (prod-like)
+  const beIntraday = []; for (let i = 0; i < 83; i++) beIntraday.push({ ts: T0 + i * 17 * MIN + 30000, total_value_usd: 9500 + (i % 5) * 4, real_estate: 0 });  // backend scattered in the same 24h
+  const beOld = [{ ts: T0 - 10 * DAY, total_value_usd: 8000, real_estate: 0 }];      // genuine older history
+  const m = merge(feDay.concat(beOld ? [] : []), beIntraday.concat(beOld));
+  const backendInSpan = m.filter(p => p.source === 'backend_snapshot' && p.ts >= feDay[0].ts && p.ts <= feDay[feDay.length - 1].ts).length;
+  const backendOldKept = m.some(p => p.source === 'backend_snapshot' && p.ts < feDay[0].ts);
+  ok('SPEC.10 #8: 0 backend plotted inside the dense frontend 24H span', backendInSpan === 0, 'inSpan=' + backendInSpan);
+  ok('SPEC.10 #6: older-than-frontend backend still kept (long-range history intact)', backendOldKept); }
 
 console.log('\nPipeline integration (partial_history honesty):');
 // frontend ~3.5d dense + backend older extends to ~5.5d total → 7D coverage ~0.78 (<0.8) → partial_history
