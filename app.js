@@ -24605,6 +24605,155 @@ try {
     };
 
     // ════════════════════════════════════════════════════════════════════════════
+    // SPEC DSH.CHART.HISTORICAL-RANGE-TRUTH.15 (Phase 1 forensic) — window.aurixChartRangeTruthAudit()
+    // ════════════════════════════════════════════════════════════════════════════
+    // READ-ONLY, deterministic, JSON-serializable. NO writes / no flag / no behaviour change. Compares
+    // 24h/7d/30d/1y/all side by side to CLASSIFY, on the REAL account, whether "long ranges look identical
+    // with surviving left fragments" is (a) LEGITIMATE short history — all trustworthy current-lifecycle
+    // history is shorter than the window, so every long range necessarily shows the same real in-window
+    // points — or (b) a genuine authority defect: out-of-window contamination, a range-insensitive shared
+    // array/cache, or incompatible (pre-account / pre-reset / foreign-value-band) fragments surviving into a
+    // finite window. It surfaces per-range windows, plotted min/max timestamps, chartHash reuse, out-of-window
+    // plotted points, array identity, and the classified lineage of every isolated fragment. Nothing here is
+    // wired into render/calc — it only reads the SAME pure builders the visible chart reads.
+    window.aurixChartRangeTruthAudit = function () {
+      const SPEC = 'DSH.CHART.HISTORICAL-RANGE-TRUTH.15';
+      const safe = (fn, d) => { try { const v = fn(); return v === undefined ? (d === undefined ? null : d) : v; } catch (_) { return (d === undefined ? null : d); } };
+      const iso = t => { try { return Number.isFinite(t) ? new Date(t).toISOString() : null; } catch (_) { return null; } };
+      const hashStr = s => { try { let h = 2166136261 >>> 0; s = String(s == null ? '' : s); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return ('00000000' + h.toString(16)).slice(-8); } catch (_) { return null; } };
+      const RANGES = ['24h', '7d', '30d', '1y', 'all'];
+      const FINITE = ['24h', '7d', '30d', '1y'];
+      const rangeMs = r => safe(() => (typeof _AURIX_EMG_RANGE_MS !== 'undefined') ? _AURIX_EMG_RANGE_MS[r] : null, null);
+      const bandLo = safe(() => (typeof _AURIX_CHART_EPOCH_BAND_LO === 'number') ? _AURIX_CHART_EPOCH_BAND_LO : 0.25, 0.25);
+      const bandHi = safe(() => (typeof _AURIX_CHART_EPOCH_BAND_HI === 'number') ? _AURIX_CHART_EPOCH_BAND_HI : 2.5, 2.5);
+      const famOf = p => { const s = (p && p.source) ? String(p.source).toLowerCase() : ''; return (s === 'backend_snapshot' || s === 'backend' || s === 'portfolio_snapshots') ? 'backend' : 'frontend'; };
+      const createdAt = safe(() => { const ca = (typeof currentUser !== 'undefined' && currentUser) ? currentUser.created_at : null; return ca ? new Date(ca).getTime() : null; }, null);
+      const resetEpoch = safe(() => (typeof _aurixPortfolioEpoch === 'function') ? (_aurixPortfolioEpoch() || 0) : 0, 0);
+      const chartEpoch = safe(() => (typeof _aurixInvestableChartEpoch === 'function') ? (_aurixInvestableChartEpoch() || 0) : 0, 0);
+      // raw display source (untouched) → map ts→family for tagging plotted points back
+      const rawSrc = safe(() => (typeof _aurixHistorySourceForDisplay === 'function') ? (_aurixHistorySourceForDisplay() || []) : [], []);
+      const famByTs = {}; (Array.isArray(rawSrc) ? rawSrc : []).forEach(p => { if (p && Number.isFinite(p.ts)) famByTs[p.ts] = famOf(p); });
+
+      // one shared array-identity registry so we can prove whether two ranges reuse the SAME array object
+      const refIds = new Map(); let refSeq = 0;
+      const refIdOf = arr => { if (!arr) return null; if (!refIds.has(arr)) refIds.set(arr, ++refSeq); return refIds.get(arr); };
+
+      const per = {};
+      RANGES.forEach(r => {
+        const v = safe(() => buildValidatedHistoricalSeries(r), null);
+        const p = safe(() => buildProductionPortfolioChart(r), null) || { points: [], state: 'pending', returnState: 'insufficient_return_history' };
+        const rs = (v && Array.isArray(v.rangeSeries)) ? v.rangeSeries : [];
+        const plotted = Array.isArray(p.points) ? p.points : [];
+        const nowRef = (v && Number.isFinite(v.nowRef)) ? v.nowRef : (rs.length ? rs[rs.length - 1].ts : null);
+        const span = rangeMs(r);
+        const windowStart = (r === 'all' || !Number.isFinite(span)) ? null : (Number.isFinite(nowRef) ? nowRef - span : null);
+        const relDay = ts => (Number.isFinite(ts) && Number.isFinite(nowRef)) ? +((ts - nowRef) / 864e5).toFixed(2) : null;
+        const tsArr = plotted.filter(q => q && Number.isFinite(q.ts)).map(q => q.ts).sort((a, b) => a - b);
+        const beforeWindow = (windowStart != null) ? plotted.filter(q => q && Number.isFinite(q.ts) && q.ts < windowStart).length : 0;
+        const backendPlotted = plotted.filter(q => famByTs[q.ts] === 'backend').length;
+        per[r] = {
+          windowStartIso: iso(windowStart), windowEndIso: iso(nowRef),
+          inputCount: (v && v.counts && Number.isFinite(v.counts.rawSnapshots)) ? v.counts.rawSnapshots : (Array.isArray(rawSrc) ? rawSrc.length : 0),
+          validatedCount: (v && Array.isArray(v.validatedFull)) ? v.validatedFull.length : null,
+          plottedCount: plotted.length,
+          minPlottedIso: iso(tsArr[0]), maxPlottedIso: iso(tsArr[tsArr.length - 1]),
+          minPlottedDayRel: relDay(tsArr[0]), maxPlottedDayRel: relDay(tsArr[tsArr.length - 1]),
+          spanPlottedDays: tsArr.length >= 2 ? +((tsArr[tsArr.length - 1] - tsArr[0]) / 864e5).toFixed(2) : 0,
+          chartHash: p.chartHash || null,
+          rangeSeriesRefId: refIdOf(rs),
+          collapsedRange: !!(v && v.collapsedRange),
+          rangeCollapsedBecauseHistoryTooShort: !!(v && v.rangeCollapsedBecauseHistoryTooShort),
+          state: p.state, returnState: p.returnState, displayedRangeState: p.displayedRangeState || null,
+          backendPlotted: backendPlotted, frontendPlotted: plotted.length - backendPlotted,
+          pointsBeforeWindowStart: beforeWindow,
+          syntheticPoints: plotted.filter(q => !(Array.isArray(rawSrc) && rawSrc.some(s => s && s.ts === q.ts))).length,
+        };
+      });
+
+      // ── fragment lineage on ALL (widest view) — segment by the SPEC.13 real-gap breaks, classify each ──
+      const allChart = safe(() => buildProductionPortfolioChart('all'), null) || { points: [] };
+      const allPts = (Array.isArray(allChart.points) ? allChart.points : []).map(q => ({ time: q.ts, value: q.value }));
+      const anchor = allPts.length ? allPts[allPts.length - 1].value : 0;
+      const LO = anchor * bandLo, HI = anchor * bandHi;
+      const cv = safe(() => (typeof _aurixBuildContinuityValidatedSeries === 'function') ? _aurixBuildContinuityValidatedSeries(allPts, 'all') : null, null);
+      let segments = [];
+      if (cv && Array.isArray(cv.segments) && cv.segments.length) segments = cv.segments.map(s => ({ startTs: s.startTs, endTs: s.endTs, count: s.count }));
+      else if (allPts.length) segments = [{ startTs: allPts[0].time, endTs: allPts[allPts.length - 1].time, count: allPts.length }];
+      const classifySeg = s => {
+        const valAt = t => { const m = allPts.find(q => q.time === t); return m ? m.value : null; };
+        const sv = valAt(s.startTs), ev = valAt(s.endTs);
+        const preAccount = (createdAt != null) ? (s.endTs < createdAt) : null;
+        const preReset = (resetEpoch > 0) ? (s.endTs < resetEpoch) : null;
+        const outsideBand = (anchor > 0 && sv != null) ? !(sv >= LO && sv <= HI && ev >= LO && ev <= HI) : null;
+        const fam = famByTs[s.startTs] || 'frontend';
+        let verdict = 'legitimate_in_lifecycle';
+        if (preAccount === true) verdict = 'pre_account_rejected';
+        else if (preReset === true) verdict = 'pre_reset_rejected';
+        else if (outsideBand === true) verdict = 'foreign_value_band';
+        else verdict = 'value_compatible_untagged_ambiguous';   // in-band, post-account: NOT defensibly rejectable
+        return { startIso: iso(s.startTs), endIso: iso(s.endTs), count: s.count, startValue: sv, endValue: ev,
+          beforeAccountCreation: preAccount, beforeResetEpoch: preReset, outsideCurrentValueBand: outsideBand, sourceFamily: fam, verdict: verdict };
+      };
+      const classifiedSegments = segments.map(classifySeg);
+      const fragments = classifiedSegments.slice(0, Math.max(0, classifiedSegments.length - 1));   // all but the final (main) segment
+
+      // ── top-level classification ──
+      const finiteHashes = FINITE.map(r => per[r].chartHash);
+      const allHash = per.all.chartHash;
+      const identicalFiniteRanges = FINITE.filter(r => per[r].chartHash && per[r].chartHash === per['7d'].chartHash);
+      const allFiniteIdentical = finiteHashes.every(h => h && h === finiteHashes[0]);
+      const longRangesMatchAll = FINITE.filter(r => r !== '24h').every(r => per[r].chartHash === allHash) && allFiniteIdentical === false ? false : (['7d', '30d', '1y'].every(r => per[r].chartHash === allHash));
+      const outOfWindowRanges = FINITE.filter(r => per[r].pointsBeforeWindowStart > 0);
+      const refCounts = {}; RANGES.forEach(r => { const id = per[r].rangeSeriesRefId; if (id != null) refCounts[id] = (refCounts[id] || 0) + 1; });
+      const sharedArrayRefsDetected = Object.keys(refCounts).some(k => refCounts[k] > 1);
+      const totalTrustSpanDays = per.all.spanPlottedDays;
+      const shortHistoryShorterThan7d = totalTrustSpanDays < 7;
+      const anySyntheticPoints = RANGES.some(r => per[r].syntheticPoints > 0);
+      const reasonCodes = [];
+      let verdict;
+      if (anySyntheticPoints) { verdict = 'DEFECT_synthetic_points'; reasonCodes.push('synthetic_points_present'); }
+      else if (outOfWindowRanges.length) { verdict = 'DEFECT_out_of_window_contamination'; reasonCodes.push('plotted_points_before_window_start:' + outOfWindowRanges.join(',')); }
+      else if (sharedArrayRefsDetected) { verdict = 'DEFECT_range_insensitive_shared_array'; reasonCodes.push('shared_rangeSeries_array_across_ranges'); }
+      else if (fragments.some(f => f.verdict === 'pre_account_rejected' || f.verdict === 'pre_reset_rejected' || f.verdict === 'foreign_value_band')) {
+        verdict = 'DEFECT_incompatible_fragment_survived'; reasonCodes.push('incompatible_fragment_in_visible_series');
+      } else if (shortHistoryShorterThan7d && ['7d', '30d', '1y'].every(r => per[r].chartHash === allHash)) {
+        verdict = 'LEGITIMATE_short_history_identical_long_ranges';
+        reasonCodes.push('all_trustworthy_history_shorter_than_7d');
+        reasonCodes.push('finite_ranges_>=7d_necessarily_identical');
+        if (fragments.length) reasonCodes.push('fragments_are_value_compatible_untagged_in_lifecycle');
+      } else if (fragments.some(f => f.verdict === 'value_compatible_untagged_ambiguous')) {
+        verdict = 'AMBIGUOUS_untagged_fragments_no_metadata'; reasonCodes.push('untagged_value_compatible_fragments_present_no_reset_epoch_metadata');
+      } else { verdict = 'OK_range_correct'; reasonCodes.push('ranges_timestamp_correct'); }
+
+      const out = {
+        spec: SPEC,
+        appVersion: safe(() => (typeof window !== 'undefined' && window.AURIX_BUILD) || null),
+        userHash: safe(() => (typeof currentUser !== 'undefined' && currentUser && currentUser.id) ? hashStr(currentUser.id) : null, null),
+        nowRefIso: per.all.windowEndIso,
+        accountCreatedAtIso: iso(createdAt),
+        resetEpochIso: iso(resetEpoch), chartEpochIso: iso(chartEpoch),
+        totalTrustSpanDays: totalTrustSpanDays,
+        shortHistoryShorterThan7d: shortHistoryShorterThan7d,
+        longRangesIdenticalToAll: ['7d', '30d', '1y'].every(r => per[r].chartHash === allHash),
+        identicalFiniteRangeHashes: allFiniteIdentical,
+        outOfWindowContaminationRanges: outOfWindowRanges,
+        sharedArrayRefsDetected: sharedArrayRefsDetected,
+        rangeSeriesRefIds: RANGES.reduce((o, r) => { o[r] = per[r].rangeSeriesRefId; return o; }, {}),
+        chartHashByRange: RANGES.reduce((o, r) => { o[r] = per[r].chartHash; return o; }, {}),
+        segmentCountAll: segments.length,
+        fragments: fragments,        // isolated non-main segments (candidates for "surviving left fragments")
+        mainSegment: classifiedSegments.length ? classifiedSegments[classifiedSegments.length - 1] : null,
+        perRange: per,
+        verdict: verdict,
+        reasonCodes: reasonCodes,
+        note: 'READ-ONLY. Identical long-range chartHash + total span < 7d + only value-compatible in-lifecycle fragments = LEGITIMATE short history (not a defect). A DEFECT verdict requires out-of-window points, a shared array, synthetic points, or a fragment provably pre-account / pre-reset / outside the value band.',
+        syntheticPoints: 0,
+      };
+      try { console.log('%c[UI][CHART_RANGE_TRUTH_AUDIT]', 'font-weight:700;color:#00b3a4', out); } catch (_) {}
+      return out;
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
     // SPEC DSH.CHART.INSTITUTIONAL.LINE.01 — window.aurixChartForensics(range)
     // ════════════════════════════════════════════════════════════════════════════
     // READ-ONLY forensic dump for ONE range. Answers the three field questions:
