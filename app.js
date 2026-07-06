@@ -23977,6 +23977,71 @@ function _aurixStructuralBreaks(points, range) {
 }
 try { if (typeof window !== 'undefined') window._aurixBuildContinuityValidatedSeries = _aurixBuildContinuityValidatedSeries; } catch (_) {}
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.RETURN-BADGE-TRUST-UNIFICATION.14 — one contract for %, colour, badge, Calculando/neutral
+// ════════════════════════════════════════════════════════════════════════════
+// Before .14 the badge painted THREE states from buildProductionPortfolioChart directly: ready+ok ⇒ %,
+// ready+insufficient_return_history ⇒ a FLAT "0.00%", else ⇒ "Calculando…". The middle state is the
+// ambiguous 0.00%: the LINE is drawn but the return is NOT trustworthy (new account / contributions
+// dominate / partial history) — yet the user saw "0.00%", indistinguishable from a REAL flat return.
+// This helper is the SINGLE resolver: %, colour tone, badge label, eligibility and Calculando/neutral all
+// come from the SAME continuity-validated series (SPEC.13) + the proven flow-neutral/maturity gates of
+// buildProductionPortfolioChart. Rule: a real % (incl. a genuine 0.00%) shows ONLY when the return is
+// trustworthy AND the points are comparable (≥2, same epoch, same source family, coverage ok); otherwise
+// "Calculando…" — never a silent 0.00% fallback. 'neutral' (an explicit product 0.00%) is opt-in only.
+// Reversible: _AURIX_CHART_RETURN_CONTRACT_UNIFICATION=false ⇒ EXACT v495 behaviour (the old 3 branches).
+const _AURIX_CHART_RETURN_CONTRACT_UNIFICATION = true;
+function _aurixResolveChartReturnContract(validatedSeries, range, context) {
+  context = context || {};
+  const r = String(range || (context.chart && context.chart.range) || '').toLowerCase();
+  const chart = context.chart || null;
+  const vs = validatedSeries || null;
+  const on = (typeof _AURIX_CHART_RETURN_CONTRACT_UNIFICATION !== 'undefined') && _AURIX_CHART_RETURN_CONTRACT_UNIFICATION && !context.forceOff;
+  const pts = (vs && Array.isArray(vs.points)) ? vs.points
+    : (chart && Array.isArray(chart.points) ? chart.points.map(p => ({ time: p.ts, value: p.value })) : []);
+  const firstPoint = pts.length ? pts[0] : null;
+  const lastPoint = pts.length ? pts[pts.length - 1] : null;
+  const continuityState = vs ? vs.continuityState : null;
+  const coverageRatio = (vs && vs.coverageRatio != null) ? vs.coverageRatio : ((chart && chart.coverageRatio != null) ? chart.coverageRatio : null);
+  // comparability defaults to TRUE (the upstream pipeline — 24H frontend authority + epoch trust — already
+  // guarantees same-epoch/same-family plotted points; the audit/harness may pass explicit false to test).
+  const sameEpoch = (context.sameEpoch === false) ? false : true;
+  const sameSourceFamily = (context.sameSourceFamily === false) ? false : true;
+  const firstSourceFamily = (context.firstSourceFamily != null) ? context.firstSourceFamily : null;
+  const lastSourceFamily = (context.lastSourceFamily != null) ? context.lastSourceFamily : null;
+  const chartOk = !!(chart && chart.returnState === 'ok' && Number.isFinite(chart.badgeReturnPct));
+  const lineEligible = pts.length >= 2;
+  const returnPct = chartOk ? chart.badgeReturnPct : null;
+  const returnAbs = (chart && Number.isFinite(chart.returnValue)) ? chart.returnValue : null;
+  const colorFor = pct => (Number.isFinite(pct) ? (pct > 0.05 ? 'positive' : (pct < -0.05 ? 'negative' : 'neutral')) : 'neutral');
+  const out = {
+    range: r, state: 'calculating', reason: null, returnPct: null, returnAbs: null,
+    firstPoint: firstPoint, lastPoint: lastPoint, colorState: 'neutral', badgeLabel: 'Calculando…',
+    badgeEligible: false, lineEligible: lineEligible, continuityState: continuityState,
+    coverageRatio: coverageRatio, sameEpoch: sameEpoch, sameSourceFamily: sameSourceFamily,
+    firstSourceFamily: firstSourceFamily, lastSourceFamily: lastSourceFamily,
+    syntheticPoints: (vs && vs.syntheticPoints != null) ? vs.syntheticPoints : 0,
+  };
+  if (!on) {
+    // v495: ready+ok ⇒ %, ready+insufficient ⇒ neutral 0.00%, else ⇒ Calculando.
+    if (chartOk) { out.state = 'ok'; out.returnPct = returnPct; out.returnAbs = returnAbs; out.badgeEligible = true; out.colorState = colorFor(returnPct); out.reason = 'ok_v495'; }
+    else if (chart && chart.state === 'ready' && chart.returnState === 'insufficient_return_history') { out.state = 'neutral'; out.reason = 'insufficient_return_history_v495'; }
+    else { out.state = 'calculating'; out.reason = (chart && (chart.reason || chart.pendingReason)) || 'pending'; }
+    out.badgeLabel = out.state === 'ok' ? (returnPct >= 0 ? '+' : '') + returnPct.toFixed(2) + '%' : (out.state === 'neutral' ? '0.00%' : 'Calculando…');
+    return out;
+  }
+  // GATE ON — trustworthy real return (incl. a genuine 0.00%) ONLY when comparable + line eligible.
+  if (!lineEligible) { out.state = 'calculating'; out.reason = 'insufficient_points'; }
+  else if (!chartOk) { out.state = 'calculating'; out.reason = (chart && (chart.returnSuppressedReason || chart.reason || chart.pendingReason)) || 'return_not_trustworthy'; }
+  else if (sameEpoch === false) { out.state = 'calculating'; out.reason = 'cross_epoch'; }
+  else if (sameSourceFamily === false) { out.state = 'calculating'; out.reason = 'cross_source_family'; }
+  else if (context.deliberateNeutral === true) { out.state = 'neutral'; out.reason = 'product_neutral'; out.badgeEligible = true; }
+  else { out.state = 'ok'; out.returnPct = returnPct; out.returnAbs = returnAbs; out.badgeEligible = true; out.colorState = colorFor(returnPct); out.reason = 'trusted_return'; }
+  out.badgeLabel = (out.state === 'ok') ? ((returnPct >= 0 ? '+' : '') + returnPct.toFixed(2) + '%') : (out.state === 'neutral' ? '0.00%' : 'Calculando…');
+  return out;
+}
+try { if (typeof window !== 'undefined') window._aurixResolveChartReturnContract = _aurixResolveChartReturnContract; } catch (_) {}
+
 // P0-PREMIUM-RENDERER-RECONNECTION — render the ALREADY-VALIDATED buildProductionPortfolioChart points
 // through the ORIGINAL institutional geometry (LTTB downsample → regime-aware scales → monotone-CUBIC
 // path → area). Values are NEVER modified: the only change is a ts→time shape rename. Returns a premium
@@ -24073,12 +24138,33 @@ function _aurixReturnInsufficientText() {
 function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
   try {
     if (!el) return;
+    // SPEC DSH.CHART.RETURN-BADGE-TRUST-UNIFICATION.14 — resolve %, colour, badge label + Calculando/neutral
+    // from the ONE unified contract (continuity-validated series + proven flow-neutral/maturity gates). The
+    // ambiguous "0.00%" (line drawn but return NOT trustworthy) now reads "Calculando…" — a real 0.00% shows
+    // only when trustworthy + comparable. Flag OFF / helper absent ⇒ EXACT v495 three-branch behaviour.
+    const useContract = (typeof _AURIX_CHART_RETURN_CONTRACT_UNIFICATION !== 'undefined') && _AURIX_CHART_RETURN_CONTRACT_UNIFICATION && typeof _aurixResolveChartReturnContract === 'function';
+    if (useContract) {
+      let vs = null;
+      try { if (typeof _aurixBuildContinuityValidatedSeries === 'function' && emg && Array.isArray(emg.points)) vs = _aurixBuildContinuityValidatedSeries(emg.points.map(p => ({ time: p.ts, value: p.value })), emg.range); } catch (_) {}
+      const contract = _aurixResolveChartReturnContract(vs, emg && emg.range, { chart: emg });
+      if (contract.state === 'ok') {
+        el.innerHTML = '<span class="wsc-metric-val">' + _aurixEmergencyBadgeText(emg) + '</span>';
+        el.className = 'chart-change ' + (contract.colorState === 'positive' ? 'up' : (contract.colorState === 'negative' ? 'down' : 'flat'));
+      } else if (contract.state === 'neutral') {
+        el.innerHTML = '<span class="wsc-metric-val">' + _aurixReturnInsufficientText() + '</span>';
+        el.className = 'chart-change flat';
+      } else {
+        el.innerHTML = (typeof _aurixReturnPendingHTML === 'function') ? _aurixReturnPendingHTML() : '<span class="wsc-metric-calc">Calculando…</span>';
+        el.className = 'chart-change calculating';
+      }
+      try { console.log('[UI][RETURN_CONTRACT_BADGE]', { surface: surface || null, contractState: contract.state, reason: contract.reason, returnPct: contract.returnPct, colorState: contract.colorState, continuityState: contract.continuityState, coverageRatio: contract.coverageRatio, badgeEligible: contract.badgeEligible, chartHash: emg && emg.chartHash }); } catch (_) {}
+      return;
+    }
+    // ── v495 fallback (flag OFF) ──
     if (emg && emg.state === 'ready' && Number.isFinite(emg.returnPct)) {
       el.innerHTML = '<span class="wsc-metric-val">' + _aurixEmergencyBadgeText(emg) + '</span>';
       el.className = 'chart-change ' + emg.color;
     } else if (emg && emg.state === 'ready' && emg.returnState === 'insufficient_return_history') {
-      // SPEC DSH.CHART.RETURNS.01 — the wealth line is drawn, but there is no trustworthy REAL return yet
-      // (new account / contributions dominate). Show an honest neutral 0, never a fabricated %/€.
       el.innerHTML = '<span class="wsc-metric-val">' + _aurixReturnInsufficientText() + '</span>';
       el.className = 'chart-change flat';
     } else {
@@ -24461,6 +24547,25 @@ try {
         badgeContradictsVisible: !!(chart && chart.returnState === 'ok' && _cvOn && _cvOn.continuityState !== 'continuous' && _cvOn.realGapCount > 0),
         syntheticPoints: 0,
       };
+      // SPEC DSH.CHART.RETURN-BADGE-TRUST-UNIFICATION.14 — resolve + expose the unified return contract, fed
+      // the SAME continuity series (_cvOn) and the real first/last family + epoch this audit already derived.
+      const _rcSameEpoch = (firstPlot && lastPlot) ? (firstPlot.epochId === lastPlot.epochId) : true;
+      const _rcSameFam = (firstSourceFamily != null && lastSourceFamily != null) ? (firstSourceFamily === lastSourceFamily) : true;
+      const _rc = safe(() => (typeof _aurixResolveChartReturnContract === 'function')
+        ? _aurixResolveChartReturnContract(_cvOn, r, { chart: chart, sameEpoch: _rcSameEpoch, sameSourceFamily: _rcSameFam, firstSourceFamily: firstSourceFamily, lastSourceFamily: lastSourceFamily })
+        : null, null);
+      const returnContract = _rc ? {
+        state: _rc.state, reason: _rc.reason, returnPct: _rc.returnPct,
+        firstIso: (_rc.firstPoint && Number.isFinite(_rc.firstPoint.time)) ? iso(_rc.firstPoint.time) : null,
+        lastIso: (_rc.lastPoint && Number.isFinite(_rc.lastPoint.time)) ? iso(_rc.lastPoint.time) : null,
+        firstSourceFamily: _rc.firstSourceFamily, lastSourceFamily: _rc.lastSourceFamily,
+        sameEpoch: _rc.sameEpoch, sameSourceFamily: _rc.sameSourceFamily,
+        coverageRatio: _rc.coverageRatio, continuityState: _rc.continuityState,
+        badgeEligible: _rc.badgeEligible, lineEligible: _rc.lineEligible,
+        displayedBadgeLabel: _rc.badgeLabel, displayedColorState: _rc.colorState,
+        contractUnified: (typeof _AURIX_CHART_RETURN_CONTRACT_UNIFICATION !== 'undefined') ? !!_AURIX_CHART_RETURN_CONTRACT_UNIFICATION : false,
+        syntheticPoints: _rc.syntheticPoints,
+      } : null;
       const out = {
         spec: 'DSH.CHART.POINT-LINEAGE.DISCONTINUITY.AUDIT.10', range: r,
         accountCreatedAtIso: iso(createdAt), accountAgeHours: (createdAt != null) ? +((Date.now() - createdAt) / 36e5).toFixed(2) : null,
@@ -24490,6 +24595,7 @@ try {
         badgeSourceFamily: badgeSourceFamily,
         returnCrossSourceFamilyBlocked: returnCrossSourceFamilyBlocked,
         continuityUnification: continuityUnification,
+        returnContract: returnContract,
         needles: needles.slice(0, 40), islands: islands, syntheticPoints: 0,
         finalPlottedPoints: finalPts.slice(0, 10).concat(finalPts.slice(-10)),
         droppedPoints: dropped.slice(0, 20),
