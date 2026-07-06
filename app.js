@@ -24358,6 +24358,266 @@ try {
     };
 
     // ════════════════════════════════════════════════════════════════════════════
+    // SPEC DSH.CHART.ARCHITECTURE-DATA-LINEAGE.BASELINE-AUDIT.12 — single read-only baseline auditor
+    // ════════════════════════════════════════════════════════════════════════════
+    // window.aurixChartArchitectureAudit() — the SINGLE architectural snapshot of the whole chart system.
+    // PURE READ. It NEVER mutates memory / localStorage / remote, NEVER calls save/sync, NEVER triggers a
+    // snapshot, NEVER touches the UI, NEVER hides the line and NEVER changes a flag. It only READS the same
+    // pipeline chokepoints the visible chart reads (_aurixHistorySourceForDisplay, buildValidatedHistoricalSeries,
+    // buildProductionPortfolioChart) plus the source-authority / epoch-trust helpers, and derives — per range —
+    // where every point comes from, which family/epoch the badge crosses, and why islands/needles survive.
+    // All numeric outputs are JSON-serializable; every access is guarded so a missing helper degrades to null
+    // (identical output in a legacy sandbox). Deterministic: same source ⇒ same object (no Math.random, the
+    // only wall-clock read is accountAge, which never feeds a hash). This does NOT fix anything (SPEC .12 is
+    // an audit-only baseline) — it is the evidence layer for the next decision: conserve / refactor / replace.
+    window.aurixChartArchitectureAudit = function () {
+      const SPEC = 'DSH.CHART.ARCHITECTURE-DATA-LINEAGE.BASELINE-AUDIT.12';
+      const safe = (fn, d) => { try { const v = fn(); return v === undefined ? (d === undefined ? null : d) : v; } catch (_) { return (d === undefined ? null : d); } };
+      const iso = t => { try { return Number.isFinite(t) ? new Date(t).toISOString() : null; } catch (_) { return null; } };
+      const hashStr = s => { try { let h = 2166136261 >>> 0; s = String(s == null ? '' : s); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return ('00000000' + h.toString(16)).slice(-8); } catch (_) { return null; } };
+      const inv = p => { const t = Number(p && p.total), re = Number(p && p.real_estate) || 0; return Number.isFinite(t) ? +(t - re).toFixed(4) : null; };
+      const RANGES = ['24h', '7d', '30d', '1y', 'all'];
+      const jumpFor = r => safe(() => (typeof _AURIX_EMG_ADJ_JUMP !== 'undefined') ? (_AURIX_EMG_ADJ_JUMP[r] || _AURIX_EMG_ADJ_JUMP.all) : 0.3, 0.3);
+      const spikeJump = safe(() => (typeof _AURIX_HPQ_SPIKE_JUMP === 'number') ? _AURIX_HPQ_SPIKE_JUMP : 0.25, 0.25);
+      const nearMs = safe(() => (typeof _AURIX_SNAP_NEAR_MS === 'number') ? _AURIX_SNAP_NEAR_MS : 3e5, 3e5);
+      const futureMs = safe(() => (typeof _AURIX_HPQ_FUTURE_MS === 'number') ? _AURIX_HPQ_FUTURE_MS : 31536e6, 31536e6);
+      const bandLo = safe(() => (typeof _AURIX_CHART_EPOCH_BAND_LO === 'number') ? _AURIX_CHART_EPOCH_BAND_LO : 0.25, 0.25);
+      const bandHi = safe(() => (typeof _AURIX_CHART_EPOCH_BAND_HI === 'number') ? _AURIX_CHART_EPOCH_BAND_HI : 2.5, 2.5);
+      const rangeMs = r => safe(() => (typeof _AURIX_EMG_RANGE_MS !== 'undefined') ? _AURIX_EMG_RANGE_MS[r] : null, null);
+      const famOf = p => { const s = (p && p.source) ? String(p.source).toLowerCase() : ''; return (s === 'backend_snapshot' || s === 'backend' || s === 'portfolio_snapshots') ? 'backend' : 'frontend'; };
+
+      // ── identity ──
+      const authed = safe(() => !!(typeof currentUser !== 'undefined' && currentUser && currentUser.id), false);
+      const userHash = safe(() => (authed && currentUser.id) ? hashStr(currentUser.id) : null, null);
+      const createdAt = safe(() => { const ca = (typeof currentUser !== 'undefined' && currentUser) ? currentUser.created_at : null; return ca ? new Date(ca).getTime() : null; }, null);
+      const canonicalLoaded = safe(() => (typeof _aurixCanonicalHistoryLoaded !== 'undefined') ? !!_aurixCanonicalHistoryLoaded : false, false);
+      const reconciled = safe(() => (typeof _aurixCanonicalHistoryReady === 'function') ? !!_aurixCanonicalHistoryReady() : null, null);
+      const portfolioRevision = safe(() => (typeof _aurixPortfolioRevision === 'function') ? _aurixPortfolioRevision() : null, null);
+      const lifecycleId = safe(() => (typeof _aurixCurrentLifecycleId === 'function') ? _aurixCurrentLifecycleId() : null, null);
+      const resetEpoch = safe(() => (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0, 0);
+      const chartEpoch = safe(() => (typeof _aurixInvestableChartEpoch === 'function') ? _aurixInvestableChartEpoch() : 0, 0);
+
+      // ── data sources (families) ──
+      const displaySrc = safe(() => (typeof _aurixHistorySourceForDisplay === 'function') ? (_aurixHistorySourceForDisplay() || []) : [], []);
+      const localHist = safe(() => (typeof categoryHistory !== 'undefined' && Array.isArray(categoryHistory)) ? categoryHistory : [], []);
+      const remoteHist = safe(() => (typeof _aurixCanonicalCatHistory !== 'undefined' && Array.isArray(_aurixCanonicalCatHistory)) ? _aurixCanonicalCatHistory : [], []);
+      const backendSnaps = safe(() => (typeof _aurixBackendSnapshots !== 'undefined' && Array.isArray(_aurixBackendSnapshots)) ? _aurixBackendSnapshots : [], []);
+      const srcArr = Array.isArray(displaySrc) ? displaySrc : [];
+      const spanOf = a => { const t = (a || []).filter(p => p && Number.isFinite(p.ts)).map(p => p.ts).sort((x, y) => x - y); return t.length ? { count: t.length, oldestIso: iso(t[0]), newestIso: iso(t[t.length - 1]), spanDays: +((t[t.length - 1] - t[0]) / 864e5).toFixed(2) } : { count: 0 }; };
+      const dataSources = {
+        localCategoryHistory: Object.assign({ authority: 'cache+push-buffer (never final for authed)' }, spanOf(localHist)),
+        remoteCanonicalHistory: Object.assign({ authority: 'authed display authority (_aurixCanonicalCatHistory)' }, spanOf(remoteHist)),
+        backendSnapshots: Object.assign({ authority: 'gap-filler / long-history (portfolio_snapshots)', loaded: backendSnaps.length }, spanOf(backendSnaps)),
+        livePoint: { note: 'live 30s snapshot is a tail element of local/remote history (no separate store)', lastDisplayTs: srcArr.length ? Math.max.apply(null, srcArr.filter(p => p && Number.isFinite(p.ts)).map(p => p.ts)) : null },
+        mergedDisplaySource: Object.assign({ which: (authed && canonicalLoaded) ? '_aurixCanonicalCatHistory (remote)' : 'categoryHistory (local)', backendMerged: srcArr.filter(p => famOf(p) === 'backend').length }, spanOf(srcArr)),
+      };
+
+      // ── per-range analyzer (all derived read-only from the SAME pipeline the chart reads) ──
+      const analyze = function (r) {
+        const chart = safe(() => buildProductionPortfolioChart(r), null) || { points: [], state: 'pending', returnState: 'insufficient_return_history' };
+        const val = safe(() => buildValidatedHistoricalSeries(r), null);
+        // normalized + sorted source (ts, investable value, family, local/remote)
+        const norm = srcArr.map((p, i) => {
+          const v = inv(p);
+          const fam = famOf(p);
+          const lr = (fam === 'backend') ? 'backend' : ((authed && canonicalLoaded) ? 'remote' : 'local');
+          const tagged = !!(p && (p.source != null || p.portfolioRevision != null || p.revision != null || p.accountId != null || p.lifecycleId != null));
+          return { ts: (p && Number.isFinite(p.ts)) ? p.ts : null, value: v, family: fam, localOrRemote: lr, tagged: tagged, idx: i };
+        }).filter(p => Number.isFinite(p.ts)).sort((a, b) => (a.ts - b.ts) || ((a.value || 0) - (b.value || 0)));
+        const nowRef = norm.length ? norm[norm.length - 1].ts : 0;
+        const rms = rangeMs(r);
+        const startTs = (r === 'all' || !Number.isFinite(rms)) ? -Infinity : nowRef - rms;
+        const inWin = norm.filter(p => p.ts >= startTs);
+        // derived economic epochs (points are UNTAGGED — heuristic on a sustained value step > jump)
+        const jump = jumpFor(r);
+        let epochId = 0, anchor = norm.length ? norm[0].value : 0; const epochByIdx = [];
+        for (let i = 0; i < norm.length; i++) { const v = norm[i].value; if (i > 0 && anchor > 0 && Math.abs(v - anchor) / anchor > jump) { const nxt = norm[i + 1] ? norm[i + 1].value : v; if (Math.abs(nxt - anchor) / (anchor || 1) > jump) { epochId++; anchor = v; } } epochByIdx.push(epochId); if (i === 0) anchor = v; }
+        const epochByTs = {}; norm.forEach((p, i) => { epochByTs[p.ts] = epochByIdx[i]; });
+        // plotted points from the production chart, tagged back to family/epoch via ts
+        const plotted = (Array.isArray(chart.points) ? chart.points : []).map(q => { const m = norm.find(n => n.ts === q.ts); return { ts: q.ts, value: q.value, family: m ? m.family : 'frontend', localOrRemote: m ? m.localOrRemote : 'local', epoch: (epochByTs[q.ts] != null ? epochByTs[q.ts] : null) }; });
+        // gaps + jumps on plotted line
+        let largestGapMs = 0, largestJumpPct = 0;
+        for (let i = 1; i < plotted.length; i++) { const g = plotted[i].ts - plotted[i - 1].ts; if (g > largestGapMs) largestGapMs = g; const pv = plotted[i - 1].value || 1; const jp = Math.abs((plotted[i].value - pv) / pv) * 100; if (jp > largestJumpPct) largestJumpPct = jp; }
+        // segments/islands: new segment on epoch change OR a temporal gap > 6× median plotted cadence
+        const pgaps = []; for (let i = 1; i < plotted.length; i++) pgaps.push(plotted[i].ts - plotted[i - 1].ts);
+        const medGap = pgaps.length ? pgaps.slice().sort((a, b) => a - b)[pgaps.length >> 1] : 0;
+        let segCount = plotted.length ? 1 : 0, islandCount = plotted.length ? 1 : 0;
+        for (let i = 1; i < plotted.length; i++) { const epochBreak = plotted[i].epoch !== plotted[i - 1].epoch; const gapBreak = medGap > 0 && (plotted[i].ts - plotted[i - 1].ts) > 6 * medGap; if (epochBreak || gapBreak) { segCount++; islandCount++; } }
+        // needles: consecutive plotted points with |deltaPct| > spikeJump
+        let needleCount = 0; for (let i = 1; i < plotted.length; i++) { const pv = plotted[i - 1].value || 1; if (Math.abs((plotted[i].value - pv) / pv) > spikeJump) needleCount++; }
+        // renderer path count (visible subpaths) via the real structural-break splitter on the plotted pts
+        let renderPathCount = plotted.length >= 2 ? 1 : 0, structuralBreakCount = 0;
+        try { if (typeof _aurixStructuralBreaks === 'function' && plotted.length >= 2) { const sb = _aurixStructuralBreaks(plotted.map(p => ({ time: p.ts, value: p.value })), r); structuralBreakCount = (sb && sb.breaks) ? sb.breaks.length : 0; renderPathCount = structuralBreakCount + 1; } } catch (_) {}
+        const smoothingMode = safe(() => (r === 'all' ? 'monotone-cubic·smoothL3' : r === '1y' ? 'monotone-cubic·smoothL2' : r === '30d' ? 'monotone-cubic·smoothL2' : 'monotone-cubic·smoothL1'), 'monotone-cubic');
+        // out-of-band (value-band epoch) points in window vs the trusted anchor
+        const anchorV = norm.length ? norm[norm.length - 1].value : 0;
+        const LO = anchorV * bandLo, HI = anchorV * bandHi;
+        const outOfBandPointCount = (anchorV > 0) ? inWin.filter(p => !(p.value >= LO && p.value <= HI)).length : 0;
+        // future / pre-account / stale in window. Points are UNTAGGED (no absolute clock reference beyond the
+        // series itself), so future/stale mirror the pipeline's outlier semantics: a point that "jumped
+        // forward" (gap from its predecessor > futureMs) is a future/clock-skew outlier; a point "left behind"
+        // (gap to its successor > futureMs) is a stale/imported outlier. Also flag any point beyond real now.
+        let futurePointCount = 0, stalePointCount = 0;
+        for (let i = 0; i < inWin.length; i++) {
+          if (i > 0 && (inWin[i].ts - inWin[i - 1].ts) > futureMs) futurePointCount++;
+          if (i < inWin.length - 1 && (inWin[i + 1].ts - inWin[i].ts) > futureMs) stalePointCount++;
+        }
+        const preAccountPointCount = (createdAt != null) ? inWin.filter(p => p.ts < createdAt).length : 0;
+        // source-family authority
+        const frontendUsableInRange = safe(() => (typeof _aurixFrontendUsableInWindow === 'function') ? _aurixFrontendUsableInWindow(srcArr, (r === '24h') ? 864e5 : Infinity, nowRef) : null, null);
+        const sourceAuthorityMode = (r === '24h') ? (frontendUsableInRange ? 'frontend_authority_24h' : 'backend_fallback_24h') : 'mixed_long_range';
+        const winBackend = inWin.filter(p => p.family === 'backend');
+        const backendExcludedByRangeAuthority = winBackend.filter(p => !plotted.some(q => q.ts === p.ts)).length;
+        const backendUsableInRange = (r !== '24h') || (frontendUsableInRange === false);
+        const first = plotted[0] || null, last = plotted[plotted.length - 1] || null;
+        const firstSourceFamily = first ? first.family : null, lastSourceFamily = last ? last.family : null;
+        const firstEpoch = first ? first.epoch : null, lastEpoch = last ? last.epoch : null;
+        const badgeState = (chart.returnState === 'ok') ? 'real_return' : 'neutral_calculando';
+        const trustReasons = [], untrustReasons = [];
+        if (chart.returnState === 'ok') trustReasons.push('flow_neutral_return_ok');
+        if (chart.reason) untrustReasons.push(chart.reason);
+        if (chart.returnSuppressedReason) untrustReasons.push(chart.returnSuppressedReason);
+        if (Array.isArray(chart.allUntrustReasons)) chart.allUntrustReasons.forEach(x => untrustReasons.push('all:' + x));
+        if (first && last && firstSourceFamily && lastSourceFamily && firstSourceFamily !== lastSourceFamily) untrustReasons.push('cross_source_family_first_last');
+        if (first && last && firstEpoch != null && lastEpoch != null && firstEpoch !== lastEpoch) untrustReasons.push('cross_epoch_first_last');
+        // continuity + institutional readiness (0-100)
+        const visiblePathContinuityScore = plotted.length >= 2 ? +(100 / (1 + structuralBreakCount)).toFixed(1) : 0;
+        let readiness = 100;
+        if (chart.state !== 'ready') readiness -= 40;
+        if (chart.returnState !== 'ok') readiness -= 15;
+        readiness -= Math.min(30, structuralBreakCount * 10);
+        readiness -= Math.min(15, needleCount * 5);
+        if (preAccountPointCount > 0) readiness -= 10;
+        if (futurePointCount > 0) readiness -= 10;
+        if (firstSourceFamily && lastSourceFamily && firstSourceFamily !== lastSourceFamily && chart.returnState === 'ok') readiness -= 20;
+        const institutionalReadinessScore = Math.max(0, Math.min(100, readiness));
+        const syntheticPointsCount = plotted.filter(q => !srcArr.some(p => p && p.ts === q.ts)).length;
+        return {
+          rawSourceCount: inWin.length,
+          plottedCount: plotted.length,
+          droppedCount: Math.max(0, inWin.length - plotted.length),
+          backendCount: winBackend.length,
+          frontendCount: inWin.filter(p => p.family === 'frontend').length,
+          localCount: inWin.filter(p => p.localOrRemote === 'local').length,
+          remoteCount: inWin.filter(p => p.localOrRemote === 'remote').length,
+          liveCount: (last && last.ts === nowRef) ? 1 : 0,
+          sourceAuthorityMode: sourceAuthorityMode,
+          frontendUsableInRange: frontendUsableInRange,
+          backendExcludedByRangeAuthority: backendExcludedByRangeAuthority,
+          backendUsableInRange: backendUsableInRange,
+          firstPoint: first ? { ts: first.ts, iso: iso(first.ts), value: first.value } : null,
+          lastPoint: last ? { ts: last.ts, iso: iso(last.ts), value: last.value } : null,
+          firstSourceFamily: firstSourceFamily,
+          lastSourceFamily: lastSourceFamily,
+          firstEpoch: firstEpoch,
+          lastEpoch: lastEpoch,
+          sameEpoch: (first && last) ? (firstEpoch === lastEpoch) : null,
+          sameSourceFamily: (first && last) ? (firstSourceFamily === lastSourceFamily) : null,
+          badgeReturnPct: (chart.returnState === 'ok') ? chart.badgeReturnPct : null,
+          badgeState: badgeState,
+          displayedRangeState: chart.displayedRangeState || null,
+          trustReasons: trustReasons,
+          untrustReasons: untrustReasons,
+          segmentCount: segCount,
+          islandCount: islandCount,
+          needleCount: needleCount,
+          largestGapMs: largestGapMs,
+          largestJumpPct: +largestJumpPct.toFixed(4),
+          syntheticPointsCount: syntheticPointsCount,
+          futurePointCount: futurePointCount,
+          preAccountPointCount: preAccountPointCount,
+          stalePointCount: stalePointCount,
+          outOfBandPointCount: outOfBandPointCount,
+          smoothingMode: smoothingMode,
+          renderPathCount: renderPathCount,
+          structuralBreakCount: structuralBreakCount,
+          visiblePathContinuityScore: visiblePathContinuityScore,
+          institutionalReadinessScore: institutionalReadinessScore,
+          state: chart.state,
+          returnState: chart.returnState,
+        };
+      };
+
+      const rangeDiagnostics = {};
+      RANGES.forEach(r => { rangeDiagnostics[r] = analyze(r); });
+
+      // ── matrices (compact cross-range views) ──
+      const sourceFamilyMatrix = {}, epochMatrix = {}, segmentMatrix = {}, badgeMatrix = {}, rendererMatrix = {}, trustGateMatrix = {};
+      RANGES.forEach(r => {
+        const d = rangeDiagnostics[r];
+        sourceFamilyMatrix[r] = { first: d.firstSourceFamily, last: d.lastSourceFamily, same: d.sameSourceFamily, backend: d.backendCount, frontend: d.frontendCount, local: d.localCount, remote: d.remoteCount, authorityMode: d.sourceAuthorityMode, backendExcluded: d.backendExcludedByRangeAuthority, frontendUsable: d.frontendUsableInRange };
+        epochMatrix[r] = { firstEpoch: d.firstEpoch, lastEpoch: d.lastEpoch, sameEpoch: d.sameEpoch };
+        segmentMatrix[r] = { segments: d.segmentCount, islands: d.islandCount, needles: d.needleCount, largestGapMs: d.largestGapMs, largestJumpPct: d.largestJumpPct };
+        badgeMatrix[r] = { badgeReturnPct: d.badgeReturnPct, badgeState: d.badgeState, displayedRangeState: d.displayedRangeState, returnState: d.returnState };
+        rendererMatrix[r] = { renderPathCount: d.renderPathCount, structuralBreakCount: d.structuralBreakCount, smoothingMode: d.smoothingMode, continuityScore: d.visiblePathContinuityScore };
+        trustGateMatrix[r] = { trustReasons: d.trustReasons, untrustReasons: d.untrustReasons, frontendUsableInRange: d.frontendUsableInRange, backendExcludedByRangeAuthority: d.backendExcludedByRangeAuthority, state: d.state };
+      });
+
+      // ── top-level aggregates ──
+      const gaps = RANGES.filter(r => rangeDiagnostics[r].islandCount > 1).map(r => ({ range: r, islands: rangeDiagnostics[r].islandCount, largestGapMs: rangeDiagnostics[r].largestGapMs }));
+      const islands = RANGES.filter(r => rangeDiagnostics[r].islandCount > 1).map(r => ({ range: r, count: rangeDiagnostics[r].islandCount }));
+      const needles = RANGES.filter(r => rangeDiagnostics[r].needleCount > 0).map(r => ({ range: r, count: rangeDiagnostics[r].needleCount, largestJumpPct: rangeDiagnostics[r].largestJumpPct }));
+      const crossSourceReturns = RANGES.filter(r => rangeDiagnostics[r].returnState === 'ok' && rangeDiagnostics[r].sameSourceFamily === false).map(r => ({ range: r, first: rangeDiagnostics[r].firstSourceFamily, last: rangeDiagnostics[r].lastSourceFamily, badge: rangeDiagnostics[r].badgeReturnPct }));
+      const crossEpochReturns = RANGES.filter(r => rangeDiagnostics[r].returnState === 'ok' && rangeDiagnostics[r].sameEpoch === false).map(r => ({ range: r, firstEpoch: rangeDiagnostics[r].firstEpoch, lastEpoch: rangeDiagnostics[r].lastEpoch, badge: rangeDiagnostics[r].badgeReturnPct }));
+      const stalePoints = RANGES.filter(r => rangeDiagnostics[r].stalePointCount > 0).map(r => ({ range: r, count: rangeDiagnostics[r].stalePointCount }));
+      const futurePoints = RANGES.filter(r => rangeDiagnostics[r].futurePointCount > 0).map(r => ({ range: r, count: rangeDiagnostics[r].futurePointCount }));
+      const preAccountPoints = RANGES.filter(r => rangeDiagnostics[r].preAccountPointCount > 0).map(r => ({ range: r, count: rangeDiagnostics[r].preAccountPointCount }));
+      const untaggedPoints = { total: srcArr.filter(p => !(p && (p.source != null || p.portfolioRevision != null || p.revision != null || p.accountId != null || p.lifecycleId != null))).length, note: 'frontend-family points carry NO per-point source/revision/accountId/lifecycleId tag (root of DERIVED epoch/account gating).' };
+
+      const recommendations = [
+        { module: 'backendSnapshots', decision: 'conservar', risk: 'medium', note: 'legitimate long-history/gap-filler; keep but keep it OUT of 24H when frontend usable (already done in .11).' },
+        { module: 'remoteCanonicalHistory', decision: 'conservar', risk: 'low', note: 'single display authority for authed users; keep as source of truth.' },
+        { module: 'localCategoryHistory', decision: 'limitar', risk: 'medium', note: 'keep as cache+push-buffer only; must never gain display authority for authed users.' },
+        { module: '_aurixMergeSnapshotSources', decision: 'refactorizar', risk: 'medium', note: 'time-only fe-authority + near-dup is range-agnostic; fold range-awareness into the merge itself.' },
+        { module: '_aurixTrustedChartSource (epoch trust)', decision: 'conservar', risk: 'low', note: 'value-band + age floor works; consider making it range-aware to also trim long-range foreign epochs.' },
+        { module: '_aurixApplyRangeSourceAuthority', decision: 'ampliar', risk: 'medium', note: 'currently 24H-only; extend a continuity-validated authority to 7d/30d/1y.' },
+        { module: 'renderer structural-break split', decision: 'auditar-mas', risk: 'high', note: 'THE remaining cause of visible islands on 7d/30d/1y/all — splits the drawn line at bridges/capital-steps/sparse-ramps even inside one epoch.' },
+        { module: 'badge return path', decision: 'conservar', risk: 'low', note: 'flow-neutral + maturity/epoch gating is sound; keep but align its epoch/family comparability with the visible line.' },
+        { module: 'visible path', decision: 'alinear', risk: 'high', note: 'visible line must consume the SAME trusted/continuity-validated series the badge path uses.' },
+        { module: 'TOTAL/ALL', decision: 'mantener-neutro', risk: 'low', note: 'keep neutral until maturity (span/points/construction gates in .06) — working as intended.' },
+      ];
+
+      const out = {
+        spec: SPEC,
+        appVersion: safe(() => (typeof window !== 'undefined' && window.AURIX_BUILD) || null),
+        userHash: userHash,
+        authed: authed,
+        accountCreatedAtIso: iso(createdAt),
+        accountAgeHours: (createdAt != null) ? +((Date.now() - createdAt) / 36e5).toFixed(2) : null,
+        portfolioRevision: portfolioRevision,
+        lifecycleId: lifecycleId,
+        resetEpochIso: iso(resetEpoch),
+        chartEpochIso: iso(chartEpoch),
+        canonicalLoaded: canonicalLoaded,
+        reconciled: reconciled,
+        currentRange: safe(() => (typeof activeRange !== 'undefined' ? activeRange : null), null),
+        currentTotalValue: safe(() => (typeof getTotalValue === 'function') ? getTotalValue() : null, null),
+        note: 'READ-ONLY baseline (SPEC .12). Points are UNTAGGED (no per-point revision/account/source for the frontend family); epoch/family/segment are DERIVED heuristics, not stored truth. Nothing here is wired into render/calc.',
+        dataSources: dataSources,
+        rangeDiagnostics: rangeDiagnostics,
+        sourceFamilyMatrix: sourceFamilyMatrix,
+        epochMatrix: epochMatrix,
+        segmentMatrix: segmentMatrix,
+        badgeMatrix: badgeMatrix,
+        rendererMatrix: rendererMatrix,
+        trustGateMatrix: trustGateMatrix,
+        gaps: gaps,
+        islands: islands,
+        needles: needles,
+        crossSourceReturns: crossSourceReturns,
+        crossEpochReturns: crossEpochReturns,
+        stalePoints: stalePoints,
+        futurePoints: futurePoints,
+        preAccountPoints: preAccountPoints,
+        untaggedPoints: untaggedPoints,
+        syntheticPoints: 0,
+        recommendations: recommendations,
+      };
+      try { console.log('%c[UI][CHART_ARCHITECTURE_AUDIT]', 'font-weight:700;color:#8a63ff', out); } catch (_) {}
+      return out;
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
     // SPEC DSH.CHART.INSTITUTIONAL.LINE.01 — window.aurixChartForensics(range)
     // ════════════════════════════════════════════════════════════════════════════
     // READ-ONLY forensic dump for ONE range. Answers the three field questions:
