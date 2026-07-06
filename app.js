@@ -24042,6 +24042,66 @@ function _aurixResolveChartReturnContract(validatedSeries, range, context) {
 }
 try { if (typeof window !== 'undefined') window._aurixResolveChartReturnContract = _aurixResolveChartReturnContract; } catch (_) {}
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.SHORT-HISTORY-PREMIUM-DISPLAY.16 — presentation-layer display policy
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC.15 proved that when trustworthy current-lifecycle history is shorter than the requested range, the
+// long chart currently draws the same short in-window series (with any tiny initial construction fragments)
+// as if it were a full historic. This policy is PRESENTATION-ONLY: for a range whose trustworthy span is
+// below the range minimum, either (a) draw a CLEAN partial line of the recent MAIN cluster (initial
+// construction fragments dropped, never bridged) when it is visually stable, or (b) show the premium
+// "building / Calculando" state (no misleading line). It NEVER fabricates a point (only drops leading
+// fragments), never touches valuation/auth/backend/cron/snapshots, and never changes the badge/return
+// (SPEC.14 already shows Calculando for short history). 24H is untouched (SPEC.11). Reversible:
+// _AURIX_CHART_SHORT_HISTORY_DISPLAY=false ⇒ EXACT v497 behaviour (full points, no trim).
+const _AURIX_CHART_SHORT_HISTORY_DISPLAY = true;
+// Minimum trustworthy span (days) below which a range is "short history" → partial/building, not full.
+const _AURIX_CHART_SHORT_HISTORY_MIN_DAYS = { '24h': 0, '7d': 2, '30d': 7, '1y': 30, 'all': 7 };
+// Resolve the display policy for the ALREADY-BUILT chart (pure; reads emg.points only, mutates nothing).
+// Returns { mode:'full'|'partial_clean'|'building', showLine, displayPoints, trustSpanDays, minSpanDays,
+// droppedLeadingFragmentPts, reason, syntheticPoints:0 }.
+function _aurixShortHistoryDisplay(emg, range) {
+  const r = String(range || (emg && emg.range) || '').toLowerCase();
+  const pts = (emg && Array.isArray(emg.points)) ? emg.points : [];
+  const out = { mode: 'full', showLine: true, displayPoints: pts, trustSpanDays: null,
+    minSpanDays: 0, droppedLeadingFragmentPts: 0, reason: 'full', syntheticPoints: 0 };
+  try {
+    if (!(typeof _AURIX_CHART_SHORT_HISTORY_DISPLAY !== 'undefined' && _AURIX_CHART_SHORT_HISTORY_DISPLAY)) return out;
+    if (pts.length < 2) { out.mode = 'building'; out.showLine = false; out.displayPoints = []; out.reason = 'insufficient_points'; return out; }
+    if (r === '24h') { out.reason = '24h_unchanged'; return out; }                    // SPEC.11 — never touched
+    const tbl = (typeof _AURIX_CHART_SHORT_HISTORY_MIN_DAYS !== 'undefined') ? _AURIX_CHART_SHORT_HISTORY_MIN_DAYS : {};
+    const minDays = (tbl[r] != null) ? tbl[r] : 0;
+    out.minSpanDays = minDays;
+    const spanDays = (pts[pts.length - 1].ts - pts[0].ts) / 864e5;
+    out.trustSpanDays = +spanDays.toFixed(2);
+    // Split at structural temporal separations (independent of the range's own gap floor, so it works on
+    // long ranges too), then drop only SMALL leading construction fragments (never a large legitimate
+    // earlier cluster — that stays for SPEC.13 to segment honestly; fragments are dropped, never bridged).
+    const gaps = []; for (let i = 1; i < pts.length; i++) gaps.push(pts[i].ts - pts[i - 1].ts);
+    const med = gaps.length ? gaps.slice().sort((a, b) => a - b)[gaps.length >> 1] : 0;
+    const sepThr = Math.max(8 * (med || 0), 6 * 36e5);                                 // ≥8× median cadence AND ≥6h
+    const runs = [[pts[0]]];
+    for (let i = 1; i < pts.length; i++) { if ((pts[i].ts - pts[i - 1].ts) >= sepThr) runs.push([pts[i]]); else runs[runs.length - 1].push(pts[i]); }
+    const hadSeparations = runs.length > 1;
+    const fragMax = Math.max(3, Math.floor(0.15 * pts.length));                        // a leading run this small is a construction fragment
+    let dropped = 0;
+    while (runs.length > 1 && runs[0].length <= fragMax) { dropped += runs[0].length; runs.shift(); }
+    out.droppedLeadingFragmentPts = dropped;
+    const kept = [].concat.apply([], runs);                                            // remaining points (may still be ≥1 large legitimate clusters)
+    if (kept.length < 2) { out.mode = 'building'; out.showLine = false; out.displayPoints = []; out.reason = 'short_history_no_stable_segment'; return out; }
+    // pristine sufficient history with NO fragments dropped → full line (v497 behaviour, byte-identical).
+    if (spanDays >= minDays && dropped === 0 && kept.length === pts.length) { out.reason = 'sufficient_history_full_line'; return out; }
+    // otherwise premium partial: draw the CLEAN kept series (small initial fragments removed). Badge stays
+    // Calculando (SPEC.14) when the return is not trustworthy; large legitimate earlier clusters are kept
+    // and SPEC.13 segments any real gap between them (no synthetic bridge).
+    out.mode = 'partial_clean'; out.showLine = true; out.displayPoints = kept;
+    out.reason = dropped ? 'short_history_leading_fragments_dropped'
+      : (spanDays < minDays ? 'short_history_partial_clean' : 'trimmed_partial_clean');
+    return out;
+  } catch (_) { return { mode: 'full', showLine: true, displayPoints: pts, trustSpanDays: null, minSpanDays: 0, droppedLeadingFragmentPts: 0, reason: 'error_fallback_full', syntheticPoints: 0 }; }
+}
+try { if (typeof window !== 'undefined') window._aurixShortHistoryDisplay = _aurixShortHistoryDisplay; } catch (_) {}
+
 // P0-PREMIUM-RENDERER-RECONNECTION — render the ALREADY-VALIDATED buildProductionPortfolioChart points
 // through the ORIGINAL institutional geometry (LTTB downsample → regime-aware scales → monotone-CUBIC
 // path → area). Values are NEVER modified: the only change is a ts→time shape rename. Returns a premium
@@ -24566,6 +24626,15 @@ try {
         contractUnified: (typeof _AURIX_CHART_RETURN_CONTRACT_UNIFICATION !== 'undefined') ? !!_AURIX_CHART_RETURN_CONTRACT_UNIFICATION : false,
         syntheticPoints: _rc.syntheticPoints,
       } : null;
+      // SPEC.16 — presentation-layer short-history display policy for this range (read-only diagnostic).
+      const _shd = safe(() => (typeof _aurixShortHistoryDisplay === 'function' && chart) ? _aurixShortHistoryDisplay(chart, r) : null, null);
+      const shortHistoryDisplay = _shd ? {
+        enabled: (typeof _AURIX_CHART_SHORT_HISTORY_DISPLAY !== 'undefined') ? !!_AURIX_CHART_SHORT_HISTORY_DISPLAY : false,
+        mode: _shd.mode, showLine: _shd.showLine, reason: _shd.reason,
+        trustSpanDays: _shd.trustSpanDays, minSpanDays: _shd.minSpanDays,
+        displayPointCount: Array.isArray(_shd.displayPoints) ? _shd.displayPoints.length : 0,
+        droppedLeadingFragmentPts: _shd.droppedLeadingFragmentPts, syntheticPoints: 0,
+      } : null;
       const out = {
         spec: 'DSH.CHART.POINT-LINEAGE.DISCONTINUITY.AUDIT.10', range: r,
         accountCreatedAtIso: iso(createdAt), accountAgeHours: (createdAt != null) ? +((Date.now() - createdAt) / 36e5).toFixed(2) : null,
@@ -24596,6 +24665,7 @@ try {
         returnCrossSourceFamilyBlocked: returnCrossSourceFamilyBlocked,
         continuityUnification: continuityUnification,
         returnContract: returnContract,
+        shortHistoryDisplay: shortHistoryDisplay,
         needles: needles.slice(0, 40), islands: islands, syntheticPoints: 0,
         finalPlottedPoints: finalPts.slice(0, 10).concat(finalPts.slice(-10)),
         droppedPoints: dropped.slice(0, 20),
@@ -27956,6 +28026,20 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
   // Badge — one source, always coherent with the line.
   if (changeEl) _aurixEmergencyPaintBadgeNode(changeEl, emg, surface);
 
+  // SPEC.16 — short-history display policy (PRESENTATION ONLY). building ⇒ premium Calculando (no line);
+  // partial_clean ⇒ trim emg.points to the recent MAIN cluster (initial construction fragments dropped,
+  // never bridged; syntheticPoints=0). The unchanged pending branch + render calls below stay byte-identical
+  // (they still read emg.points). Flag OFF / helper absent ⇒ mode 'full' ⇒ no-op (v497).
+  let _shd = null;
+  try { if (emg.state === 'ready' && typeof _aurixShortHistoryDisplay === 'function') _shd = _aurixShortHistoryDisplay(emg, emg.range); } catch (_) {}
+  if (_shd && _shd.mode === 'building') {
+    _aurixLastVisualSig[surface] = null;
+    try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'building'); } catch (_) {}
+    _wscRenderInsufficient(hostEl, { realPointCount: emg.pointCount, reason: _shd.reason }, { mode: 'building', eligible: [], lastGood: null });
+    return true;
+  }
+  if (_shd && _shd.mode === 'partial_clean' && Array.isArray(_shd.displayPoints) && _shd.displayPoints.length >= 2) emg.points = _shd.displayPoints;
+
   if (emg.state !== 'ready') {
     try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'building'); } catch (_) {}
     _wscRenderInsufficient(hostEl, { realPointCount: emg.pointCount, reason: emg.reason },
@@ -28486,6 +28570,18 @@ function renderAurixMobileLiteChart(range, token) {
         const emg = buildProductionPortfolioChart(r);
         try { if (typeof window !== 'undefined') window._aurixEmergencyLastMobile = emg; } catch (_) {}
         _aurixChartUpdateLog('mobile', emg);
+        // SPEC.16 — short-history display policy (PRESENTATION ONLY). building ⇒ premium Calculando skeleton
+        // (no misleading line); partial_clean ⇒ trim emg.points to the recent MAIN cluster (initial fragments
+        // dropped, never bridged). Unchanged pending branch + render below stay byte-identical (read emg.points).
+        let _shdM = null;
+        try { if (emg.state === 'ready' && typeof _aurixShortHistoryDisplay === 'function') _shdM = _aurixShortHistoryDisplay(emg, r); } catch (_) {}
+        if (_shdM && _shdM.mode === 'building') {
+          _aurixLastVisualSig.mobile = null;
+          _aurixMobileLiteFallback('pending');
+          if (_aurixMobileLiteEmptyRetries < 6) { _aurixMobileLiteEmptyRetries++; try { setTimeout(function () { scheduleAurixMobileLite(r); }, 1300); } catch (_) {} }
+          return;
+        }
+        if (_shdM && _shdM.mode === 'partial_clean' && Array.isArray(_shdM.displayPoints) && _shdM.displayPoints.length >= 2) emg.points = _shdM.displayPoints;
         if (emg.state !== 'ready') {
           _aurixLastVisualSig.mobile = null;   // FIX 1 — pending forces a fresh draw on the next ready
           _aurixMobileLiteFallback('pending');
