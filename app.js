@@ -24160,6 +24160,60 @@ function _aurixVisualTrustGate(points, range) {
 }
 try { if (typeof window !== 'undefined') window._aurixVisualTrustGate = _aurixVisualTrustGate; } catch (_) {}
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.BOOTSTRAP-DISPLAY-SUPPRESSION.18 — hide the bootstrap/construction prefix; show the stable tramo
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC.16/17 drop islands separated by TIME gaps. But a new/reset account often has a SINGLE
+// time-continuous run that ramps up from low bootstrap/construction values to the current stable level —
+// no time gap, so those gates keep it and the long range shows a low-value construction ramp as if it were
+// premium history. This gate is VALUE-based: when the badge is Calculando (short/untrusted history), it
+// picks the "stable display anchor" — the first point from which the series sits within a tight band of the
+// current value (85–115%) AND has enough stable continuity after (≥N points, ≥30 min span, no construction
+// jump immediately after) — and shows ONLY that trailing stable tramo. Everything before the anchor is
+// HIDDEN VISUALLY (never deleted, never a snapshot change). If no stable tramo qualifies → premium building.
+// Mature/clean accounts (badge OK) pass through UNCHANGED (24H clean included). Never bridges, never
+// interpolates, never fabricates (only hides a prefix) → syntheticPoints=0. Reversible:
+// _AURIX_CHART_BOOTSTRAP_SUPPRESSION=false ⇒ v499 (no suppression).
+const _AURIX_CHART_BOOTSTRAP_SUPPRESSION = true;
+const _AURIX_STABLE_BAND_LO = 0.85, _AURIX_STABLE_BAND_HI = 1.15;   // stable = within ±15% of the current value
+const _AURIX_STABLE_MIN_PTS = 3;                                    // the stable tramo needs ≥3 points
+const _AURIX_STABLE_MIN_SPAN_MS = 30 * 60000;                       // …AND ≥30 min span
+const _AURIX_STABLE_CONSTRUCTION_JUMP = 0.15;                       // a >15% step at the anchor edge = still constructing
+function _aurixStableDisplayAnchor(points, range, context) {
+  context = context || {};
+  const src = Array.isArray(points) ? points.filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value)) : [];
+  const out = { mode: 'line', points: src.slice(), anchorIndex: 0, anchorTs: null, hiddenPrefixPts: 0, currentValue: null, bandLo: null, bandHi: null, reason: 'passthrough', syntheticPoints: 0 };
+  try {
+    if (!(typeof _AURIX_CHART_BOOTSTRAP_SUPPRESSION !== 'undefined' && _AURIX_CHART_BOOTSTRAP_SUPPRESSION)) return out;
+    if (src.length < 2) { out.mode = 'building'; out.points = []; out.reason = 'insufficient_points'; return out; }
+    // Only act when the badge is Calculando (short/untrusted history). Mature/clean (badge OK) ⇒ unchanged.
+    if (!context.badgeCalculando) { out.reason = 'badge_ok_passthrough'; return out; }
+    const current = src[src.length - 1].value;
+    if (!(current > 0)) { out.reason = 'no_current_value'; return out; }
+    const lo = current * _AURIX_STABLE_BAND_LO, hi = current * _AURIX_STABLE_BAND_HI;
+    out.currentValue = current; out.bandLo = +lo.toFixed(2); out.bandHi = +hi.toFixed(2);
+    const minPts = _AURIX_STABLE_MIN_PTS, minSpan = _AURIX_STABLE_MIN_SPAN_MS, cjump = _AURIX_STABLE_CONSTRUCTION_JUMP;
+    for (let i = 0; i < src.length; i++) {
+      const v = src[i].value;
+      if (!(v >= lo && v <= hi)) continue;                          // out-of-band ⇒ bootstrap/construction prefix
+      const tail = src.slice(i);
+      if (tail.length < minPts) break;                              // too few after here (and later i are shorter) ⇒ stop
+      const span = tail[tail.length - 1].ts - tail[0].ts;
+      if (span < minSpan) break;                                    // too brief ⇒ stop
+      // no big construction jump right at the anchor edge (still ramping) ⇒ try a later in-band point
+      let constructing = false;
+      for (let k = i; k < Math.min(src.length - 1, i + 2); k++) { const a = src[k].value, b = src[k + 1].value; if (a > 0 && Math.abs(b - a) / a > cjump) { constructing = true; break; } }
+      if (constructing) continue;
+      out.points = tail; out.anchorIndex = i; out.anchorTs = src[i].ts; out.hiddenPrefixPts = i;
+      out.reason = i > 0 ? 'trimmed_bootstrap_prefix_to_stable_anchor' : 'already_stable_from_start';
+      return out;
+    }
+    out.mode = 'building'; out.points = []; out.reason = 'no_stable_tramo';
+    return out;
+  } catch (_) { return { mode: 'line', points: Array.isArray(points) ? points.slice() : [], anchorIndex: 0, anchorTs: null, hiddenPrefixPts: 0, currentValue: null, bandLo: null, bandHi: null, reason: 'error_passthrough', syntheticPoints: 0 }; }
+}
+try { if (typeof window !== 'undefined') window._aurixStableDisplayAnchor = _aurixStableDisplayAnchor; } catch (_) {}
+
 // P0-PREMIUM-RENDERER-RECONNECTION — render the ALREADY-VALIDATED buildProductionPortfolioChart points
 // through the ORIGINAL institutional geometry (LTTB downsample → regime-aware scales → monotone-CUBIC
 // path → area). Values are NEVER modified: the only change is a ts→time shape rename. Returns a premium
@@ -24705,6 +24759,16 @@ try {
         mainSegment: _vtg.mainSegment ? { startIso: iso(_vtg.mainSegment.startTs), endIso: iso(_vtg.mainSegment.endTs), count: _vtg.mainSegment.count } : null,
         syntheticPoints: 0,
       } : null;
+      // SPEC.18 — bootstrap-suppression diagnostic (runs on the same points, badge-Calculando gated).
+      const _sdaChart = chart && Array.isArray(chart.points) ? chart.points : [];
+      const _sda = safe(() => (typeof _aurixStableDisplayAnchor === 'function') ? _aurixStableDisplayAnchor(_sdaChart, r, { badgeCalculando: !!(chart && chart.returnState !== 'ok') }) : null, null);
+      const stableDisplayAnchor = _sda ? {
+        enabled: (typeof _AURIX_CHART_BOOTSTRAP_SUPPRESSION !== 'undefined') ? !!_AURIX_CHART_BOOTSTRAP_SUPPRESSION : false,
+        badgeCalculando: !!(chart && chart.returnState !== 'ok'),
+        mode: _sda.mode, reason: _sda.reason, anchorIso: iso(_sda.anchorTs),
+        hiddenPrefixPts: _sda.hiddenPrefixPts, renderedPointCount: Array.isArray(_sda.points) ? _sda.points.length : 0,
+        currentValue: _sda.currentValue, bandLo: _sda.bandLo, bandHi: _sda.bandHi, syntheticPoints: 0,
+      } : null;
       const out = {
         spec: 'DSH.CHART.POINT-LINEAGE.DISCONTINUITY.AUDIT.10', range: r,
         accountCreatedAtIso: iso(createdAt), accountAgeHours: (createdAt != null) ? +((Date.now() - createdAt) / 36e5).toFixed(2) : null,
@@ -24737,6 +24801,7 @@ try {
         returnContract: returnContract,
         shortHistoryDisplay: shortHistoryDisplay,
         visualTrustGate: visualTrustGate,
+        stableDisplayAnchor: stableDisplayAnchor,
         needles: needles.slice(0, 40), islands: islands, syntheticPoints: 0,
         finalPlottedPoints: finalPts.slice(0, 10).concat(finalPts.slice(-10)),
         droppedPoints: dropped.slice(0, 20),
@@ -28111,6 +28176,19 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
   }
   if (_shd && _shd.mode === 'partial_clean' && Array.isArray(_shd.displayPoints) && _shd.displayPoints.length >= 2) emg.points = _shd.displayPoints;
 
+  // SPEC.18 — bootstrap suppression: when the badge is Calculando, hide the low bootstrap/construction
+  // prefix (value out of ±15% of current) and show only the trailing STABLE tramo, or building if none.
+  // Mutates emg.points in place. Mature/clean (badge OK) ⇒ passthrough. No time-gap needed (value-based).
+  let _sda = null;
+  try { if (emg.state === 'ready' && typeof _aurixStableDisplayAnchor === 'function') _sda = _aurixStableDisplayAnchor(emg.points, emg.range, { badgeCalculando: emg.returnState !== 'ok' }); } catch (_) {}
+  if (_sda && _sda.mode === 'building') {
+    _aurixLastVisualSig[surface] = null;
+    try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'building'); } catch (_) {}
+    _wscRenderInsufficient(hostEl, { realPointCount: emg.pointCount, reason: _sda.reason }, { mode: 'building', eligible: [], lastGood: null });
+    return true;
+  }
+  if (_sda && Array.isArray(_sda.points) && _sda.points.length >= 2) emg.points = _sda.points;
+
   // SPEC.17 — visual trust gate (ALL ranges incl 24H): keep only the recent MAIN segment (small initial
   // islands dropped, never bridged) or the premium building state when the main is not trustworthy. Renders
   // via emg.points (mutated in place) so the render calls below stay byte-identical. No-op ⇒ mode 'line'.
@@ -28666,6 +28744,17 @@ function renderAurixMobileLiteChart(range, token) {
           return;
         }
         if (_shdM && _shdM.mode === 'partial_clean' && Array.isArray(_shdM.displayPoints) && _shdM.displayPoints.length >= 2) emg.points = _shdM.displayPoints;
+        // SPEC.18 — bootstrap suppression: badge Calculando ⇒ hide low bootstrap prefix, show stable tramo
+        // (or building). Value-based; mutates emg.points in place. Mature/clean (badge OK) ⇒ passthrough.
+        let _sdaM = null;
+        try { if (emg.state === 'ready' && typeof _aurixStableDisplayAnchor === 'function') _sdaM = _aurixStableDisplayAnchor(emg.points, r, { badgeCalculando: emg.returnState !== 'ok' }); } catch (_) {}
+        if (_sdaM && _sdaM.mode === 'building') {
+          _aurixLastVisualSig.mobile = null;
+          _aurixMobileLiteFallback('pending');
+          if (_aurixMobileLiteEmptyRetries < 6) { _aurixMobileLiteEmptyRetries++; try { setTimeout(function () { scheduleAurixMobileLite(r); }, 1300); } catch (_) {} }
+          return;
+        }
+        if (_sdaM && Array.isArray(_sdaM.points) && _sdaM.points.length >= 2) emg.points = _sdaM.points;
         // SPEC.17 — visual trust gate (all ranges incl 24H): keep only the recent MAIN segment (small
         // initial islands dropped, never bridged) or premium building. Mutates emg.points in place.
         let _vtgM = null;
