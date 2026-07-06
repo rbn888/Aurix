@@ -23852,9 +23852,116 @@ function _aurixSparseRampBreaks(points, range) {
   return out;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.CONTINUITY-UNIFICATION.13 — one definition of economic continuity, shared by the visible
+// line, the structural-break split and the diagnostics.
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC.12 proved the islands are NOT synthetic points (syntheticPoints=0): the RENDERER splits the curve
+// into subpaths on structural breaks, and the SPARSE-RAMP detector over-fires — it cuts a run that is
+// merely SPARSELY SAMPLED even when the two points belong to the SAME economic segment with NO real
+// temporal gap. Those cuts are ARTIFICIAL ISLANDS. This unification keeps the HONEST breaks (a confirmed
+// sparse BRIDGE = a genuine outage; a CAPITAL STEP = a real ledger flow) and drops ONLY the artificial
+// sparse-ramp cuts inside a continuous economic segment (gap < the engine's own real-gap floor AND not a
+// capital step). Same economic data ⇒ ONE premium line; a real gap / real deposit ⇒ honest segmentation;
+// never a synthetic point, never an interpolated bridge, never a hidden line. Reversible: set the flag
+// false ⇒ EXACT v494 behavior (the old union), byte-identical.
+const _AURIX_CHART_CONTINUITY_UNIFICATION = true;
+// The engine's OWN "real temporal gap" threshold for a range (the genuine-outage rule the visible-points
+// gap detector + the bridge detector already use: max(per-range floor, median cadence × 8)). Reused here
+// so the renderer's break decision, the badge eligibility and the diagnostics share ONE gap definition.
+function _aurixRealGapFloorMs(points, range) {
+  const r = String(range || '').toLowerCase();
+  const n = Array.isArray(points) ? points.length : 0;
+  let median = 0;
+  if (n >= 2) { const iv = []; for (let i = 1; i < n; i++) iv.push(points[i].time - points[i - 1].time); iv.sort((a, b) => a - b); median = iv[iv.length >> 1] || 0; }
+  const tbl = (typeof _AURIX_VP_GAP_FLOOR_MS !== 'undefined') ? _AURIX_VP_GAP_FLOOR_MS : {};
+  let floor = tbl[r] || (7 * 864e5);
+  if (r === 'all' && n >= 2) { const span = points[n - 1].time - points[0].time; floor = Math.max(tbl.all || (45 * 864e5), span / 8); }
+  const mult = (typeof _AURIX_VP_GAP_MEDIAN_MULT === 'number') ? _AURIX_VP_GAP_MEDIAN_MULT : 8;
+  return Math.max(floor, median * mult);
+}
+// THE continuity-validated series chokepoint. Given the (already validated) points + range it returns the
+// SAME truth the visible line, the structural breaks, the badge eligibility and the diagnostics must all
+// read: which breaks are honest (real gap / capital step) vs artificial (same-segment sparse ramp), the
+// resulting segments, coverage, displayedRangeState and badgeEligibility. NEVER invents/deletes a point.
+function _aurixBuildContinuityValidatedSeries(points, range, opts) {
+  opts = opts || {};
+  const r = String(range || '').toLowerCase();
+  const pts = (Array.isArray(points) ? points : []).map(p => ({ time: (p && p.time != null) ? p.time : (p && p.ts), value: p && p.value })).filter(p => Number.isFinite(p.time) && Number.isFinite(p.value)).sort((a, b) => a.time - b.time);   // order-independent (production input is already sorted ⇒ no-op)
+  const out = {
+    points: pts, segments: [], breaks: [], continuityState: 'insufficient',
+    displayedRangeState: null, badgeEligibility: 'calculating', reasonCodes: [],
+    sourceAuthorityMode: (r === '24h') ? '24h_frontend_authority' : 'mixed_long_range',
+    coverageRatio: null, syntheticPoints: 0,
+    structuralBreaksBefore: 0, structuralBreaksAfter: 0,
+    sparseRampBreaksBefore: 0, sparseRampBreaksAfter: 0,
+    capitalStepBreaksBefore: 0, capitalStepBreaksAfter: 0,
+    bridgeBreaks: 0, realGapCount: 0, artificialIslandCount: 0, realGapFloorMs: 0,
+  };
+  const on = (typeof _AURIX_CHART_CONTINUITY_UNIFICATION !== 'undefined') && _AURIX_CHART_CONTINUITY_UNIFICATION && !opts.forceOff;
+  let bridges = [], capital = [], ramps = [];
+  try { bridges = _aurixConfirmedBridgeGaps(pts, r) || []; } catch (_) {}
+  try { capital = _aurixCapitalStepBreaks(pts, r) || []; } catch (_) {}
+  try { ramps = _aurixSparseRampBreaks(pts, r) || []; } catch (_) {}
+  out.bridgeBreaks = bridges.length; out.capitalStepBreaksBefore = capital.length; out.sparseRampBreaksBefore = ramps.length;
+  const floor = _aurixRealGapFloorMs(pts, r); out.realGapFloorMs = floor;
+  const dur = b => (b && b.durationMs != null) ? b.durationMs : (b ? (b.end - b.start) : 0);
+  const capKeys = new Set(capital.map(b => b.start + ':' + b.end));
+  const bridgeKeys = new Set(bridges.map(b => b.start + ':' + b.end));
+  // REAL temporal gaps = every connection whose duration ≥ the engine's own real-gap floor. This is the
+  // SINGLE definition of "real gap": it segments even a lone interior real hole the bridge (dominance-gated)
+  // and sparse-ramp (run-gated) detectors under-flag — so a real absence of data is NEVER drawn as a false
+  // continuous bridge, and is never interpolated.
+  const realGaps = [];
+  for (let i = 1; i < pts.length; i++) { const d = pts[i].time - pts[i - 1].time; if (d >= floor) realGaps.push({ start: pts[i - 1].time, end: pts[i].time, durationMs: d, reason: 'real_temporal_gap' }); }
+  const realGapKeys = new Set(realGaps.map(b => b.start + ':' + b.end));
+  // structuralBreaksBefore = the v494 union (bridge ∪ capital ∪ ALL ramps).
+  { const s = new Set(); [].concat(bridges, capital, ramps).forEach(b => { if (b && Number.isFinite(b.start) && Number.isFinite(b.end)) s.add(b.start + ':' + b.end); }); out.structuralBreaksBefore = s.size; }
+  // GATE ON honest breaks = bridges ∪ capital steps ∪ real gaps. A sparse-ramp cut that is NEITHER a real
+  // gap NOR a capital step is an ARTIFICIAL island (same economic segment, only sparsely sampled) → dropped.
+  // GATE OFF = the exact v494 union (bridge ∪ capital ∪ ALL ramps), byte-identical.
+  const contributors = on ? [].concat(bridges, capital, realGaps) : [].concat(bridges, capital, ramps);
+  const seen = new Set(), breaks = [];
+  contributors.forEach(b => { if (!b || !Number.isFinite(b.start) || !Number.isFinite(b.end)) return; const k = b.start + ':' + b.end; if (seen.has(k)) return; seen.add(k); breaks.push(b); });
+  breaks.sort((a, b) => a.start - b.start);
+  const breakKeys = new Set(breaks.map(b => b.start + ':' + b.end));
+  out.sparseRampBreaksAfter = ramps.filter(b => breakKeys.has(b.start + ':' + b.end)).length;
+  out.capitalStepBreaksAfter = capital.length;
+  if (on) { out.artificialIslandCount = ramps.filter(b => !breakKeys.has(b.start + ':' + b.end)).length; if (out.artificialIslandCount > 0) out.reasonCodes.push('sparse_ramp_artificial_suppressed'); }
+  out.breaks = breaks; out.structuralBreaksAfter = breaks.length;
+  out.realGapCount = breaks.filter(b => bridgeKeys.has(b.start + ':' + b.end) || realGapKeys.has(b.start + ':' + b.end)).length;
+  if (pts.length >= 2) {
+    let runs = [pts];
+    try { if (typeof _aurixSplitAtGaps === 'function') runs = _aurixSplitAtGaps(pts, breaks) || [pts]; } catch (_) { runs = [pts]; }
+    out.segments = runs.filter(run => run && run.length).map(run => ({ startTs: run[0].time, endTs: run[run.length - 1].time, count: run.length }));
+    out.continuityState = breaks.length === 0 ? 'continuous' : (capital.length ? 'segmented_capital' : (out.realGapCount ? 'segmented_real_gap' : 'segmented'));
+  }
+  const rangeTbl = (typeof _AURIX_EMG_RANGE_MS !== 'undefined') ? _AURIX_EMG_RANGE_MS : {};
+  const reqSpan = rangeTbl[r];
+  if (pts.length >= 2 && r !== 'all' && Number.isFinite(reqSpan) && reqSpan > 0) {
+    const actual = pts[pts.length - 1].time - pts[0].time;
+    out.coverageRatio = +(actual / reqSpan).toFixed(4);
+    out.displayedRangeState = out.coverageRatio < 0.8 ? 'partial_history' : 'full';
+  } else if (r === 'all') { out.displayedRangeState = 'all_history'; }
+  out.badgeEligibility = (pts.length >= 2 && out.continuityState === 'continuous' && (out.coverageRatio == null || out.coverageRatio >= 0.8)) ? 'eligible' : 'calculating';
+  if (out.continuityState !== 'continuous' && out.continuityState !== 'insufficient') out.reasonCodes.push('non_continuous_' + out.continuityState);
+  if (out.coverageRatio != null && out.coverageRatio < 0.8) out.reasonCodes.push('insufficient_coverage');
+  return out;
+}
+
 // The single set of structural breaks the visible line splits on: sparse bridge ∪ capital step ∪ sparse
 // ramp, de-duplicated by the (start,end) connection. Returns counts per category for observability.
+// SPEC .13 — when continuity unification is ON, delegate to the continuity-validated series so the renderer
+// splits on the SAME break set the badge/diagnostics use (artificial same-segment sparse-ramp islands
+// removed; real gaps + capital steps preserved). Flag OFF / helper absent ⇒ the EXACT v494 union below.
 function _aurixStructuralBreaks(points, range) {
+  if ((typeof _AURIX_CHART_CONTINUITY_UNIFICATION !== 'undefined') && _AURIX_CHART_CONTINUITY_UNIFICATION && typeof _aurixBuildContinuityValidatedSeries === 'function') {
+    try {
+      const cv = _aurixBuildContinuityValidatedSeries(points, range);
+      return { breaks: cv.breaks, bridgeCount: cv.bridgeBreaks, capitalStepCount: cv.capitalStepBreaksAfter, sparseRampCount: cv.sparseRampBreaksAfter,
+        artificialIslandCount: cv.artificialIslandCount, continuityState: cv.continuityState, continuityUnified: true };
+    } catch (_) { /* fall through to v494 union */ }
+  }
   let bridges = [], capital = [], ramps = [];
   try { bridges = _aurixConfirmedBridgeGaps(points, range) || []; } catch (_) {}
   try { capital = _aurixCapitalStepBreaks(points, range) || []; } catch (_) {}
@@ -23866,8 +23973,9 @@ function _aurixStructuralBreaks(points, range) {
     if (seen.has(key)) return; seen.add(key); breaks.push(b);
   });
   breaks.sort((a, b) => a.start - b.start);
-  return { breaks: breaks, bridgeCount: bridges.length, capitalStepCount: capital.length, sparseRampCount: ramps.length };
+  return { breaks: breaks, bridgeCount: bridges.length, capitalStepCount: capital.length, sparseRampCount: ramps.length, continuityUnified: false };
 }
+try { if (typeof window !== 'undefined') window._aurixBuildContinuityValidatedSeries = _aurixBuildContinuityValidatedSeries; } catch (_) {}
 
 // P0-PREMIUM-RENDERER-RECONNECTION — render the ALREADY-VALIDATED buildProductionPortfolioChart points
 // through the ORIGINAL institutional geometry (LTTB downsample → regime-aware scales → monotone-CUBIC
@@ -24321,6 +24429,38 @@ try {
       const badgeSourceFamily = (chart && chart.returnState === 'ok') ? ((firstSourceFamily && firstSourceFamily === lastSourceFamily) ? firstSourceFamily : 'mixed') : null;
       const sourceAuthorityMode = (r === '24h') ? (frontendUsableInRange ? 'frontend_authority_24h' : 'backend_fallback_24h') : 'mixed_long_range';
       const returnCrossSourceFamilyBlocked = !!(r === '24h' && frontendUsableInRange && backendExcludedByRangeAuthority > 0);
+      // SPEC DSH.CHART.CONTINUITY-UNIFICATION.13 — the visible line, the structural breaks and the badge
+      // now read ONE continuity-validated series. This block proves the alignment: it runs the SAME helper
+      // the renderer uses on the plotted points (GATE ON) and again forced OFF (v494), and reports the
+      // before/after break split, the artificial islands removed and whether badge/visible use it.
+      const _cvPts = finalPts.map(p => ({ time: p.ts, value: p.value }));
+      const _cvOn = safe(() => (typeof _aurixBuildContinuityValidatedSeries === 'function') ? _aurixBuildContinuityValidatedSeries(_cvPts, r) : null, null);
+      const _cvOff = safe(() => (typeof _aurixBuildContinuityValidatedSeries === 'function') ? _aurixBuildContinuityValidatedSeries(_cvPts, r, { forceOff: true }) : null, null);
+      const _cvFlag = safe(() => (typeof _AURIX_CHART_CONTINUITY_UNIFICATION !== 'undefined') ? !!_AURIX_CHART_CONTINUITY_UNIFICATION : false, false);
+      const continuityUnification = {
+        continuityUnified: _cvFlag,
+        continuityState: _cvOn ? _cvOn.continuityState : null,
+        renderPathCount: _cvOn ? (_cvOn.breaks.length + (finalPts.length >= 2 ? 1 : 0)) : null,
+        renderPathCountBefore: _cvOff ? (_cvOff.breaks.length + (finalPts.length >= 2 ? 1 : 0)) : null,
+        realGapCount: _cvOn ? _cvOn.realGapCount : null,
+        artificialIslandCount: _cvOn ? _cvOn.artificialIslandCount : null,
+        structuralBreaksBefore: _cvOff ? _cvOff.structuralBreaksAfter : null,
+        structuralBreaksAfter: _cvOn ? _cvOn.structuralBreaksAfter : null,
+        sparseRampBreaksBefore: _cvOn ? _cvOn.sparseRampBreaksBefore : null,
+        sparseRampBreaksAfter: _cvOn ? _cvOn.sparseRampBreaksAfter : null,
+        capitalStepBreaksBefore: _cvOn ? _cvOn.capitalStepBreaksBefore : null,
+        capitalStepBreaksAfter: _cvOn ? _cvOn.capitalStepBreaksAfter : null,
+        badgeEligibility: _cvOn ? _cvOn.badgeEligibility : null,
+        badgeUsesContinuitySeries: false,   // badge keeps its own proven gates (coverage/maturity); this reports agreement, does not drive it
+        visibleUsesContinuitySeries: _cvFlag,   // the renderer's _aurixStructuralBreaks delegates here when the flag is on
+        sourceAuthorityMode: _cvOn ? _cvOn.sourceAuthorityMode : sourceAuthorityMode,
+        displayedRangeState: _cvOn ? _cvOn.displayedRangeState : (chart ? chart.displayedRangeState : null),
+        reasonCodes: _cvOn ? _cvOn.reasonCodes : [],
+        realGapFloorMs: _cvOn ? _cvOn.realGapFloorMs : null,
+        // agreement: does the badge (returnState ok) contradict a segmented visible line?
+        badgeContradictsVisible: !!(chart && chart.returnState === 'ok' && _cvOn && _cvOn.continuityState !== 'continuous' && _cvOn.realGapCount > 0),
+        syntheticPoints: 0,
+      };
       const out = {
         spec: 'DSH.CHART.POINT-LINEAGE.DISCONTINUITY.AUDIT.10', range: r,
         accountCreatedAtIso: iso(createdAt), accountAgeHours: (createdAt != null) ? +((Date.now() - createdAt) / 36e5).toFixed(2) : null,
@@ -24349,6 +24489,7 @@ try {
         lastSourceFamily: lastSourceFamily,
         badgeSourceFamily: badgeSourceFamily,
         returnCrossSourceFamilyBlocked: returnCrossSourceFamilyBlocked,
+        continuityUnification: continuityUnification,
         needles: needles.slice(0, 40), islands: islands, syntheticPoints: 0,
         finalPlottedPoints: finalPts.slice(0, 10).concat(finalPts.slice(-10)),
         droppedPoints: dropped.slice(0, 20),
