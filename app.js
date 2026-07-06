@@ -24102,6 +24102,64 @@ function _aurixShortHistoryDisplay(emg, range) {
 }
 try { if (typeof window !== 'undefined') window._aurixShortHistoryDisplay = _aurixShortHistoryDisplay; } catch (_) {}
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.VISUAL-TRUST-GATE.17 — never render disconnected initial islands; main segment or building
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC.16 dropped small LEADING fragments only on short-history ranges (24H exempt). This gate generalises
+// it to EVERY range (24H included): given the points about to be drawn, it computes the real visual
+// segments and, when there is more than one, keeps ONLY the recent MAIN segment (dropping SMALL earlier
+// islands — never a LARGE legitimate earlier cluster, which stays for SPEC.13 to segment honestly). If the
+// resulting main segment is not visually trustworthy (too few points / too brief), it renders nothing and
+// the caller shows the premium "Calculando/Construyendo" state. NEVER bridges dropped fragments, NEVER
+// fabricates a point (only drops) → syntheticPoints stays 0. Badge stays under SPEC.14. Mature single-run
+// and mature real multi-segment accounts pass through UNCHANGED (no regression). Reversible:
+// _AURIX_CHART_VISUAL_TRUST_GATE=false ⇒ v498 (no gate).
+const _AURIX_CHART_VISUAL_TRUST_GATE = true;
+const _AURIX_VTG_MIN_MAIN_PTS = 3;          // a lone main segment needs ≥3 points to be a trustworthy line
+const _AURIX_VTG_MIN_MAIN_SPAN_MS = 15 * 60000;   // …AND span ≥15 min (kills sub-minute construction blips)
+function _aurixVisualTrustGate(points, range) {
+  const r = String(range || '').toLowerCase();
+  const src = Array.isArray(points) ? points.filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value)) : [];
+  const out = { mode: 'line', points: src.slice(), segmentCount: src.length ? 1 : 0, mainSegment: null,
+    droppedSegmentCount: 0, droppedPointCount: 0, reason: 'passthrough', syntheticPoints: 0 };
+  try {
+    if (!(typeof _AURIX_CHART_VISUAL_TRUST_GATE !== 'undefined' && _AURIX_CHART_VISUAL_TRUST_GATE)) return out;
+    if (src.length < 2) { out.mode = 'building'; out.points = []; out.reason = 'insufficient_points'; return out; }
+    // real visual segments — split at structural temporal separations (range-independent, same rule as SPEC.16)
+    const gaps = []; for (let i = 1; i < src.length; i++) gaps.push(src[i].ts - src[i - 1].ts);
+    const med = gaps.length ? gaps.slice().sort((a, b) => a - b)[gaps.length >> 1] : 0;
+    const sepThr = Math.max(8 * (med || 0), 6 * 36e5);
+    const runs = [[src[0]]];
+    for (let i = 1; i < src.length; i++) { if ((src[i].ts - src[i - 1].ts) >= sepThr) runs.push([src[i]]); else runs[runs.length - 1].push(src[i]); }
+    out.segmentCount = runs.length;
+    const summ = seg => ({ startTs: seg[0].ts, endTs: seg[seg.length - 1].ts, count: seg.length, startValue: seg[0].value, endValue: seg[seg.length - 1].value });
+    if (runs.length === 1) { out.mainSegment = summ(runs[0]); out.reason = 'single_segment_passthrough'; return out; }   // mature dense / clean → unchanged
+    // MULTIPLE segments — the MAIN is the most recent (last) run; it is near the current value by construction.
+    const main = runs[runs.length - 1];
+    const fragMax = Math.max(3, Math.floor(0.15 * src.length));    // an earlier run this small is a construction island
+    const kept = [];
+    for (let s = 0; s < runs.length; s++) {
+      if (s === runs.length - 1) { kept.push(runs[s]); continue; }  // always keep the main
+      if (runs[s].length <= fragMax) { out.droppedSegmentCount++; out.droppedPointCount += runs[s].length; continue; }   // small earlier island → drop (never bridged)
+      kept.push(runs[s]);                                            // large legitimate earlier cluster → keep (SPEC.13 segments the real gap)
+    }
+    out.mainSegment = summ(main);
+    if (kept.length === 1) {
+      // only the main remains (all earlier were small islands) — qualify it as visually trustworthy.
+      const mainSpan = main[main.length - 1].ts - main[0].ts;
+      const qualifies = main.length >= _AURIX_VTG_MIN_MAIN_PTS && mainSpan >= _AURIX_VTG_MIN_MAIN_SPAN_MS;
+      if (!qualifies) { out.mode = 'building'; out.points = []; out.reason = 'main_segment_not_trustworthy'; return out; }
+      out.points = main; out.reason = out.droppedSegmentCount ? 'dropped_small_initial_islands_show_main' : 'main_only';
+      return out;
+    }
+    // ≥2 substantial segments remain → real segmented history: keep them all (SPEC.13 draws honest gaps, no bridge).
+    out.points = [].concat.apply([], kept);
+    out.reason = out.droppedSegmentCount ? 'multi_segment_legit_preserved_small_islands_dropped' : 'multi_segment_legit_preserved';
+    return out;
+  } catch (_) { return { mode: 'line', points: Array.isArray(points) ? points.slice() : [], segmentCount: 0, mainSegment: null, droppedSegmentCount: 0, droppedPointCount: 0, reason: 'error_passthrough', syntheticPoints: 0 }; }
+}
+try { if (typeof window !== 'undefined') window._aurixVisualTrustGate = _aurixVisualTrustGate; } catch (_) {}
+
 // P0-PREMIUM-RENDERER-RECONNECTION — render the ALREADY-VALIDATED buildProductionPortfolioChart points
 // through the ORIGINAL institutional geometry (LTTB downsample → regime-aware scales → monotone-CUBIC
 // path → area). Values are NEVER modified: the only change is a ts→time shape rename. Returns a premium
@@ -24635,6 +24693,18 @@ try {
         displayPointCount: Array.isArray(_shd.displayPoints) ? _shd.displayPoints.length : 0,
         droppedLeadingFragmentPts: _shd.droppedLeadingFragmentPts, syntheticPoints: 0,
       } : null;
+      // SPEC.17 — visual trust gate diagnostic (runs on the points the chart would draw for this range).
+      const _vtgPts = (_shd && _shd.mode === 'partial_clean' && Array.isArray(_shd.displayPoints) && _shd.displayPoints.length >= 2)
+        ? _shd.displayPoints : (chart && Array.isArray(chart.points) ? chart.points : []);
+      const _vtg = safe(() => (typeof _aurixVisualTrustGate === 'function') ? _aurixVisualTrustGate(_vtgPts, r) : null, null);
+      const visualTrustGate = _vtg ? {
+        enabled: (typeof _AURIX_CHART_VISUAL_TRUST_GATE !== 'undefined') ? !!_AURIX_CHART_VISUAL_TRUST_GATE : false,
+        mode: _vtg.mode, reason: _vtg.reason, segmentCount: _vtg.segmentCount,
+        droppedSegmentCount: _vtg.droppedSegmentCount, droppedPointCount: _vtg.droppedPointCount,
+        renderedPointCount: Array.isArray(_vtg.points) ? _vtg.points.length : 0,
+        mainSegment: _vtg.mainSegment ? { startIso: iso(_vtg.mainSegment.startTs), endIso: iso(_vtg.mainSegment.endTs), count: _vtg.mainSegment.count } : null,
+        syntheticPoints: 0,
+      } : null;
       const out = {
         spec: 'DSH.CHART.POINT-LINEAGE.DISCONTINUITY.AUDIT.10', range: r,
         accountCreatedAtIso: iso(createdAt), accountAgeHours: (createdAt != null) ? +((Date.now() - createdAt) / 36e5).toFixed(2) : null,
@@ -24666,6 +24736,7 @@ try {
         continuityUnification: continuityUnification,
         returnContract: returnContract,
         shortHistoryDisplay: shortHistoryDisplay,
+        visualTrustGate: visualTrustGate,
         needles: needles.slice(0, 40), islands: islands, syntheticPoints: 0,
         finalPlottedPoints: finalPts.slice(0, 10).concat(finalPts.slice(-10)),
         droppedPoints: dropped.slice(0, 20),
@@ -28040,6 +28111,19 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
   }
   if (_shd && _shd.mode === 'partial_clean' && Array.isArray(_shd.displayPoints) && _shd.displayPoints.length >= 2) emg.points = _shd.displayPoints;
 
+  // SPEC.17 — visual trust gate (ALL ranges incl 24H): keep only the recent MAIN segment (small initial
+  // islands dropped, never bridged) or the premium building state when the main is not trustworthy. Renders
+  // via emg.points (mutated in place) so the render calls below stay byte-identical. No-op ⇒ mode 'line'.
+  let _vtg = null;
+  try { if (emg.state === 'ready' && typeof _aurixVisualTrustGate === 'function') _vtg = _aurixVisualTrustGate(emg.points, emg.range); } catch (_) {}
+  if (_vtg && _vtg.mode === 'building') {
+    _aurixLastVisualSig[surface] = null;
+    try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'building'); } catch (_) {}
+    _wscRenderInsufficient(hostEl, { realPointCount: emg.pointCount, reason: _vtg.reason }, { mode: 'building', eligible: [], lastGood: null });
+    return true;
+  }
+  if (_vtg && Array.isArray(_vtg.points) && _vtg.points.length >= 2) emg.points = _vtg.points;
+
   if (emg.state !== 'ready') {
     try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'building'); } catch (_) {}
     _wscRenderInsufficient(hostEl, { realPointCount: emg.pointCount, reason: emg.reason },
@@ -28582,6 +28666,17 @@ function renderAurixMobileLiteChart(range, token) {
           return;
         }
         if (_shdM && _shdM.mode === 'partial_clean' && Array.isArray(_shdM.displayPoints) && _shdM.displayPoints.length >= 2) emg.points = _shdM.displayPoints;
+        // SPEC.17 — visual trust gate (all ranges incl 24H): keep only the recent MAIN segment (small
+        // initial islands dropped, never bridged) or premium building. Mutates emg.points in place.
+        let _vtgM = null;
+        try { if (emg.state === 'ready' && typeof _aurixVisualTrustGate === 'function') _vtgM = _aurixVisualTrustGate(emg.points, r); } catch (_) {}
+        if (_vtgM && _vtgM.mode === 'building') {
+          _aurixLastVisualSig.mobile = null;
+          _aurixMobileLiteFallback('pending');
+          if (_aurixMobileLiteEmptyRetries < 6) { _aurixMobileLiteEmptyRetries++; try { setTimeout(function () { scheduleAurixMobileLite(r); }, 1300); } catch (_) {} }
+          return;
+        }
+        if (_vtgM && Array.isArray(_vtgM.points) && _vtgM.points.length >= 2) emg.points = _vtgM.points;
         if (emg.state !== 'ready') {
           _aurixLastVisualSig.mobile = null;   // FIX 1 — pending forces a fresh draw on the next ready
           _aurixMobileLiteFallback('pending');
