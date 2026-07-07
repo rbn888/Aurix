@@ -23494,6 +23494,24 @@ const _AURIX_CHART_RECONCILE_GATE = true;
 // by validated-point sufficiency (≥2 after quarantine). The visual gate is retained as a DIAGNOSTIC field
 // but NEVER rejects a range. The LINE draws the validated wealth series; the badge % is the FLOW-NEUTRAL
 // real return (SPEC DSH.CHART.RETURNS.01) — contributions/withdrawals never read as return.
+// SPEC DSH.CHART.CANONICAL-REFRESH-DETERMINISM.21 — B / C3 (founder-approved: "anchor from canonical only").
+// The RETURN anchor must come from CANONICAL (frontend/remote) points ONLY, never from an optional backend-
+// snapshot gap-filler. Backend snapshots autoload ~3s AFTER first paint and fill the OLDER-than-frontend
+// tail; before this fix the first such older point became pts[0] (the return baseline), so the badge %
+// shifted across the ±0.05% dead-band → the observed green/neutral/red refresh flip, and the coverage span
+// changed → nondeterministic 7D eligibility. Anchoring on the first non-backend point makes both the return
+// and the coverage span deterministic w.r.t. the optional source. The VISIBLE line still draws all merged
+// points (backend fills visual gaps) — only the anchor is canonical. Pure; never mutates. Returns 0 (exact
+// v502) when the flag is off, when the first in-range point is already canonical, or when EVERY in-range
+// point is a backend filler (nothing canonical to anchor on ⇒ safe fallback to the merged first point).
+function _aurixCanonicalReturnAnchorIndex(pts, canonOn) {
+  if (!canonOn || !Array.isArray(pts) || pts.length < 2) return 0;
+  const isBackend = p => !!(p && p.raw && p.raw.source === 'backend_snapshot');
+  if (!isBackend(pts[0])) return 0;                       // first is already canonical → unchanged (mature accounts)
+  for (let i = 0; i < pts.length; i++) { if (!isBackend(pts[i])) return i; }   // skip leading backend gap-fillers
+  return 0;                                               // all backend → fall back to the merged first point
+}
+try { if (typeof window !== 'undefined') window._aurixCanonicalReturnAnchorIndex = _aurixCanonicalReturnAnchorIndex; } catch (_) {}
 function buildProductionPortfolioChart(range) {
   const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
   const out = {
@@ -23562,7 +23580,14 @@ function buildProductionPortfolioChart(range) {
       return out;
     }
 
-    const first = pts[0], last = pts[pts.length - 1];
+    // SPEC.21 B/C3 — the RETURN anchor is the first CANONICAL (non-backend-gap-filler) in-range point, so the
+    // optional backend-snapshot autoload can never re-anchor the return across refreshes. The VISIBLE line
+    // still starts at the merged first point (out.points below). Flag off ⇒ _anchorIdx=0 ⇒ EXACT v502.
+    const _canonOn = (typeof _AURIX_CHART_CANONICAL_REFRESH_DETERMINISM !== 'undefined') && _AURIX_CHART_CANONICAL_REFRESH_DETERMINISM;
+    const _anchorIdx = (typeof _aurixCanonicalReturnAnchorIndex === 'function') ? _aurixCanonicalReturnAnchorIndex(pts, _canonOn) : 0;
+    const first = pts[_anchorIdx], last = pts[pts.length - 1];
+    out.returnAnchorCanonicalOnly = _canonOn;
+    out.returnAnchorBackendSkipped = _anchorIdx;
     // SPEC DSH.CHART.RETURNS.01 — the badge % is the FLOW-NEUTRAL real return (excludes capital
     // added/removed in the period). The LINE still draws the wealth series (points below), unchanged.
     const per = _aurixComputePeriodReturn(r, { ts: first.ts, value: first.value }, { ts: last.ts, value: last.value });
@@ -24234,6 +24259,22 @@ try { if (typeof window !== 'undefined') window._aurixStableDisplayAnchor = _aur
 // inline v500 gate blocks (byte-identical v500); this resolver itself still delegates to the same sub-gates
 // (each self-gated by its own flag) so its output equals v500 regardless.
 const _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT = true;
+// ── SPEC DSH.CHART.CANONICAL-REFRESH-DETERMINISM-AND-VISIBLE-PATH-INTEGRITY.21 ──
+// Launch-blocking correctness layer, additive ON TOP of SPEC.19 (still the ONLY final render chokepoint).
+// This turn ships the CERTAIN, valuation-neutral parts entirely inside the resolver:
+//   C5 — 24H VISIBLE PATH INTEGRITY: a user-facing 24H final contract must NEVER render disconnected islands.
+//        When continuity produces >1 path for 24H, select exactly ONE canonical eligible contiguous path
+//        (most-recent-eligible; deterministic recency→span→count→ts tie-break) or building. NEVER bridge,
+//        NEVER fabricate, NEVER concatenate across the gap. Guarantees 24H renderPathCount ∈ {0,1}.
+//   C4/C6 — atomic semantic state + explicit blocking reason codes: expose the deterministic returnAnchorTs/
+//        Value the badge used, and replace the generic Calculando with an explicit inspectable reason
+//        (INSUFFICIENT_REAL_SPAN / INSUFFICIENT_REAL_POINTS / NO_DETERMINISTIC_RETURN_ANCHOR /
+//        CURRENT_VALUE_UNAVAILABLE / BOOTSTRAP_ONLY_HISTORY / CANONICAL_SOURCE_CONFLICT).
+// The valuation/source/commit-layer fixes for the refresh color-flip (return-anchor drift from the optional
+// backend-snapshot autoload) and the 7D coverage-span deadlock are PROVEN in the forensic audit but held for
+// founder approval (they touch return semantics + must not weaken SPEC.TRUTHFUL_RANGES). Reversible:
+// _AURIX_CHART_CANONICAL_REFRESH_DETERMINISM=false ⇒ EXACT v502 behaviour (C5/C6/anchor logic skipped).
+const _AURIX_CHART_CANONICAL_REFRESH_DETERMINISM = true;
 function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
   const r = String(range || (emg && emg.range) || '').toLowerCase();
   surface = (surface === 'mobile') ? 'mobile' : 'desktop';
@@ -24251,8 +24292,13 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     points: srcPts, renderPoints: [], renderPathCount: 0,
     lineEligible: false, badgeEligible: false, badgeLabel: 'Calculando…',
     badgeReturnPct: null, colorState: 'neutral', colorClass: 'flat',
+    // SPEC.21 C3/C4 — the deterministic return anchor the badge used (read from the canonical baseline the
+    // builder already computed; exposed so the audit can prove anchor stability across refreshes).
+    returnAnchorTs: (emg && Number.isFinite(emg.baselineTs)) ? emg.baselineTs : null,
+    returnAnchorValue: (emg && Number.isFinite(emg.baselineValue)) ? emg.baselineValue : null,
     reason: 'pending', reasonCodes: [], diagnostics: diagnostics,
   };
+  const canonRefreshOn = (typeof _AURIX_CHART_CANONICAL_REFRESH_DETERMINISM !== 'undefined') && _AURIX_CHART_CANONICAL_REFRESH_DETERMINISM;
   // Apply the resolved return contract onto the contract's badge fields (single source of truth for the %).
   const applyBadge = (o, c) => {
     if (!c) { o.badgeLabel = 'Calculando…'; o.badgeEligible = false; o.badgeReturnPct = null; o.colorState = 'neutral'; o.colorClass = 'flat'; return; }
@@ -24266,6 +24312,17 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     o.lineEligible = false; o.reason = reason; o.reasonCodes.push('building');
     o.badgeLabel = 'Calculando…'; o.badgeEligible = false; o.badgeReturnPct = null; o.colorState = 'neutral'; o.colorClass = 'flat';
     o.diagnostics.outputCount = 0; o.diagnostics.droppedCount = o.diagnostics.inputCount;
+    // SPEC.21 C6 — never a bare generic Calculando; map the building reason to an explicit inspectable code.
+    if (canonRefreshOn) {
+      const s = String(reason || '');
+      let code = 'RETURN_NOT_RELIABLE';
+      if (/canonical_24h_no_eligible_path/.test(s)) code = 'VISIBLE_PATH_NO_ELIGIBLE_24H';
+      else if (/no_stable_tramo|bootstrap/.test(s)) code = 'BOOTSTRAP_ONLY_HISTORY';
+      else if (/short_history|history_short|insufficient_requested|partial/.test(s)) code = 'INSUFFICIENT_REAL_SPAN';
+      else if (/insufficient_points|no_stable_segment|not_trustworthy/.test(s)) code = 'INSUFFICIENT_REAL_POINTS';
+      else if (/reconcile|not_ready|awaiting/.test(s)) code = 'CANONICAL_NOT_READY';
+      o.reasonCodes.push(code); o.diagnostics.blockingReasonCodes = [code];
+    }
     return o;
   };
   try {
@@ -24318,6 +24375,46 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     if (vtg && vtg.mode === 'building') return building(out, 'visual_trust_gate:' + vtg.reason);
     if (vtg && Array.isArray(vtg.points) && vtg.points.length >= 2) { if (vtg.droppedSegmentCount > 0) { partial = true; out.reasonCodes.push('visual_trust_islands_dropped'); } work = vtg.points.slice(); }
 
+    // 6.5 — SPEC.21 C5: 24H VISIBLE PATH INTEGRITY. A user-facing 24H final contract must NEVER render
+    // disconnected islands. If the continuity break set (bridge ∪ capital ∪ real-gap — the SAME set the
+    // renderer splits on) produces >1 contiguous run, select exactly ONE canonical eligible path. NEVER
+    // bridge / fabricate / concatenate across the gap → syntheticPoints stays 0. Guarantees 24H
+    // renderPathCount ∈ {0,1}. Longer ranges keep honest multi-segment history (real gaps stay segmented).
+    if (canonRefreshOn && r === '24h' && work.length >= 2) {
+      const mapped = work.map(p => ({ time: p.ts, value: p.value }));
+      let breaks = [];
+      try { if (typeof _aurixStructuralBreaks === 'function') { const sb = _aurixStructuralBreaks(mapped, r); breaks = (sb && Array.isArray(sb.breaks)) ? sb.breaks : []; } } catch (_) {}
+      if (breaks.length) {
+        let runs = [mapped];
+        try { if (typeof _aurixSplitAtGaps === 'function') runs = _aurixSplitAtGaps(mapped, breaks) || [mapped]; } catch (_) { runs = [mapped]; }
+        runs = runs.filter(run => run && run.length);
+        diagnostics.visiblePath24hRuns = runs.length;
+        if (runs.length > 1) {
+          const minPts = (typeof _AURIX_VTG_MIN_MAIN_PTS === 'number') ? _AURIX_VTG_MIN_MAIN_PTS : 3;
+          const minSpan = (typeof _AURIX_VTG_MIN_MAIN_SPAN_MS === 'number') ? _AURIX_VTG_MIN_MAIN_SPAN_MS : (15 * 60000);
+          const eligible = run => run.length >= minPts && (run[run.length - 1].time - run[0].time) >= minSpan;
+          // Policy: recent path first; else the dominant eligible path (recency → span → count → ts tie-break).
+          let chosen = null;
+          const recent = runs[runs.length - 1];
+          if (eligible(recent)) { chosen = recent; out.reasonCodes.push('canonical_24h_recent_path_selected'); }
+          else {
+            const cands = runs.filter(eligible).slice().sort((a, b) => {
+              const ar = a[a.length - 1].time, br = b[b.length - 1].time; if (br !== ar) return br - ar;   // recency desc
+              const asp = a[a.length - 1].time - a[0].time, bsp = b[b.length - 1].time - b[0].time; if (bsp !== asp) return bsp - asp;   // span desc
+              if (b.length !== a.length) return b.length - a.length;                                       // count desc
+              return b[0].time - a[0].time;                                                                // stable ts tie-break
+            });
+            chosen = cands.length ? cands[0] : null;
+            if (chosen) out.reasonCodes.push('canonical_24h_dominant_path_selected');
+          }
+          if (!chosen) return building(out, 'canonical_24h_no_eligible_path');
+          work = chosen.map(p => ({ ts: p.time, value: p.value }));
+          partial = true;
+          out.reasonCodes.push('canonical_24h_single_path');
+        }
+      }
+    }
+
     // 8 — final render mode: full (whole trustworthy historic) vs partial_clean (short history OR something
     // hidden/dropped). A short-history range that keeps all its points is STILL partial (not a full historic).
     const trimmed = work.length !== finite.length;
@@ -24330,6 +24427,21 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     // line may still paint (partial_clean / full-but-untrusted-24H) but the overall state is "calculating".
     out.state = (out.badgeEligible && out.mode === 'full') ? 'ready' : 'calculating';
     if (!out.badgeEligible) out.reasonCodes.push('badge_calculating');
+    // SPEC.21 C6 — line drawn but return not eligible: attach the EXPLICIT blocking reason(s), never a bare
+    // generic Calculando. Read-only classification from the builder's own honest fields (no eligibility change).
+    if (canonRefreshOn && !out.badgeEligible) {
+      const cv = emg || {}, codes = [];
+      if (cv.currentValue == null || !Number.isFinite(cv.currentValue)) codes.push('CURRENT_VALUE_UNAVAILABLE');
+      if (out.returnAnchorTs == null) codes.push('NO_DETERMINISTIC_RETURN_ANCHOR');
+      const sr = String(cv.returnSuppressedReason || cv.reason || '');
+      if (cv.historyTooShortForRange === true || /insufficient_requested_range_history|history_short/.test(sr)) codes.push('INSUFFICIENT_REAL_SPAN');
+      if (Number.isFinite(cv.finalPointCount) && cv.finalPointCount < ((typeof _AURIX_ALL_MIN_TRUST_POINTS === 'number') ? _AURIX_ALL_MIN_TRUST_POINTS : 8)) codes.push('INSUFFICIENT_REAL_POINTS');
+      if (/new_account|initial_build|construction|bootstrap/.test(sr)) codes.push('BOOTSTRAP_ONLY_HISTORY');
+      if (/cross_source_family|source_conflict|cross_epoch/.test(String((contract && contract.reason) || ''))) codes.push('CANONICAL_SOURCE_CONFLICT');
+      if (!codes.length) codes.push('RETURN_NOT_RELIABLE');
+      codes.forEach(c => { if (out.reasonCodes.indexOf(c) < 0) out.reasonCodes.push(c); });
+      diagnostics.blockingReasonCodes = codes;
+    }
     // 10 — finalize diagnostics + render path count (structural-break subpaths + 1, matching the renderer).
     diagnostics.outputCount = work.length;
     diagnostics.droppedCount = Math.max(0, finite.length - work.length);
@@ -25139,6 +25251,7 @@ try {
           mode: frc.mode, state: frc.state, renderPointCount: rp.length, renderPathCount: frc.renderPathCount,
           renderHash: hashOf(rp), colorClass: frc.colorClass, colorState: frc.colorState,
           badgeLabel: frc.badgeLabel, badgeEligible: frc.badgeEligible, lineEligible: frc.lineEligible,
+          returnAnchorTs: frc.returnAnchorTs, returnAnchorValue: frc.returnAnchorValue,   // SPEC.21 C3
           reasonCodes: Array.isArray(frc.reasonCodes) ? frc.reasonCodes : [],
           diagnostics: {
             inputCount: d.inputCount, outputCount: d.outputCount, droppedCount: d.droppedCount,
@@ -25149,11 +25262,13 @@ try {
         };
       };
       const perRange = {};
-      let allParity = true, anySynthetic = 0;
+      let allParity = true, anySynthetic = 0, all24hSinglePath = true;
       RANGES.forEach(r => {
         // ONE chart per range (deterministic) — both surfaces resolve from the SAME input, exactly as the
         // two paint paths do for a given active range. Surface differs ONLY in the frc.surface tag.
         const chart = safe(() => buildProductionPortfolioChart(r), null);
+        // SPEC.21 — canonicalInputHash = hash of the deterministic clipped input the contract resolves from.
+        const canonicalInputHash = hashOf(chart && Array.isArray(chart.points) ? chart.points : []);
         const bySurface = {};
         SURFACES.forEach(s => {
           const frc = safe(() => (typeof _aurixResolveFinalRenderSeriesContract === 'function') ? _aurixResolveFinalRenderSeriesContract(chart, r, s) : null, null);
@@ -25162,30 +25277,155 @@ try {
         });
         const d = bySurface.desktop, m = bySurface.mobile;
         const equal = !!(d && m && d.renderHash === m.renderHash && d.mode === m.mode &&
-          d.colorClass === m.colorClass && d.badgeLabel === m.badgeLabel && d.renderPathCount === m.renderPathCount);
+          d.colorClass === m.colorClass && d.badgeLabel === m.badgeLabel && d.renderPathCount === m.renderPathCount &&
+          d.returnAnchorTs === m.returnAnchorTs);
         if (!equal) allParity = false;
+        // SPEC.21 E — 24H user-facing final contract must never fragment (renderPathCount ≤ 1).
+        const path24hOk = (r !== '24h') || (!!d && (d.renderPathCount == null || d.renderPathCount <= 1));
+        if (!path24hOk) all24hSinglePath = false;
         perRange[r] = {
-          range: r, desktop: d, mobile: m,
+          range: r, canonicalInputHash: canonicalInputHash, desktop: d, mobile: m,
           parity: { desktopEqualsMobile: equal,
             renderHashMatch: !!(d && m && d.renderHash === m.renderHash),
             modeMatch: !!(d && m && d.mode === m.mode),
             colorClassMatch: !!(d && m && d.colorClass === m.colorClass),
-            badgeLabelMatch: !!(d && m && d.badgeLabel === m.badgeLabel) },
+            badgeLabelMatch: !!(d && m && d.badgeLabel === m.badgeLabel),
+            returnAnchorMatch: !!(d && m && d.returnAnchorTs === m.returnAnchorTs) },
+          visiblePath24hSinglePathOk: path24hOk,
         };
       });
       const out = {
-        spec: 'DSH.CHART.FINAL-CONTRACT-GUARDRAILS.20', appVersion: appVersion,
+        spec: 'DSH.CHART.FINAL-CONTRACT-GUARDRAILS.20+CANONICAL-REFRESH-DETERMINISM.21', appVersion: appVersion,
         finalContractEnabled: flagOn, surfacesAuditedFromSingleResolver: true,
+        canonicalRefreshDeterminismEnabled: safe(() => (typeof _AURIX_CHART_CANONICAL_REFRESH_DETERMINISM !== 'undefined') ? !!_AURIX_CHART_CANONICAL_REFRESH_DETERMINISM : false, false),
         ranges: perRange,
         summary: {
           allRangesDesktopEqualsMobile: allParity,
+          all24hSinglePath: all24hSinglePath,
           totalSyntheticPoints: anySynthetic,
           rangesAudited: RANGES.length, surfaces: SURFACES,
-          verdict: (allParity && anySynthetic === 0) ? 'CONTRACT_HELD_DESKTOP_MOBILE_PARITY' : 'DIVERGENCE_DETECTED',
+          verdict: (allParity && anySynthetic === 0 && all24hSinglePath) ? 'CONTRACT_HELD_DESKTOP_MOBILE_PARITY' : 'DIVERGENCE_DETECTED',
         },
       };
       try { console.log('%c[UI][CHART_FINAL_CONTRACT_AUDIT]', 'font-weight:700;color:#7c5cff', out); } catch (_) {}
       return out;
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // SPEC DSH.CHART.CANONICAL-REFRESH-DETERMINISM.21 — window.aurixChartHydrationStabilityAudit(range, ms)
+    // ════════════════════════════════════════════════════════════════════════════
+    // READ-ONLY runtime observer. Over `ms`, it samples the LIVE contract (re-running the SAME pure builders
+    // the visible chart reads) as async sources hydrate — local categoryHistory, remote canonical, backend
+    // snapshot autoload — and records every DISTINCT contract transition. It classifies the SPEC.21 defects:
+    // same canonicalInputHash → different selectedPointsHash (SAME_INPUT_CONTRACT_DIVERGENCE); same input +
+    // same returnPct → different colorClass (COLOR_BADGE_MISMATCH); same input → different returnAnchorTs
+    // (RETURN_ANCHOR_DRIFT — the proven refresh-flip cause); a source-readiness transition that changes the
+    // merged source population (HYDRATION_RACE / SOURCE_WINNER); renderPathCount>1 on 24H
+    // (VISIBLE_PATH_FRAGMENTATION); dense eligible 7D that stays calculating after canonical ready
+    // (RELIABILITY_DEADLOCK). NO mutation, NO source/chart writes, NO timers left behind (the sampling
+    // interval is cleared on completion). Returns a Promise resolving to JSON-serializable output.
+    window.aurixChartHydrationStabilityAudit = function (range, ms) {
+      const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
+      const durationMs = Math.max(500, Math.min(30000, Number(ms) || 5000));
+      const safe = (fn, d) => { try { const v = fn(); return v === undefined ? (d === undefined ? null : d) : v; } catch (_) { return (d === undefined ? null : d); } };
+      const iso = t => { try { return Number.isFinite(t) ? new Date(t).toISOString() : null; } catch (_) { return null; } };
+      const hashOf = pts => safe(() => (typeof _aurixEmergencyHash === 'function') ? _aurixEmergencyHash(Array.isArray(pts) ? pts : []) : null, null);
+      const strHash = s => { try { let h = 2166136261 >>> 0; s = String(s == null ? '' : s); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return ('00000000' + h.toString(16)).slice(-8); } catch (_) { return null; } };
+      const nowMono = () => { try { return (typeof performance !== 'undefined' && performance.now) ? +performance.now().toFixed(1) : Date.now(); } catch (_) { return 0; } };
+      const accountObservationId = safe(() => (typeof currentUser !== 'undefined' && currentUser && currentUser.id) ? strHash(currentUser.id) : 'anon', 'anon');
+      const events = [];
+      const sample = (trigger) => {
+        const chart = safe(() => buildProductionPortfolioChart(r), null) || { points: [], state: 'pending' };
+        const frc = safe(() => (typeof _aurixResolveFinalRenderSeriesContract === 'function') ? _aurixResolveFinalRenderSeriesContract(chart, r, 'desktop') : null, null) || {};
+        const merged = safe(() => (typeof _aurixHistorySourceForDisplay === 'function') ? (_aurixHistorySourceForDisplay() || []) : [], []);
+        const local = safe(() => (typeof categoryHistory !== 'undefined' && Array.isArray(categoryHistory)) ? categoryHistory : [], []);
+        const remote = safe(() => (typeof _aurixCanonicalCatHistory !== 'undefined' && Array.isArray(_aurixCanonicalCatHistory)) ? _aurixCanonicalCatHistory : [], []);
+        const backend = safe(() => (typeof _aurixBackendSnapshots !== 'undefined' && Array.isArray(_aurixBackendSnapshots)) ? _aurixBackendSnapshots : [], []);
+        const rp = Array.isArray(frc.renderPoints) ? frc.renderPoints : [];
+        const cp = Array.isArray(chart.points) ? chart.points : [];
+        const selectedPointsHash = hashOf(rp);
+        const ev = {
+          sequence: events.length, monotonicTime: nowMono(), wallTime: safe(() => Date.now(), 0),
+          range: r, surface: 'desktop', trigger: trigger,
+          sourceReadiness: {
+            localReady: local.length > 0,
+            remoteReady: remote.length > 0,
+            backendReady: backend.length > 0,
+            canonicalReady: safe(() => (typeof _aurixCanonicalHistoryReady === 'function') ? _aurixCanonicalHistoryReady() : true, true),
+          },
+          sourceCounts: { local: local.length, remote: remote.length, backend: backend.length, merged: (Array.isArray(merged) ? merged.length : 0) },
+          sourceRevisionIdentity: safe(() => (typeof _aurixPortfolioRevision === 'function') ? _aurixPortfolioRevision() : null, null),
+          canonicalInputHash: hashOf(merged),
+          clippedInputHash: hashOf(cp),
+          selectedPointsHash: selectedPointsHash,
+          renderHash: strHash([selectedPointsHash, frc.mode, frc.colorClass, frc.badgeLabel].join('|')),
+          pointCount: cp.length, renderPointCount: rp.length, renderPathCount: frc.renderPathCount != null ? frc.renderPathCount : null,
+          firstTs: cp.length ? cp[0].ts : null, lastTs: cp.length ? cp[cp.length - 1].ts : null,
+          nowRef: chart.lastTs != null ? chart.lastTs : null,
+          returnAnchorTs: frc.returnAnchorTs != null ? frc.returnAnchorTs : (Number.isFinite(chart.baselineTs) ? chart.baselineTs : null),
+          returnAnchorValue: frc.returnAnchorValue != null ? frc.returnAnchorValue : (Number.isFinite(chart.baselineValue) ? chart.baselineValue : null),
+          currentValue: Number.isFinite(chart.currentValue) ? chart.currentValue : null,
+          returnPct: Number.isFinite(chart.badgeReturnPct) ? chart.badgeReturnPct : null,
+          returnContractState: frc.state || null,
+          badgeEligible: !!frc.badgeEligible, badgeLabel: frc.badgeLabel || null,
+          colorState: frc.colorState || null, colorClass: frc.colorClass || null, mode: frc.mode || null,
+          reasonCodes: Array.isArray(frc.reasonCodes) ? frc.reasonCodes : [],
+        };
+        // signature = the fields whose change constitutes a real transition (ignore timestamps)
+        ev._sig = [ev.canonicalInputHash, ev.selectedPointsHash, ev.renderHash, ev.mode, ev.colorClass, ev.badgeLabel, ev.returnAnchorTs, ev.returnContractState, ev.sourceCounts.merged].join('#');
+        const prev = events.length ? events[events.length - 1] : null;
+        if (!prev || prev._sig !== ev._sig) events.push(ev);
+      };
+      return new Promise(function (resolve) {
+        let timer = null, done = false;
+        const t0 = safe(() => Date.now(), 0);
+        sample('start');
+        try { timer = setInterval(function () { try { sample('poll'); } catch (_) {} if (safe(() => Date.now(), 0) - t0 >= durationMs) finish(); }, 250); } catch (_) { finish(); }
+        function finish() {
+          if (done) return; done = true;
+          try { if (timer) clearInterval(timer); } catch (_) {}     // no timer left behind
+          sample('final');
+          const defects = [];
+          const byInput = {};
+          events.forEach(e => { (byInput[e.canonicalInputHash] = byInput[e.canonicalInputHash] || []).push(e); });
+          Object.keys(byInput).forEach(k => {
+            const g = byInput[k];
+            const selHashes = {}, colorByPct = {}, anchors = {};
+            g.forEach(e => { selHashes[e.selectedPointsHash] = 1; if (e.returnPct != null) (colorByPct[e.returnPct] = colorByPct[e.returnPct] || {})[e.colorClass] = 1; if (e.returnAnchorTs != null) anchors[e.returnAnchorTs] = 1; });
+            if (Object.keys(selHashes).length > 1) defects.push({ type: 'SAME_INPUT_CONTRACT_DIVERGENCE', canonicalInputHash: k, selectedPointsHashes: Object.keys(selHashes) });
+            Object.keys(colorByPct).forEach(pct => { if (Object.keys(colorByPct[pct]).length > 1) defects.push({ type: 'COLOR_BADGE_MISMATCH', canonicalInputHash: k, returnPct: +pct, colorClasses: Object.keys(colorByPct[pct]) }); });
+            if (Object.keys(anchors).length > 1) defects.push({ type: 'RETURN_ANCHOR_DRIFT', canonicalInputHash: k, returnAnchorTsValues: Object.keys(anchors).map(Number) });
+          });
+          for (let i = 1; i < events.length; i++) {
+            const a = events[i - 1], b = events[i];
+            const readinessChanged = JSON.stringify(a.sourceReadiness) !== JSON.stringify(b.sourceReadiness);
+            const winnerChanged = a.sourceCounts.merged !== b.sourceCounts.merged || a.canonicalInputHash !== b.canonicalInputHash;
+            if (readinessChanged && winnerChanged) defects.push({ type: 'DEFECT_HYDRATION_RACE', fromSeq: a.sequence, toSeq: b.sequence, from: a.sourceReadiness, to: b.sourceReadiness });
+          }
+          events.forEach(e => { if (e.range === '24h' && e.renderPathCount != null && e.renderPathCount > 1) defects.push({ type: 'VISIBLE_PATH_FRAGMENTATION', seq: e.sequence, renderPathCount: e.renderPathCount }); });
+          const minPts = (typeof _AURIX_HPQ_MIN_POINTS === 'number') ? _AURIX_HPQ_MIN_POINTS : 2;
+          events.forEach(e => { if (r !== '24h' && r !== 'all' && e.sourceReadiness.canonicalReady && e.pointCount >= Math.max(minPts, 8) && e.returnContractState === 'calculating' && e.mode !== 'building') defects.push({ type: 'RELIABILITY_DEADLOCK', seq: e.sequence, pointCount: e.pointCount, reasonCodes: e.reasonCodes }); });
+          const types = {}; defects.forEach(d => types[d.type] = 1);
+          const typeList = Object.keys(types);
+          const map = { SAME_INPUT_CONTRACT_DIVERGENCE: 'DEFECT_SAME_INPUT_CONTRACT_DIVERGENCE', COLOR_BADGE_MISMATCH: 'DEFECT_COLOR_BADGE_MISMATCH', RETURN_ANCHOR_DRIFT: 'DEFECT_RETURN_ANCHOR_DRIFT', DEFECT_HYDRATION_RACE: 'DEFECT_HYDRATION_RACE', VISIBLE_PATH_FRAGMENTATION: 'DEFECT_VISIBLE_PATH_FRAGMENTATION', RELIABILITY_DEADLOCK: 'DEFECT_RELIABILITY_DEADLOCK' };
+          const verdict = typeList.length === 0 ? 'STABLE' : (typeList.length > 1 ? 'MULTIPLE_DEFECTS' : (map[typeList[0]] || 'MULTIPLE_DEFECTS'));
+          const uniq = key => { const s = {}; events.forEach(e => { s[e[key]] = 1; }); return Object.keys(s).length; };
+          const out = {
+            spec: 'DSH.CHART.CANONICAL-REFRESH-DETERMINISM.21', verdict: verdict,
+            accountObservationId: accountObservationId, range: r, durationMs: durationMs,
+            appVersion: safe(() => (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null, null),
+            eventCount: events.length,
+            uniqueCanonicalInputHashes: uniq('canonicalInputHash'),
+            uniqueSelectedPointsHashes: uniq('selectedPointsHash'),
+            uniqueRenderHashes: uniq('renderHash'),
+            transitions: events.map(e => { const c = Object.assign({}, e); delete c._sig; return c; }),
+            defects: defects,
+            finalEvent: (function () { const e = events[events.length - 1]; if (!e) return null; const c = Object.assign({}, e); delete c._sig; return c; })(),
+          };
+          try { console.log('%c[UI][CHART_HYDRATION_STABILITY_AUDIT]', 'font-weight:700;color:#e0559a', out); } catch (_) {}
+          resolve(out);
+        }
+      });
     };
 
     // ════════════════════════════════════════════════════════════════════════════

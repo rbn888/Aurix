@@ -31,6 +31,7 @@ const CONSTS = [
   '_AURIX_CHART_VISUAL_TRUST_GATE', '_AURIX_VTG_MIN_MAIN_PTS', '_AURIX_VTG_MIN_MAIN_SPAN_MS',
   '_AURIX_CHART_BOOTSTRAP_SUPPRESSION', '_AURIX_STABLE_BAND_LO', '_AURIX_STABLE_MIN_PTS',
   '_AURIX_STABLE_MIN_SPAN_MS', '_AURIX_STABLE_CONSTRUCTION_JUMP', '_AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT',
+  '_AURIX_CHART_CANONICAL_REFRESH_DETERMINISM',   // SPEC.21 — activates C5 24H single-path in the resolver
 ];
 const FNS = [
   '_aurixEmergencyHash', '_aurixRealGapFloorMs', '_aurixConfirmedBridgeGaps', '_aurixCapitalStepBreaks',
@@ -138,6 +139,23 @@ console.log('\nG5 — deterministic guardrail:');
   ok('G5.1 same input → identical renderHash', hash(a.renderPoints) === hash(b.renderPoints));
   ok('G5.2 SPEC.19 marker intact', /SPEC DSH\.CHART\.FINAL_RENDER_SERIES_CONTRACT\.19/.test(app));
   ok('G5.3 SPEC.20 audit marker present', /SPEC DSH\.CHART\.FINAL-CONTRACT-GUARDRAILS\.20/.test(app)); }
+
+// ── G6 — SPEC.21 guardrails: 24H single visible path + same-input determinism (launch blockers) ──
+console.log('\nG6 — SPEC.21 launch guardrails:');
+function seg2(t0, n, stepMs, v0, dv) { const o = []; for (let i = 0; i < n; i++) o.push({ ts: t0 + i * stepMs, value: +(v0 + i * dv).toFixed(2) }); return o; }
+const HH = 36e5, MM = 60e3, TT = 1_800_000_000_000;
+// 24H fragmented (two clusters + 22h gap) MUST resolve to renderPathCount ≤ 1 (never disconnected islands).
+{ const A = seg2(TT, 10, 12 * MM, 1000, 0.1), B = seg2(TT + 22 * HH, 10, 12 * MM, 1002, 0.1);
+  const e = Object.assign({}, MATRIX['mature'], { range: '24h', returnState: 'ok', badgeReturnPct: 0.24, points: A.concat(B), baselineTs: A[0].ts, baselineValue: A[0].value, currentValue: B[B.length - 1].value });
+  const d = frc(e, '24h', 'desktop'), m = frc(e, '24h', 'mobile');
+  ok('G6.1 24H fragmented → renderPathCount ≤ 1 (no islands)', d.renderPathCount <= 1, 'paths=' + d.renderPathCount);
+  ok('G6.2 24H fragmented → desktop == mobile', hash(d.renderPoints) === hash(m.renderPoints) && d.mode === m.mode);
+  ok('G6.3 24H fragmented → syntheticPoints 0', d.diagnostics.syntheticPoints === 0); }
+// same emg repeated → identical selectedPointsHash + renderHash + mode + returnAnchorTs + badge + color.
+{ const runs = []; for (let i = 0; i < 8; i++) { const rr = frc(MATRIX['mature'], '30d', 'desktop'); runs.push(JSON.stringify([hash(rr.renderPoints), rr.mode, rr.returnAnchorTs, rr.badgeLabel, rr.colorClass, rr.renderPathCount])); }
+  ok('G6.4 same canonical input → same selectedPointsHash/mode/anchor/badge/color/pathCount', runs.every(x => x === runs[0])); }
+ok('G6.5 24H single-path guardrail wired into final contract audit', /all24hSinglePath/.test(app) && /visiblePath24hSinglePathOk/.test(app));
+ok('G6.6 SPEC.21 marker present', /SPEC DSH\.CHART\.CANONICAL-REFRESH-DETERMINISM/.test(app));
 
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);
