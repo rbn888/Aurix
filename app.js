@@ -24214,6 +24214,143 @@ function _aurixStableDisplayAnchor(points, range, context) {
 }
 try { if (typeof window !== 'undefined') window._aurixStableDisplayAnchor = _aurixStableDisplayAnchor; } catch (_) {}
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.FINAL_RENDER_SERIES_CONTRACT.19 — ONE final render contract for desktop + mobile
+// ════════════════════════════════════════════════════════════════════════════
+// Before .19 the render decision was split across the badge/return trust (.14), the continuity series (.13),
+// short-history display (.16), bootstrap suppression (.18) and the visual trust gate (.17) — each applied
+// INLINE in BOTH the desktop (_wscPaintEmergency) and the mobile-lite (renderAurixMobileLiteChart) paint
+// paths. Two paths meant two chances to diverge: 24H could paint a clean line and then flip back to
+// Calculando; a long range could keep a technically-real but non-premium bootstrap line; mobile and desktop
+// could apply the layers differently. This resolver is the SINGLE chokepoint. Given the ALREADY-BUILT
+// buildProductionPortfolioChart result (emg) it runs the proven pipeline in ONE fixed order —
+// continuity(3) → short-history(4) → bootstrap-suppression(5) → visual-trust-gate(6) → return-contract(7) —
+// then decides the render mode(8), the badge(9) and returns the final renderPoints(10). From here on the
+// renderer is FORBIDDEN to pick points on its own: both surfaces paint EXCLUSIVELY frc.renderPoints /
+// frc.badgeLabel / frc.colorState / frc.mode. PURE: never mutates emg or its points array, never fabricates
+// a point (syntheticPoints is always 0 — the sub-gates only drop/hide). The badge/return contract is
+// resolved from the ORIGINAL emg.points (the same input the badge node uses), so visual trimming below never
+// changes the %. Reversible: _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT=false ⇒ the paint paths keep their
+// inline v500 gate blocks (byte-identical v500); this resolver itself still delegates to the same sub-gates
+// (each self-gated by its own flag) so its output equals v500 regardless.
+const _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT = true;
+function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
+  const r = String(range || (emg && emg.range) || '').toLowerCase();
+  surface = (surface === 'mobile') ? 'mobile' : 'desktop';
+  const srcPts = (emg && Array.isArray(emg.points)) ? emg.points : [];
+  const toneClass = cs => (cs === 'positive' ? 'up' : (cs === 'negative' ? 'down' : 'flat'));
+  const diagnostics = {
+    inputCount: srcPts.length, outputCount: 0, droppedCount: 0, syntheticPoints: 0,
+    continuityState: null, shortHistoryDisplay: null, stableDisplayAnchor: null,
+    visualTrustGate: null, returnContract: null, sourceFamilies: null,
+    firstTs: null, lastTs: null, firstValue: null, lastValue: null,
+    trustSpanDays: null, coverageRatio: (emg && emg.coverageRatio != null) ? emg.coverageRatio : null,
+  };
+  const out = {
+    range: r, surface: surface, state: 'calculating', mode: 'building',
+    points: srcPts, renderPoints: [], renderPathCount: 0,
+    lineEligible: false, badgeEligible: false, badgeLabel: 'Calculando…',
+    badgeReturnPct: null, colorState: 'neutral', colorClass: 'flat',
+    reason: 'pending', reasonCodes: [], diagnostics: diagnostics,
+  };
+  // Apply the resolved return contract onto the contract's badge fields (single source of truth for the %).
+  const applyBadge = (o, c) => {
+    if (!c) { o.badgeLabel = 'Calculando…'; o.badgeEligible = false; o.badgeReturnPct = null; o.colorState = 'neutral'; o.colorClass = 'flat'; return; }
+    o.badgeLabel = c.badgeLabel; o.badgeEligible = !!c.badgeEligible;
+    o.badgeReturnPct = (c.returnPct != null) ? c.returnPct : null;
+    o.colorState = c.colorState || 'neutral'; o.colorClass = toneClass(o.colorState);
+  };
+  // Collapse to the premium building state (no line). Rule 1: badge "Calculando…", colorState neutral.
+  const building = (o, reason) => {
+    o.mode = 'building'; o.state = 'calculating'; o.renderPoints = []; o.renderPathCount = 0;
+    o.lineEligible = false; o.reason = reason; o.reasonCodes.push('building');
+    o.badgeLabel = 'Calculando…'; o.badgeEligible = false; o.badgeReturnPct = null; o.colorState = 'neutral'; o.colorClass = 'flat';
+    o.diagnostics.outputCount = 0; o.diagnostics.droppedCount = o.diagnostics.inputCount;
+    return o;
+  };
+  try {
+    // 2 — validate: points must be a finite array with ≥2 finite points, and the chart ready.
+    const finite = srcPts.filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value));
+    const ready = !!(emg && emg.state === 'ready');
+    // 3 — continuity validation (informs badge + diagnostics; the visible line's own segmentation still
+    // happens in the renderer via _aurixStructuralBreaks, which delegates to this same helper).
+    let vs = null;
+    try { if (typeof _aurixBuildContinuityValidatedSeries === 'function') vs = _aurixBuildContinuityValidatedSeries(finite.map(p => ({ time: p.ts, value: p.value })), r); } catch (_) {}
+    diagnostics.continuityState = vs ? vs.continuityState : null;
+    if (vs && vs.coverageRatio != null) diagnostics.coverageRatio = vs.coverageRatio;
+    // 7-pre — return contract from the ORIGINAL points (same input the badge node consumes). Resolved early
+    // so badgeCalculando (which gates bootstrap suppression) matches the v500 paint chain exactly.
+    let contract = null;
+    try { if (typeof _aurixResolveChartReturnContract === 'function') contract = _aurixResolveChartReturnContract(vs, r, { chart: emg }); } catch (_) {}
+    diagnostics.returnContract = contract ? { state: contract.state, reason: contract.reason, returnPct: contract.returnPct } : null;
+    const badgeCalculando = !(contract && contract.state === 'ok');   // parity with v500 (emg.returnState !== 'ok')
+
+    // Rule 1 — not ready / not enough points ⇒ building (some data) or empty (no data at all).
+    if (!ready || finite.length < 2) {
+      if (srcPts.length === 0) { out.mode = 'empty'; out.state = 'empty'; out.reason = (emg && (emg.reason || emg.pendingReason)) || 'no_points'; out.reasonCodes.push('empty'); return out; }
+      return building(out, (emg && (emg.reason || emg.pendingReason)) || (finite.length < 2 ? 'insufficient_points' : 'not_ready'));
+    }
+
+    // working copy — the gates chain on progressively trimmed points; NEVER mutate the caller's array.
+    let work = finite.slice();
+    let partial = false;   // any gate declared a non-full presentation (short-history / hidden prefix / dropped island)
+
+    // 4 — short-history display (SPEC.16). building ⇒ premium Calculando; partial_clean ⇒ trim to MAIN cluster.
+    let shd = null;
+    try { if (typeof _aurixShortHistoryDisplay === 'function') shd = _aurixShortHistoryDisplay({ points: work, range: r }, r); } catch (_) {}
+    if (shd) { diagnostics.shortHistoryDisplay = { mode: shd.mode, reason: shd.reason, trustSpanDays: shd.trustSpanDays, droppedLeadingFragmentPts: shd.droppedLeadingFragmentPts }; if (shd.trustSpanDays != null) diagnostics.trustSpanDays = shd.trustSpanDays; }
+    if (shd && shd.mode === 'building') return building(out, 'short_history:' + shd.reason);
+    if (shd && shd.mode === 'partial_clean' && Array.isArray(shd.displayPoints) && shd.displayPoints.length >= 2) { work = shd.displayPoints.slice(); partial = true; out.reasonCodes.push('short_history_partial_clean'); }
+
+    // 5 — bootstrap suppression (SPEC.18). badge Calculando ⇒ hide the low bootstrap prefix, show the stable
+    // tramo, or building if none. Value-based; mature/clean (badge OK) ⇒ passthrough.
+    let sda = null;
+    try { if (typeof _aurixStableDisplayAnchor === 'function') sda = _aurixStableDisplayAnchor(work, r, { badgeCalculando: badgeCalculando }); } catch (_) {}
+    if (sda) diagnostics.stableDisplayAnchor = { mode: sda.mode, reason: sda.reason, hiddenPrefixPts: sda.hiddenPrefixPts };
+    if (sda && sda.mode === 'building') return building(out, 'bootstrap_suppression:' + sda.reason);
+    if (sda && Array.isArray(sda.points) && sda.points.length >= 2) { if (sda.hiddenPrefixPts > 0) { partial = true; out.reasonCodes.push('bootstrap_prefix_hidden'); } work = sda.points.slice(); }
+
+    // 6 — visual trust gate (SPEC.17, ALL ranges). Keep only the recent MAIN segment (small initial islands
+    // dropped, never bridged) or building when the main is not visually trustworthy.
+    let vtg = null;
+    try { if (typeof _aurixVisualTrustGate === 'function') vtg = _aurixVisualTrustGate(work, r); } catch (_) {}
+    if (vtg) diagnostics.visualTrustGate = { mode: vtg.mode, reason: vtg.reason, segmentCount: vtg.segmentCount, droppedSegmentCount: vtg.droppedSegmentCount, droppedPointCount: vtg.droppedPointCount };
+    if (vtg && vtg.mode === 'building') return building(out, 'visual_trust_gate:' + vtg.reason);
+    if (vtg && Array.isArray(vtg.points) && vtg.points.length >= 2) { if (vtg.droppedSegmentCount > 0) { partial = true; out.reasonCodes.push('visual_trust_islands_dropped'); } work = vtg.points.slice(); }
+
+    // 8 — final render mode: full (whole trustworthy historic) vs partial_clean (short history OR something
+    // hidden/dropped). A short-history range that keeps all its points is STILL partial (not a full historic).
+    const trimmed = work.length !== finite.length;
+    out.renderPoints = work;
+    out.lineEligible = work.length >= 2;
+    out.mode = (trimmed || partial) ? 'partial_clean' : 'full';
+    // 9 — badge from the return contract (decided on the ORIGINAL points; a real % only when trustworthy).
+    applyBadge(out, contract);
+    // state: ready ONLY when the badge is trustworthy AND the full untrimmed line is shown; otherwise the
+    // line may still paint (partial_clean / full-but-untrusted-24H) but the overall state is "calculating".
+    out.state = (out.badgeEligible && out.mode === 'full') ? 'ready' : 'calculating';
+    if (!out.badgeEligible) out.reasonCodes.push('badge_calculating');
+    // 10 — finalize diagnostics + render path count (structural-break subpaths + 1, matching the renderer).
+    diagnostics.outputCount = work.length;
+    diagnostics.droppedCount = Math.max(0, finite.length - work.length);
+    diagnostics.firstTs = work.length ? work[0].ts : null;
+    diagnostics.lastTs = work.length ? work[work.length - 1].ts : null;
+    diagnostics.firstValue = work.length ? work[0].value : null;
+    diagnostics.lastValue = work.length ? work[work.length - 1].value : null;
+    let rpc = 1;
+    try { if (typeof _aurixStructuralBreaks === 'function') { const sb = _aurixStructuralBreaks(work.map(p => ({ time: p.ts, value: p.value })), r); rpc = ((sb && Array.isArray(sb.breaks)) ? sb.breaks.length : 0) + 1; } } catch (_) {}
+    out.renderPathCount = out.lineEligible ? rpc : 0;
+    out.reason = trimmed ? 'partial_clean_render' : 'full_render';
+    return out;
+  } catch (e) {
+    out.mode = 'error'; out.state = 'calculating'; out.renderPoints = [];
+    out.reason = 'error:' + ((e && e.message) || 'err'); out.reasonCodes.push('error');
+    out.badgeLabel = 'Calculando…'; out.badgeEligible = false; out.badgeReturnPct = null; out.colorState = 'neutral'; out.colorClass = 'flat';
+    return out;
+  }
+}
+try { if (typeof window !== 'undefined') window._aurixResolveFinalRenderSeriesContract = _aurixResolveFinalRenderSeriesContract; } catch (_) {}
+
 // P0-PREMIUM-RENDERER-RECONNECTION — render the ALREADY-VALIDATED buildProductionPortfolioChart points
 // through the ORIGINAL institutional geometry (LTTB downsample → regime-aware scales → monotone-CUBIC
 // path → area). Values are NEVER modified: the only change is a ts→time shape rename. Returns a premium
@@ -24769,6 +24906,21 @@ try {
         hiddenPrefixPts: _sda.hiddenPrefixPts, renderedPointCount: Array.isArray(_sda.points) ? _sda.points.length : 0,
         currentValue: _sda.currentValue, bandLo: _sda.bandLo, bandHi: _sda.bandHi, syntheticPoints: 0,
       } : null;
+      // SPEC.19 — the SINGLE final render series contract both surfaces paint (read-only projection of the
+      // resolver the desktop + mobile paths now consume). Proves inputCount → outputCount, the render mode,
+      // the badge label/eligibility, colorState and that no synthetic point was ever fabricated.
+      const _frcA = safe(() => (typeof _aurixResolveFinalRenderSeriesContract === 'function') ? _aurixResolveFinalRenderSeriesContract(chart, r, 'desktop') : null, null);
+      const finalRenderSeriesContract = _frcA ? {
+        enabled: (typeof _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT !== 'undefined') ? !!_AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT : false,
+        mode: _frcA.mode, state: _frcA.state, reason: _frcA.reason, reasonCodes: _frcA.reasonCodes,
+        inputCount: _frcA.diagnostics.inputCount, outputCount: _frcA.diagnostics.outputCount,
+        droppedCount: _frcA.diagnostics.droppedCount, renderPathCount: _frcA.renderPathCount,
+        badgeLabel: _frcA.badgeLabel, badgeEligible: _frcA.badgeEligible, lineEligible: _frcA.lineEligible,
+        colorState: _frcA.colorState,
+        firstIso: iso(_frcA.diagnostics.firstTs), lastIso: iso(_frcA.diagnostics.lastTs),
+        firstValue: _frcA.diagnostics.firstValue, lastValue: _frcA.diagnostics.lastValue,
+        syntheticPoints: _frcA.diagnostics.syntheticPoints,
+      } : null;
       const out = {
         spec: 'DSH.CHART.POINT-LINEAGE.DISCONTINUITY.AUDIT.10', range: r,
         accountCreatedAtIso: iso(createdAt), accountAgeHours: (createdAt != null) ? +((Date.now() - createdAt) / 36e5).toFixed(2) : null,
@@ -24802,6 +24954,7 @@ try {
         shortHistoryDisplay: shortHistoryDisplay,
         visualTrustGate: visualTrustGate,
         stableDisplayAnchor: stableDisplayAnchor,
+        finalRenderSeriesContract: finalRenderSeriesContract,
         needles: needles.slice(0, 40), islands: islands, syntheticPoints: 0,
         finalPlottedPoints: finalPts.slice(0, 10).concat(finalPts.slice(-10)),
         droppedPoints: dropped.slice(0, 20),
@@ -28162,6 +28315,26 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
   // Badge — one source, always coherent with the line.
   if (changeEl) _aurixEmergencyPaintBadgeNode(changeEl, emg, surface);
 
+  // SPEC.19 — FINAL RENDER SERIES CONTRACT. When ON, the desktop painter draws EXCLUSIVELY what the single
+  // resolver returns (renderPoints / mode / colorState) — no path picks points on its own, so desktop and
+  // mobile can never diverge. The resolver runs the SAME pipeline (continuity → short-history → bootstrap
+  // suppression → visual-trust-gate → return-contract) the inline v500 blocks below run, in the same order,
+  // so the ON result is byte-identical to v500 — the only change is that ONE function owns the decision.
+  // Flag OFF ⇒ the inline v500 gate blocks below run unchanged (byte-identical v500 rollback).
+  let _frcTone = null;
+  const _frcOn = (typeof _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT !== 'undefined') && _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT && typeof _aurixResolveFinalRenderSeriesContract === 'function';
+  if (_frcOn && emg.state === 'ready') {
+    const _frc = _aurixResolveFinalRenderSeriesContract(emg, emg.range, surface);
+    try { console.log('[UI][FINAL_RENDER_CONTRACT]', { surface: surface, mode: _frc.mode, state: _frc.state, reason: _frc.reason, out: _frc.diagnostics.outputCount, dropped: _frc.diagnostics.droppedCount, colorState: _frc.colorState, badgeEligible: _frc.badgeEligible, chartHash: emg.chartHash }); } catch (_) {}
+    if (_frc.mode === 'building' || _frc.mode === 'empty' || _frc.mode === 'error' || !(Array.isArray(_frc.renderPoints) && _frc.renderPoints.length >= 2)) {
+      _aurixLastVisualSig[surface] = null;
+      try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'building'); } catch (_) {}
+      _wscRenderInsufficient(hostEl, { realPointCount: emg.pointCount, reason: _frc.reason }, { mode: 'building', eligible: [], lastGood: null });
+      return true;
+    }
+    emg.points = _frc.renderPoints;   // painter draws EXCLUSIVELY the contract's final series (SPEC.19 rule)
+    _frcTone = _frc.colorClass;
+  } else {
   // SPEC.16 — short-history display policy (PRESENTATION ONLY). building ⇒ premium Calculando (no line);
   // partial_clean ⇒ trim emg.points to the recent MAIN cluster (initial construction fragments dropped,
   // never bridged; syntheticPoints=0). The unchanged pending branch + render calls below stay byte-identical
@@ -28201,6 +28374,7 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
     return true;
   }
   if (_vtg && Array.isArray(_vtg.points) && _vtg.points.length >= 2) emg.points = _vtg.points;
+  }
 
   if (emg.state !== 'ready') {
     try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'building'); } catch (_) {}
@@ -28210,7 +28384,7 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
   }
 
   try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'ready'); } catch (_) {}
-  const tone = emg.color;   // up | down | flat — reuses the shipped .wsc-* tone CSS
+  const tone = (_frcTone != null) ? _frcTone : emg.color;   // SPEC.19: contract colour when ON, else emg.color (up|down|flat)
   const W = _WSC_VIEW_W, H = _WSC_VIEW_H;
   // PREMIUM RENDERER — draw the validated points through the ORIGINAL institutional geometry
   // (monotone-cubic + regime scale + LTTB). Fall back to the emergency polyline only if it fails.
@@ -28732,9 +28906,19 @@ function renderAurixMobileLiteChart(range, token) {
         const emg = buildProductionPortfolioChart(r);
         try { if (typeof window !== 'undefined') window._aurixEmergencyLastMobile = emg; } catch (_) {}
         _aurixChartUpdateLog('mobile', emg);
-        // SPEC.16 — short-history display policy (PRESENTATION ONLY). building ⇒ premium Calculando skeleton
-        // (no misleading line); partial_clean ⇒ trim emg.points to the recent MAIN cluster (initial fragments
-        // dropped, never bridged). Unchanged pending branch + render below stay byte-identical (read emg.points).
+        // SPEC.19 — mobile uses the SAME final render contract as desktop (identical output). Flag OFF ⇒ v500.
+        let _frcToneM = null;
+        const _frcOnM = (typeof _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT !== 'undefined') && _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT && typeof _aurixResolveFinalRenderSeriesContract === 'function';
+        if (_frcOnM && emg.state === 'ready') {
+          const _frcM = _aurixResolveFinalRenderSeriesContract(emg, r, 'mobile');
+          if ((_frcM.mode !== 'full' && _frcM.mode !== 'partial_clean') || !(Array.isArray(_frcM.renderPoints) && _frcM.renderPoints.length >= 2)) {
+            _aurixLastVisualSig.mobile = null; _aurixMobileLiteFallback('pending');
+            if (_aurixMobileLiteEmptyRetries < 6) { _aurixMobileLiteEmptyRetries++; try { setTimeout(function () { scheduleAurixMobileLite(r); }, 1300); } catch (_) {} }
+            return;
+          }
+          emg.points = _frcM.renderPoints; _frcToneM = _frcM.colorClass;
+        } else {
+        // SPEC.16 — short-history display (v500 path). building ⇒ skeleton; partial_clean ⇒ trim to MAIN cluster.
         let _shdM = null;
         try { if (emg.state === 'ready' && typeof _aurixShortHistoryDisplay === 'function') _shdM = _aurixShortHistoryDisplay(emg, r); } catch (_) {}
         if (_shdM && _shdM.mode === 'building') {
@@ -28744,8 +28928,7 @@ function renderAurixMobileLiteChart(range, token) {
           return;
         }
         if (_shdM && _shdM.mode === 'partial_clean' && Array.isArray(_shdM.displayPoints) && _shdM.displayPoints.length >= 2) emg.points = _shdM.displayPoints;
-        // SPEC.18 — bootstrap suppression: badge Calculando ⇒ hide low bootstrap prefix, show stable tramo
-        // (or building). Value-based; mutates emg.points in place. Mature/clean (badge OK) ⇒ passthrough.
+        // SPEC.18 — bootstrap suppression (v500 path): badge Calculando ⇒ hide low prefix, show stable tramo.
         let _sdaM = null;
         try { if (emg.state === 'ready' && typeof _aurixStableDisplayAnchor === 'function') _sdaM = _aurixStableDisplayAnchor(emg.points, r, { badgeCalculando: emg.returnState !== 'ok' }); } catch (_) {}
         if (_sdaM && _sdaM.mode === 'building') {
@@ -28755,8 +28938,7 @@ function renderAurixMobileLiteChart(range, token) {
           return;
         }
         if (_sdaM && Array.isArray(_sdaM.points) && _sdaM.points.length >= 2) emg.points = _sdaM.points;
-        // SPEC.17 — visual trust gate (all ranges incl 24H): keep only the recent MAIN segment (small
-        // initial islands dropped, never bridged) or premium building. Mutates emg.points in place.
+        // SPEC.17 — visual trust gate (v500 path): keep the recent MAIN segment or building.
         let _vtgM = null;
         try { if (emg.state === 'ready' && typeof _aurixVisualTrustGate === 'function') _vtgM = _aurixVisualTrustGate(emg.points, r); } catch (_) {}
         if (_vtgM && _vtgM.mode === 'building') {
@@ -28766,6 +28948,7 @@ function renderAurixMobileLiteChart(range, token) {
           return;
         }
         if (_vtgM && Array.isArray(_vtgM.points) && _vtgM.points.length >= 2) emg.points = _vtgM.points;
+        }
         if (emg.state !== 'ready') {
           _aurixLastVisualSig.mobile = null;   // FIX 1 — pending forces a fresh draw on the next ready
           _aurixMobileLiteFallback('pending');
@@ -28792,7 +28975,7 @@ function renderAurixMobileLiteChart(range, token) {
         const built = _rc.ok
           ? { linePath: _rc.linePath, areaPath: _rc.areaPath, pixels: _rc.visiblePixels, points: _rc.visiblePoints }
           : (function () { const b = _aurixEmergencyBuildSvg(emg.points, { W: VBW, H: VBH, padL: 14, padR: 14, padT: 24, padB: 24 }); return { linePath: b.linePath, areaPath: b.areaPath, pixels: b.pixels, points: emg.points.map(function (p) { return { time: p.ts, value: p.value }; }) }; })();
-        const tone = emg.color;
+        const tone = (_frcToneM != null) ? _frcToneM : emg.color;   // SPEC.19: contract colour when ON, else emg.color
         const stroke = tone === 'down' ? '#e25563' : (tone === 'flat' ? '#9fb0c7' : '#2ebd85');
         const fillTop = tone === 'down' ? 'rgba(226,85,99,0.15)' : (tone === 'flat' ? 'rgba(159,176,199,0.08)' : 'rgba(46,189,133,0.16)');
         const gid = 'aurixLiteFill_' + tone;
