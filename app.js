@@ -24560,6 +24560,101 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
 }
 try { if (typeof window !== 'undefined') window._aurixResolveFinalRenderSeriesContract = _aurixResolveFinalRenderSeriesContract; } catch (_) {}
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.RUNTIME_SOAK_CROSS_RANGE_PROVENANCE_LAUNCH_GATE.23 — pure launch-gate classifiers
+// ════════════════════════════════════════════════════════════════════════════
+// READ-ONLY, pure, deterministic classifiers that reuse the SPEC.19 contract + existing hashes/helpers (no
+// second resolver, no second continuity pipeline). They power the runtime soak / launch gate that PROVES,
+// rather than assumes, whether: identical cross-range visible series are legitimate short-/shared-history
+// behaviour or a cross-range alias defect; whether the renderer visually bridges a gap the contract deems
+// discontinuous; and whether a same-settled-evidence transition (e.g. 7D PARTIAL↔Calculando) is a real
+// regression or a legitimate evidence/hydration change. Nothing here mutates, renders, or fetches.
+
+// (23.A) CROSS-RANGE PROVENANCE — classify every range pair. Same finalRenderHash across 7D/30D/1Y/ALL is
+// NOT automatically a defect: it is legitimate ONLY when independently derivable from the real available
+// history (same eligible real interval AND that interval fits inside BOTH requested windows, so neither
+// range should have clipped further). Identical output a smaller window should have clipped ⇒ alias defect.
+function _aurixClassifyCrossRangeSeriesProvenance(rangeContracts) {
+  const list = Array.isArray(rangeContracts) ? rangeContracts.filter(Boolean) : [];
+  const winMs = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '1y': 31536e6, 'all': Infinity };
+  const out = { pairs: [], matrix: {}, defects: [], verdict: 'INSUFFICIENT_EVIDENCE' };
+  const classifyPair = (a, b) => {
+    if (!a || !b) return { classification: 'INSUFFICIENT_EVIDENCE', reason: 'missing_contract' };
+    if (a.finalRenderHash == null || b.finalRenderHash == null || (a.renderPointCount || 0) < 2 || (b.renderPointCount || 0) < 2)
+      return { classification: 'INSUFFICIENT_EVIDENCE', reason: 'no_render_points' };
+    if (a.finalRenderHash !== b.finalRenderHash) return { classification: 'DIFFERENT_SERIES_EXPECTED', reason: 'distinct_final_render_hash' };
+    const sameRealInterval = (a.realFirstTs === b.realFirstTs && a.realLastTs === b.realLastTs && a.realFirstTs != null);
+    const sameCanonicalInput = (a.canonicalInputHash === b.canonicalInputHash);
+    const realSpan = Math.max(Number(a.realSpanMs) || 0, Number(b.realSpanMs) || 0);
+    const wa = (winMs[a.requestedRange] != null) ? winMs[a.requestedRange] : Infinity;
+    const wb = (winMs[b.requestedRange] != null) ? winMs[b.requestedRange] : Infinity;
+    const fitsBoth = realSpan <= wa && realSpan <= wb;
+    if (!fitsBoth) return { classification: 'CROSS_RANGE_ALIAS_DEFECT', reason: 'identical_output_but_a_smaller_window_should_have_clipped_further' };
+    if (sameRealInterval && sameCanonicalInput) return { classification: 'SAME_AVAILABLE_HISTORY_LEGITIMATE', reason: 'shared_real_interval_fits_both_windows' };
+    return { classification: 'CROSS_RANGE_ALIAS_SUSPECT', reason: !sameRealInterval ? 'identical_hash_different_real_interval' : 'identical_hash_different_canonical_input' };
+  };
+  for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+    const a = list[i], b = list[j], c = classifyPair(a, b);
+    const pair = { a: a.requestedRange, b: b.requestedRange, classification: c.classification, reason: c.reason };
+    out.pairs.push(pair);
+    out.matrix[a.requestedRange + '|' + b.requestedRange] = c.classification;
+    if (c.classification === 'CROSS_RANGE_ALIAS_DEFECT' || c.classification === 'CROSS_RANGE_ALIAS_SUSPECT') out.defects.push(pair);
+  }
+  out.verdict = out.pairs.length === 0 ? 'INSUFFICIENT_EVIDENCE' : (out.defects.length ? 'CROSS_RANGE_DEFECT' : 'CROSS_RANGE_CLEAN');
+  return out;
+}
+try { if (typeof window !== 'undefined') window._aurixClassifyCrossRangeSeriesProvenance = _aurixClassifyCrossRangeSeriesProvenance; } catch (_) {}
+
+// (23.D) REAL-GAP vs VISUAL-BRIDGE — from timestamps + renderer path ownership (NOT inferred from
+// syntheticPoints). Splits the render points on the SAME structural break set the renderer uses; any
+// adjacent pair whose dt ≥ the contract discontinuity threshold that still shares ONE path is a visual
+// bridge defect. A long smooth interval with all same-path gaps < threshold is a legitimate real interval.
+function _aurixAuditRenderPathGaps(renderPoints, range) {
+  const r = String(range || '').toLowerCase();
+  const pts = Array.isArray(renderPoints) ? renderPoints.filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value)) : [];
+  const out = { range: r, pointCount: pts.length, pathCount: pts.length ? 1 : 0, gapThresholdMs: 0,
+    maxAdjacentDtMs: 0, maxSamePathDtMs: 0, largestGapPair: null,
+    bridgedDiscontinuousGapCount: 0, suspiciousVisualBridgeCount: 0, classification: 'INSUFFICIENT', pairs: [] };
+  try {
+    if (pts.length < 2) return out;
+    const mapped = pts.map(p => ({ time: p.ts, value: p.value }));
+    const thr = (typeof _aurixRealGapFloorMs === 'function') ? _aurixRealGapFloorMs(mapped, r) : (7 * 864e5);
+    out.gapThresholdMs = thr;
+    let breaks = [];
+    try { if (typeof _aurixStructuralBreaks === 'function') { const sb = _aurixStructuralBreaks(mapped, r); breaks = (sb && Array.isArray(sb.breaks)) ? sb.breaks : []; } } catch (_) {}
+    let runs = [mapped];
+    try { if (breaks.length && typeof _aurixSplitAtGaps === 'function') runs = _aurixSplitAtGaps(mapped, breaks) || [mapped]; } catch (_) { runs = [mapped]; }
+    runs = runs.filter(run => run && run.length);
+    out.pathCount = runs.length;
+    const pathOfTs = {}; runs.forEach((run, pid) => run.forEach(p => { pathOfTs[p.time] = pid; }));
+    for (let i = 1; i < pts.length; i++) {
+      const dt = pts[i].ts - pts[i - 1].ts;
+      const samePath = pathOfTs[pts[i].ts] === pathOfTs[pts[i - 1].ts];
+      const exceeds = dt >= thr;
+      out.pairs.push({ fromTs: pts[i - 1].ts, toTs: pts[i].ts, dtMs: dt, pathId: pathOfTs[pts[i - 1].ts], samePath: samePath, exceedsThreshold: exceeds });
+      if (dt > out.maxAdjacentDtMs) { out.maxAdjacentDtMs = dt; out.largestGapPair = { fromTs: pts[i - 1].ts, toTs: pts[i].ts, dtMs: dt, samePath: samePath }; }
+      if (samePath && dt > out.maxSamePathDtMs) out.maxSamePathDtMs = dt;
+      if (samePath && exceeds) out.bridgedDiscontinuousGapCount++;         // discontinuous gap drawn inside one path = visual bridge
+    }
+    out.classification = out.bridgedDiscontinuousGapCount > 0 ? 'VISUAL_BRIDGE_DEFECT' : 'LEGITIMATE_CONTINUOUS_REAL_INTERVAL';
+    return out;
+  } catch (_) { return out; }
+}
+try { if (typeof window !== 'undefined') window._aurixAuditRenderPathGaps = _aurixAuditRenderPathGaps; } catch (_) {}
+
+// (23.6/23.7) EVIDENCE-TRANSITION classifier — on the SAME settled canonical input hash the contract must be
+// byte-stable; ANY change of the visual/semantic fields is a regression (flap). A change is legitimate only
+// when the canonical input hash itself changed (real evidence/hydration change). Pure over two snapshots.
+function _aurixClassifyEvidenceTransition(prev, next) {
+  if (!prev || !next) return 'INSUFFICIENT_EVIDENCE';
+  const fields = ['finalRenderHash', 'badgeLabel', 'badgeEligible', 'colorClass', 'mode', 'renderPathCount', 'returnAnchorTs', 'deadlockResolution', 'state'];
+  const changed = fields.some(f => prev[f] !== next[f]);
+  if (!changed) return 'NO_CHANGE';
+  if (prev.canonicalInputHash !== next.canonicalInputHash) return 'EVIDENCE_CHANGED_LEGITIMATE';
+  return 'SAME_EVIDENCE_REGRESSION';   // identical settled evidence but the contract flipped ⇒ defect
+}
+try { if (typeof window !== 'undefined') window._aurixClassifyEvidenceTransition = _aurixClassifyEvidenceTransition; } catch (_) {}
+
 // P0-PREMIUM-RENDERER-RECONNECTION — render the ALREADY-VALIDATED buildProductionPortfolioChart points
 // through the ORIGINAL institutional geometry (LTTB downsample → regime-aware scales → monotone-CUBIC
 // path → area). Values are NEVER modified: the only change is a ts→time shape rename. Returns a premium
@@ -25543,6 +25638,161 @@ try {
             finalEvent: (function () { const e = events[events.length - 1]; if (!e) return null; const c = Object.assign({}, e); delete c._sig; return c; })(),
           };
           try { console.log('%c[UI][CHART_HYDRATION_STABILITY_AUDIT]', 'font-weight:700;color:#e0559a', out); } catch (_) {}
+          resolve(out);
+        }
+      });
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // SPEC DSH.CHART.RUNTIME_SOAK_CROSS_RANGE_PROVENANCE_LAUNCH_GATE.23 — window.aurixChartRuntimeSoakAudit
+    // ════════════════════════════════════════════════════════════════════════════
+    // READ-ONLY temporal soak + cross-range provenance + visual-gap + same-evidence-flap launch gate. Reuses
+    // the SPEC.19 contract (one buildProductionPortfolioChart per range per tick, both surfaces resolved from
+    // that ONE chart) + the pure SPEC.23 classifiers. Cost-bounded: one build per range/tick (no per-surface
+    // or per-network refetch), capped sample count, single interval cleared on completion (no timer left
+    // behind). Returns a Promise resolving to a JSON-serializable launch verdict: STABLE_LAUNCH_READY only if
+    // no same-input flap, no cross-range alias, no visual bridge, no 7D partial↔calculating oscillation on
+    // unchanged evidence, desktop==mobile, all24hSinglePath, zero synthetic points; else NOT_LAUNCH_READY.
+    window.aurixChartRuntimeSoakAudit = function (options) {
+      options = options || {};
+      const safe = (fn, d) => { try { const v = fn(); return v === undefined ? (d === undefined ? null : d) : v; } catch (_) { return (d === undefined ? null : d); } };
+      const iso = t => { try { return Number.isFinite(t) ? new Date(t).toISOString() : null; } catch (_) { return null; } };
+      const hashOf = pts => safe(() => (typeof _aurixEmergencyHash === 'function') ? _aurixEmergencyHash(Array.isArray(pts) ? pts : []) : null, null);
+      const strHash = s => { try { let h = 2166136261 >>> 0; s = String(s == null ? '' : s); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return ('00000000' + h.toString(16)).slice(-8); } catch (_) { return null; } };
+      const RANGES = Array.isArray(options.ranges) && options.ranges.length ? options.ranges.map(x => String(x).toLowerCase()) : ['24h', '7d', '30d', '1y', 'all'];
+      const SURFACES = Array.isArray(options.surfaces) && options.surfaces.length ? options.surfaces : ['desktop', 'mobile'];
+      const includeCrossRange = options.includeCrossRange !== false;
+      const durationMs = Math.max(1000, Math.min(300000, Number(options.durationMs) || 60000));
+      const sampleEveryMs = Math.max(250, Math.min(10000, Number(options.sampleEveryMs) || 1000));
+      const MAX_SAMPLES = Math.max(1, Math.min(600, Math.ceil(durationMs / sampleEveryMs) + 2));
+      const accountObservationId = safe(() => (typeof currentUser !== 'undefined' && currentUser && currentUser.id) ? strHash(currentUser.id) : 'anon', 'anon');
+      // one contract projection per (range, surface) reusing ONE chart build per range.
+      const projectTick = (tickIdx) => {
+        const wall = safe(() => Date.now(), 0);
+        const perRange = {}, crossList = [];
+        RANGES.forEach(r => {
+          const chart = safe(() => buildProductionPortfolioChart(r), null) || { points: [], state: 'pending' };
+          const cp = Array.isArray(chart.points) ? chart.points : [];
+          const bySurface = {};
+          let gapDesk = null;
+          SURFACES.forEach(s => {
+            const frc = safe(() => (typeof _aurixResolveFinalRenderSeriesContract === 'function') ? _aurixResolveFinalRenderSeriesContract(chart, r, s) : null, null) || {};
+            const rp = Array.isArray(frc.renderPoints) ? frc.renderPoints : [];
+            const selHash = hashOf(rp);
+            const gap = safe(() => (typeof _aurixAuditRenderPathGaps === 'function') ? _aurixAuditRenderPathGaps(rp, r) : null, null);
+            if (s === 'desktop') gapDesk = gap;
+            bySurface[s] = {
+              range: r, surface: s, monotonicSample: tickIdx, wallTime: wall,
+              canonicalInputHash: hashOf(cp), finalRenderHash: strHash([selHash, frc.mode, frc.colorClass, frc.badgeLabel].join('|')),
+              selectedPointsHash: selHash, renderPointCount: rp.length, renderPathCount: frc.renderPathCount != null ? frc.renderPathCount : null,
+              mode: frc.mode || null, state: frc.state || null, badgeLabel: frc.badgeLabel || null, badgeEligible: !!frc.badgeEligible,
+              returnPct: (frc.badgeReturnPct != null) ? frc.badgeReturnPct : (Number.isFinite(chart.badgeReturnPct) ? chart.badgeReturnPct : null),
+              colorClass: frc.colorClass || null, reasonCodes: Array.isArray(frc.reasonCodes) ? frc.reasonCodes : [],
+              deadlockResolution: (frc.diagnostics && frc.diagnostics.reliabilityDeadlock) ? frc.diagnostics.reliabilityDeadlock.branch : null,
+              returnAnchorTs: frc.returnAnchorTs != null ? frc.returnAnchorTs : null,
+              firstRenderTs: rp.length ? rp[0].ts : null, lastRenderTs: rp.length ? rp[rp.length - 1].ts : null,
+              realFirstTs: cp.length ? cp[0].ts : null, realLastTs: cp.length ? cp[cp.length - 1].ts : null,
+              realPointCount: cp.length, realSpanMs: cp.length ? (cp[cp.length - 1].ts - cp[0].ts) : 0,
+              coverageRatio: (chart.coverageRatio != null) ? chart.coverageRatio : null,
+              syntheticPoints: (frc.diagnostics && frc.diagnostics.syntheticPoints != null) ? frc.diagnostics.syntheticPoints : 0,
+              maxSamePathDtMs: gap ? gap.maxSamePathDtMs : 0, gapThresholdMs: gap ? gap.gapThresholdMs : 0,
+              bridgedDiscontinuousGapCount: gap ? gap.bridgedDiscontinuousGapCount : 0, gapClassification: gap ? gap.classification : null,
+            };
+          });
+          perRange[r] = bySurface;
+          const d = bySurface.desktop || bySurface[SURFACES[0]];
+          if (d) crossList.push({ requestedRange: r, canonicalInputHash: d.canonicalInputHash, finalRenderHash: d.finalRenderHash,
+            renderPointCount: d.renderPointCount, realFirstTs: d.realFirstTs, realLastTs: d.realLastTs, realSpanMs: d.realSpanMs });
+        });
+        const crossRange = includeCrossRange ? safe(() => _aurixClassifyCrossRangeSeriesProvenance(crossList), null) : null;
+        return { tickIdx: tickIdx, wall: wall, perRange: perRange, crossRange: crossRange };
+      };
+      const ticks = [];
+      return new Promise(function (resolve) {
+        let timer = null, done = false, n = 0;
+        const t0 = safe(() => Date.now(), 0);
+        try { ticks.push(projectTick(n++)); } catch (_) {}
+        try {
+          timer = setInterval(function () {
+            try { if (n < MAX_SAMPLES) ticks.push(projectTick(n++)); } catch (_) {}
+            if (n >= MAX_SAMPLES || (safe(() => Date.now(), 0) - t0 >= durationMs)) finish();
+          }, sampleEveryMs);
+        } catch (_) { finish(); }
+        function finish() {
+          if (done) return; done = true;
+          try { if (timer) clearInterval(timer); } catch (_) {}   // no timer left behind
+          const defects = [];
+          const addDefect = (type, evidence) => defects.push(Object.assign({ type: type }, evidence || {}));
+          // flatten per (range, surface) sequences
+          const seqOf = (r, s) => ticks.map(t => t.perRange[r] && t.perRange[r][s]).filter(Boolean);
+          const uniq = (arr, key) => { const m = {}; arr.forEach(e => { m[e[key]] = 1; }); return Object.keys(m); };
+          // (A) same-input flaps + (B) 24H path count + (G) synthetic + parity
+          let all24hSinglePath = true, totalSyntheticPoints = 0, bridgedDiscontinuousGapCount = 0, parityOk = true;
+          RANGES.forEach(r => {
+            SURFACES.forEach(s => {
+              const seq = seqOf(r, s);
+              seq.forEach(e => {
+                if (r === '24h' && e.renderPathCount != null && e.renderPathCount > 1) { all24hSinglePath = false; addDefect('24H_PATH_COUNT_GT_1', { range: r, surface: s, renderPathCount: e.renderPathCount }); }
+                totalSyntheticPoints += (e.syntheticPoints || 0);
+                bridgedDiscontinuousGapCount += (e.bridgedDiscontinuousGapCount || 0);
+                if (e.syntheticPoints > 0) addDefect('SYNTHETIC_POINT_REGRESSION', { range: r, surface: s });
+                if (e.bridgedDiscontinuousGapCount > 0) addDefect('VISUAL_BRIDGE_DEFECT', { range: r, surface: s, maxSamePathDtMs: e.maxSamePathDtMs, gapThresholdMs: e.gapThresholdMs });
+              });
+              // group by settled canonical input; any field flap within a group = same-input regression
+              const byInput = {}; seq.forEach(e => { (byInput[e.canonicalInputHash] = byInput[e.canonicalInputHash] || []).push(e); });
+              Object.keys(byInput).forEach(k => {
+                const g = byInput[k];
+                if (uniq(g, 'finalRenderHash').length > 1) addDefect('SAME_INPUT_RENDER_FLAP', { range: r, surface: s, canonicalInputHash: k });
+                if (uniq(g, 'colorClass').length > 1) addDefect('SAME_INPUT_COLOR_FLAP', { range: r, surface: s, canonicalInputHash: k });
+                if (uniq(g, 'badgeLabel').length > 1) addDefect('SAME_INPUT_BADGE_FLAP', { range: r, surface: s, canonicalInputHash: k });
+                if (uniq(g, 'mode').length > 1) addDefect('SAME_INPUT_MODE_FLAP', { range: r, surface: s, canonicalInputHash: k });
+                if (uniq(g.map(e => ({ x: String(e.renderPathCount) })), 'x').length > 1) addDefect('SAME_INPUT_PATH_FLAP', { range: r, surface: s, canonicalInputHash: k });
+                if (uniq(g.map(e => ({ x: String(e.returnAnchorTs) })), 'x').length > 1) addDefect('SAME_INPUT_ANCHOR_FLAP', { range: r, surface: s, canonicalInputHash: k });
+              });
+            });
+            // desktop == mobile per tick
+            ticks.forEach(t => {
+              const d = t.perRange[r] && t.perRange[r].desktop, m = t.perRange[r] && t.perRange[r].mobile;
+              if (d && m && (d.finalRenderHash !== m.finalRenderHash || d.mode !== m.mode || d.colorClass !== m.colorClass || d.badgeLabel !== m.badgeLabel || d.renderPathCount !== m.renderPathCount || d.returnAnchorTs !== m.returnAnchorTs)) {
+                parityOk = false; addDefect('DESKTOP_MOBILE_DIVERGENCE', { range: r, tick: t.tickIdx });
+              }
+            });
+          });
+          // (E) 7D PARTIAL↔Calculating oscillation on SAME settled evidence
+          const sevenSeq = seqOf('7d', 'desktop');
+          const transitions = [];
+          for (let i = 1; i < sevenSeq.length; i++) {
+            const verdict = safe(() => _aurixClassifyEvidenceTransition(sevenSeq[i - 1], sevenSeq[i]), 'INSUFFICIENT_EVIDENCE');
+            if (verdict === 'SAME_EVIDENCE_REGRESSION' || verdict === 'EVIDENCE_CHANGED_LEGITIMATE') {
+              transitions.push({ fromTick: sevenSeq[i - 1].monotonicSample, toTick: sevenSeq[i].monotonicSample, verdict: verdict,
+                prev: { canonicalInputHash: sevenSeq[i - 1].canonicalInputHash, badgeLabel: sevenSeq[i - 1].badgeLabel, deadlockResolution: sevenSeq[i - 1].deadlockResolution, realPointCount: sevenSeq[i - 1].realPointCount, realSpanMs: sevenSeq[i - 1].realSpanMs, coverageRatio: sevenSeq[i - 1].coverageRatio, returnAnchorTs: sevenSeq[i - 1].returnAnchorTs, reasonCodes: sevenSeq[i - 1].reasonCodes },
+                next: { canonicalInputHash: sevenSeq[i].canonicalInputHash, badgeLabel: sevenSeq[i].badgeLabel, deadlockResolution: sevenSeq[i].deadlockResolution, realPointCount: sevenSeq[i].realPointCount, realSpanMs: sevenSeq[i].realSpanMs, coverageRatio: sevenSeq[i].coverageRatio, returnAnchorTs: sevenSeq[i].returnAnchorTs, reasonCodes: sevenSeq[i].reasonCodes } });
+            }
+            if (verdict === 'SAME_EVIDENCE_REGRESSION') addDefect('PARTIAL_CALCULATING_OSCILLATION', { range: '7d', fromTick: sevenSeq[i - 1].monotonicSample, toTick: sevenSeq[i].monotonicSample });
+          }
+          // (B) cross-range alias — any tick classifying a defect/suspect
+          const crossRangeMatrix = ticks.length ? (ticks[ticks.length - 1].crossRange || null) : null;
+          ticks.forEach(t => {
+            if (t.crossRange && Array.isArray(t.crossRange.defects)) t.crossRange.defects.forEach(p => {
+              addDefect(p.classification === 'CROSS_RANGE_ALIAS_DEFECT' ? 'CROSS_RANGE_ALIAS_DEFECT' : 'CROSS_RANGE_ALIAS_SUSPECT', { tick: t.tickIdx, a: p.a, b: p.b, reason: p.reason });
+            });
+          });
+          const dedup = {}; const defectCodes = []; defects.forEach(d => { if (!dedup[d.type]) { dedup[d.type] = 1; defectCodes.push(d.type); } });
+          const launchReady = defects.length === 0 && all24hSinglePath && totalSyntheticPoints === 0 && bridgedDiscontinuousGapCount === 0 && parityOk;
+          const out = {
+            spec: 'DSH.CHART.RUNTIME_SOAK_CROSS_RANGE_PROVENANCE_LAUNCH_GATE.23',
+            verdict: launchReady ? 'STABLE_LAUNCH_READY' : 'NOT_LAUNCH_READY',
+            accountObservationId: accountObservationId, appVersion: safe(() => (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null, null),
+            durationMs: durationMs, sampleEveryMs: sampleEveryMs, sampleCount: ticks.length, ranges: RANGES, surfaces: SURFACES,
+            summary: { all24hSinglePath: all24hSinglePath, totalSyntheticPoints: totalSyntheticPoints, bridgedDiscontinuousGapCount: bridgedDiscontinuousGapCount,
+              desktopEqualsMobile: parityOk, defectCount: defects.length, defectCodes: defectCodes },
+            crossRangeMatrix: crossRangeMatrix ? crossRangeMatrix.matrix : null,
+            crossRangeVerdict: crossRangeMatrix ? crossRangeMatrix.verdict : null,
+            sevenDayTransitions: transitions,
+            defects: defects.slice(0, 60),
+            finalTick: ticks.length ? { wallIso: iso(ticks[ticks.length - 1].wall), perRange: ticks[ticks.length - 1].perRange } : null,
+          };
+          try { console.log('%c[UI][CHART_RUNTIME_SOAK_LAUNCH_GATE]', 'font-weight:700;color:#12b886', out); } catch (_) {}
           resolve(out);
         }
       });
