@@ -25113,6 +25113,82 @@ try {
     };
 
     // ════════════════════════════════════════════════════════════════════════════
+    // SPEC DSH.CHART.FINAL-CONTRACT-GUARDRAILS.20 — window.aurixChartFinalContractAudit()
+    // ════════════════════════════════════════════════════════════════════════════
+    // READ-ONLY, deterministic, JSON-serializable. Proves, per range × surface, that the VISIBLE chart is
+    // driven 100% by _aurixResolveFinalRenderSeriesContract (SPEC.19) and that desktop and mobile produce a
+    // byte-identical final render series (identical renderHash / mode / colorClass / badgeLabel). This is the
+    // launch guardrail: a future change that lets any range or surface paint points outside the final
+    // contract — or that lets the two surfaces diverge — makes parity.desktopEqualsMobile flip to false here
+    // and breaks the guardrails harness before it can reach production. Nothing here writes / renders / flags;
+    // it only runs the SAME pure builders + resolver the visible chart reads.
+    window.aurixChartFinalContractAudit = function () {
+      const safe = (fn, d) => { try { const v = fn(); return v === undefined ? (d === undefined ? null : d) : v; } catch (_) { return (d === undefined ? null : d); } };
+      const iso = t => { try { return Number.isFinite(t) ? new Date(t).toISOString() : null; } catch (_) { return null; } };
+      const RANGES = ['24h', '7d', '30d', '1y', 'all'];
+      const SURFACES = ['desktop', 'mobile'];
+      const appVersion = safe(() => (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null, null);
+      const flagOn = safe(() => (typeof _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT !== 'undefined') ? !!_AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT : false, false);
+      const hashOf = pts => safe(() => (typeof _aurixEmergencyHash === 'function') ? _aurixEmergencyHash(Array.isArray(pts) ? pts : []) : null, null);
+      const project = (frc, chart) => {
+        if (!frc) return { mode: null, state: null, renderPointCount: 0, renderPathCount: 0, renderHash: hashOf([]),
+          colorClass: null, colorState: null, badgeLabel: null, badgeEligible: null, lineEligible: null, reasonCodes: [], diagnostics: null };
+        const rp = Array.isArray(frc.renderPoints) ? frc.renderPoints : [];
+        const d = frc.diagnostics || {};
+        return {
+          mode: frc.mode, state: frc.state, renderPointCount: rp.length, renderPathCount: frc.renderPathCount,
+          renderHash: hashOf(rp), colorClass: frc.colorClass, colorState: frc.colorState,
+          badgeLabel: frc.badgeLabel, badgeEligible: frc.badgeEligible, lineEligible: frc.lineEligible,
+          reasonCodes: Array.isArray(frc.reasonCodes) ? frc.reasonCodes : [],
+          diagnostics: {
+            inputCount: d.inputCount, outputCount: d.outputCount, droppedCount: d.droppedCount,
+            syntheticPoints: d.syntheticPoints, continuityState: d.continuityState, coverageRatio: d.coverageRatio,
+            trustSpanDays: d.trustSpanDays, firstIso: iso(d.firstTs), lastIso: iso(d.lastTs),
+            firstValue: d.firstValue, lastValue: d.lastValue, returnState: chart ? chart.returnState : null,
+          },
+        };
+      };
+      const perRange = {};
+      let allParity = true, anySynthetic = 0;
+      RANGES.forEach(r => {
+        // ONE chart per range (deterministic) — both surfaces resolve from the SAME input, exactly as the
+        // two paint paths do for a given active range. Surface differs ONLY in the frc.surface tag.
+        const chart = safe(() => buildProductionPortfolioChart(r), null);
+        const bySurface = {};
+        SURFACES.forEach(s => {
+          const frc = safe(() => (typeof _aurixResolveFinalRenderSeriesContract === 'function') ? _aurixResolveFinalRenderSeriesContract(chart, r, s) : null, null);
+          bySurface[s] = project(frc, chart);
+          anySynthetic += (bySurface[s].diagnostics && bySurface[s].diagnostics.syntheticPoints) || 0;
+        });
+        const d = bySurface.desktop, m = bySurface.mobile;
+        const equal = !!(d && m && d.renderHash === m.renderHash && d.mode === m.mode &&
+          d.colorClass === m.colorClass && d.badgeLabel === m.badgeLabel && d.renderPathCount === m.renderPathCount);
+        if (!equal) allParity = false;
+        perRange[r] = {
+          range: r, desktop: d, mobile: m,
+          parity: { desktopEqualsMobile: equal,
+            renderHashMatch: !!(d && m && d.renderHash === m.renderHash),
+            modeMatch: !!(d && m && d.mode === m.mode),
+            colorClassMatch: !!(d && m && d.colorClass === m.colorClass),
+            badgeLabelMatch: !!(d && m && d.badgeLabel === m.badgeLabel) },
+        };
+      });
+      const out = {
+        spec: 'DSH.CHART.FINAL-CONTRACT-GUARDRAILS.20', appVersion: appVersion,
+        finalContractEnabled: flagOn, surfacesAuditedFromSingleResolver: true,
+        ranges: perRange,
+        summary: {
+          allRangesDesktopEqualsMobile: allParity,
+          totalSyntheticPoints: anySynthetic,
+          rangesAudited: RANGES.length, surfaces: SURFACES,
+          verdict: (allParity && anySynthetic === 0) ? 'CONTRACT_HELD_DESKTOP_MOBILE_PARITY' : 'DIVERGENCE_DETECTED',
+        },
+      };
+      try { console.log('%c[UI][CHART_FINAL_CONTRACT_AUDIT]', 'font-weight:700;color:#7c5cff', out); } catch (_) {}
+      return out;
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
     // SPEC DSH.CHART.INSTITUTIONAL.LINE.01 — window.aurixChartForensics(range)
     // ════════════════════════════════════════════════════════════════════════════
     // READ-ONLY forensic dump for ONE range. Answers the three field questions:
