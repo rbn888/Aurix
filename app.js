@@ -25799,6 +25799,119 @@ try {
     };
 
     // ════════════════════════════════════════════════════════════════════════════
+    // SPEC DSH.CHART.LAUNCH_GATE_OBSERVABILITY_RUNNER.24 — window.aurixRunChartLaunchGate(options)
+    // ════════════════════════════════════════════════════════════════════════════
+    // AUDIT-ONLY, ZERO render change. A robust, self-logging, timeout-safe wrapper around the SPEC.23 soak so
+    // founder validation can never be misread from console behaviour: it always resolves a JSON-serializable
+    // result, always stores it in window.__AURIX_LAST_CHART_LAUNCH_GATE__, prints START/TICK/DONE/ERROR
+    // progress + a compact founder-readable verdict block, hard-timeouts, try/catches the whole audit, and
+    // leaves no timers running. It writes nothing to Supabase/localStorage, triggers no save/sync, and never
+    // mutates chart data — it only calls the existing read-only aurixChartRuntimeSoakAudit.
+    window.aurixRunChartLaunchGate = function (options) {
+      options = options || {};
+      const O = {
+        durationMs: Number(options.durationMs) || 60000,
+        sampleEveryMs: Number(options.sampleEveryMs) || 1000,
+        ranges: (Array.isArray(options.ranges) && options.ranges.length) ? options.ranges : ['24h', '7d', '30d', '1y', 'all'],
+        surfaces: (Array.isArray(options.surfaces) && options.surfaces.length) ? options.surfaces : ['desktop', 'mobile'],
+        includeCrossRange: options.includeCrossRange !== false,
+        timeoutMs: Number(options.timeoutMs) || 90000,
+        verbose: options.verbose !== false,
+      };
+      const log = function () { if (O.verbose) { try { console.log.apply(console, arguments); } catch (_) {} } };
+      const nowIso = function () { try { return new Date().toISOString(); } catch (_) { return null; } };
+      const nowMs = function () { try { return Date.now(); } catch (_) { return 0; } };
+      const appVersion = (function () { try { return (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null; } catch (_) { return null; } })();
+      const startMs = nowMs();
+      const total = Math.max(1, Math.ceil(O.durationMs / O.sampleEveryMs));
+      const result = {
+        spec: 'DSH.CHART.LAUNCH_GATE_OBSERVABILITY_RUNNER.24', appVersion: appVersion,
+        startedAtIso: nowIso(), endedAtIso: null, durationMs: null,
+        completed: false, timedOut: false, threw: false, errorMessage: null,
+        auditVerdict: null, launchReady: false, summary: null, defects: null,
+        crossRangeMatrix: null, sevenDayTransitions: null, finalTick: null, rawGate: null,
+      };
+      log('[CHART_LAUNCH_GATE][START]', { appVersion: appVersion, durationMs: O.durationMs, sampleEveryMs: O.sampleEveryMs, timeoutMs: O.timeoutMs, ranges: O.ranges, surfaces: O.surfaces });
+      let progressTimer = null, timeoutTimer = null, tick = 0, settled = false;
+      const cleanup = function () {
+        try { if (progressTimer) clearInterval(progressTimer); } catch (_) {}
+        try { if (timeoutTimer) clearTimeout(timeoutTimer); } catch (_) {}
+        progressTimer = null; timeoutTimer = null;
+      };
+      const finalize = function () {
+        result.endedAtIso = nowIso();
+        try { result.durationMs = nowMs() - startMs; } catch (_) {}
+        try { window.__AURIX_LAST_CHART_LAUNCH_GATE__ = result; } catch (_) {}
+        if (O.verbose) {
+          const s = result.summary || {};
+          const crx = result.crossRangeMatrix ? Object.keys(result.crossRangeMatrix).filter(function (k) { return /ALIAS/.test(result.crossRangeMatrix[k]); }).length : 'n/a';
+          try {
+            console.log('[CHART_LAUNCH_GATE][DONE]');
+            console.log('AURIX_BUILD: ' + (appVersion || 'n/a'));
+            console.log('VERDICT: ' + (result.auditVerdict || 'n/a'));
+            console.log('launchReady: ' + result.launchReady);
+            console.log('defectCount: ' + ((s.defectCount != null) ? s.defectCount : (Array.isArray(result.defects) ? result.defects.length : 'n/a')));
+            console.log('totalSyntheticPoints: ' + ((s.totalSyntheticPoints != null) ? s.totalSyntheticPoints : 'n/a'));
+            console.log('all24hSinglePath: ' + ((s.all24hSinglePath != null) ? s.all24hSinglePath : 'n/a'));
+            console.log('desktopMobileParity: ' + ((s.desktopEqualsMobile != null) ? s.desktopEqualsMobile : 'n/a'));
+            console.log('bridgedDiscontinuousGapCount: ' + ((s.bridgedDiscontinuousGapCount != null) ? s.bridgedDiscontinuousGapCount : 'n/a'));
+            console.log('7dTransitions: ' + (Array.isArray(result.sevenDayTransitions) ? result.sevenDayTransitions.length : 'n/a'));
+            console.log('crossRangeDefects: ' + crx);
+            console.log('To copy full JSON run:');
+            console.log('aurixCopyLastChartLaunchGate()');
+          } catch (_) {}
+        }
+      };
+      return new Promise(function (resolve) {
+        const done = function () { if (settled) return; settled = true; cleanup(); finalize(); resolve(result); };
+        try {
+          if (!(typeof window !== 'undefined' && typeof window.aurixChartRuntimeSoakAudit === 'function')) {
+            result.threw = true; result.auditVerdict = 'DEFECT_AUDIT_EXCEPTION'; result.errorMessage = 'aurixChartRuntimeSoakAudit unavailable'; result.launchReady = false;
+            log('[CHART_LAUNCH_GATE][ERROR]', result.errorMessage); return done();
+          }
+          try { progressTimer = setInterval(function () { tick++; if (tick <= total) log('[CHART_LAUNCH_GATE][TICK ' + tick + '/' + total + ']'); }, O.sampleEveryMs); } catch (_) {}
+          timeoutTimer = setTimeout(function () {
+            if (settled) return;
+            result.timedOut = true; result.auditVerdict = 'DEFECT_AUDIT_TIMEOUT'; result.launchReady = false;
+            log('[CHART_LAUNCH_GATE][ERROR] audit timeout after ' + O.timeoutMs + 'ms'); done();
+          }, O.timeoutMs);
+          Promise.resolve()
+            .then(function () { return window.aurixChartRuntimeSoakAudit({ durationMs: O.durationMs, sampleEveryMs: O.sampleEveryMs, ranges: O.ranges, surfaces: O.surfaces, includeCrossRange: O.includeCrossRange }); })
+            .then(function (raw) {
+              if (settled) return;
+              result.completed = true; result.rawGate = raw || null;
+              result.auditVerdict = (raw && raw.verdict) ? raw.verdict : 'DEFECT_AUDIT_EXCEPTION';
+              result.launchReady = !!(raw && raw.verdict === 'STABLE_LAUNCH_READY');
+              result.summary = (raw && raw.summary) || null;
+              result.defects = (raw && raw.defects) || [];
+              result.crossRangeMatrix = (raw && raw.crossRangeMatrix) || null;
+              result.sevenDayTransitions = (raw && raw.sevenDayTransitions) || [];
+              result.finalTick = (raw && raw.finalTick) || null;
+              if (!raw || !raw.verdict) { result.threw = true; result.errorMessage = 'audit returned no verdict'; }
+              done();
+            })
+            .catch(function (e) {
+              if (settled) return;
+              result.threw = true; result.auditVerdict = 'DEFECT_AUDIT_EXCEPTION'; result.launchReady = false;
+              result.errorMessage = (e && e.message) ? e.message : String(e);
+              log('[CHART_LAUNCH_GATE][ERROR]', result.errorMessage); done();
+            });
+        } catch (e) {
+          result.threw = true; result.auditVerdict = 'DEFECT_AUDIT_EXCEPTION'; result.launchReady = false;
+          result.errorMessage = (e && e.message) ? e.message : String(e);
+          log('[CHART_LAUNCH_GATE][ERROR]', result.errorMessage); done();
+        }
+      });
+    };
+    window.aurixCopyLastChartLaunchGate = function () {
+      let json = '';
+      try { json = JSON.stringify(window.__AURIX_LAST_CHART_LAUNCH_GATE__ || { error: 'no launch gate result yet — run aurixRunChartLaunchGate() first' }, null, 2); } catch (_) { json = '{"error":"stringify_failed"}'; }
+      try { if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(json); } catch (_) {}
+      try { console.log(json); } catch (_) {}
+      return json;
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
     // SPEC DSH.CHART.INSTITUTIONAL.LINE.01 — window.aurixChartForensics(range)
     // ════════════════════════════════════════════════════════════════════════════
     // READ-ONLY forensic dump for ONE range. Answers the three field questions:
