@@ -1,1 +1,1 @@
-{ "appjs": 503, "loginhtml": 482, "build": "v503-chart-canonical-refresh-determinism-21", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)" }
+{ "appjs": 504, "loginhtml": 482, "build": "v504-chart-reliability-deadlock-resolution-22", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)" }

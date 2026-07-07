@@ -23625,6 +23625,14 @@ function buildProductionPortfolioChart(range) {
       out.returnState = 'insufficient_return_history';                 // reuse the proven honest painter
       out.returnSuppressedReason = 'insufficient_requested_range_history';
       out.reason = 'range_collapsed_history_short';
+      // SPEC DSH.CHART.RELIABILITY_DEADLOCK_RESOLUTION.22 — the flow-neutral return over the AVAILABLE real
+      // interval was itself TRUSTWORTHY (per.returnState === 'ok': base floor + sane band ⇒ not a construction
+      // artifact); only the requested-window COVERAGE fell short. Expose it (additive, non-mutating of the
+      // suppressed returnState) so the SPEC.19 resolver can honestly resolve the reliability deadlock as a
+      // partial-interval return instead of an indefinite Calculando. Flag OFF ⇒ these fields are ignored (v503).
+      out.coverageSuppressed = true;
+      out.partialReturnPct = per.returnPct; out.partialReturnValue = per.returnValue; out.partialReturnColor = per.color;
+      out.partialReturnTrusted = true;
     }
     // SPEC DATA-TRUTH.01 (Fase 2) — LINE honesty state (data/debug only; no visible copy invented).
     // A finite range whose real history does not cover it is "partial_history": the line is available
@@ -24275,6 +24283,75 @@ const _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT = true;
 // founder approval (they touch return semantics + must not weaken SPEC.TRUTHFUL_RANGES). Reversible:
 // _AURIX_CHART_CANONICAL_REFRESH_DETERMINISM=false ⇒ EXACT v502 behaviour (C5/C6/anchor logic skipped).
 const _AURIX_CHART_CANONICAL_REFRESH_DETERMINISM = true;
+// ── SPEC DSH.CHART.RELIABILITY_DEADLOCK_RESOLUTION.22 ──
+// Eliminates indefinite 7D+ "Calculando…" when the real canonical history is stable and SUFFICIENT for an
+// honest deterministic return decision, WITHOUT weakening truthful-ranges globally. ROOT CAUSE: the
+// coverage-span gate in buildProductionPortfolioChart (historyTooShortForRange = coverageRatio < 0.8) forces
+// returnState='insufficient_return_history' for a finite range whose real canonical span covers < 80% of the
+// window — EVEN when the flow-neutral return over the AVAILABLE real interval is itself trustworthy
+// (per.returnState==='ok': base floor + sane band), there are dense real points, a deterministic canonical
+// anchor (SPEC.21) and a finite current value. coverageRatio is a pure function of the deterministic
+// first/last real ts, so for a fixed canonical revision it is constant < 0.8 ⇒ never clears ⇒ deadlock.
+// FIX (this helper, consumed by the SPEC.19 resolver): classify the stuck finite-range contract from CANONICAL
+// REAL EVIDENCE ONLY into PARTIAL (resolve as an honest partial-interval return), BUILDING (genuinely
+// insufficient ⇒ truthful building, NOT a deadlock) or FULL/NA. Pure, deterministic, non-mutating,
+// viewport/surface/timing independent; never invents coverage or points. Reversible:
+// _AURIX_CHART_RELIABILITY_DEADLOCK_RESOLUTION=false ⇒ EXACT v503 behaviour (branch NA ⇒ no promotion).
+const _AURIX_CHART_RELIABILITY_DEADLOCK_RESOLUTION = true;
+function _aurixResolveReliabilityDeadlock(emg, contract, range) {
+  const r = String(range || (emg && emg.range) || '').toLowerCase();
+  const out = {
+    branch: 'NA', deadlockDetected: false, returnPct: null, colorState: 'neutral',
+    reasonCode: null, blockingPredicate: null,
+    evidence: { realPointCount: 0, realSpanMs: 0, realSpanDays: 0, coverageRatio: null, minSpanDays: 0,
+      deterministicAnchor: false, currentValueAvailable: false, sourceConflict: false,
+      bootstrapOnly: false, partialTrusted: false },
+  };
+  try {
+    const on = (typeof _AURIX_CHART_RELIABILITY_DEADLOCK_RESOLUTION !== 'undefined') && _AURIX_CHART_RELIABILITY_DEADLOCK_RESOLUTION;
+    if (!on || !emg || r === '24h' || r === 'all') return out;         // finite ranges only; 24H/ALL untouched
+    if (contract && contract.state === 'ok') { out.branch = 'FULL'; out.reasonCode = 'RELIABILITY_DEADLOCK_RESOLVED_FULL'; return out; }
+    const realPointCount = Number.isFinite(emg.finalPointCount) ? emg.finalPointCount : (Array.isArray(emg.points) ? emg.points.length : 0);
+    const realSpanMs = Number.isFinite(emg.displayedActualSpanMs) ? emg.displayedActualSpanMs
+      : ((Number.isFinite(emg.lastTs) && Number.isFinite(emg.firstTs)) ? (emg.lastTs - emg.firstTs) : 0);
+    const realSpanDays = realSpanMs / 864e5;
+    const deterministicAnchor = Number.isFinite(emg.baselineTs) && (emg.baselineValue > 0);
+    const currentValueAvailable = Number.isFinite(emg.currentValue) && (emg.currentValue > 0);
+    const sourceConflict = !!(contract && (contract.reason === 'cross_source_family' || contract.reason === 'cross_epoch'));
+    const bootstrapOnly = (emg.initialBuildDetected === true) || /new_account|initial_build|construction|bootstrap/.test(String(emg.returnSuppressedReason || ''));
+    const partialTrusted = (emg.partialReturnTrusted === true) && Number.isFinite(emg.partialReturnPct);
+    const tbl = (typeof _AURIX_CHART_SHORT_HISTORY_MIN_DAYS !== 'undefined') ? _AURIX_CHART_SHORT_HISTORY_MIN_DAYS : {};
+    const minSpanDays = (tbl[r] != null) ? tbl[r] : 2;                 // reuse the existing honest short-history floor
+    const minPts = 8;                                                  // "dense multi-day usable history"
+    Object.assign(out.evidence, { realPointCount, realSpanMs, realSpanDays: +realSpanDays.toFixed(2),
+      coverageRatio: (emg.coverageRatio != null) ? emg.coverageRatio : null, minSpanDays,
+      deterministicAnchor, currentValueAvailable, sourceConflict, bootstrapOnly, partialTrusted });
+    // B) HONEST PARTIAL — a genuine deadlock: trustworthy partial-interval return over a deterministic
+    //    contiguous canonical real interval ⇒ resolve (never labelled as a full-window return; mode stays
+    //    partial_clean so the visible line communicates the real interval).
+    if (partialTrusted && deterministicAnchor && currentValueAvailable && !sourceConflict && !bootstrapOnly
+        && realPointCount >= minPts && realSpanDays >= minSpanDays) {
+      out.branch = 'PARTIAL'; out.deadlockDetected = true;
+      out.returnPct = emg.partialReturnPct;
+      out.colorState = (emg.partialReturnColor === 'up') ? 'positive' : ((emg.partialReturnColor === 'down') ? 'negative' : 'neutral');
+      out.reasonCode = 'RELIABILITY_DEADLOCK_RESOLVED_PARTIAL';
+      out.blockingPredicate = 'coverage_ratio_below_0.8_but_partial_interval_trustworthy';
+      return out;
+    }
+    // C) GENUINE BUILDING — truthful insufficient history (NOT a deadlock).
+    out.branch = 'BUILDING'; out.deadlockDetected = false;
+    out.reasonCode = 'RELIABILITY_DEADLOCK_GENUINE_BUILDING';
+    out.blockingPredicate = !partialTrusted ? 'partial_return_untrusted'
+      : !deterministicAnchor ? 'no_deterministic_anchor'
+      : !currentValueAvailable ? 'current_value_unavailable'
+      : sourceConflict ? 'canonical_source_conflict'
+      : bootstrapOnly ? 'bootstrap_only_history'
+      : (realPointCount < minPts) ? 'insufficient_real_points'
+      : 'insufficient_real_span';
+    return out;
+  } catch (_) { return out; }
+}
+try { if (typeof window !== 'undefined') window._aurixResolveReliabilityDeadlock = _aurixResolveReliabilityDeadlock; } catch (_) {}
 function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
   const r = String(range || (emg && emg.range) || '').toLowerCase();
   surface = (surface === 'mobile') ? 'mobile' : 'desktop';
@@ -24423,9 +24500,29 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     out.mode = (trimmed || partial) ? 'partial_clean' : 'full';
     // 9 — badge from the return contract (decided on the ORIGINAL points; a real % only when trustworthy).
     applyBadge(out, contract);
-    // state: ready ONLY when the badge is trustworthy AND the full untrimmed line is shown; otherwise the
-    // line may still paint (partial_clean / full-but-untrusted-24H) but the overall state is "calculating".
-    out.state = (out.badgeEligible && out.mode === 'full') ? 'ready' : 'calculating';
+    // 9.5 — SPEC.22 RELIABILITY DEADLOCK RESOLUTION (finite ranges only; 24H/ALL/mature untouched). When the
+    // badge is NOT eligible on a drawn finite-range line, classify from canonical real evidence: promote a
+    // trustworthy partial-interval return (resolve), or mark genuinely-insufficient history as truthful
+    // building (not a deadlock). Never labels a partial as a full-window return; mode stays partial_clean.
+    let deadlockResolvedPartial = false;
+    const deadlockResOn = (typeof _AURIX_CHART_RELIABILITY_DEADLOCK_RESOLUTION !== 'undefined') && _AURIX_CHART_RELIABILITY_DEADLOCK_RESOLUTION;
+    if (deadlockResOn && out.lineEligible && !out.badgeEligible && r !== '24h' && r !== 'all' && typeof _aurixResolveReliabilityDeadlock === 'function') {
+      const dl = _aurixResolveReliabilityDeadlock(emg, contract, r);
+      diagnostics.reliabilityDeadlock = { branch: dl.branch, deadlockDetected: dl.deadlockDetected, reasonCode: dl.reasonCode, blockingPredicate: dl.blockingPredicate, evidence: dl.evidence };
+      if (dl.branch === 'PARTIAL' && Number.isFinite(dl.returnPct)) {
+        out.badgeEligible = true; out.badgeReturnPct = dl.returnPct;
+        out.colorState = dl.colorState; out.colorClass = toneClass(dl.colorState);
+        out.badgeLabel = (dl.returnPct >= 0 ? '+' : '') + dl.returnPct.toFixed(2) + '%';
+        out.mode = 'partial_clean';   // a resolved deadlock is ALWAYS partial — never labelled a full-window return
+        deadlockResolvedPartial = true;
+        out.reasonCodes.push('RELIABILITY_DEADLOCK_RESOLVED_PARTIAL');
+      } else if (dl.branch === 'BUILDING') {
+        out.reasonCodes.push('RELIABILITY_DEADLOCK_GENUINE_BUILDING');   // truthful building, NOT a deadlock
+      }
+    }
+    // state: ready when the badge is trustworthy AND the full line is shown, OR a partial-interval return was
+    // honestly resolved (SPEC.22); otherwise the line may still paint but the overall state is "calculating".
+    out.state = (out.badgeEligible && (out.mode === 'full' || deadlockResolvedPartial)) ? 'ready' : 'calculating';
     if (!out.badgeEligible) out.reasonCodes.push('badge_calculating');
     // SPEC.21 C6 — line drawn but return not eligible: attach the EXPLICIT blocking reason(s), never a bare
     // generic Calculando. Read-only classification from the builder's own honest fields (no eligibility change).
@@ -25371,6 +25468,18 @@ try {
           colorState: frc.colorState || null, colorClass: frc.colorClass || null, mode: frc.mode || null,
           reasonCodes: Array.isArray(frc.reasonCodes) ? frc.reasonCodes : [],
         };
+        // SPEC.22 — reliability-deadlock classification (from the resolver via the FRC diagnostics).
+        const dl = (frc.diagnostics && frc.diagnostics.reliabilityDeadlock) ? frc.diagnostics.reliabilityDeadlock : null;
+        const dle = (dl && dl.evidence) ? dl.evidence : {};
+        ev.deadlockResolution = dl ? dl.branch : null;
+        ev.deadlockDetected = dl ? !!dl.deadlockDetected : false;
+        ev.blockingPredicate = dl ? dl.blockingPredicate : null;
+        ev.realPointCount = (dle.realPointCount != null) ? dle.realPointCount : cp.length;
+        ev.realSpanMs = (dle.realSpanMs != null) ? dle.realSpanMs : ((ev.firstTs != null && ev.lastTs != null) ? ev.lastTs - ev.firstTs : null);
+        ev.coverageRatio = (chart.coverageRatio != null) ? chart.coverageRatio : ((dle.coverageRatio != null) ? dle.coverageRatio : null);
+        ev.anchorDeterministic = (dle.deterministicAnchor != null) ? !!dle.deterministicAnchor : (ev.returnAnchorTs != null);
+        ev.currentValueAvailable = (dle.currentValueAvailable != null) ? !!dle.currentValueAvailable : (ev.currentValue != null);
+        ev.sourceConflict = (dle.sourceConflict != null) ? !!dle.sourceConflict : false;
         // signature = the fields whose change constitutes a real transition (ignore timestamps)
         ev._sig = [ev.canonicalInputHash, ev.selectedPointsHash, ev.renderHash, ev.mode, ev.colorClass, ev.badgeLabel, ev.returnAnchorTs, ev.returnContractState, ev.sourceCounts.merged].join('#');
         const prev = events.length ? events[events.length - 1] : null;
@@ -25404,7 +25513,18 @@ try {
           }
           events.forEach(e => { if (e.range === '24h' && e.renderPathCount != null && e.renderPathCount > 1) defects.push({ type: 'VISIBLE_PATH_FRAGMENTATION', seq: e.sequence, renderPathCount: e.renderPathCount }); });
           const minPts = (typeof _AURIX_HPQ_MIN_POINTS === 'number') ? _AURIX_HPQ_MIN_POINTS : 2;
-          events.forEach(e => { if (r !== '24h' && r !== 'all' && e.sourceReadiness.canonicalReady && e.pointCount >= Math.max(minPts, 8) && e.returnContractState === 'calculating' && e.mode !== 'building') defects.push({ type: 'RELIABILITY_DEADLOCK', seq: e.sequence, pointCount: e.pointCount, reasonCodes: e.reasonCodes }); });
+          // SPEC.22 — a TRUE reliability deadlock = evidence qualifies for an honest return (resolver branch
+          // would be PARTIAL) yet the contract is still calculating. With the resolution flag ON that is
+          // resolved (state 'ready') so it never fires; a BUILDING branch is truthful insufficiency, NOT a
+          // deadlock. Flag OFF (rollback) ⇒ fall back to the pre-SPEC.22 heuristic so v503's deadlock is still
+          // surfaced by the auditor.
+          events.forEach(e => {
+            if (r === '24h' || r === 'all') return;
+            const isDeadlock = (e.deadlockResolution != null)
+              ? (e.deadlockDetected && e.returnContractState === 'calculating')
+              : (e.sourceReadiness.canonicalReady && e.pointCount >= Math.max(minPts, 8) && e.returnContractState === 'calculating' && e.mode !== 'building');
+            if (isDeadlock) defects.push({ type: 'RELIABILITY_DEADLOCK', seq: e.sequence, pointCount: e.pointCount, blockingPredicate: e.blockingPredicate || null, reasonCodes: e.reasonCodes });
+          });
           const types = {}; defects.forEach(d => types[d.type] = 1);
           const typeList = Object.keys(types);
           const map = { SAME_INPUT_CONTRACT_DIVERGENCE: 'DEFECT_SAME_INPUT_CONTRACT_DIVERGENCE', COLOR_BADGE_MISMATCH: 'DEFECT_COLOR_BADGE_MISMATCH', RETURN_ANCHOR_DRIFT: 'DEFECT_RETURN_ANCHOR_DRIFT', DEFECT_HYDRATION_RACE: 'DEFECT_HYDRATION_RACE', VISIBLE_PATH_FRAGMENTATION: 'DEFECT_VISIBLE_PATH_FRAGMENTATION', RELIABILITY_DEADLOCK: 'DEFECT_RELIABILITY_DEADLOCK' };
