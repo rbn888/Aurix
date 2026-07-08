@@ -23439,6 +23439,16 @@ const _AURIX_RET_MIN_BASE = 1;                                   // start value 
 // is small; if it still exceeds this band the growth is unexplained capital (unrecorded contributions) →
 // honest state rather than a fabricated %. Backstop only — the ledger neutralization is the primary fix.
 const _AURIX_RET_SANE_PCT = { '24h': 25, '7d': 45, '30d': 80, '1y': 200, 'all': 250 };
+// SPEC DSH.CHART.PARTIAL_RETURN_TRUST_BOUNDARY.27 — supported-semantic LOWER bound for a promoted return.
+// This chart's series is INVESTABLE wealth (total − real_estate; real estate/mortgages are a separate,
+// EXCLUDED layer) and its raw points are strictly positive (non-positive snapshots are rejected upstream).
+// There is NO leverage / short / margin / negative-NAV model in the return path. A REAL flow-neutral return
+// on a positive-NAV long-only series therefore cannot fall to or below total loss: a promoted value ≤ this
+// bound (or non-finite) is a flow-estimation artifact over sparse short history (large recorded inflows
+// subtracted from a small baseline, e.g. the observed -191% on ~3 days), NEVER a trustworthy return. The
+// wide 1Y/ALL sane bands (200/250) admit such a residual as returnState 'ok'; this is the missing trust
+// boundary that must gate PARTIAL badge eligibility (never clamp / rewrite / fabricate — stay Calculando).
+const _AURIX_PARTIAL_RETURN_MIN_PCT = -100;
 // Net capital added (deposits + asset_add + import_baseline) minus removed, in baseCurrency, for flows
 // STRICTLY after the baseline snapshot and up to/including the current snapshot. Flows are stored in USD.
 function _aurixNetFlowsInWindow(fromTs, toTs) {
@@ -24331,14 +24341,22 @@ function _aurixResolveReliabilityDeadlock(emg, contract, range) {
     // is surfaced separately as PARTIAL_AVAILABLE_HISTORY (SPEC.26 Phase 3), never as a suppressed return.
     const minSpanDays = (tbl['7d'] != null) ? tbl['7d'] : 2;           // trust floor is range-independent (was window-scaled tbl[r])
     const minPts = 8;                                                  // "dense enough" — range-independent density floor (unchanged)
+    // SPEC.27 — span/points sufficiency alone is NOT a complete trust boundary. The promoted % must also lie
+    // inside the supported-semantic domain: finite AND above total loss for this positive-NAV investable-wealth
+    // series (> _AURIX_PARTIAL_RETURN_MIN_PCT). A value at/below the bound is a flow-estimation artifact the
+    // wide 1Y/ALL sane bands let through — reject it (stay honest building), never clamp/rewrite/fabricate.
+    const supportedReturnMinPct = (typeof _AURIX_PARTIAL_RETURN_MIN_PCT === 'number') ? _AURIX_PARTIAL_RETURN_MIN_PCT : -100;
+    const withinSupportedReturnDomain = Number.isFinite(emg.partialReturnPct) && emg.partialReturnPct > supportedReturnMinPct;
     Object.assign(out.evidence, { realPointCount, realSpanMs, realSpanDays: +realSpanDays.toFixed(2),
       coverageRatio: (emg.coverageRatio != null) ? emg.coverageRatio : null, minSpanDays,
-      deterministicAnchor, currentValueAvailable, sourceConflict, bootstrapOnly, partialTrusted });
+      deterministicAnchor, currentValueAvailable, sourceConflict, bootstrapOnly, partialTrusted,
+      promotedReturnPct: Number.isFinite(emg.partialReturnPct) ? emg.partialReturnPct : null,
+      supportedReturnMinPct, withinSupportedReturnDomain });
     // B) HONEST PARTIAL — a genuine deadlock: trustworthy partial-interval return over a deterministic
-    //    contiguous canonical real interval ⇒ resolve (never labelled as a full-window return; mode stays
-    //    partial_clean so the visible line communicates the real interval).
+    //    contiguous canonical real interval AND inside the supported-return domain ⇒ resolve (never labelled
+    //    as a full-window return; mode stays partial_clean so the visible line communicates the real interval).
     if (partialTrusted && deterministicAnchor && currentValueAvailable && !sourceConflict && !bootstrapOnly
-        && realPointCount >= minPts && realSpanDays >= minSpanDays) {
+        && realPointCount >= minPts && realSpanDays >= minSpanDays && withinSupportedReturnDomain) {
       out.branch = 'PARTIAL'; out.deadlockDetected = true;
       out.returnPct = emg.partialReturnPct;
       out.colorState = (emg.partialReturnColor === 'up') ? 'positive' : ((emg.partialReturnColor === 'down') ? 'negative' : 'neutral');
@@ -24346,7 +24364,7 @@ function _aurixResolveReliabilityDeadlock(emg, contract, range) {
       out.blockingPredicate = 'coverage_ratio_below_0.8_but_partial_interval_trustworthy';
       return out;
     }
-    // C) GENUINE BUILDING — truthful insufficient history (NOT a deadlock).
+    // C) GENUINE BUILDING — truthful insufficient history / untrusted return (NOT a deadlock).
     out.branch = 'BUILDING'; out.deadlockDetected = false;
     out.reasonCode = 'RELIABILITY_DEADLOCK_GENUINE_BUILDING';
     out.blockingPredicate = !partialTrusted ? 'partial_return_untrusted'
@@ -24355,6 +24373,8 @@ function _aurixResolveReliabilityDeadlock(emg, contract, range) {
       : sourceConflict ? 'canonical_source_conflict'
       : bootstrapOnly ? 'bootstrap_only_history'
       : (realPointCount < minPts) ? 'insufficient_real_points'
+      : (realSpanDays < minSpanDays) ? 'insufficient_real_span'
+      : !withinSupportedReturnDomain ? 'promoted_return_outside_supported_domain'
       : 'insufficient_real_span';
     return out;
   } catch (_) { return out; }
@@ -24878,14 +24898,24 @@ function _aurixAuditLongRangeEvidenceCore(options) {
   });
 
   // ── RETURN-CONTRACT AUDIT — why each range is Calculando / trusted / partial ─────────────────────────────
+  // SPEC.27 — supported-return LOWER bound (long-only positive-NAV investable-wealth series). A finite % at/
+  // below total loss (or non-finite) is outside the supported semantic domain and must never be badge-eligible.
+  const RET_MIN = (typeof _AURIX_PARTIAL_RETURN_MIN_PCT === 'number') ? _AURIX_PARTIAL_RETURN_MIN_PCT : -100;
+  const outsideReturnDomain = pct => !(Number.isFinite(pct) && pct > RET_MIN);
   const returnContractAudit = {};
   RANGES.forEach(r => {
     const p = perRange[r], iR = internal[r];
     const usableBaseline = iR.deterministicAnchor && iR.currentValueAvailable;
     // trustworthy usable baseline = the resolver's own PARTIAL branch fired (all SPEC.22 promotion conditions met).
     const trustworthyPartialEligible = (iR.deadlockBranch === 'PARTIAL');
+    // SPEC.27 — the contradiction to surface: an insufficient/coverage-suppressed range that nonetheless
+    // exposes a badge-ELIGIBLE promoted return outside the supported domain (e.g. ≤ -100%).
+    const impossiblePromoted = iR.badgeEligible && outsideReturnDomain(p.returnPct)
+      && (iR.coverageSuppressed || /insufficient/.test(String(p.returnState || '')));
     let classification;
-    if (iR.badgeEligible) {
+    if (impossiblePromoted) {
+      classification = 'IMPOSSIBLE_PROMOTED_RETURN';
+    } else if (iR.badgeEligible) {
       classification = (iR.reasonCodes.indexOf('RELIABILITY_DEADLOCK_RESOLVED_PARTIAL') >= 0 || iR.deadlockBranch === 'PARTIAL') ? 'PARTIAL_TRUSTED' : 'TRUSTED';
     } else if (trustworthyPartialEligible) {
       classification = 'RETURN_CONTRACT_DEFECT';   // resolver deemed a trustworthy partial usable, yet the badge stayed Calculando
@@ -24933,6 +24963,13 @@ function _aurixAuditLongRangeEvidenceCore(options) {
       defects.push({ category: 'return_contract', ranges: [r],
         proof: r + ' has a resolver-approved trustworthy partial (reliabilityDeadlock.branch=PARTIAL, deterministicAnchor=' + rc.deterministicAnchor + ', currentValue=' + rc.currentValueAvailable + ') yet badge stayed "' + rc.badgeLabel + '" (badgeEligible=false)',
         minimalRootCauseSite: '_aurixResolveFinalRenderSeriesContract badge gate (app.js ~L24509) — a PARTIAL deadlock resolution must set badgeEligible' });
+    } else if (rc.classification === 'IMPOSSIBLE_PROMOTED_RETURN') {
+      // SPEC.27 — a promoted % outside the supported semantic domain must NEVER summarise as no defect.
+      defects.push({ category: 'impossible_promoted_return', ranges: [r],
+        range: r, returnPct: rc.returnPct, returnState: rc.returnState, returnReason: rc.returnReason,
+        coverageRatio: perRange[r].coverageRatio, partialReturnTrusted: rc.partialReturnTrusted, badgeEligible: rc.badgeEligible,
+        proof: r + ' is badge-eligible ("' + rc.badgeLabel + '", returnPct=' + rc.returnPct + ') while returnState=' + rc.returnState + ' / coverageSuppressed=' + rc.coverageSuppressed + ' — the promoted return is outside the supported long-only domain (≤ ' + RET_MIN + '% or non-finite)',
+        minimalRootCauseSite: '_aurixResolveReliabilityDeadlock PARTIAL trust gate (app.js) — promotion must require withinSupportedReturnDomain (finite AND > ' + RET_MIN + '%)' });
     }
   });
 
@@ -24942,7 +24979,8 @@ function _aurixAuditLongRangeEvidenceCore(options) {
   const aliasSuspectCount = pairVals.filter(m => m.classification === 'CROSS_RANGE_ALIAS_SUSPECT').length;
   const legitimateSameHistoryCount = pairVals.filter(m => m.classification === 'SAME_AVAILABLE_HISTORY_LEGITIMATE').length;
   const possibleBridgeDefectCount = RANGES.reduce((n, r) => n + ((discontinuities[r] && discontinuities[r].bridgedDiscontinuousGapCount > 0) ? 1 : 0), 0);
-  const returnContractDefectCount = RANGES.reduce((n, r) => n + (returnContractAudit[r].classification === 'RETURN_CONTRACT_DEFECT' ? 1 : 0), 0);
+  const returnContractDefectCount = RANGES.reduce((n, r) => n + ((returnContractAudit[r].classification === 'RETURN_CONTRACT_DEFECT' || returnContractAudit[r].classification === 'IMPOSSIBLE_PROMOTED_RETURN') ? 1 : 0), 0);
+  const impossiblePromotedReturnCount = RANGES.reduce((n, r) => n + (returnContractAudit[r].classification === 'IMPOSSIBLE_PROMOTED_RETURN' ? 1 : 0), 0);
   const calculatingWithUsableBaselineCount = RANGES.reduce((n, r) => n + ((returnContractAudit[r].classification === 'CALCULATING_WITH_USABLE_BASELINE' || returnContractAudit[r].classification === 'RETURN_CONTRACT_DEFECT') ? 1 : 0), 0);
   const totalSyntheticPoints = RANGES.reduce((n, r) => n + (perRange[r].syntheticPoints || 0), 0);
   const desktopMobileParity = RANGES.every(r => internal[r].parityOk);
@@ -24974,6 +25012,7 @@ function _aurixAuditLongRangeEvidenceCore(options) {
     summary: {
       aliasDefectCount: aliasDefectCount, aliasSuspectCount: aliasSuspectCount, legitimateSameHistoryCount: legitimateSameHistoryCount,
       possibleBridgeDefectCount: possibleBridgeDefectCount, returnContractDefectCount: returnContractDefectCount,
+      impossiblePromotedReturnCount: impossiblePromotedReturnCount,
       calculatingWithUsableBaselineCount: calculatingWithUsableBaselineCount, totalSyntheticPoints: totalSyntheticPoints,
       desktopMobileParity: desktopMobileParity,
     },
