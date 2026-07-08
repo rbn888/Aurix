@@ -24321,8 +24321,16 @@ function _aurixResolveReliabilityDeadlock(emg, contract, range) {
     const bootstrapOnly = (emg.initialBuildDetected === true) || /new_account|initial_build|construction|bootstrap/.test(String(emg.returnSuppressedReason || ''));
     const partialTrusted = (emg.partialReturnTrusted === true) && Number.isFinite(emg.partialReturnPct);
     const tbl = (typeof _AURIX_CHART_SHORT_HISTORY_MIN_DAYS !== 'undefined') ? _AURIX_CHART_SHORT_HISTORY_MIN_DAYS : {};
-    const minSpanDays = (tbl[r] != null) ? tbl[r] : 2;                 // reuse the existing honest short-history floor
-    const minPts = 8;                                                  // "dense multi-day usable history"
+    // SPEC DSH.CHART.LONG_RANGE_STATE_RESOLUTION.26 —
+    // RETURN TRUST and HISTORY COVERAGE are INDEPENDENT dimensions. A flow-neutral return that is
+    // itself trustworthy over the available real interval (partialTrusted ⇒ per.returnState==='ok': base
+    // floor + range-aware sane band) stays trustworthy no matter how WIDE the requested window is. Promotion
+    // must therefore use a range-INDEPENDENT trust floor (the narrowest finite short-history floor), never the
+    // window-scaled per-range floor — otherwise the IDENTICAL trusted return shown on 7D is stuck "Calculando…"
+    // on 30D/1Y purely because the wider window is less covered (a coverage fact, not a trust fact). Coverage
+    // is surfaced separately as PARTIAL_AVAILABLE_HISTORY (SPEC.26 Phase 3), never as a suppressed return.
+    const minSpanDays = (tbl['7d'] != null) ? tbl['7d'] : 2;           // trust floor is range-independent (was window-scaled tbl[r])
+    const minPts = 8;                                                  // "dense enough" — range-independent density floor (unchanged)
     Object.assign(out.evidence, { realPointCount, realSpanMs, realSpanDays: +realSpanDays.toFixed(2),
       coverageRatio: (emg.coverageRatio != null) ? emg.coverageRatio : null, minSpanDays,
       deterministicAnchor, currentValueAvailable, sourceConflict, bootstrapOnly, partialTrusted });
@@ -24373,8 +24381,24 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     // builder already computed; exposed so the audit can prove anchor stability across refreshes).
     returnAnchorTs: (emg && Number.isFinite(emg.baselineTs)) ? emg.baselineTs : null,
     returnAnchorValue: (emg && Number.isFinite(emg.baselineValue)) ? emg.baselineValue : null,
+    // SPEC.26 Phase 3 — HISTORY COVERAGE metadata, INDEPENDENT of return state. Read-only projection of the
+    // builder's existing honest displayedRangeState / historyTooShortForRange; never alters points, timestamps,
+    // values, geometry, color or return math. Contract-ready for a future subtle secondary-status surface.
+    historyCoverage: 'UNKNOWN',
     reason: 'pending', reasonCodes: [], diagnostics: diagnostics,
   };
+  out.historyCoverage = (function () {
+    try {
+      if (r === 'all') return srcPts.length ? 'ALL_AVAILABLE_HISTORY' : 'UNKNOWN';
+      const drs = emg && emg.displayedRangeState;
+      if (drs === 'partial_history') return 'PARTIAL_AVAILABLE_HISTORY';
+      if (drs === 'full') return 'FULL_REQUESTED_WINDOW';
+      if (drs === 'all_history') return 'ALL_AVAILABLE_HISTORY';
+      if (emg && emg.historyTooShortForRange === true) return 'PARTIAL_AVAILABLE_HISTORY';
+      if (emg && emg.historyTooShortForRange === false) return 'FULL_REQUESTED_WINDOW';
+      return 'UNKNOWN';
+    } catch (_) { return 'UNKNOWN'; }
+  })();
   const canonRefreshOn = (typeof _AURIX_CHART_CANONICAL_REFRESH_DETERMINISM !== 'undefined') && _AURIX_CHART_CANONICAL_REFRESH_DETERMINISM;
   // Apply the resolved return contract onto the contract's badge fields (single source of truth for the %).
   const applyBadge = (o, c) => {
@@ -24739,6 +24763,7 @@ function _aurixAuditLongRangeEvidenceCore(options) {
       returnReason: chart.returnSuppressedReason || chart.reason || null,
       returnPct: (frc.badgeReturnPct != null) ? frc.badgeReturnPct : ((chart.badgeReturnPct != null) ? chart.badgeReturnPct : null),
       badgeLabel: frc.badgeLabel || null,
+      historyCoverage: frc.historyCoverage || 'UNKNOWN',   // SPEC.26 Phase 3 — coverage state, independent of return state
     };
     internal[r] = {
       canonicalInputHash: renderHashOf(cp),
@@ -24871,7 +24896,7 @@ function _aurixAuditLongRangeEvidenceCore(options) {
     }
     returnContractAudit[r] = {
       range: r, state: iR.state, mode: iR.mode, badgeEligible: iR.badgeEligible, badgeLabel: p.badgeLabel,
-      returnState: p.returnState, returnReason: p.returnReason, returnPct: p.returnPct,
+      historyCoverage: p.historyCoverage, returnState: p.returnState, returnReason: p.returnReason, returnPct: p.returnPct,
       deadlockBranch: iR.deadlockBranch, deterministicAnchor: iR.deterministicAnchor, currentValueAvailable: iR.currentValueAvailable,
       coverageSuppressed: iR.coverageSuppressed, partialReturnTrusted: iR.partialReturnTrusted, usableBaseline: usableBaseline,
       reasonCodes: iR.reasonCodes, classification: classification,

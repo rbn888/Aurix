@@ -190,14 +190,21 @@ console.log('AURIX-CHART-RELIABILITY-DEADLOCK-RESOLUTION — SPEC.22');
   ok('13 syntheticPoints = 0 across resolutions', cases.every(c => c.diagnostics.syntheticPoints === 0));
 }
 
-// 14 — 30D deadlock resolves only above the 30D honest floor (7 days); a 4-day 30D stays building.
+// 14 — SPEC.26: the promotion trust floor is RANGE-INDEPENDENT (return trust ≠ requested-window coverage).
+// A trusted flow-neutral return over the available real interval promotes on 30D exactly as it does on 7D,
+// regardless of how little of the wider window is covered; only a GENUINELY tiny interval (< the narrowest
+// finite floor, 2 days) stays honest building. Was previously window-scaled (30D needed 7 real days).
 {
-  const d30 = dlON(deadlock7d({ range: '30d', coverageRatio: 0.13 }), calc, '30d');   // ~3.9 days < 7d floor
-  ok('14 30D 4-day history → BUILDING (below 30D honest floor)', d30.branch === 'BUILDING' && d30.blockingPredicate === 'insufficient_real_span', d30.blockingPredicate);
+  const d30 = dlON(deadlock7d({ range: '30d', coverageRatio: 0.13 }), calc, '30d');   // ~3.9 days, trusted partial
+  ok('14 30D 3.9-day trusted partial → PARTIAL (decoupled from window coverage)', d30.branch === 'PARTIAL' && d30.deadlockDetected === true, d30.branch);
+  const tiny = seg(T0, 10, 2 * HOUR, 1000, 0.5);   // ~18h < 2-day trust floor
+  const tf = tiny[0], tl = tiny[tiny.length - 1];
+  const d30tiny = dlON(deadlock7d({ range: '30d', points: tiny, finalPointCount: 10, pointCount: 10, firstTs: tf.ts, lastTs: tl.ts, baselineTs: tf.ts, baselineValue: tf.value, currentTs: tl.ts, currentValue: tl.value, displayedActualSpanMs: tl.ts - tf.ts, coverageRatio: 0.03 }), calc, '30d');
+  ok('14 30D 18-hour history → BUILDING (below range-independent 2-day trust floor)', d30tiny.branch === 'BUILDING' && d30tiny.blockingPredicate === 'insufficient_real_span', d30tiny.blockingPredicate);
   const pts = seg(T0, 80, 3 * HOUR, 1000, 0.2);   // 10 days
   const first = pts[0], last = pts[pts.length - 1];
   const d30ok = dlON(deadlock7d({ range: '30d', points: pts, finalPointCount: 80, pointCount: 80, firstTs: first.ts, lastTs: last.ts, baselineTs: first.ts, baselineValue: first.value, currentTs: last.ts, currentValue: last.value, displayedActualSpanMs: last.ts - first.ts, coverageRatio: 0.33 }), calc, '30d');
-  ok('14 30D 10-day history → PARTIAL (above 30D floor)', d30ok.branch === 'PARTIAL', d30ok.branch);
+  ok('14 30D 10-day history → PARTIAL', d30ok.branch === 'PARTIAL', d30ok.branch);
 }
 
 // ── source-level: auditor extension + markers ──
