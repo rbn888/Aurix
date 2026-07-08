@@ -22821,6 +22821,25 @@ const _AURIX_RETURN_PENDING_TEXT = 'Calculando…';
 function _aurixReturnPendingHTML() {
   return '<span class="wsc-metric-val wsc-metric-calc" aria-label="Calculando rendimiento">' + _AURIX_RETURN_PENDING_TEXT + '</span>';
 }
+// SPEC DSH.CHART.SHORT_HISTORY_PREMIUM_PRESENTATION.28 — PRESENTATION-ONLY truthful labels for STABLE real
+// partial/available history that has no trusted return (so it must not read as indefinite "Calculando…").
+// Decision comes from the SPEC.19 final contract's historyPresentationState (single source, computed after
+// return eligibility). No %, no 0%, no colour, no geometry — reuses the existing static wsc-metric-val markup
+// (no CSS/layout change). Genuine loading/unresolved and unit contexts without the FRC keep "Calculando…".
+const _AURIX_HIST_PARTIAL_TEXT = 'Historial parcial';
+const _AURIX_HIST_AVAILABLE_TEXT = 'Historial disponible';
+function _aurixHistoryPresentationBadge(emg, surface) {
+  let pres = 'CALCULATING';
+  try {
+    if (typeof _aurixResolveFinalRenderSeriesContract === 'function') {
+      const fp = _aurixResolveFinalRenderSeriesContract(emg, emg && emg.range, surface);
+      if (fp && fp.historyPresentationState) pres = fp.historyPresentationState;
+    }
+  } catch (_) { pres = 'CALCULATING'; }
+  if (pres === 'PARTIAL_HISTORY') return { html: '<span class="wsc-metric-val">' + _AURIX_HIST_PARTIAL_TEXT + '</span>', className: 'chart-change flat', pres: pres };
+  if (pres === 'AVAILABLE_HISTORY') return { html: '<span class="wsc-metric-val">' + _AURIX_HIST_AVAILABLE_TEXT + '</span>', className: 'chart-change flat', pres: pres };
+  return { html: (typeof _aurixReturnPendingHTML === 'function') ? _aurixReturnPendingHTML() : '<span class="wsc-metric-calc">Calculando…</span>', className: 'chart-change calculating', pres: 'CALCULATING' };
+}
 // ── P0-FINAL-UI-DOM-BINDING-FIX ──────────────────────────────────────────────────
 // The SINGLE canonical return-badge painter — shared by desktop (#chartChange) and mobile
 // (#chartChangeMobile) so they use EXACTLY the same format + tone. It reads getValidReturnBaseline and
@@ -24405,7 +24424,22 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     // builder's existing honest displayedRangeState / historyTooShortForRange; never alters points, timestamps,
     // values, geometry, color or return math. Contract-ready for a future subtle secondary-status surface.
     historyCoverage: 'UNKNOWN',
+    // SPEC.28 — presentation projection, set at the very end after eligibility/mode/coverage are decided:
+    // TRUSTED_RETURN | PARTIAL_HISTORY | AVAILABLE_HISTORY | CALCULATING | UNKNOWN. Presentation-only.
+    historyPresentationState: 'UNKNOWN',
     reason: 'pending', reasonCodes: [], diagnostics: diagnostics,
+  };
+  // SPEC.28 — pure presentation projection over the FINAL decided contract (changes NO points/values/hash/
+  // eligibility/return). A premium history label is offered ONLY for a STABLE rendered line (mode full|
+  // partial_clean, ≥2 real points) that is NOT badge-eligible and NOT loading; genuine building/empty/error
+  // stays CALCULATING/UNKNOWN so real loading keeps "Calculando…".
+  const _spec28PresentationState = () => {
+    if (out.badgeEligible) return 'TRUSTED_RETURN';
+    const stable = (out.mode === 'partial_clean' || out.mode === 'full') && out.lineEligible && Array.isArray(out.renderPoints) && out.renderPoints.length >= 2;
+    if (!stable) return (out.mode === 'building') ? 'CALCULATING' : 'UNKNOWN';
+    if (r !== 'all' && out.historyCoverage === 'PARTIAL_AVAILABLE_HISTORY') return 'PARTIAL_HISTORY';
+    if (r === 'all' && out.historyCoverage === 'ALL_AVAILABLE_HISTORY') return 'AVAILABLE_HISTORY';
+    return 'CALCULATING';
   };
   out.historyCoverage = (function () {
     try {
@@ -24432,6 +24466,7 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     o.mode = 'building'; o.state = 'calculating'; o.renderPoints = []; o.renderPathCount = 0;
     o.lineEligible = false; o.reason = reason; o.reasonCodes.push('building');
     o.badgeLabel = 'Calculando…'; o.badgeEligible = false; o.badgeReturnPct = null; o.colorState = 'neutral'; o.colorClass = 'flat';
+    o.historyPresentationState = 'CALCULATING';   // SPEC.28 — genuine loading/unresolved stays Calculando
     o.diagnostics.outputCount = 0; o.diagnostics.droppedCount = o.diagnostics.inputCount;
     // SPEC.21 C6 — never a bare generic Calculando; map the building reason to an explicit inspectable code.
     if (canonRefreshOn) {
@@ -24594,6 +24629,7 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     try { if (typeof _aurixStructuralBreaks === 'function') { const sb = _aurixStructuralBreaks(work.map(p => ({ time: p.ts, value: p.value })), r); rpc = ((sb && Array.isArray(sb.breaks)) ? sb.breaks.length : 0) + 1; } } catch (_) {}
     out.renderPathCount = out.lineEligible ? rpc : 0;
     out.reason = trimmed ? 'partial_clean_render' : 'full_render';
+    out.historyPresentationState = _spec28PresentationState();   // SPEC.28 — projection over the final decided contract
     return out;
   } catch (e) {
     out.mode = 'error'; out.state = 'calculating'; out.renderPoints = [];
@@ -24784,6 +24820,7 @@ function _aurixAuditLongRangeEvidenceCore(options) {
       returnPct: (frc.badgeReturnPct != null) ? frc.badgeReturnPct : ((chart.badgeReturnPct != null) ? chart.badgeReturnPct : null),
       badgeLabel: frc.badgeLabel || null,
       historyCoverage: frc.historyCoverage || 'UNKNOWN',   // SPEC.26 Phase 3 — coverage state, independent of return state
+      historyPresentationState: frc.historyPresentationState || 'UNKNOWN',   // SPEC.28 — badge presentation projection
     };
     internal[r] = {
       canonicalInputHash: renderHashOf(cp),
@@ -24981,6 +25018,8 @@ function _aurixAuditLongRangeEvidenceCore(options) {
   const possibleBridgeDefectCount = RANGES.reduce((n, r) => n + ((discontinuities[r] && discontinuities[r].bridgedDiscontinuousGapCount > 0) ? 1 : 0), 0);
   const returnContractDefectCount = RANGES.reduce((n, r) => n + ((returnContractAudit[r].classification === 'RETURN_CONTRACT_DEFECT' || returnContractAudit[r].classification === 'IMPOSSIBLE_PROMOTED_RETURN') ? 1 : 0), 0);
   const impossiblePromotedReturnCount = RANGES.reduce((n, r) => n + (returnContractAudit[r].classification === 'IMPOSSIBLE_PROMOTED_RETURN' ? 1 : 0), 0);
+  const partialHistoryPresentationCount = RANGES.reduce((n, r) => n + (perRange[r].historyPresentationState === 'PARTIAL_HISTORY' ? 1 : 0), 0);   // SPEC.28
+  const availableHistoryPresentationCount = RANGES.reduce((n, r) => n + (perRange[r].historyPresentationState === 'AVAILABLE_HISTORY' ? 1 : 0), 0);   // SPEC.28
   const calculatingWithUsableBaselineCount = RANGES.reduce((n, r) => n + ((returnContractAudit[r].classification === 'CALCULATING_WITH_USABLE_BASELINE' || returnContractAudit[r].classification === 'RETURN_CONTRACT_DEFECT') ? 1 : 0), 0);
   const totalSyntheticPoints = RANGES.reduce((n, r) => n + (perRange[r].syntheticPoints || 0), 0);
   const desktopMobileParity = RANGES.every(r => internal[r].parityOk);
@@ -25013,6 +25052,7 @@ function _aurixAuditLongRangeEvidenceCore(options) {
       aliasDefectCount: aliasDefectCount, aliasSuspectCount: aliasSuspectCount, legitimateSameHistoryCount: legitimateSameHistoryCount,
       possibleBridgeDefectCount: possibleBridgeDefectCount, returnContractDefectCount: returnContractDefectCount,
       impossiblePromotedReturnCount: impossiblePromotedReturnCount,
+      partialHistoryPresentationCount: partialHistoryPresentationCount, availableHistoryPresentationCount: availableHistoryPresentationCount,
       calculatingWithUsableBaselineCount: calculatingWithUsableBaselineCount, totalSyntheticPoints: totalSyntheticPoints,
       desktopMobileParity: desktopMobileParity,
     },
@@ -25133,8 +25173,12 @@ function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
         el.innerHTML = '<span class="wsc-metric-val">' + _aurixReturnInsufficientText() + '</span>';
         el.className = 'chart-change flat';
       } else {
-        el.innerHTML = (typeof _aurixReturnPendingHTML === 'function') ? _aurixReturnPendingHTML() : '<span class="wsc-metric-calc">Calculando…</span>';
-        el.className = 'chart-change calculating';
+        // SPEC.28 — stable real partial/available history with no trusted return ⇒ truthful premium label;
+        // genuine loading ⇒ existing "Calculando…". Presentation-only; no %/colour/geometry change. Defensive:
+        // if the helper is absent (isolated unit context), fall back to the exact prior pending markup.
+        const _pb = (typeof _aurixHistoryPresentationBadge === 'function') ? _aurixHistoryPresentationBadge(emg, surface)
+          : { html: (typeof _aurixReturnPendingHTML === 'function') ? _aurixReturnPendingHTML() : '<span class="wsc-metric-calc">Calculando…</span>', className: 'chart-change calculating' };
+        el.innerHTML = _pb.html; el.className = _pb.className;
       }
       try { console.log('[UI][RETURN_CONTRACT_BADGE]', { surface: surface || null, contractState: contract.state, reason: contract.reason, returnPct: contract.returnPct, colorState: contract.colorState, continuityState: contract.continuityState, coverageRatio: contract.coverageRatio, badgeEligible: contract.badgeEligible, chartHash: emg && emg.chartHash }); } catch (_) {}
       return;
@@ -25147,8 +25191,10 @@ function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
       el.innerHTML = '<span class="wsc-metric-val">' + _aurixReturnInsufficientText() + '</span>';
       el.className = 'chart-change flat';
     } else {
-      el.innerHTML = (typeof _aurixReturnPendingHTML === 'function') ? _aurixReturnPendingHTML() : '<span class="wsc-metric-calc">Calculando…</span>';
-      el.className = 'chart-change calculating';
+      // SPEC.28 — same truthful premium presentation on the v495 fallback path (defensive helper guard).
+      const _pb = (typeof _aurixHistoryPresentationBadge === 'function') ? _aurixHistoryPresentationBadge(emg, surface)
+        : { html: (typeof _aurixReturnPendingHTML === 'function') ? _aurixReturnPendingHTML() : '<span class="wsc-metric-calc">Calculando…</span>', className: 'chart-change calculating' };
+      el.innerHTML = _pb.html; el.className = _pb.className;
     }
     try { console.log('[UI][EMERGENCY_BADGE]', { surface: surface || null, state: emg && emg.state, returnState: emg && emg.returnState, reason: emg && emg.reason, returnPct: emg && emg.returnPct, netFlows: emg && emg.netFlows, chartHash: emg && emg.chartHash }); } catch (_) {}
   } catch (_) {}
