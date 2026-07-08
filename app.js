@@ -24655,6 +24655,308 @@ function _aurixClassifyEvidenceTransition(prev, next) {
 }
 try { if (typeof window !== 'undefined') window._aurixClassifyEvidenceTransition = _aurixClassifyEvidenceTransition; } catch (_) {}
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.LONG_RANGE_EVIDENCE_PROVENANCE.25 — _aurixAuditLongRangeEvidenceCore
+// ════════════════════════════════════════════════════════════════════════════
+// READ-ONLY, single-pass provenance audit that PROVES why 7D/30D/1Y/ALL look near-identical and/or stay
+// "Calculando…" while 24H works. It changes NOTHING (behaviorChanged:false): no rendering, no return math,
+// no cache/backend/storage/sync/UI mutation, no second resolver. It reuses the SPEC.19 final contract
+// (_aurixResolveFinalRenderSeriesContract), the canonical builders (buildProductionPortfolioChart /
+// buildValidatedHistoricalSeries) and the SPEC.23 pure classifiers (_aurixClassifyCrossRangeSeriesProvenance,
+// _aurixAuditRenderPathGaps) + _aurixEmergencyHash. Every value is derived from the SAME pipeline the visible
+// chart reads, so it can never disagree with what the user sees. syntheticPoints is always 0.
+//
+// The decisive new evidence over SPEC.23 is the OLDER-EVIDENCE test: for each wider range it asks whether the
+// clean validatedFull history contains points OLDER than the narrower range's window start (evidence the wider
+// range SHOULD show) and whether the wider range's rangeSeries actually reaches back to use them. Identical
+// geometry alone is NOT a defect — it is a defect only when older eligible evidence exists but a wider window
+// clipped identically to a narrower one (cross-range alias), or when a discontinuous temporal gap is drawn in
+// one render path (visual bridge), or when a usable trustworthy baseline stays Calculando (return contract).
+function _aurixAuditLongRangeEvidenceCore(options) {
+  options = options || {};
+  const safe = (fn, d) => { try { const v = fn(); return v === undefined ? (d === undefined ? null : d) : v; } catch (_) { return (d === undefined ? null : d); } };
+  const DAY = 864e5;
+  const nowIso = () => { try { return new Date().toISOString(); } catch (_) { return null; } };
+  const iso = t => { try { return Number.isFinite(t) ? new Date(t).toISOString() : null; } catch (_) { return null; } };
+  const appVersion = safe(() => (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null, null);
+  const startedAtIso = nowIso();
+  const RANGE_WIN = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '1y': 31536e6, 'all': Infinity };
+  const LADDER = ['24h', '7d', '30d', '1y', 'all'];
+  const LONG = ['7d', '30d', '1y', 'all'];
+  const reqRanges = (Array.isArray(options.ranges) && options.ranges.length) ? options.ranges.map(x => String(x).toLowerCase()) : ['7d', '30d', '1y', 'all'];
+  const include24hControl = options.include24hControl !== false;
+  const SURFACES = (Array.isArray(options.surfaces) && options.surfaces.length) ? options.surfaces : ['desktop', 'mobile'];
+  let RANGES = LADDER.filter(r => reqRanges.indexOf(r) >= 0);
+  if (include24hControl && RANGES.indexOf('24h') < 0) RANGES = ['24h'].concat(RANGES);
+  // hashes reused from the launch-gate style: full render hash + timestamp-only + value-only projections.
+  const eHash = pts => safe(() => (typeof _aurixEmergencyHash === 'function') ? _aurixEmergencyHash(Array.isArray(pts) ? pts : []) : null, null);
+  const renderHashOf = pts => eHash(pts);
+  const tsHashOf = pts => eHash((Array.isArray(pts) ? pts : []).map(p => ({ ts: p.ts, value: 0 })));
+  const valHashOf = pts => eHash((Array.isArray(pts) ? pts : []).map(p => ({ ts: 0, value: p.value })));
+
+  // ── per-range projection (ONE chart build + ONE validated build per range; both surfaces from that ONE
+  //    chart, exactly like the visible paint chain) ──────────────────────────────────────────────────────
+  const perRange = {};
+  const internal = {};
+  RANGES.forEach(r => {
+    const chart = safe(() => (typeof buildProductionPortfolioChart === 'function') ? buildProductionPortfolioChart(r) : null, null) || { points: [], state: 'pending' };
+    const vhs = safe(() => (typeof buildValidatedHistoricalSeries === 'function') ? buildValidatedHistoricalSeries(r) : null, null) || {};
+    const frcBy = {};
+    SURFACES.forEach(s => { frcBy[s] = safe(() => (typeof _aurixResolveFinalRenderSeriesContract === 'function') ? _aurixResolveFinalRenderSeriesContract(chart, r, s) : null, null) || {}; });
+    const frc = frcBy.desktop || frcBy[SURFACES[0]] || {};
+    const rp = Array.isArray(frc.renderPoints) ? frc.renderPoints.filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value)) : [];
+    const cp = Array.isArray(chart.points) ? chart.points : [];
+    const validatedFull = Array.isArray(vhs.validatedFull) ? vhs.validatedFull : [];
+    const rangeSeries = Array.isArray(vhs.rangeSeries) ? vhs.rangeSeries : cp;
+    const nowRef = Number.isFinite(vhs.nowRef) && vhs.nowRef > 0 ? vhs.nowRef : (cp.length ? cp[cp.length - 1].ts : null);
+    const firstTs = rp.length ? rp[0].ts : null, lastTs = rp.length ? rp[rp.length - 1].ts : null;
+    const actualSpanMs = (firstTs != null && lastTs != null) ? (lastTs - firstTs) : 0;
+    const reqWin = RANGE_WIN[r];
+    const dl = (frc.diagnostics && frc.diagnostics.reliabilityDeadlock) || null;
+    const deterministicAnchor = Number.isFinite(chart.baselineTs) && (chart.baselineValue > 0);
+    const currentValueAvailable = Number.isFinite(chart.currentValue) && (chart.currentValue > 0);
+    // desktop==mobile parity for this range (proves the single-contract wiring; a divergence here is its own bug)
+    let parityOk = true;
+    const dsk = frcBy.desktop, mob = frcBy.mobile;
+    if (dsk && mob) {
+      const hd = renderHashOf(Array.isArray(dsk.renderPoints) ? dsk.renderPoints : []);
+      const hm = renderHashOf(Array.isArray(mob.renderPoints) ? mob.renderPoints : []);
+      parityOk = (hd === hm && dsk.mode === mob.mode && dsk.colorClass === mob.colorClass && dsk.badgeLabel === mob.badgeLabel && dsk.renderPathCount === mob.renderPathCount);
+    }
+    perRange[r] = {
+      range: r,
+      pointCount: rp.length,
+      firstTs: firstTs, lastTs: lastTs,
+      actualSpanDays: +(actualSpanMs / DAY).toFixed(3),
+      requestedSpanDays: Number.isFinite(reqWin) ? +(reqWin / DAY).toFixed(3) : null,
+      coverageRatio: (chart.coverageRatio != null) ? chart.coverageRatio : null,
+      renderHash: renderHashOf(rp),
+      timestampHash: tsHashOf(rp),
+      valueHash: valHashOf(rp),
+      renderPathCount: (frc.renderPathCount != null) ? frc.renderPathCount : null,
+      syntheticPoints: (frc.diagnostics && frc.diagnostics.syntheticPoints != null) ? frc.diagnostics.syntheticPoints : 0,
+      returnState: chart.returnState || null,
+      returnReason: chart.returnSuppressedReason || chart.reason || null,
+      returnPct: (frc.badgeReturnPct != null) ? frc.badgeReturnPct : ((chart.badgeReturnPct != null) ? chart.badgeReturnPct : null),
+      badgeLabel: frc.badgeLabel || null,
+    };
+    internal[r] = {
+      canonicalInputHash: renderHashOf(cp),
+      badgeEligible: !!frc.badgeEligible, mode: frc.mode || null, state: frc.state || null,
+      colorClass: frc.colorClass || null, reasonCodes: Array.isArray(frc.reasonCodes) ? frc.reasonCodes : [],
+      deadlockBranch: dl ? dl.branch : null, deadlockEvidence: dl ? dl.evidence : null,
+      deterministicAnchor: deterministicAnchor, currentValueAvailable: currentValueAvailable,
+      coverageSuppressed: !!chart.coverageSuppressed, partialReturnTrusted: !!chart.partialReturnTrusted,
+      validatedFullCount: validatedFull.length,
+      validatedFullFirstTs: validatedFull.length ? validatedFull[0].ts : null,
+      validatedFullLastTs: validatedFull.length ? validatedFull[validatedFull.length - 1].ts : null,
+      rangeSeriesFirstTs: rangeSeries.length ? rangeSeries[0].ts : (cp.length ? cp[0].ts : null),
+      rangeSeriesCount: rangeSeries.length,
+      nowRef: nowRef, realFirstTs: cp.length ? cp[0].ts : null, realLastTs: cp.length ? cp[cp.length - 1].ts : null,
+      realSpanMs: cp.length ? (cp[cp.length - 1].ts - cp[0].ts) : 0,
+      renderPoints: rp, parityOk: parityOk,
+    };
+  });
+
+  const presentLong = LONG.filter(r => RANGES.indexOf(r) >= 0);
+
+  // ── OLDER-EVIDENCE MATRIX — the decisive alias proof. For each wider range vs its narrower neighbour: does
+  //    clean validatedFull hold points older than the narrower window start, and does the wider range use them?
+  const olderEvidenceMatrix = {};
+  for (let i = 1; i < presentLong.length; i++) {
+    const R = presentLong[i], N = presentLong[i - 1];
+    const iR = internal[R];
+    const narrowerWin = RANGE_WIN[N];
+    const narrowerWindowStartTs = (Number.isFinite(narrowerWin) && Number.isFinite(iR.nowRef)) ? (iR.nowRef - narrowerWin) : null;
+    const olderEvidenceExists = (narrowerWindowStartTs != null) && (iR.validatedFullFirstTs != null) && (iR.validatedFullFirstTs < narrowerWindowStartTs);
+    const olderEvidenceUsed = (narrowerWindowStartTs != null) && (iR.rangeSeriesFirstTs != null) && (iR.rangeSeriesFirstTs < narrowerWindowStartTs);
+    let classification;
+    if (narrowerWindowStartTs == null) classification = 'NOT_APPLICABLE';
+    else if (!olderEvidenceExists) classification = 'NO_OLDER_EVIDENCE_SHORT_HISTORY';
+    else if (olderEvidenceUsed) classification = 'OLDER_EVIDENCE_USED';
+    else classification = 'OLDER_EVIDENCE_EXISTS_UNUSED';
+    olderEvidenceMatrix[R] = {
+      widerRange: R, narrowerRange: N,
+      narrowerWindowStartTs: narrowerWindowStartTs, narrowerWindowStartIso: iso(narrowerWindowStartTs),
+      validatedFullFirstTs: iR.validatedFullFirstTs, validatedFullFirstIso: iso(iR.validatedFullFirstTs),
+      validatedFullCount: iR.validatedFullCount,
+      rangeSeriesFirstTs: iR.rangeSeriesFirstTs, rangeSeriesFirstIso: iso(iR.rangeSeriesFirstTs),
+      olderEvidenceExists: olderEvidenceExists, olderEvidenceUsed: olderEvidenceUsed, classification: classification,
+    };
+  }
+
+  // ── CROSS-RANGE PROVENANCE (reuse SPEC.23 classifier) + PAIRWISE MATRIX ──────────────────────────────────
+  const crossList = presentLong.map(r => ({
+    requestedRange: r, canonicalInputHash: internal[r].canonicalInputHash, finalRenderHash: perRange[r].renderHash,
+    renderPointCount: perRange[r].pointCount, realFirstTs: internal[r].realFirstTs, realLastTs: internal[r].realLastTs, realSpanMs: internal[r].realSpanMs,
+  }));
+  const crossProvenance = safe(() => (typeof _aurixClassifyCrossRangeSeriesProvenance === 'function') ? _aurixClassifyCrossRangeSeriesProvenance(crossList) : null, null);
+  const pairwiseMatrix = {};
+  for (let i = 0; i < presentLong.length; i++) for (let j = i + 1; j < presentLong.length; j++) {
+    const A = presentLong[i], B = presentLong[j];   // A narrower, B wider (ladder order)
+    const pa = perRange[A], pb = perRange[B], ib = internal[B];
+    const sameRenderHash = pa.renderHash != null && pa.renderHash === pb.renderHash;
+    const sameTimestampHash = pa.timestampHash != null && pa.timestampHash === pb.timestampHash;
+    const sameValueHash = pa.valueHash != null && pa.valueHash === pb.valueHash;
+    const sameFirstLastTs = (pa.firstTs === pb.firstTs && pa.lastTs === pb.lastTs && pa.firstTs != null);
+    const base = crossProvenance && crossProvenance.matrix ? crossProvenance.matrix[A + '|' + B] : null;
+    // decisive alias test: identical render output but older evidence beyond A's window exists that B failed to use.
+    const aWin = RANGE_WIN[A];
+    const aStart = (Number.isFinite(aWin) && Number.isFinite(ib.nowRef)) ? (ib.nowRef - aWin) : null;
+    const olderBeyondAExists = (aStart != null) && (ib.validatedFullFirstTs != null) && (ib.validatedFullFirstTs < aStart);
+    const bUsesOlder = (aStart != null) && (ib.rangeSeriesFirstTs != null) && (ib.rangeSeriesFirstTs < aStart);
+    let classification;
+    if (pa.pointCount < 2 || pb.pointCount < 2) classification = 'INSUFFICIENT_EVIDENCE';
+    else if (!sameRenderHash) classification = 'DISTINCT_SERIES_EXPECTED';
+    else if (olderBeyondAExists && !bUsesOlder) classification = 'CROSS_RANGE_ALIAS_DEFECT';
+    else if (base === 'CROSS_RANGE_ALIAS_DEFECT') classification = 'CROSS_RANGE_ALIAS_DEFECT';
+    else if (base === 'CROSS_RANGE_ALIAS_SUSPECT') classification = 'CROSS_RANGE_ALIAS_SUSPECT';
+    else classification = 'SAME_AVAILABLE_HISTORY_LEGITIMATE';
+    pairwiseMatrix[A + '|' + B] = {
+      a: A, b: B, sameRenderHash: sameRenderHash, sameTimestampHash: sameTimestampHash, sameValueHash: sameValueHash,
+      sameFirstLastTs: sameFirstLastTs, olderBeyondNarrowerExists: olderBeyondAExists, widerUsesOlder: bUsesOlder,
+      baseClassification: base, classification: classification,
+    };
+  }
+
+  // ── DISCONTINUITIES — real gap vs visual bridge, from timestamps + renderer path ownership (SPEC.23.D) ───
+  const discontinuities = {};
+  RANGES.forEach(r => {
+    const rp = internal[r].renderPoints;
+    const gap = safe(() => (typeof _aurixAuditRenderPathGaps === 'function') ? _aurixAuditRenderPathGaps(rp, r) : null, null);
+    const list = [];
+    if (gap && Array.isArray(gap.pairs) && rp.length >= 2) {
+      const dts = [];
+      for (let i = 1; i < rp.length; i++) dts.push(rp[i].ts - rp[i - 1].ts);
+      const sorted = dts.slice().sort((a, b) => a - b);
+      const medianDt = sorted.length ? sorted[sorted.length >> 1] : 0;
+      gap.pairs.forEach((pr, idx) => {
+        const left = rp[idx], right = rp[idx + 1];
+        const lv = left ? left.value : null, rv = right ? right.value : null;
+        const deltaPct = (Number.isFinite(lv) && lv !== 0 && Number.isFinite(rv)) ? +(((rv - lv) / Math.abs(lv)) * 100).toFixed(4) : null;
+        const cadenceRatio = medianDt > 0 ? +(pr.dtMs / medianDt).toFixed(2) : null;
+        const renderPathBridged = !!(pr.samePath && pr.exceedsThreshold);
+        list.push({
+          leftTs: pr.fromTs, rightTs: pr.toTs, deltaMs: pr.dtMs, deltaPct: deltaPct, cadenceRatio: cadenceRatio,
+          samePath: !!pr.samePath, exceedsThreshold: !!pr.exceedsThreshold, renderPathBridged: renderPathBridged,
+          classification: renderPathBridged ? 'VISUAL_BRIDGE_DEFECT' : (pr.exceedsThreshold ? 'REAL_GAP_SEGMENTED' : 'NORMAL_CADENCE'),
+        });
+      });
+    }
+    // keep only the most suspicious jumps (bridges first, then widest gaps) — top 6 per range.
+    list.sort((a, b) => (Number(b.renderPathBridged) - Number(a.renderPathBridged)) || (b.deltaMs - a.deltaMs));
+    discontinuities[r] = {
+      range: r, pathCount: gap ? gap.pathCount : (rp.length ? 1 : 0), gapThresholdMs: gap ? gap.gapThresholdMs : 0,
+      bridgedDiscontinuousGapCount: gap ? gap.bridgedDiscontinuousGapCount : 0, gapClassification: gap ? gap.classification : null,
+      top: list.slice(0, 6),
+    };
+  });
+
+  // ── RETURN-CONTRACT AUDIT — why each range is Calculando / trusted / partial ─────────────────────────────
+  const returnContractAudit = {};
+  RANGES.forEach(r => {
+    const p = perRange[r], iR = internal[r];
+    const usableBaseline = iR.deterministicAnchor && iR.currentValueAvailable;
+    // trustworthy usable baseline = the resolver's own PARTIAL branch fired (all SPEC.22 promotion conditions met).
+    const trustworthyPartialEligible = (iR.deadlockBranch === 'PARTIAL');
+    let classification;
+    if (iR.badgeEligible) {
+      classification = (iR.reasonCodes.indexOf('RELIABILITY_DEADLOCK_RESOLVED_PARTIAL') >= 0 || iR.deadlockBranch === 'PARTIAL') ? 'PARTIAL_TRUSTED' : 'TRUSTED';
+    } else if (trustworthyPartialEligible) {
+      classification = 'RETURN_CONTRACT_DEFECT';   // resolver deemed a trustworthy partial usable, yet the badge stayed Calculando
+    } else if (usableBaseline && (iR.partialReturnTrusted || iR.coverageSuppressed)) {
+      classification = 'CALCULATING_WITH_USABLE_BASELINE';   // raw baseline exists but genuinely insufficient (short history)
+    } else {
+      classification = 'CALCULATING_NO_USABLE_BASELINE';
+    }
+    returnContractAudit[r] = {
+      range: r, state: iR.state, mode: iR.mode, badgeEligible: iR.badgeEligible, badgeLabel: p.badgeLabel,
+      returnState: p.returnState, returnReason: p.returnReason, returnPct: p.returnPct,
+      deadlockBranch: iR.deadlockBranch, deterministicAnchor: iR.deterministicAnchor, currentValueAvailable: iR.currentValueAvailable,
+      coverageSuppressed: iR.coverageSuppressed, partialReturnTrusted: iR.partialReturnTrusted, usableBaseline: usableBaseline,
+      reasonCodes: iR.reasonCodes, classification: classification,
+    };
+  });
+
+  // ── DEFECTS / SUSPECTS with exact proof + minimalRootCauseSite ───────────────────────────────────────────
+  const defects = [], suspects = [];
+  Object.keys(pairwiseMatrix).forEach(k => {
+    const m = pairwiseMatrix[k];
+    if (m.classification === 'CROSS_RANGE_ALIAS_DEFECT') {
+      defects.push({ category: 'cross_range_alias', ranges: [m.a, m.b],
+        proof: 'identical renderHash ' + perRange[m.a].renderHash + ' for ' + m.a + ' & ' + m.b + '; validatedFull has evidence older than the ' + m.a + ' window start that ' + m.b + ' did not use (olderBeyondNarrowerExists=' + m.olderBeyondNarrowerExists + ', widerUsesOlder=' + m.widerUsesOlder + ')',
+        olderEvidence: olderEvidenceMatrix[m.b] || null,
+        minimalRootCauseSite: 'buildValidatedHistoricalSeries RangeExtraction (app.js ~L23412 startTs = nowRef - span; rangeSeries clip) — a wider range must extract from validatedFull with its own wider startTs' });
+    } else if (m.classification === 'CROSS_RANGE_ALIAS_SUSPECT') {
+      suspects.push({ category: 'cross_range_alias_suspect', ranges: [m.a, m.b],
+        proof: 'identical renderHash but base classifier flagged suspect (sameTimestampHash=' + m.sameTimestampHash + ', sameValueHash=' + m.sameValueHash + ', baseClassification=' + m.baseClassification + ')',
+        minimalRootCauseSite: 'inconclusive — needs a run with more history to confirm/deny alias vs shared real interval' });
+    }
+  });
+  RANGES.forEach(r => {
+    const d = discontinuities[r];
+    if (d && d.bridgedDiscontinuousGapCount > 0) {
+      const worst = (d.top || []).filter(t => t.renderPathBridged)[0] || null;
+      defects.push({ category: 'visual_bridge', ranges: [r],
+        proof: r + ' draws ' + d.bridgedDiscontinuousGapCount + ' discontinuous gap(s) (dt ≥ ' + d.gapThresholdMs + 'ms) inside ONE render path' + (worst ? ' — widest ' + worst.deltaMs + 'ms between ' + iso(worst.leftTs) + ' and ' + iso(worst.rightTs) : ''),
+        minimalRootCauseSite: 'renderer path split (_aurixStructuralBreaks / _aurixSplitAtGaps) — a gap ≥ threshold must open a new path, never bridge' });
+    }
+  });
+  RANGES.forEach(r => {
+    const rc = returnContractAudit[r];
+    if (rc.classification === 'RETURN_CONTRACT_DEFECT') {
+      defects.push({ category: 'return_contract', ranges: [r],
+        proof: r + ' has a resolver-approved trustworthy partial (reliabilityDeadlock.branch=PARTIAL, deterministicAnchor=' + rc.deterministicAnchor + ', currentValue=' + rc.currentValueAvailable + ') yet badge stayed "' + rc.badgeLabel + '" (badgeEligible=false)',
+        minimalRootCauseSite: '_aurixResolveFinalRenderSeriesContract badge gate (app.js ~L24509) — a PARTIAL deadlock resolution must set badgeEligible' });
+    }
+  });
+
+  // ── SUMMARY ──────────────────────────────────────────────────────────────────────────────────────────────
+  const pairVals = Object.keys(pairwiseMatrix).map(k => pairwiseMatrix[k]);
+  const aliasDefectCount = pairVals.filter(m => m.classification === 'CROSS_RANGE_ALIAS_DEFECT').length;
+  const aliasSuspectCount = pairVals.filter(m => m.classification === 'CROSS_RANGE_ALIAS_SUSPECT').length;
+  const legitimateSameHistoryCount = pairVals.filter(m => m.classification === 'SAME_AVAILABLE_HISTORY_LEGITIMATE').length;
+  const possibleBridgeDefectCount = RANGES.reduce((n, r) => n + ((discontinuities[r] && discontinuities[r].bridgedDiscontinuousGapCount > 0) ? 1 : 0), 0);
+  const returnContractDefectCount = RANGES.reduce((n, r) => n + (returnContractAudit[r].classification === 'RETURN_CONTRACT_DEFECT' ? 1 : 0), 0);
+  const calculatingWithUsableBaselineCount = RANGES.reduce((n, r) => n + ((returnContractAudit[r].classification === 'CALCULATING_WITH_USABLE_BASELINE' || returnContractAudit[r].classification === 'RETURN_CONTRACT_DEFECT') ? 1 : 0), 0);
+  const totalSyntheticPoints = RANGES.reduce((n, r) => n + (perRange[r].syntheticPoints || 0), 0);
+  const desktopMobileParity = RANGES.every(r => internal[r].parityOk);
+  const anyIdenticalLong = pairVals.some(m => m.sameRenderHash);
+  const enoughRenderEvidence = presentLong.some(r => perRange[r].pointCount >= 2);
+
+  // ── VERDICT ──────────────────────────────────────────────────────────────────────────────────────────────
+  const provenAlias = aliasDefectCount > 0;
+  const provenBridge = possibleBridgeDefectCount > 0;
+  const provenReturn = returnContractDefectCount > 0;
+  const provenCount = [provenAlias, provenBridge, provenReturn].filter(Boolean).length;
+  let verdict;
+  if (provenCount >= 2) verdict = 'MULTIPLE_PROVEN_DEFECTS';
+  else if (provenAlias) verdict = 'PROVEN_CROSS_RANGE_ALIAS_DEFECT';
+  else if (provenBridge) verdict = 'PROVEN_VISUAL_BRIDGE_DEFECT';
+  else if (provenReturn) verdict = 'RETURN_CONTRACT_DEFECT';
+  else if (!enoughRenderEvidence) verdict = 'INSUFFICIENT_EVIDENCE';
+  else if (aliasSuspectCount > 0) verdict = 'INSUFFICIENT_EVIDENCE';   // identical output, not yet provable either way
+  else if (anyIdenticalLong) verdict = 'SHORT_HISTORY_TRUTHFUL_PRESENTATION_NEEDED';   // identical only because no older eligible history
+  else verdict = 'LONG_RANGE_EVIDENCE_CLEAN';
+
+  return {
+    spec: 'DSH.CHART.LONG_RANGE_EVIDENCE_PROVENANCE.25',
+    appVersion: appVersion, startedAtIso: startedAtIso, endedAtIso: nowIso(), behaviorChanged: false,
+    ranges: RANGES, surfaces: SURFACES, include24hControl: include24hControl,
+    perRange: perRange, pairwiseMatrix: pairwiseMatrix, olderEvidenceMatrix: olderEvidenceMatrix,
+    crossRangeVerdict: crossProvenance ? crossProvenance.verdict : null, crossRangeMatrix: crossProvenance ? crossProvenance.matrix : null,
+    discontinuities: discontinuities, returnContractAudit: returnContractAudit,
+    summary: {
+      aliasDefectCount: aliasDefectCount, aliasSuspectCount: aliasSuspectCount, legitimateSameHistoryCount: legitimateSameHistoryCount,
+      possibleBridgeDefectCount: possibleBridgeDefectCount, returnContractDefectCount: returnContractDefectCount,
+      calculatingWithUsableBaselineCount: calculatingWithUsableBaselineCount, totalSyntheticPoints: totalSyntheticPoints,
+      desktopMobileParity: desktopMobileParity,
+    },
+    defects: defects, suspects: suspects, verdict: verdict,
+  };
+}
+try { if (typeof window !== 'undefined') window._aurixAuditLongRangeEvidenceCore = _aurixAuditLongRangeEvidenceCore; } catch (_) {}
+
 // P0-PREMIUM-RENDERER-RECONNECTION — render the ALREADY-VALIDATED buildProductionPortfolioChart points
 // through the ORIGINAL institutional geometry (LTTB downsample → regime-aware scales → monotone-CUBIC
 // path → area). Values are NEVER modified: the only change is a ts→time shape rename. Returns a premium
@@ -25907,6 +26209,49 @@ try {
       let json = '';
       try { json = JSON.stringify(window.__AURIX_LAST_CHART_LAUNCH_GATE__ || { error: 'no launch gate result yet — run aurixRunChartLaunchGate() first' }, null, 2); } catch (_) { json = '{"error":"stringify_failed"}'; }
       try { if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(json); } catch (_) {}
+      try { console.log(json); } catch (_) {}
+      return json;
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // SPEC DSH.CHART.LONG_RANGE_EVIDENCE_PROVENANCE.25 — window.aurixAuditLongRangeEvidence(options)
+    // ════════════════════════════════════════════════════════════════════════════
+    // AUDIT-ONLY, ZERO render change. Wraps the read-only _aurixAuditLongRangeEvidenceCore (defined above with
+    // the SPEC.23 classifiers): stores the last result in-memory only, prints a compact founder-readable block,
+    // never touches Supabase/localStorage/save/sync/UI. The copy helper degrades safely (never throws) when the
+    // document is not focused (clipboard NotAllowedError) — it always falls back to console.
+    window.aurixAuditLongRangeEvidence = function (options) {
+      let result;
+      try {
+        result = (typeof _aurixAuditLongRangeEvidenceCore === 'function') ? _aurixAuditLongRangeEvidenceCore(options || {})
+          : { spec: 'DSH.CHART.LONG_RANGE_EVIDENCE_PROVENANCE.25', verdict: 'INSUFFICIENT_EVIDENCE', behaviorChanged: false, errorMessage: 'core auditor unavailable', defects: [], suspects: [] };
+      } catch (e) {
+        result = { spec: 'DSH.CHART.LONG_RANGE_EVIDENCE_PROVENANCE.25', verdict: 'INSUFFICIENT_EVIDENCE', behaviorChanged: false, errorMessage: (e && e.message) ? e.message : String(e), defects: [], suspects: [] };
+      }
+      try { window.__AURIX_LAST_LONG_RANGE_EVIDENCE_AUDIT__ = result; } catch (_) {}
+      try {
+        const s = result.summary || {};
+        console.log('%c[UI][LONG_RANGE_EVIDENCE_PROVENANCE]', 'font-weight:700;color:#12b886', result);
+        console.log('AURIX_BUILD: ' + (result.appVersion || 'n/a'));
+        console.log('VERDICT: ' + (result.verdict || 'n/a'));
+        console.log('aliasDefectCount: ' + (s.aliasDefectCount != null ? s.aliasDefectCount : 'n/a') + '  aliasSuspectCount: ' + (s.aliasSuspectCount != null ? s.aliasSuspectCount : 'n/a'));
+        console.log('possibleBridgeDefectCount: ' + (s.possibleBridgeDefectCount != null ? s.possibleBridgeDefectCount : 'n/a') + '  returnContractDefectCount: ' + (s.returnContractDefectCount != null ? s.returnContractDefectCount : 'n/a'));
+        console.log('calculatingWithUsableBaselineCount: ' + (s.calculatingWithUsableBaselineCount != null ? s.calculatingWithUsableBaselineCount : 'n/a') + '  legitimateSameHistoryCount: ' + (s.legitimateSameHistoryCount != null ? s.legitimateSameHistoryCount : 'n/a'));
+        console.log('totalSyntheticPoints: ' + (s.totalSyntheticPoints != null ? s.totalSyntheticPoints : 'n/a') + '  desktopMobileParity: ' + (s.desktopMobileParity != null ? s.desktopMobileParity : 'n/a'));
+        console.log('defects: ' + (Array.isArray(result.defects) ? result.defects.length : 'n/a') + '  suspects: ' + (Array.isArray(result.suspects) ? result.suspects.length : 'n/a'));
+        console.log('To copy full JSON run: aurixCopyLastLongRangeEvidenceAudit()');
+      } catch (_) {}
+      return result;
+    };
+    window.aurixCopyLastLongRangeEvidenceAudit = function () {
+      let json = '';
+      try { json = JSON.stringify(window.__AURIX_LAST_LONG_RANGE_EVIDENCE_AUDIT__ || { error: 'no long-range evidence audit yet — run aurixAuditLongRangeEvidence() first' }, null, 2); } catch (_) { json = '{"error":"stringify_failed"}'; }
+      try {
+        if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+          const p = navigator.clipboard.writeText(json);   // rejects with NotAllowedError when the document is not focused
+          if (p && typeof p.then === 'function') p.then(function () {}, function () {});   // swallow rejection — never throw
+        }
+      } catch (_) {}
       try { console.log(json); } catch (_) {}
       return json;
     };
