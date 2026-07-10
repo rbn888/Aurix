@@ -25061,6 +25061,374 @@ function _aurixAuditLongRangeEvidenceCore(options) {
 }
 try { if (typeof window !== 'undefined') window._aurixAuditLongRangeEvidenceCore = _aurixAuditLongRangeEvidenceCore; } catch (_) {}
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.DOM_COLOR_DENSITY_AUDIT.30 — read-only DOM / colour / density audit
+// ════════════════════════════════════════════════════════════════════════════
+// AUDIT-ONLY. Proves, on the REAL rendered chart, WHY 30D/1Y can still read "Calculando…" with a coloured
+// line, and QUANTIFIES the uneven visual point density across 24H/7D/30D/1Y/ALL. Changes NOTHING: no render
+// points, timestamps, values, return math, eligibility, path/smoothing/decimation, badge behaviour, colours,
+// classes or historyPresentationState logic. Reuses the SPEC.19 final contract
+// (_aurixResolveFinalRenderSeriesContract), the canonical builder (buildProductionPortfolioChart), the SPEC.23
+// cross-range provenance classifier (_aurixClassifyCrossRangeSeriesProvenance), the existing render/ts/value
+// hashes (_aurixEmergencyHash), the renderer's perceptual X domain (computeAurixAdaptiveXScale) and the
+// existing DOM selectors (#chartChange / #chartChangeMobile, #perfSnapshot / #wealthCurveMobile, .wsc /
+// .wsc-line / .wsc-plot). NO second resolver, NO second chart pipeline, NO point/return calculator.
+
+// Centralised, reported density thresholds (SPEC.30 DEFECT RULE 4 — thresholds must appear in the output).
+const _AURIX_DENSITY_THRESHOLDS = {
+  overdenseColumnPts: 3,   // ≥N real render points collapsing into ONE pixel column ⇒ that column is overdense
+  overdenseMedianCol: 2,   // the typical (p50) occupied column holds ≥N points ⇒ overdensity is systemic, not one spike
+  underdensePpp: 0.03,     // ≤N render points per pixel across the whole width ⇒ genuinely sparse
+  sparseSpanFrac: 0.33,    // a SINGLE contiguous empty stretch ≥N × chart width ⇒ a long visually sparse span
+};
+try { if (typeof window !== 'undefined') window._AURIX_DENSITY_THRESHOLDS = _AURIX_DENSITY_THRESHOLDS; } catch (_) {}
+
+// Pure, deterministic density metrics from render-point x-pixel positions. NEVER mutates its inputs, never
+// fabricates/moves/deletes points. xsPx: x-pixel position per render point (same order/domain as the
+// renderer); pixelWidth: real chart plot width in CSS px; timestamps: parallel ts array (gap metrics only).
+// pixel width unavailable or <2 points ⇒ densityStatus 'UNAVAILABLE' (never guesses a defect — SPEC RULE 4).
+function _aurixComputeChartDensityMetrics(xsPx, pixelWidth, timestamps) {
+  const T = (typeof _AURIX_DENSITY_THRESHOLDS !== 'undefined') ? _AURIX_DENSITY_THRESHOLDS
+    : { overdenseColumnPts: 3, overdenseMedianCol: 2, underdensePpp: 0.03, sparseSpanFrac: 0.33 };
+  const out = {
+    densityStatus: 'OK', densityClassification: 'DENSITY_UNAVAILABLE',
+    chartPixelWidth: (Number.isFinite(pixelWidth) && pixelWidth > 0) ? Math.round(pixelWidth) : null,
+    renderPointCount: Array.isArray(xsPx) ? xsPx.length : 0,
+    pointsPerPixel: null, occupiedPixelColumns: null, maxPointsInOnePixelColumn: null,
+    p50PointsPerOccupiedColumn: null, p95PointsPerOccupiedColumn: null, emptyColumnRatio: null,
+    timestampGapMinMs: null, timestampGapMedianMs: null, timestampGapP95Ms: null, timestampGapMaxMs: null,
+    longestVisuallySparseSpanPx: null, densestVisualSpanPx: null,
+    thresholds: { overdenseColumnPts: T.overdenseColumnPts, overdenseMedianCol: T.overdenseMedianCol, underdensePpp: T.underdensePpp, sparseSpanFrac: T.sparseSpanFrac },
+  };
+  const xs = Array.isArray(xsPx) ? xsPx.filter(x => Number.isFinite(x)) : [];
+  // timestamp gaps (independent of pixel availability)
+  const ts = Array.isArray(timestamps) ? timestamps.filter(t => Number.isFinite(t)).slice().sort((a, b) => a - b) : [];
+  if (ts.length >= 2) {
+    const gaps = []; for (let i = 1; i < ts.length; i++) gaps.push(ts[i] - ts[i - 1]);
+    const g = gaps.slice().sort((a, b) => a - b);
+    const pctl = q => g[Math.min(g.length - 1, Math.max(0, Math.floor(q * g.length)))];
+    out.timestampGapMinMs = g[0]; out.timestampGapMedianMs = pctl(0.5); out.timestampGapP95Ms = pctl(0.95); out.timestampGapMaxMs = g[g.length - 1];
+  }
+  if (!(Number.isFinite(pixelWidth) && pixelWidth > 0) || xs.length < 2) {
+    out.densityStatus = 'UNAVAILABLE'; out.densityClassification = 'DENSITY_UNAVAILABLE';
+    return out;
+  }
+  const W = Math.max(1, Math.round(pixelWidth));
+  // bucket render points into integer pixel columns [0..W-1]
+  const cols = new Map();
+  for (let i = 0; i < xs.length; i++) {
+    let c = Math.floor(xs[i]); if (c < 0) c = 0; if (c > W - 1) c = W - 1;
+    cols.set(c, (cols.get(c) || 0) + 1);
+  }
+  const occKeys = Array.from(cols.keys()).sort((a, b) => a - b);
+  const counts = occKeys.map(k => cols.get(k)).sort((a, b) => a - b);
+  const pctlC = q => counts[Math.min(counts.length - 1, Math.max(0, Math.floor(q * counts.length)))];
+  out.pointsPerPixel = +(xs.length / W).toFixed(4);
+  out.occupiedPixelColumns = occKeys.length;
+  out.maxPointsInOnePixelColumn = counts[counts.length - 1];
+  out.p50PointsPerOccupiedColumn = pctlC(0.5);
+  out.p95PointsPerOccupiedColumn = pctlC(0.95);
+  out.emptyColumnRatio = +(1 - occKeys.length / W).toFixed(4);
+  // longest visually sparse span = biggest empty px run between occupied columns (incl. leading/trailing edges)
+  let longestSparse = occKeys[0];   // leading edge (columns before the first occupied one)
+  for (let i = 1; i < occKeys.length; i++) longestSparse = Math.max(longestSparse, occKeys[i] - occKeys[i - 1] - 1);
+  longestSparse = Math.max(longestSparse, (W - 1) - occKeys[occKeys.length - 1]);   // trailing edge
+  out.longestVisuallySparseSpanPx = longestSparse;
+  // densest visual span = tightest px window containing ≥50% of the render points (sliding window on sorted xs)
+  const sx = xs.slice().sort((a, b) => a - b);
+  const need = Math.max(2, Math.ceil(sx.length * 0.5));
+  let densest = W;
+  for (let i = 0; i + need - 1 < sx.length; i++) densest = Math.min(densest, sx[i + need - 1] - sx[i]);
+  out.densestVisualSpanPx = +densest.toFixed(2);
+  // classification (all thresholds centralised in _AURIX_DENSITY_THRESHOLDS, reported in out.thresholds)
+  const overdense = out.maxPointsInOnePixelColumn >= T.overdenseColumnPts && out.p50PointsPerOccupiedColumn >= T.overdenseMedianCol;
+  const sparseSpan = (longestSparse / W) >= T.sparseSpanFrac;
+  const underdense = out.pointsPerPixel <= T.underdensePpp;
+  if (overdense && (sparseSpan || underdense)) out.densityClassification = 'MIXED_VISUAL_DENSITY';
+  else if (overdense) out.densityClassification = 'VISUAL_POINT_OVERDENSITY';
+  else if (underdense || sparseSpan) out.densityClassification = 'VISUAL_POINT_UNDERDENSITY';
+  else out.densityClassification = 'DENSITY_BALANCED';
+  return out;
+}
+try { if (typeof window !== 'undefined') window._aurixComputeChartDensityMetrics = _aurixComputeChartDensityMetrics; } catch (_) {}
+
+// Read-only projection of render timestamps → x-pixels using the SAME perceptual X domain the renderer uses
+// (computeAurixAdaptiveXScale over the range), scaled to the real plot pixel width; linear-time fallback if
+// the perceptual scale is unavailable. NEVER mutates the input points.
+function _aurixProjectRenderPointsToPixels(renderPoints, pixelWidth, range) {
+  const pts = (Array.isArray(renderPoints) ? renderPoints : []).filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value));
+  if (!(Number.isFinite(pixelWidth) && pixelWidth > 0) || pts.length < 2) return [];
+  const W = pixelWidth;
+  const mapped = pts.map(p => ({ time: p.ts, value: p.value }));
+  let xFn = null;
+  try {
+    if (typeof computeAurixAdaptiveXScale === 'function') {
+      const xScale = computeAurixAdaptiveXScale(mapped, W, { left: 0, right: W }, range);
+      if (xScale && typeof xScale.x === 'function') xFn = t => xScale.x(t);
+    }
+  } catch (_) { xFn = null; }
+  if (!xFn) { const t0 = pts[0].ts, t1 = pts[pts.length - 1].ts, span = (t1 - t0) || 1; xFn = t => ((t - t0) / span) * (W - 1); }
+  const xs = [];
+  for (let i = 0; i < pts.length; i++) { const x = xFn(pts[i].ts); xs.push(Number.isFinite(x) ? x : 0); }
+  return xs;
+}
+try { if (typeof window !== 'undefined') window._aurixProjectRenderPointsToPixels = _aurixProjectRenderPointsToPixels; } catch (_) {}
+
+// Read the VISIBLE line colour state from the DOM (never inferred from screenshots): the line inherits colour
+// from the .wsc-<tone> wrapper the painter writes; badge tone class is the fallback. positive|negative|neutral.
+function _aurixLineColorStateFromDom(host, badge) {
+  try {
+    const cls = el => { if (!el) return ''; const c = el.className; return (c && c.baseVal != null) ? c.baseVal : (typeof c === 'string' ? c : (el.getAttribute ? (el.getAttribute('class') || '') : '')); };
+    const wsc = host ? host.querySelector('.wsc') : null;
+    const wscClass = ' ' + cls(wsc) + ' ';
+    if (/\bwsc-up\b/.test(wscClass)) return 'positive';
+    if (/\bwsc-down\b/.test(wscClass)) return 'negative';
+    if (/\bwsc-flat\b/.test(wscClass)) return 'neutral';
+    const bc = ' ' + cls(badge) + ' ';
+    if (/\bup\b/.test(bc)) return 'positive';
+    if (/\bdown\b/.test(bc)) return 'negative';
+    if (/\bflat\b|\bcalculating\b/.test(bc)) return 'neutral';
+    return null;
+  } catch (_) { return null; }
+}
+
+// Read the settled chart DOM for one surface (read-only). Returns { domAvailable, visibleBadgeText,
+// visibleBadgeClass, visibleLineClass, visibleLineColorState, selectedRange, chartPixelWidth }. domAvailable
+// is false when there is no document / neither the badge nor the host node exists (Node / not-yet-mounted).
+function _aurixReadChartDom(surface) {
+  const out = { surface: (surface === 'mobile' ? 'mobile' : 'desktop'), domAvailable: false, visibleBadgeText: null,
+    visibleBadgeClass: null, visibleLineClass: null, visibleLineColorState: null, selectedRange: null, chartPixelWidth: null };
+  try {
+    if (typeof document === 'undefined' || !document || typeof document.getElementById !== 'function') return out;
+    const badgeId = out.surface === 'mobile' ? 'chartChangeMobile' : 'chartChange';
+    const hostId = out.surface === 'mobile' ? 'wealthCurveMobile' : 'perfSnapshot';
+    const badge = document.getElementById(badgeId);
+    const host = document.getElementById(hostId);
+    if (!badge && !host) return out;
+    out.domAvailable = true;
+    if (badge) {
+      out.visibleBadgeText = (badge.textContent || '').replace(/\s+/g, ' ').trim();
+      out.visibleBadgeClass = (typeof badge.className === 'string') ? badge.className : (badge.getAttribute ? badge.getAttribute('class') : null);
+    }
+    if (host) {
+      const line = host.querySelector('.wsc-line');
+      if (line) { const c = line.className; out.visibleLineClass = (c && c.baseVal != null) ? c.baseVal : (typeof c === 'string' ? c : (line.getAttribute ? line.getAttribute('class') : null)); }
+      out.visibleLineColorState = (typeof _aurixLineColorStateFromDom === 'function') ? _aurixLineColorStateFromDom(host, badge) : null;
+      try { const plot = host.querySelector('.wsc-plot'); const rect = (plot && plot.getBoundingClientRect) ? plot.getBoundingClientRect() : null; if (rect && rect.width > 0) out.chartPixelWidth = Math.round(rect.width); } catch (_) {}
+    }
+    try { const ab = document.querySelector('.range-btn.active'); if (ab) out.selectedRange = (ab.getAttribute && ab.getAttribute('data-range')) || (ab.dataset && ab.dataset.range) || ((ab.textContent || '').trim().toLowerCase() || null); } catch (_) {}
+  } catch (_) {}
+  return out;
+}
+try { if (typeof window !== 'undefined') window._aurixReadChartDom = _aurixReadChartDom; } catch (_) {}
+
+// Project the EXPECTED visible badge from the final contract (single source: badgeEligible + presentation
+// state). Returns { kind: PERCENT|PARTIAL|AVAILABLE|CALCULATING, text }. Pure; no eligibility/return change.
+function _aurixExpectedBadgeLabel(frc) {
+  frc = frc || {};
+  if (frc.badgeEligible) return { kind: 'PERCENT', text: frc.badgeLabel || null };
+  const hps = frc.historyPresentationState;
+  if (hps === 'PARTIAL_HISTORY') return { kind: 'PARTIAL', text: (typeof _AURIX_HIST_PARTIAL_TEXT !== 'undefined') ? _AURIX_HIST_PARTIAL_TEXT : 'Historial parcial' };
+  if (hps === 'AVAILABLE_HISTORY') return { kind: 'AVAILABLE', text: (typeof _AURIX_HIST_AVAILABLE_TEXT !== 'undefined') ? _AURIX_HIST_AVAILABLE_TEXT : 'Historial disponible' };
+  return { kind: 'CALCULATING', text: (typeof _AURIX_RETURN_PENDING_TEXT !== 'undefined') ? _AURIX_RETURN_PENDING_TEXT : 'Calculando…' };
+}
+try { if (typeof window !== 'undefined') window._aurixExpectedBadgeLabel = _aurixExpectedBadgeLabel; } catch (_) {}
+
+// Compare the contract's EXPECTED badge with the ACTUAL visible DOM text (SPEC RULE 1). A trusted % matches
+// any percentage-shaped visible text (locale formatting is not a defect); the pending labels match exactly.
+function _aurixClassifyDomPresentation(expected, visibleText, domAvailable) {
+  if (!domAvailable || visibleText == null || !expected) return 'DOM_UNAVAILABLE';
+  const norm = s => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+  const v = norm(visibleText);
+  if (!v) return 'DOM_UNAVAILABLE';
+  if (expected.kind === 'PERCENT') return (/%/.test(v) && /\d/.test(v)) ? 'DOM_PRESENTATION_MATCH' : 'DOM_PRESENTATION_MISMATCH';
+  return norm(expected.text) === v ? 'DOM_PRESENTATION_MATCH' : 'DOM_PRESENTATION_MISMATCH';
+}
+try { if (typeof window !== 'undefined') window._aurixClassifyDomPresentation = _aurixClassifyDomPresentation; } catch (_) {}
+
+// Classify line colour ownership (SPEC RULE 2). Untrusted (badge NOT eligible) MUST be neutral; a directional
+// (positive/negative) line under an untrusted badge is the colour-ownership defect. Trusted matches its tone.
+function _aurixClassifyLineColorOwnership(badgeEligible, colorClassExpected, visibleLineColorState, domAvailable) {
+  if (!domAvailable || visibleLineColorState == null) return 'COLOR_UNAVAILABLE';
+  const toTone = s => (s === 'positive' ? 'up' : (s === 'negative' ? 'down' : 'flat'));
+  const visTone = toTone(visibleLineColorState);
+  if (!badgeEligible) return (visTone === 'flat') ? 'UNTRUSTED_NEUTRAL_MATCH' : 'UNTRUSTED_LINE_COLOR_MISMATCH';
+  return (visTone === (colorClassExpected || 'flat')) ? 'TRUSTED_COLOR_MATCH' : 'UNTRUSTED_LINE_COLOR_MISMATCH';
+}
+try { if (typeof window !== 'undefined') window._aurixClassifyLineColorOwnership = _aurixClassifyLineColorOwnership; } catch (_) {}
+
+// The read-only DOM / colour / density audit core (SPEC.30). Deterministic for a fixed input. deps lets a
+// harness drive it fully headless: { buildChart, resolveContract, readDom, projectPixels }. Defaults are the
+// real globals. NEVER mutates chart points, contracts or the DOM; syntheticPoints stays 0.
+function _aurixAuditChartDomColorDensityCore(options, deps) {
+  options = options || {}; deps = deps || {};
+  const safe = (fn, d) => { try { const v = fn(); return v === undefined ? (d === undefined ? null : d) : v; } catch (_) { return (d === undefined ? null : d); } };
+  const nowIso = () => { try { return new Date().toISOString(); } catch (_) { return null; } };
+  const appVersion = safe(() => (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null, null);
+  const startedAtIso = nowIso();
+  const LADDER = ['24h', '7d', '30d', '1y', 'all'];
+  const reqRanges = (Array.isArray(options.ranges) && options.ranges.length) ? options.ranges.map(x => String(x).toLowerCase()) : LADDER.slice();
+  const RANGES = LADDER.filter(r => reqRanges.indexOf(r) >= 0);
+  const SURFACES = (Array.isArray(options.surfaces) && options.surfaces.length) ? options.surfaces.filter(s => s === 'desktop' || s === 'mobile') : ['desktop', 'mobile'];
+  const includeDom = options.includeDom !== false;
+  const buildChart = deps.buildChart || (typeof buildProductionPortfolioChart === 'function' ? buildProductionPortfolioChart : null);
+  const resolveContract = deps.resolveContract || (typeof _aurixResolveFinalRenderSeriesContract === 'function' ? _aurixResolveFinalRenderSeriesContract : null);
+  const readDom = includeDom ? (deps.readDom || (typeof _aurixReadChartDom === 'function' ? _aurixReadChartDom : null)) : null;
+  const projectPixels = deps.projectPixels || (typeof _aurixProjectRenderPointsToPixels === 'function' ? _aurixProjectRenderPointsToPixels : null);
+  const eHash = pts => safe(() => (typeof _aurixEmergencyHash === 'function') ? _aurixEmergencyHash(Array.isArray(pts) ? pts : []) : null, null);
+  const tsHashOf = pts => eHash((Array.isArray(pts) ? pts : []).map(p => ({ ts: p.ts, value: 0 })));
+  const valHashOf = pts => eHash((Array.isArray(pts) ? pts : []).map(p => ({ ts: 0, value: p.value })));
+  const LONG = ['7d', '30d', '1y', 'all'];
+
+  const perRange = {};
+  const canonByRange = {};
+  let totalSyntheticPoints = 0;
+  RANGES.forEach(r => {
+    perRange[r] = {};
+    const chart = safe(() => buildChart ? buildChart(r) : null, null) || { points: [], state: 'pending' };
+    const cp = Array.isArray(chart.points) ? chart.points.filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value)) : [];
+    canonByRange[r] = {
+      canonicalInputHash: eHash(cp.map(p => ({ ts: p.ts, value: p.value }))),
+      realFirstTs: cp.length ? cp[0].ts : null, realLastTs: cp.length ? cp[cp.length - 1].ts : null,
+      realSpanMs: cp.length ? (cp[cp.length - 1].ts - cp[0].ts) : 0,
+    };
+    SURFACES.forEach(s => {
+      const frc = safe(() => resolveContract ? resolveContract(chart, r, s) : null, null) || {};
+      const rp = Array.isArray(frc.renderPoints) ? frc.renderPoints.filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value)) : [];
+      const synth = (frc.diagnostics && frc.diagnostics.syntheticPoints != null) ? frc.diagnostics.syntheticPoints : 0;
+      totalSyntheticPoints += synth;
+      const colorClassExpected = frc.colorClass || 'flat';
+      const expected = safe(() => (typeof _aurixExpectedBadgeLabel === 'function') ? _aurixExpectedBadgeLabel(frc) : null, null) || { kind: 'CALCULATING', text: 'Calculando…' };
+      const dom = (readDom) ? (safe(() => readDom(s), null) || { domAvailable: false }) : { domAvailable: false };
+      const pxWidth = (dom && Number.isFinite(dom.chartPixelWidth) && dom.chartPixelWidth > 0) ? dom.chartPixelWidth
+        : (Number.isFinite(options.assumePixelWidth) && options.assumePixelWidth > 0 ? options.assumePixelWidth : null);
+      const xs = (projectPixels && pxWidth) ? (safe(() => projectPixels(rp, pxWidth, r), []) || []) : [];
+      const density = (typeof _aurixComputeChartDensityMetrics === 'function') ? _aurixComputeChartDensityMetrics(xs, pxWidth, rp.map(p => p.ts))
+        : { densityStatus: 'UNAVAILABLE', densityClassification: 'DENSITY_UNAVAILABLE', thresholds: null };
+      const domPresentation = (typeof _aurixClassifyDomPresentation === 'function') ? _aurixClassifyDomPresentation(expected, dom.visibleBadgeText, !!dom.domAvailable) : 'DOM_UNAVAILABLE';
+      const colorClassification = (typeof _aurixClassifyLineColorOwnership === 'function') ? _aurixClassifyLineColorOwnership(!!frc.badgeEligible, colorClassExpected, dom.visibleLineColorState, !!dom.domAvailable) : 'COLOR_UNAVAILABLE';
+      const firstTs = rp.length ? rp[0].ts : null, lastTs = rp.length ? rp[rp.length - 1].ts : null;
+      perRange[r][s] = {
+        range: r, surface: s,
+        // ── contract ──
+        mode: frc.mode || null, state: frc.state || null,
+        historyPresentationState: frc.historyPresentationState || 'UNKNOWN',
+        badgeEligible: !!frc.badgeEligible, badgeLabelInternal: frc.badgeLabel || null,
+        returnPct: (frc.badgeReturnPct != null) ? frc.badgeReturnPct : null,
+        colorClassExpected: colorClassExpected, reasonCodes: Array.isArray(frc.reasonCodes) ? frc.reasonCodes.slice() : [],
+        expectedBadgeText: expected.text, expectedBadgeKind: expected.kind,
+        // ── rendered output ──
+        renderPointCount: rp.length, renderPathCount: (frc.renderPathCount != null) ? frc.renderPathCount : null,
+        syntheticPoints: synth, renderHash: eHash(rp), timestampHash: tsHashOf(rp), valueHash: valHashOf(rp),
+        firstTs: firstTs, lastTs: lastTs, actualSpanMs: (firstTs != null && lastTs != null) ? (lastTs - firstTs) : 0,
+        // ── DOM ──
+        visibleBadgeText: (dom.visibleBadgeText != null) ? dom.visibleBadgeText : null,
+        visibleBadgeClass: (dom.visibleBadgeClass != null) ? dom.visibleBadgeClass : null,
+        visibleLineClass: (dom.visibleLineClass != null) ? dom.visibleLineClass : null,
+        visibleLineColorState: (dom.visibleLineColorState != null) ? dom.visibleLineColorState : null,
+        selectedRange: (dom.selectedRange != null) ? dom.selectedRange : null,
+        domAvailable: !!dom.domAvailable,
+        // ── density ──
+        chartPixelWidth: density.chartPixelWidth, pointsPerPixel: density.pointsPerPixel,
+        occupiedPixelColumns: density.occupiedPixelColumns, maxPointsInOnePixelColumn: density.maxPointsInOnePixelColumn,
+        p50PointsPerOccupiedColumn: density.p50PointsPerOccupiedColumn, p95PointsPerOccupiedColumn: density.p95PointsPerOccupiedColumn,
+        emptyColumnRatio: density.emptyColumnRatio,
+        timestampGapMinMs: density.timestampGapMinMs, timestampGapMedianMs: density.timestampGapMedianMs,
+        timestampGapP95Ms: density.timestampGapP95Ms, timestampGapMaxMs: density.timestampGapMaxMs,
+        longestVisuallySparseSpanPx: density.longestVisuallySparseSpanPx, densestVisualSpanPx: density.densestVisualSpanPx,
+        densityStatus: density.densityStatus, densityClassification: density.densityClassification, densityThresholds: density.thresholds,
+        // ── classifications ──
+        domPresentationClassification: domPresentation, colorClassification: colorClassification,
+      };
+    });
+  });
+
+  // ── CROSS-RANGE PROVENANCE (reuse the SPEC.23 classifier; desktop surface represents the single contract) ──
+  const primary = SURFACES.indexOf('desktop') >= 0 ? 'desktop' : SURFACES[0];
+  const presentLong = LONG.filter(r => RANGES.indexOf(r) >= 0);
+  const crossList = presentLong.map(r => {
+    const pr = perRange[r][primary] || {}, cb = canonByRange[r] || {};
+    return { requestedRange: r, canonicalInputHash: cb.canonicalInputHash, finalRenderHash: pr.renderHash,
+      renderPointCount: pr.renderPointCount || 0, realFirstTs: cb.realFirstTs, realLastTs: cb.realLastTs, realSpanMs: cb.realSpanMs };
+  });
+  const crossProvenance = safe(() => (typeof _aurixClassifyCrossRangeSeriesProvenance === 'function') ? _aurixClassifyCrossRangeSeriesProvenance(crossList) : null, null);
+  const crossRangeMatrix = crossProvenance ? crossProvenance.matrix : {};
+  const crossRangeVerdict = crossProvenance ? crossProvenance.verdict : 'INSUFFICIENT_EVIDENCE';
+
+  // ── DEFECTS (emitted ONLY when proven) + SUSPECTS ──
+  const defects = [], suspects = [];
+  let domPresentationMismatchCount = 0, untrustedLineColorMismatchCount = 0, visualDensityDefectCount = 0, aliasDefectCount = 0;
+  const DENSITY_DEFECT_SET = { VISUAL_POINT_OVERDENSITY: 1, VISUAL_POINT_UNDERDENSITY: 1, MIXED_VISUAL_DENSITY: 1 };
+  RANGES.forEach(r => SURFACES.forEach(s => {
+    const c = perRange[r][s];
+    if (c.domPresentationClassification === 'DOM_PRESENTATION_MISMATCH') {
+      domPresentationMismatchCount++;
+      defects.push({ type: 'DOM_PRESENTATION_MISMATCH', range: r, surface: s, expected: c.expectedBadgeText, visible: c.visibleBadgeText, historyPresentationState: c.historyPresentationState, recommend: 'badge binding fix' });
+    }
+    if (!c.badgeEligible && c.colorClassification === 'UNTRUSTED_LINE_COLOR_MISMATCH') {
+      untrustedLineColorMismatchCount++;
+      defects.push({ type: 'UNTRUSTED_LINE_COLOR_MISMATCH', range: r, surface: s, badgeEligible: c.badgeEligible, colorClassExpected: c.colorClassExpected, visibleLineColorState: c.visibleLineColorState, recommend: 'color ownership fix' });
+    } else if (c.badgeEligible && c.colorClassification === 'UNTRUSTED_LINE_COLOR_MISMATCH') {
+      suspects.push({ type: 'TRUSTED_LINE_COLOR_TONE_MISMATCH', range: r, surface: s, colorClassExpected: c.colorClassExpected, visibleLineColorState: c.visibleLineColorState });
+    }
+    if (c.densityStatus === 'OK' && DENSITY_DEFECT_SET[c.densityClassification]) {
+      visualDensityDefectCount++;
+      defects.push({ type: 'VISUAL_DENSITY_DEFECT', range: r, surface: s, densityClassification: c.densityClassification,
+        maxPointsInOnePixelColumn: c.maxPointsInOnePixelColumn, p50PointsPerOccupiedColumn: c.p50PointsPerOccupiedColumn,
+        pointsPerPixel: c.pointsPerPixel, longestVisuallySparseSpanPx: c.longestVisuallySparseSpanPx,
+        emptyColumnRatio: c.emptyColumnRatio, thresholds: c.densityThresholds, recommend: 'real-point visual decimation spec (do NOT patch here)' });
+    }
+  }));
+  if (crossProvenance && Array.isArray(crossProvenance.pairs)) {
+    crossProvenance.pairs.forEach(p => {
+      if (p.classification === 'CROSS_RANGE_ALIAS_DEFECT') { aliasDefectCount++; defects.push({ type: 'CROSS_RANGE_ALIAS_DEFECT', a: p.a, b: p.b, reason: p.reason, recommend: 'cross-range provenance fix' }); }
+      else if (p.classification === 'CROSS_RANGE_ALIAS_SUSPECT') suspects.push({ type: 'CROSS_RANGE_ALIAS_SUSPECT', a: p.a, b: p.b, reason: p.reason });
+    });
+  }
+
+  // ── PARITY + 24H single-path + availability ──
+  let desktopMobileParity = true;
+  if (SURFACES.indexOf('desktop') >= 0 && SURFACES.indexOf('mobile') >= 0) {
+    RANGES.forEach(r => {
+      const d = perRange[r].desktop, m = perRange[r].mobile;
+      if (d && m && !(d.renderHash === m.renderHash && d.mode === m.mode && d.colorClassExpected === m.colorClassExpected && d.badgeLabelInternal === m.badgeLabelInternal && d.renderPathCount === m.renderPathCount)) desktopMobileParity = false;
+    });
+  }
+  let all24hSinglePath = true;
+  if (RANGES.indexOf('24h') >= 0) SURFACES.forEach(s => { const c = perRange['24h'][s]; if (c && c.renderPathCount != null && c.renderPathCount > 1) all24hSinglePath = false; });
+  const anyDomAvailable = RANGES.some(r => SURFACES.some(s => perRange[r][s] && perRange[r][s].domAvailable));
+  const anyDensityAvailable = RANGES.some(r => SURFACES.some(s => perRange[r][s] && perRange[r][s].densityStatus === 'OK'));
+
+  // ── VERDICT ──
+  const catDom = domPresentationMismatchCount > 0, catColor = untrustedLineColorMismatchCount > 0,
+        catDensity = visualDensityDefectCount > 0, catAlias = aliasDefectCount > 0;
+  const catCount = [catDom, catColor, catDensity, catAlias].filter(Boolean).length;
+  let verdict;
+  if (catCount === 0) verdict = (!anyDomAvailable && !anyDensityAvailable) ? 'AUDIT_INCONCLUSIVE' : 'STABLE_NO_RENDER_CHANGE_NEEDED';
+  else if (catCount >= 2) verdict = 'MULTIPLE_DEFECTS_PROVEN';
+  else if (catDom) verdict = 'DOM_BINDING_DEFECT_PROVEN';
+  else if (catColor) verdict = 'COLOR_OWNERSHIP_DEFECT_PROVEN';
+  else if (catDensity) verdict = 'VISUAL_DENSITY_REPRESENTATION_WORK_NEEDED';
+  else verdict = 'MULTIPLE_DEFECTS_PROVEN';   // alias-only defect (no dedicated single verdict)
+
+  return {
+    spec: 'DSH.CHART.DOM_COLOR_DENSITY_AUDIT.30',
+    appVersion: appVersion, startedAtIso: startedAtIso, endedAtIso: nowIso(), behaviorChanged: false,
+    ranges: RANGES, surfaces: SURFACES, includeDom: includeDom,
+    perRange: perRange, crossRangeMatrix: crossRangeMatrix, crossRangeVerdict: crossRangeVerdict,
+    densityThresholds: (typeof _AURIX_DENSITY_THRESHOLDS !== 'undefined') ? _AURIX_DENSITY_THRESHOLDS : null,
+    defects: defects, suspects: suspects,
+    summary: {
+      domPresentationMismatchCount: domPresentationMismatchCount, untrustedLineColorMismatchCount: untrustedLineColorMismatchCount,
+      visualDensityDefectCount: visualDensityDefectCount, aliasDefectCount: aliasDefectCount,
+      totalSyntheticPoints: totalSyntheticPoints, desktopMobileParity: desktopMobileParity,
+      all24hSinglePath: all24hSinglePath, rangesAudited: RANGES.length, verdict: verdict,
+    },
+    verdict: verdict,
+  };
+}
+try { if (typeof window !== 'undefined') window._aurixAuditChartDomColorDensityCore = _aurixAuditChartDomColorDensityCore; } catch (_) {}
+
 // P0-PREMIUM-RENDERER-RECONNECTION — render the ALREADY-VALIDATED buildProductionPortfolioChart points
 // through the ORIGINAL institutional geometry (LTTB downsample → regime-aware scales → monotone-CUBIC
 // path → area). Values are NEVER modified: the only change is a ts→time shape rename. Returns a premium
@@ -26356,6 +26724,91 @@ try {
     window.aurixCopyLastLongRangeEvidenceAudit = function () {
       let json = '';
       try { json = JSON.stringify(window.__AURIX_LAST_LONG_RANGE_EVIDENCE_AUDIT__ || { error: 'no long-range evidence audit yet — run aurixAuditLongRangeEvidence() first' }, null, 2); } catch (_) { json = '{"error":"stringify_failed"}'; }
+      try {
+        if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+          const p = navigator.clipboard.writeText(json);   // rejects with NotAllowedError when the document is not focused
+          if (p && typeof p.then === 'function') p.then(function () {}, function () {});   // swallow rejection — never throw
+        }
+      } catch (_) {}
+      try { console.log(json); } catch (_) {}
+      return json;
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // SPEC DSH.CHART.DOM_COLOR_DENSITY_AUDIT.30 — window.aurixAuditChartDomColorDensity(options)
+    // ════════════════════════════════════════════════════════════════════════════
+    // AUDIT-ONLY, ZERO render change. Async: waits for a SETTLED chart state (two consecutive identical
+    // renderHash + contract-state samples, no detectable active refresh owner, bounded 5s timeout, ALL timers
+    // cleared, no network fan-out) before the DOM comparison, then runs the read-only core. Always resolves
+    // (never rejects); stores the last result in-memory only (window.__AURIX_LAST_CHART_DOM_COLOR_DENSITY_AUDIT__).
+    window.aurixAuditChartDomColorDensity = function (options) {
+      const opts = options || {};
+      const timeoutMs = (Number.isFinite(opts.timeoutMs) && opts.timeoutMs > 0) ? opts.timeoutMs : 5000;
+      const stepMs = (Number.isFinite(opts.settleStepMs) && opts.settleStepMs >= 30) ? opts.settleStepMs : 120;
+      const LADDER = ['24h', '7d', '30d', '1y', 'all'];
+      const reqRanges = (Array.isArray(opts.ranges) && opts.ranges.length) ? opts.ranges.map(x => String(x).toLowerCase()) : LADDER.slice();
+      const settleRanges = LADDER.filter(r => reqRanges.indexOf(r) >= 0);
+      const buildChart = (typeof buildProductionPortfolioChart === 'function') ? buildProductionPortfolioChart : null;
+      const resolveContract = (typeof _aurixResolveFinalRenderSeriesContract === 'function') ? _aurixResolveFinalRenderSeriesContract : null;
+      const startedAt = (function () { try { return Date.now(); } catch (_) { return 0; } })();
+      const settleSig = () => {
+        try {
+          const parts = [];
+          settleRanges.forEach(r => {
+            const chart = buildChart ? buildChart(r) : null;
+            const frc = resolveContract ? resolveContract(chart, r, 'desktop') : null;
+            const rp = (frc && Array.isArray(frc.renderPoints)) ? frc.renderPoints : [];
+            const h = (typeof _aurixEmergencyHash === 'function') ? _aurixEmergencyHash(rp) : rp.length;
+            parts.push(r + ':' + h + ':' + (frc && frc.state) + ':' + (frc && frc.historyPresentationState) + ':' + (frc && frc.badgeLabel));
+          });
+          return parts.join('|');
+        } catch (_) { return null; }
+      };
+      const refreshBusy = () => { try { return (typeof window !== 'undefined' && typeof window.__AURIX_CHART_REFRESH_ACTIVE__ !== 'undefined') ? !!window.__AURIX_CHART_REFRESH_ACTIVE__ : false; } catch (_) { return false; } };
+      const runCore = () => { try { return (typeof _aurixAuditChartDomColorDensityCore === 'function') ? _aurixAuditChartDomColorDensityCore(opts, {}) : { spec: 'DSH.CHART.DOM_COLOR_DENSITY_AUDIT.30', behaviorChanged: false, verdict: 'AUDIT_INCONCLUSIVE', defects: [], suspects: [], errorMessage: 'core unavailable', summary: {} }; } catch (e) { return { spec: 'DSH.CHART.DOM_COLOR_DENSITY_AUDIT.30', behaviorChanged: false, verdict: 'AUDIT_INCONCLUSIVE', defects: [], suspects: [], errorMessage: (e && e.message) ? e.message : String(e), summary: {} }; } };
+      const print = result => {
+        try {
+          const s = result.summary || {};
+          console.log('%c[UI][DOM_COLOR_DENSITY_AUDIT]', 'font-weight:700;color:#12b886', result);
+          console.log('AURIX_BUILD: ' + (result.appVersion || 'n/a') + '  VERDICT: ' + (result.verdict || 'n/a'));
+          console.log('domPresentationMismatchCount: ' + s.domPresentationMismatchCount + '  untrustedLineColorMismatchCount: ' + s.untrustedLineColorMismatchCount);
+          console.log('visualDensityDefectCount: ' + s.visualDensityDefectCount + '  aliasDefectCount: ' + s.aliasDefectCount);
+          console.log('totalSyntheticPoints: ' + s.totalSyntheticPoints + '  desktopMobileParity: ' + s.desktopMobileParity + '  all24hSinglePath: ' + s.all24hSinglePath);
+          console.log('defects: ' + (Array.isArray(result.defects) ? result.defects.length : 'n/a') + '  suspects: ' + (Array.isArray(result.suspects) ? result.suspects.length : 'n/a'));
+          console.log('To copy full JSON run: aurixCopyLastChartDomColorDensityAudit()');
+        } catch (_) {}
+      };
+      return new Promise(function (resolve) {
+        const timers = new Set();
+        let done = false, prevSig = null, stableCount = 0;
+        const clearAll = () => { timers.forEach(id => { try { clearTimeout(id); } catch (_) {} }); timers.clear(); };
+        const finish = reason => {
+          if (done) return; done = true; clearAll();
+          const result = runCore();
+          try {
+            const elapsed = (function () { try { return Date.now() - startedAt; } catch (_) { return null; } })();
+            result.settledState = { reason: reason, elapsedMs: elapsed, stableSamples: stableCount, timeoutMs: timeoutMs, timersCleared: true };
+          } catch (_) {}
+          try { window.__AURIX_LAST_CHART_DOM_COLOR_DENSITY_AUDIT__ = result; } catch (_) {}
+          print(result);
+          resolve(result);
+        };
+        const sample = () => {
+          if (done) return;
+          const sig = settleSig();
+          if (sig != null && sig === prevSig) stableCount++; else stableCount = 0;
+          prevSig = sig;
+          const elapsed = (function () { try { return Date.now() - startedAt; } catch (_) { return timeoutMs; } })();
+          if (stableCount >= 1 && !refreshBusy()) return finish('SETTLED_STABLE');
+          if (elapsed >= timeoutMs) return finish('SETTLED_TIMEOUT');
+          const id = setTimeout(sample, stepMs); timers.add(id);
+        };
+        sample();
+      });
+    };
+    window.aurixCopyLastChartDomColorDensityAudit = function () {
+      let json = '';
+      try { json = JSON.stringify(window.__AURIX_LAST_CHART_DOM_COLOR_DENSITY_AUDIT__ || { error: 'no DOM/colour/density audit yet — run aurixAuditChartDomColorDensity() first' }, null, 2); } catch (_) { json = '{"error":"stringify_failed"}'; }
       try {
         if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
           const p = navigator.clipboard.writeText(json);   // rejects with NotAllowedError when the document is not focused
