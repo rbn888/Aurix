@@ -25429,6 +25429,220 @@ function _aurixAuditChartDomColorDensityCore(options, deps) {
 }
 try { if (typeof window !== 'undefined') window._aurixAuditChartDomColorDensityCore = _aurixAuditChartDomColorDensityCore; } catch (_) {}
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.UNIFIED_VISUAL_LANGUAGE_CONTRACT.31 — read-only visual-language audit
+// ════════════════════════════════════════════════════════════════════════════
+// STRICTLY READ-ONLY. Determines whether 24H/7D/30D/1Y/ALL are rendered under ONE visual-render contract or
+// whether different render policies give each range a different visual personality. Changes NOTHING (no render,
+// points, smoothing, interpolation, decimation, geometry, DOM, CSS, behaviour). Reuses EXCLUSIVELY the existing
+// owners: SPEC.19 final contract (_aurixResolveFinalRenderSeriesContract), the canonical builder
+// (buildProductionPortfolioChart), the PRODUCTION renderer (renderValidatedPortfolioChartWithInstitutionalRenderer)
+// with its adaptive X scale (computeAurixAdaptiveXScale) + reduction policy (_aurixVpTargetPointCount /
+// _AURIX_VP_DENSITY) + projection policy (_AURIX_X_FILL_BETA), the SPEC.30 density metric
+// (_aurixComputeChartDensityMetrics). NO second renderer / path generator / calculator / projection engine.
+
+const _AURIX_VISUAL_LANGUAGE_THRESHOLDS = {
+  spacingConsistencyTol: 0.35,   // max allowed spread (maxCV − minCV) of horizontal-spacing CV across ranges
+  spacingInstitutionalMax: 0.60, // a range whose spacing CV ≤ this reads as evenly-spaced / institutional
+  compressionConsistencyTol: 0.50, // relative spread of compressionRatio across ranges below which it is "same"
+};
+try { if (typeof window !== 'undefined') window._AURIX_VISUAL_LANGUAGE_THRESHOLDS = _AURIX_VISUAL_LANGUAGE_THRESHOLDS; } catch (_) {}
+
+// Pure, deterministic segment + horizontal-spacing statistics from the renderer's drawn pixel coordinates.
+// NEVER mutates inputs. pixels: [{x,y}] in the renderer's own coordinate space. spacingUniformityScore is the
+// coefficient of variation (stddev/mean) of horizontal segment spacing — LOW = institutional, HIGH = compressed.
+function _aurixSegmentSpacingStats(pixels) {
+  const out = { segmentCount: 0, averageSegmentLength: null, medianSegmentLength: null, shortestSegment: null,
+    longestSegment: null, horizontalSpacingMean: null, horizontalSpacingStdDev: null, spacingUniformityScore: null };
+  const pts = Array.isArray(pixels) ? pixels.filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y)) : [];
+  if (pts.length < 2) return out;
+  const segLen = [], dx = [];
+  for (let i = 1; i < pts.length; i++) {
+    const ddx = pts[i].x - pts[i - 1].x, ddy = pts[i].y - pts[i - 1].y;
+    segLen.push(Math.sqrt(ddx * ddx + ddy * ddy)); dx.push(Math.abs(ddx));
+  }
+  out.segmentCount = segLen.length;
+  const sorted = segLen.slice().sort((a, b) => a - b);
+  const median = arr => arr.length ? arr[Math.floor((arr.length - 1) / 2)] : 0;
+  const sum = segLen.reduce((a, b) => a + b, 0);
+  out.averageSegmentLength = +(sum / segLen.length).toFixed(3);
+  out.medianSegmentLength = +median(sorted).toFixed(3);
+  out.shortestSegment = +sorted[0].toFixed(3);
+  out.longestSegment = +sorted[sorted.length - 1].toFixed(3);
+  const dmean = dx.reduce((a, b) => a + b, 0) / dx.length;
+  const variance = dx.reduce((a, b) => a + (b - dmean) * (b - dmean), 0) / dx.length;
+  const std = Math.sqrt(variance);
+  out.horizontalSpacingMean = +dmean.toFixed(3);
+  out.horizontalSpacingStdDev = +std.toFixed(3);
+  out.spacingUniformityScore = dmean > 0 ? +(std / dmean).toFixed(4) : 0;
+  return out;
+}
+try { if (typeof window !== 'undefined') window._aurixSegmentSpacingStats = _aurixSegmentSpacingStats; } catch (_) {}
+
+// The read-only unified-visual-language audit core (SPEC.31). Deterministic for a fixed input. deps lets a
+// harness drive it headless: { buildChart, resolveContract, render, projectionBeta, targetPointCount,
+// densityBand }. Defaults are the real globals / production renderer. NEVER mutates points / contracts / DOM;
+// syntheticPoints stays 0; every range is routed through the SAME renderer + path builder + projection owner.
+function _aurixAuditUnifiedVisualLanguageCore(options, deps) {
+  options = options || {}; deps = deps || {};
+  const safe = (fn, d) => { try { const v = fn(); return v === undefined ? (d === undefined ? null : d) : v; } catch (_) { return (d === undefined ? null : d); } };
+  const nowIso = () => { try { return new Date().toISOString(); } catch (_) { return null; } };
+  const appVersion = safe(() => (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null, null);
+  const startedAtIso = nowIso();
+  const LADDER = ['24h', '7d', '30d', '1y', 'all'];
+  const reqRanges = (Array.isArray(options.ranges) && options.ranges.length) ? options.ranges.map(x => String(x).toLowerCase()) : LADDER.slice();
+  const RANGES = LADDER.filter(r => reqRanges.indexOf(r) >= 0);
+  const buildChart = deps.buildChart || (typeof buildProductionPortfolioChart === 'function' ? buildProductionPortfolioChart : null);
+  const resolveContract = deps.resolveContract || (typeof _aurixResolveFinalRenderSeriesContract === 'function' ? _aurixResolveFinalRenderSeriesContract : null);
+  const render = deps.render || (typeof renderValidatedPortfolioChartWithInstitutionalRenderer === 'function' ? renderValidatedPortfolioChartWithInstitutionalRenderer : null);
+  const projectionBetaOf = deps.projectionBeta || (r => (typeof _AURIX_X_FILL_BETA !== 'undefined' && _AURIX_X_FILL_BETA[r] != null) ? _AURIX_X_FILL_BETA[r] : null);
+  const targetCountOf = deps.targetPointCount || ((r, w) => (typeof _aurixVpTargetPointCount === 'function') ? _aurixVpTargetPointCount(r, w) : null);
+  const densityBandOf = deps.densityBand || (r => (typeof _AURIX_VP_DENSITY !== 'undefined' && _AURIX_VP_DENSITY[r]) ? _AURIX_VP_DENSITY[r] : null);
+  const eHash = pts => safe(() => (typeof _aurixEmergencyHash === 'function') ? _aurixEmergencyHash(Array.isArray(pts) ? pts : []) : null, null);
+
+  const W = (Number.isFinite(options.pixelWidth) && options.pixelWidth > 0) ? options.pixelWidth : ((typeof _WSC_VIEW_W === 'number') ? _WSC_VIEW_W : 1000);
+  const H = (typeof _WSC_VIEW_H === 'number') ? _WSC_VIEW_H : 240;
+  const box = { left: W * 0.06, right: W - W * 0.06, top: H * 0.14, bottom: H - H * 0.14 };
+  const availablePixelColumns = Math.max(1, Math.round(box.right - box.left));
+
+  // fixed, single owners — a range routed through anything else would surface as a different string here
+  const RENDERER_OWNER = 'renderValidatedPortfolioChartWithInstitutionalRenderer';
+  const PATH_BUILDER_OWNER = '_aurixMonotonePath';
+  const CURVE_MODE = 'monotone-cubic';
+  const GAP_OWNER = '_aurixStructuralBreaks';
+  const INTERPOLATION_MODE = 'none';   // data is never interpolated; geometry is monotone-cubic (below)
+  const TENSION_MODE = 'monotone';     // monotone-cubic has no free tension parameter
+
+  const perRange = {};
+  let totalSyntheticPoints = 0;
+  RANGES.forEach(r => {
+    const chart = safe(() => buildChart ? buildChart(r) : null, null) || { points: [], state: 'pending' };
+    const cp = Array.isArray(chart.points) ? chart.points.filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value)) : [];
+    const frc = safe(() => resolveContract ? resolveContract(chart, r, 'desktop') : null, null) || {};
+    const rp = Array.isArray(frc.renderPoints) ? frc.renderPoints.filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value)) : [];
+    const synth = (frc.diagnostics && frc.diagnostics.syntheticPoints != null) ? frc.diagnostics.syntheticPoints : 0;
+    totalSyntheticPoints += synth;
+    const rc = (render && rp.length >= 2) ? (safe(() => render(rp, { range: r, vw: W, vh: H, box: box }), null) || { ok: false }) : { ok: false };
+    const vpx = Array.isArray(rc.visiblePixels) ? rc.visiblePixels.filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y)) : [];
+    const vpt = Array.isArray(rc.visiblePoints) ? rc.visiblePoints : [];
+    const xScale = rc.xScale || null;
+    const renderedPointCount = vpx.length;
+    // density from the drawn pixels, shifted into the plot area [0, plotWidth]
+    const xs = vpx.map(p => p.x - box.left);
+    const density = (typeof _aurixComputeChartDensityMetrics === 'function') ? _aurixComputeChartDensityMetrics(xs, availablePixelColumns, vpt.map(p => p.time)) : { pointsPerPixel: null, p50PointsPerOccupiedColumn: null, maxPointsInOnePixelColumn: null };
+    const seg = (typeof _aurixSegmentSpacingStats === 'function') ? _aurixSegmentSpacingStats(vpx) : {};
+    const beta = (xScale && Number.isFinite(xScale.beta)) ? xScale.beta : projectionBetaOf(r);
+    const band = densityBandOf(r);
+    const target = targetCountOf(r, W);
+    perRange[r] = {
+      range: r,
+      // ── INPUT ──
+      rawPointCount: cp.length, usablePointCount: rp.length, renderedPointCount: renderedPointCount,
+      // ── DOMAIN ──
+      xMin: xScale ? xScale.xMin : (rp.length ? rp[0].ts : null),
+      xMax: xScale ? xScale.xMax : (rp.length ? rp[rp.length - 1].ts : null),
+      xProjection: xScale ? (xScale.mode || null) : null,
+      xProjectionBeta: beta, pixelWidth: W, plotPixelWidth: availablePixelColumns,
+      // ── PATH ──
+      rendererOwner: RENDERER_OWNER, pathBuilderOwner: PATH_BUILDER_OWNER, curveMode: CURVE_MODE,
+      gapOwner: GAP_OWNER, gapMode: (rc.structuralBreakCount > 0) ? 'multi-path-split' : 'single-path',
+      structuralBreakCount: (rc.structuralBreakCount != null) ? rc.structuralBreakCount : null,
+      renderPathCount: (frc.renderPathCount != null) ? frc.renderPathCount : null,
+      interpolationMode: INTERPOLATION_MODE, tensionMode: TENSION_MODE,
+      // ── DENSITY ──
+      pointsPerPixel: density.pointsPerPixel, medianPointsPerColumn: density.p50PointsPerOccupiedColumn, maxPointsPerColumn: density.maxPointsInOnePixelColumn,
+      // ── VISUAL ──
+      averageSegmentLength: seg.averageSegmentLength, medianSegmentLength: seg.medianSegmentLength,
+      shortestSegment: seg.shortestSegment, longestSegment: seg.longestSegment,
+      // ── COMPRESSION ──
+      compressionRatio: renderedPointCount ? +(renderedPointCount / availablePixelColumns).toFixed(4) : 0,
+      // ── SPACING ──
+      spacingUniformityScore: seg.spacingUniformityScore,
+      // ── REDUCTION POLICY (evidence for densityPolicyConsistent) ──
+      reductionTargetPoints: target, reductionBand: band ? { min: band.min, max: band.max } : null,
+      // ── fingerprints ──
+      renderHash: eHash(rp), rendererOk: !!rc.ok, syntheticPoints: synth,
+    };
+  });
+
+  // ── CONSISTENCY across ranges (distinct policy fingerprints) ──
+  const distinct = fn => { const s = {}; RANGES.forEach(r => { const v = fn(perRange[r]); s[(v == null ? 'null' : String(v))] = 1; }); return Object.keys(s); };
+  const rendererSet = distinct(p => p.rendererOwner);
+  const pathSet = distinct(p => p.pathBuilderOwner + '|' + p.curveMode + '|' + p.tensionMode + '|' + p.gapOwner + '|' + p.interpolationMode);
+  const projSet = distinct(p => p.xProjection + ':' + p.xProjectionBeta);
+  const reductionSet = distinct(p => p.reductionBand ? (p.reductionBand.min + '-' + p.reductionBand.max) : ('t' + p.reductionTargetPoints));
+  const renderPipelineConsistent = rendererSet.length <= 1;
+  const pathPolicyConsistent = pathSet.length <= 1;
+  const projectionConsistent = projSet.length <= 1;
+  const densityPolicyConsistent = reductionSet.length <= 1;
+  // spacing: measured outcome — consistent when every drawn range's spacing CV clusters within tolerance
+  const spacingScores = RANGES.map(r => perRange[r].spacingUniformityScore).filter(v => Number.isFinite(v));
+  const spacingSpread = spacingScores.length >= 2 ? (Math.max.apply(null, spacingScores) - Math.min.apply(null, spacingScores)) : 0;
+  const spacingPolicyConsistent = spacingScores.length < 2 ? true : (spacingSpread <= _AURIX_VISUAL_LANGUAGE_THRESHOLDS.spacingConsistencyTol);
+  // compression spread (data-driven metric difference detector)
+  const compRatios = RANGES.map(r => perRange[r].compressionRatio).filter(v => Number.isFinite(v) && v > 0);
+  const compMin = compRatios.length ? Math.min.apply(null, compRatios) : 0, compMax = compRatios.length ? Math.max.apply(null, compRatios) : 0;
+  const compSpread = compMin > 0 ? ((compMax - compMin) / compMin) : 0;
+  const anyMetricDifference = (compSpread > _AURIX_VISUAL_LANGUAGE_THRESHOLDS.compressionConsistencyTol) || !spacingPolicyConsistent;
+
+  const visualLanguageConsistent = renderPipelineConsistent && pathPolicyConsistent && projectionConsistent && densityPolicyConsistent && spacingPolicyConsistent;
+
+  // ── DIVERGENCE OWNERS (identify the EXACT owner responsible) ──
+  const divergenceOwners = [];
+  if (!renderPipelineConsistent) divergenceOwners.push({ dimension: 'RENDERER', owner: RENDERER_OWNER, distinctValues: rendererSet });
+  if (!pathPolicyConsistent) divergenceOwners.push({ dimension: 'PATH', owner: PATH_BUILDER_OWNER, distinctValues: pathSet });
+  if (!projectionConsistent) { const values = {}; RANGES.forEach(r => { values[r] = perRange[r].xProjectionBeta; }); divergenceOwners.push({ dimension: 'X_PROJECTION', owner: '_AURIX_X_FILL_BETA', distinctValues: projSet, perRangeValues: values }); }
+  if (!densityPolicyConsistent) { const values = {}; RANGES.forEach(r => { values[r] = perRange[r].reductionBand; }); divergenceOwners.push({ dimension: 'REDUCTION_DENSITY', owner: '_AURIX_VP_DENSITY / _aurixVpTargetPointCount', distinctValues: reductionSet, perRangeValues: values }); }
+  if (!spacingPolicyConsistent) { const values = {}; RANGES.forEach(r => { values[r] = perRange[r].spacingUniformityScore; }); divergenceOwners.push({ dimension: 'SPACING_OUTCOME', owner: '(measured outcome of X_PROJECTION + REDUCTION + data)', spacingSpread: +spacingSpread.toFixed(4), perRangeValues: values }); }
+
+  // ── GLOBAL VERDICT ──
+  const rendererDiv = !renderPipelineConsistent, pathDiv = !pathPolicyConsistent, projDiv = !projectionConsistent, densDiv = !densityPolicyConsistent;
+  const hardDivCount = [rendererDiv, pathDiv, projDiv, densDiv].filter(Boolean).length;
+  let verdict;
+  if (hardDivCount === 0) verdict = anyMetricDifference ? 'DATA_ONLY_DIFFERENCE' : 'UNIFIED_VISUAL_LANGUAGE';
+  else if (hardDivCount >= 2) verdict = 'MIXED_DIFFERENCE';
+  else if (rendererDiv) verdict = 'VISUAL_PIPELINE_DIVERGENCE';
+  else if (pathDiv) verdict = 'PATH_POLICY_DIVERGENCE';
+  else if (projDiv) verdict = 'VISUAL_PIPELINE_DIVERGENCE';   // X-domain projection is a visual-pipeline stage
+  else verdict = 'DENSITY_ONLY_DIFFERENCE';
+
+  // ── SINGLE HIGHEST-IMPACT NEXT STEP (SPEC.32) ──
+  let recommendedSpec32;
+  if (verdict === 'UNIFIED_VISUAL_LANGUAGE') {
+    recommendedSpec32 = { title: 'DENSITY_OPTIMISATION_ONLY', owner: null, action: 'No visual-language divergence — the only remaining lever is a density optimisation (real-point visual decimation) for the most crowded range.', impact: 'low' };
+  } else if (projDiv) {
+    recommendedSpec32 = { title: 'UNIFY_X_DOMAIN_PROJECTION', owner: '_AURIX_X_FILL_BETA', action: 'Replace the range-scaled fill-blend beta with ONE range-independent visual-language projection policy (single beta or a spacing-uniformity target) so 7D/30D/1Y/ALL adopt 24H horizontal spacing.', impact: 'high', evidence: { perRangeBeta: (function () { const v = {}; RANGES.forEach(r => { v[r] = perRange[r].xProjectionBeta; }); return v; })(), spacingSpread: +spacingSpread.toFixed(4) } };
+  } else if (densDiv) {
+    recommendedSpec32 = { title: 'UNIFY_REDUCTION_DENSITY_POLICY', owner: '_AURIX_VP_DENSITY / _aurixVpTargetPointCount', action: 'Collapse the per-range density bands into one target-points-per-pixel policy so every range reduces to a comparable visual density.', impact: 'high' };
+  } else if (pathDiv) {
+    recommendedSpec32 = { title: 'UNIFY_PATH_POLICY', owner: PATH_BUILDER_OWNER, action: 'Route every range through one path builder / curve / gap owner.', impact: 'high' };
+  } else if (rendererDiv) {
+    recommendedSpec32 = { title: 'UNIFY_RENDERER', owner: RENDERER_OWNER, action: 'Route every range through the single production renderer.', impact: 'high' };
+  } else {
+    recommendedSpec32 = { title: 'DATA_PRESENTATION_REVIEW', owner: null, action: 'Policies are unified; residual differences are data-driven density — consider a density optimisation.', impact: 'medium' };
+  }
+
+  return {
+    spec: 'DSH.CHART.UNIFIED_VISUAL_LANGUAGE_CONTRACT.31',
+    appVersion: appVersion, startedAtIso: startedAtIso, endedAtIso: nowIso(), behaviorChanged: false, readOnly: true,
+    ranges: RANGES, projectionPixelWidth: W, plotPixelWidth: availablePixelColumns,
+    thresholds: _AURIX_VISUAL_LANGUAGE_THRESHOLDS,
+    perRange: perRange, divergenceOwners: divergenceOwners, recommendedSpec32: recommendedSpec32,
+    summary: {
+      visualLanguageConsistent: visualLanguageConsistent,
+      renderPipelineConsistent: renderPipelineConsistent,
+      pathPolicyConsistent: pathPolicyConsistent,
+      densityPolicyConsistent: densityPolicyConsistent,
+      spacingPolicyConsistent: spacingPolicyConsistent,
+      projectionConsistent: projectionConsistent,
+      spacingSpread: +spacingSpread.toFixed(4), compressionSpread: +compSpread.toFixed(4),
+      totalSyntheticPoints: totalSyntheticPoints, rangesAudited: RANGES.length, verdict: verdict,
+    },
+    verdict: verdict,
+  };
+}
+try { if (typeof window !== 'undefined') window._aurixAuditUnifiedVisualLanguageCore = _aurixAuditUnifiedVisualLanguageCore; } catch (_) {}
+
 // P0-PREMIUM-RENDERER-RECONNECTION — render the ALREADY-VALIDATED buildProductionPortfolioChart points
 // through the ORIGINAL institutional geometry (LTTB downsample → regime-aware scales → monotone-CUBIC
 // path → area). Values are NEVER modified: the only change is a ts→time shape rename. Returns a premium
@@ -26809,6 +27023,46 @@ try {
     window.aurixCopyLastChartDomColorDensityAudit = function () {
       let json = '';
       try { json = JSON.stringify(window.__AURIX_LAST_CHART_DOM_COLOR_DENSITY_AUDIT__ || { error: 'no DOM/colour/density audit yet — run aurixAuditChartDomColorDensity() first' }, null, 2); } catch (_) { json = '{"error":"stringify_failed"}'; }
+      try {
+        if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+          const p = navigator.clipboard.writeText(json);   // rejects with NotAllowedError when the document is not focused
+          if (p && typeof p.then === 'function') p.then(function () {}, function () {});   // swallow rejection — never throw
+        }
+      } catch (_) {}
+      try { console.log(json); } catch (_) {}
+      return json;
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // SPEC DSH.CHART.UNIFIED_VISUAL_LANGUAGE_CONTRACT.31 — window.aurixAuditUnifiedVisualLanguage(options)
+    // ════════════════════════════════════════════════════════════════════════════
+    // STRICTLY READ-ONLY, synchronous. Runs the visual-language core over the PRODUCTION renderer for every
+    // range, prints a founder-readable summary, stores the last result in-memory only. Never throws.
+    window.aurixAuditUnifiedVisualLanguage = function (options) {
+      let result;
+      try {
+        result = (typeof _aurixAuditUnifiedVisualLanguageCore === 'function') ? _aurixAuditUnifiedVisualLanguageCore(options || {}, {})
+          : { spec: 'DSH.CHART.UNIFIED_VISUAL_LANGUAGE_CONTRACT.31', behaviorChanged: false, verdict: 'MIXED_DIFFERENCE', errorMessage: 'core unavailable', summary: {}, perRange: {}, divergenceOwners: [] };
+      } catch (e) {
+        result = { spec: 'DSH.CHART.UNIFIED_VISUAL_LANGUAGE_CONTRACT.31', behaviorChanged: false, verdict: 'MIXED_DIFFERENCE', errorMessage: (e && e.message) ? e.message : String(e), summary: {}, perRange: {}, divergenceOwners: [] };
+      }
+      try { window.__AURIX_LAST_UNIFIED_VISUAL_LANGUAGE_AUDIT__ = result; } catch (_) {}
+      try {
+        const s = result.summary || {};
+        console.log('%c[UI][UNIFIED_VISUAL_LANGUAGE]', 'font-weight:700;color:#12b886', result);
+        console.log('AURIX_BUILD: ' + (result.appVersion || 'n/a') + '  VERDICT: ' + (result.verdict || 'n/a'));
+        console.log('visualLanguageConsistent: ' + s.visualLanguageConsistent + '  renderPipelineConsistent: ' + s.renderPipelineConsistent + '  pathPolicyConsistent: ' + s.pathPolicyConsistent);
+        console.log('projectionConsistent: ' + s.projectionConsistent + '  densityPolicyConsistent: ' + s.densityPolicyConsistent + '  spacingPolicyConsistent: ' + s.spacingPolicyConsistent);
+        console.log('spacingSpread: ' + s.spacingSpread + '  compressionSpread: ' + s.compressionSpread + '  totalSyntheticPoints: ' + s.totalSyntheticPoints);
+        console.log('divergenceOwners: ', result.divergenceOwners);
+        console.log('recommendedSpec32: ', result.recommendedSpec32);
+        console.log('To copy full JSON run: aurixCopyLastUnifiedVisualLanguageAudit()');
+      } catch (_) {}
+      return result;
+    };
+    window.aurixCopyLastUnifiedVisualLanguageAudit = function () {
+      let json = '';
+      try { json = JSON.stringify(window.__AURIX_LAST_UNIFIED_VISUAL_LANGUAGE_AUDIT__ || { error: 'no unified-visual-language audit yet — run aurixAuditUnifiedVisualLanguage() first' }, null, 2); } catch (_) { json = '{"error":"stringify_failed"}'; }
       try {
         if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
           const p = navigator.clipboard.writeText(json);   // rejects with NotAllowedError when the document is not focused
