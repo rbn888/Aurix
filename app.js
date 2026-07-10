@@ -21349,6 +21349,15 @@ function downsampleAurixAdaptive(points, targetPointCount) {
 //   inc3: 7D  0.40→0.48 (Fase 3 "equilibrado/continuo"; removes the dip below 24H/30D
 //         so the short→long fill progression reads consistent).
 const _AURIX_X_FILL_BETA = { '24h': 0.48, '7d': 0.48, '30d': 0.50, '1y': 0.65, 'all': 0.70 };
+// SPEC DSH.CHART.UNIFIED_X_PROJECTION_POLICY.32 — one range-independent visual projection beta. SPEC.31 proved
+// the renderer / path builder / curve / gap / interpolation are already unified and the sole remaining
+// horizontal-visual divergence owner is the range-scaled _AURIX_X_FILL_BETA (24h/7d 0.48 → 1y 0.65 → all 0.70).
+// When the flag is ON, every range resolves to the SAME 0.48 (24H/7D already use 0.48 ⇒ byte-identical; 30D/1Y/
+// ALL adopt 24H's horizontal spacing language). This changes ONLY x-pixel projection — NOT the point set, LTTB
+// target, structural breaks, timestamps, values, order or count. Flag OFF ⇒ exact v512 range-scaled rollback.
+// The legacy table above is preserved as the rollback branch (do not remove).
+const _AURIX_UNIFIED_X_FILL_BETA = 0.48;
+const _AURIX_CHART_UNIFIED_X_PROJECTION_POLICY = true;
 function computeAurixAdaptiveXScale(points, viewportWidth, box, range) {
   const vw = Math.max(240, Math.min(4000, Number(viewportWidth) || 390));
   let left, right;
@@ -21358,7 +21367,10 @@ function computeAurixAdaptiveXScale(points, viewportWidth, box, range) {
   const pts = Array.isArray(points) ? points : [];
   const n = pts.length;
   const xMin = n ? pts[0].time : 0, xMax = n ? pts[n - 1].time : 1, span = (xMax - xMin) || 1;
-  const beta = Math.max(0, Math.min(1, (range && _AURIX_X_FILL_BETA[range] != null) ? _AURIX_X_FILL_BETA[range] : 0.5));
+  // SPEC.32 — one unified projection beta when the flag is ON; else the exact legacy range-scaled value.
+  const _legacyBeta = (range && _AURIX_X_FILL_BETA[range] != null) ? _AURIX_X_FILL_BETA[range] : 0.5;
+  const _unifiedXOn = (typeof _AURIX_CHART_UNIFIED_X_PROJECTION_POLICY !== 'undefined') && _AURIX_CHART_UNIFIED_X_PROJECTION_POLICY && typeof _AURIX_UNIFIED_X_FILL_BETA === 'number';
+  const beta = Math.max(0, Math.min(1, _unifiedXOn ? _AURIX_UNIFIED_X_FILL_BETA : _legacyBeta));
   const xs = new Array(n);
   if (n <= 1) { for (let i = 0; i < n; i++) xs[i] = left; return { xMin, xMax, left, right, width, xs, beta, mode: 'fill-blend', x: () => left }; }
   const equal = 1 / (n - 1);
@@ -25498,6 +25510,12 @@ function _aurixAuditUnifiedVisualLanguageCore(options, deps) {
   const projectionBetaOf = deps.projectionBeta || (r => (typeof _AURIX_X_FILL_BETA !== 'undefined' && _AURIX_X_FILL_BETA[r] != null) ? _AURIX_X_FILL_BETA[r] : null);
   const targetCountOf = deps.targetPointCount || ((r, w) => (typeof _aurixVpTargetPointCount === 'function') ? _aurixVpTargetPointCount(r, w) : null);
   const densityBandOf = deps.densityBand || (r => (typeof _AURIX_VP_DENSITY !== 'undefined' && _AURIX_VP_DENSITY[r]) ? _AURIX_VP_DENSITY[r] : null);
+  const legacyBetaOf = deps.legacyBeta || (r => (typeof _AURIX_X_FILL_BETA !== 'undefined' && _AURIX_X_FILL_BETA[r] != null) ? _AURIX_X_FILL_BETA[r] : null);
+  // SPEC.32 — the unified X-projection policy state (read-only reflection of the runtime flag + constant)
+  const projectionPolicyFlagEnabled = (typeof deps.projectionPolicyFlag === 'boolean') ? deps.projectionPolicyFlag
+    : ((typeof _AURIX_CHART_UNIFIED_X_PROJECTION_POLICY !== 'undefined') ? !!_AURIX_CHART_UNIFIED_X_PROJECTION_POLICY : false);
+  const unifiedProjectionBeta = (typeof deps.unifiedBeta === 'number') ? deps.unifiedBeta
+    : ((typeof _AURIX_UNIFIED_X_FILL_BETA === 'number') ? _AURIX_UNIFIED_X_FILL_BETA : null);
   const eHash = pts => safe(() => (typeof _aurixEmergencyHash === 'function') ? _aurixEmergencyHash(Array.isArray(pts) ? pts : []) : null, null);
 
   const W = (Number.isFinite(options.pixelWidth) && options.pixelWidth > 0) ? options.pixelWidth : ((typeof _WSC_VIEW_W === 'number') ? _WSC_VIEW_W : 1000);
@@ -25543,6 +25561,10 @@ function _aurixAuditUnifiedVisualLanguageCore(options, deps) {
       xMax: xScale ? xScale.xMax : (rp.length ? rp[rp.length - 1].ts : null),
       xProjection: xScale ? (xScale.mode || null) : null,
       xProjectionBeta: beta, pixelWidth: W, plotPixelWidth: availablePixelColumns,
+      // ── SPEC.32 X-PROJECTION POLICY (additive; the resolved beta IS what the renderer used) ──
+      projectionPolicy: projectionPolicyFlagEnabled ? 'UNIFIED_X_PROJECTION' : 'LEGACY_RANGE_SCALED_PROJECTION',
+      resolvedProjectionBeta: beta, legacyProjectionBeta: legacyBetaOf(r),
+      unifiedProjectionBeta: unifiedProjectionBeta, projectionPolicyFlagEnabled: projectionPolicyFlagEnabled,
       // ── PATH ──
       rendererOwner: RENDERER_OWNER, pathBuilderOwner: PATH_BUILDER_OWNER, curveMode: CURVE_MODE,
       gapOwner: GAP_OWNER, gapMode: (rc.structuralBreakCount > 0) ? 'multi-path-split' : 'single-path',
@@ -25586,6 +25608,14 @@ function _aurixAuditUnifiedVisualLanguageCore(options, deps) {
   const anyMetricDifference = (compSpread > _AURIX_VISUAL_LANGUAGE_THRESHOLDS.compressionConsistencyTol) || !spacingPolicyConsistent;
 
   const visualLanguageConsistent = renderPipelineConsistent && pathPolicyConsistent && projectionConsistent && densityPolicyConsistent && spacingPolicyConsistent;
+
+  // ── SPEC.32 X-PROJECTION POLICY summary (additive) ──
+  const projectionBetaByRange = {}, spacingUniformityScoreByRange = {}, compressionRatioByRange = {};
+  RANGES.forEach(r => { projectionBetaByRange[r] = perRange[r].resolvedProjectionBeta; spacingUniformityScoreByRange[r] = perRange[r].spacingUniformityScore; compressionRatioByRange[r] = perRange[r].compressionRatio; });
+  const resolvedBetaSet = distinct(p => p.resolvedProjectionBeta);
+  const policyLabelSet = distinct(p => p.projectionPolicy);
+  const allRangesSameProjectionBeta = resolvedBetaSet.length <= 1;
+  const projectionPolicyConsistent = allRangesSameProjectionBeta && policyLabelSet.length <= 1;
 
   // ── DIVERGENCE OWNERS (identify the EXACT owner responsible) ──
   const divergenceOwners = [];
@@ -25637,6 +25667,11 @@ function _aurixAuditUnifiedVisualLanguageCore(options, deps) {
       projectionConsistent: projectionConsistent,
       spacingSpread: +spacingSpread.toFixed(4), compressionSpread: +compSpread.toFixed(4),
       totalSyntheticPoints: totalSyntheticPoints, rangesAudited: RANGES.length, verdict: verdict,
+      // ── SPEC.32 additive summary ──
+      allRangesSameProjectionBeta: allRangesSameProjectionBeta, projectionPolicyConsistent: projectionPolicyConsistent,
+      projectionPolicyFlagEnabled: projectionPolicyFlagEnabled, unifiedProjectionBeta: unifiedProjectionBeta,
+      projectionBetaByRange: projectionBetaByRange, spacingUniformityScoreByRange: spacingUniformityScoreByRange,
+      compressionRatioByRange: compressionRatioByRange, visualLanguageVerdict: verdict,
     },
     verdict: verdict,
   };
