@@ -25751,6 +25751,22 @@ function _aurixAuditUnifiedVisualLanguageCore(options, deps) {
     ranges: RANGES, projectionPixelWidth: W, plotPixelWidth: availablePixelColumns,
     thresholds: _AURIX_VISUAL_LANGUAGE_THRESHOLDS,
     perRange: perRange, divergenceOwners: divergenceOwners, recommendedSpec32: recommendedSpec32,
+    // ── SPEC.34 INTERACTION CONTRACT (additive; read-only — no runtime behaviour depends on it) ──
+    interactionContract: {
+      enabled: (typeof _AURIX_CHART_INSTITUTIONAL_INTERACTION !== 'undefined') ? !!_AURIX_CHART_INSTITUTIONAL_INTERACTION : false,
+      nearestPointPolicy: 'nearest_real_point_by_x_binary_search',
+      interpolation: false,
+      maxSnapDistancePx: (typeof _AURIX_INTERACTION_MAX_SNAP_PX === 'number') ? _AURIX_INTERACTION_MAX_SNAP_PX : null,
+      keyboardEnabled: true, mobilePointerEnabled: true,
+      selectedPointIsReal: (typeof _aurixInteractionState === 'object' && _aurixInteractionState) ? _aurixInteractionState.selectedPointIsReal : null,
+      syntheticPoints: 0,
+      debug: (typeof _aurixInteractionState === 'object' && _aurixInteractionState) ? {
+        lookupMode: _aurixInteractionState.lookupMode, interactionPointCount: _aurixInteractionState.interactionPointCount,
+        lastDistancePx: _aurixInteractionState.lastDistancePx, rafUpdateCount: _aurixInteractionState.rafUpdateCount,
+        droppedPointerEventCount: _aurixInteractionState.droppedPointerEventCount, activeSegmentId: _aurixInteractionState.activeSegmentId,
+        selectedPointIsReal: _aurixInteractionState.selectedPointIsReal, interactionSyntheticPoints: 0,
+      } : null,
+    },
     summary: {
       visualLanguageConsistent: visualLanguageConsistent,
       renderPipelineConsistent: renderPipelineConsistent,
@@ -29291,8 +29307,70 @@ function _wscFmtTs(ts) {
 // Lightweight desktop hover tooltip (crosshair + cursor dot + value/time). Pure
 // DOM over the SVG; recreated on every repaint (old nodes GC with innerHTML).
 // Skipped on mobile so slider swipe is never absorbed.
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.INSTITUTIONAL_INTERACTION_POLISH.34 — pure chart-interaction resolver
+// ════════════════════════════════════════════════════════════════════════════
+// Launch-grade interaction layer over the EXISTING final rendered series. Changes NO chart truth: no source/
+// rendered points, timestamps, values, order, downsampling, X-projection, Y-domain, returns, badges, colours,
+// historyPresentationState, gaps, path or renderer ownership. The resolver only SELECTS an existing real
+// rendered point nearest the pointer (binary search, O(log n)); it never interpolates, invents or bridges.
+// Flag OFF ⇒ exact v514 interaction. Mobile keeps its CLOSED+HARDENED inspector (already conforms) — untouched.
+const _AURIX_CHART_INSTITUTIONAL_INTERACTION = true;
+const _AURIX_INTERACTION_MAX_SNAP_PX = 44;   // centralized max snap distance (plot CSS px); beyond ⇒ no point
+// Lightweight, non-persistent debug metrics — read-only surface for the audit (never drives behaviour).
+const _aurixInteractionState = { enabled: true, lookupMode: 'binary', interactionPointCount: 0, lastDistancePx: null,
+  rafUpdateCount: 0, droppedPointerEventCount: 0, activeSegmentId: null, selectedPointIsReal: null,
+  interactionSyntheticPoints: 0, keyboardEnabled: true, mobilePointerEnabled: true, active: false, source: null };
+try { if (typeof window !== 'undefined') window.__AURIX_CHART_INTERACTION__ = _aurixInteractionState; } catch (_) {}
+
+// PURE, deterministic. points: sorted-by-x array of { x, ts, value, pixelY?, segmentId? } (REAL rendered
+// points only). xDomain: { min, max } in the same units as point.x. plotRect: { width } (CSS px). pointerX:
+// pointer position in xDomain units. Returns the interaction contract; NEVER mutates inputs, NEVER fabricates.
+function _aurixResolveChartInteraction(points, xDomain, plotRect, pointerX, options) {
+  options = options || {};
+  const out = { active: false, pointIndex: -1, point: null, pointTs: null, pointValue: null, pixelX: null, pixelY: null,
+    segmentId: null, distancePx: null, source: options.source || 'mouse', clamped: false, lookupMode: 'binary' };
+  const pts = Array.isArray(points) ? points : [];
+  const n = pts.length;
+  if (n < 1 || !plotRect || !(plotRect.width > 0) || !Number.isFinite(pointerX)) return out;
+  const maxSnap = Number.isFinite(options.maxSnapDistancePx) ? options.maxSnapDistancePx
+    : ((typeof _AURIX_INTERACTION_MAX_SNAP_PX === 'number') ? _AURIX_INTERACTION_MAX_SNAP_PX : 44);
+  const lo = pts[0].x, hi = pts[n - 1].x;
+  const dmin = (xDomain && Number.isFinite(xDomain.min)) ? xDomain.min : lo;
+  const dmax = (xDomain && Number.isFinite(xDomain.max) && xDomain.max > dmin) ? xDomain.max : (hi > dmin ? hi : dmin + 1);
+  const domSpan = (dmax - dmin) || 1;
+  const pxPerUnit = plotRect.width / domSpan;
+  // edge clamp — a pointer beyond the series edges resolves to the edge point (active, clamped)
+  let px = pointerX, clamped = false;
+  if (px < lo) { px = lo; clamped = true; }
+  if (px > hi) { px = hi; clamped = true; }
+  // O(log n) nearest-by-x via binary search on the sorted x coordinates
+  let a = 0, b = n - 1;
+  if (n === 1) { a = 0; b = 0; }
+  else { while (b - a > 1) { const m = (a + b) >> 1; if (pts[m].x <= px) a = m; else b = m; } }
+  const da = Math.abs(pts[a].x - px), db = Math.abs(pts[b].x - px);
+  let idx = (da <= db) ? a : b;   // deterministic tie → lower index (left)
+  const chosen = pts[idx];
+  const distancePx = Math.abs(chosen.x - pointerX) * pxPerUnit;   // raw pointerX (pre-clamp) ⇒ true gap distance
+  // max-snap: pointer inside a real gap / sparse zone beyond the budget ⇒ choose NO point (never imply a
+  // continuous point in a gap). A clamped edge pointer is always allowed (the user is at the series end).
+  if (!clamped && distancePx > maxSnap) return out;
+  out.active = true; out.pointIndex = idx;
+  out.point = { ts: chosen.ts, value: chosen.value }; out.pointTs = chosen.ts; out.pointValue = chosen.value;
+  out.pixelX = ((chosen.x - dmin) / domSpan) * plotRect.width;
+  out.pixelY = Number.isFinite(chosen.pixelY) ? chosen.pixelY : (Number.isFinite(chosen.y) ? chosen.y : null);
+  out.segmentId = (chosen.segmentId != null) ? chosen.segmentId : 0;
+  out.distancePx = +distancePx.toFixed(3); out.clamped = clamped;
+  return out;
+}
+try { if (typeof window !== 'undefined') window._aurixResolveChartInteraction = _aurixResolveChartInteraction; } catch (_) {}
+
 function _wscAttachTooltip(plot, model) {
   if (!plot || _dshReducedMotion()) return;
+  // SPEC.34 — institutional interaction (flag ON): resolver-driven nearest-real-point selection, rAF-throttled
+  // pointer tracking, keyboard navigation, gap-aware hiding. Flag OFF ⇒ the exact v514 body below runs.
+  const _instOn = (typeof _AURIX_CHART_INSTITUTIONAL_INTERACTION !== 'undefined') && _AURIX_CHART_INSTITUTIONAL_INTERACTION && typeof _aurixResolveChartInteraction === 'function';
+  if (_instOn) { try { if (_wscAttachTooltipInstitutional(plot, model)) return; } catch (_) { /* fall through to v514 */ } }
   const hairV = document.createElement('div'); hairV.className = 'wsc-hair';
   const hairH = document.createElement('div'); hairH.className = 'wsc-hair-h';
   const cur   = document.createElement('div'); cur.className   = 'wsc-cursor';
@@ -29350,6 +29428,92 @@ function _wscAttachTooltip(plot, model) {
   };
   plot.addEventListener('pointermove', move);
   plot.addEventListener('pointerleave', () => plot.classList.remove('wsc-hot'));
+}
+
+// SPEC.34 — the flag-ON institutional interaction. Same visible primitives (hair/cursor/tip) as v514, but
+// selection runs through the pure _aurixResolveChartInteraction (binary search, nearest REAL point, gap-aware
+// max-snap), pointer tracking is rAF-throttled (≤1 visual update/frame, no path rebuild), and the surface is
+// keyboard-navigable (ArrowLeft/Right among real points, Escape clears). No network/storage/save-sync, no
+// persisted state; listeners live on the plot node and die with the next repaint. Returns true on success.
+function _wscAttachTooltipInstitutional(plot, model) {
+  const N = model.n | 0;
+  const sx = model.sampleX, sy = model.sampleY, sv = model.sampleVal, st = model.sampleTs;
+  if (!(N >= 2) || !sx || !sy || !sv || !st) return false;
+  const hairV = document.createElement('div'); hairV.className = 'wsc-hair';
+  const hairH = document.createElement('div'); hairH.className = 'wsc-hair-h';
+  const cur = document.createElement('div'); cur.className = 'wsc-cursor';
+  const tip = document.createElement('div'); tip.className = 'wsc-tip';
+  plot.appendChild(hairV); plot.appendChild(hairH); plot.appendChild(cur); plot.appendChild(tip);
+  const pf = _dshFmtPct(Number.isFinite(model.deltaPct) ? model.deltaPct : 0);
+  const rangeLabel = ({ '24h': '24H', '7d': '7D', '30d': '30D', '1y': '1A', all: 'TOTAL' })[model.range] || '';
+  // SPEC.34 range-aware date/time: 24H/7D/30D show time; 1Y/ALL are date-focused.
+  const showTime = model.range === '24h' || model.range === '7d' || model.range === '30d';
+  const chgTone = model.deltaPct > 0.005 ? 'pos' : model.deltaPct < -0.005 ? 'neg' : '';
+  const W = (typeof _WSC_VIEW_W === 'number') ? _WSC_VIEW_W : 1000, H = (typeof _WSC_VIEW_H === 'number') ? _WSC_VIEW_H : 240;
+  // build the REAL-point set once (cached for this attach; a repaint re-attaches with a fresh series/hash).
+  const pts = new Array(N);
+  const segIds = Array.isArray(model.segmentIds) ? model.segmentIds : null;
+  for (let i = 0; i < N; i++) pts[i] = { x: sx[i], ts: st[i], value: sv[i], pixelY: sy[i], segmentId: segIds ? segIds[i] : 0 };
+  const xDomain = { min: 0, max: W };
+  let selIndex = -1, rafOn = false, pendingClientX = null;
+  const st8 = (typeof _aurixInteractionState === 'object' && _aurixInteractionState) ? _aurixInteractionState : null;
+  if (st8) { st8.interactionPointCount = N; st8.lookupMode = 'binary'; st8.interactionSyntheticPoints = 0; st8.active = false; }
+  const applyRes = (res) => {
+    if (!res || !res.active) { plot.classList.remove('wsc-hot'); if (st8) { st8.active = false; st8.selectedPointIsReal = null; } return; }
+    const r = plot.getBoundingClientRect(); if (!r.width) return;
+    const px = res.pixelX, py = (res.pixelY / H) * r.height;
+    hairV.style.transform = `translateX(${px}px)`;
+    hairH.style.transform = `translateY(${py}px)`;
+    cur.style.transform = `translate(${px}px, ${py}px)`;
+    const dt = new Date(res.pointTs);
+    const dateStr = dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+    const timeStr = showTime ? `<span class="wsc-tip-time">${dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>` : '';
+    tip.innerHTML =
+      `<span class="wsc-tip-date">${dateStr}</span>${timeStr}` +
+      `<span class="wsc-tip-lbl">${t('chartTipValue')}</span>` +
+      `<span class="wsc-tip-v">${formatBase(res.pointValue)}</span>` +
+      `<span class="wsc-tip-chg ${chgTone}">${rangeLabel} ${pf.text}</span>`;
+    const tw = tip.offsetWidth || 120, th = tip.offsetHeight || 64;
+    const pl = _aurixPlaceTooltip(px, py, tw, th, r.width, r.height, _AURIX_TOOLTIP_MARGIN_DESKTOP, false);
+    tip.style.left = `${pl.tx}px`; tip.style.top = `${pl.ty}px`; tip.style.transform = 'none';
+    plot.classList.add('wsc-hot');
+    selIndex = res.pointIndex;
+    try { plot.setAttribute('aria-label', `${rangeLabel} ${dateStr}${showTime ? ' ' + dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : ''}: ${formatBase(res.pointValue)}`); } catch (_) {}
+    if (st8) { st8.active = true; st8.lastDistancePx = res.distancePx; st8.activeSegmentId = res.segmentId; st8.selectedPointIsReal = true; st8.source = res.source; }
+  };
+  const resolveAt = (clientX, source) => {
+    const r = plot.getBoundingClientRect(); if (!r.width) return null;
+    const vx = Math.min(1, Math.max(0, (clientX - r.left) / r.width)) * W;
+    return _aurixResolveChartInteraction(pts, xDomain, { width: r.width }, vx, { source: source || 'mouse', maxSnapDistancePx: _AURIX_INTERACTION_MAX_SNAP_PX });
+  };
+  const scheduleFromPointer = () => {
+    if (rafOn) { if (st8) st8.droppedPointerEventCount++; return; }   // coalesce: ≤1 visual update per frame
+    rafOn = true;
+    const run = () => { rafOn = false; if (st8) st8.rafUpdateCount++; if (pendingClientX != null) applyRes(resolveAt(pendingClientX, 'mouse')); };
+    try { requestAnimationFrame(run); } catch (_) { run(); }
+  };
+  const onMove = (e) => { pendingClientX = e.clientX; scheduleFromPointer(); };
+  const onLeave = () => { plot.classList.remove('wsc-hot'); if (st8) st8.active = false; };
+  plot.addEventListener('pointerenter', onMove, { passive: true });
+  plot.addEventListener('pointermove', onMove, { passive: true });
+  plot.addEventListener('pointerleave', onLeave, { passive: true });
+  // keyboard: focusable surface; ArrowLeft/Right walk the REAL points; Escape clears. No keyboard trap.
+  try { if (!plot.hasAttribute('tabindex')) plot.setAttribute('tabindex', '0'); plot.setAttribute('role', 'img'); } catch (_) {}
+  const applyByIndex = (i) => {
+    const idx = Math.min(N - 1, Math.max(0, i));
+    const r = plot.getBoundingClientRect();
+    const res = { active: true, pointIndex: idx, point: { ts: pts[idx].ts, value: pts[idx].value }, pointTs: pts[idx].ts,
+      pointValue: pts[idx].value, pixelX: ((pts[idx].x - xDomain.min) / (xDomain.max - xDomain.min)) * (r.width || 1),
+      pixelY: pts[idx].pixelY, segmentId: pts[idx].segmentId, distancePx: 0, source: 'keyboard', clamped: false };
+    applyRes(res);
+  };
+  const onKey = (e) => {
+    if (e.key === 'ArrowRight') { e.preventDefault(); applyByIndex((selIndex < 0 ? -1 : selIndex) + 1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); applyByIndex((selIndex < 0 ? N : selIndex) - 1); }
+    else if (e.key === 'Escape' || e.key === 'Esc') { selIndex = -1; onLeave(); try { plot.removeAttribute('aria-label'); } catch (_) {} }
+  };
+  plot.addEventListener('keydown', onKey);
+  return true;
 }
 
 // ── WN.14 — Institutional Visualization Layer ───────────────────────────────
