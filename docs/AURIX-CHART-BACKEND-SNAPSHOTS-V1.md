@@ -109,13 +109,13 @@ Files now in the repo: `supabase/functions/portfolio-snapshot/index.ts` (Edge Fu
    # invoke once; read logs; compare the logged total_value_usd to the app value; then:
    supabase secrets unset DRY_RUN
    ```
-4. **Schedule** every 15 min (Supabase dashboard → Edge Functions → Schedules, or pg_cron):
-   ```sql
-   select cron.schedule('aurix-portfolio-snapshot', '*/15 * * * *',
-     $$ select net.http_post(
-          url := 'https://ozcasyufbknnuemllwso.functions.supabase.co/portfolio-snapshot',
-          headers := '{"Content-Type":"application/json"}'::jsonb) $$);
-   ```
+4. **Schedule** — apply the committed production migration `db/portfolio_snapshots_cron_1.sql` in the SQL
+   editor (SPEC.36). It is idempotent (unschedules any prior job first), enables pg_cron+pg_net, schedules
+   the Edge Function every 15 min, reads the invocation key from Supabase **Vault** (no hardcoded secret),
+   and adds a nightly retention-thinning job. Prereq: store the invocation key —
+   `select vault.create_secret('<anon-or-service-role-key>', 'aurix_snapshot_invoke_key');`
+   Verify: `select jobname, schedule, active from cron.job where jobname like 'aurix-portfolio-snapshot%';`
+   and `select * from cron.job_run_details order by start_time desc limit 10;` (proves it runs with no browser).
 5. **Turn on the frontend read** (choose ONE):
    - quickest: run `aurixLoadBackendSnapshots()` in the console (loads once now); or
    - permanent: flip `_AURIX_BACKEND_SNAPSHOTS_AUTOLOAD = true` in app.js, bump the app version, deploy.

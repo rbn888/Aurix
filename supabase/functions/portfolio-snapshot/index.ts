@@ -151,12 +151,28 @@ function valueUser(row: any, prices: Map<string, { price: number; currency: stri
     market_state, price_staleness };
 }
 
+// SPEC.36 — bounded, retry-safe scheduled capture. BOUNDED: the user_portfolios read is paginated in fixed
+// batches up to MAX_USERS (never an unbounded scan). ACTIVE-ONLY: rows with no catalog AND no holdings are
+// skipped before valuation. RETRY-SAFE: every per-user step is wrapped so one malformed/failing portfolio can
+// NEVER abort the run (the loop continues; the scheduler stays healthy). IDEMPOTENT: a unique index on
+// (user_id, minute-bucket) is the hard floor — a re-run within the same minute hits 23505 and is counted as a
+// skip, not an error, so reruns are safe and produce no duplicates.
+const PAGE = 1000;                    // Supabase select cap per request
+const MAX_USERS = 20000;              // hard upper bound on processed rows per run (bounded execution)
 Deno.serve(async () => {
   if (!SUPABASE_URL || !SERVICE_ROLE) return new Response('missing env', { status: 500 });
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
   const now = new Date();
-  const { data: rows, error } = await admin.from('user_portfolios').select('user_id, assets, holdings');
-  if (error) return new Response('read error: ' + error.message, { status: 500 });
+  // BOUNDED paginated read (active-only filter applied per-row below; no unbounded full-table scan).
+  const rows: any[] = [];
+  for (let from = 0; from < MAX_USERS; from += PAGE) {
+    const { data: page, error } = await admin.from('user_portfolios')
+      .select('user_id, assets, holdings').order('user_id', { ascending: true }).range(from, from + PAGE - 1);
+    if (error) return new Response('read error: ' + error.message, { status: 500 });
+    if (!page || !page.length) break;
+    for (const p of page) rows.push(p);
+    if (page.length < PAGE) break;    // last page
+  }
 
   // Collect all symbols + non-USD FX pairs across users' CATALOGS, fetch fresh prices once.
   const allSymbols: string[] = [];
@@ -168,9 +184,14 @@ Deno.serve(async () => {
   }
   const prices = await fetchPrices(allSymbols);
 
-  let inserted = 0, skipped = 0, empty = 0;
+  let inserted = 0, skipped = 0, empty = 0, errored = 0, inactive = 0;
   const dryRunSamples: any[] = [];
-  for (const r of rows ?? []) {
+  for (const r of rows) {
+   try {   // RETRY-SAFE — one failing portfolio must never abort the whole scheduled run (SPEC.36).
+    // ACTIVE-ONLY — a portfolio with neither a catalog nor holdings is not active; skip before valuation.
+    const hasCatalog = Array.isArray(r.assets) && r.assets.length > 0;
+    const hasHoldings = Array.isArray(r.holdings) && r.holdings.length > 0;
+    if (!hasCatalog && !hasHoldings) { inactive++; continue; }
     const v = valueUser(r, prices, now);
     // DRY_RUN visibility WITHOUT `functions logs`: return a per-user, secrets-free sample in the response.
     if (DRY_RUN) dryRunSamples.push({ user: String(r.user_id || '').slice(0, 8), valuationTs: now.toISOString(),
@@ -197,8 +218,14 @@ Deno.serve(async () => {
       category_values: v.categories, asset_count: v.count, source: 'backend_snapshot',
       confidence: 'scheduled', market_state: v.market_state, price_staleness: v.price_staleness, schema_version: 1,
     });
-    if (insErr) { console.error('[insert]', r.user_id, insErr.message); } else { inserted++; }
+    if (insErr) {
+      // IDEMPOTENT — a unique-violation (23505) means a snapshot already exists for this (user, minute):
+      // a safe no-op rerun, NOT a failure. Any other error is a real per-user failure (logged, loop continues).
+      if (String((insErr as any).code) === '23505' || /duplicate key|unique constraint/i.test(insErr.message || '')) skipped++;
+      else { errored++; console.error('[insert]', r.user_id, insErr.message); }
+    } else { inserted++; }
+   } catch (e) { errored++; try { console.error('[user]', r && r.user_id, (e as any) && (e as any).message); } catch (_) {} }
   }
-  return new Response(JSON.stringify({ ok: true, dryRun: DRY_RUN, users: (rows ?? []).length, inserted, skipped, empty,
+  return new Response(JSON.stringify({ ok: true, dryRun: DRY_RUN, users: rows.length, inserted, skipped, empty, inactive, errored,
     ...(DRY_RUN ? { samples: dryRunSamples } : {}) }), { headers: { 'content-type': 'application/json' } });
 });
