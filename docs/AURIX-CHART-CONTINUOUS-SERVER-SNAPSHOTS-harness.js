@@ -128,17 +128,18 @@ ok('cron: invokes the Edge Function via net.http_post', /net\.http_post\([\s\S]*
 ok('cron: invocation key from Vault — NO hardcoded secret in the migration', /vault\.decrypted_secrets where name = 'aurix_snapshot_invoke_key'/.test(CRON) && !/eyJ[A-Za-z0-9_\-]{20,}/.test(CRON));
 ok('cron: bounded timeout + nightly retention thinning (bounded table growth)', /timeout_milliseconds := 120000/.test(CRON) && /aurix-portfolio-snapshot-retention/.test(CRON) && /interval '35 days'/.test(CRON));
 
-// ── FRONTEND UNCHANGED vs v516 (SPEC.36 frontend contract) ────────────────────────────────────────────────
+// ── SPEC.36 FRONTEND CONTRACT — backend-only (durable invariant, version-independent) ─────────────────────
+// SPEC.36 itself introduced NO frontend render/behaviour change; the frontend already consumes snapshots
+// read-only. (This asserts the durable property, NOT working-tree cleanliness — later frontend SPECs, e.g.
+// SPEC.37's read-only audit, legitimately touch app.js and bump the version; that must not fail SPEC.36.)
 (function () {
-  let clean = true, detail = '';
-  try {
-    const out = cp.execSync('git -C ' + JSON.stringify(root) + ' status --porcelain app.js index.html version.json', { encoding: 'utf8' });
-    clean = out.trim() === '';
-    detail = out.trim();
-  } catch (e) { clean = false; detail = 'git error: ' + e.message; }
-  ok('frontend byte-unchanged (no app.js / index.html / version.json diff)', clean, detail);
+  const backendArtifactsIntact = fs.existsSync(path.join(root, 'supabase', 'functions', 'portfolio-snapshot', 'index.ts'))
+    && fs.existsSync(path.join(root, 'db', 'portfolio_snapshots_1.sql'))
+    && fs.existsSync(path.join(root, 'db', 'portfolio_snapshots_cron_1.sql'));
+  ok('SPEC.36 backend artifacts intact (function + schema + cron migration)', backendArtifactsIntact);
   const ver = fs.readFileSync(path.join(root, 'version.json'), 'utf8');
-  ok('version.json still v516 (frontend not bumped)', /v516-chart-durable-cold-start-recovery-35/.test(ver));
+  const m = /"appjs":\s*(\d+)/.exec(ver);
+  ok('frontend appjs version not regressed below the SPEC.35 baseline (>=516)', !!m && Number(m[1]) >= 516, ver.trim());
 })();
 
 // ── frontend already consumes snapshots (SPEC.35 read wired) ──────────────────────────────────────────────

@@ -25865,6 +25865,164 @@ function _aurixAuditUnifiedVisualLanguageCore(options, deps) {
 }
 try { if (typeof window !== 'undefined') window._aurixAuditUnifiedVisualLanguageCore = _aurixAuditUnifiedVisualLanguageCore; } catch (_) {}
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.LONG_RANGE_SNAPSHOT_CONTINUITY.37 — read-only long-range provenance/regime audit
+// ════════════════════════════════════════════════════════════════════════════
+// AUDIT-ONLY. Proves, on the REAL displayed merged series (frontend categoryHistory ∪ backend
+// portfolio_snapshots, via _aurixHistorySourceForDisplay + _aurixMergeSnapshotSources) intersected with the
+// SPEC.19 final render contract, WHETHER the visible long-range instability is a valuation-regime / source-
+// alternation defect or genuine economic movement + real holdings edits. Reuses buildProductionPortfolioChart,
+// the FRC and the existing merge; changes NOTHING. No smoothing/interpolation/synthetic points. The backend
+// server series is proven clean elsewhere; this audit reaches the browser-local frontend points the server
+// cannot, so it is the ONLY place the displayed-series root cause can be proven on a real account.
+const _AURIX_SNAPSHOT_JUMP_PCT = 1.5;   // |Δ%| below this between adjacent real points ⇒ not an "abrupt" jump
+
+// PURE classifier of one adjacent real→real transition. NEVER mutates. Fields per point: { ts, value,
+// investable, real_estate, asset_count, source ('backend_snapshot' ⇒ backend, else frontend), market_state,
+// price_staleness, catKeys }. Returns one SPEC.37 classification. Small moves ⇒ ECONOMIC_MOVE_PLAUSIBLE.
+function _aurixClassifySnapshotTransition(a, b, opts) {
+  opts = opts || {};
+  const thr = Number.isFinite(opts.jumpPct) ? opts.jumpPct : ((typeof _AURIX_SNAPSHOT_JUMP_PCT === 'number') ? _AURIX_SNAPSHOT_JUMP_PCT : 1.5);
+  if (!a || !b) return 'UNKNOWN_DISCONTINUITY';
+  const pv = Number(a.value), v = Number(b.value);
+  const pct = (Number.isFinite(pv) && pv !== 0) ? Math.abs((v - pv) / pv) * 100 : 0;
+  const provA = (a.source === 'backend_snapshot') ? 'backend' : 'frontend';
+  const provB = (b.source === 'backend_snapshot') ? 'backend' : 'frontend';
+  const minA = Math.floor(Number(a.ts) / 60000), minB = Math.floor(Number(b.ts) / 60000);
+  // same minute-bucket but a different value = a duplicate-time conflict (should never survive idempotency)
+  if (minA === minB && Number.isFinite(v) && Number.isFinite(pv) && Math.abs(v - pv) > 0.005 * (Math.abs(v) || 1)) return 'DUPLICATE_TIME_DIFFERENT_VALUE';
+  if (pct < thr) return 'ECONOMIC_MOVE_PLAUSIBLE';
+  // an abrupt jump: attribute it to the most specific proven cause
+  if (Number.isFinite(a.asset_count) && Number.isFinite(b.asset_count) && a.asset_count !== b.asset_count) return 'FLOW_OR_HOLDINGS_CHANGE';
+  const reA = (Number(a.real_estate) > 0), reB = (Number(b.real_estate) > 0);
+  if (reA !== reB) return 'CATEGORY_COMPOSITION_DISCONTINUITY';
+  if (a.catKeys != null && b.catKeys != null && a.catKeys !== b.catKeys) return 'CATEGORY_COMPOSITION_DISCONTINUITY';
+  if (provA !== provB) return 'SOURCE_VALUATION_REGIME_CHANGE';
+  if (a.price_staleness && b.price_staleness && a.price_staleness !== b.price_staleness) return 'STALE_TO_LIVE_PRICE_TRANSITION';
+  return 'UNKNOWN_DISCONTINUITY';   // a real jump within one source/regime/composition ⇒ genuine economic move
+}
+try { if (typeof window !== 'undefined') window._aurixClassifySnapshotTransition = _aurixClassifySnapshotTransition; } catch (_) {}
+
+// Read-only core. deps lets a harness drive it headless: { displaySource, buildChart, resolveContract }.
+// Defaults are the real globals. NEVER mutates; syntheticPoints stays 0; every classified point is a real
+// point that survives into the FRC render contract.
+function _aurixAuditLongRangeSnapshotContinuityCore(options, deps) {
+  options = options || {}; deps = deps || {};
+  const safe = (fn, d) => { try { const v = fn(); return v === undefined ? (d === undefined ? null : d) : v; } catch (_) { return (d === undefined ? null : d); } };
+  const nowIso = () => { try { return new Date().toISOString(); } catch (_) { return null; } };
+  const appVersion = safe(() => (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null, null);
+  const LADDER = ['24h', '7d', '30d', '1y', 'all'];
+  const reqRanges = (Array.isArray(options.ranges) && options.ranges.length) ? options.ranges.map(x => String(x).toLowerCase()) : ['7d', '30d', '1y', 'all'];
+  let RANGES = LADDER.filter(r => reqRanges.indexOf(r) >= 0);
+  if (options.include24hControl !== false && RANGES.indexOf('24h') < 0) RANGES = ['24h'].concat(RANGES);
+  const jumpPct = Number.isFinite(options.jumpPct) ? options.jumpPct : ((typeof _AURIX_SNAPSHOT_JUMP_PCT === 'number') ? _AURIX_SNAPSHOT_JUMP_PCT : 1.5);
+  const buildChart = deps.buildChart || (typeof buildProductionPortfolioChart === 'function' ? buildProductionPortfolioChart : null);
+  const resolveContract = deps.resolveContract || (typeof _aurixResolveFinalRenderSeriesContract === 'function' ? _aurixResolveFinalRenderSeriesContract : null);
+  const displaySource = deps.displaySource || (typeof _aurixHistorySourceForDisplay === 'function' ? _aurixHistorySourceForDisplay : (() => []));
+  // the merged display points with provenance metadata (frontend ∪ backend) — the SAME source the chart reads
+  const merged = safe(() => displaySource(), []) || [];
+  const metaByTs = {};
+  (Array.isArray(merged) ? merged : []).forEach(p => {
+    if (!p || !Number.isFinite(p.ts)) return;
+    const val = Number.isFinite(p.total) ? Number(p.total) : (Number.isFinite(p.value) ? Number(p.value) : NaN);
+    const re = Number(p.real_estate) || 0;
+    metaByTs[p.ts] = { ts: p.ts, value: val, investable: Number.isFinite(val) ? +(val - re).toFixed(2) : null, real_estate: re,
+      asset_count: (p.asset_count != null ? p.asset_count : (p.assetCount != null ? p.assetCount : null)),
+      source: (p.source === 'backend_snapshot') ? 'backend_snapshot' : 'frontend',
+      market_state: p.market_state || null, price_staleness: p.price_staleness || null,
+      catKeys: (p.category_values && typeof p.category_values === 'object') ? Object.keys(p.category_values).sort().join(',') : null };
+  });
+
+  const perRange = {};
+  const CLASS = ['ECONOMIC_MOVE_PLAUSIBLE', 'FLOW_OR_HOLDINGS_CHANGE', 'SOURCE_VALUATION_REGIME_CHANGE', 'STALE_TO_LIVE_PRICE_TRANSITION', 'CATEGORY_COMPOSITION_DISCONTINUITY', 'REVISION_OR_IDENTITY_MISMATCH', 'DUPLICATE_TIME_DIFFERENT_VALUE', 'UNKNOWN_DISCONTINUITY'];
+  const agg = { valuationRegimeSet: {}, sourceAlternationCount: 0, staleLiveAlternationCount: 0, compositionDiscontinuityCount: 0, revisionMismatchCount: 0, sameMinuteConflictCount: 0, genuineEconomicMoveCount: 0, totalSyntheticPoints: 0 };
+  const adjacentTransitionMatrix = {};
+
+  RANGES.forEach(r => {
+    const chart = safe(() => buildChart ? buildChart(r) : null, null) || { points: [], state: 'pending' };
+    const frc = safe(() => resolveContract ? resolveContract(chart, r, 'desktop') : null, null) || {};
+    const rp = Array.isArray(frc.renderPoints) ? frc.renderPoints.filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value)) : [];
+    const synth = (frc.diagnostics && frc.diagnostics.syntheticPoints != null) ? frc.diagnostics.syntheticPoints : 0;
+    agg.totalSyntheticPoints += synth;
+    // per-point provenance = each rendered point mapped back to its merged-source metadata (real points only)
+    const prov = rp.map(p => {
+      const m = metaByTs[p.ts] || { ts: p.ts, value: p.value, investable: null, real_estate: null, asset_count: null, source: 'frontend', market_state: null, price_staleness: null, catKeys: null };
+      return { ts: p.ts, value: p.value, investable: m.investable, real_estate: m.real_estate, asset_count: m.asset_count,
+        source: m.source, market_state: m.market_state, price_staleness: m.price_staleness, catKeys: m.catKeys,
+        survivesFRC: true, provenance: (m.source === 'backend_snapshot') ? 'backend' : 'frontend' };
+    });
+    const transitions = [];
+    const counts = {}; CLASS.forEach(c => counts[c] = 0);
+    let jumps = 0;
+    for (let i = 1; i < prov.length; i++) {
+      const cls = _aurixClassifySnapshotTransition(prov[i - 1], prov[i], { jumpPct: jumpPct });
+      counts[cls] = (counts[cls] || 0) + 1;
+      const pv = prov[i - 1].value, v = prov[i].value;
+      const pct = (pv ? +(((v - pv) / pv) * 100).toFixed(2) : 0);
+      if (Math.abs(pct) >= jumpPct) jumps++;
+      transitions.push({ fromTs: prov[i - 1].ts, toTs: prov[i].ts, pct: pct, classification: cls,
+        fromSource: prov[i - 1].provenance, toSource: prov[i].provenance });
+      // cross-range aggregates
+      if (prov[i - 1].provenance !== prov[i].provenance) agg.sourceAlternationCount++;
+      if (prov[i - 1].price_staleness && prov[i].price_staleness && prov[i - 1].price_staleness !== prov[i].price_staleness) agg.staleLiveAlternationCount++;
+      if (cls === 'CATEGORY_COMPOSITION_DISCONTINUITY') agg.compositionDiscontinuityCount++;
+      if (cls === 'DUPLICATE_TIME_DIFFERENT_VALUE') agg.sameMinuteConflictCount++;
+      if (cls === 'ECONOMIC_MOVE_PLAUSIBLE') agg.genuineEconomicMoveCount++;
+      adjacentTransitionMatrix[cls] = (adjacentTransitionMatrix[cls] || 0) + 1;
+    }
+    prov.forEach(p => { agg.valuationRegimeSet[(p.price_staleness || 'na') + ':' + p.provenance] = 1; });
+    perRange[r] = { range: r, renderPointCount: rp.length, syntheticPoints: synth, jumpCount: jumps,
+      sourceCounts: { frontend: prov.filter(p => p.provenance === 'frontend').length, backend: prov.filter(p => p.provenance === 'backend').length },
+      transitionCounts: counts, perPointProvenance: (options.includePoints === false) ? undefined : prov, transitions: (options.includePoints === false) ? undefined : transitions };
+  });
+
+  const valuationRegimeCount = Object.keys(agg.valuationRegimeSet).length;
+  const defects = [], suspects = [];
+  // DEFECTS only when proven from stored fields (never inferred)
+  if (agg.sameMinuteConflictCount > 0) defects.push({ type: 'SAME_MINUTE_CONFLICT', count: agg.sameMinuteConflictCount });
+  const jumpSourceAlt = Object.keys(perRange).reduce((n, r) => n + (perRange[r].transitionCounts.SOURCE_VALUATION_REGIME_CHANGE || 0), 0);
+  const jumpStaleLive = Object.keys(perRange).reduce((n, r) => n + (perRange[r].transitionCounts.STALE_TO_LIVE_PRICE_TRANSITION || 0), 0);
+  if (jumpSourceAlt > 0) defects.push({ type: 'SOURCE_VALUATION_REGIME_CHANGE', count: jumpSourceAlt });
+  if (jumpStaleLive > 0) suspects.push({ type: 'STALE_TO_LIVE_PRICE_TRANSITION', count: jumpStaleLive });
+  const compDisc = Object.keys(perRange).reduce((n, r) => n + (perRange[r].transitionCounts.CATEGORY_COMPOSITION_DISCONTINUITY || 0), 0);
+  if (compDisc > 0) suspects.push({ type: 'CATEGORY_COMPOSITION_DISCONTINUITY', count: compDisc });
+  const unknown = Object.keys(perRange).reduce((n, r) => n + (perRange[r].transitionCounts.UNKNOWN_DISCONTINUITY || 0), 0);
+  const totalJumps = Object.keys(perRange).reduce((n, r) => n + perRange[r].jumpCount, 0);
+  const anyData = Object.keys(perRange).some(r => perRange[r].renderPointCount >= 2);
+
+  let verdict;
+  if (!anyData) verdict = 'INSUFFICIENT_EVIDENCE';
+  else if (agg.sameMinuteConflictCount > 0) verdict = 'SAME_MINUTE_CONFLICT_DEFECT_PROVEN';
+  else if (jumpSourceAlt > 0) verdict = 'SOURCE_ALTERNATION_DEFECT_PROVEN';
+  else if (jumpStaleLive >= 3 && jumpStaleLive >= totalJumps * 0.5) verdict = 'VALUATION_REGIME_DEFECT_PROVEN';   // stale/live regime dominates the jumps
+  else if (totalJumps === 0) verdict = 'STABLE_CONTINUOUS_HISTORY';
+  else verdict = 'GENUINE_ECONOMIC_VOLATILITY';   // jumps are real edits / market moves / isolated transitions
+
+  const rootCause = (verdict === 'SOURCE_ALTERNATION_DEFECT_PROVEN') ? 'frontend↔backend valuation-regime alternation inside a continuous segment'
+    : (verdict === 'VALUATION_REGIME_DEFECT_PROVEN') ? 'stale/last_close vs live price regimes mixed as equivalent inside a continuous segment'
+    : (verdict === 'SAME_MINUTE_CONFLICT_DEFECT_PROVEN') ? 'multiple different values survive for the same user/minute'
+    : (verdict === 'GENUINE_ECONOMIC_VOLATILITY') ? 'abrupt changes are genuine market movement and real holdings edits, not a source/regime defect'
+    : (verdict === 'STABLE_CONTINUOUS_HISTORY') ? 'no abrupt inter-point change beyond the economic threshold'
+    : 'insufficient displayed history to classify';
+
+  return {
+    spec: 'DSH.CHART.LONG_RANGE_SNAPSHOT_CONTINUITY.37', appVersion: appVersion, startedAtIso: nowIso(), behaviorChanged: false, readOnly: true,
+    ranges: RANGES, jumpThresholdPct: jumpPct,
+    rootCause: rootCause, perPointProvenance: options.includePoints === false ? undefined : (function () { const o = {}; RANGES.forEach(r => { o[r] = perRange[r].perPointProvenance; }); return o; })(),
+    adjacentTransitionMatrix: adjacentTransitionMatrix, perRange: perRange,
+    valuationRegimeCount: valuationRegimeCount, sourceAlternationCount: agg.sourceAlternationCount,
+    staleLiveAlternationCount: agg.staleLiveAlternationCount, compositionDiscontinuityCount: agg.compositionDiscontinuityCount,
+    revisionMismatchCount: agg.revisionMismatchCount, sameMinuteConflictCount: agg.sameMinuteConflictCount,
+    genuineEconomicMoveCount: agg.genuineEconomicMoveCount, unknownDiscontinuityCount: unknown, totalJumpCount: totalJumps,
+    defects: defects, suspects: suspects,
+    summary: { verdict: verdict, valuationRegimeCount: valuationRegimeCount, sourceAlternationCount: agg.sourceAlternationCount,
+      staleLiveAlternationCount: agg.staleLiveAlternationCount, sameMinuteConflictCount: agg.sameMinuteConflictCount,
+      totalSyntheticPoints: agg.totalSyntheticPoints, totalJumpCount: totalJumps, defectCount: defects.length },
+    verdict: verdict,
+  };
+}
+try { if (typeof window !== 'undefined') window._aurixAuditLongRangeSnapshotContinuityCore = _aurixAuditLongRangeSnapshotContinuityCore; } catch (_) {}
+
 // P0-PREMIUM-RENDERER-RECONNECTION — render the ALREADY-VALIDATED buildProductionPortfolioChart points
 // through the ORIGINAL institutional geometry (LTTB downsample → regime-aware scales → monotone-CUBIC
 // path → area). Values are NEVER modified: the only change is a ts→time shape rename. Returns a premium
@@ -27285,6 +27443,46 @@ try {
     window.aurixCopyLastUnifiedVisualLanguageAudit = function () {
       let json = '';
       try { json = JSON.stringify(window.__AURIX_LAST_UNIFIED_VISUAL_LANGUAGE_AUDIT__ || { error: 'no unified-visual-language audit yet — run aurixAuditUnifiedVisualLanguage() first' }, null, 2); } catch (_) { json = '{"error":"stringify_failed"}'; }
+      try {
+        if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+          const p = navigator.clipboard.writeText(json);   // rejects with NotAllowedError when the document is not focused
+          if (p && typeof p.then === 'function') p.then(function () {}, function () {});   // swallow rejection — never throw
+        }
+      } catch (_) {}
+      try { console.log(json); } catch (_) {}
+      return json;
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // SPEC DSH.CHART.LONG_RANGE_SNAPSHOT_CONTINUITY.37 — window.aurixAuditLongRangeSnapshotContinuity(options)
+    // ════════════════════════════════════════════════════════════════════════════
+    // READ-ONLY. Proves on the REAL displayed merged series whether the long-range instability is a valuation-
+    // regime / source-alternation / same-minute defect or genuine economic movement. Never throws; stores the
+    // last result in-memory only. No rendering/behaviour change.
+    window.aurixAuditLongRangeSnapshotContinuity = function (options) {
+      let result;
+      try {
+        result = (typeof _aurixAuditLongRangeSnapshotContinuityCore === 'function') ? _aurixAuditLongRangeSnapshotContinuityCore(options || {}, {})
+          : { spec: 'DSH.CHART.LONG_RANGE_SNAPSHOT_CONTINUITY.37', verdict: 'INSUFFICIENT_EVIDENCE', behaviorChanged: false, errorMessage: 'core unavailable', defects: [], suspects: [], summary: {} };
+      } catch (e) {
+        result = { spec: 'DSH.CHART.LONG_RANGE_SNAPSHOT_CONTINUITY.37', verdict: 'INSUFFICIENT_EVIDENCE', behaviorChanged: false, errorMessage: (e && e.message) ? e.message : String(e), defects: [], suspects: [], summary: {} };
+      }
+      try { window.__AURIX_LAST_LONG_RANGE_SNAPSHOT_CONTINUITY_AUDIT__ = result; } catch (_) {}
+      try {
+        const s = result.summary || {};
+        console.log('%c[UI][LONG_RANGE_SNAPSHOT_CONTINUITY]', 'font-weight:700;color:#12b886', result);
+        console.log('VERDICT: ' + (result.verdict || 'n/a') + '  rootCause: ' + (result.rootCause || 'n/a'));
+        console.log('valuationRegimeCount: ' + result.valuationRegimeCount + '  sourceAlternationCount: ' + result.sourceAlternationCount + '  staleLiveAlternationCount: ' + result.staleLiveAlternationCount);
+        console.log('sameMinuteConflictCount: ' + result.sameMinuteConflictCount + '  compositionDiscontinuityCount: ' + result.compositionDiscontinuityCount + '  genuineEconomicMoveCount: ' + result.genuineEconomicMoveCount);
+        console.log('totalJumpCount: ' + result.totalJumpCount + '  totalSyntheticPoints: ' + (s.totalSyntheticPoints) + '  defects: ' + (Array.isArray(result.defects) ? result.defects.length : 'n/a'));
+        console.log('adjacentTransitionMatrix: ', result.adjacentTransitionMatrix);
+        console.log('To copy full JSON run: aurixCopyLastLongRangeSnapshotContinuityAudit()');
+      } catch (_) {}
+      return result;
+    };
+    window.aurixCopyLastLongRangeSnapshotContinuityAudit = function () {
+      let json = '';
+      try { json = JSON.stringify(window.__AURIX_LAST_LONG_RANGE_SNAPSHOT_CONTINUITY_AUDIT__ || { error: 'no long-range snapshot-continuity audit yet — run aurixAuditLongRangeSnapshotContinuity() first' }, null, 2); } catch (_) { json = '{"error":"stringify_failed"}'; }
       try {
         if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
           const p = navigator.clipboard.writeText(json);   // rejects with NotAllowedError when the document is not focused
