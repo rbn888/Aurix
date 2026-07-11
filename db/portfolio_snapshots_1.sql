@@ -41,8 +41,15 @@ create index if not exists portfolio_snapshots_user_ts_idx
 
 -- Idempotency / no-duplicate guard: at most one snapshot per user per minute-bucket.
 -- (The scheduler also applies a value/time near-duplicate check, but this is the hard floor.)
+-- NOTE: the index expression MUST be IMMUTABLE. `date_trunc('minute', ts)` on a timestamptz is only STABLE
+-- (timezone-dependent), so Postgres rejects it in an index. We bucket on the absolute epoch-minute instead —
+-- the epoch of an instant is timezone-independent, so this IMMUTABLE wrapper is correct and safe.
+create or replace function public.aurix_minute_bucket(p_ts timestamptz)
+  returns bigint language sql immutable
+  as $$ select floor(extract(epoch from p_ts) / 60)::bigint $$;
+
 create unique index if not exists portfolio_snapshots_user_minute_uidx
-  on public.portfolio_snapshots (user_id, date_trunc('minute', ts));
+  on public.portfolio_snapshots (user_id, public.aurix_minute_bucket(ts));
 
 alter table public.portfolio_snapshots enable row level security;
 

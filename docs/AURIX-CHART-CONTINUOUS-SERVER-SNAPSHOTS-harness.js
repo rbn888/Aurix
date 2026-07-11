@@ -114,7 +114,8 @@ ok('single valuation pipeline (no duplicate calc): mirrors app.js convertFromNew
 ok('writes ONLY portfolio_snapshots (never writes user_portfolios/category_history)', /from\('portfolio_snapshots'\)\.insert/.test(TS) && !/from\(['"](user_portfolios|category_history)['"]\)\.(insert|update|upsert|delete)/.test(TS));
 
 // ── schema (db/portfolio_snapshots_1.sql) ─────────────────────────────────────────────────────────────────
-ok('schema: append-only table with unique idempotency index (user_id, minute)', /create unique index[^;]*portfolio_snapshots_user_minute_uidx[\s\S]*?\(user_id, date_trunc\('minute', ts\)\)/.test(SCHEMA));
+ok('schema: append-only table with unique idempotency index (user_id, minute-bucket)', /create unique index[^;]*portfolio_snapshots_user_minute_uidx[\s\S]*?\(user_id, public\.aurix_minute_bucket\(ts\)\)/.test(SCHEMA));
+ok('schema: minute-bucket is an IMMUTABLE function (index-expression legal; date_trunc on timestamptz is only STABLE)', /create or replace function public\.aurix_minute_bucket\(p_ts timestamptz\)[\s\S]*?language sql immutable/.test(SCHEMA) && !/\(user_id, date_trunc\('minute', ts\)\)/.test(SCHEMA));
 ok('schema: per-user time index (user_id, ts desc)', /portfolio_snapshots_user_ts_idx[\s\S]*?\(user_id, ts desc\)/.test(SCHEMA));
 ok('schema: RLS on + SELECT own only + NO client insert/update/delete policy', /enable row level security/.test(SCHEMA) && /for select\s*\n?\s*using \(auth\.uid\(\) = user_id\)/.test(SCHEMA) && !/for insert/i.test(SCHEMA) && !/for update/i.test(SCHEMA));
 ok('schema: user_id FK to auth.users with on delete cascade (isolation)', /user_id\s+uuid\s+not null references auth\.users \(id\) on delete cascade/.test(SCHEMA));
