@@ -23553,6 +23553,40 @@ function _aurixComputePeriodReturn(range, first, last) {
 // re-merges backend snapshots asynchronously — so two reloads at the same instant catch different partial
 // sources and draw different lines. Setting this false restores the old (non-deterministic) behaviour.
 const _AURIX_CHART_RECONCILE_GATE = true;
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.DURABLE_COLD_START_RECOVERY.35 — atomic boot from the last verified durable series
+// ════════════════════════════════════════════════════════════════════════════
+// ROOT CAUSE proven: for an authenticated user the reconcile gate below returns state:'pending'
+// ("Histórico en construcción") on EVERY cold start until the remote row is fetched + reconciled — even though
+// loadCategoryHistory() has already restored a VALID durable series from localStorage (identity-guaranteed by
+// _aurixEnforceCacheOwner, which purges any other user's cache before boot). That is the forbidden
+// "clear → building → rebuild → render" boot contract; offline/slow boots stay building forever. FIX: render
+// the last verified durable series IMMEDIATELY, then hydrate + atomically adopt the canonical series on
+// reconcile. The RETURN/badge stays canonical-gated (unchanged — the % remains "Calculando…" until reconcile
+// via canDisplayCanonicalReturn / the suppression below), so cross-device return safety (P0-HISTORY-AUTHORITY-
+// HARD-LOCK, SPEC.09/21/25) is fully preserved — ONLY the line paints early. A genuinely-new/short portfolio
+// (< _AURIX_ALL_MIN_TRUST_POINTS mature points) still shows building (SPEC.35 rule 6/9). Flag OFF ⇒ exact v515.
+// NOTE (architectural stop rule): continuity while the app is CLOSED still needs the external
+// portfolio_snapshots scheduler; this fix restores what already exists locally, it does not fabricate closed-app data.
+const _AURIX_CHART_DURABLE_COLD_START = true;
+// PURE, deterministic cold-start decision. reconciled: canonical remote ready? durableSource: the last
+// verified persisted series (identity-isolated). Returns whether to render the durable series now (and keep
+// the return suppressed until reconcile) vs the building placeholder. Never mutates; never fabricates points.
+function _aurixResolveColdStartRender(reconciled, durableSource, opts) {
+  opts = opts || {};
+  const flagOn = opts.flagOn !== false;
+  const minPts = Number.isFinite(opts.minMaturePoints) ? opts.minMaturePoints : ((typeof _AURIX_ALL_MIN_TRUST_POINTS === 'number') ? _AURIX_ALL_MIN_TRUST_POINTS : 8);
+  const out = { renderFromDurable: false, buildingPlaceholder: false, suppressReturn: false, reason: null, source: 'canonical', maturePointCount: 0 };
+  if (reconciled) { out.reason = 'reconciled'; return out; }              // normal path — build from the canonical source
+  if (!flagOn) { out.buildingPlaceholder = true; out.reason = 'awaiting_canonical_reconcile'; return out; }   // exact v515
+  const src = Array.isArray(durableSource) ? durableSource.filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.total != null ? p.total : p.value)) : [];
+  out.maturePointCount = src.length;
+  // A verified, established series (≥ minPts real points) ⇒ render it immediately (deterministic: same
+  // persisted cache ⇒ same shape). A truly-new / short-history portfolio ⇒ honest building state.
+  if (src.length >= minPts) { out.renderFromDurable = true; out.suppressReturn = true; out.reason = 'durable_last_verified_series'; out.source = 'durable_local'; return out; }
+  out.buildingPlaceholder = true; out.reason = 'no_mature_verified_series'; return out;
+}
+try { if (typeof window !== 'undefined') window._aurixResolveColdStartRender = _aurixResolveColdStartRender; } catch (_) {}
 // PASSIVE CONSUMER. The visible chart reads the ALREADY-VALIDATED series. READY/PENDING is decided ONLY
 // by validated-point sufficiency (≥2 after quarantine). The visual gate is retained as a DIAGNOSTIC field
 // but NEVER rejects a range. The LINE draws the validated wealth series; the badge % is the FLOW-NEUTRAL
@@ -23607,10 +23641,25 @@ function buildProductionPortfolioChart(range) {
       let reconciled = true;
       try { reconciled = (typeof _aurixCanonicalHistoryReady === 'function') ? _aurixCanonicalHistoryReady() : true; } catch (_) { reconciled = true; }
       if (!reconciled) {
-        out.state = 'pending'; out.reason = 'awaiting_canonical_reconcile'; out.pendingReason = out.reason;
-        out.renderDecision = 'PENDING';
-        out.renderDecisionReason = 'authenticated source not yet reconciled (remote canonical history loading) — stable building state, never an intermediate local shape';
-        return out;
+        // SPEC.35 — instead of always showing "building", render the LAST VERIFIED DURABLE series immediately
+        // (atomic boot) when one exists for this identity; the return stays canonical-gated (suppressed below).
+        const _durableOn = (typeof _AURIX_CHART_DURABLE_COLD_START !== 'undefined') && _AURIX_CHART_DURABLE_COLD_START;
+        let _dec = { buildingPlaceholder: true, renderFromDurable: false, suppressReturn: false, reason: 'awaiting_canonical_reconcile' };
+        if (_durableOn && typeof _aurixResolveColdStartRender === 'function') {
+          let _durableSrc = null;
+          try { _durableSrc = (typeof _aurixHistorySourceForDisplay === 'function') ? _aurixHistorySourceForDisplay() : null; } catch (_) { _durableSrc = null; }
+          try { _dec = _aurixResolveColdStartRender(false, _durableSrc, { flagOn: true, minMaturePoints: (typeof _AURIX_ALL_MIN_TRUST_POINTS === 'number' ? _AURIX_ALL_MIN_TRUST_POINTS : 8) }); } catch (_) {}
+        }
+        if (_dec.buildingPlaceholder) {
+          out.state = 'pending'; out.reason = 'awaiting_canonical_reconcile'; out.pendingReason = out.reason;
+          out.renderDecision = 'PENDING';
+          out.renderDecisionReason = 'authenticated source not yet reconciled (remote canonical history loading) — stable building state, never an intermediate local shape';
+          return out;
+        }
+        // durable cold-start render: proceed to build the line from the durable source; mark the return for
+        // canonical suppression so the badge stays "Calculando…" until reconcile (no return/authority change).
+        out.__durableColdStart = !!_dec.suppressReturn;
+        out.renderDecisionReason = 'SPEC.35 durable cold-start: rendering last verified series (' + _dec.maturePointCount + ' pts); return canonical-gated until reconcile';
       }
     }
     const v = buildValidatedHistoricalSeries(r);
@@ -23774,6 +23823,15 @@ function buildProductionPortfolioChart(range) {
       // Honest state — line (wealth) is shown, but there is no trustworthy REAL requested-period return.
       out.returnPct = null; out.badgeReturnPct = null;
       out.returnValue = 0; out.color = 'flat';
+    }
+    // SPEC.35 — durable cold-start: the LINE renders the last verified series, but the RETURN stays canonical-
+    // gated (badge "Calculando…") exactly as before reconcile — no return/authority/% change. state stays
+    // 'ready' so the line paints; the honest insufficient-return state drives the badge (SPEC.28 presentation).
+    if (out.__durableColdStart) {
+      out.returnState = 'insufficient_return_history';
+      out.returnSuppressedReason = 'awaiting_canonical_reconcile';
+      out.returnPct = null; out.badgeReturnPct = null; out.returnValue = 0; out.color = 'flat';
+      out.renderSource = 'durable_local_cold_start';
     }
     out.chartHash = _aurixEmergencyHash(out.points);
     return out;
@@ -25760,6 +25818,17 @@ function _aurixAuditUnifiedVisualLanguageCore(options, deps) {
       keyboardEnabled: true, mobilePointerEnabled: true,
       selectedPointIsReal: (typeof _aurixInteractionState === 'object' && _aurixInteractionState) ? _aurixInteractionState.selectedPointIsReal : null,
       syntheticPoints: 0,
+      // ── SPEC.35 DURABLE COLD-START CONTRACT (additive; read-only) ──
+      coldStart: {
+        enabled: (typeof _AURIX_CHART_DURABLE_COLD_START !== 'undefined') ? !!_AURIX_CHART_DURABLE_COLD_START : false,
+        policy: 'render_last_verified_durable_series_then_atomic_hydrate',
+        forbiddenBootContract: 'clear->building->rebuild->render (eliminated)',
+        identityIsolatedBy: 'aurix_cache_owner via _aurixEnforceCacheOwner (purges other-user cache pre-boot)',
+        returnCanonicalGated: true, minMaturePoints: (typeof _AURIX_ALL_MIN_TRUST_POINTS === 'number') ? _AURIX_ALL_MIN_TRUST_POINTS : 8,
+        window24hAnchor: 'max_snapshot_ts_minus_24h', window24hReset: 'none (not calendar/session/cache based)',
+        backendClosedAppContinuity: 'requires external portfolio_snapshots scheduler (not deployable from this repo)',
+        syntheticPoints: 0,
+      },
       debug: (typeof _aurixInteractionState === 'object' && _aurixInteractionState) ? {
         lookupMode: _aurixInteractionState.lookupMode, interactionPointCount: _aurixInteractionState.interactionPointCount,
         lastDistancePx: _aurixInteractionState.lastDistancePx, rafUpdateCount: _aurixInteractionState.rafUpdateCount,
