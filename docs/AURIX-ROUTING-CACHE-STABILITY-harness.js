@@ -56,11 +56,13 @@ console.log('Redirect loop breaker:');
 { const sb = makeEnv('/index.html');
   ok('4 unknown redirect target falls back to login.html (never external)', (function () { R(sb, '//evil.com/x', 's'); return /login\.html$/.test(sb.__navs[0]); })(), sb.__navs[0]); }
 
-console.log('\nStale-bundle guard (index.html) + version source of truth:');
-ok('5 index.html has the cache-busted stale-bundle guard (version.json?cb, one-time reload)',
-  /P0-STALE-BUNDLE GUARD/.test(html) && /fetch\('version\.json\?cb='/.test(html) && /aurix_stale_reload_to/.test(html) && /index\.html\?fresh=/.test(html));
-ok('6 stale reload is one-time-guarded (guard !== target version → never an infinite loop)',
-  /guard !== String\(j\.appjs\)/.test(html) && /sessionStorage\.setItem\('aurix_stale_reload_to'/.test(html));
+console.log('\nBuild-coherence guard (index.html, SPEC.43) + version source of truth:');
+// SPEC.43 replaced the SPEC-era stale guard with the build-coherence contract: same no-store version.json
+// fetch, but a shared structured marker (aurix_coherence_reload {v,n}) and a cache-busted index.html?v= reload.
+ok('5 index.html has the cache-busted build-coherence guard (version.json?cb, one-time reload)',
+  /BUILD-COHERENCE GUARD/.test(html) && /fetch\('version\.json\?cb='/.test(html) && /aurix_coherence_reload/.test(html) && /index\.html\?v=/.test(html));
+ok('6 stale reload is one-time-guarded per expected version (n>=1 ⇒ recoverable, never an infinite loop)',
+  /mk\.v === j\.appjs && \(mk\.n \|\| 0\) >= 1/.test(html) && /sessionStorage\.setItem\('aurix_coherence_reload'/.test(html) && /__AURIX_BUILD_RELOAD_EXHAUSTED/.test(html));
 { const vj = JSON.parse(fs.readFileSync(path.join(root, 'version.json'), 'utf8'));
   const m = html.match(/var APPJS_V = '(\d+)'/);
   const served = m ? parseInt(m[1], 10) : -1;

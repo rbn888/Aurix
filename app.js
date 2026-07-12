@@ -5,6 +5,110 @@
 try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX_BOOT.appJsExecuted = true; window.__AURIX_BOOT.mark('app_js_executing'); } } catch (_) {}
 
 // ════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.ATOMIC_BUILD_COHERENCE.43 — one runtime build-coherence contract
+// ════════════════════════════════════════════════════════════════════════
+// The EXECUTED bundle's immutable self-version (bumped together with index APPJS_V + version.json.appjs +
+// app.js?v=). This is the authoritative "what is actually running" that the stale-bundle guard lacked: the
+// old guard compared version.json vs index APPJS_V only and its once-per-target sessionStorage marker, set
+// before adoption, permanently blocked retry if the single reload failed to adopt (CDN propagation lag) →
+// browsers stuck on v521 after v522. This contract verifies version.json.appjs === index APPJS_V ===
+// requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
+// expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
+// silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '523'; } catch (_) {}
+// PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
+// helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
+// known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
+function _aurixResolveBuildCoherence(expected, indexVersion, requestedVersion, executedVersion, reloadState) {
+  const norm = x => { const n = parseInt(x, 10); return Number.isFinite(n) ? n : null; };
+  const e = norm(expected), iv = norm(indexVersion), rv = norm(requestedVersion), xv = norm(executedVersion);
+  const rs = (reloadState && typeof reloadState === 'object') ? reloadState : null;
+  const out = { expectedVersion: e, indexVersion: iv, requestedVersion: rv, executedVersion: xv,
+    coherent: false, mismatchFields: [], action: 'none', clearMarker: false, reloadAttempted: false, nextReloadState: rs };
+  if (e == null) { out.coherent = true; out.action = 'none'; out.clearMarker = true; out.reason = 'no_expected_version'; return out; }
+  if (iv != null && iv !== e) out.mismatchFields.push('indexVersion');
+  if (rv != null && rv !== e) out.mismatchFields.push('requestedVersion');
+  if (xv != null && xv !== e) out.mismatchFields.push('executedVersion');
+  out.coherent = (iv != null) && (xv != null) && out.mismatchFields.length === 0;
+  const attemptedForExpected = !!(rs && norm(rs.v) === e && (rs.n || 0) >= 1);
+  out.reloadAttempted = attemptedForExpected;
+  if (out.coherent) { out.action = 'none'; out.clearMarker = true; return out; }
+  if (attemptedForExpected) { out.action = 'recoverable'; return out; }   // one auto-reload already spent for this expected version ⇒ recoverable, never loop
+  out.action = 'reload';
+  out.nextReloadState = { v: e, n: (rs && norm(rs.v) === e ? (rs.n || 0) + 1 : 1), ts: (rs && rs.ts) || 0 };
+  return out;
+}
+try { if (typeof window !== 'undefined') window._aurixResolveBuildCoherence = _aurixResolveBuildCoherence; } catch (_) {}
+(function _aurixBuildCoherenceBoot() {
+  if (typeof window === 'undefined') return;
+  const MK = 'aurix_coherence_reload';
+  const readState = () => { try { return JSON.parse(sessionStorage.getItem(MK) || 'null'); } catch (_) { return null; } };
+  const parseReq = () => { try { const s = document.querySelector('script[src*="app.js?v="]'); const m = s && (s.getAttribute('src') || '').match(/[?&]v=(\d+)/); return m ? parseInt(m[1], 10) : null; } catch (_) { return null; } };
+  window.aurixBuildCoherenceStatus = function () {
+    const expected = (window.__AURIX_LATEST_APPJS != null) ? window.__AURIX_LATEST_APPJS : null;
+    const indexV = (window.__AURIX_SERVED_APPJS != null) ? window.__AURIX_SERVED_APPJS : (window.__AURIX_BOOT ? parseInt(window.__AURIX_BOOT.appJsVersion, 10) : null);
+    const requestedV = (window.__AURIX_REQUESTED_APPJS != null) ? window.__AURIX_REQUESTED_APPJS : parseReq();
+    const executedV = parseInt(window.__AURIX_APPJS_VERSION__, 10);
+    const dec = _aurixResolveBuildCoherence(expected, indexV, requestedV, Number.isFinite(executedV) ? executedV : null, readState());
+    return { expectedVersion: dec.expectedVersion, indexVersion: dec.indexVersion, requestedVersion: dec.requestedVersion, executedVersion: dec.executedVersion,
+      coherent: dec.coherent, reloadAttempted: dec.reloadAttempted, auditAvailable: (typeof window.aurixAuditTemporalWindow === 'function'), build: window.AURIX_BUILD || null };
+  };
+  window.aurixApplyBuildUpdate = function () { try { const now = (window.__AURIX_BOOT && window.__AURIX_BOOT.t0) ? (window.__AURIX_BOOT.t0 + 1) : 1; const e = window.__AURIX_LATEST_APPJS; const onAurix = location.pathname.indexOf('/Aurix/') === 0; const base = location.origin + (onAurix ? '/Aurix/' : '/'); location.replace(base + 'index.html?v=' + (e || 'x') + '&_cb=' + (Date.now ? Date.now() : now)); } catch (_) { try { location.reload(); } catch (__) {} } };
+  let _auditRan = false;
+  const runAuditOnce = () => {
+    if (_auditRan) return; _auditRan = true;
+    try { if (typeof window.aurixAuditTemporalWindow === 'function') { const r = window.aurixAuditTemporalWindow({}); try { console.log('%c[BOOT][BUILD-COHERENCE] coherent build — temporal audit verdict: ' + (r && r.verdict) + (r && r.exactOwner ? ' owner=' + r.exactOwner : ''), 'font-weight:700;color:#12b886'); } catch (_) {} } } catch (_) {}
+  };
+  const decide = (expected) => {
+    const indexV = (window.__AURIX_SERVED_APPJS != null) ? window.__AURIX_SERVED_APPJS : null;
+    const requestedV = (window.__AURIX_REQUESTED_APPJS != null) ? window.__AURIX_REQUESTED_APPJS : parseReq();
+    const executedV = parseInt(window.__AURIX_APPJS_VERSION__, 10);
+    const dec = _aurixResolveBuildCoherence(expected, indexV, requestedV, Number.isFinite(executedV) ? executedV : null, readState());
+    if (dec.action === 'reload') {
+      try { sessionStorage.setItem(MK, JSON.stringify(dec.nextReloadState)); } catch (_) {}
+      try { if (typeof caches !== 'undefined' && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { try { caches.delete(k); } catch (_) {} }); }).catch(function () {}); } catch (_) {}
+      try { console.warn('[BOOT][BUILD-COHERENCE] BUILD_MISMATCH ' + JSON.stringify(dec.mismatchFields) + ' — one controlled cache-busted reload to v' + dec.expectedVersion); } catch (_) {}
+      window.aurixApplyBuildUpdate();
+      return;
+    }
+    if (dec.action === 'recoverable') {
+      window.__AURIX_BUILD_UPDATE_AVAILABLE = true;
+      try { console.warn('[BOOT][BUILD-COHERENCE] still mismatched after one reload — recoverable update available; call aurixApplyBuildUpdate()'); } catch (_) {}
+      try {
+        if (document && document.body && !document.getElementById('aurix-build-update')) {
+          const d = document.createElement('div'); d.id = 'aurix-build-update';
+          d.setAttribute('style', 'position:fixed;left:0;right:0;bottom:0;z-index:2147483646;background:#05070e;color:#dce6f5;font:600 13px system-ui,sans-serif;padding:10px 14px;text-align:center;border-top:1px solid #1b2740;cursor:pointer');
+          d.textContent = 'Nueva versión disponible — toca para actualizar';
+          d.addEventListener('click', function () { window.aurixApplyBuildUpdate(); });
+          document.body.appendChild(d);
+        }
+      } catch (_) {}
+      return;
+    }
+    // coherent (or offline) — clear the marker so the next deploy re-arms; run the read-only audit once.
+    if (dec.clearMarker) { try { sessionStorage.removeItem(MK); } catch (_) {} }
+    if (dec.coherent && dec.expectedVersion != null && dec.expectedVersion >= 522) runAuditOnce();
+  };
+  const start = () => {
+    // authoritative expected version — prefer index's no-store fetch result; else fetch no-store ourselves.
+    if (window.__AURIX_LATEST_APPJS != null) { decide(window.__AURIX_LATEST_APPJS); return; }
+    let done = false; const go = v => { if (done) return; done = true; decide(v); };
+    try {
+      fetch('version.json?cb=' + ((window.__AURIX_BOOT && window.__AURIX_BOOT.t0) || 1) + '_' + (window.__AURIX_APPJS_VERSION__ || 'x'), { cache: 'no-store' })
+        .then(function (r) { return r && r.ok ? r.json() : null; })
+        .then(function (j) { if (j && typeof j.appjs === 'number') { window.__AURIX_LATEST_APPJS = j.appjs; window.__AURIX_LATEST_BUILD = j.build || null; } go(window.__AURIX_LATEST_APPJS != null ? window.__AURIX_LATEST_APPJS : null); })
+        .catch(function () { go(null); });
+    } catch (_) { go(null); }
+    // if index already resolved it in the meantime, decide immediately
+    if (window.__AURIX_LATEST_APPJS != null) go(window.__AURIX_LATEST_APPJS);
+  };
+  try {
+    if (document.readyState === 'complete' || document.readyState === 'interactive') { start(); }
+    else { document.addEventListener('DOMContentLoaded', start, { once: true }); }
+  } catch (_) { try { start(); } catch (__) {} }
+})();
+
+// ════════════════════════════════════════════════════════════════════════
 // P0 BOOT PIPELINE — EARLY SPLASH GUARANTEE. This is the FIRST app.js logic, BEFORE
 // any migration / wiring / bootstrap. The previous splash failsafe lived ~36k lines
 // down, so ANY earlier top-level throw (e.g. a malformed-data migration) aborted

@@ -1,0 +1,101 @@
+'use strict';
+// ════════════════════════════════════════════════════════════════════════════
+// AURIX-CHART-ATOMIC-BUILD-COHERENCE-harness — SPEC DSH.CHART.ATOMIC_BUILD_COHERENCE.43
+// ════════════════════════════════════════════════════════════════════════════
+// Both authenticated accounts stayed on v521 after v522 deployed (window.aurixAuditTemporalWindow is not a
+// function) — a build-coherence defect: the old stale-bundle guard compared version.json vs index APPJS_V
+// only and blocked retry permanently (marker set once per target, before adoption). This SPEC adds one
+// runtime contract: version.json.appjs === index APPJS_V === app.js?v= === __AURIX_APPJS_VERSION__, with at
+// most ONE controlled cache-busted reload per expected version, marker cleared on coherence, recoverable
+// state on exhaust (never a loop, never a silent mixed release), and the temporal audit auto-run once when
+// coherent. This harness proves the pure decision helper (all 14 cases) + the exports/exposure + that NO
+// chart/auth/storage owner is touched.
+const fs = require('fs'), vm = require('vm'), path = require('path');
+const root = path.join(__dirname, '..');
+const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const versionJson = JSON.parse(fs.readFileSync(path.join(root, 'version.json'), 'utf8'));
+function braceSlice(s, i) { let k = s.indexOf('{', i), d = 0; for (; k < s.length; k++) { const c = s[k]; if (c === '{') d++; else if (c === '}') { d--; if (!d) { k++; break; } } } return s.slice(i, k); }
+function fnSrc(n) { const i = app.indexOf('function ' + n + '('); if (i < 0) throw new Error('missing ' + n); return braceSlice(app, i); }
+let pass = 0, fail = 0;
+function ok(n, c, extra) { if (c) { pass++; console.log('  ✓ ' + n); } else { fail++; console.log('  ✗ ' + n + (extra ? '  →  ' + extra : '')); } }
+
+const ctx = { console: { log() {} }, Math, JSON, Number, isFinite, parseInt };
+vm.createContext(ctx);
+vm.runInContext(fnSrc('_aurixResolveBuildCoherence'), ctx);
+const R = (e, iv, rv, xv, rs) => vm.runInContext('_aurixResolveBuildCoherence', ctx)(e, iv, rv, xv, rs || null);
+
+console.log('\nAURIX-CHART-ATOMIC-BUILD-COHERENCE — SPEC.43');
+
+// ── 0 marker + single owner + four version sources aligned at 523 ────────────
+ok('0 SPEC.43 marker present', app.indexOf('ATOMIC_BUILD_COHERENCE.43') >= 0);
+ok('0 single _aurixResolveBuildCoherence owner', (app.match(/^function _aurixResolveBuildCoherence\(/gm) || []).length === 1);
+ok('0 version.json.appjs = 523', versionJson.appjs === 523);
+ok('0 index APPJS_V = 523', /var APPJS_V = '523';/.test(indexHtml));
+ok('0 index requests app.js?v=523', /app\.js\?v=523/.test(indexHtml));
+ok('0 executed bundle self-version __AURIX_APPJS_VERSION__ = 523', /__AURIX_APPJS_VERSION__ = '523';/.test(app));
+
+// ── 1 all four match → no reload ─────────────────────────────────────────────
+(function () { const d = R(523, 523, 523, 523, null); ok('1 all match ⇒ coherent + action none (no reload)', d.coherent === true && d.action === 'none' && d.clearMarker === true, JSON.stringify(d)); })();
+
+// ── 2 browser executes v521 while expected v522 → one reload ─────────────────
+(function () { const d = R(522, 521, 521, 521, null); ok('2 executed v521 vs expected v522 ⇒ action reload', d.action === 'reload' && d.coherent === false && d.nextReloadState.v === 522 && d.nextReloadState.n === 1); })();
+
+// ── 3 index stale but version.json current → authoritative = expected ────────
+(function () { const d = R(523, 521, 521, 521, null); ok('3 stale index ⇒ mismatch(indexVersion) + reload to authoritative expected', d.mismatchFields.indexOf('indexVersion') >= 0 && d.action === 'reload' && d.nextReloadState.v === 523); })();
+
+// ── 4 script query stale → mismatch flagged (corrected URL uses expected) ────
+(function () { const d = R(523, 523, 521, 523, null); ok('4 stale requested query ⇒ mismatch(requestedVersion)', d.mismatchFields.indexOf('requestedVersion') >= 0 && d.coherent === false);
+  ok('4 reload URL is built from expected (aurixApplyBuildUpdate uses __AURIX_LATEST_APPJS)', /aurixApplyBuildUpdate[\s\S]{0,400}__AURIX_LATEST_APPJS/.test(app)); })();
+
+// ── 5 executed bundle stale → mismatch detected ──────────────────────────────
+(function () { const d = R(523, 523, 523, 521, null); ok('5 stale executed bundle ⇒ mismatch(executedVersion) + not coherent', d.mismatchFields.indexOf('executedVersion') >= 0 && d.coherent === false && d.action === 'reload'); })();
+
+// ── 6 successful reload clears marker (coherent ⇒ clearMarker) ───────────────
+(function () { const d = R(523, 523, 523, 523, { v: 523, n: 1, ts: 1 }); ok('6 coherent after reload ⇒ clearMarker true + no further reload', d.coherent === true && d.clearMarker === true && d.action === 'none'); })();
+
+// ── 7 repeated mismatch does NOT loop (one attempt spent ⇒ recoverable) ──────
+(function () { const d = R(523, 521, 521, 521, { v: 523, n: 1, ts: 1 }); ok('7 still mismatched after 1 attempt ⇒ recoverable (never loop)', d.action === 'recoverable' && d.reloadAttempted === true); })();
+
+// ── 8 auth/portfolio/history/storage NOT touched by the coherence code ───────
+(function () {
+  const boot = (function () { const i = app.indexOf('_aurixBuildCoherenceBoot'); return app.slice(i, i + 8000); })();
+  const helper = fnSrc('_aurixResolveBuildCoherence');
+  const blob = boot + helper;
+  const forbidden = ['categoryHistory =', '_clearLocalUserState', 'signOut', 'logout', 'removeItem(\'category', 'localStorage.clear', 'sessionStorage.clear', 'currentUser =', 'portfolio_revision', 'auth.signOut'];
+  const hit = forbidden.filter(t => blob.indexOf(t) >= 0);
+  ok('8 coherence code never clears auth/portfolio/history/storage', hit.length === 0, 'hit: ' + hit.join(','));
+  ok('8 only the reload marker + HTTP caches are touched', blob.indexOf("sessionStorage.removeItem(MK)") >= 0 && blob.indexOf('caches.delete') >= 0 && blob.indexOf('localStorage.removeItem') < 0);
+})();
+
+// ── 9 coherent v522+ ⇒ temporal audit auto-run once (wired) + audit exists ───
+(function () {
+  ok('9 aurixAuditTemporalWindow exists in bundle (SPEC.42, loaded)', app.indexOf('window.aurixAuditTemporalWindow = function') >= 0);
+  const boot = app.slice(app.indexOf('_aurixBuildCoherenceBoot'), app.indexOf('_aurixBuildCoherenceBoot') + 8000);
+  ok('9 runner calls the audit once on coherent build >=522', /runAuditOnce[\s\S]{0,200}aurixAuditTemporalWindow/.test(app) && /dec\.expectedVersion >= 522[\s\S]{0,40}runAuditOnce\(\)/.test(app));
+})();
+
+// ── 10 normal coherent boot ⇒ no reload / no extra fan-out ───────────────────
+(function () { const d = R(523, 523, 523, 523, null); ok('10 coherent ⇒ action none (no reload, no cache-bust)', d.action === 'none'); })();
+
+// ── 11 desktop/mobile share the SAME owner (no surface branching) ────────────
+(function () { const boot = app.slice(app.indexOf('_aurixBuildCoherenceBoot'), app.indexOf('_aurixBuildCoherenceBoot') + 8000); ok('11 coherence contract has no desktop/mobile branch', !/surface|isMobile|opts\.uid/.test(boot) && !/mobile/.test(fnSrc('_aurixResolveBuildCoherence'))); })();
+
+// ── 12 chart owners byte-untouched by SPEC.43 (no coherence gate in them) ────
+const noGate = n => (app.match(new RegExp('^function ' + n + '\\(', 'gm')) || []).length === 1 && fnSrc(n).indexOf('BUILD_COHERENCE') < 0 && fnSrc(n).indexOf('__AURIX_APPJS_VERSION__') < 0;
+ok('12 buildProductionPortfolioChart untouched', noGate('buildProductionPortfolioChart'));
+ok('12 FRC untouched', noGate('_aurixResolveFinalRenderSeriesContract'));
+ok('12 renderer untouched', noGate('renderValidatedPortfolioChartWithInstitutionalRenderer'));
+ok('12 buildValidatedHistoricalSeries untouched', noGate('buildValidatedHistoricalSeries'));
+
+// ── 13 no synthetic points / no point fabrication in the coherence code ──────
+(function () { const boot = app.slice(app.indexOf('_aurixBuildCoherenceBoot'), app.indexOf('_aurixBuildCoherenceBoot') + 8000); ok('13 coherence code creates no chart points (syntheticPoints unaffected)', !/renderPoints|\.points\s*=|value:|synthetic/.test(boot)); })();
+
+// ── 14 offline (no expected) ⇒ coherent, never block a normal open ───────────
+(function () { const d = R(null, 523, 523, 523, null); ok('14 offline/no version.json ⇒ coherent + no reload (never block)', d.coherent === true && d.action === 'none'); })();
+
+// ── status shape (diagnostic contract) ───────────────────────────────────────
+ok('S aurixBuildCoherenceStatus returns required fields', /aurixBuildCoherenceStatus = function[\s\S]{0,700}expectedVersion:[\s\S]{0,600}indexVersion:[\s\S]{0,600}requestedVersion:[\s\S]{0,600}executedVersion:[\s\S]{0,600}coherent:[\s\S]{0,600}reloadAttempted:[\s\S]{0,600}auditAvailable:[\s\S]{0,600}build:/.test(app));
+
+console.log('\n' + (fail === 0 ? '✅' : '❌') + ' SPEC.43 ATOMIC-BUILD-COHERENCE — ' + pass + ' passed, ' + fail + ' failed');
+process.exit(fail === 0 ? 0 : 1);

@@ -66,8 +66,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v522-temporal-window-forensics-42';
-      var APPJS_V = '522';
+      var BUILD = 'v523-atomic-build-coherence-43';
+      var APPJS_V = '523';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -84,33 +84,41 @@
       };
       B.mark('index_html_parsed');
 
-      // ── P0-STALE-BUNDLE GUARD ─────────────────────────────────────────────────────────────────
-      // A browser-cached OLD index.html keeps referencing an OLD app.js?v=… (mobile "stale chart").
-      // Fetch a cache-busted version.json (bypasses the HTTP cache) and, if the served index is
-      // behind the latest deploy, do ONE cache-busted reload to a fresh index. Guarded by
-      // sessionStorage so it can NEVER become an infinite reload loop.
+      // ── SPEC.43 BUILD-COHERENCE GUARD (early phase) ────────────────────────────────────────────
+      // A browser-cached OLD index.html keeps referencing an OLD app.js?v=… . Fetch a no-store
+      // version.json; if the served INDEX is behind the deployed version, do at most ONE controlled
+      // cache-busted reload PER expected version (shared marker `aurix_coherence_reload` {v,n,ts}, also
+      // read/cleared by the app.js coherence contract). If a single reload did not adopt (CDN
+      // propagation lag), DON'T loop — flag a recoverable state for app.js to surface. The old guard's
+      // permanent block (marker set once per target, never re-armed after a failed adopt) was the exact
+      // owner of "stuck on v521 after v522". Never clears auth/portfolio/history/cache-of-data.
       try {
         var _servedV = parseInt(APPJS_V, 10) || 0;
         window.__AURIX_SERVED_APPJS = _servedV;
+        var _reqV = null; try { var _sc = document.querySelector('script[src*="app.js?v="]'); if (_sc) { var _mm = (_sc.getAttribute('src') || '').match(/[?&]v=(\d+)/); _reqV = _mm ? parseInt(_mm[1], 10) : null; } } catch (_) {}
+        window.__AURIX_REQUESTED_APPJS = _reqV;
         fetch('version.json?cb=' + T0, { cache: 'no-store' })
           .then(function (r) { return r && r.ok ? r.json() : null; })
           .then(function (j) {
             if (!j || typeof j.appjs !== 'number') return;
             window.__AURIX_LATEST_APPJS = j.appjs;
             window.__AURIX_LATEST_BUILD = j.build || null;
-            if (j.appjs > _servedV) {
-              var guard = null; try { guard = sessionStorage.getItem('aurix_stale_reload_to'); } catch (_) {}
-              if (guard !== String(j.appjs)) {                       // reload to a given version at most ONCE
-                try { sessionStorage.setItem('aurix_stale_reload_to', String(j.appjs)); } catch (_) {}
-                try {
-                  if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { try { r.unregister(); } catch (_) {} }); }).catch(function () {});
-                  if (typeof caches !== 'undefined' && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { try { caches.delete(k); } catch (_) {} }); }).catch(function () {});
-                } catch (_) {}
-                var onAurix = location.pathname.indexOf('/Aurix/') === 0;
-                var base = location.origin + (onAurix ? '/Aurix/' : '/');
-                try { console.warn('[BOOT][STALE-BUNDLE] served app.js v' + _servedV + ' < latest v' + j.appjs + ' — one cache-busted reload'); } catch (_) {}
-                location.replace(base + 'index.html?fresh=' + j.appjs);
+            if (j.appjs > _servedV) {                                // served INDEX is stale
+              var mk = null; try { mk = JSON.parse(sessionStorage.getItem('aurix_coherence_reload') || 'null'); } catch (_) {}
+              if (mk && mk.v === j.appjs && (mk.n || 0) >= 1) {       // already reloaded once for this version → do NOT loop
+                window.__AURIX_BUILD_RELOAD_EXHAUSTED = j.appjs;
+                try { console.warn('[BOOT][BUILD-COHERENCE] index still v' + _servedV + ' after one reload to v' + j.appjs + ' — recoverable update state (no loop)'); } catch (_) {}
+                return;
               }
+              try { sessionStorage.setItem('aurix_coherence_reload', JSON.stringify({ v: j.appjs, n: (mk && mk.v === j.appjs ? (mk.n || 0) + 1 : 1), ts: T0 })); } catch (_) {}
+              try {
+                if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { try { r.unregister(); } catch (_) {} }); }).catch(function () {});
+                if (typeof caches !== 'undefined' && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { try { caches.delete(k); } catch (_) {} }); }).catch(function () {});
+              } catch (_) {}
+              var onAurix = location.pathname.indexOf('/Aurix/') === 0;
+              var base = location.origin + (onAurix ? '/Aurix/' : '/');
+              try { console.warn('[BOOT][BUILD-COHERENCE] served index v' + _servedV + ' < deployed v' + j.appjs + ' — one cache-busted reload'); } catch (_) {}
+              location.replace(base + 'index.html?v=' + j.appjs + '&_cb=' + T0);
             }
           }).catch(function () {});
       } catch (_) {}
@@ -1398,7 +1406,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=522"
+  <script src="app.js?v=523"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
