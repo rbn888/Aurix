@@ -23293,6 +23293,10 @@ function _aurixFrontendUsableInWindow(src, rangeMs, nowRef) {
 // a backend-only run (older tail / genuine ≥floor hole) is kept intact and renders as its OWN honest segment.
 // Never fabricates/interpolates/reorders. 24H stays on the untouched .11 branch (byte-identical). Reversible.
 const _AURIX_CHART_SEGMENT_SOURCE_AUTHORITY = true;
+// SPEC.41 — 24H coverage-aware source authority (rollback flag). OFF ⇒ exact v520 (.11 count-only) behaviour.
+const _AURIX_CHART_24H_COVERAGE_AWARE_AUTHORITY = true;
+const _AURIX_24H_COVERAGE_THR = 0.8;          // rolling-24H SPAN coverage needed for a source to be authoritative (aligns with the downstream partial gate coverageRatio<0.8)
+const _AURIX_24H_MIN_BACKEND_POINTS = 8;      // backend maturity floor before backend can own 24H (no 2-point full-window claim)
 function _aurixApplyRangeSourceAuthority(src, range) {
   try {
     const r = String(range || '').toLowerCase();
@@ -23305,9 +23309,47 @@ function _aurixApplyRangeSourceAuthority(src, range) {
     if (!Array.isArray(src) || src.length < 2) return src;
     let nowRef = 0; for (const p of src) if (p && Number.isFinite(p.ts) && p.ts > nowRef) nowRef = p.ts;
     if (!(nowRef > 0)) return src;
+    // SPEC DSH.CHART.24H_COVERAGE_AWARE_AUTHORITY.41 — the .11 rule granted frontend authority on COUNT
+    // (≥2 frontend points in the window) alone. An ESTABLISHED account opened only briefly today has ≥2
+    // RECENT frontend points spanning a few hours, so .11 dropped ALL backend even though the durable backend
+    // snapshots cover the full rolling 24H → the 24H span collapsed to a few hours → coverageRatio<0.8 →
+    // "Historial parcial" on a continuous, established chart. FIX: coverage-aware authority — frontend keeps
+    // 24H ONLY when it provides mature rolling-24H SPAN coverage (byte-identical to .11 on dense/healthy 24H);
+    // otherwise, if backend provides sufficient real coverage, use ONE coherent backend-authoritative series
+    // (drop the sparse/solitary frontend — never mixed); else keep the honest partial (legacy fall-through).
+    if ((typeof _AURIX_CHART_24H_COVERAGE_AWARE_AUTHORITY !== 'undefined') && _AURIX_CHART_24H_COVERAGE_AWARE_AUTHORITY) {
+      const WIN = 864e5;
+      const cov = _aurix24hSourceCoverage(src, nowRef, WIN);
+      const thr = (typeof _AURIX_24H_COVERAGE_THR === 'number') ? _AURIX_24H_COVERAGE_THR : 0.8;
+      const minBe = (typeof _AURIX_24H_MIN_BACKEND_POINTS === 'number') ? _AURIX_24H_MIN_BACKEND_POINTS : 8;
+      // RULE 1 — frontend has MATURE rolling-24H coverage ⇒ legacy frontend authority (dense/healthy: byte-identical to .11).
+      if (cov.feCount >= 2 && cov.feCoverage >= thr) return src.filter(p => _aurixSourceFamily(p) !== 'backend');
+      // RULE 2 — frontend coverage insufficient BUT backend is mature + covers the window ⇒ backend-authoritative
+      // single series (drop the sparse/solitary frontend entirely — RULE 3: never mix frontend into a backend segment).
+      if (cov.beCount >= minBe && cov.beCoverage >= thr && cov.beCoverage > cov.feCoverage) return src.filter(p => _aurixSourceFamily(p) === 'backend');
+      // RULE 5 — neither source has sufficient truthful coverage ⇒ fall through to the exact legacy .11 decision (honest partial/building).
+    }
     if (!_aurixFrontendUsableInWindow(src, 864e5, nowRef)) return src;  // frontend NOT usable ⇒ backend FALLBACK allowed
     return src.filter(p => _aurixSourceFamily(p) !== 'backend');        // frontend authority ⇒ exclude ALL backend from 24H
   } catch (_) { return Array.isArray(src) ? src : []; }
+}
+// SPEC.41 — the single direct helper for the coverage-aware 24H decision. PURE: measures, per source family,
+// the count and rolling-24H SPAN coverage of valid positive-investable points inside [nowRef−WIN, nowRef].
+// Never mutates, never fabricates. coverage = span / WIN (a single point ⇒ span 0 ⇒ coverage 0).
+function _aurix24hSourceCoverage(src, nowRef, windowMs) {
+  const start = nowRef - windowMs;
+  const fe = [], be = [];
+  const arr = Array.isArray(src) ? src : [];
+  for (const p of arr) {
+    if (!p || !Number.isFinite(p.ts) || p.ts < start || p.ts > nowRef) continue;
+    const inv = Number(p.total) - (Number(p.real_estate) || 0);
+    if (!(Number.isFinite(inv) && inv > 0)) continue;                  // only valid positive-investable points count (same rule the pipeline plots)
+    (_aurixSourceFamily(p) === 'backend' ? be : fe).push(p.ts);
+  }
+  const span = a => a.length >= 2 ? (Math.max.apply(null, a) - Math.min.apply(null, a)) : 0;
+  const w = windowMs > 0 ? windowMs : 1;
+  return { feCount: fe.length, beCount: be.length, feSpanMs: span(fe), beSpanMs: span(be),
+    feCoverage: +(span(fe) / w).toFixed(4), beCoverage: +(span(be) / w).toFixed(4) };
 }
 // SPEC.38 — reject any backend gap-filler that lands INSIDE a frontend-covered continuous segment so every
 // continuous render segment carries exactly ONE source family (one valuation regime). Segments = the SAME
