@@ -26371,6 +26371,169 @@ function _aurixAuditGeometricRootCauseCore(options, deps) {
 }
 try { if (typeof window !== 'undefined') window._aurixAuditGeometricRootCauseCore = _aurixAuditGeometricRootCauseCore; } catch (_) {}
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.TEMPORAL_WINDOW_FORENSICS.42 — READ-ONLY temporal-window forensics
+// ════════════════════════════════════════════════════════════════════════════
+// AUDIT-ONLY. Proves which temporal dataset each range actually renders and WHERE (if anywhere) the span
+// collapses across the pre-window pipeline: merge → epoch-trust (_aurixTrustedChartSource) → source-authority
+// (_aurixApplyRangeSourceAuthority) → validation → window extraction (buildValidatedHistoricalSeries stage-10,
+// _AURIX_EMG_RANGE_MS) → build → FRC. Changes NOTHING (no render/LTTB/FRC/authority/snapshot/return edit). It
+// only READS the existing pipeline read-only. Distinguishes a REAL window defect from LEGITIMATE short history
+// (all long ranges collapse onto the same available history because the raw merged history is short). deps
+// lets a harness drive it headless. Pure; no mutation; no synthetic points.
+function _aurixTemporalStageStats(pts, label) {
+  const arr = (Array.isArray(pts) ? pts : []).map(p => {
+    if (!p) return null;
+    const ts = Number.isFinite(p.ts) ? p.ts : (Number.isFinite(p.time) ? p.time : NaN);
+    const v = Number.isFinite(p.value) ? p.value : (Number.isFinite(p.total) ? p.total : (Number.isFinite(p.total_value_usd) ? p.total_value_usd : NaN));
+    return Number.isFinite(ts) ? { ts: ts, v: Number.isFinite(v) ? v : 0 } : null;
+  }).filter(Boolean).sort((a, b) => a.ts - b.ts);
+  const n = arr.length;
+  // compact deterministic FNV-1a hash of the joined (ts:value) / (ts) strings
+  const fnv = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 0x01000193) >>> 0; } return ('00000000' + h.toString(16)).slice(-8); };
+  const tsStr = arr.map(p => Math.round(p.ts)).join(','), valStr = arr.map(p => Math.round(p.v * 100)).join(',');
+  const days = {}, hours = {};
+  arr.forEach(p => { days[Math.floor(p.ts / 864e5)] = 1; hours[Math.floor(p.ts / 36e5)] = 1; });
+  const first = n ? arr[0].ts : null, last = n ? arr[n - 1].ts : null;
+  return { label: label, count: n, firstTs: first, lastTs: last, firstIso: first != null ? (function () { try { return new Date(first).toISOString(); } catch (_) { return null; } })() : null,
+    lastIso: last != null ? (function () { try { return new Date(last).toISOString(); } catch (_) { return null; } })() : null,
+    spanMs: (n >= 2) ? (last - first) : 0, spanDays: (n >= 2) ? +((last - first) / 864e5).toFixed(3) : 0,
+    uniqueDays: Object.keys(days).length, uniqueHours: Object.keys(hours).length,
+    timestampHash: fnv(tsStr), valueHash: fnv(valStr), firstPointId: first, lastPointId: last, _tsSet: arr.map(p => Math.round(p.ts)) };
+}
+function _aurixAuditTemporalWindowCore(options, deps) {
+  options = options || {}; deps = deps || {};
+  const safe = (fn, d) => { try { const v = fn(); return v === undefined ? (d === undefined ? null : d) : v; } catch (_) { return (d === undefined ? null : d); } };
+  const nowIso = () => { try { return new Date().toISOString(); } catch (_) { return null; } };
+  const appVersion = safe(() => (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null, null);
+  const displaySource = deps.displaySource || (typeof _aurixHistorySourceForDisplay === 'function' ? _aurixHistorySourceForDisplay : (() => []));
+  const backendSnaps = deps.backendSnapshots || (typeof _aurixBackendSnapshots !== 'undefined' && Array.isArray(_aurixBackendSnapshots) ? _aurixBackendSnapshots : []);
+  const epochTrust = deps.trustedSource || (typeof _aurixTrustedChartSource === 'function' ? _aurixTrustedChartSource : null);
+  const epochOn = (deps.epochTrustOn != null) ? deps.epochTrustOn : ((typeof _AURIX_CHART_EPOCH_TRUST !== 'undefined') ? _AURIX_CHART_EPOCH_TRUST : true);
+  const authority = deps.authority || (typeof _aurixApplyRangeSourceAuthority === 'function' ? _aurixApplyRangeSourceAuthority : null);
+  const buildValidated = deps.buildValidated || (typeof buildValidatedHistoricalSeries === 'function' ? buildValidatedHistoricalSeries : null);
+  const buildChart = deps.buildChart || (typeof buildProductionPortfolioChart === 'function' ? buildProductionPortfolioChart : null);
+  const resolveContract = deps.resolveContract || (typeof _aurixResolveFinalRenderSeriesContract === 'function' ? _aurixResolveFinalRenderSeriesContract : null);
+  const RANGE_MS = deps.rangeMs || (typeof _AURIX_EMG_RANGE_MS !== 'undefined' ? _AURIX_EMG_RANGE_MS : { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '1y': 31536e6, 'all': Infinity });
+  const RANGES = (Array.isArray(options.ranges) && options.ranges.length) ? options.ranges.map(x => String(x).toLowerCase()) : ['24h', '7d', '30d', '1y', 'all'];
+
+  const merged = safe(() => displaySource(), []) || [];
+  const isBackend = p => { const s = (p && p.source) ? String(p.source).toLowerCase() : ''; return s === 'backend_snapshot' || s === 'backend' || s === 'portfolio_snapshots'; };
+  const rawBackend = merged.filter(isBackend);
+  const rawFrontend = merged.filter(p => !isBackend(p));
+  const postEpoch = epochOn && epochTrust ? (safe(() => epochTrust(merged), merged) || merged) : merged;
+
+  // shared pre-window stage stats (range-independent)
+  const stageMerged = _aurixTemporalStageStats(merged, 'stage3_merged');
+  const stagePostEpoch = _aurixTemporalStageStats(postEpoch, 'stage3b_post_epoch_trust');
+  const stageRawBackend = _aurixTemporalStageStats((backendSnaps || []).map(s => ({ ts: s.ts, value: (s.total_value_usd != null ? s.total_value_usd : s.total) })), 'stage1_raw_backend');
+  const stageRawFrontend = _aurixTemporalStageStats(rawFrontend, 'stage2_raw_frontend');
+
+  const perRange = {};
+  RANGES.forEach(r => {
+    const postAuth = authority ? (safe(() => authority(postEpoch.slice ? postEpoch.slice() : postEpoch, r), postEpoch) || postEpoch) : postEpoch;
+    const v = safe(() => buildValidated ? buildValidated(r) : null, null) || { validatedFull: [], rangeSeries: [], nowRef: 0, collapsedRange: false, rangeCollapsedBecauseHistoryTooShort: false };
+    const chart = safe(() => buildChart ? buildChart(r) : null, null) || { points: [], coverageRatio: null };
+    const frc = safe(() => resolveContract ? resolveContract(chart, r, 'desktop') : null, null) || {};
+    const reqMs = RANGE_MS[r];
+    const nowRef = v.nowRef || stageMerged.lastTs || 0;
+    const s1 = stageRawBackend, s2 = stageRawFrontend, s3 = stageMerged;
+    const s4 = _aurixTemporalStageStats(postAuth, 'stage4_post_source_authority');
+    const s6 = _aurixTemporalStageStats(v.validatedFull, 'stage6_validated_full');
+    const s5 = _aurixTemporalStageStats(v.rangeSeries, 'stage5_post_temporal_window');
+    const s7 = _aurixTemporalStageStats(chart.points, 'stage7_build_production_chart');
+    const s8 = _aurixTemporalStageStats(frc.renderPoints, 'stage8_final_renderer_input');
+    const reqFinite = Number.isFinite(reqMs);
+    const expectedStart = reqFinite ? (nowRef - reqMs) : (s6.firstTs != null ? s6.firstTs : null);
+    const actualStart = s5.firstTs, actualEnd = s5.lastTs;
+    perRange[r] = {
+      range: r, stages: { stage1_raw_backend: s1, stage2_raw_frontend: s2, stage3_merged: s3, stage4_post_source_authority: s4, stage5_post_temporal_window: s5, stage6_validated_full: s6, stage7_build_production_chart: s7, stage8_final_renderer_input: s8 },
+      window: {
+        requestedDurationMs: reqFinite ? reqMs : null, requestedDurationDays: reqFinite ? +(reqMs / 864e5).toFixed(2) : null,
+        actualDurationMs: s5.spanMs, actualDurationDays: s5.spanDays,
+        coverageRatio: (chart.coverageRatio != null) ? chart.coverageRatio : (reqFinite && reqMs > 0 ? +(s5.spanMs / reqMs).toFixed(4) : null),
+        expectedStart: expectedStart, actualStart: actualStart, expectedEnd: nowRef, actualEnd: actualEnd,
+        deltaStartMs: (expectedStart != null && actualStart != null) ? (actualStart - expectedStart) : null,
+        deltaEndMs: (actualEnd != null) ? (actualEnd - nowRef) : null,
+        windowKind: reqFinite ? 'rolling[nowRef-Δ,nowRef]' : 'all_history',
+        collapsedRange: !!v.collapsedRange, rangeCollapsedBecauseHistoryTooShort: !!v.rangeCollapsedBecauseHistoryTooShort,
+      },
+      renderPathCount: (frc.renderPathCount != null) ? frc.renderPathCount : null,
+      syntheticPoints: (frc.diagnostics && frc.diagnostics.syntheticPoints != null) ? frc.diagnostics.syntheticPoints : 0,
+    };
+  });
+
+  // ── RANGE COMPARISON (pairwise, on the post-temporal-window series stage5) ──
+  const jaccardIsh = (a, b) => {
+    const A = new Set(a), B = new Set(b); if (!A.size || !B.size) return { sharedPct: 0, subsetPct: 0, supersetPct: 0, sharedCount: 0 };
+    let inter = 0; A.forEach(x => { if (B.has(x)) inter++; });
+    const uni = A.size + B.size - inter;
+    return { sharedPct: +(inter / uni * 100).toFixed(2), subsetPct: +(inter / A.size * 100).toFixed(2), supersetPct: +(inter / B.size * 100).toFixed(2), sharedCount: inter };
+  };
+  const PAIRS = [['24h', '7d'], ['7d', '30d'], ['30d', '1y'], ['1y', 'all']].filter(p => RANGES.indexOf(p[0]) >= 0 && RANGES.indexOf(p[1]) >= 0);
+  const comparison = {};
+  PAIRS.forEach(pr => {
+    const a = perRange[pr[0]].stages.stage5_post_temporal_window, b = perRange[pr[1]].stages.stage5_post_temporal_window;
+    const jc = jaccardIsh(a._tsSet, b._tsSet);
+    comparison[pr[0] + '_vs_' + pr[1]] = {
+      sharedTimestampPct: jc.sharedPct, sharedPointsPct: jc.sharedPct, smallerSubsetOfLargerPct: jc.subsetPct, largerSupersetPct: jc.supersetPct,
+      identicalDataset: (a.timestampHash === b.timestampHash && a.valueHash === b.valueHash), identicalWindow: (a.firstTs === b.firstTs && a.lastTs === b.lastTs),
+      identicalTimestampHash: a.timestampHash === b.timestampHash, reusedTail: (a.lastTs != null && a.lastTs === b.lastTs), reusedHead: (a.firstTs != null && a.firstTs === b.firstTs),
+      smallerSpanDays: a.spanDays, largerSpanDays: b.spanDays, windowOverlapPct: jc.sharedPct,
+    };
+  });
+
+  // ── CLASSIFIER ──────────────────────────────────────────────────────────────
+  const LONG = RANGES.filter(r => r !== '24h');
+  const longStats = LONG.map(r => perRange[r].stages.stage5_post_temporal_window);
+  const drawableLong = LONG.filter(r => perRange[r].stages.stage5_post_temporal_window.count >= 2);
+  // are all long ranges near-identical? (reuse signal)
+  let reused = drawableLong.length >= 2;
+  for (let i = 1; i < drawableLong.length; i++) {
+    const a = perRange[drawableLong[i - 1]].stages.stage5_post_temporal_window, b = perRange[drawableLong[i]].stages.stage5_post_temporal_window;
+    if (a.timestampHash !== b.timestampHash) reused = false;
+  }
+  // progressive? spans strictly grow across drawable long ranges (meaningful margin)
+  let progressive = drawableLong.length >= 2;
+  for (let i = 1; i < drawableLong.length; i++) {
+    const a = perRange[drawableLong[i - 1]].stages.stage5_post_temporal_window.spanMs, b = perRange[drawableLong[i]].stages.stage5_post_temporal_window.spanMs;
+    if (!(b > a * 1.05)) progressive = false;
+  }
+  const mergedSpanDays = stageMerged.spanDays, postEpochSpanDays = stagePostEpoch.spanDays;
+  const validatedAllSpanDays = perRange[LONG[LONG.length - 1] || RANGES[RANGES.length - 1]] ? perRange[LONG[LONG.length - 1]].stages.stage6_validated_full.spanDays : 0;
+  const anyCollapsed = LONG.some(r => perRange[r].window.collapsedRange || perRange[r].window.rangeCollapsedBecauseHistoryTooShort);
+  const smallestLongDays = 7;   // 7D window in days
+
+  let verdict, owner = null, ownerChainNote = '';
+  if (progressive && !reused) { verdict = 'WINDOW_SELECTION_CORRECT'; ownerChainNote = 'each larger range selects a strictly larger rolling window'; }
+  else if (reused) {
+    if (mergedSpanDays < smallestLongDays) { verdict = 'WINDOW_SELECTION_CORRECT'; ownerChainNote = 'raw merged history (' + mergedSpanDays + 'd) is shorter than the 7D window ⇒ every long range legitimately shows the same available history (honest short-history collapse, flagged rangeCollapsedBecauseHistoryTooShort)'; }
+    else if (epochOn && postEpochSpanDays < mergedSpanDays * 0.9 && postEpochSpanDays < smallestLongDays) { verdict = 'WINDOW_SELECTION_OWNER_IDENTIFIED'; owner = '_aurixTrustedChartSource'; ownerChainNote = 'raw merged history is long (' + mergedSpanDays + 'd) but the epoch-trust value-band/floor trims the pool to ' + postEpochSpanDays + 'd (< 7D) BEFORE window extraction ⇒ all long ranges reuse the same recent run'; }
+    else if (validatedAllSpanDays < postEpochSpanDays * 0.9 && validatedAllSpanDays < smallestLongDays) { verdict = 'WINDOW_SELECTION_OWNER_IDENTIFIED'; owner = 'buildValidatedHistoricalSeries(validation stages)'; ownerChainNote = 'post-epoch pool is long (' + postEpochSpanDays + 'd) but validation (spike/construction/plateau) collapses it to ' + validatedAllSpanDays + 'd'; }
+    else if (validatedAllSpanDays >= smallestLongDays) { verdict = 'WINDOW_SELECTION_OWNER_IDENTIFIED'; owner = 'buildValidatedHistoricalSeries(stage-10 range extraction)'; ownerChainNote = 'validated pool is long (' + validatedAllSpanDays + 'd) yet the long ranges reuse the same window ⇒ the stage-10 extraction is not expanding the window'; }
+    else { verdict = anyCollapsed ? 'WINDOW_SELECTION_COLLAPSED' : 'WINDOW_SELECTION_REUSED'; ownerChainNote = 'long ranges reuse the same dataset; pool spans could not attribute a single upstream owner'; }
+  } else { verdict = 'WINDOW_SELECTION_CORRECT'; ownerChainNote = 'long ranges are distinct and non-reused'; }
+
+  const ownerChain = ['_aurixHistorySourceForDisplay (merge)', epochOn ? '_aurixTrustedChartSource (epoch floor + value-band trim)' : '(epoch-trust OFF)', '_aurixApplyRangeSourceAuthority (source authority)', 'buildValidatedHistoricalSeries (validation + stage-10 range extraction, _AURIX_EMG_RANGE_MS)', 'buildProductionPortfolioChart', '_aurixResolveFinalRenderSeriesContract (FRC)'];
+  const totalSyntheticPoints = RANGES.reduce((s, r) => s + (perRange[r].syntheticPoints || 0), 0);
+  const recommendation = (verdict === 'WINDOW_SELECTION_CORRECT') ? 'No temporal-window defect. Do NOT open SPEC.43. The cross-range similarity is the real dataset (short/■band history), not a window bug.'
+    : (owner ? ('Open a minimal SPEC.43 targeting ONLY ' + owner + ' — ' + ownerChainNote + '. No renderer/visual change.') : 'Reuse detected but owner not uniquely attributable from reachable spans; re-run on the real account and inspect the stage where spanDays collapses.');
+
+  // strip internal _tsSet before returning
+  RANGES.forEach(r => Object.keys(perRange[r].stages).forEach(k => { delete perRange[r].stages[k]._tsSet; }));
+
+  return {
+    spec: 'DSH.CHART.TEMPORAL_WINDOW_FORENSICS.42', appVersion: appVersion, startedAtIso: nowIso(), readOnly: true, behaviorChanged: false,
+    ranges: RANGES, epochTrustOn: epochOn,
+    preWindowSpans: { rawBackendSpanDays: stageRawBackend.spanDays, rawFrontendSpanDays: stageRawFrontend.spanDays, mergedSpanDays: mergedSpanDays, postEpochTrustSpanDays: postEpochSpanDays, validatedFullSpanDays: validatedAllSpanDays },
+    ownerChain: ownerChain, perRange: perRange, rangeComparison: comparison,
+    totalSyntheticPoints: totalSyntheticPoints,
+    verdict: verdict, exactOwner: owner, ownerChainNote: ownerChainNote, recommendation: recommendation,
+    summary: { verdict: verdict, exactOwner: owner, reused: reused, progressive: progressive, mergedSpanDays: mergedSpanDays, postEpochTrustSpanDays: postEpochSpanDays, validatedFullSpanDays: validatedAllSpanDays, totalSyntheticPoints: totalSyntheticPoints },
+  };
+}
+try { if (typeof window !== 'undefined') window._aurixAuditTemporalWindowCore = _aurixAuditTemporalWindowCore; } catch (_) {}
+
 // Emergency badge text/tone from the emergency chart object (honours %/€ mode).
 function _aurixEmergencyBadgeText(emg) {
   try {
@@ -27796,6 +27959,38 @@ try {
     window.aurixCopyLastGeometricRootCauseAudit = function () {
       let json = '';
       try { json = JSON.stringify(window.__AURIX_LAST_GEOMETRIC_ROOT_CAUSE_AUDIT__ || { error: 'no geometric root-cause audit yet — run aurixAuditGeometricRootCause() first' }, null, 2); } catch (_) { json = '{"error":"stringify_failed"}'; }
+      try { if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) { const p = navigator.clipboard.writeText(json); if (p && typeof p.then === 'function') p.then(function () {}, function () {}); } } catch (_) {}
+      try { console.log(json); } catch (_) {}
+      return json;
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // SPEC DSH.CHART.TEMPORAL_WINDOW_FORENSICS.42 — window.aurixAuditTemporalWindow(options)
+    // ════════════════════════════════════════════════════════════════════════════
+    // READ-ONLY. Per-range per-stage temporal dataset + window analysis + pairwise overlap + owner verdict.
+    // Proves whether long-range "reuse" is a real window defect or legitimate short/epoch-band history.
+    window.aurixAuditTemporalWindow = function (options) {
+      let result;
+      try {
+        result = (typeof _aurixAuditTemporalWindowCore === 'function') ? _aurixAuditTemporalWindowCore(options || {}, {})
+          : { spec: 'DSH.CHART.TEMPORAL_WINDOW_FORENSICS.42', verdict: 'INSUFFICIENT_EVIDENCE', behaviorChanged: false, errorMessage: 'core unavailable', summary: {} };
+      } catch (e) {
+        result = { spec: 'DSH.CHART.TEMPORAL_WINDOW_FORENSICS.42', verdict: 'INSUFFICIENT_EVIDENCE', behaviorChanged: false, errorMessage: (e && e.message) ? e.message : String(e), summary: {} };
+      }
+      try { window.__AURIX_LAST_TEMPORAL_WINDOW_AUDIT__ = result; } catch (_) {}
+      try {
+        console.log('%c[UI][TEMPORAL_WINDOW_FORENSICS]', 'font-weight:700;color:#12b886', result);
+        console.log('VERDICT: ' + (result.verdict || 'n/a') + (result.exactOwner ? '  OWNER: ' + result.exactOwner : ''));
+        console.log('preWindowSpans: ', result.preWindowSpans);
+        if (result.perRange) Object.keys(result.perRange).forEach(r => { const w = result.perRange[r].window, s5 = result.perRange[r].stages && result.perRange[r].stages.stage5_post_temporal_window; console.log('  ' + r + ': reqDays=' + w.requestedDurationDays + ' actualDays=' + w.actualDurationDays + ' cov=' + w.coverageRatio + ' pts=' + (s5 ? s5.count : '?') + ' collapsed=' + w.rangeCollapsedBecauseHistoryTooShort + ' tsHash=' + (s5 ? s5.timestampHash : '?')); });
+        console.log('recommendation: ' + (result.recommendation || 'n/a'));
+        console.log('To copy full JSON run: aurixCopyLastTemporalWindowAudit()');
+      } catch (_) {}
+      return result;
+    };
+    window.aurixCopyLastTemporalWindowAudit = function () {
+      let json = '';
+      try { json = JSON.stringify(window.__AURIX_LAST_TEMPORAL_WINDOW_AUDIT__ || { error: 'no temporal-window audit yet — run aurixAuditTemporalWindow() first' }, null, 2); } catch (_) { json = '{"error":"stringify_failed"}'; }
       try { if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) { const p = navigator.clipboard.writeText(json); if (p && typeof p.then === 'function') p.then(function () {}, function () {}); } } catch (_) {}
       try { console.log(json); } catch (_) {}
       return json;
