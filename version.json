@@ -1,1 +1,1 @@
-{ "appjs": 517, "loginhtml": 482, "build": "v517-chart-long-range-snapshot-continuity-audit-37", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)" }
+{ "appjs": 518, "loginhtml": 482, "build": "v518-eliminate-source-alternation-38", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)" }

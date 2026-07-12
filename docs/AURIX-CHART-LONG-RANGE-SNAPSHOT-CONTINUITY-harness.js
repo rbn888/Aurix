@@ -145,16 +145,20 @@ ok('20 merge owner _aurixMergeSnapshotSources unchanged (single def, no SPEC.37 
 ok('20 FRC chokepoint single + no SPEC.37 gate added to it', (app.match(/^function _aurixResolveFinalRenderSeriesContract\(/gm) || []).length === 1 && !/_aurixResolveFinalRenderSeriesContract[\s\S]{0,4000}LONG_RANGE_SNAPSHOT_CONTINUITY/.test(app));
 ok('20 single audit core owner', (app.match(/^function _aurixAuditLongRangeSnapshotContinuityCore\(/gm) || []).length === 1);
 
-// ── 21 frontend rendering byte-unchanged (no app.js render-path behavior edit) ─
+// ── 21 render owners untouched — SPEC.38 supersedes the SPEC.37-era "purely additive" guard ──
+// SPEC.37 was read-only; SPEC.38 (ELIMINATE_SOURCE_ALTERNATION) now legitimately extends THIS audit core
+// (segment-awareness) and fixes the render owner in the SOURCE-AUTHORITY function — NOT in the merge or the
+// FRC. So the durable invariant is no longer "0 deletions in app.js", it is: the merge chokepoint
+// (_aurixMergeSnapshotSources) and the FRC chokepoint stay single-owner and carry NO continuity/alternation
+// gate, and the SPEC.38 render change lives ONLY in _aurixApplyRangeSourceAuthority / its segment helper.
 (function () {
-  const cp = require('child_process');
-  let diffOnlyAdditive = true, detail = '';
-  try {
-    // the SPEC.37 change must be purely additive (audit); no deletions in app.js render/merge logic
-    const del = cp.execSync('git -C ' + JSON.stringify(root) + ' diff -- app.js | grep -E "^-" | grep -v "^---" | wc -l', { encoding: 'utf8' }).trim();
-    detail = 'deletions=' + del; diffOnlyAdditive = (del === '0');
-  } catch (e) { detail = 'git error: ' + e.message; diffOnlyAdditive = false; }
-  ok('21 app.js change is purely additive (0 deleted lines ⇒ no render/behaviour change)', diffOnlyAdditive, detail);
+  const mergeSingle = (app.match(/^function _aurixMergeSnapshotSources\(/gm) || []).length === 1;
+  const mergeNoGate = !/_aurixMergeSnapshotSources[\s\S]{0,700}(ELIMINATE_SOURCE_ALTERNATION|LONG_RANGE_SNAPSHOT_CONTINUITY)/.test(app);
+  ok('21 merge owner still single + carries no audit/alternation gate (fix is NOT in the merge)', mergeSingle && mergeNoGate);
+  const frcSingle = (app.match(/^function _aurixResolveFinalRenderSeriesContract\(/gm) || []).length === 1;
+  const frcNoGate = !/_aurixResolveFinalRenderSeriesContract[\s\S]{0,4000}(LONG_RANGE_SNAPSHOT_CONTINUITY|ELIMINATE_SOURCE_ALTERNATION)/.test(app);
+  ok('21 FRC chokepoint still single + no audit gate added', frcSingle && frcNoGate);
+  ok('21 SPEC.38 render change is isolated to the source-authority owner', app.indexOf('function _aurixEnforceSegmentSourceAuthority(') >= 0 && app.indexOf('_AURIX_CHART_SEGMENT_SOURCE_AUTHORITY') >= 0);
 })();
 
 console.log('\n' + (fail === 0 ? '✅' : '❌') + ' SPEC.37 LONG-RANGE SNAPSHOT CONTINUITY — ' + pass + ' passed, ' + fail + ' failed');

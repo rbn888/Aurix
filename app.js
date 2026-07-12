@@ -23282,9 +23282,25 @@ function _aurixFrontendUsableInWindow(src, rangeMs, nowRef) {
   }
   return false;
 }
+// SPEC DSH.CHART.ELIMINATE_SOURCE_ALTERNATION.38 — the .11 rule only removed backend from 24H; on the LONG
+// ranges the range-agnostic ±60min merge authority (_AURIX_SNAP_FE_AUTHORITY_MS) is FAR smaller than the
+// engine real-gap floor (2d/7d/45d), so a backend gap-filler 60min–<floor from frontend survived INSIDE a
+// continuous render segment → frontend↔backend valuation-regime alternation mid-segment (the PROVEN defect:
+// sourceAlternationCount 183, verdict SOURCE_ALTERNATION_DEFECT_PROVEN). This is the merge/authority owner.
+// FIX: extend the SAME range-aware authority to long ranges — within each continuous segment (points whose
+// gap < the engine real-gap floor, i.e. the SAME runs the renderer splits on) a SINGLE source family owns
+// the valuation regime. A run with any frontend point ⇒ frontend authority (reject its backend interlopers);
+// a backend-only run (older tail / genuine ≥floor hole) is kept intact and renders as its OWN honest segment.
+// Never fabricates/interpolates/reorders. 24H stays on the untouched .11 branch (byte-identical). Reversible.
+const _AURIX_CHART_SEGMENT_SOURCE_AUTHORITY = true;
 function _aurixApplyRangeSourceAuthority(src, range) {
   try {
     const r = String(range || '').toLowerCase();
+    // SPEC.38 — long ranges: enforce single source family per continuous segment (24H handled below, unchanged).
+    if (r !== '24h' && (typeof _AURIX_CHART_SEGMENT_SOURCE_AUTHORITY !== 'undefined') && _AURIX_CHART_SEGMENT_SOURCE_AUTHORITY
+        && Array.isArray(src) && src.length >= 2) {
+      return _aurixEnforceSegmentSourceAuthority(src, r);
+    }
     if (r !== '24h') return src;                                       // 24H ONLY — long ranges keep backend history
     if (!Array.isArray(src) || src.length < 2) return src;
     let nowRef = 0; for (const p of src) if (p && Number.isFinite(p.ts) && p.ts > nowRef) nowRef = p.ts;
@@ -23292,6 +23308,35 @@ function _aurixApplyRangeSourceAuthority(src, range) {
     if (!_aurixFrontendUsableInWindow(src, 864e5, nowRef)) return src;  // frontend NOT usable ⇒ backend FALLBACK allowed
     return src.filter(p => _aurixSourceFamily(p) !== 'backend');        // frontend authority ⇒ exclude ALL backend from 24H
   } catch (_) { return Array.isArray(src) ? src : []; }
+}
+// SPEC.38 — reject any backend gap-filler that lands INSIDE a frontend-covered continuous segment so every
+// continuous render segment carries exactly ONE source family (one valuation regime). Segments = the SAME
+// runs the renderer splits on: consecutive points whose gap ≥ the engine real-gap floor (_aurixRealGapFloorMs)
+// open a new segment. A run with ≥1 frontend point ⇒ frontend authority (drop its backend points); a
+// backend-only run (older tail / genuine ≥floor hole) is kept intact → renders as its own honest segment,
+// so no WITHIN-segment source flip is possible. PURE: no fabrication, no interpolation, original order/objects
+// preserved (only interior backend interlopers removed). Strict NO-OP when no backend point exists.
+function _aurixEnforceSegmentSourceAuthority(src, range) {
+  if (!Array.isArray(src)) return src;
+  const backendExists = src.some(p => p && Number.isFinite(p.ts) && _aurixSourceFamily(p) === 'backend');
+  if (!backendExists) return src;                                     // no backend ⇒ identical to prior behaviour
+  const valid = src.filter(p => p && Number.isFinite(p.ts)).slice().sort((a, b) => a.ts - b.ts);
+  if (valid.length < 2) return src;
+  let floor = 0;
+  try { floor = (typeof _aurixRealGapFloorMs === 'function') ? _aurixRealGapFloorMs(valid.map(p => ({ time: p.ts, value: 1 })), range) : 0; } catch (_) { floor = 0; }
+  if (!(floor > 0)) return src;
+  const drop = new Set();
+  let runStart = 0;
+  for (let i = 1; i <= valid.length; i++) {
+    const boundary = (i === valid.length) || ((valid[i].ts - valid[i - 1].ts) >= floor);
+    if (!boundary) continue;
+    const run = valid.slice(runStart, i);
+    const hasFrontend = run.some(p => _aurixSourceFamily(p) !== 'backend');
+    if (hasFrontend) run.forEach(p => { if (_aurixSourceFamily(p) === 'backend') drop.add(p); });   // frontend owns the segment
+    runStart = i;                                                                                   // else backend-only run kept whole
+  }
+  if (!drop.size) return src;                                        // nothing interior to drop ⇒ NO-OP
+  return src.filter(p => !drop.has(p));                              // preserve order + every non-dropped object
 }
 function _aurixHpqRawStages(range) {
   let src = [];
@@ -25919,6 +25964,10 @@ function _aurixAuditLongRangeSnapshotContinuityCore(options, deps) {
   const buildChart = deps.buildChart || (typeof buildProductionPortfolioChart === 'function' ? buildProductionPortfolioChart : null);
   const resolveContract = deps.resolveContract || (typeof _aurixResolveFinalRenderSeriesContract === 'function' ? _aurixResolveFinalRenderSeriesContract : null);
   const displaySource = deps.displaySource || (typeof _aurixHistorySourceForDisplay === 'function' ? _aurixHistorySourceForDisplay : (() => []));
+  // SPEC.38 — the SAME structural-break owner the renderer splits segments on. A source change ACROSS a
+  // genuine break (the line visibly breaks ⇒ a legitimate segment boundary) is NOT a within-continuous-segment
+  // alternation defect. Injectable for headless harnesses; absent ⇒ one segment (prior behaviour, no break).
+  const structuralBreaks = deps.structuralBreaks || (typeof _aurixStructuralBreaks === 'function' ? _aurixStructuralBreaks : null);
   // the merged display points with provenance metadata (frontend ∪ backend) — the SAME source the chart reads
   const merged = safe(() => displaySource(), []) || [];
   const metaByTs = {};
@@ -25934,8 +25983,8 @@ function _aurixAuditLongRangeSnapshotContinuityCore(options, deps) {
   });
 
   const perRange = {};
-  const CLASS = ['ECONOMIC_MOVE_PLAUSIBLE', 'FLOW_OR_HOLDINGS_CHANGE', 'SOURCE_VALUATION_REGIME_CHANGE', 'STALE_TO_LIVE_PRICE_TRANSITION', 'CATEGORY_COMPOSITION_DISCONTINUITY', 'REVISION_OR_IDENTITY_MISMATCH', 'DUPLICATE_TIME_DIFFERENT_VALUE', 'UNKNOWN_DISCONTINUITY'];
-  const agg = { valuationRegimeSet: {}, sourceAlternationCount: 0, staleLiveAlternationCount: 0, compositionDiscontinuityCount: 0, revisionMismatchCount: 0, sameMinuteConflictCount: 0, genuineEconomicMoveCount: 0, totalSyntheticPoints: 0 };
+  const CLASS = ['ECONOMIC_MOVE_PLAUSIBLE', 'FLOW_OR_HOLDINGS_CHANGE', 'SOURCE_VALUATION_REGIME_CHANGE', 'STALE_TO_LIVE_PRICE_TRANSITION', 'CATEGORY_COMPOSITION_DISCONTINUITY', 'REVISION_OR_IDENTITY_MISMATCH', 'DUPLICATE_TIME_DIFFERENT_VALUE', 'SEGMENT_BOUNDARY', 'UNKNOWN_DISCONTINUITY'];
+  const agg = { valuationRegimeSet: {}, sourceAlternationCount: 0, staleLiveAlternationCount: 0, compositionDiscontinuityCount: 0, revisionMismatchCount: 0, sameMinuteConflictCount: 0, genuineEconomicMoveCount: 0, totalSyntheticPoints: 0, maxRegimesPerSegment: 0, segmentBoundaryCount: 0 };
   const adjacentTransitionMatrix = {};
 
   RANGES.forEach(r => {
@@ -25951,18 +26000,33 @@ function _aurixAuditLongRangeSnapshotContinuityCore(options, deps) {
         source: m.source, market_state: m.market_state, price_staleness: m.price_staleness, catKeys: m.catKeys,
         survivesFRC: true, provenance: (m.source === 'backend_snapshot') ? 'backend' : 'frontend' };
     });
+    // SPEC.38 — segment membership: the SAME structural breaks the renderer splits on. Transitions that
+    // straddle a break are legitimate SEGMENT_BOUNDARY handoffs (the line breaks there), NOT within-segment
+    // source alternation. Absent break owner ⇒ one segment (prior behaviour). segId increments after a break.
+    let breakSet = null;
+    try {
+      if (structuralBreaks && prov.length >= 2) {
+        const sb = structuralBreaks(prov.map(p => ({ time: p.ts, value: p.value })), r);
+        const bks = (sb && Array.isArray(sb.breaks)) ? sb.breaks : [];
+        breakSet = new Set(bks.map(b => b.start + ':' + b.end));
+      }
+    } catch (_) { breakSet = null; }
+    const segIdByIdx = new Array(prov.length); let _seg = 0;
+    for (let i = 0; i < prov.length; i++) { if (i > 0 && breakSet && breakSet.has(prov[i - 1].ts + ':' + prov[i].ts)) _seg++; segIdByIdx[i] = _seg; prov[i].segmentId = _seg; }
     const transitions = [];
     const counts = {}; CLASS.forEach(c => counts[c] = 0);
     let jumps = 0;
     for (let i = 1; i < prov.length; i++) {
-      const cls = _aurixClassifySnapshotTransition(prov[i - 1], prov[i], { jumpPct: jumpPct });
+      const crossBreak = (segIdByIdx[i] !== segIdByIdx[i - 1]);
+      const cls = crossBreak ? 'SEGMENT_BOUNDARY' : _aurixClassifySnapshotTransition(prov[i - 1], prov[i], { jumpPct: jumpPct });
       counts[cls] = (counts[cls] || 0) + 1;
       const pv = prov[i - 1].value, v = prov[i].value;
       const pct = (pv ? +(((v - pv) / pv) * 100).toFixed(2) : 0);
-      if (Math.abs(pct) >= jumpPct) jumps++;
-      transitions.push({ fromTs: prov[i - 1].ts, toTs: prov[i].ts, pct: pct, classification: cls,
+      if (!crossBreak && Math.abs(pct) >= jumpPct) jumps++;   // within-segment jumps only (a cross-break step is an honest boundary)
+      transitions.push({ fromTs: prov[i - 1].ts, toTs: prov[i].ts, pct: pct, classification: cls, crossBreak: crossBreak,
         fromSource: prov[i - 1].provenance, toSource: prov[i].provenance });
-      // cross-range aggregates
+      if (crossBreak) { agg.segmentBoundaryCount++; adjacentTransitionMatrix[cls] = (adjacentTransitionMatrix[cls] || 0) + 1; continue; }
+      // cross-range aggregates — WITHIN-segment only (a legitimate boundary is never a source-alternation defect)
       if (prov[i - 1].provenance !== prov[i].provenance) agg.sourceAlternationCount++;
       if (prov[i - 1].price_staleness && prov[i].price_staleness && prov[i - 1].price_staleness !== prov[i].price_staleness) agg.staleLiveAlternationCount++;
       if (cls === 'CATEGORY_COMPOSITION_DISCONTINUITY') agg.compositionDiscontinuityCount++;
@@ -25970,13 +26034,22 @@ function _aurixAuditLongRangeSnapshotContinuityCore(options, deps) {
       if (cls === 'ECONOMIC_MOVE_PLAUSIBLE') agg.genuineEconomicMoveCount++;
       adjacentTransitionMatrix[cls] = (adjacentTransitionMatrix[cls] || 0) + 1;
     }
+    // valuation regimes PER continuous segment (SPEC.38 target = 1). Global set kept for reporting.
+    const segRegimes = {};
+    prov.forEach((p, i) => { const s = segIdByIdx[i] || 0; (segRegimes[s] = segRegimes[s] || {})[(p.price_staleness || 'na') + ':' + p.provenance] = 1; });
+    Object.keys(segRegimes).forEach(s => { agg.maxRegimesPerSegment = Math.max(agg.maxRegimesPerSegment, Object.keys(segRegimes[s]).length); });
     prov.forEach(p => { agg.valuationRegimeSet[(p.price_staleness || 'na') + ':' + p.provenance] = 1; });
     perRange[r] = { range: r, renderPointCount: rp.length, syntheticPoints: synth, jumpCount: jumps,
+      segmentCount: (prov.length ? (segIdByIdx[prov.length - 1] + 1) : 0), maxRegimesPerSegment: Object.keys(segRegimes).reduce((m, s) => Math.max(m, Object.keys(segRegimes[s]).length), 0),
       sourceCounts: { frontend: prov.filter(p => p.provenance === 'frontend').length, backend: prov.filter(p => p.provenance === 'backend').length },
       transitionCounts: counts, perPointProvenance: (options.includePoints === false) ? undefined : prov, transitions: (options.includePoints === false) ? undefined : transitions };
   });
 
-  const valuationRegimeCount = Object.keys(agg.valuationRegimeSet).length;
+  // SPEC.38 — the headline valuationRegimeCount is now the MAX regimes inside any single continuous segment
+  // (the meaningful "1 per continuous segment" metric). The old cross-segment global count is reported
+  // alongside as valuationRegimeCountGlobal (legitimately >1 when honest segment boundaries separate sources).
+  const valuationRegimeCountGlobal = Object.keys(agg.valuationRegimeSet).length;
+  const valuationRegimeCount = agg.maxRegimesPerSegment;
   const defects = [], suspects = [];
   // DEFECTS only when proven from stored fields (never inferred)
   if (agg.sameMinuteConflictCount > 0) defects.push({ type: 'SAME_MINUTE_CONFLICT', count: agg.sameMinuteConflictCount });
@@ -26006,16 +26079,18 @@ function _aurixAuditLongRangeSnapshotContinuityCore(options, deps) {
     : 'insufficient displayed history to classify';
 
   return {
-    spec: 'DSH.CHART.LONG_RANGE_SNAPSHOT_CONTINUITY.37', appVersion: appVersion, startedAtIso: nowIso(), behaviorChanged: false, readOnly: true,
+    spec: 'DSH.CHART.ELIMINATE_SOURCE_ALTERNATION.38', appVersion: appVersion, startedAtIso: nowIso(), behaviorChanged: false, readOnly: true,
     ranges: RANGES, jumpThresholdPct: jumpPct,
     rootCause: rootCause, perPointProvenance: options.includePoints === false ? undefined : (function () { const o = {}; RANGES.forEach(r => { o[r] = perRange[r].perPointProvenance; }); return o; })(),
     adjacentTransitionMatrix: adjacentTransitionMatrix, perRange: perRange,
-    valuationRegimeCount: valuationRegimeCount, sourceAlternationCount: agg.sourceAlternationCount,
+    valuationRegimeCount: valuationRegimeCount, valuationRegimeCountGlobal: valuationRegimeCountGlobal, sourceAlternationCount: agg.sourceAlternationCount,
+    segmentBoundaryCount: agg.segmentBoundaryCount,
     staleLiveAlternationCount: agg.staleLiveAlternationCount, compositionDiscontinuityCount: agg.compositionDiscontinuityCount,
     revisionMismatchCount: agg.revisionMismatchCount, sameMinuteConflictCount: agg.sameMinuteConflictCount,
     genuineEconomicMoveCount: agg.genuineEconomicMoveCount, unknownDiscontinuityCount: unknown, totalJumpCount: totalJumps,
     defects: defects, suspects: suspects,
-    summary: { verdict: verdict, valuationRegimeCount: valuationRegimeCount, sourceAlternationCount: agg.sourceAlternationCount,
+    summary: { verdict: verdict, valuationRegimeCount: valuationRegimeCount, valuationRegimeCountGlobal: valuationRegimeCountGlobal,
+      sourceAlternationCount: agg.sourceAlternationCount, segmentBoundaryCount: agg.segmentBoundaryCount,
       staleLiveAlternationCount: agg.staleLiveAlternationCount, sameMinuteConflictCount: agg.sameMinuteConflictCount,
       totalSyntheticPoints: agg.totalSyntheticPoints, totalJumpCount: totalJumps, defectCount: defects.length },
     verdict: verdict,
