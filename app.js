@@ -26170,6 +26170,165 @@ function _aurixInstitutionalYTicks(yScale, maxLabels) {
 }
 try { if (typeof window !== 'undefined') window.renderValidatedPortfolioChartWithInstitutionalRenderer = renderValidatedPortfolioChartWithInstitutionalRenderer; } catch (_) {}
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.GEOMETRIC_ROOT_CAUSE_AUDIT.40 — READ-ONLY geometric attribution
+// ════════════════════════════════════════════════════════════════════════════
+// AUDIT-ONLY. Walks the REAL chart pipeline per range (buildProductionPortfolioChart → FRC → the shared
+// institutional renderer) and measures the DRAWN geometry, then attributes the cross-range visual difference
+// to each owner and returns a % responsibility split + a verdict. Changes NOTHING: it only READS the existing
+// owners (no renderer/LTTB/FRC/density/projection/snapshot/interaction edit; syntheticPoints stays whatever
+// the FRC reports — never fabricated here). deps lets a harness drive it headless. Pure; no mutation.
+function _aurixAuditGeometricRootCauseCore(options, deps) {
+  options = options || {}; deps = deps || {};
+  const safe = (fn, d) => { try { const v = fn(); return v === undefined ? (d === undefined ? null : d) : v; } catch (_) { return (d === undefined ? null : d); } };
+  const nowIso = () => { try { return new Date().toISOString(); } catch (_) { return null; } };
+  const appVersion = safe(() => (typeof window !== 'undefined' && window.AURIX_BUILD) ? window.AURIX_BUILD : null, null);
+  const buildChart = deps.buildChart || (typeof buildProductionPortfolioChart === 'function' ? buildProductionPortfolioChart : null);
+  const resolveContract = deps.resolveContract || (typeof _aurixResolveFinalRenderSeriesContract === 'function' ? _aurixResolveFinalRenderSeriesContract : null);
+  const render = deps.render || (typeof renderValidatedPortfolioChartWithInstitutionalRenderer === 'function' ? renderValidatedPortfolioChartWithInstitutionalRenderer : null);
+  const structuralBreaks = deps.structuralBreaks || (typeof _aurixStructuralBreaks === 'function' ? _aurixStructuralBreaks : null);
+  const W = Number(options.vw) > 0 ? Number(options.vw) : ((typeof _WSC_VIEW_W === 'number') ? _WSC_VIEW_W : 1000);
+  const H = Number(options.vh) > 0 ? Number(options.vh) : ((typeof _WSC_VIEW_H === 'number') ? _WSC_VIEW_H : 240);
+  const box = options.box || { left: W * 0.06, right: W - W * 0.06, top: H * 0.14, bottom: H - H * 0.14 };
+  const RANGES = (Array.isArray(options.ranges) && options.ranges.length) ? options.ranges.map(x => String(x).toLowerCase()) : ['24h', '7d', '30d', '1y', 'all'];
+  const mean = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0;
+  const variance = a => { if (a.length < 2) return 0; const m = mean(a); return a.reduce((s, x) => s + (x - m) * (x - m), 0) / a.length; };
+  const median = a => { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); const h = s.length >> 1; return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2; };
+  const cv = a => { const m = mean(a); return m !== 0 ? Math.sqrt(variance(a)) / Math.abs(m) : 0; };
+  const spread = a => { const v = a.filter(x => Number.isFinite(x)); if (v.length < 2) return 0; const mx = Math.max.apply(null, v), mn = Math.min.apply(null, v); return mx !== 0 ? (mx - mn) / Math.abs(mx) : 0; };
+
+  const perRange = {};
+  RANGES.forEach(r => {
+    const chart = safe(() => buildChart ? buildChart(r) : null, null) || { points: [], state: 'pending', pointCount: 0 };
+    const frc = safe(() => resolveContract ? resolveContract(chart, r, 'desktop') : null, null) || {};
+    const rpoints = (Array.isArray(frc.renderPoints) && frc.renderPoints.length) ? frc.renderPoints : (Array.isArray(chart.points) ? chart.points : []);
+    const inputPointCount = Array.isArray(chart.points) ? chart.points.length : 0;
+    const rc = safe(() => render ? render(rpoints.map(p => ({ ts: p.ts, value: p.value })), { range: r, vw: W, vh: H, box: box }) : null, null) || { visiblePixels: [], visiblePoints: [] };
+    const px = Array.isArray(rc.visiblePixels) ? rc.visiblePixels : [];
+    const vpts = Array.isArray(rc.visiblePoints) ? rc.visiblePoints : [];
+    const renderedPointCount = px.length;
+    const segLen = [], slopes = [], angles = [], dxs = [];
+    for (let i = 1; i < px.length; i++) { const dx = px[i].x - px[i - 1].x, dy = px[i].y - px[i - 1].y; segLen.push(Math.hypot(dx, dy)); dxs.push(Math.abs(dx)); slopes.push(dx !== 0 ? dy / dx : 0); angles.push(Math.atan2(dy, dx) * 180 / Math.PI); }
+    const turns = []; for (let i = 1; i < angles.length; i++) { let t = angles[i] - angles[i - 1]; while (t > 180) t -= 360; while (t < -180) t += 360; turns.push(t); }
+    const buckets = { steepUp: 0, gentleUp: 0, flat: 0, gentleDown: 0, steepDown: 0 };
+    angles.forEach(a => { const up = -a; if (up > 30) buckets.steepUp++; else if (up > 5) buckets.gentleUp++; else if (up >= -5) buckets.flat++; else if (up >= -30) buckets.gentleDown++; else buckets.steepDown++; });   // SVG y grows down ⇒ negate for intuitive up/down
+    const plotW = (box.right - box.left) || 1, plotH = (box.bottom - box.top) || 1;
+    const ys = px.map(p => p.y), xs = px.map(p => p.x);
+    const sb = safe(() => structuralBreaks ? structuralBreaks(vpts.map(p => ({ time: p.time, value: p.value })), r) : null, null);
+    const breaks = (sb && Array.isArray(sb.breaks)) ? sb.breaks : [];
+    let gapCoverage = 0;
+    if (vpts.length >= 2) { const span = (vpts[vpts.length - 1].time - vpts[0].time) || 1; gapCoverage = +(breaks.reduce((s, b) => s + ((b.end - b.start) || 0), 0) / span).toFixed(4); }
+    // EXTREMA (the founder's "LTTB • preservación de extremos"): does the RENDERER's LTTB preserve the global
+    // extrema of ITS INPUT (frc.renderPoints)? Measured at the LTTB stage — NOT vs chart.points, because the
+    // FRC (out of scope) legitimately drops leading construction fragments (SPEC.16 short-history gate) whose
+    // trough would otherwise read as an "extrema loss" that LTTB never caused. endToEndExtrema reports the
+    // full-series comparison transparently (its 'false' is the SPEC.16/FRC gate, an identical policy per range).
+    const rInVals = rpoints.map(p => p.value);
+    let extremaPreserved = null, endToEndExtrema = null;
+    if (rInVals.length && vpts.length) {
+      const minV = Math.min.apply(null, rInVals), maxV = Math.max.apply(null, rInVals);
+      const rv = vpts.map(p => p.value); const hasMin = rv.some(v => Math.abs(v - minV) <= Math.max(1e-6, Math.abs(minV) * 1e-6)), hasMax = rv.some(v => Math.abs(v - maxV) <= Math.max(1e-6, Math.abs(maxV) * 1e-6));
+      extremaPreserved = { min: hasMin, max: hasMax, both: hasMin && hasMax };
+    }
+    if (Array.isArray(chart.points) && chart.points.length && vpts.length) {
+      const cv2 = chart.points.map(p => p.value); const cMin = Math.min.apply(null, cv2), cMax = Math.max.apply(null, cv2);
+      const rv = vpts.map(p => p.value); endToEndExtrema = { min: rv.some(v => Math.abs(v - cMin) <= Math.max(1e-6, Math.abs(cMin) * 1e-6)), max: rv.some(v => Math.abs(v - cMax) <= Math.max(1e-6, Math.abs(cMax) * 1e-6)) };
+      endToEndExtrema.both = endToEndExtrema.min && endToEndExtrema.max;
+    }
+    perRange[r] = {
+      range: r, state: chart.state, inputPointCount: inputPointCount, rendererInputCount: rpoints.length, renderedPointCount: renderedPointCount,
+      frcReductionRatio: inputPointCount ? +(rpoints.length / inputPointCount).toFixed(4) : null,
+      LTTBReductionRatio: rpoints.length ? +(renderedPointCount / rpoints.length).toFixed(4) : null,
+      averageSegmentLength: +mean(segLen).toFixed(3), medianSegmentLength: +median(segLen).toFixed(3),
+      shortestSegment: +(segLen.length ? Math.min.apply(null, segLen) : 0).toFixed(3), longestSegment: +(segLen.length ? Math.max.apply(null, segLen) : 0).toFixed(3),
+      averageSlope: +mean(slopes).toFixed(4), slopeVariance: +variance(slopes).toFixed(4),
+      curvatureVariance: +variance(turns).toFixed(4), effectiveCurvature: +mean(turns.map(Math.abs)).toFixed(3),
+      vertexDensity: +((renderedPointCount / plotW) * 100).toFixed(3),
+      angleDistribution: buckets, spacingUniformity: +(1 / (1 + cv(dxs))).toFixed(4),
+      gapCount: breaks.length, gapCoverage: gapCoverage, extremaPreserved: extremaPreserved, endToEndExtrema: endToEndExtrema,
+      verticalVariation: +(Math.sqrt(variance(ys)) / plotH).toFixed(4), horizontalSpan: xs.length ? +((xs[xs.length - 1] - xs[0]) / plotW).toFixed(4) : 0,
+      yScaleMode: rc.yScale ? rc.yScale.mode : null, xBeta: rc.xScale ? rc.xScale.beta : null,
+      renderPathCount: (frc.renderPathCount != null) ? frc.renderPathCount : ((rc.structuralBreakCount != null) ? rc.structuralBreakCount + 1 : null),
+      renderHash: frc.finalRenderHash || null,
+      syntheticPoints: (frc.diagnostics && frc.diagnostics.syntheticPoints != null) ? frc.diagnostics.syntheticPoints : 0,
+    };
+  });
+
+  // ── ATTRIBUTION ─────────────────────────────────────────────────────────────
+  // Post SPEC.32/.33/.39 the ENGINE params are range-independent; this quantifies whether any residual
+  // cross-range geometric difference is caused by an OWNER (LTTB/vertical-scale/segmentation/extrema) or by
+  // the DATASET (fewer points / different temporal distribution / different volatility). Each contribution is
+  // a normalized cross-range divergence signal; they are normalized to sum 100%.
+  const drawable = RANGES.map(r => perRange[r]).filter(p => p.renderedPointCount >= 2);
+  const val = (k) => drawable.map(p => p[k]).filter(x => Number.isFinite(x));
+  const maxRendered = drawable.length ? Math.max.apply(null, drawable.map(p => p.renderedPointCount)) : 0;
+  // LTTB: among ranges whose RENDERER INPUT is large enough to reach the shared density band, do the drawn
+  // vertex counts still differ? (Uses rendererInputCount = the actual LTTB-stage input, not chart.points.)
+  const richEnough = drawable.filter(p => p.rendererInputCount >= maxRendered && maxRendered > 0);
+  const lttbContribRaw = (richEnough.length >= 2) ? spread(richEnough.map(p => p.renderedPointCount)) : 0;
+  // VERTICAL: distinct y-scale modes across ranges (data-driven blend) + vertical-variation spread.
+  const yModes = {}; drawable.forEach(p => { if (p.yScaleMode) yModes[p.yScaleMode] = 1; });
+  const verticalContribRaw = (Math.max(0, Object.keys(yModes).length - 1)) * 0.5 + spread(val('verticalVariation')) * 0.5;
+  // SEGMENTATION: proportion of ranges that break + gap-coverage spread.
+  const segmentedFrac = drawable.length ? drawable.filter(p => p.gapCount > 0).length / drawable.length : 0;
+  const segmentationContribRaw = segmentedFrac * 0.5 + spread(val('gapCoverage')) * 0.5;
+  // EXTREMA: any range that failed to preserve BOTH global extrema.
+  const extremaFail = drawable.filter(p => p.extremaPreserved && p.extremaPreserved.both === false).length;
+  const extremaContribRaw = drawable.length ? extremaFail / drawable.length : 0;
+  // DATASET: input-count scarcity + raw spacing non-uniformity + volatility spread (all pre-engine causes).
+  const inputSpread = spread(val('inputPointCount'));
+  const spacingSpread = spread(val('spacingUniformity'));
+  const volatilitySpread = spread(val('slopeVariance'));
+  // rendered-count differences that ARE explained by input scarcity (ranges below the shared band) → dataset.
+  const scarcityFrac = drawable.length ? drawable.filter(p => p.inputPointCount < maxRendered).length / drawable.length : 0;
+  const datasetContribRaw = inputSpread * 0.34 + spacingSpread * 0.33 + volatilitySpread * 0.16 + scarcityFrac * 0.17;
+
+  const raw = { DATASET: datasetContribRaw, LTTB: lttbContribRaw, VERTICAL_SCALE: verticalContribRaw, SEGMENTATION: segmentationContribRaw, EXTREMA_SELECTION: extremaContribRaw };
+  const totalRaw = Object.keys(raw).reduce((s, k) => s + (raw[k] || 0), 0);
+  const responsibilityPct = {};
+  Object.keys(raw).forEach(k => { responsibilityPct[k] = totalRaw > 0 ? +((raw[k] / totalRaw) * 100).toFixed(1) : 0; });
+
+  // engine-uniformity facts (should all be true post SPEC.39)
+  const betaSet = {}; drawable.forEach(p => { if (p.xBeta != null) betaSet[p.xBeta] = 1; });
+  const xProjectionUnified = Object.keys(betaSet).length <= 1;
+  const renderPathAllSingleOrHonest = true;   // reported per range; not a uniformity requirement
+  const engineParamsUnified = xProjectionUnified;   // density formula + curvature + path are code-identical (asserted by harness)
+
+  const EPS = 6;   // < this % ⇒ negligible owner contribution
+  let verdict, dominant = null, dominantPct = 0;
+  Object.keys(responsibilityPct).forEach(k => { if (responsibilityPct[k] > dominantPct) { dominantPct = responsibilityPct[k]; dominant = k; } });
+  const engineOwners = ['LTTB', 'VERTICAL_SCALE', 'SEGMENTATION', 'EXTREMA_SELECTION'];
+  const maxEngineOwnerPct = Math.max.apply(null, engineOwners.map(k => responsibilityPct[k] || 0));
+  if (totalRaw < 0.02 || (responsibilityPct.DATASET < EPS && maxEngineOwnerPct < EPS)) verdict = 'GEOMETRY_ALREADY_UNIFIED';
+  else if (dominant === 'DATASET') verdict = 'DATASET_DOMINANT';
+  else if (dominant === 'LTTB') verdict = 'LTTB_DOMINANT';
+  else if (dominant === 'VERTICAL_SCALE') verdict = 'VERTICAL_SCALE_DOMINANT';
+  else if (dominant === 'SEGMENTATION') verdict = 'SEGMENTATION_DOMINANT';
+  else if (dominant === 'EXTREMA_SELECTION') verdict = 'EXTREMA_SELECTION_DOMINANT';
+  else verdict = 'GEOMETRY_ALREADY_UNIFIED';
+
+  const totalSyntheticPoints = RANGES.reduce((s, r) => s + (perRange[r].syntheticPoints || 0), 0);
+  const rootCause = (verdict === 'DATASET_DOMINANT') ? 'the engine is range-uniform; the residual difference comes from the DATA (fewer points / different temporal distribution / different volatility per range)'
+    : (verdict === 'GEOMETRY_ALREADY_UNIFIED') ? 'no material cross-range geometric divergence remains from any owner'
+    : (verdict === 'LTTB_DOMINANT') ? 'the LTTB reduction produces materially different vertex counts across ranges beyond input scarcity'
+    : (verdict === 'VERTICAL_SCALE_DOMINANT') ? 'the vertical scale (legible-blend) engages on some ranges and not others, changing vertical compression'
+    : (verdict === 'SEGMENTATION_DOMINANT') ? 'gap segmentation splits some ranges and not others, changing the line topology'
+    : (verdict === 'EXTREMA_SELECTION_DOMINANT') ? 'extrema are not consistently preserved across ranges'
+    : 'insufficient evidence';
+
+  return {
+    spec: 'DSH.CHART.GEOMETRIC_ROOT_CAUSE_AUDIT.40', appVersion: appVersion, startedAtIso: nowIso(), readOnly: true, behaviorChanged: false,
+    ranges: RANGES, viewport: { W: W, H: H, box: box }, perRange: perRange,
+    engineUniformity: { xProjectionUnified: xProjectionUnified, engineParamsUnified: engineParamsUnified, distinctXBeta: Object.keys(betaSet).map(Number), distinctYScaleModes: Object.keys(yModes) },
+    attribution: { raw: raw, responsibilityPct: responsibilityPct, dominant: dominant, dominantPct: dominantPct,
+      signals: { inputCountSpread: +inputSpread.toFixed(4), spacingUniformitySpread: +spacingSpread.toFixed(4), volatilitySpread: +volatilitySpread.toFixed(4), inputScarcityFrac: +scarcityFrac.toFixed(4), segmentedFrac: +segmentedFrac.toFixed(4), lttbCountSpreadRichRanges: +lttbContribRaw.toFixed(4), distinctYModes: Object.keys(yModes).length, extremaFailRanges: extremaFail } },
+    totalSyntheticPoints: totalSyntheticPoints, rootCause: rootCause,
+    summary: { verdict: verdict, responsibilityPct: responsibilityPct, totalSyntheticPoints: totalSyntheticPoints, engineParamsUnified: engineParamsUnified },
+    verdict: verdict,
+  };
+}
+try { if (typeof window !== 'undefined') window._aurixAuditGeometricRootCauseCore = _aurixAuditGeometricRootCauseCore; } catch (_) {}
+
 // Emergency badge text/tone from the emergency chart object (honours %/€ mode).
 function _aurixEmergencyBadgeText(emg) {
   try {
@@ -27564,6 +27723,38 @@ try {
           if (p && typeof p.then === 'function') p.then(function () {}, function () {});   // swallow rejection — never throw
         }
       } catch (_) {}
+      try { console.log(json); } catch (_) {}
+      return json;
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // SPEC DSH.CHART.GEOMETRIC_ROOT_CAUSE_AUDIT.40 — window.aurixAuditGeometricRootCause(options)
+    // ════════════════════════════════════════════════════════════════════════════
+    // READ-ONLY. Per-range geometric metrics of the DRAWN line + an owner-attribution % + a verdict. Never
+    // changes rendering/behaviour; only reads the existing pipeline. Returns the audit object (also stored).
+    window.aurixAuditGeometricRootCause = function (options) {
+      let result;
+      try {
+        result = (typeof _aurixAuditGeometricRootCauseCore === 'function') ? _aurixAuditGeometricRootCauseCore(options || {}, {})
+          : { spec: 'DSH.CHART.GEOMETRIC_ROOT_CAUSE_AUDIT.40', verdict: 'INSUFFICIENT_EVIDENCE', behaviorChanged: false, errorMessage: 'core unavailable', summary: {} };
+      } catch (e) {
+        result = { spec: 'DSH.CHART.GEOMETRIC_ROOT_CAUSE_AUDIT.40', verdict: 'INSUFFICIENT_EVIDENCE', behaviorChanged: false, errorMessage: (e && e.message) ? e.message : String(e), summary: {} };
+      }
+      try { window.__AURIX_LAST_GEOMETRIC_ROOT_CAUSE_AUDIT__ = result; } catch (_) {}
+      try {
+        console.log('%c[UI][GEOMETRIC_ROOT_CAUSE]', 'font-weight:700;color:#12b886', result);
+        console.log('VERDICT: ' + (result.verdict || 'n/a') + '  rootCause: ' + (result.rootCause || 'n/a'));
+        console.log('responsibilityPct: ', result.attribution ? result.attribution.responsibilityPct : (result.summary && result.summary.responsibilityPct));
+        console.log('engineParamsUnified: ' + (result.summary && result.summary.engineParamsUnified) + '  totalSyntheticPoints: ' + (result.totalSyntheticPoints));
+        if (result.perRange) Object.keys(result.perRange).forEach(r => { const p = result.perRange[r]; console.log('  ' + r + ': in=' + p.inputPointCount + ' rendered=' + p.renderedPointCount + ' reduction=' + p.LTTBReductionRatio + ' spacingUnif=' + p.spacingUniformity + ' gaps=' + p.gapCount + ' yMode=' + p.yScaleMode + ' vtxDensity=' + p.vertexDensity); });
+        console.log('To copy full JSON run: aurixCopyLastGeometricRootCauseAudit()');
+      } catch (_) {}
+      return result;
+    };
+    window.aurixCopyLastGeometricRootCauseAudit = function () {
+      let json = '';
+      try { json = JSON.stringify(window.__AURIX_LAST_GEOMETRIC_ROOT_CAUSE_AUDIT__ || { error: 'no geometric root-cause audit yet — run aurixAuditGeometricRootCause() first' }, null, 2); } catch (_) { json = '{"error":"stringify_failed"}'; }
+      try { if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) { const p = navigator.clipboard.writeText(json); if (p && typeof p.then === 'function') p.then(function () {}, function () {}); } } catch (_) {}
       try { console.log(json); } catch (_) {}
       return json;
     };
