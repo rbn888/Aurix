@@ -28797,24 +28797,53 @@ function _wscFmtAxisValStep(v, step) {
 // slightly sharper; long ranges (30D/1A/TOTAL) read smoother + quieter (lighter
 // area) for a Bloomberg/Kubera institutional feel. Pure presentation — drives
 // SVG stroke-width / filter / fill opacity only, never geometry, values or hover.
+// SPEC DSH.CHART.UNIFIED_RENDER_FINISH.39 — ONE institutional finish (24H's proven acabado) for EVERY range.
+// SPEC.32/.33 already unified density + X-projection + curvature; the LAST per-range visual divergence lived
+// HERE: this function gave 30D/1Y/ALL a thinner stroke (2.35 vs 2.7), weaker glow (1.55 vs 2.05) and a quieter
+// area (0.62–0.84 vs 1.0), so the SAME geometry read as a different "engine". With the flag ON every range
+// resolves to the SINGLE shared config below — which IS 24H's current sharp finish — so 24H is byte-identical
+// ON vs OFF (24H + 7D already sat at this finish) and only 30D/1Y/ALL adopt 24H's language. PURE presentation:
+// SVG stroke-width / glow stdDeviation / fill opacity only — NEVER geometry, points, values, scales, gaps,
+// returns, badges or directional colours. glowAlpha is already range-independent (DPR + down-tone) and is
+// preserved verbatim in BOTH branches. renderPolishMode keeps 24H's label so the returned string is unchanged
+// for 24H too. Flag OFF ⇒ EXACT legacy per-range table (rollback). Editing _AURIX_UNIFIED_FINISH (one object)
+// changes the shared finish for every range at once — no new per-range branches are introduced.
+const _AURIX_CHART_UNIFIED_RENDER_FINISH = true;
+const _AURIX_UNIFIED_FINISH = {
+  desktop: { strokeWidth: 2.7, glowBase: 2.05, areaBase: 1.0 },   // = 24H desktop proven values
+  mobile:  { strokeWidth: 2.4, glowBase: 2.05, areaBase: 1.0 },   // = 24H mobile proven values (glow ×0.85 below)
+  mode: 'sharp-intraday',
+};
 function _wscRenderPolish(range, mobile, tone) {
   const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) ? Math.max(1, Math.min(3, window.devicePixelRatio)) : 1;
   const isLong = range === '30d' || range === '1y' || range === 'all';
   const sharp = range === '24h' || range === '7d';
-  const strokeWidth = mobile ? (sharp ? 2.4 : 2.1) : (sharp ? 2.7 : isLong ? 2.35 : 2.5);
-  // RC4-C C3 — glow more uniform: slightly larger blur radius + lower intensity (natural
-  // illumination, no harsh halo). Visual-only render params (no geometry/data change).
-  const glowStrength = +((isLong ? 1.55 : 2.05) * (mobile ? 0.85 : 1)).toFixed(2);   // SVG blur stdDeviation (user units)
-  // DPR-aware halo strength. WN.25/WN.26 PART 5 — softer halo in the red (down)
-  // state so a negative day never reads arcade-bright (×0.80).
+  // DPR-aware halo strength. WN.25/WN.26 PART 5 — softer halo in the red (down) state so a negative day never
+  // reads arcade-bright (×0.80). Already range-independent ⇒ identical in both the unified and legacy branch.
   const glowAlpha = +Math.min(0.52, (0.36 + 0.09 * (dpr - 1)) * (tone === 'down' ? 0.80 : 1)).toFixed(2);
-  // WN.26 PART 5 — slightly more area presence on DESKTOP (+10%, capped), kept
-  // subtle so the line stays dominant; mobile unchanged.
-  const areaBase = range === 'all' ? 0.62 : range === '1y' ? 0.72 : range === '30d' ? 0.84 : 1.0;
+  const _unifiedOn = (typeof _AURIX_CHART_UNIFIED_RENDER_FINISH !== 'undefined') && _AURIX_CHART_UNIFIED_RENDER_FINISH
+    && typeof _AURIX_UNIFIED_FINISH === 'object' && _AURIX_UNIFIED_FINISH;
+  let strokeWidth, glowStrength, areaBase, renderPolishMode;
+  if (_unifiedOn) {
+    // SPEC.39 — every range resolves to the SINGLE shared institutional finish (= 24H's proven values).
+    const cfg = mobile ? _AURIX_UNIFIED_FINISH.mobile : _AURIX_UNIFIED_FINISH.desktop;
+    strokeWidth = cfg.strokeWidth;
+    glowStrength = +(cfg.glowBase * (mobile ? 0.85 : 1)).toFixed(2);
+    areaBase = cfg.areaBase;
+    renderPolishMode = _AURIX_UNIFIED_FINISH.mode;
+  } else {
+    // LEGACY per-range table (flag OFF ⇒ EXACT prior behaviour, byte-identical rollback).
+    strokeWidth = mobile ? (sharp ? 2.4 : 2.1) : (sharp ? 2.7 : isLong ? 2.35 : 2.5);
+    // RC4-C C3 — glow: slightly larger blur radius + lower intensity (natural illumination, no harsh halo).
+    glowStrength = +((isLong ? 1.55 : 2.05) * (mobile ? 0.85 : 1)).toFixed(2);   // SVG blur stdDeviation (user units)
+    // WN.26 PART 5 — slightly quieter area on long ranges; DESKTOP +10% (capped); mobile unchanged.
+    areaBase = range === 'all' ? 0.62 : range === '1y' ? 0.72 : range === '30d' ? 0.84 : 1.0;
+    renderPolishMode = isLong ? 'institutional-smooth' : 'sharp-intraday';
+  }
   const areaOpacity = +Math.min(1, areaBase * (mobile ? 1 : 1.10)).toFixed(3);
   return { visualFinishApplied: true, visualFinishFinalApplied: true, strokeWidth, glowStrength, glowAlpha,
     areaOpacity, desktopAreaOpacity: areaOpacity, redStateGlowStrength: +(glowStrength).toFixed(2),
-    devicePixelRatio: dpr, renderPolishMode: isLong ? 'institutional-smooth' : 'sharp-intraday' };
+    devicePixelRatio: dpr, renderPolishMode: renderPolishMode };
 }
 
 // ── WN.25 PART 1 — canonical value → plot-Y (viewBox units) ─────────────────
