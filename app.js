@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '532'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '533'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -45509,8 +45509,12 @@ filterBtns.forEach(btn => {
       return;
     }
 
-    // Switching away from RE mode: restore search UI
+    // Switching away from RE mode: restore search UI (enterSearchMode already clears the selection).
     if (isRealEstateMode) enterSearchMode();
+    // SPEC 45 STATE ISOLATION — switching the category filter clears the previous category's selection +
+    // preview so it can never leak (e.g. a crypto pick surviving into the Stocks filter). The typed query,
+    // if any, is intentionally kept below for a live re-search under the new filter.
+    else { try { if (typeof clearSelectedAsset === 'function') clearSelectedAsset(); } catch (_) {} }
 
     activeSearchFilter = newFilter;
     _addV42UpdateFilterAttr(newFilter);
@@ -47611,6 +47615,18 @@ function _addV2Activate(targetStep) {
   const modal = document.querySelector('#modalOverlay .modal');
   if (modal) modal.dataset.step = targetStep;
 }
+// SPEC 45 STATE ISOLATION — ONE clean-state reset for the shared add-asset modal, invoked at EVERY in-modal
+// category switch (picker route + filter bar) so no search / selection / preview / suggestion from one
+// category can leak into the next (Metales showing Bitcoin, Crypto showing Apple, a stale preview card).
+// Pure UX/state: reuses the existing reset primitives (clearSelectedAsset resets selectedDbAsset + pending*
+// + chip + preview); creates/alters NO data, calc, model or portfolio state.
+function _addV2ResetForCategory() {
+  try { if (typeof isManualMode !== 'undefined' && isManualMode && typeof exitManualMode === 'function') exitManualMode(); } catch (_) {}
+  try { if (typeof clearSelectedAsset === 'function') clearSelectedAsset(); } catch (_) {}
+  try { if (typeof closeSuggestions === 'function') closeSuggestions(); } catch (_) {}
+  try { currentSuggestions = []; renderedSuggestions = []; focusedSuggIdx = -1; } catch (_) {}
+  try { if (typeof searchInput !== 'undefined' && searchInput) { searchInput.value = ''; if (typeof searchClearBtn !== 'undefined' && searchClearBtn) searchClearBtn.style.display = 'none'; } } catch (_) {}
+}
 function _addV2SetMode(mode) {
   const modal = document.querySelector('#modalOverlay .modal');
   if (modal) modal.dataset.mode = mode || '';
@@ -47802,6 +47818,10 @@ function _addV4RenderPreview() {
       if (typeof openLiquidityModal === 'function') openLiquidityModal();
       return;
     }
+
+    // SPEC 45 STATE ISOLATION — every category entered from the picker starts from a clean state (no leaked
+    // selection/preview/search/suggestions from the previously viewed category).
+    _addV2ResetForCategory();
 
     // Metales / (legacy 'gold') → metal picker sheet: choose Oro/Plata first, then the type.
     if (pick === 'metal' || pick === 'gold') {
