@@ -17551,22 +17551,40 @@ body.gs-open { overflow: hidden; }
     0 0 0 1px rgba(74, 130, 240, 0.22) inset,
     0 8px 24px -12px rgba(74, 130, 240, 0.45);
 }
-/* Premium check mark in the corner when selected. */
-.onb-lang-card::after {
-  content: '';
+/* SPEC 45 ONBOARDING FINISH — one selection language across the whole flow: a premium corner check that
+   fades / scales in when a card or chip is chosen (Language / Experience / Interests). Absolute → reflow-
+   free, so selecting never shifts layout. Replaces the old Language-only dot with a shared glyph. */
+.onb-lang-card::after,
+.onb-exp-card::after,
+#onbInterestsGrid .onb-chip::after {
+  content: '✓';
   position: absolute;
   top: 10px; right: 10px;
-  width: 16px; height: 16px;
+  width: 17px; height: 17px;
   border-radius: 999px;
-  background: rgba(74, 130, 240, 0.0);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  display: grid;
+  place-items: center;
+  font-size: 10.5px;
+  font-weight: 900;
+  line-height: 1;
+  color: transparent;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transform: scale(0.7);
+  opacity: 0.5;
+  pointer-events: none;
   transition: background .18s var(--ease-premium), border-color .18s var(--ease-premium),
-              transform .18s var(--ease-premium);
+              color .18s var(--ease-premium), transform .18s var(--ease-premium),
+              opacity .18s var(--ease-premium);
 }
-.onb-lang-card.is-selected::after {
+.onb-lang-card.is-selected::after,
+.onb-exp-card.is-selected::after,
+#onbInterestsGrid .onb-chip.is-selected::after {
+  color: #fff;
   background: var(--aurix-blue);
   border-color: rgba(74, 130, 240, 0.6);
-  transform: scale(1.05);
+  transform: scale(1);
+  opacity: 1;
 }
 
 /* ── Interests chips — premium selected ── */
@@ -17747,6 +17765,72 @@ body.gs-open { overflow: hidden; }
     animation: none;
   }
   .onb-success-tick { stroke-dashoffset: 0; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   SPEC 45 ONBOARDING FINISH — Language / Interests / Experience polish.
+   CSS-only, layered last so it wins without rewriting the baseline. Unifies keyboard focus and the
+   selection language, tightens each step's use of space, and keeps every step's hierarchy secondary
+   to the Investor Profile (Age lives inside Profile since v538 — untouched here). No markup / JS /
+   handler / flow / persistence / engine change.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Unified, accessible keyboard focus across every selectable control (matches the profile cards). */
+.onb-lang-card:focus-visible,
+#onbInterestsGrid .onb-chip:focus-visible,
+.onb-exp-card:focus-visible {
+  outline: none;
+  border-color: rgba(120, 165, 255, 0.75);
+  box-shadow: 0 0 0 3px rgba(74, 130, 240, 0.30);
+}
+
+/* ── Language — institutional first impression: the locale code reads as a quiet pill. ── */
+.onb-lang-native {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+}
+.onb-lang-card.is-selected .onb-lang-native {
+  border-color: rgba(74, 130, 240, 0.45);
+  background: rgba(74, 130, 240, 0.14);
+  color: rgba(206, 222, 255, 0.92);
+}
+
+/* ── Interests — a deliberate tile grid (multi-asset), not a generic filter bar. ── */
+#onbInterestsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: var(--space-2);
+}
+#onbInterestsGrid .onb-chip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-radius: 14px;
+  padding: 13px 12px;
+}
+
+/* ── Experience — reserve room for the corner check; calm, secondary to the profile. ── */
+.onb-exp-card { padding-right: 40px; }
+.onb-exp-desc { line-height: 1.4; }
+
+@media (max-width: 768px) {
+  #onbInterestsGrid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 360px) {
+  #onbInterestsGrid { gap: 7px; }
+  #onbInterestsGrid .onb-chip { padding: 12px 10px; }
+  /* Fill alone signals selection when horizontal space is tight. */
+  #onbInterestsGrid .onb-chip::after { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .onb-lang-card::after,
+  .onb-exp-card::after,
+  #onbInterestsGrid .onb-chip::after { transition: none; }
 }
 
 /* ══════════════════════════════════════════════════════════════════
