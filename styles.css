@@ -22574,7 +22574,7 @@ body.aurix-premium-lock{ overflow:hidden; }
    desktop/tablet/mobile.
 ══════════════════════════════════════════════════════════════ */
 .menu-panel{
-  width:238px; padding:8px;
+  width:224px; padding:7px;                                /* slightly narrower + tighter → cleaner, less dead space */
   transform:translateY(-6px);                              /* no scale/zoom */
   transition:opacity .12s ease-out, transform .12s ease-out;
 }
@@ -22592,7 +22592,7 @@ body.aurix-premium-lock{ overflow:hidden; }
 }
 .menu-identity-badge[data-tier="premium"]{ color:#0a1124; background:linear-gradient(180deg,#6ba4ff,#3f74e6); box-shadow:0 0 14px rgba(107,164,255,.4); }
 .menu-identity-badge[data-tier="founder"]{ color:#1a1206; background:linear-gradient(180deg,#ecd592,#d4af5d); box-shadow:0 0 14px rgba(212,175,93,.34); }
-.menu-identity-badge[data-tier="free"]{ color:#cdd9ec; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); }
+.menu-identity-badge[data-tier="free"]{ color:#d6e3f6; background:rgba(120,160,255,.06); border:1px solid rgba(150,180,255,.20); box-shadow:inset 0 1px 0 rgba(255,255,255,.05); text-transform:uppercase; }
 
 /* More air between sections. */
 .menu-divider{ margin:8px 6px; }
@@ -22666,6 +22666,29 @@ body.aurix-premium-lock{ overflow:hidden; }
   color:rgba(212,175,93,.72);
   opacity:.85;
 }
+/* PREMIUM-PREVIEW POLISH — Free user's premium slot is a mysterious, non-clickable "coming soon".
+   Uppercase, wide tracking, cool premium tint, dimmed, not-allowed — NEVER gold "pay now", NEVER reveals
+   "Aurix Premium". Overrides the gold .menu-item--premium-cta the button still carries (launch-critical). */
+.menu-item--coming-soon{
+  color:rgba(190,208,240,.72)!important;
+  background:rgba(255,255,255,.03)!important;
+  border:1px solid rgba(150,180,255,.16)!important;
+  box-shadow:inset 0 0 26px rgba(90,140,255,.05)!important;
+  opacity:.65;
+  cursor:not-allowed;
+  font-size:12px; font-weight:700; letter-spacing:.28em; text-transform:uppercase; text-align:center;
+  text-shadow:0 0 12px rgba(120,160,255,.22);
+  position:relative; overflow:hidden;
+  transition:opacity .2s ease;
+}
+.menu-item--coming-soon:hover{ opacity:.72; color:rgba(205,220,248,.85)!important; background:rgba(255,255,255,.05)!important; transform:none; }
+.menu-item--coming-soon::after{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(105deg,transparent 32%,rgba(160,190,255,.10) 50%,transparent 68%);
+  transform:translateX(-120%); animation:menuSoonShimmer 5s ease-in-out infinite;
+}
+@keyframes menuSoonShimmer{ 0%,55%{ transform:translateX(-120%); } 100%{ transform:translateX(120%); } }
+@media (prefers-reduced-motion:reduce){ .menu-item--coming-soon::after{ animation:none; opacity:0; } }
 /* DSH.SETTINGS.05 — Idioma/Moneda toggles sit on the right of their Cuenta row.
    Currency pills carry flex:1 for the (removed) menu row; size to content here. */
 .settings-row .menu-pref-opts{ flex:0 0 auto; }

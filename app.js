@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '526'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '527'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -42140,18 +42140,18 @@ function _aurixPremiumPreviewHTML(section) {
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const EN = (function () { try { return (typeof lang !== 'undefined' && lang === 'en'); } catch (_) { return false; } })();
   const COPY = {
-    es: { cta: 'Volver al Dashboard',
-      workspace: { badge: 'ESPACIO DE TRABAJO', title: 'Aurix Workspace se está preparando', subtitle: 'Tus futuras herramientas patrimoniales estarán conectadas a tu cartera real.', text: 'Aurix está preparando un espacio donde podrás planificar, simular escenarios y trabajar con tu patrimonio desde una única plataforma.', keyMessage: 'Workspace no será una zona aislada. Estará conectado a tu patrimonio real, tus activos y tu evolución.', bullets: ['Planificación patrimonial', 'Calculadoras financieras', 'Simuladores', 'Objetivos', 'Escenarios', 'Herramientas avanzadas'] },
+    es: { cta: 'Volver al Dashboard', comingSoon: 'PRÓXIMAMENTE',
+      workspace: { badge: 'ZONA DE TRABAJO', title: 'Aurix Workspace se está preparando', subtitle: 'Tus futuras herramientas patrimoniales estarán conectadas a tu cartera real.', text: 'Aurix está construyendo un espacio donde podrás planificar, organizar, simular escenarios y trabajar con tu patrimonio desde una única plataforma.', keyMessage: 'Workspace no será una zona aislada. Será tu mesa de trabajo patrimonial, conectada a tus activos, tu evolución y tus objetivos.', bullets: ['Planificación patrimonial', 'Calculadoras financieras', 'Simuladores', 'Objetivos', 'Escenarios', 'Herramientas avanzadas'] },
       intelligence: { badge: 'CAPA INTELIGENTE', title: 'Aurix Intelligence se está preparando', subtitle: 'Aurix ya está analizando tu información patrimonial.', text: 'Aunque todavía no veas esta sección completa, Aurix ya está organizando tus datos, calculando tu exposición y preparando una inteligencia personalizada sobre tu cartera.', keyMessage: 'Tu análisis no empieza cuando se desbloquea la sección. Empieza desde el primer dato que registras en Aurix.', bullets: ['Salud patrimonial', 'Riesgo y concentración', 'Diversificación', 'Liquidez', 'Drivers de evolución', 'Insights personalizados'] },
     },
-    en: { cta: 'Back to Dashboard',
-      workspace: { badge: 'WEALTH WORKSPACE', title: 'Aurix Workspace is getting ready', subtitle: 'Your future wealth tools will be connected to your real portfolio.', text: 'Aurix is preparing a space where you will be able to plan, simulate scenarios and work with your wealth from a single platform.', keyMessage: "Workspace won't be an isolated area. It will be connected to your real wealth, your assets and your evolution.", bullets: ['Wealth planning', 'Financial calculators', 'Simulators', 'Goals', 'Scenarios', 'Advanced tools'] },
-      intelligence: { badge: 'INTELLIGENCE LAYER', title: 'Aurix Intelligence is getting ready', subtitle: 'Aurix is already analyzing your wealth information.', text: "Even though you can't see this section in full yet, Aurix is already organizing your data, calculating your exposure and preparing personalized intelligence about your portfolio.", keyMessage: "Your analysis doesn't start when the section unlocks. It starts with the first piece of data you record in Aurix.", bullets: ['Portfolio Health', 'Risk and concentration', 'Diversification', 'Liquidity', 'Wealth drivers', 'Personalized insights'] },
+    en: { cta: 'Back to Dashboard', comingSoon: 'COMING SOON',
+      workspace: { badge: 'WEALTH WORKSPACE', title: 'Aurix Workspace is getting ready', subtitle: 'Your future wealth tools will be connected to your real portfolio.', text: 'Aurix is building a space where you will be able to plan, organize, simulate scenarios and work with your wealth from a single platform.', keyMessage: 'Workspace will not be an isolated area. It will become your wealth operating desk, connected to your assets, your evolution and your goals.', bullets: ['Wealth planning', 'Financial calculators', 'Simulators', 'Goals', 'Scenarios', 'Advanced tools'] },
+      intelligence: { badge: 'INTELLIGENCE LAYER', title: 'Aurix Intelligence is getting ready', subtitle: 'Aurix is already analyzing your wealth information.', text: 'Even though this section is not fully visible yet, Aurix is already organizing your data, calculating your exposure and preparing personalized intelligence for your portfolio.', keyMessage: 'Your analysis does not start when the section unlocks. It starts from the first data point you register in Aurix.', bullets: ['Portfolio Health', 'Risk and concentration', 'Diversification', 'Liquidity', 'Wealth drivers', 'Personalized insights'] },
     },
   };
   const dict = EN ? COPY.en : COPY.es;
   const isWs = (section === 'workspace');
-  const P = Object.assign({ cta: dict.cta }, isWs ? dict.workspace : dict.intelligence);
+  const P = Object.assign({ cta: dict.cta, comingSoon: dict.comingSoon }, isWs ? dict.workspace : dict.intelligence);
   const glyph = isWs
     ? '<svg width="30" height="30" viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="2" fill="#e2ecff"/><rect x="16" y="4" width="8" height="8" rx="2" fill="#a9c6ff"/><rect x="4" y="16" width="8" height="8" rx="2" fill="#a9c6ff"/><rect x="16" y="16" width="8" height="8" rx="2" fill="#7ea6ff"/></svg>'
     : '<svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true"><path d="M15 7 7 20M15 7l8 13M7 20h16" stroke="rgba(200,220,255,0.55)" stroke-width="1.2"/><circle cx="15" cy="7" r="2.6" fill="#e2ecff"/><circle cx="7" cy="20" r="2.6" fill="#a9c6ff"/><circle cx="23" cy="20" r="2.6" fill="#a9c6ff"/></svg>';
@@ -42159,7 +42159,7 @@ function _aurixPremiumPreviewHTML(section) {
   const style = ''
     + '<style>'
     // Clean premium-black stage with a very subtle central glow (no lateral blocks / dark rectangles).
-    + '.premium-preview-stage{position:relative;width:100%;min-height:calc(100dvh - 116px);display:flex;align-items:center;justify-content:center;padding:32px 20px;box-sizing:border-box;overflow:hidden;background:radial-gradient(circle at 50% 26%,rgba(70,120,255,0.10),transparent 60%),#05070e;}'
+    + '.premium-preview-stage{position:relative;width:100%;min-height:calc(100dvh - 116px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px;box-sizing:border-box;overflow:hidden;background:radial-gradient(circle at 50% 26%,rgba(70,120,255,0.10),transparent 60%),#05070e;}'
     // Neutralize the host containers (Intelligence #tabPlaceholder / Workspace #aurixWorkspace) so BOTH
     // previews render on the same clean field — no host padding/background/border framing the card.
     + '.tab-placeholder:has(.premium-preview-stage),.aurix-workspace:has(.premium-preview-stage){background:transparent!important;padding:0!important;margin:0!important;border:none!important;box-shadow:none!important;min-height:calc(100dvh - 116px)!important;display:flex!important;align-items:stretch!important;justify-content:center!important;}'
@@ -42169,6 +42169,8 @@ function _aurixPremiumPreviewHTML(section) {
     + '.premium-preview-orb::after{content:"";position:absolute;inset:-9px;border-radius:50%;border:1px solid rgba(120,170,255,0.35);animation:ppRing 3.2s ease-in-out infinite;}'
     + '.pp-glyph{position:relative;z-index:1;}'
     + '.premium-preview-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(150,185,255,0.95);border:1px solid rgba(120,170,255,0.4);background:rgba(90,140,255,0.08);border-radius:999px;padding:6px 14px;margin-bottom:16px;}'
+    // Editorial "coming soon" teaser ABOVE the card — subtle, uppercase, wide tracking; never competes with the badge.
+    + '.premium-preview-coming-soon{position:relative;z-index:1;font-size:10.5px;font-weight:700;letter-spacing:.34em;text-transform:uppercase;color:rgba(150,185,255,0.62);margin:0 0 16px;text-align:center;text-shadow:0 0 14px rgba(90,140,255,0.22);}'
     + '.pp-title{font-size:28px;font-weight:800;color:rgba(255,255,255,0.985);margin:0 0 10px;letter-spacing:-.01em;line-height:1.15;}'
     + '.pp-sub{font-size:16px;color:rgba(255,255,255,0.74);margin:0 0 10px;}'
     + '.pp-text{font-size:14px;line-height:1.65;color:rgba(255,255,255,0.6);max-width:600px;margin:0 auto 14px;}'
@@ -42187,6 +42189,7 @@ function _aurixPremiumPreviewHTML(section) {
     + '</style>';
   return ''
     + '<div class="premium-preview-stage premium-preview-' + (isWs ? 'workspace' : 'intelligence') + '">' + style
+    +   '<div class="premium-preview-coming-soon" aria-hidden="true">' + esc(P.comingSoon) + '</div>'
     +   '<section class="premium-preview-card" role="region" aria-label="' + esc(P.title) + '">'
     +     '<div class="premium-preview-orb"><span class="pp-glyph">' + glyph + '</span></div>'
     +     '<div class="premium-preview-badge">' + esc(P.badge) + '</div>'
@@ -50328,13 +50331,15 @@ function _aurixRenderMenuIdentity() {
     const _premiumUser = (typeof hasAurixPremiumAccess === 'function') && hasAurixPremiumAccess(_aurixCurrentAuthUser());
     const _en = (function () { try { return (typeof lang !== 'undefined' && lang === 'en'); } catch (_) { return false; } })();
     if (_premiumUser) {
-      premiumEl.classList.remove('menu-item--premium-locked');
+      premiumEl.classList.remove('menu-item--coming-soon');
       premiumEl.removeAttribute('aria-disabled');
       premiumEl.textContent = (typeof t === 'function') ? t('menuPremium') : '✨ Aurix Premium';
     } else {
-      premiumEl.classList.add('menu-item--premium-locked');
+      // FREE — teaser only: NEVER reveal "Aurix Premium". A mysterious uppercase "PRÓXIMAMENTE / COMING SOON",
+      // not clickable (the click handler no-ops for non-premium), no modal, no navigation, no error.
+      premiumEl.classList.add('menu-item--coming-soon');
       premiumEl.setAttribute('aria-disabled', 'true');
-      premiumEl.innerHTML = 'Aurix Premium <span class="menu-premium-soon">' + (_en ? 'coming soon' : 'próximamente') + '</span>';
+      premiumEl.textContent = _en ? 'COMING SOON' : 'PRÓXIMAMENTE';
     }
   }
 }

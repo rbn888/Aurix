@@ -66,8 +66,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v526-7d-single-continuous-contract';
-      var APPJS_V = '526';
+      var BUILD = 'v527-premium-preview-free-menu-polish';
+      var APPJS_V = '527';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -298,7 +298,7 @@
           <!-- DSH.MENU.03 — two primary actions; Aurix Premium is the hero.
                Language/currency moved to Configuración → Preferencias. -->
           <button id="menuGeneral" class="menu-item menu-item--general" data-i18n="settingsGeneral" role="menuitem">⚙ Configuración</button>
-          <button id="menuPremium" class="menu-item menu-item--premium-cta" data-i18n="menuPremium" role="menuitem">✨ Aurix Premium</button>
+          <button id="menuPremium" class="menu-item menu-item--premium-cta" role="menuitem">✨ Aurix Premium</button>
           <div class="menu-divider"></div>
           <button id="menuExit" class="menu-item menu-item--danger" data-i18n="menuLogout" role="menuitem">Cerrar sesión</button>
         </div>
@@ -1406,7 +1406,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=526"
+  <script src="app.js?v=527"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
