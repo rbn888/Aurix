@@ -66,8 +66,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v536-onboarding-entrance-polish';
-      var APPJS_V = '536';
+      var BUILD = 'v537-onboarding-welcome-redesign';
+      var APPJS_V = '537';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -1406,7 +1406,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=536"
+  <script src="app.js?v=537"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
@@ -1814,22 +1814,26 @@
 
     <!-- Step: WELCOME -->
     <section class="onb-step" data-onb-step="WELCOME">
-      <h2 class="onb-headline" data-i18n="onbWelcomeTitle">Bienvenido a Aurix.</h2>
-      <p class="onb-sub" data-i18n="onbWelcomeSub">Todo tu patrimonio, en un solo lugar.</p>
-      <ul class="onb-bullets" aria-label="Aurix">
-        <li class="onb-bullet">
-          <span class="onb-bullet-dot" aria-hidden="true"></span>
-          <span data-i18n="onbWelcomeBullet1">Unifica tu cartera</span>
-        </li>
-        <li class="onb-bullet">
-          <span class="onb-bullet-dot" aria-hidden="true"></span>
-          <span data-i18n="onbWelcomeBullet2">Sigue tu evolución</span>
-        </li>
-        <li class="onb-bullet">
-          <span class="onb-bullet-dot" aria-hidden="true"></span>
-          <span data-i18n="onbWelcomeBullet3">Entiende tu exposición</span>
-        </li>
-      </ul>
+      <!-- SPEC 45 WELCOME — convergence hero: scattered points merge into one Aurix core (once), a literal
+           "todo tu patrimonio, una sola visión". Decorative-safe (fixed-size box, transform/opacity only,
+           no layout impact), off under prefers-reduced-motion. -->
+      <div class="onb-welcome-hero" aria-hidden="true">
+        <span class="onb-wh-core"></span>
+        <span class="onb-wh-dot"></span>
+        <span class="onb-wh-dot"></span>
+        <span class="onb-wh-dot"></span>
+        <span class="onb-wh-dot"></span>
+        <span class="onb-wh-dot"></span>
+      </div>
+      <h2 class="onb-headline" data-i18n="onbWelcomeTitle">Todo tu patrimonio. Una sola visión.</h2>
+      <p class="onb-sub" data-i18n="onbWelcomeSub">Aurix reúne tus activos y transforma información dispersa en claridad patrimonial.</p>
+      <div class="onb-welcome-rail" aria-hidden="true">
+        <span class="onb-wr-step" data-i18n="onbWelcomeRail1">Unificar</span>
+        <span class="onb-wr-arrow">→</span>
+        <span class="onb-wr-step" data-i18n="onbWelcomeRail2">Comprender</span>
+        <span class="onb-wr-arrow">→</span>
+        <span class="onb-wr-step" data-i18n="onbWelcomeRail3">Decidir</span>
+      </div>
       <div class="onb-footer">
         <button type="button" class="onb-cta onb-cta--primary" data-onb-next data-i18n="onbContinue">Continuar</button>
       </div>

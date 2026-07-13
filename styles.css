@@ -16093,6 +16093,57 @@ body.gs-open { overflow: hidden; }
   box-shadow: 0 0 8px rgba(74, 130, 240, 0.55);
 }
 
+/* SPEC 45 WELCOME — convergence hero + capability rail. Fixed-size box (no layout impact); dots are
+   absolutely positioned and animate transform/opacity ONLY, converging once into the Aurix core →
+   "todo tu patrimonio, una sola visión". Reversible; disabled under prefers-reduced-motion. */
+.onb-welcome-hero {
+  position: relative; width: 100%; height: 76px; flex: 0 0 76px;
+  display: flex; align-items: center; justify-content: center; margin: 2px 0 16px;
+}
+.onb-wh-core {
+  width: 42px; height: 42px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, rgba(120,170,255,0.95), rgba(60,110,255,0.28) 60%, transparent 72%);
+  box-shadow: 0 0 34px rgba(80,140,255,0.45), inset 0 0 0 1px rgba(150,185,255,0.35);
+  animation: onb-wh-core-in 0.5s var(--ease-premium) 0.30s both;
+}
+.onb-wh-dot {
+  position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px;
+  border-radius: 50%; background: rgba(150,185,255,0.92); box-shadow: 0 0 8px rgba(90,140,255,0.7);
+  animation: onb-wh-converge 0.62s var(--ease-premium) both;
+}
+.onb-wh-dot:nth-child(2) { --dx: -60px; --dy: -20px; }
+.onb-wh-dot:nth-child(3) { --dx:  56px; --dy: -14px; animation-delay: 0.04s; }
+.onb-wh-dot:nth-child(4) { --dx: -40px; --dy:  22px; animation-delay: 0.08s; }
+.onb-wh-dot:nth-child(5) { --dx:  46px; --dy:  20px; animation-delay: 0.06s; }
+.onb-wh-dot:nth-child(6) { --dx:   4px; --dy: -30px; animation-delay: 0.10s; }
+@keyframes onb-wh-converge {
+  0%   { transform: translate(var(--dx, 0), var(--dy, 0)) scale(1); opacity: 0; }
+  28%  { opacity: 0.9; }
+  100% { transform: translate(0, 0) scale(0.35); opacity: 0; }
+}
+@keyframes onb-wh-core-in {
+  from { transform: scale(0.55); opacity: 0.2; }
+  to   { transform: scale(1); opacity: 1; }
+}
+.onb-welcome-rail {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: 10px; margin: 6px 0 2px;
+}
+.onb-wr-step {
+  font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: rgba(190,208,240,0.74);
+}
+.onb-wr-arrow { color: rgba(120,160,255,0.5); font-size: 12px; line-height: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .onb-wh-dot { display: none; }
+  .onb-wh-core { animation: none; }
+}
+@media (max-width: 360px) {
+  .onb-welcome-hero { height: 64px; flex-basis: 64px; margin-bottom: 12px; }
+  .onb-welcome-rail { gap: 7px; }
+  .onb-wr-step { font-size: 11.5px; letter-spacing: 0.04em; }
+}
+
 /* Success step extras — multi-line body that updates with asset count. */
 .onb-success-body {
   margin-top: -4px;

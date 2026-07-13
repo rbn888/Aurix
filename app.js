@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '536'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '537'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -4314,8 +4314,11 @@ const T = {
     onbSkip:              'Saltar',
     onbContinue:          'Continuar',
     onbBack:              'Atrás',
-    onbWelcomeTitle:      'Bienvenido a Aurix.',
-    onbWelcomeSub:        'Todo tu patrimonio, en un solo lugar.',
+    onbWelcomeTitle:      'Todo tu patrimonio. Una sola visión.',
+    onbWelcomeSub:        'Aurix reúne tus activos y transforma información dispersa en claridad patrimonial.',
+    onbWelcomeRail1:      'Unificar',
+    onbWelcomeRail2:      'Comprender',
+    onbWelcomeRail3:      'Decidir',
     onbInterestsTitle:    '¿Qué te interesa seguir?',
     onbInterestsSub:      'Opcional. Nos ayuda a personalizar tu experiencia.',
     onbAssetStocks:       'Acciones',
@@ -6391,8 +6394,11 @@ const T = {
     onbSkip:              'Skip',
     onbContinue:          'Continue',
     onbBack:              'Back',
-    onbWelcomeTitle:      'Welcome to Aurix.',
-    onbWelcomeSub:        'Your financial world, unified.',
+    onbWelcomeTitle:      'All your wealth. A single view.',
+    onbWelcomeSub:        'Aurix brings your assets together and turns scattered information into wealth clarity.',
+    onbWelcomeRail1:      'Unify',
+    onbWelcomeRail2:      'Understand',
+    onbWelcomeRail3:      'Decide',
     onbInterestsTitle:    'What do you want to track?',
     onbInterestsSub:      'Optional. Helps us tailor your experience.',
     onbAssetStocks:       'Stocks',
