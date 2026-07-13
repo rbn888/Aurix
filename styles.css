@@ -16144,6 +16144,120 @@ body.gs-open { overflow: hidden; }
   .onb-wr-step { font-size: 11.5px; letter-spacing: 0.04em; }
 }
 
+/* SPEC 45 INVESTOR PROFILE — premium identity cards. The four risk chips become full cards (name +
+   personality line + a risk-meter icon slot that's ready for a future illustration, no empty holes).
+   Same data-onb-risk / is-selected / is-active hooks → JS, persistence, selection-sync and flow are
+   untouched. Age drops to a visually subordinate block below. Reversible; off under reduced-motion. */
+.onb-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: var(--space-2);
+}
+.onb-profile-card {
+  appearance: none;
+  position: relative;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 16px;
+  padding: 15px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  cursor: pointer;
+  text-align: left;
+  transition: background .18s var(--ease-out), border-color .18s var(--ease-out),
+              box-shadow .18s var(--ease-out), transform .12s var(--ease-out);
+}
+.onb-profile-card:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.18);
+}
+.onb-profile-card:focus-visible {
+  outline: none;
+  border-color: rgba(120, 165, 255, 0.75);
+  box-shadow: 0 0 0 3px rgba(74, 130, 240, 0.30);
+}
+.onb-profile-card:active { transform: scale(0.99); }
+.onb-profile-card.is-active:not(.is-selected) {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.18);
+}
+.onb-profile-card.is-selected {
+  background: rgba(74, 130, 240, 0.11);
+  border-color: rgba(74, 130, 240, 0.60);
+  box-shadow: 0 0 0 1px rgba(74, 130, 240, 0.20) inset;
+}
+/* Risk-meter icon slot — four ascending bars, filled 1→4 by profile (illustration-ready). */
+.onb-pc-icon {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 20px;
+}
+.onb-pc-bar {
+  width: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.14);
+  transition: background .18s var(--ease-out);
+}
+.onb-pc-bar:nth-child(1) { height: 8px; }
+.onb-pc-bar:nth-child(2) { height: 12px; }
+.onb-pc-bar:nth-child(3) { height: 16px; }
+.onb-pc-bar:nth-child(4) { height: 20px; }
+.onb-profile-card[data-onb-risk="conservative"] .onb-pc-bar:nth-child(-n+1),
+.onb-profile-card[data-onb-risk="balanced"] .onb-pc-bar:nth-child(-n+2),
+.onb-profile-card[data-onb-risk="growth"] .onb-pc-bar:nth-child(-n+3),
+.onb-profile-card[data-onb-risk="aggressive"] .onb-pc-bar {
+  background: linear-gradient(180deg, rgba(140,180,255,0.95), rgba(74,130,240,0.72));
+}
+.onb-pc-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+.onb-pc-desc {
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.42;
+  color: rgba(225, 233, 255, 0.60);
+}
+/* Age — visually subordinate secondary block, separated by a hairline. */
+.onb-profile-age {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+.onb-profile-age .onb-sub--label { margin-top: 0; }
+.onb-age-helper {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.40);
+  text-align: center;
+  letter-spacing: 0.005em;
+}
+/* Entrance cascade (reuses onb-card-rise); released after run, so it never clobbers hover/selected. */
+.modal--onboarding .onb-profile-card { animation: onb-card-rise .42s var(--ease-premium) backwards; }
+.modal--onboarding .onb-profile-card:nth-child(2) { animation-delay: .05s; }
+.modal--onboarding .onb-profile-card:nth-child(3) { animation-delay: .10s; }
+.modal--onboarding .onb-profile-card:nth-child(4) { animation-delay: .15s; }
+@media (prefers-reduced-motion: reduce) {
+  .modal--onboarding .onb-profile-card { animation: none; }
+  .onb-profile-card, .onb-pc-bar { transition: none; }
+}
+/* Mobile — one column keeps the personality lines fully legible down to 320px. */
+@media (max-width: 768px) {
+  .onb-profile-grid { grid-template-columns: 1fr; }
+  .onb-profile-card { padding: 13px 14px 14px; gap: 6px; }
+}
+@media (max-width: 360px) {
+  .onb-pc-name { font-size: 14.5px; }
+  .onb-pc-desc { font-size: 12px; }
+}
+
 /* Success step extras — multi-line body that updates with asset count. */
 .onb-success-body {
   margin-top: -4px;

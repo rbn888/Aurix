@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '537'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '538'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -4338,14 +4338,19 @@ const T = {
     // ONBOARDING-PROFILE-UI-1 — investor profile step. Calm, premium
     // wording — never alarmist. The questions feel like a tone tuner,
     // not a quiz.
-    onbProfileTitle:      'Personaliza tu inteligencia',
-    onbProfileSub:        'Aurix ajustará las señales según tu forma de invertir.',
+    onbProfileTitle:      '¿Cómo prefieres invertir?',
+    onbProfileSub:        'Aurix adaptará la experiencia a tu enfoque. Podrás cambiarlo cuando quieras.',
     onbRiskQuestion:      '¿Cómo prefieres invertir?',
     onbRiskConservative:  'Conservador',
+    onbRiskConservativeDesc: 'Prioriza preservar capital y reducir volatilidad.',
     onbRiskBalanced:      'Equilibrado',
+    onbRiskBalancedDesc:  'Busca crecer manteniendo el riesgo bajo control.',
     onbRiskGrowth:        'Crecimiento',
+    onbRiskGrowthDesc:    'Prioriza la apreciación del patrimonio a largo plazo.',
     onbRiskAggressive:    'Agresivo',
+    onbRiskAggressiveDesc:'Acepta mayor volatilidad buscando mayor crecimiento.',
     onbAgeQuestion:       'Etapa inversora',
+    onbAgeHelper:         'Solo para personalizar tu experiencia.',
     onbAgeUnder30:        '<30',
     onbAge30_45:          '30–45',
     onbAge45_60:          '45–60',
@@ -6409,14 +6414,19 @@ const T = {
     onbAssetRe:           'Real estate',
     onbExpTitle:          'How would you describe yourself?',
     onbExpSub:            'Optional. We will tune detail to your level.',
-    onbProfileTitle:      'Personalize your intelligence',
-    onbProfileSub:        'Aurix will tune insights to your investing style.',
+    onbProfileTitle:      'How do you prefer to invest?',
+    onbProfileSub:        'Aurix will tailor the experience to your approach. You can change it anytime.',
     onbRiskQuestion:      'How do you prefer to invest?',
     onbRiskConservative:  'Conservative',
+    onbRiskConservativeDesc: 'Prioritizes preserving capital and reducing volatility.',
     onbRiskBalanced:      'Balanced',
+    onbRiskBalancedDesc:  'Seeks growth while keeping risk under control.',
     onbRiskGrowth:        'Growth',
+    onbRiskGrowthDesc:    'Prioritizes long-term wealth appreciation.',
     onbRiskAggressive:    'Aggressive',
+    onbRiskAggressiveDesc:'Accepts higher volatility in pursuit of higher growth.',
     onbAgeQuestion:       'Investment stage',
+    onbAgeHelper:         'Only to personalize your experience.',
     onbAgeUnder30:        '<30',
     onbAge30_45:          '30–45',
     onbAge45_60:          '45–60',

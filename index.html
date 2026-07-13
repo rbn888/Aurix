@@ -66,8 +66,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v537-onboarding-welcome-redesign';
-      var APPJS_V = '537';
+      var BUILD = 'v538-onboarding-profile-redesign';
+      var APPJS_V = '538';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -1406,7 +1406,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=537"
+  <script src="app.js?v=538"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
@@ -1886,27 +1886,48 @@
 
     <!-- ONBOARDING-PROFILE-UI-1 — single combined investor-profile
          step. Collects riskProfile (default: balanced) + ageBand
-         (default: prefer_not_say). Never alarmist, never a quiz:
-         picks reuse the existing onb-chip premium style. -->
+         (default: prefer_not_say). Never alarmist, never a quiz.
+         SPEC 45: risk = premium identity cards; age = subordinate block. -->
     <section class="onb-step" data-onb-step="PROFILE">
-      <h2 class="onb-headline" data-i18n="onbProfileTitle">Personaliza tu inteligencia</h2>
-      <p class="onb-sub" data-i18n="onbProfileSub">Aurix ajustará las señales según tu forma de invertir.</p>
+      <h2 class="onb-headline" data-i18n="onbProfileTitle">¿Cómo prefieres invertir?</h2>
+      <p class="onb-sub" data-i18n="onbProfileSub">Aurix adaptará la experiencia a tu enfoque. Podrás cambiarlo cuando quieras.</p>
 
-      <p class="onb-sub onb-sub--label" data-i18n="onbRiskQuestion">¿Cómo prefieres invertir?</p>
-      <div class="onb-chips" id="onbRiskChips">
-        <button type="button" class="onb-chip" data-onb-risk="conservative" data-i18n="onbRiskConservative">Conservador</button>
-        <button type="button" class="onb-chip is-active" data-onb-risk="balanced" data-i18n="onbRiskBalanced">Equilibrado</button>
-        <button type="button" class="onb-chip" data-onb-risk="growth" data-i18n="onbRiskGrowth">Crecimiento</button>
-        <button type="button" class="onb-chip" data-onb-risk="aggressive" data-i18n="onbRiskAggressive">Agresivo</button>
+      <!-- SPEC 45 INVESTOR PROFILE — premium identity CARDS (name + personality line + risk-meter icon slot,
+           illustration-ready). Same data-onb-risk / is-selected / is-active hooks as the old chips → JS,
+           persistence, selection-sync and navigation are untouched. -->
+      <div class="onb-profile-grid" id="onbRiskChips">
+        <button type="button" class="onb-profile-card" data-onb-risk="conservative">
+          <span class="onb-pc-icon" aria-hidden="true"><i class="onb-pc-bar"></i><i class="onb-pc-bar"></i><i class="onb-pc-bar"></i><i class="onb-pc-bar"></i></span>
+          <span class="onb-pc-name" data-i18n="onbRiskConservative">Conservador</span>
+          <span class="onb-pc-desc" data-i18n="onbRiskConservativeDesc">Prioriza preservar capital y reducir volatilidad.</span>
+        </button>
+        <button type="button" class="onb-profile-card is-active" data-onb-risk="balanced">
+          <span class="onb-pc-icon" aria-hidden="true"><i class="onb-pc-bar"></i><i class="onb-pc-bar"></i><i class="onb-pc-bar"></i><i class="onb-pc-bar"></i></span>
+          <span class="onb-pc-name" data-i18n="onbRiskBalanced">Equilibrado</span>
+          <span class="onb-pc-desc" data-i18n="onbRiskBalancedDesc">Busca crecer manteniendo el riesgo bajo control.</span>
+        </button>
+        <button type="button" class="onb-profile-card" data-onb-risk="growth">
+          <span class="onb-pc-icon" aria-hidden="true"><i class="onb-pc-bar"></i><i class="onb-pc-bar"></i><i class="onb-pc-bar"></i><i class="onb-pc-bar"></i></span>
+          <span class="onb-pc-name" data-i18n="onbRiskGrowth">Crecimiento</span>
+          <span class="onb-pc-desc" data-i18n="onbRiskGrowthDesc">Prioriza la apreciación del patrimonio a largo plazo.</span>
+        </button>
+        <button type="button" class="onb-profile-card" data-onb-risk="aggressive">
+          <span class="onb-pc-icon" aria-hidden="true"><i class="onb-pc-bar"></i><i class="onb-pc-bar"></i><i class="onb-pc-bar"></i><i class="onb-pc-bar"></i></span>
+          <span class="onb-pc-name" data-i18n="onbRiskAggressive">Agresivo</span>
+          <span class="onb-pc-desc" data-i18n="onbRiskAggressiveDesc">Acepta mayor volatilidad buscando mayor crecimiento.</span>
+        </button>
       </div>
 
-      <p class="onb-sub onb-sub--label" data-i18n="onbAgeQuestion">Etapa inversora</p>
-      <div class="onb-chips onb-chips--age" id="onbAgeChips">
+      <div class="onb-profile-age">
+        <p class="onb-sub onb-sub--label" data-i18n="onbAgeQuestion">Etapa inversora</p>
+        <div class="onb-chips onb-chips--age" id="onbAgeChips">
         <button type="button" class="onb-chip" data-onb-age="under_30" data-i18n="onbAgeUnder30">&lt;30</button>
         <button type="button" class="onb-chip" data-onb-age="age_30_45" data-i18n="onbAge30_45">30–45</button>
         <button type="button" class="onb-chip" data-onb-age="age_45_60" data-i18n="onbAge45_60">45–60</button>
         <button type="button" class="onb-chip" data-onb-age="over_60" data-i18n="onbAgeOver60">60+</button>
         <button type="button" class="onb-chip onb-chip--ghost is-active" data-onb-age="prefer_not_say" data-i18n="onbAgePreferNotSay">Prefiero no decirlo</button>
+        </div>
+        <p class="onb-age-helper" data-i18n="onbAgeHelper">Solo para personalizar tu experiencia.</p>
       </div>
 
       <div class="onb-footer onb-footer--split">
