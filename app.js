@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '529'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '530'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -25717,6 +25717,171 @@ function _aurixProjectRenderPointsToPixels(renderPoints, pixelWidth, range) {
   return xs;
 }
 try { if (typeof window !== 'undefined') window._aurixProjectRenderPointsToPixels = _aurixProjectRenderPointsToPixels; } catch (_) {}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.VERTICAL_STACK_FORENSICS — READ-ONLY vertical "brush/comb" audit
+// ════════════════════════════════════════════════════════════════════════════
+// AUDIT-ONLY. Walks the REAL chart pipeline for a range (merge → epoch-trust → source-authority → validation
+// → range extraction → build → FRC → downsample/LTTB → common X projection) and, at EACH stage, detects the
+// three collision families that produce the vertical "comb": (a) exact-duplicate timestamps with different
+// values, (b) near-duplicate timestamps (Δt ≤ nearMs) with different values that SURVIVE the exact-ts dedup,
+// (c) adjacent points whose projected integer pixel-X collides while Y differs. It also flags non-monotonic
+// time / X ordering. It reports the FIRST stage where any collision appears + the exact owner function, so
+// the fix can target that owner. Pure: mutates nothing, fabricates nothing, no network. deps lets a harness
+// drive it headless. `_aurixSourceFamily` (if present) tags each point's family for the collision groups.
+function _aurixAuditVerticalStacksCore(options, deps) {
+  options = options || {}; deps = deps || {};
+  const safe = (fn, d) => { try { const v = fn(); return v === undefined ? (d === undefined ? null : d) : v; } catch (_) { return (d === undefined ? null : d); } };
+  const iso = t => { try { return Number.isFinite(t) ? new Date(t).toISOString() : null; } catch (_) { return null; } };
+  const r = String(options.range || '24h').toLowerCase();
+  const vw = Number(options.vw) > 0 ? Number(options.vw) : ((typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 1000);
+  const NEAR_MS = options.nearMs != null ? options.nearMs : 1000;   // near-duplicate window (1s) — far below any real snapshot cadence, so this never flags genuine movement
+  const famOf = p => { try { return (typeof _aurixSourceFamily === 'function') ? _aurixSourceFamily(p) : (p && p.source ? String(p.source) : null); } catch (_) { return (p && p.source) || null; } };
+  const valOf = p => {
+    if (!p) return NaN;
+    if (Number.isFinite(p.value)) return p.value;
+    if (Number.isFinite(p.total)) return p.total - (Number(p.real_estate) || 0);   // investable = total − real_estate (same as _aurixTrustedChartSource)
+    if (Number.isFinite(p.total_value_usd)) return p.total_value_usd - (Number(p.real_estate) || 0);
+    return NaN;
+  };
+  const norm = arr => (Array.isArray(arr) ? arr : []).map(p => {
+    if (!p) return null;
+    const ts = Number.isFinite(p.ts) ? p.ts : (Number.isFinite(p.time) ? p.time : NaN);
+    const v = valOf(p);
+    return Number.isFinite(ts) ? { ts: ts, value: Number.isFinite(v) ? v : 0, source: famOf(p) } : null;
+  }).filter(Boolean);
+  // metrics for ONE stage — points are kept in their DRAW order (NOT re-sorted) so non-monotonic is detectable
+  const analyze = (pts, pixelWidth, capGroups) => {
+    const xs = (pixelWidth && typeof _aurixProjectRenderPointsToPixels === 'function')
+      ? (safe(() => _aurixProjectRenderPointsToPixels(pts.map(p => ({ ts: p.ts, value: p.value })), pixelWidth, r), []) || []) : [];
+    const haveX = xs.length === pts.length;
+    // value range for the "significant swing" threshold used by the zig-zag/comb detector
+    let vMin = Infinity, vMax = -Infinity; for (const p of pts) { if (p.value < vMin) vMin = p.value; if (p.value > vMax) vMax = p.value; }
+    const vRange = (Number.isFinite(vMax) && Number.isFinite(vMin) && vMax > vMin) ? (vMax - vMin) : 1;
+    const swingThr = vRange * 0.05;   // a "real" swing = ≥5% of the visible value range (ignores noise)
+    let exactDup = 0, nearCol = 0, xCol = 0, nonMonoTs = 0, nonMonoX = 0, srcAlt = 0, zigzag = 0;
+    const groups = [];
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i], dt = b.ts - a.ts, dv = Math.abs(b.value - a.value);
+      if (dt < 0) nonMonoTs++;
+      const xa = haveX ? xs[i - 1] : null, xb = haveX ? xs[i] : null;
+      if (haveX && xb < xa - 1e-6) nonMonoX++;
+      if (a.source != null && b.source != null && a.source !== b.source) srcAlt++;   // adjacent points from different source families
+      // zig-zag/comb: value reverses direction with BOTH swings significant (this is what a vertical "comb"
+      // actually is under the ordinal-blend X projection — near-dup timestamps get spread, so the artifact is
+      // value oscillation between consecutive drawn points, not an X collision).
+      if (i < pts.length - 1) {
+        const c = pts[i + 1], d1 = b.value - a.value, d2 = c.value - b.value;
+        if (d1 !== 0 && d2 !== 0 && (d1 > 0) !== (d2 > 0) && Math.abs(d1) >= swingThr && Math.abs(d2) >= swingThr) zigzag++;
+      }
+      let kind = null;
+      if (dt === 0 && dv > 0) { exactDup++; kind = 'exact_duplicate_ts'; }
+      else if (dt > 0 && dt <= NEAR_MS && dv > 0) { nearCol++; kind = 'near_duplicate_ts'; }
+      else if (haveX && Math.round(xa) === Math.round(xb) && dv > 0) { xCol++; kind = 'projected_x_collision'; }
+      if (kind && groups.length < (capGroups || 24)) {
+        groups.push({ kind: kind, index: i, timestamps: [a.ts, b.ts], iso: [iso(a.ts), iso(b.ts)], values: [+a.value.toFixed(2), +b.value.toFixed(2)],
+          deltaMs: dt, sourceFamilies: [a.source, b.source], projectedX: haveX ? [+xa.toFixed(3), +xb.toFixed(3)] : null });
+      }
+    }
+    return { count: pts.length, exactDuplicateTimestampCount: exactDup, nearDuplicateTimestampCount: nearCol,
+      projectedXCollisionCount: xCol, nonMonotonicTimestampCount: nonMonoTs, nonMonotonicXCount: nonMonoX,
+      sourceFamilyAlternationCount: srcAlt, valueZigZagCount: zigzag, collisionGroups: groups };
+  };
+  // owner function per pipeline stage (first-stage attribution)
+  const OWNERS = {
+    stage1_merged: '_aurixHistorySourceForDisplay / _aurixMergeSnapshotSources',
+    stage2_epoch_trust: '_aurixTrustedChartSource',
+    stage3_source_authority: '_aurixApplyRangeSourceAuthority / _aurixEnforceSegmentSourceAuthority',
+    stage4_validated_range: 'buildValidatedHistoricalSeries (dedupe is EXACT-ts only — near-dups survive here)',
+    stage5_build_chart: 'buildProductionPortfolioChart',
+    stage6_frc_render_points: '_aurixResolveFinalRenderSeriesContract',
+    stage7_downsampled_visible: 'downsampleAurixAdaptive / renderValidatedPortfolioChartWithInstitutionalRenderer',
+  };
+  const displaySource = deps.displaySource || (typeof _aurixHistorySourceForDisplay === 'function' ? _aurixHistorySourceForDisplay : (() => []));
+  const epochTrust = deps.trustedSource || (typeof _aurixTrustedChartSource === 'function' ? _aurixTrustedChartSource : null);
+  const authority = deps.authority || (typeof _aurixApplyRangeSourceAuthority === 'function' ? _aurixApplyRangeSourceAuthority : null);
+  const buildValidated = deps.buildValidated || (typeof buildValidatedHistoricalSeries === 'function' ? buildValidatedHistoricalSeries : null);
+  const buildChart = deps.buildChart || (typeof buildProductionPortfolioChart === 'function' ? buildProductionPortfolioChart : null);
+  const resolveContract = deps.resolveContract || (typeof _aurixResolveFinalRenderSeriesContract === 'function' ? _aurixResolveFinalRenderSeriesContract : null);
+  const render = deps.render || (typeof renderValidatedPortfolioChartWithInstitutionalRenderer === 'function' ? renderValidatedPortfolioChartWithInstitutionalRenderer : null);
+
+  const mergedRaw = safe(() => displaySource(), []) || [];
+  const postEpochRaw = (epochTrust ? (safe(() => epochTrust(mergedRaw), mergedRaw) || mergedRaw) : mergedRaw);
+  const postAuthRaw = (authority ? (safe(() => authority(postEpochRaw.slice ? postEpochRaw.slice() : postEpochRaw, r), postEpochRaw) || postEpochRaw) : postEpochRaw);
+  const validated = safe(() => buildValidated ? buildValidated(r) : null, null) || { rangeSeries: [] };
+  const chart = safe(() => buildChart ? buildChart(r) : null, null) || { points: [] };
+  const frcDesktop = safe(() => resolveContract ? resolveContract(chart, r, 'desktop') : null, null) || { renderPoints: [] };
+  const frcMobile = safe(() => resolveContract ? resolveContract(chart, r, 'mobile') : null, null) || { renderPoints: [] };
+  const drawn = safe(() => render ? render((frcDesktop.renderPoints || []).map(p => ({ ts: (p.ts != null ? p.ts : p.time), value: p.value })), { range: r, vw: vw }) : null, null) || { visiblePoints: [] };
+
+  const stages = {
+    stage1_merged: analyze(norm(mergedRaw), vw),
+    stage2_epoch_trust: analyze(norm(postEpochRaw), vw),
+    stage3_source_authority: analyze(norm(postAuthRaw), vw),
+    stage4_validated_range: analyze(norm(validated.rangeSeries), vw),
+    stage5_build_chart: analyze(norm(chart.points), vw),
+    stage6_frc_render_points: analyze(norm(frcDesktop.renderPoints), vw),
+    stage7_downsampled_visible: analyze(norm(drawn.visiblePoints || drawn.renderPoints), vw),
+  };
+  const order = ['stage1_merged', 'stage2_epoch_trust', 'stage3_source_authority', 'stage4_validated_range', 'stage5_build_chart', 'stage6_frc_render_points', 'stage7_downsampled_visible'];
+  // a stage "has a collision" if any ts/X collision OR a comb signal (source-family alternation ≥2 or a
+  // value zig-zag ≥3 significant reversals — the actual vertical-comb signature under ordinal-blend X).
+  // a vertical "comb" = HIGH-DENSITY value reversal (reverses on most consecutive points), NOT the few
+  // reversals of genuine volatility. Density ≥0.4 over ≥8 points; likewise a source-family that alternates
+  // densely (not a single legitimate transition).
+  const combDensity = s => s.count >= 8 ? (s.valueZigZagCount / Math.max(1, s.count - 2)) : 0;
+  const srcAltDensity = s => s.count >= 8 ? (s.sourceFamilyAlternationCount / Math.max(1, s.count - 1)) : 0;
+  const isComb = s => combDensity(s) >= 0.4 || srcAltDensity(s) >= 0.3;
+  const total = s => s.exactDuplicateTimestampCount + s.nearDuplicateTimestampCount + s.projectedXCollisionCount
+    + s.nonMonotonicTimestampCount + s.nonMonotonicXCount + (isComb(s) ? 1 : 0);
+  let firstCollisionStage = null, exactOwnerFunction = null;
+  for (const k of order) { if (total(stages[k]) > 0) { firstCollisionStage = k; exactOwnerFunction = OWNERS[k]; break; } }
+  const finalStage = stages.stage7_downsampled_visible;
+  // classification from WHERE it first appears + which family dominates
+  const clsFor = () => {
+    if (!firstCollisionStage) return 'H_no_collision_clean';
+    const s = stages[firstCollisionStage];
+    if (s.exactDuplicateTimestampCount > 0) return 'A_exact_timestamp_duplication';
+    if (srcAltDensity(s) >= 0.3) return 'C_frontend_backend_duplicate_merge';
+    if (s.nearDuplicateTimestampCount > 0) {
+      if (firstCollisionStage === 'stage1_merged') return 'C_frontend_backend_duplicate_merge_or_B_normalization';
+      return 'B_timestamp_normalization_or_near_duplicate_survival';
+    }
+    if (s.nonMonotonicTimestampCount > 0) return 'E_downsampling_or_ordering';
+    if (s.projectedXCollisionCount > 0) {
+      const upstreamNear = order.slice(0, order.indexOf(firstCollisionStage)).some(k => stages[k].nearDuplicateTimestampCount > 0 || stages[k].exactDuplicateTimestampCount > 0);
+      return upstreamNear ? 'B_near_duplicate_survival_projected' : 'G_x_projection_rounding';
+    }
+    if (combDensity(s) >= 0.4) return 'D_or_H_value_oscillation_review';   // dense value oscillation — repeated writes (D) vs genuine volatility (H); the collision groups disambiguate
+    return 'H_genuine_instantaneous_movement';
+  };
+  const dHash = safe(() => (typeof _aurixEmergencyHash === 'function') ? _aurixEmergencyHash((frcDesktop.renderPoints || []).map(p => ({ ts: (p.ts != null ? p.ts : p.time), value: p.value }))) : null, null);
+  const mHash = safe(() => (typeof _aurixEmergencyHash === 'function') ? _aurixEmergencyHash((frcMobile.renderPoints || []).map(p => ({ ts: (p.ts != null ? p.ts : p.time), value: p.value }))) : null, null);
+  const finalHasCollision = (finalStage.exactDuplicateTimestampCount + finalStage.nearDuplicateTimestampCount + finalStage.projectedXCollisionCount) > 0
+    || isComb(finalStage);
+  const out = {
+    spec: 'DSH.CHART.VERTICAL_STACK_FORENSICS', readOnly: true, range: r, viewportWidth: vw, nearMs: NEAR_MS,
+    buildVersion: safe(() => (typeof window !== 'undefined' && window.AURIX_BUILD) || null, null),
+    rawPointCount: stages.stage1_merged.count, finalPointCount: finalStage.count,
+    exactDuplicateTimestampCount: finalStage.exactDuplicateTimestampCount,
+    normalizedTimestampCollisionCount: finalStage.nearDuplicateTimestampCount,
+    projectedXCollisionCount: finalStage.projectedXCollisionCount,
+    nonMonotonicTimestampCount: finalStage.nonMonotonicTimestampCount,
+    nonMonotonicXCount: finalStage.nonMonotonicXCount,
+    sourceFamilyAlternationCount: finalStage.sourceFamilyAlternationCount,
+    valueZigZagCount: finalStage.valueZigZagCount,
+    collisionGroups: finalStage.collisionGroups,
+    perStage: stages,
+    firstCollisionStage: firstCollisionStage,
+    exactOwnerFunction: exactOwnerFunction,
+    rootCauseClassification: clsFor(),
+    desktopMobileParity: (dHash != null && mHash != null) ? (dHash === mHash) : null,
+    verdict: finalHasCollision ? 'DEFECT_vertical_stacks_present' : 'CLEAN_single_continuous_line',
+  };
+  try { console.log('%c[UI][VERTICAL_STACK_FORENSICS]', 'font-weight:700;color:#ff6b6b', out); console.log('firstCollisionStage=' + firstCollisionStage + ' class=' + out.rootCauseClassification + ' verdict=' + out.verdict); } catch (_) {}
+  return out;
+}
+try { if (typeof window !== 'undefined') { window.aurixAuditVerticalStacks = function (range) { let res; try { res = _aurixAuditVerticalStacksCore({ range: range }, {}); } catch (e) { res = { spec: 'DSH.CHART.VERTICAL_STACK_FORENSICS', verdict: 'AUDIT_ERROR', error: (e && e.message) || String(e) }; } try { window.__AURIX_LAST_VERTICAL_STACK_AUDIT__ = res; } catch (_) {} return res; }; } } catch (_) {}
 
 // Read the VISIBLE line colour state from the DOM (never inferred from screenshots): the line inherits colour
 // from the .wsc-<tone> wrapper the painter writes; badge tone class is the fallback. positive|negative|neutral.
