@@ -33,10 +33,13 @@ ok('6 NO range selector in chartless markup (useless without a chart)', !/catego
 ok('7 NO empty-state container left behind (no dead space)', !/category-perf-empty/.test(cl));
 
 console.log('\nGain/loss stays correct + no chart mount when disabled:');
-ok('8 applyRange (chartless) updates the textual header from the REAL series, skips chart/empty',
-   /if \(!_AURIX_CATEGORY_PERF_CHART_ENABLED\) \{ _aurixCategoryPerfUpdateHeader\(panel, series\); return; \}/.test(apply));
-ok('9 header math unchanged (abs + pct, up/down/flat tone, base currency)',
-   /const abs   = last - first;/.test(fn('_aurixCategoryPerfUpdateHeader')) && /is-' \+ tone/.test(fn('_aurixCategoryPerfUpdateHeader')));
+// P0-CATEGORY-PERFORMANCE-CONSISTENCY — the chartless header now derives its number from the category's
+// cost basis (passed `type`), NOT from the categoryHistory `series` (that (last−first)/first snapshot math
+// was the +598% bug). `series` still feeds only the (disabled) chart branch.
+ok('8 applyRange (chartless) refreshes the header by category type, skips chart/empty',
+   /if \(!_AURIX_CATEGORY_PERF_CHART_ENABLED\) \{ _aurixCategoryPerfUpdateHeader\(panel, type\); return; \}/.test(apply));
+ok('9 header math = cost-basis aggregate (computeCategoryPerformance), abs + pct, up/down/flat tone, base currency',
+   /computeCategoryPerformance\(positions\)/.test(fn('_aurixCategoryPerfUpdateHeader')) && /is-' \+ tone/.test(fn('_aurixCategoryPerfUpdateHeader')) && /formatBase/.test(fn('_aurixCategoryPerfUpdateHeader')) && !/const abs   = last - first;/.test(fn('_aurixCategoryPerfUpdateHeader')));
 ok('10 chart mount stays guarded by the host presence (null host ⇒ no V2 chart created)',
    /const chartHost = panel\.querySelector\('\.category-perf-chart'\);/.test(render) && /if \(chartHost && window\.AurixCharts/.test(render));
 

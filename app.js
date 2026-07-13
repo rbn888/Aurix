@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '524'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '525'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -9056,6 +9056,103 @@ function assetPnLBase(asset) {
   const pct = (abs / cost) * 100;
   return { abs, pct };
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// P0-CATEGORY-PERFORMANCE-CONSISTENCY — pure position/category cost-basis P&L
+// ════════════════════════════════════════════════════════════════════════════
+// Category headers used to derive their return from the categoryHistory snapshot time-series
+// ((last−first)/first), a portfolio-EVOLUTION number that diverged wildly from the sum of the visible
+// per-row cost-basis P&L (e.g. Stocks +598% vs Σrows +37.79). These two DETERMINISTIC, side-effect-free
+// utilities compute the SAME invested-cost P&L primitive the rows use (assetPnLBase: value = qty×price,
+// cost = costBasis) and aggregate by SUMMING ABSOLUTES — never by averaging percentages, never from
+// snapshots. Formatting stays in the UI layer. No global reads, no mutation.
+function computePositionPerformance(position) {
+  const p = position || {};
+  const id = (p.id != null) ? p.id : null;
+  const category = (p.category != null) ? p.category : null;
+  const qtyN = Number(p.quantity);
+  const quantity = Number.isFinite(qtyN) ? qtyN : null;
+  const priceN = Number(p.currentPrice);
+  const priceMissing = !Number.isFinite(priceN) || priceN <= 0;
+  const currentPrice = priceMissing ? null : priceN;
+  // Cost basis: prefer the explicit stored costBasis (the app's precise, sell-adjusted model); else derive
+  // quantity × averagePurchasePrice. Never silently treat a missing purchase price as the current price.
+  let costBasis = null;
+  const cbN = Number(p.costBasis);
+  if (Number.isFinite(cbN)) costBasis = cbN;
+  else { const apN = Number(p.averagePurchasePrice); if (Number.isFinite(apN) && Number.isFinite(qtyN)) costBasis = qtyN * apN; }
+  const apExplicit = Number(p.averagePurchasePrice);
+  const averagePurchasePrice = Number.isFinite(apExplicit) ? apExplicit
+    : ((costBasis != null && Number.isFinite(qtyN) && qtyN > 0) ? costBasis / qtyN : null);
+  const currentValue = (!priceMissing && Number.isFinite(qtyN)) ? qtyN * priceN : null;
+  let state, absolutePnL = null, returnPct = null;
+  if (costBasis == null) state = 'missing_cost_basis';
+  else if (!(costBasis > 0)) state = 'zero_cost_basis';           // 0 or negative ⇒ never divide by zero / invent a return
+  else if (priceMissing || currentValue == null) state = 'missing_price';
+  else { absolutePnL = currentValue - costBasis; returnPct = (absolutePnL / costBasis) * 100; state = 'ready'; }
+  return { id, category, quantity, currentPrice, averagePurchasePrice, currentValue, costBasis, absolutePnL, returnPct, state };
+}
+function computeCategoryPerformance(positions) {
+  const list = Array.isArray(positions) ? positions.map(computePositionPerformance) : [];
+  const category = list.length ? list[0].category : null;
+  const positionCount = list.length;
+  if (!positionCount) return { category, positionCount: 0, readyPositionCount: 0, currentValue: 0, costBasis: 0, absolutePnL: null, returnPct: null, state: 'empty' };
+  const ready = list.filter(p => p.state === 'ready');
+  const readyPositionCount = ready.length;
+  if (!readyPositionCount) {
+    const anyMissingCost = list.some(p => p.state === 'missing_cost_basis' || p.state === 'zero_cost_basis');
+    const anyMissingPrice = list.some(p => p.state === 'missing_price');
+    const state = (anyMissingPrice && !anyMissingCost) ? 'missing_price' : 'missing_cost_basis';
+    return { category, positionCount, readyPositionCount: 0, currentValue: 0, costBasis: 0, absolutePnL: null, returnPct: null, state };
+  }
+  const currentValue = ready.reduce((s, p) => s + p.currentValue, 0);
+  const costBasis = ready.reduce((s, p) => s + p.costBasis, 0);
+  const absolutePnL = ready.reduce((s, p) => s + p.absolutePnL, 0);
+  const returnPct = costBasis > 0 ? (absolutePnL / costBasis) * 100 : null;
+  const state = (readyPositionCount === positionCount) ? 'ready' : 'partial';
+  return { category, positionCount, readyPositionCount, currentValue, costBasis, absolutePnL, returnPct, state };
+}
+// Impure boundary: normalise an app `assets[]` record to the pure-utility `position` contract, using the
+// SAME native primitives as assetPnLBase (qty, price, costBasis) so the aggregate reconciles with the rows.
+function _aurixPositionFromAsset(asset) {
+  const a = asset || {};
+  const qty = Number(a.qty), price = Number(a.price), cost = Number(a.costBasis);
+  const avg = (typeof avgBuyPrice === 'function') ? avgBuyPrice(a) : null;
+  return {
+    id: (a.id != null) ? a.id : (a.ticker || a.symbol || null),
+    name: a.name || a.ticker || a.symbol || null,
+    category: (typeof TYPE_META !== 'undefined' && TYPE_META[a.type]) ? a.type : 'other',
+    quantity: Number.isFinite(qty) ? qty : null,
+    currentPrice: Number.isFinite(price) ? price : null,
+    averagePurchasePrice: (avg != null && Number.isFinite(avg)) ? avg : (Number.isFinite(cost) && Number.isFinite(qty) && qty > 0 ? cost / qty : null),
+    costBasis: Number.isFinite(cost) ? cost : null,
+  };
+}
+// READ-ONLY diagnostic: window.aurixCategoryPerformanceAudit(category) — proves the aggregate reconciles
+// with the sum of the individual rows. Never mutates state; never reads portfolioHistory/categoryHistory.
+function _aurixCategoryPerformanceAudit(category) {
+  const key = String((category != null ? category : (typeof activeCategory !== 'undefined' ? activeCategory : '')) || '').toLowerCase();
+  const src = (typeof activeAssets === 'function') ? activeAssets() : (typeof assets !== 'undefined' && Array.isArray(assets) ? assets : []);
+  const catAssets = src.filter(a => ((typeof TYPE_META !== 'undefined' && TYPE_META[a.type]) ? a.type : 'other') === key);
+  const positions = catAssets.map(_aurixPositionFromAsset);
+  const perfs = positions.map((pos, i) => Object.assign({ name: catAssets[i] && (catAssets[i].name || catAssets[i].ticker || catAssets[i].symbol) || null }, computePositionPerformance(pos)));
+  const agg = computeCategoryPerformance(positions);
+  const rowPnLSum = perfs.filter(p => p.state === 'ready').reduce((s, p) => s + p.absolutePnL, 0);
+  const aggregatePnL = (agg.absolutePnL == null) ? 0 : agg.absolutePnL;
+  const difference = Math.abs(rowPnLSum - aggregatePnL);
+  const out = {
+    category: key,
+    positions: perfs.map(p => ({ id: p.id, name: p.name, quantity: p.quantity, currentPrice: p.currentPrice, averagePurchasePrice: p.averagePurchasePrice, currentValue: p.currentValue, costBasis: p.costBasis, absolutePnL: p.absolutePnL, returnPct: p.returnPct, state: p.state })),
+    aggregate: { currentValue: agg.currentValue, costBasis: agg.costBasis, absolutePnL: agg.absolutePnL, returnPct: agg.returnPct, state: agg.state },
+    reconciliation: { rowPnLSum: +rowPnLSum.toFixed(2), aggregatePnL: +aggregatePnL.toFixed(2), difference: +difference.toFixed(2), pass: difference <= 0.01 },
+    formula: 'sum(currentValue - costBasis) / sum(costBasis)',
+    dataSource: 'assets[] cost basis (qty × price vs costBasis) — same primitive as assetPnLBase; NOT categoryHistory/portfolioHistory/snapshots',
+    usesPortfolioHistory: false,
+  };
+  try { console.log('%c[UI][CATEGORY_PERFORMANCE_AUDIT]', 'font-weight:700;color:#12b886', out); } catch (_) {}
+  return out;
+}
+try { if (typeof window !== 'undefined') window.aurixCategoryPerformanceAudit = _aurixCategoryPerformanceAudit; } catch (_) {}
 
 // Read-only canonical position view. Maps a legacy `assets[]` record to the
 // target portfolio engine contract (see PORTFOLIO ENGINE HARDENING spec).
@@ -34786,27 +34883,39 @@ function _aurixCategoryPerfTeardown() {
   _aurixCategoryPerfEntry = null;
 }
 
-function _aurixCategoryPerfUpdateHeader(panel, series) {
+// P0-CATEGORY-PERFORMANCE-CONSISTENCY — the header return is now the SUM of the visible positions'
+// invested-cost P&L (computeCategoryPerformance over the exact same asset set the rows render), NOT the
+// (last−first)/first snapshot-evolution %. It therefore reconciles to the cent with the individual rows.
+// categoryHistory is no longer the cost baseline for the headline number. `type` is the category key.
+function _aurixCategoryPerfUpdateHeader(panel, type) {
   const changeEl = panel.querySelector('.category-perf-change');
   if (!changeEl) return;
-  if (!Array.isArray(series) || series.length < 2) {
-    changeEl.textContent = '';
-    changeEl.className = 'category-perf-change';
+  const key = String(type || '').toLowerCase();
+  // Liquidity/cash: never fabricate investment performance (no yield/interest model exists).
+  if (key === 'cash' || key === 'liquidity') {
+    changeEl.className = 'category-perf-change is-flat';
+    changeEl.textContent = 'Sin rendimiento de mercado';
     return;
   }
-  const first = series[0].value;
-  const last  = series[series.length - 1].value;
-  const abs   = last - first;
-  const pct   = first > 0 ? (abs / first) * 100 : 0;
-  const sign  = abs >= 0 ? '+' : '−';
-  const tone  = abs > 0 ? 'up' : abs < 0 ? 'down' : 'flat';
-  changeEl.className = 'category-perf-change is-' + tone;
-  // formatBase available globally — same currency rendering as the rest
-  // of the dashboard.
-  const absText = (typeof formatBase === 'function')
-    ? formatBase(Math.abs(abs))
-    : Math.abs(abs).toFixed(2);
-  changeEl.textContent = `${sign}${absText} (${sign}${Math.abs(pct).toFixed(2)}%)`;
+  const src = (typeof activeAssets === 'function') ? activeAssets() : (typeof assets !== 'undefined' && Array.isArray(assets) ? assets : []);
+  const positions = src
+    .filter(a => ((typeof TYPE_META !== 'undefined' && TYPE_META[a.type]) ? a.type : 'other') === key)
+    .map(_aurixPositionFromAsset);
+  const agg = computeCategoryPerformance(positions);
+  // Missing data must never surface a fake number.
+  if (!agg || agg.absolutePnL == null || agg.returnPct == null || agg.state === 'empty' || agg.state === 'missing_cost_basis' || agg.state === 'missing_price') {
+    changeEl.className = 'category-perf-change';
+    changeEl.textContent = 'Rendimiento no disponible';
+    return;
+  }
+  const abs  = agg.absolutePnL;
+  const pct  = agg.returnPct;
+  const sign = abs >= 0 ? '+' : '−';
+  const tone = abs > 0 ? 'up' : abs < 0 ? 'down' : 'flat';
+  changeEl.className = 'category-perf-change is-' + tone + (agg.state === 'partial' ? ' is-partial' : '');
+  const absText = (typeof formatBase === 'function') ? formatBase(Math.abs(abs)) : Math.abs(abs).toFixed(2);
+  const partialTag = (agg.state === 'partial') ? ' · parcial' : '';
+  changeEl.textContent = `${sign}${absText} (${sign}${Math.abs(pct).toFixed(2)}%)${partialTag}`;
 }
 
 function _aurixCategoryPerfApplyRange(range) {
@@ -34815,21 +34924,22 @@ function _aurixCategoryPerfApplyRange(range) {
   const { type, panel, ctrl } = entry;
   const series = _categorySeriesForRange(type, range);
   // Chartless mode (ASSET-SECTIONS-CARDS-CLEANUP): no chart/empty-state to drive — just keep the
-  // textual gain/loss header in sync from the real series.
-  if (!_AURIX_CATEGORY_PERF_CHART_ENABLED) { _aurixCategoryPerfUpdateHeader(panel, series); return; }
+  // textual gain/loss header in sync. P0-CATEGORY-PERFORMANCE-CONSISTENCY: the header now derives its
+  // number from the positions' cost basis (via `type`), NOT from `series`; `series` feeds only the chart.
+  if (!_AURIX_CATEGORY_PERF_CHART_ENABLED) { _aurixCategoryPerfUpdateHeader(panel, type); return; }
   const emptyEl = panel.querySelector('.category-perf-empty');
   // No chart engine, or not enough history — both render the premium
   // empty state instead of leaving a blank chart area.
   if (!ctrl || series.length < 2) {
     if (emptyEl) emptyEl.hidden = false;
     if (ctrl) { try { ctrl.setData([]); } catch (_) {} }
-    _aurixCategoryPerfUpdateHeader(panel, []);
+    _aurixCategoryPerfUpdateHeader(panel, type);
     return;
   }
   if (emptyEl) emptyEl.hidden = true;
   try { ctrl.setRange(range); }   catch (_) {}
   try { ctrl.setData(series); }   catch (_) {}
-  _aurixCategoryPerfUpdateHeader(panel, series);
+  _aurixCategoryPerfUpdateHeader(panel, type);
 }
 
 function _aurixCategoryPerfBuildPanel(type) {
