@@ -3820,6 +3820,9 @@ body:not(.hero-active) #orb-canvas {
 /* Weight group (label · % + bar) — hidden on mobile so the mobile card keeps
    its original layout (icons stay the only visual). Shown on desktop. */
 .cat-card-weight { display: none; }
+/* SPEC DASHBOARD-SUMMARY-CARDS — the category return % is a DESKTOP-only refinement; hidden by default so
+   the mobile summary card stays visually + functionally identical (shown only in the >=769px block below). */
+.cat-card-return { display: none; }
 
 /* ── Premium asset glyphs for classes with no third-party logo ── */
 .cat-glyph {
@@ -3858,12 +3861,27 @@ body:not(.hero-active) #orb-canvas {
     display: flex; position: static; order: 2;
     bottom: auto; right: auto;
     justify-content: flex-start; flex-wrap: wrap;
-    margin-top: auto; padding-top: 14px; gap: 8px;
+    /* SPEC DASHBOARD-SUMMARY-CARDS — Allocation removed; icons flow into the freed foot with a touch more
+       air, staying pinned to the bottom for a cleaner, balanced composition. */
+    margin-top: auto; padding-top: 18px; padding-bottom: 2px; gap: 9px;
   }
-  .cat-card .cat-card-weight { display: block; order: 3; margin-top: 12px; }
+  /* SPEC DASHBOARD-SUMMARY-CARDS — Allocation row + bar removed from the desktop summary card (already
+     represented by the hero donut). Reversible: restore `display:block; order:3; margin-top:12px`. */
+  .cat-card .cat-card-weight { display: none; }
   .cat-card .market-status { display: flex; }   /* re-enabled top-right badge */
   .cat-card .cat-card-hint { display: none; }    /* hover lift is the affordance */
-  .cat-card .cat-card-value { font-size: 23px; }
+  /* Return % directly UNDER the market indicator (top-right). Same colors as the category detail header
+     (--green / --red / --text-muted). pointer-events:none → the whole card stays clickable. */
+  .cat-card .cat-card-return {
+    display: inline-block; position: absolute; top: 35px; right: 18px; z-index: 2;
+    pointer-events: none; font-size: 12px; font-weight: 700; letter-spacing: .01em;
+    font-variant-numeric: tabular-nums; opacity: .95;
+  }
+  .cat-card .cat-card-return.up   { color: var(--green); }
+  .cat-card .cat-card-return.down { color: var(--red); }
+  .cat-card .cat-card-return.flat { color: var(--text-muted); }
+  /* Nudge the main amount down slightly for a more balanced vertical rhythm now the foot is lighter. */
+  .cat-card .cat-card-value { font-size: 23px; margin-top: 2px; }
 
   .cat-card-weight-label {
     display: block; font-size: 11px; color: var(--text-muted);

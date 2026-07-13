@@ -1,1 +1,1 @@
-{ "appjs": 527, "loginhtml": 482, "build": "v527-premium-preview-free-menu-polish", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)" }
+{ "appjs": 528, "loginhtml": 482, "build": "v528-dashboard-summary-cards", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)" }

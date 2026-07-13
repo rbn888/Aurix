@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '527'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '528'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -37805,6 +37805,26 @@ function buildCardVisual(type, typeAssets) {
   return `<div class="cat-card-visual">${items.join('')}</div>`;
 }
 
+// SPEC DASHBOARD-SUMMARY-CARDS — the desktop summary card shows the category return % under the market
+// indicator, REUSING the EXACT same number the category DETAIL header renders: computeCategoryPerformance
+// over the same asset set the detail view uses (_aurixCategoryPerfUpdateHeader), same period/format/sign/
+// color. NO new calculation, NO derived data. Cash/Liquidity → null (the detail shows "Sin rendimiento de
+// mercado", never a fabricated %). Returns null when the detail would show no reliable %.
+function _aurixCatReturnDisplay(type) {
+  const key = String(type || '').toLowerCase();
+  if (key === 'cash' || key === 'liquidity') return null;
+  let agg = null;
+  try {
+    const src = (typeof activeAssets === 'function') ? activeAssets() : [];
+    const positions = src.filter(a => ((typeof TYPE_META !== 'undefined' && TYPE_META[a.type]) ? a.type : 'other') === key).map(_aurixPositionFromAsset);
+    agg = computeCategoryPerformance(positions);
+  } catch (_) { return null; }
+  if (!agg || agg.returnPct == null || (agg.state !== 'ready' && agg.state !== 'partial')) return null;
+  const pct = agg.returnPct;
+  const tone = pct > 0 ? 'up' : (pct < 0 ? 'down' : 'flat');
+  const sign = pct >= 0 ? '+' : '−';
+  return { text: sign + Math.abs(pct).toFixed(2) + '%', tone: tone };
+}
 function updateCategoryCards() {
   const section = document.getElementById('categoriesSection');
   const grid    = document.getElementById('categoriesGrid');
@@ -37874,6 +37894,13 @@ function updateCategoryCards() {
         stEl.className = `market-status ${st === '24/7' ? 'crypto' : st}`;
         stEl.innerHTML = `<span class="dot"></span>${getMarketLabel(st)}`;
       }
+      // SPEC DASHBOARD-SUMMARY-CARDS — keep the return % in sync on silent price refresh (same detail calc).
+      const rtEl = card.querySelector('.cat-card-return');
+      if (rtEl) {
+        const rt = (dist.valueBase > 0) ? _aurixCatReturnDisplay(type) : null;
+        if (rt) { rtEl.className = 'cat-card-return ' + rt.tone; rtEl.textContent = rt.text; rtEl.style.display = ''; }
+        else { rtEl.textContent = ''; rtEl.style.display = 'none'; }
+      }
     });
     return;
   }
@@ -37915,6 +37942,12 @@ function updateCategoryCards() {
     const catStatusHtml = catStatus
       ? `<span class="market-status ${catStatus === '24/7' ? 'crypto' : catStatus}"><span class="dot"></span>${getMarketLabel(catStatus)}</span>`
       : '';
+    // SPEC DASHBOARD-SUMMARY-CARDS — category return % directly UNDER the market indicator (desktop only;
+    // CSS hides it on mobile). Same number/format/sign/color as the category detail header.
+    const catReturn = isEmpty ? null : _aurixCatReturnDisplay(type);
+    const catReturnHtml = catReturn
+      ? `<span class="cat-card-return ${catReturn.tone}" aria-hidden="true">${catReturn.text}</span>`
+      : '';
 
     // AURIX-DESKTOP-ALLOCATION-HUB-1: proportional allocation bar. The smart
     // category cards are now the desktop allocation hub, so each card carries
@@ -37939,6 +37972,7 @@ function updateCategoryCards() {
     return `<button class="cat-card${isEmpty ? ' cat-card--empty' : ''}" data-type="${type}"${isEmpty ? ' aria-disabled="true"' : ''}>
       ${isEmpty ? '' : visual}
       ${catStatusHtml}
+      ${catReturnHtml}
       <div class="cat-card-content">
         <div class="cat-card-header">
           <span class="cat-card-dot" style="background:${m.color}"></span>
