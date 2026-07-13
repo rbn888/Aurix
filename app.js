@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '528'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '529'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -37970,9 +37970,7 @@ function updateCategoryCards() {
     const emptySub  = isEmpty ? `<span class="cat-card-pct">${t('emptyCatSub')}</span>` : '';
 
     return `<button class="cat-card${isEmpty ? ' cat-card--empty' : ''}" data-type="${type}"${isEmpty ? ' aria-disabled="true"' : ''}>
-      ${isEmpty ? '' : visual}
       ${catStatusHtml}
-      ${catReturnHtml}
       <div class="cat-card-content">
         <div class="cat-card-header">
           <span class="cat-card-dot" style="background:${m.color}"></span>
@@ -37983,6 +37981,7 @@ function updateCategoryCards() {
         ${rentLineHtml}
         ${hint}
       </div>
+      ${isEmpty ? '' : `<div class="cat-card-foot">${visual}${catReturnHtml}</div>`}
       ${weight}
     </button>`;
   }).join('');

@@ -37,8 +37,10 @@ console.log('\nAURIX-DASHBOARD-SUMMARY-CARDS — desktop premium layout');
 ok('1 desktop hides the Allocation weight group', /\.cat-card \.cat-card-weight\s*\{\s*display:\s*none/.test(desktopBlock));
 ok('2 desktop no longer renders the Allocation bar (weight was its only home)', !/\.cat-card \.cat-card-weight\s*\{\s*display:\s*block/.test(desktopBlock));
 
-// ── 3 icons flow into the freed foot (pinned bottom, more air) ───────────────
-ok('3 desktop icons pinned to freed foot (margin-top:auto + extra padding)', /\.cat-card \.cat-card-visual\s*\{[\s\S]{0,520}margin-top:\s*auto[\s\S]{0,80}padding-top:\s*18px/.test(desktopBlock));
+// ── 3 icons + return live in ONE bottom flex row (foot) pinned to the card foot ──
+ok('3 desktop foot is a flex row pinned to the bottom (margin-top:auto)', /\.cat-card \.cat-card-foot\s*\{[\s\S]{0,260}display:\s*flex/.test(desktopBlock) && /\.cat-card \.cat-card-foot\s*\{[\s\S]{0,260}margin-top:\s*auto/.test(desktopBlock));
+ok('3 icons take the left (flex:1), stay static in-flow inside the foot', /\.cat-card \.cat-card-visual\s*\{[\s\S]{0,260}position:\s*static[\s\S]{0,220}flex:\s*1 1 auto/.test(desktopBlock));
+ok('3 base foot is layout-transparent (display:contents) → mobile icons unchanged', /\.cat-card-foot\s*\{\s*display:\s*contents;\s*\}/.test(css));
 
 // ── 4 the % is the SAME number/calc/format as the category DETAIL header ──────
 ok('4 card return reuses computeCategoryPerformance (same as detail)', /computeCategoryPerformance\(/.test(rd) && /_aurixPositionFromAsset/.test(rd));
@@ -73,13 +75,16 @@ ok('5 card % colors === detail colors (--green / --red / --text-muted)',
    /\.cat-card \.cat-card-return\.flat\s*\{\s*color:\s*var\(--text-muted\)/.test(desktopBlock));
 ok('5 detail header uses the same --green/--red/--text-muted tokens', /\.category-perf-change\.is-up\s*\{\s*color:\s*var\(--green\)/.test(css) && /\.category-perf-change\.is-down\s*\{\s*color:\s*var\(--red\)/.test(css));
 
-// ── 6 no layout/height regression: return is absolutely positioned; min-height intact ─
-ok('6 return % is position:absolute under the market badge (no flow/height impact)', /\.cat-card \.cat-card-return\s*\{[\s\S]{0,160}position:\s*absolute[\s\S]{0,160}top:\s*35px/.test(desktopBlock));
+// ── 6 return % is IN-FLOW at bottom-right (flex, no arbitrary offsets); height intact ─
+ok('6 return % in-flow bottom-right (position:static + margin-left:auto)', /\.cat-card \.cat-card-return\s*\{[\s\S]{0,300}position:\s*static[\s\S]{0,160}margin-left:\s*auto/.test(desktopBlock));
+ok('6 return % right-anchored regardless of icon count (margin-left:auto, not space-between hacks)', /\.cat-card \.cat-card-return\s*\{[\s\S]{0,300}margin-left:\s*auto/.test(desktopBlock));
+ok('6 NO arbitrary top/bottom/left/right px offset on the return (pure flex)', !/\.cat-card \.cat-card-return\s*\{[^}]*(?:top|bottom|left|right):\s*\d/.test(desktopBlock));
 ok('6 card min-height unchanged (130px)', /\.cat-card\s*\{[\s\S]{0,900}min-height:\s*130px/.test(css));
 
 // ── 7 cards stay fully clickable ─────────────────────────────────────────────
 ok('7 card is still a <button data-type>', /<button class="cat-card\$\{isEmpty \? ' cat-card--empty' : ''\}" data-type="\$\{type\}"/.test(uc));
-ok('7 return % never intercepts clicks (pointer-events:none)', /\.cat-card \.cat-card-return\s*\{[\s\S]{0,200}pointer-events:\s*none/.test(desktopBlock));
+ok('7 return % never intercepts clicks (pointer-events:none)', /\.cat-card \.cat-card-return\s*\{[\s\S]{0,320}pointer-events:\s*none/.test(desktopBlock));
+ok('7 return % slightly larger + bolder than v528 (13.5px / 800), vertically centered on the icon row', /\.cat-card \.cat-card-return\s*\{[\s\S]{0,320}font-size:\s*13\.5px[\s\S]{0,80}font-weight:\s*800/.test(desktopBlock) && (/\.cat-card \.cat-card-foot\s*\{[\s\S]{0,260}align-items:\s*center/.test(desktopBlock) || /\.cat-card \.cat-card-return\s*\{[\s\S]{0,320}align-self:\s*center/.test(desktopBlock)));
 
 // ── 8 Market Open / Market Closed / 24/7 unchanged ───────────────────────────
 ok('8 market-status markup unchanged (getMarketStatus + getMarketLabel + dot)', /market-status \$\{catStatus === '24\/7' \? 'crypto' : catStatus\}"><span class="dot"><\/span>\$\{getMarketLabel\(catStatus\)\}/.test(uc));
@@ -101,7 +106,7 @@ ok('10 no reliable % ⇒ null (never fabricated)', /agg\.returnPct == null \|\| 
 
 // ── 11 render guards: % only for non-empty populated cards; under the market badge ─
 ok('11 catReturn computed only for non-empty cards', /const catReturn = isEmpty \? null : _aurixCatReturnDisplay\(type\);/.test(uc));
-ok('11 return element placed right after the market status in markup', /\$\{catStatusHtml\}\s*\n\s*\$\{catReturnHtml\}/.test(uc));
+ok('11 icons + return share the bottom foot row (non-empty only)', /<div class="cat-card-foot">\$\{visual\}\$\{catReturnHtml\}<\/div>/.test(uc) && /isEmpty \? '' : `<div class="cat-card-foot">/.test(uc));
 ok('11 silent refresh keeps the % in sync (same calc)', /card\.querySelector\('\.cat-card-return'\)[\s\S]{0,260}_aurixCatReturnDisplay\(type\)/.test(uc));
 
 // ── 12 scope: engines / detail / donut owner untouched by this SPEC ──────────

@@ -3823,6 +3823,10 @@ body:not(.hero-active) #orb-canvas {
 /* SPEC DASHBOARD-SUMMARY-CARDS — the category return % is a DESKTOP-only refinement; hidden by default so
    the mobile summary card stays visually + functionally identical (shown only in the >=769px block below). */
 .cat-card-return { display: none; }
+/* The foot wrapper (icons + return) is layout-transparent by default so mobile renders its children EXACTLY
+   as before (icons keep their absolute bottom-right position; the return stays display:none). Only the
+   >=769px block turns the foot into the bottom flex row. */
+.cat-card-foot { display: contents; }
 
 /* ── Premium asset glyphs for classes with no third-party logo ── */
 .cat-glyph {
@@ -3857,25 +3861,33 @@ body:not(.hero-active) #orb-canvas {
      (order:2, margin-top:auto) so they never collide with the bar. */
   .cat-card { flex-direction: column; }
   .cat-card .cat-card-content { order: 1; max-width: 100%; }
+  /* SPEC DASHBOARD-SUMMARY-CARDS-POSITION — the freed foot is ONE bottom flex row: asset icons pinned
+     bottom-left, the return % bottom-right, vertically centered on the icon row. Symmetric side margins come
+     from the card's own padding (22px); margin-left:auto keeps the % right-anchored whether the card has
+     one, several or NO icons. No arbitrary offsets. */
+  .cat-card .cat-card-foot {
+    display: flex; order: 2; margin-top: auto;
+    align-items: center; justify-content: flex-start;
+    gap: 10px; padding-top: 18px; padding-bottom: 2px;
+  }
   .cat-card .cat-card-visual {
-    display: flex; position: static; order: 2;
-    bottom: auto; right: auto;
-    justify-content: flex-start; flex-wrap: wrap;
-    /* SPEC DASHBOARD-SUMMARY-CARDS — Allocation removed; icons flow into the freed foot with a touch more
-       air, staying pinned to the bottom for a cleaner, balanced composition. */
-    margin-top: auto; padding-top: 18px; padding-bottom: 2px; gap: 9px;
+    display: flex; position: static; bottom: auto; right: auto;
+    justify-content: flex-start; align-items: center; flex-wrap: wrap;
+    gap: 9px; margin-top: 0; padding-top: 0; flex: 1 1 auto; min-width: 0;
   }
   /* SPEC DASHBOARD-SUMMARY-CARDS — Allocation row + bar removed from the desktop summary card (already
      represented by the hero donut). Reversible: restore `display:block; order:3; margin-top:12px`. */
   .cat-card .cat-card-weight { display: none; }
   .cat-card .market-status { display: flex; }   /* re-enabled top-right badge */
   .cat-card .cat-card-hint { display: none; }    /* hover lift is the affordance */
-  /* Return % directly UNDER the market indicator (top-right). Same colors as the category detail header
-     (--green / --red / --text-muted). pointer-events:none → the whole card stays clickable. */
+  /* Return % — bottom-right of the foot row, IN-FLOW (flex, no absolute offsets), vertically aligned with
+     the icon row, slightly larger + bolder than v528. Same data/calc/sign/color/formatter. Same colors as
+     the category detail header (--green / --red / --text-muted). pointer-events:none → card stays clickable. */
   .cat-card .cat-card-return {
-    display: inline-block; position: absolute; top: 35px; right: 18px; z-index: 2;
-    pointer-events: none; font-size: 12px; font-weight: 700; letter-spacing: .01em;
-    font-variant-numeric: tabular-nums; opacity: .95;
+    display: inline-block; position: static; margin-left: auto; align-self: center;
+    flex: 0 0 auto; white-space: nowrap; pointer-events: none;
+    font-size: 13.5px; font-weight: 800; letter-spacing: .01em;
+    font-variant-numeric: tabular-nums; opacity: .96;
   }
   .cat-card .cat-card-return.up   { color: var(--green); }
   .cat-card .cat-card-return.down { color: var(--red); }
