@@ -15,21 +15,39 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '523'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '524'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
-function _aurixResolveBuildCoherence(expected, indexVersion, requestedVersion, executedVersion, reloadState) {
+// SPEC.44 RUNTIME_CAPABILITY_COHERENCE — capabilityState (6th arg, optional) folds RUNTIME capability
+// availability into the coherence verdict. v523 FALSELY reported coherent because this helper compared
+// version NUMBERS only: the executed self-version (__AURIX_APPJS_VERSION__) is set at app.js line ~18, so a
+// top-level throw ANYWHERE before the audit exports (~L28k) still left all four versions matching while
+// window.aurixAuditTemporalWindow never registered. capabilityState = { registrationComplete:bool,
+// required:{name:bool,…} }. When omitted (pure version-only callers/tests) behaviour is byte-identical to
+// SPEC.43. A build is coherent ONLY when versions match AND registration completed AND every required
+// capability is present. Pure/deterministic — ts/reloadState/capabilityState are all supplied by the caller.
+function _aurixResolveBuildCoherence(expected, indexVersion, requestedVersion, executedVersion, reloadState, capabilityState) {
   const norm = x => { const n = parseInt(x, 10); return Number.isFinite(n) ? n : null; };
   const e = norm(expected), iv = norm(indexVersion), rv = norm(requestedVersion), xv = norm(executedVersion);
   const rs = (reloadState && typeof reloadState === 'object') ? reloadState : null;
+  const cap = (capabilityState && typeof capabilityState === 'object') ? capabilityState : null;
+  const reqCaps = (cap && cap.required && typeof cap.required === 'object') ? cap.required : null;
+  const missing = reqCaps ? Object.keys(reqCaps).filter(k => reqCaps[k] !== true) : [];
+  const regComplete = cap ? (cap.registrationComplete === true) : null;
+  const capsPresent = cap ? (missing.length === 0) : null;
   const out = { expectedVersion: e, indexVersion: iv, requestedVersion: rv, executedVersion: xv,
-    coherent: false, mismatchFields: [], action: 'none', clearMarker: false, reloadAttempted: false, nextReloadState: rs };
+    coherent: false, mismatchFields: [], action: 'none', clearMarker: false, reloadAttempted: false, nextReloadState: rs,
+    registrationComplete: regComplete, requiredCapabilitiesPresent: capsPresent, missingCapabilities: missing, classify: null };
   if (e == null) { out.coherent = true; out.action = 'none'; out.clearMarker = true; out.reason = 'no_expected_version'; return out; }
   if (iv != null && iv !== e) out.mismatchFields.push('indexVersion');
   if (rv != null && rv !== e) out.mismatchFields.push('requestedVersion');
   if (xv != null && xv !== e) out.mismatchFields.push('executedVersion');
-  out.coherent = (iv != null) && (xv != null) && out.mismatchFields.length === 0;
+  const versionsMatch = (iv != null) && (xv != null) && out.mismatchFields.length === 0;
+  // Capability-aware coherence: matching versions alone is NO LONGER sufficient.
+  out.coherent = versionsMatch && (cap ? (regComplete === true && capsPresent === true) : true);
+  if (out.mismatchFields.length) out.classify = 'BUILD_VERSION_MISMATCH';
+  else if (versionsMatch && cap && !out.coherent) out.classify = 'RUNTIME_CAPABILITY_MISMATCH';
   const attemptedForExpected = !!(rs && norm(rs.v) === e && (rs.n || 0) >= 1);
   out.reloadAttempted = attemptedForExpected;
   if (out.coherent) { out.action = 'none'; out.clearMarker = true; return out; }
@@ -44,36 +62,61 @@ try { if (typeof window !== 'undefined') window._aurixResolveBuildCoherence = _a
   const MK = 'aurix_coherence_reload';
   const readState = () => { try { return JSON.parse(sessionStorage.getItem(MK) || 'null'); } catch (_) { return null; } };
   const parseReq = () => { try { const s = document.querySelector('script[src*="app.js?v="]'); const m = s && (s.getAttribute('src') || '').match(/[?&]v=(\d+)/); return m ? parseInt(m[1], 10) : null; } catch (_) { return null; } };
+  // SPEC.44 — the executed bundle's ACTUAL public tools, read LIVE (typeof). These required capabilities are
+  // the SPEC.42/40/37 read-only audits whose absence proved SPEC.43's version-only coherence was blind.
+  const requiredCapabilities = () => ({
+    temporalWindowAudit: (typeof window.aurixAuditTemporalWindow === 'function'),
+    geometricAudit: (typeof window.aurixAuditGeometricRootCause === 'function'),
+    snapshotContinuityAudit: (typeof window.aurixAuditLongRangeSnapshotContinuity === 'function')
+  });
+  const capabilityState = () => ({ registrationComplete: (window.__AURIX_APP_REGISTRATION_COMPLETE__ === true), required: requiredCapabilities() });
   window.aurixBuildCoherenceStatus = function () {
     const expected = (window.__AURIX_LATEST_APPJS != null) ? window.__AURIX_LATEST_APPJS : null;
     const indexV = (window.__AURIX_SERVED_APPJS != null) ? window.__AURIX_SERVED_APPJS : (window.__AURIX_BOOT ? parseInt(window.__AURIX_BOOT.appJsVersion, 10) : null);
     const requestedV = (window.__AURIX_REQUESTED_APPJS != null) ? window.__AURIX_REQUESTED_APPJS : parseReq();
     const executedV = parseInt(window.__AURIX_APPJS_VERSION__, 10);
-    const dec = _aurixResolveBuildCoherence(expected, indexV, requestedV, Number.isFinite(executedV) ? executedV : null, readState());
+    const dec = _aurixResolveBuildCoherence(expected, indexV, requestedV, Number.isFinite(executedV) ? executedV : null, readState(), capabilityState());
     return { expectedVersion: dec.expectedVersion, indexVersion: dec.indexVersion, requestedVersion: dec.requestedVersion, executedVersion: dec.executedVersion,
-      coherent: dec.coherent, reloadAttempted: dec.reloadAttempted, auditAvailable: (typeof window.aurixAuditTemporalWindow === 'function'), build: window.AURIX_BUILD || null };
+      coherent: dec.coherent, registrationComplete: dec.registrationComplete, requiredCapabilitiesPresent: dec.requiredCapabilitiesPresent,
+      missingCapabilities: dec.missingCapabilities, reloadAttempted: dec.reloadAttempted, build: window.AURIX_BUILD || null };
+  };
+  // SPEC.44 Phase 5 — one safe runtime-readiness diagnostic. Read-only; no secrets, no user data, no network.
+  window.aurixRuntimeReadinessStatus = function () {
+    const req = requiredCapabilities();
+    const missing = Object.keys(req).filter(k => req[k] !== true);
+    let lastBootError = null;
+    try { const errs = window.__AURIX_BOOT && window.__AURIX_BOOT.errors; if (errs && errs.length) lastBootError = errs[errs.length - 1]; } catch (_) {}
+    return { build: window.AURIX_BUILD || null, appJsVersion: window.__AURIX_APPJS_VERSION__ || null,
+      registrationComplete: (window.__AURIX_APP_REGISTRATION_COMPLETE__ === true),
+      temporalWindowAuditAvailable: (typeof window.aurixAuditTemporalWindow === 'function'),
+      requiredCapabilitiesPresent: (missing.length === 0), missingCapabilities: missing, lastBootError: lastBootError };
   };
   window.aurixApplyBuildUpdate = function () { try { const now = (window.__AURIX_BOOT && window.__AURIX_BOOT.t0) ? (window.__AURIX_BOOT.t0 + 1) : 1; const e = window.__AURIX_LATEST_APPJS; const onAurix = location.pathname.indexOf('/Aurix/') === 0; const base = location.origin + (onAurix ? '/Aurix/' : '/'); location.replace(base + 'index.html?v=' + (e || 'x') + '&_cb=' + (Date.now ? Date.now() : now)); } catch (_) { try { location.reload(); } catch (__) {} } };
   let _auditRan = false;
+  // SPEC.44 — deferred: NEVER auto-execute the temporal audit before the bundle finished registering
+  // (removes the SPEC.43 early-boot race). Coherence now requires registrationComplete, so this only fires
+  // on a fully-registered coherent build; the explicit guard is defence-in-depth.
   const runAuditOnce = () => {
-    if (_auditRan) return; _auditRan = true;
+    if (_auditRan) return;
+    if (window.__AURIX_APP_REGISTRATION_COMPLETE__ !== true) return;
+    _auditRan = true;
     try { if (typeof window.aurixAuditTemporalWindow === 'function') { const r = window.aurixAuditTemporalWindow({}); try { console.log('%c[BOOT][BUILD-COHERENCE] coherent build — temporal audit verdict: ' + (r && r.verdict) + (r && r.exactOwner ? ' owner=' + r.exactOwner : ''), 'font-weight:700;color:#12b886'); } catch (_) {} } } catch (_) {}
   };
   const decide = (expected) => {
     const indexV = (window.__AURIX_SERVED_APPJS != null) ? window.__AURIX_SERVED_APPJS : null;
     const requestedV = (window.__AURIX_REQUESTED_APPJS != null) ? window.__AURIX_REQUESTED_APPJS : parseReq();
     const executedV = parseInt(window.__AURIX_APPJS_VERSION__, 10);
-    const dec = _aurixResolveBuildCoherence(expected, indexV, requestedV, Number.isFinite(executedV) ? executedV : null, readState());
+    const dec = _aurixResolveBuildCoherence(expected, indexV, requestedV, Number.isFinite(executedV) ? executedV : null, readState(), capabilityState());
     if (dec.action === 'reload') {
       try { sessionStorage.setItem(MK, JSON.stringify(dec.nextReloadState)); } catch (_) {}
       try { if (typeof caches !== 'undefined' && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { try { caches.delete(k); } catch (_) {} }); }).catch(function () {}); } catch (_) {}
-      try { console.warn('[BOOT][BUILD-COHERENCE] BUILD_MISMATCH ' + JSON.stringify(dec.mismatchFields) + ' — one controlled cache-busted reload to v' + dec.expectedVersion); } catch (_) {}
+      try { console.warn('[BOOT][BUILD-COHERENCE] ' + (dec.classify || 'BUILD_MISMATCH') + ' mismatch=' + JSON.stringify(dec.mismatchFields) + ' missingCapabilities=' + JSON.stringify(dec.missingCapabilities) + ' — one controlled cache-busted reload to v' + dec.expectedVersion); } catch (_) {}
       window.aurixApplyBuildUpdate();
       return;
     }
     if (dec.action === 'recoverable') {
       window.__AURIX_BUILD_UPDATE_AVAILABLE = true;
-      try { console.warn('[BOOT][BUILD-COHERENCE] still mismatched after one reload — recoverable update available; call aurixApplyBuildUpdate()'); } catch (_) {}
+      try { console.warn('[BOOT][BUILD-COHERENCE] still incoherent after one reload — ' + (dec.classify || '') + ' missingCapabilities=' + JSON.stringify(dec.missingCapabilities) + ' — recoverable update available; call aurixApplyBuildUpdate()'); } catch (_) {}
       try {
         if (document && document.body && !document.getElementById('aurix-build-update')) {
           const d = document.createElement('div'); d.id = 'aurix-build-update';
@@ -54905,4 +54948,28 @@ if (typeof window !== 'undefined' && _aurixIsDebugHost()) {
     if (ov && ov.classList.contains('open')) closeHealthPanel();
   });
 })();
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.RUNTIME_CAPABILITY_COHERENCE.44 — FINAL REGISTRATION MARKER + CAPABILITY MANIFEST
+// ════════════════════════════════════════════════════════════════════════════
+// This is the LAST executable statement of the bundle. It runs ONLY if EVERY preceding top-level statement
+// executed without an uncaught throw — so a partially-executed bundle (a mid-file throw aborting before the
+// read-only audit exports at ~L28k, which is exactly why v523's authenticated runtime lacked
+// aurixAuditTemporalWindow while all four version numbers matched) is now DISTINGUISHABLE from a fully
+// registered one: __AURIX_APP_REGISTRATION_COMPLETE__ stays false and the coherence contract classifies
+// RUNTIME_CAPABILITY_MISMATCH. Pure instrumentation — never throws, touches no chart/auth/history/storage.
+try {
+  if (typeof window !== 'undefined') {
+    window.__AURIX_APP_REGISTRATION_COMPLETE__ = true;
+    window.__AURIX_RUNTIME_CAPABILITIES__ = Object.freeze({
+      appJsVersion: window.__AURIX_APPJS_VERSION__ || null,
+      bundleExecuted: true,
+      appRegistrationComplete: true,
+      temporalWindowAudit: (typeof window.aurixAuditTemporalWindow === 'function'),
+      geometricAudit: (typeof window.aurixAuditGeometricRootCause === 'function'),
+      snapshotContinuityAudit: (typeof window.aurixAuditLongRangeSnapshotContinuity === 'function')
+    });
+    try { if (window.__AURIX_BOOT && window.__AURIX_BOOT.mark) window.__AURIX_BOOT.mark('app_registration_complete'); } catch (_) {}
+  }
+} catch (_) {}
 
