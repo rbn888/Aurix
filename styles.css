@@ -15780,6 +15780,30 @@ body.gs-open { overflow: hidden; }
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+/* SPEC 45 ONBOARDING POLISH — premium entrance choreography. On top of the whole-step fade, each step's
+   selectable cards/bullets cascade up in a subtle stagger so every screen change feels intentional and
+   smooth. `backwards` fill applies the hidden pre-state during the stagger delay (no flash) and RELEASES
+   after the animation ends, so it never clobbers the existing :hover / :active / .is-selected transforms.
+   Purely additive (final resting state = the existing layout), reversible, fully off under reduced-motion.
+   No markup / handler / navigation / data change. */
+@keyframes onb-card-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.modal--onboarding .onb-lang-card,
+.modal--onboarding .onb-chip,
+.modal--onboarding .onb-exp-card,
+.modal--onboarding .onb-bullet { animation: onb-card-rise .42s var(--ease-premium) backwards; }
+.modal--onboarding .onb-lang-card:nth-child(2), .modal--onboarding .onb-chip:nth-child(2), .modal--onboarding .onb-exp-card:nth-child(2), .modal--onboarding .onb-bullet:nth-child(2) { animation-delay: .05s; }
+.modal--onboarding .onb-lang-card:nth-child(3), .modal--onboarding .onb-chip:nth-child(3), .modal--onboarding .onb-exp-card:nth-child(3), .modal--onboarding .onb-bullet:nth-child(3) { animation-delay: .10s; }
+.modal--onboarding .onb-lang-card:nth-child(4), .modal--onboarding .onb-chip:nth-child(4), .modal--onboarding .onb-exp-card:nth-child(4), .modal--onboarding .onb-bullet:nth-child(4) { animation-delay: .15s; }
+.modal--onboarding .onb-lang-card:nth-child(5), .modal--onboarding .onb-chip:nth-child(5), .modal--onboarding .onb-exp-card:nth-child(5), .modal--onboarding .onb-bullet:nth-child(5) { animation-delay: .20s; }
+.modal--onboarding .onb-chip:nth-child(6), .modal--onboarding .onb-exp-card:nth-child(6) { animation-delay: .25s; }
+.modal--onboarding .onb-chip:nth-child(7), .modal--onboarding .onb-exp-card:nth-child(7) { animation-delay: .30s; }
+.modal--onboarding .onb-chip:nth-child(n+8) { animation-delay: .34s; }
+@media (prefers-reduced-motion: reduce) {
+  .modal--onboarding .onb-lang-card,
+  .modal--onboarding .onb-chip,
+  .modal--onboarding .onb-exp-card,
+  .modal--onboarding .onb-bullet { animation: none; }
+}
 .onb-headline {
   font-size: 26px;
   font-weight: 800;
