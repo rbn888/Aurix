@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '533'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '534'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -7045,8 +7045,19 @@ async function _aurixResyncFromRemote(reason) {
     const now = (typeof Date !== 'undefined') ? Date.now() : 0;
     if (now - _aurixLastResyncAt < 1500) return;   // collapse visibility+focus bursts
     _aurixResyncInFlight = true; _aurixLastResyncAt = now;
-    try { console.log('[SYNC][REMOTE_LOAD]', { reason: reason || 'foreground' }); } catch (_) {}
+    // SPEC 45 RESET GENERATION GUARD — capture the reset generation this resync was STARTED in. A reset that
+    // fires while this network round-trip is in flight bumps _aurixResetGeneration; a late response therefore
+    // belongs to the PREVIOUS lifecycle and must be discarded so it can never re-hydrate the old portfolio.
+    const _resetGen = (typeof _aurixResetGeneration !== 'undefined') ? _aurixResetGeneration : 0;
+    try { console.log('[SYNC][REMOTE_LOAD]', { reason: reason || 'foreground', gen: _resetGen }); } catch (_) {}
     const remote = await loadPortfolioFromBackend(currentUser.id);
+    // A reset (or a newer resync-triggering reset) landed while we awaited the network → this response is from
+    // a stale generation. Reject the ENTIRE response (no merge, no write, no render) — the post-reset clean
+    // state stands. Idempotent: further stale responses hit the same guard.
+    if (typeof _aurixIsResetStale === 'function' && _aurixIsResetStale(_resetGen)) {
+      try { console.log('[SYNC][DISCARDED_STALE_GENERATION]', { startedGen: _resetGen, currentGen: _aurixResetGeneration, reason: reason || 'foreground' }); } catch (_) {}
+      return;
+    }
     // P0-UI-RENDER — capture the remote performance_state fingerprint across the reconcile. _mergeRemoteState
     // adopts it even when the HOLDINGS merge keeps local (apply:"local"); the return badges (gated on
     // getValidReturnBaseline().valid) must then be REPAINTED or they keep a stale "Calculando…".
