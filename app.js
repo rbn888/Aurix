@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '534'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '535'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -2659,6 +2659,13 @@ const T = {
     addV2_subtitle_asset:      'Acciones, ETFs, fondos, cripto e índices',
     addV2_subtitle_gold:       'Joyería, lingotes y monedas',
     addV2_subtitle_re:         'Inmuebles y rentas',
+    // SPEC 45 CATEGORY HEADERS — per-category title + subtitle so each add flow reads for its own asset class
+    addV2_title_stock:         'Añadir acciones',
+    addV2_subtitle_stock:      'Empresas cotizadas, ADRs e índices',
+    addV2_title_crypto:        'Añadir criptomoneda',
+    addV2_subtitle_crypto:     'Bitcoin, Ethereum y altcoins',
+    addV2_title_etf:           'Añadir fondo o ETF',
+    addV2_subtitle_etf:        'ETFs, fondos indexados y fondos de inversión',
     addV2_preview_empty:       'Selecciona un activo para ver vista previa.',
     addV2_preview_price:       'Precio en vivo',
     addV2_preview_value:       'Posición estimada',
@@ -4777,6 +4784,13 @@ const T = {
     addV2_subtitle_asset:      'Stocks, ETFs, funds, crypto and indices',
     addV2_subtitle_gold:       'Jewelry, bars and coins',
     addV2_subtitle_re:         'Properties and rental income',
+    // SPEC 45 CATEGORY HEADERS — per-category title + subtitle so each add flow reads for its own asset class
+    addV2_title_stock:         'Add stocks',
+    addV2_subtitle_stock:      'Listed companies, ADRs and indices',
+    addV2_title_crypto:        'Add crypto',
+    addV2_subtitle_crypto:     'Bitcoin, Ethereum and altcoins',
+    addV2_title_etf:           'Add fund or ETF',
+    addV2_subtitle_etf:        'ETFs, index funds and mutual funds',
     addV2_preview_empty:       'Select an asset to see the preview.',
     addV2_preview_price:       'Live price',
     addV2_preview_value:       'Estimated position',
@@ -45200,6 +45214,7 @@ function openContextualModal(type) {
   // crypto means crypto, stocks means stocks, etc.
   const filterKey = { crypto: 'crypto', stock: 'stock', etf: 'etf', fund: 'etf' }[type];
   if (typeof _addV2SetMode === 'function') _addV2SetMode('asset');
+  try { if (typeof _addV2SetCategoryHeader === 'function') _addV2SetCategoryHeader(type); } catch (_) {}   // SPEC 45 — per-category header
   _modalContext = 'asset';
   _modalAssetFilterContext = filterKey || null;
   if (typeof _addV2RefreshQuick === 'function') _addV2RefreshQuick();
@@ -47621,6 +47636,19 @@ modalOverlay.addEventListener('click', e => {
 // reads "Añadir activo / Añadir oro físico / Añadir inmueble".
 const _ADD_V2_TITLE_KEY = { asset: 'addV2_title_asset', gold: 'addV2_title_gold', real_estate: 'addV2_title_re' };
 const _ADD_V2_SUB_KEY   = { asset: 'addV2_subtitle_asset', gold: 'addV2_subtitle_gold', real_estate: 'addV2_subtitle_re' };
+// SPEC 45 CATEGORY HEADERS — the financial-asset mode ('asset') is shared by stocks/crypto/ETF, so it showed
+// one generic header. This overrides the title + subtitle with the picked category's own copy (no reused
+// generic header). Presentation-only: reads existing i18n; no logic/data/model change. Normalizes the picker
+// keys (stocks/fund) and the contextual-entry keys (stock/etf) to one bucket. Unknown/legacy 'asset' → no-op
+// (keeps the generic header set by _addV2SetMode).
+const _ADD_V2_CAT_TITLE = { stock: 'addV2_title_stock', crypto: 'addV2_title_crypto', etf: 'addV2_title_etf' };
+const _ADD_V2_CAT_SUB   = { stock: 'addV2_subtitle_stock', crypto: 'addV2_subtitle_crypto', etf: 'addV2_subtitle_etf' };
+function _addV2SetCategoryHeader(cat) {
+  const c = ({ stocks: 'stock', stock: 'stock', crypto: 'crypto', fund: 'etf', etf: 'etf' })[String(cat || '').toLowerCase()];
+  if (!c || !_ADD_V2_CAT_TITLE[c]) return;
+  try { const titleEl = document.querySelector('#modalOverlay .modal-header h3'); if (titleEl) titleEl.textContent = t(_ADD_V2_CAT_TITLE[c]); } catch (_) {}
+  try { const subEl = document.getElementById('addV2HeaderSub'); if (subEl) { subEl.textContent = t(_ADD_V2_CAT_SUB[c]); subEl.hidden = false; } } catch (_) {}
+}
 
 function _addV2Activate(targetStep) {
   const modal = document.querySelector('#modalOverlay .modal');
@@ -47854,6 +47882,7 @@ function _addV4RenderPreview() {
     // market filter pre-engaged, so "Acciones" means stocks, "Criptomonedas" means crypto, etc.
     const filterKey = { stocks: 'stock', crypto: 'crypto', fund: 'etf', asset: null }[pick];
     _addV2SetMode('asset');
+    try { _addV2SetCategoryHeader(pick); } catch (_) {}   // SPEC 45 — per-category header (stocks/crypto/ETF), not the generic one
     try { _modalContext = 'asset'; _modalAssetFilterContext = filterKey || null; } catch (_) {}
     _addV2Activate('form');
     try { if (typeof _addV2RefreshQuick === 'function') _addV2RefreshQuick(); } catch (_) {}

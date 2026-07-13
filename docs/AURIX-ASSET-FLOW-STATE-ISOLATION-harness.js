@@ -62,6 +62,19 @@ ok('7 reset touches no data/model/calc/portfolio/supabase', !/\bassets\b|\.push\
 ok('8 results dropdown is a custom .asset-suggestions div', /id="assetSuggestions"/.test(html) && /class="asset-suggestions"/.test(html));
 ok('8 no native <select> in the add-asset form', !/<select[\s>]/.test(html.slice(html.indexOf('id="addV2Picker"'), html.indexOf('id="assetSuggestions"') + 4000)));
 
+// ── 8b CATEGORY HEADERS (SPEC 45) — each financial category shows its own title/subtitle, not a reused one ─
+(function () {
+  const setHdr = fnSrc('_addV2SetCategoryHeader');
+  ok('8b _addV2SetCategoryHeader maps picker + contextual keys to one bucket', /stocks: 'stock'[\s\S]{0,80}crypto: 'crypto'[\s\S]{0,40}fund: 'etf'[\s\S]{0,40}etf: 'etf'/.test(setHdr));
+  ok('8b it overrides the header title + subtitle from per-category i18n', /modal-header h3[\s\S]{0,120}_ADD_V2_CAT_TITLE/.test(setHdr) && /addV2HeaderSub[\s\S]{0,120}_ADD_V2_CAT_SUB/.test(setHdr));
+  ok('8b picker asset route applies the per-category header', /_addV2SetMode\('asset'\);\s*try \{ _addV2SetCategoryHeader\(pick\)/.test(app));
+  ok('8b contextual entry (dashboard cards) applies the per-category header', /_addV2SetMode\('asset'\);\s*try \{ if \(typeof _addV2SetCategoryHeader[\s\S]{0,60}_addV2SetCategoryHeader\(type\)/.test(app));
+  // distinct copy per category in BOTH languages (stock ≠ crypto ≠ etf ≠ generic)
+  const keys = ['addV2_title_stock', 'addV2_title_crypto', 'addV2_title_etf', 'addV2_subtitle_stock', 'addV2_subtitle_crypto', 'addV2_subtitle_etf'];
+  ok('8b per-category i18n keys defined twice (ES + EN)', keys.every(k => (app.match(new RegExp(k + ':', 'g')) || []).length >= 2), keys.filter(k => (app.match(new RegExp(k + ':', 'g')) || []).length < 2).join(','));
+  ok('8b titles are distinct (not the generic asset title)', /addV2_title_stock:\s*'Añadir acciones'/.test(app) && /addV2_title_crypto:\s*'Añadir criptomoneda'/.test(app) && /addV2_title_etf:\s*'Añadir fondo o ETF'/.test(app));
+})();
+
 // ── 9 regression: openModal still does the full clean-state reset (fresh open per category) ─
 (function () { const om = fnSrc('openModal');
   ok('9 openModal full reset intact (selectedDbAsset null + caches + search cleared)', /selectedDbAsset\s*=\s*null/.test(om) && /currentSuggestions\s*=\s*\[\]/.test(om) && /searchInput\.value\s*=\s*''/.test(om)); })();
