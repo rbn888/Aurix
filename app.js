@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '530'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '531'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -38059,13 +38059,13 @@ function updateCategoryCards() {
         stEl.className = `market-status ${st === '24/7' ? 'crypto' : st}`;
         stEl.innerHTML = `<span class="dot"></span>${getMarketLabel(st)}`;
       }
-      // SPEC DASHBOARD-SUMMARY-CARDS — keep the return % in sync on silent price refresh (same detail calc).
+      // SPEC DASHBOARD-SUMMARY-CARDS — keep BOTH return % twins (desktop foot + mobile-in-content) in sync on
+      // silent price refresh (same detail calc). CSS shows exactly one per breakpoint.
+      const rt = (dist.valueBase > 0) ? _aurixCatReturnDisplay(type) : null;
       const rtEl = card.querySelector('.cat-card-return');
-      if (rtEl) {
-        const rt = (dist.valueBase > 0) ? _aurixCatReturnDisplay(type) : null;
-        if (rt) { rtEl.className = 'cat-card-return ' + rt.tone; rtEl.textContent = rt.text; rtEl.style.display = ''; }
-        else { rtEl.textContent = ''; rtEl.style.display = 'none'; }
-      }
+      if (rtEl) { if (rt) { rtEl.className = 'cat-card-return ' + rt.tone; rtEl.textContent = rt.text; rtEl.style.display = ''; } else { rtEl.textContent = ''; rtEl.style.display = 'none'; } }
+      const rtmEl = card.querySelector('.cat-card-return-m');
+      if (rtmEl) { if (rt) { rtmEl.className = 'cat-card-return-m ' + rt.tone; rtmEl.textContent = rt.text; rtmEl.style.display = ''; } else { rtmEl.textContent = ''; rtmEl.style.display = 'none'; } }
     });
     return;
   }
@@ -38113,6 +38113,12 @@ function updateCategoryCards() {
     const catReturnHtml = catReturn
       ? `<span class="cat-card-return ${catReturn.tone}" aria-hidden="true">${catReturn.text}</span>`
       : '';
+    // SPEC MOBILE-SUMMARY-CARDS — a MOBILE-ONLY twin of the return %, rendered in the content column directly
+    // under the amount (left-aligned). Same data/text/tone as the desktop foot %; CSS shows exactly one per
+    // breakpoint (this one on mobile, the foot one on desktop) so DESKTOP stays byte-identical to v529.
+    const catReturnMobileHtml = catReturn
+      ? `<span class="cat-card-return-m ${catReturn.tone}" aria-hidden="true">${catReturn.text}</span>`
+      : '';
 
     // AURIX-DESKTOP-ALLOCATION-HUB-1: proportional allocation bar. The smart
     // category cards are now the desktop allocation hub, so each card carries
@@ -38142,11 +38148,12 @@ function updateCategoryCards() {
           <span class="cat-card-name">${m.label}</span>
         </div>
         <span class="cat-card-value" data-target="${isEmpty ? '' : dist.valueBase}">${isEmpty ? '—' : formatBase(dist.valueBase)}</span>
+        ${catReturnMobileHtml}
         ${emptySub}
         ${rentLineHtml}
-        ${hint}
+        ${isEmpty ? hint : ''}
       </div>
-      ${isEmpty ? '' : `<div class="cat-card-foot">${visual}${catReturnHtml}</div>`}
+      ${isEmpty ? '' : `<div class="cat-card-foot">${hint}${visual}${catReturnHtml}</div>`}
       ${weight}
     </button>`;
   }).join('');

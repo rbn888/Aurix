@@ -106,8 +106,33 @@ ok('10 no reliable % ⇒ null (never fabricated)', /agg\.returnPct == null \|\| 
 
 // ── 11 render guards: % only for non-empty populated cards; under the market badge ─
 ok('11 catReturn computed only for non-empty cards', /const catReturn = isEmpty \? null : _aurixCatReturnDisplay\(type\);/.test(uc));
-ok('11 icons + return share the bottom foot row (non-empty only)', /<div class="cat-card-foot">\$\{visual\}\$\{catReturnHtml\}<\/div>/.test(uc) && /isEmpty \? '' : `<div class="cat-card-foot">/.test(uc));
-ok('11 silent refresh keeps the % in sync (same calc)', /card\.querySelector\('\.cat-card-return'\)[\s\S]{0,260}_aurixCatReturnDisplay\(type\)/.test(uc));
+ok('11 foot row (non-empty) holds hint + icons + desktop % ', /<div class="cat-card-foot">\$\{hint\}\$\{visual\}\$\{catReturnHtml\}<\/div>/.test(uc) && /isEmpty \? '' : `<div class="cat-card-foot">/.test(uc));
+ok('11 silent refresh keeps BOTH % twins in sync (same calc)', /_aurixCatReturnDisplay\(type\)/.test(uc) && /card\.querySelector\('\.cat-card-return'\)/.test(uc) && /card\.querySelector\('\.cat-card-return-m'\)/.test(uc));
+
+// ── MOBILE (SPEC MOBILE-SUMMARY-CARDS) — desktop stays v529, mobile gets the new hierarchy ───
+(function () {
+  const mob = (function () { let from = 0; for (;;) { const i = css.indexOf('@media (max-width: 768px)', from); if (i < 0) return ''; const b = braceSlice(css, i); if (b.indexOf('.cat-card-return-m') >= 0) return b; from = i + 1; } })();
+  // 3) return % under the amount, left-aligned, in the content column
+  ok('M return % twin rendered in content, right after the amount', /cat-card-value[\s\S]{0,140}\$\{catReturnMobileHtml\}/.test(uc));
+  ok('M base hides .cat-card-return-m (desktop never shows it)', /\.cat-card-return-m \{ display: none; \}/.test(css));
+  ok('M mobile shows return % block, left-aligned', /\.cat-card \.cat-card-return-m \{[\s\S]{0,160}display: block[\s\S]{0,160}text-align: left/.test(mob));
+  ok('M mobile return % colors === detail/desktop (--green/--red/--text-muted)', /\.cat-card-return-m\.up\s*\{\s*color:\s*var\(--green\)/.test(mob) && /\.cat-card-return-m\.down\s*\{\s*color:\s*var\(--red\)/.test(mob) && /\.cat-card-return-m\.flat\s*\{\s*color:\s*var\(--text-muted\)/.test(mob));
+  // 4)+5) View assets above the icons, bottom-right cluster; icons static inside the foot
+  ok('M mobile foot = bottom-right flex COLUMN (View assets above icons)', /\.cat-card \.cat-card-foot \{[\s\S]{0,220}flex-direction: column[\s\S]{0,220}position: absolute[\s\S]{0,120}bottom: 12px/.test(mob));
+  ok('M "View assets" (hint) shown inside the foot cluster', /\.cat-card \.cat-card-foot \.cat-card-hint \{[\s\S]{0,120}display: block/.test(mob));
+  ok('M icons static inside the cluster (bottom-right)', /\.cat-card \.cat-card-visual \{[\s\S]{0,120}position: static/.test(mob));
+  ok('M cluster is pointer-events:none (card stays fully clickable)', /\.cat-card \.cat-card-foot \{[\s\S]{0,260}pointer-events: none/.test(mob));
+  // hint moved to foot for non-empty; kept in content for empty (unchanged there)
+  ok('M hint in foot for non-empty; content hint only when empty', /\$\{isEmpty \? hint : ''\}/.test(uc));
+})();
+
+// ── DESKTOP unchanged (identical to v529): return-m hidden, hint hidden, foot still a flex ROW ──
+(function () {
+  const dsk = desktopBlock;
+  ok('D desktop foot is still a flex row (v529), not a column', /\.cat-card \.cat-card-foot \{[\s\S]{0,220}display: flex/.test(dsk) && !/\.cat-card \.cat-card-foot \{[\s\S]{0,220}flex-direction: column/.test(dsk));
+  ok('D desktop hides hint + mobile % twin', /\.cat-card \.cat-card-hint \{ display: none/.test(dsk) && !/\.cat-card \.cat-card-return-m \{[\s\S]{0,80}display: block/.test(dsk));
+  ok('D desktop return % still in-flow bottom-right (margin-left:auto, v529)', /\.cat-card \.cat-card-return \{[\s\S]{0,300}margin-left: auto/.test(dsk));
+})();
 
 // ── 12 scope: engines / detail / donut owner untouched by this SPEC ──────────
 ok('12 getInvestableDistribution (donut/value source) not modified by SPEC', fnSrc('getInvestableDistribution').indexOf('cat-card-return') < 0 && fnSrc('getInvestableDistribution').indexOf('_aurixCatReturnDisplay') < 0);

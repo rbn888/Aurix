@@ -3823,6 +3823,9 @@ body:not(.hero-active) #orb-canvas {
 /* SPEC DASHBOARD-SUMMARY-CARDS — the category return % is a DESKTOP-only refinement; hidden by default so
    the mobile summary card stays visually + functionally identical (shown only in the >=769px block below). */
 .cat-card-return { display: none; }
+/* SPEC MOBILE-SUMMARY-CARDS — mobile-only return % twin (in the content column, under the amount). Hidden by
+   default; shown ONLY inside the max-width:768px block below → desktop (>=769px) never renders it. */
+.cat-card-return-m { display: none; }
 /* The foot wrapper (icons + return) is layout-transparent by default so mobile renders its children EXACTLY
    as before (icons keep their absolute bottom-right position; the return stays display:none). Only the
    >=769px block turns the foot into the bottom flex row. */
@@ -3930,6 +3933,39 @@ body:not(.hero-active) #orb-canvas {
    surface the "Sin asignación todavía" status instead. */
 @media (max-width: 768px) {
   .cat-card:not(.cat-card--empty) .cat-card-pct { display: none; }
+}
+
+/* SPEC MOBILE-SUMMARY-CARDS-POSITION — mobile-only hierarchy (desktop >=769px is untouched, identical to
+   v529): 1) category + market state, 2) amount (left), 3) return % under the amount (left), 4) "View
+   assets →" above the icons, 5) icons bottom-right. Solved with flex inside the breakpoint; no arbitrary
+   offsets. Cards stay clickable (cluster is pointer-events:none). */
+@media (max-width: 768px) {
+  /* 3) return % — in the content column, directly under the amount, left-aligned, slightly more legible
+        than the value's secondary text but never competing with the value. Same colors as detail/desktop. */
+  .cat-card .cat-card-return-m {
+    display: block; text-align: left; margin-top: 3px;
+    font-size: 13px; font-weight: 700; letter-spacing: .01em; line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .cat-card .cat-card-return-m.up   { color: var(--green); }
+  .cat-card .cat-card-return-m.down { color: var(--red); }
+  .cat-card .cat-card-return-m.flat { color: var(--text-muted); }
+  /* 4)+5) bottom-right cluster: "View assets →" sits directly above the icon row, both anchored to the
+     bottom-right with a safe, uniform margin. The foot (icons + hidden desktop %) becomes an absolute
+     bottom-right flex COLUMN; consistent for zero / one / many icons. */
+  .cat-card .cat-card-foot {
+    display: flex; flex-direction: column; align-items: flex-end; gap: 5px;
+    position: absolute; right: 12px; bottom: 12px; margin: 0; padding: 0;
+    max-width: 62%; pointer-events: none;
+  }
+  .cat-card .cat-card-foot .cat-card-hint {
+    display: block; position: static; margin: 0; opacity: 0.5;
+    text-align: right; white-space: nowrap;
+  }
+  .cat-card .cat-card-visual {
+    position: static; bottom: auto; right: auto; margin: 0;
+    justify-content: flex-end; align-items: center;
+  }
 }
 /* Blur only on desktop — skip on mobile to avoid GPU lag */
 @media (min-width: 768px) {
