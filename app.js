@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '525'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '526'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -24735,6 +24735,15 @@ const _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT = true;
 // founder approval (they touch return semantics + must not weaken SPEC.TRUTHFUL_RANGES). Reversible:
 // _AURIX_CHART_CANONICAL_REFRESH_DETERMINISM=false ⇒ EXACT v502 behaviour (C5/C6/anchor logic skipped).
 const _AURIX_CHART_CANONICAL_REFRESH_DETERMINISM = true;
+// ── SPEC DSH.CHART.7D_SINGLE_CONTINUOUS_CONTRACT.45 ──
+// Production evidence: on ≥2 accounts the 7D chart drew two disconnected islands (continuous-left → big
+// empty gap → separate-right). Root cause classification E (FINAL_CONTRACT_SEGMENTATION): the FRC already
+// enforces a single visible path for 24H (SPEC.21 C5), but NOT for 7D — so the visual-trust-gate's honest
+// multi-segment output (≥2 substantial real clusters separated by a real gap) reached the renderer as two
+// visible runs. This flag turns on the SAME deterministic single-continuous-segment selection for 7D only:
+// pick exactly ONE authoritative continuous run (never bridge/fabricate/concatenate → syntheticPoints stays
+// 0), mark the range partial, keep the discarded runs in diagnostics. 24H/30D/1Y/ALL are byte-untouched.
+const _AURIX_CHART_7D_SINGLE_CONTINUOUS = true;
 // ── SPEC DSH.CHART.RELIABILITY_DEADLOCK_RESOLUTION.22 ──
 // Eliminates indefinite 7D+ "Calculando…" when the real canonical history is stable and SUFFICIENT for an
 // honest deterministic return decision, WITHOUT weakening truthful-ranges globally. ROOT CAUSE: the
@@ -24994,6 +25003,51 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
       }
     }
 
+    // 6.6 — SPEC.45 7D SINGLE-CONTINUOUS-CONTRACT. A user-facing 7D final contract must NEVER render
+    // disconnected islands (production evidence: continuous-left → big-gap → separate-right on ≥2 accounts).
+    // The visual-trust-gate faithfully preserves ≥2 substantial real clusters separated by a real gap
+    // (SPEC.13/17 — correct upstream); the fix is a range-specific single-path enforcement HERE, mirroring
+    // the proven 24H SPEC.21 C5 layer. Split on the SAME break set the renderer splits on; when >1 run,
+    // select EXACTLY ONE authoritative continuous run — recent path first (its endpoint reconciles with the
+    // current portfolio value the badge shows), else the dominant eligible path by recency → span → count →
+    // stable ts. NEVER bridge / fabricate / concatenate across the gap → syntheticPoints stays 0. Discarded
+    // runs live in diagnostics, not in the visible line. 30D/1Y/ALL keep honest multi-segment history.
+    if ((typeof _AURIX_CHART_7D_SINGLE_CONTINUOUS !== 'undefined' && _AURIX_CHART_7D_SINGLE_CONTINUOUS) && r === '7d' && work.length >= 2) {
+      const mapped = work.map(p => ({ time: p.ts, value: p.value }));
+      let breaks = [];
+      try { if (typeof _aurixStructuralBreaks === 'function') { const sb = _aurixStructuralBreaks(mapped, r); breaks = (sb && Array.isArray(sb.breaks)) ? sb.breaks : []; } } catch (_) {}
+      let runs = [mapped];
+      if (breaks.length) { try { if (typeof _aurixSplitAtGaps === 'function') runs = _aurixSplitAtGaps(mapped, breaks) || [mapped]; } catch (_) { runs = [mapped]; } }
+      runs = runs.filter(run => run && run.length);
+      diagnostics.visiblePath7dRuns = runs.length;
+      if (runs.length > 1) {
+        const minPts = (typeof _AURIX_VTG_MIN_MAIN_PTS === 'number') ? _AURIX_VTG_MIN_MAIN_PTS : 3;
+        const minSpan = (typeof _AURIX_VTG_MIN_MAIN_SPAN_MS === 'number') ? _AURIX_VTG_MIN_MAIN_SPAN_MS : (15 * 60000);
+        const eligible = run => run.length >= minPts && (run[run.length - 1].time - run[0].time) >= minSpan;
+        const summarise = run => ({ count: run.length, firstTs: run[0].time, lastTs: run[run.length - 1].time, spanHours: +((run[run.length - 1].time - run[0].time) / 36e5).toFixed(2), firstValue: run[0].value, lastValue: run[run.length - 1].value });
+        let chosen = null;
+        const recent = runs[runs.length - 1];
+        if (eligible(recent)) { chosen = recent; out.reasonCodes.push('single_continuous_7d_recent_path_selected'); }
+        else {
+          const cands = runs.filter(eligible).slice().sort((a, b) => {
+            const ar = a[a.length - 1].time, br = b[b.length - 1].time; if (br !== ar) return br - ar;   // recency desc
+            const asp = a[a.length - 1].time - a[0].time, bsp = b[b.length - 1].time - b[0].time; if (bsp !== asp) return bsp - asp;   // span desc
+            if (b.length !== a.length) return b.length - a.length;                                       // count desc
+            return b[0].time - a[0].time;                                                                // stable ts tie-break
+          });
+          chosen = cands.length ? cands[0] : null;
+          if (chosen) out.reasonCodes.push('single_continuous_7d_dominant_path_selected');
+        }
+        if (!chosen) return building(out, 'single_continuous_7d_no_eligible_path');
+        diagnostics.sevenDayUpstreamRuns = runs.length;
+        diagnostics.sevenDaySelectedRun = summarise(chosen);
+        diagnostics.sevenDayDiscardedRuns = runs.filter(run => run !== chosen).map(summarise);
+        work = chosen.map(p => ({ ts: p.time, value: p.value }));
+        partial = true;
+        out.reasonCodes.push('single_continuous_7d_single_path');
+      }
+    }
+
     // 8 — final render mode: full (whole trustworthy historic) vs partial_clean (short history OR something
     // hidden/dropped). A short-history range that keeps all its points is STILL partial (not a full historic).
     const trimmed = work.length !== finite.length;
@@ -25062,6 +25116,73 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
   }
 }
 try { if (typeof window !== 'undefined') window._aurixResolveFinalRenderSeriesContract = _aurixResolveFinalRenderSeriesContract; } catch (_) {}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.7D_SINGLE_CONTINUOUS_CONTRACT.45 — READ-ONLY forensic/debug audit
+// ════════════════════════════════════════════════════════════════════════════
+// window.aurixAudit7dContinuity() — proves the 7D final render contract exposes exactly ONE visible
+// continuous segment (or PENDING), names the gap owner + first break stage + classification, and reports
+// desktop/mobile parity. Pure/read-only: re-runs the SAME builders the visible chart reads; mutates nothing;
+// no network. Run it on each affected account in the founder browser to confirm the fix per-account.
+function _aurixAudit7dContinuity(rangeArg) {
+  const r = String(rangeArg || '7d').toLowerCase();
+  const safe = (fn, d) => { try { const v = fn(); return v === undefined ? (d === undefined ? null : d) : v; } catch (_) { return (d === undefined ? null : d); } };
+  const iso = t => { try { return Number.isFinite(t) ? new Date(t).toISOString() : null; } catch (_) { return null; } };
+  const hashOf = pts => safe(() => (typeof _aurixEmergencyHash === 'function') ? _aurixEmergencyHash(Array.isArray(pts) ? pts : []) : null, null);
+  const normHash = pts => hashOf((Array.isArray(pts) ? pts : []).map(p => ({ ts: (p.ts != null ? p.ts : p.time), value: p.value })));
+  const segCount = (pts) => {
+    const mapped = (Array.isArray(pts) ? pts : []).map(p => ({ time: (p.ts != null ? p.ts : p.time), value: p.value })).filter(p => Number.isFinite(p.time) && Number.isFinite(p.value));
+    if (mapped.length < 2) return { runs: mapped.length ? 1 : 0, segments: mapped.length ? [mapped] : [] };
+    let breaks = [];
+    try { if (typeof _aurixStructuralBreaks === 'function') { const sb = _aurixStructuralBreaks(mapped, r); breaks = (sb && Array.isArray(sb.breaks)) ? sb.breaks : []; } } catch (_) {}
+    let runs = [mapped];
+    if (breaks.length) { try { if (typeof _aurixSplitAtGaps === 'function') runs = _aurixSplitAtGaps(mapped, breaks) || [mapped]; } catch (_) {} }
+    runs = runs.filter(x => x && x.length);
+    return { runs: runs.length, segments: runs };
+  };
+  const largestGap = (pts) => {
+    const s = (Array.isArray(pts) ? pts : []).map(p => (p.ts != null ? p.ts : p.time)).filter(Number.isFinite).sort((a, b) => a - b);
+    let g = 0, gs = null, ge = null;
+    for (let i = 1; i < s.length; i++) { const d = s[i] - s[i - 1]; if (d > g) { g = d; gs = s[i - 1]; ge = s[i]; } }
+    return { largestGapMs: g, largestGapStart: gs, largestGapEnd: ge };
+  };
+  const emg = safe(() => (typeof buildProductionPortfolioChart === 'function') ? buildProductionPortfolioChart(r) : null, null) || { points: [] };
+  const inputPts = Array.isArray(emg.points) ? emg.points : [];
+  const desk = safe(() => (typeof _aurixResolveFinalRenderSeriesContract === 'function') ? _aurixResolveFinalRenderSeriesContract(emg, r, 'desktop') : null, null) || {};
+  const mob = safe(() => (typeof _aurixResolveFinalRenderSeriesContract === 'function') ? _aurixResolveFinalRenderSeriesContract(emg, r, 'mobile') : null, null) || {};
+  const dRender = Array.isArray(desk.renderPoints) ? desk.renderPoints : [];
+  const mRender = Array.isArray(mob.renderPoints) ? mob.renderPoints : [];
+  const upstream = segCount(inputPts), finalSeg = segCount(dRender);
+  const diag = desk.diagnostics || {};
+  const gapInput = largestGap(inputPts), gapFinal = largestGap(dRender);
+  const dHash = normHash(dRender), mHash = normHash(mRender);
+  const parity = (dRender.length === mRender.length) && (dHash === mHash);
+  const out = {
+    spec: 'DSH.CHART.7D_SINGLE_CONTINUOUS_CONTRACT.45', readOnly: true, range: r,
+    account: safe(() => (typeof currentUser !== 'undefined' && currentUser && currentUser.id) ? String(currentUser.id).slice(0, 8) + '…' : 'mounted', 'mounted'),
+    buildVersion: safe(() => window.AURIX_BUILD, null),
+    runtimeReady: safe(() => (typeof window.aurixRuntimeReadinessStatus === 'function') ? window.aurixRuntimeReadinessStatus().registrationComplete : null, null),
+    sourceOwner: '_aurixResolveFinalRenderSeriesContract (SPEC.45 step 6.6 — single-continuous 7D path)',
+    upstreamSegmentCount: upstream.runs,
+    finalVisibleSegmentCount: finalSeg.runs,
+    selectedContinuousSegment: diag.sevenDaySelectedRun || (finalSeg.segments[0] ? { count: finalSeg.segments[0].length, firstTs: finalSeg.segments[0][0].time, lastTs: finalSeg.segments[0][finalSeg.segments[0].length - 1].time } : null),
+    nonVisibleSegments: diag.sevenDayDiscardedRuns || [],
+    largestGapMs: gapInput.largestGapMs, largestGapStart: gapInput.largestGapStart, largestGapEnd: gapInput.largestGapEnd,
+    largestGapStartIso: iso(gapInput.largestGapStart), largestGapEndIso: iso(gapInput.largestGapEnd),
+    largestGapInVisibleLineMs: gapFinal.largestGapMs,
+    gapClassification: (upstream.runs <= 1) ? 'A_OR_CONTINUOUS_no_upstream_split' : (finalSeg.runs <= 1 ? 'E_FINAL_CONTRACT_SEGMENTATION_resolved_to_single' : 'E_FINAL_CONTRACT_SEGMENTATION_unresolved'),
+    firstContinuityBreakStage: (upstream.runs > 1) ? 'real multi-cluster history reaches FRC → step 6.6 selects one path' : 'none',
+    continuityDecision: Array.isArray(desk.reasonCodes) ? desk.reasonCodes.filter(c => /7d|single_continuous|partial|building/i.test(c)) : [],
+    partialHistory: (desk.mode === 'partial_clean') || (Array.isArray(desk.reasonCodes) && desk.reasonCodes.indexOf('single_continuous_7d_single_path') >= 0),
+    state: desk.state, readyPendingReason: (desk.state === 'ready') ? 'ready' : (desk.reason || 'calculating'),
+    finalRenderPointCount: dRender.length,
+    desktopHash: dHash, mobileHash: mHash, desktopMobileParity: parity,
+    invariantHeld: (desk.state !== 'ready') ? true : (finalSeg.runs === 1 && dRender.length >= 2 && parity),
+  };
+  try { console.log('%c[UI][7D_SINGLE_CONTINUOUS_CONTRACT]', 'font-weight:700;color:#12b886', out); } catch (_) {}
+  return out;
+}
+try { if (typeof window !== 'undefined') window.aurixAudit7dContinuity = _aurixAudit7dContinuity; } catch (_) {}
 
 // ════════════════════════════════════════════════════════════════════════════
 // SPEC DSH.CHART.RUNTIME_SOAK_CROSS_RANGE_PROVENANCE_LAUNCH_GATE.23 — pure launch-gate classifiers
