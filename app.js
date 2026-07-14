@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '539'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '540'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -23981,6 +23981,66 @@ function _aurixCanonicalReturnAnchorIndex(pts, canonOn) {
   return 0;                                               // all backend → fall back to the merged first point
 }
 try { if (typeof window !== 'undefined') window._aurixCanonicalReturnAnchorIndex = _aurixCanonicalReturnAnchorIndex; } catch (_) {}
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.24H_RETURN_READINESS.46 — trustworthy PARTIAL 24H return publication
+// ════════════════════════════════════════════════════════════════════════════
+// ROOT CAUSE (P0): a rolling-24H window whose real history covers < 80% of 24h is flagged
+// historyTooShortForRange in buildProductionPortfolioChart → returnState is suppressed to
+// insufficient_return_history for EVERY sub-full-window 24H. So a fresh account that has run for
+// 8-12 real hours (incl. markets open) shows a neutral line + no % + "Historial parcial" indefinitely.
+// The reliability-deadlock partial-promotion (SPEC.22/26/27) that rescues 7D/30D/1Y EXPLICITLY excludes
+// 24H (_aurixResolveReliabilityDeadlock: r==='24h' ⇒ NA; FRC step 9.5: r!=='24h'), and the VISIBLE badge
+// owner (_aurixResolveChartReturnContract, via _aurixEmergencyPaintBadgeNode) only shows a % when
+// emg.returnState==='ok'. Net: 24H had NO path to publish a trustworthy covered-period return.
+// FIX (24H-ONLY, isolated): publish the REAL covered-period return when it is trustworthy by REAL
+// temporal coverage + financial confidence — enough elapsed coverage, an ORIGINAL validated baseline, a
+// FRESH endpoint, a continuous-enough interval, flow-neutral trust (per.returnState==='ok'), inside the
+// supported return domain. It is kept honestly PARTIAL (displayedRangeState='partial_history',
+// partial24hPublished=true; NEVER labelled a full-24H return). Otherwise the prior state is byte-identical.
+// 7D/30D/1Y/ALL are gated out entirely. Pure, deterministic decision (no threshold relaxation of the
+// existing gates — an ADDITIVE 24H trust boundary): _aurix24hReturnReadiness(ev) → { publishable,
+// reasonCode, blockingPredicate, configuredThreshold, ...evidence }.
+const _AURIX_24H_PARTIAL_MIN_COVERAGE = 0.25;        // ≥ ~6h of real elapsed coverage within the rolling 24h window
+const _AURIX_24H_PARTIAL_MIN_POINTS = 8;             // dense-enough real history (same density floor the long ranges use)
+const _AURIX_24H_ENDPOINT_FRESH_MS = 90 * 60000;     // the final point must be within 90 min of wall-clock now (never a stale "current")
+const _AURIX_24H_MAX_INTERNAL_GAP_MS = 6 * 36e5;     // "continuous enough": no interior hole larger than 6h in the covered interval
+function _aurix24hReturnReadiness(ev) {
+  ev = ev || {};
+  const minCov = (typeof _AURIX_24H_PARTIAL_MIN_COVERAGE === 'number') ? _AURIX_24H_PARTIAL_MIN_COVERAGE : 0.25;
+  const minPts = (typeof _AURIX_24H_PARTIAL_MIN_POINTS === 'number') ? _AURIX_24H_PARTIAL_MIN_POINTS : 8;
+  const freshMs = (typeof _AURIX_24H_ENDPOINT_FRESH_MS === 'number') ? _AURIX_24H_ENDPOINT_FRESH_MS : 90 * 60000;
+  const maxGap = (typeof _AURIX_24H_MAX_INTERNAL_GAP_MS === 'number') ? _AURIX_24H_MAX_INTERNAL_GAP_MS : 6 * 36e5;
+  const supportedMin = (typeof _AURIX_PARTIAL_RETURN_MIN_PCT === 'number') ? _AURIX_PARTIAL_RETURN_MIN_PCT : -100;
+  const out = {
+    publishable: false, reasonCode: null, blockingPredicate: null, configuredThreshold: null,
+    coverageRatio: (ev.coverageRatio != null) ? ev.coverageRatio : null,
+    pointCount: Number.isFinite(ev.pointCount) ? ev.pointCount : 0,
+    endpointFreshnessMs: Number.isFinite(ev.endpointFreshnessMs) ? ev.endpointFreshnessMs : null,
+    largestGapMs: Number.isFinite(ev.largestGapMs) ? ev.largestGapMs : null,
+    baselineIsOriginal: !!ev.baselineIsOriginal,
+    currentValueAvailable: !!ev.currentValueAvailable,
+    financialConfidenceOk: !!ev.financialConfidenceOk,
+    returnPct: Number.isFinite(ev.returnPct) ? ev.returnPct : null,
+    withinSupportedReturnDomain: Number.isFinite(ev.returnPct) && ev.returnPct > supportedMin,
+    bootstrapOnly: !!ev.bootstrapOnly,
+  };
+  // Ordered gates — the FIRST failing gate is the exact blocking rule. Never relax, never fabricate, never
+  // clamp: a failure keeps the existing honest neutral/"Historial parcial" state. Financial confidence and
+  // supported-domain come first (a % that cannot be trusted is never a coverage question).
+  if (!out.financialConfidenceOk) { out.reasonCode = 'FINANCIAL_CONFIDENCE_UNTRUSTED'; out.blockingPredicate = 'per_return_state_not_ok'; return out; }
+  if (out.bootstrapOnly) { out.reasonCode = 'BOOTSTRAP_ONLY_HISTORY'; out.blockingPredicate = 'construction_or_bootstrap_history'; return out; }
+  if (!out.baselineIsOriginal) { out.reasonCode = 'BASELINE_NOT_ORIGINAL'; out.blockingPredicate = 'baseline_not_original_validated_point'; return out; }
+  if (!out.currentValueAvailable) { out.reasonCode = 'CURRENT_VALUE_UNAVAILABLE'; out.blockingPredicate = 'current_value_unavailable'; return out; }
+  if (!out.withinSupportedReturnDomain) { out.reasonCode = 'RETURN_OUTSIDE_SUPPORTED_DOMAIN'; out.blockingPredicate = 'promoted_return_outside_supported_domain'; out.configuredThreshold = supportedMin; return out; }
+  if (!(out.pointCount >= minPts)) { out.reasonCode = 'INSUFFICIENT_REAL_POINTS'; out.blockingPredicate = 'point_count_below_floor'; out.configuredThreshold = minPts; return out; }
+  if (!(out.coverageRatio != null && out.coverageRatio >= minCov)) { out.reasonCode = 'INSUFFICIENT_ELAPSED_COVERAGE'; out.blockingPredicate = 'coverage_ratio_below_floor'; out.configuredThreshold = minCov; return out; }
+  if (!(out.endpointFreshnessMs != null && out.endpointFreshnessMs <= freshMs)) { out.reasonCode = 'STALE_ENDPOINT'; out.blockingPredicate = 'endpoint_freshness_exceeded'; out.configuredThreshold = freshMs; return out; }
+  if (!(out.largestGapMs == null || out.largestGapMs <= maxGap)) { out.reasonCode = 'DISCONTINUOUS_INTERVAL'; out.blockingPredicate = 'internal_gap_exceeds_max'; out.configuredThreshold = maxGap; return out; }
+  out.publishable = true; out.reasonCode = 'TRUSTED_PARTIAL_24H_RETURN'; out.blockingPredicate = null;
+  return out;
+}
+try { if (typeof window !== 'undefined') window._aurix24hReturnReadiness = _aurix24hReturnReadiness; } catch (_) {}
+
 function buildProductionPortfolioChart(range) {
   const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
   const out = {
@@ -24106,17 +24166,51 @@ function buildProductionPortfolioChart(range) {
     out.coverageRatio = _finiteRange ? +(_actualSpanMs / _reqSpanMs).toFixed(4) : null;
     out.historyTooShortForRange = !!(_finiteRange && (out.rangeCollapsedBecauseHistoryTooShort === true || (out.coverageRatio != null && out.coverageRatio < 0.8)));
     if (out.historyTooShortForRange && per.returnState === 'ok') {
-      out.returnState = 'insufficient_return_history';                 // reuse the proven honest painter
-      out.returnSuppressedReason = 'insufficient_requested_range_history';
-      out.reason = 'range_collapsed_history_short';
-      // SPEC DSH.CHART.RELIABILITY_DEADLOCK_RESOLUTION.22 — the flow-neutral return over the AVAILABLE real
-      // interval was itself TRUSTWORTHY (per.returnState === 'ok': base floor + sane band ⇒ not a construction
-      // artifact); only the requested-window COVERAGE fell short. Expose it (additive, non-mutating of the
-      // suppressed returnState) so the SPEC.19 resolver can honestly resolve the reliability deadlock as a
-      // partial-interval return instead of an indefinite Calculando. Flag OFF ⇒ these fields are ignored (v503).
-      out.coverageSuppressed = true;
-      out.partialReturnPct = per.returnPct; out.partialReturnValue = per.returnValue; out.partialReturnColor = per.color;
-      out.partialReturnTrusted = true;
+      // SPEC DSH.CHART.24H_RETURN_READINESS.46 — 24H-ONLY trustworthy PARTIAL return publication. A rolling
+      // 24H window that covers < 80% of 24h is "partial", but the covered-period FLOW-NEUTRAL return can
+      // itself be trustworthy. Publish the REAL covered-period return (kept honestly partial) when the 24H
+      // readiness boundary passes on REAL evidence; otherwise the exact prior suppression. Gated on r==='24h'
+      // so 7D/30D/1Y/ALL are byte-identical (they keep the SPEC.22 deadlock-resolution path, untouched).
+      let _partial24hOk = false;
+      if (r === '24h' && typeof _aurix24hReturnReadiness === 'function') {
+        try {
+          let _gapMs = 0; for (let _i = 1; _i < pts.length; _i++) { const _d = pts[_i].ts - pts[_i - 1].ts; if (_d > _gapMs) _gapMs = _d; }
+          const _freshMs = Number.isFinite(last.ts) ? (Date.now() - last.ts) : null;
+          const _bootstrap = (out.rangeCollapsedBecauseHistoryTooShort === true) || /new_account|initial_build|construction|bootstrap/.test(String(out.returnSuppressedReason || out.reason || ''));
+          const _rd = _aurix24hReturnReadiness({
+            coverageRatio: out.coverageRatio, pointCount: out.finalPointCount,
+            endpointFreshnessMs: _freshMs, largestGapMs: _gapMs,
+            baselineIsOriginal: (Number.isFinite(first.ts) && first.value > 0),
+            currentValueAvailable: (Number.isFinite(last.value) && last.value > 0),
+            financialConfidenceOk: (per.returnState === 'ok'),
+            returnPct: per.returnPct, bootstrapOnly: _bootstrap,
+          });
+          out.partial24hReadiness = _rd;
+          _partial24hOk = !!(_rd && _rd.publishable);
+        } catch (_) { _partial24hOk = false; }
+      }
+      if (_partial24hOk) {
+        // Publish the covered-period 24H return. returnState stays 'ok' (per.returnState) → the % is set at
+        // the returnState==='ok' block below and the visible-badge owner (_aurixResolveChartReturnContract)
+        // shows it. historyTooShortForRange stays true ⇒ displayedRangeState='partial_history' below, so it is
+        // never presented/diagnosed as a full 24H return (SPEC.46 policy point 3). No points/geometry change.
+        out.partial24hPublished = true;
+        out.coverageSuppressed = false;
+        out.returnSuppressedReason = null;
+        out.reason = 'partial_24h_return_published';
+      } else {
+        out.returnState = 'insufficient_return_history';                 // reuse the proven honest painter
+        out.returnSuppressedReason = 'insufficient_requested_range_history';
+        out.reason = 'range_collapsed_history_short';
+        // SPEC DSH.CHART.RELIABILITY_DEADLOCK_RESOLUTION.22 — the flow-neutral return over the AVAILABLE real
+        // interval was itself TRUSTWORTHY (per.returnState === 'ok': base floor + sane band ⇒ not a construction
+        // artifact); only the requested-window COVERAGE fell short. Expose it (additive, non-mutating of the
+        // suppressed returnState) so the SPEC.19 resolver can honestly resolve the reliability deadlock as a
+        // partial-interval return instead of an indefinite Calculando. Flag OFF ⇒ these fields are ignored (v503).
+        out.coverageSuppressed = true;
+        out.partialReturnPct = per.returnPct; out.partialReturnValue = per.returnValue; out.partialReturnColor = per.color;
+        out.partialReturnTrusted = true;
+      }
     }
     // SPEC DATA-TRUTH.01 (Fase 2) — LINE honesty state (data/debug only; no visible copy invented).
     // A finite range whose real history does not cover it is "partial_history": the line is available
@@ -25224,6 +25318,90 @@ function _aurixAudit7dContinuity(rangeArg) {
   return out;
 }
 try { if (typeof window !== 'undefined') window.aurixAudit7dContinuity = _aurixAudit7dContinuity; } catch (_) {}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.24H_RETURN_READINESS.46 — READ-ONLY forensic audit
+// ════════════════════════════════════════════════════════════════════════════
+// window.aurixAudit24hReturnReadiness([emg],[nowRef]) — proves, on a real account, the EXACT owner blocking
+// (or the reason publishing) a trustworthy 24H return, walking the audited path: validated 24H series →
+// temporal coverage → continuity → baseline selection → endpoint freshness → performance/cashflow
+// confidence → return calculation → badge/readiness decision. Pure read: never mutates, never fabricates,
+// never touches points/geometry/renderer. Returns the serializable contract in the SPEC.46 shape.
+function _aurixAudit24hReturnReadinessCore(emgArg, nowRefArg) {
+  const r = '24h';
+  let emg = emgArg;
+  if (!emg) { try { emg = (typeof buildProductionPortfolioChart === 'function') ? buildProductionPortfolioChart(r) : null; } catch (_) { emg = null; } }
+  emg = emg || {};
+  const pts = Array.isArray(emg.points) ? emg.points.filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value)) : [];
+  const now = Number.isFinite(nowRefArg) ? nowRefArg : Date.now();
+  const reqSpan = (typeof _AURIX_EMG_RANGE_MS !== 'undefined' && Number.isFinite(_AURIX_EMG_RANGE_MS[r])) ? _AURIX_EMG_RANGE_MS[r] : 864e5;
+  const oldest = pts.length ? pts[0].ts : null;
+  const newest = pts.length ? pts[pts.length - 1].ts : null;
+  let largestGapMs = 0; for (let i = 1; i < pts.length; i++) { const d = pts[i].ts - pts[i - 1].ts; if (d > largestGapMs) largestGapMs = d; }
+  const coverageHours = (oldest != null && newest != null) ? +(((newest - oldest) / 36e5).toFixed(2)) : 0;
+  const coverageRatio = (emg.coverageRatio != null) ? emg.coverageRatio
+    : ((oldest != null && newest != null) ? +(((newest - oldest) / reqSpan).toFixed(4)) : null);
+  const endpointFreshnessMs = (newest != null) ? (now - newest) : null;
+  const endpointFreshnessMinutes = (endpointFreshnessMs != null) ? +((endpointFreshnessMs / 60000).toFixed(2)) : null;
+  const baselineTimestamp = Number.isFinite(emg.baselineTs) ? emg.baselineTs : oldest;
+  const baselineValue = Number.isFinite(emg.baselineValue) ? emg.baselineValue : (pts.length ? pts[0].value : null);
+  const currentTimestamp = Number.isFinite(emg.currentTs) ? emg.currentTs : newest;
+  const currentValue = Number.isFinite(emg.currentValue) ? emg.currentValue : (pts.length ? pts[pts.length - 1].value : null);
+  const financialConfidenceOk = (emg.returnState === 'ok') || (emg.partialReturnTrusted === true) || (emg.partial24hPublished === true);
+  const returnPctCandidate = Number.isFinite(emg.returnPct) ? emg.returnPct
+    : (Number.isFinite(emg.badgeReturnPct) ? emg.badgeReturnPct : (Number.isFinite(emg.partialReturnPct) ? emg.partialReturnPct : null));
+  const bootstrapOnly = (emg.rangeCollapsedBecauseHistoryTooShort === true)
+    || /new_account|initial_build|construction|bootstrap/.test(String(emg.returnSuppressedReason || emg.reason || ''));
+  const baselineIsOriginal = (Number.isFinite(baselineTimestamp) && baselineValue > 0);
+  const readiness = (typeof _aurix24hReturnReadiness === 'function') ? _aurix24hReturnReadiness({
+    coverageRatio: coverageRatio, pointCount: pts.length, endpointFreshnessMs: endpointFreshnessMs,
+    largestGapMs: largestGapMs, baselineIsOriginal: baselineIsOriginal,
+    currentValueAvailable: (Number.isFinite(currentValue) && currentValue > 0),
+    financialConfidenceOk: financialConfidenceOk, returnPct: returnPctCandidate, bootstrapOnly: bootstrapOnly,
+  }) : null;
+  const published = (emg.partial24hPublished === true) || (emg.returnState === 'ok' && Number.isFinite(emg.badgeReturnPct));
+  const returnComputable = published || !!(readiness && readiness.publishable);
+  const computedReturnPct = returnComputable ? returnPctCandidate : null;
+  let currentState;
+  if (published) currentState = (emg.historyTooShortForRange === true) ? 'TRUSTED_PARTIAL_RETURN' : 'TRUSTED_RETURN';
+  else if (emg.historyTooShortForRange === true || emg.displayedRangeState === 'partial_history') currentState = 'PARTIAL_HISTORY_NEUTRAL';
+  else if (!pts.length || emg.state !== 'ready') currentState = 'CALCULATING';
+  else currentState = 'NEUTRAL';
+  return {
+    spec: 'DSH.CHART.24H_RETURN_READINESS.46',
+    pointCount: pts.length,
+    oldestTimestamp: oldest,
+    newestTimestamp: newest,
+    coverageHours: coverageHours,
+    coverageRatio: coverageRatio,
+    largestGapMinutes: +((largestGapMs / 60000).toFixed(2)),
+    baselineTimestamp: baselineTimestamp,
+    baselineValue: baselineValue,
+    baselineAccepted: baselineIsOriginal,
+    baselineRejectionReason: baselineIsOriginal ? null : 'baseline_not_original_validated_point',
+    currentTimestamp: currentTimestamp,
+    currentValue: currentValue,
+    endpointFreshnessMinutes: endpointFreshnessMinutes,
+    returnComputable: returnComputable,
+    computedReturnPct: computedReturnPct,
+    performanceMode: emg.returnState || null,
+    cashflowConfidence: financialConfidenceOk ? 'ok' : 'untrusted',
+    currentState: currentState,
+    exactBlockingStage: returnComputable ? null : 'badge_readiness_decision',
+    exactOwnerFunction: returnComputable ? null
+      : (!financialConfidenceOk ? '_aurixComputePeriodReturn' : (published ? null : 'buildProductionPortfolioChart→_aurix24hReturnReadiness')),
+    exactBlockingRule: returnComputable ? null : (readiness ? readiness.blockingPredicate : 'unknown'),
+    configuredThreshold: readiness ? readiness.configuredThreshold : null,
+    exactReason: returnComputable
+      ? (published ? 'trusted_partial_24h_return_published' : 'trusted_partial_24h_return_ready')
+      : (readiness ? readiness.reasonCode : 'unknown'),
+    partial24hPublished: !!emg.partial24hPublished,
+    historyTooShortForRange: !!emg.historyTooShortForRange,
+    readiness: readiness,
+  };
+}
+try { if (typeof window !== 'undefined') window.aurixAudit24hReturnReadiness = function (emg, nowRef) { let res; try { res = _aurixAudit24hReturnReadinessCore(emg, nowRef); } catch (e) { res = { spec: 'DSH.CHART.24H_RETURN_READINESS.46', verdict: 'AUDIT_ERROR', error: (e && e.message) || String(e) }; } try { window.__AURIX_LAST_24H_RETURN_READINESS_AUDIT__ = res; } catch (_) {} return res; }; } catch (_) {}
+try { if (typeof window !== 'undefined') window._aurixAudit24hReturnReadinessCore = _aurixAudit24hReturnReadinessCore; } catch (_) {}
 
 // ════════════════════════════════════════════════════════════════════════════
 // SPEC DSH.CHART.RUNTIME_SOAK_CROSS_RANGE_PROVENANCE_LAUNCH_GATE.23 — pure launch-gate classifiers
