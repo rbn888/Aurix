@@ -212,7 +212,7 @@ ok('SPEC.48 marker present', /24H_BOOTSTRAP_EXIT\.48/.test(app));
 ok('recent-run anchor helper exists (exactly one)', (app.match(/function _aurix24hRecentRunAnchor\(/g) || []).length === 1);
 ok('bootstrap predicate no longer keys on rangeCollapsed (removed the coverage-as-bootstrap conflation)', !/_bootstrap = \(out\.rangeCollapsedBecauseHistoryTooShort === true\)/.test(app));
 const buildSrc = fnSrc('buildProductionPortfolioChart');
-ok('7 24H block never assigns out.points (line/points byte-identical)', (function () { const s = buildSrc.indexOf("if (r === '24h' && out.historyTooShortForRange)"); const blk = s >= 0 ? buildSrc.slice(s, s + 4200) : ''; return blk.length > 0 && !/out\.points\s*=/.test(blk) && !/renderPoints|linePath|areaPath/.test(blk); })());
+ok('7 24H block never assigns out.points (line/points byte-identical)', (function () { const s = buildSrc.indexOf("if (r === '24h' && (out.historyTooShortForRange || _has24hPrefix))"); const blk = s >= 0 ? buildSrc.slice(s, s + 4200) : ''; return blk.length > 0 && !/out\.points\s*=/.test(blk) && !/renderPoints|linePath|areaPath/.test(blk); })());
 ok('8 non-24H suppression preserved in untouched else-if branch', /\} else if \(out\.historyTooShortForRange && per\.returnState === 'ok'\) \{/.test(buildSrc));
 ok('8 SPEC.22 deadlock resolver still excludes 24H', /r === '24h' \|\| r === 'all'\) return out;/.test(app));
 ok('8 FRC deadlock step still excludes 24H', /deadlockResOn && out\.lineEligible && !out\.badgeEligible && r !== '24h' && r !== 'all'/.test(app));

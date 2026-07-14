@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '542'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '543'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -24214,7 +24214,19 @@ function buildProductionPortfolioChart(range) {
     const _actualSpanMs = last.ts - first.ts;
     out.coverageRatio = _finiteRange ? +(_actualSpanMs / _reqSpanMs).toFixed(4) : null;
     out.historyTooShortForRange = !!(_finiteRange && (out.rangeCollapsedBecauseHistoryTooShort === true || (out.coverageRatio != null && out.coverageRatio < 0.8)));
-    if (r === '24h' && out.historyTooShortForRange) {
+    // SPEC DSH.CHART.24H_RETURN_CONTRACT_FINAL_OWNER.50 — compute the 24H post-construction recent-run anchor
+    // for BOTH coverage regimes. ROOT CAUSE (v542): SPEC.48's recent-run post-construction baseline ran ONLY
+    // inside `historyTooShortForRange` (window coverage < 0.8). A 24H series with a construction/import prefix
+    // but ≥80% window coverage therefore NEVER had its post-construction candidate evaluated — the
+    // construction-contaminated FULL-range baseline drove _aurixComputePeriodReturn to insufficient_return_history.
+    // Baseline-REGIME selection is INDEPENDENT of window COVERAGE: run it whenever a real prefix exists
+    // (runStartIdx > 0) OR the window is short. Every financial predicate (freshness, elapsed coverage, gap,
+    // flow-neutral confidence, supported domain) still gates publication — this only lets the CORRECT candidate
+    // reach the contract. 7D/30D/1Y/ALL untouched (the `else if` branch below). 24H-only.
+    let _rr24 = null;
+    if (r === '24h' && typeof _aurix24hRecentRunAnchor === 'function') { try { _rr24 = _aurix24hRecentRunAnchor(pts); } catch (_) { _rr24 = null; } }
+    const _has24hPrefix = !!(_rr24 && _rr24.runStartIdx > 0);
+    if (r === '24h' && (out.historyTooShortForRange || _has24hPrefix)) {
       // SPEC DSH.CHART.24H_BOOTSTRAP_EXIT.48 — anchor the 24H RETURN on the most-recent continuous run (the
       // SAME run the FRC draws for the line) so the baseline is the first ORIGINAL validated point of the
       // POST-CONSTRUCTION investable regime. This excludes any construction/import prefix + pre-real-regime
@@ -24225,7 +24237,7 @@ function buildProductionPortfolioChart(range) {
       // the untouched `else if` branch below. The flow-neutral engine remains the financial-validity arbiter.
       let _pub = false, _per24 = per, _first24 = first, _rd = null;
       try {
-        const _anchor = (typeof _aurix24hRecentRunAnchor === 'function') ? _aurix24hRecentRunAnchor(pts) : null;
+        const _anchor = _rr24;
         if (_anchor && _anchor.runStartIdx > 0 && _anchor.runStartIdx < pts.length) {
           _first24 = pts[_anchor.runStartIdx];
           _per24 = _aurixComputePeriodReturn(r, { ts: _first24.ts, value: _first24.value }, { ts: last.ts, value: last.value });
@@ -24317,7 +24329,10 @@ function buildProductionPortfolioChart(range) {
     // history, NOT a mature requested-period chart. Consumers/audit read this; the badge stays neutral.
     out.displayedActualSpanMs = _actualSpanMs;
     out.displayedRequestedSpanMs = _finiteRange ? _reqSpanMs : null;
-    out.displayedRangeState = out.historyTooShortForRange ? 'partial_history' : (_finiteRange ? 'full' : 'all_history');
+    // SPEC.50 — a 24H return published from the post-construction recent run (prefix excluded) is a PARTIAL
+    // covered-period return even when window coverage ≥ 0.8 → keep it honestly 'partial_history' (never a
+    // complete 24H return), independent of the coverage gate.
+    out.displayedRangeState = (out.historyTooShortForRange || out.partial24hPublished) ? 'partial_history' : (_finiteRange ? 'full' : 'all_history');
     // SPEC DATA-TRUTH.01 (Fase 3) — ALL return TRUST. ALL is all-history; if the ledger flow TIMING in
     // its window is untrustworthy (a low-confidence retimed flow, a double-matched structural step) or the
     // baseline is a construction low, a numeric ALL return (e.g. -21%) is not trustworthy → honest state.
@@ -25633,6 +25648,106 @@ function _aurixAuditReadySeriesVisibilityCore(rangeArg, emgArg) {
 }
 try { if (typeof window !== 'undefined') window.aurixAuditReadySeriesVisibility = function (range) { let res; try { res = _aurixAuditReadySeriesVisibilityCore(range); } catch (e) { res = { spec: 'DSH.CHART.READY_SERIES_VISIBILITY.49', verdict: 'AUDIT_ERROR', error: (e && e.message) || String(e) }; } try { window.__AURIX_LAST_READY_SERIES_VISIBILITY_AUDIT__ = res; } catch (_) {} return res; }; } catch (_) {}
 try { if (typeof window !== 'undefined') window._aurixAuditReadySeriesVisibilityCore = _aurixAuditReadySeriesVisibilityCore; } catch (_) {}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.24H_RETURN_CONTRACT_FINAL_OWNER.50 — READ-ONLY return-publication forensic
+// ════════════════════════════════════════════════════════════════════════════
+// window.aurixAuditReturnContractDecision('24h'|'7d') — walks the return-publication path (selected segment →
+// accepted baseline → endpoint → elapsed coverage → gap continuity → construction/flow classification →
+// performance calc → publication decision) and reports each ORDERED predicate with pass/fail + owner, plus the
+// FIRST failed predicate. Proves whether a valid candidate return is being suppressed by a contradictory rule
+// (candidateReturnState 'ok' while currentReturnState 'insufficient_return_history') or is a legitimate honest
+// failure. Pure read: no mutation, no fabrication, no points/geometry change, JSON-serializable.
+function _aurixAuditReturnContractDecisionCore(rangeArg, emgArg) {
+  const r = String(rangeArg || '24h').toLowerCase();
+  let emg = emgArg;
+  if (!emg) { try { emg = (typeof buildProductionPortfolioChart === 'function') ? buildProductionPortfolioChart(r) : null; } catch (_) { emg = null; } }
+  emg = emg || {};
+  const pts = Array.isArray(emg.points) ? emg.points.filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value)) : [];
+  const now = Number.isFinite(emg.__auditNowRef) ? emg.__auditNowRef : ((typeof Date !== 'undefined' && Date.now) ? Date.now() : 0);
+  const last = pts.length ? pts[pts.length - 1] : null;
+  const DAYMS = 864e5, HOURMS = 36e5;
+  const anchor = (r === '24h' && emg.partial24hAnchor && typeof emg.partial24hAnchor === 'object') ? emg.partial24hAnchor : null;
+  // selected segment + accepted baseline (24H: post-construction recent run; else full canonical range).
+  let baselineTs, baselineValue, regime, selCount, coverageRatioSel, gapMs, perState, perPct;
+  if (anchor) {
+    baselineTs = anchor.acceptedBaselineTs; baselineValue = anchor.acceptedBaselineValue; regime = anchor.acceptedBaselineRegime;
+    selCount = anchor.postBootstrapPointCount; coverageRatioSel = anchor.recentRunCoverageRatio;
+    gapMs = Number.isFinite(anchor.recentRunLargestGapMs) ? anchor.recentRunLargestGapMs : null;
+    perState = anchor.recentRunReturnState; perPct = anchor.recentRunReturnPct;
+  } else {
+    baselineTs = Number.isFinite(emg.baselineTs) ? emg.baselineTs : (pts.length ? pts[0].ts : null);
+    baselineValue = Number.isFinite(emg.baselineValue) ? emg.baselineValue : (pts.length ? pts[0].value : null);
+    regime = 'investable'; selCount = pts.length;
+    coverageRatioSel = (emg.coverageRatio != null) ? emg.coverageRatio : null;
+    let g = 0; for (let i = 1; i < pts.length; i++) { const d = pts[i].ts - pts[i - 1].ts; if (d > g) g = d; } gapMs = pts.length > 1 ? g : null;
+    // Use the pre-suppression flow-neutral CANDIDATE (partialReturnTrusted/partialReturnPct) when the range
+    // suppressed a trustworthy return purely for COVERAGE (SPEC.22) — so the audit attributes the block to the
+    // real first-failed predicate (elapsed coverage) rather than mislabelling it as untrusted cashflow.
+    const _candOk = (emg.returnState === 'ok') || (emg.partialReturnTrusted === true);
+    perState = _candOk ? 'ok' : (emg.returnState || null);
+    perPct = Number.isFinite(emg.returnPct) ? emg.returnPct : (Number.isFinite(emg.badgeReturnPct) ? emg.badgeReturnPct : (Number.isFinite(emg.partialReturnPct) ? emg.partialReturnPct : null));
+  }
+  const selFirstTs = baselineTs, selLastTs = last ? last.ts : null;
+  const elapsedCoverageHours = (selFirstTs != null && selLastTs != null) ? +(((selLastTs - selFirstTs) / HOURMS).toFixed(2)) : null;
+  const freshMs = (last != null) ? (now - last.ts) : null;
+  const rawReturnPct = (baselineValue > 0 && last) ? +(((last.value - baselineValue) / baselineValue) * 100).toFixed(4) : null;
+  // per-range policy (each range keeps its OWN thresholds — 7D never inherits 24H)
+  const covFloor = (r === '24h') ? ((typeof _AURIX_24H_PARTIAL_MIN_COVERAGE === 'number') ? _AURIX_24H_PARTIAL_MIN_COVERAGE : 0.25) : 0.8;
+  const minSpanDaysFloor = (r === '24h') ? 0.25 : 2;   // 24H ≥6h; 7D ≥2 real days (SPEC.22 minSpanDays)
+  const freshFloorMs = (r === '24h') ? ((typeof _AURIX_24H_ENDPOINT_FRESH_MS === 'number') ? _AURIX_24H_ENDPOINT_FRESH_MS : 90 * 60000) : (6 * HOURMS);
+  const gapFloorMs = (typeof _AURIX_24H_MAX_INTERNAL_GAP_MS === 'number') ? _AURIX_24H_MAX_INTERNAL_GAP_MS : (6 * HOURMS);
+  const supportedMin = (typeof _AURIX_PARTIAL_RETURN_MIN_PCT === 'number') ? _AURIX_PARTIAL_RETURN_MIN_PCT : -100;
+  const minPts = (typeof _AURIX_24H_PARTIAL_MIN_POINTS === 'number') ? _AURIX_24H_PARTIAL_MIN_POINTS : 8;
+  const realSpanDays = (selFirstTs != null && selLastTs != null) ? (selLastTs - selFirstTs) / DAYMS : 0;
+  const P = [];
+  const add = (name, passed, actual, required, ownerFunction, reason) => P.push({ name: name, passed: !!passed, actual: actual, required: required, ownerFunction: ownerFunction, reason: reason });
+  add('two_original_points', selCount >= 2, selCount, '>=2', 'buildValidatedHistoricalSeries', selCount >= 2 ? 'ok' : 'fewer_than_two_validated_points');
+  add('baseline_same_regime_as_endpoint', regime !== 'construction', regime, '!=construction', '_aurix24hRecentRunAnchor', regime !== 'construction' ? 'ok' : 'baseline_in_construction_regime');
+  add('construction_import_excluded', regime !== 'construction', (anchor ? ('runStartIdx=' + anchor.runStartIdx) : 'single_run'), 'prefix_excluded', '_aurix24hRecentRunAnchor', 'post_construction_baseline_selected');
+  add('cashflow_trusted', perState === 'ok', perState, "returnState==='ok'", '_aurixComputePeriodReturn', perState === 'ok' ? 'ok' : 'flow_neutral_return_not_trusted');
+  add('endpoint_fresh', freshMs != null && freshMs <= freshFloorMs, (freshMs != null ? +((freshMs / 60000).toFixed(2)) : null) + 'min', '<=' + (freshFloorMs / 60000) + 'min', '_aurix24hReturnReadiness', (freshMs != null && freshMs <= freshFloorMs) ? 'ok' : 'stale_endpoint');
+  add('elapsed_coverage_ok', (r === '24h') ? (coverageRatioSel != null && coverageRatioSel >= covFloor) : (realSpanDays >= minSpanDaysFloor), (r === '24h' ? ('coverageRatio=' + coverageRatioSel) : ('realSpanDays=' + (+realSpanDays.toFixed(2)))), (r === '24h' ? ('>=' + covFloor) : ('>=' + minSpanDaysFloor + 'd')), '_aurix24hReturnReadiness', 'range_own_elapsed_policy');
+  add('internal_gap_ok', gapMs == null || gapMs <= gapFloorMs, (gapMs != null ? +((gapMs / 60000).toFixed(2)) : null) + 'min', '<=' + (gapFloorMs / 60000) + 'min', '_aurix24hReturnReadiness', (gapMs == null || gapMs <= gapFloorMs) ? 'ok' : 'internal_gap_exceeds_floor');
+  add('sufficient_points', selCount >= minPts, selCount, '>=' + minPts, '_aurix24hReturnReadiness', selCount >= minPts ? 'ok' : 'insufficient_real_points');
+  add('finite_return_gt_minus100', Number.isFinite(perPct) && perPct > supportedMin, perPct, '>' + supportedMin, '_aurix24hReturnReadiness', (Number.isFinite(perPct) && perPct > supportedMin) ? 'ok' : 'return_outside_supported_domain');
+  const failed = P.find(p => !p.passed) || null;
+  const publishableNow = !failed;
+  const candidateReturnState = (perState === 'ok' && publishableNow) ? 'ok' : (perState === 'ok' ? 'ok_but_predicate_pending' : 'insufficient_return_history');
+  return {
+    spec: 'DSH.CHART.24H_RETURN_CONTRACT_FINAL_OWNER.50',
+    range: r,
+    selectedPointCount: selCount,
+    selectedFirstTimestamp: selFirstTs,
+    selectedLastTimestamp: selLastTs,
+    elapsedCoverageHours: elapsedCoverageHours,
+    largestInternalGapMinutes: (gapMs != null) ? +((gapMs / 60000).toFixed(2)) : null,
+    baselineTimestamp: baselineTs,
+    baselineValue: baselineValue,
+    baselineOriginalPoint: !!(Number.isFinite(baselineTs) && baselineValue > 0),
+    baselineRegime: regime,
+    currentTimestamp: last ? last.ts : null,
+    currentValue: last ? last.value : (Number.isFinite(emg.currentValue) ? emg.currentValue : null),
+    endpointFreshnessMinutes: (freshMs != null) ? +((freshMs / 60000).toFixed(2)) : null,
+    rawReturnPct: rawReturnPct,
+    flowAdjustedReturnPct: Number.isFinite(perPct) ? perPct : null,
+    returnCandidateState: candidateReturnState,
+    predicates: P,
+    firstFailedPredicate: failed ? failed.name : null,
+    firstFailedOwner: failed ? failed.ownerFunction : null,
+    currentReturnState: emg.returnState || null,
+    candidateReturnState: candidateReturnState,
+    publishableNow: publishableNow,
+    // the contradiction signal: a valid candidate suppressed by a downstream rule (should be false after SPEC.50)
+    validCandidateSuppressed: !!(publishableNow && emg.returnState !== 'ok' && !emg.partial24hPublished),
+    partial24hPublished: !!emg.partial24hPublished,
+    displayedRangeState: emg.displayedRangeState || null,
+    exactReason: failed ? (failed.name + ':' + failed.reason)
+      : (emg.returnState === 'ok' ? 'return_published' : 'all_predicates_pass_candidate_ready'),
+  };
+}
+try { if (typeof window !== 'undefined') window.aurixAuditReturnContractDecision = function (range) { let res; try { res = _aurixAuditReturnContractDecisionCore(range); } catch (e) { res = { spec: 'DSH.CHART.24H_RETURN_CONTRACT_FINAL_OWNER.50', verdict: 'AUDIT_ERROR', error: (e && e.message) || String(e) }; } try { window.__AURIX_LAST_RETURN_CONTRACT_DECISION_AUDIT__ = res; } catch (_) {} return res; }; } catch (_) {}
+try { if (typeof window !== 'undefined') window._aurixAuditReturnContractDecisionCore = _aurixAuditReturnContractDecisionCore; } catch (_) {}
 
 // ════════════════════════════════════════════════════════════════════════════
 // SPEC DSH.CHART.RUNTIME_SOAK_CROSS_RANGE_PROVENANCE_LAUNCH_GATE.23 — pure launch-gate classifiers
