@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '541'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '542'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -25191,8 +25191,21 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     let sda = null;
     try { if (typeof _aurixStableDisplayAnchor === 'function') sda = _aurixStableDisplayAnchor(work, r, { badgeCalculando: badgeCalculando }); } catch (_) {}
     if (sda) diagnostics.stableDisplayAnchor = { mode: sda.mode, reason: sda.reason, hiddenPrefixPts: sda.hiddenPrefixPts };
-    if (sda && sda.mode === 'building') return building(out, 'bootstrap_suppression:' + sda.reason);
-    if (sda && Array.isArray(sda.points) && sda.points.length >= 2) { if (sda.hiddenPrefixPts > 0) { partial = true; out.reasonCodes.push('bootstrap_prefix_hidden'); } work = sda.points.slice(); }
+    if (sda && sda.mode === 'building') {
+      // SPEC DSH.CHART.READY_SERIES_VISIBILITY.49 — bootstrap suppression is a RETURN / VALUE-TRUST decision
+      // (it hides a low construction ramp while the badge is Calculando), NOT a point-sufficiency one. It must
+      // NEVER hide an otherwise-drawable validated series: LINE VISIBILITY ⊥ RETURN READINESS. When ≥2
+      // continuous validated points still exist ('no_stable_tramo' — a trust verdict, not 'insufficient_points'),
+      // KEEP them as a partial line; the independent return contract keeps the badge Calculando/neutral (the %
+      // is never fabricated). Only genuine insufficiency (<2 points) collapses to the honest construction state.
+      // Gated to 24H + 7D (the proven ranges); 30D/1Y/ALL keep the exact prior bootstrap behaviour (unchanged).
+      const _visRange = (r === '24h' || r === '7d');
+      const _drawable = _visRange && Array.isArray(work) && work.length >= 2 && sda.reason !== 'insufficient_points';
+      if (!_drawable) return building(out, 'bootstrap_suppression:' + sda.reason);
+      partial = true; out.reasonCodes.push('bootstrap_no_stable_tramo_line_preserved');
+      diagnostics.bootstrapLinePreserved = true; diagnostics.bootstrapSuppressedReason = sda.reason;
+      // keep `work` unchanged (the drawable validated series) — do NOT hide it.
+    } else if (sda && Array.isArray(sda.points) && sda.points.length >= 2) { if (sda.hiddenPrefixPts > 0) { partial = true; out.reasonCodes.push('bootstrap_prefix_hidden'); } work = sda.points.slice(); }
 
     // 6 — visual trust gate (SPEC.17, ALL ranges). Keep only the recent MAIN segment (small initial islands
     // dropped, never bridged) or building when the main is not visually trustworthy.
@@ -25549,6 +25562,77 @@ function _aurixAudit24hReturnReadinessCore(emgArg, nowRefArg) {
 }
 try { if (typeof window !== 'undefined') window.aurixAudit24hReturnReadiness = function (emg, nowRef) { let res; try { res = _aurixAudit24hReturnReadinessCore(emg, nowRef); } catch (e) { res = { spec: 'DSH.CHART.24H_RETURN_READINESS.46', verdict: 'AUDIT_ERROR', error: (e && e.message) || String(e) }; } try { window.__AURIX_LAST_24H_RETURN_READINESS_AUDIT__ = res; } catch (_) {} return res; }; } catch (_) {}
 try { if (typeof window !== 'undefined') window._aurixAudit24hReturnReadinessCore = _aurixAudit24hReturnReadinessCore; } catch (_) {}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.READY_SERIES_VISIBILITY.49 — READ-ONLY forensic audit
+// ════════════════════════════════════════════════════════════════════════════
+// window.aurixAuditReadySeriesVisibility('24h'|'7d') — proves whether a drawable validated series reaches the
+// renderer or is converted to the construction state, tracing the exact hand-off: buildProductionPortfolioChart
+// → Final Render Contract (short-history → bootstrap → visual-trust → single-path) → return contract →
+// desktop painter. Identifies the FIRST function that overwrites a drawable series into mode:'building'. Pure
+// read: no mutation, no fabrication, no points/geometry/renderer change, no permanent logs. JSON-serializable.
+function _aurixAuditReadySeriesVisibilityCore(rangeArg, emgArg) {
+  const r = String(rangeArg || '24h').toLowerCase();
+  let emg = emgArg;
+  if (!emg) { try { emg = (typeof buildProductionPortfolioChart === 'function') ? buildProductionPortfolioChart(r) : null; } catch (_) { emg = null; } }
+  emg = emg || {};
+  const inPts = Array.isArray(emg.points) ? emg.points.filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value)) : [];
+  let frc = {};
+  try { if (typeof _aurixResolveFinalRenderSeriesContract === 'function') frc = _aurixResolveFinalRenderSeriesContract(emg, r, 'desktop') || {}; } catch (_) { frc = {}; }
+  const diag = frc.diagnostics || {};
+  // return contract (independent of the line) — same input the badge node consumes.
+  let vs = null, contract = {};
+  try { if (typeof _aurixBuildContinuityValidatedSeries === 'function') vs = _aurixBuildContinuityValidatedSeries(inPts.map(p => ({ time: p.ts, value: p.value })), r); } catch (_) {}
+  try { if (typeof _aurixResolveChartReturnContract === 'function') contract = _aurixResolveChartReturnContract(vs, r, { chart: emg }) || {}; } catch (_) { contract = {}; }
+  const renderPts = Array.isArray(frc.renderPoints) ? frc.renderPoints : [];
+  const lineRendered = (frc.mode === 'full' || frc.mode === 'partial_clean') && renderPts.length >= 2;
+  // FIRST state-overwrite owner — derived from the REAL FRC verdict (post-fix reality).
+  let stage = 'none', owner = null, cond = null;
+  if (!lineRendered) {
+    const reason = String(frc.reason || '');
+    if (/^short_history:/.test(reason)) { stage = 'short_history_display'; owner = '_aurixShortHistoryDisplay'; cond = (diag.shortHistoryDisplay && diag.shortHistoryDisplay.reason) || reason; }
+    else if (/^bootstrap_suppression:/.test(reason)) { stage = 'bootstrap_suppression'; owner = '_aurixStableDisplayAnchor'; cond = (diag.stableDisplayAnchor && diag.stableDisplayAnchor.reason) || reason; }
+    else if (/^visual_trust_gate:/.test(reason)) { stage = 'visual_trust_gate'; owner = '_aurixVisualTrustGate'; cond = (diag.visualTrustGate && diag.visualTrustGate.reason) || reason; }
+    else if (/canonical_24h_no_eligible_path/.test(reason)) { stage = 'single_path_24h'; owner = '_aurixResolveFinalRenderSeriesContract'; cond = 'no_eligible_24h_path'; }
+    else if (/single_continuous_7d_no_eligible_path/.test(reason)) { stage = 'single_path_7d'; owner = '_aurixResolveFinalRenderSeriesContract'; cond = 'no_eligible_7d_path'; }
+    else if (/insufficient_points|not_ready|no_points/.test(reason) || emg.state !== 'ready' || inPts.length < 2) { stage = 'validate'; owner = 'buildProductionPortfolioChart'; cond = (inPts.length < 2 ? 'fewer_than_two_points' : 'not_ready'); }
+    else { stage = 'final_render_contract'; owner = '_aurixResolveFinalRenderSeriesContract'; cond = reason || 'building'; }
+  }
+  return {
+    spec: 'DSH.CHART.READY_SERIES_VISIBILITY.49',
+    range: r,
+    productionPointCount: Number.isFinite(emg.finalPointCount) ? emg.finalPointCount : inPts.length,
+    productionReturnState: emg.returnState || null,
+    productionReturnPct: Number.isFinite(emg.returnPct) ? emg.returnPct : (Number.isFinite(emg.badgeReturnPct) ? emg.badgeReturnPct : null),
+    baselineValid: !!(Number.isFinite(emg.baselineTs) && emg.baselineValue > 0),
+    bootstrapExitEligible: (emg.partial24hAnchor && emg.partial24hAnchor.bootstrapExitEligible != null) ? !!emg.partial24hAnchor.bootstrapExitEligible : null,
+    partialReturnPublished: !!emg.partial24hPublished,
+    frcInputPointCount: inPts.length,
+    frcInputState: emg.state || null,
+    frcOutputPointCount: renderPts.length,
+    frcOutputMode: frc.mode || null,
+    frcOutputState: frc.state || null,
+    frcReason: frc.reason || null,
+    returnContractInputState: emg.returnState || null,
+    returnContractOutputState: contract.state || null,
+    returnContractReason: contract.reason || null,
+    painterReceivedPointCount: lineRendered ? renderPts.length : 0,
+    painterDecision: lineRendered ? 'render_line' : 'construction',
+    firstStateOverwriteStage: stage,
+    exactOwnerFunction: owner,
+    exactCondition: cond,
+    exactReason: lineRendered ? 'line_rendered_return_independent' : (frc.reason || 'building'),
+    // forensic sub-gate verdicts (proves the line survived a value-trust verdict)
+    bootstrapVerdict: diag.stableDisplayAnchor ? diag.stableDisplayAnchor.reason : null,
+    bootstrapLinePreserved: !!diag.bootstrapLinePreserved,
+    shortHistoryVerdict: diag.shortHistoryDisplay ? diag.shortHistoryDisplay.mode + ':' + diag.shortHistoryDisplay.reason : null,
+    visualTrustVerdict: diag.visualTrustGate ? diag.visualTrustGate.mode + ':' + diag.visualTrustGate.reason : null,
+    historyPresentationState: frc.historyPresentationState || null,
+    badgeEligible: !!frc.badgeEligible,
+  };
+}
+try { if (typeof window !== 'undefined') window.aurixAuditReadySeriesVisibility = function (range) { let res; try { res = _aurixAuditReadySeriesVisibilityCore(range); } catch (e) { res = { spec: 'DSH.CHART.READY_SERIES_VISIBILITY.49', verdict: 'AUDIT_ERROR', error: (e && e.message) || String(e) }; } try { window.__AURIX_LAST_READY_SERIES_VISIBILITY_AUDIT__ = res; } catch (_) {} return res; }; } catch (_) {}
+try { if (typeof window !== 'undefined') window._aurixAuditReadySeriesVisibilityCore = _aurixAuditReadySeriesVisibilityCore; } catch (_) {}
 
 // ════════════════════════════════════════════════════════════════════════════
 // SPEC DSH.CHART.RUNTIME_SOAK_CROSS_RANGE_PROVENANCE_LAUNCH_GATE.23 — pure launch-gate classifiers
