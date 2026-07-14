@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '540'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '541'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -24041,6 +24041,55 @@ function _aurix24hReturnReadiness(ev) {
 }
 try { if (typeof window !== 'undefined') window._aurix24hReturnReadiness = _aurix24hReturnReadiness; } catch (_) {}
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.24H_BOOTSTRAP_EXIT.48 — post-construction RETURN baseline for 24H
+// ════════════════════════════════════════════════════════════════════════════
+// ROOT CAUSE (P0, follow-up to SPEC.46): the SPEC.46 bootstrap predicate keyed on
+// `rangeCollapsedBecauseHistoryTooShort` — but for 24H that flag is TRUE for ANY window covering < 24h,
+// i.e. it is a COVERAGE fact, not a construction fact. It therefore permanently classified every partial
+// 24H as BOOTSTRAP_ONLY_HISTORY, so a mature post-construction series (production: 119 pts, 19.07h, fresh,
+// flow-trusted) could never exit bootstrap. The visible line already excludes any construction/import
+// prefix and pre-real-regime outage: the FRC draws only the MOST-RECENT continuous run (SPEC.21 C5). But
+// the RETURN still anchored on the FULL-range first point (a construction/import value, e.g. 2427.97 →
+// current 6035.73), a large jump that must NOT be published as performance.
+// FIX: anchor the 24H RETURN on the SAME most-recent continuous run the line uses — the first ORIGINAL
+// validated point of the post-construction investable regime — by splitting on the SAME structural break
+// set (bridge ∪ capital-step ∪ real-gap). This EXCLUDES the pre-gap construction/import prefix and any
+// pre-last-capital-step history from the RETURN (so a recorded deposit shows only the post-deposit MARKET
+// return), and guarantees the published interval's internal gaps are ≤ the 6h floor. It NEVER creates,
+// deletes or moves a point (out.points / the visible line are byte-identical). A single continuous run ⇒
+// runStartIdx 0 ⇒ mature/clean 24H unchanged. The flow-neutral engine (_aurixComputePeriodReturn) remains
+// the financial-validity arbiter over the selected interval. Pure, deterministic.
+function _aurix24hRecentRunAnchor(pts) {
+  const out = { runStartIdx: 0, runStartTs: null, runCount: 1,
+    postBootstrapPointCount: (Array.isArray(pts) ? pts.length : 0), bootstrapSnapshotCount: 0,
+    constructionEndTimestamp: null, largestGapMsInRun: 0 };
+  try {
+    const src = Array.isArray(pts) ? pts.filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value)) : [];
+    if (src.length < 2) { out.runStartTs = src.length ? src[0].ts : null; return out; }
+    const mapped = src.map(p => ({ time: p.ts, value: p.value }));
+    let breaks = [];
+    try { if (typeof _aurixStructuralBreaks === 'function') { const sb = _aurixStructuralBreaks(mapped, '24h'); breaks = (sb && Array.isArray(sb.breaks)) ? sb.breaks : []; } } catch (_) {}
+    let runs = [mapped];
+    if (breaks.length) { try { if (typeof _aurixSplitAtGaps === 'function') runs = _aurixSplitAtGaps(mapped, breaks) || [mapped]; } catch (_) { runs = [mapped]; } }
+    runs = runs.filter(x => x && x.length);
+    out.runCount = runs.length;
+    const recent = runs[runs.length - 1];
+    const startTs = recent[0].time;
+    let idx = src.findIndex(p => p.ts === startTs);
+    if (idx < 0) idx = 0;
+    out.runStartIdx = idx;
+    out.runStartTs = src[idx].ts;
+    out.postBootstrapPointCount = src.length - idx;
+    out.bootstrapSnapshotCount = idx;                                   // points EXCLUDED as pre-construction/import/gap prefix
+    out.constructionEndTimestamp = idx > 0 ? src[idx].ts : null;        // regime boundary (null ⇒ single run, pipeline already trimmed)
+    let g = 0; for (let i = idx + 1; i < src.length; i++) { const d = src[i].ts - src[i - 1].ts; if (d > g) g = d; }
+    out.largestGapMsInRun = g;
+    return out;
+  } catch (_) { return out; }
+}
+try { if (typeof window !== 'undefined') window._aurix24hRecentRunAnchor = _aurix24hRecentRunAnchor; } catch (_) {}
+
 function buildProductionPortfolioChart(range) {
   const r = String(range || (typeof activeRange !== 'undefined' ? activeRange : '24h')).toLowerCase();
   const out = {
@@ -24165,52 +24214,103 @@ function buildProductionPortfolioChart(range) {
     const _actualSpanMs = last.ts - first.ts;
     out.coverageRatio = _finiteRange ? +(_actualSpanMs / _reqSpanMs).toFixed(4) : null;
     out.historyTooShortForRange = !!(_finiteRange && (out.rangeCollapsedBecauseHistoryTooShort === true || (out.coverageRatio != null && out.coverageRatio < 0.8)));
-    if (out.historyTooShortForRange && per.returnState === 'ok') {
-      // SPEC DSH.CHART.24H_RETURN_READINESS.46 — 24H-ONLY trustworthy PARTIAL return publication. A rolling
-      // 24H window that covers < 80% of 24h is "partial", but the covered-period FLOW-NEUTRAL return can
-      // itself be trustworthy. Publish the REAL covered-period return (kept honestly partial) when the 24H
-      // readiness boundary passes on REAL evidence; otherwise the exact prior suppression. Gated on r==='24h'
-      // so 7D/30D/1Y/ALL are byte-identical (they keep the SPEC.22 deadlock-resolution path, untouched).
-      let _partial24hOk = false;
-      if (r === '24h' && typeof _aurix24hReturnReadiness === 'function') {
-        try {
-          let _gapMs = 0; for (let _i = 1; _i < pts.length; _i++) { const _d = pts[_i].ts - pts[_i - 1].ts; if (_d > _gapMs) _gapMs = _d; }
-          const _freshMs = Number.isFinite(last.ts) ? (Date.now() - last.ts) : null;
-          const _bootstrap = (out.rangeCollapsedBecauseHistoryTooShort === true) || /new_account|initial_build|construction|bootstrap/.test(String(out.returnSuppressedReason || out.reason || ''));
-          const _rd = _aurix24hReturnReadiness({
-            coverageRatio: out.coverageRatio, pointCount: out.finalPointCount,
-            endpointFreshnessMs: _freshMs, largestGapMs: _gapMs,
-            baselineIsOriginal: (Number.isFinite(first.ts) && first.value > 0),
-            currentValueAvailable: (Number.isFinite(last.value) && last.value > 0),
-            financialConfidenceOk: (per.returnState === 'ok'),
-            returnPct: per.returnPct, bootstrapOnly: _bootstrap,
-          });
-          out.partial24hReadiness = _rd;
-          _partial24hOk = !!(_rd && _rd.publishable);
-        } catch (_) { _partial24hOk = false; }
-      }
-      if (_partial24hOk) {
-        // Publish the covered-period 24H return. returnState stays 'ok' (per.returnState) → the % is set at
-        // the returnState==='ok' block below and the visible-badge owner (_aurixResolveChartReturnContract)
-        // shows it. historyTooShortForRange stays true ⇒ displayedRangeState='partial_history' below, so it is
-        // never presented/diagnosed as a full 24H return (SPEC.46 policy point 3). No points/geometry change.
+    if (r === '24h' && out.historyTooShortForRange) {
+      // SPEC DSH.CHART.24H_BOOTSTRAP_EXIT.48 — anchor the 24H RETURN on the most-recent continuous run (the
+      // SAME run the FRC draws for the line) so the baseline is the first ORIGINAL validated point of the
+      // POST-CONSTRUCTION investable regime. This excludes any construction/import prefix + pre-real-regime
+      // outage + pre-last-capital-step history from the RETURN (a recorded deposit ⇒ only post-deposit MARKET
+      // return), and guarantees the published interval's internal gaps are ≤ the 6h floor. The visible line /
+      // out.points are UNCHANGED. Publish only when the recent-run covered-period return is trustworthy by
+      // real coverage + financial confidence; else the exact prior neutral suppression. 7D/30D/1Y/ALL are in
+      // the untouched `else if` branch below. The flow-neutral engine remains the financial-validity arbiter.
+      let _pub = false, _per24 = per, _first24 = first, _rd = null;
+      try {
+        const _anchor = (typeof _aurix24hRecentRunAnchor === 'function') ? _aurix24hRecentRunAnchor(pts) : null;
+        if (_anchor && _anchor.runStartIdx > 0 && _anchor.runStartIdx < pts.length) {
+          _first24 = pts[_anchor.runStartIdx];
+          _per24 = _aurixComputePeriodReturn(r, { ts: _first24.ts, value: _first24.value }, { ts: last.ts, value: last.value });
+        }
+        const _postCount = _anchor ? _anchor.postBootstrapPointCount : pts.length;
+        const _covRun = (_reqSpanMs > 0) ? +(((last.ts - _first24.ts) / _reqSpanMs).toFixed(4)) : null;
+        let _gapRun = (_anchor && _anchor.runStartIdx > 0) ? _anchor.largestGapMsInRun : 0;
+        if (!_anchor || _anchor.runStartIdx === 0) { for (let _i = 1; _i < pts.length; _i++) { const _d = pts[_i].ts - pts[_i - 1].ts; if (_d > _gapRun) _gapRun = _d; } }
+        const _freshMs = Number.isFinite(last.ts) ? (Date.now() - last.ts) : null;
+        const _minPts24 = (typeof _AURIX_24H_PARTIAL_MIN_POINTS === 'number') ? _AURIX_24H_PARTIAL_MIN_POINTS : 8;
+        // REGIME (bootstrap is now a REGIME fact, not a coverage fact): a genuinely-short post-construction
+        // clean run (< min points) is still 'construction'; a run selected after an excluded prefix is
+        // 'post_construction'; a single clean run (pipeline already trimmed construction) is 'investable'.
+        const _regime = (_postCount < _minPts24) ? 'construction' : (_anchor && _anchor.runStartIdx > 0 ? 'post_construction' : 'investable');
+        _rd = (typeof _aurix24hReturnReadiness === 'function') ? _aurix24hReturnReadiness({
+          coverageRatio: _covRun, pointCount: _postCount, endpointFreshnessMs: _freshMs, largestGapMs: _gapRun,
+          baselineIsOriginal: (Number.isFinite(_first24.ts) && _first24.value > 0),
+          currentValueAvailable: (Number.isFinite(last.value) && last.value > 0),
+          financialConfidenceOk: (_per24.returnState === 'ok'),
+          returnPct: _per24.returnPct, bootstrapOnly: (_regime === 'construction'),
+        }) : null;
+        _pub = !!(_rd && _rd.publishable);
+        // Classify the WINDOW-level large value change (full first → current) for the safety audit.
+        const _winPct = (first.value > 0) ? +(((last.value - first.value) / first.value) * 100).toFixed(4) : null;
+        const _sane24 = (typeof _AURIX_RET_SANE_PCT !== 'undefined' && Number.isFinite(_AURIX_RET_SANE_PCT['24h'])) ? _AURIX_RET_SANE_PCT['24h'] : 25;
+        let _cls;
+        if (_per24.returnState !== 'ok') _cls = 'unreconciled_capital_or_construction';       // D / contaminated — never published
+        else if ((_anchor && _anchor.runStartIdx > 0) || Math.abs(_per24.netFlows || 0) > 0.05 * (_first24.value || 1)) _cls = 'external_capital_flow_reconciled';   // B/C neutralized
+        else if (_winPct != null && Math.abs(_winPct) <= _sane24) _cls = 'market_performance';   // A
+        else _cls = 'external_capital_flow_reconciled';
+        out.partial24hAnchor = {
+          bootstrapFlagSource: 'recent_continuous_run_regime',
+          runStartIdx: _anchor ? _anchor.runStartIdx : 0, runCount: _anchor ? _anchor.runCount : 1,
+          bootstrapSnapshotCount: _anchor ? _anchor.bootstrapSnapshotCount : 0,
+          postBootstrapPointCount: _postCount,
+          constructionEndTimestamp: _anchor ? _anchor.constructionEndTimestamp : null,
+          acceptedBaselineRegime: _regime,
+          acceptedBaselineTs: _first24.ts, acceptedBaselineValue: +_first24.value.toFixed(2),
+          baselineToCurrentPct: (_first24.value > 0) ? +(((last.value - _first24.value) / _first24.value) * 100).toFixed(4) : null,
+          windowBaselineToCurrentPct: _winPct,
+          largeValueChangeClassification: _cls,
+          recentRunReturnPct: _per24.returnPct, recentRunReturnState: _per24.returnState,
+          recentRunCoverageRatio: _covRun, recentRunLargestGapMs: _gapRun,
+          bootstrapExitEligible: _pub, bootstrapExitRejectionReason: _pub ? null : (_rd ? _rd.reasonCode : 'unknown'),
+          readiness: _rd,
+        };
+        out.partial24hReadiness = _rd;
+      } catch (_) { _pub = false; }
+      if (_pub) {
+        // Publish the recent-run covered-period return — post-construction baseline, honestly PARTIAL. Override
+        // the full-range anchor so the % / colour / netFlows describe the SAME interval the line draws. The
+        // later `if (returnState==='ok')` block is guarded by partial24hPublished so it does not re-overwrite.
+        out.baselineTs = _first24.ts; out.baselineValue = +_first24.value.toFixed(2);
+        out.baselineSnapshot = { snapshotId: _first24.snapshotId || null, ts: _first24.ts, value: +_first24.value.toFixed(2) };
+        out.returnState = 'ok';
+        out.netFlows = _per24.netFlows;
+        out.returnPct = _per24.returnPct; out.badgeReturnPct = _per24.returnPct;
+        out.returnValue = _per24.returnValue; out.color = _per24.color;
         out.partial24hPublished = true;
         out.coverageSuppressed = false;
         out.returnSuppressedReason = null;
         out.reason = 'partial_24h_return_published';
       } else {
-        out.returnState = 'insufficient_return_history';                 // reuse the proven honest painter
-        out.returnSuppressedReason = 'insufficient_requested_range_history';
+        // Honest neutral — genuine construction-only / contaminated / too-short post-construction interval.
+        out.returnState = 'insufficient_return_history';
+        out.returnSuppressedReason = (out.partial24hAnchor && out.partial24hAnchor.bootstrapExitRejectionReason)
+          ? ('24h_' + String(out.partial24hAnchor.bootstrapExitRejectionReason).toLowerCase()) : 'insufficient_requested_range_history';
         out.reason = 'range_collapsed_history_short';
-        // SPEC DSH.CHART.RELIABILITY_DEADLOCK_RESOLUTION.22 — the flow-neutral return over the AVAILABLE real
-        // interval was itself TRUSTWORTHY (per.returnState === 'ok': base floor + sane band ⇒ not a construction
-        // artifact); only the requested-window COVERAGE fell short. Expose it (additive, non-mutating of the
-        // suppressed returnState) so the SPEC.19 resolver can honestly resolve the reliability deadlock as a
-        // partial-interval return instead of an indefinite Calculando. Flag OFF ⇒ these fields are ignored (v503).
         out.coverageSuppressed = true;
-        out.partialReturnPct = per.returnPct; out.partialReturnValue = per.returnValue; out.partialReturnColor = per.color;
-        out.partialReturnTrusted = true;
+        out.partialReturnPct = _per24.returnPct; out.partialReturnValue = _per24.returnValue; out.partialReturnColor = _per24.color;
+        out.partialReturnTrusted = (_per24.returnState === 'ok');
       }
+    } else if (out.historyTooShortForRange && per.returnState === 'ok') {
+      // 7D/30D/1Y — EXACT prior suppression (SPEC.22 deadlock-resolution path). Byte-identical, untouched.
+      out.returnState = 'insufficient_return_history';                 // reuse the proven honest painter
+      out.returnSuppressedReason = 'insufficient_requested_range_history';
+      out.reason = 'range_collapsed_history_short';
+      // SPEC DSH.CHART.RELIABILITY_DEADLOCK_RESOLUTION.22 — the flow-neutral return over the AVAILABLE real
+      // interval was itself TRUSTWORTHY (per.returnState === 'ok': base floor + sane band ⇒ not a construction
+      // artifact); only the requested-window COVERAGE fell short. Expose it (additive, non-mutating of the
+      // suppressed returnState) so the SPEC.19 resolver can honestly resolve the reliability deadlock as a
+      // partial-interval return instead of an indefinite Calculando. Flag OFF ⇒ these fields are ignored (v503).
+      out.coverageSuppressed = true;
+      out.partialReturnPct = per.returnPct; out.partialReturnValue = per.returnValue; out.partialReturnColor = per.color;
+      out.partialReturnTrusted = true;
     }
     // SPEC DATA-TRUTH.01 (Fase 2) — LINE honesty state (data/debug only; no visible copy invented).
     // A finite range whose real history does not cover it is "partial_history": the line is available
@@ -24283,8 +24383,12 @@ function buildProductionPortfolioChart(range) {
       }
     }
     if (out.returnState === 'ok') {
-      out.returnPct = per.returnPct; out.badgeReturnPct = per.returnPct;
-      out.returnValue = per.returnValue; out.color = per.color;
+      // SPEC.48 — when a 24H recent-run return was already published above, its post-construction %/colour/
+      // netFlows stand (do NOT re-overwrite with the full-range `per`). Otherwise the standard full-range %.
+      if (!out.partial24hPublished) {
+        out.returnPct = per.returnPct; out.badgeReturnPct = per.returnPct;
+        out.returnValue = per.returnValue; out.color = per.color;
+      }
     } else {
       // Honest state — line (wealth) is shown, but there is no trustworthy REAL requested-period return.
       out.returnPct = null; out.badgeReturnPct = null;
@@ -25350,33 +25454,65 @@ function _aurixAudit24hReturnReadinessCore(emgArg, nowRefArg) {
   const financialConfidenceOk = (emg.returnState === 'ok') || (emg.partialReturnTrusted === true) || (emg.partial24hPublished === true);
   const returnPctCandidate = Number.isFinite(emg.returnPct) ? emg.returnPct
     : (Number.isFinite(emg.badgeReturnPct) ? emg.badgeReturnPct : (Number.isFinite(emg.partialReturnPct) ? emg.partialReturnPct : null));
-  const bootstrapOnly = (emg.rangeCollapsedBecauseHistoryTooShort === true)
-    || /new_account|initial_build|construction|bootstrap/.test(String(emg.returnSuppressedReason || emg.reason || ''));
-  const baselineIsOriginal = (Number.isFinite(baselineTimestamp) && baselineValue > 0);
-  const readiness = (typeof _aurix24hReturnReadiness === 'function') ? _aurix24hReturnReadiness({
-    coverageRatio: coverageRatio, pointCount: pts.length, endpointFreshnessMs: endpointFreshnessMs,
-    largestGapMs: largestGapMs, baselineIsOriginal: baselineIsOriginal,
-    currentValueAvailable: (Number.isFinite(currentValue) && currentValue > 0),
-    financialConfidenceOk: financialConfidenceOk, returnPct: returnPctCandidate, bootstrapOnly: bootstrapOnly,
-  }) : null;
+  // SPEC.48 — recent-run (post-construction) anchor. Prefer the builder's authoritative record (emg
+  // .partial24hAnchor); else derive it read-only from the points (mock / isolated contexts).
+  const _minPts24 = (typeof _AURIX_24H_PARTIAL_MIN_POINTS === 'number') ? _AURIX_24H_PARTIAL_MIN_POINTS : 8;
+  let anchor = (emg.partial24hAnchor && typeof emg.partial24hAnchor === 'object') ? emg.partial24hAnchor : null;
+  if (!anchor && (typeof _aurix24hRecentRunAnchor === 'function')) {
+    const ra = _aurix24hRecentRunAnchor(pts);
+    const _first = (ra && pts[ra.runStartIdx]) ? pts[ra.runStartIdx] : (pts.length ? pts[0] : null);
+    const _cur = pts.length ? pts[pts.length - 1] : null;
+    anchor = ra ? {
+      bootstrapFlagSource: 'recent_continuous_run_regime',
+      runStartIdx: ra.runStartIdx, runCount: ra.runCount, bootstrapSnapshotCount: ra.bootstrapSnapshotCount,
+      postBootstrapPointCount: ra.postBootstrapPointCount, constructionEndTimestamp: ra.constructionEndTimestamp,
+      acceptedBaselineRegime: (ra.postBootstrapPointCount < _minPts24) ? 'construction' : (ra.runStartIdx > 0 ? 'post_construction' : 'investable'),
+      acceptedBaselineTs: _first ? _first.ts : null, acceptedBaselineValue: _first ? +(+_first.value).toFixed(2) : null,
+      baselineToCurrentPct: (_first && _first.value > 0 && _cur) ? +(((_cur.value - _first.value) / _first.value) * 100).toFixed(4) : null,
+      windowBaselineToCurrentPct: (pts.length && pts[0].value > 0 && _cur) ? +(((_cur.value - pts[0].value) / pts[0].value) * 100).toFixed(4) : null,
+      largeValueChangeClassification: null, recentRunLargestGapMs: ra.largestGapMsInRun,
+      bootstrapExitEligible: null, bootstrapExitRejectionReason: null,
+    } : null;
+  }
+  const acceptedBaselineTs = (anchor && Number.isFinite(anchor.acceptedBaselineTs)) ? anchor.acceptedBaselineTs
+    : (Number.isFinite(baselineTimestamp) ? baselineTimestamp : oldest);
+  const acceptedBaselineValue = (anchor && Number.isFinite(anchor.acceptedBaselineValue)) ? anchor.acceptedBaselineValue
+    : (Number.isFinite(baselineValue) ? baselineValue : (pts.length ? pts[0].value : null));
+  const baselineIsOriginal = (Number.isFinite(acceptedBaselineTs) && acceptedBaselineValue > 0);
+  const bootstrapRegime = anchor ? anchor.acceptedBaselineRegime : 'investable';
+  // readiness — prefer the builder's stored decision; else recompute over the recent-run evidence.
+  const readiness = (emg.partial24hReadiness && typeof emg.partial24hReadiness === 'object') ? emg.partial24hReadiness
+    : ((typeof _aurix24hReturnReadiness === 'function') ? _aurix24hReturnReadiness({
+        coverageRatio: (anchor && anchor.recentRunCoverageRatio != null) ? anchor.recentRunCoverageRatio : coverageRatio,
+        pointCount: anchor ? anchor.postBootstrapPointCount : pts.length,
+        endpointFreshnessMs: endpointFreshnessMs,
+        largestGapMs: (anchor && Number.isFinite(anchor.recentRunLargestGapMs)) ? anchor.recentRunLargestGapMs : largestGapMs,
+        baselineIsOriginal: baselineIsOriginal,
+        currentValueAvailable: (Number.isFinite(currentValue) && currentValue > 0),
+        financialConfidenceOk: financialConfidenceOk, returnPct: returnPctCandidate,
+        bootstrapOnly: (bootstrapRegime === 'construction'),
+      }) : null);
   const published = (emg.partial24hPublished === true) || (emg.returnState === 'ok' && Number.isFinite(emg.badgeReturnPct));
   const returnComputable = published || !!(readiness && readiness.publishable);
   const computedReturnPct = returnComputable ? returnPctCandidate : null;
+  const bootstrapExitEligible = (anchor && anchor.bootstrapExitEligible != null) ? !!anchor.bootstrapExitEligible : !!(readiness && readiness.publishable);
+  const bootstrapExitRejectionReason = bootstrapExitEligible ? null
+    : ((anchor && anchor.bootstrapExitRejectionReason) ? anchor.bootstrapExitRejectionReason : (readiness ? readiness.reasonCode : 'unknown'));
   let currentState;
   if (published) currentState = (emg.historyTooShortForRange === true) ? 'TRUSTED_PARTIAL_RETURN' : 'TRUSTED_RETURN';
   else if (emg.historyTooShortForRange === true || emg.displayedRangeState === 'partial_history') currentState = 'PARTIAL_HISTORY_NEUTRAL';
   else if (!pts.length || emg.state !== 'ready') currentState = 'CALCULATING';
   else currentState = 'NEUTRAL';
   return {
-    spec: 'DSH.CHART.24H_RETURN_READINESS.46',
+    spec: 'DSH.CHART.24H_BOOTSTRAP_EXIT.48',
     pointCount: pts.length,
     oldestTimestamp: oldest,
     newestTimestamp: newest,
     coverageHours: coverageHours,
     coverageRatio: coverageRatio,
     largestGapMinutes: +((largestGapMs / 60000).toFixed(2)),
-    baselineTimestamp: baselineTimestamp,
-    baselineValue: baselineValue,
+    baselineTimestamp: acceptedBaselineTs,
+    baselineValue: acceptedBaselineValue,
     baselineAccepted: baselineIsOriginal,
     baselineRejectionReason: baselineIsOriginal ? null : 'baseline_not_original_validated_point',
     currentTimestamp: currentTimestamp,
@@ -25389,12 +25525,23 @@ function _aurixAudit24hReturnReadinessCore(emgArg, nowRefArg) {
     currentState: currentState,
     exactBlockingStage: returnComputable ? null : 'badge_readiness_decision',
     exactOwnerFunction: returnComputable ? null
-      : (!financialConfidenceOk ? '_aurixComputePeriodReturn' : (published ? null : 'buildProductionPortfolioChart→_aurix24hReturnReadiness')),
+      : (!financialConfidenceOk ? '_aurixComputePeriodReturn' : 'buildProductionPortfolioChart→_aurix24hReturnReadiness'),
     exactBlockingRule: returnComputable ? null : (readiness ? readiness.blockingPredicate : 'unknown'),
     configuredThreshold: readiness ? readiness.configuredThreshold : null,
     exactReason: returnComputable
       ? (published ? 'trusted_partial_24h_return_published' : 'trusted_partial_24h_return_ready')
       : (readiness ? readiness.reasonCode : 'unknown'),
+    // ── SPEC.48 bootstrap-exit audit extension ──
+    bootstrapFlagSource: anchor ? anchor.bootstrapFlagSource : null,
+    bootstrapSnapshotCount: anchor ? anchor.bootstrapSnapshotCount : 0,
+    postBootstrapPointCount: anchor ? anchor.postBootstrapPointCount : pts.length,
+    constructionEndTimestamp: anchor ? anchor.constructionEndTimestamp : null,
+    acceptedBaselineRegime: bootstrapRegime,
+    baselineToCurrentPct: anchor ? anchor.baselineToCurrentPct : ((acceptedBaselineValue > 0 && currentValue != null) ? +(((currentValue - acceptedBaselineValue) / acceptedBaselineValue) * 100).toFixed(4) : null),
+    windowBaselineToCurrentPct: anchor ? anchor.windowBaselineToCurrentPct : null,
+    largeValueChangeClassification: anchor ? anchor.largeValueChangeClassification : null,
+    bootstrapExitEligible: bootstrapExitEligible,
+    bootstrapExitRejectionReason: bootstrapExitRejectionReason,
     partial24hPublished: !!emg.partial24hPublished,
     historyTooShortForRange: !!emg.historyTooShortForRange,
     readiness: readiness,

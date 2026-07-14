@@ -35,10 +35,10 @@ console.log('\nAURIX-CHART-ATOMIC-BUILD-COHERENCE — SPEC.43');
 ok('0 SPEC.43 marker present', app.indexOf('ATOMIC_BUILD_COHERENCE.43') >= 0);
 ok('0 SPEC.44 marker present (extends the SPEC.43 owner — not a new build system)', app.indexOf('RUNTIME_CAPABILITY_COHERENCE.44') >= 0);
 ok('0 single _aurixResolveBuildCoherence owner', (app.match(/^function _aurixResolveBuildCoherence\(/gm) || []).length === 1);
-ok('0 version.json.appjs = 540', versionJson.appjs === 540);
-ok('0 index APPJS_V = 540', /var APPJS_V = '540';/.test(indexHtml));
-ok('0 index requests app.js?v=540', /app\.js\?v=540/.test(indexHtml));
-ok('0 executed bundle self-version __AURIX_APPJS_VERSION__ = 540', /__AURIX_APPJS_VERSION__ = '540';/.test(app));
+ok('0 version.json.appjs = 541', versionJson.appjs === 541);
+ok('0 index APPJS_V = 541', /var APPJS_V = '541';/.test(indexHtml));
+ok('0 index requests app.js?v=541', /app\.js\?v=541/.test(indexHtml));
+ok('0 executed bundle self-version __AURIX_APPJS_VERSION__ = 541', /__AURIX_APPJS_VERSION__ = '541';/.test(app));
 
 // ── 1 all four match → no reload ─────────────────────────────────────────────
 (function () { const d = R(523, 523, 523, 523, null); ok('1 all match ⇒ coherent + action none (no reload)', d.coherent === true && d.action === 'none' && d.clearMarker === true, JSON.stringify(d)); })();
