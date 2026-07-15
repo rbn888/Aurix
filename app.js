@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '544'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '545'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -24998,6 +24998,22 @@ const _AURIX_CHART_CANONICAL_REFRESH_DETERMINISM = true;
 // pick exactly ONE authoritative continuous run (never bridge/fabricate/concatenate → syntheticPoints stays
 // 0), mark the range partial, keep the discarded runs in diagnostics. 24H/30D/1Y/ALL are byte-untouched.
 const _AURIX_CHART_7D_SINGLE_CONTINUOUS = true;
+// ── SPEC DSH.CHART.CURRENT_REGIME_RENDER_HANDOFF.51 ──
+// P0 render-handoff completion. The regime selector is PROVEN correct on the affected account for every
+// range (selectedRunIndex === currentRegimeRunIndex, fresh endpoint matching the live portfolio value), yet
+// 30D/1Y/ALL still rendered historical regimes / a 16k→6k cliff / disconnected islands as part of the ACTIVE
+// line. ROOT CAUSE: the FRC isolates the single authoritative current-regime run only for 24H (SPEC.21 §6.5)
+// and 7D (SPEC.45 §6.6) — 30D/1Y/ALL have NO single-continuous enforcement, so the visual-trust-gate's honest
+// multi-cluster output (large legit clusters survive) reached out.renderPoints (and thus both faithful
+// painters, `emg.points = frc.renderPoints`) as ≥2 visible runs. This flag extends the SAME deterministic
+// single-continuous selection to 30D/1Y/ALL: split on the SAME break set, pick EXACTLY ONE run (recent-path
+// first — its endpoint reconciles with the live value the selector proved — else the dominant eligible path
+// by recency→span→count→ts), mark partial, keep discarded runs in diagnostics. It CANNOT run in
+// buildProductionPortfolioChart (that output feeds the flow-neutral RETURN over the full window — an explicit
+// invariant that the line change must not touch), so it lives in the FRC, exactly like §6.5/§6.6, and never
+// invents/deletes/bridges a point (syntheticPoints stays 0). 24H/7D byte-untouched (own §6.5/§6.6 own them).
+// Reversible: _AURIX_CHART_ACTIVE_REGIME_SINGLE_PATH=false ⇒ EXACT v544 (30D/1Y/ALL keep multi-segment).
+const _AURIX_CHART_ACTIVE_REGIME_SINGLE_PATH = true;
 // ── SPEC DSH.CHART.RELIABILITY_DEADLOCK_RESOLUTION.22 ──
 // Eliminates indefinite 7D+ "Calculando…" when the real canonical history is stable and SUFFICIENT for an
 // honest deterministic return decision, WITHOUT weakening truthful-ranges globally. ROOT CAUSE: the
@@ -25315,6 +25331,49 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
       }
     }
 
+    // 6.7 — SPEC.51 CURRENT-REGIME RENDER HANDOFF (30D/1Y/ALL). The active line for these ranges must render
+    // exactly the authoritative current-regime run — never a resurrected historical regime, cliff or island.
+    // 24H (§6.5) and 7D (§6.6) already enforce this; 30D/1Y/ALL did not, so the visual-trust-gate's surviving
+    // multi-cluster output reached the painters as ≥2 runs. Mirror §6.6 EXACTLY (same break set the renderer
+    // splits on, same recency→span→count→ts policy), gated to the three long ranges so §6.5/§6.6 stay
+    // byte-identical. Select ONE run; NEVER bridge / fabricate / concatenate → syntheticPoints stays 0.
+    // Discarded runs live in diagnostics, not the visible line. The RETURN is untouched (resolved from the
+    // ORIGINAL emg.points, above). Flag off ⇒ exact v544.
+    if ((typeof _AURIX_CHART_ACTIVE_REGIME_SINGLE_PATH !== 'undefined' && _AURIX_CHART_ACTIVE_REGIME_SINGLE_PATH) && (r === '30d' || r === '1y' || r === 'all') && work.length >= 2) {
+      const mapped = work.map(p => ({ time: p.ts, value: p.value }));
+      let breaks = [];
+      try { if (typeof _aurixStructuralBreaks === 'function') { const sb = _aurixStructuralBreaks(mapped, r); breaks = (sb && Array.isArray(sb.breaks)) ? sb.breaks : []; } } catch (_) {}
+      let runs = [mapped];
+      if (breaks.length) { try { if (typeof _aurixSplitAtGaps === 'function') runs = _aurixSplitAtGaps(mapped, breaks) || [mapped]; } catch (_) { runs = [mapped]; } }
+      runs = runs.filter(run => run && run.length);
+      diagnostics.activeRegimeUpstreamRuns = runs.length;
+      if (runs.length > 1) {
+        const minPts = (typeof _AURIX_VTG_MIN_MAIN_PTS === 'number') ? _AURIX_VTG_MIN_MAIN_PTS : 3;
+        const minSpan = (typeof _AURIX_VTG_MIN_MAIN_SPAN_MS === 'number') ? _AURIX_VTG_MIN_MAIN_SPAN_MS : (15 * 60000);
+        const eligible = run => run.length >= minPts && (run[run.length - 1].time - run[0].time) >= minSpan;
+        const summarise = run => ({ count: run.length, firstTs: run[0].time, lastTs: run[run.length - 1].time, spanHours: +((run[run.length - 1].time - run[0].time) / 36e5).toFixed(2), firstValue: run[0].value, lastValue: run[run.length - 1].value });
+        let chosen = null;
+        const recent = runs[runs.length - 1];
+        if (eligible(recent)) { chosen = recent; out.reasonCodes.push('active_regime_recent_path_selected'); }
+        else {
+          const cands = runs.filter(eligible).slice().sort((a, b) => {
+            const ar = a[a.length - 1].time, br = b[b.length - 1].time; if (br !== ar) return br - ar;   // recency desc
+            const asp = a[a.length - 1].time - a[0].time, bsp = b[b.length - 1].time - b[0].time; if (bsp !== asp) return bsp - asp;   // span desc
+            if (b.length !== a.length) return b.length - a.length;                                       // count desc
+            return b[0].time - a[0].time;                                                                // stable ts tie-break
+          });
+          chosen = cands.length ? cands[0] : null;
+          if (chosen) out.reasonCodes.push('active_regime_dominant_path_selected');
+        }
+        if (!chosen) return building(out, 'active_regime_no_eligible_path');
+        diagnostics.activeRegimeSelectedRun = summarise(chosen);
+        diagnostics.activeRegimeDiscardedRuns = runs.filter(run => run !== chosen).map(summarise);
+        work = chosen.map(p => ({ ts: p.time, value: p.value }));
+        partial = true;
+        out.reasonCodes.push('active_regime_single_path');
+      }
+    }
+
     // 8 — final render mode: full (whole trustworthy historic) vs partial_clean (short history OR something
     // hidden/dropped). A short-history range that keeps all its points is STILL partial (not a full historic).
     const trimmed = work.length !== finite.length;
@@ -25590,6 +25649,122 @@ function _aurixAuditCurrentRegimeAuthorityCore(rangeArg) {
   return out;
 }
 try { if (typeof window !== 'undefined') window.aurixAuditCurrentRegimeAuthority = function (range) { let res; try { res = _aurixAuditCurrentRegimeAuthorityCore(range); } catch (e) { res = { spec: 'P0.CURRENT_REGIME_SEGMENT_AUTHORITY', verdict: 'AUDIT_ERROR', error: (e && e.message) || String(e) }; } try { window.__AURIX_LAST_CURRENT_REGIME_AUTHORITY_AUDIT__ = res; } catch (_) {} return res; }; } catch (_) {}
+
+// ════════════════════════════════════════════════════════════════════════════
+// P0 CURRENT-REGIME → FINAL RENDER HANDOFF — READ-ONLY forensic audit (SPEC.51)
+// ════════════════════════════════════════════════════════════════════════════
+// window.aurixAuditCurrentRegimeRenderHandoff('24h'|'7d'|'30d'|'1y'|'all') — proves WHERE the final rendered
+// series stops matching the already-correct selected current-regime run. Given the selector is PROVEN correct,
+// this walks the handoff chain the visible chart uses — selectedRun → buildProductionPortfolioChart output →
+// FRC input → FRC output (renderPoints) → desktop renderPoints → mobile renderPoints — hashes each stage
+// (deterministic `_aurixEmergencyHash`) and reports segment counts + the FIRST stage whose series diverges
+// from the authoritative current-regime run. selectedRun is the run the FRC's OWN single-continuous policy
+// picks (recent-path-first eligible, else dominant recency→span→count→ts) — the SAME rule §6.5/§6.6/§6.7 use.
+// PURE / read-only: re-runs the real builders + `_aurixResolveFinalRenderSeriesContract` for both surfaces;
+// mutates nothing, no network, invents no point, emits no permanent log. Acceptance = selectedRunHash ===
+// frcOutputHash === desktopHash === mobileHash for every supported range.
+function _aurixAuditCurrentRegimeRenderHandoffCore(rangeArg) {
+  const r = String(rangeArg || '24h').toLowerCase();
+  const safe = (fn, d) => { try { const v = fn(); return v === undefined ? (d === undefined ? null : d) : v; } catch (_) { return (d === undefined ? null : d); } };
+  const norm = pts => (Array.isArray(pts) ? pts : []).map(p => ({ ts: (p.ts != null ? p.ts : p.time), value: p.value })).filter(p => Number.isFinite(p.ts) && Number.isFinite(p.value));
+  const hashOf = pts => safe(() => (typeof _aurixEmergencyHash === 'function') ? _aurixEmergencyHash(norm(pts)) : null, null);
+  const segCount = pts => {
+    const mapped = norm(pts).map(p => ({ time: p.ts, value: p.value }));
+    if (mapped.length < 2) return mapped.length ? 1 : 0;
+    let breaks = [];
+    try { if (typeof _aurixStructuralBreaks === 'function') { const sb = _aurixStructuralBreaks(mapped, r); breaks = (sb && Array.isArray(sb.breaks)) ? sb.breaks : []; } } catch (_) {}
+    let runs = [mapped];
+    if (breaks.length) { try { if (typeof _aurixSplitAtGaps === 'function') runs = _aurixSplitAtGaps(mapped, breaks) || [mapped]; } catch (_) { runs = [mapped]; } }
+    return runs.filter(x => x && x.length).length;
+  };
+  // The authoritative current-regime run = the FRC's OWN single-continuous selection over the production points.
+  const selectedRunOf = pts => {
+    const mapped = norm(pts).map(p => ({ time: p.ts, value: p.value }));
+    if (mapped.length < 2) return mapped.map(p => ({ ts: p.time, value: p.value }));
+    let breaks = [];
+    try { if (typeof _aurixStructuralBreaks === 'function') { const sb = _aurixStructuralBreaks(mapped, r); breaks = (sb && Array.isArray(sb.breaks)) ? sb.breaks : []; } } catch (_) {}
+    let runs = [mapped];
+    if (breaks.length) { try { if (typeof _aurixSplitAtGaps === 'function') runs = _aurixSplitAtGaps(mapped, breaks) || [mapped]; } catch (_) { runs = [mapped]; } }
+    runs = runs.filter(x => x && x.length);
+    if (runs.length <= 1) return (runs[0] || []).map(p => ({ ts: p.time, value: p.value }));
+    const minPts = (typeof _AURIX_VTG_MIN_MAIN_PTS === 'number') ? _AURIX_VTG_MIN_MAIN_PTS : 3;
+    const minSpan = (typeof _AURIX_VTG_MIN_MAIN_SPAN_MS === 'number') ? _AURIX_VTG_MIN_MAIN_SPAN_MS : (15 * 60000);
+    const eligible = run => run.length >= minPts && (run[run.length - 1].time - run[0].time) >= minSpan;
+    let chosen = null;
+    const recent = runs[runs.length - 1];
+    if (eligible(recent)) chosen = recent;
+    else { const cands = runs.filter(eligible).slice().sort((a, b) => { const ar = a[a.length - 1].time, br = b[b.length - 1].time; if (br !== ar) return br - ar; const asp = a[a.length - 1].time - a[0].time, bsp = b[b.length - 1].time - b[0].time; if (bsp !== asp) return bsp - asp; if (b.length !== a.length) return b.length - a.length; return b[0].time - a[0].time; }); chosen = cands.length ? cands[0] : null; }
+    return (chosen || recent).map(p => ({ ts: p.time, value: p.value }));
+  };
+  const emg = safe(() => (typeof buildProductionPortfolioChart === 'function') ? buildProductionPortfolioChart(r) : null, null) || { points: [] };
+  const production = Array.isArray(emg.points) ? emg.points : [];
+  const desk = safe(() => (typeof _aurixResolveFinalRenderSeriesContract === 'function') ? _aurixResolveFinalRenderSeriesContract(emg, r, 'desktop') : null, null) || {};
+  const mob = safe(() => (typeof _aurixResolveFinalRenderSeriesContract === 'function') ? _aurixResolveFinalRenderSeriesContract(emg, r, 'mobile') : null, null) || {};
+  const frcOut = Array.isArray(desk.renderPoints) ? desk.renderPoints : [];   // FRC output == desktop input (single chokepoint)
+  const dRender = frcOut, mRender = Array.isArray(mob.renderPoints) ? mob.renderPoints : [];
+  const selectedRun = selectedRunOf(production);
+  const H = {
+    selectedRun: hashOf(selectedRun), production: hashOf(production),
+    frcInput: hashOf(production), frcOutput: hashOf(frcOut),
+    desktop: hashOf(dRender), mobile: hashOf(mRender),
+  };
+  const selectedRunEqualsProduction = H.selectedRun === H.production;
+  const productionEqualsFrcInput = H.production === H.frcInput;
+  const frcInputEqualsFrcOutput = H.frcInput === H.frcOutput;
+  const frcOutputEqualsDesktop = H.frcOutput === H.desktop;
+  const frcOutputEqualsMobile = H.frcOutput === H.mobile;
+  const desktopMobileParity = (dRender.length === mRender.length) && (H.desktop === H.mobile);
+  // Acceptance chain (production omitted intentionally — it must keep ALL points for the return): the ACTIVE
+  // rendered line must equal the authoritative current-regime run. Find the FIRST stage that breaks it.
+  let firstMismatchStage = null, exactOwnerFunction = null, exactCondition = null, exactReason = null, verdict;
+  const notReady = !(desk && (desk.mode === 'full' || desk.mode === 'partial_clean')) || frcOut.length < 2;
+  if (notReady) {
+    verdict = 'PENDING_OR_EMPTY';
+    exactReason = 'no drawable active line (mode=' + (desk.mode || 'n/a') + ', frcOutput pts=' + frcOut.length + ') — nothing to hand off';
+  } else if (H.frcOutput !== H.selectedRun) {
+    verdict = 'MISMATCH';
+    firstMismatchStage = 'frc_output';
+    exactOwnerFunction = '_aurixResolveFinalRenderSeriesContract';
+    exactCondition = 'renderPoints (work) retains >1 regime run for range ' + r + ' — no single-continuous isolation on this range';
+    exactReason = 'frcOutput (' + segCount(frcOut) + ' seg) ≠ authoritative current-regime run (' + segCount(selectedRun) + ' seg). buildProductionPortfolioChart correctly keeps ALL points (the flow-neutral return reads the full window — must not change), so the isolation belongs in the FRC. 24H §6.5 / 7D §6.6 isolate; ' + r.toUpperCase() + ' had none (pre-SPEC.51).';
+  } else if (!frcOutputEqualsDesktop) {
+    verdict = 'MISMATCH'; firstMismatchStage = 'desktop_handoff'; exactOwnerFunction = '_wscPaintEmergency';
+    exactCondition = 'desktop painter did not paint frc.renderPoints unchanged';
+    exactReason = 'frcOutput === selectedRun but desktop renderPoints diverge.';
+  } else if (!frcOutputEqualsMobile) {
+    verdict = 'MISMATCH'; firstMismatchStage = 'mobile_handoff'; exactOwnerFunction = 'renderAurixMobileLiteChart / mobile paint path';
+    exactCondition = 'mobile painter did not paint frc.renderPoints unchanged';
+    exactReason = 'frcOutput === selectedRun but mobile renderPoints diverge.';
+  } else if (!desktopMobileParity) {
+    verdict = 'MISMATCH'; firstMismatchStage = 'desktop_mobile_parity'; exactOwnerFunction = 'FRC surface handling';
+    exactCondition = 'desktop and mobile renderPoints differ'; exactReason = 'both drawn but not byte-identical.';
+  } else {
+    verdict = 'HANDOFF_CLEAN';
+    exactReason = 'selectedRunHash === frcOutputHash === desktopHash === mobileHash — active line is exactly the current-regime run.';
+  }
+  const out = {
+    spec: 'P0.CURRENT_REGIME_RENDER_HANDOFF.51', readOnly: true, verdict: verdict, range: r,
+    account: safe(() => (typeof currentUser !== 'undefined' && currentUser && currentUser.id) ? String(currentUser.id).slice(0, 8) + '…' : 'mounted', 'mounted'),
+    buildVersion: safe(() => window.AURIX_BUILD, null),
+    activeRegimeSinglePathFlag: safe(() => (typeof _AURIX_CHART_ACTIVE_REGIME_SINGLE_PATH !== 'undefined') ? _AURIX_CHART_ACTIVE_REGIME_SINGLE_PATH : null, null),
+    selectedRunPointCount: selectedRun.length,
+    selectedRunFirstTimestamp: selectedRun.length ? selectedRun[0].ts : null,
+    selectedRunLastTimestamp: selectedRun.length ? selectedRun[selectedRun.length - 1].ts : null,
+    selectedRunHash: H.selectedRun,
+    selectedRunSegmentCount: segCount(selectedRun),
+    productionPointCount: production.length, productionHash: H.production, productionSegmentCount: segCount(production),
+    frcInputPointCount: production.length, frcInputHash: H.frcInput, frcInputSegmentCount: segCount(production),
+    frcOutputPointCount: frcOut.length, frcOutputHash: H.frcOutput, frcOutputSegmentCount: segCount(frcOut),
+    desktopPointCount: dRender.length, desktopHash: H.desktop, desktopSegmentCount: segCount(dRender),
+    mobilePointCount: mRender.length, mobileHash: H.mobile, mobileSegmentCount: segCount(mRender),
+    selectedRunEqualsProduction, productionEqualsFrcInput, frcInputEqualsFrcOutput,
+    frcOutputEqualsDesktop, frcOutputEqualsMobile, desktopMobileParity,
+    firstMismatchStage, exactOwnerFunction, exactCondition, exactReason,
+  };
+  try { console.log('%c[UI][CURRENT_REGIME_RENDER_HANDOFF]', 'font-weight:700;color:#7048e8', out); } catch (_) {}
+  return out;
+}
+try { if (typeof window !== 'undefined') window.aurixAuditCurrentRegimeRenderHandoff = function (range) { let res; try { res = _aurixAuditCurrentRegimeRenderHandoffCore(range); } catch (e) { res = { spec: 'P0.CURRENT_REGIME_RENDER_HANDOFF.51', verdict: 'AUDIT_ERROR', error: (e && e.message) || String(e) }; } try { window.__AURIX_LAST_CURRENT_REGIME_RENDER_HANDOFF_AUDIT__ = res; } catch (_) {} return res; }; } catch (_) {}
 
 // ════════════════════════════════════════════════════════════════════════════
 // SPEC DSH.CHART.24H_RETURN_READINESS.46 — READ-ONLY forensic audit
