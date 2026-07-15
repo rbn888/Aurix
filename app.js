@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '547'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '548'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -45022,12 +45022,64 @@ function buildBadgeHtml(asset, badgeText, cls = 'asset-badge') {
 
 // Always resolve the display name through the translation system for known assets.
 // Handles legacy saved assets that may have stored mixed-language names (e.g. "Oro (Gold)").
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC 52 — INSTITUTIONAL DISPLAY NAME (presentation-only, single owner)
+// ════════════════════════════════════════════════════════════════════════════
+// One commercial name per asset, identical in every view, independent of the discovery
+// provider. PURELY PRESENTATION: computed at render time from the STORED fields; it never
+// mutates a.name, ISIN, ticker, marketSymbol, coinId, identity, holdings, persistence,
+// catalogs or registries. The legal name stays intact on the asset. Policy: strip only
+// value-less trailing corporate-form legal suffixes (Inc./Corp./S.A./Ltd/…) and ONLY for
+// equities (type 'stock', incl. REITs) — so "Apple Inc." / "Apple Corporation" / OpenFIGI
+// legal forms all converge to the same brand as the ASSET_DB short name. Funds, ETFs,
+// indices and crypto are returned UNCHANGED so every distinguishing token is preserved:
+// Acc/Dist, Hedged/Unhedged, share class (A/B/C/D/…), the currency that differentiates a
+// class, UCITS, ETF. Reversible: _AURIX_INSTITUTIONAL_DISPLAY_NAME=false ⇒ prior behaviour
+// (return a.name verbatim; metals still translated).
+const _AURIX_INSTITUTIONAL_DISPLAY_NAME = true;
+// Trailing corporate-form tokens with no user value. Matched case-insensitively, dots
+// removed, as a WHOLE trailing token only. Deliberately conservative — excludes ambiguous
+// brand words like "Holding(s)"/"Group"/"Trust" which can be part of the recognised name.
+const _AURIX_LEGAL_SUFFIXES = ['incorporated','inc','corporation','corp','company','co','plc','sa','nv','ag','se','ltd','limited','llc','spa','ab','asa','oyj','kgaa','nsa'];
+function _aurixStripLegalSuffix(name) {
+  let s = String(name || '').trim();
+  if (!s) return s;
+  let changed = true, guard = 0;
+  while (changed && guard++ < 4) {
+    changed = false;
+    const m = s.match(/^(.*[A-Za-z0-9])[,\s.]+([A-Za-z.]+)\.?$/);   // "<head><sep><lastToken>" (sep may include dots: "Co., Ltd.")
+    if (!m) break;
+    const tail = m[2].replace(/\./g, '').toLowerCase();
+    if (_AURIX_LEGAL_SUFFIXES.indexOf(tail) >= 0 && m[1].trim().length >= 2) {
+      s = m[1].trim().replace(/[,\s]+$/, '');
+      changed = true;
+    }
+  }
+  return s || String(name || '').trim();
+}
+// Build the institutional commercial name from the STORED asset (no external lookup).
+function _aurixInstitutionalDisplayName(a) {
+  const name = String((a && a.name) || '').trim();
+  if (!name) return (a && a.ticker) || '';
+  // Equities only: remove legal corporate suffixes. Everything else (fund/etf/index/crypto/
+  // other) keeps its full descriptor so class/Acc/Dist/currency/UCITS are never lost.
+  if (a && a.type === 'stock') return _aurixStripLegalSuffix(name);
+  return name;
+}
+try { if (typeof window !== 'undefined') { window._aurixInstitutionalDisplayName = _aurixInstitutionalDisplayName; window._aurixStripLegalSuffix = _aurixStripLegalSuffix; } } catch (_) {}
+
 function getDisplayName(a) {
+  if (!a) return '';
   if (a.type === 'metal') {
     const translated = T[lang]?.metalNames?.[a.ticker?.toUpperCase()];
     if (translated) return translated;
   }
-  // Fallback: use stored name as-is (already English for all non-metal assets)
+  // SPEC 52 — single institutional display-name owner (presentation only). Flag OFF ⇒
+  // exact prior behaviour (return a.name verbatim).
+  if (typeof _AURIX_INSTITUTIONAL_DISPLAY_NAME !== 'undefined' && _AURIX_INSTITUTIONAL_DISPLAY_NAME
+      && typeof _aurixInstitutionalDisplayName === 'function') {
+    try { return _aurixInstitutionalDisplayName(a); } catch (_) { return a.name; }
+  }
   return a.name;
 }
 
@@ -45599,7 +45651,7 @@ function _gsRenderResults(items) {
           <div class="gs-row-line">
             <span class="gs-row-ticker">${_gsEscape(item.ticker)}</span>
             ${b.label ? `<span class="gs-row-badge is-${_gsEscape(b.kind)}">${_gsEscape(b.label)}</span>` : ''}
-            <span class="gs-row-name">${_gsEscape(item.name)}</span>
+            <span class="gs-row-name">${_gsEscape((typeof getDisplayName === 'function') ? getDisplayName(item) : item.name)}</span>
           </div>
           <div class="gs-row-meta">—</div>
         </div>
