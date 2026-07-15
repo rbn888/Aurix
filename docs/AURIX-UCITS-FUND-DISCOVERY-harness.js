@@ -49,9 +49,10 @@ ok('0 flag + funcs + fund route + typeLabel + subtitle wired', app.indexOf('SPEC
 
 // ── 2 búsqueda por nombre completo ─────────────────────────────────────────────
 {
-  const full = 'Vanguard U.S. 500 Stock Index Fund EUR Acc';
+  // SPEC 53B — nombres comerciales cortos; el nombre visible es "Vanguard US 500 Stock Index".
+  const full = 'Vanguard US 500 Stock Index';
   const r = call('_aurixSearchFundsLocal', full.toLowerCase());
-  ok('2 nombre completo → encontrado', r.some(x => x.name === full));
+  ok('2 nombre comercial completo → encontrado', r.some(x => x.name === full));
   const ranked = call('_aurixRankSearchResults', r, full);
   ok('2 coincidencia exacta de nombre rankea primero', ranked[0] && ranked[0].name === full);
 }
@@ -151,7 +152,7 @@ ok('0 flag + funcs + fund route + typeLabel + subtitle wired', app.indexOf('SPEC
     return sum % 10 === 0;
   };
   const allIsins = DB.map(f => f.isin);
-  ok('13 los 18 registros tienen ISIN (no null)', DB.length === 18 && allIsins.every(x => typeof x === 'string' && x.length === 12), 'n=' + DB.length);
+  ok('13 catálogo lanzamiento = 25 registros, todos con ISIN', DB.length === 25 && allIsins.every(x => typeof x === 'string' && x.length === 12), 'n=' + DB.length);
   ok('13 todos los ISIN pasan el dígito de control', allIsins.every(validIsinCheck), allIsins.filter(x => !validIsinCheck(x)).join(','));
   ok('13 ISINs únicos', new Set(allIsins).size === allIsins.length);
   // ISINs corregidos presentes (los productos/clases correctos de SPEC 49)
@@ -164,6 +165,31 @@ ok('0 flag + funcs + fund route + typeLabel + subtitle wired', app.indexOf('SPEC
   const byTicker = t => DB.find(f => f.ticker === t) || {};
   ok('13 VG-EUR sigue Eurozone EUR (ISIN Eurozone real)', byTicker('VG-EUR').isin === 'IE0008248795' && /Eurozone/i.test(byTicker('VG-EUR').name) && byTicker('VG-EUR').currency === 'EUR');
   ok('13 FT-TECH y BGF-WT clase USD (nombre USD ↔ ISIN USD)', byTicker('FT-TECH').currency === 'USD' && byTicker('FT-TECH').isin === 'LU0109392836' && byTicker('BGF-WT').currency === 'USD' && byTicker('BGF-WT').isin === 'LU0056508442');
+}
+
+// ── 14 SPEC 53B — nombres comerciales cortos, altas nuevas, monetarios, tope ───
+{
+  const byTicker = t => DB.find(f => f.ticker === t) || {};
+  // caps: 20–30 índice + 3–5 monetarios
+  const mmf = DB.filter(f => f.category === 'money_market');
+  const idx = DB.filter(f => f.category !== 'money_market');
+  ok('14 dentro de tope (índice 20-30, MMF 3-5)', idx.length >= 20 && idx.length <= 30 && mmf.length >= 3 && mmf.length <= 5, 'idx=' + idx.length + ' mmf=' + mmf.length);
+  // nombres comerciales cortos: sin coletillas legales largas en el título
+  const bad = DB.filter(f => /\bFund\b|Institutional|Index Solutions|Acc\b|Dist\b|\bUCITS\b|A\(acc\)/.test(f.name));
+  ok('14 nombres visibles cortos (sin "Fund/Acc/Institutional/…" en título)', bad.length === 0, bad.map(f => f.name).join(' | '));
+  ok('14 pero conserva "Hedged" cuando es definitorio (VG-GB)', /Hedged/.test(byTicker('VG-GB').name));
+  // metadatos legales conservados
+  ok('14 legalName + shareClass como metadatos en todos', DB.every(f => f.legalName && f.shareClass));
+  // altas nuevas de índice presentes
+  ok('14 Fidelity S&P 500 (nuevo) presente', byTicker('FID-500').isin === 'IE00BYX5MX67' && /Fidelity S&P 500/.test(byTicker('FID-500').name));
+  ok('14 MyInvestor Nasdaq 100 (nuevo) presente', byTicker('MI-NDX').isin === 'ES0165265002');
+  // fondos monetarios presentes y buscables por "monetario"/nombre
+  ok('14 5 monetarios presentes (Groupama/AXA/Amundi/BNP/BlackRock)', ['GRP-TRES', 'AXA-TCT', 'AM-LIQ', 'BNP-IC', 'BLK-ICS'].every(t => byTicker(t).isin));
+  ok('14 monetario encontrable por "monetario"', call('_aurixSearchFundsLocal', 'monetario').length >= 3);
+  ok('14 monetario encontrable por gestora ("groupama")', call('_aurixSearchFundsLocal', 'groupama').some(x => x.isin === 'FR0000989626'));
+  // nuevas búsquedas comerciales típicas resuelven
+  ok('14 "nasdaq" → MyInvestor Nasdaq 100', call('_aurixSearchFundsLocal', 'nasdaq').some(x => x.isin === 'ES0165265002'));
+  ok('14 "fidelity s&p 500" → Fidelity S&P 500 Index', call('_aurixSearchFundsLocal', 'fidelity s&p 500').some(x => x.isin === 'IE00BYX5MX67'));
 }
 
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + '  (' + pass + ' passed, ' + fail + ' failed)\n');

@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '548'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '549'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -45172,25 +45172,39 @@ const _AURIX_FUND_KEYWORDS = ['fund','fondo','fondos','index','índice','indice'
 // DEGIRO). SEARCH-ONLY. `ticker` is a short discovery handle (not a market ticker);
 // `isin` is shown only when present; `marketSymbol` is intentionally omitted so selection
 // uses the existing manual-NAV path. Extend freely — data only, no logic depends on size.
+// SPEC 53B — LAUNCH CATALOG FINAL. `name` is the SHORT market-recognised commercial name
+// (matches MyInvestor / Trade Republic / DEGIRO usage). Full legal name + share class live in
+// `legalName` / `shareClass` (metadata only — no code reads them). `currency` + `isin` surface
+// in the existing subtitle (SPEC 48 _aurixSearchSubtitle). One share class per product (no
+// functional duplicates); every ISIN authoritative + check-digit valid (SPEC 49/50/53). DATA ONLY.
 const _AURIX_FUND_DB = [
-  { ticker:'VG-WLD', name:'Vanguard Global Stock Index Fund EUR Acc', manager:'Vanguard', currency:'EUR', isin:'IE00B03HD191', aliases:['vanguard global stock','global stock index','vanguard world','vanguard msci world'] },
-  { ticker:'VG-500', name:'Vanguard U.S. 500 Stock Index Fund EUR Acc', manager:'Vanguard', currency:'EUR', isin:'IE0032620787', aliases:['vanguard us 500','vanguard s&p 500','vanguard sp500','sp 500 index'] },
-  { ticker:'VG-EM',  name:'Vanguard Emerging Markets Stock Index Fund EUR Acc', manager:'Vanguard', currency:'EUR', isin:'IE0031786142', aliases:['vanguard emerging','emerging markets index'] },
-  { ticker:'VG-EUR', name:'Vanguard Eurozone Stock Index Fund EUR Acc', manager:'Vanguard', currency:'EUR', isin:'IE0008248795', aliases:['vanguard eurozone'] },
-  { ticker:'VG-GB',  name:'Vanguard Global Bond Index Fund EUR Hedged Acc', manager:'Vanguard', currency:'EUR', isin:'IE00B18GC888', aliases:['vanguard global bond','global bond index'] },
-  { ticker:'IS-DW',  name:'iShares Developed World Index Fund (IE) EUR Acc', manager:'iShares', currency:'EUR', isin:'IE00BD0NCM55', aliases:['ishares developed world','ishares world index','ishares msci world index'] },
-  { ticker:'AM-WLD', name:'Amundi Index MSCI World AE-C', manager:'Amundi', currency:'EUR', isin:'LU0996182563', aliases:['amundi msci world','amundi world','amundi index world'] },
-  { ticker:'AM-EM',  name:'Amundi Index MSCI Emerging Markets AE-C', manager:'Amundi', currency:'EUR', isin:'LU0996177134', aliases:['amundi emerging','amundi index emerging'] },
-  { ticker:'PC-MEGA',name:'Pictet-Global Megatrend Selection P EUR', manager:'Pictet', currency:'EUR', isin:'LU0386882277', aliases:['pictet megatrend','pictet global megatrend'] },
-  { ticker:'PC-WATER',name:'Pictet-Water P EUR', manager:'Pictet', currency:'EUR', isin:'LU0104884860', aliases:['pictet water'] },
-  { ticker:'PC-SEC', name:'Pictet-Security P EUR', manager:'Pictet', currency:'EUR', isin:'LU0270904781', aliases:['pictet security'] },
-  { ticker:'DWS-DIV',name:'DWS Top Dividende LD', manager:'DWS', currency:'EUR', isin:'DE0009848119', aliases:['dws top dividende','dws dividende'] },
-  { ticker:'FT-TECH',name:'Franklin Technology Fund A(acc)USD', manager:'Franklin Templeton', currency:'USD', isin:'LU0109392836', aliases:['franklin technology'] },
-  { ticker:'TP-GBOND',name:'Templeton Global Bond Fund A(acc)USD', manager:'Franklin Templeton', currency:'USD', isin:'LU0252652382', aliases:['templeton global bond'] },
-  { ticker:'BGF-WT', name:'BlackRock Global Funds World Technology A2 USD', manager:'BlackRock', currency:'USD', isin:'LU0056508442', aliases:['blackrock world technology','bgf world technology'] },
-  { ticker:'FID-WLD',name:'Fidelity MSCI World Index Fund P Acc EUR', manager:'Fidelity', currency:'EUR', isin:'IE00BYX5NX33', aliases:['fidelity world index','fidelity msci world'] },
-  { ticker:'JPM-GF', name:'JPMorgan Funds Global Focus Fund A (acc) EUR', manager:'J.P. Morgan', currency:'EUR', isin:'LU0210534227', aliases:['jpmorgan global focus','jpm global focus'] },
-  { ticker:'INV-CT', name:'Invesco Global Consumer Trends Fund A USD', manager:'Invesco', currency:'USD', isin:'LU0052864419', aliases:['invesco consumer trends'] },
+  { ticker:'VG-WLD',  name:'Vanguard Global Stock Index',            legalName:'Vanguard Global Stock Index Fund',                shareClass:'EUR Acc',         manager:'Vanguard',           currency:'EUR', isin:'IE00B03HD191', aliases:['vanguard global stock','global stock index','vanguard world','vanguard msci world','msci world'] },
+  { ticker:'VG-500',  name:'Vanguard US 500 Stock Index',           legalName:'Vanguard U.S. 500 Stock Index Fund',              shareClass:'Investor EUR Acc', manager:'Vanguard',          currency:'EUR', isin:'IE0032620787', aliases:['vanguard us 500','vanguard s&p 500','vanguard sp500','sp 500 index','s&p 500'] },
+  { ticker:'VG-EM',   name:'Vanguard Emerging Markets Stock Index',  legalName:'Vanguard Emerging Markets Stock Index Fund',      shareClass:'Investor EUR Acc', manager:'Vanguard',          currency:'EUR', isin:'IE0031786142', aliases:['vanguard emerging','emerging markets index','msci emerging'] },
+  { ticker:'VG-EUR',  name:'Vanguard Eurozone Stock Index',          legalName:'Vanguard Eurozone Stock Index Fund',             shareClass:'Investor EUR Acc', manager:'Vanguard',          currency:'EUR', isin:'IE0008248795', aliases:['vanguard eurozone','eurozone stock index','msci emu'] },
+  { ticker:'VG-GB',   name:'Vanguard Global Bond Index (EUR Hedged)',legalName:'Vanguard Global Bond Index Fund',                shareClass:'EUR Hedged Acc',  manager:'Vanguard',           currency:'EUR', isin:'IE00B18GC888', aliases:['vanguard global bond','global bond index','global aggregate'] },
+  { ticker:'IS-DW',   name:'iShares Developed World Index',          legalName:'iShares Developed World Index Fund (IE)',        shareClass:'D Acc EUR',       manager:'iShares',            currency:'EUR', isin:'IE00BD0NCM55', aliases:['ishares developed world','ishares world index','ishares msci world index','developed world'] },
+  { ticker:'AM-WLD',  name:'Amundi MSCI World',                      legalName:'Amundi Index Solutions – Amundi Index MSCI World',shareClass:'AE-C',           manager:'Amundi',             currency:'EUR', isin:'LU0996182563', aliases:['amundi msci world','amundi world','amundi index world'] },
+  { ticker:'AM-EM',   name:'Amundi MSCI Emerging Markets',           legalName:'Amundi Index Solutions – Amundi Index MSCI Emerging Markets', shareClass:'AE-C', manager:'Amundi',      currency:'EUR', isin:'LU0996177134', aliases:['amundi emerging','amundi index emerging','amundi msci em'] },
+  { ticker:'PC-MEGA', name:'Pictet Global Megatrend Selection',      legalName:'Pictet – Global Megatrend Selection',            shareClass:'P EUR',           manager:'Pictet',             currency:'EUR', isin:'LU0386882277', aliases:['pictet megatrend','pictet global megatrend'] },
+  { ticker:'PC-WATER',name:'Pictet Water',                           legalName:'Pictet – Water',                                 shareClass:'P EUR',           manager:'Pictet',             currency:'EUR', isin:'LU0104884860', aliases:['pictet water'] },
+  { ticker:'PC-SEC',  name:'Pictet Security',                        legalName:'Pictet – Security',                              shareClass:'P EUR',           manager:'Pictet',             currency:'EUR', isin:'LU0270904781', aliases:['pictet security'] },
+  { ticker:'DWS-DIV', name:'DWS Top Dividende',                      legalName:'DWS Top Dividende',                              shareClass:'LD (Dist)',       manager:'DWS',                currency:'EUR', isin:'DE0009848119', aliases:['dws top dividende','dws dividende'] },
+  { ticker:'FT-TECH', name:'Franklin Technology',                    legalName:'Franklin Technology Fund',                       shareClass:'A (acc) USD',     manager:'Franklin Templeton', currency:'USD', isin:'LU0109392836', aliases:['franklin technology'] },
+  { ticker:'TP-GBOND',name:'Templeton Global Bond',                  legalName:'Templeton Global Bond Fund',                     shareClass:'A (acc) USD',     manager:'Franklin Templeton', currency:'USD', isin:'LU0252652382', aliases:['templeton global bond'] },
+  { ticker:'BGF-WT',  name:'BlackRock World Technology',             legalName:'BGF World Technology Fund',                      shareClass:'A2 USD',          manager:'BlackRock',          currency:'USD', isin:'LU0056508442', aliases:['blackrock world technology','bgf world technology'] },
+  { ticker:'FID-WLD', name:'Fidelity MSCI World',                    legalName:'Fidelity Funds – MSCI World Index Fund',         shareClass:'P Acc EUR',       manager:'Fidelity',           currency:'EUR', isin:'IE00BYX5NX33', aliases:['fidelity world index','fidelity msci world'] },
+  { ticker:'JPM-GF',  name:'JPMorgan Global Focus',                  legalName:'JPMorgan Funds – Global Focus Fund',             shareClass:'A (acc) EUR',     manager:'J.P. Morgan',        currency:'EUR', isin:'LU0210534227', aliases:['jpmorgan global focus','jpm global focus'] },
+  { ticker:'INV-CT',  name:'Invesco Global Consumer Trends',         legalName:'Invesco Funds – Global Consumer Trends Fund',    shareClass:'A (acc) USD',     manager:'Invesco',            currency:'USD', isin:'LU0052864419', aliases:['invesco consumer trends'] },
+  // SPEC 53B additions — top-demand index funds
+  { ticker:'FID-500', name:'Fidelity S&P 500 Index',                 legalName:'Fidelity Funds – S&P 500 Index Fund',            shareClass:'P Acc EUR',       manager:'Fidelity',           currency:'EUR', isin:'IE00BYX5MX67', aliases:['fidelity s&p 500','fidelity sp500','fidelity s&p500','s&p 500 index'] },
+  { ticker:'MI-NDX',  name:'MyInvestor Nasdaq 100',                  legalName:'MyInvestor Nasdaq 100 FI',                       shareClass:'FI',              manager:'MyInvestor',         currency:'EUR', isin:'ES0165265002', aliases:['myinvestor nasdaq','nasdaq 100','nasdaq index'] },
+  // SPEC 53B additions — money-market funds (fondos monetarios)
+  { ticker:'GRP-TRES',name:'Groupama Trésorerie',                    legalName:'Groupama Trésorerie',                            shareClass:'IC',              manager:'Groupama AM',        currency:'EUR', isin:'FR0000989626', category:'money_market', aliases:['groupama tresorerie','groupama','monetario','money market','treasury'] },
+  { ticker:'AXA-TCT', name:'AXA Trésor Court Terme',                 legalName:'AXA Trésor Court Terme',                         shareClass:'C',               manager:'AXA IM',             currency:'EUR', isin:'FR0000447823', category:'money_market', aliases:['axa tresor','axa court terme','monetario','money market'] },
+  { ticker:'AM-LIQ',  name:'Amundi Euro Liquidity SRI',              legalName:'Amundi Euro Liquidity-Rated SRI',                shareClass:'—',               manager:'Amundi',             currency:'EUR', isin:'FR0007038138', category:'money_market', aliases:['amundi liquidity','amundi euro liquidity','monetario','money market'] },
+  { ticker:'BNP-IC',  name:'BNP Paribas InstiCash EUR',              legalName:'BNP Paribas InstiCash EUR 3M',                   shareClass:'Classic Cap',     manager:'BNP Paribas',        currency:'EUR', isin:'LU0423950210', category:'money_market', aliases:['bnp insticash','insticash','monetario','money market'] },
+  { ticker:'BLK-ICS', name:'BlackRock ICS Euro Liquidity',           legalName:'BlackRock ICS Euro Liquidity Fund',              shareClass:'—',               manager:'BlackRock',          currency:'EUR', isin:'IE00B3ZJFC95', category:'money_market', aliases:['blackrock ics','ics euro liquidity','monetario','money market'] },
 ];
 // Parse manager + quote currency directly from a fund's DISPLAY NAME (no external data),
 // so Yahoo-sourced MUTUALFUND results can also show a manager/currency chip.
