@@ -138,5 +138,33 @@ ok('0 flag + funcs + fund route + typeLabel + subtitle wired', app.indexOf('SPEC
   ok('12 5000 búsquedas locales < 500ms (coste despreciable)', ms < 500, ms + 'ms');
 }
 
+// ── 13 SPEC 50 — corrección de datos: ISIN válido (forma + dígito de control),
+//    todos los 18 con ISIN, únicos, sin registros CONFLICT (ISINs malos ausentes) ──
+{
+  // Validador ISIN con dígito de control (Luhn sobre expansión de letras A=10..Z=35).
+  const validIsinCheck = s => {
+    if (!/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(s)) return false;
+    let digits = '';
+    for (const ch of s) digits += (ch >= 'A' && ch <= 'Z') ? (ch.charCodeAt(0) - 55).toString() : ch;
+    let sum = 0, dbl = false;
+    for (let i = digits.length - 1; i >= 0; i--) { let d = +digits[i]; if (dbl) { d *= 2; if (d > 9) d -= 9; } sum += d; dbl = !dbl; }
+    return sum % 10 === 0;
+  };
+  const allIsins = DB.map(f => f.isin);
+  ok('13 los 18 registros tienen ISIN (no null)', DB.length === 18 && allIsins.every(x => typeof x === 'string' && x.length === 12), 'n=' + DB.length);
+  ok('13 todos los ISIN pasan el dígito de control', allIsins.every(validIsinCheck), allIsins.filter(x => !validIsinCheck(x)).join(','));
+  ok('13 ISINs únicos', new Set(allIsins).size === allIsins.length);
+  // ISINs corregidos presentes (los productos/clases correctos de SPEC 49)
+  const mustHave = ['IE0008248795', 'LU0270904781', 'LU0109392836', 'LU0056508442', 'IE00BYX5NX33', 'LU0210534227', 'LU0052864419'];
+  ok('13 ISINs corregidos/rellenados presentes', mustHave.every(x => allIsins.indexOf(x) >= 0), mustHave.filter(x => allIsins.indexOf(x) < 0).join(','));
+  // ISINs CONFLICT (incorrectos) ausentes → ya no hay registros CONFLICT
+  const mustNotHave = ['IE0007987690', 'LU0270904983', 'LU0260870158', 'LU0171310443'];
+  ok('13 ISINs CONFLICT (incorrectos) eliminados', mustNotHave.every(x => allIsins.indexOf(x) < 0), mustNotHave.filter(x => allIsins.indexOf(x) >= 0).join(','));
+  // el nombre/divisa de los ex-CONFLICT sigue coherente con el producto previsto
+  const byTicker = t => DB.find(f => f.ticker === t) || {};
+  ok('13 VG-EUR sigue Eurozone EUR (ISIN Eurozone real)', byTicker('VG-EUR').isin === 'IE0008248795' && /Eurozone/i.test(byTicker('VG-EUR').name) && byTicker('VG-EUR').currency === 'EUR');
+  ok('13 FT-TECH y BGF-WT clase USD (nombre USD ↔ ISIN USD)', byTicker('FT-TECH').currency === 'USD' && byTicker('FT-TECH').isin === 'LU0109392836' && byTicker('BGF-WT').currency === 'USD' && byTicker('BGF-WT').isin === 'LU0056508442');
+}
+
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + '  (' + pass + ' passed, ' + fail + ' failed)\n');
 process.exit(fail === 0 ? 0 : 1);
