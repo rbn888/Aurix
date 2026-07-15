@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '543'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '544'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -25450,6 +25450,146 @@ function _aurixAudit7dContinuity(rangeArg) {
   return out;
 }
 try { if (typeof window !== 'undefined') window.aurixAudit7dContinuity = _aurixAudit7dContinuity; } catch (_) {}
+
+// ════════════════════════════════════════════════════════════════════════════
+// P0 CURRENT-REGIME-SEGMENT-AUTHORITY — READ-ONLY forensic audit (no fix; proof-first)
+// ════════════════════════════════════════════════════════════════════════════
+// window.aurixAuditCurrentRegimeAuthority('24h'|'7d'|'30d'|'1y'|'all') — proves, on a real account, WHICH
+// continuous run the active-chart segment selector picks for `range`, and whether that run is the CURRENT
+// PORTFOLIO REGIME: the run whose endpoint reconciles with the LIVE investable portfolio value the header
+// shows. Production evidence: the 24H segment ended near 6,068 USD (endpoint 170 min old) while the live
+// portfolio is ~16,404 USD — i.e. an older/longer continuous run outranked the newest authoritative regime.
+// This audit re-runs the SAME builders the visible chart reads (buildProductionPortfolioChart → structural
+// breaks → _aurixSplitAtGaps runs) and the SAME live-value accessor the header uses
+// (getInvestablePortfolioValue). PURE / read-only: mutates nothing, no network, invents no point. It reports
+// every candidate run with its distance to the live value + freshness, which run the CURRENT owner selects
+// (recency-first), which run is the true current regime, and NAMES the first wrong-selection owner + rule so
+// the surgical fix lands on the proven owner ONLY. Run for all 5 ranges on the affected account before any fix.
+function _aurixAuditCurrentRegimeAuthorityCore(rangeArg) {
+  const r = String(rangeArg || '24h').toLowerCase();
+  const safe = (fn, d) => { try { const v = fn(); return v === undefined ? (d === undefined ? null : d) : v; } catch (_) { return (d === undefined ? null : d); } };
+  const iso = t => { try { return Number.isFinite(t) ? new Date(t).toISOString() : null; } catch (_) { return null; } };
+  const nowRef = safe(() => Date.now(), 0);
+  const live = safe(() => (typeof getInvestablePortfolioValue === 'function') ? +(+getInvestablePortfolioValue()).toFixed(2) : null, null);
+  const emg = safe(() => (typeof buildProductionPortfolioChart === 'function') ? buildProductionPortfolioChart(r) : null, null) || { points: [] };
+  const pts = (Array.isArray(emg.points) ? emg.points : []).filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value));
+  // Best-effort source family remap (emg.points is stripped to {ts,value}; the validated series keeps source).
+  const srcByTs = {};
+  try { const vhs = (typeof buildValidatedHistoricalSeries === 'function') ? buildValidatedHistoricalSeries(r) : null; if (vhs && Array.isArray(vhs.rangeSeries)) vhs.rangeSeries.forEach(p => { const s = (p && (p.source || (p.raw && p.raw.source))) || null; if (p && Number.isFinite(p.ts) && s) srcByTs[p.ts] = s; }); } catch (_) {}
+  // Reconstruct the SAME continuous runs the selector sees: structural breaks → split at gaps.
+  const mapped = pts.map(p => ({ time: p.ts, value: p.value }));
+  let breaks = [];
+  try { if (typeof _aurixStructuralBreaks === 'function') { const sb = _aurixStructuralBreaks(mapped, r); breaks = (sb && Array.isArray(sb.breaks)) ? sb.breaks : []; } } catch (_) {}
+  let runs = [mapped];
+  if (breaks.length) { try { if (typeof _aurixSplitAtGaps === 'function') runs = _aurixSplitAtGaps(mapped, breaks) || [mapped]; } catch (_) { runs = [mapped]; } }
+  runs = runs.filter(x => x && x.length);
+  const globalLastTs = pts.length ? pts[pts.length - 1].ts : null;
+  const minPts = (typeof _AURIX_VTG_MIN_MAIN_PTS === 'number') ? _AURIX_VTG_MIN_MAIN_PTS : 3;
+  const minSpan = (typeof _AURIX_VTG_MIN_MAIN_SPAN_MS === 'number') ? _AURIX_VTG_MIN_MAIN_SPAN_MS : (15 * 60000);
+  const eligible = run => run.length >= minPts && (run[run.length - 1].time - run[0].time) >= minSpan;
+  const candidateRuns = runs.map((run, i) => {
+    const first = run[0], last = run[run.length - 1];
+    const freshMin = Number.isFinite(last.time) ? +((nowRef - last.time) / 60000).toFixed(2) : null;
+    const dist = (Number.isFinite(live) && live > 0) ? +((Math.abs(last.value - live) / live) * 100).toFixed(2) : null;
+    const fam = {}; run.forEach(p => { const s = srcByTs[p.time] || 'canonical'; fam[s] = (fam[s] || 0) + 1; });
+    return {
+      runIndex: i, pointCount: run.length,
+      firstTimestamp: first.time, lastTimestamp: last.time,
+      firstTimestampIso: iso(first.time), lastTimestampIso: iso(last.time),
+      endpointFreshnessMinutes: freshMin,
+      firstValue: +first.value.toFixed(2), lastValue: +last.value.toFixed(2),
+      distanceToLiveValuePct: dist,
+      containsLatestSnapshot: (globalLastTs != null && last.time === globalLastTs),
+      sourceFamilies: Object.keys(fam),
+      structuralBreakBefore: i > 0, structuralBreakAfter: i < runs.length - 1,
+      eligible: eligible(run),
+      spanMs: last.time - first.time,
+      selectionScore: null, selected: false, rejectionReason: null,
+    };
+  });
+  // Replicate the CURRENT owner's selection rule (recency-first; the exact rule FRC §6.5/§6.6 and the return
+  // anchor _aurix24hRecentRunAnchor use): recent (chronologically-last) run if eligible, else dominant by
+  // recency → span → count → stable ts. For 30d/1y/all the visible LINE renders all runs, but the active
+  // endpoint/return anchors on the last-run point — modelled here as the same recency-first pick.
+  let selIdx = null, selRule = null;
+  if (runs.length <= 1) { selIdx = runs.length ? 0 : null; selRule = 'single_run (no split — that run is the active segment)'; }
+  else {
+    const recentIdx = runs.length - 1;
+    if (eligible(runs[recentIdx])) { selIdx = recentIdx; selRule = 'recent_path_first: chronologically-last eligible run'; }
+    else {
+      const idxs = runs.map((run, i) => i).filter(i => eligible(runs[i]));
+      idxs.sort((a, b) => {
+        const A = runs[a], B = runs[b];
+        const ar = A[A.length - 1].time, br = B[B.length - 1].time; if (br !== ar) return br - ar;
+        const asp = A[A.length - 1].time - A[0].time, bsp = B[B.length - 1].time - B[0].time; if (bsp !== asp) return bsp - asp;
+        if (B.length !== A.length) return B.length - A.length;
+        return B[0].time - A[0].time;
+      });
+      selIdx = idxs.length ? idxs[0] : null; selRule = 'dominant_eligible: recency → span → count → stable ts';
+    }
+  }
+  candidateRuns.forEach(c => { c.selectionScore = c.lastTimestamp; });   // current owner ranks purely on recency
+  if (selIdx != null && candidateRuns[selIdx]) candidateRuns[selIdx].selected = true;
+  // Freshest run (max endpoint ts) and the TRUE current regime (eligible run whose endpoint best reconciles
+  // with the live portfolio value; tie → freshest). containsLatestSnapshot is the strongest signal.
+  let freshestRunIndex = null, fr = -Infinity;
+  candidateRuns.forEach(c => { if (Number.isFinite(c.lastTimestamp) && c.lastTimestamp > fr) { fr = c.lastTimestamp; freshestRunIndex = c.runIndex; } });
+  let currentRegimeRunIndex = null;
+  const withLatest = candidateRuns.filter(c => c.containsLatestSnapshot);
+  const byDist = candidateRuns.filter(c => c.eligible && c.distanceToLiveValuePct != null).slice().sort((a, b) => (a.distanceToLiveValuePct - b.distanceToLiveValuePct) || (b.lastTimestamp - a.lastTimestamp));
+  // Justified tolerance: an endpoint within ±15% of the live value is economically consistent with the current
+  // portfolio state — the SAME ±15% band SPEC.18 already uses to define a "stable" tramo (_AURIX_STABLE_BAND).
+  const TOL = 100 * ((typeof _AURIX_STABLE_BAND_HI === 'number') ? (_AURIX_STABLE_BAND_HI - 1) : 0.15);
+  if (byDist.length && byDist[0].distanceToLiveValuePct <= TOL) currentRegimeRunIndex = byDist[0].runIndex;
+  else if (withLatest.length) currentRegimeRunIndex = withLatest[0].runIndex;
+  else if (byDist.length) currentRegimeRunIndex = byDist[0].runIndex;
+  candidateRuns.forEach(c => {
+    if (c.selected) return;
+    if (!c.eligible) { c.rejectionReason = 'not_eligible (below min points/span)'; return; }
+    if (currentRegimeRunIndex != null && c.runIndex === currentRegimeRunIndex) { c.rejectionReason = 'IS_CURRENT_REGIME_BUT_NOT_SELECTED (outranked by recency-first)'; return; }
+    c.rejectionReason = 'older_or_less_recent_run';
+  });
+  const sel = (selIdx != null) ? candidateRuns[selIdx] : null;
+  const cur = (currentRegimeRunIndex != null) ? candidateRuns[currentRegimeRunIndex] : null;
+  const selConsistent = !!(sel && sel.distanceToLiveValuePct != null && sel.distanceToLiveValuePct <= TOL);
+  let firstWrongSelectionStage = null, exactOwnerFunction = null, exactSelectionRule = null, exactReason = null, verdict;
+  if (!pts.length || emg.state !== 'ready') { verdict = 'PENDING_OR_EMPTY'; exactReason = 'chart not ready / no validated points (state=' + (emg.state || 'n/a') + ')'; }
+  else if (runs.length <= 1) { verdict = 'SINGLE_RUN_HEALTHY'; exactReason = 'one continuous run — no segment ambiguity; selected run distance to live = ' + (sel ? sel.distanceToLiveValuePct : null) + '%'; }
+  else if (sel && !selConsistent && cur && cur.runIndex !== sel.runIndex && cur.distanceToLiveValuePct != null && cur.distanceToLiveValuePct <= TOL) {
+    verdict = 'WRONG_SEGMENT_SELECTED';
+    firstWrongSelectionStage = (r === '24h') ? 'FRC §6.5 (24H single visible path) + _aurix24hRecentRunAnchor (return endpoint)'
+      : (r === '7d') ? 'FRC §6.6 (7D single-continuous contract)'
+      : 'active endpoint/return anchor (last-run, recency) — the line itself renders all runs on this range';
+    exactOwnerFunction = (r === '24h') ? '_aurixResolveFinalRenderSeriesContract §6.5 / _aurix24hRecentRunAnchor'
+      : (r === '7d') ? '_aurixResolveFinalRenderSeriesContract §6.6'
+      : 'buildProductionPortfolioChart (last-point anchor) / _aurixResolveFinalRenderSeriesContract (multi-run)';
+    exactSelectionRule = selRule + ' — ranks by RECENCY (chronologically-last run) with NO reconciliation against the live portfolio value or the current-regime value band';
+    exactReason = 'selected run #' + sel.runIndex + ' endpoint ' + sel.lastValue + ' (' + sel.endpointFreshnessMinutes + ' min old) is ' + sel.distanceToLiveValuePct + '% from live ' + live + '; the current-regime run #' + cur.runIndex + ' endpoint ' + cur.lastValue + ' reconciles (' + cur.distanceToLiveValuePct + '% ≤ ' + TOL + '%) but is NOT selected because recency-first prefers the older-value regime whose endpoint ts is later.';
+  } else if (sel && selConsistent) { verdict = 'CURRENT_REGIME_SELECTED'; exactReason = 'selected run #' + sel.runIndex + ' reconciles with live value (' + sel.distanceToLiveValuePct + '% ≤ ' + TOL + '%) — no wrong selection on this range.'; }
+  else { verdict = 'INDETERMINATE'; exactReason = 'multi-run but neither a clearly-consistent current-regime run nor a mismatch could be established (live=' + live + ', selected dist=' + (sel ? sel.distanceToLiveValuePct : null) + '%).'; }
+  const out = {
+    spec: 'P0.CURRENT_REGIME_SEGMENT_AUTHORITY', readOnly: true, verdict: verdict, range: r,
+    account: safe(() => (typeof currentUser !== 'undefined' && currentUser && currentUser.id) ? String(currentUser.id).slice(0, 8) + '…' : 'mounted', 'mounted'),
+    buildVersion: safe(() => window.AURIX_BUILD, null),
+    livePortfolioValue: live, livePortfolioTimestamp: nowRef, livePortfolioTimestampIso: iso(nowRef),
+    liveValueTolerancePct: TOL,
+    chartState: emg.state || null, validatedInRangePointCount: pts.length, runCount: runs.length,
+    candidateRuns: candidateRuns,
+    selectedRunIndex: selIdx,
+    selectedRunLastValue: sel ? sel.lastValue : null,
+    selectedRunFreshnessMinutes: sel ? sel.endpointFreshnessMinutes : null,
+    selectedRunDistanceToLivePct: sel ? sel.distanceToLiveValuePct : null,
+    freshestRunIndex: freshestRunIndex,
+    currentRegimeRunIndex: currentRegimeRunIndex,
+    firstWrongSelectionStage: firstWrongSelectionStage,
+    exactOwnerFunction: exactOwnerFunction,
+    exactSelectionRule: exactSelectionRule,
+    exactReason: exactReason,
+  };
+  try { console.log('%c[UI][CURRENT_REGIME_SEGMENT_AUTHORITY]', 'font-weight:700;color:#e8590c', out); } catch (_) {}
+  return out;
+}
+try { if (typeof window !== 'undefined') window.aurixAuditCurrentRegimeAuthority = function (range) { let res; try { res = _aurixAuditCurrentRegimeAuthorityCore(range); } catch (e) { res = { spec: 'P0.CURRENT_REGIME_SEGMENT_AUTHORITY', verdict: 'AUDIT_ERROR', error: (e && e.message) || String(e) }; } try { window.__AURIX_LAST_CURRENT_REGIME_AUTHORITY_AUDIT__ = res; } catch (_) {} return res; }; } catch (_) {}
 
 // ════════════════════════════════════════════════════════════════════════════
 // SPEC DSH.CHART.24H_RETURN_READINESS.46 — READ-ONLY forensic audit
