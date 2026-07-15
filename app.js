@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '545'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '546'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -2590,7 +2590,7 @@ const T = {
     // Shorter labels used only in the donut center (narrow space)
     donutMeta: { etf: 'Fondos', real_estate: 'Inmob.' },
     // Suggestion type badges
-    typeLabel: { crypto: 'Cripto', stock: 'Acción', etf: 'ETF', metal: 'Metal' },
+    typeLabel: { crypto: 'Cripto', stock: 'Acción', etf: 'ETF', metal: 'Metal', fund: 'Fondo' },
     // Contextual add button in category detail view
     addCtx: { crypto: '+ Añadir cripto', stock: '+ Añadir acción', etf: '+ Añadir fondo', metal: '+ Añadir metal', real_estate: '+ Añadir inmueble', cash: '+ Añadir liquidez' },
     // Search
@@ -4723,7 +4723,7 @@ const T = {
     // Shorter labels used only in the donut center (narrow space)
     donutMeta: { etf: 'Funds', real_estate: 'Real Est.' },
     // Suggestion type badges
-    typeLabel: { crypto: 'Crypto', stock: 'Stock', etf: 'ETF', metal: 'Metal' },
+    typeLabel: { crypto: 'Crypto', stock: 'Stock', etf: 'ETF', metal: 'Metal', fund: 'Fund' },
     // Contextual add button in category detail view
     addCtx: { crypto: '+ Add crypto', stock: '+ Add stock', etf: '+ Add fund', metal: '+ Add metal', real_estate: '+ Add property', cash: '+ Add liquidity' },
     // Search
@@ -45091,6 +45091,117 @@ function searchMetalsLocal(query) {
   ].filter(m => m.kw.some(k => k.startsWith(q)));
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC 48 — UCITS FUND DISCOVERY (Asset Search Engine — DISCOVERY ONLY)
+// ════════════════════════════════════════════════════════════════════════════
+// Lets a user find a UCITS fund by its commercial name / manager, the same way they
+// find a stock or ETF — on top of the existing Yahoo MUTUALFUND + ISIN discovery.
+// STRICTLY DISCOVERY: this only produces search-result items in the SAME shape the add
+// flow already consumes ({ticker,name,type,marketSymbol} + display-only isin/manager/
+// currency) and improves ranking/labelling. It NEVER touches the add flow, holding
+// identity, the (holding) dedup, the Price Engine, the snapshot registry, persistence or
+// any data model. Curated funds carry no marketSymbol → on selection the EXISTING MC-7
+// manual-NAV path prices them (unchanged); the normal add path does not persist the
+// search ISIN (verified), so a catalog ISIN is display-only and can never contaminate
+// identity or pricing. Reversible: _AURIX_FUND_DISCOVERY=false ⇒ byte-identical prior
+// search behaviour (funds still surface exactly as before via Yahoo).
+const _AURIX_FUND_DISCOVERY = true;
+const _AURIX_FUND_MANAGER_LABEL = {
+  'vanguard':'Vanguard', 'ishares':'iShares', 'blackrock':'BlackRock', 'bgf':'BlackRock',
+  'amundi':'Amundi', 'fidelity':'Fidelity', 'jpmorgan':'J.P. Morgan', 'jp morgan':'J.P. Morgan',
+  'pictet':'Pictet', 'dws':'DWS', 'bnp paribas':'BNP Paribas', 'bnp':'BNP Paribas',
+  'franklin templeton':'Franklin Templeton', 'franklin':'Franklin Templeton', 'templeton':'Franklin Templeton',
+  'invesco':'Invesco',
+};
+// Fund-intent keywords (ES/EN) used to detect a fund-compatible query so fund results are
+// surfaced/kept even under the 10-result cap. Manager names are added programmatically.
+const _AURIX_FUND_KEYWORDS = ['fund','fondo','fondos','index','índice','indice','indexado','indexados','ucits','sicav','msci world','s&p 500','sp 500','acc','dist','nav'];
+// Curated DISCOVERY seed of popular UCITS funds (MyInvestor / Indexa / Trade Republic /
+// DEGIRO). SEARCH-ONLY. `ticker` is a short discovery handle (not a market ticker);
+// `isin` is shown only when present; `marketSymbol` is intentionally omitted so selection
+// uses the existing manual-NAV path. Extend freely — data only, no logic depends on size.
+const _AURIX_FUND_DB = [
+  { ticker:'VG-WLD', name:'Vanguard Global Stock Index Fund EUR Acc', manager:'Vanguard', currency:'EUR', isin:'IE00B03HD191', aliases:['vanguard global stock','global stock index','vanguard world','vanguard msci world'] },
+  { ticker:'VG-500', name:'Vanguard U.S. 500 Stock Index Fund EUR Acc', manager:'Vanguard', currency:'EUR', isin:'IE0032620787', aliases:['vanguard us 500','vanguard s&p 500','vanguard sp500','sp 500 index'] },
+  { ticker:'VG-EM',  name:'Vanguard Emerging Markets Stock Index Fund EUR Acc', manager:'Vanguard', currency:'EUR', isin:'IE0031786142', aliases:['vanguard emerging','emerging markets index'] },
+  { ticker:'VG-EUR', name:'Vanguard Eurozone Stock Index Fund EUR Acc', manager:'Vanguard', currency:'EUR', isin:'IE0007987690', aliases:['vanguard eurozone'] },
+  { ticker:'VG-GB',  name:'Vanguard Global Bond Index Fund EUR Hedged Acc', manager:'Vanguard', currency:'EUR', isin:'IE00B18GC888', aliases:['vanguard global bond','global bond index'] },
+  { ticker:'IS-DW',  name:'iShares Developed World Index Fund (IE) EUR Acc', manager:'iShares', currency:'EUR', isin:'IE00BD0NCM55', aliases:['ishares developed world','ishares world index','ishares msci world index'] },
+  { ticker:'AM-WLD', name:'Amundi Index MSCI World AE-C', manager:'Amundi', currency:'EUR', isin:'LU0996182563', aliases:['amundi msci world','amundi world','amundi index world'] },
+  { ticker:'AM-EM',  name:'Amundi Index MSCI Emerging Markets AE-C', manager:'Amundi', currency:'EUR', isin:'LU0996177134', aliases:['amundi emerging','amundi index emerging'] },
+  { ticker:'PC-MEGA',name:'Pictet-Global Megatrend Selection P EUR', manager:'Pictet', currency:'EUR', isin:'LU0386882277', aliases:['pictet megatrend','pictet global megatrend'] },
+  { ticker:'PC-WATER',name:'Pictet-Water P EUR', manager:'Pictet', currency:'EUR', isin:'LU0104884860', aliases:['pictet water'] },
+  { ticker:'PC-SEC', name:'Pictet-Security P EUR', manager:'Pictet', currency:'EUR', isin:'LU0270904983', aliases:['pictet security'] },
+  { ticker:'DWS-DIV',name:'DWS Top Dividende LD', manager:'DWS', currency:'EUR', isin:'DE0009848119', aliases:['dws top dividende','dws dividende'] },
+  { ticker:'FT-TECH',name:'Franklin Technology Fund A(acc)USD', manager:'Franklin Templeton', currency:'USD', isin:'LU0260870158', aliases:['franklin technology'] },
+  { ticker:'TP-GBOND',name:'Templeton Global Bond Fund A(acc)USD', manager:'Franklin Templeton', currency:'USD', isin:'LU0252652382', aliases:['templeton global bond'] },
+  { ticker:'BGF-WT', name:'BlackRock Global Funds World Technology A2 USD', manager:'BlackRock', currency:'USD', isin:'LU0171310443', aliases:['blackrock world technology','bgf world technology'] },
+  { ticker:'FID-WLD',name:'Fidelity MSCI World Index Fund P Acc EUR', manager:'Fidelity', currency:'EUR', isin:null, aliases:['fidelity world index','fidelity msci world'] },
+  { ticker:'JPM-GF', name:'JPMorgan Funds Global Focus Fund A (acc) EUR', manager:'J.P. Morgan', currency:'EUR', isin:null, aliases:['jpmorgan global focus','jpm global focus'] },
+  { ticker:'INV-CT', name:'Invesco Global Consumer Trends Fund A USD', manager:'Invesco', currency:'USD', isin:null, aliases:['invesco consumer trends'] },
+];
+// Parse manager + quote currency directly from a fund's DISPLAY NAME (no external data),
+// so Yahoo-sourced MUTUALFUND results can also show a manager/currency chip.
+function _aurixParseFundMeta(name) {
+  const n = String(name || '').toLowerCase();
+  let manager = null;
+  for (const key of Object.keys(_AURIX_FUND_MANAGER_LABEL)) { if (n.indexOf(key) >= 0) { manager = _AURIX_FUND_MANAGER_LABEL[key]; break; } }
+  const cm = String(name || '').match(/\b(USD|EUR|GBP|CHF|JPY|SEK|NOK|DKK)\b/);
+  return { manager: manager, currency: cm ? cm[1] : null };
+}
+function _aurixIsIsin(s) { return /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(String(s || '').toUpperCase().trim()); }
+// A query is "fund-compatible" if it is an ISIN, names a known manager, or contains a
+// fund keyword. Used to reserve result slots so a fund query isn't crowded out.
+function _aurixLooksLikeFundQuery(query) {
+  const q = String(query || '').toLowerCase().trim();
+  if (!q) return false;
+  if (_aurixIsIsin(q)) return true;
+  if (Object.keys(_AURIX_FUND_MANAGER_LABEL).some(m => q.indexOf(m) >= 0)) return true;
+  return _AURIX_FUND_KEYWORDS.some(k => q.indexOf(k) >= 0);
+}
+// Match the curated fund seed by name / alias / manager / isin / ticker. Returns items in
+// the existing search-result shape + display-only isin/manager/currency. Discovery only.
+function _aurixSearchFundsLocal(query) {
+  if (!(typeof _AURIX_FUND_DISCOVERY !== 'undefined' && _AURIX_FUND_DISCOVERY)) return [];
+  const q = String(query || '').toLowerCase().trim();
+  if (q.length < 2) return [];
+  const isIsinQ = _aurixIsIsin(q);
+  const out = [];
+  for (const f of _AURIX_FUND_DB) {
+    const name = f.name.toLowerCase(), mgr = (f.manager || '').toLowerCase();
+    const hit = (isIsinQ && f.isin && f.isin.toLowerCase() === q)
+      || name.indexOf(q) >= 0
+      || mgr.indexOf(q) >= 0
+      || f.ticker.toLowerCase().indexOf(q) >= 0
+      || (Array.isArray(f.aliases) && f.aliases.some(a => a.indexOf(q) >= 0 || q.indexOf(a) >= 0));
+    if (hit) out.push({ ticker: f.ticker, name: f.name, type: 'fund', marketSymbol: null, isin: f.isin || null, manager: f.manager || null, assetCurrency: f.currency || null });
+  }
+  return out;
+}
+// Stable relevance rank: exact (ticker/isin/name) → startsWith(name/ticker) → includes →
+// rest. Preserves input order within a tier so existing result order is otherwise intact.
+function _aurixRankSearchResults(items, query) {
+  const q = String(query || '').toLowerCase().trim();
+  const score = a => {
+    const tk = String(a.ticker || '').toLowerCase(), nm = String(a.name || '').toLowerCase(), is = String(a.isin || '').toLowerCase();
+    if (tk === q || is === q || nm === q) return 0;
+    if (tk.startsWith(q) || nm.startsWith(q)) return 1;
+    if (nm.indexOf(q) >= 0 || tk.indexOf(q) >= 0) return 2;
+    return 3;
+  };
+  return items.map((a, i) => ({ a, i, s: score(a) })).sort((x, y) => (x.s - y.s) || (x.i - y.i)).map(o => o.a);
+}
+// Fund-only display subtitle: "Manager · CUR · ISIN" (skips missing parts). Non-fund →
+// the plain ticker (unchanged). Presentation helper for the search dropdown only.
+function _aurixSearchSubtitle(a) {
+  if (!a || a.type !== 'fund') return a && a.ticker ? a.ticker : '';
+  const parts = [];
+  if (a.manager) parts.push(a.manager);
+  if (a.assetCurrency) parts.push(a.assetCurrency);
+  if (a.isin) parts.push(a.isin);
+  return parts.length ? parts.join(' · ') : (a.ticker || 'Fund');
+}
+
 async function searchAllAssets(query, signal) {
   const metals = searchMetalsLocal(query);
 
@@ -45113,13 +45224,34 @@ async function searchAllAssets(query, signal) {
     ? cryptoRes.value
     : [];
 
+  // SPEC 48 — flag OFF ⇒ EXACT prior behaviour (metals → yahoo → crypto, dedupe by ticker, cap 10).
+  if (!(typeof _AURIX_FUND_DISCOVERY !== 'undefined' && _AURIX_FUND_DISCOVERY)) {
+    const seen = new Set();
+    const merged = [];
+    for (const item of [...metals, ...yahooItems, ...cryptoItems]) {
+      const key = item.ticker.toUpperCase();
+      if (!seen.has(key)) { seen.add(key); merged.push(item); }
+    }
+    return merged.slice(0, 10);
+  }
+  // SPEC 48 — flag ON: (1) label Yahoo MUTUALFUND items with parsed manager/currency;
+  // (2) inject curated fund matches; (3) dedupe (funds by isin/ticker, others by ticker);
+  // (4) relevance rank (exact first). Stocks/ETFs/indices/crypto items are untouched.
+  const yEnriched = yahooItems.map(it => {
+    if (it && it.type === 'fund') { const meta = _aurixParseFundMeta(it.name); return Object.assign({}, it, { manager: it.manager || meta.manager, assetCurrency: it.assetCurrency || meta.currency }); }
+    return it;
+  });
+  const funds = _aurixSearchFundsLocal(query);
   const seen = new Set();
   const merged = [];
-  for (const item of [...metals, ...yahooItems, ...cryptoItems]) {
-    const key = item.ticker.toUpperCase();
+  for (const item of [...funds, ...metals, ...yEnriched, ...cryptoItems]) {
+    if (!item || !item.ticker) continue;
+    const key = (item.type === 'fund')
+      ? 'FUND:' + String(item.isin || item.ticker || item.name).toUpperCase()
+      : String(item.ticker).toUpperCase();
     if (!seen.has(key)) { seen.add(key); merged.push(item); }
   }
-  return merged.slice(0, 10);
+  return _aurixRankSearchResults(merged, query).slice(0, 10);
 }
 
 // Filter-aware search: only queries the relevant API source
@@ -45130,6 +45262,21 @@ async function searchByFilter(query, filter, signal) {
   if (filter === 'crypto') {
     const results = await searchCoinGeckoAPI(query, signal);
     return results || [];
+  }
+  // SPEC 48 — dedicated fund route (only when the discovery flag is on): curated fund seed
+  // merged with Yahoo MUTUALFUND hits, deduped + relevance-ranked. Discovery only.
+  if (filter === 'fund' && (typeof _AURIX_FUND_DISCOVERY !== 'undefined' && _AURIX_FUND_DISCOVERY)) {
+    const funds = _aurixSearchFundsLocal(query);
+    const yahoo = await searchYahooFinance(query, signal);
+    const yFunds = (Array.isArray(yahoo) ? yahoo : []).filter(a => a && a.type === 'fund')
+      .map(it => { const meta = _aurixParseFundMeta(it.name); return Object.assign({}, it, { manager: it.manager || meta.manager, assetCurrency: it.assetCurrency || meta.currency }); });
+    const seen = new Set(); const merged = [];
+    for (const item of [...funds, ...yFunds]) {
+      if (!item || !item.ticker) continue;
+      const key = 'FUND:' + String(item.isin || item.ticker || item.name).toUpperCase();
+      if (!seen.has(key)) { seen.add(key); merged.push(item); }
+    }
+    return _aurixRankSearchResults(merged, query).slice(0, 10);
   }
   if (filter === 'stock' || filter === 'etf') {
     const yahooResults = await searchYahooFinance(query, signal);
@@ -45518,7 +45665,7 @@ function showDefaultSuggestions() {
         ${_assetIconHtml(a, a.ticker, 'sugg-badge ' + a.type)}
         <div class="sugg-info">
           <div class="sugg-name">${escHtml(getDisplayName(a))}</div>
-          <div class="sugg-ticker">${escHtml(a.ticker)}</div>
+          <div class="sugg-ticker">${escHtml((typeof _aurixSearchSubtitle === 'function') ? _aurixSearchSubtitle(a) : a.ticker)}</div>
         </div>
         <span class="sugg-type ${a.type}">${T[lang].typeLabel[a.type] || a.type}</span>
       </div>`).join('')}`;

@@ -1,0 +1,142 @@
+'use strict';
+// ════════════════════════════════════════════════════════════════════════════
+// AURIX-UCITS-FUND-DISCOVERY-harness — SPEC 48 (Asset Search Engine, discovery only)
+// ════════════════════════════════════════════════════════════════════════════
+// Proves the fund-discovery layer against the REAL app.js source: fund-intent detection,
+// name/manager/ISIN resolution over the curated seed, manager/currency parsing from a
+// fund name, relevance ranking (exact first), the fund display subtitle, catalog
+// integrity (no dup tickers/ISINs, valid ISIN shape), and NON-REGRESSION for
+// stocks/ETFs/indices/crypto (fund paths never fire for non-fund queries). Pure /
+// deterministic — no network, no DOM. Nothing modified.
+const fs = require('fs'), vm = require('vm'), path = require('path');
+const root = path.join(__dirname, '..');
+const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+function braceSlice(s, i) { let d = 0, k = s.indexOf('{', i); const openIsBracket = s[i] === '['; if (openIsBracket) k = i; let open = s[k]; let close = open === '[' ? ']' : '}'; for (; k < s.length; k++) { const c = s[k]; if (c === open) d++; else if (c === close) { d--; if (!d) { k++; break; } } } return s.slice(i, k); }
+function fnSrc(n) { const i = app.indexOf('function ' + n + '('); if (i < 0) throw new Error('missing fn ' + n); return braceSlice(app, i); }
+function konstSrc(n) {
+  const m = new RegExp('const ' + n + '\\s*=\\s*').exec(app);
+  if (!m) throw new Error('missing const ' + n);
+  const eq = m.index + m[0].length, first = app[eq];
+  if (first === '{' || first === '[') { const body = braceSlice(app, eq); const semi = app.indexOf(';', eq + body.length); return app.slice(m.index, semi + 1); }
+  const semi = app.indexOf(';', eq); return app.slice(m.index, semi + 1);
+}
+let pass = 0, fail = 0;
+function ok(n, c, extra) { if (c) { pass++; console.log('  ✓ ' + n); } else { fail++; console.log('  ✗ ' + n + (extra ? '  →  ' + extra : '')); } }
+
+const ctx = { console: { log() {} }, Math, JSON, Array, Object, String, Number, isFinite, RegExp, Date };
+vm.createContext(ctx);
+['_AURIX_FUND_DISCOVERY', '_AURIX_FUND_MANAGER_LABEL', '_AURIX_FUND_KEYWORDS', '_AURIX_FUND_DB'].forEach(c => vm.runInContext(konstSrc(c), ctx));
+['_aurixParseFundMeta', '_aurixIsIsin', '_aurixLooksLikeFundQuery', '_aurixSearchFundsLocal', '_aurixRankSearchResults', '_aurixSearchSubtitle'].forEach(f => vm.runInContext(fnSrc(f), ctx));
+const call = (n, ...a) => vm.runInContext(n, ctx)(...a);
+const DB = vm.runInContext('_AURIX_FUND_DB', ctx);
+
+console.log('\nAURIX-UCITS-FUND-DISCOVERY — SPEC 48');
+
+// ── 0 presence / wiring ───────────────────────────────────────────────────────
+ok('0 flag + funcs + fund route + typeLabel + subtitle wired', app.indexOf('SPEC 48 — UCITS FUND DISCOVERY') >= 0
+  && /const _AURIX_FUND_DISCOVERY = true;/.test(app)
+  && app.indexOf("filter === 'fund'") >= 0
+  && /typeLabel: \{ crypto: 'Cripto'.*fund: 'Fondo' \}/.test(app)
+  && /typeLabel: \{ crypto: 'Crypto'.*fund: 'Fund' \}/.test(app)
+  && app.indexOf('_aurixSearchSubtitle(a) : a.ticker') >= 0);
+
+// ── 1 búsqueda por nombre parcial ──────────────────────────────────────────────
+{
+  const r = call('_aurixSearchFundsLocal', 'vanguard glob');
+  ok('1 nombre parcial "vanguard glob" → Vanguard Global', r.length >= 1 && r.some(x => /Vanguard Global/i.test(x.name)));
+  ok('1 resultado lleva type=fund + manager + currency', r[0] && r[0].type === 'fund' && r[0].manager === 'Vanguard' && r[0].assetCurrency === 'EUR');
+}
+
+// ── 2 búsqueda por nombre completo ─────────────────────────────────────────────
+{
+  const full = 'Vanguard U.S. 500 Stock Index Fund EUR Acc';
+  const r = call('_aurixSearchFundsLocal', full.toLowerCase());
+  ok('2 nombre completo → encontrado', r.some(x => x.name === full));
+  const ranked = call('_aurixRankSearchResults', r, full);
+  ok('2 coincidencia exacta de nombre rankea primero', ranked[0] && ranked[0].name === full);
+}
+
+// ── 3 búsqueda por ISIN ────────────────────────────────────────────────────────
+{
+  ok('3 _aurixIsIsin reconoce ISIN válido', call('_aurixIsIsin', 'IE00B03HD191') === true && call('_aurixIsIsin', 'NOTANISIN') === false);
+  const r = call('_aurixSearchFundsLocal', 'IE00B03HD191');
+  ok('3 búsqueda por ISIN → el fondo correcto', r.length === 1 && r[0].isin === 'IE00B03HD191');
+}
+
+// ── 4 búsqueda por gestora ─────────────────────────────────────────────────────
+{
+  const r = call('_aurixSearchFundsLocal', 'amundi');
+  ok('4 gestora "amundi" → ≥1 fondo Amundi', r.length >= 1 && r.every(x => x.manager === 'Amundi'));
+}
+
+// ── 5 gestoras populares ES/EU representadas ───────────────────────────────────
+{
+  const managers = ['vanguard', 'ishares', 'amundi', 'fidelity', 'jpmorgan', 'pictet', 'dws', 'franklin', 'invesco', 'blackrock'];
+  const missing = managers.filter(m => call('_aurixLooksLikeFundQuery', m) !== true || call('_aurixSearchFundsLocal', m).length < 1);
+  ok('5 todas las gestoras nombradas resuelven (intent + ≥1 fondo)', missing.length === 0, 'missing=' + missing.join(','));
+}
+
+// ── 6 fund-intent detection ────────────────────────────────────────────────────
+{
+  ok('6 intent TRUE para keywords/gestora/ISIN', call('_aurixLooksLikeFundQuery', 'msci world index') && call('_aurixLooksLikeFundQuery', 'pictet') && call('_aurixLooksLikeFundQuery', 'IE0032620787'));
+  ok('6 intent FALSE para acción/cripto', call('_aurixLooksLikeFundQuery', 'AAPL') === false && call('_aurixLooksLikeFundQuery', 'BTC') === false);
+}
+
+// ── 7 parseo de gestora/divisa desde el nombre (para fondos de Yahoo) ──────────
+{
+  const m = call('_aurixParseFundMeta', 'iShares Developed World Index Fund (IE) EUR Acc');
+  ok('7 parse Yahoo fund name → iShares + EUR', m.manager === 'iShares' && m.currency === 'EUR');
+  const m2 = call('_aurixParseFundMeta', 'Franklin Technology Fund A(acc)USD');
+  ok('7 parse → Franklin Templeton + USD', m2.manager === 'Franklin Templeton' && m2.currency === 'USD');
+}
+
+// ── 8 subtitle de fondo muestra gestora · divisa · ISIN ────────────────────────
+{
+  const f = { type: 'fund', ticker: 'VG-WLD', manager: 'Vanguard', assetCurrency: 'EUR', isin: 'IE00B03HD191' };
+  ok('8 subtitle fondo = "Vanguard · EUR · IE00B03HD191"', call('_aurixSearchSubtitle', f) === 'Vanguard · EUR · IE00B03HD191');
+  ok('8 subtitle no-fondo = ticker (sin cambios)', call('_aurixSearchSubtitle', { type: 'stock', ticker: 'AAPL' }) === 'AAPL');
+}
+
+// ── 9 relevancia: exacto → prefijo → contiene ──────────────────────────────────
+{
+  const items = [
+    { ticker: 'ZZZ', name: 'holds aapl inside name' }, // contiene → 2
+    { ticker: 'AAPLX', name: 'Apple Long Variant' },   // prefijo de ticker → 1
+    { ticker: 'AAPL', name: 'Apple' },                 // exacto → 0
+  ];
+  const ranked = call('_aurixRankSearchResults', items, 'aapl');
+  ok('9 exacto (AAPL) primero, luego prefijo (AAPLX), luego contiene (ZZZ)', ranked[0].ticker === 'AAPL' && ranked[1].ticker === 'AAPLX' && ranked[2].ticker === 'ZZZ', ranked.map(x => x.ticker).join(','));
+  // estabilidad: misma puntuación conserva orden de entrada
+  const stable = call('_aurixRankSearchResults', [{ ticker: 'X1', name: 'nvidia corp' }, { ticker: 'X2', name: 'nvidia holding' }], 'nvidia');
+  ok('9 estable dentro del mismo tier (orden de entrada)', stable[0].ticker === 'X1' && stable[1].ticker === 'X2');
+}
+
+// ── 10 NO REGRESIÓN acciones/etf/índice/cripto ─────────────────────────────────
+{
+  ok('10 query de acción NO inyecta fondos', call('_aurixSearchFundsLocal', 'AAPL').length === 0 && call('_aurixSearchFundsLocal', 'TSLA').length === 0);
+  ok('10 query de cripto NO inyecta fondos', call('_aurixSearchFundsLocal', 'BTC').length === 0);
+  // rank preserva el conjunto (mismos elementos, sin perder ni duplicar) para lista no-fondo
+  const nonFund = [{ ticker: 'SPY', name: 'SPDR S&P 500' }, { ticker: 'QQQ', name: 'Invesco QQQ' }, { ticker: 'VTI', name: 'Vanguard Total' }];
+  const out = call('_aurixRankSearchResults', nonFund.slice(), 'spy');
+  ok('10 rank conserva todos los items no-fondo', out.length === 3 && ['SPY', 'QQQ', 'VTI'].every(t => out.some(x => x.ticker === t)));
+}
+
+// ── 11 sin duplicados en el catálogo (tickers e ISINs únicos) ──────────────────
+{
+  const tks = DB.map(f => f.ticker), isins = DB.map(f => f.isin).filter(Boolean);
+  ok('11 tickers únicos en el seed', new Set(tks).size === tks.length);
+  ok('11 ISINs únicos en el seed', new Set(isins).size === isins.length);
+  ok('11 ISINs presentes tienen forma ISO válida', isins.every(x => call('_aurixIsIsin', x)), isins.filter(x => !call('_aurixIsIsin', x)).join(','));
+  ok('11 cada entrada tiene ticker+name+manager+currency+type-implícito', DB.every(f => f.ticker && f.name && f.manager && f.currency));
+}
+
+// ── 12 tiempo de respuesta equivalente (búsqueda local O(n) trivial) ───────────
+{
+  const t0 = Date.now();
+  for (let i = 0; i < 5000; i++) call('_aurixSearchFundsLocal', 'vanguard');
+  const ms = Date.now() - t0;
+  ok('12 5000 búsquedas locales < 500ms (coste despreciable)', ms < 500, ms + 'ms');
+}
+
+console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + '  (' + pass + ' passed, ' + fail + ' failed)\n');
+process.exit(fail === 0 ? 0 : 1);
