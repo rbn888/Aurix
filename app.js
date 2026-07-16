@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '549'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '550'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -24063,7 +24063,9 @@ try { if (typeof window !== 'undefined') window._aurix24hReturnReadiness = _auri
 function _aurix24hRecentRunAnchor(pts) {
   const out = { runStartIdx: 0, runStartTs: null, runCount: 1,
     postBootstrapPointCount: (Array.isArray(pts) ? pts.length : 0), bootstrapSnapshotCount: 0,
-    constructionEndTimestamp: null, largestGapMsInRun: 0 };
+    constructionEndTimestamp: null, largestGapMsInRun: 0,
+    // SPEC DSH.CHART.24H_RETURN_PUBLICATION_DEADLOCK — observability of the accepted-regime decision
+    spannedObservationGapCount: 0, spannedObservationGapMaxMs: 0, regimeBoundaryReason: null };
   try {
     const src = Array.isArray(pts) ? pts.filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value)) : [];
     if (src.length < 2) { out.runStartTs = src.length ? src[0].ts : null; return out; }
@@ -24074,16 +24076,59 @@ function _aurix24hRecentRunAnchor(pts) {
     if (breaks.length) { try { if (typeof _aurixSplitAtGaps === 'function') runs = _aurixSplitAtGaps(mapped, breaks) || [mapped]; } catch (_) { runs = [mapped]; } }
     runs = runs.filter(x => x && x.length);
     out.runCount = runs.length;
-    const recent = runs[runs.length - 1];
-    const startTs = recent[0].time;
+    // ── SPEC DSH.CHART.24H_RETURN_PUBLICATION_DEADLOCK — accepted-regime baseline (fix) ──────────────
+    // ROOT CAUSE (proven): the accepted RETURN baseline was ALWAYS `runs[last][0]` — so ANY structural
+    // break re-anchored the baseline forward, INCLUDING a pure browser/overnight OBSERVATION gap (a
+    // real_temporal_gap / confirmed_sparse_bridge with NO capital flow). Every night the baseline jumped to
+    // the morning run and the elapsed-coverage clock reset (production: coverage 0.07 < 0.25 despite an
+    // 18h-old regime → INSUFFICIENT_ELAPSED_COVERAGE, indefinite "Historial parcial").
+    // FIX: the accepted regime is the current POST-CONSTRUCTION / POST-CAPITAL-EVENT regime. Start at the
+    // most-recent run and extend BACKWARD across pure OBSERVATION gaps (they only split the VISIBLE line);
+    // STOP only at a break that genuinely ENDS a return interval — a RECONCILED capital event
+    // (break.reason === 'capital_step') or a genuine CONSTRUCTION-LOW prefix run (level ≪ the accepted
+    // regime). A time gap is NEVER a capital event (capital = a VALUE jump, caught by the flow-neutral
+    // engine), so spanning observation gaps removes no financial protection. Rendering segmentation is
+    // untouched (the FRC still splits the line at every break). Single run ⇒ runStartIdx 0 (unchanged).
+    const runMedian = run => { const v = run.map(p => p.value).slice().sort((a, b) => a - b); return v.length ? v[v.length >> 1] : 0; };
+    const CONSTRUCTION_LOW_FRAC = 0.55;   // matches the codebase baseline_construction_low convention (0.55×)
+    const acceptedRegimeMedian = runMedian(runs[runs.length - 1]) || (runs[runs.length - 1][0] ? runs[runs.length - 1][0].value : 0);
+    // the break separating runs[k-1] and runs[k]: its start = runs[k-1]'s last ts, end = runs[k]'s first ts
+    const boundaryBefore = k => {
+      const startTs = runs[k - 1][runs[k - 1].length - 1].time, endTs = runs[k][0].time;
+      return breaks.find(b => b && b.start === startTs && b.end === endTs) || breaks.find(b => b && b.start === startTs) || null;
+    };
+    let startRun = runs.length - 1;
+    for (let k = runs.length - 1; k >= 1; k--) {
+      const b = boundaryBefore(k);
+      const reason = (b && b.reason) ? String(b.reason) : '';
+      if (reason === 'capital_step') { out.regimeBoundaryReason = 'capital_step'; break; }   // reconciled capital event ENDS the interval
+      const prevMed = runMedian(runs[k - 1]);
+      if (acceptedRegimeMedian > 0 && prevMed < CONSTRUCTION_LOW_FRAC * acceptedRegimeMedian) { out.regimeBoundaryReason = 'construction_low'; break; }
+      // pure observation gap between two same-regime runs → span it (baseline stays earlier)
+      startRun = k - 1;
+      out.spannedObservationGapCount++;
+      const gms = runs[k][0].time - runs[k - 1][runs[k - 1].length - 1].time;
+      if (gms > out.spannedObservationGapMaxMs) out.spannedObservationGapMaxMs = gms;
+    }
+    const startTs = runs[startRun][0].time;
     let idx = src.findIndex(p => p.ts === startTs);
     if (idx < 0) idx = 0;
     out.runStartIdx = idx;
     out.runStartTs = src[idx].ts;
     out.postBootstrapPointCount = src.length - idx;
-    out.bootstrapSnapshotCount = idx;                                   // points EXCLUDED as pre-construction/import/gap prefix
-    out.constructionEndTimestamp = idx > 0 ? src[idx].ts : null;        // regime boundary (null ⇒ single run, pipeline already trimmed)
-    let g = 0; for (let i = idx + 1; i < src.length; i++) { const d = src[i].ts - src[i - 1].ts; if (d > g) g = d; }
+    out.bootstrapSnapshotCount = idx;                                   // points EXCLUDED as pre-construction/import/capital prefix
+    out.constructionEndTimestamp = idx > 0 ? src[idx].ts : null;        // regime boundary (null ⇒ single accepted run)
+    // largestGapMsInRun = largest DENSE (intra-session) gap in the accepted region. OBSERVATION outages
+    // (≥ 8× the median cadence) are EXCLUDED: a benign overnight/browser hole splits the rendered line but
+    // must NOT trip the return's continuity gate (contract: an observation gap never invalidates an
+    // otherwise-trustworthy endpoint-to-endpoint return). A genuine unreconciled capital event is a VALUE
+    // jump caught by the flow-neutral engine — never a time gap — so excluding time-outages loses nothing.
+    const acc = []; for (let i = idx + 1; i < src.length; i++) acc.push(src[i].ts - src[i - 1].ts);
+    const accSorted = acc.slice().sort((a, b) => a - b);
+    const medCadence = accSorted.length ? (accSorted[accSorted.length >> 1] || 0) : 0;
+    const mult = (typeof _AURIX_VP_GAP_MEDIAN_MULT === 'number') ? _AURIX_VP_GAP_MEDIAN_MULT : 8;
+    const obsGapCeil = medCadence > 0 ? medCadence * mult : Infinity;   // gaps ≥ this are observation outages (excluded)
+    let g = 0; for (const d of acc) { if (d < obsGapCeil && d > g) g = d; }
     out.largestGapMsInRun = g;
     return out;
   } catch (_) { return out; }
@@ -24244,8 +24289,12 @@ function buildProductionPortfolioChart(range) {
         }
         const _postCount = _anchor ? _anchor.postBootstrapPointCount : pts.length;
         const _covRun = (_reqSpanMs > 0) ? +(((last.ts - _first24.ts) / _reqSpanMs).toFixed(4)) : null;
-        let _gapRun = (_anchor && _anchor.runStartIdx > 0) ? _anchor.largestGapMsInRun : 0;
-        if (!_anchor || _anchor.runStartIdx === 0) { for (let _i = 1; _i < pts.length; _i++) { const _d = pts[_i].ts - pts[_i - 1].ts; if (_d > _gapRun) _gapRun = _d; } }
+        // SPEC DSH.CHART.24H_RETURN_PUBLICATION_DEADLOCK — the internal-gap gate reads the anchor's
+        // largestGapMsInRun, which already EXCLUDES spanned observation outages (overnight/browser holes)
+        // for the accepted region (incl. runStartIdx === 0). The prior all-raw-gaps recompute re-introduced
+        // the overnight gap here and tripped DISCONTINUOUS_INTERVAL — the second facet of the deadlock.
+        let _gapRun = _anchor ? _anchor.largestGapMsInRun : 0;
+        if (!_anchor) { for (let _i = 1; _i < pts.length; _i++) { const _d = pts[_i].ts - pts[_i - 1].ts; if (_d > _gapRun) _gapRun = _d; } }
         const _freshMs = Number.isFinite(last.ts) ? (Date.now() - last.ts) : null;
         const _minPts24 = (typeof _AURIX_24H_PARTIAL_MIN_POINTS === 'number') ? _AURIX_24H_PARTIAL_MIN_POINTS : 8;
         // REGIME (bootstrap is now a REGIME fact, not a coverage fact): a genuinely-short post-construction
