@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '555'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '556'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -30839,9 +30839,13 @@ if (typeof window !== 'undefined') {
 
 // Compact axis value label, e.g. 61.2k / 1.84M. No currency token (clean).
 function _wscFmtAxisVal(v) {
+  // SPEC CHART_PRODUCTION_CERTIFICATION — institutional axis labels (VISUAL ONLY, axis-text formatter; the
+  // two callers are Y-tick rendering — NEVER the tooltip/badge/return, so no financial number is affected).
+  // Uppercase K/M and drop decimals that add no information: 20000→"20K", 20200→"20.2K", 1.5e6→"1.5M", 2e6→"2M".
   const a = Math.abs(v);
-  if (a >= 1e6) return (v / 1e6).toFixed(2) + 'M';
-  if (a >= 1e3) return (v / 1e3).toFixed(1) + 'k';
+  const strip = (n, d) => { let s = n.toFixed(d); if (s.indexOf('.') >= 0) s = s.replace(/0+$/, '').replace(/\.$/, ''); return s; };
+  if (a >= 1e6) return strip(v / 1e6, 2) + 'M';
+  if (a >= 1e3) return strip(v / 1e3, 1) + 'K';
   return Math.round(v).toString();
 }
 
@@ -33699,9 +33703,12 @@ function renderAurixMobileLiteChart(range, token) {
         const gid = 'aurixLiteFill_' + tone;
         // FIX 2 — mobile right Y-axis labels from the SAME rendered scale (compact; right-aligned inside pad).
         const _myt = (_rc.ok && _rc.yScale && typeof _aurixInstitutionalYTicks === 'function') ? _aurixInstitutionalYTicks(_rc.yScale, 3) : [];
-        // SPEC MOBILE.CHART.LAYOUT.01 — labels right-aligned inside the reserved gutter with a constant margin
-        // from the card edge (x 982→966). Vertical position (tk.y), size, font, colour and opacity unchanged.
-        const _mYlabels = _myt.map(function (tk) { return '<text class="mob-ylab" x="966" y="' + Math.min(252, Math.max(14, tk.y + 5)).toFixed(0) + '" text-anchor="end" fill="rgba(159,176,199,0.55)" font-size="17" font-family="-apple-system,system-ui" style="pointer-events:none">' + tk.text + '</text>'; }).join('');
+        // SPEC MOBILE.CHART.LAYOUT.01 + CHART_PRODUCTION_CERTIFICATION (visual) — labels right-aligned inside the
+        // reserved gutter. x 982→966→973: nudged ~7px toward the card edge for an institutional finish and a
+        // wider curve↔label gap (curve/grid end at x=900, so the gap grows 66→73u). Still inside the 900..1000
+        // gutter (text-anchor:end ⇒ never overlaps the curve or clips the edge). Vertical position (tk.y), size,
+        // font, colour, opacity and the curve geometry are UNCHANGED.
+        const _mYlabels = _myt.map(function (tk) { return '<text class="mob-ylab" x="973" y="' + Math.min(252, Math.max(14, tk.y + 5)).toFixed(0) + '" text-anchor="end" fill="rgba(159,176,199,0.55)" font-size="17" font-family="-apple-system,system-ui" style="pointer-events:none">' + tk.text + '</text>'; }).join('');
         const svg =
           '<svg class="aurix-lite-svg' + (_aurixMobileLitePrevRange !== r ? (' aurix-lite-in' + ((_aurixPremiumMotionOn() && !(typeof document !== 'undefined' && document.hidden) && !_dshReducedMotion()) ? ' aurix-pm' : '')) : '') + '" viewBox="0 0 ' + VBW + ' ' + VBH + '" preserveAspectRatio="none" width="100%" height="100%" style="display:block" aria-hidden="true">' +
             '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +

@@ -84,10 +84,10 @@ ok('L1 mobile plot box reserves a right gutter (right=900 of 1000 viewBox, ~100u
    /const _mbox = \{ left: 14, right: 900, top: 24, bottom: 236 \};/.test(paintM), 'right=900');
 ok('L2 curve/area map into the gutter box → all mobile pixels end at/inside x=900 (never over the labels)',
    Math.max.apply(null, rcM.visiblePixels.map(q => q.x)) <= 900 + 0.5, 'maxX=' + Math.max.apply(null, rcM.visiblePixels.map(q => q.x)).toFixed(1));
-ok('L3 Y-labels right-aligned inside the gutter with a constant margin from the card edge (x=966, ~34u)',
-   /class="mob-ylab" x="966"[\s\S]{0,90}text-anchor="end"/.test(paintM));
-ok('L4 label gutter is clear of the curve (label right edge 966 sits inside 900..1000 gutter)',
-   966 > 900 && 966 < 1000);
+ok('L3 Y-labels right-aligned inside the gutter, nudged ~7px toward the card edge (x=973, ~27u)',
+   /class="mob-ylab" x="973"[\s\S]{0,90}text-anchor="end"/.test(paintM));
+ok('L4 label gutter is clear of the curve (label right edge 973 sits inside 900..1000 gutter, wider curve↔label gap)',
+   973 > 900 && 973 < 1000);
 ok('L5 grid horizontal lines aligned to the plot right (x2=900, no lines running under the labels)',
    /class="h" x1="14" y1="77" x2="900"/.test(paintM) && !/class="h"[^>]*x2="986"/.test(paintM));
 ok('L6 label typography/colour/opacity UNCHANGED (font-size 17, rgba(159,176,199,0.55))',
