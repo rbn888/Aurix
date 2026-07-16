@@ -4657,18 +4657,24 @@ body:not(.hero-active) #orb-canvas {
     position: sticky;
     top: 0;
     z-index: 60;
-    min-height: 54px;
+    /* SPEC MOBILE-ABOVE-THE-FOLD-COMPRESSION — compact the header to reclaim
+       real vertical space above the fold (min-height 54→48, tighter top/bottom
+       padding, margin-bottom 12→8). Safe-area inset preserved so the mark never
+       rides under the notch / Dynamic Island. */
+    min-height: 48px;
     /* AURIX-MOBILE-DASHBOARD-CATEGORY-FIX-1 (#1): a small horizontal inset so
        AURIX aligns optically with the card CONTENT (the .app shell adds 16px,
        this adds ~8px more) instead of sitting flush against the screen edge.
        Symmetric, so the hamburger reads as intentionally placed on the right. */
-    padding: 8px var(--space-2);
-    padding-top: calc(8px + env(safe-area-inset-top, 0px));
-    margin-bottom: var(--space-2);
+    padding: 6px var(--space-2);
+    padding-top: calc(6px + env(safe-area-inset-top, 0px));
+    margin-bottom: var(--space-1);
     background: rgba(11, 15, 26, 0.72);
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    /* SPEC MOBILE-ABOVE-THE-FOLD-COMPRESSION — remove the static header divider
+       line (the glass background + scroll depth already separate the header). */
+    border-bottom: none;
   }
   /* AURIX-LAUNCH-CRITICAL-MOBILE-1 (#2): AURIX centred in the mobile header
      (roadmap requirement), hamburger/search on the right. The logo is taken
@@ -4698,19 +4704,24 @@ body:not(.hero-active) #orb-canvas {
     pointer-events: auto;
   }
   .logo-block .logo-aurix {
-    transform: none;
-    font-size: 20px;
-    letter-spacing: 0.36em;
+    /* SPEC MOBILE-ABOVE-THE-FOLD-COMPRESSION — a slightly smaller, flatter,
+       tighter-tracked wordmark reads more premium and trims header height.
+       scaleY only (no horizontal scale) so the optical-centering math below
+       still holds. NEVER add a `background` shorthand here (wordmark clip bug). */
+    transform: scaleY(0.92);
+    transform-origin: center;
+    font-size: 18px;
+    letter-spacing: 0.30em;
     /* AURIX-LAUNCH-CRITICAL-MOBILE-1 (#2) — OPTICAL centering. letter-spacing
-       adds tracking AFTER every glyph, including a trailing 0.36em after the
+       adds tracking AFTER every glyph, including a trailing 0.30em after the
        final "X", so the text BOX is wider on the right and the inked glyphs
        sit left of the box centre. A left padding equal to the tracking
        balances that trailing space, so the GLYPHS (not the box) are centred
-       on screen. em-based, so it scales with the 20px font at every
-       breakpoint. This is the missing piece — geometric centring alone
-       (left:0;right:0;justify-content:center) leaves the ~3.6px optical
+       on screen. em-based, so it scales with the font at every breakpoint.
+       This is the missing piece — geometric centring alone
+       (left:0;right:0;justify-content:center) leaves the optical
        offset that reads as "shifted left". */
-    padding-left: 0.36em;
+    padding-left: 0.30em;
   }
   /* Controls right — static in flow, kept above the centred logo layer and
      always clickable. */
@@ -4724,6 +4735,17 @@ body:not(.hero-active) #orb-canvas {
     justify-self: initial;
     margin-left: auto;
     gap: 8px;
+  }
+  /* SPEC MOBILE-ABOVE-THE-FOLD-COMPRESSION — trim the hamburger's outer box +
+     padding for a lighter, flatter, more premium header. The bar geometry (gap
+     4px, bar 1.5px) is UNCHANGED so the open-X animation stays correct, and 34px
+     keeps a safe tap area. Mobile-scoped; desktop keeps the base 36px. */
+  .menu-toggle {
+    width: 34px;
+    height: 34px;
+    padding: 8px 6px;
+    border-radius: 9px;
+    margin-top: 0;
   }
 }
 
@@ -4744,13 +4766,15 @@ body:not(.hero-active) #orb-canvas {
     padding-top: calc(6px + env(safe-area-inset-top, 0px));
     margin-bottom: var(--space-1);
   }
-  .logo-block .logo-aurix { font-size: 20px; }
+  .logo-block .logo-aurix { font-size: 18px; }
 
   /* DASHBOARD-MOBILE-DENSITY-1 — tighter rhythm above the card so the
      chart + Aurix Signal surface lift slightly into view. The 4-step
-     top margin used to push the card too far down on small screens. */
+     top margin used to push the card too far down on small screens.
+     SPEC MOBILE-ABOVE-THE-FOLD-COMPRESSION — top margin 16→12 to raise the
+     whole column (Total Value / Portfolio Evolution / first Summary Card). */
   .dashboard-top {
-    margin-top: var(--space-3);
+    margin-top: var(--space-2);
     margin-bottom: var(--space-2);
   }
 
@@ -12732,8 +12756,9 @@ body.workspace-active .header {
   .assets-section { max-width: 100%; }
 
   /* Top spacing compressed to the same beat as the Market/Workspace
-     mobile shells. */
-  .dashboard-top { margin-top: var(--space-2); margin-bottom: var(--space-2); }
+     mobile shells. SPEC MOBILE-ABOVE-THE-FOLD-COMPRESSION — top margin 12→8 to
+     lift the whole column a further notch on small phones. */
+  .dashboard-top { margin-top: var(--space-1); margin-bottom: var(--space-2); }
 
   /* Hero card: same radius/border treatment as the Workspace summary
      cards and the Market discovery cards. */
@@ -22581,8 +22606,14 @@ body.aurix-skeleton #totalValue::after {
   .mobile-slide-chart .perf-unit-block .chart-change { width: 92px; min-width: 92px; margin-top: 4px; min-height: 16px; line-height: 1.2; }
   .mobile-slide-chart .range-toggle { flex: 1; min-width: 0; }
 
-  /* PART 6 — give the plot breathing room (slightly taller). */
-  .mobile-slide-chart .chart-wrap { min-height: 244px; }
+  /* PART 6 — give the plot breathing room (slightly taller).
+     SPEC MOBILE-ABOVE-THE-FOLD-COMPRESSION — this scoped min-height is the TRUE
+     governing height of the mobile chart drawing area (it wins the cascade over
+     the slider/slide min-heights and the ≤640 .chart-wrap height, with flex:1
+     growing from this floor). Trimmed a small, proportional −20px (244→224) so
+     the first Summary Card lifts into view. Renderer/scale/point-selection/
+     geometry/continuity are UNCHANGED — the surface sizes to this container. */
+  .mobile-slide-chart .chart-wrap { min-height: 224px; }
 
   /* PART 2 — reserved right Y-label lane (curve/grid stop at ~85% in the SVG;
      labels live in the remaining lane). Keep them readable + clear of the path. */
