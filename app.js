@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '554'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '555'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -23996,6 +23996,65 @@ function _aurixComputePeriodReturn(range, first, last) {
     return out;
   } catch (_) { return out; }
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.MULTI_RANGE_FINANCIAL_CERTIFICATION — READ-ONLY financial certification (additive; frozen engine)
+// ════════════════════════════════════════════════════════════════════════════
+// Reconciles the PUBLISHED return of every range against the flow-neutral certification equation. Pure READ:
+// it calls buildProductionPortfolioChart(range) and inspects its output — it NEVER mutates state and NEVER
+// touches rendering / hydration / repaint / segmentation / FRC / merge / gap detection / LTTB / pricing /
+// Supabase. Every visible consumer (displayed %, tooltip %, badge %, desktop, mobile) reads the SAME
+// out.returnPct (out.returnPct === out.lineReturnPct === out.badgeReturnPct at the single owner), so certifying
+// that value certifies all consumers. Certification per range:
+//   equation:  baselineValue + marketPnl(returnValue) + externalCashflows(netFlows) == currentValue
+//   published% == flow-neutral market return == (currentValue − baselineValue − externalCashflows)/baselineValue×100
+// The ±0.05% neutral dead-band affects COLOR ONLY — never the numeric percentage (returnPct is the exact value).
+function _aurixCertifyRangeReturn(range) {
+  const r = String(range || '').toLowerCase();
+  let emg = null;
+  try { emg = (typeof buildProductionPortfolioChart === 'function') ? buildProductionPortfolioChart(r) : null; } catch (_) { emg = null; }
+  if (!emg) return { range: r, reason: 'no_chart', certified: false };
+  const minBase = (typeof _AURIX_RET_MIN_BASE === 'number') ? _AURIX_RET_MIN_BASE : 1;
+  const baselineValue = Number(emg.baselineValue), currentValue = Number(emg.currentValue);
+  const externalCashflows = Number(emg.netFlows) || 0;
+  const marketPnl = Number(emg.returnValue) || 0;
+  const publishedPct = Number.isFinite(emg.badgeReturnPct) ? emg.badgeReturnPct : null;
+  const ok = emg.returnState === 'ok';
+  const expectedPct = (ok && Number.isFinite(baselineValue) && baselineValue > minBase)
+    ? +(((currentValue - baselineValue - externalCashflows) / baselineValue) * 100).toFixed(4) : null;
+  const difference = (publishedPct != null && expectedPct != null) ? +(publishedPct - expectedPct).toFixed(4) : null;
+  const equationResidual = (Number.isFinite(baselineValue) && Number.isFinite(currentValue))
+    ? +(baselineValue + marketPnl + externalCashflows - currentValue).toFixed(2) : null;   // ==0 by construction
+  // consumer parity at the single owner: the one value the badge/tooltip/line all read.
+  const consumerParity = (emg.returnPct === emg.badgeReturnPct) && (emg.badgeReturnPct === (emg.lineReturnPct != null ? emg.lineReturnPct : emg.badgeReturnPct) || emg.returnPct === emg.badgeReturnPct);
+  const colorExpected = !Number.isFinite(publishedPct) ? 'flat' : (publishedPct > 0.05 ? 'up' : (publishedPct < -0.05 ? 'down' : 'flat'));
+  const colorMatchesNumber = (emg.color === colorExpected) || (!ok);
+  const certified = ok
+    ? ((difference === 0 || Math.abs(difference || 0) <= 0.0001) && Math.abs(equationResidual || 0) <= 0.01 && emg.returnPct === emg.badgeReturnPct && colorMatchesNumber)
+    : true;   // an honestly-suppressed range publishes NO % ⇒ nothing to mis-state ⇒ certified-honest
+  return {
+    range: r, backendState: (function () { try { return (typeof window !== 'undefined') ? window.aurixBackendSnapshotsState : null; } catch (_) { return null; } })(),
+    baselineTimestamp: emg.baselineTs || null, endpointTimestamp: emg.currentTs || null,
+    baselineValue: Number.isFinite(baselineValue) ? baselineValue : null, currentValue: Number.isFinite(currentValue) ? currentValue : null,
+    externalCashflows: externalCashflows, marketPnl: marketPnl,
+    publishedReturnPct: publishedPct, expectedReturnPct: expectedPct, difference: difference,
+    equationResidual: equationResidual, returnState: emg.returnState, color: emg.color, colorExpected: colorExpected,
+    displayedRangeState: emg.displayedRangeState || null, consumerParity: !!consumerParity, certified: !!certified,
+    reason: ok
+      ? (certified ? 'certified: baseline+marketPnl+cashflows==current AND published==flow-neutral AND one-number-all-consumers' : 'MISMATCH')
+      : ('honest_suppressed: ' + (emg.returnSuppressedReason || emg.reason || emg.returnState)),
+  };
+}
+try {
+  if (typeof window !== 'undefined') {
+    window.aurixMultiRangeFinancialCertification = function () {
+      const cert = ['24h', '7d', '30d', '1y', 'all'].map(_aurixCertifyRangeReturn);
+      const allOk = cert.every(c => c && c.certified);
+      try { console.log('%c[UI][MULTI_RANGE_FINANCIAL_CERTIFICATION] ' + (allOk ? 'ALL CERTIFIED ✓' : 'MISMATCH ✗'), 'font-weight:700;color:' + (allOk ? '#3ddc84' : '#ff5a5a')); (console.table || console.log)(cert); } catch (_) {}
+      return { allCertified: allOk, ranges: cert };
+    };
+  }
+} catch (_) {}
 
 // SPEC DSH.CHART.DETERMINISM.NEW-ACCOUNT.09 — deterministic-source gate (reversible). The whole pipeline
 // below (raw stages → sort → dedup-by-ts → spike/construction/plateau → range extraction) is byte-for-byte
