@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '552'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '553'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -1143,46 +1143,108 @@ try {
 async function _aurixFetchBackendSnapshots() {
   try {
     if (!_AURIX_BACKEND_SNAPSHOTS_ENABLED) return [];
-    if (typeof supabaseClient === 'undefined' || !supabaseClient) return [];
-    if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) return [];   // authed only
+    // SPEC BACKEND-SNAPSHOT-HYDRATION-RELIABILITY — return NULL to signal a NOT-READY/FAILED read (auth or
+    // client not ready, query error, exception) so the hydration state machine RETRIES; an empty ARRAY means
+    // a successful read with no rows (genuinely no backend history yet → ready). This is the only change:
+    // the RLS-safe select, columns, mapping and filter are byte-identical.
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return null;
+    if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) return null;   // authed only
     const sinceIso = new Date(Date.now() - _AURIX_BACKEND_SNAPSHOT_LOOKBACK_DAYS * 864e5).toISOString();
     const { data, error } = await supabaseClient.from('portfolio_snapshots')
       .select('ts,total_value_usd,real_estate,category_values,source,confidence,market_state,price_staleness')
       .eq('user_id', currentUser.id).gte('ts', sinceIso).order('ts', { ascending: true }).limit(5000);
-    if (error || !Array.isArray(data)) return [];
+    if (error || !Array.isArray(data)) return null;                                            // transient failure ⇒ retryable
     return data.map(r => ({
       ts: (typeof r.ts === 'number') ? r.ts : Date.parse(r.ts),
       total_value_usd: Number(r.total_value_usd), real_estate: Number(r.real_estate) || 0,
       category_values: r.category_values || {}, source: 'backend_snapshot',
       confidence: r.confidence || 'scheduled', market_state: r.market_state || null, price_staleness: r.price_staleness || null,
     })).filter(p => Number.isFinite(p.ts) && Number.isFinite(p.total_value_usd));
-  } catch (_) { return []; }
+  } catch (_) { return null; }
+}
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.CHART.BACKEND_SNAPSHOT_HYDRATION_RELIABILITY — deterministic backend-snapshot hydration
+// ════════════════════════════════════════════════════════════════════════════
+// OWNER FIX (autoload/merge-APPLICATION path only): the fragile "one setTimeout(3s) + ≤20×1s one-shot poll,
+// load ONCE, give up forever" autoload is replaced by an explicit state machine:
+//   idle → loading → ready | failed
+// Start IMMEDIATELY on mount (microtask), retry with bounded exponential backoff, retry on
+// visibilitychange/focus/online while not-ready, dedupe concurrent loads (single in-flight), guard against a
+// stale response overwriting newer data (monotonic seq), NEVER permanently complete after a failure, expose a
+// manual refresh path, and on success ATOMICALLY assign _aurixBackendSnapshots + invalidate the frontend-only
+// visual memo + force the real desktop AND mobile repaint from the SAME merged contract. READ/LOAD ONLY —
+// the merge (`_aurixMergeSnapshotSources`), `_aurixTrustedChartSource`, FRC, renderer, gap threshold,
+// producer/scheduler and returns are UNTOUCHED (the merge is read fresh at display time on each repaint).
+let _aurixBackendSnapshotsState = 'idle';        // idle | loading | ready | failed
+let _aurixBackendHydrateSeq = 0;                 // monotonic — only the newest response may commit
+let _aurixBackendHydrateInFlight = false;        // dedupe concurrent loads → one in-flight request
+let _aurixBackendHydrateAttempts = 0;            // backoff counter (reset to 0 on success)
+let _aurixBackendHydrateRetryTimer = null;       // single pending retry
+function _aurixBackendAuthClientReady() { try { return !!(typeof currentUser !== 'undefined' && currentUser && currentUser.id && typeof supabaseClient !== 'undefined' && supabaseClient); } catch (_) { return false; } }
+function _aurixSetBackendSnapshotsState(s) { _aurixBackendSnapshotsState = s; try { if (typeof window !== 'undefined') window.aurixBackendSnapshotsState = s; } catch (_) {} }
+function _aurixForceMergedChartRepaint() {
+  // Invalidate the frontend-only visual memo so the painter cannot skip the repaint as "no visual change".
+  try { if (typeof _aurixLastVisualSig !== 'undefined' && _aurixLastVisualSig) { Object.keys(_aurixLastVisualSig).forEach(function (k) { _aurixLastVisualSig[k] = null; }); } } catch (_) {}
+  // Desktop + mobile both repaint from the SAME merged contract: render() drives updateChart (desktop) and
+  // scheduleAurixMobileLite (mobile); the explicit mobile call is a belt-and-suspenders for the lite path.
+  try { if (typeof render === 'function') render(false); } catch (_) {}
+  try { if (typeof scheduleAurixMobileLite === 'function') scheduleAurixMobileLite(typeof activeRange !== 'undefined' ? activeRange : '30d'); } catch (_) {}
+}
+function _aurixScheduleBackendHydrateRetry(reason) {
+  if (_aurixBackendSnapshotsState === 'ready') return;
+  if (_aurixBackendHydrateRetryTimer) return;           // one pending retry at a time
+  const n = Math.min(_aurixBackendHydrateAttempts, 6);
+  const delay = Math.min(1000 * Math.pow(2, n), 60000); // bounded exponential backoff, capped at 60s
+  try { _aurixBackendHydrateRetryTimer = setTimeout(function () { _aurixBackendHydrateRetryTimer = null; _aurixHydrateBackendSnapshots('retry:' + (reason || '')); }, delay); } catch (_) {}
+}
+async function _aurixHydrateBackendSnapshots(reason) {
+  try {
+    if (!_AURIX_BACKEND_SNAPSHOTS_ENABLED) return;
+    if (_aurixBackendSnapshotsState === 'ready') return;   // already hydrated (manual refresh resets to idle first)
+    if (_aurixBackendHydrateInFlight) return;              // dedupe → a single request in flight
+    if (!_aurixBackendAuthClientReady()) { _aurixBackendHydrateAttempts++; _aurixScheduleBackendHydrateRetry('auth_not_ready'); return; }
+    _aurixBackendHydrateInFlight = true;
+    _aurixSetBackendSnapshotsState('loading');
+    const seq = ++_aurixBackendHydrateSeq;
+    let rows = null;
+    try { rows = await _aurixFetchBackendSnapshots(); } catch (_) { rows = null; }
+    _aurixBackendHydrateInFlight = false;
+    if (seq !== _aurixBackendHydrateSeq) return;           // superseded by a newer load ⇒ this response is stale, drop it
+    if (Array.isArray(rows)) {                             // SUCCESS (empty array ⇒ no backend history yet)
+      _aurixBackendSnapshots = rows;                       // ATOMIC assign; newest-wins guaranteed by the seq guard above
+      _aurixBackendHydrateAttempts = 0;
+      _aurixSetBackendSnapshotsState('ready');
+      _aurixForceMergedChartRepaint();
+      try { console.log('[BACKEND-SNAPSHOTS] ready: ' + rows.length + ' snapshot(s) (' + (reason || '') + ')'); } catch (_) {}
+    } else {                                               // null ⇒ transient failure → stay RETRYABLE (never falsely complete)
+      _aurixSetBackendSnapshotsState('failed');
+      _aurixBackendHydrateAttempts++;
+      _aurixScheduleBackendHydrateRetry('fetch_failed');
+    }
+  } catch (_) { _aurixBackendHydrateInFlight = false; _aurixSetBackendSnapshotsState('failed'); _aurixBackendHydrateAttempts++; _aurixScheduleBackendHydrateRetry('exception'); }
 }
 try {
   if (typeof window !== 'undefined') {
+    // Manual/internal refresh path — force a fresh hydrate regardless of current state (console/audit/internal).
+    // Routes through the state machine so dedupe + stale-guard still apply.
     window.aurixLoadBackendSnapshots = async function () {
-      const rows = await _aurixFetchBackendSnapshots();
-      _aurixBackendSnapshots = Array.isArray(rows) ? rows : [];
-      try { if (typeof render === 'function') render(false); } catch (_) {}                 // repaint if a live render hook exists
-      try { console.log('[BACKEND-SNAPSHOTS] loaded ' + _aurixBackendSnapshots.length + ' backend snapshot(s)'); } catch (_) {}
-      return _aurixBackendSnapshots.length;
+      _aurixSetBackendSnapshotsState('idle'); _aurixBackendHydrateAttempts = 0;
+      await _aurixHydrateBackendSnapshots('manual');
+      return (_aurixBackendSnapshots || []).length;
     };
-    // Guarded auto-load — OFF by default ⇒ no extra query until activation (strict NO-OP, chart == v481).
-    // SPEC ACTIVATE-READ.04 — fire the load ONLY once auth + client are ready (not a blind timeout).
-    // Bounded auth-poll (≤ ~20s, every 1s) then load ONCE; gives up silently if never authed ⇒ NO-OP.
+    _aurixSetBackendSnapshotsState('idle');
     if (_AURIX_BACKEND_SNAPSHOTS_ENABLED && _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD) {
-      let _blTries = 0;
-      const _blTick = function () {
-        _blTries++;
-        try {
-          if (typeof currentUser !== 'undefined' && currentUser && currentUser.id && typeof supabaseClient !== 'undefined' && supabaseClient) {
-            window.aurixLoadBackendSnapshots();   // authed + client ready → load once (no-op on error/empty)
-            return;
-          }
-        } catch (_) {}
-        if (_blTries < 20) { try { setTimeout(_blTick, 1000); } catch (_) {} }   // bounded; never loops forever
-      };
-      try { setTimeout(_blTick, 3000); } catch (_) {}
+      // Begin IMMEDIATELY (microtask) — not gated behind a fixed 3s delay. If auth/client isn't ready yet the
+      // machine schedules its own backoff retry (no finite one-shot poll that can give up permanently).
+      try { Promise.resolve().then(function () { _aurixHydrateBackendSnapshots('mount'); }); } catch (_) { try { setTimeout(function () { _aurixHydrateBackendSnapshots('mount'); }, 0); } catch (_) {} }
+      // Session-lifecycle triggers — converge to ready across late auth, mobile resume, background→foreground,
+      // offline→online and remount/navigation. Each fires ONLY while not-ready (strict no-op once ready).
+      const _reHydrate = function (reason) { if (_aurixBackendSnapshotsState !== 'ready') _aurixHydrateBackendSnapshots(reason); };
+      try {
+        document.addEventListener('visibilitychange', function () { if (!document.hidden) _reHydrate('visibilitychange'); });
+        window.addEventListener('focus', function () { _reHydrate('focus'); });
+        window.addEventListener('online', function () { _reHydrate('online'); });
+      } catch (_) {}
     }
   }
 } catch (_) {}

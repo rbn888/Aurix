@@ -118,9 +118,12 @@ async function fetchWith(clientResult, authed) {
   const rowsOk = await fetchWith({ data: [{ ts: iso, total_value_usd: 12345, real_estate: 0, category_values: {}, confidence: 'scheduled', market_state: 'crypto_24_7', price_staleness: 'live' }], error: null }, true);
   ok('loader maps rows → pipeline shape (ts→ms, source tagged)', rowsOk.length === 1 && rowsOk[0].ts === 1_800_000_000_000 && rowsOk[0].source === 'backend_snapshot' && rowsOk[0].total_value_usd === 12345);
   const rowsErr = await fetchWith({ data: null, error: { message: 'relation "portfolio_snapshots" does not exist' } }, true);
-  ok('loader on table-missing/error → [] (strict NO-OP, chart == v481)', Array.isArray(rowsErr) && rowsErr.length === 0);
+  // SPEC BACKEND_SNAPSHOT_HYDRATION_RELIABILITY — fetch now returns NULL on failure (vs [] before) so the
+  // hydration state machine can distinguish a transient failure (retry) from an empty success (ready). The
+  // chart stays a strict NO-OP because _aurixBackendSnapshots is only assigned on an Array (never on null).
+  ok('loader on table-missing/error → null (retryable failure signal; chart stays NO-OP)', rowsErr === null);
   const rowsAnon = await fetchWith({ data: [{ ts: iso, total_value_usd: 1 }], error: null }, false);
-  ok('loader when NOT authed → [] (no query result used)', Array.isArray(rowsAnon) && rowsAnon.length === 0);
+  ok('loader when NOT authed → null (retryable; no query result used)', rowsAnon === null);
 
   // security (source): no service-role in frontend; edge fn uses env; frontend never writes the table
   const loginTxt = fs.readFileSync(path.join(root, 'login.html'), 'utf8');
@@ -131,9 +134,11 @@ async function fetchWith(clientResult, authed) {
   ok('frontend reads portfolio_snapshots via .select only (never insert/upsert/update/delete)',
     /from\('portfolio_snapshots'\)[\s\S]{0,80}\.select\(/.test(app) && !/from\('portfolio_snapshots'\)[\s\S]{0,120}\.(insert|upsert|update|delete)\(/.test(app));
   // SPEC ACTIVATE-READ.04 — read now activated: autoload ON, but load fires ONLY after auth+client (bounded poll)
-  ok('autoload ACTIVATED (fires only after auth+client, bounded poll)', /const _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD = true;/.test(app));
-  ok('autoload waits for currentUser+supabaseClient then loads once (not a blind timeout)', /if \(typeof currentUser !== 'undefined' && currentUser && currentUser\.id && typeof supabaseClient !== 'undefined' && supabaseClient\)[\s\S]{0,80}aurixLoadBackendSnapshots\(\)/.test(app));
-  ok('autoload poll is bounded (never loops forever)', /_blTries < 20/.test(app));
+  ok('hydration ACTIVATED (autoload flag on)', /const _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD = true;/.test(app));
+  // SPEC BACKEND_SNAPSHOT_HYDRATION_RELIABILITY — replaced the one-shot 3s+finite-poll autoload with a state
+  // machine: starts IMMEDIATELY on mount (microtask), auth-gated, retries with bounded exponential backoff.
+  ok('hydration starts immediately on mount + is auth-gated (not a blind 3s timeout)', /_aurixHydrateBackendSnapshots\('mount'\)/.test(app) && /function _aurixBackendAuthClientReady\(\)[\s\S]{0,180}currentUser[\s\S]{0,90}supabaseClient/.test(app));
+  ok('retry is bounded exponential backoff, converges (no permanent give-up like the old _blTries<20)', /Math\.min\(1000 \* Math\.pow\(2, n\), 60000\)/.test(app) && !/_blTries < 20/.test(app));
   ok('per-range backend-usage diagnostic exposed (perRange)', /perRange\[rg\] = \{ backendInWindow/.test(app));
   ok('window.aurixLoadBackendSnapshots exposed for manual/activation load', /window\.aurixLoadBackendSnapshots = async function/.test(app));
 
