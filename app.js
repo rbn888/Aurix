@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '551'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '552'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -43278,6 +43278,18 @@ function _applyTab(tab) {
   const mainEl      = document.querySelector('main');
   const placeholder = document.getElementById('tabPlaceholder');
   const workspaceEl = document.getElementById('aurixWorkspace');
+  // ── SECTION-ISOLATION-1 — single active section, no residual previews ──────────────────────────
+  // The nav owner must UNMOUNT the previous section, not merely hide it. `display:none` alone is not
+  // enough: the premium-preview stylesheet forces `display:flex!important` on any host that still
+  // `:has(.premium-preview-stage)` (line ~43368), which OVERRIDES the inline `display:none` set below —
+  // so a preview left mounted in a hidden host leaks Intelligence/Workspace into every other section.
+  // Clearing the two DYNAMIC tab hosts on every navigation removes the residual `.premium-preview-stage`,
+  // so `:has()` no longer matches and the inline `display:none` governs. `main` (Dashboard) is the
+  // persistent shell and is NEVER cleared here; the active host is re-mounted by its render call below.
+  // Same owner drives desktop header-tabs AND the mobile bottom nav (both call switchTab→_applyTab), so
+  // this fixes both surfaces with one change. Preview text/styles/behaviour are untouched.
+  if (placeholder) placeholder.innerHTML = '';
+  if (workspaceEl) workspaceEl.innerHTML = '';
   if (tab === 'home') {
     mainEl.style.display      = '';
     placeholder.style.display = 'none';
@@ -43316,6 +43328,34 @@ function _applyTab(tab) {
     updateBottomNavActive();
   }
 }
+
+// ── SECTION-ISOLATION-1 — explicit protection: exactly ONE main section active, zero residual previews ──
+// Read-only invariant. `ok:false` (with reasons) if: >1 host is effectively visible; a NON-active host still
+// contains a `.premium-preview-stage`; or Dashboard(main) contains any Intelligence/Workspace preview node.
+// Effective visibility uses getComputedStyle so the premium-preview `display:flex!important` override is
+// caught (a leaked host reads as visible even with inline display:none). Exposed for the harness + console.
+function _aurixSectionIsolationInvariant() {
+  const out = { ok: true, activeTab: (typeof currentTab !== 'undefined' ? currentTab : null), visible: [], residualPreviewHosts: [], reasons: [] };
+  try {
+    const hosts = [
+      { id: 'main', el: document.querySelector('main') },
+      { id: 'tabPlaceholder', el: document.getElementById('tabPlaceholder') },
+      { id: 'aurixWorkspace', el: document.getElementById('aurixWorkspace') },
+    ].filter(h => h.el);
+    const shown = h => { try { return getComputedStyle(h.el).display !== 'none'; } catch (_) { return h.el.style.display !== 'none'; } };
+    hosts.forEach(h => {
+      const isShown = shown(h);
+      if (isShown) out.visible.push(h.id);
+      const hasPreview = !!(h.el.querySelector && h.el.querySelector('.premium-preview-stage'));
+      if (hasPreview && !isShown) out.residualPreviewHosts.push(h.id);                 // mounted but hidden ⇒ residual
+      if (h.id === 'main' && hasPreview) { out.ok = false; out.reasons.push('dashboard_contains_preview'); }
+    });
+    if (out.visible.length !== 1) { out.ok = false; out.reasons.push('active_section_count=' + out.visible.length); }
+    if (out.residualPreviewHosts.length) { out.ok = false; out.reasons.push('residual_preview_in:' + out.residualPreviewHosts.join(',')); }
+  } catch (e) { out.ok = false; out.reasons.push('exception:' + ((e && e.message) || 'err')); }
+  return out;
+}
+try { if (typeof window !== 'undefined') window.aurixSectionIsolationAudit = function () { const r = _aurixSectionIsolationInvariant(); try { console.log('%c[UI][SECTION_ISOLATION]', 'font-weight:700;color:#4da3ff', r); } catch (_) {} return r; }; } catch (_) {}
 
 // ════════════════════════════════════════════════════════════════════════════
 // AURIX PREMIUM — Launch 1 preview gating + owner premium override

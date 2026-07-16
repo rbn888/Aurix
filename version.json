@@ -1,1 +1,1 @@
-{ "appjs": 551, "loginhtml": 482, "build": "v553-range-invariant-gap-segmentation", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)" }
+{ "appjs": 552, "loginhtml": 482, "build": "v554-section-isolation", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)" }
