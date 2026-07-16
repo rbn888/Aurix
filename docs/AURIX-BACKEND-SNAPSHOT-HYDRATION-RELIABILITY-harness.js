@@ -24,7 +24,7 @@ const wait = () => new Promise(r => setImmediate(r));   // let real microtasks/p
 // ── controllable environment ────────────────────────────────────────────────
 const env = {
   authed: false, mockResult: () => ({ data: [], error: null }),
-  renderCalls: 0, mobileCalls: 0, timers: [], lastVisualSig: { desktop: 'stale', mobile: 'stale' },
+  renderCalls: 0, rwcCalls: 0, mobileCalls: 0, timers: [], lastVisualSig: { desktop: 'stale', mobile: 'stale' },
   listeners: {},
 };
 function mkQuery() { const q = {}; ['from', 'select', 'eq', 'gte', 'order', 'limit'].forEach(m => q[m] = () => q); q.then = (res, rej) => Promise.resolve().then(env.mockResult).then(res, rej); return q; }
@@ -34,6 +34,8 @@ const ctx = {
   get supabaseClient() { return env.authed ? { from: () => mkQuery() } : null; },
   activeRange: '30d',
   render(_a) { env.renderCalls++; },
+  renderWealthCurve(_a) { env.rwcCalls++; },
+  updateChart() { env.rwcCalls++; },
   scheduleAurixMobileLite(_r) { env.mobileCalls++; },
   _aurixLastVisualSig: env.lastVisualSig,
   setTimeout(fn, d) { const id = env.timers.length + 1; env.timers.push({ id, fn, d, done: false }); return id; },
@@ -59,7 +61,7 @@ const bundle = [
 vm.runInContext(bundle, ctx);
 const H = ctx.__hyd;
 function runTimers() { const pend = env.timers.filter(t => !t.done); env.timers = []; pend.forEach(t => { try { t.fn(); } catch (_) {} }); }
-function resetEnv() { env.authed = false; env.mockResult = () => ({ data: [], error: null }); env.renderCalls = 0; env.mobileCalls = 0; env.timers = []; env.lastVisualSig.desktop = 'stale'; env.lastVisualSig.mobile = 'stale'; H.reset(); }
+function resetEnv() { env.authed = false; env.mockResult = () => ({ data: [], error: null }); env.renderCalls = 0; env.rwcCalls = 0; env.mobileCalls = 0; env.timers = []; env.lastVisualSig.desktop = 'stale'; env.lastVisualSig.mobile = 'stale'; H.reset(); }
 const ROWS = [{ ts: '2026-07-16T00:00:00Z', total_value_usd: 17000 }, { ts: '2026-07-16T00:15:00Z', total_value_usd: 17010 }];
 
 (async () => {
@@ -69,7 +71,7 @@ resetEnv(); env.authed = true; env.mockResult = () => ({ data: ROWS, error: null
 await H.hydrate('mount'); await wait();
 ok('1 state ready', H.state() === 'ready', H.state());
 ok('1 backend snapshots assigned (2)', H.snaps().length === 2);
-ok('1 forced repaint (desktop render + mobile lite)', env.renderCalls >= 1 && env.mobileCalls >= 1, 'render=' + env.renderCalls + ' mobile=' + env.mobileCalls);
+ok('1 forced repaint (desktop wealth curve + mobile lite)', env.rwcCalls >= 1 && env.mobileCalls >= 1, 'rwc=' + env.rwcCalls + ' mobile=' + env.mobileCalls);
 ok('1 visual memo invalidated (desktop+mobile null)', env.lastVisualSig.desktop === null && env.lastVisualSig.mobile === null);
 
 // ── 2) auth ready after many retries (>23s equiv) → eventually loads, never permanently frontend-only ──
@@ -89,7 +91,7 @@ resetEnv(); env.authed = true; let n3 = 0; env.mockResult = () => (++n3 === 1 ? 
 await H.hydrate('mount'); await wait();
 ok('3 first attempt failed (retryable, not complete)', H.state() === 'failed', H.state());
 runTimers(); await wait();                                          // backoff retry → success
-ok('3 second attempt ready + repaint', H.state() === 'ready' && H.snaps().length === 2 && env.renderCalls >= 1);
+ok('3 second attempt ready + repaint', H.state() === 'ready' && H.snaps().length === 2 && env.rwcCalls >= 1);
 
 // ── 4) offline then online → automatic recovery via online listener ────────────
 console.log('\n4) offline → online:');
@@ -180,7 +182,7 @@ console.log('\n10+13) merged series (real merge + structural breaks):');
 console.log('\n11) desktop/mobile parity:');
 resetEnv(); env.authed = true; env.mockResult = () => ({ data: ROWS, error: null });
 await H.hydrate('mount'); await wait();
-ok('11 both surfaces repainted from the same hydrate (render + mobile lite each ≥1)', env.renderCalls >= 1 && env.mobileCalls >= 1);
+ok('11 both surfaces repainted (desktop wealth curve + mobile lite each ≥1)', env.rwcCalls >= 1 && env.mobileCalls >= 1);
 
 // ── 12) returns unchanged + source invariants ───────────────────────────────────
 console.log('\n12) source invariants:');

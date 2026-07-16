@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '553'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '554'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -1185,10 +1185,18 @@ function _aurixSetBackendSnapshotsState(s) { _aurixBackendSnapshotsState = s; tr
 function _aurixForceMergedChartRepaint() {
   // Invalidate the frontend-only visual memo so the painter cannot skip the repaint as "no visual change".
   try { if (typeof _aurixLastVisualSig !== 'undefined' && _aurixLastVisualSig) { Object.keys(_aurixLastVisualSig).forEach(function (k) { _aurixLastVisualSig[k] = null; }); } } catch (_) {}
-  // Desktop + mobile both repaint from the SAME merged contract: render() drives updateChart (desktop) and
-  // scheduleAurixMobileLite (mobile); the explicit mobile call is a belt-and-suspenders for the lite path.
-  try { if (typeof render === 'function') render(false); } catch (_) {}
-  try { if (typeof scheduleAurixMobileLite === 'function') scheduleAurixMobileLite(typeof activeRange !== 'undefined' ? activeRange : '30d'); } catch (_) {}
+  // SPEC HYDRATED_HISTORY_VISIBLE_ADOPTION — repaint the VISIBLE WEALTH-CURVE CHART, not the dashboard shell.
+  // ROOT CAUSE (v555 defect): this used render(false), but render() only repaints the shell (totals/cards) —
+  // it NEVER calls renderWealthCurve/updateChart, so the DESKTOP wealth-curve chart was never rebuilt from the
+  // merged history after hydration (it stayed on the stale frontend-only contract → visible gap). The visible
+  // chart is painted by renderWealthCurve→_wscPaintSurface→_wscPaintEmergency (desktop) and
+  // scheduleAurixMobileLite→renderAurixMobileLiteChart (mobile); BOTH rebuild from buildProductionPortfolioChart,
+  // which reads the merged history fresh (so an older async repaint also reads merged — never restores stale).
+  // Mirror the codebase's canonical post-history-change repaint idiom (renderWealthCurve + updateChart) and add
+  // the mobile lite. Reads/paints only — no merge/FRC/renderer/threshold/return change.
+  try { if (typeof renderWealthCurve === 'function') renderWealthCurve(false); } catch (_) {}     // desktop wealth curve (→ _wscPaintEmergency)
+  try { if (typeof updateChart === 'function') updateChart(); } catch (_) {}                       // desktop institutional/legacy surface (guarded, no-op on mobile)
+  try { if (typeof scheduleAurixMobileLite === 'function') scheduleAurixMobileLite(typeof activeRange !== 'undefined' ? activeRange : '30d'); } catch (_) {}   // mobile lite chart
 }
 function _aurixScheduleBackendHydrateRetry(reason) {
   if (_aurixBackendSnapshotsState === 'ready') return;
