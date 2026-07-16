@@ -1,1 +1,1 @@
-{ "appjs": 550, "loginhtml": 482, "build": "v551-mobile-above-fold-compression", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)" }
+{ "appjs": 550, "loginhtml": 482, "build": "v552-mobile-header-compaction-2", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)" }
