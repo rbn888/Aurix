@@ -40,6 +40,7 @@ const CONSTS = [
 const FNS = [
   '_aurixRealGapFloorMs', '_aurixConfirmedBridgeGaps', '_aurixCapitalStepBreaks', '_aurixSparseRampBreaks',
   '_aurixSplitAtGaps', '_aurixBuildContinuityValidatedSeries', '_aurixStructuralBreaks', '_aurixVerticalJumps',
+  '_aurixRegimeBoundaryBreaks',   // SPEC RANGE_INVARIANT_GAP — FRC current-regime split now uses regime (capital+cliff) boundaries
   '_aurixResolveChartReturnContract', '_aurixShortHistoryDisplay', '_aurixVisualTrustGate',
   '_aurixStableDisplayAnchor', '_aurixResolveReliabilityDeadlock', '_aurixResolveFinalRenderSeriesContract',
   '_aurixEmergencyHash', '_aurixAuditCurrentRegimeRenderHandoffCore',

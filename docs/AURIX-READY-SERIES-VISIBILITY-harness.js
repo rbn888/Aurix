@@ -37,6 +37,7 @@ const CONSTS = [
 const FNS = [
   '_aurixRealGapFloorMs', '_aurixConfirmedBridgeGaps', '_aurixCapitalStepBreaks', '_aurixSparseRampBreaks',
   '_aurixSplitAtGaps', '_aurixBuildContinuityValidatedSeries', '_aurixStructuralBreaks', '_aurixVerticalJumps',
+  '_aurixRegimeBoundaryBreaks',   // SPEC RANGE_INVARIANT_GAP — FRC regime split
   '_aurixResolveChartReturnContract', '_aurixShortHistoryDisplay', '_aurixVisualTrustGate',
   '_aurixStableDisplayAnchor', '_aurixResolveReliabilityDeadlock', '_aurixResolveFinalRenderSeriesContract',
   '_aurixAuditReadySeriesVisibilityCore',
@@ -115,13 +116,15 @@ console.log('\nCore visibility contract:');
   const r1y = frc(emgOf(pts, { range: '1y', coverageRatio: 0.01, ...NOT_READY }), '1y');
   ok('11 1Y bootstrap no-stable → STILL building (1Y unchanged)', r1y.mode === 'building');
 }
-// ── 8) SPEC.45 — 7D two runs separated by real gap → single continuous segment selected ──
+// ── 8) SPEC RANGE_INVARIANT_GAP — 7D two SAME-LEVEL runs separated by a real observation gap → BOTH
+//      segments render (multi-segment); the same-level gap is inactivity, not a regime change. (Was SPEC.45
+//      single continuous segment; superseded for observation gaps — capital/value-cliff single-path kept.)
 {
   const runA = seg(T0 - 6 * DAY, 6, 3 * HOUR, 6000, 2);
-  const runB = seg(T0 - 20 * HOUR, 8, 2 * HOUR, 6100, 2);   // recent run, >6h gap before it
+  const runB = seg(T0 - 20 * HOUR, 8, 2 * HOUR, 6100, 2);   // recent run, >6h gap before it, SAME level → observation gap
   const pts = runA.concat(runB);
   const r = frc(emgOf(pts, { range: '7d', returnState: 'ok', badgeReturnPct: 1.0, coverageRatio: 0.9 }), '7d');
-  ok('8 SPEC.45 7D two-run → single continuous segment (renderPathCount 1)', r.renderPathCount === 1 && r.renderPoints.length === runB.length, JSON.stringify({ rpc: r.renderPathCount, n: r.renderPoints.length, expect: runB.length }));
+  ok('8 7D observation-gap two-run → BOTH segments (renderPathCount 2, both runs kept)', r.renderPathCount === 2 && r.renderPoints.length === pts.length, JSON.stringify({ rpc: r.renderPathCount, n: r.renderPoints.length, expect: pts.length }));
 }
 // ── 9) point identities/hashes unchanged (renderPoints ⊂ input, no synthetic) ──
 {

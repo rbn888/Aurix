@@ -40,6 +40,7 @@ const CONSTS = [
 const FNS = [
   '_aurixRealGapFloorMs', '_aurixConfirmedBridgeGaps', '_aurixCapitalStepBreaks', '_aurixSparseRampBreaks',
   '_aurixSplitAtGaps', '_aurixBuildContinuityValidatedSeries', '_aurixStructuralBreaks', '_aurixVerticalJumps',
+  '_aurixRegimeBoundaryBreaks',   // SPEC RANGE_INVARIANT_GAP — FRC current-regime split (capital+cliff only)
   '_aurixResolveChartReturnContract', '_aurixShortHistoryDisplay', '_aurixVisualTrustGate',
   '_aurixStableDisplayAnchor', '_aurixResolveReliabilityDeadlock', '_aurixResolveFinalRenderSeriesContract',
   '_aurixEmergencyHash',
@@ -97,32 +98,34 @@ console.log('AURIX-7D-SINGLE-CONTINUOUS-CONTRACT — SPEC.45');
 { const e = emgOf(CONT_BE, { range: '7d' }); const r = frc(ON, e, '7d', 'desktop');
   ok('2 continuous BE 7D → one visible segment, all original', visibleRuns(ON, r.renderPoints, '7d') === 1 && isSubset(r.renderPoints, CONT_BE)); }
 
-// 3. FE recent + BE older + real gap → never two islands; select one deterministic; partial true.
-{ const e = emgOf(ISLANDS, { range: '7d' }); const r = frc(ON, e, '7d', 'desktop'); const rOff = frc(OFF, e, '7d', 'desktop');
-  ok('3 ON 7D islands → exactly ONE visible segment (never two islands)', visibleRuns(ON, r.renderPoints, '7d') === 1, 'runs=' + visibleRuns(ON, r.renderPoints, '7d'));
-  ok('3 ON 7D islands → selected the RECENT run (endpoint reconciles with current value)', r.renderPoints[r.renderPoints.length - 1].ts === ISL_NEW[ISL_NEW.length - 1].ts);
-  ok('3 ON 7D islands → partial + single-path reason + discarded run in diagnostics', (r.reasonCodes || []).includes('single_continuous_7d_single_path') && r.mode === 'partial_clean' && r.diagnostics.sevenDayDiscardedRuns && r.diagnostics.sevenDayDiscardedRuns.length === 1);
-  ok('3 ON 7D islands → all points original, zero synthetic', isSubset(r.renderPoints, ISLANDS) && r.diagnostics.syntheticPoints === 0);
-  ok('3 BEFORE (flag OFF) drew TWO islands — proves this fix is the owner', visibleRuns(OFF, rOff.renderPoints, '7d') === 2, 'offRuns=' + visibleRuns(OFF, rOff.renderPoints, '7d')); }
-
-// 4. Overlap / mixed → the chosen run is ONE contiguous run (one valuation family per continuous segment).
+// 3. SPEC RANGE_INVARIANT_GAP (supersedes SPEC.45 for observation gaps) — two SAME-LEVEL islands (1000/1001)
+//    separated by a real gap are an OBSERVATION gap (inactivity, NOT a regime change): BOTH segments render,
+//    both original endpoints preserved, zero synthetic, never bridged. (Regime cliffs/capital still collapse.)
 { const e = emgOf(ISLANDS, { range: '7d' }); const r = frc(ON, e, '7d', 'desktop');
-  ok('4 selected segment is a single contiguous run (no mixed-family concatenation)', visibleRuns(ON, r.renderPoints, '7d') === 1 && r.renderPoints.length === ISL_NEW.length); }
+  ok('3 ON 7D observation islands → BOTH segments visible (2 runs)', visibleRuns(ON, r.renderPoints, '7d') === 2, 'runs=' + visibleRuns(ON, r.renderPoints, '7d'));
+  ok('3 ON 7D islands → both original endpoints preserved (no history loss)', r.renderPoints[0].ts === ISL_OLD[0].ts && r.renderPoints[r.renderPoints.length - 1].ts === ISL_NEW[ISL_NEW.length - 1].ts);
+  ok('3 ON 7D islands → NOT collapsed (no single-path reason; both runs kept)', !(r.reasonCodes || []).includes('single_continuous_7d_single_path') && r.renderPoints.length === ISLANDS.length);
+  ok('3 ON 7D islands → all points original, zero synthetic', isSubset(r.renderPoints, ISLANDS) && (r.diagnostics.syntheticPoints || 0) === 0); }
+
+// 4. Observation islands → both contiguous runs kept as separate segments (no cross-gap concatenation).
+{ const e = emgOf(ISLANDS, { range: '7d' }); const r = frc(ON, e, '7d', 'desktop');
+  ok('4 both observation segments kept, split at the gap (no mixed-family bridge)', visibleRuns(ON, r.renderPoints, '7d') === 2 && r.renderPoints.length === ISLANDS.length); }
 
 // 5. Genuinely continuous input (valid points throughout) → 6.6 does NOT over-split; keeps all.
 { const e = emgOf(CONT_FE, { range: '7d' }); const r = frc(ON, e, '7d', 'desktop');
   ok('5 continuous input kept intact (6.6 sees 1 run, trims nothing)', r.renderPoints.length === CONT_FE.length && r.diagnostics.visiblePath7dRuns === 1 && !(r.reasonCodes || []).includes('single_continuous_7d_single_path')); }
 
-// 6. Real missing history — recent block too small/brief AND older ineligible → PENDING (building), never bridged.
+// 6. Real missing history — big older run + a tiny recent tail over an observation gap → never BRIDGED
+//    across the gap; every rendered point is original (no synthetic). Segments stay separate (or building).
 { const tiny = seg(T0, 60, HOUR, 1000, 0.01).concat(seg(T0 + 6 * DAY + 20 * HOUR, 2, 10 * MIN, 1001, 0.01));   // 2-pt, ~10min recent tail
   const e = emgOf(tiny, { range: '7d' }); const r = frc(ON, e, '7d', 'desktop');
-  ok('6 real missing history → single segment OR pending (never two islands, never bridged)', (r.mode === 'building') || (visibleRuns(ON, r.renderPoints, '7d') === 1), 'mode=' + r.mode + ' runs=' + visibleRuns(ON, r.renderPoints, '7d'));
+  ok('6 missing history → never bridged across the gap (multi-segment or pending)', (r.mode === 'building') || visibleRuns(ON, r.renderPoints, '7d') >= 2 || r.renderPoints.length <= 60, 'mode=' + r.mode + ' runs=' + visibleRuns(ON, r.renderPoints, '7d'));
   ok('6 no synthetic points in the pending/partial path', (r.diagnostics.syntheticPoints || 0) === 0); }
 
-// 7. Two different account shapes → same deterministic policy, no cross-contamination.
+// 7. Two different account shapes → same deterministic multi-segment policy, no cross-contamination.
 { const rA = frc(ON, emgOf(ISLANDS, { range: '7d' }), '7d', 'desktop'); const rB = frc(ON, emgOf(ISLANDS_B, { range: '7d' }), '7d', 'desktop');
-  ok('7 account A → one visible segment (recent)', visibleRuns(ON, rA.renderPoints, '7d') === 1 && rA.renderPoints[rA.renderPoints.length - 1].ts === ISL_NEW[ISL_NEW.length - 1].ts);
-  ok('7 account B → one visible segment (recent), independent shape', visibleRuns(ON, rB.renderPoints, '7d') === 1 && rB.renderPoints[rB.renderPoints.length - 1].ts === B_NEW[B_NEW.length - 1].ts);
+  ok('7 account A → both observation segments visible, both endpoints kept', visibleRuns(ON, rA.renderPoints, '7d') === 2 && rA.renderPoints[0].ts === ISL_OLD[0].ts && rA.renderPoints[rA.renderPoints.length - 1].ts === ISL_NEW[ISL_NEW.length - 1].ts);
+  ok('7 account B → both observation segments visible, independent shape', visibleRuns(ON, rB.renderPoints, '7d') === 2 && rB.renderPoints[rB.renderPoints.length - 1].ts === B_NEW[B_NEW.length - 1].ts);
   ok('7 deterministic: re-run A identical (no state carryover)', dHash(ON, rA.renderPoints) === dHash(ON, frc(ON, emgOf(ISLANDS, { range: '7d' }), '7d', 'desktop').renderPoints)); }
 
 // 8-11. 24H / 30D / 1Y / ALL behaviour UNCHANGED by this fix (ON === OFF, and 6.6 never fires).
@@ -144,9 +147,10 @@ console.log('AURIX-7D-SINGLE-CONTINUOUS-CONTRACT — SPEC.45');
   });
   ok('16 desktop/mobile exact point parity (7D)', allParity); }
 
-// 17. FRC never returns more than one visible segment for 7D (all 7D fixtures).
-{ let maxRuns = 0; [ISLANDS, CONT_FE, CONT_BE, ISLANDS_B].forEach(pts => { const r = frc(ON, emgOf(pts, { range: '7d' }), '7d', 'desktop'); maxRuns = Math.max(maxRuns, visibleRuns(ON, r.renderPoints, '7d')); });
-  ok('17 7D final contract NEVER exposes >1 visible segment', maxRuns <= 1, 'maxRuns=' + maxRuns); }
+// 17. SPEC RANGE_INVARIANT_GAP — 7D contract: CONTINUOUS input → exactly 1 segment; SAME-LEVEL observation
+//     islands → exactly 2 segments (both sections visible, never bridged). Deterministic across fixtures.
+{ ok('17 continuous 7D fixtures → exactly 1 segment', [CONT_FE, CONT_BE].every(pts => visibleRuns(ON, frc(ON, emgOf(pts, { range: '7d' }), '7d', 'desktop').renderPoints, '7d') === 1));
+  ok('17 observation-gap 7D fixtures → exactly 2 segments (never bridged)', [ISLANDS, ISLANDS_B].every(pts => visibleRuns(ON, frc(ON, emgOf(pts, { range: '7d' }), '7d', 'desktop').renderPoints, '7d') === 2)); }
 
 // 18. Golden v510 / renderer byte-untouched by SPEC.45 (no new symbols in the render path).
 { const chartFns = ['renderValidatedPortfolioChartWithInstitutionalRenderer', 'renderAurixInstitutionalChart', '_aurixSplitAtGaps'];

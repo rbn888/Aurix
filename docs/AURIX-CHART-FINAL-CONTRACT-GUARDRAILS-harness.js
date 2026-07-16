@@ -36,6 +36,7 @@ const CONSTS = [
 const FNS = [
   '_aurixEmergencyHash', '_aurixRealGapFloorMs', '_aurixConfirmedBridgeGaps', '_aurixCapitalStepBreaks',
   '_aurixSparseRampBreaks', '_aurixSplitAtGaps', '_aurixBuildContinuityValidatedSeries', '_aurixStructuralBreaks',
+  '_aurixRegimeBoundaryBreaks',   // SPEC RANGE_INVARIANT_GAP — FRC regime split
   '_aurixResolveChartReturnContract', '_aurixShortHistoryDisplay', '_aurixVisualTrustGate',
   '_aurixStableDisplayAnchor', '_aurixResolveFinalRenderSeriesContract',
 ];
@@ -144,11 +145,12 @@ console.log('\nG5 — deterministic guardrail:');
 console.log('\nG6 — SPEC.21 launch guardrails:');
 function seg2(t0, n, stepMs, v0, dv) { const o = []; for (let i = 0; i < n; i++) o.push({ ts: t0 + i * stepMs, value: +(v0 + i * dv).toFixed(2) }); return o; }
 const HH = 36e5, MM = 60e3, TT = 1_800_000_000_000;
-// 24H fragmented (two clusters + 22h gap) MUST resolve to renderPathCount ≤ 1 (never disconnected islands).
+// SPEC RANGE_INVARIANT_GAP — 24H two SAME-LEVEL clusters + 22h gap is an OBSERVATION gap ⇒ BOTH segments
+// render (multi-segment), never bridged, synthetic 0, desktop==mobile. (Was renderPathCount ≤ 1 pre-SPEC.)
 { const A = seg2(TT, 10, 12 * MM, 1000, 0.1), B = seg2(TT + 22 * HH, 10, 12 * MM, 1002, 0.1);
   const e = Object.assign({}, MATRIX['mature'], { range: '24h', returnState: 'ok', badgeReturnPct: 0.24, points: A.concat(B), baselineTs: A[0].ts, baselineValue: A[0].value, currentValue: B[B.length - 1].value });
   const d = frc(e, '24h', 'desktop'), m = frc(e, '24h', 'mobile');
-  ok('G6.1 24H fragmented → renderPathCount ≤ 1 (no islands)', d.renderPathCount <= 1, 'paths=' + d.renderPathCount);
+  ok('G6.1 24H observation-gap → BOTH segments (renderPathCount 2, no bridge)', d.renderPathCount === 2, 'paths=' + d.renderPathCount);
   ok('G6.2 24H fragmented → desktop == mobile', hash(d.renderPoints) === hash(m.renderPoints) && d.mode === m.mode);
   ok('G6.3 24H fragmented → syntheticPoints 0', d.diagnostics.syntheticPoints === 0); }
 // same emg repeated → identical selectedPointsHash + renderHash + mode + returnAnchorTs + badge + color.

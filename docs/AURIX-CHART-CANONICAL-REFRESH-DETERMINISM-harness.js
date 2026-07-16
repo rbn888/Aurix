@@ -40,7 +40,7 @@ const CONSTS = [
 const FNS = [
   '_aurixEmergencyHash', '_aurixRealGapFloorMs', '_aurixConfirmedBridgeGaps', '_aurixVerticalJumps',
   '_aurixCapitalStepBreaks', '_aurixSparseRampBreaks', '_aurixSplitAtGaps', '_aurixBuildContinuityValidatedSeries',
-  '_aurixStructuralBreaks', '_aurixResolveChartReturnContract', '_aurixShortHistoryDisplay', '_aurixVisualTrustGate',
+  '_aurixStructuralBreaks', '_aurixRegimeBoundaryBreaks', '_aurixResolveChartReturnContract', '_aurixShortHistoryDisplay', '_aurixVisualTrustGate',
   '_aurixStableDisplayAnchor', '_aurixResolveFinalRenderSeriesContract', '_aurixCanonicalReturnAnchorIndex',
 ];
 function mkCtx(withCanonFlag) {
@@ -96,37 +96,39 @@ console.log('AURIX-CHART-CANONICAL-REFRESH-DETERMINISM — SPEC.21');
   ok('4 positive eligible return → badge eligible, not Calculando', r.badgeEligible === true && !/Calculando/.test(r.badgeLabel) && r.colorClass === 'up');
 }
 
-// 5. 24H two disconnected islands → ONE canonical eligible path, renderPathCount ≤ 1, no bridge, synthetic 0.
+// 5. SPEC RANGE_INVARIANT_GAP — 24H two same-level OBSERVATION-gap islands → BOTH segments visible (multi-
+//    segment), NO bridge/connector, synthetic 0, no history loss. (Was single-path collapse pre-SPEC; the
+//    islands are same value level ⇒ inactivity, not a regime change, so both sides now render.)
 {
   const A = seg(T0, 10, 12 * MIN, 1000, 0.1);                 // ~1.8h cluster
-  const B = seg(T0 + 22 * HOUR, 10, 12 * MIN, 1002, 0.1);     // recent ~1.8h cluster, 22h gap between
+  const B = seg(T0 + 22 * HOUR, 10, 12 * MIN, 1002, 0.1);     // recent ~1.8h cluster, 22h gap, SAME level → observation gap
   const pts = A.concat(B);
   const r = frcON(emgOf(pts, { range: '24h', returnState: 'ok', badgeReturnPct: 0.24 }), '24h', 'desktop');
-  ok('5 24H islands → renderPathCount ≤ 1', r.renderPathCount <= 1, 'paths=' + r.renderPathCount);
-  ok('5 24H islands → one contiguous path OR building', (r.mode === 'building') || (r.renderPoints.length >= 2), r.mode);
+  ok('5 24H observation-gap islands → BOTH segments visible (renderPathCount 2)', r.renderPathCount === 2, 'paths=' + r.renderPathCount);
   ok('5 24H islands → no synthetic point (renderPoints ⊆ input)', r.diagnostics.syntheticPoints === 0 && subsetOf(r.renderPoints, pts));
-  ok('5 24H islands → no bridge across gap (single cluster span)', r.mode === 'building' || (r.renderPoints[r.renderPoints.length - 1].ts - r.renderPoints[0].ts) <= 3 * HOUR, 'span=' + ((r.renderPoints[r.renderPoints.length - 1].ts - r.renderPoints[0].ts) / HOUR).toFixed(2) + 'h');
+  ok('5 24H islands → both original endpoints preserved (no history loss)', r.renderPoints[0].ts === A[0].ts && r.renderPoints[r.renderPoints.length - 1].ts === B[B.length - 1].ts);
+  ok('5 24H islands → no bridge: rendered as separate paths, not one collapsed cluster', r.renderPathCount === 2);
 }
 
-// 6. 24H recent path eligible → recent path selected deterministically.
+// 6. SPEC RANGE_INVARIANT_GAP — 24H same-level islands keep BOTH clusters (no single-cluster selection for
+//    an observation gap); the recent-path single-path reason must NOT be emitted for a same-level gap.
 {
   const A = seg(T0, 10, 12 * MIN, 1000, 0.1);
-  const B = seg(T0 + 22 * HOUR, 10, 12 * MIN, 1002, 0.1);     // recent, eligible (10 pts / ~1.8h)
+  const B = seg(T0 + 22 * HOUR, 10, 12 * MIN, 1002, 0.1);
   const pts = A.concat(B);
   const r = frcON(emgOf(pts, { range: '24h', returnState: 'ok', badgeReturnPct: 0.24 }), '24h', 'desktop');
-  ok('6 24H recent eligible → recent cluster selected', r.renderPoints[0].ts >= B[0].ts, 'first=' + r.renderPoints[0].ts + ' Bstart=' + B[0].ts);
-  ok('6 24H recent selection reason code present', (r.reasonCodes || []).indexOf('canonical_24h_recent_path_selected') >= 0 || (r.reasonCodes || []).indexOf('canonical_24h_single_path') >= 0);
+  ok('6 24H observation gap → both clusters kept (renderPoints starts at oldest, ends at newest)', r.renderPoints[0].ts === A[0].ts && r.renderPoints[r.renderPoints.length - 1].ts === B[B.length - 1].ts);
+  ok('6 24H observation gap → NOT collapsed to a single recent path', (r.reasonCodes || []).indexOf('canonical_24h_single_path') < 0 && r.renderPathCount === 2);
 }
 
-// 7. 24H recent path ineligible, older dominant eligible → deterministic fallback (older) or building.
+// 7. SPEC RANGE_INVARIANT_GAP — determinism: same input → identical multi-segment output (no state carry).
 {
-  const A = seg(T0, 10, 12 * MIN, 1000, 0.1);                 // older, large eligible
-  const B = seg(T0 + 22 * HOUR, 2, 3 * MIN, 1002, 0.1);       // recent tiny: 2 pts / 6 min (ineligible)
+  const A = seg(T0, 10, 12 * MIN, 1000, 0.1);
+  const B = seg(T0 + 22 * HOUR, 10, 12 * MIN, 1002, 0.1);
   const pts = A.concat(B);
-  const r = frcON(emgOf(pts, { range: '24h', returnState: 'ok', badgeReturnPct: 0.24 }), '24h', 'desktop');
-  ok('7 24H recent-ineligible → renderPathCount ≤ 1', r.renderPathCount <= 1);
-  ok('7 24H recent-ineligible → older dominant path or building (deterministic)',
-     r.mode === 'building' || (r.renderPoints[0].ts === A[0].ts && r.renderPoints[r.renderPoints.length - 1].ts <= A[A.length - 1].ts), r.mode + ' first=' + (r.renderPoints[0] && r.renderPoints[0].ts));
+  const r1 = frcON(emgOf(pts, { range: '24h', returnState: 'ok', badgeReturnPct: 0.24 }), '24h', 'desktop');
+  const r2 = frcON(emgOf(pts, { range: '24h', returnState: 'ok', badgeReturnPct: 0.24 }), '24h', 'desktop');
+  ok('7 24H observation gap → deterministic (identical renderPoints hash + path count)', hash(r1.renderPoints) === hash(r2.renderPoints) && r1.renderPathCount === r2.renderPathCount && r1.renderPathCount === 2);
 }
 
 // 8. 7D dense multi-day usable history WITH sufficient coverage → eligible (not Calculando).
@@ -199,15 +201,21 @@ console.log('AURIX-CHART-CANONICAL-REFRESH-DETERMINISM — SPEC.21');
   ok('17 syntheticPoints = 0 globally', cases.every(c => c.diagnostics.syntheticPoints === 0));
 }
 
-// 19. flag OFF → exact v502 behaviour (24H islands NOT collapsed; C5 skipped).
+// 19. SPEC RANGE_INVARIANT_GAP — §6.5 no longer collapses same-level OBSERVATION islands (inactivity, not a
+//     regime change) under EITHER flag state; it STILL collapses a genuine REGIME island (value cliff).
 {
-  const A = seg(T0, 10, 12 * MIN, 1000, 0.1), B = seg(T0 + 22 * HOUR, 10, 12 * MIN, 1002, 0.1);
+  const A = seg(T0, 10, 12 * MIN, 1000, 0.1), B = seg(T0 + 22 * HOUR, 10, 12 * MIN, 1002, 0.1);   // SAME level → observation gap
   const pts = A.concat(B);
   const onR = frcON(emgOf(pts, { range: '24h', returnState: 'ok', badgeReturnPct: 0.24 }), '24h', 'desktop');
   const offR = frcOFF(emgOf(pts, { range: '24h', returnState: 'ok', badgeReturnPct: 0.24 }), '24h', 'desktop');
-  ok('19 flag OFF keeps v502 (multi-path 24H NOT collapsed)', offR.renderPathCount >= 2, 'offPaths=' + offR.renderPathCount);
-  ok('19 flag ON collapses to single path (the fix)', onR.renderPathCount <= 1, 'onPaths=' + onR.renderPathCount);
-  ok('19 flag OFF has no canonical_24h reason codes', !(offR.reasonCodes || []).some(c => /canonical_24h/.test(c)));
+  ok('19 observation islands: flag OFF keeps multi-path', offR.renderPathCount >= 2, 'offPaths=' + offR.renderPathCount);
+  ok('19 observation islands: flag ON ALSO keeps both segments (no collapse for inactivity)', onR.renderPathCount >= 2, 'onPaths=' + onR.renderPathCount);
+  ok('19 observation islands: no canonical_24h single-path collapse', !(onR.reasonCodes || []).some(c => /canonical_24h_single_path/.test(c)));
+  // regime CLIFF (16000 → 6000 across the gap) with the flag ON → STILL collapses to the single current
+  // regime (capital/value-cliff single-path is UNCHANGED — SPEC.21 preserved).
+  const C = seg(T0, 10, 12 * MIN, 16000, 1), D = seg(T0 + 22 * HOUR, 10, 12 * MIN, 6000, 1);
+  const cliffR = frcON(emgOf(C.concat(D), { range: '24h', returnState: 'ok', badgeReturnPct: 0.24 }), '24h', 'desktop');
+  ok('19 regime cliff: flag ON collapses to single current-regime path (SPEC.21 preserved)', cliffR.renderPathCount <= 1, 'cliffPaths=' + cliffR.renderPathCount);
 }
 
 // 2/B. return anchor from CANONICAL points only (backend gap-filler autoload never re-anchors the return).

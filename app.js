@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '550'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '551'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -21319,6 +21319,17 @@ const _AURIX_VP_GAP_FLOOR_MS = {
   'all': 45 * 864e5,   // 45 d  (also floored to span/8 below)
 };
 const _AURIX_VP_GAP_MEDIAN_MULT = 8;   // a real gap is ≥ 8× the median inter-point interval
+// SPEC DSH.CHART.RANGE_INVARIANT_GAP_SEGMENTATION — the observation-gap threshold is RANGE-INVARIANT:
+// purely cadence-relative (median × _AURIX_VP_GAP_MEDIAN_MULT) clamped to [MIN, MAX], NEVER scaled by the
+// requested range. MIN preserves the historical 24H behaviour (dense data ⇒ 8h floor) and is the smallest
+// interval that counts as an observation gap; MAX is a generous safety cap so a very sparse account still
+// segments a long inactivity. Same timestamp pair ⇒ identical classification in 24H/7D/30D/1Y/ALL.
+const _AURIX_OBS_GAP_MIN_MS = 8 * 36e5;    // 8h — range-invariant minimum observation gap
+const _AURIX_OBS_GAP_MAX_MS = 30 * 864e5;  // 30d — cadence×mult is capped here for very sparse cadences
+// A value CLIFF across a gap (regime change, not inactivity): the value level jumps by more than this
+// fraction across a real observation gap ⇒ the boundary is a REGIME boundary (single-path, SPEC.45/51),
+// NOT an observation gap. Same-level gaps stay observation gaps (multi-segment).
+const _AURIX_REGIME_CLIFF_FRAC = 0.35;
 const _AURIX_VP_CAPITAL_KINDS = { deposit: 1, withdrawal: 1, asset_add: 1, asset_remove: 1, import_baseline: 1 };
 const _AURIX_VP_CLUSTER_WIDTH_PX = 5;   // a band of ≤5px …
 const _AURIX_VP_CLUSTER_MIN_PTS  = 4;   // … holding ≥4 points is a visual cluster
@@ -24658,16 +24669,51 @@ const _AURIX_CHART_CONTINUITY_UNIFICATION = true;
 // gap detector + the bridge detector already use: max(per-range floor, median cadence × 8)). Reused here
 // so the renderer's break decision, the badge eligibility and the diagnostics share ONE gap definition.
 function _aurixRealGapFloorMs(points, range) {
-  const r = String(range || '').toLowerCase();
+  // SPEC RANGE_INVARIANT_GAP_SEGMENTATION — RANGE-INVARIANT observation-gap threshold. Cadence-relative
+  // (median inter-point interval × mult) clamped to [MIN, MAX]. NEVER derived from the requested range.
+  // ROOT CAUSE (fixed here): the previous floor was `_AURIX_VP_GAP_FLOOR_MS[range]` (24h=8h, 7d=2d,
+  // 30d=7d, 1y/all=45d), so the SAME overnight timestamp gap segmented in 24H but drew a smooth bridge in
+  // every long range. The threshold now depends ONLY on the account's own snapshot cadence, so 24H/7D/30D/
+  // 1Y/ALL classify the same timestamp pair identically. MIN preserves the historical 24H 8h behaviour for
+  // dense data; a sparse/daily account's own cadence lifts the threshold so normal cadence never segments.
   const n = Array.isArray(points) ? points.length : 0;
   let median = 0;
   if (n >= 2) { const iv = []; for (let i = 1; i < n; i++) iv.push(points[i].time - points[i - 1].time); iv.sort((a, b) => a - b); median = iv[iv.length >> 1] || 0; }
-  const tbl = (typeof _AURIX_VP_GAP_FLOOR_MS !== 'undefined') ? _AURIX_VP_GAP_FLOOR_MS : {};
-  let floor = tbl[r] || (7 * 864e5);
-  if (r === 'all' && n >= 2) { const span = points[n - 1].time - points[0].time; floor = Math.max(tbl.all || (45 * 864e5), span / 8); }
   const mult = (typeof _AURIX_VP_GAP_MEDIAN_MULT === 'number') ? _AURIX_VP_GAP_MEDIAN_MULT : 8;
-  return Math.max(floor, median * mult);
+  const MIN = (typeof _AURIX_OBS_GAP_MIN_MS === 'number') ? _AURIX_OBS_GAP_MIN_MS : (8 * 36e5);
+  const MAX = (typeof _AURIX_OBS_GAP_MAX_MS === 'number') ? _AURIX_OBS_GAP_MAX_MS : (30 * 864e5);
+  return Math.min(MAX, Math.max(MIN, median * mult));
 }
+// SPEC RANGE_INVARIANT_GAP_SEGMENTATION — REGIME boundaries (capital events + value cliffs across a gap)
+// vs OBSERVATION gaps (same-level inactivity). The FRC single-path steps (SPEC.45/51) select the current
+// regime by splitting on REGIME boundaries ONLY, so observation gaps stay INSIDE the selected regime and
+// render as separate visible segments. A regime boundary = a reconciled capital step (ledger-matched) OR a
+// value CLIFF (|Δvalue| > _AURIX_REGIME_CLIFF_FRAC) that coincides with a real observation gap (never a
+// dense-cadence market move). Same-level gaps are NEVER regime boundaries. Range-invariant (uses the
+// range-invariant real-gap floor). Deterministic; no synthetic points.
+function _aurixRegimeBoundaryBreaks(points, range) {
+  const out = [], seen = new Set();
+  const n = Array.isArray(points) ? points.length : 0;
+  if (n < 2) return out;
+  const push = b => { if (!b || !Number.isFinite(b.start) || !Number.isFinite(b.end)) return; const k = b.start + ':' + b.end; if (seen.has(k)) return; seen.add(k); out.push(b); };
+  let capital = [];
+  try { if (typeof _aurixCapitalStepBreaks === 'function') capital = _aurixCapitalStepBreaks(points, range) || []; } catch (_) { capital = []; }
+  capital.forEach(push);
+  let floor = 0;
+  try { floor = (typeof _aurixRealGapFloorMs === 'function') ? _aurixRealGapFloorMs(points, range) : (8 * 36e5); } catch (_) { floor = 8 * 36e5; }
+  const CLIFF = (typeof _AURIX_REGIME_CLIFF_FRAC === 'number') ? _AURIX_REGIME_CLIFF_FRAC : 0.35;
+  for (let i = 1; i < n; i++) {
+    const dt = points[i].time - points[i - 1].time;
+    if (dt < floor) continue;                                  // only across a real observation gap
+    const prev = Math.abs(points[i - 1].value) || 1;
+    if (Math.abs(points[i].value - points[i - 1].value) / prev > CLIFF) {   // value cliff across the gap ⇒ regime change
+      push({ start: points[i - 1].time, end: points[i].time, reason: 'value_cliff', deltaPct: +(((points[i].value - points[i - 1].value) / prev) * 100).toFixed(2) });
+    }
+  }
+  out.sort((a, b) => a.start - b.start);
+  return out;
+}
+try { if (typeof window !== 'undefined') window._aurixRegimeBoundaryBreaks = _aurixRegimeBoundaryBreaks; } catch (_) {}
 // THE continuity-validated series chokepoint. Given the (already validated) points + range it returns the
 // SAME truth the visible line, the structural breaks, the badge eligibility and the diagnostics must all
 // read: which breaks are honest (real gap / capital step) vs artificial (same-segment sparse ramp), the
@@ -25303,7 +25349,11 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     if (canonRefreshOn && r === '24h' && work.length >= 2) {
       const mapped = work.map(p => ({ time: p.ts, value: p.value }));
       let breaks = [];
-      try { if (typeof _aurixStructuralBreaks === 'function') { const sb = _aurixStructuralBreaks(mapped, r); breaks = (sb && Array.isArray(sb.breaks)) ? sb.breaks : []; } } catch (_) {}
+      // SPEC RANGE_INVARIANT_GAP_SEGMENTATION — 24H current-regime selection splits on REGIME boundaries
+      // ONLY (capital + value cliff). Observation gaps stay INSIDE the regime and render as separate visible
+      // segments (24H no longer collapses an overnight gap into a single recent path). SPEC.21 regime
+      // single-path preserved for value cliffs / capital.
+      try { if (typeof _aurixRegimeBoundaryBreaks === 'function') breaks = _aurixRegimeBoundaryBreaks(mapped, r) || []; } catch (_) {}
       if (breaks.length) {
         let runs = [mapped];
         try { if (typeof _aurixSplitAtGaps === 'function') runs = _aurixSplitAtGaps(mapped, breaks) || [mapped]; } catch (_) { runs = [mapped]; }
@@ -25347,7 +25397,11 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     if ((typeof _AURIX_CHART_7D_SINGLE_CONTINUOUS !== 'undefined' && _AURIX_CHART_7D_SINGLE_CONTINUOUS) && r === '7d' && work.length >= 2) {
       const mapped = work.map(p => ({ time: p.ts, value: p.value }));
       let breaks = [];
-      try { if (typeof _aurixStructuralBreaks === 'function') { const sb = _aurixStructuralBreaks(mapped, r); breaks = (sb && Array.isArray(sb.breaks)) ? sb.breaks : []; } } catch (_) {}
+      // SPEC RANGE_INVARIANT_GAP_SEGMENTATION — current-regime selection splits on REGIME boundaries ONLY
+      // (capital events + value cliffs). A same-level OBSERVATION gap is NOT a regime boundary, so it stays
+      // INSIDE the selected regime run and renders as a separate visible segment (multi-segment). SPEC.45
+      // single-path is preserved for genuine regime changes (value cliff / capital).
+      try { if (typeof _aurixRegimeBoundaryBreaks === 'function') breaks = _aurixRegimeBoundaryBreaks(mapped, r) || []; } catch (_) {}
       let runs = [mapped];
       if (breaks.length) { try { if (typeof _aurixSplitAtGaps === 'function') runs = _aurixSplitAtGaps(mapped, breaks) || [mapped]; } catch (_) { runs = [mapped]; } }
       runs = runs.filter(run => run && run.length);
@@ -25391,7 +25445,10 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     if ((typeof _AURIX_CHART_ACTIVE_REGIME_SINGLE_PATH !== 'undefined' && _AURIX_CHART_ACTIVE_REGIME_SINGLE_PATH) && (r === '30d' || r === '1y' || r === 'all') && work.length >= 2) {
       const mapped = work.map(p => ({ time: p.ts, value: p.value }));
       let breaks = [];
-      try { if (typeof _aurixStructuralBreaks === 'function') { const sb = _aurixStructuralBreaks(mapped, r); breaks = (sb && Array.isArray(sb.breaks)) ? sb.breaks : []; } } catch (_) {}
+      // SPEC RANGE_INVARIANT_GAP_SEGMENTATION — SPEC.51 current-regime selection splits on REGIME boundaries
+      // ONLY (capital events + value cliffs). Observation gaps stay INSIDE the current regime and render as
+      // separate visible segments. Current-regime authority (capital/value-cliff single-path) is unchanged.
+      try { if (typeof _aurixRegimeBoundaryBreaks === 'function') breaks = _aurixRegimeBoundaryBreaks(mapped, r) || []; } catch (_) {}
       let runs = [mapped];
       if (breaks.length) { try { if (typeof _aurixSplitAtGaps === 'function') runs = _aurixSplitAtGaps(mapped, breaks) || [mapped]; } catch (_) { runs = [mapped]; } }
       runs = runs.filter(run => run && run.length);
@@ -27614,29 +27671,41 @@ function renderValidatedPortfolioChartWithInstitutionalRenderer(points, opts) {
     const src = (Array.isArray(points) ? points : []).map(p => ({ time: p.ts, value: p.value }));   // shape rename ONLY; values untouched
     if (src.length < 2) return { linePath: '', areaPath: '', visiblePixels: [], visiblePoints: [], ok: false };
     const target = (typeof _aurixVpTargetPointCount === 'function') ? _aurixVpTargetPointCount(r, vw) : src.length;
-    const visiblePoints = downsampleAurixAdaptive(src, target);                       // LTTB + local-extrema
+    // SPEC RANGE_INVARIANT_GAP_SEGMENTATION — detect structural breaks on the ORIGINAL validated points
+    // (BEFORE LTTB) and DOWNSAMPLE EACH SEGMENT INDEPENDENTLY, so an observation gap never shares an LTTB
+    // bucket with the other side and no curve command is ever emitted across it. Both original endpoints
+    // survive. Healthy continuous data (no breaks) takes the SAME whole-series LTTB path as before ⇒
+    // byte-identical. Breaks are range-invariant (the real-gap floor is cadence-relative, not per-range).
+    const _orphanOn = (typeof _AURIX_ORPHAN_CLEANUP_ENABLED !== 'undefined') ? _AURIX_ORPHAN_CLEANUP_ENABLED : true;
+    const _orphanMax = (typeof _AURIX_ORPHAN_MAX_PTS === 'number') ? _AURIX_ORPHAN_MAX_PTS : 2;
+    const sbrk = _aurixStructuralBreaks(src, r);
+    const breaks = sbrk.breaks;
+    let visiblePoints, segments = null;
+    if (breaks.length) {
+      const rawRuns = (_aurixSplitAtGaps(src, breaks) || []).filter(run => run && run.length);
+      const kept = [];
+      for (let ri = 0; ri < rawRuns.length; ri++) {
+        const isInterior = (ri > 0 && ri < rawRuns.length - 1);                        // V480 orphan cleanup — skip interior micro-island (≤N pts)
+        if (_orphanOn && isInterior && rawRuns[ri].length <= _orphanMax) continue;
+        kept.push(rawRuns[ri]);
+      }
+      const totalKept = kept.reduce((s, run) => s + run.length, 0) || 1;
+      segments = kept.map(run => (run.length <= 2) ? run.slice() : downsampleAurixAdaptive(run, Math.max(2, Math.round(target * run.length / totalKept))));
+      visiblePoints = [].concat.apply([], segments);
+    } else {
+      visiblePoints = downsampleAurixAdaptive(src, target);                            // LTTB + local-extrema (unchanged whole-series path)
+    }
     const xScale = computeAurixAdaptiveXScale(visiblePoints, vw, box, r);             // perceptual X
     const yScale = computeAurixValueScale(visiblePoints, vh, box);                    // regime-relative Y
     const scale = { xMin: xScale.xMin, xMax: xScale.xMax, yMin: yScale.yMin, yMax: yScale.yMax, x: xScale.x, y: yScale.y, top: yScale.top, bottom: yScale.bottom };
-    // SPEC BRIDGE-SEGMENTATION.01 + DATA-TRUTH.01 — split the path ONLY at STRUCTURAL breaks (sparse
-    // bridge ∪ capital step ∪ sparse ramp); else draw the single continuous premium curve exactly as
-    // before (byte-identical when there are no breaks — dense uniform data is untouched).
-    const sbrk = _aurixStructuralBreaks(visiblePoints, r);
-    const breaks = sbrk.breaks;
+    // SPEC BRIDGE-SEGMENTATION.01 + DATA-TRUTH.01 + RANGE_INVARIANT_GAP — one path/fill per segment; never
+    // a curve command between segment endpoints. No breaks ⇒ the single continuous premium curve (v-prior).
     let linePath = '', areaPath = '';
-    if (breaks.length) {
-      const runs = _aurixSplitAtGaps(visiblePoints, breaks);
-      const _orphanOn = (typeof _AURIX_ORPHAN_CLEANUP_ENABLED !== 'undefined') ? _AURIX_ORPHAN_CLEANUP_ENABLED : true;
-      const _orphanMax = (typeof _AURIX_ORPHAN_MAX_PTS === 'number') ? _AURIX_ORPHAN_MAX_PTS : 2;
+    if (segments) {
       const lineParts = [], areaParts = [];
-      for (let ri = 0; ri < runs.length; ri++) {
-        const run = runs[ri];
+      for (const run of segments) {
         if (!run || run.length < 1) continue;
-        // V480 orphan cleanup — skip an INTERIOR micro-island (≤N points between two structural breaks).
-        // First/last runs and genuine clusters (> N points) always render; source data is untouched.
-        const isInterior = (ri > 0 && ri < runs.length - 1);
-        if (_orphanOn && isInterior && run.length <= _orphanMax) continue;
-        const rp = _aurixMonotonePath(run, xScale, yScale);                            // dense premium curve, per run
+        const rp = _aurixMonotonePath(run, xScale, yScale);                            // dense premium curve, per segment
         if (rp && rp.d) { lineParts.push(rp.d); if (run.length >= 2) areaParts.push(buildAurixAreaPath(rp.d, run, scale)); }
       }
       linePath = lineParts.join(' ');                                                  // multiple 'M…' subpaths ⇒ visible break at each structural discontinuity
@@ -27649,7 +27718,7 @@ function renderValidatedPortfolioChartWithInstitutionalRenderer(points, opts) {
     const visiblePixels = visiblePoints.map(p => ({ x: +xScale.x(p.time).toFixed(2), y: +yScale.y(p.value).toFixed(2) }));
     return { linePath: linePath, areaPath: areaPath, visiblePixels: visiblePixels, visiblePoints: visiblePoints, xScale: xScale, yScale: yScale, scale: scale,
       segmentedBridgeCount: sbrk.bridgeCount, capitalStepSegmentCount: sbrk.capitalStepCount, sparseRampSegmentCount: sbrk.sparseRampCount,
-      structuralBreakCount: breaks.length, bridgeGaps: breaks, ok: !!(linePath && areaPath) };
+      structuralBreakCount: breaks.length, bridgeGaps: breaks, segmentCount: segments ? segments.length : 1, ok: !!(linePath && areaPath) };
   } catch (e) { return { linePath: '', areaPath: '', visiblePixels: [], visiblePoints: [], ok: false, error: (e && e.message) || 'err' }; }
 }
 
