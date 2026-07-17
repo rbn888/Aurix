@@ -25167,6 +25167,20 @@ function _aurixResolvePublicationReadiness(ctx) {
   return out;
 }
 try { if (typeof window !== 'undefined') { window._aurixResolvePublicationReadiness = _aurixResolvePublicationReadiness; window._AURIX_PUBLICATION_STATE = _AURIX_PUBLICATION_STATE; } } catch (_) {}
+// Cheap live predicate (no series needed) — the SAME readiness the badge painter applies, for the hover
+// tooltips so a per-point return % is never shown before reconciliation while the badge says "Calculando…".
+// Reads only the hydration globals (endpoint completeness is already guaranteed for persisted points by
+// LB-1). Defaults to publishable (true) when the resolver/globals are absent, matching the badge default.
+function _aurixReturnPublishReadyNow() {
+  try {
+    if (typeof _aurixResolvePublicationReadiness !== 'function') return true;
+    return _aurixResolvePublicationReadiness({
+      backendEnabled: (typeof _AURIX_BACKEND_SNAPSHOTS_ENABLED !== 'undefined') ? _AURIX_BACKEND_SNAPSHOTS_ENABLED : false,
+      hydrationState: (typeof _aurixBackendSnapshotsState !== 'undefined') ? _aurixBackendSnapshotsState : 'ready',
+    }).publishable;
+  } catch (_) { return true; }
+}
+try { if (typeof window !== 'undefined') window._aurixReturnPublishReadyNow = _aurixReturnPublishReadyNow; } catch (_) {}
 
 const _AURIX_CHART_RETURN_CONTRACT_UNIFICATION = true;
 function _aurixResolveChartReturnContract(validatedSeries, range, context) {
@@ -34200,7 +34214,10 @@ function _aurixMobInspectorUpdate(clientX) {
     // Fase 3 — tooltip from REAL values only: value (protagonist) · date · time · % from start.
     let pctTxt = '', tone = '';
     const v0 = pts[0].v;
-    if (typeof v0 === 'number' && v0 !== 0 && typeof p.v === 'number') { const pc = ((p.v - v0) / Math.abs(v0)) * 100; tone = pc > 0.005 ? 'pos' : pc < -0.005 ? 'neg' : ''; pctTxt = (pc > 0 ? '+' : '') + pc.toFixed(2) + '%'; }
+    // SPEC CHART-INTEGRITY.LB-2 — withhold the per-point return % while publication is not ready (hydration
+    // in progress), matching the badge; the value + date (factual line data) still show (LINE ⊥ RETURN).
+    const _pubReadyTip = (typeof _aurixReturnPublishReadyNow !== 'function') || _aurixReturnPublishReadyNow();
+    if (_pubReadyTip && typeof v0 === 'number' && v0 !== 0 && typeof p.v === 'number') { const pc = ((p.v - v0) / Math.abs(v0)) * 100; tone = pc > 0.005 ? 'pos' : pc < -0.005 ? 'neg' : ''; pctTxt = (pc > 0 ? '+' : '') + pc.toFixed(2) + '%'; }
     let dateStr = '', timeStr = '';
     try {
       const dt = new Date(p.t);
@@ -34464,6 +34481,11 @@ function updateChartTooltip(context) {
     // value (dp.raw) is already in baseCurrency — format without converting.
     valText = formatChartTooltip(value);
     valDir  = value > first ? 'up' : value < first ? 'down' : 'flat';
+  } else if (typeof _aurixReturnPublishReadyNow === 'function' && !_aurixReturnPublishReadyNow()) {
+    // SPEC CHART-INTEGRITY.LB-2 — publication not ready (hydration in progress): withhold the per-point
+    // return % (same predicate as the badge) so a pre-reconciliation number never leaks via hover.
+    valText = '—';
+    valDir  = 'flat';
   } else {
     const pct  = first > 0 ? ((value - first) / first) * 100 : 0;
     const sign = pct >= 0 ? '+' : '';
