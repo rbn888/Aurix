@@ -22,7 +22,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # SPEC CHART-INTEGRITY.CI — fail-closed deploy gate. Runs the full chart-engine harness suite (P0
+  # chart-integrity harnesses first). Any red harness fails this job; `deploy` depends on it, so a
+  # failing suite blocks the publish. No continue-on-error, no ignored exit codes.
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Chart-integrity certification gate
+        run: node scripts/aurix-ci-gate.mjs
+
   deploy:
+    needs: gate
     runs-on: ubuntu-latest
     environment:
       name: github-pages

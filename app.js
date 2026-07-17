@@ -1256,6 +1256,59 @@ try {
     }
   }
 } catch (_) {}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC CHART-INTEGRITY.LB-3 — BACKEND CONTINUITY HEALTH CONTRACT
+// ════════════════════════════════════════════════════════════════════════════
+// Historical continuity across a closed app depends on the backend snapshot cron (portfolio_snapshots,
+// */15). That external process was previously invisible to the client. This is the single, deterministic
+// classification of backend continuity health. It distinguishes an EMPTY new-user history from a FAILED
+// request from a DEAD/late cron — a distinction the old code could not make. It NEVER fabricates points and
+// NEVER hides a real gap; it produces an explicit state so the UI can degrade safely and monitoring can alert.
+const _AURIX_BACKEND_HEALTH = Object.freeze({
+  HEALTHY: 'HEALTHY', LATE: 'LATE', STALE: 'STALE', UNAVAILABLE: 'UNAVAILABLE',
+  UNAUTHORIZED: 'UNAUTHORIZED', EMPTY_NEW_USER: 'EMPTY_NEW_USER', UNKNOWN: 'UNKNOWN',
+});
+const _AURIX_BACKEND_CADENCE_MS = 15 * 60000;   // scheduler cadence (pg_cron */15)
+const _AURIX_BACKEND_LATE_FACTOR = 2;            // ≤ 2 cadences old ⇒ healthy; ≤ 8 ⇒ late; else stale
+const _AURIX_BACKEND_STALE_FACTOR = 8;
+// Pure: classify from explicit inputs (fully testable). fetchStatus ∈ 'ok'|'error'|'unauthorized'|null.
+function _aurixBackendHealth(input) {
+  const i = input || {};
+  const cadence = Number.isFinite(i.cadenceMs) ? i.cadenceMs : _AURIX_BACKEND_CADENCE_MS;
+  const lateF = Number.isFinite(i.lateFactor) ? i.lateFactor : _AURIX_BACKEND_LATE_FACTOR;
+  const staleF = Number.isFinite(i.staleFactor) ? i.staleFactor : _AURIX_BACKEND_STALE_FACTOR;
+  const out = { status: _AURIX_BACKEND_HEALTH.UNKNOWN, ageMs: null, latestTs: (Number.isFinite(i.latestTs) ? i.latestTs : null),
+    rowCount: Number.isFinite(i.rows) ? i.rows : null, expectedCadenceMs: cadence, reason: null };
+  if (i.clientReady === false)         { out.status = _AURIX_BACKEND_HEALTH.UNKNOWN;      out.reason = 'client_not_ready'; return out; }
+  if (i.fetchStatus === 'unauthorized'){ out.status = _AURIX_BACKEND_HEALTH.UNAUTHORIZED; out.reason = 'rls_or_auth_denied'; return out; }
+  if (i.fetchStatus === 'error')       { out.status = _AURIX_BACKEND_HEALTH.UNAVAILABLE;  out.reason = 'fetch_error'; return out; }
+  if (i.rows === 0)                    { out.status = _AURIX_BACKEND_HEALTH.EMPTY_NEW_USER;out.reason = 'no_rows_yet'; return out; }
+  if (!Number.isFinite(i.latestTs) || !Number.isFinite(i.now)) { out.status = _AURIX_BACKEND_HEALTH.UNKNOWN; out.reason = 'no_timestamp'; return out; }
+  const age = i.now - i.latestTs; out.ageMs = age;
+  if (age <= cadence * lateF)  { out.status = _AURIX_BACKEND_HEALTH.HEALTHY; out.reason = 'fresh'; }
+  else if (age <= cadence * staleF) { out.status = _AURIX_BACKEND_HEALTH.LATE; out.reason = 'behind_schedule'; }
+  else { out.status = _AURIX_BACKEND_HEALTH.STALE; out.reason = 'cron_late_or_dead'; }
+  return out;
+}
+// Runtime wrapper: metadata-only health snapshot from the current hydration state (no balances, no PII).
+function _aurixBackendHealthSnapshot() {
+  try {
+    const enabled = (typeof _AURIX_BACKEND_SNAPSHOTS_ENABLED !== 'undefined') && _AURIX_BACKEND_SNAPSHOTS_ENABLED;
+    if (!enabled) return { status: _AURIX_BACKEND_HEALTH.UNKNOWN, reason: 'backend_snapshots_disabled', enabled: false };
+    const st = (typeof _aurixBackendSnapshotsState !== 'undefined') ? _aurixBackendSnapshotsState : 'idle';
+    const rows = Array.isArray(_aurixBackendSnapshots) ? _aurixBackendSnapshots : [];
+    const latestTs = rows.length ? Math.max.apply(null, rows.map(r => Number(r && (r.ts)) || 0)) : null;
+    const clientReady = (typeof _aurixBackendAuthClientReady === 'function') ? _aurixBackendAuthClientReady() : true;
+    const fetchStatus = st === 'failed' ? 'error' : (st === 'ready' ? 'ok' : null);
+    const h = _aurixBackendHealth({ clientReady: clientReady, fetchStatus: (st === 'ready' || st === 'failed') ? fetchStatus : (clientReady ? null : null),
+      rows: st === 'ready' ? rows.length : (st === 'failed' ? null : null), latestTs: latestTs, now: Date.now() });
+    h.hydrationState = st;
+    return h;
+  } catch (e) { return { status: _AURIX_BACKEND_HEALTH.UNKNOWN, reason: 'health_error' }; }
+}
+try { if (typeof window !== 'undefined') { window.aurixBackendHealth = _aurixBackendHealthSnapshot; window._aurixBackendHealth = _aurixBackendHealth; } } catch (_) {}
+
 // ── P0-FINAL-PERFORMANCE-KILL-SWITCH-AND-SERVER-CANONICAL ────────────────────────
 // The single REMOTE canonical performance object (Supabase user_portfolios.performance_state). It is the
 // ONLY source an authenticated client may render REAL performance from. Set ONLY from a remote READ (in
@@ -6819,6 +6872,31 @@ const _aurixGuardTelemetry = {
   snapshotQuarantined: 0, lastQuarantineReason: null, lastQuarantineTs: null,
   saveBlocked: 0, lastSaveBlockReason: null, lastSaveBlockAt: null,
 };
+// SPEC CHART-INTEGRITY.OBSERVABILITY — privacy-safe structured integrity events. Records reason codes and
+// COUNTS only (never raw balances, tokens, or per-asset symbols/composition) into a bounded ring buffer so
+// production behaviour (rejected snapshots, hydration, readiness blockers, health) is inspectable without
+// leaking sensitive data. Callers must pass counts/reason codes, not values.
+const _AURIX_INTEGRITY_EVENTS_MAX = 100;
+function _aurixEmitIntegrityEvent(type, payload) {
+  try {
+    if (typeof window === 'undefined') return;
+    if (!Array.isArray(window.__AURIX_INTEGRITY_EVENTS__)) window.__AURIX_INTEGRITY_EVENTS__ = [];
+    const rec = { t: type, ts: Date.now() };
+    const p = payload || {};
+    // whitelist safe scalar fields only (numbers, short reason strings, booleans) — drop anything else.
+    for (const k of Object.keys(p)) {
+      const v = p[k];
+      if (typeof v === 'number' || typeof v === 'boolean') rec[k] = v;
+      else if (typeof v === 'string' && v.length <= 48) rec[k] = v;
+    }
+    window.__AURIX_INTEGRITY_EVENTS__.push(rec);
+    if (window.__AURIX_INTEGRITY_EVENTS__.length > _AURIX_INTEGRITY_EVENTS_MAX) {
+      window.__AURIX_INTEGRITY_EVENTS__ = window.__AURIX_INTEGRITY_EVENTS__.slice(-_AURIX_INTEGRITY_EVENTS_MAX);
+    }
+    if (typeof IS_DEV !== 'undefined' && IS_DEV) { try { console.debug('[AURIX-integrity]', type, rec); } catch (_) {} }
+  } catch (_) {}
+}
+try { if (typeof window !== 'undefined') window._aurixEmitIntegrityEvent = _aurixEmitIntegrityEvent; } catch (_) {}
 // P0-SNAPSHOT-GUARD-PARITY-FIX — reasons that are device-RELATIVE heuristics (compared to THIS device's
 // last local snapshot). They must NOT permanently drop a point — that creates per-device history
 // divergence. They are QUARANTINED (kept + synced); the shared canonical history (union + trust filter),
@@ -9152,6 +9230,74 @@ function getInvestablePortfolioValue() {
   try { return investableValueUSD(); } catch (_) { return 0; }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC CHART-INTEGRITY.LB-1 — CANONICAL VALUATION-COMPLETENESS CONTRACT
+// ════════════════════════════════════════════════════════════════════════════
+// ROOT CAUSE (forensic P0): a cold-start snapshot could be persisted while some active holdings had no
+// valid price. assetValueUSD() returns NaN for an unpriced/uncovered holding and every aggregator SKIPS it
+// (totalValueUSD / recordCategorySnapshot), so the remaining holdings produced a positive-but-INCOMPLETE
+// total. That partial total became the return endpoint and published a false ~-24% (which was < the 25%
+// 24H sane band). There was NO price-coverage check anywhere — the write guard proved FX coverage only.
+//
+// This is the SINGLE, deterministic assessment of whether a portfolio valuation is COMPLETE. It is the
+// shared source of truth for: snapshot eligibility (LB-1), publication readiness (LB-2) and diagnostics.
+// A valuation is complete ONLY when EVERY active, non-zero-quantity holding produced a finite, positive USD
+// value with a present price and covered FX. It NEVER converts an unknown to zero and NEVER invents a value.
+// Zero-quantity / closed holdings are legitimately excluded. An empty account (no active non-zero holdings)
+// is trivially complete (total 0) — the downstream total<=0 guard handles new accounts.
+const _AURIX_VALUATION_REASON = Object.freeze({
+  COMPLETE: 'COMPLETE', VALUATION_NOT_READY: 'VALUATION_NOT_READY', MISSING_PRICE: 'MISSING_PRICE',
+  MISSING_FX: 'MISSING_FX', INVALID_HOLDING: 'INVALID_HOLDING', EMPTY: 'EMPTY',
+});
+function _aurixAssessValuationCompleteness(list) {
+  const out = {
+    totalActive: 0, priced: 0, unpriced: 0, invalid: 0, missingFx: 0,
+    total: 0, complete: true, reason: _AURIX_VALUATION_REASON.EMPTY,
+    pricesReady: (typeof _aurixPricesReady === 'boolean') ? _aurixPricesReady : true,
+    missing: [],   // safe identifiers (symbol/ticker/id) of holdings that could not be valued
+  };
+  try {
+    let src = Array.isArray(list) ? list : (typeof activeAssets === 'function' ? activeAssets() : []);
+    // never assess closed positions (qty 0 by contract)
+    src = src.filter(a => a && !(typeof isClosedAsset === 'function' && isClosedAsset(a)));
+    for (const a of src) {
+      if (!a) continue;
+      const isCash = a.type === 'cash';
+      // economic quantity: cash carries its amount via liquidityNominal, everything else via qty.
+      let qty;
+      if (isCash) { try { qty = Number(typeof liquidityNominal === 'function' ? liquidityNominal(a) : a.qty); } catch (_) { qty = NaN; } }
+      else { qty = Number(a.qty); }
+      if (qty === 0) continue;                                   // zero-quantity position — legitimately excluded
+      const sid = String(a.symbol || a.ticker || a.id || a.name || 'unknown');
+      out.totalActive++;
+      if (!Number.isFinite(qty)) { out.invalid++; out.missing.push(sid); continue; }   // non-finite quantity = invalid holding
+      // FX coverage (never assume EUR; unknown currency ⇒ uncovered)
+      const curr = String(a.assetCurrency || 'USD').toUpperCase();
+      const fxUnknown = (curr !== 'USD' && curr !== 'EUR' && typeof _aurixFxStatus === 'function' && _aurixFxStatus(curr) === 'unknown');
+      // price presence (cash has no market price; gold + market assets require a finite positive price)
+      const priceMissing = !isCash && (!Number.isFinite(Number(a.price)) || Number(a.price) <= 0);
+      let v; try { v = Number(assetValueUSD(a)); } catch (_) { v = NaN; }
+      const valued = Number.isFinite(v) && v > 0;
+      if (fxUnknown)          { out.missingFx++;  out.missing.push(sid); }
+      else if (priceMissing)  { out.unpriced++;   out.missing.push(sid); }
+      else if (!valued)       { out.invalid++;    out.missing.push(sid); }
+      else                    { out.priced++;     out.total += v; }
+    }
+    if (out.totalActive === 0)                          { out.complete = true;  out.reason = _AURIX_VALUATION_REASON.EMPTY; }
+    else if (out.missingFx > 0)                         { out.complete = false; out.reason = _AURIX_VALUATION_REASON.MISSING_FX; }
+    else if (out.unpriced > 0)                          { out.complete = false; out.reason = out.pricesReady ? _AURIX_VALUATION_REASON.MISSING_PRICE : _AURIX_VALUATION_REASON.VALUATION_NOT_READY; }
+    else if (out.invalid > 0)                           { out.complete = false; out.reason = _AURIX_VALUATION_REASON.INVALID_HOLDING; }
+    else                                                { out.complete = true;  out.reason = _AURIX_VALUATION_REASON.COMPLETE; }
+    out.total = +out.total.toFixed(2);
+  } catch (e) {
+    // Fail SAFE: an assessment error must NEVER be interpreted as "complete" (that would re-open the hole).
+    out.complete = false; out.reason = _AURIX_VALUATION_REASON.VALUATION_NOT_READY;
+    try { if (typeof IS_DEV !== 'undefined' && IS_DEV) console.warn('[LB-1] valuation assessment error', e && e.message); } catch (_) {}
+  }
+  return out;
+}
+try { if (typeof window !== 'undefined') window._aurixAssessValuationCompleteness = _aurixAssessValuationCompleteness; } catch (_) {}
+
 // ── P&L calculations ────────────────────────────────────────
 function assetPnLBase(asset) {
   // LIQ-2: cash never produces P&L. Holding 20,000 EUR ≠ a position
@@ -9721,6 +9867,12 @@ function recordCategorySnapshot() {
   // FASE 2 — write-guard inputs (no longer flagged-and-kept; rejected below).
   const _catFxPartial = _aurixFxUncovered(assets) > 0;
   const _catFxApprox  = _aurixFxApproxUsed(assets);
+  // SPEC CHART-INTEGRITY.LB-1 — same valuation-completeness gate as recordSnapshot (assessed over the
+  // active set that feeds the total). An incomplete valuation is HARD-rejected by the write guard below.
+  const _catVal = (typeof _aurixAssessValuationCompleteness === 'function')
+    ? _aurixAssessValuationCompleteness(typeof activeAssets === 'function' ? activeAssets() : assets)
+    : { complete: true, reason: 'COMPLETE', unpriced: 0, missingFx: 0, invalid: 0, missing: [] };
+  if (_catVal.complete === false) { _aurixEmitIntegrityEvent('snapshot_rejected_incomplete', { surface: 'category', reason: _catVal.reason, unpriced: _catVal.unpriced, missingFx: _catVal.missingFx, invalid: _catVal.invalid, active: _catVal.totalActive }); }
 
   // AURIX-DATA-001 · F4 — capture-time integrity guard. Refuse to persist a
   // point that is impossible (non-finite total/bucket, or a total that does not
@@ -9750,7 +9902,9 @@ function recordCategorySnapshot() {
   const _catPrevValid = _aurixLastValidSnapshot(categoryHistory, 'total');
   if (_aurixGuardSnapshot(
         { ts: now, total: newPoint.total, investable: newPoint.total - (Number(newPoint.real_estate) || 0),
-          fxPartial: _catFxPartial, fxApprox: _catFxApprox },
+          fxPartial: _catFxPartial, fxApprox: _catFxApprox,
+          valuationComplete: _catVal.complete, valuationReason: _catVal.reason, missing: _catVal.missing,
+          unpricedActive: (Number(_catVal.unpriced) || 0) + (Number(_catVal.missingFx) || 0) + (Number(_catVal.invalid) || 0) },
         _catPrevValid ? { ts: _catPrevValid.ts, total: _catPrevValid.total } : null,
         'category')) return;
   if (_within5s && _isMaterial) newPoint.material = true;
@@ -9929,6 +10083,17 @@ function _shouldRejectSnapshot(next, prevValid, context) {
   const n = next || {};
   const total = Number(n.total), investable = Number(n.investable);
   const base = { ts: n.ts, total, investable, context: context.surface || null };
+  // SPEC CHART-INTEGRITY.LB-1 — VALUATION COMPLETENESS is the FIRST gate (before FX/structural/anomaly).
+  // A caller that proved the endpoint valuation incomplete (some active holding unpriced / FX uncovered /
+  // invalid) sets valuationComplete:false. This is device-INDEPENDENT bad data ⇒ a HARD reject (it is NOT
+  // in _AURIX_GUARD_QUARANTINE_REASONS, so it is never kept/synced). Backward-compatible: callers that do
+  // not set the field leave it undefined (=== false is false) ⇒ zero behaviour change for existing writers.
+  if (n.valuationComplete === false) {
+    return { reject: true, reason: 'valuation_incomplete', details: Object.assign({}, base, {
+      valuationReason: n.valuationReason || null,
+      unpricedActive: Number.isFinite(n.unpricedActive) ? n.unpricedActive : null,
+      missing: Array.isArray(n.missing) ? n.missing.slice(0, 10) : null }) };
+  }
   if (n.fxPartial === true) return { reject: true, reason: 'fx_partial', details: base };
   if (n.fxApprox  === true) return { reject: true, reason: 'fx_approx',  details: base };
   if (!Number.isFinite(total) || total <= 0) return { reject: true, reason: 'invalid_total', details: base };
@@ -10018,8 +10183,17 @@ function recordSnapshot() {
   const _fxPartial  = _aurixFxUncovered(activeAssets()) > 0;
   const _fxApprox   = _aurixFxApproxUsed(activeAssets());
   const _prevValid  = _aurixLastValidSnapshot(portfolioHistory, 'value');
+  // SPEC CHART-INTEGRITY.LB-1 — prove the valuation is COMPLETE before this point may be persisted. An
+  // incomplete valuation (any active holding unpriced / FX-uncovered / invalid) is HARD-rejected below via
+  // valuationComplete:false, preserving the last valid snapshot. typeof-guarded for harness isolation.
+  const _val = (typeof _aurixAssessValuationCompleteness === 'function')
+    ? _aurixAssessValuationCompleteness(activeAssets())
+    : { complete: true, reason: 'COMPLETE', unpriced: 0, missingFx: 0, invalid: 0, missing: [] };
+  if (_val.complete === false) { _aurixEmitIntegrityEvent('snapshot_rejected_incomplete', { surface: 'portfolio', reason: _val.reason, unpriced: _val.unpriced, missingFx: _val.missingFx, invalid: _val.invalid, active: _val.totalActive }); }
   if (_aurixGuardSnapshot(
-        { ts: now, total: val, investable: val, fxPartial: _fxPartial, fxApprox: _fxApprox },
+        { ts: now, total: val, investable: val, fxPartial: _fxPartial, fxApprox: _fxApprox,
+          valuationComplete: _val.complete, valuationReason: _val.reason, missing: _val.missing,
+          unpricedActive: (Number(_val.unpriced) || 0) + (Number(_val.missingFx) || 0) + (Number(_val.invalid) || 0) },
         _prevValid ? { ts: _prevValid.ts, total: _prevValid.value } : null,
         'portfolio')) return;
 
@@ -24953,6 +25127,47 @@ try { if (typeof window !== 'undefined') window._aurixBuildContinuityValidatedSe
 // trustworthy AND the points are comparable (≥2, same epoch, same source family, coverage ok); otherwise
 // "Calculando…" — never a silent 0.00% fallback. 'neutral' (an explicit product 0.00%) is opt-in only.
 // Reversible: _AURIX_CHART_RETURN_CONTRACT_UNIFICATION=false ⇒ EXACT v495 behaviour (the old 3 branches).
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC CHART-INTEGRITY.LB-2 — CANONICAL PUBLICATION-READINESS CONTRACT
+// ════════════════════════════════════════════════════════════════════════════
+// ROOT CAUSE (forensic P0): a confirmed return could publish on cold start BEFORE backend hydration +
+// reconciliation finished (the return path read the merged source synchronously and never consulted the
+// hydration state), so an early-published number could later CHANGE once merged. This is the single,
+// deterministic answer to "may a confirmed number publish right now?". A number publishes ONLY when the
+// endpoint valuation is complete AND (if backend snapshots are enabled) hydration has SETTLED to a usable
+// state AND the merge generation is consistent. Uncertainty NEVER becomes an optimistic local-only number:
+// it degrades to an explicit non-publishable state. Ordered gates — first failing gate is the exact blocker.
+const _AURIX_PUBLICATION_STATE = Object.freeze({
+  READY: 'READY', VALUATION_INCOMPLETE: 'VALUATION_INCOMPLETE', HYDRATING_HISTORY: 'HYDRATING_HISTORY',
+  RECONCILING_HISTORY: 'RECONCILING_HISTORY', STALE_HISTORY: 'STALE_HISTORY',
+});
+// Staging-tunable: block a confirmed number while backend hydration is FAILED (spec default), vs. fall back
+// to a labelled local-only number. TRUE = integrity-first (spec). Flip to false only if staging shows a
+// dead-backend must not permanently withhold the badge for otherwise-healthy local histories.
+const _AURIX_LB2_BLOCK_ON_HYDRATION_FAILED = true;
+function _aurixResolvePublicationReadiness(ctx) {
+  ctx = ctx || {};
+  const out = { state: _AURIX_PUBLICATION_STATE.READY, publishable: true, blocker: null };
+  // valuationComplete: default TRUE unless a caller explicitly proved the endpoint valuation incomplete.
+  if (ctx.valuationComplete === false) { out.state = _AURIX_PUBLICATION_STATE.VALUATION_INCOMPLETE; out.publishable = false; out.blocker = 'endpoint_valuation_incomplete'; return out; }
+  const backendEnabled = ctx.backendEnabled === true;
+  if (backendEnabled) {
+    const hs = ctx.hydrationState;
+    // idle (first hydration not attempted) or loading (in flight) ⇒ the reconciliation window is open.
+    if (hs === 'idle' || hs === 'loading') { out.state = _AURIX_PUBLICATION_STATE.HYDRATING_HISTORY; out.publishable = false; out.blocker = 'backend_hydration_in_progress'; return out; }
+    // failed after bounded retries ⇒ backend history is unavailable/stale. SPEC default = safe degradation
+    // (never publish a number a later successful merge could contradict); recovers on the next retry. The
+    // block-on-failed policy is a single toggle so staging can decide whether a dead backend should instead
+    // fall back to a labelled local-only number (set the flag false) — default TRUE keeps the spec behaviour.
+    const blockOnFailed = (typeof _AURIX_LB2_BLOCK_ON_HYDRATION_FAILED !== 'undefined') ? _AURIX_LB2_BLOCK_ON_HYDRATION_FAILED : true;
+    if (hs === 'failed' && blockOnFailed) { out.state = _AURIX_PUBLICATION_STATE.STALE_HISTORY; out.publishable = false; out.blocker = 'backend_hydration_failed'; return out; }
+  }
+  // a known-inconsistent merge generation (a late hydrate not yet repainted) ⇒ reconciling.
+  if (ctx.generationConsistent === false) { out.state = _AURIX_PUBLICATION_STATE.RECONCILING_HISTORY; out.publishable = false; out.blocker = 'merge_generation_inconsistent'; return out; }
+  return out;
+}
+try { if (typeof window !== 'undefined') { window._aurixResolvePublicationReadiness = _aurixResolvePublicationReadiness; window._AURIX_PUBLICATION_STATE = _AURIX_PUBLICATION_STATE; } } catch (_) {}
+
 const _AURIX_CHART_RETURN_CONTRACT_UNIFICATION = true;
 function _aurixResolveChartReturnContract(validatedSeries, range, context) {
   context = context || {};
@@ -24985,6 +25200,22 @@ function _aurixResolveChartReturnContract(validatedSeries, range, context) {
     firstSourceFamily: firstSourceFamily, lastSourceFamily: lastSourceFamily,
     syntheticPoints: (vs && vs.syntheticPoints != null) ? vs.syntheticPoints : 0,
   };
+  // SPEC CHART-INTEGRITY.LB-2 — publication readiness. Defaults to publishable (backendEnabled false,
+  // hydrationState 'ready') so callers/harnesses that supply none of these inputs are byte-identical to
+  // before. In the live runtime the real globals (backend flag ON, hydration idle→loading→ready) mean a
+  // confirmed number is withheld until hydration settles. typeof-guarded so string-slice harnesses that
+  // load only this function (without the resolver / globals) keep the prior behaviour.
+  const _pubReady = (typeof _aurixResolvePublicationReadiness === 'function')
+    ? _aurixResolvePublicationReadiness({
+        valuationComplete: (context.valuationComplete != null) ? context.valuationComplete : undefined,
+        backendEnabled: (context.backendEnabled != null) ? context.backendEnabled
+          : ((typeof _AURIX_BACKEND_SNAPSHOTS_ENABLED !== 'undefined') ? _AURIX_BACKEND_SNAPSHOTS_ENABLED : false),
+        hydrationState: (context.hydrationState != null) ? context.hydrationState
+          : ((typeof _aurixBackendSnapshotsState !== 'undefined') ? _aurixBackendSnapshotsState : 'ready'),
+        generationConsistent: (context.generationConsistent != null) ? context.generationConsistent : undefined,
+      })
+    : { publishable: true, state: 'READY', blocker: null };
+  out.publicationState = _pubReady.state; out.publicationBlocker = _pubReady.blocker;
   if (!on) {
     // v495: ready+ok ⇒ %, ready+insufficient ⇒ neutral 0.00%, else ⇒ Calculando.
     if (chartOk) { out.state = 'ok'; out.returnPct = returnPct; out.returnAbs = returnAbs; out.badgeEligible = true; out.colorState = colorFor(returnPct); out.reason = 'ok_v495'; }
@@ -24998,6 +25229,7 @@ function _aurixResolveChartReturnContract(validatedSeries, range, context) {
   else if (!chartOk) { out.state = 'calculating'; out.reason = (chart && (chart.returnSuppressedReason || chart.reason || chart.pendingReason)) || 'return_not_trustworthy'; }
   else if (sameEpoch === false) { out.state = 'calculating'; out.reason = 'cross_epoch'; }
   else if (sameSourceFamily === false) { out.state = 'calculating'; out.reason = 'cross_source_family'; }
+  else if (!_pubReady.publishable) { out.state = 'calculating'; out.reason = 'not_publication_ready:' + _pubReady.state; }
   else if (context.deliberateNeutral === true) { out.state = 'neutral'; out.reason = 'product_neutral'; out.badgeEligible = true; }
   else { out.state = 'ok'; out.returnPct = returnPct; out.returnAbs = returnAbs; out.badgeEligible = true; out.colorState = colorFor(returnPct); out.reason = 'trusted_return'; }
   out.badgeLabel = (out.state === 'ok') ? ((returnPct >= 0 ? '+' : '') + returnPct.toFixed(2) + '%') : (out.state === 'neutral' ? '0.00%' : 'Calculando…');
