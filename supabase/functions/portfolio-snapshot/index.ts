@@ -94,14 +94,20 @@ function valueUser(row: any, prices: Map<string, { price: number; currency: stri
   const byId = new Map<any, any>(catalog.map((a: any) => [a && a.id, a]));   // catalog keyed by id
   const categories: Record<string, number> = {};
   const warnings: string[] = [];
-  let total = 0, realEstate = 0, count = 0, priced = 0, unpriced = 0, fxCount = 0;
+  let total = 0, realEstate = 0, count = 0, priced = 0, unpriced = 0, fxCount = 0, dropped = 0;
   let anyStale = false, anyClosed = false, anyCrypto = false;
+  // SPEC CHART-INTEGRITY.LB-1 (server-side) — `dropped` counts ACTIVE, non-zero holdings that were EXCLUDED
+  // from `total` (orphan / non-finite qty / non-finite value = missing price with no stored fallback or
+  // missing FX). It is DISTINCT from `unpriced` (which also counts stale-but-valued holdings that fell back
+  // to the stored catalog price and ARE in the total, exactly like app.js). dropped>0 ⇒ the total is a
+  // PARTIAL valuation and MUST NOT be persisted (mirrors the client valuation-completeness contract).
   for (const h of holdings) {
     if (!h) continue;
     const asset = byId.get(h.asset_id);
-    if (!asset) { unpriced++; warnings.push('orphan_holding:' + h.asset_id); continue; }   // salvage not replicated server-side
+    if (!asset) { unpriced++; dropped++; warnings.push('orphan_holding:' + h.asset_id); continue; }   // salvage not replicated server-side
     const qty = Number(h.quantity);                                    // quantity lives on HOLDINGS
-    if (!Number.isFinite(qty) || qty === 0) continue;
+    if (qty === 0) continue;                                           // zero-quantity position — legitimately excluded
+    if (!Number.isFinite(qty)) { dropped++; warnings.push('invalid_qty:' + (asset.symbol || h.asset_id)); continue; }   // corrupt quantity ⇒ incomplete
     const bucket = bucketOf(asset.type || 'other');
     const cur = String(asset.assetCurrency || 'USD').toUpperCase();
     const storedPrice = Number(asset.currentPrice);                    // catalog price field = currentPrice
@@ -136,7 +142,7 @@ function valueUser(row: any, prices: Map<string, { price: number; currency: stri
       if ((bucket === 'stock' || bucket === 'etf' || bucket === 'fund') && !isUsEquityOpenNow(now)) { staleness = staleness === 'live' ? 'last_close' : staleness; anyClosed = true; }
       if (bucket === 'crypto') anyCrypto = true;
     }
-    if (!Number.isFinite(valueUSD)) { unpriced++; warnings.push('unpriced:' + (asset.symbol || h.asset_id)); continue; }
+    if (!Number.isFinite(valueUSD)) { unpriced++; dropped++; warnings.push('unpriced:' + (asset.symbol || h.asset_id)); continue; }   // excluded from total ⇒ partial valuation (LB-1)
     if (staleness !== 'live') anyStale = true;
     categories[bucket] = (categories[bucket] || 0) + valueUSD;
     total += valueUSD;
@@ -146,7 +152,7 @@ function valueUser(row: any, prices: Map<string, { price: number; currency: stri
   const market_state = anyCrypto && !anyClosed ? 'crypto_24_7' : (anyClosed ? (anyCrypto ? 'mixed' : 'closed') : 'open');
   const price_staleness = anyStale ? (market_state === 'closed' ? 'last_close' : 'stale') : 'live';
   return { total: +total.toFixed(2), realEstate: +realEstate.toFixed(2), categories, count,
-    priced_asset_count: priced, unpriced_asset_count: unpriced, fx_conversions: fxCount,
+    priced_asset_count: priced, unpriced_asset_count: unpriced, dropped_asset_count: dropped, fx_conversions: fxCount,
     holdings_count: holdings.length, catalog_count: catalog.length, warnings: warnings.slice(0, 20),
     market_state, price_staleness };
 }
@@ -184,7 +190,7 @@ Deno.serve(async () => {
   }
   const prices = await fetchPrices(allSymbols);
 
-  let inserted = 0, skipped = 0, empty = 0, errored = 0, inactive = 0;
+  let inserted = 0, skipped = 0, empty = 0, errored = 0, inactive = 0, incompleteRej = 0;
   const dryRunSamples: any[] = [];
   for (const r of rows) {
    try {   // RETRY-SAFE — one failing portfolio must never abort the whole scheduled run (SPEC.36).
@@ -198,9 +204,16 @@ Deno.serve(async () => {
       total_value_usd: v.total, real_estate: v.realEstate, asset_count: v.count,
       holdings_count: v.holdings_count, catalog_count: v.catalog_count,
       priced_asset_count: v.priced_asset_count, unpriced_asset_count: v.unpriced_asset_count,
+      dropped_asset_count: v.dropped_asset_count,
       fx_conversions: v.fx_conversions, category_values: v.categories,
       market_state: v.market_state, price_staleness: v.price_staleness, warnings: v.warnings });
     if (!Number.isFinite(v.total) || v.total <= 0) { empty++; continue; }
+    // SPEC CHART-INTEGRITY.LB-1 (server-side) — a PARTIAL valuation (≥1 active holding excluded from the
+    // total) must NEVER be persisted: it would become a low endpoint/baseline just like the client-side
+    // −24% incident. Skip the write so the previous VALID snapshot remains the latest (no fabrication, no
+    // deletion). Recovers automatically on the next run once prices/FX resolve. Placed BEFORE the near-dup
+    // and insert steps, mirroring the client's completeness-first gate.
+    if (Number(v.dropped_asset_count) > 0) { incompleteRej++; continue; }
 
     // near-duplicate guard: skip if the latest snapshot is within NEAR_MS and NEAR_FRAC value.
     const { data: last } = await admin.from('portfolio_snapshots')
@@ -226,6 +239,6 @@ Deno.serve(async () => {
     } else { inserted++; }
    } catch (e) { errored++; try { console.error('[user]', r && r.user_id, (e as any) && (e as any).message); } catch (_) {} }
   }
-  return new Response(JSON.stringify({ ok: true, dryRun: DRY_RUN, users: rows.length, inserted, skipped, empty, inactive, errored,
+  return new Response(JSON.stringify({ ok: true, dryRun: DRY_RUN, users: rows.length, inserted, skipped, empty, inactive, errored, incompleteRej,
     ...(DRY_RUN ? { samples: dryRunSamples } : {}) }), { headers: { 'content-type': 'application/json' } });
 });
