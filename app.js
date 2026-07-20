@@ -20084,8 +20084,11 @@ function _dshComputePerfSnapshot(range) {
   const last  = vals[vals.length - 1];
   const max   = Math.max(...vals);
   const min   = Math.min(...vals);
-  const deltaAbs     = (_ret && Number.isFinite(_ret.deltaAbs)) ? _ret.deltaAbs : (last - first);
-  const deltaPct     = (_ret && Number.isFinite(_ret.deltaPct)) ? _ret.deltaPct : (first > 0 ? ((last - first) / first) * 100 : null);
+  // SPEC INSTITUTIONAL-CHART.M3 — fail closed: the ONLY performance source is the flow-neutral _aurixRangeReturn.
+  // When it is unavailable, present no number (null) rather than a raw portfolio-value delta that could
+  // misclassify cash flows as market gain/loss.
+  const deltaAbs     = (_ret && Number.isFinite(_ret.deltaAbs)) ? _ret.deltaAbs : null;
+  const deltaPct     = (_ret && Number.isFinite(_ret.deltaPct)) ? _ret.deltaPct : null;
   const amplitudePct = min > 0 ? ((max - min) / min) * 100 : null;
 
   // Per-period series: collapse to one close per calendar day for multi-day
@@ -25293,6 +25296,24 @@ function _aurixReturnPublishReadyNow() {
   } catch (_) { return true; }
 }
 try { if (typeof window !== 'undefined') window._aurixReturnPublishReadyNow = _aurixReturnPublishReadyNow; } catch (_) {}
+
+// SPEC INSTITUTIONAL-CHART.M3 — cash-flow / market-performance isolation for per-point consumers.
+// A raw portfolio-value delta ((value−first)/first) equals the flow-neutral market return ONLY when the
+// window contains NO external cash flows. The tooltips draw a COLOURED per-point % (reads as gain/loss), so
+// per M3 they may present that raw % ONLY when the window is flow-free; otherwise they must fail closed
+// (show value+date, no %) rather than misclassify a deposit/withdrawal/transfer as market performance.
+// Reuses the certified _aurixRangeReturn.netFlowsNeutralized (no ad-hoc arithmetic). Fail-closed: on any
+// uncertainty (engine absent / error / non-finite) it returns TRUE (has-flows ⇒ suppress). Desktop+mobile
+// share this one predicate ⇒ identical semantics.
+function _aurixWindowHasCashFlows(range) {
+  try {
+    if (typeof _aurixRangeReturn !== 'function') return true;
+    const rr = _aurixRangeReturn(range);
+    if (!rr || !Number.isFinite(rr.netFlowsNeutralized)) return true;
+    return Math.abs(rr.netFlowsNeutralized) > 0.0001;
+  } catch (_) { return true; }
+}
+try { if (typeof window !== 'undefined') window._aurixWindowHasCashFlows = _aurixWindowHasCashFlows; } catch (_) {}
 
 const _AURIX_CHART_RETURN_CONTRACT_UNIFICATION = true;
 function _aurixResolveChartReturnContract(validatedSeries, range, context) {
@@ -34329,7 +34350,10 @@ function _aurixMobInspectorUpdate(clientX) {
     // SPEC CHART-INTEGRITY.LB-2 — withhold the per-point return % while publication is not ready (hydration
     // in progress), matching the badge; the value + date (factual line data) still show (LINE ⊥ RETURN).
     const _pubReadyTip = (typeof _aurixReturnPublishReadyNow !== 'function') || _aurixReturnPublishReadyNow();
-    if (_pubReadyTip && typeof v0 === 'number' && v0 !== 0 && typeof p.v === 'number') { const pc = ((p.v - v0) / Math.abs(v0)) * 100; tone = pc > 0.005 ? 'pos' : pc < -0.005 ? 'neg' : ''; pctTxt = (pc > 0 ? '+' : '') + pc.toFixed(2) + '%'; }
+    // SPEC INSTITUTIONAL-CHART.M3 — identical flow-free rule as desktop: only present the raw per-point % when
+    // the window is flow-free (raw delta ≡ flow-neutral); else withhold so a flow never reads as performance.
+    const _flowFreeTip = (typeof _aurixWindowHasCashFlows !== 'function') || !_aurixWindowHasCashFlows(_aurixMobChartMeta && _aurixMobChartMeta.range);
+    if (_pubReadyTip && _flowFreeTip && typeof v0 === 'number' && v0 !== 0 && typeof p.v === 'number') { const pc = ((p.v - v0) / Math.abs(v0)) * 100; tone = pc > 0.005 ? 'pos' : pc < -0.005 ? 'neg' : ''; pctTxt = (pc > 0 ? '+' : '') + pc.toFixed(2) + '%'; }
     let dateStr = '', timeStr = '';
     try {
       const dt = new Date(p.t);
@@ -34598,8 +34622,13 @@ function updateChartTooltip(context) {
     // return % (same predicate as the badge) so a pre-reconciliation number never leaks via hover.
     valText = '—';
     valDir  = 'flat';
+  } else if (typeof _aurixWindowHasCashFlows === 'function' && _aurixWindowHasCashFlows(typeof activeRange !== 'undefined' ? activeRange : undefined)) {
+    // SPEC INSTITUTIONAL-CHART.M3 — window contains cash flows ⇒ a raw value-delta % would misclassify a
+    // deposit/withdrawal/transfer as market performance ⇒ withhold the %; value + date still shown.
+    valText = '—';
+    valDir  = 'flat';
   } else {
-    const pct  = first > 0 ? ((value - first) / first) * 100 : 0;
+    const pct  = first > 0 ? ((value - first) / first) * 100 : 0;   // flow-free window ⇒ raw delta ≡ flow-neutral market return
     const sign = pct >= 0 ? '+' : '';
     valText = `${sign}${pct.toFixed(2)}%`;
     valDir  = pct > 0.005 ? 'up' : pct < -0.005 ? 'down' : 'flat';
