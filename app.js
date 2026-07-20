@@ -25744,6 +25744,11 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     if (!stable) return (out.mode === 'building') ? 'CALCULATING' : 'UNKNOWN';
     if (r !== 'all' && out.historyCoverage === 'PARTIAL_AVAILABLE_HISTORY') return 'PARTIAL_HISTORY';
     if (r === 'all' && out.historyCoverage === 'ALL_AVAILABLE_HISTORY') return 'AVAILABLE_HISTORY';
+    // SPEC INSTITUTIONAL-CHART.M4 — a stable line split by a REAL DATA GAP (missing snapshots) is genuinely
+    // INCOMPLETE history, not transient loading. Surface the explicit incomplete state ("Historial parcial")
+    // instead of a misleading "Calculando…" that would never resolve — even at high coverage. Capital-step
+    // splits (continuous data) are unaffected. Presentation-only: no points/values/return/eligibility change.
+    if (diagnostics && diagnostics.continuityState === 'segmented_real_gap') return 'PARTIAL_HISTORY';
     return 'CALCULATING';
   };
   out.historyCoverage = (function () {
