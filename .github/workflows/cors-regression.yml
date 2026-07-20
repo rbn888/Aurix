@@ -1,0 +1,38 @@
+name: CORS regression (price API)
+
+# SPEC FIX PRODUCTION CORS FOR CANONICAL APP DOMAIN — PROTECTION.
+# Fails if the canonical app origin (https://app.aurixsystem.io) is not accepted
+# by BOTH price entrypoints (/api/prices and /api/prices/snapshot). Guards against
+# the Vercel ALLOWED_ORIGINS env drifting away from the app domain again.
+# Deliberately decoupled from the Pages deploy gate so a transient API blip never
+# blocks the app deploy; runs on push to main, daily, and on demand.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/aurix-cors-regression.mjs'
+      - '.github/workflows/cors-regression.yml'
+      - 'api/**'
+  schedule:
+    - cron: '17 6 * * *'   # daily 06:17 UTC — catches env/config drift between pushes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cors:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Assert canonical app origin is CORS-allowed by the price API
+        run: node scripts/aurix-cors-regression.mjs
+        env:
+          AURIX_API_BASE: https://isa-portfolio-ten.vercel.app
+          AURIX_APP_ORIGIN: https://app.aurixsystem.io

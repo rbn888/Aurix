@@ -3,3 +3,5 @@
 
 # Local auxiliary notes (not part of the app; never committed)
 memory/
+.vercel
+.env*
