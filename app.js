@@ -9467,6 +9467,88 @@ function sanitizeTransactionPrices(asset) {
   });
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC INSTITUTIONAL-CHART.M1 — CANONICAL ACCOUNTING ENGINE (single owner)
+// ════════════════════════════════════════════════════════════════════════════
+// The ONE deterministic, side-effect-free owner of the five separated quantities — Portfolio Value, Cash
+// Flows, Realized PnL, Unrealized PnL — and the Accounting Residual that proves they reconcile. It replays
+// each position's transactions under WEIGHTED-AVERAGE COST (the same method the sell handler uses), so it
+// INCORPORATES the M0/D1 correction: a sell reduces remaining basis by qty×avgCost (NOT by qty×sellPrice).
+// It NEVER mutates stored data (additive; existing UI/consumers unchanged) and FAILS CLOSED: if any active
+// position is unpriced or the identity residual is non-zero, it returns state 'reconciliation_failed' and
+// callers must withhold accounting rather than fabricate. Flag-gated for rollback.
+//
+// Enforced identity (per position, avg-cost ⇒ residual ≡ 0 by construction):
+//   (currentValue + saleProceeds − buyCost)  ==  (realizedPnL + unrealizedPnL)
+// which is the position-level form of: ΔPortfolioValue = CashFlows + RealizedPnL + ΔUnrealizedPnL.
+const _AURIX_CANONICAL_ACCOUNTING_ENABLED = true;   // rollback: false ⇒ engine inert (never read); UI byte-identical
+const _AURIX_ACCOUNTING_EPSILON = 0.01;             // ≤1 cent reconciliation tolerance
+// Pure per-position average-cost replay. Input: { transactions:[{type,qty,price}], currentPrice, id, storedCostBasis, storedRealizedPnL }.
+function _aurixAccountPosition(p) {
+  const txns = (p && Array.isArray(p.transactions)) ? p.transactions : [];
+  let qty = 0, cost = 0, realized = 0, buyCost = 0, proceeds = 0;
+  for (const tx of txns) {
+    if (!tx) continue;
+    const q = Number(tx.qty) || 0, pr = Number(tx.price) || 0;
+    if (tx.type === 'buy') { cost += q * pr; qty += q; buyCost += q * pr; }
+    else if (tx.type === 'sell') { const avg = qty > 0 ? cost / qty : 0; realized += (pr - avg) * q; cost -= avg * q; qty -= q; proceeds += q * pr; }
+  }
+  if (qty <= 1e-12) { qty = qty < 0 ? qty : 0; cost = 0; }   // closed/over-sold ⇒ no remaining basis (realized holds the gain)
+  const price = Number(p && p.currentPrice);
+  const priced = Number.isFinite(price) && price > 0;
+  const currentValue = priced ? qty * price : NaN;
+  const unrealizedPnL = priced ? currentValue - cost : NaN;
+  const residual = priced ? (currentValue + proceeds - buyCost) - (realized + unrealizedPnL) : 0;
+  return { id: (p && p.id != null) ? p.id : null, qty,
+    costBasis: +cost.toFixed(6), realizedPnL: +realized.toFixed(6),
+    currentValue: priced ? +currentValue.toFixed(6) : null,
+    unrealizedPnL: priced ? +unrealizedPnL.toFixed(6) : null, priced,
+    residual: +(residual || 0).toFixed(6),
+    // diagnostic (M2 data-reconciliation): how far the STORED costBasis/realizedPnL drift from canonical.
+    storedCostBasisDivergence: (p && Number.isFinite(Number(p.storedCostBasis))) ? +(Number(p.storedCostBasis) - cost).toFixed(6) : null,
+    storedRealizedDivergence: (p && Number.isFinite(Number(p.storedRealizedPnL))) ? +(Number(p.storedRealizedPnL) - realized).toFixed(6) : null };
+}
+// Canonical portfolio accounting. `input.positions` explicit, else derived from live globals (read-only).
+function _aurixComputeAccounting(input) {
+  const EPS = (input && Number.isFinite(input.epsilon)) ? input.epsilon : _AURIX_ACCOUNTING_EPSILON;
+  let positions = (input && Array.isArray(input.positions)) ? input.positions : null;
+  if (!positions) {
+    // derive from live app state (read-only); cash contributes value but no market PnL.
+    try {
+      const src = (typeof activeAssets === 'function') ? activeAssets() : [];
+      positions = src.map(a => ({ id: a && a.id, type: a && a.type, transactions: a && a.transactions,
+        currentPrice: (a && a.type === 'cash') ? 1 : (a && a.price),
+        storedCostBasis: a && a.costBasis, storedRealizedPnL: a && a.realizedPnL,
+        _cash: a && a.type === 'cash', _cashValue: (typeof assetValueUSD === 'function' && a) ? assetValueUSD(a) : null }));
+    } catch (_) { positions = []; }
+  }
+  const per = [];
+  let val = 0, cb = 0, real = 0, unreal = 0, resid = 0, anyUnpriced = false;
+  for (const p of positions) {
+    if (p && p._cash) {   // cash: pure value, no cost basis / PnL
+      const cv = Number.isFinite(Number(p._cashValue)) ? Number(p._cashValue) : NaN;
+      if (!Number.isFinite(cv)) anyUnpriced = true; else val += cv;
+      per.push({ id: p.id || null, cash: true, currentValue: Number.isFinite(cv) ? +cv.toFixed(6) : null, priced: Number.isFinite(cv) });
+      continue;
+    }
+    const r = _aurixAccountPosition(p);
+    if (!r.priced) anyUnpriced = true;
+    else { val += r.currentValue; cb += r.costBasis; real += r.realizedPnL; unreal += r.unrealizedPnL; resid += r.residual; }
+    per.push(r);
+  }
+  let cashFlows = (input && Number.isFinite(input.cashFlowsNet)) ? input.cashFlowsNet : NaN;
+  if (!Number.isFinite(cashFlows)) { try { cashFlows = (typeof _aurixLoadCapitalFlows === 'function' ? _aurixLoadCapitalFlows() : []).reduce((s, f) => s + (Number(f && f.amountUSD) || 0), 0); } catch (_) { cashFlows = 0; } }
+  const reconciled = !anyUnpriced && Math.abs(resid) <= EPS;
+  return {
+    portfolioValue: +val.toFixed(2), costBasis: +cb.toFixed(2), cashFlows: +cashFlows.toFixed(2),
+    realizedPnL: +real.toFixed(2), unrealizedPnL: +unreal.toFixed(2), marketPnL: +(real + unreal).toFixed(2),
+    residual: +resid.toFixed(6), reconciled, anyUnpriced,
+    state: reconciled ? 'reconciled' : (anyUnpriced ? 'valuation_incomplete' : 'reconciliation_failed'),
+    positions: per,
+  };
+}
+try { if (typeof window !== 'undefined' && _AURIX_CANONICAL_ACCOUNTING_ENABLED) { window.aurixComputeAccounting = _aurixComputeAccounting; window._aurixAccountPosition = _aurixAccountPosition; } } catch (_) {}
+
 // Returns null when no transactions exist so legacy costBasis is preserved.
 function computeCostBasisFromTransactions(asset) {
   const buys = (asset.transactions || []).filter(tx => tx.type === 'buy');
