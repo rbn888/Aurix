@@ -9548,6 +9548,21 @@ function _aurixComputeAccounting(input) {
   };
 }
 try { if (typeof window !== 'undefined' && _AURIX_CANONICAL_ACCOUNTING_ENABLED) { window.aurixComputeAccounting = _aurixComputeAccounting; window._aurixAccountPosition = _aurixAccountPosition; } } catch (_) {}
+// SPEC INSTITUTIONAL-CHART.M2 — report-only divergence detector. Records when the corrected average-cost
+// derivation differs from a prior stored costBasis (i.e. a D1-corrupted cache), into a bounded local buffer
+// + a privacy-safe integrity event (magnitude only). NEVER rewrites the transaction ledger or realizedPnL;
+// never blocks. Used to size the historical reconciliation (a separate authorized process).
+const _AURIX_COSTBASIS_DIVERGENCE_MAX = 200;
+function _aurixRecordCostBasisDivergence(asset, prior, corrected) {
+  try {
+    if (typeof window === 'undefined') return;
+    if (!Array.isArray(window.__AURIX_COSTBASIS_DIVERGENCES__)) window.__AURIX_COSTBASIS_DIVERGENCES__ = [];
+    const rec = { id: (asset && asset.id) || null, prior: +Number(prior).toFixed(2), corrected: +Number(corrected).toFixed(2), delta: +(Number(corrected) - Number(prior)).toFixed(2), ts: Date.now() };
+    window.__AURIX_COSTBASIS_DIVERGENCES__.push(rec);
+    if (window.__AURIX_COSTBASIS_DIVERGENCES__.length > _AURIX_COSTBASIS_DIVERGENCE_MAX) window.__AURIX_COSTBASIS_DIVERGENCES__ = window.__AURIX_COSTBASIS_DIVERGENCES__.slice(-_AURIX_COSTBASIS_DIVERGENCE_MAX);
+    if (typeof _aurixEmitIntegrityEvent === 'function') _aurixEmitIntegrityEvent('costbasis_divergence_corrected', { corrected: true, deltaAbs: Math.abs(rec.delta) });
+  } catch (_) {}
+}
 
 // Returns null when no transactions exist so legacy costBasis is preserved.
 function computeCostBasisFromTransactions(asset) {
@@ -9564,14 +9579,29 @@ function syncCostBasisFromTransactions(asset) {
   // a positive residual).
   if (isClosedAsset(asset)) { asset.costBasis = 0; return; }
   if (!asset.transactions || !asset.transactions.length) return;
-  let totalCost = 0;
+  // SPEC INSTITUTIONAL-CHART.M2 — D1 CORRECTION. Remaining cost basis under WEIGHTED-AVERAGE COST, identical
+  // to the sell handler and the M1 canonical engine (_aurixAccountPosition): a SELL reduces basis by
+  // qty×averageCost — NEVER by qty×sellPrice (the D1 defect, which subtracted PROCEEDS and broke unrealized
+  // PnL for any partially-sold position). This makes the render-path sync mathematically consistent with the
+  // canonical engine, so it can never again overwrite correct accounting. Derived-only (recomputes the
+  // costBasis cache from the untouched transaction history); no historical transaction is rewritten.
+  let qty = 0, cost = 0;
   for (const tx of asset.transactions) {
-    const qty   = Number(tx.qty)   || 0;
-    const price = Number(tx.price) || 0;
-    if (tx.type === 'buy')  totalCost += qty * price;
-    if (tx.type === 'sell') totalCost -= qty * price;
+    const q  = Number(tx.qty)   || 0;
+    const pr = Number(tx.price) || 0;
+    if (tx.type === 'buy')  { cost += q * pr; qty += q; }
+    else if (tx.type === 'sell') { const avg = qty > 0 ? cost / qty : 0; cost -= avg * q; qty -= q; }
   }
-  asset.costBasis = Math.max(0, totalCost);
+  if (qty <= 1e-12) cost = 0;   // fully sold / over-sold ⇒ no remaining basis (realizedPnL holds the gain)
+  // M2 divergence DETECTION (report-only; never blocks, never rewrites transaction history): record when the
+  // recomputed correct basis differs materially from the prior stored value (i.e. a D1-corrupted cache).
+  try {
+    const prior = Number(asset.costBasis);
+    if (Number.isFinite(prior) && Math.abs(prior - cost) > 0.01 && typeof _aurixRecordCostBasisDivergence === 'function') {
+      _aurixRecordCostBasisDivergence(asset, prior, cost);
+    }
+  } catch (_) {}
+  asset.costBasis = cost;
 }
 
 function migrateLegacyAssetToTransactions(asset) {
