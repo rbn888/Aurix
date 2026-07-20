@@ -7313,6 +7313,21 @@ main { padding-bottom: 72px; }
   height: calc(100dvh - 60px - 56px); /* BLOQUE-1.4 — dvh progressive enhancement; vh kept as fallback */
   background: transparent;
 }
+/* SPEC INTELLIGENCE-SCROLL-INTEGRITY — #tabPlaceholder is the shared host for
+   Market/Insights/Intelligence and pins a fixed sub-viewport height
+   (height: calc(100dvh - 116px)) with display:flex; align-items:stretch and NO
+   overflow-y. Intelligence content (.aurix-intcc) flows taller than that box,
+   so everything below the fold was clipped and unreachable — the host trapped
+   scroll instead of letting the page scroll. Scope-relax to min-height ONLY
+   when the Intelligence screen is mounted, so the window/body is the single
+   canonical scroll owner (same model as Dashboard's <main>). Market/Insights
+   keep the fixed host untouched. min-height preserves the empty-state centering
+   (.aurix-intcc.is-empty). :has() is already the host pattern used below. */
+.tab-placeholder:has(.aurix-intelligence-screen) {
+  height: auto;
+  min-height: calc(100vh - 60px - 56px);
+  min-height: calc(100dvh - 60px - 56px);
+}
 .placeholder-label {
   color: #444;
   font-size: var(--font-size-sm);
