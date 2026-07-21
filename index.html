@@ -1590,7 +1590,7 @@
       <div class="settings-panes">
 
       <section class="settings-section is-active" data-pane="account" id="settingsSectionAccount">
-        <h4 class="settings-section-title" data-i18n="settingsAccount">Cuenta</h4>
+        <h4 class="settings-section-title"><span class="settings-sec-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></span><span data-i18n="settingsAccount">Cuenta</span></h4>
         <!-- DSH.SETTINGS.05 — editable display name, inline in the row (no big
              Save button). Saves on Enter and on blur-if-changed. -->
         <div class="settings-row">
@@ -1633,7 +1633,7 @@
       </section>
 
       <section class="settings-section" data-pane="plan" id="settingsSectionPlan">
-        <h4 class="settings-section-title" data-i18n="settingsPlanTitle">Membresía</h4>
+        <h4 class="settings-section-title"><span class="settings-sec-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.2l1-5.8L3.5 9.2l5.9-.9z"/></svg></span><span data-i18n="settingsPlanTitle">Membresía</span></h4>
         <div class="plan-card" id="planCardCurrent">
           <div class="plan-card-head">
             <span class="plan-card-tier" id="planTierName">Aurix Free</span>
@@ -1664,7 +1664,7 @@
            the existing AurixOnboarding.savePreferences API so the
            persisted shape stays identical to the onboarding step. -->
       <section class="settings-section" data-pane="profile" id="settingsSectionProfile">
-        <h4 class="settings-section-title" data-i18n="settingsProfileTitle">Perfil inversor</h4>
+        <h4 class="settings-section-title"><span class="settings-sec-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.4"/><circle cx="15" cy="16" r="2.4"/></svg></span><span data-i18n="settingsProfileTitle">Perfil inversor</span></h4>
         <p class="settings-section-sub" data-i18n="settingsProfileSub">Ajusta cómo Aurix interpreta las señales de tu cartera.</p>
 
         <div class="settings-profile-group">
@@ -1702,20 +1702,32 @@
       <!-- DSH.SETTINGS.05 — Preferencias section removed; Idioma/Moneda moved to
            Cuenta. Datos y seguridad always last; reset stays destructive (red). -->
       <section class="settings-section" data-pane="data" id="settingsSectionData">
-        <h4 class="settings-section-title" data-i18n="settingsData">Datos y seguridad</h4>
+        <h4 class="settings-section-title"><span class="settings-sec-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6z"/></svg></span><span data-i18n="settingsData">Datos y seguridad</span></h4>
         <div class="settings-actions">
           <button type="button" class="settings-action" id="settingsExportBtn">
-            <span class="settings-action-label" data-i18n="settingsExport">Exportar datos</span>
-            <span class="settings-action-sub" data-i18n="settingsExportSub">Descarga un JSON con toda tu cartera</span>
+            <span class="settings-action-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="M8 11l4 4 4-4"/><path d="M5 20h14"/></svg></span>
+            <span class="settings-action-text">
+              <span class="settings-action-label" data-i18n="settingsExport">Exportar datos</span>
+              <span class="settings-action-sub" data-i18n="settingsExportSub">Descarga un JSON con toda tu cartera</span>
+            </span>
+            <span class="settings-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
           </button>
           <button type="button" class="settings-action" id="settingsImportBtn" disabled>
-            <span class="settings-action-label" data-i18n="settingsImport">Importar datos</span>
-            <span class="settings-action-sub" data-i18n="settingsImportSub">Próximamente</span>
+            <span class="settings-action-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 20h14"/></svg></span>
+            <span class="settings-action-text">
+              <span class="settings-action-label" data-i18n="settingsImport">Importar datos</span>
+              <span class="settings-action-sub" data-i18n="settingsImportSub">Próximamente</span>
+            </span>
+            <span class="settings-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
           </button>
           <!-- DSH.SETTINGS.05 — reset stays last + red; no "Zona peligrosa" title. -->
           <button type="button" class="settings-action settings-action--danger" id="settingsResetBtn">
-            <span class="settings-action-label" data-i18n="settingsReset">Resetear cartera</span>
-            <span class="settings-action-sub" data-i18n="settingsResetSub">Borra activos, historial y seguimiento</span>
+            <span class="settings-action-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/></svg></span>
+            <span class="settings-action-text">
+              <span class="settings-action-label" data-i18n="settingsReset">Resetear cartera</span>
+              <span class="settings-action-sub" data-i18n="settingsResetSub">Borra activos, historial y seguimiento</span>
+            </span>
+            <span class="settings-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
           </button>
         </div>
       </section>
