@@ -6921,16 +6921,33 @@ function switchLang(newLang) {
   localStorage.setItem(LANG_KEY, lang);
   // AURIX-LAUNCH-P0-PERSISTENCE: stamp + flush so this explicit choice wins.
   try { _touchPrefs(); } catch (_) {}
+  // SPEC GLOBAL-LANGUAGE — switchLang is the SINGLE owner. Propagate to the onboarding
+  // engine's own language store so the two persisted representations (app preferences.lang
+  // / LANG_KEY vs the engine's language / preferred_language) can never diverge and reassert
+  // a stale language. One-way (app→engine); the engine never pushes language back into the app.
+  try { if (window.AurixOnboarding && typeof window.AurixOnboarding.setLanguage === 'function') window.AurixOnboarding.setLanguage(lang); } catch (_) {}
   document.documentElement.lang = lang;
   document.querySelectorAll('[data-lang]').forEach(b => {
     b.classList.toggle('active', b.dataset.lang === lang);
   });
   applyI18n();
   applyTypeMetaLabels();
+  // SPEC GLOBAL-LANGUAGE — retranslate DERIVED Settings surfaces that applyI18n() cannot reach
+  // (they are not [data-i18n]): the Investor-Profile summary values + the segmented button
+  // active state. Idempotent no-ops when the Settings modal is closed. Fixes the "Investor
+  // Profile / part of the UI stays in the old language" (mixed-language) symptom.
+  try { if (typeof _settingsPaintProfile === 'function') _settingsPaintProfile(); } catch (_) {}
+  try { if (typeof _aurixSyncLangCurrencyButtons === 'function') _aurixSyncLangCurrencyButtons(); } catch (_) {}
   if (currentTab === 'market') {
     renderMarket();
   } else if (currentTab === 'workspace') {
     if (typeof renderWorkspace === 'function') renderWorkspace();
+  } else if ((currentTab === 'intelligence' || currentTab === 'insights') && typeof _applyTab === 'function') {
+    // SPEC GLOBAL-LANGUAGE — Intelligence/Insights render into #tabPlaceholder, not <main>.
+    // The old code fell through to render() (Dashboard) and left these tabs in the previous
+    // language. Re-mount the active tab so its content re-renders in the new language (this
+    // also re-applies the .tab-placeholder--intel scroll-owner hook).
+    _applyTab(currentTab);
   } else {
     render();
     updateDonut();
