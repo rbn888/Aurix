@@ -5,3 +5,6 @@
 memory/
 .vercel
 .env*
+
+# Dev-only preview screenshots (SPEC deliverables) — never shipped to production
+docs/*-preview/
