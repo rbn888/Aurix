@@ -7323,7 +7323,15 @@ main { padding-bottom: 72px; }
    canonical scroll owner (same model as Dashboard's <main>). Market/Insights
    keep the fixed host untouched. min-height preserves the empty-state centering
    (.aurix-intcc.is-empty). :has() is already the host pattern used below. */
-.tab-placeholder:has(.aurix-intelligence-screen) {
+/* SPEC INTELLIGENCE-MOBILE-SCROLL — the v560 fix relaxed the fixed host height to
+   auto ONLY via `:has()`, which fails silently on older iOS Safari / WebViews →
+   `.tab-placeholder` stayed pinned at calc(100dvh-116px) with no overflow-y and
+   trapped the Intelligence content below the fold (no scroll at all). Add a robust,
+   `:has()`-independent hook — `.tab-placeholder--intel`, set by _applyTab — so the
+   window/body stays the single vertical scroll owner on every engine. The `:has()`
+   variant is kept for engines that support it (harmless duplication of intent). */
+.tab-placeholder:has(.aurix-intelligence-screen),
+.tab-placeholder.tab-placeholder--intel {
   height: auto;
   min-height: calc(100vh - 60px - 56px);
   min-height: calc(100dvh - 60px - 56px);
