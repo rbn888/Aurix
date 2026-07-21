@@ -4480,6 +4480,7 @@ const T = {
     // SETTINGS-INVESTOR-PROFILE-1 — investor profile section copy.
     // Tone: tuning, not banking. No "risk tolerance assessment" wording.
     settingsProfileTitle:        'Perfil inversor',
+    settingsPrefsTitle:          'Preferencias',
     settingsProfileSub:          'Ajusta cómo Aurix interpreta las señales de tu cartera.',
     settingsProfileRisk:         'Tu estilo de inversión',
     settingsProfileExperience:   'Experiencia',
@@ -6565,6 +6566,7 @@ const T = {
     settingsLang:             'Language',
     settingsCurrency:         'Base currency',
     settingsProfileTitle:        'Investor profile',
+    settingsPrefsTitle:          'Preferences',
     settingsProfileSub:          'Adjust how Aurix interprets your portfolio signals.',
     settingsProfileRisk:         'Your investing style',
     settingsProfileExperience:   'Experience',
@@ -54304,6 +54306,13 @@ try {
   }
 } catch (_) {}
 
+// SETTINGS-MOBILE-V2 — SINGLE premium-visibility owner. Launch 1 is free, so ALL
+// Membresía/Premium UI (rail tab + plan section + cards + CTA) is hidden by this one
+// flag via `html[data-aurix-premium-ui="off"]`. Flip to true for Launch 2 — no markup,
+// handler, translation or plan-card architecture is removed anywhere.
+const AURIX_PREMIUM_UI_ENABLED = false;
+try { if (typeof document !== 'undefined') document.documentElement.setAttribute('data-aurix-premium-ui', AURIX_PREMIUM_UI_ENABLED ? 'on' : 'off'); } catch (_) {}
+
 // ── Settings panel open / close + populate ────────────────────────
 function _settingsT(key) {
   try { return (T && T[lang] && T[lang][key]) || key; } catch (_) { return key; }
@@ -54394,6 +54403,13 @@ function _settingsPaintProfile() {
   document.querySelectorAll('[data-settings-age]').forEach(el => {
     el.classList.toggle('is-active', el.dataset.settingsAge === profile.ageBand);
   });
+  // SETTINGS-MOBILE-V2 — reflect the current selection in each summary row (reuses
+  // the active chip's localized label, so the summary is always i18n-correct).
+  document.querySelectorAll('.settings-profile-group').forEach(grp => {
+    const active = grp.querySelector('.settings-profile-chip.is-active');
+    const val = grp.querySelector('.settings-profile-summary-value');
+    if (val) val.textContent = active ? (active.textContent || '').trim() : '—';
+  });
 }
 
 // Persist a single profile facet and refresh any surface that reads
@@ -54447,11 +54463,17 @@ if (typeof document !== 'undefined') {
     const ov = document.getElementById('settingsOverlay');
     if (!ov || !ov.classList.contains('open')) return;
     const r = e.target.closest && e.target.closest('[data-settings-risk]');
-    if (r) { _settingsSaveProfile({ riskProfile: r.dataset.settingsRisk }); return; }
+    if (r) { _settingsSaveProfile({ riskProfile: r.dataset.settingsRisk }); _settingsCollapseProfileGroup(r); return; }
     const x = e.target.closest && e.target.closest('[data-settings-experience]');
-    if (x) { _settingsSaveProfile({ experience: x.dataset.settingsExperience }); return; }
+    if (x) { _settingsSaveProfile({ experience: x.dataset.settingsExperience }); _settingsCollapseProfileGroup(x); return; }
     const a = e.target.closest && e.target.closest('[data-settings-age]');
-    if (a) { _settingsSaveProfile({ ageBand: a.dataset.settingsAge }); return; }
+    if (a) { _settingsSaveProfile({ ageBand: a.dataset.settingsAge }); _settingsCollapseProfileGroup(a); return; }
+    // SETTINGS-MOBILE-V2 — summary row tapped → reveal its chips (one group at a time).
+    const sum = e.target.closest && e.target.closest('.settings-profile-summary');
+    if (sum) { _settingsToggleProfileGroup(sum.closest('.settings-profile-group')); return; }
+    // "Editar nombre" → make the display-name field editable and focus it.
+    const nedit = e.target.closest && e.target.closest('#settingsNameEditBtn');
+    if (nedit) { _settingsEnterNameEdit(); return; }
   });
   // Enter inside the name field saves + blurs (never submits a form / reloads).
   document.addEventListener('keydown', e => {
@@ -54466,7 +54488,33 @@ if (typeof document !== 'undefined') {
     const input = e.target;
     if (!input || input.id !== 'settingsNameInput') return;
     if ((input.value || '').trim() !== (input.dataset.baseline || '')) _settingsSaveDisplayName();
+    // SETTINGS-MOBILE-V2 — return to value-at-rest (read-only) once editing ends.
+    try { input.setAttribute('readonly', ''); } catch (_) {}
   });
+}
+// SETTINGS-MOBILE-V2 helpers — investor-profile summary/edit toggle + name edit entry.
+function _settingsToggleProfileGroup(grp) {
+  if (!grp) return;
+  const open = grp.classList.contains('is-editing');
+  document.querySelectorAll('.settings-profile-group.is-editing').forEach(g => {
+    g.classList.remove('is-editing');
+    const b = g.querySelector('.settings-profile-summary'); if (b) b.setAttribute('aria-expanded', 'false');
+  });
+  if (!open) {
+    grp.classList.add('is-editing');
+    const b = grp.querySelector('.settings-profile-summary'); if (b) b.setAttribute('aria-expanded', 'true');
+  }
+}
+function _settingsCollapseProfileGroup(chipEl) {
+  const grp = chipEl && chipEl.closest && chipEl.closest('.settings-profile-group');
+  if (!grp) return;
+  grp.classList.remove('is-editing');
+  const b = grp.querySelector('.settings-profile-summary'); if (b) b.setAttribute('aria-expanded', 'false');
+}
+function _settingsEnterNameEdit() {
+  const input = document.getElementById('settingsNameInput');
+  if (!input) return;
+  try { input.removeAttribute('readonly'); input.focus(); input.select(); } catch (_) {}
 }
 // DSH.SETTINGS.01 — desktop/tablet side-nav: show one pane at a time. On mobile
 // the rail is hidden (CSS) and every section is shown, so this is a no-op there.
