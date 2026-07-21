@@ -49678,20 +49678,21 @@ function _addV4RenderPreview() {
     _addV2SetMode('asset');
     try { _addV2SetCategoryHeader(pick); } catch (_) {}   // SPEC 45 — per-category header (stocks/crypto/ETF), not the generic one
     try { _modalContext = 'asset'; _modalAssetFilterContext = filterKey || null; } catch (_) {}
+    // SPEC 60 — set the active category BEFORE rendering Recent/Popular. _addV2RefreshQuick()
+    // below reads `activeSearchFilter` (Popular = DEFAULTS[activeSearchFilter]; Recent filters
+    // by it). SPEC 59 set it AFTER the refresh, so Recent/Popular rendered with the stale 'all'
+    // → other categories leaked into a specific-category entry. One shared context, set first.
+    try { activeSearchFilter = filterKey || 'all'; } catch (_) {}
     _addV2Activate('form');
     // SPEC CATEGORY-CONTEXT — reflect the opening category (or All) onto the modal so the
     // tabs hide/show correctly even for the All entry (filterKey null → no filter-btn click below).
     try { if (typeof _addV42UpdateFilterAttr === 'function') _addV42UpdateFilterAttr(filterKey || 'all'); } catch (_) {}
     try { if (typeof _addV2RefreshQuick === 'function') _addV2RefreshQuick(); } catch (_) {}
     try { if (typeof _updateSearchEmptyHint === 'function') _updateSearchEmptyHint(); } catch (_) {}
-    // SPEC 59 — engage the category WITHOUT opening the suggestions panel. The old
-    // `btn.click()` routed through the filter handler which calls showDefaultSuggestions()
-    // on an empty query → the panel auto-opened on entry. Set the same state directly
-    // (active tab + activeSearchFilter + placeholder + refreshed Popular) and leave the
-    // panel CLOSED; it now opens only on explicit focus or typing. Category scoping already
-    // applied above (_addV42UpdateFilterAttr + _addV2RefreshQuick).
+    // SPEC 59 — engage the category WITHOUT opening the suggestions panel (the old btn.click()
+    // routed through the filter handler → showDefaultSuggestions() auto-opened the panel).
+    // activeSearchFilter is already set above (SPEC 60); here only the tab highlight + placeholder.
     if (filterKey) {
-      try { activeSearchFilter = filterKey; } catch (_) {}
       try { filterBtns.forEach(b => b.classList.toggle('active', b.dataset.filter === filterKey)); } catch (_) {}
       try { searchInput.placeholder = T[lang].searchPH[filterKey] || T[lang].searchPH.all; } catch (_) {}
     }

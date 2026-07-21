@@ -38,6 +38,14 @@ const matches = (af, r) => af === 'all' ? true : (af === 'etf' ? (r.t === 'etf' 
   ok('source: _addV42UpdateFilterAttr sets data-category-locked from context', /categoryLocked\s*=\s*\(ctx && ctx !== 'real_estate'\)/.test(app));
   ok('source: recents tagged with the asset type on save', /_gsSaveRecent\(label, item\.type\)/.test(app));
   ok('source: add-asset Recent filtered by activeSearchFilter', /const af = \(typeof activeSearchFilter/.test(app) && /all\.filter\(matches\)/.test(app));
+  // SPEC 60 — Recent AND Popular must render with the OPENING category: activeSearchFilter is
+  // set BEFORE _addV2RefreshQuick() on picker entry (SPEC 59 set it after → other categories
+  // leaked into a specific-category entry). Both owners read the same shared activeSearchFilter.
+  { const w = app.slice(app.indexOf("picker.addEventListener('click'"), app.indexOf("picker.addEventListener('click'") + 4600);
+    const afPos = w.indexOf("try { activeSearchFilter = filterKey || 'all'; }");
+    const refreshPos = w.indexOf("if (typeof _addV2RefreshQuick === 'function') _addV2RefreshQuick()");
+    ok('SPEC60: activeSearchFilter set BEFORE Recent/Popular render on picker entry', afPos > 0 && refreshPos > 0 && afPos < refreshPos, 'af@' + afPos + ' refresh@' + refreshPos);
+    ok('SPEC60: Popular owner reads DEFAULTS[activeSearchFilter] (same context as Recent)', /const filter = \(typeof activeSearchFilter === 'string'/.test(app) && /DEFAULTS\[filter\]/.test(app)); }
 
   // 1. Backward-compat: legacy plain strings load as untyped {q,t:null}.
   { const sb = env(['Bitcoin', 'Apple Inc']);
