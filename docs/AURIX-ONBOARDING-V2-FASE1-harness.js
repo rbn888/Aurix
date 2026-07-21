@@ -39,14 +39,18 @@ ok('7 "Oro físico"/"Physical gold" no longer the metal label (Metales/Metals)',
    /addV2_pick_metal_sub:\s*'Oro, plata, lingotes, monedas y joyería'/.test(app));
 
 console.log('\nRouting — each category routes correctly (in-place, modal not re-opened):');
-const wire = app.slice(app.indexOf("picker.addEventListener('click'"), app.indexOf("picker.addEventListener('click'") + 3000);
+// Window widened (3000→4600): the picker handler grew with SPEC 57A / CATEGORY-CONTEXT / 59.
+const wire = app.slice(app.indexOf("picker.addEventListener('click'"), app.indexOf("picker.addEventListener('click'") + 4600);
 ok('8 Liquidez → openLiquidityModal (a FORM), never the success screen',
    /if \(pick === 'liquidity'\) \{[\s\S]*?openLiquidityModal\(\)/.test(wire) && /function openLiquidityModal/.test(app) && /liquidityQtyInput/.test(app));
 ok('9 Metales → metal picker sheet (choose Oro/Plata first, not straight to gold)',
    /if \(pick === 'metal' \|\| pick === 'gold'\) \{[\s\S]*?_addV2Activate\('metal-picker'\)/.test(wire));
 ok('10 Acciones/Criptomonedas/Fondos → asset surface with the matching filter pre-engaged',
    /const filterKey = \{ stocks: 'stock', crypto: 'crypto', fund: 'etf', asset: null \}\[pick\];/.test(wire) &&
-   /\.filter-btn\[data-filter="' \+ filterKey \+ '"\]/.test(wire));
+   // SPEC 59 — the filter is now pre-engaged directly (activeSearchFilter = filterKey +
+   // _addV42UpdateFilterAttr) instead of a filter-btn click, so entry never auto-opens the panel.
+   /if \(filterKey\) \{[\s\S]*?activeSearchFilter = filterKey/.test(wire) &&
+   /_addV42UpdateFilterAttr\(filterKey \|\| 'all'\)/.test(wire));
 ok('11 Inmuebles → real_estate form', /if \(pick === 'real_estate'\) \{[\s\S]*?enterRealEstateMode/.test(wire));
 
 console.log('\nSearch only AFTER a category (Step 2) — no search box on the selector itself:');
