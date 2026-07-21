@@ -14648,6 +14648,18 @@ body.gs-open { overflow: hidden; }
     rgba(10, 14, 24, 0.96);
   border: 1px solid var(--aurix-border);
 }
+/* SETTINGS V1 — premium header: consistent title size, tighter vertical rhythm,
+   hairline separator; no oversized empty band. Scoped to the Settings modal. */
+.modal--settings .modal-header {
+  padding: 17px 20px 15px;
+  border-bottom: 1px solid var(--aurix-border);
+  margin-bottom: 0;
+}
+.modal--settings .modal-header h3 {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
 .modal--reset {
   max-width: 460px;
   background:
@@ -14669,14 +14681,44 @@ body.gs-open { overflow: hidden; }
   flex-direction: column;
   gap: 10px;
 }
+/* SETTINGS V1 PREMIUM REBUILD — grouped premium cards.
+   Account / Profile / Data panes become a single glass card with a small
+   eyebrow header and hairline-divided rows (kills the per-row boxes). The Plan
+   pane stays transparent because its plan-cards are already the cards. Visual
+   layer only — every id / data-* hook / handler is untouched. */
+.settings-section[data-pane="account"],
+.settings-section[data-pane="profile"],
+.settings-section[data-pane="data"] {
+  gap: 0;
+  padding: 4px 16px 6px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--aurix-border);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+}
 .settings-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 10.5px;
   font-weight: 800;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(180, 200, 240, 0.62);
-  margin: 0 0 2px;
+  color: rgba(180, 200, 240, 0.66);
+  margin: 0;
+  padding: 14px 2px 10px;
 }
+/* eyebrow icon — one consistent 15px stroke glyph per section */
+.settings-section-title .settings-sec-ico {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  color: rgba(122, 162, 247, 0.9);
+}
+.settings-section-title .settings-sec-ico svg { width: 100%; height: 100%; display: block; }
+/* Profile keeps calm chip groups → give the card comfortable inner rhythm. */
+.settings-section[data-pane="profile"] { gap: 16px; padding-bottom: 16px; }
+.settings-section[data-pane="profile"] .settings-section-title { padding-bottom: 4px; }
 /* SETTINGS-INVESTOR-PROFILE-1 — investor profile section.
    Three calm chip rows; never reads as a questionnaire. */
 .settings-section-sub {
@@ -14742,15 +14784,33 @@ body.gs-open { overflow: hidden; }
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
-  min-height: 46px;                 /* DSH.SETTINGS.05 — uniform institutional row height */
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.022);   /* dark glass, less solid blue */
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  font-size: 13px;
+  padding: 0 2px;
+  min-height: 52px;                 /* SETTINGS V1 — uniform institutional row height */
+  font-size: 13.5px;
 }
-.settings-row-label { color: rgba(220, 230, 250, 0.60); }
-.settings-row-value { color: var(--text-bright); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Hairline dividers inside the card (no per-row boxes). Every row after the
+   first shares one 1px separator; the row after the eyebrow gets one too. */
+.settings-section[data-pane="account"] .settings-row + .settings-row,
+.settings-section[data-pane="account"] .settings-section-title + .settings-row,
+.settings-section[data-pane="data"] .settings-action + .settings-action {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.settings-row-label {
+  color: rgba(220, 230, 250, 0.62);
+  font-weight: 500;
+  letter-spacing: -0.003em;
+  flex: 0 0 auto;
+}
+.settings-row-value {
+  color: var(--text-bright);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 0;                     /* SETTINGS V1 — allow long values to shrink, never overflow */
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ── Plan cards ── */
 .plan-card {
@@ -14981,43 +15041,58 @@ body.gs-open { overflow: hidden; }
   flex-direction: column;
   gap: 8px;
 }
+.settings-actions {
+  gap: 0;
+}
+/* SETTINGS V1 — data actions are in-card rows: leading icon · text · chevron.
+   Transparent (the pane card is the container); consistent height + press feel. */
 .settings-action {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: var(--aurix-surface-2);
-  border: 1px solid rgba(74, 130, 240, 0.12);
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 2px;
+  min-height: 60px;
+  border: none;
+  background: none;
   color: var(--text-bright);
   font-family: inherit;
   font-size: 13.5px;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.16s, background 0.16s, transform 0.16s;
+  transition: background 0.16s, transform 0.12s;
 }
-.settings-action:hover:not([disabled]) {
-  border-color: var(--aurix-border-hi);
-  background: var(--aurix-blue-soft);
+.settings-action:hover:not([disabled]) { background: rgba(255, 255, 255, 0.03); }
+.settings-action:active:not([disabled]) { transform: scale(0.995); }
+.settings-action[disabled] { opacity: 0.5; cursor: not-allowed; }
+.settings-action-ico {
+  flex: 0 0 auto;
+  width: 20px; height: 20px;
+  color: rgba(122, 162, 247, 0.92);
+  display: flex; align-items: center; justify-content: center;
 }
-.settings-action:active:not([disabled]) { transform: scale(0.99); }
-.settings-action[disabled] { opacity: 0.55; cursor: not-allowed; }
-.settings-action-label { font-weight: 700; }
+.settings-action-ico svg { width: 100%; height: 100%; display: block; }
+.settings-action-text {
+  display: flex; flex-direction: column; gap: 2px;
+  align-items: flex-start; min-width: 0; flex: 1 1 auto;
+}
+.settings-action-chevron {
+  flex: 0 0 auto;
+  width: 16px; height: 16px;
+  margin-left: auto;
+  color: rgba(220, 230, 250, 0.30);
+}
+.settings-action-chevron svg { width: 100%; height: 100%; display: block; }
+.settings-action-label { font-weight: 600; }
 .settings-action-sub {
   font-size: 11.5px;
   font-weight: 500;
-  color: rgba(220, 230, 250, 0.58);
+  line-height: 1.4;
+  color: rgba(220, 230, 250, 0.56);
 }
-.settings-action--danger {
-  background: rgba(224, 90, 90, 0.06);
-  border-color: rgba(224, 90, 90, 0.22);
-}
-.settings-action--danger:hover {
-  background: rgba(224, 90, 90, 0.12);
-  border-color: rgba(224, 90, 90, 0.45);
-}
+.settings-action--danger:hover:not([disabled]) { background: rgba(224, 90, 90, 0.08); }
 .settings-action--danger .settings-action-label { color: var(--red); }
+.settings-action--danger .settings-action-ico { color: var(--red); }
 
 /* ── Prefs list ── */
 .settings-prefs-list {
@@ -23114,9 +23189,11 @@ body.aurix-premium-lock{ overflow:hidden; }
 @media (prefers-reduced-motion:reduce){ .menu-item--coming-soon::after{ animation:none; opacity:0; } }
 /* DSH.SETTINGS.05 — Idioma/Moneda toggles sit on the right of their Cuenta row.
    Currency pills carry flex:1 for the (removed) menu row; size to content here. */
-.settings-row .menu-pref-opts{ flex:0 0 auto; }
-.settings-row .menu-curr-btn{ flex:0 0 auto; }
-.settings-row .menu-pref-opt{ padding:6px 12px; }
+/* SETTINGS V1 — segmented controls must SHRINK, never widen the row past the
+   card (root overflow-x:hidden was clipping every value on narrow phones). */
+.settings-row .menu-pref-opts{ flex:0 1 auto; min-width:0; justify-content:flex-end; flex-wrap:wrap; row-gap:5px; }
+.settings-row .menu-curr-btn{ flex:0 1 auto; }
+.settings-row .menu-pref-opt{ padding:6px 12px; white-space:nowrap; }
 /* DSH.SETTINGS.TOGGLE.01 — crisp active state: Aurix blue fill, bright border,
    white text. Inactive keeps the dark-glass base above. */
 .settings-row .menu-pref-opt.active{
@@ -23166,8 +23243,16 @@ body.aurix-premium-lock{ overflow:hidden; }
 @media (max-width: 768px){
   .settings-nav{ display:none; }
   .settings-body--nav{ flex-direction:column; }
-  .settings-panes{ display:flex; flex-direction:column; gap:22px; }
+  .settings-panes{ display:flex; flex-direction:column; gap:18px; min-width:0; overflow-x:hidden; }
   .settings-body--nav .settings-panes > .settings-section{ display:flex; }
+  /* SETTINGS V1 — let the whole flex chain shrink to the viewport so nothing
+     clips on narrow phones (root overflow-x:hidden used to cut values off). */
+  .modal--settings{ max-width:100%; min-width:0; }
+  .modal--settings .modal-body{ min-width:0; }
+  .settings-section, .settings-row, .settings-action, .settings-action-text,
+  .settings-profile-group, .settings-profile-chips,
+  .plan-card, .plan-card-head, .plan-card-body{ min-width:0; max-width:100%; }
+  .plan-card-head{ flex-wrap:wrap; }
 }
 
 /* ── DSH.SETTINGS.05 — inline editable display name (Cuenta) ──────────────────
@@ -23175,7 +23260,7 @@ body.aurix-premium-lock{ overflow:hidden; }
    No Save button. Reorganization/persistence only; no auth. */
 .settings-name-input{
   appearance:none; -webkit-appearance:none;
-  flex:0 1 200px; min-width:0; width:200px; text-align:left;
+  flex:1 1 auto; min-width:0; width:auto; max-width:220px; text-align:right;
   background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.12); border-radius:9px;
   padding:7px 11px; color:var(--text-bright,#fff); font-size:13.5px; font-weight:600;
   transition:border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
