@@ -419,7 +419,7 @@
     // redirect breaker / pending-login state, or corrupt Supabase auth storage. These are read-only
     // diagnostics + narrowly-scoped self-heal. They NEVER touch portfolio / holdings / chart / history
     // data and NEVER log a secret. app.js already exposes aurixClearAuthRedirectState for the app page.
-    var AURIX_LOGIN_BUILD = 482;   // bumped ONLY when login.html changes (see version.json.loginhtml)
+    var AURIX_LOGIN_BUILD = 483;   // bumped ONLY when login.html changes (see version.json.loginhtml)
     function _storageAvailable() {
       try { var k = '__aurix_probe__'; localStorage.setItem(k, '1'); localStorage.removeItem(k); return true; } catch (_) { return false; }
     }
