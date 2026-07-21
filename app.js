@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '557'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '558'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -408,26 +408,76 @@ const _SAFE_REDIRECT_TARGETS = new Set([
 // recorded for window.aurixBootDiagnostic(). Returns true if the navigation was issued.
 const _AURIX_REDIRECT_MAX = 3;
 const _AURIX_REDIRECT_WINDOW_MS = 10000;
+// SPEC ANDROID-AUTH-REDIRECT-LOOP — storage-INDEPENDENT loop bound. The sessionStorage counter above
+// is DEFEATED in Android in-app WebViews / partitioned or private contexts where setItem "succeeds"
+// but the value is gone after the full-page navigation: the log is always empty, the cap never trips,
+// and index⇄login flickers forever (and the "hide shell on suppression" mitigation never fires). A
+// bounce counter carried in the URL (?_arl=N) survives across navigation regardless of storage and
+// bounds the loop by itself. Cleared the instant a real session is confirmed (_aurixMarkSessionConfirmed).
+const _AURIX_REDIRECT_URL_PARAM = '_arl';
+const _AURIX_REDIRECT_URL_MAX = 5;
+// Round-trip storage capability probe (setItem→getItem→removeItem). Detects the SILENT non-throwing
+// failure mode (write succeeds, read returns null) that a bare try/catch never sees. Cached on window.
+function _aurixStorageUsable() {
+  try { if (typeof window !== 'undefined' && typeof window.__AURIX_STORAGE_OK === 'boolean') return window.__AURIX_STORAGE_OK; } catch (_) {}
+  let ok = false;
+  try {
+    const k = '__aurix_probe__';
+    sessionStorage.setItem(k, '1');
+    ok = sessionStorage.getItem(k) === '1';
+    sessionStorage.removeItem(k);
+  } catch (_) { ok = false; }
+  try { if (typeof window !== 'undefined') window.__AURIX_STORAGE_OK = ok; } catch (_) {}
+  return ok;
+}
+function _aurixReadUrlBounce() {
+  try { const n = parseInt(new URLSearchParams(window.location.search).get(_AURIX_REDIRECT_URL_PARAM) || '0', 10); return (Number.isFinite(n) && n > 0) ? n : 0; } catch (_) { return 0; }
+}
+// Strip the URL bounce marker + clear the sessionStorage loop log. Idempotent; safe to call often.
+function _aurixClearRedirectFallback() {
+  try {
+    const u = new URL(window.location.href);
+    if (u.searchParams.has(_AURIX_REDIRECT_URL_PARAM)) {
+      u.searchParams.delete(_AURIX_REDIRECT_URL_PARAM);
+      history.replaceState(null, '', u.pathname + (u.search || '') + (u.hash || ''));
+    }
+  } catch (_) {}
+  try { sessionStorage.removeItem('aurix_redirect_log'); } catch (_) {}
+  try { sessionStorage.removeItem('aurix_redirect_broken'); } catch (_) {}
+}
 function safeRedirect(path, source) {
   const target  = _SAFE_REDIRECT_TARGETS.has(path) ? path : 'login.html';
+  // Storage-independent URL bounce count — the primary bound on Android WebViews where sessionStorage
+  // is silently defeated. Reads the count this page arrived with; the target gets count+1.
+  const urlBounce  = _aurixReadUrlBounce();
+  const nextBounce = urlBounce + 1;
+  // Legacy sessionStorage window-based log — still the tighter, primary bound whenever storage works.
+  let logLen = 0;
   try {
     const now = Date.now();
     let log = [];
     try { log = JSON.parse(sessionStorage.getItem('aurix_redirect_log') || '[]'); } catch (_) { log = []; }
     if (!Array.isArray(log)) log = [];
     log = log.filter(e => e && (now - e.ts) < _AURIX_REDIRECT_WINDOW_MS);
-    if (log.length >= _AURIX_REDIRECT_MAX) {
-      try { sessionStorage.setItem('aurix_redirect_broken', JSON.stringify({ at: now, target: target, source: source || null, bounces: log.length })); } catch (_) {}
-      try { console.warn('[AUTH][REDIRECT-LOOP-BREAK] suppressed →' + target + ' after ' + log.length + ' bounces in ' + _AURIX_REDIRECT_WINDOW_MS + 'ms (source=' + (source || '?') + ')'); } catch (_) {}
-      return false;
+    logLen = log.length;
+    if (logLen < _AURIX_REDIRECT_MAX) {
+      log.push({ ts: now, target: target, from: (typeof window !== 'undefined' ? window.location.pathname : ''), source: source || null });
+      try { sessionStorage.setItem('aurix_redirect_log', JSON.stringify(log)); } catch (_) {}
+      try { sessionStorage.setItem('aurix_last_redirect', JSON.stringify({ target: target, source: source || null, ts: now })); } catch (_) {}
     }
-    log.push({ ts: now, target: target, from: (typeof window !== 'undefined' ? window.location.pathname : ''), source: source || null });
-    try { sessionStorage.setItem('aurix_redirect_log', JSON.stringify(log)); } catch (_) {}
-    try { sessionStorage.setItem('aurix_last_redirect', JSON.stringify({ target: target, source: source || null, ts: now })); } catch (_) {}
   } catch (_) {}
+  // Suppress if EITHER bound is hit — the URL bound holds even when storage is fully defeated.
+  if (logLen >= _AURIX_REDIRECT_MAX || nextBounce > _AURIX_REDIRECT_URL_MAX) {
+    try { sessionStorage.setItem('aurix_redirect_broken', JSON.stringify({ at: Date.now(), target: target, source: source || null, bounces: logLen, urlBounce: urlBounce })); } catch (_) {}
+    try { if (typeof window !== 'undefined') window.__AURIX_REDIRECT_LOOP_BROKEN = { target: target, source: source || null, urlBounce: urlBounce, logLen: logLen }; } catch (_) {}
+    try { console.warn('[AUTH][REDIRECT-LOOP-BREAK] suppressed →' + target + ' (log=' + logLen + ', urlBounce=' + urlBounce + ', source=' + (source || '?') + ')'); } catch (_) {}
+    return false;
+  }
   const onAurix = window.location.pathname.startsWith('/Aurix/');
   const base    = window.location.origin + (onAurix ? '/Aurix/' : '/');
-  window.location.href = base + target;
+  // Carry the incremented bounce count on the target so the bound survives the navigation without storage.
+  const sep = target.indexOf('?') >= 0 ? '&' : '?';
+  window.location.href = base + target + sep + _AURIX_REDIRECT_URL_PARAM + '=' + nextBounce;
   return true;
 }
 
@@ -2421,7 +2471,7 @@ let _aurixRecentSessionUntil = 0;             // set whenever a real session is 
 let _explicitSignOut = false;                 // set by signOut() so the listener force-redirects
 let _aurixLoginRedirectTimers = [];
 let _aurixLoginRedirectPending = false;
-function _aurixMarkSessionConfirmed() { try { _aurixRecentSessionUntil = Date.now() + 10000; } catch (_) {} }
+function _aurixMarkSessionConfirmed() { try { _aurixRecentSessionUntil = Date.now() + 10000; } catch (_) {} try { if (typeof _aurixClearRedirectFallback === 'function') _aurixClearRedirectFallback(); } catch (_) {} }
 function _aurixCancelLoginRedirect(reason) {
   _aurixLoginRedirectTimers.forEach(t => { try { clearTimeout(t); } catch (_) {} });
   _aurixLoginRedirectTimers = []; _aurixLoginRedirectPending = false;
@@ -2468,10 +2518,47 @@ try {
       _aurixCancelLoginRedirect('manual-clear');
       try { sessionStorage.removeItem('aurix_redirect_log'); } catch (_) {}
       try { sessionStorage.removeItem('aurix_redirect_broken'); } catch (_) {}
+      try { if (typeof _aurixClearRedirectFallback === 'function') _aurixClearRedirectFallback(); } catch (_) {}   // also strips the ?_arl URL marker
       return true;
     };
   }
 } catch (_) {}
+
+// SPEC ANDROID-AUTH-REDIRECT-LOOP — stable, recoverable login screen shown when the redirect loop is
+// broken (bounce bound hit). Replaces the endless index⇄login flicker with a single readable screen:
+// it stops navigating, hides the unstable shell, explains that browser storage may be blocked, and
+// offers ONE manual retry (a single clean navigation to login with the bounce counter reset).
+function _aurixShowStorageRecoveryScreen(ctx) {
+  try {
+    if (typeof document === 'undefined' || document.getElementById('aurixAuthRecovery')) return;
+    try { if (window.hideSplashSafe) window.hideSplashSafe('auth-recovery'); } catch (_) {}
+    const storageOk = _aurixStorageUsable();
+    const p = document.createElement('div');
+    p.id = 'aurixAuthRecovery';
+    p.setAttribute('role', 'alert');
+    p.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;z-index:2147483646;background:#070a14;color:#e7ecf5;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px 22px;font:15px/1.55 -apple-system,system-ui,sans-serif';
+    p.innerHTML =
+      '<div style="font:800 22px/1.25 -apple-system,system-ui;color:#7fb0ff;letter-spacing:.04em;margin-bottom:14px">AURIX</div>'
+      + '<div style="max-width:460px;color:#c3cee2;margin-bottom:10px">No pudimos iniciar tu sesión de forma estable.</div>'
+      + '<div style="max-width:460px;color:#8a96aa;font-size:13.5px;margin-bottom:22px">'
+        + (storageOk
+            ? 'Tu sesión no está disponible en este momento. Vuelve a iniciar sesión para continuar.'
+            : 'Tu navegador está bloqueando el almacenamiento local (habitual al abrir un enlace dentro de otra app como Gmail, WhatsApp o Instagram). Abre Aurix directamente en Chrome o Safari para continuar.')
+      + '</div>'
+      + '<button id="aurixAuthRecoveryRetry" style="width:100%;max-width:320px;padding:14px 18px;background:linear-gradient(180deg,rgba(77,141,255,.95),rgba(53,110,225,.95));color:#fff;border:0;border-radius:11px;font:800 15px/1 -apple-system,system-ui;cursor:pointer">Reintentar inicio de sesión</button>';
+    document.body.appendChild(p);
+    const btn = document.getElementById('aurixAuthRecoveryRetry');
+    if (btn) btn.onclick = function () {
+      try { sessionStorage.removeItem('aurix_redirect_log'); } catch (_) {}
+      try { sessionStorage.removeItem('aurix_redirect_broken'); } catch (_) {}
+      const onAurix = location.pathname.startsWith('/Aurix/');
+      const base = location.origin + (onAurix ? '/Aurix/' : '/');
+      // ONE clean attempt: navigate to login with NO bounce counter (reset), so a working browser
+      // gets a fresh flow and a storage-blocked one lands on login (no further auto-redirect loop).
+      try { location.replace(base + 'login.html'); } catch (_) { try { location.href = base + 'login.html'; } catch (__) {} }
+    };
+  } catch (_) {}
+}
 
 if (supabaseClient && !window.__AUTH_LISTENER__) {
   window.__AUTH_LISTENER__ = true;
@@ -49958,9 +50045,13 @@ function _aurixPreloadBootIcons() {
         // SPEC POST-LOGIN-BOUNCE.03 — route through the single guarded owner (waitForSession already
         // applied its own bounded grace, so this only redirects if the session is still genuinely absent).
         const issued = await aurixScheduleLoginRedirect('boot:no-session');
-        // If the loop breaker suppressed the redirect, do NOT leave the splash spinning forever —
-        // hide the shell so the user sees the app rather than an infinite index⇄login flicker.
-        if (!issued) { try { _bootShellHide('auth-redirect-suppressed'); } catch (_) {} }
+        // If the loop breaker suppressed the redirect, do NOT leave the splash spinning forever and do
+        // NOT keep flickering index⇄login — hide the unstable shell and show a stable, recoverable login
+        // screen (explains blocked storage + one manual retry). SPEC ANDROID-AUTH-REDIRECT-LOOP.
+        if (!issued) {
+          try { _bootShellHide('auth-redirect-suppressed'); } catch (_) {}
+          try { _aurixShowStorageRecoveryScreen('boot:no-session'); } catch (_) {}
+        }
       }
       return;
     }

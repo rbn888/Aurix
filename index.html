@@ -66,8 +66,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v560-intel-scroll-integrity';
-      var APPJS_V = '557';
+      var BUILD = 'v561-android-auth-redirect-loop';
+      var APPJS_V = '558';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -95,6 +95,12 @@
       try {
         var _servedV = parseInt(APPJS_V, 10) || 0;
         window.__AURIX_SERVED_APPJS = _servedV;
+        // SPEC ANDROID-AUTH-REDIRECT-LOOP (degraded mode) — round-trip storage probe. When storage is
+        // defeated (Android in-app WebView / partitioned), the coherence reload's own anti-loop marker
+        // (aurix_coherence_reload, sessionStorage) can't persist, so a stale index would reload forever.
+        // In that case we DO NOT perform the cache-busted coherence reload (see guard below).
+        var _storageOk = (function () { try { var k = '__aurix_probe__'; sessionStorage.setItem(k, '1'); var ok = sessionStorage.getItem(k) === '1'; sessionStorage.removeItem(k); return ok; } catch (_) { return false; } })();
+        window.__AURIX_STORAGE_OK = _storageOk;
         var _reqV = null; try { var _sc = document.querySelector('script[src*="app.js?v="]'); if (_sc) { var _mm = (_sc.getAttribute('src') || '').match(/[?&]v=(\d+)/); _reqV = _mm ? parseInt(_mm[1], 10) : null; } } catch (_) {}
         window.__AURIX_REQUESTED_APPJS = _reqV;
         fetch('version.json?cb=' + T0, { cache: 'no-store' })
@@ -104,6 +110,11 @@
             window.__AURIX_LATEST_APPJS = j.appjs;
             window.__AURIX_LATEST_BUILD = j.build || null;
             if (j.appjs > _servedV) {                                // served INDEX is stale
+              if (!_storageOk) {                                     // degraded mode — cannot persist the anti-loop marker → NO reload (avoid infinite reload)
+                window.__AURIX_COHERENCE_DEGRADED = j.appjs;
+                try { console.warn('[BOOT][BUILD-COHERENCE] storage blocked — skipping coherence reload (degraded, no loop); served v' + _servedV + ' < deployed v' + j.appjs); } catch (_) {}
+                return;
+              }
               var mk = null; try { mk = JSON.parse(sessionStorage.getItem('aurix_coherence_reload') || 'null'); } catch (_) {}
               if (mk && mk.v === j.appjs && (mk.n || 0) >= 1) {       // already reloaded once for this version → do NOT loop
                 window.__AURIX_BUILD_RELOAD_EXHAUSTED = j.appjs;
@@ -1406,7 +1417,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=557"
+  <script src="app.js?v=558"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
