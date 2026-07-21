@@ -2120,6 +2120,47 @@ body.modal-open {
   display: none !important;
 }
 
+/* ════════════════════════════════════════════════════════════════════════════
+   SPEC 57A — Add Asset mobile layout stabilization (All / Crypto / Stocks /
+   ETF-Funds / Metals). ONE compact, consistent vertical rhythm for the shared
+   asset-mode discovery stack, replacing ad-hoc per-block margins. Visual/structural
+   only — no markup, search, pricing or persistence logic touched. Scoped to the
+   mobile sheet; desktop 2-column asset layout (>768px) is untouched. */
+@media (max-width: 768px) {
+  /* Single rhythm: search · filters · quick(popular/recent) · ISIN toggle · ISIN
+     block flow with one uniform gap instead of divergent per-block margins. */
+  .modal[data-mode="asset"] #searchWrap { display: flex; flex-direction: column; gap: 12px; }
+  .modal[data-mode="asset"] #searchWrap > * { margin: 0; }
+  /* Quick picks: no extra top/bottom margin (the stack gap owns spacing); chips
+     WRAP within the sheet and never clip laterally. The flex chain needs min-width:0
+     at every level or the chip row keeps its content width and overflows the sheet. */
+  .modal[data-mode="asset"] #addV2Quick,
+  .modal[data-mode="asset"] .add-v2-quick { margin: 0; }
+  .modal[data-mode="asset"] #searchWrap,
+  .modal[data-mode="asset"] .add-v2-quick,
+  .modal[data-mode="asset"] .add-v2-quick-section,
+  .modal[data-mode="asset"] .add-v2-chips { min-width: 0; max-width: 100%; }
+  .modal[data-mode="asset"] .add-v2-chips { flex-wrap: wrap; margin: 0; }
+  /* Popular items were a horizontal-scroll carousel (flex-wrap:nowrap; overflow-x:auto,
+     line ~1870) that clipped cards laterally. Convert to a clean WRAPPED layout — no
+     horizontal scroll, no lateral cut. ID specificity requires overriding #addV2PopularChips. */
+  .modal[data-mode="asset"] #addV2PopularChips {
+    display: flex; flex-wrap: wrap; overflow-x: visible; gap: 8px; padding-bottom: 0; min-width: 0;
+  }
+  .modal[data-mode="asset"] #addV2PopularChips > * { flex: 0 1 auto; max-width: 100%; min-width: 0; }
+  .modal[data-mode="asset"] #addV2PopularChips .add-v2-asset-card { flex: 1 1 46%; }
+  /* Recent/Popular sections show ONLY when they have data: `.add-v2-quick-section
+     { display:flex }` was overriding the JS-set [hidden] attribute (empty "RECIENTES"
+     label with no chips). Respect [hidden] so empty sections take no vertical space. */
+  .modal[data-mode="asset"] .add-v2-quick-section[hidden] { display: none; }
+  /* Search by ISIN — open state sits immediately below the toggle with no dead
+     height: tighter padding, no stray top margin. */
+  .modal[data-mode="asset"] #searchWrap.isin-revealed .isin-or-wrap { margin-top: 0; padding: 12px; }
+  .modal[data-mode="asset"] .isin-toggle-mobile { margin: 0; }
+  /* Results list feels part of the flow: full-width, contained, no lateral clip. */
+  .modal[data-mode="asset"] .asset-suggestions { max-width: 100%; }
+}
+
 .modal-body {
   padding: var(--space-5);
   /* MC-7B: scroll the form body, not the whole modal, so the header
