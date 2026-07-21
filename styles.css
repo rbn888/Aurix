@@ -1270,7 +1270,11 @@ body.modal-open {
   overflow: hidden;
   position: fixed;
   width: 100%;
-  touch-action: none;
+  /* SPEC 58 — allow native pinch-zoom over modals/sheets. position:fixed already locks
+     the background scroll, so the previous fully-disabled touch-action was redundant AND
+     blocked the browser's two-finger pinch across every open modal. pan-x pan-y pinch-zoom
+     keeps one-finger scrolling (modal-body) and re-enables pinch. */
+  touch-action: pan-x pan-y pinch-zoom;
 }
 
 /* ── Modal ─────────────────────────────────────────────── */
