@@ -26,14 +26,18 @@ function makeEnv(pathname) {
   const navs = [];
   const sb = {
     console: { warn: () => {}, log: () => {} }, Date: Date, JSON: JSON, Array: Array,
+    Number: Number, parseInt: parseInt, isFinite: isFinite, URL: URL, URLSearchParams: URLSearchParams,
     _SAFE_REDIRECT_TARGETS: new Set(['index.html', 'login.html', 'reset.html', 'reset-password.html']),
     _AURIX_REDIRECT_MAX: 3, _AURIX_REDIRECT_WINDOW_MS: 10000,
+    // SPEC ANDROID-AUTH-REDIRECT-LOOP — storage-independent URL bounce bound (mirrors app.js constants).
+    _AURIX_REDIRECT_URL_PARAM: '_arl', _AURIX_REDIRECT_URL_MAX: 5,
     sessionStorage: { getItem: k => store.has(k) ? store.get(k) : null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) },
-    window: { location: { pathname: pathname || '/index.html', origin: 'https://rbn888.github.io', get href() { return ''; }, set href(v) { navs.push(v); } } },
+    window: { location: { pathname: pathname || '/index.html', search: '', origin: 'https://rbn888.github.io', get href() { return ''; }, set href(v) { navs.push(v); } } },
   };
   sb.__navs = navs; sb.__store = store;
   vm.createContext(sb);
-  vm.runInContext(fnSrc(app, 'safeRedirect'), sb);
+  // safeRedirect now reads a storage-independent URL bounce counter via _aurixReadUrlBounce — provide it too.
+  vm.runInContext(fnSrc(app, '_aurixReadUrlBounce') + '\n' + fnSrc(app, 'safeRedirect'), sb);
   return sb;
 }
 const R = (sb, target, source) => vm.runInContext('safeRedirect(' + JSON.stringify(target) + ',' + JSON.stringify(source || null) + ')', sb);
@@ -54,7 +58,7 @@ console.log('Redirect loop breaker:');
   const last = JSON.parse(sb.__store.get('aurix_last_redirect') || 'null');
   ok('3 loop-break is recorded for the diagnostic (aurix_redirect_broken + source)', !!broken && broken.bounces >= 3 && !!last, JSON.stringify(broken)); }
 { const sb = makeEnv('/index.html');
-  ok('4 unknown redirect target falls back to login.html (never external)', (function () { R(sb, '//evil.com/x', 's'); return /login\.html$/.test(sb.__navs[0]); })(), sb.__navs[0]); }
+  ok('4 unknown redirect target falls back to login.html (never external)', (function () { R(sb, '//evil.com/x', 's'); return /login\.html(?:\?|$)/.test(sb.__navs[0]) && !/evil/.test(sb.__navs[0]); })(), sb.__navs[0]); }
 
 console.log('\nBuild-coherence guard (index.html, SPEC.43) + version source of truth:');
 // SPEC.43 replaced the SPEC-era stale guard with the build-coherence contract: same no-store version.json

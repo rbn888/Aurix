@@ -592,26 +592,64 @@
     // P0-ROUTING-LOOP-BREAKER (mirror of app.js safeRedirect) — a shared sessionStorage redirect log
     // stops an index⇄login ping-pong from flickering forever. Returns true if the nav was issued.
     var _AURIX_REDIRECT_MAX = 3, _AURIX_REDIRECT_WINDOW_MS = 10000;
+    // SPEC ANDROID-AUTH-REDIRECT-LOOP — storage-INDEPENDENT bound (mirror of app.js). A ?_arl=N bounce
+    // counter carried in the URL survives navigation even when sessionStorage is defeated (Android
+    // in-app WebView / partitioned context), so the loop is bounded without relying on storage.
+    var _AURIX_REDIRECT_URL_PARAM = '_arl', _AURIX_REDIRECT_URL_MAX = 5;
+    function _loginReadUrlBounce() {
+      try { var n = parseInt(new URLSearchParams(window.location.search).get(_AURIX_REDIRECT_URL_PARAM) || '0', 10); return (isFinite(n) && n > 0) ? n : 0; } catch (_) { return 0; }
+    }
+    function _loginStorageUsable() {
+      try { if (typeof window.__AURIX_STORAGE_OK === 'boolean') return window.__AURIX_STORAGE_OK; } catch (_) {}
+      var ok = false;
+      try { var k = '__aurix_probe__'; sessionStorage.setItem(k, '1'); ok = sessionStorage.getItem(k) === '1'; sessionStorage.removeItem(k); } catch (_) { ok = false; }
+      try { window.__AURIX_STORAGE_OK = ok; } catch (_) {}
+      return ok;
+    }
+    // Stable notice when the loop is broken from the login side — stop redirecting, tell the user
+    // storage may be blocked. login.html IS the recovery screen, so no navigation is issued.
+    function _loginShowStorageNotice() {
+      try {
+        if (document.getElementById('aurixLoginStorageNotice')) return;
+        var storageOk = _loginStorageUsable();
+        var d = document.createElement('div');
+        d.id = 'aurixLoginStorageNotice';
+        d.setAttribute('role', 'alert');
+        d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2147483646;background:#0c1426;border-top:1px solid #1c2b49;color:#c3cee2;font:13px/1.5 -apple-system,system-ui,sans-serif;padding:14px 16px calc(14px + env(safe-area-inset-bottom));text-align:center';
+        d.textContent = storageOk
+          ? 'No pudimos completar el inicio de sesión. Inténtalo de nuevo.'
+          : 'Tu navegador está bloqueando el almacenamiento local. Abre Aurix directamente en Chrome o Safari para iniciar sesión.';
+        document.addEventListener('DOMContentLoaded', function () { try { document.body.appendChild(d); } catch (_) {} });
+        try { if (document.body) document.body.appendChild(d); } catch (_) {}
+      } catch (_) {}
+    }
     function safeRedirect(path, source) {
       const target  = _SAFE_REDIRECT_TARGETS.has(path) ? path : 'login.html';
+      var urlBounce = _loginReadUrlBounce(), nextBounce = urlBounce + 1, logLen = 0;
       try {
         const now = Date.now();
         let log = [];
         try { log = JSON.parse(sessionStorage.getItem('aurix_redirect_log') || '[]'); } catch (_) { log = []; }
         if (!Array.isArray(log)) log = [];
         log = log.filter(function (e) { return e && (now - e.ts) < _AURIX_REDIRECT_WINDOW_MS; });
-        if (log.length >= _AURIX_REDIRECT_MAX) {
-          try { sessionStorage.setItem('aurix_redirect_broken', JSON.stringify({ at: now, target: target, source: source || null, bounces: log.length })); } catch (_) {}
-          try { console.warn('[AUTH][REDIRECT-LOOP-BREAK] login suppressed →' + target + ' after ' + log.length + ' bounces'); } catch (_) {}
-          return false;
+        logLen = log.length;
+        if (logLen < _AURIX_REDIRECT_MAX) {
+          log.push({ ts: now, target: target, from: window.location.pathname, source: source || null });
+          try { sessionStorage.setItem('aurix_redirect_log', JSON.stringify(log)); } catch (_) {}
+          try { sessionStorage.setItem('aurix_last_redirect', JSON.stringify({ target: target, source: source || null, ts: now })); } catch (_) {}
         }
-        log.push({ ts: now, target: target, from: window.location.pathname, source: source || null });
-        try { sessionStorage.setItem('aurix_redirect_log', JSON.stringify(log)); } catch (_) {}
-        try { sessionStorage.setItem('aurix_last_redirect', JSON.stringify({ target: target, source: source || null, ts: now })); } catch (_) {}
       } catch (_) {}
+      if (logLen >= _AURIX_REDIRECT_MAX || nextBounce > _AURIX_REDIRECT_URL_MAX) {
+        try { sessionStorage.setItem('aurix_redirect_broken', JSON.stringify({ at: Date.now(), target: target, source: source || null, bounces: logLen, urlBounce: urlBounce })); } catch (_) {}
+        try { window.__AURIX_REDIRECT_LOOP_BROKEN = { target: target, source: source || null, urlBounce: urlBounce, logLen: logLen }; } catch (_) {}
+        try { console.warn('[AUTH][REDIRECT-LOOP-BREAK] login suppressed →' + target + ' (log=' + logLen + ', urlBounce=' + urlBounce + ')'); } catch (_) {}
+        try { _loginShowStorageNotice(); } catch (_) {}
+        return false;
+      }
       const onAurix = window.location.pathname.startsWith('/Aurix/');
       const base    = window.location.origin + (onAurix ? '/Aurix/' : '/');
-      window.location.href = base + target;
+      var sep = target.indexOf('?') >= 0 ? '&' : '?';
+      window.location.href = base + target + sep + _AURIX_REDIRECT_URL_PARAM + '=' + nextBounce;
       return true;
     }
 
