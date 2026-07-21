@@ -43767,6 +43767,9 @@ function _applyTab(tab) {
   // this fixes both surfaces with one change. Preview text/styles/behaviour are untouched.
   if (placeholder) placeholder.innerHTML = '';
   if (workspaceEl) workspaceEl.innerHTML = '';
+  // SPEC INTELLIGENCE-MOBILE-SCROLL — clear the robust scroll-owner hook on every nav;
+  // re-added below only for the Intelligence tab (see the intelligence branch).
+  if (placeholder) placeholder.classList.remove('tab-placeholder--intel');
   if (tab === 'home') {
     mainEl.style.display      = '';
     placeholder.style.display = 'none';
@@ -43797,6 +43800,8 @@ function _applyTab(tab) {
       // INT.2 — Aurix Intelligence Command Center. Read-only patrimonial reading;
       // init wires reveal animations + the inline explore delegation.
       placeholder.innerHTML = renderIntelligenceTab();
+      // SPEC INTELLIGENCE-MOBILE-SCROLL — robust, :has()-independent scroll-owner hook.
+      placeholder.classList.add('tab-placeholder--intel');
       if (typeof _initIntelligenceCommandCenter === 'function') _initIntelligenceCommandCenter();
     } else {
       const _label = tab.charAt(0).toUpperCase() + tab.slice(1);
