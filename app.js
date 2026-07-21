@@ -38587,6 +38587,31 @@ async function _fetchStocksFallbackFC2() {
   } catch { return null; }
 }
 
+// SPEC 56 — per-symbol snapshot for a held asset whose symbol is OUTSIDE the curated
+// universes (UCITS-fund 0P* codes, uncommon tickers). This is the SAME /snapshot the
+// add-time resolveSymbolQuote() already uses, so refresh reaches parity: the asset's
+// OWN marketSymbol is finally sent to the (capable) backend. Cached per-symbol at the
+// same TTL as the batch, so it never storms; the server applies the provider-appropriate
+// cadence (daily NAV for funds). No new provider / fallback system — one existing endpoint.
+const _fc2SymbolCache = new Map(); // symbol → { price, change24h, ts }
+async function _fetchSymbolSnapshotFC2(symbol) {
+  if (!symbol) return null;
+  const now = Date.now();
+  const cached = _fc2SymbolCache.get(symbol);
+  if (cached && now - cached.ts < _FC2_CACHE_TTL) return cached;
+  try {
+    const url = `${PRICES_PROXY}/snapshot?symbols=${encodeURIComponent(symbol)}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const p = (json?.snapshot ?? []).find(x => Number.isFinite(x.price));
+    if (!p) return null;
+    const rec = { price: Number(p.price), change24h: p.change24h ?? null, ts: now };
+    _fc2SymbolCache.set(symbol, rec);
+    return rec;
+  } catch { return null; }
+}
+
 async function getUnifiedMarketPrice(symbol) {
   const norm = normalizeSymbol(symbol);
 
@@ -38600,9 +38625,15 @@ async function getUnifiedMarketPrice(symbol) {
   // 2. Fallback: single cached batch snapshot for the stocks universe
   if (IS_DEV) console.log('[FC2] fallback triggered for', symbol);
   const data  = await _fetchStocksFallbackFC2();
-  if (!data) return null;
-  const found = data.find(d => normalizeSymbol(d.symbol) === norm);
+  const found = data && data.find(d => normalizeSymbol(d.symbol) === norm);
   if (found?.price > 0) return { price: Number(found.price), change24h: found.change24h ?? null };
+
+  // 3. SPEC 56 — the symbol is not in the curated universe (e.g. a UCITS fund's 0P* code).
+  //    Query the asset's OWN symbol directly via /snapshot — parity with the add-time path
+  //    (resolveSymbolQuote). This is what unfreezes funds: the refresh loop now asks the
+  //    backend for the exact symbol instead of searching a fixed batch it can never contain.
+  const direct = await _fetchSymbolSnapshotFC2(symbol);
+  if (direct?.price > 0) return { price: direct.price, change24h: direct.change24h ?? null };
 
   return null;
 }
