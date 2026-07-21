@@ -47,9 +47,9 @@ ok('9 Metales → metal picker sheet (choose Oro/Plata first, not straight to go
    /if \(pick === 'metal' \|\| pick === 'gold'\) \{[\s\S]*?_addV2Activate\('metal-picker'\)/.test(wire));
 ok('10 Acciones/Criptomonedas/Fondos → asset surface with the matching filter pre-engaged',
    /const filterKey = \{ stocks: 'stock', crypto: 'crypto', fund: 'etf', asset: null \}\[pick\];/.test(wire) &&
-   // SPEC 59 — the filter is now pre-engaged directly (activeSearchFilter = filterKey +
-   // _addV42UpdateFilterAttr) instead of a filter-btn click, so entry never auto-opens the panel.
-   /if \(filterKey\) \{[\s\S]*?activeSearchFilter = filterKey/.test(wire) &&
+   // SPEC 59/60 — the filter is pre-engaged directly (activeSearchFilter = filterKey || 'all',
+   // set BEFORE the Recent/Popular render) + _addV42UpdateFilterAttr, no filter-btn click.
+   /activeSearchFilter = filterKey \|\| 'all'/.test(wire) &&
    /_addV42UpdateFilterAttr\(filterKey \|\| 'all'\)/.test(wire));
 ok('11 Inmuebles → real_estate form', /if \(pick === 'real_estate'\) \{[\s\S]*?enterRealEstateMode/.test(wire));
 
