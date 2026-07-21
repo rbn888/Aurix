@@ -1756,6 +1756,12 @@ body.modal-open {
   gap: 6px;
   margin: 4px 0 16px;
 }
+/* SPEC CATEGORY-CONTEXT — hide the category tabs when the modal was opened FROM a
+   specific category (data-category-locked="1", set by _addV42UpdateFilterAttr from
+   _modalAssetFilterContext). The category stays fixed; search/recent/popular/results
+   are already scoped to activeSearchFilter. All entry (locked="0") keeps the tabs.
+   All viewports — this is a behavioural contract, not a mobile-only visual. */
+.modal[data-mode="asset"][data-category-locked="1"] .search-filters { display: none; }
 .modal[data-mode="asset"] .filter-btn {
   padding: 5px 11px;
   font-size: 11.5px;

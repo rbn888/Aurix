@@ -46090,30 +46090,36 @@ const _GS_RECENT_KEY    = 'aurix.gs.recent.v1';
 const _GS_RECENT_MAX    = 5;
 const _GS_RECENT_MAX_LEN= 32;
 
+// SPEC CATEGORY-CONTEXT — recents are now typed objects { q, t } so the add-asset
+// flow can show only recents of the active category. Backward-compatible: legacy
+// plain-string entries load as { q, t: null } (untyped → only shown in the All view).
+// The `t` is the SELECTED asset's classification at save time (reusing existing type),
+// never hardcoded. Global search still reads only `.q`.
 function _gsLoadRecent() {
   try {
     const raw = localStorage.getItem(_GS_RECENT_KEY);
     if (!raw) return [];
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return [];
-    // MOBILE PASS 1A: drop fragments left over from the old behavior
-    // (every typing-burst was saved). Anything below 3 characters is
-    // almost certainly a partial keystroke, not a real selection.
+    // MOBILE PASS 1A: drop fragments (< 3 chars = partial keystroke, not a selection).
     return arr
-      .filter(s => typeof s === 'string')
-      .map(s => s.trim())
-      .filter(s => s.length >= 3)
+      .map(e => {
+        if (typeof e === 'string') { const q = e.trim(); return q.length >= 3 ? { q, t: null } : null; }
+        if (e && typeof e.q === 'string') { const q = e.q.trim(); return q.length >= 3 ? { q, t: (typeof e.t === 'string' ? e.t : null) } : null; }
+        return null;
+      })
+      .filter(Boolean)
       .slice(0, _GS_RECENT_MAX);
   } catch (_) { return []; }
 }
-function _gsSaveRecent(q) {
+function _gsSaveRecent(q, type) {
   const v = String(q || '').trim();
-  // MOBILE PASS 1A: enforce a 3-char minimum so partial keystrokes
-  // never enter the store, matching the load-time filter.
+  // MOBILE PASS 1A: enforce a 3-char minimum so partial keystrokes never enter the store.
   if (!v || v.length < 3 || v.length > _GS_RECENT_MAX_LEN) return;
+  const t = (typeof type === 'string' && type) ? type : null;
   try {
     const cur = _gsLoadRecent();
-    const next = [v, ...cur.filter(x => x.toLowerCase() !== v.toLowerCase())].slice(0, _GS_RECENT_MAX);
+    const next = [{ q: v, t }, ...cur.filter(x => x.q.toLowerCase() !== v.toLowerCase())].slice(0, _GS_RECENT_MAX);
     localStorage.setItem(_GS_RECENT_KEY, JSON.stringify(next));
   } catch (_) {}
 }
@@ -46177,7 +46183,7 @@ function _gsInit() {
     // Save chosen asset's label as "recent" before either action so
     // both surfaces (chart / add) feed the same recent-search history.
     const label = (item.name && item.name.trim()) || (item.ticker || '').trim();
-    if (label) _gsSaveRecent(label);
+    if (label) _gsSaveRecent(label, item.type);   // SPEC CATEGORY-CONTEXT — tag with the asset's own classification
 
     if (action === 'chart') {
       const mItem = _searchResultToMarketItem(item);
@@ -46214,8 +46220,9 @@ function _gsRenderRecent() {
     _GLOBAL_SEARCH.recentSection.hidden = true;
     return;
   }
-  _GLOBAL_SEARCH.recentChips.innerHTML = recent.map(q =>
-    `<button type="button" class="gs-chip is-recent" data-gs-chip="${_gsEscape(q)}">${_gsEscape(q)}</button>`
+  // Global search is category-agnostic — render every recent query (ignore the type tag).
+  _GLOBAL_SEARCH.recentChips.innerHTML = recent.map(r =>
+    `<button type="button" class="gs-chip is-recent" data-gs-chip="${_gsEscape(r.q)}">${_gsEscape(r.q)}</button>`
   ).join('');
   _GLOBAL_SEARCH.recentSection.hidden = false;
 }
@@ -47270,6 +47277,14 @@ function closeModal() {
 function _addV42UpdateFilterAttr(filter) {
   const modal = document.querySelector('#modalOverlay .modal');
   if (modal) modal.dataset.searchFilter = filter || 'all';
+  // SPEC CATEGORY-CONTEXT — when the modal was opened FROM a specific category
+  // (_modalAssetFilterContext = stock/crypto/etf/fund/metal), lock it: the category
+  // tabs are hidden (CSS) and the category stays fixed. Opened from All (null) → tabs
+  // shown + switchable. real_estate has its own form (no tabs) so it's not "locked".
+  if (modal) {
+    const ctx = (typeof _modalAssetFilterContext === 'string') ? _modalAssetFilterContext : null;
+    modal.dataset.categoryLocked = (ctx && ctx !== 'real_estate') ? '1' : '0';
+  }
   const ISIN_OK = new Set(['all', 'stock', 'etf']);
   if (!ISIN_OK.has(filter) && typeof _setIsinRevealed === 'function') {
     // If the user had the disclosure open and switches to a filter
@@ -49492,12 +49507,24 @@ function _addV2RenderRecents() {
   // Reuse the global-search recents store — query strings only, no
   // portfolio leakage. Tap pre-fills the search input and runs the
   // existing search pipeline.
-  const list = (typeof _gsLoadRecent === 'function') ? _gsLoadRecent() : [];
+  const all = (typeof _gsLoadRecent === 'function') ? _gsLoadRecent() : [];
+  // SPEC CATEGORY-CONTEXT — Recent shows ONLY the active category's recents. The active
+  // category is `activeSearchFilter` (= the locked opening category when tabs are hidden,
+  // or the active tab in All mode). 'etf' covers both etf and fund types. In All mode
+  // (activeSearchFilter==='all') every recent is shown. Legacy untyped recents (t:null)
+  // appear only in All, never inside a specific category — no cross-category mixing.
+  const af = (typeof activeSearchFilter === 'string') ? activeSearchFilter : 'all';
+  const matches = (r) => {
+    if (af === 'all') return true;
+    if (af === 'etf') return r.t === 'etf' || r.t === 'fund';
+    return r.t === af;
+  };
+  const list = all.filter(matches);
   if (!list.length) { section.hidden = true; return; }
   section.hidden = false;
-  wrap.innerHTML = list.map(q => `
-    <button type="button" class="add-v2-chip is-recent" data-recent-q="${escHtml(q)}">
-      <span class="add-v2-chip-text">${escHtml(q)}</span>
+  wrap.innerHTML = list.map(r => `
+    <button type="button" class="add-v2-chip is-recent" data-recent-q="${escHtml(r.q)}">
+      <span class="add-v2-chip-text">${escHtml(r.q)}</span>
     </button>
   `).join('');
   wrap.querySelectorAll('[data-recent-q]').forEach(btn => {
@@ -49643,6 +49670,9 @@ function _addV4RenderPreview() {
     try { _addV2SetCategoryHeader(pick); } catch (_) {}   // SPEC 45 — per-category header (stocks/crypto/ETF), not the generic one
     try { _modalContext = 'asset'; _modalAssetFilterContext = filterKey || null; } catch (_) {}
     _addV2Activate('form');
+    // SPEC CATEGORY-CONTEXT — reflect the opening category (or All) onto the modal so the
+    // tabs hide/show correctly even for the All entry (filterKey null → no filter-btn click below).
+    try { if (typeof _addV42UpdateFilterAttr === 'function') _addV42UpdateFilterAttr(filterKey || 'all'); } catch (_) {}
     try { if (typeof _addV2RefreshQuick === 'function') _addV2RefreshQuick(); } catch (_) {}
     try { if (typeof _updateSearchEmptyHint === 'function') _updateSearchEmptyHint(); } catch (_) {}
     if (filterKey) { try { const btn = document.querySelector('.filter-btn[data-filter="' + filterKey + '"]'); if (btn) btn.click(); } catch (_) {} }
