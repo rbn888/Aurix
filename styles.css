@@ -14695,6 +14695,7 @@ body.gs-open { overflow: hidden; }
    pane stays transparent because its plan-cards are already the cards. Visual
    layer only — every id / data-* hook / handler is untouched. */
 .settings-section[data-pane="account"],
+.settings-section[data-pane="prefs"],
 .settings-section[data-pane="profile"],
 .settings-section[data-pane="data"] {
   gap: 0;
@@ -14724,9 +14725,9 @@ body.gs-open { overflow: hidden; }
   color: rgba(122, 162, 247, 0.9);
 }
 .settings-section-title .settings-sec-ico svg { width: 100%; height: 100%; display: block; }
-/* Profile keeps calm chip groups → give the card comfortable inner rhythm. */
-.settings-section[data-pane="profile"] { gap: 16px; padding-bottom: 16px; }
-.settings-section[data-pane="profile"] .settings-section-title { padding-bottom: 4px; }
+/* SETTINGS-MOBILE-V2 — profile card uses divided summary rows (like Cuenta); the
+   chips live collapsed under each row and only appear while that group is editing. */
+.settings-section[data-pane="profile"] { gap: 0; padding-bottom: 6px; }
 /* SETTINGS-INVESTOR-PROFILE-1 — investor profile section.
    Three calm chip rows; never reads as a questionnaire. */
 .settings-section-sub {
@@ -14800,7 +14801,10 @@ body.gs-open { overflow: hidden; }
    first shares one 1px separator; the row after the eyebrow gets one too. */
 .settings-section[data-pane="account"] .settings-row + .settings-row,
 .settings-section[data-pane="account"] .settings-section-title + .settings-row,
-.settings-section[data-pane="data"] .settings-action + .settings-action {
+.settings-section[data-pane="prefs"] .settings-row + .settings-row,
+.settings-section[data-pane="prefs"] .settings-section-title + .settings-row,
+.settings-section[data-pane="data"] .settings-action + .settings-action,
+.settings-section[data-pane="profile"] .settings-profile-group + .settings-profile-group {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 .settings-row-label {
@@ -15073,6 +15077,8 @@ body.gs-open { overflow: hidden; }
 .settings-action:hover:not([disabled]) { background: rgba(255, 255, 255, 0.03); }
 .settings-action:active:not([disabled]) { transform: scale(0.995); }
 .settings-action[disabled] { opacity: 0.5; cursor: not-allowed; }
+/* SETTINGS-MOBILE-V2 — a disabled action has no action → no chevron, not pulsable. */
+.settings-action[disabled] .settings-action-chevron { display: none; }
 .settings-action-ico {
   flex: 0 0 auto;
   width: 20px; height: 20px;
@@ -23286,6 +23292,64 @@ body.aurix-premium-lock{ overflow:hidden; }
 @media (max-width: 560px){
   .settings-name-input{ flex:1 1 auto; width:auto; max-width:58%; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SETTINGS MOBILE V2 · FREE MVP — value-at-rest name, summary-first investor
+   profile, discreet tech info, and the single premium-visibility owner.
+   Visual/structural layer; every id/handler/i18n/plan-card architecture intact.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* Premium/Membresía hidden for Launch 1 via ONE owner (html[data-aurix-premium-ui]).
+   Specificity (0,5,1) beats the mobile pane-show rule (0,4,0) — no !important. */
+html[data-aurix-premium-ui="off"] .settings-nav-item[data-settings-pane="plan"],
+html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .settings-section[data-pane="plan"] {
+  display: none;
+}
+
+/* Nombre visible — value at rest (read-only looks like a plain value); the edit
+   button turns it into an input. Preserves the existing save-on-Enter/blur logic. */
+.settings-name-field { display:flex; align-items:center; gap:6px; min-width:0; justify-content:flex-end; }
+.settings-name-input[readonly] {
+  background:transparent; border-color:transparent; box-shadow:none;
+  padding-right:0; cursor:default; text-align:right;
+}
+.settings-name-edit {
+  flex:0 0 auto; width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+  border:none; background:transparent; border-radius:8px; cursor:pointer;
+  color:rgba(122,162,247,.9); transition:background .15s ease, color .15s ease;
+}
+.settings-name-edit svg { width:16px; height:16px; display:block; }
+.settings-name-edit:hover { background:rgba(255,255,255,.05); color:#fff; }
+
+/* Investor profile — summary row (label · value · chevron), chips collapsed until
+   that group is editing. One consistent row look with the account/prefs rows. */
+.settings-profile-group { display:flex; flex-direction:column; gap:0; min-width:0; }
+.settings-profile-summary {
+  display:flex; align-items:center; gap:12px; width:100%;
+  min-height:52px; padding:0 2px; border:none; background:transparent;
+  font-family:inherit; font-size:13.5px; color:var(--text-bright,#fff); cursor:pointer; text-align:left;
+}
+.settings-profile-summary-label { flex:0 0 auto; color:rgba(220,230,250,.62); font-weight:500; }
+.settings-profile-summary-value {
+  flex:1 1 auto; min-width:0; text-align:right; font-weight:600; color:var(--text-bright,#fff);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.settings-profile-chevron { flex:0 0 auto; width:16px; height:16px; color:rgba(220,230,250,.30); transition:transform .18s ease; }
+.settings-profile-chevron svg { width:100%; height:100%; display:block; }
+.settings-profile-group.is-editing .settings-profile-chevron { transform:rotate(90deg); color:rgba(122,162,247,.9); }
+.settings-profile-summary:hover .settings-profile-chevron { color:rgba(220,230,250,.55); }
+/* Chips collapsed by default; revealed only while editing that one group. */
+.settings-profile-chips { display:none; padding:2px 2px 12px; }
+.settings-profile-group.is-editing .settings-profile-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.settings-profile-chips--age { gap:5px; }
+
+/* Información técnica — Build at the very end, discreet secondary text. */
+.settings-techinfo {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  margin-top:4px; padding:10px 6px 2px; min-width:0;
+}
+.settings-techinfo-label { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:rgba(220,230,250,.38); }
+.settings-techinfo-value { font-size:11px; color:rgba(220,230,250,.42); font-variant-numeric:tabular-nums; }
 
 /* ══════════════════════════════════════════════════════════════
    DSH.DONUT.01 — Desktop micro-composition donut + composition modal.

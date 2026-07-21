@@ -1583,35 +1583,40 @@
     <div class="modal-body settings-body settings-body--nav">
       <nav class="settings-nav" role="tablist" aria-label="Configuración">
         <button type="button" class="settings-nav-item is-current" role="tab" data-settings-pane="account" data-i18n="settingsAccount">Cuenta</button>
+        <button type="button" class="settings-nav-item" role="tab" data-settings-pane="prefs" data-i18n="settingsPrefsTitle">Preferencias</button>
+        <!-- SETTINGS-MOBILE-V2 — Membresía/Premium hidden for Launch 1 via the single
+             `html[data-aurix-premium-ui="off"]` owner; markup/handlers preserved for Launch 2. -->
         <button type="button" class="settings-nav-item" role="tab" data-settings-pane="plan" data-i18n="settingsPlanTitle">Membresía</button>
         <button type="button" class="settings-nav-item" role="tab" data-settings-pane="profile" data-i18n="settingsProfileTitle">Perfil inversor</button>
         <button type="button" class="settings-nav-item" role="tab" data-settings-pane="data" data-i18n="settingsData">Datos y seguridad</button>
       </nav>
       <div class="settings-panes">
 
+      <!-- 1 · CUENTA — Nombre / Email / Estado. Membresía + Build rows removed (V2);
+           display name shows as a value at rest, editable only on tapping edit. -->
       <section class="settings-section is-active" data-pane="account" id="settingsSectionAccount">
         <h4 class="settings-section-title"><span class="settings-sec-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></span><span data-i18n="settingsAccount">Cuenta</span></h4>
-        <!-- DSH.SETTINGS.05 — editable display name, inline in the row (no big
-             Save button). Saves on Enter and on blur-if-changed. -->
         <div class="settings-row">
           <span class="settings-row-label" data-i18n="settingsDisplayName">Nombre visible</span>
-          <input type="text" id="settingsNameInput" class="settings-name-input" maxlength="40" autocomplete="off" autocapitalize="words" spellcheck="false" aria-label="Nombre visible">
+          <span class="settings-name-field">
+            <input type="text" id="settingsNameInput" class="settings-name-input" maxlength="40" autocomplete="off" autocapitalize="words" spellcheck="false" aria-label="Nombre visible" readonly>
+            <button type="button" class="settings-name-edit" id="settingsNameEditBtn" aria-label="Editar nombre visible"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18.5 9.5l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></button>
+          </span>
         </div>
         <div class="settings-row">
           <span class="settings-row-label" data-i18n="settingsEmail">Email</span>
-          <span class="settings-row-value" id="settingsAccountEmail">—</span>
+          <span class="settings-row-value settings-row-value--email" id="settingsAccountEmail">—</span>
         </div>
         <div class="settings-row">
           <span class="settings-row-label" data-i18n="settingsStatus">Estado</span>
           <span class="settings-row-value" id="settingsAccountStatus" data-i18n="settingsStatusLocal">Local · sin sesión</span>
         </div>
-        <div class="settings-row">
-          <span class="settings-row-label" data-i18n="settingsAccountMembership">Membresía</span>
-          <span class="settings-tier-chip" id="settingsAccountTier" data-tier="free">FREE</span>
-        </div>
-        <!-- DSH.SETTINGS.05 — Idioma & Moneda live in Cuenta now (Preferencias
-             section removed). Reuse the existing switchLang / _applyCurrencyChange
-             handlers via data-lang / .menu-curr-btn; persistence unchanged. -->
+      </section>
+
+      <!-- 2 · PREFERENCIAS — Idioma / Moneda (moved out of Cuenta). Same handlers
+           (data-lang / .menu-curr-btn) + persistence; segmented controls unchanged. -->
+      <section class="settings-section" data-pane="prefs" id="settingsSectionPrefs">
+        <h4 class="settings-section-title"><span class="settings-sec-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><circle cx="10" cy="7" r="2.2"/><line x1="4" y1="17" x2="20" y2="17"/><circle cx="15" cy="17" r="2.2"/></svg></span><span data-i18n="settingsPrefsTitle">Preferencias</span></h4>
         <div class="settings-row">
           <span class="settings-row-label" data-i18n="settingsLang">Idioma</span>
           <div class="menu-pref-opts" role="group" aria-label="Language">
@@ -1625,10 +1630,6 @@
             <button type="button" class="menu-curr-btn menu-pref-opt" data-currency="USD" aria-pressed="true">USD</button>
             <button type="button" class="menu-curr-btn menu-pref-opt" data-currency="EUR" aria-pressed="false">EUR</button>
           </div>
-        </div>
-        <div class="settings-row settings-row--meta">
-          <span class="settings-row-label" data-i18n="settingsBuild">Build</span>
-          <span class="settings-row-value settings-row-value--meta" id="settingsBuildVersion">v1.0 · 2026.05</span>
         </div>
       </section>
 
@@ -1667,8 +1668,15 @@
         <h4 class="settings-section-title"><span class="settings-sec-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="8" r="2.4"/><circle cx="15" cy="16" r="2.4"/></svg></span><span data-i18n="settingsProfileTitle">Perfil inversor</span></h4>
         <p class="settings-section-sub" data-i18n="settingsProfileSub">Ajusta cómo Aurix interpreta las señales de tu cartera.</p>
 
-        <div class="settings-profile-group">
-          <span class="settings-profile-label" data-i18n="settingsProfileRisk">Tu estilo de inversión</span>
+        <!-- SETTINGS-MOBILE-V2 — summary-by-default. The summary button shows the
+             current value; tapping it reveals the existing chips (one group open at
+             a time) and collapses back after a choice. Chips/handlers/ids unchanged. -->
+        <div class="settings-profile-group" data-profile-facet="risk">
+          <button type="button" class="settings-profile-summary" aria-expanded="false">
+            <span class="settings-profile-summary-label" data-i18n="settingsProfileRisk">Tu estilo de inversión</span>
+            <span class="settings-profile-summary-value" data-profile-value="risk">—</span>
+            <span class="settings-profile-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+          </button>
           <div class="settings-profile-chips" id="settingsRiskChips">
             <button type="button" class="settings-profile-chip" data-settings-risk="conservative" data-i18n="onbRiskConservative">Conservador</button>
             <button type="button" class="settings-profile-chip" data-settings-risk="balanced" data-i18n="onbRiskBalanced">Equilibrado</button>
@@ -1677,8 +1685,12 @@
           </div>
         </div>
 
-        <div class="settings-profile-group">
-          <span class="settings-profile-label" data-i18n="settingsProfileExperience">Experiencia</span>
+        <div class="settings-profile-group" data-profile-facet="experience">
+          <button type="button" class="settings-profile-summary" aria-expanded="false">
+            <span class="settings-profile-summary-label" data-i18n="settingsProfileExperience">Experiencia</span>
+            <span class="settings-profile-summary-value" data-profile-value="experience">—</span>
+            <span class="settings-profile-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+          </button>
           <div class="settings-profile-chips" id="settingsExperienceChips">
             <button type="button" class="settings-profile-chip" data-settings-experience="beginner" data-i18n="settingsExperienceBeginner">Principiante</button>
             <button type="button" class="settings-profile-chip" data-settings-experience="intermediate" data-i18n="settingsExperienceIntermediate">Intermedio</button>
@@ -1687,8 +1699,12 @@
           </div>
         </div>
 
-        <div class="settings-profile-group">
-          <span class="settings-profile-label" data-i18n="settingsProfileAge">Etapa inversora</span>
+        <div class="settings-profile-group" data-profile-facet="age">
+          <button type="button" class="settings-profile-summary" aria-expanded="false">
+            <span class="settings-profile-summary-label" data-i18n="settingsProfileAge">Etapa inversora</span>
+            <span class="settings-profile-summary-value" data-profile-value="age">—</span>
+            <span class="settings-profile-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+          </button>
           <div class="settings-profile-chips settings-profile-chips--age" id="settingsAgeChips">
             <button type="button" class="settings-profile-chip" data-settings-age="under_30" data-i18n="onbAgeUnder30">&lt;30</button>
             <button type="button" class="settings-profile-chip" data-settings-age="age_30_45" data-i18n="onbAge30_45">30–45</button>
@@ -1731,6 +1747,13 @@
           </button>
         </div>
       </section>
+
+      <!-- 6 · INFORMACIÓN TÉCNICA — Build moved to the end, discreet secondary text.
+           Always visible (not a hideable pane); sits below the active pane on desktop. -->
+      <div class="settings-techinfo">
+        <span class="settings-techinfo-label" data-i18n="settingsBuild">Build</span>
+        <span class="settings-techinfo-value" id="settingsBuildVersion">v1.0 · 2026.05</span>
+      </div>
 
       </div>
     </div>
