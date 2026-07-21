@@ -34356,6 +34356,7 @@ function _aurixInitMobileChartInspector() {
     const schedule = function () { if (!rafOn) { rafOn = true; try { requestAnimationFrame(function () { rafOn = false; _aurixMobInspectorUpdate(lastX); }); } catch (_) { rafOn = false; _aurixMobInspectorUpdate(lastX); } } };
     area.addEventListener('touchstart', function (e) {
       if (!e.touches || !e.touches.length) return;
+      if (e.touches.length > 1) { clearLp(); claimed = false; return; }   // SPEC 58 — two fingers → native pinch, never arm the inspector
       const t = e.touches[0]; startX = t.clientX; startY = t.clientY; claimed = false; clearLp();
       lpTimer = setTimeout(function () {            // Fase 1 — long-press (~280ms) claims the gesture
         claimed = true; _aurixMobInspectorActive = true; lastX = startX;
@@ -34366,6 +34367,13 @@ function _aurixInitMobileChartInspector() {
     }, { passive: true });
     area.addEventListener('touchmove', function (e) {
       if (!e.touches || !e.touches.length) return;
+      // SPEC 58 — a second finger arrived → release the gesture to the browser's native
+      // pinch-zoom (never preventDefault a multi-touch), and drop any active inspection.
+      if (e.touches.length > 1) {
+        clearLp();
+        if (claimed) { claimed = false; _aurixMobInspectorHide(); try { area.style.touchAction = ''; } catch (_) {} }
+        return;
+      }
       const t = e.touches[0];
       if (!claimed) {                              // before claim: a real drag → carousel/scroll wins
         if (Math.abs(t.clientX - startX) > 10 || Math.abs(t.clientY - startY) > 12) clearLp();
@@ -49882,6 +49890,7 @@ function initMobileSlider() {
   }
 
   track.addEventListener('touchstart', e => {
+    if (e.touches && e.touches.length > 1) { isDragging = false; return; }   // SPEC 58 — two fingers → native pinch, don't start a swipe
     const t = e.touches[0];
     startX    = t.clientX;
     startY    = t.clientY;
@@ -49897,6 +49906,13 @@ function initMobileSlider() {
   // non-passive — preventDefault() needed to block scroll on horizontal swipe
   track.addEventListener('touchmove', e => {
     if (!isDragging) return;
+    // SPEC 58 — a second finger arrived → abandon the swipe so the browser can pinch-zoom
+    // (never preventDefault a multi-touch move). Snap back to the current slide cleanly.
+    if (e.touches && e.touches.length > 1) {
+      isDragging = false; isHorizontal = null;
+      track.style.transition = ''; track.style.transform = `translateX(${-(currentIndex * slideW)}px)`;
+      return;
+    }
     // RC3-INC6 — if the inspector claims mid-gesture (long-press), mark this gesture as the
     // chart's so its release can never switch to the donut.
     if (typeof window !== 'undefined' && window.__aurixInspectorActive) fromInspector = true;
@@ -52464,6 +52480,7 @@ function _aurixRenderMenuIdentity() {
     }, 300);
 
     const onMove = ev => {
+      if (ev.touches && ev.touches.length > 1) { cancel(); return; }   // SPEC 58 — two fingers → native pinch, abandon the drag
       if (fired) {
         _ddMove(ev);
       } else if (Math.abs(ev.touches[0].clientY - startY) > 8) {
@@ -52659,6 +52676,7 @@ function _aurixRenderMenuIdentity() {
 
   function onTouchMove(e) {
     if (!drag.card) return;
+    if (e.touches && e.touches.length > 1) { try { resetDrag(); } catch (_) {} return; }   // SPEC 58 — two fingers → native pinch, abandon the drag
 
     const touch = e.touches[0];
     const dx = touch.clientX - drag.startX;
