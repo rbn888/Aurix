@@ -23243,7 +23243,12 @@ body.aurix-premium-lock{ overflow:hidden; }
 @media (max-width: 768px){
   .settings-nav{ display:none; }
   .settings-body--nav{ flex-direction:column; }
-  .settings-panes{ display:flex; flex-direction:column; gap:18px; min-width:0; overflow-x:hidden; }
+  /* SCROLL-OWNER FIX — no overflow-x here: `overflow-x:hidden` forces the CSS
+     spec's "visible→auto" promotion on overflow-y, turning .settings-panes into
+     an accidental NESTED scroll container that traps content and stops the real
+     owner (.settings-body / .modal-body) from scrolling. The min-width:0 chain
+     already prevents horizontal overflow. One vertical scroll owner: the body. */
+  .settings-panes{ display:flex; flex-direction:column; gap:18px; min-width:0; }
   .settings-body--nav .settings-panes > .settings-section{ display:flex; }
   /* SETTINGS V1 — let the whole flex chain shrink to the viewport so nothing
      clips on narrow phones (root overflow-x:hidden used to cut values off). */
