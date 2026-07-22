@@ -67,6 +67,11 @@ ok('5 index.html has the cache-busted build-coherence guard (version.json?cb, on
   /BUILD-COHERENCE GUARD/.test(html) && /fetch\('version\.json\?cb='/.test(html) && /aurix_coherence_reload/.test(html) && /index\.html\?v=/.test(html));
 ok('6 stale reload is one-time-guarded per expected version (n>=1 ⇒ recoverable, never an infinite loop)',
   /mk\.v === j\.appjs && \(mk\.n \|\| 0\) >= 1/.test(html) && /sessionStorage\.setItem\('aurix_coherence_reload'/.test(html) && /__AURIX_BUILD_RELOAD_EXHAUSTED/.test(html));
+// SPEC FINAL — the guard ALSO catches CSS-only releases: same appjs, different `build`
+// string ⇒ one cache-busted reload (separate marker), so a browser-cached OLD index that
+// still requests the OLD styles.css?v= can't keep serving the stale layout ("old tabs").
+ok('6b CSS-only build mismatch also triggers a one-time coherence reload (build string)',
+  /j\.build && j\.build !== BUILD/.test(html) && /aurix_coherence_reload_build/.test(html) && /__AURIX_BUILD_RELOAD_EXHAUSTED_BUILD/.test(html));
 { const vj = JSON.parse(fs.readFileSync(path.join(root, 'version.json'), 'utf8'));
   const m = html.match(/var APPJS_V = '(\d+)'/);
   const served = m ? parseInt(m[1], 10) : -1;

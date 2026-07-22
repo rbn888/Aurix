@@ -66,8 +66,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v575-desktop-add-asset-polish';
-      var APPJS_V = '567';
+      var BUILD = 'v576-desktop-add-asset-final';
+      var APPJS_V = '568';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -130,6 +130,26 @@
               var base = location.origin + (onAurix ? '/Aurix/' : '/');
               try { console.warn('[BOOT][BUILD-COHERENCE] served index v' + _servedV + ' < deployed v' + j.appjs + ' — one cache-busted reload'); } catch (_) {}
               location.replace(base + 'index.html?v=' + j.appjs + '&_cb=' + T0);
+            } else if (j.build && j.build !== BUILD) {
+              // BUILD-COHERENCE (CSS-ONLY RELEASES) — a CSS/markup-only deploy bumps `build`
+              // (and styles.css?v=) but NOT `appjs`, so the appjs check above never fires and a
+              // browser-cached OLD index keeps requesting the OLD styles.css?v= → stale layout
+              // ("old tabs" instead of the premium module). Mirror the appjs guard on the build
+              // STRING: at most ONE cache-busted reload per build (separate marker), degraded-mode
+              // safe (no reload when storage can't persist the anti-loop marker → never a loop).
+              if (!_storageOk) { window.__AURIX_COHERENCE_DEGRADED_BUILD = j.build; return; }
+              var mkb = null; try { mkb = JSON.parse(sessionStorage.getItem('aurix_coherence_reload_build') || 'null'); } catch (_) {}
+              if (mkb && mkb.b === j.build && (mkb.n || 0) >= 1) {
+                window.__AURIX_BUILD_RELOAD_EXHAUSTED_BUILD = j.build;
+                try { console.warn('[BOOT][BUILD-COHERENCE] index build ' + BUILD + ' still stale vs ' + j.build + ' after one reload — recoverable (no loop)'); } catch (_) {}
+                return;
+              }
+              try { sessionStorage.setItem('aurix_coherence_reload_build', JSON.stringify({ b: j.build, n: (mkb && mkb.b === j.build ? (mkb.n || 0) + 1 : 1), ts: T0 })); } catch (_) {}
+              try { if (typeof caches !== 'undefined' && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { try { caches.delete(k); } catch (_) {} }); }).catch(function () {}); } catch (_) {}
+              var onAurixB = location.pathname.indexOf('/Aurix/') === 0;
+              var baseB = location.origin + (onAurixB ? '/Aurix/' : '/');
+              try { console.warn('[BOOT][BUILD-COHERENCE] served build ' + BUILD + ' != deployed ' + j.build + ' (same appjs) — one cache-busted reload'); } catch (_) {}
+              location.replace(baseB + 'index.html?b=' + encodeURIComponent(j.build) + '&_cb=' + T0);
             }
           }).catch(function () {});
       } catch (_) {}
@@ -222,7 +242,7 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=575">
+  <link rel="stylesheet" href="styles.css?v=576">
 </head>
 <body style="background:#070a14">
 
@@ -1092,12 +1112,13 @@
           </div>
         </div>
 
-        </div><!-- /.add-v2-left -->
-
-        <div class="add-v2-right">
           <!-- Desktop live preview panel. Reads from existing selected
                state (selectedDbAsset / pendingPrice / pendingCurrency)
-               via _addV4RenderPreview. No new pricing logic. -->
+               via _addV4RenderPreview. No new pricing logic.
+               SPEC FINAL-LAYOUT: the asset preview lives in the LEFT column
+               (under the selected asset); the RIGHT column is the form only.
+               Moved markup only — same id/handlers; mobile hides it (≤900) so
+               the mobile stack order is unchanged. -->
           <div class="add-v2-preview" id="addV2PreviewCard">
             <div class="add-v2-preview-empty" id="addV2PreviewEmpty">
               <span class="add-v2-preview-empty-icon" aria-hidden="true">◉</span>
@@ -1118,6 +1139,10 @@
               <div class="add-v2-preview-value" id="addV2PreviewValue">—</div>
             </div>
           </div>
+
+        </div><!-- /.add-v2-left -->
+
+        <div class="add-v2-right">
 
           <!-- Cantidad (visible tras seleccionar activo) -->
           <div class="form-group" id="qtyGroup" style="display:none">
@@ -1417,7 +1442,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=567"
+  <script src="app.js?v=568"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).

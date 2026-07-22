@@ -23764,19 +23764,54 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   SPEC — DESKTOP ADD ASSET · PREMIUM LAYOUT POLISH  (visual-only)
+   SPEC — DESKTOP ADD ASSET · FINAL LAYOUT  (visual-only; supersedes the v575
+   single-panel polish). Scoped @media ≥901 + .modal[data-mode="asset"] ONLY.
    ──────────────────────────────────────────────────────────────────────────
-   Elevates the desktop Add Asset composition to an institutional panel using
-   the EXISTING structure only. No logic / markup / events / owners / render /
-   search / state touched. Scoped to @media ≥901 + .modal[data-mode="asset"]
-   exclusively — mobile ≤900, gold/RE/manual, and every non-asset modal are
-   byte-identical. Reorganizes hierarchy & spacing; adds no component.
-   Owner: the 2-column grid at styles.css ~1728 (.add-v2-left / .add-v2-right).
-   ══════════════════════════════════════════════════════════════════════════ */
+   Composition driven by the existing data-asset-flow state (SPEC 63):
+   • SEARCH (no selection): ONE column — search · ISIN · results/Populares fill
+     the width; no empty side panel.
+   • SELECTED (data-asset-flow="form"): TWO columns — LEFT = selected asset +
+     live preview (name · ticker · badge · precio en vivo · posición estimada);
+     RIGHT = the form (cantidad · custodio · CTA). Fits without scroll.
+   No logic/events/owners/render/search/mobile change. (The preview markup was
+   relocated into the left wrapper; it's display:none ≤900 so the mobile stack
+   is byte-identical.) Recientes empty-state is already handled by JS
+   (_addV2RenderRecents sets [hidden]) + .add-v2-quick-section[hidden]{none}. */
 @media (min-width: 901px) {
 
-  /* ── LEFT COLUMN — the selected asset is the protagonist; results breathe ── */
-  .modal[data-mode="asset"] .add-v2-left { gap: 14px; }
+  /* Modal hugs its content in asset mode → no forced 640px void, no scroll. */
+  .modal-overlay.open .modal[data-mode="asset"] { min-height: 0; }
+
+  /* ── SEARCH STATE — single column; ISIN sits directly under the buscador. ── */
+  .modal[data-mode="asset"] #assetForm.modal-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+  /* Search block order (reorder only — no markup): Search · ISIN toggle · ISIN
+     field · Category tabs · Recientes/Populares · (selected chip) · status. */
+  .modal[data-mode="asset"] #searchInputWrap    { order: 1; }
+  .modal[data-mode="asset"] .isin-toggle-mobile { order: 2; }
+  .modal[data-mode="asset"] #isinOrWrap         { order: 3; }
+  .modal[data-mode="asset"] .search-filters     { order: 4; }
+  .modal[data-mode="asset"] #addV2Quick         { order: 5; }
+  .modal[data-mode="asset"] #searchEmptyHint    { order: 5; }
+  .modal[data-mode="asset"] .selected-chip      { order: 6; }
+  .modal[data-mode="asset"] .lookup-status      { order: 7; }
+  /* Preview is irrelevant while searching — hidden so the left never clutters. */
+  .modal[data-mode="asset"]:not([data-asset-flow="form"]) .add-v2-preview { display: none; }
+
+  /* ── SELECTED STATE — asset info (left) | form (right). ── */
+  .modal[data-mode="asset"][data-asset-flow="form"] #assetForm.modal-body {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 26px;
+  }
+  /* ISIN belongs to the search block only — never beside the selected asset. */
+  .modal[data-mode="asset"][data-asset-flow="form"] #isinOrWrap,
+  .modal[data-mode="asset"][data-asset-flow="form"] .isin-toggle-mobile { display: none !important; }
+
+  /* LEFT — the selected asset is the protagonist; preview reads beneath it. */
+  .modal[data-mode="asset"][data-asset-flow="form"] .add-v2-left { gap: 14px; }
   .modal[data-mode="asset"] .selected-chip {
     padding: 14px 16px;
     border-radius: 14px;
@@ -23786,13 +23821,27 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   }
   .modal[data-mode="asset"] .selected-chip .chip-badge { width: 40px; height: 40px; font-size: 13px; }
   .modal[data-mode="asset"] .selected-chip .chip-name  { font-size: 15px; letter-spacing: -0.008em; }
-  .modal[data-mode="asset"] .selected-chip .chip-sub   { font-size: 11.5px; }
   .modal[data-mode="asset"] .selected-chip .chip-price { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
-  /* Results read as a contained inline surface, not a stray dropdown. */
   .modal[data-mode="asset"] .asset-suggestions { border-radius: 14px; }
 
-  /* ── RIGHT COLUMN — ONE continuous institutional panel ── */
-  .modal[data-mode="asset"] .add-v2-right {
+  /* Preview = clean info panel in the left column (no card-in-card). */
+  .modal[data-mode="asset"][data-asset-flow="form"] .add-v2-preview {
+    display: flex;
+    background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012));
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 20px;
+    min-height: 0;
+  }
+  /* Hierarchy — hero = posición estimada; live price second; labels recede. */
+  .modal[data-mode="asset"] .add-v2-preview-name { font-size: 19px; }
+  .modal[data-mode="asset"] .add-v2-preview-price-label,
+  .modal[data-mode="asset"] .add-v2-preview-value-label { margin-top: 14px; font-size: 10px; color: rgba(220,230,250,0.42); }
+  .modal[data-mode="asset"] .add-v2-preview-price { font-size: 20px; }
+  .modal[data-mode="asset"] .add-v2-preview-value { font-size: 34px; margin-top: 2px; }
+
+  /* RIGHT — the form as a self-contained panel: cantidad · custodio · CTA. */
+  .modal[data-mode="asset"][data-asset-flow="form"] .add-v2-right {
     gap: 0;
     padding: 22px;
     border-radius: 18px;
@@ -23800,42 +23849,11 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
     border: 1px solid rgba(255,255,255,0.08);
     box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset;
   }
-  /* The preview card dissolves INTO the panel — the panel now owns the chrome,
-     so preview → figures → form → CTA read as a single vertical surface. */
-  .modal[data-mode="asset"] .add-v2-preview {
-    flex: 0 0 auto;
-    background: none;
-    border: 0;
-    border-radius: 0;
-    padding: 0;
-    min-height: 0;
-  }
-  /* Pre-selection empty state keeps a calm, centered presence (no void). */
-  .modal[data-mode="asset"] .add-v2-preview-empty { min-height: 240px; padding: 24px 8px; }
-
-  /* Hierarchy — hero = "Posición estimada"; live price second; labels recede. */
-  .modal[data-mode="asset"] .add-v2-preview-name { font-size: 19px; }
-  .modal[data-mode="asset"] .add-v2-preview-price-label,
-  .modal[data-mode="asset"] .add-v2-preview-value-label {
-    margin-top: 14px;
-    font-size: 10px;
-    color: rgba(220,230,250,0.42);
-  }
-  .modal[data-mode="asset"] .add-v2-preview-price { font-size: 20px; }
-  .modal[data-mode="asset"] .add-v2-preview-value { font-size: 34px; margin-top: 2px; }
-
-  /* Separación visual between the live figures and the input form. */
-  .modal[data-mode="asset"] #qtyGroup {
-    margin-top: 18px;
-    padding-top: 18px;
-    border-top: 1px solid rgba(255,255,255,0.08);
-  }
+  .modal[data-mode="asset"][data-asset-flow="form"] #qtyGroup { margin: 0; }
   .modal[data-mode="asset"] #qtyGroup > label,
   .modal[data-mode="asset"] .wl-loc-field-label { color: rgba(220,230,250,0.5); }
-  /* Custodio keeps the same rhythm directly under quantity. */
-  .modal[data-mode="asset"] .wl-loc-field { margin-top: 12px; }
-
-  /* CTA closes the composition — anchored to the panel's base, full presence. */
-  .modal[data-mode="asset"] .modal-cta { margin-top: auto; padding-top: 20px; }
+  .modal[data-mode="asset"] .wl-loc-field { margin-top: 14px; }
+  /* CTA closes the panel. */
+  .modal[data-mode="asset"] .modal-cta { margin-top: 20px; padding-top: 4px; }
   .modal[data-mode="asset"] .btn-submit { padding: 15px; font-size: 15px; font-weight: 800; }
 }
