@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '568'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '569'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -1199,7 +1199,15 @@ async function _aurixFetchBackendSnapshots() {
     // the RLS-safe select, columns, mapping and filter are byte-identical.
     if (typeof supabaseClient === 'undefined' || !supabaseClient) return null;
     if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) return null;   // authed only
-    const sinceIso = new Date(Date.now() - _AURIX_BACKEND_SNAPSHOT_LOOKBACK_DAYS * 864e5).toISOString();
+    // SPEC 65 — RESET-EPOCH FLOOR. Backend wealth snapshots from BEFORE the last
+    // reset must never rehydrate a wiped account. The reset epoch (local
+    // PORTFOLIO_EPOCH, or the reset_at back-compat marker) is a strict floor,
+    // applied BOTH server-side (gte) and client-side (filter) so pre-reset
+    // patrimonio can never be merged into the chart, even if the source rows
+    // still exist (e.g. before the DELETE policy is applied / cron re-adds).
+    const _lookbackMs = Date.now() - _AURIX_BACKEND_SNAPSHOT_LOOKBACK_DAYS * 864e5;
+    const _resetEpoch = (typeof _aurixPortfolioEpoch === 'function') ? (_aurixPortfolioEpoch() || 0) : 0;
+    const sinceIso = new Date(Math.max(_lookbackMs, _resetEpoch)).toISOString();
     const { data, error } = await supabaseClient.from('portfolio_snapshots')
       .select('ts,total_value_usd,real_estate,category_values,source,confidence,market_state,price_staleness')
       .eq('user_id', currentUser.id).gte('ts', sinceIso).order('ts', { ascending: true }).limit(5000);
@@ -1209,7 +1217,7 @@ async function _aurixFetchBackendSnapshots() {
       total_value_usd: Number(r.total_value_usd), real_estate: Number(r.real_estate) || 0,
       category_values: r.category_values || {}, source: 'backend_snapshot',
       confidence: r.confidence || 'scheduled', market_state: r.market_state || null, price_staleness: r.price_staleness || null,
-    })).filter(p => Number.isFinite(p.ts) && Number.isFinite(p.total_value_usd));
+    })).filter(p => Number.isFinite(p.ts) && Number.isFinite(p.total_value_usd) && p.ts >= _resetEpoch);
   } catch (_) { return null; }
 }
 // ════════════════════════════════════════════════════════════════════════════
@@ -1264,10 +1272,18 @@ async function _aurixHydrateBackendSnapshots(reason) {
     _aurixBackendHydrateInFlight = true;
     _aurixSetBackendSnapshotsState('loading');
     const seq = ++_aurixBackendHydrateSeq;
+    // SPEC 65 — capture the reset generation at request start; if a RESET fires
+    // while this fetch is in flight, the response belongs to a stale generation
+    // and must be discarded (never merged into the freshly-wiped account).
+    const _resetGenAtStart = (typeof _aurixResetGeneration !== 'undefined') ? _aurixResetGeneration : 0;
     let rows = null;
     try { rows = await _aurixFetchBackendSnapshots(); } catch (_) { rows = null; }
     _aurixBackendHydrateInFlight = false;
     if (seq !== _aurixBackendHydrateSeq) return;           // superseded by a newer load ⇒ this response is stale, drop it
+    if (typeof _aurixIsResetStale === 'function' && _aurixIsResetStale(_resetGenAtStart)) {
+      try { console.log('[BACKEND-SNAPSHOTS][DISCARDED_STALE_GENERATION]', { startedGen: _resetGenAtStart, currentGen: _aurixResetGeneration }); } catch (_) {}
+      return;                                              // a reset happened mid-fetch ⇒ drop this pre-reset response
+    }
     if (Array.isArray(rows)) {                             // SUCCESS (empty array ⇒ no backend history yet)
       _aurixBackendSnapshots = rows;                       // ATOMIC assign; newest-wins guaranteed by the seq guard above
       _aurixBackendHydrateAttempts = 0;
@@ -54822,32 +54838,49 @@ function _shouldDistrustRemote(remoteData) {
 }
 
 async function _pushEmptyPortfolioToBackend() {
-  // Best-effort push of empty assets/holdings to Supabase so the
-  // remote row immediately reflects the local wipe. If offline or
-  // unauthenticated, the tombstone alone protects future reads via
-  // _shouldDistrustRemote until autoSave can drain.
+  // SPEC 65 — ATOMIC, AWAITED, CONFIRMED remote wipe. Returns TRUE only when the
+  // remote user_portfolios row is confirmed empty (the reset's atomic gate). The
+  // caller (performAtomicFreshStartReset) awaits this and NEVER declares success
+  // on a false/failed return — it shows an error and allows retry.
+  //   • user_portfolios: assets/holdings/history/watchlist wiped (the assets +
+  //     chart-history source; also the cross-device source — a fresh device now
+  //     loads a genuinely empty remote row).
+  //   • portfolio_snapshots: the append-only BACKEND wealth-history table. It is
+  //     RLS SELECT-only until db/portfolio_snapshots_reset_delete_1.sql adds the
+  //     owner DELETE policy; this hard-deletes the SOURCE so it can never be
+  //     rehydrated on any device. Until the policy is applied the delete errors
+  //     harmlessly (logged) — the reset-epoch filter in _aurixFetchBackendSnapshots
+  //     is the second line of defence that already blocks pre-reset rows.
   try {
-    if (!supabaseClient || !currentUser) return;
-    await supabaseClient
+    if (!supabaseClient || !currentUser) return false;
+    const { error } = await supabaseClient
       .from('user_portfolios')
       .upsert({
         user_id:    currentUser.id,
         assets:     [],
         holdings:   [],
-        // AURIX-PERSISTENCE-REMOTE-HISTORY-WATCHLIST-1: a reset must also wipe
-        // the remote history + watchlist, else the union-by-ts merge would
-        // resurrect pre-reset history on the next load. (The epoch filter is a
-        // second line of defence; this clears the source.)
         portfolio_history:    [],
         category_history:     [],
         watchlist:            [],
         watchlist_updated_at: new Date().toISOString(),
+        // Derived financial state is part of the wipe — never leave a stale
+        // performance_state that could re-publish an old return after reset.
+        performance_state:    null,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' });
-    // Clear tombstone once remote is in sync — local + remote both empty.
-    try { localStorage.removeItem(RESET_AT_KEY); } catch (_) {}
+    if (error) { console.warn('[reset] remote user_portfolios clear FAILED:', error.message); return false; }
+    // Hard-delete the backend snapshot source (own rows only, via RLS DELETE
+    // policy). Best-effort: a failure here does NOT fail the reset (the epoch
+    // filter blocks these rows), but it IS logged so a missing policy is visible.
+    try {
+      const del = await supabaseClient.from('portfolio_snapshots').delete().eq('user_id', currentUser.id);
+      if (del && del.error) console.warn('[reset] remote portfolio_snapshots delete failed (RLS DELETE policy applied?):', del.error.message);
+      else try { console.log('[reset] remote portfolio_snapshots deleted for user'); } catch (_) {}
+    } catch (e2) { console.warn('[reset] remote snapshot delete threw:', e2 && e2.message); }
+    return true;
   } catch (e) {
     console.warn('[reset] remote clear failed:', e && e.message);
+    return false;
   }
 }
 
@@ -54890,9 +54923,11 @@ function performSafeReset() {
   // schema-version flag and migration vars stay consistent.
   try { if (typeof save === 'function') save('reset'); } catch (_) {}
 
-  // Fire-and-forget remote wipe — does not block UI. Tombstone above
-  // is the real safety net; this is the happy-path acceleration.
-  try { _pushEmptyPortfolioToBackend(); } catch (_) {}
+  // SPEC 65 — the remote wipe is NO LONGER fire-and-forget here. The atomic
+  // orchestrator (performAtomicFreshStartReset) AWAITS _pushEmptyPortfolioToBackend
+  // BEFORE this local wipe and gates success on it, so a reset is never declared
+  // complete while the remote still holds data. (performSafeReset is only invoked
+  // by that orchestrator, post-confirmation.)
 
   // Re-render dashboard so the donut, KPIs and asset list all
   // reflect the empty state immediately.
@@ -55031,9 +55066,24 @@ async function performAtomicFreshStartReset() {
   const gen = _aurixResetGeneration;
 
   try {
-    // 1. Close the confirm + settings modals first so the user sees
-    //    the dashboard during the cleanup (no double-render with
-    //    overlays still mounted).
+    // SPEC 65 — ATOMIC CONTRACT: confirm the REMOTE wipe BEFORE touching local
+    // state or declaring success. Generation was already bumped above, so any
+    // sync/hydration response started before this reset is discarded on return
+    // (_aurixIsResetStale). If the remote wipe fails we keep the CURRENT data
+    // intact (no local wipe, no empty render), surface an error and let the user
+    // retry — a reset is NEVER shown as completed while the remote still holds
+    // data. This is the single owner of "reset only when remote borrado done".
+    const remoteOk = await _pushEmptyPortfolioToBackend();
+    if (!remoteOk) {
+      const isEsFail = (typeof lang !== 'undefined' && lang === 'es');
+      try { _aurixShowToast(isEsFail ? 'No se pudo completar el reinicio. Reintenta.' : 'Reset could not complete. Try again.', { variant: 'error' }); } catch (_) {}
+      try { const b = document.getElementById('resetConfirmBtn'); if (b) b.disabled = false; } catch (_) {}
+      return false;
+    }
+    if (_aurixIsResetStale(gen)) return false; // a newer reset took over
+
+    // 1. Close the confirm + settings modals now that the remote is confirmed
+    //    empty, so the user sees the clean dashboard during the local cleanup.
     try { if (typeof closeResetConfirm   === 'function') closeResetConfirm();   } catch (_) {}
     try { if (typeof closeSettingsPanel  === 'function') closeSettingsPanel();  } catch (_) {}
 
@@ -55041,8 +55091,8 @@ async function performAtomicFreshStartReset() {
     //    deferred resize/update callbacks from touching stale assets.
     _aurixTearDownAllCharts();
 
-    // 3. Storage + memory wipe + tombstone + remote push (the legacy
-    //    safe path — already idempotent and well-tested via RESET-1/2).
+    // 3. Local storage + memory wipe + tombstone + epoch (RESET-1/2/HISTORY-1).
+    //    Runs only after the remote is confirmed empty above.
     try { performSafeReset(); } catch (e) {
       console.warn('[reset] safe reset failed:', e && e.message);
     }

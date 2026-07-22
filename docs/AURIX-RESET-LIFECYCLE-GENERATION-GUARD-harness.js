@@ -52,7 +52,10 @@ ok('4 the guard is a synchronous reject — NO artificial timeout/delay added', 
 // ── 5 performSafeReset closes the old lifecycle atomically ────────────────────
 ok('5 stamps the reset tombstone + portfolio epoch FIRST', /localStorage\.setItem\(RESET_AT_KEY[\s\S]{0,120}localStorage\.setItem\(PORTFOLIO_EPOCH_KEY/.test(safe));
 ok('5 wipes the authoritative in-memory sources (assets/history/category)', /assets = \[\]/.test(safe) && /portfolioHistory = \[\]/.test(safe) && /categoryHistory  = \[\]/.test(safe));
-ok('5 clears persisted portfolio keys + pushes the empty state to the backend', /PORTFOLIO_KEYS\.forEach/.test(safe) && /_pushEmptyPortfolioToBackend\(\)/.test(safe));
+// SPEC 65 — the remote empty-state push moved OUT of performSafeReset (where it
+// was fire-and-forget) INTO the atomic orchestrator, which now AWAITS it and gates
+// success on it. performSafeReset still clears the persisted local keys.
+ok('5 clears persisted portfolio keys (local) + orchestrator AWAITS the empty-state remote wipe', /PORTFOLIO_KEYS\.forEach/.test(safe) && /await\s+_pushEmptyPortfolioToBackend\(\)/.test(atomic));
 ok('5 reuses existing onboarding flow via the aurix:reset event (no 2nd impl)', /new CustomEvent\('aurix:reset'\)/.test(safe));
 
 // ── 6 existing complementary protections intact (tombstone + epoch read-filter) ─
