@@ -23708,9 +23708,21 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
    EXCLUDED BY CONSTRUCTION: Real Estate (data-mode="real_estate" — not matched),
    Cash/Liquidity (separate #liquidityOverlay — not referenced), desktop >768
    (whole fix lives inside @media ≤768). ══════════════════════════════════════ */
+/* SPEC 63 A/B — the anchor must NOT depend on :focus-within alone. Done/blur
+   removes focus, and dropping the sheet at that instant (a) leaves the empty
+   gap above again and (b) slides the tapped result out from under the finger so
+   the click lands on the backdrop → modalOverlay closes to the Dashboard. So we
+   ALSO hold the top-anchor whenever a search flow is active — `data-asset-flow`
+   is set to "search" (query/results) or "form" (asset selected) by
+   _updateSearchEmptyHint (the existing search-lifecycle owner) and back to
+   "idle" at rest. Scope unchanged: asset + gold only. */
 @media (max-width: 768px) {
   #modalOverlay > .modal[data-mode="asset"]:focus-within,
-  #modalOverlay > .modal[data-mode="gold"]:focus-within {
+  #modalOverlay > .modal[data-mode="gold"]:focus-within,
+  #modalOverlay > .modal[data-mode="asset"][data-asset-flow="search"],
+  #modalOverlay > .modal[data-mode="asset"][data-asset-flow="form"],
+  #modalOverlay > .modal[data-mode="gold"][data-asset-flow="search"],
+  #modalOverlay > .modal[data-mode="gold"][data-asset-flow="form"] {
     /* top-anchor the sheet during input focus (overrides the overlay's
        align-items:flex-end / center only for this item, only while focused). */
     align-self: flex-start;
@@ -23723,7 +23735,30 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   /* The ≤520 bottom-sheet family zeroes the overlay's padding-top; restore a
      safe-area top gap so the top-anchored sheet clears the notch / status bar. */
   #modalOverlay > .modal[data-mode="asset"]:focus-within,
-  #modalOverlay > .modal[data-mode="gold"]:focus-within {
+  #modalOverlay > .modal[data-mode="gold"]:focus-within,
+  #modalOverlay > .modal[data-mode="asset"][data-asset-flow="search"],
+  #modalOverlay > .modal[data-mode="asset"][data-asset-flow="form"],
+  #modalOverlay > .modal[data-mode="gold"][data-asset-flow="search"],
+  #modalOverlay > .modal[data-mode="gold"][data-asset-flow="form"] {
     margin-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SPEC 63 C — ADD ASSET MOBILE · empty CTA "black rectangle"
+   ──────────────────────────────────────────────────────────────────────────
+   OWNER of the black bar: `.modal[data-mode="asset"] .modal-cta` (styles.css
+   ~2733, @media ≤768) — a position:sticky footer with a SOLID background
+   (rgba(5,7,13,0.96)) + border-top + padding. In the SEARCH step its only
+   children (#btnSubmitAsset, #goldCtaSummary) are hidden, so it renders as an
+   empty black rectangle below the content. It only becomes meaningful once an
+   asset is selected (the "form" sub-state) and the submit button appears.
+   FIX: collapse it entirely (no height, no background, no padding, no border,
+   no pseudo) whenever the sheet is NOT in the form sub-state. `data-asset-flow`
+   is owned by _updateSearchEmptyHint (SPEC 63 A/B). Mobile + asset mode only;
+   desktop (≥901, static CTA in the right column) and gold/RE untouched. */
+@media (max-width: 900px) {
+  #modalOverlay > .modal[data-mode="asset"]:not([data-asset-flow="form"]) .modal-cta {
+    display: none;
   }
 }
