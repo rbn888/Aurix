@@ -482,10 +482,32 @@
       if (delay > 0 && delay < 2147483647) { _launchTimer = setTimeout(applyLaunchGate, delay); }
     }
   }
+  // Small, elegant launch-state toast (no modal / popup / alert) — shown when the
+  // locked DESKTOP navbar CTA is tapped before launch. Mobile is unchanged (its
+  // Hero CTA already shows the hours beneath it), so the toast is scoped to the
+  // navbar CTA (.header-right). Reuses the launch.count i18n string.
+  var _launchToastEl = null, _launchToastTimer = null;
+  function showLaunchToast() {
+    if (!_launchToastEl) {
+      _launchToastEl = document.createElement('div');
+      _launchToastEl.className = 'launch-toast';
+      _launchToastEl.setAttribute('role', 'status');
+      document.body.appendChild(_launchToastEl);
+    }
+    _launchToastEl.textContent = t('launch.count').replace('{h}', String(publicLaunchRemainingHours()));
+    void _launchToastEl.offsetWidth;                 // reflow so the transition plays
+    _launchToastEl.classList.add('is-visible');
+    if (_launchToastTimer) clearTimeout(_launchToastTimer);
+    _launchToastTimer = setTimeout(function () { if (_launchToastEl) _launchToastEl.classList.remove('is-visible'); }, 2600);
+  }
+
   // Defence beyond the visual state: cancel any activation of a locked CTA.
   document.addEventListener('click', function (e) {
     var cta = (e.target && e.target.closest) ? e.target.closest('[data-launch-cta]') : null;
-    if (cta && !isPublicLaunchOpen()) { e.preventDefault(); e.stopPropagation(); }
+    if (cta && !isPublicLaunchOpen()) {
+      e.preventDefault(); e.stopPropagation();
+      if (cta.closest('.header-right')) showLaunchToast();   // desktop navbar CTA → elegant state
+    }
   }, true);
   document.addEventListener('visibilitychange', function () { if (!document.hidden) applyLaunchGate(); });
   window.addEventListener('focus', applyLaunchGate);

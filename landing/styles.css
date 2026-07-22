@@ -96,22 +96,39 @@ img,svg{ display:block; max-width:100%; }
 /* AURIX-LANDING-MOBILE-CTA — a visible primary "Request Access" on the mobile hero. The header CTA is
    hidden ≤860px (.header-right .btn → display:none) and otherwise only lives inside the hamburger, so
    mobile users never saw it. Same action (#early-access). Desktop is unchanged: hidden ≥861px. */
-/* SPEC LANZAMIENTO 1 — promoted to a prominent hero CTA on ALL viewports
-   (single public "Enter Aurix" + the launch countdown below it). */
-.hero-cta-mobile{ display:flex; flex-direction:column; align-items:flex-start; gap:10px; margin-top:26px; }
-.hero-cta-mobile .btn{ height:50px; font-size:15px; min-width:220px; }
-.hero-cta-note{ font-size:12.5px; letter-spacing:.01em; color:var(--accent-3); opacity:.82;
-  text-decoration:none; transition:opacity .18s var(--ease); }
-.hero-cta-note:hover{ opacity:1; }
+/* LANDING POLISH — the Hero CTA is MOBILE-ONLY again (desktop's single entry
+   point is the navbar CTA; no duplicate "Enter Aurix" on desktop, no Hero
+   countdown). Mobile keeps the prominent Hero CTA exactly as before. */
+.hero-cta-mobile{ display:none; }
 @media (max-width:860px){
-  .hero-cta-mobile{ align-items:center; gap:9px; margin-top:22px; width:100%; }
-  .hero-cta-mobile .btn{ width:100%; max-width:420px; height:48px; }
+  .hero-cta-mobile{ display:flex; flex-direction:column; align-items:center; gap:9px; margin-top:22px; width:100%; }
+  .hero-cta-mobile .btn{ width:100%; max-width:420px; height:48px; font-size:15px; }
+  .hero-cta-note{ font-size:12.5px; letter-spacing:.01em; color:var(--accent-3); opacity:.82;
+    text-decoration:none; transition:opacity .18s var(--ease); }
+  .hero-cta-note:hover{ opacity:1; }
 }
 
 /* Locked CTA before launch — premium disabled look; protection is layered
    (aria-disabled + tabindex=-1 + href neutralised + capture-phase click guard). */
 .btn.is-launch-locked{ opacity:.5; cursor:not-allowed; pointer-events:none; filter:saturate(.72); }
 .launch-count{ font-variant-numeric:tabular-nums; }
+
+/* Small, elegant launch-state pill shown when the (locked) navbar CTA is tapped
+   before launch. Not a modal / popup / alert — a quiet toast that auto-dismisses. */
+.launch-toast{
+  position:fixed; top:76px; right:22px; z-index:200;
+  padding:10px 16px; border-radius:12px;
+  background:rgba(13,18,30,.92); border:1px solid rgba(79,142,247,.28);
+  color:var(--text); font-size:13px; font-weight:600; letter-spacing:.01em;
+  font-variant-numeric:tabular-nums;
+  box-shadow:0 12px 34px -16px rgba(4,8,16,.9), 0 0 0 1px rgba(255,255,255,.02) inset;
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  opacity:0; transform:translateY(-6px); pointer-events:none;
+  transition:opacity .22s var(--ease), transform .22s var(--ease);
+}
+.launch-toast.is-visible{ opacity:1; transform:translateY(0); }
+@media (max-width:860px){ .launch-toast{ top:auto; bottom:22px; right:16px; left:16px; text-align:center; } }
+@media (prefers-reduced-motion:reduce){ .launch-toast{ transition:opacity .12s linear; transform:none; } }
 
 .eyebrow{
   display:inline-block; font-size:12px; font-weight:700; letter-spacing:.22em;
