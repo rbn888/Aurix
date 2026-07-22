@@ -53,8 +53,9 @@
         </div>
         <!-- href is the live fallback; app.js sets the canonical app URL on
              [data-app-link]. TODO: flip APP_URL to https://app.aurixsystem.io. -->
-        <a class="btn btn-ghost" href="https://app.aurixsystem.io/" data-app-link data-i18n="cta.enter">Enter Aurix</a>
-        <a class="btn btn-primary" href="#early-access" data-i18n="cta.request">Request Access</a>
+        <!-- SPEC LANZAMIENTO 1 — single public CTA. Gated (disabled + hours) until
+             PUBLIC_LAUNCH_AT by applyLaunchGate() in app.js ([data-launch-cta]). -->
+        <a class="btn btn-primary" href="https://app.aurixsystem.io/" data-app-link data-launch-cta data-i18n="cta.enter">Enter Aurix</a>
         <button class="menu-toggle" id="menuToggle" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
       </div>
     </div>
@@ -70,8 +71,7 @@
       <a href="#early-access" data-i18n="nav.early">Early Access</a>
     </nav>
     <div class="mobile-actions">
-      <a class="btn btn-primary btn-block" href="#early-access" data-i18n="cta.request">Request Access</a>
-      <a class="btn btn-ghost btn-block" href="https://app.aurixsystem.io/" data-app-link data-i18n="cta.enter">Enter Aurix</a>
+      <a class="btn btn-primary btn-block" href="https://app.aurixsystem.io/" data-app-link data-launch-cta data-i18n="cta.enter">Enter Aurix</a>
     </div>
     <div class="mobile-lang">
       <button class="lang-btn" data-lang="es">ES</button><span class="lang-sep">|</span><button class="lang-btn" data-lang="en">EN</button>
@@ -91,8 +91,8 @@
           <!-- Mobile-only primary CTA: on ≤860px the header "Request Access" is hidden and otherwise only
                lives inside the hamburger. Same action (#early-access). Hidden ≥861px (navbar CTA present). -->
           <div class="hero-cta-mobile reveal">
-            <a class="btn btn-primary btn-block" href="#early-access" data-i18n="cta.request">Request Access</a>
-            <a class="hero-cta-note" href="#early-access" data-i18n="cta.joinLaunch">Join before Launch 1</a>
+            <a class="btn btn-primary btn-block" href="https://app.aurixsystem.io/" data-app-link data-launch-cta data-i18n="cta.enter">Enter Aurix</a>
+            <span class="hero-cta-note launch-count" id="launchCountdown" hidden></span>
           </div>
         </div>
 
