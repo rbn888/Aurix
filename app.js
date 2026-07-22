@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '570'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '571'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -24039,15 +24039,24 @@ function _aurixEnforceSegmentSourceAuthority(src, range) {
   let floor = 0;
   try { floor = (typeof _aurixRealGapFloorMs === 'function') ? _aurixRealGapFloorMs(valid.map(p => ({ time: p.ts, value: 1 })), range) : 0; } catch (_) { floor = 0; }
   if (!(floor > 0)) return src;
+  // SPEC 7D/30D CONTINUITY — the prior scan split runs on the MERGED (backend-filled)
+  // series, so a genuine FRONTEND gap (days of inactivity) was hidden by the backend
+  // fillers → one run with frontend → ALL backend dropped → the multi-day hole re-opened
+  // → discontinuous / "Historial parcial". FIX: drop a backend point ONLY where FRONTEND
+  // is dense around it — its two bracketing consecutive frontend points exist AND are
+  // < floor apart ⇒ frontend owns that continuous segment. A backend point inside a
+  // GENUINE frontend gap ≥ floor (or a frontend-free tail) SURVIVES to bridge the real
+  // hole. Certified SPEC.38 behaviour preserved (interior interlopers dropped; separated
+  // tails/segments kept). No fabrication/interpolation; original order + objects preserved.
+  const feTs = valid.filter(p => _aurixSourceFamily(p) !== 'backend').map(p => p.ts);   // frontend ts, ascending
   const drop = new Set();
-  let runStart = 0;
-  for (let i = 1; i <= valid.length; i++) {
-    const boundary = (i === valid.length) || ((valid[i].ts - valid[i - 1].ts) >= floor);
-    if (!boundary) continue;
-    const run = valid.slice(runStart, i);
-    const hasFrontend = run.some(p => _aurixSourceFamily(p) !== 'backend');
-    if (hasFrontend) run.forEach(p => { if (_aurixSourceFamily(p) === 'backend') drop.add(p); });   // frontend owns the segment
-    runStart = i;                                                                                   // else backend-only run kept whole
+  if (feTs.length) {
+    for (const p of valid) {
+      if (_aurixSourceFamily(p) !== 'backend') continue;
+      let before = -Infinity, after = Infinity;
+      for (const t of feTs) { if (t <= p.ts && t > before) before = t; if (t >= p.ts && t < after) after = t; }
+      if (before > -Infinity && after < Infinity && (after - before) < floor) drop.add(p);   // frontend-dense ⇒ frontend owns this segment
+    }
   }
   if (!drop.size) return src;                                        // nothing interior to drop ⇒ NO-OP
   return src.filter(p => !drop.has(p));                              // preserve order + every non-dropped object

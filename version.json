@@ -1,1 +1,1 @@
-{ "appjs": 570, "loginhtml": 484, "build": "v579-chart-overnight-continuity", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)" }
+{ "appjs": 571, "loginhtml": 484, "build": "v580-chart-7d30d-continuity", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)" }
