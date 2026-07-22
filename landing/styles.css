@@ -96,14 +96,22 @@ img,svg{ display:block; max-width:100%; }
 /* AURIX-LANDING-MOBILE-CTA — a visible primary "Request Access" on the mobile hero. The header CTA is
    hidden ≤860px (.header-right .btn → display:none) and otherwise only lives inside the hamburger, so
    mobile users never saw it. Same action (#early-access). Desktop is unchanged: hidden ≥861px. */
-.hero-cta-mobile{ display:none; }
+/* SPEC LANZAMIENTO 1 — promoted to a prominent hero CTA on ALL viewports
+   (single public "Enter Aurix" + the launch countdown below it). */
+.hero-cta-mobile{ display:flex; flex-direction:column; align-items:flex-start; gap:10px; margin-top:26px; }
+.hero-cta-mobile .btn{ height:50px; font-size:15px; min-width:220px; }
+.hero-cta-note{ font-size:12.5px; letter-spacing:.01em; color:var(--accent-3); opacity:.82;
+  text-decoration:none; transition:opacity .18s var(--ease); }
+.hero-cta-note:hover{ opacity:1; }
 @media (max-width:860px){
-  .hero-cta-mobile{ display:flex; flex-direction:column; align-items:center; gap:9px; margin-top:22px; width:100%; }
-  .hero-cta-mobile .btn{ width:100%; max-width:420px; height:48px; font-size:15px; }
-  .hero-cta-note{ font-size:12.5px; letter-spacing:.01em; color:var(--accent-3); opacity:.82;
-    text-decoration:none; transition:opacity .18s var(--ease); }
-  .hero-cta-note:hover{ opacity:1; }
+  .hero-cta-mobile{ align-items:center; gap:9px; margin-top:22px; width:100%; }
+  .hero-cta-mobile .btn{ width:100%; max-width:420px; height:48px; }
 }
+
+/* Locked CTA before launch — premium disabled look; protection is layered
+   (aria-disabled + tabindex=-1 + href neutralised + capture-phase click guard). */
+.btn.is-launch-locked{ opacity:.5; cursor:not-allowed; pointer-events:none; filter:saturate(.72); }
+.launch-count{ font-variant-numeric:tabular-nums; }
 
 .eyebrow{
   display:inline-block; font-size:12px; font-weight:700; letter-spacing:.22em;

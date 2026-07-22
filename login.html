@@ -419,7 +419,7 @@
     // redirect breaker / pending-login state, or corrupt Supabase auth storage. These are read-only
     // diagnostics + narrowly-scoped self-heal. They NEVER touch portfolio / holdings / chart / history
     // data and NEVER log a secret. app.js already exposes aurixClearAuthRedirectState for the app page.
-    var AURIX_LOGIN_BUILD = 483;   // bumped ONLY when login.html changes (see version.json.loginhtml)
+    var AURIX_LOGIN_BUILD = 484;   // bumped ONLY when login.html changes (see version.json.loginhtml)
     function _storageAvailable() {
       try { var k = '__aurix_probe__'; localStorage.setItem(k, '1'); localStorage.removeItem(k); return true; } catch (_) { return false; }
     }
@@ -522,6 +522,8 @@
         'lg.title': 'AURIX — Acceso',
         'lg.access': 'Acceso privado',
         'lg.hint': 'Aurix se encuentra actualmente en beta privada. Introduce tu código de invitación para continuar.',
+        'lg.publicAccess': 'Accede a Aurix',
+        'lg.publicHint': 'Introduce tu correo para iniciar sesión o crear tu cuenta.',
         'lg.invitePh': 'Código de invitación',
         'lg.signin': 'Acceder',
         'lg.emailPh': 'correo electrónico',
@@ -548,6 +550,8 @@
         'lg.title': 'AURIX — Access',
         'lg.access': 'Private access',
         'lg.hint': 'Aurix is currently in private beta. Enter your invitation code to continue.',
+        'lg.publicAccess': 'Access Aurix',
+        'lg.publicHint': 'Enter your email to sign in or create your account.',
         'lg.invitePh': 'Invitation code',
         'lg.signin': 'Sign in',
         'lg.emailPh': 'email address',
@@ -668,6 +672,17 @@
         if (event === 'SIGNED_IN' && session && !_otpVerifyNavInProgress) safeRedirect('index.html', 'login:SIGNED_IN');
       });
     }
+
+    // ── Public launch (SPEC LANZAMIENTO 1) — SINGLE SOURCE OF TRUTH for the app
+    //    OTP gate. KEEP IN SYNC with landing/app.js. Fixed UTC (never deploy-time
+    //    / localStorage). 2026-07-23T17:00:00.000Z === Thu 23 Jul 2026 19:00
+    //    Europe/Madrid. Rollback: PUBLIC_LAUNCH_ENABLED = false. Before launch
+    //    the private invite gate is UNCHANGED (owner/testers/whitelist unaffected);
+    //    after launch, email/OTP opens to everyone (no invite required).
+    const PUBLIC_LAUNCH_ENABLED = true;
+    const PUBLIC_LAUNCH_AT       = '2026-07-23T17:00:00.000Z';
+    const PUBLIC_LAUNCH_AT_MS    = Date.parse(PUBLIC_LAUNCH_AT);
+    function isPublicLaunchOpen() { return PUBLIC_LAUNCH_ENABLED === true && Date.now() >= PUBLIC_LAUNCH_AT_MS; }
 
     // ── DOM refs ───────────────────────────────────────────────
     const inviteInput  = document.getElementById('inviteCode');
@@ -869,6 +884,25 @@
 
     lockAuth();
 
+    // SPEC LANZAMIENTO 1 — public launch access. After PUBLIC_LAUNCH_AT the email
+    // step opens for EVERYONE (no invite); the private-beta invite UI is hidden and
+    // the copy switches to the public flow. Before launch this is a no-op, so the
+    // invite gate (owner / testers / whitelist) stays byte-identical. Re-checked on
+    // visibility/focus so a device suspended across the launch instant converges —
+    // no reload, no new deploy. The OTP send/verify + profile flow are unchanged.
+    function _applyPublicLaunchAccess() {
+      if (!isPublicLaunchOpen()) return;
+      try { unlockAuth(); } catch (_) {}
+      try {
+        const _inv = document.querySelector('.invite-section'); if (_inv) _inv.style.display = 'none';
+        const _lbl = document.querySelector('.beta-access-label'); if (_lbl) { _lbl.setAttribute('data-i18n', 'lg.publicAccess'); _lbl.textContent = tL('lg.publicAccess'); }
+        const _hint = document.querySelector('.beta-hint'); if (_hint) { _hint.setAttribute('data-i18n', 'lg.publicHint'); _hint.textContent = tL('lg.publicHint'); }
+      } catch (_) {}
+    }
+    _applyPublicLaunchAccess();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) _applyPublicLaunchAccess(); });
+    window.addEventListener('focus', _applyPublicLaunchAccess);
+
     // ── Submit button state (single UI authority) ─────────────
     function updateSubmitState() {
       if (cooldown) {
@@ -931,6 +965,12 @@
     // ── Email submit → send OTP ────────────────────────────────
     submitBtn.onclick = async () => {
       if (isSubmitting) return;
+      // SPEC LANZAMIENTO 1 — second gate (beyond the disabled field): before the
+      // public launch, an OTP may be sent ONLY from an authorized private session
+      // (a valid invite unlocked the email step). Public callers with no invite
+      // are blocked until PUBLIC_LAUNCH_AT — no OTP, no account creation. After
+      // launch the email step is unlocked for everyone so this passes.
+      if (!isPublicLaunchOpen() && authSection.classList.contains('locked')) return;
       isSubmitting = true;
 
       try {
