@@ -5,11 +5,25 @@
 (function () {
   'use strict';
 
+  /* ── Public launch (SPEC LANZAMIENTO 1) — SINGLE SOURCE OF TRUTH for the
+     landing. KEEP IN SYNC with login.html (the app deploy, which owns the real
+     OTP gate). Fixed UTC timestamp so an early/late deploy never shifts the
+     official launch, and never computed from deploy time or localStorage.
+       2026-07-23T17:00:00.000Z === Thu 23 Jul 2026, 19:00 Europe/Madrid
+     Rollback: set PUBLIC_LAUNCH_ENABLED = false → public access closed again. */
+  var PUBLIC_LAUNCH_ENABLED = true;
+  var PUBLIC_LAUNCH_AT      = '2026-07-23T17:00:00.000Z';
+  var PUBLIC_LAUNCH_AT_MS   = Date.parse(PUBLIC_LAUNCH_AT);
+  function isPublicLaunchOpen() { return PUBLIC_LAUNCH_ENABLED === true && Date.now() >= PUBLIC_LAUNCH_AT_MS; }
+  // ceil so it never shows "0 h" while still closed (0 only once truly open).
+  function publicLaunchRemainingHours() { return Math.max(0, Math.ceil((PUBLIC_LAUNCH_AT_MS - Date.now()) / 3600000)); }
+
   /* ── Translations ───────────────────────────────────── */
   var I18N = {
     es: {
       'nav.product': 'Plataforma', 'nav.market': 'Mercado', 'nav.workspace': 'Inteligencia', 'nav.roadmap': 'Roadmap', 'nav.early': 'Acceso anticipado',
       'cta.enter': 'Entrar en Aurix', 'cta.request': 'Solicitar acceso', 'cta.joinLaunch': 'Únete antes del Launch 1',
+      'launch.count': 'Lanzamiento en {h} h',
 
       'hero.eyebrow': 'Sistema operativo del patrimonio',
       'hero.h1a': 'Todo tu patrimonio.',
@@ -114,6 +128,7 @@
     en: {
       'nav.product': 'Platform', 'nav.market': 'Market', 'nav.workspace': 'Intelligence', 'nav.roadmap': 'Roadmap', 'nav.early': 'Early Access',
       'cta.enter': 'Enter Aurix', 'cta.request': 'Request Access', 'cta.joinLaunch': 'Join before Launch 1',
+      'launch.count': 'Launching in {h} h',
 
       'hero.eyebrow': 'Wealth Operating System',
       'hero.h1a': 'Your entire wealth.',
@@ -264,6 +279,8 @@
 
     // Keep "Enter Aurix" links carrying the active language across origins.
     updateAppLinks();
+    // Re-render the launch countdown copy in the active language.
+    if (typeof applyLaunchGate === 'function') applyLaunchGate();
   }
 
   // Fictional headline wealth figure (labelled "Product preview"). ES: 4,82 M€ · EN: $4.82M
@@ -423,6 +440,56 @@
     });
     orb.addEventListener('pointerleave', function () { orb.classList.remove('is-sheen'); });
   }
+
+  /* ── Public-launch CTA gate + hours countdown ─────────
+     Locks every [data-launch-cta] until PUBLIC_LAUNCH_AT and shows only the
+     remaining hours; enables them automatically at the timestamp (no reload,
+     no new deploy). Recomputed on mount, language change, tab-visible, focus,
+     pageshow (bfcache) and via a light timer aligned to the next hour boundary. */
+  var _launchTimer = null;
+  function applyLaunchGate() {
+    var open = isPublicLaunchOpen();
+    var ctas = document.querySelectorAll('[data-launch-cta]');
+    for (var i = 0; i < ctas.length; i++) {
+      var el = ctas[i];
+      if (open) {
+        el.classList.remove('is-launch-locked');
+        el.removeAttribute('aria-disabled');
+        el.removeAttribute('tabindex');
+        if (el.dataset.launchHref) { el.setAttribute('href', el.dataset.launchHref); }
+        if ('disabled' in el) { try { el.disabled = false; } catch (_) {} }
+      } else {
+        el.classList.add('is-launch-locked');
+        el.setAttribute('aria-disabled', 'true');
+        el.setAttribute('tabindex', '-1');
+        if (el.tagName === 'A') {
+          if (el.getAttribute('href') && el.getAttribute('href') !== '#') { el.dataset.launchHref = el.getAttribute('href'); }
+          el.setAttribute('href', '#');
+        }
+        if ('disabled' in el) { try { el.disabled = true; } catch (_) {} }
+      }
+    }
+    var cd = document.getElementById('launchCountdown');
+    if (cd) {
+      if (open) { cd.hidden = true; cd.textContent = ''; }
+      else { cd.hidden = false; cd.textContent = t('launch.count').replace('{h}', String(publicLaunchRemainingHours())); }
+    }
+    if (_launchTimer) { clearTimeout(_launchTimer); _launchTimer = null; }
+    if (!open) {
+      var msToLaunch = PUBLIC_LAUNCH_AT_MS - Date.now();
+      var msToHourTick = (msToLaunch % 3600000) || 3600000;     // when remainingHours next decrements
+      var delay = Math.min(msToLaunch, msToHourTick) + 250;      // land just past the boundary
+      if (delay > 0 && delay < 2147483647) { _launchTimer = setTimeout(applyLaunchGate, delay); }
+    }
+  }
+  // Defence beyond the visual state: cancel any activation of a locked CTA.
+  document.addEventListener('click', function (e) {
+    var cta = (e.target && e.target.closest) ? e.target.closest('[data-launch-cta]') : null;
+    if (cta && !isPublicLaunchOpen()) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) applyLaunchGate(); });
+  window.addEventListener('focus', applyLaunchGate);
+  window.addEventListener('pageshow', applyLaunchGate);
 
   function init() {
     applyLang(detectLang());
