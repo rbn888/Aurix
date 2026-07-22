@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '569'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '570'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -24010,8 +24010,18 @@ function _aurix24hSourceCoverage(src, nowRef, windowMs) {
   }
   const span = a => a.length >= 2 ? (Math.max.apply(null, a) - Math.min.apply(null, a)) : 0;
   const w = windowMs > 0 ? windowMs : 1;
+  // SPEC OVERNIGHT-CONTINUITY — coverage must be GAP-AWARE, not raw max−min span. A
+  // frontend family whose valid points sit at the window edges with a ≥floor OVERNIGHT
+  // HOLE between them had span≈window, so RULE 1 wrongly claimed 24H frontend authority
+  // and STRIPPED the backend gap-fillers that bridge the hole → broken 24H line during
+  // inactivity. Subtract internal holes ≥ the 24h real-gap floor from the covered span:
+  // an unbridged frontend hole no longer counts as coverage, so RULE 2 hands 24H to the
+  // gap-free backend series instead. Dense / in-session data (no ≥floor hole) is
+  // byte-identical (subtracts 0). Never fabricates or reorders a point.
+  const holeFloor = (typeof _AURIX_VP_GAP_FLOOR_MS === 'object' && _AURIX_VP_GAP_FLOOR_MS && _AURIX_VP_GAP_FLOOR_MS['24h']) || (8 * 36e5);
+  const covered = a => { if (a.length < 2) return 0; const s = a.slice().sort((x, y) => x - y); let c = s[s.length - 1] - s[0]; for (let i = 1; i < s.length; i++) { const g = s[i] - s[i - 1]; if (g >= holeFloor) c -= g; } return Math.max(0, c); };
   return { feCount: fe.length, beCount: be.length, feSpanMs: span(fe), beSpanMs: span(be),
-    feCoverage: +(span(fe) / w).toFixed(4), beCoverage: +(span(be) / w).toFixed(4) };
+    feCoverage: +(covered(fe) / w).toFixed(4), beCoverage: +(span(be) / w).toFixed(4) };
 }
 // SPEC.38 — reject any backend gap-filler that lands INSIDE a frontend-covered continuous segment so every
 // continuous render segment carries exactly ONE source family (one valuation regime). Segments = the SAME
