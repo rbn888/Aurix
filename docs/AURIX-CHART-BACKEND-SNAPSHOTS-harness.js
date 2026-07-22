@@ -94,7 +94,10 @@ console.log('\nWiring + diagnostics + safety (source):');
 ok('merge wired at chokepoint behind flag (NO-OP until data)', /_AURIX_BACKEND_SNAPSHOTS_ENABLED && Array\.isArray\(_aurixBackendSnapshots\) && _aurixBackendSnapshots\.length/.test(app) && /return _aurixMergeSnapshotSources\(base, _aurixBackendSnapshots\)/.test(app));
 ok('_aurixBackendSnapshots defaults empty (strict no-op today)', /let _aurixBackendSnapshots = \[\];/.test(app));
 ok('diagnostics exposed', /window\.aurixSnapshotSourceAudit = function/.test(app) && /window\.aurixSnapshotMergeDebug = function/.test(app));
-ok('no new table write from frontend (append-only backend table is service-role only)', !/from\('portfolio_snapshots'\)[\s\S]{0,40}\.(insert|upsert|update|delete)/.test(app));
+// SPEC 65 — the append-only writer stays service-role (no client insert/upsert/update).
+// The ONLY client write permitted is the irreversible-RESET own-rows delete
+// (delete().eq('user_id', currentUser.id)), gated by an owner DELETE RLS policy.
+ok('no client insert/upsert/update on the append-only backend table (service-role only)', !/from\('portfolio_snapshots'\)[\s\S]{0,40}\.(insert|upsert|update)\(/.test(app));
 ok('migration file present (not applied)', fs.existsSync(path.join(root, 'db', 'portfolio_snapshots_1.sql')));
 
 console.log('\nRead-only loader (NO-OP until activation) + security:');
@@ -131,8 +134,10 @@ async function fetchWith(clientResult, authed) {
   const edge = fs.existsSync(path.join(root, 'supabase', 'functions', 'portfolio-snapshot', 'index.ts')) ? fs.readFileSync(path.join(root, 'supabase', 'functions', 'portfolio-snapshot', 'index.ts'), 'utf8') : '';
   ok('edge function reads service-role from env (never hardcoded)', /Deno\.env\.get\('SUPABASE_SERVICE_ROLE_KEY'\)/.test(edge) && !/eyJ[A-Za-z0-9_-]{20,}/.test(edge));
   ok('edge function supports DRY_RUN (verify before real inserts)', /DRY_RUN/.test(edge));
-  ok('frontend reads portfolio_snapshots via .select only (never insert/upsert/update/delete)',
-    /from\('portfolio_snapshots'\)[\s\S]{0,80}\.select\(/.test(app) && !/from\('portfolio_snapshots'\)[\s\S]{0,120}\.(insert|upsert|update|delete)\(/.test(app));
+  ok('frontend reads portfolio_snapshots via .select; only write is the SPEC 65 reset own-rows delete',
+    /from\('portfolio_snapshots'\)[\s\S]{0,80}\.select\(/.test(app) &&
+    !/from\('portfolio_snapshots'\)[\s\S]{0,120}\.(insert|upsert|update)\(/.test(app) &&
+    /from\('portfolio_snapshots'\)\s*\.delete\(\)\s*\.eq\('user_id',\s*currentUser\.id\)/.test(app));
   // SPEC ACTIVATE-READ.04 — read now activated: autoload ON, but load fires ONLY after auth+client (bounded poll)
   ok('hydration ACTIVATED (autoload flag on)', /const _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD = true;/.test(app));
   // SPEC BACKEND_SNAPSHOT_HYDRATION_RELIABILITY — replaced the one-shot 3s+finite-poll autoload with a state
