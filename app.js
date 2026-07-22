@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '566'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '567'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -46482,6 +46482,9 @@ function renderSuggestions(results, query, loading = false) {
 function closeSuggestions() {
   assetSuggestionsEl.classList.remove('open');
   focusedSuggIdx = -1;
+  // SPEC 63 — refresh the sheet flow state so closing the results list (with no
+  // query / chip) lets the sheet return to its resting anchor.
+  if (typeof _updateSearchEmptyHint === 'function') _updateSearchEmptyHint();
 }
 
 function setFocusedSugg(idx) {
@@ -46878,6 +46881,21 @@ function _updateSearchEmptyHint() {
   if (_searchEmptyHintEl) _searchEmptyHintEl.style.display = idle ? '' : 'none';
   const quickEl = document.getElementById('addV2Quick');
   if (quickEl) quickEl.classList.toggle('is-hidden', !idle);
+  // SPEC 63 — expose the asset-sheet flow state to the layout so the mobile
+  // sheet stays TOP-anchored while a query / results / selection is active,
+  // not only while an input is :focus-within. Done/blur removes focus but must
+  // NOT drop the sheet (bug A); keeping the sheet put also stops the tapped
+  // result from sliding out from under the finger onto the backdrop (bug B).
+  // This fn is already invoked on input / focus / blur / selectAsset /
+  // clearSelectedAsset, so the attribute tracks the real search state. Pure
+  // layout signal — no search/ranking/pricing/selection logic is touched.
+  try {
+    const _sheet = document.querySelector('#modalOverlay .modal');
+    if (_sheet) {
+      const _sugOpen = !!(assetSuggestionsEl && assetSuggestionsEl.classList.contains('open'));
+      _sheet.dataset.assetFlow = hasChip ? 'form' : ((hasQuery || _sugOpen) ? 'search' : 'idle');
+    }
+  } catch (_) {}
 }
 if (searchInput) {
   searchInput.addEventListener('input', _updateSearchEmptyHint);
@@ -49450,6 +49468,11 @@ function _addV2ResetForCategory() {
 function _addV2SetMode(mode) {
   const modal = document.querySelector('#modalOverlay .modal');
   if (modal) modal.dataset.mode = mode || '';
+  // SPEC 63 — reset the sheet flow to its resting (idle) state on every
+  // mode/category entry; focus/typing/selection recompute it via
+  // _updateSearchEmptyHint. Prevents a stale 'form' from a prior session
+  // leaving the CTA bar (and top-anchor) engaged on a fresh picker entry.
+  if (modal) modal.dataset.assetFlow = 'idle';
   const titleEl = document.querySelector('#modalOverlay .modal-header h3');
   if (titleEl) {
     const key = _ADD_V2_TITLE_KEY[mode] || 'modalAddTitle';

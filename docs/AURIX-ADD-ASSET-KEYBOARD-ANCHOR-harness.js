@@ -32,6 +32,9 @@ const spec = specIdx >= 0 ? css.slice(specIdx, specIdx + 2600) : '';
 // note, so scope those checks to the code after the comment's closing `*/`.
 const rulesIdx = specIdx >= 0 ? css.indexOf('*/', specIdx) : -1;
 const specRules = rulesIdx >= 0 ? css.slice(rulesIdx + 2, rulesIdx + 2 + 900) : '';
+// The full SPEC 62+63 anchor region (to EOF) — proximity checks run here so the
+// multi-selector groups don't collide with unrelated rules elsewhere in the file.
+const specRegion = specIdx >= 0 ? css.slice(specIdx) : '';
 
 // 1. The fix exists and is anchored to the SPEC.
 ok('1 SPEC 62 keyboard-anchor block present in styles.css', specIdx >= 0);
@@ -49,7 +52,7 @@ ok('3 resting bottom-sheet anchor preserved (#modalOverlay align-items:flex-end 
 
 // 4. The fix top-anchors the sheet on focus via align-self:flex-start.
 ok('4 fix top-anchors on focus (align-self: flex-start under :focus-within)',
-  /:focus-within\s*\{[^}]*align-self:\s*flex-start/.test(spec));
+  /:focus-within,[\s\S]{0,700}align-self:\s*flex-start/.test(specRegion));
 
 // 5. Scoped to the asset (search) sheet AND gold (Metals) — the SPEC "Aplicar a" set.
 ok('5 scoped to asset + gold sheet (data-mode="asset" / "gold")',
@@ -71,7 +74,7 @@ ok('8 desktop untouched (fix is inside @media ≤768 only)',
 
 // 9. Notch/safe-area top gap on the small-phone (≤520) top-anchored sheet.
 ok('9 ≤520 top-anchored sheet clears the notch (margin-top: safe-area-inset-top)',
-  /@media\s*\(max-width:\s*520px\)\s*\{[\s\S]{0,400}#modalOverlay > \.modal\[data-mode="asset"\]:focus-within[\s\S]{0,180}margin-top:\s*env\(safe-area-inset-top/.test(css));
+  /@media\s*\(max-width:\s*520px\)[\s\S]{0,700}margin-top:\s*env\(safe-area-inset-top/.test(specRegion));
 
 // 10. Pure CSS — no JS keyboard machinery introduced (SPEC forbids timers / resize /
 //     visualViewport recalc / scrollTo / auto-blur). app.js still has ZERO visualViewport
@@ -91,6 +94,46 @@ ok('12 SPEC 58 pinch-zoom intact (body.modal-open touch-action allows pinch-zoom
 // 13. Search auto-zoom guard intact (16px input keeps the sheet from being dragged on focus).
 ok('13 search input anti-zoom guard intact (font-size:16px on the mobile search field)',
   /\.search-field-wrap input\s*\{[^}]*font-size:\s*16px/.test(css));
+
+// ── SPEC 63 — search-flow hotfix (keyboard/Done, result selection, black bar) ──
+console.log('\nSPEC 63 — SEARCH FLOW HOTFIX');
+
+// 14. A/B: the anchor no longer depends on :focus-within ALONE — it also holds
+//     while a search flow is active (data-asset-flow search/form), so Done/blur
+//     doesn't drop the sheet and the tapped result can't slide onto the backdrop.
+ok('14 A/B anchor also holds on data-asset-flow (not :focus-within alone)',
+  /\[data-asset-flow="search"\][\s\S]{0,700}align-self:\s*flex-start/.test(specRegion) &&
+  /#modalOverlay > \.modal\[data-mode="asset"\]\[data-asset-flow="form"\]/.test(css));
+
+// 15. A/B owner: _updateSearchEmptyHint (the existing search-lifecycle owner) sets
+//     data-asset-flow — reused state exposed to the layout, no new nav/search logic.
+ok('15 A/B state owner: _updateSearchEmptyHint sets modal.dataset.assetFlow',
+  /function _updateSearchEmptyHint\(\)\s*\{[\s\S]*?dataset\.assetFlow\s*=\s*hasChip \? 'form' : \(\(hasQuery \|\| _sugOpen\) \? 'search' : 'idle'\)/.test(app));
+
+// 16. B: the global modal-close owner is UNCHANGED (no nav patch) — closeModal
+//     still fires only on a true backdrop hit (e.target === modalOverlay).
+ok('16 B: backdrop-close owner untouched (e.target === modalOverlay ⇒ closeModal)',
+  /modalOverlay\.addEventListener\('click',\s*e\s*=>\s*\{\s*\n?\s*if \(e\.target === modalOverlay\) closeModal\(\);/.test(app));
+
+// 17. B: closing the results list refreshes the flow so the sheet can rest again.
+ok('17 B: closeSuggestions refreshes flow (calls _updateSearchEmptyHint)',
+  /function closeSuggestions\(\)\s*\{[\s\S]*?_updateSearchEmptyHint\(\)/.test(app));
+
+// 18. C: the empty CTA "black rectangle" collapses when NOT in the form sub-state
+//     (no height/background/padding/border) — mobile + asset mode only.
+ok('18 C: empty CTA collapses off the form sub-state (display:none)',
+  /#modalOverlay > \.modal\[data-mode="asset"\]:not\(\[data-asset-flow="form"\]\) \.modal-cta\s*\{[^}]*display:\s*none/.test(css));
+
+// 19. C: the CTA is NOT globally killed — in the form sub-state it still renders
+//     (the solid asset CTA background rule is preserved for the selected-asset flow).
+ok('19 C: CTA preserved for the form sub-state (asset CTA background rule intact)',
+  /\.modal\[data-mode="asset"\] \.modal-cta\s*\{[^}]*background:\s*rgba\(5,7,13,0\.96\)/.test(css));
+
+// 20. Scope guard: Real Estate + Cash + desktop remain excluded by the SPEC 63 rules
+//     (no data-mode="real_estate", no #liquidityOverlay in the flow/CTA additions).
+const spec63 = css.slice(css.indexOf('SPEC 63 A/B'));
+ok('20 RE/Cash excluded from SPEC 63 rules', spec63.length > 0 &&
+  !/data-mode="real_estate"[^\n]*align-self/.test(spec63) && !/#liquidityOverlay/.test(spec63));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 if (fail) { console.log(fail + ' failed'); process.exit(1); }
