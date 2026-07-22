@@ -90,6 +90,21 @@ ok('21 rollback is a single flag (PUBLIC_LAUNCH_ENABLED) in each surface',
     open(false, atMs + 999999) === false);
 })();
 
+// ── 8. LANDING POLISH (final) — single desktop CTA, no Early Access, toast ──
+ok('25 desktop single CTA: Hero CTA is mobile-only (no duplicate Enter Aurix on desktop)',
+  /\.hero-cta-mobile\s*\{\s*display:\s*none;\s*\}/.test(lCss));
+ok('26 "Early Access" removed from public nav (no nav.early link remains)',
+  !/data-i18n="nav\.early"/.test(lHtml));
+ok('27 locked navbar CTA shows an elegant toast reusing launch.count (no alert/modal)',
+  /function showLaunchToast\(\)/.test(lApp) && /_launchToastEl[\s\S]{0,220}t\('launch\.count'\)/.test(lApp) && !/\balert\(/.test(lApp));
+ok('28 toast scoped to the navbar CTA (.header-right) — mobile Hero CTA behaviour unchanged',
+  /closest\('\.header-right'\)\)\s*showLaunchToast\(\)/.test(lApp));
+ok('29 toast is a small fixed pill, not a full-screen modal/overlay',
+  /\.launch-toast\s*\{[^}]*position:\s*fixed/.test(lCss) && !/\.launch-toast\s*\{[^}]*inset:\s*0/.test(lCss));
+// private/invite path still reachable in markup (section kept; only the nav link removed)
+ok('30 private access preserved in landing markup (#early-access section kept; only nav link removed)',
+  /id="early-access"/.test(lHtml));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 if (fail) { console.log(fail + ' failed'); process.exit(1); }
 console.log('GATE: GO — all ' + pass + ' assertions passed');
