@@ -23762,3 +23762,80 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
     display: none;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SPEC — DESKTOP ADD ASSET · PREMIUM LAYOUT POLISH  (visual-only)
+   ──────────────────────────────────────────────────────────────────────────
+   Elevates the desktop Add Asset composition to an institutional panel using
+   the EXISTING structure only. No logic / markup / events / owners / render /
+   search / state touched. Scoped to @media ≥901 + .modal[data-mode="asset"]
+   exclusively — mobile ≤900, gold/RE/manual, and every non-asset modal are
+   byte-identical. Reorganizes hierarchy & spacing; adds no component.
+   Owner: the 2-column grid at styles.css ~1728 (.add-v2-left / .add-v2-right).
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 901px) {
+
+  /* ── LEFT COLUMN — the selected asset is the protagonist; results breathe ── */
+  .modal[data-mode="asset"] .add-v2-left { gap: 14px; }
+  .modal[data-mode="asset"] .selected-chip {
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(74,130,240,0.12), rgba(74,130,240,0.03));
+    border: 1px solid rgba(74,130,240,0.24);
+    box-shadow: 0 10px 30px -20px rgba(74,130,240,0.65);
+  }
+  .modal[data-mode="asset"] .selected-chip .chip-badge { width: 40px; height: 40px; font-size: 13px; }
+  .modal[data-mode="asset"] .selected-chip .chip-name  { font-size: 15px; letter-spacing: -0.008em; }
+  .modal[data-mode="asset"] .selected-chip .chip-sub   { font-size: 11.5px; }
+  .modal[data-mode="asset"] .selected-chip .chip-price { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  /* Results read as a contained inline surface, not a stray dropdown. */
+  .modal[data-mode="asset"] .asset-suggestions { border-radius: 14px; }
+
+  /* ── RIGHT COLUMN — ONE continuous institutional panel ── */
+  .modal[data-mode="asset"] .add-v2-right {
+    gap: 0;
+    padding: 22px;
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012));
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset;
+  }
+  /* The preview card dissolves INTO the panel — the panel now owns the chrome,
+     so preview → figures → form → CTA read as a single vertical surface. */
+  .modal[data-mode="asset"] .add-v2-preview {
+    flex: 0 0 auto;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    min-height: 0;
+  }
+  /* Pre-selection empty state keeps a calm, centered presence (no void). */
+  .modal[data-mode="asset"] .add-v2-preview-empty { min-height: 240px; padding: 24px 8px; }
+
+  /* Hierarchy — hero = "Posición estimada"; live price second; labels recede. */
+  .modal[data-mode="asset"] .add-v2-preview-name { font-size: 19px; }
+  .modal[data-mode="asset"] .add-v2-preview-price-label,
+  .modal[data-mode="asset"] .add-v2-preview-value-label {
+    margin-top: 14px;
+    font-size: 10px;
+    color: rgba(220,230,250,0.42);
+  }
+  .modal[data-mode="asset"] .add-v2-preview-price { font-size: 20px; }
+  .modal[data-mode="asset"] .add-v2-preview-value { font-size: 34px; margin-top: 2px; }
+
+  /* Separación visual between the live figures and the input form. */
+  .modal[data-mode="asset"] #qtyGroup {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .modal[data-mode="asset"] #qtyGroup > label,
+  .modal[data-mode="asset"] .wl-loc-field-label { color: rgba(220,230,250,0.5); }
+  /* Custodio keeps the same rhythm directly under quantity. */
+  .modal[data-mode="asset"] .wl-loc-field { margin-top: 12px; }
+
+  /* CTA closes the composition — anchored to the panel's base, full presence. */
+  .modal[data-mode="asset"] .modal-cta { margin-top: auto; padding-top: 20px; }
+  .modal[data-mode="asset"] .btn-submit { padding: 15px; font-size: 15px; font-weight: 800; }
+}
