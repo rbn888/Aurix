@@ -23680,3 +23680,50 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
 /* Modal — a touch narrower; legend columns separated a bit more */
 .modal--composition { max-width: 480px; }
 .aurix-composition-legend { grid-template-columns: repeat(2, minmax(0, 176px)); gap: 8px 56px; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SPEC 62 — ADD ASSET MOBILE · KEYBOARD ANCHOR STABILITY
+   ──────────────────────────────────────────────────────────────────────────
+   OWNER (positioning): the flex layout of #modalOverlay (.modal-overlay,
+   position:fixed; inset:0 — pinned to the LAYOUT viewport). On mobile the Add
+   Asset search sheet is bottom-anchored (align-items:flex-end, ≤520) or centered
+   (521–768, base rule). iOS Safari does NOT shrink the layout viewport when the
+   keyboard opens (only the visual viewport shrinks), so the fixed overlay stays
+   full-height, the bottom-anchored sheet's content ends up behind the keyboard,
+   and Safari scroll-shifts the overlay to reveal the focused Search input → the
+   sheet appears to drift DOWN with a large empty gap ABOVE.
+
+   FIX (layout-owner, pure CSS — no JS, no timers, no resize/visualViewport
+   listeners, no transform hacks, no per-device exceptions, no auto scroll/blur):
+   while an input inside the asset/metals sheet has focus (keyboard open),
+   override the flex alignment for THAT item to top-anchored (align-self:
+   flex-start). The header + Search then stay inside the visual viewport (nothing
+   to scroll to → no drift, no empty gap above), Results fill the remaining space
+   and stay reachable through the SINGLE .modal-body scroll owner. On blur
+   (keyboard closes) :focus-within drops and the sheet returns to its resting
+   bottom-sheet position; query/category/results/selection are pure state and are
+   never touched. Resting layout (keyboard closed) is byte-identical to before.
+
+   SCOPE: asset (All/Crypto/Stocks/ETF) + gold (Metals) only.
+   EXCLUDED BY CONSTRUCTION: Real Estate (data-mode="real_estate" — not matched),
+   Cash/Liquidity (separate #liquidityOverlay — not referenced), desktop >768
+   (whole fix lives inside @media ≤768). ══════════════════════════════════════ */
+@media (max-width: 768px) {
+  #modalOverlay > .modal[data-mode="asset"]:focus-within,
+  #modalOverlay > .modal[data-mode="gold"]:focus-within {
+    /* top-anchor the sheet during input focus (overrides the overlay's
+       align-items:flex-end / center only for this item, only while focused). */
+    align-self: flex-start;
+    /* fully-rounded card while it lives at the top (the resting bottom sheet is
+       20px 20px 0 0); keeps the premium sheet chrome when top-anchored. */
+    border-radius: 20px;
+  }
+}
+@media (max-width: 520px) {
+  /* The ≤520 bottom-sheet family zeroes the overlay's padding-top; restore a
+     safe-area top gap so the top-anchored sheet clears the notch / status bar. */
+  #modalOverlay > .modal[data-mode="asset"]:focus-within,
+  #modalOverlay > .modal[data-mode="gold"]:focus-within {
+    margin-top: env(safe-area-inset-top, 0px);
+  }
+}
