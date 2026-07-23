@@ -79,5 +79,12 @@ ok('8.2 invite gate untouched (validate_invite_code RPC still used)', /validate_
 ok('8.3 public-launch gate untouched (isPublicLaunchOpen still gates the submit)', /isPublicLaunchOpen\(\)/.test(login));
 ok('8.4 client is table-agnostic: login.html names NO physical table, writes only via the RPC', !/rest\/v1\/(waitlist|Correos)/.test(login) && !/from\(\s*['"](waitlist|Correos)/.test(login) && /client\.rpc\(\s*['"]persist_access_email/.test(login));
 
+// ── 9 both writers target the SAME real historical table public."Correos usuario" ──
+console.log('9 — single source of truth (login OTP + landing → public."Correos usuario"):');
+const wl = fs.readFileSync(path.join(root, 'api', 'waitlist.js'), 'utf8');
+ok('9.1 login OTP writer (RPC) targets public."Correos usuario"', /insert into public\."Correos usuario"/.test(sql));
+ok('9.2 landing writer (api/waitlist.js) targets "Correos usuario" (percent-encoded path)', /WAITLIST_TABLE_PATH = 'Correos%20usuario'/.test(wl) && /rest\/v1\/\$\{WAITLIST_TABLE_PATH\}/.test(wl));
+ok('9.3 landing writer no longer targets the stale public.waitlist path', !/rest\/v1\/waitlist\b/.test(wl));
+
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);
