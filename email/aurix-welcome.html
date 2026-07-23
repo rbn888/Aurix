@@ -21,7 +21,7 @@
   <meta name="x-apple-disable-message-reformatting">
   <meta name="color-scheme" content="dark">
   <meta name="supported-color-schemes" content="dark light">
-  <title>{{TITLE}}</title>
+  <title>Welcome to Aurix.</title>
   <!--[if mso]><style>* { font-family: Arial, sans-serif !important; }</style><![endif]-->
   <style>
     /* Progressive enhancement only — the email works fully without this block. */
@@ -36,7 +36,7 @@
 </head>
 <body style="margin:0; padding:0; background:#030712; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
   <!-- Preheader (hidden preview text) -->
-  <div style="display:none; max-height:0; overflow:hidden; opacity:0; mso-hide:all; font-size:1px; line-height:1px; color:#030712;">{{PREHEADER}}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
+  <div style="display:none; max-height:0; overflow:hidden; opacity:0; mso-hide:all; font-size:1px; line-height:1px; color:#030712;">Thank you for joining us. Your journey starts today.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
 
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#030712;">
     <tr>
@@ -57,25 +57,31 @@
           <!-- Title -->
           <tr>
             <td class="aurix-pad" align="left" style="padding:30px 40px 6px 40px;">
-              <h1 style="margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:30px; line-height:1.2; font-weight:800; color:#FFFFFF;">{{TITLE}}</h1>
+              <h1 style="margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:30px; line-height:1.2; font-weight:800; color:#FFFFFF;">Welcome to Aurix.</h1>
             </td>
           </tr>
 
           <!-- Body -->
           <tr>
             <td class="aurix-pad" align="left" style="padding:10px 40px 4px 40px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:16px; line-height:1.62; color:#C7D3E3;">
-              {{BODY_HTML}}
+              <p style="margin:0 0 16px 0;">Thank you for joining us.</p>
+              <p style="margin:0 0 16px 0;">Today marks the beginning of your journey with Aurix.</p>
+              <p style="margin:0 0 16px 0;">Our mission is simple: to help you understand, organize and grow your wealth from one private, intelligent platform.</p>
+              <p style="margin:0 0 16px 0;">From today, you can track your stocks, ETFs, funds, crypto, precious metals, real estate, cash and more—all in one place.</p>
+              <p style="margin:0 0 16px 0;">This is only the beginning.</p>
+              <p style="margin:0 0 16px 0;">Over the coming months, Aurix will continue to evolve with new intelligence capabilities, financial tools and features designed to help you make better financial decisions.</p>
+              <p style="margin:0 0 16px 0;">We're grateful to have you with us from the very beginning.</p>
             </td>
           </tr>
 
           <!-- ACTION BLOCK (reusable slot) — per email: a bulletproof CTA (launch), the OTP code
                block (verification), or empty (welcome prose). Injected by scripts/aurix-email.mjs so
                structure/branding stay identical across every Aurix email; only this block varies. -->
-          {{ACTION_BLOCK}}
+          
 
           <!-- Closing line (optional slot) -->
           <tr>
-            <td class="aurix-pad" align="left" style="padding:2px 40px 26px 40px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:16px; line-height:1.6; color:#C7D3E3;">{{CLOSING}}</td>
+            <td class="aurix-pad" align="left" style="padding:2px 40px 26px 40px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:16px; line-height:1.6; color:#C7D3E3;">Welcome to Aurix.</td>
           </tr>
 
           <!-- Footer -->
@@ -84,7 +90,7 @@
             <td class="aurix-pad" align="left" style="padding:22px 40px 30px 40px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:13px; line-height:1.6; color:#7E8CA3;">
               <strong style="color:#C7D3E3;">The Aurix Team</strong><br>
               Aurix · Wealth Intelligence Platform<br>
-              {{FOOTER_NOTE}}<span style="color:#4A566B;">&copy; {{YEAR}} Aurix</span>
+              <span style="color:#5E6B82;">You are receiving this because you joined the Aurix waitlist.</span> <a href="mailto:unsubscribe@aurixsystem.io?subject=unsubscribe" style="color:#7E8CA3; text-decoration:underline;">Unsubscribe</a>.<br><span style="color:#4A566B;">&copy; 2026 Aurix</span>
             </td>
           </tr>
 
