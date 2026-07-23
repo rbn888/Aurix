@@ -260,10 +260,6 @@
     for (var j = 0; j < btns.length; j++) {
       btns[j].classList.toggle('active', btns[j].getAttribute('data-lang') === lang);
     }
-    // Keep the early-access note in sync unless it is showing a live status
-    var note = document.getElementById('earlyNote');
-    if (note && !note.classList.contains('ok')) note.textContent = dict['early.note'];
-
     // AURIX-LANDING-POLISH-1: multilingual SEO basics — localize the document
     // title, meta description and og:locale when the language changes. (No
     // separate /en route; single page, dynamic per selection.)
@@ -598,90 +594,9 @@
       }
     }
 
-    // Request-access modal (exclusive, compact). No backend.
-    var modal = document.getElementById('accessModal');
-    var openBtn = document.getElementById('openModal');
-    function openModal() {
-      if (!modal) return;
-      modal.classList.add('open');
-      modal.setAttribute('aria-hidden', 'false');
-      document.body.classList.add('modal-open');
-      var f = modal.querySelector('#ea-name');
-      if (f) setTimeout(function () { try { f.focus(); } catch (_) {} }, 60);
-    }
-    function closeModal() {
-      if (!modal) return;
-      modal.classList.remove('open');
-      modal.setAttribute('aria-hidden', 'true');
-      document.body.classList.remove('modal-open');
-    }
-    if (openBtn) openBtn.addEventListener('click', openModal);
-    if (modal) {
-      modal.addEventListener('click', function (e) {
-        if (e.target.closest('[data-modal-close]')) closeModal();
-      });
-    }
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && modal && modal.classList.contains('open')) closeModal();
-    });
-
-    // AURIX-WAITLIST-1: Request Access form — persists the lead to the
-    // /api/waitlist endpoint (Supabase) and triggers one welcome email.
-    var form = document.getElementById('earlyForm');
-    if (form) {
-      form.addEventListener('submit', function (e) {
-        e.preventDefault();
-        var name = form.querySelector('#ea-name');
-        var email = form.querySelector('#ea-email');
-        var note = document.getElementById('earlyNote');
-        var submit = form.querySelector('button[type="submit"]');
-        var emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((email.value || '').trim());
-        var nameOk = (name.value || '').trim().length >= 2;
-        name.classList.toggle('invalid', !nameOk);
-        email.classList.toggle('invalid', !emailOk);
-        if (!nameOk || !emailOk) {
-          note.classList.remove('ok');
-          note.textContent = t('early.invalid');
-          return;
-        }
-
-        // In-flight UI
-        note.classList.remove('ok');
-        note.textContent = t('early.sending');
-        submit.disabled = true;
-
-        fetch(WAITLIST_ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: name.value.trim(),
-            email: email.value.trim(),
-            locale: lang,
-            source: 'landing'
-          })
-        }).then(function (r) {
-          return r.json().catch(function () { return {}; }).then(function (data) {
-            return { ok: r.ok && data && data.ok, status: r.status, data: data };
-          });
-        }).then(function (res) {
-          if (res.ok) {
-            note.classList.add('ok');
-            // Friendly message when the email is already on the waitlist.
-            note.textContent = (res.data && res.data.duplicate) ? t('early.dup') : t('early.success');
-            // submit stays disabled — nothing more to do
-          } else {
-            note.classList.remove('ok');
-            // 429 = rate limited → friendly "too many attempts" message.
-            note.textContent = (res.status === 429) ? t('early.rate') : t('early.error');
-            submit.disabled = false; // allow retry
-          }
-        }).catch(function () {
-          note.classList.remove('ok');
-          note.textContent = t('early.error');
-          submit.disabled = false;
-        });
-      });
-    }
+    // HOTFIX LANDING — the "Request Access" modal + waitlist form were removed with the Private
+    // Beta section (Aurix is now open to the public; the single CTA is "Enter Aurix"). No modal
+    // open/close, no waitlist submit, no Escape/backdrop handlers tied to it remain.
 
     // ── Market preview: tabs + animated chart ──────────────
     // Illustrative product preview (labelled, no real-time data): six tabs over a

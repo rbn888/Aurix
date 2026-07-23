@@ -102,8 +102,8 @@ ok('28 toast scoped to the navbar CTA (.header-right) — mobile Hero CTA behavi
 ok('29 toast is a small fixed pill, not a full-screen modal/overlay',
   /\.launch-toast\s*\{[^}]*position:\s*fixed/.test(lCss) && !/\.launch-toast\s*\{[^}]*inset:\s*0/.test(lCss));
 // private/invite path still reachable in markup (section kept; only the nav link removed)
-ok('30 private access preserved in landing markup (#early-access section kept; only nav link removed)',
-  /id="early-access"/.test(lHtml));
+ok('30 private access REMOVED from landing (HOTFIX LANDING — public launch complete, Aurix open to all: no Private Beta section, modal or Request-Access CTA)',
+  !/id="early-access"/.test(lHtml) && !/id="accessModal"/.test(lHtml) && !/id="openModal"/.test(lHtml));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 if (fail) { console.log(fail + ' failed'); process.exit(1); }
