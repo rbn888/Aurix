@@ -26,6 +26,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { renderEmail, ctaBlock, marketingFooter } from './aurix-email.mjs';   // shared institutional shell (DRY)
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MODE = process.argv.includes('--send') ? 'send'
@@ -69,19 +70,13 @@ function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').
 function normalizeEmail(e) { return String(e || '').trim().toLowerCase(); }
 
 function renderHtml(unsubscribeUrl) {
-  const tpl = fs.readFileSync(path.join(ROOT, 'email', 'aurix-base-template.html'), 'utf8');
-  const bodyHtml = BODY_PARAS.map(p => `<p style="margin:0 0 16px 0;">${esc(p)}</p>`).join('\n              ');
-  const out = tpl
-    .replaceAll('{{PREHEADER}}', esc(PREHEADER))
-    .replaceAll('{{TITLE}}', esc(TITLE))
-    .replaceAll('{{BODY_HTML}}', bodyHtml)
-    .replaceAll('{{CTA_TEXT}}', esc(CTA_TEXT))
-    .replaceAll('{{CTA_URL}}', CTA_URL)
-    .replaceAll('{{FALLBACK_URL}}', esc(FALLBACK))
-    .replaceAll('{{CLOSING}}', esc(CLOSING))
-    .replaceAll('{{UNSUBSCRIBE_URL}}', unsubscribeUrl)
-    .replaceAll('{{YEAR}}', '2026');
-  return out;
+  // Uses the shared institutional shell (scripts/aurix-email.mjs) so this campaign, the OTP email and
+  // the welcome email are one visual system. Only the content + action block differ.
+  return renderEmail({
+    preheader: PREHEADER, title: TITLE, bodyParas: BODY_PARAS,
+    actionBlock: ctaBlock(CTA_TEXT, CTA_URL, FALLBACK), closing: CLOSING,
+    footerNote: marketingFooter(unsubscribeUrl), year: '2026',
+  });
 }
 function plainText() {
   return `${TITLE}\n\n${BODY_PARAS.join('\n\n')}\n\n${CTA_TEXT} ${CTA_URL}\n${FALLBACK}\n\n${CLOSING}\n\nThe Aurix Team`;

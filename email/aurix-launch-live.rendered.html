@@ -4,13 +4,8 @@
   ONE reusable base for all Aurix brand emails. Content is injected via slots so
   future campaigns change subject/title/body/CTA WITHOUT duplicating this HTML.
 
-  Reusable slots (mustache): The wait is over. Your access to Aurix is now ready. Aurix is now live. <p style="margin:0 0 16px 0;">The wait is over.</p>
-              <p style="margin:0 0 16px 0;">Aurix is officially open, and you can now access the platform.</p>
-              <p style="margin:0 0 16px 0;">From today, you can bring your entire wealth together in one private platform—track stocks, ETFs, funds, crypto, precious metals, real estate, cash and more, all from a single place.</p>
-              <p style="margin:0 0 16px 0;">This is just the beginning. Aurix will continue to evolve with new intelligence features, financial tools and powerful capabilities over the coming months.</p>
-              <p style="margin:0 0 16px 0;">Thank you for being part of our journey from the very beginning.</p>
-              <p style="margin:0 0 16px 0;">Your access is now ready.</p> Enter Aurix →
-  https://aurixsystem.io https://aurixsystem.io mailto:unsubscribe@aurixsystem.io?subject=unsubscribe 2026
+  Reusable slots (mustache): PREHEADER · TITLE · BODY_HTML · ACTION_BLOCK · CLOSING ·
+  UNSUBSCRIBE_URL · YEAR. ACTION_BLOCK hosts a CTA / OTP code / nothing (see scripts/aurix-email.mjs).
 
   Email-safe: table layout, inline styles, system fonts (no external fonts/JS/
   video/remote CSS). Dark by design; honours the client's dark mode. Tested target
@@ -78,7 +73,9 @@
             </td>
           </tr>
 
-          <!-- Primary CTA (bulletproof) -->
+          <!-- ACTION BLOCK (reusable slot) — per email: a bulletproof CTA (launch), the OTP code
+               block (verification), or empty (welcome prose). Injected by scripts/aurix-email.mjs so
+               structure/branding stay identical across every Aurix email; only this block varies. -->
           <tr>
             <td class="aurix-pad" align="left" style="padding:22px 40px 6px 40px;">
               <!--[if mso]>
@@ -88,13 +85,10 @@
               </v:roundrect>
               <![endif]-->
               <!--[if !mso]><!-- -->
-              <a href="https://aurixsystem.io" class="aurix-cta aurix-cta-a" target="_blank" rel="noopener noreferrer"
-                 style="display:inline-block; background:#2684FF; color:#FFFFFF; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:16px; font-weight:700; text-decoration:none; padding:15px 34px; border-radius:10px; box-shadow:0 6px 22px rgba(38,132,255,0.32); mso-padding-alt:0;">Enter Aurix →</a>
+              <a href="https://aurixsystem.io" class="aurix-cta aurix-cta-a" target="_blank" rel="noopener noreferrer" style="display:inline-block; background:#2684FF; color:#FFFFFF; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:16px; font-weight:700; text-decoration:none; padding:15px 34px; border-radius:10px; box-shadow:0 6px 22px rgba(38,132,255,0.32); mso-padding-alt:0;">Enter Aurix →</a>
               <!--<![endif]-->
             </td>
           </tr>
-
-          <!-- Fallback URL -->
           <tr>
             <td class="aurix-pad" align="left" style="padding:6px 40px 30px 40px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:13px; line-height:1.5; color:#9FB0C7;">
               Or paste this link into your browser:<br>
@@ -113,9 +107,7 @@
             <td class="aurix-pad" align="left" style="padding:22px 40px 30px 40px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:13px; line-height:1.6; color:#7E8CA3;">
               <strong style="color:#C7D3E3;">The Aurix Team</strong><br>
               Aurix · Wealth Intelligence Platform<br>
-              <span style="color:#5E6B82;">You are receiving this because you joined the Aurix waitlist.</span>
-              <a href="mailto:unsubscribe@aurixsystem.io?subject=unsubscribe" style="color:#7E8CA3; text-decoration:underline;">Unsubscribe</a>.
-              <br><span style="color:#4A566B;">&copy; 2026 Aurix</span>
+              <span style="color:#5E6B82;">You are receiving this because you joined the Aurix waitlist.</span> <a href="mailto:unsubscribe@aurixsystem.io?subject=unsubscribe" style="color:#7E8CA3; text-decoration:underline;">Unsubscribe</a>.<br><span style="color:#4A566B;">&copy; 2026 Aurix</span>
             </td>
           </tr>
 

@@ -1,1 +1,8 @@
-{}
+{
+  "crons": [
+    { "path": "/api/cron/welcome-email", "schedule": "*/15 * * * *" }
+  ],
+  "functions": {
+    "api/cron/welcome-email.js": { "includeFiles": "email/**" }
+  }
+}

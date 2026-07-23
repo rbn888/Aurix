@@ -16,13 +16,14 @@ console.log('AURIX-LAUNCH-EMAIL-CAMPAIGN — SPEC\n');
 
 // ── 1 reusable institutional template ────────────────────────────────────────
 console.log('1 — reusable base template:');
-['{{PREHEADER}}', '{{TITLE}}', '{{BODY_HTML}}', '{{CTA_TEXT}}', '{{CTA_URL}}', '{{FALLBACK_URL}}', '{{CLOSING}}', '{{UNSUBSCRIBE_URL}}', '{{YEAR}}']
+// Shared shell slots (V1: CTA/fallback/unsubscribe moved into the renderer's ACTION_BLOCK / FOOTER_NOTE).
+['{{PREHEADER}}', '{{TITLE}}', '{{BODY_HTML}}', '{{ACTION_BLOCK}}', '{{CLOSING}}', '{{FOOTER_NOTE}}', '{{YEAR}}']
   .forEach(slot => ok('1 slot present ' + slot, tpl.includes(slot)));
 ok('1 email-safe: no <script>', !/<script/i.test(tpl));
 ok('1 email-safe: no remote fonts/CSS/img (no https link/@import/remote src)', !/@import|fonts\.googleapis|<link[^>]+stylesheet|src=["']https?:/i.test(tpl));
 ok('1 dark palette tokens (#030712 bg, #080D18 surface, #2684FF electric)', /#030712/.test(tpl) && /#080D18/.test(tpl) && /#2684FF/.test(tpl));
 ok('1 container 600px, blue border + subtle blue shadow', /max-width:600px/.test(tpl) && /border:1px solid #2684FF/.test(tpl) && /box-shadow:0 0 40px rgba\(38,132,255/.test(tpl));
-ok('1 Outlook bulletproof CTA (VML roundrect)', /v:roundrect/.test(tpl));
+ok('1 Outlook bulletproof CTA (VML roundrect in shared renderer ctaBlock)', /v:roundrect/.test(fs.readFileSync(path.join(root, 'scripts', 'aurix-email.mjs'), 'utf8')));
 ok('1 preheader is hidden (display:none)', /display:none;[^"]*mso-hide:all/.test(tpl));
 ok('1 wordmark AURIX in header', /letter-spacing:4px[^>]*>?[\s\S]{0,40}AURIX|>AURIX<\/span>/.test(tpl));
 
@@ -38,14 +39,11 @@ ok('2 closing "See you inside."', /const CLOSING\s*=\s*'See you inside\.'/.test(
   .forEach(frag => ok('2 body contains: "' + frag.slice(0, 32) + '…"', scr.includes(frag)));
 ok('2 no emojis / no discount / no urgency copy', !/😀|🚀|🔥|discount|% off|hurry|limited time|act now/i.test(scr));
 
-// ── 3 rendered output has NO unresolved variables (replicate the render) ──────
+// ── 3 rendered launch email (committed preview) has NO unresolved slots + exact content ──
 console.log('3 — rendered launch email (no unresolved slots):');
-const bodyHtml = 'X';
-const rendered = tpl
-  .replaceAll('{{PREHEADER}}', 'P').replaceAll('{{TITLE}}', 'T').replaceAll('{{BODY_HTML}}', bodyHtml)
-  .replaceAll('{{CTA_TEXT}}', 'C').replaceAll('{{CTA_URL}}', 'U').replaceAll('{{FALLBACK_URL}}', 'F')
-  .replaceAll('{{CLOSING}}', 'K').replaceAll('{{UNSUBSCRIBE_URL}}', 'Z').replaceAll('{{YEAR}}', '2026');
-ok('3 zero unresolved {{...}} after render', (rendered.match(/\{\{[A-Z_]+\}\}/g) || []).length === 0);
+const rendered = fs.readFileSync(path.join(root, 'email', 'aurix-launch-live.rendered.html'), 'utf8');
+ok('3 zero unresolved {{SLOT}} in the rendered launch email', (rendered.match(/\{\{[A-Z_]+\}\}/g) || []).length === 0);
+ok('3 rendered launch shows the CTA + fallback URL', /Enter Aurix/.test(rendered) && /https:\/\/aurixsystem\.io/.test(rendered));
 
 // ── 4 safety + idempotency guards in the sender ──────────────────────────────
 console.log('4 — sender safety & idempotency:');
