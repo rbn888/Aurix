@@ -1,1 +1,1 @@
-{ "appjs": 573, "loginhtml": 484, "build": "v582-multidevice-state-hardening", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)" }
+{ "appjs": 574, "loginhtml": 484, "build": "v583-spec66-funds-integrity", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)" }

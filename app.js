@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '573'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '574'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -9581,7 +9581,7 @@ function _aurixPositionFromAsset(asset) {
   return {
     id: (a.id != null) ? a.id : (a.ticker || a.symbol || null),
     name: a.name || a.ticker || a.symbol || null,
-    category: (typeof TYPE_META !== 'undefined' && TYPE_META[a.type]) ? a.type : 'other',
+    category: _aurixDisplayCategory(a.type),
     quantity: Number.isFinite(qty) ? qty : null,
     currentPrice: Number.isFinite(price) ? price : null,
     averagePurchasePrice: (avg != null && Number.isFinite(avg)) ? avg : (Number.isFinite(cost) && Number.isFinite(qty) && qty > 0 ? cost / qty : null),
@@ -9593,7 +9593,7 @@ function _aurixPositionFromAsset(asset) {
 function _aurixCategoryPerformanceAudit(category) {
   const key = String((category != null ? category : (typeof activeCategory !== 'undefined' ? activeCategory : '')) || '').toLowerCase();
   const src = (typeof activeAssets === 'function') ? activeAssets() : (typeof assets !== 'undefined' && Array.isArray(assets) ? assets : []);
-  const catAssets = src.filter(a => ((typeof TYPE_META !== 'undefined' && TYPE_META[a.type]) ? a.type : 'other') === key);
+  const catAssets = src.filter(a => _aurixDisplayCategory(a.type) === key);
   const positions = catAssets.map(_aurixPositionFromAsset);
   const perfs = positions.map((pos, i) => Object.assign({ name: catAssets[i] && (catAssets[i].name || catAssets[i].ticker || catAssets[i].symbol) || null }, computePositionPerformance(pos)));
   const agg = computeCategoryPerformance(positions);
@@ -9934,6 +9934,20 @@ function _aurixCategoryBucket(asset) {
   if (t === 'real_estate')                  return 'real_estate';
   if (t === 'cash')                         return 'liquidity';
   return 'other';
+}
+
+// SPEC 66 — SINGLE SOURCE for an asset's DISPLAY category (donut, category cards, drill-down list,
+// per-category performance). ROOT CAUSE of the "invisible fund" bug: every display grouping used the
+// inline TYPE_META type-key lookup, but TYPE_META has NO 'fund' key — so a fund (type 'fund')
+// resolved to 'other' and never appeared in its category, even though it summed into wealth and fed the
+// category chart (which already merges etf+fund via _categoryBucketsForType + _aurixCategoryBucket).
+// FIX: funds live in the SAME group as ETFs — the existing "Fondos/ETF" bucket (donutLabel "Fondos") —
+// exactly as the category chart already treats them, so a fund now behaves identically to an ETF across
+// EVERY view from one resolver. No new category, no other-category change, no format change.
+function _aurixDisplayCategory(type) {
+  const t = String(type || '').toLowerCase();
+  if (t === 'fund') return 'etf';   // funds fold into the Fondos/ETF group (parity with the category chart)
+  return (typeof TYPE_META !== 'undefined' && TYPE_META[t]) ? t : 'other';
 }
 
 // WL.1 (Fase 2 — Wealth Location) ── canonical location taxonomy + grouping key.
@@ -19478,7 +19492,7 @@ function getDistribution() {
   const groups = {};
   assets.forEach(a => {
     const valUSD = assetValueUSD(a);
-    const key    = TYPE_META[a.type] ? a.type : 'other';
+    const key    = _aurixDisplayCategory(a.type);
     groups[key]  = (groups[key] || 0) + valUSD;
   });
 
@@ -19515,7 +19529,7 @@ function getInvestableDistribution(opts) {
   const nonInvest = {};   // non-investable (real_estate) assets, by display key
   assets.forEach(a => {
     const valUSD = assetValueUSD(a);
-    const key    = TYPE_META[a.type] ? a.type : 'other';
+    const key    = _aurixDisplayCategory(a.type);
     if (isInvestableAsset(a)) groups[key]    = (groups[key]    || 0) + valUSD;
     else                      nonInvest[key] = (nonInvest[key] || 0) + valUSD;
   });
@@ -36860,7 +36874,7 @@ function _aurixCategoryPerfUpdateHeader(panel, type) {
   }
   const src = (typeof activeAssets === 'function') ? activeAssets() : (typeof assets !== 'undefined' && Array.isArray(assets) ? assets : []);
   const positions = src
-    .filter(a => ((typeof TYPE_META !== 'undefined' && TYPE_META[a.type]) ? a.type : 'other') === key)
+    .filter(a => _aurixDisplayCategory(a.type) === key)
     .map(_aurixPositionFromAsset);
   const agg = computeCategoryPerformance(positions);
   // Missing data must never surface a fake number.
@@ -39687,7 +39701,7 @@ function _aurixCatReturnDisplay(type) {
   let agg = null;
   try {
     const src = (typeof activeAssets === 'function') ? activeAssets() : [];
-    const positions = src.filter(a => ((typeof TYPE_META !== 'undefined' && TYPE_META[a.type]) ? a.type : 'other') === key).map(_aurixPositionFromAsset);
+    const positions = src.filter(a => _aurixDisplayCategory(a.type) === key).map(_aurixPositionFromAsset);
     agg = computeCategoryPerformance(positions);
   } catch (_) { return null; }
   if (!agg || agg.returnPct == null || (agg.state !== 'ready' && agg.state !== 'partial')) return null;
@@ -39781,7 +39795,7 @@ function updateCategoryCards() {
   grid.innerHTML = ALL_CATEGORIES.map(type => {
     const dist       = distMap[type] || { type, valueBase: 0, pct: 0 };
     const m          = TYPE_META[type] || TYPE_META.other;
-    const typeAssets = activeAssets().filter(a => (TYPE_META[a.type] ? a.type : 'other') === type);
+    const typeAssets = activeAssets().filter(a => _aurixDisplayCategory(a.type) === type);
     const visual     = buildCardVisual(type, typeAssets, dist.pct);
     const isEmpty    = dist.valueBase === 0;
 
@@ -45302,7 +45316,7 @@ function render(animate = false) {
     }
     // categoriesSection already hidden by updateCategoryCards() short-circuit
     // Render premium detail hero (category stats + mini sparkline)
-    const typeAssets = activeAssets().filter(a => (TYPE_META[a.type] ? a.type : 'other') === activeCategory);
+    const typeAssets = activeAssets().filter(a => _aurixDisplayCategory(a.type) === activeCategory);
     renderDetailHero(activeCategory, typeAssets);
     // CATEGORY-DETAIL-CHARTS-2 — premium performance panel directly
     // below the hero. _aurixCategoryPerfRender is idempotent: same
@@ -45366,7 +45380,7 @@ function render(animate = false) {
   const sorted   = [...activeAssets()].sort((a, b) => assetNativeValue(b) - assetNativeValue(a));
   const display  = activeCategory ? sorted : applyCustomOrder(sorted);
   const filtered = activeCategory
-    ? display.filter(a => (TYPE_META[a.type] ? a.type : 'other') === activeCategory)
+    ? display.filter(a => _aurixDisplayCategory(a.type) === activeCategory)
     : display;
 
   if (filtered.length === 0) {
@@ -46111,7 +46125,7 @@ function _aurixSearchFundsLocal(query) {
       || mgr.indexOf(q) >= 0
       || f.ticker.toLowerCase().indexOf(q) >= 0
       || (Array.isArray(f.aliases) && f.aliases.some(a => a.indexOf(q) >= 0 || q.indexOf(a) >= 0));
-    if (hit) out.push({ ticker: f.ticker, name: f.name, type: 'fund', marketSymbol: null, isin: f.isin || null, manager: f.manager || null, assetCurrency: f.currency || null });
+    if (hit) out.push({ ticker: f.ticker, name: f.name, type: 'fund', marketSymbol: null, isin: f.isin || null, manager: f.manager || null, assetCurrency: f.currency || null, shareClass: f.shareClass || null });
   }
   return out;
 }
@@ -46134,7 +46148,13 @@ function _aurixSearchSubtitle(a) {
   if (!a || a.type !== 'fund') return a && a.ticker ? a.ticker : '';
   const parts = [];
   if (a.manager) parts.push(a.manager);
-  if (a.assetCurrency) parts.push(a.assetCurrency);
+  // SPEC 66 — when several share classes of the same fund exist, the share class
+  // (e.g. "EUR Acc") is the disambiguator: it already encodes DIVISA + Acumulación/
+  // Distribución, so it REPLACES the bare currency (never both → no redundant "EUR · EUR Acc").
+  // Falls back to the plain currency when no share class is known, so the existing
+  // "Gestora · Divisa · ISIN" subtitle is byte-identical for entries without a class.
+  if (a.shareClass) parts.push(a.shareClass);
+  else if (a.assetCurrency) parts.push(a.assetCurrency);
   if (a.isin) parts.push(a.isin);
   return parts.length ? parts.join(' · ') : (a.ticker || 'Fund');
 }
@@ -46640,7 +46660,7 @@ function renderSuggestions(results, query, loading = false) {
       ${_assetIconHtml(a, a.ticker, 'sugg-badge ' + a.type)}
       <div class="sugg-info">
         <div class="sugg-name">${escHtml(getDisplayName(a))}</div>
-        <div class="sugg-ticker">${escHtml(a.ticker)}</div>
+        <div class="sugg-ticker">${escHtml((typeof _aurixSearchSubtitle === 'function') ? _aurixSearchSubtitle(a) : a.ticker)}</div>
       </div>
       <span class="sugg-type ${a.type}">${T[lang].typeLabel[a.type] || a.type}</span>
     </div>`).join('') + loadingHtml;

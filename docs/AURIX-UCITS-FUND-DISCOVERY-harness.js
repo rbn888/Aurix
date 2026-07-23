@@ -96,6 +96,10 @@ ok('0 flag + funcs + fund route + typeLabel + subtitle wired', app.indexOf('SPEC
   const f = { type: 'fund', ticker: 'VG-WLD', manager: 'Vanguard', assetCurrency: 'EUR', isin: 'IE00B03HD191' };
   ok('8 subtitle fondo = "Vanguard · EUR · IE00B03HD191"', call('_aurixSearchSubtitle', f) === 'Vanguard · EUR · IE00B03HD191');
   ok('8 subtitle no-fondo = ticker (sin cambios)', call('_aurixSearchSubtitle', { type: 'stock', ticker: 'AAPL' }) === 'AAPL');
+  // SPEC 66 — cuando existe clase (shareClass), REEMPLAZA la divisa suelta (evita "EUR · EUR Acc")
+  // y desambigua Divisa + Acumulación/Distribución sin redundancia.
+  const fc = { type: 'fund', ticker: 'VG-WLD', manager: 'Vanguard', assetCurrency: 'EUR', shareClass: 'EUR Acc', isin: 'IE00B03HD191' };
+  ok('8b subtitle con clase = "Vanguard · EUR Acc · IE00B03HD191"', call('_aurixSearchSubtitle', fc) === 'Vanguard · EUR Acc · IE00B03HD191');
 }
 
 // ── 9 relevancia: exacto → prefijo → contiene ──────────────────────────────────
