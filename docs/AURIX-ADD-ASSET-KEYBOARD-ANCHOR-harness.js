@@ -76,10 +76,14 @@ ok('8 desktop untouched (fix is inside @media ≤768 only)',
 ok('9 ≤520 top-anchored sheet clears the notch (margin-top: safe-area-inset-top)',
   /@media\s*\(max-width:\s*520px\)[\s\S]{0,700}margin-top:\s*env\(safe-area-inset-top/.test(specRegion));
 
-// 10. Pure CSS — no JS keyboard machinery introduced (SPEC forbids timers / resize /
-//     visualViewport recalc / scrollTo / auto-blur). app.js still has ZERO visualViewport
-//     usage and no add-asset keyboard scrollTo/reset was added.
-ok('10 no visualViewport handling introduced (pure CSS fix)', !/visualViewport/.test(app));
+// 10. Pure CSS — no JS keyboard MACHINERY introduced (SPEC forbids timers / resize /
+//     visualViewport recalc / scrollTo / auto-blur). Intent: the add-asset keyboard fix stays
+//     CSS-only. Scoped to viewport *machinery* (listeners / resize / scroll driving), NOT a bare
+//     feature-detection read — the SPEC PLATFORM-HARDENING.1 resilience layer legitimately
+//     capability-detects visualViewport (`!!root.visualViewport`) with zero listeners/handlers.
+ok('10 no visualViewport keyboard machinery introduced (pure CSS fix)',
+  !/visualViewport\s*\.\s*(addEventListener|removeEventListener|onresize|onscroll)/.test(app)
+  && !/visualViewport[\s\S]{0,120}(scrollTo|scrollIntoView|scrollBy)\s*\(/.test(app));
 
 // 11. Single scroll owner preserved: the sheet body (.modal-body) is still the sole
 //     overflow-y:auto surface on mobile (no double-scroll introduced).

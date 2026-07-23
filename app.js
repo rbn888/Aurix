@@ -5,6 +5,243 @@
 try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX_BOOT.appJsExecuted = true; window.__AURIX_BOOT.mark('app_js_executing'); } } catch (_) {}
 
 // ════════════════════════════════════════════════════════════════════════
+// SPEC PLATFORM-HARDENING.1 — RESILIENT RUNTIME FOUNDATION (single owner)
+// ════════════════════════════════════════════════════════════════════════
+// ONE central, reusable Runtime Resilience layer for the whole app. It does NOT add product features and
+// does NOT modify Portfolio/Dashboard/Workspace/Intelligence/auth/design/navigation — it is purely additive
+// infrastructure that future (and existing) code can route critical browser-API access through so a missing,
+// blocked or throwing browser API can NEVER break the bootstrap or make Aurix unusable. It REUSES the
+// infrastructure already established in index.html (window.__AURIX_STORAGE_OK round-trip probe, the
+// __AURIX_BOOT watchdog) rather than duplicating wrappers. Every method is defensively wrapped so the layer
+// itself can never throw. Storage/capabilities degrade safely (absent ⇒ no-op that returns a safe fallback,
+// never an exception). Bootstrap guards (claim/once) enforce single init; recover() allows exactly one
+// controlled retry per key (never an infinite loop). Logging is technical-only telemetry (owner, api,
+// exception type, phase) — never personal data, financial data or user content.
+//
+// Written so the entire layer can be exercised in isolation: `root` is the window-like object and EVERY
+// browser API (localStorage, sessionStorage, indexedDB, caches, navigator, matchMedia, Notification) is read
+// off `root`, so the harness can install it against an adversarial mock (storage throws / IDB absent / …).
+function _aurixInstallRuntimeResilience(root) {
+  if (!root || typeof root !== 'object') return null;
+  if (root.AurixRuntime) return root.AurixRuntime;           // single owner: install exactly once
+
+  const _now = () => { try { return Date.now(); } catch (_) { return 0; } };
+
+  // ── 7. Logging — technical-only telemetry ring buffer (no PII / financial / user content) ──────────
+  const LOG_MAX = 120;
+  const _log = [];
+  function sanitizeType(err) {
+    // Capture the EXCEPTION TYPE only (e.g. "QuotaExceededError", "TypeError"), never a message that
+    // could carry user/financial content. A short bounded string for anything non-Error.
+    try {
+      if (err == null) return null;
+      if (typeof err === 'object') return String((err.name || (err.constructor && err.constructor.name) || 'Error')).slice(0, 60);
+      return String(err).slice(0, 60);
+    } catch (_) { return 'Unknown'; }
+  }
+  function log(entry) {
+    try {
+      const e = entry || {};
+      _log.push({ t: _now(), owner: String(e.owner || '').slice(0, 40), api: String(e.api || '').slice(0, 60),
+        phase: String(e.phase || '').slice(0, 24), type: (e.type != null ? String(e.type).slice(0, 60) : sanitizeType(e.error)) });
+      if (_log.length > LOG_MAX) _log.shift();
+    } catch (_) {}
+  }
+
+  // ── 2. Browser Capabilities — feature detection ONLY (never User-Agent sniffing) ───────────────────
+  function probeStorage(store) {
+    // Round-trip write→read→remove: detects the SILENT non-throwing failure (write "succeeds", read is
+    // null) seen in partitioned / private / limited-storage contexts. Same contract as _aurixStorageUsable.
+    try {
+      if (!store) return false;
+      const k = '__aurix_rt_probe__';
+      store.setItem(k, '1');
+      const ok = store.getItem(k) === '1';
+      store.removeItem(k);
+      return ok;
+    } catch (_) { return false; }
+  }
+  function detectCapabilities() {
+    const nav = (root.navigator && typeof root.navigator === 'object') ? root.navigator : {};
+    const feat = (fn) => { try { return !!fn(); } catch (_) { return false; } };
+    // sessionStorage availability reuses index.html's authoritative probe when present (no duplicate probe).
+    let sessionOk;
+    try { sessionOk = (typeof root.__AURIX_STORAGE_OK === 'boolean') ? root.__AURIX_STORAGE_OK : probeStorage(root.sessionStorage); }
+    catch (_) { sessionOk = false; }
+    return {
+      localStorage:       feat(() => probeStorage(root.localStorage)),
+      sessionStorage:     sessionOk,
+      indexedDB:          feat(() => !!root.indexedDB),
+      cacheStorage:       feat(() => !!root.caches && typeof root.caches.open === 'function'),
+      serviceWorker:      feat(() => nav.serviceWorker && typeof nav.serviceWorker.register === 'function'),
+      persistentStorage:  feat(() => nav.storage && typeof nav.storage.persist === 'function'),
+      visualViewport:     feat(() => !!root.visualViewport),
+      notifications:      feat(() => typeof root.Notification === 'function'),
+      clipboard:          feat(() => nav.clipboard && typeof nav.clipboard.writeText === 'function'),
+      share:              feat(() => typeof nav.share === 'function'),
+      hardwareConcurrency:(typeof nav.hardwareConcurrency === 'number') ? nav.hardwareConcurrency : null,
+      deviceMemory:       (typeof nav.deviceMemory === 'number') ? nav.deviceMemory : null,
+      reducedMotion:      feat(() => root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches),
+    };
+  }
+  const capabilities = detectCapabilities();
+
+  // ── 1 + 4. Storage — one safe, degrading owner for local/session/IndexedDB/Cache ──────────────────
+  function makeWebStorage(kind) {
+    const name = kind + 'Storage';
+    const store = () => root[name];                          // read live so late availability changes are seen
+    const available = () => capabilities[name];
+    return {
+      get available() { return available(); },
+      get(key, fallback) {
+        if (!available()) return fallback === undefined ? null : fallback;
+        try { const v = store().getItem(key); return v == null ? (fallback === undefined ? null : fallback) : v; }
+        catch (e) { log({ owner: 'storage', api: name + '.getItem', error: e, phase: 'runtime' }); return fallback === undefined ? null : fallback; }
+      },
+      set(key, value) {
+        if (!available()) return false;
+        try { store().setItem(key, value); return true; }
+        catch (e) { log({ owner: 'storage', api: name + '.setItem', error: e, phase: 'runtime' }); return false; }
+      },
+      remove(key) {
+        if (!available()) return false;
+        try { store().removeItem(key); return true; }
+        catch (e) { log({ owner: 'storage', api: name + '.removeItem', error: e, phase: 'runtime' }); return false; }
+      },
+      json(key, fallback) {
+        const raw = this.get(key, null);
+        if (raw == null) return fallback === undefined ? null : fallback;
+        try { return JSON.parse(raw); }
+        catch (e) { log({ owner: 'storage', api: name + '.json', error: e, phase: 'runtime' }); return fallback === undefined ? null : fallback; }
+      },
+      setJson(key, obj) {
+        try { return this.set(key, JSON.stringify(obj)); }
+        catch (e) { log({ owner: 'storage', api: name + '.setJson', error: e, phase: 'runtime' }); return false; }
+      },
+    };
+  }
+
+  // Minimal, fully-degrading IndexedDB key/value owner. Absent ⇒ every op resolves to a safe fallback,
+  // never rejects (a missing DB must never break a caller). Only touches IDB when the capability is real.
+  const IDB_DB = 'aurix-runtime', IDB_STORE = 'kv';
+  function openKv() {
+    return new Promise((resolve) => {
+      if (!capabilities.indexedDB) return resolve(null);
+      try {
+        const req = root.indexedDB.open(IDB_DB, 1);
+        req.onupgradeneeded = () => { try { const db = req.result; if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE); } catch (_) {} };
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => { log({ owner: 'storage', api: 'indexedDB.open', error: req.error, phase: 'runtime' }); resolve(null); };
+      } catch (e) { log({ owner: 'storage', api: 'indexedDB.open', error: e, phase: 'runtime' }); resolve(null); }
+    });
+  }
+  function idbRead(run, fallback) {
+    return openKv().then((db) => {
+      if (!db) return fallback;
+      return new Promise((resolve) => {
+        try {
+          const req = run(db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE));
+          req.onsuccess = () => resolve(req.result === undefined ? fallback : req.result);
+          req.onerror = () => { log({ owner: 'storage', api: 'indexedDB.read', error: req.error, phase: 'runtime' }); resolve(fallback); };
+        } catch (e) { log({ owner: 'storage', api: 'indexedDB.read', error: e, phase: 'runtime' }); resolve(fallback); }
+      });
+    }).catch((e) => { log({ owner: 'storage', api: 'indexedDB.read', error: e, phase: 'runtime' }); return fallback; });
+  }
+  function idbWrite(run) {
+    // Resolves true ONLY on a real committed write; absent DB / error ⇒ false (never a false-positive success).
+    return openKv().then((db) => {
+      if (!db) return false;
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction(IDB_STORE, 'readwrite');
+          run(tx.objectStore(IDB_STORE));
+          tx.oncomplete = () => resolve(true);
+          tx.onerror = () => { log({ owner: 'storage', api: 'indexedDB.write', error: tx.error, phase: 'runtime' }); resolve(false); };
+          tx.onabort = () => resolve(false);
+        } catch (e) { log({ owner: 'storage', api: 'indexedDB.write', error: e, phase: 'runtime' }); resolve(false); }
+      });
+    }).catch((e) => { log({ owner: 'storage', api: 'indexedDB.write', error: e, phase: 'runtime' }); return false; });
+  }
+  const idb = {
+    get available() { return capabilities.indexedDB; },
+    open: openKv,
+    get(key, fallback) { const fb = fallback === undefined ? null : fallback; return idbRead((s) => s.get(key), fb).then(v => v == null ? fb : v); },
+    set(key, value) { return idbWrite((s) => s.put(value, key)); },
+    del(key) { return idbWrite((s) => s.delete(key)); },
+  };
+
+  // Cache API owner — absent ⇒ safe no-ops (null / []), never a throw.
+  const cache = {
+    get available() { return capabilities.cacheStorage; },
+    open(cacheName) { if (!capabilities.cacheStorage) return Promise.resolve(null); try { return root.caches.open(cacheName).catch((e) => { log({ owner: 'storage', api: 'caches.open', error: e, phase: 'runtime' }); return null; }); } catch (e) { log({ owner: 'storage', api: 'caches.open', error: e, phase: 'runtime' }); return Promise.resolve(null); } },
+    keys() { if (!capabilities.cacheStorage) return Promise.resolve([]); try { return root.caches.keys().catch(() => []); } catch (_) { return Promise.resolve([]); } },
+    delete(cacheName) { if (!capabilities.cacheStorage) return Promise.resolve(false); try { return root.caches.delete(cacheName).catch(() => false); } catch (_) { return Promise.resolve(false); } },
+  };
+
+  // ── 3 + 6. Bootstrap protection & recovery — single init / single controlled recovery, never a loop ──
+  const _claimed = Object.create(null);
+  const _recoveries = Object.create(null);
+  function claim(key) {
+    // Returns true the FIRST time for a key, false forever after. The primitive for "one bootstrap / one
+    // render / one routing decision / one init" — dobles inicializaciones become impossible.
+    const k = String(key);
+    if (_claimed[k]) return false;
+    _claimed[k] = true;
+    return true;
+  }
+  function once(key, fn) {
+    if (!claim(key)) return false;
+    try { if (typeof fn === 'function') fn(); } catch (e) { log({ owner: 'bootstrap', api: 'once:' + key, error: e, phase: 'bootstrap' }); }
+    return true;
+  }
+  function recover(key, fn, max) {
+    // At most `max` (default 1) controlled recoveries per key — never infinite retry.
+    const k = String(key), cap = (typeof max === 'number' && max > 0) ? max : 1;
+    const n = _recoveries[k] || 0;
+    if (n >= cap) { log({ owner: 'recovery', api: k, type: 'exhausted', phase: 'recover' }); return false; }
+    _recoveries[k] = n + 1;
+    try { if (typeof fn === 'function') fn(); } catch (e) { log({ owner: 'recovery', api: k, error: e, phase: 'recover' }); }
+    return true;
+  }
+
+  // ── 5. Runtime protection — contain any exception, log it, return a fallback (never desmontar root) ──
+  function protect(phase, owner, fn, fallback) {
+    try { return typeof fn === 'function' ? fn() : fallback; }
+    catch (e) { log({ owner: owner || 'runtime', api: 'protect', error: e, phase: phase || 'runtime' }); return fallback; }
+  }
+
+  const degraded = {
+    storage: !(capabilities.localStorage || capabilities.sessionStorage),
+    localStorage: !capabilities.localStorage,
+    sessionStorage: !capabilities.sessionStorage,
+    indexedDB: !capabilities.indexedDB,
+    cacheStorage: !capabilities.cacheStorage,
+    serviceWorker: !capabilities.serviceWorker,
+    visualViewport: !capabilities.visualViewport,
+  };
+
+  const AurixRuntime = {
+    version: '1',
+    capabilities,
+    degraded,
+    has(name) { try { return (name in capabilities) ? capabilities[name] : false; } catch (_) { return false; } },
+    storage: { local: makeWebStorage('local'), session: makeWebStorage('session'), idb, cache },
+    claim, once, recover, protect, log,
+    logs() { try { return _log.slice(); } catch (_) { return []; } },
+    clearLogs() { try { _log.length = 0; } catch (_) {} },
+    status() {
+      return { version: '1', capabilities: capabilities, degraded: degraded, logCount: _log.length,
+        build: root.AURIX_BUILD || null, appJsVersion: root.__AURIX_APPJS_VERSION__ || null };
+    },
+  };
+
+  try { root.AurixRuntime = AurixRuntime; root.__AURIX_RUNTIME = AurixRuntime; root.aurixRuntimeStatus = AurixRuntime.status; } catch (_) {}
+  try { if (root.__AURIX_BOOT && typeof root.__AURIX_BOOT.mark === 'function') root.__AURIX_BOOT.mark('runtime_resilience_ready'); } catch (_) {}
+  return AurixRuntime;
+}
+try { if (typeof window !== 'undefined') _aurixInstallRuntimeResilience(window); } catch (_) {}
+
+// ════════════════════════════════════════════════════════════════════════
 // SPEC DSH.CHART.ATOMIC_BUILD_COHERENCE.43 — one runtime build-coherence contract
 // ════════════════════════════════════════════════════════════════════════
 // The EXECUTED bundle's immutable self-version (bumped together with index APPJS_V + version.json.appjs +
@@ -15,7 +252,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '580'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '581'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
