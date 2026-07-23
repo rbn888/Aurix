@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '577'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '578'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -56116,16 +56116,26 @@ try {
   // ONBOARDING-1B §3: `awaitingAsset` is single-use — it's cleared
   // the moment we observe the add-asset modal close so a second close
   // (e.g. user reopened add-asset manually) never re-mounts onboarding.
+  //
+  // HOTFIX P0 (liquidity modal behind onboarding): the add-asset picker hands off to the
+  // "Añadir liquidez" FORM by CLOSING itself (closeModal) and opening #liquidityOverlay in the
+  // SAME synchronous tick. The MutationObserver callback is batched (delivered as a microtask
+  // AFTER that tick), so it must consider BOTH overlays: re-mounting onboarding the instant the
+  // picker closes would drop the onboarding overlay (z-index 250) IN FRONT of the just-opened
+  // liquidity modal (double overlay + liquidity trapped behind). Fix: only re-mount when NEITHER
+  // add-flow modal is open — the asset→liquidity handoff keeps onboarding hidden until the whole
+  // flow (picker OR liquidity form) is dismissed, then restores it for a clean continuation.
   const _addAssetOv = document.getElementById('modalOverlay');
-  if (_addAssetOv && typeof MutationObserver !== 'undefined') {
+  const _liquidityOv = document.getElementById('liquidityOverlay');
+  if ((_addAssetOv || _liquidityOv) && typeof MutationObserver !== 'undefined') {
     const mo = new MutationObserver(() => {
       if (!awaitingAsset) return;
-      const isOpen = _addAssetOv.classList.contains('open');
-      if (isOpen) return;
-      // Closed. Consume the awaiting flag FIRST so further mutations
-      // can't re-enter this branch. The reopen target depends on which
-      // step we're in — ONBOARDING-2 needs to also handle the SUCCESS
-      // multi-asset loop where the user might cancel the modal.
+      const anyFlowOpen = (_addAssetOv && _addAssetOv.classList.contains('open')) ||
+                          (_liquidityOv && _liquidityOv.classList.contains('open'));
+      if (anyFlowOpen) return;   // still inside the add flow (picker or liquidity form) — don't re-mount yet
+      // Whole add flow dismissed. Consume the awaiting flag FIRST so further mutations can't
+      // re-enter this branch. The reopen target depends on which step we're in — ONBOARDING-2
+      // needs to also handle the SUCCESS multi-asset loop where the user might cancel the modal.
       awaitingAsset = false;
       const snap = Eng.getSnapshot();
       if (snap.completed) return;
@@ -56133,7 +56143,8 @@ try {
         _openOnboardingOverlay();
       }
     });
-    mo.observe(_addAssetOv, { attributes: true, attributeFilter: ['class'] });
+    if (_addAssetOv)  mo.observe(_addAssetOv,  { attributes: true, attributeFilter: ['class'] });
+    if (_liquidityOv) mo.observe(_liquidityOv, { attributes: true, attributeFilter: ['class'] });
   }
 
   // ── Entry point — called from boot after auth + portfolio load ──

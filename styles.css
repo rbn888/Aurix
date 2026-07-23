@@ -15933,6 +15933,12 @@ body.gs-open { overflow: hidden; }
   z-index: 250;
   padding: var(--space-3);
 }
+/* HOTFIX P0 — the "Añadir liquidez" form is reachable FROM the onboarding
+   ACTIVATION flow (picker → Liquidez), so its overlay + backdrop must always
+   render ABOVE the onboarding overlay (250), never behind it. Defence-in-depth
+   alongside the onboarding re-mount fix; scoped to this one modal (the only one
+   opened while the onboarding overlay can be present). */
+#liquidityOverlay { z-index: 260; }
 .modal--onboarding {
   position: relative;
   max-width: 480px;
