@@ -1,1 +1,1 @@
-{ "appjs": 572, "loginhtml": 484, "build": "v581-chart-ui-i18n-loading-transition", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)" }
+{ "appjs": 573, "loginhtml": 484, "build": "v582-multidevice-state-hardening", "note": "served-version source of truth for the stale-bundle guards in index.html (appjs) and login.html (loginhtml)" }
