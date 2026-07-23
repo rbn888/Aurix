@@ -30,6 +30,7 @@ function _aurixInstallRuntimeResilience(root) {
   // ── 7. Logging — technical-only telemetry ring buffer (no PII / financial / user content) ──────────
   const LOG_MAX = 120;
   const _log = [];
+  let _sink = null;                                          // optional observer (SPEC PLATFORM-HARDENING.2 diagnostics)
   function sanitizeType(err) {
     // Capture the EXCEPTION TYPE only (e.g. "QuotaExceededError", "TypeError"), never a message that
     // could carry user/financial content. A short bounded string for anything non-Error.
@@ -42,9 +43,11 @@ function _aurixInstallRuntimeResilience(root) {
   function log(entry) {
     try {
       const e = entry || {};
-      _log.push({ t: _now(), owner: String(e.owner || '').slice(0, 40), api: String(e.api || '').slice(0, 60),
-        phase: String(e.phase || '').slice(0, 24), type: (e.type != null ? String(e.type).slice(0, 60) : sanitizeType(e.error)) });
+      const rec = { t: _now(), owner: String(e.owner || '').slice(0, 40), api: String(e.api || '').slice(0, 60),
+        phase: String(e.phase || '').slice(0, 24), type: (e.type != null ? String(e.type).slice(0, 60) : sanitizeType(e.error)) };
+      _log.push(rec);
       if (_log.length > LOG_MAX) _log.shift();
+      if (_sink) { try { _sink(rec); } catch (_) {} }        // fan out to the diagnostics observer (never throws back)
     } catch (_) {}
   }
 
@@ -227,6 +230,7 @@ function _aurixInstallRuntimeResilience(root) {
     has(name) { try { return (name in capabilities) ? capabilities[name] : false; } catch (_) { return false; } },
     storage: { local: makeWebStorage('local'), session: makeWebStorage('session'), idb, cache },
     claim, once, recover, protect, log,
+    onEvent(fn) { _sink = (typeof fn === 'function') ? fn : null; },   // single diagnostics observer (SPEC PH.2)
     logs() { try { return _log.slice(); } catch (_) { return []; } },
     clearLogs() { try { _log.length = 0; } catch (_) {} },
     status() {
@@ -242,6 +246,219 @@ function _aurixInstallRuntimeResilience(root) {
 try { if (typeof window !== 'undefined') _aurixInstallRuntimeResilience(window); } catch (_) {}
 
 // ════════════════════════════════════════════════════════════════════════
+// SPEC PLATFORM-HARDENING.2 — RUNTIME OBSERVABILITY & FAILURE DIAGNOSTICS (single owner)
+// ════════════════════════════════════════════════════════════════════════
+// ONE central diagnostics layer, integrated with the Runtime Resilience layer above, so any bootstrap /
+// render / navigation / runtime failure leaves enough TECHNICAL evidence to locate root cause — even when
+// it can't be reproduced in dev. It records ONLY technical information (owner / phase / API / exception
+// TYPE / timing); NEVER personal data, financial data or user content. It does NOT add product features,
+// does NOT modify the user experience, sends NOTHING automatically (local-only), and observes without
+// changing behaviour. The bootstrap timeline is DERIVED from the existing __AURIX_BOOT marks (bootstrap_
+// start / runtime_resilience_ready / auth_done / app_registration_complete / dashboard_rendered /
+// shell_first_reveal / splash_hidden), so auth/routing/dashboard are never touched. All buffers are fixed-
+// size (bounded memory). `root` is passed explicitly so the whole layer runs in an isolated harness sandbox.
+function _aurixInstallRuntimeDiagnostics(root) {
+  if (!root || typeof root !== 'object') return null;
+  const RT = root.AurixRuntime;
+  if (!RT || typeof RT.onEvent !== 'function') return null;   // requires the resilience layer
+  if (RT.diagnostics) return RT.diagnostics;                  // single owner: install exactly once
+
+  const _now = () => { try { return Date.now(); } catch (_) { return 0; } };
+  const EVENTS_MAX = 100;                                     // ── 6. fixed-size ring buffer (bounded memory) ──
+  const _events = [];
+  const RENDER_THRESHOLD = 3;
+  const _counters = { errors: 0, rejections: 0, recoveriesExecuted: 0, recoveriesAvoided: 0, loopsAvoided: 0, degradationsApplied: 0, renderSignals: 0 };
+  const _renderStability = { bootstrap: 0, render: 0, routing: 0, remount: 0, threshold: RENDER_THRESHOLD, overThreshold: false };
+
+  function pushEvent(ev) {
+    try {
+      const rec = { t: _now(), kind: String(ev.kind || 'event').slice(0, 24), owner: String(ev.owner || '').slice(0, 40),
+        phase: String(ev.phase || '').slice(0, 24), api: String(ev.api || '').slice(0, 80),
+        type: (ev.type != null ? String(ev.type).slice(0, 80) : null) };
+      _events.push(rec);
+      if (_events.length > EVENTS_MAX) _events.shift();       // never grows unbounded
+      return rec;
+    } catch (_) { return null; }
+  }
+  function currentPhase() {
+    try {
+      const B = root.__AURIX_BOOT;
+      if (!B) return 'runtime';
+      if (B.dashboardReady || B.splashHidden) return 'runtime';
+      if (B.bootstrapStarted) return 'bootstrap';
+      return 'boot';
+    } catch (_) { return 'runtime'; }
+  }
+
+  // ── 2. Runtime errors — subscribe to the resilience layer's SINGLE technical sink ──────────────────
+  // Every storage / bootstrap / protect exception already flows through AurixRuntime.log — classify it and
+  // record it (associated with owner / phase / API). Recovery counting is owned by the recover() wrapper
+  // below (a successful recover does not log), so recovery-owner log lines are recorded but not re-counted.
+  try {
+    RT.onEvent(function (rec) {
+      let kind = 'error';
+      if (rec.owner === 'recovery') { kind = (rec.type === 'exhausted') ? 'recovery-avoided' : 'recovery-error'; }
+      else if (rec.owner === 'bootstrap') { kind = 'bootstrap-error'; _counters.errors++; }
+      else { _counters.errors++; }                            // storage / runtime contained exception
+      pushEvent({ kind: kind, owner: rec.owner, phase: rec.phase, api: rec.api, type: rec.type });
+    });
+  } catch (_) {}
+
+  // Degradations the resilience layer already applied at install (safe degradation is an event to record).
+  try {
+    const d = RT.degraded || {};
+    Object.keys(d).forEach(function (k) { if (d[k]) { _counters.degradationsApplied++; pushEvent({ kind: 'degradation', owner: 'AurixRuntime', phase: 'bootstrap', api: k, type: 'unavailable' }); } });
+  } catch (_) {}
+  // Build-coherence "recoverable" / storage-degraded states = a reload loop that was AVOIDED (index.html/app.js).
+  try {
+    if (root.__AURIX_COHERENCE_DEGRADED != null || root.__AURIX_COHERENCE_DEGRADED_BUILD != null) { _counters.loopsAvoided++; pushEvent({ kind: 'loop-avoided', owner: 'build-coherence', phase: 'bootstrap', api: 'storage-durability', type: 'degraded-no-reload' }); }
+    if (root.__AURIX_BUILD_RELOAD_EXHAUSTED != null || root.__AURIX_BUILD_RELOAD_EXHAUSTED_BUILD != null) { _counters.loopsAvoided++; pushEvent({ kind: 'loop-avoided', owner: 'build-coherence', phase: 'bootstrap', api: 'reload', type: 'recoverable' }); }
+  } catch (_) {}
+
+  // Centralized global error / unhandled-rejection capture — records the exception TYPE ONLY (never the
+  // message, which could carry user content) plus a technical location (file:line).
+  try {
+    if (typeof root.addEventListener === 'function') {
+      root.addEventListener('error', function (e) {
+        try {
+          const f = (e && e.filename) || '';
+          if (String(f).indexOf('extension://') >= 0) return; // ignore browser-extension noise (as index.html does)
+          _counters.errors++;
+          pushEvent({ kind: 'js-error', owner: 'window', phase: currentPhase(),
+            api: (f ? String(f).split('/').pop() : '') + (e && e.lineno ? ':' + e.lineno : ''),
+            type: (e && e.error && e.error.name) || 'Error' });
+        } catch (_) {}
+      }, true);
+      root.addEventListener('unhandledrejection', function (e) {
+        try {
+          _counters.rejections++;
+          const r = e && e.reason;
+          pushEvent({ kind: 'promise-rejection', owner: 'window', phase: currentPhase(), api: 'promise', type: (r && r.name) || 'Rejection' });
+        } catch (_) {}
+      });
+    }
+  } catch (_) {}
+
+  // ── 4. Recovery tracking — wrap recover() so executed vs avoided is counted exactly (never a loop) ──
+  try {
+    const _recover = RT.recover;
+    RT.recover = function (key, fn, max) {
+      const ok = _recover(key, fn, max);
+      try {
+        if (ok) { _counters.recoveriesExecuted++; pushEvent({ kind: 'recovery', owner: 'recovery', phase: 'recover', api: String(key).slice(0, 60), type: 'executed' }); }
+        else { _counters.recoveriesAvoided++; _counters.loopsAvoided++; pushEvent({ kind: 'recovery-avoided', owner: 'recovery', phase: 'recover', api: String(key).slice(0, 60), type: 'loop-avoided' }); }
+      } catch (_) {}
+      return ok;
+    };
+  } catch (_) {}
+
+  // ── 5. Render stability — OBSERVE only (never change behaviour) ─────────────────────────────────────
+  // Wrap the public claim() so a REPEATED claim for a stability-critical key (bootstrap / render / routing /
+  // remount) is recorded. claim()'s own single-init contract is unchanged; the wrapper only reads its result.
+  function classifyKey(key) {
+    const k = String(key).toLowerCase();
+    if (k.indexOf('remount') >= 0) return 'remount';
+    if (k.indexOf('rout') >= 0 || k.indexOf('nav') >= 0) return 'routing';
+    if (k.indexOf('render') >= 0 || k.indexOf('paint') >= 0) return 'render';
+    if (k.indexOf('boot') >= 0 || k.indexOf('init') >= 0) return 'bootstrap';
+    return null;
+  }
+  function noteRender(bucket, why) {
+    try {
+      _renderStability[bucket] = (_renderStability[bucket] || 0) + 1;
+      _counters.renderSignals++;
+      if (_renderStability[bucket] >= RENDER_THRESHOLD) _renderStability.overThreshold = true;
+      pushEvent({ kind: 'render-stability', owner: 'render', phase: currentPhase(), api: bucket, type: why });
+    } catch (_) {}
+  }
+  try {
+    const _claim = RT.claim;
+    RT.claim = function (key) {
+      const first = _claim(key);
+      try { if (!first) { const c = classifyKey(key); if (c) noteRender(c, 'repeat'); } } catch (_) {}
+      return first;
+    };
+  } catch (_) {}
+  function recordRender(kind) { const c = classifyKey(kind) || 'render'; noteRender(c, 'signal'); }
+
+  // ── 1. Bootstrap timeline — derived from existing __AURIX_BOOT marks (order + timestamp + duration + owner) ──
+  const PHASE_OWNERS = {
+    index_html_parsed: 'index.html', app_js_executing: 'app.js', app_js_loaded: 'index.html',
+    runtime_resilience_ready: 'AurixRuntime', runtime_diagnostics_ready: 'AurixRuntime', bootstrap_start: 'bootstrap',
+    DOMContentLoaded: 'document', auth_done: 'auth', app_registration_complete: 'app.js', dashboard_rendered: 'dashboard',
+    portfolio_fx_done: 'portfolio', shell_first_reveal: 'render', splash_hidden: 'render', window_load: 'window',
+  };
+  function timeline() {
+    try {
+      const B = root.__AURIX_BOOT;
+      if (!B || !Array.isArray(B.steps)) return [];
+      const parsed = B.steps.map(function (s) {
+        const m = String(s).match(/^(.*)\((\d+)ms\)$/);
+        const name = m ? m[1] : String(s);
+        return { phase: name, atMs: m ? parseInt(m[2], 10) : null, owner: PHASE_OWNERS[name] || 'app', result: 'ok', durationMs: null };
+      });
+      for (let i = 0; i < parsed.length - 1; i++) { if (parsed[i].atMs != null && parsed[i + 1].atMs != null) parsed[i].durationMs = parsed[i + 1].atMs - parsed[i].atMs; }
+      return parsed;
+    } catch (_) { return []; }
+  }
+
+  // ── 3. Browser context — feature detection + structured client hints; UA recorded as opaque evidence ──
+  // No decision/branching is ever taken on the User-Agent string; it is stored purely as human-readable
+  // evidence. All runtime environment facts come from feature detection / navigator.userAgentData hints.
+  function browser() {
+    const nav = (root.navigator && typeof root.navigator === 'object') ? root.navigator : {};
+    const uaData = nav.userAgentData || null;
+    const mm = (q) => { try { return !!(root.matchMedia && root.matchMedia(q).matches); } catch (_) { return false; } };
+    const durable = (typeof root.__AURIX_STORAGE_OK === 'boolean') ? root.__AURIX_STORAGE_OK : (RT.capabilities.sessionStorage === true);
+    return {
+      clientHints: uaData ? { platform: (typeof uaData.platform === 'string' ? uaData.platform : null), mobile: (typeof uaData.mobile === 'boolean' ? uaData.mobile : null),
+        brands: (Array.isArray(uaData.brands) ? uaData.brands.map(function (b) { return { brand: b && b.brand, version: b && b.version }; }) : null) } : null,
+      userAgent: (typeof nav.userAgent === 'string' ? nav.userAgent : null),   // evidence only — never used for logic
+      language: (typeof nav.language === 'string' ? nav.language : null),
+      standalone: mm('(display-mode: standalone)') || nav.standalone === true,
+      hardwareConcurrency: (typeof nav.hardwareConcurrency === 'number' ? nav.hardwareConcurrency : null),
+      deviceMemory: (typeof nav.deviceMemory === 'number' ? nav.deviceMemory : null),
+      online: (typeof nav.onLine === 'boolean' ? nav.onLine : null),
+      reducedMotion: mm('(prefers-reduced-motion: reduce)'),
+      viewport: { w: (typeof root.innerWidth === 'number' ? root.innerWidth : null), h: (typeof root.innerHeight === 'number' ? root.innerHeight : null),
+        dpr: (typeof root.devicePixelRatio === 'number' ? root.devicePixelRatio : null), visualViewport: !!root.visualViewport },
+      incognitoHint: durable ? 'unlikely' : 'possible',        // technically-possible HINT only (storage durability), never definitive
+    };
+  }
+
+  function recoveries() { return { executed: _counters.recoveriesExecuted, avoided: _counters.recoveriesAvoided, loopsAvoided: _counters.loopsAvoided, degradationsApplied: _counters.degradationsApplied }; }
+  function owners() {
+    const set = Object.create(null);
+    try { timeline().forEach(function (p) { if (p.owner) set[p.owner] = true; }); } catch (_) {}
+    try { _events.forEach(function (e) { if (e.owner) set[e.owner] = true; }); } catch (_) {}
+    return Object.keys(set);
+  }
+
+  // ── 7. Technical export — everything needed to explain an incident; no private information ──────────
+  function report() {
+    return { spec: 'PLATFORM-HARDENING.2', version: '1', generatedAtMs: _now(),
+      build: root.AURIX_BUILD || null, appJsVersion: root.__AURIX_APPJS_VERSION__ || null,
+      timeline: timeline(), events: _events.slice(),
+      counters: { errors: _counters.errors, rejections: _counters.rejections, renderSignals: _counters.renderSignals },
+      recoveries: recoveries(),
+      renderStability: { bootstrap: _renderStability.bootstrap, render: _renderStability.render, routing: _renderStability.routing, remount: _renderStability.remount, threshold: RENDER_THRESHOLD, overThreshold: _renderStability.overThreshold },
+      capabilities: RT.capabilities, browser: browser(), owners: owners() };
+  }
+
+  const diagnostics = { version: '1', report, recordRender,
+    events() { try { return _events.slice(); } catch (_) { return []; } },
+    timeline, browser, recoveries,
+    counters() { try { return Object.assign({}, _counters); } catch (_) { return {}; } },
+    renderStability() { try { return Object.assign({}, _renderStability); } catch (_) { return {}; } },
+    clear() { try { _events.length = 0; } catch (_) {} } };
+
+  try { RT.diagnostics = diagnostics; root.__AURIX_DIAGNOSTICS = diagnostics; root.aurixDiagnosticsReport = report; } catch (_) {}
+  try { if (root.__AURIX_BOOT && typeof root.__AURIX_BOOT.mark === 'function') root.__AURIX_BOOT.mark('runtime_diagnostics_ready'); } catch (_) {}
+  return diagnostics;
+}
+try { if (typeof window !== 'undefined') _aurixInstallRuntimeDiagnostics(window); } catch (_) {}
+
+// ════════════════════════════════════════════════════════════════════════
 // SPEC DSH.CHART.ATOMIC_BUILD_COHERENCE.43 — one runtime build-coherence contract
 // ════════════════════════════════════════════════════════════════════════
 // The EXECUTED bundle's immutable self-version (bumped together with index APPJS_V + version.json.appjs +
@@ -252,7 +469,7 @@ try { if (typeof window !== 'undefined') _aurixInstallRuntimeResilience(window);
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '581'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '582'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
