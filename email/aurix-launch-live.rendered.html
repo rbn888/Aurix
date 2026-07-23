@@ -1,0 +1,129 @@
+<!--
+  AURIX — INSTITUTIONAL EMAIL BASE TEMPLATE (reusable)
+  ────────────────────────────────────────────────────────────────────────────
+  ONE reusable base for all Aurix brand emails. Content is injected via slots so
+  future campaigns change subject/title/body/CTA WITHOUT duplicating this HTML.
+
+  Reusable slots (mustache): The wait is over. Your access to Aurix is now ready. Aurix is now live. <p style="margin:0 0 16px 0;">The wait is over.</p>
+              <p style="margin:0 0 16px 0;">Aurix is officially open, and you can now access the platform.</p>
+              <p style="margin:0 0 16px 0;">From today, you can bring your entire wealth together in one private platform—track stocks, ETFs, funds, crypto, precious metals, real estate, cash and more, all from a single place.</p>
+              <p style="margin:0 0 16px 0;">This is just the beginning. Aurix will continue to evolve with new intelligence features, financial tools and powerful capabilities over the coming months.</p>
+              <p style="margin:0 0 16px 0;">Thank you for being part of our journey from the very beginning.</p>
+              <p style="margin:0 0 16px 0;">Your access is now ready.</p> Enter Aurix →
+  https://aurixsystem.io https://aurixsystem.io mailto:unsubscribe@aurixsystem.io?subject=unsubscribe 2026
+
+  Email-safe: table layout, inline styles, system fonts (no external fonts/JS/
+  video/remote CSS). Dark by design; honours the client's dark mode. Tested target
+  set: Gmail, Apple Mail, Outlook, iOS, Android, desktop.
+  Palette (official Aurix tokens): bg #030712 · surface #080D18 · electric #2684FF
+  · text #E8EEF7 · muted #9FB0C7.
+-->
+<!DOCTYPE html>
+<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="color-scheme" content="dark">
+  <meta name="supported-color-schemes" content="dark light">
+  <title>Aurix is now live.</title>
+  <!--[if mso]><style>* { font-family: Arial, sans-serif !important; }</style><![endif]-->
+  <style>
+    /* Progressive enhancement only — the email works fully without this block. */
+    body { margin:0 !important; padding:0 !important; width:100% !important; background:#030712; }
+    .aurix-cta:hover { filter:brightness(1.06); }
+    @media only screen and (max-width:620px) {
+      .aurix-container { width:100% !important; border-radius:0 !important; }
+      .aurix-pad { padding-left:22px !important; padding-right:22px !important; }
+      .aurix-cta-a { display:block !important; width:100% !important; box-sizing:border-box !important; }
+    }
+  </style>
+</head>
+<body style="margin:0; padding:0; background:#030712; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%;">
+  <!-- Preheader (hidden preview text) -->
+  <div style="display:none; max-height:0; overflow:hidden; opacity:0; mso-hide:all; font-size:1px; line-height:1px; color:#030712;">The wait is over. Your access to Aurix is now ready.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#030712;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+
+        <!-- Container -->
+        <table role="presentation" class="aurix-container" width="600" cellpadding="0" cellspacing="0" border="0"
+               style="width:600px; max-width:600px; background:#080D18; border:1px solid #2684FF; border-radius:14px; box-shadow:0 0 40px rgba(38,132,255,0.14); overflow:hidden;">
+
+          <!-- Header / wordmark -->
+          <tr>
+            <td class="aurix-pad" align="center" style="padding:34px 40px 8px 40px;">
+              <span style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:22px; font-weight:800; letter-spacing:4px; color:#FFFFFF;">AURIX</span>
+            </td>
+          </tr>
+          <tr><td style="padding:0 40px;"><div style="height:1px; line-height:1px; font-size:0; background:rgba(38,132,255,0.18);">&nbsp;</div></td></tr>
+
+          <!-- Title -->
+          <tr>
+            <td class="aurix-pad" align="left" style="padding:30px 40px 6px 40px;">
+              <h1 style="margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:30px; line-height:1.2; font-weight:800; color:#FFFFFF;">Aurix is now live.</h1>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td class="aurix-pad" align="left" style="padding:10px 40px 4px 40px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:16px; line-height:1.62; color:#C7D3E3;">
+              <p style="margin:0 0 16px 0;">The wait is over.</p>
+              <p style="margin:0 0 16px 0;">Aurix is officially open, and you can now access the platform.</p>
+              <p style="margin:0 0 16px 0;">From today, you can bring your entire wealth together in one private platform—track stocks, ETFs, funds, crypto, precious metals, real estate, cash and more, all from a single place.</p>
+              <p style="margin:0 0 16px 0;">This is just the beginning. Aurix will continue to evolve with new intelligence features, financial tools and powerful capabilities over the coming months.</p>
+              <p style="margin:0 0 16px 0;">Thank you for being part of our journey from the very beginning.</p>
+              <p style="margin:0 0 16px 0;">Your access is now ready.</p>
+            </td>
+          </tr>
+
+          <!-- Primary CTA (bulletproof) -->
+          <tr>
+            <td class="aurix-pad" align="left" style="padding:22px 40px 6px 40px;">
+              <!--[if mso]>
+              <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://aurixsystem.io" style="height:52px;v-text-anchor:middle;width:520px;" arcsize="16%" strokecolor="#2684FF" fillcolor="#2684FF">
+                <w:anchorlock/>
+                <center style="color:#FFFFFF;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Enter Aurix →</center>
+              </v:roundrect>
+              <![endif]-->
+              <!--[if !mso]><!-- -->
+              <a href="https://aurixsystem.io" class="aurix-cta aurix-cta-a" target="_blank" rel="noopener noreferrer"
+                 style="display:inline-block; background:#2684FF; color:#FFFFFF; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:16px; font-weight:700; text-decoration:none; padding:15px 34px; border-radius:10px; box-shadow:0 6px 22px rgba(38,132,255,0.32); mso-padding-alt:0;">Enter Aurix →</a>
+              <!--<![endif]-->
+            </td>
+          </tr>
+
+          <!-- Fallback URL -->
+          <tr>
+            <td class="aurix-pad" align="left" style="padding:6px 40px 30px 40px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:13px; line-height:1.5; color:#9FB0C7;">
+              Or paste this link into your browser:<br>
+              <a href="https://aurixsystem.io" target="_blank" rel="noopener noreferrer" style="color:#2684FF; text-decoration:underline;">https://aurixsystem.io</a>
+            </td>
+          </tr>
+
+          <!-- Closing line (optional slot) -->
+          <tr>
+            <td class="aurix-pad" align="left" style="padding:2px 40px 26px 40px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:16px; line-height:1.6; color:#C7D3E3;">See you inside.</td>
+          </tr>
+
+          <!-- Footer -->
+          <tr><td style="padding:0 40px;"><div style="height:1px; line-height:1px; font-size:0; background:rgba(38,132,255,0.12);">&nbsp;</div></td></tr>
+          <tr>
+            <td class="aurix-pad" align="left" style="padding:22px 40px 30px 40px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:13px; line-height:1.6; color:#7E8CA3;">
+              <strong style="color:#C7D3E3;">The Aurix Team</strong><br>
+              Aurix · Wealth Intelligence Platform<br>
+              <span style="color:#5E6B82;">You are receiving this because you joined the Aurix waitlist.</span>
+              <a href="mailto:unsubscribe@aurixsystem.io?subject=unsubscribe" style="color:#7E8CA3; text-decoration:underline;">Unsubscribe</a>.
+              <br><span style="color:#4A566B;">&copy; 2026 Aurix</span>
+            </td>
+          </tr>
+
+        </table>
+        <!-- /Container -->
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
