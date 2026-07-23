@@ -66,8 +66,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v583-spec66-funds-integrity';
-      var APPJS_V = '574';
+      var BUILD = 'v584-spec67-disable-export';
+      var APPJS_V = '575';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -1442,7 +1442,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=574"
+  <script src="app.js?v=575"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
@@ -1745,11 +1745,14 @@
       <section class="settings-section" data-pane="data" id="settingsSectionData">
         <h4 class="settings-section-title"><span class="settings-sec-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6z"/></svg></span><span data-i18n="settingsData">Datos y seguridad</span></h4>
         <div class="settings-actions">
-          <button type="button" class="settings-action" id="settingsExportBtn">
+          <!-- SPEC 67 — "Exportar datos" TEMPORARILY DISABLED before launch: kept in place + same
+               design, shown as "Próximamente" via `disabled` (mirrors #settingsImportBtn). Re-enable:
+               remove `disabled` and restore the sub to data-i18n="settingsExportSub". -->
+          <button type="button" class="settings-action" id="settingsExportBtn" disabled>
             <span class="settings-action-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="M8 11l4 4 4-4"/><path d="M5 20h14"/></svg></span>
             <span class="settings-action-text">
               <span class="settings-action-label" data-i18n="settingsExport">Exportar datos</span>
-              <span class="settings-action-sub" data-i18n="settingsExportSub">Descarga un JSON con toda tu cartera</span>
+              <span class="settings-action-sub" data-i18n="settingsImportSub">Próximamente</span>
             </span>
             <span class="settings-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
           </button>

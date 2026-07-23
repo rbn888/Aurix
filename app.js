@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '574'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '575'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -55385,7 +55385,10 @@ function exportPortfolioBackup() {
       return;
     }
     if (e.target.closest && e.target.closest('#settingsExportBtn')) {
-      try { exportPortfolioBackup(); } catch (err) { console.warn('[settings] export fail:', err && err.message); }
+      // SPEC 67 — "Exportar datos" TEMPORARILY DISABLED before launch. The button carries `disabled`
+      // in index.html (so this rarely fires), but we ALSO no-op here so NO export flow can run while
+      // disabled. The export code (exportPortfolioBackup) is intact — re-enable by removing `disabled`
+      // from #settingsExportBtn and restoring the call: `try { exportPortfolioBackup(); } catch (…) {}`.
       return;
     }
     if (e.target.closest && e.target.closest('#settingsResetBtn')) {
