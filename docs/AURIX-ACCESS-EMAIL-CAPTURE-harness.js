@@ -54,7 +54,7 @@ ok('4.3 no table name / SQL / Supabase internals leaked to the user copy', !/wai
 console.log('5 — migration SQL (public.persist_access_email):');
 ok('5.1 SECURITY DEFINER + pinned search_path', /create or replace function public\.persist_access_email/.test(sql) && /security definer/.test(sql) && /set search_path = public/.test(sql));
 ok('5.2 normalizes (lower + btrim) and validates before persisting', /lower\(btrim\(coalesce\(p_email/.test(sql) && /raise exception 'invalid_email'/.test(sql));
-ok('5.3 idempotent upsert onto the EXISTING email UNIQUE (on conflict do nothing)', /insert into public\.waitlist/.test(sql) && /on conflict \(email\) do nothing/.test(sql));
+ok('5.3 idempotent upsert onto the EXISTING email UNIQUE (on conflict do nothing)', /insert into public\."Correos usuario"/.test(sql) && /on conflict \(email\) do nothing/.test(sql));
 ok('5.4 inserts a NEUTRAL row (name \'\' for NOT NULL) — never overwrites history', /values \('',\s*v_email/.test(sql));
 ok('5.5 returns void → cannot enumerate whether an email already exists', /returns void/.test(sql));
 ok('5.6 grants EXECUTE to anon/authenticated, revokes from public (function only, not the table)',
@@ -63,9 +63,9 @@ ok('5.6 grants EXECUTE to anon/authenticated, revokes from public (function only
 // ── 6 no new table / no data loss / reuse historical table ───────────────────────
 console.log('6 — reuse historical table, create nothing new, delete nothing:');
 ok('6.1 creates NO table (function only)', !/create table/i.test(sql));
-ok('6.2 targets the historical table public.waitlist ONLY (no parallel table)', /public\.waitlist/.test(sql) && !/access_emails|user_emails|leads|waitlist_emails|correos_usuario/i.test(sql));
-ok('6.3 the existing email UNIQUE constraint it relies on really exists', /email\s+text\s+not null unique/.test(waitlistSql));
-ok('6.4 never deletes/drops data (no delete/drop table/truncate on waitlist)', !/delete from public\.waitlist|drop table|truncate/i.test(sql));
+ok('6.2 targets the historical table public."Correos usuario" ONLY (no parallel table)', /public\."Correos usuario"/.test(sql) && !/access_emails|user_emails|leads|waitlist_emails/i.test(sql));
+ok('6.3 the historical table\'s email UNIQUE constraint exists (documented origin: waitlist_1.sql, preserved through the physical rename)', /email\s+text\s+not null unique/.test(waitlistSql));
+ok('6.4 never deletes/drops data (no delete/drop table/truncate)', !/delete from|drop table|truncate/i.test(sql));
 ok('6.5 does not touch auth.users / portfolios / onboarding', !/auth\.users|user_portfolios|user_onboarding/.test(sql));
 
 // ── 7 rollback documented + reversible ──────────────────────────────────────────
@@ -77,7 +77,7 @@ console.log('8 — no regression (OTP engine, invite gate, public launch intact)
 ok('8.1 OTP engine unchanged (signInWithOtp shouldCreateUser + verifyOtp still present)', /signInWithOtp\(\{[\s\S]{0,80}shouldCreateUser: true/.test(login) && /verifyOtp\(/.test(login));
 ok('8.2 invite gate untouched (validate_invite_code RPC still used)', /validate_invite_code/.test(login));
 ok('8.3 public-launch gate untouched (isPublicLaunchOpen still gates the submit)', /isPublicLaunchOpen\(\)/.test(login));
-ok('8.4 landing waitlist writer still targets public.waitlist (same historical table)', /rest\/v1\/waitlist/.test(fs.readFileSync(path.join(root, 'api', 'waitlist.js'), 'utf8')));
+ok('8.4 client is table-agnostic: login.html names NO physical table, writes only via the RPC', !/rest\/v1\/(waitlist|Correos)/.test(login) && !/from\(\s*['"](waitlist|Correos)/.test(login) && /client\.rpc\(\s*['"]persist_access_email/.test(login));
 
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);

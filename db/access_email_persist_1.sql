@@ -4,13 +4,14 @@
 -- HOTFIX P0 — GUARANTEED CAPTURE OF EVERY ACCESS EMAIL.
 --
 -- Every valid email entered to access Aurix must be saved IMMEDIATELY into the historical email table
--- (public.waitlist — the card the owner now sees as "correos usuario") BEFORE the OTP is requested, so the
+-- (public."Correos usuario" — physically renamed by the owner from the original "waitlist"; note the
+-- capital + space, so it is a QUOTED identifier everywhere) BEFORE the OTP is requested, so the
 -- address is never lost if the user abandons / the OTP send fails / the code expires / is wrong / the user
 -- never verifies. This SECURITY DEFINER RPC is the ONLY public write surface: waitlist RLS denies
 -- anon/authenticated (see db/waitlist_1.sql) and the service_role key must NEVER reach the browser. Same
 -- hardening model as public.validate_invite_code. login.html calls it before every signInWithOtp.
 --
--- REUSES the historical table and its EXISTING `email` UNIQUE constraint — creates NO new table, no parallel
+-- REUSES the historical table (public."Correos usuario") and its EXISTING `email` UNIQUE constraint — creates NO new table, no parallel
 -- source, migrates no data. Idempotent: a new email inserts exactly one neutral row (name '' satisfies the
 -- NOT NULL column; status defaults to 'waitlist'); an existing email is left COMPLETELY untouched (no
 -- duplicate; no change to name/status/source/created_at/welcome_email_sent_at/notes) → testers / invited /
@@ -40,10 +41,10 @@ begin
 
   v_source := coalesce(nullif(btrim(p_source), ''), 'login-otp');
 
-  -- 3) idempotent upsert onto the EXISTING `email` UNIQUE constraint. New email → one neutral row.
-  --    Existing email → DO NOTHING: never overwrite historical name/status/source/created_at/
-  --    welcome_email_sent_at/notes (preserve testers / invited / joined / owner intact).
-  insert into public.waitlist (name, email, source, status)
+  -- 3) idempotent upsert onto the EXISTING `email` UNIQUE constraint (preserved through the table rename).
+  --    New email → one neutral row. Existing email → DO NOTHING: never overwrite historical name/status/
+  --    source/created_at/welcome_email_sent_at/notes (preserve testers / invited / joined / owner intact).
+  insert into public."Correos usuario" (name, email, source, status)
   values ('', v_email, v_source, 'waitlist')
   on conflict (email) do nothing;
 end;
@@ -60,5 +61,5 @@ grant  execute on function public.persist_access_email(text, text) to anon, auth
 
 -- ── ROLLBACK (code-safe; NEVER deletes captured emails) ──────────────────────
 --   drop function if exists public.persist_access_email(text, text);
---   -- Dropping the function removes NO waitlist rows. After dropping, redeploy the previous login.html
+--   -- Dropping the function removes NO rows from public."Correos usuario". After dropping, redeploy the previous login.html
 --   -- (revert the persist-before-OTP commit) so the client stops calling the RPC.
