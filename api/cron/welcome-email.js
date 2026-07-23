@@ -1,4 +1,7 @@
-// GET /api/cron/welcome-email   (Vercel Cron — runs every ~15 min; see vercel.json)
+// GET /api/cron/welcome-email   (drive with a Vercel Cron ~every 15 min, or a manual/dashboard trigger)
+// NOTE: the cron schedule + `functions.includeFiles: "email/**"` are configured by the founder on Vercel
+// when arming (kept OUT of the committed vercel.json — a */15 cron needs a Pro plan and would otherwise
+// fail the shared build). includeFiles is required so this function can read email/aurix-welcome.html.
 // ════════════════════════════════════════════════════════════════════════════
 // AURIX-EMAIL-EXPERIENCE-V1 · one-time welcome email, ~30 min after a NEW user's
 // first successful access. Trigger proxy = auth.users.created_at (a Supabase Auth

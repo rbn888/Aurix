@@ -65,11 +65,13 @@ ok('3 CRON_SECRET auth guard', /CRON_SECRET/.test(cron) && /unauthorized/.test(c
 ok('3 reuses existing infra (Supabase admin + Resend + shared welcome template)', /api\.resend\.com\/emails/.test(cron) && /aurix-welcome\.html/.test(cron));
 ok('3 GET-only serverless handler (Vercel ESM, matches api/ pattern)', /export default async function handler/.test(cron) && /method !== 'GET'/.test(cron));
 
-// ── 4 cron wiring (vercel.json) ──────────────────────────────────────────────
+// ── 4 cron scheduling (founder-configured on Vercel; NOT in repo vercel.json) ──
 console.log('4 — cron scheduling:');
-const vj = JSON.parse(R('vercel.json'));
-ok('4 vercel.json schedules /api/cron/welcome-email', Array.isArray(vj.crons) && vj.crons.some(c => c.path === '/api/cron/welcome-email' && /\*/.test(c.schedule)));
-ok('4 function includes the email template (includeFiles)', vj.functions && vj.functions['api/cron/welcome-email.js'] && /email/.test(vj.functions['api/cron/welcome-email.js'].includeFiles));
+// Vercel Cron cadence + includeFiles are configured by the founder on Vercel (plan-dependent: */15
+// needs Pro) — kept OUT of the committed vercel.json so it never breaks the shared build. The endpoint
+// is a standard, deployable serverless function usable by a Vercel Cron OR a manual/dashboard trigger.
+ok('4 repo vercel.json is valid JSON (no plan-limited cron that would break the build)', (() => { try { JSON.parse(R('vercel.json')); return true; } catch (_) { return false; } })());
+ok('4 cron endpoint is a deployable serverless GET function', /export default async function handler/.test(cron) && /req\.method !== 'GET'/.test(cron));
 
 // ── 5 auth flow untouched (no change to login/OTP send logic) ────────────────
 console.log('5 — no auth/other-flow change:');
