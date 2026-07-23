@@ -44,7 +44,10 @@ ok('3 base foot is layout-transparent (display:contents) → mobile icons unchan
 
 // ── 4 the % is the SAME number/calc/format as the category DETAIL header ──────
 ok('4 card return reuses computeCategoryPerformance (same as detail)', /computeCategoryPerformance\(/.test(rd) && /_aurixPositionFromAsset/.test(rd));
-ok('4 card filters the SAME asset set the detail uses', /\(TYPE_META\[a\.type\] \? a\.type : 'other'\) === key/.test(rd) || /TYPE_META\[a\.type\][\s\S]{0,30}=== key/.test(rd));
+// SPEC 66 — the grouping key now flows through the single-source resolver _aurixDisplayCategory
+// (funds fold into the Fondos/ETF group). The card and the detail still filter the SAME asset set;
+// only the shared helper replaced the inline `TYPE_META[a.type] ? a.type : 'other'` expression.
+ok('4 card filters the SAME asset set the detail uses', /_aurixDisplayCategory\(a\.type\) === key/.test(rd));
 ok('4 detail header also derives its % from computeCategoryPerformance', /computeCategoryPerformance\(positions\)/.test(fnSrc('_aurixCategoryPerfUpdateHeader')));
 // FORMAT parity: for the SAME returnPct both produce the identical "%": sign + abs(pct).toFixed(2) + '%'.
 (function () {
