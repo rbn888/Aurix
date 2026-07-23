@@ -4,8 +4,8 @@
 //
 // Flow:
 //   1. Validate { name, email, locale, source } (JSON, ≤ 2KB, origin-checked).
-//   2. Insert into public.waitlist via the Supabase REST API using the
-//      service_role key (server-side only — RLS denies the public key).
+//   2. Insert into public."Correos usuario" (historical table, renamed from waitlist) via the Supabase
+//      REST API using the service_role key (server-side only — RLS denies the public key).
 //   3. Duplicate email (unique) → friendly "already on the waitlist", no new row.
 //   4. Welcome email is sent only when welcome_email_sent_at IS NULL, then the
 //      column is stamped so it is never sent twice (one email per address).
@@ -26,6 +26,10 @@ function corsOrigin(req) {
 const MAX_BYTES = 2048;
 const EMAIL_RE  = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ozcasyufbknnuemllwso.supabase.co';
+// Historical email table, physically renamed by the owner from "waitlist" to "Correos usuario" (capital +
+// space → a quoted SQL identifier; percent-encoded here for the PostgREST path). Single source of truth for
+// every captured email — landing (here) and login OTP (public.persist_access_email RPC) both write to it.
+const WAITLIST_TABLE_PATH = 'Correos%20usuario';
 
 // Lightweight in-memory per-IP rate limit — best-effort (per serverless
 // instance), same pattern as api/verify-pin.js. Max 5 submissions / IP / hour.
@@ -101,7 +105,7 @@ export default async function handler(req, res) {
   let duplicate = false;
   let needsEmail = false;
   try {
-    const ins = await fetch(`${SUPABASE_URL}/rest/v1/waitlist`, {
+    const ins = await fetch(`${SUPABASE_URL}/rest/v1/${WAITLIST_TABLE_PATH}`, {
       method: 'POST',
       headers: { ...sbHeaders, Prefer: 'return=representation' },
       body: JSON.stringify({ name, email, locale, source, status: 'waitlist' }),
@@ -115,7 +119,7 @@ export default async function handler(req, res) {
       // never stamped welcome_email_sent_at (i.e. it is still null).
       duplicate = true;
       const q = await fetch(
-        `${SUPABASE_URL}/rest/v1/waitlist?email=eq.${encodeURIComponent(email)}&select=welcome_email_sent_at`,
+        `${SUPABASE_URL}/rest/v1/${WAITLIST_TABLE_PATH}?email=eq.${encodeURIComponent(email)}&select=welcome_email_sent_at`,
         { headers: sbHeaders }
       );
       if (q.ok) {
@@ -143,7 +147,7 @@ export default async function handler(req, res) {
       // Stamp idempotently: only set if still null (guards against races/retries).
       try {
         await fetch(
-          `${SUPABASE_URL}/rest/v1/waitlist?email=eq.${encodeURIComponent(email)}&welcome_email_sent_at=is.null`,
+          `${SUPABASE_URL}/rest/v1/${WAITLIST_TABLE_PATH}?email=eq.${encodeURIComponent(email)}&welcome_email_sent_at=is.null`,
           {
             method: 'PATCH',
             headers: { ...sbHeaders, Prefer: 'return=minimal' },

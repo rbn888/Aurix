@@ -419,7 +419,7 @@
     // redirect breaker / pending-login state, or corrupt Supabase auth storage. These are read-only
     // diagnostics + narrowly-scoped self-heal. They NEVER touch portfolio / holdings / chart / history
     // data and NEVER log a secret. app.js already exposes aurixClearAuthRedirectState for the app page.
-    var AURIX_LOGIN_BUILD = 484;   // bumped ONLY when login.html changes (see version.json.loginhtml)
+    var AURIX_LOGIN_BUILD = 485;   // bumped ONLY when login.html changes (see version.json.loginhtml)
     function _storageAvailable() {
       try { var k = '__aurix_probe__'; localStorage.setItem(k, '1'); localStorage.removeItem(k); return true; } catch (_) { return false; }
     }
@@ -539,6 +539,7 @@
         'lg.err.otp-invalid': 'Código incorrecto o caducado.',
         'lg.err.network': 'No se pudo conectar. Revisa tu conexión.',
         'lg.err.generic': 'No se pudo completar la operación. Inténtalo de nuevo.',
+        'lg.err.persist': 'No hemos podido preparar tu acceso. Inténtalo de nuevo en unos segundos.',
         'lg.btn.sending': 'Enviando código...',
         'lg.btn.verifying': 'Verificando...',
         'lg.btn.resending': 'Reenviando...',
@@ -567,6 +568,7 @@
         'lg.err.otp-invalid': 'Incorrect or expired code.',
         'lg.err.network': 'Could not connect. Check your connection.',
         'lg.err.generic': 'Something went wrong. Please try again.',
+        'lg.err.persist': 'We couldn’t prepare your access. Please try again in a few seconds.',
         'lg.btn.sending': 'Sending code…',
         'lg.btn.verifying': 'Verifying…',
         'lg.btn.resending': 'Resending…',
@@ -753,6 +755,33 @@
         timer = setTimeout(() => reject(new Error('network timeout')), ms || _AUTH_TIMEOUT_MS);
       });
       return Promise.race([promise, timeout]).finally(() => { if (timer) clearTimeout(timer); });
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // HOTFIX P0 — GUARANTEED EMAIL CAPTURE (persist BEFORE OTP) · single shared owner
+    // ════════════════════════════════════════════════════════════════════════
+    // Every valid email entered to access Aurix must be saved IMMEDIATELY into the historical email table
+    // (public.waitlist — the card the owner now sees as "correos usuario") BEFORE any OTP is requested, so
+    // the address is never lost if the user abandons, the OTP fails/expires/is wrong, or verification never
+    // happens. This is the ONE owner called by BOTH the email-submit and the resend paths — no duplicated
+    // insert logic. It writes via the public persist_access_email SECURITY DEFINER RPC
+    // (db/access_email_persist_1.sql) — never a privileged server key, never a client insert (waitlist RLS
+    // denies anon). Idempotent: an existing email is preserved untouched (no duplicate, no flag/status/
+    // permission change) and the RPC returns nothing either way, so it never reveals whether an address
+    // already existed. Returns true ONLY on confirmed persistence; on any failure the caller must NOT send
+    // the OTP (CASO C). Never throws; never surfaces a table name / SQL / RLS detail to the user.
+    async function persistAccessEmail(normalizedEmail, source) {
+      if (!client || !_isValidEmail(normalizedEmail)) return false;
+      try {
+        const { error } = await _authWithTimeout(
+          client.rpc('persist_access_email', { p_email: normalizedEmail, p_source: source || 'login-otp' })
+        );
+        if (error) { _reportLoginSafe('persist-access-email', error.message || 'rpc error', ''); return false; }
+        return true;
+      } catch (e) {
+        _reportLoginSafe('persist-access-email', (e && e.message) || 'network', '');
+        return false;
+      }
     }
 
     // ── Invite gate ────────────────────────────────────────────
@@ -991,6 +1020,21 @@
         errorEl.innerText = '';
         window.setButtonBusy(submitBtn, true, tL('lg.btn.sending'));
 
+        // ── HOTFIX P0 — PERSIST BEFORE OTP ──────────────────────────────────────────
+        // Order (mandatory): validate → normalize → persist → confirm → signInWithOtp. Normalize (trim
+        // already applied above + lowercase) and SAVE the email to the historical table, CONFIRMING the
+        // write, BEFORE requesting the OTP. CASO C — if persistence is not confirmed we do NOT send the OTP,
+        // do NOT claim a code was sent: show a human retry message and keep the form usable (retry is
+        // idempotent). The busy spinner is always cleared by the finally below.
+        const normalizedEmail = email.toLowerCase();
+        const persisted = await persistAccessEmail(normalizedEmail, 'login-otp');
+        if (!persisted) {
+          errorEl.style.color = 'var(--red)';
+          errorEl.innerText   = tL('lg.err.persist');
+          updateSubmitState();
+          return;
+        }
+
         console.log('OTP REQUEST FIRED');
 
         // OTP-RESEND-1: catch thrown network failures so they route
@@ -1218,6 +1262,17 @@
       isResending = true;
       otpErrorEl.innerText = '';
       window.setButtonBusy(otpResendEl, true, tL('lg.btn.resending'));
+
+      // HOTFIX P0 — persist before RE-sending the OTP too (same shared owner; idempotent). CASO C: if the
+      // write is not confirmed, do not re-send — show the human retry message and let the user try again.
+      const _persistedResend = await persistAccessEmail(String(email).trim().toLowerCase(), 'login-otp-resend');
+      if (!_persistedResend) {
+        window.setButtonBusy(otpResendEl, false);
+        otpErrorEl.style.color = 'var(--red)';
+        otpErrorEl.innerText   = tL('lg.err.persist');
+        isResending = false;
+        return;
+      }
 
       let resendErr = null;
       try {
