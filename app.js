@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '572'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '573'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -590,6 +590,8 @@ async function supabaseSavePortfolio(catalogAssets, holdings) {
   if (!supabaseClient) return;
   const userId = await getUserId();
   if (!userId) return;
+  // SPEC MULTI-DEVICE STATE HARDENING — reconciliation WRITE BARRIER on this legacy assets/holdings writer.
+  if (typeof _aurixPersistenceReady === 'function' && !_aurixPersistenceReady()) return;
   try {
     const { error } = await supabaseClient
       .from('user_portfolios')
@@ -713,6 +715,13 @@ async function autoSaveToBackend(attempt = 1) {
   // A second push from a debounced save() here would race with that
   // and could write a half-cleared state.
   if (typeof _aurixResetInProgress !== 'undefined' && _aurixResetInProgress) return;
+  // SPEC MULTI-DEVICE STATE HARDENING — reconciliation WRITE BARRIER (assets/holdings too). Never push
+  // over the canonical row until the remote reconcile has settled safely; a blocked autosave keeps its
+  // data in localStorage and syncs on the next mutation/flush once reconcile succeeds.
+  if (typeof _aurixPersistenceReady === 'function' && !_aurixPersistenceReady()) {
+    _persistDebug('[persist-save-backend] autosave BLOCKED (reconcile not ready)', { outcome: (typeof _aurixRemoteLoadOutcome !== 'undefined') ? _aurixRemoteLoadOutcome : null });
+    return;
+  }
 
   const tombstone = (typeof _aurixResetAt === 'function') ? _aurixResetAt() : 0;
   // AURIX-PERSIST-HARDEN-1: never push an empty/ambiguous assets array over a
@@ -1040,6 +1049,43 @@ function _mergeCategoryByTs(localArr, remoteArr) {
 let _aurixCanonicalHistoryLoaded = false;   // remote reachable + reconciled this session
 let _aurixRemoteCanonicalHash = null;       // body hash of the remote canonical history at last reconcile
 let _aurixLocalCanonicalHash  = null;       // body hash of the APPLIED (display) canonical history
+// ── SPEC MULTI-DEVICE STATE HARDENING (P0) ───────────────────────────────────
+// Reconciliation is a WRITE BARRIER. A device must NEVER publish persistent state over the
+// canonical account until it has SETTLED the remote reconcile this session. _aurixRemoteLoadOutcome
+// records how the last remote load resolved:
+//   'ok-row' — the canonical row was read (existing account fully reconciled → _aurixCanonicalHistoryLoaded);
+//   'no-row' — NO remote row exists yet (genuine new account → first write legitimately creates it, nothing to clobber);
+//   'failed' — a TRANSIENT load failure (offline / query error / exception) — a write here could overwrite a
+//              row we merely failed to read → BLOCK;
+//   null     — no load attempted yet (very early boot) → BLOCK.
+// Set ONLY by loadPortfolioFromBackend (every real load reflects reality). Read-only elsewhere.
+let _aurixRemoteLoadOutcome = null;
+// The single gate EVERY persistent user_portfolios writer consults. Fail-closed: true ONLY when it is
+// provably safe to write. Deliberately does NOT gate the explicit reset path (_pushEmptyPortfolioToBackend),
+// which is a user-initiated wipe. No new state/architecture — reuses the existing session reconcile signals.
+function _aurixPersistenceReady() {
+  try {
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return false;
+    if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) return false;
+    if (typeof _bootLoadComplete !== 'undefined' && !_bootLoadComplete) return false;          // boot reconcile not finished
+    if (typeof _aurixResetInProgress !== 'undefined' && _aurixResetInProgress) return false;   // reset owns the write
+    // Remote reconcile must have SETTLED into a known-safe outcome. A transient failure (or a load not yet
+    // attempted) must NEVER allow a write.
+    if (_aurixRemoteLoadOutcome !== 'ok-row' && _aurixRemoteLoadOutcome !== 'no-row') return false;
+    return true;
+  } catch (_) { return false; }
+}
+// Whether the history columns (category_history / portfolio_history) may be written. Mirrors the assets/
+// holdings defensive omit (_aurixAssetsForBackend): include ONLY when the canonical history is loaded
+// (existing account) OR it is a genuine new account with no remote row (empty history safely creates the
+// row). Otherwise omit so a populated remote history is NEVER clobbered by a partial/unhydrated client.
+function _aurixHistoryColumnsSafe() {
+  try {
+    if (typeof _aurixCanonicalHistoryLoaded !== 'undefined' && _aurixCanonicalHistoryLoaded === true) return true;
+    if (_aurixRemoteLoadOutcome === 'no-row') return true;
+    return false;
+  } catch (_) { return false; }
+}
 const _AURIX_CANONICAL_TAIL_MS = 120000;    // exclude the live tail (<2 min) from the parity body
 // P0-HISTORY-AUTHORITY-HARD-LOCK — THE single remote-authoritative history the chart + return read for an
 // authenticated user. It is set FROM the remote portfolios row (never the local union), so two devices
@@ -2127,6 +2173,11 @@ function scheduleWatchlistFlush() {
 async function _flushStatePersistence(reason) {
   if (!supabaseClient || !currentUser) return;
   if (typeof _aurixResetInProgress !== 'undefined' && _aurixResetInProgress) return;
+  // SPEC MULTI-DEVICE STATE HARDENING — reconciliation WRITE BARRIER. Never publish persistent state
+  // (history / watchlist / prefs / assets) until the remote reconcile has settled safely. Blocks every
+  // trigger equally: debounced, lifecycle (pagehide/visibilitychange) and watchlist. A blocked flush loses
+  // nothing — localStorage already holds the state and it syncs on the next flush once reconcile succeeds.
+  if (!_aurixPersistenceReady()) { _persistDebug('[persist-save-backend] flush BLOCKED (reconcile not ready)', { reason, outcome: _aurixRemoteLoadOutcome }); return; }
   // Throttle to ≤1 write / 60s, except forced lifecycle flushes (pagehide /
   // visibilitychange) which must always persist before the app backgrounds.
   const now = Date.now();
@@ -2171,6 +2222,11 @@ async function _flushStatePersistence(reason) {
       payload.assets   = safe.assets;
       payload.holdings = safe.holdings;
     }
+    // SPEC MULTI-DEVICE STATE HARDENING — same defensive omit for the history columns. If the canonical
+    // history is not loaded (and this is not a genuine new account), OMIT category_history/portfolio_history
+    // so a partial/unhydrated client can never clobber a populated remote history. Defense-in-depth behind
+    // the reconcile barrier above; the payload keeps the columns by default so the format is unchanged.
+    if (!_aurixHistoryColumnsSafe()) { delete payload.category_history; delete payload.portfolio_history; }
     let { error } = await supabaseClient
       .from('user_portfolios')
       .upsert(payload, { onConflict: 'user_id' });
@@ -2222,6 +2278,8 @@ async function _aurixFlushPerformanceState(reason) {
   try {
     if (!supabaseClient || !currentUser || !currentUser.id) { audit.failureReason = 'no_client_or_user'; _aurixPerfWriteAudit = audit; return audit; }
     if (typeof _aurixResetInProgress !== 'undefined' && _aurixResetInProgress) { audit.failureReason = 'reset_in_progress'; _aurixPerfWriteAudit = audit; return audit; }
+    // SPEC MULTI-DEVICE STATE HARDENING — reconciliation WRITE BARRIER on the derived performance_state write.
+    if (typeof _aurixPersistenceReady === 'function' && !_aurixPersistenceReady()) { audit.failureReason = 'reconcile_not_ready'; _aurixPerfWriteAudit = audit; return audit; }
     const now = Date.now();
     if (reason !== 'lifecycle' && reason !== 'perf-now' && _aurixLastPerfFlushMs && now - _aurixLastPerfFlushMs < 30_000) { audit.failureReason = 'throttled'; _aurixPerfWriteAudit = audit; return audit; }
     const ps = (typeof _aurixComputePerformanceStateCandidate === 'function') ? _aurixComputePerformanceStateCandidate() : null;
@@ -2339,6 +2397,13 @@ async function loadPortfolioFromBackend(userId) {
       .eq('user_id', userId)
       .single();
     if (error) {
+      // SPEC MULTI-DEVICE STATE HARDENING — distinguish a genuine NO-ROW (new account: PGRST116 /
+      // "no rows" from .single()) from a TRANSIENT failure. Only 'no-row' may create the first row;
+      // a transient failure must BLOCK writes so a row we failed to read is never clobbered.
+      try {
+        const _noRow = !!(error && (error.code === 'PGRST116' || /0 rows|no rows|multiple \(or no\) rows/i.test(error.message || '')));
+        _aurixRemoteLoadOutcome = _noRow ? 'no-row' : 'failed';
+      } catch (_) { _aurixRemoteLoadOutcome = 'failed'; }
       _persistDebug('[persist-load-backend] ERROR', error.message);
       if (IS_DEV) console.warn('[DATA] Supabase load error:', error.message);
       try { if (typeof _aurixSyncState !== 'undefined') { _aurixSyncState.lastRemoteLoadStatus = 'error: ' + error.message; _aurixSyncState.lastError = error.message; } } catch (_) {}
@@ -2349,9 +2414,13 @@ async function loadPortfolioFromBackend(userId) {
       symbols: (data && Array.isArray(data.assets)) ? data.assets.map(a => a && (a.symbol || a.ticker)) : [],
       updated_at: data && data.updated_at,
     });
+    // SPEC MULTI-DEVICE STATE HARDENING — a successful read with a row ⇒ reconciled ('ok-row'); a null
+    // payload without an error is treated as a failure (never assume an empty account on ambiguous data).
+    try { _aurixRemoteLoadOutcome = data ? 'ok-row' : 'failed'; } catch (_) {}
     try { if (typeof _aurixSyncState !== 'undefined') _aurixSyncState.lastRemoteLoadStatus = data ? ('ok:' + ((data.assets || []).length) + ' assets') : 'null'; } catch (_) {}
     return data || null;
   } catch (err) {
+    try { _aurixRemoteLoadOutcome = 'failed'; } catch (_) {}
     try { if (typeof _aurixSyncState !== 'undefined') { _aurixSyncState.lastRemoteLoadStatus = 'exception: ' + (err && err.message); _aurixSyncState.lastError = err && err.message; } } catch (_) {}
     if (IS_DEV) console.warn('[DATA] Supabase load exception:', err);
     return null;
