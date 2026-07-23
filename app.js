@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '575'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '576'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -9946,7 +9946,13 @@ function _aurixCategoryBucket(asset) {
 // EVERY view from one resolver. No new category, no other-category change, no format change.
 function _aurixDisplayCategory(type) {
   const t = String(type || '').toLowerCase();
-  if (t === 'fund') return 'etf';   // funds fold into the Fondos/ETF group (parity with the category chart)
+  if (t === 'fund') return 'etf';         // funds fold into the Fondos/ETF group (parity with the category chart)
+  // SPEC 68 — same class of bug as fund: a 'commodity' (gold/silver spot, WTI, Brent, gas, …) buckets to
+  // 'metal' in _aurixCategoryBucket and feeds the Metales chart, but TYPE_META has no 'commodity' key so it
+  // resolved to 'other' → the asset showed in "Otros" while its value inflated the Metales chart (invisible
+  // in its category + patrimonio/chart desync). Fold 'commodity' into 'metal', matching the existing history
+  // bucket, so it appears in the SAME category whose chart already includes it. No bucket/history change.
+  if (t === 'commodity') return 'metal';  // commodities live in the Metales group (parity with _aurixCategoryBucket)
   return (typeof TYPE_META !== 'undefined' && TYPE_META[t]) ? t : 'other';
 }
 
