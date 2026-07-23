@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '578'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '579'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -46170,10 +46170,13 @@ function _aurixRankSearchResults(items, query) {
   };
   return items.map((a, i) => ({ a, i, s: score(a) })).sort((x, y) => (x.s - y.s) || (x.i - y.i)).map(o => o.a);
 }
-// Fund-only display subtitle: "Manager · CUR · ISIN" (skips missing parts). Non-fund →
-// the plain ticker (unchanged). Presentation helper for the search dropdown only.
+// Fund/ETF display subtitle: "Manager · shareClass|CUR · ISIN" (skips missing parts). Any other type
+// (or an ETF/fund with no metadata) → the plain ticker (unchanged). Presentation helper for the search
+// dropdown only. SPEC 70 — extended from fund-only to ALSO cover ETFs so multiple ETF share classes are
+// distinguishable; a plain ETF (no manager/isin/shareClass) still falls back to its ticker, unchanged.
 function _aurixSearchSubtitle(a) {
-  if (!a || a.type !== 'fund') return a && a.ticker ? a.ticker : '';
+  const _t = a && String(a.type || '').toLowerCase();
+  if (!a || (_t !== 'fund' && _t !== 'etf')) return a && a.ticker ? a.ticker : '';
   const parts = [];
   if (a.manager) parts.push(a.manager);
   // SPEC 66 — when several share classes of the same fund exist, the share class
@@ -46231,9 +46234,17 @@ async function searchAllAssets(query, signal) {
   const merged = [];
   for (const item of [...funds, ...metals, ...yEnriched, ...cryptoItems]) {
     if (!item || !item.ticker) continue;
-    const key = (item.type === 'fund')
-      ? 'FUND:' + String(item.isin || item.ticker || item.name).toUpperCase()
-      : String(item.ticker).toUpperCase();
+    // SPEC 70 — ISIN-first dedupe. THE same share class arriving from more than one source (the curated
+    // catalog entry + its Yahoo twin) shares an ISIN → collapse to ONE unambiguous result. The curated
+    // entry leads the merge, so it wins and keeps full identity (type/manager/currency/shareClass). This
+    // kills the "three visually-identical options" for an exact-ISIN query WITHOUT deduping genuinely
+    // different share classes (different ISINs stay distinct). Non-ISIN items keep the prior keys.
+    const isin = item.isin ? String(item.isin).toUpperCase().trim() : '';
+    const key = isin
+      ? ('ISIN:' + isin)
+      : (item.type === 'fund')
+        ? 'FUND:' + String(item.ticker || item.name).toUpperCase()
+        : String(item.ticker).toUpperCase();
     if (!seen.has(key)) { seen.add(key); merged.push(item); }
   }
   return _aurixRankSearchResults(merged, query).slice(0, 10);
