@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '571'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '572'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -2717,6 +2717,12 @@ const T = {
     wscLowDensityLabel: 'Datos recientes insuficientes',
     wscLastReliable:    'Última evolución fiable',
     wscExcludesContrib: 'Excluye aportaciones/importaciones',
+    // Chart Engine — estados del gráfico (badge de rendimiento). Reutilizados por los
+    // painters del Chart Engine vía _aurixChartStateI18n (fallback = literal certificado).
+    chartCalculating:    'Calculando…',
+    chartCalculatingAria:'Calculando rendimiento',
+    chartPartialHistory: 'Historial parcial',
+    chartAvailableHistory:'Historial disponible',
     chartTipValue:   'Valor cartera',
     perfSnapshotTitle: 'Resumen de rendimiento',
     perfMax:         'Máximo',
@@ -4855,6 +4861,12 @@ const T = {
     wscLowDensityLabel: 'Insufficient recent data',
     wscLastReliable:    'Last reliable evolution',
     wscExcludesContrib: 'Excludes contributions/imports',
+    // Chart Engine — chart state labels (performance badge). Consumed by the Chart
+    // Engine painters via _aurixChartStateI18n (fallback = certified literal).
+    chartCalculating:    'Calculating…',
+    chartCalculatingAria:'Calculating performance',
+    chartPartialHistory: 'Partial history',
+    chartAvailableHistory:'Available history',
     chartTipValue:   'Portfolio value',
     perfSnapshotTitle: 'Performance snapshot',
     perfMax:         'High',
@@ -23514,8 +23526,38 @@ try {
 // dry "—" or a false loss. Identical on web + mobile; the shimmer/glow is CSS-only (.wsc-metric-calc)
 // and degrades to static text under prefers-reduced-motion. No %, no $, no red/green, no flash.
 const _AURIX_RETURN_PENDING_TEXT = 'Calculando…';
+// SPEC CHART-UI-I18N — resolve a Chart Engine STATE label through the existing app i18n table
+// (T[lang]) at paint time so every chart state follows the selected language. PRESENTATION-ONLY:
+// no calc/state/geometry change. Defensive: outside the app runtime (isolated harness sandbox where
+// T/lang are absent) or for an unknown key it returns the certified Spanish literal fallback, so the
+// harness-visible text is byte-identical to before. switchLang() already repaints the chart, so the
+// label re-resolves on a language change with no extra wiring.
+function _aurixChartStateI18n(key, fallback) {
+  try {
+    if (typeof T !== 'undefined' && typeof lang !== 'undefined' && T[lang] && typeof T[lang][key] === 'string') return T[lang][key];
+  } catch (_) {}
+  return fallback;
+}
+// SPEC CHART-UI-24H-PREMIUM-REVEAL — is the authed canonical-history reconcile still in-flight?
+// This is the EXISTING signal that already gates the authed "Calculando…" kill-switch: an authed
+// device that has not yet reconciled the remote canonical history this session (_aurixCanonical
+// HistoryLoaded === false). While it is in-flight, a not-yet-trusted 24H state is TRANSIENT (the
+// definitive green/red return is imminent), NOT a persistent partial history. Once reconcile settles
+// the flag flips true and the normal contract decides TRUSTED_RETURN vs a real PARTIAL_HISTORY.
+// Anonymous/local-canonical sessions never wait on a remote reconcile ⇒ false (no behaviour change).
+// Defensive: absent globals (isolated harness sandbox) ⇒ false ⇒ exact prior behaviour. No timers,
+// no data/geometry/return-math change; reuses only pre-existing session signals.
+function _aurix24hReconcileInFlight() {
+  try {
+    const authed = !!(typeof currentUser !== 'undefined' && currentUser && currentUser.id);
+    if (!authed) return false;
+    return (typeof _aurixCanonicalHistoryLoaded !== 'undefined') && _aurixCanonicalHistoryLoaded === false;
+  } catch (_) { return false; }
+}
 function _aurixReturnPendingHTML() {
-  return '<span class="wsc-metric-val wsc-metric-calc" aria-label="Calculando rendimiento">' + _AURIX_RETURN_PENDING_TEXT + '</span>';
+  const _txt  = (typeof _aurixChartStateI18n === 'function') ? _aurixChartStateI18n('chartCalculating', _AURIX_RETURN_PENDING_TEXT) : _AURIX_RETURN_PENDING_TEXT;
+  const _aria = (typeof _aurixChartStateI18n === 'function') ? _aurixChartStateI18n('chartCalculatingAria', 'Calculando rendimiento') : 'Calculando rendimiento';
+  return '<span class="wsc-metric-val wsc-metric-calc" aria-label="' + _aria + '">' + _txt + '</span>';
 }
 // SPEC DSH.CHART.SHORT_HISTORY_PREMIUM_PRESENTATION.28 — PRESENTATION-ONLY truthful labels for STABLE real
 // partial/available history that has no trusted return (so it must not read as indefinite "Calculando…").
@@ -23532,8 +23574,8 @@ function _aurixHistoryPresentationBadge(emg, surface) {
       if (fp && fp.historyPresentationState) pres = fp.historyPresentationState;
     }
   } catch (_) { pres = 'CALCULATING'; }
-  if (pres === 'PARTIAL_HISTORY') return { html: '<span class="wsc-metric-val">' + _AURIX_HIST_PARTIAL_TEXT + '</span>', className: 'chart-change flat', pres: pres };
-  if (pres === 'AVAILABLE_HISTORY') return { html: '<span class="wsc-metric-val">' + _AURIX_HIST_AVAILABLE_TEXT + '</span>', className: 'chart-change flat', pres: pres };
+  if (pres === 'PARTIAL_HISTORY') return { html: '<span class="wsc-metric-val">' + ((typeof _aurixChartStateI18n === 'function') ? _aurixChartStateI18n('chartPartialHistory', _AURIX_HIST_PARTIAL_TEXT) : _AURIX_HIST_PARTIAL_TEXT) + '</span>', className: 'chart-change flat', pres: pres };
+  if (pres === 'AVAILABLE_HISTORY') return { html: '<span class="wsc-metric-val">' + ((typeof _aurixChartStateI18n === 'function') ? _aurixChartStateI18n('chartAvailableHistory', _AURIX_HIST_AVAILABLE_TEXT) : _AURIX_HIST_AVAILABLE_TEXT) + '</span>', className: 'chart-change flat', pres: pres };
   return { html: (typeof _aurixReturnPendingHTML === 'function') ? _aurixReturnPendingHTML() : '<span class="wsc-metric-calc">Calculando…</span>', className: 'chart-change calculating', pres: 'CALCULATING' };
 }
 // ── P0-FINAL-UI-DOM-BINDING-FIX ──────────────────────────────────────────────────
@@ -25750,6 +25792,13 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     if (out.badgeEligible) return 'TRUSTED_RETURN';
     const stable = (out.mode === 'partial_clean' || out.mode === 'full') && out.lineEligible && Array.isArray(out.renderPoints) && out.renderPoints.length >= 2;
     if (!stable) return (out.mode === 'building') ? 'CALCULATING' : 'UNKNOWN';
+    // SPEC CHART-UI-24H-PREMIUM-REVEAL — a NOT-eligible 24H partial while the authed canonical-history
+    // reconcile is still in-flight is a TRANSIENT loading state (the definitive green/red return is
+    // imminent), not a persistent partial history. Present it as CALCULATING so "Historial parcial"
+    // never flashes for one or two seconds; once reconcile settles this resolves to TRUSTED_RETURN or,
+    // for a genuinely short account, a real PARTIAL_HISTORY. Presentation-only; no eligibility/points/
+    // return change. No-op outside a real authed session (harness sandbox / anonymous / settled).
+    if (r === '24h' && (typeof _aurix24hReconcileInFlight === 'function') && _aurix24hReconcileInFlight()) return 'CALCULATING';
     if (r !== 'all' && out.historyCoverage === 'PARTIAL_AVAILABLE_HISTORY') return 'PARTIAL_HISTORY';
     if (r === 'all' && out.historyCoverage === 'ALL_AVAILABLE_HISTORY') return 'AVAILABLE_HISTORY';
     return 'CALCULATING';
@@ -33443,6 +33492,21 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
     }
     emg.points = _frc.renderPoints;   // painter draws EXCLUSIVELY the contract's final series (SPEC.19 rule)
     _frcTone = _frc.colorClass;
+    // SPEC CHART-UI-24H-PREMIUM-REVEAL — hold a STABLE loading area for the 24H transient. When the
+    // contract would draw a line but the return is NOT yet trusted AND the authed canonical-history
+    // reconcile is still in-flight, drawing now means a NEUTRAL provisional line + "Historial parcial"
+    // that recolours to green/red one or two seconds later. Instead keep the premium loading skin (no
+    // neutral line, no partial badge — the badge is CALCULATING via the SPEC.28 projection) until the
+    // definitive dataset is ready; the first REAL line then reveals with the existing left→right draw.
+    // Presentation-only: reuses _frc.badgeEligible + the existing reconcile signal; no points/geometry/
+    // return change; no timers. No-op outside a real authed session (harness sandbox / anonymous /
+    // settled) and for every other range, so the certified 24H (v579) and 7D/30D (v580) fixes are intact.
+    if (emg.range === '24h' && !_frc.badgeEligible && (typeof _aurix24hReconcileInFlight === 'function') && _aurix24hReconcileInFlight()) {
+      _aurixLastVisualSig[surface] = null;
+      try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'building'); } catch (_) {}
+      _wscRenderInsufficient(hostEl, { realPointCount: emg.pointCount, reason: 'transient_24h_reconcile_pending' }, { mode: 'building', eligible: [], lastGood: null });
+      return true;
+    }
   } else {
   // SPEC.16 — short-history display policy (PRESENTATION ONLY). building ⇒ premium Calculando (no line);
   // partial_clean ⇒ trim emg.points to the recent MAIN cluster (initial construction fragments dropped,
@@ -33904,9 +33968,14 @@ function renderWealthCurve(animate) {
   if (el && !_reduced && !(typeof document !== 'undefined' && document.hidden)) {
     const _pm = _aurixPremiumMotionOn();
     const _visible = (typeof el.offsetParent === 'undefined') || el.offsetParent !== null;
-    const _firstVisible = _pm && _visible && !_aurixWscFirstPaintDone;
+    // SPEC CHART-UI-24H-PREMIUM-REVEAL — spend the first-visible one-shot on the first REAL line paint,
+    // not on a transient loading/building hold (which contains no .wsc-line). Otherwise the premium
+    // left→right draw would be consumed by the placeholder and the definitive 24H line would appear
+    // without its reveal. Gate on an actually-painted line so the draw plays on the definitive line.
+    let _hasLine = false; try { _hasLine = !!el.querySelector('.wsc-line'); } catch (_) {}
+    const _firstVisible = _pm && _visible && _hasLine && !_aurixWscFirstPaintDone;
     if (_firstVisible) _aurixWscFirstPaintDone = true;
-    if ((animate || _firstVisible) && _visible) {
+    if (((animate && _hasLine) || _firstVisible) && _visible) {
       el.classList.remove('wsc-in', 'aurix-pm'); void el.offsetWidth;
       el.classList.add('wsc-in'); if (_pm) el.classList.add('aurix-pm');
       setTimeout(() => el.classList.remove('wsc-in', 'aurix-pm'), 620);
