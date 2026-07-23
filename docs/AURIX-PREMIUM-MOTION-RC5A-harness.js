@@ -32,11 +32,14 @@ ok('1b rollback exact: ALL draw/reveal CSS keyed on .aurix-pm (absent ⇒ RC4 un
 const rwc = fn('renderWealthCurve');
 ok('2 line reveal only on FIRST visible paint (one-shot, gated on motion ON ⇒ off=RC4)',
    /let _aurixWscFirstPaintDone = false;/.test(app) &&
-   /_firstVisible = _pm && _visible && !_aurixWscFirstPaintDone/.test(rwc) &&
+   // SPEC CHART-UI-24H-PREMIUM-REVEAL — the one-shot is spent on the first REAL line paint (a
+   // transient loading/building hold has no .wsc-line), so the definitive line keeps its reveal.
+   /_hasLine = !!el\.querySelector\('\.wsc-line'\)/.test(rwc) &&
+   /_firstVisible = _pm && _visible && _hasLine && !_aurixWscFirstPaintDone/.test(rwc) &&
    /if \(_firstVisible\) _aurixWscFirstPaintDone = true;/.test(rwc));
 ok('3 line reveal on MANUAL range/unit change (animate=true)',
    /_dshRenderPerfSnapshot\(true\)/.test(app) &&                       // range change + unit toggle
-   /if \(\(animate \|\| _firstVisible\) && _visible\)/.test(rwc) &&
+   /if \(\(\(animate && _hasLine\) \|\| _firstVisible\) && _visible\)/.test(rwc) &&
    /el\.classList\.add\('wsc-in'\); if \(_pm\) el\.classList\.add\('aurix-pm'\);/.test(rwc));
 ok('4 NO reveal on auto refresh (data paths pass falsy/false)',
    /renderWealthCurve\(false\)/.test(app) &&                            // boot / toggle entry
