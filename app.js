@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '579'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '580'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -108,7 +108,20 @@ try { if (typeof window !== 'undefined') window._aurixResolveBuildCoherence = _a
     const executedV = parseInt(window.__AURIX_APPJS_VERSION__, 10);
     const dec = _aurixResolveBuildCoherence(expected, indexV, requestedV, Number.isFinite(executedV) ? executedV : null, readState(), capabilityState());
     if (dec.action === 'reload') {
-      try { sessionStorage.setItem(MK, JSON.stringify(dec.nextReloadState)); } catch (_) {}
+      // P0 ANDROID/INCOGNITO — the one-reload anti-loop guard lives in sessionStorage. NEVER reload unless
+      // that marker actually PERSISTED: in private/partitioned/blocked/limited-storage contexts the write is
+      // lost, so `attemptedForExpected` can never become true and the coherence check would reload on every
+      // boot forever (flicker / disappearing UI / unusable). Confirm durability via write + read-back; if the
+      // marker can't be armed, DO NOT reload — degrade to the existing recoverable "update available" state
+      // (mirrors index.html's _storageOk guard). Never turn a storage limitation into a reload loop.
+      var _armed = false;
+      try { var _mv = JSON.stringify(dec.nextReloadState); sessionStorage.setItem(MK, _mv); _armed = (sessionStorage.getItem(MK) === _mv); } catch (_) { _armed = false; }
+      if (!_armed) {
+        window.__AURIX_BUILD_UPDATE_AVAILABLE = true;
+        window.__AURIX_COHERENCE_STORAGE_DEGRADED = true;
+        try { console.warn('[BOOT][BUILD-COHERENCE] storage not durable — skipping coherence reload (degraded, no loop); update available via aurixApplyBuildUpdate()'); } catch (_) {}
+        return;
+      }
       try { if (typeof caches !== 'undefined' && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { try { caches.delete(k); } catch (_) {} }); }).catch(function () {}); } catch (_) {}
       try { console.warn('[BOOT][BUILD-COHERENCE] ' + (dec.classify || 'BUILD_MISMATCH') + ' mismatch=' + JSON.stringify(dec.mismatchFields) + ' missingCapabilities=' + JSON.stringify(dec.missingCapabilities) + ' — one controlled cache-busted reload to v' + dec.expectedVersion); } catch (_) {}
       window.aurixApplyBuildUpdate();
