@@ -15,7 +15,7 @@ try { if (typeof window !== 'undefined' && window.__AURIX_BOOT) { window.__AURIX
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '576'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '577'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -9097,6 +9097,21 @@ function formatShort(amount) {
 function getCurrencySymbol(curr) {
   const c = String(curr || baseCurrency || 'USD').toUpperCase();
   return c === 'EUR' ? '€' : '$';
+}
+// SPEC 69 — premium currency glyph for Efectivo/Divisas asset badges. Extends the €/$ helper to the
+// common world currencies so a cash holding shows its symbol (€ $ £ ¥ …) instead of raw ticker text,
+// mirroring how metals show their icon. Presentation-only: falls back to the 3-letter code, then the
+// generic currency sign. No new asset logic, no network.
+const _AURIX_CCY_GLYPH = { EUR: '€', USD: '$', GBP: '£', JPY: '¥', CNY: '¥', CHF: '₣', AUD: '$', CAD: '$', NZD: '$', HKD: '$', SGD: '$', MXN: '$', BRL: 'R$', SEK: 'kr', NOK: 'kr', DKK: 'kr', PLN: 'zł', INR: '₹', KRW: '₩', RUB: '₽', TRY: '₺', ZAR: 'R', ILS: '₪', THB: '฿', AED: 'د.إ' };
+function _aurixCurrencyGlyph(ccy) {
+  const c = String(ccy || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+  return _AURIX_CCY_GLYPH[c] || c || '¤';
+}
+function _aurixCashGlyph(asset) {
+  const a = asset || {};
+  let c = String(a.assetCurrency || a.currency || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+  if (!c) c = String(a.ticker || a.symbol || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+  return _aurixCurrencyGlyph(c);
 }
 function _syncPerfCurrencyButtons() {
   const sym = getCurrencySymbol(baseCurrency);
@@ -45893,6 +45908,13 @@ function buildBadgeHtml(asset, badgeText, cls = 'asset-badge') {
     return `<div class="${cls} metal badge--metal-icon">`
       + aurixMetalIconSvg(_metalKind(asset.ticker), _metalVisualType(asset))
       + `</div>`;
+  }
+  // SPEC 69 — Efectivo/Divisas: premium currency glyph (€ / $ / £ / ¥ …) instead of raw ticker text,
+  // mirroring the metal special-case above. Reuses the existing .asset-badge.cash green styling (no
+  // size/layout/CSS change). Single source → every buildBadgeHtml surface (rows, detail, manage,
+  // reduce) inherits the consistent premium cash icon.
+  if (asset && asset.type === 'cash') {
+    return `<div class="${cls} cash">${escHtml(_aurixCashGlyph(asset))}</div>`;
   }
   const logoUrl = getAssetLogoUrl(asset);
   if (logoUrl) {
