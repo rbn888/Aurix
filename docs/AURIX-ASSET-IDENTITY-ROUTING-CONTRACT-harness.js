@@ -84,5 +84,24 @@ console.log('6 — ISIN-first dedupe in the search merge:');
 const merge = app.slice(app.indexOf('const funds = _aurixSearchFundsLocal(query);'), app.indexOf('const funds = _aurixSearchFundsLocal(query);') + 900);
 ok('6.1 merge keys by ISIN when present (collapses same-ISIN variants)', /const isin = item\.isin \? String\(item\.isin\)\.toUpperCase\(\)\.trim\(\) : '';/.test(merge) && /'ISIN:' \+ isin/.test(merge));
 
+// ── 7 AUTOMATIC NAV pricing contract (funds are NOT frozen/manual when a source exists) ──
+console.log('7 — automatic NAV pricing owner + provider-key adoption:');
+// The single owner that maps an ISIN → the priceable NAV symbol Yahoo serves (Morningstar 0P* preferred).
+const yfs = fnSrc('_yahooFundSymbolByISIN');
+ok('7.1 _yahooFundSymbolByISIN queries the search endpoint by ISIN', /\/api\/search\/assets\?q=\$\{encodeURIComponent\(isin\)\}/.test(yfs));
+ok('7.2 it prefers the Morningstar 0P* NAV code', /\^0P\[A-Z0-9\]\+/.test(yfs));
+// selectAsset must resolve + ADOPT the automatic symbol for a curated fund (ISIN, no marketSymbol),
+// instead of dropping to MANUAL — so pricing, persistence and refresh use the automatic path.
+const sa = fnSrc('selectAsset');
+ok('7.3 selectAsset resolves the automatic symbol for a fund w/ ISIN & no marketSymbol',
+   /entry\.type === 'fund' && entry\.isin && !entry\.marketSymbol/.test(sa) && /_yahooFundSymbolByISIN\(entry\.isin\)/.test(sa));
+ok('7.4 the resolved symbol is ADOPTED as the provider key (persists + refreshes)',
+   /entry\.marketSymbol\s*=\s*_fundSym;/.test(sa) && /pendingMarketSymbol = _fundSym;/.test(sa));
+ok('7.5 it prices via the standard quote resolver (automatic NAV, not manual)', /resolveSymbolQuote\(_fundSym\)/.test(sa));
+// Persistence: the submit stamps marketSymbol from the selected asset (so the adopted 0P* survives reopen).
+ok('7.6 submit persists marketSymbol from the selected asset', /const \{ ticker, type, coinId[^}]*marketSymbol[^}]*\} = selectedDbAsset;/.test(app) && /coinId, marketSymbol,/.test(app));
+// MC-7 remains the EXPLICIT manual fallback ONLY when no automatic symbol resolves (price stays null).
+ok('7.7 MC-7 manual path stays as the explicit fallback (labelled "Manual NAV")', /Manual NAV — no provider price for this fund/.test(app));
+
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);

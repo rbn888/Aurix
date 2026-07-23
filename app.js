@@ -46822,6 +46822,24 @@ async function selectAsset(entry) {
           price   = fb?.price ?? null;
         }
       }
+    } else if (entry.type === 'fund' && entry.isin && !entry.marketSymbol) {
+      // SPEC 70 — AUTOMATIC NAV for discovered/curated funds. A curated catalog fund carries an ISIN but
+      // no priceable marketSymbol, so it previously fell straight to the MC-7 MANUAL NAV path (frozen).
+      // Resolve the automatic priceable symbol via the SAME owner the ISIN add-path uses
+      // (_yahooFundSymbolByISIN → the Morningstar 0P* code Yahoo serves fund NAVs for, broker-ticker
+      // fallback otherwise) and ADOPT it as the provider key: pricing here, persistence (submit reads
+      // selectedDbAsset.marketSymbol === entry.marketSymbol) and the per-symbol refresh then all run the
+      // automatic Yahoo NAV path — identical to a fund added directly by ISIN. General (every curated
+      // fund), NO per-ISIN exception. If no symbol resolves, price stays null and the existing MC-7
+      // manual-NAV path (explicitly labelled "Manual NAV") handles genuinely non-automatic funds.
+      const _fundSym = await _yahooFundSymbolByISIN(entry.isin);
+      if (_fundSym) {
+        entry.marketSymbol  = _fundSym;   // persisted at submit → survives reopen → same provider on refresh
+        pendingMarketSymbol = _fundSym;
+        const quote = await resolveSymbolQuote(_fundSym);
+        if (quote) { price = quote.price; if (quote.currency) pendingCurrency = quote.currency; }
+        else { const fb = getFallbackData(_fundSym); price = fb?.price ?? null; }
+      }
     }
 
     if (price) {
