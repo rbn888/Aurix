@@ -86,8 +86,8 @@
           <span class="eyebrow reveal" data-i18n="hero.eyebrow">Wealth Operating System</span>
           <h1 class="hero-title reveal"><span data-i18n="hero.h1a">Your entire wealth.</span><br><span data-i18n="hero.h1b">One operating system.</span></h1>
           <p class="hero-sub reveal" data-i18n="hero.sub">Aurix brings stocks, funds, crypto, metals, real estate and cash into one clear, private interface.</p>
-          <!-- Mobile-only primary CTA: on ≤860px the header "Request Access" is hidden and otherwise only
-               lives inside the hamburger. Same action (#early-access). Hidden ≥861px (navbar CTA present). -->
+          <!-- Mobile-only primary CTA: on ≤860px the header "Enter Aurix" is hidden and otherwise only
+               lives inside the hamburger. Same action (open the app). Hidden ≥861px (navbar CTA present). -->
           <div class="hero-cta-mobile reveal">
             <a class="btn btn-primary btn-block" href="https://app.aurixsystem.io/" data-app-link data-launch-cta data-i18n="cta.enter">Enter Aurix</a>
             <span class="hero-cta-note launch-count" id="launchCountdown" hidden></span>
@@ -288,21 +288,9 @@
       </div>
     </section>
 
-    <!-- ─────────────── PRIVATE BETA + FOUNDER ACCESS (unified) ─────────────── -->
-    <!-- One premium card. Founder Access is folded in as a benefit line — no
-         second card, no duplicate "Founder Access" heading, single CTA. -->
-    <section class="section section--early" id="early-access">
-      <div class="container">
-        <div class="early-card reveal">
-          <span class="early-eyebrow" data-i18n="early.eyebrow">Private Beta</span>
-          <h2 class="early-title" data-i18n="early.title">Invitation only.</h2>
-          <p class="early-sub" data-i18n="early.sub">Aurix is currently opening access to selected early users before public launch.</p>
-          <p class="early-founder" data-i18n="early.founder">Founder Access will be available for early members with exclusive benefits, priority access and permanent founder recognition.</p>
-          <button class="btn btn-primary btn-lg" id="openModal" data-i18n="cta.request">Request Access</button>
-          <p class="early-trust" data-i18n="early.trust">Limited early invitations available</p>
-        </div>
-      </div>
-    </section>
+    <!-- HOTFIX LANDING — the "Private Beta / Invitation only / Request Access" section was removed:
+         Aurix is now open to the public. Adjacent sections flow with their own section spacing (no
+         spacer was left behind), and the single public CTA is "Enter Aurix" (header / hero / footer). -->
     <!-- ─────────────── COMMUNITY (AURIX-WEBSITE-MESSAGING-1) ─────────────── -->
     <!-- Trust signal, not a primary CTA. Lives at the bottom of the landing,
          below the access CTA and above the footer. Quiet, integrated cards. -->
@@ -390,22 +378,8 @@
     </div>
   </footer>
 
-  <!-- ─────────────── REQUEST ACCESS MODAL ─────────────── -->
-  <div class="modal" id="accessModal" aria-hidden="true">
-    <div class="modal-backdrop" data-modal-close></div>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <button class="modal-x" id="closeModal" aria-label="Close" data-modal-close>&times;</button>
-      <span class="early-eyebrow" data-i18n="early.eyebrow">Private Beta</span>
-      <h3 class="modal-title" id="modalTitle" data-i18n="modal.title">Request private access.</h3>
-      <p class="modal-sub" data-i18n="modal.sub">Leave your details and we’ll contact selected users.</p>
-      <form class="early-form" id="earlyForm" novalidate>
-        <div class="field"><label for="ea-name" data-i18n="early.name">Name</label><input id="ea-name" name="name" type="text" autocomplete="name" required></div>
-        <div class="field"><label for="ea-email" data-i18n="early.email">Email</label><input id="ea-email" name="email" type="email" autocomplete="email" required></div>
-        <button class="btn btn-primary btn-lg btn-block" type="submit" data-i18n="early.button">Request Access</button>
-        <p class="early-note" id="earlyNote" data-i18n="early.note">We will not share your information. Private beta · limited spots.</p>
-      </form>
-    </div>
-  </div>
+  <!-- HOTFIX LANDING — the "Request Access" modal was removed with the Private Beta section
+       (Aurix is now open to the public; the CTA is "Enter Aurix"). -->
 
   <script src="app.js"></script>
 </body>
