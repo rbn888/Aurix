@@ -23880,3 +23880,50 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   .modal[data-mode="asset"] .modal-cta { margin-top: 20px; padding-top: 4px; }
   .modal[data-mode="asset"] .btn-submit { padding: 15px; font-size: 15px; font-weight: 800; }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   SPEC PLATFORM-HARDENING.3 — user-safe technical diagnostics modal.
+   Reuses .modal-overlay / .modal / .modal-body / .btn-submit chrome;
+   only the diagnostics-specific layout lives here. Presentation only.
+   ════════════════════════════════════════════════════════════════════ */
+.diag-body { display: flex; flex-direction: column; gap: 16px; }
+.diag-intro {
+  margin: 0; font-size: 14px; line-height: 1.5;
+  color: var(--text-muted, rgba(220, 230, 250, 0.72));
+}
+.diag-meta {
+  display: flex; flex-direction: column; gap: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03); padding: 6px 14px;
+}
+.diag-meta-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.diag-meta-row:last-child { border-bottom: 0; }
+.diag-meta-label { font-size: 13px; color: var(--text-muted, rgba(220, 230, 250, 0.6)); }
+.diag-meta-value {
+  font-size: 13px; font-weight: 600; color: var(--text-bright, #eef2ff);
+  font-variant-numeric: tabular-nums; text-align: right;
+  word-break: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.diag-actions { display: flex; flex-direction: column; gap: 10px; }
+.diag-btn { width: 100%; }
+.diag-details {
+  border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 12px;
+}
+.diag-details > summary {
+  cursor: pointer; font-size: 13px; list-style: none;
+  color: var(--text-muted, rgba(220, 230, 250, 0.6)); user-select: none;
+}
+.diag-details > summary::-webkit-details-marker { display: none; }
+.diag-details[open] > summary { color: var(--text-bright, #eef2ff); }
+.diag-dump {
+  margin: 12px 0 0; max-height: 240px; overflow: auto;
+  padding: 12px; border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28); border: 1px solid rgba(255, 255, 255, 0.06);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px; line-height: 1.45; white-space: pre-wrap; word-break: break-word;
+  color: var(--text-muted, rgba(220, 230, 250, 0.72));
+  -webkit-overflow-scrolling: touch;
+}
