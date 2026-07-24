@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '584'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '585'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -10217,7 +10217,12 @@ function assetPnLBase(asset) {
   // gain/loss. FX P&L is out of scope and would need an explicit FX
   // valuation model — not coming from this path.
   if (asset.type === 'cash') return { abs: 0, pct: 0 };
-  const value = asset.qty * asset.price;
+  // GOLD-PNL-UNIT-1: value via the canonical valuation owner (assetNativeValue) so gold uses
+  // the SAME effective unit (grams × purity ÷ OZ_TO_G × pricePerOz) as the value shown in the
+  // UI, and cost basis (now normalised to that same unit by syncCostBasisFromTransactions)
+  // reconciles: value − cost = absolute P&L. For every non-gold, non-cash asset
+  // assetNativeValue === qty × price, so this is byte-identical to the previous behaviour.
+  const value = assetNativeValue(asset);
   const cost  = asset.costBasis || 0;
   if (!cost || cost <= 0) return { abs: 0, pct: 0 };
   const abs = value - cost;
@@ -10286,13 +10291,21 @@ function _aurixPositionFromAsset(asset) {
   const a = asset || {};
   const qty = Number(a.qty), price = Number(a.price), cost = Number(a.costBasis);
   const avg = (typeof avgBuyPrice === 'function') ? avgBuyPrice(a) : null;
+  // GOLD-PNL-UNIT-1: category performance computes currentValue = quantity × currentPrice.
+  // For gold the true value is grams × purity ÷ OZ_TO_G × pricePerOz, so feed a currentPrice
+  // whose quantity×price equals assetNativeValue (Scale B), and an averagePurchasePrice whose
+  // quantity×avg equals the (now normalised) costBasis — keeping the row's value, cost, P&L and
+  // % all in the same effective unit as everywhere else. Non-gold is unchanged (price, avg).
+  const isGold = a.ticker === 'XAU' && a.karat;
+  const goldCurPrice = (isGold && Number.isFinite(qty) && qty > 0) ? assetNativeValue(a) / qty : null;
+  const goldAvgPrice = (isGold && Number.isFinite(cost) && Number.isFinite(qty) && qty > 0) ? cost / qty : null;
   return {
     id: (a.id != null) ? a.id : (a.ticker || a.symbol || null),
     name: a.name || a.ticker || a.symbol || null,
     category: _aurixDisplayCategory(a.type),
     quantity: Number.isFinite(qty) ? qty : null,
-    currentPrice: Number.isFinite(price) ? price : null,
-    averagePurchasePrice: (avg != null && Number.isFinite(avg)) ? avg : (Number.isFinite(cost) && Number.isFinite(qty) && qty > 0 ? cost / qty : null),
+    currentPrice: (goldCurPrice != null) ? goldCurPrice : (Number.isFinite(price) ? price : null),
+    averagePurchasePrice: (goldAvgPrice != null) ? goldAvgPrice : ((avg != null && Number.isFinite(avg)) ? avg : (Number.isFinite(cost) && Number.isFinite(qty) && qty > 0 ? cost / qty : null)),
     costBasis: Number.isFinite(cost) ? cost : null,
   };
 }
@@ -10393,12 +10406,22 @@ function syncCostBasisFromTransactions(asset) {
   // a positive residual).
   if (isClosedAsset(asset)) { asset.costBasis = 0; return; }
   if (!asset.transactions || !asset.transactions.length) return;
+  // GOLD-PNL-UNIT-1: physical gold stores tx qty = weight (in goldUnit) and tx price = per
+  // troy OUNCE, but its VALUE is grams × purity ÷ OZ_TO_G × pricePerOz (see assetNativeValue).
+  // A raw qty×price would leave cost basis in a different (grams×perOz) scale than the value,
+  // so value − cost was ~OZ_TO_G/purity× off (correct % but wrong absolute P&L). Normalise each
+  // lot with the SAME canonical conversion used by assetNativeValue — no second formula, no
+  // change to transactions[] or the live price. Non-gold path is byte-identical (qty × price).
+  const isGold = asset.ticker === 'XAU' && asset.karat;
   let totalCost = 0;
   for (const tx of asset.transactions) {
     const qty   = Number(tx.qty)   || 0;
     const price = Number(tx.price) || 0;
-    if (tx.type === 'buy')  totalCost += qty * price;
-    if (tx.type === 'sell') totalCost -= qty * price;
+    const lot = isGold
+      ? _goldGrams(qty, asset.goldUnit || 'g') * _goldPurity(asset.karat) * (price / OZ_TO_G)
+      : qty * price;
+    if (tx.type === 'buy')  totalCost += lot;
+    if (tx.type === 'sell') totalCost -= lot;
   }
   asset.costBasis = Math.max(0, totalCost);
 }
@@ -10407,7 +10430,13 @@ function migrateLegacyAssetToTransactions(asset) {
   if (asset.transactions && asset.transactions.length) return;
   if (!asset.qty || asset.qty <= 0) return;
   if (!asset.costBasis || asset.costBasis <= 0) return;
-  const avgPrice = asset.costBasis / asset.qty;
+  // GOLD-PNL-UNIT-1: derive the synthetic buy price in the SAME unit gold tx prices use
+  // (per troy oz), so the gold-aware syncCostBasisFromTransactions reproduces this asset's
+  // existing costBasis exactly (effectiveOz × price = costBasis). Net cost basis is preserved
+  // for legacy gold — no data migration, no regression. Non-gold keeps price = costBasis/qty.
+  const isGold = asset.ticker === 'XAU' && asset.karat;
+  const effectiveOz = isGold ? (_goldGrams(asset.qty, asset.goldUnit || 'g') * _goldPurity(asset.karat) / OZ_TO_G) : 0;
+  const avgPrice = (isGold && effectiveOz > 0) ? (asset.costBasis / effectiveOz) : (asset.costBasis / asset.qty);
   asset.transactions = [{ type: 'buy', qty: asset.qty, price: avgPrice, ts: Date.now() }];
 }
 
@@ -41105,7 +41134,7 @@ function generateBaseInsights() {
   // Performance + risk for top-3 gainers (> 20% up from cost)
   const performers = assets
     .filter(a => a.costBasis > 0)
-    .map(a => ({ asset: a, pct: Math.round((a.qty * a.price - a.costBasis) / a.costBasis * 100) }))
+    .map(a => ({ asset: a, pct: Math.round((assetNativeValue(a) - a.costBasis) / a.costBasis * 100) }))
     .filter(p => p.pct > 20)
     .sort((a, b) => b.pct - a.pct)
     .slice(0, 3);
@@ -41386,7 +41415,7 @@ function detectInactivityAfterGrowth() {
     let bestAsset = null, bestGain = 0;
     assets.forEach(a => {
       if (!a.costBasis || a.costBasis <= 0) return;
-      const g = (a.qty * a.price - a.costBasis) / a.costBasis * 100;
+      const g = (assetNativeValue(a) - a.costBasis) / a.costBasis * 100;
       if (g > bestGain) { bestGain = g; bestAsset = a; }
     });
     const daysRound = Math.round(days);
@@ -41862,7 +41891,7 @@ function getAmbientMessages() {
     let bestPerformer = null, bestGain = 0;
     assets.forEach(a => {
       if (!a.costBasis || a.costBasis <= 0) return;
-      const g = (a.qty * a.price - a.costBasis) / a.costBasis * 100;
+      const g = (assetNativeValue(a) - a.costBasis) / a.costBasis * 100;
       if (g > bestGain) { bestGain = g; bestPerformer = a; }
     });
     if (bestPerformer && bestGain > 0) {
@@ -41922,7 +41951,7 @@ function detectWowInsights() {
   let topGain = null, topValue = 0;
   assets.forEach(a => {
     if (!a.costBasis) return;
-    const pnl = a.qty * a.price - a.costBasis;
+    const pnl = assetNativeValue(a) - a.costBasis;
     if (pnl > topValue) { topValue = pnl; topGain = a; }
   });
   if (topGain && total > 0 && topValue > total * 0.3) {
@@ -41944,7 +41973,7 @@ function detectWowInsights() {
       const cnt  = repeatedBuys[name];
       const aObj = assets.find(a => a.name === name);
       const gain = aObj && aObj.costBasis > 0
-        ? Math.round(((aObj.qty * aObj.price - aObj.costBasis) / aObj.costBasis) * 100)
+        ? Math.round(((assetNativeValue(aObj) - aObj.costBasis) / aObj.costBasis) * 100)
         : null;
       const nk = name.replace(/\s+/g, '_');
       candidates.push({
@@ -42356,7 +42385,10 @@ function getDiversificationScore() {
 function getPortfolioPnL() {
   let value = 0, cost = 0;
   assets.forEach(a => {
-    value += a.qty * a.price;
+    // GOLD-PNL-UNIT-1: value via the canonical valuation owner so gold's value (effective
+    // oz × spot) is in the SAME unit as its (normalised) cost basis. assetNativeValue === qty
+    // × price for non-gold and === nominal for cash, so this is unchanged for every other type.
+    value += assetNativeValue(a);
     cost  += a.costBasis || 0;
   });
   return cost ? ((value - cost) / cost) * 100 : 0;
