@@ -128,10 +128,12 @@ ok('17 B: closeSuggestions refreshes flow (calls _updateSearchEmptyHint)',
 ok('18 C: empty CTA collapses off the form sub-state (display:none)',
   /#modalOverlay > \.modal\[data-mode="asset"\]:not\(\[data-asset-flow="form"\]\) \.modal-cta\s*\{[^}]*display:\s*none/.test(css));
 
-// 19. C: the CTA is NOT globally killed — in the form sub-state it still renders
-//     (the solid asset CTA background rule is preserved for the selected-asset flow).
-ok('19 C: CTA preserved for the form sub-state (asset CTA background rule intact)',
-  /\.modal\[data-mode="asset"\] \.modal-cta\s*\{[^}]*background:\s*rgba\(5,7,13,0\.96\)/.test(css));
+// 19. C: the CTA is NOT globally killed — in the form sub-state it still renders on a solid
+//     (non-translucent) surface. ADD-ASSET-MOBILE-FOOTER-1 moved that opaque surface from
+//     `.modal-cta` onto its wrapping action footer `.add-v2-footer` (which contains the CTA);
+//     the contract (solid CTA surface in the selected-asset flow) is unchanged.
+ok('19 C: CTA preserved for the form sub-state (solid action-footer surface intact)',
+  /\.modal\[data-mode="asset"\] \.add-v2-footer\s*\{[^}]*background:\s*rgba\(5,7,13,0\.96\)/.test(css));
 
 // 20. Scope guard: Real Estate + Cash + desktop remain excluded by the SPEC 63 rules
 //     (no data-mode="real_estate", no #liquidityOverlay in the flow/CTA additions).
