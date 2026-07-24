@@ -2730,16 +2730,56 @@ body.modal-open {
   .modal[data-mode="gold"] .modal-body {
     padding-bottom: calc(env(safe-area-inset-bottom) + 92px + 24px);
   }
+  /* ADD-ASSET-MOBILE-FOOTER-1 — the action footer is sticky IN-FLOW, so it already occupies
+     its space at the end of the body: the last field ("Ubicación / custodio") sits above it and
+     is never covered. Keep only light breathing padding (a large padding-bottom would let the
+     footer un-stick and leave a gap at max scroll). `scroll-padding-bottom` reserves the footer
+     height so that, when the keyboard is open, scrollIntoView never parks a focused input under
+     the footer. */
   .modal[data-mode="asset"] #assetForm.modal-body {
-    padding-bottom: calc(env(safe-area-inset-bottom) + 48px + 22px + 24px);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 12px);
+    scroll-padding-bottom: calc(env(safe-area-inset-bottom) + 120px);
   }
-  /* Non-gold asset modes keep the sticky variant — solid base so the
-     CTA never reads as a translucent overlay. */
-  .modal[data-mode="asset"] .modal-cta {
+  /* Non-gold asset modes: the "Valor estimado" + CTA action footer sticks to the bottom of
+     the scrollable sheet body. Opaque Aurix surface + hairline top border + a very subtle
+     shadow separate it from the content; it NEVER reads as a translucent overlay and never
+     covers "Ubicación / custodio". Sticky (in-flow), not a floating fixed layer. */
+  /* Only in the form flow (an asset is selected) does the footer render — during
+     search/idle both children are hidden, so the footer must not show an empty bar
+     (mirrors the existing CTA visibility rule keyed on data-asset-flow). */
+  #modalOverlay > .modal[data-mode="asset"]:not([data-asset-flow="form"]) .add-v2-footer {
+    display: none;
+  }
+  .modal[data-mode="asset"] .add-v2-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    margin-top: 4px;
+    padding: 12px 0 calc(4px + env(safe-area-inset-bottom));
     background: rgba(5,7,13,0.96);
     border-top: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 -8px 24px -14px rgba(0,0,0,0.6);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+  }
+  /* Inside the footer the estimated-value chip and CTA are static (the footer owns the
+     sticky/background); the CTA drops its base gradient + sticky so there is no double layer. */
+  .modal[data-mode="asset"] .add-v2-footer .form-preview {
+    margin: 0;
+  }
+  .modal[data-mode="asset"] .add-v2-footer .modal-cta {
+    position: static;
+    padding: 0;
+    margin: 0;
+    background: none;
+    border-top: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    z-index: auto;
   }
 }
 .type-btn {
@@ -2762,6 +2802,12 @@ body.modal-open {
 }
 
 /* ── Form Preview ──────────────────────────────────────── */
+/* ADD-ASSET-MOBILE-FOOTER-1 — wrapper for "Valor estimado" + CTA. Desktop/tablet:
+   `display: contents` makes the wrapper layout-neutral, so the two children flow exactly
+   as before (byte-identical desktop). The mobile @media (max-width: 768px) turns it into an
+   opaque sticky action footer. */
+.add-v2-footer { display: contents; }
+
 .form-preview {
   background: var(--bg-card-2);
   border: 1px solid var(--border);
