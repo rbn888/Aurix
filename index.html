@@ -66,8 +66,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v591-platform-hardening-runtime-diagnostics';
-      var APPJS_V = '582';
+      var BUILD = 'v592-platform-hardening-user-safe-diagnostics';
+      var APPJS_V = '583';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -1442,7 +1442,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=582"
+  <script src="app.js?v=583"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
@@ -1761,6 +1761,17 @@
             <span class="settings-action-text">
               <span class="settings-action-label" data-i18n="settingsImport">Importar datos</span>
               <span class="settings-action-sub" data-i18n="settingsImportSub">Próximamente</span>
+            </span>
+            <span class="settings-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+          </button>
+          <!-- SPEC PLATFORM-HARDENING.3 — discreet, user-safe technical diagnostics entry.
+               Opens #diagOverlay; generates a PII-free report via window.AurixDiagShare
+               (which reuses window.aurixDiagnosticsReport). Sits above the destructive reset. -->
+          <button type="button" class="settings-action" id="settingsDiagBtn">
+            <span class="settings-action-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l1 4-2 1v3l4 8H6l4-8V8L8 7z"/></svg></span>
+            <span class="settings-action-text">
+              <span class="settings-action-label" data-i18n="settingsDiag">Diagnóstico técnico</span>
+              <span class="settings-action-sub" data-i18n="settingsDiagSub">Genera un informe seguro para soporte</span>
             </span>
             <span class="settings-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
           </button>
@@ -2168,6 +2179,35 @@
       <label class="reset-confirm-label" for="resetConfirmInput" data-i18n="resetTypeLabel">Escribe RESET para confirmar</label>
       <input type="text" class="reset-confirm-input" id="resetConfirmInput" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="RESET">
       <button type="button" class="btn-submit btn-submit--danger" id="resetConfirmBtn" disabled data-i18n="resetDeleteBtn">Eliminar datos y empezar de cero</button>
+    </div>
+  </div>
+</div>
+
+<!-- SPEC PLATFORM-HARDENING.3 — user-safe technical diagnostics modal. Simple by design:
+     a plain-language privacy note, the generation time / Aurix version / local report id,
+     copy + (when available) share buttons, and an optional collapsed technical dump. All
+     content is produced by window.AurixDiagShare (PII-free, sanitized). Nothing is sent. -->
+<div class="modal-overlay" id="diagOverlay">
+  <div class="modal modal--diag" role="dialog" aria-modal="true" aria-labelledby="diagTitle">
+    <div class="modal-header">
+      <h3 id="diagTitle" data-i18n="diagTitle">Diagnóstico técnico</h3>
+      <button class="modal-close" id="diagClose" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body diag-body">
+      <p class="diag-intro" data-i18n="diagIntro">Este informe ayuda a soporte a resolver una incidencia. No contiene datos financieros, personales ni información de tu cartera, y no se envía a ningún sitio automáticamente.</p>
+      <div class="diag-meta">
+        <div class="diag-meta-row"><span class="diag-meta-label" data-i18n="diagReportId">Identificador del informe</span><span class="diag-meta-value" id="diagReportId">—</span></div>
+        <div class="diag-meta-row"><span class="diag-meta-label" data-i18n="diagVersion">Versión de Aurix</span><span class="diag-meta-value" id="diagReportVersion">—</span></div>
+        <div class="diag-meta-row"><span class="diag-meta-label" data-i18n="diagGeneratedAt">Generado</span><span class="diag-meta-value" id="diagReportTime">—</span></div>
+      </div>
+      <div class="diag-actions">
+        <button type="button" class="btn-submit diag-btn" id="diagCopyBtn" data-i18n="diagCopyBtn">Copiar informe técnico</button>
+        <button type="button" class="btn-submit btn-submit--ghost diag-btn" id="diagShareBtn" hidden data-i18n="diagShareBtn">Compartir informe técnico</button>
+      </div>
+      <details class="diag-details">
+        <summary data-i18n="diagDetails">Ver detalles técnicos</summary>
+        <pre class="diag-dump" id="diagDump" aria-live="polite"></pre>
+      </details>
     </div>
   </div>
 </div>

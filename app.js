@@ -459,6 +459,194 @@ function _aurixInstallRuntimeDiagnostics(root) {
 try { if (typeof window !== 'undefined') _aurixInstallRuntimeDiagnostics(window); } catch (_) {}
 
 // ════════════════════════════════════════════════════════════════════════
+// SPEC PLATFORM-HARDENING.3 — User-safe diagnostics access (share layer)
+// ════════════════════════════════════════════════════════════════════════
+// A real Android/mobile user cannot open DevTools to run window.aurixDiagnosticsReport().
+// This additive layer lets an affected user GENERATE and SHARE a technical report from
+// inside the app — with no DevTools, no personal/financial data, and NOTHING sent
+// automatically. It REUSES the single V2 owner (window.aurixDiagnosticsReport) — it never
+// duplicates diagnostics — and applies a FINAL sanitization pass (allow-list projection +
+// leaf-string redaction) so aurixDiagnosticsReport() is never exposed raw. It owns copy /
+// share (with a graceful fallback to copy) and a local, ephemeral report id. It NEVER uses
+// persistent storage, NEVER navigates or reloads, NEVER throws to the root, and degrades
+// safely when Clipboard/Share are unavailable. `root` is passed explicitly so the whole
+// layer runs in an isolated harness sandbox.
+function _aurixInstallDiagnosticsShare(root) {
+  if (!root || typeof root !== 'object') return null;
+  const existing = root.AurixDiagShare;
+  if (existing && existing.__aurix) return existing;          // single owner: install once
+
+  const MAX_STR = 160;          // per free-form leaf string cap
+  const MAX_EVENTS = 100;       // mirror the V2 ring-buffer bound (never grows unbounded)
+  const MAX_OWNERS = 40;
+  const MAX_OUTPUT = 24000;     // total shareable text cap (bounded memory + payload)
+
+  const _now = () => { try { return Date.now(); } catch (_) { return 0; } };
+  const _rand = () => { try { return Math.random(); } catch (_) { return 0; } };
+  const num  = (v) => (typeof v === 'number' && isFinite(v) ? v : null);
+  const bool = (v) => (typeof v === 'boolean' ? v : null);
+
+  // ── FINAL redaction — applied to genuinely free-form leaf strings only (api / type /
+  //    userAgent / language / client-hint strings). Controlled-vocabulary fields (kind /
+  //    owner / phase / result / spec) come from the V2 layer's bounded vocab and are NOT
+  //    scrubbed (so technical phase names like "runtime_resilience_ready" survive intact).
+  const RX_JWT    = /\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/g;  // JWT
+  const RX_BEARER = /\b[Bb]earer\s+[A-Za-z0-9._-]+/g;                                 // bearer token
+  const RX_EMAIL  = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;                // email
+  const RX_URLQ   = /([?#])\S+/g;                                                     // URL query / hash (sensitive params)
+  const RX_TOKEN  = /\b[A-Za-z0-9_-]{28,}\b/g;                                        // long opaque token / id
+  const RX_MONEY  = /[$€£¥]\s?\d[\d.,]*|\b\d[\d.,]*\s?(?:€|EUR|USD|GBP)\b/gi;          // currency amounts
+  function scrub(s) {
+    if (typeof s !== 'string') return (s == null ? null : s);
+    let out = s;
+    try {
+      out = out.replace(RX_JWT, '[redacted]')
+               .replace(RX_BEARER, '[redacted]')
+               .replace(RX_EMAIL, '[redacted]')
+               .replace(RX_URLQ, '$1[redacted]')
+               .replace(RX_MONEY, '[redacted]')
+               .replace(RX_TOKEN, '[redacted]');
+    } catch (_) {}
+    if (out.length > MAX_STR) out = out.slice(0, MAX_STR) + '…';
+    return out;
+  }
+
+  // ── allow-list projection over the V2 report → keep only certified technical fields ──
+  function sanitize() {
+    let base;
+    try { base = (typeof root.aurixDiagnosticsReport === 'function') ? root.aurixDiagnosticsReport() : null; } catch (_) { base = null; }
+    if (!base || typeof base !== 'object') base = {};
+    const tl  = Array.isArray(base.timeline) ? base.timeline : [];
+    const ev  = Array.isArray(base.events) ? base.events : [];
+    const br  = (base.browser && typeof base.browser === 'object') ? base.browser : {};
+    const ch  = (br.clientHints && typeof br.clientHints === 'object') ? br.clientHints : {};
+    const vp  = (br.viewport && typeof br.viewport === 'object') ? br.viewport : {};
+    const cap = (base.capabilities && typeof base.capabilities === 'object') ? base.capabilities : {};
+    const cn  = (base.counters && typeof base.counters === 'object') ? base.counters : {};
+    const rc  = (base.recoveries && typeof base.recoveries === 'object') ? base.recoveries : {};
+    const rs  = (base.renderStability && typeof base.renderStability === 'object') ? base.renderStability : {};
+    const caps = {};
+    try { Object.keys(cap).forEach((k) => { if (typeof cap[k] === 'boolean') caps[String(k).slice(0, 40)] = cap[k]; }); } catch (_) {}
+    return {
+      baseSpec: (typeof base.spec === 'string' ? base.spec : null),
+      build: (typeof base.build === 'string' ? base.build : null),
+      appJsVersion: (typeof base.appJsVersion === 'string' ? base.appJsVersion : null),
+      timeline: tl.slice(0, MAX_EVENTS).map((p) => ({
+        phase: (typeof p.phase === 'string' ? p.phase : null), owner: (typeof p.owner === 'string' ? p.owner : null),
+        atMs: num(p.atMs), durationMs: num(p.durationMs), result: (typeof p.result === 'string' ? p.result : null) })),
+      events: ev.slice(-MAX_EVENTS).map((e) => ({
+        kind: (typeof e.kind === 'string' ? e.kind : null), owner: (typeof e.owner === 'string' ? e.owner : null),
+        phase: (typeof e.phase === 'string' ? e.phase : null), api: scrub(e.api), type: scrub(e.type) })),
+      counters: { errors: num(cn.errors), rejections: num(cn.rejections), renderSignals: num(cn.renderSignals) },
+      recoveries: { executed: num(rc.executed), avoided: num(rc.avoided), loopsAvoided: num(rc.loopsAvoided), degradationsApplied: num(rc.degradationsApplied) },
+      renderStability: { bootstrap: num(rs.bootstrap), render: num(rs.render), routing: num(rs.routing), remount: num(rs.remount), threshold: num(rs.threshold), overThreshold: bool(rs.overThreshold) },
+      capabilities: caps,
+      connectivity: { online: bool(br.online) },
+      viewport: { w: num(vp.w), h: num(vp.h), dpr: num(vp.dpr), visualViewport: bool(vp.visualViewport) },
+      // Device/browser context comes ONLY from structured client hints + feature detection.
+      // The raw userAgent is DELIBERATELY excluded: it is the one field that can carry a device
+      // profile name (spec §3 "excluir nombres"), and the structured hints already describe the
+      // platform/engine safely. Brands (engine + version) are opaque and safe.
+      browser: {
+        platform: scrub(ch.platform), mobile: bool(ch.mobile), language: scrub(br.language),
+        brands: (Array.isArray(ch.brands) ? ch.brands.slice(0, 8).map((b) => ({ brand: scrub(b && b.brand), version: scrub(b && b.version) })) : null),
+        standalone: bool(br.standalone), reducedMotion: bool(br.reducedMotion),
+        hardwareConcurrency: num(br.hardwareConcurrency), deviceMemory: num(br.deviceMemory),
+        incognitoHint: (typeof br.incognitoHint === 'string' ? br.incognitoHint : null) },
+      owners: (Array.isArray(base.owners) ? base.owners : []).filter((o) => typeof o === 'string').slice(0, MAX_OWNERS),
+    };
+  }
+
+  // ── local ephemeral report id — NOT persisted, NOT a user tracking id ──
+  function reportId() {
+    let ts = '000000', rnd = 'XXXX';
+    try { ts = _now().toString(36).slice(-6).toUpperCase(); } catch (_) {}
+    try { const r = (_rand().toString(36).split('.')[1] || '').slice(0, 4).toUpperCase(); if (r) rnd = r; } catch (_) {}
+    return 'AX-DIAG-' + ts + '-' + rnd;
+  }
+
+  function build() {
+    const r = sanitize();
+    return {
+      reportId: reportId(), generatedAtMs: _now(),
+      aurixVersion: r.appJsVersion || r.build || null,
+      note: 'Aurix technical diagnostics · PII-free · no financial or personal data · not sent automatically.',
+      diagnostics: r,
+    };
+  }
+
+  function text() {
+    let s;
+    try { s = JSON.stringify(build(), null, 2); } catch (_) { s = '{}'; }
+    if (typeof s !== 'string') s = '{}';
+    if (s.length > MAX_OUTPUT) s = s.slice(0, MAX_OUTPUT) + '\n…[truncated]';
+    return s;
+  }
+
+  // ── copy — Clipboard API first, then a self-contained textarea+execCommand fallback.
+  //    Never rejects; resolves { ok, method } so the UI can confirm or degrade. ──
+  function copyFallback(str) {
+    try {
+      const doc = root.document;
+      if (!doc || typeof doc.createElement !== 'function') return false;
+      const ta = doc.createElement('textarea');
+      ta.value = str; ta.setAttribute('readonly', '');
+      try { ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.opacity = '0'; } catch (_) {}
+      (doc.body || doc.documentElement).appendChild(ta);
+      try { ta.focus(); ta.select(); } catch (_) {}
+      let done = false;
+      try { done = !!(doc.execCommand && doc.execCommand('copy')); } catch (_) { done = false; }
+      try { if (ta.parentNode) ta.parentNode.removeChild(ta); } catch (_) {}
+      return done;
+    } catch (_) { return false; }
+  }
+  function copy() {
+    const str = text();
+    return new Promise((resolve) => {
+      try {
+        const nav = root.navigator;
+        if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
+          Promise.resolve(nav.clipboard.writeText(str)).then(
+            () => resolve({ ok: true, method: 'clipboard' }),
+            () => { const fb = copyFallback(str); resolve({ ok: fb, method: fb ? 'execCommand' : 'none' }); }
+          );
+          return;
+        }
+      } catch (_) {}
+      const fb = copyFallback(str);
+      resolve({ ok: fb, method: fb ? 'execCommand' : 'none' });
+    });
+  }
+
+  function isShareAvailable() {
+    try { return !!(root.navigator && typeof root.navigator.share === 'function'); } catch (_) { return false; }
+  }
+  // ── share — Web Share API when present; on absence OR failure/cancel, fall back to copy ──
+  function share() {
+    const str = text();
+    return new Promise((resolve) => {
+      const fallback = () => copy().then((c) => resolve({ ok: c.ok, shared: false, method: c.ok ? c.method : 'none' }));
+      try {
+        const nav = root.navigator;
+        if (nav && typeof nav.share === 'function') {
+          Promise.resolve(nav.share({ title: 'Aurix · Diagnóstico técnico', text: str })).then(
+            () => resolve({ ok: true, shared: true, method: 'share' }),
+            () => fallback()
+          );
+          return;
+        }
+      } catch (_) {}
+      fallback();
+    });
+  }
+
+  const api = { __aurix: true, version: '1', sanitize, build, text, reportId, copy, share, isShareAvailable };
+  try { root.AurixDiagShare = api; } catch (_) {}
+  return api;
+}
+try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); } catch (_) {}
+
+// ════════════════════════════════════════════════════════════════════════
 // SPEC DSH.CHART.ATOMIC_BUILD_COHERENCE.43 — one runtime build-coherence contract
 // ════════════════════════════════════════════════════════════════════════
 // The EXECUTED bundle's immutable self-version (bumped together with index APPJS_V + version.json.appjs +
@@ -469,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallRuntimeDiagnostics(window)
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '582'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '583'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -5032,6 +5220,20 @@ const T = {
     settingsImportSub:        'Próximamente',
     settingsReset:            'Resetear cartera',
     settingsResetSub:         'Borra activos, historial y seguimiento',
+    // SPEC PLATFORM-HARDENING.3 — user-safe diagnostics access
+    settingsDiag:             'Diagnóstico técnico',
+    settingsDiagSub:          'Genera un informe seguro para soporte',
+    diagTitle:                'Diagnóstico técnico',
+    diagIntro:                'Este informe ayuda a soporte a resolver una incidencia. No contiene datos financieros, personales ni información de tu cartera, y no se envía a ningún sitio automáticamente.',
+    diagGeneratedAt:          'Generado',
+    diagVersion:             'Versión de Aurix',
+    diagReportId:            'Identificador del informe',
+    diagCopyBtn:             'Copiar informe técnico',
+    diagShareBtn:            'Compartir informe técnico',
+    diagDetails:             'Ver detalles técnicos',
+    diagCopiedToast:         'Informe técnico copiado',
+    diagCopyFailToast:       'No se pudo copiar. Mantén pulsado el texto para copiarlo manualmente.',
+    diagSharedToast:         'Informe técnico compartido',
     settingsPrefs:            'Preferencias',
     settingsLang:             'Idioma',
     settingsCurrency:         'Moneda base',
@@ -7126,6 +7328,20 @@ const T = {
     settingsImportSub:        'Coming soon',
     settingsReset:            'Reset portfolio',
     settingsResetSub:         'Erase assets, history and watchlist',
+    // SPEC PLATFORM-HARDENING.3 — user-safe diagnostics access
+    settingsDiag:             'Technical diagnostics',
+    settingsDiagSub:          'Generate a safe report for support',
+    diagTitle:                'Technical diagnostics',
+    diagIntro:                'This report helps support resolve an issue. It contains no financial, personal or portfolio data, and is never sent anywhere automatically.',
+    diagGeneratedAt:          'Generated',
+    diagVersion:             'Aurix version',
+    diagReportId:            'Report ID',
+    diagCopyBtn:             'Copy technical report',
+    diagShareBtn:            'Share technical report',
+    diagDetails:             'View technical details',
+    diagCopiedToast:         'Technical report copied',
+    diagCopyFailToast:       'Could not copy. Long-press the text to copy it manually.',
+    diagSharedToast:         'Technical report shared',
     settingsPrefs:            'Preferences',
     settingsLang:             'Language',
     settingsCurrency:         'Base currency',
@@ -55413,6 +55629,59 @@ function closeSettingsPanel() {
   }
 }
 
+// ── SPEC PLATFORM-HARDENING.3 — user-safe diagnostics modal ────────
+// Presentation only. Reads the sanitized report from window.AurixDiagShare
+// (which reuses window.aurixDiagnosticsReport) and offers copy / share. Every
+// operation is wrapped so it can NEVER block the app, throw to the root, or
+// navigate/reload; if the share layer is unavailable, the panel still opens and
+// degrades gracefully.
+function _diagPopulate() {
+  const D = (typeof window !== 'undefined') ? window.AurixDiagShare : null;
+  const idEl = document.getElementById('diagReportId');
+  const vEl  = document.getElementById('diagReportVersion');
+  const tEl  = document.getElementById('diagReportTime');
+  const dump = document.getElementById('diagDump');
+  const shareBtn = document.getElementById('diagShareBtn');
+  let doc = null;
+  try { doc = D && typeof D.build === 'function' ? D.build() : null; } catch (_) { doc = null; }
+  if (idEl) idEl.textContent = (doc && doc.reportId) ? doc.reportId : '—';
+  if (vEl)  vEl.textContent  = (doc && doc.aurixVersion) ? String(doc.aurixVersion) : '—';
+  if (tEl) {
+    let when = '—';
+    try {
+      const ms = doc && typeof doc.generatedAtMs === 'number' ? doc.generatedAtMs : 0;
+      if (ms > 0) when = new Date(ms).toLocaleString(typeof lang !== 'undefined' && lang === 'es' ? 'es-ES' : 'en-GB');
+    } catch (_) {}
+    tEl.textContent = when;
+  }
+  if (dump) { try { dump.textContent = (D && typeof D.text === 'function') ? D.text() : '{}'; } catch (_) { dump.textContent = '{}'; } }
+  // Only reveal Share when the platform actually supports it (spec: copy-only otherwise).
+  if (shareBtn) {
+    let has = false;
+    try { has = !!(D && typeof D.isShareAvailable === 'function' && D.isShareAvailable()); } catch (_) { has = false; }
+    if (has) shareBtn.removeAttribute('hidden'); else shareBtn.setAttribute('hidden', '');
+  }
+}
+function openDiagPanel() {
+  const ov = document.getElementById('diagOverlay');
+  if (!ov) return;
+  try { _diagPopulate(); } catch (_) {}
+  // Collapse the technical dump by default (spec: no illegible dump on open).
+  try { const d = ov.querySelector('.diag-details'); if (d) d.removeAttribute('open'); } catch (_) {}
+  ov.classList.add('open');
+  document.body.classList.add('modal-open');
+}
+function closeDiagPanel() {
+  const ov = document.getElementById('diagOverlay');
+  if (!ov) return;
+  ov.classList.remove('open');
+  // Keep the body lock while Settings (its opener) is still open.
+  const settings = document.getElementById('settingsOverlay');
+  if (!settings || !settings.classList.contains('open')) {
+    document.body.classList.remove('modal-open');
+  }
+}
+
 // ── Reset confirm overlay ─────────────────────────────────────────
 function openResetConfirm() {
   const ov = document.getElementById('resetConfirmOverlay');
@@ -55919,6 +56188,33 @@ function exportPortfolioBackup() {
       openResetConfirm();
       return;
     }
+    // SPEC PLATFORM-HARDENING.3 — open the user-safe technical diagnostics modal.
+    if (e.target.closest && e.target.closest('#settingsDiagBtn')) {
+      openDiagPanel();
+      return;
+    }
+    // Diagnostics modal — close (button or backdrop), copy, share.
+    if (e.target.closest && e.target.closest('#diagClose')) { closeDiagPanel(); return; }
+    const diagOv = document.getElementById('diagOverlay');
+    if (diagOv && diagOv.classList.contains('open') && e.target === diagOv) { closeDiagPanel(); return; }
+    if (e.target.closest && e.target.closest('#diagCopyBtn')) {
+      const D = (typeof window !== 'undefined') ? window.AurixDiagShare : null;
+      Promise.resolve(D && typeof D.copy === 'function' ? D.copy() : { ok: false })
+        .then(r => _aurixShowToast(_settingsT((r && r.ok) ? 'diagCopiedToast' : 'diagCopyFailToast'), { variant: (r && r.ok) ? 'success' : 'error' }))
+        .catch(() => {});
+      return;
+    }
+    if (e.target.closest && e.target.closest('#diagShareBtn')) {
+      const D = (typeof window !== 'undefined') ? window.AurixDiagShare : null;
+      Promise.resolve(D && typeof D.share === 'function' ? D.share() : { ok: false })
+        .then(r => {
+          if (r && r.shared) _aurixShowToast(_settingsT('diagSharedToast'), { variant: 'success' });
+          else if (r && r.ok) _aurixShowToast(_settingsT('diagCopiedToast'), { variant: 'success' });
+          else _aurixShowToast(_settingsT('diagCopyFailToast'), { variant: 'error' });
+        })
+        .catch(() => {});
+      return;
+    }
 
     // Reset confirm overlay
     if (e.target.closest && e.target.closest('#resetConfirmClose')) {
@@ -55958,6 +56254,8 @@ function exportPortfolioBackup() {
     if (e.key !== 'Escape') return;
     const resetOv    = document.getElementById('resetConfirmOverlay');
     const settingsOv = document.getElementById('settingsOverlay');
+    const diagOv     = document.getElementById('diagOverlay');
+    if (diagOv && diagOv.classList.contains('open'))        { closeDiagPanel();      return; }
     if (resetOv && resetOv.classList.contains('open'))      { closeResetConfirm();   return; }
     if (settingsOv && settingsOv.classList.contains('open')) { closeSettingsPanel(); return; }
   });
