@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '583'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '584'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -3792,6 +3792,10 @@ const T = {
     manualCurrLabel:  'Moneda',
     manualPriceLabel: 'Precio por unidad',
     manualPriceOptional: ' (opcional)',
+    // PURCHASE-PRICE-V1 — optional real purchase price (market/DB assets)
+    purchasePriceLabel: 'Precio de compra',
+    purchasePriceOptional: ' (opcional)',
+    purchasePriceHint: 'Precio medio pagado por unidad.',
     // Bottom nav
     tabHome:     'Inicio',
     tabInsights: 'Insights',
@@ -5928,6 +5932,10 @@ const T = {
     manualCurrLabel:  'Currency',
     manualPriceLabel: 'Price per unit',
     manualPriceOptional: ' (optional)',
+    // PURCHASE-PRICE-V1 — optional real purchase price (market/DB assets)
+    purchasePriceLabel: 'Purchase price',
+    purchasePriceOptional: ' (optional)',
+    purchasePriceHint: 'Average price paid per unit.',
     filterAll: 'All', filterCrypto: 'Crypto', filterStock: 'Stocks',
     filterEtf: 'ETF / Funds', filterMetal: 'Metals', filterRE: 'Real Estate',
     reName: 'Property name', reValueLabel: 'Value (in base currency)',
@@ -47436,6 +47444,10 @@ async function selectAsset(entry) {
   qtyGroup.style.display    = '';
   formPreviewEl.style.display = '';
   btnSubmitEl.style.display  = '';
+  // PURCHASE-PRICE-V1 — reveal the optional purchase-price field for priced market/DB
+  // assets (stock/etf/fund/crypto). Hidden for gold (XAU), whose specialised flow keeps
+  // its spot-based cost basis. Real-estate/manual/cash paths never reach this reveal.
+  { const _ppg = document.getElementById('purchasePriceGroup'); if (_ppg) _ppg.style.display = (entry.ticker === 'XAU') ? 'none' : ''; }
   // GOLD-UX-2: per-asset CTA copy. Non-gold assets keep the canonical
   // "Añadir a cartera" / "Add to portfolio"; gold enters disabled
   // with "Completa los datos" until the user finishes the flow.
@@ -47584,6 +47596,9 @@ function clearSelectedAsset() {
   if (goldUnitGroupEl) goldUnitGroupEl.style.display = 'none';
   const _gsEl = document.getElementById('goldSection');
   if (_gsEl) _gsEl.style.display = 'none';
+  // PURCHASE-PRICE-V1 — deselecting hides the purchase-price field so it never lingers
+  // into the real-estate / manual / idle flows (re-selecting a priced asset re-reveals it).
+  { const _ppg = document.getElementById('purchasePriceGroup'); if (_ppg) _ppg.style.display = 'none'; }
   // GOLD-1B: restore the ISIN entry when leaving a physical-gold
   // selection so the user can switch to ETF/fund/manual input again.
   const _isinEl = document.getElementById('isinOrWrap');
@@ -48881,6 +48896,15 @@ assetForm.addEventListener('submit', e => {
   const qty = parseLocalFloat(qtyInput.value);
   if (isNaN(qty) || qty <= 0) { qtyInput.focus(); return; }
 
+  // PURCHASE-PRICE-V1 — optional real purchase price → sourced into the first Buy
+  // transaction (the single source of truth for cost basis / avg price / P&L). When the
+  // user leaves it empty, we fall back to the live price `pendingPrice` (unchanged
+  // behaviour). The gold flow never shows the field (spot-based valuation), so `_ppRaw`
+  // is empty for XAU and `_effectivePrice === pendingPrice`. The live price (`asset.price`,
+  // `spotPriceAtAdd`, `manualNav`) is NEVER overwritten by this value.
+  const _ppRaw = (function () { const el = document.getElementById('assetPurchasePrice'); return el ? parseLocalFloat(el.value) : NaN; })();
+  const _effectivePrice = (Number.isFinite(_ppRaw) && _ppRaw > 0) ? _ppRaw : pendingPrice;
+
   const { ticker, type, coinId = null, marketSymbol = null } = selectedDbAsset;
   const isGoldAsset = ticker === 'XAU';
   const karat       = isGoldAsset ? pendingKarat    : undefined;
@@ -48914,10 +48938,12 @@ assetForm.addEventListener('submit', e => {
     return a.ticker.toUpperCase() === ticker.toUpperCase() && a.type === type && aCurrency === newCurrency;
   });
 
-  // Cost basis for this purchase (in asset's native USD)
+  // Cost basis for this purchase (in asset's native USD). Uses the effective purchase
+  // price (user-entered when provided, else live). Gold keeps its spot formula intact —
+  // `_effectivePrice === pendingPrice` for XAU (field hidden).
   const newPurchaseCost = isGoldAsset
-    ? _goldGrams(qty, pendingGoldUnit) * _goldPurity(pendingKarat) * (pendingPrice / OZ_TO_G)
-    : qty * pendingPrice;
+    ? _goldGrams(qty, pendingGoldUnit) * _goldPurity(pendingKarat) * (_effectivePrice / OZ_TO_G)
+    : qty * _effectivePrice;
 
   let normalFlashId = existing?.id;
   const _buyTs = Date.now();
@@ -48930,9 +48956,9 @@ assetForm.addEventListener('submit', e => {
     existing.qty    = +(existing.qty + qty).toFixed(8);
     existing.price  = pendingPrice;
     if (!existing.transactions) existing.transactions = [];
-    existing.transactions.push({ type: 'buy', qty, price: pendingPrice, ts: _buyTs });
+    existing.transactions.push({ type: 'buy', qty, price: _effectivePrice, ts: _buyTs });
     if (_newLoc) existing.location = _newLoc;   // WL.2: conserve unless user set one
-    _ledgerTrade(existing, 'buy', qty, pendingPrice, _buyTs);
+    _ledgerTrade(existing, 'buy', qty, _effectivePrice, _buyTs);
   } else {
     let initialChange24h = null;
     if (marketSymbol && type !== 'crypto') {
@@ -48988,9 +49014,9 @@ assetForm.addEventListener('submit', e => {
         resaleMargin:      pendingResaleMargin,
         resaleFactor:      +(Math.max(0, Math.min(1, 1 - pendingResaleMargin / 100))).toFixed(4),
       } : {}),
-      transactions:  [{ type: 'buy', qty, price: pendingPrice, ts: _buyTs }],
+      transactions:  [{ type: 'buy', qty, price: _effectivePrice, ts: _buyTs }],
     });
-    _ledgerTrade(assets.find(a => a.id === normalFlashId), 'buy', qty, pendingPrice, _buyTs);
+    _ledgerTrade(assets.find(a => a.id === normalFlashId), 'buy', qty, _effectivePrice, _buyTs);
   }
 
   _persistDebug('[persist-add-asset]', {
