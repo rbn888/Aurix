@@ -30,14 +30,18 @@ function near(a, b, eps) { return Math.abs(a - b) <= (eps || 1e-6); }
 // ── Extract the canonical pipeline into a sandbox (no DOM needed) ──
 const ctx = { Number, Math, Object, Array, Date, console };
 vm.createContext(ctx);
-['isClosedAsset', 'avgBuyPrice', 'computeCostBasisFromTransactions', 'syncCostBasisFromTransactions',
- 'syncQtyFromTransactions', 'migrateLegacyAssetToTransactions', 'assetPnLBase'].forEach(fn => {
+// Constants + tiny stubs the extracted fns close over (values match app.js).
+vm.runInContext('const OZ_TO_G = 31.1034768; const _PURITY_TABLE = {24:1,22:0.9167,21:0.875,18:0.75,14:0.5833,10:0.4167,9:0.375}; function liquidityNominal(a){ return a.qty; }', ctx);
+['_goldPurity', '_goldGrams', 'isClosedAsset', 'assetNativeValue', 'avgBuyPrice',
+ 'computeCostBasisFromTransactions', 'syncCostBasisFromTransactions', 'syncQtyFromTransactions',
+ 'migrateLegacyAssetToTransactions', 'sanitizeTransactionPrices', 'assetPnLBase'].forEach(fn => {
   vm.runInContext(fnSrc(fn), ctx);
 });
 const P = (name) => vm.runInContext(name, ctx);
 const avgBuyPrice = P('avgBuyPrice'), syncCost = P('syncCostBasisFromTransactions'),
       syncQty = P('syncQtyFromTransactions'), migrate = P('migrateLegacyAssetToTransactions'),
-      pnl = P('assetPnLBase');
+      pnl = P('assetPnLBase'), goldGrams = P('_goldGrams'), goldPurity = P('_goldPurity');
+const OZ_TO_G = 31.1034768;
 
 // A helper mirroring exactly what the add-asset owner now writes for a NEW asset: a first Buy
 // at the EFFECTIVE price (entered → else live), costBasis = qty × effective.
@@ -88,6 +92,33 @@ console.log('3 — stock / etf / fund / crypto / metal share one primitive:');
     if (!(near(a.costBasis, 3 * px) && near(avgBuyPrice(a), px))) allOk = false;
   }
   ok('3.1 cost basis + avg price correct for stock/etf/fund/crypto/metal', allOk);
+}
+
+// ── 3b METAL / XAU manual price — canonical unit = per troy OUNCE (no parallel conversion) ──
+console.log('3b — gold (XAU) manual purchase price (canonical unit: per oz):');
+{
+  // Owner: gold entered price is per oz (same unit as spot/pendingPrice). qty = weight in
+  // goldUnit; tx price = entered per-oz; newPurchaseCost = grams × purity × (price/OZ_TO_G).
+  const currentSpot = 2000, entered = 1800, qty = 10, unit = 'g', karat = 18;   // per oz
+  const grams = goldGrams(qty, unit), purity = goldPurity(karat);
+  const effective = (entered > 0) ? entered : currentSpot;
+  const newPurchaseCost = grams * purity * (effective / OZ_TO_G);
+  const a = { ticker: 'XAU', karat, goldUnit: unit, type: 'metal', qty, price: currentSpot,
+    costBasis: newPurchaseCost, transactions: [{ type: 'buy', qty, price: effective, ts: 1 }] };
+  // render() sync sequence runs on gold too:
+  migrate(a); syncQty(a); syncCost(a);
+  ok('3b.1 first Buy tx price = entered per-oz value (1,800), not current spot (2,000)', a.transactions[0].price === 1800);
+  ok('3b.2 avg buy price = entered per-oz value', avgBuyPrice(a) === 1800);
+  ok('3b.3 live spot price preserved on asset.price (2,000, never overwritten)', a.price === 2000);
+  const p = pnl(a);
+  ok('3b.4 P&L reflects purchase vs current spot: (2000−1800)/1800 ≈ +11.11%', near(p.pct, (200 / 1800) * 100, 1e-4));
+  // empty → fallback to spot → P&L 0 at add
+  const eff2 = (NaN > 0) ? NaN : currentSpot;
+  const b = { ticker: 'XAU', karat, goldUnit: unit, type: 'metal', qty, price: currentSpot,
+    costBasis: grams * purity * (eff2 / OZ_TO_G), transactions: [{ type: 'buy', qty, price: eff2, ts: 1 }] };
+  migrate(b); syncQty(b); syncCost(b);
+  ok('3b.5 empty purchase price → gold first Buy uses spot (P&L 0 at add)', b.transactions[0].price === 2000 && near(pnl(b).abs, 0));
+  ok('3b.6 cost basis uses the EXISTING gold formula with the entered price (no new formula)', near(newPurchaseCost, grams * purity * (1800 / OZ_TO_G)));
 }
 
 // ── 4 first Buy visible in View Transactions (renders straight from transactions[]) ──
@@ -157,8 +188,9 @@ console.log('10 — recompute + owner wiring (source contracts):');
   ok('10.2 first Buy tx + ledger + cost basis all use _effectivePrice', /price: _effectivePrice, ts: _buyTs/.test(app) && /_ledgerTrade\(assets\.find\(a => a\.id === normalFlashId\), 'buy', qty, _effectivePrice/.test(app) && /qty \* _effectivePrice;/.test(app));
   ok('10.3 live price fields NOT overwritten (asset.price + spotPriceAtAdd stay pendingPrice)', /price:\s*pendingPrice,/.test(app) && /spotPriceAtAdd:\s*pendingPrice,/.test(app));
   ok('10.4 submit tail recomputes: save() + render(true) + onPortfolioChange(true)', /save\(\);\s*\n\s*render\(true\);\s*\n\s*closeModal\(\);[\s\S]{0,120}onPortfolioChange\(true\)/.test(app));
-  ok('10.5 field gated to non-gold market assets (hidden for XAU), and hidden on deselect', /purchasePriceGroup'\);[\s\S]{0,80}entry\.ticker === 'XAU'/.test(app) && /purchasePriceGroup'\); if \(_ppg\) _ppg\.style\.display = 'none';/.test(app));
+  ok('10.5 field shown for ALL priced market assets incl gold; XAU labelled per-oz; hidden on deselect', /_ppg\.style\.display = '';\s*\n\s*const _ppu = document\.getElementById\('purchasePriceUnit'\); if \(_ppu\) _ppu\.textContent = \(entry\.ticker === 'XAU'\) \? t\('purchasePricePerOz'\) : '';/.test(app) && /purchasePriceGroup'\); if \(_ppg\) _ppg\.style\.display = 'none';/.test(app));
   ok('10.6 real-estate + cash paths create NO purchase-price tx (excluded)', /type:\s*'real_estate'/.test(app) && /type:\s*'cash'/.test(app));
+  ok('10.9 gold uses the canonical per-oz unit — NO parallel conversion added (label only)', /purchasePricePerOz: ' por onza'/.test(app) && /purchasePricePerOz: ' per oz'/.test(app) && /id="purchasePriceUnit"/.test(html));
   ok('10.7 HTML: optional purchase-price field sits between Quantity and Custodian in #qtyGroup', /id="assetPurchasePrice"/.test(html) && html.indexOf('id="assetPurchasePrice"') > html.indexOf('id="assetQty"') && html.indexOf('id="assetPurchasePrice"') < html.indexOf('id="assetLocationType"'));
   ok('10.8 helper copy present (ES+EN "Average price paid per unit")', /purchasePriceHint: 'Precio medio pagado por unidad\.'/.test(app) && /purchasePriceHint: 'Average price paid per unit\.'/.test(app));
 }

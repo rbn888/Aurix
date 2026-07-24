@@ -3796,6 +3796,7 @@ const T = {
     purchasePriceLabel: 'Precio de compra',
     purchasePriceOptional: ' (opcional)',
     purchasePriceHint: 'Precio medio pagado por unidad.',
+    purchasePricePerOz: ' por onza',
     // Bottom nav
     tabHome:     'Inicio',
     tabInsights: 'Insights',
@@ -5936,6 +5937,7 @@ const T = {
     purchasePriceLabel: 'Purchase price',
     purchasePriceOptional: ' (optional)',
     purchasePriceHint: 'Average price paid per unit.',
+    purchasePricePerOz: ' per oz',
     filterAll: 'All', filterCrypto: 'Crypto', filterStock: 'Stocks',
     filterEtf: 'ETF / Funds', filterMetal: 'Metals', filterRE: 'Real Estate',
     reName: 'Property name', reValueLabel: 'Value (in base currency)',
@@ -47444,10 +47446,14 @@ async function selectAsset(entry) {
   qtyGroup.style.display    = '';
   formPreviewEl.style.display = '';
   btnSubmitEl.style.display  = '';
-  // PURCHASE-PRICE-V1 — reveal the optional purchase-price field for priced market/DB
-  // assets (stock/etf/fund/crypto). Hidden for gold (XAU), whose specialised flow keeps
-  // its spot-based cost basis. Real-estate/manual/cash paths never reach this reveal.
-  { const _ppg = document.getElementById('purchasePriceGroup'); if (_ppg) _ppg.style.display = (entry.ticker === 'XAU') ? 'none' : ''; }
+  // PURCHASE-PRICE-V1 — reveal the optional purchase-price field for every priced
+  // market/DB asset (stock/etf/fund/crypto AND gold). For gold the canonical price unit
+  // is troy OUNCE (asset.price / pendingPrice / the stored tx price are all per-oz spot,
+  // and assetPnLBase consumes qty×price) — so the field is entered + persisted per oz
+  // (no parallel conversion), and the unit is labelled explicitly. Real-estate/manual/
+  // cash paths never reach this reveal.
+  { const _ppg = document.getElementById('purchasePriceGroup'); if (_ppg) _ppg.style.display = '';
+    const _ppu = document.getElementById('purchasePriceUnit'); if (_ppu) _ppu.textContent = (entry.ticker === 'XAU') ? t('purchasePricePerOz') : ''; }
   // GOLD-UX-2: per-asset CTA copy. Non-gold assets keep the canonical
   // "Añadir a cartera" / "Add to portfolio"; gold enters disabled
   // with "Completa los datos" until the user finishes the flow.
