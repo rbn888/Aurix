@@ -66,8 +66,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v593-chromium-compat-backdrop-filter';
-      var APPJS_V = '583';
+      var BUILD = 'v594-purchase-price-v1';
+      var APPJS_V = '584';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -1149,6 +1149,19 @@
             <label for="assetQty" id="qtyLabel" data-i18n="qty">Cantidad</label>
             <input type="text" inputmode="decimal" id="assetQty" placeholder="0" autocomplete="off">
 
+            <!-- PURCHASE-PRICE-V1 — optional real purchase price. When set it becomes the
+                 first Buy transaction (single source of truth for cost basis / avg price /
+                 P&L). Empty ⇒ live price is used. Revealed only for priced market/DB assets
+                 (stock/etf/fund/crypto); hidden for gold (spot-based) + real-estate. Nested in
+                 #qtyGroup so it sits between Quantity and Custodian and shares its show/hide. -->
+            <div class="form-group" id="purchasePriceGroup" style="display:none">
+              <label for="assetPurchasePrice">
+                <span data-i18n="purchasePriceLabel">Precio de compra</span><span id="purchasePriceUnit" class="pp-unit"></span><span class="label-optional" data-i18n="purchasePriceOptional"> (opcional)</span>
+              </label>
+              <input type="text" inputmode="decimal" id="assetPurchasePrice" placeholder="0.00" autocomplete="off">
+              <span class="input-hint" data-i18n="purchasePriceHint">Precio medio pagado por unidad.</span>
+            </div>
+
             <!-- WL.2 (Fase 2 — Wealth Location): optional location/custodian.
                  Nested inside #qtyGroup so it shares its show/hide. Pure
                  metadata — never affects valuation. -->
@@ -1442,7 +1455,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=583"
+  <script src="app.js?v=584"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
