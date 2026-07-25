@@ -70,7 +70,8 @@ const fb = mb ? mb.body : '';
 // bar bought nothing and produced the reported fragmented composition (content sliding behind a pinned
 // strip). "Valor estimado" + CTA now close the card as the last elements of the natural flow.
 ok('3.2 footer is in-flow (position: static) — never a floating/pinned layer', /\.modal\[data-mode="asset"\]\s*\.add-v2-footer\s*\{[^}]*position:\s*static/.test(fb) && !/\.modal\[data-mode="asset"\]\s*\.add-v2-footer\s*\{[^}]*position:\s*sticky/.test(fb));
-ok('3.3 footer background is OPAQUE Aurix surface (not a translucent gradient)', /\.add-v2-footer\s*\{[^}]*background:\s*rgba\(5,7,13,0\.96\)/.test(fb));
+// VISUAL-POLISH-V1 retintó la base (5,7,13 → 8,12,22); la alpha 0.96 (=OPACO) es la invariante.
+ok('3.3 footer background is OPAQUE Aurix surface (not a translucent gradient)', /\.add-v2-footer\s*\{[^}]*background:\s*rgba\(8,12,22,0\.96\)/.test(fb) && !/\.add-v2-footer\s*\{[^}]*background:\s*linear-gradient/.test(fb));
 // The hairline top border stays (it still separates the action zone). The drop shadow is gone with
 // the sticky positioning — it only ever existed to sell a floating layer that no longer floats.
 ok('3.4 footer keeps the hairline top border; no shadow (nothing floats any more)',

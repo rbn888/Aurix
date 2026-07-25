@@ -2,7 +2,7 @@
 <!-- AURIX-DASHBOARD-PREMIUM-POLISH-1: paint dark on the very first frame via an
      inline attribute on <html> (applied before any CSS parses) so mobile
      Safari/Chrome never flash white before styles load. -->
-<html lang="es" style="background:#070a14">
+<html lang="es" style="background:#0A0E1A">
 <head>
   <meta charset="UTF-8">
   <!-- P0 BOOT-CHECK: discourage stale-HTML caching on mobile (Safari/PWA). The real
@@ -22,7 +22,7 @@
        no white flash before styles.css or the boot splash parse. This inline
        rule lives at the top of <head>, ahead of the render-blocking external
        stylesheet, and matches the splash base + PWA background_color. */
-    html, body { background:#070a14; margin:0; }
+    html, body { background:#0A0E1A; margin:0; }
   </style>
   <title>AURIX</title>
   <link rel="manifest" href="manifest.webmanifest">
@@ -66,7 +66,7 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v601-search-v21-typeweight';
+      var BUILD = 'v602-visual-polish-v1';
       var APPJS_V = '588';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
@@ -242,9 +242,9 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=599">
+  <link rel="stylesheet" href="styles.css?v=602">
 </head>
-<body style="background:#070a14">
+<body style="background:#0A0E1A">
 
 
 <style>
@@ -255,7 +255,7 @@
   #bootLoader{
     position:fixed; inset:0; z-index:9999;
     display:flex; align-items:center; justify-content:center;
-    background:radial-gradient(120% 120% at 50% 38%, #0c1426 0%, #070a14 60%, #04060c 100%);
+    background:radial-gradient(120% 120% at 50% 38%, #121B30 0%, #0A0E1A 60%, #06090F 100%);
     font-family:'Inter', system-ui, -apple-system, Segoe UI, sans-serif;
     transition:opacity .35s ease;
     -webkit-tap-highlight-color:transparent;
