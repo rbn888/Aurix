@@ -8,3 +8,6 @@ memory/
 
 # Dev-only preview screenshots (SPEC deliverables) — never shipped to production
 docs/*-preview/
+
+# Supabase CLI scratch state (regenerated on every `supabase projects …` call; never commit)
+supabase/.temp/
