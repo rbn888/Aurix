@@ -102,7 +102,13 @@ img,svg{ display:block; max-width:100%; }
 .hero-cta-mobile{ display:none; }
 @media (max-width:860px){
   .hero-cta-mobile{ display:flex; flex-direction:column; align-items:center; gap:9px; margin-top:22px; width:100%; }
-  .hero-cta-mobile .btn{ width:100%; max-width:420px; height:48px; font-size:15px; }
+  /* CTA-GET-STARTED-1 — the Hero CTA read as a full-width bar on phones. Width only:
+     `auto` + a min-width floor so it stays a compact, centred pill with visible side air.
+     Height (48px), font-size, colour, glow and radius are untouched, and .btn already sets
+     white-space:nowrap, so "Get Started" can never wrap. Centring is inherited from the
+     parent's align-items:center. Desktop is unreachable here — .hero-cta-mobile is
+     display:none above 860px AND this rule lives inside @media (max-width:860px). */
+  .hero-cta-mobile .btn{ width:auto; min-width:216px; padding:0 34px; height:48px; font-size:15px; }
   .hero-cta-note{ font-size:12.5px; letter-spacing:.01em; color:var(--accent-3); opacity:.82;
     text-decoration:none; transition:opacity .18s var(--ease); }
   .hero-cta-note:hover{ opacity:1; }
