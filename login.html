@@ -419,7 +419,7 @@
     // redirect breaker / pending-login state, or corrupt Supabase auth storage. These are read-only
     // diagnostics + narrowly-scoped self-heal. They NEVER touch portfolio / holdings / chart / history
     // data and NEVER log a secret. app.js already exposes aurixClearAuthRedirectState for the app page.
-    var AURIX_LOGIN_BUILD = 485;   // bumped ONLY when login.html changes (see version.json.loginhtml)
+    var AURIX_LOGIN_BUILD = 486;   // bumped ONLY when login.html changes (see version.json.loginhtml)
     function _storageAvailable() {
       try { var k = '__aurix_probe__'; localStorage.setItem(k, '1'); localStorage.removeItem(k); return true; } catch (_) { return false; }
     }
@@ -706,10 +706,16 @@
     // the OTP send itself is the authoritative validator. Trims first
     // so trailing spaces from autofill / paste do not block valid
     // addresses. Returns false for null / undefined / non-string.
+    // EMAIL-DOMAIN-VALIDATION-1 — the old domain half was `[^\s@]+\.[^\s@]+`, which accepted any
+    // junk without a space: "gmail..com" reached the database that way (one real row, one hard
+    // bounce on the launch campaign). The domain is now checked label by label — each label must
+    // start and end alphanumeric, no empty labels (double dot), no leading/trailing dot, and a
+    // TLD of 2+ letters. The LOCAL part is deliberately left as permissive as before, so nothing
+    // that used to work stops working: subdomains, +tags, hyphens and punycode all still pass.
     function _isValidEmail(raw) {
       if (typeof raw !== 'string') return false;
       const s = raw.trim();
-      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+      return /^[^\s@]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}$/.test(s);
     }
 
     // OTP-RESEND-1: friendly Spanish messages for the auth surfaces.

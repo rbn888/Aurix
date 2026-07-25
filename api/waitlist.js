@@ -24,7 +24,12 @@ function corsOrigin(req) {
 }
 
 const MAX_BYTES = 2048;
-const EMAIL_RE  = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// EMAIL-DOMAIN-VALIDATION-1 — server-side gate for the capture form. The previous domain half
+// (`[^\s@]+\.[^\s@]+`) accepted anything without a space, which is how "gmail..com" was stored
+// through this endpoint (source=landing) and later hard-bounced on the launch campaign. Domain is
+// now validated label by label: no empty label (double dot), no leading/trailing dot, labels start
+// and end alphanumeric, TLD 2+ letters. Local part left as permissive as before.
+const EMAIL_RE  = /^[^\s@]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}$/;
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ozcasyufbknnuemllwso.supabase.co';
 // Historical email table, physically renamed by the owner from "waitlist" to "Correos usuario" (capital +
 // space → a quoted SQL identifier; percent-encoded here for the PostgREST path). Single source of truth for
