@@ -23980,3 +23980,47 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   color: var(--text-muted, rgba(220, 230, 250, 0.72));
   -webkit-overflow-scrolling: touch;
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   AURIX-MOBILE-FIELD-ZOOM-1 · P1 — global 16px floor for editable controls
+   ════════════════════════════════════════════════════════════════════════════
+   ROOT CAUSE of the mobile "auto-zoom + displaced viewport + trapped user" bug:
+   iOS Safari (and iPadOS) zoom the page in whenever a focused form control has a
+   COMPUTED font-size below 16px. The zoom is what shifts the viewport, breaks the
+   modal's scale and leaves residual offset after the keyboard closes — the user
+   then has to hunt for a tappable area or refresh. Aurix had NO shared owner for
+   form controls: every control was sized per screen (.add-asset-input 13px,
+   .settings-name-input 13.5px, .form-group input 15px, .ws2-input 14px,
+   .wsg-select/.wsg-text 14px, .ws4-num 15px, .wsmse-rename-in 15px,
+   .wl-loc-field-* 13px, .market-search-wrap input 13px, .form-group--isin 13.5px…),
+   with only a handful of per-screen 16px patches that left gaps between their
+   breakpoints (e.g. .search-field-wrap was patched at ≤520px but stayed 15px from
+   521–768px). This block is that missing shared owner: ONE mobile-only rule that
+   covers every editable control, present and future.
+
+   Why !important: it must outrank arbitrarily specific per-screen selectors such
+   as `.modal[data-mode="asset"] .search-field-wrap input`. It is safe here because
+   NO editable control in Aurix sets a font-size ABOVE 16px — every declaration is
+   <16px or exactly 16px — so this floor can only ever RAISE a value, never shrink
+   one. The AURIX-MOBILE-FIELD-ZOOM harness pins that invariant so a future >16px
+   field cannot be silently clamped.
+
+   16px is a platform threshold, not a design token, so it is written literally.
+   Desktop (>768px) is deliberately untouched — no visual change above the fold.
+   Non-text inputs are excluded: their font-size is irrelevant to the zoom trigger
+   and forcing it could disturb em-based control sizing.
+
+   This is a PURE CSS fix. It removes the TRIGGER rather than compensating for it,
+   so no visualViewport/keyboard manager, no scrollIntoView, no listeners and no
+   User-Agent sniffing are introduced — the existing modal scroll owners
+   (.modal-body, .settings-body) and the SPEC 58 pinch-zoom allowance keep working
+   untouched, and manual pinch-zoom stays available (no user-scalable=no anywhere).
+   ════════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="submit"]):not([type="button"]),
+  textarea,
+  select,
+  [contenteditable]:not([contenteditable="false"]) {
+    font-size: 16px !important;
+  }
+}
