@@ -3,7 +3,7 @@
 // AURIX-EMAIL-CAMPAIGN-1 — idempotent, safe mass sender for "Aurix is now live."
 // ════════════════════════════════════════════════════════════════════════════
 // Reuses the EXISTING infrastructure only — no new services:
-//   • Waitlist source : Supabase public.waitlist  (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)
+//   • Waitlist source : Supabase public."Correos usuario"  (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)
 //   • Provider        : Resend                      (RESEND_API_KEY + WAITLIST_FROM)
 //   • Template        : email/aurix-base-template.html  (reusable base, slots injected here)
 //   • Idempotency     : Supabase public.email_campaign_sends  (db/email_campaign_sends.sql)
@@ -44,6 +44,11 @@ const TEST_EMAILS   = (process.env.AURIX_TEST_EMAILS || '').split(',').map(s => 
 const BATCH_SIZE    = Number(process.env.CAMPAIGN_BATCH_SIZE || 40);
 const RATE_MS       = Number(process.env.CAMPAIGN_RATE_MS || 600);   // ~1.6 req/s (within Resend limits)
 const STOP_FILE     = path.join(ROOT, 'email', '.campaign-stop');
+// AURIX-EMAIL-ACTIVATION-1 — the historical email table was physically renamed by the owner from
+// "waitlist" to "Correos usuario" (capital + space → quoted SQL identifier, percent-encoded for the
+// PostgREST path). api/waitlist.js and public.persist_access_email already write there; this sender
+// still read the old name and would have aborted with a 404. Single source of truth for recipients.
+const WAITLIST_TABLE_PATH = 'Correos%20usuario';
 
 // ── Exact approved campaign content (do NOT alter the meaning) ────────────────
 const SUBJECT   = 'Aurix is now live.';
@@ -90,7 +95,7 @@ async function sb(pathq, opts = {}) {
   return res;
 }
 async function fetchWaitlist() {
-  const res = await sb('waitlist?select=email,status,notes&limit=100000');
+  const res = await sb(`${WAITLIST_TABLE_PATH}?select=email,status,notes&limit=100000`);
   if (!res.ok) throw new Error('waitlist read failed: ' + res.status);
   return res.json();
 }

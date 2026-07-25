@@ -61,7 +61,9 @@ ok('4 rate limit + batch pacing', /RATE_MS/.test(scr) && /BATCH_SIZE/.test(scr) 
 ok('4 abnormal error-rate circuit breaker', /windowErrors \/ windowTotal > 0\.25/.test(scr));
 ok('4 immediate STOP file to halt pending batches', /STOP_FILE/.test(scr) && /\.campaign-stop/.test(scr));
 ok('4 refuses to send without RESEND_API_KEY', /RESEND_API_KEY not set/.test(scr) && /refusing to send/.test(scr));
-ok('4 reuses existing infra only (Supabase waitlist + Resend, no new service)', /rest\/v1\/\$\{pathq\}/.test(scr) && /sb\('waitlist\?select/.test(scr) && /api\.resend\.com\/emails/.test(scr));
+ok('4 reuses existing infra only (Supabase "Correos usuario" + Resend, no new service)', /rest\/v1\/\$\{pathq\}/.test(scr) && /sb\(`\$\{WAITLIST_TABLE_PATH\}\?select/.test(scr) && /api\.resend\.com\/emails/.test(scr));
+ok('4 recipients read from the REAL physical table public."Correos usuario"',
+   /const WAITLIST_TABLE_PATH = 'Correos%20usuario'/.test(scr) && !/sb\('waitlist\?select/.test(scr));
 ok('4 ledger writes only safe fields (no secrets/credentials)',
    /body: JSON\.stringify\(\{ campaign_id: CAMPAIGN_ID, email, status, provider_message_id: providerMessageId \|\| null, error: error \|\| null \}\)/.test(scr));
 
