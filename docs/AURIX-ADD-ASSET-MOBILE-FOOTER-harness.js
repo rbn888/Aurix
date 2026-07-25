@@ -65,9 +65,17 @@ console.log('3 — mobile action footer (sticky / opaque / safe-area):');
 const mb = mediaBlockContaining('.add-v2-footer {');
 ok('3.1 footer rules live inside a mobile max-width media query (≤768px)', !!mb && mb.px <= 768, mb && ('≤' + mb.px));
 const fb = mb ? mb.body : '';
-ok('3.2 footer is position: sticky; bottom: 0 (inside modal, not a floating fixed layer)', /\.modal\[data-mode="asset"\]\s*\.add-v2-footer\s*\{[^}]*position:\s*sticky[^}]*bottom:\s*0/.test(fb));
+// SUPERSEDED by ADD-ASSET-MOBILE-COMPACT-1: the footer is now IN-FLOW. Once the ISIN toggle and the
+// filter row stopped rendering in the selected state the whole card fits with no scroll, so the sticky
+// bar bought nothing and produced the reported fragmented composition (content sliding behind a pinned
+// strip). "Valor estimado" + CTA now close the card as the last elements of the natural flow.
+ok('3.2 footer is in-flow (position: static) — never a floating/pinned layer', /\.modal\[data-mode="asset"\]\s*\.add-v2-footer\s*\{[^}]*position:\s*static/.test(fb) && !/\.modal\[data-mode="asset"\]\s*\.add-v2-footer\s*\{[^}]*position:\s*sticky/.test(fb));
 ok('3.3 footer background is OPAQUE Aurix surface (not a translucent gradient)', /\.add-v2-footer\s*\{[^}]*background:\s*rgba\(5,7,13,0\.96\)/.test(fb));
-ok('3.4 footer has a hairline top border + subtle shadow', /\.add-v2-footer\s*\{[^}]*border-top:\s*1px solid[^}]*box-shadow:/.test(fb));
+// The hairline top border stays (it still separates the action zone). The drop shadow is gone with
+// the sticky positioning — it only ever existed to sell a floating layer that no longer floats.
+ok('3.4 footer keeps the hairline top border; no shadow (nothing floats any more)',
+   /\.modal\[data-mode="asset"\]\s*\.add-v2-footer\s*\{[^}]*border-top:\s*1px solid/.test(fb)
+   && !/\.modal\[data-mode="asset"\]\s*\.add-v2-footer\s*\{[^}]*box-shadow:\s*0/.test(fb));
 ok('3.5 footer honours env(safe-area-inset-bottom)', /\.add-v2-footer\s*\{[^}]*env\(safe-area-inset-bottom\)/.test(fb));
 ok('3.6 backdrop-filter is -webkit- paired (Chromium/WebView safe)', /-webkit-backdrop-filter:\s*blur/.test(fb) && /(^|[^-])backdrop-filter:\s*blur/.test(fb));
 ok('3.7 inner .modal-cta neutralised inside footer (static, no double bg/sticky)', /\.add-v2-footer\s*\.modal-cta\s*\{[^}]*position:\s*static[^}]*background:\s*none/.test(fb));
