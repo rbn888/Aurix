@@ -22,7 +22,7 @@
   var I18N = {
     es: {
       'nav.product': 'Plataforma', 'nav.market': 'Mercado', 'nav.workspace': 'Inteligencia', 'nav.roadmap': 'Roadmap', 'nav.early': 'Acceso anticipado',
-      'cta.enter': 'Get Started', 'cta.request': 'Solicitar acceso', 'cta.joinLaunch': 'Únete antes del Launch 1',
+      'cta.enter': 'Comenzar', 'cta.request': 'Solicitar acceso', 'cta.joinLaunch': 'Únete antes del Launch 1',
       'launch.count': 'Lanzamiento en {h} h',
 
       'hero.eyebrow': 'Sistema operativo del patrimonio',
