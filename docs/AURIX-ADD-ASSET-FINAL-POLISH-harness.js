@@ -17,7 +17,12 @@ ok('4 header subtitle hidden on mobile', /\.modal\[data-mode="asset"\] \.modal-s
 // 5. ISIN placed right below search via order.
 ok('5 ISIN ordered right below Search (order 2/3 before tabs order 4)', /\.isin-toggle-mobile\s*\{ order: 2; \}/.test(css) && /#isinOrWrap\s*\{ order: 3; \}/.test(css) && /\.search-filters\s*\{ order: 4; \}/.test(css));
 // 6. Panel uses Aurix cool tokens (no warm --bg-card in the mobile asset suggestions).
-ok('6 search panel uses cool tokens (not warm --bg-card)', /\.modal\[data-mode="asset"\] \.asset-suggestions \{\s*background: rgba\(13, 18, 30/.test(css));
+// VISUAL-POLISH-V1 eleva el tono de esta superficie; la invariante es que siga siendo FRÍA
+// (canal azul por encima del rojo) y nunca el cálido --bg-card.
+ok('6 search panel uses cool tokens (not warm --bg-card)', (function () {
+  const m = /\.modal\[data-mode="asset"\] \.asset-suggestions \{\s*background: rgba\((\d+),\s*(\d+),\s*(\d+)/.exec(css);
+  return !!m && (+m[3]) > (+m[1]) + 8;
+})());
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 if (fail) { console.log(fail + ' failed'); process.exit(1); }
 console.log('GATE: GO'); process.exit(0);
