@@ -65,11 +65,21 @@ export default async function handler(req, res) {
                    : qt.quoteType === 'INDEX'      ? 'index'
                    : qt.quoteType === 'MUTUALFUND' ? 'fund'
                                                    : 'stock';
+        // SEARCH-V2.1 — pass through two ranking signals Yahoo ALREADY returns in this same
+        // response and that were being discarded: `score` (Yahoo's own relevance/popularity
+        // weight, which tracks how much a symbol is actually looked up) and the exchange.
+        // No new provider, no extra request, no pricing/financial data. Both are optional —
+        // the ranker treats a missing value as neutral. Yahoo does NOT expose market cap or
+        // volume on the search endpoint, so those two ranking signals stay unavailable for
+        // equities/ETFs by design rather than being invented.
         return {
           ticker:       qt.symbol,
           name:         qt.longname || qt.shortname || qt.symbol,
           type,
           marketSymbol: qt.symbol,
+          providerScore: Number.isFinite(qt.score) ? qt.score : null,
+          exchange:      (typeof qt.exchDisp === 'string' && qt.exchDisp) ? qt.exchDisp
+                       : (typeof qt.exchange === 'string' && qt.exchange) ? qt.exchange : null,
         };
       });
     return res.status(200).json({ results });

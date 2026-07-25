@@ -83,6 +83,11 @@ export default async function handler(req, res) {
         image:        (typeof c.large === 'string' && c.large) ? c.large
                     : (typeof c.thumb === 'string' && c.thumb) ? c.thumb
                     : null,
+        // SEARCH-V2.1 — CoinGecko already returns market_cap_rank on this same response and
+        // it was being discarded. It is the one REAL capitalisation/popularity signal any of
+        // our providers gives on a search endpoint (1 = largest), so the unified ranker uses
+        // it to put BTC/ETH above look-alike derivatives. No new provider, no extra request.
+        marketCapRank: Number.isFinite(c.market_cap_rank) ? c.market_cap_rank : null,
       });
       if (results.length >= MAX_RESULTS) break;
     }
