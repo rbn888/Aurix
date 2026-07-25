@@ -43,7 +43,7 @@ ok('1.4 carries manager', c.manager === 'Fidelity');
 ok('1.5 carries currency', c.assetCurrency === 'EUR');
 ok('1.6 carries share class', c.shareClass === 'P Acc EUR');
 ok('1.7 carries ISIN', c.isin === 'IE00BYX5NX33');
-ok('1.8 subtitle disambiguates (manager · shareClass · ISIN)', sub(c) === 'Fidelity · P Acc EUR · IE00BYX5NX33');
+ok('1.8 subtitle disambiguates (ticker · tipo · manager · shareClass · ISIN)', sub(c) === 'FID-WLD · FUND · Fidelity · P Acc EUR · IE00BYX5NX33', sub(c));
 ok('1.9 routes to Fondos/ETF (fund → etf)', cat(c.type) === 'etf');
 
 // ── 2 additional canary IE0031786142 ─────────────────────────────────────────
@@ -75,9 +75,9 @@ ok('4.2 money-market funds carry full identity + route to etf', mm.every(f => f.
 
 // ── 5 subtitle covers ETF too; plain items fall back to ticker ───────────────
 console.log('5 — ETF disambiguation (no regression for plain items):');
-ok('5.1 ETF with metadata → rich subtitle', sub({ type: 'etf', ticker: 'CSPX', manager: 'iShares', shareClass: 'Acc', isin: 'IE00B5BMR087' }) === 'iShares · Acc · IE00B5BMR087');
-ok('5.2 plain ETF (no metadata) → ticker (unchanged)', sub({ type: 'etf', ticker: 'VOO' }) === 'VOO');
-ok('5.3 stock → ticker (unchanged)', sub({ type: 'stock', ticker: 'AAPL' }) === 'AAPL');
+ok('5.1 ETF with metadata → rich subtitle', sub({ type: 'etf', ticker: 'CSPX', manager: 'iShares', shareClass: 'Acc', isin: 'IE00B5BMR087' }) === 'CSPX · ETF · iShares · Acc · IE00B5BMR087');
+ok('5.2 plain ETF (no metadata) → ticker · tipo', sub({ type: 'etf', ticker: 'VOO' }) === 'VOO · ETF');
+ok('5.3 stock → ticker · tipo (ya no un ticker desnudo)', sub({ type: 'stock', ticker: 'AAPL' }) === 'AAPL · STOCK');
 
 // ── 6 search merge dedupes by ISIN across sources (source pin) ───────────────
 console.log('6 — ISIN-first dedupe in the search merge:');

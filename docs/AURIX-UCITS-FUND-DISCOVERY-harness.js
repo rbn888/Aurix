@@ -26,7 +26,12 @@ function ok(n, c, extra) { if (c) { pass++; console.log('  ✓ ' + n); } else { 
 const ctx = { console: { log() {} }, Math, JSON, Array, Object, String, Number, isFinite, RegExp, Date };
 vm.createContext(ctx);
 ['_AURIX_FUND_DISCOVERY', '_AURIX_FUND_MANAGER_LABEL', '_AURIX_FUND_KEYWORDS', '_AURIX_FUND_DB'].forEach(c => vm.runInContext(konstSrc(c), ctx));
-['_aurixParseFundMeta', '_aurixIsIsin', '_aurixLooksLikeFundQuery', '_aurixSearchFundsLocal', '_aurixRankSearchResults', '_aurixSearchSubtitle'].forEach(f => vm.runInContext(fnSrc(f), ctx));
+// SEARCH-V2.1 — _aurixRankSearchResults now delegates to named scoring helpers, so the
+// sandbox must load them too (they are separately unit-tested in AURIX-SEARCH-RANKING).
+['_aurixParseFundMeta', '_aurixIsIsin', '_aurixLooksLikeFundQuery', '_aurixSearchFundsLocal',
+ '_aurixSearchAliasHit', '_aurixSearchPopularity', '_aurixSearchTypeWeight',
+ '_aurixSearchProviderWeight', '_aurixSearchMatchScore',
+ '_aurixRankSearchResults', '_aurixSearchSubtitle'].forEach(f => vm.runInContext(fnSrc(f), ctx));
 const call = (n, ...a) => vm.runInContext(n, ctx)(...a);
 const DB = vm.runInContext('_AURIX_FUND_DB', ctx);
 
@@ -94,12 +99,14 @@ ok('0 flag + funcs + fund route + typeLabel + subtitle wired', app.indexOf('SPEC
 // ── 8 subtitle de fondo muestra gestora · divisa · ISIN ────────────────────────
 {
   const f = { type: 'fund', ticker: 'VG-WLD', manager: 'Vanguard', assetCurrency: 'EUR', isin: 'IE00B03HD191' };
-  ok('8 subtitle fondo = "Vanguard · EUR · IE00B03HD191"', call('_aurixSearchSubtitle', f) === 'Vanguard · EUR · IE00B03HD191');
-  ok('8 subtitle no-fondo = ticker (sin cambios)', call('_aurixSearchSubtitle', { type: 'stock', ticker: 'AAPL' }) === 'AAPL');
+  // SEARCH-V2.1 — el ticker y el tipo ENCABEZAN la línea secundaria (el nombre es el titular);
+  // los desambiguadores de SPEC 66/70 (gestora · clase · ISIN) se conservan intactos detrás.
+  ok('8 subtitle fondo = "VG-WLD · FUND · Vanguard · EUR · IE00B03HD191"', call('_aurixSearchSubtitle', f) === 'VG-WLD · FUND · Vanguard · EUR · IE00B03HD191');
+  ok('8 subtitle no-fondo ya NO es un ticker desnudo (ticker · tipo)', call('_aurixSearchSubtitle', { type: 'stock', ticker: 'AAPL' }) === 'AAPL · STOCK');
   // SPEC 66 — cuando existe clase (shareClass), REEMPLAZA la divisa suelta (evita "EUR · EUR Acc")
   // y desambigua Divisa + Acumulación/Distribución sin redundancia.
   const fc = { type: 'fund', ticker: 'VG-WLD', manager: 'Vanguard', assetCurrency: 'EUR', shareClass: 'EUR Acc', isin: 'IE00B03HD191' };
-  ok('8b subtitle con clase = "Vanguard · EUR Acc · IE00B03HD191"', call('_aurixSearchSubtitle', fc) === 'Vanguard · EUR Acc · IE00B03HD191');
+  ok('8b subtitle con clase = "VG-WLD · FUND · Vanguard · EUR Acc · IE00B03HD191"', call('_aurixSearchSubtitle', fc) === 'VG-WLD · FUND · Vanguard · EUR Acc · IE00B03HD191');
 }
 
 // ── 9 relevancia: exacto → prefijo → contiene ──────────────────────────────────

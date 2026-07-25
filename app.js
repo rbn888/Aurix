@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '586'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '587'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -46901,18 +46901,103 @@ function _aurixSearchFundsLocal(query) {
   }
   return out;
 }
-// Stable relevance rank: exact (ticker/isin/name) → startsWith(name/ticker) → includes →
-// rest. Preserves input order within a tier so existing result order is otherwise intact.
+// ════════════════════════════════════════════════════════════════════════════
+// SEARCH-V2.1 — THE single ranking authority for every Aurix search surface.
+// ════════════════════════════════════════════════════════════════════════════
+// Replaces the previous 4-tier rank (exact → startsWith → includes → rest), which ordered
+// only by how the string matched and therefore let an index outrank the ETF that tracks it
+// ("S&P 500" → ^GSPC first) and let a look-alike token outrank BTC. Scoring is now a match
+// tier PLUS additive signals, so ordering reflects what a user actually means.
+//
+// Signals, and the honest state of their data:
+//   1 exact match (ticker / ISIN / name)      — full data
+//   2 name match (prefix > word start > any)  — full data
+//   3 alias match                             — reuses the EXISTING curated `aliases` on
+//        _AURIX_FUND_DB (SPEC 48). No new alias system — that is Search V2.2.
+//   4 popularity  ┐ collapsed into ONE normalised term, because the only real popularity
+//   5 market cap  ├ data our providers expose on a SEARCH endpoint is CoinGecko's
+//   6 volume      ┘ `market_cap_rank` (crypto) and Yahoo's own `score` (equities/ETFs).
+//        Yahoo does NOT return cap or volume on /v1/finance/search, so for stocks/ETFs
+//        those two are genuinely unavailable and are left neutral rather than invented.
+//   7 provider quality — curated catalog entry > live provider hit > local fallback.
+//   8 asset type — an index is demoted: "S&P 500" should offer the investable ETFs first,
+//        not ^GSPC, which the user cannot buy.
+//
+// Higher score wins. Ties keep the input order, so the function stays stable and every
+// surface fed the same items in the same order renders the same list.
+function _aurixSearchAliasHit(a, q) {
+  // Aliases live on the curated catalog, not on the result item (keeping the item shape
+  // untouched preserves the identity/routing contract). Absent catalog ⇒ neutral.
+  try {
+    if (typeof _AURIX_FUND_DB === 'undefined' || !Array.isArray(_AURIX_FUND_DB)) return 0;
+    const isin = String(a.isin || '').toUpperCase(), tk = String(a.ticker || '').toUpperCase();
+    const rec = _AURIX_FUND_DB.find(f => (isin && String(f.isin || '').toUpperCase() === isin)
+                                      || (!isin && String(f.ticker || '').toUpperCase() === tk));
+    if (!rec || !Array.isArray(rec.aliases)) return 0;
+    for (const al of rec.aliases) {
+      const s = String(al || '').toLowerCase();
+      if (!s) continue;
+      if (s === q) return 600;
+      if (s.indexOf(q) === 0 || q.indexOf(s) === 0) return 450;
+      if (s.indexOf(q) >= 0) return 380;
+    }
+  } catch (_) {}
+  return 0;
+}
+function _aurixSearchPopularity(a) {
+  // Normalised 0..80. Crypto: CoinGecko market_cap_rank (1 = largest). Equities/ETFs:
+  // Yahoo's own relevance score (unbounded, log-compressed). Missing ⇒ 0 (neutral).
+  const rank = Number(a && a.marketCapRank);
+  if (Number.isFinite(rank) && rank > 0) return Math.max(0, 80 - Math.log10(rank) * 26);
+  const ps = Number(a && a.providerScore);
+  if (Number.isFinite(ps) && ps > 0) return Math.min(80, Math.log10(ps + 1) * 16);
+  return 0;
+}
+function _aurixSearchTypeWeight(a) {
+  const t = String(a && a.type || '').toLowerCase();
+  // An index is NOT directly investable. "S&P 500" and "Nasdaq" match the index name exactly,
+  // so a small nudge could never beat that — the penalty is a full match tier (-1000), which
+  // pushes ^GSPC/^IXIC below the ETFs that track them while still keeping them in the list
+  // (they stay reachable, just last). This is the SPEC's headline example.
+  if (t === 'index') return -1000;
+  // Metals only ever reach the ranker via searchMetalsLocal, a curated keyword matcher that
+  // fires solely on gold/silver terms — a hit there is a high-precision canonical instrument,
+  // so it must lead its own query instead of losing to any ticker that merely starts with
+  // "GOLD". It cannot distort other queries because it never appears in them.
+  if (t === 'metal') return 200;
+  if (t === 'etf' || t === 'fund') return 15;
+  if (t === 'stock' || t === 'crypto') return 10;
+  return 0;
+}
+function _aurixSearchProviderWeight(a) {
+  // A curated catalog entry carries verified identity (ISIN + manager + share class).
+  if (a && a.isin && a.manager) return 40;
+  if (a && (a.marketSymbol || a.coinId)) return 20;
+  return 0;
+}
+function _aurixSearchMatchScore(a, q) {
+  const tk = String(a.ticker || '').toLowerCase(), nm = String(a.name || '').toLowerCase();
+  const is = String(a.isin || '').toLowerCase();
+  if (!q) return 0;
+  if (tk === q || is === q || nm === q) return 1000;
+  if (nm.indexOf(q) === 0) return 700;
+  if (tk.indexOf(q) === 0) return 650;
+  // word-start match inside the name ("world" → "MSCI World") beats a mid-token match.
+  if (new RegExp('(^|[^a-z0-9])' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(nm)) return 500;
+  if (nm.indexOf(q) >= 0) return 300;
+  if (tk.indexOf(q) >= 0) return 200;
+  return 0;
+}
 function _aurixRankSearchResults(items, query) {
   const q = String(query || '').toLowerCase().trim();
-  const score = a => {
-    const tk = String(a.ticker || '').toLowerCase(), nm = String(a.name || '').toLowerCase(), is = String(a.isin || '').toLowerCase();
-    if (tk === q || is === q || nm === q) return 0;
-    if (tk.startsWith(q) || nm.startsWith(q)) return 1;
-    if (nm.indexOf(q) >= 0 || tk.indexOf(q) >= 0) return 2;
-    return 3;
-  };
-  return items.map((a, i) => ({ a, i, s: score(a) })).sort((x, y) => (x.s - y.s) || (x.i - y.i)).map(o => o.a);
+  const score = a => _aurixSearchMatchScore(a, q)
+                   + _aurixSearchAliasHit(a, q)
+                   + _aurixSearchPopularity(a)
+                   + _aurixSearchProviderWeight(a)
+                   + _aurixSearchTypeWeight(a);
+  return items.map((a, i) => ({ a, i, s: score(a) }))
+              .sort((x, y) => (y.s - x.s) || (x.i - y.i))
+              .map(o => o.a);
 }
 // Fund/ETF display subtitle: "Manager · shareClass|CUR · ISIN" (skips missing parts). Any other type
 // (or an ETF/fund with no metadata) → the plain ticker (unchanged). Presentation helper for the search
@@ -46920,8 +47005,27 @@ function _aurixRankSearchResults(items, query) {
 // distinguishable; a plain ETF (no manager/isin/shareClass) still falls back to its ticker, unchanged.
 function _aurixSearchSubtitle(a) {
   const _t = a && String(a.type || '').toLowerCase();
-  if (!a || (_t !== 'fund' && _t !== 'etf')) return a && a.ticker ? a.ticker : '';
+  // SEARCH-V2.1 — institutional hierarchy: the NAME is the headline (rendered above by
+  // getDisplayName) and this secondary line carries the identifiers, led by the ticker:
+  //   "VOO · ETF · Vanguard".  Previously a stock/crypto/index showed a BARE ticker here,
+  //   which is what made the ticker read as the protagonist. Funds/ETFs keep every
+  //   disambiguator SPEC 66/70 added (manager · share class · ISIN) — the ticker and type
+  //   are prefixed, nothing informative was removed. The type label is localised when the
+  //   i18n table is available and falls back to the raw type in an isolated sandbox.
+  const _label = (() => {
+    try { if (typeof T !== 'undefined' && typeof lang !== 'undefined' && T[lang] && T[lang].typeLabel && T[lang].typeLabel[_t]) return T[lang].typeLabel[_t]; } catch (_) {}
+    return _t ? _t.toUpperCase() : '';
+  })();
+  if (!a) return '';
+  if (_t !== 'fund' && _t !== 'etf') {
+    const base = [];
+    if (a.ticker) base.push(a.ticker);
+    if (_label)   base.push(_label);
+    return base.join(' · ');
+  }
   const parts = [];
+  if (a.ticker) parts.push(a.ticker);
+  if (_label)   parts.push(_label);
   if (a.manager) parts.push(a.manager);
   // SPEC 66 — when several share classes of the same fund exist, the share class
   // (e.g. "EUR Acc") is the disambiguator: it already encodes DIVISA + Acumulación/
@@ -47414,7 +47518,6 @@ function showDefaultSuggestions() {
           <div class="sugg-name">${escHtml(getDisplayName(a))}</div>
           <div class="sugg-ticker">${escHtml((typeof _aurixSearchSubtitle === 'function') ? _aurixSearchSubtitle(a) : a.ticker)}</div>
         </div>
-        <span class="sugg-type ${a.type}">${T[lang].typeLabel[a.type] || a.type}</span>
       </div>`).join('')}`;
 
   assetSuggestionsEl.classList.add('open');
@@ -47445,7 +47548,6 @@ function renderSuggestions(results, query, loading = false) {
         <div class="sugg-name">${escHtml(getDisplayName(a))}</div>
         <div class="sugg-ticker">${escHtml((typeof _aurixSearchSubtitle === 'function') ? _aurixSearchSubtitle(a) : a.ticker)}</div>
       </div>
-      <span class="sugg-type ${a.type}">${T[lang].typeLabel[a.type] || a.type}</span>
     </div>`).join('') + loadingHtml;
 
   assetSuggestionsEl.classList.add('open');
