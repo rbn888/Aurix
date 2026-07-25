@@ -153,5 +153,67 @@ console.log('\nAURIX-CHART-DURABLE-COLD-START-RECOVERY — SPEC.35   (minMatureP
   ok('S3 marker present', app.indexOf('DSH.CHART.DURABLE_COLD_START_RECOVERY.35') >= 0);
 })();
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC PREMIUM-24H-FIRST-PAINT (P0) — SPEC.35's activation boundary for 24H
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC.35 publishes the durable series as the FIRST visible frame with the return still
+// canonical-gated. For 24H on a mature account that IS the reported artefact: provisional
+// neutral line + "Calculando…" and then a visible repaint into the definitive red/green
+// chart. This section pins the narrowed activation: while the remote load has not SETTLED,
+// 24H publishes nothing but the existing premium loading state; the moment it settles —
+// EITHER way — SPEC.35 behaves exactly as before. The gate is executed from the REAL app.js
+// source (extracted verbatim), not re-implemented here, so drift fails the gate.
+(function () {
+  console.log('\n24H FIRST PAINT — publication boundary:');
+  const marker = 'SPEC PREMIUM-24H-FIRST-PAINT';
+  ok('P0 marker present in the SPEC.35 reconcile gate', app.indexOf(marker) >= 0);
+  let gate = null;
+  try {
+    const i = app.indexOf('let _hold24hFirstPaint');
+    const j = app.indexOf('_AURIX_CHART_DURABLE_COLD_START;', i);
+    const snippet = app.slice(i, j + '_AURIX_CHART_DURABLE_COLD_START;'.length);
+    // The extracted source is the ONLY logic under test.
+    gate = new Function('r', '_aurixRemoteLoadOutcome', '_AURIX_CHART_DURABLE_COLD_START',
+      snippet + ' return { hold: _hold24hFirstPaint, durableOn: !!_durableOn };');
+  } catch (e) { ok('P0 gate extractable from source', false, e.message); }
+  if (gate) {
+    ok('P0 gate extractable from source', true);
+    // 24H, remote load NOT settled → hold the premium loading state, no durable publication.
+    const boot = gate('24h', null, true);
+    ok('P0 24H + load unsettled ⇒ durable cold-start SUPPRESSED (no provisional line/%)',
+       boot.hold === true && boot.durableOn === false, JSON.stringify(boot));
+    // Settled — any outcome — releases immediately. 'failed' is the offline case: SPEC.35 must
+    // still render the durable line, otherwise this fix would strand an offline user in loading.
+    for (const outcome of ['ok-row', 'no-row', 'failed']) {
+      const s = gate('24h', outcome, true);
+      ok(`P0 24H + load settled '${outcome}' ⇒ SPEC.35 unchanged (durable line restored)`,
+         s.hold === false && s.durableOn === true, JSON.stringify(s));
+    }
+    // Every other range keeps SPEC.35 verbatim, settled or not.
+    for (const r of ['7d', '30d', '1y', 'all']) {
+      const s = gate(r, null, true);
+      ok(`P0 ${r} untouched by the 24H gate (durable cold-start still active)`,
+         s.hold === false && s.durableOn === true, JSON.stringify(s));
+    }
+    // The flag still wins: with SPEC.35 disabled nothing is force-enabled.
+    ok('P0 gate never force-enables durable cold-start when the flag is off',
+       gate('24h', 'ok-row', false).durableOn === false && gate('7d', null, false).durableOn === false);
+  }
+  // Presentation-only: reuses the EXISTING pending state/reason — no new visual state invented.
+  const blk = app.slice(app.indexOf(marker), app.indexOf(marker) + 2600);
+  ok('P0 holds the EXISTING premium loading state (awaiting_canonical_reconcile), no new state',
+     /buildingPlaceholder/.test(blk) && /awaiting_canonical_reconcile/.test(blk));
+  ok('P0 no timer / delay / CSS hiding introduced by the fix',
+     !/setTimeout|setInterval|requestAnimationFrame|style\.|classList/.test(blk));
+  // No second reconcile owner: the fix only READS the signal, and every WRITE still lives in
+  // loadPortfolioFromBackend's terminal paths (1 declaration + 4 writes = 5 assignment forms).
+  ok('P0 the fix only READS the reconcile signal (never writes it)',
+     !/_aurixRemoteLoadOutcome\s*=[^=]/.test(blk));
+  ok('P0 no duplicated reconcile machinery — writes still confined to the existing owner',
+     (app.match(/_aurixRemoteLoadOutcome\s*=[^=]/g) || []).length === 5);
+  ok('P0 return math / series builders untouched by this SPEC',
+     !/getValidReturnBaseline|buildValidatedHistoricalSeries|deltaPct/.test(blk));
+})();
+
 console.log('\n' + (fail === 0 ? '✅' : '❌') + ' SPEC.35 DURABLE COLD-START RECOVERY — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);

@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '585'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '586'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -25492,7 +25492,26 @@ function buildProductionPortfolioChart(range) {
       if (!reconciled) {
         // SPEC.35 — instead of always showing "building", render the LAST VERIFIED DURABLE series immediately
         // (atomic boot) when one exists for this identity; the return stays canonical-gated (suppressed below).
-        const _durableOn = (typeof _AURIX_CHART_DURABLE_COLD_START !== 'undefined') && _AURIX_CHART_DURABLE_COLD_START;
+        // ── SPEC PREMIUM-24H-FIRST-PAINT (P0) — publication contract, presentation only ──────────────
+        // SPEC.35's durable cold-start is exactly what produces the reported 24H first-paint artefact: it
+        // publishes the durable series as the FIRST visible frame with the return still canonical-gated, so a
+        // mature account sees a provisional neutral line + "Calculando…" and then a visible repaint into the
+        // definitive red/green chart the moment the reconcile lands. While the remote load has not SETTLED
+        // there is still a real possibility of ending in a valid 24H result, so 24H must publish nothing but
+        // the existing premium loading state and let the first visible frame BE the definitive one.
+        // Released the instant the possibility resolves EITHER way — _aurixRemoteLoadOutcome is set on every
+        // terminal path of loadPortfolioFromBackend ('ok-row' | 'no-row' | 'failed', exceptions included), so
+        // an offline/failed load falls straight back to SPEC.35 and still gets its durable line: no deadlock,
+        // no timer, no delay. 24H only; 7D/30D/1Y/ALL keep SPEC.35 verbatim. Anonymous sessions never reach
+        // this branch (_aurixCanonicalHistoryReady() ⇒ reconciled). Pure presentation: no data, no geometry,
+        // no return math, no new state — it only defers WHEN the existing states may be published.
+        let _hold24hFirstPaint = false;
+        try {
+          _hold24hFirstPaint = (r === '24h')
+            && (typeof _aurixRemoteLoadOutcome !== 'undefined') && _aurixRemoteLoadOutcome === null;
+        } catch (_) { _hold24hFirstPaint = false; }
+        const _durableOn = !_hold24hFirstPaint
+          && (typeof _AURIX_CHART_DURABLE_COLD_START !== 'undefined') && _AURIX_CHART_DURABLE_COLD_START;
         let _dec = { buildingPlaceholder: true, renderFromDurable: false, suppressReturn: false, reason: 'awaiting_canonical_reconcile' };
         if (_durableOn && typeof _aurixResolveColdStartRender === 'function') {
           let _durableSrc = null;
