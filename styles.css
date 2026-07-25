@@ -353,7 +353,7 @@ button[aria-busy="true"] {
 }
 
 .header--scrolled {
-  background: rgba(14,19,31,0.80);
+  background: rgba(27,34,50,0.80);
   /* AURIX-BRAND-PREMIUM-1: deeper, less-saturated glass reads more refined and
      "expensive" than an oversaturated blur — same darkness, calmer colour. */
   backdrop-filter: blur(24px) saturate(120%);
@@ -1299,7 +1299,7 @@ body.modal-open {
 }
 
 .modal {
-  background: rgba(20,20,25,0.85);
+  background: rgba(35,35,42,0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border-subtle);
@@ -1431,8 +1431,8 @@ body.modal-open {
   gap: 14px;
   padding: 14px 16px;
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015));
-  border: 1px solid rgba(255,255,255,0.07);
+  background: linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.03));
+  border: 1px solid rgba(255,255,255,0.12);
   color: var(--text);
   font-family: inherit;
   text-align: left;
@@ -1451,12 +1451,12 @@ body.modal-open {
 .add-v2-card.is-disabled {
   cursor: not-allowed;
   opacity: 0.55;
-  background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01));
+  background: linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.022));
   border-color: rgba(255,255,255,0.05);
 }
 .add-v2-card.is-disabled:hover {
   border-color: rgba(255,255,255,0.05);
-  background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01));
+  background: linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.022));
   box-shadow: none;
 }
 .add-v2-icon {
@@ -1477,7 +1477,7 @@ body.modal-open {
 .add-v2-card[data-pick="real_estate"] .add-v2-icon { color: #C9B3F6; background: rgba(201,179,246,0.10); border-color: rgba(201,179,246,0.22); }
 .add-v2-card.is-disabled .add-v2-icon {
   color: rgba(220,230,250,0.5);
-  background: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.075);
   border-color: rgba(255,255,255,0.06);
 }
 .add-v2-text {
@@ -1502,8 +1502,8 @@ body.modal-open {
   display: inline-block;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.16);
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -1590,8 +1590,8 @@ body.modal-open {
   gap: 8px;
   padding: 7px 12px 7px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.13);
+  background: rgba(255,255,255,0.075);
   color: var(--text);
   font-family: inherit;
   font-size: 12.5px;
@@ -1686,12 +1686,12 @@ body.modal-open {
   font-size: 15px;
   padding: 0 44px 0 16px;
   border-radius: 14px;
-  background: rgba(13,18,30,0.55);
+  background: rgba(26,32,48,0.55);
   border-color: rgba(255,255,255,0.10);
 }
 .modal[data-mode="asset"] .search-field-wrap input:focus {
   border-color: rgba(74,130,240,0.45);
-  background: rgba(13,18,30,0.75);
+  background: rgba(26,32,48,0.75);
   box-shadow: 0 0 0 4px rgba(74,130,240,0.08);
 }
 
@@ -1706,8 +1706,8 @@ body.modal-open {
     width: 100%;
     min-height: 640px;
     border-radius: 24px;
-    background: rgba(14,18,28,0.94);
-    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(27,32,46,0.94);
+    border: 1px solid rgba(255,255,255,0.11);
     box-shadow:
       0 1px 0 rgba(255,255,255,0.04) inset,
       0 40px 80px -32px rgba(4,8,16,0.95),
@@ -1777,7 +1777,7 @@ body.modal-open {
   letter-spacing: 0.02em;
   color: rgba(220,230,250,0.6);
   border-color: rgba(255,255,255,0.07);
-  background: rgba(255,255,255,0.025);
+  background: rgba(255,255,255,0.055);
 }
 .modal[data-mode="asset"] .filter-btn:hover {
   color: rgba(225,233,255,0.92);
@@ -1797,8 +1797,8 @@ body.modal-open {
   gap: 12px;
   padding: 12px 14px;
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.012));
-  border: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.026));
+  border: 1px solid rgba(255,255,255,0.11);
   color: var(--text);
   font-family: inherit;
   cursor: pointer;
@@ -1863,8 +1863,8 @@ body.modal-open {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: rgba(220,230,250,0.65);
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.075);
+  border: 1px solid rgba(255,255,255,0.11);
 }
 .add-v2-asset-type-pill.crypto { color: #5b9cf6; background: rgba(91,156,246,.10); border-color: rgba(91,156,246,.20); }
 .add-v2-asset-type-pill.stock  { color: #c0c8d8; background: rgba(192,200,216,.10); border-color: rgba(192,200,216,.18); }
@@ -1900,8 +1900,8 @@ body.modal-open {
   position: relative;
   border-radius: 18px;
   padding: 22px 22px 24px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.012));
-  border: 1px solid rgba(255,255,255,0.07);
+  background: linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.026));
+  border: 1px solid rgba(255,255,255,0.12);
   min-height: 220px;
   display: flex;
   flex-direction: column;
@@ -1959,8 +1959,8 @@ body.modal-open {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(220,230,250,0.65);
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.075);
+  border: 1px solid rgba(255,255,255,0.11);
   flex-shrink: 0;
 }
 .add-v2-preview-type.crypto { color: #5b9cf6; background: rgba(91,156,246,.10); border-color: rgba(91,156,246,.20); }
@@ -2063,12 +2063,12 @@ body.modal-open {
 /* ISIN advanced disclosure — keep monospace input but ensure colors
    read on the dark sheet (defensive fix for ISIN input + status). */
 .form-group--isin input {
-  background: rgba(13,18,30,0.55);
+  background: rgba(26,32,48,0.55);
   color: rgba(248,252,255,0.96);
   border-color: rgba(255,255,255,0.10);
 }
 .form-group--isin input:focus {
-  background: rgba(13,18,30,0.75);
+  background: rgba(26,32,48,0.75);
   border-color: rgba(74,130,240,0.45);
   box-shadow: 0 0 0 4px rgba(74,130,240,0.08);
 }
@@ -2102,8 +2102,8 @@ body.modal-open {
   margin-top: 10px;
   padding: 14px;
   border-radius: 12px;
-  background: rgba(255,255,255,0.025);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.055);
+  border: 1px solid rgba(255,255,255,0.11);
 }
 
 /* MOBILE PASS 1A: complete the ISIN disclosure across all viewports.
@@ -2200,13 +2200,13 @@ body.modal-open {
   /* (3) Search panel — Aurix cool tokens, NOT the neutral/warm --bg-card (#1a1a1a)
      / --bg-card-2 (#212121) which read brownish against the blue-glass theme. */
   .modal[data-mode="asset"] .asset-suggestions {
-    background: rgba(13, 18, 30, 0.98);
+    background: rgba(26,32,48,0.98);
     border-color: var(--aurix-border, rgba(74, 130, 240, 0.16));
   }
   .modal[data-mode="asset"] .suggestion-item:hover,
   .modal[data-mode="asset"] .suggestion-item.focused { background: rgba(74, 130, 240, 0.10); }
   .modal[data-mode="asset"] .asset-suggestions.open::after {
-    background: linear-gradient(to top, rgba(13, 18, 30, 0.98) 0%, transparent 100%);
+    background: linear-gradient(to top, rgba(26,32,48,0.98) 0%, transparent 100%);
   }
 
   /* (4) Popular — strict 2-column grid, max 6 (JS caps the list), equal cells.
@@ -2257,8 +2257,8 @@ body.modal-open {
 }
 
 .form-group input {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.075);
+  border: 1px solid rgba(255,255,255,0.13);
   border-radius: var(--radius-sm);
   padding: 11px 14px;
   color: var(--text);
@@ -2716,8 +2716,8 @@ body.modal-open {
     bottom: 0;
     margin: 0;
     padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-    background: rgba(10,12,18,0.98);
-    border-top: 1px solid rgba(255,255,255,0.08);
+    background: rgba(38,40,51,0.98);
+    border-top: 1px solid rgba(255,255,255,0.13);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     box-shadow: 0 -8px 24px -10px rgba(0,0,0,0.55);
@@ -2765,8 +2765,8 @@ body.modal-open {
     position: static;
     margin-top: 4px;
     padding: 10px 0 calc(4px + env(safe-area-inset-bottom));
-    background: rgba(8,12,22,0.96);
-    border-top: 1px solid rgba(255,255,255,0.06);
+    background: rgba(27,30,38,0.97);
+    border-top: 1px solid rgba(255,255,255,0.11);
   }
   /* Inside the footer the estimated-value chip and CTA are static (the footer owns the
      sticky/background); the CTA drops its base gradient + sticky so there is no double layer. */
@@ -2831,9 +2831,9 @@ body.modal-open {
   z-index: 2;
   background: linear-gradient(
     to top,
-    rgba(8,12,22,0.95),
-    rgba(8,12,22,0.7),
-    rgba(8,12,22,0)
+    rgba(19,24,38,0.95),
+    rgba(19,24,38,0.7),
+    rgba(19,24,38,0)
   );
 }
 .modal-cta button {
@@ -3183,7 +3183,7 @@ body:not(.hero-active) #orb-canvas {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(to bottom, rgba(255,255,255,0.06), transparent 40%);
+  background: linear-gradient(to bottom, rgba(255,255,255,0.1), transparent 40%);
   pointer-events: none;
   z-index: 0;
 }
@@ -3529,12 +3529,12 @@ body:not(.hero-active) #orb-canvas {
               opacity var(--dur-fast);
 }
 .perf-btn:hover {
-  background: rgba(255,255,255,.04);
+  background: rgba(255,255,255,0.075);
   color: var(--text-muted);
   border-color: rgba(255,255,255,.18);
 }
 .perf-btn.active {
-  background: rgba(255,255,255,.09);
+  background: rgba(255,255,255,0.13);
   color: var(--text);
   border-color: rgba(255,255,255,.20);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
@@ -4476,7 +4476,7 @@ body:not(.hero-active) #orb-canvas {
   border-radius: 4px;
   transition: color .15s, background .15s;
 }
-.search-clear:hover { color: var(--text); background: rgba(255,255,255,.07); }
+.search-clear:hover { color: var(--text); background: rgba(255,255,255,0.11); }
 
 /* ── Suggestions dropdown ──────────────────────────────── */
 .asset-suggestions {
@@ -4519,7 +4519,7 @@ body:not(.hero-active) #orb-canvas {
 }
 .suggestion-item:hover,
 .suggestion-item.focused { background: var(--bg-card-2); }
-.suggestion-item + .suggestion-item { border-top: 1px solid rgba(255,255,255,.04); }
+.suggestion-item + .suggestion-item { border-top: 1px solid rgba(255,255,255,0.08); }
 
 .sugg-badge {
   width: 34px; height: 34px;
@@ -4569,7 +4569,7 @@ body:not(.hero-active) #orb-canvas {
   padding: var(--space-1) 14px;
   font-size: 11px;
   color: var(--text-dim);
-  border-top: 1px solid rgba(255,255,255,.04);
+  border-top: 1px solid rgba(255,255,255,0.08);
   letter-spacing: .3px;
 }
 
@@ -4632,7 +4632,7 @@ body:not(.hero-active) #orb-canvas {
   border-radius: 4px; flex-shrink: 0;
   transition: color .15s, background .15s;
 }
-.chip-clear:hover { color: var(--text); background: rgba(255,255,255,.07); }
+.chip-clear:hover { color: var(--text); background: rgba(255,255,255,0.11); }
 
 /* ── Search type filters ───────────────────────────────── */
 .search-filters {
@@ -5160,8 +5160,8 @@ body:not(.hero-active) #orb-canvas {
     overflow: hidden;
     /* Premium sheet feel: a hairline top border + a tiny tint shift
        from the surface behind. Bottom area honours the home indicator. */
-    background: rgba(14,16,22,0.96);
-    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(27,30,38,0.96);
+    border: 1px solid rgba(255,255,255,0.11);
     border-bottom: 0;
     padding-bottom: env(safe-area-inset-bottom);
   }
@@ -5182,7 +5182,7 @@ body:not(.hero-active) #orb-canvas {
   .modal-header {
     flex-shrink: 0;
     padding: 6px 16px 12px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    border-bottom: 1px solid rgba(255,255,255,0.09);
   }
   .modal-header h3 { font-size: 16px; }
   /* Form body scrolls within the constrained sheet */
@@ -5230,7 +5230,7 @@ body:not(.hero-active) #orb-canvas {
     border-radius: 12px;
     padding: 12px;
     margin-bottom: 14px;
-    background: rgba(255,255,255,0.03);
+    background: rgba(255,255,255,0.06);
     border-color: rgba(255,255,255,0.06);
   }
 
@@ -7070,8 +7070,8 @@ img {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: rgba(220,230,250,0.65);
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.075);
+  border: 1px solid rgba(255,255,255,0.11);
 }
 .mkt-prv-badge:empty { display: none; }
 .mkt-prv-stats {
@@ -7133,8 +7133,8 @@ img {
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.075);
+  border: 1px solid rgba(255,255,255,0.13);
   color: rgba(220,230,250,0.7);
   cursor: pointer;
   transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.15s;
@@ -7159,7 +7159,7 @@ img {
   .modal--mkt-preview .modal-header { border-bottom: 1px solid rgba(120,160,255,0.09); }
   .modal--mkt-preview .mkt-prv-ranges {
     gap: 4px; margin: 2px 0 16px; padding: 4px; width: max-content; max-width: 100%;
-    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.09); border-radius: 12px;
   }
   .modal--mkt-preview .mkt-prv-ranges .aurix-chart-range {
     padding: 6px 12px; font-size: 12px; font-weight: 700; border-radius: 9px; letter-spacing: 0.01em;
@@ -7343,7 +7343,7 @@ main { padding-bottom: 72px; }
   display: flex;
   justify-content: space-around;
   align-items: center;
-  background: rgba(8,12,22,0.6);
+  background: rgba(19,24,38,0.6);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   border-top: 1px solid var(--color-border-subtle);
@@ -8660,8 +8660,8 @@ main { padding-bottom: 72px; }
   height: 40px;
   padding: 0 16px;
   border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.13);
+  background: rgba(255,255,255,0.1);
   color: #fff;
   outline: none;
   font-size: 13px;
@@ -8686,7 +8686,7 @@ main { padding-bottom: 72px; }
 .market-tab {
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.05);
+  background: rgba(255,255,255,0.09);
   color: #fff;
   border: none;
   cursor: pointer;
@@ -9106,7 +9106,7 @@ main { padding-bottom: 72px; }
      existing alignment + columns are stable. */
   padding: 16px 10px;
   margin: 0 -10px;
-  border-bottom: 1px solid rgba(255,255,255,0.035);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
   border-radius: 10px;
   transition: background 140ms ease, box-shadow 220ms ease, transform 160ms ease;
 }
@@ -9375,8 +9375,8 @@ main { padding-bottom: 72px; }
 .asset-icon:not(.has-logo),
 .sugg-badge:not(.has-logo),
 .add-v2-asset-icon:not(.has-logo) {
-  background: radial-gradient(circle at 32% 26%, rgba(58,74,116,0.85) 0%, rgba(17,23,40,0.96) 100%) !important;
-  border: 1px solid rgba(255,255,255,0.06) !important;
+  background: radial-gradient(circle at 32% 26%, rgba(58,74,116,0.85) 0%, rgba(31,39,62,0.96) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.11) !important;
   color: rgba(228,235,255,0.92) !important;
 }
 .aurix-aicon-init {
@@ -9634,8 +9634,8 @@ main { padding-bottom: 72px; }
     height: 40px;
     padding: 0 16px 0 40px;
     border-radius: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(13, 18, 30, 0.55);
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(26,32,48,0.55);
     color: rgba(235, 243, 255, 0.95);
     font-size: 13px;
     font-family: 'Inter', sans-serif;
@@ -9651,7 +9651,7 @@ main { padding-bottom: 72px; }
   .market-search-wrap input:focus {
     outline: none;
     border-color: rgba(74, 130, 240, 0.45);
-    background: rgba(13, 18, 30, 0.75);
+    background: rgba(26,32,48,0.75);
     box-shadow: 0 0 0 4px rgba(74, 130, 240, 0.08);
   }
   .market-search-icon {
@@ -9683,7 +9683,7 @@ main { padding-bottom: 72px; }
     display: inline-flex;
     gap: 3px;
     padding: 4px;
-    background: linear-gradient(180deg, rgba(13,18,30,0.66), rgba(13,18,30,0.5));
+    background: linear-gradient(180deg, rgba(26,32,48,0.66), rgba(26,32,48,0.5));
     border: 1px solid rgba(74,130,240,0.16);
     border-radius: 12px;
     width: fit-content;
@@ -9720,7 +9720,7 @@ main { padding-bottom: 72px; }
   .market-section {
     background:
       radial-gradient(130% 120% at 10% 0%, rgba(74,130,240,0.11), transparent 58%),
-      linear-gradient(165deg, rgba(30,44,74,0.44), rgba(13,19,34,0.52));
+      linear-gradient(165deg, rgba(30,44,74,0.44), rgba(26,34,54,0.52));
     /* AURIX-MARKET-V1.0 CAMBIO 10: slightly more visible electric border + a soft
        outer glow + depth so the card reads as part of the Dashboard/Intelligence
        ecosystem. */
@@ -9759,7 +9759,7 @@ main { padding-bottom: 72px; }
     letter-spacing: 0.08em;
     text-transform: uppercase;
     padding: 8px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(255,255,255,0.11);
     margin-bottom: 0;
   }
   .market-table-header > div:nth-child(2),
@@ -9774,7 +9774,7 @@ main { padding-bottom: 72px; }
     height: 48px;
     padding: 0 4px;
     margin: 0 -4px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
     border-radius: 6px;
     transition: background 0.15s ease;
   }
@@ -11052,8 +11052,8 @@ body.workspace-active .header {
   border-radius: 22px;
   background:
     radial-gradient(120% 80% at 0% 0%, rgba(74, 130, 240,0.16) 0%, rgba(74, 130, 240,0) 60%),
-    linear-gradient(180deg, rgba(20,26,40,0.92), rgba(12,16,26,0.92));
-  border: 1px solid rgba(255,255,255,0.06);
+    linear-gradient(180deg, rgba(35,43,62,0.92), rgba(24,30,43,0.92));
+  border: 1px solid rgba(255,255,255,0.11);
   box-shadow:
     0 1px 0 rgba(255,255,255,0.04) inset,
     0 18px 40px -24px rgba(8,12,24,0.85);
@@ -11074,7 +11074,7 @@ body.workspace-active .header {
 .ws-intel-hero.is-warn {
   background:
     radial-gradient(120% 80% at 0% 0%, rgba(233,168,87,0.14) 0%, rgba(233,168,87,0) 60%),
-    linear-gradient(180deg, rgba(28,22,16,0.94), rgba(14,12,8,0.92));
+    linear-gradient(180deg, rgba(46,38,30,0.94), rgba(27,24,19,0.92));
   border-color: rgba(233,168,87,0.24);
 }
 .ws-intel-hero.is-positive { border-color: rgba(63,191,127,0.22); }
@@ -11112,8 +11112,8 @@ body.workspace-active .header {
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.01em;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.09);
+  border: 1px solid rgba(255,255,255,0.13);
   color: rgba(225,233,255,0.92);
   white-space: nowrap;
 }
@@ -11129,8 +11129,8 @@ body.workspace-active .header {
   border-radius: 22px;
   background:
     radial-gradient(120% 80% at 0% 0%, rgba(74, 130, 240,0.16) 0%, rgba(74, 130, 240,0) 60%),
-    linear-gradient(180deg, rgba(20,26,40,0.92), rgba(12,16,26,0.92));
-  border: 1px solid rgba(255,255,255,0.06);
+    linear-gradient(180deg, rgba(35,43,62,0.92), rgba(24,30,43,0.92));
+  border: 1px solid rgba(255,255,255,0.11);
   box-shadow:
     0 1px 0 rgba(255,255,255,0.04) inset,
     0 18px 40px -24px rgba(8,12,24,0.85);
@@ -11154,7 +11154,7 @@ body.workspace-active .header {
 .ws-hero.is-warn {
   background:
     radial-gradient(120% 80% at 0% 0%, rgba(233,168,87,0.14) 0%, rgba(233,168,87,0) 60%),
-    linear-gradient(180deg, rgba(28,22,16,0.94), rgba(14,12,8,0.92));
+    linear-gradient(180deg, rgba(46,38,30,0.94), rgba(27,24,19,0.92));
   border-color: rgba(233,168,87,0.24);
 }
 .ws-hero.is-positive { border-color: rgba(63,191,127,0.22); }
@@ -11219,8 +11219,8 @@ body.workspace-active .header {
   min-height: 96px;
   padding: 16px;
   border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.012));
-  border: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.026));
+  border: 1px solid rgba(255,255,255,0.11);
   transition: transform 0.18s ease, border-color 0.18s ease;
 }
 .ws-kpi-card:active { transform: scale(0.985); }
@@ -11286,8 +11286,8 @@ body.workspace-active .header {
   gap: 12px;
   padding: 14px 16px;
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
-  border: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(255,255,255,0.065), rgba(255,255,255,0.022));
+  border: 1px solid rgba(255,255,255,0.11);
 }
 .ws-risk-icon {
   width: 36px;
@@ -11415,8 +11415,8 @@ body.workspace-active .header {
   gap: 4px;
   padding: 10px 10px 11px;
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
-  border: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(255,255,255,0.065), rgba(255,255,255,0.022));
+  border: 1px solid rgba(255,255,255,0.11);
   min-width: 0;
 }
 .ws-cockpit-chip-label {
@@ -11494,7 +11494,7 @@ body.workspace-active .header {
 .ws-hero-insight.is-warn::after    { background: radial-gradient(120% 80% at 100% 0%, rgba(233,168,87,0.14), transparent 60%); }
 .ws-hero-insight.is-positive { border-color: rgba(63,191,127,0.28); background: linear-gradient(180deg, rgba(63,191,127,0.10), rgba(63,191,127,0.02)); }
 .ws-hero-insight.is-positive::after{ background: radial-gradient(120% 80% at 100% 0%, rgba(63,191,127,0.14), transparent 60%); }
-.ws-hero-insight.is-neutral  { border-color: rgba(255,255,255,0.10); background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)); }
+.ws-hero-insight.is-neutral  { border-color: rgba(255,255,255,0.10); background: linear-gradient(180deg, rgba(255,255,255,0.075), rgba(255,255,255,0.022)); }
 .ws-hero-insight.is-neutral::after { background: none; }
 
 /* Diagnostic grid — 2x2 compact cards. Label / status / context line. */
@@ -11509,8 +11509,8 @@ body.workspace-active .header {
   gap: 4px;
   padding: 12px 14px 13px;
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
-  border: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(255,255,255,0.065), rgba(255,255,255,0.022));
+  border: 1px solid rgba(255,255,255,0.11);
   min-width: 0;
 }
 .ws-diag-label {
@@ -11560,8 +11560,8 @@ body.workspace-active .header {
   gap: 11px;
   padding: 11px 14px;
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.008));
-  border: 1px solid rgba(255,255,255,0.06);
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.11);
 }
 .ws-signal-icon {
   width: 32px;
@@ -11693,8 +11693,8 @@ body.workspace-active .header {
   .ws-intel-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 }
 .ws-intel-stat {
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255,255,255,0.055);
+  border: 1px solid rgba(255,255,255,0.12);
   border-radius: 12px;
   padding: 12px 12px 13px;
   display: flex;
@@ -11742,8 +11742,8 @@ body.workspace-active .header {
   border-radius: 16px;
   background:
     radial-gradient(120% 80% at 0% 0%, rgba(74, 130, 240, 0.10) 0%, rgba(74, 130, 240, 0) 60%),
-    linear-gradient(180deg, rgba(20, 22, 32, 0.94), rgba(14, 16, 24, 0.94));
-  border: 1px solid rgba(255, 255, 255, 0.08);
+    linear-gradient(180deg, rgba(35,38,51,0.94), rgba(27,30,40,0.94));
+  border: 1px solid rgba(255,255,255,0.13);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -11811,8 +11811,8 @@ body.workspace-active .header {
   .ws-intel-dim-grid { grid-template-columns: 1fr; }
 }
 .ws-intel-dim {
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255,255,255,0.055);
+  border: 1px solid rgba(255,255,255,0.12);
   border-radius: 12px;
   padding: 14px 14px 15px;
   display: flex;
@@ -11855,8 +11855,8 @@ body.workspace-active .header {
   position: relative;
   padding: 14px 14px 14px 18px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255,255,255,0.055);
+  border: 1px solid rgba(255,255,255,0.11);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -11901,8 +11901,8 @@ body.workspace-active .header {
   gap: 8px;
   padding: 32px 16px;
   text-align: center;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px dashed rgba(255, 255, 255, 0.08);
+  background: rgba(255,255,255,0.04);
+  border: 1px dashed rgba(255,255,255,0.13);
   border-radius: 14px;
 }
 .ws-intel-empty-title {
@@ -11968,8 +11968,8 @@ body.workspace-active .header {
   height: 32px;
   padding: 0 12px 0 10px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.075);
+  border: 1px solid rgba(255,255,255,0.16);
   color: rgba(225,233,255,0.92);
   font-family: inherit;
   font-size: 12.5px;
@@ -12335,7 +12335,7 @@ body.workspace-active .header {
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   }
   .header.header--scrolled {
-    background: rgba(14,19,31, 0.9);
+    background: rgba(27,34,50,0.9);
     border-bottom-color: rgba(255, 255, 255, 0.07);
     /* AURIX-BRAND-PREMIUM-HEADER-2 (B2): consistent premium glass with the
        base scrolled state — inner light + faint blue hairline + soft depth. */
@@ -12567,8 +12567,8 @@ body.workspace-active .header {
   font-weight: 800;
   letter-spacing: 0.08em;
   line-height: 1.5;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.09);
+  border: 1px solid rgba(255,255,255,0.16);
   color: rgba(255,255,255,0.70);
   flex: 0 0 auto;
   font-family: inherit;
@@ -12818,8 +12818,8 @@ body.workspace-active .header {
     height: 40px;
     padding: 0 14px 0 38px;
     border-radius: 10px;
-    border: 1px solid rgba(255,255,255,0.12);
-    background: rgba(13,18,30,0.55);
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(26,32,48,0.55);
     color: rgba(235,243,255,0.95);
     font-size: 16px;
     letter-spacing: 0.01em;
@@ -12831,7 +12831,7 @@ body.workspace-active .header {
     outline: none;
     font-size: 16px;
     border-color: rgba(74,130,240,0.45);
-    background: rgba(13,18,30,0.75);
+    background: rgba(26,32,48,0.75);
     box-shadow: 0 0 0 4px rgba(74,130,240,0.08);
   }
   .market-search-icon {
@@ -12906,8 +12906,8 @@ body.workspace-active .header {
     font-weight: 500;
     letter-spacing: 0.015em;
     border-radius: 8px;
-    border: 1px solid rgba(255,255,255,0.06);
-    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.11);
+    background: rgba(255,255,255,0.055);
     color: rgba(255,255,255,0.62);
     line-height: 1.35;
   }
@@ -13528,7 +13528,7 @@ body.gs-open { overflow: hidden; }
   /* ── Market ────────────────────────────────────────────────── */
   /* Type badge: drop contrast a notch — premium chrome, not loud chip. */
   .market-row-badge {
-    background: rgba(255,255,255,0.04);
+    background: rgba(255,255,255,0.075);
     border-color: rgba(255,255,255,0.08);
     color: rgba(220,230,250,0.62);
     font-weight: 700;
@@ -13671,7 +13671,7 @@ body.gs-open { overflow: hidden; }
   .modal-overlay.open { backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
   .modal {
     border-radius: 22px 22px 0 0;
-    border-top: 1px solid rgba(255,255,255,0.06);
+    border-top: 1px solid rgba(255,255,255,0.11);
   }
   .modal-close {
     width: 36px;
@@ -13748,7 +13748,7 @@ body.gs-open { overflow: hidden; }
 
   /* Market row badge — drop visual weight a notch on mobile too. */
   .market-row-badge {
-    background: rgba(255,255,255,0.035);
+    background: rgba(255,255,255,0.065);
     border-color: rgba(255,255,255,0.08);
     color: rgba(220,230,250,0.62);
   }
@@ -13835,8 +13835,8 @@ body.gs-open { overflow: hidden; }
 .mkt-tf-pill {
   padding: 6px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.06);
-  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.11);
+  background: rgba(255,255,255,0.06);
   color: rgba(220,230,250,0.58);
   font-family: inherit;
   font-size: 11.5px;
@@ -13866,8 +13866,8 @@ body.gs-open { overflow: hidden; }
   gap: 8px;
   padding: 6px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.07);
-  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
   color: rgba(220,230,250,0.78);
   font-family: inherit;
   font-size: 11.5px;
@@ -13892,8 +13892,8 @@ body.gs-open { overflow: hidden; }
   min-width: 160px;
   padding: 4px;
   border-radius: 12px;
-  background: rgba(14,18,28,0.96);
-  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(27,32,46,0.96);
+  border: 1px solid rgba(255,255,255,0.12);
   box-shadow: 0 18px 36px -16px rgba(4,8,16,0.9);
   display: flex;
   flex-direction: column;
@@ -13963,7 +13963,7 @@ body.gs-open { overflow: hidden; }
 /* Controls bar — premium hairline separator + tighter rhythm. */
 #marketList.is-v3 .mkt-explorer-controls {
   padding: 4px 2px 12px;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
   margin-bottom: 10px;
 }
 #marketList.is-v3 .mkt-tf-pill {
@@ -14008,7 +14008,7 @@ body.gs-open { overflow: hidden; }
 #marketList.is-v3 .market-row {
   padding: 14px 12px;
   margin: 0 -12px;
-  border-bottom: 1px solid rgba(255,255,255,0.025);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
   border-radius: 12px;
   /* AURIX-MARKET-V1.0 CAMBIO 4/5: ACTIVO ≈55% (wider), sparkline column ≈28%
      narrower; same grid as the header above. */
@@ -14163,8 +14163,8 @@ body.gs-open { overflow: hidden; }
 .mkt-filter-chip-current {
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.09);
+  border: 1px solid rgba(255,255,255,0.11);
   font-size: 11px;
   font-weight: 600;
   color: rgba(220,230,250,0.75);
@@ -14194,8 +14194,8 @@ body.gs-open { overflow: hidden; }
 .mkt-filter-sheet {
   width: 100%;
   max-width: 540px;
-  background: rgba(14,18,28,0.96);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(27,32,46,0.96);
+  border: 1px solid rgba(255,255,255,0.11);
   border-bottom: 0;
   border-radius: 22px 22px 0 0;
   padding: 14px 18px calc(20px + env(safe-area-inset-bottom));
@@ -14223,8 +14223,8 @@ body.gs-open { overflow: hidden; }
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.075);
+  border: 1px solid rgba(255,255,255,0.13);
   color: rgba(220,230,250,0.75);
   font-family: inherit;
   font-size: 16px;
@@ -14232,7 +14232,7 @@ body.gs-open { overflow: hidden; }
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .mkt-filter-close:hover {
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.12);
   color: #fff;
   border-color: rgba(255,255,255,0.16);
 }
@@ -14254,8 +14254,8 @@ body.gs-open { overflow: hidden; }
   min-width: 60px;
   padding: 9px 12px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.075);
+  border: 1px solid rgba(255,255,255,0.12);
   color: rgba(220,230,250,0.78);
   font-family: inherit;
   font-size: 12px;
@@ -14290,8 +14290,8 @@ body.gs-open { overflow: hidden; }
 .mkt-filter-sort-item {
   padding: 12px 14px;
   border-radius: 12px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.11);
   color: rgba(220,230,250,0.78);
   font-family: inherit;
   font-size: 13px;
@@ -14316,7 +14316,7 @@ body.gs-open { overflow: hidden; }
   .mkt-filter-sheet {
     max-width: 440px;
     border-radius: 18px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid rgba(255,255,255,0.11);
     padding: 18px 20px 22px;
     transform: translateY(20px) scale(0.98);
   }
@@ -14546,7 +14546,7 @@ body.gs-open { overflow: hidden; }
     letter-spacing: 0.01em;
     line-height: 1.2;
     color: rgba(225, 233, 250, 0.66);
-    background: rgba(255, 255, 255, 0.045);
+    background: rgba(255,255,255,0.08);
     border-radius: 999px;
     transition:
       background 0.2s var(--ease-out, ease),
@@ -14556,7 +14556,7 @@ body.gs-open { overflow: hidden; }
   }
   .market-tab:hover {
     color: rgba(235, 243, 255, 0.92);
-    background: rgba(255, 255, 255, 0.07);
+    background: rgba(255,255,255,0.11);
   }
   .market-tab:active { transform: scale(0.96); }
   .market-tab.active {
@@ -14572,8 +14572,8 @@ body.gs-open { overflow: hidden; }
 /* 2 ── Market filter sheet (mobile bottom-sheet / desktop popover) */
 .mkt-filter-sheet {
   background:
-    linear-gradient(180deg, rgba(28, 42, 74, 0.32) 0%, rgba(12, 18, 32, 0.0) 50%),
-    rgba(10, 14, 24, 0.96);
+    linear-gradient(180deg, rgba(28, 42, 74, 0.32) 0%, rgba(24,32,51,0.0) 50%),
+    rgba(22,27,40,0.96);
   border: 1px solid var(--aurix-border);
   border-bottom: 0;
   box-shadow:
@@ -14585,7 +14585,7 @@ body.gs-open { overflow: hidden; }
   font-size: 16px;
 }
 .mkt-filter-close {
-  background: rgba(20, 30, 56, 0.55);
+  background: rgba(35,48,84,0.55);
   border: 1px solid var(--aurix-border);
   color: rgba(220, 230, 250, 0.82);
   border-radius: 12px;
@@ -14812,8 +14812,8 @@ body.gs-open { overflow: hidden; }
 .modal--settings {
   max-width: 560px;
   background:
-    linear-gradient(180deg, rgba(28, 42, 74, 0.32) 0%, rgba(12, 18, 32, 0.0) 50%),
-    rgba(10, 14, 24, 0.96);
+    linear-gradient(180deg, rgba(28, 42, 74, 0.32) 0%, rgba(24,32,51,0.0) 50%),
+    rgba(22,27,40,0.96);
   border: 1px solid var(--aurix-border);
 }
 /* SETTINGS V1 — premium header: consistent title size, tighter vertical rhythm,
@@ -14831,8 +14831,8 @@ body.gs-open { overflow: hidden; }
 .modal--reset {
   max-width: 460px;
   background:
-    linear-gradient(180deg, rgba(74, 22, 22, 0.18) 0%, rgba(12, 18, 32, 0.0) 50%),
-    rgba(10, 14, 24, 0.96);
+    linear-gradient(180deg, rgba(74, 22, 22, 0.18) 0%, rgba(24,32,51,0.0) 50%),
+    rgba(22,27,40,0.96);
   border: 1px solid rgba(224, 90, 90, 0.32);
 }
 
@@ -15409,8 +15409,8 @@ body.gs-open { overflow: hidden; }
     max-height: calc(100dvh - env(safe-area-inset-top, 0px) - 12px);
     overflow: hidden;
     background:
-      linear-gradient(180deg, rgba(28, 42, 74, 0.18) 0%, rgba(10, 14, 24, 0.0) 40%),
-      rgba(10, 14, 24, 0.97);
+      linear-gradient(180deg, rgba(28, 42, 74, 0.18) 0%, rgba(38,44,62,0.0) 40%),
+      rgba(38,44,62,0.97);
     border: 1px solid var(--aurix-border);
     border-bottom: 0;
     box-shadow: 0 -28px 60px -20px rgba(2, 6, 14, 0.85);
@@ -15461,7 +15461,7 @@ body.gs-open { overflow: hidden; }
     width: 38px;
     height: 38px;
     border-radius: 999px;
-    background: rgba(20, 30, 56, 0.65);
+    background: rgba(35,48,84,0.65);
     border: 1px solid var(--aurix-border);
     color: rgba(225, 233, 255, 0.92);
     font-size: 14px;
@@ -15592,7 +15592,7 @@ body.gs-open { overflow: hidden; }
     gap: 10px;
     padding: 12px 16px max(16px, env(safe-area-inset-bottom));
     background:
-      linear-gradient(180deg, rgba(12, 18, 34, 0.99) 0%, rgba(7, 12, 24, 1) 100%);
+      linear-gradient(180deg, rgba(40,51,81,0.99) 0%, rgba(31,40,62,1) 100%);
     background-clip: padding-box;
     border-top: 1px solid rgba(74, 130, 240, 0.20);
     box-shadow: 0 -18px 38px rgba(0, 0, 0, 0.45);
@@ -15602,7 +15602,7 @@ body.gs-open { overflow: hidden; }
     width: 52px;
     height: 52px;
     border-radius: 14px;
-    background: rgba(20, 30, 56, 0.65);
+    background: rgba(35,48,84,0.65);
     border: 1px solid var(--aurix-border);
     color: rgba(220, 230, 250, 0.72);
     font-size: 19px;
@@ -15655,7 +15655,7 @@ body.gs-open { overflow: hidden; }
   position: relative;
   cursor: not-allowed;
   color: rgba(220, 230, 250, 0.36);
-  background: rgba(20, 30, 56, 0.30);
+  background: rgba(35,48,84,0.30);
   border-color: rgba(74, 130, 240, 0.06);
   display: inline-flex;
   align-items: center;
@@ -15664,7 +15664,7 @@ body.gs-open { overflow: hidden; }
 .mkt-filter-pill.is-soon:hover,
 .mkt-tf-pill.is-soon:hover {
   /* No real hover affordance — taps are intentionally inert. */
-  background: rgba(20, 30, 56, 0.34);
+  background: rgba(35,48,84,0.34);
   border-color: rgba(74, 130, 240, 0.10);
   color: rgba(220, 230, 250, 0.44);
   box-shadow: none;
@@ -15996,8 +15996,8 @@ body.gs-open { overflow: hidden; }
   position: relative;
   max-width: 480px;
   background:
-    linear-gradient(180deg, rgba(40, 80, 150, 0.18) 0%, rgba(12, 18, 32, 0.0) 50%),
-    rgba(8, 12, 22, 0.96);
+    linear-gradient(180deg, rgba(40, 80, 150, 0.18) 0%, rgba(24,32,51,0.0) 50%),
+    rgba(19,24,38,0.96);
   border: 1px solid rgba(74, 130, 240, 0.18);
   border-radius: var(--radius-lg);
   box-shadow:
@@ -17214,7 +17214,7 @@ body.gs-open { overflow: hidden; }
   /* "Añadir liquidez" — equal-weight contrast at desktop. Stays NEUTRAL
      (not Aurix-blue), so it reads as an equal action, never a second primary. */
   .summary-footer .btn-summary-action.btn-secondary {
-    background: rgba(255,255,255,0.055);
+    background: rgba(255,255,255,0.095);
     border-color: rgba(255,255,255,0.22);
   }
   /* Bloque 3 — raised-key relief: a brighter top inset edge + a faint dark
@@ -17522,8 +17522,8 @@ body.gs-open { overflow: hidden; }
 .modal--health {
   max-width: 640px;
   background:
-    linear-gradient(180deg, rgba(40, 60, 110, 0.20) 0%, rgba(12, 18, 32, 0.0) 50%),
-    rgba(10, 14, 24, 0.96);
+    linear-gradient(180deg, rgba(40, 60, 110, 0.20) 0%, rgba(24,32,51,0.0) 50%),
+    rgba(22,27,40,0.96);
   border: 1px solid rgba(74, 130, 240, 0.18);
 }
 /* HEALTH-3 fix: the section selectors below all set display:flex/grid,
@@ -18569,7 +18569,7 @@ body.gs-open { overflow: hidden; }
   border: 1px solid var(--aurix-blue-border);
   background:
     radial-gradient(125% 135% at 10% -10%, rgba(74, 130, 240, 0.18) 0%, rgba(74, 130, 240, 0.05) 36%, transparent 68%),
-    linear-gradient(162deg, var(--aurix-surface) 0%, rgba(11, 16, 26, 0.92) 100%);
+    linear-gradient(162deg, var(--aurix-surface) 0%, rgba(23,30,43,0.92) 100%);
   box-shadow:
     0 26px 64px -36px var(--aurix-blue-glow),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -18633,7 +18633,7 @@ body.gs-open { overflow: hidden; }
   border-color: rgba(233, 168, 87, 0.32);
   background:
     radial-gradient(125% 135% at 10% -10%, rgba(233, 168, 87, 0.16) 0%, rgba(233, 168, 87, 0.04) 36%, transparent 68%),
-    linear-gradient(162deg, rgba(40, 31, 18, 0.55) 0%, rgba(11, 16, 26, 0.92) 100%);
+    linear-gradient(162deg, rgba(62,50,32,0.55) 0%, rgba(23,30,43,0.92) 100%);
   box-shadow: 0 26px 64px -36px rgba(233, 168, 87, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 .aurix-ws-intel-mode .ws-exec-hero.is-warn::before { background: linear-gradient(90deg, transparent, var(--aurix-warning), transparent); }
@@ -18651,7 +18651,7 @@ body.gs-open { overflow: hidden; }
   border-color: var(--aurix-blue-border);
   background:
     radial-gradient(125% 135% at 10% -10%, rgba(74, 130, 240, 0.2) 0%, rgba(74, 130, 240, 0.055) 36%, transparent 68%),
-    linear-gradient(162deg, var(--aurix-surface) 0%, rgba(11, 16, 26, 0.92) 100%);
+    linear-gradient(162deg, var(--aurix-surface) 0%, rgba(23,30,43,0.92) 100%);
   box-shadow: 0 26px 64px -36px var(--aurix-blue-glow), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 .aurix-ws-intel-mode .ws-exec-hero.is-positive::before { background: linear-gradient(90deg, transparent, var(--aurix-blue), transparent); }
@@ -18664,7 +18664,7 @@ body.gs-open { overflow: hidden; }
   padding: 16px 16px 6px;
   border-radius: 18px;
   border: 1px solid var(--aurix-border);
-  background: linear-gradient(180deg, rgba(17, 23, 35, 0.7) 0%, rgba(10, 14, 22, 0.7) 100%);
+  background: linear-gradient(180deg, rgba(31,39,55,0.7) 0%, rgba(22,27,38,0.7) 100%);
   /* AURIX-BRAND-PREMIUM-HEADER-2 (P1): Level-2 depth, secondary to the hero. */
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 26px -20px rgba(0, 0, 0, 0.55);
 }
@@ -18683,7 +18683,7 @@ body.gs-open { overflow: hidden; }
   align-items: center;
   gap: 12px;
   padding: 13px 2px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255,255,255,0.09);
 }
 .aurix-ws-intel-mode .ws-exec-metric:last-child { border-bottom: 0; }
 .aurix-ws-intel-mode .ws-exec-metric-bar { width: 3px; height: 26px; border-radius: 2px; background: var(--aurix-blue); }
@@ -18753,7 +18753,7 @@ body.gs-open { overflow: hidden; }
   border-radius: 16px;
   /* AURIX-BRAND-PREMIUM-HEADER-2 (P1): Level-2 material — subtle top-light
      gradient + soft depth shadow so cards read as a clear tier below the hero. */
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.012) 100%);
+  background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.026) 100%);
   border: 1px solid var(--aurix-border);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 26px -20px rgba(0, 0, 0, 0.55);
   transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
@@ -18803,13 +18803,13 @@ body.gs-open { overflow: hidden; }
   padding: 16px 18px;
   border-radius: 14px;
   /* AURIX-BRAND-PREMIUM-HEADER-2 (P1): Level-2 material, matching the dimensions. */
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.012) 100%);
+  background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.026) 100%);
   border: 1px solid var(--aurix-border);
   border-left: 3px solid var(--aurix-blue);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 26px -20px rgba(0, 0, 0, 0.55);
   transition: border-color 0.16s ease, background 0.16s ease;
 }
-.aurix-ws-intel-mode .ws-exec-signal:hover { background: rgba(255, 255, 255, 0.04); }
+.aurix-ws-intel-mode .ws-exec-signal:hover { background: rgba(255,255,255,0.075); }
 .aurix-ws-intel-mode .ws-exec-signal.is-strength  { border-left-color: var(--aurix-success); }
 .aurix-ws-intel-mode .ws-exec-signal.is-attention { border-left-color: var(--aurix-warning); }
 .aurix-ws-intel-mode .ws-exec-signal.is-risk      { border-left-color: var(--aurix-danger); }
@@ -19303,8 +19303,8 @@ body.gs-open { overflow: hidden; }
 #addOverlay .modal,
 #reduceOverlay .modal {
   background:
-    linear-gradient(180deg, rgba(28,42,74,0.30) 0%, rgba(12,18,32,0.0) 46%),
-    rgba(10,14,24,0.96) !important;
+    linear-gradient(180deg, rgba(28,42,74,0.30) 0%, rgba(24,32,51,0.0) 46%),
+    rgba(22,27,40,0.96) !important;
   border: 1px solid rgba(74,130,240,0.22) !important;
   box-shadow:
     0 40px 100px -40px rgba(2,6,14,0.90),
@@ -19861,7 +19861,7 @@ body.gs-open { overflow: hidden; }
   border: 1px solid rgba(74,130,240,0.16);
   background:
     radial-gradient(140% 120% at 12% 0%, rgba(74,130,240,0.10), transparent 58%),
-    linear-gradient(165deg, rgba(32,44,72,0.50), rgba(15,21,37,0.62));
+    linear-gradient(165deg, rgba(32,44,72,0.50), rgba(28,36,58,0.62));
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   transition: border-color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
@@ -19890,7 +19890,7 @@ body.gs-open { overflow: hidden; }
 .intcc-empty-card {
   text-align: center; padding: 44px 24px;
   border: 1px solid var(--color-border-subtle); border-radius: 18px;
-  background: var(--bg-card, rgba(255,255,255,0.02));
+  background: var(--bg-card, rgba(255,255,255,0.04));
 }
 .intcc-empty-title { margin: 0 0 8px; font-size: 17px; font-weight: 700; color: var(--text-bright); }
 .intcc-empty-body  { margin: 0; font-size: 13px; color: var(--text-muted); line-height: 1.55; }
@@ -19909,7 +19909,7 @@ body.gs-open { overflow: hidden; }
   background:
     radial-gradient(120% 150% at 8% 8%, rgba(77,141,255,0.16), transparent 56%),
     radial-gradient(120% 150% at 92% 92%, rgba(37,99,235,0.14), transparent 60%),
-    linear-gradient(165deg, rgba(30,46,82,0.62), rgba(13,19,36,0.62));
+    linear-gradient(165deg, rgba(30,46,82,0.62), rgba(26,34,57,0.62));
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 18px 50px rgba(0,0,0,0.34);
   overflow: hidden;
   --orb-c: 77,141,255;               /* electric Aurix blue #4D8DFF (Bloque 3) */
@@ -19936,7 +19936,7 @@ body.gs-open { overflow: hidden; }
   border: 1px solid rgba(120,160,255,0.20);   /* slightly brighter, Inteligencia-family hue */
   background:
     radial-gradient(130% 130% at 12% 0%, rgba(74,130,240,0.11), transparent 60%),
-    linear-gradient(165deg, rgba(34,48,80,0.46), rgba(15,21,37,0.32));
+    linear-gradient(165deg, rgba(34,48,80,0.46), rgba(28,36,58,0.32));
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.06),
     0 8px 26px -18px rgba(77,141,255,0.5),   /* diffuse halo — Inteligencia family, weaker spread */
@@ -19969,8 +19969,8 @@ body.gs-open { overflow: hidden; }
   display: inline-flex; align-items: center; gap: 6px;
   height: 25px; padding: 0 12px; border-radius: 999px;       /* INT.2V — height -10% */
   font-size: 11.5px; font-weight: 600; line-height: 1; white-space: nowrap;
-  border: 1px solid rgba(255,255,255,0.05); color: var(--text-bright);   /* softer border */
-  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.09); color: var(--text-bright);   /* softer border */
+  background: rgba(255,255,255,0.065);
   box-shadow: inset 0 0 12px rgba(74,130,240,0.06);          /* premium inner glow */
 }
 .intcc-chip.is-good::before, .intcc-chip.is-accent::before { content: '✓'; font-size: 10px; font-weight: 800; opacity: 0.95; }
@@ -20063,7 +20063,7 @@ body.gs-open { overflow: hidden; }
   border-color: rgba(74,130,240,0.26);
   background:
     radial-gradient(130% 150% at 88% 10%, rgba(92,156,255,0.16), transparent 60%),
-    linear-gradient(165deg, rgba(34,48,80,0.52), rgba(15,21,37,0.60));
+    linear-gradient(165deg, rgba(34,48,80,0.52), rgba(28,36,58,0.60));
 }
 
 /* ── Bloque 3 — Since last visit ── */
@@ -20106,7 +20106,7 @@ body.gs-open { overflow: hidden; }
   color: rgba(150,180,240,0.7);
 }
 .intcc-drv-row.is-monetary .intcc-drv-kind { color: rgba(120,210,170,0.8); }
-.intcc-drv-track { height: 7px; border-radius: 999px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.intcc-drv-track { height: 7px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
 .intcc-drv-bar {
   display: block; height: 100%; border-radius: 999px;
   background: linear-gradient(90deg, rgba(92,156,255,0.98), rgba(150,190,255,0.6));
@@ -20120,7 +20120,7 @@ body.gs-open { overflow: hidden; }
 /* ── Bloque 6 — Explore (inline) ── */
 .intcc-explore-hint { margin: -6px 0 14px; font-size: 12px; color: var(--text-muted); }
 .intcc-explore-list { display: flex; flex-direction: column; gap: 8px; }
-.intcc-x-item { position: relative; border: 1px solid var(--color-border-subtle); border-radius: 12px; background: rgba(255,255,255,0.015); }
+.intcc-x-item { position: relative; border: 1px solid var(--color-border-subtle); border-radius: 12px; background: rgba(255,255,255,0.03); }
 .intcc-x-q {
   width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
   font: inherit; cursor: pointer; text-align: left;
@@ -20145,7 +20145,7 @@ body.gs-open { overflow: hidden; }
 .intcc-x-answer {
   position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 60;
   border-radius: 12px; border: 1px solid rgba(74,130,240,0.40);
-  background: linear-gradient(165deg, rgba(34,48,80,0.99), rgba(15,21,37,0.99));
+  background: linear-gradient(165deg, rgba(34,48,80,0.99), rgba(28,36,58,0.99));
   box-shadow: 0 16px 42px rgba(0,0,0,0.52), 0 0 0 1px rgba(74,130,240,0.12);
   opacity: 0; transform: translateY(-4px); pointer-events: none;
   transition: opacity 200ms ease, transform 200ms ease;
@@ -20188,7 +20188,7 @@ body.gs-open { overflow: hidden; }
 .intcc-re-ctx {
   margin: 16px 0 0; padding-top: 12px; font-size: 11.5px; line-height: 1.45;
   color: var(--text-dim, rgba(255,255,255,0.45));
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid rgba(255,255,255,0.11);
 }
 
 /* ── Bloque 8 — Watch areas ── */
@@ -20252,7 +20252,7 @@ body.gs-open { overflow: hidden; }
     align-self: stretch;
     display: flex; align-items: center; gap: 22px;
     padding: 16px 24px 16px 16px;   /* AURIX-INTCC-V2.1 CAMBIO 5: trim the left inner void (left 24→16) */
-    background: linear-gradient(165deg, rgba(120,160,255,0.06), rgba(255,255,255,0.012));
+    background: linear-gradient(165deg, rgba(120,160,255,0.06), rgba(255,255,255,0.026));
     border: 1px solid rgba(120,160,255,0.13);
     border-radius: 16px;
     box-shadow:
@@ -20343,7 +20343,7 @@ body.gs-open { overflow: hidden; }
     display: flex; align-items: center; gap: 8px;
     font-size: 12.5px; font-weight: 600; line-height: 1.3; color: var(--text-bright);
     padding: 7px 11px; border-radius: 10px;
-    background: rgba(255,255,255,0.03); border: 1px solid rgba(120,160,255,0.10);
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(120,160,255,0.10);
   }
   .intcc-m-concl-check {
     flex: 0 0 auto; width: 16px; height: 16px; border-radius: 50%;
@@ -20553,7 +20553,7 @@ body.gs-open { overflow: hidden; }
   border: 1px solid rgba(74,130,240,0.16);
   background:
     radial-gradient(140% 120% at 12% 0%, rgba(74,130,240,0.10), transparent 58%),
-    linear-gradient(165deg, rgba(32,44,72,0.50), rgba(15,21,37,0.62));
+    linear-gradient(165deg, rgba(32,44,72,0.50), rgba(28,36,58,0.62));
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   transition: border-color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
@@ -20842,7 +20842,7 @@ body.gs-open { overflow: hidden; }
   margin: 0; padding: 14px 16px; border-radius: 14px; font-size: 14px; line-height: 1.5; font-weight: 600;
   color: var(--text-bright);
   border: 1px solid rgba(77,141,255,0.30);
-  background: radial-gradient(130% 150% at 88% 6%, rgba(92,156,255,0.16), transparent 60%), linear-gradient(165deg, rgba(34,52,92,0.5), rgba(14,20,38,0.55));
+  background: radial-gradient(130% 150% at 88% 6%, rgba(92,156,255,0.16), transparent 60%), linear-gradient(165deg, rgba(34,52,92,0.5), rgba(27,35,59,0.55));
 }
 
 @media (max-width: 720px) {
@@ -20859,7 +20859,7 @@ body.gs-open { overflow: hidden; }
 .wsh-ws-cta { font-size: 11px; font-weight: 600; color: rgba(159,194,255,0.7); letter-spacing: 0.02em; }
 
 /* Mode toggle (Manual / Aurix Sync) */
-.ws4-modes { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(120,160,255,0.14); }
+.ws4-modes { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(255,255,255,0.075); border: 1px solid rgba(120,160,255,0.14); }
 .ws4-mode { font: inherit; cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--text-muted); padding: 7px 16px; border-radius: 9px; border: 0; background: transparent; transition: background 160ms ease, color 160ms ease; }
 .ws4-mode.is-active { color: #cfe0ff; background: rgba(74,130,240,0.22); box-shadow: inset 0 0 0 1px rgba(74,130,240,0.34); }
 .ws4-sync-ctx { margin: 12px 0 0; font-size: 12px; font-weight: 600; color: rgba(159,194,255,0.85); }
@@ -20875,7 +20875,7 @@ body.gs-open { overflow: hidden; }
   -webkit-appearance: none; appearance: none; -moz-appearance: textfield;
   width: 100%; box-sizing: border-box; padding: 10px 34px 10px 12px;
   font: inherit; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
-  color: var(--text-bright); background: rgba(255,255,255,0.04);
+  color: var(--text-bright); background: rgba(255,255,255,0.075);
   border: 1px solid rgba(120,160,255,0.18); border-radius: 10px; outline: none;
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
@@ -20907,7 +20907,7 @@ body.gs-open { overflow: hidden; }
 .wsg-select, .wsg-text {
   -webkit-appearance: none; appearance: none; width: 100%; box-sizing: border-box;
   padding: 10px 12px; font: inherit; font-size: 14px; font-weight: 600; color: var(--text-bright);
-  background: rgba(255,255,255,0.04); border: 1px solid rgba(120,160,255,0.18); border-radius: 10px; outline: none;
+  background: rgba(255,255,255,0.075); border: 1px solid rgba(120,160,255,0.18); border-radius: 10px; outline: none;
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 .wsg-select:focus, .wsg-text:focus { border-color: rgba(77,141,255,0.55); box-shadow: 0 0 0 3px rgba(77,141,255,0.15); }
@@ -20917,7 +20917,7 @@ body.gs-open { overflow: hidden; }
 
 /* Goals list */
 .wsg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.wsg-card { display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.13); background: rgba(255,255,255,0.025); }
+.wsg-card { display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.13); background: rgba(255,255,255,0.055); }
 .wsg-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .wsg-card-id { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .wsg-card-name { margin: 0; font-size: 15px; font-weight: 700; color: var(--text-bright); }
@@ -20955,7 +20955,7 @@ body.gs-open { overflow: hidden; }
 .wsg-form-preview {
   position: sticky; top: 12px; display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 14px;
   border: 1px solid rgba(77,141,255,0.30);
-  background: radial-gradient(130% 150% at 88% 6%, rgba(92,156,255,0.16), transparent 60%), linear-gradient(165deg, rgba(34,52,92,0.5), rgba(14,20,38,0.55));
+  background: radial-gradient(130% 150% at 88% 6%, rgba(92,156,255,0.16), transparent 60%), linear-gradient(165deg, rgba(34,52,92,0.5), rgba(27,35,59,0.55));
 }
 .wsg-pv-title { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(159,194,255,0.9); }
 .wsg-pv-state { align-self: flex-start; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; color: #8fb8ff; background: rgba(74,130,240,0.12); border: 1px solid rgba(74,130,240,0.3); }
@@ -21076,9 +21076,9 @@ body.gs-open { overflow: hidden; }
 }
 
 /* ── WS.5C — Aurix delete modal + template visual previews ── */
-.ws-modal-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(5,8,16,0.66); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); opacity: 0; transition: opacity 160ms ease; }
+.ws-modal-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(15,19,30,0.66); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); opacity: 0; transition: opacity 160ms ease; }
 .ws-modal-overlay.is-open { opacity: 1; }
-.ws-modal { width: min(380px, 100%); padding: 22px; border-radius: 18px; border: 1px solid rgba(74,130,240,0.30); background: radial-gradient(130% 120% at 12% 0%, rgba(74,130,240,0.12), transparent 58%), linear-gradient(165deg, rgba(32,44,72,0.96), rgba(15,21,37,0.97)); box-shadow: 0 30px 70px rgba(0,0,0,0.5); transform: translateY(8px) scale(0.98); transition: transform 200ms cubic-bezier(0.22,1,0.36,1); }
+.ws-modal { width: min(380px, 100%); padding: 22px; border-radius: 18px; border: 1px solid rgba(74,130,240,0.30); background: radial-gradient(130% 120% at 12% 0%, rgba(74,130,240,0.12), transparent 58%), linear-gradient(165deg, rgba(32,44,72,0.96), rgba(28,36,58,0.97)); box-shadow: 0 30px 70px rgba(0,0,0,0.5); transform: translateY(8px) scale(0.98); transition: transform 200ms cubic-bezier(0.22,1,0.36,1); }
 .ws-modal-overlay.is-open .ws-modal { transform: none; }
 .ws-modal-title { margin: 0 0 8px; font-size: 17px; font-weight: 700; color: var(--text-bright); }
 .ws-modal-text { margin: 0 0 18px; font-size: 13.5px; line-height: 1.5; color: var(--text-muted); }
@@ -21879,12 +21879,12 @@ body.gs-open { overflow: hidden; }
   padding: 7px 14px;
   font-size: 12.5px;
   font-weight: 600;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.075);
+  border: 1px solid rgba(255,255,255,0.18);
   color: rgba(225,233,255,0.9);
   transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
 }
-.ws2-back:hover, .ws2-ghost:hover, .ws2-use-sheet:hover { background: rgba(255,255,255,0.08); border-color: rgba(74,130,240,0.4); }
+.ws2-back:hover, .ws2-ghost:hover, .ws2-use-sheet:hover { background: rgba(255,255,255,0.12); border-color: rgba(74,130,240,0.4); }
 .ws2-back:active, .ws2-ghost:active, .ws2-use-sheet:active { transform: scale(0.97); }
 
 .ws2-tool-body {
@@ -21899,8 +21899,8 @@ body.gs-open { overflow: hidden; }
   gap: 12px;
   padding: 18px;
   border-radius: 16px;
-  border: 1px solid var(--color-border-subtle, rgba(255,255,255,0.08));
-  background: var(--bg-card, rgba(255,255,255,0.02));
+  border: 1px solid var(--color-border-subtle, rgba(255,255,255,0.13));
+  background: var(--bg-card, rgba(255,255,255,0.04));
 }
 .ws2-field { display: flex; flex-direction: column; gap: 5px; }
 .ws2-field-label { font-size: 12px; color: var(--text-muted, rgba(220,230,250,0.6)); }
@@ -21908,8 +21908,8 @@ body.gs-open { overflow: hidden; }
   width: 100%;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid var(--color-border-subtle, rgba(255,255,255,0.1));
-  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--color-border-subtle, rgba(255,255,255,0.16));
+  background: rgba(255,255,255,0.06);
   color: var(--text-bright, #e8eaf0);
   font: inherit;
   font-size: 14px;
@@ -21925,7 +21925,7 @@ body.gs-open { overflow: hidden; }
   justify-content: space-between;
   gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--color-border-subtle, rgba(255,255,255,0.06));
+  border-bottom: 1px solid var(--color-border-subtle, rgba(255,255,255,0.11));
 }
 .ws2-result:last-of-type { border-bottom: 0; }
 .ws2-result-label { font-size: 12.5px; color: var(--text-muted, rgba(220,230,250,0.6)); }
@@ -21942,7 +21942,7 @@ body.gs-open { overflow: hidden; }
 .ws2-breakdown { margin-top: 14px; }
 .ws2-breakdown-title { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted, rgba(220,230,250,0.5)); margin-bottom: 8px; }
 .ws2-bd-rows { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
-.ws2-bd-row { display: flex; justify-content: space-between; font-size: 12.5px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.ws2-bd-row { display: flex; justify-content: space-between; font-size: 12.5px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
 .ws2-bd-year { color: var(--text-muted, rgba(220,230,250,0.6)); }
 .ws2-bd-val { color: var(--text-bright, #e8eaf0); font-variant-numeric: tabular-nums; }
 
@@ -21953,7 +21953,7 @@ body.gs-open { overflow: hidden; }
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.18);
 }
 .ws2-status.is-reached      { color: rgba(72,207,173,0.95); border-color: rgba(72,207,173,0.4); background: rgba(72,207,173,0.08); }
 .ws2-status.is-ontrack      { color: rgba(99,179,237,0.95); border-color: rgba(99,179,237,0.4); background: rgba(99,179,237,0.08); }
@@ -22448,7 +22448,7 @@ body.gs-open { overflow: hidden; }
 
   /* loading skeleton */
   .perf-skel {
-    background: linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.08) 37%, rgba(255,255,255,.04) 63%);
+    background: linear-gradient(90deg, rgba(255,255,255,0.075) 25%, rgba(255,255,255,0.12) 37%, rgba(255,255,255,0.075) 63%);
     background-size: 400% 100%; animation: perfShimmer 1.4s ease infinite; border-radius: 6px;
   }
   .perf-skel-head { width: 42%; height: 46px; margin-bottom: 8px; }
@@ -23905,8 +23905,8 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
      removed on selection; duplicate identity head/meta hidden (chip owns it). */
   .modal[data-mode="asset"][data-asset-flow="form"] .add-v2-preview {
     display: flex;
-    background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012));
-    border: 1px solid rgba(255,255,255,0.08);
+    background: linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.026));
+    border: 1px solid rgba(255,255,255,0.13);
     border-radius: 16px;
     padding: 18px;
     min-height: 0;
@@ -23925,8 +23925,8 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
     gap: 0;
     padding: 22px;
     border-radius: 18px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012));
-    border: 1px solid rgba(255,255,255,0.08);
+    background: linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.026));
+    border: 1px solid rgba(255,255,255,0.13);
     box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset;
   }
   .modal[data-mode="asset"][data-asset-flow="form"] #qtyGroup { margin: 0; }
