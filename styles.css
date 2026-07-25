@@ -2750,20 +2750,23 @@ body.modal-open {
   #modalOverlay > .modal[data-mode="asset"]:not([data-asset-flow="form"]) .add-v2-footer {
     display: none;
   }
+  /* ADD-ASSET-MOBILE-COMPACT-1 — the footer is now IN-FLOW (position:static), superseding the
+     sticky treatment of ADD-ASSET-MOBILE-FOOTER-1. With the ISIN + filters removed from the
+     selected state the whole card fits without scroll, so a sticky bar bought nothing and
+     produced exactly the fragmented composition reported: content sliding behind a pinned strip.
+     "Valor estimado" + CTA now close the card as the last elements of the natural flow. The
+     opaque surface, hairline top border and safe-area padding are kept (they still separate the
+     action zone); the drop shadow and backdrop blur are dropped because they only ever existed to
+     sell a floating layer that no longer floats. */
   .modal[data-mode="asset"] .add-v2-footer {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    position: sticky;
-    bottom: 0;
-    z-index: 3;
+    position: static;
     margin-top: 4px;
-    padding: 12px 0 calc(4px + env(safe-area-inset-bottom));
+    padding: 10px 0 calc(4px + env(safe-area-inset-bottom));
     background: rgba(5,7,13,0.96);
     border-top: 1px solid rgba(255,255,255,0.06);
-    box-shadow: 0 -8px 24px -14px rgba(0,0,0,0.6);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
   }
   /* Inside the footer the estimated-value chip and CTA are static (the footer owns the
      sticky/background); the CTA drops its base gradient + sticky so there is no double layer. */
@@ -24023,4 +24026,39 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   [contenteditable]:not([contenteditable="false"]) {
     font-size: 16px !important;
   }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   ADD-ASSET-MOBILE-COMPACT-1 · P1 — mobile Add Asset: compact selected-asset card
+   ════════════════════════════════════════════════════════════════════════════
+   ROOT CAUSE: the "hide the search-only controls once an asset is selected" rule already existed
+   — but it lives inside `@media (min-width: 901px)` (the SPEC 64 desktop two-column block), so it
+   never applied on phones. On mobile the ISIN toggle stayed visible at the TOP of the sheet with
+   an asset already chosen, and the search filters sat between the header and the asset card. Both
+   are search-phase UI with no purpose in the form phase, and together they pushed the card down
+   and made the body overflow (measured at 390×844: content 528px in a 517px body).
+
+   OWNER: the existing `data-asset-flow` state on the sheet (set by _updateSearchEmptyHint;
+   "form" ⇔ an asset is selected). No new state, no second modal, no JS, no markup change — the
+   same attribute the desktop block already keys off. Clearing the chip flips it back to
+   search/idle, so everything below reappears automatically.
+
+   Filters are hidden alongside ISIN because the SPEC fixes the exact order for the selected
+   state (header → asset card → cantidad → precio → custodio → valor estimado → CTA); leaving the
+   filter row between the header and the card would break that order, and it is the same class of
+   search-only control. Functionality is untouched — only visibility, only in the form phase.
+   ════════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* ── ESTADO B · activo seleccionado ─────────────────────────────────────── */
+  /* display:none (not visibility/opacity) so NO reserved space survives — the flex column's
+     `gap` collapses with the box, which is what removes the hole under the header. */
+  .modal[data-mode="asset"][data-asset-flow="form"] #isinOrWrap,
+  .modal[data-mode="asset"][data-asset-flow="form"] .isin-toggle-mobile,
+  .modal[data-mode="asset"][data-asset-flow="form"] .search-filters { display: none !important; }
+
+  /* Vertical compaction — ONLY slack. No typography, input height or touch target is reduced. */
+  .modal[data-mode="asset"][data-asset-flow="form"] #assetForm.modal-body { padding-top: 10px; }
+  .modal[data-mode="asset"][data-asset-flow="form"] #qtyGroup { margin-bottom: 8px; }
+  .modal[data-mode="asset"][data-asset-flow="form"] .wl-loc-field { margin-top: 6px; padding-top: 6px; }
+  .modal[data-mode="asset"][data-asset-flow="form"] .add-v2-footer .form-preview { margin-bottom: 8px; }
 }
