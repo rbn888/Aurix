@@ -22,28 +22,49 @@ ok('1 --text-bright lifted to ~0.985 (was 0.94) — top tier reads clean, hierar
    /--text-bright: rgba\(255,255,255,0\.985\);\s*\/\* AURIX-VISUAL-CLARITY-1/.test(css));
 
 console.log('\nLevel-2 — secondary readable "without effort":');
-ok('2 --aurix-text-secondary lifted 0.62 → 0.68 (low-brightness/OLED legibility, still below primary)',
-   /--aurix-text-secondary: rgba\(255, 255, 255, 0\.68\);\s*\/\* AURIX-VISUAL-CLARITY-1/.test(css));
+// VISUAL-POLISH-V1 evolves this token further (0.68 → 0.73). The INVARIANT is unchanged and is
+// what is asserted: secondary keeps rising (never lowered) and stays below the primary tier.
+ok('2 --aurix-text-secondary lifted 0.62 → 0.68 → 0.73 (sube siempre, nunca baja; sigue bajo el tier primario)', (function () {
+  const m = /--aurix-text-secondary: rgba\(255, 255, 255, (0\.\d+)\);/.exec(css);
+  return !!m && parseFloat(m[1]) >= 0.68 && parseFloat(m[1]) < 0.92;
+})());
 
 console.log('\nLevel-4 — card edges hold separation at low brightness (depth without heavier shadows):');
-ok('3 --color-border-subtle 0.06 → 0.08',
-   /--color-border-subtle:  rgba\(255, 255, 255, 0\.08\);\s*\/\* AURIX-VISUAL-CLARITY-1/.test(css));
-ok('4 --border-subtle alias kept in step at 0.08',
-   /--border-subtle: rgba\(255,255,255,0\.08\);\s*\/\* AURIX-VISUAL-CLARITY-1/.test(css));
+// VISUAL-POLISH-V1: 0.08 → 0.10, y su alias --border-subtle se mueve con él. Invariante: el borde
+// nunca se debilita (>= 0.08) y ambos permanecen SINCRONIZADOS (si divergen, dos tarjetas idénticas
+// se dibujarían con bordes distintos).
+ok('3 --color-border-subtle >= 0.08 y sincronizado con su alias --border-subtle', (function () {
+  const a = /--color-border-subtle:\s*rgba\(255, 255, 255, (0\.\d+)\);/.exec(css);
+  const b = /--border-subtle: rgba\(255,255,255,(0\.\d+)\);/.exec(css);
+  return !!a && !!b && parseFloat(a[1]) >= 0.08 && parseFloat(a[1]) === parseFloat(b[1]);
+})());
+// VISUAL-POLISH-V1: 0.08 → 0.10 (thin but visible card edge). Invariant: never below 0.08.
+ok('4 --border-subtle mantiene o mejora la separación de borde (>= 0.08)', (function () {
+  const m = /--border-subtle: rgba\(255,255,255,(0\.\d+)\);/.exec(css);
+  return !!m && parseFloat(m[1]) >= 0.08;
+})());
 
 console.log('\nGlobal & device parity — all four tokens are in :root (one hierarchy on every device):');
 ok('5 tokens declared inside the :root design-system block (not behind a media query)', (function () {
   const r = css.indexOf(':root {'); const end = css.indexOf('\n}', r);
   const block = css.slice(r, end);
-  return ['--text-bright: rgba(255,255,255,0.985)', '--color-border-subtle:  rgba(255, 255, 255, 0.08)',
-          '--border-subtle: rgba(255,255,255,0.08)', '--aurix-text-secondary: rgba(255, 255, 255, 0.68)']
+  // VISUAL-POLISH-V1: se comprueba la INTENCIÓN (los cuatro tokens viven en :root, no tras una
+  // media query, para que la jerarquía sea idéntica en todos los dispositivos), no sus literales,
+  // que este SPEC evoluciona deliberadamente.
+  return ['--text-bright:', '--color-border-subtle:', '--border-subtle:', '--aurix-text-secondary:']
           .every(t => block.indexOf(t) !== -1);
 })());
 
 console.log('\nDo NOT brighten the UI / preserve identity (palette + dark bg + brand blue unchanged):');
-ok('6 brand blue, success, danger, dark backgrounds untouched',
+// VISUAL-POLISH-V1 deliberately lifts the dark bases (still very dark, same hue family). The BRAND
+// colours remain the thing that must never drift — that is what stays pinned literally.
+ok('6 brand blue, success y danger intactos; las bases siguen siendo muy oscuras',
    /--aurix-blue:\s*#4A82F0;/.test(css) && /--aurix-success:\s*#3fbf7f;/.test(css) &&
-   /--aurix-danger:\s*#e05a5a;/.test(css) && /--bg-main:\s*#0B0F1A;/.test(css) && /--bg:\s*#05070f;/.test(css));
+   /--aurix-danger:\s*#e05a5a;/.test(css) && (function () {
+     const lum = h => { const n = parseInt(h.slice(1), 16); return (((n>>16)&255)*0.299 + ((n>>8)&255)*0.587 + (n&255)*0.114); };
+     const bm = /--bg-main:\s*(#[0-9A-Fa-f]{6});/.exec(css), bg = /--bg:\s*(#[0-9A-Fa-f]{6});/.exec(css);
+     return bm && bg && lum(bm[1]) < 32 && lum(bg[1]) < 32;   // siguen siendo casi negras
+   })());
 ok('7 body text token --text unchanged (#e6e6e8) — only the TOP tier was crisped, UI not brightened',
    /--text:\s*#e6e6e8;/.test(css));
 

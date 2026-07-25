@@ -133,7 +133,7 @@ ok('18 C: empty CTA collapses off the form sub-state (display:none)',
 //     `.modal-cta` onto its wrapping action footer `.add-v2-footer` (which contains the CTA);
 //     the contract (solid CTA surface in the selected-asset flow) is unchanged.
 ok('19 C: CTA preserved for the form sub-state (solid action-footer surface intact)',
-  /\.modal\[data-mode="asset"\] \.add-v2-footer\s*\{[^}]*background:\s*rgba\(5,7,13,0\.96\)/.test(css));
+  /\.modal\[data-mode="asset"\] \.add-v2-footer\s*\{[^}]*background:\s*rgba\(8,12,22,0\.96\)/.test(css));
 
 // 20. Scope guard: Real Estate + Cash + desktop remain excluded by the SPEC 63 rules
 //     (no data-mode="real_estate", no #liquidityOverlay in the flow/CTA additions).

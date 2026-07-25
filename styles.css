@@ -29,11 +29,11 @@ select:focus-visible {
 }
 
 :root {
-  --bg:          #05070f;
-  --bg-card:     #1a1a1a;
-  --bg-card-2:   #212121;
-  --border:      #272727;
-  --border-hi:   #303030;
+  --bg:          #080C16;
+  --bg-card:     #171C28;
+  --bg-card-2:   #1D2330;
+  --border:      #2B3140;
+  --border-hi:   #394154;
   --accent:      var(--aurix-blue);  /* AURIX-DESIGN-SYSTEM-1: legacy accent → canonical blue */
   --accent-dim:  #1a2438;
   --green:       var(--aurix-success);
@@ -43,7 +43,7 @@ select:focus-visible {
   --text:        #e6e6e8;
   --text-bright: rgba(255,255,255,0.985);  /* AURIX-VISUAL-CLARITY-1: Level-1 crispness — the top tier (key numbers/emphasis) reads truly clean so the hierarchy gap below it widens, without brightening the UI overall */
   --text-muted:  #b0b4bd;  /* AURIX-DASH-V1: was #a0a0a0 — lift secondary text toward soft white for low-brightness legibility */
-  --text-dim:    #686c75;  /* AURIX-DASH-V1: was #484848 — tertiary (dates/prices/inactive) now readable, not near-invisible */
+  --text-dim:    #7C8393;  /* AURIX-DASH-V1: was #484848 — tertiary (dates/prices/inactive) now readable, not near-invisible */
   --radius:      12px;
   --radius-sm:   8px;
   --radius-xs:   6px;
@@ -78,12 +78,12 @@ select:focus-visible {
   --aurix-danger:       #e05a5a;
   --aurix-warning:      #e9a857;
 
-  --aurix-bg:           #070a14;
-  --aurix-card:         #11161f;
+  --aurix-bg:           #0A0E1A;
+  --aurix-card:         #171C28;
   --aurix-border:       var(--aurix-blue-border);
 
   --aurix-text:           rgba(255, 255, 255, 0.92);
-  --aurix-text-secondary: rgba(255, 255, 255, 0.68);  /* AURIX-VISUAL-CLARITY-1: Level-2 secondary reads "without effort" at low brightness/OLED; still clearly below the primary tier */
+  --aurix-text-secondary: rgba(255, 255, 255, 0.73);  /* AURIX-VISUAL-CLARITY-1: Level-2 secondary reads "without effort" at low brightness/OLED; still clearly below the primary tier */
 
   /* Legacy blue alias → canonical (the cyan #2bc8f2 is retired; do not assign
      new literals to --aurix-blue-light). */
@@ -126,8 +126,8 @@ select:focus-visible {
   --color-bg-elevated:  var(--bg-card-2);
 
   /* Borders — exact matches present in CSS */
-  --color-border-subtle:  rgba(255, 255, 255, 0.08);  /* AURIX-VISUAL-CLARITY-1: Level-4 card edges hold their separation at 20–50% brightness / OLED (was 0.06 → vanished); still a hairline at full brightness — depth without heavier shadows */
-  --color-border-default: rgba(255, 255, 255, 0.10);
+  --color-border-subtle:  rgba(255, 255, 255, 0.10);  /* AURIX-VISUAL-CLARITY-1: Level-4 card edges hold their separation at 20–50% brightness / OLED (was 0.06 → vanished); still a hairline at full brightness — depth without heavier shadows */
+  --color-border-default: rgba(255, 255, 255, 0.13);
 
   /* Text */
   --color-text-primary:   #FFFFFF;
@@ -139,12 +139,12 @@ select:focus-visible {
   --color-negative: var(--aurix-danger);
 
   /* ── Visual system ── */
-  --bg-main:    #0B0F1A;
-  --surface-1:  rgba(255,255,255,0.03);
-  --surface-2:  rgba(255,255,255,0.05);
-  --surface-3:  rgba(255,255,255,0.08);
-  --border-subtle: rgba(255,255,255,0.08);  /* AURIX-VISUAL-CLARITY-1: kept in step with --color-border-subtle (0.06→0.08) — card edge separation at low brightness */
-  --border-strong: rgba(255,255,255,0.10);  /* alias of --color-border-default */
+  --bg-main:    #0E131F;
+  --surface-1:  rgba(255,255,255,0.040);
+  --surface-2:  rgba(255,255,255,0.065);
+  --surface-3:  rgba(255,255,255,0.095);
+  --border-subtle: rgba(255,255,255,0.10);  /* VISUAL-POLISH-V1: kept in step with --color-border-subtle (0.06→0.08→0.10) — borde fino visible */
+  --border-strong: rgba(255,255,255,0.13);  /* alias of --color-border-default */
   --accent:        var(--aurix-blue);  /* AURIX-DESIGN-SYSTEM-1: legacy accent → canonical blue */
   --text-primary:  #FFFFFF;
   --text-secondary: rgba(255,255,255,0.7);
@@ -353,7 +353,7 @@ button[aria-busy="true"] {
 }
 
 .header--scrolled {
-  background: rgba(11,15,26,0.80);
+  background: rgba(14,19,31,0.80);
   /* AURIX-BRAND-PREMIUM-1: deeper, less-saturated glass reads more refined and
      "expensive" than an oversaturated blur — same darkness, calmer colour. */
   backdrop-filter: blur(24px) saturate(120%);
@@ -2765,7 +2765,7 @@ body.modal-open {
     position: static;
     margin-top: 4px;
     padding: 10px 0 calc(4px + env(safe-area-inset-bottom));
-    background: rgba(5,7,13,0.96);
+    background: rgba(8,12,22,0.96);
     border-top: 1px solid rgba(255,255,255,0.06);
   }
   /* Inside the footer the estimated-value chip and CTA are static (the footer owns the
@@ -2831,9 +2831,9 @@ body.modal-open {
   z-index: 2;
   background: linear-gradient(
     to top,
-    rgba(5,7,13,0.95),
-    rgba(5,7,13,0.7),
-    rgba(5,7,13,0)
+    rgba(8,12,22,0.95),
+    rgba(8,12,22,0.7),
+    rgba(8,12,22,0)
   );
 }
 .modal-cta button {
@@ -4822,7 +4822,7 @@ body:not(.hero-active) #orb-canvas {
        between the header and the Total Value card (clean premium separation
        kept via the card's own top margin). */
     margin-bottom: 4px;
-    background: rgba(11, 15, 26, 0.72);
+    background: rgba(14,19,31, 0.72);
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
     /* SPEC MOBILE-ABOVE-THE-FOLD-COMPRESSION — remove the static header divider
@@ -7343,7 +7343,7 @@ main { padding-bottom: 72px; }
   display: flex;
   justify-content: space-around;
   align-items: center;
-  background: rgba(5,7,13,0.6);
+  background: rgba(8,12,22,0.6);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   border-top: 1px solid var(--color-border-subtle);
@@ -12329,13 +12329,13 @@ body.workspace-active .header {
   .header {
     padding-top: var(--space-4);
     padding-bottom: var(--space-3);
-    background: rgba(11, 15, 26, 0.62);
+    background: rgba(14,19,31, 0.62);
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   }
   .header.header--scrolled {
-    background: rgba(11, 15, 26, 0.9);
+    background: rgba(14,19,31, 0.9);
     border-bottom-color: rgba(255, 255, 255, 0.07);
     /* AURIX-BRAND-PREMIUM-HEADER-2 (B2): consistent premium glass with the
        base scrolled state — inner light + faint blue hairline + soft depth. */
@@ -23822,7 +23822,7 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
    ──────────────────────────────────────────────────────────────────────────
    OWNER of the black bar: `.modal[data-mode="asset"] .modal-cta` (styles.css
    ~2733, @media ≤768) — a position:sticky footer with a SOLID background
-   (rgba(5,7,13,0.96)) + border-top + padding. In the SEARCH step its only
+   (rgba(8,12,22,0.96)) + border-top + padding. In the SEARCH step its only
    children (#btnSubmitAsset, #goldCtaSummary) are hidden, so it renders as an
    empty black rectangle below the content. It only becomes meaningful once an
    asset is selected (the "form" sub-state) and the submit button appears.
