@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '587'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '588'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -46965,8 +46965,10 @@ function _aurixSearchTypeWeight(a) {
   // so it must lead its own query instead of losing to any ticker that merely starts with
   // "GOLD". It cannot distort other queries because it never appears in them.
   if (t === 'metal') return 200;
-  if (t === 'etf' || t === 'fund') return 15;
-  if (t === 'stock' || t === 'crypto') return 10;
+  // Every other investable type is EQUAL. An earlier revision preferred etf/fund over stock;
+  // checked against live provider data that demoted BLK (BlackRock, Inc.) below two obscure
+  // 0P* fund codes for the query "BlackRock" — the company IS the expected answer. Ties fall
+  // back to the provider's own order, which is better than an arbitrary type preference.
   return 0;
 }
 function _aurixSearchProviderWeight(a) {
