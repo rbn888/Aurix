@@ -47,7 +47,12 @@ export default async function handler(req, res) {
   const now = Date.now();
   const windowMax = now - DELAY_MS;                    // first access must be ≥30 min ago
   const html = fs.readFileSync(path.join(process.cwd(), 'email', 'aurix-welcome.html'), 'utf8');
-  const text = 'Welcome to Aurix.\n\nThank you for joining us.\nToday marks the beginning of your journey with Aurix.\n\nThe Aurix Team';
+  // Plain-text alternative — kept in step with email/aurix-welcome.html (same copy, same CTA).
+  const text = 'Welcome to Aurix.\n\nThank you for joining us. Your journey with Aurix begins today.\n\n'
+    + 'Our mission is simple: help you understand, organize and grow your wealth from one private, intelligent platform.\n\n'
+    + 'Track your stocks, ETFs, funds, crypto, precious metals, real estate and cash — all in one place.\n\n'
+    + 'This is only the beginning: new intelligence and financial tools are coming over the next months.\n\n'
+    + 'Enter Aurix: https://app.aurixsystem.io\n\nThe Aurix Team';
 
   const stats = { scanned: 0, eligible: 0, sent: 0, skipped_duplicate: 0, skipped_invalid: 0, failed: 0, dry };
   try {
