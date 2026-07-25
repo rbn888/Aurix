@@ -45,12 +45,23 @@ export function ctaBlock(text, url, fallbackUrl) {
 // The OTP verification code as the hero: large, letter-spaced, high-contrast, on an elevated
 // blue-tinted plate, comfortably selectable. NO buttons, NO links (never leave the auth flow).
 // `codeHtml` is the code string OR a provider variable literal (e.g. Supabase `{{ .Token }}`).
+// P0 — the code must NEVER split across lines, in any mobile client. A numeric code is one
+// unbreakable word, so a desktop browser overflows rather than wraps; but Gmail (mobile app and
+// web) and other clients inject word-break/overflow-wrap on content that reaches the edge, and
+// that is what splits it. Two independent defences, because either alone can be defeated:
+//   1. white-space:nowrap — inline, so it outranks an injected class rule and forbids the break.
+//   2. real headroom — at 40px/10px tracking an 8-digit code measured 282px inside a 292px plate
+//      on a 320px viewport: ~10px of slack, i.e. one wider font metric away from touching the
+//      edge and triggering that injection. 34px/6px measures ~217px, leaving ~80px.
+// 34px bold with 6px tracking keeps the code the unmistakable hero of the email. Plate padding
+// trimmed 16px→12px for a little extra width. text-indent offsets the trailing letter-spacing so
+// the code stays optically centred.
 export function otpCodeBlock(codeHtml) {
   return `<tr>
             <td class="aurix-pad" align="center" style="padding:24px 40px 30px 40px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr><td align="center" style="background:#0C1424; border:1px solid rgba(38,132,255,0.45); border-radius:12px; padding:24px 16px;">
-                  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Courier New',monospace; font-size:40px; line-height:1.1; font-weight:800; letter-spacing:10px; color:#FFFFFF; text-indent:10px;">${codeHtml}</div>
+                <tr><td align="center" style="background:#0C1424; border:1px solid rgba(38,132,255,0.45); border-radius:12px; padding:24px 12px;">
+                  <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Courier New',monospace; font-size:34px; line-height:1.15; font-weight:800; letter-spacing:6px; color:#FFFFFF; text-indent:6px; white-space:nowrap; word-break:keep-all; overflow-wrap:normal;">${codeHtml}</div>
                 </td></tr>
               </table>
             </td>
@@ -96,21 +107,25 @@ export function renderOtpEmail(codeVar = '{{ .Token }}') {
 }
 
 // One-time welcome (sent ~30 min after a NEW user's first successful access).
+// Tightened to 4 paragraphs / ~60 words (was 7 / ~95, −37%) so it reads in seconds with the same
+// message, and given the primary CTA it previously lacked — the reader had nowhere to go.
+// NO unsubscribe and no "you joined the waitlist" line: this is TRANSACTIONAL, triggered by the
+// user's own registration, not an opt-in campaign — and the waitlist sentence was simply untrue for
+// someone who just signed up. The launch campaign keeps marketingFooter(), which is where the
+// reason + one-click unsubscribe genuinely belong. `unsubscribeUrl` stays in the signature so the
+// existing call sites keep working unchanged.
 export function renderWelcomeEmail(unsubscribeUrl = 'mailto:unsubscribe@aurixsystem.io?subject=unsubscribe') {
   return renderEmail({
     preheader: 'Thank you for joining us. Your journey starts today.',
     title: 'Welcome to Aurix.',
     bodyParas: [
-      'Thank you for joining us.',
-      'Today marks the beginning of your journey with Aurix.',
-      'Our mission is simple: to help you understand, organize and grow your wealth from one private, intelligent platform.',
-      'From today, you can track your stocks, ETFs, funds, crypto, precious metals, real estate, cash and more—all in one place.',
-      'This is only the beginning.',
-      'Over the coming months, Aurix will continue to evolve with new intelligence capabilities, financial tools and features designed to help you make better financial decisions.',
-      "We're grateful to have you with us from the very beginning.",
+      'Thank you for joining us. Your journey with Aurix begins today.',
+      'Our mission is simple: help you understand, organize and grow your wealth from one private, intelligent platform.',
+      'Track your stocks, ETFs, funds, crypto, precious metals, real estate and cash — all in one place.',
+      'This is only the beginning: new intelligence and financial tools are coming over the next months.',
     ],
-    actionBlock: '',
-    closing: 'Welcome to Aurix.',
-    footerNote: marketingFooter(unsubscribeUrl),
+    actionBlock: ctaBlock('Enter Aurix →', 'https://app.aurixsystem.io', 'https://app.aurixsystem.io'),
+    closing: '',                 // the duplicate "Welcome to Aurix." right above the footer is gone (it repeated the title)
+    footerNote: '',              // transactional → minimal corporate footer, NO unsubscribe
   });
 }
