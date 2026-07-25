@@ -148,10 +148,12 @@ ok('3.7 calidad de proveedor: catálogo curado > hit de proveedor > local',
    call('_aurixSearchProviderWeight', { isin: 'IE00B03HD191', manager: 'Vanguard' })
    > call('_aurixSearchProviderWeight', { marketSymbol: 'VOO' })
    && call('_aurixSearchProviderWeight', { marketSymbol: 'VOO' }) > call('_aurixSearchProviderWeight', {}));
-ok('3.8 tipo: índice penalizado, ETF/fondo favorecido',
-   call('_aurixSearchTypeWeight', { type: 'index' }) < 0
-   && call('_aurixSearchTypeWeight', { type: 'etf' }) > call('_aurixSearchTypeWeight', { type: 'stock' })
-   && call('_aurixSearchTypeWeight', { type: 'index' }) <= -1000);
+// El índice se penaliza un tier COMPLETO; el resto de tipos invertibles son IGUALES entre sí
+// (preferir etf/fondo sobre acción hundía BLK bajo códigos 0P* en datos reales).
+ok('3.8 tipo: índice penalizado un tier completo; el resto, neutral',
+   call('_aurixSearchTypeWeight', { type: 'index' }) <= -1000
+   && call('_aurixSearchTypeWeight', { type: 'etf' }) === call('_aurixSearchTypeWeight', { type: 'stock' })
+   && call('_aurixSearchTypeWeight', { type: 'metal' }) > 0);
 
 // ── 4 estabilidad y conservación del conjunto ────────────────────────────────
 console.log('\n4 — estabilidad:');
