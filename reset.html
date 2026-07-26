@@ -2,6 +2,20 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <!-- SECURITY-HARDENING-V1 · credential-entry page: strictest policy of the set.
+       No remote images, no API calls beyond Supabase Auth, no framing allowed. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; manifest-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://ozcasyufbknnuemllwso.supabase.co wss://ozcasyufbknnuemllwso.supabase.co">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <script>
+    // SECURITY-HARDENING-V1 · clickjacking guard (password entry must never be framed).
+    (function () {
+      try {
+        if (window.top === window.self) return;
+        try { window.top.location = window.self.location; }
+        catch (_) { document.documentElement.style.display = 'none'; }
+      } catch (_) {}
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <!-- RESET-CANONICAL-1: canonical password reset entrypoint. -->
   <!-- AURIX-APP-DOMAIN-READY-1: no <base href> — relative links work under

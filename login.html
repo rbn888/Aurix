@@ -2,6 +2,26 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <!-- ══ SECURITY-HARDENING-V1 · owner: login.html <head> ═════════════════════════
+       Same rationale as index.html (GitHub Pages cannot send response headers), but
+       the access page has a strictly smaller surface: no remote images at all, and
+       the only third parties are jsDelivr (supabase-js) and Google Fonts. Keeping
+       this policy separate from the app shell is deliberate — the auth page must not
+       inherit the app's wider image/API allow-list. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; manifest-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://isa-portfolio-ten.vercel.app https://ozcasyufbknnuemllwso.supabase.co wss://ozcasyufbknnuemllwso.supabase.co">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <script>
+    // SECURITY-HARDENING-V1 · clickjacking guard. The access page is the highest-value
+    // framing target (OTP entry), and neither X-Frame-Options nor CSP frame-ancestors is
+    // available on GitHub Pages / in a <meta> CSP. No effect when not framed.
+    (function () {
+      try {
+        if (window.top === window.self) return;
+        try { window.top.location = window.self.location; }
+        catch (_) { document.documentElement.style.display = 'none'; }
+      } catch (_) {}
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <!-- AURIX-APP-DOMAIN-READY-1: no <base href> — relative links work under
        /Aurix/ (GitHub Pages) and at the root custom domain. -->
@@ -324,6 +344,22 @@
           if (typeof s !== 'string') return '';
           return s.length > n ? s.slice(0, n) : s;
         }
+        // SECURITY-HARDENING-V1 · outbound redaction, identical contract to the app.js
+        // reporter. It matters MORE here: this page handles the email + the OTP, so an
+        // error string that interpolates either one must never leave the device.
+        const RX_JWT    = /\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/g;
+        const RX_BEARER = /\b[Bb]earer\s+[A-Za-z0-9._-]+/g;
+        const RX_EMAIL  = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+        const RX_TOKEN  = /\b[A-Za-z0-9_-]{28,}\b/g;
+        function redact(s) {
+          if (typeof s !== 'string') return '';
+          try {
+            return s.replace(RX_JWT, '[redacted]')
+                    .replace(RX_BEARER, '[redacted]')
+                    .replace(RX_EMAIL, '[redacted]')
+                    .replace(RX_TOKEN, '[redacted]');
+          } catch (_) { return s; }
+        }
         function send(kind, msg, stack) {
           try {
             if (navigator.onLine === false) return;
@@ -336,8 +372,8 @@
               build: window.AURIX_BUILD || '',
               ts:    Date.now(),
               kind:  kind || 'unknown',
-              msg:   trim(msg, 500),
-              stack: trim(stack, 1500),
+              msg:   redact(trim(msg, 500)),
+              stack: redact(trim(stack, 1500)),
               path:  trim(location.pathname, 200),
               ua:    trim(navigator.userAgent, 300),
             };
@@ -419,7 +455,7 @@
     // redirect breaker / pending-login state, or corrupt Supabase auth storage. These are read-only
     // diagnostics + narrowly-scoped self-heal. They NEVER touch portfolio / holdings / chart / history
     // data and NEVER log a secret. app.js already exposes aurixClearAuthRedirectState for the app page.
-    var AURIX_LOGIN_BUILD = 486;   // bumped ONLY when login.html changes (see version.json.loginhtml)
+    var AURIX_LOGIN_BUILD = 487;   // bumped ONLY when login.html changes (see version.json.loginhtml)
     function _storageAvailable() {
       try { var k = '__aurix_probe__'; localStorage.setItem(k, '1'); localStorage.removeItem(k); return true; } catch (_) { return false; }
     }

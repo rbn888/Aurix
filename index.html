@@ -5,6 +5,42 @@
 <html lang="es" style="background:#0A0E1A">
 <head>
   <meta charset="UTF-8">
+  <!-- ══ SECURITY-HARDENING-V1 · owner: index.html <head> ═════════════════════════
+       The app is published by GitHub Pages, which does NOT allow custom response
+       headers, so the transport-level policy has to travel INSIDE the document.
+       This is the single CSP owner for the app shell: every allowed origin below is
+       one that the shipped bundle actually uses (verified by
+       docs/AURIX-SECURITY-BASELINE-harness.js, which fails the deploy gate if any
+       shipped URL falls outside this allow-list).
+         · script-src  → jsDelivr only (chart.js, lightweight-charts, supabase-js).
+                         'unsafe-inline' is REQUIRED (the shell boots from inline
+                         scripts); no 'unsafe-eval' — nothing in the bundle evals.
+         · connect-src → own origin + Aurix API + Supabase (https + wss realtime).
+                         This is the directive that closes the data-exfiltration path.
+         · img-src     → CoinGecko / jsDelivr crypto icons / FMP stock logos only.
+                         A blocked logo degrades to the designed premium fallback
+                         (_aurixIconImgError), never to a broken UI.
+         · object-src / frame-src 'none', base-uri + form-action 'self' → kill plugin
+                         embedding, framing, <base> hijack and form re-targeting.
+       frame-ancestors / X-Frame-Options are IGNORED in a <meta> CSP, so clickjacking
+       is covered by the frame guard script below instead. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; manifest-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://*.coingecko.com https://cdn.jsdelivr.net https://financialmodelingprep.com; connect-src 'self' https://isa-portfolio-ten.vercel.app https://ozcasyufbknnuemllwso.supabase.co wss://ozcasyufbknnuemllwso.supabase.co">
+  <!-- Never leak the full app URL (path/query) to a third-party origin; same-origin
+       navigation keeps the full referrer, so nothing internal changes. -->
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <script>
+    // SECURITY-HARDENING-V1 · clickjacking guard (single owner, runs before anything paints).
+    // GitHub Pages cannot send X-Frame-Options and a <meta> CSP cannot carry frame-ancestors,
+    // so framing is refused here. Zero effect for every real user: the app is never legitimately
+    // embedded (no iframe exists in the product) and a PWA / in-app WebView is top-level, not a frame.
+    (function () {
+      try {
+        if (window.top === window.self) return;              // normal case — do nothing at all
+        try { window.top.location = window.self.location; }  // same-origin-ish: break out
+        catch (_) { document.documentElement.style.display = 'none'; }  // cross-origin: refuse to render
+      } catch (_) {}
+    })();
+  </script>
   <!-- P0 BOOT-CHECK: discourage stale-HTML caching on mobile (Safari/PWA). The real
        cache-bust is the per-asset ?v= query + the never-cached /boot-check.html. -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -66,8 +102,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v605-email-domain-validation';
-      var APPJS_V = '588';
+      var BUILD = 'v606-security-hardening-v1';
+      var APPJS_V = '589';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -1462,7 +1498,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=588"
+  <script src="app.js?v=589"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).

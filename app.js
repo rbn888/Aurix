@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '588'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '589'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -919,6 +919,29 @@ function _persistDebug(tag, data) {
       return s.length > n ? s.slice(0, n) : s;
     }
 
+    // SECURITY-HARDENING-V1 · outbound redaction. The payload contract was already
+    // narrow BY CONSTRUCTION (no portfolio, no session objects), but `msg` and `stack`
+    // are the two fields the app does not author: they come from whatever a thrown
+    // Error or a rejected promise happened to interpolate, so a future `throw new
+    // Error('sync failed for ' + email)` would ship a real identifier off-device.
+    // This closes that class of leak at the exit point instead of trusting every
+    // future throw site. Same pattern the diagnostics-share layer already applies.
+    const RX_JWT    = /\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/g;
+    const RX_BEARER = /\b[Bb]earer\s+[A-Za-z0-9._-]+/g;
+    const RX_EMAIL  = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+    const RX_MONEY  = /[$€£¥]\s?\d[\d.,]*|\b\d[\d.,]*\s?(?:€|EUR|USD|GBP)\b/gi;
+    const RX_TOKEN  = /\b[A-Za-z0-9_-]{28,}\b/g;
+    function redact(s) {
+      if (typeof s !== 'string') return '';
+      try {
+        return s.replace(RX_JWT, '[redacted]')
+                .replace(RX_BEARER, '[redacted]')
+                .replace(RX_EMAIL, '[redacted]')
+                .replace(RX_MONEY, '[redacted]')
+                .replace(RX_TOKEN, '[redacted]');
+      } catch (_) { return s; }
+    }
+
     function send(kind, msg, stack, endpoint) {
       try {
         // Skip while offline — the worst case is silent loss, but the
@@ -934,8 +957,8 @@ function _persistDebug(tag, data) {
           build: (typeof window !== 'undefined' && window.AURIX_BUILD) || '',
           ts:    Date.now(),
           kind:  kind || 'unknown',
-          msg:   trim(msg, MAX_MSG),
-          stack: trim(stack, MAX_STACK),
+          msg:   redact(trim(msg, MAX_MSG)),
+          stack: redact(trim(stack, MAX_STACK)),
           path:  trim(location.pathname, 200),
           ua:    trim(navigator.userAgent, MAX_UA),
         };
@@ -11096,6 +11119,15 @@ function _aurixGuardSnapshot(next, prevValid, surface) {
       deltaPct: res.details && res.details.deltaPct,
       when: Number.isFinite(next.ts) ? new Date(next.ts).toISOString() : null };
     _aurixPushRejected(rec);
+    // SECURITY-HARDENING-V1 · console hygiene. `rec` carries the user's net worth
+    // (total / investable / previousTotal). It stays intact in the in-memory rejected
+    // ring (read on demand via the opt-in debugAurix* helpers), but what gets WRITTEN
+    // to the production console is this value-free projection: the guard reason, the
+    // surface, the timestamp and the relative delta are everything a diagnosis needs,
+    // and none of them is a monetary amount. Kills the "user shares a console
+    // screenshot / recording" leak path without losing a single diagnostic signal.
+    const recSafe = { reason: rec.reason, surface: rec.surface, ts: rec.ts,
+      deltaPct: rec.deltaPct, when: rec.when };
     // P0-SNAPSHOT-GUARD-PARITY-FIX — a device-relative suspicious move is QUARANTINED, never dropped:
     // the point is ALLOWED into local history (and therefore synced to the shared canonical store), so
     // web and mobile converge to the same series. The shared canonical history (union-by-ts merge +
@@ -11104,11 +11136,11 @@ function _aurixGuardSnapshot(next, prevValid, surface) {
     if (_AURIX_GUARD_QUARANTINE_REASONS[res.reason]) {
       try { _aurixGuardTelemetry.snapshotQuarantined++; _aurixGuardTelemetry.lastQuarantineReason = res.reason; _aurixGuardTelemetry.lastQuarantineTs = next.ts; } catch (_) {}
       try { if (next && typeof next === 'object') next.suspect = true; } catch (_) {}   // quarantine marker (informational)
-      try { console.warn('[AURIX][snapshot-guard] quarantined (kept + synced, not dropped — canonical decides)', rec); } catch (_) {}
+      try { console.warn('[AURIX][snapshot-guard] quarantined (kept + synced, not dropped — canonical decides)', recSafe); } catch (_) {}
       return false;   // allow the write so the shared history can reconcile it
     }
     try { _aurixGuardTelemetry.snapshotRejected++; _aurixGuardTelemetry.lastRejectReason = res.reason; _aurixGuardTelemetry.lastRejectTs = next.ts; } catch (_) {}
-    try { console.warn('[AURIX][snapshot-guard] rejected (corruption/incomplete data — dropped)', rec); } catch (_) {}
+    try { console.warn('[AURIX][snapshot-guard] rejected (corruption/incomplete data — dropped)', recSafe); } catch (_) {}
     return true;
   }
   if (typeof window !== 'undefined' && window.AURIX_DEBUG_SNAPSHOTS === true) {
