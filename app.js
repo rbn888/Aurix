@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '590'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '591'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -42590,6 +42590,9 @@ function renderMarket() {
       const sortBtn = e.target.closest('[data-mkt-sort]');
       if (sortBtn) {
         e.stopPropagation();
+        // §6 — una ordenación sin datos que la sustenten no se puede activar por
+        // ningún camino (ratón o teclado): si no hay marketCap, no hay orden por cap.
+        if (sortBtn.disabled || sortBtn.getAttribute('aria-disabled') === 'true') return;
         const sb = sortBtn.dataset.mktSort;
         const menu = document.getElementById('mktSortMenu');
         if (menu) menu.hidden = true;
@@ -42767,8 +42770,7 @@ function renderMyAssetsBlock(data) {
         if (b.price !== a.price) return (b.price || 0) - (a.price || 0);
         return a.symbol.localeCompare(b.symbol);
       });
-  const perfHeader = _aurixMktExpFlag() ? _aurixMktTimeframe : t('marketCol24h');
-  const tableHeader = `<div class="market-table-header"><div>${t('marketColAsset')}</div><div>${t('marketColPrice')}</div><div>${perfHeader}</div><div></div><div></div></div>`;
+  const tableHeader = _aurixMktTableHeaderHtml();
   return `<div class="market-section-header">${t('tab_watchlist')}</div>${tableHeader}${sorted.map(renderMarketItem).join('')}`;
 }
 
@@ -42784,8 +42786,7 @@ function renderAllAssets(data) {
   }
   // MARKET-2: same sort + header rules as the per-type rendering.
   final = _aurixMktExpSortItems(final);
-  const perfHeader = _aurixMktExpFlag() ? _aurixMktTimeframe : t('marketCol24h');
-  const tableHeader = `<div class="market-table-header"><div>${t('marketColAsset')}</div><div>${t('marketColPrice')}</div><div>${perfHeader}</div><div></div><div></div></div>`;
+  const tableHeader = _aurixMktTableHeaderHtml();
   return `<div class="market-section-header">${t('tab_all')}</div>${tableHeader}${final.map(renderMarketItem).join('')}`;
 }
 
@@ -42918,6 +42919,76 @@ function _aurixMktTypePriority(item) {
     : _AURIX_TYPE_PRIORITY.other;
 }
 
+// MARKET-INSTITUTIONAL-V1 · §7 — etiqueta CORTA de tipo para la línea de identidad.
+// _TYPE_LABEL devuelve el rótulo de la PESTAÑA ("Fondos y ETFs"), que en una fila
+// queda largo y además describe la categoría, no el instrumento. Aquí se quiere el
+// tipo del activo: "ETF", "Acción", "Fondo"…
+function _aurixMktShortType(type) {
+  const isEs = (typeof lang !== 'undefined' && lang === 'es');
+  const k = String(type || '').toLowerCase();
+  const M = {
+    etf: isEs ? 'ETF' : 'ETF', etfs: isEs ? 'ETF' : 'ETF',
+    fund: isEs ? 'Fondo' : 'Fund', funds: isEs ? 'Fondo' : 'Fund',
+    stock: isEs ? 'Acción' : 'Stock', stocks: isEs ? 'Acción' : 'Stock',
+    crypto: isEs ? 'Cripto' : 'Crypto',
+    index: isEs ? 'Índice' : 'Index', indices: isEs ? 'Índice' : 'Index',
+    commodity: isEs ? 'Materia prima' : 'Commodity', commodities: isEs ? 'Materia prima' : 'Commodity',
+    metal: isEs ? 'Metal' : 'Metal',
+  };
+  return M[k] || String(type).toUpperCase();
+}
+
+// MARKET-INSTITUTIONAL-V1 · §7 — owner ÚNICO del header de la tabla. Estaba
+// duplicado literalmente en tres renderers (Todo / Seguimiento / por tipo), que es
+// como se desalinean los encabezados con el tiempo. Ahora hay una sola definición y
+// declara las CINCO columnas canónicas: Activo · Precio · 24H · Tendencia · ★.
+// La capitalización se retiró de la UI: su cobertura real es 0% (ninguna fuente del
+// sistema la publica) y una columna entera de guiones no informa, sólo ocupa el ancho
+// que necesitan la identidad y la tendencia. Los accesores internos siguen aquí, sin
+// coste, para el día que exista marketCap real.
+function _aurixMktTableHeaderHtml() {
+  const perf = (typeof _aurixMktExpFlag === 'function' && _aurixMktExpFlag())
+    ? _aurixMktTimeframe : t('marketCol24h');
+  return '<div class="market-table-header">'
+    + `<div>${t('marketColAsset')}</div>`
+    + `<div>${t('marketColPrice')}</div>`
+    + `<div>${perf}</div>`
+    + `<div>${(typeof lang !== 'undefined' && lang === 'es') ? 'TENDENCIA' : 'TREND'}</div>`
+    + '<div></div>'
+    + '</div>';
+}
+
+// MARKET-INSTITUTIONAL-V1 · §6/§7 — accesores HONESTOS de fila.
+// Devuelven el dato real o NaN. Nunca calculan, estiman ni rellenan: si el valor
+// no existe, la columna pinta "—" y la ordenación manda esa fila al final.
+function _aurixMktRowPrice(row) {
+  const v = Number(row && (row.current_price ?? row.price));
+  return Number.isFinite(v) && v > 0 ? v : NaN;
+}
+function _aurixMktRowMarketCap(row) {
+  // Sólo se acepta una capitalización que venga EXPLÍCITA de la fuente. Hoy ninguna
+  // la trae; se deja el accesor para que el día que exista todo funcione sin tocar
+  // la ordenación ni el render. `market_cap_rank` de CoinGecko NO se usa aquí: es un
+  // rango, no una capitalización, y mezclarlos sería exactamente el dato falso que
+  // el SPEC prohíbe.
+  const v = Number(row && (row.marketCap ?? row.market_cap));
+  return Number.isFinite(v) && v > 0 ? v : NaN;
+}
+// ¿Hay cobertura suficiente para ofrecer la ordenación por capitalización?
+// Se mide sobre las filas realmente visibles, no se presupone.
+function _aurixMktCapCoverage(rows) {
+  if (!Array.isArray(rows) || !rows.length) return 0;
+  return rows.filter(r => Number.isFinite(_aurixMktRowMarketCap(r))).length / rows.length;
+}
+// Formato abreviado; "—" cuando no existe (§7).
+function _aurixMktFmtCap(row) {
+  const v = _aurixMktRowMarketCap(row);
+  if (!Number.isFinite(v)) return '—';
+  const u = [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'K']];
+  for (const [n, s] of u) if (v >= n) return (v / n).toFixed(v / n >= 100 ? 0 : 1) + s;
+  return String(Math.round(v));
+}
+
 function _aurixMktExpSortItems(items) {
   if (!Array.isArray(items)) return [];
   if (!_aurixMktExpFlag()) return items;
@@ -42936,8 +43007,48 @@ function _aurixMktExpSortItems(items) {
     });
   } else if (sb === 'name') {
     sorted.sort((a, b) => String(a.name || a.symbol || '').localeCompare(String(b.name || b.symbol || '')));
-  } else if (sb === 'price') {
-    sorted.sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
+  } else if (sb === 'relevance') {
+    // MARKET-INSTITUTIONAL-V1 · §6 — "Relevancia" = el orden canónico tal y como
+    // llega de _aurixRankSearchResults. NO se reordena aquí: reordenarlo sería
+    // crear un ranking paralelo, que el SPEC prohíbe expresamente.
+    return items;
+  } else if (sb === 'price' || sb === 'price_asc') {
+    // §6 — los ausentes SIEMPRE al final, en ambas direcciones.
+    const dir = (sb === 'price_asc') ? 1 : -1;
+    sorted.sort((a, b) => {
+      const aV = _aurixMktRowPrice(a), bV = _aurixMktRowPrice(b);
+      const aM = !Number.isFinite(aV), bM = !Number.isFinite(bV);
+      if (aM && bM) return 0;
+      if (aM) return 1;
+      if (bM) return -1;
+      return (aV - bV) * dir;
+    });
+  } else if (sb === 'change_asc') {
+    // Mayor caída 24H: ascendente por variación, ausentes al final.
+    sorted.sort((a, b) => {
+      const aV = _mktHistoryChangeForRow(a), bV = _mktHistoryChangeForRow(b);
+      const aM = aV == null || !Number.isFinite(aV);
+      const bM = bV == null || !Number.isFinite(bV);
+      if (aM && bM) return 0;
+      if (aM) return 1;
+      if (bM) return -1;
+      return aV - bV;
+    });
+  } else if (sb === 'cap' || sb === 'cap_asc') {
+    // §6 — la capitalización se ordena SÓLO con marketCap real. Hoy ninguna fuente
+    // del sistema la devuelve (el snapshot expone price/change24h/currency y nada
+    // más), así que la cobertura es 0 y estas opciones se sirven deshabilitadas en
+    // el selector. Si algún día llega marketCap real, este orden ya funciona; lo que
+    // NUNCA hace es calcularla o estimarla, que convertiría la columna en un dato falso.
+    const dir = (sb === 'cap_asc') ? 1 : -1;
+    sorted.sort((a, b) => {
+      const aV = _aurixMktRowMarketCap(a), bV = _aurixMktRowMarketCap(b);
+      const aM = !Number.isFinite(aV), bM = !Number.isFinite(bV);
+      if (aM && bM) return 0;
+      if (aM) return 1;
+      if (bM) return -1;
+      return (aV - bV) * dir;
+    });
   } else if (sb === 'change') {
     // MARKET-8: sort by the currently selected timeframe's change pct.
     // 24H falls back to live change24h immediately; other periods read
@@ -42971,12 +43082,22 @@ function _aurixMktExpControlsHtml() {
   // MARKET-8 + RESET-6: 'featured' is the post-reset default and the
   // first option shown in the sheet. Deterministic ranking via
   // _aurixMktFeaturedRank; ties resolve by type priority + ticker.
+  // MARKET-INSTITUTIONAL-V1 §6 — mismo juego de ordenaciones en web y móvil.
+  // Las de capitalización llevan `off: true`: se muestran, pero deshabilitadas y con
+  // el motivo, porque hoy ninguna fuente devuelve marketCap. No se ocultan para que el
+  // usuario sepa que la opción existe y por qué no está disponible (§6).
   const SORT_OPTS = [
-    { key: 'featured',  es: 'Destacados',  en: 'Featured',   chipEs: 'Destac.', chipEn: 'Feat.'  },
-    { key: 'change',    es: 'Cambio',      en: 'Change',     chipEs: 'Cambio',  chipEn: 'Change' },
-    { key: 'price',     es: 'Precio',      en: 'Price',      chipEs: 'Precio',  chipEn: 'Price'  },
-    { key: 'watchlist', es: 'Seguimiento', en: 'Watchlist',  chipEs: 'Seguim.', chipEn: 'Watch'  },
+    { key: 'relevance',  es: 'Relevancia',            en: 'Relevance',      chipEs: 'Relev.',  chipEn: 'Relev.' },
+    { key: 'featured',   es: 'Destacados',            en: 'Featured',       chipEs: 'Destac.', chipEn: 'Feat.'  },
+    { key: 'change',     es: 'Mayor subida 24H',      en: 'Top gainers',    chipEs: 'Subida',  chipEn: 'Gainers'},
+    { key: 'change_asc', es: 'Mayor caída 24H',       en: 'Top losers',     chipEs: 'Caída',   chipEn: 'Losers' },
+    { key: 'price',      es: 'Precio: mayor a menor', en: 'Price: high→low',chipEs: 'Precio↓', chipEn: 'Price↓' },
+    { key: 'price_asc',  es: 'Precio: menor a mayor', en: 'Price: low→high',chipEs: 'Precio↑', chipEn: 'Price↑' },
+    { key: 'name',       es: 'Nombre A–Z',            en: 'Name A–Z',       chipEs: 'Nombre',  chipEn: 'Name'   },
+    { key: 'watchlist',  es: 'Seguimiento',           en: 'Watchlist',      chipEs: 'Seguim.', chipEn: 'Watch'  },
   ];
+  const CAP_OFF_HINT = isEs ? 'La fuente de precios no publica capitalización'
+                            : 'The price source does not publish market cap';
   const current = SORT_OPTS.find(o => o.key === _aurixMktSortBy) || SORT_OPTS[0];
   const currentChipLabel = isEs ? current.chipEs : current.chipEn;
 
@@ -43008,7 +43129,9 @@ function _aurixMktExpControlsHtml() {
     return `<button type="button" class="${cls}" data-mkt-tf="${tf}">${tf}</button>`;
   }).join('');
   const sortItems = SORT_OPTS.map(o =>
-    `<button type="button" class="mkt-sort-item${o.key === _aurixMktSortBy ? ' is-active' : ''}" data-mkt-sort="${o.key}">${isEs ? o.es : o.en}</button>`
+    o.off
+      ? `<button type="button" class="mkt-sort-item is-disabled" data-mkt-sort="${o.key}" disabled aria-disabled="true" title="${CAP_OFF_HINT}">${isEs ? o.es : o.en} · ${isEs ? 'no disponible' : 'unavailable'}</button>`
+      : `<button type="button" class="mkt-sort-item${o.key === _aurixMktSortBy ? ' is-active' : ''}" data-mkt-sort="${o.key}">${isEs ? o.es : o.en}</button>`
   ).join('');
   const helperHtml = '';
   return `
@@ -43100,18 +43223,24 @@ function renderCurrentMarketView() {
 
   let html;
   if (_marketSearchQuery) {
-    const q = normalizeSymbol(_marketSearchQuery);
-    const filtered = data.filter(item => {
-      const sym  = normalizeSymbol(item.symbol);
-      const name = (item.name || '').toLowerCase();
-      return sym.includes(q) || name.includes(_marketSearchQuery);
-    }).slice(0, 15);
-    // MARKET-2: apply explorer sort to search results too so the
-    // ordering preference is honored everywhere.
-    const results = _aurixMktExpSortItems(filtered);
-    html = results.length
-      ? results.map(renderMarketItem).join('')
-      : `<div class="market-empty">${t('market_no_results')}</div>`;
+    // MARKET-INSTITUTIONAL-V1 · §2 — la lista de búsqueda YA NO sale de filtrar
+    // MARKET_DATA (que sólo contenía los 5/3/3 símbolos monitorizados): sale del
+    // pipeline canónico compartido con Add Asset. Por eso "MSCI World" muestra
+    // ahora todos los productos que el proveedor devuelve, no sólo URTH.
+    const fresh = (_mktDiscQuery === _marketSearchQuery);
+    if (_mktDiscState === 'loading' || !fresh) {
+      // Skeleton con la geometría REAL de la fila (§10): la lista no se vacía.
+      html = _aurixMktSkeletonHtml(6);
+    } else if (_mktDiscState === 'error') {
+      html = `<div class="market-empty">${t('market_no_results')}</div>`;
+    } else {
+      // El orden lo decide el selector; "Relevancia" respeta el ranking canónico
+      // tal y como llega de _aurixRankSearchResults (no se reordena).
+      const results = _aurixMktExpSortItems(_aurixMktFilterTraditional(_mktDiscResults));
+      html = results.length
+        ? results.map(renderMarketItem).join('')
+        : `<div class="market-empty">${t('market_no_results')}</div>`;
+    }
   } else if (currentMarketTab === 'watchlist') {
     html = renderMyAssetsBlock(data);
   } else if (currentMarketTab === 'all') {
@@ -43126,7 +43255,7 @@ function renderCurrentMarketView() {
     // es quien puede resetear un subfiltro que dejó de ser válido, y la lista debe
     // renderizarse ya con ese estado corregido (si no, chip y filas divergen un frame).
     const disc = _renderDiscoveryCatalog('etfs', data);
-    html = disc + renderFromCache('etfs', data);
+    html = disc + _aurixMktChipListHtml('etfs', data);
   } else {
     const activeType = _TAB_TO_TYPE[currentMarketTab];
     if (!activeType) return;
@@ -43136,7 +43265,7 @@ function renderCurrentMarketView() {
     // alone, with no empty discovery shell.
     // MARKET-FOUNDATION-V1: mismo orden — catálogo primero (puede resetear), lista después.
     const disc = _DISCOVERY_CATALOGS[currentMarketTab] ? _renderDiscoveryCatalog(currentMarketTab, data) : '';
-    html = disc + renderFromCache(activeType, data);
+    html = disc + _aurixMktChipListHtml(activeType, data);
   }
   // MARKET-2: prepend the explorer controls bar. Empty string when the
   // V2 flag is off, so the legacy layout ships exactly as before.
@@ -43184,7 +43313,21 @@ function initMarketSearch() {
   if (!input) return;
   input.addEventListener('input', e => {
     _marketSearchQuery = e.target.value.trim().toLowerCase();
+    // MARKET-INSTITUTIONAL-V1 · §2 — la consulta deja de filtrar sólo la tabla
+    // cargada y pasa por el pipeline canónico de Add Asset. Debounce + cancelación
+    // como en Add Asset: una sola petición en vuelo, sin duplicados.
+    try { if (_mktDiscTimer) clearTimeout(_mktDiscTimer); } catch (_) {}
+    const q = _marketSearchQuery;
+    if (!q) {
+      try { if (_mktDiscAbort) _mktDiscAbort.abort(); } catch (_) {}
+      _mktDiscQuery = ''; _mktDiscResults = []; _mktDiscState = 'idle';
+      renderCurrentMarketView();
+      return;
+    }
+    // Repintado inmediato para que el estado de carga aparezca sin esperar al debounce.
+    _mktDiscState = 'loading'; _mktDiscQuery = q;
     renderCurrentMarketView();
+    _mktDiscTimer = setTimeout(() => { _aurixMktDiscover(q); }, _MKT_DISC_DEBOUNCE);
   });
 }
 
@@ -43603,6 +43746,11 @@ function _renderDiscoveryCatalog(tabKey, data) {
   const visible = canJudge
     ? reg.catalog.filter((c, i) => {
         if (i === 0) return true;                                   // la categoría por defecto siempre está
+        // MARKET-INSTITUTIONAL-V1 · §5 — un chip con consulta de discovery SÍ puede
+        // recuperar resultados reales aunque la tabla cargada no los tenga: la
+        // cobertura ya no se mide sólo contra las 5/3/3 filas monitorizadas. Por eso
+        // vuelven "Oro", "Emergentes" o "Bonos", ahora respaldados por el buscador.
+        if (_aurixMktChipQuery(tabKey, c.id)) return true;
         const cov = _aurixMktChipCoverage(c, rows, false);
         return cov > 0 && cov < rows.length;
       })
@@ -43688,7 +43836,11 @@ function _initFundsCatalogDelegation() {
       if (next && next !== reg.get()) {
         reg.set(next);
         const el = document.getElementById('marketList');
-        if (el) { el._lastKey = null; renderCurrentMarketView(); }
+        if (el) el._lastKey = null;
+        // §5 — si el chip tiene consulta, sus filas las recupera el pipeline canónico.
+        const cq = _aurixMktChipQuery(tabKey, next);
+        if (cq) { _aurixMktDiscover(cq); return; }
+        renderCurrentMarketView();
       }
       return;
     }
@@ -43785,6 +43937,149 @@ function _aurixMktMobileCategoryFilter() {
 // verdad filtra. Es auto-mantenido: si mañana crece el universo monitorizado, el
 // chip reaparece solo, sin tocar código.
 //
+// ══════════════════════════════════════════════════════════════════════════
+// MARKET-INSTITUTIONAL-V1 · §2 — DISCOVERY UNIFICADO
+// ══════════════════════════════════════════════════════════════════════════
+// Market dejaba de encontrar lo que Add Asset sí encuentra porque su buscador
+// filtraba localmente MARKET_DATA (universos de 5/3/3 símbolos). Add Asset, en
+// cambio, ya tiene el pipeline canónico completo:
+//     searchYahooFinance + searchCoinGeckoAPI + searchMetalsLocal
+//   → _aurixSearchFundsLocal (catálogo curado)
+//   → dedupe ISIN-first (SPEC 70)
+//   → _aurixRankSearchResults
+// Aquí NO se crea un segundo buscador ni un ranking paralelo: se llama a
+// searchAllAssets() —el mismo owner que usa Add Asset— y se traduce su salida a
+// filas de Market con _searchResultToMarketItem(), que ya existía para esto.
+// Consecuencia medida contra la API real: "MSCI World" pasa de 1 fila (URTH) a
+// los 7 productos que el proveedor devuelve de verdad (iShares ×3, Amundi, HSBC,
+// Xtrackers). No se fabrica ninguno: si el buscador no lo devuelve, no aparece.
+let _mktDiscQuery   = '';        // consulta a la que pertenecen los resultados
+let _mktDiscResults = [];        // filas de Market ya normalizadas
+let _mktDiscState   = 'idle';    // idle | loading | ready | error
+let _mktDiscAbort   = null;      // AbortController de la petición en vuelo
+let _mktDiscTimer    = null;     // debounce
+const _mktDiscCache = new Map(); // consulta → filas (evita repetir peticiones)
+const _MKT_DISC_DEBOUNCE = 260;
+const _MKT_DISC_CACHE_MAX = 40;
+
+// Precio/variación para las filas que el buscador devuelve sin cotizar. Reutiliza
+// el MISMO endpoint de snapshot que ya usa toda la app (PRICES_PROXY): ni proveedor
+// nuevo ni contrato nuevo. Falla en silencio → la fila se pinta sin precio ("—"),
+// que es el estado honesto previsto en §10.
+async function _aurixMktHydrateQuotes(items, signal) {
+  if (!Array.isArray(items) || !items.length) return items;
+  if (typeof PRICES_PROXY === 'undefined' || typeof fetch !== 'function') return items;
+  const need = items.filter(it => it && !(Number.isFinite(it.current_price) && it.current_price > 0));
+  if (!need.length) return items;
+  const syms = Array.from(new Set(need.map(it => it.marketSymbol || it.symbol).filter(Boolean))).slice(0, 40);
+  if (!syms.length) return items;
+  try {
+    const url = `${PRICES_PROXY}/snapshot?symbols=${encodeURIComponent(syms.join(','))}`;
+    const res = await fetch(url, { signal });
+    if (!res.ok) return items;
+    const json = await res.json();
+    const by = new Map();
+    for (const s of (json && Array.isArray(json.snapshot) ? json.snapshot : [])) {
+      if (s && s.symbol) by.set(normalizeSymbol(s.symbol), s);
+    }
+    items.forEach(it => {
+      const hit = by.get(normalizeSymbol(it.marketSymbol || it.symbol));
+      if (!hit) return;
+      const p = Number(hit.price);
+      if (Number.isFinite(p) && p > 0) { it.current_price = p; it.price = p; }
+      if (Number.isFinite(hit.change24h)) { it.change24h = hit.change24h; it.price_change_percentage_24h = hit.change24h; }
+      if (hit.currency) it.currency = hit.currency;
+    });
+  } catch (_) { /* sin precio: la fila se pinta con "—" */ }
+  return items;
+}
+
+// Ejecuta el pipeline canónico para una consulta y deja el resultado listo para
+// pintar. Una sola petición en vuelo: la anterior se aborta (reutiliza el patrón
+// de cancelación que ya emplea Add Asset).
+async function _aurixMktDiscover(query, opts) {
+  const q = String(query || '').trim();
+  const tag = q.toLowerCase();
+  if (!q) { _mktDiscQuery = ''; _mktDiscResults = []; _mktDiscState = 'idle'; return []; }
+  if (_mktDiscCache.has(tag)) {
+    _mktDiscQuery = tag; _mktDiscResults = _mktDiscCache.get(tag); _mktDiscState = 'ready';
+    if (!(opts && opts.silent)) renderCurrentMarketView();
+    return _mktDiscResults;
+  }
+  try { if (_mktDiscAbort) _mktDiscAbort.abort(); } catch (_) {}
+  const ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+  _mktDiscAbort = ctrl;
+  _mktDiscQuery = tag; _mktDiscState = 'loading';
+  if (!(opts && opts.silent)) renderCurrentMarketView();
+  let rows = [];
+  try {
+    const found = await searchAllAssets(q, ctrl ? ctrl.signal : undefined);
+    if (ctrl && ctrl.signal.aborted) return _mktDiscResults;
+    rows = (Array.isArray(found) ? found : [])
+      .map(r => {
+        const row = _searchResultToMarketItem(r);
+        if (!row) return null;
+        // Identidad extendida SÓLO con lo que el resultado ya trae (§3/§9): nada
+        // se deduce ni se rellena. Si no hay gestora, no se muestra gestora.
+        row.issuer   = r.manager || r.issuer || null;
+        row.exchange = r.exchange || null;
+        row.isin     = r.isin || null;
+        row.displayName = (typeof getDisplayName === 'function') ? getDisplayName(r) : (r.name || row.symbol);
+        return row;
+      })
+      .filter(Boolean);
+    await _aurixMktHydrateQuotes(rows, ctrl ? ctrl.signal : undefined);
+    if (ctrl && ctrl.signal.aborted) return _mktDiscResults;
+    _mktDiscResults = rows; _mktDiscState = 'ready';
+    _mktDiscCache.set(tag, rows);
+    if (_mktDiscCache.size > _MKT_DISC_CACHE_MAX) {
+      try { _mktDiscCache.delete(_mktDiscCache.keys().next().value); } catch (_) {}
+    }
+  } catch (e) {
+    if (!(e && e.name === 'AbortError')) { _mktDiscResults = []; _mktDiscState = 'error'; }
+  }
+  // El repintado final NO es opcional: `silent` sólo evita el repintado de "cargando"
+  // cuando la llamada nace desde dentro del propio render (evita recursión). Si se
+  // omitiera también el final, la lista se quedaría en skeleton para siempre.
+  if (_mktDiscQuery === tag) renderCurrentMarketView();
+  return _mktDiscResults;
+}
+
+// ── MARKET-INSTITUTIONAL-V1 · §5 — filtros respaldados por discovery ─────────
+// En MARKET-FOUNDATION-V1 la cobertura de un chip se medía SÓLO contra la tabla
+// cargada (5/3/3 símbolos), por eso "Oro" o "MSCI World" quedaban ocultos: no
+// tenían nada que filtrar. Ahora un chip puede recuperar sus propios productos por
+// el pipeline canónico, así que la pregunta correcta no es "¿hay filas cargadas?"
+// sino "¿puede este filtro recuperar resultados reales?".
+//
+// Cada consulta es un ALIAS de búsqueda, no una lista de activos: el resultado lo
+// decide el buscador. Si un día el proveedor deja de devolver productos para un
+// alias, el chip se queda vacío y se oculta solo — nunca inventa contenido.
+const _MKT_CHIP_QUERIES = {
+  etfs: {
+    sp_500: 'S&P 500', nasdaq_100: 'Nasdaq 100', msci_world: 'MSCI World',
+    all_world: 'All World', emerging_markets: 'Emerging Markets',
+    dividend: 'Dividend ETF', bonds: 'Bond ETF', europe: 'Europe ETF', gold: 'Gold ETF',
+  },
+  commodities: { precious_metals: 'Gold', energy_commodities: 'Crude Oil', industrial_metals: 'Copper' },
+  indices:     { us: 'S&P 500 index', europe: 'Euro Stoxx', asia: 'Nikkei', global: 'MSCI World index' },
+};
+function _aurixMktChipQuery(tabKey, chipId) {
+  const tab = _MKT_CHIP_QUERIES[tabKey === 'funds' ? 'etfs' : tabKey];
+  return (tab && tab[chipId]) ? tab[chipId] : null;
+}
+// Consulta del subfiltro activo (null = ninguno / categoría por defecto). Es estado
+// derivado del chip activo, NO un segundo owner: siempre se recalcula desde reg.get().
+function _aurixMktActiveChipQuery() {
+  try {
+    const reg = _DISCOVERY_CATALOGS[currentMarketTab];
+    if (!reg || !Array.isArray(reg.catalog) || !reg.catalog.length) return null;
+    const activeId = reg.get();
+    if (!activeId || activeId === reg.catalog[0].id) return null;   // por defecto → sin filtro
+    return _aurixMktChipQuery(currentMarketTab, activeId);
+  } catch (_) { return null; }
+}
+
 // Devuelve el Set de símbolos normalizados de una categoría del catálogo.
 function _aurixMktCatalogSymbols(cat) {
   const set = new Set();
@@ -43814,6 +44109,69 @@ function _aurixMktRowsForTab(tabKey, data) {
   return data.filter(d => String(d && d.type).toLowerCase().trim() === lc);
 }
 
+// MARKET-INSTITUTIONAL-V1 · §10 — owner ÚNICO del skeleton. Antes vivía inline en
+// renderFromCache; ahora lo comparten la carga inicial y la búsqueda, de modo que
+// ambos estados tienen exactamente la geometría de la fila real (6 celdas) y no
+// aparece un salto de layout al sustituir el skeleton por los datos.
+// ── MARKET-INSTITUTIONAL-V1 · ruido tokenizado fuera de las exposiciones clásicas ──
+// Al abrir Market al pipeline canónico entraron también los envoltorios cripto que
+// CoinGecko publica sobre índices tradicionales: "SPDR S&P 500 ETF (Ondo Tokenized
+// ETF)", "Backed CSPX", "DeFi S&P 500", "iShares TIPS Bond ETF (Ondo…)". Son activos
+// REALES —no se inventan ni se borran del sistema— pero no son el instrumento que
+// busca quien filtra por "S&P 500" o "Bonos" en una pestaña de fondos.
+//
+// Alcance deliberadamente ESTRECHO (no es Search V2.2): sólo se aplica a las pestañas
+// de exposición tradicional (fondos/ETF, índices, materias primas). La pestaña Cripto
+// y el buscador global no se tocan: allí un token envuelto es exactamente lo buscado.
+const _MKT_TRADITIONAL_TABS = { etfs: true, funds: true, indices: true, commodities: true };
+const _MKT_RX_TOKENIZED = /\b(tokeni[sz]ed|wrapped|synthetic|staked|on-?chain)\b|\bdefi\b|\bondo\b|\bbacked\b|\bx?stock\b/i;
+function _aurixMktIsTraditionalAsset(row) {
+  if (!row) return false;
+  const type = String(row.type || '').toLowerCase();
+  // Un activo de tipo cripto nunca es la exposición tradicional que pide el filtro.
+  if (type === 'crypto') return false;
+  const name = String(row.name || row.displayName || '');
+  return !_MKT_RX_TOKENIZED.test(name);
+}
+// Aplica el filtro SÓLO si la pestaña activa es de exposición tradicional. Si el
+// resultado quedara vacío se devuelve la lista sin filtrar: nunca se prefiere una
+// lista vacía a mostrar lo que el proveedor sí encontró.
+function _aurixMktFilterTraditional(rows) {
+  if (!Array.isArray(rows) || !rows.length) return rows;
+  if (!_MKT_TRADITIONAL_TABS[currentMarketTab]) return rows;
+  const kept = rows.filter(_aurixMktIsTraditionalAsset);
+  return kept.length ? kept : rows;
+}
+
+// MARKET-INSTITUTIONAL-V1 · §5 — la lista de una pestaña con subfiltro activo sale
+// del discovery cuando ese chip tiene consulta; si no, de la tabla ya cargada. Un solo
+// punto de decisión, para que chip y filas no puedan discrepar.
+function _aurixMktChipListHtml(type, data) {
+  const cq = _aurixMktActiveChipQuery();
+  if (!cq) return renderFromCache(type, data);
+  const tag = String(cq).toLowerCase();
+  // Si ya hay una recuperación en vuelo para ESTA consulta, no se relanza: hacerlo
+  // abortaba la anterior (el controlador es único) y la vista se quedaba en skeleton.
+  if (_mktDiscQuery !== tag) { _aurixMktDiscover(cq, { silent: true }); return _aurixMktSkeletonHtml(6); }
+  if (_mktDiscState === 'loading') return _aurixMktSkeletonHtml(6);
+  if (_mktDiscState === 'error') return `<div class="market-empty">${t('market_no_results')}</div>`;
+  const rows = _aurixMktExpSortItems(_aurixMktFilterTraditional(_mktDiscResults));
+  if (!rows.length) return `<div class="market-empty">${t('market_no_results')}</div>`;
+  return _aurixMktTableHeaderHtml() + rows.map(renderMarketItem).join('');
+}
+
+function _aurixMktSkeletonHtml(n) {
+  const rows = Array.from({ length: Math.max(1, n | 0) }).map(() => `
+      <div class="market-row skeleton" aria-hidden="true">
+        <div class="col col-asset"><div class="skeleton-circle"></div><div class="skeleton-text"></div></div>
+        <div class="col col-price"><div class="skeleton-price"></div></div>
+        <div class="col col-change"><div class="skeleton-change"></div></div>
+        <div class="col col-chart"><div class="skeleton-spark"></div></div>
+        <div class="col col-action"></div>
+      </div>`).join('');
+  return `<div class="market-skeleton">${rows}</div>`;
+}
+
 function renderFromCache(type, data) {
   const normalizedType = String(type).toLowerCase().trim();
   let items = data.filter(d => String(d.type).toLowerCase().trim() === normalizedType);
@@ -43825,24 +44183,14 @@ function renderFromCache(type, data) {
   // resultado vacío y cae en el skeleton de abajo — nunca se muestra otra categoría.
   const _catSet = _aurixMktMobileCategoryFilter();
   if (_catSet) items = items.filter(it => _catSet.has(normalizeSymbol(it.symbol)));
-  if (!items.length) {
-    return `<div class="market-skeleton">${Array.from({ length: 8 }).map(() => `
-      <div class="market-row skeleton">
-        <div class="skeleton-circle"></div>
-        <div class="skeleton-text"></div>
-        <div class="skeleton-price"></div>
-        <div class="skeleton-change"></div>
-        <div class="skeleton-change"></div>
-      </div>`).join('')}</div>`;
-  }
+  if (!items.length) return _aurixMktSkeletonHtml(8);
   // MARKET-2: honour the explorer sort. No-op when flag is off.
   items = _aurixMktExpSortItems(items);
   const label = _TYPE_LABEL[normalizedType]?.() ?? normalizedType;
   // MARKET-2: header's performance-column label tracks the active
   // timeframe (24H / 7D / 1M / 1Y / ALL). The actual cells render
   // honest "—" when timeframe data is unavailable.
-  const perfHeader = _aurixMktExpFlag() ? _aurixMktTimeframe : t('marketCol24h');
-  const tableHeader = `<div class="market-table-header"><div>${t('marketColAsset')}</div><div>${t('marketColPrice')}</div><div>${perfHeader}</div><div></div><div></div></div>`;
+  const tableHeader = _aurixMktTableHeaderHtml();
   return `<div class="market-section-header">${label}</div>${tableHeader}${items.map(renderMarketItem).join('')}`;
 }
 
@@ -44747,20 +45095,28 @@ function renderMarketItem(item, idx) {
   // MC-11A: directional indicator paired with the existing safeChange
   // output. Colors stay on the .is-up / .is-down classes; the arrow is
   // a CSS pseudo-element driven off those classes (no inline text).
-  // MARKET-FOUNDATION-V1 · BLOQUE D — la fila entera abre el activo, así que debe
-  // ser un control real: foco por teclado (tabindex) y semántica de botón. Antes era
-  // un <div> puro: sólo se podía abrir con ratón/tap y el estado "keyboard focus" que
-  // exige el SPEC no existía en ninguna fila. La geometría no cambia (mismos nodos).
+  // MARKET-INSTITUTIONAL-V1 · §7/§9 — IDENTIDAD. El título pasa a ser el nombre
+  // completo y el ticker baja a la línea secundaria junto al tipo, la gestora y la
+  // moneda. Antes el título era el TICKER, que en fondos/ETF es justo el dato menos
+  // legible ("IWDA.AS" en lugar de "iShares Core MSCI World UCITS ETF").
+  // Regla dura: cada segmento sólo se pinta si el dato EXISTE. No se deduce gestora
+  // ni mercado ni moneda — si la fuente no lo trae, no aparece ese segmento.
+  const idTitle = (name && name !== item.symbol) ? name : item.symbol;
+  const idMeta = [
+    `<span class="mkt-id-ticker">${escHtml(item.symbol)}</span>`,
+    item.type ? `<span>${escHtml(_aurixMktShortType(item.type))}</span>` : '',
+    item.issuer   ? `<span>${escHtml(item.issuer)}</span>`   : '',
+    item.exchange ? `<span>${escHtml(item.exchange)}</span>` : '',
+    item.currency ? `<span>${escHtml(item.currency)}</span>` : '',
+  ].filter(Boolean).join('<i class="mkt-id-sep" aria-hidden="true">·</i>');
   return `
     <div class="market-row" data-symbol="${normSym}" role="button" tabindex="0" aria-label="${escHtml(item.symbol)}">
       <div class="col col-asset">
         <div class="asset-wrapper">
           ${_assetIconHtml(item, item.symbol, 'asset-icon', typeof idx === 'number' && idx < _AURIX_MKT_EAGER_ICONS)}
           <div class="asset-text">
-            <div class="asset-symbol-row">
-              <span class="asset-symbol">${item.symbol}</span>
-            </div>
-            ${name && name !== item.symbol ? `<div class="asset-name">${escHtml(name)}</div>` : ''}
+            <div class="mkt-id-name" title="${escHtml(idTitle)}">${escHtml(idTitle)}</div>
+            <div class="mkt-id-meta">${idMeta}</div>
           </div>
         </div>
       </div>
@@ -47035,6 +47391,74 @@ function _aurixLooksLikeFundQuery(query) {
 }
 // Match the curated fund seed by name / alias / manager / isin / ticker. Returns items in
 // the existing search-result shape + display-only isin/manager/currency. Discovery only.
+// ══════════════════════════════════════════════════════════════════════════
+// MARKET-INSTITUTIONAL-V1 · §3 — CATÁLOGO CURADO DE ETF
+// ══════════════════════════════════════════════════════════════════════════
+// Sólo existe para cubrir las consultas GENÉRICAS que el proveedor no resuelve.
+// Medido contra la API real antes de escribir esto: "MSCI World" → 7 productos,
+// "All World" → 7, "Gold ETF" → 7 … pero "S&P 500" → **0 resultados**. Sin este
+// catálogo, la búsqueda más común de un inversor particular no devuelve nada.
+//
+// Cada entrada es sólo IDENTIDAD (los campos que §3 autoriza): ticker, símbolo de
+// mercado, nombre, tipo, gestora, bolsa, moneda, ISIN y aliases. NO se guarda ni un
+// precio, ni capitalización, ni volumen, ni rentabilidad: esos datos siempre salen
+// del proveedor en vivo. Si el proveedor no cotiza uno de estos símbolos, la fila
+// aparece sin precio ("—") en lugar de con un número inventado.
+//
+// El ranking lo sigue decidiendo _aurixRankSearchResults: aquí sólo se aportan
+// candidatos, exactamente igual que hace _aurixSearchFundsLocal con los fondos.
+const _AURIX_ETF_DB = [
+  // ── S&P 500 (la familia que el proveedor NO devuelve) ──
+  { ticker:'VOO',    marketSymbol:'VOO',    name:'Vanguard S&P 500 ETF',                       manager:'Vanguard',  exchange:'NYSEARCA', currency:'USD', isin:'US9229083632', aliases:['s&p 500','s&p500','sp500','sp 500','vanguard s&p 500'] },
+  { ticker:'SPY',    marketSymbol:'SPY',    name:'SPDR S&P 500 ETF Trust',                     manager:'SPDR',      exchange:'NYSEARCA', currency:'USD', isin:'US78462F1030', aliases:['s&p 500','s&p500','sp500','sp 500','spdr s&p 500'] },
+  { ticker:'IVV',    marketSymbol:'IVV',    name:'iShares Core S&P 500 ETF',                   manager:'iShares',   exchange:'NYSEARCA', currency:'USD', isin:'US4642872000', aliases:['s&p 500','s&p500','sp500','sp 500','ishares core s&p 500'] },
+  { ticker:'VUAA.L', marketSymbol:'VUAA.L', name:'Vanguard S&P 500 UCITS ETF (Acc)',           manager:'Vanguard',  exchange:'LSE',      currency:'USD', isin:'IE00BFMXXD54', aliases:['s&p 500','s&p500','sp500','vuaa','vanguard s&p 500 ucits'] },
+  { ticker:'CSPX.L', marketSymbol:'CSPX.L', name:'iShares Core S&P 500 UCITS ETF (Acc)',       manager:'iShares',   exchange:'LSE',      currency:'USD', isin:'IE00B5BMR087', aliases:['s&p 500','s&p500','sp500','cspx','ishares core s&p 500 ucits'] },
+  { ticker:'SXR8.DE',marketSymbol:'SXR8.DE',name:'iShares Core S&P 500 UCITS ETF (Xetra)',     manager:'iShares',   exchange:'XETRA',    currency:'EUR', isin:'IE00B5BMR087', aliases:['s&p 500','s&p500','sp500','sxr8'] },
+  // ── Nasdaq 100 ──
+  { ticker:'QQQ',    marketSymbol:'QQQ',    name:'Invesco QQQ Trust',                          manager:'Invesco',   exchange:'NASDAQ',   currency:'USD', isin:'US46090E1038', aliases:['nasdaq','nasdaq 100','nasdaq100','qqq'] },
+  { ticker:'QQQM',   marketSymbol:'QQQM',   name:'Invesco NASDAQ 100 ETF',                     manager:'Invesco',   exchange:'NASDAQ',   currency:'USD', isin:'US46138G6492', aliases:['nasdaq','nasdaq 100','nasdaq100','qqqm'] },
+  { ticker:'EQQQ.L', marketSymbol:'EQQQ.L', name:'Invesco EQQQ NASDAQ-100 UCITS ETF',          manager:'Invesco',   exchange:'LSE',      currency:'USD', isin:'IE0032077012', aliases:['nasdaq','nasdaq 100','nasdaq100','eqqq'] },
+  { ticker:'CNDX.L', marketSymbol:'CNDX.L', name:'iShares NASDAQ 100 UCITS ETF (Acc)',         manager:'iShares',   exchange:'LSE',      currency:'USD', isin:'IE00B53SZB19', aliases:['nasdaq','nasdaq 100','nasdaq100','cndx'] },
+  // ── MSCI World ──
+  { ticker:'IWDA.AS',marketSymbol:'IWDA.AS',name:'iShares Core MSCI World UCITS ETF (Acc)',    manager:'iShares',   exchange:'EURONEXT', currency:'USD', isin:'IE00B4L5Y983', aliases:['msci world','world','iwda'] },
+  { ticker:'SWDA.L', marketSymbol:'SWDA.L', name:'iShares Core MSCI World UCITS ETF (LSE)',    manager:'iShares',   exchange:'LSE',      currency:'USD', isin:'IE00B4L5Y983', aliases:['msci world','world','swda'] },
+  { ticker:'EUNL.DE',marketSymbol:'EUNL.DE',name:'iShares Core MSCI World UCITS ETF (Xetra)',  manager:'iShares',   exchange:'XETRA',    currency:'EUR', isin:'IE00B4L5Y983', aliases:['msci world','world','eunl'] },
+  { ticker:'URTH',   marketSymbol:'URTH',   name:'iShares MSCI World ETF',                     manager:'iShares',   exchange:'NYSEARCA', currency:'USD', isin:'US46434V4234', aliases:['msci world','world','urth'] },
+  // ── All World ──
+  { ticker:'VWCE.DE',marketSymbol:'VWCE.DE',name:'Vanguard FTSE All-World UCITS ETF (Acc)',    manager:'Vanguard',  exchange:'XETRA',    currency:'EUR', isin:'IE00BK5BQT80', aliases:['all world','all-world','ftse all world','vwce'] },
+  { ticker:'VWRL.L', marketSymbol:'VWRL.L', name:'Vanguard FTSE All-World UCITS ETF (Dist)',   manager:'Vanguard',  exchange:'LSE',      currency:'USD', isin:'IE00B3RBWM25', aliases:['all world','all-world','ftse all world','vwrl'] },
+  { ticker:'ACWI',   marketSymbol:'ACWI',   name:'iShares MSCI ACWI ETF',                      manager:'iShares',   exchange:'NASDAQ',   currency:'USD', isin:'US4642882579', aliases:['all world','acwi','msci acwi'] },
+  // ── Oro (§3: oro spot/físico ya existente aparte) ──
+  { ticker:'GLD',     marketSymbol:'GLD',     name:'SPDR Gold Shares',                         manager:'SPDR',      exchange:'NYSEARCA', currency:'USD', isin:'US78463V1070', aliases:['gold','oro','gold etf','gld'] },
+  { ticker:'IAU',     marketSymbol:'IAU',     name:'iShares Gold Trust',                       manager:'iShares',   exchange:'NYSEARCA', currency:'USD', isin:'US4642851053', aliases:['gold','oro','gold etf','iau'] },
+  { ticker:'SGLN.L',  marketSymbol:'SGLN.L',  name:'iShares Physical Gold ETC',                manager:'iShares',   exchange:'LSE',      currency:'USD', isin:'IE00B4ND3602', aliases:['gold','oro','gold etf','sgln'] },
+  { ticker:'PHAU.L',  marketSymbol:'PHAU.L',  name:'WisdomTree Physical Gold',                 manager:'WisdomTree',exchange:'LSE',      currency:'USD', isin:'JE00B1VS3770', aliases:['gold','oro','gold etf','phau'] },
+  { ticker:'4GLD.DE', marketSymbol:'4GLD.DE', name:'Xetra-Gold ETC',                           manager:'Deka',      exchange:'XETRA',    currency:'EUR', isin:'DE000A0S9GB0', aliases:['gold','oro','gold etf','4gld','xetra gold'] },
+];
+
+// Mismo contrato de coincidencia que _aurixSearchFundsLocal (nombre / gestora /
+// ticker / ISIN / aliases), para que Market y Add Asset se comporten igual.
+function _aurixSearchEtfsLocal(query) {
+  const q = String(query || '').toLowerCase().trim();
+  if (q.length < 2) return [];
+  const isIsinQ = (typeof _aurixIsIsin === 'function') ? _aurixIsIsin(q) : false;
+  const out = [];
+  for (const e of _AURIX_ETF_DB) {
+    const name = e.name.toLowerCase(), mgr = (e.manager || '').toLowerCase();
+    const hit = (isIsinQ && e.isin && e.isin.toLowerCase() === q)
+      || name.indexOf(q) >= 0
+      || mgr.indexOf(q) >= 0
+      || e.ticker.toLowerCase().indexOf(q) >= 0
+      || (Array.isArray(e.aliases) && e.aliases.some(a => a.indexOf(q) >= 0 || q.indexOf(a) >= 0));
+    if (!hit) continue;
+    out.push({ ticker: e.ticker, name: e.name, type: 'etf', marketSymbol: e.marketSymbol,
+               isin: e.isin || null, manager: e.manager || null, exchange: e.exchange || null,
+               assetCurrency: e.currency || null, currency: e.currency || null });
+  }
+  return out;
+}
+
 function _aurixSearchFundsLocal(query) {
   if (!(typeof _AURIX_FUND_DISCOVERY !== 'undefined' && _AURIX_FUND_DISCOVERY)) return [];
   const q = String(query || '').toLowerCase().trim();
@@ -47231,9 +47655,15 @@ async function searchAllAssets(query, signal) {
     return it;
   });
   const funds = _aurixSearchFundsLocal(query);
+  // MARKET-INSTITUTIONAL-V1 · §3 — el catálogo curado de ETF entra por el MISMO
+  // punto que el de fondos, así que Add Asset y Market comparten candidatos,
+  // dedupe e identidad sin que exista un segundo pipeline. Va delante en el merge
+  // para que, ante ISIN repetido, gane la entrada curada (identidad completa:
+  // gestora, bolsa, moneda) frente al eco del proveedor — misma regla que SPEC 70.
+  const curatedEtfs = _aurixSearchEtfsLocal(query);
   const seen = new Set();
   const merged = [];
-  for (const item of [...funds, ...metals, ...yEnriched, ...cryptoItems]) {
+  for (const item of [...curatedEtfs, ...funds, ...metals, ...yEnriched, ...cryptoItems]) {
     if (!item || !item.ticker) continue;
     // SPEC 70 — ISIN-first dedupe. THE same share class arriving from more than one source (the curated
     // catalog entry + its Yahoo twin) shares an ISIN → collapse to ONE unambiguous result. The curated
@@ -47246,7 +47676,16 @@ async function searchAllAssets(query, signal) {
       : (item.type === 'fund')
         ? 'FUND:' + String(item.ticker || item.name).toUpperCase()
         : String(item.ticker).toUpperCase();
-    if (!seen.has(key)) { seen.add(key); merged.push(item); }
+    // MARKET-INSTITUTIONAL-V1 · §9 — segunda clave por TICKER EXACTO. La dedupe por
+    // ISIN sola no basta desde que el catálogo curado aporta candidatos: la entrada
+    // curada trae ISIN y su gemela del proveedor no, así que generaban dos claves
+    // distintas y el MISMO producto salía dos veces (visto en "MSCI World": IWDA.AS y
+    // URTH duplicados). Se compara el ticker EXACTO, sin normalizar el sufijo de
+    // mercado, para no fusionar cotizaciones distintas del mismo fondo (IWDA.AS ≠
+    // SWDA.L) ni clases de participación diferentes, que §9 prohíbe expresamente.
+    const tkey = 'TK:' + String(item.ticker || '').toUpperCase().trim();
+    if (seen.has(key) || seen.has(tkey)) continue;
+    seen.add(key); seen.add(tkey); merged.push(item);
   }
   return _aurixRankSearchResults(merged, query).slice(0, 10);
 }

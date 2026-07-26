@@ -24119,3 +24119,144 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   box-shadow: inset 0 0 0 2px rgba(74,130,240,0.65);
   border-radius: 8px;
 }
+
+/* ════════ MARKET-INSTITUTIONAL-V1 · §7 + §8 — lista premium ═════════════════
+   Se añade al FINAL a propósito: gana por orden de fuente sobre las ~20 reglas de
+   rejilla acumuladas (MK.F1…MK.F8, V3, V4) sin editar ninguna, así el revert es
+   borrar este bloque. Header y fila comparten SIEMPRE la misma definición, que es
+   el invariante que protege el harness de MARKET-FOUNDATION.
+
+   DIAGNÓSTICO del "sparkline con ancho excesivo": el svg era pequeño (32–44px)
+   pero su PISTA de rejilla era `31fr` — en un monitor de 1440px la columna medía
+   ~400px para dibujar 32px de gráfico. El resultado no era un gráfico grande sino
+   un hueco enorme. Por eso la pista pasa a ser FIJA (168px, dentro del objetivo
+   140–180) y el svg la ocupa de verdad: el gráfico no crece con la pantalla, no
+   domina la fila y desaparece el vacío. El ancho recuperado va a la identidad. */
+
+@media (min-width: 769px) {
+  #marketList .market-table-header,
+  #marketList .market-row,
+  #marketList.is-v3 .market-table-header,
+  #marketList.is-v3 .market-row,
+  #marketList.is-v4 .market-table-header,
+  #marketList.is-v4 .market-row {
+    /* Activo · Precio · 24H · Tendencia · ★  (la capitalización se retiró: 0% de
+       cobertura real; su ancho va a identidad y tendencia) */
+    grid-template-columns: minmax(0, 1fr) 108px 96px 168px 44px;
+    column-gap: 14px;
+    align-items: center;
+  }
+  #marketList .market-row { padding: 13px 12px; min-height: 60px; }
+
+  /* Sparkline: ancho fijo idéntico en todas las filas, recortado y sin desbordar. */
+  #marketList .col-chart {
+    width: 168px; max-width: 168px; overflow: hidden;
+    display: flex; align-items: center; justify-content: flex-end;
+  }
+  #marketList .col-chart svg { width: 168px !important; max-width: 168px; height: 30px; display: block; }
+
+  /* Capitalización: numérica y discreta; "—" aún más apagado (dato ausente honesto). */
+  #marketList .market-table-header > div:nth-child(2),
+  #marketList .market-table-header > div:nth-child(3),
+  #marketList .market-table-header > div:nth-child(4) { text-align: right; }
+}
+
+/* ── Identidad: nombre completo dominante, metadatos en segunda línea ───────── */
+#marketList .col-asset { min-width: 0; }
+#marketList .asset-wrapper { display: flex; align-items: center; gap: 11px; min-width: 0; }
+#marketList .asset-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+#marketList .mkt-id-name {
+  font-size: 13.5px; font-weight: 600; letter-spacing: -0.005em;
+  color: rgba(255,255,255,0.94);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;   /* title= lleva el nombre completo */
+}
+#marketList .mkt-id-meta {
+  display: flex; align-items: center; flex-wrap: nowrap; gap: 5px;
+  font-size: 11px; letter-spacing: 0.02em;
+  color: rgba(220,230,250,0.52);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#marketList .mkt-id-ticker { font-weight: 600; color: rgba(220,230,250,0.78); font-variant-numeric: tabular-nums; }
+#marketList .mkt-id-sep { font-style: normal; opacity: 0.45; }
+/* El logo nunca se deforma y respira igual sea cual sea su relación de aspecto. */
+#marketList .asset-icon img,
+#marketList .asset-icon > img { object-fit: contain; padding: 2px; }
+
+/* Skeleton con la geometría REAL de la fila → no hay salto al llegar los datos. */
+#marketList .market-row.skeleton { pointer-events: none; }
+#marketList .skeleton-spark {
+  height: 10px; border-radius: 4px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.09), rgba(255,255,255,0.05));
+}
+#marketList .skeleton-spark { height: 22px; width: 168px; }
+
+/* ── §8 MÓVIL: tres zonas, no la tabla de escritorio encogida ───────────────── */
+/* Rejilla REAL de dos filas para la zona derecha. El primer intento apilaba precio y
+   variación en la MISMA celda con translateY: el precio invadía el espacio del nombre
+   y el 24H quedaba suelto abajo. Con dos filas explícitas cada dato tiene su caja, el
+   nombre recupera ancho y no hace falta ningún transform. */
+@media (max-width: 768px) {
+  #marketList .market-table-header { display: none; }
+  #marketList .market-row,
+  #marketList.is-v3 .market-row,
+  #marketList.is-v4 .market-row {
+    /* La identidad manda: se lleva todo el ancho sobrante. El sparkline baja a 44px
+       (sigue leyéndose la forma) y el precio se ajusta a su contenido con un tope, en
+       vez de reservar un bloque fijo que estrangulaba el nombre. */
+    grid-template-columns: minmax(0, 1fr) 44px max-content 30px;
+    grid-template-rows: auto auto;
+    column-gap: 12px;
+    row-gap: 0;
+    align-items: center;
+    padding: 9px 12px;
+    min-height: 58px;
+  }
+  /* padding-right propio: con `max-content` en la columna de precio, la identidad
+     puede crecer hasta rozarla. Este colchón garantiza que el nombre NUNCA toque la
+     cifra, ni siquiera en su segunda línea (caso "iShares MSCI World" / "$200.88"). */
+  #marketList .col-asset { grid-column: 1; grid-row: 1 / span 2; min-width: 0; padding-right: 6px; }
+  /* El nombre puede usar DOS líneas antes de truncar: "SPDR S&P 500 ETF" cabe entero
+     en lugar de quedarse en "SPDR S&P…". Los metadatos siguen en una sola línea, son
+     secundarios y ceden el espacio al nombre. */
+  #marketList .mkt-id-name {
+    font-size: 13px; line-height: 1.24; white-space: normal;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  #marketList .mkt-id-meta { font-size: 10.5px; }
+  #marketList .asset-wrapper { gap: 9px; }
+  #marketList .col-chart {
+    grid-column: 2; grid-row: 1 / span 2;
+    display: flex; align-items: center; justify-content: center;
+    width: 44px; max-width: 44px; overflow: hidden;
+  }
+  #marketList .col-chart svg { width: 44px !important; max-width: 44px; height: 20px; display: block; }
+  #marketList .col-price {
+    grid-column: 3; grid-row: 1;
+    display: flex; align-items: flex-end; justify-content: flex-end;
+    text-align: right; white-space: nowrap; line-height: 1.2;
+    font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
+  }
+  #marketList .col-change {
+    grid-column: 3; grid-row: 2;
+    display: flex; align-items: flex-start; justify-content: flex-end;
+    text-align: right; white-space: nowrap; line-height: 1.2;
+    font-size: 11.5px; font-variant-numeric: tabular-nums;
+  }
+  #marketList .col-cap { display: none; }
+  #marketList .col-action {
+    grid-column: 4; grid-row: 1 / span 2;
+    display: flex; align-items: center; justify-content: flex-end;
+  }
+  #marketList .watchlist-btn { width: 30px; height: 30px; }
+  #marketList .market-row { border-bottom: 1px solid rgba(255,255,255,0.05); }
+  #marketList, #marketList .market-row { max-width: 100%; overflow-x: hidden; }
+}
+
+
+/* MARKET-INSTITUTIONAL-V1 §6 — ordenación ofrecida pero no disponible: se ve, se
+   entiende por qué, y no se puede activar. Preferible a ocultarla en silencio. */
+.mkt-sort-item.is-disabled,
+.mkt-filter-sort-item.is-disabled {
+  opacity: 0.38; cursor: not-allowed; pointer-events: auto;
+}
