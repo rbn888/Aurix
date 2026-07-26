@@ -12,6 +12,7 @@
 // chip vuelva a quedarse sin filas que filtrar.
 const fs = require('fs'), path = require('path');
 const root = path.join(__dirname, '..');
+const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
 const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
 // Las aserciones "esto YA NO existe" tienen que mirar CÓDIGO, no comentarios: los
@@ -161,15 +162,19 @@ ok('3.1 renderFromCache aplica el subfiltro sin condicionarlo a que dé resultad
    /_catSet\)\s*items = items\.filter/.test(fromCache.replace(/\s+/g, ' ')));
 ok('3.2 el patrón `if (sub.length) items = sub` ha desaparecido',
    !/if\s*\(sub\.length\)\s*items\s*=\s*sub/.test(appCode));
+// MARKET-INSTITUTIONAL-V1 sustituyó renderFromCache directo por _aurixMktChipListHtml
+// (que elige entre lista recuperada y tabla cargada). El invariante protegido es el
+// mismo: el catálogo se evalúa ANTES que la lista, porque puede resetear el subfiltro.
 ok('3.3 el catálogo se pinta ANTES que la lista (un reset se refleja en el mismo frame)',
-   /const disc = _renderDiscoveryCatalog\('etfs', data\);\s*\n\s*html = disc \+ renderFromCache\('etfs', data\)/.test(app));
+   /const disc = _renderDiscoveryCatalog\('etfs', data\);\s*\n\s*html = disc \+ _aurixMktChipListHtml\('etfs', data\)/.test(app) &&
+   /const disc = _DISCOVERY_CATALOGS\[currentMarketTab\] \? _renderDiscoveryCatalog\(currentMarketTab, data\) : '';\s*\n\s*html = disc \+ _aurixMktChipListHtml\(activeType, data\)/.test(app));
 ok('3.4 el renderer de chips recibe los datos reales de la pestaña',
    /_renderDiscoveryCatalog\(currentMarketTab, data\)/.test(app) &&
    /function _renderDiscoveryCatalog\(tabKey, data\)/.test(app));
 ok('3.5 un subfiltro que deja de ser válido se resetea al por defecto (SPEC §3)',
    /if \(!visible\.some\(c => c\.id === activeId\)\) \{[\s\S]{0,120}reg\.set\(activeId\)/.test(app));
 ok('3.6 en cold start (sin filas) se pintan todos los chips — sin parpadeo de la fila',
-   /const canJudge = rows\.length > 0;/.test(app) && /canJudge\s*\?[\s\S]{0,400}: reg\.catalog\.slice\(\)/.test(app));
+   /const canJudge = rows\.length > 0;/.test(app) && /canJudge\s*\?[\s\S]{0,900}: reg\.catalog\.slice\(\)/.test(app));
 ok('3.7 el estado activo del chip también se expone accesible (aria-selected)',
    /aria-selected="\$\{c\.id === cat\.id \? 'true' : 'false'\}"/.test(app));
 
@@ -193,8 +198,16 @@ const rowVals = new Set(gridRules.row.map(r => r.val));
 const orphanHeaders = gridRules.hdr.filter(h => !rowVals.has(h.val));
 ok('4.1 toda definición de columnas del header tiene una fila con la definición IDÉNTICA',
    orphanHeaders.length === 0, orphanHeaders.map(o => 'L' + o.line + ' [' + o.val + ']').join(', '));
-ok('4.2 el header declara las 5 columnas canónicas (identidad, precio, 24H, sparkline, watchlist)',
-   /market-table-header"><div>\$\{t\('marketColAsset'\)\}<\/div><div>\$\{t\('marketColPrice'\)\}<\/div><div>\$\{perfHeader\}<\/div><div><\/div><div><\/div>/.test(app));
+// MARKET-INSTITUTIONAL-V1 unificó el header (estaba duplicado en tres renderers) y
+// fijó CINCO columnas canónicas: la de capitalización se retiró porque su cobertura
+// real es 0% y una columna de guiones sólo roba ancho a identidad y tendencia.
+ok('4.2 el header lo emite un owner ÚNICO con las 5 columnas canónicas',
+   (app.match(/^function _aurixMktTableHeaderHtml\(/gm) || []).length === 1 &&
+   (app.match(/_aurixMktTableHeaderHtml\(\)/g) || []).length >= 4 &&
+   /marketColAsset[\s\S]{0,120}marketColPrice[\s\S]{0,160}perf[\s\S]{0,200}TENDENCIA/.test(app));
+ok('4.2b la capitalización NO aparece en la UI (ni cabecera, ni celda, ni ordenación)',
+   !/CAP\.|MKT CAP/.test(app) && !/class="col col-cap/.test(app) &&
+   !/data-mkt-sort="cap/.test(read('index.html')));
 ok('4.3 la fila emite exactamente esas 5 celdas, en ese orden',
    /col-asset[\s\S]{0,1400}col-price[\s\S]{0,400}col-change[\s\S]{0,600}col-chart[\s\S]{0,300}col-action/.test(fnSource('renderMarketItem') || ''));
 ok('4.4 precio y variación usan cifras tabulares (el ancho no baila al actualizar precios)',

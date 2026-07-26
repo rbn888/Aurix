@@ -81,7 +81,10 @@ ok('5.3 stock → ticker · tipo (ya no un ticker desnudo)', sub({ type: 'stock'
 
 // ── 6 search merge dedupes by ISIN across sources (source pin) ───────────────
 console.log('6 — ISIN-first dedupe in the search merge:');
-const merge = app.slice(app.indexOf('const funds = _aurixSearchFundsLocal(query);'), app.indexOf('const funds = _aurixSearchFundsLocal(query);') + 900);
+// MARKET-INSTITUTIONAL-V1 insertó el catálogo curado de ETF (y su comentario) entre
+// este ancla y el bloque de dedupe, empujando la clave ISIN más allá de los 900 chars.
+// Se amplía la ventana; la dedupe ISIN-first que este assert protege sigue igual.
+const merge = app.slice(app.indexOf('const funds = _aurixSearchFundsLocal(query);'), app.indexOf('const funds = _aurixSearchFundsLocal(query);') + 2200);
 ok('6.1 merge keys by ISIN when present (collapses same-ISIN variants)', /const isin = item\.isin \? String\(item\.isin\)\.toUpperCase\(\)\.trim\(\) : '';/.test(merge) && /'ISIN:' \+ isin/.test(merge));
 
 // ── 7 AUTOMATIC NAV pricing contract (funds are NOT frozen/manual when a source exists) ──

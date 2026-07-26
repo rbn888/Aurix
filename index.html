@@ -102,8 +102,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v607-market-foundation-v1';
-      var APPJS_V = '590';
+      var BUILD = 'v608-market-institutional-v1';
+      var APPJS_V = '591';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -278,7 +278,7 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=607">
+  <link rel="stylesheet" href="styles.css?v=608">
 </head>
 <body style="background:#0A0E1A">
 
@@ -1498,7 +1498,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=590"
+  <script src="app.js?v=591"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
@@ -1606,9 +1606,18 @@
              and the first option. Deterministic ranking via the
              _aurixMktFeaturedRank map (BTC/AAPL/SPY/XAU/SPX first per
              type bucket, then alphabetical). -->
+        <!-- MARKET-INSTITUTIONAL-V1 §6 — juego completo de ordenaciones, también en móvil.
+             "Relevancia" respeta el ranking canónico (no reordena). Las dos opciones de
+             capitalización NO se ofrecen: su cobertura real es 0% y una opción que no
+             puede cumplirse no debe estar en la experiencia principal. La lógica de
+             ordenación por cap sigue en app.js, lista para cuando exista el dato. -->
+        <button type="button" class="mkt-filter-sort-item" data-mkt-sort="relevance" data-i18n="mktSortRelevance">Relevancia</button>
         <button type="button" class="mkt-filter-sort-item" data-mkt-sort="featured"  data-i18n="mktSortFeatured">Destacados</button>
-        <button type="button" class="mkt-filter-sort-item" data-mkt-sort="change"    data-i18n="mktSortChange">Cambio</button>
-        <button type="button" class="mkt-filter-sort-item" data-mkt-sort="price"     data-i18n="mktSortPrice">Precio</button>
+        <button type="button" class="mkt-filter-sort-item" data-mkt-sort="change"    data-i18n="mktSortChange">Mayor subida 24H</button>
+        <button type="button" class="mkt-filter-sort-item" data-mkt-sort="change_asc" data-i18n="mktSortChangeAsc">Mayor caída 24H</button>
+        <button type="button" class="mkt-filter-sort-item" data-mkt-sort="price"     data-i18n="mktSortPrice">Precio: mayor a menor</button>
+        <button type="button" class="mkt-filter-sort-item" data-mkt-sort="price_asc" data-i18n="mktSortPriceAsc">Precio: menor a mayor</button>
+        <button type="button" class="mkt-filter-sort-item" data-mkt-sort="name"      data-i18n="mktSortName">Nombre A–Z</button>
         <button type="button" class="mkt-filter-sort-item" data-mkt-sort="watchlist" data-i18n="mktSortWatchlist">Seguimiento</button>
       </div>
     </div>
