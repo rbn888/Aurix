@@ -24148,13 +24148,57 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
        y el sobrante se va a una sexta pista vacía al FINAL del contenedor, no entre
        columnas. Los nombres largos siguen legibles: 520px son ~62 caracteres, y por
        encima entra la elipsis con el nombre completo en `title`. */
-    grid-template-columns: minmax(0, 520px) 104px 92px 168px 40px 1fr;
-    column-gap: 18px;
+    /* HOTFIX ROW-GEOMETRY — el aire flexible pasa del FINAL al MEDIO.
+       En v609 la pista `1fr` iba la última, así que empujaba todo el bloque de datos
+       hacia la izquierda: quedaban 190px muertos a la derecha de la estrella y sólo
+       18px entre Precio, 24H y Tendencia. Ahora el sobrante vive en la pista 2, entre
+       identidad y el bloque derecho: la estrella se apoya en el borde de la card, la
+       tendencia se va a la derecha y Precio/24H respiran con 28px reales. */
+    grid-template-columns: minmax(0, 500px) minmax(20px, 1fr) 118px 96px 168px 40px;
+    column-gap: 28px;
     align-items: center;
   }
-  /* La sexta pista es sólo aire de cierre: ni el header ni la fila pintan nada en ella. */
-  #marketList .market-table-header > div:nth-child(6),
-  #marketList .market-row > .col:nth-child(6) { display: none; }
+  /* Colocación explícita: la pista 2 es aire, así que nada puede auto-colocarse en ella.
+     Header y fila usan EXACTAMENTE la misma rejilla y las mismas pistas. */
+  #marketList .market-row > .col-asset,
+  #marketList .market-table-header > div:nth-child(1) { grid-column: 1; }
+  #marketList .market-row > .col-price,
+  #marketList .market-table-header > div:nth-child(2) { grid-column: 3; }
+  #marketList .market-row > .col-change,
+  #marketList .market-table-header > div:nth-child(3) { grid-column: 4; }
+  #marketList .market-row > .col-chart,
+  #marketList .market-table-header > div:nth-child(4) { grid-column: 5; }
+  #marketList .market-row > .col-action,
+  #marketList .market-table-header > div:nth-child(5) { grid-column: 6; }
+  /* La estrella cierra la fila: alineada a la derecha de su pista, con el padding de
+     la card (12px) como margen interno respecto al borde. Área de clic intacta. */
+  #marketList .market-row > .col-action { justify-content: flex-end; }
+
+  /* Monitores anchos: la identidad puede permitirse su techo alto sin comprimir nada. */
+  @media (min-width: 1600px) {
+    #marketList .market-table-header,
+    #marketList .market-row,
+    #marketList.is-v3 .market-table-header,
+    #marketList.is-v3 .market-row,
+    #marketList.is-v4 .market-table-header,
+    #marketList.is-v4 .market-row {
+      grid-template-columns: minmax(0, 560px) minmax(24px, 1fr) 124px 100px 176px 40px;
+      column-gap: 32px;
+    }
+  }
+  /* Portátiles estrechos: se baja el techo de identidad al mínimo del rango (430px)
+     para que el aire central no desaparezca y las columnas sigan separadas. */
+  @media (max-width: 1339px) {
+    #marketList .market-table-header,
+    #marketList .market-row,
+    #marketList.is-v3 .market-table-header,
+    #marketList.is-v3 .market-row,
+    #marketList.is-v4 .market-table-header,
+    #marketList.is-v4 .market-row {
+      grid-template-columns: minmax(0, 430px) minmax(16px, 1fr) 112px 92px 158px 40px;
+      column-gap: 22px;
+    }
+  }
   #marketList .market-row { padding: 13px 12px; min-height: 60px; }
 
   /* Sparkline: ancho fijo idéntico en todas las filas, recortado y sin desbordar. */
@@ -24212,18 +24256,26 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
     /* La identidad manda: se lleva todo el ancho sobrante. El sparkline baja a 44px
        (sigue leyéndose la forma) y el precio se ajusta a su contenido con un tope, en
        vez de reservar un bloque fijo que estrangulaba el nombre. */
-    grid-template-columns: minmax(0, 1fr) 44px max-content 30px;
+    /* HOTFIX ROW-GEOMETRY (móvil) — rejilla PROPIA, sin heredar nada de la web.
+       Medido en 390px: la pista `max-content` del precio se resolvía a 44px, así que
+       el texto desbordaba hacia la izquierda y se solapaba con la identidad (el precio
+       arrancaba en x=163 cuando la identidad terminaba en 192), y al gráfico sólo le
+       quedaban 44px de acordeón. Ahora cada dato tiene una pista REAL a su medida:
+       el precio deja de invadir el nombre y el sparkline sube a 78px (rango 68–88).
+       El ancho extra sale de recortar el aire muerto —padding, gaps y estrella—, no
+       de la legibilidad: el tamaño de fuente y el nombre a dos líneas se mantienen. */
+    grid-template-columns: minmax(0, 1fr) 86px 70px 30px;
     grid-template-rows: auto auto;
-    column-gap: 12px;
+    column-gap: 7px;
     row-gap: 0;
     align-items: center;
-    padding: 9px 12px;
+    padding: 9px 6px;
     min-height: 58px;
   }
   /* padding-right propio: con `max-content` en la columna de precio, la identidad
      puede crecer hasta rozarla. Este colchón garantiza que el nombre NUNCA toque la
      cifra, ni siquiera en su segunda línea (caso "iShares MSCI World" / "$200.88"). */
-  #marketList .col-asset { grid-column: 1; grid-row: 1 / span 2; min-width: 0; padding-right: 6px; }
+  #marketList .col-asset { grid-column: 1; grid-row: 1 / span 2; min-width: 0; padding-right: 2px; }
   /* El nombre puede usar DOS líneas antes de truncar: "SPDR S&P 500 ETF" cabe entero
      en lugar de quedarse en "SPDR S&P…". Los metadatos siguen en una sola línea, son
      secundarios y ceden el espacio al nombre. */
@@ -24232,32 +24284,49 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
     overflow: hidden; text-overflow: ellipsis;
   }
-  #marketList .mkt-id-meta { font-size: 10.5px; }
-  #marketList .asset-wrapper { gap: 9px; }
-  #marketList .col-chart {
-    grid-column: 2; grid-row: 1 / span 2;
-    display: flex; align-items: center; justify-content: center;
-    width: 44px; max-width: 44px; overflow: hidden;
+  /* La línea de metadatos pasa de flex a bloque en móvil: con flex, `text-overflow`
+     no se aplica a los hijos y el recorte cortaba el glifo en seco ("· Acció"). Como
+     bloque en línea, la elipsis funciona y el corte se lee como intencionado. */
+  #marketList .mkt-id-meta {
+    font-size: 10.5px;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  #marketList .col-chart svg { width: 44px !important; max-width: 44px; height: 20px; display: block; }
+  #marketList .mkt-id-meta > span { display: inline; }
+  #marketList .mkt-id-sep { margin: 0 3px; }
+  #marketList .asset-wrapper { gap: 8px; }
+  #marketList .asset-icon { width: 32px; height: 32px; min-width: 32px; }
+  /* Sparkline: tercera zona, ancho real de 78px y algo más de alto para que la forma
+     se lea. Justificado a la derecha de su pista → no deja hueco muerto antes de la
+     estrella. Sigue recortado, nunca desborda. */
+  #marketList .col-chart {
+    grid-column: 3; grid-row: 1 / span 2;
+    display: flex; align-items: center; justify-content: flex-end;
+    width: 70px; max-width: 70px; overflow: hidden;
+  }
+  #marketList .col-chart svg { width: 70px !important; max-width: 70px; height: 26px; display: block; }
   #marketList .col-price {
-    grid-column: 3; grid-row: 1;
+    grid-column: 2; grid-row: 1;
     display: flex; align-items: flex-end; justify-content: flex-end;
     text-align: right; white-space: nowrap; line-height: 1.2;
     font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
   }
   #marketList .col-change {
-    grid-column: 3; grid-row: 2;
+    grid-column: 2; grid-row: 2;
     display: flex; align-items: flex-start; justify-content: flex-end;
     text-align: right; white-space: nowrap; line-height: 1.2;
     font-size: 11.5px; font-variant-numeric: tabular-nums;
   }
   #marketList .col-cap { display: none; }
+  /* Estrella pegada al borde derecho, con el padding de la fila como margen interno.
+     El área de clic real se mantiene cómoda con un padding negativo óptico. */
   #marketList .col-action {
     grid-column: 4; grid-row: 1 / span 2;
     display: flex; align-items: center; justify-content: flex-end;
   }
-  #marketList .watchlist-btn { width: 30px; height: 30px; }
+  #marketList .watchlist-btn { width: 28px; height: 28px; }   /* cabe entera en su pista: no invade el gráfico */
   #marketList .market-row { border-bottom: 1px solid rgba(255,255,255,0.05); }
   #marketList, #marketList .market-row { max-width: 100%; overflow-x: hidden; }
 }
