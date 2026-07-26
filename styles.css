@@ -24140,12 +24140,21 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   #marketList.is-v3 .market-row,
   #marketList.is-v4 .market-table-header,
   #marketList.is-v4 .market-row {
-    /* Activo · Precio · 24H · Tendencia · ★  (la capitalización se retiró: 0% de
-       cobertura real; su ancho va a identidad y tendencia) */
-    grid-template-columns: minmax(0, 1fr) 108px 96px 168px 44px;
-    column-gap: 14px;
+    /* Activo · Precio · 24H · Tendencia · ★
+       HOTFIX COMPACT-GRID — antes la identidad era `1fr`, así que absorbía TODO el
+       ancho sobrante y empujaba Precio/24H/Tendencia contra el borde derecho: los
+       encabezados quedaban visualmente desligados de sus datos y la tabla se leía
+       hueca en monitores anchos. Ahora la identidad tiene un techo (`minmax(0,520px)`)
+       y el sobrante se va a una sexta pista vacía al FINAL del contenedor, no entre
+       columnas. Los nombres largos siguen legibles: 520px son ~62 caracteres, y por
+       encima entra la elipsis con el nombre completo en `title`. */
+    grid-template-columns: minmax(0, 520px) 104px 92px 168px 40px 1fr;
+    column-gap: 18px;
     align-items: center;
   }
+  /* La sexta pista es sólo aire de cierre: ni el header ni la fila pintan nada en ella. */
+  #marketList .market-table-header > div:nth-child(6),
+  #marketList .market-row > .col:nth-child(6) { display: none; }
   #marketList .market-row { padding: 13px 12px; min-height: 60px; }
 
   /* Sparkline: ancho fijo idéntico en todas las filas, recortado y sin desbordar. */
@@ -24259,4 +24268,14 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
 .mkt-sort-item.is-disabled,
 .mkt-filter-sort-item.is-disabled {
   opacity: 0.38; cursor: not-allowed; pointer-events: auto;
+}
+
+/* HOTFIX MARKET-DETAIL-HISTORY — estado vacío compacto. Sustituye al lienzo de 220px
+   con serie vacía, que se leía como "un gráfico que no termina de cargar". */
+.mkt-prv-nohist {
+  padding: 18px 4px 20px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: rgba(220,230,250,0.46);
+  text-align: center;
 }
