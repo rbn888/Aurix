@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '591'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '592'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -3728,6 +3728,9 @@ const T = {
     qtyGold:         u => `Cantidad (${u})`,
     estimatedVal:    'Valor estimado:',
     addToPortfolio:  'Añadir a cartera',
+    mkt_not_addable: 'No disponible para cartera',
+    mkt_no_history: 'Sin histórico disponible para este activo en nuestra fuente de datos.',
+    mkt_not_addable_hint: 'Los índices y las materias primas genéricas no son posiciones que puedas mantener en cartera. Puedes seguirlos desde Seguimiento.',
     // Modal: Reduce
     modalReduceTitle: 'Reducir posición',
     reduceQtyLabel:   'Cantidad a restar',
@@ -5874,6 +5877,9 @@ const T = {
     qtyGold:         u => `Quantity (${u})`,
     estimatedVal:    'Estimated value:',
     addToPortfolio:  'Add to portfolio',
+    mkt_not_addable: 'Not available for portfolio',
+    mkt_no_history: 'No price history available for this asset from our data source.',
+    mkt_not_addable_hint: 'Indices and generic commodities are not positions you can hold. You can still track them from your Watchlist.',
     // Modal: Reduce
     modalReduceTitle: 'Reduce position',
     reduceQtyLabel:   'Amount to subtract',
@@ -37881,6 +37887,23 @@ function _aurixMktPickAdapter(item) {
   }
   let sym = it.marketSymbol || it.symbol || it.ticker || '';
   if ((tp === 'metal' || tp === 'commodity') && (sym === 'XAU' || sym === 'XAU/USD')) sym = 'GC=F';
+  // HOTFIX MARKET-DETAIL-HISTORY — restaurar el "^" de los índices.
+  // CAUSA RAÍZ del "índice sin histórico": normalizeSymbol quita el prefijo de índice
+  // al ingerir (`^GSPC → GSPC`), así que aquí se pedía un símbolo que Yahoo NO conoce.
+  // Comprobado contra el endpoint real: `GSPC` → 404, `^GSPC` → 21 puntos; igual con
+  // IXIC y DJI. El histórico existe; lo que fallaba era el enlace símbolo → histórico.
+  // Se resuelve contra MARKET_INDICES (los canónicos ya viven ahí) y, si el índice no
+  // estuviera en esa lista, se repone el "^" sólo en símbolos puramente alfabéticos —
+  // nunca en los que llevan sufijo de mercado (000001.SS y similares).
+  if (tp === 'index' || tp === 'indices') {
+    const bare = String(sym).toUpperCase().replace(/^\^/, '');
+    let canon = null;
+    try {
+      canon = (typeof MARKET_INDICES !== 'undefined' ? MARKET_INDICES : [])
+        .find(x => String(x).toUpperCase().replace(/^\^/, '') === bare) || null;
+    } catch (_) {}
+    sym = canon || (/^[A-Z]{2,6}$/.test(bare) ? '^' + bare : sym);
+  }
   if (!sym) return null;
   return { kind: 'yahoo', args: { symbol: String(sym).toUpperCase() } };
 }
@@ -38040,6 +38063,27 @@ function _aurixMktOpenSymbol(symbol, itemOverride) {
 
   _aurixMktUpdateWatchUI(sym);
 
+  // HOTFIX MARKET-ASSET-FLOW — estado honesto del CTA "Añadir a cartera".
+  // Un índice (^GSPC) o una materia prima genérica no son posiciones que se puedan
+  // tener en cartera: el alta sólo admite crypto/stock/etf/fund/metal. Antes el CTA
+  // se ofrecía igual y acababa abriendo el buscador general. Ahora se deshabilita
+  // con el motivo real y no hay ningún camino que caiga al buscador.
+  try {
+    const addBtn = document.getElementById('mktPrvAddBtn');
+    if (addBtn) {
+      const addable = (typeof _aurixMktAddableType === 'function') ? _aurixMktAddableType(item) : null;
+      addBtn.disabled = !addable;
+      addBtn.classList.toggle('btn-submit--disabled', !addable);
+      if (addable) {
+        addBtn.textContent = t('addToPortfolio');
+        addBtn.removeAttribute('title');
+      } else {
+        addBtn.textContent = t('mkt_not_addable');
+        addBtn.setAttribute('title', t('mkt_not_addable_hint'));
+      }
+    }
+  } catch (_) {}
+
   // Open the overlay BEFORE mounting so layout can compute dimensions.
   overlay.classList.add('open');
   document.body.classList.add('modal-open');
@@ -38053,26 +38097,25 @@ function _aurixMktOpenSymbol(symbol, itemOverride) {
 
   const adapter = _aurixMktPickAdapter(item);
   if (!adapter) {
-    // No reliable address for this asset's history — show the
-    // identity panel, hide the chart slot via empty state.
-    const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
-    mount.style.height = (isMobile ? 200 : 220) + 'px';
+    // HOTFIX MARKET-DETAIL-HISTORY — sin dirección fiable para el histórico de este
+    // activo. Antes se reservaba un lienzo de 220px con una serie VACÍA: un hueco
+    // grande que parecía un gráfico que no carga. Ahora se declara honestamente:
+    // mensaje compacto, nada de lienzo, y los selectores de rango se ocultan porque
+    // no hay ningún periodo que seleccionar. Identidad, precio, watchlist y CTA
+    // mantienen su sitio. No se simula ninguna serie.
+    mount.style.height = 'auto';
+    mount.innerHTML = '<div class="mkt-prv-nohist">' + escHtml(t('mkt_no_history')) + '</div>';
     try {
-      _aurixMktCtrl = window.AurixCharts.createChart(mount, {
-        variant:        'asset',
-        colorMode:      'neutral',
-        showCrosshair:  false,
-        showTooltip:    false,
-        showTimeScale:  false,
-        showPriceScale: false,
-        height:         isMobile ? 200 : 220,
-      });
-      _aurixMktCtrl.setData([]);
+      const rangesHost = document.getElementById('mktPrvRanges');
+      if (rangesHost) rangesHost.hidden = true;
     } catch (_) {}
+    _aurixMktSetMeta('');
     _aurixMktItem  = item;
     _aurixMktRange = '30d';
     return true;
   }
+  // Camino con histórico: el selector de rangos vuelve a estar disponible.
+  try { const rh = document.getElementById('mktPrvRanges'); if (rh) rh.hidden = false; } catch (_) {}
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
   mount.style.height = (isMobile ? 200 : 240) + 'px';
@@ -38184,10 +38227,12 @@ function _aurixMktOpenSymbol(symbol, itemOverride) {
     // Add to portfolio CTA.
     if (e.target.closest && e.target.closest('#mktPrvAddBtn')) {
       const item = _aurixMktItem;
-      _aurixMktClose();
-      if (item && typeof _openAddAssetWithFund === 'function') {
-        _openAddAssetWithFund(item);
-      }
+      const sel  = (typeof _aurixMktToSelection === 'function') ? _aurixMktToSelection(item) : null;
+      // Si el activo no es añadible NO se abre nada: jamás se cae al buscador
+      // general como sustituto (el CTA ya se muestra deshabilitado con su motivo).
+      if (!sel) return;
+      _aurixMktClose();                       // cerrar la ficha ANTES de abrir el alta
+      if (typeof _openAddAssetWithFund === 'function') _openAddAssetWithFund(sel);
       return;
     }
   });
@@ -43886,6 +43931,65 @@ _initFundsCatalogDelegation();
 // ADD-V2.1: discovery picks already know the asset type, so skip the
 // Step-1 type picker and land directly on the form.
 // ADD-V2.2: pin asset mode so search/quick-picks chrome stays usable.
+// ══════════════════════════════════════════════════════════════════════════
+// HOTFIX MARKET-ASSET-FLOW — de Asset Detail al formulario, sin buscador
+// ══════════════════════════════════════════════════════════════════════════
+// CAUSA RAÍZ del "se abre el buscador general": las filas de MARKET_DATA las
+// construye normalizeMarketData, que devuelve { symbol, name, price, change,
+// change24h, type, fallback } — SIN `ticker`. selectAsset() empieza por
+// `entry.ticker.slice(0, 4)`, así que lanzaba TypeError; el try/catch de
+// _openAddAssetWithFund se lo tragaba y el modal se quedaba en su fase inicial
+// con buscador y populares. No era un problema de flujo, era una incompatibilidad
+// de forma entre la fila de Market y lo que espera el formulario.
+//
+// Aquí se traduce la fila a la MISMA forma que ya consume selectAsset. No se
+// duplica modal, formulario ni persistencia: se reutiliza la segunda fase tal cual.
+
+// Tipos que el alta admite de verdad (T[lang].typeLabel): crypto, stock, etf,
+// metal, fund. Índices y materias primas genéricas NO son posiciones que se puedan
+// tener en cartera, así que se declaran no añadibles en vez de fingir que lo son.
+function _aurixMktAddableType(item) {
+  if (!item) return null;
+  const t0 = String(item.type || '').toLowerCase().trim();
+  const sym = normalizeSymbol(item.ticker || item.symbol || '');
+  if (t0 === 'crypto') return 'crypto';
+  if (t0 === 'stock' || t0 === 'stocks') return 'stock';
+  if (t0 === 'etf' || t0 === 'etfs') return 'etf';
+  if (t0 === 'fund' || t0 === 'funds') return 'fund';
+  if (t0 === 'metal') return 'metal';
+  // Materias primas: sólo los metales preciosos tienen alta real (XAU/XAG).
+  if (t0 === 'commodity' || t0 === 'commodities') return (sym === 'XAUUSD' || sym === 'XAU' || sym === 'XAGUSD' || sym === 'XAG') ? 'metal' : null;
+  return null;   // index / indices / desconocido → no añadible
+}
+
+// Fila de Market → entrada canónica de selectAsset. Sólo copia lo que existe:
+// no inventa ticker, gestora ni moneda.
+function _aurixMktToSelection(item) {
+  const type = _aurixMktAddableType(item);
+  if (!type) return null;
+  const ticker = String(item.ticker || item.symbol || '').toUpperCase().trim();
+  if (!ticker) return null;
+  // Mismo criterio de nombre que la fila de Market (renderMarketItem): el nombre del
+  // feed si es real, y si no el curado. Así el chip del formulario dice "SPDR S&P 500
+  // ETF" y no "SPY", que es el ticker repetido.
+  const _dataName = (item.name && item.name !== item.symbol) ? item.name : null;
+  let _disp = item.displayName || _dataName;
+  if (!_disp) { try { _disp = _MKT_DISPLAY_NAMES[normalizeSymbol(ticker)] || null; } catch (_) { _disp = null; } }
+  const sel = {
+    ticker,
+    name: _disp || ticker,
+    type,
+    marketSymbol: item.marketSymbol || item.symbol || ticker,
+  };
+  if (item.coinId) sel.coinId = item.coinId;
+  if (item.isin) sel.isin = item.isin;
+  if (item.manager || item.issuer) sel.manager = item.manager || item.issuer;
+  if (item.assetCurrency || item.currency) sel.assetCurrency = item.assetCurrency || item.currency;
+  const p = item.current_price ?? item.price;
+  if (Number.isFinite(p)) sel.price = p;
+  return sel;
+}
+
 function _openAddAssetWithFund(item) {
   if (!item) return;
   try { openModal({ skipPicker: true }); } catch (_) {}

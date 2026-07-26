@@ -109,8 +109,11 @@ ok('5.1 la fila NO emite celda de capitalización', !/class="col col-cap/.test(a
 ok('5.2 la cabecera NO declara columna de capitalización', !/CAP\.|MKT CAP/.test(app));
 ok('5.3 no se ofrece ordenación por capitalización en ninguna superficie',
    !/data-mkt-sort="cap/.test(indexHtml) && !/key: 'cap'/.test(app));
-ok('5.4 la retícula web quedó en 5 columnas',
-   /grid-template-columns: minmax\(0, 1fr\) 108px 96px 168px 44px;/.test(cssCode));
+// HOTFIX COMPACT-GRID: cinco columnas de DATOS + una sexta pista vacía al final que
+// absorbe el sobrante. Antes la identidad era `1fr` y repartía el hueco entre columnas.
+ok('5.4 la retícula web tiene 5 columnas de datos y el sobrante al final',
+   /grid-template-columns: minmax\(0, 520px\) 104px 92px 168px 40px 1fr;/.test(cssCode) &&
+   /nth-child\(6\)[\s\S]{0,90}display: none;/.test(cssCode));
 ok('5.5 la capitalización NUNCA se calcula ni se estima (sólo se acepta explícita)',
    /const v = Number\(row && \(row\.marketCap \?\? row\.market_cap\)\);/.test(app) &&
    !/marketCap\s*=\s*(price|qty|shares)/.test(app));
@@ -154,6 +157,60 @@ ok('8.3 el discovery de Market no escribe en localStorage ni en Supabase',
    !/localStorage\.setItem|supabase\./.test(disc) && !/localStorage\.setItem/.test(fnSource('_aurixMktChipListHtml')));
 ok('8.4 la barrera de persistencia sigue en pie',
    /_aurixPersistenceReady/.test(app) && /const _AURIX_BLOCK_DESTRUCTIVE_SAVES = true;/.test(app));
+
+// ── 9. HOTFIX: flujo de alta, histórico de índices y retícula compacta ──────
+console.log('\n9 — HOTFIX (alta desde ficha · histórico de índices · retícula):');
+// 9a — el adaptador de fila → selección: la causa era que MARKET_DATA no trae `ticker`
+// y selectAsset() empieza por entry.ticker.slice(0,4).
+let toSel = null, addable = null;
+try {
+  const src = fnSource('_aurixMktAddableType') + '\n' + fnSource('_aurixMktToSelection');
+  const norm = s => String(s||'').toUpperCase().replace(/\.[A-Z]{1,3}$/,'').replace(/\//g,'').replace(/-/g,'').replace(/^\^/,'').trim();
+  const f = new Function('normalizeSymbol', src + '; return {a:_aurixMktAddableType, s:_aurixMktToSelection};')(norm);
+  addable = f.a; toSel = f.s;
+} catch (_) {}
+ok('9.1 el adaptador fila→selección es ejecutable', typeof toSel === 'function');
+if (toSel) {
+  const row = { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', type: 'etfs', price: 738.93 };
+  const sel = toSel(row);
+  ok('9.2 una fila de MARKET_DATA (sin ticker) produce un ticker válido para selectAsset',
+     !!sel && sel.ticker === 'SPY' && typeof sel.ticker.slice === 'function');
+  ok('9.3 el tipo se traduce al vocabulario del alta (etfs → etf)', !!sel && sel.type === 'etf');
+  ok('9.4 crypto / stock / fund / metal son añadibles',
+     addable({type:'crypto',symbol:'BTC'}) === 'crypto' && addable({type:'stock',symbol:'AAPL'}) === 'stock' &&
+     addable({type:'funds',symbol:'X'}) === 'fund' && addable({type:'metal',symbol:'XAU'}) === 'metal');
+  ok('9.5 un índice NO es añadible (no es una posición que se pueda mantener)',
+     addable({type:'indices',symbol:'GSPC'}) === null && toSel({type:'indices',symbol:'GSPC'}) === null);
+  ok('9.6 el oro spot sí es añadible como metal; una materia prima genérica no',
+     addable({type:'commodity',symbol:'XAU/USD'}) === 'metal' && addable({type:'commodity',symbol:'WTI'}) === null);
+  ok('9.7 no se inventa identidad: sin gestora ni moneda, no se emiten esos campos',
+     (() => { const x = toSel({symbol:'AAPL', type:'stock'}); return !('manager' in x) && !('assetCurrency' in x); })());
+}
+ok('9.8 si el activo no es añadible NO se abre nada (jamás el buscador general)',
+   /if \(!sel\) return;/.test(app) && /_aurixMktClose\(\);\s*\/\/ cerrar la ficha ANTES/.test(app));
+ok('9.9 el CTA se deshabilita con motivo real en lugar de ofrecerse en falso',
+   /addBtn\.disabled = !addable;/.test(app) && /t\('mkt_not_addable'\)/.test(app));
+// 9b — histórico de índices
+let pick = null;
+try { pick = new Function('MARKET_INDICES', fnSource('_aurixMktPickAdapter') + '; return _aurixMktPickAdapter;')(['^GSPC','^IXIC','^DJI']); } catch (_) {}
+ok('9.10 el selector de adaptador es ejecutable', typeof pick === 'function');
+if (pick) {
+  const sym = (it) => { const a = pick(it); return a && a.args ? a.args.symbol : null; };
+  ok('9.11 los índices recuperan su "^" (GSPC → ^GSPC), que es lo que Yahoo acepta',
+     sym({type:'indices',symbol:'GSPC'}) === '^GSPC' && sym({type:'indices',symbol:'IXIC'}) === '^IXIC' &&
+     sym({type:'indices',symbol:'DJI'}) === '^DJI');
+  ok('9.12 un índice con sufijo de mercado NO recibe "^" (no se rompe 000001.SS)',
+     sym({type:'indices',symbol:'000001.SS'}) === '000001.SS');
+  ok('9.13 los demás tipos no cambian de dirección', sym({type:'etf',symbol:'SPY'}) === 'SPY');
+  ok('9.14 crypto sigue yendo por su propio adaptador',
+     (pick({type:'crypto',symbol:'BTC',coinId:'bitcoin'}) || {}).kind === 'crypto');
+}
+// 9c — retícula compacta
+ok('9.15 la identidad tiene techo: no absorbe todo el ancho del contenedor',
+   /minmax\(0, 520px\)/.test(cssCode) && !/grid-template-columns: minmax\(0, 1fr\) 108px 96px 168px 44px/.test(cssCode));
+ok('9.16 la tendencia se mantiene en ~168px', /168px/.test(cssCode));
+ok('9.17 la geometría móvil aprobada no se toca',
+   /grid-template-columns: minmax\(0, 1fr\) 44px max-content 30px;/.test(cssCode) && /-webkit-line-clamp: 2;/.test(cssCode));
 
 console.log('\nRESULT: ' + (fail === 0 ? 'ALL PASS ✓' : 'FAIL ✗') + '  (' + pass + ' passed, ' + fail + ' failed)');
 process.exit(fail === 0 ? 0 : 1);
