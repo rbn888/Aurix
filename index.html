@@ -2,7 +2,7 @@
 <!-- AURIX-DASHBOARD-PREMIUM-POLISH-1: paint dark on the very first frame via an
      inline attribute on <html> (applied before any CSS parses) so mobile
      Safari/Chrome never flash white before styles load. -->
-<html lang="es" style="background:#0A0E1A">
+<html lang="es" style="background:#040507">
 <head>
   <meta charset="UTF-8">
   <!-- ══ SECURITY-HARDENING-V1 · owner: index.html <head> ═════════════════════════
@@ -58,12 +58,12 @@
        no white flash before styles.css or the boot splash parse. This inline
        rule lives at the top of <head>, ahead of the render-blocking external
        stylesheet, and matches the splash base + PWA background_color. */
-    html, body { background:#0A0E1A; margin:0; }
+    html, body { background:#040507; margin:0; }
   </style>
   <title>AURIX</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
-  <meta name="theme-color" content="#0A0E1A">
+  <meta name="theme-color" content="#040507">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -102,7 +102,7 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v611-market-row-alignment';
+      var BUILD = 'v612-background-canvas-v1';
       var APPJS_V = '592';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
@@ -278,9 +278,9 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=611">
+  <link rel="stylesheet" href="styles.css?v=612">
 </head>
-<body style="background:#0A0E1A">
+<body style="background:#040507">
 
 
 <style>
@@ -291,7 +291,7 @@
   #bootLoader{
     position:fixed; inset:0; z-index:9999;
     display:flex; align-items:center; justify-content:center;
-    background:radial-gradient(120% 120% at 50% 38%, #121B30 0%, #0A0E1A 60%, #06090F 100%);
+    background:radial-gradient(120% 120% at 50% 38%, #0C1220 0%, #040507 60%, #030406 100%);
     font-family:'Inter', system-ui, -apple-system, Segoe UI, sans-serif;
     transition:opacity .35s ease;
     -webkit-tap-highlight-color:transparent;

@@ -139,7 +139,10 @@ select:focus-visible {
   --color-negative: var(--aurix-danger);
 
   /* ── Visual system ── */
-  --bg-main:    #0E131F;
+  --bg-main:    #040507;   /* BACKGROUND-CANVAS-V1 — negro premium neutro y profundo.
+                              Era #0E131F: un azul muy oscuro que competía con las cards
+                              (#171C28) y dejaba la interfaz turbia. Este es el ÚNICO
+                              valor del lienzo: html, body y .app lo consumen. */
   --surface-1:  rgba(255,255,255,0.040);
   --surface-2:  rgba(255,255,255,0.065);
   --surface-3:  rgba(255,255,255,0.095);
@@ -185,9 +188,12 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background:
-    radial-gradient(circle at 50% 40%, rgba(74, 130, 240,0.12), transparent 60%),
-    radial-gradient(circle at 70% 65%, rgba(0,255,180,0.08), transparent 70%);
+  /* BACKGROUND-CANVAS-V1 — se retiran los dos degradados radiales que teñían TODO el
+     lienzo (azul 12% centrado y verde-azulado 8% abajo a la derecha). Eran la causa de
+     que el fondo se viera lavado y de que el azul eléctrico de los componentes perdiera
+     protagonismo: competía con un azul ambiental permanente. La capa se conserva vacía
+     porque otras reglas cuentan con su existencia; no pinta nada. */
+  background: none;
   z-index: -2;
   transition: all 1.5s ease;
 }
@@ -218,7 +224,9 @@ body::before {
 }
 /* Subtle background darkening when drilling into a category */
 body.is-detail-view {
-  background-color: #090a0f;
+  /* BACKGROUND-CANVAS-V1 — antes #090a0f: un tercer negro que hacía que el lienzo
+     cambiara de tono al entrar en detalle. Ahora comparte la única fuente de verdad. */
+  background-color: var(--bg-main);
 }
 
 /* ── Page & card entrance ──────────────────────────────── */
