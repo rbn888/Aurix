@@ -361,11 +361,17 @@ button[aria-busy="true"] {
 }
 
 .header--scrolled {
-  background: rgba(27,34,50,0.80);
+  /* HEADER-CANVAS-UNIFICATION — el rectángulo tras AURIX no venía de un color propio
+     del header sino de pintar el CANVAS ANTIGUO en alfa: rgba(27,34,50,.8) y
+     rgba(14,19,31,.72/.62) son #1B2232 y #0E131F, el fondo previo a v612. Sobre el
+     negro nuevo (#040507) esa translucidez se leía como una banda más clara.
+     Se sustituye por el token canónico del lienzo, OPACO: el header desaparece
+     visualmente y el contenido que pasa por debajo queda oculto, sin salto de color. */
+  background: var(--bg-main);
   /* AURIX-BRAND-PREMIUM-1: deeper, less-saturated glass reads more refined and
      "expensive" than an oversaturated blur — same darkness, calmer colour. */
-  backdrop-filter: blur(24px) saturate(120%);
-  -webkit-backdrop-filter: blur(24px) saturate(120%);
+  /* HEADER-CANVAS-UNIFICATION — el blur se retira también aquí: sobre una superficie
+     opaca no produce ningún efecto visible y sólo fuerza una capa de composición. */
   /* AURIX-BRAND-PREMIUM-HEADER-2 (B2): more elegant separation — inner top
      light, a faint Aurix-blue hairline at the base, and a softer deeper shadow
      so the header reads as a premium glass plane floating above content. */
@@ -4830,9 +4836,9 @@ body:not(.hero-active) #orb-canvas {
        between the header and the Total Value card (clean premium separation
        kept via the card's own top margin). */
     margin-bottom: 4px;
-    background: rgba(14,19,31, 0.72);
-    backdrop-filter: blur(18px) saturate(140%);
-    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    /* HEADER-CANVAS-UNIFICATION — mismo token que el lienzo. El blur se retira: sobre
+       una superficie opaca no aporta nada visual y sólo fuerza una capa de composición. */
+    background: var(--bg-main);
     /* SPEC MOBILE-ABOVE-THE-FOLD-COMPRESSION — remove the static header divider
        line (the glass background + scroll depth already separate the header). */
     border-bottom: none;
@@ -12348,13 +12354,12 @@ body.workspace-active .header {
   .header {
     padding-top: var(--space-4);
     padding-bottom: var(--space-3);
-    background: rgba(14,19,31, 0.62);
-    backdrop-filter: blur(18px) saturate(140%);
-    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    /* HEADER-CANVAS-UNIFICATION — idem en desktop. */
+    background: var(--bg-main);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   }
   .header.header--scrolled {
-    background: rgba(27,34,50,0.9);
+    background: var(--bg-main);
     border-bottom-color: rgba(255, 255, 255, 0.07);
     /* AURIX-BRAND-PREMIUM-HEADER-2 (B2): consistent premium glass with the
        base scrolled state — inner light + faint blue hairline + soft depth. */
