@@ -9108,7 +9108,10 @@ main { padding-bottom: 72px; }
   margin: 0 -10px;
   border-bottom: 1px solid rgba(255,255,255,0.07);
   border-radius: 10px;
-  transition: background 140ms ease, box-shadow 220ms ease, transform 160ms ease;
+  /* MARKET-FOUNDATION-V1 · BLOQUE C — se retira `transform` de la transición: ya no
+     hay ningún estado que transforme la fila, y dejarla declarada invitaba a
+     reintroducir un desplazamiento animado (prohibido: provoca reflow/salto). */
+  transition: background 140ms ease, box-shadow 220ms ease;
 }
 .market-row:hover {
   /* AURIX-DASH-V1: blue-tinted hover to match the unified design system. */
@@ -9953,9 +9956,17 @@ main { padding-bottom: 72px; }
     /* AURIX-DASH-V2: was rgba(255,255,255,0.06) white — this @media-hover rule
        won by source order over the desktop blue hover on the active is-v4 rows. */
     background: rgba(74,130,240,0.06);
-    border-radius: 8px;
-    transform: translateX(2px);
-    transition: background 0.15s ease, transform 0.15s ease;
+    /* MARKET-FOUNDATION-V1 · BLOQUES B+C — esta regla era la causa real de que el
+       hover no coincidiera con la fila ni con el header:
+         · `transform: translateX(2px)` DESPLAZABA la fila 2px a la derecha al pasar
+           el ratón, mientras el header (que no se mueve) se quedaba atrás → las
+           columnas dejaban de estar alineadas justo en el momento de interactuar.
+         · `border-radius: 8px` contradecía el radio real de la fila (10px base /
+           12px en is-v3), así que el fondo de hover dibujaba una caja distinta.
+       Se elimina el desplazamiento y el radio divergente: el hover reutiliza EXACTA-
+       MENTE la caja de la fila y sólo cambia el color de fondo. Sin reflow, sin
+       escalado, sin salto. La transición se limita a `background` (bajo coste). */
+    transition: background 0.15s ease;
   }
   .featured-card:hover {
     transform: translateY(-2px);
@@ -24061,4 +24072,50 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   .modal[data-mode="asset"][data-asset-flow="form"] #qtyGroup { margin-bottom: 8px; }
   .modal[data-mode="asset"][data-asset-flow="form"] .wl-loc-field { margin-top: 6px; padding-top: 6px; }
   .modal[data-mode="asset"][data-asset-flow="form"] .add-v2-footer .form-preview { margin-bottom: 8px; }
+}
+
+/* ════════ MARKET-FOUNDATION-V1 · BLOQUE C — estados de fila con UNA sola caja ═══
+   El SPEC exige cinco estados (normal / hover / keyboard focus / pressed / abierto)
+   que compartan EXACTAMENTE la misma geometría. Antes sólo existían normal y hover,
+   y el hover además desplazaba la fila (corregido arriba). Aquí se completan los que
+   faltaban SIN tocar ninguna definición de columnas, alto, padding, margen ni radio:
+   todos heredan la caja de `.market-row` y sólo pintan color.
+
+   `border-radius: inherit` en los pseudo-estados evita el fallo clásico de que el
+   realce dibuje una esquina distinta a la de la fila. El foco usa `box-shadow` inset
+   en lugar de `outline` con desplazamiento, para que no sobresalga de los límites de
+   la fila ni empuje a las columnas vecinas.
+   Se añade al final de la hoja a propósito: gana por orden de fuente sin editar
+   ninguna de las reglas de Market ya existentes (revert = borrar este bloque). */
+
+/* Foco de teclado — sólo :focus-visible, así el clic con ratón no deja el anillo. */
+.market-row:focus { outline: none; }
+.market-row:focus-visible {
+  outline: none;
+  background: rgba(74,130,240,0.08);
+  box-shadow: inset 0 0 0 2px rgba(74,130,240,0.55);
+  border-radius: inherit;
+}
+
+/* Pressed — mismo cuadro, sólo un fondo algo más marcado. Sin scale ni translate. */
+.market-row:active {
+  background: rgba(74,130,240,0.11);
+  border-radius: inherit;
+}
+
+/* Seleccionada / abierta — la ficha del activo está abierta sobre esta fila. */
+.market-row.is-selected,
+.market-row[aria-expanded="true"] {
+  background: rgba(74,130,240,0.10);
+  box-shadow: inset 0 0 0 1px rgba(74,130,240,0.22);
+  border-radius: inherit;
+}
+
+/* La estrella es el único control anidado: su foco debe verse y quedar DENTRO de su
+   propia caja, para no invadir la columna de al lado ni alterar el alto de la fila. */
+.watchlist-btn:focus { outline: none; }
+.watchlist-btn:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(74,130,240,0.65);
+  border-radius: 8px;
 }

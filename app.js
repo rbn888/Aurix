@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '589'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '590'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -42554,6 +42554,8 @@ function renderMarket() {
         document.querySelectorAll(`.watchlist-btn[data-symbol="${sym}"]`).forEach(b => {
           b.textContent = isAdded ? '★' : '☆';
           b.classList.toggle('active', isAdded);
+          // MARKET-FOUNDATION-V1 · BLOQUE D — el estado accesible acompaña al visual.
+          b.setAttribute('aria-pressed', isAdded ? 'true' : 'false');
         });
         renderCurrentMarketView();
         return;
@@ -42602,6 +42604,22 @@ function renderMarket() {
       // no-op if the engine / item lookup fails.
       const row = e.target.closest('.market-row');
       if (!row || !row.dataset || !row.dataset.symbol) return;
+      try {
+        if (typeof _aurixMktOpenSymbol === 'function') _aurixMktOpenSymbol(row.dataset.symbol);
+      } catch (_) {}
+    });
+    // MARKET-FOUNDATION-V1 · BLOQUE D — teclado. La fila ya es role="button" +
+    // tabindex="0"; Enter/Espacio deben abrirla igual que el clic. La estrella es un
+    // <button> nativo, así que Enter/Espacio sobre ella disparan su propio click y la
+    // rama de arriba (con stopPropagation) evita que además se abra la ficha: misma
+    // separación fila/estrella que con ratón. preventDefault sólo en Espacio, para que
+    // no haga scroll de página. Un ÚNICO listener, mismo owner que el clic.
+    screen.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+      if (e.target.closest('.watchlist-btn')) return;          // el botón se gestiona solo
+      const row = e.target.closest('.market-row');
+      if (!row || !row.dataset || !row.dataset.symbol) return;
+      if (e.key !== 'Enter') e.preventDefault();
       try {
         if (typeof _aurixMktOpenSymbol === 'function') _aurixMktOpenSymbol(row.dataset.symbol);
       } catch (_) {}
@@ -43104,8 +43122,11 @@ function renderCurrentMarketView() {
     // live ETF market list (MC-9 baseline) renders below — both kept
     // accessible per spec. Clicks on discovery cards reuse openModal +
     // selectAsset; clicks on live rows keep their existing behavior.
-    const live = renderFromCache('etfs', data);
-    html = _renderDiscoveryCatalog('etfs') + live;
+    // MARKET-FOUNDATION-V1 · BLOQUE A — el catálogo se pinta ANTES que la lista:
+    // es quien puede resetear un subfiltro que dejó de ser válido, y la lista debe
+    // renderizarse ya con ese estado corregido (si no, chip y filas divergen un frame).
+    const disc = _renderDiscoveryCatalog('etfs', data);
+    html = disc + renderFromCache('etfs', data);
   } else {
     const activeType = _TAB_TO_TYPE[currentMarketTab];
     if (!activeType) return;
@@ -43113,7 +43134,8 @@ function renderCurrentMarketView() {
     // live monitoring table for every supported tab. The registry guard
     // means tabs without a catalog (none today) still render the table
     // alone, with no empty discovery shell.
-    const disc = _DISCOVERY_CATALOGS[currentMarketTab] ? _renderDiscoveryCatalog(currentMarketTab) : '';
+    // MARKET-FOUNDATION-V1: mismo orden — catálogo primero (puede resetear), lista después.
+    const disc = _DISCOVERY_CATALOGS[currentMarketTab] ? _renderDiscoveryCatalog(currentMarketTab, data) : '';
     html = disc + renderFromCache(activeType, data);
   }
   // MARKET-2: prepend the explorer controls bar. Empty string when the
@@ -43563,15 +43585,46 @@ function _fundCardBadges(it) {
 // Reads the catalog + active state from _DISCOVERY_CATALOGS so each tab
 // shares the same DOM/styling and the same click delegation. data-disc-
 // attributes carry the tab key so the delegation can route correctly.
-function _renderDiscoveryCatalog(tabKey) {
+function _renderDiscoveryCatalog(tabKey, data) {
   const reg = _DISCOVERY_CATALOGS[tabKey];
   if (!reg || !Array.isArray(reg.catalog) || reg.catalog.length === 0) return '';
-  const activeId = reg.get();
-  const cat = reg.catalog.find(c => c.id === activeId) || reg.catalog[0];
-  const chips = reg.catalog.map(c => {
+  // MARKET-FOUNDATION-V1 · BLOQUE A — sólo se pinta el chip que filtra de verdad.
+  // `rows` son las filas YA cargadas de esta pestaña: la misma fuente que la lista.
+  const rows = _aurixMktRowsForTab(tabKey, data);
+  // Cold start: sin filas todavía no se puede juzgar cobertura (la lista muestra
+  // skeleton). Se pintan todos los chips para no provocar un parpadeo en la fila de
+  // chips; en cuanto llegan los datos, el siguiente render aplica la cobertura real.
+  const canJudge = rows.length > 0;
+  // Un subfiltro sólo es real si produce un subconjunto ESTRICTO: ni vacío (no
+  // cambiaría nada y antes caía al fallback silencioso) ni completo (devolvería
+  // exactamente la misma lista que "todo", que es el defecto descrito por el SPEC
+  // con otra cara). Caso real detectado: en Índices, "EE.UU." cubría los 3 únicos
+  // índices monitorizados → seleccionarlo dejaba la lista idéntica.
+  const visible = canJudge
+    ? reg.catalog.filter((c, i) => {
+        if (i === 0) return true;                                   // la categoría por defecto siempre está
+        const cov = _aurixMktChipCoverage(c, rows, false);
+        return cov > 0 && cov < rows.length;
+      })
+    : reg.catalog.slice();
+  // SPEC §3 — si el subfiltro activo deja de ser válido (su chip ya no se muestra),
+  // se resetea a la categoría por defecto ANTES de pintar. Esto va OBLIGATORIAMENTE
+  // antes de cualquier salida temprana: si saliéramos sin resetear, el estado activo
+  // seguiría filtrando la lista mientras su chip ya no existe — exactamente la
+  // incoherencia "selección visual ≠ contenido" que este SPEC viene a eliminar.
+  let activeId = reg.get();
+  if (!visible.some(c => c.id === activeId)) {
+    activeId = reg.catalog[0].id;
+    try { reg.set(activeId); } catch (_) {}
+  }
+  // Si sólo sobrevive la categoría por defecto no hay filtro secundario que ofrecer:
+  // una fila con un único chip que no filtra nada es, otra vez, un control decorativo.
+  if (visible.length <= 1) return '';
+  const cat = visible.find(c => c.id === activeId) || visible[0];
+  const chips = visible.map(c => {
     const label = t(reg.labelPrefix + c.id) || c.id;
     const active = c.id === cat.id ? ' active' : '';
-    return `<button class="funds-cat${active}" data-disc-cat="${_escFunds(c.id)}" data-disc-tab="${_escFunds(tabKey)}">${_escFunds(label)}</button>`;
+    return `<button class="funds-cat${active}" type="button" role="tab" aria-selected="${c.id === cat.id ? 'true' : 'false'}" data-disc-cat="${_escFunds(c.id)}" data-disc-tab="${_escFunds(tabKey)}">${_escFunds(label)}</button>`;
   }).join('');
   const cards = cat.items.map(it => `
     <button class="funds-card" data-disc-pick="${_escFunds(it.ticker)}" data-disc-tab="${_escFunds(tabKey)}" type="button">
@@ -43716,16 +43769,62 @@ function _aurixMktMobileCategoryFilter() {
   } catch (_) { return null; }
 }
 
+// ── MARKET-FOUNDATION-V1 · BLOQUE A — coherencia chip ↔ lista ────────────────
+// CAUSA RAÍZ de "el chip cambia pero la lista no": los chips secundarios se
+// pintan desde el catálogo de descubrimiento (_DISCOVERY_CATALOGS), que es una
+// lista curada de tickers, mientras que la lista viva sólo monitoriza universos
+// muy pequeños (MARKET_ETFS = 5 símbolos, MARKET_INDICES = 3, MARKET_COMMODITIES
+// = 3). Cuando un chip no comparte NI UN símbolo con esas filas, el filtro
+// resultante quedaba vacío y renderFromCache hacía `if (sub.length) items = sub`
+// — es decir, se caía EN SILENCIO a la lista completa. El chip se marcaba activo
+// y la lista no cambiaba. Ese es exactamente el caso "Oro" reportado: sus tickers
+// (SGLN.L / PHAU.L / GLD / IAU / 4GLD.DE) no intersecan con SPY/QQQ/VOO/VTI/URTH.
+//
+// La corrección NO inventa activos ni clasificaciones (prohibido por el SPEC): mide
+// la cobertura real contra las filas ya cargadas y sólo deja visible el chip que de
+// verdad filtra. Es auto-mantenido: si mañana crece el universo monitorizado, el
+// chip reaparece solo, sin tocar código.
+//
+// Devuelve el Set de símbolos normalizados de una categoría del catálogo.
+function _aurixMktCatalogSymbols(cat) {
+  const set = new Set();
+  if (!cat || !Array.isArray(cat.items)) return set;
+  cat.items.forEach(it => {
+    const s = normalizeSymbol(it.ticker || it.marketSymbol || '');
+    if (s) set.add(s);
+  });
+  return set;
+}
+
+// ¿Cuántas filas REALES (de las ya cargadas para esta pestaña) produciría el chip?
+// La categoría por defecto no filtra: su "cobertura" son todas las filas.
+function _aurixMktChipCoverage(cat, rows, isDefault) {
+  if (isDefault) return Array.isArray(rows) ? rows.length : 0;
+  const set = _aurixMktCatalogSymbols(cat);
+  if (!set.size || !Array.isArray(rows)) return 0;
+  return rows.filter(r => set.has(normalizeSymbol(r && r.symbol))).length;
+}
+
+// Filas ya cargadas que alimentan la lista de una pestaña concreta. Es la MISMA
+// fuente que usa renderFromCache, para que el chip y la lista no puedan discrepar.
+function _aurixMktRowsForTab(tabKey, data) {
+  const type = _TAB_TO_TYPE[tabKey] || (tabKey === 'funds' ? 'etfs' : null);
+  if (!type || !Array.isArray(data)) return [];
+  const lc = String(type).toLowerCase().trim();
+  return data.filter(d => String(d && d.type).toLowerCase().trim() === lc);
+}
+
 function renderFromCache(type, data) {
   const normalizedType = String(type).toLowerCase().trim();
   let items = data.filter(d => String(d.type).toLowerCase().trim() === normalizedType);
-  // MARKET-MOBILE-1: apply the mobile subcategory filter (with safe fallback to
-  // the full list when there is no overlap with loaded data).
+  // MARKET-MOBILE-1 + MARKET-FOUNDATION-V1 · BLOQUE A: se aplica el subfiltro activo.
+  // Ya NO existe el fallback silencioso a la lista completa (`if (sub.length)`): era
+  // la causa directa de "el chip se marca activo y la lista no cambia". Ahora sólo se
+  // pintan chips con cobertura real (_renderDiscoveryCatalog), así que un chip visible
+  // siempre produce filas; y si por carrera de datos no las produjera, se respeta el
+  // resultado vacío y cae en el skeleton de abajo — nunca se muestra otra categoría.
   const _catSet = _aurixMktMobileCategoryFilter();
-  if (_catSet) {
-    const sub = items.filter(it => _catSet.has(normalizeSymbol(it.symbol)));
-    if (sub.length) items = sub;
-  }
+  if (_catSet) items = items.filter(it => _catSet.has(normalizeSymbol(it.symbol)));
   if (!items.length) {
     return `<div class="market-skeleton">${Array.from({ length: 8 }).map(() => `
       <div class="market-row skeleton">
@@ -44128,15 +44227,31 @@ function updateMarketTabUI() {
   const active = document.querySelector(`.market-tab[data-market="${currentMarketTab}"]`);
   if (active) {
     active.classList.add('active');
-    // Keep the active pill in view on mobile — important when the
-    // scroller is wider than the viewport so the user always sees
-    // which tab is selected after a click. Desktop fits all tabs.
-    // requestAnimationFrame defers the scroll until after layout so
-    // the initial Market mount (Watchlist) lands at scrollLeft=0
-    // instead of a stale offset from a previous render.
+    // MARKET-FOUNDATION-V1 · BLOQUE E — carrusel de categorías.
+    // CAUSA RAÍZ del "primer chip cortado": esto llamaba a scrollIntoView con
+    // `inline:'center'` de forma INCONDICIONAL en cada render, incluido el montaje
+    // inicial y cada reentrada en Market. Centrar la pastilla activa arrastra el
+    // scroller hacia la derecha, de modo que el primer chip queda medio tapado por
+    // el borde/máscara del carrusel — y además producía el auto-scroll al volver a
+    // la vista y el salto brusco al cambiar de categoría, ambos prohibidos por el SPEC.
+    //
+    // Ahora se desplaza SÓLO si la pastilla activa no está completamente visible, y
+    // con `inline:'nearest'`: no mueve nada cuando ya se ve (caso del primer chip) y,
+    // cuando debe moverse, la trae justo a la vista en lugar de recentrar todo.
     if (typeof active.scrollIntoView === 'function') {
       requestAnimationFrame(() => {
-        try { active.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'auto' }); } catch (_) {}
+        try {
+          const scroller = active.parentElement;
+          if (scroller && typeof active.getBoundingClientRect === 'function') {
+            const a = active.getBoundingClientRect();
+            const s = scroller.getBoundingClientRect();
+            // Margen igual a la máscara/padding lateral del carrusel (22px): un chip
+            // que cae bajo el degradado cuenta como NO visible y se trae a la vista.
+            const EDGE = 22;
+            if (a.left >= s.left + EDGE && a.right <= s.right - EDGE) return;  // ya visible → no tocar
+          }
+          active.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'auto' });
+        } catch (_) {}
       });
     }
   }
@@ -44632,8 +44747,12 @@ function renderMarketItem(item, idx) {
   // MC-11A: directional indicator paired with the existing safeChange
   // output. Colors stay on the .is-up / .is-down classes; the arrow is
   // a CSS pseudo-element driven off those classes (no inline text).
+  // MARKET-FOUNDATION-V1 · BLOQUE D — la fila entera abre el activo, así que debe
+  // ser un control real: foco por teclado (tabindex) y semántica de botón. Antes era
+  // un <div> puro: sólo se podía abrir con ratón/tap y el estado "keyboard focus" que
+  // exige el SPEC no existía en ninguna fila. La geometría no cambia (mismos nodos).
   return `
-    <div class="market-row" data-symbol="${normSym}">
+    <div class="market-row" data-symbol="${normSym}" role="button" tabindex="0" aria-label="${escHtml(item.symbol)}">
       <div class="col col-asset">
         <div class="asset-wrapper">
           ${_assetIconHtml(item, item.symbol, 'asset-icon', typeof idx === 'number' && idx < _AURIX_MKT_EAGER_ICONS)}
@@ -44655,7 +44774,7 @@ function renderMarketItem(item, idx) {
       </div>
       <div class="col col-chart${isLoading ? ' is-loading' : ''}" data-spark-key="${normSym}" data-spark-change="${chg ?? ''}" data-spark-tf="${selectedTf}">${isLoading ? '' : chart}</div>
       <div class="col col-action">
-        <button class="watchlist-btn ${watched ? 'active' : ''}" data-symbol="${normSym}" aria-label="${watched ? 'Unwatch' : 'Watch'} ${item.symbol}">${watched ? '★' : '☆'}</button>
+        <button type="button" class="watchlist-btn ${watched ? 'active' : ''}" data-symbol="${normSym}" aria-pressed="${watched ? 'true' : 'false'}" aria-label="${watched ? 'Unwatch' : 'Watch'} ${escHtml(item.symbol)}">${watched ? '★' : '☆'}</button>
       </div>
     </div>
   `;
