@@ -35,7 +35,11 @@ console.log('AURIX-SEARCH-RANKING — SEARCH V2.1 (phase 1)\n');
 console.log('0 — motor único:');
 ok('0 marker present', app.indexOf('SEARCH-V2.1') >= 0);
 ok('0 a single ranking function exists', (app.match(/function _aurixRankSearchResults\(/g) || []).length === 1);
-ok('0 searchAllAssets ranks through it', /searchAllAssets[\s\S]{0,3000}_aurixRankSearchResults\(merged, query\)/.test(app));
+// MARKET-INSTITUTIONAL-V1 amplió searchAllAssets (catálogo curado de ETF + comentarios
+// de causa raíz), así que la llamada al ranker quedó a ~3.9k chars del inicio de la
+// función y la ventana de 3000 ya no la alcanzaba. Se amplía la ventana: lo que este
+// assert protege —que searchAllAssets ordene por el ranker canónico— no ha cambiado.
+ok('0 searchAllAssets ranks through it', /searchAllAssets[\s\S]{0,6000}_aurixRankSearchResults\(merged, query\)/.test(app));
 ok('0 the filtered route ranks through the SAME function', (app.match(/_aurixRankSearchResults\(merged, query\)/g) || []).length >= 2);
 ok('0 no second/alternate ranker was introduced', !/function _aurix\w*Rank\w*Results2|function _aurixMarketRankSearch/.test(app));
 
