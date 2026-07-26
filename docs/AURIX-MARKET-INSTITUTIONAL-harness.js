@@ -109,11 +109,12 @@ ok('5.1 la fila NO emite celda de capitalización', !/class="col col-cap/.test(a
 ok('5.2 la cabecera NO declara columna de capitalización', !/CAP\.|MKT CAP/.test(app));
 ok('5.3 no se ofrece ordenación por capitalización en ninguna superficie',
    !/data-mkt-sort="cap/.test(indexHtml) && !/key: 'cap'/.test(app));
-// HOTFIX COMPACT-GRID: cinco columnas de DATOS + una sexta pista vacía al final que
-// absorbe el sobrante. Antes la identidad era `1fr` y repartía el hueco entre columnas.
-ok('5.4 la retícula web tiene 5 columnas de datos y el sobrante al final',
-   /grid-template-columns: minmax\(0, 520px\) 104px 92px 168px 40px 1fr;/.test(cssCode) &&
-   /nth-child\(6\)[\s\S]{0,90}display: none;/.test(cssCode));
+// HOTFIX ROW-GEOMETRY: cinco columnas de DATOS y una pista de aire flexible en el
+// MEDIO (pista 2). En v609 ese aire iba al final y dejaba ~190px muertos a la derecha
+// de la estrella mientras Precio/24H/Tendencia quedaban comprimidos.
+ok('5.4 la rejilla web tiene 5 columnas de datos y el aire flexible en el medio',
+   /grid-template-columns: minmax\(0, 500px\) minmax\(20px, 1fr\) 118px 96px 168px 40px;/.test(cssCode) &&
+   !/minmax\(0, 520px\) 104px 92px 168px 40px 1fr/.test(cssCode));
 ok('5.5 la capitalización NUNCA se calcula ni se estima (sólo se acepta explícita)',
    /const v = Number\(row && \(row\.marketCap \?\? row\.market_cap\)\);/.test(app) &&
    !/marketCap\s*=\s*(price|qty|shares)/.test(app));
@@ -135,12 +136,14 @@ console.log('\n7 — Sparkline compacto y estados honestos:');
 ok('7.1 la pista del sparkline es FIJA de 168px en web (no crece con la pantalla)',
    /#marketList \.col-chart \{[^}]*width: 168px; max-width: 168px;/.test(cssCode));
 ok('7.2 el svg se recorta al ancho de su pista', /#marketList \.col-chart svg \{ width: 168px !important; max-width: 168px;/.test(cssCode));
-ok('7.3 en móvil el sparkline es aún más estrecho y no roba ancho al nombre',
-   /width: 44px; max-width: 44px;/.test(cssCode));
+ok('7.3 en móvil el sparkline es amplio (rango 68–88px) y no hereda anchos de web',
+   /width: 70px; max-width: 70px;/.test(cssCode) && /width: 70px !important;/.test(cssCode) &&
+   !/width: 44px; max-width: 44px;/.test(cssCode));
 ok('7.4 el nombre puede ocupar dos líneas en móvil antes de truncar',
    /-webkit-line-clamp: 2;/.test(cssCode));
-ok('7.5 la identidad reserva separación del precio (no puede tocarlo)',
-   /#marketList \.col-asset \{ grid-column: 1; grid-row: 1 \/ span 2; min-width: 0; padding-right: 6px; \}/.test(cssCode));
+ok('7.5 la identidad no puede solaparse con el precio: cada uno tiene su pista real',
+   /grid-template-columns: minmax\(0, 1fr\) 86px 70px 30px;/.test(cssCode) &&
+   !/minmax\(0, 1fr\) 44px max-content 30px/.test(cssCode));
 ok('7.6 el skeleton tiene UN owner y la geometría de la fila real',
    (app.match(/^function _aurixMktSkeletonHtml\(/gm) || []).length === 1);
 ok('7.7 no puede quedarse en skeleton permanente: siempre repinta al terminar',
@@ -206,11 +209,16 @@ if (pick) {
      (pick({type:'crypto',symbol:'BTC',coinId:'bitcoin'}) || {}).kind === 'crypto');
 }
 // 9c — retícula compacta
-ok('9.15 la identidad tiene techo: no absorbe todo el ancho del contenedor',
-   /minmax\(0, 520px\)/.test(cssCode) && !/grid-template-columns: minmax\(0, 1fr\) 108px 96px 168px 44px/.test(cssCode));
+ok('9.15 la identidad tiene techo por viewport (430–560px) y no absorbe el sobrante',
+   /minmax\(0, 500px\)/.test(cssCode) && /minmax\(0, 430px\)/.test(cssCode) && /minmax\(0, 560px\)/.test(cssCode));
 ok('9.16 la tendencia se mantiene en ~168px', /168px/.test(cssCode));
-ok('9.17 la geometría móvil aprobada no se toca',
-   /grid-template-columns: minmax\(0, 1fr\) 44px max-content 30px;/.test(cssCode) && /-webkit-line-clamp: 2;/.test(cssCode));
+ok('9.17 móvil conserva nombre a dos líneas y rejilla propia (no hereda la de web)',
+   /-webkit-line-clamp: 2;/.test(cssCode) &&
+   /grid-template-columns: minmax\(0, 1fr\) 86px 70px 30px;/.test(cssCode) &&
+   !/minmax\(0, 500px\)[^;]*;\s*[^}]*max-width: 768px/.test(cssCode));
+ok('9.18 header y filas comparten pistas: colocación explícita, sin absolutos ni transforms',
+   /#marketList \.market-row > \.col-price,\s*\n\s*#marketList \.market-table-header > div:nth-child\(2\) \{ grid-column: 3; \}/.test(cssCode) &&
+   !/#marketList[^{]*\.col-[a-z]+[^{]*\{[^}]*position:\s*absolute/.test(cssCode));
 
 console.log('\nRESULT: ' + (fail === 0 ? 'ALL PASS ✓' : 'FAIL ✗') + '  (' + pass + ' passed, ' + fail + ' failed)');
 process.exit(fail === 0 ? 0 : 1);
