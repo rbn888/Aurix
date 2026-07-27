@@ -12713,6 +12713,29 @@ body.workspace-active .header {
     box-sizing: border-box;
   }
 
+  /* MOBILE-PREMIUM — UNA sola card para toda la lista, igual que en desktop, donde
+     .market-section ya es la tarjeta institucional. Antes las filas se apoyaban
+     directamente sobre el lienzo. Va SOLO en #marketList: la regla de arriba es un
+     guard de overflow compartido por cuatro contenedores y aplicarle la card allí
+     pintaba tres tarjetas anidadas. Mismo lenguaje que desktop (gradiente de la
+     familia, borde azul, radio 14) atenuado para móvil. Sin sombras nuevas y sin
+     padding vertical: la altura de fila no cambia. `overflow: hidden` recorta la
+     primera y la última fila contra el radio. */
+  #marketList.market-section {
+    background:
+      radial-gradient(130% 120% at 10% 0%, rgba(74,130,240,0.07), transparent 58%),
+      linear-gradient(165deg, rgba(30,44,74,0.30), rgba(26,34,54,0.36));
+    border: 1px solid rgba(74,130,240,0.18);
+    border-radius: 14px;
+    overflow: hidden;
+    padding: 0;
+  }
+  /* Dentro de la card las filas no dibujan su propia caja redondeada: si no, cada
+     fila se leería como una tarjeta suelta, que es justo lo que NO se quiere. */
+  #marketList.market-section .market-row { border-radius: 0; }
+  /* La última fila no dibuja separador: el borde de la card ya cierra la lista. */
+  #marketList.market-section .market-row:last-child { border-bottom: 0; }
+
   /* Horizontal scrollers (top tabs, category chips) stay scrollable
      internally but their overscroll must not bubble up and rock the
      page sideways when the keyboard slides in. contain:paint isolates
@@ -24299,12 +24322,23 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
        El aire para el icono sale de un padding izquierdo asimétrico (10 vs 8): protege
        el círculo sin robarle ancho al nombre. El gap uniforme de 8px da separación
        constante precio↔gráfico y gráfico↔estrella. */
-    grid-template-columns: minmax(0, 1fr) 84px 68px 28px;
+    /* MOBILE-PREMIUM — se inserta una pista FLEXIBLE entre el bloque Precio/24H y el
+       sparkline, de modo que todo el sobrante del ancho empuja gráfico y estrella
+       hacia el extremo derecho en lugar de acumularse en la identidad. La identidad
+       pasa a tener techo (140px) para que ese sobrante exista de verdad; por debajo
+       de ~410px no hay holgura que repartir y la pista flexible vale 0, así que la
+       fila se comporta igual que antes. El gap baja de 8 a 6 para pagar la cuarta
+       separación que introduce la nueva pista. */
+    grid-template-columns: minmax(0, 140px) 84px minmax(0, 1fr) 70px 28px;
     grid-template-rows: auto auto;
     column-gap: 8px;
     row-gap: 0;
     align-items: center;
-    padding: 9px 8px 9px 10px;
+    /* MOBILE-PREMIUM (opción 2) — padding lateral 9→6: la card ya aporta el inset
+       visual, así que esos 6px se devuelven a la identidad y los metadatos largos
+       ("AAPL · Acción", "GSPC · Índice") vuelven a caber enteros. Contrapartida
+       aceptada por el owner: el margen de la estrella al borde baja a ~7px. */
+    padding: 9px 6px;
     min-height: 58px;
   }
   /* padding-right propio: con `max-content` en la columna de precio, la identidad
@@ -24326,13 +24360,13 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   #marketList.is-v4 .market-row .col-change { grid-column: 2 / 3; grid-row: 2 / 3; }
   #marketList .market-row .col-chart,
   #marketList.is-v3 .market-row .col-chart,
-  #marketList.is-v4 .market-row .col-chart  { grid-column: 3 / 4; grid-row: 1 / 3; }
+  #marketList.is-v4 .market-row .col-chart  { grid-column: 4 / 5; grid-row: 1 / 3; }
   /* `justify-self: end` dejaba la caja de la estrella (40px) desbordando su pista de
      30px hacia la izquierda y rozando el gráfico. Con `stretch` la caja ES la pista:
      el hueco gráfico↔estrella queda constante y no hay solape de ningún tipo. */
   #marketList .market-row .col-action,
   #marketList.is-v3 .market-row .col-action,
-  #marketList.is-v4 .market-row .col-action { grid-column: 4 / 5; grid-row: 1 / 3; align-self: center; justify-self: stretch; display: flex; align-items: center; justify-content: flex-end; }
+  #marketList.is-v4 .market-row .col-action { grid-column: 5 / 6; grid-row: 1 / 3; align-self: center; justify-self: stretch; display: flex; align-items: center; justify-content: flex-end; }
   #marketList .col-asset { grid-column: 1; grid-row: 1 / span 2; min-width: 0; padding-right: 0; }
   /* El nombre puede usar DOS líneas antes de truncar: "SPDR S&P 500 ETF" cabe entero
      en lugar de quedarse en "SPDR S&P…". Los metadatos siguen en una sola línea, son
@@ -24360,11 +24394,11 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
      se lea. Justificado a la derecha de su pista → no deja hueco muerto antes de la
      estrella. Sigue recortado, nunca desborda. */
   #marketList .col-chart {
-    grid-column: 3; grid-row: 1 / span 2;
+    grid-column: 4; grid-row: 1 / span 2;
     display: flex; align-items: center; justify-content: center;
-    width: 68px; max-width: 68px; overflow: hidden;
+    width: 70px; max-width: 70px; overflow: hidden;
   }
-  #marketList .col-chart svg { width: 68px !important; max-width: 68px; height: 26px; display: block; }
+  #marketList .col-chart svg { width: 70px !important; max-width: 70px; height: 26px; display: block; }
   #marketList .col-price {
     grid-column: 2; grid-row: 1;
     display: flex; align-items: flex-end; justify-content: flex-end;
@@ -24381,7 +24415,7 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   /* Estrella pegada al borde derecho, con el padding de la fila como margen interno.
      El área de clic real se mantiene cómoda con un padding negativo óptico. */
   #marketList .col-action {
-    grid-column: 4; grid-row: 1 / span 2;
+    grid-column: 5; grid-row: 1 / span 2;
     display: flex; align-items: center; justify-content: flex-end;
   }
   #marketList .watchlist-btn { width: 28px; height: 28px; }   /* cabe entera en su pista: no invade el gráfico */

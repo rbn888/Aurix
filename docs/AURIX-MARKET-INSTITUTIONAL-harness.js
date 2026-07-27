@@ -137,12 +137,12 @@ ok('7.1 la pista del sparkline es FIJA en web (no crece con la pantalla)',
    /#marketList \.col-chart \{[^}]*width: 172px; max-width: 172px;/.test(cssCode));
 ok('7.2 el svg se recorta al ancho de su pista', /#marketList \.col-chart svg \{ width: 172px !important; max-width: 172px;/.test(cssCode));
 ok('7.3 en móvil el sparkline es amplio (rango 68–88px) y no hereda anchos de web',
-   /width: 68px; max-width: 68px;/.test(cssCode) && /width: 68px !important;/.test(cssCode) &&
+   /width: 70px; max-width: 70px;/.test(cssCode) && /width: 70px !important;/.test(cssCode) &&
    !/width: 44px; max-width: 44px;/.test(cssCode));
 ok('7.4 el nombre puede ocupar dos líneas en móvil antes de truncar',
    /-webkit-line-clamp: 2;/.test(cssCode));
 ok('7.5 la identidad no puede solaparse con el precio: cada uno tiene su pista real',
-   /grid-template-columns: minmax\(0, 1fr\) 84px 68px 28px;/.test(cssCode) &&
+   /grid-template-columns: minmax\(0, 140px\) 84px minmax\(0, 1fr\) 70px 28px;/.test(cssCode) &&
    !/minmax\(0, 1fr\) 44px max-content 30px/.test(cssCode));
 ok('7.6 el skeleton tiene UN owner y la geometría de la fila real',
    (app.match(/^function _aurixMktSkeletonHtml\(/gm) || []).length === 1);
@@ -214,7 +214,7 @@ ok('9.15 la identidad tiene techo por viewport (430–560px) y no absorbe el sob
 ok('9.16 la tendencia se mantiene en ~168px', /172px/.test(cssCode));
 ok('9.17 móvil conserva nombre a dos líneas y rejilla propia (no hereda la de web)',
    /-webkit-line-clamp: 2;/.test(cssCode) &&
-   /grid-template-columns: minmax\(0, 1fr\) 84px 68px 28px;/.test(cssCode) &&
+   /grid-template-columns: minmax\(0, 140px\) 84px minmax\(0, 1fr\) 70px 28px;/.test(cssCode) &&
    !/minmax\(0, 500px\)[^;]*;\s*[^}]*max-width: 768px/.test(cssCode));
 ok('9.18 header y filas comparten pistas: colocación explícita, sin absolutos ni transforms',
    /#marketList \.market-row > \.col-price,\s*\n\s*#marketList \.market-table-header > div:nth-child\(2\) \{ grid-column: 2; \}/.test(cssCode) &&
