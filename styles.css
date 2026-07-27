@@ -24483,3 +24483,45 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
 /* El enlace de soporte reutiliza la caja de .settings-action; sólo se neutraliza
    la decoración propia del <a> para que no se distinga de los botones vecinos. */
 #acSupportLink { text-decoration: none; }
+
+/* ════════ MARKET-MOBILE-V2 — pulido de composición (sólo móvil) ═════════════
+   AUDITORÍA contra Dashboard móvil, medida a 390px:
+     Dashboard   margen lateral 12px · header→1er bloque 6px  · entre bloques 12px
+     Market      margen lateral 24px · header→buscador  26px  · entre bloques 18/8px
+   Market añadía un padding lateral PROPIO sobre el de `.app`, duplicando el margen
+   del sistema. No era una decisión de diseño: era acumulación. Alinearlo devuelve
+   24px de ancho útil —y ese ancho es justo lo que permite mejorar el bloque derecho
+   sin restar a identidad, precio ni gráfico.
+
+   Se mantienen buscador y filtros FUERA de la card: el lenguaje del Dashboard son
+   bloques separados con su propio radio (hero, slider, summary), no un contenedor
+   único. Unificarlos introduciría un patrón que el resto de la app no usa, así que
+   la jerarquía más institucional aquí es la que ya existe. */
+@media (max-width: 768px) {
+  /* §4 — el margen lateral pasa a ser el del sistema (los 12px de .app). */
+  .market-screen { padding-left: 0; padding-right: 0; }
+
+  /* §2 — ritmo vertical alineado con Dashboard: 12px del header al buscador
+     (eran 26) y 12px entre buscador y filtros (eran 18). */
+  .market-screen { padding-top: 4px; }
+  .market-search-wrap { margin-top: 4px; margin-bottom: 4px; }
+  .market-tabs { padding-top: 6px; padding-bottom: 6px; margin-top: 2px; margin-bottom: 4px; }
+  #marketList { margin-top: 6px; }
+
+  /* §5 + §6 — con los 24px recuperados el reparto interno se equilibra: padding
+     simétrico de 10px (el icono y la estrella dejan de tener trato distinto) y el
+     gap sube de 8 a 10px, así que el bloque sparkline+estrella respira más y se
+     desplaza a la derecha. La identidad NO pierde ancho: gana. */
+  #marketList .market-row,
+  #marketList.is-v3 .market-row,
+  #marketList.is-v4 .market-row {
+    column-gap: 10px;
+    padding: 9px 10px;
+  }
+  /* Las filas siguen planas dentro de la card (el radio propio las haría leerse
+     como tarjetas sueltas). Se declara al nivel de especificidad de las reglas
+     is-v4 previas, que ganaban al selector corto. */
+  #marketList.market-section .market-row,
+  #marketList.is-v3 .market-row,
+  #marketList.is-v4 .market-row { border-radius: 0; }
+}
