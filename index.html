@@ -102,8 +102,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v615-market-mobile-right-block';
-      var APPJS_V = '592';
+      var BUILD = 'v616-account-center-v1';
+      var APPJS_V = '593';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -278,7 +278,7 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=615">
+  <link rel="stylesheet" href="styles.css?v=616">
 </head>
 <body style="background:#040507">
 
@@ -364,8 +364,14 @@
           <div class="menu-divider"></div>
           <!-- DSH.MENU.03 — two primary actions; Aurix Premium is the hero.
                Language/currency moved to Configuración → Preferencias. -->
-          <button id="menuGeneral" class="menu-item menu-item--general" data-i18n="settingsGeneral" role="menuitem">⚙ Configuración</button>
-          <button id="menuPremium" class="menu-item menu-item--premium-cta" role="menuitem">✨ Aurix Premium</button>
+          <!-- ACCOUNT-CENTER-V1 — seis destinos, cada uno abre DIRECTAMENTE su sección
+               del modal de configuración ya existente (data-account-section = data-pane).
+               Sin pantalla intermedia: no hay una opción "Configuración" genérica. -->
+          <button class="menu-item" data-account-section="account"       role="menuitem" data-i18n="acProfile">Perfil</button>
+          <button class="menu-item" data-account-section="notifications" role="menuitem" data-i18n="acNotifications">Notificaciones</button>
+          <button class="menu-item" data-account-section="prefs"         role="menuitem" data-i18n="acPreferences">Preferencias</button>
+          <button class="menu-item" data-account-section="data"          role="menuitem" data-i18n="acSecurity">Seguridad</button>
+          <button class="menu-item" data-account-section="help"          role="menuitem" data-i18n="acHelp">Ayuda y soporte</button>
           <div class="menu-divider"></div>
           <button id="menuExit" class="menu-item menu-item--danger" data-i18n="menuLogout" role="menuitem">Cerrar sesión</button>
         </div>
@@ -1498,7 +1504,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=592"
+  <script src="app.js?v=593"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
@@ -1677,7 +1683,10 @@
         <!-- SETTINGS-MOBILE-V2 — Membresía/Premium hidden for Launch 1 via the single
              `html[data-aurix-premium-ui="off"]` owner; markup/handlers preserved for Launch 2. -->
         <button type="button" class="settings-nav-item" role="tab" data-settings-pane="plan" data-i18n="settingsPlanTitle">Membresía</button>
-        <button type="button" class="settings-nav-item" role="tab" data-settings-pane="profile" data-i18n="settingsProfileTitle">Perfil inversor</button>
+        <!-- ACCOUNT-CENTER-V1 — "Perfil inversor" deja de ser una entrada propia del rail:
+             vive dentro de Preferencias (mismo markup, sin duplicar owners). -->
+        <button type="button" class="settings-nav-item" role="tab" data-settings-pane="notifications" data-i18n="acNotifications">Notificaciones</button>
+        <button type="button" class="settings-nav-item" role="tab" data-settings-pane="help" data-i18n="acHelp">Ayuda y soporte</button>
         <button type="button" class="settings-nav-item" role="tab" data-settings-pane="data" data-i18n="settingsData">Datos y seguridad</button>
       </nav>
       <div class="settings-panes">
@@ -1802,6 +1811,36 @@
             <button type="button" class="settings-profile-chip" data-settings-age="over_60" data-i18n="onbAgeOver60">60+</button>
             <button type="button" class="settings-profile-chip settings-profile-chip--ghost" data-settings-age="prefer_not_say" data-i18n="onbAgePreferNotSay">Prefiero no decirlo</button>
           </div>
+        </div>
+      </section>
+
+      <!-- ACCOUNT-CENTER-V1 — Notificaciones. V1 es sólo el contenedor visual con un
+           estado vacío honesto: no hay backend, ni programación, ni envío. El markup
+           queda listo para que en el futuro se inyecten avisos del equipo sin rehacer
+           la tarjeta. -->
+      <section class="settings-section" data-pane="notifications" id="settingsSectionNotifications">
+        <h4 class="settings-section-title"><span class="settings-sec-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10.3 21a2 2 0 003.4 0"/></svg></span><span data-i18n="acNotifications">Notificaciones</span></h4>
+        <div class="ac-empty" id="acNotificationsList">
+          <div class="ac-empty-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10.3 21a2 2 0 003.4 0"/></svg>
+          </div>
+          <div class="ac-empty-title" data-i18n="acNoNotifications">No tienes notificaciones</div>
+          <span class="ac-soon" data-i18n="acSoon">Próximamente</span>
+        </div>
+      </section>
+
+      <!-- ACCOUNT-CENTER-V1 — Ayuda y soporte. Un único destino real: abrir el cliente
+           de correo. No se adjunta diagnóstico ni ningún dato automáticamente. -->
+      <section class="settings-section" data-pane="help" id="settingsSectionHelp">
+        <h4 class="settings-section-title"><span class="settings-sec-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 013.9-2c1.2.8 1.1 2.2.2 3-.7.6-1.6 1-1.6 2"/><path d="M12 17h.01"/></svg></span><span data-i18n="acHelp">Ayuda y soporte</span></h4>
+        <div class="settings-actions">
+          <a class="settings-action" id="acSupportLink"
+             href="mailto:aurixsystemoficial@gmail.com?subject=Soporte%20Aurix&body=Hola%2C%20equipo%20de%20Aurix%3A%0A%0ANecesito%20ayuda%20con%3A%0A%0A">
+            <span class="settings-action-main">
+              <span class="settings-action-label" data-i18n="acContactSupport">Contactar con soporte</span>
+              <span class="settings-action-sub" data-i18n="acContactSupportSub">Se abrirá tu cliente de correo. No se adjunta ningún dato.</span>
+            </span>
+          </a>
         </div>
       </section>
 

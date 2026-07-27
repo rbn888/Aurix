@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '592'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '593'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -3728,6 +3728,15 @@ const T = {
     qtyGold:         u => `Cantidad (${u})`,
     estimatedVal:    'Valor estimado:',
     addToPortfolio:  'Añadir a cartera',
+    acProfile:            'Perfil',
+    acNotifications:      'Notificaciones',
+    acPreferences:        'Preferencias',
+    acSecurity:           'Seguridad',
+    acHelp:               'Ayuda y soporte',
+    acNoNotifications:    'No tienes notificaciones',
+    acSoon:               'Próximamente',
+    acContactSupport:     'Contactar con soporte',
+    acContactSupportSub:  'Se abrirá tu cliente de correo. No se adjunta ningún dato.',
     mkt_not_addable: 'No disponible para cartera',
     mkt_no_history: 'Sin histórico disponible para este activo en nuestra fuente de datos.',
     mkt_not_addable_hint: 'Los índices y las materias primas genéricas no son posiciones que puedas mantener en cartera. Puedes seguirlos desde Seguimiento.',
@@ -5877,6 +5886,15 @@ const T = {
     qtyGold:         u => `Quantity (${u})`,
     estimatedVal:    'Estimated value:',
     addToPortfolio:  'Add to portfolio',
+    acProfile:            'Profile',
+    acNotifications:      'Notifications',
+    acPreferences:        'Preferences',
+    acSecurity:           'Security',
+    acHelp:               'Help & support',
+    acNoNotifications:    'You have no notifications',
+    acSoon:               'Coming soon',
+    acContactSupport:     'Contact support',
+    acContactSupportSub:  'Opens your email client. No data is attached.',
     mkt_not_addable: 'Not available for portfolio',
     mkt_no_history: 'No price history available for this asset from our data source.',
     mkt_not_addable_hint: 'Indices and generic commodities are not positions you can hold. You can still track them from your Watchlist.',
@@ -56475,8 +56493,14 @@ function _settingsSelectPane(pane) {
     btn.classList.toggle('is-current', on);
     btn.setAttribute('aria-selected', on ? 'true' : 'false');
   });
+  // ACCOUNT-CENTER-V1 — "Preferencias" agrupa las generales (idioma/moneda) Y el
+  // perfil inversor, que antes era una entrada propia del rail. Se resuelve aquí, en
+  // el ÚNICO conmutador de panes, en lugar de mover markup o duplicar owners: así
+  // idioma, moneda y perfil siguen usando exactamente sus handlers y su persistencia.
+  const _PANE_SECTIONS = { prefs: ['prefs', 'profile'] };
+  const visibles = _PANE_SECTIONS[pane] || [pane];
   document.querySelectorAll('.settings-panes > .settings-section').forEach(sec => {
-    sec.classList.toggle('is-active', sec.dataset.pane === pane);
+    sec.classList.toggle('is-active', visibles.indexOf(sec.dataset.pane) >= 0);
   });
   // Reset the pane scroll so each section opens from the top.
   const panes = document.querySelector('.settings-panes');
@@ -56487,22 +56511,36 @@ if (typeof window !== 'undefined' && !window.__aurixSettingsNavWired) {
   window.__aurixSettingsNavWired = true;
   document.addEventListener('click', e => {
     const item = e.target.closest && e.target.closest('.settings-nav-item');
-    if (item && item.dataset.settingsPane) _settingsSelectPane(item.dataset.settingsPane);
+    if (item && item.dataset.settingsPane) {
+      _aurixAccountSection = item.dataset.settingsPane;   // misma fuente de verdad
+      _settingsSelectPane(item.dataset.settingsPane);
+    }
   });
 }
 
-function openSettingsPanel() {
+// ACCOUNT-CENTER-V1 — la tarjeta se abre DIRECTAMENTE en la sección pedida. Antes
+// forzaba siempre 'account', que es lo que obligaba a pasar por una pantalla
+// intermedia y buscar la sección a mano. `_aurixAccountSection` es la única fuente
+// de verdad de qué sección está activa; no se añaden booleanos paralelos.
+let _aurixAccountSection = 'account';
+function openSettingsPanel(section) {
   const ov = document.getElementById('settingsOverlay');
   if (!ov) return;
+  const pane = section || _aurixAccountSection || 'account';
+  _aurixAccountSection = pane;
   _settingsPopulate();
-  _settingsSelectPane('account');   // always open on Cuenta
+  _settingsSelectPane(pane);
   ov.classList.add('open');
   document.body.classList.add('modal-open');
+  // Foco al cierre de la tarjeta: es el control siempre accesible del modal.
+  try { const c = document.getElementById('settingsClose'); if (c) setTimeout(() => c.focus(), 0); } catch (_) {}
 }
 function closeSettingsPanel() {
   const ov = document.getElementById('settingsOverlay');
   if (!ov) return;
   ov.classList.remove('open');
+  // ACCOUNT-CENTER-V1 — el foco vuelve al control que abrió el flujo.
+  try { const t = document.getElementById('menuToggle'); if (t) t.focus({ preventScroll: true }); } catch (_) {}
   // Only release body lock if the reset confirm overlay isn't itself open.
   const reset = document.getElementById('resetConfirmOverlay');
   if (!reset || !reset.classList.contains('open')) {
@@ -57031,17 +57069,28 @@ function exportPortfolioBackup() {
 
 // ── Wiring: open from menu, close, reset, export, type-RESET gate ─
 (function _initSettingsPanel() {
-  // Menu entry
+  // ACCOUNT-CENTER-V1 — entrada desde el menú. Un ÚNICO handler para las cinco
+  // secciones: lee `data-account-section`, cierra el menú y abre la tarjeta ya en esa
+  // sección. Antes sólo existía #menuGeneral y abría siempre "Cuenta".
+  //
+  // BUG CORREGIDO: el cierre anterior quitaba la clase `open` del PANEL y el
+  // aria-expanded, pero NO del botón — y la clase `open` del botón es la que dibuja
+  // la X. Resultado: menú cerrado con la X todavía visible. Ahora se restaura
+  // siempre el icono de tres líneas en el mismo punto donde se cierra el panel.
+  function _closeAccountMenu() {
+    const panel  = document.getElementById('menuPanel');
+    const toggle = document.getElementById('menuToggle');
+    if (panel)  panel.classList.remove('open');
+    if (toggle) { toggle.classList.remove('open'); toggle.setAttribute('aria-expanded', 'false'); }
+  }
   document.addEventListener('click', e => {
-    const trigger = e.target.closest && e.target.closest('#menuGeneral');
+    const trigger = e.target.closest && e.target.closest('[data-account-section]');
     if (trigger) {
       e.stopPropagation();
-      // Close hamburger menu if open
-      const panel = document.getElementById('menuPanel');
-      const toggle = document.getElementById('menuToggle');
-      if (panel && panel.classList.contains('open')) panel.classList.remove('open');
-      if (toggle) toggle.setAttribute('aria-expanded', 'false');
-      openSettingsPanel();
+      const section = trigger.dataset.accountSection;
+      _aurixAccountSection = section;   // fuente de verdad ANTES de abrir
+      _closeAccountMenu();              // el menú se cierra al navegar
+      openSettingsPanel(section);
     }
   });
 
