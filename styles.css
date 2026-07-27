@@ -24336,9 +24336,18 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
     align-items: center;
     /* MOBILE-PREMIUM (opción 2) — padding lateral 9→6: la card ya aporta el inset
        visual, así que esos 6px se devuelven a la identidad y los metadatos largos
-       ("AAPL · Acción", "GSPC · Índice") vuelven a caber enteros. Contrapartida
-       aceptada por el owner: el margen de la estrella al borde baja a ~7px. */
-    padding: 9px 6px;
+       ("AAPL · Acción", "GSPC · Índice") vuelven a caber enteros. */
+    /* RIGHT-BLOCK — la fila arrastraba `margin: 0 -8px` de una regla previa pensada
+       para cuando NO existía card: se salía 8px por la izquierda (recortada por el
+       overflow) y dejaba 8px muertos por la derecha, que es el hueco que se percibía.
+       Al anularlos la fila ocupa el interior real de la card y todo su contenido
+       —incluido el bloque sparkline + estrella— se desplaza a la derecha, sin tocar
+       identidad, precio, ancho del gráfico ni tamaño de la estrella. El padding pasa a
+       ser asimétrico (4 izq / 8 der) para conservar el inset del icono y dejar a la
+       estrella un margen de 8px contra el borde interior de la card. */
+    margin-left: 0;
+    margin-right: 0;
+    padding: 9px 8px 9px 4px;
     min-height: 58px;
   }
   /* padding-right propio: con `max-content` en la columna de precio, la identidad
