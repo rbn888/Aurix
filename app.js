@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '598'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '599'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -47795,14 +47795,13 @@ function getLocalResults(query, filter) {
   const pool = (filter === 'all' || filter === 'crypto')
     ? ASSET_DB  // stocks + ETFs + metals (crypto comes from API only)
     : ASSET_DB.filter(a => a.type === filter);
-  return pool
-    .filter(a => a.ticker.toLowerCase().startsWith(q) || a.name.toLowerCase().includes(q))
-    .sort((a, b) => {
-      const at = a.ticker.toLowerCase().startsWith(q) ? 0 : 1;
-      const bt = b.ticker.toLowerCase().startsWith(q) ? 0 : 1;
-      return at - bt;
-    })
-    .slice(0, 8);
+  const hits = pool.filter(a => a.ticker.toLowerCase().startsWith(q) || a.name.toLowerCase().includes(q));
+  // SPEC SEARCH-V2.2 — el pintado instantáneo usaba su PROPIO orden (startsWith primero), así que
+  // durante unos milisegundos Add Asset mostraba una jerarquía distinta de la del motor. Se ordena
+  // con la MISMA autoridad de ranking, de modo que el orden provisional ya coincide con el final y
+  // no hay dos sistemas de ranking en la aplicación. El conjunto de candidatos no cambia.
+  const ranked = (typeof _aurixRankSearchResults === 'function') ? _aurixRankSearchResults(hits, query) : hits;
+  return ranked.slice(0, 8);
 }
 
 // ── Real-time API search (proxied via backend) ───────────────────────────
@@ -48156,7 +48155,19 @@ function _aurixSearchSubtitle(a) {
   return parts.length ? parts.join(' · ') : (a.ticker || 'Fund');
 }
 
-async function searchAllAssets(query, signal) {
+// ── SPEC SEARCH-V2.2 — UN SOLO MOTOR PARA MARKET Y ADD ASSET ────────────────────────────────
+// Market y la búsqueda global ya entraban por aquí; Add Asset sólo lo hacía con el filtro 'all'.
+// Con cualquier otro filtro tomaba las ramas por-tipo de `searchByFilter`, que iban directas al
+// proveedor y por tanto SIN catálogo curado, SIN dedupe por ISIN/ticker y SIN ranking — de ahí que
+// el mismo activo pudiera salir con otro orden, con otro nombre o duplicado según desde dónde se
+// buscara. El filtro pasa a ser una PROYECCIÓN por tipo DENTRO del pipeline, aplicada antes del
+// corte, no un motor distinto. Sin `filter` el comportamiento es idéntico al anterior.
+function _aurixSearchProject(items, filter) {
+  const f = String(filter || '').toLowerCase();
+  if (!f || f === 'all') return items;
+  return items.filter(a => a && String(a.type || '').toLowerCase() === f);
+}
+async function searchAllAssets(query, signal, filter) {
   const metals = searchMetalsLocal(query);
 
   const [yahooRes, cryptoRes] = await Promise.allSettled([
@@ -48186,7 +48197,7 @@ async function searchAllAssets(query, signal) {
       const key = item.ticker.toUpperCase();
       if (!seen.has(key)) { seen.add(key); merged.push(item); }
     }
-    return merged.slice(0, 10);
+    return _aurixSearchProject(merged, filter).slice(0, 10);   // SEARCH-V2.2: proyección antes del corte
   }
   // SPEC 48 — flag ON: (1) label Yahoo MUTUALFUND items with parsed manager/currency;
   // (2) inject curated fund matches; (3) dedupe (funds by isin/ticker, others by ticker);
@@ -48228,44 +48239,18 @@ async function searchAllAssets(query, signal) {
     if (seen.has(key) || seen.has(tkey)) continue;
     seen.add(key); seen.add(tkey); merged.push(item);
   }
-  return _aurixRankSearchResults(merged, query).slice(0, 10);
+  return _aurixRankSearchResults(_aurixSearchProject(merged, filter), query).slice(0, 10);
 }
 
-// Filter-aware search: only queries the relevant API source
+// ── SPEC SEARCH-V2.2 — `searchByFilter` deja de ser un motor y pasa a ser una VISTA ──────────
+// Antes tenía una rama por filtro: 'metal' local, 'crypto' directo a CoinGecko, 'stock'/'etf'
+// directos a Yahoo y 'fund' con su propio merge, su propia clave de dedupe y su propio corte.
+// Ninguna de ellas veía el catálogo curado, la dedupe por ISIN + ticker exacto ni el ranking, así
+// que Add Asset con filtro y Market podían devolver distinto orden, distinto nombre o duplicados
+// para el MISMO instrumento. Ahora hay un único pipeline y el filtro es una proyección dentro de
+// él: mismos candidatos, misma normalización, mismos alias, mismo ranking y misma presentación.
 async function searchByFilter(query, filter, signal) {
-  if (filter === 'metal') {
-    return searchMetalsLocal(query);
-  }
-  if (filter === 'crypto') {
-    const results = await searchCoinGeckoAPI(query, signal);
-    return results || [];
-  }
-  // SPEC 48 — dedicated fund route (only when the discovery flag is on): curated fund seed
-  // merged with Yahoo MUTUALFUND hits, deduped + relevance-ranked. Discovery only.
-  if (filter === 'fund' && (typeof _AURIX_FUND_DISCOVERY !== 'undefined' && _AURIX_FUND_DISCOVERY)) {
-    const funds = _aurixSearchFundsLocal(query);
-    const yahoo = await searchYahooFinance(query, signal);
-    const yFunds = (Array.isArray(yahoo) ? yahoo : []).filter(a => a && a.type === 'fund')
-      .map(it => { const meta = _aurixParseFundMeta(it.name); return Object.assign({}, it, { manager: it.manager || meta.manager, assetCurrency: it.assetCurrency || meta.currency }); });
-    const seen = new Set(); const merged = [];
-    for (const item of [...funds, ...yFunds]) {
-      if (!item || !item.ticker) continue;
-      const key = 'FUND:' + String(item.isin || item.ticker || item.name).toUpperCase();
-      if (!seen.has(key)) { seen.add(key); merged.push(item); }
-    }
-    return _aurixRankSearchResults(merged, query).slice(0, 10);
-  }
-  if (filter === 'stock' || filter === 'etf') {
-    const yahooResults = await searchYahooFinance(query, signal);
-    if (yahooResults) return yahooResults.filter(a => a.type === filter);
-    const q = query.toLowerCase();
-    return ASSET_DB
-      .filter(a => a.type === filter && (
-        a.ticker.toLowerCase().startsWith(q) || a.name.toLowerCase().includes(q)
-      ))
-      .slice(0, 8);
-  }
-  return searchAllAssets(query, signal);
+  return searchAllAssets(query, signal, filter);
 }
 
 // ── GLOBAL-SEARCH-1: Global asset search overlay ──────────────────────────

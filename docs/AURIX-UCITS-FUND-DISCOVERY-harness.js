@@ -40,7 +40,11 @@ console.log('\nAURIX-UCITS-FUND-DISCOVERY — SPEC 48');
 // ── 0 presence / wiring ───────────────────────────────────────────────────────
 ok('0 flag + funcs + fund route + typeLabel + subtitle wired', app.indexOf('SPEC 48 — UCITS FUND DISCOVERY') >= 0
   && /const _AURIX_FUND_DISCOVERY = true;/.test(app)
-  && app.indexOf("filter === 'fund'") >= 0
+  // SEARCH-V2.2 — la ruta dedicada `filter === 'fund'` desaparece: los fondos se descubren por el
+  // ÚNICO pipeline, que inyecta el mismo catálogo curado y enriquece los MUTUALFUND de Yahoo. El
+  // contrato pasa de "existe una rama de fondos" a "el filtro de fondos entra por el motor".
+  && /async function searchByFilter\(query, filter, signal\) \{\s*return searchAllAssets\(query, signal, filter\);\s*\}/.test(app)
+  && /const funds = _aurixSearchFundsLocal\(query\);/.test(app)
   && /typeLabel: \{ crypto: 'Cripto'.*fund: 'Fondo' \}/.test(app)
   && /typeLabel: \{ crypto: 'Crypto'.*fund: 'Fund' \}/.test(app)
   && app.indexOf('_aurixSearchSubtitle(a) : a.ticker') >= 0);
