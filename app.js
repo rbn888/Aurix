@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '600'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '601'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -49364,14 +49364,30 @@ function openContextualModal(type) {
   // Financial assets — keep the asset surface, just lock the filter so
   // crypto means crypto, stocks means stocks, etc.
   const filterKey = { crypto: 'crypto', stock: 'stock', etf: 'etf', fund: 'etf' }[type];
+  // HOTFIX ADD-FROM-CATEGORY-PARITY — este camino se había quedado atrás. SPEC 59 ya identificó
+  // que sintetizar `btn.click()` sobre la pestaña de filtro enruta por el handler del filtro, que
+  // termina en `showDefaultSuggestions()` y ABRE el panel de sugerencias sin que el usuario haya
+  // escrito; lo corrigió en la ruta del picker in-modal, pero `openContextualModal` —la entrada
+  // "+ Añadir cripto" desde una categoría— conservó el clic antiguo. De ahí que el modal se abra
+  // con una lista desplegada sobre la card premium, que el estado inicial no coincida con el del
+  // Dashboard y que, al enfocar, el teclado encuentre la geometría del panel abierto en lugar de
+  // la del estado de reposo. Se replica AQUÍ el tratamiento de SPEC 59, sin nueva lógica:
+  //   activeSearchFilter primero (SPEC 60) → refresco de Recientes/Populares → resaltado de la
+  //   pestaña y placeholder, SIN clic sintético y por tanto sin abrir el panel.
+  // Y se invoca el reset que el picker sí hacía (SPEC 45 STATE ISOLATION), para que consulta,
+  // selección y sugerencias de la sesión anterior no sobrevivan a la reapertura.
+  try { if (typeof _addV2ResetForCategory === 'function') _addV2ResetForCategory(); } catch (_) {}
   if (typeof _addV2SetMode === 'function') _addV2SetMode('asset');
   try { if (typeof _addV2SetCategoryHeader === 'function') _addV2SetCategoryHeader(type); } catch (_) {}   // SPEC 45 — per-category header
   _modalContext = 'asset';
   _modalAssetFilterContext = filterKey || null;
+  try { activeSearchFilter = filterKey || 'all'; } catch (_) {}                                   // SPEC 60 — antes del refresco
+  try { if (typeof _addV42UpdateFilterAttr === 'function') _addV42UpdateFilterAttr(filterKey || 'all'); } catch (_) {}
   if (typeof _addV2RefreshQuick === 'function') _addV2RefreshQuick();
+  try { if (typeof _updateSearchEmptyHint === 'function') _updateSearchEmptyHint(); } catch (_) {}
   if (filterKey) {
-    const btn = document.querySelector(`.filter-btn[data-filter="${filterKey}"]`);
-    if (btn) btn.click();
+    try { document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === filterKey)); } catch (_) {}
+    try { if (typeof searchInput !== 'undefined' && searchInput) searchInput.placeholder = T[lang].searchPH[filterKey] || T[lang].searchPH.all; } catch (_) {}
   }
 }
 
