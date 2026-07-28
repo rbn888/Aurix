@@ -253,5 +253,29 @@ ok('6.7 _aurixCaptureFlow, el esquema del ledger y el id siguen intactos',
 ok('6.8 el backfill sigue escribiendo originalTs = ts de la transacción',
    /\{ originalTs: c\.originalTs, retimeReason: dec\.reason/.test(app));
 
+// ── 7) FORENSE V2 DESPLEGADO ────────────────────────────────────────────────
+// El diagnóstico vive en el bundle a propósito: pegarlo a mano en la consola lo corrompía.
+console.log('\n7 — forense de asignación desplegado (window.aurixChartForensicsV2):');
+{
+  const fnV2 = (app.indexOf('window.aurixChartForensicsV2 = function') >= 0)
+    ? braceSlice(app.indexOf('window.aurixChartForensicsV2 = function')) : '';
+  ok('7.1 la función existe una sola vez y acepta el rango',
+     (app.match(/window\.aurixChartForensicsV2 = function/g) || []).length === 1 && /function \(range\)/.test(fnV2));
+  ok('7.2 es SOLO LECTURA: no escribe ledger, storage ni histórico',
+     !/_aurixSaveCapitalFlows|localStorage\.setItem|localStorage\.removeItem|_aurixCaptureFlow|portfolioHistory\s*=|categoryHistory\s*=/.test(fnV2));
+  ok('7.3 devuelve las claves que exige el diagnóstico',
+     ['build', 'resumen', 'ledger', 'COLISIONES', 'escalones_detectados',
+      'escalones_sin_flujo_asignado', 'impacto', 'ledger_completo'].every(k => new RegExp('\\b' + k + ':').test(fnV2)));
+  ok('7.4 compara el importe consumido contra la magnitud REAL del escalón',
+     /ratio_consumido_sobre_escalon: ratio/.test(fnV2) && /stepUSD: \+\(ph\[i\]\.value - ph\[i - 1\]\.value\)/.test(fnV2));
+  // GOTCHA de la casa: un assert de "ya no se usa" debe mirar CÓDIGO, no comentarios — aquí el
+  // propio comentario nombra la función descartada.
+  const fnV2Code = fnV2.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map(l => l.replace(/(^|[^:'"`\\])\/\/.*$/, '$1')).join('\n');
+  ok('7.5 los huérfanos se buscan con _aurixVerticalJumps (no con _aurixCapitalStepBreaks)',
+     /_aurixVerticalJumps\(/.test(fnV2Code) && !/_aurixCapitalStepBreaks/.test(fnV2Code));
+  ok('7.6 no reemplaza al forense existente (ambos conviven)',
+     (app.match(/window\.aurixChartForensics = function/g) || []).length === 1);
+}
+
 console.log('\nRESULT: ' + (fail === 0 ? 'ALL PASS ✓' : 'FAIL ✗') + '  (' + pass + ' passed, ' + fail + ' failed)');
 process.exit(fail === 0 ? 0 : 1);
