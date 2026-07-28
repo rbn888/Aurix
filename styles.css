@@ -24799,7 +24799,11 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   #marketList.market-section {
     border-radius: 14px;
     border: 1px solid rgba(74,130,240,0.18);
-    overflow: hidden;
+    /* Los ejes SEPARADOS, nunca el shorthand: `overflow: hidden` aquí mataba el scroll
+       vertical de la lista en esta banda —exactamente el defecto que MARKET-MOBILE-SCROLL
+       corrigió en móvil— porque pisa el `overflow-y: auto` de la regla base. */
+    overflow-x: hidden;
+    overflow-y: auto;
   }
   #marketList.market-section .market-row:last-child { border-bottom: 0; }
 }
