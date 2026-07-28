@@ -251,5 +251,41 @@ ok('10.5 desaparece la franja vacía bajo la lista (reserva de 80px y margen her
 ok('10.7 el arreglo es CSS-only y vive en el bloque móvil (escritorio intacto)',
    /@media \(max-width: 768px\)[\s\S]{0,4000}\.market-screen \{ padding-bottom: calc\(8px/.test(cssCode));
 
+// ── 11 MARKET-EXCELLENCE-01B — pulido institucional (sólo presentación) ─────
+console.log('\n11 — pulido de filas y estados:');
+ok('11.1 cifras tabulares en precio, variación, cabecera y ticker (columna que no ondula)',
+   /#marketList \.col-price,\s*\n#marketList \.col-change,[\s\S]{0,200}font-variant-numeric: tabular-nums;/.test(cssCode));
+// El "sin tocar tamaños" se comprueba SOBRE EL BLOQUE NUEVO: los `font-size` por breakpoint
+// existen desde antes y son legítimos; lo que no debe hacer este pulido es alterarlos.
+// El marcador vive en un COMENTARIO, así que hay que anclar sobre el CSS crudo y despojar
+// después: `cssCode` ya no lo contiene (mismo gotcha de siempre con los asserts de ausencia).
+const bloque01B = css.slice(css.indexOf('MARKET-EXCELLENCE-01B')).replace(/\/\*[\s\S]*?\*\//g, '');
+ok('11.2 jerarquía por color/peso, no por tamaño (los tamaños siguen fijados por breakpoint)',
+   /#marketList \.mkt-id-name \{[^}]*color: rgba\(255,255,255,0\.96\)/.test(bloque01B) &&
+   /#marketList \.mkt-id-meta \{[^}]*color: rgba\(255,255,255,0\.46\)/.test(bloque01B) &&
+   !/\.mkt-id-name \{[^}]*font-size/.test(bloque01B) &&
+   !/\.market-row \{[^}]*(padding|height):/.test(bloque01B));
+ok('11.3 el precio pesa más que la variación', /#marketList \.col-price  \{[^}]*font-weight: 650/.test(cssCode));
+ok('11.4 separador afinado y cabecera en tono secundario',
+   /#marketList \.market-row \{ border-bottom-color: rgba\(255,255,255,0\.045\); \}/.test(cssCode));
+ok('11.5 iconografía unificada: mismo radio y aro sutil',
+   /#marketList \.asset-icon \{[^}]*border-radius: 9px;[^}]*box-shadow: inset 0 0 0 1px/.test(cssCode));
+ok('11.6 el esqueleto usa barrido con anchos variados y respeta prefers-reduced-motion',
+   /@keyframes mktShimmer/.test(cssCode) &&
+   /nth-child\(3\) \.skeleton-text \{ width: 112px; \}/.test(cssCode) &&
+   /@media \(prefers-reduced-motion: reduce\)[\s\S]{0,320}\.skeleton-spark \{ animation: none; \}/.test(cssCode));
+ok('11.7 vacío/error con ritmo vertical propio y SIN inventar copy nueva',
+   /#marketList \.market-empty \{[^}]*min-height: 132px/.test(cssCode) &&
+   (app.match(/market_no_results/g) || []).length >= 2 &&
+   !/market_error_state|market_load_failed/.test(app));
+ok('11.8 tablet 769–1024 recibe el mismo aire final',
+   /@media \(min-width: 769px\) and \(max-width: 1024px\) \{\s*\n\s*#marketList\.market-section \{ padding-bottom: 14px; \}/.test(cssCode));
+ok('11.9 REGRESIÓN: no se tocan las medidas ya fijadas (radio de card, filas planas, rejilla web)',
+   /#marketList\.market-section \{[\s\S]{0,400}border-radius: 14px;/.test(cssCode) &&
+   /#marketList\.market-section \.market-row \{ border-radius: 0; \}/.test(cssCode) &&
+   /grid-template-columns: minmax\(0, 420px\) 124px minmax\(32px, 1fr\) 100px minmax\(32px, 1fr\) 172px 44px;/.test(cssCode));
+ok('11.10 es CSS-only: ni datos, ni contratos, ni lógica',
+   !/renderMarketItem[\s\S]{0,200}mkt-id-name[\s\S]{0,200}font-/.test(app));
+
 console.log('\nRESULT: ' + (fail === 0 ? 'ALL PASS ✓' : 'FAIL ✗') + '  (' + pass + ' passed, ' + fail + ' failed)');
 process.exit(fail === 0 ? 0 : 1);
