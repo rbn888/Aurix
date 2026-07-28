@@ -88,6 +88,34 @@ const matches = (af, r) => af === 'all' ? true : (af === 'etf' ? (r.t === 'etf' 
 
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   if (fail) { console.log(fail + ' failed'); process.exit(1); }
-  console.log('GATE: GO — all ' + pass + ' assertions passed');
+  // ── PARIDAD DE ENTRADA — "+ Añadir X" desde categoría == ruta del picker ─────────────
+// SPEC 59 quitó el `btn.click()` sintético en la ruta del picker porque enrutaba por el handler
+// del filtro y acababa en `showDefaultSuggestions()`, abriendo el panel sin que el usuario
+// escribiera. `openContextualModal` conservó el clic antiguo: misma causa, otro camino.
+{
+  const oc = (function () { const i = app.indexOf('function openContextualModal('); if (i < 0) return '';
+    let d = 0, k = app.indexOf('{', i); for (; k < app.length; k++) { const c = app[k]; if (c === '{') d++; else if (c === '}') { d--; if (!d) { k++; break; } } } return app.slice(i, k); })();
+  const code = oc.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map(l => l.replace(/(^|[^:'"`\\])\/\/.*$/, '$1')).join('\n');
+  ok('P1 la entrada por categoría ya NO sintetiza un clic sobre la pestaña de filtro',
+     !/\.filter-btn\[data-filter=[^\]]*\][\s\S]{0,120}\.click\(\)/.test(code) && !/btn\.click\(\)/.test(code));
+  ok('P2 no abre el panel de sugerencias al entrar (nada de showDefaultSuggestions)',
+     !/showDefaultSuggestions|renderSuggestions/.test(code));
+  ok('P3 invoca el mismo reset de estado que la ruta del picker (SPEC 45)',
+     /_addV2ResetForCategory\(\)/.test(code));
+  ok('P4 fija activeSearchFilter ANTES del refresco de Recientes/Populares (SPEC 60)',
+     code.indexOf('activeSearchFilter =') < code.indexOf('_addV2RefreshQuick()') && code.indexOf('activeSearchFilter =') > 0);
+  ok('P5 engancha la categoría igual que el picker: resaltado + placeholder',
+     /classList\.toggle\('active', b\.dataset\.filter === filterKey\)/.test(code) &&
+     /searchInput\.placeholder = T\[lang\]\.searchPH\[filterKey\]/.test(code));
+  ok('P6 sigue habiendo UN solo modal y UNA sola plantilla (no se creó nada nuevo)',
+     (app.match(/function openContextualModal\(/g) || []).length === 1 &&
+     !/function _addV2RenderResultsAlt|assetSuggestions2/.test(app));
+  // El patrón casa también con la línea de DEFINICIÓN: se cuentan sólo las invocaciones.
+  ok('P7 el reset lo comparten ambas rutas (owner único, dos llamantes)',
+     (app.match(/(?:function )?_addV2ResetForCategory\(\)/g) || []).filter(m => !/^function /.test(m)).length === 2 &&
+     (app.match(/function _addV2ResetForCategory\(/g) || []).length === 1);
+}
+
+console.log('GATE: GO — all ' + pass + ' assertions passed');
   process.exit(0);
 })();
