@@ -220,5 +220,36 @@ ok('9.18 header y filas comparten pistas: colocación explícita, sin absolutos 
    /#marketList \.market-row > \.col-price,\s*\n\s*#marketList \.market-table-header > div:nth-child\(2\) \{ grid-column: 2; \}/.test(cssCode) &&
    !/#marketList[^{]*\.col-[a-z]+[^{]*\{[^}]*position:\s*absolute/.test(cssCode));
 
+// ── 10 MARKET-EXCELLENCE-01 — el final del scroll móvil ─────────────────────
+// Medido antes del arreglo: la última fila terminaba a 0,05 / −0,88px del borde de la card
+// (se leía como recorte) y en pantallas cortas la card desbordaba su host 31,5px porque el
+// tope era `max-height: 70vh` — un porcentaje del viewport que ni descuenta el chrome de
+// Market ni sigue a la unidad dinámica, de ahí el reajuste al aparecer la barra de URL.
+console.log('\n10 — final del scroll en móvil:');
+ok('10.1 el scroller ya no fija su altura con un porcentaje del viewport',
+   /#marketList\.market-section \{[^}]*max-height: none;/.test(cssCode));
+ok('10.2 deriva su altura del espacio real: cadena flex con min-height 0',
+   /\.market-screen \{ display: flex; flex-direction: column; min-height: 100%; \}/.test(cssCode) &&
+   /\.market-body,\s*\n\s*\.market-main\s*\{ flex: 0 1 auto; min-height: 0;/.test(cssCode) &&
+   /#marketList\.market-section \{[^}]*flex: 0 1 auto;[^}]*min-height: 0;/.test(cssCode));
+ok('10.3 no se estira con pocas filas: encoge pero no crece (0 1 auto, nunca 1 1)',
+   !/#marketList\.market-section \{[^}]*flex: 1 1 auto/.test(cssCode));
+ok('10.4 la última fila tiene aire real al final, con safe-area',
+   /#marketList\.market-section \{[^}]*padding: 0 0 calc\(10px \+ env\(safe-area-inset-bottom, 0px\)\);/.test(cssCode));
+ok('10.5 desaparece la franja vacía bajo la lista (reserva de 80px y margen heredado)',
+   /\.market-screen \{ padding-bottom: calc\(8px \+ env\(safe-area-inset-bottom, 0px\)\); \}/.test(cssCode) &&
+   /#marketList\.market-section \{ margin-bottom: 0; \}/.test(cssCode));
+// El patrón debe mirar SÓLO la regla del contenedor: los tamaños fijos de sus hijos
+// (icono 40px, sparkline 28px) son legítimos y no tienen que ver con el scroll.
+{
+  const bloque = (cssCode.match(/#marketList\.market-section \{[^}]*\}/g) || []).join('\n');
+  ok('10.6 se conserva el scroll nativo: sin altura rígida en el scroller ni JS de reposicionamiento',
+     /-webkit-overflow-scrolling: touch/.test(bloque) &&
+     !/(^|[^-])height:\s*\d/.test(bloque.replace(/max-height|min-height/g, '')) &&
+     !/scrollTop\s*=\s*[^;]*marketList/.test(app));
+}
+ok('10.7 el arreglo es CSS-only y vive en el bloque móvil (escritorio intacto)',
+   /@media \(max-width: 768px\)[\s\S]{0,4000}\.market-screen \{ padding-bottom: calc\(8px/.test(cssCode));
+
 console.log('\nRESULT: ' + (fail === 0 ? 'ALL PASS ✓' : 'FAIL ✗') + '  (' + pass + ' passed, ' + fail + ' failed)');
 process.exit(fail === 0 ? 0 : 1);
