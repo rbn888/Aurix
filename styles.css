@@ -24668,3 +24668,123 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
 @media (min-width: 769px) and (max-width: 1024px) {
   #marketList.market-section { padding-bottom: 14px; }
 }
+
+/* ════════ MARKET-EXCELLENCE-02 — base institucional de la ficha de activo ════════
+   Owner: #marketPreviewOverlay / .modal--mkt-preview. SOLO presentación: ni JS, ni motor de
+   gráfico, ni datasets, ni providers, ni campos nuevos. Se ordena lo que ya existe. */
+
+/* 1 · HEADER — el nombre es el titular; ticker, tipo y origen son soporte. */
+#marketPreviewOverlay .mkt-prv-head { align-items: center; gap: 12px; min-width: 0; }
+#marketPreviewOverlay .mkt-prv-icon {
+  width: 40px; height: 40px; flex: 0 0 40px;
+  border-radius: 11px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.07);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+#marketPreviewOverlay .mkt-prv-icon img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+#marketPreviewOverlay .mkt-prv-id { min-width: 0; }
+#marketPreviewOverlay .mkt-prv-name {
+  font-size: 16px; font-weight: 650; letter-spacing: -0.012em;
+  color: rgba(255,255,255,0.97);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#marketPreviewOverlay .mkt-prv-sub { display: flex; align-items: center; gap: 8px; margin-top: 3px; min-width: 0; }
+#marketPreviewOverlay .mkt-prv-symbol {
+  font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
+  color: rgba(255,255,255,0.58);
+  font-variant-numeric: tabular-nums;
+}
+/* El tipo es una etiqueta discreta, no un badge de color que compita con la variación. */
+#marketPreviewOverlay .mkt-prv-badge {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: rgba(255,255,255,0.44);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 5px; padding: 2px 6px; white-space: nowrap;
+}
+#marketPreviewOverlay .mkt-prv-badge:empty { display: none; }
+
+/* 2 · PRECIO — domina la lectura; la variación acompaña en la misma línea base. */
+#marketPreviewOverlay .mkt-prv-stats {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px;
+  padding: 4px 0 2px;
+}
+#marketPreviewOverlay .mkt-prv-price {
+  font-size: 30px; font-weight: 700; letter-spacing: -0.022em; line-height: 1.1;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+}
+#marketPreviewOverlay .mkt-prv-change {
+  font-size: 14px; font-weight: 600; letter-spacing: -0.004em;
+  font-variant-numeric: tabular-nums;
+}
+#marketPreviewOverlay .mkt-prv-change:empty { display: none; }
+
+/* 3 · TEMPORALIDADES — separadas del precio y del gráfico, con estados claros. Una sola
+   activa. No se altera qué rangos existen: eso lo decide el owner de datos. */
+#marketPreviewOverlay .mkt-prv-ranges { margin: 14px 0 10px; }
+#marketPreviewOverlay .mkt-prv-ranges [role="tab"],
+#marketPreviewOverlay .mkt-prv-ranges button {
+  transition: background-color .16s ease, color .16s ease, border-color .16s ease;
+}
+#marketPreviewOverlay .mkt-prv-ranges button:focus-visible {
+  outline: 2px solid rgba(74,130,240,0.55); outline-offset: 2px;
+}
+/* Una temporalidad deshabilitada por falta de datos debe LEERSE deshabilitada. */
+#marketPreviewOverlay .mkt-prv-ranges button[disabled],
+#marketPreviewOverlay .mkt-prv-ranges button[aria-disabled="true"] {
+  opacity: 0.34; cursor: default; pointer-events: none;
+}
+
+/* 4 · GRÁFICO — integración, no rediseño: aire propio y una línea que lo separa de los
+   controles sin encajonarlo. */
+#marketPreviewOverlay .mkt-prv-mount {
+  margin-top: 2px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  min-height: 168px;                     /* evita el salto de layout entre estados */
+}
+#marketPreviewOverlay .aurix-chart-state,
+#marketPreviewOverlay [class*="aurix-chart-state"] {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 148px; padding: 20px 16px; text-align: center;
+  color: rgba(255,255,255,0.42); font-size: 13px; line-height: 1.5;
+}
+/* El error se ve, pero no grita. */
+#marketPreviewOverlay [class*="aurix-chart-state--error"] { color: rgba(255,155,155,0.72); }
+
+/* 5 · METADATA — una línea de origen, discreta y sólo si existe (el owner ya la oculta
+   cuando está vacía; aquí sólo se le da tono y sitio). */
+#marketPreviewOverlay .mkt-prv-meta {
+  margin-top: 10px; font-size: 11.5px; letter-spacing: 0.01em;
+  color: rgba(255,255,255,0.38);
+}
+
+/* 6 · RESPONSIVE — una composición por breakpoint, no un móvil estirado. */
+@media (max-width: 768px) {
+  #marketPreviewOverlay .mkt-prv-price { font-size: 27px; }
+  #marketPreviewOverlay .mkt-prv-name  { font-size: 15px; }
+  #marketPreviewOverlay .mkt-prv-icon  { width: 36px; height: 36px; flex-basis: 36px; }
+  #marketPreviewOverlay .modal-body    { overflow-x: hidden; }
+  /* El CTA es fijo al pie del sheet: el cuerpo necesita su propio colchón para que el
+     gráfico no quede debajo. Con safe-area para el indicador de inicio. */
+  #marketPreviewOverlay .mkt-prv-mount { padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+}
+/* La banda intermedia tenía composición de móvil estirado: se le da ancho útil contenido y
+   el radio completo de card, en vez de heredar el sheet a pantalla completa. */
+@media (min-width: 769px) and (max-width: 1024px) {
+  #marketPreviewOverlay { align-items: center; }
+  #marketPreviewOverlay > .modal {
+    width: min(560px, calc(100% - 64px));
+    max-width: 560px;
+    border-radius: 18px;
+    max-height: min(86dvh, 720px);
+  }
+  #marketPreviewOverlay .sheet-handle { display: none; }
+  #marketPreviewOverlay .mkt-prv-price { font-size: 29px; }
+}
+@media (min-width: 1025px) {
+  #marketPreviewOverlay > .modal { width: min(620px, calc(100% - 96px)); max-width: 620px; }
+  #marketPreviewOverlay .mkt-prv-mount { min-height: 208px; }
+}
