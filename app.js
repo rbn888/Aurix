@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '596'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '597'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -31451,6 +31451,59 @@ try {
         const cons = c.flujos.reduce((a, f) => a + (Number(f.amountUSD) || 0), 0);
         return s + Math.max(0, Math.abs(cons) - Math.abs(c.escalon_magnitudUSD)) * Math.sign(cons || 1);
       }, 0);
+      // ── INTEGRIDAD DEL LEDGER DERIVADO ────────────────────────────────────────────────────
+      // El `id` de un flujo es `kind:assetId:tsEFECTIVO:round(|importe|)` y `_aurixCaptureFlow` es
+      // idempotente por id. Cuando dos transacciones del MISMO activo y MISMO importe redondeado
+      // acaban en el MISMO ts efectivo —típicamente el ancla base, por el suelo temporal— comparten
+      // id y sólo se materializa una fila. La transacción NO se pierde (la fuente de verdad son
+      // `assets[].transactions`, que no se tocan y de las que el ledger se re-deriva en cada
+      // arranque) y NO afecta al cálculo: el ancla base queda estrictamente antes de toda baseline,
+      // así que esas filas nunca entran en ninguna ventana (baseline, actual]. Esto lo demuestra
+      // fila a fila en lugar de pedir que se crea.
+      let integridad = null;
+      try {
+        const lista = (typeof activeAssets === 'function') ? activeAssets() : (Array.isArray(assets) ? assets : []);
+        const cand = [];
+        (lista || []).forEach(a => {
+          if (!a || !Array.isArray(a.transactions)) return;
+          a.transactions.forEach(tx => {
+            if (!tx || !Number.isFinite(tx.ts) || !Number.isFinite(tx.qty) || !Number.isFinite(tx.price)) return;
+            const nat = Math.abs(Number(tx.qty) * Number(tx.price));
+            const usd = (typeof _nativeToUSD === 'function') ? _nativeToUSD(nat, a.assetCurrency) : nat;
+            if (!Number.isFinite(usd) || usd <= 0) return;
+            const sell = String(tx.type || '').toLowerCase() === 'sell';
+            const signed = sell ? -usd : usd;
+            cand.push({ key: (a.id || 'cash') + '|' + tx.ts + '|' + Math.round(Math.abs(signed) * 100) + '|' + (sell ? 's' : 'b'),
+                        amountUSD: signed, originalTs: tx.ts, assetId: a.id, kind: sell ? 'asset_remove' : 'asset_add' });
+          });
+        });
+        const pl = (typeof _aurixPlanFlowRetiming === 'function') ? _aurixPlanFlowRetiming(cand) : new Map();
+        const porId = {};
+        cand.forEach(c => {
+          const dec = pl.get(c.key) || { effectiveTs: c.originalTs, reason: 'no_plan' };
+          const t = Number.isFinite(dec.effectiveTs) ? dec.effectiveTs : c.originalTs;
+          const fid = c.kind + ':' + (c.assetId || 'cash') + ':' + t + ':' + Math.round(Math.abs(c.amountUSD));
+          (porId[fid] = porId[fid] || []).push({ assetId: c.assetId, kind: c.kind, amountUSD: +c.amountUSD.toFixed(2),
+            originalTs: iso(c.originalTs), tsEfectivo: iso(t), motivo: dec.reason, dentroDeVentana: (t > base && t <= cur) });
+        });
+        const colapsadas = [];
+        Object.keys(porId).forEach(fid => { if (porId[fid].length > 1) {
+          porId[fid].slice(1).forEach(x => colapsadas.push(Object.assign({ id_compartido: fid, se_materializa: porId[fid][0].originalTs }, x)));
+        } });
+        const derivadas = flows.filter(f => f && (f.source === 'tx-backfill' || f.source === 'inferred')).length;
+        integridad = {
+          transacciones_derivables: cand.length,
+          filas_derivadas_en_ledger: derivadas,
+          filas_de_usuario_intactas: flows.length - derivadas,
+          registros_que_no_aparecen: colapsadas.length,
+          motivo: colapsadas.length ? 'id compartido (mismo activo, mismo importe redondeado y mismo ts efectivo)' : null,
+          detalle: colapsadas,
+          importe_no_materializado: +colapsadas.reduce((s, x) => s + Math.abs(x.amountUSD), 0).toFixed(2),
+          importe_no_materializado_DENTRO_de_ventana: +colapsadas.filter(x => x.dentroDeVentana).reduce((s, x) => s + Math.abs(x.amountUSD), 0).toFixed(2),
+          movimientos_perdidos: colapsadas.some(x => x.dentroDeVentana),
+          nota: 'la fuente de verdad son assets[].transactions; el ledger derivado se reconstruye desde ellas en cada arranque',
+        };
+      } catch (e) { integridad = { error: String(e && e.message || e) }; }
       const bv = p.baselineValue, cv = p.currentValue;
       const out = {
         build: (typeof window !== 'undefined' && window.__AURIX_APPJS_VERSION__) ? window.__AURIX_APPJS_VERSION__ : '?',
@@ -31460,6 +31513,7 @@ try {
           ventana_desde: iso(base), ventana_hasta: iso(cur), baseline: bv, valor: cv },
         ledger: { total_flujos: flows.length, en_ventana: inWin.length,
           neto_en_ventana: +netActual.toFixed(2), exceso_por_doble_asignacion: +exceso.toFixed(2) },
+        integridad_ledger: integridad,
         COLISIONES: colisiones.length ? colisiones : 'ninguna',
         escalones_detectados: escalones,
         escalones_sin_flujo_asignado: escalones.filter(e => e.flujos_asignados === 0),
