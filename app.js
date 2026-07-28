@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '595'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '596'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -31386,6 +31386,90 @@ try {
         state: p.state,
       };
       try { console.log('%c[UI][CHART_FORENSICS]', 'font-weight:700;color:#4da3ff', out); } catch (_) {}
+      return out;
+    };
+
+    // ── SPEC FLOW-RETIMING — forense de asignación de flujos (SOLO LECTURA) ──────────────────
+    // `aurixChartForensics` responde "hay dos flujos en el mismo escalón"; esto responde lo que
+    // decide el veredicto: la MAGNITUD real del escalón frente a lo que se le resta. Vive en el
+    // bundle a propósito — el diagnóstico equivalente se venía pegando a mano en la consola y
+    // llegaba truncado; una función desplegada no se corrompe al copiarla.
+    // No escribe: ni ledger, ni storage, ni histórico. Sólo lee y compone el informe.
+    window.aurixChartForensicsV2 = function (range) {
+      const r = String(range || 'all').toLowerCase();
+      const D = 864e5, M6 = 6e4;
+      const iso = t => { try { return Number.isFinite(t) ? new Date(t).toISOString() : null; } catch (_) { return null; } };
+      const origOf = f => (f && f.originalTs != null) ? f.originalTs : (f ? f.ts : null);
+      let p = null, fx = null, flows = [], ph = [];
+      try { p = buildProductionPortfolioChart(r); } catch (_) { p = null; }
+      if (!p) return { error: 'no_chart', range: r };
+      try { fx = (typeof window.aurixChartForensics === 'function') ? window.aurixChartForensics(r) : null; } catch (_) { fx = null; }
+      try { flows = (typeof _aurixLoadCapitalFlows === 'function') ? (_aurixLoadCapitalFlows() || []) : []; } catch (_) { flows = []; }
+      try {
+        ph = (typeof portfolioHistory !== 'undefined' && Array.isArray(portfolioHistory))
+          ? portfolioHistory.filter(x => x && Number.isFinite(x.ts) && Number.isFinite(x.value)).slice().sort((a, b) => a.ts - b.ts) : [];
+      } catch (_) { ph = []; }
+      const base = p.baselineTs, cur = p.currentTs;
+      const inWin = flows.filter(f => f && typeof f.ts === 'number' && f.ts > base && f.ts <= cur);
+      // Magnitud REAL del escalón, leída de la serie de patrimonio en ese instante.
+      const stepAt = ts => { const i = ph.findIndex(x => x.ts === ts);
+        return (i > 0) ? { prev: ph[i - 1].value, cur: ph[i].value, stepUSD: +(ph[i].value - ph[i - 1].value).toFixed(2) } : null; };
+      const byStep = {};
+      inWin.forEach(f => { if (f.matchedStepTs != null) { (byStep[f.matchedStepTs] = byStep[f.matchedStepTs] || []).push(f); } });
+      const colisiones = Object.keys(byStep).filter(k => byStep[k].length > 1).map(k => {
+        const ts = Number(k), fs = byStep[k], st = stepAt(ts);
+        const consumido = +fs.reduce((s, f) => s + (Number(f.amountUSD) || 0), 0).toFixed(2);
+        const ratio = (st && st.stepUSD) ? +(consumido / st.stepUSD).toFixed(3) : null;
+        const dup = fs.length === 2
+          && Math.abs(Math.abs(fs[0].amountUSD) - Math.abs(fs[1].amountUSD)) < 0.01
+          && (fs[0].kind || '') === (fs[1].kind || '')
+          && Math.abs(origOf(fs[0]) - origOf(fs[1])) < 5 * M6;
+        return { escalon_ts: iso(ts), escalon_magnitudUSD: st ? st.stepUSD : null,
+          escalon_de: st ? st.prev : null, escalon_a: st ? st.cur : null,
+          flujos_asignados: fs.length, importe_consumido: consumido, ratio_consumido_sobre_escalon: ratio,
+          SOBRE_RESTA: (ratio != null) ? (ratio > 1.5) : null, parecen_duplicados: dup,
+          flujos: fs.map(f => ({ id: f.id || null, kind: f.kind || null, source: f.source || null, amountUSD: f.amountUSD,
+            ts_efectivo: iso(f.ts), ts_original: iso(origOf(f)), retimed_dias: +((f.ts - origOf(f)) / D).toFixed(3),
+            retimeReason: f.retimeReason || null, retimeConfidence: (f.retimeConfidence == null) ? null : f.retimeConfidence })) };
+      });
+      // Escalones estructurales y cuáles quedan SIN dueño (indicio de mala reasignación). Se usa
+      // _aurixVerticalJumps (todos los saltos) y no _aurixCapitalStepBreaks, que sólo devuelve los
+      // que YA casan con un flujo y por tanto nunca mostraría un huérfano.
+      let jumps = [];
+      try { jumps = _aurixVerticalJumps((p.points || []).map(x => ({ time: x.ts, value: x.value }))) || []; } catch (_) { jumps = []; }
+      const PAD = (typeof _AURIX_CAPSTEP_TS_PAD_MS === 'number') ? _AURIX_CAPSTEP_TS_PAD_MS : 36e5;
+      const escalones = jumps.map(j => {
+        const owners = inWin.filter(f => { const t = (f.matchedStepTs != null) ? f.matchedStepTs : f.ts;
+          return t >= (j.startTs - PAD) && t <= (j.endTs + PAD); });
+        return { desde: iso(j.startTs), hasta: iso(j.endTs), deltaUSD: +(+j.deltaUsd).toFixed(2),
+          deltaPct: (j.deltaPct == null) ? null : +(+j.deltaPct).toFixed(2),
+          flujos_asignados: owners.length, ids: owners.map(f => f.id || '(sin id)') };
+      });
+      const netActual = inWin.reduce((s, f) => s + (Number(f.amountUSD) || 0), 0);
+      const exceso = colisiones.reduce((s, c) => {
+        if (c.escalon_magnitudUSD == null) return s;
+        const cons = c.flujos.reduce((a, f) => a + (Number(f.amountUSD) || 0), 0);
+        return s + Math.max(0, Math.abs(cons) - Math.abs(c.escalon_magnitudUSD)) * Math.sign(cons || 1);
+      }, 0);
+      const bv = p.baselineValue, cv = p.currentValue;
+      const out = {
+        build: (typeof window !== 'undefined' && window.__AURIX_APPJS_VERSION__) ? window.__AURIX_APPJS_VERSION__ : '?',
+        rango: r,
+        resumen: { estado: (p.returnState || '') + '/' + (p.displayedRangeState || ''),
+          untrust: p.allUntrustReasons || [], warnings: fx ? fx.warnings : null,
+          ventana_desde: iso(base), ventana_hasta: iso(cur), baseline: bv, valor: cv },
+        ledger: { total_flujos: flows.length, en_ventana: inWin.length,
+          neto_en_ventana: +netActual.toFixed(2), exceso_por_doble_asignacion: +exceso.toFixed(2) },
+        COLISIONES: colisiones.length ? colisiones : 'ninguna',
+        escalones_detectados: escalones,
+        escalones_sin_flujo_asignado: escalones.filter(e => e.flujos_asignados === 0),
+        impacto: { pct_que_saldria_hoy: (bv > 0) ? +(((cv - bv - netActual) / bv) * 100).toFixed(4) : null,
+          pct_si_se_corrige: (bv > 0) ? +(((cv - bv - (netActual - exceso)) / bv) * 100).toFixed(4) : null },
+        ledger_completo: flows.map(f => ({ id: f.id || null, kind: f.kind || null, source: f.source || null,
+          amountUSD: f.amountUSD, ts: iso(f.ts), originalTs: iso(origOf(f)), matchedStepTs: iso(f.matchedStepTs),
+          retimeReason: f.retimeReason || null, retimeConfidence: (f.retimeConfidence == null) ? null : f.retimeConfidence })),
+      };
+      try { console.log('%c[UI][CHART_FORENSICS_V2]', 'font-weight:700;color:#4da3ff', out); } catch (_) {}
       return out;
     };
 
