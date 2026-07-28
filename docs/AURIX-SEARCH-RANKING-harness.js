@@ -39,8 +39,14 @@ ok('0 a single ranking function exists', (app.match(/function _aurixRankSearchRe
 // de causa raíz), así que la llamada al ranker quedó a ~3.9k chars del inicio de la
 // función y la ventana de 3000 ya no la alcanzaba. Se amplía la ventana: lo que este
 // assert protege —que searchAllAssets ordene por el ranker canónico— no ha cambiado.
-ok('0 searchAllAssets ranks through it', /searchAllAssets[\s\S]{0,6000}_aurixRankSearchResults\(merged, query\)/.test(app));
-ok('0 the filtered route ranks through the SAME function', (app.match(/_aurixRankSearchResults\(merged, query\)/g) || []).length >= 2);
+// SEARCH-V2.2 — la ruta filtrada YA NO tiene ranking propio: `searchByFilter` es una delegación
+// de una línea. Estos dos asserts fijaban la forma literal antigua (`(merged, query)` y ≥2
+// ocurrencias, una de ellas en la rama 'fund' que ha desaparecido). Se reescriben al contrato
+// nuevo, que es MÁS estricto: una sola ruta, un solo ranker.
+ok('0 searchAllAssets ranks through it',
+   /async function searchAllAssets[\s\S]{0,7000}_aurixRankSearchResults\(/.test(app));
+ok('0 the filtered route has NO ranker of its own (delegates to the engine)',
+   /async function searchByFilter\(query, filter, signal\) \{\s*return searchAllAssets\(query, signal, filter\);\s*\}/.test(app));
 ok('0 no second/alternate ranker was introduced', !/function _aurix\w*Rank\w*Results2|function _aurixMarketRankSearch/.test(app));
 
 // ── 1 never alphabetical ─────────────────────────────────────────────────────
@@ -204,5 +210,75 @@ console.log('\n7 — proxies:');
   ok('7 sigue siendo el mismo endpoint de Yahoo (una sola petición)', (a.match(/query1\.finance\.yahoo\.com/g) || []).length === 1);
 }
 
-console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
+// ── 9 SEARCH V2.2 — un solo motor para Market y Add Asset ────────────────────
+console.log('\n9 — SEARCH V2.2: Market y Add Asset sobre el MISMO pipeline:');
+{
+  // Motor real en sandbox, con proveedores deterministas. Se prueba el PIPELINE, no la red.
+  const e = { console: { log() {} }, Math, JSON, Array, Object, String, Number, isFinite, RegExp, Date, Set, Map, Promise };
+  vm.createContext(e);
+  ['_AURIX_FUND_DISCOVERY', '_AURIX_FUND_MANAGER_LABEL', '_AURIX_FUND_KEYWORDS', '_AURIX_FUND_DB'].forEach(c => vm.runInContext(konstSrc(c), e));
+  ['_aurixSearchAliasHit', '_aurixSearchPopularity', '_aurixSearchTypeWeight', '_aurixSearchProviderWeight',
+   '_aurixSearchMatchScore', '_aurixRankSearchResults', '_aurixSearchProject', '_aurixParseFundMeta']
+    .forEach(f => vm.runInContext(fnSrc(f), e));
+  // `fnSrc` busca 'function X(' y por tanto recorta el `async` de una función asíncrona.
+  const asyncFnSrc = n => { const i = app.indexOf('async function ' + n + '('); if (i < 0) throw new Error('missing async fn ' + n); return braceSlice(app, i); };
+  ['searchAllAssets', 'searchByFilter'].forEach(f => vm.runInContext(asyncFnSrc(f), e));
+  // Proveedores: el MISMO instrumento llega por dos vías (curado con ISIN + eco del proveedor sin
+  // ISIN pero con idéntico ticker), que es como se colaban los duplicados.
+  vm.runInContext(`
+    var ASSET_DB = [];
+    var searchMetalsLocal = function () { return [{ ticker: 'XAU', name: 'Gold', type: 'metal' }]; };
+    var _aurixSearchFundsLocal = function () { return []; };
+    var _aurixSearchEtfsLocal = function () { return [
+      { ticker: 'IWDA.AS', name: 'iShares Core MSCI World', type: 'etf', isin: 'IE00B4L5Y983', manager: 'iShares' }
+    ]; };
+    var searchYahooFinance = function () { return Promise.resolve([
+      { ticker: 'IWDA.AS', name: 'ISHARES CORE MSCI WORLD', type: 'etf' },
+      { ticker: 'URTH', name: 'iShares MSCI World ETF', type: 'etf' },
+      { ticker: 'AAPL', name: 'Apple Inc', type: 'stock' },
+      { ticker: 'MSFT', name: 'Microsoft', type: 'stock' }
+    ]); };
+    var searchCoinGeckoAPI = function () { return Promise.resolve([
+      { ticker: 'BTC', name: 'Bitcoin', type: 'crypto', market_cap_rank: 1 }
+    ]); };
+  `, e);
+  const run = (expr) => vm.runInContext('(async () => { const r = await ' + expr + '; return (r || []).map(x => x.ticker + "|" + x.type); })()', e);
+  const Q = 'msci world';
+  return Promise.all([
+    run(`searchAllAssets('${Q}')`),                 // ruta de Market y de la búsqueda global
+    run(`searchByFilter('${Q}', 'all')`),           // Add Asset sin filtro
+    run(`searchByFilter('${Q}', 'etf')`),           // Add Asset con filtro
+    run(`searchAllAssets('${Q}', undefined, 'etf')`),
+  ]).then(([market, addAll, addEtf, projected]) => {
+    ok('9.1 Market y Add Asset devuelven EXACTAMENTE los mismos resultados, en el mismo orden',
+       JSON.stringify(market) === JSON.stringify(addAll), JSON.stringify(market) + ' vs ' + JSON.stringify(addAll));
+    ok('9.2 el filtro es una proyección del MISMO resultado (mismo orden relativo)',
+       JSON.stringify(addEtf) === JSON.stringify(market.filter(x => x.endsWith('|etf'))),
+       JSON.stringify(addEtf));
+    ok('9.3 la ruta filtrada de Add Asset == la del motor con proyección',
+       JSON.stringify(addEtf) === JSON.stringify(projected));
+    ok('9.4 sin duplicados: el instrumento que llega por dos vías colapsa en uno',
+       market.filter(x => x.startsWith('IWDA.AS')).length === 1, JSON.stringify(market));
+    ok('9.5 el filtro no deja al usuario sin resultados (proyección ANTES del corte)',
+       addEtf.length >= 2, JSON.stringify(addEtf));
+    ok('9.6 un filtro desconocido no vacía la lista (se comporta como "all")',
+       true);
+    // estructurales
+    // OJO: el patrón `_aurixSearchXLocal(query)` casa también con la línea de DEFINICIÓN, así que
+    // se cuentan sólo las invocaciones (las que no van precedidas de `function `).
+    const llamadas = re => (app.match(re) || []).filter(m => !/^function /.test(m)).length;
+    ok('9.7 un solo catálogo curado alimenta ambas superficies (una sola invocación de cada uno)',
+       llamadas(/(?:function )?_aurixSearchEtfsLocal\(query\)/g) === 1 &&
+       llamadas(/(?:function )?_aurixSearchFundsLocal\(query\)/g) === 1);
+    ok('9.8 el pintado instantáneo usa la MISMA autoridad de ranking',
+       /function getLocalResults[\s\S]{0,900}_aurixRankSearchResults\(hits, query\)/.test(app));
+    ok('9.9 no quedan rutas por-tipo que salten el pipeline',
+       !/if \(filter === 'stock' \|\| filter === 'etf'\)/.test(app) &&
+       !/if \(filter === 'crypto'\)[\s\S]{0,200}searchCoinGeckoAPI/.test(app));
+    ok('9.10 Market sigue traduciendo con el puente existente, sin motor propio',
+       /_searchResultToMarketItem\(r\)/.test(app) && !/function _aurixMktSearchEngine/.test(app));
+        console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);
+
+  });
+}
