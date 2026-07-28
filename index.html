@@ -102,8 +102,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v618-market-mobile-scroll';
-      var APPJS_V = '593';
+      var BUILD = 'v619-account-center-i18n';
+      var APPJS_V = '594';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -1504,7 +1504,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=593"
+  <script src="app.js?v=594"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
@@ -1672,12 +1672,12 @@
   <div class="modal modal--settings" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
     <div class="modal-header">
       <h3 id="settingsTitle" data-i18n="settingsTitle">Configuración</h3>
-      <button class="modal-close" id="settingsClose" aria-label="Close">✕</button>
+      <button class="modal-close" id="settingsClose" aria-label="Cerrar" data-i18n-aria="ariaCloseModal">✕</button>
     </div>
     <!-- DSH.SETTINGS.01 — desktop/tablet: left nav rail + single visible pane.
          Mobile collapses the rail and stacks every section vertically (CSS). -->
     <div class="modal-body settings-body settings-body--nav">
-      <nav class="settings-nav" role="tablist" aria-label="Configuración">
+      <nav class="settings-nav" role="tablist" aria-label="Configuración" data-i18n-aria="ariaSettingsNav">
         <button type="button" class="settings-nav-item is-current" role="tab" data-settings-pane="account" data-i18n="settingsAccount">Cuenta</button>
         <button type="button" class="settings-nav-item" role="tab" data-settings-pane="prefs" data-i18n="settingsPrefsTitle">Preferencias</button>
         <!-- SETTINGS-MOBILE-V2 — Membresía/Premium hidden for Launch 1 via the single
@@ -1698,8 +1698,8 @@
         <div class="settings-row">
           <span class="settings-row-label" data-i18n="settingsDisplayName">Nombre visible</span>
           <span class="settings-name-field">
-            <input type="text" id="settingsNameInput" class="settings-name-input" maxlength="40" autocomplete="off" autocapitalize="words" spellcheck="false" aria-label="Nombre visible" readonly>
-            <button type="button" class="settings-name-edit" id="settingsNameEditBtn" aria-label="Editar nombre visible"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18.5 9.5l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></button>
+            <input type="text" id="settingsNameInput" class="settings-name-input" maxlength="40" autocomplete="off" autocapitalize="words" spellcheck="false" aria-label="Nombre visible" data-i18n-aria="ariaDisplayName" readonly>
+            <button type="button" class="settings-name-edit" id="settingsNameEditBtn" aria-label="Editar nombre visible" data-i18n-aria="ariaEditDisplayName"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18.5 9.5l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></button>
           </span>
         </div>
         <div class="settings-row">
@@ -1718,14 +1718,14 @@
         <h4 class="settings-section-title"><span class="settings-sec-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><circle cx="10" cy="7" r="2.2"/><line x1="4" y1="17" x2="20" y2="17"/><circle cx="15" cy="17" r="2.2"/></svg></span><span data-i18n="settingsPrefsTitle">Preferencias</span></h4>
         <div class="settings-row">
           <span class="settings-row-label" data-i18n="settingsLang">Idioma</span>
-          <div class="menu-pref-opts" role="group" aria-label="Language">
+          <div class="menu-pref-opts" role="group" aria-label="Idioma" data-i18n-aria="ariaLangGroup">
             <button type="button" class="menu-item--lang menu-pref-opt" data-lang="es" aria-pressed="true">Español</button>
             <button type="button" class="menu-item--lang menu-pref-opt" data-lang="en" aria-pressed="false">English</button>
           </div>
         </div>
         <div class="settings-row">
           <span class="settings-row-label" data-i18n="settingsCurrency">Moneda base</span>
-          <div class="menu-pref-opts" role="group" aria-label="Currency">
+          <div class="menu-pref-opts" role="group" aria-label="Moneda base" data-i18n-aria="ariaCurrencyGroup">
             <button type="button" class="menu-curr-btn menu-pref-opt" data-currency="USD" aria-pressed="true">USD</button>
             <button type="button" class="menu-curr-btn menu-pref-opt" data-currency="EUR" aria-pressed="false">EUR</button>
           </div>
@@ -1741,7 +1741,7 @@
             <span class="plan-card-badge" id="planTierBadge" data-i18n="settingsPlanCurrent">Plan actual</span>
           </div>
           <div class="plan-card-body">
-            <p class="plan-card-desc" id="planCurrentDesc">Seguimiento completo de tu patrimonio. Sin límite de activos.</p>
+            <p class="plan-card-desc" id="planCurrentDesc" data-i18n="settingsPlanDescFree">Seguimiento completo de tu patrimonio. Sin límite de activos.</p>
           </div>
         </div>
 
@@ -1835,7 +1835,7 @@
         <h4 class="settings-section-title"><span class="settings-sec-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 013.9-2c1.2.8 1.1 2.2.2 3-.7.6-1.6 1-1.6 2"/><path d="M12 17h.01"/></svg></span><span data-i18n="acHelp">Ayuda y soporte</span></h4>
         <div class="settings-actions">
           <a class="settings-action" id="acSupportLink"
-             href="mailto:aurixsystemoficial@gmail.com?subject=Soporte%20Aurix&body=Hola%2C%20equipo%20de%20Aurix%3A%0A%0ANecesito%20ayuda%20con%3A%0A%0A">
+             href="mailto:aurixsystemoficial@gmail.com">
             <span class="settings-action-main">
               <span class="settings-action-label" data-i18n="acContactSupport">Contactar con soporte</span>
               <span class="settings-action-sub" data-i18n="acContactSupportSub">Se abrirá tu cliente de correo. No se adjunta ningún dato.</span>

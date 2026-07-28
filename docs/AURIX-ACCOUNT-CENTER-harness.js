@@ -94,11 +94,18 @@ ok('5.2 muestra estado vacío con el texto exacto y la etiqueta Próximamente',
    /acSoon:\s*'Próximamente'/.test(app));
 ok('5.3 no se introdujo backend, programación ni envío de notificaciones',
    !/api\/notifications|sendNotification|scheduleNotification/.test(app));
-ok('5.4 Ayuda usa EXACTAMENTE el correo indicado',
-   /mailto:aurixsystemoficial@gmail\.com\?subject=Soporte%20Aurix/.test(html));
-ok('5.5 el cuerpo del correo es el pedido y no adjunta datos ni diagnóstico',
-   /body=Hola%2C%20equipo%20de%20Aurix%3A%0A%0ANecesito%20ayuda%20con%3A/.test(html) &&
-   !/mailto:[^"]*AurixDiagShare|mailto:[^"]*diagnostic/.test(html));
+// ACCOUNT-CENTER-I18N-1 — el mailto pasa a ser NEUTRO: sólo destinatario. Antes llevaba
+// asunto y cuerpo precargados en español, que es texto de producto sin traducir dentro de
+// un enlace; y prerrellenar el correo del usuario no es decisión del producto.
+const mailtos = [...html.matchAll(/mailto:[^"']*/g)].map(m => m[0]);
+ok('5.4 Ayuda usa EXACTAMENTE el correo indicado y NADA más',
+   mailtos.length === 1 && mailtos[0] === 'mailto:aurixsystemoficial@gmail.com', mailtos.join(' | '));
+ok('5.5 el mailto no precarga asunto ni cuerpo (ni texto en ningún idioma)',
+   !/mailto:[^"']*[?&](subject|body)=/i.test(html) &&
+   !/Soporte%20Aurix|equipo%20de%20Aurix|Necesito%20ayuda/i.test(html));
+ok('5.6 el enlace de soporte no adjunta datos ni diagnóstico y no lo reescribe el JS',
+   !/mailto:[^"']*(AurixDiagShare|diagnostic|report)/i.test(html) &&
+   !/acSupportLink[\s\S]{0,200}(href|mailto)/.test(appCode));
 
 // ── 6. Seguridad reutiliza los owners protegidos ────────────────────────────
 console.log('\n6 — Seguridad reutiliza los owners existentes, sin tocarlos:');
@@ -120,6 +127,129 @@ ok('7.4 el foco vuelve al botón de menú al cerrar',
    /getElementById\('menuToggle'\); if \(t\) t\.focus\(\{ preventScroll: true \}\)/.test(app));
 ok('7.5 el bloqueo de scroll del body se libera al cerrar (sin scroll atascado)',
    /function closeSettingsPanel\(\)[\s\S]{0,600}document\.body\.classList\.remove\('modal-open'\)/.test(app));
+
+// ── 8. i18n COMPLETO del Account Center ─────────────────────────────────────
+// SPEC ACCOUNT CENTER I18N COMPLETE. El criterio no es "las capturas están bien":
+// es que NINGÚN texto del Account Center se resuelva fuera del diccionario, y que el
+// cambio de idioma no exija recargar. Los dos defectos reales que esto fija:
+//   (a) traducción paralela — ternarios `lang === 'es' ? 'Sesión activa' : …` dentro de
+//       _settingsPopulate, invisibles para applyI18n();
+//   (b) `removeAttribute('data-i18n')` sobre el estado de sesión, que lo sacaba del
+//       sistema para siempre → mezcla de idiomas con la tarjeta abierta.
+console.log('\n8 — i18n completo: cero literales y cambio inmediato ES↔EN:');
+
+// Bloques exactos del Account Center en el markup.
+const acMenu  = html.slice(html.indexOf('<div id="menuPanel"'), html.indexOf('</header>'));
+const acModal = html.slice(html.indexOf('<div class="modal-overlay" id="settingsOverlay">'), html.indexOf('id="founderOverlay"'));
+const acHtml  = acMenu + acModal;
+
+// Diccionarios ES / EN tal y como los declara app.js (una sola fuente, sin duplicar).
+const _iT = app.indexOf('const T = {');
+const _esS = app.indexOf('es: {', _iT), _enS = app.indexOf('en: {', _iT);
+const dictEs = app.slice(_esS, _enS), dictEn = app.slice(_enS, app.indexOf('\n};', _enS));
+const dictHas = (blk, k) => new RegExp('(?:^|[\\s{,])' + k + '\\s*:', 'm').test(blk);
+const dictVal = (blk, k) => {
+  const m = blk.match(new RegExp('(?:^|[\\s{,])' + k + "\\s*:\\s*('[^']*'|\"[^\"]*\")", 'm'));
+  return m ? m[1].slice(1, -1) : null;
+};
+
+// 8.1 — toda clave usada en el Account Center existe en AMBOS diccionarios.
+const acKeys = [...new Set([...acHtml.matchAll(/data-i18n(?:-aria|-ph|-title)?="([A-Za-z0-9_]+)"/g)].map(m => m[1]))];
+const missingKeys = acKeys.filter(k => !dictHas(dictEs, k) || !dictHas(dictEn, k));
+ok('8.1 las ' + acKeys.length + ' claves del Account Center existen en ES y en EN',
+   acKeys.length >= 50 && missingKeys.length === 0, missingKeys.join(','));
+
+// 8.2 — cobertura mínima obligatoria del SPEC, concepto a concepto, en los dos idiomas.
+const REQUIRED = [
+  'settingsTitle', 'acProfile', 'acNotifications', 'acPreferences', 'acSecurity', 'acHelp',
+  'menuLogout', 'acContactSupport', 'acNoNotifications', 'acSoon', 'settingsLang',
+  'settingsCurrency', 'settingsProfileTitle', 'settingsProfileRisk', 'settingsProfileExperience',
+  'settingsProfileAge', 'settingsExport', 'settingsImport', 'settingsDiag', 'settingsReset',
+  'settingsStatus', 'settingsDisplayName', 'settingsEmail',
+  'settingsSessionActive', 'settingsSessionNone',
+];
+const reqMissing = REQUIRED.filter(k => !dictHas(dictEs, k) || !dictHas(dictEn, k));
+ok('8.2 la cobertura mínima del SPEC (' + REQUIRED.length + ' conceptos) está en los dos idiomas',
+   reqMissing.length === 0, reqMissing.join(','));
+// ...y traducida de verdad: ningún valor EN puede llevar acentos/ñ del español.
+const notTranslated = REQUIRED.filter(k => { const v = dictVal(dictEn, k); return v && /[áéíóúñ¿¡]/i.test(v); });
+ok('8.3 ningún valor EN quedó en español (acentos/ñ en el diccionario inglés)',
+   notTranslated.length === 0, notTranslated.join(','));
+
+// 8.4 — cero literales visibles sin clave en el markup del Account Center.
+const bareText = [];
+for (const m of acHtml.matchAll(/<(button|span|div|h3|h4|p|a|label)\b([^>]*)>([^<>]*[A-Za-zÁÉÍÓÚáéíóúñÑ][^<>]*)</g)) {
+  const attrs = m[2], txt = m[3].trim();
+  if (!txt || /data-i18n[="]/.test(attrs)) continue;
+  // Exentos por naturaleza, no por excepción: nombres de idioma en su propio idioma
+  // (convención universal), códigos de moneda, nombres de tier y marca.
+  if (/^(Español|English|USD|EUR|FREE|PREMIUM|FOUNDER|Aurix Free|Aurix Premium|—|·)$/.test(txt)) continue;
+  if (/id="settingsBuildVersion"/.test(attrs)) continue;   // valor de build, no copy
+  bareText.push(txt.slice(0, 40));
+}
+ok('8.4 no queda texto visible hardcodeado en el markup del Account Center',
+   bareText.length === 0, bareText.join(' | '));
+
+// 8.5 — cero atributos accesibles hardcodeados (los lee un lector de pantalla: son copy).
+const bareAttr = [];
+for (const m of acHtml.matchAll(/(aria-label|placeholder|title)="([^"]+)"/g)) {
+  const tag = acHtml.slice(acHtml.lastIndexOf('<', m.index), acHtml.indexOf('>', m.index) + 1);
+  const need = 'data-i18n-' + (m[1] === 'aria-label' ? 'aria' : m[1] === 'placeholder' ? 'ph' : 'title');
+  if (!tag.includes(need)) bareAttr.push(m[1] + '="' + m[2] + '"');
+}
+ok('8.5 todo aria-label/placeholder/title del Account Center se resuelve por clave',
+   bareAttr.length === 0, bareAttr.join(' | '));
+
+// 8.6 — sin traducción paralela: ningún ternario de idioma pinta texto en la región
+// del Account Center. Se permite elegir LOCALE para fechas (no es copy).
+const acJsStart = app.indexOf('function _settingsPopulate()');
+const acJsEnd   = app.indexOf('function exportPortfolioBackup(');
+const acJs = appCode.slice(acJsStart, acJsEnd);
+const langTernaries = acJs.split('\n')
+  .filter(l => /lang *===? *'es'/.test(l))
+  .filter(l => !/toLocaleString|toLocaleDate|es-ES|en-GB/.test(l));
+ok('8.6 cero ternarios `lang === \'es\'` pintando texto en el Account Center',
+   langTernaries.length === 0, langTernaries.map(l => l.trim().slice(0, 60)).join(' | '));
+ok('8.7 los textos derivados usan el helper existente (_settingsT), no un traductor nuevo',
+   /statusKey = session \? 'settingsSessionActive' : 'settingsSessionNone'/.test(app) &&
+   /_settingsT\(statusKey\)/.test(app) &&
+   /descKey = isPremiumTier\(plan\.tier\) \? 'settingsPlanDescPremium' : 'settingsPlanDescFree'/.test(app) &&
+   /_settingsT\(descKey\)/.test(app) &&
+   (app.match(/^function _settingsT\(/gm) || []).length === 1 &&
+   !/const (AC_T|ACCOUNT_T|_acT) *=/.test(appCode));
+// Los literales de los toasts sólo pueden vivir en el diccionario. El assert mira la
+// LLAMADA, no el fichero entero: `resetDoneToast` es una clave antigua de otra pantalla
+// que comparte texto y no debe hacer fallar esto.
+ok('8.8 los toasts del reset también salen del diccionario',
+   /_settingsT\('settingsResetDoneToast'\)/.test(app) && /_settingsT\('settingsResetFailToast'\)/.test(app) &&
+   !/_aurixShowToast\(\s*(isEs|isEsFail|lang)/.test(appCode) &&
+   !/_aurixShowToast\(\s*['"][^'"]*[A-Za-zÁÉÍÓÚáéíóúñÑ]{4,}/.test(appCode));
+
+// 8.9 — el estado de sesión vuelve al sistema: se RELIGA la clave en vez de borrarla.
+ok('8.9 el estado de sesión se religa a su clave (ya no se saca del i18n con removeAttribute)',
+   /setAttribute\('data-i18n', statusKey\)/.test(app) &&
+   !/statusEl\.removeAttribute\('data-i18n'\)/.test(appCode));
+ok('8.10 la descripción del plan también queda religada a su clave',
+   /setAttribute\('data-i18n', descKey\)/.test(app));
+
+// 8.11 — cambio inmediato: switchLang (owner único) re-deriva el Account Center.
+const switchSrc = fnSource('switchLang');
+ok('8.11 switchLang re-deriva el Account Center con el owner de repintado existente',
+   /_settingsPopulate\(\)/.test(switchSrc) && /applyI18n\(\)/.test(switchSrc));
+ok('8.12 no hay recarga/logout para aplicar el idioma',
+   !/location\.reload|location\.href *=/.test(switchSrc) && !/signOut|logout/i.test(switchSrc));
+ok('8.13 sigue habiendo UN solo owner de idioma (switchLang) y una sola pasada applyI18n',
+   (app.match(/^function switchLang\(/gm) || []).length === 1 &&
+   (app.match(/^function applyI18n\(/gm) || []).length === 1);
+ok('8.14 applyI18n cubre texto y los tres tipos de atributo (aria/placeholder/title)',
+   /\[data-i18n\]/.test(app) && /\[data-i18n-aria\]/.test(app) &&
+   /\[data-i18n-ph\]/.test(app) && /\[data-i18n-title\]/.test(app));
+
+// 8.15 — web y móvil comparten el mismo texto: ningún pane inyecta copy desde CSS
+// (un `content:` con texto sería intraducible y sólo aparecería en un breakpoint).
+const acCss = cssCode.match(/\.(settings|menu-item|ac-empty|ac-soon)[^{]*\{[^}]*\}/g) || [];
+ok('8.15 ningún selector del Account Center inyecta texto por CSS `content:`',
+   !acCss.some(r => /content: *['"][^'"]*[A-Za-zÁÉÍÓÚáéíóúñÑ]{3,}/.test(r)));
 
 console.log('\nRESULT: ' + (fail === 0 ? 'ALL PASS ✓' : 'FAIL ✗') + '  (' + pass + ' passed, ' + fail + ' failed)');
 process.exit(fail === 0 ? 0 : 1);

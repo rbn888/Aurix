@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '593'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '594'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -3737,6 +3737,25 @@ const T = {
     acSoon:               'Próximamente',
     acContactSupport:     'Contactar con soporte',
     acContactSupportSub:  'Se abrirá tu cliente de correo. No se adjunta ningún dato.',
+    // ACCOUNT-CENTER-I18N-1 — textos del Account Center que se pintan desde JS. Antes
+    // vivían como ternarios `lang === 'es' ? … : …` dentro de _settingsPopulate, es decir
+    // un segundo diccionario paralelo que applyI18n() no podía alcanzar: con la tarjeta
+    // abierta, Estado/Email/plan se quedaban en el idioma anterior. Ahora son claves.
+    settingsSessionActive:  'Sesión activa',
+    settingsSessionNone:    'Sin sesión',
+    settingsPlanDescFree:   'Seguimiento completo de tu patrimonio. Sin límite de activos.',
+    settingsPlanDescPremium:'Acceso completo a todas las herramientas premium.',
+    settingsResetDoneToast: 'Cartera reiniciada',
+    settingsResetFailToast: 'No se pudo completar el reinicio. Reintenta.',
+    // Etiquetas accesibles del Account Center (las leen lectores de pantalla, así que
+    // también son texto visible del producto). Estaban fijas: unas en español y otras
+    // en inglés, en el mismo modal.
+    ariaSettingsNav:        'Configuración',
+    ariaDisplayName:        'Nombre visible',
+    ariaEditDisplayName:    'Editar nombre visible',
+    ariaCloseModal:         'Cerrar',
+    ariaLangGroup:          'Idioma',
+    ariaCurrencyGroup:      'Moneda base',
     mkt_not_addable: 'No disponible para cartera',
     mkt_no_history: 'Sin histórico disponible para este activo en nuestra fuente de datos.',
     mkt_not_addable_hint: 'Los índices y las materias primas genéricas no son posiciones que puedas mantener en cartera. Puedes seguirlos desde Seguimiento.',
@@ -5895,6 +5914,23 @@ const T = {
     acSoon:               'Coming soon',
     acContactSupport:     'Contact support',
     acContactSupportSub:  'Opens your email client. No data is attached.',
+    // ACCOUNT-CENTER-I18N-1 — see the ES block: these were inline `lang === 'es'`
+    // ternaries inside _settingsPopulate (a parallel dictionary applyI18n could not
+    // reach), so the open card kept Status/Email/plan in the previous language.
+    settingsSessionActive:  'Active session',
+    settingsSessionNone:    'No session',
+    settingsPlanDescFree:   'Full wealth tracking. No asset limit.',
+    settingsPlanDescPremium:'Full access to every premium tool.',
+    settingsResetDoneToast: 'Portfolio reset',
+    settingsResetFailToast: 'Reset could not complete. Try again.',
+    // Accessible labels for the Account Center (screen readers read them, so they are
+    // product copy too). They were hardcoded — some Spanish, some English, same modal.
+    ariaSettingsNav:        'Settings',
+    ariaDisplayName:        'Display name',
+    ariaEditDisplayName:    'Edit display name',
+    ariaCloseModal:         'Close',
+    ariaLangGroup:          'Language',
+    ariaCurrencyGroup:      'Base currency',
     mkt_not_addable: 'Not available for portfolio',
     mkt_no_history: 'No price history available for this asset from our data source.',
     mkt_not_addable_hint: 'Indices and generic commodities are not positions you can hold. You can still track them from your Watchlist.',
@@ -7775,6 +7811,15 @@ function switchLang(newLang) {
   // Profile / part of the UI stays in the old language" (mixed-language) symptom.
   try { if (typeof _settingsPaintProfile === 'function') _settingsPaintProfile(); } catch (_) {}
   try { if (typeof _aurixSyncLangCurrencyButtons === 'function') _aurixSyncLangCurrencyButtons(); } catch (_) {}
+  // ACCOUNT-CENTER-I18N-1 — el Account Center también pinta texto DERIVADO del estado
+  // (estado de sesión, email sin sesión, descripción del plan). applyI18n() ya alcanza
+  // esos nodos porque _settingsPopulate deja escrita la clave correcta en `data-i18n`,
+  // pero se re-deriva aquí para que la elección de clave se rehaga en el idioma nuevo
+  // sin depender del orden de las pasadas. Es el MISMO owner de repintado que usa
+  // openSettingsPanel — no hay un traductor propio del Account Center — y es idempotente
+  // con la tarjeta cerrada, así que "cambiar idioma y reabrir" da el mismo resultado que
+  // "cambiar idioma con la tarjeta abierta": ninguno exige recargar.
+  try { if (typeof _settingsPopulate === 'function') _settingsPopulate(); } catch (_) {}
   if (currentTab === 'market') {
     renderMarket();
   } else if (currentTab === 'workspace') {
@@ -56297,11 +56342,14 @@ function _settingsPopulate() {
   // Tier-aware description for the current-plan card (replaces the old asset
   // usage meter, removed in AURIX-MONETIZATION-1 · Phase 7 — Aurix does not cap
   // the number of assets). Painted dynamically so it stays correct per tier.
+  // ACCOUNT-CENTER-I18N-1 — el idioma ya no se decide aquí con un ternario: se elige la
+  // CLAVE y se deja escrita en `data-i18n`. Así el texto derivado queda dentro del
+  // sistema, y tanto applyI18n() como este repintado dicen exactamente lo mismo.
   const descEl = document.getElementById('planCurrentDesc');
   if (descEl) {
-    descEl.textContent = isPremiumTier(plan.tier)
-      ? (lang === 'es' ? 'Acceso completo a todas las herramientas premium.' : 'Full access to every premium tool.')
-      : (lang === 'es' ? 'Seguimiento completo de tu patrimonio. Sin límite de activos.' : 'Full wealth tracking. No asset limit.');
+    const descKey = isPremiumTier(plan.tier) ? 'settingsPlanDescPremium' : 'settingsPlanDescFree';
+    try { descEl.setAttribute('data-i18n', descKey); } catch (_) {}
+    descEl.textContent = _settingsT(descKey);
   }
 
   // AURIX-MONETIZATION-1 · Phase 7 — Account reflects the REAL Supabase session.
@@ -56310,17 +56358,25 @@ function _settingsPopulate() {
   // status fields were stuck on "Sin sesión" even with an active session.
   const session = (typeof currentUser !== 'undefined' && currentUser) ? currentUser : null;
   if (emailEl) {
-    emailEl.textContent = (session && session.email)
-      ? session.email
-      : (lang === 'es' ? 'Sin sesión' : 'No session');
+    // Con sesión el contenido es un email (dato, no texto traducible) → se retira el
+    // binding; sin sesión sí es copy y se religa a su clave.
+    if (session && session.email) {
+      try { emailEl.removeAttribute('data-i18n'); } catch (_) {}
+      emailEl.textContent = session.email;
+    } else {
+      try { emailEl.setAttribute('data-i18n', 'settingsSessionNone'); } catch (_) {}
+      emailEl.textContent = _settingsT('settingsSessionNone');
+    }
   }
   if (statusEl) {
-    // Drop the static data-i18n binding ("Local · sin sesión") so a later
-    // applyI18n() pass can't overwrite the live value, then paint real status.
-    try { statusEl.removeAttribute('data-i18n'); } catch (_) {}
-    statusEl.textContent = session
-      ? (lang === 'es' ? 'Sesión activa' : 'Active session')
-      : (lang === 'es' ? 'Sin sesión' : 'No session');
+    // ACCOUNT-CENTER-I18N-1 — antes se hacía `removeAttribute('data-i18n')` para que un
+    // applyI18n() posterior no sobreescribiera el valor vivo. El efecto colateral era que
+    // el estado quedaba FUERA del sistema i18n para siempre: al cambiar de idioma con la
+    // tarjeta abierta se quedaba en el anterior. Se REEMPLAZA la clave por la que
+    // corresponde al estado real, así applyI18n() ya no pelea: traduce lo correcto.
+    const statusKey = session ? 'settingsSessionActive' : 'settingsSessionNone';
+    try { statusEl.setAttribute('data-i18n', statusKey); } catch (_) {}
+    statusEl.textContent = _settingsT(statusKey);
   }
 
   // DSH.SETTINGS.02 — "Nombre visible" (display name, same rule as the menu
@@ -56964,8 +57020,9 @@ async function performAtomicFreshStartReset() {
     // data. This is the single owner of "reset only when remote borrado done".
     const remoteOk = await _pushEmptyPortfolioToBackend();
     if (!remoteOk) {
-      const isEsFail = (typeof lang !== 'undefined' && lang === 'es');
-      try { _aurixShowToast(isEsFail ? 'No se pudo completar el reinicio. Reintenta.' : 'Reset could not complete. Try again.', { variant: 'error' }); } catch (_) {}
+      // ACCOUNT-CENTER-I18N-1 — mismo helper de traducción que el resto de la tarjeta
+      // (_settingsT), en lugar de un ternario de idioma incrustado en el flujo.
+      try { _aurixShowToast(_settingsT('settingsResetFailToast'), { variant: 'error' }); } catch (_) {}
       try { const b = document.getElementById('resetConfirmBtn'); if (b) b.disabled = false; } catch (_) {}
       return false;
     }
@@ -57013,8 +57070,7 @@ async function performAtomicFreshStartReset() {
     await new Promise(r => requestAnimationFrame(() => r()));
 
     // 6. Success toast.
-    const isEs = (typeof lang !== 'undefined' && lang === 'es');
-    _aurixShowToast(isEs ? 'Cartera reiniciada' : 'Portfolio reset', { variant: 'success' });
+    _aurixShowToast(_settingsT('settingsResetDoneToast'), { variant: 'success' });
 
     // 7. ONBOARDING-1B §2: reset must feel like a completed clean
     //    action, NOT shove the user into another modal immediately.
