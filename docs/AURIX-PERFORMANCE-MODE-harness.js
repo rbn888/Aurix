@@ -44,7 +44,14 @@ vm.runInContext("function computePerformanceSnapshot(r){ var rs=(getInstitutiona
   fn('_aurixFlowIsInternal'), fn('_aurixFlowNeutralize'), fn('_wscAssessSeriesQuality'),
   fn('_aurixRangeReturn'), fn('getCanonicalPortfolioSeries'), fn('getInstitutionalPerformanceSeries'), fn('_aurixDashSeries'), fn('_aurixCaptureFlow'),
   fn('_aurixEarliestTrackedTs'), fn('_aurixFlowTsCorroboratedByHistory'), fn('_aurixMatchHistoricalStep'), fn('_aurixFlowRetimeDecision'), fn('_aurixEffectiveFlowTs'), fn('_aurixPurgeDerivedFlows'),
-  fn('_aurixBackfillFlowsFromTransactions') ].forEach(c=>vm.runInContext(c, sb));
+  fn('_aurixBackfillFlowsFromTransactions'),
+  // SPEC FLOW-RETIMING — el casado usa ahora la MISMA serie que el retorno (invertible, moneda
+  // base) en vez de `portfolioHistory` (total, USD crudo). Se cargan las primitivas nuevas y se
+  // refleja el fixture existente como fuente invertible equivalente: económicamente idéntica.
+  fn('_aurixRetimeSeries'), fn('_aurixRetimeAmountBase'), fn('_aurixRetimeSteps'), fn('_aurixStepClaims'),
+  fn('_aurixRetimeIntervalIdx'), fn('_aurixPlanFlowRetiming'), fn('_aurixInvestableSnapshots'),
+  'var _aurixHistorySourceForDisplay = function () { return (typeof portfolioHistory !== "undefined" && Array.isArray(portfolioHistory)) ? portfolioHistory.map(function (p) { return { ts: p.ts, total: p.value, real_estate: 0 }; }) : []; };'
+  ].forEach(c=>vm.runInContext(c, sb));
 
 let ok=true; const ck=(n,c,g)=>{console.log((c?'  ✓':'  ✗')+' '+n+(g!==undefined?'  ['+g+']':'')); if(!c) ok=false;};
 const spread=(n,span,base,slope)=>Array.from({length:n},(_,i)=>({ts:NOW-span+Math.round(i*span/(n-1)),value:base+i*(slope||0)}));

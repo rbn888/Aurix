@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '594'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '595'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -9076,28 +9076,104 @@ function _aurixEarliestTrackedTs() {
   } catch (_) { return 0; }
 }
 
-// True when portfolioHistory shows a real value STEP near `ts` matching the flow's sign and a
-// meaningful fraction of its magnitude — i.e. the capital event actually happened then (vs a
-// migration/import artefact stamped at boot time). portfolioHistory values are USD, as are flows.
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC FLOW-RETIMING — IDENTIDAD DE SERIE · TANDAS · EXCLUSIVIDAD · SUELO TEMPORAL
+// ════════════════════════════════════════════════════════════════════════════
+// (1) IDENTIDAD DE SERIE. El casado se hacía contra `portfolioHistory` = patrimonio TOTAL en USD
+//     crudo (inmuebles incluidos), mientras la resta la hace `_aurixComputePeriodReturn` sobre la
+//     serie INVERTIBLE en moneda base. Casar contra una serie y restar de otra permitía que un
+//     flujo casara con un escalón que la serie donde se resta ni siquiera tiene (p. ej. una
+//     revalorización inmobiliaria), y que los criterios de sostenimiento/ratio se evaluaran sobre
+//     una curva distinta de aquella en la que se mide el retorno. AHORA ambos extremos usan la
+//     MISMA serie económica y la MISMA unidad: `_aurixInvestableSnapshots('all')`, que aplica
+//     exactamente la transformación de `_aurixHpqRawStages` (total − real_estate → toBase).
+// (2) TANDAS. Varios `asset_add` en el mismo intervalo de snapshot producen UN escalón combinado
+//     cuya magnitud no encaja con ningún importe individual → ninguno se corroboraba en su sitio y
+//     cada uno se exiliaba a un escalón parecido días después. Ahora los candidatos del mismo
+//     intervalo se agrupan y se corrobora la SUMA contra el escalón combinado.
+// (3) EXCLUSIVIDAD POR CAPACIDAD Y CONFIANZA. Un escalón tiene una capacidad finita y sólo puede
+//     absorber capital una vez. Se asigna por confianza descendente y se rechaza toda reclamación
+//     que exceda la capacidad restante — eso elimina la sobre-resta (dos flujos consumiendo el
+//     mismo escalón) sin tocar el guard `double_matched_flow_step`, que sigue siendo el vigilante.
+// (4) SUELO TEMPORAL. Un flujo cuyo `originalTs` es anterior al primer snapshot utilizable no puede
+//     corroborarse (no existe punto previo) y antes salía despedido hacia adelante, hasta caer
+//     DENTRO de una ventana a la que su capital no pertenece. Ahora se ancla al capital base.
+// INVARIANTES: resultado independiente del orden de iteración · ningún escalón sobreconsumido ·
+// ningún flujo en dos escalones · Σ asignado ≤ capacidad · misma serie para casar y para calcular ·
+// `originalTs` e importes intactos (sólo se recalcula el ts efectivo y su rastro de auditoría).
 const _AURIX_FLOW_CORROBORATE_MS = 3 * 86_400_000;   // straddle window: event must sit between adjacent snapshots ≤3d apart
 const _AURIX_FLOW_CORROBORATE_FRAC = 0.4;            // observed step ≥ 40% of |amount| ⇒ corroborated (allows market noise/FX)
+
+// (1) LA serie de casado = LA serie de cálculo. Única fuente; nadie más la deriva.
+function _aurixRetimeSeries() {
+  try {
+    if (typeof _aurixInvestableSnapshots === 'function') {
+      const s = _aurixInvestableSnapshots('all');
+      if (Array.isArray(s) && s.length) return s.map(p => ({ ts: p.ts, value: p.value }));
+    }
+  } catch (_) {}
+  return [];
+}
+// Importes del ledger en la MISMA unidad que la serie (moneda base), nunca USD crudo.
+function _aurixRetimeAmountBase(amountUSD) {
+  const n = Number(amountUSD);
+  if (!Number.isFinite(n)) return NaN;
+  try { return (typeof toBase === 'function') ? toBase(n, 'USD') : n; } catch (_) { return n; }
+}
+// Escalones estructurales de esa serie, con su CAPACIDAD: el mayor importe cuyo escalón podría
+// plausiblemente ser éste (|step| / LO). Sostenimiento con la regla existente, sin cambios.
+function _aurixRetimeSteps(series) {
+  const out = [];
+  const med = arr => { const s = arr.slice().sort((a, b) => a - b); return s.length ? s[(s.length - 1) >> 1] : 0; };
+  for (let i = 1; i < series.length; i++) {
+    const prev = series[i - 1].value, cur = series[i].value, step = cur - prev;
+    if (!Number.isFinite(step) || step === 0) continue;
+    const sign = Math.sign(step);
+    const postMed = med(series.slice(i, Math.min(series.length, i + _AURIX_STEP_SUSTAIN + 1)).map(p => p.value));
+    const sustained = postMed > 0 && (sign > 0 ? postMed >= cur * 0.70 : postMed <= cur * 1.30);
+    if (!sustained) continue;
+    out.push({ idx: i, ts: series[i].ts, prevTs: series[i - 1].ts, step: +step.toFixed(2),
+               sign: sign, capacity: Math.abs(step) / _AURIX_STEP_MATCH_LO, consumed: 0 });
+  }
+  return out;
+}
+// Reclamaciones compatibles de un importe sobre los escalones, ordenadas por confianza. Primitiva
+// ÚNICA: la usan tanto el camino de un solo flujo como el plan global (sin lógica duplicada).
+function _aurixStepClaims(amountBase, steps) {
+  const claims = [];
+  if (!Number.isFinite(amountBase) || amountBase === 0) return claims;
+  const want = Math.abs(amountBase), sign = Math.sign(amountBase);
+  for (const st of steps) {
+    if (st.sign !== sign) continue;
+    const ratio = Math.abs(st.step) / want;
+    if (ratio < _AURIX_STEP_MATCH_LO || ratio > _AURIX_STEP_MATCH_HI) continue;
+    claims.push({ ts: st.ts, idx: st.idx, stepValue: st.step, confidence: +(1 - Math.min(1, Math.abs(ratio - 1))).toFixed(3) });
+  }
+  // Orden total y estable: confianza, luego ts — nunca el orden de llegada.
+  claims.sort((a, b) => (b.confidence - a.confidence) || (a.ts - b.ts));
+  return claims;
+}
+// Intervalo (prevTs, ts] de la serie en el que cae un instante; -1 si queda fuera del tramo.
+function _aurixRetimeIntervalIdx(series, ts) {
+  if (!Array.isArray(series) || series.length < 2 || !Number.isFinite(ts)) return -1;
+  if (ts <= series[0].ts) return -1;                       // anterior al primer snapshot utilizable
+  for (let i = 1; i < series.length; i++) if (ts <= series[i].ts) return i;
+  return -1;                                                // posterior al último snapshot
+}
+// Corroboración en el sitio: el escalón del propio intervalo explica el importe (o la suma de la
+// tanda). Misma regla de antes (signo + fracción), ahora sobre la serie y la unidad correctas.
 function _aurixFlowTsCorroboratedByHistory(amountUSD, ts) {
   try {
-    if (!Number.isFinite(amountUSD) || !Number.isFinite(ts)) return false;
-    if (typeof portfolioHistory === 'undefined' || !Array.isArray(portfolioHistory)) return false;
-    const epoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
-    const pts = portfolioHistory
-      .filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value) && (!epoch || p.ts >= epoch))
-      .sort((a, b) => a.ts - b.ts);
-    if (pts.length < 2) return false;
-    // Nearest snapshot strictly before ts and nearest at/after ts.
-    let before = null, after = null;
-    for (const p of pts) { if (p.ts < ts) before = p; else { after = p; break; } }
-    if (!before || !after) return false;                       // event outside tracked span → treat as base capital
-    if ((after.ts - before.ts) > _AURIX_FLOW_CORROBORATE_MS) return false;  // gap too wide to attribute the step to this event
-    const step = after.value - before.value;                   // USD
-    if (Math.sign(step) !== Math.sign(amountUSD)) return false; // step must move in the flow's direction
-    return Math.abs(step) >= _AURIX_FLOW_CORROBORATE_FRAC * Math.abs(amountUSD);
+    const amt = _aurixRetimeAmountBase(amountUSD);
+    if (!Number.isFinite(amt) || !Number.isFinite(ts)) return false;
+    const series = _aurixRetimeSeries();
+    const i = _aurixRetimeIntervalIdx(series, ts);
+    if (i < 1) return false;                                 // fuera del tramo ⇒ capital base
+    const before = series[i - 1], after = series[i];
+    if ((after.ts - before.ts) > _AURIX_FLOW_CORROBORATE_MS) return false;
+    const step = after.value - before.value;
+    if (Math.sign(step) !== Math.sign(amt)) return false;
+    return Math.abs(step) >= _AURIX_FLOW_CORROBORATE_FRAC * Math.abs(amt);
   } catch (_) { return false; }
 }
 
@@ -9111,53 +9187,151 @@ const _AURIX_STEP_MATCH_LO = 0.6;   // observed step must be ≥60% of |amount|
 const _AURIX_STEP_MATCH_HI = 1.6;   // and ≤160% of |amount| (FX/market noise around a real capital event)
 const _AURIX_STEP_MATCH_MIN_CONF = 0.5;   // confidence floor to trust a re-time (⇒ magnitude ratio ~[0.5,1.5])
 const _AURIX_STEP_SUSTAIN = 4;      // points after the jump used to confirm the new level HOLDS (structural)
-function _aurixMatchHistoricalStep(amountUSD, ts) {
+// Mejor escalón compatible para UN importe. Conserva su forma pública; ahora se apoya en las
+// primitivas compartidas (serie de identidad + reclamaciones), sin lógica propia duplicada.
+// `stepUSD` conserva el nombre histórico del campo; su unidad es la de la serie (moneda base).
+function _aurixMatchHistoricalStep(amountUSD, ts, opts) {
   const out = { ts: null, matchedStepTs: null, confidence: 0, reason: 'no_match', reliable: false, stepUSD: null };
   try {
-    if (!Number.isFinite(amountUSD) || amountUSD === 0) { out.reason = 'invalid_amount'; return out; }
-    if (typeof portfolioHistory === 'undefined' || !Array.isArray(portfolioHistory)) { out.reason = 'no_history'; return out; }
-    const epoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
-    const pts = portfolioHistory
-      .filter(p => p && Number.isFinite(p.ts) && Number.isFinite(p.value) && (!epoch || p.ts >= epoch))
-      .sort((a, b) => a.ts - b.ts);
-    if (pts.length < 2) { out.reason = 'insufficient_history'; return out; }
-    const want = Math.abs(amountUSD), sign = Math.sign(amountUSD);
-    const med = arr => { const s = arr.slice().sort((a, b) => a - b); return s.length ? s[(s.length - 1) >> 1] : 0; };
-    let best = null;
-    for (let i = 1; i < pts.length; i++) {
-      const prev = pts[i - 1].value, cur = pts[i].value, step = cur - prev;
-      if (Math.sign(step) !== sign) continue;                 // step must move in the flow's direction
-      const mag = Math.abs(step);
-      if (mag <= 0) continue;
-      const ratio = mag / want;
-      if (ratio < _AURIX_STEP_MATCH_LO || ratio > _AURIX_STEP_MATCH_HI) continue;   // magnitude compatible with the amount
-      // Sustained — the new level HOLDS afterwards (structural capital event, not a transient market spike).
-      const postMed = med(pts.slice(i, Math.min(pts.length, i + _AURIX_STEP_SUSTAIN + 1)).map(p => p.value));
-      const sustained = postMed > 0 && (sign > 0 ? postMed >= cur * 0.70 : postMed <= cur * 1.30);
-      if (!sustained) continue;
-      const conf = +(1 - Math.min(1, Math.abs(ratio - 1))).toFixed(3);   // 1 == perfect magnitude match
-      if (!best || conf > best.confidence) best = { ts: pts[i].ts, matchedStepTs: pts[i].ts, confidence: conf, stepUSD: +step.toFixed(2) };
+    const amt = _aurixRetimeAmountBase(amountUSD);
+    if (!Number.isFinite(amt) || amt === 0) { out.reason = 'invalid_amount'; return out; }
+    const steps = (opts && Array.isArray(opts.steps)) ? opts.steps : _aurixRetimeSteps(_aurixRetimeSeries());
+    if (!steps.length) { out.reason = 'insufficient_history'; return out; }
+    // (3) exclusividad: si el llamante lleva contabilidad de capacidad, se descartan los escalones
+    //     que ya no pueden absorber este importe. Sin `opts` el comportamiento es el de siempre.
+    const want = Math.abs(amt);
+    const claims = _aurixStepClaims(amt, steps).filter(c => {
+      if (!opts || !opts.respectCapacity) return true;
+      const st = steps.find(s => s.idx === c.idx);
+      return !!st && (st.consumed + want) <= st.capacity + 0.005;
+    });
+    if (!claims.length) {
+      out.reason = _aurixStepClaims(amt, steps).length ? 'step_capacity_exhausted' : 'no_compatible_step';
+      return out;
     }
-    if (!best) { out.reason = 'no_compatible_step'; return out; }
-    Object.assign(out, best);
+    const best = claims[0];
+    out.ts = best.ts; out.matchedStepTs = best.ts; out.confidence = best.confidence; out.stepUSD = best.stepValue;
     out.reliable = best.confidence >= _AURIX_STEP_MATCH_MIN_CONF;
     out.reason = out.reliable ? 'matched_structural_step' : 'low_confidence_step';
     return out;
   } catch (_) { return out; }
 }
 
-// Full re-time decision for a DERIVED flow (audit-friendly): corroborated at its own ts → keep it;
-// else re-time to a reliable matching structural step; else keep the honest base-capital anchor.
+// ── PLAN GLOBAL DE ASIGNACIÓN (único) ───────────────────────────────────────
+// Entrada: candidatos `{ key, amountUSD, originalTs }`. Salida: Map key → decisión con la MISMA
+// forma que `_aurixFlowRetimeDecision`. Es la única autoridad de asignación: el camino de un solo
+// flujo también pasa por aquí, así que no existen dos fuentes de verdad.
+// Orden interno FIJO: identidad de serie → tandas → exclusividad por capacidad y confianza →
+// suelo temporal. El resultado NO depende del orden de iteración de la entrada.
+function _aurixPlanFlowRetiming(candidates) {
+  const plan = new Map();
+  const list = Array.isArray(candidates) ? candidates.filter(c => c && Number.isFinite(Number(c.amountUSD)) && Number.isFinite(Number(c.originalTs))) : [];
+  const base = k => ({ originalTs: null, effectiveTs: null, corroborated: false, matchedStepTs: null, confidence: 0, reason: 'self_heal_off', key: k });
+  if (!list.length) return plan;
+  if (!_AURIX_LEDGER_SELF_HEAL) {
+    list.forEach(c => { const d = base(c.key); d.originalTs = c.originalTs; d.effectiveTs = c.originalTs; plan.set(c.key, d); });
+    return plan;
+  }
+  const series = _aurixRetimeSeries();
+  const steps = _aurixRetimeSteps(series);
+  const anchor = _aurixEarliestTrackedTs();
+  const firstTs = series.length ? series[0].ts : Infinity;
+  const stepByIdx = new Map(steps.map(s => [s.idx, s]));
+
+  // Orden canónico de trabajo: nunca el de llegada. Desempates totales para que dos ejecuciones
+  // con la entrada barajada produzcan exactamente el mismo plan.
+  const canon = (a, b) => (a.originalTs - b.originalTs)
+    || (Math.abs(Number(b.amountUSD)) - Math.abs(Number(a.amountUSD)))
+    || String(a.key).localeCompare(String(b.key));
+  const work = list.slice().sort(canon).map(c => ({
+    key: c.key, amountUSD: Number(c.amountUSD), amountBase: _aurixRetimeAmountBase(c.amountUSD),
+    originalTs: Number(c.originalTs), intervalIdx: _aurixRetimeIntervalIdx(series, Number(c.originalTs)),
+  }));
+
+  const decide = (c, patch) => {
+    const d = base(c.key);
+    d.originalTs = c.originalTs; d.effectiveTs = c.originalTs;
+    plan.set(c.key, Object.assign(d, patch));
+  };
+
+  // (4) SUELO TEMPORAL — un flujo anterior al primer snapshot utilizable jamás se desplaza hacia
+  //     adelante: su capital ya estaba dentro antes de que empezara a medirse. Ancla base.
+  const pending = [];
+  for (const c of work) {
+    if (!Number.isFinite(c.amountBase) || c.amountBase === 0) { decide(c, { effectiveTs: c.originalTs, reason: 'invalid_amount' }); continue; }
+    if (c.originalTs <= firstTs) { decide(c, { effectiveTs: anchor, reason: 'fallback_base_pre_history' }); continue; }
+    pending.push(c);
+  }
+
+  // (2) TANDAS — candidatos del MISMO intervalo de snapshot: se corrobora la SUMA contra el escalón
+  //     combinado. Si encaja, cada miembro conserva su ts original y la tanda consume capacidad.
+  const byInterval = new Map();
+  pending.forEach(c => { if (c.intervalIdx >= 1) { if (!byInterval.has(c.intervalIdx)) byInterval.set(c.intervalIdx, []); byInterval.get(c.intervalIdx).push(c); } });
+  const corroborated = new Set();
+  [...byInterval.keys()].sort((a, b) => a - b).forEach(idx => {
+    const members = byInterval.get(idx);
+    const st = stepByIdx.get(idx);
+    if (!st) return;
+    const before = series[idx - 1], after = series[idx];
+    if ((after.ts - before.ts) > _AURIX_FLOW_CORROBORATE_MS) return;
+    const sum = members.reduce((s, m) => s + m.amountBase, 0);
+    if (Math.sign(st.step) !== Math.sign(sum)) return;
+    if (Math.abs(st.step) < _AURIX_FLOW_CORROBORATE_FRAC * Math.abs(sum)) return;
+    st.consumed += Math.abs(sum);                       // la tanda ocupa el escalón que ella causó
+    members.forEach(m => {
+      corroborated.add(m.key);
+      // `matchedStepTs` significa "escalón al que fui RE-TIMED", y un flujo corroborado no se
+      // reubica: conserva su ts. Se deja a null igual que hacía el camino corroborado previo. Es
+      // además lo correcto de cara al guard `double_matched_flow_step` —que NO se toca—: una tanda
+      // corroborada es el caso RESUELTO (la suma explica el escalón), no una ambigüedad real, así
+      // que no debe contarse como dos flujos peleándose por un mismo escalón.
+      decide(m, { effectiveTs: m.originalTs, corroborated: true, confidence: 1, matchedStepTs: null,
+                  reason: members.length > 1 ? 'corroborated_batch_at_original_ts' : 'corroborated_at_original_ts' });
+    });
+  });
+
+  // (3) EXCLUSIVIDAD — el resto compite por los escalones libres. Se ordena por confianza de la
+  //     MEJOR reclamación (desempates totales) y se concede sólo si cabe en la capacidad restante.
+  const rest = pending.filter(c => !corroborated.has(c.key));
+  const ranked = rest.map(c => ({ c, claims: _aurixStepClaims(c.amountBase, steps) }))
+    .sort((a, b) => ((b.claims[0] ? b.claims[0].confidence : 0) - (a.claims[0] ? a.claims[0].confidence : 0))
+      || (Math.abs(b.c.amountBase) - Math.abs(a.c.amountBase))
+      || (a.c.originalTs - b.c.originalTs)
+      || String(a.c.key).localeCompare(String(b.c.key)));
+  for (const { c, claims } of ranked) {
+    const want = Math.abs(c.amountBase);
+    let granted = null, sawClaim = claims.length > 0, sawReliable = false;
+    for (const cl of claims) {
+      if (cl.confidence < _AURIX_STEP_MATCH_MIN_CONF) continue;
+      sawReliable = true;
+      const st = stepByIdx.get(cl.idx);
+      if (!st) continue;
+      if ((st.consumed + want) > st.capacity + 0.005) continue;   // escalón sin capacidad libre
+      st.consumed += want;                                        // consumido: nadie más lo usa
+      granted = cl; break;
+    }
+    if (granted) {
+      decide(c, { effectiveTs: granted.ts, matchedStepTs: granted.ts, confidence: granted.confidence, reason: 'retimed_to_structural_step' });
+    } else {
+      decide(c, { effectiveTs: anchor, confidence: claims[0] ? claims[0].confidence : 0,
+                  matchedStepTs: null,
+                  reason: !sawClaim ? 'fallback_base_no_step'
+                        : (!sawReliable ? 'fallback_base_low_confidence' : 'fallback_base_step_capacity_exhausted') });
+    }
+  }
+  return plan;
+}
+
+// Full re-time decision for a DERIVED flow (audit-friendly). Conserva firma y forma; ahora delega
+// en el plan global con un único candidato, así que un solo flujo y una tanda comparten owner.
 function _aurixFlowRetimeDecision(amountUSD, ts) {
   const d = { originalTs: ts, effectiveTs: ts, corroborated: false, matchedStepTs: null, confidence: 0, reason: 'self_heal_off' };
   if (!_AURIX_LEDGER_SELF_HEAL) return d;
-  if (_aurixFlowTsCorroboratedByHistory(amountUSD, ts)) { d.corroborated = true; d.confidence = 1; d.reason = 'corroborated_at_original_ts'; return d; }
-  const step = _aurixMatchHistoricalStep(amountUSD, ts);
-  d.matchedStepTs = step.matchedStepTs; d.confidence = step.confidence;
-  if (step.reliable) { d.effectiveTs = step.ts; d.reason = 'retimed_to_structural_step'; return d; }
-  d.effectiveTs = _aurixEarliestTrackedTs();
-  d.reason = (step.reason === 'low_confidence_step') ? 'fallback_base_low_confidence' : 'fallback_base_no_step';
-  return d;
+  const plan = _aurixPlanFlowRetiming([{ key: '_single', amountUSD: amountUSD, originalTs: ts }]);
+  const got = plan.get('_single');
+  if (!got) return d;
+  return { originalTs: ts, effectiveTs: got.effectiveTs, corroborated: got.corroborated,
+           matchedStepTs: got.matchedStepTs, confidence: got.confidence, reason: got.reason };
 }
 
 // The timestamp a DERIVED flow should carry (thin wrapper over the decision, unchanged signature).
@@ -9274,6 +9448,12 @@ function _aurixBackfillFlowsFromTransactions() {
     // (e.g. migration Date.now()) tx-backfill flows are corrected, not duplicated. Live 'user' flows kept.
     if (_AURIX_LEDGER_SELF_HEAL) _aurixPurgeDerivedFlows();
     const before = _aurixLoadCapitalFlows().length;
+    // SPEC FLOW-RETIMING — RECOLECTAR → PLANIFICAR UNA VEZ → ESCRIBIR. Antes se decidía flujo a
+    // flujo dentro del bucle, en aislamiento: dos flujos podían reclamar el mismo escalón (sobre-
+    // resta) y una tanda de altas en el mismo intervalo no podía corroborarse nunca. La asignación
+    // exclusiva y las tandas son decisiones sobre el CONJUNTO, así que primero se recolecta.
+    // No cambian ni `_aurixCaptureFlow`, ni el esquema del ledger, ni los importes, ni `originalTs`.
+    const candidates = [];
     for (const a of list) {
       if (!a || !Array.isArray(a.transactions)) continue;
       for (const tx of a.transactions) {
@@ -9284,15 +9464,21 @@ function _aurixBackfillFlowsFromTransactions() {
         if (!Number.isFinite(usd) || usd <= 0) continue;
         const isSell = String(tx.type || '').toLowerCase() === 'sell';
         const signed = isSell ? -usd : usd;
-        // SPEC DSH.CHART.RETURNS.RETIMING.01 — corroborated → keep ts; else re-time to the matching
-        // structural history step; else honest base anchor. Ledger sizes it, history times it.
-        const dec = _aurixFlowRetimeDecision(signed, tx.ts);
-        const effTs = dec.effectiveTs;
-        if (effTs !== tx.ts) reAnchored++;
-        // SAME (kind, assetId, ts, amount) as _ledgerTrade → idempotent with live flows.
-        _aurixCaptureFlow(isSell ? 'asset_remove' : 'asset_add', signed, effTs, a.id, 'tx-backfill', 'tx-backfill',
-          { originalTs: tx.ts, retimeReason: dec.reason, retimeConfidence: dec.confidence, matchedStepTs: dec.matchedStepTs });
+        // Clave estable e independiente del orden de recorrido (activo + tx + importe).
+        candidates.push({ key: (a.id || 'cash') + '|' + tx.ts + '|' + Math.round(Math.abs(signed) * 100) + '|' + (isSell ? 's' : 'b'),
+                          amountUSD: signed, originalTs: tx.ts, assetId: a.id, isSell: isSell });
       }
+    }
+    // UN solo plan global para todos los candidatos: identidad de serie → tandas → exclusividad
+    // por capacidad y confianza → suelo temporal.
+    const plan = _aurixPlanFlowRetiming(candidates);
+    for (const c of candidates) {
+      const dec = plan.get(c.key) || { effectiveTs: c.originalTs, reason: 'no_plan', confidence: 0, matchedStepTs: null };
+      const effTs = Number.isFinite(dec.effectiveTs) ? dec.effectiveTs : c.originalTs;
+      if (effTs !== c.originalTs) reAnchored++;
+      // SAME (kind, assetId, ts, amount) as _ledgerTrade → idempotent with live flows.
+      _aurixCaptureFlow(c.isSell ? 'asset_remove' : 'asset_add', c.amountUSD, effTs, c.assetId, 'tx-backfill', 'tx-backfill',
+        { originalTs: c.originalTs, retimeReason: dec.reason, retimeConfidence: dec.confidence, matchedStepTs: dec.matchedStepTs });
     }
     added = _aurixLoadCapitalFlows().length - before;
   } catch (_) {}

@@ -48,6 +48,20 @@ sb.window = sb;
 vm.createContext(sb);
 // real helpers under test
 vm.runInContext(fn('_aurixEarliestTrackedTs'), sb);
+// SPEC FLOW-RETIMING — el casado dejó de leer `portfolioHistory` (patrimonio total en USD crudo) y
+// pasó a la MISMA serie que el retorno: invertible en moneda base, vía `_aurixInvestableSnapshots`.
+// Los fixtures de este harness siguen sembrando `portfolioHistory`, así que se refleja como fuente
+// invertible equivalente (total = value, sin inmuebles, FX 1): económicamente idéntica, y ahora
+// ejercita el camino nuevo. Sin esto el harness fijaría la serie ANTIGUA.
+vm.runInContext(fn('_aurixRetimeSeries'), sb);
+vm.runInContext(fn('_aurixRetimeAmountBase'), sb);
+vm.runInContext(fn('_aurixRetimeSteps'), sb);
+vm.runInContext(fn('_aurixStepClaims'), sb);
+vm.runInContext(fn('_aurixRetimeIntervalIdx'), sb);
+vm.runInContext(fn('_aurixPlanFlowRetiming'), sb);
+vm.runInContext(fn('_aurixInvestableSnapshots'), sb);
+vm.runInContext('var toBase = toBase || function (v) { return v; };', sb);
+vm.runInContext('var _aurixHistorySourceForDisplay = function () { return (typeof portfolioHistory !== "undefined" && Array.isArray(portfolioHistory)) ? portfolioHistory.map(function (p) { return { ts: p.ts, total: p.value, real_estate: 0 }; }) : []; };', sb);
 vm.runInContext(fn('_aurixFlowTsCorroboratedByHistory'), sb);
 vm.runInContext(fn('_aurixMatchHistoricalStep'), sb);
 vm.runInContext(fn('_aurixFlowRetimeDecision'), sb);
