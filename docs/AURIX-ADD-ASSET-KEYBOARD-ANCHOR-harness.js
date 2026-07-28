@@ -146,5 +146,29 @@ ok('20 RE/Cash excluded from SPEC 63 rules', spec63.length > 0 &&
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 if (fail) { console.log(fail + ' failed'); process.exit(1); }
+// ── ADD-MODAL-FORENSICS — helper de solo lectura para diagnosticar en móvil real ─────
+// Chrome headless no encoge el visual viewport al enfocar, así que la condición que provoca
+// el defecto reportado no existe en emulación: hace falta capturar en el dispositivo.
+{
+  const fi = app.indexOf('window.aurixAddModalForensics = function');
+  const fn = fi < 0 ? '' : (function () { let d = 0, k = app.indexOf('{', fi); for (; k < app.length; k++) { const c = app[k]; if (c === '{') d++; else if (c === '}') { d--; if (!d) { k++; break; } } } return app.slice(fi, k); })();
+  const code = fn.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map(l => l.replace(/(^|[^:'"`\\])\/\/.*$/, '$1')).join('\n');
+  ok('F1 el forense existe una sola vez y no se autoejecuta',
+     (app.match(/window\.aurixAddModalForensics = function/g) || []).length === 1 &&
+     !/aurixAddModalForensics\(\)\s*;/.test(code));
+  ok('F2 es SOLO LECTURA: no toca estado, foco, scroll, query ni navegación',
+     !/\.value\s*=|\.focus\(\)|\.blur\(\)|scrollTop\s*=|scrollIntoView|classList\.(add|remove|toggle)|openContextualModal|showDefaultSuggestions|renderSuggestions/.test(code));
+  ok('F3 no registra listeners ni envía nada fuera',
+     !/addEventListener|fetch\(|XMLHttpRequest|navigator\.send/.test(code));
+  ok('F4 captura teclado y viewport real (lo que la emulación no reproduce)',
+     /visualViewport/.test(code) && /alturaOcupadaPorTeclado/.test(code) && /tecladoAbierto/.test(code));
+  ok('F5 distingue las tres fases y el punto de entrada',
+     /fase:/.test(code) && /resultados_con_teclado/.test(code) && /puntoDetectado/.test(code));
+  ok('F6 reporta geometría, scroll, recorte y estilos críticos',
+     /geometria:/.test(code) && /ancestrosQueRecortan/.test(code) && /recortadaPorAbajo/.test(code) && /maxHeight/.test(code));
+  ok('F7 sin datos personales: ni email, ni id de usuario, ni ledger',
+     !/currentUser|email|assets\[|_aurixLoadCapitalFlows|localStorage/.test(code));
+}
+
 console.log('GATE: GO — all ' + pass + ' assertions passed');
 process.exit(0);

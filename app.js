@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '599'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '600'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -31574,6 +31574,141 @@ try {
           retimeReason: f.retimeReason || null, retimeConfidence: (f.retimeConfidence == null) ? null : f.retimeConfidence })),
       };
       try { console.log('%c[UI][CHART_FORENSICS_V2]', 'font-weight:700;color:#4da3ff', out); } catch (_) {}
+      return out;
+    };
+
+    // ── SPEC ADD-MODAL-FORENSICS — foto del modal "Añadir activo" (SOLO LECTURA) ─────────────
+    // Sirve para comparar los DOS puntos de entrada (Dashboard vs categoría) en un móvil real,
+    // con el teclado abierto: es la condición que ninguna emulación reproduce (Chrome headless no
+    // encoge el visual viewport al enfocar) y sin ella el diagnóstico es adivinar.
+    // No cambia estado, foco, scroll, query, resultados, filtros ni navegación. No registra
+    // listeners, no ejecuta nada al cargar y no envía nada a ningún sitio. No incluye datos
+    // personales: sólo geometría, estilos computados e identificadores de UI.
+    window.aurixAddModalForensics = function () {
+      const num = v => (Number.isFinite(v) ? +v.toFixed(1) : null);
+      const box = el => { if (!el) return null; try { const r = el.getBoundingClientRect();
+        return { top: num(r.top), bottom: num(r.bottom), left: num(r.left), right: num(r.right), w: num(r.width), h: num(r.height) }; } catch (_) { return null; } };
+      const css = (el, props) => { if (!el) return null; try { const c = getComputedStyle(el); const o = {};
+        props.forEach(p => { o[p] = c[p]; }); return o; } catch (_) { return null; } };
+      const CRIT = ['position', 'top', 'bottom', 'height', 'maxHeight', 'minHeight', 'overflow', 'overflowY',
+                    'flex', 'transform', 'paddingBottom', 'overscrollBehavior', 'zIndex', 'alignSelf', 'display'];
+      const q = sel => { try { return document.querySelector(sel); } catch (_) { return null; } };
+      const overlay = q('#modalOverlay');
+      const sheet   = q('#modalOverlay > .modal');
+      const header  = q('#modalOverlay .modal-header');
+      const body    = q('#modalOverlay .modal-body');
+      const input   = q('#assetSearch');
+      const sugg    = q('#assetSuggestions');
+      const quick   = q('#addV2Quick');
+      const rows    = sugg ? [...sugg.querySelectorAll('.suggestion-item')] : [];
+      const chips   = q('#addV2PopularChips');
+      const nav     = q('#bottomNav');
+      const vv      = (typeof window !== 'undefined' && window.visualViewport) ? window.visualViewport : null;
+      const vvH     = vv ? num(vv.height) : null;
+      const innerH  = num(window.innerHeight);
+      const teclado = (vvH != null && innerH != null) ? +(innerH - vvH).toFixed(1) : null;
+      // Línea por debajo de la cual el teclado tapa el contenido (si no hay teclado, el viewport).
+      const corte   = (vvH != null && vv) ? num(vv.offsetTop + vv.height) : innerH;
+      const visible = el => { const b = box(el); if (!b) return null;
+        return { entera: b.top >= -0.5 && b.bottom <= corte + 0.5, bajoElTeclado: b.top >= corte - 0.5,
+                 recortadaPorAbajo: b.top < corte && b.bottom > corte + 0.5, px_fuera: num(Math.max(0, b.bottom - corte)) }; };
+      // Ancestros con overflow que puedan estar recortando la lista.
+      const recortadores = [];
+      try { let el = rows.length ? rows[0] : (sugg || body);
+        while (el && el !== document.documentElement) {
+          const c = getComputedStyle(el);
+          if (/(auto|hidden|scroll|clip)/.test(c.overflowY + ' ' + c.overflow)) {
+            recortadores.push({ sel: (el.id ? '#' + el.id : '') + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : ''),
+              overflowY: c.overflowY, clientH: el.clientHeight, scrollH: el.scrollHeight, scrollTop: el.scrollTop,
+              recorta: el.scrollHeight > el.clientHeight + 1 });
+          }
+          el = el.parentElement;
+        }
+      } catch (_) {}
+      // Origen del contenido montado, sin tocarlo.
+      const origen = (() => {
+        const abiertas = !!(sugg && sugg.classList.contains('open'));
+        if (!abiertas && !(quick && quick.offsetParent !== null)) return 'vacio';
+        if (abiertas && rows.length) return (input && input.value.trim()) ? 'resultados' : 'populares';
+        if (quick && quick.offsetParent !== null) return 'populares';
+        return 'vacio';
+      })();
+      const act = document.activeElement;
+      const out = {
+        build: (window.__AURIX_APPJS_VERSION__ || '?'),
+        capturadoEn: 'cliente',
+        // ── punto de entrada y estado lógico
+        entrada: {
+          modalContext: (typeof _modalContext !== 'undefined') ? _modalContext : null,
+          filtroContexto: (typeof _modalAssetFilterContext !== 'undefined') ? _modalAssetFilterContext : null,
+          puntoDetectado: (typeof _modalAssetFilterContext !== 'undefined' && _modalAssetFilterContext) ? 'categoria' : 'dashboard',
+          activeSearchFilter: (typeof activeSearchFilter !== 'undefined') ? activeSearchFilter : null,
+          query: input ? input.value : null,
+          queryLongitud: input ? String(input.value || '').length : null,
+          modoManual: (typeof isManualMode !== 'undefined') ? !!isManualMode : null,
+          seleccionActiva: (typeof selectedDbAsset !== 'undefined' && selectedDbAsset) ? (selectedDbAsset.ticker || 'sí') : null,
+        },
+        // ── foco
+        foco: {
+          activeElement: act ? ((act.id ? '#' + act.id : act.tagName.toLowerCase()) + (act.className && typeof act.className === 'string' ? '.' + act.className.trim().split(/\s+/)[0] : '')) : null,
+          esElBuscador: !!(act && input && act === input),
+          focusWithinModal: !!(sheet && sheet.matches(':focus-within')),
+          dataAssetFlow: sheet ? (sheet.dataset.assetFlow || null) : null,
+          dataMode: sheet ? (sheet.dataset.mode || null) : null,
+        },
+        // ── viewport y teclado
+        viewport: {
+          innerHeight: innerH, visualViewportHeight: vvH,
+          visualViewportOffsetTop: vv ? num(vv.offsetTop) : null,
+          alturaOcupadaPorTeclado: teclado, tecladoAbierto: (teclado != null && teclado > 80),
+          lineaDeCorte: corte, scrollY: num(window.scrollY),
+          fondoDesplazable: num(document.documentElement.scrollHeight - document.documentElement.clientHeight),
+          bodyModalOpen: document.body.classList.contains('modal-open'),
+        },
+        // ── geometría
+        geometria: {
+          overlay: box(overlay), sheet: box(sheet), header: box(header), modalBody: box(body),
+          input: box(input), populares: box(quick), listaResultados: box(sugg),
+          primeraFila: rows.length ? box(rows[0]) : null,
+          ultimaFila: rows.length ? box(rows[rows.length - 1]) : null,
+          nav: box(nav),
+        },
+        // ── scroll
+        scroll: {
+          modalBody: body ? { scrollTop: body.scrollTop, scrollHeight: body.scrollHeight, clientHeight: body.clientHeight, desplazable: body.scrollHeight > body.clientHeight + 1 } : null,
+          listaResultados: sugg ? { scrollTop: sugg.scrollTop, scrollHeight: sugg.scrollHeight, clientHeight: sugg.clientHeight, desplazable: sugg.scrollHeight > sugg.clientHeight + 1 } : null,
+          ancestrosQueRecortan: recortadores,
+        },
+        // ── contenido
+        contenido: {
+          origen: origen,
+          filasMontadas: rows.length,
+          chipsPopulares: chips ? chips.children.length : 0,
+          sugerenciasAbiertas: !!(sugg && sugg.classList.contains('open')),
+          popularesVisible: !!(quick && quick.offsetParent !== null),
+          primeraFilaVisible: rows.length ? visible(rows[0]) : null,
+          ultimaFilaVisible: rows.length ? visible(rows[rows.length - 1]) : null,
+          filasRecortadas: rows.map((r, i) => ({ i, ...(visible(r) || {}) })).filter(x => x.entera === false),
+        },
+        // ── estilos computados críticos
+        estilos: {
+          overlay: css(overlay, CRIT), sheet: css(sheet, CRIT), modalBody: css(body, CRIT),
+          listaResultados: css(sugg, CRIT), populares: css(quick, CRIT), nav: css(nav, ['position', 'zIndex', 'height']),
+        },
+        clases: {
+          overlay: overlay ? overlay.className : null,
+          sheet: sheet ? sheet.className : null,
+          listaResultados: sugg ? sugg.className : null,
+        },
+        // ── marca de fase, para distinguir las tres capturas al comparar
+        fase: (() => {
+          const tec = (teclado != null && teclado > 80);
+          if (origen === 'resultados') return tec ? 'resultados_con_teclado' : 'resultados_sin_teclado';
+          if (tec) return 'inicial_con_teclado';
+          return 'inicial';
+        })(),
+      };
+      try { console.log('%c[UI][ADD_MODAL_FORENSICS] ' + out.fase, 'font-weight:700;color:#4da3ff', out); } catch (_) {}
       return out;
     };
 
