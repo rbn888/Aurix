@@ -24788,3 +24788,32 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   #marketPreviewOverlay > .modal { width: min(620px, calc(100% - 96px)); max-width: 620px; }
   #marketPreviewOverlay .mkt-prv-mount { min-height: 208px; }
 }
+
+/* ════════ MARKET-EXCELLENCE-03 — pulido final ════════════════════════════════
+   Últimas inconsistencias detectadas midiendo, no rediseñando. CSS-only. */
+
+/* 1 · La lista de Market perdía su card en la banda intermedia: 14px de radio en móvil,
+   14px en escritorio y 0 entre 769 y 1024, donde ni el bloque móvil ni el de escritorio
+   la alcanzan. Se le da el MISMO tratamiento, no uno nuevo. */
+@media (min-width: 769px) and (max-width: 1024px) {
+  #marketList.market-section {
+    border-radius: 14px;
+    border: 1px solid rgba(74,130,240,0.18);
+    overflow: hidden;
+  }
+  #marketList.market-section .market-row:last-child { border-bottom: 0; }
+}
+
+/* 2 · Estado pressed en la fila. Había hover (ratón) y focus-visible (teclado), pero en
+   táctil —que es donde más se usa— no había ninguna confirmación al pulsar. */
+#marketList .market-row { transition: background-color .14s ease; }
+#marketList .market-row:active { background-color: rgba(255,255,255,0.045); }
+#marketPreviewOverlay .mkt-prv-ranges button:active { transform: scale(0.97); }
+
+/* 3 · Accesibilidad: quien pide menos movimiento no debe recibir transiciones ni escalados. */
+@media (prefers-reduced-motion: reduce) {
+  #marketList .market-row,
+  #marketPreviewOverlay .mkt-prv-ranges button { transition: none; }
+  #marketList .watchlist-btn:active,
+  #marketPreviewOverlay .mkt-prv-ranges button:active { transform: none; }
+}

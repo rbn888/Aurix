@@ -333,5 +333,31 @@ console.log('\n12 — ficha de activo (Asset Detail):');
      !/mktPrvVolume|mktPrvMarketCap|mkt-prv-fundamentals/.test(indexHtml + app));
 }
 
+// ── 13 MARKET-EXCELLENCE-03 — pulido final ──────────────────────────────────
+console.log('\n13 — pulido final:');
+{
+  const f = css.slice(css.indexOf('MARKET-EXCELLENCE-03')).replace(/\/\*[\s\S]*?\*\//g, '');
+  ok('13.1 la lista recupera su card en la banda 769–1024 (mismo radio que móvil y escritorio)',
+     /@media \(min-width: 769px\) and \(max-width: 1024px\) \{[\s\S]{0,300}#marketList\.market-section \{[^}]*border-radius: 14px/.test(f));
+  ok('13.2 los tres breakpoints comparten el MISMO radio de card (14px), sin valores sueltos',
+     (cssCode.match(/#marketList\.market-section \{[^}]*border-radius: (\d+)px/g) || [])
+       .every(m => /border-radius: 14px/.test(m)));
+  ok('13.3 hay estado pressed en la fila, no sólo hover y focus',
+     /#marketList \.market-row:active \{ background-color/.test(f) &&
+     /\.market-row:focus-visible/.test(cssCode) && /\.market-row:hover/.test(cssCode));
+  ok('13.4 la transición es acotada (sólo color), sin animar geometría',
+     /#marketList \.market-row \{ transition: background-color \.14s ease; \}/.test(f));
+  ok('13.5 prefers-reduced-motion desactiva transiciones y escalados',
+     /@media \(prefers-reduced-motion: reduce\)[\s\S]{0,320}transition: none;[\s\S]{0,220}transform: none;/.test(f));
+  ok('13.6 sin componentes nuevos ni estilos duplicados: todo son overrides de lo existente',
+     !/\.mkt-[a-z-]+--v2|\.market-row-new|\.mkt-prv-v2/.test(cssCode) &&
+     (cssCode.match(/@keyframes mktShimmer/g) || []).length === 1);
+  ok('13.7 accesibilidad básica: foco visible en fila, estrella y temporalidades',
+     /\.market-row:focus-visible/.test(cssCode) && /\.watchlist-btn:focus-visible/.test(cssCode) &&
+     /#marketPreviewOverlay \.mkt-prv-ranges button:focus-visible/.test(cssCode));
+  ok('13.8 NO se toca dato, lógica ni navegación (bloque exclusivamente CSS)',
+     !/MARKET-EXCELLENCE-03/.test(app));
+}
+
 console.log('\nRESULT: ' + (fail === 0 ? 'ALL PASS ✓' : 'FAIL ✗') + '  (' + pass + ' passed, ' + fail + ' failed)');
 process.exit(fail === 0 ? 0 : 1);
