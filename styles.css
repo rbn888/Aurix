@@ -12719,17 +12719,30 @@ body.workspace-active .header {
      guard de overflow compartido por cuatro contenedores y aplicarle la card allí
      pintaba tres tarjetas anidadas. Mismo lenguaje que desktop (gradiente de la
      familia, borde azul, radio 14) atenuado para móvil. Sin sombras nuevas y sin
-     padding vertical: la altura de fila no cambia. `overflow: hidden` recorta la
-     primera y la última fila contra el radio. */
+     padding vertical: la altura de fila no cambia. El overflow recorta la primera y
+     la última fila contra el radio. */
+  /* HOTFIX MARKET-MOBILE-SCROLL — la card se declaraba con `overflow: hidden`, que
+     por ser shorthand pisaba el `overflow-y: auto` de `.market-section` PERO no su
+     `max-height: 70vh`: la lista quedaba recortada a 70vh y sin forma de desplazarse
+     (Market monta en `#tabPlaceholder`, de altura fija y sin overflow, así que el
+     scroll de la lista sólo puede vivir aquí dentro). Se separan los ejes: X sigue
+     oculto —recorta el radio y es el guard contra la deriva lateral— e Y recupera el
+     scroll. Geometría intacta: mismo max-height, mismos paddings, mismo radio; en
+     móvil la barra es overlay y además se oculta, así que la card no pierde ni 1px. */
   #marketList.market-section {
     background:
       radial-gradient(130% 120% at 10% 0%, rgba(74,130,240,0.07), transparent 58%),
       linear-gradient(165deg, rgba(30,44,74,0.30), rgba(26,34,54,0.36));
     border: 1px solid rgba(74,130,240,0.18);
     border-radius: 14px;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;   /* inercia nativa en iOS */
+    overscroll-behavior-y: contain;      /* sin rebote propagado al body */
+    scrollbar-width: none;
     padding: 0;
   }
+  #marketList.market-section::-webkit-scrollbar { display: none; }
   /* Dentro de la card las filas no dibujan su propia caja redondeada: si no, cada
      fila se leería como una tarjeta suelta, que es justo lo que NO se quiere. */
   #marketList.market-section .market-row { border-radius: 0; }
