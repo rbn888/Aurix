@@ -339,6 +339,11 @@ console.log('\n13 — pulido final:');
   const f = css.slice(css.indexOf('MARKET-EXCELLENCE-03')).replace(/\/\*[\s\S]*?\*\//g, '');
   ok('13.1 la lista recupera su card en la banda 769–1024 (mismo radio que móvil y escritorio)',
      /@media \(min-width: 769px\) and \(max-width: 1024px\) \{[\s\S]{0,300}#marketList\.market-section \{[^}]*border-radius: 14px/.test(f));
+  // Regresión que este mismo bloque estuvo a punto de introducir: el shorthand `overflow`
+  // pisa el `overflow-y: auto` de la regla base y deja la lista sin scroll.
+  ok('13.1b la card de la banda intermedia NO usa el shorthand overflow (mataría el scroll)',
+     /@media \(min-width: 769px\) and \(max-width: 1024px\) \{[\s\S]{0,600}overflow-x: hidden;\s*\n\s*overflow-y: auto;/.test(f) &&
+     !/@media \(min-width: 769px\) and \(max-width: 1024px\) \{[\s\S]{0,600}\n\s*overflow: hidden;/.test(f));
   ok('13.2 los tres breakpoints comparten el MISMO radio de card (14px), sin valores sueltos',
      (cssCode.match(/#marketList\.market-section \{[^}]*border-radius: (\d+)px/g) || [])
        .every(m => /border-radius: 14px/.test(m)));
