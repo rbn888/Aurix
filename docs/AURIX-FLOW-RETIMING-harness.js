@@ -259,22 +259,35 @@ console.log('\n7 — forense de asignación desplegado (window.aurixChartForensi
 {
   const fnV2 = (app.indexOf('window.aurixChartForensicsV2 = function') >= 0)
     ? braceSlice(app.indexOf('window.aurixChartForensicsV2 = function')) : '';
+  // Todo assert de "no usa X" mira CÓDIGO, nunca comentarios: los comentarios de la propia
+  // función nombran a los owners descartados y darían falsos negativos.
+  const fnV2Code = fnV2.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map(l => l.replace(/(^|[^:'"`\\])\/\/.*$/, '$1')).join('\n');
   ok('7.1 la función existe una sola vez y acepta el rango',
      (app.match(/window\.aurixChartForensicsV2 = function/g) || []).length === 1 && /function \(range\)/.test(fnV2));
   ok('7.2 es SOLO LECTURA: no escribe ledger, storage ni histórico',
-     !/_aurixSaveCapitalFlows|localStorage\.setItem|localStorage\.removeItem|_aurixCaptureFlow|portfolioHistory\s*=|categoryHistory\s*=/.test(fnV2));
+     !/_aurixSaveCapitalFlows|localStorage\.setItem|localStorage\.removeItem|_aurixCaptureFlow\(|portfolioHistory\s*=[^=]|categoryHistory\s*=[^=]|assets\s*=[^=]/.test(fnV2Code));
   ok('7.3 devuelve las claves que exige el diagnóstico',
      ['build', 'resumen', 'ledger', 'COLISIONES', 'escalones_detectados',
       'escalones_sin_flujo_asignado', 'impacto', 'ledger_completo'].every(k => new RegExp('\\b' + k + ':').test(fnV2)));
   ok('7.4 compara el importe consumido contra la magnitud REAL del escalón',
      /ratio_consumido_sobre_escalon: ratio/.test(fnV2) && /stepUSD: \+\(ph\[i\]\.value - ph\[i - 1\]\.value\)/.test(fnV2));
-  // GOTCHA de la casa: un assert de "ya no se usa" debe mirar CÓDIGO, no comentarios — aquí el
-  // propio comentario nombra la función descartada.
-  const fnV2Code = fnV2.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map(l => l.replace(/(^|[^:'"`\\])\/\/.*$/, '$1')).join('\n');
   ok('7.5 los huérfanos se buscan con _aurixVerticalJumps (no con _aurixCapitalStepBreaks)',
      /_aurixVerticalJumps\(/.test(fnV2Code) && !/_aurixCapitalStepBreaks/.test(fnV2Code));
   ok('7.6 no reemplaza al forense existente (ambos conviven)',
      (app.match(/window\.aurixChartForensics = function/g) || []).length === 1);
+  // El id del ledger incluye el ts EFECTIVO, así que al converger varios flujos en el ancla base
+  // dos transacciones del mismo activo e importe comparten id y sólo se materializa una fila. No
+  // es pérdida (la fuente son las transacciones y el ancla queda fuera de toda ventana), pero debe
+  // quedar DEMOSTRADO fila a fila, no afirmado.
+  ok('7.7 reporta integridad del ledger derivado (qué filas no se materializan y por qué)',
+     /integridad_ledger: integridad/.test(fnV2) && /registros_que_no_aparecen: colapsadas\.length/.test(fnV2) &&
+     /id_compartido: fid/.test(fnV2));
+  ok('7.8 distingue si algún importe colapsado caía DENTRO de la ventana (única vía de pérdida real)',
+     /importe_no_materializado_DENTRO_de_ventana/.test(fnV2) && /movimientos_perdidos: colapsadas\.some\(x => x\.dentroDeVentana\)/.test(fnV2));
+  ok('7.9 el bloque de integridad reusa el plan real (no reimplementa la asignación)',
+     /_aurixPlanFlowRetiming\(cand\)/.test(fnV2));
+  ok('7.10 y el id se recompone con el MISMO esquema que _aurixCaptureFlow',
+     /c\.kind \+ ':' \+ \(c\.assetId \|\| 'cash'\) \+ ':' \+ t \+ ':' \+ Math\.round\(Math\.abs\(c\.amountUSD\)\)/.test(fnV2));
 }
 
 console.log('\nRESULT: ' + (fail === 0 ? 'ALL PASS ✓' : 'FAIL ✗') + '  (' + pass + ' passed, ' + fail + ' failed)');
