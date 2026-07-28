@@ -13,6 +13,7 @@ const fs = require('fs'), vm = require('vm'), path = require('path');
 const root = path.join(__dirname, '..');
 const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 function braceSlice(s) { let k = app.indexOf('{', s), d = 0; for (; k < app.length; k++) { const c = app[k]; if (c === '{') d++; else if (c === '}') { d--; if (!d) { k++; break; } } } return app.slice(s, k); }
+function fnSource(n) { return fnSrc(n); }
 function fnSrc(n) { const i = app.indexOf('function ' + n + '('); if (i < 0) throw new Error('missing fn ' + n); return braceSlice(i); }
 function konstSrc(n) { const m = new RegExp('const ' + n + '\\s*=\\s*').exec(app); if (!m) throw new Error('missing const ' + n); const eq = m.index + m[0].length, f = app[eq]; if (f === '{' || f === '[') { const b = braceSlice(eq); const s = app.indexOf(';', eq + b.length); return app.slice(m.index, s + 1); } const s = app.indexOf(';', eq); return app.slice(m.index, s + 1); }
 let pass = 0, fail = 0;
@@ -288,6 +289,34 @@ console.log('\n7 — forense de asignación desplegado (window.aurixChartForensi
      /_aurixPlanFlowRetiming\(cand\)/.test(fnV2));
   ok('7.10 y el id se recompone con el MISMO esquema que _aurixCaptureFlow',
      /c\.kind \+ ':' \+ \(c\.assetId \|\| 'cash'\) \+ ':' \+ t \+ ':' \+ Math\.round\(Math\.abs\(c\.amountUSD\)\)/.test(fnV2));
+}
+
+// ── 8) AUDITORÍA DE MATERIALIZACIÓN ─────────────────────────────────────────
+// Responde "qué transacción derivable no acabó con fila y por qué", OBSERVANDO en el instante de
+// la escritura. Un diagnóstico que re-planifica más tarde miente: la serie ya cambió.
+console.log('\n8 — auditoría de materialización del ledger derivado:');
+{
+  const bf = fnSource('_aurixBackfillFlowsFromTransactions');
+  const bfCode = bf.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map(l => l.replace(/(^|[^:'"`\\])\/\/.*$/, '$1')).join('\n');
+  ok('8.1 la auditoría se construye DENTRO del backfill (mismo instante que la escritura)',
+     /_aurixLastBackfillAudit = \{/.test(bfCode) && /const post = _aurixLoadCapitalFlows\(\);/.test(bfCode));
+  ok('8.2 vive sólo en memoria: no se persiste ni se sincroniza',
+     (app.match(/_aurixLastBackfillAudit/g) || []).length >= 3 &&
+     !/localStorage\.setItem\([^)]*_aurixLastBackfillAudit/.test(app) &&
+     !/_aurixLastBackfillAudit[\s\S]{0,80}JSON\.stringify[\s\S]{0,40}setItem/.test(app));
+  ok('8.3 clasifica la omisión por las DOS únicas vías de _aurixCaptureFlow',
+     /importe_redondea_a_cero/.test(bfCode) && /id_ya_presente/.test(bfCode));
+  ok('8.4 identifica al dueño del id cuando la fila no se materializa',
+     /duenoDelId: dueno \? \{ source: dueno\.source/.test(bfCode));
+  ok('8.5 distingue "duplicado evitado" de "sin rastro" (la única vía de pérdida real)',
+     /cubiertas_por_fila_existente/.test(bfCode) && /sin_rastro_en_el_ledger/.test(bfCode));
+  ok('8.6 la gemela NO se busca excluyendo el id: la fila que ocupa el id puede ser la operación',
+     /const gemela = mia \? null : post\.find/.test(bfCode) && !/f\.id !== idEsperado/.test(bfCode));
+  ok('8.7 el forense lo expone y avisa si el backfill aún no ha corrido',
+     /materializacion: \(typeof _aurixLastBackfillAudit !== 'undefined'\) \? _aurixLastBackfillAudit : null/.test(app));
+  ok('8.8 la auditoría no reintenta ni reescribe nada (sólo lee el ledger ya escrito)',
+     !/_aurixCaptureFlow\(/.test(bfCode.slice(bfCode.indexOf('const post = _aurixLoadCapitalFlows();'))) &&
+     !/_aurixSaveCapitalFlows/.test(bfCode));
 }
 
 console.log('\nRESULT: ' + (fail === 0 ? 'ALL PASS ✓' : 'FAIL ✗') + '  (' + pass + ' passed, ' + fail + ' failed)');
