@@ -287,5 +287,51 @@ ok('11.9 REGRESIÓN: no se tocan las medidas ya fijadas (radio de card, filas pl
 ok('11.10 es CSS-only: ni datos, ni contratos, ni lógica',
    !/renderMarketItem[\s\S]{0,200}mkt-id-name[\s\S]{0,200}font-/.test(app));
 
+// ── 12 MARKET-EXCELLENCE-02 — base institucional de la ficha de activo ──────
+// Owner único: #marketPreviewOverlay / .modal--mkt-preview, abierto por _aurixMktOpenSymbol.
+// Todo el bloque es presentación: ni JS, ni motor, ni datasets, ni providers.
+console.log('\n12 — ficha de activo (Asset Detail):');
+{
+  const d = css.slice(css.indexOf('MARKET-EXCELLENCE-02')).replace(/\/\*[\s\S]*?\*\//g, '');
+  ok('12.1 owner único: un solo overlay y un solo abridor, sin segundo flujo',
+     (indexHtml.match(/id="marketPreviewOverlay"/g) || []).length === 1 &&
+     (app.match(/function _aurixMktOpenSymbol\(/g) || []).length === 1);
+  ok('12.2 el precio domina y es tabular',
+     /\.mkt-prv-price \{[^}]*font-size: 30px;[^}]*font-weight: 700/.test(d) &&
+     /\.mkt-prv-price \{[^}]*font-variant-numeric: tabular-nums/.test(d) &&
+     /\.mkt-prv-change \{[^}]*font-variant-numeric: tabular-nums/.test(d));
+  ok('12.3 jerarquía de header: nombre titular, ticker y tipo de soporte, sin badge chillón',
+     /\.mkt-prv-name \{[^}]*font-weight: 650/.test(d) &&
+     /\.mkt-prv-symbol \{[^}]*color: rgba\(255,255,255,0\.58\)/.test(d) &&
+     /\.mkt-prv-badge:empty \{ display: none; \}/.test(d));
+  ok('12.4 temporalidades honestas: una deshabilitada se LEE deshabilitada, y no se altera el set',
+     /button\[disabled\],[\s\S]{0,90}aria-disabled="true"\]\s*\{[^}]*pointer-events: none/.test(d) &&
+     /ranges:\s*\['24H','1W','1M','1Y','ALL'\]/.test(app));
+  ok('12.5 estados con altura estable (sin salto de layout) y error no agresivo',
+     /\.mkt-prv-mount \{[^}]*min-height: 168px/.test(d) &&
+     /aurix-chart-state[\s\S]{0,160}min-height: 148px/.test(d) &&
+     /aurix-chart-state--error"\] \{ color: rgba\(255,155,155/.test(d));
+  ok('12.6 tablet 769–1024 con composición PROPIA (card contenida, no sheet estirado)',
+     /@media \(min-width: 769px\) and \(max-width: 1024px\) \{[\s\S]{0,400}#marketPreviewOverlay > \.modal \{[^}]*border-radius: 18px/.test(d) &&
+     /@media \(min-width: 769px\) and \(max-width: 1024px\) \{[\s\S]{0,400}\.sheet-handle \{ display: none; \}/.test(d));
+  ok('12.7 móvil sin scroll horizontal y con colchón bajo el CTA (safe-area)',
+     /@media \(max-width: 768px\)[\s\S]{0,700}\.modal-body    \{ overflow-x: hidden; \}/.test(d) &&
+     /\.mkt-prv-mount \{ padding-bottom: calc\(8px \+ env\(safe-area-inset-bottom, 0px\)\); \}/.test(d));
+  ok('12.8 escritorio con más ancho útil sin inflar tipografías',
+     /@media \(min-width: 1025px\)[\s\S]{0,220}max-width: 620px/.test(d) &&
+     !/@media \(min-width: 1025px\)[\s\S]{0,300}font-size: [4-9]\dpx/.test(d));
+  ok('12.9 NO se toca el motor del gráfico ni sus datos',
+     !/mkt-prv-mount[\s\S]{0,200}(canvas|svg) \{[^}]*(width|height): \d+px/.test(d) &&
+     (app.match(/function _aurixMktPickAdapter\(/g) || []).length === 1 &&
+     (app.match(/function _aurixMktLoad\(/g) || []).length <= 1);
+  ok('12.10 continuidad Market → ficha: mismo owner, sin duplicar navegación',
+     /_aurixMktOpenSymbol\(row\.dataset\.symbol\)/.test(app) &&
+     (app.match(/function _aurixMktClose\(/g) || []).length === 1);
+  ok('12.11 no se añaden campos ni métricas: sólo la línea de origen que ya existía',
+     /\.mkt-prv-meta \{[^}]*color: rgba\(255,255,255,0\.38\)/.test(d) &&
+     (app.match(/function _aurixMktSetMeta\(/g) || []).length === 1 &&
+     !/mktPrvVolume|mktPrvMarketCap|mkt-prv-fundamentals/.test(indexHtml + app));
+}
+
 console.log('\nRESULT: ' + (fail === 0 ? 'ALL PASS ✓' : 'FAIL ✗') + '  (' + pass + ' passed, ' + fail + ' failed)');
 process.exit(fail === 0 ? 0 : 1);
