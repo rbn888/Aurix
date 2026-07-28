@@ -657,7 +657,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '597'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '598'; } catch (_) {}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -9060,6 +9060,9 @@ if (typeof window !== 'undefined') {
 // self-healing (re-derived each boot), never mutates user-authored transactions. Monotonic:
 // a genuine in-window buy with a corroborating step is still neutralised exactly as before.
 let _AURIX_LEDGER_SELF_HEAL = true;   // rollback: window.disableAurixLedgerSelfHeal()
+// SPEC LEDGER-MATERIALIZATION-AUDIT — foto EN MEMORIA de lo que el ultimo backfill consiguio
+// materializar. No se persiste ni se sincroniza: se reconstruye en cada arranque con el backfill.
+let _aurixLastBackfillAudit = null;
 
 // Earliest tracked timestamp across the wealth + category history (epoch-filtered), used as the
 // "base capital" anchor. Falls back to the reset epoch, then to 0 (⇒ before any window baseline).
@@ -9479,8 +9482,52 @@ function _aurixBackfillFlowsFromTransactions() {
       // SAME (kind, assetId, ts, amount) as _ledgerTrade → idempotent with live flows.
       _aurixCaptureFlow(c.isSell ? 'asset_remove' : 'asset_add', c.amountUSD, effTs, c.assetId, 'tx-backfill', 'tx-backfill',
         { originalTs: c.originalTs, retimeReason: dec.reason, retimeConfidence: dec.confidence, matchedStepTs: dec.matchedStepTs });
+      c.__effTs = effTs; c.__reason = dec.reason;
     }
     added = _aurixLoadCapitalFlows().length - before;
+    // SPEC LEDGER-MATERIALIZATION-AUDIT — se OBSERVA aquí, en el instante de la escritura, qué
+    // transacción acabó con fila y cuál no. Un diagnóstico que re-planifica más tarde no sirve: la
+    // serie ya ha cambiado y sus asignaciones no son las que se ejecutaron. Sólo memoria: no
+    // persiste nada, no reintenta nada, no altera el ledger.
+    try {
+      const post = _aurixLoadCapitalFlows();
+      const rnd = v => Math.round(Math.abs(Number(v) || 0));
+      const filas = candidates.map(c => {
+        const kind = c.isSell ? 'asset_remove' : 'asset_add';
+        const idEsperado = kind + ':' + (c.assetId || 'cash') + ':' + c.__effTs + ':' + rnd(c.amountUSD);
+        const mia = post.find(f => f && f.id === idEsperado && f.originalTs === c.originalTs);
+        const dueno = mia ? null : post.find(f => f && f.id === idEsperado);
+        // Aunque no se materialice, ¿existe YA la operación en el ledger por otra vía (típicamente
+        // la fila 'user' capturada en vivo)? Es lo que distingue "duplicado evitado" de "perdida".
+        // OJO: no se excluye por id. Cuando la fila que ocupa el id ES la propia operación (la
+        // capturada en vivo como 'user'), esa fila es justamente la prueba de que el movimiento SÍ
+        // está en el ledger. Excluirla haría que el caso más importante se contara como sin rastro.
+        const gemela = mia ? null : post.find(f => f && f.kind === kind && (f.assetId || 'cash') === (c.assetId || 'cash')
+          && rnd(f.amountUSD) === rnd(c.amountUSD));
+        return {
+          assetId: c.assetId || 'cash', kind: kind, amountUSD: +Number(c.amountUSD).toFixed(2),
+          originalTs: c.originalTs, tsEfectivo: c.__effTs, motivoPlan: c.__reason,
+          materializada: !!mia,
+          omision: mia ? null : (rnd(c.amountUSD) === 0 ? 'importe_redondea_a_cero'
+                               : (dueno ? 'id_ya_presente' : 'desconocida')),
+          idEsperado: idEsperado,
+          duenoDelId: dueno ? { source: dueno.source || null, ts: dueno.ts, originalTs: (dueno.originalTs != null ? dueno.originalTs : null) } : null,
+          yaEnLedgerPorOtraVia: gemela ? { id: gemela.id, source: gemela.source || null, ts: gemela.ts } : null,
+        };
+      });
+      const noMat = filas.filter(f => !f.materializada);
+      _aurixLastBackfillAudit = {
+        cuando: (function () { try { return Date.now(); } catch (_) { return 0; } })(),
+        transacciones_derivables: candidates.length,
+        materializadas: filas.length - noMat.length,
+        no_materializadas: noMat.length,
+        por_motivo: noMat.reduce((m, f) => { m[f.omision] = (m[f.omision] || 0) + 1; return m; }, {}),
+        cubiertas_por_fila_existente: noMat.filter(f => f.yaEnLedgerPorOtraVia).length,
+        sin_rastro_en_el_ledger: noMat.filter(f => !f.yaEnLedgerPorOtraVia).length,
+        detalle_no_materializadas: noMat,
+        filas: filas,
+      };
+    } catch (_) { _aurixLastBackfillAudit = { error: 'audit_failed' }; }
   } catch (_) {}
   if (typeof IS_DEV !== 'undefined' && IS_DEV) { try { console.debug('[tx-backfill] re-anchored:', reAnchored); } catch (_) {} }
   if (typeof IS_DEV !== 'undefined' && IS_DEV) { try { console.debug('[tx-backfill] scanned:', scanned, 'added:', added); } catch (_) {} }
@@ -31514,6 +31561,9 @@ try {
         ledger: { total_flujos: flows.length, en_ventana: inWin.length,
           neto_en_ventana: +netActual.toFixed(2), exceso_por_doble_asignacion: +exceso.toFixed(2) },
         integridad_ledger: integridad,
+        // OBSERVADO en el momento de la escritura (no re-planificado): qué transacción acabó con
+        // fila y cuál no. `null` si el backfill aún no ha corrido en esta sesión (espera ~10 s).
+        materializacion: (typeof _aurixLastBackfillAudit !== 'undefined') ? _aurixLastBackfillAudit : null,
         COLISIONES: colisiones.length ? colisiones : 'ninguna',
         escalones_detectados: escalones,
         escalones_sin_flujo_asignado: escalones.filter(e => e.flujos_asignados === 0),
