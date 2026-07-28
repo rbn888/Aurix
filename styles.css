@@ -24567,3 +24567,104 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   #marketList.is-v3 .market-row,
   #marketList.is-v4 .market-row { border-radius: 0; }
 }
+
+/* ════════ MARKET-EXCELLENCE-01B — pulido institucional de filas y estados ════════
+   Sólo presentación. No se tocan las medidas que ya fijan los harnesses (radio 14 de la
+   card, filas planas dentro de ella, padding 9/10 en móvil, rejilla de 7 pistas en
+   escritorio) ni ningún dato: se trabaja sobre jerarquía, alineación, contraste y ritmo,
+   que es donde estaba la distancia con un producto institucional.
+   Cada bloque respeta la estructura de su breakpoint; no se impone una composición común. */
+
+/* ── 1. Alineación numérica. Sin cifras tabulares, cada fila desplaza el punto decimal
+   unos píxeles y la columna de precios se lee ondulada. Es el detalle que más separa una
+   tabla financiera de una lista cualquiera, y no cambia ni tamaños ni pesos. */
+#marketList .col-price,
+#marketList .col-change,
+#marketList .market-table-header > div,
+#marketList .mkt-id-ticker {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+}
+
+/* ── 2. Jerarquía de identidad: el nombre es el titular y los metadatos son soporte.
+   Antes competían por contraste; se separan por color y peso, no por tamaño (el tamaño ya
+   lo fija cada breakpoint y está pinchado por los harnesses). */
+#marketList .mkt-id-name {
+  color: rgba(255,255,255,0.96);
+  letter-spacing: -0.008em;
+}
+#marketList .mkt-id-meta {
+  color: rgba(255,255,255,0.46);
+  letter-spacing: 0.005em;
+}
+#marketList .mkt-id-ticker { color: rgba(255,255,255,0.62); font-weight: 600; }
+#marketList .mkt-id-sep    { color: rgba(255,255,255,0.24); }
+
+/* ── 3. El precio manda sobre la variación: misma línea, distinta autoridad. */
+#marketList .col-price  { color: rgba(255,255,255,0.94); font-weight: 650; }
+#marketList .col-change { font-weight: 600; letter-spacing: -0.004em; }
+#marketList .col-change.is-up   { color: #3ddc84; }
+#marketList .col-change.is-down { color: #ff6b6b; }
+#marketList .col-change-empty   { color: rgba(255,255,255,0.28); }
+
+/* ── 4. Separadores: el borde a 0.07 marcaba demasiado la retícula y competía con los
+   datos. Se baja a un hilo y se apoya en el hover, no al revés. */
+#marketList .market-row { border-bottom-color: rgba(255,255,255,0.045); }
+#marketList .market-table-header {
+  color: rgba(255,255,255,0.38);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+/* ── 5. Iconografía coherente: mismo radio y un aro sutil que unifica logos, monogramas y
+   SVG de metales, que hoy conviven con acabados distintos. */
+#marketList .asset-icon {
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+  background-clip: padding-box;
+}
+#marketList .asset-icon img { border-radius: inherit; }
+
+/* ── 6. Estados. El esqueleto imitaba la fila con bloques opacos y un pulso plano; se le
+   da el mismo ritmo que la lista real y un barrido suave, para que la espera se lea como
+   contenido en camino y no como una avería. */
+.market-skeleton .market-row.skeleton { animation: none; }
+.market-skeleton .skeleton-circle,
+.market-skeleton .skeleton-text,
+.market-skeleton .skeleton-price,
+.market-skeleton .skeleton-change,
+.market-skeleton .skeleton-spark {
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.045) 25%, rgba(255,255,255,0.085) 37%, rgba(255,255,255,0.045) 63%);
+  background-size: 400% 100%;
+  animation: mktShimmer 1.4s ease-in-out infinite;
+}
+.market-skeleton .market-row.skeleton:nth-child(2) .skeleton-text { width: 84px; }
+.market-skeleton .market-row.skeleton:nth-child(3) .skeleton-text { width: 112px; }
+.market-skeleton .market-row.skeleton:nth-child(4) .skeleton-text { width: 92px; }
+@keyframes mktShimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .market-skeleton .skeleton-circle,
+  .market-skeleton .skeleton-text,
+  .market-skeleton .skeleton-price,
+  .market-skeleton .skeleton-change,
+  .market-skeleton .skeleton-spark { animation: none; }
+}
+
+/* Vacío y error comparten contenedor y texto (no se inventa copy que no existe); lo que se
+   les da es un ritmo vertical propio en vez de una línea suelta pegada al borde. */
+#marketList .market-empty {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 132px;
+  padding: 28px 20px;
+  color: rgba(255,255,255,0.42);
+  font-size: 13.5px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ── 7. Tablet 769–1024: el mismo aire final que ya tienen móvil y escritorio. Medido: la
+   última fila terminaba a 0px del borde de la card en esta banda. */
+@media (min-width: 769px) and (max-width: 1024px) {
+  #marketList.market-section { padding-bottom: 14px; }
+}
