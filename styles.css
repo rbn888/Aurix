@@ -24828,3 +24828,54 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   #marketList .watchlist-btn:active,
   #marketPreviewOverlay .mkt-prv-ranges button:active { transform: none; }
 }
+
+/* ════════ MARKET-V2-01 — verdad del mini gráfico ══════════════════════════════
+   La celda `.col-chart` sólo tiene dos finales legítimos: histórico REAL montado por el
+   motor, o ausencia declarada. El tercero —una serie inventada con forma de mercado— se
+   eliminó del JS. Aquí se le da forma institucional a la ausencia y se cumple
+   Reduced Motion, que el esqueleto de MARKET-8 todavía no respetaba. */
+
+/* Ausencia de histórico: una línea base plana, sin dirección ni color. Es legible como
+   "no hay serie", nunca como "el activo no se movió", y no puede confundirse con un
+   gráfico. Absoluta como el esqueleto: mismo hueco, cero salto de layout. */
+.col-chart--none {
+  position: relative;
+  opacity: 1;
+}
+.col-chart--none::after {
+  content: '';
+  position: absolute;
+  left: 8%; right: 8%; top: 50%;
+  height: 1px;
+  transform: translateY(-0.5px);
+  border-radius: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(220,230,250,0.00) 0%,
+    rgba(220,230,250,0.16) 18%,
+    rgba(220,230,250,0.16) 82%,
+    rgba(220,230,250,0.00) 100%
+  );
+}
+
+/* Accesibilidad (SPEC · Reduced Motion): quien pide menos movimiento recibe el mismo
+   esqueleto en estático, no un barrido infinito. */
+@media (prefers-reduced-motion: reduce) {
+  .col-change-skeleton,
+  .col-chart.is-loading::after { animation: none; }
+}
+
+/* Área táctil de la estrella (SPEC · Touch targets). El botón mide 28×28 visualmente, que
+   es la densidad correcta para la fila, pero como diana de dedo se queda corto. Se amplía
+   SÓLO el área de pulsación con un pseudo-elemento: mismo tamaño visual, misma retícula,
+   cero cambio de layout. No se toca el handler: el clic sigue resolviéndose por
+   `closest('.watchlist-btn')`, así que el área ampliada pertenece a la estrella. */
+#marketList .watchlist-btn { position: relative; }
+#marketList .watchlist-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 44px; height: 44px;
+  transform: translate(-50%, -50%);
+  border-radius: 12px;
+}

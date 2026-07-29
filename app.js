@@ -37783,15 +37783,19 @@ function _aurixSparkMountAll(container) {
     const chg = (raw === '' || raw === null || raw === undefined) ? 0 : Number(raw);
     const tone = chg > 0.005 ? 'positive' : (chg < -0.005 ? 'negative' : 'neutral');
 
-    // MARKET-8: if the in-memory history cache has a series for this
-    // row at the currently selected timeframe, use the REAL series.
-    // Otherwise fall through to the synthetic walk used since CHART-5.
+    // MARKET-8: si la caché en memoria tiene serie para esta fila en la temporalidad
+    // seleccionada, se usa la serie REAL.
+    // MARKET-V2-01 — y si NO la tiene, no se dibuja NADA. Aquí vivía la caída al
+    // "synthetic walk" (Math.random() etiquetado además como `isSynthetic: false`, con lo
+    // que ni los guardas de verdad de dato del motor podían detectarlo). Una celda sin
+    // histórico se queda en su esqueleto y la resuelve _mktHistoryApplyToRow / _mktSparkSettle.
     const realEntry = (typeof _mktHistoryEntryForCell === 'function')
       ? _mktHistoryEntryForCell(cell)
       : null;
+    const hasReal = !!(realEntry && Array.isArray(realEntry.series) && realEntry.series.length >= 2);
+    if (!hasReal) return;
 
     try {
-      // Clear the legacy SVG only after we have engine readiness.
       cell.innerHTML = '';
       const ctrl = window.AurixCharts.createSparkline(cell, {
         colorMode: tone,
@@ -37800,39 +37804,44 @@ function _aurixSparkMountAll(container) {
         // the cell in either layout with zero CSS coupling.
         height:    cell.clientHeight || 32,
       });
-      let series, meta;
-      if (realEntry && Array.isArray(realEntry.series) && realEntry.series.length >= 2) {
-        series = realEntry.series;
-        meta   = realEntry.meta || {
-          source: 'history', currency: 'USD', granularity: '1d',
-          isSynthetic: false, completeness: 1, asOf: Date.now(),
-        };
-      } else {
-        const pts  = (typeof generateSparkline === 'function') ? generateSparkline(chg) : [];
-        const now  = Date.now();
-        const step = 60 * 1000;
-        series = pts.map((v, i) => ({
-          time:  now - (pts.length - i) * step,
-          value: Number(v),
-        }));
-        meta = {
-          source: 'synthetic', currency: 'USD', granularity: '1m',
-          isSynthetic: false, completeness: 1, asOf: now,
-        };
-      }
-      ctrl.setData(series, meta);
+      ctrl.setData(realEntry.series, realEntry.meta || {
+        source: 'history', currency: 'USD', granularity: '1d',
+        isSynthetic: false, completeness: 1, asOf: Date.now(),
+      });
+      cell.classList.remove('is-loading', 'col-chart--none');
       if (key) _aurixMarketSpark.set(key, ctrl);
     } catch (err) {
-      // Restore the legacy SVG so the row never ships an empty cell.
-      try {
-        const chart = (typeof renderSparkline === 'function' && typeof generateSparkline === 'function')
-          ? renderSparkline(generateSparkline(chg), chg >= 0)
-          : '';
-        cell.innerHTML = chart;
-      } catch (_) {}
+      // El fallo de montaje NO se maquilla con una serie inventada: la celda vuelve a su
+      // esqueleto y _mktSparkSettle la resolverá a vacío honesto si no llega a pintarse.
+      try { cell.innerHTML = ''; cell.classList.add('is-loading'); } catch (_) {}
       console.warn('[market-spark-v2] mount fail', key, err && err.message ? err.message : err);
     }
   });
+}
+
+// MARKET-V2-01 — resolución acotada del mini gráfico. Sin la serie inventada, una celda
+// sólo puede acabar en dos sitios: gráfico real o vacío honesto. Nunca en un esqueleto
+// eterno. Esto cubre los caminos en los que _mktHistoryApplyToRow no llega a ejecutarse:
+// motor/adaptadores aún cargando (CDN diferido), activo sin adaptador, o fetch caído.
+const _AURIX_MKT_SPARK_SETTLE_MS = 7000;
+let _mktSparkSettleTimer = null;
+function _mktSparkSettle(container) {
+  if (typeof document === 'undefined') return;
+  if (_mktSparkSettleTimer) { clearTimeout(_mktSparkSettleTimer); _mktSparkSettleTimer = null; }
+  _mktSparkSettleTimer = setTimeout(() => {
+    _mktSparkSettleTimer = null;
+    const el = container || document.getElementById('marketList');
+    if (!el || !el.querySelectorAll) return;
+    // Un reintento tardío y acotado: si el motor terminó de cargar después del render,
+    // monta ahora todo lo que ya tenga serie en caché. Es idempotente.
+    try { _aurixSparkMountAll(el); } catch (_) {}
+    // Lo que siga sin gráfico no tiene histórico utilizable: se declara, no se parpadea.
+    el.querySelectorAll('.col-chart.is-loading[data-spark-key]').forEach(cell => {
+      cell.classList.remove('is-loading');
+      cell.classList.add('col-chart--none');
+      cell.innerHTML = '';
+    });
+  }, _AURIX_MKT_SPARK_SETTLE_MS);
 }
 
 // ── CHART-6 ──────────────────────────────────────────────────────
@@ -43920,6 +43929,9 @@ function renderCurrentMarketView() {
   // live change24h baked into the row) unless we want real 24h spark
   // data. Concurrency-limited, cache-aware, generation-token-guarded.
   try { _mktHistoryFetchVisible(data); } catch (e) { console.warn('[mkt-history] fetch fail:', e && e.message); }
+  // MARKET-V2-01: una celda de mini gráfico sólo puede acabar en gráfico real o en vacío
+  // honesto. Este cierre acotado garantiza que ningún esqueleto se quede parpadeando.
+  try { _mktSparkSettle(el); } catch (_) {}
   renderFeaturedBlock(data);
   renderMarketTickerStrip(data);
   requestAnimationFrame(() => renderMarketInsights(data));
@@ -45369,31 +45381,12 @@ const CRYPTO_FALLBACK = [
   { symbol: 'DOGE', name: 'Dogecoin',  current_price: 0.19,   price_change_percentage_24h: 0.6,  image: 'https://assets.coingecko.com/coins/images/5/thumb/dogecoin.png' },
 ];
 
-function generateSparkline(change) {
-  const points = [];
-  let value = 50;
-  for (let i = 0; i < 20; i++) {
-    value += (Math.random() - 0.5) * 5 + (change || 0) * 0.2;
-    points.push(Math.max(5, Math.min(95, value)));
-  }
-  return points;
-}
-
-function renderSparkline(points, isUp = true) {
-  const width = 80, height = 30;
-  const path = points.map((p, i) => {
-    const x = (i / (points.length - 1)) * width;
-    const y = height - (p / 100) * height;
-    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  const color = isUp ? '#00ff88' : '#ff4d4d';
-  // MK.F5 §4 — subtle ~7% area fill under the line (green up / red down) for a
-  // Bloomberg-lite read. (The V2 engine already draws its own gradient fill; this
-  // only affects the legacy fallback SVG.) Data generation is untouched.
-  const fill = isUp ? 'rgba(0,255,136,0.07)' : 'rgba(255,77,77,0.07)';
-  const area = `${path} L${width},${height} L0,${height} Z`;
-  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><path d="${area}" fill="${fill}" stroke="none"/><path d="${path}" stroke="${color}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-}
+// MARKET-V2-01 — aquí vivían `generateSparkline()` y `renderSparkline()`. La primera era
+// un paseo aleatorio (`Math.random()`) sesgado por la variación del día; la segunda lo
+// pintaba como un mini gráfico financiero con línea, relleno y color direccional. Se
+// eliminan las dos: en Market no puede existir una función cuyo trabajo sea fabricar una
+// serie de mercado. El único dibujo posible es el histórico real (_mktHistoryFetchVisible
+// → _mktHistoryApplyToRow); su ausencia se declara con `.col-chart--none`.
 
 function normalizeMarketData(raw, type, symbol) {
   const sym      = normalizeSymbol(symbol);
@@ -45765,7 +45758,13 @@ function renderMarketItem(item, idx) {
   const _dataName = (item.name && item.name !== item.symbol) ? item.name : null;
   const name    = _dataName || _MKT_DISPLAY_NAMES[normSym] || '';
   const watched = isInWatchlist(normSym);
-  const chart   = renderSparkline(generateSparkline(chg ?? live24 ?? 0), (chg ?? live24 ?? 0) >= 0);
+  // MARKET-V2-01 — VERDAD DEL MINI GRÁFICO. La fila ya NO pinta ninguna serie en su
+  // HTML. Antes hacía `renderSparkline(generateSparkline(chg))`, y generateSparkline era
+  // literalmente `Math.random()` sesgado por la variación: un gráfico financiero
+  // inventado, con la forma y el color de uno real, en cada fila de Market. El histórico
+  // real existe y ya se pide en cada render (_mktHistoryFetchVisible), así que el único
+  // dibujo legítimo es ése. Hasta que llega: esqueleto. Si no llega: celda honestamente
+  // vacía (.col-chart--none). Nunca una línea que el usuario pueda leer como mercado.
   // MK.F7 §3 — no per-row category badge: the category already lives in the
   // tabs/filters, so "AAPL [Acción] / AAPL" was redundant. Row = ticker + name only.
   // MC-11A: directional indicator paired with the existing safeChange
@@ -45804,7 +45803,7 @@ function renderMarketItem(item, idx) {
                 ? '<span class="col-change-empty">—</span>'
                 : safeChange(chg))}
       </div>
-      <div class="col col-chart${isLoading ? ' is-loading' : ''}" data-spark-key="${normSym}" data-spark-change="${chg ?? ''}" data-spark-tf="${selectedTf}">${isLoading ? '' : chart}</div>
+      <div class="col col-chart is-loading" data-spark-key="${normSym}" data-spark-change="${chg ?? ''}" data-spark-tf="${selectedTf}"></div>
       <div class="col col-action">
         <button type="button" class="watchlist-btn ${watched ? 'active' : ''}" data-symbol="${normSym}" aria-pressed="${watched ? 'true' : 'false'}" aria-label="${watched ? 'Unwatch' : 'Watch'} ${escHtml(item.symbol)}">${watched ? '★' : '☆'}</button>
       </div>
@@ -56318,8 +56317,19 @@ function _mktHistoryAdaptersReady() {
 }
 async function _mktHistoryFetchOne(item, range, gen) {
   const adapter = _aurixMktPickAdapter(item);
-  if (!adapter) return;
-  const key = _mktHistoryCacheKey(item, range);
+  const key0 = _mktHistoryCacheKey(item, range);
+  if (!adapter) {
+    // MARKET-V2-01 — sin adaptador no hay dirección fiable para el histórico de este
+    // activo: NUNCA la habrá para esta fila. Se cachea la ausencia y se aplica, para que
+    // la celda del mini gráfico resuelva a vacío honesto en vez de quedarse en esqueleto.
+    if (key0) {
+      const none = { ts: Date.now(), series: [], meta: null, changePct: null };
+      _marketHistoryCache.set(key0, none);
+      _mktHistoryApplyToRow(item, range, none, gen);
+    }
+    return;
+  }
+  const key = key0;
   if (!key) return;
   // Guard against double-fire when render runs back-to-back.
   if (_mktHistoryCacheFresh(_marketHistoryCache.get(key), range)) return;
@@ -56404,7 +56414,20 @@ function _mktHistoryApplyToRow(item, range, entry, gen) {
         } catch (_) {}
       }
     } else if (sparkCell) {
-      sparkCell.classList.remove('is-loading');
+      // MARKET-V2-01 — antes esta rama se limitaba a quitar `is-loading`, dejando a la
+      // vista el SVG inventado que la fila traía de fábrica. Ya no hay SVG que dejar, así
+      // que hay que distinguir los dos motivos:
+      const usable = entry.series && entry.series.length >= 2;
+      if (usable) {
+        // Serie real disponible pero el motor aún no está listo (CDN diferido): se mantiene
+        // el esqueleto para que _mktSparkSettle la monte cuando lo esté.
+        sparkCell.classList.add('is-loading');
+      } else {
+        // El activo no tiene histórico utilizable: vacío honesto y declarado, sin parpadeo.
+        sparkCell.classList.remove('is-loading');
+        sparkCell.classList.add('col-chart--none');
+        sparkCell.innerHTML = '';
+      }
     }
   });
 }
