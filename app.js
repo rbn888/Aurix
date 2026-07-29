@@ -38460,6 +38460,327 @@ function _aurixMktAdaptersReady() {
       && typeof window.AurixChartAdapters.yahooHistoryAdapter === 'function'
       && typeof window.AurixChartAdapters.cryptoHistoryAdapter === 'function';
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MARKET-V2-02A — VIEW MODEL ÚNICO DE ASSET DETAIL (contrato de datos)
+// ══════════════════════════════════════════════════════════════════════════════
+// Owner único de los datos de la ficha. Ningún componente de la ficha vuelve a leer
+// item / snapshot / catálogo / serie por su cuenta: todos consumen este view model.
+//
+// MAPA DE FUENTES (medido, no supuesto — ver api/ y services/chart-adapters.js):
+//   · snapshot  /api/prices/snapshot  → symbol, name, price, currency, change24h,
+//                                        timestamp, source, stale, confidence
+//   · search    /api/search/assets    → ticker, name, type, marketSymbol,
+//                                        providerScore, exchange
+//   · catálogo curado (_AURIX_FUND_DB / _AURIX_ETF_DB) → name, legalName, manager,
+//                                        exchange, currency, isin, shareClass
+//   · histórico (yahoo/crypto adapter) → series[{time,value,open,high,low,close,volume}]
+//                                        + meta{source,currency,granularity,
+//                                               isSynthetic,completeness,asOf}
+// Fuera de ese conjunto NO hay nada más: market cap, volumen, sector, industria, supply,
+// dividend yield, expense ratio, AUM, CUSIP, FIGI, país y launch date no existen en
+// ninguna fuente actual. Esta capa no los declara ni los deja "pendientes": no existen.
+//
+// TRES ESTADOS POR CAMPO, explícitos (exigencia del SPEC):
+//   'direct'      — lo dice una fuente.
+//   'derived'     — lo calculamos a partir del histórico que ya se descargó.
+//   'unavailable' — no lo tenemos, y `reason` dice por qué.
+//
+// REGLA DE VERDAD DE LAS DERIVADAS: cada métrica derivada viaja con su `coverage`
+// (desde / hasta / span / puntos). Una ventana parcial NUNCA se publica como histórico
+// absoluto: no existe ATH/ATL en este contrato, sino "máximo/mínimo histórico
+// DISPONIBLE", y el 52 semanas sólo se emite si la ventana cubre de verdad el año.
+//
+// UNIDADES: los valores derivados salen en USD canónico, igual que la serie del adapter.
+// La conversión a divisa base es del render (toBase), no de esta capa. `valuesCurrency`
+// lo declara para que ningún consumidor convierta dos veces.
+//
+// PUREZA: función sin DOM y sin globales de UI. Todo lo externo entra por `deps`, para
+// que el harness pueda ejecutarla tal cual con datos reales.
+// 52 semanas = 364 días. Se exige cubrir el 90 % del año para poder llamarlo "52 semanas":
+// con menos, la cifra existiría pero la etiqueta sería falsa.
+const _AURIX_MKT_VM_52W_MS = 364 * 864e5;
+const _AURIX_MKT_VM_52W_MIN_COVERAGE = 0.9;
+
+function _aurixMktVmField(value, state, extra) {
+  const f = { value: (value === undefined ? null : value), state: state };
+  if (extra) for (const k in extra) f[k] = extra[k];
+  return f;
+}
+function _aurixMktVmNone(reason) { return _aurixMktVmField(null, 'unavailable', { reason: reason }); }
+
+// Tipo canónico. La lista de Market normaliza a plurales (etfs/indices/commodities), así
+// que sin esto la composición por tipo no acertaría nunca — el mismo defecto que MK.F4
+// corrigió en los iconos.
+function _aurixMktVmType(raw) {
+  const t = String(raw || '').toLowerCase();
+  return ({ etfs: 'etf', indices: 'index', commodities: 'commodity', funds: 'fund' })[t] || t;
+}
+
+// Catálogo curado: ISIN, gestora, mercado y divisa de referencia. Se busca por ISIN, luego
+// por ticker y por marketSymbol, siempre EXACTO (normalizar el sufijo de mercado fusionaría
+// IWDA.AS con SWDA.L, que la identidad de activo prohíbe).
+function _aurixMktCatalogRecord(item, deps) {
+  const it = item || {};
+  const dbs = (deps && deps.catalogs) || [];
+  const isin = String(it.isin || '').toUpperCase();
+  const tk   = String(it.ticker || it.symbol || '').toUpperCase();
+  const ms   = String(it.marketSymbol || '').toUpperCase();
+  for (const db of dbs) {
+    if (!Array.isArray(db)) continue;
+    const hit = db.find(r => {
+      if (!r) return false;
+      const rIsin = String(r.isin || '').toUpperCase();
+      const rTk   = String(r.ticker || '').toUpperCase();
+      const rMs   = String(r.marketSymbol || '').toUpperCase();
+      if (isin && rIsin && rIsin === isin) return true;
+      if (tk && rTk && rTk === tk) return true;
+      if (ms && rMs && rMs === ms) return true;
+      return false;
+    });
+    if (hit) return hit;
+  }
+  return null;
+}
+
+// Estadística de una serie del adapter. Usa high/low reales del punto cuando existen
+// (Yahoo los trae) y cae a `value` cuando no (CoinGecko sólo publica el cierre): así el
+// máximo del periodo es el máximo REAL intradía cuando la fuente lo da, no el del cierre.
+function _aurixMktSeriesStats(series) {
+  if (!Array.isArray(series) || !series.length) return null;
+  let hi = null, lo = null, hiTs = null, loTs = null;
+  let first = null, last = null, firstTs = null, lastTs = null, points = 0;
+  for (const p of series) {
+    if (!p) continue;
+    const ts = Number(p.time);
+    const v  = Number(p.value);
+    if (!Number.isFinite(ts) || !Number.isFinite(v) || v <= 0) continue;
+    points++;
+    const ph = Number.isFinite(Number(p.high)) ? Number(p.high) : v;
+    const pl = Number.isFinite(Number(p.low))  ? Number(p.low)  : v;
+    if (hi === null || ph > hi) { hi = ph; hiTs = ts; }
+    if (lo === null || pl < lo) { lo = pl; loTs = ts; }
+    if (firstTs === null || ts < firstTs) { firstTs = ts; first = v; }
+    if (lastTs  === null || ts > lastTs)  { lastTs  = ts; last  = v; }
+  }
+  if (points < 1) return null;
+  return {
+    points: points, high: hi, low: lo, highTs: hiTs, lowTs: loTs,
+    first: first, last: last, firstTs: firstTs, lastTs: lastTs,
+    spanMs: (firstTs != null && lastTs != null) ? (lastTs - firstTs) : 0,
+    changePct: (first != null && last != null && first > 0) ? ((last - first) / first) * 100 : null,
+  };
+}
+function _aurixMktVmCoverage(stats) {
+  if (!stats) return null;
+  return {
+    fromMs: stats.firstTs, toMs: stats.lastTs, spanMs: stats.spanMs,
+    spanDays: Math.round(stats.spanMs / 864e5), points: stats.points,
+  };
+}
+
+// El view model. `input`:
+//   item     — el market item que abrió la ficha (identidad + precio vivo)
+//   range    — rango seleccionado ('24h'|'7d'|'30d'|'1y'|'all')
+//   series   — serie del rango seleccionado (puede venir vacía)
+//   meta     — meta del adapter para esa serie
+//   snapshot — fila de /api/prices/snapshot si se tiene (price/timestamp/stale/confidence)
+//   nowMs    — reloj inyectable
+// `deps`:
+//   catalogs    — [_AURIX_ETF_DB, _AURIX_FUND_DB]
+//   resolveLogo — el resolver canónico de logo (getAssetLogo), inyectado para no acoplar
+//   seriesForRange(r) — lee la caché YA descargada de otros rangos. Sin llamadas nuevas:
+//                       si el usuario no ha visitado ese rango, devuelve null y la métrica
+//                       queda 'unavailable' con motivo. Nunca se inventa la ventana.
+function _aurixMktBuildDetailVM(input, deps) {
+  const inp  = input || {};
+  const d    = deps  || {};
+  const it   = inp.item || {};
+  const meta = inp.meta || null;
+  const snap = inp.snapshot || null;
+  const range = String(inp.range || '30d').toLowerCase();
+  const now  = Number.isFinite(Number(inp.nowMs)) ? Number(inp.nowMs) : 0;
+  const type = _aurixMktVmType(it.type);
+  const rec  = _aurixMktCatalogRecord(it, d);
+
+  // ── IDENTIDAD ──────────────────────────────────────────────────────────────
+  const ticker = String(it.ticker || it.symbol || '').toUpperCase();
+  const name   = String(it.name || (rec && (rec.name || rec.legalName)) || '').trim();
+  const exchange = it.exchange || (rec && rec.exchange) || null;
+  const currency = it.currency || (meta && meta.currency) || (rec && rec.currency) || null;
+  const isin     = String(it.isin || (rec && rec.isin) || '').toUpperCase() || null;
+  // Gestora: SÓLO del catálogo curado. Deducirla del nombre por regex (como hace el
+  // monograma del icono) vale para un placeholder visual, no para publicarla como dato.
+  const issuer   = (rec && rec.manager) ? String(rec.manager) : null;
+  let logo = null;
+  try { logo = (typeof d.resolveLogo === 'function') ? (d.resolveLogo(it) || null) : null; } catch (_) { logo = null; }
+
+  const identity = {
+    logo:     logo ? _aurixMktVmField(logo, 'direct') : _aurixMktVmNone('no_canonical_logo'),
+    name:     name     ? _aurixMktVmField(name, 'direct')     : _aurixMktVmNone('no_name'),
+    ticker:   ticker   ? _aurixMktVmField(ticker, 'direct')   : _aurixMktVmNone('no_ticker'),
+    type:     type     ? _aurixMktVmField(type, 'direct')     : _aurixMktVmNone('no_type'),
+    exchange: exchange ? _aurixMktVmField(String(exchange), 'direct') : _aurixMktVmNone('not_published_by_source'),
+    currency: currency ? _aurixMktVmField(String(currency).toUpperCase(), 'direct') : _aurixMktVmNone('not_published_by_source'),
+    isin:     isin     ? _aurixMktVmField(isin, 'direct', { origin: 'curated_catalog' }) : _aurixMktVmNone('not_in_curated_catalog'),
+    issuer:   issuer   ? _aurixMktVmField(issuer, 'direct', { origin: 'curated_catalog' }) : _aurixMktVmNone('not_reliably_derivable'),
+  };
+
+  // ── PRECIO ─────────────────────────────────────────────────────────────────
+  const px = [snap && snap.price, it.current_price, it.price]
+    .map(Number).find(v => Number.isFinite(v) && v > 0);
+  const asOf = Number(
+    (snap && snap.timestamp) || (meta && meta.asOf) || 0
+  ) || null;
+  // Frescura: sólo se publica si la fuente la afirma. `stale` es booleano del snapshot;
+  // `confidence` es 0..1. Si no vienen, no se inventa una etiqueta de confianza.
+  let freshness;
+  if (snap && (typeof snap.stale === 'boolean' || Number.isFinite(Number(snap.confidence)))) {
+    const conf = Number.isFinite(Number(snap.confidence)) ? Number(snap.confidence) : null;
+    freshness = _aurixMktVmField(snap.stale === true ? 'stale' : 'live', 'direct', { confidence: conf });
+  } else {
+    freshness = _aurixMktVmNone('not_published_by_source');
+  }
+
+  const stats = _aurixMktSeriesStats(inp.series);
+  const cov   = _aurixMktVmCoverage(stats);
+  // Variación del periodo: para 24H la fuente ya publica change24h (dato directo); para el
+  // resto se deriva de la serie con la MISMA regla que la lista (primer→último válido), de
+  // modo que fila y ficha no puedan discrepar.
+  const live24 = (snap && snap.change24h != null) ? snap.change24h : it.change24h;
+  let change;
+  if (range === '24h' && Number.isFinite(Number(live24))) {
+    change = _aurixMktVmField(Number(live24), 'direct', { window: '24h' });
+  } else if (stats && stats.changePct != null && stats.points >= 2) {
+    change = _aurixMktVmField(stats.changePct, 'derived', { window: range, coverage: cov });
+  } else {
+    change = _aurixMktVmNone(stats ? 'insufficient_points_for_change' : 'no_series_for_range');
+  }
+
+  const price = {
+    current:   Number.isFinite(px) ? _aurixMktVmField(px, 'direct') : _aurixMktVmNone('no_price'),
+    change:    change,
+    periodHigh: (stats && stats.points >= 2)
+      ? _aurixMktVmField(stats.high, 'derived', { at: stats.highTs, window: range, coverage: cov })
+      : _aurixMktVmNone(stats ? 'insufficient_points_for_range' : 'no_series_for_range'),
+    periodLow: (stats && stats.points >= 2)
+      ? _aurixMktVmField(stats.low, 'derived', { at: stats.lowTs, window: range, coverage: cov })
+      : _aurixMktVmNone(stats ? 'insufficient_points_for_range' : 'no_series_for_range'),
+    asOf:      asOf ? _aurixMktVmField(asOf, 'direct') : _aurixMktVmNone('no_timestamp'),
+    freshness: freshness,
+  };
+
+  // ── HISTÓRICO DERIVADO ─────────────────────────────────────────────────────
+  // Se reutiliza EXCLUSIVAMENTE lo ya descargado. `seriesForRange` lee caché; si el rango
+  // no está en caché no se pide nada y la métrica se declara no disponible.
+  const readRange = (r) => {
+    if (r === range) return inp.series;
+    try { return (typeof d.seriesForRange === 'function') ? d.seriesForRange(r) : null; } catch (_) { return null; }
+  };
+  // 52 SEMANAS — hay que RECORTAR la serie a las últimas 52 semanas, no tomar el máximo de
+  // la ventana más larga que cubra el año. Detectado con datos reales: la serie 'all' de
+  // AAPL llega a 1984, así que su máximo/mínimo (mínimo real: 0,06 $) se estaba publicando
+  // como "52 semanas". La cifra era auténtica y la etiqueta, falsa: justo lo que el SPEC
+  // prohíbe. El ancla es el último punto de la serie (nowRef), no el reloj del cliente.
+  const yearCandidates = [];
+  for (const r of ['1y', 'all']) {
+    const s = readRange(r);
+    const st = _aurixMktSeriesStats(s);
+    if (!st || st.points < 2) continue;
+    const anchor = st.lastTs;
+    const from = anchor - _AURIX_MKT_VM_52W_MS;
+    const win = _aurixMktSeriesStats((s || []).filter(p => p && Number(p.time) >= from));
+    if (!win || win.points < 2) continue;
+    // Sólo cuenta si la ventana RECORTADA cubre de verdad el año: si el histórico empieza
+    // más tarde, el recorte sale corto y no se publica.
+    if (win.spanMs < _AURIX_MKT_VM_52W_MS * _AURIX_MKT_VM_52W_MIN_COVERAGE) continue;
+    yearCandidates.push(win);
+  }
+  // Entre ventanas válidas gana la de MÁS puntos: el 'all' de un valor largo viene semanal
+  // (granularity 1wk) y el '1y' diario, así que el diario da un máximo/mínimo más fiel.
+  let yearStats = null;
+  for (const c of yearCandidates) if (!yearStats || c.points > yearStats.points) yearStats = c;
+  const yearCov = _aurixMktVmCoverage(yearStats);
+  // Motivo honesto: distinguir "no has cargado un rango que llegue al año" de "el activo
+  // no tiene un año de histórico".
+  const anyYearSource = ['1y', 'all'].some(r => { const s = _aurixMktSeriesStats(readRange(r)); return !!(s && s.points >= 2); });
+  const high52w = yearStats
+    ? _aurixMktVmField(yearStats.high, 'derived', { at: yearStats.highTs, coverage: yearCov })
+    : _aurixMktVmNone(anyYearSource ? 'history_shorter_than_52w' : 'range_not_loaded');
+  const low52w = yearStats
+    ? _aurixMktVmField(yearStats.low, 'derived', { at: yearStats.lowTs, coverage: yearCov })
+    : _aurixMktVmNone(anyYearSource ? 'history_shorter_than_52w' : 'range_not_loaded');
+
+  // Máximo / mínimo histórico DISPONIBLE. Nunca "ATH/ATL": el rango 'all' es todo lo que
+  // publica el proveedor, no necesariamente todo lo que ha existido el activo. La etiqueta
+  // lo dice y la cobertura lo demuestra.
+  const allStats = _aurixMktSeriesStats(readRange('all'));
+  const allCov   = _aurixMktVmCoverage(allStats);
+  const availableHigh = (allStats && allStats.points >= 2)
+    ? _aurixMktVmField(allStats.high, 'derived', { at: allStats.highTs, coverage: allCov, absolute: false })
+    : _aurixMktVmNone('all_range_not_loaded');
+  const availableLow = (allStats && allStats.points >= 2)
+    ? _aurixMktVmField(allStats.low, 'derived', { at: allStats.lowTs, coverage: allCov, absolute: false })
+    : _aurixMktVmNone('all_range_not_loaded');
+
+  const derived = {
+    high52w: high52w, low52w: low52w,
+    availableHigh: availableHigh, availableLow: availableLow,
+  };
+
+  // ── COMPOSICIÓN POR TIPO ───────────────────────────────────────────────────
+  // Qué campos de metadata tienen SENTIDO por tipo (no qué campos existen: eso lo dice el
+  // estado). Un ISIN en una cripto no es "un dato que falta", es un campo que no aplica.
+  const APPLIES = {
+    crypto:    ['exchange', 'currency'],
+    stock:     ['exchange', 'currency', 'isin'],
+    etf:       ['exchange', 'currency', 'isin', 'issuer'],
+    fund:      ['currency', 'isin', 'issuer'],
+    index:     ['exchange', 'currency'],
+    commodity: ['currency'],
+    metal:     ['currency'],
+  };
+  const applies = APPLIES[type] || ['exchange', 'currency'];
+  // Sólo entran los campos que aplican Y existen: ni módulos vacíos ni huecos reservados.
+  const metaFields = applies
+    .filter(k => identity[k] && identity[k].state !== 'unavailable')
+    .map(k => ({ key: k, field: identity[k] }));
+
+  const derivedFields = ['periodHigh', 'periodLow'].map(k => ({ key: k, field: price[k] }))
+    .concat(['high52w', 'low52w', 'availableHigh', 'availableLow'].map(k => ({ key: k, field: derived[k] })))
+    .filter(e => e.field && e.field.state !== 'unavailable');
+
+  const sections = [
+    { id: 'identity', present: identity.name.state !== 'unavailable' || identity.ticker.state !== 'unavailable' },
+    { id: 'price',    present: price.current.state !== 'unavailable' },
+    { id: 'chart',    present: !!(stats && stats.points >= 2) },
+    { id: 'derived',  present: derivedFields.length > 0, fields: derivedFields.map(e => e.key) },
+    { id: 'metadata', present: metaFields.length > 0,    fields: metaFields.map(e => e.key) },
+  ].filter(s => s.present);
+
+  return {
+    version: 'MARKET-V2-02A',
+    range: range,
+    type: type,
+    valuesCurrency: 'USD',   // los derivados salen en USD canónico: convierte el render
+    identity: identity,
+    price: price,
+    derived: derived,
+    series: { points: stats ? stats.points : 0, coverage: cov, granularity: (meta && meta.granularity) || null },
+    // Etiquetas OBLIGATORIAS del SPEC. Viven en el contrato para que ningún componente
+    // pueda rotular una ventana parcial como histórico absoluto.
+    labels: {
+      periodHigh: 'mktVmPeriodHigh', periodLow: 'mktVmPeriodLow',
+      high52w: 'mktVmHigh52w',       low52w: 'mktVmLow52w',
+      availableHigh: 'mktVmAvailableHigh', availableLow: 'mktVmAvailableLow',
+    },
+    sections: sections,
+    metaFields: metaFields,
+    derivedFields: derivedFields,
+    nowMs: now,
+  };
+}
+
 function _aurixMktPickAdapter(item) {
   const it = item || {};
   const tp = String(it.type || '').toLowerCase();
