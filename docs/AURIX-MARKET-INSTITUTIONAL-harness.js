@@ -435,5 +435,180 @@ console.log('\n14 — Market V2 bloque 1 (verdad del mini gráfico):');
      !/fetch\(/.test(settleFn) && !/HistoryAdapter\(/.test(settleFn));
 }
 
+// ── 15 MARKET V2 · BLOQUE 2A — view model único de Asset Detail ─────────────
+// No se comprueba que "existe una línea": se EJECUTA el view model real extraído de
+// app.js contra series construidas a mano, y se afirma sobre su salida.
+console.log('\n15 — Market V2 bloque 2A (view model de Asset Detail):');
+{
+  const vm = require('vm');
+  const ctx = { console: { log() {}, warn() {} }, Math, JSON, Number, isFinite, Infinity, Array, Object, String, Boolean };
+  vm.createContext(ctx);
+  const decl = (re) => { const m = app.match(re); if (!m) throw new Error('decl no encontrada: ' + re); return m[0]; };
+  vm.runInContext(decl(/const _AURIX_MKT_VM_52W_MS = [^;]+;/), ctx);
+  vm.runInContext(decl(/const _AURIX_MKT_VM_52W_MIN_COVERAGE = [^;]+;/), ctx);
+  ['_aurixMktVmField', '_aurixMktVmNone', '_aurixMktVmType', '_aurixMktCatalogRecord',
+   '_aurixMktSeriesStats', '_aurixMktVmCoverage', '_aurixMktBuildDetailVM']
+    .forEach(n => vm.runInContext(fnSource(n), ctx));
+  const build = (input, deps) => vm.runInContext('_aurixMktBuildDetailVM', ctx)(input, deps);
+
+  const DAY = 864e5, NOW = 1_750_000_000_000;
+  // Serie diaria con OHLC: el máximo intradía va 5 por encima del cierre más alto, para
+  // poder demostrar que la derivada usa high/low reales y no sólo el cierre.
+  const daily = (days, base, step, withOhlc) => {
+    const a = [];
+    for (let i = days; i >= 0; i--) {
+      const v = base + (days - i) * step;
+      const p = { time: NOW - i * DAY, value: v };
+      if (withOhlc) { p.high = v + 5; p.low = v - 5; p.close = v; }
+      a.push(p);
+    }
+    return a;
+  };
+  const ETF_DB = [{ ticker: 'CSPX.L', marketSymbol: 'CSPX.L', name: 'iShares Core S&P 500 UCITS ETF (Acc)', manager: 'iShares', exchange: 'LSE', currency: 'USD', isin: 'IE00B5BMR087' }];
+  const FUND_DB = [{ ticker: 'VG-WLD', name: 'Vanguard Global Stock Index', manager: 'Vanguard', currency: 'EUR', isin: 'IE00B03HD191' }];
+  const deps = (extra) => Object.assign({ catalogs: [ETF_DB, FUND_DB], resolveLogo: () => 'https://logo/x.png' }, extra || {});
+
+  // 15.1 — cripto, sólo 30d cargado
+  const btc = build({
+    item: { symbol: 'BTC', ticker: 'BTC', name: 'Bitcoin', type: 'crypto', coinId: 'bitcoin', current_price: 64120, change24h: 1.84, currency: 'USD' },
+    range: '30d', series: daily(30, 60000, 100, false), meta: { source: 'coingecko', currency: 'USD', granularity: '1h', asOf: NOW },
+    nowMs: NOW,
+  }, deps());
+  ok('15.1 con 30d cargado: máximo/mínimo del PERIODO derivados, con cobertura declarada',
+     btc.price.periodHigh.state === 'derived' && btc.price.periodLow.state === 'derived' &&
+     btc.price.periodHigh.value === 63000 && btc.price.periodLow.value === 60000 &&
+     btc.price.periodHigh.coverage && btc.price.periodHigh.coverage.spanDays === 30);
+  ok('15.2 REGLA DE VERDAD: sin ventana de un año NO se publica 52 semanas',
+     btc.derived.high52w.state === 'unavailable' && btc.derived.high52w.reason === 'range_not_loaded' &&
+     btc.derived.low52w.state === 'unavailable');
+  ok('15.3 REGLA DE VERDAD: sin rango ALL no hay máximo histórico disponible',
+     btc.derived.availableHigh.state === 'unavailable' && btc.derived.availableHigh.reason === 'all_range_not_loaded');
+  ok('15.4 una cripto no "le falta" el ISIN: el campo NO aplica a su tipo',
+     btc.metaFields.every(f => f.key !== 'isin' && f.key !== 'issuer') &&
+     btc.metaFields.some(f => f.key === 'currency'));
+
+  // 15.5 — la trampa: 1y en caché pero con sólo 200 días de span
+  const shortYear = build({
+    item: { symbol: 'BTC', ticker: 'BTC', name: 'Bitcoin', type: 'crypto', current_price: 64120, currency: 'USD' },
+    range: '30d', series: daily(30, 60000, 100, false), meta: { asOf: NOW }, nowMs: NOW,
+  }, deps({ seriesForRange: r => (r === '1y' ? daily(200, 40000, 120, false) : null) }));
+  ok('15.5 una ventana de 200 días NO se rotula como 52 semanas (cifra real, etiqueta falsa)',
+     shortYear.derived.high52w.state === 'unavailable' &&
+     shortYear.derived.high52w.reason === 'history_shorter_than_52w');
+
+  // 15.6 — ALL de 3 años en caché
+  const withAll = build({
+    item: { symbol: 'BTC', ticker: 'BTC', name: 'Bitcoin', type: 'crypto', current_price: 64120, currency: 'USD' },
+    range: '30d', series: daily(30, 60000, 100, false), meta: { asOf: NOW }, nowMs: NOW,
+  }, deps({ seriesForRange: r => (r === 'all' ? daily(1095, 5000, 55, false) : null) }));
+  ok('15.6 con ALL cargado: 52 semanas y máximo DISPONIBLE derivados, nunca como absolutos',
+     withAll.derived.high52w.state === 'derived' &&
+     withAll.derived.availableHigh.state === 'derived' &&
+     withAll.derived.availableHigh.absolute === false &&
+     withAll.derived.availableHigh.coverage.spanDays === 1095);
+  ok('15.7 el 52 semanas se RECORTA al último año; el disponible abarca todo el histórico',
+     withAll.derived.high52w.coverage.spanDays === 364 &&
+     withAll.derived.availableHigh.coverage.spanDays === 1095);
+  // REGRESIÓN REAL detectada con datos de producción: la serie 'all' de AAPL llega a 1984,
+  // y el máximo/mínimo de esos 41 años se publicaba como "52 semanas" (mínimo: 0,06 $).
+  // Este assert lo blinda: un pico de hace dos años NO puede aparecer en el 52 semanas,
+  // pero SÍ debe aparecer en el máximo histórico disponible.
+  const spike = daily(1095, 100, 0.05, false);
+  spike[100].value = 99999;            // pico ~2,7 años atrás
+  spike[100].high  = 99999;
+  const spiked = build({
+    item: { symbol: 'AAPL', ticker: 'AAPL', name: 'Apple Inc.', type: 'stock', current_price: 150, currency: 'USD' },
+    range: 'all', series: spike, meta: { source: 'yahoo', asOf: NOW }, nowMs: NOW,
+  }, deps());
+  ok('15.7b un pico de hace 2,7 años NO contamina el 52 semanas, pero sí el disponible',
+     spiked.derived.high52w.value !== 99999 &&
+     spiked.derived.high52w.coverage.spanDays === 364 &&
+     spiked.derived.availableHigh.value === 99999);
+  // Con 1y diario y ALL semanal cubriendo ambos el año, el 52 semanas debe salir del más
+  // fino: un máximo semanal se salta los extremos intradía de las otras sesiones.
+  const coarseAll = []; for (let i = 1095; i >= 0; i -= 7) coarseAll.push({ time: NOW - i * DAY, value: 100 + (1095 - i) * 0.05 });
+  const mixed = build({
+    item: { symbol: 'AAPL', ticker: 'AAPL', name: 'Apple Inc.', type: 'stock', current_price: 150, currency: 'USD' },
+    range: '1y', series: daily(370, 100, 0.1, true), meta: { granularity: '1d', asOf: NOW }, nowMs: NOW,
+  }, deps({ seriesForRange: r => (r === 'all' ? coarseAll : null) }));
+  ok('15.7c entre ventanas válidas gana la de más resolución (diaria sobre semanal)',
+     mixed.derived.high52w.coverage.points > 300);
+
+  // 15.8 — ETF curado: ISIN + gestora
+  const etf = build({
+    item: { symbol: 'CSPX.L', ticker: 'CSPX.L', marketSymbol: 'CSPX.L', name: 'iShares Core S&P 500 UCITS ETF (Acc)', type: 'etfs', current_price: 540, currency: 'USD', exchange: 'LSE' },
+    range: '1y', series: daily(370, 400, 0.4, true), meta: { source: 'yahoo', currency: 'USD', granularity: '1d', asOf: NOW }, nowMs: NOW,
+  }, deps());
+  ok('15.8 ETF: ISIN y gestora salen del catálogo curado y lo declaran',
+     etf.identity.isin.state === 'direct' && etf.identity.isin.value === 'IE00B5BMR087' &&
+     etf.identity.isin.origin === 'curated_catalog' &&
+     etf.identity.issuer.state === 'direct' && etf.identity.issuer.value === 'iShares');
+  ok('15.9 tipo plural normalizado (etfs → etf), o la composición por tipo no acertaría',
+     etf.type === 'etf' && etf.metaFields.map(f => f.key).join(',') === 'exchange,currency,isin,issuer');
+  ok('15.10 usa el high/low REAL del punto cuando la fuente lo publica, no el cierre',
+     etf.price.periodHigh.value === 400 + 370 * 0.4 + 5);
+  ok('15.11 con 370 días cargados el 52 semanas SÍ se publica, recortado a 364 días',
+     etf.derived.high52w.state === 'derived' && etf.derived.high52w.coverage.spanDays === 364);
+
+  // 15.12 — acción sin catálogo curado
+  const aapl = build({
+    item: { symbol: 'AAPL', ticker: 'AAPL', name: 'Apple Inc.', type: 'stock', current_price: 214, currency: 'USD', exchange: 'NasdaqGS' },
+    range: '30d', series: daily(30, 200, 0.5, true), meta: { source: 'yahoo', asOf: NOW }, nowMs: NOW,
+  }, deps());
+  ok('15.12 sin catálogo: ISIN y gestora se declaran NO disponibles con motivo, no vacíos',
+     aapl.identity.isin.state === 'unavailable' && aapl.identity.isin.reason === 'not_in_curated_catalog' &&
+     aapl.identity.issuer.state === 'unavailable' && aapl.identity.issuer.reason === 'not_reliably_derivable' &&
+     aapl.metaFields.map(f => f.key).join(',') === 'exchange,currency');
+
+  // 15.13 — sin serie
+  const noHist = build({
+    item: { symbol: 'BNB', ticker: 'BNB', name: 'BNB', type: 'crypto', current_price: 610, currency: 'USD' },
+    range: '24h', series: [], meta: null, nowMs: NOW,
+  }, deps());
+  ok('15.13 sin serie: no hay sección de gráfico ni de derivadas, y el precio sigue',
+     !noHist.sections.some(s => s.id === 'chart') &&
+     !noHist.sections.some(s => s.id === 'derived') &&
+     noHist.sections.some(s => s.id === 'price') &&
+     noHist.price.periodHigh.reason === 'no_series_for_range');
+  ok('15.14 sin módulos vacíos: toda sección presente tiene contenido real',
+     noHist.sections.every(s => s.present === true) &&
+     noHist.derivedFields.length === 0);
+
+  // 15.16/15.17 — variación: directa en 24H, derivada en el resto
+  const chg24 = build({
+    item: { symbol: 'BTC', ticker: 'BTC', name: 'Bitcoin', type: 'crypto', current_price: 64120, change24h: 1.84, currency: 'USD' },
+    range: '24h', series: daily(1, 63000, 1120, false), meta: { asOf: NOW }, nowMs: NOW,
+  }, deps());
+  ok('15.16 en 24H la variación es DIRECTA (la publica la fuente), no derivada',
+     chg24.price.change.state === 'direct' && chg24.price.change.value === 1.84 && chg24.price.change.window === '24h');
+  ok('15.17 en 30d la variación es DERIVADA con la misma regla que la fila de Market',
+     btc.price.change.state === 'derived' &&
+     Math.abs(btc.price.change.value - ((63000 - 60000) / 60000) * 100) < 1e-9);
+
+  // 15.18 — campos excluidos por decisión de fase
+  const excluded = /marketCap|market_cap|volume|sector|industry|supply|dividendYield|expenseRatio|\bAUM\b|cusip|figi|country|launchDate/i;
+  ok('15.18 el contrato NO declara ninguno de los campos excluidos en esta fase',
+     !excluded.test(JSON.stringify(etf)) && !excluded.test(JSON.stringify(btc)));
+  ok('15.19 el contrato no habla de ATH/ATL: sólo de máximo/mínimo DISPONIBLE',
+     !/\bath\b|\batl\b/i.test(JSON.stringify(Object.keys(withAll.derived))) &&
+     'availableHigh' in withAll.derived && 'availableLow' in withAll.derived);
+  ok('15.20 las etiquetas obligatorias del SPEC viven en el contrato',
+     ['periodHigh', 'periodLow', 'high52w', 'low52w', 'availableHigh', 'availableLow']
+       .every(k => typeof btc.labels[k] === 'string' && btc.labels[k]));
+  ok('15.21 los valores derivados se declaran en USD canónico (el render convierte)',
+     btc.valuesCurrency === 'USD' && etf.valuesCurrency === 'USD');
+
+  // Pureza y no-regresión
+  const vmSrcs = ['_aurixMktBuildDetailVM', '_aurixMktSeriesStats', '_aurixMktCatalogRecord', '_aurixMktVmType']
+    .map(n => fnSource(n)).join('\n');
+  ok('15.22 el view model es puro: sin DOM, sin window, sin i18n dentro',
+     !/document\.|window\.|getElementById|innerHTML|querySelector/.test(vmSrcs));
+  ok('15.23 no añade llamadas: lee caché por inyección, nunca pide histórico',
+     !/fetch\(|HistoryAdapter\(|_mktHistoryFetchOne|_mktHistoryFetchVisible/.test(vmSrcs));
+  ok('15.24 la máquina de estados del motor sigue intacta (2A no toca render ni estados)',
+     !/dataset\.state|setState\(/.test(vmSrcs) &&
+     (app.match(/function _aurixMktLoad\(/g) || []).length === 1);
+}
+
 console.log('\nRESULT: ' + (fail === 0 ? 'ALL PASS ✓' : 'FAIL ✗') + '  (' + pass + ' passed, ' + fail + ' failed)');
 process.exit(fail === 0 ? 0 : 1);
