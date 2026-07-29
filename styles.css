@@ -24879,3 +24879,149 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   transform: translate(-50%, -50%);
   border-radius: 12px;
 }
+
+/* ════════ MARKET-V2-02B — header, precio y temporalidades de la ficha ═════════
+   Owner del DOM: `_aurixMktRenderHead` (app.js). Aquí sólo la presentación de lo que ese
+   owner pinta desde el view model. Bloque acotado a #marketPreviewOverlay: ni una regla
+   escapa a la ficha. */
+
+/* 1 · IDENTIDAD — el logo canónico se pinta con el renderer único (`_assetIconHtml`) y su
+   clase `asset-icon`, que es la que lleva el contrato `has-logo` (ocultar las iniciales
+   cuando hay logo). Sólo hay que hacer que llene la caja de 40px de la ficha. */
+#marketPreviewOverlay .mkt-prv-icon .asset-icon {
+  width: 100%; height: 100%;
+  border-radius: inherit;
+  font-size: 14px;
+}
+#marketPreviewOverlay .mkt-prv-icon .aurix-aicon-img { border-radius: inherit; }
+/* Nombres largos: el titular elide en una línea y NUNCA empuja al ticker ni al tipo.
+   `min-width: 0` en toda la cadena flex es lo que permite que el ellipsis funcione. */
+#marketPreviewOverlay .mkt-prv-head,
+#marketPreviewOverlay .mkt-prv-id,
+#marketPreviewOverlay .mkt-prv-sub { min-width: 0; }
+#marketPreviewOverlay .mkt-prv-sub { flex-wrap: wrap; row-gap: 2px; }
+/* Mercado · divisa: soporte, nunca compite con el ticker. */
+#marketPreviewOverlay .mkt-prv-submeta {
+  font-size: 11.5px; font-weight: 500; letter-spacing: 0.01em;
+  color: rgba(255,255,255,0.44);
+  white-space: nowrap;
+}
+#marketPreviewOverlay .mkt-prv-submeta[hidden],
+#marketPreviewOverlay .mkt-prv-period[hidden],
+#marketPreviewOverlay .mkt-prv-fresh[hidden] { display: none; }
+
+/* 2 · PRECIO — la jerarquía es precio ≫ variación > periodo > frescura, y se lee en una
+   sola línea base. `align-items: baseline` ya viene de MARKET-EXCELLENCE-02. */
+#marketPreviewOverlay .mkt-prv-stats { gap: 8px; }
+/* Sin saltos de ancho al cambiar de rango: cifras tabulares + un ancho mínimo reservado
+   en `ch`, de modo que "+0,42 %" y "−12,80 %" ocupen lo mismo y nada se desplace. */
+#marketPreviewOverlay .mkt-prv-change {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  min-width: 7.5ch;
+  text-align: left;
+}
+#marketPreviewOverlay .mkt-prv-change.is-flat,
+#marketPreviewOverlay .mkt-prv-change--none {
+  /* El cero y la ausencia son NEUTROS: ni verde ni rojo. */
+  color: rgba(255,255,255,0.46);
+}
+/* Pendiente: barra discreta del mismo ancho que la cifra que va a ocupar, así el cambio de
+   rango no mueve nada. Reutiliza el barrido de MARKET-8 (mismo keyframe, sin duplicar). */
+#marketPreviewOverlay .mkt-prv-change--pending {
+  position: relative;
+  color: transparent;
+  min-height: 14px;
+}
+#marketPreviewOverlay .mkt-prv-change--pending::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  height: 11px;
+  transform: translateY(-50%);
+  border-radius: 5px;
+  background: linear-gradient(90deg,
+    rgba(74,130,240,0.06) 0%, rgba(74,130,240,0.16) 50%, rgba(74,130,240,0.06) 100%);
+  background-size: 200% 100%;
+  animation: mktChangeShimmer 1.4s linear infinite;
+}
+/* Periodo al que corresponde la variación: sin él la cifra es ambigua. Chip mínimo. */
+#marketPreviewOverlay .mkt-prv-period {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.07em;
+  color: rgba(255,255,255,0.40);
+  background: rgba(255,255,255,0.045);
+  border-radius: 4px; padding: 2px 5px;
+  font-variant-numeric: tabular-nums;
+}
+#marketPreviewOverlay .mkt-prv-fresh {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em;
+  color: rgba(240,190,120,0.78);
+}
+
+/* 3 · TEMPORALIDADES — el componente es del MOTOR (`.aurix-chart-range`), así que sólo se
+   ajusta dentro de la ficha: nunca se toca el CSS inyectado del motor. */
+#marketPreviewOverlay .mkt-prv-ranges .aurix-chart-ranges {
+  gap: 6px; margin-bottom: 0; flex-wrap: nowrap;
+}
+#marketPreviewOverlay .mkt-prv-ranges .aurix-chart-range {
+  position: relative;
+  /* Área táctil de 44px sin engordar la píldora: el pseudo-elemento amplía la diana. */
+  min-height: 30px;
+  padding: 6px 12px;
+  font-size: 11.5px;
+  /* El motor inyecta 0.15s; la franja del SPEC es 180–240 ms. Se ajusta SÓLO dentro de la
+     ficha: el CSS del motor no se toca (lo comparten dashboard y sparklines). */
+  transition: color 200ms ease, background-color 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+}
+#marketPreviewOverlay .mkt-prv-ranges .aurix-chart-range::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 0; right: 0;
+  height: 44px;
+  transform: translateY(-50%);
+}
+/* Estado activo INEQUÍVOCO: relleno, borde y color, no sólo un matiz de opacidad. */
+#marketPreviewOverlay .mkt-prv-ranges .aurix-chart-range[aria-pressed="true"] {
+  color: #fff;
+  background: rgba(74,130,240,0.20);
+  border-color: rgba(120,160,255,0.46);
+  box-shadow: inset 0 0 0 1px rgba(120,160,255,0.14);
+}
+
+/* 4 · MÓVIL — identidad legible, precio protagonista y las cinco temporalidades en UNA
+   fila. Si no caben, scroll horizontal contenido y sin recortes: nunca se reduce la
+   tipografía hasta perder la jerarquía ni se aumenta la altura de la ficha. */
+@media (max-width: 768px) {
+  #marketPreviewOverlay .mkt-prv-ranges {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    /* El scroll no puede cortar el foco ni la píldora activa. */
+    padding: 2px 0;
+    margin-left: 0; margin-right: 0;
+  }
+  #marketPreviewOverlay .mkt-prv-ranges::-webkit-scrollbar { display: none; }
+  #marketPreviewOverlay .mkt-prv-ranges .aurix-chart-range { flex: 0 0 auto; }
+  #marketPreviewOverlay .mkt-prv-change { min-width: 7ch; }
+}
+
+/* 5 · ESCRITORIO / TABLET — composición unitaria: identidad y precio no se separan a los
+   extremos, y las temporalidades quedan compactas a la izquierda. */
+@media (min-width: 769px) {
+  #marketPreviewOverlay .mkt-prv-stats { gap: 10px; }
+  #marketPreviewOverlay .mkt-prv-ranges .aurix-chart-ranges { justify-content: flex-start; }
+}
+
+/* 6 · MOTION — 180–240 ms, sin rebotes, sin contadores. El precio NO se anima: al cambiar
+   de rango prima la estabilidad. Y con Reduced Motion no queda ni transición ni barrido. */
+#marketPreviewOverlay .mkt-prv-change,
+#marketPreviewOverlay .mkt-prv-period {
+  transition: color 200ms ease, background-color 200ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  #marketPreviewOverlay .mkt-prv-change,
+  #marketPreviewOverlay .mkt-prv-period,
+  #marketPreviewOverlay .mkt-prv-ranges .aurix-chart-range { transition: none; }
+  #marketPreviewOverlay .mkt-prv-change--pending::after { animation: none; }
+}

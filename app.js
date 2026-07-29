@@ -3758,6 +3758,7 @@ const T = {
     ariaCurrencyGroup:      'Moneda base',
     mkt_not_addable: 'No disponible para cartera',
     mkt_no_history: 'Sin histórico disponible para este activo en nuestra fuente de datos.',
+    mkt_price_stale: 'Precio retrasado',
     mkt_not_addable_hint: 'Los índices y las materias primas genéricas no son posiciones que puedas mantener en cartera. Puedes seguirlos desde Seguimiento.',
     // Modal: Reduce
     modalReduceTitle: 'Reducir posición',
@@ -5933,6 +5934,7 @@ const T = {
     ariaCurrencyGroup:      'Base currency',
     mkt_not_addable: 'Not available for portfolio',
     mkt_no_history: 'No price history available for this asset from our data source.',
+    mkt_price_stale: 'Delayed price',
     mkt_not_addable_hint: 'Indices and generic commodities are not positions you can hold. You can still track them from your Watchlist.',
     // Modal: Reduce
     modalReduceTitle: 'Reduce position',
@@ -38762,7 +38764,11 @@ function _aurixMktBuildDetailVM(input, deps) {
     version: 'MARKET-V2-02A',
     range: range,
     type: type,
-    valuesCurrency: 'USD',   // los derivados salen en USD canónico: convierte el render
+    // Divisa REAL de los valores derivados. No es siempre USD: el adapter de Yahoo
+    // preserva la divisa de cotización (un ETF de Xetra viene en EUR) y `_aurixMktLoad`
+    // convierte a divisa base con `toBase(value, meta.currency)`. Declarar 'USD' a secas
+    // habría hecho que el render convirtiera EUR como si fuera USD.
+    valuesCurrency: String((meta && meta.currency) || 'USD').toUpperCase(),
     identity: identity,
     price: price,
     derived: derived,
@@ -38779,6 +38785,193 @@ function _aurixMktBuildDetailVM(input, deps) {
     derivedFields: derivedFields,
     nowMs: now,
   };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MARKET-V2-02B — OWNER ÚNICO DE HEADER, PRECIO Y TEMPORALIDADES
+// ══════════════════════════════════════════════════════════════════════════════
+// `_aurixMktRenderHead(vm)` es el único sitio que escribe en la identidad, el precio, la
+// variación y el periodo de la ficha. La vista NO lee snapshot, search ni catálogos: sólo
+// consume el view model de 2A. Antes esta zona se poblaba a mano dentro de
+// `_aurixMktOpenSymbol` y arrastraba dos defectos reales:
+//   · el icono era `sym.slice(0, 4)` — SIEMPRE iniciales, nunca el logo canónico, aunque
+//     el activo tuviera logo oficial (la lista de Market sí lo mostraba: divergencia);
+//   · la variación era `item.change24h` fija, y NO se actualizaba al cambiar de rango, así
+//     que con 1M/1Y/ALL seleccionado se seguía leyendo la variación de 24 horas bajo otra
+//     temporalidad. Exactamente lo que el SPEC prohíbe.
+const _AURIX_MKT_RANGE_LABEL = Object.freeze({ '24h': '24H', '7d': '1W', '30d': '1M', '1y': '1Y', 'all': 'ALL' });
+// Serie y meta del rango ACTIVO. Se guardan para poder repintar el header sin volver a
+// pedir nada (requisito: cero llamadas nuevas).
+let _aurixMktSeries  = null;
+let _aurixMktMetaCur = null;
+// Token de generación: una respuesta de un rango anterior no puede pisar al rango activo.
+let _aurixMktGen = 0;
+
+// Dependencias del view model, ensambladas en UN solo sitio.
+function _aurixMktVmDeps() {
+  return {
+    catalogs: [
+      (typeof _AURIX_ETF_DB  !== 'undefined' && Array.isArray(_AURIX_ETF_DB))  ? _AURIX_ETF_DB  : [],
+      (typeof _AURIX_FUND_DB !== 'undefined' && Array.isArray(_AURIX_FUND_DB)) ? _AURIX_FUND_DB : [],
+    ],
+    // Mismo resolver canónico que usa la lista: un solo owner de logo en todo Market.
+    resolveLogo: (a) => { try { return (typeof getAssetLogo === 'function') ? getAssetLogo(a) : null; } catch (_) { return null; } },
+    // Sólo caché ya descargada. Nunca dispara una petición.
+    seriesForRange: (r) => {
+      try {
+        if (typeof _mktHistoryCacheKey !== 'function' || typeof _marketHistoryCache === 'undefined') return null;
+        const key = _mktHistoryCacheKey(_aurixMktItem, r);
+        const ent = key ? _marketHistoryCache.get(key) : null;
+        return (ent && Array.isArray(ent.series) && ent.series.length >= 2) ? ent.series : null;
+      } catch (_) { return null; }
+    },
+  };
+}
+
+// Lo que la ficha sabe del precio vivo viene del propio item (que ya lo trae del snapshot).
+// Sólo se declaran los campos que EXISTEN: así el view model puede distinguir "la fuente
+// dice que está retrasado" de "la fuente no dice nada".
+function _aurixMktSnapshotOf(item) {
+  if (!item) return null;
+  const s = {}; let has = false;
+  const px = (item.current_price != null) ? item.current_price : item.price;
+  if (Number.isFinite(Number(px)))              { s.price = Number(px); has = true; }
+  if (item.change24h != null)                    { s.change24h = item.change24h; has = true; }
+  if (Number.isFinite(Number(item.timestamp)))   { s.timestamp = Number(item.timestamp); has = true; }
+  if (typeof item.stale === 'boolean')           { s.stale = item.stale; has = true; }
+  if (Number.isFinite(Number(item.confidence)))  { s.confidence = Number(item.confidence); has = true; }
+  return has ? s : null;
+}
+
+function _aurixMktCurrentVM() {
+  return _aurixMktBuildDetailVM({
+    item:     _aurixMktItem,
+    range:    _aurixMktRange,
+    series:   _aurixMktSeries,
+    meta:     _aurixMktMetaCur,
+    snapshot: _aurixMktSnapshotOf(_aurixMktItem),
+    nowMs:    Date.now(),
+  }, _aurixMktVmDeps());
+}
+
+// Un campo unavailable no deja hueco: se oculta el nodo entero.
+function _aurixMktHeadField(el, field, text) {
+  if (!el) return false;
+  if (!field || field.state === 'unavailable' || !text) {
+    el.textContent = ''; el.hidden = true; return false;
+  }
+  el.textContent = text; el.hidden = false; return true;
+}
+
+function _aurixMktRenderHead(vm, opts) {
+  if (!vm) return;
+  const o  = opts || {};
+  const id = vm.identity, pr = vm.price;
+  const item = _aurixMktItem;
+
+  // ── IDENTIDAD ──────────────────────────────────────────────────────────────
+  // Logo canónico por el renderer único (_assetIconHtml): pinta el logo oficial y
+  // conserva el fallback DEBAJO, revelado sólo si la imagen falla. Reutiliza la clase
+  // `asset-icon`, que es la que lleva el contrato `has-logo` (ocultar iniciales cuando
+  // hay logo). Inventar una clase nueva habría dejado las iniciales visibles.
+  const iconEl = document.getElementById('mktPrvIcon');
+  if (iconEl) {
+    const sym = id.ticker.state !== 'unavailable' ? id.ticker.value : '';
+    try {
+      iconEl.innerHTML = (typeof _assetIconHtml === 'function')
+        ? _assetIconHtml(item, sym, 'asset-icon', true)
+        : '';
+    } catch (_) { iconEl.innerHTML = ''; }
+  }
+  _aurixMktHeadField(document.getElementById('mktPrvName'),   id.name,   id.name.value);
+  _aurixMktHeadField(document.getElementById('mktPrvSymbol'), id.ticker, id.ticker.value);
+
+  // Tipo: etiqueta traducida del propio tipo canónico del view model.
+  const badgeEl = document.getElementById('mktPrvBadge');
+  if (badgeEl) {
+    const KIND_KEY = { crypto:'market_badge_crypto', stock:'market_badge_stock', etf:'market_badge_etf', index:'market_badge_index', commodity:'market_badge_commodity', fund:'market_badge_fund', metal:'market_badge_metal' };
+    const key = (id.type.state !== 'unavailable') ? KIND_KEY[id.type.value] : null;
+    let label = '';
+    try { label = key && typeof t === 'function' ? (t(key) || '') : ''; } catch (_) { label = ''; }
+    _aurixMktHeadField(badgeEl, key ? id.type : null, label);
+  }
+
+  // Mercado y divisa: sólo los que existen, con el mismo separador que la lista.
+  const subEl = document.getElementById('mktPrvSubMeta');
+  if (subEl) {
+    const parts = [];
+    if (id.exchange.state !== 'unavailable') parts.push(id.exchange.value);
+    if (id.currency.state !== 'unavailable') parts.push(id.currency.value);
+    if (parts.length) { subEl.textContent = parts.join(' · '); subEl.hidden = false; }
+    else              { subEl.textContent = '';                subEl.hidden = true;  }
+  }
+
+  // ── PRECIO (nivel 1) ───────────────────────────────────────────────────────
+  const priceEl = document.getElementById('mktPrvPrice');
+  if (priceEl) {
+    priceEl.textContent = (pr.current.state !== 'unavailable' && typeof safePrice === 'function')
+      ? safePrice(pr.current.value)
+      : '—';
+  }
+
+  // ── VARIACIÓN (nivel 2) ────────────────────────────────────────────────────
+  // Honesta por rango: en 24H es el dato directo de la fuente; en el resto se deriva de
+  // la serie cargada. Si no se puede calcular ⇒ ausencia neutra. NUNCA se hereda la del
+  // rango anterior ni se reetiqueta change24h bajo otra temporalidad.
+  const changeEl = document.getElementById('mktPrvChange');
+  if (changeEl) {
+    if (o.pending) {
+      changeEl.textContent = '';
+      changeEl.className = 'mkt-prv-change mkt-prv-change--pending';
+      changeEl.removeAttribute('data-change-state');
+      changeEl.hidden = false;
+    } else if (pr.change.state === 'unavailable') {
+      changeEl.textContent = '—';
+      changeEl.className = 'mkt-prv-change mkt-prv-change--none';
+      changeEl.setAttribute('data-change-state', 'unavailable');
+      changeEl.hidden = false;
+    } else {
+      const v = Number(pr.change.value);
+      changeEl.textContent = (typeof safeChange === 'function') ? safeChange(v) : (v.toFixed(2) + '%');
+      changeEl.className = 'mkt-prv-change ' + (v > 0.005 ? 'is-up' : v < -0.005 ? 'is-down' : 'is-flat');
+      // El SPEC pide marcar internamente el origen: directo de la fuente vs derivado.
+      changeEl.setAttribute('data-change-state', pr.change.state);
+      changeEl.hidden = false;
+    }
+  }
+
+  // ── PERIODO (nivel 3) ──────────────────────────────────────────────────────
+  const periodEl = document.getElementById('mktPrvPeriod');
+  if (periodEl) {
+    const label = _AURIX_MKT_RANGE_LABEL[vm.range] || '';
+    if (label) { periodEl.textContent = label; periodEl.hidden = false; }
+    else       { periodEl.textContent = '';    periodEl.hidden = true;  }
+  }
+
+  // ── ESTADO DE ACTUALIZACIÓN (nivel 4, sólo si aporta) ──────────────────────
+  // "Al día" no se anuncia. Sólo se declara cuando la fuente dice que el dato está
+  // retrasado, que es la única variante que cambia una decisión del usuario.
+  const freshEl = document.getElementById('mktPrvFresh');
+  if (freshEl) {
+    const isStale = pr.freshness.state === 'direct' && pr.freshness.value === 'stale';
+    let label = '';
+    try { label = isStale && typeof t === 'function' ? (t('mkt_price_stale') || '') : ''; } catch (_) { label = ''; }
+    if (isStale && label) { freshEl.textContent = label; freshEl.hidden = false; }
+    else                  { freshEl.textContent = '';    freshEl.hidden = true;  }
+  }
+}
+
+// Deja la cabecera en blanco: al cerrar y abrir otro activo no puede quedar ni un dato
+// del anterior mientras se resuelve el nuevo.
+function _aurixMktResetHead() {
+  ['mktPrvName', 'mktPrvSymbol', 'mktPrvBadge', 'mktPrvSubMeta', 'mktPrvPeriod', 'mktPrvFresh']
+    .forEach(idn => { const el = document.getElementById(idn); if (el) { el.textContent = ''; if (idn !== 'mktPrvName' && idn !== 'mktPrvSymbol') el.hidden = true; } });
+  const iconEl = document.getElementById('mktPrvIcon');
+  if (iconEl) iconEl.innerHTML = '';
+  const priceEl = document.getElementById('mktPrvPrice');
+  if (priceEl) priceEl.textContent = '—';
+  const changeEl = document.getElementById('mktPrvChange');
+  if (changeEl) { changeEl.textContent = ''; changeEl.className = 'mkt-prv-change'; changeEl.removeAttribute('data-change-state'); }
 }
 
 function _aurixMktPickAdapter(item) {
@@ -38842,6 +39035,13 @@ function _aurixMktTeardown() {
   if (rangesHost) rangesHost.innerHTML = '';
   _aurixMktSetMeta('');
   _aurixMktItem = null;
+  // MARKET-V2-02B — al cerrar no puede sobrevivir NADA del activo anterior: ni serie, ni
+  // meta, ni cabecera pintada. El token se bumpea para que cualquier respuesta en vuelo
+  // de la ficha que se cierra sea descartada al llegar.
+  _aurixMktSeries  = null;
+  _aurixMktMetaCur = null;
+  _aurixMktGen++;
+  _aurixMktResetHead();
 }
 function _aurixMktClose() {
   _aurixMktTeardown();
@@ -38860,6 +39060,11 @@ async function _aurixMktLoad(item, adapter) {
   try { ctrl.setState('loading'); } catch (_) {}
   if (_aurixMktAbort) { try { _aurixMktAbort.abort(); } catch (_) {} }
   _aurixMktAbort = (typeof AbortController === 'function') ? new AbortController() : null;
+  // MARKET-V2-02B — token de generación. `abort()` no garantiza que una promesa YA resuelta
+  // deje de continuar, así que la respuesta de un rango anterior podía repintar encima del
+  // rango activo. Con el token, sólo la carga más reciente puede escribir.
+  const gen = ++_aurixMktGen;
+  const reqRange = _aurixMktRange;
   const args = Object.assign({}, adapter.args, {
     range:  _aurixMktRange,
     signal: _aurixMktAbort ? _aurixMktAbort.signal : undefined,
@@ -38869,11 +39074,17 @@ async function _aurixMktLoad(item, adapter) {
       ? window.AurixChartAdapters.cryptoHistoryAdapter
       : window.AurixChartAdapters.yahooHistoryAdapter;
     const result = await fn(args);
+    if (gen !== _aurixMktGen) return;          // llegó tarde: manda el rango activo
+    if (reqRange !== _aurixMktRange) return;   // el usuario ya cambió de temporalidad
     if (ctrl !== _aurixMktCtrl) return;
     if (item !== _aurixMktItem) return;
     if (!result || !Array.isArray(result.series) || !result.series.length) {
       ctrl.setData([]);
       _aurixMktSetMeta(_aurixMktMetaLine(item, adapter, result && result.meta));
+      // Sin serie no hay variación de periodo: ausencia neutra, nunca la del rango previo.
+      _aurixMktSeries  = null;
+      _aurixMktMetaCur = (result && result.meta) || null;
+      _aurixMktRenderHead(_aurixMktCurrentVM());
       return;
     }
     const fromCurr = (result.meta && result.meta.currency) || 'USD';
@@ -38892,11 +39103,23 @@ async function _aurixMktLoad(item, adapter) {
       asOf:         Date.now(),
     });
     _aurixMktSetMeta(_aurixMktMetaLine(item, adapter, result.meta));
+    // MARKET-V2-02B — se guarda la serie CRUDA del adapter (con OHLC y en la divisa de
+    // cotización), no la ya convertida para el lienzo: el view model declara su divisa en
+    // `valuesCurrency` y es el render quien convierte. Guardar la convertida provocaría
+    // una segunda conversión al formatear.
+    _aurixMktSeries  = result.series;
+    _aurixMktMetaCur = result.meta || null;
+    _aurixMktRenderHead(_aurixMktCurrentVM());
   } catch (err) {
     if (err && err.name === 'AbortError') return;
+    if (gen !== _aurixMktGen) return;
     console.warn('[market-preview] load fail', err && err.message ? err.message : err);
     try { ctrl.setState('error'); } catch (_) {}
     _aurixMktSetMeta('');
+    // Un error no conserva la variación de la carga anterior.
+    _aurixMktSeries  = null;
+    _aurixMktMetaCur = null;
+    _aurixMktRenderHead(_aurixMktCurrentVM());
   }
 }
 function _aurixMktUpdateWatchUI(symbol) {
@@ -38927,41 +39150,16 @@ function _aurixMktOpenSymbol(symbol, itemOverride) {
   // Tear down any prior instance before opening a new one.
   _aurixMktTeardown();
 
-  // Populate identity / price block.
+  // MARKET-V2-02B — identidad y precio los pinta el OWNER ÚNICO desde el view model.
+  // El rango arranca en 1M, así que la variación NO puede ser la de 24 h: hasta que la
+  // serie del rango llegue, se muestra pendiente. Antes se pintaba `item.change24h` aquí
+  // y ya no se volvía a tocar nunca.
   const sym = String(item.symbol || symbol || '').toUpperCase();
-  const nameEl    = document.getElementById('mktPrvName');
-  const symEl     = document.getElementById('mktPrvSymbol');
-  const iconEl    = document.getElementById('mktPrvIcon');
-  const badgeEl   = document.getElementById('mktPrvBadge');
-  const priceEl   = document.getElementById('mktPrvPrice');
-  const changeEl  = document.getElementById('mktPrvChange');
-  if (nameEl)   nameEl.textContent   = item.name || sym;
-  if (symEl)    symEl.textContent    = sym;
-  if (iconEl)   iconEl.textContent   = sym.slice(0, 4);
-  if (badgeEl) {
-    const tp = String(item.type || '').toLowerCase();
-    const KIND_KEY = { crypto:'market_badge_crypto', stock:'market_badge_stock', etf:'market_badge_etf', index:'market_badge_index', commodity:'market_badge_commodity', fund:'market_badge_fund', metal:'market_badge_metal' };
-    const labelKey = KIND_KEY[tp];
-    badgeEl.textContent = labelKey ? (typeof t === 'function' ? t(labelKey) : '') : '';
-  }
-  if (priceEl) {
-    const p = (typeof item.current_price === 'number' && Number.isFinite(item.current_price)) ? item.current_price
-            : (typeof item.price         === 'number' && Number.isFinite(item.price))         ? item.price
-            : null;
-    priceEl.textContent = (p != null && typeof safePrice === 'function') ? safePrice(p) : '—';
-  }
-  if (changeEl) {
-    const chg = (typeof item.change24h === 'number') ? item.change24h
-              : (typeof item.change    === 'number') ? item.change
-              : null;
-    if (chg != null && typeof safeChange === 'function') {
-      changeEl.textContent = safeChange(chg);
-      changeEl.className = 'mkt-prv-change ' + (chg > 0.005 ? 'is-up' : chg < -0.005 ? 'is-down' : 'is-flat');
-    } else {
-      changeEl.textContent = '';
-      changeEl.className = 'mkt-prv-change';
-    }
-  }
+  _aurixMktItem   = item;
+  _aurixMktRange  = '30d';
+  _aurixMktSeries = null;
+  _aurixMktMetaCur = null;
+  _aurixMktRenderHead(_aurixMktCurrentVM(), { pending: true });
 
   _aurixMktUpdateWatchUI(sym);
 
@@ -39055,6 +39253,12 @@ function _aurixMktOpenSymbol(symbol, itemOverride) {
           const r = _AURIX_MKT_RANGE_MAP[label] || '30d';
           if (r === _aurixMktRange) return;
           _aurixMktRange = r;
+          // MARKET-V2-02B — la serie y la variación del rango anterior se descartan EN EL
+          // ACTO, antes de pedir nada. Así no existe un solo frame en el que se lea la
+          // cifra del rango viejo bajo la temporalidad nueva.
+          _aurixMktSeries  = null;
+          _aurixMktMetaCur = null;
+          _aurixMktRenderHead(_aurixMktCurrentVM(), { pending: true });
           _aurixMktLoad(_aurixMktItem, adapter);
         },
       });
@@ -49053,6 +49257,11 @@ function _searchResultToMarketItem(result) {
     type:           String(result.type || 'other').toLowerCase(),
     coinId:         result.coinId       || null,
     marketSymbol:   result.marketSymbol || null,
+    // MARKET-V2-02B — `/api/search/assets` YA publica `exchange` (exchDisp de Yahoo) y este
+    // puente lo estaba descartando, así que el mercado no llegaba nunca a la ficha aunque
+    // existiera. Paso directo, sin transformar ni deducir: si la fuente no lo trae, null.
+    exchange:       result.exchange     || null,
+    isin:           result.isin         || null,
     currency:       result.currency     || 'USD',
     current_price:  result.price        ?? result.current_price ?? null,
     price:          result.price        ?? result.current_price ?? null,
