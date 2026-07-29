@@ -24745,14 +24745,21 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   border-top: 1px solid rgba(255,255,255,0.05);
   min-height: 168px;                     /* evita el salto de layout entre estados */
 }
-#marketPreviewOverlay .aurix-chart-state,
-#marketPreviewOverlay [class*="aurix-chart-state"] {
-  display: flex; align-items: center; justify-content: center;
-  min-height: 148px; padding: 20px 16px; text-align: center;
+/* ASSET-DETAIL-STATE-REGRESSION (P0) — los estados cargando/vacío/error son del MOTOR, no
+   de esta ficha. Su contrato: base `.aurix-chart-state { display: none }` y visibilidad
+   opt-in por `.aurix-chart-host[data-state="X"] .aurix-chart-state--X { display: flex }`
+   (services/aurix-chart-core.js, CSS inyectado). MARKET-EXCELLENCE-02 declaró aquí
+   `display: flex` con especificidad de id, que gana a ese selector de clases: los TRES
+   estados quedaban visibles siempre, absolutos y apilados sobre el lienzo — de ahí el
+   "No hay histórico disponible" + "No se pudo cargar el gráfico" encima del gráfico y el
+   estado que no se limpiaba al cambiar de temporalidad.
+   Regla permanente: aquí NO se declara display, ni caja, ni alineación sobre
+   `.aurix-chart-state`. Sólo tono tipográfico, que no puede revivir un estado oculto. */
+#marketPreviewOverlay .aurix-chart-state {
   color: rgba(255,255,255,0.42); font-size: 13px; line-height: 1.5;
 }
 /* El error se ve, pero no grita. */
-#marketPreviewOverlay [class*="aurix-chart-state--error"] { color: rgba(255,155,155,0.72); }
+#marketPreviewOverlay .aurix-chart-state--error { color: rgba(255,155,155,0.72); }
 
 /* 5 · METADATA — una línea de origen, discreta y sólo si existe (el owner ya la oculta
    cuando está vacía; aquí sólo se le da tono y sitio). */
