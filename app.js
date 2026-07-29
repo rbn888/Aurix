@@ -657,7 +657,54 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // requested app.js?v= === __AURIX_APPJS_VERSION__ and does at most ONE controlled cache-busted reload per
 // expected version, clearing the marker on coherence and showing a recoverable state (never a loop, never a
 // silent mixed release). It NEVER touches auth/portfolio/history/chart — pure reload orchestration only.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '601'; } catch (_) {}
+// CUARTA FUENTE DEL BUMP. Tiene que valer lo mismo que version.json.appjs, que index
+// APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
+// nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
+// disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '605'; } catch (_) {}
+
+// ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
+// Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
+// DESREGISTRAN restos antiguos. Así que este aviso no pertenece a ningún ciclo de PWA, sino
+// al contrato de coherencia de build de aquí abajo. Antes existía únicamente el camino que
+// CREA el nodo; ninguno que lo quite ni que apague el estado, y la pulsación no estaba
+// protegida contra repetición. Estas tres funciones son el único owner de mostrar, aplicar
+// y ocultar.
+let _aurixBuildUpdateApplying = false;
+function _aurixBuildBannerHide() {
+  try { if (typeof window !== 'undefined') window.__AURIX_BUILD_UPDATE_AVAILABLE = false; } catch (_) {}
+  try {
+    const el = (typeof document !== 'undefined' && document.getElementById) ? document.getElementById('aurix-build-update') : null;
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+  } catch (_) {}
+  return true;
+}
+function _aurixBuildBannerShow(applyFn) {
+  if (typeof document === 'undefined' || !document.body) return false;
+  try { if (typeof window !== 'undefined') window.__AURIX_BUILD_UPDATE_AVAILABLE = true; } catch (_) {}
+  // Idempotente: un solo nodo y, por tanto, un solo listener por documento.
+  if (document.getElementById('aurix-build-update')) return true;
+  const d = document.createElement('div');
+  d.id = 'aurix-build-update';
+  d.setAttribute('role', 'button');
+  d.setAttribute('tabindex', '0');
+  d.setAttribute('style', 'position:fixed;left:0;right:0;bottom:0;z-index:2147483646;background:#05070e;color:#dce6f5;font:600 13px system-ui,sans-serif;padding:10px 14px;text-align:center;border-top:1px solid #1b2740;cursor:pointer');
+  d.textContent = 'Nueva versión disponible — toca para actualizar';
+  d.addEventListener('click', function () {
+    // Doble pulsación: una sola aplicación y una sola navegación.
+    if (_aurixBuildUpdateApplying) return;
+    _aurixBuildUpdateApplying = true;
+    d.setAttribute('aria-disabled', 'true');
+    // El estado visual se limpia YA, no al terminar de navegar.
+    _aurixBuildBannerHide();
+    try {
+      const fn = applyFn || (typeof window !== 'undefined' ? window.aurixApplyBuildUpdate : null);
+      if (typeof fn === 'function') fn();
+    } catch (_) {}
+  });
+  document.body.appendChild(d);
+  return true;
+}
 // PURE decision helper (single owner of the comparison; harnessed). ts is supplied by the caller so the
 // helper stays deterministic. Unknown (null) fields are not asserted; coherence requires index + executed
 // known and all-equal to expected. Offline (expected null) ⇒ coherent (never block a normal open).
@@ -733,7 +780,15 @@ try { if (typeof window !== 'undefined') window._aurixResolveBuildCoherence = _a
       temporalWindowAuditAvailable: (typeof window.aurixAuditTemporalWindow === 'function'),
       requiredCapabilitiesPresent: (missing.length === 0), missingCapabilities: missing, lastBootError: lastBootError };
   };
-  window.aurixApplyBuildUpdate = function () { try { const now = (window.__AURIX_BOOT && window.__AURIX_BOOT.t0) ? (window.__AURIX_BOOT.t0 + 1) : 1; const e = window.__AURIX_LATEST_APPJS; const onAurix = location.pathname.indexOf('/Aurix/') === 0; const base = location.origin + (onAurix ? '/Aurix/' : '/'); location.replace(base + 'index.html?v=' + (e || 'x') + '&_cb=' + (Date.now ? Date.now() : now)); } catch (_) { try { location.reload(); } catch (__) {} } };
+  // UNA sola navegación por sesión de página: sin el cerrojo, dos pulsaciones rápidas (o una
+  // pulsación más la recarga automática de coherencia) podían disparar dos `location.replace`.
+  window.aurixApplyBuildUpdate = function () {
+    if (window.__AURIX_BUILD_UPDATE_NAVIGATED === true) return false;
+    window.__AURIX_BUILD_UPDATE_NAVIGATED = true;
+    try { _aurixBuildBannerHide(); } catch (_) {}
+    try { const now = (window.__AURIX_BOOT && window.__AURIX_BOOT.t0) ? (window.__AURIX_BOOT.t0 + 1) : 1; const e = window.__AURIX_LATEST_APPJS; const onAurix = location.pathname.indexOf('/Aurix/') === 0; const base = location.origin + (onAurix ? '/Aurix/' : '/'); location.replace(base + 'index.html?v=' + (e || 'x') + '&_cb=' + (Date.now ? Date.now() : now)); } catch (_) { try { location.reload(); } catch (__) {} }
+    return true;
+  };
   let _auditRan = false;
   // SPEC.44 — deferred: NEVER auto-execute the temporal audit before the bundle finished registering
   // (removes the SPEC.43 early-boot race). Coherence now requires registrationComplete, so this only fires
@@ -772,18 +827,13 @@ try { if (typeof window !== 'undefined') window._aurixResolveBuildCoherence = _a
     if (dec.action === 'recoverable') {
       window.__AURIX_BUILD_UPDATE_AVAILABLE = true;
       try { console.warn('[BOOT][BUILD-COHERENCE] still incoherent after one reload — ' + (dec.classify || '') + ' missingCapabilities=' + JSON.stringify(dec.missingCapabilities) + ' — recoverable update available; call aurixApplyBuildUpdate()'); } catch (_) {}
-      try {
-        if (document && document.body && !document.getElementById('aurix-build-update')) {
-          const d = document.createElement('div'); d.id = 'aurix-build-update';
-          d.setAttribute('style', 'position:fixed;left:0;right:0;bottom:0;z-index:2147483646;background:#05070e;color:#dce6f5;font:600 13px system-ui,sans-serif;padding:10px 14px;text-align:center;border-top:1px solid #1b2740;cursor:pointer');
-          d.textContent = 'Nueva versión disponible — toca para actualizar';
-          d.addEventListener('click', function () { window.aurixApplyBuildUpdate(); });
-          document.body.appendChild(d);
-        }
-      } catch (_) {}
+      try { _aurixBuildBannerShow(); } catch (_) {}
       return;
     }
     // coherent (or offline) — clear the marker so the next deploy re-arms; run the read-only audit once.
+    // Y se OCULTA el aviso: sin actualización pendiente no puede quedar ni el nodo ni el
+    // estado. Este era el camino que faltaba — sólo existía el que lo creaba.
+    try { _aurixBuildBannerHide(); } catch (_) {}
     if (dec.clearMarker) { try { sessionStorage.removeItem(MK); } catch (_) {} }
     if (dec.coherent && dec.expectedVersion != null && dec.expectedVersion >= 522) runAuditOnce();
   };
