@@ -102,8 +102,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v634-market-v2-detail-vm';
-      var APPJS_V = '603';
+      var BUILD = 'v635-market-v2-head-price-ranges';
+      var APPJS_V = '604';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -278,7 +278,7 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=633">
+  <link rel="stylesheet" href="styles.css?v=635">
 </head>
 <body style="background:#040507">
 
@@ -1504,7 +1504,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=603"
+  <script src="app.js?v=604"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
@@ -1645,6 +1645,9 @@
           <div class="mkt-prv-sub">
             <span class="mkt-prv-symbol" id="mktPrvSymbol">—</span>
             <span class="mkt-prv-badge" id="mktPrvBadge"></span>
+            <!-- MARKET-V2-02B — mercado y divisa. Los pinta el owner único del header
+                 desde el view model; si el campo no existe, el span queda oculto. -->
+            <span class="mkt-prv-submeta" id="mktPrvSubMeta" hidden></span>
           </div>
         </div>
       </div>
@@ -1654,6 +1657,12 @@
       <div class="mkt-prv-stats">
         <div class="mkt-prv-price" id="mktPrvPrice">—</div>
         <div class="mkt-prv-change" id="mktPrvChange"></div>
+        <!-- MARKET-V2-02B — a qué periodo corresponde esa variación. Sin esto la cifra
+             es ambigua: es el tercer nivel de la jerarquía, no un adorno. -->
+        <span class="mkt-prv-period" id="mktPrvPeriod" hidden></span>
+        <!-- Sólo se puebla si la fuente declara el dato retrasado. "Al día" no se
+             anuncia: es lo esperado y sería ruido. -->
+        <span class="mkt-prv-fresh" id="mktPrvFresh" hidden></span>
       </div>
       <div class="mkt-prv-ranges" id="mktPrvRanges"></div>
       <div class="mkt-prv-meta"   id="mktPrvMeta" hidden></div>

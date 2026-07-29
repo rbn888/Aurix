@@ -610,5 +610,175 @@ console.log('\n15 — Market V2 bloque 2A (view model de Asset Detail):');
      (app.match(/function _aurixMktLoad\(/g) || []).length === 1);
 }
 
+// ── 16 MARKET V2 · BLOQUE 2B — header, precio y temporalidades ──────────────
+// Asserts de COMPORTAMIENTO: se ejecuta el owner real del header con un DOM mínimo y se
+// afirma sobre lo que pinta, no sobre la presencia de selectores.
+console.log('\n16 — Market V2 bloque 2B (header, precio y temporalidades):');
+{
+  const vm2 = require('vm');
+  const b2 = cssCode.slice(cssCode.indexOf('#marketPreviewOverlay .mkt-prv-icon .asset-icon'));
+  const codeOf = (s) => String(s || '').replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').map(l => l.replace(/(^|[^:'"`\\])\/\/.*$/, '$1')).join('\n');
+  const head   = codeOf(fnSource('_aurixMktRenderHead'));
+  const openFn = codeOf(fnSource('_aurixMktOpenSymbol'));
+  const loadFn = codeOf(fnSource('_aurixMktLoad'));
+  const down   = codeOf(fnSource('_aurixMktTeardown'));
+  const bridge = codeOf(fnSource('_searchResultToMarketItem'));
+
+  // ── DOM mínimo + el owner REAL, ejecutado.
+  const ids = ['mktPrvIcon','mktPrvName','mktPrvSymbol','mktPrvBadge','mktPrvSubMeta',
+               'mktPrvPrice','mktPrvChange','mktPrvPeriod','mktPrvFresh'];
+  function mkEl() {
+    return { textContent: '', innerHTML: '', hidden: false, className: '', _attr: {},
+      classList: { add() {}, remove() {}, toggle() {} },
+      setAttribute(k, v) { this._attr[k] = v; }, getAttribute(k) { return this._attr[k] === undefined ? null : this._attr[k]; },
+      removeAttribute(k) { delete this._attr[k]; } };
+  }
+  const els = {};
+  const ctx2 = { console: { log() {}, warn() {} }, Math, JSON, Number, isFinite, Infinity, Array, Object, String, Boolean, Date,
+    document: { getElementById: (k) => els[k] || null },
+    baseCurrency: 'USD', lang: 'es',
+    T: { es: { market_badge_crypto: 'Cripto', market_badge_stock: 'Acción', market_badge_etf: 'ETF', mkt_price_stale: 'Precio retrasado' } },
+    _aurixMktItem: null, _aurixMktRange: '30d', _aurixMktSeries: null, _aurixMktMetaCur: null,
+    _AURIX_ETF_DB: [{ ticker: 'CSPX.L', marketSymbol: 'CSPX.L', manager: 'iShares', exchange: 'LSE', currency: 'USD', isin: 'IE00B5BMR087' }],
+    _AURIX_FUND_DB: [], _marketHistoryCache: new Map() };
+  ctx2.t = (k) => ctx2.T[ctx2.lang][k];
+  ctx2.getAssetLogo = (a) => (a && a.image) || null;
+  ctx2._assetIconHtml = (a) => (a && a.image) ? '<div class="asset-icon has-logo"><img class="aurix-aicon-img"></div>' : '<div class="asset-icon"><span class="aurix-aicon-fallback">Z</span></div>';
+  ctx2.safePrice  = (v) => '$' + Number(v).toFixed(2);
+  ctx2.safeChange = (v) => (v >= 0 ? '+' : '') + Number(v).toFixed(2) + '%';
+  ctx2._mktHistoryCacheKey = () => null;
+  vm2.createContext(ctx2);
+  for (const re of [/const _AURIX_MKT_VM_52W_MS = [^;]+;/, /const _AURIX_MKT_VM_52W_MIN_COVERAGE = [^;]+;/,
+                    /const _AURIX_MKT_RANGE_LABEL = Object\.freeze\([^;]+;/]) {
+    vm2.runInContext(app.match(re)[0], ctx2);
+  }
+  ['_aurixMktVmField','_aurixMktVmNone','_aurixMktVmType','_aurixMktCatalogRecord','_aurixMktSeriesStats',
+   '_aurixMktVmCoverage','_aurixMktBuildDetailVM','_aurixMktVmDeps','_aurixMktSnapshotOf','_aurixMktCurrentVM',
+   '_aurixMktHeadField','_aurixMktRenderHead','_aurixMktResetHead'].forEach(n => vm2.runInContext(fnSource(n), ctx2));
+  const DAY = 864e5, NOW = 1_750_000_000_000;
+  const daily = (d, base, step) => { const a = []; for (let i = d; i >= 0; i--) a.push({ time: NOW - i * DAY, value: base + (d - i) * step }); return a; };
+  // Devuelve una INSTANTÁNEA por valor. Devolver `els` haría que todas las llamadas
+  // compartieran el mismo objeto y cualquier comparación entre rangos se comparase consigo
+  // misma (siempre verde): un assert que no prueba nada.
+  function paint(state, opts) {
+    ids.forEach(k => { els[k] = mkEl(); });
+    Object.assign(ctx2, state);
+    vm2.runInContext('_aurixMktRenderHead(_aurixMktCurrentVM(), ' + JSON.stringify(opts || null) + ')', ctx2);
+    const snap = {};
+    ids.forEach(k => {
+      const e = els[k];
+      snap[k] = { textContent: e.textContent, innerHTML: e.innerHTML, hidden: e.hidden,
+                  className: e.className, attr: Object.assign({}, e._attr),
+                  getAttribute(a) { return this.attr[a] === undefined ? null : this.attr[a]; } };
+    });
+    return snap;
+  }
+  const BTC = { symbol: 'BTC', ticker: 'BTC', name: 'Bitcoin', type: 'crypto', current_price: 64120, change24h: 1.84, currency: 'USD', image: 'https://logo/btc.png' };
+
+  const p24 = paint({ _aurixMktItem: BTC, _aurixMktRange: '24h', _aurixMktSeries: daily(1, 63000, 1120), _aurixMktMetaCur: { currency: 'USD', asOf: NOW } });
+  ok('16.1 en 24H la variación es la DIRECTA de la fuente, y el periodo lo declara',
+     p24.mktPrvChange.textContent === '+1.84%' &&
+     p24.mktPrvChange.getAttribute('data-change-state') === 'direct' &&
+     p24.mktPrvPeriod.textContent === '24H');
+  const p1m = paint({ _aurixMktItem: BTC, _aurixMktRange: '30d', _aurixMktSeries: daily(30, 60000, 100), _aurixMktMetaCur: { currency: 'USD', asOf: NOW } });
+  ok('16.2 change24h NO se reutiliza bajo 1M: la variación se deriva de la serie',
+     p1m.mktPrvChange.getAttribute('data-change-state') === 'derived' &&
+     p1m.mktPrvChange.textContent === '+5.00%' &&
+     p1m.mktPrvChange.textContent !== p24.mktPrvChange.textContent &&
+     p1m.mktPrvPeriod.textContent === '1M');
+  const pNo = paint({ _aurixMktItem: BTC, _aurixMktRange: '1y', _aurixMktSeries: null, _aurixMktMetaCur: null });
+  ok('16.3 un rango sin serie muestra ausencia NEUTRA, nunca la cifra del rango anterior',
+     pNo.mktPrvChange.textContent === '—' &&
+     pNo.mktPrvChange.getAttribute('data-change-state') === 'unavailable' &&
+     /--none/.test(pNo.mktPrvChange.className) && pNo.mktPrvPeriod.textContent === '1Y');
+  const pPend = paint({ _aurixMktItem: BTC, _aurixMktRange: '30d', _aurixMktSeries: null, _aurixMktMetaCur: null }, { pending: true });
+  ok('16.4 mientras carga no se muestra ninguna cifra (ni la de 24h ni la previa)',
+     pPend.mktPrvChange.textContent === '' && /--pending/.test(pPend.mktPrvChange.className) &&
+     pPend.mktPrvChange.getAttribute('data-change-state') === null);
+  ok('16.5 la variación derivada usa primer y último punto válido de la serie',
+     /stats\.changePct/.test(codeOf(fnSource('_aurixMktBuildDetailVM'))) &&
+     Math.abs(Number(p1m.mktPrvChange.textContent.replace('%', '')) - ((63000 - 60000) / 60000) * 100) < 0.01);
+  // Identidad
+  const pEtf = paint({ _aurixMktItem: { symbol: 'CSPX.L', ticker: 'CSPX.L', marketSymbol: 'CSPX.L', name: 'iShares Core S&P 500 UCITS ETF USD (Acc)', type: 'etfs', current_price: 540.25, currency: 'USD', exchange: 'LSE' }, _aurixMktRange: '1y', _aurixMktSeries: daily(370, 400, 0.4), _aurixMktMetaCur: { currency: 'USD', asOf: NOW } });
+  ok('16.6 header con mercado y divisa cuando existen, con el separador de la lista',
+     pEtf.mktPrvSubMeta.hidden === false && pEtf.mktPrvSubMeta.textContent === 'LSE · USD');
+  ok('16.7 el header OCULTA los campos unavailable en vez de dejar hueco',
+     p1m.mktPrvSubMeta.textContent === 'USD' &&      // cripto: no hay exchange, no se inventa
+     pNo.mktPrvFresh.hidden === true &&              // la fuente no publica frescura
+     ids.every(k => typeof els[k].hidden === 'boolean'));
+  ok('16.8 el logo canónico se pinta por el renderer único y sólo cae a iniciales si falta',
+     /_assetIconHtml\(item, sym, 'asset-icon', true\)/.test(head) &&
+     /has-logo/.test(pEtf.mktPrvIcon.innerHTML) === false &&   // este ETF no trae imagen
+     /has-logo/.test(p1m.mktPrvIcon.innerHTML) === true);
+  ok('16.9 "al día" no se anuncia: la frescura sólo aparece si la fuente la declara stale',
+     /value === 'stale'/.test(head) &&
+     paint({ _aurixMktItem: Object.assign({}, BTC, { stale: true }), _aurixMktRange: '24h', _aurixMktSeries: null, _aurixMktMetaCur: null }).mktPrvFresh.hidden === false &&
+     paint({ _aurixMktItem: Object.assign({}, BTC, { stale: false }), _aurixMktRange: '24h', _aurixMktSeries: null, _aurixMktMetaCur: null }).mktPrvFresh.hidden === true);
+  // Se pinta un activo, se resetea, y SÓLO entonces se mira: la instantánea tiene que ser
+  // posterior al reset, o se estaría comprobando el estado pintado.
+  paint({ _aurixMktItem: BTC, _aurixMktRange: '30d', _aurixMktSeries: daily(30, 60000, 100), _aurixMktMetaCur: { currency: 'USD', asOf: NOW } });
+  vm2.runInContext('_aurixMktResetHead()', ctx2);
+  const pReset = {};
+  ids.forEach(k => { const e = els[k]; pReset[k] = { textContent: e.textContent, hidden: e.hidden, className: e.className,
+    getAttribute(a) { return e._attr[a] === undefined ? null : e._attr[a]; } }; });
+  ok('16.10 al cerrar no sobrevive ningún dato del activo anterior',
+     pReset.mktPrvName.textContent === '' && pReset.mktPrvSymbol.textContent === '' &&
+     pReset.mktPrvPrice.textContent === '—' && pReset.mktPrvChange.textContent === '' &&
+     pReset.mktPrvChange.getAttribute('data-change-state') === null &&
+     pReset.mktPrvSubMeta.hidden === true && pReset.mktPrvPeriod.hidden === true);
+
+  // ── Arquitectura y anti-obsolescencia (sobre el código real)
+  ok('16.11 la vista consume el view model: un solo owner escribe la cabecera',
+     /_aurixMktBuildDetailVM/.test(codeOf(fnSource('_aurixMktCurrentVM'))) &&
+     /_aurixMktRenderHead\(_aurixMktCurrentVM\(\)/.test(openFn) &&
+     (app.match(/function _aurixMktRenderHead\(/g) || []).length === 1);
+  ok('16.12 la vista NO vuelve a leer item/snapshot/catálogo por su cuenta',
+     !/item\.change24h|item\.current_price|_AURIX_(ETF|FUND)_DB/.test(head) &&
+     !/item\.change24h|item\.current_price/.test(openFn));
+  ok('16.13 respuestas obsoletas no pisan el rango activo (token de generación)',
+     /const gen = \+\+_aurixMktGen;/.test(loadFn) &&
+     /if \(gen !== _aurixMktGen\) return;/.test(loadFn) &&
+     /if \(reqRange !== _aurixMktRange\) return;/.test(loadFn));
+  ok('16.14 al cambiar de rango se descarta la serie anterior ANTES de pedir la nueva',
+     /_aurixMktSeries  = null;[\s\S]{0,120}_aurixMktRenderHead\(_aurixMktCurrentVM\(\), \{ pending: true \}\)[\s\S]{0,80}_aurixMktLoad/.test(openFn));
+  ok('16.15 un error de carga no conserva la variación de la carga previa',
+     /catch \(err\)[\s\S]{0,400}_aurixMktSeries  = null;[\s\S]{0,120}_aurixMktRenderHead/.test(loadFn));
+  ok('16.16 se guarda la serie CRUDA del adapter, no la ya convertida (evita doble conversión)',
+     /_aurixMktSeries  = result\.series;/.test(loadFn) &&
+     /valuesCurrency: String\(\(meta && meta\.currency\)/.test(codeOf(fnSource('_aurixMktBuildDetailVM'))));
+  ok('16.17 el teardown limpia serie, meta, cabecera y bumpea el token',
+     /_aurixMktSeries  = null;/.test(down) && /_aurixMktGen\+\+;/.test(down) && /_aurixMktResetHead\(\)/.test(down));
+  ok('16.18 el puente de search deja pasar el exchange que la API ya publica',
+     /exchange:       result\.exchange     \|\| null/.test(bridge));
+  ok('16.19 la máquina de estados del motor sigue intacta',
+     !/dataset\.state/.test(head) && !/aurix-chart-state/.test(b2) &&
+     (app.match(/function _aurixMktLoad\(/g) || []).length === 1);
+
+  // ── Presentación (bloque CSS acotado)
+  ok('16.20 sin salto de ancho al cambiar de rango: tabular + ancho mínimo reservado',
+     /\.mkt-prv-change \{[^}]*font-variant-numeric: tabular-nums/.test(b2) &&
+     /\.mkt-prv-change \{[^}]*min-width: 7\.5ch/.test(b2));
+  ok('16.21 el cero y la ausencia son neutros (ni verde ni rojo)',
+     /\.mkt-prv-change\.is-flat,\s*#marketPreviewOverlay \.mkt-prv-change--none \{[^}]*color: rgba\(255,255,255,0\.46\)/.test(b2));
+  ok('16.22 nombres largos: elipsis con min-width 0 en toda la cadena flex',
+     /\.mkt-prv-head,\s*#marketPreviewOverlay \.mkt-prv-id,\s*#marketPreviewOverlay \.mkt-prv-sub \{ min-width: 0; \}/.test(b2) &&
+     /\.mkt-prv-name \{[^}]*text-overflow: ellipsis/.test(cssCode));
+  ok('16.23 temporalidades con área táctil de 44px sin engordar la píldora',
+     /\.aurix-chart-range::before \{[^}]*height: 44px/.test(b2) &&
+     /\.aurix-chart-range \{[^}]*min-height: 30px/.test(b2));
+  ok('16.24 estado activo inequívoco: relleno + borde, no sólo opacidad',
+     /\.aurix-chart-range\[aria-pressed="true"\] \{[^}]*background: rgba\(74,130,240,0\.20\)[^}]*border-color/.test(b2));
+  ok('16.25 móvil: una fila con scroll horizontal contenido, sin recortes',
+     /@media \(max-width: 768px\)[\s\S]{0,600}\.mkt-prv-ranges \{[^}]*overflow-x: auto;[^}]*overflow-y: hidden/.test(b2));
+  ok('16.26 motion en la franja del SPEC (180–240 ms) y sin animar el precio',
+     /transition: color 200ms ease/.test(b2) && !/\.mkt-prv-price \{[^}]*transition/.test(b2));
+  ok('16.27 Reduced Motion elimina transiciones y el barrido de pendiente',
+     /@media \(prefers-reduced-motion: reduce\) \{[\s\S]{0,320}transition: none;[\s\S]{0,140}--pending::after \{ animation: none; \}/.test(b2));
+  ok('16.28 el bloque CSS no escapa de la ficha: todo bajo #marketPreviewOverlay',
+     b2.split('\n').filter(l => /^[.#\[a-z]/.test(l.trim()) && l.includes('{'))
+       .every(l => /#marketPreviewOverlay/.test(l) || /^@|^\s*\}/.test(l.trim())));
+}
+
 console.log('\nRESULT: ' + (fail === 0 ? 'ALL PASS ✓' : 'FAIL ✗') + '  (' + pass + ' passed, ' + fail + ' failed)');
 process.exit(fail === 0 ? 0 : 1);
