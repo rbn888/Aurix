@@ -380,5 +380,60 @@ console.log('\n13 — pulido final:');
      !/MARKET-EXCELLENCE-03/.test(app));
 }
 
+// ── 14 MARKET V2 · BLOQUE 1 — verdad del mini gráfico ───────────────────────
+// La celda `.col-chart` sólo puede acabar en histórico REAL o en ausencia declarada.
+// El tercer final —una serie inventada con forma de mercado— queda prohibido por código.
+console.log('\n14 — Market V2 bloque 1 (verdad del mini gráfico):');
+{
+  // El marcador vive en un comentario: hay que cortar sobre el CSS crudo y limpiar después.
+  const v2 = css.slice(css.indexOf('MARKET-V2-01 — verdad')).replace(/\/\*[\s\S]*?\*\//g, '');
+  // Igual con el JS: los comentarios de estos bloques CITAN el defecto ("Math.random()",
+  // "synthetic"), así que los asserts de prohibición deben mirar código, no prosa.
+  const code = (s) => String(s || '').replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').map(l => l.replace(/(^|[^:'"`\\])\/\/.*$/, '$1')).join('\n');
+  const rowFn = code(fnSource('renderMarketItem'));
+  const mountFn = code(fnSource('_aurixSparkMountAll'));
+  const applyFn = code(fnSource('_mktHistoryApplyToRow'));
+  const settleFn = code(fnSource('_mktSparkSettle'));
+  const fetchOneFn = code(fnSource('_mktHistoryFetchOne'));
+  ok('14.1 el generador de series falsas ya NO existe en el bundle',
+     !/function generateSparkline\s*\(/.test(appCode) &&
+     !/function renderSparkline\s*\(/.test(appCode));
+  ok('14.2 la fila NO pinta ninguna serie en su HTML: la celda nace en esqueleto',
+     !!rowFn && !/<svg/.test(rowFn) &&
+     /col col-chart is-loading"/.test(rowFn) &&
+     /data-spark-key="\$\{normSym\}"/.test(rowFn));
+  ok('14.3 el montaje exige serie real: sin ella no dibuja nada',
+     !!mountFn && /const hasReal = /.test(mountFn) && /if \(!hasReal\) return;/.test(mountFn) &&
+     !/synthetic/.test(mountFn.replace(/\/\/.*$/gm, '')));
+  ok('14.4 desaparece el meta que mentía (source synthetic declarado isSynthetic:false)',
+     !/source: 'synthetic'/.test(appCode));
+  ok('14.5 ninguna ruta de gráfico de Market se alimenta de Math.random()',
+     ![mountFn, applyFn, settleFn, rowFn].some(f => /Math\.random\(/.test(f || '')));
+  ok('14.6 sin histórico utilizable la celda se declara vacía, no se queda en blanco',
+     !!applyFn && /col-chart--none/.test(applyFn) && /const usable = /.test(applyFn));
+  ok('14.7 un activo sin adaptador resuelve la celda en vez de dejarla en esqueleto',
+     !!fetchOneFn && /if \(!adapter\) \{/.test(fetchOneFn) && /_mktHistoryApplyToRow\(item, range, none, gen\)/.test(fetchOneFn));
+  ok('14.8 cierre acotado: ningún esqueleto puede quedarse parpadeando para siempre',
+     !!settleFn && /_AURIX_MKT_SPARK_SETTLE_MS/.test(settleFn) &&
+     /_aurixSparkMountAll\(el\)/.test(settleFn) && /col-chart--none/.test(settleFn) &&
+     /_mktSparkSettle\(el\)/.test(fnSource('renderCurrentMarketView')));
+  ok('14.9 la ausencia se dibuja sin dirección ni color (no simula "no se movió")',
+     /\.col-chart--none::after \{/.test(v2) &&
+     /rgba\(220,230,250,0\.16\)/.test(v2) &&
+     !/\.col-chart--none[\s\S]{0,400}(success|danger|00ff88|ff4d4d)/.test(v2));
+  ok('14.10 sin salto de layout: la ausencia es absoluta como el esqueleto',
+     /\.col-chart--none::after \{[^}]*position: absolute/.test(v2));
+  ok('14.11 Reduced Motion: el esqueleto de Market deja de animarse',
+     /@media \(prefers-reduced-motion: reduce\) \{\s*\.col-change-skeleton,\s*\.col-chart\.is-loading::after \{ animation: none; \}/.test(v2));
+  ok('14.13 la estrella gana área táctil (44px) SIN cambiar su tamaño visual (28px)',
+     /#marketList \.watchlist-btn::before \{[^}]*width: 44px; height: 44px/.test(v2) &&
+     /#marketList \.watchlist-btn \{ position: relative; \}/.test(v2) &&
+     /#marketList\.is-v4 \.watchlist-btn \{[^}]*width: 28px/.test(cssCode));
+  ok('14.12 no aumenta llamadas: se reusa el backfill existente, sin nuevo fetch',
+     (appCode.match(/_mktHistoryFetchVisible\(/g) || []).length === 2 &&
+     !/fetch\(/.test(settleFn) && !/HistoryAdapter\(/.test(settleFn));
+}
+
 console.log('\nRESULT: ' + (fail === 0 ? 'ALL PASS ✓' : 'FAIL ✗') + '  (' + pass + ' passed, ' + fail + ' failed)');
 process.exit(fail === 0 ? 0 : 1);
