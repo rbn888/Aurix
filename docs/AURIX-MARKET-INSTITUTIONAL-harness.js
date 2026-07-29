@@ -293,6 +293,11 @@ ok('11.10 es CSS-only: ni datos, ni contratos, ni lógica',
 console.log('\n12 — ficha de activo (Asset Detail):');
 {
   const d = css.slice(css.indexOf('MARKET-EXCELLENCE-02')).replace(/\/\*[\s\S]*?\*\//g, '');
+  const chartCore = read('services/aurix-chart-core.js');
+  // Cuerpos de TODA regla de styles.css cuyo selector mezcle la ficha con un estado del motor.
+  const overlayStateRules = (cssCode.match(/[^}{]*aurix-chart-state[^{}]*\{[^}]*\}/g) || [])
+    .filter(r => /marketPreviewOverlay|modal--mkt-preview|mkt-prv/.test(r.split('{')[0]))
+    .map(r => r.slice(r.indexOf('{') + 1, -1));
   ok('12.1 owner único: un solo overlay y un solo abridor, sin segundo flujo',
      (indexHtml.match(/id="marketPreviewOverlay"/g) || []).length === 1 &&
      (app.match(/function _aurixMktOpenSymbol\(/g) || []).length === 1);
@@ -307,10 +312,21 @@ console.log('\n12 — ficha de activo (Asset Detail):');
   ok('12.4 temporalidades honestas: una deshabilitada se LEE deshabilitada, y no se altera el set',
      /button\[disabled\],[\s\S]{0,90}aria-disabled="true"\]\s*\{[^}]*pointer-events: none/.test(d) &&
      /ranges:\s*\['24H','1W','1M','1Y','ALL'\]/.test(app));
-  ok('12.5 estados con altura estable (sin salto de layout) y error no agresivo',
+  // ASSET-DETAIL-STATE-REGRESSION (P0) — la altura estable vive en el mount; los estados
+  // del motor NO se tocan. La versión anterior de este assert exigía justamente la regla
+  // que causó la regresión (display:flex con especificidad de id sobre .aurix-chart-state),
+  // que pintaba cargando+vacío+error a la vez sobre el gráfico.
+  ok('12.5 la altura estable vive en el mount, no en los estados',
      /\.mkt-prv-mount \{[^}]*min-height: 168px/.test(d) &&
-     /aurix-chart-state[\s\S]{0,160}min-height: 148px/.test(d) &&
-     /aurix-chart-state--error"\] \{ color: rgba\(255,155,155/.test(d));
+     /\.aurix-chart-state--error \{ color: rgba\(255,155,155/.test(d));
+  ok('12.5b la ficha NO pisa el contrato de visibilidad de los estados del motor',
+     // ni display, ni caja, ni alineación en NINGUNA regla de estado de la ficha…
+     !overlayStateRules.some(r => /(^|[;{\s])(display|align-items|justify-content|min-height|position|inset|opacity|visibility)\s*:/.test(r)) &&
+     // …y ningún selector amplio que alcance a las variantes del motor.
+     !/\[class\*=["']aurix-chart-state/.test(cssCode));
+  ok('12.5c el contrato sigue siendo del motor: base oculta + opt-in por data-state',
+     /\.aurix-chart-state \{[^}]*display: none/.test(chartCore) &&
+     /\[data-state="loading"\] \.aurix-chart-state--loading,[\s\S]{0,200}\{\s*display: flex/.test(chartCore));
   ok('12.6 tablet 769–1024 con composición PROPIA (card contenida, no sheet estirado)',
      /@media \(min-width: 769px\) and \(max-width: 1024px\) \{[\s\S]{0,400}#marketPreviewOverlay > \.modal \{[^}]*border-radius: 18px/.test(d) &&
      /@media \(min-width: 769px\) and \(max-width: 1024px\) \{[\s\S]{0,400}\.sheet-handle \{ display: none; \}/.test(d));
