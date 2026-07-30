@@ -399,10 +399,16 @@ console.log('\n14 — Market V2 bloque 1 (verdad del mini gráfico):');
   ok('14.1 el generador de series falsas ya NO existe en el bundle',
      !/function generateSparkline\s*\(/.test(appCode) &&
      !/function renderSparkline\s*\(/.test(appCode));
-  ok('14.2 la fila NO pinta ninguna serie en su HTML: la celda nace en esqueleto',
+  // MARKET-FIRST-PAINT-P0 — la protección de MARKET-V2-01 es "la fila no dibuja NINGUNA serie
+  // en su HTML", no "la celda nace en esqueleto". La celda sigue yendo VACÍA (aquí se comprueba,
+  // que es más fuerte que exigir una clase); lo que cambia es que su estado inicial ya se deriva
+  // de la caché, para que una fila con snapshot no se construya en dos pasos. El esqueleto queda
+  // reservado a lo único que lo merece: que todavía no se sepa nada de ese activo.
+  ok('14.2 la fila NO pinta ninguna serie en su HTML: celda vacía y estado derivado de la caché',
      !!rowFn && !/<svg/.test(rowFn) &&
-     /col col-chart is-loading"/.test(rowFn) &&
-     /data-spark-key="\$\{normSym\}"/.test(rowFn));
+     /col col-chart \$\{_chartCls\}"/.test(rowFn) &&
+     /data-spark-key="\$\{normSym\}"[^>]*><\/div>/.test(rowFn) &&
+     /_chartCls = _histHasSeries \? '' : \(_histUsable \? 'col-chart--none' : 'is-loading'\)/.test(rowFn));
   ok('14.3 el montaje exige serie real: sin ella no dibuja nada',
      !!mountFn && /const hasReal = /.test(mountFn) && /if \(!hasReal\) return;/.test(mountFn) &&
      !/synthetic/.test(mountFn.replace(/\/\/.*$/gm, '')));

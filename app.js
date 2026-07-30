@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '605'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '606'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -37816,14 +37816,27 @@ function _aurixSparkDestroyAll() {
 }
 function _aurixSparkMountAll(container) {
   if (!container || !container.querySelectorAll) return;
-  // Always destroy stale controllers first — so the registry stays
-  // clean even when the flag is flipped off mid-session and the
-  // legacy SVG cells need to take back over.
-  _aurixSparkDestroyAll();
-  if (!_aurixSparkFlag())  return;
-  if (!_aurixSparkReady()) return;
+  // Flag/engine off → the registry must end up empty, exactly as before.
+  if (!_aurixSparkFlag() || !_aurixSparkReady()) { _aurixSparkDestroyAll(); return; }
   const cells = container.querySelectorAll('.col-chart[data-spark-key]');
+  // MARKET-FIRST-PAINT-P0 — BARRIDO SELECTIVO. Antes cada render destruía TODOS los
+  // controladores y volvía a crearlos, aunque la serie fuese idéntica: N gráficos reconstruidos
+  // por render, en el mismo turno que bloquea el pintado. Ahora sólo se destruye lo que ya no
+  // corresponde; una celda que sigue mostrando exactamente la misma serie no se toca.
+  const keep = new Set();
   cells.forEach(cell => {
+    const k = cell.dataset.sparkKey || '';
+    if (!k || !_aurixMarketSpark.has(k)) return;
+    const stamp = _mktHistorySeriesStamp(_mktHistoryEntryForCell(cell));
+    if (stamp !== 'none' && cell.dataset.sparkStamp === stamp && cell.querySelector('svg')) keep.add(k);
+  });
+  _aurixMarketSpark.forEach((ctrl, k) => {
+    if (keep.has(k)) return;
+    try { ctrl.destroy(); } catch (_) {}
+    _aurixMarketSpark.delete(k);
+  });
+  cells.forEach(cell => {
+    if (keep.has(cell.dataset.sparkKey || '')) return;   // sin diferencia → sin repintado
     // Skip hidden cells (mobile media query hides .col-chart). The
     // chart engine can't render into a 0-size container; falling
     // through here leaves the legacy SVG visible (also hidden by CSS).
@@ -37858,8 +37871,11 @@ function _aurixSparkMountAll(container) {
       });
       ctrl.setData(realEntry.series, realEntry.meta || {
         source: 'history', currency: 'USD', granularity: '1d',
-        isSynthetic: false, completeness: 1, asOf: Date.now(),
+        // MARKET-FIRST-PAINT-P0 — ver nota en _mktHistoryApplyToRow: `asOf` = momento de
+        // obtención del dato, nunca el del pintado.
+        isSynthetic: false, completeness: 1, asOf: realEntry.ts || Date.now(),
       });
+      cell.dataset.sparkStamp = _mktHistorySeriesStamp(realEntry);
       cell.classList.remove('is-loading', 'col-chart--none');
       if (key) _aurixMarketSpark.set(key, ctrl);
     } catch (err) {
@@ -44387,6 +44403,17 @@ function _aurixMktPatchInPlace(el, html) {
       for (const sel of DYN) {
         const fc = f.querySelector(sel), lc = l.querySelector(sel);
         if (!fc || !lc) continue;
+        // MARKET-FIRST-PAINT-P0 — el HTML fresco trae la celda del gráfico VACÍA (el SVG lo monta
+        // el motor después, no el string). Copiarla encima destruía en cada render un mini
+        // gráfico ya montado para volver a crearlo acto seguido. Si la celda viva ya pinta este
+        // mismo activo y temporalidad, se deja intacta: no hay diferencia que publicar.
+        if (sel === '.col-chart'
+            && lc.querySelector('svg')
+            && lc.dataset.sparkKey === fc.dataset.sparkKey
+            && lc.dataset.sparkTf  === fc.dataset.sparkTf) {
+          if (fc.hasAttribute('data-spark-change')) lc.setAttribute('data-spark-change', fc.getAttribute('data-spark-change'));
+          continue;
+        }
         if (lc.className !== fc.className) lc.className = fc.className;
         ['data-mkt-tf', 'data-spark-change', 'data-spark-tf'].forEach(attr => {
           if (fc.hasAttribute(attr)) lc.setAttribute(attr, fc.getAttribute(attr));
@@ -46351,6 +46378,19 @@ function renderMarketItem(item, idx) {
   // legible ("IWDA.AS" en lugar de "iShares Core MSCI World UCITS ETF").
   // Regla dura: cada segmento sólo se pinta si el dato EXISTE. No se deduce gestora
   // ni mercado ni moneda — si la fuente no lo trae, no aparece ese segmento.
+  // MARKET-FIRST-PAINT-P0 — LA FILA ES UN SNAPSHOT. Antes la celda del gráfico nacía SIEMPRE en
+  // `is-loading`, incluso teniendo la serie en memoria, así que toda fila se construía en dos
+  // pasos por definición. Ahora nace ya en su estado final: `_aurixSparkMountAll` monta la serie
+  // en el MISMO turno síncrono que escribe este HTML (render → mount ocurren antes de que el
+  // navegador pinte), de modo que el usuario no puede observar el estado intermedio.
+  // Sólo queda esqueleto lo que de verdad no se sabe todavía.
+  const _histRange   = _MKT_HISTORY_RANGE_MAP[selectedTf] || '24h';
+  const _histEntry   = _marketHistoryCache.get(_mktHistoryCacheKey(item, _histRange)) || null;
+  const _histUsable  = _mktHistoryCacheUsable(_histEntry);
+  const _histHasSeries = !!(_histUsable && Array.isArray(_histEntry.series) && _histEntry.series.length >= 2);
+  // Ausencia YA resuelta (activo sin histórico utilizable) = vacío honesto inmediato, sin pasar
+  // por esqueleto ni esperar los 7 s de `_mktSparkSettle`.
+  const _chartCls = _histHasSeries ? '' : (_histUsable ? 'col-chart--none' : 'is-loading');
   const idTitle = (name && name !== item.symbol) ? name : item.symbol;
   const idMeta = [
     `<span class="mkt-id-ticker">${escHtml(item.symbol)}</span>`,
@@ -46378,7 +46418,7 @@ function renderMarketItem(item, idx) {
                 ? '<span class="col-change-empty">—</span>'
                 : safeChange(chg))}
       </div>
-      <div class="col col-chart is-loading" data-spark-key="${normSym}" data-spark-change="${chg ?? ''}" data-spark-tf="${selectedTf}"></div>
+      <div class="col col-chart ${_chartCls}" data-spark-key="${normSym}" data-spark-change="${chg ?? ''}" data-spark-tf="${selectedTf}"></div>
       <div class="col col-action">
         <button type="button" class="watchlist-btn ${watched ? 'active' : ''}" data-symbol="${normSym}" aria-pressed="${watched ? 'true' : 'false'}" aria-label="${watched ? 'Unwatch' : 'Watch'} ${escHtml(item.symbol)}">${watched ? '★' : '☆'}</button>
       </div>
@@ -56839,14 +56879,40 @@ function _mktHistoryCacheKey(item, range) {
   if (!sym) return '';
   return `${sym}|${range}`;
 }
+// MARKET-FIRST-PAINT-P0 — DOS DECISIONES DISTINTAS SOBRE LA MISMA ENTRADA.
+//
+// `_mktHistoryCacheFresh` decide si hay que VOLVER A PEDIR. Se queda exactamente igual: los TTL
+// por rango gobiernan la red, así que este SPEC no añade ni una llamada.
+//
+// `_mktHistoryCacheUsable` decide si se puede PINTAR. Y para pintar la edad es irrelevante: una
+// entrada en caché es un dato REAL que se descargó de verdad, sólo que puede no ser el más
+// reciente. Aquí estaba el defecto: con el TTL de 24H en 60 s, salir a Dashboard y volver
+// caducaba TODAS las entradas, y la lista tiraba un snapshot bueno a la basura para volver a
+// esqueleto + red. Medido antes del fix: al volver tras caducar el TTL, las 11 filas
+// regresaban a esqueleto y tardaban 688 ms en resolverse, teniendo el dato ya en memoria.
+//
+// Con la separación: se pinta al instante lo último que sabemos y el refresco corrige en
+// silencio sólo si hay diferencia. Nunca valor → esqueleto → valor.
 function _mktHistoryCacheFresh(entry, range) {
   if (!entry) return false;
   const ttl = _MKT_HISTORY_TTL[range] || 60 * 1000;
   return (Date.now() - entry.ts) < ttl;
 }
+function _mktHistoryCacheUsable(entry) {
+  // Una entrada existe = ya hubo una resolución real para este activo (serie utilizable, o
+  // ausencia declarada). Ambas cosas son pintables; lo único no pintable es "aún no sabemos".
+  return !!(entry && entry.ts);
+}
+// Identidad barata de la serie, SIN el timestamp: dos descargas que traen los mismos puntos dan
+// el mismo sello, así que un refresco que no aporta diferencia no remonta el mini gráfico.
+function _mktHistorySeriesStamp(entry) {
+  if (!entry || !Array.isArray(entry.series) || entry.series.length < 2) return 'none';
+  const s = entry.series, f = s[0], l = s[s.length - 1];
+  return `${s.length}:${(f && f.value) ?? ''}:${(l && l.value) ?? ''}`;
+}
 function _mktHistoryChangeForRow(item) {
   // 24H: prefer the live change24h that flows through the market store.
-  // Other timeframes: read from the cache; null when not yet fetched.
+  // Other timeframes: read from the cache — the LAST KNOWN value, fresh or not (see above).
   const tf = _aurixMktTimeframe || '24H';
   if (tf === '24H') {
     const live = item && (item.price_change_percentage_24h ?? item.change24h ?? item.change);
@@ -56855,8 +56921,7 @@ function _mktHistoryChangeForRow(item) {
   const range = _MKT_HISTORY_RANGE_MAP[tf] || '24h';
   const key   = _mktHistoryCacheKey(item, range);
   const entry = _marketHistoryCache.get(key);
-  if (!entry) return null;
-  if (!_mktHistoryCacheFresh(entry, range)) return null;
+  if (!_mktHistoryCacheUsable(entry)) return null;
   return (entry.changePct == null || !Number.isFinite(entry.changePct))
     ? null
     : entry.changePct;
@@ -56870,7 +56935,9 @@ function _mktHistoryEntryForCell(cell) {
   const tf    = cell.dataset.sparkTf || '24H';
   const range = _MKT_HISTORY_RANGE_MAP[tf] || '24h';
   const ent   = _marketHistoryCache.get(`${sym}|${range}`);
-  return (ent && _mktHistoryCacheFresh(ent, range)) ? ent : null;
+  // MARKET-FIRST-PAINT-P0 — pintable ≠ fresco. El mini gráfico monta con lo último conocido y
+  // el refresco silencioso lo sustituye sólo si la serie cambia.
+  return _mktHistoryCacheUsable(ent) ? ent : null;
 }
 function _mktHistoryEnqueue(job) {
   _marketHistoryQueue.pending.push(job);
@@ -56959,16 +57026,25 @@ function _mktHistoryApplyToRow(item, range, entry, gen) {
       const v = entry.changePct;
       if (v == null || !Number.isFinite(v)) {
         cell.classList.remove('is-up', 'is-down', 'is-flat');
-        cell.innerHTML = '<span class="col-change-empty">—</span>';
+        // MARKET-FIRST-PAINT-P0 — REFRESCO SILENCIOSO: sólo se toca el DOM si el texto cambia.
+        const emptyHtml = '<span class="col-change-empty">—</span>';
+        if (cell.innerHTML !== emptyHtml) cell.innerHTML = emptyHtml;
       } else {
         cell.classList.toggle('is-up',   v > 0);
         cell.classList.toggle('is-down', v < 0);
         cell.classList.toggle('is-flat', v === 0);
-        cell.textContent = (typeof safeChange === 'function') ? safeChange(v) : (v.toFixed(2) + '%');
+        const txt = (typeof safeChange === 'function') ? safeChange(v) : (v.toFixed(2) + '%');
+        if (cell.textContent !== txt) cell.textContent = txt;
       }
     }
     // Sparkline: replace synthetic mount with real series (engine path).
     const sparkCell = row.querySelector('.col-chart[data-spark-key]');
+    // MARKET-FIRST-PAINT-P0 — si esta celda ya muestra ESTA misma serie, no se desmonta ni se
+    // vuelve a crear el controlador: un refresco que no trae diferencia no puede provocar un
+    // repintado visible del mini gráfico.
+    if (sparkCell && sparkCell.dataset.sparkStamp && sparkCell.dataset.sparkStamp === _mktHistorySeriesStamp(entry) && sparkCell.querySelector('svg')) {
+      return;
+    }
     if (sparkCell && entry.series && entry.series.length >= 2 &&
         window.AurixCharts && typeof window.AurixCharts.createSparkline === 'function') {
       sparkCell.classList.remove('is-loading');
@@ -56988,8 +57064,13 @@ function _mktHistoryApplyToRow(item, range, entry, gen) {
           });
           ctrl.setData(entry.series, entry.meta || {
             source: 'history', currency: 'USD', granularity: '1d',
-            isSynthetic: false, completeness: 1, asOf: Date.now(),
+            // MARKET-FIRST-PAINT-P0 — `asOf` es CUÁNDO se obtuvo el dato, no cuándo se pinta.
+            // Con snapshots reutilizados, `Date.now()` convertiría una serie de hace minutos en
+            // una que dice ser de ahora mismo: exactamente el tipo de meta que miente que este
+            // subsistema ya arrastró una vez.
+            isSynthetic: false, completeness: 1, asOf: entry.ts || Date.now(),
           });
+          sparkCell.dataset.sparkStamp = _mktHistorySeriesStamp(entry);
           if (key) _aurixMarketSpark.set(key, ctrl);
         } catch (_) {}
       }
@@ -57030,11 +57111,16 @@ function _mktHistoryFetchVisible(dataset) {
     if (!item || !item.symbol) continue;
     const key = _mktHistoryCacheKey(item, range);
     if (!key) continue;
-    if (_mktHistoryCacheFresh(_marketHistoryCache.get(key), range)) {
-      // Cache fresh — apply now so re-renders with stale DOM rehydrate.
-      _mktHistoryApplyToRow(item, range, _marketHistoryCache.get(key), gen);
+    const cached = _marketHistoryCache.get(key);
+    if (_mktHistoryCacheFresh(cached, range)) {
+      // Cache fresh — apply now so re-renders with stale DOM rehydrate. No refetch.
+      _mktHistoryApplyToRow(item, range, cached, gen);
       continue;
     }
+    // MARKET-FIRST-PAINT-P0 — caducada pero REAL: se aplica YA (la fila queda completa en este
+    // mismo turno) y el refresco sale detrás. El orden es el del SPEC: último snapshot válido →
+    // render inmediato → refresh silencioso → actualizar sólo si hay diferencia.
+    if (_mktHistoryCacheUsable(cached)) _mktHistoryApplyToRow(item, range, cached, gen);
     _mktHistoryEnqueue(() => _mktHistoryFetchOne(item, range, gen));
   }
 }
