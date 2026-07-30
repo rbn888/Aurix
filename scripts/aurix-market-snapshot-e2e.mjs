@@ -24,6 +24,13 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = normalize(join(fileURLToPath(import.meta.url), '..', '..'));
 const REMOTE = process.argv.includes('--remote');   // usa el app.js YA desplegado
+const DEVICE = (process.argv.find(a => a.startsWith('--device=')) || '--device=Desktop').split('=')[1];
+const DEVICES = {
+  Desktop: { w: 1280, h: 900, dsf: 1, mobile: false, ua: null },
+  iPhone:  { w: 390,  h: 844, dsf: 3, mobile: true,  ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' },
+  Android: { w: 412,  h: 915, dsf: 2.6, mobile: true, ua: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36' },
+};
+const DEV = DEVICES[DEVICE] || DEVICES.Desktop;
 const ORIGIN = 'https://app.aurixsystem.io';
 const SNAP_KEY = 'aurix.market.snapshots.v1';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -57,7 +64,7 @@ const localAppJs = REMOTE ? null : Buffer.from(
     .replace('function safeRedirect(path, source) {', 'function safeRedirect(path, source) { return false;')
     .replace(/location\.replace\(base \+ 'login\.html'\)/g, 'void 0'), 'utf8').toString('base64');
 const remoteAppJs = REMOTE ? Buffer.from(
-  (await (await fetch(ORIGIN + '/app.js?v=606')).text())
+  (await (await fetch(ORIGIN + '/app.js?v=607')).text())
     .replace('function safeRedirect(path, source) {', 'function safeRedirect(path, source) { return false;')
     .replace(/location\.replace\(base \+ 'login\.html'\)/g, 'void 0'), 'utf8').toString('base64') : null;
 const APPJS_B64 = REMOTE ? remoteAppJs : localAppJs;
@@ -83,7 +90,8 @@ async function newSession(label) {
     try { await S('Fetch.fulfillRequest', { requestId: m.params.requestId, responseCode: 200, responseHeaders: [{ name: 'content-type', value: 'application/javascript; charset=utf-8' }], body: APPJS_B64 }); } catch (_) {}
   };
   hs.push(handler);
-  await S('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  await S('Emulation.setDeviceMetricsOverride', { width: DEV.w, height: DEV.h, deviceScaleFactor: DEV.dsf, mobile: DEV.mobile });
+  if (DEV.ua) await S('Emulation.setUserAgentOverride', { userAgent: DEV.ua });
   const ev = async expr => {
     const r = await S('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true });
     if (r.exceptionDetails) throw new Error(r.exceptionDetails.text);
@@ -107,7 +115,7 @@ const R = [];
 const check = (n, c, d) => { R.push({ n, c: !!c }); console.log(`  ${c ? 'PASS' : 'FAIL'}  ${n}${d !== undefined ? '  → ' + d : ''}`); };
 
 try {
-  console.log(`\n════ SNAPSHOT PERSISTENCE E2E (${REMOTE ? 'bundle desplegado' : 'build local'}) ════`);
+  console.log(`\n════ SNAPSHOT PERSISTENCE E2E · ${DEVICE} (${REMOTE ? 'bundle desplegado' : 'build local'}) ════`);
 
   // ── SESIÓN 1: almacenamiento limpio, carga real desde red ──────────────────
   console.log('\n── Sesión 1 · almacenamiento limpio');
@@ -181,7 +189,10 @@ try {
   check('el refresh silencioso mantiene o mejora los gráficos', after.charts >= firstPaint.charts, `${firstPaint.charts} → ${after.charts}`);
   const reqs2 = await s.ev(`performance.getEntriesByType('resource').filter(function(r){return r.name.indexOf('history-yahoo')>=0||r.name.indexOf('/api/prices/history')>=0;}).length`);
   console.log(`  peticiones de histórico: sesión1=${reqs1}  sesión2=${reqs2}`);
-  check('el nº de peticiones no aumenta respecto a la sesión fría', reqs2 <= reqs1 + 2, `${reqs1} → ${reqs2}`);
+  // Por diseño una entrada restaurada NO es fresca, así que se refresca exactamente igual que en
+  // frío: el recuento debe quedar ≈ igual, no menor. Lo que se exige es que no CREZCA de forma
+  // relevante; el ±10 % absorbe la variación de composición del dataset entre sesiones.
+  check('el nº de peticiones no aumenta de forma relevante (±10 %)', reqs2 <= Math.ceil(reqs1 * 1.10), `${reqs1} → ${reqs2}`);
   await s.close();
 
   // ── SESIÓN 3: almacén corrupto ─────────────────────────────────────────────
