@@ -24925,12 +24925,17 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
    El dimensionado se deja a las reglas `.col-chart svg` que ya existen en cada
    breakpoint (las mismas que gobernaban el SVG legacy), así que la caja es la de siempre
    y la sustitución por el gráfico real no mueve nada. */
-   CONTRASTE MEDIDO, no elegido a ojo: con alpha 0.30 y la `opacity: 0.85` que `.col-chart` ya
-   aplica, el trazo efectivo caía a ~0.25 sobre fondo casi negro y la celda se leía VACÍA en
-   iPhone — el mismo hueco que este bloque elimina. 0.55 la hace legible manteniéndola muy por
-   debajo del gráfico real (verde/rojo saturado a opacidad plena). */
+   CONTRASTE MEDIDO, no elegido a ojo. `.col-chart` ya aplica `opacity: 0.85` (0.6 en `is-v3`),
+   así que el alpha declarado aquí NO es el que se ve:
+     0.30 → ~0.25 efectivo: sobre fondo casi negro la celda se leía VACÍA en iPhone, o sea seguía
+            siendo el hueco que este bloque elimina.
+     0.55 → ~0.47 efectivo: visible, pero se leía como placeholder apagado.
+     0.72 → ~0.61 efectivo: presencia plena en OLED sin dejar de ser secundario.
+   Sube SÓLO el alpha: mismo tono neutro (no se acerca al verde/rojo del histórico real), mismo
+   grosor, misma geometría, mismo tamaño, mismo comportamiento. El gráfico real sigue estando muy
+   por encima — color saturado y direccional a opacidad plena. */
 .col-chart--preview {
-  color: rgba(220, 230, 250, 0.55);
+  color: rgba(220, 230, 250, 0.72);
   opacity: 1;
 }
 .col-chart--preview .mkt-spark-preview { display: block; }

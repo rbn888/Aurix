@@ -34,7 +34,7 @@ const REMOTE = process.argv.includes('--remote');
 const SHOT = process.argv.includes('--shot');
 const ONLY = (process.argv.find(a => a.startsWith('--device=')) || '').split('=')[1] || null;
 const ORIGIN = 'https://app.aurixsystem.io';
-const APPJS_V = '611', CSS_V = '644';
+const APPJS_V = '611', CSS_V = '645';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // Los ocho que el SPEC obliga a validar. Bitcoin y Ethereum eran los únicos que ya pintaban.
