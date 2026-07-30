@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '606'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '607'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -37814,7 +37814,16 @@ function _aurixSparkDestroyAll() {
   _aurixMarketSpark.forEach(ctrl => { try { ctrl.destroy(); } catch (_) {} });
   _aurixMarketSpark.clear();
 }
-function _aurixSparkMountAll(container) {
+// MARKET-SNAPSHOT-PERSIST-P1 — ¿esta celda YA muestra un gráfico real?
+// El motor es LightweightCharts: monta `<div class="aurix-chart-host">` con <canvas> dentro y
+// NO produce ningún <svg>. Preguntar por `svg` (como hacía el código anterior) devolvía siempre
+// "no montado": las optimizaciones de "no repintar sin diferencia" quedaban inertes y, peor, el
+// barrido de cierre habría marcado como vacías —y borrado— celdas con gráfico real.
+function _mktSparkCellHasChart(cell) {
+  try { return !!(cell && (cell.querySelector('.aurix-chart-host') || cell.querySelector('canvas'))); }
+  catch (_) { return false; }
+}
+function _aurixSparkMountAll(container, _isRetry) {
   if (!container || !container.querySelectorAll) return;
   // Flag/engine off → the registry must end up empty, exactly as before.
   if (!_aurixSparkFlag() || !_aurixSparkReady()) { _aurixSparkDestroyAll(); return; }
@@ -37823,12 +37832,13 @@ function _aurixSparkMountAll(container) {
   // controladores y volvía a crearlos, aunque la serie fuese idéntica: N gráficos reconstruidos
   // por render, en el mismo turno que bloquea el pintado. Ahora sólo se destruye lo que ya no
   // corresponde; una celda que sigue mostrando exactamente la misma serie no se toca.
+  let _sparkDeferred = 0;
   const keep = new Set();
   cells.forEach(cell => {
     const k = cell.dataset.sparkKey || '';
     if (!k || !_aurixMarketSpark.has(k)) return;
     const stamp = _mktHistorySeriesStamp(_mktHistoryEntryForCell(cell));
-    if (stamp !== 'none' && cell.dataset.sparkStamp === stamp && cell.querySelector('svg')) keep.add(k);
+    if (stamp !== 'none' && cell.dataset.sparkStamp === stamp && _mktSparkCellHasChart(cell)) keep.add(k);
   });
   _aurixMarketSpark.forEach((ctrl, k) => {
     if (keep.has(k)) return;
@@ -37841,7 +37851,12 @@ function _aurixSparkMountAll(container) {
     // chart engine can't render into a 0-size container; falling
     // through here leaves the legacy SVG visible (also hidden by CSS).
     const r = cell.getBoundingClientRect();
-    if (r.width <= 0 || r.height <= 0) return;
+    if (r.width <= 0 || r.height <= 0) {
+      // Puede ser una celda legítimamente oculta (móvil) o una fila recién insertada cuyo layout
+      // aún no es medible. Sólo el segundo caso merece reintento, y se distingue en el rAF.
+      if (_mktHistoryEntryForCell(cell)) _sparkDeferred++;
+      return;
+    }
 
     const key = cell.dataset.sparkKey || '';
     const raw = cell.dataset.sparkChange;
@@ -37885,6 +37900,14 @@ function _aurixSparkMountAll(container) {
       console.warn('[market-spark-v2] mount fail', key, err && err.message ? err.message : err);
     }
   });
+  // MARKET-SNAPSHOT-PERSIST-P1 — UN solo reintento en el frame siguiente. Una fila recién
+  // insertada puede no ser medible en el mismo turno en que se escribe el innerHTML; sin esto,
+  // una celda con snapshot restaurado se quedaba en blanco hasta el settle de 7 s (o para
+  // siempre). `_isRetry` acota el reintento a uno: en móvil `.col-chart` está oculta por CSS y
+  // sería 0×0 siempre, así que sin esa cota esto sería un bucle de rAF.
+  if (_sparkDeferred && !_isRetry && typeof requestAnimationFrame === 'function') {
+    try { requestAnimationFrame(() => { try { _aurixSparkMountAll(container, true); } catch (_) {} }); } catch (_) {}
+  }
 }
 
 // MARKET-V2-01 — resolución acotada del mini gráfico. Sin la serie inventada, una celda
@@ -37904,7 +37927,14 @@ function _mktSparkSettle(container) {
     // monta ahora todo lo que ya tenga serie en caché. Es idempotente.
     try { _aurixSparkMountAll(el); } catch (_) {}
     // Lo que siga sin gráfico no tiene histórico utilizable: se declara, no se parpadea.
-    el.querySelectorAll('.col-chart.is-loading[data-spark-key]').forEach(cell => {
+    // MARKET-FIRST-PAINT-P0 — el criterio es NO RESUELTA, no `is-loading`. Desde que una celda
+    // con snapshot en caché nace sin esqueleto, filtrar por `is-loading` dejaba fuera justo a
+    // esas: si su montaje síncrono no pudo medir el layout, se quedaban en blanco PARA SIEMPRE
+    // (ni gráfico, ni vacío declarado, ni reintento). Observado en la validación cruzada de
+    // sesiones: 21 celdas restauradas en blanco.
+    el.querySelectorAll('.col-chart[data-spark-key]').forEach(cell => {
+      if (_mktSparkCellHasChart(cell)) return;                      // ya resuelta: gráfico real
+      if (cell.classList.contains('col-chart--none')) return;       // ya resuelta: vacío declarado
       cell.classList.remove('is-loading');
       cell.classList.add('col-chart--none');
       cell.innerHTML = '';
@@ -44408,7 +44438,7 @@ function _aurixMktPatchInPlace(el, html) {
         // gráfico ya montado para volver a crearlo acto seguido. Si la celda viva ya pinta este
         // mismo activo y temporalidad, se deja intacta: no hay diferencia que publicar.
         if (sel === '.col-chart'
-            && lc.querySelector('svg')
+            && _mktSparkCellHasChart(lc)
             && lc.dataset.sparkKey === fc.dataset.sparkKey
             && lc.dataset.sparkTf  === fc.dataset.sparkTf) {
           if (fc.hasAttribute('data-spark-change')) lc.setAttribute('data-spark-change', fc.getAttribute('data-spark-change'));
@@ -44443,6 +44473,15 @@ function renderCurrentMarketView() {
   const data = isAggregate
     ? Object.freeze(_composeAggregateDataset())
     : Object.freeze([...MARKET_DATA]);
+
+  // MARKET-SNAPSHOT-PERSIST-P1 — ÚNICO punto de restauración, y va AQUÍ por una razón concreta:
+  // `renderMarketItem` decide el estado inicial de cada celda leyendo `_marketHistoryCache`, así
+  // que la hidratación tiene que ocurrir ANTES de construir el HTML. Hacerlo más tarde (en
+  // `_mktHistoryFetchVisible`, que corre después del innerHTML) obligaría a la fila a nacer en
+  // esqueleto y a corregirse después: justo lo que P0 eliminó.
+  // Es LAZY respecto al arranque: sólo se ejecuta al renderizar Market, nunca en el bootstrap,
+  // y la lectura del almacén se memoiza una sola vez por sesión.
+  try { _aurixMktSnapshotRestore(data); } catch (_) {}
 
   // SPEC 3.3 — warm the first-viewport icons before we paint the list (no-op
   // when not searching; search composes its own slice further down). Fire-and-
@@ -56962,6 +57001,267 @@ function _mktHistoryAdaptersReady() {
       && typeof window.AurixChartAdapters.yahooHistoryAdapter === 'function'
       && typeof window.AurixChartAdapters.cryptoHistoryAdapter === 'function';
 }
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   MARKET-SNAPSHOT-PERSIST-P1 — OWNER ÚNICO DE LOS SNAPSHOTS PERSISTIDOS DE MARKET
+   ══════════════════════════════════════════════════════════════════════════════════════════
+   MARKET-FIRST-PAINT-P0 dejó la fila atómica SIEMPRE QUE hubiera algo en memoria. Quedaba la
+   primera entrada de la sesión: sin caché, la celda del mini gráfico nace en esqueleto y espera
+   a la red (~675 ms medidos). Este owner persiste la serie REAL ya descargada para que la
+   siguiente sesión pinte esa celda de inmediato.
+
+   Es stale-while-revalidate, no un sustituto de la red: lo persistido sirve para PINTAR, nunca
+   para evitar la actualización. Se apoya en la separación que ya existe (USABLE vs FRESH): como
+   se restaura el `ts` ORIGINAL, la entrada entra usable-pero-no-fresca y la maquinaria de P0 la
+   pinta al instante y la refresca en silencio. No hace falta lógica de frescura nueva.
+
+   LO QUE SE PERSISTE Y POR QUÉ ESE LÍMITE (medido en producción, no elegido a ojo):
+     · sólo el rango '24h' — el del mini gráfico de la fila. 7d/30d/1y/all NO se persisten.
+     · una serie real de 24h son ~47 puntos (5m). Un registro serializado ≈ 1,2 KB.
+       10 ≈ 10 KB · 25 ≈ 24 KB · 50 ≈ 54 KB. JSON.parse del conjunto completo: 0,18 ms.
+     · con 40 entradas el almacén ronda los 44 KB ≈ 1 % de la cuota de localStorage. Por eso NO
+       se introduce IndexedDB: sería arquitectura nueva para un volumen que no la necesita.
+
+   PRECIO: el registro lo guarda (el esquema del SPEC lo pide y permite validar divisa), pero
+   NO se usa para pintar. El precio de la fila sale de MARKET_DATA, que es la fuente viva; pintar
+   un precio de hace horas como si fuera la cotización actual es justo lo que el SPEC prohíbe, y
+   hoy no existe ninguna marca de "precio de hace N horas" en la fila que lo haga honesto.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+const _AURIX_MKT_SNAP_KEY     = 'aurix.market.snapshots.v1';
+const _AURIX_MKT_SNAP_SCHEMA  = 1;
+const _AURIX_MKT_SNAP_RANGE   = '24h';          // sólo el rango del mini gráfico de la fila
+const _AURIX_MKT_SNAP_MAX     = 40;             // ≈ 44 KB medidos
+const _AURIX_MKT_SNAP_MAX_AGE = 24 * 3600 * 1000;
+const _AURIX_MKT_SNAP_MAX_PTS = 120;            // cota dura por registro (una serie 24h trae ~47)
+const _AURIX_MKT_SNAP_MAX_BYTES = 512 * 1024;   // cota dura del almacén completo
+const _AURIX_MKT_SNAP_WRITE_MS  = 1200;
+
+function _aurixMktSnapStorage() {
+  // Safe Storage existente: nunca lanza y degrada solo si localStorage no está disponible.
+  try {
+    const rt = (typeof window !== 'undefined') && window.AurixRuntime;
+    if (rt && rt.storage && rt.storage.local) return rt.storage.local;
+  } catch (_) {}
+  return null;
+}
+
+// Identidad canónica. `normalizeSymbol` es LOSSY (BRK.B → BRK, AAPL.MX → AAPL), así que por sí
+// sola no puede gobernar un almacén que sobrevive a la sesión: dos listings distintos acabarían
+// compartiendo registro. Aquí manda el símbolo CRUDO más los discriminantes fuertes disponibles.
+function _aurixMktSnapshotIdentity(item) {
+  if (!item) return '';
+  const raw = String(item.symbol || item.ticker || '').trim().toUpperCase();
+  if (!raw) return '';
+  return [
+    'v1',
+    String(item.type || '').toLowerCase(),
+    String(item.coinId || item.coin_id || '').toLowerCase(),
+    String(item.isin || '').toUpperCase(),
+    String(item.marketSymbol || '').toUpperCase(),
+    String(item.exchange || '').toUpperCase(),
+    String(item.currency || '').toUpperCase(),
+    raw,
+  ].join('|');
+}
+
+// Un registro sólo se pinta si supera TODAS estas puertas. Cualquier fallo descarta ESA entrada
+// en silencio: Market sigue su curso normal y pide ese activo por red.
+function _aurixMktSnapshotStoreValidate(rec, now) {
+  try {
+    if (!rec || typeof rec !== 'object' || Array.isArray(rec)) return false;
+    if (rec.schemaVersion !== _AURIX_MKT_SNAP_SCHEMA) return false;
+    if (typeof rec.identityKey !== 'string' || rec.identityKey.length < 3 || rec.identityKey.length > 200) return false;
+    if (typeof rec.cacheSymbol !== 'string' || !rec.cacheSymbol) return false;
+    if (rec.range !== _AURIX_MKT_SNAP_RANGE) return false;
+    if (typeof rec.asOf !== 'number' || !Number.isFinite(rec.asOf) || rec.asOf <= 0) return false;
+    if (typeof rec.savedAt !== 'number' || !Number.isFinite(rec.savedAt)) return false;
+    if (rec.asOf > now + 60000 || rec.savedAt > now + 60000) return false;      // futuro ⇒ corrupto
+    if ((now - rec.savedAt) > _AURIX_MKT_SNAP_MAX_AGE) return false;            // caducidad de seguridad
+    if (rec.isSynthetic === true || rec.isDecorative === true) return false;    // nunca dato inventado
+    if (typeof rec.source !== 'string' || !rec.source || rec.source === 'synthetic') return false;
+    if (rec.price != null && !Number.isFinite(rec.price)) return false;
+    if (rec.currency != null && !/^[A-Z]{3}$/.test(String(rec.currency))) return false;
+    if (rec.change != null && !Number.isFinite(rec.change)) return false;
+    if (!Array.isArray(rec.series) || rec.series.length < 2 || rec.series.length > _AURIX_MKT_SNAP_MAX_PTS) return false;
+    let prevT = -Infinity;
+    for (let i = 0; i < rec.series.length; i++) {
+      const p = rec.series[i];
+      if (!Array.isArray(p) || p.length !== 2) return false;
+      const t = p[0], v = p[1];
+      if (!Number.isFinite(t) || !Number.isFinite(v)) return false;
+      if (v <= 0) return false;                 // un precio <= 0 no es una cotización
+      if (t < prevT) return false;              // puntos ordenados
+      prevT = t;
+    }
+    if (typeof rec.seriesStamp !== 'string' || !rec.seriesStamp) return false;
+    // Sin campos inesperados: el almacén no es un cajón de sastre donde pueda colarse nada.
+    const ALLOWED = ['schemaVersion', 'identityKey', 'cacheSymbol', 'assetType', 'range', 'price',
+      'currency', 'change', 'changePeriod', 'series', 'valuesCurrency', 'source', 'granularity',
+      'completeness', 'isSynthetic', 'asOf', 'savedAt', 'seriesStamp'];
+    for (const k of Object.keys(rec)) if (ALLOWED.indexOf(k) < 0) return false;
+    return true;
+  } catch (_) { return false; }
+}
+
+// LRU por savedAt: lo más reciente sobrevive. El almacén no puede crecer sin límite.
+function _aurixMktSnapshotStorePrune(list) {
+  const out = (Array.isArray(list) ? list : []).slice();
+  out.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+  return out.slice(0, _AURIX_MKT_SNAP_MAX);
+}
+
+let _aurixMktSnapCache = null;      // lectura única por sesión (lazy, al entrar en Market)
+function _aurixMktSnapshotStoreRead() {
+  if (_aurixMktSnapCache) return _aurixMktSnapCache;
+  _aurixMktSnapCache = new Map();
+  const st = _aurixMktSnapStorage();
+  if (!st) return _aurixMktSnapCache;
+  let raw = null;
+  try { raw = st.get(_AURIX_MKT_SNAP_KEY, null); } catch (_) { return _aurixMktSnapCache; }
+  if (!raw || typeof raw !== 'string') return _aurixMktSnapCache;
+  if (raw.length > _AURIX_MKT_SNAP_MAX_BYTES) { try { st.remove(_AURIX_MKT_SNAP_KEY); } catch (_) {} return _aurixMktSnapCache; }
+  let parsed = null;
+  // Un JSON corrupto NO puede romper el arranque ni Market: se descarta el almacén entero.
+  try { parsed = JSON.parse(raw); } catch (_) { try { st.remove(_AURIX_MKT_SNAP_KEY); } catch (__) {} return _aurixMktSnapCache; }
+  if (!parsed || parsed.schemaVersion !== _AURIX_MKT_SNAP_SCHEMA || !Array.isArray(parsed.entries)) {
+    // Esquema incompatible ⇒ se invalida SÓLO esta clave (nunca un clear() global).
+    try { st.remove(_AURIX_MKT_SNAP_KEY); } catch (_) {}
+    return _aurixMktSnapCache;
+  }
+  const now = Date.now();
+  for (const rec of parsed.entries) {
+    if (!_aurixMktSnapshotStoreValidate(rec, now)) continue;   // una entrada mala no tira las demás
+    _aurixMktSnapCache.set(rec.identityKey, rec);
+  }
+  return _aurixMktSnapCache;
+}
+
+let _aurixMktSnapDirty = false, _aurixMktSnapTimer = null;
+function _aurixMktSnapshotStoreWrite() {
+  _aurixMktSnapDirty = false;
+  const st = _aurixMktSnapStorage();
+  if (!st || !_aurixMktSnapCache) return false;
+  try {
+    const entries = _aurixMktSnapshotStorePrune(Array.from(_aurixMktSnapCache.values()));
+    // La poda vuelve a la caché en memoria: almacén y memoria no pueden divergir.
+    _aurixMktSnapCache = new Map(entries.map(r => [r.identityKey, r]));
+    const payload = JSON.stringify({ schemaVersion: _AURIX_MKT_SNAP_SCHEMA, entries });
+    if (payload.length > _AURIX_MKT_SNAP_MAX_BYTES) return false;
+    return st.set(_AURIX_MKT_SNAP_KEY, payload);
+  } catch (_) { return false; }   // cuota llena / storage caído ⇒ Market sigue funcionando igual
+}
+function _aurixMktSnapshotStoreSchedule() {
+  if (_aurixMktSnapDirty) return;
+  _aurixMktSnapDirty = true;
+  // Debounce corto: agrupa la ráfaga de filas que resuelven juntas sin arriesgarse a perderlo
+  // todo si el usuario cierra enseguida (además hay flush en pagehide/visibilitychange).
+  try { if (_aurixMktSnapTimer) clearTimeout(_aurixMktSnapTimer); } catch (_) {}
+  try { _aurixMktSnapTimer = setTimeout(() => { _aurixMktSnapTimer = null; _aurixMktSnapshotStoreWrite(); }, _AURIX_MKT_SNAP_WRITE_MS); }
+  catch (_) { _aurixMktSnapshotStoreWrite(); }
+}
+try {
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    const _flush = () => { if (_aurixMktSnapDirty) _aurixMktSnapshotStoreWrite(); };
+    window.addEventListener('pagehide', _flush);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') _flush(); });
+  }
+} catch (_) {}
+
+// ESCRITURA — sólo ante un snapshot REAL y sólo si aporta diferencia.
+function _aurixMktSnapshotCapture(item, range, entry) {
+  try {
+    if (range !== _AURIX_MKT_SNAP_RANGE) return false;                 // sólo el rango de la fila
+    if (!entry || !Array.isArray(entry.series) || entry.series.length < 2) return false;  // nada de errores ni vacíos
+    const meta = entry.meta || {};
+    if (meta.isSynthetic === true || meta.isDecorative === true) return false;
+    const identityKey = _aurixMktSnapshotIdentity(item);
+    if (!identityKey) return false;
+    const stamp = _mktHistorySeriesStamp(entry);
+    if (stamp === 'none') return false;
+    const store = _aurixMktSnapshotStoreRead();
+    const prev  = store.get(identityKey);
+    const price = Number(item && (item.current_price ?? item.price));
+    const change = Number(entry.changePct);
+    // Sin diferencia real (misma serie, mismo precio, misma variación) ⇒ no se reescribe nada.
+    if (prev && prev.seriesStamp === stamp
+        && (prev.price == null ? null : prev.price) === (Number.isFinite(price) ? price : null)
+        && (prev.change == null ? null : prev.change) === (Number.isFinite(change) ? change : null)) return false;
+    const series = [];
+    for (const p of entry.series) {
+      const t = Number(p && (p.time ?? p.t));
+      const v = Number(p && p.value);
+      if (!Number.isFinite(t) || !Number.isFinite(v) || v <= 0) continue;
+      series.push([t, Math.round(v * 10000) / 10000]);
+      if (series.length >= _AURIX_MKT_SNAP_MAX_PTS) break;
+    }
+    if (series.length < 2) return false;
+    const now = Date.now();
+    const rec = {
+      schemaVersion: _AURIX_MKT_SNAP_SCHEMA,
+      identityKey,
+      cacheSymbol: normalizeSymbol(item.symbol || item.ticker || ''),
+      assetType: String((item && item.type) || '') || null,
+      range,
+      price: Number.isFinite(price) ? price : null,
+      currency: (item && item.currency && /^[A-Z]{3}$/.test(String(item.currency).toUpperCase())) ? String(item.currency).toUpperCase() : 'USD',
+      change: Number.isFinite(change) ? change : null,
+      changePeriod: '24h',
+      series,
+      valuesCurrency: (meta.currency && /^[A-Z]{3}$/.test(String(meta.currency).toUpperCase())) ? String(meta.currency).toUpperCase() : 'USD',
+      source: String(meta.source || 'history'),
+      granularity: String(meta.granularity || '') || null,
+      completeness: Number.isFinite(Number(meta.completeness)) ? Number(meta.completeness) : null,
+      isSynthetic: false,
+      // asOf = instante en que se OBTUVO el dato. Nunca se sustituye por Date.now(): es lo único
+      // que permite que la sesión siguiente sepa que esto es un último-dato-conocido y no una
+      // cotización de ahora mismo. `savedAt` es un campo APARTE y sólo gobierna la poda LRU.
+      asOf: Number.isFinite(Number(meta.asOf)) ? Number(meta.asOf) : (entry.ts || now),
+      savedAt: now,
+      seriesStamp: stamp,
+    };
+    if (!_aurixMktSnapshotStoreValidate(rec, now)) return false;      // no se persiste lo que no se podría restaurar
+    store.set(identityKey, rec);
+    _aurixMktSnapshotStoreSchedule();
+    return true;
+  } catch (_) { return false; }
+}
+
+// RESTAURACIÓN — lazy, al entrar en Market (nunca en el critical path del bootstrap).
+// Hidrata `_marketHistoryCache` con el `ts` ORIGINAL, de modo que la entrada queda
+// usable-pero-no-fresca: P0 la pinta al instante y la cola de 3 la refresca en silencio.
+function _aurixMktSnapshotRestore(items) {
+  let restored = 0;
+  try {
+    if (!Array.isArray(items) || !items.length) return 0;
+    const store = _aurixMktSnapshotStoreRead();
+    if (!store.size) return 0;
+    const now = Date.now();
+    for (const item of items) {
+      if (!item || !item.symbol) continue;
+      const identityKey = _aurixMktSnapshotIdentity(item);
+      if (!identityKey) continue;
+      const rec = store.get(identityKey);
+      // Identidad EXACTA o nada: jamás se pinta el listing de otro activo.
+      if (!rec || !_aurixMktSnapshotStoreValidate(rec, now)) continue;
+      const key = _mktHistoryCacheKey(item, _AURIX_MKT_SNAP_RANGE);
+      if (!key || key !== `${rec.cacheSymbol}|${_AURIX_MKT_SNAP_RANGE}`) continue;
+      if (_marketHistoryCache.has(key)) continue;      // lo vivo en memoria siempre manda
+      _marketHistoryCache.set(key, {
+        ts: rec.asOf,                                   // ← el instante REAL, no el de restauración
+        series: rec.series.map(p => ({ time: p[0], value: p[1] })),
+        meta: {
+          source: rec.source, currency: rec.valuesCurrency,
+          granularity: rec.granularity || '1d', isSynthetic: false,
+          completeness: rec.completeness == null ? 1 : rec.completeness,
+          asOf: rec.asOf, restored: true,
+        },
+        changePct: rec.change,
+      });
+      restored++;
+    }
+  } catch (_) {}
+  return restored;
+}
+
 async function _mktHistoryFetchOne(item, range, gen) {
   const adapter = _aurixMktPickAdapter(item);
   const key0 = _mktHistoryCacheKey(item, range);
@@ -57009,6 +57309,8 @@ async function _mktHistoryFetchOne(item, range, gen) {
     entry = { ts: Date.now(), series: s, meta: result.meta || null, changePct };
   }
   _marketHistoryCache.set(key, entry);
+  // MARKET-SNAPSHOT-PERSIST-P1 — único punto de escritura: sólo tras un dato REAL recién llegado.
+  try { _aurixMktSnapshotCapture(item, range, entry); } catch (_) {}
   _mktHistoryApplyToRow(item, range, entry, gen);
 }
 function _mktHistoryApplyToRow(item, range, entry, gen) {
@@ -57042,7 +57344,7 @@ function _mktHistoryApplyToRow(item, range, entry, gen) {
     // MARKET-FIRST-PAINT-P0 — si esta celda ya muestra ESTA misma serie, no se desmonta ni se
     // vuelve a crear el controlador: un refresco que no trae diferencia no puede provocar un
     // repintado visible del mini gráfico.
-    if (sparkCell && sparkCell.dataset.sparkStamp && sparkCell.dataset.sparkStamp === _mktHistorySeriesStamp(entry) && sparkCell.querySelector('svg')) {
+    if (sparkCell && sparkCell.dataset.sparkStamp && sparkCell.dataset.sparkStamp === _mktHistorySeriesStamp(entry) && _mktSparkCellHasChart(sparkCell)) {
       return;
     }
     if (sparkCell && entry.series && entry.series.length >= 2 &&
