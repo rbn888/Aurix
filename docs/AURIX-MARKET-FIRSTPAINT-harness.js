@@ -196,6 +196,11 @@ if (!missing.length) {
   // se restituye el provisional (antes volvía a esqueleto o a vacío).
   const mountFn2 = stripComments(fnSource('_aurixSparkMountAll'));
   const applyFn2 = stripComments(fnSource('_mktHistoryApplyToRow'));
+  // El barrido selectivo destruye el controlador de toda celda cuya serie ya no está en caché, y
+  // `destroy()` retira el host del DOM. Medido en producción: sin repintar ahí mismo, la celda se
+  // quedaba VACÍA —y sin clase de estado que lo delatase— hasta el cierre de 7 s.
+  ok('3B.10b tras destruir un controlador la celda se repinta en el mismo turno, no queda vacía',
+     /const hasReal = [\s\S]{0,200}if \(!hasReal\) \{[\s\S]{0,400}innerHTML = _mktSparkPreviewSvg\(key\)[\s\S]{0,300}classList\.add\('col-chart--preview'\)/.test(mountFn2));
   ok('3B.11 un fallo de montaje restituye el provisional, nunca deja la celda en blanco',
      /catch \(err\) \{[\s\S]{0,400}innerHTML = _mktSparkPreviewSvg\(/.test(mountFn2) &&
      /catch \(_\) \{[\s\S]{0,400}innerHTML = _mktSparkPreviewSvg\(/.test(applyFn2));

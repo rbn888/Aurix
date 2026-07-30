@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '610'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '611'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -37873,7 +37873,21 @@ function _aurixSparkMountAll(container, _isRetry) {
       ? _mktHistoryEntryForCell(cell)
       : null;
     const hasReal = !!(realEntry && Array.isArray(realEntry.series) && realEntry.series.length >= 2);
-    if (!hasReal) return;
+    if (!hasReal) {
+      // MARKET-CRYPTO-PREVIEW-P0 — SIN ESTO QUEDA UN HUECO REAL, medido en producción: el barrido
+      // selectivo de arriba destruye el controlador de toda celda cuya serie ya no está en caché,
+      // y `destroy()` retira el host del DOM. La celda se quedaba literalmente vacía —sin clase de
+      // estado que la delatara— hasta el cierre de 7 s. Aquí se repinta el provisional en el MISMO
+      // turno síncrono que la destruyó, así que el vaciado no llega a ser observable.
+      try {
+        if (!_mktSparkCellHasChart(cell) && !cell.querySelector('.mkt-spark-preview')) {
+          cell.innerHTML = _mktSparkPreviewSvg(key);
+        }
+        cell.classList.remove('is-loading', 'col-chart--none');
+        cell.classList.add('col-chart--preview');
+      } catch (_) {}
+      return;
+    }
 
     try {
       cell.innerHTML = '';

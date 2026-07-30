@@ -34,7 +34,7 @@ const REMOTE = process.argv.includes('--remote');
 const SHOT = process.argv.includes('--shot');
 const ONLY = (process.argv.find(a => a.startsWith('--device=')) || '').split('=')[1] || null;
 const ORIGIN = 'https://app.aurixsystem.io';
-const APPJS_V = '610', CSS_V = '643';
+const APPJS_V = '611', CSS_V = '644';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // Los ocho que el SPEC obliga a validar. Bitcoin y Ethereum eran los únicos que ya pintaban.
@@ -191,13 +191,17 @@ try {
       try {
         const png = await S('Page.captureScreenshot', { format: 'png' });
         await writeFile(join(ROOT, `mkt-crypto-${name.toLowerCase()}-settled.png`), Buffer.from(png.data, 'base64'));
-        const cold = await ev(`(function(){try{_marketHistoryCache.clear();}catch(_){}
-          try{currentMarketTab='crypto'; document.getElementById('marketList')._lastKey=null; renderCurrentMarketView();}catch(_){}
-          var l=document.getElementById('marketList');
-          return l?l.querySelectorAll('.col-chart .mkt-spark-preview').length+'/'+l.querySelectorAll('.market-row').length:'0/0';})()`);
+        await ev(`(function(){try{_marketHistoryCache.clear();}catch(_){}
+          try{currentMarketTab='crypto'; document.getElementById('marketList')._lastKey=null; renderCurrentMarketView();}catch(_){}})()`);
+        // Se MIDE, no sólo se fotografía: este re-render destruye los controladores cuya serie ya
+        // no está en caché, y ahí es donde apareció un hueco que el sample normal no veía.
+        const cold = await ev(SAMPLER);
         const png2 = await S('Page.captureScreenshot', { format: 'png' });
         await writeFile(join(ROOT, `mkt-crypto-${name.toLowerCase()}-firstpaint.png`), Buffer.from(png2.data, 'base64'));
-        console.log(`     capturas → …-settled.png · …-firstpaint.png (cold: ${cold} celdas con provisional)`);
+        const coldHoles = (cold.skeleton || 0) + (cold.none || 0) + (cold.empty || 0);
+        console.log(`     capturas → …-settled.png · …-firstpaint.png`);
+        console.log(`     coldRender  rows=${cold.rows}  real=${cold.real} preview=${cold.preview}  │ skeleton=${cold.skeleton} none=${cold.none} empty=${cold.empty}  ${coldHoles ? '✗ HUECOS' : '✓'}`);
+        if (coldHoles) { RESULTS.push({ device: name + '/cold', pass: false, first: cold, settled: cold, bad: ['cold:' + coldHoles] }); }
       } catch (e) { console.log('     captura falló: ' + e.message); }
     }
     if (missing.length) console.log(`     ⚠ no presentes en la pestaña: ${missing.join(', ')}`);

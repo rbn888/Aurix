@@ -412,8 +412,13 @@ console.log('\n14 — Market V2 bloque 1 (verdad del mini gráfico):');
      /data-spark-key="\$\{normSym\}"[^>]*>\$\{_chartHtml\}<\/div>/.test(rowFn) &&
      /_chartCls\s+= _histHasSeries \? '' : 'col-chart--preview'/.test(rowFn) &&
      /_chartHtml = _histHasSeries \? '' : _mktSparkPreviewSvg\(normSym\)/.test(rowFn));
-  ok('14.3 el montaje exige serie real: sin ella no dibuja nada',
-     !!mountFn && /const hasReal = /.test(mountFn) && /if \(!hasReal\) return;/.test(mountFn) &&
+  // MARKET-CRYPTO-PREVIEW-P0 — la guarda sigue siendo la misma (sin serie real no se monta el
+  // motor), pero ya no sale con un `return` pelado: repinta el provisional, porque el barrido de
+  // arriba pudo acabar de vaciar la celda al destruir su controlador.
+  ok('14.3 el montaje exige serie real: sin ella no dibuja el motor, sólo el provisional',
+     !!mountFn && /const hasReal = /.test(mountFn) &&
+     /if \(!hasReal\) \{[\s\S]{0,500}_mktSparkPreviewSvg\(key\)[\s\S]{0,300}return;\s*\}/.test(mountFn) &&
+     !/createSparkline[\s\S]{0,200}hasReal/.test(mountFn) &&
      !/synthetic/.test(mountFn.replace(/\/\/.*$/gm, '')));
   ok('14.4 desaparece el meta que mentía (source synthetic declarado isSynthetic:false)',
      !/source: 'synthetic'/.test(appCode));
