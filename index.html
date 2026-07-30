@@ -102,7 +102,7 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v636-build-banner-hotfix';
+      var BUILD = 'v637-boot-supervisor';
       var APPJS_V = '605';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
@@ -112,6 +112,7 @@
       var B = window.__AURIX_BOOT = {
         build: BUILD, appJsVersion: APPJS_V, t0: T0, steps: [], errors: [],
         appJsRequested: false, appJsLoaded: false, appJsExecuted: false,
+        appJsLoadError: false, probe: null,
         domContentLoaded: false, windowLoad: false, bootstrapStarted: false,
         dashboardReady: false, splashHidden: false, watchdogFired: false,
         tickCount: 0, lastTick: T0,
@@ -230,44 +231,226 @@
       // app.js / timestamp / "watchdog" diagnostics live on window.__AURIX_BOOT (read via
       // debugAurixBoot()) and are NEVER painted into the UI. No visible stamp.
 
-      // WATCHDOG PANEL — internal safety net. Shown ONLY on a genuine fatal: app.js never
-      // EXECUTED (network/404/parse) after a long grace, with the splash still up. A slow-
-      // but-working boot (app.js executed, app-side failsafe owns the splash) never shows it.
+      // ── BOOT SUPERVISOR · SPEC BOOT-CHROME-ANDROID-P0 ─────────────────────────────────────────
+      // The old backstop was a blind wall-clock timer: "app.js has not executed by 12000ms ⇒
+      // declare app_js_never_loaded". On a slow mobile link that deadline expires while the bundle
+      // is still DOWNLOADING. Reproduced on Chrome 140 / Android at ~400 Kbps against production:
+      // app.js (≈990 KB over the wire) was only REQUESTED at 11.4s — it queues behind styles.css
+      // and services/*.js — and finished at 31.9s with HTTP 200. The panel was therefore painted
+      // at 12s over a completely healthy boot and, because nothing ever retired it, stayed on top
+      // after app.js executed at 32.4s. Signature: appJsRequested=true, appJsLoaded=false,
+      // domContentLoaded=false, errors=[] — i.e. the parser was still blocked on a live transfer.
+      //
+      // The supervisor replaces the deadline with EVIDENCE:
+      //   • alive    — document.readyState === 'loading' means the parser is still blocked on the
+      //                pending <script src="app.js">. A failed request cannot block the parser:
+      //                onerror fires, the parser moves on and readyState leaves 'loading'. So a
+      //                blocked parser is positive proof that the transfer is still in flight.
+      //   • terminal — onerror fired · the parser passed the script without loading it · the bundle
+      //                loaded but never executed · a 1-byte Range probe proves the resource is
+      //                unreachable/4xx/5xx. Terminal is reported at once, with no 12s tax.
+      //   • ceiling  — still 'loading' and the probe is fine, but nothing lands: a stalled socket.
+      // Terminal ⇒ ONE marked recovery (SW unregister + Aurix cache purge + a single reload); if
+      // the marker says we already tried, paint the diagnostic. Never a loop. sessionStorage is
+      // only ever written/removed key-by-key — localStorage, portfolio, session and preferences
+      // are never touched.
+      var SOFT_MS = 12000, PROBE_EVERY_MS = 8000, CEILING_MS = 90000, EXEC_GRACE_MS = 4000;
+      var RECOVERY_KEY = 'aurix_boot_recovery';
+
+      // Resolved LAZILY: this script runs in <head>, long before the app.js tag is parsed. The
+      // element only exists once the parser has reached it — which is exactly when we need it.
+      function appJsUrl() {
+        try { var s = document.querySelector('script[src*="app.js?v="]'); if (s && s.src) return s.src; } catch (_) {}
+        return 'app.js?v=' + APPJS_V;
+      }
+      function storageOk() {
+        if (typeof window.__AURIX_STORAGE_OK === 'boolean') return window.__AURIX_STORAGE_OK;
+        try { var k = '__aurix_probe2__'; sessionStorage.setItem(k, '1'); var ok = sessionStorage.getItem(k) === '1'; sessionStorage.removeItem(k); return ok; } catch (_) { return false; }
+      }
+      // The recovery screen must never be Spanish-only: ?lang= wins, then the persisted app
+      // preference (LANG_KEY in app.js), then the device language. All readable pre-bootstrap.
+      function bootLang() {
+        var l = null;
+        try { var m = (location.search || '').match(/[?&]lang=(es|en)\b/i); if (m) l = m[1].toLowerCase(); } catch (_) {}
+        if (!l) { try { var s = localStorage.getItem('portfolio_lang'); if (s === 'es' || s === 'en') l = s; } catch (_) {} }
+        if (!l) { try { l = ((navigator.language || '') + '').toLowerCase().indexOf('es') === 0 ? 'es' : 'en'; } catch (_) { l = 'en'; } }
+        return l === 'es' ? 'es' : 'en';
+      }
+      var DIAG_T = {
+        es: { title: 'AURIX · diagnóstico de arranque', hint: 'No se ha podido cargar la aplicación. Tu cartera, tu sesión y tus preferencias están intactas.', retry: 'Reintentar (recarga limpia)', retrying: 'Reintentando…' },
+        en: { title: 'AURIX · startup diagnostics', hint: 'The application could not be loaded. Your portfolio, session and preferences are intact.', retry: 'Retry (clean reload)', retrying: 'Retrying…' }
+      };
+
+      function purgeAurixCaches() {
+        var jobs = [];
+        try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { try { return r.unregister(); } catch (_) { return null; } })); }).catch(function () {})); } catch (_) {}
+        try { if (typeof caches !== 'undefined' && caches.keys) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { try { return caches.delete(k); } catch (_) { return null; } })); }).catch(function () {})); } catch (_) {}
+        try { return Promise.all(jobs); } catch (_) { return { then: function (f) { try { f(); } catch (_) {} return this; } }; }
+      }
+      function recoveryMark() { try { return JSON.parse(sessionStorage.getItem(RECOVERY_KEY) || 'null'); } catch (_) { return null; } }
+      // Exactly ONE automatic recovery per tab. Degraded storage (Android in-app WebView /
+      // partitioned) cannot persist the anti-loop marker, so we do NOT auto-reload there — the
+      // diagnostic is shown instead. That is the same degraded-mode rule the coherence guard uses.
+      function recoverOnce(reason) {
+        if (!storageOk()) return false;
+        if (recoveryMark()) return false;
+        var ts = (new Date()).getTime();
+        try { sessionStorage.setItem(RECOVERY_KEY, JSON.stringify({ r: reason, b: BUILD, ts: ts })); } catch (_) { return false; }
+        var qs = (location.search || '').replace(/[?&]_recover=\d+/g, '');
+        if (qs && qs.charAt(0) !== '?') qs = '?' + qs.replace(/^&/, '');
+        var done = false;
+        var go = function () {
+          if (done) return; done = true;
+          try { location.replace(location.pathname + (qs ? qs + '&' : '?') + '_recover=' + ts); } catch (_) { try { location.reload(); } catch (_) {} }
+        };
+        try { console.warn('[BOOT][SUPERVISOR] ' + reason + ' — one recovery reload'); } catch (_) {}
+        try { setTimeout(go, 1500); } catch (_) {}   // never hang waiting on caches/SW
+        try { purgeAurixCaches().then(go, go); } catch (_) { go(); }
+        return true;
+      }
+
+      // 1-byte Range probe. It exists to answer ONE question: does the server give a definitive
+      // "this resource is not servable" verdict (4xx/5xx)? That is the only probe outcome allowed
+      // to condemn the boot — see the priority rule in supervise().
+      //
+      // A network-level failure (status 0) is deliberately NOT a verdict. Under a saturated slow
+      // link the probe competes with the very transfer it is measuring and can fail on contention,
+      // connection limits or an in-flight navigation. Reproduced at 400 Kbps: the probe errored
+      // while app.js was downloading perfectly well, and an earlier revision of this supervisor
+      // wrongly reported app_js_unreachable_network over a healthy boot.
+      //
+      // The response is aborted as soon as the headers land, so a proxy that ignores Range can
+      // never turn the probe into a second full download of the bundle.
+      function probeAppJs() {
+        var at = function () { return (new Date()).getTime() - T0; };
+        try {
+          var ac = null; try { ac = new AbortController(); } catch (_) {}
+          return fetch(appJsUrl(), { method: 'GET', headers: { Range: 'bytes=0-0' }, cache: 'no-store', credentials: 'omit', signal: ac ? ac.signal : undefined })
+            .then(function (r) {
+              B.probe = { status: r.status, definitiveFailure: r.status >= 400, at: at() };
+              try { if (ac) ac.abort(); } catch (_) {}                       // headers are enough — never pull the body
+            })
+            .catch(function (e) { B.probe = { status: 0, definitiveFailure: false, error: String((e && e.message) || e).slice(0, 120), at: at() }; });
+        } catch (_) { B.probe = { status: 0, definitiveFailure: false, error: 'probe_threw', at: at() }; return { then: function (f) { try { f(); } catch (_) {} return this; } }; }
+      }
+
       function esc(s) { return String(s).replace(/[<>&]/g, function(c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; }); }
-      function showDiag(reason) {
+      // PII-FREE BY CONSTRUCTION: only boot flags, versions, cache/SW *names*, transport state and
+      // the UA. No tokens, no email, no holdings, no localStorage dump.
+      function showDiag(reason, extra) {
         try {
           if (document.getElementById('aurixBootDiag')) return;
           B.watchdogFired = true;
+          var L = DIAG_T[bootLang()];
+          var now = (new Date()).getTime();
+          var mk = recoveryMark();
           var info = {
-            reason: reason, build: B.build, appJs: 'app.js?v=' + B.appJsVersion, htmlTs: HTML_TS,
+            reason: reason, build: B.build, htmlTs: HTML_TS,
+            appJsUrl: appJsUrl(), appJsVersionRequested: B.appJsVersion,
+            deployedAppjs: (typeof window.__AURIX_LATEST_APPJS === 'number' ? window.__AURIX_LATEST_APPJS : null),
+            deployedBuild: window.__AURIX_LATEST_BUILD || null,
             lastBootStep: B.last(),
             appJsRequested: B.appJsRequested, appJsLoaded: B.appJsLoaded, appJsExecuted: B.appJsExecuted,
+            appJsLoadError: !!B.appJsLoadError, scriptProbe: B.probe || null,
             bootstrapStarted: B.bootstrapStarted, dashboardReady: B.dashboardReady,
-            domContentLoaded: B.domContentLoaded, windowLoad: B.windowLoad,
-            tickCount: B.tickCount, lastTickAgeMs: (new Date()).getTime() - B.lastTick,
-            eventLoopBlocked: ((new Date()).getTime() - B.lastTick) > 1500,
+            domContentLoaded: B.domContentLoaded, windowLoad: B.windowLoad, readyState: document.readyState,
+            tickCount: B.tickCount, lastTickAgeMs: now - B.lastTick,
+            eventLoopBlocked: (now - B.lastTick) > 1500,
+            recovery: mk ? { attempted: true, reason: mk.r, build: mk.b, agoMs: now - (mk.ts || now) } : { attempted: false, reason: storageOk() ? null : 'storage_degraded' },
+            serviceWorker: (extra && extra.sw) || null,
+            swControlled: (function () { try { return !!(navigator.serviceWorker && navigator.serviceWorker.controller); } catch (_) { return null; } })(),
+            aurixCaches: (extra && extra.caches) || null,
+            storageOk: storageOk(),
+            online: (function () { try { return navigator.onLine; } catch (_) { return null; } })(),
+            visibilityState: document.visibilityState || null,
+            lang: bootLang(),
             errors: B.errors.slice(0, 8), steps: B.steps,
             ua: navigator.userAgent, ts: new Date().toISOString()
           };
           var bl = document.getElementById('bootLoader'); if (bl) bl.style.display = 'none';
-          var p = document.createElement('div'); p.id = 'aurixBootDiag';
+          var p = document.createElement('div'); p.id = 'aurixBootDiag'; p.setAttribute('lang', info.lang);
           p.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;z-index:2147483647;background:#070a14;color:#cdd9ef;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;padding:20px 14px;overflow:auto;-webkit-overflow-scrolling:touch';
-          p.innerHTML = '<div style="font:700 16px/1.3 -apple-system,system-ui;color:#7fb0ff;margin-bottom:8px">AURIX · diagnóstico de arranque</div>'
+          p.innerHTML = '<div style="font:700 16px/1.3 -apple-system,system-ui;color:#7fb0ff;margin-bottom:6px">' + esc(L.title) + '</div>'
+            + '<div style="font:400 13px/1.45 -apple-system,system-ui;color:#8fa3c4;margin-bottom:10px">' + esc(L.hint) + '</div>'
             + '<div style="white-space:pre-wrap;word-break:break-word;background:#0c1426;border:1px solid #1c2b49;border-radius:8px;padding:12px">' + esc(JSON.stringify(info, null, 2)) + '</div>'
-            + '<button id="aurixBootRetry" style="margin-top:16px;width:100%;padding:13px 18px;background:#1b3a6b;color:#fff;border:0;border-radius:9px;font:600 15px/1 -apple-system,system-ui">Reintentar (recarga limpia)</button>';
+            + '<button id="aurixBootRetry" style="margin-top:16px;width:100%;padding:13px 18px;background:#1b3a6b;color:#fff;border:0;border-radius:9px;font:600 15px/1 -apple-system,system-ui">' + esc(L.retry) + '</button>';
           document.body.appendChild(p);
           var btn = document.getElementById('aurixBootRetry');
-          if (btn) btn.onclick = function() { try { sessionStorage.clear(); } catch (_) {} try { location.replace(location.pathname + '?fresh=' + (new Date()).getTime()); } catch (_) { try { location.reload(); } catch (_) {} } };
+          // Manual retry: purge Aurix caches + clear ONLY the boot markers (so the automatic
+          // recovery is re-armed for the next attempt). Never sessionStorage.clear() — that used
+          // to take the app's own session state with it.
+          if (btn) btn.onclick = function () {
+            try { btn.disabled = true; btn.textContent = L.retrying; } catch (_) {}
+            try { sessionStorage.removeItem(RECOVERY_KEY); sessionStorage.removeItem('aurix_coherence_reload'); sessionStorage.removeItem('aurix_coherence_reload_build'); } catch (_) {}
+            var done = false;
+            var go = function () { if (done) return; done = true; try { location.replace(location.pathname + '?fresh=' + (new Date()).getTime()); } catch (_) { try { location.reload(); } catch (_) {} } };
+            try { setTimeout(go, 1500); } catch (_) {}
+            try { purgeAurixCaches().then(go, go); } catch (_) { go(); }
+          };
         } catch (_) {}
       }
-      // Single genuine-fatal backstop: only if app.js NEVER executed AND the splash is
-      // still up AND the dashboard never became ready. App.js executes in ~tens of ms, so
-      // this cannot fire on a working (even slow) boot — only when the app truly never ran.
-      setTimeout(function() {
-        if (!B.appJsExecuted && !B.dashboardReady && !B.splashHidden && !document.getElementById('aurixBootDiag')) {
-          showDiag(B.appJsLoaded ? 'app_js_loaded_but_never_executed' : 'app_js_never_loaded');
+      // Collect the async SW/cache facts (bounded to 700ms) before painting, so the report is
+      // complete on the first frame the user sees.
+      function paintDiag(reason) {
+        try {
+          if (document.getElementById('aurixBootDiag')) return;
+          var extra = {}; var jobs = [];
+          try {
+            if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { extra.sw = { registrations: rs.length, scopes: rs.slice(0, 4).map(function (r) { return String((r && r.scope) || '').slice(0, 80); }) }; }).catch(function () { extra.sw = 'unavailable'; }));
+            else extra.sw = 'unsupported';
+          } catch (_) { extra.sw = 'unsupported'; }
+          try {
+            if (typeof caches !== 'undefined' && caches.keys) jobs.push(caches.keys().then(function (ks) { extra.caches = ks.slice(0, 12); }).catch(function () { extra.caches = 'unavailable'; }));
+            else extra.caches = 'unsupported';
+          } catch (_) { extra.caches = 'unsupported'; }
+          var painted = false;
+          var doIt = function () { if (painted) return; painted = true; showDiag(reason, extra); };
+          try { setTimeout(doIt, 700); } catch (_) {}
+          try { Promise.all(jobs).then(doIt, doIt); } catch (_) { doIt(); }
+        } catch (_) { showDiag(reason, null); }
+      }
+
+      // `verdictIssued` gates only the FAILURE verdict. The supervisor keeps polling afterwards so
+      // that a late-arriving bundle can still retire an already-painted panel — a verdict that the
+      // app subsequently disproves must not outlive the evidence for it.
+      var verdictIssued = false, disarmed = false, lastProbeAt = -PROBE_EVERY_MS, probeInFlight = false;
+      function terminal(reason) {
+        if (verdictIssued) return; verdictIssued = true;
+        if (recoverOnce(reason)) return;   // one marked reload — the page is going away
+        paintDiag(reason);
+      }
+      function supervise() {
+        if (disarmed) return;
+        var t = (new Date()).getTime() - T0;
+        // SUCCESS — the app is alive. Disarm and, if a panel was painted by an earlier verdict
+        // that the app has since disproven, retire it: nobody may be left staring at a
+        // diagnostic on top of a working application.
+        if (B.appJsExecuted || B.dashboardReady || B.splashHidden) {
+          disarmed = true;
+          var p = document.getElementById('aurixBootDiag');
+          if (p && p.parentNode) { try { p.parentNode.removeChild(p); B.mark('boot_diag_retired'); } catch (_) {} }
+          var blr = document.getElementById('bootLoader');
+          if (blr && B.watchdogFired && !B.splashHidden) { try { blr.style.display = ''; } catch (_) {} }
+          return;
         }
-      }, 12000);
+        if (verdictIssued) return;   // verdict already out — from here we only watch for success
+        // TERMINAL — proven failure. Reported immediately; no 12s tax on a real 404.
+        if (B.appJsLoadError) return terminal('app_js_load_error');
+        if (B.appJsLoaded && t > EXEC_GRACE_MS) return terminal('app_js_loaded_but_never_executed');
+        if (B.appJsRequested && !B.appJsLoaded && document.readyState !== 'loading') return terminal('app_js_parser_passed_without_load');
+        // Only a DEFINITIVE server status may condemn the bundle. A probe network error is
+        // ambiguous and must never outrank the parser evidence below.
+        if (B.probe && B.probe.definitiveFailure) return terminal('app_js_unreachable_' + B.probe.status);
+        // ALIVE — parser still blocked on the pending bundle ⇒ the transfer is in flight. Wait.
+        if (t < SOFT_MS) return;
+        if (!probeInFlight && (t - lastProbeAt) >= PROBE_EVERY_MS) {
+          probeInFlight = true; lastProbeAt = t;
+          probeAppJs().then(function () { probeInFlight = false; }, function () { probeInFlight = false; });
+        }
+        if (t > CEILING_MS) return terminal('app_js_stalled');
+      }
+      window.__AURIX_BOOT_SUPERVISE = supervise;   // harness hook
+      try { setInterval(supervise, 1000); } catch (_) { setTimeout(supervise, SOFT_MS); }
     })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1506,7 +1689,7 @@
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
   <script src="app.js?v=605"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
-    onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
+    onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoadError=true;window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
        Loads after app.js so it can read its primitives. No consumers yet. -->
   <script src="services/wealth-engine.js?v=2"></script>

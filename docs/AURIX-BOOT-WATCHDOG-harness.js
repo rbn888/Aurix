@@ -100,8 +100,33 @@ console.log('\nLIVE FILES — watchdog + instrumentation present:');
   ck('index.html: __AURIX_BOOT watchdog object', idx.indexOf('window.__AURIX_BOOT') >= 0 && idx.indexOf('showDiag') >= 0);
   // CLOSURE SPEC §1/§5/§8 — production-clean splash: NO visible stamp, panel only on a
   // genuine fatal (app.js never executed), at a single long backstop (not 8s).
-  ck('index.html: single genuine-fatal backstop (12s, gated on appJsExecuted)',
-     idx.indexOf('12000') >= 0 && /!B\.appJsExecuted/.test(idx) && idx.indexOf('8000') < 0 && idx.indexOf('14000') < 0);
+  // BOOT-CHROME-ANDROID-P0 — the backstop is no longer a blind deadline (that timer fired at 12s
+  // over bundles that were still downloading on slow mobile links). It is an evidence-based
+  // supervisor. Pinned here so none of it can be quietly tuned away:
+  //   • the soft deadline stays at 12000ms (never shortened to 8s/14s),
+  //   • the success gate stays anchored on appJsExecuted,
+  //   • readyState is consulted, i.e. a verdict rests on parser evidence and not on the clock.
+  ck('index.html: evidence-based boot supervisor (12s soft deadline, gated on appJsExecuted)',
+     /var SOFT_MS = 12000\b/.test(idx)
+     && !/var SOFT_MS = (8000|14000)\b/.test(idx)
+     && /B\.appJsExecuted \|\| B\.dashboardReady \|\| B\.splashHidden/.test(idx)
+     && /document\.readyState !== 'loading'/.test(idx));
+  // A slow boot must never be condemned: only a DEFINITIVE server status may fail the bundle,
+  // and an ambiguous probe network error must not (reproduced: the probe fails on contention).
+  ck('index.html: only a definitive HTTP status condemns the bundle',
+     /definitiveFailure/.test(idx) && /B\.probe\.definitiveFailure/.test(idx));
+  // Automatic recovery is single-shot and marked; degraded storage must not auto-reload.
+  ck('index.html: single marked auto-recovery, no loop',
+     /aurix_boot_recovery/.test(idx) && /if \(recoveryMark\(\)\) return false;/.test(idx) && /if \(!storageOk\(\)\) return false;/.test(idx));
+  // A verdict the app later disproves must not outlive the evidence for it.
+  ck('index.html: panel is retired if the bundle arrives late',
+     /removeChild\(p\)/.test(idx) && /boot_diag_retired/.test(idx));
+  // The recovery screen must never be Spanish-only.
+  ck('index.html: recovery screen is localised (en/es)',
+     /startup diagnostics/.test(idx) && /diagnóstico de arranque/.test(idx) && /Retry \(clean reload\)/.test(idx) && /function bootLang/.test(idx));
+  // The old retry wiped sessionStorage wholesale, taking app session state with it.
+  ck('index.html: retry never wipes sessionStorage wholesale',
+     !/sessionStorage\.clear\(\)/.test(idx.replace(/\/\/[^\n]*/g, '')));
   ck('index.html: recoverable diagnostic panel + retry', idx.indexOf('aurixBootDiag') >= 0 && idx.indexOf('aurixBootRetry') >= 0);
   ck('index.html: NO reload in boot guard (loop impossible)', idx.indexOf('window.location.reload') < 0);
   // Drift-proof: the app.js script tag version must match the declared APPJS_V (not a

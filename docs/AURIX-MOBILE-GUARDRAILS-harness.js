@@ -85,8 +85,13 @@ console.log('\nG5 — donut + lower cards do not depend on heavy updateDonut:');
 console.log('\nG6 — splash is production-clean:');
 ck('G6.1 no visible build stamp / watchdog text in index.html',
    idx.indexOf('aurixBuildStamp') < 0 && idx.indexOf('_aurixStampSplash') < 0 && idx.indexOf('watchdog timer started') < 0);
-ck('G6.2 diagnostic panel gated to a genuine fatal (app.js never executed), not a slow boot',
-   /!B\.appJsExecuted/.test(idx) && idx.indexOf('8000') < 0 && idx.indexOf('14000') < 0);
+// BOOT-CHROME-ANDROID-P0 — same intent as before (a slow boot must never raise the panel), now
+// pinned against the evidence-based supervisor instead of the old blind 12s timer.
+ck('G6.2 diagnostic panel gated to a genuine fatal (evidence-based), not a slow boot',
+   /B\.appJsExecuted \|\| B\.dashboardReady \|\| B\.splashHidden/.test(idx)
+   && /var SOFT_MS = 12000\b/.test(idx)
+   && !/var SOFT_MS = (8000|14000)\b/.test(idx)
+   && /document\.readyState !== 'loading'/.test(idx));
 ck('G6.3 splash markup is only the AURIX wordmark', /<div class="boot-wordmark">AURIX<\/div>/.test(idx));
 
 // ── G7 — AURIX_MOBILE_SAFE cannot be removed silently ──
