@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '608'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '609'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -37891,12 +37891,18 @@ function _aurixSparkMountAll(container, _isRetry) {
         isSynthetic: false, completeness: 1, asOf: realEntry.ts || Date.now(),
       });
       cell.dataset.sparkStamp = _mktHistorySeriesStamp(realEntry);
-      cell.classList.remove('is-loading', 'col-chart--none');
+      // MARKET-CRYPTO-PREVIEW-P0 — el histórico real desaloja al placeholder. `innerHTML = ''`
+      // (arriba) y el montaje ocurren en el mismo turno síncrono, así que no hay frame vacío.
+      cell.classList.remove('is-loading', 'col-chart--none', 'col-chart--preview');
       if (key) _aurixMarketSpark.set(key, ctrl);
     } catch (err) {
-      // El fallo de montaje NO se maquilla con una serie inventada: la celda vuelve a su
-      // esqueleto y _mktSparkSettle la resolverá a vacío honesto si no llega a pintarse.
-      try { cell.innerHTML = ''; cell.classList.add('is-loading'); } catch (_) {}
+      // MARKET-CRYPTO-PREVIEW-P0 — el fallo de montaje NO se maquilla con una serie inventada,
+      // pero tampoco deja el hueco: la celda vuelve al placeholder monocromo.
+      try {
+        cell.innerHTML = _mktSparkPreviewSvg(key);
+        cell.classList.remove('is-loading', 'col-chart--none');
+        cell.classList.add('col-chart--preview');
+      } catch (_) {}
       console.warn('[market-spark-v2] mount fail', key, err && err.message ? err.message : err);
     }
   });
@@ -37932,12 +37938,17 @@ function _mktSparkSettle(container) {
     // esas: si su montaje síncrono no pudo medir el layout, se quedaban en blanco PARA SIEMPRE
     // (ni gráfico, ni vacío declarado, ni reintento). Observado en la validación cruzada de
     // sesiones: 21 celdas restauradas en blanco.
+    // MARKET-CRYPTO-PREVIEW-P0 — el cierre ya NO declara vacíos. Antes, todo lo que a los 7 s no
+    // tuviera histórico acababa en `col-chart--none`: en Cripto eso era la mayoría de las filas
+    // (Solana, BNB, XRP, USDC, USDT, Cardano) y es exactamente el hueco reportado. Ahora lo no
+    // resuelto se queda en el placeholder, que es un final legítimo y no un vacío.
     el.querySelectorAll('.col-chart[data-spark-key]').forEach(cell => {
       if (_mktSparkCellHasChart(cell)) return;                      // ya resuelta: gráfico real
-      if (cell.classList.contains('col-chart--none')) return;       // ya resuelta: vacío declarado
-      cell.classList.remove('is-loading');
-      cell.classList.add('col-chart--none');
-      cell.innerHTML = '';
+      // Provisional ya en pie (con su SVG dentro): no se toca, así no hay repintado observable.
+      if (cell.classList.contains('col-chart--preview') && cell.firstElementChild) return;
+      cell.classList.remove('is-loading', 'col-chart--none');
+      cell.classList.add('col-chart--preview');
+      cell.innerHTML = _mktSparkPreviewSvg(cell.dataset.sparkKey || '');
     });
   }, _AURIX_MKT_SPARK_SETTLE_MS);
 }
@@ -46045,8 +46056,52 @@ const CRYPTO_FALLBACK = [
 // un paseo aleatorio (`Math.random()`) sesgado por la variación del día; la segunda lo
 // pintaba como un mini gráfico financiero con línea, relleno y color direccional. Se
 // eliminan las dos: en Market no puede existir una función cuyo trabajo sea fabricar una
-// serie de mercado. El único dibujo posible es el histórico real (_mktHistoryFetchVisible
-// → _mktHistoryApplyToRow); su ausencia se declara con `.col-chart--none`.
+// serie de mercado.
+//
+// MARKET-CRYPTO-PREVIEW-P0 — PLACEHOLDER VISUAL, EXCLUSIVO DE LA FILA DE MARKET LIST.
+// Lo que vuelve NO es aquella serie: vuelve un relleno de celda para que `.col-chart` nunca
+// nazca vacía ni en esqueleto. Las diferencias con `generateSparkline()` son las que impiden
+// que se lea como mercado:
+//   • DETERMINISTA por símbolo (sin `Math.random()`): el mismo activo dibuja siempre la misma
+//     forma, así que no simula volatilidad ni parpadea entre renders (y el parcheo in-place
+//     lo reconoce como "sin diferencia" y no toca el DOM).
+//   • MONOCROMO y atenuado: no toma el signo de la variación, así que no codifica dirección.
+//     Nunca puede leerse como "sube" o "baja".
+//   • MARCADO como provisional y `aria-hidden`: la celda lleva `.col-chart--preview` y el nodo
+//     `.mkt-spark-preview`. No es dato — ni la capa asistiva lo anuncia, ni las sondas lo pueden
+//     confundir con un gráfico real (ése es `.aurix-chart-host`/`<canvas>`, nunca un `<svg>`).
+//   • Vive SÓLO en el DOM de la lista. Asset Detail, métricas, cálculos, histórico y
+//     exportaciones leen `_marketHistoryCache` / el motor, jamás este markup: el placeholder
+//     no entra en ninguno de esos caminos porque no existe fuera de la celda.
+// El precio y la variación 24H de la fila siguen siendo REALES; esto sustituye únicamente al
+// hueco. El único dibujo con valor informativo sigue siendo el histórico real
+// (_mktHistoryFetchVisible → _mktHistoryApplyToRow), que lo reemplaza en cuanto llega.
+function _mktSparkPreviewSvg(sym) {
+  // PRNG sembrado con el símbolo (FNV-1a → xorshift32). La estabilidad es un requisito, no un
+  // detalle: con `Math.random()` cada render redibujaría otra forma y el "provisional" se vería
+  // temblar, que es justo la aparición progresiva que este bloque elimina.
+  const s = String(sym || 'aurix');
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  let seed = (h >>> 0) || 1;
+  const rnd = () => {
+    seed ^= seed << 13; seed >>>= 0;
+    seed ^= seed >>> 17;
+    seed ^= seed << 5;  seed >>>= 0;
+    return (seed % 1000) / 1000;
+  };
+  const N = 24;
+  const pts = [];
+  let y = 0.5;
+  for (let i = 0; i < N; i++) {
+    y = Math.max(0.14, Math.min(0.86, y + (rnd() - 0.5) * 0.2));
+    pts.push(`${(i * (100 / (N - 1))).toFixed(2)},${(y * 32).toFixed(2)}`);
+  }
+  return '<svg class="mkt-spark-preview" viewBox="0 0 100 32" preserveAspectRatio="none"'
+       + ' aria-hidden="true" focusable="false"><polyline points="' + pts.join(' ')
+       + '" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"'
+       + ' stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>';
+}
 
 function normalizeMarketData(raw, type, symbol) {
   const sym      = normalizeSymbol(symbol);
@@ -46446,9 +46501,15 @@ function renderMarketItem(item, idx) {
   const _histEntry   = _marketHistoryCache.get(_mktHistoryCacheKey(item, _histRange)) || null;
   const _histUsable  = _mktHistoryCacheUsable(_histEntry);
   const _histHasSeries = !!(_histUsable && Array.isArray(_histEntry.series) && _histEntry.series.length >= 2);
-  // Ausencia YA resuelta (activo sin histórico utilizable) = vacío honesto inmediato, sin pasar
-  // por esqueleto ni esperar los 7 s de `_mktSparkSettle`.
-  const _chartCls = _histHasSeries ? '' : (_histUsable ? 'col-chart--none' : 'is-loading');
+  // MARKET-CRYPTO-PREVIEW-P0 — LA CELDA NACE CON CONTENIDO, SIEMPRE. Antes esta línea repartía la
+  // ausencia entre dos estados vacíos: esqueleto (`is-loading`, histórico aún en vuelo) o vacío
+  // declarado (`col-chart--none`, sin histórico utilizable). Los dos son huecos, y en Cripto son
+  // la mayoría de las filas. Ahora la ausencia se pinta: placeholder monocromo en el MISMO string
+  // del primer paint, cero esqueletos, cero aparición progresiva. Si luego llega histórico real,
+  // el motor lo sustituye dentro de esta misma celda (mismo hueco → sin reflow); si no llega, el
+  // placeholder se queda.
+  const _chartCls  = _histHasSeries ? '' : 'col-chart--preview';
+  const _chartHtml = _histHasSeries ? '' : _mktSparkPreviewSvg(normSym);
   const idTitle = (name && name !== item.symbol) ? name : item.symbol;
   const idMeta = [
     `<span class="mkt-id-ticker">${escHtml(item.symbol)}</span>`,
@@ -46476,7 +46537,7 @@ function renderMarketItem(item, idx) {
                 ? '<span class="col-change-empty">—</span>'
                 : safeChange(chg))}
       </div>
-      <div class="col col-chart ${_chartCls}" data-spark-key="${normSym}" data-spark-change="${chg ?? ''}" data-spark-tf="${selectedTf}"></div>
+      <div class="col col-chart ${_chartCls}" data-spark-key="${normSym}" data-spark-change="${chg ?? ''}" data-spark-tf="${selectedTf}">${_chartHtml}</div>
       <div class="col col-action">
         <button type="button" class="watchlist-btn ${watched ? 'active' : ''}" data-symbol="${normSym}" aria-pressed="${watched ? 'true' : 'false'}" aria-label="${watched ? 'Unwatch' : 'Watch'} ${escHtml(item.symbol)}">${watched ? '★' : '☆'}</button>
       </div>
@@ -57392,23 +57453,35 @@ function _mktHistoryApplyToRow(item, range, entry, gen) {
             isSynthetic: false, completeness: 1, asOf: entry.ts || Date.now(),
           });
           sparkCell.dataset.sparkStamp = _mktHistorySeriesStamp(entry);
+          // MARKET-CRYPTO-PREVIEW-P0 — sustitución del provisional por el real: el vaciado y el
+          // montaje van en el mismo turno síncrono, así que no se puede observar frame vacío, y
+          // la celda no cambia de caja, así que no hay reflow.
+          sparkCell.classList.remove('col-chart--preview', 'col-chart--none');
           if (key) _aurixMarketSpark.set(key, ctrl);
-        } catch (_) {}
+        } catch (_) {
+          // Falló el motor tras vaciar la celda: se restituye el provisional, nunca el hueco.
+          try {
+            sparkCell.innerHTML = _mktSparkPreviewSvg(sparkCell.dataset.sparkKey || '');
+            sparkCell.classList.remove('is-loading', 'col-chart--none');
+            sparkCell.classList.add('col-chart--preview');
+          } catch (_e) {}
+        }
       }
     } else if (sparkCell) {
       // MARKET-V2-01 — antes esta rama se limitaba a quitar `is-loading`, dejando a la
       // vista el SVG inventado que la fila traía de fábrica. Ya no hay SVG que dejar, así
       // que hay que distinguir los dos motivos:
-      const usable = entry.series && entry.series.length >= 2;
-      if (usable) {
-        // Serie real disponible pero el motor aún no está listo (CDN diferido): se mantiene
-        // el esqueleto para que _mktSparkSettle la monte cuando lo esté.
-        sparkCell.classList.add('is-loading');
-      } else {
-        // El activo no tiene histórico utilizable: vacío honesto y declarado, sin parpadeo.
-        sparkCell.classList.remove('is-loading');
-        sparkCell.classList.add('col-chart--none');
-        sparkCell.innerHTML = '';
+      // MARKET-CRYPTO-PREVIEW-P0 — ninguna de las dos ramas puede vaciar la celda:
+      //   • serie utilizable pero motor aún no listo (CDN diferido) → el provisional aguanta y
+      //     `_mktSparkSettle` monta el real cuando el motor cargue (no depende de `is-loading`);
+      //   • sin histórico utilizable → el provisional se queda, que es el estado final pedido.
+      // El esqueleto y el vacío declarado desaparecen los dos de esta ruta.
+      sparkCell.classList.remove('is-loading', 'col-chart--none');
+      if (!_mktSparkCellHasChart(sparkCell)) {
+        sparkCell.classList.add('col-chart--preview');
+        if (!sparkCell.firstElementChild) {
+          sparkCell.innerHTML = _mktSparkPreviewSvg(sparkCell.dataset.sparkKey || '');
+        }
       }
     }
   });

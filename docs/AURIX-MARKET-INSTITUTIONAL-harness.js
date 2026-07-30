@@ -399,16 +399,19 @@ console.log('\n14 — Market V2 bloque 1 (verdad del mini gráfico):');
   ok('14.1 el generador de series falsas ya NO existe en el bundle',
      !/function generateSparkline\s*\(/.test(appCode) &&
      !/function renderSparkline\s*\(/.test(appCode));
-  // MARKET-FIRST-PAINT-P0 — la protección de MARKET-V2-01 es "la fila no dibuja NINGUNA serie
-  // en su HTML", no "la celda nace en esqueleto". La celda sigue yendo VACÍA (aquí se comprueba,
-  // que es más fuerte que exigir una clase); lo que cambia es que su estado inicial ya se deriva
-  // de la caché, para que una fila con snapshot no se construya en dos pasos. El esqueleto queda
-  // reservado a lo único que lo merece: que todavía no se sepa nada de ese activo.
-  ok('14.2 la fila NO pinta ninguna serie en su HTML: celda vacía y estado derivado de la caché',
+  // MARKET-FIRST-PAINT-P0 — la protección de MARKET-V2-01 es "la fila no dibuja NINGUNA SERIE DE
+  // MERCADO en su HTML", no "la celda va vacía".
+  // MARKET-CRYPTO-PREVIEW-P0 — y desde aquí la celda ya NO va vacía: cuando no hay serie real
+  // utilizable lleva dentro el provisional monocromo (`_mktSparkPreviewSvg`), que es un relleno
+  // visual sin dirección ni dato. Lo que se sigue protegiendo, y es lo que importa, es que la
+  // fila no fabrique una SERIE: ni `<svg>` literal en la plantilla, ni valores derivados de la
+  // variación. El estado inicial sigue derivándose de la caché.
+  ok('14.2 la fila no fabrica ninguna serie de mercado; sin histórico pinta el provisional',
      !!rowFn && !/<svg/.test(rowFn) &&
      /col col-chart \$\{_chartCls\}"/.test(rowFn) &&
-     /data-spark-key="\$\{normSym\}"[^>]*><\/div>/.test(rowFn) &&
-     /_chartCls = _histHasSeries \? '' : \(_histUsable \? 'col-chart--none' : 'is-loading'\)/.test(rowFn));
+     /data-spark-key="\$\{normSym\}"[^>]*>\$\{_chartHtml\}<\/div>/.test(rowFn) &&
+     /_chartCls\s+= _histHasSeries \? '' : 'col-chart--preview'/.test(rowFn) &&
+     /_chartHtml = _histHasSeries \? '' : _mktSparkPreviewSvg\(normSym\)/.test(rowFn));
   ok('14.3 el montaje exige serie real: sin ella no dibuja nada',
      !!mountFn && /const hasReal = /.test(mountFn) && /if \(!hasReal\) return;/.test(mountFn) &&
      !/synthetic/.test(mountFn.replace(/\/\/.*$/gm, '')));
@@ -416,8 +419,20 @@ console.log('\n14 — Market V2 bloque 1 (verdad del mini gráfico):');
      !/source: 'synthetic'/.test(appCode));
   ok('14.5 ninguna ruta de gráfico de Market se alimenta de Math.random()',
      ![mountFn, applyFn, settleFn, rowFn].some(f => /Math\.random\(/.test(f || '')));
-  ok('14.6 sin histórico utilizable la celda se declara vacía, no se queda en blanco',
-     !!applyFn && /col-chart--none/.test(applyFn) && /const usable = /.test(applyFn));
+  // MARKET-CRYPTO-PREVIEW-P0 — el final "vacío declarado" (`col-chart--none`) se retira de la
+  // llegada asíncrona: sin histórico utilizable la celda se queda con el provisional. La regla
+  // que sustituye a la anterior es más dura: NINGUNA rama de `_mktHistoryApplyToRow` puede
+  // vaciar la celda, y las dos únicas escrituras de `innerHTML` son el montaje real (que el
+  // motor rellena en el mismo turno) y la restitución del provisional.
+  ok('14.6 sin histórico utilizable la celda conserva el provisional: ninguna rama la vacía',
+     !!applyFn &&
+     !/sparkCell\.classList\.add\('col-chart--none'\)/.test(applyFn) &&
+     // El único vaciado que queda es el previo al montaje real, y el motor lo rellena en el
+     // mismo turno síncrono (por eso no hay frame vacío observable).
+     (applyFn.match(/sparkCell\.innerHTML = '';/g) || []).length === 1 &&
+     /sparkCell\.innerHTML = '';\s*try \{[\s\S]{0,200}createSparkline/.test(applyFn) &&
+     /sparkCell\.classList\.add\('col-chart--preview'\)/.test(applyFn) &&
+     /_mktSparkPreviewSvg\(/.test(applyFn));
   ok('14.7 un activo sin adaptador resuelve la celda en vez de dejarla en esqueleto',
      !!fetchOneFn && /if \(!adapter\) \{/.test(fetchOneFn) && /_mktHistoryApplyToRow\(item, range, none, gen\)/.test(fetchOneFn));
   ok('14.8 cierre acotado: ningún esqueleto puede quedarse parpadeando para siempre',

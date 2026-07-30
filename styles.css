@@ -24916,6 +24916,21 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   );
 }
 
+/* ════════ MARKET-CRYPTO-PREVIEW-P0 — provisional del mini gráfico ════════════
+   Relleno de celda para que la fila de Market nunca muestre un hueco mientras no hay
+   histórico real (o si no llega nunca). Es deliberadamente MONOCROMO: hereda un gris
+   azulado neutro por `currentColor` y jamás el verde/rojo direccional del gráfico real,
+   de modo que no puede leerse como una variación de mercado. Trazo fino y atenuado: se
+   lee como "todavía no hay serie".
+   El dimensionado se deja a las reglas `.col-chart svg` que ya existen en cada
+   breakpoint (las mismas que gobernaban el SVG legacy), así que la caja es la de siempre
+   y la sustitución por el gráfico real no mueve nada. */
+.col-chart--preview {
+  color: rgba(220, 230, 250, 0.30);
+  opacity: 1;
+}
+.col-chart--preview .mkt-spark-preview { display: block; }
+
 /* Accesibilidad (SPEC · Reduced Motion): quien pide menos movimiento recibe el mismo
    esqueleto en estático, no un barrido infinito. */
 @media (prefers-reduced-motion: reduce) {

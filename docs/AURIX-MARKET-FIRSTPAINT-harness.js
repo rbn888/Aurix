@@ -44,7 +44,10 @@ function fnSource(name) {
 // ── SANDBOX: funciones REALES del bundle + dependencias mínimas ─────────────
 const NEEDED = ['_mktHistoryCacheKey', '_mktHistoryCacheFresh', '_mktHistoryCacheUsable',
   '_mktHistorySeriesStamp', '_mktHistoryChangeForRow', '_mktHistoryEntryForCell',
-  'renderMarketItem', 'safePrice', 'safeChange', 'fmtMktPrice'];
+  'renderMarketItem', 'safePrice', 'safeChange', 'fmtMktPrice',
+  // MARKET-CRYPTO-PREVIEW-P0 — el pintor del provisional entra al sandbox: la fila lo invoca
+  // en su primer paint, así que sin él `renderMarketItem` ni siquiera es ejecutable.
+  '_mktSparkPreviewSvg'];
 const missing = NEEDED.filter(n => !fnSource(n));
 ok('0.1 todas las funciones del owner son extraíbles del bundle', missing.length === 0, missing.join(','));
 
@@ -111,16 +114,85 @@ if (!missing.length) {
 // ── 3. La celda del gráfico nace en su estado final ─────────────────────────
 console.log('\n3 — El mini gráfico nace resuelto cuando el snapshot ya existe:');
 if (!missing.length) {
+  // MARKET-CRYPTO-PREVIEW-P0 — los dos estados VACÍOS de la celda (esqueleto y vacío declarado)
+  // desaparecen del primer paint. Sin serie real utilizable, la fila nace con el provisional.
   S._marketHistoryCache.clear();
-  ok('3.1 sin snapshot → esqueleto (honesto: aún no se sabe)', chartCls(S.renderMarketItem(ITEM, 0)) === 'is-loading');
+  ok('3.1 sin snapshot → provisional, NUNCA esqueleto',
+     chartCls(S.renderMarketItem(ITEM, 0)) === 'col-chart--preview', chartCls(S.renderMarketItem(ITEM, 0)));
   put('AAPL', '7d', { ts: NOW - 3600000, series: mkSeries(12, 80), meta: null, changePct: 1.1 });
   ok('3.2 con snapshot caducado → NACE MONTABLE, sin esqueleto', chartCls(S.renderMarketItem(ITEM, 0)) === '', chartCls(S.renderMarketItem(ITEM, 0)));
   put('AAPL', '7d', { ts: NOW - 1000, series: mkSeries(12, 80), meta: null, changePct: 1.1 });
   ok('3.3 con snapshot fresco → igual, sin esqueleto', chartCls(S.renderMarketItem(ITEM, 0)) === '');
-  // Ausencia YA resuelta: vacío declarado de inmediato, sin esperar los 7 s del settle.
+  // Ausencia YA resuelta (activo sin histórico): tampoco es un hueco — es el provisional.
   put('AAPL', '7d', { ts: NOW - 5000, series: [], meta: null, changePct: null });
-  ok('3.4 ausencia de histórico ya resuelta → vacío honesto inmediato, no esqueleto',
-     chartCls(S.renderMarketItem(ITEM, 0)) === 'col-chart--none', chartCls(S.renderMarketItem(ITEM, 0)));
+  ok('3.4 ausencia de histórico ya resuelta → provisional, no vacío declarado',
+     chartCls(S.renderMarketItem(ITEM, 0)) === 'col-chart--preview', chartCls(S.renderMarketItem(ITEM, 0)));
+}
+
+// ── 3B. El provisional: la celda nunca sale vacía y no simula mercado ───────
+console.log('\n3B — El provisional de Market List (MARKET-CRYPTO-PREVIEW-P0):');
+if (!missing.length) {
+  const cellHtml = html => {
+    const m = String(html).match(/<div class="col col-chart[^"]*"[^>]*>([\s\S]*?)<\/div>/);
+    return m ? m[1] : null;
+  };
+  S._marketHistoryCache.clear();
+  const dry = S.renderMarketItem(ITEM, 0);
+  ok('3B.1 sin histórico la celda NO va vacía: trae el provisional dentro',
+     /<svg class="mkt-spark-preview"/.test(cellHtml(dry) || ''), cellHtml(dry));
+  ok('3B.2 el provisional se declara no-dato (aria-hidden, no anunciable)',
+     /aria-hidden="true"/.test(cellHtml(dry) || ''));
+  // DETERMINISMO: es lo que impide que el provisional "tiemble" entre renders y lo que hace que
+  // el parcheo in-place lo vea como "sin diferencia" y no toque el DOM.
+  ok('3B.3 mismo símbolo ⇒ misma forma exacta en renders sucesivos',
+     S._mktSparkPreviewSvg('SOL') === S._mktSparkPreviewSvg('SOL'));
+  ok('3B.4 símbolos distintos ⇒ formas distintas (no es una plantilla plana)',
+     S._mktSparkPreviewSvg('SOL') !== S._mktSparkPreviewSvg('ADA'));
+  // Este assert mira CÓDIGO, no prosa: el comentario de la función cita literalmente el
+  // `Math.random()` retirado para explicar por qué el provisional es determinista.
+  const stripComments = s => String(s || '').replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').map(l => l.replace(/(^|[^:'"`\\])\/\/.*$/, '$1')).join('\n');
+  const previewFn = stripComments(fnSource('_mktSparkPreviewSvg'));
+  ok('3B.5 el provisional NO usa Math.random() (esa era la serie falsa retirada)',
+     !!previewFn && !/Math\.random\(/.test(previewFn));
+  // NO CODIFICA DIRECCIÓN: la diferencia dura con `generateSparkline()`. Un provisional que
+  // tomase el signo de la variación volvería a ser legible como mercado.
+  const up = S._mktSparkPreviewSvg('SOL');
+  ok('3B.6 la forma no depende de la variación: no puede leerse como subida/bajada',
+     up === S._mktSparkPreviewSvg('SOL') && !/(stroke="(?!currentColor)|fill="(?!none)")/.test(up) &&
+     /stroke="currentColor"/.test(up) && /fill="none"/.test(up));
+  ok('3B.7 es una línea, no un gráfico con relleno ni área',
+     !/<path/.test(up) && !/gradient/i.test(up) && (up.match(/<polyline/g) || []).length === 1);
+  // SIN REFLOW: el provisional y el gráfico real ocupan la MISMA celda; el provisional se
+  // dimensiona con las reglas `.col-chart svg` que ya existían (no inventa caja propia).
+  ok('3B.8 se estira a la caja de la celda (viewBox + preserveAspectRatio, sin width/height fijos)',
+     /viewBox="0 0 100 32"/.test(up) && /preserveAspectRatio="none"/.test(up) &&
+     !/<svg[^>]*\swidth="/.test(up) && !/<svg[^>]*\sheight="/.test(up));
+  // ALCANCE: el provisional pertenece SÓLO a la fila de Market. Ninguna otra superficie lo llama.
+  const callers = (appCode.match(/_mktSparkPreviewSvg\(/g) || []).length;
+  const owners = ['renderMarketItem', '_aurixSparkMountAll', '_mktSparkSettle', '_mktHistoryApplyToRow']
+    .reduce((n, f) => n + ((stripComments(fnSource(f)) || '').match(/_mktSparkPreviewSvg\(/g) || []).length, 0);
+  ok('3B.9 sólo lo invocan los cuatro owners de la celda de Market List (nada más)',
+     callers === owners + 1 /* la propia declaración */, 'callers=' + callers + ' owners=' + owners);
+  // EL CIERRE YA NO DECLARA VACÍOS. Éste era el productor real del hueco reportado en Cripto:
+  // a los 7 s, toda fila sin histórico acababa en `col-chart--none` + innerHTML vacío.
+  const settleFn = stripComments(fnSource('_mktSparkSettle'));
+  ok('3B.10 el cierre de 7 s repinta el provisional en vez de declarar la celda vacía',
+     !!settleFn && !/classList\.add\('col-chart--none'\)/.test(settleFn) &&
+     /classList\.add\('col-chart--preview'\)/.test(settleFn) &&
+     /innerHTML = _mktSparkPreviewSvg\(/.test(settleFn) &&
+     !/innerHTML = '';/.test(settleFn));
+  // NINGÚN CAMINO DE FALLO PUEDE DEJAR HUECO: si el motor revienta después de vaciar la celda,
+  // se restituye el provisional (antes volvía a esqueleto o a vacío).
+  const mountFn2 = stripComments(fnSource('_aurixSparkMountAll'));
+  const applyFn2 = stripComments(fnSource('_mktHistoryApplyToRow'));
+  ok('3B.11 un fallo de montaje restituye el provisional, nunca deja la celda en blanco',
+     /catch \(err\) \{[\s\S]{0,400}innerHTML = _mktSparkPreviewSvg\(/.test(mountFn2) &&
+     /catch \(_\) \{[\s\S]{0,400}innerHTML = _mktSparkPreviewSvg\(/.test(applyFn2));
+  // Y el histórico real SIGUE MANDANDO: cuando llega, desaloja al provisional.
+  ok('3B.12 el histórico real desaloja al provisional en cuanto se monta',
+     /classList\.remove\([^)]*'col-chart--preview'/.test(mountFn2) &&
+     /classList\.remove\('col-chart--preview'/.test(applyFn2));
 }
 
 // ── 4. La celda lee la caché pese al TTL ────────────────────────────────────
