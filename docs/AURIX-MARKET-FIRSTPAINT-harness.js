@@ -161,6 +161,16 @@ if (!missing.length) {
   ok('3B.6 la forma no depende de la variación: no puede leerse como subida/bajada',
      up === S._mktSparkPreviewSvg('SOL') && !/(stroke="(?!currentColor)|fill="(?!none)")/.test(up) &&
      /stroke="currentColor"/.test(up) && /fill="none"/.test(up));
+  // AMPLITUD MEDIDA EN PRODUCCIÓN: el paseo sin normalizar ocupaba 6-9 px de los 28 de la celda
+  // y en iPhone se leía como celda VACÍA — o sea, seguía siendo un hueco. Toda forma debe llenar
+  // la caja, sea cual sea la semilla.
+  const ampOf = svg => {
+    const ys = (svg.match(/points="([^"]+)"/)[1]).split(' ').map(p => parseFloat(p.split(',')[1]));
+    return Math.max.apply(null, ys) - Math.min.apply(null, ys);
+  };
+  const amps = ['SOL', 'ADA', 'USDC', 'AAVE', 'BTC', 'XRP', 'USDT', 'BNB'].map(s => ampOf(S._mktSparkPreviewSvg(s)));
+  ok('3B.6b toda forma llena la caja (>=60% del alto): ninguna se lee como celda vacía',
+     Math.min.apply(null, amps) >= 32 * 0.6, 'min=' + Math.min.apply(null, amps).toFixed(1) + '/32');
   ok('3B.7 es una línea, no un gráfico con relleno ni área',
      !/<path/.test(up) && !/gradient/i.test(up) && (up.match(/<polyline/g) || []).length === 1);
   // SIN REFLOW: el provisional y el gráfico real ocupan la MISMA celda; el provisional se

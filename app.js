@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '609'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '610'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -46091,12 +46091,19 @@ function _mktSparkPreviewSvg(sym) {
     return (seed % 1000) / 1000;
   };
   const N = 24;
-  const pts = [];
+  const raw = [];
   let y = 0.5;
-  for (let i = 0; i < N; i++) {
-    y = Math.max(0.14, Math.min(0.86, y + (rnd() - 0.5) * 0.2));
-    pts.push(`${(i * (100 / (N - 1))).toFixed(2)},${(y * 32).toFixed(2)}`);
-  }
+  for (let i = 0; i < N; i++) { y += (rnd() - 0.5) * 0.2; raw.push(y); }
+  // NORMALIZACIÓN AL ALTO DE LA CAJA. Sin esto el paseo se queda cerca del centro y la línea
+  // ocupa 6-9 px de los 28 de la celda: medido en producción, se lee como celda VACÍA, que es
+  // exactamente el hueco que este bloque elimina. Reescalando min..max a la banda 14–86 % del
+  // viewBox, toda forma tiene amplitud visible sea cual sea la semilla.
+  const lo = Math.min.apply(null, raw), hi = Math.max.apply(null, raw);
+  const span = hi - lo;
+  const pts = raw.map((v, i) => {
+    const n = span > 1e-6 ? (v - lo) / span : 0.5;      // degenerado (plano) → centrado
+    return `${(i * (100 / (N - 1))).toFixed(2)},${((0.86 - n * 0.72) * 32).toFixed(2)}`;
+  });
   return '<svg class="mkt-spark-preview" viewBox="0 0 100 32" preserveAspectRatio="none"'
        + ' aria-hidden="true" focusable="false"><polyline points="' + pts.join(' ')
        + '" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"'
