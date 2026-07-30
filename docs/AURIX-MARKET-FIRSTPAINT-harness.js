@@ -150,7 +150,16 @@ if (!missing.length) {
   ok('5.6 el montador salta las celdas sin diferencia en vez de recrearlas',
      /if \(keep\.has\(cell\.dataset\.sparkKey \|\| ''\)\) return;/.test(appCode));
   ok('5.7 el parche in-place ya no destruye un gráfico montado sin motivo',
-     /sel === '\.col-chart'[\s\S]{0,200}lc\.querySelector\('svg'\)/.test(appCode));
+     /sel === '\.col-chart'[\s\S]{0,220}_mktSparkCellHasChart\(lc\)/.test(appCode));
+  // REGRESSION LOCK — el motor es LightweightCharts: monta `.aurix-chart-host` con <canvas> y
+  // NUNCA un <svg>. Preguntar por 'svg' devolvía siempre "no montado": dejaba inertes las
+  // optimizaciones de no-repintado y, en el barrido de cierre, habría BORRADO gráficos reales.
+  ok('5.8 la detección de "celda ya montada" no busca <svg> en ninguna ruta de Market',
+     !/querySelector\('svg'\)/.test(appCode));
+  ok('5.9 existe un único helper de detección y es el que usan todas las rutas',
+     /function _mktSparkCellHasChart/.test(appCode) &&
+     (appCode.match(/_mktSparkCellHasChart\(/g) || []).length >= 5 &&
+     /aurix-chart-host/.test(fnSource('_mktSparkCellHasChart') || ''));
 }
 
 // ── 6. Prioridad del SPEC: snapshot → pintar → refrescar detrás ─────────────
