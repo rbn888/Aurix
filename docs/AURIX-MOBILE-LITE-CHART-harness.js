@@ -195,8 +195,10 @@ const idx = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 ck('§1 splash shows ONLY the wordmark (no visible build/app.js/watchdog/timestamp text)',
    idx.indexOf('aurixBuildStamp') < 0 && idx.indexOf('_aurixStampSplash') < 0 &&
    idx.indexOf('watchdog timer started') < 0 && /<div class="boot-wordmark">AURIX<\/div>/.test(idx));
+// BOOT-CHROME-ANDROID-P0 — the panel is now gated on evidence (success gate + parser state)
+// rather than on a bare deadline; the 12s soft deadline itself is unchanged.
 ck('§8 debug not painted into UI (no visible diag/stamp in normal flow; panel gated on fatal)',
-   /!B\.appJsExecuted/.test(idx) && idx.indexOf('12000') >= 0);
+   /B\.appJsExecuted \|\| B\.dashboardReady \|\| B\.splashHidden/.test(idx) && /var SOFT_MS = 12000\b/.test(idx));
 
 // §8.5 — placeholder ALWAYS carries an internal reason (no silent placeholder)
 { const reasons = [];
