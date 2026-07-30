@@ -47,14 +47,14 @@ const send = (a, b = {}, s) => Promise.race([
   new Promise((res, rej) => { const i = ++id; pend.set(i, { res, rej }); ws.send(JSON.stringify({ id: i, method: a, params: b, ...(s ? { sessionId: s } : {}) })); }),
   sleep(30000).then(() => { throw new Error('cdp timeout ' + a); }),
 ]);
-const src = REMOTE ? await (await fetch(ORIGIN + '/app.js?v=608')).text() : await readFile(join(ROOT, 'app.js'), 'utf8');
+const src = REMOTE ? await (await fetch(ORIGIN + '/app.js?v=607')).text() : await readFile(join(ROOT, 'app.js'), 'utf8');
 const APPJS_B64 = Buffer.from(src
   .replace('function safeRedirect(path, source) {', 'function safeRedirect(path, source) { return false;')
   .replace(/location\.replace\(base \+ 'login\.html'\)/g, 'void 0'), 'utf8').toString('base64');
 // styles.css TAMBIÉN se sirve desde el build bajo prueba: este SPEC es CSS-only, así que sin
 // interceptarlo la sonda mediría la hoja de producción y no vería ningún cambio.
 const CSS_B64 = Buffer.from(
-  REMOTE ? await (await fetch(ORIGIN + '/styles.css')).text() : await readFile(join(ROOT, 'styles.css'), 'utf8'),
+  REMOTE ? await (await fetch(ORIGIN + '/styles.css?v=640')).text() : await readFile(join(ROOT, 'styles.css'), 'utf8'),
   'utf8').toString('base64');
 
 const DEVICES = {
