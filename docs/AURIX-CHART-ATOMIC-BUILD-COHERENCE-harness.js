@@ -35,10 +35,26 @@ console.log('\nAURIX-CHART-ATOMIC-BUILD-COHERENCE — SPEC.43');
 ok('0 SPEC.43 marker present', app.indexOf('ATOMIC_BUILD_COHERENCE.43') >= 0);
 ok('0 SPEC.44 marker present (extends the SPEC.43 owner — not a new build system)', app.indexOf('RUNTIME_CAPABILITY_COHERENCE.44') >= 0);
 ok('0 single _aurixResolveBuildCoherence owner', (app.match(/^function _aurixResolveBuildCoherence\(/gm) || []).length === 1);
-ok('0 version.json.appjs = 604', versionJson.appjs === 604);
-ok('0 index APPJS_V = 604', /var APPJS_V = '604';/.test(indexHtml));
-ok('0 index requests app.js?v=604', /app\.js\?v=604/.test(indexHtml));
-ok('0 executed bundle self-version __AURIX_APPJS_VERSION__ = 601', /__AURIX_APPJS_VERSION__ = '601';/.test(app));
+// HOTFIX BUILD-BANNER-P1 — antes esto eran CUATRO pines a literales independientes. Un bump
+// parcial (mover version.json + index y olvidar el self-version del bundle) dejaba los cuatro
+// asserts verdes por separado mientras la igualdad de cuatro vías estaba rota: `executedVersion`
+// nunca alcanzaba a `expected`, la coherencia era imposible y el aviso "nueva versión
+// disponible" se quedaba fijo. Ahora se deriva la esperada de version.json y se comparan
+// ENTRE SÍ, así que un bump incompleto no puede pasar el gate.
+const _appjsExpected = versionJson.appjs;
+const _mSelf = app.match(/__AURIX_APPJS_VERSION__ = '(\d+)';/);
+const _mIdxVar = indexHtml.match(/var APPJS_V = '(\d+)';/);
+const _mIdxReq = indexHtml.match(/app\.js\?v=(\d+)/);
+const _sources = {
+  'version.json.appjs': _appjsExpected,
+  'index APPJS_V': _mIdxVar ? parseInt(_mIdxVar[1], 10) : null,
+  'index app.js?v=': _mIdxReq ? parseInt(_mIdxReq[1], 10) : null,
+  '__AURIX_APPJS_VERSION__': _mSelf ? parseInt(_mSelf[1], 10) : null,
+};
+ok('0 las CUATRO fuentes de versión existen y son numéricas',
+   Object.keys(_sources).every(k => Number.isFinite(_sources[k])), JSON.stringify(_sources));
+ok('0 IGUALDAD DE CUATRO VÍAS: un bump parcial no puede desplegarse',
+   Object.keys(_sources).every(k => _sources[k] === _appjsExpected), JSON.stringify(_sources));
 
 // ── 1 all four match → no reload ─────────────────────────────────────────────
 (function () { const d = R(523, 523, 523, 523, null); ok('1 all match ⇒ coherent + action none (no reload)', d.coherent === true && d.action === 'none' && d.clearMarker === true, JSON.stringify(d)); })();
@@ -167,6 +183,90 @@ ok('S aurixBuildCoherenceStatus returns SPEC.44 fields', /aurixBuildCoherenceSta
   // the EOF manifest / coherence code fabricate no chart points
   const eof = app.slice(app.indexOf('RUNTIME_CAPABILITY_COHERENCE.44'));
   ok('26 EOF capability block creates no chart points (syntheticPoints unaffected)', !/renderPoints|\.points\s*=|value:\s*[0-9]|synthetic/.test(eof));
+})();
+
+// ── 27 HOTFIX BUILD-BANNER-P1 — comportamiento del aviso "nueva versión disponible" ──
+// Se EJECUTA el owner real (extraído de app.js) contra un DOM simulado. No hay Service
+// Worker en la app: el aviso pertenece a este contrato de coherencia, y el defecto era que
+// sólo existía el camino que lo crea.
+(function () {
+  const vmm = require('vm');
+  // DOM mínimo con padre real, para poder comprobar que el nodo se ELIMINA.
+  function mkDoc() {
+    const body = { children: [], appendChild(c) { c.parentNode = body; this.children.push(c); },
+      removeChild(c) { const i = this.children.indexOf(c); if (i >= 0) this.children.splice(i, 1); c.parentNode = null; } };
+    return {
+      body,
+      createElement() {
+        return { id: '', textContent: '', _attr: {}, _listeners: [], parentNode: null, style: {},
+          setAttribute(k, v) { this._attr[k] = v; }, getAttribute(k) { return this._attr[k] === undefined ? null : this._attr[k]; },
+          addEventListener(ev, fn) { this._listeners.push([ev, fn]); },
+          click() { this._listeners.filter(l => l[0] === 'click').forEach(l => l[1]()); } };
+      },
+      getElementById(id) { return this.body.children.find(c => c.id === id) || null; },
+    };
+  }
+  const ctx = { console: { log() {}, warn() {} }, Object, String, Number, Boolean };
+  ctx.window = ctx;
+  ctx.document = mkDoc();
+  let navigations = 0;
+  ctx.window.aurixApplyBuildUpdate = function () {
+    if (ctx.window.__AURIX_BUILD_UPDATE_NAVIGATED === true) return false;
+    ctx.window.__AURIX_BUILD_UPDATE_NAVIGATED = true;
+    navigations++;
+    return true;
+  };
+  vmm.createContext(ctx);
+  vmm.runInContext(app.match(/let _aurixBuildUpdateApplying = false;/)[0], ctx);
+  vmm.runInContext(fnSrc('_aurixBuildBannerHide'), ctx);
+  vmm.runInContext(fnSrc('_aurixBuildBannerShow'), ctx);
+  const banner = () => ctx.document.getElementById('aurix-build-update');
+
+  // Estado normal: sin actualización pendiente, el aviso no existe.
+  ok('27.1 sin actualización pendiente no hay nodo ni estado', banner() === null && ctx.window.__AURIX_BUILD_UPDATE_AVAILABLE !== true);
+  // Deploy detectado: se muestra una sola vez.
+  vmm.runInContext('_aurixBuildBannerShow()', ctx);
+  vmm.runInContext('_aurixBuildBannerShow()', ctx);
+  vmm.runInContext('_aurixBuildBannerShow()', ctx);
+  ok('27.2 con actualización pendiente el aviso aparece UNA vez (idempotente)',
+     ctx.document.body.children.filter(c => c.id === 'aurix-build-update').length === 1 &&
+     ctx.window.__AURIX_BUILD_UPDATE_AVAILABLE === true);
+  ok('27.3 un solo listener de click por documento', banner()._listeners.filter(l => l[0] === 'click').length === 1);
+  // Pulsación: aplica una vez, limpia el estado visual y desactiva.
+  banner().click();
+  ok('27.4 al pulsar: el aviso desaparece INMEDIATAMENTE y el estado queda en false',
+     banner() === null && ctx.window.__AURIX_BUILD_UPDATE_AVAILABLE === false);
+  ok('27.5 la actualización se aplica exactamente una vez', navigations === 1);
+  // Doble pulsación: el nodo ya no existe, pero el cerrojo debe aguantar una segunda vía.
+  vmm.runInContext('_aurixBuildBannerShow()', ctx);
+  banner().click();
+  ok('27.6 doble pulsación NO produce una segunda aplicación ni una segunda recarga', navigations === 1);
+  // Coherente: ocultar limpia nodo y estado aunque ya estuviera pintado.
+  vmm.runInContext('_aurixBuildBannerHide()', ctx);
+  ok('27.7 al volver a ser coherente el aviso se retira del DOM y el estado baja',
+     banner() === null && ctx.window.__AURIX_BUILD_UPDATE_AVAILABLE === false &&
+     ctx.document.body.children.length === 0);
+
+  // Cableado en el resolutor: mostrar sólo en recoverable, ocultar en coherente.
+  const boot = app.slice(app.indexOf('function _aurixBuildCoherenceBoot'), app.indexOf('P0 BOOT PIPELINE'));
+  ok('27.8 el camino coherente OCULTA el aviso (era el que faltaba)',
+     /clear the marker[\s\S]{0,400}_aurixBuildBannerHide\(\)/.test(boot));
+  ok('27.9 el aviso sólo se crea en el estado recoverable, por el owner único',
+     /action === 'recoverable'[\s\S]{0,600}_aurixBuildBannerShow\(\)/.test(boot) &&
+     // Un solo sitio en TODO el bundle crea el nodo: el owner.
+     (app.match(/d\.id = 'aurix-build-update';/g) || []).length === 1 &&
+     (app.match(/function _aurixBuildBannerShow\(/g) || []).length === 1);
+  ok('27.10 una sola navegación por sesión de página (cerrojo en aurixApplyBuildUpdate)',
+     /__AURIX_BUILD_UPDATE_NAVIGATED === true\) return false;/.test(boot));
+  ok('27.11 no se oculta con CSS ni con timeouts: se elimina el nodo y se apaga el estado',
+     /removeChild\(el\)/.test(fnSrc('_aurixBuildBannerHide')) &&
+     !/setTimeout|display\s*:\s*none|visibility|opacity/.test(fnSrc('_aurixBuildBannerHide')));
+  ok('27.12 el estado NO se restaura desde storage: sólo del registro real de versiones',
+     !/localStorage|sessionStorage/.test(fnSrc('_aurixBuildBannerShow')) &&
+     !/localStorage|sessionStorage/.test(fnSrc('_aurixBuildBannerHide')));
+  ok('27.13 la app no tiene Service Worker: toda referencia sólo DESREGISTRA restos',
+     !fs.existsSync(path.join(root, 'sw.js')) && !fs.existsSync(path.join(root, 'service-worker.js')) &&
+     !/serviceWorker\.register\(/.test(app + indexHtml));
 })();
 
 console.log('\n' + (fail === 0 ? '✅' : '❌') + ' SPEC.43/44 BUILD+CAPABILITY COHERENCE — ' + pass + ' passed, ' + fail + ' failed');
