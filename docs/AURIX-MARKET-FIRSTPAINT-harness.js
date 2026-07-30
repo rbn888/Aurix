@@ -208,5 +208,47 @@ console.log('\n8 — Alcance: sólo el owner de Market:');
      String(t(/AurixChartAdapters\.(yahoo|crypto)HistoryAdapter/g)));
 }
 
+// ── 9. Enlace símbolo → histórico de CRIPTO (MARKET-CRYPTO-HISTORY) ─────────
+// La causa real de "los mini gráficos salen vacíos": una cripto sin `coinId` caía a Yahoo con
+// el ticker DESNUDO, que Yahoo no resuelve. Comprobado contra el endpoint real: `SOL` → 0
+// puntos, `SOL-USD` → 232. Afectaba a ~68 de 129 filas (casi toda la pestaña Cripto), tanto al
+// mini gráfico como a la variación. Es la MISMA clase de fallo que el "^" de los índices.
+console.log('\n9 — Enlace símbolo → histórico de cripto:');
+{
+  const vm2 = require('vm');
+  const sb = { console, String, Number, RegExp, JSON, MARKET_INDICES: ['^GSPC', '^IXIC', '^DJI'] };
+  sb.window = sb; vm2.createContext(sb);
+  const srcPick = fnSource('_aurixMktPickAdapter');
+  ok('9.1 el owner del enrutado es extraíble', !!srcPick);
+  if (srcPick) {
+    vm2.runInContext(srcPick, sb);
+    const P = sb._aurixMktPickAdapter;
+    const y = o => { const r = P(o); return r && r.kind === 'yahoo' ? r.args.symbol : (r ? r.kind : null); };
+    // Lo que ya funcionaba NO cambia.
+    ok('9.2 una cripto CON coinId sigue yendo al adaptador de cripto',
+       (P({ type: 'crypto', coinId: 'solana', symbol: 'SOL' }) || {}).kind === 'crypto');
+    ok('9.3 una acción normal no se toca', y({ type: 'stock', symbol: 'AAPL' }) === 'AAPL');
+    ok('9.4 los índices conservan su "^"', y({ type: 'index', symbol: 'GSPC' }) === '^GSPC');
+    ok('9.5 el oro sigue mapeando a GC=F', y({ type: 'metal', symbol: 'XAU' }) === 'GC=F');
+    // El fix.
+    ok('9.6 una cripto SIN coinId pide el par canónico, no el ticker desnudo',
+       y({ type: 'crypto', symbol: 'SOL' }) === 'SOL-USD', y({ type: 'crypto', symbol: 'SOL' }));
+    ok('9.7 se aplica a los tickers afectados de la lista',
+       ['ADA', 'DOGE', 'AVAX', 'DOT', 'USDT'].every(s => y({ type: 'crypto', symbol: s }) === s + '-USD'));
+    // Y no puede estropear lo que ya venía bien formado.
+    ok('9.8 no duplica el sufijo si el símbolo ya trae el par',
+       y({ type: 'crypto', symbol: 'SOL-USD' }) === 'SOL-USD');
+    ok('9.9 no toca símbolos con sufijo de mercado o separador',
+       y({ type: 'crypto', symbol: 'BTC.X' }) === 'BTC.X' && y({ type: 'crypto', symbol: 'ETH/EUR' }) === 'ETH/EUR');
+    ok('9.10 marketSymbol explícito sigue mandando', y({ type: 'crypto', marketSymbol: 'BTC-EUR', symbol: 'BTC' }) === 'BTC-EUR');
+  }
+  // Sigue siendo UNA sola petición por fila: el fix corrige el símbolo, no añade llamadas.
+  const f1b = fnSource('_mktHistoryFetchOne') || '';
+  ok('9.11 no se añade ninguna petición: misma llamada por fila con el símbolo correcto',
+     (f1b.match(/await fn\(args\)/g) || []).length === 1);
+  ok('9.12 el enrutado sigue teniendo un único owner compartido',
+     (appCode.match(/_aurixMktPickAdapter\(/g) || []).length === 3);
+}
+
 console.log(`\nRESULT: ${fail ? 'FAIL ✗' : 'PASS ✓'}  (${pass} passed, ${fail} failed)`);
 process.exit(fail ? 1 : 0);

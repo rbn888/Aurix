@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '607'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '608'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -39094,6 +39094,25 @@ function _aurixMktPickAdapter(item) {
         .find(x => String(x).toUpperCase().replace(/^\^/, '') === bare) || null;
     } catch (_) {}
     sym = canon || (/^[A-Z]{2,6}$/.test(bare) ? '^' + bare : sym);
+  }
+  // HOTFIX MARKET-CRYPTO-HISTORY — MISMA CLASE DE FALLO que el "^" de los índices de arriba,
+  // en el mismo enlace símbolo → histórico, y con el mismo desenlace visible: la fila se queda
+  // sin mini gráfico y con la variación en "—".
+  //
+  // Una cripto sólo entra por el adaptador de cripto si trae `coinId`. Los items que compone
+  // la LISTA de Market no lo traen (el catálogo curado sí lo tiene, pero no llega hasta aquí),
+  // así que caían a Yahoo con el ticker DESNUDO. Yahoo no resuelve un ticker de cripto suelto:
+  // comprobado contra el endpoint real, `SOL` → ok:false / 0 puntos y `SOL-USD` → 232 puntos.
+  // Igual con ADA, DOGE, AVAX… Ese era el motivo de que ~68 de las 129 filas (prácticamente
+  // toda la pestaña Cripto) mostrasen el mini gráfico vacío y la variación en "—": el histórico
+  // EXISTE y es real, se estaba pidiendo con el símbolo equivocado.
+  //
+  // NO añade ninguna llamada: es la misma petición por fila, con el símbolo correcto. Sólo se
+  // reescribe un ticker plano; cualquier símbolo que ya traiga par, sufijo de mercado o
+  // separador se deja intacto.
+  if (tp === 'crypto') {
+    const bare = String(sym).toUpperCase();
+    if (/^[A-Z0-9]{2,10}$/.test(bare)) sym = bare + '-USD';
   }
   if (!sym) return null;
   return { kind: 'yahoo', args: { symbol: String(sym).toUpperCase() } };
