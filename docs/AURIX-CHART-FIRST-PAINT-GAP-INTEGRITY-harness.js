@@ -51,7 +51,7 @@ const FNS = ['_aurixNormalizeBackendSnapshot', '_aurixMergeSnapshotSources', '_a
   '_aurixSourceFamily', '_aurixFrontendUsableInWindow', '_aurix24hSourceCoverage',
   '_aurix24hStripNonAuthoritativePreservingHoles', '_aurixApplyRangeSourceAuthority',
   '_aurixEnforceSegmentSourceAuthority', '_aurixRealGapFloorMs', '_aurix24hReconcileInFlight',
-  '_aurixChartPublicationSourcesPending'];
+  '_aurixChartPublicationSourcesPending', '_aurixEmergencyPaintBadgeNode', '_aurixResolveChartReturnContract', '_aurixHistoryPresentationBadge', '_aurixReturnPendingHTML', '_aurixBuildContinuityValidatedSeries', '_aurixShortHistoryDisplay', '_aurixVisualTrustGate', '_aurixStableDisplayAnchor', '_aurixCanonicalReturnAnchorIndex', '_aurixResolveReliabilityDeadlock', '_aurixResolveFinalRenderSeriesContract', '_aurixEmergencyHash', '_aurixConfirmedBridgeGaps', '_aurixVerticalJumps', '_aurixCapitalStepBreaks', '_aurixSparseRampBreaks', '_aurixSplitAtGaps', '_aurixStructuralBreaks', '_aurixRegimeBoundaryBreaks'];
 // globales de sesión que los predicados leen con `typeof … !== 'undefined'` (inyectables por escenario)
 const ctx = {
   console: { log() {}, warn() {} }, Math, JSON, Array, Number, isFinite, Infinity, Date, Set, Object,
@@ -137,11 +137,12 @@ section('CONTRATO 1 — los tres sitios de publicación dejan de estar acotados 
 ok('1.9 builder: la retención del primer frame NO está acotada a 24H',
   /_holdFirstPaint\s*=/.test(bare) && !/_hold(24h)?FirstPaint\s*=\s*\(?\s*\(?r\s*===\s*'24h'/.test(bare),
   (/_hold\w*FirstPaint\s*=\s*[^;]{0,120};/.exec(bare) || ['no encontrado'])[0].replace(/\s+/g, ' '));
-// pintor de escritorio (v579)
-const holdDesktop = /if\s*\([^{]*!_frc\.badgeEligible[^{]*\)\s*\{/.exec(bare);
-ok('1.10 pintor escritorio: hold sin `emg.range === \'24h\'` y sobre el predicado único',
-  !!holdDesktop && !/emg\.range\s*===\s*'24h'/.test(holdDesktop[0]) && /_aurixChartPublicationSourcesPending/.test(holdDesktop[0]),
-  holdDesktop ? holdDesktop[0].replace(/\s+/g, ' ').slice(0, 170) : 'no encontrado');
+// pintor de escritorio (v579 → puerta única de P0-FIRST-DEFINITIVE-PAINT, ver 4.1/4.1b/4.1c)
+const deskGate = /if\s*\([^{]*_aurixChartPublicationSourcesPending\(\)\.pending\)\s*\{/.exec(
+  (function () { try { return fnSrc('_wscPaintEmergency'); } catch (_) { return ''; } })());
+ok('1.10 pintor escritorio: la puerta no está acotada a un rango y usa el predicado único',
+  !!deskGate && !/range\s*===\s*'24h'/.test(deskGate[0]),
+  deskGate ? deskGate[0].replace(/\s+/g, ' ').slice(0, 170) : 'no encontrado');
 // pintor móvil (nunca tuvo hold: paridad obligatoria)
 const mobileFn = (function () { try { return fnSrc('renderAurixMobileLiteChart'); } catch (_) { return ''; } })();
 ok('1.11 pintor móvil: tiene el MISMO hold que escritorio (paridad)',
@@ -265,6 +266,165 @@ ok('3.2 el descarte 24H sólo filtra (preserva orden y objetos originales)',
   !!stripSrc && /\.filter\(/.test(stripSrc) && !/\.push\(|\.splice\(|\.reverse\(/.test(stripSrc));
 ok('3.3 no se ocultó nada con CSS ni con tiempo en la retención',
   !/PublicationSourcesPending[\s\S]{0,300}?(display\s*:\s*none|visibility\s*:\s*hidden)/.test(bare));
+
+// ══════════════════════════════════════════════════════════════════════════
+section('SPEC P0-FIRST-DEFINITIVE-PAINT — la primera publicación es SIEMPRE la definitiva');
+// ══════════════════════════════════════════════════════════════════════════
+// v646 retenía la LÍNEA pero publicaba la superficie equivocada mientras esperaba: los tres sitios de
+// primera publicación escribían copia terminal —`wscQualityGateTitle` ("Histórico en construcción" /
+// "History in progress") en escritorio y móvil, y "Calculando…" en el badge—. El placeholder premium
+// limpio ya existía: `.chart-loading-skin` de index.html, visible con el host VACÍO.
+const paintBare = (function () { try { return fnSrc('_wscPaintEmergency').replace(/\/\/[^\n]*/g, ''); } catch (_) { return ''; } })();
+const mobileBare = mobileFn.replace(/\/\/[^\n]*/g, '');
+// UNA sola puerta: debe estar ANTES de todos los sitios que publican copia terminal, no ser un parche por sitio.
+const gateRe = /_aurixChartPublicationSourcesPending\(\)\.pending\)\s*\{[\s\S]{0,900}?return true;\s*\}\s*\}/;
+const gate = gateRe.exec(paintBare) || [''];
+ok('4.1 escritorio: existe UNA puerta de publicación y no publica copia terminal',
+  !!gate[0] && !/_wscRenderInsufficient/.test(gate[0]), 'la puerta no se encontró o sigue pintando la superficie terminal');
+ok('4.2 escritorio: la puerta deja el host VACÍO (pasa el placeholder premium existente)',
+  /innerHTML\s*=\s*''/.test(gate[0]));
+ok('4.3 escritorio: la puerta usa el estado de skin ya existente `loading`, no `building`',
+  /_aurixSetChartSkin\([^)]*'loading'\)/.test(gate[0]));
+// la puerta precede a los CINCO sitios de _wscRenderInsufficient y al pintado del badge
+const gateAt = paintBare.search(gateRe);
+const firstInsuff = paintBare.indexOf('_wscRenderInsufficient');
+const badgeAt = paintBare.indexOf('_aurixEmergencyPaintBadgeNode');
+ok('4.1b escritorio: la puerta va ANTES de los 5 sitios terminales y del badge',
+  gateAt > 0 && gateAt < firstInsuff && gateAt < badgeAt,
+  'gate@' + gateAt + ' insuficiente@' + firstInsuff + ' badge@' + badgeAt);
+ok('4.1c escritorio: sin lógica de retención duplicada (una única consulta al predicado)',
+  (paintBare.match(/_aurixChartPublicationSourcesPending\(\)\.pending/g) || []).length === 1,
+  (paintBare.match(/_aurixChartPublicationSourcesPending\(\)\.pending/g) || []).length + ' consultas');
+const mgate = /_aurixChartPublicationSourcesPending\(\)\.pending\)\s*\{[\s\S]{0,1100}?return;\s*\}\s*\}/.exec(mobileBare) || [''];
+ok('4.4 móvil: existe UNA puerta silenciosa (quiet), sin copia terminal',
+  /quiet:\s*true/.test(mgate[0]) && !/wscQualityGateTitle/.test(mgate[0]));
+const mGateAt = mobileBare.indexOf('_aurixChartPublicationSourcesPending');
+const mFirstFb = mobileBare.indexOf("_aurixMobileLiteFallback('pending')");
+ok('4.4b móvil: la puerta va ANTES de los sitios de fallback con copia',
+  mGateAt > 0 && mFirstFb > 0 && mGateAt < mFirstFb, 'gate@' + mGateAt + ' fallback@' + mFirstFb);
+ok('4.4c móvil: sin lógica de retención duplicada',
+  (mobileBare.match(/_aurixChartPublicationSourcesPending\(\)\.pending/g) || []).length === 1,
+  (mobileBare.match(/_aurixChartPublicationSourcesPending\(\)\.pending/g) || []).length + ' consultas');
+const fbFn = (function () { try { return fnSrc('_aurixMobileLiteFallback').replace(/\/\/[^\n]*/g, ''); } catch (_) { return ''; } })();
+ok('4.5 móvil: quiet vacía el host y los llamantes TERMINALES conservan la copia',
+  /opts && opts\.quiet[\s\S]{0,120}innerHTML\s*=\s*''/.test(fbFn) && /wscQualityGateTitle/.test(fbFn));
+ok('4.6 móvil: quiet no rompe el contrato de diagnóstico (placeholderReason se sigue fijando)',
+  fbFn.indexOf('placeholderReason') < fbFn.indexOf('opts.quiet'));
+
+// ── el badge: prueba FUNCIONAL con DOS sandboxes (hold ON vs OFF) ───────────────────────────
+// Dos contextos independientes con el flag de rollback en true/false. Así el ANTES (la publicación
+// provisional) se REPRODUCE de verdad en el mismo binario: si el pintor fallara en el sandbox, el
+// contexto OFF también saldría vacío y estos asserts caerían — una excepción no puede fingir un PASS.
+function mkBadgeCtx(holdOn) {
+  const c = {
+    console: { log() {}, warn() {} }, Math, JSON, Array, Number, isFinite, Infinity, Date, Set, Object,
+    currentUser: null, _aurixCanonicalHistoryLoaded: true, _aurixRemoteLoadOutcome: 'ok-row',
+    _aurixBackendSnapshotsState: 'ready',
+    // los dos formateadores terminales viven fuera del alcance extraíble (igual que en el harness SPEC.28)
+    _aurixEmergencyBadgeText: e => ((e.badgeReturnPct >= 0 ? '+' : '') + Number(e.badgeReturnPct).toFixed(2) + '%'),
+    _aurixReturnInsufficientText: () => '0.00%',
+  };
+  vm.createContext(c);
+  ['_AURIX_CHART_RETURN_CONTRACT_UNIFICATION', '_AURIX_CHART_SHORT_HISTORY_DISPLAY',
+    '_AURIX_CHART_SHORT_HISTORY_MIN_DAYS', '_AURIX_CHART_VISUAL_TRUST_GATE', '_AURIX_VTG_MIN_MAIN_PTS',
+    '_AURIX_VTG_MIN_MAIN_SPAN_MS', '_AURIX_CHART_BOOTSTRAP_SUPPRESSION', '_AURIX_STABLE_BAND_LO',
+    '_AURIX_STABLE_MIN_PTS', '_AURIX_STABLE_MIN_SPAN_MS', '_AURIX_STABLE_CONSTRUCTION_JUMP',
+    '_AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT', '_AURIX_CHART_CANONICAL_REFRESH_DETERMINISM',
+    '_AURIX_CHART_RELIABILITY_DEADLOCK_RESOLUTION', '_AURIX_PARTIAL_RETURN_MIN_PCT',
+    '_AURIX_RETURN_PENDING_TEXT', '_AURIX_HIST_PARTIAL_TEXT', '_AURIX_HIST_AVAILABLE_TEXT',
+    '_AURIX_CHART_CONTINUITY_UNIFICATION', '_AURIX_ALL_MIN_TRUST_POINTS', '_AURIX_ORPHAN_CLEANUP_ENABLED',
+    '_AURIX_ORPHAN_MAX_PTS', '_AURIX_BRIDGE_SEG_ENABLED', '_AURIX_BRIDGE_SEG_FRAC',
+    '_AURIX_CAPITAL_STEP_SEG_ENABLED', '_AURIX_SPARSE_RAMP_SEG_ENABLED', '_AURIX_VJUMP_MIN_FRAC',
+    '_AURIX_VJUMP_P95_MULT', '_AURIX_CAPSTEP_RATIO_LO', '_AURIX_CAPSTEP_RATIO_HI', '_AURIX_CAPSTEP_TS_PAD_MS',
+    '_AURIX_SPARSE_RAMP_MULT', '_AURIX_SPARSE_RAMP_MIN_MS', '_AURIX_REGIME_CLIFF_FRAC',
+    '_AURIX_VP_GAP_FLOOR_MS', '_AURIX_VP_GAP_MEDIAN_MULT', '_AURIX_OBS_GAP_MIN_MS', '_AURIX_OBS_GAP_MAX_MS',
+    '_AURIX_EMG_RANGE_MS', '_AURIX_BACKEND_SNAPSHOTS_ENABLED', '_AURIX_BACKEND_SNAPSHOTS_AUTOLOAD',
+  ].forEach(n => { try { vm.runInContext(konstSrc(n), c); } catch (_) {} });
+  // el flag del SPEC, forzado por escenario (rollback documentado)
+  vm.runInContext('const _AURIX_CHART_FIRSTPAINT_HOLD_ALL_RANGES = ' + (holdOn ? 'true' : 'false') + ';', c);
+  ['_aurixEmergencyHash', '_aurixRealGapFloorMs', '_aurixConfirmedBridgeGaps', '_aurixVerticalJumps',
+    '_aurixCapitalStepBreaks', '_aurixSparseRampBreaks', '_aurixSplitAtGaps', '_aurixRegimeBoundaryBreaks',
+    '_aurixBuildContinuityValidatedSeries', '_aurixStructuralBreaks', '_aurixResolveChartReturnContract',
+    '_aurixShortHistoryDisplay', '_aurixVisualTrustGate', '_aurixStableDisplayAnchor',
+    '_aurixCanonicalReturnAnchorIndex', '_aurixResolveReliabilityDeadlock',
+    '_aurixResolveFinalRenderSeriesContract', '_aurixChartPublicationSourcesPending',
+    '_aurixReturnPendingHTML', '_aurixHistoryPresentationBadge', '_aurixEmergencyPaintBadgeNode',
+  ].forEach(n => { try { vm.runInContext(fnSrc(n), c); } catch (_) {} });
+  return c;
+}
+const BON = mkBadgeCtx(true), BOFF = mkBadgeCtx(false);
+// prueba de cordura del sandbox: el pintor DEBE saber publicar algo, o los asserts no valen nada
+(function () {
+  const el = { innerHTML: '', className: '' };
+  BOFF.__el = el; BOFF.__emg = { range: '24h', state: 'ready', points: [], returnState: 'insufficient_return_history' };
+  try { vm.runInContext('_aurixEmergencyPaintBadgeNode(__el, __emg, "desktop")', BOFF); } catch (_) {}
+  ok('4.6b cordura del sandbox: el pintor de badge publica (los asserts 4.7+ son válidos)',
+    el.innerHTML !== '', 'el pintor no escribió nada ni con la retención OFF ⇒ sandbox roto');
+})();
+if (has('_aurixEmergencyPaintBadgeNode')) {
+  const paintIn = (c, emg, sess) => {
+    Object.keys(sess).forEach(k => { c[k] = sess[k]; });
+    const el = { innerHTML: '', className: '' };
+    c.__el = el; c.__emg = emg;
+    try { vm.runInContext('_aurixEmergencyPaintBadgeNode(__el, __emg, "desktop")', c); } catch (_) {}
+    return el;
+  };
+  const paintBadge = (emg, sess) => paintIn(BON, emg, sess);
+  const paintBefore = (emg, sess) => paintIn(BOFF, emg, sess);
+  const U = { id: 'u1' };
+  const PENDING = { currentUser: U, _aurixRemoteLoadOutcome: 'ok-row', _aurixCanonicalHistoryLoaded: false, _aurixBackendSnapshotsState: 'ready' };
+  const SETTLED = { currentUser: U, _aurixRemoteLoadOutcome: 'ok-row', _aurixCanonicalHistoryLoaded: true, _aurixBackendSnapshotsState: 'ready' };
+  const OFFLINE = { currentUser: U, _aurixRemoteLoadOutcome: 'failed', _aurixCanonicalHistoryLoaded: false, _aurixBackendSnapshotsState: 'failed' };
+  // CUENTA MADURA, reconciliación pendiente: el builder retiene ⇒ nada publicado (ni un carácter)
+  const held = paintBadge({ range: '7d', state: 'pending', points: [], reason: 'awaiting_canonical_reconcile' }, PENDING);
+  ok('4.7 [madura, pendiente] el badge NO publica NADA (ni "Calculando…" ni "Historial parcial")',
+    held.innerHTML === '' && held.className === '', JSON.stringify([held.innerHTML.slice(0, 40), held.className]));
+  // arranque durable: state 'ready' pero retorno no fiable — el caso que SÍ pintaba "Calculando…"
+  const seg = (t0, n, step, v0, dv) => { const o = []; for (let i = 0; i < n; i++) o.push({ ts: t0 + i * step, value: +(v0 + i * dv).toFixed(2) }); return o; };
+  const durable = { range: '7d', state: 'ready', points: seg(NOW - 3 * D, 40, 5400000, 10000, 1),
+    returnState: 'insufficient_return_history', displayedRangeState: 'partial_history', historyTooShortForRange: true,
+    coverageRatio: 0.4, pointCount: 40 };
+  const held2 = paintBadge(durable, PENDING);
+  ok('4.8 [madura, arranque durable + pendiente] tampoco publica nada',
+    held2.innerHTML === '' && held2.className === '', JSON.stringify([held2.innerHTML.slice(0, 60), held2.className]));
+  // ── ANTES / DESPUÉS sobre el MISMO binario (flag de rollback) ──────────────────────────
+  const before1 = paintBefore({ range: '7d', state: 'pending', points: [], reason: 'awaiting_canonical_reconcile' }, PENDING);
+  const before2 = paintBefore(durable, PENDING);
+  ok('4.8a ANTES (retención OFF): la cuenta madura pendiente SÍ publicaba estado provisional',
+    /Calculando|Historial parcial/.test(before1.innerHTML) || /Calculando|Historial parcial/.test(before2.innerHTML),
+    JSON.stringify([before1.innerHTML.slice(0, 50), before2.innerHTML.slice(0, 50)]));
+  ok('4.8b DESPUÉS (retención ON): el mismo escenario no publica nada',
+    held.innerHTML === '' && held2.innerHTML === '');
+  // CUENTA NUEVA / cobertura real insuficiente, YA reconciliada ⇒ el estado FINAL sí se publica
+  const finalPartial = paintBadge(durable, SETTLED);
+  ok('4.9 [reconciliado] el estado honesto FINAL sí se publica (no se pierde)',
+    finalPartial.innerHTML !== '' && /Historial parcial|Calculando/.test(finalPartial.innerHTML),
+    JSON.stringify(finalPartial.innerHTML.slice(0, 60)));
+  // OFFLINE: comportamiento certificado intacto, sin bloqueo
+  const off = paintBadge(durable, OFFLINE);
+  ok('4.10 [offline] publica como antes (sin bloqueo indefinido)', off.innerHTML !== '',
+    JSON.stringify(off.innerHTML.slice(0, 60)));
+  // un % DEFINITIVO nunca se retiene, ni con fuentes pendientes
+  const okEmg = { range: '24h', state: 'ready', points: seg(NOW - 20 * H, 60, 12e5, 10000, 3),
+    returnState: 'ok', returnPct: 1.8, badgeReturnPct: 1.8, color: 'up', displayedRangeState: 'full',
+    historyTooShortForRange: false, coverageRatio: 0.99, pointCount: 60 };
+  const defin = paintBadge(okEmg, PENDING);
+  ok('4.11 un retorno DEFINITIVO se publica siempre (la retención no lo alcanza)',
+    defin.innerHTML !== '' && !/Calculando/.test(defin.innerHTML), JSON.stringify(defin.innerHTML.slice(0, 60)));
+  // los cinco rangos: pendiente ⇒ nada; reconciliado ⇒ algo
+  let allHeld = true, allPub = true, detail = [];
+  ['24h', '7d', '30d', '1y', 'all'].forEach(r => {
+    const e = Object.assign({}, durable, { range: r });
+    if (paintBadge(e, PENDING).innerHTML !== '') { allHeld = false; detail.push(r + ':publicó'); }
+    if (paintBadge(e, SETTLED).innerHTML === '') { allPub = false; detail.push(r + ':vacío-final'); }
+  });
+  ok('4.12 24H/7D/30D/1A/TOTAL: pendiente ⇒ nada publicado', allHeld, detail.join(' '));
+  ok('4.13 24H/7D/30D/1A/TOTAL: reconciliado ⇒ estado final publicado', allPub, detail.join(' '));
+  setSession({ currentUser: null, _aurixRemoteLoadOutcome: 'ok-row', _aurixCanonicalHistoryLoaded: true, _aurixBackendSnapshotsState: 'ready' });
+} else ok('4.7 pintor de badge extraíble', false, '_aurixEmergencyPaintBadgeNode ausente');
+
+ok('4.14 sin CSS nuevo, sin placeholder nuevo, sin timers en la retención',
+  !/P0-FIRST-DEFINITIVE-PAINT[\s\S]{0,600}?(setTimeout\(|setInterval\(|display\s*:\s*none)/.test(bare));
 
 console.log('\n' + (fail === 0 ? 'RESULT: GO' : 'RESULT: NO-GO') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);

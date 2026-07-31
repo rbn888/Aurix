@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '612'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '613'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -29961,6 +29961,17 @@ function _aurixReturnInsufficientText() {
 function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
   try {
     if (!el) return;
+    // ── SPEC P0-FIRST-DEFINITIVE-PAINT ────────────────────────────────────────────────────
+    // Third and last site that published a provisional visible state. While a source the definitive series
+    // needs is still pending, the return area must publish NOTHING — not "Calculando…"/"Calculating", not
+    // "Historial parcial", not a provisional %. #chartChange / #chartChangeMobile ship EMPTY in index.html,
+    // so leaving the node untouched IS the clean premium placeholder (no CSS, no new placeholder, no timer).
+    // Gated on the SAME predicate the two chart surfaces use, so all three publish as one. Applied ONLY to
+    // the two non-terminal branches below: a definitive %/neutral still paints immediately, and the instant
+    // the sources settle this releases and the first painted value is the definitive one — including a
+    // genuine "Historial parcial" for a truly short account, now reachable only as a FINAL state. Offline /
+    // failed load keeps the certified behaviour (the predicate settles on failure ⇒ paints exactly as before).
+    const _holdPending = () => { try { return (typeof _aurixChartPublicationSourcesPending === 'function') && _aurixChartPublicationSourcesPending().pending; } catch (_) { return false; } };
     // SPEC DSH.CHART.RETURN-BADGE-TRUST-UNIFICATION.14 — resolve %, colour, badge label + Calculando/neutral
     // from the ONE unified contract (continuity-validated series + proven flow-neutral/maturity gates). The
     // ambiguous "0.00%" (line drawn but return NOT trustworthy) now reads "Calculando…" — a real 0.00% shows
@@ -29977,6 +29988,8 @@ function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
         el.innerHTML = '<span class="wsc-metric-val">' + _aurixReturnInsufficientText() + '</span>';
         el.className = 'chart-change flat';
       } else {
+        // SPEC P0-FIRST-DEFINITIVE-PAINT — non-terminal: publish nothing while sources are pending.
+        if (_holdPending()) return;
         // SPEC.28 — stable real partial/available history with no trusted return ⇒ truthful premium label;
         // genuine loading ⇒ existing "Calculando…". Presentation-only; no %/colour/geometry change. Defensive:
         // if the helper is absent (isolated unit context), fall back to the exact prior pending markup.
@@ -29995,6 +30008,8 @@ function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
       el.innerHTML = '<span class="wsc-metric-val">' + _aurixReturnInsufficientText() + '</span>';
       el.className = 'chart-change flat';
     } else {
+      // SPEC P0-FIRST-DEFINITIVE-PAINT — non-terminal: publish nothing while sources are pending.
+      if (_holdPending()) return;
       // SPEC.28 — same truthful premium presentation on the v495 fallback path (defensive helper guard).
       const _pb = (typeof _aurixHistoryPresentationBadge === 'function') ? _aurixHistoryPresentationBadge(emg, surface)
         : { html: (typeof _aurixReturnPendingHTML === 'function') ? _aurixReturnPendingHTML() : '<span class="wsc-metric-calc">Calculando…</span>', className: 'chart-change calculating' };
@@ -35056,6 +35071,36 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
     _aurixLastVisualSig[surface] = null;   // pending → force a fresh draw on the next ready
   }
 
+  // ── SPEC P0-FIRST-DEFINITIVE-PAINT — THE single publication gate ──────────────────────────────
+  // This is the one point where the renderer gets permission to make its first publication. Below it there
+  // are FIVE sites that call _wscRenderInsufficient (FRC building/empty/error, SPEC.16 short-history,
+  // SPEC.18 bootstrap suppression, SPEC.17 visual-trust-gate and the `emg.state !== 'ready'` pending path),
+  // and every one of them writes t('wscQualityGateTitle') — "Histórico en construcción" / "History in
+  // progress". v646 held only the `ready` branch, so the DOMINANT case (the builder returns state 'pending'
+  // while the remote load has not settled ⇒ the pending path at the bottom) still published that copy for
+  // 1–2 s before the definitive chart. Holding here covers all five with ONE condition instead of five
+  // patches, and it also holds the badge, so the chart area and the return publish as a single unit.
+  // While a needed source is pending AND the result is not yet definitive: publish NOTHING — an empty host
+  // lets the .chart-loading-skin already baked into index.html through (the clean premium placeholder), and
+  // the badge node keeps the empty markup it ships with. A DEFINITIVE result is never held. The one-shot
+  // reveal is not consumed: the skin stays 'loading', so the first entry into 'ready' still plays the draw.
+  // No timer, no delay, no CSS, no new placeholder, no new state machine — only WHEN publication happens.
+  if ((typeof _aurixChartPublicationSourcesPending === 'function') && _aurixChartPublicationSourcesPending().pending) {
+    let _definitive = false;
+    try {
+      if ((typeof _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT !== 'undefined') && _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT
+          && typeof _aurixResolveFinalRenderSeriesContract === 'function' && emg.state === 'ready') {
+        _definitive = !!_aurixResolveFinalRenderSeriesContract(emg, emg.range, surface).badgeEligible;
+      }
+    } catch (_) { _definitive = false; }
+    if (!_definitive) {
+      _aurixLastVisualSig[surface] = null;
+      try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'loading'); } catch (_) {}
+      try { hostEl.innerHTML = ''; } catch (_) {}
+      return true;
+    }
+  }
+
   // Badge — one source, always coherent with the line.
   if (changeEl) _aurixEmergencyPaintBadgeNode(changeEl, emg, surface);
 
@@ -35078,23 +35123,9 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
     }
     emg.points = _frc.renderPoints;   // painter draws EXCLUSIVELY the contract's final series (SPEC.19 rule)
     _frcTone = _frc.colorClass;
-    // SPEC CHART-UI-24H-PREMIUM-REVEAL — hold a STABLE loading area for the reconciliation transient. When
-    // the contract would draw a line but the return is NOT yet trusted AND a source the definitive series
-    // needs is still pending, drawing now means a NEUTRAL provisional line + "Historial parcial" that
-    // recolours to green/red one or two seconds later. Instead keep the premium loading skin (no neutral
-    // line, no partial badge — the badge is CALCULATING via the SPEC.28 projection) until the definitive
-    // dataset is ready; the first REAL line then reveals with the existing left→right draw, which is
-    // one-shot on the first entry into 'ready' and therefore is NOT consumed by this hold.
-    // Presentation-only: reuses _frc.badgeEligible + already-existing session signals; no points/geometry/
-    // return change; no timers. No-op outside a real authed session (harness sandbox / anonymous /
-    // settled). SPEC P0-CHART-FIRST-PAINT-GAP-INTEGRITY: was scoped to emg.range === '24h', so every other
-    // range kept publishing the provisional frame and repainting.
-    if (!_frc.badgeEligible && (typeof _aurixChartPublicationSourcesPending === 'function') && _aurixChartPublicationSourcesPending().pending) {
-      _aurixLastVisualSig[surface] = null;
-      try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'building'); } catch (_) {}
-      _wscRenderInsufficient(hostEl, { realPointCount: emg.pointCount, reason: 'transient_reconcile_pending' }, { mode: 'building', eligible: [], lastGood: null });
-      return true;
-    }
+    // SPEC P0-FIRST-DEFINITIVE-PAINT — the v646 hold that used to live here (scoped to the `ready` branch,
+    // and publishing the terminal quality-gate copy while it waited) is now the SINGLE publication gate at
+    // the top of this function, which covers this branch and the four other _wscRenderInsufficient sites.
   } else {
   // SPEC.16 — short-history display policy (PRESENTATION ONLY). building ⇒ premium Calculando (no line);
   // partial_clean ⇒ trim emg.points to the recent MAIN cluster (initial construction fragments dropped,
@@ -35629,7 +35660,7 @@ function _aurixMobileLiteHost() {
   }
   return host;
 }
-function _aurixMobileLiteFallback(reason, err) {
+function _aurixMobileLiteFallback(reason, err, opts) {
   const st = _aurixMobileChartState;
   st.rendered = false;
   st.fallbackUsed = true;
@@ -35642,6 +35673,12 @@ function _aurixMobileLiteFallback(reason, err) {
     // P0-PRODUCTION-PORTFOLIO-CHART — this chart NEVER shows the old mobile "unavailable" message.
     // A pending/insufficient series (or any transient render miss) renders the SAME premium
     // "Histórico en construcción" state as desktop — no percentage, no fake line, no unavailable message.
+    // SPEC P0-FIRST-DEFINITIVE-PAINT — `quiet` mode: while a source the definitive series needs is still
+    // pending, the first publication must show ONLY the existing premium loading skin, so this surface
+    // publishes NO copy (an empty host lets .chart-loading-skin through). The debug contract is unchanged:
+    // placeholderReason/lastError are still set above, so the placeholder is never silent to diagnostics —
+    // only to the user, and only until the state is terminal. Every terminal caller keeps the copy verbatim.
+    if (opts && opts.quiet) { if (host) host.innerHTML = ''; return; }
     let title = 'Histórico en construcción';
     try { if (typeof t === 'function') title = t('wscQualityGateTitle') || title; } catch (_) {}
     if (host) host.innerHTML = '<div class="wsc wsc--empty" style="display:flex;align-items:center;justify-content:center;height:100%;min-height:120px;text-align:center;padding:14px"><div class="wsc-empty-title" style="color:#5e7bb0;font:600 13px/1.4 -apple-system,system-ui">' + title + '</div></div>';
@@ -35672,6 +35709,29 @@ function renderAurixMobileLiteChart(range, token) {
         const emg = buildProductionPortfolioChart(r);
         try { if (typeof window !== 'undefined') window._aurixEmergencyLastMobile = emg; } catch (_) {}
         _aurixChartUpdateLog('mobile', emg);
+        // ── SPEC P0-FIRST-DEFINITIVE-PAINT — THE single publication gate (mobile) ────────────────
+        // Mirror of the desktop gate. This surface has SIX _aurixMobileLiteFallback('pending') sites and the
+        // dominant one is the `emg.state !== 'ready'` path further down, so gating here (before any of them)
+        // is what actually stops "History in progress" from reaching a phone. Quiet ⇒ empty host ⇒ only the
+        // existing premium loading skin. A DEFINITIVE result is never held. The existing convergence retry
+        // is deliberately reused (reconcile + hydration also call scheduleAurixMobileLite): no new timer.
+        if ((typeof _aurixChartPublicationSourcesPending === 'function') && _aurixChartPublicationSourcesPending().pending) {
+          let _definitiveM = false;
+          try {
+            // NOTE: _frcOnM is declared below this gate — re-evaluate the same condition inline rather than
+            // reading it here (a TDZ ReferenceError would silently degrade to "always hold").
+            if ((typeof _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT !== 'undefined') && _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT
+                && typeof _aurixResolveFinalRenderSeriesContract === 'function' && emg.state === 'ready') {
+              _definitiveM = !!_aurixResolveFinalRenderSeriesContract(emg, r, 'mobile').badgeEligible;
+            }
+          } catch (_) { _definitiveM = false; }
+          if (!_definitiveM) {
+            _aurixLastVisualSig.mobile = null;
+            _aurixMobileLiteFallback('pending', null, { quiet: true });
+            if (_aurixMobileLiteEmptyRetries < 6) { _aurixMobileLiteEmptyRetries++; try { setTimeout(function () { scheduleAurixMobileLite(r); }, 1300); } catch (_) {} }
+            return;
+          }
+        }
         // SPEC.19 — mobile uses the SAME final render contract as desktop (identical output). Flag OFF ⇒ v500.
         let _frcToneM = null;
         const _frcOnM = (typeof _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT !== 'undefined') && _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT && typeof _aurixResolveFinalRenderSeriesContract === 'function';
@@ -35686,11 +35746,8 @@ function renderAurixMobileLiteChart(range, token) {
           // provisional frame since v579, but this surface had NO hold in ANY range, so a phone kept
           // showing the neutral provisional line + partial badge and then repainting. Same single
           // condition, same existing 'pending' skeleton, same one-shot reveal on the definitive line.
-          if (!_frcM.badgeEligible && (typeof _aurixChartPublicationSourcesPending === 'function') && _aurixChartPublicationSourcesPending().pending) {
-            _aurixLastVisualSig.mobile = null; _aurixMobileLiteFallback('pending');
-            if (_aurixMobileLiteEmptyRetries < 6) { _aurixMobileLiteEmptyRetries++; try { setTimeout(function () { scheduleAurixMobileLite(r); }, 1300); } catch (_) {} }
-            return;
-          }
+          // SPEC P0-FIRST-DEFINITIVE-PAINT — the v646 hold that used to live here is now the SINGLE
+          // publication gate above, which also covers the five other 'pending' fallback sites.
           emg.points = _frcM.renderPoints; _frcToneM = _frcM.colorClass;
         } else {
         // SPEC.16 — short-history display (v500 path). building ⇒ skeleton; partial_clean ⇒ trim to MAIN cluster.
