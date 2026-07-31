@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '611'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '612'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -24766,6 +24766,41 @@ function _aurix24hReconcileInFlight() {
     return (typeof _aurixCanonicalHistoryLoaded !== 'undefined') && _aurixCanonicalHistoryLoaded === false;
   } catch (_) { return false; }
 }
+// ── SPEC P0-CHART-FIRST-PAINT-GAP-INTEGRITY — publication hold, SINGLE owner ──────────────────
+// Is ANY source the DEFINITIVE series needs still pending? The three certified first-paint holds
+// (v598 builder, v579 desktop painter, SPEC.28 presentation projection) were each scoped to
+// range === '24h' and read only the canonical-reconcile signal, so 7D/30D/1Y/TOTAL still published
+// SPEC.35's durable cold-start frame — a provisional NEUTRAL line with the return canonical-gated —
+// and then visibly repainted into the definitive red/green chart a second later; the MOBILE painter
+// had no hold at all, in any range. This is the one condition all of them now share.
+// It only ORs signals that ALREADY exist (no new state, no timer, no delay, no CSS): the remote load
+// outcome, the canonical-reconcile flag and the backend-snapshot hydration state machine. Every leg
+// SETTLES on failure too ('failed' / 'no-row' / hydration 'failed'), so a network failure or an
+// offline boot releases the hold immediately and falls through to the existing durable fallback —
+// no deadlock, no infinite loading. The canonical leg is deliberately conditioned on a read row
+// ('ok-row'): after a failed load _aurixCanonicalHistoryLoaded stays false forever, so gating on it
+// alone would hold the placeholder indefinitely. Anonymous sessions have no remote authority to wait
+// for ⇒ never pending (byte-identical prior behaviour).
+const _AURIX_CHART_FIRSTPAINT_HOLD_ALL_RANGES = true;   // rollback: false ⇒ exact v645 (24H-only holds)
+function _aurixChartPublicationSourcesPending() {
+  const out = { pending: false, reason: null };
+  try {
+    if ((typeof _AURIX_CHART_FIRSTPAINT_HOLD_ALL_RANGES !== 'undefined') && !_AURIX_CHART_FIRSTPAINT_HOLD_ALL_RANGES) return out;
+    const authed = !!(typeof currentUser !== 'undefined' && currentUser && currentUser.id);
+    if (!authed) return out;                                       // local IS canonical ⇒ nothing to wait for
+    const outcome = (typeof _aurixRemoteLoadOutcome !== 'undefined') ? _aurixRemoteLoadOutcome : 'failed';
+    if (outcome === null) { out.pending = true; out.reason = 'remote_load_not_settled'; return out; }
+    if (outcome === 'ok-row' && (typeof _aurixCanonicalHistoryLoaded !== 'undefined') && _aurixCanonicalHistoryLoaded === false) {
+      out.pending = true; out.reason = 'canonical_reconcile_in_flight'; return out;
+    }
+    const beOn = (typeof _AURIX_BACKEND_SNAPSHOTS_ENABLED !== 'undefined' && _AURIX_BACKEND_SNAPSHOTS_ENABLED)
+              && (typeof _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD !== 'undefined' && _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD);
+    const beSt = (typeof _aurixBackendSnapshotsState !== 'undefined') ? _aurixBackendSnapshotsState : 'ready';
+    if (beOn && (beSt === 'idle' || beSt === 'loading')) { out.pending = true; out.reason = 'backend_snapshots_hydrating'; return out; }
+  } catch (_) { return { pending: false, reason: null }; }
+  return out;
+}
+try { if (typeof window !== 'undefined') window._aurixChartPublicationSourcesPending = _aurixChartPublicationSourcesPending; } catch (_) {}
 function _aurixReturnPendingHTML() {
   const _txt  = (typeof _aurixChartStateI18n === 'function') ? _aurixChartStateI18n('chartCalculating', _AURIX_RETURN_PENDING_TEXT) : _AURIX_RETURN_PENDING_TEXT;
   const _aria = (typeof _aurixChartStateI18n === 'function') ? _aurixChartStateI18n('chartCalculatingAria', 'Calculando rendimiento') : 'Calculando rendimiento';
@@ -25239,14 +25274,17 @@ function _aurixApplyRangeSourceAuthority(src, range) {
       const thr = (typeof _AURIX_24H_COVERAGE_THR === 'number') ? _AURIX_24H_COVERAGE_THR : 0.8;
       const minBe = (typeof _AURIX_24H_MIN_BACKEND_POINTS === 'number') ? _AURIX_24H_MIN_BACKEND_POINTS : 8;
       // RULE 1 — frontend has MATURE rolling-24H coverage ⇒ legacy frontend authority (dense/healthy: byte-identical to .11).
-      if (cov.feCount >= 2 && cov.feCoverage >= thr) return src.filter(p => _aurixSourceFamily(p) !== 'backend');
+      if (cov.feCount >= 2 && cov.feCoverage >= thr) return _aurix24hStripNonAuthoritativePreservingHoles(src, r, 'frontend');
       // RULE 2 — frontend coverage insufficient BUT backend is mature + covers the window ⇒ backend-authoritative
       // single series (drop the sparse/solitary frontend entirely — RULE 3: never mix frontend into a backend segment).
-      if (cov.beCount >= minBe && cov.beCoverage >= thr && cov.beCoverage > cov.feCoverage) return src.filter(p => _aurixSourceFamily(p) === 'backend');
+      if (cov.beCount >= minBe && cov.beCoverage >= thr && cov.beCoverage > cov.feCoverage) return _aurix24hStripNonAuthoritativePreservingHoles(src, r, 'backend');
       // RULE 5 — neither source has sufficient truthful coverage ⇒ fall through to the exact legacy .11 decision (honest partial/building).
     }
     if (!_aurixFrontendUsableInWindow(src, 864e5, nowRef)) return src;  // frontend NOT usable ⇒ backend FALLBACK allowed
-    return src.filter(p => _aurixSourceFamily(p) !== 'backend');        // frontend authority ⇒ exclude ALL backend from 24H
+    // frontend authority ⇒ exclude backend from 24H, EXCEPT the points bridging a genuine ≥floor frontend
+    // hole (SPEC P0-CHART-FIRST-PAINT-GAP-INTEGRITY: this legacy .11 fall-through was the exact site that
+    // re-opened the hole and split the definitive line while valid */15 snapshots covered the interval).
+    return _aurix24hStripNonAuthoritativePreservingHoles(src, r, 'frontend');
   } catch (_) { return Array.isArray(src) ? src : []; }
 }
 // SPEC.41 — the single direct helper for the coverage-aware 24H decision. PURE: measures, per source family,
@@ -25276,6 +25314,43 @@ function _aurix24hSourceCoverage(src, nowRef, windowMs) {
   const covered = a => { if (a.length < 2) return 0; const s = a.slice().sort((x, y) => x - y); let c = s[s.length - 1] - s[0]; for (let i = 1; i < s.length; i++) { const g = s[i] - s[i - 1]; if (g >= holeFloor) c -= g; } return Math.max(0, c); };
   return { feCount: fe.length, beCount: be.length, feSpanMs: span(fe), beSpanMs: span(be),
     feCoverage: +(covered(fe) / w).toFixed(4), beCoverage: +(span(be) / w).toFixed(4) };
+}
+// ── SPEC P0-CHART-FIRST-PAINT-GAP-INTEGRITY — 24H exclusion that PRESERVES gap bridges ──────────
+// The 24H authority rules resolve a whole window to ONE source family and drop the other family entirely.
+// That is correct for intraday TEETH (two families competing at near-duplicate instants, the .11 false
+// −0.85% return) but WRONG for the points that are the ONLY observations INSIDE a genuine hole of the
+// authoritative family: dropping them RE-OPENS the hole and the DEFINITIVE line renders SPLIT even though
+// valid observations cover the whole interval (the reported symptom 2). Both directions were affected:
+//   • frontend authority (RULE 1 + the legacy .11 fall-through) stripped the */15 backend snapshots that
+//     bridged a frontend hole left by a closed app;
+//   • backend authority (RULE 2) stripped the frontend session points that bridged a late/dead-cron hole.
+// RULE: drop the non-authoritative family exactly as before, EXCEPT a point that sits strictly between two
+// consecutive authoritative points whose separation is ≥ the range-invariant observation-gap floor — i.e. it
+// bridges a hole the renderer would otherwise segment on. Leading/trailing tails keep the prior behaviour,
+// so pts[0] and the endpoint stay in the authoritative family ⇒ baseline, endpoint, flow-neutral return and
+// colour are byte-identical, and a SOLITARY non-authoritative point (which bridges nothing) is still
+// dropped. Never fabricates, never interpolates, never reorders: a pure filter over the caller's objects.
+function _aurix24hStripNonAuthoritativePreservingHoles(src, range, keepFamily) {
+  if (!Array.isArray(src)) return src;
+  const keep = (keepFamily === 'backend') ? 'backend' : 'frontend';
+  const isKept = p => _aurixSourceFamily(p) === keep;
+  const stripAll = () => src.filter(p => isKept(p));
+  const keptTs = src.filter(p => p && Number.isFinite(p.ts) && isKept(p)).map(p => p.ts).sort((a, b) => a - b);
+  if (keptTs.length < 2) return stripAll();                          // no authoritative interval ⇒ nothing to bridge
+  let floor = 0;
+  try {
+    const t = src.filter(p => p && Number.isFinite(p.ts)).map(p => ({ time: p.ts, value: 1 })).sort((a, b) => a.time - b.time);
+    floor = (typeof _aurixRealGapFloorMs === 'function') ? _aurixRealGapFloorMs(t, range) : 0;
+  } catch (_) { floor = 0; }
+  if (!(floor > 0)) return stripAll();                               // no threshold ⇒ exact prior behaviour
+  return src.filter(p => {
+    if (isKept(p)) return true;
+    if (!Number.isFinite(p.ts)) return false;
+    let before = -Infinity, after = Infinity;
+    for (const t of keptTs) { if (t <= p.ts && t > before) before = t; if (t >= p.ts && t < after) after = t; }
+    // interior to a GENUINE hole of the authoritative family ⇒ only observation there ⇒ keep. Else drop.
+    return before > -Infinity && after < Infinity && (after - before) >= floor;
+  });
 }
 // SPEC.38 — reject any backend gap-filler that lands INSIDE a frontend-covered continuous segment so every
 // continuous render segment carries exactly ONE source family (one valuation regime). Segments = the SAME
@@ -25879,24 +25954,25 @@ function buildProductionPortfolioChart(range) {
         // SPEC.35 — instead of always showing "building", render the LAST VERIFIED DURABLE series immediately
         // (atomic boot) when one exists for this identity; the return stays canonical-gated (suppressed below).
         // ── SPEC PREMIUM-24H-FIRST-PAINT (P0) — publication contract, presentation only ──────────────
-        // SPEC.35's durable cold-start is exactly what produces the reported 24H first-paint artefact: it
+        // SPEC.35's durable cold-start is exactly what produces the reported first-paint artefact: it
         // publishes the durable series as the FIRST visible frame with the return still canonical-gated, so a
         // mature account sees a provisional neutral line + "Calculando…" and then a visible repaint into the
         // definitive red/green chart the moment the reconcile lands. While the remote load has not SETTLED
-        // there is still a real possibility of ending in a valid 24H result, so 24H must publish nothing but
-        // the existing premium loading state and let the first visible frame BE the definitive one.
+        // there is still a real possibility of ending in a valid result, so nothing but the existing premium
+        // loading state may be published and the first visible frame must BE the definitive one.
         // Released the instant the possibility resolves EITHER way — _aurixRemoteLoadOutcome is set on every
         // terminal path of loadPortfolioFromBackend ('ok-row' | 'no-row' | 'failed', exceptions included), so
         // an offline/failed load falls straight back to SPEC.35 and still gets its durable line: no deadlock,
-        // no timer, no delay. 24H only; 7D/30D/1Y/ALL keep SPEC.35 verbatim. Anonymous sessions never reach
-        // this branch (_aurixCanonicalHistoryReady() ⇒ reconciled). Pure presentation: no data, no geometry,
-        // no return math, no new state — it only defers WHEN the existing states may be published.
-        let _hold24hFirstPaint = false;
+        // no timer, no delay. SPEC P0-CHART-FIRST-PAINT-GAP-INTEGRITY: this was scoped to r === '24h', which
+        // is why 7D/30D/1Y/TOTAL kept flashing the provisional frame; the contract is range-agnostic now.
+        // Anonymous sessions never reach this branch (_aurixCanonicalHistoryReady() ⇒ reconciled). Pure
+        // presentation: no data, no geometry, no return math, no new state — it only defers WHEN the
+        // existing states may be published.
+        let _holdFirstPaint = false;
         try {
-          _hold24hFirstPaint = (r === '24h')
-            && (typeof _aurixRemoteLoadOutcome !== 'undefined') && _aurixRemoteLoadOutcome === null;
-        } catch (_) { _hold24hFirstPaint = false; }
-        const _durableOn = !_hold24hFirstPaint
+          _holdFirstPaint = (typeof _aurixRemoteLoadOutcome !== 'undefined') && _aurixRemoteLoadOutcome === null;
+        } catch (_) { _holdFirstPaint = false; }
+        const _durableOn = !_holdFirstPaint
           && (typeof _AURIX_CHART_DURABLE_COLD_START !== 'undefined') && _AURIX_CHART_DURABLE_COLD_START;
         let _dec = { buildingPlaceholder: true, renderFromDurable: false, suppressReturn: false, reason: 'awaiting_canonical_reconcile' };
         if (_durableOn && typeof _aurixResolveColdStartRender === 'function') {
@@ -27023,13 +27099,16 @@ function _aurixResolveFinalRenderSeriesContract(emg, range, surface) {
     if (out.badgeEligible) return 'TRUSTED_RETURN';
     const stable = (out.mode === 'partial_clean' || out.mode === 'full') && out.lineEligible && Array.isArray(out.renderPoints) && out.renderPoints.length >= 2;
     if (!stable) return (out.mode === 'building') ? 'CALCULATING' : 'UNKNOWN';
-    // SPEC CHART-UI-24H-PREMIUM-REVEAL — a NOT-eligible 24H partial while the authed canonical-history
-    // reconcile is still in-flight is a TRANSIENT loading state (the definitive green/red return is
-    // imminent), not a persistent partial history. Present it as CALCULATING so "Historial parcial"
-    // never flashes for one or two seconds; once reconcile settles this resolves to TRUSTED_RETURN or,
-    // for a genuinely short account, a real PARTIAL_HISTORY. Presentation-only; no eligibility/points/
-    // return change. No-op outside a real authed session (harness sandbox / anonymous / settled).
-    if (r === '24h' && (typeof _aurix24hReconcileInFlight === 'function') && _aurix24hReconcileInFlight()) return 'CALCULATING';
+    // SPEC CHART-UI-24H-PREMIUM-REVEAL — a NOT-eligible partial while a source the definitive series needs
+    // is still pending is a TRANSIENT loading state (the definitive green/red return is imminent), not a
+    // persistent partial history. Present it as CALCULATING so "Historial parcial" never flashes for one or
+    // two seconds; once every source settles this resolves to TRUSTED_RETURN or, for a genuinely short
+    // account, a real PARTIAL_HISTORY. SPEC P0-CHART-FIRST-PAINT-GAP-INTEGRITY: this was scoped to
+    // r === '24h' and read only the canonical-reconcile flag, so 7D/30D/1Y/TOTAL published PARTIAL_HISTORY
+    // as a transitory state (forbidden by contract 1) and flipped once the backend snapshots hydrated.
+    // Presentation-only; no eligibility/points/return change. No-op outside a real authed session
+    // (harness sandbox / anonymous / settled).
+    if ((typeof _aurixChartPublicationSourcesPending === 'function') && _aurixChartPublicationSourcesPending().pending) return 'CALCULATING';
     if (r !== 'all' && out.historyCoverage === 'PARTIAL_AVAILABLE_HISTORY') return 'PARTIAL_HISTORY';
     if (r === 'all' && out.historyCoverage === 'ALL_AVAILABLE_HISTORY') return 'AVAILABLE_HISTORY';
     return 'CALCULATING';
@@ -34999,19 +35078,21 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
     }
     emg.points = _frc.renderPoints;   // painter draws EXCLUSIVELY the contract's final series (SPEC.19 rule)
     _frcTone = _frc.colorClass;
-    // SPEC CHART-UI-24H-PREMIUM-REVEAL — hold a STABLE loading area for the 24H transient. When the
-    // contract would draw a line but the return is NOT yet trusted AND the authed canonical-history
-    // reconcile is still in-flight, drawing now means a NEUTRAL provisional line + "Historial parcial"
-    // that recolours to green/red one or two seconds later. Instead keep the premium loading skin (no
-    // neutral line, no partial badge — the badge is CALCULATING via the SPEC.28 projection) until the
-    // definitive dataset is ready; the first REAL line then reveals with the existing left→right draw.
-    // Presentation-only: reuses _frc.badgeEligible + the existing reconcile signal; no points/geometry/
+    // SPEC CHART-UI-24H-PREMIUM-REVEAL — hold a STABLE loading area for the reconciliation transient. When
+    // the contract would draw a line but the return is NOT yet trusted AND a source the definitive series
+    // needs is still pending, drawing now means a NEUTRAL provisional line + "Historial parcial" that
+    // recolours to green/red one or two seconds later. Instead keep the premium loading skin (no neutral
+    // line, no partial badge — the badge is CALCULATING via the SPEC.28 projection) until the definitive
+    // dataset is ready; the first REAL line then reveals with the existing left→right draw, which is
+    // one-shot on the first entry into 'ready' and therefore is NOT consumed by this hold.
+    // Presentation-only: reuses _frc.badgeEligible + already-existing session signals; no points/geometry/
     // return change; no timers. No-op outside a real authed session (harness sandbox / anonymous /
-    // settled) and for every other range, so the certified 24H (v579) and 7D/30D (v580) fixes are intact.
-    if (emg.range === '24h' && !_frc.badgeEligible && (typeof _aurix24hReconcileInFlight === 'function') && _aurix24hReconcileInFlight()) {
+    // settled). SPEC P0-CHART-FIRST-PAINT-GAP-INTEGRITY: was scoped to emg.range === '24h', so every other
+    // range kept publishing the provisional frame and repainting.
+    if (!_frc.badgeEligible && (typeof _aurixChartPublicationSourcesPending === 'function') && _aurixChartPublicationSourcesPending().pending) {
       _aurixLastVisualSig[surface] = null;
       try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'building'); } catch (_) {}
-      _wscRenderInsufficient(hostEl, { realPointCount: emg.pointCount, reason: 'transient_24h_reconcile_pending' }, { mode: 'building', eligible: [], lastGood: null });
+      _wscRenderInsufficient(hostEl, { realPointCount: emg.pointCount, reason: 'transient_reconcile_pending' }, { mode: 'building', eligible: [], lastGood: null });
       return true;
     }
   } else {
@@ -35597,6 +35678,15 @@ function renderAurixMobileLiteChart(range, token) {
         if (_frcOnM && emg.state === 'ready') {
           const _frcM = _aurixResolveFinalRenderSeriesContract(emg, r, 'mobile');
           if ((_frcM.mode !== 'full' && _frcM.mode !== 'partial_clean') || !(Array.isArray(_frcM.renderPoints) && _frcM.renderPoints.length >= 2)) {
+            _aurixLastVisualSig.mobile = null; _aurixMobileLiteFallback('pending');
+            if (_aurixMobileLiteEmptyRetries < 6) { _aurixMobileLiteEmptyRetries++; try { setTimeout(function () { scheduleAurixMobileLite(r); }, 1300); } catch (_) {} }
+            return;
+          }
+          // SPEC P0-CHART-FIRST-PAINT-GAP-INTEGRITY — MOBILE PARITY. The desktop painter has held the
+          // provisional frame since v579, but this surface had NO hold in ANY range, so a phone kept
+          // showing the neutral provisional line + partial badge and then repainting. Same single
+          // condition, same existing 'pending' skeleton, same one-shot reveal on the definitive line.
+          if (!_frcM.badgeEligible && (typeof _aurixChartPublicationSourcesPending === 'function') && _aurixChartPublicationSourcesPending().pending) {
             _aurixLastVisualSig.mobile = null; _aurixMobileLiteFallback('pending');
             if (_aurixMobileLiteEmptyRetries < 6) { _aurixMobileLiteEmptyRetries++; try { setTimeout(function () { scheduleAurixMobileLite(r); }, 1300); } catch (_) {} }
             return;

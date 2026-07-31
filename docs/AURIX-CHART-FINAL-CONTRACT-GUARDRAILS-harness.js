@@ -101,7 +101,7 @@ console.log('\nG3 — no bypass of the final contract in either paint path:');
 const deskFn = fnSrc('_wscPaintEmergency');
 const liteFn = app.slice(app.indexOf('function renderAurixMobileLiteChart'), app.indexOf('function scheduleAurixMobileLite'));
 ok('G3.1 desktop ON-branch assigns emg.points = _frc.renderPoints', /_frcOn && emg\.state === 'ready'[\s\S]{0,900}emg\.points = _frc\.renderPoints/.test(deskFn));
-ok('G3.2 mobile ON-branch assigns emg.points = _frcM.renderPoints', /_frcOnM && emg\.state === 'ready'[\s\S]{0,900}emg\.points = _frcM\.renderPoints/.test(liteFn));
+ok('G3.2 mobile ON-branch assigns emg.points = _frcM.renderPoints', /_frcOnM && emg\.state === 'ready'[\s\S]{0,1600}emg\.points = _frcM\.renderPoints/.test(liteFn));
 ok('G3.3 desktop renderer reads emg.points (fed only by the contract on the ON path)', /renderValidatedPortfolioChartWithInstitutionalRenderer\(emg\.points/.test(deskFn));
 ok('G3.4 mobile renderer reads emg.points (fed only by the contract on the ON path)', /renderValidatedPortfolioChartWithInstitutionalRenderer\(emg\.points/.test(liteFn));
 ok('G3.5 desktop tone comes from the contract when ON', /_frcTone != null\) \? _frcTone : emg\.color/.test(deskFn));
