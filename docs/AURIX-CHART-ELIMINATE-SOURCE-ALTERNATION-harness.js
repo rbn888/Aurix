@@ -35,6 +35,7 @@ vm.runInContext(fnSrc('_aurixRealGapFloorMs'), ctx);
 vm.runInContext(fnSrc('_aurixSourceFamily'), ctx);
 vm.runInContext(fnSrc('_aurixFrontendUsableInWindow'), ctx);
 vm.runInContext(fnSrc('_aurixEnforceSegmentSourceAuthority'), ctx);
+vm.runInContext(fnSrc('_aurix24hStripNonAuthoritativePreservingHoles'), ctx);
 vm.runInContext(fnSrc('_aurixApplyRangeSourceAuthority'), ctx);
 vm.runInContext(fnSrc('_aurixClassifySnapshotTransition'), ctx);
 vm.runInContext(fnSrc('_aurixAuditLongRangeSnapshotContinuityCore'), ctx);
@@ -100,6 +101,7 @@ ok('1 marker present in app.js', app.indexOf('ELIMINATE_SOURCE_ALTERNATION.38') 
   vm.runInContext(fnSrc('_aurixSourceFamily'), ctx2);
   vm.runInContext(fnSrc('_aurixFrontendUsableInWindow'), ctx2);
   vm.runInContext(fnSrc('_aurixEnforceSegmentSourceAuthority'), ctx2);
+  vm.runInContext(fnSrc('_aurix24hStripNonAuthoritativePreservingHoles'), ctx2);
   vm.runInContext(fnSrc('_aurixApplyRangeSourceAuthority'), ctx2);
   const src = [fe(T0, 1000), be(T0 + 6 * 36e5, 1090), fe(T0 + 12 * 36e5, 1010)];
   const outR = vm.runInContext('_aurixApplyRangeSourceAuthority', ctx2)(src, '7d');

@@ -164,36 +164,38 @@ console.log('\nAURIX-CHART-DURABLE-COLD-START-RECOVERY — SPEC.35   (minMatureP
 // EITHER way — SPEC.35 behaves exactly as before. The gate is executed from the REAL app.js
 // source (extracted verbatim), not re-implemented here, so drift fails the gate.
 (function () {
-  console.log('\n24H FIRST PAINT — publication boundary:');
+  console.log('\nFIRST PAINT — publication boundary:');
   const marker = 'SPEC PREMIUM-24H-FIRST-PAINT';
   ok('P0 marker present in the SPEC.35 reconcile gate', app.indexOf(marker) >= 0);
   let gate = null;
   try {
-    const i = app.indexOf('let _hold24hFirstPaint');
+    const i = app.indexOf('let _holdFirstPaint');
     const j = app.indexOf('_AURIX_CHART_DURABLE_COLD_START;', i);
     const snippet = app.slice(i, j + '_AURIX_CHART_DURABLE_COLD_START;'.length);
     // The extracted source is the ONLY logic under test.
     gate = new Function('r', '_aurixRemoteLoadOutcome', '_AURIX_CHART_DURABLE_COLD_START',
-      snippet + ' return { hold: _hold24hFirstPaint, durableOn: !!_durableOn };');
+      snippet + ' return { hold: _holdFirstPaint, durableOn: !!_durableOn };');
   } catch (e) { ok('P0 gate extractable from source', false, e.message); }
   if (gate) {
     ok('P0 gate extractable from source', true);
-    // 24H, remote load NOT settled → hold the premium loading state, no durable publication.
-    const boot = gate('24h', null, true);
-    ok('P0 24H + load unsettled ⇒ durable cold-start SUPPRESSED (no provisional line/%)',
-       boot.hold === true && boot.durableOn === false, JSON.stringify(boot));
+    // SPEC P0-CHART-FIRST-PAINT-GAP-INTEGRITY supersedes the v598 scoping: the hold was `r === '24h'`,
+    // so 7D/30D/1Y/TOTAL still published SPEC.35's provisional durable frame (neutral line + suppressed
+    // return) and then repainted into the definitive red/green chart. The publication boundary is now
+    // RANGE-AGNOSTIC — every range holds while the remote load is unsettled and releases the instant it
+    // settles, whatever the outcome.
+    for (const r of ['24h', '7d', '30d', '1y', 'all']) {
+      const boot = gate(r, null, true);
+      ok(`P0 ${r} + load unsettled ⇒ durable cold-start SUPPRESSED (no provisional line/%)`,
+         boot.hold === true && boot.durableOn === false, JSON.stringify(boot));
+    }
     // Settled — any outcome — releases immediately. 'failed' is the offline case: SPEC.35 must
     // still render the durable line, otherwise this fix would strand an offline user in loading.
-    for (const outcome of ['ok-row', 'no-row', 'failed']) {
-      const s = gate('24h', outcome, true);
-      ok(`P0 24H + load settled '${outcome}' ⇒ SPEC.35 unchanged (durable line restored)`,
-         s.hold === false && s.durableOn === true, JSON.stringify(s));
-    }
-    // Every other range keeps SPEC.35 verbatim, settled or not.
-    for (const r of ['7d', '30d', '1y', 'all']) {
-      const s = gate(r, null, true);
-      ok(`P0 ${r} untouched by the 24H gate (durable cold-start still active)`,
-         s.hold === false && s.durableOn === true, JSON.stringify(s));
+    for (const r of ['24h', '7d', 'all']) {
+      for (const outcome of ['ok-row', 'no-row', 'failed']) {
+        const s = gate(r, outcome, true);
+        ok(`P0 ${r} + load settled '${outcome}' ⇒ SPEC.35 unchanged (durable line restored)`,
+           s.hold === false && s.durableOn === true, JSON.stringify(s));
+      }
     }
     // The flag still wins: with SPEC.35 disabled nothing is force-enabled.
     ok('P0 gate never force-enables durable cold-start when the flag is off',

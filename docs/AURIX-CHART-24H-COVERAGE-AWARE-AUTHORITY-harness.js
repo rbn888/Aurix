@@ -32,6 +32,7 @@ function mkCtx(coverageAware) {
   vm.runInContext(fnSrc('_aurixFrontendUsableInWindow'), ctx);
   vm.runInContext(fnSrc('_aurix24hSourceCoverage'), ctx);
   vm.runInContext(fnSrc('_aurixEnforceSegmentSourceAuthority'), ctx);
+  vm.runInContext(fnSrc('_aurix24hStripNonAuthoritativePreservingHoles'), ctx);
   vm.runInContext(fnSrc('_aurixApplyRangeSourceAuthority'), ctx);
   return ctx;
 }
