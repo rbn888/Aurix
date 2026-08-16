@@ -37,8 +37,13 @@ ok('5 telemetry object declared (counters only — additive)',
    /const _aurixGuardTelemetry = \{[\s\S]*?snapshotRejected: 0,[\s\S]*?saveBlocked: 0,/.test(app));
 
 console.log('\nGrounded fact #1/#4 — a rejected snapshot is DROPPED (early return), never stored, never retried:');
+// BLOCK-A — the guard argument was hoisted into the named `_snapQuality` probe so the quality
+// verdict can be stamped onto the PERSISTED point. The invariant asserted here is unchanged
+// (guard rejects ⇒ early return ⇒ nothing appended); both halves are still pinned: the probe
+// still carries the real valuation, and the call still early-returns on the portfolio surface.
 ok('6 recordSnapshot returns early when the guard rejects (point never appended)',
-   /if \(_aurixGuardSnapshot\(\s*\{ ts: now, total: val, investable: val[\s\S]*?'portfolio'\)\) return;/.test(fnSrc('recordSnapshot')));
+   /const _snapQuality = \{ ts: now, total: val, investable: val/.test(fnSrc('recordSnapshot')) &&
+   /if \(_aurixGuardSnapshot\(\s*_snapQuality,[\s\S]*?'portfolio'\)\) return;/.test(fnSrc('recordSnapshot')));
 ok('7 recordCategorySnapshot returns early when the guard rejects (point never appended)',
    /_aurixGuardSnapshot\(/.test(fnSrc('recordCategorySnapshot')) && /'category'\)\) return;/.test(fnSrc('recordCategorySnapshot')));
 ok('8 rejected snapshots only enter an in-memory diagnostic ring (no persistence / no retry queue)',

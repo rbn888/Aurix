@@ -1743,6 +1743,28 @@ function _aurixCategoryPointValid(p) {
   return true;
 }
 
+// ── SPEC CHART-INTEGRITY.BLOCK-A · CANONICAL VALUATION QUALITY ───────────────
+// Single shared vocabulary for "was the valuation behind this point COMPLETE?".
+// Structural validity (_aurixCategoryPointValid) proves a point is internally
+// coherent; it does NOT prove it is complete. A snapshot taken while one holding
+// had no price is undercounted yet keeps `total === Σbuckets`, so it passes every
+// structural check and then draws a FALSE MARKET MOVE.
+//
+// The criterion is PROVENANCE/COMPLETENESS, never magnitude — a real −30 % day is
+// complete and must survive untouched. Deliberately NOT part of this predicate:
+//   • `suspect` — set by the write guard from a device-RELATIVE magnitude delta
+//     (see _AURIX_GUARD_QUARANTINE_REASONS). Keying the canonical series on it
+//     would silently delete legitimate large moves, which is exactly what this
+//     SPEC forbids. It travels with the point for audit/telemetry only.
+//   • absence of these fields — a legacy point predates the metadata and its
+//     state is UNKNOWN, never assumed bad. Unknown ⇒ trusted (backward compatible).
+function _aurixPointValuationIncomplete(p) {   // HARD — valuation provably partial
+  return !!p && (p.fxPartial === true || p.valuationComplete === false);
+}
+function _aurixPointValuationApprox(p) {       // SOFT — approximate FX fallback used
+  return !!p && p.fxApprox === true;
+}
+
 function _mergeCategoryByTs(localArr, remoteArr) {
   const all = []
     .concat(Array.isArray(localArr)  ? localArr  : [])
@@ -1753,7 +1775,27 @@ function _mergeCategoryByTs(localArr, remoteArr) {
   // never a magnitude/regime threshold, so a legitimate remote point of any
   // size whose total === Σbuckets always survives.
   const valid = all.filter(_aurixCategoryPointValid);
-  const deduped = Object.values(valid.reduce((acc, p) => { acc[p.ts] = p; return acc; }, {}));
+  // SPEC CHART-INTEGRITY.BLOCK-A · MERGE AUTHORITY — structural validity alone no longer
+  // decides who owns an instant. When local and remote both hold a point for the SAME ts,
+  // a point whose own metadata proves an INCOMPLETE valuation must not supersede a complete
+  // one merely by arriving later in the concat order (was: unconditional last-wins).
+  // Deliberately NOT a filter: every distinct timestamp is still kept, so the union-by-ts
+  // contract is untouched and this can never delete history (nor, via the state flush,
+  // erase a remote row). Legacy points carry no metadata ⇒ both sides "complete" ⇒ the
+  // previous last-wins behaviour applies unchanged.
+  // typeof-guarded for harness isolation (production always has the hoisted declaration);
+  // when absent the predicate is a constant false ⇒ exactly the previous last-wins behaviour.
+  const _incomplete = (typeof _aurixPointValuationIncomplete === 'function')
+    ? _aurixPointValuationIncomplete : function () { return false; };
+  const deduped = Object.values(valid.reduce((acc, p) => {
+    const cur = acc[p.ts];
+    if (!cur) { acc[p.ts] = p; return acc; }
+    const curBad = _incomplete(cur);
+    const pBad   = _incomplete(p);
+    if (curBad !== pBad) { if (curBad) acc[p.ts] = p; return acc; }   // the complete one wins
+    acc[p.ts] = p;                                                    // tie → unchanged behaviour
+    return acc;
+  }, {}));
   return _aurixFilterAfterEpoch(deduped.sort((a, b) => a.ts - b.ts), 'ts');
 }
 
@@ -11237,13 +11279,18 @@ function recordCategorySnapshot() {
   // snapshot; reject incomplete/anomalous points so the canonical investable series never
   // ingests a corrupt snapshot. investable = total − real_estate.
   const _catPrevValid = _aurixLastValidSnapshot(categoryHistory, 'total');
-  if (_aurixGuardSnapshot(
-        { ts: now, total: newPoint.total, investable: newPoint.total - (Number(newPoint.real_estate) || 0),
+  // BLOCK-A — hoisted named probe (see recordSnapshot): the guard's verdict must reach the
+  // persisted point, otherwise categoryHistory — the store the chart actually reads — keeps
+  // no record of whether the valuation behind each point was complete.
+  const _catQuality = { ts: now, total: newPoint.total, investable: newPoint.total - (Number(newPoint.real_estate) || 0),
           fxPartial: _catFxPartial, fxApprox: _catFxApprox,
           valuationComplete: _catVal.complete, valuationReason: _catVal.reason, missing: _catVal.missing,
-          unpricedActive: (Number(_catVal.unpriced) || 0) + (Number(_catVal.missingFx) || 0) + (Number(_catVal.invalid) || 0) },
+          unpricedActive: (Number(_catVal.unpriced) || 0) + (Number(_catVal.missingFx) || 0) + (Number(_catVal.invalid) || 0) };
+  if (_aurixGuardSnapshot(
+        _catQuality,
         _catPrevValid ? { ts: _catPrevValid.ts, total: _catPrevValid.total } : null,
         'category')) return;
+  _aurixStampPointQuality(newPoint, _catQuality);
   if (_within5s && _isMaterial) newPoint.material = true;
   const base = (_within5s && !_isMaterial)
     ? categoryHistory.slice(0, -1)
@@ -11400,6 +11447,25 @@ function _aurixLastValidSnapshot(arr, totalKey) {
   return null;
 }
 
+// SPEC CHART-INTEGRITY.BLOCK-A · QUALITY PROPAGATION — copy the quality verdict from the
+// guard probe onto the point that is actually PERSISTED. Without this the verdict dies with
+// the throwaway literal handed to _aurixGuardSnapshot (which mutates `next.suspect`, not the
+// stored point), so nothing downstream — merge, canonical series, audits — could ever tell a
+// partial point from a complete one. Reuses the EXISTING flag vocabulary
+// (fxPartial/fxApprox/valuationComplete/suspect) that the read paths already understand; no
+// second quality system. Writes a key ONLY when there is something to record, so a clean
+// point keeps a byte-identical shape and existing rows/readers are unaffected.
+function _aurixStampPointQuality(point, q) {
+  try {
+    if (!point || typeof point !== 'object' || !q) return point;
+    if (q.fxPartial === true) point.fxPartial = true;
+    if (q.fxApprox  === true) point.fxApprox  = true;
+    if (q.valuationComplete === false) point.valuationComplete = false;
+    if (q.suspect === true) point.suspect = true;   // audit/telemetry only — never a series filter
+  } catch (_) {}
+  return point;
+}
+
 // True if a real capital flow (deposit/withdrawal/asset_add/asset_remove/import_baseline)
 // exists within ±windowMs of ts — i.e. a large jump is justified by capital, not a glitch.
 function _aurixHasCapitalFlowNear(ts, windowMs) {
@@ -11536,17 +11602,20 @@ function recordSnapshot() {
     ? _aurixAssessValuationCompleteness(activeAssets())
     : { complete: true, reason: 'COMPLETE', unpriced: 0, missingFx: 0, invalid: 0, missing: [] };
   if (_val.complete === false) { _aurixEmitIntegrityEvent('snapshot_rejected_incomplete', { surface: 'portfolio', reason: _val.reason, unpriced: _val.unpriced, missingFx: _val.missingFx, invalid: _val.invalid, active: _val.totalActive }); }
-  if (_aurixGuardSnapshot(
-        { ts: now, total: val, investable: val, fxPartial: _fxPartial, fxApprox: _fxApprox,
+  // BLOCK-A — hoisted into a named probe so the guard's verdict (including the `suspect`
+  // marker it writes) survives to be stamped onto the persisted point below.
+  const _snapQuality = { ts: now, total: val, investable: val, fxPartial: _fxPartial, fxApprox: _fxApprox,
           valuationComplete: _val.complete, valuationReason: _val.reason, missing: _val.missing,
-          unpricedActive: (Number(_val.unpriced) || 0) + (Number(_val.missingFx) || 0) + (Number(_val.invalid) || 0) },
+          unpricedActive: (Number(_val.unpriced) || 0) + (Number(_val.missingFx) || 0) + (Number(_val.invalid) || 0) };
+  if (_aurixGuardSnapshot(
+        _snapQuality,
         _prevValid ? { ts: _prevValid.ts, total: _prevValid.value } : null,
         'portfolio')) return;
 
   const _within5s   = !!(last && now - last.ts < 5_000);
   const _isMaterial = !!(last && Number.isFinite(last.value) && last.value > 0 &&
                          Math.abs(val - last.value) / last.value > 0.01);
-  const newPoint = { ts: now, value: +(val.toFixed(2)) };
+  const newPoint = _aurixStampPointQuality({ ts: now, value: +(val.toFixed(2)) }, _snapQuality);
   // AURIX-CHART-QUALITY-GATE-1 — MATERIAL-CHANGE SNAPSHOT: a user add/edit/delete moves
   // wealth > 1% within the 5 s window; append it (do NOT overwrite) and mark it. Small
   // price/FX noise (≤1%) still collapses via the normal upsert (no noise added).
@@ -22147,6 +22216,11 @@ function _aurixInvestableSnapshots(range) {
         if (epoch && p.ts < epoch) continue;
         if (p.ts < start) continue;
         if (p.fxPartial === true) continue;                       // always drop partial-coverage
+        // BLOCK-A — same shared predicate as the chart path, so the two never disagree about a
+        // point. `fxPartial` above is already one of its two arms; this adds the other
+        // (valuationComplete:false) so a point proven incomplete can never become the return
+        // baseline/endpoint on a surface the chart refuses to plot. One vocabulary, two readers.
+        if (typeof _aurixPointValuationIncomplete === 'function' && _aurixPointValuationIncomplete(p)) continue;
         if (excludeApprox && p.fxApprox === true) continue;       // drop approx FX (with fallback)
         const total = Number(p.total), re = Number(p.real_estate) || 0;
         const invUSD = (Number.isFinite(total) ? total : 0) - re;   // investable = total − real estate
@@ -25400,9 +25474,15 @@ function _aurixHpqRawStages(range) {
   // SPEC DSH.CHART.24H.FRONTEND-SOURCE-AUTHORITY.11 — for 24H, frontend/remote family is the authority when
   // usable; exclude backend so the line/badge never cross backend→remote. Range-aware (needs `range`).
   try { if (typeof _AURIX_CHART_24H_FE_AUTHORITY !== 'undefined' && _AURIX_CHART_24H_FE_AUTHORITY && typeof _aurixApplyRangeSourceAuthority === 'function') src = _aurixApplyRangeSourceAuthority(src, range); } catch (_) {}
-  const counts = { rawSnapshots: src.length, invalidRecord: 0, nonFiniteValue: 0, futureSnapshots: 0, zeroValueSnapshots: 0, duplicateSnapshots: 0, staleSnapshots: 0 };
+  const counts = { rawSnapshots: src.length, invalidRecord: 0, nonFiniteValue: 0, futureSnapshots: 0, zeroValueSnapshots: 0, duplicateSnapshots: 0, staleSnapshots: 0, incompleteValuation: 0 };
   const quarantined = [];
   const valid = [];
+  // BLOCK-A — timestamps of points excluded ONLY for valuation quality. They must not draw a line,
+  // but they are real observations in time, so they still anchor the range window: otherwise
+  // excluding a trailing partial point would slide `nowRef` backwards for the chart while the
+  // return path (_aurixInvestableSnapshots) kept anchoring on the raw tail, and line and % would
+  // measure two different windows. Preserves the pre-SPEC anchor exactly.
+  const anchorPool = [];
   src.forEach((p, idx) => {
     const id = 'snap#' + idx;
     if (!p || !Number.isFinite(p.ts)) { counts.invalidRecord++; quarantined.push(_aurixHpqDiag(null, { ts: p && p.ts, value: null, snapshotId: id, raw: p }, idx, null, 'HistoryValidation', 'non_finite_timestamp', null, 'record has no finite timestamp')); return; }
@@ -25411,6 +25491,27 @@ function _aurixHpqRawStages(range) {
     let value; try { value = (typeof toBase === 'function') ? toBase(invUSD, 'USD') : invUSD; } catch (_) { value = invUSD; }
     if (!Number.isFinite(value)) { counts.nonFiniteValue++; quarantined.push(_aurixHpqDiag(null, { ts: p.ts, value: value, snapshotId: id, raw: p }, idx, null, 'PortfolioNormalization', 'non_finite_value', null, 'normalized investable value is NaN/Infinity')); return; }
     if (!(value > 0)) { counts.zeroValueSnapshots++; quarantined.push(_aurixHpqDiag(null, { ts: p.ts, value: value, snapshotId: id, raw: p }, idx, null, 'SnapshotValidation', 'zero_or_negative_value', null, 'normalized investable value is zero or negative')); return; }
+    // SPEC CHART-INTEGRITY.BLOCK-A · CANONICAL GATE — a point whose OWN metadata proves the
+    // valuation behind it was incomplete is not market performance and must never become a
+    // canonical point. Provenance-based, never magnitude-based: a complete −30 % day carries no
+    // flag and passes untouched. Legacy points carry no metadata ⇒ unknown ⇒ kept (compatible).
+    // typeof-guarded like the epoch/authority helpers above, so legacy harness sandboxes that
+    // extract this function alone keep working (in production both are hoisted declarations).
+    if (typeof _aurixPointValuationIncomplete === 'function' && _aurixPointValuationIncomplete(p)) {
+      counts.incompleteValuation++;
+      anchorPool.push(p.ts);   // still anchors the window (see nowRef below)
+      quarantined.push(_aurixHpqDiag(null, { ts: p.ts, value: value, snapshotId: id, raw: p }, idx, null, 'SnapshotValidation', 'valuation_incomplete', null, 'snapshot metadata proves the valuation was partial (unpriced holding / uncovered FX) — undercounted, not a market move'));
+      return;
+    }
+    // fxApprox is deliberately NOT excluded here. A first attempt did exclude it (with its own
+    // "release if it would starve the chart" rule) and adversarial review showed that created a
+    // DIVERGENT RELEASE RULE: this path counted complete points across ALL history, while the
+    // return path (_aurixInvestableSnapshots) counts them inside the RANGE WINDOW. A user with long
+    // complete history plus a fully-approx recent week trips both at once — the chart quarantines
+    // (history ≥ 2) while the badge releases (window = 0) — publishing a 7D % for a line the chart
+    // refuses to draw. Approx is also weaker grounds for exclusion than fxPartial: the holding WAS
+    // valued, only the FX rate is a fallback, so the point carries real trend information. Approx
+    // handling therefore stays exactly where it already lived, in one place, unchanged by this SPEC.
     valid.push({ ts: p.ts, value: value, index: idx, snapshotId: id, raw: p });
   });
   // SPEC DSH.CHART.DETERMINISM.NEW-ACCOUNT.09 — DETERMINISTIC ordering. The dedupe below keeps the LAST
@@ -25435,7 +25536,16 @@ function _aurixHpqRawStages(range) {
     quarantined.push(_aurixHpqDiag(null, f0, f0.index, null, 'SnapshotValidation', 'stale_timestamp', null, 'leading snapshot is >365 days before the next (stale / imported record)'));
     valid.shift();
   }
-  const nowRef = valid.length ? valid[valid.length - 1].ts : (function () { try { return Date.now(); } catch (_) { return 0; } })();
+  // BLOCK-A — anchor on the latest REAL observation, whether or not it was complete enough to plot
+  // (see anchorPool above), so the chart window matches the return window as it did before.
+  let nowRef = valid.length ? valid[valid.length - 1].ts : 0;
+  // A quality-excluded point may ONLY move the anchor forward within the plausible horizon: the
+  // clock-skew protection above (future_timestamp) must not be reopened through this pool.
+  for (let i = 0; i < anchorPool.length; i++) {
+    const t = anchorPool[i];
+    if (t > nowRef && (!valid.length || (t - nowRef) <= _AURIX_HPQ_FUTURE_MS)) nowRef = t;
+  }
+  if (!(nowRef > 0)) { try { nowRef = Date.now(); } catch (_) { nowRef = 0; } }
   const byTs = new Map();
   valid.forEach(v => {
     if (byTs.has(v.ts)) { counts.duplicateSnapshots++; const prev = byTs.get(v.ts); quarantined.push(_aurixHpqDiag(null, prev, prev.index, null, 'DuplicateRemoval', 'duplicate_timestamp', null, 'duplicate timestamp superseded by a later value for the same instant')); }
