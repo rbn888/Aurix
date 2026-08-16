@@ -11,3 +11,8 @@ docs/*-preview/
 
 # Supabase CLI scratch state (regenerated on every `supabase projects …` call; never commit)
 supabase/.temp/
+
+# Claude Code: sólo lo LOCAL se ignora. .claude/ queda versionable a propósito
+# (agents/, skills/ y demás infraestructura compartida deben poder commitearse).
+.claude/settings.local.json
+.claude/settings.local.json.bak-*
