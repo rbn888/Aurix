@@ -22127,6 +22127,102 @@ function _wscGetFreshLastGood(range, now) {
   return rec;
 }
 
+// ── SPEC CHART-PREMIUM-PUBLICATION.BLOCK-B · CANONICAL LAST KNOWN GOOD ───────
+// The store above already is a per-range LKG with per-range TTL, but its only writer lived in the
+// legacy _wscPaintSurface branch that _wscPaintEmergency made unreachable, so on the canonical path
+// nothing ever wrote it and the reconciliation window had nothing to fall back on: a mature account
+// published a provisional flat/fragmented frame (or a blank hold) before the definitive one.
+//
+// This wires the SAME store to the canonical painter. Deliberately NOT a second cache: same key,
+// same loader, same TTL, same faint-overlay/diagnostic readers — the record is only WIDENED from
+// "the visual array" to the whole publication (series + return + colour + state + identity), which
+// is what makes a coherent atomic republish possible instead of mixing metadata across executions.
+const _AURIX_CHART_LKG_PUBLICATION = true;   // rollback: false ⇒ exact 858d908 behaviour
+// Scalars restored verbatim so a republished frame is the SAME result, never a recomputation over a
+// half-hydrated source. Everything the badge/colour/state path reads must be in this list.
+const _AURIX_LKG_RESULT_FIELDS = Object.freeze([
+  'range', 'state', 'reason', 'pointCount', 'color', 'returnPct', 'returnValue',
+  'lineReturnPct', 'badgeReturnPct', 'returnState', 'netFlows', 'chartHash',
+  'firstTs', 'lastTs', 'firstValue', 'lastValue',
+  'baselineTs', 'baselineValue', 'currentTs', 'currentValue',
+  'collapsedRange', 'rangeCollapsedBecauseHistoryTooShort', 'visualQualityPassed',
+  'colorClass',   // the contract's resolved tone — stored so the republish is not re-judged
+]);
+
+// The result CURRENTLY published per range (in-memory, this page's lifetime). Consumers that used to
+// recompute their own chart (the return badge) read this instead, so the % on screen always belongs
+// to the series on screen. Same shape as the LKG record's `result` — one vocabulary, two lifetimes:
+// this one is "what is on screen now", the localStorage one is "what to show while reconciling".
+const _aurixPublishedChartByRange = {};
+function _aurixPublishedChartFor(range) {
+  try {
+    const r = String(range || '').toLowerCase();
+    const rec = _aurixPublishedChartByRange[r];
+    return (rec && rec.range === r && Array.isArray(rec.points) && rec.points.length >= 2) ? rec : null;
+  } catch (_) { return null; }
+}
+function _aurixMarkChartPublished(emg) {
+  try {
+    if (!emg || !emg.range || !Array.isArray(emg.points) || emg.points.length < 2) return;
+    _aurixPublishedChartByRange[String(emg.range).toLowerCase()] = emg;
+  } catch (_) {}
+}
+
+// Persist a DEFINITIVE publication as this range's LKG. Called only where the final publication
+// contract already said yes (FRC badgeEligible + a real render series), never for a provisional or
+// insufficient frame — so a new account can never manufacture an LKG out of construction data.
+function _aurixChartLkgSave(emg, renderPoints, range, colorClass) {
+  try {
+    if (!_AURIX_CHART_LKG_PUBLICATION) return;
+    if (!emg || emg.state !== 'ready') return;
+    const pts = Array.isArray(renderPoints) ? renderPoints : (Array.isArray(emg.points) ? emg.points : []);
+    if (pts.length < 2) return;
+    const r = String(range || emg.range || '').toLowerCase();
+    if (!r) return;
+    const result = {};
+    _AURIX_LKG_RESULT_FIELDS.forEach(k => { if (emg[k] !== undefined) result[k] = emg[k]; });
+    result.range = r;                         // identity is the range itself — never inherited
+    if (colorClass != null) result.colorClass = colorClass;
+    _wscSaveLastGood(r, {
+      // legacy shape kept verbatim so the existing faint-overlay reader and the diagnostics that
+      // already consume this record are untouched.
+      ts: Date.now(), qualityScore: Number.isFinite(emg.pointCount) ? emg.pointCount : pts.length,
+      series: pts.map(p => p.value), tsArr: pts.map(p => p.ts),
+      percent: Number.isFinite(emg.badgeReturnPct) ? emg.badgeReturnPct : emg.returnPct,
+      // BLOCK-B widening — the full coherent publication.
+      range: r, identity: emg.chartHash || null, result: result,
+    });
+  } catch (_) {}
+}
+
+// Rebuild the definitive result this range last published. Returns an emg-shaped object so the
+// EXISTING paint path (FRC → line → badge) draws it with no duplicated renderer and no new state
+// machine; the `_aurixLkgRestored` marker is what tells the badge painter this frame is definitive.
+function _aurixChartLkgRestore(range) {
+  try {
+    if (!_AURIX_CHART_LKG_PUBLICATION) return null;
+    const r = String(range || '').toLowerCase();
+    if (!r) return null;
+    const rec = _wscGetFreshLastGood(r, Date.now());
+    if (!rec || !rec.result || rec.range !== r || rec.result.range !== r) return null;   // never cross ranges
+    const vals = Array.isArray(rec.series) ? rec.series : null;
+    const tss  = Array.isArray(rec.tsArr) ? rec.tsArr : null;
+    if (!vals || !tss || vals.length < 2 || vals.length !== tss.length) return null;
+    const emg = {};
+    _AURIX_LKG_RESULT_FIELDS.forEach(k => { if (rec.result[k] !== undefined) emg[k] = rec.result[k]; });
+    emg.range = r; emg.state = 'ready';
+    emg.points = [];
+    for (let i = 0; i < vals.length; i++) {
+      if (!Number.isFinite(vals[i]) || !Number.isFinite(tss[i])) return null;
+      emg.points.push({ ts: tss[i], value: vals[i] });
+    }
+    emg.pointCount = Number.isFinite(emg.pointCount) ? emg.pointCount : emg.points.length;
+    emg._aurixLkgRestored = true;
+    emg._aurixLkgAgeMs = Date.now() - rec.ts;
+    return emg;
+  } catch (_) { return null; }
+}
+
 // Protected render: drawn into the chart area (hostEl) when the window is NOT
 // institutionally renderable. Reuses the existing .wsc--empty skin (no styles.css
 // change) and overlays an OPTIONAL faint reference — the last-known-good curve
@@ -30081,7 +30177,10 @@ function _aurixEmergencyPaintBadgeNode(el, emg, surface) {
     // the sources settle this releases and the first painted value is the definitive one — including a
     // genuine "Historial parcial" for a truly short account, now reachable only as a FINAL state. Offline /
     // failed load keeps the certified behaviour (the predicate settles on failure ⇒ paints exactly as before).
-    const _holdPending = () => { try { return (typeof _aurixChartPublicationSourcesPending === 'function') && _aurixChartPublicationSourcesPending().pending; } catch (_) { return false; } };
+    // BLOCK-B — a restored LKG frame is DEFINITIVE (it passed the publication contract when it was
+    // produced), so the badge must publish with it instead of holding: otherwise the line would be
+    // on screen with an empty return area and the frame would no longer be atomic.
+    const _holdPending = () => { try { if (emg && emg._aurixLkgRestored) return false; return (typeof _aurixChartPublicationSourcesPending === 'function') && _aurixChartPublicationSourcesPending().pending; } catch (_) { return false; } };
     // SPEC DSH.CHART.RETURN-BADGE-TRUST-UNIFICATION.14 — resolve %, colour, badge label + Calculando/neutral
     // from the ONE unified contract (continuity-validated series + proven flow-neutral/maturity gates). The
     // ambiguous "0.00%" (line drawn but return NOT trustworthy) now reads "Calculando…" — a real 0.00% shows
@@ -32188,7 +32287,14 @@ function _aurixPaintReturnBadge(el, surface) {
     // P0-EMERGENCY-CHART-RECOVERY — the visible return badge is driven ONLY by the emergency chart
     // object (the same object that drives the visible line), so a % can never appear without a line.
     if (_aurixEmergencyChartOn()) {
-      _aurixEmergencyPaintBadgeNode(el, buildProductionPortfolioChart(typeof activeRange !== 'undefined' ? activeRange : '24h'), surface);
+      // SPEC CHART-PREMIUM-PUBLICATION.BLOCK-B — ATOMICITY. This function used to rebuild its OWN
+      // chart result at its own instant, so the six independent call sites (reconcile, focus, mobile,
+      // …) could each publish a % belonging to a series different from the one currently drawn. Read
+      // the result that is ACTUALLY published for this range instead; only fall back to building one
+      // when nothing has been published yet (first paint, where the painter owns the sequence).
+      const _r = (typeof activeRange !== 'undefined' ? activeRange : '24h');
+      const _pub = (typeof _aurixPublishedChartFor === 'function') ? _aurixPublishedChartFor(_r) : null;
+      _aurixEmergencyPaintBadgeNode(el, _pub || buildProductionPortfolioChart(_r), surface);
       return;
     }
     const snap = (typeof computePerformanceSnapshot === 'function') ? computePerformanceSnapshot(typeof activeRange !== 'undefined' ? activeRange : '24h') : null;
@@ -35166,7 +35272,7 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
   opts = opts || {};
   const uid = opts.uid || 'd';
   const surface = uid === 'm' ? 'mobile' : 'desktop';
-  const emg = buildProductionPortfolioChart(typeof activeRange !== 'undefined' ? activeRange : '24h');
+  let emg = buildProductionPortfolioChart(typeof activeRange !== 'undefined' ? activeRange : '24h');
   try { if (typeof window !== 'undefined') window._aurixEmergencyLast = emg; } catch (_) {}
   _aurixChartUpdateLog(surface, emg);
 
@@ -35204,10 +35310,23 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
       }
     } catch (_) { _definitive = false; }
     if (!_definitive) {
-      _aurixLastVisualSig[surface] = null;
-      try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'loading'); } catch (_) {}
-      try { hostEl.innerHTML = ''; } catch (_) {}
-      return true;
+      // ── SPEC CHART-PREMIUM-PUBLICATION.BLOCK-B — INVISIBLE RECONCILIATION ────────────────────
+      // A mature account already has a definitive frame for THIS range: keep it on screen instead
+      // of blanking, and let reconciliation finish underneath. The restored object replaces `emg`
+      // and falls through the normal path below, so the line, the %, the colour and the state are
+      // published from that ONE result exactly as when it was first produced — no partial window
+      // can overwrite it, and nothing is recomputed over half-hydrated data. When there is no
+      // fresh LKG for this range (new account, cold cache, expired TTL) the certified blank hold
+      // below is unchanged, so construction/insufficiency still shows the approved state.
+      const _lkg = (typeof _aurixChartLkgRestore === 'function') ? _aurixChartLkgRestore(emg.range) : null;
+      if (_lkg) {
+        emg = _lkg;
+      } else {
+        _aurixLastVisualSig[surface] = null;
+        try { if (typeof _aurixSetChartSkin === 'function') _aurixSetChartSkin(surface, 'loading'); } catch (_) {}
+        try { hostEl.innerHTML = ''; } catch (_) {}
+        return true;
+      }
     }
   }
 
@@ -35222,7 +35341,14 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
   // Flag OFF ⇒ the inline v500 gate blocks below run unchanged (byte-identical v500 rollback).
   let _frcTone = null;
   const _frcOn = (typeof _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT !== 'undefined') && _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT && typeof _aurixResolveFinalRenderSeriesContract === 'function';
-  if (_frcOn && emg.state === 'ready') {
+  // BLOCK-B — a restored LKG frame is republished VERBATIM: it already passed the final publication
+  // contract when it was produced, so re-judging it here would run that contract against the current
+  // half-hydrated globals and could downgrade a good frame mid-reconciliation. Its stored tone and
+  // series go straight to the draw below; nothing about it is recomputed.
+  if (emg._aurixLkgRestored) {
+    _frcTone = (emg.colorClass != null) ? emg.colorClass : null;
+    _aurixMarkChartPublished(emg);
+  } else if (_frcOn && emg.state === 'ready') {
     const _frc = _aurixResolveFinalRenderSeriesContract(emg, emg.range, surface);
     try { console.log('[UI][FINAL_RENDER_CONTRACT]', { surface: surface, mode: _frc.mode, state: _frc.state, reason: _frc.reason, out: _frc.diagnostics.outputCount, dropped: _frc.diagnostics.droppedCount, colorState: _frc.colorState, badgeEligible: _frc.badgeEligible, chartHash: emg.chartHash }); } catch (_) {}
     if (_frc.mode === 'building' || _frc.mode === 'empty' || _frc.mode === 'error' || !(Array.isArray(_frc.renderPoints) && _frc.renderPoints.length >= 2)) {
@@ -35233,6 +35359,11 @@ function _wscPaintEmergency(changeEl, hostEl, opts) {
     }
     emg.points = _frc.renderPoints;   // painter draws EXCLUSIVELY the contract's final series (SPEC.19 rule)
     _frcTone = _frc.colorClass;
+    // BLOCK-B — this frame passed the final publication contract, so it becomes both "what is on
+    // screen now" (read by the badge instead of recomputing) and this range's durable LKG. Saved
+    // only here: a provisional or insufficient frame returned above and never reaches this line.
+    _aurixMarkChartPublished(emg);
+    if (_frc.badgeEligible) { try { _aurixChartLkgSave(emg, _frc.renderPoints, emg.range, _frc.colorClass); } catch (_) {} }
     // SPEC P0-FIRST-DEFINITIVE-PAINT — the v646 hold that used to live here (scoped to the `ready` branch,
     // and publishing the terminal quality-gate copy while it waited) is now the SINGLE publication gate at
     // the top of this function, which covers this branch and the four other _wscRenderInsufficient sites.
@@ -35816,7 +35947,7 @@ function renderAurixMobileLiteChart(range, token) {
     // Ready ⇒ clean line; pending ⇒ skeleton (no line, no %). No desktop/mobile mismatch possible.
     if (_aurixEmergencyChartOn()) {
       try {
-        const emg = buildProductionPortfolioChart(r);
+        let emg = buildProductionPortfolioChart(r);
         try { if (typeof window !== 'undefined') window._aurixEmergencyLastMobile = emg; } catch (_) {}
         _aurixChartUpdateLog('mobile', emg);
         // ── SPEC P0-FIRST-DEFINITIVE-PAINT — THE single publication gate (mobile) ────────────────
@@ -35836,16 +35967,27 @@ function renderAurixMobileLiteChart(range, token) {
             }
           } catch (_) { _definitiveM = false; }
           if (!_definitiveM) {
-            _aurixLastVisualSig.mobile = null;
-            _aurixMobileLiteFallback('pending', null, { quiet: true });
-            if (_aurixMobileLiteEmptyRetries < 6) { _aurixMobileLiteEmptyRetries++; try { setTimeout(function () { scheduleAurixMobileLite(r); }, 1300); } catch (_) {} }
-            return;
+            // BLOCK-B — mobile parity: keep this range's definitive frame on screen while the
+            // sources reconcile underneath (see the desktop gate). No LKG ⇒ certified skeleton +
+            // the existing convergence retry, unchanged. No new timer either way.
+            const _lkgM = (typeof _aurixChartLkgRestore === 'function') ? _aurixChartLkgRestore(r) : null;
+            if (_lkgM) {
+              emg = _lkgM;
+            } else {
+              _aurixLastVisualSig.mobile = null;
+              _aurixMobileLiteFallback('pending', null, { quiet: true });
+              if (_aurixMobileLiteEmptyRetries < 6) { _aurixMobileLiteEmptyRetries++; try { setTimeout(function () { scheduleAurixMobileLite(r); }, 1300); } catch (_) {} }
+              return;
+            }
           }
         }
         // SPEC.19 — mobile uses the SAME final render contract as desktop (identical output). Flag OFF ⇒ v500.
         let _frcToneM = null;
         const _frcOnM = (typeof _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT !== 'undefined') && _AURIX_CHART_FINAL_RENDER_SERIES_CONTRACT && typeof _aurixResolveFinalRenderSeriesContract === 'function';
-        if (_frcOnM && emg.state === 'ready') {
+        if (emg._aurixLkgRestored) {   // BLOCK-B — republish verbatim, never re-judged (see desktop)
+          _frcToneM = (emg.colorClass != null) ? emg.colorClass : null;
+          _aurixMarkChartPublished(emg);
+        } else if (_frcOnM && emg.state === 'ready') {
           const _frcM = _aurixResolveFinalRenderSeriesContract(emg, r, 'mobile');
           if ((_frcM.mode !== 'full' && _frcM.mode !== 'partial_clean') || !(Array.isArray(_frcM.renderPoints) && _frcM.renderPoints.length >= 2)) {
             _aurixLastVisualSig.mobile = null; _aurixMobileLiteFallback('pending');
@@ -35859,6 +36001,8 @@ function renderAurixMobileLiteChart(range, token) {
           // SPEC P0-FIRST-DEFINITIVE-PAINT — the v646 hold that used to live here is now the SINGLE
           // publication gate above, which also covers the five other 'pending' fallback sites.
           emg.points = _frcM.renderPoints; _frcToneM = _frcM.colorClass;
+          _aurixMarkChartPublished(emg);   // BLOCK-B — same publication registry + LKG as desktop
+          if (_frcM.badgeEligible) { try { _aurixChartLkgSave(emg, _frcM.renderPoints, r, _frcM.colorClass); } catch (_) {} }
         } else {
         // SPEC.16 — short-history display (v500 path). building ⇒ skeleton; partial_clean ⇒ trim to MAIN cluster.
         let _shdM = null;

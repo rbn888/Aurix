@@ -158,11 +158,14 @@ console.log('\nHard protections preserved after the fix:');
 
 console.log('\nWiring — visible surfaces read buildProductionPortfolioChart; "no disponible" removed:');
 ok('W1 desktop _wscPaintEmergency reads buildProductionPortfolioChart',
-  /const surface = uid === 'm' \? 'mobile' : 'desktop';\s*const emg = buildProductionPortfolioChart\(/.test(app));
+  // BLOCK-B: `emg` is now `let` (the publication gate may substitute this range's restored LKG).
+  /const surface = uid === 'm' \? 'mobile' : 'desktop';\s*let emg = buildProductionPortfolioChart\(/.test(app));
 ok('W2 mobile lite renderer reads buildProductionPortfolioChart',
-  /const emg = buildProductionPortfolioChart\(r\);/.test(app));
+  /let emg = buildProductionPortfolioChart\(r\);/.test(app));
 ok('W3 return badge reads buildProductionPortfolioChart',
-  /_aurixEmergencyPaintBadgeNode\(el, buildProductionPortfolioChart\(/.test(app));
+  // BLOCK-B: the badge now PREFERS the already-published result for this range (atomicity) and
+  // still builds one when nothing has been published yet.
+  /_aurixEmergencyPaintBadgeNode\(el, _pub \|\| buildProductionPortfolioChart\(_r\), surface\)/.test(app));
 ok('W4 mobile fallback no longer shows "Gráfico temporalmente no disponible en móvil"',
   !/Gráfico temporalmente no disponible en móvil/.test(fnSrc('_aurixMobileLiteFallback')) &&
   /Histórico en construcción/.test(fnSrc('_aurixMobileLiteFallback')));
