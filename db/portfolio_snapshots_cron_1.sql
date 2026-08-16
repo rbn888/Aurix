@@ -10,8 +10,14 @@
 --   1. db/portfolio_snapshots_1.sql applied (creates the append-only table + unique idempotency index).
 --   2. Edge Function deployed:  supabase functions deploy portfolio-snapshot --project-ref <ref>
 --      (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are platform-injected into the function env; never in code.)
---   3. Vault secret `aurix_snapshot_invoke_key` = an invocation key (anon or service_role) so pg_net's POST is
---      accepted by the Functions gateway. The key is read from Vault here — NEVER hardcoded in this file.
+--   3. Vault secret `aurix_snapshot_invoke_key` = a REAL Supabase SECRET key of this project (`sb_secret_…`)
+--      — verified against production: the platform gateway validates the `apikey` header against the
+--      project's own keys even with verify_jwt = false, and answers 401 "Invalid API key" to anything it
+--      does not recognise, so an arbitrary high-entropy string would never reach the function at all.
+--      It must be the SAME value set as the function secret
+--      AURIX_SNAPSHOT_INVOKE_KEY. Sent as the `apikey` header below and validated by the function itself
+--      (authorizeCaller). NEVER a publishable key: that one ships in the frontend bundle and the function
+--      refuses it. Read from Vault here — NEVER hardcoded in this file.
 --
 -- Security: the invocation key lives ONLY in Supabase Vault. The function itself uses the service-role env
 -- (platform-injected) to write portfolio_snapshots; this migration only *triggers* it on a schedule.
@@ -31,9 +37,14 @@ select cron.schedule(
   $CRON$
     select net.http_post(
       url     := 'https://ozcasyufbknnuemllwso.functions.supabase.co/portfolio-snapshot',
+      -- SPEC SECURE-SNAPSHOT-ENDPOINT — the function authenticates the CALLER itself via the `apikey`
+      -- header (authorizeCaller). `Authorization: Bearer` was removed: the gateway runs with
+      -- verify_jwt = false (the new sb_secret_… keys are opaque tokens, not JWTs, so JWT enforcement
+      -- would reject this call), and the function never reads Authorization — sending it would only
+      -- copy the secret into an extra header for no benefit. These are the strictly required headers.
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
-        'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'aurix_snapshot_invoke_key')
+        'apikey', (select decrypted_secret from vault.decrypted_secrets where name = 'aurix_snapshot_invoke_key')
       ),
       body    := '{}'::jsonb,
       timeout_milliseconds := 120000

@@ -23,6 +23,15 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;               // env only — never hardcode
 const PRICE_API_BASE = Deno.env.get('AURIX_PRICE_API_BASE') || 'https://isa-portfolio-ten.vercel.app';
 const DRY_RUN = (Deno.env.get('DRY_RUN') || '') === '1';
+// SPEC SECURE-SNAPSHOT-ENDPOINT — server-to-server invocation secret. The function performs its OWN
+// authentication (see authorizeCaller) because the platform gateway cannot do it for us here: the new
+// Supabase API keys (sb_secret_… / sb_publishable_…) are OPAQUE tokens, not JWTs, so `verify_jwt = true`
+// would reject the scheduler's call outright. Set as a function secret; the SAME value is stored in Vault
+// so pg_net can present it. Never in the repo, never in a response, never logged.
+// It must be a REAL project secret key: verified in production, the gateway itself answers 401 "Invalid
+// API key" to an `apikey` it does not recognise, so an arbitrary string never even reaches this gate. The
+// two layers compose — gateway: is this a key of this project? here: is it the one allowed to invoke?
+const INVOKE_KEY = Deno.env.get('AURIX_SNAPSHOT_INVOKE_KEY') || '';
 const NEAR_MS = 5 * 60_000;          // skip if a snapshot exists within 5 min…
 const NEAR_FRAC = 0.002;             // …and within 0.2% value (matches the frontend merge dedup)
 
@@ -165,7 +174,48 @@ function valueUser(row: any, prices: Map<string, { price: number; currency: stri
 // skip, not an error, so reruns are safe and produce no duplicates.
 const PAGE = 1000;                    // Supabase select cap per request
 const MAX_USERS = 20000;              // hard upper bound on processed rows per run (bounded execution)
-Deno.serve(async () => {
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC SECURE-SNAPSHOT-ENDPOINT — CALLER AUTHENTICATION (own gate, fail-CLOSED)
+// ════════════════════════════════════════════════════════════════════════════
+// This endpoint reads EVERY user's portfolio with the service role and, in DRY_RUN, returns per-user
+// valuations. It previously ran with `verify_jwt = false` and NO check of its own — the handler did not
+// even receive the Request — so it was invocable anonymously. This gate is the fix.
+//
+// Contract: the caller presents the private invocation secret in the `apikey` header. Rejection is
+// unconditional and happens BEFORE any privileged work: no createClient, no user_portfolios read, no
+// valuation, no price fetch, no insert, and no DRY_RUN sample ever reaches an unauthenticated caller.
+//
+// Fail-CLOSED by design: a missing or implausible INVOKE_KEY rejects EVERY request (503). A deploy that
+// forgets the secret is therefore inert-but-secure, never open. A PUBLISHABLE key is refused on both
+// sides — as the presented credential and as the configured expectation — since it ships in the
+// frontend bundle and would grant server privileges to anyone who reads it.
+function timingSafeEqualStr(a: string, b: string): boolean {
+  const ea = new TextEncoder().encode(a);
+  const eb = new TextEncoder().encode(b);
+  if (ea.length !== eb.length) return false;          // length is not secret (key length is fixed by format)
+  let diff = 0;
+  for (let i = 0; i < ea.length; i++) diff |= ea[i] ^ eb[i];
+  return diff === 0;                                   // constant time over equal-length inputs
+}
+function authorizeCaller(req: Request): { ok: boolean; status: number; reason: string } {
+  if (!INVOKE_KEY || INVOKE_KEY.length < 20) return { ok: false, status: 503, reason: 'not_configured' };
+  if (INVOKE_KEY.indexOf('sb_publishable_') === 0) return { ok: false, status: 503, reason: 'misconfigured_publishable' };
+  const presented = (req && req.headers) ? (req.headers.get('apikey') || '') : '';
+  if (!presented) return { ok: false, status: 401, reason: 'missing_apikey' };
+  if (presented.indexOf('sb_publishable_') === 0) return { ok: false, status: 403, reason: 'publishable_rejected' };
+  if (!timingSafeEqualStr(presented, INVOKE_KEY)) return { ok: false, status: 403, reason: 'invalid_apikey' };
+  return { ok: true, status: 200, reason: 'ok' };
+}
+
+Deno.serve(async (req: Request) => {
+  // AUTH FIRST — nothing privileged above this line. The body carries only a generic code: it must never
+  // disclose whether the secret is unset, malformed or merely wrong beyond the coarse status.
+  const auth = authorizeCaller(req);
+  if (!auth.ok) {
+    return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }),
+      { status: auth.status, headers: { 'content-type': 'application/json' } });
+  }
   if (!SUPABASE_URL || !SERVICE_ROLE) return new Response('missing env', { status: 500 });
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
   const now = new Date();
