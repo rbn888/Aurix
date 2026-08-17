@@ -60,6 +60,39 @@ select:focus-visible {
   --elev-1-solid:  #191E27;                   /* opaque twin of --elev-1 */
   --elev-2-solid:  #252C39;                   /* opaque twin of --elev-2 */
 
+  /* ════════ ASSET-IDENTITY ICON WELL — one primitive for every asset logo (BLOCK 2: S1+D1)
+     Before this block BOTH icon families removed every support surface the moment a real
+     logo existed (`.has-logo`, `.badge--has-logo`, `.cat-card-visual img` — the latter with
+     five `!important` nullifications), so a dark or near-black logo had nothing behind it
+     and nothing around it: it vanished into the card. The Market family's per-type "plate"
+     did not help either — its gradient bottomed out at #0D1322, MEASURABLY DARKER than the
+     card plane it sat on (L 0.0066 vs 0.0117, i.e. 1.11 the wrong way).
+
+     The well is deliberately the LOGO'S OWN BOX, never a larger pill: a full-bleed logo
+     hides it completely (it only shows through transparent pixels), so a logo with good
+     contrast keeps looking exactly as designed and nothing reads as a button. What the well
+     always guarantees is that the icon is LOCATED and DELIMITED against its surface.
+
+     Honest limit, measured on the shipped well (#354053 once composited on a card) — there is
+     NO dark level that rescues every dark logo, so this primitive does not pretend to:
+       glyph          well   old plate   bare card
+       #000           2.01     1.13        1.26
+       #111           1.80     1.02        1.13
+       #222           1.52     1.16        1.05
+       #333           1.21     1.47        1.32   ← the one case that gets WORSE
+       #1a1a2e        1.63     1.09        1.02
+       #fff          10.47    18.53       16.70   (still far above any legibility need)
+     Every dark glyph improves except a mid-grey around #333, which converges with the well's
+     own luminance — no single dark level can serve both ends of the dark range at once. A
+     black mark only becomes truly legible with a contextual LIGHT well (excluded here: no
+     white backgrounds) or per-logo detection (excluded: no image analysis). What this block
+     does guarantee is that the icon is never invisible: it is always a delimited disc.
+
+     Reuses the ladder above; introduces no colour of its own. No glow, no shadow, no
+     gradient, no filter, and no change to any icon footprint. */
+  --asset-well:       var(--elev-2);        /* alpha, so it stacks on whatever hosts it: 1.60 against the card plane, 1.58 on a category card — a defined disc, deliberately NOT the 1.86 that --elev-3 produced (that read as a button) */
+  --asset-well-ring:  var(--border-subtle); /* the hairline that delimits an OPAQUE logo (1.36 against the well; was 0.05 → 1.16) */
+
   --bg:          var(--elev-0);        /* was #080C16 — a second near-black under the .app shell; now the single canvas */
   --bg-card:     var(--elev-1-solid);  /* was #171C28 (1.197) → 1.22 — opaque card/dropdown plane, barely moves */
   --bg-card-2:   var(--elev-2-solid);  /* was #1D2330 (1.297) → 1.45 — this is the hover/elevated tier, so it takes the real step */
@@ -954,12 +987,18 @@ button[aria-busy="true"] {
   box-shadow: none !important;
 }
 
+/* ASSET-IDENTITY ICON WELL (BLOCK 2) — the Dashboard-holdings / asset-detail logo joins the
+   SAME primitive as the Market family. The well goes on the 28px logo itself, not on the
+   44px .badge--has-logo container: hugging the logo keeps today's footprint and avoids the
+   "logo inside a visible button" look a 44px well would produce. filter/box-shadow stay
+   none by contract — no aggressive treatment of the logo, no shadow, no halo. */
 .asset-badge-logo {
   width: 28px; height: 28px;
   object-fit: contain;
   border-radius: 50%;
   display: block;
-  background: none !important;
+  background: var(--asset-well) !important;
+  border: 1px solid var(--asset-well-ring) !important;
   box-shadow: none !important;
   filter: none !important;
   padding: 0 !important;
@@ -4283,12 +4322,19 @@ body:not(.hero-active) #orb-canvas {
   box-shadow: none !important;
 }
 
+/* ASSET-IDENTITY ICON WELL (BLOCK 2) — this was the P0 (D1). The five `!important`
+   nullifications below removed background, shadow, filter, backdrop-filter and padding, so
+   nothing could rescue a dark logo on a category card and no other rule could override it
+   either. background now carries the shared well and a hairline ring; filter/backdrop-filter
+   stay none on purpose (the logo itself is never manipulated) and the footprint is
+   identical — 24px with border-box, so the ring costs no layout. */
 .cat-card-visual img {
   width: 24px;
   height: 24px;
   object-fit: contain;
   border-radius: 50%;
-  background: none !important;
+  background: var(--asset-well) !important;
+  border: 1px solid var(--asset-well-ring) !important;
   box-shadow: none !important;
   filter: none !important;
   backdrop-filter: none !important;
@@ -4298,17 +4344,21 @@ body:not(.hero-active) #orb-canvas {
   transform: none !important;
 }
 
+/* ASSET-IDENTITY ICON WELL (BLOCK 2) — the text fallback shares the primitive so a logo and
+   its fallback occupy the same visual plane (its old rgba(255,255,255,0.08) measured 1.08
+   against the card, i.e. barely there). Same box, same ring, brighter initial. */
 .logo-fallback {
   display: inline-flex;
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.08);
+  background: var(--asset-well);
+  border: 1px solid var(--asset-well-ring);
   align-items: center;
   justify-content: center;
   font-size: 11px;
   font-weight: var(--font-weight-semibold);
-  color: rgba(255,255,255,0.6);
+  color: var(--color-text-secondary);
 }
 
 @media (max-width: 768px) {
@@ -7027,9 +7077,15 @@ body:not(.hero-active) #orb-canvas {
 .dar-metric-label { display: none; font-weight: var(--font-weight-medium); color: var(--text-muted); }
 .dar-tx-info .dar-metric-label { display: inline; }
 
-/* ── Logo artifact safety override (highest specificity) ── */
+/* ── Logo artifact safety override (highest specificity) ──
+   ASSET-IDENTITY ICON WELL (BLOCK 2) — this rule is the deepest cause of D1 and the reason
+   a patch on the declaration above would have looked applied and changed nothing: it sits
+   LATER in the file at the same specificity (0-1-1), so its `background: transparent
+   !important` won. Its real intent is artifact safety — no stray shadow, no filter on a
+   logo — and that intent is kept verbatim. Only the background nullification is dropped,
+   because the well is now deliberate. The global `img` safety rule right below stays as is:
+   it is element-level (0-0-1), so it cannot override the class-scoped wells. */
 .cat-card-visual img {
-  background: transparent !important;
   box-shadow: none !important;
   filter: none !important;
 }
@@ -9483,11 +9539,17 @@ main { padding-bottom: 72px; }
 .asset-icon.has-logo .aurix-aicon-init,
 .sugg-badge.has-logo .aurix-aicon-init,
 .add-v2-asset-icon.has-logo .aurix-aicon-init { display: none; }
+/* ASSET-IDENTITY ICON WELL (BLOCK 2) — a real logo no longer costs the icon its whole
+   support surface. These three containers ARE the logo box (the img fills them), so the
+   well hugs the logo: invisible behind a full-bleed logo, present behind a transparent
+   one, and its hairline delimits an opaque one (the border sits outside the padding box,
+   so an inset:0 logo can never cover it). Geometry untouched: box-sizing is border-box
+   globally, so the 1px ring does not change a single icon footprint. */
 .asset-icon.has-logo,
 .sugg-badge.has-logo,
 .add-v2-asset-icon.has-logo {
-  background: transparent !important;
-  border-color: transparent !important;
+  background: var(--asset-well) !important;
+  border: 1px solid var(--asset-well-ring) !important;
   box-shadow: none !important;
 }
 /* Premium fallback (no logo): one unified Aurix circle — dark gradient + clean
@@ -9550,10 +9612,15 @@ main { padding-bottom: 72px; }
 .sugg-badge.has-logo .aurix-aicon-fallback,
 .add-v2-asset-icon.has-logo .aurix-aicon-fallback { visibility: hidden; }
 
-/* Per-type plates so the logo always sits on the right backdrop. */
+/* Per-type plates so the logo always sits on the right backdrop.
+   ASSET-IDENTITY ICON WELL (BLOCK 2) — the per-type gradients are GONE and every type now
+   converges on the single well. They were the opposite of support: the gradient bottomed
+   out at #0D1322, darker than the card plane itself, with a 0.05 border that measured 1.16
+   against it — so a dark logo lost both its backdrop and its edge. One material, one ring,
+   for crypto / stock / etf / fund / index / commodity / metal / unknown alike. */
 .aicon--crypto.has-logo {
-  background: radial-gradient(circle at 50% 38%, #1b2438 0%, #0d1322 100%) !important;
-  border: 1px solid rgba(255,255,255,0.05) !important;
+  background: var(--asset-well) !important;
+  border: 1px solid var(--asset-well-ring) !important;
 }
 .aicon--crypto .aurix-aicon-img { object-fit: cover; }
 /* AURIX-ASSET-ICON-UNIFICATION — stocks / ETFs / funds now sit on the SAME
@@ -9564,8 +9631,8 @@ main { padding-bottom: 72px; }
 .aicon--stock.has-logo,
 .aicon--etf.has-logo,
 .aicon--fund.has-logo {
-  background: radial-gradient(circle at 50% 38%, #1b2438 0%, #0d1322 100%) !important;
-  border: 1px solid rgba(255,255,255,0.05) !important;
+  background: var(--asset-well) !important;
+  border: 1px solid var(--asset-well-ring) !important;
   box-shadow: none !important;
 }
 /* SPEC 3.3 — stock/ETF/fund logos (FMP, often with internal whitespace, not
@@ -17371,8 +17438,11 @@ body.gs-open { overflow: hidden; }
      not neon). 45/42 ≈ +7%. */
   .hero-left .summary-total {
     font-size: clamp(32px, 4.6vw, 48px);   /* AURIX-DASH-V4: ~7% more presence — the figure dominates the screen */
-    text-shadow: 0 1px 1px rgba(0,0,0,0.22), 0 0 18px rgba(255,255,255,0.16);
-  }
+    /* INSTITUTIONAL-DARK-FOUNDATION (D2) — completion of BLOCK 1. This third halo was missed
+       there: at 0-2-0 it OUTRANKED the two rules that were cleaned, so on desktop (≥1024px,
+       i.e. exactly where the founder looks) the wealth figure kept an 18px white glow. The
+       BLOCK 2 gate caught it by resolving the cascade instead of checking one rule. Size and
+       the deliberate +7% presence are untouched; only the halo is gone. */
   /* 2/3/6. Vertical balance via dual auto-margins: the free space splits EQUALLY
      above the actions AND above the health pill, so the actions sit a touch
      lower than the info block (elegant breathing) and the health capsule drops

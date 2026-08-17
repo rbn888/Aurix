@@ -224,7 +224,9 @@ console.log('\nContraste crítico sobre el nuevo plano de contenido (AA = 4.5):'
 console.log('\nCache-bust / deploy:');
 const cssV = /styles\.css\?v=(\d+)/.exec(html);
 const buildIdx = /var BUILD = '([^']+)'/.exec(html);
-ok('CB1 styles.css?v= subido a 646 (el CSS cambió)', cssV && +cssV[1] === 646, cssV && cssV[1]);
+// El invariante es "el CSS cambió ⇒ el bust subió respecto al 645 que había antes de este
+// bloque", no un número fijo: los bloques posteriores lo siguen subiendo (BLOCK 2 → 647).
+ok('CB1 styles.css?v= subido por encima de 645 (el CSS cambió)', cssV && +cssV[1] >= 646, cssV && cssV[1]);
 ok('CB2 AURIX_BUILD subido y coherente con version.json', buildIdx && buildIdx[1] === version.build, (buildIdx && buildIdx[1]) + ' vs ' + version.build);
 ok('CB3 appjs NO subido (app.js no se tocó)', version.appjs === 614, String(version.appjs));
 
