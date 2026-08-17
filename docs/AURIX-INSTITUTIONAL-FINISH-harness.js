@@ -44,12 +44,20 @@ const e1 = planeOf('--elev-1'), e2 = planeOf('--elev-2');
 function toHsl([r, g, b]) { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let h, s; const l = (mx + mn) / 2, d = mx - mn; if (!d) { h = s = 0; } else { s = l > .5 ? d / (2 - mx - mn) : d / (mx + mn); h = mx === r ? ((g - b) / d + (g < b ? 6 : 0)) : mx === g ? ((b - r) / d + 2) : ((r - g) / d + 4); h /= 6; } return [h * 360, s * 100, l * 100]; }
 
 // ── scope diff, anchored to this block's commit ─────────────────────────────
+// TODA llamada a git va envuelta: el checkout de CI es SHALLOW (fetch-depth 1), así que cuando
+// el commit de este bloque es la punta, `git diff <sha>^ <sha>` no encuentra el padre y
+// execSync LANZA. Eso tiró este gate en CI (exit 1) aunque pasaba en local con historia
+// completa. Sin historia se cae al diff del árbol de trabajo; si tampoco hay, las aserciones de
+// alcance quedan vacías y el peso lo llevan las de ESTADO, que no dependen de git.
 const PATHS = '-- styles.css index.html version.json';
-const B3 = (function () { try { return execSync('git log --format=%H --fixed-strings --grep=' + JSON.stringify('(BLOCK 3)'), { cwd: root }).toString().trim().split('\n').filter(Boolean); } catch (_) { return []; } })();
-const diff = B3.length ? B3.map(s => execSync('git diff -U0 ' + s + '^ ' + s + ' ' + PATHS, { cwd: root }).toString()).join('\n')
-                       : execSync('git diff -U0 ' + PATHS, { cwd: root }).toString();
-const files = B3.length ? [...new Set(B3.flatMap(s => execSync('git diff --name-only ' + s + '^ ' + s, { cwd: root }).toString().trim().split('\n')))].filter(Boolean)
-                        : execSync('git diff --name-only', { cwd: root }).toString().trim().split('\n').filter(Boolean);
+const sh = cmd => { try { return execSync(cmd, { cwd: root, stdio: ['pipe', 'pipe', 'ignore'] }).toString(); } catch (_) { return null; } };
+const B3 = (sh('git log --format=%H --fixed-strings --grep=' + JSON.stringify('(BLOCK 3)')) || '').trim().split('\n').filter(Boolean);
+const rangeDiff = B3.length ? B3.map(s => sh('git diff -U0 ' + s + '^ ' + s + ' ' + PATHS)) : [null];
+const diff = (B3.length && rangeDiff.every(p => p !== null)) ? rangeDiff.join('\n') : (sh('git diff -U0 ' + PATHS) || '');
+const rangeFiles = B3.length ? B3.map(s => sh('git diff --name-only ' + s + '^ ' + s)) : [null];
+const files = (B3.length && rangeFiles.every(p => p !== null))
+  ? [...new Set(rangeFiles.join('\n').trim().split('\n'))].filter(Boolean)
+  : (sh('git diff --name-only') || '').trim().split('\n').filter(Boolean);
 const dlines = diff.split('\n').filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l));
 const declOf = l => { const m = /^[+-]\s*(--)?([a-z-]+)\s*:\s*([^;]*);?\s*$/.exec(l.replace(/\/\*[\s\S]*?\*\//g, '')); return m ? { custom: !!m[1], prop: m[2], value: m[3].trim() } : null; };
 

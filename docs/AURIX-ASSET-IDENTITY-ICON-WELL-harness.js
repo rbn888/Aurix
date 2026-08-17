@@ -105,16 +105,13 @@ const OLD_PLATE = hex('#0d1322');                                        // the 
 // (BLOCK 3 añadió @media y selectores legítimos fuera de identidad de activo) las rompiera
 // aunque BLOCK 2 siguiera intacto. Ambos commits del bloque llevan el marcador "(BLOCK 2)";
 // mientras el bloque aún no esté commiteado se cae al árbol de trabajo, que es lo correcto.
+// Toda llamada a git envuelta: en un checkout SHALLOW (CI, fetch-depth 1) el padre del commit
+// no existe y `git diff <sha>^ <sha>` lanza. Sin historia se cae al árbol de trabajo.
 const PATHS = '-- styles.css index.html version.json';
-const B2 = (function () {
-  try {
-    return execSync('git log --format=%H --fixed-strings --grep=' + JSON.stringify('(BLOCK 2)'), { cwd: root })
-      .toString().trim().split('\n').filter(Boolean);
-  } catch (_) { return []; }
-})();
-const diff = B2.length
-  ? B2.map(s => execSync('git diff -U0 ' + s + '^ ' + s + ' ' + PATHS, { cwd: root }).toString()).join('\n')
-  : execSync('git diff -U0 ' + PATHS, { cwd: root }).toString();
+const sh = cmd => { try { return execSync(cmd, { cwd: root, stdio: ['pipe', 'pipe', 'ignore'] }).toString(); } catch (_) { return null; } };
+const B2 = (sh('git log --format=%H --fixed-strings --grep=' + JSON.stringify('(BLOCK 2)')) || '').trim().split('\n').filter(Boolean);
+const b2Diff = B2.length ? B2.map(s => sh('git diff -U0 ' + s + '^ ' + s + ' ' + PATHS)) : [null];
+const diff = (B2.length && b2Diff.every(p => p !== null)) ? b2Diff.join('\n') : (sh('git diff -U0 ' + PATHS) || '');
 
 console.log('AURIX-ASSET-IDENTITY-ICON-WELL — DASHBOARD EXCELLENCE V1 · BLOCK 2\n');
 
@@ -225,9 +222,10 @@ const geom = lines.map(declOf).filter(Boolean).filter(d => !d.custom && GEOM.has
 ok('7a ninguna propiedad de geometría en el diff', geom.length === 0, geom.map(d => d.prop + ': ' + d.value).join(' | ').slice(0, 240));
 ok('7b ninguna @media tocada', !lines.some(l => /@media/.test(l.replace(/\/\*[\s\S]*?\*\//g, ''))));
 ok('7c el ring no cuesta layout: box-sizing es border-box global', /\*,\s*\*::before,\s*\*::after\s*\{[^}]*box-sizing:\s*border-box/.test(css));
-const files = B2.length
-  ? [...new Set(B2.flatMap(s => execSync('git diff --name-only ' + s + '^ ' + s, { cwd: root }).toString().trim().split('\n')))].filter(Boolean)
-  : execSync('git diff --name-only', { cwd: root }).toString().trim().split('\n').filter(Boolean);
+const b2Files = B2.length ? B2.map(s => sh('git diff --name-only ' + s + '^ ' + s)) : [null];
+const files = (B2.length && b2Files.every(p => p !== null))
+  ? [...new Set(b2Files.join('\n').trim().split('\n'))].filter(Boolean)
+  : (sh('git diff --name-only') || '').trim().split('\n').filter(Boolean);
 ok('8a el diff sólo toca styles.css, el cache-bust y los harness', files.every(f =>
    ['styles.css', 'index.html', 'version.json'].includes(f) || /^docs\/.*-harness\.js$/.test(f)), files.join(', '));
 ok('8b app.js / Chart Engine / snapshots / watchdog / backend intactos',

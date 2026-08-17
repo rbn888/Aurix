@@ -174,22 +174,22 @@ ok('F5 la cifra gana nitidez sin perder contraste sobre el hero', (function () {
 // perfecto. Se ancla al commit propio buscándolo por su marcador; antes de existir el commit
 // (primera ejecución, cambio aún sin commitear) cae al árbol de trabajo, que es lo correcto.
 console.log('\nG/H/I — alcance: geometría, motores y materiales ad-hoc:');
+// Toda llamada a git envuelta: en un checkout SHALLOW (CI, fetch-depth 1) el padre del commit
+// no existe y `git diff <sha>^ <sha>` lanza. Sin historia se cae al árbol de trabajo.
 const PATHS = '-- styles.css index.html version.json';
+const sh = cmd => { try { return execSync(cmd, { cwd: root, stdio: ['pipe', 'pipe', 'ignore'] }).toString(); } catch (_) { return null; } };
+const shasOf = marker => (sh('git log --format=%H --fixed-strings --grep=' + JSON.stringify(marker)) || '').trim().split('\n').filter(Boolean);
 function blockDiff(marker) {
-  try {
-    const shas = execSync('git log --format=%H --fixed-strings --grep=' + JSON.stringify(marker), { cwd: root })
-      .toString().trim().split('\n').filter(Boolean);
-    if (shas.length) return shas.map(s => execSync('git diff -U0 ' + s + '^ ' + s + ' ' + PATHS, { cwd: root }).toString()).join('\n');
-  } catch (_) {}
-  return execSync('git diff -U0 ' + PATHS, { cwd: root }).toString();
+  const shas = shasOf(marker);
+  const parts = shas.length ? shas.map(s => sh('git diff -U0 ' + s + '^ ' + s + ' ' + PATHS)) : [null];
+  if (shas.length && parts.every(p => p !== null)) return parts.join('\n');
+  return sh('git diff -U0 ' + PATHS) || '';
 }
 function blockFiles(marker) {
-  try {
-    const shas = execSync('git log --format=%H --fixed-strings --grep=' + JSON.stringify(marker), { cwd: root })
-      .toString().trim().split('\n').filter(Boolean);
-    if (shas.length) return [...new Set(shas.flatMap(s => execSync('git diff --name-only ' + s + '^ ' + s, { cwd: root }).toString().trim().split('\n')))].filter(Boolean);
-  } catch (_) {}
-  return execSync('git diff --name-only', { cwd: root }).toString().trim().split('\n').filter(Boolean);
+  const shas = shasOf(marker);
+  const parts = shas.length ? shas.map(s => sh('git diff --name-only ' + s + '^ ' + s)) : [null];
+  if (shas.length && parts.every(p => p !== null)) return [...new Set(parts.join('\n').trim().split('\n'))].filter(Boolean);
+  return (sh('git diff --name-only') || '').trim().split('\n').filter(Boolean);
 }
 const diff = blockDiff('(BLOCK 1)');
 const added = diff.split('\n').filter(l => l.startsWith('+') && !l.startsWith('+++'));
