@@ -168,8 +168,30 @@ ok('F5 la cifra gana nitidez sin perder contraste sobre el hero', (function () {
 })());
 
 // ── G/H/I. lo que NO se ha movido ───────────────────────────────────────────
+// Las aserciones de ALCANCE describen el cambio de ESTE bloque, así que deben mirar el diff de
+// este bloque — no el del árbol de trabajo. Leerlo del árbol hacía que cualquier bloque
+// posterior (BLOCK 3 añadió @media y colores legítimos) las rompiera aunque BLOCK 1 siguiera
+// perfecto. Se ancla al commit propio buscándolo por su marcador; antes de existir el commit
+// (primera ejecución, cambio aún sin commitear) cae al árbol de trabajo, que es lo correcto.
 console.log('\nG/H/I — alcance: geometría, motores y materiales ad-hoc:');
-const diff = execSync('git diff -U0 -- styles.css index.html version.json', { cwd: root }).toString();
+const PATHS = '-- styles.css index.html version.json';
+function blockDiff(marker) {
+  try {
+    const shas = execSync('git log --format=%H --fixed-strings --grep=' + JSON.stringify(marker), { cwd: root })
+      .toString().trim().split('\n').filter(Boolean);
+    if (shas.length) return shas.map(s => execSync('git diff -U0 ' + s + '^ ' + s + ' ' + PATHS, { cwd: root }).toString()).join('\n');
+  } catch (_) {}
+  return execSync('git diff -U0 ' + PATHS, { cwd: root }).toString();
+}
+function blockFiles(marker) {
+  try {
+    const shas = execSync('git log --format=%H --fixed-strings --grep=' + JSON.stringify(marker), { cwd: root })
+      .toString().trim().split('\n').filter(Boolean);
+    if (shas.length) return [...new Set(shas.flatMap(s => execSync('git diff --name-only ' + s + '^ ' + s, { cwd: root }).toString().trim().split('\n')))].filter(Boolean);
+  } catch (_) {}
+  return execSync('git diff --name-only', { cwd: root }).toString().trim().split('\n').filter(Boolean);
+}
+const diff = blockDiff('(BLOCK 1)');
 const added = diff.split('\n').filter(l => l.startsWith('+') && !l.startsWith('+++'));
 const removed = diff.split('\n').filter(l => l.startsWith('-') && !l.startsWith('---'));
 // Se comparan DECLARACIONES CSS reales, no texto del diff: un filtro por substring daba
@@ -190,7 +212,7 @@ const geomTouched = added.concat(removed).map(declOf).filter(Boolean)
 ok('G1 ninguna propiedad de geometría/responsive en el diff', geomTouched.length === 0,
    geomTouched.map(d => d.prop + ': ' + d.value).join(' | ').slice(0, 300));
 ok('G2 ninguna @media añadida o eliminada', !added.concat(removed).some(l => /@media/.test(l.replace(/\/\*[\s\S]*?\*\//g, ''))));
-const filesTouched = execSync('git diff --name-only', { cwd: root }).toString().trim().split('\n').filter(Boolean);
+const filesTouched = blockFiles('(BLOCK 1)');
 // Superficie de producto permitida: la hoja de estilos, el cache-bust y la versión servida.
 // docs/*.js son artefactos de validación (este gate y el harness de tokens preexistente, que
 // necesitó aprender la nueva indirección de alias); no son código de producto.

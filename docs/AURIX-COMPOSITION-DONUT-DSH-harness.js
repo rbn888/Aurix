@@ -177,9 +177,14 @@ ok('37 periodic pulse "resplandor" removed (clean static halo + breathing kept) 
    /\.micro-composition-donut::after \{ animation: none; box-shadow: none; content: none; \}/.test(css) &&
    /@keyframes aurixMcdBreath/.test(css) &&
    /@media \(prefers-reduced-motion: reduce\) \{ \.mcd-wipe \{ animation: none; stroke-dashoffset: 0; \} \}/.test(css));
+// INSTITUTIONAL-FINISH (D5): the hover border literal became a canonical-blue token
+// (rgba(77,141,255,…) = #4D8DFF was NOT the brand blue). The INVARIANT this assertion
+// protects is unchanged and is what stays asserted — the hover transitions border-color
+// ONLY, never box-shadow. The colour is now matched in either form so it cannot silently
+// regress to a hardcoded off-brand blue either.
 ok('38 FLICKER FIX: .hero-card:hover no longer transitions box-shadow (only border-color animates)',
    /\.hero-card \{ transition: border-color var\(--dur-med\) var\(--ease-premium\); \}/.test(css) &&
-   /\.hero-card:hover \{\s*border-color: rgba\(77,141,255,0\.40\);/.test(css));
+   /\.hero-card:hover \{\s*border-color: (rgba\(var\(--aurix-blue-rgb\), ?0\.40\)|rgba\(77,141,255,0\.40\));/.test(css));
 // behavioral: the static ring still covers 360° AND the reveal markup contains exactly one wipe + mask
 { const sb = { Math }; vm.createContext(sb); vm.runInContext(fnSrc('_aurixDonutSegmentsSVG'), sb); vm.runInContext(fnSrc('_aurixDonutRevealSVG'), sb);
   const e = [{color:'#7C3AED',pct:47.7},{color:'#EA580C',pct:35.9},{color:'#2563EB',pct:13.1},{color:'#0891B2',pct:2.7},{color:'#16A34A',pct:0.4},{color:'#CA8A04',pct:0.2}];

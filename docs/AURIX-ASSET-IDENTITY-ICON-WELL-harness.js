@@ -100,6 +100,22 @@ const catCard = over(hex('#1e2c4a'), 0.50, canvas);                      // .cat
 const wellOnCat = (function () { const c = colorOf(tokenOf('--asset-well')); return c.a === 1 ? c.rgb : over(c.rgb, c.a, catCard); })();
 const OLD_PLATE = hex('#0d1322');                                        // the gradient floor this block removed
 
+// Las aserciones de ALCANCE describen el cambio de ESTE bloque, así que miran el diff de ESTE
+// bloque, no el del árbol de trabajo: leerlo del árbol hacía que cualquier bloque posterior
+// (BLOCK 3 añadió @media y selectores legítimos fuera de identidad de activo) las rompiera
+// aunque BLOCK 2 siguiera intacto. Ambos commits del bloque llevan el marcador "(BLOCK 2)";
+// mientras el bloque aún no esté commiteado se cae al árbol de trabajo, que es lo correcto.
+const PATHS = '-- styles.css index.html version.json';
+const B2 = (function () {
+  try {
+    return execSync('git log --format=%H --fixed-strings --grep=' + JSON.stringify('(BLOCK 2)'), { cwd: root })
+      .toString().trim().split('\n').filter(Boolean);
+  } catch (_) { return []; }
+})();
+const diff = B2.length
+  ? B2.map(s => execSync('git diff -U0 ' + s + '^ ' + s + ' ' + PATHS, { cwd: root }).toString()).join('\n')
+  : execSync('git diff -U0 ' + PATHS, { cwd: root }).toString();
+
 console.log('AURIX-ASSET-IDENTITY-ICON-WELL — DASHBOARD EXCELLENCE V1 · BLOCK 2\n');
 
 // ── 0. integridad sintáctica de la hoja ─────────────────────────────────────
@@ -167,7 +183,7 @@ ok('5a un logo blanco no compite con el well', cr([255, 255, 255], wellOnCard) >
 ok('5b el ring es un hairline, no un borde (alpha ≤ 0.13)', colorOf(tokenOf('--asset-well-ring')).a <= 0.13);
 // Se comparan DECLARACIONES, no texto del diff: una línea de continuación de comentario de
 // bloque no empieza por `*`, así que un comentario que MENCIONA "gradient" daba falso positivo.
-const addedDecls = execSync('git diff -U0 -- styles.css', { cwd: root }).toString()
+const addedDecls = diff
   .split('\n').filter(l => l.startsWith('+') && !l.startsWith('+++'))
   .map(l => /^\+\s*(--)?([a-z-]+)\s*:\s*([^;]*);?\s*$/.exec(l.replace(/\/\*[\s\S]*?\*\//g, '')))
   .filter(Boolean).map(m => ({ custom: !!m[1], prop: m[2], value: m[3].trim() }));
@@ -197,7 +213,6 @@ ok('6d el contenedor de la píldora sigue sin superficie (el well va en el logo,
 
 // ── 7/8. geometría y alcance ────────────────────────────────────────────────
 console.log('\n7-8 — geometría intacta y alcance limitado a identidad de activo:');
-const diff = execSync('git diff -U0 -- styles.css index.html version.json', { cwd: root }).toString();
 const lines = diff.split('\n').filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l));
 const declOf = l => {
   const m = /^[+-]\s*(--)?([a-z-]+)\s*:\s*([^;]*);?\s*$/.exec(l.replace(/\/\*[\s\S]*?\*\//g, ''));
@@ -210,7 +225,9 @@ const geom = lines.map(declOf).filter(Boolean).filter(d => !d.custom && GEOM.has
 ok('7a ninguna propiedad de geometría en el diff', geom.length === 0, geom.map(d => d.prop + ': ' + d.value).join(' | ').slice(0, 240));
 ok('7b ninguna @media tocada', !lines.some(l => /@media/.test(l.replace(/\/\*[\s\S]*?\*\//g, ''))));
 ok('7c el ring no cuesta layout: box-sizing es border-box global', /\*,\s*\*::before,\s*\*::after\s*\{[^}]*box-sizing:\s*border-box/.test(css));
-const files = execSync('git diff --name-only', { cwd: root }).toString().trim().split('\n').filter(Boolean);
+const files = B2.length
+  ? [...new Set(B2.flatMap(s => execSync('git diff --name-only ' + s + '^ ' + s, { cwd: root }).toString().trim().split('\n')))].filter(Boolean)
+  : execSync('git diff --name-only', { cwd: root }).toString().trim().split('\n').filter(Boolean);
 ok('8a el diff sólo toca styles.css, el cache-bust y los harness', files.every(f =>
    ['styles.css', 'index.html', 'version.json'].includes(f) || /^docs\/.*-harness\.js$/.test(f)), files.join(', '));
 ok('8b app.js / Chart Engine / snapshots / watchdog / backend intactos',

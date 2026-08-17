@@ -133,6 +133,20 @@ select:focus-visible {
      into these (here and below) so existing rules stay coherent with no
      per-rule edits. New rules must consume these, never raw literals. */
   --aurix-blue:         #4A82F0;                 /* primary action: buttons, active tabs, focus, links */
+  /* INSTITUTIONAL-FINISH (D5) — the canonical blue's channels, so a rule needing an
+     ARBITRARY alpha of it can consume the token instead of hand-writing a near-miss literal.
+     This is the whole enabler for D5: the hero carried rgba(77,141,255,…) = #4D8DFF, a blue
+     that is NOT the brand blue, across its gradients, border and glow at five different
+     alphas that no existing token matches. Without this the choice would be distorting the
+     hero's alphas to fit the tokens, or leaving it off-brand. NOT a new blue: same value as
+     --aurix-blue. Introduced for the hero only; Workspace/Intelligence keep their own
+     literals (explicitly out of this block's scope). */
+  --aurix-blue-rgb:     74, 130, 240;
+  /* INSTITUTIONAL-FINISH (D4 + S6) — the single institutional focus ring. Discreet by
+     contract: canonical blue, no glow, no layout cost (outline does not reflow). */
+  --focus-ring-color:   rgba(var(--aurix-blue-rgb), 0.55);
+  --focus-ring-width:   2px;
+  --focus-ring-offset:  2px;
   --aurix-blue-hover:   #6595F2;                 /* hover / pressed lift — INSTITUTIONAL-DARK-FOUNDATION (S8): this was `var(--aurix-blue-hover)`, a self-reference, i.e. a cycle that resolves to guaranteed-invalid; any rule consuming it would have silently inherited a colour instead. Same hue family as --aurix-blue (#4A82F0), one step lighter: 5.68:1 on --elev-1, 4.76:1 on --elev-2. NOT a new blue family. */
   --aurix-blue-soft:    rgba(74, 130, 240, .16); /* soft tint / fill */
   --aurix-blue-border:  rgba(74, 130, 240, .28); /* active / accent border */
@@ -153,8 +167,15 @@ select:focus-visible {
      new literals to --aurix-blue-light). */
   --aurix-blue-light:   var(--aurix-blue);
   /* Category palette */
-  --color-crypto:      #2563EB;
-  --color-real-estate: #7C3AED;
+  /* INSTITUTIONAL-FINISH (S4) — crypto and real-estate were Tailwind-600 values, i.e. a
+     LIGHT-mode palette used on dark: measured on the content plane they read 3.23:1 and
+     2.93:1, below the 3:1 floor for a graphical object, so two donut segments and their
+     legend swatches were the weakest marks on the Dashboard. Lifted in LUMINANCE ONLY —
+     hue and saturation are preserved exactly (crypto 221°/83%, real-estate 262°/83%), so
+     the category↔colour association is untouched. Both now read 3.60:1. The other four
+     already measured 4.54–5.68 and are deliberately NOT touched. */
+  --color-crypto:      #336DEC;   /* was #2563EB — 3.23 → 3.60 */
+  --color-real-estate: #8B51EF;   /* was #7C3AED — 2.93 → 3.60 */
   --color-funds:       #0891B2;
   --color-stocks:      #EA580C;
   --color-cash:        #16A34A;
@@ -3365,17 +3386,23 @@ body:not(.hero-active) #orb-canvas {
 /* AURIX-DASH-V1: hero card raised to the Intelligence hero material — deep
    blue dual-radial + linear backdrop, electric-blue border, inset highlight and
    a layered glow. Dashboard, Market and Intelligence now share one look. */
+/* INSTITUTIONAL-FINISH (D5) — the hero now speaks the canonical blue. Every rgba(77,141,255)
+   here was #4D8DFF, three hue degrees off --aurix-blue (#4A82F0), which is why the hero's
+   border and glow read a shade cooler than the CTAs and tabs sitting right beside them. The
+   second radial was worse: rgba(37,99,235) is #2563EB, a THIRD blue (it is literally the old
+   crypto category colour). All of them now consume --aurix-blue-rgb at their ORIGINAL alphas,
+   so only the hue changes — no glow added, no layout, no redesign. */
 .hero-card {
   background:
-    radial-gradient(120% 150% at 8% 8%, rgba(77,141,255,0.16), transparent 56%),
-    radial-gradient(120% 150% at 92% 92%, rgba(37,99,235,0.12), transparent 60%),
+    radial-gradient(120% 150% at 8% 8%, rgba(var(--aurix-blue-rgb), 0.16), transparent 56%),
+    radial-gradient(120% 150% at 92% 92%, rgba(var(--aurix-blue-rgb), 0.12), transparent 60%),
     linear-gradient(165deg, rgba(30,46,82,0.62), rgba(13,19,36,0.66));
-  border: 1px solid rgba(77,141,255,0.30);
+  border: 1px solid rgba(var(--aurix-blue-rgb), 0.30);
   border-radius: var(--radius-lg);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.06),
     0 18px 50px rgba(0,0,0,0.40),
-    0 0 44px rgba(77,141,255,0.10);
+    0 0 44px rgba(var(--aurix-blue-rgb), 0.10);
   position: relative;
   overflow: hidden;
   display: grid;
@@ -3386,11 +3413,11 @@ body:not(.hero-active) #orb-canvas {
 }
 
 .hero-card:hover {
-  border-color: rgba(77,141,255,0.5);
+  border-color: rgba(var(--aurix-blue-rgb), 0.5);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.08),
     0 22px 62px rgba(0,0,0,0.46),
-    0 0 52px rgba(77,141,255,0.16);
+    0 0 52px rgba(var(--aurix-blue-rgb), 0.16);
 }
 
 .hero-card::before {
@@ -3442,8 +3469,17 @@ body:not(.hero-active) #orb-canvas {
   min-width: 0;
 }
 
+/* INSTITUTIONAL-FINISH (D3 + D4) — Portfolio Distribution on the Dark Foundation, explicitly.
+   It consumed the LEGACY alias --surface-2; it now names the canonical level it belongs to.
+   BLOCK 1 already did the luminance work through that alias (1.119 → 1.221 against the
+   canvas), which is the separation D3 asked for.
+   IT DELIBERATELY DOES NOT GO UP A STEP, and this is measured: this panel hosts the donut and
+   its legend, and on --elev-2 the category palette collapses toward the 3:1 graphical floor
+   (crypto 3.61 → 3.04, real-estate 3.60 → 3.03) — it would trade away exactly what S4 just
+   bought in this same block. A content plane that carries data marks is the right home for it.
+   No new gradient, no glow, no geometry, no content change. */
 .portfolio-combined-card {
-  background: var(--surface-2);
+  background: var(--elev-1);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: var(--space-4);
@@ -3456,7 +3492,18 @@ body:not(.hero-active) #orb-canvas {
   cursor: pointer;
 }
 
-.portfolio-combined-card:hover { border-color: var(--border-hi); }
+/* INSTITUTIONAL-FINISH (D4) — the Dashboard's largest actionable surface finally has a
+   coherent interaction contract. Its hover mixed families (--border-hi is the legacy OPAQUE
+   #394154 on top of an alpha base border), and it had no keyboard state at all despite being
+   cursor:pointer over its whole area. Hover now uses --border-strong, the alpha sibling of
+   its own base border, and focus-visible uses the shared ring. No JS, no role change: the
+   element was already the click target. */
+.portfolio-combined-card:hover { border-color: var(--border-strong); }
+.portfolio-combined-card:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-color: var(--aurix-blue-border);
+}
 
 .distribution-panel {
   display: flex;
@@ -24002,12 +24049,14 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
    moved over them. Hover now only nudges the (cheap) border-colour; the box-shadow is identical
    to the base (no transition), so nothing repaints. Only border-color animates. */
 .hero-card { transition: border-color var(--dur-med) var(--ease-premium); }
+/* INSTITUTIONAL-FINISH (D5) — this later override is the one that actually wins on the hero
+   hover; same canonical-blue swap, same alphas. */
 .hero-card:hover {
-  border-color: rgba(77,141,255,0.40);
+  border-color: rgba(var(--aurix-blue-rgb), 0.40);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.06),
     0 18px 50px rgba(0,0,0,0.40),
-    0 0 44px rgba(77,141,255,0.10);
+    0 0 44px rgba(var(--aurix-blue-rgb), 0.10);
 }
 
 /* Modal — a touch narrower; legend columns separated a bit more */
@@ -25077,6 +25126,56 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   width: 44px; height: 44px;
   transform: translate(-50%, -50%);
   border-radius: 12px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AURIX-INSTITUTIONAL-FINISH — S6 (shared focus contract) + S7 (high ambient light)
+   DASHBOARD EXCELLENCE V1 · BLOCK 3. Appended last on purpose: these are the two
+   cross-cutting contracts of the block and they must not be outranked by an
+   earlier component rule. Nothing here changes geometry, size or the default look.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── S6 — one institutional :focus-visible for REAL controls ────────────────
+   The audit measured 304 `:hover` rules against 23 `:focus-visible`: navigating
+   Aurix with a keyboard left almost every control with no visible state. This is
+   ONE contract, scoped to elements that are genuinely interactive — no element is
+   made focusable or actionable that was not already, and no JS changes.
+   `outline` is used rather than a box-shadow so it costs no layout and cannot be
+   clipped by a control's own `overflow: hidden`. :focus-visible only, so a mouse
+   click never paints a ring. */
+button:focus-visible,
+a[href]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+[role="link"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* ── S7 — high ambient light, opt-in ───────────────────────────────────────
+   Aurix stays Aurix Dark: the canvas is NOT touched, no light mode, no white, no
+   grey, no size or layout change. Under bright ambient light the screen's black
+   floor rises and it is the hairlines that vanish first, so this reinforces EDGES
+   and the focus ring only.
+   It deliberately does NOT brighten the surface fills: raising --elev-1 would push
+   the category palette back toward the 3:1 floor (crypto 3.61 → 3.04) and lower the
+   negative-return red on the content plane — a "more contrast" mode that degrades
+   the data marks would be a contradiction. Edges carry the separation instead. */
+@media (prefers-contrast: more) {
+  :root {
+    --border-subtle:        rgba(255,255,255,0.22);   /* 0.10 → 0.22 */
+    --border-strong:        rgba(255,255,255,0.30);   /* 0.13 → 0.30 */
+    --color-border-subtle:  rgba(255,255,255,0.22);   /* kept in step with its alias */
+    --color-border-default: rgba(255,255,255,0.30);
+    --asset-well-ring:      rgba(255,255,255,0.30);   /* the icon well's disc reads harder */
+    --focus-ring-color:     rgba(var(--aurix-blue-rgb), 0.90);
+    --focus-ring-width:     3px;
+  }
 }
 
 /* ════════ MARKET-V2-02B — header, precio y temporalidades de la ficha ═════════
