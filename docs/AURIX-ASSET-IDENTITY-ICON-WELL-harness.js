@@ -101,6 +101,28 @@ const wellOnCat = (function () { const c = colorOf(tokenOf('--asset-well')); ret
 const OLD_PLATE = hex('#0d1322');                                        // the gradient floor this block removed
 
 console.log('AURIX-ASSET-IDENTITY-ICON-WELL — DASHBOARD EXCELLENCE V1 · BLOCK 2\n');
+
+// ── 0. integridad sintáctica de la hoja ─────────────────────────────────────
+// Añadido tras un fallo real de esta sesión: al sustituir una declaración por un comentario se
+// perdió una `}`, lo que dejó `@media (min-width: 1024px)` sin cerrar y habría tirado un bloque
+// entero de CSS de escritorio en producción. Ningún assert de contenido lo detecta — una hoja
+// desbalanceada sigue conteniendo todos los tokens correctos. El gate de CI del repo lo paró;
+// este gate debe pararlo antes.
+console.log('0 — integridad estructural de styles.css:');
+const braces = { open: (cssRaw.match(/\{/g) || []).length, close: (cssRaw.match(/\}/g) || []).length };
+ok('0a llaves balanceadas', braces.open === braces.close, '{ ' + braces.open + ' vs } ' + braces.close);
+// NO se asserta paridad literal de `/*` vs `*/`: styles.css ya traía de antes un cierre
+// duplicado benigno (L~25053, profundidad final 0, los 216 harnesses pasan) y afirmarlo sería
+// asertar sobre una premisa falsa. El invariante que importa es el que rompí: que la hoja siga
+// balanceada DESPUÉS de quitar comentarios, que es como la lee cualquier parser.
+ok('0b la hoja sigue balanceada tras eliminar comentarios (como la lee un parser)', (function () {
+  const stripped = cssRaw.replace(/\/\*[\s\S]*?\*\//g, '');
+  return (stripped.match(/\{/g) || []).length === (stripped.match(/\}/g) || []).length;
+})());
+ok('0c ninguna regla queda sin cerrar tras el último bloque', (function () {
+  let d = 0; for (const ch of cssRaw) { if (ch === '{') d++; else if (ch === '}') d--; if (d < 0) return false; } return d === 0;
+})());
+
 console.log('  --asset-well      ' + tokenOf('--asset-well') + '  → ' + tokenOf('--elev-3'));
 console.log('  --asset-well-ring ' + tokenOf('--asset-well-ring') + '\n');
 

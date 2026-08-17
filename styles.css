@@ -17443,6 +17443,7 @@ body.gs-open { overflow: hidden; }
        i.e. exactly where the founder looks) the wealth figure kept an 18px white glow. The
        BLOCK 2 gate caught it by resolving the cascade instead of checking one rule. Size and
        the deliberate +7% presence are untouched; only the halo is gone. */
+  }
   /* 2/3/6. Vertical balance via dual auto-margins: the free space splits EQUALLY
      above the actions AND above the health pill, so the actions sit a touch
      lower than the info block (elegant breathing) and the health capsule drops
