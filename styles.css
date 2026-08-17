@@ -29,9 +29,40 @@ select:focus-visible {
 }
 
 :root {
-  --bg:          #080C16;
-  --bg-card:     #171C28;
-  --bg-card-2:   #1D2330;
+  /* ════════ INSTITUTIONAL-DARK-FOUNDATION — canonical surface ladder (BLOCK 1: S2+S3)
+     ONE canvas + three elevation levels. Before this block THREE canvases coexisted
+     (--bg #080C16, --aurix-bg #0A0E1A, --bg-main #040507) and TWO material families
+     claimed different levels while measuring the same plane (--bg-card 1.197 vs
+     --surface-2 1.119 ⇒ only 1.07 between them). Every legacy name below is now an
+     ALIAS of one of these values, so not a single component rule had to be rewritten.
+
+     Ladder (WCAG contrast vs canvas, measured — not estimated):
+       --elev-0  #040507  1.00   canvas (html, body, .app shell)
+       --elev-1           1.22   content plane — cards/panels that carry figures
+       --elev-2           1.45   elevated chrome — hover, dropdown, focused item
+       --elev-3           1.70   topmost; also where a nested alpha surface lands (1.73)
+
+     WHY LEVEL 1 IS 1.22 AND NOT 1.25 — measured ceiling, not preference. On a surface
+     at 1.247 the negative-return red (#e05a5a) falls to 4.50:1 and the canonical blue
+     (#4A82F0) to 4.50:1: exactly the figures and CTAs that live on this plane would
+     land on the AA line. At 1.22 they hold 4.60 and 4.57. The 0.03 of luminance is
+     perceptually irrelevant; the contrast of a negative return is not. Levels 2 and 3
+     carry labels and chrome, never figures, so they take the full step.
+
+     TINT — the overlay is rgb(165,196,255), chosen so the composite reproduces the
+     chromatic delta of the outgoing #171C28 card, (21,25,32) against (19,23,33), one
+     step lighter: Aurix blue-black, NOT neutral grey. Alpha is preserved so deliberate
+     nesting still composites upward; opaque twins exist for the tokens that need them. */
+  --elev-0:        #040507;
+  --elev-1:        rgba(165,196,255,0.131);   /* → #191E27 over canvas, 1.22 */
+  --elev-2:        rgba(165,196,255,0.203);   /* → #252C39 over canvas, 1.45 */
+  --elev-3:        rgba(165,196,255,0.261);   /* → #2E3748 over canvas, 1.70 — intentionally unaliased: the elevated-chrome remap is OUT of this block */
+  --elev-1-solid:  #191E27;                   /* opaque twin of --elev-1 */
+  --elev-2-solid:  #252C39;                   /* opaque twin of --elev-2 */
+
+  --bg:          var(--elev-0);        /* was #080C16 — a second near-black under the .app shell; now the single canvas */
+  --bg-card:     var(--elev-1-solid);  /* was #171C28 (1.197) → 1.22 — opaque card/dropdown plane, barely moves */
+  --bg-card-2:   var(--elev-2-solid);  /* was #1D2330 (1.297) → 1.45 — this is the hover/elevated tier, so it takes the real step */
   --border:      #2B3140;
   --border-hi:   #394154;
   --accent:      var(--aurix-blue);  /* AURIX-DESIGN-SYSTEM-1: legacy accent → canonical blue */
@@ -69,7 +100,7 @@ select:focus-visible {
      into these (here and below) so existing rules stay coherent with no
      per-rule edits. New rules must consume these, never raw literals. */
   --aurix-blue:         #4A82F0;                 /* primary action: buttons, active tabs, focus, links */
-  --aurix-blue-hover:   var(--aurix-blue-hover);                 /* hover / pressed lift */
+  --aurix-blue-hover:   #6595F2;                 /* hover / pressed lift — INSTITUTIONAL-DARK-FOUNDATION (S8): this was `var(--aurix-blue-hover)`, a self-reference, i.e. a cycle that resolves to guaranteed-invalid; any rule consuming it would have silently inherited a colour instead. Same hue family as --aurix-blue (#4A82F0), one step lighter: 5.68:1 on --elev-1, 4.76:1 on --elev-2. NOT a new blue family. */
   --aurix-blue-soft:    rgba(74, 130, 240, .16); /* soft tint / fill */
   --aurix-blue-border:  rgba(74, 130, 240, .28); /* active / accent border */
   --aurix-blue-glow:    rgba(74, 130, 240, .35); /* glow color — use inside box-shadow */
@@ -78,7 +109,7 @@ select:focus-visible {
   --aurix-danger:       #e05a5a;
   --aurix-warning:      #e9a857;
 
-  --aurix-bg:           #0A0E1A;
+  --aurix-bg:           var(--elev-0);   /* INSTITUTIONAL-DARK-FOUNDATION: was #0A0E1A, a THIRD canvas value with zero consumers — aliased so it can never reintroduce one */
   --aurix-card:         #171C28;
   --aurix-border:       var(--aurix-blue-border);
 
@@ -139,13 +170,20 @@ select:focus-visible {
   --color-negative: var(--aurix-danger);
 
   /* ── Visual system ── */
-  --bg-main:    #040507;   /* BACKGROUND-CANVAS-V1 — negro premium neutro y profundo.
+  --bg-main:    var(--elev-0);   /* BACKGROUND-CANVAS-V1 — negro premium neutro y profundo.
                               Era #0E131F: un azul muy oscuro que competía con las cards
                               (#171C28) y dejaba la interfaz turbia. Este es el ÚNICO
-                              valor del lienzo: html, body y .app lo consumen. */
-  --surface-1:  rgba(255,255,255,0.040);
-  --surface-2:  rgba(255,255,255,0.065);
-  --surface-3:  rgba(255,255,255,0.095);
+                              valor del lienzo: html, body y .app lo consumen.
+                              INSTITUTIONAL-DARK-FOUNDATION: el valor literal se mudó a
+                              --elev-0; este nombre queda como alias del mismo lienzo. */
+  /* INSTITUTIONAL-DARK-FOUNDATION (S3) — the alpha material family now rides the SAME
+     ladder as the opaque one. --surface-1 and --surface-2 were both card materials
+     (0.040 unused, 0.065 = 1.119 vs canvas): they are ONE plane, so both alias level 1.
+     --surface-3 was the hover of those cards at 1.21 — a step so small it read as no
+     change; it now lands on level 2 (1.45), which is where an interaction should sit. */
+  --surface-1:  var(--elev-1);
+  --surface-2:  var(--elev-1);
+  --surface-3:  var(--elev-2);
   --border-subtle: rgba(255,255,255,0.10);  /* VISUAL-POLISH-V1: kept in step with --color-border-subtle (0.06→0.08→0.10) — borde fino visible */
   --border-strong: rgba(255,255,255,0.13);  /* alias of --color-border-default */
   --accent:        var(--aurix-blue);  /* AURIX-DESIGN-SYSTEM-1: legacy accent → canonical blue */
@@ -701,12 +739,16 @@ button[aria-busy="true"] {
 .summary-total {
   font-size: clamp(28px, 4vw, 42px);
   font-weight: var(--font-weight-medium);
-  color: rgba(255,255,255,0.95);
+  /* INSTITUTIONAL-DARK-FOUNDATION (D2) — the wealth figure is the most important number
+     in the product, so it consumes the canonical top-level text token instead of a
+     hand-written rgba, and it carries no glow: the 12px white halo was softening the
+     very numerals it was meant to emphasise. Weight, size, tabular numerals, layout,
+     animation and every value are untouched. */
+  color: var(--text-bright);
   letter-spacing: -0.5px;
   line-height: 1.1;
   margin-bottom: var(--space-4);
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 12px rgba(255,255,255,0.15);
   animation: summaryFadeUp 0.6s ease forwards;
   white-space: nowrap;
   overflow: hidden;
@@ -737,8 +779,12 @@ button[aria-busy="true"] {
 }
 .summary-perf.positive { color: var(--green); }
 .summary-perf.negative { color: var(--red); }
-.positive { text-shadow: 0 0 6px rgba(63, 191, 127,0.3); }
-.negative { text-shadow: 0 0 6px rgba(224, 90, 90,0.25); }
+/* INSTITUTIONAL-DARK-FOUNDATION (S5) — the coloured glow on every ± figure is gone.
+   These were GLOBAL unscoped selectors, so any element carrying .positive/.negative
+   anywhere in Aurix got a halo: it blurred the numerals of the one thing that must be
+   crisp, and it read crypto rather than institutional. Colour, semantics, typography
+   and every calculation are untouched — the state is already carried by colour at
+   7.27:1 (success) and 4.60:1 (danger) on the content plane. */
 
 .summary-meta {
   font-size: 12px;
@@ -799,9 +845,9 @@ button[aria-busy="true"] {
 }
 /* Figure gets more presence inside the zone — a tighter, bluer glow than the
    global soft white text-shadow. */
-.summary-hero-zone .summary-total {
-  text-shadow: 0 0 18px rgba(74,130,240,0.30), 0 0 8px rgba(255,255,255,0.12);
-}
+/* INSTITUTIONAL-DARK-FOUNDATION (D2) — the hero override stacked a blue 18px halo plus
+   a white 8px halo on top of the base glow. Removed for the same reason: the figure now
+   reads crisp on the elevated hero material. No geometry, size or weight change. */
 .summary-hero-zone .summary-meta { color: var(--text-muted); }
 /* AURIX-DASH-V4: the two hero titles ("VALOR TOTAL DE CARTERA" / "EVOLUCIÓN DEL
    PATRIMONIO") are one system — identical card-title typography (size/weight/

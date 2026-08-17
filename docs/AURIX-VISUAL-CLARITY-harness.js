@@ -62,8 +62,23 @@ ok('6 brand blue, success y danger intactos; las bases siguen siendo muy oscuras
    /--aurix-blue:\s*#4A82F0;/.test(css) && /--aurix-success:\s*#3fbf7f;/.test(css) &&
    /--aurix-danger:\s*#e05a5a;/.test(css) && (function () {
      const lum = h => { const n = parseInt(h.slice(1), 16); return (((n>>16)&255)*0.299 + ((n>>8)&255)*0.587 + (n&255)*0.114); };
-     const bm = /--bg-main:\s*(#[0-9A-Fa-f]{6});/.exec(css), bg = /--bg:\s*(#[0-9A-Fa-f]{6});/.exec(css);
-     return bm && bg && lum(bm[1]) < 32 && lum(bg[1]) < 32;   // siguen siendo casi negras
+     // INSTITUTIONAL-DARK-FOUNDATION: --bg-main y --bg dejaron de ser literales y ahora
+     // son ALIAS de --elev-0 (un único lienzo). El invariante que esta aserción protege es
+     // el mismo — el lienzo sigue siendo casi negro — así que se resuelve la indirección
+     // antes de medir, con el mismo umbral. Un alias que apunte a algo claro sigue fallando.
+     const litOrAlias = name => {
+       const m = new RegExp('--' + name + ':\\s*([^;]+);').exec(css);
+       if (!m) return null;
+       const v = m[1].trim();
+       const hexOf = s => /^#[0-9A-Fa-f]{6}$/.test(s) ? s : null;
+       if (hexOf(v)) return v;
+       const a = /^var\(\s*(--[\w-]+)\s*\)$/.exec(v);
+       if (!a) return null;
+       const inner = new RegExp(a[1].replace('--', '--') + ':\\s*([^;]+);').exec(css);
+       return inner ? hexOf(inner[1].trim()) : null;
+     };
+     const bm = litOrAlias('bg-main'), bg = litOrAlias('bg');
+     return bm && bg && lum(bm) < 32 && lum(bg) < 32;   // siguen siendo casi negras
    })());
 ok('7 body text token --text unchanged (#e6e6e8) — only the TOP tier was crisped, UI not brightened',
    /--text:\s*#e6e6e8;/.test(css));
