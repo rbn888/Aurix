@@ -19848,6 +19848,20 @@ body.gs-open { overflow: hidden; }
   font-family: inherit;
   -webkit-appearance: none;
   appearance: none;
+  /* ADD-ASSET-MOBILE-INTERACTION · FIX 1 — the POPUP of a native <select> (and of an
+     <input list=…> datalist) is rendered by the OS, not by the page: no amount of
+     background/color on the control reaches it, which is why "Tipo…" opened as a white
+     iOS menu on an otherwise dark sheet. `color-scheme: dark` is the standard, declarative
+     way to tell the UA to paint its own native widgets with the dark palette — one
+     property, no JS, no custom dropdown, no parallel component. Options/values are
+     untouched (Broker/Exchange/Wallet/Bank/Custodian/Other), as is the data model. */
+  color-scheme: dark;
+}
+/* Fallback for engines that ignore color-scheme on the control but do honour option
+   painting (older Android WebView / Chromium): keep the list itself dark + legible. */
+.wl-loc-field-type option {
+  background: var(--elev-1, #0d1320);
+  color: var(--text-bright);
 }
 .wl-loc-field-type:focus,
 .wl-loc-field-provider:focus {
@@ -24123,6 +24137,40 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   #modalOverlay > .modal[data-mode="gold"][data-asset-flow="search"],
   #modalOverlay > .modal[data-mode="gold"][data-asset-flow="form"] {
     margin-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ADD-ASSET-MOBILE-INTERACTION · FIX 3 — keep Results inside the visual viewport
+   ──────────────────────────────────────────────────────────────────────────
+   SPEC 63 A/B top-anchors the sheet so the header + Search survive the keyboard,
+   but the sheet is still SIZED by `.modal-overlay > .modal { max-height: calc(100dvh
+   - …) }` (~line 16100). iOS never shrinks the layout viewport — nor dvh — for the
+   keyboard, so the sheet keeps the full screen height and its lower half (Results)
+   lives underneath the keyboard: the tail of the list is unreachable.
+
+   `--aurix-vvh` is the ONE fact CSS cannot derive: the visual-viewport height,
+   published by the feature-detected listener in app.js only while a keyboard is
+   actually open (`html[data-aurix-kb="open"]`). Capping the sheet to it makes the
+   existing SINGLE .modal-body scroll owner resolve the rest — Results become
+   scrollable ABOVE the keyboard instead of extending behind it.
+
+   Only `max-height`, so nothing moves: no transform, no translate, no scroll
+   forcing, no transition (⇒ no layout jump). The attribute and the property are
+   both removed on keyboard close, restoring the resting layout byte-for-byte.
+   min() keeps the existing 100dvh cap authoritative whenever it is the smaller of
+   the two, so this can only ever TIGHTEN the box, never grow it.
+   SCOPE: ≤768px + the asset/gold Add Asset sheet only (same scope as SPEC 63) ⇒
+   desktop, Real Estate, Cash/Liquidity and every other overlay are untouched.
+   Absent visualViewport ⇒ the variable never exists ⇒ this rule never matches.
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  html[data-aurix-kb="open"] #modalOverlay > .modal[data-mode="asset"],
+  html[data-aurix-kb="open"] #modalOverlay > .modal[data-mode="gold"] {
+    max-height: min(
+      calc(100dvh - env(safe-area-inset-top, 0px) - var(--aurix-modal-safe-bottom) - 16px),
+      calc(var(--aurix-vvh, 100dvh) - env(safe-area-inset-top, 0px) - 12px)
+    );
   }
 }
 

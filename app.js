@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '615'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '616'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -50724,6 +50724,59 @@ function _applyFirstAssetModalCopy(firstMode) {
   }
 }
 
+// ── ADD-ASSET-MOBILE-INTERACTION · FIX 3 — visual-viewport height publisher ──────────────
+// PROBLEM (owner: styles.css `.modal-overlay > .modal { max-height: calc(100dvh - …) }`).
+// iOS Safari does NOT shrink the layout viewport — nor `dvh` — when the software keyboard
+// opens; only `window.visualViewport` reflects it. So the Add Asset sheet keeps measuring the
+// FULL screen while the keyboard covers its lower half: SPEC 63's top-anchor kept the header
+// and Search reachable, but Results still extend underneath the keyboard and the tail of the
+// list cannot be reached. No pure-CSS expression can know the keyboard's height, so the one
+// missing input is published here as a custom property and consumed by ONE mobile CSS rule.
+//
+// Deliberately NOT wired into _onAurixViewportChange: that owner is debounced 200 ms and
+// rebuilds the charts (initMobileCharts/updateChart) — reusing it would drag the Chart Engine
+// into a keyboard event. This listens only to visualViewport, which that owner ignores.
+//
+// visualViewport is a standard browser API (already probed in the capability report), not a
+// dependency, and it is feature-detected: where it is absent NOTHING is written and the CSS
+// falls back to the existing 100dvh rule (unchanged behaviour). Android, which usually DOES
+// resize the layout viewport, simply reports no meaningful delta and stays on the same path.
+// Writes only a length + a boolean attribute: no layout is read back, no scroll is forced, no
+// element is moved, and on keyboard close both are cleared so the resting layout is restored
+// byte-for-byte. Desktop is excluded by the media query that consumes it.
+if (typeof window !== 'undefined' && !window.__AURIX_VVH_LISTENER__) {
+  window.__AURIX_VVH_LISTENER__ = true;
+  const _vv = window.visualViewport || null;
+  if (_vv) {
+    // Threshold: a keyboard occupies far more than any browser-chrome collapse (address bar
+    // ~60–110 px). 120 px keeps chrome changes from ever being mistaken for a keyboard.
+    const _KB_MIN_DELTA = 120;
+    let _kbRaf = 0;
+    const _syncVv = () => {
+      if (_kbRaf) return;                                   // coalesce bursts into one write per frame
+      _kbRaf = requestAnimationFrame(() => {
+        _kbRaf = 0;
+        try {
+          const de = document.documentElement;
+          if (!de) return;
+          const open = (window.innerHeight - _vv.height) > _KB_MIN_DELTA;
+          if (open) {
+            de.style.setProperty('--aurix-vvh', _vv.height + 'px');
+            de.setAttribute('data-aurix-kb', 'open');
+          } else {
+            de.removeAttribute('data-aurix-kb');
+            de.style.removeProperty('--aurix-vvh');          // exact restore — no residual cap
+          }
+        } catch (_) {}
+      });
+    };
+    try {
+      _vv.addEventListener('resize', _syncVv, { passive: true });
+      _vv.addEventListener('scroll', _syncVv, { passive: true });   // iOS shifts the visual viewport on focus
+    } catch (_) {}
+  }
+}
+
 function openModal(opts) {
   // ADD-V2.1: optional Step-1 type picker. Default = show picker.
   // Internal callers that need to skip the picker (edit-RE, category
@@ -50854,6 +50907,27 @@ function openModal(opts) {
   modalOverlay.classList.add('open');
   document.body.classList.add('modal-open');
   suppressFocusDefaults = true;
+  // ── ADD-ASSET-MOBILE-INTERACTION · FIX 2 — clean initial state on mobile ──────────────
+  // SPEC 59/60 removed the synthetic click that opened the suggestion panel from the
+  // CATEGORY entry point (openContextualModal), but openContextualModal calls openModal
+  // FIRST and these two timers fire 50/70 ms LATER — i.e. AFTER that reset — so they put
+  // the forced focus (keyboard) and the open dropdown straight back. That is why "Add
+  // crypto" still opened with the list deployed and the keyboard up: the fix was applied
+  // one layer above its actual owner. This IS the owner.
+  // On mobile the sheet must open at rest — Search + Recent + Popular, which
+  // _addV2RefreshQuick already rendered — and reveal results only once the user taps or
+  // types (the existing input/focus handlers do that, unchanged). Desktop keeps the
+  // previous behaviour byte-for-byte: there is no keyboard to displace the layout and the
+  // curated defaults are what stops the wide form looking blank.
+  // Mobile: no programmatic focus, no auto-suggestions. Leave the panel closed and release the
+  // focus-suppression latch so the user's OWN tap on Search behaves exactly as a normal focus
+  // (which is what opens the panel). Returning here leaves the two desktop timers below
+  // untouched — they are the certified behaviour and still run verbatim on desktop.
+  if ((typeof window !== 'undefined') && window.innerWidth <= 768) {
+    try { if (assetSuggestionsEl) assetSuggestionsEl.classList.remove('open'); } catch (_) {}
+    suppressFocusDefaults = false;
+    return;
+  }
   setTimeout(() => searchInput.focus(), 50);
   // ADD-ASSET-DISCOVERY-1: surface curated defaults right away so the
   // form never appears blank — works for skipPicker paths AND for the
