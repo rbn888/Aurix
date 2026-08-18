@@ -250,7 +250,20 @@ const buildIdx = /var BUILD = '([^']+)'/.exec(html);
 // bloque", no un número fijo: los bloques posteriores lo siguen subiendo (BLOCK 2 → 647).
 ok('CB1 styles.css?v= subido por encima de 645 (el CSS cambió)', cssV && +cssV[1] >= 646, cssV && cssV[1]);
 ok('CB2 AURIX_BUILD subido y coherente con version.json', buildIdx && buildIdx[1] === version.build, (buildIdx && buildIdx[1]) + ' vs ' + version.build);
-ok('CB3 appjs NO subido (app.js no se tocó)', version.appjs === 614, String(version.appjs));
+// CB3 — mismo razonamiento que CB1: el invariante NO es un número fijo. La versión original
+// (`version.appjs === 614`) codificaba una circunstancia de ESTE bloque (era CSS-only), así que
+// congelaba app.js para cualquier SPEC posterior: TRIM_DETERMINISM lo tocó legítimamente y el
+// aserto pasó a ser falso por construcción. El invariante real del cache-bust es la COHERENCIA de
+// las cuatro fuentes de versión de appjs (version.json, APPJS_V, app.js?v= y __AURIX_APPJS_VERSION__
+// — ésta última es la que se olvida) y que nunca retroceda por debajo del 614 de este bloque.
+const appJs = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+const appjsV = /var APPJS_V = '(\d+)'/.exec(html);
+const appjsSrc = /app\.js\?v=(\d+)/.exec(html);
+const appjsSelf = /window\.__AURIX_APPJS_VERSION__ = '(\d+)'/.exec(appJs);
+ok('CB3 appjs no retrocede (>= 614)', version.appjs >= 614, String(version.appjs));
+ok('CB3 appjs coherente en las 4 fuentes (version.json / APPJS_V / app.js?v= / __AURIX_APPJS_VERSION__)',
+  !!(appjsV && appjsSrc && appjsSelf) && [appjsV[1], appjsSrc[1], appjsSelf[1]].every(v => +v === version.appjs),
+  [version.appjs, appjsV && appjsV[1], appjsSrc && appjsSrc[1], appjsSelf && appjsSelf[1]].join(' / '));
 
 console.log('\n' + (fail === 0 ? 'RESULT: ALL PASS ✓' : 'RESULT: FAIL ✗') + '  (' + pass + ' passed, ' + fail + ' failed)');
 process.exit(fail === 0 ? 0 : 1);
