@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '616'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '617'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -50925,6 +50925,14 @@ function openModal(opts) {
   // untouched — they are the certified behaviour and still run verbatim on desktop.
   if ((typeof window !== 'undefined') && window.innerWidth <= 768) {
     try { if (assetSuggestionsEl) assetSuggestionsEl.classList.remove('open'); } catch (_) {}
+    // Not opening the keyboard is not enough: closeModal() never blurs, so a sheet closed WITH
+    // the keyboard up leaves searchInput as document.activeElement and the next open inherits
+    // both the focus and the keyboard (reproduced on the stock/etf re-entry in the live probe).
+    // Blur whatever inside the sheet still holds focus so every mobile open starts at rest.
+    try {
+      const _ae = document.activeElement;
+      if (_ae && typeof _ae.blur === 'function' && _ae !== document.body) _ae.blur();
+    } catch (_) {}
     suppressFocusDefaults = false;
     return;
   }
