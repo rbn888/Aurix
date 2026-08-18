@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '614'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '615'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -25651,6 +25651,38 @@ function _aurixHpqRawStages(range) {
   return { normalized: deduped, nowRef: nowRef, quarantined: quarantined, counts: counts };
 }
 
+// ── SPEC DSH.CHART.TRIM_DETERMINISM.LEGACY_COMPATIBILITY ─────────────────────────────────────────
+// PROVEN DEFECT (this SPEC): the construction-prefix scan window was `limit = floor(n * 0.5)` — a
+// COUNT-based bound. The cut therefore depended on the TOTAL number of points, not on the economics of
+// the series, so densifying the source moved the 50 % boundary FORWARD and swallowed genuine, weeks-old
+// capital steps. Reproduced on the real pipeline with one economic history: 78 points ⇒ 30D `full`
+// (trimmed 18, span 43 d); +24 recent backend points ⇒ 30D `partial_history` (trimmed 32, span 20 d),
+// coverageRatio 1.0 → 0.667, badge +70.61 % → suppressed. No financial change whatsoever — only density.
+// That is the full → partial_history flip users saw after a refresh, because backend-snapshot hydration
+// is exactly what densifies the source between the first paint and the recompute.
+//
+// FIX: the construction regime is a fact about the START of the account's life, so bound the scan
+// TEMPORALLY from the FIRST observation instead of by point count. `i` walks only the points inside
+// [series[0].ts, series[0].ts + WINDOW]; the step evaluated is series[i] → series[i+1], where i+1 may lie
+// OUTSIDE the window (it is the first point of the real regime — that step is precisely the exit from
+// construction, so it must stay reachable). Because the scanned index set is fixed by the TIMESTAMPS of
+// the leading points, appending later points cannot change it: the cut is invariant under densification.
+// It also bounds the damage structurally — the surviving series can never start later than
+// series[0].ts + WINDOW, so a real capital step weeks into the account's life can no longer erase
+// history (which is what the old count-based rule did).
+//
+// WINDOW = 72 h. Bounded by evidence, not taste: the certified construction-prefix scenario
+// (docs/AURIX-HISTORICAL-PIPELINE-AUDIT-harness.js case 9) places its construction step 1 DAY after the
+// first point, so the window must exceed that; the legacy capital steps this SPEC must protect sit 14 and
+// 39 days in. 72 h covers a real initial build (import baseline, first valuations, the opening batch of
+// asset adds) and cannot reach a contribution made a fortnight later. Construction protection does NOT
+// rest on this stage alone: spike quarantine runs BEFORE it, and the flow-neutral return engine plus the
+// TOTAL maturity gates (_AURIX_ALL_MIN_TRUST_SPAN_MS / _AURIX_ALL_MIN_TRUST_POINTS /
+// construction_step_in_window) remain the financial arbiters of a publishable return.
+//
+// Rollback: _AURIX_HPQ_TEMPORAL_CONSTRUCTION_WINDOW = false ⇒ byte-identical prior floor(n*0.5) behaviour.
+const _AURIX_HPQ_TEMPORAL_CONSTRUCTION_WINDOW = true;
+const _AURIX_HPQ_CONSTRUCTION_WINDOW_MS = 72 * 36e5;   // 72 h from the FIRST observation
 // Stage 7 — construction-prefix quarantine: trim a leading regime that ends in a SUSTAINED step larger
 // than the range jump threshold (old construction/import baseline before the current regime). Returns
 // { series, trimmed }.
@@ -25658,6 +25690,30 @@ function _aurixHpqTrimConstruction(series, jump) {
   const n = series.length;
   if (n < 3) return { series: series.slice(), trimmed: 0 };
   let cut = 0;
+  // ── SPEC TRIM_DETERMINISM — temporal scan window (ADDITIVE: the legacy count-based path below is left
+  // byte-identical and is what runs when the flag is off, so rollback is the certified code verbatim).
+  if ((typeof _AURIX_HPQ_TEMPORAL_CONSTRUCTION_WINDOW !== 'undefined') && _AURIX_HPQ_TEMPORAL_CONSTRUCTION_WINDOW) {
+    const w = (typeof _AURIX_HPQ_CONSTRUCTION_WINDOW_MS === 'number') ? _AURIX_HPQ_CONSTRUCTION_WINDOW_MS : (72 * 36e5);
+    const t0 = (series[0] && Number.isFinite(series[0].ts)) ? series[0].ts : NaN;
+    if (!Number.isFinite(t0)) return { series: series.slice(), trimmed: 0 };   // no temporal anchor ⇒ never trim
+    const deadline = t0 + w;
+    // `i` walks ONLY the points inside the construction window — the index set is fixed by the timestamps
+    // of the LEADING points, so appending later points cannot move it. series[i+1] may lie outside the
+    // window: that step is the exit from construction into the real regime and must stay reachable.
+    let scanEnd = 0;
+    while (scanEnd < n && Number.isFinite(series[scanEnd].ts) && series[scanEnd].ts <= deadline) scanEnd++;
+    scanEnd = Math.min(scanEnd, n - 1);   // series[i+1] must exist
+    for (let i = 0; i < scanEnd; i++) {
+      const a = series[i].value, b = series[i + 1].value;
+      const step = Math.abs(b - a) / (a || 1);
+      if (step > jump) {
+        let sustained = true;
+        for (let k = i + 1; k < Math.min(n, i + 4); k++) { if (Math.abs(series[k].value - b) / (b || 1) > jump) { sustained = false; break; } }
+        if (sustained) cut = i + 1;   // everything up to & including i is the construction prefix
+      }
+    }
+    return { series: series.slice(cut), trimmed: cut };
+  }
   const limit = Math.max(1, Math.floor(n * 0.5));
   for (let i = 0; i < Math.min(n - 1, limit); i++) {
     const a = series[i].value, b = series[i + 1].value;
