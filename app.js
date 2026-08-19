@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '618'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '619'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -2856,6 +2856,9 @@ function _aurixCanonicalHistoryReady() {
       && _aurixLocalCanonicalHash != null
       && _aurixLocalCanonicalHash === _aurixRemoteCanonicalHash;
 }
+// SPEC DSH.PERF.24H_PENDING_RECOVERY — rollback flag for the parity-gate evidence-coherence fix below.
+// false ⇒ chartReady counts ONLY _aurixCanonicalCatHistory (the certified pre-fix expression, verbatim).
+const _AURIX_PARITY_GATE_COUNTS_BACKEND_EVIDENCE = true;
 // P0-HISTORY-PARITY-EMERGENCY-GATE — THE single authority every return/color/line consumer must pass before
 // painting a REAL return. It is deliberately strict: better "Calculando…" than a number that disagrees with
 // the other device. For an authenticated user it demands the displayed history be the CONFIRMED remote
@@ -2886,7 +2889,36 @@ function canDisplayCanonicalReturn(range) {
     } catch (_) {}
     const ret = (typeof _aurixRangeReturn === 'function') ? _aurixRangeReturn(r) : null;
     out.baselineSnapshotId = (ret && Number.isFinite(ret.baselineTs)) ? ret.baselineTs : null;
-    out.chartReady = Array.isArray(_aurixCanonicalCatHistory) && _aurixCanonicalCatHistory.length >= 2;
+    // ── SPEC DSH.PERF.24H_PENDING_RECOVERY — parity-gate evidence coherence ─────────────────────
+    // PROVEN OWNER of a 24H that can never leave pending. This function computed its two evidence
+    // facts from DIFFERENT sources: `baselineSnapshotId` above comes from _aurixRangeReturn, i.e. the
+    // MERGED display source (_aurixInvestableSnapshots → _aurixHistorySourceForDisplay = canonical ∪
+    // BACKEND snapshots), while `chartReady` counted ONLY _aurixCanonicalCatHistory. An account whose
+    // history lives in portfolio_snapshots (server-side */15) with a sparse remote category_history —
+    // exactly a new account used briefly on a phone — therefore got: chart drawn from 80 points,
+    // _aurixRangeReturn valid (+1.0863%), baselineSnapshotId set … and chartReady false ⇒ 'no_chart'
+    // ⇒ getValidReturnBaseline 'awaiting_canonical_history' ⇒ the candidate persists pending ⇒ the
+    // reader finds pct null ⇒ "Historial parcial", permanently. Measured: 0 or 1 canonical rows never
+    // recover; 2 rows recover instantly, on an IDENTICAL visible series.
+    // FIX: count the SAME confirmed-remote evidence the return actually consumed. Backend snapshots are
+    // server-side and byte-identical for every device, so they satisfy this gate's purpose (web/mobile
+    // PARITY) at least as well as the canonical rows — they were simply never counted. The LOCAL cache
+    // (categoryHistory) stays excluded, the >= 2 threshold is unchanged, `loaded`/`storeOk` still gate
+    // ahead of this, and epoch/reset/distrust still filter upstream (they filter the merged source too,
+    // via _aurixInvestableSnapshots, so a pre-reset history cannot slip through here).
+    // Rollback: _AURIX_PARITY_GATE_COUNTS_BACKEND_EVIDENCE = false ⇒ byte-identical prior behaviour.
+    const _canonEvidenceN = Array.isArray(_aurixCanonicalCatHistory) ? _aurixCanonicalCatHistory.length : 0;
+    let _backendEvidenceN = 0;
+    try {
+      if ((typeof _AURIX_PARITY_GATE_COUNTS_BACKEND_EVIDENCE !== 'undefined') && _AURIX_PARITY_GATE_COUNTS_BACKEND_EVIDENCE
+          && (typeof _AURIX_BACKEND_SNAPSHOTS_ENABLED !== 'undefined') && _AURIX_BACKEND_SNAPSHOTS_ENABLED
+          && Array.isArray(_aurixBackendSnapshots)) {
+        _backendEvidenceN = _aurixBackendSnapshots.length;
+      }
+    } catch (_) { _backendEvidenceN = 0; }
+    out.canonicalEvidenceCount = _canonEvidenceN;
+    out.backendEvidenceCount = _backendEvidenceN;
+    out.chartReady = Array.isArray(_aurixCanonicalCatHistory) && (_canonEvidenceN + _backendEvidenceN) >= 2;
 
     // Anonymous / not signed in: local IS canonical (single device, no parity concern).
     if (!authed) { out.ok = true; out.reason = 'anonymous_local_canonical'; return out; }
