@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '617'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '618'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -2215,6 +2215,35 @@ function _aurixCurrentRevision() { try { return (typeof _aurixPortfolioRevision 
 // holdings/capital change may invalidate a ready remote performance_state. These reasons never count as a
 // real mutation, so they never flip a ready 24H to "Calculando…".
 const _AURIX_LIVE_DATA_REVISION_REASONS = ['price-refresh', 'market-update', 'snapshot', 'live-data', 'perf-state', 'price', 'history-maintenance'];
+// ── SPEC DSH.PERF.24H_PUBLICATION_NON_REGRESSION — LAYER 1: unit coherence ──────────────────────
+// PROVEN DEFECT. Every canonical return series is INVESTABLE wealth (total − real_estate: the Hero,
+// the chart, _aurixInvestableSnapshots → _aurixEligibleInvestableSeries → _aurixRangeReturn all speak
+// that basis — AURIX-INVESTABLE-WEALTH-1). But the two publication GATES compared that investable
+// baseline against `totalValueBase()` (TOTAL net worth, real estate INCLUDED):
+//   • getValidReturnBaseline  → _baselineRatio ≤ _AURIX_RETURN_COMPARABLE_RATIO[r]  ⇒ baseline_not_comparable
+//   • _aurixPerformanceSanityCheck → chartMatchesCurrentValue (1% tol)              ⇒ chart_current_mismatch
+// Reproduced on the real functions: baseline 6000.57 (investable) vs currentValue 10060 (total, +4000
+// property) ⇒ ratio 1.6765 > 1.20 ⇒ pending_baseline, PERMANENT — while _aurixRangeReturn itself
+// returned a perfectly valid +0.9464%. Any holder of ≥ ~17% real estate could never publish a return.
+// FIX: give both gates the SAME live reference the series is built from — investable wealth. This is a
+// UNIT correction, NOT a relaxation: the ratio limit, the 1% tolerance, coverage, the trim, source
+// authority, the Chart Engine and the flow-neutral arbiter are all untouched. Range-generic on purpose:
+// the canonical series is investable for EVERY range, so scoping it to 24H would leave a real-estate
+// holder with a ready 24H and a permanently pending 7D/30D/1Y/TOTAL — a new incoherence.
+// Rollback: _AURIX_PERF_INVESTABLE_UNIT_REFERENCE = false ⇒ byte-identical prior behaviour.
+const _AURIX_PERF_INVESTABLE_UNIT_REFERENCE = true;
+// The live value in the SAME basis as the canonical return series. Falls back to totalValueBase() only
+// when investableValueBase is absent (legacy unit sandboxes / harnesses that stub one helper only).
+function _aurixLiveReturnReferenceValue() {
+  try {
+    if ((typeof _AURIX_PERF_INVESTABLE_UNIT_REFERENCE !== 'undefined') && _AURIX_PERF_INVESTABLE_UNIT_REFERENCE
+        && typeof investableValueBase === 'function') {
+      const v = investableValueBase();
+      if (Number.isFinite(v)) return v;
+    }
+  } catch (_) {}
+  try { return (typeof totalValueBase === 'function') ? totalValueBase() : null; } catch (_) { return null; }
+}
 function _aurixSelectRemotePerformance(range) {
   const out = { row: null, ok: false, reason: null, requestedRange: null, rangeKey: null, rangeEntryExists: false,
     expectedLifecycleId: null, performanceLifecycleId: null, expectedPortfolioRevision: null, performancePortfolioRevision: null,
@@ -2296,7 +2325,11 @@ function _aurixPerformanceSanityCheck(range, opts) {
   try {
     const canon = (typeof _aurixCanonicalPerformance === 'function') ? _aurixCanonicalPerformance(r) : null;
     const ret = (typeof _aurixRangeReturn === 'function') ? _aurixRangeReturn(r) : null;
-    let curLive = null; try { curLive = (typeof totalValueBase === 'function') ? totalValueBase() : null; } catch (_) {}
+    // SPEC DSH.PERF.24H_PUBLICATION_NON_REGRESSION L1 — the coherence check must compare like with like:
+    // out.chartLastValue is INVESTABLE (the canonical series basis), so the live reference must be too.
+    // out.totalValueBase keeps its original meaning (real TOTAL net worth) for the audit payload.
+    let curLive = null; try { curLive = (typeof _aurixLiveReturnReferenceValue === 'function') ? _aurixLiveReturnReferenceValue() : ((typeof totalValueBase === 'function') ? totalValueBase() : null); } catch (_) {}
+    let curTotal = null; try { curTotal = (typeof totalValueBase === 'function') ? totalValueBase() : null; } catch (_) {}
     const series = (canon && Array.isArray(canon.chartSeries)) ? canon.chartSeries : [];
     out.chartPointCount = out.sourcePointCount = series.length;
     out.chartSeriesHash = out.sourceSeriesHash = canon ? canon.chartSeriesHash : null;
@@ -2310,7 +2343,8 @@ function _aurixPerformanceSanityCheck(range, opts) {
     out.netFlowsNeutralized = ret ? ret.netFlowsNeutralized : null;
     out.grossDeltaPct = ret ? ret.grossDeltaPct : null;
     out.lastSnapshotTs = canon ? canon.lastSnapshotTs : null;
-    out.totalValueBase = curLive;
+    out.totalValueBase = curTotal;                 // unchanged meaning: TOTAL net worth (audit only)
+    out.liveReferenceValue = curLive;              // SPEC L1 — the INVESTABLE live value the gates compare against
     out.currentValueUsed = (out.chartLastValue != null) ? out.chartLastValue : curLive;   // the deterministic anchor the return uses
     out.ageMs = Math.max(0, Date.now() - out.calculatedAt);
     if (out.baselineValueUsed > 0 && Number.isFinite(out.currentValueUsed)) {
@@ -2366,6 +2400,7 @@ function _aurixComputePerformanceStateCandidate() {
           baselineValue: g.baselineValue != null ? g.baselineValue : null,
           displayedReturnPct: null, displayedReturnValue: null, displayedColor: 'pending',
           returnState: 'pending_sanity', sanityFailureReason: sane.sanityFailureReason,
+          invalidReason: null,                          // SPEC L2 — sanity path: the cause IS sanityFailureReason
           chartSeriesHash: (sane.chartSeriesHash != null ? sane.chartSeriesHash : chartSeriesHash),
           performanceHash: (typeof _aurixHistoryHash === 'function') ? _aurixHistoryHash([rg, 'pending_sanity', sane.sanityFailureReason]) : 'pending_sanity',
         };
@@ -2377,13 +2412,125 @@ function _aurixComputePerformanceStateCandidate() {
         baselineSnapshotId: g.baselineTs != null ? g.baselineTs : null, baselineValue: g.baselineValue != null ? g.baselineValue : null,
         displayedReturnPct: pct, displayedReturnValue: g.valid ? g.deltaAbs : null, displayedColor: color,
         returnState: g.valid ? (g.returnState || 'ready') : (g.returnState || null), sanityFailureReason: null,
+        // SPEC DSH.PERF.24H_PUBLICATION_NON_REGRESSION L2 — persist WHY a range is pending. Without it the
+        // monotonic guard cannot tell a transient sync/lag cause from a demonstrated financial invalidation.
+        // Additive field; no existing consumer reads it.
+        invalidReason: g.valid ? null : (g.invalidReason || null),
         chartSeriesHash: chartSeriesHash,
         performanceHash: (typeof _aurixHistoryHash === 'function') ? _aurixHistoryHash([rg, g.baselineTs, g.baselineValue, pct, color]) : null,
       };
     }
-    return { userId: _aurixCurrentUserId(), lifecycleId: _aurixCurrentLifecycleId(), portfolioRevision: _aurixCurrentRevision(), calculatedAt: Date.now(), byRange: byRange };
+    const cand = { userId: _aurixCurrentUserId(), lifecycleId: _aurixCurrentLifecycleId(), portfolioRevision: _aurixCurrentRevision(), calculatedAt: Date.now(), byRange: byRange };
+    // SPEC L2 — the payload we are about to PERSIST must not demote a ready 24H for a transient cause.
+    // Guarding here (not only at adoption) is what makes the preservation durable across sessions: the
+    // written row is what the next cold boot reads back.
+    return (typeof _aurix24hMonotonicPublication === 'function')
+      ? _aurix24hMonotonicPublication(cand, (typeof _aurixRemotePerformanceState !== 'undefined') ? _aurixRemotePerformanceState : null, 'local_candidate').ps
+      : cand;
   } catch (_) { return null; }
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC DSH.PERF.24H_PUBLICATION_NON_REGRESSION — LAYER 2: monotonic 24H publication
+// ════════════════════════════════════════════════════════════════════════════
+// PROVEN REGRESSION. The visible 24H return is rendered ONLY from performance_state.byRange['24h']
+// (getValidReturnBaseline kill switch). Two owners assign it, and NEITHER had a monotonicity rule:
+//   • _aurixComputePerformanceStateCandidate → the payload persisted by _aurixFlushPerformanceState
+//   • _mergeRemoteState                      → adoption of the remote row on reconcile
+// So a recompute whose gate inputs were momentarily incoherent (canonical history lagging the live
+// value, hydration mid-flight, no comparable baseline yet) overwrote a READY entry with pending, the
+// writer adopted its OWN payload back (P0-PERFORMANCE-STATE-CONSUMPTION-FIX) and re-rendered ⇒ the
+// published % vanished into "Calculando…" and then "Historial parcial", durably, because the pending
+// row was ALSO persisted and read back on the next boot.
+//
+// CONTRACT: READY → PENDING requires DEMONSTRATED invalidating evidence. A pending caused by a
+// transient sync/lag/hydration condition may NOT demote a ready 24H. Everything else still demotes:
+// a different user or lifecycle (reset), a revision bump from a REAL unsynced holdings/capital
+// mutation (reusing _AURIX_LIVE_DATA_REVISION_REASONS — the same vocabulary the reader already uses),
+// a demonstrated maths failure on the SAME unit, or simply a new VALID computation (which replaces
+// normally, ready or not). The preserved entry is carried forward VERBATIM and stamped with its
+// original provenance — it is never re-dated, so nothing pretends to have been recomputed.
+//
+// Deliberately NOT preserve-by-default: only the causes proven transient are blocked, so an unknown
+// future failure mode still demotes (fail-closed financially — never a stale % on unknown evidence).
+// No timeout, no LKG, no synthetic %, no threshold change. 24H only.
+// Rollback: _AURIX_PERF_STATE_24H_MONOTONIC = false ⇒ byte-identical prior behaviour.
+const _AURIX_PERF_STATE_24H_MONOTONIC = true;
+// Causes that are a TEMPORARY absence of a comparable baseline / a lagging source — never a proof that
+// the previously published return is wrong. Sourced from the real reason vocabularies:
+// getValidReturnBaseline.invalidReason and _aurixPerformanceSanityCheck.sanityFailureReason.
+const _AURIX_24H_TRANSIENT_PENDING_CAUSES = [
+  'baseline_not_comparable',            // baseline vs live reference momentarily out of band (canonical lag)
+  'no_valid_baseline',                  // series not yet rebuilt after hydration
+  'no_current_value',                   // live valuation not yet available
+  'insufficient_history',               // window not yet re-spanned
+  'awaiting_canonical_history',         // canonical reconcile in flight
+  'awaiting_canonical_reconcile',
+  'flows_dominate_baseline',            // one-time onboarding/construction artifact
+  'remote_performance_pending',         // reader-side pending echoed into a candidate
+  'no_remote_performance_state',
+  'range_entry_missing',                // candidate produced no 24H entry at all
+  'chart_current_mismatch',             // chart tail vs live reference (source handover / snapshot lag)
+  'insufficient_chart_series',          // series not yet dense enough post-hydration
+  'no_valid_values',
+  'baseline_not_in_series',             // baseline dropped by a mid-hydration series rebuild
+  'no_displayed_pct',
+];
+function _aurix24hRowIsReady(row) {
+  return !!(row && typeof row === 'object' && Number.isFinite(row.displayedReturnPct)
+    && !(row.returnState && String(row.returnState).indexOf('pending') === 0));
+}
+function _aurix24hRowOf(ps) {
+  try {
+    const br = ps && ps.byRange;
+    if (!br || typeof br !== 'object') return null;
+    if (br['24h']) return br['24h'];
+    for (const k in br) { if (String(k).toLowerCase() === '24h') return br[k]; }
+  } catch (_) {}
+  return null;
+}
+// PURE. Returns { ps, preserved, reason, previousCause }. Never mutates either input: when it preserves,
+// it returns a shallow clone of `nextPs` with byRange['24h'] replaced by the prior READY row verbatim.
+function _aurix24hMonotonicPublication(nextPs, prevPs, sourceLabel) {
+  const out = { ps: nextPs, preserved: false, reason: null, previousCause: null, source: sourceLabel || null };
+  try {
+    if (!((typeof _AURIX_PERF_STATE_24H_MONOTONIC !== 'undefined') && _AURIX_PERF_STATE_24H_MONOTONIC)) { out.reason = 'flag_off'; return out; }
+    if (!nextPs || typeof nextPs !== 'object' || !prevPs || typeof prevPs !== 'object') { out.reason = 'no_pair'; return out; }
+    const prevRow = _aurix24hRowOf(prevPs), nextRow = _aurix24hRowOf(nextPs);
+    if (!_aurix24hRowIsReady(prevRow)) { out.reason = 'no_previous_ready'; return out; }
+    if (_aurix24hRowIsReady(nextRow)) { out.reason = 'new_valid_computation'; return out; }   // normal replacement
+    // ── invalidating evidence (each one ALLOWS the demotion) ──
+    if (prevPs.userId != null && nextPs.userId != null && prevPs.userId !== nextPs.userId) { out.reason = 'user_changed'; return out; }
+    if (prevPs.lifecycleId !== nextPs.lifecycleId) { out.reason = 'lifecycle_changed'; return out; }   // reset / new epoch
+    const prevRev = prevPs.portfolioRevision || 0, nextRev = nextPs.portfolioRevision || 0;
+    if (nextRev > prevRev) {
+      const lr = (typeof _aurixLocalRevisionInfo === 'function') ? _aurixLocalRevisionInfo() : { hasRealUnsyncedHoldingsMutation: true, localRevisionReason: null };
+      out.revisionDelta = nextRev - prevRev; out.localRevisionReason = lr.localRevisionReason;
+      if (lr.hasRealUnsyncedHoldingsMutation) { out.reason = 'real_holdings_mutation'; return out; }    // real capital/holdings change
+    }
+    // ── the pending CAUSE must be one proven transient; anything else demotes ──
+    const cause = (nextRow && nextRow.returnState === 'pending_sanity')
+      ? (nextRow.sanityFailureReason || 'no_displayed_pct')
+      : ((nextRow && (nextRow.invalidReason || nextRow.returnState)) || 'range_entry_missing');
+    out.previousCause = cause;
+    const transient = (typeof _AURIX_24H_TRANSIENT_PENDING_CAUSES !== 'undefined') ? _AURIX_24H_TRANSIENT_PENDING_CAUSES : [];
+    if (transient.indexOf(String(cause)) < 0) { out.reason = 'invalidating_cause:' + cause; return out; }
+    // ── PRESERVE: carry the prior READY row forward VERBATIM (original provenance, never re-dated) ──
+    const byRange = {};
+    for (const k in (nextPs.byRange || {})) byRange[k] = nextPs.byRange[k];
+    byRange['24h'] = prevRow;
+    const ps = {};
+    for (const k in nextPs) ps[k] = nextPs[k];
+    ps.byRange = byRange;
+    ps.monotonic24h = { preserved: true, cause: cause, source: out.source,
+      preservedFromCalculatedAt: (prevPs.calculatedAt != null ? prevPs.calculatedAt : null),
+      preservedFromPortfolioRevision: prevRev, preservedPerformanceHash: prevRow.performanceHash || null };
+    out.ps = ps; out.preserved = true; out.reason = 'preserved_transient:' + cause;
+    try { if (typeof IS_DEV !== 'undefined' && IS_DEV) console.log('[PERF_STATE][24H_MONOTONIC] preserved ready 24H —', out.reason, out.source); } catch (_) {}
+    return out;
+  } catch (e) { out.reason = 'error'; return out; }
+}
+try { if (typeof window !== 'undefined') { window._aurix24hMonotonicPublication = _aurix24hMonotonicPublication; window._aurix24hRowIsReady = _aurix24hRowIsReady; } } catch (_) {}
 
 // ════════════════════════════════════════════════════════════════════════════
 // P0-PERFORMANCE-PIPELINE-RECONSTRUCTION — the SINGLE authoritative producer of render state
@@ -2779,7 +2926,18 @@ function _mergeRemoteState(remoteRow) {
     // P0-FINAL-PERFORMANCE-KILL-SWITCH — adopt the REMOTE canonical performance_state (the ONLY object an
     // authed client may render real performance from). Set ONLY here (a remote READ), never from local
     // compute. Absent column / null ⇒ stays null ⇒ authed users see "Calculando…" (no divergence possible).
+    const _prevPs24 = _aurixRemotePerformanceState;   // SPEC L2 — the state adopted BEFORE this reconcile
     try { _aurixRemotePerformanceState = (remoteRow && remoteRow.performance_state && typeof remoteRow.performance_state === 'object') ? remoteRow.performance_state : _aurixRemotePerformanceState; } catch (_) {}
+    // SPEC DSH.PERF.24H_PUBLICATION_NON_REGRESSION L2 — the SECOND owner of byRange['24h']. A row persisted
+    // pending by an earlier session/device (the exact "ayer READY, hoy Historial parcial" vector) must not
+    // demote a ready 24H already adopted here for a transient cause. Same guard, same evidence rules.
+    // Purely ADDITIVE around the adoption above, which stays byte-identical (remote READ is still the only
+    // source: this only chooses between the remote row and the ready 24H entry already adopted from remote).
+    try {
+      if (typeof _aurix24hMonotonicPublication === 'function' && _aurixRemotePerformanceState !== _prevPs24) {
+        _aurixRemotePerformanceState = _aurix24hMonotonicPublication(_aurixRemotePerformanceState, _prevPs24, 'remote_adoption').ps;
+      }
+    } catch (_) {}
     const distrust = (typeof _shouldDistrustRemote === 'function') && _shouldDistrustRemote(remoteRow);
 
     // ── History (union-by-ts). If the local reset tombstone is newer than
@@ -24714,7 +24872,10 @@ function getValidReturnBaseline(range, opts) {
   const lastResetAt = (typeof _aurixResetAt === 'function') ? (_aurixResetAt() || 0) : 0;
   const createdAt = _aurixPortfolioCreatedAt();
   let currentValue = null;
-  try { currentValue = (typeof totalValueBase === 'function') ? totalValueBase() : null; } catch (_) { currentValue = null; }
+  // SPEC DSH.PERF.24H_PUBLICATION_NON_REGRESSION L1 — baselineValue below comes from _aurixRangeReturn,
+  // i.e. the INVESTABLE canonical series. The comparability ratio, the flow-dominance test and the
+  // post-construction escape must therefore all read the INVESTABLE live value, not TOTAL net worth.
+  try { currentValue = (typeof _aurixLiveReturnReferenceValue === 'function') ? _aurixLiveReturnReferenceValue() : ((typeof totalValueBase === 'function') ? totalValueBase() : null); } catch (_) { currentValue = null; }
   const ret = (typeof _aurixRangeReturn === 'function') ? _aurixRangeReturn(r) : null;
   const baselineValue = ret ? ret.startValue : null;
   const baselineTs = ret ? ret.baselineTs : null;
