@@ -281,8 +281,21 @@ function mirror(name) {
   ok('9.2 the demo key is read from the environment only',
     /process\.env\.COINGECKO_DEMO_API_KEY/.test(cSrc) && /process\.env\.COINGECKO_DEMO_API_KEY/.test(catSrc));
   ok('9.3 no paid provider dependency was added', !/coinmarketcap|pro-api|dexscreener/i.test(cSrc + catSrc));
-  ok('9.4 catalog is warmed, never awaited, by the search path',
-    /warm\(\)/.test(fs.readFileSync(path.join(root, 'api/search/crypto.js'), 'utf8')));
+  {
+    // Producción demostró que un warm fire-and-forget no sobrevive al congelado de la instancia y que
+    // su fallo bloqueaba (cooldown) a quien SÍ espera el catálogo. Contrato actual: la ruta textual no
+    // lo espera NI lo dispara; sólo el modo contrato lo construye.
+    const crySrc = fs.readFileSync(path.join(root, 'api/search/crypto.js'), 'utf8');
+    ok('9.4 the textual path neither awaits nor kicks off the catalog', !/\bwarm\(\)/.test(crySrc) && /chainsFor/.test(crySrc));
+    ok('9.5 only the contract resolver builds the catalog (bounded, awaited once)',
+      /await ensure\(CATALOG_WAIT_MS\)/.test(fs.readFileSync(path.join(root, 'api/search/_contract-discovery.js'), 'utf8')));
+  }
+  {
+    resetCatalog(); plan = {}; calls.length = 0;
+    const rr = mkRes(); await crypto(req({ q: 'usdc' }), rr);
+    ok('9.6 a textual search makes ZERO catalog requests', calls.filter(c => c.url.includes('/coins/list')).length === 0, 'calls=' + calls.length);
+    ok('9.7 with a cold catalog no chain field is emitted', rr.body.results.every(r => r.chain === undefined && r.chainCount === undefined));
+  }
 
   console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail === 0 ? 0 : 1);

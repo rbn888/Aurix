@@ -106,7 +106,10 @@ function start() {
   return state.inflight;
 }
 
-// Non-blocking: kick a refresh when stale and return immediately. Search NEVER waits on the catalog.
+// Non-blocking refresh. NOT used by the textual search path: on serverless the instance is frozen as
+// soon as the response is sent, so a fire-and-forget load never completes (and its failure would then
+// cool down the paths that DO await the catalog). Kept for a caller that stays alive — e.g. a cron or
+// a long-lived runtime.
 export function warm() {
   if (fresh() || errorCoolingDown() || state.inflight) return;
   start();

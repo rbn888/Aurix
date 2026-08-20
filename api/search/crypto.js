@@ -13,7 +13,7 @@
 //     We surface only the fields the frontend uses, so the raw response
 //     never reaches the browser.
 
-import { warm, chainsFor, catalogState } from './_cg-catalog.js';
+import { chainsFor, catalogState } from './_cg-catalog.js';
 import { resolveContract } from './_contract-discovery.js';
 
 // AURIX-APP-DOMAIN-READY-1: allowlist (comma-separated) instead of a single
@@ -75,9 +75,13 @@ export default async function handler(req, res) {
     const json  = await upstream.json();
     const coins = Array.isArray(json?.coins) ? json.coins : [];
 
-    // SPEC ASSET-DISCOVERY-IDENTITY.V1 — the catalog is warmed OUT OF BAND (never awaited here), so a
-    // search request costs exactly ONE upstream call, as before.
-    if (IDENTITY_V1) { try { warm(); } catch (_) {} }
+    // SPEC ASSET-DISCOVERY-IDENTITY.V1 — the textual path NEVER touches the identity catalog: it does
+    // not await it and does not even kick it off. Measured in production: a fire-and-forget warm-up is
+    // useless on serverless (the instance is frozen the moment the response is sent, the in-flight
+    // fetch dies, and the failure then sat in a cooldown that blocked the paths that DO await it).
+    // So a textual search still costs exactly ONE upstream call, and chain/contract are attached only
+    // when this instance already holds a warm catalog (built by a contract lookup). Otherwise the
+    // fields are absent and `meta.catalogState` says why — unknown is reported, never guessed.
 
     // CoinGecko ranks by relevance + market cap. Cap to MAX_RESULTS and
     // strip down to the four fields the frontend actually consumes.
