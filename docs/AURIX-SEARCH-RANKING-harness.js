@@ -216,9 +216,13 @@ console.log('\n9 — SEARCH V2.2: Market y Add Asset sobre el MISMO pipeline:');
   // Motor real en sandbox, con proveedores deterministas. Se prueba el PIPELINE, no la red.
   const e = { console: { log() {} }, Math, JSON, Array, Object, String, Number, isFinite, RegExp, Date, Set, Map, Promise };
   vm.createContext(e);
-  ['_AURIX_FUND_DISCOVERY', '_AURIX_FUND_MANAGER_LABEL', '_AURIX_FUND_KEYWORDS', '_AURIX_FUND_DB'].forEach(c => vm.runInContext(konstSrc(c), e));
+  // ASSET-DISCOVERY-IDENTITY.V1 — el motor ya resuelve identidad canónica y ruta de contrato, así que
+  // el sandbox carga TAMBIÉN esas piezas: se sigue probando el pipeline real, no una versión reducida.
+  ['_AURIX_FUND_DISCOVERY', '_AURIX_FUND_MANAGER_LABEL', '_AURIX_FUND_KEYWORDS', '_AURIX_FUND_DB',
+   '_AURIX_DISCOVERY_IDENTITY_V1', '_AURIX_CONTRACT_SHAPES'].forEach(c => vm.runInContext(konstSrc(c), e));
   ['_aurixSearchAliasHit', '_aurixSearchPopularity', '_aurixSearchTypeWeight', '_aurixSearchProviderWeight',
-   '_aurixSearchMatchScore', '_aurixRankSearchResults', '_aurixSearchProject', '_aurixParseFundMeta']
+   '_aurixSearchMatchScore', '_aurixRankSearchResults', '_aurixSearchProject', '_aurixParseFundMeta',
+   '_aurixDetectContractFamily', '_aurixLooksLikeContract', '_aurixCanonicalAssetKey', '_aurixMarkCryptoAmbiguity']
     .forEach(f => vm.runInContext(fnSrc(f), e));
   // `fnSrc` busca 'function X(' y por tanto recorta el `async` de una función asíncrona.
   const asyncFnSrc = n => { const i = app.indexOf('async function ' + n + '('); if (i < 0) throw new Error('missing async fn ' + n); return braceSlice(app, i); };

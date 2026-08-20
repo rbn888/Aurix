@@ -27,9 +27,14 @@ function corsOrigin(req) {
   if (o && (ALLOWED_ORIGINS.includes(o) || /^http:\/\/localhost(:\d+)?$/.test(o))) return o;
   return ALLOWED_ORIGINS[0];
 }
+import { warm, chainsFor, catalogState } from './_cg-catalog.js';
+
 const MAX_RESULTS    = 12;
 const MIN_Q          = 2;
 const MAX_Q          = 64;
+// SPEC MKT-EXCELLENCE.ASSET-DISCOVERY-IDENTITY.V1 — canonical identity, flag-guarded.
+// OFF ⇒ the previous response byte-for-byte (symbol dedupe, no identity fields).
+const IDENTITY_V1 = process.env.AURIX_DISCOVERY_IDENTITY_V1 !== 'off';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin',  corsOrigin(req));
@@ -57,6 +62,10 @@ export default async function handler(req, res) {
     const json  = await upstream.json();
     const coins = Array.isArray(json?.coins) ? json.coins : [];
 
+    // SPEC ASSET-DISCOVERY-IDENTITY.V1 — the catalog is warmed OUT OF BAND (never awaited here), so a
+    // search request costs exactly ONE upstream call, as before.
+    if (IDENTITY_V1) { try { warm(); } catch (_) {} }
+
     // CoinGecko ranks by relevance + market cap. Cap to MAX_RESULTS and
     // strip down to the four fields the frontend actually consumes.
     const seen    = new Set();
@@ -65,11 +74,13 @@ export default async function handler(req, res) {
       if (!c || typeof c.id !== 'string' || typeof c.symbol !== 'string') continue;
       const ticker = String(c.symbol).toUpperCase().trim();
       if (!ticker) continue;
-      // Dedupe by symbol — CoinGecko occasionally returns multiple chains
-      // for the same brand (e.g. USDC on different networks). The first
-      // hit is usually the canonical one (highest market cap).
-      if (seen.has(ticker)) continue;
-      seen.add(ticker);
+      // SPEC ASSET-DISCOVERY-IDENTITY.V1 — dedupe by the PROVIDER ID, never by symbol.
+      // The old rule ("first hit per symbol wins") silently deleted every token that shares a ticker
+      // with a bigger one: USD Coin vs Bridged USDC, and any long-tail token whose symbol collides with
+      // a major. Two tokens with the same symbol are NOT the same asset; only the same provider id is.
+      const key = IDENTITY_V1 ? c.id : ticker;
+      if (seen.has(key)) continue;
+      seen.add(key);
       results.push({
         ticker,
         name:         (typeof c.name === 'string' && c.name) ? c.name : ticker,
@@ -91,7 +102,29 @@ export default async function handler(req, res) {
       });
       if (results.length >= MAX_RESULTS) break;
     }
-    return res.status(200).json({ results });
+    if (!IDENTITY_V1) return res.status(200).json({ results });
+
+    // ── canonical identity + chain evidence ────────────────────────────────────────────────────
+    // canonicalKey is the identity the whole app dedupes on. It is NEVER derived from the symbol.
+    // Chain/contract are attached ONLY from the cached catalog and ONLY when the coin lives on exactly
+    // one chain (a multi-chain coin gets chainCount and no invented network). Cold catalog ⇒ the fields
+    // are absent and `meta.catalogState` says so, so the client can tell "unknown" from "none".
+    const counts = new Map();
+    for (const r of results) counts.set(r.ticker, (counts.get(r.ticker) || 0) + 1);
+    for (const r of results) {
+      r.canonicalKey = 'coingecko:' + r.coinId;
+      r.source = 'coingecko';
+      // Same-symbol results in ONE result set: the UI must disambiguate these (progressive disclosure).
+      r.symbolCollision = (counts.get(r.ticker) || 0) > 1;
+      let chain = null;
+      try { chain = chainsFor(r.coinId); } catch (_) { chain = null; }
+      if (chain) {
+        r.chainCount = chain.chainCount;
+        if (chain.primaryChain) { r.chain = chain.primaryChain; r.contract = chain.contract; }
+        if (chain.chains.length) r.chains = chain.chains.slice(0, 4).map(c => c.network);
+      }
+    }
+    return res.status(200).json({ results, meta: { catalogState: catalogState().status, identityV1: true } });
   } catch (err) {
     console.error('[API][search-crypto] upstream failure:', err?.message);
     return res.status(502).json({ error: 'upstream_unreachable', results: [] });

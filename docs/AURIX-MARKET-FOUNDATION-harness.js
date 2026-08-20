@@ -243,7 +243,9 @@ ok('6.3 la estrella da feedback inmediato (glifo + clase + aria-pressed)',
    /b\.textContent = isAdded \? '★' : '☆'/.test(renderMarket) &&
    /b\.setAttribute\('aria-pressed', isAdded \? 'true' : 'false'\)/.test(renderMarket));
 ok('6.4 la fila es un control real: role=button + tabindex para foco de teclado',
-   /class="market-row" data-symbol="\$\{normSym\}" role="button" tabindex="0"/.test(app));
+   // El contrato es role=button + tabindex=0 en la fila, no el orden literal de los atributos: la
+   // identidad canónica (data-canon) se añade entre medias en ASSET-DISCOVERY-IDENTITY.V1.
+   /class="market-row" data-symbol="\$\{normSym\}"[^>]*role="button" tabindex="0"/.test(app));
 ok('6.5 Enter y Espacio abren la fila (mismo owner que el clic, un solo listener)',
    /screen\.addEventListener\('keydown'/.test(renderMarket) &&
    /if \(e\.key !== 'Enter' && e\.key !== ' ' && e\.key !== 'Spacebar'\) return;/.test(renderMarket));

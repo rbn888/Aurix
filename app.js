@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '620'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '621'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -3864,6 +3864,9 @@ const T = {
       real_estate: 'Describe el inmueble por tipo o ubicación…',
     },
     noResults:       q => `Sin resultados para "${q}"`,
+    // SPEC ASSET-DISCOVERY-IDENTITY.V1 — un contrato sin resolver no es "sin resultados".
+    contractNotFound:    'Ese contrato no existe en las redes soportadas.',
+    contractProviderDown:'No se ha podido verificar el contrato ahora mismo. Vuelve a intentarlo.',
     // Price lookup
     noPrice:         'sin precio',
     priceUnavail:    'Precio no disponible para este activo.',
@@ -6055,6 +6058,9 @@ const T = {
       real_estate: 'Describe the property by type or location…',
     },
     noResults:       q => `No results for "${q}"`,
+    // SPEC ASSET-DISCOVERY-IDENTITY.V1 — an unresolved contract is not "no results".
+    contractNotFound:    'That contract does not exist on the supported networks.',
+    contractProviderDown:'The contract could not be verified right now. Please try again.',
     // Price lookup
     noPrice:         'no price',
     priceUnavail:    'Price not available for this asset.',
@@ -44601,7 +44607,8 @@ function renderMarket() {
       const row = e.target.closest('.market-row');
       if (!row || !row.dataset || !row.dataset.symbol) return;
       try {
-        if (typeof _aurixMktOpenSymbol === 'function') _aurixMktOpenSymbol(row.dataset.symbol);
+        if (typeof _aurixMktActivateRow === 'function') _aurixMktActivateRow(row);
+        else if (typeof _aurixMktOpenSymbol === 'function') _aurixMktOpenSymbol(row.dataset.symbol);
       } catch (_) {}
     });
     // MARKET-FOUNDATION-V1 · BLOQUE D — teclado. La fila ya es role="button" +
@@ -44617,7 +44624,8 @@ function renderMarket() {
       if (!row || !row.dataset || !row.dataset.symbol) return;
       if (e.key !== 'Enter') e.preventDefault();
       try {
-        if (typeof _aurixMktOpenSymbol === 'function') _aurixMktOpenSymbol(row.dataset.symbol);
+        if (typeof _aurixMktActivateRow === 'function') _aurixMktActivateRow(row);
+        else if (typeof _aurixMktOpenSymbol === 'function') _aurixMktOpenSymbol(row.dataset.symbol);
       } catch (_) {}
     });
   }
@@ -46044,7 +46052,37 @@ const _MKT_DISC_CACHE_MAX = 40;
 async function _aurixMktHydrateQuotes(items, signal) {
   if (!Array.isArray(items) || !items.length) return items;
   if (typeof PRICES_PROXY === 'undefined' || typeof fetch !== 'function') return items;
-  const need = items.filter(it => it && !(Number.isFinite(it.current_price) && it.current_price > 0));
+  const _blockedBySymbolAmbiguity = new Set();
+  let need = items.filter(it => it && !(Number.isFinite(it.current_price) && it.current_price > 0));
+  // SPEC ASSET-DISCOVERY-IDENTITY.V1 · §7 — este hidratador cotiza por SÍMBOLO. Ahora que dos tokens
+  // distintos pueden compartir ticker en la MISMA lista, pedir el precio del símbolo para los dos
+  // pintaría el precio del grande sobre el pequeño: un precio inventado para ese activo. Se cotiza
+  // sólo al dueño demostrable del símbolo (único con ese ticker, o el de mejor market rank real del
+  // proveedor); el resto se queda en "—", que es el estado honesto. Un resultado por CONTRATO nunca
+  // se cotiza por símbolo: ya trae el precio de su propia identidad, o no lo trae.
+  if (typeof _AURIX_DISCOVERY_IDENTITY_V1 !== 'undefined' && _AURIX_DISCOVERY_IDENTITY_V1) {
+    const groups = new Map();
+    items.forEach(it => {
+      if (!it || String(it.type || '').toLowerCase() !== 'crypto') return;
+      const tk = String(it.symbol || it.ticker || '').toUpperCase();
+      if (!tk) return;
+      if (!groups.has(tk)) groups.set(tk, []);
+      groups.get(tk).push(it);
+    });
+    groups.forEach(group => {
+      if (group.length < 2) return;
+      const ranked = group.filter(g => Number.isFinite(g.marketCapRank));
+      let owner = null;
+      if (ranked.length) {
+        const best = Math.min.apply(null, ranked.map(g => g.marketCapRank));
+        const tied = ranked.filter(g => g.marketCapRank === best);
+        if (tied.length === 1) owner = tied[0];
+      }
+      group.forEach(g => { if (g !== owner) _blockedBySymbolAmbiguity.add(g); });
+    });
+    items.forEach(it => { if (it && (it.matchedBy === 'contract' || it.priceable === false)) _blockedBySymbolAmbiguity.add(it); });
+    need = need.filter(it => !_blockedBySymbolAmbiguity.has(it));
+  }
   if (!need.length) return items;
   const syms = Array.from(new Set(need.map(it => it.marketSymbol || it.symbol).filter(Boolean))).slice(0, 40);
   if (!syms.length) return items;
@@ -46058,6 +46096,7 @@ async function _aurixMktHydrateQuotes(items, signal) {
       if (s && s.symbol) by.set(normalizeSymbol(s.symbol), s);
     }
     items.forEach(it => {
+      if (_blockedBySymbolAmbiguity.has(it)) return;   // §7: nunca el precio de OTRO activo con el mismo símbolo
       const hit = by.get(normalizeSymbol(it.marketSymbol || it.symbol));
       if (!hit) return;
       const p = Number(hit.price);
@@ -46118,6 +46157,35 @@ async function _aurixMktDiscover(query, opts) {
   // omitiera también el final, la lista se quedaría en skeleton para siempre.
   if (_mktDiscQuery === tag) renderCurrentMarketView();
   return _mktDiscResults;
+}
+
+// ── SPEC ASSET-DISCOVERY-IDENTITY.V1 · §6 — abrir una fila de discovery POR IDENTIDAD ─────────
+// Una fila que viene del buscador (no de la tabla monitorizada) se abría por SÍMBOLO: el handler
+// llamaba a _aurixMktOpenSymbol(row.dataset.symbol) sin item, y `_findMktItem` la buscaba en
+// MARKET_DATA. Dos defectos: (1) si el activo no está en la tabla no ocurría NADA — un resultado
+// visible que no se puede abrir; (2) si su símbolo coincidía con uno de la tabla se abría el activo
+// EQUIVOCADO. Ahora la fila lleva su identidad canónica y se resuelve por ella; si el activo existe
+// en discovery pero no en la tabla, se continúa hacia Add Asset con el activo YA identificado
+// (id de proveedor, red y contrato incluidos). Las filas de la tabla mantienen su ruta intacta.
+function _aurixMktDiscRowItem(row) {
+  if (!row || !row.dataset || !row.dataset.canon) return null;
+  if (typeof _AURIX_DISCOVERY_IDENTITY_V1 === 'undefined' || !_AURIX_DISCOVERY_IDENTITY_V1) return null;
+  const canon = row.dataset.canon;
+  try { return (_mktDiscResults || []).find(r => r && r.canonicalKey === canon) || null; } catch (_) { return null; }
+}
+function _aurixMktActivateRow(row) {
+  if (!row || !row.dataset) return;
+  const disc = _aurixMktDiscRowItem(row);
+  let opened = false;
+  try {
+    if (typeof _aurixMktOpenSymbol === 'function') opened = _aurixMktOpenSymbol(row.dataset.symbol, disc || undefined);
+  } catch (_) {}
+  if (opened || !disc) return;
+  // Sólo cuando la ficha está activa pero no ha podido abrirse: nunca se cambia el comportamiento
+  // con el flag de Market apagado.
+  try {
+    if (typeof _aurixMktFlag === 'function' && _aurixMktFlag() && typeof _openAddAssetWithFund === 'function') _openAddAssetWithFund(disc);
+  } catch (_) {}
 }
 
 // ── MARKET-INSTITUTIONAL-V1 · §5 — filtros respaldados por discovery ─────────
@@ -47242,7 +47310,7 @@ function renderMarketItem(item, idx) {
     item.currency ? `<span>${escHtml(item.currency)}</span>` : '',
   ].filter(Boolean).join('<i class="mkt-id-sep" aria-hidden="true">·</i>');
   return `
-    <div class="market-row" data-symbol="${normSym}" role="button" tabindex="0" aria-label="${escHtml(item.symbol)}">
+    <div class="market-row" data-symbol="${normSym}"${item.canonicalKey ? ` data-canon="${escHtml(String(item.canonicalKey))}"` : ''} role="button" tabindex="0" aria-label="${escHtml(item.symbol)}">
       <div class="col col-asset">
         <div class="asset-wrapper">
           ${_assetIconHtml(item, item.symbol, 'asset-icon', typeof idx === 'number' && idx < _AURIX_MKT_EAGER_ICONS)}
@@ -49725,6 +49793,22 @@ function _aurixSearchSubtitle(a) {
     return _t ? _t.toUpperCase() : '';
   })();
   if (!a) return '';
+  // SPEC ASSET-DISCOVERY-IDENTITY.V1 — desambiguación progresiva de cripto. Por defecto el subtítulo
+  // es EXACTAMENTE el de antes ("USDC · CRYPTO"): si el nombre ya distingue el activo, la red y el
+  // contrato no aportan información y no se muestran. Sólo cuando el resultado llega por contrato o
+  // comparte símbolo con otro de la MISMA lista se sustituye la etiqueta de tipo por la red y se
+  // añade el contrato abreviado — "USDC · Ethereum · 0xA0b8…eB48" — de forma que dos activos que
+  // comparten ticker nunca se lean como el mismo. Nada se inventa: si no hay red o contrato, no se
+  // escribe. Una sola línea, el mismo nodo de siempre: cero cambio de layout en móvil o escritorio.
+  if (typeof _AURIX_DISCOVERY_IDENTITY_V1 !== 'undefined' && _AURIX_DISCOVERY_IDENTITY_V1 && _t === 'crypto') {
+    const needsId = !!(a.matchedBy === 'contract' || a.symbolCollision);
+    const parts = [];
+    if (a.ticker) parts.push(a.ticker);
+    if (needsId && a.chain) parts.push(a.chain);
+    else if (_label) parts.push(_label);
+    if (needsId && a.contract && typeof _aurixShortContract === 'function') parts.push(_aurixShortContract(a.contract));
+    return parts.join(' · ');
+  }
   if (_t !== 'fund' && _t !== 'etf') {
     const base = [];
     if (a.ticker) base.push(a.ticker);
@@ -49746,6 +49830,140 @@ function _aurixSearchSubtitle(a) {
   return parts.length ? parts.join(' · ') : (a.ticker || 'Fund');
 }
 
+// ════════════════════════════════════════════════════════════════════════════════════════════
+// SPEC MKT-EXCELLENCE.ASSET-DISCOVERY-IDENTITY.V1 — IDENTIDAD CANÓNICA + BÚSQUEDA POR CONTRATO
+// ════════════════════════════════════════════════════════════════════════════════════════════
+// El buscador identificaba un token cripto por su SÍMBOLO: `/api/search/crypto` colapsaba por
+// ticker (el primer USDC ganaba y el resto desaparecía) y la dedupe de `searchAllAssets` volvía a
+// colapsar por ticker exacto. Consecuencia: dos tokens distintos con el mismo símbolo eran "el
+// mismo activo", y un token cuyo símbolo choca con uno mayor era INENCONTRABLE.
+// Aquí vive la identidad canónica del discovery — nunca el símbolo — y la ruta de contrato:
+//   texto     → proveedores existentes → dedupe por identidad canónica → _aurixRankSearchResults
+//   contrato  → /api/search/contract → identidad exacta con PRIORIDAD ABSOLUTA (no entra al ranker)
+// NO se crea un ranking paralelo: el orden lo sigue decidiendo _aurixRankSearchResults. La ruta de
+// contrato no puntúa, PRECEDE. Reversible: _AURIX_DISCOVERY_IDENTITY_V1=false ⇒ comportamiento previo.
+const _AURIX_DISCOVERY_IDENTITY_V1 = true;
+// Formas de dirección soportadas → familia de cadena. Multi-chain por construcción: EVM es UNA
+// familia, no la definición de "contrato". Mismo criterio que el backend (api/search/_cg-catalog.js).
+const _AURIX_CONTRACT_SHAPES = [
+  { family: 'evm',    re: /^0x[0-9a-fA-F]{40}$/ },
+  { family: 'tron',   re: /^T[1-9A-HJ-NP-Za-km-z]{33}$/ },
+  { family: 'solana', re: /^[1-9A-HJ-NP-Za-km-z]{32,44}$/ },
+];
+function _aurixDetectContractFamily(input) {
+  const s = String(input || '').trim();
+  if (!s) return null;
+  for (const sh of _AURIX_CONTRACT_SHAPES) if (sh.re.test(s)) return sh.family;
+  return null;
+}
+function _aurixLooksLikeContract(input) { return _aurixDetectContractFamily(input) != null; }
+// Presentación: 0xA0b8…eB48. Sólo acorta; nunca deduce ni completa una dirección.
+function _aurixShortContract(addr) {
+  const s = String(addr || '').trim();
+  if (!s) return '';
+  if (s.length <= 12) return s;
+  return s.slice(0, 6) + '…' + s.slice(-4);
+}
+// LA identidad de un resultado de discovery. Un símbolo NUNCA identifica un activo: dos tokens con
+// el mismo ticker en contratos/redes distintos son activos distintos y deben coexistir. Orden:
+//   1. canonicalKey que ya trae el proveedor (backend)
+//   2. crypto: id de proveedor (una moneda de CoinGecko es UN activo aunque viva en varias redes)
+//   3. crypto sin id de proveedor: red + contrato (token on-chain long tail)
+//   4. ISIN (fondos/ETF) y, como último recurso, tipo+ticker — nunca para fusionar dos cryptos.
+function _aurixCanonicalAssetKey(a) {
+  if (!a) return null;
+  if (a.canonicalKey) return String(a.canonicalKey);
+  const type = String(a.type || '').toLowerCase();
+  if (type === 'crypto') {
+    if (a.coinId) return 'coingecko:' + String(a.coinId);
+    const c = a.contract ? String(a.contract).toLowerCase() : '';
+    if (c) return 'chain:' + String(a.networkId || a.chain || 'unknown').toLowerCase() + ':' + c;
+    const tk = String(a.ticker || a.symbol || '').toUpperCase();
+    return tk ? 'crypto-symbol:' + tk : null;      // sin identidad demostrable: NO se fusiona con nada más
+  }
+  if (a.isin) return 'isin:' + String(a.isin).toUpperCase();
+  const tk = String(a.ticker || a.symbol || '').toUpperCase();
+  return tk ? (type || 'asset') + ':' + tk : null;
+}
+// Estado del último lookup por contrato. La UI lo lee para NO degradar en silencio a búsqueda
+// textual: "contrato no encontrado" y "proveedor no disponible" son respuestas distintas (§7).
+let _aurixContractLookup = { address: null, state: 'idle', reason: null, at: 0 };
+const _AURIX_CONTRACT_CACHE_MAX = 60;
+const _aurixContractCache = new Map();      // dirección en minúsculas → payload del backend
+function _aurixContractLookupState() { return Object.assign({}, _aurixContractLookup); }
+// Traduce la respuesta del backend al MISMO shape de item que ya consume el flujo de alta.
+function _aurixContractResultToItem(r) {
+  if (!r) return null;
+  const ticker = String(r.ticker || '').toUpperCase();
+  if (!ticker) return null;
+  return {
+    ticker, name: r.name || ticker, type: 'crypto',
+    coinId: r.coinId || null, marketSymbol: r.marketSymbol || null,
+    image: r.image || null,
+    price: (Number.isFinite(r.price) && r.price > 0) ? r.price : null,
+    marketCapRank: Number.isFinite(r.marketCapRank) ? r.marketCapRank : null,
+    canonicalKey: r.canonicalKey || null,
+    chain: r.chain || null, networkId: r.networkId || null, contract: r.contract || null,
+    source: r.source || null, priceable: r.priceable !== false,
+    matchedBy: 'contract',
+  };
+}
+// Un contrato NO es texto: se resuelve contra el endpoint de contrato, con caché por dirección y
+// cancelación. No añade peticiones a la búsqueda normal — sólo se llama cuando el input ES una
+// dirección, así que no hay fan-out por tecla.
+async function _aurixSearchByContract(address, signal) {
+  const addr = String(address || '').trim();
+  const key = addr.toLowerCase();
+  if (!addr) return null;
+  const cached = _aurixContractCache.get(key);
+  if (cached) {
+    _aurixContractLookup = { address: addr, state: cached.found ? 'found' : (cached.reason === 'provider_unavailable' ? 'provider_unavailable' : 'not_found'), reason: cached.reason || null, at: Date.now() };
+    return cached;
+  }
+  _aurixContractLookup = { address: addr, state: 'loading', reason: null, at: Date.now() };
+  const base = (typeof PRICES_PROXY === 'string') ? PRICES_PROXY.replace('/api/prices', '') : '';
+  try {
+    const res = await fetch(`${base}/api/search/contract?address=${encodeURIComponent(addr)}`, { signal, headers: { Accept: 'application/json' } });
+    if (!res.ok) { _aurixContractLookup = { address: addr, state: 'provider_unavailable', reason: 'http_' + res.status, at: Date.now() }; return null; }
+    const json = await res.json();
+    const found = !!(json && json.found && json.result);
+    _aurixContractLookup = { address: addr, state: found ? 'found' : ((json && json.reason === 'provider_unavailable') ? 'provider_unavailable' : 'not_found'),
+      reason: (json && json.reason) || null, at: Date.now() };
+    // Sólo se cachea una respuesta CONCLUYENTE. Un proveedor caído no se memoriza como "no existe".
+    if (found || (json && json.reason === 'contract_not_found')) {
+      _aurixContractCache.set(key, json);
+      if (_aurixContractCache.size > _AURIX_CONTRACT_CACHE_MAX) { try { _aurixContractCache.delete(_aurixContractCache.keys().next().value); } catch (_) {} }
+    }
+    return json;
+  } catch (err) {
+    if (err && err.name === 'AbortError') throw err;
+    _aurixContractLookup = { address: addr, state: 'provider_unavailable', reason: 'network', at: Date.now() };
+    return null;
+  }
+}
+// Marca los choques de símbolo DEL CONJUNTO VISIBLE para que el subtítulo desambigüe sólo cuando
+// hace falta (progressive disclosure): si el nombre ya distingue, no se muestra red ni contrato.
+function _aurixMarkCryptoAmbiguity(items) {
+  if (!Array.isArray(items)) return items;
+  const counts = new Map();
+  for (const it of items) {
+    if (!it || String(it.type || '').toLowerCase() !== 'crypto') continue;
+    const tk = String(it.ticker || it.symbol || '').toUpperCase();
+    if (tk) counts.set(tk, (counts.get(tk) || 0) + 1);
+  }
+  for (const it of items) {
+    if (!it || String(it.type || '').toLowerCase() !== 'crypto') continue;
+    const tk = String(it.ticker || it.symbol || '').toUpperCase();
+    if ((counts.get(tk) || 0) > 1) it.symbolCollision = true;
+  }
+  return items;
+}
+try { if (typeof window !== 'undefined') {
+  window._aurixCanonicalAssetKey = _aurixCanonicalAssetKey;
+  window._aurixLooksLikeContract = _aurixLooksLikeContract;
+  window.aurixContractLookupState = _aurixContractLookupState;
+} } catch (_) {}
+
 // ── SPEC SEARCH-V2.2 — UN SOLO MOTOR PARA MARKET Y ADD ASSET ────────────────────────────────
 // Market y la búsqueda global ya entraban por aquí; Add Asset sólo lo hacía con el filtro 'all'.
 // Con cualquier otro filtro tomaba las ramas por-tipo de `searchByFilter`, que iban directas al
@@ -49759,6 +49977,21 @@ function _aurixSearchProject(items, filter) {
   return items.filter(a => a && String(a.type || '').toLowerCase() === f);
 }
 async function searchAllAssets(query, signal, filter) {
+  // SPEC ASSET-DISCOVERY-IDENTITY.V1 — CONTRACT SEARCH. Si el input tiene forma de dirección de una
+  // familia soportada, la búsqueda CAMBIA de modo: se resuelve contrato → red/token → identidad
+  // canónica → metadata/logo → precio si existe. El match exacto de contrato tiene prioridad
+  // ABSOLUTA, así que no compite en el ranker: es el único resultado de esa consulta.
+  // Tampoco se lanzan las peticiones de texto (Yahoo/CoinGecko search): una dirección no es texto y
+  // gastarlas sería presupuesto de red tirado. Si el contrato NO se resuelve, se devuelve vacío con
+  // el estado del lookup registrado — la UI avisa, NUNCA degrada en silencio a búsqueda textual.
+  if (typeof _AURIX_DISCOVERY_IDENTITY_V1 !== 'undefined' && _AURIX_DISCOVERY_IDENTITY_V1
+      && typeof _aurixLooksLikeContract === 'function' && _aurixLooksLikeContract(query)) {
+    const payload = await _aurixSearchByContract(query, signal);
+    if (signal?.aborted) return null;
+    const item = (payload && payload.found) ? _aurixContractResultToItem(payload.result) : null;
+    return _aurixSearchProject(item ? [item] : [], filter).slice(0, 10);
+  }
+
   const metals = searchMetalsLocal(query);
 
   const [yahooRes, cryptoRes] = await Promise.allSettled([
@@ -49808,6 +50041,18 @@ async function searchAllAssets(query, signal, filter) {
   const merged = [];
   for (const item of [...curatedEtfs, ...funds, ...metals, ...yEnriched, ...cryptoItems]) {
     if (!item || !item.ticker) continue;
+    // SPEC ASSET-DISCOVERY-IDENTITY.V1 — la cripto se deduplica por IDENTIDAD CANÓNICA, no por
+    // ticker. La clave `TK:` de abajo fusionaba dos tokens distintos que comparten símbolo (USD Coin
+    // y un USDC puenteado, o cualquier token cuyo ticker choca con uno mayor): se fusionaba por
+    // coincidencia de símbolo, que §7 prohíbe expresamente. Ahora sólo se fusiona lo que tiene la
+    // MISMA identidad demostrable (mismo id de proveedor, o misma red+contrato). El resto de tipos
+    // conserva su dedupe ISIN-first + ticker exacto tal cual.
+    if (typeof _AURIX_DISCOVERY_IDENTITY_V1 !== 'undefined' && _AURIX_DISCOVERY_IDENTITY_V1
+        && typeof _aurixCanonicalAssetKey === 'function' && String(item.type || '').toLowerCase() === 'crypto') {
+      const ck = 'CANON:' + (_aurixCanonicalAssetKey(item) || ('TK:' + String(item.ticker).toUpperCase()));
+      if (seen.has(ck)) continue;
+      seen.add(ck); merged.push(item); continue;
+    }
     // SPEC 70 — ISIN-first dedupe. THE same share class arriving from more than one source (the curated
     // catalog entry + its Yahoo twin) shares an ISIN → collapse to ONE unambiguous result. The curated
     // entry leads the merge, so it wins and keeps full identity (type/manager/currency/shareClass). This
@@ -49830,7 +50075,11 @@ async function searchAllAssets(query, signal, filter) {
     if (seen.has(key) || seen.has(tkey)) continue;
     seen.add(key); seen.add(tkey); merged.push(item);
   }
-  return _aurixRankSearchResults(_aurixSearchProject(merged, filter), query).slice(0, 10);
+  // El ranking sigue siendo el de SEARCH-V2.1: aquí sólo se mejora el conjunto de candidatos
+  // (retrieval) y, tras el corte, se marca qué resultados necesitan desambiguación visual.
+  const ranked = _aurixRankSearchResults(_aurixSearchProject(merged, filter), query).slice(0, 10);
+  return (typeof _AURIX_DISCOVERY_IDENTITY_V1 !== 'undefined' && _AURIX_DISCOVERY_IDENTITY_V1
+          && typeof _aurixMarkCryptoAmbiguity === 'function') ? _aurixMarkCryptoAmbiguity(ranked) : ranked;
 }
 
 // ── SPEC SEARCH-V2.2 — `searchByFilter` deja de ser un motor y pasa a ser una VISTA ──────────
@@ -50198,6 +50447,24 @@ function _searchResultToMarketItem(result) {
     current_price:  result.price        ?? result.current_price ?? null,
     price:          result.price        ?? result.current_price ?? null,
     change24h:      result.change24h    ?? null,
+    // SPEC ASSET-DISCOVERY-IDENTITY.V1 — la identidad canónica viaja INTACTA hasta Market: la fila
+    // de discovery ya no se identifica por símbolo, así que dos tokens con el mismo ticker abren
+    // fichas distintas y el paso a Add Asset conserva red y contrato. Campos aditivos: si el
+    // resultado no los trae, quedan null (nunca se deducen).
+    canonicalKey:   result.canonicalKey  || (typeof _aurixCanonicalAssetKey === 'function' ? _aurixCanonicalAssetKey(result) : null),
+    chain:          result.chain         || null,
+    networkId:      result.networkId     || null,
+    contract:       result.contract      || null,
+    // El logo del proveedor (CoinGecko) ya venía en el resultado y este puente lo descartaba, así
+    // que un activo long-tail (HYPE) perdía su icono al pasar por Market. getAssetLogo lo prefiere.
+    image:          result.image         || null,
+    source:         result.source        || null,
+    // señal REAL de capitalización del proveedor (CoinGecko la publica en /search): decide qué
+    // resultado es el dueño demostrable de un símbolo compartido en _aurixMktHydrateQuotes.
+    marketCapRank:  Number.isFinite(result.marketCapRank) ? result.marketCapRank : null,
+    symbolCollision: result.symbolCollision === true,
+    matchedBy:      result.matchedBy     || null,
+    priceable:      result.priceable !== false,
   };
 }
 
@@ -50249,8 +50516,19 @@ function renderSuggestions(results, query, loading = false) {
     : '';
 
   if (!results.length) {
-    assetSuggestionsEl.innerHTML = loadingHtml ||
-      `<div class="suggestion-empty">${t('noResults')(escHtml(query))}</div>`;
+    // SPEC ASSET-DISCOVERY-IDENTITY.V1 — §7 DATA HONESTY. Un contrato que no resuelve no puede
+    // leerse como "no hay nada": hay que distinguir "ese contrato no existe en las redes que
+    // soportamos" de "el proveedor no ha respondido". El texto genérico se mantiene para todo lo demás.
+    let emptyHtml = `<div class="suggestion-empty">${t('noResults')(escHtml(query))}</div>`;
+    try {
+      if (typeof _AURIX_DISCOVERY_IDENTITY_V1 !== 'undefined' && _AURIX_DISCOVERY_IDENTITY_V1
+          && typeof _aurixLooksLikeContract === 'function' && _aurixLooksLikeContract(query)) {
+        const st = (typeof _aurixContractLookup === 'object' && _aurixContractLookup) ? _aurixContractLookup.state : null;
+        const msg = (st === 'provider_unavailable') ? t('contractProviderDown') : (st === 'not_found' ? t('contractNotFound') : null);
+        if (msg) emptyHtml = `<div class="suggestion-empty">${escHtml(msg)}</div>`;
+      }
+    } catch (_) {}
+    assetSuggestionsEl.innerHTML = loadingHtml || emptyHtml;
     assetSuggestionsEl.classList.add('open');
     return;
   }
