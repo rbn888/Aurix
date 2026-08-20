@@ -291,10 +291,19 @@ function mirror(name) {
       /await ensure\(CATALOG_WAIT_MS\)/.test(fs.readFileSync(path.join(root, 'api/search/_contract-discovery.js'), 'utf8')));
   }
   {
-    resetCatalog(); plan = {}; calls.length = 0;
+    // CATALOG-RETRIEVAL cambió este contrato: la ruta textual ya PUEDE construir el catálogo, pero sólo
+    // dentro de un presupuesto acotado que corre EN PARALELO con la llamada al proveedor (nunca después),
+    // así que la petición no se vuelve más lenta de lo que ya era. Sigue prohibido el fire-and-forget.
+    const crySrc2 = fs.readFileSync(path.join(root, 'api/search/crypto.js'), 'utf8');
+    ok('9.6 the catalog is raced against the upstream call, bounded, never awaited after it',
+      /ensure\(CATALOG_BUDGET_MS\)/.test(crySrc2) &&
+      crySrc2.indexOf('ensure(CATALOG_BUDGET_MS)') < crySrc2.indexOf('await fetch(url') &&
+      crySrc2.indexOf('await catalogP') > crySrc2.indexOf('await fetch(url'));
+    resetCatalog(); plan = { catalog: '429' }; calls.length = 0;
     const rr = mkRes(); await crypto(req({ q: 'usdc' }), rr);
-    ok('9.6 a textual search makes ZERO catalog requests', calls.filter(c => c.url.includes('/coins/list')).length === 0, 'calls=' + calls.length);
-    ok('9.7 with a cold catalog no chain field is emitted', rr.body.results.every(r => r.chain === undefined && r.chainCount === undefined));
+    ok('9.7 with an unavailable catalog no chain field is emitted', rr.body.results.every(r => r.chain === undefined && r.chainCount === undefined));
+    ok('9.8 and at most ONE catalog request is ever in flight per query',
+      calls.filter(c => c.url.includes('/coins/list')).length <= 1, 'calls=' + calls.length);
   }
 
   console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');

@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '622'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '623'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -49751,11 +49751,22 @@ function _aurixSearchProviderWeight(a) {
   if (a && (a.marketSymbol || a.coinId)) return 20;
   return 0;
 }
+// SPEC MKT-EXCELLENCE.CATALOG-RETRIEVAL — el SLUG del proveedor es otro IDENTIFICADOR del activo,
+// exactamente igual que el ISIN de un fondo, y este marcador ya los trataba así. Sin esto, el candidato
+// canónico que aporta el catálogo para "USD Coin" (CoinGecko renombró USD Coin → "USDC", pero su id
+// sigue siendo `usd-coin`) puntuaba 0 y caía al final, por debajo de derivados cuyo NOMBRE sí contiene
+// "usd coin". Se compara sin puntuación ni espacios, así que "USD Coin" == "usd-coin" == "usdcoin".
+// No es un ranking paralelo: es un identificador más dentro del ÚNICO marcador que ya existía.
+// Reversible: _AURIX_SEARCH_PROVIDER_SLUG_MATCH=false ⇒ marcador previo byte a byte.
+const _AURIX_SEARCH_PROVIDER_SLUG_MATCH = true;
+function _aurixSearchIdentifierKey(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ''); }
 function _aurixSearchMatchScore(a, q) {
   const tk = String(a.ticker || '').toLowerCase(), nm = String(a.name || '').toLowerCase();
   const is = String(a.isin || '').toLowerCase();
   if (!q) return 0;
   if (tk === q || is === q || nm === q) return 1000;
+  if (typeof _AURIX_SEARCH_PROVIDER_SLUG_MATCH !== 'undefined' && _AURIX_SEARCH_PROVIDER_SLUG_MATCH
+      && a.coinId && _aurixSearchIdentifierKey(a.coinId) === _aurixSearchIdentifierKey(q)) return 1000;
   if (nm.indexOf(q) === 0) return 700;
   if (tk.indexOf(q) === 0) return 650;
   // word-start match inside the name ("world" → "MSCI World") beats a mid-token match.

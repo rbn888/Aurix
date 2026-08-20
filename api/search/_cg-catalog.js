@@ -63,8 +63,18 @@ const state = {
   contracts: 0,
   byContract: new Map(),    // lowercased address → { coinId, cg }
   byId: new Map(),          // coinId → { symbol, name, chains: [[cg, address], ...] }
+  // SPEC MKT-EXCELLENCE.CATALOG-RETRIEVAL — text retrieval indexes over the SAME single pass. They
+  // exist because CoinGecko's /search endpoint is a relevance feed, not a catalog: for "USD Coin" the
+  // canonical USDC is not in its first 12 hits. These add CANDIDATES only; ranking stays elsewhere.
+  bySymbol: new Map(),      // 'USDC'      → [coinId, …]  (every coin sharing the ticker)
+  byNameKey: new Map(),     // 'usdcoin'   → [coinId, …]  (name AND provider slug, punctuation-free)
+  nameKeys: [],             // sorted keys, for the bounded prefix pass
   inflight: null,
 };
+// Comparison key: lowercase, strip everything that is not a letter or a digit. Makes "USD Coin",
+// "usd-coin" and "usdcoin" the same key WITHOUT inventing aliases — the slug is the provider's own.
+function textKey(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ''); }
+const MAX_RETRIEVAL_IDS_PER_KEY = 8;
 
 function fresh() { return state.status === 'ready' && (Date.now() - state.at) < TTL_MS; }
 function errorCoolingDown() { return state.status === 'error' && (Date.now() - state.at) < ERROR_TTL_MS; }
@@ -76,10 +86,24 @@ async function load() {
   if (!res.ok) throw new Error('upstream_' + res.status);
   const list = await res.json();
   if (!Array.isArray(list)) throw new Error('upstream_malformed');
-  const byContract = new Map(), byId = new Map();
+  const byContract = new Map(), byId = new Map(), bySymbol = new Map(), byNameKey = new Map();
   let contracts = 0;
+  const push = (map, key, id) => {
+    if (!key) return;
+    const arr = map.get(key);
+    if (!arr) { map.set(key, [id]); return; }
+    if (arr.length < MAX_RETRIEVAL_IDS_PER_KEY && arr.indexOf(id) < 0) arr.push(id);
+  };
   for (const c of list) {
-    if (!c || typeof c.id !== 'string' || !c.platforms || typeof c.platforms !== 'object') continue;
+    if (!c || typeof c.id !== 'string') continue;
+    // Retrieval indexes cover EVERY coin, including natives with no contract (BTC/ETH): a coin with no
+    // contract is still a findable asset. The contract index below is the one that needs platforms.
+    const sym = typeof c.symbol === 'string' ? c.symbol.toUpperCase().trim() : '';
+    const nm = typeof c.name === 'string' ? c.name.trim() : '';
+    push(bySymbol, sym, c.id);
+    push(byNameKey, textKey(nm), c.id);
+    push(byNameKey, textKey(c.id), c.id);        // the provider's own slug ("usd-coin" → "usdcoin")
+    if (!c.platforms || typeof c.platforms !== 'object') continue;
     const chains = [];
     for (const [cg, addr] of Object.entries(c.platforms)) {
       const a = (typeof addr === 'string') ? addr.trim() : '';
@@ -88,10 +112,11 @@ async function load() {
       const key = a.toLowerCase();
       if (!byContract.has(key)) { byContract.set(key, { coinId: c.id, cg }); contracts++; }
     }
-    if (!chains.length) continue;                          // native coins (BTC/ETH/SOL) have no contract — correct
-    byId.set(c.id, { symbol: typeof c.symbol === 'string' ? c.symbol.toUpperCase() : null, name: typeof c.name === 'string' ? c.name : null, chains });
+    byId.set(c.id, { symbol: sym || null, name: nm || null, chains });
   }
   state.byContract = byContract; state.byId = byId;
+  state.bySymbol = bySymbol; state.byNameKey = byNameKey;
+  state.nameKeys = Array.from(byNameKey.keys()).sort();
   state.coins = byId.size; state.contracts = contracts;
   state.status = 'ready'; state.at = Date.now(); state.error = null;
   return state;
@@ -153,7 +178,41 @@ export function chainsFor(coinId) {
   return { chainCount: chains.length, primaryChain: single ? chains[0].network : null, contract: single ? chains[0].contract : null, chains };
 }
 
-export const __testing = { state, load };
+// SPEC MKT-EXCELLENCE.CATALOG-RETRIEVAL — SECOND CANDIDATE SOURCE for textual search.
+// CoinGecko's /search is a relevance feed: for "USD Coin" the canonical USDC (id `usd-coin`) is not in
+// its first 12 hits, so the asset was unreachable by its own commercial name. This resolves the query
+// against the catalog we ALREADY hold, in priority order — exact ticker, exact name or provider slug,
+// then a bounded prefix pass — and returns CANDIDATES only: no score, no order authority, no price, no
+// invented field. Cold catalog ⇒ [] (the caller degrades to exactly the previous behaviour).
+export function lookupByText(query, limit) {
+  const out = [], seen = new Set();
+  if (!fresh()) return out;
+  const max = Math.max(1, Math.min(Number(limit) || 4, 8));
+  const raw = String(query || '').trim();
+  const key = textKey(raw);
+  if (!key) return out;
+  const add = (id, matchedBy) => {
+    if (out.length >= max || !id || seen.has(id)) return;
+    const meta = state.byId.get(id);
+    if (!meta) return;
+    seen.add(id);
+    out.push({ coinId: id, symbol: meta.symbol, name: meta.name, matchedBy });
+  };
+  for (const id of (state.bySymbol.get(raw.toUpperCase()) || [])) add(id, 'symbol');     // a) exact ticker
+  for (const id of (state.byNameKey.get(key) || [])) add(id, 'name');                   // b) exact name / slug
+  if (out.length < max && key.length >= 3) {                                            // c) bounded prefix
+    const keys = state.nameKeys;
+    let lo = 0, hi = keys.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (keys[mid] < key) lo = mid + 1; else hi = mid; }
+    for (let i = lo; i < keys.length && out.length < max; i++) {
+      if (!keys[i].startsWith(key)) break;
+      for (const id of (state.byNameKey.get(keys[i]) || [])) add(id, 'prefix');
+    }
+  }
+  return out;
+}
+
+export const __testing = { state, load, textKey };
 // NOTE — the leading underscore is load-bearing: Vercel turns every non-underscore file under api/
 // into a Serverless Function, and this deployment sits at the plan's 12-function ceiling. Shared
 // modules MUST stay underscore-prefixed (they are still bundled through the import graph).

@@ -13,7 +13,7 @@
 //     We surface only the fields the frontend uses, so the raw response
 //     never reaches the browser.
 
-import { chainsFor, catalogState } from './_cg-catalog.js';
+import { chainsFor, catalogState, ensure, lookupByText } from './_cg-catalog.js';
 import { resolveContract } from './_contract-discovery.js';
 
 // AURIX-APP-DOMAIN-READY-1: allowlist (comma-separated) instead of a single
@@ -36,6 +36,14 @@ const MAX_Q          = 64;
 // SPEC MKT-EXCELLENCE.ASSET-DISCOVERY-IDENTITY.V1 — canonical identity, flag-guarded.
 // OFF ⇒ the previous response byte-for-byte (symbol dedupe, no identity fields).
 const IDENTITY_V1 = process.env.AURIX_DISCOVERY_IDENTITY_V1 !== 'off';
+// SPEC MKT-EXCELLENCE.CATALOG-RETRIEVAL — the identity catalog as a SECOND candidate source.
+// OFF ⇒ candidates come from /search alone, exactly as before.
+const CATALOG_RETRIEVAL = IDENTITY_V1 && process.env.AURIX_CATALOG_RETRIEVAL !== 'off';
+// The catalog is raced AGAINST the /search request, never awaited after it: the budget is smaller than
+// the upstream call it runs beside, so the request never gets slower than it already was. Not ready in
+// time ⇒ this query ships without catalog candidates (the load keeps going for the next one).
+const CATALOG_BUDGET_MS = 400;
+const CATALOG_CANDIDATES = 4;
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin',  corsOrigin(req));
@@ -64,6 +72,11 @@ export default async function handler(req, res) {
   }
 
   try {
+    // SPEC CATALOG-RETRIEVAL — started BEFORE the upstream call so the two overlap: the catalog costs
+    // at most CATALOG_BUDGET_MS of a wait that the /search request is already spending. Never after.
+    const catalogP = CATALOG_RETRIEVAL
+      ? ensure(CATALOG_BUDGET_MS).then(r => r, () => false)
+      : Promise.resolve(false);
     const url = `https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(q)}`;
     const upstream = await fetch(url, {
       signal:  AbortSignal.timeout(8000),
@@ -75,13 +88,12 @@ export default async function handler(req, res) {
     const json  = await upstream.json();
     const coins = Array.isArray(json?.coins) ? json.coins : [];
 
-    // SPEC ASSET-DISCOVERY-IDENTITY.V1 — the textual path NEVER touches the identity catalog: it does
-    // not await it and does not even kick it off. Measured in production: a fire-and-forget warm-up is
-    // useless on serverless (the instance is frozen the moment the response is sent, the in-flight
-    // fetch dies, and the failure then sat in a cooldown that blocked the paths that DO await it).
-    // So a textual search still costs exactly ONE upstream call, and chain/contract are attached only
-    // when this instance already holds a warm catalog (built by a contract lookup). Otherwise the
-    // fields are absent and `meta.catalogState` says why — unknown is reported, never guessed.
+    // SPEC ASSET-DISCOVERY-IDENTITY.V1 — chain/contract are attached only when this instance holds a
+    // warm catalog; otherwise the fields are absent and `meta.catalogState` says why (unknown is
+    // reported, never guessed). A fire-and-forget warm-up is useless on serverless — the instance is
+    // frozen the moment the response is sent — which is why the catalog is raced against the upstream
+    // call above (bounded) instead of being kicked off and abandoned.
+    const catalogReady = await catalogP;
 
     // CoinGecko ranks by relevance + market cap. Cap to MAX_RESULTS and
     // strip down to the four fields the frontend actually consumes.
@@ -121,6 +133,38 @@ export default async function handler(req, res) {
     }
     if (!IDENTITY_V1) return res.status(200).json({ results });
 
+    // ── SPEC CATALOG-RETRIEVAL — second candidate source ──────────────────────────────────────────
+    // /search is a relevance feed, not a catalog: "USD Coin" did not return the canonical USDC at all,
+    // so an asset was unreachable by its own commercial name. The catalog resolves the query by exact
+    // ticker / exact name / provider slug / bounded prefix and its hits are PREPENDED — not because
+    // they are better, but so the MAX_RESULTS cap cannot drop the exact match before the ranker ever
+    // sees it. Order here is candidate order; the ranker downstream is still the only authority, and a
+    // catalog candidate carries no rank, so a /search hit for the same coin (which does) outranks it.
+    // Deduped by canonical identity (provider id), never by symbol. Zero extra upstream calls.
+    let catalogAdded = 0;
+    if (CATALOG_RETRIEVAL && catalogReady) {
+      const extra = [];
+      for (const cand of lookupByText(q, CATALOG_CANDIDATES)) {
+        if (!cand || !cand.coinId || seen.has(cand.coinId)) continue;
+        if (!cand.symbol) continue;                     // no ticker ⇒ nothing the add flow could use
+        seen.add(cand.coinId);
+        extra.push({
+          ticker: cand.symbol,
+          name: cand.name || cand.symbol,
+          type: 'crypto',
+          coinId: cand.coinId,
+          marketSymbol: cand.symbol,
+          image: null,                                  // the catalog carries no logo — never invented
+          marketCapRank: null,                          // and no rank: the ranker treats it as neutral
+        });
+      }
+      catalogAdded = extra.length;
+      if (catalogAdded) {
+        results.unshift(...extra);
+        if (results.length > MAX_RESULTS) results.length = MAX_RESULTS;
+      }
+    }
+
     // ── canonical identity + chain evidence ────────────────────────────────────────────────────
     // canonicalKey is the identity the whole app dedupes on. It is NEVER derived from the symbol.
     // Chain/contract are attached ONLY from the cached catalog and ONLY when the coin lives on exactly
@@ -141,7 +185,7 @@ export default async function handler(req, res) {
         if (chain.chains.length) r.chains = chain.chains.slice(0, 4).map(c => c.network);
       }
     }
-    return res.status(200).json({ results, meta: { catalogState: catalogState().status, identityV1: true } });
+    return res.status(200).json({ results, meta: { catalogState: catalogState().status, identityV1: true, catalogCandidates: catalogAdded } });
   } catch (err) {
     console.error('[API][search-crypto] upstream failure:', err?.message);
     return res.status(502).json({ error: 'upstream_unreachable', results: [] });
