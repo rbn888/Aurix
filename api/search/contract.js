@@ -19,7 +19,7 @@
 import {
   detectAddressFamily, networksForFamily, networkByCg, networkLabel,
   ensure, lookupContract, catalogState,
-} from './_cg-catalog.js';
+} from './cg-catalog.js';
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || 'https://rbn888.github.io,https://app.aurixsystem.io')
   .split(',').map(s => s.trim()).filter(Boolean);

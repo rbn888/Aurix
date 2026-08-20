@@ -13,6 +13,8 @@
 //     We surface only the fields the frontend uses, so the raw response
 //     never reaches the browser.
 
+import { warm, chainsFor, catalogState } from './cg-catalog.js';
+
 // AURIX-APP-DOMAIN-READY-1: allowlist (comma-separated) instead of a single
 // origin, so the GitHub Pages app (rbn888.github.io) and the future
 // app.aurixsystem.io app are both accepted during migration. ALLOWED_ORIGINS
@@ -27,8 +29,6 @@ function corsOrigin(req) {
   if (o && (ALLOWED_ORIGINS.includes(o) || /^http:\/\/localhost(:\d+)?$/.test(o))) return o;
   return ALLOWED_ORIGINS[0];
 }
-import { warm, chainsFor, catalogState } from './_cg-catalog.js';
-
 const MAX_RESULTS    = 12;
 const MIN_Q          = 2;
 const MAX_Q          = 64;
