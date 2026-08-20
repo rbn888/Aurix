@@ -112,8 +112,9 @@ function buildCtx(overrides) {
     _aurixContractCache: new Map(),
     fetch: async (url) => {
       const u = String(url);
-      if (u.indexOf('/api/search/contract') >= 0) {
-        W.contractCalls++;
+      // contract discovery viaja por el MISMO endpoint cripto con ?address= (una sola función)
+      if (u.indexOf('/api/search/crypto') >= 0 && u.indexOf('address=') >= 0) {
+        W.contractCalls++; W.lastContractUrl = u;
         if (W.failContract) return { ok: false, status: 429, json: async () => ({}) };
         const m = /address=([^&]+)/.exec(u);
         const addr = m ? decodeURIComponent(m[1]).toLowerCase() : '';
@@ -224,6 +225,8 @@ const OFF = buildCtx({ _AURIX_DISCOVERY_IDENTITY_V1: false });
   ok('5.4 NO textual provider call was made for an address', W.yahooCalls === 0 && W.cryptoCalls === 0 && W.contractCalls === 1,
     JSON.stringify({ y: W.yahooCalls, c: W.cryptoCalls, k: W.contractCalls }));
   ok('5.5 the result is marked as contract-matched (never re-ranked against text)', byContract[0].matchedBy === 'contract');
+  ok('5.5b the lookup rides the existing crypto route with ?address= (no new serverless function)',
+    /\/api\/search\/crypto\?address=/.test(String(W.lastContractUrl || '')), String(W.lastContractUrl));
   W.contractCalls = 0;
   const again = await search(ON, USDC_ETH);
   ok('5.6 the same address is cached (0 extra requests)', W.contractCalls === 0 && again.length === 1);

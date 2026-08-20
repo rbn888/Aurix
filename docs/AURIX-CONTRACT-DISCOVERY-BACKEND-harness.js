@@ -2,9 +2,11 @@
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 // AURIX-CONTRACT-DISCOVERY-BACKEND-harness — SPEC MKT-EXCELLENCE.ASSET-DISCOVERY-IDENTITY.V1
 // ════════════════════════════════════════════════════════════════════════════════════════════════
-// Drives the REAL Vercel handlers (api/search/crypto.js, api/search/contract.js) and the shared
-// identity catalog (api/search/cg-catalog.js) with a stubbed upstream `fetch`. No re-implementation:
-// the handlers are imported and invoked exactly as Vercel invokes them.
+// Drives the REAL route (api/search/crypto.js — textual mode AND contract mode) plus the shared
+// modules it bundles (_cg-catalog.js, _contract-discovery.js) with a stubbed upstream `fetch`. No
+// re-implementation: the handler is imported and invoked exactly as Vercel invokes it. Contract
+// discovery is a MODE of this route, not a second function: the deployment is at the plan's
+// 12-Serverless-Function ceiling, which is why the shared modules stay underscore-prefixed.
 //
 // WHAT IT PROVES
 //   • crypto search dedupes by PROVIDER ID, never by symbol (USDC / Bridged USDC / USDCx coexist)
@@ -106,7 +108,8 @@ const os = require('os');
 const MIRROR = path.join(os.tmpdir(), 'aurix-discovery-harness-mirror');
 function mirror(name) {
   const src = fs.readFileSync(path.join(root, 'api/search', name + '.js'), 'utf8')
-    .replace(/from '\.\/cg-catalog\.js'/g, "from './cg-catalog.mjs'");
+    .replace(/from '\.\/_cg-catalog\.js'/g, "from './_cg-catalog.mjs'")
+    .replace(/from '\.\/_contract-discovery\.js'/g, "from './_contract-discovery.mjs'");
   const out = path.join(MIRROR, name + '.mjs');
   fs.writeFileSync(out, src);
   return out;
@@ -114,10 +117,12 @@ function mirror(name) {
 (async () => {
   fs.rmSync(MIRROR, { recursive: true, force: true });
   fs.mkdirSync(MIRROR, { recursive: true });
-  const cgPath = mirror('cg-catalog'), cryptoPath = mirror('crypto'), contractPath = mirror('contract');
+  const cgPath = mirror('_cg-catalog'); mirror('_contract-discovery');
+  const cryptoPath = mirror('crypto');
   const catalog  = await import('file://' + cgPath);
   const crypto   = (await import('file://' + cryptoPath)).default;
-  const contract = (await import('file://' + contractPath)).default;
+  // contract discovery is reached through the SAME route, with ?address= instead of ?q=
+  const contract = crypto;
 
   function resetCatalog() {
     const st = catalog.__testing.state;
@@ -269,8 +274,8 @@ function mirror(name) {
 
   // ── 9) source discipline ──
   console.log('\n9) source discipline:');
-  const cSrc = fs.readFileSync(path.join(root, 'api/search/contract.js'), 'utf8');
-  const catSrc = fs.readFileSync(path.join(root, 'api/search/cg-catalog.js'), 'utf8');
+  const cSrc = fs.readFileSync(path.join(root, 'api/search/_contract-discovery.js'), 'utf8');
+  const catSrc = fs.readFileSync(path.join(root, 'api/search/_cg-catalog.js'), 'utf8');
   ok('9.1 no hardcoded provider key anywhere', !/x-cg-demo-api-key['"]\s*\]?\s*=\s*['"][A-Za-z0-9-]{8,}/.test(cSrc + catSrc) &&
     (cSrc + catSrc).indexOf('CG-') < 0);
   ok('9.2 the demo key is read from the environment only',

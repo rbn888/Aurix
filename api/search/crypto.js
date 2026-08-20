@@ -13,7 +13,8 @@
 //     We surface only the fields the frontend uses, so the raw response
 //     never reaches the browser.
 
-import { warm, chainsFor, catalogState } from './cg-catalog.js';
+import { warm, chainsFor, catalogState } from './_cg-catalog.js';
+import { resolveContract } from './_contract-discovery.js';
 
 // AURIX-APP-DOMAIN-READY-1: allowlist (comma-separated) instead of a single
 // origin, so the GitHub Pages app (rbn888.github.io) and the future
@@ -44,6 +45,18 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET')     return res.status(405).json({ error: 'method_not_allowed' });
+
+  // SPEC ASSET-DISCOVERY-IDENTITY.V1 — CONTRACT MODE. An `address` param is not text: this route
+  // switches to contract discovery (contract → network/token → canonical identity → metadata →
+  // price when it exists) and returns { found, result, reason, meta }. It shares this function
+  // instead of owning its own because the deployment is at the plan's 12-function ceiling.
+  if (IDENTITY_V1) {
+    const address = String(req.query?.address ?? '').trim();
+    if (address) {
+      const out = await resolveContract(address, req.query?.network);
+      return res.status(out.status).json(out.payload);
+    }
+  }
 
   const q = String(req.query?.q ?? '').trim();
   if (!q || q.length < MIN_Q || q.length > MAX_Q) {

@@ -1,5 +1,8 @@
-// GET /api/search/contract?address=<contract>&network=<optional cg platform id>
-// SPEC MKT-EXCELLENCE.ASSET-DISCOVERY-IDENTITY.V1 — CONTRACT DISCOVERY
+// SPEC MKT-EXCELLENCE.ASSET-DISCOVERY-IDENTITY.V1 — CONTRACT DISCOVERY (resolver, not a route)
+// Served by GET /api/search/crypto?address=<contract>&network=<optional cg platform id>.
+// It is NOT its own Serverless Function on purpose: this deployment sits at the plan's 12-function
+// ceiling, so contract discovery is a MODE of the existing crypto-search route and this module stays
+// underscore-prefixed (bundled through the import graph, never routed).
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 // Resolves a raw contract address to a CANONICAL asset identity:
 //     contract → network/token → canonical identity → metadata/logo → price when it exists
@@ -19,15 +22,7 @@
 import {
   detectAddressFamily, networksForFamily, networkByCg, networkLabel,
   ensure, lookupContract, catalogState,
-} from './cg-catalog.js';
-
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || 'https://rbn888.github.io,https://app.aurixsystem.io')
-  .split(',').map(s => s.trim()).filter(Boolean);
-function corsOrigin(req) {
-  const o = (req && req.headers && req.headers.origin) || '';
-  if (o && (ALLOWED_ORIGINS.includes(o) || /^http:\/\/localhost(:\d+)?$/.test(o))) return o;
-  return ALLOWED_ORIGINS[0];
-}
+} from './_cg-catalog.js';
 
 const CATALOG_WAIT_MS = 3000;      // one cold wait; afterwards the catalog is in-instance
 const MAX_CG_PROBES   = 3;         // bounded: hint first, then the family's largest networks
@@ -142,25 +137,19 @@ function toResult(hit, address) {
   };
 }
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', corsOrigin(req));
-  res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'GET') return res.status(405).json({ error: 'method_not_allowed' });
-
-  const address = String(req.query?.address ?? req.query?.q ?? '').trim();
-  const hint = String(req.query?.network ?? '').trim().toLowerCase();
+// Pure resolver: returns { status, payload }. The route owns CORS/method handling.
+export async function resolveContract(rawAddress, rawHint) {
+  const address = String(rawAddress ?? '').trim();
+  const hint = String(rawHint ?? '').trim().toLowerCase();
   const family = detectAddressFamily(address);
   if (!family) {
-    return res.status(400).json({ found: false, reason: 'unsupported_address_shape', result: null,
-      meta: { family: null, note: 'no supported chain family matches this address shape' } });
+    return { status: 400, payload: { found: false, reason: 'unsupported_address_shape', result: null,
+      meta: { family: null, note: 'no supported chain family matches this address shape' } } };
   }
 
   const ck = family + ':' + address.toLowerCase() + ':' + hint;
   const cached = cacheGet(ck);
-  if (cached) return res.status(200).json(Object.assign({}, cached, { meta: Object.assign({}, cached.meta, { cached: true }) }));
+  if (cached) return { status: 200, payload: Object.assign({}, cached, { meta: Object.assign({}, cached.meta, { cached: true }) }) };
 
   const probes = [];
   let degraded = false;
@@ -187,7 +176,7 @@ export default async function handler(req, res) {
       const payload = { found: true, result: toResult(r.hit, address), reason: null,
         meta: { family, probes, catalogState: catalogState().status, resolvedBy: fromCatalog ? 'catalog+coingecko' : 'coingecko' } };
       cachePut(ck, payload);
-      return res.status(200).json(payload);
+      return { status: 200, payload };
     }
   }
 
@@ -200,7 +189,7 @@ export default async function handler(req, res) {
         source: 'coingecko-catalog', priceable: true }, address),
       meta: { family, probes, catalogState: catalogState().status, resolvedBy: 'catalog' } };
     cachePut(ck, payload);
-    return res.status(200).json(payload);
+    return { status: 200, payload };
   }
 
   // 3 — on-chain long tail.
@@ -213,7 +202,7 @@ export default async function handler(req, res) {
       const payload = { found: true, result: toResult(r.hit, address), reason: null,
         meta: { family, probes, catalogState: catalogState().status, resolvedBy: 'geckoterminal' } };
       cachePut(ck, payload);
-      return res.status(200).json(payload);
+      return { status: 200, payload };
     }
   }
 
@@ -222,5 +211,5 @@ export default async function handler(req, res) {
     reason: degraded ? 'provider_unavailable' : 'contract_not_found',
     meta: { family, probes, catalogState: catalogState().status } };
   if (!degraded) cachePut(ck, payload);          // never cache a provider outage as "does not exist"
-  return res.status(200).json(payload);
+  return { status: 200, payload };
 }

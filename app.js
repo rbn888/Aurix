@@ -49923,7 +49923,9 @@ async function _aurixSearchByContract(address, signal) {
   _aurixContractLookup = { address: addr, state: 'loading', reason: null, at: Date.now() };
   const base = (typeof PRICES_PROXY === 'string') ? PRICES_PROXY.replace('/api/prices', '') : '';
   try {
-    const res = await fetch(`${base}/api/search/contract?address=${encodeURIComponent(addr)}`, { signal, headers: { Accept: 'application/json' } });
+    // Contract discovery es un MODO del endpoint de búsqueda cripto (`?address=`), no un endpoint
+    // aparte: el despliegue del backend está en el techo de 12 funciones del plan.
+    const res = await fetch(`${base}/api/search/crypto?address=${encodeURIComponent(addr)}`, { signal, headers: { Accept: 'application/json' } });
     if (!res.ok) { _aurixContractLookup = { address: addr, state: 'provider_unavailable', reason: 'http_' + res.status, at: Date.now() }; return null; }
     const json = await res.json();
     const found = !!(json && json.found && json.result);

@@ -151,17 +151,6 @@ export function chainsFor(coinId) {
 }
 
 export const __testing = { state, load };
-
-// This module lives under api/, so Vercel may route it as a function. Rather than leave an
-// undefined route, the default export is a READ-ONLY health probe for the identity index:
-// aggregate counters only (no key, no PII, no user data) and it never triggers a load.
-const _ALLOWED = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || 'https://rbn888.github.io,https://app.aurixsystem.io')
-  .split(',').map(s => s.trim()).filter(Boolean);
-export default async function handler(req, res) {
-  const o = (req && req.headers && req.headers.origin) || '';
-  res.setHeader('Access-Control-Allow-Origin', (o && (_ALLOWED.includes(o) || /^http:\/\/localhost(:\d+)?$/.test(o))) ? o : _ALLOWED[0]);
-  res.setHeader('Vary', 'Origin');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'GET') return res.status(405).json({ error: 'method_not_allowed' });
-  return res.status(200).json({ catalog: catalogState() });
-}
+// NOTE — the leading underscore is load-bearing: Vercel turns every non-underscore file under api/
+// into a Serverless Function, and this deployment sits at the plan's 12-function ceiling. Shared
+// modules MUST stay underscore-prefixed (they are still bundled through the import graph).
