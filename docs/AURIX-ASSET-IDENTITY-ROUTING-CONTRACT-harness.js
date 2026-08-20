@@ -84,7 +84,12 @@ console.log('6 — ISIN-first dedupe in the search merge:');
 // MARKET-INSTITUTIONAL-V1 insertó el catálogo curado de ETF (y su comentario) entre
 // este ancla y el bloque de dedupe, empujando la clave ISIN más allá de los 900 chars.
 // Se amplía la ventana; la dedupe ISIN-first que este assert protege sigue igual.
-const merge = app.slice(app.indexOf('const funds = _aurixSearchFundsLocal(query);'), app.indexOf('const funds = _aurixSearchFundsLocal(query);') + 2200);
+// ASSET-DISCOVERY-IDENTITY.V1 volvió a insertar código (dedupe cripto por identidad canónica) dentro
+// de este bloque. En vez de ampliar otra ventana de N caracteres, la ventana pasa a ser el BLOQUE
+// completo: desde el catálogo curado hasta el ranking, que es exactamente donde vive la dedupe.
+const _mergeStart = app.indexOf('const funds = _aurixSearchFundsLocal(query);');
+const _mergeEnd = app.indexOf('_aurixRankSearchResults(_aurixSearchProject(merged, filter), query)', _mergeStart);
+const merge = app.slice(_mergeStart, _mergeEnd > _mergeStart ? _mergeEnd : _mergeStart + 2200);
 ok('6.1 merge keys by ISIN when present (collapses same-ISIN variants)', /const isin = item\.isin \? String\(item\.isin\)\.toUpperCase\(\)\.trim\(\) : '';/.test(merge) && /'ISIN:' \+ isin/.test(merge));
 
 // ── 7 AUTOMATIC NAV pricing contract (funds are NOT frozen/manual when a source exists) ──
