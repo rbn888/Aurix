@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '619'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '620'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -22530,6 +22530,36 @@ function _aurixInvestableSnapshots(range) {
 // then trims a long dead-flat lead-in. This stops 1A/TOTAL showing −94% off an
 // old baseline and 30D pinning to the floor. Raw history is never mutated;
 // filtering happens at data-selection time. Returns { series, meta }.
+// ── SPEC DSH.PERF.WN12_BOUNDED_RANGE_SPAN_GUARD ─────────────────────────────────
+// WN.12 (below) is a COSMETIC trim: it removes a low-information opening segment so the chart never
+// starts with a dead/linear stretch. But `_aurixRangeReturn` reads the SAME series, so on a BOUNDED
+// range that cosmetic cut silently redefines the FINANCIAL window the badge publishes as "24H".
+// Measured on the real chain (backend snapshots */15 over 20 h + N frontend `category_history` rows):
+// the ±60 min frontend-authority merge opens a ~2 h hole in the otherwise uniform grid; WN.12 measures
+// curvature as an UN-normalised second difference of VALUE, so that single large-Δt step becomes sdMax
+// (3.3 against a 0.01 median) ⇒ thr = 0.20·sdMax sits above the entire genuine curvature ⇒ the walk runs
+// to its cap (m−3) ⇒ 77 pts / 19.9 h collapse to 4 pts / 1.65 h and the badge publishes +0.0899 instead
+// of +1.0863. ONE frontend row is enough to flip it, so the published % became a function of how many
+// frontend rows exist rather than of the 24 h window.
+// THE GUARD: on a bounded range (24h/7d/30d/1y) the trim is applied only if the SURVIVING series still
+// retains at least _AURIX_WN12_MIN_SPAN_RETENTION of the PRE-TRIM temporal span. Otherwise it is
+// rejected IN FULL and the pre-WN.12 series is kept — all-or-nothing. The guard only ever DECLINES to
+// remove real data: no point is synthesised, interpolated or smoothed, and no financial threshold moves.
+// THE THRESHOLD IS DERIVED, NOT TUNED: 0.80 is the already-ADOPTED, app-wide boundary at which a window
+// stops being authoritative for its range — `_AURIX_24H_COVERAGE_THR` (0.8, source authority for 24H)
+// and the display/badge contract `coverageRatio < 0.8 ⇒ historyTooShortForRange / 'partial_history' /
+// badgeEligibility='calculating'`. Read as a retention floor: a cosmetic trim may cost at most the 20 %
+// of the window the app already tolerates before declaring a series unfit to speak for its range. A
+// cosmetic filter must never be the reason a range loses that authority.
+// What this PRESERVES: WN.12 still trims exactly what it was designed for — a DENSE low-information
+// lead-in (many points, little span: e.g. an onboarding burst captured every 30 s ahead of a */15
+// history), where retention stays ≈1.0. What it STOPS is buying chart aesthetics with the measured
+// window. ALL/TOTAL is unbounded (no requested span ⇒ no coverage contract to honour) and keeps WN.12
+// byte-identical. The predicate is a TIME span, invariant to densification, so the v652 trim-determinism
+// invariant is untouched. Rollback: flip the flag false ⇒ byte-identical to the previous build.
+const _AURIX_WN12_BOUNDED_RANGE_SPAN_GUARD = true;
+const _AURIX_WN12_MIN_SPAN_RETENTION = 0.80;                              // = the adopted coverageRatio<0.8 authority boundary
+const _AURIX_WN12_BOUNDED_RANGES = { '24h': 1, '7d': 1, '30d': 1, '1y': 1 };   // 'all'/TOTAL is unbounded ⇒ guard does not apply
 function _aurixEligibleInvestableSeries(range) {
   const raw = _aurixInvestableSnapshots(range);
   const meta = {
@@ -22586,6 +22616,7 @@ function _aurixEligibleInvestableSeries(range) {
   //    only if the lead-in eats > 25% of the x-width; keep 1 context point.
   meta.staleLeadInRemoved = false;
   meta.activeTrimApplied = false;
+  meta.wn12SpanGuardBlocked = false;
   if (series.length >= 8) {
     const vals = series.map(s => s.value);
     const m = vals.length;
@@ -22597,9 +22628,30 @@ function _aurixEligibleInvestableSeries(range) {
       if (f > m * 0.25 && (m - f) >= 3) {
         const trimTo = Math.max(0, f - 1);               // keep ~1 point of context
         if (trimTo > 0) {
-          meta.reasons.stale_low_information += trimTo; meta.excluded += trimTo;
-          meta.staleLeadInRemoved = true; meta.activeTrimApplied = true;
-          series = series.slice(trimTo);
+          // SPEC WN12_BOUNDED_RANGE_SPAN_GUARD — on a bounded range, a cosmetic trim may not hand the
+          // return path a materially shorter window than the one actually available. All-or-nothing:
+          // if the surviving span retains < _AURIX_WN12_MIN_SPAN_RETENTION of the pre-trim span, the
+          // pre-WN.12 series is kept intact (real points only; nothing is added or altered).
+          let _spanGuardBlocked = false;
+          if (typeof _AURIX_WN12_BOUNDED_RANGE_SPAN_GUARD !== 'undefined' && _AURIX_WN12_BOUNDED_RANGE_SPAN_GUARD === true
+              && _AURIX_WN12_BOUNDED_RANGES[range] === 1) {
+            const _preSpanMs  = series[m - 1].ts - series[0].ts;
+            const _keptSpanMs = series[m - 1].ts - series[trimTo].ts;
+            const _retention  = (_preSpanMs > 0) ? (_keptSpanMs / _preSpanMs) : 1;
+            meta.wn12PreTrimSpanMs = _preSpanMs;
+            meta.wn12SpanRetention = +_retention.toFixed(4);
+            if (_preSpanMs > 0 && _retention < _AURIX_WN12_MIN_SPAN_RETENTION) {
+              _spanGuardBlocked = true;
+              meta.wn12SpanGuardBlocked = true;
+              meta.wn12SpanGuardDeclinedTrim = trimTo;
+              meta.wn12SpanGuardKeptSpanMs = _keptSpanMs;
+            }
+          }
+          if (!_spanGuardBlocked) {
+            meta.reasons.stale_low_information += trimTo; meta.excluded += trimTo;
+            meta.staleLeadInRemoved = true; meta.activeTrimApplied = true;
+            series = series.slice(trimTo);
+          }
         }
       }
     }
