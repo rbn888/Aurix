@@ -284,10 +284,34 @@ ok('8.3 Market no escribe en localStorage ni en Supabase desde el owner tocado',
    !/localStorage\.setItem/.test(tabUI));
 ok('8.4 no se han añadido proveedores ni endpoints nuevos',
    !/api\/market\/|api\/quotes|api\/screener/.test(app));
-ok('8.5 los universos vivos no se han tocado (sin activos inventados)',
-   /const MARKET_ETFS +=\s*\['SPY','QQQ','VOO','VTI','URTH'\];/.test(app) &&
-   /const MARKET_INDICES +=\s*\['\^GSPC','\^IXIC','\^DJI'\];/.test(app) &&
-   /const MARKET_COMMODITIES +=\s*\['XAU\/USD','XAG\/USD','WTI'\];/.test(app));
+// MARKET-EXCELLENCE-B4 — el literal congelado se sustituye por el invariante que de
+// verdad protegía: ningún activo inventado. B4 amplió los universos con listados
+// reales (identidad del catálogo curado, 23/23 resueltos contra el proveedor) y sin
+// añadir ni una petición. Lo que NO puede pasar sigue vigilado aquí: que un símbolo
+// del universo aparezca sin identidad detrás o con un precio de respaldo inventado.
+// El contrato completo del universo vive en AURIX-MARKET-UNIVERSE-harness.
+(function () {
+  const lit = (n) => {
+    const m = new RegExp('const ' + n + '\\s*=\\s*\\[').exec(app);
+    if (!m) return null;
+    let d = 0; const j = app.indexOf('[', m.index);
+    for (let k = j; k < app.length; k++) {
+      if (app[k] === '[') d++;
+      else if (app[k] === ']') { d--; if (!d) { try { return eval(app.slice(j, k + 1)); } catch (_) { return null; } } }
+    }
+    return null;
+  };
+  const etfs = lit('MARKET_ETFS') || [];
+  const idx  = lit('MARKET_INDICES') || [];
+  const comm = lit('MARKET_COMMODITIES') || [];
+  const named = /const _MKT_DISPLAY_NAMES = \{([\s\S]*?)\n\};/.exec(app);
+  const idxNames = /const INDEX_NAMES\s*=\s*\{([\s\S]*?)\n\};/.exec(app);
+  ok('8.5 los universos vivos sólo contienen listados con identidad detrás',
+     etfs.length > 0 && idx.length > 0 && comm.length === 3
+     && etfs.every(s => app.includes("ticker:'" + s + "'") || (named && named[1].includes(s.replace(/\.[A-Z]{1,3}$/, ''))))
+     && idx.every(s => !!idxNames && idxNames[1].includes("'" + s + "'")),
+     'etfs=' + etfs.length + ' idx=' + idx.length);
+})();
 ok('8.6 la identidad de los activos no se modifica (canonicalId / marketSymbol intactos)',
    !/canonicalId\s*=\s*(?!.*existing)/.test(fnSource('renderMarketItem') || ''));
 ok('8.7 el ranking de Search V2.1 no ha sido tocado por este cambio',

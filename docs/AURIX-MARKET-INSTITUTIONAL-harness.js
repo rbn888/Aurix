@@ -153,8 +153,16 @@ ok('7.8 no se relanza una recuperación ya en vuelo (abortaría la suya propia)'
 
 // ── 8. Nada de datos ni de backend ──────────────────────────────────────────
 console.log('\n8 — Sin cambios de datos, persistencia ni proveedores:');
-ok('8.1 los universos vivos siguen intactos',
-   /const MARKET_ETFS +=\s*\['SPY','QQQ','VOO','VTI','URTH'\];/.test(app));
+// MARKET-EXCELLENCE-B4 — este SPEC no toca los universos vivos, pero congelar su
+// literal convertía la afirmación en un candado: B4 los amplió legítimamente (con
+// identidad verificada y sin una petición más). Lo que aquí importa sigue siendo el
+// INVARIANTE de este SPEC: el discovery institucional no fabrica activos ni cuelga
+// el universo de la búsqueda. El contrato del universo vive en
+// AURIX-MARKET-UNIVERSE-harness.
+ok('8.1 este SPEC no fabrica activos: el universo vivo no sale del discovery',
+   !/MARKET_ETFS\s*=\s*\[[^\]]*_mktDisc/.test(appCode)
+   && !/MARKET_ETFS\.push\(|MARKET_INDICES\.push\(|MARKET_ETFS\s*=\s*[^[\s]/.test(appCode)
+   && /const MARKET_ETFS\s*=\s*\[/.test(appCode) && /const MARKET_INDICES\s*=\s*\[/.test(appCode));
 ok('8.2 no se añadió ningún endpoint nuevo', !/api\/market\/|api\/quotes|api\/screener/.test(app));
 ok('8.3 el discovery de Market no escribe en localStorage ni en Supabase',
    !/localStorage\.setItem|supabase\./.test(disc) && !/localStorage\.setItem/.test(fnSource('_aurixMktChipListHtml')));

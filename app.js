@@ -46129,9 +46129,9 @@ function _aurixMktMobileCategoryFilter() {
 // ── MARKET-FOUNDATION-V1 · BLOQUE A — coherencia chip ↔ lista ────────────────
 // CAUSA RAÍZ de "el chip cambia pero la lista no": los chips secundarios se
 // pintan desde el catálogo de descubrimiento (_DISCOVERY_CATALOGS), que es una
-// lista curada de tickers, mientras que la lista viva sólo monitoriza universos
-// muy pequeños (MARKET_ETFS = 5 símbolos, MARKET_INDICES = 3, MARKET_COMMODITIES
-// = 3). Cuando un chip no comparte NI UN símbolo con esas filas, el filtro
+// lista curada de tickers, mientras que la lista viva sólo monitorizaba universos
+// muy pequeños (entonces 5 ETF, 3 índices y 3 materias primas; MARKET-EXCELLENCE-B4
+// los llevó a 23 y 10). Cuando un chip no comparte NI UN símbolo con esas filas, el filtro
 // resultante quedaba vacío y renderFromCache hacía `if (sub.length) items = sub`
 // — es decir, se caía EN SILENCIO a la lista completa. El chip se marcaba activo
 // y la lista no cambiaba. Ese es exactamente el caso "Oro" reportado: sus tickers
