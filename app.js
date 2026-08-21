@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '628'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '629'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -20743,9 +20743,25 @@ function buildMarketEventSnapshot(type, changedSymbols = []) {
 }
 
 // ── FC-4: Structural validation — reject corrupt items before entering MARKET_DATA
+/* ══════════════════════════════════════════════════════════════════════════════
+   MARKET-ROW-PRICE-TRUTH — QUÉ HACE QUE UNA FILA SEA REAL
+   ══════════════════════════════════════════════════════════════════════════════
+   Este guardián exigía precio finito, así que una fila cuyo precio el proveedor NO
+   devolvió se BORRABA de la lista. Consecuencia medida con el proveedor caído: la
+   pestaña de ETF encogía de 23 filas a 8 —las que casualmente tienen precio en el
+   mapa estático de respaldo— y los índices de 10 a 9. El universo se reducía por un
+   fallo temporal, y encima las supervivientes mostraban un número de 2024 con el
+   mismo aspecto que una cotización viva.
+
+   Lo que hace real a una fila es su IDENTIDAD, no su precio. Un precio ausente es
+   un estado honesto que la fila ya sabe pintar ("—" vía `safePrice`). Lo que sigue
+   siendo inválido es un número imposible: eso es basura, no ausencia.
+   ══════════════════════════════════════════════════════════════════════════════ */
 function _isValidMarketItem(item) {
   if (!item?.symbol || typeof item.symbol !== 'string') return false;
   const price = item.current_price ?? item.price;
+  // Ausencia declarada: la fila vive por su identidad y declara que no sabe el precio.
+  if (price == null) return true;
   return typeof price === 'number' && isFinite(price) && price > 0 && price < 1e9;
 }
 
@@ -46529,12 +46545,14 @@ function _applyTypeItems(tab, items) {
 function _buildFallbackItems(tab) {
   if (tab === 'crypto')      return CRYPTO_FALLBACK; // CoinGecko raw format — _setCryptoData handles it
   if (tab === 'stocks') {
+    // MARKET-ROW-PRICE-TRUTH — la fila de arranque nace con IDENTIDAD y sin precio. Antes
+    // tomaba el número del mapa estático (`getFallbackData`) y lo pintaba igual que una
+    // cotización viva; el precio real llega enseguida por el snapshot y lo sustituye.
     const assetStocks = ASSET_DB.filter(a => a.type === 'stock');
     return assetStocks.map(a => {
       const sym = normalizeSymbol(a.marketSymbol || a.ticker);
-      const fb  = getFallbackData(sym);
       return normalizeMarketData(
-        fb ? { name: a.name, price: fb.price, percent_change_24h: fb.change24h, fallback: true } : { name: a.name },
+        { name: a.name, price: null, percent_change_24h: null, fallback: true, priceProvenance: 'none' },
         'stock', sym
       );
     });
@@ -47006,22 +47024,29 @@ function _buildItem(symbol, data, fallbackMap, type) {
     // La variación sólo viaja si el proveedor la envió (B4). `null` ⇒ la fila muestra
     // ausencia neutra; jamás un 0,00 % que se leería como "plano".
     return normalizeMarketData(
-      { name, price: data.price, percent_change_24h: (data.change24h ?? null) },
+      { name, price: data.price, percent_change_24h: (data.change24h ?? null), priceProvenance: 'live' },
       type, symbol
     );
   }
   const cached = getCachedPrice(symbol);
   if (cached) {
     if (typeof AURIX_TELEMETRY !== 'undefined') AURIX_TELEMETRY.market.staleFallbackUses++;
-    return normalizeMarketData({ name, price: cached.price, fallback: true }, type, symbol);
+    // Precio REAL que se descargó de verdad, sólo que no es el último: es pintable
+    // (es la base de MARKET-FIRST-PAINT) y su procedencia queda declarada.
+    return normalizeMarketData({ name, price: cached.price, fallback: true, priceProvenance: 'cached' }, type, symbol);
   }
-  // MARKET-EXCELLENCE-B4 — un símbolo sin precio conocido tampoco tiene variación
-  // conocida. El `change24h: 0` de antes fabricaba un "plano" para cualquier símbolo
-  // fuera de los mapas de respaldo: con el universo ampliado eso sería una cifra
-  // financiera inventada en cada fila no resuelta.
-  const fb = getFallbackData(symbol) ?? { price: fallbackMap?.[symbol] ?? null, change24h: null };
+  // MARKET-ROW-PRICE-TRUTH — aquí ya NO hay precio: sólo quedaban los mapas ESTÁTICOS
+  // (`FALLBACK_PRICES` / `INDEX_FALLBACKS`), números escritos a mano en 2024 que la fila
+  // pintaba con el mismo aspecto que una cotización viva. Eso es un precio inventado, y
+  // el SPEC lo prohíbe. La fila SIGUE existiendo —su identidad es real— y declara que no
+  // sabe el precio: `safePrice(null)` ya pinta "—".
+  //
+  // Los mapas no se borran: `getFallbackData` tiene otros consumidores (Add Asset, fondos)
+  // fuera del alcance de este cambio. Lo que se corta es su uso como precio de fila.
+  // MARKET-EXCELLENCE-B4 — un símbolo sin precio conocido tampoco tiene variación conocida:
+  // nunca un 0,00 % que se leería como "plano".
   return normalizeMarketData(
-    { name, price: fb.price, percent_change_24h: fb.change24h ?? null, fallback: true },
+    { name, price: null, percent_change_24h: null, fallback: true, priceProvenance: 'none' },
     type, symbol
   );
 }
@@ -47110,17 +47135,22 @@ function normalizeMarketData(raw, type, symbol) {
   const sym      = normalizeSymbol(symbol);
   const normType = String(type).toLowerCase();
   if (!raw) {
-    return { symbol: sym, name: sym, price: null, change: null, change24h: null, type: normType, fallback: true };
+    return { symbol: sym, name: sym, price: null, change: null, change24h: null, type: normType, fallback: true, priceProvenance: 'none' };
   }
   const change = raw.percent_change_24h ?? raw.change24h ?? raw.change ?? null;
+  const price  = raw.price ?? raw.close ?? null;
   return {
     symbol:   sym,
     name:     raw.name    || sym,
-    price:    raw.price   ?? raw.close ?? null,
+    price,
     change,
     change24h: change,
     type: normType,
-    fallback: raw.fallback || false
+    fallback: raw.fallback || false,
+    // MARKET-ROW-PRICE-TRUTH — procedencia del precio de la fila. Aditivo y explícito:
+    // 'live' (proveedor), 'cached' (real, descargado antes), 'none' (no se sabe). Un
+    // productor que no la declare queda descrito por lo que SÍ se sabe del precio.
+    priceProvenance: raw.priceProvenance || (price == null ? 'none' : (raw.fallback ? 'cached' : 'live')),
   };
 }
 

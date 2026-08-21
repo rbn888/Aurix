@@ -162,8 +162,15 @@ if (typeof build2 === 'function') {
      JSON.stringify(unresolved));
   ok('5.5 un símbolo no resuelto NO recibe nombre inventado (queda su ticker)',
      unresolved.name === 'ZZZZ.XX', unresolved.name);
-  ok('5.6 el respaldo declarado sigue marcándose como tal (sin regresión)',
-     fbMapped.price === 548 && fbMapped.fallback === true, JSON.stringify(fbMapped));
+  // MARKET-ROW-PRICE-TRUTH — esta afirmación fijaba que la fila sin precio del proveedor
+  // publicara el número del mapa ESTÁTICO (548 para SPY, escrito a mano en 2024). Ese era
+  // justo el defecto: se pintaba idéntico a una cotización viva. Ahora la fila sobrevive por
+  // su identidad, declara que no sabe el precio y sigue marcada como respaldo. El invariante
+  // que importa —la fila no desaparece y su procedencia queda declarada— se refuerza.
+  ok('5.6 sin precio del proveedor la fila vive, sin cifra inventada y con procedencia',
+     fbMapped.price === null && fbMapped.change24h === null
+     && fbMapped.fallback === true && fbMapped.priceProvenance === 'none'
+     && fbMapped.symbol === 'SPY', JSON.stringify(fbMapped));
 }
 
 // ── 6. Presupuesto de peticiones: el universo crece, la red no ────────────
