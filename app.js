@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '624'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '625'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -38737,12 +38737,24 @@ function _aurixAssetTeardown() {
   _aurixAssetSetMeta('');
   _aurixAssetAsset = null;
 }
+// MARKET-EXCELLENCE-B1.1 — par de mercado canónico de una cripto (`ETH` → `ETH-USD`).
+// Es la MISMA regla que ya usaba el enlace cripto → histórico de Yahoo en Market
+// (HOTFIX MARKET-CRYPTO-HISTORY); aquí vive una sola vez para que las dos fichas
+// entreguen al adaptador la misma identidad. No decide proveedor: sólo traduce.
+function _aurixCryptoPairSymbol(item) {
+  const it  = item || {};
+  const raw = String(it.marketSymbol || it.symbol || it.ticker || '').trim().toUpperCase();
+  if (!raw) return '';
+  if (/-USD$/.test(raw)) return raw;                              // ya viene como par
+  return /^[A-Z0-9]{2,10}$/.test(raw) ? raw + '-USD' : '';
+}
 function _aurixAssetPickAdapter(asset) {
   const a = asset || {};
   const tp = String(a.type || '').toLowerCase();
   if (tp === 'cash' || tp === 'real_estate') return null;
   if (tp === 'crypto' && a.coinId) {
-    return { kind: 'crypto', args: { coinId: String(a.coinId) } };
+    // `pairSymbol` sólo lo usa el adaptador para la ventana larga de ALL.
+    return { kind: 'crypto', args: { coinId: String(a.coinId), pairSymbol: _aurixCryptoPairSymbol(a) } };
   }
   // Stocks / ETFs / funds / indices / commodities / metals via Yahoo.
   let sym = a.marketSymbol || a.ticker || '';
@@ -38770,8 +38782,14 @@ function _aurixAssetMetaLine(asset, adapter, meta) {
              (isEs ? 'Referencia de mercado' : 'Market reference');
     }
 
+    // MARKET-EXCELLENCE-B1.1 — la fuente la declara el DATO (`meta.source`), no el
+    // adaptador elegido: el ALL de cripto puede venir de la fuente de ventana larga,
+    // y etiquetarlo "CoinGecko" sería falso. Sin meta, se mantiene lo de antes.
     const parts = [];
-    if (adapter && adapter.kind === 'crypto')      parts.push('CoinGecko');
+    const src = (meta && typeof meta.source === 'string') ? meta.source.toLowerCase() : '';
+    if      (src === 'coingecko')                  parts.push('CoinGecko');
+    else if (src === 'yahoo')                      parts.push('Yahoo');
+    else if (adapter && adapter.kind === 'crypto') parts.push('CoinGecko');
     else if (adapter && adapter.kind === 'yahoo')  parts.push('Yahoo');
 
     if      (g === '1d')  parts.push(isEs ? 'Diario'  : 'Daily');
@@ -38779,6 +38797,7 @@ function _aurixAssetMetaLine(asset, adapter, meta) {
     else if (g === '15m') parts.push('15m');
     else if (g === '1h')  parts.push('1h');
     else if (g === '1wk') parts.push(isEs ? 'Semanal' : 'Weekly');
+    else if (g === '1mo') parts.push(isEs ? 'Mensual' : 'Monthly');
 
     return parts.join(' · ');
   } catch (_) { return ''; }
@@ -39817,7 +39836,7 @@ function _aurixMktPickAdapter(item) {
   const it = item || {};
   const tp = String(it.type || '').toLowerCase();
   if (tp === 'crypto' && it.coinId) {
-    return { kind: 'crypto', args: { coinId: String(it.coinId) } };
+    return { kind: 'crypto', args: { coinId: String(it.coinId), pairSymbol: _aurixCryptoPairSymbol(it) } };
   }
   let sym = it.marketSymbol || it.symbol || it.ticker || '';
   if ((tp === 'metal' || tp === 'commodity') && (sym === 'XAU' || sym === 'XAU/USD')) sym = 'GC=F';

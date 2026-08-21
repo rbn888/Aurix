@@ -255,6 +255,70 @@
     };
   }
 
+  /* ── MARKET-EXCELLENCE-B1.1 — ALL de cripto: ventana larga real ─────────────
+     CoinGecko `market_chart?days=max` es EXCLUSIVO de Pro con la clave/tier
+     actual: el proxy devuelve 502 `upstream_401` de forma determinista (medido
+     2026-08-21, con el rate-limit despejado, en ethereum/bitcoin/solana). Los
+     días que el tier SÍ sirve son 1/7/30/90/180/365 ⇒ el techo real es 365 días.
+     Recortar ALL a 365 días NO es una solución: dejaría ALL idéntico a 1Y, que
+     es exactamente el defecto que ASSET-CHARTS-1 arregló.
+
+     La ventana larga existe en una fuente que ya está en producción y ya se usa
+     para cripto en Market (el par `<TICKER>-USD` de Yahoo, HOTFIX
+     MARKET-CRYPTO-HISTORY). Medido contra el endpoint real:
+       ETH-USD 2017-11 → hoy (460 pts) · BTC-USD 2014-10 → hoy (144 pts)
+       SOL-USD 2020-04 → hoy (334 pts) · ADA-USD 2017-11 → hoy (460 pts)
+     Se pide PRIMERO esa fuente para ALL (y sólo para ALL): así no se gastan tres
+     intentos + backoff contra un 401 seguro en cada apertura, que además
+     consumían cuota de la clave demo compartida. Si no hay par conocido, o la
+     fuente larga falla, se cae al `days=max` de siempre — que es lo que
+     funcionaría con una clave Pro, sin perder capacidad.
+
+     Nada de esto inventa un solo punto: es precio real de mercado, de otra
+     fuente, declarada en `meta.source` y con la ventana real en `meta.window`. */
+  function _realGranularity(series, fallback) {
+    if (!Array.isArray(series) || series.length < 2) return fallback;
+    const d = [];
+    for (let i = 1; i < series.length; i++) d.push(series[i].time - series[i - 1].time);
+    d.sort(function (x, y) { return x - y; });
+    const med = d[Math.floor(d.length / 2)];
+    if      (med <= 6 * 60e3)    return '5m';
+    else if (med <= 30 * 60e3)   return '15m';
+    else if (med <= 2 * 3600e3)  return '1h';
+    else if (med <= 36 * 3600e3) return '1d';
+    else if (med <= 10 * 86400e3) return '1wk';
+    return '1mo';
+  }
+  function _windowOf(series) {
+    if (!Array.isArray(series) || !series.length) return null;
+    const startMs = series[0].time, endMs = series[series.length - 1].time;
+    return { startMs, endMs, spanDays: Math.round((endMs - startMs) / 86400e3) };
+  }
+  // Devuelve la serie larga real, o null si esta fuente no puede servirla.
+  async function _cryptoLongHistory(symbol, signal) {
+    const r = await yahooHistoryAdapter({ symbol, range: 'all', signal });
+    if (!r || !Array.isArray(r.series) || !r.series.length) return null;
+    if (r.meta && r.meta.status !== DATA_STATUS.READY) return null;
+    // La granularidad se MIDE, no se hereda del intervalo pedido: para spans muy
+    // largos la fuente entrega pasos mensuales aunque se pidiera semanal (BTC).
+    return {
+      series: r.series,
+      meta: {
+        source:       'yahoo',
+        currency:     (r.meta && r.meta.currency) || 'USD',
+        granularity:  _realGranularity(r.series, (r.meta && r.meta.granularity) || '1wk'),
+        isSynthetic:  false,
+        completeness: 1,
+        asOf:         Date.now(),
+        status:       DATA_STATUS.READY,
+        error:        null,
+        // Ventana REAL cubierta y de dónde vino: ALL nunca se etiqueta a ciegas.
+        window:       _windowOf(r.series),
+        longHistoryVia: 'yahoo-pair',
+      },
+    };
+  }
+
   // ── 2. Crypto adapter (CoinGecko via existing proxy) ─────────
   async function cryptoHistoryAdapter(args) {
     const a = args || {};
@@ -266,6 +330,18 @@
     const days = CRYPTO_DAYS[range];
     if (!days) {
       return _emptyResult('coingecko', 'USD', '1h', DATA_STATUS.UNAVAILABLE, 'bad-request');
+    }
+
+    // MARKET-EXCELLENCE-B1.1 — sólo ALL, y sólo si el llamante trajo el par.
+    if (range === 'all' && a.pairSymbol) {
+      if (a.signal && a.signal.aborted) return _cryptoEmpty(coinId, 'aborted');
+      let long = null;
+      try { long = await _cryptoLongHistory(String(a.pairSymbol).toUpperCase(), a.signal); }
+      catch (err) { _warn('crypto long-history fail', coinId, err?.message); }
+      if (a.signal && a.signal.aborted) return _cryptoEmpty(coinId, 'aborted');
+      if (long) { _cryptoDiag(coinId, 'ok'); return long; }
+      // Sin ventana larga por esta vía: se sigue al camino de siempre (days=max),
+      // que es el que funciona con una clave Pro.
     }
 
     const url = `${API_BASE}/api/prices/history` +
