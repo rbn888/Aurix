@@ -102,8 +102,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v659-catalog-retrieval';
-      var APPJS_V = '623';
+      var BUILD = 'v660-market-data-state-contract';
+      var APPJS_V = '624';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -1670,7 +1670,7 @@
   <script defer src="services/aurix-chart-core.js?v=24"></script>
   <!-- CHART-3: historical data adapter layer. Pure infra — no UI consumer.
        Loads `defer` so boot stays uninterrupted; safe even if absent. -->
-  <script defer src="services/chart-adapters.js?v=2"></script>
+  <script defer src="services/chart-adapters.js?v=3"></script>
   <script src="services/market.js"></script>
   <script src="ai/insightEngine.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.0"></script>
@@ -1687,7 +1687,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=623"
+  <script src="app.js?v=624"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoadError=true;window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).

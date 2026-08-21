@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '623'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '624'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4043,6 +4043,10 @@ const T = {
     ariaCurrencyGroup:      'Moneda base',
     mkt_not_addable: 'No disponible para cartera',
     mkt_no_history: 'Sin histórico disponible para este activo en nuestra fuente de datos.',
+    // MARKET-EXCELLENCE-B1 — tres mensajes para tres hechos distintos.
+    mkt_no_history_canvas: 'Este activo no tiene histórico de precio disponible.',
+    mkt_hist_unavailable: 'No hemos podido cargar el histórico ahora mismo. Inténtalo de nuevo en unos minutos.',
+    mkt_hist_stale: 'Último histórico disponible · sin actualizar',
     mkt_price_stale: 'Precio retrasado',
     mkt_not_addable_hint: 'Los índices y las materias primas genéricas no son posiciones que puedas mantener en cartera. Puedes seguirlos desde Seguimiento.',
     // Modal: Reduce
@@ -6222,6 +6226,10 @@ const T = {
     ariaCurrencyGroup:      'Base currency',
     mkt_not_addable: 'Not available for portfolio',
     mkt_no_history: 'No price history available for this asset from our data source.',
+    // MARKET-EXCELLENCE-B1 — three messages for three different facts.
+    mkt_no_history_canvas: 'This asset has no price history available.',
+    mkt_hist_unavailable: "We couldn't load the price history right now. Please try again in a few minutes.",
+    mkt_hist_stale: 'Latest available history · not up to date',
     mkt_price_stale: 'Delayed price',
     mkt_not_addable_hint: 'Indices and generic commodities are not positions you can hold. You can still track them from your Watchlist.',
     // Modal: Reduce
@@ -38787,7 +38795,7 @@ async function _aurixAssetLoad(asset, adapter) {
   const ctrl = _aurixAssetCtrl;
   if (!ctrl) return;
   if (!_aurixAssetAdaptersReady()) {
-    try { ctrl.setState('error'); } catch (_) {}
+    _aurixMktSetCanvasState(ctrl, document.getElementById('adChartMount'), _AURIX_MKT_DS.UNAVAILABLE);
     _aurixAssetSetMeta('');
     return;
   }
@@ -38806,8 +38814,19 @@ async function _aurixAssetLoad(asset, adapter) {
     // Drop late responses for a different asset/range than we now expect.
     if (ctrl !== _aurixAssetCtrl) return;
     if (asset !== _aurixAssetAsset) return;
-    if (!result || !Array.isArray(result.series) || !result.series.length) {
+    // MARKET-EXCELLENCE-B1 — mismo contrato y mismo intérprete que Market: la
+    // ficha de activo consumía estos mismos adaptadores y tenía el mismo defecto
+    // (proveedor caído → "este activo no tiene histórico").
+    const adState = _aurixMktDataState(result, null);
+    if (adState === _AURIX_MKT_DS.ABORTED) return;
+    if (adState === _AURIX_MKT_DS.UNAVAILABLE || adState === _AURIX_MKT_DS.STALE) {
+      _aurixMktSetCanvasState(ctrl, document.getElementById('adChartMount'), _AURIX_MKT_DS.UNAVAILABLE);
+      _aurixAssetSetMeta('');
+      return;
+    }
+    if (adState === _AURIX_MKT_DS.NO_HISTORY) {
       ctrl.setData([]);
+      _aurixMktSetCanvasState(ctrl, document.getElementById('adChartMount'), _AURIX_MKT_DS.NO_HISTORY);
       // Show the asset-context line even on no-data so the badge
       // (e.g. "NAV diario", "Oro spot") still explains WHY the chart
       // is empty (intraday unavailable for funds, etc.).
@@ -38834,7 +38853,7 @@ async function _aurixAssetLoad(asset, adapter) {
   } catch (err) {
     if (err && err.name === 'AbortError') return;
     console.warn('[chart-asset] load fail', err && err.message ? err.message : err);
-    try { ctrl.setState('error'); } catch (_) {}
+    _aurixMktSetCanvasState(ctrl, document.getElementById('adChartMount'), _AURIX_MKT_DS.UNAVAILABLE);
     _aurixAssetSetMeta('');
   }
 }
@@ -38885,18 +38904,9 @@ function _aurixAssetMount(asset) {
     return;
   }
 
-  // CHART-6B: asset-specific empty state copy. Replaces the engine's
-  // generic "Sin datos disponibles" with copy tailored to the detail
-  // surface. Pure DOM-poke — fails silently if the engine HTML ever
-  // changes shape.
-  try {
-    const emptyEl = mount.querySelector('.aurix-chart-state--empty');
-    if (emptyEl) {
-      emptyEl.textContent = (typeof lang !== 'undefined' && lang === 'es')
-        ? 'No hay histórico disponible para este activo.'
-        : 'No historical data available for this asset.';
-    }
-  } catch (_) {}
+  // CHART-6B → MARKET-EXCELLENCE-B1: el copy de los estados del lienzo ya no se
+  // escribe al montar (no se sabe todavía QUÉ estado va a ser). Lo escribe
+  // `_aurixMktSetCanvasState` en la transición, dueño único para ficha y Market.
 
   // Range pills — premium chip system from AurixChartCore. Layout
   // wraps on narrow modals, no horizontal overflow.
@@ -39897,11 +39907,79 @@ function _aurixMktClose() {
   if (overlay) overlay.classList.remove('open');
   document.body.classList.remove('modal-open');
 }
+/* ══════════════════════════════════════════════════════════════════════════════
+   MARKET-EXCELLENCE-B1 · DATA STATE CONTRACT — INTÉRPRETE ÚNICO
+   ══════════════════════════════════════════════════════════════════════════════
+   CAUSA RAÍZ del "Ethereum no tiene histórico": una serie vacía significaba dos
+   cosas distintas y aquí se trataba como una sola. `_aurixMktLoad` comprobaba
+   `!result.series.length` y llamaba a `ctrl.setData([])`, que fuerza el estado
+   `empty` del motor — el mismo estado y el mismo texto ("No hay histórico
+   disponible para este activo") que un activo sin histórico real. `meta.error`
+   ('rate-limited' / 'upstream-error'), que el adaptador de cripto SÍ traía,
+   se descartaba sin leerlo. Con ETH/ALL (CoinGecko days=max → 429 tras los tres
+   reintentos del adaptador) eso convertía un fallo temporal del proveedor en una
+   afirmación falsa sobre un activo real.
+
+   Este reductor es el ÚNICO sitio que decide qué estado se está mirando. La UI
+   no vuelve a inspeccionar `series.length` ni `meta.error` en ningún sitio.
+
+     'ready'        hay serie utilizable
+     'no_history'   el proveedor respondió bien y no hay histórico: es la verdad
+     'unavailable'  fallo temporal (red, HTTP, rate-limit, parseo): NO sabemos nada
+     'stale'        'unavailable' PERO ya teníamos dato válido de este mismo rango:
+                    se conserva lo que había, sin inventar ni un punto
+     'aborted'      cancelado por el propio cliente: no se pinta nada
+
+   Tolerante por diseño: un productor que no declare `status` mantiene el
+   comportamiento anterior (ausencia → no_history), salvo que traiga `meta.error`,
+   que ya era señal inequívoca de fallo.
+   ══════════════════════════════════════════════════════════════════════════════ */
+const _AURIX_MKT_DS = Object.freeze({
+  READY: 'ready', NO_HISTORY: 'no_history', UNAVAILABLE: 'unavailable',
+  STALE: 'stale', ABORTED: 'aborted',
+});
+function _aurixMktDataState(result, prevSeries) {
+  const hasPrev = Array.isArray(prevSeries) && prevSeries.length >= 2;
+  // Sin respuesta utilizable no hay ninguna afirmación posible sobre el activo.
+  if (!result || typeof result !== 'object') {
+    return hasPrev ? _AURIX_MKT_DS.STALE : _AURIX_MKT_DS.UNAVAILABLE;
+  }
+  if (Array.isArray(result.series) && result.series.length) return _AURIX_MKT_DS.READY;
+  const meta   = result.meta || null;
+  const status = meta && typeof meta.status === 'string' ? meta.status : '';
+  if (status === _AURIX_MKT_DS.ABORTED)     return _AURIX_MKT_DS.ABORTED;
+  if (status === _AURIX_MKT_DS.NO_HISTORY)  return _AURIX_MKT_DS.NO_HISTORY;
+  if (status === _AURIX_MKT_DS.UNAVAILABLE) {
+    return hasPrev ? _AURIX_MKT_DS.STALE : _AURIX_MKT_DS.UNAVAILABLE;
+  }
+  if (status === _AURIX_MKT_DS.READY) return _AURIX_MKT_DS.NO_HISTORY;  // 'ready' sin puntos
+  // Productor que no declara estado: `meta.error` sigue siendo señal de fallo.
+  if (meta && meta.error) {
+    return hasPrev ? _AURIX_MKT_DS.STALE : _AURIX_MKT_DS.UNAVAILABLE;
+  }
+  return _AURIX_MKT_DS.NO_HISTORY;
+}
+// El texto del estado del lienzo lo escribe UN solo sitio, con copy de producto:
+// ni códigos, ni JSON, ni nombres de proveedor.
+function _aurixMktSetCanvasState(ctrl, mount, state) {
+  try { ctrl.setState(state === _AURIX_MKT_DS.NO_HISTORY ? 'empty' : 'error'); } catch (_) {}
+  if (!mount) return;
+  try {
+    const el = mount.querySelector(state === _AURIX_MKT_DS.NO_HISTORY
+      ? '.aurix-chart-state--empty' : '.aurix-chart-state--error');
+    if (!el) return;
+    el.textContent = (state === _AURIX_MKT_DS.NO_HISTORY)
+      ? t('mkt_no_history_canvas')
+      : t('mkt_hist_unavailable');
+  } catch (_) {}
+}
 async function _aurixMktLoad(item, adapter) {
   const ctrl = _aurixMktCtrl;
   if (!ctrl) return;
   if (!_aurixMktAdaptersReady()) {
-    try { ctrl.setState('error'); } catch (_) {}
+    // Sin capa de datos no se puede afirmar nada del activo: temporalmente
+    // indisponible, jamás "sin histórico".
+    _aurixMktSetCanvasState(ctrl, document.getElementById('mktPrvMount'), _AURIX_MKT_DS.UNAVAILABLE);
     _aurixMktSetMeta('');
     return;
   }
@@ -39926,8 +40004,30 @@ async function _aurixMktLoad(item, adapter) {
     if (reqRange !== _aurixMktRange) return;   // el usuario ya cambió de temporalidad
     if (ctrl !== _aurixMktCtrl) return;
     if (item !== _aurixMktItem) return;
-    if (!result || !Array.isArray(result.series) || !result.series.length) {
+    // MARKET-EXCELLENCE-B1 — un solo reductor decide qué estamos mirando.
+    const mount = document.getElementById('mktPrvMount');
+    const state = _aurixMktDataState(result, _aurixMktSeries);
+    if (state === _AURIX_MKT_DS.ABORTED) return;
+    if (state === _AURIX_MKT_DS.STALE) {
+      // Había dato válido de ESTE rango y el refresco falló: se conserva tal cual
+      // (ni un punto nuevo, ni un punto menos) y se declara que no está al día.
+      _aurixMktSetMeta(t('mkt_hist_stale'));
+      _aurixMktRenderHead(_aurixMktCurrentVM());
+      return;
+    }
+    if (state === _AURIX_MKT_DS.UNAVAILABLE) {
+      // Fallo temporal del proveedor. NUNCA el estado vacío: no sabemos si este
+      // activo tiene histórico o no, así que no se afirma ninguna de las dos cosas.
+      _aurixMktSetCanvasState(ctrl, mount, state);
+      _aurixMktSetMeta('');
+      _aurixMktSeries  = null;
+      _aurixMktMetaCur = null;
+      _aurixMktRenderHead(_aurixMktCurrentVM());
+      return;
+    }
+    if (state === _AURIX_MKT_DS.NO_HISTORY) {
       ctrl.setData([]);
+      _aurixMktSetCanvasState(ctrl, mount, state);
       _aurixMktSetMeta(_aurixMktMetaLine(item, adapter, result && result.meta));
       // Sin serie no hay variación de periodo: ausencia neutra, nunca la del rango previo.
       _aurixMktSeries  = null;
@@ -39962,7 +40062,15 @@ async function _aurixMktLoad(item, adapter) {
     if (err && err.name === 'AbortError') return;
     if (gen !== _aurixMktGen) return;
     console.warn('[market-preview] load fail', err && err.message ? err.message : err);
-    try { ctrl.setState('error'); } catch (_) {}
+    // MARKET-EXCELLENCE-B1 — una excepción es, por definición, "no lo sabemos":
+    // mismo camino que UNAVAILABLE, nunca el estado vacío.
+    const state = _aurixMktDataState(null, _aurixMktSeries);
+    if (state === _AURIX_MKT_DS.STALE) {
+      _aurixMktSetMeta(t('mkt_hist_stale'));
+      _aurixMktRenderHead(_aurixMktCurrentVM());
+      return;
+    }
+    _aurixMktSetCanvasState(ctrl, document.getElementById('mktPrvMount'), state);
     _aurixMktSetMeta('');
     // Un error no conserva la variación de la carga anterior.
     _aurixMktSeries  = null;
@@ -40113,16 +40221,11 @@ function _aurixMktOpenSymbol(symbol, itemOverride) {
     } catch (_) {}
   }
 
-  // Asset-specific empty-state copy (same pattern as CHART-6B).
-  try {
-    const emptyEl = mount.querySelector('.aurix-chart-state--empty');
-    if (emptyEl) {
-      emptyEl.textContent = (typeof lang !== 'undefined' && lang === 'es')
-        ? 'No hay histórico disponible para este activo.'
-        : 'No historical data available for this asset.';
-    }
-  } catch (_) {}
-
+  // MARKET-EXCELLENCE-B1 — el copy de los estados del lienzo ya NO se escribe aquí.
+  // Lo escribe `_aurixMktSetCanvasState` en el momento de la transición, que es el
+  // único sitio que sabe QUÉ estado es. Escribirlo también al montar dejaba dos
+  // dueños del mismo texto y era la mitad visible del defecto: el estado vacío
+  // llevaba redactado "este activo no tiene histórico" antes de saber si era cierto.
   _aurixMktLoad(item, adapter);
   return true;
 }
@@ -58076,6 +58179,10 @@ const _MKT_HISTORY_TTL = Object.freeze({
   '1y':   6  * 3600 * 1000,
   'all':  24 * 3600 * 1000,
 });
+// MARKET-EXCELLENCE-B1 — ventana de reintento tras un fallo temporal del proveedor.
+// Suficiente para no reintentar en ráfaga dentro del mismo render, muy por debajo de
+// cualquier TTL de dato bueno.
+const _MKT_HISTORY_UNAVAIL_TTL = 60 * 1000;
 const _marketHistoryCache  = new Map();          // key → entry
 const _marketHistoryQueue  = { running: 0, max: 3, pending: [] };
 let   _marketHistoryGen    = 0;                  // bumped on each render
@@ -58110,7 +58217,13 @@ function _mktHistoryCacheKey(item, range) {
 // silencio sólo si hay diferencia. Nunca valor → esqueleto → valor.
 function _mktHistoryCacheFresh(entry, range) {
   if (!entry) return false;
-  const ttl = _MKT_HISTORY_TTL[range] || 60 * 1000;
+  // MARKET-EXCELLENCE-B1 — un fallo temporal NO se recuerda con el TTL del dato
+  // bueno. Con `all` a 24 h, un 429 de CoinGecko dejaba la fila declarada "sin
+  // histórico" un día entero sin volver a preguntar. Un intento fallido sólo
+  // frena la red lo justo para no martillear al proveedor.
+  const ttl = entry.unavailable
+    ? _MKT_HISTORY_UNAVAIL_TTL
+    : (_MKT_HISTORY_TTL[range] || 60 * 1000);
   return (Date.now() - entry.ts) < ttl;
 }
 function _mktHistoryCacheUsable(entry) {
@@ -58464,6 +58577,27 @@ async function _mktHistoryFetchOne(item, range, gen) {
   try { result = await fn(args); }
   catch (_) { _marketHistoryErrors++; }
   if (gen !== _marketHistoryGen) return; // stale — user moved on
+  // MARKET-EXCELLENCE-B1 — el MISMO contrato que la ficha, con el MISMO intérprete.
+  // Antes, un fallo temporal del proveedor escribía en caché una ausencia
+  // (`series: []`) que (a) pisaba una serie válida ya descargada o restaurada del
+  // almacén persistido, y (b) contaba como fresca durante todo el TTL del rango.
+  // Un 429 en ALL borraba dato real y lo dejaba borrado 24 h.
+  const prevEntry = _marketHistoryCache.get(key) || null;
+  const dstate = _aurixMktDataState(result, prevEntry && prevEntry.series);
+  if (dstate === _AURIX_MKT_DS.ABORTED) return;
+  if (dstate === _AURIX_MKT_DS.STALE) {
+    // Se conserva el dato válido anterior intacto y sin tocar su `ts`: sigue siendo
+    // no-fresco, así que el siguiente render vuelve a intentar la actualización.
+    _mktHistoryApplyToRow(item, range, prevEntry, gen);
+    return;
+  }
+  if (dstate === _AURIX_MKT_DS.UNAVAILABLE) {
+    // No se sabe nada del activo: se registra el INTENTO, no una ausencia.
+    const attempt = { ts: Date.now(), series: [], meta: (result && result.meta) || null, changePct: null, unavailable: true };
+    _marketHistoryCache.set(key, attempt);
+    _mktHistoryApplyToRow(item, range, attempt, gen);
+    return;
+  }
   const ok = result && Array.isArray(result.series) && result.series.length >= 2;
   let entry;
   if (!ok) {

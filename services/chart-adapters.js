@@ -31,6 +31,26 @@
    - Errors NEVER throw — they return an empty series + meta. The chart
      core renders the empty/error state cleanly.
    - No UI surface consumes adapters in CHART-3. This is infrastructure.
+
+   MARKET-EXCELLENCE-B1 · DATA STATE CONTRACT
+   ------------------------------------------
+   "Empty series" is NOT one fact, it is three, and until B1 the adapter
+   contract could not tell them apart: an empty `series` meant both "this
+   asset genuinely has no price history" and "the provider was down / rate
+   limited". Consumers therefore rendered a temporary CoinGecko 429 on
+   ETH/ALL as "Ethereum has no historical data" — a false statement about a
+   real asset. The Yahoo adapter was worse: it recorded no reason at all.
+
+   Every adapter return now declares ONE canonical status in `meta.status`:
+
+     'ready'        series has usable points
+     'no_history'   the provider answered correctly with zero points
+     'unavailable'  transport / HTTP / parse failure, rate limit, upstream
+                    error — we learned NOTHING about this asset's history
+     'aborted'      the caller cancelled; not a user-facing state
+
+   `meta.error` keeps the finer-grained slug (rate-limited, http-502, …) for
+   diagnostics ONLY. It is never a user-facing string.
    ───────────────────────────────────────────────────────────────── */
 (function () {
   'use strict';
@@ -99,15 +119,38 @@
       g[String(coinId || '').toLowerCase()] = { status: status, at: Date.now() };
     } catch (_) {}
   }
+  // MARKET-EXCELLENCE-B1 — canonical data states. Single vocabulary shared by
+  // every adapter and every consumer.
+  const DATA_STATUS = Object.freeze({
+    READY:       'ready',
+    NO_HISTORY:  'no_history',
+    UNAVAILABLE: 'unavailable',
+    ABORTED:     'aborted',
+  });
+  // The crypto adapter's fine-grained reason → canonical status. A 200 with no
+  // prices is the ONLY crypto reason that may ever mean "no history".
+  const _CRYPTO_REASON_STATUS = Object.freeze({
+    'empty-feed-real': DATA_STATUS.NO_HISTORY,
+    'rate-limited':    DATA_STATUS.UNAVAILABLE,
+    'upstream-error':  DATA_STATUS.UNAVAILABLE,
+    'aborted':         DATA_STATUS.ABORTED,
+  });
   function _cryptoEmpty(coinId, reason) {
     _cryptoDiag(coinId, reason);
     return {
       series: [],
-      meta: { source: 'coingecko', currency: 'USD', granularity: '1h', isSynthetic: false, completeness: 0, asOf: Date.now(), error: reason },
+      meta: {
+        source: 'coingecko', currency: 'USD', granularity: '1h', isSynthetic: false,
+        completeness: 0, asOf: Date.now(),
+        status: _CRYPTO_REASON_STATUS[reason] || DATA_STATUS.UNAVAILABLE,
+        error: reason,
+      },
     };
   }
 
-  function _emptyResult(source, currency, granularity) {
+  // `status` is REQUIRED at every call site: the meaning of an empty series is
+  // knowledge the producer has and the consumer cannot recover.
+  function _emptyResult(source, currency, granularity, status, error) {
     return Object.freeze({
       series: [],
       meta: Object.freeze({
@@ -117,6 +160,8 @@
         isSynthetic: false,
         completeness: 0,
         asOf: Date.now(),
+        status: status || DATA_STATUS.UNAVAILABLE,
+        error: error || null,
       }),
     });
   }
@@ -138,7 +183,8 @@
     const symbol = String(a.symbol || '').trim();
     const range  = String(a.range  || '').toLowerCase();
     if (!symbol || !_validRange(range)) {
-      return _emptyResult('yahoo', 'USD', '1d');
+      // A request we could not even form says nothing about the asset.
+      return _emptyResult('yahoo', 'USD', '1d', DATA_STATUS.UNAVAILABLE, 'bad-request');
     }
 
     let res;
@@ -149,18 +195,23 @@
         { signal: a.signal, headers: { Accept: 'application/json' } }
       );
     } catch (err) {
+      if (a.signal && a.signal.aborted) {
+        return _emptyResult('yahoo', 'USD', '1d', DATA_STATUS.ABORTED, 'aborted');
+      }
       _warn('yahoo fetch fail', symbol, range, err?.message);
-      return _emptyResult('yahoo', 'USD', '1d');
+      return _emptyResult('yahoo', 'USD', '1d', DATA_STATUS.UNAVAILABLE, 'network-error');
     }
     if (!res.ok) {
+      // The endpoint answers 200 + empty `points` for a genuine no-history and
+      // 4xx/502 only for real failures, so a non-2xx is NEVER "no history".
       _warn('yahoo http', symbol, range, res.status);
-      return _emptyResult('yahoo', 'USD', '1d');
+      return _emptyResult('yahoo', 'USD', '1d', DATA_STATUS.UNAVAILABLE, 'http-' + res.status);
     }
 
     let body;
     try { body = await res.json(); } catch (_) { body = null; }
     if (!body || body.ok !== true || !Array.isArray(body.points)) {
-      return _emptyResult('yahoo', 'USD', '1d');
+      return _emptyResult('yahoo', 'USD', '1d', DATA_STATUS.UNAVAILABLE, 'bad-response');
     }
 
     const granularity = String(body.granularity || '1d');
@@ -196,6 +247,10 @@
         isSynthetic:  false,
         completeness: _completenessFor(series.length, range),
         asOf:         Date.now(),
+        // The provider answered correctly. Zero usable points here IS the real
+        // answer: this symbol has no history for this range.
+        status:       series.length ? DATA_STATUS.READY : DATA_STATUS.NO_HISTORY,
+        error:        null,
       },
     };
   }
@@ -206,11 +261,11 @@
     const coinId = String(a.coinId || '').trim().toLowerCase();
     const range  = String(a.range  || '').toLowerCase();
     if (!coinId || !_validRange(range)) {
-      return _emptyResult('coingecko', 'USD', '1h');
+      return _emptyResult('coingecko', 'USD', '1h', DATA_STATUS.UNAVAILABLE, 'bad-request');
     }
     const days = CRYPTO_DAYS[range];
     if (!days) {
-      return _emptyResult('coingecko', 'USD', '1h');
+      return _emptyResult('coingecko', 'USD', '1h', DATA_STATUS.UNAVAILABLE, 'bad-request');
     }
 
     const url = `${API_BASE}/api/prices/history` +
@@ -267,6 +322,8 @@
             isSynthetic:  false,
             completeness: _completenessFor(series.length, range),
             asOf:         Date.now(),
+            status:       series.length ? DATA_STATUS.READY : DATA_STATUS.NO_HISTORY,
+            error:        null,
           },
         };
       }
@@ -288,7 +345,7 @@
     const a = args || {};
     const range = String(a.range || '').toLowerCase();
     if (!_validRange(range)) {
-      return _emptyResult('local-snapshot', 'USD', '5m');
+      return _emptyResult('local-snapshot', 'USD', '5m', DATA_STATUS.UNAVAILABLE, 'bad-request');
     }
 
     const raw = (typeof window !== 'undefined' && Array.isArray(window.portfolioHistory))
@@ -301,7 +358,8 @@
         ? globalThis.portfolioHistory
         : [];
 
-    if (!raw.length) return _emptyResult('local-snapshot', 'USD', '5m');
+    // Local snapshots: an empty store is a real, known absence, not a failure.
+    if (!raw.length) return _emptyResult('local-snapshot', 'USD', '5m', DATA_STATUS.NO_HISTORY);
 
     const now    = Date.now();
     const cutoff = range === 'all' ? 0 : (now - RANGE_SPAN_MS[range]);
@@ -314,7 +372,7 @@
       if (t < cutoff) continue;
       filtered.push({ time: t, value: v });
     }
-    if (!filtered.length) return _emptyResult('local-snapshot', 'USD', '5m');
+    if (!filtered.length) return _emptyResult('local-snapshot', 'USD', '5m', DATA_STATUS.NO_HISTORY);
     filtered.sort((a, b) => a.time - b.time);
 
     // Granularity inference from median delta between adjacent points.
@@ -340,6 +398,8 @@
         isSynthetic:  false,
         completeness: _completenessFor(filtered.length, range),
         asOf:         now,
+        status:       DATA_STATUS.READY,
+        error:        null,
       },
     };
   }
@@ -349,6 +409,9 @@
     yahooHistoryAdapter,
     cryptoHistoryAdapter,
     portfolioHistoryAdapter,
+    // MARKET-EXCELLENCE-B1 — the canonical status vocabulary, published so no
+    // consumer has to hardcode it.
+    DATA_STATUS,
     // Diagnostics — useful from console without exposing internals.
     _ranges: Object.keys(RANGE_SPAN_MS),
   });

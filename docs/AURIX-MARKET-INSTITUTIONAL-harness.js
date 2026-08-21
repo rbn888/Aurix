@@ -768,8 +768,26 @@ console.log('\n16 — Market V2 bloque 2B (header, precio y temporalidades):');
      /if \(reqRange !== _aurixMktRange\) return;/.test(loadFn));
   ok('16.14 al cambiar de rango se descarta la serie anterior ANTES de pedir la nueva',
      /_aurixMktSeries  = null;[\s\S]{0,120}_aurixMktRenderHead\(_aurixMktCurrentVM\(\), \{ pending: true \}\)[\s\S]{0,80}_aurixMktLoad/.test(openFn));
-  ok('16.15 un error de carga no conserva la variación de la carga previa',
-     /catch \(err\)[\s\S]{0,400}_aurixMktSeries  = null;[\s\S]{0,120}_aurixMktRenderHead/.test(loadFn));
+  // MARKET-EXCELLENCE-B1 — el INVARIANTE no cambia (un error no puede dejar en pantalla la
+  // variación de otra carga), pero el owner ya no tiene una sola rama de error: distingue
+  // "no sabemos nada" de "seguimos mostrando el dato válido de ESTE mismo rango". La
+  // afirmación se reescribe sobre la forma nueva en vez de sobre la proximidad textual:
+  //   · el token de generación sigue descartando cualquier respuesta tardía ANTES de decidir,
+  //     así que la serie que puede sobrevivir sólo puede ser la del rango activo;
+  //   · la rama que no conserva nada sigue anulando serie y meta antes de repintar.
+  ok('16.15 un error de carga no conserva la variación de otra carga',
+     /catch \(err\)[\s\S]*?if \(gen !== _aurixMktGen\) return;/.test(loadFn) &&
+     /catch \(err\)[\s\S]*?_aurixMktSeries  = null;[\s\S]{0,200}_aurixMktRenderHead/.test(loadFn));
+  ok('16.15b la rama que conserva dato válido no reescribe ni fabrica serie',
+     (() => {
+       const i = loadFn.indexOf('catch (err)');
+       const seg = i < 0 ? '' : loadFn.slice(i);
+       const j = seg.indexOf('_AURIX_MKT_DS.STALE');
+       if (j < 0) return false;
+       const end = seg.indexOf('return;', j);          // la rama termina en su propio return
+       const branch = seg.slice(j, end < 0 ? j + 300 : end);
+       return !/_aurixMktSeries\s*=/.test(branch) && !/ctrl\.setData\(/.test(branch);
+     })());
   ok('16.16 se guarda la serie CRUDA del adapter, no la ya convertida (evita doble conversión)',
      /_aurixMktSeries  = result\.series;/.test(loadFn) &&
      /valuesCurrency: String\(\(meta && meta\.currency\)/.test(codeOf(fnSource('_aurixMktBuildDetailVM'))));
