@@ -308,7 +308,9 @@ console.log('\n9 — Enlace símbolo → histórico de cripto:');
   const srcPick = fnSource('_aurixMktPickAdapter');
   ok('9.1 el owner del enrutado es extraíble', !!srcPick);
   if (srcPick) {
-    vm2.runInContext(srcPick, sb);
+    // MARKET-EXCELLENCE-B1.1 — el owner del enrutado delega la traducción del par
+    // de cripto en `_aurixCryptoPairSymbol`; se inyecta el REAL, no un doble.
+    vm2.runInContext(fnSource('_aurixCryptoPairSymbol') + '\n' + srcPick, sb);
     const P = sb._aurixMktPickAdapter;
     const y = o => { const r = P(o); return r && r.kind === 'yahoo' ? r.args.symbol : (r ? r.kind : null); };
     // Lo que ya funcionaba NO cambia.

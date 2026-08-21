@@ -195,7 +195,8 @@ ok('9.9 el CTA se deshabilita con motivo real en lugar de ofrecerse en falso',
    /addBtn\.disabled = !addable;/.test(app) && /t\('mkt_not_addable'\)/.test(app));
 // 9b — histórico de índices
 let pick = null;
-try { pick = new Function('MARKET_INDICES', fnSource('_aurixMktPickAdapter') + '; return _aurixMktPickAdapter;')(['^GSPC','^IXIC','^DJI']); } catch (_) {}
+// MARKET-EXCELLENCE-B1.1 — el enrutado usa el traductor real del par de cripto.
+try { pick = new Function('MARKET_INDICES', fnSource('_aurixCryptoPairSymbol') + '\n' + fnSource('_aurixMktPickAdapter') + '; return _aurixMktPickAdapter;')(['^GSPC','^IXIC','^DJI']); } catch (_) {}
 ok('9.10 el selector de adaptador es ejecutable', typeof pick === 'function');
 if (pick) {
   const sym = (it) => { const a = pick(it); return a && a.args ? a.args.symbol : null; };
