@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '627'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '628'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -45209,11 +45209,17 @@ function _aurixMktExpControlsHtml() {
   // Las de capitalización llevan `off: true`: se muestran, pero deshabilitadas y con
   // el motivo, porque hoy ninguna fuente devuelve marketCap. No se ocultan para que el
   // usuario sepa que la opción existe y por qué no está disponible (§6).
+  // MARKET-EXCELLENCE-B5 — la etiqueta declara el periodo que el orden USA de verdad.
+  // Estaba fijada a "24H" con el motivo escrito abajo ("hasta que llegue el histórico
+  // por periodo"), pero el histórico por periodo ya llegó y `_mktHistoryChangeForRow`
+  // ordena por la temporalidad activa: con 7D seleccionado el orden era de 7D y el
+  // rótulo seguía diciendo 24H.
+  const _tf = _aurixMktTimeframe || '24H';
   const SORT_OPTS = [
     { key: 'relevance',  es: 'Relevancia',            en: 'Relevance',      chipEs: 'Relev.',  chipEn: 'Relev.' },
     { key: 'featured',   es: 'Destacados',            en: 'Featured',       chipEs: 'Destac.', chipEn: 'Feat.'  },
-    { key: 'change',     es: 'Mayor subida 24H',      en: 'Top gainers',    chipEs: 'Subida',  chipEn: 'Gainers'},
-    { key: 'change_asc', es: 'Mayor caída 24H',       en: 'Top losers',     chipEs: 'Caída',   chipEn: 'Losers' },
+    { key: 'change',     es: 'Mayor subida ' + _tf,   en: 'Top gainers ' + _tf, chipEs: 'Subida',  chipEn: 'Gainers'},
+    { key: 'change_asc', es: 'Mayor caída ' + _tf,    en: 'Top losers ' + _tf,  chipEs: 'Caída',   chipEn: 'Losers' },
     { key: 'price',      es: 'Precio: mayor a menor', en: 'Price: high→low',chipEs: 'Precio↓', chipEn: 'Price↓' },
     { key: 'price_asc',  es: 'Precio: menor a mayor', en: 'Price: low→high',chipEs: 'Precio↑', chipEn: 'Price↑' },
     { key: 'name',       es: 'Nombre A–Z',            en: 'Name A–Z',       chipEs: 'Nombre',  chipEn: 'Name'   },
@@ -45222,7 +45228,16 @@ function _aurixMktExpControlsHtml() {
   const CAP_OFF_HINT = isEs ? 'La fuente de precios no publica capitalización'
                             : 'The price source does not publish market cap';
   const current = SORT_OPTS.find(o => o.key === _aurixMktSortBy) || SORT_OPTS[0];
-  const currentChipLabel = isEs ? current.chipEs : current.chipEn;
+  // MARKET-EXCELLENCE-B5 · ESTADO DE COBERTURA. Mientras falte histórico del universo
+  // para el periodo activo, el ranking NO se presenta como definitivo: la propia
+  // etiqueta del orden lo declara. Es el mínimo honesto y no añade ni un nodo ni una
+  // regla de CSS. Cuando la cola termina, el orden se recalcula y el aviso desaparece.
+  const rankPending = (typeof _aurixMktRankIsPending === 'function') ? _aurixMktRankIsPending() : false;
+  const PENDING_SUFFIX = isEs ? ' · calculando' : ' · computing';
+  const currentChipLabel = (isEs ? current.chipEs : current.chipEn) + (rankPending ? PENDING_SUFFIX : '');
+  // `currentLabel` se usaba abajo en la rama V3 sin estar declarada en ningún sitio:
+  // un ReferenceError latente que sólo no explota porque V4 está activo. Se declara.
+  const currentLabel = (isEs ? current.es : current.en) + (rankPending ? PENDING_SUFFIX : '');
 
   // MARKET-4B + MARKET-7: single "Filtros" chip. Premium, compact, opens
   // a body-level sheet via _aurixMktV4OpenSheet. Until period history
@@ -58388,6 +58403,43 @@ function _mktHistoryEntryForCell(cell) {
   // el refresco silencioso lo sustituye sólo si la serie cambia.
   return _mktHistoryCacheUsable(ent) ? ent : null;
 }
+/* ══════════════════════════════════════════════════════════════════════════════
+   MARKET-EXCELLENCE-B5 · VERDAD DEL ORDEN POR PERIODO
+   ══════════════════════════════════════════════════════════════════════════════
+   AUDITORÍA. El supuesto de partida del SPEC —"el caché se llena sólo para filas
+   visibles, así que el orden depende del scroll"— es FALSO en este código:
+   `_mktHistoryFetchVisible(dataset)` recibe el universo COMPLETO de la pestaña
+   (`renderCurrentMarketView` le pasa `data`, no una porción del viewport) y recorre
+   todos sus elementos; no existe un solo IntersectionObserver en el bundle, así que
+   desplazarse no dispara ninguna petición ni altera el conjunto ordenado. El orden
+   ya es independiente del scroll por construcción.
+
+   LO QUE SÍ ESTABA ROTO: el orden se calcula UNA vez, con la cobertura que hubiera
+   en ese instante, y `_mktHistoryApplyToRow` va escribiendo cada variación que llega
+   DENTRO de la fila ya pintada, sin volver a ordenar. Resultado en una pestaña fría
+   con "Mayor subida 7D": la lista acaba mostrando un +20 % por debajo de un +2 %, y
+   se queda así hasta que algo provoque otro render. Eso es presentar un resultado
+   parcial como definitivo.
+
+   CORRECCIÓN, en el único sitio que sabe cuándo termina el trabajo: al vaciarse la
+   cola se recalcula el orden UNA sola vez, y sólo si la ordenación activa depende de
+   histórico de periodo. No hay caché nuevo, ni peticiones nuevas, ni precarga nueva:
+   el mismo trabajo que ya se hacía, ahora publicado cuando está completo.
+   ══════════════════════════════════════════════════════════════════════════════ */
+// Generación para la que se debe un re-ranking. 0 = nada pendiente.
+let _mktRankPendingGen = 0;
+// ¿La ordenación activa se resuelve con histórico de periodo? 24H usa el dato vivo
+// y completo del snapshot, así que NO entra aquí: su comportamiento no se toca.
+function _aurixMktSortNeedsPeriodHistory() {
+  const sb = (typeof _aurixMktSortBy !== 'undefined') ? _aurixMktSortBy : '';
+  if (sb !== 'change' && sb !== 'change_asc') return false;
+  return (typeof _aurixMktTimeframe !== 'undefined') && _aurixMktTimeframe !== '24H';
+}
+// El ranking está pendiente si se debe un re-ranking para la generación VIGENTE.
+// Al cambiar de pestaña o de temporalidad la generación cambia y lo pendiente caduca.
+function _aurixMktRankIsPending() {
+  return _mktRankPendingGen !== 0 && _mktRankPendingGen === _marketHistoryGen;
+}
 function _mktHistoryEnqueue(job) {
   _marketHistoryQueue.pending.push(job);
   _mktHistoryDrain();
@@ -58403,6 +58455,16 @@ function _mktHistoryDrain() {
         _marketHistoryQueue.running--;
         _mktHistoryDrain();
       });
+  }
+  // Cola vacía: si se debía un re-ranking para la generación vigente, se publica AHORA.
+  // No puede realimentarse: el re-render vuelve a pasar por `_mktHistoryFetchVisible`,
+  // que encontrará todas las entradas frescas (incluidas las marcadas `unavailable`),
+  // no encolará nada y por tanto no volverá a marcar nada pendiente.
+  if (!_marketHistoryQueue.running && !_marketHistoryQueue.pending.length && _aurixMktRankIsPending()) {
+    _mktRankPendingGen = 0;
+    const publish = () => { try { renderCurrentMarketView(); } catch (_) {} };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(publish);
+    else publish();
   }
 }
 function _mktHistoryAdaptersReady() {
@@ -58849,6 +58911,9 @@ function _mktHistoryFetchVisible(dataset) {
   // tabs (all/watchlist) it's the composed dataset.
   const items = Array.isArray(dataset) ? dataset : [];
   if (!items.length) return;
+  // MARKET-EXCELLENCE-B5 — se cuenta el trabajo REALMENTE encolado para saber si el
+  // ranking por periodo está publicándose con cobertura incompleta.
+  let enqueued = 0;
   // For 24H we only enqueue when the cache is stale AND a sparkline
   // upgrade is desired. To keep 24H rendering instant (using live
   // change24h), we still backfill the sparkline asynchronously.
@@ -58867,7 +58932,12 @@ function _mktHistoryFetchVisible(dataset) {
     // render inmediato → refresh silencioso → actualizar sólo si hay diferencia.
     if (_mktHistoryCacheUsable(cached)) _mktHistoryApplyToRow(item, range, cached, gen);
     _mktHistoryEnqueue(() => _mktHistoryFetchOne(item, range, gen));
+    enqueued++;
   }
+  // Si la ordenación activa se resuelve con histórico de periodo y ha quedado trabajo
+  // por hacer, este orden es PROVISIONAL: se declara pendiente y la cola lo publicará
+  // completo al terminar. Con 24H, o sin trabajo pendiente, nada de esto se activa.
+  if (enqueued > 0 && _aurixMktSortNeedsPeriodHistory()) _mktRankPendingGen = gen;
 }
 
 // RESET-2: storage audit helper. Reports the count/size of every
