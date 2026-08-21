@@ -32,6 +32,39 @@ function corsOrigin(req) {
 }
 const MAX_RESULTS    = 7;
 
+// ── MARKET-EXCELLENCE · BRK.B SEARCH ALIAS ──────────────────────────────────
+// La consulta se enviaba VERBATIM a Yahoo y Yahoo indexa las clases de acción
+// estadounidenses con GUION (`BRK-B`), no con punto. Medido contra el endpoint real:
+//   "BRK-B"     → BRK-B ✓        "Berkshire" → BRK-B ✓
+//   "BRK.B"     → BRKC (basura)  "BRK.A"     → BRK.AQ / BRK.AX (basura)
+//   "BF.B"      → 0 resultados   "BF-B"      → BF-B ✓
+// Es decir: la convención que el usuario escribe (la de prensa/Bloomberg) no
+// encontraba el instrumento, mientras el nombre sí. Aquí sólo se traduce la
+// CONSULTA; la respuesta conserva el símbolo de Yahoo tal cual, así que la
+// identidad canónica y el enrutado de precio/histórico no cambian (comprobado:
+// el snapshot resuelve BRK.B y BRK-B al mismo precio).
+//
+// NORMALIZACIÓN DELIBERADAMENTE ESTRECHA. Sólo `TICKER.A` / `TICKER.B`:
+//   · `.A` y `.B` NO son sufijos de mercado de Yahoo, así que no hay colisión
+//     posible con listados internacionales (`.L`, `.DE`, `.AS`, `.MC`, `.SW`,
+//     `.PA`, `.MI`, `.T`, `.F`, `.V`…), que quedan intactos;
+//   · el prefijo se limita a 1–4 letras, así que los códigos numéricos con
+//     sufijo (7203.T) tampoco entran.
+// La forma COMPACTA no puede resolverse con patrón: `NVDA` → `NVD-A` rompería
+// tickers reales. Por eso es un mapa explícito y sólo con formas verificadas como
+// inexistentes por sí mismas (ni `BRKB` ni `BRKA` devuelven hoy un instrumento
+// canónico), de modo que no puede ensombrecer a ningún activo real.
+const CLASS_SHARE_DOT = /^([A-Z]{1,4})\.([AB])$/;
+const COMPACT_ALIASES = Object.freeze({ BRKB: 'BRK-B', BRKA: 'BRK-A' });
+function aliasQuery(raw) {
+  const q = String(raw || '').trim();
+  const up = q.toUpperCase();
+  if (COMPACT_ALIASES[up]) return COMPACT_ALIASES[up];
+  const m = CLASS_SHARE_DOT.exec(up);
+  if (m) return `${m[1]}-${m[2]}`;
+  return q;                                   // todo lo demás viaja intacto
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin',  corsOrigin(req));
   res.setHeader('Vary', 'Origin');
@@ -45,8 +78,9 @@ export default async function handler(req, res) {
   if (!q || q.length > 64) return res.status(400).json({ error: 'invalid_query' });
 
   try {
+    // Sólo la consulta se traduce (clases de acción US). Una sola petición, como antes.
     const url = `https://query1.finance.yahoo.com/v1/finance/search` +
-                `?q=${encodeURIComponent(q)}&quotesCount=8&newsCount=0&listsCount=0`;
+                `?q=${encodeURIComponent(aliasQuery(q))}&quotesCount=8&newsCount=0&listsCount=0`;
     const upstream = await fetch(url, {
       signal:  AbortSignal.timeout(8000),
       headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (Aurix)' },
