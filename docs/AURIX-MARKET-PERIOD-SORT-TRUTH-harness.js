@@ -86,7 +86,7 @@ function build() {
   const fns = ['normalizeSymbol', '_mktHistoryAdapterRange', '_mktHistoryCacheKey',
                '_mktHistoryCacheFresh', '_mktHistoryCacheUsable', '_mktHistorySeriesStamp',
                '_mktHistoryChangeForRow', '_mktHistoryAdaptersReady',
-               '_aurixMktSortNeedsPeriodHistory', '_aurixMktRankIsPending',
+               '_aurixMktSortNeedsPeriodHistory', '_aurixMktSortCoveragePending',
                '_mktHistoryEnqueue', '_mktHistoryDrain', '_mktHistoryFetchVisible',
                '_aurixMktExpSortItems']
     .map(fnSource).join('\n');
@@ -171,7 +171,7 @@ const universe = (n, type) => Array.from({ length: n }, (_, i) => ({ symbol: 'S'
     ctx.__items = universe(5);
     vm.runInContext('_mktHistoryFetchVisible(__items)', ctx);
     ok('2.1 con trabajo pendiente el ranking se declara PENDIENTE',
-       vm.runInContext('_aurixMktRankIsPending()', ctx) === true);
+       vm.runInContext('_aurixMktSortCoveragePending()', ctx) === true);
     await ctx.flushQueue();
     ok('2.2 pide el histórico de TODAS las filas del universo (5), no sólo de las vistas',
        ctx.__fetched.length === 5, ctx.__fetched.join(','));
@@ -182,7 +182,7 @@ const universe = (n, type) => Array.from({ length: n }, (_, i) => ({ symbol: 'S'
        ctx.__raf.length === 1, 'raf=' + ctx.__raf.length);
     ctx.flushRaf();
     ok('2.5 el re-ranking es exactamente un render', ctx.__renders === 1, 'renders=' + ctx.__renders);
-    ok('2.6 y el estado pendiente se apaga', vm.runInContext('_aurixMktRankIsPending()', ctx) === false);
+    ok('2.6 y el estado pendiente se apaga', vm.runInContext('_aurixMktSortCoveragePending()', ctx) === false);
     ctx.__items = universe(5);
     const order = vm.runInContext('_aurixMktExpSortItems(__items).map(x => x.symbol)', ctx);
     ok('2.7 el orden final refleja TODA la cobertura (20, 5, 2, -1, ausente)',
@@ -206,7 +206,7 @@ const universe = (n, type) => Array.from({ length: n }, (_, i) => ({ symbol: 'S'
     ok('3.1 la segunda pasada con caché fresco no pide NADA',
        firstRound === 3 && ctx.__fetched.length === 0, 'r1=' + firstRound + ' r2=' + ctx.__fetched.length);
     ok('3.2 y por tanto no declara ranking pendiente',
-       vm.runInContext('_aurixMktRankIsPending()', ctx) === false);
+       vm.runInContext('_aurixMktSortCoveragePending()', ctx) === false);
     await ctx.flushQueue();
     ok('3.3 sin trabajo pendiente NO hay re-render (imposible el bucle de renders)',
        ctx.__renders === 0 && ctx.__raf.length === 0, 'renders=' + ctx.__renders);
@@ -224,7 +224,7 @@ const universe = (n, type) => Array.from({ length: n }, (_, i) => ({ symbol: 'S'
     vm.runInContext('_mktHistoryFetchVisible(__items)', ctx);
     ok('3.4 el intento fallido no se reintenta de inmediato', ctx.__fetched.length === 0);
     ok('3.5 y el ranking queda publicado, no pendiente para siempre',
-       vm.runInContext('_aurixMktRankIsPending()', ctx) === false);
+       vm.runInContext('_aurixMktSortCoveragePending()', ctx) === false);
   }
 
   // ── 4. F · cambio de temporalidad / pestaña invalida el trabajo viejo ───
@@ -269,7 +269,7 @@ const universe = (n, type) => Array.from({ length: n }, (_, i) => ({ symbol: 'S'
        JSON.stringify(order) === JSON.stringify(['S2', 'S0', 'S1']), order.join(','));
     vm.runInContext('_mktHistoryFetchVisible(__items)', ctx);
     ok('5.4 pero NUNCA declara ranking pendiente ni fuerza re-ranking en 24H',
-       vm.runInContext('_aurixMktRankIsPending()', ctx) === false);
+       vm.runInContext('_aurixMktSortCoveragePending()', ctx) === false);
     await ctx.flushQueue();
     ok('5.3 24H sigue rellenando el mini gráfico (el trabajo de fondo no desaparece)',
        ctx.__fetched.length === 3, ctx.__fetched.join(','));
@@ -300,7 +300,7 @@ const universe = (n, type) => Array.from({ length: n }, (_, i) => ({ symbol: 'S'
   ok('6.3 el re-ranking vive en el drenaje de la cola (un solo owner)',
      (fnSource('_mktHistoryDrain').match(/_mktRankPendingGen = 0;/g) || []).length === 1
      && (appCode.match(/_mktRankPendingGen = gen;/g) || []).length === 1
-     && /if \(!_marketHistoryQueue\.running && !_marketHistoryQueue\.pending\.length && _aurixMktRankIsPending\(\)\)/.test(app)
+     && /if \(!_marketHistoryQueue\.running && !_marketHistoryQueue\.pending\.length && _aurixMktSortCoveragePending\(\)\)/.test(app)
      && (appCode.match(/renderCurrentMarketView\(\); \} catch \(_\) \{\} \};/g) || []).length === 1);
   ok('6.4 el estado de cobertura no añade nodos ni CSS: va en la etiqueta del orden',
      /rankPending \? PENDING_SUFFIX : ''/.test(app)

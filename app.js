@@ -45232,7 +45232,7 @@ function _aurixMktExpControlsHtml() {
   // para el periodo activo, el ranking NO se presenta como definitivo: la propia
   // etiqueta del orden lo declara. Es el mínimo honesto y no añade ni un nodo ni una
   // regla de CSS. Cuando la cola termina, el orden se recalcula y el aviso desaparece.
-  const rankPending = (typeof _aurixMktRankIsPending === 'function') ? _aurixMktRankIsPending() : false;
+  const rankPending = (typeof _aurixMktSortCoveragePending === 'function') ? _aurixMktSortCoveragePending() : false;
   const PENDING_SUFFIX = isEs ? ' · calculando' : ' · computing';
   const currentChipLabel = (isEs ? current.chipEs : current.chipEn) + (rankPending ? PENDING_SUFFIX : '');
   // `currentLabel` se usaba abajo en la rama V3 sin estar declarada en ningún sitio:
@@ -58437,7 +58437,7 @@ function _aurixMktSortNeedsPeriodHistory() {
 }
 // El ranking está pendiente si se debe un re-ranking para la generación VIGENTE.
 // Al cambiar de pestaña o de temporalidad la generación cambia y lo pendiente caduca.
-function _aurixMktRankIsPending() {
+function _aurixMktSortCoveragePending() {
   return _mktRankPendingGen !== 0 && _mktRankPendingGen === _marketHistoryGen;
 }
 function _mktHistoryEnqueue(job) {
@@ -58460,7 +58460,7 @@ function _mktHistoryDrain() {
   // No puede realimentarse: el re-render vuelve a pasar por `_mktHistoryFetchVisible`,
   // que encontrará todas las entradas frescas (incluidas las marcadas `unavailable`),
   // no encolará nada y por tanto no volverá a marcar nada pendiente.
-  if (!_marketHistoryQueue.running && !_marketHistoryQueue.pending.length && _aurixMktRankIsPending()) {
+  if (!_marketHistoryQueue.running && !_marketHistoryQueue.pending.length && _aurixMktSortCoveragePending()) {
     _mktRankPendingGen = 0;
     const publish = () => { try { renderCurrentMarketView(); } catch (_) {} };
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(publish);
