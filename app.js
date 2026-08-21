@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '629'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '630'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -46745,10 +46745,19 @@ async function _refreshStocks() {
     const res  = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`http_${res.status}`);
     const json = await res.json();
-    const data = (json?.snapshot ?? [])
-      .filter(p => Number.isFinite(p.price))
-      .map(p => ({ symbol: p.symbol, name: p.symbol, price: p.price, change24h: p.change24h ?? null }));
-    if (!data.length) {
+    // MARKET-ROW-PRICE-TRUTH · PRICE ENGINE — este filtro descartaba la ENTRADA de un
+    // símbolo sin precio, y como `commitMarketData` reemplaza todas las filas del tipo,
+    // el activo desaparecía de la pestaña. Ahora la entrada viaja con precio null y el
+    // motor conserva la fila por su identidad.
+    const snap = (json?.snapshot ?? []);
+    const data = snap.map(p => ({
+      symbol: p.symbol, name: p.symbol,
+      price: Number.isFinite(p.price) ? p.price : null,
+      change24h: p.change24h ?? null,
+    }));
+    // La señal de "el proveedor no ha respondido nada útil" sigue siendo la misma: que
+    // NINGÚN símbolo traiga precio. Ahí sí procede el backoff.
+    if (!data.some(d => d.price != null)) {
       MARKET_FAILURE_TS['stocks'] = Date.now();
       console.warn(`[market-runtime] stocks empty payload — backoff ${MARKET_FAILURE_BACKOFF / 1000}s`);
       return;
@@ -47314,6 +47323,22 @@ function _updatePriceCache(item) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+/* ══════════════════════════════════════════════════════════════════════════════
+   MARKET-ROW-PRICE-TRUTH · PRICE ENGINE — un precio imposible es AUSENCIA
+   ══════════════════════════════════════════════════════════════════════════════
+   Los dos bucles de consenso (cripto y acciones) terminaban en
+   `if (!isFinite(price) || price > 1e9) continue;`, que no descartaba el PRECIO:
+   descartaba el ACTIVO. Si el snapshot omitía un símbolo puntual, su fila
+   desaparecía de Market con nombre, icono, identidad y navegación incluidos —
+   la misma clase de defecto que v665 corrigió en la ruta de ETF/índices, en el
+   otro extremo del sistema.
+   Aquí se sanea el PRECIO y la fila sobrevive por su identidad. Además se cachea
+   sólo lo usable: antes un número imposible se escribía en la caché de precios
+   aunque la fila se tirara.
+   ══════════════════════════════════════════════════════════════════════════════ */
+function _mktUsablePrice(price) {
+  return (typeof price === 'number' && isFinite(price) && price > 0 && price <= 1e9) ? price : null;
+}
 function _setCryptoData(raw) {
   // Normalize all candidates from CoinGecko proxy
   const candidates = raw.map(c => normalizePriceItem(c, c.source ?? 'coingecko', 'crypto'));
@@ -47337,22 +47362,33 @@ function _setCryptoData(raw) {
     const clean    = removeOutliers(usable, 'crypto');
     const resolved = resolveConsensusPrice(clean);
 
-    let price;
+    let price = null, priceFrom = 'none';
     if (resolved) {
-      price = resolved.price;
-      _updatePriceCache({ symbol, price, timestamp: resolved.timestamp, source: resolved.source, confidence: computeConfidence(valid) });
+      price = _mktUsablePrice(resolved.price);
+      if (price != null) {
+        priceFrom = 'live';
+        _updatePriceCache({ symbol, price, timestamp: resolved.timestamp, source: resolved.source, confidence: computeConfidence(valid) });
+      }
     } else {
       const best = getBestCandidate(list, 'crypto');
       if (best) {
-        price = best.price;
-        _updatePriceCache({ symbol, price, timestamp: best.timestamp, source: best.source, confidence: 0.5 });
-      } else {
-        price = getCachedPrice(symbol)?.price ?? null;
+        price = _mktUsablePrice(best.price);
+        if (price != null) {
+          priceFrom = 'live';
+          _updatePriceCache({ symbol, price, timestamp: best.timestamp, source: best.source, confidence: 0.5 });
+        }
       }
     }
-
-    if (!isFinite(price) || price > 1e9) continue;
-    const chg    = change24h ?? 0;
+    // Si el proveedor no dio un precio usable, el último REAL que se descargó sigue
+    // siendo pintable (y declarado como cacheado). Antes esta oportunidad se perdía:
+    // un candidato con número imposible saltaba directo al `continue`.
+    if (price == null) {
+      price = _mktUsablePrice(getCachedPrice(symbol)?.price ?? null);
+      if (price != null) priceFrom = 'cached';
+    }
+    // Sin precio la fila SIGUE existiendo: `safePrice(null)` pinta "—".
+    // Y sin variación tampoco se inventa un 0, que se leería como "plano".
+    const chg    = (typeof change24h === 'number' && isFinite(change24h)) ? change24h : null;
     const mdItem = {
       symbol,
       canonicalSymbol:             canonicalSymbol(symbol, 'crypto'),
@@ -47362,6 +47398,7 @@ function _setCryptoData(raw) {
       change:                      chg,
       change24h:                   chg,
       price_change_percentage_24h: chg,
+      priceProvenance:             priceFrom,
       type:                        'crypto',
       provider:                    'coingecko',
       confidence:                  computeConfidence(valid),
@@ -47402,21 +47439,31 @@ function _setStocksData(data) {
     const clean    = removeOutliers(usable, 'stock');
     const resolved = resolveConsensusPrice(clean);
 
-    let price;
+    let price = null, priceFrom = 'none';
     if (resolved) {
-      price = resolved.price;
-      _updatePriceCache({ symbol, price, timestamp: resolved.timestamp, source: resolved.source, confidence: computeConfidence(valid) });
+      price = _mktUsablePrice(resolved.price);
+      if (price != null) {
+        priceFrom = 'live';
+        _updatePriceCache({ symbol, price, timestamp: resolved.timestamp, source: resolved.source, confidence: computeConfidence(valid) });
+      }
     } else {
       const best = getBestCandidate(list, 'stock');
       if (best) {
-        price = best.price;
-        _updatePriceCache({ symbol, price, timestamp: best.timestamp, source: best.source, confidence: 0.5 });
-      } else {
-        price = getCachedPrice(symbol)?.price ?? null;
+        price = _mktUsablePrice(best.price);
+        if (price != null) {
+          priceFrom = 'live';
+          _updatePriceCache({ symbol, price, timestamp: best.timestamp, source: best.source, confidence: 0.5 });
+        }
       }
     }
-
-    if (!isFinite(price) || price > 1e9) continue;
+    // Si el proveedor no dio un precio usable, el último REAL que se descargó sigue
+    // siendo pintable (y declarado como cacheado). Antes esta oportunidad se perdía:
+    // un candidato con número imposible saltaba directo al `continue`.
+    if (price == null) {
+      price = _mktUsablePrice(getCachedPrice(symbol)?.price ?? null);
+      if (price != null) priceFrom = 'cached';
+    }
+    // Sin precio la fila SIGUE existiendo: `safePrice(null)` pinta "—".
     const mdItem = {
       symbol,
       canonicalSymbol:             canonicalSymbol(symbol, 'stock'),
@@ -47425,6 +47472,7 @@ function _setStocksData(data) {
       current_price:               price,
       change24h:                   change24h ?? null,
       price_change_percentage_24h: change24h ?? null,
+      priceProvenance:             priceFrom,
       type:                        'stock',
       provider:                    resolved?.source ?? 'stocks-api',
       confidence:                  computeConfidence(valid),
