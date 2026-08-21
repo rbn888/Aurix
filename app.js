@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '625'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '626'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -47424,9 +47424,28 @@ function renderMarketItem(item, idx) {
   const _chartCls  = _histHasSeries ? '' : 'col-chart--preview';
   const _chartHtml = _histHasSeries ? '' : _mktSparkPreviewSvg(normSym);
   const idTitle = (name && name !== item.symbol) ? name : item.symbol;
+  // MARKET-EXCELLENCE-B3 — ÚNICO delta real que quedaba entre la búsqueda de Market y
+  // la de Add Asset. El motor, el retrieval, la dedupe canónica y el ranking ya son los
+  // mismos (`searchAllAssets`), y el puente `_searchResultToMarketItem` ya traía intactos
+  // `chain`, `contract`, `matchedBy` y `symbolCollision`. Pero esta línea de identidad
+  // NUNCA los pintaba: comprobado contra la API real, "USDC" devuelve 5 tokens distintos
+  // con el mismo ticker y "HYPE" 4, así que Add Asset los distinguía
+  // ("USDC · Beam · 0x76bf…5e7d") y Market mostraba 5 filas idénticas "USDC · Cripto · USD".
+  // Misma regla de divulgación progresiva que `_aurixSearchSubtitle`: la red SUSTITUYE a la
+  // etiqueta de tipo y el contrato abreviado se añade SÓLO cuando hace falta desambiguar
+  // (llegada por contrato o colisión de símbolo en la MISMA lista). Nada se deduce: si no
+  // hay red o contrato, no se escribe ese segmento. Cero cambios para el resto de filas.
+  const _idNeedsChain = String(item.type || '').toLowerCase() === 'crypto'
+    && (item.matchedBy === 'contract' || item.symbolCollision === true);
+  const _idChain    = (_idNeedsChain && item.chain) ? String(item.chain) : '';
+  const _idContract = (_idNeedsChain && item.contract && typeof _aurixShortContract === 'function')
+    ? _aurixShortContract(item.contract) : '';
   const idMeta = [
     `<span class="mkt-id-ticker">${escHtml(item.symbol)}</span>`,
-    item.type ? `<span>${escHtml(_aurixMktShortType(item.type))}</span>` : '',
+    _idChain
+      ? `<span>${escHtml(_idChain)}</span>`
+      : (item.type ? `<span>${escHtml(_aurixMktShortType(item.type))}</span>` : ''),
+    _idContract ? `<span>${escHtml(_idContract)}</span>` : '',
     item.issuer   ? `<span>${escHtml(item.issuer)}</span>`   : '',
     item.exchange ? `<span>${escHtml(item.exchange)}</span>` : '',
     item.currency ? `<span>${escHtml(item.currency)}</span>` : '',
