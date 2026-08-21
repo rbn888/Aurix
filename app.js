@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '626'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '627'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -46754,7 +46754,13 @@ async function _refreshGeneric(tab, symbols, fallbackMap, title) {
         const json = await res.json();
         for (const item of (json?.snapshot ?? [])) {
           if (item?.symbol && Number.isFinite(item.price)) {
-            snapshotMap.set(item.symbol, item);
+            // MARKET-EXCELLENCE-B4 — el endpoint responde con el símbolo CANÓNICO
+            // (`VUAA.L` → `VUAA`), y aquí se buscaba con el crudo: para cualquier
+            // símbolo con sufijo de mercado el hit era null y la fila caía al precio
+            // de respaldo cacheado —o a ninguno— teniendo el precio real en la mano.
+            // Con 5 ETF todos sin sufijo no se notaba; con listados internacionales
+            // sería sistemático. Se normalizan los DOS lados de la clave.
+            snapshotMap.set(normalizeSymbol(item.symbol), item);
           }
         }
       }
@@ -46763,8 +46769,16 @@ async function _refreshGeneric(tab, symbols, fallbackMap, title) {
     }
 
     const results = symbols.map(symbol => {
-      const hit  = snapshotMap.get(symbol);
-      const data = hit ? { price: hit.price, previousClose: null } : null;
+      const hit  = snapshotMap.get(normalizeSymbol(symbol));
+      // MARKET-EXCELLENCE-B4 — la variación y la divisa que el proveedor YA envía se
+      // descartaban aquí, así que toda fila de ETF/índice mostraba "—" en 24H, que es
+      // la temporalidad por defecto. Ampliar el universo sin esto sería más filas y
+      // peor lectura. Es dato real del proveedor: si no viene, queda null (nunca 0).
+      const data = hit
+        ? { price: hit.price, previousClose: null,
+            change24h: Number.isFinite(hit.change24h) ? hit.change24h : null,
+            currency: hit.currency || null }
+        : null;
       return _buildItem(symbol, data, fallbackMap, type);
     });
     const safeResults = results.filter(item => item && item.symbol);
@@ -46879,13 +46893,49 @@ function renderMarketByType(type) {
 }
 
 
-const MARKET_ETFS        = ['SPY','QQQ','VOO','VTI','URTH'];
-const MARKET_INDICES     = ['^GSPC','^IXIC','^DJI'];
+/* ══════════════════════════════════════════════════════════════════════════════
+   MARKET-EXCELLENCE-B4 · UNIVERSO VISIBLE DE MARKET
+   ══════════════════════════════════════════════════════════════════════════════
+   El universo de browse era absurdamente pequeño frente a su importancia: 5 ETF y
+   3 índices. No por límite de arquitectura, sino porque nunca se amplió: cada
+   pestaña se hidrata con UNA sola petición batched a `/api/prices/snapshot`
+   (tope 200 símbolos, caché servidor con TTL por tipo), así que el coste de red
+   NO crece con la longitud de la lista. Medido contra el endpoint real: los 23
+   símbolos de ETF de abajo resuelven 23/23 con precio real de Yahoo en esa única
+   petición.
+
+   Los ETF son EXACTAMENTE los del catálogo curado (`_AURIX_ETF_DB`) más los 5 que
+   ya había: identidad completa ya verificada en repo (nombre institucional,
+   gestora, bolsa, divisa, ISIN) y cero datos inventados. Los que el SPEC pide y
+   NO están (VT, VEA, VWO, IWM, DIA) siguen siendo descubribles por búsqueda —
+   comprobado— y no se añaden aquí porque no tengo su ISIN/gestora verificados y
+   el catálogo exige identidad completa: inventarla está prohibido.
+
+   Efecto colateral bueno y ya previsto por MARKET-FOUNDATION-V1 · BLOQUE A: los
+   chips de descubrimiento que se auto-ocultaban por no intersecar con la lista
+   viva (el caso "Oro": SGLN.L / PHAU.L / GLD / IAU / 4GLD.DE) vuelven solos.
+   ══════════════════════════════════════════════════════════════════════════════ */
+const MARKET_ETFS        = [
+  // S&P 500
+  'SPY','VOO','IVV','VUAA.L','CSPX.L','SXR8.DE',
+  // Nasdaq 100
+  'QQQ','QQQM','EQQQ.L','CNDX.L',
+  // Global / MSCI World
+  'URTH','IWDA.AS','SWDA.L','EUNL.DE','VWCE.DE','VWRL.L','ACWI','VTI',
+  // Oro físico
+  'GLD','IAU','SGLN.L','PHAU.L','4GLD.DE',
+];
+const MARKET_INDICES     = [
+  '^GSPC','^IXIC','^DJI','^RUT',
+  '^STOXX50E','^GDAXI','^FTSE','^FCHI','^IBEX','^N225',
+];
 const MARKET_COMMODITIES = ['XAU/USD','XAG/USD','WTI'];
 // Canonical live stock universe (resolved by the snapshot gateway registry).
+// MARKET-EXCELLENCE-B4 — misma petición batched, dos compañías focales que faltaban.
 const STOCKS_UNIVERSE = [
   'AAPL','MSFT','NVDA','TSLA','AMZN','META','GOOGL','JPM','V','WMT',
   'BRK.B','JNJ','PG','XOM','BAC','AVGO','COST','KO','MCD','NKE',
+  'MA','LLY',
 ];
 const INDEX_FALLBACKS    = {
   '^GSPC':     5300,
@@ -46914,24 +46964,49 @@ const INDEX_NAMES        = {
   '^N225':     'Nikkei 225',
   '^FTSE':     'FTSE 100',
   '^STOXX50E': 'Euro Stoxx 50',
+  // MARKET-EXCELLENCE-B4 — el único de la lista ampliada que aún no tenía nombre.
+  '^RUT':      'Russell 2000',
 };
 const COMMODITY_NAMES    = { 'XAU/USD': 'Gold', 'XAG/USD': 'Silver', 'WTI': 'Oil (WTI)' };
 
+// MARKET-EXCELLENCE-B4 — nombre institucional de un ETF del universo visible. La
+// fuente es el catálogo curado que YA existe (identidad verificada: nombre, gestora,
+// bolsa, divisa, ISIN); aquí sólo se lee. Sin catálogo o sin entrada ⇒ '' y el
+// resolvedor de siempre (`_MKT_DISPLAY_NAMES`) sigue mandando. Nada se deduce.
+function _aurixEtfCatalogName(symbol) {
+  try {
+    if (typeof _AURIX_ETF_DB === 'undefined' || !Array.isArray(_AURIX_ETF_DB)) return '';
+    const raw = String(symbol || '').toUpperCase();
+    if (!raw) return '';
+    const hit = _AURIX_ETF_DB.find(e => e
+      && (String(e.ticker || '').toUpperCase() === raw || String(e.marketSymbol || '').toUpperCase() === raw));
+    return (hit && hit.name) ? String(hit.name) : '';
+  } catch (_) { return ''; }
+}
 function _buildItem(symbol, data, fallbackMap, type) {
-  const name = INDEX_NAMES[symbol] ?? COMMODITY_NAMES[symbol] ?? symbol;
+  const name = INDEX_NAMES[symbol] ?? COMMODITY_NAMES[symbol] ?? (_aurixEtfCatalogName(symbol) || symbol);
   if (data?.price) {
     const norm = normalizeSymbol(symbol);
     _updatePriceCache({ symbol: norm, price: data.price, timestamp: Date.now(), source: 'twelve-data' });
-    return normalizeMarketData({ name, price: data.price }, type, symbol);
+    // La variación sólo viaja si el proveedor la envió (B4). `null` ⇒ la fila muestra
+    // ausencia neutra; jamás un 0,00 % que se leería como "plano".
+    return normalizeMarketData(
+      { name, price: data.price, percent_change_24h: (data.change24h ?? null) },
+      type, symbol
+    );
   }
   const cached = getCachedPrice(symbol);
   if (cached) {
     if (typeof AURIX_TELEMETRY !== 'undefined') AURIX_TELEMETRY.market.staleFallbackUses++;
     return normalizeMarketData({ name, price: cached.price, fallback: true }, type, symbol);
   }
-  const fb = getFallbackData(symbol) ?? { price: fallbackMap?.[symbol] ?? null, change24h: 0 };
+  // MARKET-EXCELLENCE-B4 — un símbolo sin precio conocido tampoco tiene variación
+  // conocida. El `change24h: 0` de antes fabricaba un "plano" para cualquier símbolo
+  // fuera de los mapas de respaldo: con el universo ampliado eso sería una cifra
+  // financiera inventada en cada fila no resuelta.
+  const fb = getFallbackData(symbol) ?? { price: fallbackMap?.[symbol] ?? null, change24h: null };
   return normalizeMarketData(
-    { name, price: fb.price, percent_change_24h: fb.change24h, fallback: true },
+    { name, price: fb.price, percent_change_24h: fb.change24h ?? null, fallback: true },
     type, symbol
   );
 }
@@ -47348,6 +47423,14 @@ const _MKT_DISPLAY_NAMES = {
   // Stocks
   AAPL: 'Apple Inc.', MSFT: 'Microsoft Corp.', NVDA: 'NVIDIA Corp.', AMZN: 'Amazon.com Inc.',
   GOOGL: 'Alphabet Inc.', GOOG: 'Alphabet Inc.', META: 'Meta Platforms', TSLA: 'Tesla Inc.',
+  // MARKET-EXCELLENCE-B4 — el universo de acciones ya monitorizaba estas 14 filas, pero
+  // sin nombre: el título de la fila era el ticker desnudo. Son etiquetas de UI (razón
+  // social), no datos de mercado. Clave = normalizeSymbol (BRK.B → BRK).
+  BRK: 'Berkshire Hathaway', JPM: 'JPMorgan Chase', V: 'Visa Inc.', MA: 'Mastercard',
+  WMT: 'Walmart Inc.', JNJ: 'Johnson & Johnson', PG: 'Procter & Gamble',
+  XOM: 'Exxon Mobil', BAC: 'Bank of America', AVGO: 'Broadcom Inc.',
+  COST: 'Costco Wholesale', KO: 'Coca-Cola Co.', MCD: "McDonald's Corp.",
+  NKE: 'Nike Inc.', LLY: 'Eli Lilly & Co.',
   // Crypto
   BTC: 'Bitcoin', ETH: 'Ethereum', SOL: 'Solana', BNB: 'BNB', XRP: 'XRP',
   USDC: 'USD Coin', USDT: 'Tether', ADA: 'Cardano', AVAX: 'Avalanche', DOGE: 'Dogecoin',
