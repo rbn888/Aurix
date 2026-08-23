@@ -24840,6 +24840,49 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   #marketList.is-v4 .market-row { border-radius: 0; }
 }
 
+/* ════════ MARKET-EXCELLENCE-V1 · CIERRE VISIBLE ══════════════════════════════
+   Los dos ÚNICOS defectos de geometría que seguían midiéndose en
+   `scripts/aurix-market-visual-audit.mjs` al cerrar el bloque. Sólo presentación:
+   ni una regla de datos, ni un selector nuevo en el HTML, ni lógica. Desktop
+   (1440) medía limpio en las cuatro pestañas y NO se toca. */
+
+/* 1 · MÓVIL — ALTURA DE FILA UNIFORME.
+   Medido a 390px: las filas convivían a 58, 65 y 66px en la misma lista (ETF
+   [66,65], Índices [58,66,65], Acciones [58,66]). La causa no es un defecto: es
+   el `-webkit-line-clamp: 2` del nombre, decidido para que "SPDR S&P 500 ETF"
+   quepa entero en lugar de morir en "SPDR S&P…". Pero el efecto secundario es que
+   la altura de fila DEPENDE del largo del nombre, y una tabla financiera cuyo
+   ritmo vertical cambia fila a fila deja de leerse como tabla.
+   Se reserva la caja del caso peor —el que ya existe— en vez de recortar el
+   nombre: los nombres largos conservan sus dos líneas y los cortos ocupan la
+   misma altura. El contenido sigue centrado (`align-items: center` de la rejilla),
+   así que un nombre de una línea no deja hueco arriba ni abajo. `min-height` no
+   es un tope: si algún día un contenido necesita más, la fila crece. */
+@media (max-width: 768px) {
+  #marketList .market-row,
+  #marketList.is-v3 .market-row,
+  #marketList.is-v4 .market-row { min-height: 66px; }
+}
+
+/* 2 · TABLET — LA FILA DEJA DE DESBORDAR LA CARD.
+   Medido a 834px: la card ocupaba 48..786 y la fila 37..797, es decir sobresalía
+   11px por CADA lado, y `#marketList` reportaba 12px de scroll horizontal. No se
+   veía como barra porque la banda 769–1024 ya lleva `overflow-x: hidden` (arriba,
+   MARKET-EXCELLENCE-03 §1), pero el precio de esconderlo era peor: el icono del
+   activo (x=49) y la estrella (borde en 785) quedaban RECORTADOS contra el borde
+   de la card, sin el aire que sí tienen en escritorio (allí la fila mide 121..1319
+   dentro de una card 112..1328: 9px por lado).
+   El bleed viene del `margin: 0 -12px` de la fila, que en escritorio cabe y aquí
+   no. Se anula SÓLO en esta banda: la fila pasa a medir justo el ancho interior de
+   la card, el desbordamiento baja a 0 y el aire del contenido lo da su propio
+   `padding: 16px 12px`. Es la misma relación fila↔card que ya tiene móvil. */
+@media (min-width: 769px) and (max-width: 1024px) {
+  #marketList .market-row,
+  #marketList.is-v3 .market-row,
+  #marketList .market-table-header,
+  #marketList.is-v3 .market-table-header { margin-left: 0; margin-right: 0; }
+}
+
 /* ════════ MARKET-EXCELLENCE-01B — pulido institucional de filas y estados ════════
    Sólo presentación. No se tocan las medidas que ya fijan los harnesses (radio 14 de la
    card, filas planas dentro de ella, padding 9/10 en móvil, rejilla de 7 pistas en

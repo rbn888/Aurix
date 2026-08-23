@@ -233,7 +233,12 @@ ok('6.5 v665 sigue en pie (la ausencia declarada es válida)',
 ok('6.6 B1/B4/B5 intactos',
    /function _aurixMktDataState\(/.test(app) && /'CNDX\.L'/.test(app)
    && /_aurixMktSortCoveragePending/.test(app));
-ok('6.7 CRYPTO_FALLBACK y ASSET_DB no se han tocado (fuera de alcance, registrado)',
+// El registro pendiente de v666 quedó cerrado en el cierre de MARKET EXCELLENCE V1:
+// CRYPTO_FALLBACK ya no lleva precio inventado. El invariante que este harness debe
+// seguir defendiendo no es "no se ha tocado", sino que la semilla SIGUE EXISTIENDO
+// (la fila de cripto nace por identidad) y que ASSET_DB no ha cambiado de camino.
+// Quien prueba el contenido de la semilla es AURIX-MARKET-ROW-PRICE-TRUTH §7.
+ok('6.7 la semilla de cripto y la de acciones siguen en su sitio',
    /const CRYPTO_FALLBACK = \[/.test(app) && /ASSET_DB\.filter\(a => a\.type === 'stock'\)/.test(app));
 
 console.log(`\n${pass} passed, ${fail} failed`);

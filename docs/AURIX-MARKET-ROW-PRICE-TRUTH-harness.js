@@ -12,6 +12,7 @@ const fs = require('fs'), path = require('path');
 const root = path.join(__dirname, '..');
 const read = (f) => { try { return fs.readFileSync(path.join(root, f), 'utf8'); } catch (_) { return ''; } };
 const app = read('app.js');
+const css = read('styles.css');
 
 let pass = 0, fail = 0;
 const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail++; console.log('  ✗ ' + n + (x ? '  → ' + x : '')); } };
@@ -192,6 +193,54 @@ ok('6.6 B1/B1.1/B5 intactos',
    && /_cryptoLongHistory/.test(read('services/chart-adapters.js')));
 ok('6.7 el orden por precio manda los ausentes al final (ya existía)',
    /const aM = !Number\.isFinite\(aV\), bM = !Number\.isFinite\(bV\);/.test(fnSource('_aurixMktExpSortItems')));
+
+// ── 7. CRYPTO_FALLBACK · la ÚLTIMA ruta de arranque con precio inventado ─
+// v666 dejó esto registrado como fuera de alcance: la semilla de cripto seguía
+// llevando `current_price: 97000` para BTC y `3400` para ETH, escritos a mano, y la
+// fila los pintaba igual que una cotización viva. Mismo defecto que 5.x corrigió en
+// ETF/índices, en la otra pestaña.
+console.log('\n7 — CRYPTO_FALLBACK: identidad sí, precio no:');
+const CFB = litArr('CRYPTO_FALLBACK') || [];
+ok('7.1 la semilla sigue existiendo y con su universo intacto (10 activos)',
+   CFB.length === 10 && CFB.some(c => c.symbol === 'BTC') && CFB.some(c => c.symbol === 'ETH'));
+ok('7.2 NINGUNA entrada trae precio',
+   CFB.length > 0 && CFB.every(c => c.current_price == null),
+   CFB.filter(c => c.current_price != null).map(c => c.symbol + '=' + c.current_price).join(','));
+ok('7.3 NINGUNA entrada trae variación (un 0 se leería como "plano")',
+   CFB.length > 0 && CFB.every(c => c.price_change_percentage_24h == null),
+   CFB.filter(c => c.price_change_percentage_24h != null).map(c => c.symbol).join(','));
+ok('7.4 los números concretos ya no están escritos en el bundle',
+   !/current_price:\s*97000/.test(app) && !/current_price:\s*3400\b/.test(app));
+ok('7.5 lo que SÍ se conserva es la identidad: símbolo, nombre e icono',
+   CFB.every(c => c.symbol && c.name && /^https:\/\/assets\.coingecko\.com\//.test(String(c.image || ''))));
+{
+  // El owner REAL: `normalizePriceItem` convierte `null` en `Number(null) === 0`, así que
+  // la prueba dura es que el saneador compartido lo rechace y NUNCA llegue a la fila.
+  const usable = new Function(fnSource('_mktUsablePrice') + '\n;return _mktUsablePrice;')();
+  ok('7.6 el saneador compartido rechaza el 0 que produce la semilla sin precio',
+     CFB.every(c => usable(Number(c.price ?? c.current_price ?? null)) === null)
+     && usable(0) === null && usable(97000) === 97000);
+  ok('7.7 y la fila sobrevive sin precio: `_isValidMarketItem` la acepta por identidad',
+     CFB.every(c => isValid({ symbol: c.symbol, current_price: null, price: null }) === true));
+}
+ok('7.8 la semilla sigue entrando por el MISMO camino, sin ruta nueva',
+   /if \(tab === 'crypto'\)\s+return CRYPTO_FALLBACK;/.test(fnSource('_buildFallbackItems'))
+   && /_setCryptoData\(items\)/.test(fnSource('_applyTypeItems')));
+
+// ── 8. CIERRE VISIBLE · geometría medida con aurix-market-visual-audit ───
+// Los dos únicos defectos que la sonda seguía midiendo. Valores tomados de la
+// medición, no elegidos: móvil convivía a 58/65/66px y tablet desbordaba 12px.
+console.log('\n8 — Cierre visible: geometría de la lista:');
+ok('8.1 móvil declara una altura de fila única (antes 58/65/66 según el nombre)',
+   /#marketList\.is-v4 \.market-row \{ min-height: 66px; \}/.test(css));
+ok('8.2 el nombre a dos líneas NO se sacrifica para conseguirla',
+   /-webkit-line-clamp: 2/.test(css));
+ok('8.3 tablet anula el bleed que sacaba la fila fuera de la card',
+   /@media \(min-width: 769px\) and \(max-width: 1024px\) \{[\s\S]{0,400}?#marketList\.is-v3 \.market-row,[\s\S]{0,200}?margin-left: 0; margin-right: 0;/.test(css));
+ok('8.4 el bleed de escritorio (que ahí SÍ cabe) sigue intacto',
+   /#marketList\.is-v3 \.market-row \{[^}]*margin: 0 -12px;/.test(css));
+ok('8.5 ambos arreglos son CSS puro: la fila de app.js no se ha tocado',
+   !/min-height: 66px/.test(app) && !/margin-left: 0; margin-right: 0/.test(app));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
