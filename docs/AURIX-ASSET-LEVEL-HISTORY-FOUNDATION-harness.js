@@ -145,6 +145,31 @@ const V = valueUser(ROW, PRICES, NOW);
      Math.abs(Object.values(V.assetValues).reduce((s, x) => s + x, 0) - V.total) < 0.01,
      'Σ=' + Object.values(V.assetValues).reduce((s, x) => s + x, 0) + ' vs total=' + V.total);
 }
+{
+  // ── TRAMPA PARA EL LECTOR FUTURO — Σ asset_values NO es el patrimonio invertible ──
+  // `asset_values` contiene TODAS las posiciones valoradas, incluidas las de real estate.
+  // Eso es correcto para el capturador (guardar menos sería perder dato), pero convierte
+  // `asset_values[x] / Σ asset_values` en el peso sobre el patrimonio TOTAL, no sobre el
+  // INVERTIBLE — que es el denominador que usa todo lo demás en Aurix (`total − real_estate`,
+  // el mismo de `category_values` y del Dashboard). Un lector que lo ignore publicaría un
+  // 20 % donde el peso real es del 50 %.
+  // Se fija aquí, ejecutable, en vez de en una nota: la futura SPEC de Attribution debe
+  // derivar el denominador de la semántica canónica, nunca de la suma del mapa.
+  const withRE = {
+    assets: [...ROW.assets, { id: 'a-flat', symbol: 'FLAT', type: 'real_estate', currentPrice: 1, assetCurrency: 'USD' }],
+    holdings: [...ROW.holdings, { id: 'h6', asset_id: 'a-flat', quantity: 300000 }],
+  };
+  const R = valueUser(withRE, PRICES, NOW);
+  const sumAll = Object.values(R.assetValues).reduce((s, x) => s + x, 0);
+  ok('3.3 las posiciones de real estate SÍ están en el mapa (no se pierden)',
+     R.assetValues['a-flat'] === 300000 && R.realEstate === 300000);
+  ok('3.4 por eso Σ asset_values = TOTAL, y NO el invertible',
+     Math.abs(sumAll - R.total) < 0.01 && Math.abs(sumAll - (R.total - R.realEstate)) > 0.01,
+     'Σ=' + sumAll + ' · total=' + R.total + ' · invertible=' + (R.total - R.realEstate));
+  ok('3.5 el invertible se deriva de la semántica canónica (total − real_estate)',
+     Math.abs((R.total - R.realEstate) - (sumAll - R.assetValues['a-flat'])) < 0.01,
+     'un peso invertible correcto excluye las posiciones de real estate del numerador Y del denominador');
+}
 
 console.log('\n4 — Una posición sin valoración NO se convierte en 0:');
 {
