@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '633'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '634'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4491,6 +4491,23 @@ const T = {
     intcc_tl_more:   n => `+${n} ${n === 1 ? 'evento anterior' : 'eventos anteriores'}`,
     intcc_re_ctx:    n => n === 1 ? '1 inmueble registrado, como contexto patrimonial.' : `${n} inmuebles registrados, como contexto patrimonial.`,
     intcc_disclaimer: 'Aurix interpreta tu patrimonio con datos reales. No es asesoramiento de inversión.',
+    // INT.PREVIEW.V1 — Intelligence Preview (FREE). Only facts certified as publishable
+    // TODAY: single-position concentration, liquidity weight and ONE allowed watch area.
+    // No health score, no attribution, no cause, no price, no checkout.
+    intprev_badge:      'Inteligencia · tu cartera',
+    intprev_title:      'Esto es lo que Aurix ya entiende de tu patrimonio',
+    intprev_f_conc:     (pct, name) => `El ${pct}% de tu patrimonio invertible depende de ${name}.`,
+    intprev_f_liq:      pct => `La liquidez representa el ${pct}% de tu patrimonio invertible.`,
+    intprev_q_label:    'La pregunta siguiente',
+    intprev_q:          '¿Cómo ha cambiado esta exposición en el tiempo?',
+    intprev_premium:    'Aurix ya lee tu estructura. El movimiento de esa estructura, su causa y su vigilancia continua llegan con Aurix Premium.',
+    intprev_cta:        'Volver al Dashboard',
+    intprev_hold_empty_t: 'Aurix todavía no tiene con qué leer tu patrimonio',
+    intprev_hold_empty_b: 'Registra tu primer activo y esta lectura aparecerá aquí, calculada sobre tus datos reales.',
+    intprev_hold_inc_t:   'Aurix no puede confirmar ahora la valoración completa de tu cartera',
+    intprev_hold_inc_b:   'Cuando todos tus activos tengan precio y divisa disponibles, esta lectura aparecerá aquí. Aurix prefiere no mostrar una cifra que no pueda demostrar.',
+    intprev_hold_none_t:  'Aurix está leyendo tu estructura patrimonial',
+    intprev_hold_none_b:  'Todavía no hay un hecho que Aurix pueda afirmar con la precisión suficiente sobre tu cartera actual.',
     // WS.1 — Workspace Home (planning center)
     wsh_eyebrow:        'Workspace',
     wsh_hero_title:     'Diseña tu futuro financiero',
@@ -6675,6 +6692,23 @@ const T = {
     intcc_tl_more:   n => `+${n} earlier ${n === 1 ? 'event' : 'events'}`,
     intcc_re_ctx:    n => n === 1 ? '1 property on record, as wealth context.' : `${n} properties on record, as wealth context.`,
     intcc_disclaimer: 'Aurix interprets your wealth with real data. It is not investment advice.',
+    // INT.PREVIEW.V1 — Intelligence Preview (FREE). Only facts certified as publishable
+    // TODAY: single-position concentration, liquidity weight and ONE allowed watch area.
+    // No health score, no attribution, no cause, no price, no checkout.
+    intprev_badge:      'Intelligence · your portfolio',
+    intprev_title:      'This is what Aurix already understands about your wealth',
+    intprev_f_conc:     (pct, name) => `${pct}% of your investable wealth depends on ${name}.`,
+    intprev_f_liq:      pct => `Liquidity represents ${pct}% of your investable wealth.`,
+    intprev_q_label:    'The next question',
+    intprev_q:          'How has this exposure changed over time?',
+    intprev_premium:    'Aurix already reads your structure. The movement of that structure, its cause and its ongoing monitoring come with Aurix Premium.',
+    intprev_cta:        'Back to Dashboard',
+    intprev_hold_empty_t: 'Aurix has nothing to read your wealth from yet',
+    intprev_hold_empty_b: 'Add your first asset and this reading will appear here, computed on your real data.',
+    intprev_hold_inc_t:   'Aurix cannot confirm a complete valuation of your portfolio right now',
+    intprev_hold_inc_b:   'Once every asset has an available price and currency, this reading will appear here. Aurix would rather show nothing than a figure it cannot prove.',
+    intprev_hold_none_t:  'Aurix is reading your wealth structure',
+    intprev_hold_none_b:  'There is no fact yet that Aurix can state with enough precision about your current portfolio.',
     // WS.1 — Workspace Home (planning center)
     wsh_eyebrow:        'Workspace',
     wsh_hero_title:     'Design your financial future',
@@ -48361,6 +48395,175 @@ function _aurixPremiumPreviewHTML(section) {
     + '</div>';
 }
 
+/* ════════ INT.PREVIEW.V1 — Intelligence Preview (FREE activation bridge) ══════
+   SPEC AURIX 2.4. The Dashboard "Ver análisis" CTA used to land a non-premium
+   user on the shared PREMIUM-PREVIEW-V2 card — a dead screen with six generic
+   bullets and zero of the user's data. This replaces ONLY that landing with up
+   to three REAL, personalised facts plus one contextual question.
+
+   Everything here is restricted to what the financial certification (Fase 2.3)
+   declared publishable TODAY:
+     · single-position concentration over INVESTABLE wealth (real estate excluded
+       from numerator and denominator by _aurixHealthSnapshot);
+     · liquidity weight via the canonical buildLiquidityView / investable
+       distribution;
+     · ONE existing watch area, restricted to _INT_PREVIEW_WATCH_ALLOWED.
+   Deliberately ABSENT: any 0–100 health score (the two engines are not
+   semantically equivalent), asset-level attribution, temporal deltas, causal
+   claims ("because"), Timeline, "since your last visit", synthetic values,
+   price, checkout and entitlement changes.
+
+   Fail-closed: no fact is rendered unless _aurixAssessValuationCompleteness
+   reports a COMPLETE valuation. An unpriced holding or an uncovered FX rate
+   poisons its category bucket in getInvestableDistribution, which would move
+   the very weights this screen states — so on anything less than complete we
+   show a hold state that says what is missing. Fewer facts beat wrong facts.
+
+   Reads only existing primitives. Creates no new financial metric and no new
+   signal rule; it consumes _intccWatchAreas as-is and filters it.
+   `data-preview-*` attributes exist so intelligence_preview_view /
+   preview_cta_click / intelligence_preview_fact_exposed can be instrumented
+   later without touching this markup — no listener is wired here, nothing is
+   emitted into the void. */
+
+// Watch areas admissible in the FREE preview. `crypto` (exposure of an asset
+// class) and `dep` (concentration of an individual position) carry both a real
+// figure and the semantically correct word. EXCLUDED on purpose: `liq` and
+// `div`, which are product thresholds with no figure (heuristics, not facts),
+// and `sector`, whose copy says a category "concentra" — concentration is a
+// single position, exposure is a class; fixing that copy is not this SPEC's job,
+// so the preview stays silent instead of publishing the wrong word.
+const _INT_PREVIEW_WATCH_ALLOWED = ['crypto', 'dep'];
+
+function _aurixIntelligencePreviewFacts() {
+  const out = { facts: [], state: 'ok', reason: '' };
+  let list = [];
+  try { list = (typeof activeAssets === 'function') ? activeAssets() : []; } catch (_) { list = []; }
+
+  // Fail-closed gate. Note _aurixAssessValuationCompleteness reports an EMPTY
+  // portfolio as complete:true, so the empty case is separated explicitly.
+  let val = null;
+  try {
+    val = (typeof _aurixAssessValuationCompleteness === 'function')
+      ? _aurixAssessValuationCompleteness(list) : null;
+  } catch (_) { val = null; }
+  if (!val)                    { out.state = 'incomplete'; out.reason = 'no-assessment'; return out; }
+  if (!val.totalActive)        { out.state = 'empty';      out.reason = 'no-holdings';   return out; }
+  if (!val.complete)           { out.state = 'incomplete'; out.reason = String(val.reason || 'incomplete'); return out; }
+
+  let snap = null, liq = null;
+  try { snap = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null; } catch (_) {}
+  try { liq  = (typeof buildLiquidityView   === 'function') ? buildLiquidityView()   : null; } catch (_) {}
+  // No investable wealth (e.g. real estate only) ⇒ every weight below would
+  // divide by zero. Hold instead of publishing a 0%.
+  if (!snap || !(Number(snap.totUSD) > 0)) { out.state = 'incomplete'; out.reason = 'no-investable'; return out; }
+
+  // 1 · Single-position concentration — the aha fact. Investable denominator.
+  const top = snap.topInvestedAsset;
+  if (top && Number.isFinite(top.pctTotal) && top.pctTotal >= 1 && top.name) {
+    out.facts.push({ kind: 'concentration', text: t('intprev_f_conc')(top.pctTotal, top.name) });
+  }
+  // 2 · Liquidity weight — canonical semantics, stated, never advised. Omitted
+  // at 0%: Aurix only knows the liquidity the user registered, so "0%" would
+  // read as a claim about their finances rather than about their portfolio.
+  if (liq && Number.isFinite(liq.cashPct) && liq.cashPct > 0) {
+    out.facts.push({ kind: 'liquidity', text: t('intprev_f_liq')(liq.cashPct) });
+  }
+  // 3 · ONE allowed watch area. `dep` is skipped when fact 1 already stated the
+  // same concentration — three facts, three distinct things.
+  let areas = [];
+  try {
+    areas = (typeof _intccWatchAreas === 'function')
+      ? (_intccWatchAreas(snap, liq || { cashPct: 0 }) || []) : [];
+  } catch (_) { areas = []; }
+  const hasConc = out.facts.some(f => f.kind === 'concentration');
+  const pick = areas
+    .filter(a => a && _INT_PREVIEW_WATCH_ALLOWED.indexOf(a.key) !== -1)
+    .filter(a => !(hasConc && a.key === 'dep'))[0];
+  if (pick) out.facts.push({ kind: 'watch:' + pick.key, title: pick.title, text: pick.body });
+
+  if (!out.facts.length) { out.state = 'none'; out.reason = 'no-qualifying-fact'; }
+  return out;
+}
+
+function _aurixIntelligencePreviewHTML() {
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const tx = (k, fb) => { try { const v = t(k); return (typeof v === 'string' && v) ? v : fb; } catch (_) { return fb; } };
+  let res;
+  try { res = _aurixIntelligencePreviewFacts(); } catch (_) { res = { facts: [], state: 'incomplete', reason: 'render-error' }; }
+
+  const style = ''
+    + '<style>'
+    + '.intprev-stage{position:relative;width:100%;min-height:calc(100dvh - 116px);display:flex;align-items:center;justify-content:center;padding:24px 16px;box-sizing:border-box;background:radial-gradient(circle at 50% 22%,rgba(70,120,255,0.10),transparent 60%),#05070e;}'
+    // Neutralize the Intelligence host (#tabPlaceholder) exactly like the shared
+    // premium preview does, so the card sits on one clean field.
+    + '.tab-placeholder:has(.intprev-stage){background:transparent!important;padding:0!important;margin:0!important;border:none!important;box-shadow:none!important;min-height:calc(100dvh - 116px)!important;display:flex!important;align-items:stretch!important;justify-content:center!important;}'
+    + '.intprev-card{position:relative;width:100%;max-width:620px;border-radius:24px;border:1px solid rgba(90,140,255,0.24);background:rgba(12,18,34,0.72);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 0 70px rgba(60,110,255,0.10),inset 0 1px 0 rgba(255,255,255,0.06);padding:30px 26px 26px;animation:intprevIn .22s ease-out both;}'
+    + '.intprev-badge{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(150,185,255,0.95);border:1px solid rgba(120,170,255,0.35);background:rgba(90,140,255,0.08);border-radius:999px;padding:5px 12px;margin-bottom:16px;}'
+    + '.intprev-title{font-size:20px;font-weight:800;color:rgba(255,255,255,0.985);margin:0 0 20px;letter-spacing:-.01em;line-height:1.25;}'
+    + '.intprev-facts{list-style:none;padding:0;margin:0 0 22px;display:flex;flex-direction:column;gap:12px;}'
+    + '.intprev-fact{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border:1px solid rgba(120,160,255,0.16);border-radius:14px;background:rgba(255,255,255,0.035);}'
+    + '.intprev-fact-dot{width:6px;height:6px;border-radius:50%;background:rgba(120,170,255,0.95);box-shadow:0 0 8px rgba(90,140,255,0.7);flex:0 0 auto;margin-top:7px;}'
+    + '.intprev-fact-body{min-width:0;}'
+    + '.intprev-fact-label{display:block;font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(150,185,255,0.8);margin-bottom:4px;}'
+    + '.intprev-fact-text{font-size:14.5px;line-height:1.5;color:rgba(255,255,255,0.9);}'
+    + '.intprev-sep{height:1px;background:linear-gradient(90deg,transparent,rgba(120,170,255,0.28),transparent);margin:0 0 18px;}'
+    + '.intprev-q-label{font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(150,185,255,0.72);margin:0 0 6px;}'
+    + '.intprev-q{font-size:17px;font-weight:700;line-height:1.35;color:rgba(210,228,255,0.97);margin:0 0 14px;}'
+    + '.intprev-premium{font-size:13.5px;line-height:1.6;color:rgba(255,255,255,0.62);margin:0 0 22px;}'
+    + '.intprev-cta{width:100%;font-size:14px;font-weight:700;color:rgba(215,230,255,0.95);background:rgba(90,140,255,0.10);border:1px solid rgba(120,170,255,0.34);border-radius:14px;height:46px;padding:0 20px;cursor:pointer;transition:background .2s,border-color .2s;}'
+    + '.intprev-cta:hover{background:rgba(90,140,255,0.18);border-color:rgba(120,170,255,0.5);}'
+    + '.intprev-hold-title{font-size:17px;font-weight:700;color:rgba(255,255,255,0.95);margin:0 0 8px;line-height:1.3;}'
+    + '.intprev-hold-body{font-size:14px;line-height:1.6;color:rgba(255,255,255,0.62);margin:0 0 22px;}'
+    + '@keyframes intprevIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}'
+    + '@media (min-width:768px){.intprev-stage{padding:32px 24px;}.intprev-card{padding:38px 36px 30px;}.intprev-title{font-size:24px;}.intprev-q{font-size:18px;}.intprev-cta{width:auto;min-width:220px;}}'
+    + '@media (prefers-reduced-motion:reduce){.intprev-card{animation:none;}.intprev-cta{transition:none;}}'
+    + '</style>';
+
+  const ctaLabel = tx('intprev_cta', 'Volver al Dashboard');
+  const cta = '<button type="button" class="intprev-cta" data-preview-event="preview_cta_click"'
+    + ' onclick="try{switchTab(\'home\')}catch(_){}">' + esc(ctaLabel) + '</button>';
+
+  let body;
+  if (res.state === 'ok' && res.facts.length) {
+    const items = res.facts.map(f => ''
+      + '<li class="intprev-fact" data-preview-fact="' + esc(f.kind) + '">'
+      +   '<span class="intprev-fact-dot" aria-hidden="true"></span>'
+      +   '<span class="intprev-fact-body">'
+      +     (f.title ? '<span class="intprev-fact-label">' + esc(f.title) + '</span>' : '')
+      +     '<span class="intprev-fact-text">' + esc(f.text) + '</span>'
+      +   '</span>'
+      + '</li>').join('');
+    body = ''
+      + '<h2 class="intprev-title">' + esc(tx('intprev_title', 'Esto es lo que Aurix ya entiende de tu patrimonio')) + '</h2>'
+      + '<ul class="intprev-facts">' + items + '</ul>'
+      + '<div class="intprev-sep" aria-hidden="true"></div>'
+      + '<p class="intprev-q-label">' + esc(tx('intprev_q_label', 'La pregunta siguiente')) + '</p>'
+      + '<p class="intprev-q">' + esc(tx('intprev_q', '¿Cómo ha cambiado esta exposición en el tiempo?')) + '</p>'
+      + '<p class="intprev-premium">' + esc(tx('intprev_premium', '')) + '</p>'
+      + cta;
+  } else {
+    // Hold states — say what is missing instead of promising anything.
+    const k = (res.state === 'empty') ? 'empty' : (res.state === 'none' ? 'none' : 'inc');
+    body = ''
+      + '<h2 class="intprev-hold-title">' + esc(tx('intprev_hold_' + k + '_t', '')) + '</h2>'
+      + '<p class="intprev-hold-body">' + esc(tx('intprev_hold_' + k + '_b', '')) + '</p>'
+      + cta;
+  }
+
+  return ''
+    + '<div class="intprev-stage" data-aurix-preview="intelligence"'
+    +   ' data-preview-event="intelligence_preview_view"'
+    +   ' data-preview-state="' + esc(res.state) + '"'
+    +   ' data-preview-facts="' + res.facts.length + '">' + style
+    +   '<section class="intprev-card" role="region" aria-label="' + esc(tx('intprev_badge', 'Intelligence')) + '">'
+    +     '<div class="intprev-badge">' + esc(tx('intprev_badge', 'Intelligence')) + '</div>'
+    +     body
+    +   '</section>'
+    + '</div>';
+}
+try { if (typeof window !== 'undefined') { window._aurixIntelligencePreviewHTML = _aurixIntelligencePreviewHTML; window._aurixIntelligencePreviewFacts = _aurixIntelligencePreviewFacts; } } catch (_) {}
+
 // IA.1 — render the Intelligence tab. The portfolio intelligence (health,
 // risk, diversification, liquidity, concentration, signals/score) was moved
 // out of Workspace into this dedicated tab. PURELY a move: it reuses the
@@ -48368,7 +48571,11 @@ function _aurixPremiumPreviewHTML(section) {
 // `_aurixWorkspaceIntelligence()` payload. Read-only — no editable sheet here.
 function renderIntelligenceTab() {
   // AURIX PREMIUM — Launch-1 gate: non-premium users see the premium preview (owner bypasses).
-  if (!hasAurixPremiumAccess(_aurixCurrentAuthUser())) return _aurixPremiumPreviewHTML('intelligence');
+  // INT.PREVIEW.V1 (SPEC 2.4): that preview is no longer the dead "PRÓXIMAMENTE" card but a
+  // real, personalised reading of the user's own portfolio. The gate itself is UNCHANGED —
+  // hasAurixPremiumAccess still decides, so full Intelligence stays exactly as it was for the
+  // owner. Workspace keeps using the shared _aurixPremiumPreviewHTML.
+  if (!hasAurixPremiumAccess(_aurixCurrentAuthUser())) return _aurixIntelligencePreviewHTML();
   // INT.1 — premium deterministic portfolio intelligence layer. Reads only
   // existing data (snapshot + distributions); no new APIs, no AI, no external
   // data. Responsive single markup (CSS handles desktop/mobile). The legacy

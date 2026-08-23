@@ -70,7 +70,11 @@ console.log('\nShared layout + i18n isolation + compact:');
   ok('EN carries no Spanish leak', !/se está preparando|Volver al Dashboard|Salud patrimonial|CAPA INTELIGENTE|próximamente/.test(enI)); }
 
 console.log('\nGates + owner + header stability (source):');
-ok('renderIntelligenceTab returns preview when NOT premium', /if \(!hasAurixPremiumAccess\(_aurixCurrentAuthUser\(\)\)\) return _aurixPremiumPreviewHTML\('intelligence'\);/.test(app));
+// INT.PREVIEW.V1 (SPEC 2.4): the gate is unchanged — a non-premium user still gets a preview
+// surface — but Intelligence now returns the personalised INT.PREVIEW.V1 reading instead of the
+// shared "PRÓXIMAMENTE" card. Workspace keeps the shared card (asserted on the next line).
+// Contract of the new surface lives in docs/AURIX-INT-PREVIEW-V1-harness.js.
+ok('renderIntelligenceTab returns the Intelligence preview when NOT premium', /if \(!hasAurixPremiumAccess\(_aurixCurrentAuthUser\(\)\)\) return _aurixIntelligencePreviewHTML\(\);/.test(app));
 ok('renderWorkspace shows preview when NOT premium', /!hasAurixPremiumAccess\(_aurixCurrentAuthUser\(\)\)\) \{[\s\S]{0,140}_aurixPremiumPreviewHTML\('workspace'\)/.test(app));
 ok('header stability: workspace preview does NOT go full-bleed (no logo shift)', /const _wsFullBleed = \(tab === 'workspace'\) && !\(typeof hasAurixPremiumAccess === 'function' && !hasAurixPremiumAccess\(_aurixCurrentAuthUser\(\)\)\);/.test(app) && /classList\.toggle\('workspace-active', _wsFullBleed\)/.test(app));
 ok('i18n by lang (ES default)', /typeof lang !== 'undefined' && lang === 'en'/.test(app));
