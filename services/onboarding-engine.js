@@ -36,16 +36,34 @@
     COMPLETED:   'COMPLETED',
   });
 
+  // ── ONBOARDING-EXCELLENCE-V1 ─────────────────────────────────────
   // Forward order — back-navigation uses ORDER.indexOf to find the previous.
+  // El recorrido pasa de 7 estados visibles a 4 momentos. Los estados retirados
+  // NO se borran de STATES: siguen existiendo para poder MIGRAR a quien quedó
+  // parado en ellos, y sus datos siguen siendo válidos y editables en Ajustes.
+  //   • INTERESTS  → vive ahora dentro de WELCOME (una pantalla, no dos).
+  //   • EXPERIENCE → `experience` no gobernaba ningún comportamiento.
+  //   • PROFILE    → `ageBand` tampoco, y `riskProfile` sólo matizaba el tono de
+  //                  una frase: no se pregunta antes de haber entregado valor.
   const ORDER = [
     STATES.LANGUAGE,
     STATES.WELCOME,
-    STATES.INTERESTS,
-    STATES.EXPERIENCE,
-    STATES.PROFILE,
     STATES.ACTIVATION,
     STATES.SUCCESS,
   ];
+
+  // Estados que ya no forman parte del recorrido → dónde continúa cada uno. Un
+  // usuario a mitad NUNCA puede quedar atrapado en un paso que dejó de existir:
+  // el que aún no había elegido intereses vuelve a WELCOME (allí están), y el que
+  // ya los eligió sigue hacia ACTIVATION, que es lo único que le queda por hacer.
+  const RETIRED_STEP_MIGRATION = Object.freeze({
+    [STATES.INTERESTS]:  STATES.WELCOME,
+    [STATES.EXPERIENCE]: STATES.ACTIVATION,
+    [STATES.PROFILE]:    STATES.ACTIVATION,
+  });
+  function _migrateRetiredStep(step) {
+    return RETIRED_STEP_MIGRATION[step] || step;
+  }
 
   // ── Runtime flags (spec §7) ──────────────────────────────────────
   // Mutable on window so the legacy global pattern in app.js can read them.
@@ -145,7 +163,9 @@
     let prefs = {};
     try { prefs = JSON.parse(_safeGet(LS.preferences) || '{}') || {}; } catch (_) {}
     return {
-      state:        completed ? STATES.COMPLETED : step,
+      // ONBOARDING-EXCELLENCE-V1 — migración en la LECTURA: quien quedó parado en
+      // un paso retirado entra ya en el estado válido, sin pantalla intermedia.
+      state:        completed ? STATES.COMPLETED : _migrateRetiredStep(step),
       completed,
       language:     prefs.language     || null,
       interests:    Array.isArray(prefs.interests) ? prefs.interests : [],
@@ -294,6 +314,13 @@
     if (!ORDER.includes(step) && step !== STATES.COMPLETED) return getSnapshot();
     _state = { ..._state, state: step };
     _writeLocal(_state);
+    // ONBOARDING-EXCELLENCE-V1 — el paso también viaja al backend. Antes sólo se
+    // escribía en local, así que `onboarding_step` remoto se quedaba en el valor
+    // de la última preferencia guardada: un segundo dispositivo no reanudaba donde
+    // el usuario lo había dejado. Es el mismo upsert idempotente que ya existía
+    // (mismo `onConflict: user_id`), no una ruta nueva, y es fail-soft: sin red el
+    // comportamiento local es exactamente el de siempre.
+    _syncRemote(_state);
     _emitState();
     return getSnapshot();
   }
@@ -351,9 +378,27 @@
     return getSnapshot();
   }
 
+  // ── ONBOARDING-EXCELLENCE-V1 — DIFERIR NO ES COMPLETAR ────────────
+  // `skipOnboarding()` llamaba a `completeOnboarding()`: un toque en la esquina
+  // superior marcaba COMPLETED de forma permanente, en local Y en remoto, y el
+  // usuario no volvía a ver el onboarding nunca — pudiendo quedarse sin añadir su
+  // primer activo. Era la mayor fuga de activación del flujo.
+  // Diferir CONSERVA el paso en curso y no toca `completed`, así que la próxima
+  // entrada reanuda exactamente donde estaba. Sin diálogo de confirmación: el
+  // usuario que pulsa "Lo haré más tarde" ya ha decidido.
+  function deferOnboarding() {
+    _analytics('onboarding_deferred', { fromState: _state.state });
+    // El estado permanece tal cual (no se avanza ni se retrocede) y se persiste
+    // para que la reanudación sea determinista también tras cerrar la pestaña.
+    _writeLocal(_state);
+    _syncRemote(_state);
+    _emitState();
+    return getSnapshot();
+  }
+  // Compat: cualquier llamador antiguo de `skipOnboarding()` obtiene la semántica
+  // nueva. No queda ninguna ruta que marque COMPLETED sin haber terminado.
   function skipOnboarding() {
-    _analytics('skipped', { fromState: _state.state });
-    return completeOnboarding();
+    return deferOnboarding();
   }
 
   function completeOnboarding(opts) {
@@ -414,6 +459,9 @@
     if (!window._aurixOnboardingInProgress) return;
     if (_state.state === STATES.ACTIVATION) {
       setStep(STATES.SUCCESS);
+      // ONBOARDING-EXCELLENCE-V1 — evento semántico del funnel. Reutiliza el
+      // `_analytics` que ya existía (window.aurixAnalytics): sin proveedor nuevo.
+      _analytics('first_asset_added', { fromState: STATES.ACTIVATION });
       _analytics('activation_completed', {});
     }
   });
@@ -438,6 +486,7 @@
     setLanguage,
     savePreferences,
     skipOnboarding,
+    deferOnboarding,
     completeOnboarding,
     clearOnboardingState,
     getSnapshot,

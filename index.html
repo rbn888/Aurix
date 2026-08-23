@@ -102,8 +102,8 @@
     //     app.js) is detectable: if tickCount freezes, the event loop is blocked.
     //   • a second visible stamp line confirms the timer was actually registered.
     (function() {
-      var BUILD = 'v668-cash-ledger-truth';
-      var APPJS_V = '632';
+      var BUILD = 'v669-onboarding-excellence';
+      var APPJS_V = '633';
       var HTML_TS = '2026-07-09T00:00:00Z';
       var T0 = (new Date()).getTime();
       window.AURIX_BUILD = BUILD;
@@ -461,7 +461,7 @@
        reshaping (FOUT) when the real font swaps in. -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=650">
+  <link rel="stylesheet" href="styles.css?v=651">
 </head>
 <body style="background:#040507">
 
@@ -1676,7 +1676,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.0"></script>
   <script src="config.js"></script>
   <script src="services/ux.js"></script>
-  <script src="services/onboarding-engine.js?v=1"></script>
+  <script src="services/onboarding-engine.js?v=2"></script>
   <!-- AURIX-PORTFOLIO-CHART-ENGINE-1 · Fase D: Portfolio Chart Engine (PCE).
        Load order = engine → price-layer → net-worth → adapter (ascending deps).
        `defer` so boot is uninterrupted; their globals are only used lazily at
@@ -1687,7 +1687,7 @@
   <script defer src="services/portfolio-net-worth.js?v=4"></script>
   <script defer src="services/portfolio-reconstruction-adapter.js?v=1"></script>
   <script>try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsRequested=true;window.__AURIX_BOOT.mark('app_js_requested');}}catch(_){}</script>
-  <script src="app.js?v=632"
+  <script src="app.js?v=633"
     onload="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoaded=true;window.__AURIX_BOOT.mark('app_js_loaded');}}catch(_){}"
     onerror="try{if(window.__AURIX_BOOT){window.__AURIX_BOOT.appJsLoadError=true;window.__AURIX_BOOT.mark('app_js_load_error');window.__AURIX_BOOT.errors.push('app.js failed to load (network/404/parse)');}}catch(_){}"></script>
   <!-- AURIX-WEALTH-ENGINE-1: pure derived-financials façade (window.wealthEngine).
@@ -2165,12 +2165,13 @@
     <div class="onb-progress" id="onbProgress" aria-hidden="true">
       <span class="onb-progress-dot" data-step="LANGUAGE"></span>
       <span class="onb-progress-dot" data-step="WELCOME"></span>
-      <span class="onb-progress-dot" data-step="INTERESTS"></span>
-      <span class="onb-progress-dot" data-step="EXPERIENCE"></span>
-      <span class="onb-progress-dot" data-step="PROFILE"></span>
       <span class="onb-progress-dot" data-step="ACTIVATION"></span>
     </div>
-    <button type="button" class="onb-skip" id="onbSkipBtn" data-i18n="onbSkip">Saltar</button>
+    <!-- ONBOARDING-EXCELLENCE-V1 — "Saltar" ejecutaba `completeOnboarding()`: un toque
+         accidental en la esquina cerraba el onboarding PARA SIEMPRE y el usuario podía
+         quedarse sin añadir su primer activo. Ahora es "Lo haré más tarde": difiere,
+         conserva el progreso y el onboarding se reanuda en la siguiente entrada. -->
+    <button type="button" class="onb-skip" id="onbSkipBtn" data-i18n="onbLater">Lo haré más tarde</button>
 
     <!-- Step: LANGUAGE — first screen always. No localised copy: bilingual. -->
     <section class="onb-step" data-onb-step="LANGUAGE">
@@ -2208,6 +2209,14 @@
       </div>
       <h2 class="onb-headline" data-i18n="onbWelcomeTitle">Todo tu patrimonio. Una sola visión.</h2>
       <p class="onb-sub" data-i18n="onbWelcomeSub">Aurix reúne tus activos y transforma información dispersa en claridad patrimonial.</p>
+      <!-- ONBOARDING-EXCELLENCE-V1 — INTERESES FUSIONADOS EN LA BIENVENIDA.
+           Antes eran dos pantallas: una que sólo se leía (WELCOME) y otra que sólo
+           preguntaba (INTERESTS). La bienvenida sin decisión costaba un tap entero y
+           no producía nada. Ahora la misma pantalla dice qué es Aurix y deja elegir
+           inmediatamente qué controlar. El rail Unificar→Comprender→Decidir se
+           conserva porque encuadra la elección que viene justo debajo, no la retrasa.
+           El grid mantiene su id, sus `data-onb-interest` y su consumidor real
+           (`_aurixBuildStarterWatchlist`): cero cambio de datos. -->
       <div class="onb-welcome-rail" aria-hidden="true">
         <span class="onb-wr-step" data-i18n="onbWelcomeRail1">Unificar</span>
         <span class="onb-wr-arrow">→</span>
@@ -2215,15 +2224,7 @@
         <span class="onb-wr-arrow">→</span>
         <span class="onb-wr-step" data-i18n="onbWelcomeRail3">Decidir</span>
       </div>
-      <div class="onb-footer">
-        <button type="button" class="onb-cta onb-cta--primary" data-onb-next data-i18n="onbContinue">Continuar</button>
-      </div>
-    </section>
-
-    <!-- Step: INTERESTS -->
-    <section class="onb-step" data-onb-step="INTERESTS">
-      <h2 class="onb-headline" data-i18n="onbInterestsTitle">¿Qué te interesa seguir?</h2>
-      <p class="onb-sub" data-i18n="onbInterestsSub">Opcional. Nos ayuda a personalizar tu experiencia.</p>
+      <p class="onb-sub onb-interests-lead" data-i18n="onbInterestsLead">¿Qué quieres controlar?</p>
       <div class="onb-chip-grid" id="onbInterestsGrid">
         <button type="button" class="onb-chip" data-onb-interest="stocks"      data-i18n="onbAssetStocks">Acciones</button>
         <button type="button" class="onb-chip" data-onb-interest="crypto"      data-i18n="onbAssetCrypto">Cripto</button>
@@ -2232,11 +2233,18 @@
         <button type="button" class="onb-chip" data-onb-interest="cash"        data-i18n="onbAssetCash">Liquidez</button>
         <button type="button" class="onb-chip" data-onb-interest="real_estate" data-i18n="onbAssetRe">Inmuebles</button>
       </div>
-      <div class="onb-footer onb-footer--split">
-        <button type="button" class="onb-cta onb-cta--ghost" data-onb-back data-i18n="onbBack">Atrás</button>
+      <div class="onb-footer">
         <button type="button" class="onb-cta onb-cta--primary" data-onb-next data-i18n="onbContinue">Continuar</button>
       </div>
     </section>
+
+    <!-- ONBOARDING-EXCELLENCE-V1 — INTERESTS / EXPERIENCE / PROFILE salen del flujo.
+         INTERESTS vive ahora dentro de WELCOME (arriba). EXPERIENCE y PROFILE se
+         retiran porque no gobernaban comportamiento: `experience` y `ageBand` no
+         tenían ningún consumidor, y `riskProfile` sólo matizaba el tono de una frase
+         — no justifica preguntarlo ANTES de haber entregado valor. Las secciones se
+         conservan en el DOM y siguen editables desde Ajustes, así que ningún dato ya
+         guardado se pierde ni cambia de forma; simplemente dejan de estar en `ORDER`. -->
 
     <!-- Step: EXPERIENCE -->
     <section class="onb-step" data-onb-step="EXPERIENCE">
@@ -2344,11 +2352,11 @@
         </svg>
       </div>
       <h2 class="onb-headline" data-i18n="onbSuccessTitle">Perfecto.</h2>
-      <p class="onb-sub" data-i18n="onbSuccessSub">Tu cartera ha comenzado.</p>
+      <p class="onb-sub" data-i18n="onbSuccessSub">Tu patrimonio ya está en Aurix.</p>
       <span class="onb-success-chip" id="onbSuccessChip"></span>
       <p class="onb-sub onb-success-body" id="onbSuccessBody"></p>
       <div class="onb-footer onb-footer--split">
-        <button type="button" class="onb-cta onb-cta--ghost" id="onbGoDashboardBtn" data-i18n="onbGoDashboard">Ir al dashboard</button>
+        <button type="button" class="onb-cta onb-cta--ghost" id="onbGoDashboardBtn" data-i18n="onbGoDashboard">Ver mi patrimonio</button>
         <button type="button" class="onb-cta onb-cta--primary" id="onbAddAnotherBtn" data-i18n="onbAddAnother">+ Añadir otro activo</button>
       </div>
     </section>

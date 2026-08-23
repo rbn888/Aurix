@@ -49,26 +49,45 @@ ok('6 entrance cascade untouched (still animates the 4 card types)', /\.modal--o
 
 // ── 7 ISOLATION — the three polished steps keep every markup hook ────────────
 ok('7 LANGUAGE keeps both lang cards + disabled continue', /data-onb-lang="es"/.test(LANG) && /data-onb-lang="en"/.test(LANG) && /id="onbLangContinue"[^>]*disabled/.test(LANG));
-ok('7 INTERESTS keeps its 6 data-onb-interest chips + #onbInterestsGrid', (INT.match(/data-onb-interest=/g) || []).length === 6 && /id="onbInterestsGrid"/.test(INT));
+// ONBOARDING-EXCELLENCE-V1 — los intereses ya no son un paso propio: viven dentro
+// de WELCOME. Lo que este harness debe seguir defendiendo NO es dónde están, sino
+// que conservan sus 6 chips, su id y sus hooks — que es lo que hace que el pulido
+// de v539 y su consumidor (`_aurixBuildStarterWatchlist`) sigan funcionando.
+ok('7 los 6 chips de intereses + #onbInterestsGrid siguen intactos (ahora dentro de WELCOME)',
+   (WEL.match(/data-onb-interest=/g) || []).length === 6 && /id="onbInterestsGrid"/.test(WEL));
 ok('7 EXPERIENCE keeps its 3 data-onb-exp cards + tag/name/desc', (EXP.match(/data-onb-exp=/g) || []).length === 3 && (EXP.match(/class="onb-exp-tag"/g) || []).length === 3 && (EXP.match(/class="onb-exp-desc"/g) || []).length === 3);
 
 // ── 8 ISOLATION — Welcome + Investor Profile (incl. Age) untouched ───────────
 ok('8 WELCOME still the convergence hero + rail (not regressed)', /class="onb-welcome-hero"/.test(WEL) && (WEL.match(/class="onb-wh-dot"/g) || []).length === 5 && (WEL.match(/class="onb-wr-step"/g) || []).length === 3);
 ok('8 PROFILE still 4 identity cards + Age subordinate block inside it', (PROF.match(/class="onb-profile-card/g) || []).length === 4 && /class="onb-profile-age"/.test(PROF) && /id="onbAgeChips"/.test(PROF));
-ok('8 Age is NOT promoted to its own step (still 7 steps, unchanged flow)', (html.match(/data-onb-step="/g) || []).length === 7 && html.indexOf('data-onb-step="AGE"') < 0);
+// El invariante real de v538 era que la EDAD no se convirtiera en un paso propio.
+// Sigue vigente. El recuento de secciones baja a 6 porque INTERESTS se fusionó en
+// WELCOME (ONBOARDING-EXCELLENCE-V1); EXPERIENCE y PROFILE permanecen en el DOM
+// para Ajustes aunque salgan del recorrido.
+ok('8 la edad NO es un paso propio, y las secciones del overlay son las esperadas',
+   (html.match(/data-onb-step="/g) || []).length === 6 && html.indexOf('data-onb-step="AGE"') < 0,
+   (html.match(/data-onb-step="/g) || []).length + ' secciones');
 
 // ── 9 flow intact — delegated handlers + nav untouched ───────────────────────
 ok('9 delegated lang/interest/exp handlers untouched (attribute-based, app.js)', /e\.target\.closest\('\[data-onb-lang\]'\)/.test(app) && /e\.target\.closest\('\[data-onb-interest\]'\)/.test(app) && /e\.target\.closest\('\[data-onb-exp\]'\)/.test(app));
-ok('9 back / next / skip controls present across the flow', /data-onb-back/.test(INT) && /data-onb-next/.test(INT) && /id="onbSkipBtn"/.test(html));
+// El control de "saltar" sigue existiendo, pero su semántica cambió: ya no completa
+// el onboarding, lo DIFIERE (ONBOARDING-EXCELLENCE-V1). Aquí se comprueba que los
+// controles de navegación siguen presentes en el recorrido vigente.
+ok('9 avanzar/retroceder/diferir siguen presentes en el flujo',
+   /data-onb-next/.test(WEL) && /data-onb-back/.test(html) && /id="onbSkipBtn"/.test(html));
 
 // ── 10 CSS-only — no app.js logic added by this SPEC ─────────────────────────
 ok('10 marker lives in CSS, not app.js logic', app.indexOf('SPEC 45 ONBOARDING FINISH') < 0 && css.indexOf('SPEC 45 ONBOARDING FINISH') >= 0);
-ok('10 no onboarding markup change vs HEAD (pure CSS + version diff)', (function () {
-  let names = 'giterr'; try { names = cp.execSync('git -C ' + JSON.stringify(root) + ' diff --name-only', { encoding: 'utf8' }); } catch (e) { return true; }
-  // index.html may appear (version-string bump only); assert its diff touches no onb-step markup.
-  let idx = ''; try { idx = cp.execSync('git -C ' + JSON.stringify(root) + ' diff -- index.html', { encoding: 'utf8' }); } catch (e) {}
-  return !/^[+-].*data-onb-(step|lang|interest|exp|risk|age|next|back)=/m.test(idx);
-})());
+// El assert original congelaba el markup del onboarding: era el guard de aislamiento
+// de un SPEC CSS-only (v539), correcto entonces. ONBOARDING-EXCELLENCE-V1 cambia el
+// markup DELIBERADAMENTE, así que congelarlo dejaría de describir la realidad. Lo que
+// se conserva es lo que ese guard protegía de verdad: que los HOOKS por atributo con
+// los que trabajan los handlers delegados sigan existiendo, uno a uno.
+ok('10 todos los hooks por atributo del onboarding siguen presentes',
+   // `data-onb-next` / `data-onb-back` son atributos booleanos: se buscan sin '='.
+   ['data-onb-step=', 'data-onb-lang=', 'data-onb-interest=', 'data-onb-exp=',
+    'data-onb-risk=', 'data-onb-age=', 'data-onb-next', 'data-onb-back']
+     .every(h => html.indexOf(h) >= 0));
 
 console.log('\n' + (fail === 0 ? '✅' : '❌') + ' ONBOARDING-FINISH-QA — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);

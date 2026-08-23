@@ -24840,6 +24840,52 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
   #marketList.is-v4 .market-row { border-radius: 0; }
 }
 
+/* ════════ ONBOARDING-EXCELLENCE-V1 · EL CTA NUNCA QUEDA BAJO EL PLIEGUE ══════
+   Medido con la sonda de Fase 0 a 375×667 (iPhone SE): el paso más largo dejaba sus
+   DOS botones fuera de la pantalla, así que la acción principal dependía de que el
+   usuario descubriera que había scroll. Y la bienvenida ahora también aloja los
+   intereses, con lo que el contenido crece.
+   El arreglo no recorta contenido ni cambia una sola medida de las que ya fijan los
+   harnesses: separa scroll de acción. El cuerpo del paso desplaza, el pie se ancla.
+   Vale para TODOS los pasos, hoy y los que vengan, sin ajustar alturas a mano. */
+.modal--onboarding .onb-step.is-active {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;                    /* imprescindible para que el hijo pueda encoger */
+  overflow-y: auto;
+  overscroll-behavior: contain;     /* el rebote no se propaga al documento */
+  -webkit-overflow-scrolling: touch;
+}
+.modal--onboarding .onb-footer {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;                 /* si sobra alto, el pie se va abajo, no flota */
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
+  /* El contenido que pasa por debajo se desvanece contra el pie en vez de cortarse
+     en seco: se lee como un pie anclado, no como un recorte. */
+  background: linear-gradient(180deg, rgba(19,24,38,0) 0%, rgba(19,24,38,0.96) 38%);
+  z-index: 1;
+}
+/* Objetivo táctil: ningún CTA por debajo de 44px, en ningún paso. */
+.modal--onboarding .onb-cta { min-height: 44px; }
+
+/* Pantallas CORTAS (no estrechas: lo que falta es alto). El hero de convergencia es
+   decorativo y declara `aria-hidden`, así que es lo primero que cede — 76px que van
+   íntegros al contenido con el que el usuario interactúa. El rail se mantiene: es el
+   que encuadra la elección de intereses justo debajo. */
+@media (max-height: 700px) {
+  .modal--onboarding { max-height: min(92vh, 620px); }
+  .modal--onboarding .onb-welcome-hero { display: none; }
+  .modal--onboarding .onb-headline { margin-bottom: 6px; }
+  .modal--onboarding .onb-welcome-rail { margin: 8px 0; }
+}
+/* La bienvenida fusionada: el lead de intereses separa las dos ideas sin gritar. */
+.onb-interests-lead {
+  margin-top: 14px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.82);
+}
+
 /* ════════ MARKET-EXCELLENCE-V1 · CIERRE VISIBLE ══════════════════════════════
    Los dos ÚNICOS defectos de geometría que seguían midiéndose en
    `scripts/aurix-market-visual-audit.mjs` al cerrar el bloque. Sólo presentación:

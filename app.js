@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '632'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '633'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5659,6 +5659,8 @@ const T = {
     exit: 'Salir',
     // ── Onboarding ────────────────────────────────
     onbSkip:              'Saltar',
+    onbLater:             'Lo haré más tarde',
+    onbInterestsLead:     '¿Qué quieres controlar?',
     onbContinue:          'Continuar',
     onbBack:              'Atrás',
     onbWelcomeTitle:      'Todo tu patrimonio. Una sola visión.',
@@ -5707,12 +5709,12 @@ const T = {
     onbActSub:            'Empieza a construir tu visión financiera.',
     onbAddAssetBtn:       '+ Añadir activo',
     onbSuccessTitle:      'Perfecto.',
-    onbSuccessSub:        'Tu cartera ha comenzado.',
+    onbSuccessSub:        'Tu patrimonio ya está en Aurix.',
     onbSuccessBody1:      'Ya has añadido tu primer activo. Puedes seguir construyendo tu portfolio o entrar al dashboard.',
     onbSuccessBodyN:      n => `Puedes seguir construyendo tu portfolio o entrar al dashboard.`,
     onbSuccessCount:      n => n === 1 ? 'Tienes 1 activo' : `Tienes ${n} activos`,
     onbAddAnother:        '+ Añadir otro activo',
-    onbGoDashboard:       'Ir al dashboard',
+    onbGoDashboard:       'Ver mi patrimonio',
     onbWelcomeBullet1:    'Sigue tu evolución',
     onbWelcomeBullet2:    'Entiende tu exposición',
     onbWelcomeBullet3:    'Toma mejores decisiones',
@@ -7807,6 +7809,8 @@ const T = {
     exit: 'Exit',
     // ── Onboarding ────────────────────────────────
     onbSkip:              'Skip',
+    onbLater:             "I'll do it later",
+    onbInterestsLead:     'What do you want to track?',
     onbContinue:          'Continue',
     onbBack:              'Back',
     onbWelcomeTitle:      'All your wealth. A single view.',
@@ -7852,12 +7856,12 @@ const T = {
     onbActSub:            'Start building your financial view.',
     onbAddAssetBtn:       '+ Add asset',
     onbSuccessTitle:      'Great.',
-    onbSuccessSub:        'Your portfolio has started.',
+    onbSuccessSub:        'Your wealth is now in Aurix.',
     onbSuccessBody1:      'You added your first asset. You can continue building your portfolio or go to your dashboard.',
     onbSuccessBodyN:      n => `You can continue building your portfolio or go to your dashboard.`,
     onbSuccessCount:      n => n === 1 ? 'You have 1 asset' : `You have ${n} assets`,
     onbAddAnother:        '+ Add another asset',
-    onbGoDashboard:       'Go to dashboard',
+    onbGoDashboard:       'See my wealth',
     onbWelcomeBullet1:    'Track your evolution',
     onbWelcomeBullet2:    'Understand your exposure',
     onbWelcomeBullet3:    'Make better decisions',
@@ -61108,6 +61112,7 @@ try {
   // restore the onboarding modal once; further dismissals leave them
   // on the dashboard, where Skip + manual reopen remain available.
   let _activationAddAttempted = false;
+  let _activationViewed = false;   // ONBOARDING-EXCELLENCE-V1 — un solo `activation_viewed` por sesión
 
   function _ov() { return document.getElementById('onboardingOverlay'); }
   function _modal() { return document.querySelector('#onboardingOverlay .modal'); }
@@ -61303,13 +61308,15 @@ try {
     // onboarding modal visually hidden but the engine state intact.
     // The 'aurix:asset-added' listener re-opens onboarding at SUCCESS.
     if (e.target.closest && e.target.closest('#onbAddAssetBtn') && _ov()?.classList.contains('open')) {
-      // ONBOARDING-1B §3: only the first attempt arms the auto-return
-      // path. Subsequent reopens (e.g. user closed add-asset and pressed
-      // the CTA again manually) do not re-arm — they remain a normal
-      // open, so closing the add-asset modal leaves the user wherever
-      // they choose without a forced loop.
-      awaitingAsset = !_activationAddAttempted;
+      // ONBOARDING-EXCELLENCE-V1 — REINTENTOS. `awaitingAsset = !_activationAddAttempted`
+      // sólo armaba el retorno la PRIMERA vez: si el usuario abría Add Asset, lo
+      // cancelaba y volvía a pulsar, cerrar el modal ya no le devolvía al onboarding y
+      // se quedaba fuera del flujo sin haber añadido nada. Ahora cada intento arma el
+      // retorno, así que cancelar y reintentar es un ciclo cerrado tantas veces como
+      // haga falta. El flag se conserva para la telemetría del primer intento.
+      awaitingAsset = true;
       _activationAddAttempted = true;
+      try { if (typeof window.aurixAnalytics === 'function') window.aurixAnalytics('add_asset_started', { from: 'ACTIVATION' }); } catch (_) {}
       _hideOnboardingOverlay();
       try {
         if (typeof openModal === 'function') openModal();
@@ -61321,9 +61328,11 @@ try {
       return;
     }
 
-    // Skip
+    // ONBOARDING-EXCELLENCE-V1 — "Lo haré más tarde": cierra y CONSERVA el progreso.
+    // Antes esto marcaba COMPLETED de forma permanente.
     if (e.target.closest && e.target.closest('#onbSkipBtn') && _ov()?.classList.contains('open')) {
-      Eng.skipOnboarding();
+      if (typeof Eng.deferOnboarding === 'function') Eng.deferOnboarding();
+      else Eng.skipOnboarding();
       _hideOnboardingOverlay();
       return;
     }
@@ -61362,6 +61371,13 @@ try {
     const modal = _modal();
     if (modal && snap.state && snap.state !== STATES.COMPLETED) {
       modal.setAttribute('data-step', snap.state);
+    }
+    // ONBOARDING-EXCELLENCE-V1 — el paso que decide la activación merece su propio
+    // evento de embudo: es donde se mide la caída entre "vio la invitación" y
+    // "abrió Add Asset". Una sola vez por sesión de onboarding.
+    if (snap.state === STATES.ACTIVATION && !_activationViewed) {
+      _activationViewed = true;
+      try { if (typeof window.aurixAnalytics === 'function') window.aurixAnalytics('activation_viewed', {}); } catch (_) {}
     }
     _syncSelectionsFromState();
 
