@@ -145,7 +145,15 @@ console.log('\nCASO G — lógica financiera intacta');
   ok('LB-1 partial-valuation gate intact', /if \(Number\(v\.dropped_asset_count\) > 0\) \{ incompleteRej\+\+; continue; \}/.test(ts));
   ok('near-duplicate guard intact', /dt <= NEAR_MS && dv <= NEAR_FRAC/.test(ts));
   ok('investable buckets unchanged', /INVESTABLE_TYPES = new Set\(\['crypto', 'stock', 'etf', 'fund', 'metal', 'liquidity', 'cash', 'other'\]\)/.test(ts));
-  ok('inserted fields unchanged', /source: 'backend_snapshot',\s*\n?\s*confidence: 'scheduled'/.test(ts));
+  // ASSET-LEVEL-HISTORICAL-DATA-FOUNDATION — el insert gana `asset_values` (aditivo,
+  // write-only). El invariante sigue siendo que NINGÚN campo existente desaparece o
+  // cambia de significado, así que se comprueban uno a uno en vez de exigir que dos
+  // sean contiguos: la adyacencia textual nunca fue el contrato.
+  ok('inserted fields unchanged (+ asset_values, aditivo)',
+     ['user_id:', 'ts:', 'total_value_usd:', 'real_estate:', 'category_values:', 'asset_count:',
+      "source: 'backend_snapshot'", "confidence: 'scheduled'", 'market_state:', 'price_staleness:',
+      'schema_version: 1'].every(f => ts.includes(f))
+     && /asset_values: v\.assetValues/.test(ts));
 }
 
 // ── CRON — pg_net presents the secret the function actually checks ─────────

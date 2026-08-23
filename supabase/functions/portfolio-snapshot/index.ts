@@ -102,6 +102,16 @@ function valueUser(row: any, prices: Map<string, { price: number; currency: stri
   const holdings: any[] = Array.isArray(row.holdings) ? row.holdings : [];
   const byId = new Map<any, any>(catalog.map((a: any) => [a && a.id, a]));   // catalog keyed by id
   const categories: Record<string, number> = {};
+  // SPEC ASSET-LEVEL-HISTORICAL-DATA-FOUNDATION — misma valoración, un nivel más fino.
+  // El bucle de abajo YA calcula el USD de cada posición para sumarlo a su bucket; esto
+  // sólo conserva ese número junto a la identidad canónica de la posición en lugar de
+  // dejar que se pierda en el agregado. No cambia ni una cifra: se escribe DESPUÉS del
+  // mismo guard de valoración que decide si el valor entra en `total`/`categories`, así
+  // que una posición sin precio válido no aparece aquí — y su ausencia significa "no se
+  // pudo valorar", nunca 0 USD. Sin esta serie, la evolución por activo no se puede
+  // reconstruir después: el precio histórico de un proveedor externo no es determinista
+  // ni auditable, y dos dispositivos no obtendrían el mismo número.
+  const assetValues: Record<string, number> = {};
   const warnings: string[] = [];
   let total = 0, realEstate = 0, count = 0, priced = 0, unpriced = 0, fxCount = 0, dropped = 0;
   let anyStale = false, anyClosed = false, anyCrypto = false;
@@ -154,13 +164,20 @@ function valueUser(row: any, prices: Map<string, { price: number; currency: stri
     if (!Number.isFinite(valueUSD)) { unpriced++; dropped++; warnings.push('unpriced:' + (asset.symbol || h.asset_id)); continue; }   // excluded from total ⇒ partial valuation (LB-1)
     if (staleness !== 'live') anyStale = true;
     categories[bucket] = (categories[bucket] || 0) + valueUSD;
+    // La identidad es `asset_id` (la clave del join catálogo⋈holdings, la misma que ya
+    // usan los flujos de capital). Nunca ticker ni nombre: cambian, colisionan entre
+    // cadenas y no son identidad. Se redondea a la misma precisión que el resto de
+    // importes publicados. Si dos holdings apuntaran al mismo activo, se suman: el peso
+    // del activo es lo que se quiere medir, no el de cada lote.
+    const _aid = String(h.asset_id);
+    assetValues[_aid] = +(((assetValues[_aid] || 0) + valueUSD).toFixed(2));
     total += valueUSD;
     if (bucket === 'real_estate') realEstate += valueUSD;
     count++;
   }
   const market_state = anyCrypto && !anyClosed ? 'crypto_24_7' : (anyClosed ? (anyCrypto ? 'mixed' : 'closed') : 'open');
   const price_staleness = anyStale ? (market_state === 'closed' ? 'last_close' : 'stale') : 'live';
-  return { total: +total.toFixed(2), realEstate: +realEstate.toFixed(2), categories, count,
+  return { total: +total.toFixed(2), realEstate: +realEstate.toFixed(2), categories, assetValues, count,
     priced_asset_count: priced, unpriced_asset_count: unpriced, dropped_asset_count: dropped, fx_conversions: fxCount,
     holdings_count: holdings.length, catalog_count: catalog.length, warnings: warnings.slice(0, 20),
     market_state, price_staleness };
@@ -256,6 +273,7 @@ Deno.serve(async (req: Request) => {
       priced_asset_count: v.priced_asset_count, unpriced_asset_count: v.unpriced_asset_count,
       dropped_asset_count: v.dropped_asset_count,
       fx_conversions: v.fx_conversions, category_values: v.categories,
+      asset_position_count: Object.keys(v.assetValues).length,
       market_state: v.market_state, price_staleness: v.price_staleness, warnings: v.warnings });
     if (!Number.isFinite(v.total) || v.total <= 0) { empty++; continue; }
     // SPEC CHART-INTEGRITY.LB-1 (server-side) — a PARTIAL valuation (≥1 active holding excluded from the
@@ -279,6 +297,14 @@ Deno.serve(async (req: Request) => {
     const { error: insErr } = await admin.from('portfolio_snapshots').insert({
       user_id: r.user_id, ts: now.toISOString(), total_value_usd: v.total, real_estate: v.realEstate,
       category_values: v.categories, asset_count: v.count, source: 'backend_snapshot',
+      // SPEC ASSET-LEVEL-HISTORICAL-DATA-FOUNDATION — la serie por posición. Sólo llega
+      // aquí un snapshot COMPLETO: el guard LB-1 de arriba descarta la escritura entera
+      // cuando `dropped_asset_count > 0`, así que un `asset_values` persistido contiene
+      // SIEMPRE todas las posiciones activas del instante. No existe el caso "parcial".
+      // La columna es NULLABLE y sin default a propósito: en los snapshots anteriores a
+      // esta capacidad vale NULL = "no se capturó", que es distinto de `{}` = "no había
+      // posiciones". Confundirlos convertiría el pasado en evidencia falsa de cartera vacía.
+      asset_values: v.assetValues,
       confidence: 'scheduled', market_state: v.market_state, price_staleness: v.price_staleness, schema_version: 1,
     });
     if (insErr) {

@@ -37,6 +37,9 @@ function strip(s) {
     .split('const byId = new Map<any, any>(catalog.map((a: any) =>').join('const byId = new Map(catalog.map((a) =>')
     .split('const categories: Record<string, number> = {};').join('const categories = {};')
     .split('const warnings: string[] = [];').join('const warnings = [];')
+    // ASSET-LEVEL-HISTORICAL-DATA-FOUNDATION — el capturador conserva ahora el valor por
+    // posición junto al agregado; su declaración entra en el mismo despojado literal.
+    .split('const assetValues: Record<string, number> = {};').join('const assetValues = {};')
     .split('let valueUSD: number = NaN;').join('let valueUSD = NaN;');
 }
 // contiguous helper region: from `const INVESTABLE_TYPES` (line ~31) to just before the SPEC.36 Deno.serve block.
