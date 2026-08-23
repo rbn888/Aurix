@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '631'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '632'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -2342,6 +2342,10 @@ function _aurixPerformanceSanityCheck(range, opts) {
     out.displayedReturnValue = canon ? canon.displayedReturnValue : null;
     out.netFlowsNeutralized = ret ? ret.netFlowsNeutralized : null;
     out.grossDeltaPct = ret ? ret.grossDeltaPct : null;
+    // AURIX-CASH-LEDGER-TRUTH — evidencia de reconciliación del ledger económico.
+    out.unmatchedFlows     = ret ? (ret.unmatchedFlows || 0) : 0;
+    out.unmatchedFlowTotal = ret ? (ret.unmatchedFlowTotal || 0) : 0;
+    out.flowLedgerRevision = (typeof _aurixFlowLedgerRevision === 'function') ? _aurixFlowLedgerRevision() : 0;
     out.lastSnapshotTs = canon ? canon.lastSnapshotTs : null;
     out.totalValueBase = curTotal;                 // unchanged meaning: TOTAL net worth (audit only)
     out.liveReferenceValue = curLive;              // SPEC L1 — the INVESTABLE live value the gates compare against
@@ -2372,6 +2376,29 @@ function _aurixPerformanceSanityCheck(range, opts) {
     const pctFromValue = (out.baselineValueUsed > 0) ? (out.displayedReturnValue / out.baselineValueUsed) * 100 : null;   // (1)+(2)
     if (!(Number.isFinite(pctFromValue) && Math.abs(out.displayedReturnPct - pctFromValue) <= _AURIX_PERF_SANITY_PCT_TOL)) { out.sanityFailureReason = 'pct_value_baseline_incoherent'; return out; }
     if (Math.abs(out.valueDeltaVsFormula || 0) > flows + baseValTol) { out.sanityFailureReason = 'return_unexplained_by_baseline_current_flows'; return out; }   // (9) — divergence from raw formula must be covered by registered flows
+    // ── AURIX-CASH-LEDGER-TRUTH — FAIL-CLOSED DE RECONCILIACIÓN ────────────────
+    // El gate de arriba comprueba que el AJUSTE aplicado esté explicado por flujos.
+    // No comprueba lo contrario, y ahí estaba el agujero: con `netFlowsNeutralized`
+    // a 0 un retorno íntegramente compuesto por movimiento de capital es
+    // internamente coherente —displayed == formula ⇒ delta 0— y se publicaba.
+    // Medido en cuenta real: −6 % / −5.000 USD durante horas, hasta que la ventana
+    // 24H se deslizó y el escalón caducó. Eso no es reconciliar: es esperar.
+    //
+    // Un flujo registrado dentro de la ventana que no se pudo casar con la serie
+    // significa que NO sabemos si lo que vemos es mercado o capital. En esa
+    // situación no se publica una cifra: se muestra el estado de cálculo que ya
+    // existe. Sin delay, sin timeout, sin LKG: en cuanto el flujo se reconcilia
+    // (llega el snapshot que lo respalda, o el evento se corrige/anula) el mismo
+    // cálculo publica en el siguiente ciclo. Determinista y sin ventana muerta.
+    if ((out.unmatchedFlows || 0) > 0) { out.sanityFailureReason = 'pending_flow_reconciliation'; return out; }
+    // Y la revisión del ledger que se USÓ debe ser la vigente: si el ledger cambió
+    // mientras se calculaba (push/pull de otro dispositivo), el número describe un
+    // estado que ya no existe.
+    if (typeof _aurixFlowLedgerRevision === 'function'
+        && Number.isFinite(opts.flowLedgerRevisionAtCompute)
+        && opts.flowLedgerRevisionAtCompute !== _aurixFlowLedgerRevision()) {
+      out.sanityFailureReason = 'pending_flow_reconciliation'; return out;
+    }
     const cmpMax = (typeof _AURIX_RETURN_COMPARABLE_RATIO !== 'undefined') ? (_AURIX_RETURN_COMPARABLE_RATIO[r] || 3.0) : 3.0;
     if (flows <= _AURIX_PERF_SANITY_VALUE_REL_TOL * out.currentValueUsed && Math.abs(out.displayedReturnPct) > (cmpMax - 1) * 100) { out.sanityFailureReason = 'absurd_return_no_flows'; return out; }   // (9) hard cap
     out.sanityPassed = true;
@@ -8479,6 +8506,32 @@ window.aurixSyncTrace = async function () {
 };
 function _aurixMarkSynced(remoteUpdatedMs) { const m = _aurixReadPortfolioMeta(); m.syncedAt = remoteUpdatedMs || Date.now(); if (!(m.updatedAt > m.syncedAt)) m.updatedAt = m.syncedAt; _aurixWritePortfolioMeta(m); }
 function _aurixRemoteUpdatedMs(remote) { try { return (remote && remote.updated_at) ? new Date(remote.updated_at).getTime() : 0; } catch (_) { return 0; } }
+// AURIX-CASH-LEDGER-TRUTH — ¿el remoto perdería terreno económico respecto al local?
+// Compara holding a holding (por asset_id, que es estable) las dos únicas magnitudes
+// que representan capital: unidades y número de transacciones. TRUE en cuanto alguna
+// retrocede sin que el usuario haya pedido nada destructivo. Conservador por diseño:
+// si no puede compararse (holding nuevo, id ausente), no bloquea.
+function _aurixRemoteLosesEconomicGround(localModel, remote) {
+  try {
+    const lh = (localModel && Array.isArray(localModel.holdings)) ? localModel.holdings : [];
+    const rh = (remote && Array.isArray(remote.holdings)) ? remote.holdings : [];
+    if (!lh.length || !rh.length) return false;
+    const byId = new Map();
+    for (const h of rh) { if (h && h.asset_id != null) byId.set(String(h.asset_id), h); }
+    const EPS = 1e-9;
+    for (const l of lh) {
+      if (!l || l.asset_id == null) continue;
+      const r = byId.get(String(l.asset_id));
+      if (!r) continue;                                   // el remoto no lo conoce: no es retroceso comparable
+      const lq = Number(l.quantity), rq = Number(r.quantity);
+      if (Number.isFinite(lq) && Number.isFinite(rq) && rq < lq - EPS) return true;
+      const lt = Array.isArray(l.transactions) ? l.transactions.length : 0;
+      const rt = Array.isArray(r.transactions) ? r.transactions.length : 0;
+      if (rt < lt) return true;
+    }
+    return false;
+  } catch (_) { return false; }                           // ante la duda, no bloquear el sync
+}
 // Decide which side to apply (NEVER loses assets). Returns { apply:'remote'|'local', reason }.
 function _aurixMergePortfolio(localModel, remote) {
   const lc = (localModel && Array.isArray(localModel.assets)) ? localModel.assets.length : 0;
@@ -8497,7 +8550,27 @@ function _aurixMergePortfolio(localModel, remote) {
   if (rc > lc) { try { console.log('[SYNC][APPLIED_REMOTE]', { reason: 'remote-more', lc, rc }); } catch (_) {} return { apply: 'remote', reason: 'remote-more' }; }
   if (lc > rc) { try { console.log('[SYNC][STALE_LOCAL]', { reason: 'local-more-keep', lc, rc }); } catch (_) {} return { apply: 'local', reason: 'local-more' }; }
   const meta = _aurixReadPortfolioMeta(); const rMs = _aurixRemoteUpdatedMs(remote);
-  if (rMs > (meta.updatedAt || 0)) { try { console.log('[SYNC][APPLIED_REMOTE]', { reason: 'remote-newer-equal-count', rMs, localUpdatedAt: meta.updatedAt }); } catch (_) {} return { apply: 'remote', reason: 'remote-newer' }; }
+  if (rMs > (meta.updatedAt || 0)) {
+    // ── AURIX-CASH-LEDGER-TRUTH — P0 REMOTE OVERWRITE ────────────────────────
+    // Hasta aquí la autoridad se decidía por NÚMERO DE FILAS y, en empate, por
+    // `updated_at`. Una fila con 3.500 € y una fila con 500 € son indistinguibles
+    // para ese criterio, así que un remoto atrasado con reloj mayor sustituía un
+    // saldo local más nuevo: es el 3.000 → 500 reproducido en el harness.
+    // `updated_at` no es evidencia económica — es un reloj, y ni siquiera el mismo.
+    //
+    // El desempate mínimo y demostrable: si el remoto tiene MENOS unidades o MENOS
+    // transacciones en algún holding que su gemelo local, no puede ser más nuevo
+    // económicamente, por muy reciente que sea su marca de tiempo. Se conserva el
+    // estado local (verificable) y se espera reconciliación: el flush pendiente lo
+    // publicará y el siguiente ciclo convergerá con el remoto ya actualizado.
+    // No es un merge heurístico: no fusiona nada, sólo se niega a perder capital.
+    if (_aurixRemoteLosesEconomicGround(localModel, remote)) {
+      try { console.log('[SYNC][CONFLICT_BLOCKED]', 'remote-newer but economically behind — keeping local'); } catch (_) {}
+      return { apply: 'local', reason: 'remote-economically-behind' };
+    }
+    try { console.log('[SYNC][APPLIED_REMOTE]', { reason: 'remote-newer-equal-count', rMs, localUpdatedAt: meta.updatedAt }); } catch (_) {}
+    return { apply: 'remote', reason: 'remote-newer' };
+  }
   return { apply: 'local', reason: 'local-current' };
 }
 let _aurixResyncInFlight = false, _aurixLastResyncAt = 0;
@@ -8528,6 +8601,12 @@ async function _aurixResyncFromRemote(reason) {
     let _psFpBefore = null;
     try { const p = _aurixRemotePerformanceState; _psFpBefore = p ? ((p.portfolioRevision || 0) + ':' + (p.calculatedAt || 0) + ':' + (p.lifecycleId || '')) : null; } catch (_) {}
     try { _mergeRemoteState(remote); } catch (_) {}   // history/watchlist reconcile (existing)
+    // AURIX-CASH-LEDGER-TRUTH — reconciliar el ledger económico en el MISMO ciclo
+    // que el resto del estado remoto. Sin esto, un segundo dispositivo neutraliza
+    // con un ledger vacío y publica un retorno distinto sobre los mismos datos.
+    // Fire-and-forget y fail-soft: si falla, el gate mantiene el estado de cálculo
+    // en lugar de publicar una cifra que no puede probar.
+    try { _aurixCapitalFlowsPull(); } catch (_) {}
     let _psFpAfter = null;
     try { const p = _aurixRemotePerformanceState; _psFpAfter = p ? ((p.portfolioRevision || 0) + ':' + (p.calculatedAt || 0) + ':' + (p.lifecycleId || '')) : null; } catch (_) {}
     const _psChanged = _psFpBefore !== _psFpAfter;
@@ -9299,7 +9378,21 @@ function _aurixLoadCapitalFlows() {
     // Reset support: a portfolio/history reset bumps the epoch; drop any flow
     // recorded before it (mirrors portfolioHistory's epoch guard).
     const epoch = (typeof _aurixPortfolioEpoch === 'function') ? _aurixPortfolioEpoch() : 0;
-    return arr.filter(f => f && typeof f.ts === 'number' && Number.isFinite(f.amountUSD) && (!epoch || f.ts >= epoch));
+    // AURIX-CASH-LEDGER-TRUTH — un flujo borrado NO se elimina del almacén: lleva
+    // tombstone (`deletedAt`) y sale de la lectura. Financial history is never erased.
+    // Los registros legacy no tienen el campo ⇒ siguen leyéndose igual que siempre.
+    return arr.filter(f => f && typeof f.ts === 'number' && Number.isFinite(f.amountUSD)
+                        && !f.deletedAt && (!epoch || f.ts >= epoch));
+  } catch (_) { return []; }
+}
+
+// Lectura CRUDA (incluye tombstones): sólo para sync/backfill/auditoría, nunca
+// para valoración ni neutralización.
+function _aurixLoadCapitalFlowsRaw() {
+  try {
+    const raw = localStorage.getItem(_AURIX_CAPITAL_FLOWS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter(f => f && typeof f.ts === 'number') : [];
   } catch (_) { return []; }
 }
 
@@ -9307,26 +9400,276 @@ function _aurixSaveCapitalFlows(arr) {
   try { localStorage.setItem(_AURIX_CAPITAL_FLOWS_KEY, JSON.stringify(arr)); } catch (_) {}
 }
 
-// Append a flow, idempotent by a deterministic id (kind + asset/currency + ts +
-// rounded amount) so repeated saves/clicks for the same action collapse to one.
+// AURIX-CASH-LEDGER-TRUTH — identidad ESTABLE de un evento económico. El id
+// histórico (`kind:asset:ts:importe`) incluía el importe, así que editar 500 → 700
+// no actualizaba el evento: creaba un segundo flujo y el ledger sumaba 1200. Un id
+// opaco no cambia cuando cambia el importe, que es justo lo que una edición debe
+// poder hacer. Se guarda junto a la operación para poder editarla o anularla.
+function _aurixNewFlowId() {
+  try { return 'flw_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10); }
+  catch (_) { return 'flw_' + String(Math.random()).slice(2); }
+}
+// Append a flow, idempotent by id. `extra.flowId` fija una identidad estable
+// (owner de cash); sin él se conserva el id determinista legacy, que sigue siendo
+// correcto para eventos que nunca se editan (asset_add/asset_remove de trades).
 function _aurixCaptureFlow(kind, amountUSD, ts, assetId, note, source, extra) {
   try {
     if (!Number.isFinite(amountUSD) || Math.round(Math.abs(amountUSD) * 100) === 0) return; // never NaN / ~0
     const t  = Number.isFinite(ts) ? ts : Date.now();
-    const id = `${kind}:${assetId || 'cash'}:${t}:${Math.round(Math.abs(amountUSD))}`;
-    const flows = _aurixLoadCapitalFlows();
+    const id = (extra && extra.flowId) ? String(extra.flowId)
+             : `${kind}:${assetId || 'cash'}:${t}:${Math.round(Math.abs(amountUSD))}`;
+    const flows = _aurixLoadCapitalFlowsRaw();
     if (flows.some(f => f.id === id)) return;                       // idempotent (id keyed on effective ts)
-    const flow = { id, ts: t, amountUSD: +amountUSD.toFixed(2), kind, source: source || 'user' };
+    const flow = { id, ts: t, amountUSD: +amountUSD.toFixed(2), kind, source: source || 'user', revision: 1 };
     if (assetId) flow.assetId = assetId;
     if (note)    flow.note = note;
     // SPEC DSH.CHART.RETURNS.RETIMING.01 — optional re-time audit trail (originalTs/matchedStepTs/etc);
     // never affects the id or the amount, so idempotency and neutralisation are unchanged.
     if (extra && typeof extra === 'object') { for (const k in extra) { if (extra[k] !== undefined) flow[k] = extra[k]; } }
+    if (extra && extra.flowId) { flow.amount = extra.amount; flow.currency = extra.currency; }
     flows.push(flow);
     _aurixSaveCapitalFlows(flows);
+    try { _aurixCapitalFlowsPush([flow]); } catch (_) {}
     if (typeof IS_DEV !== 'undefined' && IS_DEV) { try { console.debug('[capital-flow]', flow); } catch (_) {} }
   } catch (_) {}
 }
+
+// ── AURIX-CASH-LEDGER-TRUTH — EDIT / DELETE sobre un evento existente ────────
+// Las dos operaciones que el ledger no sabía representar. Ninguna crea un evento
+// nuevo y ninguna destruye el anterior: mismo `flow_id`, `revision + 1`.
+function _aurixAmendFlow(flowId, amountUSD, extra) {
+  try {
+    if (!flowId) return false;
+    const flows = _aurixLoadCapitalFlowsRaw();
+    const f = flows.find(x => x.id === flowId);
+    if (!f || f.deletedAt) return false;
+    if (!Number.isFinite(amountUSD)) return false;
+    f.amountUSD = +amountUSD.toFixed(2);
+    f.revision  = (Number(f.revision) || 1) + 1;
+    if (extra && extra.amount   != null) f.amount   = extra.amount;
+    if (extra && extra.currency != null) f.currency = extra.currency;
+    _aurixSaveCapitalFlows(flows);
+    try { _aurixCapitalFlowsPush([f]); } catch (_) {}
+    return true;
+  } catch (_) { return false; }
+}
+function _aurixRevokeFlow(flowId) {
+  try {
+    if (!flowId) return false;
+    const flows = _aurixLoadCapitalFlowsRaw();
+    const f = flows.find(x => x.id === flowId);
+    if (!f || f.deletedAt) return false;
+    f.deletedAt = Date.now();                      // tombstone, nunca un splice
+    f.revision  = (Number(f.revision) || 1) + 1;
+    _aurixSaveCapitalFlows(flows);
+    try { _aurixCapitalFlowsPush([f]); } catch (_) {}
+    return true;
+  } catch (_) { return false; }
+}
+
+// ── AURIX-CASH-LEDGER-TRUTH — persistencia remota del ledger económico ───────
+// `aurixCapitalFlows` vivía SÓLO en el localStorage del dispositivo que hizo la
+// operación, así que un segundo dispositivo no podía neutralizar un flujo que
+// nunca vio y publicaba un retorno distinto sobre los mismos datos. La tabla
+// `capital_flows` (db/capital_flows_1.sql) es la autoridad; esto es su writer y
+// su reader. Fail-soft: sin sesión o sin tabla, el comportamiento local es el de
+// siempre — nada de lo que ya funcionaba depende de que la red responda.
+const _AURIX_FLOW_REVISION_KEY = 'aurixFlowLedgerRevision';
+function _aurixFlowLedgerRevision() {
+  try { return Number(localStorage.getItem(_AURIX_FLOW_REVISION_KEY)) || 0; } catch (_) { return 0; }
+}
+function _aurixBumpFlowLedgerRevision() {
+  try { const n = _aurixFlowLedgerRevision() + 1; localStorage.setItem(_AURIX_FLOW_REVISION_KEY, String(n)); return n; } catch (_) { return 0; }
+}
+function _aurixFlowRowFromLocal(f) {
+  return {
+    flow_id:    String(f.id),
+    ts:         new Date(Number(f.ts) || Date.now()).toISOString(),
+    kind:       String(f.kind || 'deposit'),
+    amount:     Number.isFinite(Number(f.amount)) ? Number(f.amount) : +Number(f.amountUSD).toFixed(2),
+    currency:   String(f.currency || 'USD'),
+    amount_usd: +Number(f.amountUSD).toFixed(2),
+    asset_id:   f.assetId ? String(f.assetId) : null,
+    revision:   Number(f.revision) || 1,
+    deleted_at: f.deletedAt ? new Date(Number(f.deletedAt)).toISOString() : null,
+    updated_at: new Date().toISOString(),
+  };
+}
+async function _aurixCapitalFlowsPush(flows) {
+  try {
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return false;
+    if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) return false;
+    const list = (Array.isArray(flows) ? flows : []).filter(Boolean);
+    if (!list.length) return false;
+    const rows = list.map(f => Object.assign({ user_id: currentUser.id }, _aurixFlowRowFromLocal(f)));
+    // Idempotente por (user_id, flow_id): repetir el push de un mismo evento es
+    // un no-op, y una edición reescribe SU fila en vez de añadir otra.
+    const { error } = await supabaseClient.from('capital_flows').upsert(rows, { onConflict: 'user_id,flow_id' });
+    if (error) { try { console.warn('[capital-flows][push]', error.message || error); } catch (_) {} return false; }
+    _aurixBumpFlowLedgerRevision();
+    return true;
+  } catch (_) { return false; }
+}
+async function _aurixCapitalFlowsPull() {
+  try {
+    if (typeof supabaseClient === 'undefined' || !supabaseClient) return false;
+    if (typeof currentUser === 'undefined' || !currentUser || !currentUser.id) return false;
+    const { data, error } = await supabaseClient
+      .from('capital_flows').select('flow_id, ts, kind, amount, currency, amount_usd, asset_id, revision, deleted_at')
+      .eq('user_id', currentUser.id);
+    if (error || !Array.isArray(data)) return false;
+    const local = _aurixLoadCapitalFlowsRaw();
+    const byId  = new Map(local.map(f => [String(f.id), f]));
+    let changed = 0;
+    for (const r of data) {
+      const remote = {
+        id: String(r.flow_id), ts: new Date(r.ts).getTime(), kind: String(r.kind),
+        amountUSD: Number(r.amount_usd), amount: Number(r.amount), currency: String(r.currency || 'USD'),
+        revision: Number(r.revision) || 1, source: 'user',
+      };
+      if (r.asset_id)   remote.assetId  = String(r.asset_id);
+      if (r.deleted_at) remote.deletedAt = new Date(r.deleted_at).getTime();
+      if (!Number.isFinite(remote.ts) || !Number.isFinite(remote.amountUSD)) continue;
+      const cur = byId.get(remote.id);
+      // Autoridad por REVISIÓN, no por reloj: una edición posterior siempre gana,
+      // y un cliente atrasado no puede resucitar el importe antiguo.
+      if (!cur) { local.push(remote); byId.set(remote.id, remote); changed++; }
+      else if ((Number(remote.revision) || 1) > (Number(cur.revision) || 1)) { Object.assign(cur, remote); changed++; }
+    }
+    if (changed) _aurixSaveCapitalFlows(local);
+    // Empujar lo que sólo existe aquí (dispositivo que operó sin red, o backfill).
+    const remoteIds = new Set(data.map(r => String(r.flow_id)));
+    const onlyLocal = local.filter(f => !remoteIds.has(String(f.id)));
+    if (onlyLocal.length) { try { await _aurixCapitalFlowsPush(onlyLocal); } catch (_) {} }
+    return true;
+  } catch (_) { return false; }
+}
+// Backfill idempotente del ledger histórico que hoy vive en localStorage. El id
+// legacy es DETERMINISTA (kind:asset:ts:importe), así que dos dispositivos que
+// vivieron la misma operación producen la misma fila y el upsert las colapsa:
+// no se duplica nada. No recalcula ni un saldo: sólo publica lo ya registrado.
+async function _aurixBackfillCapitalFlows() {
+  try {
+    const local = _aurixLoadCapitalFlowsRaw();
+    if (!local.length) return false;
+    return await _aurixCapitalFlowsPush(local);
+  } catch (_) { return false; }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// AURIX-CASH-LEDGER-TRUTH — EL OWNER ECONÓMICO ÚNICO DE LA LIQUIDEZ
+// ════════════════════════════════════════════════════════════════════════════
+// Había dos caminos de alta de cash que producían estados económicamente
+// distintos para el MISMO hecho: el modal "Añadir liquidez" incrementaba el
+// saldo sin dejar transacción ni tocar `costBasis`, y el "+" contextual dejaba
+// transacción `buy` y sumaba `costBasis`. Mismo dinero, dos contabilidades, y un
+// saldo que no se podía reconstruir desde su propio ledger.
+//
+// A partir de aquí la UI puede tener los botones que quiera, pero la ECONOMÍA
+// vive en un solo sitio. Cada operación hace, atómicamente, las cinco cosas:
+//   1. mueve el saldo               4. deja `costBasis` coherente
+//   2. escribe la transacción       5. bumpea la revisión económica
+//   3. emite/actualiza el flujo con `flowId` ESTABLE
+//
+// FRONTERA DELIBERADA: aquí sólo vive el flujo EXTERNO (deposit/withdrawal).
+// Comprar o vender un activo con cash existente es un movimiento INTERNO — no
+// entra ni sale capital del portfolio — y sigue su propio camino
+// (`_ledgerTrade` → asset_add/asset_remove, ya clasificados como internos).
+// Confundirlos es exactamente lo que convierte un cambio de composición en una
+// aportación falsa.
+//
+// `op`: 'deposit' | 'withdrawal' | 'edit' | 'delete'
+// Devuelve { ok, flowId, balance, reason }.
+function aurixCashOperation(op, params) {
+  const p = params || {};
+  const out = { ok: false, flowId: null, balance: null, reason: null };
+  try {
+    const asset = p.asset || null;
+    if (!asset || asset.type !== 'cash') { out.reason = 'not_a_cash_asset'; return out; }
+    const currency = String(p.currency || asset.assetCurrency || 'USD');
+    const ts = Number.isFinite(p.ts) ? p.ts : Date.now();
+    if (!Array.isArray(asset.transactions)) asset.transactions = [];
+
+    const toUSD = (v) => {
+      try { const u = _nativeToUSD(v, currency); return Number.isFinite(u) ? u : v; } catch (_) { return v; }
+    };
+
+    // ASIENTO DE APERTURA. Un saldo que ya existía (creado antes de que la
+    // liquidez tuviera ledger) no está respaldado por ninguna transacción, así que
+    // "saldo ≡ Σ ledger" sería falso desde el primer movimiento. Se reconoce el
+    // saldo preexistente como apertura la primera vez que se opera sobre él.
+    // NO es una aportación: no emite flujo de capital, porque ese dinero ya estaba
+    // dentro del patrimonio y contarlo como entrada falsearía la rentabilidad.
+    // Aditivo y no destructivo: el saldo no cambia, sólo pasa a ser reconstruible.
+    try {
+      const backed = asset.transactions.reduce((s, t) => s + ((t && t.type === 'sell') ? -Number(t.qty || 0) : Number(t.qty || 0)), 0);
+      const gap = +(Number(asset.qty || 0) - backed).toFixed(2);
+      if (Math.abs(gap) > 0.005) {
+        asset.transactions.unshift({ type: gap > 0 ? 'buy' : 'sell', qty: Math.abs(gap), price: 1, ts: Math.min(ts - 1, Number(asset.openedAt) || (ts - 1)), opening: true });
+        if (!Number.isFinite(Number(asset.costBasis)) || Number(asset.costBasis) === 0) asset.costBasis = Math.max(0, Number(asset.qty) || 0);
+      }
+    } catch (_) {}
+
+    if (op === 'deposit' || op === 'withdrawal') {
+      const amount = Number(p.amount);
+      if (!Number.isFinite(amount) || amount <= 0) { out.reason = 'invalid_amount'; return out; }
+      const signed = (op === 'withdrawal') ? -amount : amount;
+      if (op === 'withdrawal' && amount > Number(asset.qty || 0) + 1e-9) { out.reason = 'insufficient_balance'; return out; }
+
+      const flowId = p.flowId || _aurixNewFlowId();
+      // 1 · saldo. El cash siempre vale su nominal: price = 1 (LIQ-1).
+      asset.qty   = +(Number(asset.qty || 0) + signed).toFixed(2);
+      asset.price = 1;
+      // 2 · transacción — el saldo pasa a ser RECONSTRUIBLE desde el ledger.
+      //     `flowId` viaja en la transacción para poder editarla o anularla después.
+      asset.transactions.push({ type: op === 'withdrawal' ? 'sell' : 'buy', qty: amount, price: 1, ts, flowId });
+      // 4 · costBasis. Para liquidez el coste ES el nominal: sin esto un depósito
+      //     entra en `totalValue` sin entrar en `totalCostBasis` y el P&L total lo
+      //     lee como plusvalía.
+      asset.costBasis = Math.max(0, +(Number(asset.costBasis || 0) + signed).toFixed(2));
+      if (p.source) asset.source = p.source;
+      // 3 · flujo externo con identidad estable.
+      _aurixCaptureFlow(op, toUSD(signed), ts, asset.id, null, p.source || 'user',
+                        { flowId, amount: signed, currency });
+      out.ok = true; out.flowId = flowId; out.balance = asset.qty;
+    } else if (op === 'edit') {
+      const flowId = p.flowId; const next = Number(p.amount);
+      if (!flowId) { out.reason = 'missing_flow_id'; return out; }
+      if (!Number.isFinite(next) || next <= 0) { out.reason = 'invalid_amount'; return out; }
+      const tx = asset.transactions.find(t => t && t.flowId === flowId);
+      if (!tx) { out.reason = 'flow_not_found'; return out; }
+      const prev = Number(tx.qty) || 0;
+      const sign = (tx.type === 'sell') ? -1 : 1;
+      const delta = (next - prev) * sign;
+      asset.qty       = +(Number(asset.qty || 0) + delta).toFixed(2);
+      asset.costBasis = Math.max(0, +(Number(asset.costBasis || 0) + delta).toFixed(2));
+      tx.qty = next;
+      // MISMO flow_id, revision + 1: una edición corrige el evento, no añade otro.
+      _aurixAmendFlow(flowId, toUSD(next * sign), { amount: next * sign, currency });
+      out.ok = true; out.flowId = flowId; out.balance = asset.qty;
+    } else if (op === 'delete') {
+      const flowId = p.flowId;
+      if (!flowId) { out.reason = 'missing_flow_id'; return out; }
+      const i = asset.transactions.findIndex(t => t && t.flowId === flowId);
+      if (i < 0) { out.reason = 'flow_not_found'; return out; }
+      const tx = asset.transactions[i];
+      const sign = (tx.type === 'sell') ? -1 : 1;
+      const undo = -(Number(tx.qty) || 0) * sign;
+      asset.qty       = +(Number(asset.qty || 0) + undo).toFixed(2);
+      asset.costBasis = Math.max(0, +(Number(asset.costBasis || 0) + undo).toFixed(2));
+      asset.transactions.splice(i, 1);
+      _aurixRevokeFlow(flowId);                    // tombstone: el evento no se borra
+      out.ok = true; out.flowId = flowId; out.balance = asset.qty;
+    } else {
+      out.reason = 'unknown_op'; return out;
+    }
+
+    // 5 · revisión económica — el sync necesita saber que esto SÍ movió capital.
+    try { if (typeof _aurixBumpPortfolioMeta === 'function') _aurixBumpPortfolioMeta('cash-' + op); } catch (_) {}
+    return out;
+  } catch (e) { out.reason = 'error'; return out; }
+}
+if (typeof window !== 'undefined') { try { window.aurixCashOperation = aurixCashOperation; } catch (_) {} }
 
 if (typeof window !== 'undefined') {
   // Audit helpers (read-only): the raw ledger + a summarised table.
@@ -22733,7 +23076,11 @@ function _aurixFlowNeutralize(series, range) {
   const n = series.length;
   const out = { adjusted: series.map(s => s.value), flowsInRange: 0, neutralized: 0, totalOffset: 0,
                 internalCount: 0, externalCount: 0, shapeTransfers: 0, externalWithdrawals: 0, externalDeposits: 0,
-                internalNeutralized: 0, externalNeutralized: 0, recordedNeutralized: 0 };
+                internalNeutralized: 0, externalNeutralized: 0, recordedNeutralized: 0,
+                // AURIX-CASH-LEDGER-TRUTH — flujos registrados en la ventana que NO tienen
+                // contrapartida observable en la serie. No se neutralizan (restar sin evidencia
+                // fabrica pérdidas) y el gate de publicación los lee para no publicar a ciegas.
+                unmatchedFlows: 0, unmatchedFlowTotal: 0 };
   if (n < 2) return out;
   const t0 = series[0].ts, t1 = series[n - 1].ts;
   let anchor = 0;
@@ -22783,14 +23130,48 @@ function _aurixFlowNeutralize(series, range) {
   // snapshots). Applied at the snapshot just after the flow, de-duped against a
   // shape step already neutralised nearby. This is what makes WN.11 actually fire
   // on real recorded data instead of being a no-op.
-  const RECORD_MAT = Math.max(anchor * 0.02, 1);
+  // AURIX-CASH-LEDGER-TRUTH — DOS correcciones, en direcciones opuestas, sobre la
+  // MISMA línea. Pass A (arriba) es inferencia sin ledger y conserva intactos sus
+  // umbrales; esto es evidencia EXACTA y se rige por otras reglas.
+  //
+  // (1) SE ELIMINA EL UMBRAL DE MATERIALIDAD. `RECORD_MAT = max(anchor×0.02, 1)`
+  //     descartaba todo flujo por debajo del 2 % del patrimonio: en una cartera de
+  //     83.000 USD eso son 1.660 USD, así que una aportación real y registrada de
+  //     500 € se ignoraba y se publicaba como rentabilidad de mercado. Si existe un
+  //     evento económico exacto y válido, Aurix no puede decidir ignorarlo por su
+  //     tamaño. La materialidad pertenece a la heurística, no al ledger.
+  //
+  // (2) SE EXIGE CONTRAPARTIDA EN LA SERIE. Éste es el defecto que produjo el
+  //     −6 % / −5.000 USD medido en cuenta real: el usuario repuso a mano un saldo
+  //     que había perdido, ese reingreso SÍ se registró como `deposit`, y el motor
+  //     lo restó de una serie que nunca subió por él — porque la pérdida original
+  //     (un overwrite de sync) no había generado ningún flujo que la compensara.
+  //     Restar un offset sin escalón que lo respalde FABRICA una pérdida. Ahora un
+  //     flujo sólo se neutraliza si el patrimonio se movió de verdad en su sentido
+  //     y magnitud; si no, se cuenta como `unmatchedFlow` y el gate de publicación
+  //     decide (fail-closed), que es lo correcto: no sabemos qué pasó ahí.
+  const MATCH_REL_TOL = 0.35;                  // el escalón puede no ser exacto (precios se mueven a la vez)
+  const MATCH_ABS_TOL = Math.max(anchor * 0.001, 1);
+  out.unmatchedFlows = 0; out.unmatchedFlowTotal = 0;
   span.forEach(f => {
     const base = toBase(f.amountUSD, 'USD');
-    if (!Number.isFinite(base) || Math.abs(base) < RECORD_MAT) return;
+    if (!Number.isFinite(base) || Math.round(Math.abs(base) * 100) === 0) return;
     if (f.ts <= t0 || f.ts > t1) return;                 // only inside the rendered window
     let i = ts.findIndex(tt => tt >= f.ts);
     if (i <= 0) return;
     if (stepOff[i] || stepOff[i - 1] || (i + 1 < n && stepOff[i + 1])) return;  // already covered by a shape step
+    // Contrapartida: el mejor escalón observado en el entorno inmediato del evento.
+    let observed = 0;
+    for (let k = Math.max(1, i - 1); k <= Math.min(n - 1, i + 1); k++) {
+      const d = vals[k] - vals[k - 1];
+      if (Math.abs(d) > Math.abs(observed)) observed = d;
+    }
+    const matched = Math.sign(observed) === Math.sign(base)
+                 && Math.abs(observed - base) <= Math.max(MATCH_ABS_TOL, Math.abs(base) * MATCH_REL_TOL);
+    if (!matched) {
+      out.unmatchedFlows++; out.unmatchedFlowTotal = +(out.unmatchedFlowTotal + base).toFixed(2);
+      return;                                            // NO se resta sin evidencia
+    }
     stepOff[i] += base; out.recordedNeutralized++;
     if (_aurixFlowIsInternal(f.kind)) out.internalNeutralized++; else out.externalNeutralized++;
   });
@@ -24861,6 +25242,10 @@ function _aurixRangeReturn(range) {
   out.deltaPct   = (Number.isFinite(first) && first > 0 && Number.isFinite(last)) ? +(((last - first) / first) * 100).toFixed(4) : null;
   out.grossDeltaPct = (rawFirst > 0) ? +(((rawLast - rawFirst) / rawFirst) * 100).toFixed(4) : null;
   out.netFlowsNeutralized = +((neutral.totalOffset || 0)).toFixed(2);
+  // AURIX-CASH-LEDGER-TRUTH — evidencia para el gate: flujos registrados dentro de
+  // la ventana que no pudieron reconciliarse contra la serie.
+  out.unmatchedFlows     = neutral.unmatchedFlows || 0;
+  out.unmatchedFlowTotal = +((neutral.unmatchedFlowTotal || 0)).toFixed(2);
   out.valid = out.deltaPct != null;
   out.basis = (neutral.neutralized > 0) ? 'flow-neutral' : 'flow-neutral(no-flows-in-window)';
 
@@ -52730,13 +53115,19 @@ reduceForm.addEventListener('submit', e => {
   if (!Array.isArray(asset.transactions)) asset.transactions = [];
   const _sellTs    = Date.now();
   const _sellPrice = Number.isFinite(currentPrice) ? currentPrice : 0;
-  asset.transactions.push({
-    type:  'sell',
-    qty:   amount,
-    price: _sellPrice,
-    ts:    _sellTs,
-  });
-  asset.realizedPnL = Number(asset.realizedPnL || 0) + (Number.isFinite(realized) ? realized : 0);
+  const _isCashReduce = (asset.type === 'cash');
+  // AURIX-CASH-LEDGER-TRUTH — retirar liquidez es una RETIRADA, no la venta de un
+  // instrumento: no realiza plusvalía ni prorratea coste. La escribe el owner
+  // económico (transacción + flujo + costBasis + saldo) unas líneas más abajo.
+  if (!_isCashReduce) {
+    asset.transactions.push({
+      type:  'sell',
+      qty:   amount,
+      price: _sellPrice,
+      ts:    _sellTs,
+    });
+    asset.realizedPnL = Number(asset.realizedPnL || 0) + (Number.isFinite(realized) ? realized : 0);
+  }
   // AURIX-WEALTH-LEDGER-CAPTURE-1: cash reductions are withdrawals; everything
   // else is a sell (with durable realized PnL on the event).
   // WN.8 AUDIT: a NON-cash sell here only REDUCES/CLOSES the asset — it does NOT
@@ -52748,18 +53139,24 @@ reduceForm.addEventListener('submit', e => {
   // (Real assets are NOT auto-mutated here — too risky / could double-count if
   // the user later records the cash manually; the reconciliation is visual +
   // metric only, anchored to the real current value.)
-  if (asset.type === 'cash') {
-    _ledgerCashFlow('withdrawal', asset, amount, (asset.assetCurrency || 'USD'), _sellTs, asset.source || null);
+  if (_isCashReduce) {
+    const _cashRes = aurixCashOperation('withdrawal', {
+      asset, amount, currency: (asset.assetCurrency || 'USD'), ts: _sellTs, source: asset.source || null,
+    });
+    if (!_cashRes.ok) { reduceError.textContent = t('errQtyPositive'); return; }
+    // Retirar TODA la liquidez cierra la posición igual que antes (saldo 0), y el
+    // owner ya dejó el saldo y el ledger en su sitio.
+    if (wasRemoved) _closePosition(asset, _sellTs);
   } else {
     _ledgerTrade(asset, 'sell', amount, _sellPrice, _sellTs, (Number.isFinite(realized) ? realized : 0));
-  }
-  if (wasRemoved) {
-    // AURIX-CLOSED-POSITIONS-1: full sell → CLOSE, never delete. History +
-    // realizedPnL (already accrued above) stay attached to the row.
-    _closePosition(asset, _sellTs);
-  } else {
-    if (asset.costBasis && asset.qty > 0) asset.costBasis *= remaining / asset.qty;
-    asset.qty = remaining;
+    if (wasRemoved) {
+      // AURIX-CLOSED-POSITIONS-1: full sell → CLOSE, never delete. History +
+      // realizedPnL (already accrued above) stay attached to the row.
+      _closePosition(asset, _sellTs);
+    } else {
+      if (asset.costBasis && asset.qty > 0) asset.costBasis *= remaining / asset.qty;
+      asset.qty = remaining;
+    }
   }
 
   const sellToastName = (typeof getDisplayName === 'function') ? getDisplayName(asset) : (asset.name || asset.ticker || '');
@@ -52885,14 +53282,22 @@ addForm.addEventListener('submit', e => {
   // optimistic paint; the ledger makes it persist. Mirrors the sell handler.
   const _buyTs    = Date.now();
   const _buyPrice = Number.isFinite(Number(asset.price)) ? Number(asset.price) : 0;
-  const addedCostNative = assetNativeValue({ ...asset, qty: amount });
-  asset.costBasis = (asset.costBasis || assetNativeValue(asset)) + addedCostNative;
-  asset.qty = +(asset.qty + amount).toFixed(8);
-  if (!Array.isArray(asset.transactions)) asset.transactions = [];
-  asset.transactions.push({ type: 'buy', qty: amount, price: _buyPrice, ts: _buyTs });
+  // AURIX-CASH-LEDGER-TRUTH — la liquidez sale de esta rama. Un "+" sobre un
+  // activo cash es una APORTACIÓN, no la compra de un instrumento: emitía a la vez
+  // una transacción `buy` y un `deposit` (doble representación del mismo hecho) y
+  // calculaba el coste con la ruta de valoración de activos. Ahora lo resuelve el
+  // owner económico, exactamente igual que el modal de liquidez.
   if (asset.type === 'cash') {
-    _ledgerCashFlow('deposit', asset, amount, (asset.assetCurrency || 'USD'), _buyTs, asset.source || null);
+    const _cashRes = aurixCashOperation('deposit', {
+      asset, amount, currency: (asset.assetCurrency || 'USD'), ts: _buyTs, source: asset.source || null,
+    });
+    if (!_cashRes.ok) { addError.textContent = t('errQtyPositive'); return; }
   } else {
+    const addedCostNative = assetNativeValue({ ...asset, qty: amount });
+    asset.costBasis = (asset.costBasis || assetNativeValue(asset)) + addedCostNative;
+    asset.qty = +(asset.qty + amount).toFixed(8);
+    if (!Array.isArray(asset.transactions)) asset.transactions = [];
+    asset.transactions.push({ type: 'buy', qty: amount, price: _buyPrice, ts: _buyTs });
     _ledgerTrade(asset, 'buy', amount, _buyPrice, _buyTs);
   }
   const addFlashId   = asset.id;
@@ -53180,30 +53585,40 @@ liquidityForm.addEventListener('submit', e => {
   // valuation path then mis-converted. New entries store price:1 so
   // qty * price reads cleanly in any consumer; assetNativeValue
   // additionally short-circuits cash to qty, covering legacy rows.
-  const existingCash = assets.find(a => a.type === 'cash' && a.assetCurrency === curr);
-  if (existingCash) {
-    existingCash.qty   = +(existingCash.qty + qty).toFixed(2);
-    existingCash.price = 1;
-    if (source) existingCash.source = source;
-  } else {
-    assets.push({
+  // AURIX-CASH-LEDGER-TRUTH — este handler ya NO hace contabilidad. Localiza (o
+  // crea vacío) el activo y delega en el owner económico único, el mismo que usan
+  // el "+" y el "−" contextuales. Antes incrementaba el saldo aquí sin dejar
+  // transacción ni costBasis, así que la misma aportación registrada por el otro
+  // botón producía un estado distinto y el saldo no era reconstruible.
+  let existingCash = assets.find(a => a.type === 'cash' && a.assetCurrency === curr);
+  if (!existingCash) {
+    existingCash = {
       id:            Date.now().toString(36) + Math.random().toString(36).slice(2),
       name:          curr === 'EUR' ? 'Euros' : 'Dólares',
       ticker:        curr === 'EUR' ? '€' : '$',
       type:          'cash',
-      qty,
+      qty:           0,                  // el saldo lo pone la operación, no el alta
       price:         1,
       coinId:        null,
       marketSymbol:  null,
       assetCurrency: curr,
       change24h:     null,
       prevPrice:     null,
+      costBasis:     0,
+      transactions:  [],
       source:        source || null,
-    });
+    };
+    assets.push(existingCash);
   }
-
-  // AURIX-WEALTH-LEDGER-CAPTURE-1: every liquidity add is a deposit event.
-  _ledgerCashFlow('deposit', assets.find(a => a.type === 'cash' && a.assetCurrency === curr), qty, curr, Date.now(), source);
+  const _liqRes = aurixCashOperation('deposit', { asset: existingCash, amount: qty, currency: curr, source });
+  if (!_liqRes.ok) { liquidityQtyInput.focus(); return; }
+  // AURIX-WEALTH-LEDGER-CAPTURE-1: el evento del wealthLedger opcional sigue
+  // emitiéndose; el flujo de capital ya lo escribió el owner con id estable.
+  try {
+    const WL = window.wealthLedger;
+    if (WL && WL.record) WL.record({ type: 'deposit', amount: qty, currency: curr, ts: Date.now(), origin: 'user',
+                                     assetId: existingCash.id, ticker: existingCash.ticker, source: source || undefined });
+  } catch (_) {}
 
   save();
   render(true);

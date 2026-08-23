@@ -25,7 +25,11 @@ function makeEnv(tombstone){
   // P0-RELIABILITY-GATE: _aurixWritePortfolioMeta now stamps a deviceId; stub it here (this harness
   // focuses on the merge/timestamp logic).
   vm.runInContext("function _aurixDeviceId(){ return 'd-test'; }", sb);
-  ['_aurixReadPortfolioMeta','_aurixWritePortfolioMeta','_aurixBumpPortfolioMeta','_aurixMarkSynced','_aurixRemoteUpdatedMs','_shouldDistrustRemote','_aurixMergePortfolio']
+  // AURIX-CASH-LEDGER-TRUTH — `_aurixMergePortfolio` gana un desempate económico:
+  // un remoto con reloj mayor pero MENOS capital ya no puede sustituir al local
+  // (era el 3.000 € → 500 €). Su predicado entra en el sandbox como una dependencia
+  // más; los casos 4–8 de abajo no cambian de resultado porque comparan conteos.
+  ['_aurixReadPortfolioMeta','_aurixWritePortfolioMeta','_aurixBumpPortfolioMeta','_aurixMarkSynced','_aurixRemoteUpdatedMs','_shouldDistrustRemote','_aurixRemoteLosesEconomicGround','_aurixMergePortfolio']
     .forEach(n=>{ try{ vm.runInContext(fnSrc(n), sb); }catch(e){ console.log('load fail '+n+': '+e.message); } });
   return sb;
 }

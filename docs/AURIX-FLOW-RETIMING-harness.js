@@ -248,9 +248,16 @@ ok('6.5 NO se tocó el guard double_matched_flow_step',
    /if \(Object\.keys\(stepCounts\)\.some\(k => stepCounts\[k\] > 1\)\) untrust\.push\('double_matched_flow_step'\);/.test(app));
 ok('6.6 NO se tocó _aurixComputePeriodReturn (fórmula flow-neutral intacta)',
    (app.match(/function _aurixComputePeriodReturn\(/g) || []).length === 1 && /neutralDelta = rawDelta - nf\.net/.test(app));
-ok('6.7 _aurixCaptureFlow, el esquema del ledger y el id siguen intactos',
-   /const id = `\$\{kind\}:\$\{assetId \|\| 'cash'\}:\$\{t\}:\$\{Math\.round\(Math\.abs\(amountUSD\)\)\}`;/.test(app) &&
+// AURIX-CASH-LEDGER-TRUTH — el id determinista sigue siendo el de SIEMPRE para todo
+// evento que no se edita (asset_add/asset_remove de trades, que es lo que este
+// harness re-fecha). Lo único añadido es que una operación de CASH puede traer su
+// propio `flowId` estable: editar 500 → 700 debe actualizar el evento, y un id que
+// incluye el importe hacía imposible eso (creaba un segundo flujo y sumaba 1200).
+ok('6.7 _aurixCaptureFlow, el esquema del ledger y el id determinista siguen intactos',
+   /: `\$\{kind\}:\$\{assetId \|\| 'cash'\}:\$\{t\}:\$\{Math\.round\(Math\.abs\(amountUSD\)\)\}`;/.test(app) &&
    (app.match(/function _aurixCaptureFlow\(/g) || []).length === 1);
+ok('6.7b y el id estable sólo se usa cuando la operación lo aporta (cash editable)',
+   /const id = \(extra && extra\.flowId\) \? String\(extra\.flowId\)/.test(app));
 ok('6.8 el backfill sigue escribiendo originalTs = ts de la transacción',
    /\{ originalTs: c\.originalTs, retimeReason: dec\.reason/.test(app));
 

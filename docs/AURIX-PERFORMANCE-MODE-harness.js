@@ -29,6 +29,12 @@ const sb = {
   _aurixPortfolioEpoch: () => 0,
   _aurixEligibleInvestableSeries: () => ({ series: ELIG, meta:{} }),
   _aurixLoadCapitalFlows: () => FLOWS.slice(),
+  // AURIX-CASH-LEDGER-TRUTH — `_aurixCaptureFlow` escribe sobre la lectura CRUDA
+  // (incluye tombstones: un evento anulado no debe poder re-crearse con el mismo id)
+  // y publica al ledger remoto. Ambas son dependencias nuevas del owner que este
+  // sandbox ejecuta; sin ellas el backfill fallaba en silencio dentro de su try.
+  _aurixLoadCapitalFlowsRaw: () => FLOWS.slice(),
+  _aurixCapitalFlowsPush: () => true,
   _aurixSaveCapitalFlows: (a) => { STORE = a.slice(); FLOWS = a.slice(); },
   // SPEC DSH.CHART.RETURNS.LEDGER.01 — deps for the corroboration/re-anchor logic in the backfill.
   portfolioHistory: [], categoryHistory: [],
