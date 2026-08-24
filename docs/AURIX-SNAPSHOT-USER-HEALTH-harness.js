@@ -255,6 +255,32 @@ console.log('\n12 · snapshot path > observability path:');
   ok('12.10 a missing user_id records nothing rather than a junk row', note(null, 'ERROR') === null && note('', 'ERROR') === null);
 }
 
+// ── 2-TER · The CLI migration is the SAME certified SQL ───────────────────
+// The file applied by `supabase db push` lives in supabase/migrations/, but the file
+// this gate certifies — and the one the reviewer read — is db/…_user_health_1.sql.
+// Two copies of a migration WILL drift, and the failure mode is silent and severe:
+// the gate would certify one text while production executes another. So identity is
+// asserted, not assumed, and there must be exactly ONE migration.
+console.log('\n2-TER · Repo-driven schema: migration ≡ certified SQL:');
+{
+  const MIG_DIR = path.join(ROOT, 'supabase', 'migrations');
+  let files = [];
+  try { files = fs.readdirSync(MIG_DIR).filter(f => /\.sql$/.test(f)).sort(); } catch (e) { files = []; }
+  ok('2t.1 exactly one migration exists', files.length === 1, files.join(' '));
+  ok('2t.2 its name carries a CLI-parseable version (YYYYMMDDHHMMSS_slug.sql)',
+    files.length === 1 && /^\d{14}_[a-z0-9_]+\.sql$/.test(files[0]), files[0] || '(none)');
+  ok('2t.3 it is BYTE-IDENTICAL to the certified db/ file — no drift possible',
+    files.length === 1 && fs.readFileSync(path.join(MIG_DIR, files[0]), 'utf8') === sql,
+    files.length === 1 ? 'differs' : 'no migration');
+  // Everything the certified file guarantees therefore holds for what production runs:
+  // one transaction, no destructive statement, no financial table written.
+  ok('2t.4 …so the applied text is transactional and non-destructive by inheritance',
+    /^begin;$/m.test(sql) && /^commit;$/m.test(sql)
+    && !/(^|;)\s*(update|delete|truncate)\s/i.test(SQL_CODE.replace(/\s+/g, ' '))
+    && !/into public\.portfolio_snapshots/i.test(SQL_CODE)
+    && !/alter table public\.portfolio_snapshots/i.test(SQL_CODE));
+}
+
 // ── 13–15 · The financial capturer is untouched ──────────────────────────────
 console.log('\n13–15 · LB-1 and the valuation are byte-identical:');
 {
@@ -491,7 +517,10 @@ console.log('\n22–25 · Chart, Performance, Category History Reader, Preview V
     // git diff omits UNTRACKED files, so the previous form of this check passed on an
     // empty list — vacuously. Status includes them, so the confinement claim is real.
     let status = null;
-    try { status = cp.execSync('git status --porcelain', { cwd: ROOT, maxBuffer: 8 * 1024 * 1024, stdio: ['ignore','pipe','ignore'] }).toString('utf8'); } catch (e) { status = null; }
+    // -uall so a brand-new DIRECTORY is listed as its individual files. Without it git
+    // collapses supabase/migrations/ to one entry and the allow-list would be checking a
+    // directory name instead of the files actually added — a check that no longer sees.
+    try { status = cp.execSync('git status --porcelain -uall', { cwd: ROOT, maxBuffer: 8 * 1024 * 1024, stdio: ['ignore','pipe','ignore'] }).toString('utf8'); } catch (e) { status = null; }
     const touched = Array.from(new Set(files.concat(
       (status || '').split('\n').filter(Boolean).map(l => l.slice(3).trim()))));
     // ENUMERATED, never a wildcard over docs/. A pattern like AURIX-*-harness.js would
@@ -509,9 +538,13 @@ console.log('\n22–25 · Chart, Performance, Category History Reader, Preview V
       'docs/AURIX-CHART-CONTINUOUS-SERVER-SNAPSHOTS-harness.js',
       'docs/AURIX-BACKEND-SNAPSHOT-VALUATION-harness.js',
     ];
+    // The migration is the ONE exception to literal enumeration: its name carries a
+    // generated timestamp. The pattern is tight (one directory, one shape) and 2t.1
+    // caps the count at one, so it cannot become a wildcard over the repo.
+    const MIG_RE = /^supabase\/migrations\/\d{14}_[a-z0-9_]+\.sql$/;
     ok('22.3 every touched file is on the EXPLICIT allow-list (untracked included)',
-      touched.length > 0 && touched.every(f => ALLOWED.indexOf(f) !== -1),
-      touched.filter(f => ALLOWED.indexOf(f) === -1).join(' ') || touched.join(' '));
+      touched.length > 0 && touched.every(f => ALLOWED.indexOf(f) !== -1 || MIG_RE.test(f)),
+      touched.filter(f => ALLOWED.indexOf(f) === -1 && !MIG_RE.test(f)).join(' ') || touched.join(' '));
     // The re-anchored assertions must still REFUSE a conditional LB-1. This is the
     // −24% invariant; a wildcard body would have let `if (!STRICT) continue;` pass.
     ok('22.5 the re-anchored gates still reject a CONDITIONAL LB-1 (no wildcard bodies)',
