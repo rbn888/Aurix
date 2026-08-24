@@ -198,8 +198,15 @@ console.log('\n5/6 — Compatibilidad con lo que ya existe:');
   ok('5.3 la migración es aditiva e idempotente (no toca columnas ni filas existentes)',
      /add column if not exists/.test(sql)
      && !/\b(drop|update|delete|truncate)\b/i.test(sql.replace(/--.*$/gm, '')));
+  // Se mide el CÓDIGO, no las menciones — el mismo principio que 6.2 aplica ya al
+  // capturador. Un comentario que nombra la columna para decir que NO se usa (el
+  // Category History Reader documenta así por qué su denominador no es Σ asset_values)
+  // no es un consumidor. El filtro descarta únicamente líneas que EMPIEZAN por marca
+  // de comentario, así que es imposible que oculte una lectura real: una línea que
+  // arranca con `//` es comentario íntegro.
+  const appCode = app.split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
   ok('6.1 ningún consumidor de producto lee asset_values (write-only)',
-     !/asset_values/.test(app), 'app.js no debe consumirlo todavía');
+     !/asset_values/.test(appCode), 'app.js no debe consumirlo todavía');
   // Se cuenta la ESCRITURA, no las menciones: el bloque que documenta la decisión
   // nombra la columna varias veces y eso no es un consumidor.
   ok('6.2 existe exactamente UNA escritura de la columna, en el insert del capturador',

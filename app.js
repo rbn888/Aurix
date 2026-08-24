@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '634'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '635'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -2190,6 +2190,255 @@ function _aurixBackendHealthSnapshot() {
   } catch (e) { return { status: _AURIX_BACKEND_HEALTH.UNKNOWN, reason: 'health_error' }; }
 }
 try { if (typeof window !== 'undefined') { window.aurixBackendHealth = _aurixBackendHealthSnapshot; window._aurixBackendHealth = _aurixBackendHealth; } } catch (_) {}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC CATEGORY-HISTORY-READER — the canonical read layer for category_values
+// ════════════════════════════════════════════════════════════════════════════
+// Aurix already PERSISTS per-category history server-side (portfolio_snapshots.category_values, */15),
+// but nothing could CONSUME it: `_aurixNormalizeBackendSnapshot` — the only existing reader of those rows —
+// projects them onto the chart point shape {ts,total,real_estate,…} and DROPS category_values on the floor.
+// So the history exists and is unreadable. This is the minimum read contract that closes that gap, and
+// nothing more: it answers ANTES → AHORA → DELTA for one category over one window, and stops there.
+//
+// SOURCE OF TRUTH — `_aurixBackendSnapshots`, the RAW server rows as returned by _aurixFetchBackendSnapshots
+// (which does select category_values and keeps it intact). Deliberately NOT:
+//   · `_aurixHistorySourceForDisplay()` / `_aurixMergeSnapshotSources` — the merge runs rows through
+//     _aurixNormalizeBackendSnapshot (category_values gone) and drops backend points wherever a frontend
+//     point is temporally present, so it is a DISPLAY contract, not a history contract.
+//   · `categoryHistory` / `_aurixCanonicalCatHistory` — the AURIX-DATA-001 contaminated origin. Its
+//     name is the closest match in the codebase and it is exactly the wrong source; the audit established
+//     that the contamination does NOT reach the server capture, so the server route is the only one used
+//     here. One source of history, never two.
+// No prices, no localStorage, no interpolation, no synthetic point, no reconstruction from the CURRENT
+// portfolio. A number this layer returns was measured by the server at a real instant, or it is not returned.
+//
+// PERFORMANCE — zero additional queries. The 400-day / limit(5000) read already happens once per session for
+// the chart (hydration state machine above), and 24H/7D live inside it, so the minimum query compatible with
+// both windows is the one already in flight. A second dedicated "two extremes" query would be strictly worse:
+// one more round trip, a second definition of the history, and two sources that can disagree. No cache is
+// added — the reader is a pure projection over the already-hydrated array, recomputed on demand.
+//
+// MULTI-DEVICE — every input is a server row, so two devices holding the same hydrated array compute the
+// same answer. Known residual (pre-existing, NOT introduced or fixed here): the loader applies the reset
+// epoch as a floor, and that epoch is read from localStorage, so a device that never saw a reset can hold
+// older rows than one that did. Owned by the loader, out of scope for this SPEC.
+const _AURIX_CATHIST_CANONICAL = Object.freeze(['stock', 'etf', 'fund', 'crypto', 'metal', 'liquidity', 'real_estate', 'other']);
+const _AURIX_CATHIST_REAL_ESTATE_KEY = 'real_estate';
+// The investable buckets: the canonical set minus real estate. Exposure is a share of INVESTABLE wealth,
+// so real estate is never an exposure and never a denominator contributor.
+const _AURIX_CATHIST_INVESTABLE = Object.freeze(_AURIX_CATHIST_CANONICAL.filter(k => k !== _AURIX_CATHIST_REAL_ESTATE_KEY));
+// Reconciliation tolerance for Σ category_values vs total_value_usd. The writer sums each valued position
+// into BOTH `total` and its bucket, so the identity is exact up to rounding (`total` is stored .toFixed(2),
+// the buckets are raw sums). Tight on purpose: a genuinely missing bucket must not fit inside the tolerance.
+const _AURIX_CATHIST_RECON_ABS_TOL = 0.05;      // USD
+const _AURIX_CATHIST_RECON_REL_TOL = 1e-6;      // 0.0001% of the total
+// Mirrors the `.limit(5000)` in _aurixFetchBackendSnapshots. The loader orders ASCENDING, so hitting the cap
+// truncates the NEWEST rows — i.e. `end` would silently stop being "now". Surfaced as coverage.truncated
+// instead of being fixed here (the cap is the loader's, and it is a known deferred risk).
+const _AURIX_CATHIST_SOURCE_ROW_CAP = 5000;
+// ONLY the two windows Financial declared defensible. 30D/1A/TOTAL are absent by decision, not by omission:
+// declaring them before the real history covers them would publish a window Aurix cannot back.
+// maxStartDriftMs bounds how far the real start snapshot may sit from the ideal start instant, on EITHER
+// side — the selected start is always a REAL captured point, never a synthesized one, so the honest move is
+// to bound and REPORT the drift rather than pretend the window began exactly on the boundary. These are DATA
+// representativeness bounds, not product materiality rules; the next engine may tighten them with Financial.
+const _AURIX_CATHIST_WINDOWS = Object.freeze({
+  '24H': Object.freeze({ ms: 24 * 3600000, maxStartDriftMs: 2 * 3600000 }),   // span ∈ [22h, 26h]
+  '7D':  Object.freeze({ ms: 7 * 864e5,    maxStartDriftMs: 12 * 3600000 }),  // span ∈ [6.5d, 7.5d]
+});
+// The raw server rows. Never the merged display source.
+function _aurixCatHistRows() {
+  try { return Array.isArray(_aurixBackendSnapshots) ? _aurixBackendSnapshots : []; } catch (_) { return []; }
+}
+// VALID / INVALID for one historical point. There is no second definition of "valid snapshot" here: the
+// server already refuses to WRITE a partial valuation (capturer guard LB-1 — dropped_asset_count > 0 skips
+// the insert entirely), and this re-derives that same guarantee from the row itself, because the row does not
+// carry dropped_asset_count and older rows predate the guard. The derivation is the writer's own arithmetic
+// identity: every valued position is added to `total` AND to its bucket, therefore
+//     Σ category_values === total_value_usd
+// on any complete capture. When it reconciles, the map accounts for the whole portfolio, and only then does
+// an ABSENT category mean a real 0 ("no value in that bucket") rather than an unknown ("that bucket existed
+// but could not be valued"). When it does not reconcile, the two cases are indistinguishable from the row —
+// so the point is INVALID and never enters a temporal calculation. `categoriesComplete` is the flag that
+// licenses the absent⇒0 reading downstream; nothing may read a category off a point without it.
+function _aurixCatHistValidatePoint(row) {
+  const out = { valid: false, reason: 'unknown', point: null };
+  if (!row || typeof row !== 'object') { out.reason = 'not_a_row'; return out; }
+  const ts = Number(row.ts);
+  if (!Number.isFinite(ts) || ts <= 0) { out.reason = 'bad_ts'; return out; }
+  const total = Number(row.total_value_usd != null ? row.total_value_usd : row.total);
+  if (!Number.isFinite(total) || total <= 0) { out.reason = 'bad_total'; return out; }
+  const realEstate = Number(row.real_estate != null ? row.real_estate : 0);
+  if (!Number.isFinite(realEstate) || realEstate < 0) { out.reason = 'bad_real_estate'; return out; }
+  const raw = row.category_values;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) { out.reason = 'no_category_map'; return out; }
+  const keys = Object.keys(raw);
+  // `{}` is a legitimate stored value (the column is NOT NULL DEFAULT '{}'), but it carries no category
+  // information at all, so it cannot support an exposure. Absent map ⇒ hold, never a portfolio of zeros.
+  if (!keys.length) { out.reason = 'empty_category_map'; return out; }
+  const all = {};
+  let sum = 0;
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    // Only the canonical buckets the capturer can emit (bucketOf). An unrecognised key means the row was
+    // written by a semantics this reader does not know — fail closed rather than silently ignore weight.
+    if (_AURIX_CATHIST_CANONICAL.indexOf(k) === -1) { out.reason = 'unknown_category:' + k; return out; }
+    const v = Number(raw[k]);
+    if (!Number.isFinite(v) || v < 0) { out.reason = 'bad_category_value:' + k; return out; }
+    all[k] = v; sum += v;
+  }
+  const tol = Math.max(_AURIX_CATHIST_RECON_ABS_TOL, _AURIX_CATHIST_RECON_REL_TOL * Math.abs(total));
+  if (Math.abs(sum - total) > tol) { out.reason = 'category_sum_mismatch'; return out; }
+  // Second, independent cross-check: real estate is stored BOTH as its own column and as a bucket. If the
+  // two disagree the row's notion of "what is not investable" is not the reader's, and the denominator
+  // below would be wrong in a way no downstream check could see.
+  const reCat = Number(all[_AURIX_CATHIST_REAL_ESTATE_KEY] || 0);
+  if (Math.abs(reCat - realEstate) > tol) { out.reason = 'real_estate_mismatch'; return out; }
+  // THE denominator. Canonical investable wealth = total − real_estate. Never total_value_usd (that is
+  // TOTAL wealth), never Σ asset_values (also TOTAL, and a different column's semantics).
+  const investableValue = total - realEstate;
+  if (!(investableValue > 0)) { out.reason = 'no_investable'; return out; }
+  // `categories` holds the INVESTABLE buckets only, so real estate cannot reach an exposure or a delta.
+  const categories = {};
+  for (let i = 0; i < _AURIX_CATHIST_INVESTABLE.length; i++) {
+    const k = _AURIX_CATHIST_INVESTABLE[i];
+    if (Object.prototype.hasOwnProperty.call(all, k)) categories[k] = all[k];
+  }
+  out.valid = true; out.reason = '';
+  out.point = {
+    ts: ts, totalValue: total, realEstate: realEstate, investableValue: investableValue,
+    categories: categories, categoriesComplete: true,
+    confidence: row.confidence || null, marketState: row.market_state || null, priceStaleness: row.price_staleness || null,
+  };
+  return out;
+}
+// Exposure of one category at one point, in PERCENT of investable wealth (0–100), or null.
+// Returning 0 for an absent category is licensed ONLY by point.categoriesComplete: the map reconciled to the
+// total, so every valued position is accounted for and this bucket genuinely holds nothing. Without that
+// flag the absence is an unknown, and an unknown is null — never 0.
+function _aurixCatExposurePct(point, category) {
+  if (!point || point.categoriesComplete !== true) return null;
+  const inv = Number(point.investableValue);
+  if (!Number.isFinite(inv) || inv <= 0) return null;
+  const key = String(category == null ? '' : category);
+  if (_AURIX_CATHIST_INVESTABLE.indexOf(key) === -1) return null;   // unknown bucket, or real estate (not an exposure)
+  const cats = point.categories;
+  if (!cats || typeof cats !== 'object') return null;
+  const v = Object.prototype.hasOwnProperty.call(cats, key) ? Number(cats[key]) : 0;
+  if (!Number.isFinite(v) || v < 0) return null;
+  return (v / inv) * 100;
+}
+// The window contract. Returns state 'ok' | 'insufficient_data' | 'unsupported_range' — never a number it
+// cannot back. Extremes are selected on DATA time (the newest valid capture is "now"), not on the local
+// clock; the clock appears only as the REPORTED coverage.endAgeMs, so a dead cron cannot be mistaken for
+// a fresh reading. Produces no narrative, no insight, no causality, no attribution, no threshold verdict.
+function _aurixCatHistWindow(range) {
+  const key = String(range == null ? '' : range).toUpperCase();
+  const out = {
+    range: key, state: 'insufficient_data', reason: '', startAt: null, endAt: null, start: null, end: null,
+    coverage: { health: null, hydration: null, rows: 0, validPoints: 0, invalidPoints: 0, invalidReasons: {},
+      firstValidAt: null, lastValidAt: null, historySpanMs: null, windowSpanMs: null, startDriftMs: null,
+      endAgeMs: null, truncated: false },
+    warnings: [],
+  };
+  const spec = _AURIX_CATHIST_WINDOWS[key];
+  if (!spec) { out.state = 'unsupported_range'; out.reason = 'range_not_supported'; return out; }
+  try {
+    let hydration = 'idle';
+    try { hydration = (typeof _aurixBackendSnapshotsState !== 'undefined') ? _aurixBackendSnapshotsState : 'idle'; } catch (_) {}
+    out.coverage.hydration = hydration;
+    // Reuse the existing backend continuity classification rather than inventing a second freshness rule.
+    try { const h = _aurixBackendHealthSnapshot(); out.coverage.health = (h && h.status) || null; } catch (_) {}
+    // A history that has not finished loading is not an empty history. Hold instead of answering from a
+    // partial array — the hydration state machine retries and the answer changes on the next call.
+    if (hydration !== 'ready') { out.reason = 'not_hydrated'; return out; }
+    const rows = _aurixCatHistRows();
+    out.coverage.rows = rows.length;
+    out.coverage.truncated = rows.length >= _AURIX_CATHIST_SOURCE_ROW_CAP;
+    if (out.coverage.truncated) out.warnings.push('source_row_cap_reached');   // newest rows may be missing (ascending limit)
+    const valid = [];
+    for (let i = 0; i < rows.length; i++) {
+      const v = _aurixCatHistValidatePoint(rows[i]);
+      if (v.valid) { valid.push(v.point); continue; }
+      out.coverage.invalidPoints++;
+      // Tally, not silence: an excluded point is visible to whoever asks why a window is unavailable.
+      const r = String(v.reason || 'unknown').split(':')[0];
+      out.coverage.invalidReasons[r] = (out.coverage.invalidReasons[r] || 0) + 1;
+    }
+    valid.sort((a, b) => a.ts - b.ts);
+    out.coverage.validPoints = valid.length;
+    if (!valid.length) { out.reason = rows.length ? 'no_valid_points' : 'no_rows'; return out; }
+    out.coverage.firstValidAt = valid[0].ts;
+    out.coverage.lastValidAt = valid[valid.length - 1].ts;
+    out.coverage.historySpanMs = valid[valid.length - 1].ts - valid[0].ts;
+    // Two distinct captures are the minimum for a BEFORE → NOW statement. One point is a snapshot, not a change.
+    if (valid.length < 2) { out.reason = 'single_point'; return out; }
+    const end = valid[valid.length - 1];
+    out.coverage.endAgeMs = Date.now() - end.ts;
+    // Reuse the existing STALE bound (cadence × staleFactor) instead of a new number. Reported, not fatal:
+    // whether a stale-but-real reading may be published is a product decision, not this layer's.
+    try {
+      const staleAfter = _AURIX_BACKEND_CADENCE_MS * _AURIX_BACKEND_STALE_FACTOR;
+      if (out.coverage.endAgeMs > staleAfter) out.warnings.push('end_point_stale');
+    } catch (_) {}
+    const targetStart = end.ts - spec.ms;
+    // Nearest REAL capture to the ideal start, on either side. Never synthesized, never interpolated.
+    let start = null, bestDist = Infinity;
+    for (let i = 0; i < valid.length - 1; i++) {
+      const d = Math.abs(valid[i].ts - targetStart);
+      if (d < bestDist) { bestDist = d; start = valid[i]; }
+    }
+    if (!start) { out.reason = 'no_start_point'; return out; }
+    const drift = start.ts - targetStart;             // >0 ⇒ start is NEWER than ideal (window shorter)
+    if (Math.abs(drift) > spec.maxStartDriftMs) {
+      out.coverage.startDriftMs = drift;
+      out.reason = (drift > 0) ? 'insufficient_history' : 'start_drift_exceeded';
+      return out;
+    }
+    out.coverage.startDriftMs = drift;
+    out.coverage.windowSpanMs = end.ts - start.ts;
+    out.startAt = start.ts; out.endAt = end.ts;
+    out.start = start; out.end = end;
+    out.state = 'ok'; out.reason = '';
+    return out;
+  } catch (e) {
+    out.state = 'insufficient_data'; out.reason = 'reader_error';
+    return out;
+  }
+}
+// ANTES → AHORA → DELTA for one category. The unit of the delta is PERCENTAGE POINTS (endPct − startPct):
+// crypto 82.4% → 89.7% is Δ +7.3 pp, which is NOT "+8.9%" (the relative change of the weight). `unit` is
+// carried in the payload so no consumer can lose that distinction. Nothing is stored: this is recomputed
+// from the window every time, so there is no derived value that can drift from its inputs.
+function _aurixCatExposureDelta(rangeOrWindow, category) {
+  const cat = String(category == null ? '' : category);
+  const w = (rangeOrWindow && typeof rangeOrWindow === 'object' && rangeOrWindow.state)
+    ? rangeOrWindow : _aurixCatHistWindow(rangeOrWindow);
+  const base = { range: (w && w.range) || null, category: cat, unit: 'percentage_points',
+    startAt: null, endAt: null, startPct: null, endPct: null, deltaPp: null };
+  if (!w || w.state !== 'ok') {
+    return Object.assign(base, { state: (w && w.state) || 'insufficient_data', reason: (w && w.reason) || 'no_window' });
+  }
+  const s = _aurixCatExposurePct(w.start, cat);
+  const e = _aurixCatExposurePct(w.end, cat);
+  if (s === null || e === null) return Object.assign(base, { state: 'insufficient_data', reason: 'exposure_unavailable' });
+  return Object.assign(base, { state: 'ok', reason: '', startAt: w.startAt, endAt: w.endAt,
+    startPct: s, endPct: e, deltaPp: e - s });
+}
+try {
+  if (typeof window !== 'undefined') {
+    window.aurixCategoryHistoryWindow = _aurixCatHistWindow;
+    window.aurixCategoryExposurePct = _aurixCatExposurePct;
+    window.aurixCategoryExposureDelta = _aurixCatExposureDelta;
+    window.aurixCategoryHistoryValidatePoint = _aurixCatHistValidatePoint;
+    window.AURIX_CATEGORY_HISTORY_CONTRACT = Object.freeze({
+      source: 'portfolio_snapshots.category_values (server, read-only)',
+      canonical: _AURIX_CATHIST_CANONICAL, investable: _AURIX_CATHIST_INVESTABLE,
+      denominator: 'total_value_usd - real_estate', ranges: Object.keys(_AURIX_CATHIST_WINDOWS),
+      deltaUnit: 'percentage_points',
+    });
+  }
+} catch (_) {}
 
 // ── P0-FINAL-PERFORMANCE-KILL-SWITCH-AND-SERVER-CANONICAL ────────────────────────
 // The single REMOTE canonical performance object (Supabase user_portfolios.performance_state). It is the
