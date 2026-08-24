@@ -506,8 +506,13 @@ console.log('\n22–25 · Chart, Performance, Category History Reader, Preview V
   if (appDiff === null) {
     skip('22–25 app.js untouched vs ' + BASELINE, BASELINE + ' not in this clone (shallow checkout)');
     // History-free fallback: the frontend bundle cannot be reached from this SPEC's files.
-    ok('22.1 no file of this SPEC references a frontend owner',
-      !/app\.js|switchTab|buildProductionPortfolioChart|_aurixCatHist|_aurixIntelligencePreview/.test(sql + ts));
+    // CODE only. Both files NAME app.js in prose — the capturer to say it mirrors its gold
+    // valuation, the migration to explain that app.js salvages an orphan while the server
+    // drops it. That asymmetry IS the P0's documentation; asserting over comments would
+    // punish the explanation and, worse, this branch only runs in a shallow clone, so it
+    // went untested until CI ran it.
+    ok('22.1 no file of this SPEC references a frontend owner IN CODE',
+      !/\bapp\.js\b|switchTab|buildProductionPortfolioChart|_aurixCatHist|_aurixIntelligencePreview|_aurixSalvageHolding/.test(TS_EXEC + SQL_CODE));
   } else {
     const files = appDiff.split('\n').filter(Boolean);
     ok('22.1 app.js is NOT in the diff ⇒ Chart, Performance, Reader and Preview cannot have moved',
