@@ -116,7 +116,7 @@ console.log('\nCASO E — DRY_RUN sigue bloqueando inserts y queda tras el gate'
 {
   ok('DRY_RUN still short-circuits before the insert',
      ts.indexOf("if (DRY_RUN) { console.log('[DRY_RUN]'") < ts.indexOf("from('portfolio_snapshots').insert"));
-  ok('DRY_RUN continues without writing', /if \(DRY_RUN\) \{ console\.log\('\[DRY_RUN\]'[\s\S]{0,80}skipped\+\+; continue; \}/.test(ts));
+  ok('DRY_RUN continues without writing', /if \(DRY_RUN\) \{ console\.log\('\[DRY_RUN\]'[\s\S]{0,80}skipped\+\+; noteHealth\([^;]*\); continue; \}/.test(ts));
   // FASE 3 — the per-user samples are unreachable without auth
   ok('samples are only built inside the handler, after the gate',
      ts.indexOf('authorizeCaller(req)') < ts.indexOf('dryRunSamples.push'));
@@ -142,7 +142,7 @@ console.log('\nCASO G — lógica financiera intacta');
 {
   ok('gold purity mirror intact', /const PURITY_TABLE[\s\S]{0,200}'24': 1\.0000/.test(ts));
   ok('gold grams × purity × spot/OZ_TO_G intact', /grams \* purity \* \(spotPerOz \/ OZ_TO_G\)/.test(ts));
-  ok('LB-1 partial-valuation gate intact', /if \(Number\(v\.dropped_asset_count\) > 0\) \{ incompleteRej\+\+; continue; \}/.test(ts));
+  ok('LB-1 partial-valuation gate intact', /if \(Number\(v\.dropped_asset_count\) > 0\) \{ incompleteRej\+\+; noteHealth\([^;]*\); continue; \}/.test(ts));
   ok('near-duplicate guard intact', /dt <= NEAR_MS && dv <= NEAR_FRAC/.test(ts));
   ok('investable buckets unchanged', /INVESTABLE_TYPES = new Set\(\['crypto', 'stock', 'etf', 'fund', 'metal', 'liquidity', 'cash', 'other'\]\)/.test(ts));
   // ASSET-LEVEL-HISTORICAL-DATA-FOUNDATION — el insert gana `asset_values` (aditivo,

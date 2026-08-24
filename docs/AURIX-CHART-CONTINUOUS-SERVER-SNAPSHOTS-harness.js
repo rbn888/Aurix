@@ -106,11 +106,11 @@ if (transpileOk) {
 
 // ── runtime scheduler guarantees (SOURCE — the Deno.serve loop) ──────────────────────────────────────────
 ok('bounded execution: paginated read (.range) + MAX_USERS cap, no unbounded scan', /\.range\(from, from \+ PAGE - 1\)/.test(TS) && /MAX_USERS/.test(TS) && !/\.select\('user_id, assets, holdings'\);\s*\n\s*if \(error\) return/.test(TS));
-ok('active-only: skips rows with no catalog AND no holdings before valuation', /if \(!hasCatalog && !hasHoldings\) \{ inactive\+\+; continue; \}/.test(TS));
+ok('active-only: skips rows with no catalog AND no holdings before valuation', /if \(!hasCatalog && !hasHoldings\) \{ inactive\+\+; noteHealth\([^;]*\); continue; \}/.test(TS));
 ok('retry-safe: every per-user step wrapped in try/catch (one failure never aborts the run)', /for \(const r of rows\) \{\s*\n\s*try \{/.test(TS) && /\} catch \(e\) \{ errored\+\+;/.test(TS));
 ok('idempotent reruns: unique-violation (23505) counted as skip, not error', /'23505'|duplicate key\|unique constraint/.test(TS) && /skipped\+\+/.test(TS));
 ok('near-duplicate guard (5min / 0.2%) matches the frontend merge dedup', /NEAR_MS = 5 \* 60_000/.test(TS) && /NEAR_FRAC = 0\.002/.test(TS));
-ok('writes only REAL snapshots (skips total <= 0)', /if \(!Number\.isFinite\(v\.total\) \|\| v\.total <= 0\) \{ empty\+\+; continue; \}/.test(TS));
+ok('writes only REAL snapshots (skips total <= 0)', /if \(!Number\.isFinite\(v\.total\) \|\| v\.total <= 0\) \{ empty\+\+; noteHealth\([^;]*\); continue; \}/.test(TS));
 ok('deterministic ordering: read ordered by user_id; ts monotonic (now); index ts desc', /\.order\('user_id'/.test(TS) && /ts: now\.toISOString\(\)/.test(TS));
 ok('service-role from ENV only — never hardcoded, never shipped to frontend', /Deno\.env\.get\('SUPABASE_SERVICE_ROLE_KEY'\)/.test(TS) && !/service_role.{0,40}ey[A-Za-z0-9]/.test(TS));
 ok('single valuation pipeline (no duplicate calc): mirrors app.js convertFromNewToFlat, one valueUser', (TS.match(/function valueUser\(/g) || []).length === 1);

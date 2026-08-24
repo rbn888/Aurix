@@ -21,9 +21,9 @@ ok('2 orphan holding increments dropped', /if \(!asset\) \{ unpriced\+\+; droppe
 ok('3 non-finite quantity increments dropped (qty===0 still excluded, not dropped)', /if \(qty === 0\) continue;/.test(edge) && /if \(!Number\.isFinite\(qty\)\) \{ dropped\+\+;/.test(edge));
 ok('4 non-finite value (missing price/FX, no fallback) increments dropped', /if \(!Number\.isFinite\(valueUSD\)\) \{ unpriced\+\+; dropped\+\+;/.test(edge));
 ok('5 valueUser returns dropped_asset_count', /dropped_asset_count: dropped/.test(edge));
-ok('6 insert is SKIPPED when dropped>0 (partial valuation never persisted)', /if \(Number\(v\.dropped_asset_count\) > 0\) \{ incompleteRej\+\+; continue; \}/.test(edge));
+ok('6 insert is SKIPPED when dropped>0 (partial valuation never persisted)', /if \(Number\(v\.dropped_asset_count\) > 0\) \{ incompleteRej\+\+; noteHealth\([^;]*\); continue; \}/.test(edge));
 ok('7 completeness gate runs BEFORE near-dup and BEFORE insert', edge.indexOf('dropped_asset_count) > 0') < edge.indexOf('near-duplicate guard') && edge.indexOf('dropped_asset_count) > 0') < edge.indexOf('.insert('));
-ok('8 gate SKIPS (continue) — never updates/deletes existing rows (previous valid snapshot preserved)', !/\.update\(|\.delete\(/.test(edge) && /incompleteRej\+\+; continue;/.test(edge));
+ok('8 gate SKIPS (continue) — never updates/deletes existing rows (previous valid snapshot preserved)', !/\.update\(|\.delete\(/.test(edge) && /incompleteRej\+\+; noteHealth\([^;]*\); continue;/.test(edge));
 ok('9 incompleteRej reported in the response summary', /inserted, skipped, empty, inactive, errored, incompleteRej/.test(edge));
 ok('10 return formula / valuation math otherwise unchanged (still stored-price fallback for stale)', /const unit = fresh \? fresh\.price : storedPrice;/.test(edge));
 

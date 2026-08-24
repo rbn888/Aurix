@@ -35,6 +35,71 @@ const INVOKE_KEY = Deno.env.get('AURIX_SNAPSHOT_INVOKE_KEY') || '';
 const NEAR_MS = 5 * 60_000;          // skip if a snapshot exists within 5 min…
 const NEAR_FRAC = 0.002;             // …and within 0.2% value (matches the frontend merge dedup)
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC PER-USER SNAPSHOT CONTINUITY OBSERVABILITY — operational state, not data
+// ════════════════════════════════════════════════════════════════════════════
+// The forensic audit of 2026-08-24 confirmed the blindness this closes: this
+// function can refuse to insert for ONE account on every */15 tick, forever,
+// while other accounts insert normally, the GLOBAL watchdog stays HEALTHY
+// (it reads max(ts) across all users) and the user's app looks fine (app.js
+// salvages an orphaned holding; this function counts it as dropped). The three
+// silent branches — inactive / empty / incompleteRej — wrote no row and logged
+// no line, so nobody could name the dark account or the reason.
+//
+// What follows records ONLY what this function already computes and currently
+// throws away: an outcome, a dropped count and its own warnings. It changes NO
+// valuation. LB-1 stays exactly as it is — a partial valuation is still never
+// persisted, an unvalued position is still never 0, and no orphan is salvaged
+// server-side here. That fix, if it is one, belongs to another owner.
+//
+// FAIL-SAFE, absolutely: the write happens ONCE, AFTER the loop, so it runs
+// after every financial write of the run and cannot precede or prevent one.
+// Every failure path is swallowed (rpc error, throw, missing table before the
+// migration is applied). Observability must never become a cause of snapshot
+// loss. snapshot path > observability path.
+const HEALTH_OUTCOMES = ['INSERTED', 'INACTIVE', 'EMPTY', 'INCOMPLETE', 'SKIPPED', 'ERROR'] as const;
+// Warning prefixes this contract has REVIEWED as safe to persist. `invalid_qty`
+// is normalised to the canonical `invalid_quantity` here rather than renamed at
+// the source, so `valueUser` keeps emitting exactly what it emitted before.
+const HEALTH_WARN_ALLOW: Record<string, string> = {
+  orphan_holding: 'orphan_holding',
+  unpriced: 'unpriced',
+  fx_missing: 'fx_missing',
+  invalid_qty: 'invalid_quantity',
+};
+const HEALTH_WARN_MAX = 12;            // bounded array; the counter carries duration, not a log
+const HEALTH_WARN_VALUE_MAX = 40;      // bounded value; never a payload
+const HEALTH_UPSERT_CHUNK = 500;       // one bounded request per chunk
+// Asset ids, tickers and ISO currency codes are internal identifiers, not PII —
+// no email, name, amount, quantity, price or position ever reaches this array.
+// An UNKNOWN prefix keeps its own name and DROPS its value entirely: a warning
+// shape nobody reviewed can never carry an unreviewed payload into storage.
+function normalizeWarnings(ws: any): string[] {
+  if (!Array.isArray(ws)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const w of ws) {
+    if (out.length >= HEALTH_WARN_MAX) break;
+    const s = String(w == null ? '' : w);
+    const i = s.indexOf(':');
+    const prefix = (i < 0 ? s : s.slice(0, i)).trim();
+    const canon = HEALTH_WARN_ALLOW[prefix];
+    let entry: string;
+    if (!canon) {
+      const safe = prefix.replace(/[^A-Za-z0-9_]/g, '').slice(0, 32);
+      if (!safe) continue;
+      entry = safe + ':-';
+    } else {
+      const val = (i < 0 ? '' : s.slice(i + 1)).replace(/\s+/g, '').slice(0, HEALTH_WARN_VALUE_MAX);
+      entry = canon + ':' + (val || '-');
+    }
+    if (seen.has(entry)) continue;
+    seen.add(entry);
+    out.push(entry);
+  }
+  return out;
+}
+
 // Investable buckets (real_estate is tracked but EXCLUDED from investable; kept in the snapshot so the
 // chart computes investable = total - real_estate exactly like the app).
 const INVESTABLE_TYPES = new Set(['crypto', 'stock', 'etf', 'fund', 'metal', 'liquidity', 'cash', 'other']);
@@ -259,12 +324,41 @@ Deno.serve(async (req: Request) => {
 
   let inserted = 0, skipped = 0, empty = 0, errored = 0, inactive = 0, incompleteRej = 0;
   const dryRunSamples: any[] = [];
+  // Per-user operational outcomes for this run. Accumulated in memory (no extra
+  // round trip inside the loop) and flushed ONCE after it. `noteHealth` cannot
+  // throw into the capture path: the whole body is guarded.
+  const userHealth: any[] = [];
+  const noteHealth = (uid: any, outcome: string, dropped?: any, positions?: any, warnings?: any, snapshotAt?: any) => {
+    try {
+      if (!uid) return;
+      // Closed vocabulary enforced at the source too, not only by the table's CHECK:
+      // an unknown outcome is dropped here rather than risking the whole batch.
+      if ((HEALTH_OUTCOMES as readonly string[]).indexOf(outcome) < 0) return;
+      const d = Number(dropped), n = Number(positions);
+      userHealth.push({
+        user_id: String(uid),
+        outcome: outcome,
+        dropped: Number.isFinite(d) && d > 0 ? Math.floor(d) : 0,
+        // Positions this attempt actually valued into the total. The ONE fact that
+        // separates "nothing to capture" from "should have captured and did not":
+        // a fully liquidated account has 0 (its holdings are qty 0 and are skipped),
+        // while an account holding a position whose price is missing has ≥1 — that
+        // position values to a FINITE 0, so it is not `dropped`, the total is 0 and
+        // the attempt lands in EMPTY with no warning at all. Without this number that
+        // account is indistinguishable from a liquidated one, which is exactly the
+        // darkness this SPEC exists to remove. A count, never an amount.
+        positions: Number.isFinite(n) && n > 0 ? Math.floor(n) : 0,
+        warnings: normalizeWarnings(warnings),
+        snapshot_at: snapshotAt ? new Date(snapshotAt).toISOString() : null,
+      });
+    } catch (_) { /* observability never interferes with capture */ }
+  };
   for (const r of rows) {
    try {   // RETRY-SAFE — one failing portfolio must never abort the whole scheduled run (SPEC.36).
     // ACTIVE-ONLY — a portfolio with neither a catalog nor holdings is not active; skip before valuation.
     const hasCatalog = Array.isArray(r.assets) && r.assets.length > 0;
     const hasHoldings = Array.isArray(r.holdings) && r.holdings.length > 0;
-    if (!hasCatalog && !hasHoldings) { inactive++; continue; }
+    if (!hasCatalog && !hasHoldings) { inactive++; noteHealth(r.user_id, 'INACTIVE'); continue; }
     const v = valueUser(r, prices, now);
     // DRY_RUN visibility WITHOUT `functions logs`: return a per-user, secrets-free sample in the response.
     if (DRY_RUN) dryRunSamples.push({ user: String(r.user_id || '').slice(0, 8), valuationTs: now.toISOString(),
@@ -275,13 +369,19 @@ Deno.serve(async (req: Request) => {
       fx_conversions: v.fx_conversions, category_values: v.categories,
       asset_position_count: Object.keys(v.assetValues).length,
       market_state: v.market_state, price_staleness: v.price_staleness, warnings: v.warnings });
-    if (!Number.isFinite(v.total) || v.total <= 0) { empty++; continue; }
+    if (!Number.isFinite(v.total) || v.total <= 0) { empty++; noteHealth(r.user_id, Number(v.dropped_asset_count) > 0 ? 'INCOMPLETE' : 'EMPTY', v.dropped_asset_count, v.count, v.warnings); continue; }
     // SPEC CHART-INTEGRITY.LB-1 (server-side) — a PARTIAL valuation (≥1 active holding excluded from the
     // total) must NEVER be persisted: it would become a low endpoint/baseline just like the client-side
     // −24% incident. Skip the write so the previous VALID snapshot remains the latest (no fabrication, no
     // deletion). Recovers automatically on the next run once prices/FX resolve. Placed BEFORE the near-dup
     // and insert steps, mirroring the client's completeness-first gate.
-    if (Number(v.dropped_asset_count) > 0) { incompleteRej++; continue; }
+    // OBSERVABILITY NOTE (labels only, no branch reordered): the `empty` branch above
+    // runs BEFORE this one, so the exact case the audit found — an account whose ONLY
+    // holding is orphaned — reaches EMPTY with total 0 and would be filed as "nothing to
+    // capture" when the truth is "nothing could be VALUED". That is why it reports
+    // INCOMPLETE whenever dropped > 0: an operator filtering for LB-1 victims must find
+    // them. The capture decision, its counter and its ordering are untouched.
+    if (Number(v.dropped_asset_count) > 0) { incompleteRej++; noteHealth(r.user_id, 'INCOMPLETE', v.dropped_asset_count, v.count, v.warnings); continue; }
 
     // near-duplicate guard: skip if the latest snapshot is within NEAR_MS and NEAR_FRAC value.
     const { data: last } = await admin.from('portfolio_snapshots')
@@ -289,10 +389,10 @@ Deno.serve(async (req: Request) => {
     if (last && last[0]) {
       const dt = now.getTime() - new Date(last[0].ts).getTime();
       const dv = Math.abs(Number(last[0].total_value_usd) - v.total);
-      if (dt <= NEAR_MS && dv <= NEAR_FRAC * (Math.abs(v.total) || 1)) { skipped++; continue; }
+      if (dt <= NEAR_MS && dv <= NEAR_FRAC * (Math.abs(v.total) || 1)) { skipped++; noteHealth(r.user_id, 'SKIPPED', v.dropped_asset_count, v.count, v.warnings, last[0].ts); continue; }
     }
 
-    if (DRY_RUN) { console.log('[DRY_RUN]', r.user_id, JSON.stringify(v)); skipped++; continue; }
+    if (DRY_RUN) { console.log('[DRY_RUN]', r.user_id, JSON.stringify(v)); skipped++; noteHealth(r.user_id, 'SKIPPED', v.dropped_asset_count, v.count, v.warnings); continue; }
 
     const { error: insErr } = await admin.from('portfolio_snapshots').insert({
       user_id: r.user_id, ts: now.toISOString(), total_value_usd: v.total, real_estate: v.realEstate,
@@ -310,11 +410,35 @@ Deno.serve(async (req: Request) => {
     if (insErr) {
       // IDEMPOTENT — a unique-violation (23505) means a snapshot already exists for this (user, minute):
       // a safe no-op rerun, NOT a failure. Any other error is a real per-user failure (logged, loop continues).
-      if (String((insErr as any).code) === '23505' || /duplicate key|unique constraint/i.test(insErr.message || '')) skipped++;
-      else { errored++; console.error('[insert]', r.user_id, insErr.message); }
-    } else { inserted++; }
-   } catch (e) { errored++; try { console.error('[user]', r && r.user_id, (e as any) && (e as any).message); } catch (_) {} }
+      if (String((insErr as any).code) === '23505' || /duplicate key|unique constraint/i.test(insErr.message || '')) { skipped++; noteHealth(r.user_id, 'SKIPPED', v.dropped_asset_count, v.count, v.warnings, now.toISOString()); }
+      // The DB message stays in the function logs ONLY — it is not normalised and
+      // could carry column/constraint detail, so it never reaches the health row.
+      else { errored++; console.error('[insert]', r.user_id, insErr.message); noteHealth(r.user_id, 'ERROR', v.dropped_asset_count, v.count, v.warnings); }
+    } else { inserted++; noteHealth(r.user_id, 'INSERTED', v.dropped_asset_count, v.count, v.warnings, now.toISOString()); }
+   } catch (e) { errored++; noteHealth(r && r.user_id, 'ERROR'); try { console.error('[user]', r && r.user_id, (e as any) && (e as any).message); } catch (_) {} }
   }
+
+  // ── Per-user observability flush — AFTER every financial write of this run ──
+  // Deliberately last: by the time this executes, every snapshot that was going
+  // to be inserted already is. A failure here (rpc error, throw, or the migration
+  // not applied yet so the function does not exist) costs a diagnostic, never a
+  // snapshot. Skipped entirely in DRY_RUN so that mode stays a pure read.
+  let healthWritten = 0, healthFailed = 0;
+  if (!DRY_RUN) {
+    for (let i = 0; i < userHealth.length; i += HEALTH_UPSERT_CHUNK) {
+      const chunk = userHealth.slice(i, i + HEALTH_UPSERT_CHUNK);
+      try {
+        const { error: hErr } = await admin.rpc('portfolio_snapshot_user_health_upsert', { p_rows: chunk });
+        if (hErr) { healthFailed += chunk.length; console.warn('[user_health]', hErr.message); }
+        else healthWritten += chunk.length;
+      } catch (e) {
+        healthFailed += chunk.length;
+        try { console.warn('[user_health]', (e as any) && (e as any).message); } catch (_) {}
+      }
+    }
+  }
+
   return new Response(JSON.stringify({ ok: true, dryRun: DRY_RUN, users: rows.length, inserted, skipped, empty, inactive, errored, incompleteRej,
+    healthWritten, healthFailed,
     ...(DRY_RUN ? { samples: dryRunSamples } : {}) }), { headers: { 'content-type': 'application/json' } });
 });

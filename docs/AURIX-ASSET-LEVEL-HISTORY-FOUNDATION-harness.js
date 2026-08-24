@@ -182,7 +182,7 @@ console.log('\n4 — Una posición sin valoración NO se convierte en 0:');
   ok('4.2 y NO aparece como 0 (ausencia ≠ cero)', U.assetValues['a-x'] === undefined);
   ok('4.3 el capturador la cuenta como valoración parcial', U.dropped_asset_count === 1);
   ok('4.4 y un snapshot parcial NUNCA se persiste (guard LB-1 intacto)',
-     /if \(Number\(v\.dropped_asset_count\) > 0\) \{ incompleteRej\+\+; continue; \}/.test(fn),
+     /if \(Number\(v\.dropped_asset_count\) > 0\) \{ incompleteRej\+\+; noteHealth\([^;]*\); continue; \}/.test(fn),
      'sin este guard, un mapa incompleto se leería como cartera menguante');
   ok('4.5 ⇒ todo asset_values persistido está completo por construcción',
      U.dropped_asset_count > 0 && Object.keys(U.assetValues).length === 4);

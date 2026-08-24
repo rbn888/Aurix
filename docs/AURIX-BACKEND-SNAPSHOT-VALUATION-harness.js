@@ -56,7 +56,7 @@ ok('price from catalog.currentPrice', /Number\(asset\.currentPrice\)/.test(edge)
 ok('type/symbol/assetCurrency from catalog', /asset\.type/.test(edge) && /asset\.symbol/.test(edge) && /asset\.assetCurrency/.test(edge));
 
 console.log('\nSafety (DRY_RUN, no writes, no secrets):');
-ok('DRY_RUN gates the INSERT (log/skip, no insert in dry run)', /if \(DRY_RUN\) \{[\s\S]{0,80}skipped\+\+; continue; \}/.test(edge) && edge.indexOf('if (DRY_RUN)') < edge.indexOf('.insert('));
+ok('DRY_RUN gates the INSERT (log/skip, no insert in dry run)', /if \(DRY_RUN\) \{[\s\S]{0,80}skipped\+\+; noteHealth\([^;]*\); continue; \}/.test(edge) && edge.indexOf('if (DRY_RUN)') < edge.indexOf('.insert('));
 ok('DRY_RUN returns per-user samples in the response (no functions-logs needed)', /samples: dryRunSamples/.test(edge) && /String\(r\.user_id \|\| ''\)\.slice\(0, 8\)/.test(edge));
 ok('samples carry NO secret (no email/token/service-role fields)', !/email|access_token|refresh_token|service_role/i.test(edge.slice(edge.indexOf('dryRunSamples.push'), edge.indexOf('dryRunSamples.push') + 600)));
 ok('service-role from env only (never hardcoded)', /Deno\.env\.get\('SUPABASE_SERVICE_ROLE_KEY'\)/.test(edge) && !/eyJ[A-Za-z0-9_-]{20,}/.test(edge));
@@ -101,7 +101,7 @@ ok('edge requests fresh XAU/USD spot (registry key)', /allSymbols\.push\('XAU\/U
 
 console.log('\nNo frontend/app runtime change (this fix is Edge-Function-only):');
 ok('app.js hydration ACTIVATED, auth-gated, retryable (failure→null so it never falsely completes)', /const _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD = true;/.test(app) && /if \(error \|\| !Array\.isArray\(data\)\) return null;/.test(app));
-ok('DRY_RUN still gates inserts (no real write)', /if \(DRY_RUN\) \{[\s\S]{0,80}skipped\+\+; continue; \}/.test(edge));
+ok('DRY_RUN still gates inserts (no real write)', /if \(DRY_RUN\) \{[\s\S]{0,80}skipped\+\+; noteHealth\([^;]*\); continue; \}/.test(edge));
 
 console.log('\n' + (fail === 0 ? 'PASS' : 'FAIL') + ' — ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);
