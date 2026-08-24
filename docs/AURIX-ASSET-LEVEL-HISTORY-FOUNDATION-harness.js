@@ -55,6 +55,7 @@ const TS_STRIP = [
   ['function goldPurity(k: any): number {',              'function goldPurity(k) {'],
   ['function goldGrams(qty: number, unit: string): number {', 'function goldGrams(qty, unit) {'],
   ['function isUsEquityOpenNow(now: Date): boolean {',   'function isUsEquityOpenNow(now) {'],
+  ['function usableFactor(v: any): number {',             'function usableFactor(v) {'],
   ['function fxToUsd(cur: string, prices: Map<string, { price: number; currency: string }>): number {',
    'function fxToUsd(cur, prices) {'],
   ['function valueUser(row: any, prices: Map<string, { price: number; currency: string }>, now: Date) {',
@@ -80,7 +81,7 @@ function deTypeScript(src) {
 // de un tipo inline (`Map<string, { price: number }>`) abre y cierra el conteo de
 // llaves antes que el cuerpo real y la función sale truncada.
 const FN_JS = deTypeScript(fn);
-const SRC = ['bucketOf', 'goldPurity', 'goldGrams', 'isUsEquityOpenNow', 'fxToUsd', 'valueUser']
+const SRC = ['bucketOf', 'goldPurity', 'goldGrams', 'isUsEquityOpenNow', 'usableFactor', 'fxToUsd', 'valueUser']
   .map(n => extractFn(n, FN_JS)).join('\n');
 const CONSTS = 'const OZ_TO_G = 31.1034768;'
   + 'const PURITY_TABLE = { "10":0.4167,"14":0.5833,"18":0.7500,"21":0.8750,"22":0.9167,"24":1.0000 };';

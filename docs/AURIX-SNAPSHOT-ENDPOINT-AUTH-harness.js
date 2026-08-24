@@ -152,7 +152,7 @@ console.log('\nCASO G — lógica financiera intacta');
   ok('inserted fields unchanged (+ asset_values, aditivo)',
      ['user_id:', 'ts:', 'total_value_usd:', 'real_estate:', 'category_values:', 'asset_count:',
       "source: 'backend_snapshot'", "confidence: 'scheduled'", 'market_state:', 'price_staleness:',
-      'schema_version: 1'].every(f => ts.includes(f))
+      'schema_version:'].every(f => ts.includes(f)) && /schema_version: \d+,/.test(ts)
      && /asset_values: v\.assetValues/.test(ts));
 }
 

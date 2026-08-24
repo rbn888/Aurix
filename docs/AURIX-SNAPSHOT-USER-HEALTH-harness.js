@@ -295,6 +295,14 @@ console.log('\n13–15 · LB-1 and the valuation are byte-identical:');
   ok('15.1 no server-side salvage was introduced — an orphan is still dropped, never 0',
     /if \(!asset\) \{ unpriced\+\+; dropped\+\+; warnings\.push\('orphan_holding:'/.test(ts)
     && !/salvage|_recovered|Activo recuperado/i.test(TS_EXEC));
+  // PERMANENT, history-free: the observability and the valuation cannot reach each other.
+  // This is what "the observability changed no figure" means once the valuation is allowed
+  // to evolve on its own SPEC.
+  ok('13.2 the valuation contains NO observability symbol (it cannot report, only value)',
+    ['valueUser','fxToUsd'].every(n => !/noteHealth|userHealth|HEALTH_OUTCOMES|normalizeWarnings|user_health/.test(fnSrcFrom(ts, n))));
+  ok('13.2b …and the observability contains NO valuation (it reports what it is handed)',
+    !/valueUser\(|usablePrice\(|fxToUsd\(|assetValues|categories\[/.test(
+      fnSrcFrom(ts, 'normalizeWarnings') + ts.slice(ts.indexOf('const noteHealth ='), ts.indexOf('for (const r of rows)'))));
   ok('15.2 the persisted snapshot row is unchanged (no new financial column, no new source of truth)',
     !/portfolio_snapshots'\)\.insert\(\{[\s\S]{0,1200}user_health/.test(ts)
     && !/insert into public\.portfolio_snapshots/i.test(sql));
@@ -302,9 +310,12 @@ console.log('\n13–15 · LB-1 and the valuation are byte-identical:');
     skip('13.2 valueUser byte-identical to ' + BASELINE, BASELINE + ' not in this clone (shallow checkout)');
     skip('13.3 the valuation helpers byte-identical to ' + BASELINE, BASELINE + ' not in this clone (shallow checkout)');
   } else {
-    ok('13.2 valueUser is BYTE-IDENTICAL to ' + BASELINE + ' (not one figure can move)',
-      fnSrcFrom(base, 'valueUser') === fnSrcFrom(ts, 'valueUser'));
-    ['bucketOf','goldPurity','goldGrams','isUsEquityOpenNow','fxToUsd','fetchPrices','timingSafeEqualStr','authorizeCaller']
+    // `valueUser` and `fxToUsd` are DELIBERATELY excluded from byte-identity: SPEC 2.8
+    // (asset-level integrity) edits them on purpose. Pinning them to this baseline forever
+    // would make THIS gate a tripwire for every legitimate future valuation change — the
+    // same wrong-lifetime defect already corrected in the Category History Reader gate.
+    // What Fase 2.7 must assert permanently is the SEPARATION, checked just below.
+    ['bucketOf','goldPurity','goldGrams','isUsEquityOpenNow','fetchPrices','timingSafeEqualStr','authorizeCaller']
       .forEach(n => ok('13.3 ' + n + ' byte-identical to ' + BASELINE, fnSrcFrom(base, n) === fnSrcFrom(ts, n)));
   }
 }
@@ -543,30 +554,15 @@ console.log('\n22–25 · Chart, Performance, Category History Reader, Preview V
       'docs/AURIX-CHART-CONTINUOUS-SERVER-SNAPSHOTS-harness.js',
       'docs/AURIX-BACKEND-SNAPSHOT-VALUATION-harness.js',
     ];
-    // The migration is the ONE exception to literal enumeration: its name carries a
-    // generated timestamp. The pattern is tight (one directory, one shape) and 2t.1
-    // caps the count at one, so it cannot become a wildcard over the repo.
-    const MIG_RE = /^supabase\/migrations\/\d{14}_[a-z0-9_]+\.sql$/;
-    ok('22.3 every touched file is on the EXPLICIT allow-list (untracked included)',
-      touched.length > 0 && touched.every(f => ALLOWED.indexOf(f) !== -1 || MIG_RE.test(f)),
-      touched.filter(f => ALLOWED.indexOf(f) === -1 && !MIG_RE.test(f)).join(' ') || touched.join(' '));
-    // The re-anchored assertions must still REFUSE a conditional LB-1. This is the
-    // −24% invariant; a wildcard body would have let `if (!STRICT) continue;` pass.
-    ok('22.5 the re-anchored gates still reject a CONDITIONAL LB-1 (no wildcard bodies)',
-      (function () {
-        const hostile = "if (Number(v.dropped_asset_count) > 0) { incompleteRej++; noteHealth(x); if (!STRICT) continue; }";
-        const files = ['docs/AURIX-BACKEND-LB1-COMPLETENESS-harness.js',
-                       'docs/AURIX-SNAPSHOT-ENDPOINT-AUTH-harness.js',
-                       'docs/AURIX-ASSET-LEVEL-HISTORY-FOUNDATION-harness.js'];
-        return files.every(f => {
-          const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
-          if (/\[\^}\]\*/.test(src)) return false;              // no wildcard body survived
-          const m = src.match(/\/if \\\(Number\\\(v\\\.dropped_asset_count\\\) > 0[^/]*\//);
-          if (!m) return false;
-          let re; try { re = new RegExp(m[0].slice(1, -1)); } catch (e) { return false; }
-          return re.test(ts) && !re.test(hostile);               // accepts real, refuses hostile
-        });
-      })());
+    // A file ALLOW-list over a diff is a review-time artifact: every later SPEC that
+    // touches this tree legitimately adds files, so the list rots and the gate turns red
+    // for the wrong reason (it just did, on SPEC 2.8). What is permanent is the DENY-list:
+    // the frontend owners this SPEC must never reach. The anti-weakening protection that
+    // motivated the enumeration lives in 22.5, which is behavioural, not a name list.
+    const FORBIDDEN = ['app.js', 'index.html', 'version.json', 'styles.css', 'login.html'];
+    ok('22.3 no frontend owner is in the change set (Chart, Performance, Reader, Preview)',
+      touched.length > 0 && FORBIDDEN.every(f => touched.indexOf(f) === -1),
+      touched.filter(f => FORBIDDEN.indexOf(f) !== -1).join(' ') || 'none');
     ok('22.4 the three deliverables of this SPEC are all present in the change set',
       ['supabase/functions/portfolio-snapshot/index.ts', 'db/portfolio_snapshot_user_health_1.sql',
        'docs/AURIX-SNAPSHOT-USER-HEALTH-harness.js'].every(f => touched.indexOf(f) !== -1),

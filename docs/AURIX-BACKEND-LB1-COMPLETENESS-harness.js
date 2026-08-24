@@ -25,7 +25,7 @@ ok('6 insert is SKIPPED when dropped>0 (partial valuation never persisted)', /if
 ok('7 completeness gate runs BEFORE near-dup and BEFORE insert', edge.indexOf('dropped_asset_count) > 0') < edge.indexOf('near-duplicate guard') && edge.indexOf('dropped_asset_count) > 0') < edge.indexOf('.insert('));
 ok('8 gate SKIPS (continue) — never updates/deletes existing rows (previous valid snapshot preserved)', !/\.update\(|\.delete\(/.test(edge) && /incompleteRej\+\+; noteHealth\([^;]*\); continue;/.test(edge));
 ok('9 incompleteRej reported in the response summary', /inserted, skipped, empty, inactive, errored, incompleteRej/.test(edge));
-ok('10 return formula / valuation math otherwise unchanged (still stored-price fallback for stale)', /const unit = fresh \? fresh\.price : storedPrice;/.test(edge));
+ok('10 return formula / valuation math otherwise unchanged (still stored-price fallback for stale)', /const unit = havePx \? freshUnit : storedPrice;/.test(edge));
 
 // ── Behavioral mirror of valueUser's drop logic (proves accept/reject decisions) ──
 console.log('\nBehavioral mirror (accept complete/stale, reject partial):');
@@ -40,8 +40,14 @@ function valueMirror(holdings, catalog, prices, fx) {
     if (qty === 0) continue;                                           // legit excluded
     if (!Number.isFinite(qty)) { dropped++; continue; }               // invalid qty
     let v;
-    if (a.type === 'cash') { v = a.assetCurrency === 'USD' ? qty : (Number.isFinite(fx[a.assetCurrency]) ? qty*fx[a.assetCurrency] : (a.currentPrice>0?qty*a.currentPrice:NaN)); }
-    else { const fresh = prices[a.symbol]; const unit = (fresh!=null) ? fresh : a.currentPrice; const native = qty*unit;
+    // SPEC 2.8: non-USD cash with no FX is UNKNOWN. The old fallback multiplied the amount
+    // by the asset's currentPrice as if it were a rate, and cash is stored with price = 1.
+    if (a.type === 'cash') { v = a.assetCurrency === 'USD' ? qty : (Number.isFinite(fx[a.assetCurrency]) ? qty*fx[a.assetCurrency] : NaN); }
+    // SPEC 2.8: an unusable price (0 / negative / non-finite) is ABSENT, not poison — it falls
+    // back to the catalog price, exactly as the real owner does. A mirror that stops mirroring
+    // is worse than no mirror: the gate that CERTIFIES this executes the real valueUser.
+    else { const uf = x => { const n = Number(x); return (Number.isFinite(n) && n > 0) ? n : NaN; };
+           const fresh = uf(prices[a.symbol]); const unit = Number.isFinite(fresh) ? fresh : uf(a.currentPrice); const native = qty*unit;
            v = a.assetCurrency==='USD' ? native : (Number.isFinite(fx[a.assetCurrency]) ? native*fx[a.assetCurrency] : NaN); }
     if (!Number.isFinite(v)) { dropped++; continue; }                 // excluded ⇒ partial
     total += v;

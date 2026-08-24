@@ -52,7 +52,7 @@ console.log('\nEdge Function reads the SAME fields (source cross-check):');
 ok('selects the holdings column too', /select\('user_id, assets, holdings'\)/.test(edge));
 ok('joins holdings.asset_id → catalog.id (byId map)', /byId\.get\(h\.asset_id\)/.test(edge) && /catalog\.map\(\(a: any\) => \[a && a\.id, a\]\)/.test(edge));
 ok('qty from holdings.quantity (NOT assets.qty)', /Number\(h\.quantity\)/.test(edge) && !/Number\(a\.qty\)/.test(edge));
-ok('price from catalog.currentPrice', /Number\(asset\.currentPrice\)/.test(edge));
+ok('price from catalog.currentPrice (through the usable-price rule)', /usableFactor\(asset\.currentPrice\)/.test(edge));
 ok('type/symbol/assetCurrency from catalog', /asset\.type/.test(edge) && /asset\.symbol/.test(edge) && /asset\.assetCurrency/.test(edge));
 
 console.log('\nSafety (DRY_RUN, no writes, no secrets):');

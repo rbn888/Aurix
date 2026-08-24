@@ -147,13 +147,29 @@ async function fetchPrices(symbols: string[]): Promise<Map<string, { price: numb
   return map;
 }
 
+// SPEC ASSET-LEVEL SNAPSHOT INTEGRITY — the canonical "is this a usable FACTOR?" rule.
+// It governs every multiplicative input to a valuation, not only the price: a purity of 0
+// from an unparseable karat produces a finite 0 exactly like a price of 0 does, and would
+// be persisted as "this gold is worth nothing".
+// UNKNOWN VALUE ≠ ZERO VALUE, and `Number()` erases that distinction: Number(null),
+// Number('') and Number(false) are all 0 — FINITE — so reading a price through Number()
+// alone turns "we do not know what this is worth" into "this is worth nothing". A
+// NEGATIVE price is finite too, and it silently SUBTRACTS from the portfolio total.
+// This mirrors app.js exactly (`priceMissing = !Number.isFinite(priceN) || priceN <= 0`,
+// app.js:11521-11522), which is the product's own definition of a missing price, and it
+// is the same `> 0` test the liquidity branch below already applied on its own. Returning
+// NaN routes every such position into the existing !Number.isFinite(valueUSD) guard ⇒
+// dropped_asset_count++ ⇒ LB-1 refuses the WHOLE snapshot. One rule, one truth, applied
+// at every point where a price enters the valuation: catalog, provider, gold spot and FX.
+function usableFactor(v: any): number { const n = Number(v); return (Number.isFinite(n) && n > 0) ? n : NaN; }
+
 // USD per unit of a non-USD currency, from the price snapshot. The endpoint's registry resolves FX pairs
 // in the Yahoo form `<CUR>USD=X` (e.g. EURUSD=X → USD per 1 EUR) — NOT `<CUR>/USD`. NaN if absent.
 function fxToUsd(cur: string, prices: Map<string, { price: number; currency: string }>): number {
   const c = (cur || 'USD').toUpperCase();
   if (c === 'USD') return 1;
   const p = prices.get(`${c}USD=X`);
-  return p && Number.isFinite(p.price) ? p.price : NaN;
+  return p ? usableFactor(p.price) : NaN;
 }
 
 // Value one user's portfolio in USD. AURIX stores the NEW model in user_portfolios as TWO columns:
@@ -194,32 +210,50 @@ function valueUser(row: any, prices: Map<string, { price: number; currency: stri
     if (!Number.isFinite(qty)) { dropped++; warnings.push('invalid_qty:' + (asset.symbol || h.asset_id)); continue; }   // corrupt quantity ⇒ incomplete
     const bucket = bucketOf(asset.type || 'other');
     const cur = String(asset.assetCurrency || 'USD').toUpperCase();
-    const storedPrice = Number(asset.currentPrice);                    // catalog price field = currentPrice
+    const storedPrice = usableFactor(asset.currentPrice);              // catalog price field = currentPrice (NaN when unusable)
     let valueUSD: number = NaN;
     let staleness = 'live';
     const symU = String(asset.symbol || asset.ticker || '').toUpperCase();
     if (bucket === 'liquidity') {
       // cash: qty is the amount in assetCurrency (no market price)
       if (cur === 'USD') valueUSD = qty;
-      else { const fx = fxToUsd(cur, prices); if (Number.isFinite(fx)) { valueUSD = qty * fx; fxCount++; } else { valueUSD = Number.isFinite(storedPrice) && storedPrice > 0 ? qty * storedPrice : NaN; staleness = 'stale'; warnings.push('fx_missing:' + cur); } }
+      // FAIL-CLOSED. The old fallback multiplied the amount by the asset's `currentPrice`
+      // as if that were an exchange rate — and cash is stored with price = 1 (LIQ-1), so
+      // 1000 EUR was published as 1000 USD, an ~8% fabrication, with only a warning and a
+      // PERSISTED snapshot. A stored 1 is not a rate: without FX the value is UNKNOWN.
+      else { const fx = fxToUsd(cur, prices); if (Number.isFinite(fx)) { valueUSD = qty * fx; fxCount++; } else { valueUSD = NaN; staleness = 'stale'; warnings.push('fx_missing:' + cur); } }
     } else if (symU === 'XAU' && asset.karat) {
       // PHYSICAL GOLD — MIRROR app.js assetNativeValue EXACTLY: grams(unit) × purity(karat) × (spotPerOz / OZ_TO_G).
       // spotPerOz = fresh XAU/USD (registry key) if available (backend revalues while the app is closed),
       // else the catalog currentPrice (the SAME input app.js uses) — so on a closed day this reconciles to the app.
       const grams = goldGrams(qty, String(asset.goldUnit || 'g'));
-      const purity = goldPurity(asset.karat);
+      // Purity is the OTHER multiplicative factor. goldPurity falls back to
+      // `(Number(k) || 0) / 24`, so an unparseable karat ('18K', 'abc', '  ') yields 0 —
+      // a finite 0 that would sail through as "worth nothing". Unknown purity ⇒ NaN ⇒ dropped.
+      const purity = usableFactor(goldPurity(asset.karat));
       const freshXau = prices.get('XAU/USD') || prices.get('XAU');
-      const spotPerOz = (freshXau && Number.isFinite(freshXau.price)) ? freshXau.price : storedPrice;
-      if (freshXau) priced++; else { staleness = 'stale'; unpriced++; }
+      // A spot of 0 / negative / NaN is NOT a spot: same as not having received one.
+      const freshSpot = freshXau ? usableFactor(freshXau.price) : NaN;
+      const haveSpot = Number.isFinite(freshSpot);
+      const spotPerOz = haveSpot ? freshSpot : storedPrice;
+      if (haveSpot) priced++; else { staleness = 'stale'; unpriced++; }
       const nativeUSD = grams * purity * (spotPerOz / OZ_TO_G);   // XAU spot is USD/oz ⇒ nativeUSD is USD
       // app currency step (XAU assetCurrency is normally USD; mirror the non-USD branch for parity)
       valueUSD = (cur === 'USD') ? nativeUSD : (Number.isFinite(fxToUsd(cur, prices)) ? nativeUSD * fxToUsd(cur, prices) : NaN);
     } else {
       const sym = String(asset.symbol || asset.ticker || '').toUpperCase();
       const fresh = sym ? prices.get(sym) : undefined;
-      const unit = fresh ? fresh.price : storedPrice;                  // price per unit in its quote currency
-      const quoteCur = fresh ? (fresh.currency || 'USD').toUpperCase() : cur;
-      if (fresh) priced++; else { staleness = 'stale'; unpriced++; }
+      // An unusable provider price is treated as ABSENT, never as poison: it falls back to
+      // the catalog price and marks the point stale, exactly as app.js PRICES-PRESERVE-1
+      // requires ("Missing / null / NaN / 0 prices keep the last known price so totals do
+      // not briefly drop to zero on a partial provider response"). fetchPrices is global
+      // and runs once per tick, so poisoning here would let ONE bad symbol block the
+      // snapshot of every account holding it, indefinitely.
+      const freshUnit = fresh ? usableFactor(fresh.price) : NaN;
+      const havePx = Number.isFinite(freshUnit);
+      const unit = havePx ? freshUnit : storedPrice;                    // price per unit in its quote currency
+      const quoteCur = havePx ? (fresh.currency || 'USD').toUpperCase() : cur;
+      if (havePx) priced++; else { staleness = 'stale'; unpriced++; }
       const native = qty * unit;
       if (quoteCur === 'USD') valueUSD = native;
       else { const fx = fxToUsd(quoteCur, prices); if (Number.isFinite(fx)) { valueUSD = native * fx; fxCount++; } else { valueUSD = NaN; staleness = 'stale'; warnings.push('fx_missing:' + quoteCur); } }
@@ -340,13 +374,14 @@ Deno.serve(async (req: Request) => {
         outcome: outcome,
         dropped: Number.isFinite(d) && d > 0 ? Math.floor(d) : 0,
         // Positions this attempt actually valued into the total. The ONE fact that
-        // separates "nothing to capture" from "should have captured and did not":
-        // a fully liquidated account has 0 (its holdings are qty 0 and are skipped),
-        // while an account holding a position whose price is missing has ≥1 — that
-        // position values to a FINITE 0, so it is not `dropped`, the total is 0 and
-        // the attempt lands in EMPTY with no warning at all. Without this number that
-        // account is indistinguishable from a liquidated one, which is exactly the
-        // darkness this SPEC exists to remove. A count, never an amount.
+        // separates "nothing to capture" from "should have captured and did not": a fully
+        // liquidated account values 0 (its holdings are qty 0 and are skipped), while an
+        // account that held something valuable values at least one — and without this
+        // number the two are indistinguishable, which is the darkness this SPEC removes.
+        // NOTE: the original justification also cited an unpriced position landing in
+        // EMPTY with no warning. SPEC 2.8 closed that path — an unusable valuation is now
+        // dropped and reported as INCOMPLETE — so this column now earns its place on the
+        // liquidated-vs-active distinction alone. A count, never an amount.
         positions: Number.isFinite(n) && n > 0 ? Math.floor(n) : 0,
         warnings: normalizeWarnings(warnings),
         snapshot_at: snapshotAt ? new Date(snapshotAt).toISOString() : null,
@@ -405,7 +440,14 @@ Deno.serve(async (req: Request) => {
       // esta capacidad vale NULL = "no se capturó", que es distinto de `{}` = "no había
       // posiciones". Confundirlos convertiría el pasado en evidencia falsa de cartera vacía.
       asset_values: v.assetValues,
-      confidence: 'scheduled', market_state: v.market_state, price_staleness: v.price_staleness, schema_version: 1,
+      // SPEC ASSET-LEVEL SNAPSHOT INTEGRITY — the BOUNDARY, using metadata that already
+      // exists rather than a new versioning architecture. schema_version 1 rows were
+      // captured while an unusable price could still be valued as a finite 0, so a 0.00
+      // in their asset_values may mean "unknown" and cannot be told apart afterwards.
+      // From 2 on, every persisted position was genuinely valued: unknown ⇒ dropped ⇒
+      // LB-1 ⇒ no snapshot. A future asset-level reader can therefore trust
+      // `schema_version >= 2` WITHOUT anyone inventing what the older rows meant.
+      confidence: 'scheduled', market_state: v.market_state, price_staleness: v.price_staleness, schema_version: 2,
     });
     if (insErr) {
       // IDEMPOTENT — a unique-violation (23505) means a snapshot already exists for this (user, minute):

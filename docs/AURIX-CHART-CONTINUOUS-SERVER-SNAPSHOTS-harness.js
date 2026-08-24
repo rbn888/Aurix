@@ -27,6 +27,7 @@ function strip(s) {
     .split('function goldPurity(k: any): number {').join('function goldPurity(k) {')
     .split('function goldGrams(qty: number, unit: string): number {').join('function goldGrams(qty, unit) {')
     .split('function isUsEquityOpenNow(now: Date): boolean {').join('function isUsEquityOpenNow(now) {')
+    .split('function usableFactor(v: any): number {').join('function usableFactor(v) {')
     .split('async function fetchPrices(symbols: string[]): Promise<Map<string, { price: number; currency: string }>> {').join('async function fetchPrices(symbols) {')
     .split('function fxToUsd(cur: string, prices: Map<string, { price: number; currency: string }>): number {').join('function fxToUsd(cur, prices) {')
     .split('function valueUser(row: any, prices: Map<string, { price: number; currency: string }>, now: Date) {').join('function valueUser(row, prices, now) {')
@@ -49,7 +50,7 @@ const jsBlock = strip(TS.slice(regionStart, regionEnd));
 const ctx = { Number, Math, Map, Set, String, Array, isFinite, NaN, Infinity, fetch: () => Promise.resolve({ ok: false }), encodeURIComponent, console: { log() {} } };
 vm.createContext(ctx);
 let transpileOk = true;
-try { vm.runInContext(jsBlock + '\n;this.__v = { valueUser, goldGrams, goldPurity, bucketOf, isUsEquityOpenNow, fxToUsd };', ctx); } catch (e) { transpileOk = false; console.log('  ! transpile failed: ' + e.message); }
+try { vm.runInContext(jsBlock + '\n;this.__v = { valueUser, goldGrams, goldPurity, bucketOf, isUsEquityOpenNow, usableFactor, fxToUsd };', ctx); } catch (e) { transpileOk = false; console.log('  ! transpile failed: ' + e.message); }
 const V = ctx.__v || {};
 
 console.log('\nAURIX-CHART-CONTINUOUS-SERVER-SNAPSHOTS — SPEC.36');
