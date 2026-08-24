@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '635'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '636'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -2375,12 +2375,31 @@ function _aurixCatHistWindow(range) {
     if (valid.length < 2) { out.reason = 'single_point'; return out; }
     const end = valid[valid.length - 1];
     out.coverage.endAgeMs = Date.now() - end.ts;
-    // Reuse the existing STALE bound (cadence × staleFactor) instead of a new number. Reported, not fatal:
-    // whether a stale-but-real reading may be published is a product decision, not this layer's.
-    try {
-      const staleAfter = _AURIX_BACKEND_CADENCE_MS * _AURIX_BACKEND_STALE_FACTOR;
-      if (out.coverage.endAgeMs > staleAfter) out.warnings.push('end_point_stale');
-    } catch (_) {}
+    // FRESHNESS IS A VALIDITY CONDITION, NOT A WARNING — this is what the first live
+    // verification caught: a real portfolio whose newest capture was 21 days old still
+    // returned state 'ok', so a 21-day-old instant was being served as the end of "the
+    // last 24H". A window named 24H/7D is a CLAIM ABOUT THE PRESENT, so an end point that
+    // no longer represents the present invalidates the claim itself; attaching a warning
+    // and publishing anyway put the burden on the consumer and made the wrong reading the
+    // default. Existing history stays perfectly valid HISTORY — it simply cannot answer a
+    // question about now. NO CURRENT DATA ⇒ NO CURRENT CHANGE CLAIM.
+    //
+    // The bound is the canonical one already owned by _aurixBackendHealth (cadence ×
+    // staleFactor ⇒ STALE), never a number invented here, and deliberately NOT
+    // window-dependent: "does the newest capture represent the present?" does not depend on
+    // how far back the window reaches, so the same rule holds for 24H, 7D and any window
+    // added later. Measured on the newest VALID point (the actual end), not on the newest
+    // row, so a fresh-but-invalid capture cannot vouch for a stale one.
+    //
+    // Resolved fail-closed: if the canonical threshold cannot be read at all, the window is
+    // refused rather than published unchecked.
+    let staleAfterMs = NaN;
+    try { staleAfterMs = _AURIX_BACKEND_CADENCE_MS * _AURIX_BACKEND_STALE_FACTOR; } catch (_) { staleAfterMs = NaN; }
+    if (!Number.isFinite(staleAfterMs) || out.coverage.endAgeMs > staleAfterMs) {
+      out.warnings.push('end_point_stale');            // kept for diagnosis; no longer the whole answer
+      out.reason = Number.isFinite(staleAfterMs) ? 'end_point_stale' : 'freshness_contract_unavailable';
+      return out;   // state stays insufficient_data ⇒ no start, no end, no delta, no window shifted back
+    }
     const targetStart = end.ts - spec.ms;
     // Nearest REAL capture to the ideal start, on either side. Never synthesized, never interpolated.
     let start = null, bestDist = Infinity;

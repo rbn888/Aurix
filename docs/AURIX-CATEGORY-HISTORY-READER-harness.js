@@ -200,6 +200,112 @@ console.log('\n6 · Missing coverage never degrades into a number:');
     Number.isFinite(w7.coverage.validPoints) && Number.isFinite(w7.coverage.historySpanMs));
 }
 
+// ── 6-BIS · STALE ENDPOINT MUST FAIL CLOSED ──────────────────────────────────
+// The regression the FIRST LIVE VERIFICATION caught on a real portfolio: a complete
+// history whose newest capture was 21 days old still returned state 'ok', so a
+// three-week-old instant was served as the end of "the last 24H". A warning is not
+// enough — freshness is a validity condition of the claim, not a footnote on it.
+// NO CURRENT DATA ⇒ NO CURRENT CHANGE CLAIM. The fixtures express staleness in
+// CADENCES of the canonical contract, never in a hardcoded date, so what is certified
+// is the semantics (STALE ENDPOINT → NEVER OK) and not one calendar case.
+console.log('\n6-BIS · A stale end point can never be "the last 24H/7D":');
+{
+  const CADENCE = vm.runInContext('_AURIX_BACKEND_CADENCE_MS', sb);
+  const STALE_F = vm.runInContext('_AURIX_BACKEND_STALE_FACTOR', sb);
+  const staleAfter = CADENCE * STALE_F;
+  const CLOCK = NOW;
+  const hist = series(10, { crypto: 8240, liquidity: 1760, real_estate: 5000 },
+                          { crypto: 8970, liquidity: 1030, real_estate: 5000 });
+  setRows(hist);
+  const lastAt = Math.max.apply(null, hist.map(r => r.ts));
+  const at = age => { NOW = lastAt + age; return null; };
+
+  ok('6b.1 the freshness bound is the CANONICAL one (cadence × staleFactor), not a new number',
+    staleAfter === 15 * MIN * 8 && /_AURIX_BACKEND_CADENCE_MS \* _AURIX_BACKEND_STALE_FACTOR/.test(READER_CODE),
+    String(staleAfter));
+  ok('6b.2 no hardcoded calendar bound anywhere (no "21 days", no absolute date)',
+    !/21\s*\*\s*864e5|21\s*\*\s*24|2026-|new Date\(['"]/.test(READER_CODE));
+
+  // Boundary sweep — the rule is a threshold on the age of the end point, nothing else.
+  at(staleAfter - 1);
+  ok('6b.3 end just INSIDE the bound ⇒ ok (the fix does not over-refuse)', win('24H').state === 'ok', win('24H').reason);
+  at(staleAfter);
+  ok('6b.4 end exactly AT the bound ⇒ ok', win('24H').state === 'ok', win('24H').reason);
+  at(staleAfter + 1);
+  ok('6b.5 end one millisecond PAST the bound ⇒ insufficient_data / end_point_stale',
+    win('24H').state === 'insufficient_data' && win('24H').reason === 'end_point_stale',
+    win('24H').state + '/' + win('24H').reason);
+
+  // The live case: end point ~21 days old, health STALE.
+  at(21 * D);
+  const s24 = win('24H'), s7 = win('7D');
+  ok('6b.6 LIVE CASE 24H: a ~21-day-old end ⇒ insufficient_data / end_point_stale',
+    s24.state === 'insufficient_data' && s24.reason === 'end_point_stale', s24.state + '/' + s24.reason);
+  ok('6b.7 LIVE CASE 7D: same history, same refusal',
+    s7.state === 'insufficient_data' && s7.reason === 'end_point_stale', s7.state + '/' + s7.reason);
+  ok('6b.8 health classifies the same situation as STALE (one contract, not two)',
+    s24.coverage.health === 'STALE' && s7.coverage.health === 'STALE', String(s24.coverage.health));
+  ok('6b.9 the warning survives for diagnosis — it is just no longer the whole answer',
+    s24.warnings.indexOf('end_point_stale') !== -1 && s7.warnings.indexOf('end_point_stale') !== -1);
+
+  // No period is presented as current, and no delta is publishable.
+  ok('6b.10 no start/end is presented as a current period',
+    s24.startAt === null && s24.endAt === null && s24.start === null && s24.end === null
+    && s7.startAt === null && s7.endAt === null);
+  ok('6b.11 24H stale publishes NO delta',
+    (function(){ const d = delta('24H','crypto');
+      return d.state === 'insufficient_data' && d.reason === 'end_point_stale'
+        && d.deltaPp === null && d.startPct === null && d.endPct === null; })());
+  ok('6b.12 7D stale publishes NO delta',
+    (function(){ const d = delta('7D','crypto');
+      return d.state === 'insufficient_data' && d.reason === 'end_point_stale' && d.deltaPp === null; })());
+  ok('6b.13 not ONE investable category yields a publishable figure while the end is stale',
+    vm.runInContext('_AURIX_CATHIST_INVESTABLE', sb)
+      .every(c => ['24H','7D'].every(r => delta(r, c).deltaPp === null)));
+
+  // The window is refused, never dragged backwards to manufacture a fresh-looking period.
+  ok('6b.14 the window is NOT shifted back to fabricate a 24H/7D over old data',
+    s24.coverage.windowSpanMs === null && s24.coverage.startDriftMs === null
+    && s7.coverage.windowSpanMs === null && s7.coverage.startDriftMs === null);
+  ok('6b.15 …and the refusal happens BEFORE any start is selected',
+    READER_CODE.indexOf("reason = Number.isFinite(staleAfterMs) ? 'end_point_stale'") < READER_CODE.indexOf('const targetStart'));
+
+  // The history itself is untouched: still complete, still readable, still diagnosable.
+  ok('6b.16 the old history is still fully VALID history (nothing discarded or reinterpreted)',
+    s24.coverage.validPoints === hist.length && s24.coverage.invalidPoints === 0,
+    JSON.stringify({ v: s24.coverage.validPoints, n: hist.length }));
+  ok('6b.17 coverage still answers WHY and WHEN (lastValidAt / endAgeMs / span)',
+    s24.coverage.lastValidAt === lastAt && s24.coverage.endAgeMs >= 21 * D
+    && Math.abs(s24.coverage.historySpanMs - 10 * D) <= 15 * MIN);
+  ok('6b.18 a stale end does not corrupt point-level reads — the captures remain legible',
+    (function(){ const p = validate(hist[hist.length - 1]);
+      return p.valid === true && expo(p.point, 'crypto') > 0 && p.point.investableValue === p.point.totalValue - 5000; })());
+
+  // And the same reader returns to ok by itself once fresh captures exist again — no flag,
+  // no manual reset: the only thing that changed is the age of the newest capture.
+  setRows(hist.concat(series(1, { crypto: 8970, liquidity: 1030, real_estate: 5000 },
+                                { crypto: 9100, liquidity: 900, real_estate: 5000 })
+    .map(r => Object.assign({}, r, { ts: r.ts + 21 * D }))));
+  ok('6b.19 fresh captures restore ok automatically, with a real delta again',
+    (function(){ const w = win('24H'), d = delta('24H','crypto');
+      return w.state === 'ok' && w.warnings.indexOf('end_point_stale') === -1
+        && d.state === 'ok' && Number.isFinite(d.deltaPp); })());
+  ok('6b.20 startDrift still governs the start once the end is fresh (rule unchanged)',
+    (function(){ const w = win('24H'); return w.state === 'ok' && Number.isFinite(w.coverage.startDriftMs)
+      && Math.abs(w.coverage.startDriftMs) <= 2 * H; })(), JSON.stringify(win('24H').coverage.startDriftMs));
+  // …and it still BITES: across the 20-day gap in this fixture the capture nearest the
+  // ideal 7D start is 6 days NEWER than it (nothing reaches back a full week from the fresh
+  // end), so 7D is refused on the start rule. The freshness fix neither replaced it nor
+  // loosened it — both extremes must hold, independently.
+  ok('6b.21 a fresh end does not excuse an unrepresentative start',
+    (function(){ const w = win('7D');
+      return w.state === 'insufficient_data' && w.reason === 'insufficient_history'
+        && w.startAt === null && w.endAt === null; })(),
+    win('7D').reason);
+
+  NOW = CLOCK;
+}
+
 // ── 7 · The denominator ──────────────────────────────────────────────────────
 console.log('\n7 · Denominator = investable wealth (total − real_estate):');
 {
@@ -345,14 +451,17 @@ console.log('\n15 · Same server history ⇒ same answer on any device:');
   ok('15.1 row order does not change the result', a === b);
   ok('15.2 no device/browser state is consulted',
     !/navigator|screen|innerWidth|matchMedia|userAgent|timeZone/.test(READER_CODE));
+  // The clock decides WHETHER the window may be published (freshness), never WHICH
+  // captures are its extremes. Shifted inside the fresh bound, the extremes are identical
+  // and only endAgeMs moves.
   ok('15.3 the local clock is REPORTED (endAgeMs) but never selects an extreme',
     /endAgeMs/.test(READER_CODE) && (function(){
-      const w1 = win('24H'); NOW += 5 * D; const w2 = win('24H'); NOW -= 5 * D;
-      return w1.startAt === w2.startAt && w1.endAt === w2.endAt && w2.coverage.endAgeMs > w1.coverage.endAgeMs;
+      setRows(rows);
+      const w1 = win('24H'); NOW += H; const w2 = win('24H'); NOW -= H;
+      return w1.state === 'ok' && w2.state === 'ok'
+        && w1.startAt === w2.startAt && w1.endAt === w2.endAt
+        && w2.coverage.endAgeMs > w1.coverage.endAgeMs;
     })());
-  ok('15.4 a stale end point is flagged, so a dead cron cannot pass as a fresh reading',
-    (function(){ NOW += 5 * D; const w = win('24H'); NOW -= 5 * D;
-      return w.state === 'ok' && w.warnings.indexOf('end_point_stale') !== -1; })());
 }
 
 // ── 16 · Older snapshots still read ──────────────────────────────────────────
@@ -411,15 +520,19 @@ console.log('\n17–18 · Chart, Performance and Preview V1 are byte-identical:'
     skip('18.1 additive-diff vs ' + BASELINE, BASELINE + ' not in this clone (shallow checkout)');
   } else {
     untouched.forEach(n => ok('17.3 ' + n + ' byte-identical to ' + BASELINE, fnSrcIn(base, n) === fnSrc(n)));
-    // Purely additive, enumerated rather than assumed: the ONLY line app.js loses versus
-    // the baseline is its own build self-version, which the cache-bust contract requires
-    // to move whenever the bundle changes. Not one line of logic is removed or edited.
-    ok('18.1 the change is ADDITIVE — the only removed line is the build self-version',
+    // CONTAINMENT, stated exactly: remove the reader block from app.js, normalise the build
+    // self-version (which the cache-bust contract forces to move on every bundle change),
+    // and what remains must be the baseline BYTE FOR BYTE. That proves the whole of this
+    // SPEC — including the stale-endpoint hotfix, which does edit reader logic — is confined
+    // to its own block and touched nothing else in a 3.5 MB bundle. Stronger than counting
+    // diff lines and it survives further revisions of the reader itself.
+    ok('18.1 outside the reader block, app.js is byte-identical to ' + BASELINE,
       (function(){
-        let diff = null;
-        try { diff = cp.execSync('git diff ' + BASELINE + ' -- app.js', { cwd: ROOT, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore','pipe','ignore'] }).toString('utf8'); } catch (e) { return false; }
-        const removed = diff.split('\n').filter(l => /^-/.test(l) && !/^---/.test(l));
-        return removed.length === 1 && /__AURIX_APPJS_VERSION__/.test(removed[0]);
+        const bannerIdx = app.lastIndexOf('// ════', app.indexOf(BLOCK_START));
+        const p0Idx = app.indexOf('// ── P0-FINAL-PERFORMANCE-KILL-SWITCH-AND-SERVER-CANONICAL', bannerIdx);
+        if (bannerIdx < 0 || p0Idx < 0) return false;
+        const norm = s => s.replace(/window\.__AURIX_APPJS_VERSION__ = '\d+';/, "window.__AURIX_APPJS_VERSION__ = '<v>';");
+        return norm(app.slice(0, bannerIdx) + app.slice(p0Idx)) === norm(base);
       })());
   }
   ok('18.2 the reader is not wired into any renderer, tab or Preview path',
