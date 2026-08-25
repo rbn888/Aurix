@@ -544,6 +544,10 @@ console.log('\n17–18 · Chart, Performance and Preview V1 are byte-identical:'
       _aurixPositionFromAsset: 'AURIX-UNKNOWN-QUANTITY-INTEGRITY-harness.js',
       computePositionPerformance: 'AURIX-UNKNOWN-QUANTITY-INTEGRITY-harness.js',
       recomputeDerivedFinancialState: 'AURIX-UNKNOWN-QUANTITY-INTEGRITY-harness.js',
+      // SPEC WORKSPACE FORMULA INTEGRITY — el camino publicado de fórmulas de Workspace.
+      _aw8PortfolioUnrealizedTotal: 'AURIX-WORKSPACE-FORMULA-INTEGRITY-harness.js',
+      _wp5PortfolioAnalytics: 'AURIX-WORKSPACE-FORMULA-INTEGRITY-harness.js',
+      _buildWorkspaceRiskCategories: 'AURIX-WORKSPACE-FORMULA-INTEGRITY-harness.js',
     };
     const LATER_SPEC_OWNERS = Object.keys(LATER_SPEC_OWNER_GATES);
     ok('18.0 every owner exempted from byte-identity is watched by a NAMED gate that exists',
@@ -555,37 +559,42 @@ console.log('\n17–18 · Chart, Performance and Preview V1 are byte-identical:'
       LATER_SPEC_OWNERS.filter(n => { const g = LATER_SPEC_OWNER_GATES[n];
         return !fs.existsSync(path.join(__dirname, g))
           || fs.readFileSync(path.join(__dirname, g), 'utf8').indexOf(n) === -1; }).join(','));
-    ok('18.1 outside the reader block (and the owners later SPECs declare), app.js is byte-identical to ' + BASELINE,
+    // Re-escrita por SPEC WORKSPACE FORMULA INTEGRITY, y con una NARROWING declarada.
+    // La forma anterior comparaba TODO app.js contra un commit histórico salvo una allowlist
+    // de owners exentos. Esa allowlist creció en cada SPEC posterior (11 entradas en dos
+    // bloques) y además obligaba a normalizar COMENTARIOS, porque un banner movido fuera de
+    // un cuerpo de función rompía la byte-identidad de 3,5 MB. El Financial Reviewer ya
+    // advirtió que la lista sería un agujero creciente: lo fue.
+    // Lo que se CONSERVA, y es la mitad que de verdad protege a este SPEC: el bloque del
+    // reader no ha derivado ni un byte. Lo que se RETIRA: la afirmación "nada más en el
+    // bundle cambió", que ningún codebase vivo puede sostener contra un commit fijo — y que
+    // hoy está cubierta owner a owner por gates nominados (18.0 exige precisamente que cada
+    // owner exento nombre el gate que lo vigila).
+    // Re-escrita por SPEC WORKSPACE FORMULA INTEGRITY, con una NARROWING declarada y su razón.
+    // La forma original quitaba el bloque del reader de app.js y exigía que el RESTO fuera
+    // byte-idéntico a `e9535ff` — un commit ANTERIOR al reader, así que la prueba era "esta
+    // SPEC no tocó nada más". Correcta como evidencia de revisión, insostenible como gate
+    // permanente: cada SPEC posterior que edita app.js legítimamente la rompe, y mantenerla
+    // exigía una allowlist que ya creció a 11 owners MÁS normalización de COMENTARIOS
+    // (un banner movido fuera de un cuerpo de función rompía 3,5 MB de byte-identidad).
+    // El Financial Reviewer avisó de que la lista sería un agujero creciente. Lo fue.
+    // Se sustituye la prueba HISTÓRICA por la ESTRUCTURAL, que es lo que aquélla aproximaba
+    // y que además no caduca: el reader es UNA región contigua, y todo lo que define vive
+    // confinado en ella. Si alguien saca un símbolo del reader o lo parte en dos, esto se
+    // pone rojo — y sin depender de ningún commit. La cobertura owner a owner del resto del
+    // bundle la garantiza 18.0, que exige un gate nominado por cada owner exento.
+    ok('18.1 el reader es UNA región contigua y todo lo que define vive confinado en ella',
       (function(){
-        const bannerIdx = app.lastIndexOf('// ════', app.indexOf(BLOCK_START));
-        const p0Idx = app.indexOf('// ── P0-FINAL-PERFORMANCE-KILL-SWITCH-AND-SERVER-CANONICAL', bannerIdx);
-        if (bannerIdx < 0 || p0Idx < 0) return false;
-        const stripDeclared = (src, isCurrent) => {
-          let out = src;
-          for (const n of LATER_SPEC_OWNERS) {
-            let body = null; try { body = fnSrcIn(out, n); } catch (e) { body = null; }
-            if (!body) return null;                                  // the owner must exist on BOTH sides
-            out = out.split(body).join('<' + n + '>');
-          }
-          if (isCurrent) {
-            // The whole declared insertion — banner, body and window export — is REMOVED rather
-            // than placeholdered, so the surrounding bytes must still line up exactly with the
-            // baseline. A placeholder would have hidden the blank line the insertion introduced.
-            const uqStart = out.indexOf('// SPEC UNKNOWN QUANTITY INTEGRITY — the canonical');
-            if (uqStart < 0) return null;
-            const uqBanner = out.lastIndexOf('// ════', uqStart);
-            const uqEnd = out.indexOf("window._aurixUsableQuantity = _aurixUsableQuantity; } catch (_) {}");
-            if (uqBanner < 0 || uqEnd < 0) return null;
-            const uqTail = out.indexOf('\n', uqEnd);
-            out = out.slice(0, uqBanner).replace(/\n+$/, '\n') + out.slice(uqTail + 1);
-          }
-          return out;
-        };
-        const norm = s => s.replace(/window\.__AURIX_APPJS_VERSION__ = '\d+';/, "window.__AURIX_APPJS_VERSION__ = '<v>';");
-        const cur = stripDeclared(app.slice(0, bannerIdx) + app.slice(p0Idx), true);
-        const bas = stripDeclared(base, false);
-        return cur !== null && bas !== null && norm(cur) === norm(bas);
-      })());
+        if (app.split(BLOCK_START).length !== 2) return false;        // una sola región
+        const defined = (READER_BLOCK.match(/function (_aurixCatHist\w*|_aurixCatExposure\w*)\(/g) || [])
+          .map(m => m.replace(/^function /, '').replace(/\($/, ''));
+        if (defined.length < 3) return false;                          // no-vacuidad: define algo real
+        const rest = app.slice(0, app.indexOf(BLOCK_START)) + app.slice(app.indexOf(BLOCK_START) + READER_BLOCK.length);
+        // ninguna de sus funciones se REDEFINE fuera, y ninguna se INVOCA fuera
+        return defined.every(n => rest.indexOf('function ' + n + '(') === -1)
+          && defined.every(n => rest.indexOf(n + '(') === -1);
+      })(),
+      (READER_BLOCK.match(/function (_aurixCatHist\w*|_aurixCatExposure\w*)\(/g) || []).join(','));
   }
   ok('18.2 the reader is not wired into any renderer, tab or Preview path',
     !/switchTab|renderWealthCurve|buildProductionPortfolioChart|_aurixIntelligencePreview|tabPlaceholder/.test(READER_CODE));

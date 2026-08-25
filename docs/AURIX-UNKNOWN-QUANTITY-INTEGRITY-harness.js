@@ -482,9 +482,16 @@ console.log('\n26–30 · Chart, Performance, Reader, Preview and User Health:')
   // the adversarial review found them: the salvage path (which WROTE a laundered 0 back to disk),
   // the position boundary and the pure utility behind the published category return.
   const DECLARED_CALL_SITES = ['totalValueUSD', 'investableValueUSD', '_aurixAssessValuationCompleteness',
-    '_aurixSalvageHolding', '_aurixPositionFromAsset', 'computePositionPerformance'];
+    '_aurixSalvageHolding', '_aurixPositionFromAsset', 'computePositionPerformance',
+    // SPEC WORKSPACE FORMULA INTEGRITY — la capa de fórmulas publicadas de Workspace lee la
+    // cantidad certificada por AQUÍ y sólo por aquí; su gate propio es
+    // docs/AURIX-WORKSPACE-FORMULA-INTEGRITY-harness.js.
+    '_aw8Qty',
+    // …y el owner de la superficie VIVA de Workspace, donde `assetCount` se contaba sobre la
+    // lista sin filtrar mientras el total ya venía filtrado. Mismo gate que _aw8Qty.
+    '_aurixHealthSnapshot'];
   ok('30.3 the quantity rule is used ONLY where this SPEC declares it',
-    (app.match(/_aurixUsableQuantity\(/g) || []).length === DECLARED_CALL_SITES.length + 2   // +1 definition, +1 DERIVED_FINANCIAL_STATE
+    (app.match(/_aurixUsableQuantity\(/g) || []).length === DECLARED_CALL_SITES.length + 2   // +1 definicion, +1 recomputeDerivedFinancialState
     && DECLARED_CALL_SITES.every(n => /_aurixUsableQuantity\(/.test(fnSrc(n)))
     && (ts.match(/usableQuantity\(/g) || []).length === 2,                                   // 1 definition + 1 server call site
     'client=' + (app.match(/_aurixUsableQuantity\(/g) || []).length + ' server=' + (ts.match(/usableQuantity\(/g) || []).length

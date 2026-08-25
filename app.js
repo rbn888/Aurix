@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '637'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '638'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5353,6 +5353,7 @@ const T = {
     wsConcentrationAbove:    (sym, pct) => `${sym} concentración por encima de ${pct}%`,
     wsDominantWeight:        (sym, pct) => `${sym} peso dominante (${pct}%)`,
     wsLowDiversification:    count => `Baja diversificación (${count} posiciones)`,
+    wsDataPartial:           'Datos parciales: hay posiciones sin valorar',
     wsBalancedExposure:      'Exposición equilibrada',
     wsCryptoExposureHigh:    pct => `Exposición cripto elevada (${pct}%)`,
     wsCryptoExposureMid:     pct => `Exposición cripto ${pct}%`,
@@ -7554,6 +7555,7 @@ const T = {
     wsConcentrationAbove:    (sym, pct) => `${sym} concentration above ${pct}%`,
     wsDominantWeight:        (sym, pct) => `${sym} dominant weight (${pct}%)`,
     wsLowDiversification:    count => `Low diversification (${count} positions)`,
+    wsDataPartial:           'Partial data: some positions cannot be valued',
     wsBalancedExposure:      'Balanced exposure',
     wsCryptoExposureHigh:    pct => `Crypto exposure elevated (${pct}%)`,
     wsCryptoExposureMid:     pct => `Crypto exposure ${pct}%`,
@@ -12666,6 +12668,10 @@ const DERIVED_FINANCIAL_STATE = {
     totalPnL:        0,
     totalPnLPercent: 0,
     assetCount:      0,
+    // SPEC WORKSPACE FORMULA INTEGRITY — presente ya en el objeto POR DEFECTO: si sólo
+    // existiera tras el primer recompute, el gate de certificabilidad estaría apagado
+    // exactamente en el instante en que menos se sabe de la cartera.
+    uncertifiablePositions: 0,
     gainers:         [],
     losers:          [],
     allocations:     [],
@@ -13203,6 +13209,11 @@ function recomputeDerivedFinancialState(source = 'unknown') {
       // total excludes is how "low diversification" (assetCount < 4) fires on a portfolio that
       // has more positions than the count admits — or hides that one of them is unvaluable.
       assetCount:      _valuableAssets.length,
+      // SPEC WORKSPACE FORMULA INTEGRITY — cuántas posiciones ABIERTAS quedaron fuera del
+      // universo elegible. `assetCount` es cierto sobre lo valorable, pero afirmar "N
+      // posiciones" como hecho de cartera es falso mientras esto sea > 0. El owner común ya
+      // conoce el dato; publicarlo evita que cada consumidor lo recalcule (o lo ignore).
+      uncertifiablePositions: portfolioAssets.length - _valuableAssets.length,
       gainers:         Object.freeze(gainers),
       losers:          Object.freeze(losers),
       allocations:     Object.freeze(allocations),
@@ -14703,11 +14714,41 @@ const _AW8_WORKSPACE_FUNCTIONS = Object.freeze({
 // which already handles gold karat + EUR normalisation). Returning both
 // `pnl` and `cost` lets PORTFOLIO.PNL and PORTFOLIO.PNL_PCT share the
 // same walk without duplicating portfolio math.
+// ─── SPEC WORKSPACE FORMULA INTEGRITY · BLOQUE AÑADIDO ─────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC WORKSPACE FORMULA INTEGRITY — el guard de certificabilidad, dicho UNA vez
+// ════════════════════════════════════════════════════════════════════════════
+// Workspace no puede presentar una cifra financiera como válida cuando uno de sus
+// inputs necesarios no es certificable. La cantidad es el input necesario de toda
+// valoración, y `assetValueUSD` la lee a través de `assetNativeValue` = qty × price,
+// donde `null * 200` es 0 FINITO: por eso ASSET.QTY publicaba 0 y ASSET.PNL_PCT
+// publicaba −100% sobre una posición que nadie podía valorar. Reutiliza la regla
+// canónica de UNKNOWN QUANTITY INTEGRITY; no introduce una segunda definición.
+// La cantidad CERTIFICADA de una posición, para que la capa de fórmulas no alcance nunca
+// la regla canónica por su cuenta: un solo owner nombrable por el que pasa todo Workspace.
+function _aw8Qty(a) {
+  return _aurixUsableQuantity(a && a.qty);
+}
+function _aw8QtyCertifiable(a) {
+  return !!a && Number.isFinite(_aw8Qty(a));
+}
+// ─── FIN BLOQUE WORKSPACE FORMULA INTEGRITY ───────────────────────────────────
+// PR-8C: shared aggregator for portfolio PnL formulas. Reads `assets[]`
+// once and applies the canonical USD valuation (assetValueUSD from PR-6,
+// which already handles gold karat + EUR normalisation). Returning both
+// `pnl` and `cost` lets PORTFOLIO.PNL and PORTFOLIO.PNL_PCT share the
+// same walk without duplicating portfolio math.
 function _aw8PortfolioUnrealizedTotal() {
-  if (typeof assets === 'undefined' || !Array.isArray(assets)) return { pnl: 0, cost: 0 };
-  let pnl = 0, cost = 0;
+  // SPEC WORKSPACE FORMULA INTEGRITY — devuelve además `partial`: el número de posiciones
+  // que ENTRARÍAN en el recorrido (costBasis > 0) pero cuya cantidad no es certificable.
+  // Numerador y denominador salen del MISMO universo —una posición excluida no aporta ni
+  // a `pnl` ni a `cost`—, y `partial` permite a la capa publicada negarse a dar la cifra
+  // en vez de presentar como exacto un agregado que ya no cubre toda la cartera.
+  if (typeof assets === 'undefined' || !Array.isArray(assets)) return { pnl: 0, cost: 0, partial: 0 };
+  let pnl = 0, cost = 0, partial = 0;
   for (const a of assets) {
     if (!a || !a.costBasis || a.costBasis <= 0) continue;
+    if (!_aw8QtyCertifiable(a)) { partial++; continue; }   // fuera del cálculo que no puede soportar
     // AURIX-DATA-001 (F2-cost) — compare USD value against USD cost basis (was
     // native cost vs USD value → phantom P&L). Uncovered FX → skip, never a phantom.
     const val   = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : (Number(a.qty || 0) * Number(a.price || 0));
@@ -14716,7 +14757,7 @@ function _aw8PortfolioUnrealizedTotal() {
     cost += cbUSD;
     pnl  += val - cbUSD;
   }
-  return { pnl, cost };
+  return { pnl, cost, partial };
 }
 
 // PR-WP5: portfolio analytics aggregator. One walk over assets[] computes
@@ -14726,11 +14767,17 @@ function _aw8PortfolioUnrealizedTotal() {
 // Positions with no costBasis are skipped (matches PR-8C convention) so a
 // closed or zero-cost position can't skew win-rate or pnl%-ranking.
 function _wp5PortfolioAnalytics() {
-  const out = { cost: 0, total: 0, wins: 0, best: null, worst: null };
+  const out = { cost: 0, total: 0, wins: 0, best: null, worst: null, partial: 0 };
   if (typeof assets === 'undefined' || !Array.isArray(assets)) return out;
   let bestPct = -Infinity, worstPct = Infinity;
   for (const a of assets) {
     if (!a || !a.costBasis || a.costBasis <= 0) continue;
+    // SPEC WORKSPACE FORMULA INTEGRITY — el MISMO universo que _aw8PortfolioUnrealizedTotal.
+    // Antes este recorrido no excluía la posición incierta y el otro sí, así que
+    // PORTFOLIO.PNL_PCT y PORTFOLIO.COST se calculaban sobre universos distintos (medido:
+    // 25% sobre un coste publicado de 5.800, cuando ese 25% era sobre 800). Y una cantidad
+    // desconocida valorada en 0 ganaba el ranking WORST con un −100% inventado.
+    if (!_aw8QtyCertifiable(a)) { out.partial++; continue; }
     const cost = Number(a.costBasis) || 0;
     if (cost <= 0) continue;
     out.cost  += cost;
@@ -14784,11 +14831,19 @@ const _AW8_FINANCIAL_FUNCTIONS = Object.freeze({
   'PORTFOLIO.VALUE'(args) {
     if (args.length !== 0) throw new _AwEvalError('#ERROR');
     const snap = (typeof getDerivedFinancialSnapshot === 'function') ? getDerivedFinancialSnapshot() : null;
+    const _p = snap && snap.portfolio;
+    if (Number(_p && _p.uncertifiablePositions || 0) > 0) throw new _AwEvalError('#N/A');
     return Number(snap?.portfolio?.totalValue || 0);
   },
   'PORTFOLIO.ASSETS'(args) {
     if (args.length !== 0) throw new _AwEvalError('#ERROR');
     const snap = (typeof getDerivedFinancialSnapshot === 'function') ? getDerivedFinancialSnapshot() : null;
+    // SPEC WORKSPACE FORMULA INTEGRITY — `assetCount` es cierto sobre lo valorable, pero
+    // `=PORTFOLIO.ASSETS()` lo publica como el número de posiciones de la cartera. Con una
+    // abierta sin valorar devolvía 3 habiendo 4: un hecho falso, y en la celda de al lado
+    // `=PORTFOLIO.PNL()` ya devolvía #N/A. Misma respuesta para toda la familia.
+    const _p = snap && snap.portfolio;
+    if (Number(_p && _p.uncertifiablePositions || 0) > 0) throw new _AwEvalError('#N/A');
     return Number(snap?.portfolio?.assetCount || 0);
   },
   EXPOSURE(args) {
@@ -14796,6 +14851,8 @@ const _AW8_FINANCIAL_FUNCTIONS = Object.freeze({
     const cat = String(args[0].value || '').trim().toLowerCase();
     if (!cat) throw new _AwEvalError('#ERROR');
     const snap = (typeof getDerivedFinancialSnapshot === 'function') ? getDerivedFinancialSnapshot() : null;
+    const _p = snap && snap.portfolio;
+    if (Number(_p && _p.uncertifiablePositions || 0) > 0) throw new _AwEvalError('#N/A');
     const exp = snap?.portfolio?.exposure || {};
     if (Object.prototype.hasOwnProperty.call(exp, cat)) return Number(exp[cat] || 0);
     if (cat === 'stocks' && exp.stock != null) return Number(exp.stock || 0); // common alias
@@ -14806,6 +14863,10 @@ const _AW8_FINANCIAL_FUNCTIONS = Object.freeze({
     const symbol = String(args[0].value || '').trim().toUpperCase();
     if (!symbol) throw new _AwEvalError('#ERROR');
     const snap = (typeof getDerivedFinancialSnapshot === 'function') ? getDerivedFinancialSnapshot() : null;
+    // un peso es un cociente: con el denominador parcial, `=ALLOCATION("AAPL")` publicaba
+    // 0,333 sobre un total que no cubría toda la cartera.
+    const _p = snap && snap.portfolio;
+    if (Number(_p && _p.uncertifiablePositions || 0) > 0) throw new _AwEvalError('#N/A');
     const allocs = snap?.portfolio?.allocations || [];
     for (const a of allocs) {
       if (String(a?.symbol || '').toUpperCase() === symbol) return Number(a.allocation || 0);
@@ -14817,7 +14878,12 @@ const _AW8_FINANCIAL_FUNCTIONS = Object.freeze({
   'ASSET.QTY'(args) {
     if (args.length !== 1 || args[0].type !== 'str') throw new _AwEvalError('#ERROR');
     const a = _aw8AssetByTicker(args[0].value);
-    return a ? (Number(a.qty) || 0) : 0;
+    if (!a) return 0;
+    // SPEC WORKSPACE FORMULA INTEGRITY — la cantidad es el input necesario. Si no es
+    // certificable, #N/A (la misma semantica institucional que PORTFOLIO.CAGR ya usa)
+    // en vez de un 0 o un -100%% fabricados. Una posicion inexistente sigue dando 0.
+    if (!_aw8QtyCertifiable(a)) throw new _AwEvalError('#N/A');
+    return _aw8Qty(a);
   },
   'ASSET.PRICE'(args) {
     if (args.length !== 1 || args[0].type !== 'str') throw new _AwEvalError('#ERROR');
@@ -14828,6 +14894,7 @@ const _AW8_FINANCIAL_FUNCTIONS = Object.freeze({
     if (args.length !== 1 || args[0].type !== 'str') throw new _AwEvalError('#ERROR');
     const a = _aw8AssetByTicker(args[0].value);
     if (!a) return 0;
+    if (!_aw8QtyCertifiable(a)) throw new _AwEvalError('#N/A');   // SPEC WORKSPACE FORMULA INTEGRITY
     return (typeof assetValueUSD === 'function') ? assetValueUSD(a) : (Number(a.qty || 0) * Number(a.price || 0));
   },
   'ASSET.COST'(args) {
@@ -14839,6 +14906,7 @@ const _AW8_FINANCIAL_FUNCTIONS = Object.freeze({
     if (args.length !== 1 || args[0].type !== 'str') throw new _AwEvalError('#ERROR');
     const a = _aw8AssetByTicker(args[0].value);
     if (!a || !a.costBasis || a.costBasis <= 0) return 0;
+    if (!_aw8QtyCertifiable(a)) throw new _AwEvalError('#N/A');   // SPEC WORKSPACE FORMULA INTEGRITY
     const val   = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : (Number(a.qty || 0) * Number(a.price || 0));
     const cbUSD = (typeof costBasisUSD === 'function') ? costBasisUSD(a) : Number(a.costBasis) || 0;  // AURIX-DATA-001 (F2-cost)
     if (!Number.isFinite(val) || !Number.isFinite(cbUSD)) return 0;
@@ -14848,6 +14916,7 @@ const _AW8_FINANCIAL_FUNCTIONS = Object.freeze({
     if (args.length !== 1 || args[0].type !== 'str') throw new _AwEvalError('#ERROR');
     const a = _aw8AssetByTicker(args[0].value);
     if (!a || !a.costBasis || a.costBasis <= 0) return 0;
+    if (!_aw8QtyCertifiable(a)) throw new _AwEvalError('#N/A');   // SPEC WORKSPACE FORMULA INTEGRITY
     const val   = (typeof assetValueUSD === 'function') ? assetValueUSD(a) : (Number(a.qty || 0) * Number(a.price || 0));
     const cbUSD = (typeof costBasisUSD === 'function') ? costBasisUSD(a) : Number(a.costBasis) || 0;  // AURIX-DATA-001 (F2-cost)
     if (!Number.isFinite(val) || !Number.isFinite(cbUSD) || cbUSD <= 0) return 0;
@@ -14857,18 +14926,27 @@ const _AW8_FINANCIAL_FUNCTIONS = Object.freeze({
   // explicit alias for PORTFOLIO.PNL — same number, separate name for users
   // building open-position dashboards. Both share _aw8PortfolioUnrealizedTotal
   // so the iteration walks `assets[]` exactly once per cell evaluation.
+  // SPEC WORKSPACE FORMULA INTEGRITY — una cifra de CARTERA con una posicion no
+  // certificable dentro no es una cifra de cartera. Mismo contrato que LB-1 aplica
+  // al snapshot (una posicion sin valorar rechaza el snapshot ENTERO) y que el guard
+  // de completitud aplica al punto del grafico: fail-closed, en la tercera superficie.
   'PORTFOLIO.PNL'(args) {
     if (args.length !== 0) throw new _AwEvalError('#ERROR');
-    return _aw8PortfolioUnrealizedTotal().pnl;
+    const r = _aw8PortfolioUnrealizedTotal();
+    if (r.partial > 0) throw new _AwEvalError('#N/A');
+    return r.pnl;
   },
   'PORTFOLIO.PNL_PCT'(args) {
     if (args.length !== 0) throw new _AwEvalError('#ERROR');
-    const { pnl, cost } = _aw8PortfolioUnrealizedTotal();
+    const { pnl, cost, partial } = _aw8PortfolioUnrealizedTotal();
+    if (partial > 0) throw new _AwEvalError('#N/A');
     return cost > 0 ? (pnl / cost) * 100 : 0;
   },
   'PORTFOLIO.UNREALIZED'(args) {
     if (args.length !== 0) throw new _AwEvalError('#ERROR');
-    return _aw8PortfolioUnrealizedTotal().pnl;
+    const r = _aw8PortfolioUnrealizedTotal();
+    if (r.partial > 0) throw new _AwEvalError('#N/A');
+    return r.pnl;
   },
   // PR-WP5: advanced portfolio analytics. All four read from a single
   // _wp5PortfolioAnalytics walk over assets[]. BEST/WORST return ticker
@@ -14877,20 +14955,27 @@ const _AW8_FINANCIAL_FUNCTIONS = Object.freeze({
   // percentage to match PORTFOLIO.PNL_PCT convention).
   'PORTFOLIO.COST'(args) {
     if (args.length !== 0) throw new _AwEvalError('#ERROR');
-    return _wp5PortfolioAnalytics().cost;
+    const a = _wp5PortfolioAnalytics();
+    if (a.partial > 0) throw new _AwEvalError('#N/A');
+    return a.cost;
   },
   'PORTFOLIO.WINRATE'(args) {
     if (args.length !== 0) throw new _AwEvalError('#ERROR');
     const a = _wp5PortfolioAnalytics();
+    if (a.partial > 0) throw new _AwEvalError('#N/A');
     return a.total > 0 ? (a.wins / a.total) * 100 : 0;
   },
   'PORTFOLIO.BEST'(args) {
     if (args.length !== 0) throw new _AwEvalError('#ERROR');
-    return _wp5PortfolioAnalytics().best || '';
+    const a = _wp5PortfolioAnalytics();
+    if (a.partial > 0) throw new _AwEvalError('#N/A');   // un ranking incompleto no es un ranking
+    return a.best || '';
   },
   'PORTFOLIO.WORST'(args) {
     if (args.length !== 0) throw new _AwEvalError('#ERROR');
-    return _wp5PortfolioAnalytics().worst || '';
+    const a = _wp5PortfolioAnalytics();
+    if (a.partial > 0) throw new _AwEvalError('#N/A');
+    return a.worst || '';
   },
   // PR-WP5: PORTFOLIO.CAGR is intentionally blocked. asset.transactions
   // may still carry a synthetic ts from the legacy migrate path, and
@@ -16368,6 +16453,25 @@ function _buildWorkspaceRiskCategories() {
   // long-term, low daily volatility. We resolve "top is RE" by mapping
   // the allocation symbol back to the live assets array (allocations
   // only carry symbol + value), and downgrade tone to info.
+  // SPEC WORKSPACE FORMULA INTEGRITY — GATE ÚNICO DE COMPLETITUD, antes de cualquier
+  // afirmación. Las tres categorías se construyen sobre `totalValue`, `exposure`,
+  // `allocations` y `assetCount`, que ahora provienen del universo CERTIFICABLE: son
+  // ciertas sobre lo valorable, pero se publican como hechos de cartera. Con una posición
+  // abierta sin valorar, "Baja diversificación (3 posiciones)" es literalmente falso
+  // habiendo 4 registros, y un "89%" puede moverse cuando esa posición se resuelva.
+  // Peor aún serían los fallbacks: `wsBalancedExposure` / `wsExposureNormal` /
+  // `wsStableSignal` fabricarían TRANQUILIDAD sobre datos incompletos. Así que el panel
+  // no afirma nada: enuncia la parcialidad y calla. Ni tranquilizador ni alarmista.
+  const _uncertifiable = Number(portfolio.uncertifiablePositions || 0);
+  if (_uncertifiable > 0) {
+    const partial = [{ tone: 'info', text: t('wsDataPartial') }];
+    return [
+      { id: 'concentration', label: t('wsConcentration'), signals: partial },
+      { id: 'exposure',      label: t('wsExposureLabel'), signals: partial },
+      { id: 'volatility',    label: t('wsVolatility'),    signals: partial },
+    ];
+  }
+
   const topAllocAsset = (() => {
     const topSym = allocations[0] && allocations[0].symbol;
     if (!topSym || !Array.isArray(assets)) return null;
@@ -62325,6 +62429,8 @@ function computeAurixSignal() {
 function _aurixHealthSnapshot() {
   const out = {
     totUSD:        0,
+    // SPEC WORKSPACE FORMULA INTEGRITY — posiciones abiertas fuera del universo certificable.
+    uncertifiablePositions: 0,
     topAsset:      null,    // { name, ticker, type, pctTotal }
     // WORKSPACE-LIQUIDITY-LOGIC-1: largest NON-LIQUIDITY holding. Cash /
     // currency entries are not the same shape of risk as crypto, equity
@@ -62362,7 +62468,19 @@ function _aurixHealthSnapshot() {
   // weight is only meaningful against total patrimony, not the investable subset.
   // totalValueUSD/getDistribution (total) are untouched globally; here we read the
   // investable equivalents for everything except that RE block.
-  const assets = (typeof investableAssets === 'function') ? investableAssets() : [];
+  // SPEC WORKSPACE FORMULA INTEGRITY — ESTE es el owner de la superficie VIVA de Workspace
+  // (`_aurixWorkspaceIntelligence` lo consume y es lo que se renderiza; el panel de
+  // `_buildWorkspaceRiskCategories` es código muerto). Aquí `assetCount` se contaba sobre la
+  // lista SIN filtrar mientras `totUSD` ya venía filtrado por la regla canónica, así que el
+  // numerador y el denominador de todo porcentaje publicado salían de universos distintos:
+  // "4 activos" junto a pesos que sólo cubrían 3. Un solo universo, y se expone cuántas
+  // posiciones abiertas quedaron fuera para que la superficie pueda enunciar la parcialidad.
+  const _allInvestable = (typeof investableAssets === 'function') ? investableAssets() : [];
+  const assets = Array.isArray(_allInvestable)
+    ? _allInvestable.filter(a => !(typeof _aurixUsableQuantity === 'function')
+        || Number.isFinite(_aurixUsableQuantity(a && a.qty)))
+    : [];
+  out.uncertifiablePositions = (Array.isArray(_allInvestable) ? _allInvestable.length : 0) - assets.length;
   if (!Array.isArray(assets) || assets.length === 0) return out;
   const totUSD = (typeof investableValueUSD === 'function') ? investableValueUSD() : 0;
   out.totUSD     = totUSD;
