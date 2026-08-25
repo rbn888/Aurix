@@ -207,7 +207,19 @@ function valueUser(row: any, prices: Map<string, { price: number; currency: stri
     if (!asset) { unpriced++; dropped++; warnings.push('orphan_holding:' + h.asset_id); continue; }   // salvage not replicated server-side
     const qty = Number(h.quantity);                                    // quantity lives on HOLDINGS
     if (qty === 0) continue;                                           // zero-quantity position — legitimately excluded
-    if (!Number.isFinite(qty)) { dropped++; warnings.push('invalid_qty:' + (asset.symbol || h.asset_id)); continue; }   // corrupt quantity ⇒ incomplete
+    // SPEC NEGATIVE QUANTITY FAIL-CLOSED — a NEGATIVE quantity is not a position, it is corrupt data.
+    // `Number()` yields a finite number for it, so the two guards this line joins were the only domain
+    // check on quantity and neither rejected it: −500 units of cash reached the valuation as a real
+    // amount and SUBTRACTED patrimony (observed: a valid 4000 + a −500 cash published 3500, dropped 0,
+    // LB-1 satisfied, `asset_values` persisting −500). A single negative position alone was worse than
+    // wrong, it was invisible: total ≤ 0 filed the account as EMPTY — "nothing to capture" — with no
+    // warning at all. Validated HERE, at the quantity boundary, and NOT through usableFactor: that rule
+    // governs multiplicative FACTORS and rejects 0, whereas a quantity of 0 is a legitimate closed
+    // position that must keep being skipped silently (never dropped). Two different contracts.
+    // Deliberately ordered AFTER the `qty === 0` skip so 0 — and −0, which `=== 0` — keep their exact
+    // previous semantics. Fail-CLOSED: no contribution to total, category_values or asset_values ⇒
+    // dropped++ ⇒ LB-1 refuses the WHOLE snapshot, so no surface can value what another discards.
+    if (!Number.isFinite(qty) || qty < 0) { dropped++; warnings.push('invalid_qty:' + (asset.symbol || h.asset_id)); continue; }   // corrupt quantity ⇒ incomplete
     const bucket = bucketOf(asset.type || 'other');
     const cur = String(asset.assetCurrency || 'USD').toUpperCase();
     const storedPrice = usableFactor(asset.currentPrice);              // catalog price field = currentPrice (NaN when unusable)

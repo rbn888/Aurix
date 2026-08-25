@@ -18,7 +18,13 @@ console.log('AURIX-BACKEND-LB1-COMPLETENESS — SPEC CHART-INTEGRITY.LB-1 (serve
 console.log('Edge Function guard (source):');
 ok('1 `dropped` counter declared in valueUser', /let total = 0,[^;]*dropped = 0;/.test(edge));
 ok('2 orphan holding increments dropped', /if \(!asset\) \{ unpriced\+\+; dropped\+\+;/.test(edge));
-ok('3 non-finite quantity increments dropped (qty===0 still excluded, not dropped)', /if \(qty === 0\) continue;/.test(edge) && /if \(!Number\.isFinite\(qty\)\) \{ dropped\+\+;/.test(edge));
+// Re-anchored by SPEC NEGATIVE QUANTITY FAIL-CLOSED: same intention, one clause wider. The guard now
+// also rejects a FINITE NEGATIVE quantity, which `Number()` accepted and which subtracted patrimony.
+// The `qty === 0` skip must keep PRECEDING it — 0 is a closed position, not corrupt data.
+ok('3 invalid quantity increments dropped: non-finite OR negative (qty===0 still excluded, not dropped)',
+  /if \(qty === 0\) continue;/.test(edge)
+  && /if \(!Number\.isFinite\(qty\) \|\| qty < 0\) \{ dropped\+\+;/.test(edge)
+  && edge.indexOf('if (qty === 0) continue;') < edge.indexOf('if (!Number.isFinite(qty) || qty < 0)'));
 ok('4 non-finite value (missing price/FX, no fallback) increments dropped', /if \(!Number\.isFinite\(valueUSD\)\) \{ unpriced\+\+; dropped\+\+;/.test(edge));
 ok('5 valueUser returns dropped_asset_count', /dropped_asset_count: dropped/.test(edge));
 ok('6 insert is SKIPPED when dropped>0 (partial valuation never persisted)', /if \(Number\(v\.dropped_asset_count\) > 0\) \{ incompleteRej\+\+; noteHealth\([^;]*\); continue; \}/.test(edge));
@@ -38,7 +44,9 @@ function valueMirror(holdings, catalog, prices, fx) {
     if (!a) { dropped++; continue; }                                   // orphan
     const qty = Number(h.quantity);
     if (qty === 0) continue;                                           // legit excluded
-    if (!Number.isFinite(qty)) { dropped++; continue; }               // invalid qty
+    // SPEC NEGATIVE QUANTITY FAIL-CLOSED: a finite negative quantity is corrupt data, not a position.
+    // Mirrored here so this mirror keeps matching the real owner (which the dedicated gate executes).
+    if (!Number.isFinite(qty) || qty < 0) { dropped++; continue; }     // invalid qty
     let v;
     // SPEC 2.8: non-USD cash with no FX is UNKNOWN. The old fallback multiplied the amount
     // by the asset's currentPrice as if it were a rate, and cash is stored with price = 1.
