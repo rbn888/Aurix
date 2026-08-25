@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '638'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '639'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -26143,7 +26143,31 @@ function _aurixChartPublicationSourcesPending() {
     const beOn = (typeof _AURIX_BACKEND_SNAPSHOTS_ENABLED !== 'undefined' && _AURIX_BACKEND_SNAPSHOTS_ENABLED)
               && (typeof _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD !== 'undefined' && _AURIX_BACKEND_SNAPSHOTS_AUTOLOAD);
     const beSt = (typeof _aurixBackendSnapshotsState !== 'undefined') ? _aurixBackendSnapshotsState : 'ready';
-    if (beOn && (beSt === 'idle' || beSt === 'loading')) { out.pending = true; out.reason = 'backend_snapshots_hydrating'; return out; }
+    // ── SPEC P0 CHART PRE-HYDRATION FALSE CONTINUITY ────────────────────────────────────────────
+    // UNKNOWN HISTORY ≠ COMPLETE HISTORY. Esta lista enumeraba `idle` y `loading` y OMITÍA `failed`,
+    // mientras el gate del RETORNO —`_aurixResolvePublicationReadiness`— ya bloqueaba los tres
+    // (`failed` ⇒ STALE_HISTORY, con su propio toggle). Dos políticas donde el comentario de este
+    // mismo gate promete que «the chart area and the return publish as a single unit».
+    //
+    // La consecuencia, reproducida con los owners reales: `_aurixHistorySourceForDisplay` devuelve
+    // SÓLO el frontend mientras `_aurixBackendSnapshots` esté vacío (fast-path `if (!beRaw.length)
+    // return fe`). En la ventana `failed` —hasta 60 s por ciclo y recurrente para siempre en una red
+    // inestable, porque los reintentos no tienen tope— el gráfico publicaba esa serie truncada como
+    // definitiva: una línea continua y aparentemente completa que omitía la historia del día
+    // anterior Y la propia ausencia. Al aterrizar un reintento, `ready` traía el tramo previo y el
+    // hueco real de 14 h aparecía «de repente». El hueco no apareció: apareció la HISTORIA.
+    // Por eso el síntoma no era global: móvil con red inestable reincide en `failed`; un escritorio
+    // que hidrata a la primera nunca ve la falsa continuidad.
+    //
+    // No se inventa una regla: se DELEGA en la política ya decidida para el retorno, así que ambos
+    // gates comparten una sola definición y su toggle. Nada de umbrales, clasificador, merge,
+    // geometría ni valores financieros. Un hueco real sigue siendo un hueco después de `ready`.
+    if (beOn && typeof _aurixResolvePublicationReadiness === 'function') {
+      const rd = _aurixResolvePublicationReadiness({ backendEnabled: true, hydrationState: beSt });
+      if (!rd.publishable) { out.pending = true; out.reason = rd.blocker || 'backend_snapshots_hydrating'; return out; }
+    } else if (beOn && (beSt === 'idle' || beSt === 'loading')) {
+      out.pending = true; out.reason = 'backend_snapshots_hydrating'; return out;   // fallback si el resolver falta
+    }
   } catch (_) { return { pending: false, reason: null }; }
   return out;
 }
