@@ -42,7 +42,7 @@ sb._aurixFxRate = ccy => (ccy==='GBP' ? 1.27 : NaN);
 sb._aurixHasCapitalFlowNear = () => false;
 sb._aurixPushRejected = () => {};
 // real functions under test
-['assetNativeValue','assetValueUSD','_aurixAssessValuationCompleteness','_shouldRejectSnapshot','_aurixGuardSnapshot']
+['_aurixUsableQuantity','assetNativeValue','assetValueUSD','_aurixAssessValuationCompleteness','_shouldRejectSnapshot','_aurixGuardSnapshot']
   .forEach(n => vm.runInContext(fnSrc(n), sb));
 const assess = list => { sb.__l = list; return vm.runInContext('_aurixAssessValuationCompleteness(__l)', sb); };
 const guard  = (next, prev) => { sb.__n = next; sb.__p = prev; return vm.runInContext('_aurixGuardSnapshot(__n, __p, "portfolio")', sb); };

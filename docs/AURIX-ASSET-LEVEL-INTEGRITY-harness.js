@@ -51,6 +51,7 @@ const TS_STRIP = [
   ['function goldGrams(qty: number, unit: string): number {', 'function goldGrams(qty, unit) {'],
   ['function isUsEquityOpenNow(now: Date): boolean {', 'function isUsEquityOpenNow(now) {'],
   ['function usableFactor(v: any): number {', 'function usableFactor(v) {'],
+  ['function usableQuantity(raw: any): number {', 'function usableQuantity(raw) {'],
   ['function fxToUsd(cur: string, prices: Map<string, { price: number; currency: string }>): number {', 'function fxToUsd(cur, prices) {'],
   ['function valueUser(row: any, prices: Map<string, { price: number; currency: string }>, now: Date) {', 'function valueUser(row, prices, now) {'],
   ['const catalog: any[] =', 'const catalog ='],
@@ -65,7 +66,7 @@ const TS_STRIP = [
 let js = ts;
 for (const [a, b] of TS_STRIP) js = js.split(a).join(b);
 js = js.replace(/\b(let|const|var)\s+(\w+)\s*:\s*[\w<>\[\]{}, ;|]+?\s*=/g, '$1 $2 =');
-const NAMES = ['bucketOf', 'goldPurity', 'goldGrams', 'isUsEquityOpenNow', 'usableFactor', 'fxToUsd', 'valueUser'];
+const NAMES = ['bucketOf', 'goldPurity', 'goldGrams', 'isUsEquityOpenNow', 'usableFactor', 'usableQuantity', 'fxToUsd', 'valueUser'];
 const SRC = NAMES.map(n => extractFn(n, js)).join('\n');
 function assertTranspiled(src) {
   const bad = src.split('\n').filter(l => /\b(any|Record<|Map<|: string|: number|: boolean|: Date)\b/.test(l) && !/^\s*\/\//.test(l));
@@ -402,10 +403,46 @@ console.log('\n19–23 · Chart, Performance, Reader, Preview, User Health:');
       !/\bapp\.js\b|switchTab|buildProductionPortfolioChart|_aurixCatHist|_aurixIntelligencePreview/.test(TS_CODE));
   } else {
     const list = files.split('\n').filter(Boolean);
-    ok('19.1 app.js is NOT in the diff ⇒ Chart, Performance, Reader and Preview cannot have moved',
-      list.indexOf('app.js') === -1, list.join(' '));
-    ok('19.2 index.html / version.json untouched (no bundle change)',
-      list.indexOf('index.html') === -1 && list.indexOf('version.json') === -1, list.join(' '));
+    // The four surfaces this SPEC must not move, pinned by BYTE-IDENTITY of their own
+    // bodies instead of by "app.js is absent from the diff". The old form died the moment
+    // any other SPEC legitimately edited a different part of the 3.5 MB bundle — which is
+    // exactly what UNKNOWN QUANTITY INTEGRITY does — and an assertion that cannot survive
+    // a legitimate edit elsewhere stops being evidence. This form keeps the teeth: touch
+    // Chart, Performance, Reader or Preview and it goes red.
+    const FRONTEND_OWNERS = ['buildValidatedHistoricalSeries', '_aurixResolveFinalRenderSeriesContract',
+      'computePerformanceSnapshot', '_aurixComputePerformanceStateCandidate',
+      '_aurixNormalizeBackendSnapshot', '_aurixMergeSnapshotSources', '_aurixHistorySourceForDisplay',
+      '_aurixCatHistWindow', '_aurixIntelligencePreviewFacts', '_aurixIntelligencePreviewHTML'];
+    const bodyOf = (src, n) => { const s = 'function ' + n + '('; const i = src.indexOf(s); if (i < 0) return null;
+      let k = src.indexOf('{', i), d = 0; for (; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}') { d--; if (!d) return src.slice(i, k + 1); } } return null; };
+    ok('19.1 Chart, Performance, Reader and Preview are byte-identical to ' + BASELINE + ' (they cannot have moved)',
+      (function () {
+        let base = null;
+        try { base = cp.execSync('git show ' + BASELINE + ':app.js', { cwd: ROOT, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }).toString('utf8'); } catch (e) { return false; }
+        const cur = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
+        return FRONTEND_OWNERS.every(n => { const a = bodyOf(base, n), b = bodyOf(cur, n); return !!a && !!b && a === b; });
+      })(),
+      FRONTEND_OWNERS.join(','));
+    ok('19.2 the four bundle-version sources are COHERENT (a bundle change carried a complete bump)',
+      (function () {
+      // Re-anchored: "index.html / version.json untouched" was a claim about a rolling
+      // baseline, so a LATER SPEC that legitimately changes the bundle — and is OBLIGED by
+      // the cache-bust contract to bump it — turned this red for the right change. The
+      // durable invariant is not "untouched", it is COHERENT: if the bundle moved, every one
+      // of the four version sources moved together. A partial bump is the actual failure mode
+      // (memory records __AURIX_APPJS_VERSION__ as the one that gets forgotten), and this
+      // catches it whether or not any baseline is reachable.
+      const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+      const ver = JSON.parse(fs.readFileSync(path.join(ROOT, 'version.json'), 'utf8'));
+      const appSrc = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
+      const m1 = idx.match(/var APPJS_V = '(\d+)';/);
+      const m2 = idx.match(/app\.js\?v=(\d+)/);
+      const m3 = appSrc.match(/window\.__AURIX_APPJS_VERSION__ = '(\d+)';/);
+      if (!m1 || !m2 || !m3) return false;
+      const all = [String(ver.appjs), m1[1], m2[1], m3[1]];
+      return all.every(v => v === all[0]) && /var BUILD = '[^']+';/.test(idx)
+        && idx.indexOf(String(ver.build)) !== -1;
+    })());
   }
   ok('23.1 the per-user observability block is untouched by this SPEC',
     /function normalizeWarnings\(ws: any\): string\[\] \{/.test(ts)

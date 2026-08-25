@@ -163,6 +163,39 @@ async function fetchPrices(symbols: string[]): Promise<Map<string, { price: numb
 // at every point where a price enters the valuation: catalog, provider, gold spot and FX.
 function usableFactor(v: any): number { const n = Number(v); return (Number.isFinite(n) && n > 0) ? n : NaN; }
 
+// SPEC UNKNOWN QUANTITY INTEGRITY — the canonical "is this a real QUANTITY?" rule.
+// A quantity is NOT a factor, so it cannot go through usableFactor: that rule rejects 0,
+// and a quantity of 0 is a legitimate closed position that must keep being skipped in
+// silence. Three states, not two — VALID_POSITIVE / ZERO / INVALID — encoded in one
+// number: > 0 valid, 0 a real zero, NaN invalid.
+// The defect this closes is UNKNOWN ≠ ZERO on the OTHER factor of the valuation.
+// `Number()` erases exactly the distinction that matters, and the erasure is silent:
+// Number(null), Number(''), Number('   '), Number(false) and Number([]) are all 0 and
+// FINITE, so a holding whose quantity nobody knows landed in the `qty === 0` branch and
+// was filed as a CLOSED POSITION — excluded from the total with dropped 0, so LB-1 saw
+// nothing wrong and the snapshot was persisted as COMPLETE with the position simply
+// missing. Silently understated patrimony, and a direct breach of the schema_version >= 2
+// promise that `asset_values` carries EVERY active position of the instant.
+// Worse in the other direction: Number(true) is 1 and Number([5]) is 5, so a boolean or a
+// wrapped array FABRICATED a quantity out of nothing and was valued as a real position.
+// So the type is checked BEFORE any coercion:
+//   • number  → itself when finite and >= 0 (this is what admits 0 and -0 unchanged)
+//   • string  → trimmed first, because '' and '   ' are NOT zero; then the same test.
+//               Numeric strings stay supported: the model has always persisted them.
+//   • anything else (null / undefined / boolean / object / array) is NEVER a quantity.
+// A negative collapses into INVALID here too, so the negative and the unknown share one
+// verdict and one warning instead of two spellings of the same refusal.
+function usableQuantity(raw: any): number {
+  if (typeof raw === 'number') return (Number.isFinite(raw) && raw >= 0) ? raw : NaN;   // >= 0 keeps 0 and -0
+  if (typeof raw === 'string') {
+    const t = raw.trim();
+    if (!t) return NaN;                                                                 // '' / '   ' are UNKNOWN, not zero
+    const n = Number(t);
+    return (Number.isFinite(n) && n >= 0) ? n : NaN;
+  }
+  return NaN;
+}
+
 // USD per unit of a non-USD currency, from the price snapshot. The endpoint's registry resolves FX pairs
 // in the Yahoo form `<CUR>USD=X` (e.g. EURUSD=X → USD per 1 EUR) — NOT `<CUR>/USD`. NaN if absent.
 function fxToUsd(cur: string, prices: Map<string, { price: number; currency: string }>): number {
@@ -205,21 +238,30 @@ function valueUser(row: any, prices: Map<string, { price: number; currency: stri
     if (!h) continue;
     const asset = byId.get(h.asset_id);
     if (!asset) { unpriced++; dropped++; warnings.push('orphan_holding:' + h.asset_id); continue; }   // salvage not replicated server-side
-    const qty = Number(h.quantity);                                    // quantity lives on HOLDINGS
+    // SPEC UNKNOWN QUANTITY INTEGRITY — the raw value is classified BEFORE any coercion,
+    // because `Number()` is what erased the difference between NO VALUE and ZERO. See
+    // usableQuantity: null / '' / '   ' / false / [] used to become a finite 0 and be filed
+    // as a closed position (dropped 0 ⇒ LB-1 content ⇒ snapshot persisted as COMPLETE with
+    // the holding simply missing), while true / [5] fabricated a quantity of 1 / 5 and were
+    // valued as real positions.
+    const qty = usableQuantity(h.quantity);                            // quantity lives on HOLDINGS
     if (qty === 0) continue;                                           // zero-quantity position — legitimately excluded
-    // SPEC NEGATIVE QUANTITY FAIL-CLOSED — a NEGATIVE quantity is not a position, it is corrupt data.
-    // `Number()` yields a finite number for it, so the two guards this line joins were the only domain
-    // check on quantity and neither rejected it: −500 units of cash reached the valuation as a real
-    // amount and SUBTRACTED patrimony (observed: a valid 4000 + a −500 cash published 3500, dropped 0,
-    // LB-1 satisfied, `asset_values` persisting −500). A single negative position alone was worse than
-    // wrong, it was invisible: total ≤ 0 filed the account as EMPTY — "nothing to capture" — with no
-    // warning at all. Validated HERE, at the quantity boundary, and NOT through usableFactor: that rule
-    // governs multiplicative FACTORS and rejects 0, whereas a quantity of 0 is a legitimate closed
+    // SPEC NEGATIVE QUANTITY FAIL-CLOSED + UNKNOWN QUANTITY INTEGRITY — one refusal for both.
+    // A negative quantity is corrupt data, not a position: `Number()` yields a finite number
+    // for it, so it reached the valuation as a real amount and SUBTRACTED patrimony (observed:
+    // a valid 4000 + a −500 cash published 3500, dropped 0, LB-1 satisfied, `asset_values`
+    // persisting −500). A single negative position alone was worse than wrong, it was invisible:
+    // total ≤ 0 filed the account as EMPTY — "nothing to capture" — with no warning at all.
+    // Both verdicts now arrive as NaN from usableQuantity, so this ONE line covers the negative
+    // and the unknown with one warning instead of two spellings of the same refusal.
+    // Validated at the quantity boundary and NOT through usableFactor: that rule governs
+    // multiplicative FACTORS and rejects 0, whereas a quantity of 0 is a legitimate closed
     // position that must keep being skipped silently (never dropped). Two different contracts.
-    // Deliberately ordered AFTER the `qty === 0` skip so 0 — and −0, which `=== 0` — keep their exact
-    // previous semantics. Fail-CLOSED: no contribution to total, category_values or asset_values ⇒
-    // dropped++ ⇒ LB-1 refuses the WHOLE snapshot, so no surface can value what another discards.
-    if (!Number.isFinite(qty) || qty < 0) { dropped++; warnings.push('invalid_qty:' + (asset.symbol || h.asset_id)); continue; }   // corrupt quantity ⇒ incomplete
+    // Deliberately ordered AFTER the `qty === 0` skip so 0 — and −0, which `=== 0` — keep their
+    // exact previous semantics. Fail-CLOSED: no contribution to total, category_values or
+    // asset_values ⇒ dropped++ ⇒ LB-1 refuses the WHOLE snapshot, so no surface can value what
+    // another discards.
+    if (!Number.isFinite(qty)) { dropped++; warnings.push('invalid_qty:' + (asset.symbol || h.asset_id)); continue; }   // corrupt quantity ⇒ incomplete
     const bucket = bucketOf(asset.type || 'other');
     const cur = String(asset.assetCurrency || 'USD').toUpperCase();
     const storedPrice = usableFactor(asset.currentPrice);              // catalog price field = currentPrice (NaN when unusable)

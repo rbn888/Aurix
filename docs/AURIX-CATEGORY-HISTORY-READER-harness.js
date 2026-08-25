@@ -526,13 +526,65 @@ console.log('\n17–18 · Chart, Performance and Preview V1 are byte-identical:'
     // SPEC — including the stale-endpoint hotfix, which does edit reader logic — is confined
     // to its own block and touched nothing else in a 3.5 MB bundle. Stronger than counting
     // diff lines and it survives further revisions of the reader itself.
-    ok('18.1 outside the reader block, app.js is byte-identical to ' + BASELINE,
+    // The containment claim is unchanged; the normalisation now also removes the owners that a
+    // LATER SPEC edits on purpose. UNKNOWN QUANTITY INTEGRITY rewrites the quantity contract in
+    // totalValueUSD / investableValueUSD / _aurixAssessValuationCompleteness and adds
+    // _aurixUsableQuantity — all far from the reader. Without this the assertion would report
+    // "the reader is not contained" for a change that never touched the reader, which is a false
+    // accusation, not evidence. Everything NOT named here is still compared BYTE FOR BYTE, so the
+    // reader containment this gate exists to prove is fully intact — and if a future SPEC edits the
+    // reader itself, or anything else in the 3.5 MB bundle, this still goes red.
+    // Each exemption must NAME the gate that does watch that owner, and that gate must exist.
+    // Without this the list is a growing blind spot: the adversarial review flagged exactly that.
+    const LATER_SPEC_OWNER_GATES = {
+      totalValueUSD: 'AURIX-UNKNOWN-QUANTITY-INTEGRITY-harness.js',
+      investableValueUSD: 'AURIX-UNKNOWN-QUANTITY-INTEGRITY-harness.js',
+      _aurixAssessValuationCompleteness: 'AURIX-VALUATION-COMPLETENESS-CONTRACT-harness.js',
+      _aurixSalvageHolding: 'AURIX-UNKNOWN-QUANTITY-INTEGRITY-harness.js',
+      _aurixPositionFromAsset: 'AURIX-UNKNOWN-QUANTITY-INTEGRITY-harness.js',
+      computePositionPerformance: 'AURIX-UNKNOWN-QUANTITY-INTEGRITY-harness.js',
+      recomputeDerivedFinancialState: 'AURIX-UNKNOWN-QUANTITY-INTEGRITY-harness.js',
+    };
+    const LATER_SPEC_OWNERS = Object.keys(LATER_SPEC_OWNER_GATES);
+    ok('18.0 every owner exempted from byte-identity is watched by a NAMED gate that exists',
+      LATER_SPEC_OWNERS.length > 0 && LATER_SPEC_OWNERS.every(n => {
+        const g = LATER_SPEC_OWNER_GATES[n];
+        if (!fs.existsSync(path.join(__dirname, g))) return false;
+        return fs.readFileSync(path.join(__dirname, g), 'utf8').indexOf(n) !== -1;
+      }),
+      LATER_SPEC_OWNERS.filter(n => { const g = LATER_SPEC_OWNER_GATES[n];
+        return !fs.existsSync(path.join(__dirname, g))
+          || fs.readFileSync(path.join(__dirname, g), 'utf8').indexOf(n) === -1; }).join(','));
+    ok('18.1 outside the reader block (and the owners later SPECs declare), app.js is byte-identical to ' + BASELINE,
       (function(){
         const bannerIdx = app.lastIndexOf('// ════', app.indexOf(BLOCK_START));
         const p0Idx = app.indexOf('// ── P0-FINAL-PERFORMANCE-KILL-SWITCH-AND-SERVER-CANONICAL', bannerIdx);
         if (bannerIdx < 0 || p0Idx < 0) return false;
+        const stripDeclared = (src, isCurrent) => {
+          let out = src;
+          for (const n of LATER_SPEC_OWNERS) {
+            let body = null; try { body = fnSrcIn(out, n); } catch (e) { body = null; }
+            if (!body) return null;                                  // the owner must exist on BOTH sides
+            out = out.split(body).join('<' + n + '>');
+          }
+          if (isCurrent) {
+            // The whole declared insertion — banner, body and window export — is REMOVED rather
+            // than placeholdered, so the surrounding bytes must still line up exactly with the
+            // baseline. A placeholder would have hidden the blank line the insertion introduced.
+            const uqStart = out.indexOf('// SPEC UNKNOWN QUANTITY INTEGRITY — the canonical');
+            if (uqStart < 0) return null;
+            const uqBanner = out.lastIndexOf('// ════', uqStart);
+            const uqEnd = out.indexOf("window._aurixUsableQuantity = _aurixUsableQuantity; } catch (_) {}");
+            if (uqBanner < 0 || uqEnd < 0) return null;
+            const uqTail = out.indexOf('\n', uqEnd);
+            out = out.slice(0, uqBanner).replace(/\n+$/, '\n') + out.slice(uqTail + 1);
+          }
+          return out;
+        };
         const norm = s => s.replace(/window\.__AURIX_APPJS_VERSION__ = '\d+';/, "window.__AURIX_APPJS_VERSION__ = '<v>';");
-        return norm(app.slice(0, bannerIdx) + app.slice(p0Idx)) === norm(base);
+        const cur = stripDeclared(app.slice(0, bannerIdx) + app.slice(p0Idx), true);
+        const bas = stripDeclared(base, false);
+        return cur !== null && bas !== null && norm(cur) === norm(bas);
       })());
   }
   ok('18.2 the reader is not wired into any renderer, tab or Preview path',

@@ -60,6 +60,7 @@ const TS_STRIP = [
   ['function goldGrams(qty: number, unit: string): number {', 'function goldGrams(qty, unit) {'],
   ['function isUsEquityOpenNow(now: Date): boolean {', 'function isUsEquityOpenNow(now) {'],
   ['function usableFactor(v: any): number {', 'function usableFactor(v) {'],
+  ['function usableQuantity(raw: any): number {', 'function usableQuantity(raw) {'],
   ['function fxToUsd(cur: string, prices: Map<string, { price: number; currency: string }>): number {', 'function fxToUsd(cur, prices) {'],
   ['function valueUser(row: any, prices: Map<string, { price: number; currency: string }>, now: Date) {', 'function valueUser(row, prices, now) {'],
   ['const catalog: any[] =', 'const catalog ='],
@@ -74,7 +75,7 @@ const TS_STRIP = [
 let js = ts;
 for (const [a, b] of TS_STRIP) js = js.split(a).join(b);
 js = js.replace(/\b(let|const|var)\s+(\w+)\s*:\s*[\w<>\[\]{}, ;|]+?\s*=/g, '$1 $2 =');
-const NAMES = ['bucketOf', 'goldPurity', 'goldGrams', 'isUsEquityOpenNow', 'usableFactor', 'fxToUsd', 'valueUser'];
+const NAMES = ['bucketOf', 'goldPurity', 'goldGrams', 'isUsEquityOpenNow', 'usableFactor', 'usableQuantity', 'fxToUsd', 'valueUser'];
 const SRC = NAMES.map(n => extractFn(n, js)).join('\n');
 function assertTranspiled(src) {
   const bad = src.split('\n').filter(l => /\b(any|Record<|Map<|: string|: number|: boolean|: Date)\b/.test(l) && !/^\s*\/\//.test(l));
@@ -254,8 +255,11 @@ console.log('\n5 · Zero is not negative: closed / liquidated semantics intact:'
   ok('5.6 qty −0 keeps the qty-0 branch (−0 === 0), never the dropped branch',
     (function () { const w = val(B({}), { quantity: -0 });
       return Number(w.dropped_asset_count) === 0 && persisted(w) && !has(w.assetValues, 'b'); })());
+  // Re-anchored by SPEC UNKNOWN QUANTITY INTEGRITY: the negative verdict now arrives as NaN
+  // from usableQuantity, so the guard reads `!Number.isFinite(qty)` alone. Same ordering claim.
   ok('5.7 the zero-quantity skip still PRECEDES the invalid-quantity guard',
-    ts.indexOf('if (qty === 0) continue;') < ts.indexOf('if (!Number.isFinite(qty) || qty < 0)'));
+    ts.indexOf('if (qty === 0) continue;') < ts.indexOf('if (!Number.isFinite(qty))')
+    && ts.indexOf('const qty = usableQuantity(h.quantity);') < ts.indexOf('if (qty === 0) continue;'));
   ok('5.8 …and still precedes every price resolution',
     ts.indexOf('if (qty === 0) continue;') < ts.indexOf('const storedPrice = usableFactor('));
   ok('5.9 a fully liquidated account still values 0 with dropped 0 (EMPTY, not INCOMPLETE)',
@@ -337,11 +341,12 @@ console.log('\n8 · No clamp, no abs, no reinterpretation as a closed position:'
   ok('8.4 no Math.abs and no quantity clamp exists in the executable surface',
     !/Math\.abs\s*\(\s*qty/.test(TS_CODE) && !/Math\.max\s*\(\s*0\s*,\s*qty/.test(TS_CODE)
     && (TS_CODE.match(/\bqty\s*=(?!=)/g) || []).length === 1
-    && TS_CODE.indexOf('const qty = Number(h.quantity);') !== -1,
+    && TS_CODE.indexOf('const qty = usableQuantity(h.quantity);') !== -1,
     'qty assignments: ' + JSON.stringify(TS_CODE.match(/\bqty\s*=(?!=)[^;\n]*/g) || []));
   ok('8.5 the guard is a single expression on the quantity, not a second valuation path',
-    (ts.match(/if \(!Number\.isFinite\(qty\) \|\| qty < 0\)/g) || []).length === 1
-    && (TS_CODE.match(/const qty = Number\(h\.quantity\);/g) || []).length === 1);
+    (ts.match(/if \(!Number\.isFinite\(qty\)\)/g) || []).length === 1
+    && (TS_CODE.match(/const qty = usableQuantity\(h\.quantity\);/g) || []).length === 1
+    && (ts.match(/^function usableQuantity\(/gm) || []).length === 1);
   ok('8.6 quantity is validated at its own boundary, NOT through usableFactor',
     !/usableFactor\(\s*(qty|h\.quantity)/.test(TS_CODE)
     && /function usableFactor\(v: any\): number \{ const n = Number\(v\); return \(Number\.isFinite\(n\) && n > 0\) \? n : NaN; \}/.test(ts));

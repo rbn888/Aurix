@@ -526,10 +526,46 @@ console.log('\n22–25 · Chart, Performance, Category History Reader, Preview V
       !/\bapp\.js\b|switchTab|buildProductionPortfolioChart|_aurixCatHist|_aurixIntelligencePreview|_aurixSalvageHolding/.test(TS_EXEC + SQL_CODE));
   } else {
     const files = appDiff.split('\n').filter(Boolean);
-    ok('22.1 app.js is NOT in the diff ⇒ Chart, Performance, Reader and Preview cannot have moved',
-      files.indexOf('app.js') === -1, files.join(' '));
-    ok('22.2 index.html / version.json untouched (no bundle change ⇒ no bump needed)',
-      files.indexOf('index.html') === -1 && files.indexOf('version.json') === -1, files.join(' '));
+    // The four surfaces this SPEC must not move, pinned by BYTE-IDENTITY of their own
+    // bodies instead of by "app.js is absent from the diff". The old form died the moment
+    // any other SPEC legitimately edited a different part of the 3.5 MB bundle — which is
+    // exactly what UNKNOWN QUANTITY INTEGRITY does — and an assertion that cannot survive
+    // a legitimate edit elsewhere stops being evidence. This form keeps the teeth: touch
+    // Chart, Performance, Reader or Preview and it goes red.
+    const FRONTEND_OWNERS = ['buildValidatedHistoricalSeries', '_aurixResolveFinalRenderSeriesContract',
+      'computePerformanceSnapshot', '_aurixComputePerformanceStateCandidate',
+      '_aurixNormalizeBackendSnapshot', '_aurixMergeSnapshotSources', '_aurixHistorySourceForDisplay',
+      '_aurixCatHistWindow', '_aurixIntelligencePreviewFacts', '_aurixIntelligencePreviewHTML'];
+    const bodyOf = (src, n) => { const s = 'function ' + n + '('; const i = src.indexOf(s); if (i < 0) return null;
+      let k = src.indexOf('{', i), d = 0; for (; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}') { d--; if (!d) return src.slice(i, k + 1); } } return null; };
+    ok('22.1 Chart, Performance, Reader and Preview are byte-identical to ' + BASELINE + ' (they cannot have moved)',
+      (function () {
+        let base = null;
+        try { base = cp.execSync('git show ' + BASELINE + ':app.js', { cwd: ROOT, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }).toString('utf8'); } catch (e) { return false; }
+        const cur = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
+        return FRONTEND_OWNERS.every(n => { const a = bodyOf(base, n), b = bodyOf(cur, n); return !!a && !!b && a === b; });
+      })(),
+      FRONTEND_OWNERS.join(','));
+    ok('22.2 the four bundle-version sources are COHERENT (a bundle change carried a complete bump)',
+      (function () {
+      // Re-anchored: "index.html / version.json untouched" was a claim about a rolling
+      // baseline, so a LATER SPEC that legitimately changes the bundle — and is OBLIGED by
+      // the cache-bust contract to bump it — turned this red for the right change. The
+      // durable invariant is not "untouched", it is COHERENT: if the bundle moved, every one
+      // of the four version sources moved together. A partial bump is the actual failure mode
+      // (memory records __AURIX_APPJS_VERSION__ as the one that gets forgotten), and this
+      // catches it whether or not any baseline is reachable.
+      const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+      const ver = JSON.parse(fs.readFileSync(path.join(ROOT, 'version.json'), 'utf8'));
+      const appSrc = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
+      const m1 = idx.match(/var APPJS_V = '(\d+)';/);
+      const m2 = idx.match(/app\.js\?v=(\d+)/);
+      const m3 = appSrc.match(/window\.__AURIX_APPJS_VERSION__ = '(\d+)';/);
+      if (!m1 || !m2 || !m3) return false;
+      const all = [String(ver.appjs), m1[1], m2[1], m3[1]];
+      return all.every(v => v === all[0]) && /var BUILD = '[^']+';/.test(idx)
+        && idx.indexOf(String(ver.build)) !== -1;
+    })());
     // git diff omits UNTRACKED files, so the previous form of this check passed on an
     // empty list — vacuously. Status includes them, so the confinement claim is real.
     let status = null;
@@ -559,10 +595,18 @@ console.log('\n22–25 · Chart, Performance, Category History Reader, Preview V
     // for the wrong reason (it just did, on SPEC 2.8). What is permanent is the DENY-list:
     // the frontend owners this SPEC must never reach. The anti-weakening protection that
     // motivated the enumeration lives in 22.5, which is behavioural, not a name list.
-    const FORBIDDEN = ['app.js', 'index.html', 'version.json', 'styles.css', 'login.html'];
-    ok('22.3 no frontend owner is in the change set (Chart, Performance, Reader, Preview)',
-      touched.length > 0 && FORBIDDEN.every(f => touched.indexOf(f) === -1),
-      touched.filter(f => FORBIDDEN.indexOf(f) !== -1).join(' ') || 'none');
+    // …and the DENY-list rotted too, for the same reason and one SPEC later: a rolling
+    // baseline makes "the change set" include every later SPEC's legitimate work, and
+    // UNKNOWN QUANTITY INTEGRITY edits app.js ON PURPOSE (plus the cache-bust files that
+    // an app.js edit obliges). Naming files therefore proves nothing about THIS SPEC.
+    // The teeth are RELOCATED, not removed: 22.1 now pins the four frontend owners by
+    // byte-identity, and the claim below is the baseline-independent one — this SPEC's own
+    // files may not so much as NAME a frontend owner in executable code. Both are stronger
+    // than a file list because neither can be satisfied by an empty or stale diff.
+    ok('22.3 no file of this SPEC references a frontend owner IN CODE (Chart, Performance, Reader, Preview)',
+      touched.length > 0
+      && !/\bapp\.js\b|switchTab|buildProductionPortfolioChart|_aurixCatHist|_aurixIntelligencePreview|_aurixSalvageHolding/.test(TS_EXEC + SQL_CODE),
+      'touched=' + touched.length);
     ok('22.4 the three deliverables of this SPEC are all present in the change set',
       ['supabase/functions/portfolio-snapshot/index.ts', 'db/portfolio_snapshot_user_health_1.sql',
        'docs/AURIX-SNAPSHOT-USER-HEALTH-harness.js'].every(f => touched.indexOf(f) !== -1),

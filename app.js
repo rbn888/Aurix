@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '636'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '637'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -10734,11 +10734,28 @@ function convertToNewModel(flatAssets) {
 // a degraded display. Only a genuinely EMPTY orphan (no qty, no transactions, no cost) is
 // dropped. Intentionally-deleted assets have no holding row, so they are never resurrected.
 function _aurixSalvageHolding(h, fallbackById) {
-  const qty  = Number(h.quantity) || 0;
+  // SPEC UNKNOWN QUANTITY INTEGRITY — `Number(h.quantity) || 0` LAUNDERED an unknown quantity into a
+  // finite 0 before any contract could see it, and this is the one path that then WRITES it back:
+  // convertToNewFormat persists `quantity: a.qty`, so the unknown was destroyed on disk as a real 0
+  // and from then on the server skipped it in silence too — parity preserved, truth lost. Salvaged as
+  // 0 the position also stopped counting as active, so the completeness gate reported COMPLETE and
+  // certified a total with the position missing: DEFECT 1 through the orphan door.
+  // The raw value is preserved instead, so the canonical rule downstream declares it INVALID rather
+  // than this function inventing a quantity. `|| 0` is kept for costBasis: that is a different
+  // contract (a cost of 0 is meaningful and is what the "nothing to preserve" test below reads).
+  const qtyCanon = _aurixUsableQuantity(h.quantity);
+  const qtyKnown = Number.isFinite(qtyCanon);
+  const qty  = qtyKnown ? qtyCanon : h.quantity;
   const cost = Number(h.costBasis) || 0;
   const tx   = Array.isArray(h.transactions) ? h.transactions : [];
   const fb   = fallbackById && (fallbackById[h.asset_id] || fallbackById[h.id]);
-  if (!fb && qty === 0 && cost === 0 && tx.length === 0) return null;   // nothing to preserve
+  // "Nothing to preserve" now also covers an UNKNOWN quantity that carries no cost and no
+  // transactions: an orphan with no financial content whatsoever is still discarded, so a scrap of
+  // garbage cannot block every future snapshot of the account. What is preserved — and therefore
+  // declared INVALID downstream instead of silently valued — is an unknown quantity that DOES carry
+  // financial content (a cost basis, transactions, or a legacy mirror entry). A known positive
+  // quantity is preserved exactly as before; a known 0 is discarded exactly as before.
+  if (!fb && cost === 0 && tx.length === 0 && !(qtyKnown && qtyCanon > 0)) return null;
   if (fb) {
     // Full recovery from the legacy mirror; the holding stays authoritative for the financials.
     return Object.assign({}, fb, {
@@ -11367,6 +11384,38 @@ function realizedPnLUSD(asset) {
 // duplicate is ever created.
 function isClosedAsset(a) { return !!a && a.lifecycleStatus === 'closed'; }
 function activeAssets()   { return Array.isArray(assets) ? assets.filter(a => !isClosedAsset(a)) : []; }
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC UNKNOWN QUANTITY INTEGRITY — the canonical "is this a real QUANTITY?" rule
+// ════════════════════════════════════════════════════════════════════════════
+// UNKNOWN ≠ ZERO, applied to the OTHER factor of the valuation. `Number()` erases
+// exactly the distinction that matters and does it silently: Number(null),
+// Number(''), Number('   '), Number(false) and Number([]) are all 0 and FINITE, so
+// a holding whose quantity nobody knew landed in the `qty === 0` branch and was
+// filed as a CLOSED POSITION — dropped from the total with nothing marked wrong, so
+// the completeness contract reported COMPLETE and the total was certified with the
+// position simply missing. Silently understated patrimony. And in the other
+// direction Number(true) is 1 and Number([5]) is 5: a boolean or a wrapped array
+// FABRICATED a quantity and was valued as a real position.
+// Three states in one number: > 0 valid, 0 a real zero, NaN invalid. This is NOT
+// usableFactor/priceMissing — those reject 0, and a quantity of 0 is a legitimate
+// closed position that must keep being ignored in silence. Two contracts.
+// A negative collapses into INVALID here too, so the client stops publishing a total
+// built on it (it used to show 850 for a valid 1000 plus a qty −3) while the
+// completeness gate already refused the snapshot — that was the divergence.
+// BYTE-ALIGNED with usableQuantity in supabase/functions/portfolio-snapshot/index.ts:
+// server and client must never interpret the same stored value differently.
+function _aurixUsableQuantity(raw) {
+  if (typeof raw === 'number') return (Number.isFinite(raw) && raw >= 0) ? raw : NaN;   // >= 0 keeps 0 and -0
+  if (typeof raw === 'string') {
+    const t = raw.trim();
+    if (!t) return NaN;                                                                 // '' / '   ' are UNKNOWN, not zero
+    const n = Number(t);
+    return (Number.isFinite(n) && n >= 0) ? n : NaN;
+  }
+  return NaN;                                                                           // null/undefined/boolean/object/array
+}
+try { if (typeof window !== 'undefined') window._aurixUsableQuantity = _aurixUsableQuantity; } catch (_) {}
 function _closePosition(asset, ts) {
   if (!asset) return;
   asset.qty             = 0;
@@ -11386,7 +11435,16 @@ function totalValueUSD() {
   // F2-A: skip uncovered-FX assets (assetValueUSD → NaN) so one exotic currency
   // can never NaN-poison the whole total — covered portion only, never invented.
   // USD/EUR-only portfolios are unaffected (nothing is NaN).
-  return activeAssets().reduce((sum, a) => { const v = assetValueUSD(a); return Number.isFinite(v) ? sum + v : sum; }, 0);
+  // SPEC UNKNOWN QUANTITY INTEGRITY — a position whose QUANTITY is not a real quantity
+  // is skipped on exactly the same "covered portion only" principle. Without this the
+  // published total contradicted the completeness gate it is supposed to agree with: a
+  // qty −3 beside a valid 1000 made this return 850 while _aurixAssessValuationCompleteness
+  // correctly refused the snapshot, so the hero showed a number no contract had certified.
+  // The canonical rule is REUSED, not restated — this is not a second valuation engine.
+  return activeAssets().reduce((sum, a) => {
+    if (!Number.isFinite(_aurixUsableQuantity(a && a.qty))) return sum;
+    const v = assetValueUSD(a); return Number.isFinite(v) ? sum + v : sum;
+  }, 0);
 }
 
 function totalValueBase() { return toBase(totalValueUSD(), 'USD'); }
@@ -11402,7 +11460,12 @@ function totalValueBase() { return toBase(totalValueUSD(), 'USD'); }
 // only real_estate is excluded.
 function isInvestableAsset(a) { return _aurixCategoryBucket(a) !== 'real_estate'; }
 function investableAssets()   { return activeAssets().filter(isInvestableAsset); }
-function investableValueUSD()  { return investableAssets().reduce((sum, a) => { const v = assetValueUSD(a); return Number.isFinite(v) ? sum + v : sum; }, 0); }
+function investableValueUSD()  {
+  // SPEC UNKNOWN QUANTITY INTEGRITY — same quantity contract as totalValueUSD. This is the
+  // base the Hero and the chart actually render, so it is the one that must not publish a
+  // figure built on a quantity the completeness gate calls invalid.
+  return investableAssets().reduce((sum, a) => { if (!Number.isFinite(_aurixUsableQuantity(a && a.qty))) return sum; const v = assetValueUSD(a); return Number.isFinite(v) ? sum + v : sum; }, 0);
+}
 function investableValueBase() { return toBase(investableValueUSD(), 'USD'); }
 
 // WN.5 — canonical investable portfolio value (USD). The Dashboard chart, its
@@ -11446,14 +11509,22 @@ function _aurixAssessValuationCompleteness(list) {
     for (const a of src) {
       if (!a) continue;
       const isCash = a.type === 'cash';
-      // economic quantity: cash carries its amount via liquidityNominal, everything else via qty.
-      let qty;
-      if (isCash) { try { qty = Number(typeof liquidityNominal === 'function' ? liquidityNominal(a) : a.qty); } catch (_) { qty = NaN; } }
-      else { qty = Number(a.qty); }
+      // SPEC UNKNOWN QUANTITY INTEGRITY — the economic quantity is read from the RAW field
+      // through the canonical rule, BEFORE any coercion. Both previous readings went through
+      // `Number()`, and for cash through `liquidityNominal` whose `|| 0` erased it a second
+      // time, so null / '' / '   ' / false became a finite 0, hit the `qty === 0` skip below
+      // and were filed as closed positions: the assessment then reported COMPLETE over a
+      // portfolio it had silently stopped counting. Cash carries its amount in the same
+      // `qty` field (liquidityNominal is only `Number(a.qty || 0)`), so one rule serves both.
+      // NOT wrapped in try/catch on purpose: the previous cash branch needed one because it
+      // reached for `liquidityNominal`, and swallowing the failure turned a broken helper into
+      // "every position is invalid" — a silent, portfolio-wide fail-closed that reads like data.
+      // This helper is pure type inspection in this same file and cannot throw.
+      const qty = _aurixUsableQuantity(a.qty);
       if (qty === 0) continue;                                   // zero-quantity position — legitimately excluded
       const sid = String(a.symbol || a.ticker || a.id || a.name || 'unknown');
       out.totalActive++;
-      if (!Number.isFinite(qty)) { out.invalid++; out.missing.push(sid); continue; }   // non-finite quantity = invalid holding
+      if (!Number.isFinite(qty)) { out.invalid++; out.missing.push(sid); continue; }   // unknown/invalid/negative quantity = invalid holding
       // FX coverage (never assume EUR; unknown currency ⇒ uncovered)
       const curr = String(a.assetCurrency || 'USD').toUpperCase();
       const fxUnknown = (curr !== 'USD' && curr !== 'EUR' && typeof _aurixFxStatus === 'function' && _aurixFxStatus(curr) === 'unknown');
@@ -11515,7 +11586,12 @@ function computePositionPerformance(position) {
   const p = position || {};
   const id = (p.id != null) ? p.id : null;
   const category = (p.category != null) ? p.category : null;
-  const qtyN = Number(p.quantity);
+  // SPEC UNKNOWN QUANTITY INTEGRITY — the coercion was happening TWICE. This utility's own contract
+  // already uses `quantity: null` to mean UNKNOWN (see the line below, and _aurixPositionFromAsset),
+  // but `Number(null)` is 0, so the unknown was resurrected as a finite zero right here: currentValue
+  // became 0 instead of null and the row was graded 'ready' with a published −100,00% return. Reading
+  // through the canonical rule keeps unknown unknown, so the state falls to 'missing_price'.
+  const qtyN = _aurixUsableQuantity(p.quantity);
   const quantity = Number.isFinite(qtyN) ? qtyN : null;
   const priceN = Number(p.currentPrice);
   const priceMissing = !Number.isFinite(priceN) || priceN <= 0;
@@ -11561,7 +11637,15 @@ function computeCategoryPerformance(positions) {
 // SAME native primitives as assetPnLBase (qty, price, costBasis) so the aggregate reconciles with the rows.
 function _aurixPositionFromAsset(asset) {
   const a = asset || {};
-  const qty = Number(a.qty), price = Number(a.price), cost = Number(a.costBasis);
+  // SPEC UNKNOWN QUANTITY INTEGRITY — this boundary publishes a RETURN PERCENTAGE, not a display
+  // component, so it gets the canonical quantity rule too. `Number(a.qty)` made an unknown quantity
+  // a FINITE 0, so `currentValue` became 0 instead of null and computePositionPerformance graded the
+  // row 'ready' — the category header then printed a real "−100,00%" over a position nobody could
+  // value. That is the −24% class of defect: a return published on partial data. With the canonical
+  // rule the quantity is NaN, `currentValue` is null and the state falls to 'missing_price', which
+  // the UI already renders as "Rendimiento no disponible". `price` and `cost` keep reading through
+  // Number() on purpose: they are governed by their own contracts, not by this one.
+  const qty = _aurixUsableQuantity(a.qty), price = Number(a.price), cost = Number(a.costBasis);
   const avg = (typeof avgBuyPrice === 'function') ? avgBuyPrice(a) : null;
   // GOLD-PNL-UNIT-1: category performance computes currentValue = quantity × currentPrice.
   // For gold the true value is grams × purity ÷ OZ_TO_G × pricePerOz, so feed a currentPrice
@@ -13051,6 +13135,16 @@ function recomputeDerivedFinancialState(source = 'unknown') {
                           : Array.isArray(assets)            ? assets
                           : []).filter(a => !isClosedAsset(a));
 
+    // SPEC UNKNOWN QUANTITY INTEGRITY — ONE list, derived once, for every figure that must agree
+    // with the total. The first version of this fix guarded `totalValue` alone and left
+    // allocations / exposure / assetCount reading the unfiltered list, so numerator and
+    // denominator stopped coming from the same filter: a fabricated `quantity: true` on a 3.000
+    // price gave totalValue 50.000 but exposure.crypto 53.000, and Workspace printed "crypto
+    // exposure 106%" — an impossible ratio, auto-rendered, worse than the 100% it printed before.
+    // `portfolioAssets` itself is deliberately NOT filtered: totalCostBasis and totalRealizedPnL
+    // have their own contracts and must keep seeing every open position.
+    const _valuableAssets = portfolioAssets.filter(a => Number.isFinite(_aurixUsableQuantity(a && a.qty)));
+    const _valuableSet    = new Set(_valuableAssets);   // membership in the loop below, not a rescan
     let totalValue        = 0;
     let totalCostBasis    = 0;
     let totalRealizedPnL  = 0;
@@ -13062,7 +13156,14 @@ function recomputeDerivedFinancialState(source = 'unknown') {
       // AURIX-DATA-001 (F2-cost) — value AND cost/realized all in USD, each
       // guarded so an uncovered-FX asset can't NaN-poison the aggregate (covered
       // portion only, never invented). USD/EUR portfolios stay byte-identical.
-      const _vUSD  = assetValueUSD(asset);
+      // SPEC UNKNOWN QUANTITY INTEGRITY — the SAME quantity contract as totalValueUSD /
+      // investableValueUSD, because this is the OTHER published total: Workspace renders it as
+      // PORTFOLIO.VALUE and the concentration/exposure percentages divide by it. Without this the
+      // two published totals disagreed — the Hero saying 1000 and this one 850 for the same
+      // portfolio — which is a worse failure than both being wrong together. Cost and realized P&L
+      // keep their own contracts; only the VALUE is governed by the quantity rule.
+      const _qtyOk = _valuableSet.has(asset);
+      const _vUSD  = _qtyOk ? assetValueUSD(asset) : NaN;
       const _cbUSD = costBasisUSD(asset);
       const _rpUSD = realizedPnLUSD(asset);
       if (Number.isFinite(_vUSD))  totalValue       += _vUSD;
@@ -13075,8 +13176,11 @@ function recomputeDerivedFinancialState(source = 'unknown') {
     const totalPnL           = totalUnrealizedPnL + totalRealizedPnL;
     const totalPnLPercent    = totalCostBasis > 0 ? (totalPnL / totalCostBasis) * 100 : 0;
 
-    const allocations = buildPortfolioAllocations(portfolioAssets, totalValue);
-    const exposure    = buildPortfolioExposure(portfolioAssets);
+    // Same list as the total, so every weight and every exposure percentage shares its denominator.
+    // A position nobody can value can no longer be named "dominant weight" nor inflate a category
+    // exposure above 100%.
+    const allocations = buildPortfolioAllocations(_valuableAssets, totalValue);
+    const exposure    = buildPortfolioExposure(_valuableAssets);
 
     const gainers = [...portfolioAssets]
       .filter(a => Number(a.change24h || 0) > 0)
@@ -13095,7 +13199,10 @@ function recomputeDerivedFinancialState(source = 'unknown') {
       totalPnLPercent,
       unrealizedPnL:   totalUnrealizedPnL,
       realizedPnL:     totalRealizedPnL,
-      assetCount:      portfolioAssets.length,
+      // Counts what the total actually values. Publishing a count that includes a position the
+      // total excludes is how "low diversification" (assetCount < 4) fires on a portfolio that
+      // has more positions than the count admits — or hides that one of them is unvaluable.
+      assetCount:      _valuableAssets.length,
       gainers:         Object.freeze(gainers),
       losers:          Object.freeze(losers),
       allocations:     Object.freeze(allocations),

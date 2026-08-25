@@ -32,7 +32,7 @@ vm.createContext(ctx);
 vm.runInContext('const OZ_TO_G = 31.1034768; const _PURITY_TABLE = {24:1,22:0.9167,21:0.875,18:0.75,14:0.5833,10:0.4167,9:0.375}; function liquidityNominal(a){ return a.qty; } function _aurixDisplayCategory(t){ return t === "metal" ? "metal" : String(t||""); }', ctx);
 ['_goldPurity', '_goldGrams', 'isClosedAsset', 'assetNativeValue', 'avgBuyPrice',
  'syncCostBasisFromTransactions', 'syncQtyFromTransactions', 'migrateLegacyAssetToTransactions',
- 'sanitizeTransactionPrices', 'assetPnLBase', '_aurixPositionFromAsset',
+ 'sanitizeTransactionPrices', 'assetPnLBase', '_aurixUsableQuantity', '_aurixPositionFromAsset',
  'computePositionPerformance', 'computeCategoryPerformance'].forEach(fn => vm.runInContext(fnSrc(fn), ctx));
 const G = (n) => vm.runInContext(n, ctx);
 const purity = G('_goldPurity');

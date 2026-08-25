@@ -21,6 +21,9 @@ const near = (a, b, eps) => Math.abs(a - b) <= (eps == null ? 1e-9 : eps);
 // ── extract the two PURE utilities and run them in a sandbox ─────────────────
 const ctx = { Number, Array, Object, Math, isFinite, parseInt, console: { log() {} } };
 vm.createContext(ctx);
+// SPEC UNKNOWN QUANTITY INTEGRITY — computePositionPerformance now reads the quantity through
+// the canonical rule, so the rule must be loaded with it or the real owner cannot run.
+vm.runInContext(fnSrc('_aurixUsableQuantity'), ctx);
 vm.runInContext(fnSrc('computePositionPerformance'), ctx);
 vm.runInContext(fnSrc('computeCategoryPerformance'), ctx);
 const CPP = (p) => vm.runInContext('computePositionPerformance', ctx)(p);

@@ -51,7 +51,11 @@ ok('fixture app investable value = 37000 USD', appInvestableUSD === 37000);
 console.log('\nEdge Function reads the SAME fields (source cross-check):');
 ok('selects the holdings column too', /select\('user_id, assets, holdings'\)/.test(edge));
 ok('joins holdings.asset_id → catalog.id (byId map)', /byId\.get\(h\.asset_id\)/.test(edge) && /catalog\.map\(\(a: any\) => \[a && a\.id, a\]\)/.test(edge));
-ok('qty from holdings.quantity (NOT assets.qty)', /Number\(h\.quantity\)/.test(edge) && !/Number\(a\.qty\)/.test(edge));
+// Re-anchored by SPEC UNKNOWN QUANTITY INTEGRITY: the FIELD is unchanged (holdings.quantity),
+// only the reader is — `Number()` was what erased UNKNOWN into 0, so it is now the canonical
+// usableQuantity(). The point of this assertion (quantity comes from holdings, never from the
+// catalog) is untouched, and the negative form still forbids reading a quantity off the asset.
+ok('qty from holdings.quantity (NOT assets.qty)', /usableQuantity\(h\.quantity\)/.test(edge) && !/Number\(a\.qty\)/.test(edge) && !/usableQuantity\(a\.qty\)/.test(edge));
 ok('price from catalog.currentPrice (through the usable-price rule)', /usableFactor\(asset\.currentPrice\)/.test(edge));
 ok('type/symbol/assetCurrency from catalog', /asset\.type/.test(edge) && /asset\.symbol/.test(edge) && /asset\.assetCurrency/.test(edge));
 

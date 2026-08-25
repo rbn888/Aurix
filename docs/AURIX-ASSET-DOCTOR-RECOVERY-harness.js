@@ -26,7 +26,7 @@ function makeEnv(opts){
     assets: opts.assets ? opts.assets.map(a=>Object.assign({},a)) : [],
     save:function(){ saveCalls++; }, render:function(){}, _mem:mem, _saveCalls:()=>saveCalls };
   vm.createContext(sb);
-  ['inferPriceSource','inferProviderId','_aurixSalvageHolding','_aurixLegacyFallbackById','convertToNewModel','convertFromNewToFlat','convertToLegacyFormat']
+  ['inferPriceSource','inferProviderId','_aurixUsableQuantity','_aurixSalvageHolding','_aurixLegacyFallbackById','convertToNewModel','convertFromNewToFlat','convertToLegacyFormat']
     .forEach(n=>{ try{ vm.runInContext(fn(n), sb); }catch(e){ console.log('load fail '+n+': '+e.message); } });
   vm.runInContext(DOCTOR_BLOCK, sb);
   return sb;

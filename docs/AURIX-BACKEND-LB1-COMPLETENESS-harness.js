@@ -18,13 +18,19 @@ console.log('AURIX-BACKEND-LB1-COMPLETENESS — SPEC CHART-INTEGRITY.LB-1 (serve
 console.log('Edge Function guard (source):');
 ok('1 `dropped` counter declared in valueUser', /let total = 0,[^;]*dropped = 0;/.test(edge));
 ok('2 orphan holding increments dropped', /if \(!asset\) \{ unpriced\+\+; dropped\+\+;/.test(edge));
-// Re-anchored by SPEC NEGATIVE QUANTITY FAIL-CLOSED: same intention, one clause wider. The guard now
-// also rejects a FINITE NEGATIVE quantity, which `Number()` accepted and which subtracted patrimony.
-// The `qty === 0` skip must keep PRECEDING it — 0 is a closed position, not corrupt data.
-ok('3 invalid quantity increments dropped: non-finite OR negative (qty===0 still excluded, not dropped)',
+// Re-anchored twice, same intention, progressively wider. NEGATIVE QUANTITY FAIL-CLOSED added the
+// negative; UNKNOWN QUANTITY INTEGRITY moved BOTH verdicts into usableQuantity, which classifies the
+// RAW value before `Number()` can turn null / '' / '   ' / false / [] into a finite 0 (and before
+// true / [5] can fabricate a quantity of 1 / 5). So the guard reads !Number.isFinite(qty) again, but
+// now over a canonically parsed quantity. The `qty === 0` skip must keep PRECEDING it — 0 is a closed
+// position, not corrupt data — and the canonical read must precede them both.
+ok('3 invalid quantity increments dropped: unknown OR negative OR non-finite (qty===0 still excluded, not dropped)',
   /if \(qty === 0\) continue;/.test(edge)
-  && /if \(!Number\.isFinite\(qty\) \|\| qty < 0\) \{ dropped\+\+;/.test(edge)
-  && edge.indexOf('if (qty === 0) continue;') < edge.indexOf('if (!Number.isFinite(qty) || qty < 0)'));
+  && /const qty = usableQuantity\(h\.quantity\);/.test(edge)
+  && /if \(!Number\.isFinite\(qty\)\) \{ dropped\+\+;/.test(edge)
+  && /function usableQuantity\(raw: any\): number \{/.test(edge)
+  && edge.indexOf('const qty = usableQuantity(h.quantity);') < edge.indexOf('if (qty === 0) continue;')
+  && edge.indexOf('if (qty === 0) continue;') < edge.indexOf('if (!Number.isFinite(qty))'));
 ok('4 non-finite value (missing price/FX, no fallback) increments dropped', /if \(!Number\.isFinite\(valueUSD\)\) \{ unpriced\+\+; dropped\+\+;/.test(edge));
 ok('5 valueUser returns dropped_asset_count', /dropped_asset_count: dropped/.test(edge));
 ok('6 insert is SKIPPED when dropped>0 (partial valuation never persisted)', /if \(Number\(v\.dropped_asset_count\) > 0\) \{ incompleteRej\+\+; noteHealth\([^;]*\); continue; \}/.test(edge));
@@ -42,11 +48,16 @@ function valueMirror(holdings, catalog, prices, fx) {
   for (const h of holdings) {
     const a = byId.get(h.asset_id);
     if (!a) { dropped++; continue; }                                   // orphan
-    const qty = Number(h.quantity);
+    // SPEC UNKNOWN QUANTITY INTEGRITY: the raw value is classified BEFORE coercion, exactly as the
+    // real owner does — `Number()` is what turned null / '' / '   ' / false / [] into a finite 0 and
+    // filed an unknown quantity as a closed position. Mirrored here so this mirror keeps matching the
+    // owner (which the dedicated gate executes). A negative shares the same INVALID verdict.
+    const uq = raw => { if (typeof raw === 'number') return (Number.isFinite(raw) && raw >= 0) ? raw : NaN;
+                        if (typeof raw === 'string') { const t = raw.trim(); if (!t) return NaN; const n = Number(t); return (Number.isFinite(n) && n >= 0) ? n : NaN; }
+                        return NaN; };
+    const qty = uq(h.quantity);
     if (qty === 0) continue;                                           // legit excluded
-    // SPEC NEGATIVE QUANTITY FAIL-CLOSED: a finite negative quantity is corrupt data, not a position.
-    // Mirrored here so this mirror keeps matching the real owner (which the dedicated gate executes).
-    if (!Number.isFinite(qty) || qty < 0) { dropped++; continue; }     // invalid qty
+    if (!Number.isFinite(qty)) { dropped++; continue; }                // invalid qty
     let v;
     // SPEC 2.8: non-USD cash with no FX is UNKNOWN. The old fallback multiplied the amount
     // by the asset's currentPrice as if it were a rate, and cash is stored with price = 1.

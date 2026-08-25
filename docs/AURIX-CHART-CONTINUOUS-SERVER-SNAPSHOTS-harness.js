@@ -28,6 +28,7 @@ function strip(s) {
     .split('function goldGrams(qty: number, unit: string): number {').join('function goldGrams(qty, unit) {')
     .split('function isUsEquityOpenNow(now: Date): boolean {').join('function isUsEquityOpenNow(now) {')
     .split('function usableFactor(v: any): number {').join('function usableFactor(v) {')
+    .split('function usableQuantity(raw: any): number {').join('function usableQuantity(raw) {')
     .split('async function fetchPrices(symbols: string[]): Promise<Map<string, { price: number; currency: string }>> {').join('async function fetchPrices(symbols) {')
     .split('function fxToUsd(cur: string, prices: Map<string, { price: number; currency: string }>): number {').join('function fxToUsd(cur, prices) {')
     .split('function valueUser(row: any, prices: Map<string, { price: number; currency: string }>, now: Date) {').join('function valueUser(row, prices, now) {')

@@ -53,6 +53,7 @@ ok('4 detail header also derives its % from computeCategoryPerformance', /comput
 (function () {
   const ctx = { Number, Array, Object, Math, isFinite, parseInt, console: { log() {} } };
   vm.createContext(ctx);
+  vm.runInContext(fnSrc('_aurixUsableQuantity'), ctx);   // SPEC UNKNOWN QUANTITY INTEGRITY dependency
   vm.runInContext(fnSrc('computePositionPerformance'), ctx);
   vm.runInContext(fnSrc('computeCategoryPerformance'), ctx);
   const CCP = ps => vm.runInContext('computeCategoryPerformance', ctx)(ps);

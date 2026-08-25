@@ -120,10 +120,34 @@ ok('9 _aurixApplyRangeSourceAuthority body untouched', noGate('_aurixApplyRangeS
 ok('9 _aurixTrustedChartSource body untouched', noGate('_aurixTrustedChartSource'));
 ok('9 _aurixHpqRawStages body untouched', noGate('_aurixHpqRawStages'));
 ok('9 FRC + renderer bodies untouched', noGate('_aurixResolveFinalRenderSeriesContract') && noGate('renderValidatedPortfolioChartWithInstitutionalRenderer'));
+// Re-anchored by SPEC UNKNOWN QUANTITY INTEGRITY. The previous form counted deletions in the
+// WORKING-TREE diff of app.js, which measured the wrong thing twice over: it reported 0 for any
+// COMMITTED change whatever its content (so it passed vacuously the moment SPEC.42 was committed),
+// and it turned red for any LATER SPEC's legitimate edit to an unrelated part of a 3.5 MB bundle
+// — which is what this SPEC does. What SPEC.42 actually claims is that its forensics is READ-ONLY
+// and changed no behaviour. That claim is stated in the code itself and is asserted here directly,
+// so it holds forever and cannot be satisfied by an empty diff.
 (function () {
-  const cp = require('child_process');
-  let del = 'err'; try { del = cp.execSync('git -C ' + JSON.stringify(root) + ' diff -- app.js | grep -E "^-" | grep -v "^---" | wc -l', { encoding: 'utf8' }).trim(); } catch (e) { del = 'giterr'; }
-  ok('9 app.js change purely additive (0 deletions)', del === '0', 'deletions=' + del);
+  const SPEC42 = /TEMPORAL_WINDOW_FORENSICS/;
+  const OWNERS = ['buildValidatedHistoricalSeries', '_aurixApplyRangeSourceAuthority', '_aurixTrustedChartSource',
+    '_aurixHpqRawStages', '_aurixResolveFinalRenderSeriesContract', 'renderValidatedPortfolioChartWithInstitutionalRenderer'];
+  // The adversarial review was right that `/readOnly: true/` is a self-declaration in a string,
+  // not evidence of read-onlyness. Measured instead: the audit core assigns to nothing outside its
+  // own locals — no write to a chart/selection global, no push into a persisted series.
+  ok('9 the audit core writes to no chart, selection or persistence owner (measured, not declared)',
+    (function () {
+      const i = app.indexOf('// SPEC DSH.CHART.TEMPORAL_WINDOW_FORENSICS.42');
+      if (i < 0) return false;
+      const core = app.slice(i, app.indexOf('\nfunction ', i + 200) + 1);
+      if (core.length < 500) return false;                       // non-vacuous: the core is really there
+      return !/\b(portfolioHistory|categoryHistory|_aurixBackendSnapshots|assets)\s*=[^=]/.test(core)
+        && !/\.(push|splice|unshift)\s*\(/.test(core.replace(/steps\.push\([^)]*\)/g, ''))
+        && !/localStorage\.setItem|supabaseClient\.from\(/.test(core);
+    })());
+  ok('9 the SPEC.42 symbol never appears inside a temporal-selection owner body',
+    OWNERS.every(n => !SPEC42.test(fnSrc(n))), OWNERS.filter(n => SPEC42.test(fnSrc(n))).join(','));
+  ok('9 the audit is reachable only through its own read-only entry point',
+    /window\.aurixAuditTemporalWindow/.test(app) && (app.match(/spec: 'DSH\.CHART\.TEMPORAL_WINDOW_FORENSICS\.42'/g) || []).length >= 2);
 })();
 
 console.log('\n' + (fail === 0 ? '✅' : '❌') + ' SPEC.42 TEMPORAL-WINDOW-FORENSICS — ' + pass + ' passed, ' + fail + ' failed');

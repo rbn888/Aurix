@@ -70,7 +70,7 @@ sb._aurixAssessValuationCompleteness = () => sb.__val;
 
 // ── real functions under test ────────────────────────────────────────────────
 vm.runInContext(konstSrc('_INT_PREVIEW_WATCH_ALLOWED'), sb);
-['isInvestableAsset','investableAssets','investableValueUSD','getInvestableDistribution',
+['_aurixUsableQuantity','isInvestableAsset','investableAssets','investableValueUSD','getInvestableDistribution',
  '_intRealEstatePresence','buildLiquidityView','_aurixHealthSnapshot','_intccWatchAreas',
  '_aurixIntelligencePreviewFacts','_aurixIntelligencePreviewHTML']
   .forEach(n => vm.runInContext(fnSrc(n), sb));

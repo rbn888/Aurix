@@ -31,7 +31,7 @@ function makeStore(){
     // the salvage layer in isolation, so the foreign-cache check is a pass-through stub here.
     _aurixCacheIsForeign:()=>false };
   vm.createContext(sb);
-  ['inferPriceSource','inferProviderId','_aurixSalvageHolding','_aurixLegacyFallbackById',
+  ['inferPriceSource','inferProviderId','_aurixUsableQuantity','_aurixSalvageHolding','_aurixLegacyFallbackById',
    'convertToNewModel','convertFromNewToFlat','convertToLegacyFormat','getPortfolioData','load']
     .forEach(name=>{ try { vm.runInContext(fn(name), sb); } catch(e){ console.log('load fail '+name+': '+e.message); } });
   // saveData has destructured params (breaks the brace-matcher); replicate it faithfully
