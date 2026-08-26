@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '646'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '647'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4852,6 +4852,12 @@ const T = {
     // una barra se leían mal ("la cripto 39%").
     // ── SPEC INT.06 ────────────────────────────────────────────────────────────
     intv6_radar_legend: 'Peso de cada clase de activo sobre tu patrimonio invertible.',
+    intv6_r_effective_days: n => `los últimos ${n} ${n === 1 ? 'día' : 'días'} registrados`,
+    intv6_radar_residual: pct => `Otros activos sin clasificar: ${pct}% de tu patrimonio invertible.`,
+    intv6_comp_title: 'Composición',
+    intv6_comp_legend: 'Peso de cada clase de activo sobre tu patrimonio invertible.',
+    intv6_comp_single: 'Todo tu patrimonio invertible está en una sola clase de activo.',
+    intv6_comp_pending: 'Aurix necesita poder valorar tus posiciones para leer tu composición.',
     intv6_memory_accruing: 'Aurix está acumulando tu historia patrimonial.',
     intv6_memory_accruing_sub: 'Todavía no hay suficientes eventos registrados para construir tu memoria. Cada observación que Aurix guarda la hace más profunda.',
     intv5_cat_stock: 'Bolsa', intv5_cat_etf: 'ETF', intv5_cat_fund: 'Fondos',
@@ -7127,6 +7133,12 @@ const T = {
     // Standalone bar labels (the sentence forms carry articles in Spanish).
     // SPEC INT.06
     intv6_radar_legend: 'Weight of each asset class in your investable wealth.',
+    intv6_r_effective_days: n => `the last ${n} recorded ${n === 1 ? 'day' : 'days'}`,
+    intv6_radar_residual: pct => `Unclassified other assets: ${pct}% of your investable wealth.`,
+    intv6_comp_title: 'Composition',
+    intv6_comp_legend: 'Weight of each asset class in your investable wealth.',
+    intv6_comp_single: 'All of your investable wealth sits in a single asset class.',
+    intv6_comp_pending: 'Aurix needs to be able to value your positions before it can read your composition.',
     intv6_memory_accruing: 'Aurix is accumulating your wealth history.',
     intv6_memory_accruing_sub: 'There are not enough recorded events yet to build your memory. Every observation Aurix stores makes it deeper.',
     intv5_cat_stock: 'Equities', intv5_cat_etf: 'ETFs', intv5_cat_fund: 'Funds',
@@ -26072,6 +26084,7 @@ function _aurixInvestablePerformance(range) {
     range: r, valid: false, returnPct: null, startAt: null, endAt: null,
     startValue: null, endValue: null, observations: 0, flowCount: 0,
     externalFlowCount: 0, tradeFlowCount: 0, confidence: null, basis: 'investable-twr', fallbackReason: null,
+    spanMs: null, nominalMs: null, coversNominal: null,
   };
   try {
     // 1 · AUTHORITATIVE INVESTABLE SERIES (real estate already excluded).
@@ -26092,6 +26105,19 @@ function _aurixInvestablePerformance(range) {
 
     const tFirst = pts[0].ts, tLast = pts[pts.length - 1].ts;
     out.startAt = tFirst; out.endAt = tLast;
+    // INT.06B — HOW MUCH OF THE NOMINAL WINDOW WAS ACTUALLY MEASURED.
+    // The arithmetic was always right, but the LABEL could overstate: measured on
+    // real code, a portfolio with 4 days of history returned valid 7D with a span
+    // of 4.00 days, which INT.04 then published as "en los últimos 7 días". Sparse
+    // snapshots can do the same on any range. The threshold is NOT invented here:
+    // `_AURIX_WN12_MIN_SPAN_RETENTION` (0.8) is the boundary this codebase already
+    // adopted for "a window stops being authoritative for its range".
+    const _nominal = { '24h': 864e5, '7d': 6048e5, '30d': 2592e6, '90d': 7776e6, '1y': 31536e6 }[String(r).toLowerCase()] || null;
+    out.spanMs = tLast - tFirst;
+    out.nominalMs = _nominal;
+    out.coversNominal = (_nominal == null)
+      ? true                                            // 'all' has no nominal span to fall short of
+      : (out.spanMs / _nominal) >= _AURIX_WN12_MIN_SPAN_RETENTION;
     out.startValue = +pts[0].value.toFixed(2);
     out.endValue   = +pts[pts.length - 1].value.toFixed(2);
 
@@ -26382,7 +26408,8 @@ function _aurixFactLedger(opts) {
       causalRoot: _AURIX_CAUSAL_ROOT.INVESTABLE_RETURN,
       value: p.returnPct, unit: 'percent',
       values: { returnPct: p.returnPct, startValue: p.startValue, endValue: p.endValue, flowCount: p.flowCount },
-      window: { range: pr, startAt: p.startAt, endAt: p.endAt, observations: p.observations },
+      window: { range: pr, startAt: p.startAt, endAt: p.endAt, observations: p.observations,
+                spanMs: p.spanMs, coversNominal: p.coversNominal !== false },
       source: 'aurixInvestablePerformance',
       direction: p.returnPct > 0 ? 'up' : (p.returnPct < 0 ? 'down' : 'flat'),
       positive: p.returnPct > 0,
@@ -50992,6 +51019,17 @@ function _intv4RangeLabel(range) {
                 '90d': 'intv4_r_90d', 'all': 'intv4_r_all', 'now': 'intv4_r_now' };
   return map[k] ? _intv4T(map[k]) : '';
 }
+// INT.06B — the window a fact may CLAIM. If the measured span does not cover its
+// nominal range (sparse snapshots, short history), the nominal name is a lie, so
+// the EFFECTIVE window is named instead. Never silently keeps the nominal label.
+function _intv4WindowLabel(win) {
+  if (!win) return '';
+  if (win.coversNominal === false && Number.isFinite(win.spanMs) && win.spanMs > 0) {
+    const days = Math.max(1, Math.round(win.spanMs / 864e5));
+    return _intv4T('intv6_r_effective_days', days);
+  }
+  return _intv4RangeLabel(win.range);
+}
 function _intv4CatLabel(cat) {
   const k = 'intv4_cat_' + String(cat || '');
   const v = _intv4T(k);
@@ -51008,7 +51046,7 @@ function _intv5CatLabel(cat) {
 function _intv4FactText(fact) {
   if (!fact || !fact.semanticKey) return '';
   const k = fact.semanticKey, v = fact.values || {};
-  const win = _intv4RangeLabel(fact.window && fact.window.range);
+  const win = _intv4WindowLabel(fact.window);
   if (/^investable_return_/.test(k))   return _intv4T('intv4_f_return', _intv4Num(fact.value, 2), win);
   if (k === 'return_positive')         return _intv4T('intv4_f_return_pos', _intv4Num(fact.value, 2));
   if (k === 'investable_level')        return _intv4T('intv4_f_level', _intv4Money(fact.value));
@@ -51076,7 +51114,7 @@ function _intv4StoryHtml(story, esc, depth) {
              data-root="${esc(story.causalRoot)}" data-fact="${esc(story.semanticKey)}">
       <p class="intv4-story-head">${esc(head)}</p>
       ${why ? `<p class="intv4-story-why">${esc(why)}</p>` : ''}
-      ${showWin ? `<p class="intv4-story-meta">${esc(_intv4T('intv4_window', _intv4RangeLabel(story.window.range)))}</p>` : ''}
+      ${showWin ? `<p class="intv4-story-meta">${esc(_intv4T('intv4_window', _intv4WindowLabel(story.window)))}</p>` : ''}
       ${advanced && support.length ? `
         <details class="intv4-more">
           <summary class="intv4-more-sum">${esc(_intv4T('intv4_supporting'))}</summary>
@@ -51445,36 +51483,69 @@ function _intv5StructureHtml(core, esc) {
 // long spike and a spread portfolio a small even shape. That is the honest
 // reading of a composition map and is labelled as such — it is NOT a quality
 // score, and a bigger polygon does not mean "better".
-const _INTV6_RADAR_MAX_AXES = 5;
-const _INTV6_RADAR_MIN_AXES = 3;
+// FOUNDER DECISION (INT.06B): the pentagon ALWAYS renders. The five dimensions are
+// FIXED — the canonical investable asset classes — and what varies is the LENGTH of
+// each axis according to the real datum. A class with no weight sits at 0%, i.e. at
+// the centre. The radar never disappears because a class is missing.
+//
+// This is honest, and it is what finally makes the module unconditional: a class
+// the user does not hold genuinely IS 0% of their investable wealth, so drawing it
+// at the centre states a fact rather than inventing a dimension. Nothing is
+// normalised, scored or padded — the value is the measured percentage.
+//
+// Still forbidden, and asserted by the gate: the old `Growth` fabricated from
+// composition (45 + cryptoPct*0.25), the saturating 55 + pct*2.2, and axes that
+// merely restate the top position.
+//
+// `other` is deliberately NOT one of the five (it is a residual bucket, not an
+// asset class), so when it carries weight it is reported as a caption instead of
+// being silently dropped — the axes must never hide wealth.
+const _INTV6_RADAR_CLASSES = Object.freeze(['crypto', 'stock', 'etf', 'metal', 'cash']);
+const _INTV6_RADAR_RESIDUAL = 'other';
 function _intv6RadarDims() {
-  const out = { dims: [], values: {}, status: 'unavailable' };
-  let dist = [];
-  try { dist = (typeof getInvestableDistribution === 'function') ? (getInvestableDistribution() || []) : []; }
-  catch (_) { dist = []; }
-  const rows = dist
-    .filter(d => d && !d.nonInvestable && Number.isFinite(d.pct) && d.pct > 0)
-    .slice(0, _INTV6_RADAR_MAX_AXES);
-  if (rows.length < _INTV6_RADAR_MIN_AXES) { out.status = 'insufficient_classes'; return out; }
-  for (const d of rows) {
-    const key = 'cls_' + String(d.type);
-    const meta = (typeof TYPE_META !== 'undefined' && TYPE_META[d.type]) ? TYPE_META[d.type] : null;
-    out.dims.push({ key, suffix: '%', label: (meta && (meta.donutLabel || meta.label)) || String(d.type) });
-    out.values[key] = Math.round(d.pct);          // rounding only; no derivation
+  const out = { dims: [], values: {}, status: 'unavailable', residualPct: 0, presentClasses: 0 };
+  let dist = null;
+  try { dist = (typeof getInvestableDistribution === 'function') ? getInvestableDistribution() : null; }
+  catch (_) { dist = null; }
+  // Fail closed ONLY when the distribution itself cannot be read: with no valuation
+  // we do not know a class is 0%, we simply do not know. That is different from a
+  // class the user genuinely does not hold.
+  if (!Array.isArray(dist) || !dist.length) { out.status = 'unavailable'; return out; }
+  const pctByType = {};
+  for (const d of dist) {
+    if (!d || d.nonInvestable || !Number.isFinite(d.pct)) continue;
+    pctByType[String(d.type)] = (pctByType[String(d.type)] || 0) + d.pct;
   }
+  for (const cls of _INTV6_RADAR_CLASSES) {
+    const meta = (typeof TYPE_META !== 'undefined' && TYPE_META[cls]) ? TYPE_META[cls] : null;
+    const pct = Math.round(pctByType[cls] || 0);         // rounding only; no derivation
+    out.dims.push({ key: 'cls_' + cls, suffix: '%',
+                    label: (meta && (meta.donutLabel || meta.label)) || cls });
+    out.values['cls_' + cls] = pct;
+    if (pct > 0) out.presentClasses++;
+  }
+  out.residualPct = Math.round(pctByType[_INTV6_RADAR_RESIDUAL] || 0);
   out.status = 'ok';
   return out;
 }
 function _intv6RadarHtml(esc) {
   const r = _intv6RadarDims();
-  if (r.status !== 'ok') return '';               // no polygon rather than a degenerate one
+  if (r.status !== 'ok') {
+    // No valuation at all ⇒ we cannot claim 0% for anything. Honest hold.
+    return `
+      <section class="intcc-card intcc-radar intv6-radar" data-state="hold">
+        <h3 class="intcc-card-title">${esc(_intv4T('intcc_radar_title'))}</h3>
+        <p class="intcc-empty-body">${esc(_intv4T('intv6_comp_pending'))}</p>
+      </section>`;
+  }
   const svg = _intccRadarSvg(r.values, r.dims);
-  if (!svg) return '';
   return `
-    <section class="intcc-card intcc-radar intv6-radar" data-axes="${r.dims.length}">
+    <section class="intcc-card intcc-radar intv6-radar" data-axes="${r.dims.length}"
+             data-state="radar" data-present="${r.presentClasses}">
       <h3 class="intcc-card-title">${esc(_intv4T('intcc_radar_title'))}</h3>
       <p class="intv6-radar-legend">${esc(_intv4T('intv6_radar_legend'))}</p>
       <div class="intcc-radar-wrap">${svg}</div>
+      ${r.residualPct > 0 ? `<p class="intv6-radar-residual">${esc(_intv4T('intv6_radar_residual', r.residualPct))}</p>` : ''}
     </section>`;
 }
 

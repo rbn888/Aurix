@@ -1,6 +1,6 @@
 {
-  "url": "https://app.aurixsystem.io/",
-  "at": "2026-08-26T19:03:18.090Z",
+  "url": "http://127.0.0.1:8843/",
+  "at": "2026-08-26T19:33:58.064Z",
   "rows": [
     {
       "vp": "mobile",
@@ -46,9 +46,9 @@
           "ov": "visible"
         },
         {
-          "w": 235,
-          "sw": 235,
-          "cw": 235,
+          "w": 280,
+          "sw": 280,
+          "cw": 280,
           "d": "block",
           "ws": "normal",
           "ov": "visible"
@@ -70,7 +70,7 @@
           "ov": "visible"
         }
       ],
-      "wowText": "Tienes 12 posiciones, pero tu diversificación efectiva equivale a unas 2,3",
+      "wowText": "Han mejorado 2 dimensiones independientes de tu patrimonio a la vez",
       "wowRepeatsHead": false,
       "stories": 3,
       "questions": 4,
@@ -124,12 +124,23 @@
       ],
       "heroAlign": null,
       "radarAxes": 5,
+      "compState": "radar",
+      "radarVals": [
+        85,
+        0,
+        0,
+        0,
+        15
+      ],
+      "radarZeros": 3,
+      "emptyGridGap": false,
+      "gapPx": 0,
       "radarLabels": [
         "Cripto",
         "Acciones",
-        "Liquidez",
         "Fondos",
-        "Metales"
+        "Metales",
+        "Liquidez"
       ],
       "bodyBg": "rgb(4, 5, 7)"
     },
@@ -176,9 +187,9 @@
           "ov": "visible"
         },
         {
-          "w": 243,
-          "sw": 243,
-          "cw": 243,
+          "w": 294,
+          "sw": 294,
+          "cw": 294,
           "d": "block",
           "ws": "normal",
           "ov": "visible"
@@ -200,7 +211,7 @@
           "ov": "visible"
         }
       ],
-      "wowText": "Tienes 12 posiciones, pero tu diversificación efectiva equivale a unas 2,3",
+      "wowText": "Han mejorado 2 dimensiones independientes de tu patrimonio a la vez",
       "wowRepeatsHead": false,
       "stories": 3,
       "questions": 4,
@@ -246,12 +257,23 @@
       ],
       "heroAlign": 1,
       "radarAxes": 5,
+      "compState": "radar",
+      "radarVals": [
+        85,
+        0,
+        0,
+        0,
+        15
+      ],
+      "radarZeros": 3,
+      "emptyGridGap": false,
+      "gapPx": 0,
       "radarLabels": [
         "Cripto",
         "Acciones",
-        "Liquidez",
         "Fondos",
-        "Metales"
+        "Metales",
+        "Liquidez"
       ],
       "bodyBg": "rgb(4, 5, 7)"
     },
@@ -298,9 +320,9 @@
           "ov": "visible"
         },
         {
-          "w": 243,
-          "sw": 243,
-          "cw": 243,
+          "w": 294,
+          "sw": 294,
+          "cw": 294,
           "d": "block",
           "ws": "normal",
           "ov": "visible"
@@ -322,7 +344,7 @@
           "ov": "visible"
         }
       ],
-      "wowText": "Tienes 12 posiciones, pero tu diversificación efectiva equivale a unas 2,3",
+      "wowText": "Han mejorado 2 dimensiones independientes de tu patrimonio a la vez",
       "wowRepeatsHead": false,
       "stories": 3,
       "questions": 4,
@@ -368,12 +390,23 @@
       ],
       "heroAlign": 0,
       "radarAxes": 5,
+      "compState": "radar",
+      "radarVals": [
+        85,
+        0,
+        0,
+        0,
+        15
+      ],
+      "radarZeros": 3,
+      "gapPx": 0,
+      "emptyGridGap": false,
       "radarLabels": [
         "Cripto",
         "Acciones",
-        "Liquidez",
         "Fondos",
-        "Metales"
+        "Metales",
+        "Liquidez"
       ],
       "bodyBg": "rgb(4, 5, 7)"
     }

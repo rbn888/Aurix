@@ -85,7 +85,7 @@ const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AU
   '_AURIX_WN12_MIN_SPAN_RETENTION','_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS',
   '_AURIX_RETURN_COMPARABLE_RATIO','_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS',
   '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL',
-  '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV6_RADAR_MAX_AXES','_INTV6_RADAR_MIN_AXES','TYPE_META','_AURIX_QUESTION_CATALOG',
+  '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV6_RADAR_CLASSES','_INTV6_RADAR_RESIDUAL','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
   '_INTV4_SHOWN_KEY'];
 const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
@@ -97,7 +97,7 @@ const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aur
   '_aurixFactClamp01','_aurixEffectiveDiversification','_aurixFactLedger','_aurixIntelligenceStories',
   '_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged','_aurixIntelligenceCore',
   '_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccClamp','_intccEsc','_intccDate',
-  '_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4CatLabel','_intv5CatLabel',
+  '_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4WindowLabel','_intv4CatLabel','_intv5CatLabel',
   '_intv4FactText','_intv4WhyText','_intv4WowText','_intv4StoryHtml','_intv4BriefHtml',
   '_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml','_intv4MemoryHtml',
   '_intv4QualityHtml','_intv4ReadShown','_intv4RecordShown',
@@ -293,10 +293,12 @@ console.log('\n3 · One fact is never sold as several discoveries:');
     && !/55\s*\+/.test(fnSrc('_intv6RadarDims'))
     && !/\* 100|\/ 100/.test(fnSrc('_intv6RadarDims')));
   ok('3.5d the radar values ARE the measured percentages (rounding only)',
-    /Math\.round\(d\.pct\)/.test(fnSrc('_intv6RadarDims')));
-  ok('3.5e under 3 asset classes there is no polygon at all (fail closed)',
-    /_INTV6_RADAR_MIN_AXES/.test(fnSrc('_intv6RadarDims'))
-    && /if \(r\.status !== 'ok'\) return '';/.test(fnSrc('_intv6RadarHtml')));
+    /Math\.round\(pctByType\[cls\] \|\| 0\)/.test(fnSrc('_intv6RadarDims')));
+  // FOUNDER RULE: the five dimensions are FIXED and the pentagon always renders;
+  // only the axis lengths change, and a class with no weight sits at the centre.
+  ok('3.5e the five dimensions are fixed and the polygon is unconditional',
+    /_INTV6_RADAR_CLASSES = Object\.freeze\(\['crypto', 'stock', 'etf', 'metal', 'cash'\]\)/.test(app)
+    && /for \(const cls of _INTV6_RADAR_CLASSES\)/.test(fnSrc('_intv6RadarDims')));
   ok('3.5g every axis value carries its unit (a bare number could read as a score)',
     (() => { const vals = attrs(html, 'class="intcc-radar-val"[^>]*>([^<]+)<');
       return vals.length >= 3 && vals.every(v => /%$/.test(v.trim())); })(),
@@ -624,6 +626,106 @@ console.log('\n13 · ES and EN: same facts, same numbers, same order:');
     JSON.stringify([emptyText(es), emptyText(en)]));
   ok('13.7 the check is non-vacuous — those classes really are present and filled',
     TEXT_CLASSES.some(c => new RegExp('class="' + c + '[^"]*"[^>]*>\\S').test(es)));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 13B · INT.06B — DATA-ADAPTIVE COMPOSITION (the founder's real portfolio)
+// ════════════════════════════════════════════════════════════════════════════
+// The live founder portfolio is Bitcoin + Ethereum + Euros: three POSITIONS but
+// only TWO asset classes, because BTC and ETH correctly collapse into `crypto`.
+// The polygon needs three axes, so it fail-closed and — since the module returned
+// '' while the grid pinned it to `grid-column: 1/5` — left a visible hole.
+console.log('\n13B · The pentagon always renders; only the axis LENGTHS change:');
+{
+  const mk = (types) => types.map((t, i) => ({ id: 'x' + i, name: 'A' + i, ticker: 'A' + i, type: t,
+    qty: t === 'cash' ? 1000 * (types.length - i) : 1, price: t === 'cash' ? undefined : 1000 * (types.length - i) }));
+  const shape = (types) => Object.assign({}, MATURE, { assets: mk(types) });
+  const st = (types) => { const h = render(shape(types)).html;
+    const vals = []; const re = /class="intcc-radar-val"[^>]*>(\d+)%/g; let m;
+    while ((m = re.exec(h))) vals.push(parseInt(m[1], 10));
+    // scope to the radar card: the HERO also carries a data-state attribute
+    return { state: (h.match(/class="intcc-card intcc-radar[^"]*"[^>]*data-state="([^"]+)"/) || [, null])[1],
+             axes: (h.match(/class="intcc-radar-axis"/g) || []).length,
+             labels: attrs(h, 'class="intcc-radar-label"[^>]*>([^<]+)<'),
+             vals: vals, present: (h.match(/data-present="(\d+)"/) || [, null])[1],
+             hasCard: /class="intcc-card intcc-radar/.test(h), html: h }; };
+
+  const five = st(['crypto', 'stock', 'etf', 'metal', 'cash']);
+  const three = st(['crypto', 'stock', 'cash']);
+  const founder = st(['crypto', 'crypto', 'cash']);   // BTC + ETH + EUR = 2 classes
+  const one = st(['crypto', 'crypto']);
+
+  ok('13B.1 the pentagon ALWAYS has its five fixed axes, whatever the portfolio',
+    [five, three, founder, one].every(x => x.axes === 5 && x.labels.length === 5),
+    JSON.stringify([five.axes, three.axes, founder.axes, one.axes]));
+  ok('13B.2 the five dimensions are the SAME five every time (fixed, not data-derived)',
+    JSON.stringify(five.labels) === JSON.stringify(founder.labels)
+    && JSON.stringify(founder.labels) === JSON.stringify(one.labels),
+    JSON.stringify(founder.labels));
+  ok('13B.3 the radar NEVER disappears because asset classes are missing',
+    [five, three, founder, one].every(x => x.hasCard && x.state === 'radar'));
+  ok('13B.4 the founder shape (BTC+ETH+EUR) draws 5 axes with only 2 carrying weight',
+    founder.axes === 5 && founder.present === '2'
+    && founder.vals.filter(v => v === 0).length === 3,
+    JSON.stringify({ vals: founder.vals, present: founder.present }));
+  ok('13B.5 a class the user does not hold reads 0% — at the centre, not omitted',
+    (() => { const zeros = founder.vals.filter(v => v === 0).length;
+      // a zero axis puts its vertex exactly at the centre of the grid
+      const pts = (founder.html.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim().split(/\s+/);
+      return zeros === 3 && pts.length === 5 && pts.filter(p => p === '110.0,106.0').length === 3; })(),
+    (founder.html.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1]);
+  ok('13B.6 one single class → still five axes, four of them at zero',
+    one.axes === 5 && one.vals.filter(v => v === 0).length === 4);
+  ok('13B.7 the weights published are the certified ones (≈100 across the axes)',
+    (() => { const sum = founder.vals.reduce((a, b) => a + b, 0); return Math.abs(sum - 100) <= 2; })(),
+    JSON.stringify(founder.vals));
+  ok('13B.8 real estate never enters the radar',
+    (() => { const withRE = st(['crypto', 'crypto', 'cash', 'real_estate']);
+      return withRE.axes === 5 && Math.abs(withRE.vals.reduce((a, b) => a + b, 0) - 100) <= 2; })());
+  ok('13B.9 an unclassified residual is REPORTED, never swallowed by the five axes',
+    (() => { const o = st(['crypto', 'weird_type', 'cash']);
+      return /intv6-radar-residual/.test(o.html); })());
+  ok('13B.10 no valuation at all ⇒ honest hold (we cannot claim 0% when we do not know)',
+    st([]).state === 'hold');
+  ok('13B.11 no old formula and no renderer arithmetic',
+    !/45\s*\+|55\s*\+|\* 100|\/ 100/.test(fnSrc('_intv6RadarDims') + fnSrc('_intv6RadarHtml')));
+  ok('13B.12 values are the measured percentages, rounding only',
+    /Math\.round\(pctByType\[cls\] \|\| 0\)/.test(fnSrc('_intv6RadarDims')));
+  ok('13B.13 the module occupies its column at every class count (no reserved hole)',
+    /:not\(:has\(\.intcc-radar\)\)[\s\S]{0,120}\.intcc-drivers \{ grid-column: 1 \/ 7/.test(css));
+
+  // ── HONEST WINDOWS ────────────────────────────────────────────────────────
+  const DAYm = 864e5;
+  const hist = days => { const n = days;
+    return Array.from({ length: n + 1 }, (_, i) => ({ ts: NOW - (n - i) * DAYm, total: 100000 * (1 + 0.118 * (i / n)), real_estate: 0 })); };
+  const perfOf = (days, range) => { const c = makeCtx(Object.assign({}, MATURE, { rows: hist(days), flows: [] }));
+    return run('_aurixInvestablePerformance(' + JSON.stringify(range) + ')', c); };
+  const p4 = perfOf(4, '7d'), p12 = perfOf(12, '7d');
+  ok('13B.14 a 7D window measured over only 4 days is flagged as NOT covering it',
+    p4.valid === true && p4.coversNominal === false && Math.round(p4.spanMs / DAYm) === 4,
+    JSON.stringify({ v: p4.valid, cov: p4.coversNominal, span: Math.round(p4.spanMs / DAYm) }));
+  ok('13B.15 …and with 12 days of history the 7D window really covers 7 days',
+    p12.coversNominal === true && Math.round(p12.spanMs / DAYm) === 7);
+  ok('13B.16 the copy never claims "7 days" for a window that does not cover it',
+    (() => { const c = makeCtx(MATURE);
+      const a = run('_intv4WindowLabel({"range":"7d","spanMs":' + (4 * DAYm) + ',"coversNominal":false})', c);
+      const b = run('_intv4WindowLabel({"range":"7d","spanMs":' + (7 * DAYm) + ',"coversNominal":true})', c);
+      return a !== b && /4/.test(a) && !/7/.test(a); })());
+  ok('13B.17 "all" has no nominal span to fall short of', perfOf(4, 'all').coversNominal === true);
+  ok('13B.18 ALL and 7D may differ when their intervals differ',
+    (() => { const a = perfOf(30, 'all'), b = perfOf(30, '7d');
+      return a.valid && b.valid && a.startAt !== b.startAt && a.returnPct !== b.returnPct; })());
+  ok('13B.19 a deposit inside the 7D window is never published as 7D performance',
+    (() => { const c = makeCtx(Object.assign({}, MATURE, {
+        rows: [0,1,2,3,4,5,6,7].map(i => ({ ts: NOW - (7 - i) * DAYm, total: i < 4 ? 100000 : 110000, real_estate: 0 })),
+        flows: [{ id: 'd', ts: NOW - 3.5 * DAYm, amountUSD: 10000, kind: 'deposit' }] }));
+      const r = run("_aurixInvestablePerformance('7d')", c);
+      return r.valid === true && Math.abs(r.returnPct) < 0.5; })());
+  ok('13B.20 the span threshold is the boundary this codebase already adopted',
+    /_AURIX_WN12_MIN_SPAN_RETENTION/.test(fnSrc('_aurixInvestablePerformance')));
+  ok('13B.21 NON-VACUITY — without the guard a 4-day span would still be named "7d"',
+    (() => { const c = makeCtx(MATURE);
+      return run('_intv4RangeLabel("7d")', c) !== run('_intv4WindowLabel({"range":"7d","spanMs":' + (4 * DAYm) + ',"coversNominal":false})', c); })());
 }
 
 // ════════════════════════════════════════════════════════════════════════════

@@ -78,7 +78,7 @@ const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AU
   '_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS','_AURIX_RETURN_COMPARABLE_RATIO',
   '_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FACT_STATUS',
   '_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_RANK_WEIGHTS',
-  '_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV6_RADAR_MAX_AXES','_INTV6_RADAR_MIN_AXES','TYPE_META','_AURIX_QUESTION_CATALOG','_INTV4_DEPTH',
+  '_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV6_RADAR_CLASSES','_INTV6_RADAR_RESIDUAL','TYPE_META','_AURIX_QUESTION_CATALOG','_INTV4_DEPTH',
   '_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_SHOWN_KEY'];
 const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal','assetNativeValue',
@@ -88,7 +88,7 @@ const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aur
   '_aurixCatExposureDelta','_aurixFactClamp01','_aurixEffectiveDiversification','_aurixFactLedger',
   '_aurixIntelligenceStories','_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged',
   '_aurixIntelligenceCore','_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccClamp','_intccEsc',
-  '_intccDate','_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4CatLabel','_intv5CatLabel',
+  '_intccDate','_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4WindowLabel','_intv4CatLabel','_intv5CatLabel',
   '_intv4FactText','_intv4WhyText','_intv4WowText','_intv4StoryHtml','_intv4BriefHtml','_intv4ChangedHtml',
   '_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml','_intv4MemoryHtml','_intv4QualityHtml',
   '_intv4ReadShown','_intv4RecordShown',
@@ -127,15 +127,13 @@ function buildHtml(lang) {
                                                   { crypto:39000, stock:40000, liquidity:21000 });
   sb._aurixBackendSnapshotsState = 'ready';
   sb._aurixBackendHealthSnapshot = () => ({ status: 'ok' });
+  // THE FOUNDER'S REAL PORTFOLIO SHAPE: three positions, but only TWO asset
+  // classes (BTC + ETH collapse into `crypto`). The previous 6-class fixture is
+  // precisely why the empty radar column was never caught before it shipped.
   sb.assets = [
-    { id:'a1', name:'Bitcoin', ticker:'BTC', type:'crypto', qty:1, price:53000 },
-    { id:'a2', name:'Apple', ticker:'AAPL', type:'stock', qty:100, price:120 },
-    { id:'a3', name:'Microsoft', ticker:'MSFT', type:'stock', qty:50, price:100 },
-    { id:'a4', name:'MSCI World', ticker:'IWDA', type:'etf', qty:30, price:90 },
-    { id:'a5', type:'etf', qty:20, price:80 },      { id:'a6', type:'crypto', qty:5, price:200 },
-    { id:'a7', type:'metal', qty:10, price:60 },    { id:'a8', type:'stock', qty:10, price:50 },
-    { id:'a9', type:'fund', qty:10, price:40 },     { id:'a10', type:'stock', qty:10, price:30 },
-    { id:'a11', type:'etf', qty:10, price:20 },     { id:'a12', type:'cash', qty:5000 },
+    { id:'btc', name:'Bitcoin',  ticker:'BTC', type:'crypto', qty:1,     price:52000 },
+    { id:'eth', name:'Ethereum', ticker:'ETH', type:'crypto', qty:10,    price:3300  },
+    { id:'eur', name:'Euros',    ticker:'EUR', type:'cash',   qty:15000 },
   ];
   sb._aurixHealthSnapshot = () => ({ assetCount:12, totUSD:100000, categoryCount:5, cashPct:12, cryptoPct:39,
     realEstatePct:0, topInvestedAsset:{ name:'BTC', ticker:'BTC', type:'crypto', pctTotal:53 },
@@ -351,6 +349,26 @@ const MEASURE = `(function(){
   out.heroAlign = (hl && eb && vis(hl) && vis(eb))
     ? Math.round(Math.abs(hl.getBoundingClientRect().top - eb.getBoundingClientRect().top)) : null;
   out.radarAxes = host.querySelectorAll('.intcc-radar-axis').length;
+  var compCard = host.querySelector('.intcc-radar');
+  out.compState = compCard ? (compCard.getAttribute('data-state') || '?') : 'absent';
+  out.radarVals = Array.prototype.slice.call(host.querySelectorAll('.intcc-radar-val'))
+    .map(function(e){ return parseInt((e.textContent||'').replace(/\\D/g,''), 10) || 0; });
+  out.radarZeros = out.radarVals.filter(function(v){ return v === 0; }).length;
+  // A HOLE detector: on the wide grid, the leftmost module of row 2 must start at
+  // the container's content edge. A fail-closed module used to leave 1/3 of the
+  // row blank, which is exactly what the founder photographed.
+  (function(){
+    // A HOLE detector anchored on the HERO, which spans the full grid width, so
+    // its left edge IS the grid's content edge. The leftmost module of row 2 must
+    // start there; a fail-closed module used to leave a third of the row blank,
+    // which is exactly what the founder photographed.
+    var hero = host.querySelector('.intcc-hero');
+    var first = host.querySelector('.intcc-radar') || host.querySelector('.intcc-drivers');
+    if (!hero || !first || !vis(hero) || innerWidth < 1024) { out.emptyGridGap = false; out.gapPx = 0; return; }
+    var gap = Math.round(first.getBoundingClientRect().left - hero.getBoundingClientRect().left);
+    out.gapPx = gap;
+    out.emptyGridGap = Math.abs(gap) > 4;
+  })();
   out.radarLabels = Array.prototype.slice.call(host.querySelectorAll('.intcc-radar-label')).map(function(e){ return (e.textContent||'').trim(); });
   var bodyBg = getComputedStyle(document.body).backgroundColor;
   out.bodyBg = bodyBg;
@@ -423,8 +441,17 @@ for (const vp of VIEWPORTS) {
   check(vp, 'no text clipped without ellipsis', m.clipped.length === 0, JSON.stringify(m.clipped.slice(0, 4)));
   check(vp, 'the canonical score appears exactly once', m.scoreCount === 1 && m.badgeCount === 1,
     'val=' + m.scoreCount + ' badge=' + m.badgeCount);
-  check(vp, 'the radar polygon is drawn with >=3 asset-class axes',
-    m.radarAxes >= 3 && m.radarLabels.length === m.radarAxes, 'axes=' + m.radarAxes + ' ' + JSON.stringify(m.radarLabels));
+  // Either state is valid; what must never happen is an EMPTY reserved column.
+  // FOUNDER RULE: the pentagon always renders with its five fixed axes; only the
+  // lengths change, and a class with no weight sits at the centre.
+  check(vp, 'the pentagon renders with its five fixed axes',
+    m.compState === 'radar' && m.radarAxes === 5 && m.radarLabels.length === 5,
+    'state=' + m.compState + ' axes=' + m.radarAxes + ' ' + JSON.stringify(m.radarLabels));
+  check(vp, 'a class with no weight reads 0% (at the centre, not omitted)',
+    m.radarZeros >= 1 && m.radarVals.length === 5,
+    JSON.stringify(m.radarVals));
+  check(vp, 'no reserved column is left empty where a module fail-closed',
+    m.emptyGridGap === false, 'gapPx=' + m.gapPx);
   if (!vp.mobile || vp.name === 'tablet') {
     // the hero is only rendered on tablet/desktop (phones use the two cards)
     check(vp, 'hero eyebrows are optically aligned (<=2px)', m.heroAlign !== null && m.heroAlign <= 2, 'delta=' + m.heroAlign + 'px');
