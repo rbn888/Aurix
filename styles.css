@@ -20543,6 +20543,14 @@ body.gs-open { overflow: hidden; }
    only add the story/brief layout. Single markup; the queries below are the only
    responsive branch. */
 .aurix-intv4 { display: flex; flex-direction: column; gap: 14px; }
+/* The new surface follows DOM order, full stop. It reuses .intcc-explore and
+   .intcc-timeline for their card styling, and those classes carry legacy mobile
+   flex `order` values (4 and 6) from the old eight-block layout. Inheriting them
+   pushed the honest-limits card ABOVE Explore and Memory on phones and tablets
+   (measured in visual QA), because the new sections have no order of their own.
+   Higher specificity than the legacy single-class rules, so it wins wherever
+   they sit in the file. */
+.aurix-intcc.aurix-intv4 > * { order: 0; }
 
 /* Context header — the canonical score ONCE, quiet, never the headline. */
 .intv4-header {
@@ -20559,8 +20567,6 @@ body.gs-open { overflow: hidden; }
 }
 .intv4-head-val { font-size: 30px; font-weight: 700; line-height: 1; color: var(--text-bright); font-variant-numeric: tabular-nums; }
 .intv4-head-suffix { font-size: 13px; font-weight: 600; color: rgba(150,180,240,0.6); margin-left: 2px; }
-.intv4-head-orb { width: 72px; height: 72px; flex: 0 0 auto; opacity: 0.85; }
-.intv4-head-orb .intcc-orb { width: 100%; height: 100%; }
 
 /* The Brief — the primary surface. */
 .intv4-story-list { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
@@ -20586,10 +20592,13 @@ body.gs-open { overflow: hidden; }
 }
 /* ADVANCED depth: progressive disclosure — never competing with the conclusion. */
 .intv4-more { margin-top: 8px; }
+/* The disclosure trigger is a real touch target: 44px of hit area (measured at
+   20px before this), while the LABEL keeps its small, quiet type. */
 .intv4-more-sum {
   cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px;
   font-size: 11.5px; font-weight: 650; color: var(--aurix-blue, #4A82F0);
-  padding: 3px 0; transition: opacity 140ms ease;
+  padding: 13px 2px; min-height: 44px; box-sizing: border-box;
+  transition: opacity 140ms ease;
 }
 .intv4-more-sum::-webkit-details-marker { display: none; }
 .intv4-more-sum::after {
@@ -20638,7 +20647,6 @@ body.gs-open { overflow: hidden; }
   .aurix-intv4 { gap: 16px; }
   .intv4-header { padding: 18px 22px; }
   .intv4-head-val { font-size: 38px; }
-  .intv4-head-orb { width: 88px; height: 88px; }
   .intv4-story-head { font-size: 16px; }
   .intv4-story { padding: 15px 0 15px 17px; }
 }
@@ -20647,9 +20655,34 @@ body.gs-open { overflow: hidden; }
 @media (max-width: 480px) {
   .intv4-header { padding: 13px 15px; gap: 12px; }
   .intv4-head-val { font-size: 26px; }
-  .intv4-head-orb { width: 56px; height: 56px; }
   .intv4-story-head { font-size: 14.5px; }
   .intv4-wow-text { font-size: 13.5px; }
+}
+/* DESKTOP — the legacy `.aurix-intcc` becomes a 12-COLUMN GRID at >=1024px, with
+   every old block pinned by hand (.intcc-explore lived in grid-column 9/13). The
+   INT.04 sections have no pins, so they auto-placed into single 1fr columns and
+   the surface collapsed — measured: the question label got 39px for ~80px of text.
+   The new surface is deliberately a single READING COLUMN, not a 12-column
+   dashboard (SPEC §11: no metrics dashboard, no wall of cards), so the grid is
+   re-asserted as a flex column. Higher specificity than the legacy rule, so it
+   wins wherever it sits in the file. */
+@media (min-width: 1024px) {
+  .aurix-intcc.aurix-intv4 {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: none;
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 12px 30px 56px;
+    align-items: stretch;
+  }
+}
+
+/* The question rows inherit a legacy compact mobile padding (7px → ~32px tall).
+   Scoped to the INT.04 surface so no other screen changes: a premium touch
+   target is 44px. The label keeps its size; only the hit area grows. */
+@media (max-width: 640px) {
+  .intv4-explore .intcc-x-q { min-height: 44px; box-sizing: border-box; padding-top: 10px; padding-bottom: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .intv4-more-sum, .intv4-more-sum::after { transition: none; }

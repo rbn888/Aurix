@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '643'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '644'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4794,8 +4794,8 @@ const T = {
     intv4_confidence_high: 'Datos completos',
     intv4_confidence_medium: 'Pocas observaciones todavía',
     // ventanas
-    intv4_r_24h: 'últimas 24 h', intv4_r_7d: 'últimos 7 días', intv4_r_30d: 'últimos 30 días',
-    intv4_r_90d: 'últimos 90 días', intv4_r_all: 'todo el periodo registrado', intv4_r_now: 'ahora mismo',
+    intv4_r_24h: 'las últimas 24 h', intv4_r_7d: 'los últimos 7 días', intv4_r_30d: 'los últimos 30 días',
+    intv4_r_90d: 'los últimos 90 días', intv4_r_all: 'todo el periodo registrado', intv4_r_now: 'ahora mismo',
     // categorías del lector certificado
     intv4_cat_stock: 'la bolsa', intv4_cat_etf: 'los ETF', intv4_cat_fund: 'los fondos',
     intv4_cat_crypto: 'la cripto', intv4_cat_metal: 'los metales', intv4_cat_liquidity: 'la liquidez',
@@ -4818,6 +4818,7 @@ const T = {
     intv4_f_eff: (n, eff) => `Tienes ${n} posiciones, pero por cómo están repartidas tu diversificación efectiva equivale a unas ${eff} posiciones igualmente ponderadas`,
     // por qué importa (por raíz causal — una sola vez por historia)
     intv4_why_top_position: 'Cuanto más peso tiene una sola posición, más depende tu patrimonio de lo que le pase a ella.',
+    intv4_why_effective_holdings: 'Contar posiciones no mide diversificación: lo que importa es cómo se reparte el peso entre ellas.',
     intv4_why_category_mix: 'La composición por clase de activo define a qué está expuesto realmente tu patrimonio.',
     intv4_why_cash_weight: 'La liquidez es lo que te permite decidir sin vender otra cosa.',
     intv4_why_investable_return: 'Es el rendimiento de tus inversiones, ya neutralizadas tus aportaciones y retiradas.',
@@ -7081,6 +7082,7 @@ const T = {
     intv4_f_top3: pct => `Your three largest positions add up to ${pct}%`,
     intv4_f_eff: (n, eff) => `You hold ${n} positions, but given how they are weighted your effective diversification is about ${eff} equally weighted positions`,
     intv4_why_top_position: 'The more weight a single position carries, the more your wealth depends on what happens to it.',
+    intv4_why_effective_holdings: 'Counting positions does not measure diversification: what matters is how the weight is spread across them.',
     intv4_why_category_mix: 'Your asset-class mix defines what your wealth is actually exposed to.',
     intv4_why_cash_weight: 'Cash is what lets you decide without having to sell something else.',
     intv4_why_investable_return: 'This is the return of your investments, with contributions and withdrawals already neutralised.',
@@ -26303,6 +26305,17 @@ function _aurixFactLedger(opts) {
 
   // ── A · PERFORMANCE — exclusively the INT.02 certified owner ──────────────
   const perfRanges = Array.isArray(o.perfRanges) ? o.perfRanges : ['24h', '7d', '30d', 'all'];
+  // A window is identified by the interval it actually MEASURED, not by its name.
+  // With a short history 7D, 30D and ALL select the same first/last observation,
+  // so they are ONE measurement — publishing it once per range name put the same
+  // percentage on screen four times.
+  //
+  // When several names collapse onto one interval the WIDEST wins, because it is
+  // the only truthful label: if only 5 days exist, that interval genuinely is
+  // "the whole recorded period", while calling it "the last 7 days" claims a
+  // window the data does not have. perfRanges runs narrow → wide, so a later
+  // name replaces an earlier one for the same interval.
+  const perfByWindow = new Map();
   for (const pr of perfRanges) {
     let p = null;
     try { p = (typeof _aurixInvestablePerformance === 'function') ? _aurixInvestablePerformance(pr) : null; } catch (_) { p = null; }
@@ -26311,11 +26324,22 @@ function _aurixFactLedger(opts) {
         _AURIX_FACT_STATUS.INSUFFICIENT_HISTORY, (p && p.fallbackReason) || 'owner_unavailable', { range: pr });
       continue;
     }
-    const abs = Math.abs(p.returnPct);
-    if (abs < _AURIX_FACT_MATERIAL.returnPct) {
-      // Measured but flat: still a fact — it is what makes "your wealth grew but
-      // your investments did not" possible. Low magnitude, real materiality.
+    perfByWindow.set(p.startAt + ':' + p.endAt, { range: pr, p });
+  }
+  const perfKept = new Set(Array.from(perfByWindow.values()).map(x => x.range));
+  for (const pr of perfRanges) {
+    if (!perfByWindow.size) break;
+    if (perfKept.has(pr)) continue;
+    // measured, but the same interval is published under a wider, truthful name
+    if (!(gaps.some(g => g.semanticKey === 'investable_return_' + pr))) {
+      gap(_AURIX_FACT_FAMILY.PERFORMANCE, 'investable_return_' + pr,
+        _AURIX_FACT_STATUS.AVAILABLE, 'duplicate_window', { range: pr });
     }
+  }
+  for (const { range: pr, p } of perfByWindow.values()) {
+    const abs = Math.abs(p.returnPct);
+    // A measured-but-flat return is still a fact: it is what makes "your wealth
+    // grew but your investments did not" possible. Low magnitude, real materiality.
     push({
       semanticKey: 'investable_return_' + pr,
       family: _AURIX_FACT_FAMILY.PERFORMANCE,
@@ -50955,7 +50979,18 @@ function _intv4FactText(fact) {
   if (k === 'effective_holdings')      return _intv4T('intv4_f_eff', v.positions, _intv4Num(v.effectiveN, 1));
   return '';                                                     // unmapped ⇒ silent
 }
-function _intv4WhyText(causalRoot) { return _intv4T('intv4_why_' + String(causalRoot || '')); }
+function _intv4WhyText(factOrRoot) {
+  // A fact-specific explanation wins over the root's default: several facts share
+  // one causal root (that is the point of the root), but they do not all say the
+  // same thing, and an explanation that does not match its own headline reads as
+  // a mistake.
+  if (factOrRoot && typeof factOrRoot === 'object') {
+    const specific = _intv4T('intv4_why_' + String(factOrRoot.semanticKey || ''));
+    if (specific) return specific;
+    return _intv4T('intv4_why_' + String(factOrRoot.causalRoot || ''));
+  }
+  return _intv4T('intv4_why_' + String(factOrRoot || ''));
+}
 function _intv4WowText(w) {
   if (!w || !w.semanticKey) return '';
   const v = w.values || {};
@@ -50971,10 +51006,14 @@ function _intv4WowText(w) {
 function _intv4StoryHtml(story, esc, depth) {
   const head = _intv4FactText(story);
   if (!head) return '';                                          // no copy ⇒ no card
-  const why = _intv4WhyText(story.causalRoot);
+  const why = _intv4WhyText(story);
+  const seenTxt = new Set([head]);
   const support = (story.supporting || [])
     .map(s => ({ s, txt: _intv4FactText(s) }))
-    .filter(x => !!x.txt);
+    .filter(x => !!x.txt)
+    // Same sentence = repetition, even from a different fact key. A derived
+    // positive that restates the headline number is the common case.
+    .filter(x => { if (seenTxt.has(x.txt)) return false; seenTxt.add(x.txt); return true; });
   const showWin = story.window && story.window.range && story.window.range !== 'now';
   const conf = story.confidence >= 1 ? 'intv4_confidence_high' : 'intv4_confidence_medium';
   const advanced = (depth === _INTV4_DEPTH.ADVANCED) || support.length > 0;
@@ -51015,9 +51054,14 @@ function _intv4BriefHtml(core, esc, depth) {
 // WHAT CHANGED — only Core-certified changes. CAUSE is never asserted: the Core
 // reports causeKnown:false, so this surface shows CHANGE and lets the story's
 // "why it matters" carry the (prudent) impact. No per-position attribution.
-function _intv4ChangedHtml(core, esc) {
+function _intv4ChangedHtml(core, esc, alreadyPublished) {
   const seen = new Set();
+  // Same rule as Memory: what the Brief already headlined is not repeated here.
+  // Without this the same percentage appeared in the conclusion AND in the change
+  // list on one screen — the repetition this surface exists to remove.
+  const published = new Set(Array.isArray(alreadyPublished) ? alreadyPublished : []);
   const rows = (core.whatChanged || [])
+    .filter(w => !published.has(w.semanticKey))
     .filter(w => { if (seen.has(w.causalRoot)) return false; seen.add(w.causalRoot); return true; })
     .map(w => {
       const f = (core.ledger && core.ledger.facts || []).find(x => x.semanticKey === w.semanticKey);
@@ -51040,8 +51084,23 @@ function _intv4ChangedHtml(core, esc) {
 // DISCOVERY — rendered ONLY when a strong enough insight exists. Absence of
 // surprise is preferable to a weak or repetitive conclusion (SPEC §5), so this
 // returns '' rather than an empty card.
-function _intv4DiscoveryHtml(core, esc) {
-  const w = (core.wowInsights || []).map(x => ({ x, txt: _intv4WowText(x) })).filter(x => !!x.txt)[0];
+function _intv4DiscoveryHtml(core, esc, publishedTexts) {
+  // A wow insight earns its place by RELATING facts, so it is fine for it to rest
+  // on facts the Brief already published — "your wealth grew, but not from
+  // return" is a new statement even when both halves appear above. What is NOT
+  // fine is RESTATING a conclusion almost verbatim: that reads as the same
+  // sentence twice and empties the section of meaning. So the filter is on the
+  // rendered TEXT, not on the underlying keys.
+  const norm = t0 => String(t0 || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const shown = (Array.isArray(publishedTexts) ? publishedTexts : []).map(norm).filter(Boolean);
+  const duplicates = txt => {
+    const b = norm(txt);
+    if (!b) return true;
+    return shown.some(a => a.indexOf(b) === 0 || b.indexOf(a) === 0);
+  };
+  const w = (core.wowInsights || [])
+    .map(x => ({ x, txt: _intv4WowText(x) }))
+    .filter(x => !!x.txt && !duplicates(x.txt))[0];
   if (!w) return '';
   return `
     <section class="intcc-card intv4-discovery" data-wow="${esc(w.x.semanticKey)}">
@@ -51122,7 +51181,7 @@ function _intv4MemoryHtml(core, esc, alreadyPublished) {
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
       ${events.length ? `<ul class="intcc-tl-list">${events.map(x => {
         const at = x.f.window && (x.f.window.endAt || x.f.window.startAt);
-        const why = _intv4WhyText(x.f.causalRoot);
+        const why = _intv4WhyText(x.f);
         return `<li class="intcc-tl-item" data-fact="${esc(x.f.semanticKey)}">
           <span class="intcc-tl-node" aria-hidden="true"></span>
           <div class="intcc-tl-text">
@@ -51222,17 +51281,12 @@ function _renderIntelligenceCommandCenter() {
         <span class="intv4-head-val">${score.score != null ? score.score : '—'}<span class="intv4-head-suffix">${esc(t('intcc_health_suffix'))}</span></span>
         <span class="intcc-health-badge is-tone-${esc(score.tone)}">${esc(score.label)}</span>
       </div>
-      <div class="intv4-head-orb" aria-hidden="true">${_intccOrbHtml()}</div>
     </section>`;
 
-  const briefHtml     = _intv4BriefHtml(core, esc, depth);
-  const changedHtml   = _intv4ChangedHtml(core, esc);
-  const discoveryHtml = _intv4DiscoveryHtml(core, esc);
-  const exploreHtml   = _intv4ExploreHtml(core, esc);
-  // Every fact the Brief already published (headline AND supporting), so the
-  // memory below cannot restate it.
-  // Built with the SAME filter the Brief applies, so a story the Brief does NOT
-  // render is never treated as already published.
+  // Every fact the Brief actually publishes (headline AND supporting). Computed
+  // FIRST, because both What Changed and Memory filter against it, and built with
+  // the SAME filter the Brief applies — a story the Brief does NOT render must
+  // never count as already published.
   const publishedKeys = [];
   (core.topStories || [])
     .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL)
@@ -51241,13 +51295,25 @@ function _renderIntelligenceCommandCenter() {
       publishedKeys.push(st.semanticKey);
       (st.supporting || []).forEach(sp => publishedKeys.push(sp.semanticKey));
     });
+  // The sentences the Brief actually prints, so Discovery can refuse to restate one.
+  const publishedTexts = (core.topStories || [])
+    .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL)
+    .slice(0, _INTV4_BRIEF_MAX)
+    .map(st => _intv4FactText(st))
+    .filter(Boolean);
+  const briefHtml     = _intv4BriefHtml(core, esc, depth);
+  const changedHtml   = _intv4ChangedHtml(core, esc, publishedKeys);
+  const discoveryHtml = _intv4DiscoveryHtml(core, esc, publishedTexts);
+  const exploreHtml   = _intv4ExploreHtml(core, esc);
   const memoryHtml    = _intv4MemoryHtml(core, esc, publishedKeys);
   const qualityHtml   = _intv4QualityHtml(core, esc);
 
   // Record what was actually PUBLISHED (stories + the shown discovery), so the
   // next visit ranks it lower. Never what was merely computed.
   try {
-    const shown = (core.topStories || []).slice(0, _INTV4_BRIEF_MAX).map(st => st.semanticKey);
+    const shown = (core.topStories || [])
+      .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL)
+      .slice(0, _INTV4_BRIEF_MAX).map(st => st.semanticKey);
     const wow = (core.wowInsights || [])[0];
     if (wow && discoveryHtml) shown.push(wow.semanticKey);
     _intv4RecordShown(shown);

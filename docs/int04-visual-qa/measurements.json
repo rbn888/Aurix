@@ -1,0 +1,234 @@
+{
+  "url": "http://127.0.0.1:8804/",
+  "at": "2026-08-26T17:38:47.912Z",
+  "rows": [
+    {
+      "vp": "mobile",
+      "vw": 390,
+      "docOverflowX": 0,
+      "order": [
+        "intv4-header",
+        "intv4-brief",
+        "intv4-changed",
+        "intv4-discovery",
+        "intcc-explore",
+        "intv4-memory",
+        "intv4-quality"
+      ],
+      "sectionOverflow": 0,
+      "hiddenFacts": [],
+      "clipped": [],
+      "fontMin": 12,
+      "tinyFonts": [],
+      "tapSmall": [],
+      "scoreCount": 1,
+      "badgeCount": 1,
+      "ringCount": 0,
+      "percents": [
+        "5,81%",
+        "12%",
+        "39%",
+        "5,81%",
+        "39%"
+      ],
+      "dupPercents": [],
+      "labelGeom": [
+        {
+          "w": 280,
+          "sw": 280,
+          "cw": 280,
+          "d": "block",
+          "ws": "normal",
+          "ov": "visible"
+        },
+        {
+          "w": 235,
+          "sw": 235,
+          "cw": 235,
+          "d": "block",
+          "ws": "normal",
+          "ov": "visible"
+        },
+        {
+          "w": 223,
+          "sw": 223,
+          "cw": 223,
+          "d": "block",
+          "ws": "normal",
+          "ov": "visible"
+        },
+        {
+          "w": 280,
+          "sw": 280,
+          "cw": 280,
+          "d": "block",
+          "ws": "normal",
+          "ov": "visible"
+        }
+      ],
+      "wowText": "Tienes 12 posiciones, pero tu diversificación efectiva equivale a unas 2,3",
+      "wowRepeatsHead": false,
+      "stories": 4,
+      "questions": 4,
+      "headFs": 14.5,
+      "whyFs": 12.5,
+      "disclosures": 3,
+      "supTotal": 5,
+      "supVisible": 5,
+      "supOverflow": 0,
+      "bodyBg": "rgb(4, 5, 7)"
+    },
+    {
+      "vp": "tablet",
+      "vw": 834,
+      "docOverflowX": 0,
+      "order": [
+        "intv4-header",
+        "intv4-brief",
+        "intv4-changed",
+        "intv4-discovery",
+        "intcc-explore",
+        "intv4-memory",
+        "intv4-quality"
+      ],
+      "sectionOverflow": 0,
+      "hiddenFacts": [],
+      "clipped": [],
+      "fontMin": 12,
+      "tinyFonts": [],
+      "tapSmall": [],
+      "scoreCount": 1,
+      "badgeCount": 1,
+      "ringCount": 0,
+      "percents": [
+        "5,81%",
+        "12%",
+        "39%",
+        "5,81%",
+        "39%"
+      ],
+      "dupPercents": [],
+      "labelGeom": [
+        {
+          "w": 306,
+          "sw": 306,
+          "cw": 306,
+          "d": "block",
+          "ws": "normal",
+          "ov": "visible"
+        },
+        {
+          "w": 243,
+          "sw": 243,
+          "cw": 243,
+          "d": "block",
+          "ws": "normal",
+          "ov": "visible"
+        },
+        {
+          "w": 230,
+          "sw": 230,
+          "cw": 230,
+          "d": "block",
+          "ws": "normal",
+          "ov": "visible"
+        },
+        {
+          "w": 317,
+          "sw": 317,
+          "cw": 317,
+          "d": "block",
+          "ws": "normal",
+          "ov": "visible"
+        }
+      ],
+      "wowText": "Tienes 12 posiciones, pero tu diversificación efectiva equivale a unas 2,3",
+      "wowRepeatsHead": false,
+      "stories": 4,
+      "questions": 4,
+      "headFs": 16,
+      "whyFs": 12.5,
+      "disclosures": 3,
+      "supTotal": 5,
+      "supVisible": 5,
+      "supOverflow": 0,
+      "bodyBg": "rgb(4, 5, 7)"
+    },
+    {
+      "vp": "desktop",
+      "vw": 1440,
+      "docOverflowX": 0,
+      "order": [
+        "intv4-header",
+        "intv4-brief",
+        "intv4-changed",
+        "intv4-discovery",
+        "intcc-explore",
+        "intv4-memory",
+        "intv4-quality"
+      ],
+      "sectionOverflow": 0,
+      "hiddenFacts": [],
+      "clipped": [],
+      "fontMin": 12,
+      "tinyFonts": [],
+      "tapSmall": [],
+      "scoreCount": 1,
+      "badgeCount": 1,
+      "ringCount": 0,
+      "percents": [
+        "5,81%",
+        "12%",
+        "39%",
+        "5,81%",
+        "39%"
+      ],
+      "dupPercents": [],
+      "labelGeom": [
+        {
+          "w": 306,
+          "sw": 306,
+          "cw": 306,
+          "d": "block",
+          "ws": "normal",
+          "ov": "visible"
+        },
+        {
+          "w": 243,
+          "sw": 243,
+          "cw": 243,
+          "d": "block",
+          "ws": "normal",
+          "ov": "visible"
+        },
+        {
+          "w": 230,
+          "sw": 230,
+          "cw": 230,
+          "d": "block",
+          "ws": "normal",
+          "ov": "visible"
+        },
+        {
+          "w": 317,
+          "sw": 317,
+          "cw": 317,
+          "d": "block",
+          "ws": "normal",
+          "ov": "visible"
+        }
+      ],
+      "wowText": "Tienes 12 posiciones, pero tu diversificación efectiva equivale a unas 2,3",
+      "wowRepeatsHead": false,
+      "stories": 4,
+      "questions": 4,
+      "headFs": 16,
+      "whyFs": 12.5,
+      "disclosures": 3,
+      "supTotal": 5,
+      "supVisible": 5,
+      "supOverflow": 0,
+      "bodyBg": "rgb(4, 5, 7)"
+    }
+  ]
+}

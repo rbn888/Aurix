@@ -8,6 +8,9 @@ memory/
 
 # Dev-only preview screenshots (SPEC deliverables) — never shipped to production
 docs/*-preview/
+# Visual-QA captures: the repo root IS the Pages site, so 2.5 MB of PNGs would be
+# published and bloat every deploy. The measurements JSON is the committed evidence.
+docs/*-visual-qa/*.png
 
 # Supabase CLI scratch state (regenerated on every `supabase projects …` call; never commit)
 supabase/.temp/
