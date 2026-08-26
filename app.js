@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '639'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '640'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4642,12 +4642,15 @@ const T = {
     intcc_empty_body:     'Añade activos a tu cartera para que Aurix interprete tu patrimonio.',
     intcc_read_healthy:      'Tu patrimonio conserva una estructura saludable',
     intcc_read_balanced:     'Tu cartera muestra una evolución equilibrada',
-    intcc_read_growing:      'Tu patrimonio está creciendo',
+    // INT.01 — este estado se publica desde el TWR flow-neutral: es RENDIMIENTO,
+    // no avance de valor. La copia no puede llamarlo "crecer" (una aportación
+    // hace crecer el patrimonio sin generar un céntimo de rendimiento).
+    intcc_read_growing:      'Tu cartera está generando rendimiento',
     intcc_read_attention:    'Tu patrimonio requiere atención',
     intcc_read_concentrated: 'Tu patrimonio está concentrado',
     intcc_sub_healthy:       'La estructura general es sólida y no se observan dependencias excesivas de una sola posición.',
     intcc_sub_balanced:      'La diversificación actual es razonable y no se observan dependencias excesivas de una sola posición.',
-    intcc_sub_growing:       pct => `Tu patrimonio invertible ha avanzado cerca de un ${pct}% en el periodo registrado.`,
+    intcc_sub_growing:       pct => `Tu cartera ha generado cerca de un ${pct}% de rendimiento en el periodo registrado, ya neutralizadas tus aportaciones y retiradas.`,
     intcc_sub_attention:     'Se observan algunos puntos que conviene mirar con calma, sin urgencia.',
     intcc_sub_concentrated:  name => name ? `Una parte relevante de tu patrimonio se apoya en ${name}.` : 'Una parte relevante de tu patrimonio se apoya en pocas posiciones.',
     intcc_chip_div:    'Diversificación adecuada',
@@ -4692,7 +4695,7 @@ const T = {
     intcc_dim_liq:    'Liquidez',
     intcc_dim_conc:   'Concentración',
     intcc_dim_stab:   'Estabilidad',
-    intcc_dim_growth: 'Crecimiento',
+    intcc_dim_growth: 'Rendimiento',   // INT.01 — the axis is TWR return, not value growth
     intcc_drivers_title: 'Factores principales',
     intcc_drv_explain_asset: name => `${name} representa actualmente la mayor exposición individual de tu patrimonio.`,
     intcc_drv_explain_cash:  (name, pct) => `Tu mayor posición actual es efectivo en ${name} (${pct}%). Aporta estabilidad y capacidad para aprovechar oportunidades.`,
@@ -6844,12 +6847,14 @@ const T = {
     intcc_empty_body:     'Add assets to your portfolio so Aurix can interpret your wealth.',
     intcc_read_healthy:      'Your wealth keeps a healthy structure',
     intcc_read_balanced:     'Your portfolio shows a balanced trajectory',
-    intcc_read_growing:      'Your wealth is growing',
+    // INT.01 — published from the flow-neutral TWR: this is RETURN, not value
+    // advance. See the ES dictionary for the rationale.
+    intcc_read_growing:      'Your portfolio is generating return',
     intcc_read_attention:    'Your wealth needs attention',
     intcc_read_concentrated: 'Your wealth is concentrated',
     intcc_sub_healthy:       'The overall structure is solid and shows no excessive dependence on a single position.',
     intcc_sub_balanced:      'Current diversification is reasonable and shows no excessive dependence on a single position.',
-    intcc_sub_growing:       pct => `Your investable wealth has advanced around ${pct}% over the recorded period.`,
+    intcc_sub_growing:       pct => `Your portfolio has generated around ${pct}% return over the recorded period, with your contributions and withdrawals already neutralised.`,
     intcc_sub_attention:     'A few points are worth looking at calmly, with no urgency.',
     intcc_sub_concentrated:  name => name ? `A relevant part of your wealth rests on ${name}.` : 'A relevant part of your wealth rests on a few positions.',
     intcc_chip_div:    'Adequate diversification',
@@ -6894,7 +6899,7 @@ const T = {
     intcc_dim_liq:    'Liquidity',
     intcc_dim_conc:   'Concentration',
     intcc_dim_stab:   'Stability',
-    intcc_dim_growth: 'Growth',
+    intcc_dim_growth: 'Return',        // INT.01 — the axis is TWR return, not value growth
     intcc_drivers_title: 'Key drivers',
     intcc_drv_explain_asset: name => `${name} is currently the single largest exposure in your wealth.`,
     intcc_drv_explain_cash:  (name, pct) => `Your largest current position is cash in ${name} (${pct}%). It adds stability and the capacity to seize opportunities.`,
@@ -49366,16 +49371,54 @@ function _intccEsc(s) {
 }
 function _intccClamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
 
-// Real historical growth of investable+total wealth over the recorded window.
-// Returns a % (can be negative) or null when there is not enough history to be
-// meaningful. NEVER invents — reads the stored portfolioHistory series only.
+// INT.01 TRUTH FOUNDATION — Intelligence publishes NO RETURN FIGURE. FAIL CLOSED.
+//
+// ── What was removed ────────────────────────────────────────────────────────
+// This used to be (last − first) / first over portfolioHistory, which turned a
+// CONTRIBUTION into performance: 10.000 € plus a 10.000 € deposit published
+// "+100%" in the hero and "Crecimiento 100/100" in the radar while the market
+// had returned exactly 0%. A deposit is not a return. That is gone.
+//
+// ── Why the existing TWR engine is NOT wired here (INT.01 finding) ──────────
+// `computeAurixTWRSeries` (WN.4C) IS correctly flow-neutral — Modified-Dietz
+// subperiods chained time-weighted over the capital_flows ledger. The problem is
+// its INPUT, not its arithmetic:
+//
+//  1. `_aurixUsdSnapshotsForRange` reads RAW `portfolioHistory`, which is TOTAL
+//     net worth INCLUDING REAL ESTATE (stated at the `_aurixInvestableSnapshots`
+//     contract: "legacy portfolioHistory stored total net worth incl. real
+//     estate"). Real-estate revaluation and asset deletion write NO capital flow
+//     — the ledger is written only by `_ledgerTrade`, cash ops and the backfills
+//     — so editing a flat's valuation from 380k to 420k arrives as a NO-FLOW
+//     interval and would be published as "your portfolio generated ~10% return,
+//     contributions and withdrawals already neutralised". The user typed a number
+//     into a form; nothing was earned.
+//  2. It applies neither the chart epoch (`_aurixInvestableChartEpoch`) nor the
+//     trust filter, so it consumes snapshots the chart itself refuses to read
+//     (AURIX-DATA-001 contamination, construction baselines).
+//  3. The engine's own coverage guard only inspects NO-FLOW intervals
+//     (`maxNoFlowJump` is updated solely in the else branch), so any interval
+//     containing one recorded flow bypasses the unrecorded-capital-event guard.
+//
+// The Dashboard measures return over `_aurixEligibleInvestableSeries`
+// (investable = total − real_estate, authoritative source, epoch + trust
+// filtered). Publishing a total-wealth TWR here would therefore ALSO put two
+// divergent returns one tap apart — the exact defect shape INT.01 exists to
+// remove, merely relocated from the score to the return.
+//
+// ── Contract ────────────────────────────────────────────────────────────────
+// Until a certified INVESTABLE flow-neutral series exists, this owner returns
+// null, ALWAYS. Consumers must treat null as "this dimension does not exist
+// yet" — no substitute, no neutral figure, no approximation.
+//
+// NEXT WORK (deliberately NOT in INT.01): build and certify investable return
+// from `_aurixEligibleInvestableSeries` reconciled with the USD `capital_flows`
+// ledger. That is the plug-in point for this function — and the ONLY thing that
+// may make it return a number.
+//
+// DO NOT reintroduce any figure derived from raw `portfolioHistory` here.
 function _intccGrowthPct() {
-  const h = (typeof portfolioHistory !== 'undefined' && Array.isArray(portfolioHistory)) ? portfolioHistory : [];
-  if (h.length < 2) return null;
-  const first = h[0], last = h[h.length - 1];
-  if (!first || !last || !(first.value > 0) || !(last.ts > first.ts)) return null;
-  if (last.ts - first.ts < 3 * 86400000) return null;   // need ≥ ~3 days of span
-  return ((last.value - first.value) / first.value) * 100;
+  return null;
 }
 
 // Radar — 5 deterministic dimensions, each 0–100 (higher = healthier). All read
@@ -49387,64 +49430,77 @@ function _intccRadar(snap, drivers, growthPct) {
   const cash   = snap.cashPct || 0;
   const crypto = snap.cryptoPct || 0;
   const topCat = (snap.topCategory && snap.topCategory.pctTotal) || 0;
-  const topCatType = (snap.topCategory && String(snap.topCategory.type || '')) || '';
 
   let diversification = 30 + cats * 14 - Math.max(0, topCat - 40) * 0.7 - Math.max(0, top1 - 35) * 0.5;
   let liquidity       = 100 - Math.max(0, 8 - cash) * 8 - Math.max(0, cash - 55) * 0.7;
   let concentration   = 100 - Math.max(0, top1 - 20) * 1.5 - Math.max(0, top3 - 55) * 0.8;
   let stability       = 100 - crypto * 0.7 - (snap.assetCount <= 1 ? 25 : 0) - Math.max(0, top1 - 50) * 0.4;
-  let growth;
-  if (growthPct != null) growth = 55 + growthPct * 2.2;
-  else growth = 45 + crypto * 0.25 + (/stock|etf|crypto/.test(topCatType) ? 10 : 0);
+
+  // INT.01 TRUTH FOUNDATION — the Growth axis is MEASURED or ABSENT.
+  //
+  // It used to be fabricated from portfolio COMPOSITION whenever there was no
+  // measurable return: `45 + cryptoPct*0.25 + (stock|etf|crypto ? 10 : 0)`. A
+  // two-day-old 60%-crypto portfolio published "Crecimiento 70/100" without a
+  // single day of known performance — a synthetic number presented as a fact,
+  // and it cascaded into the wealth-identity label. Composition is not return.
+  //
+  // `growthPct` now arrives from the certified flow-neutral engine, so:
+  //   growthPct != null  ⇒ measured, publish the axis;
+  //   growthPct == null  ⇒ growth is `null` and the axis is NOT PUBLISHED.
+  // Deliberately NOT 0, NOT 50, NOT "neutral", NOT estimated. Consumers must
+  // treat null as "this dimension does not exist yet".
+  const growth = (growthPct != null)
+    ? Math.round(_intccClamp(55 + growthPct * 2.2, 6, 100))
+    : null;
 
   return {
     diversification: Math.round(_intccClamp(diversification, 6, 100)),
     liquidity:       Math.round(_intccClamp(liquidity, 6, 100)),
     concentration:   Math.round(_intccClamp(concentration, 6, 100)),
     stability:       Math.round(_intccClamp(stability, 6, 100)),
-    growth:          Math.round(_intccClamp(growth, 6, 100)),
+    growth,
   };
 }
 
-// Aurix Health Score — official 0–100 with the INT.2 bands. Starts at 100 and
-// applies fixed, explainable deductions. Inputs (spec): top-1 / top-3
-// concentration, number of categories, crypto exposure, investable liquidity,
-// single-position. PROHIBITED: gross real-estate value, penalising real estate,
-// total wealth for liquidity — none of those are read here.
-function _intccHealthScore(snap, drivers) {
-  if (!snap || !snap.assetCount || snap.totUSD <= 0)
-    return { score: null, band: 'empty', tone: 'green', label: t('intcc_band_empty'), reasons: [] };
-  const top1   = (snap.topInvestedAsset && snap.topInvestedAsset.pctTotal) || 0;
-  const top3   = (drivers && drivers.pct) || 0;
-  const cats   = snap.categoryCount || 0;
-  const cash   = snap.cashPct || 0;
-  const crypto = snap.cryptoPct || 0;
-  let s = 100;
-  const reasons = [];
-  if (top1 > 60)        { s -= 22; reasons.push(t('intcc_hs_conc1_high')); }
-  else if (top1 > 45)   { s -= 12; reasons.push(t('intcc_hs_conc1_mid')); }
-  else if (top1 > 35)   { s -= 6; }
-  if (top3 > 80)        { s -= 12; reasons.push(t('intcc_hs_conc3_high')); }
-  else if (top3 > 65)   { s -= 6; }
-  if (cats <= 1)        { s -= 18; reasons.push(t('intcc_hs_div_low')); }
-  else if (cats === 2)  { s -= 9;  reasons.push(t('intcc_hs_div_mid')); }
-  if (crypto > 60)      { s -= 16; reasons.push(t('intcc_hs_crypto_high')); }
-  else if (crypto > 45) { s -= 9;  reasons.push(t('intcc_hs_crypto_mid')); }
-  else if (crypto > 30) { s -= 4; }
-  if (cash === 0)       { s -= 8;  reasons.push(t('intcc_hs_liq_zero')); }
-  else if (cash < 3)    { s -= 5;  reasons.push(t('intcc_hs_liq_low')); }
-  else if (cash > 70)   { s -= 6;  reasons.push(t('intcc_hs_liq_idle')); }
-  if (snap.assetCount === 1) { s -= 15; reasons.push(t('intcc_hs_single')); }
-  s = Math.round(_intccClamp(s, 0, 100));
-  let band, label;
-  if (s >= 90)      { band = 'excellent'; label = t('intcc_band_excellent'); }
-  else if (s >= 75) { band = 'good';      label = t('intcc_band_good'); }
-  else if (s >= 60) { band = 'watch';     label = t('intcc_band_watch'); }
-  else              { band = 'limited';   label = t('intcc_band_limited'); }
-  const explain = reasons.length ? reasons[0] : t('intcc_hs_clean');
-  // INT.2Z — visual tone by score range (5 levels), independent of the label
-  // band. Drives ring/badge/accent colour only; the score formula is untouched.
-  return { score: s, band, tone: _intccScoreTone(s), label, reasons: reasons.slice(0, 3), explain };
+// INT.01 TRUTH FOUNDATION — Intelligence does NOT own a health score.
+//
+// `_aurixHealthScore` is the CANONICAL owner of wealth health: it has the wider
+// product surface (Dashboard, Workspace, health panel) and is the definition
+// already published to real users. Until INT.01 this function ran a SECOND
+// independent 0–100 engine, with its own deduction ladder AND its own bands
+// (90/75/60) against the canonical 80/60/40 — divergence measured up to ~25
+// points, with tone crossing: the same wealth read "solid" in Workspace and
+// "to watch" in Intelligence, one tap apart. Unacceptable on a Premium surface.
+//
+// This is now a pure ADAPTER. Score, band partition and label all come from the
+// canonical engine, so one snapshot yields one score, one semantic band and one
+// base interpretation on every surface that publishes the concept. The
+// canonical financial methodology is NOT modified — nothing was retuned to make
+// numbers agree; Intelligence simply stopped asserting a competing truth.
+//
+// The only thing Intelligence keeps is `tone`, the purely visual 5-level CSS
+// token (INT.2Z). Its thresholds (80/60/40) ARE the canonical partition, so
+// label and colour now come out of the SAME split — previously the label used
+// one engine's bands and the tone the other's.
+//
+// Fail closed: no canonical engine, or no canonical score, ⇒ no score.
+// `drivers` is kept in the signature for call-site compatibility; top-3
+// concentration is the canonical engine's business now, not a second opinion.
+function _intccHealthScore(snap, drivers) {   // eslint-disable-line no-unused-vars
+  const canonical = (typeof _aurixHealthScore === 'function') ? _aurixHealthScore(snap) : null;
+  if (!canonical || canonical.score == null)
+    return { score: null, band: 'empty', tone: 'green', label: t('intcc_band_empty'), reasons: [], explain: '' };
+  const s = canonical.score;
+  // Canonical partition (_aurixHealthScore): 80 / 60 / 40.
+  const band = s >= 80 ? 'solid' : (s >= 60 ? 'moderate' : (s >= 40 ? 'elevated' : 'high'));
+  return {
+    score:   s,
+    band,
+    tone:    _intccScoreTone(s),
+    label:   canonical.label,
+    reasons: [],                       // deduction narrative belongs to the canonical owner
+    explain: canonical.explain || '',
+  };
 }
 
 // INT.2Z — premium 5-level colour tone, purely visual (no effect on the score).
@@ -49486,7 +49542,9 @@ function _intccIdentity(snap, radar) {
   let key;
   if (crypto >= 55 || topCatType === 'crypto')                          key = 'tech';
   else if (cash >= 45 || (crypto < 10 && (topCatType === 'cash' || topCatType === 'metal'))) key = 'defensive';
-  else if (radar.growth >= 70 && crypto >= 25)                          key = 'growth';
+  // INT.01 — the `growth` identity requires MEASURED growth. When the axis is
+  // absent (null) this branch must not fire off a fabricated number.
+  else if (Number.isFinite(radar.growth) && radar.growth >= 70 && crypto >= 25) key = 'growth';
   else if (cats >= 4 && radar.concentration >= 65)                      key = 'diversified';
   else if (radar.diversification >= 55 && radar.concentration >= 55)    key = 'balanced';
   else                                                                  key = 'hybrid';
@@ -49589,11 +49647,42 @@ function _intccSinceLastVisit(snap) {
 
 // Bloque 9 — intelligence timeline.
 // INT.2ZA — Timeline V3. Coherent, prioritised milestones derived strictly from
-// the real stored series (no invented events, no backend, no drill-down): wealth
-// thresholds, all-time high, relevant drawdown, and liquidity crossings. Each
+// the real stored series (no invented events, no backend, no drill-down). Each
 // event carries its real timestamp + a relevance weight (`prio`). We pick the 5
 // most relevant, then display them chronologically (newest first). Hard cap 5,
 // NO "+N earlier events" CTA (it was not actionable).
+//
+// INT.01 TRUTH FOUNDATION — only events whose truth can be CERTIFIED with
+// today's sources are published. Two former event families were removed:
+//
+//  · RELEVANT DRAWDOWN — it was computed on GROSS wealth value, so withdrawing
+//    30.000 € from 100.000 € published "your wealth fell 30%". That presents a
+//    capital OUTFLOW as a market loss. A drawdown claim needs a flow-neutral
+//    series; until that event is rebuilt on one, it is not published at all.
+//
+//  · LIQUIDITY CROSSINGS — they read `categoryHistory`, which the code itself
+//    declares a cache / push-buffer and explicitly NOT a display source (the
+//    authority is `_aurixCanonicalCatHistory`). Publishing from a source
+//    declared non-authoritative is exactly what INT.01 exists to stop. (The
+//    loops also `break` on the FIRST match, pinning the OLDEST crossing.)
+//    Migrating category events to the certified server reader is INT.02 work.
+//
+// What survives are assertions about LEVEL, which stay true regardless of how
+// the level was reached — a deposit genuinely raises wealth past a threshold:
+//   · wealth threshold crossings;
+//   · the all-time high.
+// No new events are added here.
+//
+// Why `portfolioHistory` (TOTAL net worth incl. real estate) is the right source
+// for these two and NOT for a return: both copies speak about "tu patrimonio" —
+// total wealth — so the source and the claim agree. A return claim would need the
+// INVESTABLE series instead, which is exactly why `_intccGrowthPct` publishes
+// nothing. Level ≠ performance.
+//
+// RESIDUAL (deferred with the series decision, NOT introduced here): this reads
+// LOCAL history without the chart epoch or the trust filter, so a contaminated
+// snapshot (AURIX-DATA-001, construction baselines) could date the ATH wrongly.
+// The ATH publishes no figure, only a date, so it cannot state a false amount.
 function _intccTimeline() {
   const out = [];
   const h = (typeof portfolioHistory !== 'undefined' && Array.isArray(portfolioHistory)) ? portfolioHistory : [];
@@ -49601,10 +49690,23 @@ function _intccTimeline() {
   if (h.length >= 2) {
     // Wealth threshold crossings (hitos patrimoniales) — lowest priority so a run
     // of similar amounts never crowds out the more informative events.
+    //
+    // INT.01 — CURRENCY TRUTH. `portfolioHistory` values are USD, but the label is
+    // rendered with `formatBase`, which FORMATS and does NOT convert
+    // (formatBase(a) → formatCurrency(a, baseCurrency)). Comparing USD values
+    // against these constants and then labelling them with the base symbol
+    // published a false figure: a EUR user crossing 100.000 USD (~92.000 €) was
+    // told "tu patrimonio superó 100.000,00 €". The threshold is now a BASE-currency
+    // milestone and the series is converted to base before comparison, so the
+    // number compared is the number published. Round milestones stay round in the
+    // user's own currency.
     const THRESH = [10000, 25000, 50000, 100000, 250000, 500000, 1000000, 2000000, 5000000];
     for (const thr of THRESH) {
       for (let i = 1; i < h.length; i++) {
-        if (h[i - 1].value < thr && h[i].value >= thr) {
+        const prevBase = toBase(h[i - 1].value, 'USD'), curBase = toBase(h[i].value, 'USD');
+        // Unknown FX ⇒ NaN ⇒ no comparison, no event. Fail closed.
+        if (!Number.isFinite(prevBase) || !Number.isFinite(curBase)) continue;
+        if (prevBase < thr && curBase >= thr) {
           out.push({ ts: h[i].ts, tone: 'up', prio: 1, text: t('intcc_tl_cross')(formatBase(thr)) });
           break;
         }
@@ -49616,33 +49718,6 @@ function _intccTimeline() {
       let peak = h[0].value, peakIdx = 0;
       for (let i = 1; i < h.length; i++) { if (h[i].value > peak) { peak = h[i].value; peakIdx = i; } }
       if (peakIdx >= 1 && peak > 0) out.push({ ts: h[peakIdx].ts, tone: 'up', prio: 3, text: t('intcc_tl_ath') });
-    }
-    // Largest relevant drawdown from a running peak (bajada relevante ≥10%).
-    let runPeak = h[0].value, worst = 0, worstTs = 0;
-    for (let i = 1; i < h.length; i++) {
-      if (h[i].value > runPeak) runPeak = h[i].value;
-      else if (runPeak > 0) {
-        const dd = ((runPeak - h[i].value) / runPeak) * 100;
-        if (dd > worst) { worst = dd; worstTs = h[i].ts; }
-      }
-    }
-    if (worst >= 10 && worstTs) out.push({ ts: worstTs, tone: 'down', prio: 3, text: t('intcc_tl_drop')(Math.round(worst)) });
-  }
-
-  // Liquidity crossings (cambios de liquidez) from the category series.
-  const ch = (typeof categoryHistory !== 'undefined' && Array.isArray(categoryHistory)) ? categoryHistory : [];
-  for (let i = 1; i < ch.length; i++) {
-    const pT = ch[i - 1].total, cT = ch[i].total;
-    if (pT > 0 && cT > 0) {
-      const pL = (ch[i - 1].liquidity / pT) * 100, cL = (ch[i].liquidity / cT) * 100;
-      if (pL >= 10 && cL < 10) { out.push({ ts: ch[i].ts, tone: 'down', prio: 2, text: t('intcc_tl_liq10') }); break; }
-    }
-  }
-  for (let i = 1; i < ch.length; i++) {
-    const pT = ch[i - 1].total, cT = ch[i].total;
-    if (pT > 0 && cT > 0) {
-      const pL = (ch[i - 1].liquidity / pT) * 100, cL = (ch[i].liquidity / cT) * 100;
-      if (pL < 15 && cL >= 15) { out.push({ ts: ch[i].ts, tone: 'info', prio: 2, text: t('intcc_tl_liq_up') }); break; }
     }
   }
 
@@ -49710,15 +49785,29 @@ function _intccScoreRingHtml(score) {
     </svg>`;
 }
 
-// Premium wealth radar — pentagon grid + filled data polygon + outer labels.
+// Premium wealth radar — polygon grid + filled data polygon + outer labels.
+//
+// INT.01 TRUTH FOUNDATION — the geometry is derived from the dimensions that
+// ACTUALLY have certified evidence, not from a fixed pentagon. A dimension whose
+// value is null (today: Growth without measurable flow-neutral return) is not
+// drawn at all: no axis, no label, no number, no vertex. Rendering it at 0 or at
+// mid-scale would read as a measurement, and pinning the polygon to the centre
+// on that axis would read as "your growth is the worst possible". Since the grid,
+// axes, vertices and labels are all computed from `dims.length`, dropping the
+// axis yields an honest 4-sided radar with zero geometry hacks.
+// Truth over visual symmetry.
 function _intccRadarSvg(radar) {
-  const dims = [
+  const ALL_DIMS = [
     { key: 'diversification', label: t('intcc_dim_div') },
     { key: 'liquidity',       label: t('intcc_dim_liq') },
     { key: 'concentration',   label: t('intcc_dim_conc') },
     { key: 'stability',       label: t('intcc_dim_stab') },
     { key: 'growth',          label: t('intcc_dim_growth') },
   ];
+  const dims = ALL_DIMS.filter(d => radar && Number.isFinite(radar[d.key]));
+  // Fail closed: fewer than 3 certified dimensions cannot form a polygon, so we
+  // publish no radar rather than a degenerate shape.
+  if (dims.length < 3) return '';
   const cx = 110, cy = 106, R = 76, n = dims.length;
   const ang = i => (-90 + i * (360 / n)) * Math.PI / 180;
   const pt  = (i, r) => [cx + Math.cos(ang(i)) * r, cy + Math.sin(ang(i)) * r];
