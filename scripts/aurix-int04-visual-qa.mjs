@@ -191,6 +191,14 @@ const EXPECTED_ORDER = {
   tablet:  ['intcc-hero','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv5-structure','intv4-changed','intv4-discovery'],
   desktop: ['intcc-hero','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv5-structure','intv4-changed','intv4-discovery'],
 };
+// INT.07 §14 — a row must behave like a ROW: every card in it shares one bottom
+// baseline. The founder photographed the opposite (a broken mosaic with black
+// holes), so this is measured per row on the desktop grid.
+const DESKTOP_ROWS = [
+  ['intcc-radar', 'intcc-drivers', 'intcc-explore'],
+  ['intcc-watch', 'intcc-timeline'],
+  ['intv5-structure', 'intv4-changed'],
+];
 const VIEWPORTS = [
   { name: 'mobile',  width: 390,  height: 844,  dsf: 3, mobile: true  },   // iPhone 14/15
   { name: 'tablet',  width: 834,  height: 1112, dsf: 2, mobile: true  },   // iPad Air portrait
@@ -370,6 +378,21 @@ const MEASURE = `(function(){
     out.emptyGridGap = Math.abs(gap) > 4;
   })();
   out.radarLabels = Array.prototype.slice.call(host.querySelectorAll('.intcc-radar-label')).map(function(e){ return (e.textContent||'').trim(); });
+  // ROW SYMMETRY: bottom edges of the cards in each desktop row must coincide.
+  out.rowSymmetry = [];
+  if (innerWidth >= 1024) {
+    var ROWS = ${JSON.stringify(DESKTOP_ROWS)};
+    ROWS.forEach(function(row){
+      var boxes = row.map(function(cls){ var el = host.querySelector('.' + cls);
+        return (el && vis(el)) ? el.getBoundingClientRect() : null; }).filter(Boolean);
+      if (boxes.length < 2) return;
+      var tops = boxes.map(function(b){ return Math.round(b.top); });
+      var bots = boxes.map(function(b){ return Math.round(b.bottom); });
+      out.rowSymmetry.push({ row: row.join('|'),
+        topSpread: Math.max.apply(null, tops) - Math.min.apply(null, tops),
+        botSpread: Math.max.apply(null, bots) - Math.min.apply(null, bots) });
+    });
+  }
   var bodyBg = getComputedStyle(document.body).backgroundColor;
   out.bodyBg = bodyBg;
   return out;
@@ -455,6 +478,11 @@ for (const vp of VIEWPORTS) {
   if (!vp.mobile || vp.name === 'tablet') {
     // the hero is only rendered on tablet/desktop (phones use the two cards)
     check(vp, 'hero eyebrows are optically aligned (<=2px)', m.heroAlign !== null && m.heroAlign <= 2, 'delta=' + m.heroAlign + 'px');
+  }
+  if (!vp.mobile) {
+    check(vp, 'every desktop row shares one bottom baseline (no broken mosaic)',
+      m.rowSymmetry.length >= 2 && m.rowSymmetry.every(function(r){ return r.botSpread <= 2 && r.topSpread <= 2; }),
+      JSON.stringify(m.rowSymmetry));
   }
   check(vp, 'no card wastes more than 120px of dead space',
     m.deadSpace.every(function(d){ return d.slack <= 120; }),

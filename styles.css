@@ -20666,6 +20666,30 @@ body.gs-open { overflow: hidden; }
    accent is reserved for real signals elsewhere. */
 .intv6-radar .intcc-radar-area { fill: rgba(74,130,240,0.20); stroke: rgba(122,162,255,0.85); }
 
+/* ── INT.07 · INTERIOR DISTRIBUTION over the full row height ─────────────────
+   Now that a card stretches to its row, its CONTENT must be distributed rather
+   than clinging to the top. Nothing is invented to fill space: the existing
+   elements simply breathe into the height they were given. */
+@media (min-width: 1024px) {
+  /* FACTORES PRINCIPALES (§8): title → lead → three real factors → bottom
+     padding, spread deliberately instead of stacked at the top. */
+  .aurix-intv6 .intcc-drivers .intcc-drv-list { flex: 1 1 auto; justify-content: space-evenly; gap: 4px; }
+  .aurix-intv6 .intcc-drivers .intcc-drv-explain { margin-bottom: 4px; }
+  /* RADAR: the polygon takes the room the row gives it and stays centred. */
+  .aurix-intv6 .intcc-radar .intcc-radar-wrap { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; }
+  /* EXPLORA: the question rows share the height evenly. */
+  .aurix-intv6 .intcc-explore .intcc-explore-list { flex: 1 1 auto; justify-content: space-evenly; }
+  /* MEMORIA (§10/§11): a persistent container. The timeline sits toward the top
+     and the honest message below it, so the card reads as designed at one event
+     or at ten — it never collapses to fit today's sparse history. */
+  .aurix-intv6 .intcc-timeline .intcc-tl-list { flex: 1 1 auto; }
+  .aurix-intv6 .intv4-memory.is-accruing .intv6-accrue { margin-top: 18px; }
+  /* QUÉ HA CAMBIADO / ESTRUCTURA: an empty-ish card keeps its pair's height with
+     its message at the top; the interior slack is deliberate, not a hole. */
+  .aurix-intv6 .intv4-changed .intv4-chg-list { flex: 1 1 auto; }
+  .aurix-intv6 .intv5-structure .intv6-struct-dep { margin-top: auto; }
+}
+
 /* ── INT.06B · COMPOSITION state (fewer classes than a polygon needs) ────────
    Same certified percentages as the radar, in a form that is honest at one or two
    classes. No axis is invented to reach a figure. */
@@ -20807,15 +20831,23 @@ body.gs-open { overflow: hidden; }
   .intv4-changed   { grid-column: 7 / 13; grid-row: 4; }
   .intv4-discovery { grid-column: 1 / 13; grid-row: 5; }
   .intcc-disclaimer { grid-column: 1 / 13; grid-row: 6; }
-  /* DEAD SPACE (SPEC §9/§15). A grid item stretches to the tallest cell in its
-     row, which is what left a large void under the three key drivers. These cards
-     are content-sized instead, so a card now ENDS where its content ends and the
-     row keeps its rhythm without inventing filler. */
+  /* ROW SYMMETRY (INT.07 §14). INT.06 sized each card by its own content to kill
+     dead space — and that produced the broken mosaic the founder photographed:
+     cards ending at different baselines with black holes between them. A row must
+     behave like a ROW. Its height is set by the card that legitimately needs the
+     most content and the others STRETCH to it, so every row shares one baseline.
+     Controlled emptiness INSIDE a card is acceptable; an exterior hole caused by
+     two unequal cards is not. Interior distribution is handled per module below.
+     `stretch` is the grid default, so this is asserted rather than set. */
+  .aurix-intv6 > * { align-self: stretch; }
+  /* Each card lays its own content out over the full row height it receives. */
   .aurix-intv6 .intcc-radar,
   .aurix-intv6 .intcc-drivers,
+  .aurix-intv6 .intcc-explore,
+  .aurix-intv6 .intcc-watch,
+  .aurix-intv6 .intcc-timeline,
   .aurix-intv6 .intv5-structure,
-  .aurix-intv6 .intv4-changed,
-  .aurix-intv6 .intcc-timeline { align-self: start; }
+  .aurix-intv6 .intv4-changed { display: flex; flex-direction: column; }
   /* DATA-ADAPTIVE (INT.06B). The pins above reserve a column even when a module
      is genuinely absent — that is exactly how a fail-closed radar left a hole at
      grid-column 1/5. Each row now recomposes when one of its members is missing,
@@ -20869,7 +20901,9 @@ body.gs-open { overflow: hidden; }
   /* INT.05 — change reads right after the cockpit, so every later block shifts by
      one. Distinct values on purpose: `order: 3` tied with the drivers and DOM
      order silently decided the winner (measured). */
-  /* INT.06 — the same cognitive order as the desktop grid, one column. */
+  /* INT.07 §15 — hero → radar → factores → explora → lo que importa → memoria →
+     estructura → qué ha cambiado → descubrimiento. One column, natural heights:
+     equal heights stop making sense once the cards are stacked. */
   .intcc-hero      { order: 1; }
   .intcc-radar     { order: 2; }
   .intcc-drivers   { order: 3; }

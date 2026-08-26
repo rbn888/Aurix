@@ -1,6 +1,6 @@
 {
-  "url": "https://app.aurixsystem.io/",
-  "at": "2026-08-26T19:42:41.975Z",
+  "url": "http://127.0.0.1:8852/",
+  "at": "2026-08-26T19:53:50.959Z",
   "rows": [
     {
       "vp": "mobile",
@@ -142,6 +142,7 @@
         "Metales",
         "Liquidez"
       ],
+      "rowSymmetry": [],
       "bodyBg": "rgb(4, 5, 7)"
     },
     {
@@ -275,6 +276,7 @@
         "Metales",
         "Liquidez"
       ],
+      "rowSymmetry": [],
       "bodyBg": "rgb(4, 5, 7)"
     },
     {
@@ -365,7 +367,7 @@
         },
         {
           "k": "intcc-explore",
-          "slack": 30
+          "slack": 1
         },
         {
           "k": "intcc-watch",
@@ -373,7 +375,7 @@
         },
         {
           "k": "intcc-timeline",
-          "slack": 5
+          "slack": 1
         },
         {
           "k": "intv5-structure",
@@ -407,6 +409,23 @@
         "Fondos",
         "Metales",
         "Liquidez"
+      ],
+      "rowSymmetry": [
+        {
+          "row": "intcc-radar|intcc-drivers|intcc-explore",
+          "topSpread": 0,
+          "botSpread": 0
+        },
+        {
+          "row": "intcc-watch|intcc-timeline",
+          "topSpread": 0,
+          "botSpread": 0
+        },
+        {
+          "row": "intv5-structure|intv4-changed",
+          "topSpread": 0,
+          "botSpread": 0
+        }
       ],
       "bodyBg": "rgb(4, 5, 7)"
     }
