@@ -489,7 +489,13 @@ console.log('\n26–30 · Chart, Performance, Reader, Preview and User Health:')
     '_aw8Qty',
     // …y el owner de la superficie VIVA de Workspace, donde `assetCount` se contaba sobre la
     // lista sin filtrar mientras el total ya venía filtrado. Mismo gate que _aw8Qty.
-    '_aurixHealthSnapshot'];
+    '_aurixHealthSnapshot',
+    // SPEC INT.03 — el owner de diversificación efectiva (HHI / effective holdings) del
+    // Intelligence Core. Lee la cantidad certificada por AQUÍ para FALLAR CERRADO: una
+    // posición con cantidad no usable invalidaría el denominador y sobrestimaría la
+    // diversificación, así que no publica número. Gate propio:
+    // docs/AURIX-INT-CORE-FACT-ENGINE-harness.js (sección 4).
+    '_aurixEffectiveDiversification'];
   ok('30.3 the quantity rule is used ONLY where this SPEC declares it',
     (app.match(/_aurixUsableQuantity\(/g) || []).length === DECLARED_CALL_SITES.length + 2   // +1 definicion, +1 recomputeDerivedFinancialState
     && DECLARED_CALL_SITES.every(n => /_aurixUsableQuantity\(/.test(fnSrc(n)))

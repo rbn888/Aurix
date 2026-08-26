@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '641'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '642'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -2242,9 +2242,22 @@ const _AURIX_CATHIST_SOURCE_ROW_CAP = 5000;
 // side — the selected start is always a REAL captured point, never a synthesized one, so the honest move is
 // to bound and REPORT the drift rather than pretend the window began exactly on the boundary. These are DATA
 // representativeness bounds, not product materiality rules; the next engine may tighten them with Financial.
+// INT.03 — 30D/90D are now DECLARED. This does not weaken the decision above, it
+// relies on the mechanism that decision described: a declared window is only ever
+// ANSWERED when a real captured point sits within maxStartDriftMs of the ideal
+// start, otherwise `_aurixCatHistWindow` returns state 'insufficient_data' with
+// reason 'insufficient_history' and no start/end/delta at all. So declaring a
+// window cannot publish one Aurix cannot back — the drift guard is what publishes,
+// and it refuses until the history genuinely reaches back that far. With server
+// captures starting 2026-08-17, 30D and 90D therefore fail closed today and begin
+// answering on their own once the history covers them. The drift bounds keep the
+// same DATA-representativeness proportion as the two existing windows (≈7% of the
+// span: 2h/24h = 8.3%, 12h/7d = 7.1%), so no window is more permissive than 24H.
 const _AURIX_CATHIST_WINDOWS = Object.freeze({
   '24H': Object.freeze({ ms: 24 * 3600000, maxStartDriftMs: 2 * 3600000 }),   // span ∈ [22h, 26h]
   '7D':  Object.freeze({ ms: 7 * 864e5,    maxStartDriftMs: 12 * 3600000 }),  // span ∈ [6.5d, 7.5d]
+  '30D': Object.freeze({ ms: 30 * 864e5,   maxStartDriftMs: 2 * 864e5 }),     // span ∈ [28d, 32d]
+  '90D': Object.freeze({ ms: 90 * 864e5,   maxStartDriftMs: 6 * 864e5 }),     // span ∈ [84d, 96d]
 });
 // The raw server rows. Never the merged display source.
 function _aurixCatHistRows() {
@@ -25989,6 +26002,666 @@ function _aurixInvestablePerformance(range) {
 }
 if (typeof window !== 'undefined') {
   window.debugAurixInvestablePerformance = (range) => _aurixInvestablePerformance(range || 'all');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC INT.03 · INTELLIGENCE CORE / WEALTH FACT ENGINE
+// ════════════════════════════════════════════════════════════════════════════
+// CERTIFIED ENGINES → FACT LEDGER → RELATION/PRIORITY → CORE OUTPUT → INT.04
+//
+// The deterministic brain of Intelligence. It owns NO financial formula: every
+// number comes from an already-certified owner (`_aurixInvestablePerformance`,
+// `_aurixCatExposureDelta`, `_aurixEligibleInvestableSeries`,
+// `_aurixHealthSnapshot`, the capital-flow ledger). What it adds is the layer
+// that was missing: certification gating, causal grouping, deduplication,
+// prioritisation, novelty and a single consumption contract.
+//
+// THE LEDGER INVARIANT — a fact that cannot be certified from a valid source
+// does not enter the ledger, and what is not in the ledger can never be
+// presented as truth by any Intelligence surface. Absence is recorded as a
+// structured GAP (family + reason), never as 0 / neutral / an estimate.
+//
+// THE CORE EMITS NO COPY. Every fact is structured data with stable keys and
+// units; INT.04 renders it and Auris may INTERPRET it. Auris never owns a
+// number. This is also why language cannot alter any figure or any selection:
+// there is no text in this layer to vary.
+//
+// NOT BUILT HERE (by SPEC): per-asset attribution, benchmarks, correlations,
+// sector/geography, economic currency exposure, predictions, recommendations.
+// If a sentence would need one of those, the sentence is not publishable.
+
+// Data sufficiency vocabulary. Only AVAILABLE facts reach the ledger.
+const _AURIX_FACT_STATUS = Object.freeze({
+  AVAILABLE:            'available',
+  INSUFFICIENT_HISTORY: 'insufficient_history',
+  LOW_CONFIDENCE:       'low_confidence',
+  UNAVAILABLE_SOURCE:   'unavailable_source',
+  NOT_YET_SUPPORTED:    'not_yet_supported',
+});
+const _AURIX_FACT_FAMILY = Object.freeze({
+  PERFORMANCE:     'performance',
+  WEALTH_LEVEL:    'wealth_level',
+  CAPITAL_FLOW:    'capital_flow',
+  LIQUIDITY:       'liquidity',
+  EXPOSURE:        'exposure',
+  CONCENTRATION:   'concentration',
+  DIVERSIFICATION: 'diversification',
+  DATA_QUALITY:    'data_quality',
+});
+// CAUSAL ROOTS — the deduplication axis, and the whole point of §4. Before
+// INT.03 a single phenomenon (BTC = 53% of the portfolio) surfaced as three
+// independent "discoveries": high concentration, dependence on the main
+// position, and reduced diversification. They share ONE root, so they collapse
+// into one primary story plus supporting facts. Deduplication is by ROOT, never
+// by string — two different sentences about the same phenomenon are still
+// repetition.
+const _AURIX_CAUSAL_ROOT = Object.freeze({
+  TOP_POSITION:        'top_position',          // concentration / dependence / diversification-by-weight
+  CATEGORY_MIX:        'category_mix',          // exposure by category and its drift
+  CASH_WEIGHT:         'cash_weight',           // liquidity level and its drift
+  INVESTABLE_RETURN:   'investable_return',     // flow-neutral market performance
+  EXTERNAL_CAPITAL:    'external_capital',      // recorded contributions / withdrawals
+  WEALTH_LEVEL:        'wealth_level',          // level, highs, milestones
+  DATA_COVERAGE:       'data_coverage',         // what Aurix cannot yet know
+});
+// Materiality thresholds. Named so they are reviewable, not buried in
+// expressions. These are PUBLICATION thresholds, not financial advice.
+const _AURIX_FACT_MATERIAL = Object.freeze({
+  exposureDeltaPp:  3,      // pp of investable wealth — below this a drift is noise
+  cashDeltaPp:      3,
+  concentrationPct: 25,     // a single position at/above this is structurally material
+  returnPct:        1,      // |return| below this is not a story
+  flowShareOfValue: 0.02,   // recorded capital ≥2% of investable value is material
+  effectiveNRatio:  0.6,    // effectiveN/positions below this means weights are lopsided
+});
+// Ranking weights. Explicit and testable on purpose — §5 forbids an opaque
+// "magic" formula. Every component is a normalised 0..1 score.
+const _AURIX_RANK_WEIGHTS = Object.freeze({
+  materiality: 0.34,   // how much of the wealth this actually concerns
+  magnitude:   0.22,   // how big the measured change is
+  confidence:  0.18,   // data quality — a huge fact with poor data must not win
+  novelty:     0.14,   // new/unseen beats already-told, but cannot outrank material
+  utility:     0.08,   // is it actionable-adjacent / interpretable
+  rarity:      0.04,   // unusual for this portfolio
+});
+const _AURIX_NOVELTY_WINDOW_MS = 2 * 864e5;    // presentation memory horizon (legacy engine's 2 days)
+const _AURIX_INTCORE_STORY_LIMIT = 5;          // 3–5 primary stories with DISTINCT roots
+
+function _aurixFactClamp01(n) { return Math.max(0, Math.min(1, Number.isFinite(n) ? n : 0)); }
+
+// ── EFFECTIVE DIVERSIFICATION ───────────────────────────────────────────────
+// HHI over REAL position weights plus the effective number of equally-weighted
+// holdings (1 / Σw²). Denominator is explicit: investable value (real estate
+// excluded), so a property never dilutes the measure. This is a description of
+// how weight is spread, NOT a recommendation and NOT a risk forecast.
+// Fail closed: if any investable position cannot be valued, no number is
+// produced — a partial denominator would silently overstate diversification.
+function _aurixEffectiveDiversification() {
+  const out = { status: _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE, reason: 'no_source',
+    positions: 0, hhi: null, effectiveN: null, topWeightPct: null,
+    denominator: 'investable_value_usd', unit: 'positions' };
+  try {
+    if (typeof investableAssets !== 'function' || typeof assetValueUSD !== 'function') return out;
+    const list = investableAssets();
+    if (!Array.isArray(list) || !list.length) { out.reason = 'no_positions'; return out; }
+    let total = 0; const vals = [];
+    for (const a of list) {
+      if (typeof _aurixUsableQuantity === 'function' && !Number.isFinite(_aurixUsableQuantity(a && a.qty))) {
+        out.status = _AURIX_FACT_STATUS.LOW_CONFIDENCE; out.reason = 'unusable_quantity'; return out;
+      }
+      const v = assetValueUSD(a);
+      if (!Number.isFinite(v)) { out.status = _AURIX_FACT_STATUS.LOW_CONFIDENCE; out.reason = 'unvalued_position'; return out; }
+      if (v <= 0) continue;                                   // a closed / zero position is not a weight
+      vals.push(v); total += v;
+    }
+    if (!(total > 0) || vals.length < 1) { out.reason = 'no_valued_positions'; return out; }
+    let hhi = 0, maxW = 0;
+    for (const v of vals) { const w = v / total; hhi += w * w; if (w > maxW) maxW = w; }
+    if (!(hhi > 0) || !Number.isFinite(hhi)) { out.status = _AURIX_FACT_STATUS.LOW_CONFIDENCE; out.reason = 'hhi_not_finite'; return out; }
+    out.status = _AURIX_FACT_STATUS.AVAILABLE; out.reason = '';
+    out.positions = vals.length;
+    out.hhi = +hhi.toFixed(6);
+    out.effectiveN = +(1 / hhi).toFixed(2);
+    out.topWeightPct = +(maxW * 100).toFixed(2);
+    return out;
+  } catch (_) { out.status = _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE; out.reason = 'error'; return out; }
+}
+
+// ── FACT LEDGER ─────────────────────────────────────────────────────────────
+// Builds every certifiable fact once. `opts.ranges` bounds which windows are
+// asked for; `opts.presentationHistory` (array of { semanticKey, shownAt }) is
+// injected rather than read ambiently so the whole core is deterministic and
+// testable — novelty must never make the SAME input produce a different fact.
+function _aurixFactLedger(opts) {
+  const o = opts || {};
+  const nowTs = Number.isFinite(o.now) ? o.now : ((typeof Date !== 'undefined') ? Date.now() : 0);
+  const ranges = Array.isArray(o.ranges) ? o.ranges : ['24H', '7D', '30D', '90D'];
+  const facts = [], gaps = [];
+  const seenHistory = Array.isArray(o.presentationHistory) ? o.presentationHistory : [];
+  const lastShown = key => {
+    let t0 = null;
+    for (const h of seenHistory) {
+      if (h && h.semanticKey === key && Number.isFinite(h.shownAt) && (t0 === null || h.shownAt > t0)) t0 = h.shownAt;
+    }
+    return t0;
+  };
+  // NOVELTY affects PRIORITY, never TRUTH. A fact already shown is still true;
+  // it simply ranks lower until the memory horizon passes.
+  const noveltyOf = key => {
+    const t0 = lastShown(key);
+    if (t0 === null) return 1;
+    const age = nowTs - t0;
+    if (!Number.isFinite(age) || age <= 0) return 0;
+    return _aurixFactClamp01(age / _AURIX_NOVELTY_WINDOW_MS);
+  };
+  const gap = (family, semanticKey, status, reason, extra) => {
+    gaps.push(Object.assign({ family, semanticKey, status, reason: reason || '' }, extra || {}));
+  };
+  const push = (f) => {
+    const materiality = _aurixFactClamp01(f.materiality);
+    const magnitude   = _aurixFactClamp01(f.magnitude);
+    const confidence  = _aurixFactClamp01(f.confidence);
+    const utility     = _aurixFactClamp01(f.utility);
+    const rarity      = _aurixFactClamp01(f.rarity);
+    const novelty     = _aurixFactClamp01(noveltyOf(f.semanticKey));
+    const W = _AURIX_RANK_WEIGHTS;
+    const priority = +(
+      materiality * W.materiality + magnitude * W.magnitude + confidence * W.confidence +
+      novelty * W.novelty + utility * W.utility + rarity * W.rarity
+    ).toFixed(6);
+    facts.push(Object.assign({}, f, {
+      id: f.semanticKey + (f.window && f.window.range ? '@' + f.window.range : ''),
+      dataStatus: _AURIX_FACT_STATUS.AVAILABLE,
+      materiality, magnitude, confidence, utility, rarity, novelty, priority,
+      components: { materiality, magnitude, confidence, novelty, utility, rarity },
+      supporting: [],
+    }));
+  };
+
+  // ── A · PERFORMANCE — exclusively the INT.02 certified owner ──────────────
+  const perfRanges = Array.isArray(o.perfRanges) ? o.perfRanges : ['24h', '7d', '30d', 'all'];
+  for (const pr of perfRanges) {
+    let p = null;
+    try { p = (typeof _aurixInvestablePerformance === 'function') ? _aurixInvestablePerformance(pr) : null; } catch (_) { p = null; }
+    if (!p || p.valid !== true || !Number.isFinite(p.returnPct)) {
+      gap(_AURIX_FACT_FAMILY.PERFORMANCE, 'investable_return_' + pr,
+        _AURIX_FACT_STATUS.INSUFFICIENT_HISTORY, (p && p.fallbackReason) || 'owner_unavailable', { range: pr });
+      continue;
+    }
+    const abs = Math.abs(p.returnPct);
+    if (abs < _AURIX_FACT_MATERIAL.returnPct) {
+      // Measured but flat: still a fact — it is what makes "your wealth grew but
+      // your investments did not" possible. Low magnitude, real materiality.
+    }
+    push({
+      semanticKey: 'investable_return_' + pr,
+      family: _AURIX_FACT_FAMILY.PERFORMANCE,
+      causalRoot: _AURIX_CAUSAL_ROOT.INVESTABLE_RETURN,
+      value: p.returnPct, unit: 'percent',
+      values: { returnPct: p.returnPct, startValue: p.startValue, endValue: p.endValue, flowCount: p.flowCount },
+      window: { range: pr, startAt: p.startAt, endAt: p.endAt, observations: p.observations },
+      source: 'aurixInvestablePerformance',
+      direction: p.returnPct > 0 ? 'up' : (p.returnPct < 0 ? 'down' : 'flat'),
+      positive: p.returnPct > 0,
+      materiality: 1,
+      magnitude: _aurixFactClamp01(abs / 20),
+      confidence: p.confidence === 'high' ? 1 : 0.7,
+      utility: 0.9, rarity: 0.2,
+    });
+  }
+
+  // ── B · WEALTH LEVEL — level, highs, milestones (investable basis) ────────
+  let lvl = null;
+  try { lvl = (typeof _aurixEligibleInvestableSeries === 'function') ? _aurixEligibleInvestableSeries('all') : null; } catch (_) { lvl = null; }
+  const lvlSeries = (lvl && Array.isArray(lvl.series)) ? lvl.series : [];
+  if (lvlSeries.length < 2) {
+    gap(_AURIX_FACT_FAMILY.WEALTH_LEVEL, 'investable_level', _AURIX_FACT_STATUS.INSUFFICIENT_HISTORY, 'insufficient_observations');
+  } else {
+    const last = lvlSeries[lvlSeries.length - 1];
+    push({
+      semanticKey: 'investable_level',
+      family: _AURIX_FACT_FAMILY.WEALTH_LEVEL,
+      causalRoot: _AURIX_CAUSAL_ROOT.WEALTH_LEVEL,
+      value: +last.value.toFixed(2), unit: 'base_currency',
+      values: { value: +last.value.toFixed(2) },
+      window: { range: 'now', startAt: last.ts, endAt: last.ts },
+      source: 'aurixEligibleInvestableSeries', direction: 'flat', positive: null,
+      materiality: 1, magnitude: 0.2, confidence: 1, utility: 0.5, rarity: 0,
+    });
+    // A new high is a LEVEL claim: true regardless of how the level was reached
+    // (a contribution genuinely raises the level). It is never a return claim.
+    let peak = lvlSeries[0].value, peakIdx = 0;
+    for (let i = 1; i < lvlSeries.length; i++) { if (lvlSeries[i].value > peak) { peak = lvlSeries[i].value; peakIdx = i; } }
+    if (peakIdx === lvlSeries.length - 1 && lvlSeries.length >= 3) {
+      push({
+        semanticKey: 'investable_all_time_high',
+        family: _AURIX_FACT_FAMILY.WEALTH_LEVEL,
+        causalRoot: _AURIX_CAUSAL_ROOT.WEALTH_LEVEL,
+        value: +peak.toFixed(2), unit: 'base_currency',
+        values: { value: +peak.toFixed(2), at: lvlSeries[peakIdx].ts },
+        window: { range: 'all', startAt: lvlSeries[0].ts, endAt: lvlSeries[peakIdx].ts },
+        source: 'aurixEligibleInvestableSeries', direction: 'up', positive: true,
+        note: 'level_claim_not_return',
+        materiality: 0.8, magnitude: 0.6, confidence: 1, utility: 0.6, rarity: 0.6,
+      });
+    }
+  }
+
+  // ── C · CAPITAL FLOW — recorded capital, explicitly NOT performance ───────
+  // The same perimeter INT.02 neutralises out of the return, so the pair
+  // "you added X / your investments returned Y" is internally consistent.
+  let flowLedger = [];
+  try { flowLedger = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : []; } catch (_) { flowLedger = []; }
+  if (lvlSeries.length >= 2) {
+    const t0 = lvlSeries[0].ts, t1 = lvlSeries[lvlSeries.length - 1].ts;
+    const inWin = flowLedger.filter(f => f && Number.isFinite(f.ts) && Number.isFinite(f.amountUSD) && f.ts > t0 && f.ts <= t1);
+    let net = 0, bad = false;
+    for (const f of inWin) {
+      const amt = (typeof toBase === 'function') ? toBase(f.amountUSD, 'USD') : f.amountUSD;
+      if (!Number.isFinite(amt)) { bad = true; break; }
+      net += amt;
+    }
+    const endValue = lvlSeries[lvlSeries.length - 1].value;
+    if (bad) {
+      gap(_AURIX_FACT_FAMILY.CAPITAL_FLOW, 'recorded_capital_net', _AURIX_FACT_STATUS.LOW_CONFIDENCE, 'fx_unavailable');
+    } else if (inWin.length && endValue > 0 && Math.abs(net) >= _AURIX_FACT_MATERIAL.flowShareOfValue * endValue) {
+      push({
+        semanticKey: 'recorded_capital_net',
+        family: _AURIX_FACT_FAMILY.CAPITAL_FLOW,
+        causalRoot: _AURIX_CAUSAL_ROOT.EXTERNAL_CAPITAL,
+        value: +net.toFixed(2), unit: 'base_currency',
+        values: { net: +net.toFixed(2), events: inWin.length, shareOfValue: +(Math.abs(net) / endValue).toFixed(4) },
+        window: { range: 'all', startAt: t0, endAt: t1 },
+        source: 'capitalFlowsLedger', direction: net > 0 ? 'up' : 'down', positive: null,
+        note: 'capital_not_return',
+        materiality: 0.9, magnitude: _aurixFactClamp01(Math.abs(net) / endValue),
+        confidence: 1, utility: 0.9, rarity: 0.2,
+      });
+    } else if (!inWin.length) {
+      gap(_AURIX_FACT_FAMILY.CAPITAL_FLOW, 'recorded_capital_net', _AURIX_FACT_STATUS.AVAILABLE, 'no_flows_in_window');
+    }
+  }
+
+  // ── STRUCTURE NOW — one snapshot read, shared by D/E/F ────────────────────
+  let snap = null;
+  try { snap = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null; } catch (_) { snap = null; }
+  const haveSnap = !!(snap && snap.assetCount && snap.totUSD > 0);
+
+  // ── D · LIQUIDITY — level now + certified drift ───────────────────────────
+  if (!haveSnap) {
+    gap(_AURIX_FACT_FAMILY.LIQUIDITY, 'cash_weight', _AURIX_FACT_STATUS.UNAVAILABLE_SOURCE, 'no_snapshot');
+  } else {
+    push({
+      semanticKey: 'cash_weight',
+      family: _AURIX_FACT_FAMILY.LIQUIDITY,
+      causalRoot: _AURIX_CAUSAL_ROOT.CASH_WEIGHT,
+      value: snap.cashPct, unit: 'percent_of_investable',
+      values: { pct: snap.cashPct },
+      window: { range: 'now', startAt: null, endAt: null },
+      source: 'aurixHealthSnapshot', direction: 'flat', positive: null,
+      materiality: 0.7, magnitude: 0.2, confidence: 1, utility: 0.7, rarity: 0.1,
+    });
+  }
+  // ── E · EXPOSURE + liquidity drift — the certified server reader only ─────
+  const invBuckets = (typeof _AURIX_CATHIST_INVESTABLE !== 'undefined' && Array.isArray(_AURIX_CATHIST_INVESTABLE))
+    ? _AURIX_CATHIST_INVESTABLE : ['stock', 'etf', 'fund', 'crypto', 'metal', 'liquidity', 'other'];
+  for (const range of ranges) {
+    for (const cat of invBuckets) {
+      let d = null;
+      try { d = (typeof _aurixCatExposureDelta === 'function') ? _aurixCatExposureDelta(range, cat) : null; } catch (_) { d = null; }
+      const isCash = (cat === 'liquidity');
+      const famKey = isCash ? _AURIX_FACT_FAMILY.LIQUIDITY : _AURIX_FACT_FAMILY.EXPOSURE;
+      const rootKey = isCash ? _AURIX_CAUSAL_ROOT.CASH_WEIGHT : _AURIX_CAUSAL_ROOT.CATEGORY_MIX;
+      const sk = (isCash ? 'cash_drift_' : 'exposure_drift_') + cat + '_' + range;
+      if (!d || d.state !== 'ok' || !Number.isFinite(d.deltaPp)) {
+        gap(famKey, sk, _AURIX_FACT_STATUS.INSUFFICIENT_HISTORY, (d && d.reason) || 'reader_unavailable',
+          { range, category: cat });
+        continue;
+      }
+      const thr = isCash ? _AURIX_FACT_MATERIAL.cashDeltaPp : _AURIX_FACT_MATERIAL.exposureDeltaPp;
+      if (Math.abs(d.deltaPp) < thr) continue;             // measured, but not material — no story
+      push({
+        semanticKey: sk,
+        family: famKey, causalRoot: rootKey,
+        value: +d.deltaPp.toFixed(2), unit: 'percentage_points',
+        values: { startPct: d.startPct, endPct: d.endPct, deltaPp: +d.deltaPp.toFixed(2), category: cat },
+        window: { range, startAt: d.startAt, endAt: d.endAt },
+        source: 'aurixCatExposureDelta',
+        direction: d.deltaPp > 0 ? 'up' : 'down',
+        // A drop in cash weight is not automatically bad, and a rise in one
+        // category is not automatically good: `positive` stays null unless the
+        // dimension has an unambiguous better direction (see POSITIVE below).
+        positive: null,
+        materiality: _aurixFactClamp01(Math.max(d.startPct, d.endPct) / 100),
+        magnitude: _aurixFactClamp01(Math.abs(d.deltaPp) / 20),
+        confidence: 1, utility: 0.85,
+        rarity: _aurixFactClamp01(Math.abs(d.deltaPp) / 30),
+      });
+    }
+  }
+
+  // ── F · CONCENTRATION — top1 / top3, ONE root shared with diversification ─
+  if (haveSnap) {
+    const top1 = (snap.topInvestedAsset && snap.topInvestedAsset.pctTotal) || 0;
+    let drivers = null;
+    try { drivers = (typeof buildPortfolioDrivers === 'function') ? buildPortfolioDrivers(snap) : null; } catch (_) { drivers = null; }
+    const top3 = (drivers && Number.isFinite(drivers.pct)) ? drivers.pct : null;
+    if (top1 >= _AURIX_FACT_MATERIAL.concentrationPct) {
+      push({
+        semanticKey: 'top_position_weight',
+        family: _AURIX_FACT_FAMILY.CONCENTRATION,
+        causalRoot: _AURIX_CAUSAL_ROOT.TOP_POSITION,
+        value: top1, unit: 'percent_of_investable',
+        values: { pct: top1, name: (snap.topInvestedAsset && snap.topInvestedAsset.name) || null,
+                  type: (snap.topInvestedAsset && snap.topInvestedAsset.type) || null },
+        window: { range: 'now', startAt: null, endAt: null },
+        source: 'aurixHealthSnapshot', direction: 'flat', positive: null,
+        materiality: _aurixFactClamp01(top1 / 100),
+        magnitude: _aurixFactClamp01(top1 / 100),
+        confidence: 1, utility: 0.9, rarity: _aurixFactClamp01((top1 - 25) / 50),
+      });
+    }
+    if (Number.isFinite(top3) && top3 > 0) {
+      push({
+        semanticKey: 'top3_weight',
+        family: _AURIX_FACT_FAMILY.CONCENTRATION,
+        // SAME ROOT as top1 on purpose: "top-3 concentration" is not an
+        // independent discovery from "your main position dominates".
+        causalRoot: _AURIX_CAUSAL_ROOT.TOP_POSITION,
+        value: top3, unit: 'percent_of_investable',
+        values: { pct: top3 },
+        window: { range: 'now', startAt: null, endAt: null },
+        source: 'buildPortfolioDrivers', direction: 'flat', positive: null,
+        materiality: _aurixFactClamp01(top3 / 100), magnitude: _aurixFactClamp01(top3 / 100),
+        confidence: 1, utility: 0.6, rarity: 0.1,
+      });
+    }
+  }
+
+  // ── G · EFFECTIVE DIVERSIFICATION ────────────────────────────────────────
+  const div = _aurixEffectiveDiversification();
+  if (div.status !== _AURIX_FACT_STATUS.AVAILABLE) {
+    gap(_AURIX_FACT_FAMILY.DIVERSIFICATION, 'effective_holdings', div.status, div.reason);
+  } else {
+    const ratio = div.positions > 0 ? (div.effectiveN / div.positions) : 1;
+    push({
+      semanticKey: 'effective_holdings',
+      family: _AURIX_FACT_FAMILY.DIVERSIFICATION,
+      // Shares the TOP_POSITION root: lopsided weights ARE the dominant
+      // position seen from another angle. Kept as a supporting fact, not a
+      // third independent headline.
+      causalRoot: _AURIX_CAUSAL_ROOT.TOP_POSITION,
+      value: div.effectiveN, unit: 'positions',
+      values: { positions: div.positions, effectiveN: div.effectiveN, hhi: div.hhi,
+                topWeightPct: div.topWeightPct, ratio: +ratio.toFixed(4),
+                denominator: div.denominator },
+      window: { range: 'now', startAt: null, endAt: null },
+      source: 'aurixEffectiveDiversification', direction: 'flat', positive: null,
+      materiality: 0.75,
+      magnitude: _aurixFactClamp01(1 - ratio),
+      confidence: 1, utility: 0.9,
+      rarity: _aurixFactClamp01((_AURIX_FACT_MATERIAL.effectiveNRatio - ratio) / _AURIX_FACT_MATERIAL.effectiveNRatio),
+    });
+  }
+
+  // ── H · POSITIVE INTELLIGENCE — only objectively observable improvements ──
+  // Derived from facts already in the ledger, so nothing is congratulated that
+  // is not measured. A direction only counts as positive where the dimension
+  // has an unambiguous better direction.
+  const byKey = k => facts.find(f => f.semanticKey === k) || null;
+  const cashUp = ranges.map(r => byKey('cash_drift_liquidity_' + r)).filter(f => f && f.value > 0);
+  if (cashUp.length) {
+    const best = cashUp.reduce((a, b) => (Math.abs(b.value) > Math.abs(a.value) ? b : a));
+    push({
+      semanticKey: 'liquidity_improved',
+      family: _AURIX_FACT_FAMILY.LIQUIDITY, causalRoot: _AURIX_CAUSAL_ROOT.CASH_WEIGHT,
+      value: best.value, unit: 'percentage_points',
+      values: Object.assign({}, best.values), window: Object.assign({}, best.window),
+      source: 'aurixCatExposureDelta', direction: 'up', positive: true,
+      supportingKeys: [best.semanticKey],
+      materiality: best.materiality, magnitude: best.magnitude, confidence: 1, utility: 0.8, rarity: 0.4,
+    });
+  }
+  const perfPositive = facts.filter(f => f.family === _AURIX_FACT_FAMILY.PERFORMANCE && f.value > _AURIX_FACT_MATERIAL.returnPct);
+  if (perfPositive.length) {
+    const best = perfPositive.reduce((a, b) => (b.value > a.value ? b : a));
+    push({
+      semanticKey: 'return_positive',
+      family: _AURIX_FACT_FAMILY.PERFORMANCE, causalRoot: _AURIX_CAUSAL_ROOT.INVESTABLE_RETURN,
+      value: best.value, unit: 'percent',
+      values: Object.assign({}, best.values), window: Object.assign({}, best.window),
+      source: 'aurixInvestablePerformance', direction: 'up', positive: true,
+      supportingKeys: [best.semanticKey],
+      materiality: 1, magnitude: best.magnitude, confidence: best.confidence, utility: 0.9, rarity: 0.3,
+    });
+  }
+
+  // ── I · DATA QUALITY — what Aurix cannot yet know, as structured truth ────
+  // Not a apology: a real limit, stated so INT.04 can turn it into content
+  // instead of silence. Per-asset attribution is time-gated by the asset_values
+  // capture start, which is a CALENDAR fact, not a modelling gap.
+  gap(_AURIX_FACT_FAMILY.DATA_QUALITY, 'per_asset_attribution',
+    _AURIX_FACT_STATUS.NOT_YET_SUPPORTED, 'asset_level_history_too_short');
+
+  return { facts, gaps, generatedAt: nowTs };
+}
+
+// ── RELATION / DEDUPLICATION — ONE ROOT → ONE PRIMARY STORY ────────────────
+// Groups the ledger by causal root, elects the highest-priority fact of each
+// root as the primary story and demotes the rest to supporting facts. This is
+// what structurally prevents the same phenomenon from being presented as
+// several independent discoveries.
+function _aurixIntelligenceStories(ledger, opts) {
+  const o = opts || {};
+  const limit = Number.isFinite(o.limit) ? o.limit : _AURIX_INTCORE_STORY_LIMIT;
+  const facts = (ledger && Array.isArray(ledger.facts)) ? ledger.facts : [];
+  const groups = new Map();
+  for (const f of facts) {
+    const root = f.causalRoot || 'unrooted';
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root).push(f);
+  }
+  const stories = [];
+  for (const [root, group] of groups) {
+    // Deterministic election: priority, then magnitude, then semanticKey — never
+    // insertion order, so the same input always yields the same primary.
+    const ordered = group.slice().sort((a, b) =>
+      (b.priority - a.priority) || (b.magnitude - a.magnitude) || (a.semanticKey < b.semanticKey ? -1 : 1));
+    const primary = ordered[0];
+    stories.push(Object.assign({}, primary, {
+      causalRoot: root,
+      supporting: ordered.slice(1).map(f => ({
+        semanticKey: f.semanticKey, family: f.family, value: f.value, unit: f.unit,
+        window: f.window, values: f.values, priority: f.priority,
+      })),
+    }));
+  }
+  stories.sort((a, b) => (b.priority - a.priority) || (a.causalRoot < b.causalRoot ? -1 : 1));
+  return stories.slice(0, limit);
+}
+
+// ── WOW INSIGHTS — non-obvious COMBINATIONS of certified facts ──────────────
+// "Wow" is never spectacular copy: it is a relation between facts the user is
+// unlikely to have connected. Every one decomposes into the facts that support
+// it, and any conclusion that would need an unknown cause is degraded to the
+// observation Aurix can actually demonstrate.
+function _aurixWowInsights(ledger) {
+  const facts = (ledger && Array.isArray(ledger.facts)) ? ledger.facts : [];
+  const byKey = k => facts.find(f => f.semanticKey === k) || null;
+  const out = [];
+  // 1 · Many nominal positions, few effective ones.
+  const eff = byKey('effective_holdings');
+  if (eff && eff.values && eff.values.positions >= 5 &&
+      eff.values.ratio < _AURIX_FACT_MATERIAL.effectiveNRatio) {
+    out.push({ semanticKey: 'wow_nominal_vs_effective', causalRoot: eff.causalRoot,
+      values: { positions: eff.values.positions, effectiveN: eff.values.effectiveN },
+      supportingKeys: [eff.semanticKey], confidence: eff.confidence,
+      priority: eff.priority + 0.05 });
+  }
+  // 2 · Wealth rose while the investments themselves went nowhere — the growth
+  //     came from contributions. This is the flagship honest insight.
+  const flow = byKey('recorded_capital_net');
+  const perfAll = byKey('investable_return_all');
+  if (flow && perfAll && flow.value > 0 &&
+      Math.abs(perfAll.value) < _AURIX_FACT_MATERIAL.returnPct) {
+    out.push({ semanticKey: 'wow_growth_from_capital_not_return', causalRoot: _AURIX_CAUSAL_ROOT.EXTERNAL_CAPITAL,
+      values: { capitalNet: flow.value, returnPct: perfAll.value, window: perfAll.window },
+      supportingKeys: [flow.semanticKey, perfAll.semanticKey],
+      confidence: Math.min(flow.confidence, perfAll.confidence),
+      priority: Math.max(flow.priority, perfAll.priority) + 0.08 });
+  }
+  // 3 · Liquidity falling while concentration is already material — two
+  //     independent dimensions moving the same way.
+  const cashDown = facts.filter(f => f.causalRoot === _AURIX_CAUSAL_ROOT.CASH_WEIGHT &&
+    f.unit === 'percentage_points' && f.value < 0);
+  const top1 = byKey('top_position_weight');
+  if (cashDown.length && top1) {
+    const worst = cashDown.reduce((a, b) => (b.value < a.value ? b : a));
+    out.push({ semanticKey: 'wow_liquidity_down_while_concentrated', causalRoot: _AURIX_CAUSAL_ROOT.CASH_WEIGHT,
+      values: { cashDeltaPp: worst.value, topPositionPct: top1.value },
+      supportingKeys: [worst.semanticKey, top1.semanticKey],
+      confidence: Math.min(worst.confidence, top1.confidence),
+      priority: Math.max(worst.priority, top1.priority) + 0.04 });
+  }
+  // 4 · Simultaneous structural improvement across independent dimensions.
+  const positives = facts.filter(f => f.positive === true);
+  const distinctRoots = new Set(positives.map(f => f.causalRoot));
+  if (distinctRoots.size >= 2) {
+    out.push({ semanticKey: 'wow_multi_dimension_improvement', causalRoot: 'multi',
+      values: { roots: Array.from(distinctRoots).sort() },
+      supportingKeys: positives.map(f => f.semanticKey).sort(),
+      confidence: positives.reduce((m, f) => Math.min(m, f.confidence), 1),
+      priority: positives.reduce((m, f) => Math.max(m, f.priority), 0) + 0.03 });
+  }
+  out.sort((a, b) => (b.priority - a.priority) || (a.semanticKey < b.semanticKey ? -1 : 1));
+  return out;
+}
+
+// ── EXPLORE YOUR WEALTH — the question catalog CORE (no UI) ─────────────────
+// Declarative: each question states the facts it needs, its causal root, its
+// eligibility and its interest. Selection enforces DISTINCT causal roots, which
+// is what removes the current "three questions, one answer" problem (what moves
+// my wealth / where am I concentrated / what should I watch all resolved to
+// top1). Answers are STRUCTURED — never copy, never "movers" used for exposure.
+const _AURIX_QUESTION_CATALOG = Object.freeze([
+  { id: 'q_performance',      family: 'performance',        causalRoot: _AURIX_CAUSAL_ROOT.INVESTABLE_RETURN,
+    requires: ['investable_return_all'], interest: 0.95 },
+  { id: 'q_what_changed',     family: 'what_changed',       causalRoot: _AURIX_CAUSAL_ROOT.CATEGORY_MIX,
+    requiresFamily: 'exposure', interest: 0.9 },
+  { id: 'q_liquidity',        family: 'liquidity',          causalRoot: _AURIX_CAUSAL_ROOT.CASH_WEIGHT,
+    requires: ['cash_weight'], interest: 0.7 },
+  { id: 'q_concentration',    family: 'concentration',      causalRoot: _AURIX_CAUSAL_ROOT.TOP_POSITION,
+    requires: ['top_position_weight'], interest: 0.85 },
+  { id: 'q_diversification',  family: 'diversification',    causalRoot: _AURIX_CAUSAL_ROOT.TOP_POSITION,
+    requires: ['effective_holdings'], interest: 0.8 },
+  { id: 'q_capital_flows',    family: 'capital_flows',      causalRoot: _AURIX_CAUSAL_ROOT.EXTERNAL_CAPITAL,
+    requires: ['recorded_capital_net'], interest: 0.75 },
+  { id: 'q_structure',        family: 'structure',          causalRoot: _AURIX_CAUSAL_ROOT.CATEGORY_MIX,
+    requiresFamily: 'exposure', interest: 0.6 },
+  { id: 'q_historical',       family: 'historical_behaviour', causalRoot: _AURIX_CAUSAL_ROOT.WEALTH_LEVEL,
+    requires: ['investable_level'], interest: 0.55 },
+  { id: 'q_data_quality',     family: 'data_quality',       causalRoot: _AURIX_CAUSAL_ROOT.DATA_COVERAGE,
+    alwaysEligible: true, interest: 0.3 },
+]);
+function _aurixContextualQuestions(ledger, opts) {
+  const o = opts || {};
+  const limit = Number.isFinite(o.limit) ? o.limit : 4;
+  const facts = (ledger && Array.isArray(ledger.facts)) ? ledger.facts : [];
+  const gaps  = (ledger && Array.isArray(ledger.gaps)) ? ledger.gaps : [];
+  const has = k => facts.some(f => f.semanticKey === k);
+  const famFacts = fam => facts.filter(f => f.family === fam);
+  const eligible = [];
+  for (const q of _AURIX_QUESTION_CATALOG) {
+    let answerFacts = [];
+    if (q.requires) {
+      if (!q.requires.every(has)) continue;                       // INELIGIBLE — a missing fact is not a question
+      answerFacts = q.requires.map(k => facts.find(f => f.semanticKey === k));
+    } else if (q.requiresFamily) {
+      answerFacts = famFacts(q.requiresFamily);
+      if (!answerFacts.length) continue;
+    } else if (!q.alwaysEligible) {
+      continue;
+    }
+    const best = answerFacts.reduce((m, f) => (f && (!m || f.priority > m.priority) ? f : m), null);
+    eligible.push({
+      id: q.id, family: q.family, causalRoot: q.causalRoot,
+      interest: q.interest,
+      score: +((q.interest * 0.6) + ((best ? best.priority : 0.2) * 0.4)).toFixed(6),
+      answer: {
+        factKeys: answerFacts.filter(Boolean).map(f => f.semanticKey),
+        gapKeys: q.family === 'data_quality' ? gaps.map(g => g.semanticKey) : [],
+      },
+    });
+  }
+  eligible.sort((a, b) => (b.score - a.score) || (a.id < b.id ? -1 : 1));
+  // HARD RULE — simultaneously selected questions may not share a causal root.
+  const picked = [], usedRoots = new Set();
+  for (const q of eligible) {
+    if (usedRoots.has(q.causalRoot)) continue;
+    usedRoots.add(q.causalRoot); picked.push(q);
+    if (picked.length >= limit) break;
+  }
+  return { selected: picked, eligible };
+}
+
+// ── WHAT CHANGED — CHANGE / CAUSE / IMPACT kept separate ────────────────────
+// CHANGE is published when measured. CAUSE only when Aurix can demonstrate it —
+// which today it essentially cannot for a category move, so `cause` is null and
+// `causeKnown:false` rather than a fabricated "it rose because of Bitcoin".
+// IMPACT is a prudent structural reading of the fact, never advice.
+function _aurixWhatChanged(ledger) {
+  const facts = (ledger && Array.isArray(ledger.facts)) ? ledger.facts : [];
+  return facts
+    .filter(f => f.unit === 'percentage_points' || f.family === _AURIX_FACT_FAMILY.PERFORMANCE
+              || f.family === _AURIX_FACT_FAMILY.CAPITAL_FLOW)
+    .filter(f => f.window && (f.window.startAt != null || f.window.range))
+    .map(f => ({
+      semanticKey: f.semanticKey, family: f.family, causalRoot: f.causalRoot,
+      change: { value: f.value, unit: f.unit, direction: f.direction, window: f.window },
+      cause: null,
+      causeKnown: false,
+      causeReason: 'attribution_not_supported',
+      impact: { dimension: f.family, materiality: f.materiality },
+      confidence: f.confidence,
+    }))
+    .sort((a, b) => (b.impact.materiality - a.impact.materiality) || (a.semanticKey < b.semanticKey ? -1 : 1));
+}
+
+// ── THE CONSUMPTION CONTRACT FOR INT.04 ────────────────────────────────────
+// One entry point. INT.04 must never recompute a financial metric: everything
+// it can render is here, already certified, deduplicated and ranked.
+function _aurixIntelligenceCore(opts) {
+  const o = opts || {};
+  const ledger = _aurixFactLedger(o);
+  const stories = _aurixIntelligenceStories(ledger, o);
+  return {
+    version: 'int03',
+    generatedAt: ledger.generatedAt,
+    topStories: stories,
+    supportingFacts: stories.reduce((acc, s) => acc.concat(s.supporting || []), []),
+    whatChanged: _aurixWhatChanged(ledger),
+    positiveDevelopments: ledger.facts.filter(f => f.positive === true)
+      .sort((a, b) => (b.priority - a.priority) || (a.semanticKey < b.semanticKey ? -1 : 1)),
+    wowInsights: _aurixWowInsights(ledger),
+    contextualQuestions: _aurixContextualQuestions(ledger, o),
+    temporalEvents: ledger.facts.filter(f => f.family === _AURIX_FACT_FAMILY.WEALTH_LEVEL)
+      .sort((a, b) => (b.priority - a.priority) || (a.semanticKey < b.semanticKey ? -1 : 1)),
+    dataAvailability: {
+      status: _AURIX_FACT_STATUS,
+      gaps: ledger.gaps,
+      factCount: ledger.facts.length,
+      roots: Array.from(new Set(ledger.facts.map(f => f.causalRoot))).sort(),
+    },
+    ledger,
+  };
+}
+if (typeof window !== 'undefined') {
+  window.debugAurixIntelligenceCore = (opts) => _aurixIntelligenceCore(opts || {});
+  window.AURIX_INTELLIGENCE_CORE_CONTRACT = Object.freeze({
+    families: _AURIX_FACT_FAMILY, status: _AURIX_FACT_STATUS, roots: _AURIX_CAUSAL_ROOT,
+    rankWeights: _AURIX_RANK_WEIGHTS, materiality: _AURIX_FACT_MATERIAL,
+    note: 'INT.03 — the Core emits structured facts only. No copy, no causality it cannot demonstrate.',
+  });
 }
 
 function _aurixPortfolioCreatedAt() {

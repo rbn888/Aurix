@@ -49,6 +49,10 @@ const READER_BLOCK = (function(){
 })();
 // Executable surface only (comments carry the rationale and legitimately NAME the
 // sources being avoided, so the "never reads X" assertions must look at code).
+// SPEC INT.03 — the owners outside the reader block that are ALLOWED to call it.
+// Declared by name so an undeclared consumer fails 18.1/18.3. `_aurixFactLedger` is the
+// Intelligence Core's fact builder; no renderer may read the reader directly.
+const DECLARED_READER_CONSUMERS = ['_aurixFactLedger'];
 const READER_CODE = READER_BLOCK.split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
 
 // ── sandbox ──────────────────────────────────────────────────────────────────
@@ -161,10 +165,34 @@ console.log('\n4 · 7D window over real coverage:');
 // ── 5 · Windows are only the two Financial declared defensible ────────────────
 console.log('\n5 · Declared windows:');
 {
+  // RE-CERTIFIED BY SPEC INT.03. The original assertion froze the set at 24H+7D. INT.03
+  // declares 30D and 90D as well, and the invariant it was really protecting is UNCHANGED
+  // and re-proved below: a declared window is only ever ANSWERED when a real capture sits
+  // within its drift bound, so declaring one cannot publish one Aurix cannot back. What
+  // publishes is the drift guard, not the declaration.
   const ranges = vm.runInContext('Object.keys(_AURIX_CATHIST_WINDOWS)', sb);
-  ok('5.1 exactly 24H + 7D', JSON.stringify(ranges) === '["24H","7D"]', JSON.stringify(ranges));
-  ok('5.2 30D / 1A / TOTAL are rejected, not silently approximated',
-    ['30D','1A','TOTAL','ALL','1Y','MAX'].every(r => { const w = win(r); return w.state === 'unsupported_range' && w.start === null && w.end === null; }));
+  ok('5.1 the declared window set is exactly 24H + 7D + 30D + 90D',
+    JSON.stringify(ranges) === '["24H","7D","30D","90D"]', JSON.stringify(ranges));
+  ok('5.1b every declared window carries a span AND a drift bound',
+    ranges.every(r => { const w = vm.runInContext('_AURIX_CATHIST_WINDOWS["' + r + '"]', sb);
+      return w && Number.isFinite(w.ms) && w.ms > 0 && Number.isFinite(w.maxStartDriftMs) && w.maxStartDriftMs > 0; }));
+  ok('5.1c no declared window is more permissive than 24H (drift as a share of its span)',
+    (function(){ const share = r => { const w = vm.runInContext('_AURIX_CATHIST_WINDOWS["' + r + '"]', sb);
+        return w.maxStartDriftMs / w.ms; };
+      const base = share('24H');
+      return ranges.every(r => share(r) <= base + 1e-9); })(),
+    JSON.stringify(ranges.map(r => { const w = vm.runInContext('_AURIX_CATHIST_WINDOWS["' + r + '"]', sb);
+      return r + ':' + (w.maxStartDriftMs / w.ms).toFixed(4); })));
+  ok('5.2 an UNDECLARED range is still rejected outright, never approximated',
+    ['1A','TOTAL','ALL','1Y','MAX','12H'].every(r => { const w = win(r); return w.state === 'unsupported_range' && w.start === null && w.end === null; }));
+  ok('5.2b a DECLARED window the history cannot cover fails CLOSED — never approximated',
+    (function(){
+      // The fixture history spans hours, so 30D/90D cannot be honoured.
+      return ['30D','90D'].every(r => { const w = win(r);
+        return w.state === 'insufficient_data' && w.reason === 'insufficient_history'
+            && w.start === null && w.end === null && w.startAt === null && w.endAt === null; });
+    })(),
+    JSON.stringify(['30D','90D'].map(r => { const w = win(r); return r + ':' + w.state + '/' + w.reason; })));
 }
 
 // ── 6 · insufficient_data ────────────────────────────────────────────────────
@@ -362,8 +390,13 @@ console.log('\n9 · Exposure and delta semantics:');
     d.startAt === win('7D').startAt && d.endAt === win('7D').endAt);
   ok('9.7 no derived value is stored — the delta is recomputed from the window',
     !/_aurixCatHistCache|cachedDelta|_cache\s*=/.test(READER_CODE));
-  ok('9.8 an unsupported range propagates as unsupported_range with null figures',
-    (function(){ const x = delta('30D','crypto'); return x.state === 'unsupported_range' && x.deltaPp === null && x.startPct === null; })());
+  ok('9.8 an UNDECLARED range propagates as unsupported_range with null figures',
+    (function(){ const x = delta('1A','crypto'); return x.state === 'unsupported_range' && x.deltaPp === null && x.startPct === null; })());
+  ok('9.8b a DECLARED-but-uncovered window propagates insufficient_data with null figures',
+    (function(){ const x = delta('30D','crypto');
+      return x.state === 'insufficient_data' && x.reason === 'insufficient_history'
+          && x.deltaPp === null && x.startPct === null && x.endPct === null; })(),
+    JSON.stringify(delta('30D','crypto')));
 }
 
 // ── 10 · Absence: real 0 vs unknown ──────────────────────────────────────────
@@ -590,17 +623,44 @@ console.log('\n17–18 · Chart, Performance and Preview V1 are byte-identical:'
           .map(m => m.replace(/^function /, '').replace(/\($/, ''));
         if (defined.length < 3) return false;                          // no-vacuidad: define algo real
         const rest = app.slice(0, app.indexOf(BLOCK_START)) + app.slice(app.indexOf(BLOCK_START) + READER_BLOCK.length);
-        // ninguna de sus funciones se REDEFINE fuera, y ninguna se INVOCA fuera
-        return defined.every(n => rest.indexOf('function ' + n + '(') === -1)
-          && defined.every(n => rest.indexOf(n + '(') === -1);
+        // RE-CERTIFIED BY SPEC INT.03. Ninguna de sus funciones se REDEFINE fuera — eso sigue
+        // siendo absoluto. Lo que cambia es la INVOCACIÓN: el reader dejó de ser una capa sin
+        // consumidores y ahora tiene consumidores DECLARADOS (ver 18.3). La contención se
+        // mantiene como allowlist nominal, no como prohibición total: si aparece una llamada
+        // desde un owner no declarado, esto se pone rojo igual que antes.
+        if (!defined.every(n => rest.indexOf('function ' + n + '(') === -1)) return false;
+        return defined.every(n => {
+          const calls = (rest.match(new RegExp(n.replace(/[$]/g, '\\$') + '\\(', 'g')) || []).length;
+          if (!calls) return true;
+          return DECLARED_READER_CONSUMERS.some(c => new RegExp(n + '\\(').test(fnSrc(c)));
+        });
       })(),
       (READER_BLOCK.match(/function (_aurixCatHist\w*|_aurixCatExposure\w*)\(/g) || []).join(','));
   }
   ok('18.2 the reader is not wired into any renderer, tab or Preview path',
     !/switchTab|renderWealthCurve|buildProductionPortfolioChart|_aurixIntelligencePreview|tabPlaceholder/.test(READER_CODE));
-  ok('18.3 nothing outside the reader block calls it yet (a read layer, not a feature)',
-    (function(){ const rest = app.slice(0, app.indexOf(BLOCK_START)) + app.slice(app.indexOf(BLOCK_START) + READER_BLOCK.length);
-      return !/_aurixCatHistWindow\(|_aurixCatExposureDelta\(|_aurixCatExposurePct\(/.test(rest); })());
+  // RE-CERTIFIED BY SPEC INT.03. The reader was built as a read layer with ZERO consumers
+  // and that is precisely what INT.03 was written to change: the Foundation Audit found it
+  // "built and disconnected". The containment invariant is preserved in the only form that
+  // still means something once it IS consumed — an allowlist of consumers declared BY NAME.
+  // Every entry must be a real function that really calls the reader (no-vacuity), and any
+  // undeclared consumer turns 18.1 red.
+  ok('18.3 the reader has exactly the DECLARED consumers, named one by one',
+    (function(){
+      const rest = app.slice(0, app.indexOf(BLOCK_START)) + app.slice(app.indexOf(BLOCK_START) + READER_BLOCK.length);
+      const anyCall = /_aurixCatHistWindow\(|_aurixCatExposureDelta\(|_aurixCatExposurePct\(/.test(rest);
+      if (!anyCall) return DECLARED_READER_CONSUMERS.length === 0;
+      // every declared consumer must genuinely call the reader…
+      if (!DECLARED_READER_CONSUMERS.every(c => /_aurixCatHistWindow\(|_aurixCatExposureDelta\(|_aurixCatExposurePct\(/.test(fnSrc(c)))) return false;
+      // …and the total number of call sites outside the block must be accounted for by them.
+      const outside = (rest.match(/_aurixCatHistWindow\(|_aurixCatExposureDelta\(|_aurixCatExposurePct\(/g) || []).length;
+      const declared = DECLARED_READER_CONSUMERS.reduce((n, c) =>
+        n + (fnSrc(c).match(/_aurixCatHistWindow\(|_aurixCatExposureDelta\(|_aurixCatExposurePct\(/g) || []).length, 0);
+      return outside === declared;
+    })(),
+    'declared=' + DECLARED_READER_CONSUMERS.join(','));
+  ok('18.4 the reader is consumed ONLY by the Intelligence Core (no renderer reads it directly)',
+    DECLARED_READER_CONSUMERS.length === 1 && DECLARED_READER_CONSUMERS[0] === '_aurixFactLedger');
 }
 
 // ── 19 · Runtime hygiene ─────────────────────────────────────────────────────
@@ -615,7 +675,7 @@ console.log('\n19 · Runtime hygiene:');
   ok('19.4 the public contract is frozen and self-describing',
     (function(){ const c = sb.window.AURIX_CATEGORY_HISTORY_CONTRACT;
       return !!c && c.denominator === 'total_value_usd - real_estate' && c.deltaUnit === 'percentage_points'
-        && JSON.stringify(c.ranges) === '["24H","7D"]' && /portfolio_snapshots\.category_values/.test(c.source); })());
+        && JSON.stringify(c.ranges) === '["24H","7D","30D","90D"]' && /portfolio_snapshots\.category_values/.test(c.source); })());
   ok('19.5 the read-only entry points are exposed for verification',
     typeof sb.window.aurixCategoryHistoryWindow === 'function' && typeof sb.window.aurixCategoryExposureDelta === 'function');
 }
