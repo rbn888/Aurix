@@ -458,6 +458,34 @@ console.log('\n8 · Ranking is explicit; novelty moves priority, never truth:');
     (() => { const W = run('JSON.parse(JSON.stringify(_AURIX_RANK_WEIGHTS))', makeCtx({}));
              return W.confidence > W.novelty; })());
   ok('8.9 at most 5 primary stories', fresh.topStories.length <= 5, 'n=' + fresh.topStories.length);
+  // SELECTION vs ORDERING (found by INT.04). `priority` is a weighted SUM, so a
+  // full novelty swing (1.0 × 0.14) could out-argue a materiality gap of 0.31
+  // (× 0.34) and EVICT a more material root from the Brief. Which stories survive
+  // truncation is therefore decided by root MATERIALITY; novelty only reorders.
+  ok('8.10 every story exposes its ROOT materiality (the group max, not the elected primary\'s)',
+    fresh.topStories.every(s => Number.isFinite(s.rootMateriality))
+    && fresh.topStories.every(s => s.rootMateriality >= s.materiality - 1e-9),
+    JSON.stringify(fresh.topStories.map(s => s.causalRoot + ':' + s.rootMateriality)));
+  ok('8.11 novelty cannot EVICT a more material root from the selection',
+    (() => {
+      const all = base;
+      const noHist = core(all, { now: T0 + 40 * DAY });
+      const everyShown = core(all, { now: T0 + 40 * DAY, presentationHistory:
+        noHist.ledger.facts.map(f => ({ semanticKey: f.semanticKey, shownAt: T0 + 40 * DAY })) });
+      const matOf = c => { const m = {};
+        c.ledger.facts.forEach(f => { m[f.causalRoot] = Math.max(m[f.causalRoot] || 0, f.materiality); }); return m; };
+      const m = matOf(noHist);
+      const A = noHist.topStories.map(s => s.causalRoot), B = everyShown.topStories.map(s => s.causalRoot);
+      const dropped = A.filter(r => B.indexOf(r) === -1), admitted = B.filter(r => A.indexOf(r) === -1);
+      return dropped.every(d => admitted.every(k => (m[k] || 0) >= (m[d] || 0)));
+    })());
+  ok('8.12 …and the selected SET is identical regardless of presentation history',
+    (() => { const all = base;
+      const A = core(all, { now: T0 + 40 * DAY }).topStories.map(s => s.causalRoot).sort();
+      const B = core(all, { now: T0 + 40 * DAY, presentationHistory:
+        core(all, { now: T0 + 40 * DAY }).ledger.facts.map(f => ({ semanticKey: f.semanticKey, shownAt: T0 + 40 * DAY })) })
+        .topStories.map(s => s.causalRoot).sort();
+      return JSON.stringify(A) === JSON.stringify(B); })());
 }
 
 // ════════════════════════════════════════════════════════════════════════════

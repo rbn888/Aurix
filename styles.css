@@ -20533,6 +20533,128 @@ body.gs-open { overflow: hidden; }
 .intcc-tl-text { margin: 0 0 4px; font-size: 13.5px; line-height: 1.45; color: var(--text-bright); }
 .intcc-tl-date { font-size: 10.5px; font-weight: 600; color: rgba(150,180,240,0.6); letter-spacing: 0.06em; text-transform: uppercase; }
 
+/* ════════════════════════════════════════════════════════════════════════════
+   SPEC INT.04 · INTELLIGENCE PREMIUM EXPERIENCE
+   ════════════════════════════════════════════════════════════════════════════
+   Calm, institutional, hierarchical. Deliberately NOT a metrics dashboard and
+   NOT a wall of cards: one conclusion leads, its supporting facts sit behind a
+   disclosure, and the same figure is never repeated across the screen. Reuses
+   the existing .intcc-card glass surface so nothing is redesigned — these rules
+   only add the story/brief layout. Single markup; the queries below are the only
+   responsive branch. */
+.aurix-intv4 { display: flex; flex-direction: column; gap: 14px; }
+
+/* Context header — the canonical score ONCE, quiet, never the headline. */
+.intv4-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 14px 18px; border-radius: 18px;
+  border: 1px solid rgba(74,130,240,0.14);
+  background: linear-gradient(165deg, rgba(32,44,72,0.42), rgba(28,36,58,0.54));
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.intv4-head-score { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.intv4-head-label {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.10em; text-transform: uppercase;
+  color: rgba(150,180,240,0.72);
+}
+.intv4-head-val { font-size: 30px; font-weight: 700; line-height: 1; color: var(--text-bright); font-variant-numeric: tabular-nums; }
+.intv4-head-suffix { font-size: 13px; font-weight: 600; color: rgba(150,180,240,0.6); margin-left: 2px; }
+.intv4-head-orb { width: 72px; height: 72px; flex: 0 0 auto; opacity: 0.85; }
+.intv4-head-orb .intcc-orb { width: 100%; height: 100%; }
+
+/* The Brief — the primary surface. */
+.intv4-story-list { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.intv4-story {
+  position: relative; padding: 13px 0 13px 15px;
+  border-top: 1px solid rgba(150,180,240,0.10);
+}
+.intv4-story:first-child { border-top: 0; }
+.intv4-story::before {
+  content: ''; position: absolute; left: 0; top: 16px;
+  width: 3px; height: 18px; border-radius: 2px; background: rgba(106,160,255,0.55);
+}
+.intv4-story.is-up::before,
+.intv4-story.is-positive::before { background: #5fd6a0; }
+.intv4-story.is-down::before { background: #e9a857; }
+/* GUIDED depth: the conclusion, always the loudest thing in the block. */
+.intv4-story-head { margin: 0; font-size: 15px; font-weight: 650; line-height: 1.4; color: var(--text-bright); }
+/* BALANCED depth: why it matters + the window it was measured over. */
+.intv4-story-why { margin: 5px 0 0; font-size: 12.5px; line-height: 1.5; color: rgba(198,214,246,0.78); }
+.intv4-story-meta {
+  margin: 6px 0 0; font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em;
+  text-transform: uppercase; color: rgba(150,180,240,0.52);
+}
+/* ADVANCED depth: progressive disclosure — never competing with the conclusion. */
+.intv4-more { margin-top: 8px; }
+.intv4-more-sum {
+  cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; font-weight: 650; color: var(--aurix-blue, #4A82F0);
+  padding: 3px 0; transition: opacity 140ms ease;
+}
+.intv4-more-sum::-webkit-details-marker { display: none; }
+.intv4-more-sum::after {
+  content: ''; width: 5px; height: 5px; border-right: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor; transform: rotate(45deg) translateY(-1px);
+  transition: transform 160ms ease;
+}
+.intv4-more[open] .intv4-more-sum::after { transform: rotate(-135deg) translateY(-1px); }
+.intv4-more-sum:hover { opacity: 0.82; }
+.intv4-sup-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.intv4-sup {
+  position: relative; padding-left: 14px; font-size: 12.5px; line-height: 1.45;
+  color: rgba(198,214,246,0.86);
+}
+.intv4-sup::before {
+  content: ''; position: absolute; left: 0; top: 7px; width: 4px; height: 4px;
+  border-radius: 50%; background: rgba(150,180,240,0.45);
+}
+.intv4-story-conf {
+  margin: 8px 0 0; font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em;
+  text-transform: uppercase; color: rgba(150,180,240,0.48);
+}
+
+/* What changed — a compact, scannable list, not a card per change. */
+.intv4-chg-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.intv4-chg { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; line-height: 1.45; color: var(--text-bright); }
+.intv4-chg-dot { flex: 0 0 auto; width: 7px; height: 7px; margin-top: 6px; border-radius: 50%; background: #6aa0ff; }
+.intv4-chg.is-up .intv4-chg-dot { background: #5fd6a0; }
+.intv4-chg.is-down .intv4-chg-dot { background: #e9a857; }
+.intv4-chg-text { min-width: 0; }
+
+/* Discovery — present only when a real one exists. */
+.intv4-discovery { border-color: rgba(122,162,255,0.30); }
+.intv4-wow-text { margin: 6px 0 0; font-size: 14.5px; font-weight: 600; line-height: 1.45; color: var(--text-bright); }
+
+/* Wealth memory + honest limits. */
+.intv4-mem-what { display: block; }
+.intv4-mem-why { display: block; margin-top: 3px; font-size: 12px; line-height: 1.45; color: rgba(198,214,246,0.66); }
+.intv4-memory .intcc-tl-date { display: block; margin-top: 3px; }
+.intv4-quality { border-color: rgba(150,180,240,0.14); }
+.intv4-quality-line { margin: 6px 0 0; font-size: 12.5px; line-height: 1.55; color: rgba(198,214,246,0.76); }
+
+/* Tablet / desktop — the header can breathe; the Brief stays a single column so
+   the leading conclusion is never demoted to one tile among many. */
+@media (min-width: 700px) {
+  .aurix-intv4 { gap: 16px; }
+  .intv4-header { padding: 18px 22px; }
+  .intv4-head-val { font-size: 38px; }
+  .intv4-head-orb { width: 88px; height: 88px; }
+  .intv4-story-head { font-size: 16px; }
+  .intv4-story { padding: 15px 0 15px 17px; }
+}
+/* Phones — same meaning, tighter rhythm. Nothing is removed, so a mobile reader
+   gets the identical financial content. */
+@media (max-width: 480px) {
+  .intv4-header { padding: 13px 15px; gap: 12px; }
+  .intv4-head-val { font-size: 26px; }
+  .intv4-head-orb { width: 56px; height: 56px; }
+  .intv4-story-head { font-size: 14.5px; }
+  .intv4-wow-text { font-size: 13.5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .intv4-more-sum, .intv4-more-sum::after { transition: none; }
+}
+
 .intcc-disclaimer { margin: 6px 2px 0; font-size: 11px; line-height: 1.5; color: var(--text-muted); opacity: 0.7; text-align: center; }
 
 /* ── Desktop — professional grid (≥1024px) ──
