@@ -20542,15 +20542,9 @@ body.gs-open { overflow: hidden; }
    the existing .intcc-card glass surface so nothing is redesigned — these rules
    only add the story/brief layout. Single markup; the queries below are the only
    responsive branch. */
-.aurix-intv4 { display: flex; flex-direction: column; gap: 14px; }
-/* The new surface follows DOM order, full stop. It reuses .intcc-explore and
-   .intcc-timeline for their card styling, and those classes carry legacy mobile
-   flex `order` values (4 and 6) from the old eight-block layout. Inheriting them
-   pushed the honest-limits card ABOVE Explore and Memory on phones and tablets
-   (measured in visual QA), because the new sections have no order of their own.
-   Higher specificity than the legacy single-class rules, so it wins wherever
-   they sit in the file. */
-.aurix-intcc.aurix-intv4 > * { order: 0; }
+/* INT.05 — the cockpit is back on the legacy 12-column grid and the legacy mobile
+   order, so the INT.04 single-column and order:0 overrides are gone. What stays is
+   the story/brief typography below, which now lives INSIDE the .intcc-watch slot. */
 
 /* Context header — the canonical score ONCE, quiet, never the headline. */
 .intv4-header {
@@ -20641,10 +20635,36 @@ body.gs-open { overflow: hidden; }
 .intv4-quality { border-color: rgba(150,180,240,0.14); }
 .intv4-quality-line { margin: 6px 0 0; font-size: 12.5px; line-height: 1.55; color: rgba(198,214,246,0.76); }
 
+/* ── INT.05 · STRUCTURE module (the radar slot, honest) ──────────────────────
+   Reuses the Health ring language for effective diversification and the driver
+   bars for current exposure. No pentagon is drawn because there is not yet more
+   than one certified, independent, direction-defensible dimension. */
+.intv5-structure { display: flex; flex-direction: column; gap: 14px; }
+.intv5-eff { display: flex; align-items: center; gap: 14px; }
+.intv5-eff-ring { position: relative; width: 92px; height: 92px; flex: 0 0 auto; display: grid; place-items: center; }
+.intv5-eff-ring .intcc-score-svg { width: 92px; height: 92px; }
+.intv5-eff-ring .intcc-score-val { font-size: 21px; }
+.intv5-eff-ring .intcc-score-suffix { font-size: 10.5px; }
+.intv5-eff-text { min-width: 0; }
+.intv5-eff-label {
+  margin: 0; font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: rgba(150,180,240,0.72);
+}
+.intv5-eff-desc { margin: 5px 0 0; font-size: 12.5px; line-height: 1.45; color: rgba(198,214,246,0.84); }
+.intv5-expo-list { margin-top: 2px; }
+.intv5-expo-list .intcc-drv-row { grid-template-columns: minmax(58px, 1fr) 2fr auto; }
+/* WHAT MATTERS lives in the old watch slot: it keeps the card, loses the list. */
+.intv5-matters .intv4-story:first-child { border-top: 0; }
+.intv5-honesty { display: block; margin-top: 6px; opacity: 0.78; }
+/* The legacy mobile hero card overflows its own width by 3px (measured) — the
+   decorative orb's glow box. Scoped to the restored surface so no other screen
+   changes; the clip is invisible and removes the horizontal overflow. */
+.aurix-intv5 .intcc-m-hero { overflow: hidden; }
+.aurix-intv5 .intcc-m-hero-text { min-width: 0; }
+
 /* Tablet / desktop — the header can breathe; the Brief stays a single column so
    the leading conclusion is never demoted to one tile among many. */
 @media (min-width: 700px) {
-  .aurix-intv4 { gap: 16px; }
   .intv4-header { padding: 18px 22px; }
   .intv4-head-val { font-size: 38px; }
   .intv4-story-head { font-size: 16px; }
@@ -20658,31 +20678,11 @@ body.gs-open { overflow: hidden; }
   .intv4-story-head { font-size: 14.5px; }
   .intv4-wow-text { font-size: 13.5px; }
 }
-/* DESKTOP — the legacy `.aurix-intcc` becomes a 12-COLUMN GRID at >=1024px, with
-   every old block pinned by hand (.intcc-explore lived in grid-column 9/13). The
-   INT.04 sections have no pins, so they auto-placed into single 1fr columns and
-   the surface collapsed — measured: the question label got 39px for ~80px of text.
-   The new surface is deliberately a single READING COLUMN, not a 12-column
-   dashboard (SPEC §11: no metrics dashboard, no wall of cards), so the grid is
-   re-asserted as a flex column. Higher specificity than the legacy rule, so it
-   wins wherever it sits in the file. */
-@media (min-width: 1024px) {
-  .aurix-intcc.aurix-intv4 {
-    display: flex;
-    flex-direction: column;
-    grid-template-columns: none;
-    max-width: 880px;
-    margin: 0 auto;
-    padding: 12px 30px 56px;
-    align-items: stretch;
-  }
-}
-
 /* The question rows inherit a legacy compact mobile padding (7px → ~32px tall).
    Scoped to the INT.04 surface so no other screen changes: a premium touch
    target is 44px. The label keeps its size; only the hit area grows. */
 @media (max-width: 640px) {
-  .intv4-explore .intcc-x-q { min-height: 44px; box-sizing: border-box; padding-top: 10px; padding-bottom: 10px; }
+  .aurix-intv5 .intcc-x-q { min-height: 44px; box-sizing: border-box; padding-top: 10px; padding-bottom: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .intv4-more-sum, .intv4-more-sum::after { transition: none; }
@@ -20710,7 +20710,11 @@ body.gs-open { overflow: hidden; }
   /* INT.2Z — Perfil removed; Áreas + Timeline split row 3 in halves (no hole). */
   .intcc-watch     { grid-column: 1 / 7;  grid-row: 3; }
   .intcc-timeline  { grid-column: 7 / 13; grid-row: 3; }
-  .intcc-disclaimer { grid-column: 1 / 13; grid-row: 4; }
+  /* INT.05 — the two integrated bands sit full width BELOW the cockpit rows, so
+     neither becomes another large competing board. The disclaimer moves down. */
+  .intv4-changed   { grid-column: 1 / 13; grid-row: 4; }
+  .intv4-discovery { grid-column: 1 / 13; grid-row: 5; }
+  .intcc-disclaimer { grid-column: 1 / 13; grid-row: 6; }
   .intcc-hero { gap: 20px; }
   .intcc-hero-title { font-size: 27px; margin-bottom: 9px; }
   /* INT.2ZC — Salud (left) and Inteligencia (right) read as two sibling modules
@@ -20749,13 +20753,18 @@ body.gs-open { overflow: hidden; }
 
 /* ── Mobile — prioritised experience (spec order) ── */
 @media (max-width: 1023px) {
+  /* INT.05 — change reads right after the cockpit, so every later block shifts by
+     one. Distinct values on purpose: `order: 3` tied with the drivers and DOM
+     order silently decided the winner (measured). */
   .intcc-hero     { order: 1; }
-  .intcc-radar    { order: 2; }
-  .intcc-drivers  { order: 3; }
-  .intcc-explore  { order: 4; }
-  .intcc-watch    { order: 5; }
-  .intcc-timeline { order: 6; }
-  .intcc-disclaimer { order: 8; }
+  .intv4-changed  { order: 2; }
+  .intcc-radar    { order: 3; }
+  .intcc-drivers  { order: 4; }
+  .intcc-explore  { order: 5; }
+  .intcc-watch    { order: 6; }
+  .intcc-timeline { order: 7; }
+  .intv4-discovery { order: 8; }
+  .intcc-disclaimer { order: 9; }
 }
 @media (max-width: 640px) {
   /* Bloque 12 — clear the bottom nav (safe area) so last cards aren't hidden */

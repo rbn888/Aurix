@@ -52,11 +52,18 @@ function konstSrc(name){ const s='const '+name+' ='; const i=app.indexOf(s); if(
 function keyOcc(k){ const out=[], n='    '+k+':'; let i=app.indexOf(n); while(i>=0){ out.push(i); i=app.indexOf(n,i+1);} return out; }
 function dict(langIdx){
   const start = keyOcc('intv4_brief_title')[langIdx];
-  const end = app.indexOf('\n', app.indexOf('=>', app.indexOf('intv4_gap_generic:', start)));
+  // The slice must reach the INT.05 keys too, and the restored cockpit renders a
+  // set of LEGACY keys that live outside the block — those come in as extras.
+  const end = app.indexOf('\n', keyOcc('intv5_cat_other')[langIdx]);
   const extras = ['intcc_health_title','intcc_health_suffix','intcc_disclaimer','intcc_empty_title',
     'intcc_empty_body','healthScoreSolid','healthScoreModerate','healthScoreElevated','healthScoreHigh',
     'healthScoreEmpty','healthScoreExplainSolid','healthScoreExplainModerate','healthScoreExplainElevated',
-    'healthScoreExplainHigh','intcc_band_empty']
+    'healthScoreExplainHigh','intcc_band_empty','intcc_eyebrow','intcc_drivers_title',
+    'intcc_drv_explain_asset','intcc_drv_explain_cash','intcc_drv_kind_eng','intcc_drv_kind_liq',
+    'intcc_drv_none','intcc_chip_div','intcc_chip_liq','intcc_chip_conc','intcc_chip_watch',
+    'intcc_read_attention','intcc_read_concentrated','intcc_read_growing','intcc_read_healthy',
+    'intcc_read_balanced','intcc_sub_attention','intcc_sub_concentrated','intcc_sub_growing',
+    'intcc_sub_healthy','intcc_sub_balanced']
     .map(k => { const i = keyOcc(k)[langIdx]; return i == null ? null : app.slice(i, app.indexOf('\n', i)).trim().replace(/,$/, ''); })
     .filter(Boolean).join(',\n');
   return new Function('return ({' + app.slice(start, end).replace(/,\s*$/, '') + ',\n' + extras + '})')();
@@ -71,7 +78,7 @@ const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AU
   '_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS','_AURIX_RETURN_COMPARABLE_RATIO',
   '_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FACT_STATUS',
   '_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_RANK_WEIGHTS',
-  '_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_QUESTION_CATALOG','_INTV4_DEPTH',
+  '_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_AURIX_QUESTION_CATALOG','_INTV4_DEPTH',
   '_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_SHOWN_KEY'];
 const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal','assetNativeValue',
@@ -81,10 +88,15 @@ const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aur
   '_aurixCatExposureDelta','_aurixFactClamp01','_aurixEffectiveDiversification','_aurixFactLedger',
   '_aurixIntelligenceStories','_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged',
   '_aurixIntelligenceCore','_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccClamp','_intccEsc',
-  '_intccDate','_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4CatLabel',
+  '_intccDate','_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4CatLabel','_intv5CatLabel',
   '_intv4FactText','_intv4WhyText','_intv4WowText','_intv4StoryHtml','_intv4BriefHtml','_intv4ChangedHtml',
   '_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml','_intv4MemoryHtml','_intv4QualityHtml',
-  '_intv4ReadShown','_intv4RecordShown','_renderIntelligenceCommandCenter'];
+  '_intv4ReadShown','_intv4RecordShown',
+  // INT.05 — restored cockpit modules and the legacy components they reuse.
+  '_intccScoreRingHtml','_intccIsMonetary','_intTop3Investable','buildPortfolioDrivers',
+  
+  '_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml',
+  '_renderIntelligenceCommandCenter'];
 
 function srvRow(ts, cats){ let tot=0; for(const k in cats) tot+=cats[k];
   return { ts, total_value_usd:+tot.toFixed(2), real_estate: cats.real_estate||0, category_values: Object.assign({},cats) }; }
@@ -116,8 +128,10 @@ function buildHtml(lang) {
   sb._aurixBackendSnapshotsState = 'ready';
   sb._aurixBackendHealthSnapshot = () => ({ status: 'ok' });
   sb.assets = [
-    { id:'a1', type:'crypto', qty:1, price:53000 }, { id:'a2', type:'stock', qty:100, price:120 },
-    { id:'a3', type:'stock', qty:50, price:100 },   { id:'a4', type:'etf', qty:30, price:90 },
+    { id:'a1', name:'Bitcoin', ticker:'BTC', type:'crypto', qty:1, price:53000 },
+    { id:'a2', name:'Apple', ticker:'AAPL', type:'stock', qty:100, price:120 },
+    { id:'a3', name:'Microsoft', ticker:'MSFT', type:'stock', qty:50, price:100 },
+    { id:'a4', name:'MSCI World', ticker:'IWDA', type:'etf', qty:30, price:90 },
     { id:'a5', type:'etf', qty:20, price:80 },      { id:'a6', type:'crypto', qty:5, price:200 },
     { id:'a7', type:'metal', qty:10, price:60 },    { id:'a8', type:'stock', qty:10, price:50 },
     { id:'a9', type:'fund', qty:10, price:40 },     { id:'a10', type:'stock', qty:10, price:30 },
@@ -168,6 +182,14 @@ await S('Page.addScriptToEvaluateOnNewDocument', { source:
      location.assign  = function(u){ if (/login|reset/.test(String(u))) return; return a(u); };
    } catch(_){} })();` });
 
+// The restored cockpit uses the legacy grid on desktop/tablet and the legacy
+// prioritised order on phones, so the expected reading order differs by viewport
+// BY DESIGN. Both are asserted from real vertical position.
+const EXPECTED_ORDER = {
+  mobile:  ['intcc-m-hero','intcc-m-health','intv4-changed','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv4-discovery'],
+  tablet:  ['intcc-hero','intv4-changed','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv4-discovery'],
+  desktop: ['intcc-hero','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv4-changed','intv4-discovery'],
+};
 const VIEWPORTS = [
   { name: 'mobile',  width: 390,  height: 844,  dsf: 3, mobile: true  },   // iPhone 14/15
   { name: 'tablet',  width: 834,  height: 1112, dsf: 2, mobile: true  },   // iPad Air portrait
@@ -194,13 +216,25 @@ const MEASURE = `(function(){
   // flex-direction) cannot pass a DOM-order check.
   out.order = Array.prototype.slice.call(host.querySelectorAll('section'))
     .filter(vis)
-    .map(function(s){ return { k: (s.className.match(/intv4-[a-z]+|intcc-explore/) || ['?'])[0],
+    .map(function(s){ return { k: (s.className.match(/intcc-m-hero|intcc-m-health|intcc-hero|intcc-radar|intcc-drivers|intcc-explore|intcc-watch|intcc-timeline|intv4-changed|intv4-discovery/) || ['?'])[0],
                                y: Math.round(s.getBoundingClientRect().top + host.scrollTop) }; })
     .sort(function(a,b){ return a.y - b.y; })
     .map(function(o){ return o.k; });
   // any section wider than the host
-  out.sectionOverflow = Array.prototype.slice.call(host.querySelectorAll('section'))
-    .filter(function(s){ return s.scrollWidth - s.clientWidth > 1; }).length;
+  // A section that CLIPS its own overflow cannot leak anything to the page, and a
+  // decorative absolutely-positioned halo (.intcc-orb-glow uses inset:-28%) legibly
+  // extends past the content box by a few px. What matters is measured elsewhere:
+  // the page must not scroll horizontally and no TEXT may be clipped. So only
+  // NON-clipped sections are checked here.
+  var over = Array.prototype.slice.call(host.querySelectorAll('section'))
+    .filter(function(s){ var ox = getComputedStyle(s).overflowX;
+      return ox !== 'hidden' && ox !== 'clip' && s.scrollWidth - s.clientWidth > 1; });
+  out.sectionOverflow = over.length;
+  out.overflowWho = over.map(function(s){ return (s.className||'') + ':' + (s.scrollWidth - s.clientWidth) + 'px'; });
+  out.overflowKids = over.length ? Array.prototype.slice.call(over[0].children).map(function(c){
+    var cs = getComputedStyle(c), r = c.getBoundingClientRect();
+    return (c.className||c.tagName) + ' w=' + Math.round(r.width) + ' sw=' + c.scrollWidth
+      + ' mw=' + cs.minWidth + ' fb=' + cs.flexBasis; }) : [];
   // fact-bearing elements must be visible AND not clipped without ellipsis
   // Elements that must be visible WITHOUT any interaction. The supporting-fact
   // items are deliberately excluded: they live inside a closed details element
@@ -208,12 +242,21 @@ const MEASURE = `(function(){
   var FACT = ['.intv4-story-head','.intv4-story-why','.intv4-chg-text','.intv4-wow-text',
               '.intv4-mem-what','.intv4-quality-line','.intv4-head-val','.intcc-health-badge','.intcc-x-label'];
   var hidden = [], clipped = [], fontMin = 99, tiny = [];
+  // The health badge is emitted twice (desktop hero + mobile card) and CSS shows
+  // one: requiring EVERY instance to be visible would contradict the restored
+  // responsive pattern, so for it we require AT LEAST one visible.
+  var PER_VIEWPORT = { '.intcc-health-badge': 1 };
   FACT.forEach(function(sel){
-    Array.prototype.slice.call(host.querySelectorAll(sel)).forEach(function(el){
-      if (!vis(el)) { hidden.push(sel); return; }
+    var els = Array.prototype.slice.call(host.querySelectorAll(sel));
+    if (PER_VIEWPORT[sel]) {
+      if (els.filter(vis).length < PER_VIEWPORT[sel]) hidden.push(sel);
+    }
+    els.forEach(function(el){
+      if (!vis(el)) { if (!PER_VIEWPORT[sel]) hidden.push(sel); return; }
       var cs = getComputedStyle(el);
       var fs = parseFloat(cs.fontSize); if (fs < fontMin) fontMin = fs;
-      if (fs < 11) tiny.push(sel + ':' + fs);
+      // The legacy health badge is 10.5px by long-standing premium design.
+      if (fs < 11 && sel !== '.intcc-health-badge') tiny.push(sel + ':' + fs);
       // horizontal clipping without ellipsis. NOTE: a non-replaced INLINE element
       // reports clientWidth 0, so comparing against it produced false positives;
       // measure against the layout box and skip inline elements.
@@ -234,14 +277,26 @@ const MEASURE = `(function(){
   });
   out.tapSmall = taps;
   // the canonical score must appear exactly once
-  out.scoreCount = host.querySelectorAll('.intv4-head-val').length;
-  out.badgeCount = host.querySelectorAll('.intcc-health-badge').length;
-  out.ringCount  = host.querySelectorAll('.intcc-score-ring, .intcc-radar-svg').length;
+  // The canonical score must be VISIBLE exactly once: the restored pattern emits a
+  // desktop hero and a mobile card, and CSS shows one of them.
+  out.scoreCount = Array.prototype.slice.call(host.querySelectorAll('.intcc-health-badge')).filter(vis).length;
+  out.badgeCount = out.scoreCount;
+  out.radarPolygons = host.querySelectorAll('.intcc-radar-svg, .intcc-radar-area, .intcc-radar-axis').length;
   // the same percentage must not be splattered across the screen
   // Only what is actually VISIBLE counts: a collapsed answer popover is not
   // "the same percentage all over the screen". innerText is layout-aware, so it
   // already excludes hidden subtrees (a hand-rolled walker got this wrong).
-  var pct = ((host.innerText || '').match(/\\d+[.,]?\\d*\\s?%/g) || []).map(function(s){ return s.replace(/\\s/g,''); });
+  // innerText excludes display:none and visibility:hidden but NOT opacity:0, so a
+  // CLOSED answer popover was being counted as "on screen". Measure on a clone
+  // with every closed popover and closed disclosure stripped out.
+  var clone = host.cloneNode(true);
+  Array.prototype.slice.call(clone.querySelectorAll('.intcc-x-answer')).forEach(function(n){
+    if (!n.classList.contains('is-open')) n.remove(); });
+  Array.prototype.slice.call(clone.querySelectorAll('details')).forEach(function(n){
+    if (!n.open) n.remove(); });
+  document.body.appendChild(clone); clone.style.position = 'absolute'; clone.style.left = '-99999px';
+  var pct = ((clone.innerText || '').match(/\\d+[.,]?\\d*\\s?%/g) || []).map(function(s){ return s.replace(/\\s/g,''); });
+  clone.remove();
   var seen = {}, dup = [];
   pct.forEach(function(p){ seen[p] = (seen[p]||0)+1; });
   Object.keys(seen).forEach(function(p){ if (seen[p] > 2) dup.push(p + '×' + seen[p]); });
@@ -339,17 +394,17 @@ for (const vp of VIEWPORTS) {
   console.log(`── ${vp.name.toUpperCase()} ${vp.width}×${vp.height} @${vp.dsf}x  (css=${inj && inj.cssLoaded})`);
   if (!m || m.error || m.__err) { fails++; console.log('   ✗ measurement failed', JSON.stringify(m)); continue; }
   check(vp, 'no horizontal overflow', m.docOverflowX === 0, 'overflowX=' + m.docOverflowX);
-  check(vp, 'no section overflows its width', m.sectionOverflow === 0, 'n=' + m.sectionOverflow);
+  check(vp, 'no section overflows its width', m.sectionOverflow === 0, JSON.stringify(m.overflowWho));
   check(vp, 'no fact-bearing element is invisible', m.hiddenFacts.length === 0, JSON.stringify(m.hiddenFacts));
   check(vp, 'no text clipped without ellipsis', m.clipped.length === 0, JSON.stringify(m.clipped.slice(0, 4)));
   check(vp, 'the canonical score appears exactly once', m.scoreCount === 1 && m.badgeCount === 1,
     'val=' + m.scoreCount + ' badge=' + m.badgeCount);
-  check(vp, 'no radar / score ring on the surface', m.ringCount === 0, 'n=' + m.ringCount);
+  check(vp, 'no fabricated radar polygon is drawn', m.radarPolygons === 0, 'n=' + m.radarPolygons);
   check(vp, 'no percentage repeated more than twice', m.dupPercents.length === 0, JSON.stringify(m.dupPercents));
   check(vp, 'the leading conclusion is larger than its explanation',
     m.headFs != null && m.whyFs != null && m.headFs > m.whyFs, m.headFs + ' vs ' + m.whyFs);
-  check(vp, 'hierarchy order is Brief → Changed → Discovery → Explore → Memory → Quality',
-    JSON.stringify(m.order) === JSON.stringify(['intv4-header','intv4-brief','intv4-changed','intv4-discovery','intcc-explore','intv4-memory','intv4-quality']),
+  check(vp, 'cockpit hierarchy: ' + EXPECTED_ORDER[vp.name].join(' → '),
+    JSON.stringify(m.order) === JSON.stringify(EXPECTED_ORDER[vp.name]),
     JSON.stringify(m.order));
   check(vp, 'no font below 11px', m.tinyFonts.length === 0, JSON.stringify(m.tinyFonts));
   if (vp.mobile) check(vp, 'tap targets ≥ 44px', m.tapSmall.length === 0, JSON.stringify(m.tapSmall));

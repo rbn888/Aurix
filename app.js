@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '644'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '645'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4842,6 +4842,17 @@ const T = {
     intv4_q_q_data_quality: '¿Qué puede saber Aurix de mí ahora mismo?',
     intv4_gap_per_asset_attribution: 'Aurix todavía no puede decirte qué activo explicó tu rendimiento: la historia por posición es demasiado corta para afirmarlo.',
     intv4_gap_generic: familia => `Todavía no hay historia suficiente para ${familia}.`,
+    // ── SPEC INT.05 · el módulo ESTRUCTURA que ocupa el hueco del radar ────────
+    intv5_structure_title: 'Estructura',
+    intv5_eff_label: 'Diversificación efectiva',
+    intv5_eff_desc: (n, eff) => `Tienes ${n} posiciones; por cómo está repartido el peso equivalen a unas ${eff} igualmente ponderadas.`,
+    intv5_structure_pending: 'Aurix necesita poder valorar todas tus posiciones para medir tu diversificación efectiva.',
+    // Etiquetas SIN artículo: las de `intv4_cat_*` llevan artículo porque se
+    // interpolan en frases ("tu exposición a la cripto"), y como rótulo suelto de
+    // una barra se leían mal ("la cripto 39%").
+    intv5_cat_stock: 'Bolsa', intv5_cat_etf: 'ETF', intv5_cat_fund: 'Fondos',
+    intv5_cat_crypto: 'Cripto', intv5_cat_metal: 'Metales', intv5_cat_liquidity: 'Liquidez',
+    intv5_cat_other: 'Otros',
     // INT.PREVIEW.V1 — Intelligence Preview (FREE). Only facts certified as publishable
     // TODAY: single-position concentration, liquidity weight and ONE allowed watch area.
     // No health score, no attribution, no cause, no price, no checkout.
@@ -7104,6 +7115,15 @@ const T = {
     intv4_q_q_data_quality: 'What can Aurix know about me right now?',
     intv4_gap_per_asset_attribution: 'Aurix cannot yet tell you which asset explained your return: the per-position history is too short to state it.',
     intv4_gap_generic: family => `There is not enough history yet for ${family}.`,
+    // SPEC INT.05 — the STRUCTURE module that occupies the radar slot.
+    intv5_structure_title: 'Structure',
+    intv5_eff_label: 'Effective diversification',
+    intv5_eff_desc: (n, eff) => `You hold ${n} positions; given how the weight is spread they amount to about ${eff} equally weighted ones.`,
+    intv5_structure_pending: 'Aurix needs to be able to value every position before it can measure your effective diversification.',
+    // Standalone bar labels (the sentence forms carry articles in Spanish).
+    intv5_cat_stock: 'Equities', intv5_cat_etf: 'ETFs', intv5_cat_fund: 'Funds',
+    intv5_cat_crypto: 'Crypto', intv5_cat_metal: 'Metals', intv5_cat_liquidity: 'Cash',
+    intv5_cat_other: 'Other',
     // INT.PREVIEW.V1 — Intelligence Preview (FREE). Only facts certified as publishable
     // TODAY: single-position concentration, liquidity weight and ONE allowed watch area.
     // No health score, no attribution, no cause, no price, no checkout.
@@ -26198,6 +26218,11 @@ const _AURIX_FACT_MATERIAL = Object.freeze({
   returnPct:        1,      // |return| below this is not a story
   flowShareOfValue: 0.02,   // recorded capital ≥2% of investable value is material
   effectiveNRatio:  0.6,    // effectiveN/positions below this means weights are lopsided
+  // INT.05 — "your three largest positions add up to 100%" is TRUE and worthless:
+  // with three or fewer holdings it is arithmetic, not information. A top-3 fact
+  // needs both enough positions to be non-obvious AND a real concentration level.
+  top3MinPct:       70,
+  top3MinPositions: 4,
 });
 // Ranking weights. Explicit and testable on purpose — §5 forbids an opaque
 // "magic" formula. Every component is a normalised 0..1 score.
@@ -26211,6 +26236,9 @@ const _AURIX_RANK_WEIGHTS = Object.freeze({
 });
 const _AURIX_NOVELTY_WINDOW_MS = 2 * 864e5;    // presentation memory horizon (legacy engine's 2 days)
 const _AURIX_INTCORE_STORY_LIMIT = 5;          // 3–5 primary stories with DISTINCT roots
+// INT.05 — a story must earn its space. Below this priority it is not published
+// at all: showing two real conclusions is better than padding to five.
+const _AURIX_INTCORE_STORY_MIN_PRIORITY = 0.42;
 
 function _aurixFactClamp01(n) { return Math.max(0, Math.min(1, Number.isFinite(n) ? n : 0)); }
 
@@ -26508,7 +26536,16 @@ function _aurixFactLedger(opts) {
         confidence: 1, utility: 0.9, rarity: _aurixFactClamp01((top1 - 25) / 50),
       });
     }
-    if (Number.isFinite(top3) && top3 > 0) {
+    // Non-obvious or nothing: see _AURIX_FACT_MATERIAL.top3MinPct / top3MinPositions.
+    let invCount = 0;
+    try { invCount = (typeof investableAssets === 'function') ? investableAssets().length : 0; } catch (_) { invCount = 0; }
+    const top3Worth = Number.isFinite(top3) && top3 >= _AURIX_FACT_MATERIAL.top3MinPct
+      && invCount >= _AURIX_FACT_MATERIAL.top3MinPositions;
+    if (Number.isFinite(top3) && top3 > 0 && !top3Worth) {
+      gap(_AURIX_FACT_FAMILY.CONCENTRATION, 'top3_weight', _AURIX_FACT_STATUS.AVAILABLE,
+        invCount < _AURIX_FACT_MATERIAL.top3MinPositions ? 'trivially_true_for_position_count' : 'below_materiality');
+    }
+    if (top3Worth) {
       push({
         semanticKey: 'top3_weight',
         family: _AURIX_FACT_FAMILY.CONCENTRATION,
@@ -26520,7 +26557,8 @@ function _aurixFactLedger(opts) {
         window: { range: 'now', startAt: null, endAt: null },
         source: 'buildPortfolioDrivers', direction: 'flat', positive: null,
         materiality: _aurixFactClamp01(top3 / 100), magnitude: _aurixFactClamp01(top3 / 100),
-        confidence: 1, utility: 0.6, rarity: 0.1,
+        // Supporting evidence for the concentration story, never a headline.
+        confidence: 1, utility: 0.25, rarity: 0.1,
       });
     }
   }
@@ -26601,6 +26639,7 @@ function _aurixFactLedger(opts) {
 function _aurixIntelligenceStories(ledger, opts) {
   const o = opts || {};
   const limit = Number.isFinite(o.limit) ? o.limit : _AURIX_INTCORE_STORY_LIMIT;
+  const minPriority = Number.isFinite(o.minPriority) ? o.minPriority : _AURIX_INTCORE_STORY_MIN_PRIORITY;
   const facts = (ledger && Array.isArray(ledger.facts)) ? ledger.facts : [];
   const groups = new Map();
   for (const f of facts) {
@@ -26645,7 +26684,10 @@ function _aurixIntelligenceStories(ledger, opts) {
   //     still refreshes the surface — it reorders, it does not remove.
   const byMateriality = stories.slice().sort((a, b) =>
     (b.rootMateriality - a.rootMateriality) || (b.priority - a.priority) || (a.causalRoot < b.causalRoot ? -1 : 1));
-  const selected = byMateriality.slice(0, limit);
+  // The floor is applied AFTER the materiality-first selection, so it removes
+  // weak stories without ever letting a fresher-but-minor one take a strong
+  // story's place.
+  const selected = byMateriality.filter(st => st.priority >= minPriority).slice(0, limit);
   selected.sort((a, b) => (b.priority - a.priority) || (a.causalRoot < b.causalRoot ? -1 : 1));
   return selected;
 }
@@ -50947,6 +50989,10 @@ function _intv4CatLabel(cat) {
   const v = _intv4T(k);
   return v || String(cat || '');
 }
+// Standalone (bar/chip) form: no article. Falls back to the sentence form.
+function _intv5CatLabel(cat) {
+  return _intv4T('intv5_cat_' + String(cat || '')) || _intv4CatLabel(cat);
+}
 
 // THE FACT → SENTENCE MAP. Keyed on the Core's `semanticKey`, so the copy surface
 // is finite and auditable: a fact with no entry here is NOT rendered (fail
@@ -51233,6 +51279,190 @@ function _intv4RecordShown(keys) {
   } catch (_) {}
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC INT.05 · PREMIUM EXPERIENCE RESTORATION
+// ════════════════════════════════════════════════════════════════════════════
+// INT.04 connected the Core but flattened Intelligence into a vertical column of
+// text cards, losing the cockpit. INT.05 restores the PREVIOUS VISUAL LANGUAGE
+// and keeps the NEW BRAIN:
+//
+//   INTELLIGENCE ANTERIOR = BASE VISUAL     INTELLIGENCE NUEVO = CEREBRO
+//
+// Every module below reuses the ORIGINAL components, classes and grid slots that
+// were never deleted (only unwired), so the 12-column desktop layout and the
+// mobile order/hero swap work again untouched. What does NOT come back is the old
+// SEMANTICS: each slot is now fed by `_aurixIntelligenceCore` or by an explicitly
+// named certified owner.
+//
+//   COMPONENTE VISUAL REUTILIZABLE  ≠  SEMÁNTICA ANTIGUA NO PUBLICABLE
+//
+// Slot map (legacy class → new content → source):
+//   .intcc-hero / .intcc-m-*  → health + reading + chips + orb → canonical score + Core
+//   .intcc-radar              → STRUCTURE (effective diversification + exposure)
+//   .intcc-drivers            → key drivers (top-3)            → buildPortfolioDrivers
+//   .intcc-explore            → contextual questions           → Core catalogue
+//   .intcc-watch              → WHAT MATTERS TODAY             → Core stories
+//   .intcc-timeline           → WEALTH MEMORY                  → Core temporal events
+//
+// THE RADAR IS NOT RESTORED AS A PENTAGON, ON PURPOSE. Its five axes were not
+// five independent dimensions: three of them restated the top position, and the
+// Growth axis was fabricated (45 + cryptoPct*0.25) when no return existed, with a
+// saturating 55 + pct*2.2 transform. Today the certified, mutually independent and
+// direction-defensible dimensions are effectively ONE (effective diversification);
+// liquidity has no defensible "higher is better" direction without a policy, and a
+// return axis reintroduces the saturation. So the SLOT keeps its premium visual
+// language with an honest structural reading instead of a fabricated figure.
+// WHAT IS MISSING for a legitimate pentagon is recorded in the closing notes.
+
+// The hero reading: a STATE, not a fact — so it never competes with, or repeats,
+// a Brief conclusion. Same state machine the previous hero used, but every input
+// now comes from the Core instead of the old radar.
+function _intv5Reading(core, score, snap) {
+  const facts = (core && core.ledger && core.ledger.facts) || [];
+  const by = k => facts.find(f => f.semanticKey === k) || null;
+  const top1 = by('top_position_weight');
+  const top3 = by('top3_weight');
+  const ret  = facts.filter(f => f.family === _AURIX_FACT_FAMILY.PERFORMANCE)
+                    .sort((a, b) => b.materiality - a.materiality)[0] || null;
+  const eff  = by('effective_holdings');
+  let state;
+  if (score.score != null && score.score < 60)                             state = 'attention';
+  else if ((top1 && top1.value >= 50) || (top3 && top3.value >= 70))       state = 'concentrated';
+  else if (ret && ret.value >= 8)                                          state = 'growing';
+  else if (score.score != null && score.score >= 90
+           && (!eff || eff.values.ratio >= _AURIX_FACT_MATERIAL.effectiveNRatio)) state = 'healthy';
+  else                                                                     state = 'balanced';
+  let sub;
+  if (state === 'attention')         sub = _intv4T('intcc_sub_attention');
+  else if (state === 'concentrated') sub = _intv4T('intcc_sub_concentrated',
+    (top1 && top1.values && top1.values.name) || ((snap && snap.topCategory && snap.topCategory.label) || ''));
+  else if (state === 'growing')      sub = _intv4T('intcc_sub_growing', _intv4Num(ret.value, 2));
+  else if (state === 'healthy')      sub = _intv4T('intcc_sub_healthy');
+  else                               sub = _intv4T('intcc_sub_balanced');
+  return { state, title: _intv4T('intcc_read_' + state), sub };
+}
+
+// Hero chips: short confirmations derived from Core facts. Never a metric — the
+// score is published once, in the ring beside them.
+function _intv5Chips(core, score) {
+  const facts = (core && core.ledger && core.ledger.facts) || [];
+  const by = k => facts.find(f => f.semanticKey === k) || null;
+  const out = [];
+  const eff = by('effective_holdings'), cash = by('cash_weight'), top1 = by('top_position_weight');
+  if (eff && eff.values.ratio >= _AURIX_FACT_MATERIAL.effectiveNRatio) out.push({ tone: 'good', label: _intv4T('intcc_chip_div') });
+  if (cash && cash.value >= 5 && cash.value <= 60)                     out.push({ tone: 'good', label: _intv4T('intcc_chip_liq') });
+  if (!top1 || top1.value < 45)                                        out.push({ tone: 'good', label: _intv4T('intcc_chip_conc') });
+  if (score.score != null && score.score < 60)                         out.push({ tone: 'warn', label: _intv4T('intcc_chip_watch') });
+  return out.filter(c => !!c.label).slice(0, 3);
+}
+
+// STRUCTURE — the radar slot, honest. A ring for effective diversification (the
+// same ring language as Health) plus current exposure per category taken from the
+// CORE's certified exposure facts, which carry `endPct` alongside their window.
+//
+// An earlier attempt read `getInvestableDistribution()` directly and rendered
+// "otros activos 100% / los ETF 0%": its entries are keyed by DISPLAY category,
+// not by the exposure vocabulary, so the mapping was wrong. Rather than re-derive
+// that mapping in the renderer, the Core stays the single authority — only
+// categories it can certify appear, and if it can certify none the card shows the
+// ring alone. Nothing is computed here.
+function _intv5StructureHtml(core, esc) {
+  const facts = (core && core.ledger && core.ledger.facts) || [];
+  const eff = facts.find(f => f.semanticKey === 'effective_holdings') || null;
+  // One row per category: the narrowest certified window wins, so the level shown
+  // is the most current one Aurix can back.
+  const byCat = new Map();
+  for (const f of facts) {
+    if (f.unit !== 'percentage_points' || !f.values || !f.values.category) continue;
+    if (!Number.isFinite(f.values.endPct)) continue;
+    const prev = byCat.get(f.values.category);
+    if (!prev) { byCat.set(f.values.category, f); continue; }
+    const rank = r => ({ '24H': 0, '7D': 1, '30D': 2, '90D': 3 }[String(r || '').toUpperCase()] ?? 9);
+    if (rank(f.window && f.window.range) < rank(prev.window && prev.window.range)) byCat.set(f.values.category, f);
+  }
+  const rows = Array.from(byCat.values())
+    .sort((a, b) => b.values.endPct - a.values.endPct)
+    .slice(0, 5);
+  const ringPct = eff ? Math.round(eff.values.ratio * 100) : null;
+  return `
+    <section class="intcc-card intcc-radar intv5-structure">
+      <h3 class="intcc-card-title">${esc(_intv4T('intv5_structure_title'))}</h3>
+      ${eff ? `
+        <div class="intv5-eff">
+          <div class="intcc-score-ring intv5-eff-ring">
+            ${_intccScoreRingHtml({ score: ringPct })}
+            <div class="intcc-score-num">
+              <span class="intcc-score-val">${esc(_intv4Num(eff.values.effectiveN, 1))}</span>
+              <span class="intcc-score-suffix">/ ${eff.values.positions}</span>
+            </div>
+          </div>
+          <div class="intv5-eff-text">
+            <p class="intv5-eff-label">${esc(_intv4T('intv5_eff_label'))}</p>
+            <p class="intv5-eff-desc">${esc(_intv4T('intv5_eff_desc', eff.values.positions, _intv4Num(eff.values.effectiveN, 1)))}</p>
+          </div>
+        </div>` : `<p class="intcc-empty-body">${esc(_intv4T('intv5_structure_pending'))}</p>`}
+      ${rows.length ? `
+        <ol class="intcc-drv-list intv5-expo-list">
+          ${rows.map(f => `
+            <li class="intcc-drv-row" data-level-of="${esc(f.semanticKey)}">
+              <span class="intcc-drv-name">${esc(_intv5CatLabel(f.values.category))}</span>
+              <span class="intcc-drv-track" aria-hidden="true"><span class="intcc-drv-bar" style="width:${Math.max(3, Math.min(100, Math.round(f.values.endPct)))}%"></span></span>
+              <span class="intcc-drv-pct">${esc(_intv4Num(f.values.endPct, 0))}%</span>
+            </li>`).join('')}
+        </ol>` : ''}
+    </section>`;
+}
+
+// KEY DRIVERS — the original module and markup, unchanged data source
+// (`buildPortfolioDrivers`, the certified investable snapshot). It shows the
+// top-3 BREAKDOWN, which is strictly more information than the single
+// concentration fact, and the Brief no longer headlines that fact when this
+// module publishes it.
+function _intv5DriversHtml(snap, esc) {
+  let drivers = { items: [], pct: 0 };
+  try { drivers = (typeof buildPortfolioDrivers === 'function') ? buildPortfolioDrivers(snap) : drivers; } catch (_) {}
+  const items = (drivers.items || []).slice(0, 3);
+  const top = items[0];
+  const lead = top
+    ? (_intccIsMonetary(top.type) ? _intv4T('intcc_drv_explain_cash', top.name, top.pct)
+                                  : _intv4T('intcc_drv_explain_asset', top.name))
+    : '';
+  return `
+    <section class="intcc-card intcc-drivers">
+      <h3 class="intcc-card-title">${esc(_intv4T('intcc_drivers_title'))}</h3>
+      ${items.length ? `
+        ${lead ? `<p class="intcc-drv-explain">${esc(lead)}</p>` : ''}
+        <ol class="intcc-drv-list">
+          ${items.map((it, i) => `
+            <li class="intcc-drv-row${_intccIsMonetary(it.type) ? ' is-monetary' : ''}">
+              <span class="intcc-drv-rank">${i + 1}</span>
+              <span class="intcc-drv-name">${esc(it.name)}<span class="intcc-drv-kind">${esc(_intccIsMonetary(it.type) ? _intv4T('intcc_drv_kind_liq') : _intv4T('intcc_drv_kind_eng'))}</span></span>
+              <span class="intcc-drv-track" aria-hidden="true"><span class="intcc-drv-bar" style="width:${Math.max(3, Math.min(100, it.pct))}%"></span></span>
+              <span class="intcc-drv-pct">${it.pct}%</span>
+            </li>`).join('')}
+        </ol>`
+        : `<p class="intcc-empty-body">${esc(_intv4T('intcc_drv_none'))}</p>`}
+    </section>`;
+}
+
+// WHAT MATTERS TODAY — the Core's prioritised stories, in the original
+// "areas to watch" slot. 2 to 5, never padded: the Core drops anything under its
+// priority floor, so two real conclusions render as two.
+function _intv5MattersHtml(core, esc, depth, skipRoots) {
+  const skip = new Set(skipRoots || []);
+  const stories = (core.topStories || [])
+    .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL)
+    .filter(st => !skip.has(st.causalRoot))
+    .slice(0, _INTV4_BRIEF_MAX);
+  const cards = stories.map(st => _intv4StoryHtml(st, esc, depth)).filter(Boolean);
+  return `
+    <section class="intcc-card intcc-watch intv4-brief intv5-matters">
+      <h3 class="intcc-card-title">${esc(_intv4T('intv4_brief_title'))}</h3>
+      ${cards.length ? `<div class="intv4-story-list">${cards.join('')}</div>`
+                     : `<p class="intcc-empty-body">${esc(_intv4T('intv4_brief_empty'))}</p>`}
+    </section>`;
+}
+
 function _renderIntelligenceCommandCenter() {
   const snap = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null;
   const esc  = _intccEsc;
@@ -51247,11 +51477,11 @@ function _renderIntelligenceCommandCenter() {
       </div>`;
   }
 
-  // ── SINGLE SOURCE OF INTELLIGENCE (SPEC INT.04 §2) ───────────────────────
-  // The whole surface is rendered from ONE call to the Intelligence Core. No
-  // financial figure is computed here and no fact is derived locally: if it is
-  // not in the Core's ledger, it cannot be said. `presentationHistory` is the
-  // only thing this layer contributes, and it can only move PRIORITY.
+  // ── SINGLE SOURCE OF INTELLIGENCE ────────────────────────────────────────
+  // ONE call to the Core. No financial figure is computed in this renderer and
+  // no fact is derived locally: what is not in the Core's ledger cannot be said.
+  // `presentationHistory` is this layer's only contribution and can move only
+  // PRIORITY, never truth.
   let core = null;
   try {
     core = (typeof _aurixIntelligenceCore === 'function')
@@ -51269,73 +51499,119 @@ function _renderIntelligenceCommandCenter() {
   }
   const depth = _INTV4_DEFAULT_DEPTH;
 
-  // Context header — the CANONICAL health score, ONCE (SPEC §13). The score is
-  // context, not Intelligence: no duplicated chips, no second label, no ring
-  // repeated on mobile. `_intccHealthScore` is the INT.01 adapter over the
-  // canonical `_aurixHealthScore`, so there is still exactly one score in Aurix.
-  const score = _intccHealthScore(snap, null);
-  const headerHtml = `
-    <section class="intv4-header is-tone-${esc(score.tone)}">
-      <div class="intv4-head-score">
-        <span class="intv4-head-label">${esc(t('intcc_health_title'))}</span>
-        <span class="intv4-head-val">${score.score != null ? score.score : '—'}<span class="intv4-head-suffix">${esc(t('intcc_health_suffix'))}</span></span>
+  // ── COCKPIT (row 1) — the canonical score ONCE, plus the state reading ────
+  const score   = _intccHealthScore(snap, null);
+  const reading = _intv5Reading(core, score, snap);
+  const chips   = _intv5Chips(core, score);
+  const heroHtml = `
+    <section class="intcc-hero is-${esc(reading.state)} is-tone-${esc(score.tone)}" data-state="${esc(reading.state)}">
+      <div class="intcc-hero-score">
+        <span class="intcc-hero-health-label">${esc(t('intcc_health_title'))}</span>
+        <div class="intcc-score-ring">
+          ${_intccScoreRingHtml(score)}
+          <div class="intcc-score-num"><span class="intcc-score-val">${score.score != null ? score.score : '—'}</span><span class="intcc-score-suffix">${esc(t('intcc_health_suffix'))}</span></div>
+        </div>
         <span class="intcc-health-badge is-tone-${esc(score.tone)}">${esc(score.label)}</span>
+      </div>
+      <div class="intcc-hero-intel">
+        <div class="intcc-hero-body">
+          <span class="intcc-eyebrow">${esc(t('intcc_eyebrow'))}</span>
+          <h2 class="intcc-hero-title">${esc(reading.title)}</h2>
+          <p class="intcc-hero-sub">${esc(reading.sub)}</p>
+          ${chips.length ? `<div class="intcc-chips">${chips.map(c => `<span class="intcc-chip is-${esc(c.tone)}">${esc(c.label)}</span>`).join('')}</div>` : ''}
+        </div>
+        <div class="intcc-hero-orb-wrap">${_intccOrbHtml()}</div>
       </div>
     </section>`;
 
-  // Every fact the Brief actually publishes (headline AND supporting). Computed
-  // FIRST, because both What Changed and Memory filter against it, and built with
-  // the SAME filter the Brief applies — a story the Brief does NOT render must
-  // never count as already published.
+  // Mobile composition (≤640px): the desktop hero is hidden by CSS and these two
+  // cards take over. Same engines, same numbers — only the arrangement differs.
+  const mHeroHtml = `
+    <section class="intcc-card intcc-m-card intcc-m-hero is-${esc(reading.state)}">
+      <div class="intcc-m-hero-text">
+        <h3 class="intcc-card-title">${esc(t('intcc_eyebrow'))}</h3>
+        <h2 class="intcc-m-hero-title">${esc(reading.title)}</h2>
+        <p class="intcc-m-hero-hint">${esc(reading.sub)}</p>
+      </div>
+      <div class="intcc-m-orb">${_intccOrbHtml()}</div>
+    </section>`;
+  const mHealthHtml = `
+    <section class="intcc-card intcc-m-card intcc-m-health is-tone-${esc(score.tone)}">
+      <h3 class="intcc-card-title">${esc(t('intcc_health_title'))}</h3>
+      <div class="intcc-m-health-body">
+        <div class="intcc-m-health-score">
+          <div class="intcc-score-ring">
+            ${_intccScoreRingHtml(score)}
+            <div class="intcc-score-num"><span class="intcc-score-val">${score.score != null ? score.score : '—'}</span><span class="intcc-score-suffix">${esc(t('intcc_health_suffix'))}</span></div>
+          </div>
+          <span class="intcc-health-badge is-tone-${esc(score.tone)}">${esc(score.label)}</span>
+        </div>
+        ${chips.length ? `<ul class="intcc-m-concl">
+          ${chips.map(c => `<li class="intcc-m-concl-row is-${esc(c.tone)}"><span class="intcc-m-concl-check" aria-hidden="true">✓</span>${esc(c.label)}</li>`).join('')}
+        </ul>` : ''}
+      </div>
+    </section>`;
+
+  // ── Row 2 — STRUCTURE · KEY DRIVERS · EXPLORE ───────────────────────────
+  const structureHtml = _intv5StructureHtml(core, esc);
+  const driversHtml   = _intv5DriversHtml(snap, esc);
+  const exploreHtml   = _intv4ExploreHtml(core, esc);
+
+  // ── Row 3 — WHAT MATTERS TODAY · WEALTH MEMORY ──────────────────────────
+  // The drivers module already publishes the top-3 breakdown, so the Brief does
+  // not ALSO headline the concentration root: one phenomenon, one place.
+  const skipRoots = (driversHtml && /intcc-drv-row/.test(driversHtml)) ? [_AURIX_CAUSAL_ROOT.TOP_POSITION] : [];
+  const mattersHtml = _intv5MattersHtml(core, esc, depth, skipRoots);
   const publishedKeys = [];
   (core.topStories || [])
-    .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL)
+    .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL && skipRoots.indexOf(st.causalRoot) === -1)
     .slice(0, _INTV4_BRIEF_MAX)
     .forEach(st => {
       publishedKeys.push(st.semanticKey);
       (st.supporting || []).forEach(sp => publishedKeys.push(sp.semanticKey));
     });
-  // The sentences the Brief actually prints, so Discovery can refuse to restate one.
   const publishedTexts = (core.topStories || [])
-    .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL)
+    .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL && skipRoots.indexOf(st.causalRoot) === -1)
     .slice(0, _INTV4_BRIEF_MAX)
     .map(st => _intv4FactText(st))
     .filter(Boolean);
-  const briefHtml     = _intv4BriefHtml(core, esc, depth);
+  const memoryHtml = _intv4MemoryHtml(core, esc, publishedKeys);
+
+  // ── Row 4 — WHAT CHANGED, an integrated band (not another big board) ────
   const changedHtml   = _intv4ChangedHtml(core, esc, publishedKeys);
   const discoveryHtml = _intv4DiscoveryHtml(core, esc, publishedTexts);
-  const exploreHtml   = _intv4ExploreHtml(core, esc);
-  const memoryHtml    = _intv4MemoryHtml(core, esc, publishedKeys);
-  const qualityHtml   = _intv4QualityHtml(core, esc);
 
-  // Record what was actually PUBLISHED (stories + the shown discovery), so the
-  // next visit ranks it lower. Never what was merely computed.
+  // Data honesty stays available but does not occupy a permanent giant card: it
+  // is a quiet line beside the disclaimer, and the Explore catalogue still offers
+  // it as a full question when it is genuinely relevant.
+  const gaps = (core.dataAvailability && core.dataAvailability.gaps) || [];
+  const honestyLine = Array.from(new Set(gaps
+    .filter(g => g.status === _AURIX_FACT_STATUS.NOT_YET_SUPPORTED)
+    .map(g => _intv4T('intv4_gap_' + g.semanticKey))
+    .filter(Boolean)))[0] || '';
+
   try {
     const shown = (core.topStories || [])
-      .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL)
+      .filter(st => st.causalRoot !== _AURIX_CAUSAL_ROOT.WEALTH_LEVEL && skipRoots.indexOf(st.causalRoot) === -1)
       .slice(0, _INTV4_BRIEF_MAX).map(st => st.semanticKey);
     const wow = (core.wowInsights || [])[0];
     if (wow && discoveryHtml) shown.push(wow.semanticKey);
     _intv4RecordShown(shown);
   } catch (_) {}
 
-  // RADAR / DRIVERS / WATCH AREAS are deliberately NOT rendered (SPEC §12).
-  // The radar does not carry five independent dimensions — three of its axes are
-  // restatements of the top position — and the drivers and watch-area blocks
-  // republished that same weight twice more. The Brief now tells that story ONCE,
-  // with its supporting facts nested, so keeping them would sell one fact as four
-  // discoveries and put the same percentage all over the screen. The owners stay
-  // in the codebase, dormant, for a future honest risk surface.
   return `
-    <div class="aurix-intcc aurix-intv4" data-depth="${esc(depth)}">
-      ${headerHtml}
-      ${briefHtml}
+    <div class="aurix-intcc aurix-intv5">
+      ${heroHtml}
+      ${mHeroHtml}
+      ${mHealthHtml}
+      ${structureHtml}
+      ${driversHtml}
+      ${exploreHtml}
+      ${mattersHtml}
+      ${memoryHtml}
       ${changedHtml}
       ${discoveryHtml}
-      ${exploreHtml}
-      ${memoryHtml}
-      ${qualityHtml}
-      <p class="intcc-disclaimer">${esc(t('intcc_disclaimer'))}</p>
+      <p class="intcc-disclaimer">${esc(t('intcc_disclaimer'))}${honestyLine ? ` <span class="intv5-honesty">${esc(honestyLine)}</span>` : ''}</p>
     </div>`;
 }
 

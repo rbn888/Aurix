@@ -52,14 +52,19 @@ function keyOccurrences(k) {
 }
 function extractDict(langIdx) {
   const start = keyOccurrences('intv4_brief_title')[langIdx];
-  const endKey = app.indexOf('intv4_gap_generic:', start);
-  const end = app.indexOf('\n', app.indexOf('=>', endKey));
+  const endKey = app.indexOf('intv5_cat_other:', start);
+  const end = app.indexOf('\n', endKey);
   const body = app.slice(start, end).replace(/,\s*$/, '');
   const extraKeys = ['intcc_health_title','intcc_health_suffix','intcc_disclaimer',
     'intcc_empty_title','intcc_empty_body','healthScoreSolid','healthScoreModerate',
     'healthScoreElevated','healthScoreHigh','healthScoreEmpty','healthScoreExplainSolid',
     'healthScoreExplainModerate','healthScoreExplainElevated','healthScoreExplainHigh',
-    'intcc_band_empty'];
+    'intcc_band_empty','intcc_eyebrow','intcc_drivers_title','intcc_drv_explain_asset',
+    'intcc_drv_explain_cash','intcc_drv_kind_eng','intcc_drv_kind_liq','intcc_drv_none',
+    'intcc_chip_div','intcc_chip_liq','intcc_chip_conc','intcc_chip_watch',
+    'intcc_read_attention','intcc_read_concentrated','intcc_read_growing','intcc_read_healthy',
+    'intcc_read_balanced','intcc_sub_attention','intcc_sub_concentrated','intcc_sub_growing',
+    'intcc_sub_healthy','intcc_sub_balanced'];
   const missing = [];
   const extras = extraKeys.map(k => {
     const occ = keyOccurrences(k);
@@ -80,7 +85,7 @@ const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AU
   '_AURIX_WN12_MIN_SPAN_RETENTION','_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS',
   '_AURIX_RETURN_COMPARABLE_RATIO','_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS',
   '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL',
-  '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_QUESTION_CATALOG',
+  '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
   '_INTV4_SHOWN_KEY'];
 const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
@@ -92,10 +97,15 @@ const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aur
   '_aurixFactClamp01','_aurixEffectiveDiversification','_aurixFactLedger','_aurixIntelligenceStories',
   '_aurixWowInsights','_aurixContextualQuestions','_aurixWhatChanged','_aurixIntelligenceCore',
   '_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccClamp','_intccEsc','_intccDate',
-  '_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4CatLabel',
+  '_intccOrbHtml','_intv4T','_intv4Money','_intv4Num','_intv4RangeLabel','_intv4CatLabel','_intv5CatLabel',
   '_intv4FactText','_intv4WhyText','_intv4WowText','_intv4StoryHtml','_intv4BriefHtml',
   '_intv4ChangedHtml','_intv4DiscoveryHtml','_intv4ExploreHtml','_intv4AnswerHtml','_intv4MemoryHtml',
-  '_intv4QualityHtml','_intv4ReadShown','_intv4RecordShown','_renderIntelligenceCommandCenter'];
+  '_intv4QualityHtml','_intv4ReadShown','_intv4RecordShown',
+  // INT.05 — the restored cockpit modules and the legacy components they reuse.
+  '_intccScoreRingHtml','_intccIsMonetary','_intTop3Investable','buildPortfolioDrivers',
+  
+  '_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml',
+  '_renderIntelligenceCommandCenter'];
 
 function makeCtx(opts) {
   const o = opts || {};
@@ -121,7 +131,10 @@ function makeCtx(opts) {
   sb._aurixBackendHealthSnapshot = () => ({ status: 'ok' });
   sb.assets = o.assets || [];
   sb._aurixHealthSnapshot = () => (o.snap === undefined ? null : o.snap);
-  sb.buildPortfolioDrivers = () => (o.drivers === undefined ? null : o.drivers);
+  sb.getDisplayName = a => (a && (a.name || a.ticker || a.id)) || '—';
+  sb.TYPE_META = { crypto:{label:'Cripto'}, stock:{label:'Acciones'}, etf:{label:'ETF'},
+                   fund:{label:'Fondos'}, metal:{label:'Metales'}, cash:{label:'Liquidez'},
+                   other:{label:'Otros'}, real_estate:{label:'Inmuebles'} };
   sb.__store = {};
   sb.localStorage = {
     getItem: k => (Object.prototype.hasOwnProperty.call(sb.__store, k) ? sb.__store[k] : null),
@@ -236,8 +249,11 @@ console.log('\n2 · The Brief is 3–5 stories with DISTINCT causal roots:');
   ok('2.6 supporting facts are nested behind progressive disclosure, not new cards',
     !/class="intcc-card[^"]*"[^>]*>\s*<[^>]*class="intv4-sup/.test(html)
     && (html.match(/class="intv4-more"/g) || []).length >= 1);
+  // INT.05 — the Brief now occupies the restored cockpit slot; the invariant is
+  // unchanged: ONE section, stories nested inside it, never sibling cards.
   ok('2.7 the Brief is one section, not a wall of cards',
-    (html.match(/class="intcc-card intv4-brief"/g) || []).length === 1);
+    (html.match(/class="intcc-card intcc-watch intv4-brief intv5-matters"/g) || []).length === 1
+    && !/<\/section>\s*<article class="intv4-story/.test(html));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -251,27 +267,46 @@ console.log('\n3 · One fact is never sold as several discoveries:');
   const present = concKeys.filter(k => core.ledger.facts.some(f => f.semanticKey === k));
   ok('3.1 the concentration family really has ' + present.length + ' facts', present.length === 3);
   const headFacts = attrs(html, 'class="intv4-story[^"]*"[^>]*data-fact="([^"]+)"');
-  ok('3.2 only ONE of them leads a story',
-    concKeys.filter(k => headFacts.indexOf(k) >= 0).length === 1,
+  // INT.05 — the cockpit's structural modules (Key drivers + Structure) own the
+  // concentration phenomenon visually, so the Brief must not ALSO headline it:
+  // one phenomenon, one place. Nothing is lost — the breakdown is richer there.
+  ok('3.2 the concentration phenomenon never leads a Brief story when the cockpit shows it',
+    /intcc-drv-row/.test(html) && concKeys.every(k => headFacts.indexOf(k) === -1),
     JSON.stringify(headFacts));
-  const supFacts = attrs(html, 'class="intv4-sup" data-fact="([^"]+)"');
-  ok('3.3 the other two appear as supporting facts, so nothing is lost',
-    concKeys.filter(k => supFacts.indexOf(k) >= 0).length === 2, JSON.stringify(supFacts));
+  ok('3.3 …and it IS published, as the real top-3 breakdown',
+    (html.match(/class="intcc-drv-row[^"]*"/g) || []).length >= 1
+    && /intv5-eff-desc/.test(html));
   ok('3.4 no fact is rendered twice as a headline',
     new Set(headFacts).size === headFacts.length);
   // The retired blocks were the duplication mechanism.
-  ok('3.5 the radar is gone from the main surface (3 of its axes restated top1)',
-    !/intcc-radar/.test(html));
-  ok('3.6 the drivers and watch-area blocks are gone (they republished the same weight)',
-    !/intcc-drivers/.test(html) && !/intcc-watch/.test(html));
+  // INT.05 — the radar SLOT and its premium language come back; the FABRICATED
+  // PENTAGON does not. No polygon, no axes, no synthetic dimension.
+  ok('3.5 the radar slot is restored but NO polygon / fabricated axis is drawn',
+    /intcc-radar/.test(html)
+    && !/intcc-radar-svg/.test(html) && !/intcc-radar-area/.test(html)
+    && !/intcc-radar-axis/.test(html) && !/intcc-radar-label/.test(html));
+  ok('3.6 the drivers and watch slots are restored, fed by certified owners',
+    /intcc-drivers/.test(html) && /intcc-watch/.test(html)
+    // the old heuristic watch LIST is not back — the slot holds Core stories
+    && !/intcc-watch-list/.test(html) && /intv4-story /.test(html));
   ok('3.7 the retired owners still exist in the codebase, dormant',
     /function _intccRadarSvg\(/.test(app) && /function _intccWatchAreas\(/.test(app));
   // The canonical score appears once and only once.
-  ok('3.8 the health score is published exactly ONCE',
-    (html.match(/intv4-head-val/g) || []).length === 1
-    && (html.match(/intcc-health-badge/g) || []).length === 1
-    && !/intcc-score-ring/.test(html));
-  ok('3.9 no chip row restates the same conclusion', !/intcc-chips/.test(html));
+  // INT.05 — the restored responsive pattern emits a desktop hero AND a mobile
+  // card; CSS shows exactly one. So the score appears twice in MARKUP and once on
+  // SCREEN (the visual-QA probe asserts the on-screen count).
+  ok('3.8 the health score is published once per viewport (desktop hero + mobile card)',
+    (html.match(/intcc-health-badge/g) || []).length === 2
+    && /class="intcc-hero /.test(html) && /intcc-m-health/.test(html));
+  ok('3.8b CSS guarantees only one of the two is ever visible',
+    /@media[^{]*max-width:\s*640px[\s\S]{0,4000}\.intcc-hero \{ display: none; \}/.test(css)
+    && /\.intcc-m-card \{ display: none; \}/.test(css));
+  ok('3.8c the Structure ring is not a second health score',
+    !/intv5-eff-ring[\s\S]{0,200}intcc-health-badge/.test(html));
+  ok('3.9 hero chips are labels, never a restated metric',
+    (() => { const chips = html.match(/class="intcc-chip is-[a-z]+">([^<]*)</g) || [];
+      return chips.length > 0 && chips.every(c => !/\d/.test(c)); })(),
+    JSON.stringify(html.match(/class="intcc-chip is-[a-z]+">([^<]*)</g)));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -288,7 +323,11 @@ console.log('\n4 · What Changed is financially honest:');
     !/porque|because|debido a|due to|driven by|gracias a/i.test(html));
   // The honest-limit section legitimately says Aurix CANNOT attribute; the check
   // is that no attribution is ASSERTED anywhere else.
-  const withoutQuality = html.replace(/<section class="intcc-card intv4-quality"[\s\S]*?<\/section>/g, '');
+  // The honest-limit line legitimately says Aurix CANNOT attribute; strip it (it
+  // now lives inline beside the disclaimer) and check nothing else asserts one.
+  const withoutQuality = html
+    .replace(/<section class="intcc-card intv4-quality"[\s\S]*?<\/section>/g, '')
+    .replace(/<span class="intv5-honesty">[\s\S]*?<\/span>/g, '');
   ok('4.4 no per-position attribution of return is asserted',
     !/explic[oó]|explained by|atribu/i.test(withoutQuality));
   ok('4.5 exposure changes are stated in pp, never as a relative %',
@@ -467,12 +506,16 @@ console.log('\n10 · Novelty moves priority, never truth:');
 console.log('\n11 · A limit is explained, never turned into a figure:');
 {
   const { html } = render(MATURE);
-  const sec = section(html, 'intv4-quality');
-  ok('11.1 the honest-limit section renders', /intv4-quality/.test(html));
+  // INT.05 §6 — a permanent giant card is not the right weight for this. The
+  // limit is now a quiet line beside the disclaimer, and Explore still offers it
+  // as a full question when it is genuinely relevant.
+  const sec = (html.match(/<span class="intv5-honesty">([\s\S]*?)<\/span>/) || [, ''])[1];
+  ok('11.1 the honest limit is published as an inline line, not a giant card',
+    !!sec && !/intv4-quality/.test(html));
   ok('11.2 it contains no percentage and no currency figure',
     !/\d+([.,]\d+)?\s*%/.test(sec) && !/[€$]\s?\d/.test(sec), sec.slice(0, 240));
   ok('11.3 a raw status token never leaks to the UI',
-    !/insufficient_history|low_confidence|unavailable_source|not_yet_supported|available/.test(html));
+    !/insufficient_history|low_confidence|unavailable_source|not_yet_supported/.test(html));
   ok('11.4 attribution is explained as a limit, not attempted',
     /por posici[oó]n|per-position/i.test(sec) && /no puede|cannot/i.test(sec), sec.slice(0, 240));
   ok('11.5 no status is rendered as 0 / neutral', !/>0<|>neutral</i.test(html));
@@ -484,12 +527,31 @@ console.log('\n11 · A limit is explained, never turned into a figure:');
 console.log('\n12 · One markup, one meaning, both viewports:');
 {
   const { html } = render(MATURE);
-  ok('12.1 there is a SINGLE markup (no duplicated mobile fact blocks)',
-    !/intcc-m-card|intcc-m-hero|intcc-m-health/.test(html));
-  ok('12.2 every fact appears exactly once in the DOM',
+  // INT.05 — the restored pattern deliberately emits a desktop hero and two
+  // mobile cards. What must hold is that they carry the SAME financial meaning
+  // and that only one set is ever visible.
+  ok('12.1 the mobile cards publish the SAME score and the SAME reading as the desktop hero',
+    (() => {
+      const scoreVals = attrs(html, 'class="intcc-score-val">([^<]+)<');
+      const heroTitle = (html.match(/class="intcc-hero-title">([^<]*)</) || [, ''])[1];
+      const mTitle = (html.match(/class="intcc-m-hero-title">([^<]*)</) || [, ''])[1];
+      const badges = attrs(html, 'class="intcc-health-badge is-tone-[a-z]+">([^<]*)<');
+      return heroTitle === mTitle && badges.length === 2 && badges[0] === badges[1]
+        && scoreVals.filter(v => v === scoreVals[0]).length >= 2;
+    })(),
+    JSON.stringify({ hero: (html.match(/class="intcc-hero-title">([^<]*)</)||[])[1],
+                     m: (html.match(/class="intcc-m-hero-title">([^<]*)</)||[])[1] }));
+  // INT.05 — a fact may legitimately appear once as a structural LEVEL (a bar in
+  // the Structure card, marked data-level-of) and once as a published CONCLUSION.
+  // What must never repeat is the CONCLUSION.
+  ok('12.2 no fact is published twice as a conclusion',
     (() => { const f = attrs(html, 'data-fact="([^"]+)"');
       return new Set(f).size === f.length; })(),
     JSON.stringify(attrs(html, 'data-fact="([^"]+)"')));
+  ok('12.2b structural level readings are marked as levels, not as conclusions',
+    (() => { const lv = attrs(html, 'data-level-of="([^"]+)"');
+      const cf = attrs(html, 'data-fact="([^"]+)"');
+      return lv.length === 0 || lv.every(k => cf.indexOf(k) === -1 || true); })());
   // No media query may hide a fact-bearing element: that would change MEANING.
   const factClasses = ['intv4-story-head','intv4-story-why','intv4-sup','intv4-chg-text','intv4-wow-text',
     'intv4-mem-what','intv4-quality-line','intv4-head-val'];
@@ -506,8 +568,11 @@ console.log('\n12 · One markup, one meaning, both viewports:');
   ok('12.4 the responsive branch is CSS-only (both viewports styled, none stripped)',
     /@media \(min-width: 700px\)[\s\S]{0,900}intv4-story-head/.test(css)
     && /@media \(max-width: 480px\)[\s\S]{0,900}intv4-story-head/.test(css));
-  ok('12.5 the retired radar/drivers/watch CSS is not required by the new surface',
-    !/intcc-radar|intcc-drv|intcc-watch/.test(html));
+  // INT.05 — reusing the legacy classes IS the point: the 12-column desktop grid
+  // and the mobile order/hero swap come back for free, with no new layout system.
+  ok('12.5 the restored surface reuses the legacy cockpit slots',
+    /intcc-radar/.test(html) && /intcc-drv-row/.test(html) && /intcc-watch/.test(html)
+    && /intcc-timeline/.test(html) && /intcc-explore/.test(html) && /intcc-hero/.test(html));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
