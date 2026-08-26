@@ -59,7 +59,7 @@ function extractDict(langIdx) {
     'intcc_empty_title','intcc_empty_body','healthScoreSolid','healthScoreModerate',
     'healthScoreElevated','healthScoreHigh','healthScoreEmpty','healthScoreExplainSolid',
     'healthScoreExplainModerate','healthScoreExplainElevated','healthScoreExplainHigh',
-    'intcc_band_empty','intcc_eyebrow','intcc_drivers_title','intcc_drv_explain_asset',
+    'intcc_band_empty','intcc_eyebrow','intcc_radar_title','intcc_drivers_title','intcc_drv_explain_asset',
     'intcc_drv_explain_cash','intcc_drv_kind_eng','intcc_drv_kind_liq','intcc_drv_none',
     'intcc_chip_div','intcc_chip_liq','intcc_chip_conc','intcc_chip_watch',
     'intcc_read_attention','intcc_read_concentrated','intcc_read_growing','intcc_read_healthy',
@@ -85,7 +85,7 @@ const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AU
   '_AURIX_WN12_MIN_SPAN_RETENTION','_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS',
   '_AURIX_RETURN_COMPARABLE_RATIO','_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS',
   '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL',
-  '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_AURIX_QUESTION_CATALOG',
+  '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV6_RADAR_MAX_AXES','_INTV6_RADAR_MIN_AXES','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
   '_INTV4_SHOWN_KEY'];
 const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
@@ -104,7 +104,7 @@ const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aur
   // INT.05 — the restored cockpit modules and the legacy components they reuse.
   '_intccScoreRingHtml','_intccIsMonetary','_intTop3Investable','buildPortfolioDrivers',
   
-  '_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml',
+  '_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv6RadarDims','_intv6RadarHtml','_intccRadarSvg','getInvestableDistribution','_aurixDisplayCategory',
   '_renderIntelligenceCommandCenter'];
 
 function makeCtx(opts) {
@@ -132,9 +132,6 @@ function makeCtx(opts) {
   sb.assets = o.assets || [];
   sb._aurixHealthSnapshot = () => (o.snap === undefined ? null : o.snap);
   sb.getDisplayName = a => (a && (a.name || a.ticker || a.id)) || '—';
-  sb.TYPE_META = { crypto:{label:'Cripto'}, stock:{label:'Acciones'}, etf:{label:'ETF'},
-                   fund:{label:'Fondos'}, metal:{label:'Metales'}, cash:{label:'Liquidez'},
-                   other:{label:'Otros'}, real_estate:{label:'Inmuebles'} };
   sb.__store = {};
   sb.localStorage = {
     getItem: k => (Object.prototype.hasOwnProperty.call(sb.__store, k) ? sb.__store[k] : null),
@@ -279,12 +276,33 @@ console.log('\n3 · One fact is never sold as several discoveries:');
   ok('3.4 no fact is rendered twice as a headline',
     new Set(headFacts).size === headFacts.length);
   // The retired blocks were the duplication mechanism.
-  // INT.05 — the radar SLOT and its premium language come back; the FABRICATED
-  // PENTAGON does not. No polygon, no axes, no synthetic dimension.
-  ok('3.5 the radar slot is restored but NO polygon / fabricated axis is drawn',
-    /intcc-radar/.test(html)
-    && !/intcc-radar-svg/.test(html) && !/intcc-radar-area/.test(html)
-    && !/intcc-radar-axis/.test(html) && !/intcc-radar-label/.test(html));
+  // INT.06 — the POLYGON is back, as a COMPOSITION map: one axis per investable
+  // asset class, each value its real % of investable wealth. So the radar is
+  // drawn, and NONE of the old fabricated dimensions may appear.
+  ok('3.5 the radar polygon is restored',
+    /intcc-radar-svg/.test(html) && /intcc-radar-area/.test(html)
+    && /intcc-radar-axis/.test(html) && /intcc-radar-label/.test(html));
+  ok('3.5b every axis is an investable ASSET CLASS, not an invented dimension',
+    (() => { const axes = attrs(html, 'class="intcc-radar-label"[^>]*>([^<]+)<');
+      const banned = ['Crecimiento','Growth','Estabilidad','Stability','Rendimiento','Return',
+                      'Diversificación','Diversification','Concentración','Concentration'];
+      return axes.length >= 3 && axes.every(a => banned.indexOf(a.trim()) === -1); })(),
+    JSON.stringify(attrs(html, 'class="intcc-radar-label"[^>]*>([^<]+)<')));
+  ok('3.5c the old fabricated formulas are absent from the radar owners',
+    !/45\s*\+\s*crypto\s*\*\s*0\.25/.test(fnSrc('_intv6RadarDims'))
+    && !/55\s*\+/.test(fnSrc('_intv6RadarDims'))
+    && !/\* 100|\/ 100/.test(fnSrc('_intv6RadarDims')));
+  ok('3.5d the radar values ARE the measured percentages (rounding only)',
+    /Math\.round\(d\.pct\)/.test(fnSrc('_intv6RadarDims')));
+  ok('3.5e under 3 asset classes there is no polygon at all (fail closed)',
+    /_INTV6_RADAR_MIN_AXES/.test(fnSrc('_intv6RadarDims'))
+    && /if \(r\.status !== 'ok'\) return '';/.test(fnSrc('_intv6RadarHtml')));
+  ok('3.5g every axis value carries its unit (a bare number could read as a score)',
+    (() => { const vals = attrs(html, 'class="intcc-radar-val"[^>]*>([^<]+)<');
+      return vals.length >= 3 && vals.every(v => /%$/.test(v.trim())); })(),
+    JSON.stringify(attrs(html, 'class="intcc-radar-val"[^>]*>([^<]+)<')));
+  ok('3.5f the radar does not restate Health or its weights',
+    !/_aurixHealthScore|_AURIX_RANK_WEIGHTS/.test(fnSrc('_intv6RadarDims') + fnSrc('_intv6RadarHtml')));
   ok('3.6 the drivers and watch slots are restored, fed by certified owners',
     /intcc-drivers/.test(html) && /intcc-watch/.test(html)
     // the old heuristic watch LIST is not back — the slot holds Core stories

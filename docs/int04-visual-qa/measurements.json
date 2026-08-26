@@ -1,6 +1,6 @@
 {
-  "url": "https://app.aurixsystem.io/",
-  "at": "2026-08-26T18:26:58.782Z",
+  "url": "http://127.0.0.1:8834/",
+  "at": "2026-08-26T18:51:54.649Z",
   "rows": [
     {
       "vp": "mobile",
@@ -9,12 +9,13 @@
       "order": [
         "intcc-m-hero",
         "intcc-m-health",
-        "intv4-changed",
         "intcc-radar",
         "intcc-drivers",
         "intcc-explore",
         "intcc-watch",
         "intcc-timeline",
+        "intv5-structure",
+        "intv4-changed",
         "intv4-discovery"
       ],
       "sectionOverflow": 0,
@@ -27,15 +28,11 @@
       "tapSmall": [],
       "scoreCount": 1,
       "badgeCount": 1,
-      "radarPolygons": 0,
+      "radarPolygons": 7,
       "percents": [
-        "39%",
-        "21%",
-        "64%",
-        "15%",
-        "6%",
         "5,81%",
         "12%",
+        "53%",
         "39%"
       ],
       "dupPercents": [],
@@ -83,6 +80,57 @@
       "supTotal": 3,
       "supVisible": 3,
       "supOverflow": 0,
+      "deadSpace": [
+        {
+          "k": "?",
+          "slack": 22
+        },
+        {
+          "k": "?",
+          "slack": 1
+        },
+        {
+          "k": "intcc-radar",
+          "slack": 1
+        },
+        {
+          "k": "intcc-drivers",
+          "slack": 1
+        },
+        {
+          "k": "intcc-explore",
+          "slack": 1
+        },
+        {
+          "k": "intcc-watch",
+          "slack": 1
+        },
+        {
+          "k": "intcc-timeline",
+          "slack": 4
+        },
+        {
+          "k": "intv5-structure",
+          "slack": 1
+        },
+        {
+          "k": "intv4-changed",
+          "slack": 1
+        },
+        {
+          "k": "intv4-discovery",
+          "slack": 1
+        }
+      ],
+      "heroAlign": null,
+      "radarAxes": 5,
+      "radarLabels": [
+        "Cripto",
+        "Acciones",
+        "Liquidez",
+        "Fondos",
+        "Metales"
+      ],
       "bodyBg": "rgb(4, 5, 7)"
     },
     {
@@ -91,12 +139,13 @@
       "docOverflowX": 0,
       "order": [
         "intcc-hero",
-        "intv4-changed",
         "intcc-radar",
         "intcc-drivers",
         "intcc-explore",
         "intcc-watch",
         "intcc-timeline",
+        "intv5-structure",
+        "intv4-changed",
         "intv4-discovery"
       ],
       "sectionOverflow": 0,
@@ -109,15 +158,11 @@
       "tapSmall": [],
       "scoreCount": 1,
       "badgeCount": 1,
-      "radarPolygons": 0,
+      "radarPolygons": 7,
       "percents": [
-        "39%",
-        "21%",
-        "64%",
-        "15%",
-        "6%",
         "5,81%",
         "12%",
+        "53%",
         "39%"
       ],
       "dupPercents": [],
@@ -165,6 +210,49 @@
       "supTotal": 3,
       "supVisible": 3,
       "supOverflow": 0,
+      "deadSpace": [
+        {
+          "k": "intcc-radar",
+          "slack": 1
+        },
+        {
+          "k": "intcc-drivers",
+          "slack": 1
+        },
+        {
+          "k": "intcc-explore",
+          "slack": 1
+        },
+        {
+          "k": "intcc-watch",
+          "slack": 1
+        },
+        {
+          "k": "intcc-timeline",
+          "slack": 5
+        },
+        {
+          "k": "intv5-structure",
+          "slack": 1
+        },
+        {
+          "k": "intv4-changed",
+          "slack": 1
+        },
+        {
+          "k": "intv4-discovery",
+          "slack": 1
+        }
+      ],
+      "heroAlign": 1,
+      "radarAxes": 5,
+      "radarLabels": [
+        "Cripto",
+        "Acciones",
+        "Liquidez",
+        "Fondos",
+        "Metales"
+      ],
       "bodyBg": "rgb(4, 5, 7)"
     },
     {
@@ -178,6 +266,7 @@
         "intcc-explore",
         "intcc-watch",
         "intcc-timeline",
+        "intv5-structure",
         "intv4-changed",
         "intv4-discovery"
       ],
@@ -191,15 +280,11 @@
       "tapSmall": [],
       "scoreCount": 1,
       "badgeCount": 1,
-      "radarPolygons": 0,
+      "radarPolygons": 7,
       "percents": [
-        "39%",
-        "21%",
-        "64%",
-        "15%",
-        "6%",
         "5,81%",
         "12%",
+        "53%",
         "39%"
       ],
       "dupPercents": [],
@@ -247,6 +332,49 @@
       "supTotal": 3,
       "supVisible": 3,
       "supOverflow": 0,
+      "deadSpace": [
+        {
+          "k": "intcc-radar",
+          "slack": 1
+        },
+        {
+          "k": "intcc-drivers",
+          "slack": 1
+        },
+        {
+          "k": "intcc-explore",
+          "slack": 30
+        },
+        {
+          "k": "intcc-watch",
+          "slack": 1
+        },
+        {
+          "k": "intcc-timeline",
+          "slack": 5
+        },
+        {
+          "k": "intv5-structure",
+          "slack": 1
+        },
+        {
+          "k": "intv4-changed",
+          "slack": 1
+        },
+        {
+          "k": "intv4-discovery",
+          "slack": 1
+        }
+      ],
+      "heroAlign": 0,
+      "radarAxes": 5,
+      "radarLabels": [
+        "Cripto",
+        "Acciones",
+        "Liquidez",
+        "Fondos",
+        "Metales"
+      ],
       "bodyBg": "rgb(4, 5, 7)"
     }
   ]

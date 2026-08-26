@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '645'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '646'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4850,6 +4850,10 @@ const T = {
     // Etiquetas SIN artículo: las de `intv4_cat_*` llevan artículo porque se
     // interpolan en frases ("tu exposición a la cripto"), y como rótulo suelto de
     // una barra se leían mal ("la cripto 39%").
+    // ── SPEC INT.06 ────────────────────────────────────────────────────────────
+    intv6_radar_legend: 'Peso de cada clase de activo sobre tu patrimonio invertible.',
+    intv6_memory_accruing: 'Aurix está acumulando tu historia patrimonial.',
+    intv6_memory_accruing_sub: 'Todavía no hay suficientes eventos registrados para construir tu memoria. Cada observación que Aurix guarda la hace más profunda.',
     intv5_cat_stock: 'Bolsa', intv5_cat_etf: 'ETF', intv5_cat_fund: 'Fondos',
     intv5_cat_crypto: 'Cripto', intv5_cat_metal: 'Metales', intv5_cat_liquidity: 'Liquidez',
     intv5_cat_other: 'Otros',
@@ -7121,6 +7125,10 @@ const T = {
     intv5_eff_desc: (n, eff) => `You hold ${n} positions; given how the weight is spread they amount to about ${eff} equally weighted ones.`,
     intv5_structure_pending: 'Aurix needs to be able to value every position before it can measure your effective diversification.',
     // Standalone bar labels (the sentence forms carry articles in Spanish).
+    // SPEC INT.06
+    intv6_radar_legend: 'Weight of each asset class in your investable wealth.',
+    intv6_memory_accruing: 'Aurix is accumulating your wealth history.',
+    intv6_memory_accruing_sub: 'There are not enough recorded events yet to build your memory. Every observation Aurix stores makes it deeper.',
     intv5_cat_stock: 'Equities', intv5_cat_etf: 'ETFs', intv5_cat_fund: 'Funds',
     intv5_cat_crypto: 'Crypto', intv5_cat_metal: 'Metals', intv5_cat_liquidity: 'Cash',
     intv5_cat_other: 'Other',
@@ -50871,8 +50879,8 @@ function _intccScoreRingHtml(score) {
 // axes, vertices and labels are all computed from `dims.length`, dropping the
 // axis yields an honest 4-sided radar with zero geometry hacks.
 // Truth over visual symmetry.
-function _intccRadarSvg(radar) {
-  const ALL_DIMS = [
+function _intccRadarSvg(radar, dimsOverride) {
+  const ALL_DIMS = Array.isArray(dimsOverride) && dimsOverride.length ? dimsOverride : [
     { key: 'diversification', label: t('intcc_dim_div') },
     { key: 'liquidity',       label: t('intcc_dim_liq') },
     { key: 'concentration',   label: t('intcc_dim_conc') },
@@ -50906,7 +50914,7 @@ function _intccRadarSvg(radar) {
     // Label + a dimmer numeric value stacked underneath → values legible
     // without turning the radar into a table.
     labels += `<text class="intcc-radar-label" x="${lx.toFixed(1)}" y="${(ly + 1).toFixed(1)}" text-anchor="${anchor}">${_intccEsc(d.label)}</text>`;
-    labels += `<text class="intcc-radar-val" x="${lx.toFixed(1)}" y="${(ly + 12).toFixed(1)}" text-anchor="${anchor}">${radar[d.key]}</text>`;
+    labels += `<text class="intcc-radar-val" x="${lx.toFixed(1)}" y="${(ly + 12).toFixed(1)}" text-anchor="${anchor}">${radar[d.key]}${d.suffix || ''}</text>`;
     const [dx, dy] = pt(i, R * (radar[d.key] / 100));
     dots += `<circle class="intcc-radar-dot" cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="2.6"/>`;
   });
@@ -51222,6 +51230,23 @@ function _intv4MemoryHtml(core, esc, alreadyPublished) {
     .filter(x => !!x.txt)
     .filter(x => { const k = x.f.semanticKey; if (seen.has(k)) return false; seen.add(k); return true; })
     .slice(0, _INTV4_MEMORY_MAX);
+  // PREMIUM EMPTY STATE (SPEC §12). The honest semantics are "the history does not
+  // yet contain enough events" — NOT "Aurix is analysing". So the visual is a faint
+  // timeline with observation nodes that accumulate: a temporal signal, not a
+  // spinner, not a skeleton, and not a claim of intelligence. CSS-only, and the
+  // motion is disabled under prefers-reduced-motion.
+  if (!events.length) {
+    return `
+      <section class="intcc-card intcc-timeline intv4-memory is-accruing">
+        <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
+        <div class="intv6-accrue" aria-hidden="true">
+          <span class="intv6-accrue-line"></span>
+          ${[0, 1, 2, 3, 4].map(i => `<span class="intv6-accrue-node" style="--i:${i}"></span>`).join('')}
+        </div>
+        <p class="intv6-accrue-text">${esc(_intv4T('intv6_memory_accruing'))}</p>
+        <p class="intv6-accrue-sub">${esc(_intv4T('intv6_memory_accruing_sub'))}</p>
+      </section>`;
+  }
   return `
     <section class="intcc-card intcc-timeline intv4-memory">
       <h3 class="intcc-card-title">${esc(_intv4T('intv4_memory_title'))}</h3>
@@ -51356,36 +51381,17 @@ function _intv5Chips(core, score) {
   return out.filter(c => !!c.label).slice(0, 3);
 }
 
-// STRUCTURE — the radar slot, honest. A ring for effective diversification (the
-// same ring language as Health) plus current exposure per category taken from the
-// CORE's certified exposure facts, which carry `endPct` alongside their window.
-//
-// An earlier attempt read `getInvestableDistribution()` directly and rendered
-// "otros activos 100% / los ETF 0%": its entries are keyed by DISPLAY category,
-// not by the exposure vocabulary, so the mapping was wrong. Rather than re-derive
-// that mapping in the renderer, the Core stays the single authority — only
-// categories it can certify appear, and if it can certify none the card shows the
-// ring alone. Nothing is computed here.
+// STRUCTURE — the "why" behind the radar's map (SPEC §17: they must complement,
+// not duplicate). The radar shows WHERE the weight is by asset class; this card
+// shows HOW that weight is spread and how much rides on the single largest name.
+// It used to carry category bars — that is now the radar's job, so they are gone.
 function _intv5StructureHtml(core, esc) {
   const facts = (core && core.ledger && core.ledger.facts) || [];
-  const eff = facts.find(f => f.semanticKey === 'effective_holdings') || null;
-  // One row per category: the narrowest certified window wins, so the level shown
-  // is the most current one Aurix can back.
-  const byCat = new Map();
-  for (const f of facts) {
-    if (f.unit !== 'percentage_points' || !f.values || !f.values.category) continue;
-    if (!Number.isFinite(f.values.endPct)) continue;
-    const prev = byCat.get(f.values.category);
-    if (!prev) { byCat.set(f.values.category, f); continue; }
-    const rank = r => ({ '24H': 0, '7D': 1, '30D': 2, '90D': 3 }[String(r || '').toUpperCase()] ?? 9);
-    if (rank(f.window && f.window.range) < rank(prev.window && prev.window.range)) byCat.set(f.values.category, f);
-  }
-  const rows = Array.from(byCat.values())
-    .sort((a, b) => b.values.endPct - a.values.endPct)
-    .slice(0, 5);
+  const eff  = facts.find(f => f.semanticKey === 'effective_holdings') || null;
+  const top1 = facts.find(f => f.semanticKey === 'top_position_weight') || null;
   const ringPct = eff ? Math.round(eff.values.ratio * 100) : null;
   return `
-    <section class="intcc-card intcc-radar intv5-structure">
+    <section class="intcc-card intv5-structure">
       <h3 class="intcc-card-title">${esc(_intv4T('intv5_structure_title'))}</h3>
       ${eff ? `
         <div class="intv5-eff">
@@ -51401,15 +51407,74 @@ function _intv5StructureHtml(core, esc) {
             <p class="intv5-eff-desc">${esc(_intv4T('intv5_eff_desc', eff.values.positions, _intv4Num(eff.values.effectiveN, 1)))}</p>
           </div>
         </div>` : `<p class="intcc-empty-body">${esc(_intv4T('intv5_structure_pending'))}</p>`}
-      ${rows.length ? `
-        <ol class="intcc-drv-list intv5-expo-list">
-          ${rows.map(f => `
-            <li class="intcc-drv-row" data-level-of="${esc(f.semanticKey)}">
-              <span class="intcc-drv-name">${esc(_intv5CatLabel(f.values.category))}</span>
-              <span class="intcc-drv-track" aria-hidden="true"><span class="intcc-drv-bar" style="width:${Math.max(3, Math.min(100, Math.round(f.values.endPct)))}%"></span></span>
-              <span class="intcc-drv-pct">${esc(_intv4Num(f.values.endPct, 0))}%</span>
-            </li>`).join('')}
-        </ol>` : ''}
+      ${top1 ? `<p class="intv6-struct-dep" data-level-of="${esc(top1.semanticKey)}">${esc(_intv4FactText(top1))}</p>` : ''}
+    </section>`;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC INT.06 · RADAR RESTORATION — a COMPOSITION map, not a score
+// ════════════════════════════════════════════════════════════════════════════
+// The founder asked for the pentagon back. It comes back with its full visual
+// language (grid, filled polygon, outer labels + values) and with NONE of its old
+// semantics, which were certified defective: `Growth` fabricated from composition
+// (45 + cryptoPct*0.25), a saturating 55 + pct*2.2, three of five axes restating
+// the top position, and five axes pretending to be five independent signals.
+//
+// WHAT MADE FIVE HONEST AXES POSSIBLE was changing the QUESTION the radar answers.
+// It no longer scores health across invented dimensions; it MAPS COMPOSITION:
+//
+//   one axis per investable ASSET CLASS · value = its real % of investable wealth
+//
+// Every property the SPEC demands falls out of that choice for free:
+//   · DISTINCT — asset classes are different things, not restatements.
+//   · SAME UNIT — every axis is a percentage of the same denominator.
+//   · NO NORMALISATION — the number IS the quantity, so there is no transform to
+//     defend, no threshold to justify and nothing to saturate.
+//   · DETERMINISTIC + CERTIFIED — `getInvestableDistribution()` is the canonical
+//     investable distribution the dashboard donut and `_aurixHealthSnapshot`
+//     already read; real estate is excluded from it by construction.
+//   · FAIL CLOSED — under 3 classes there is no polygon, so nothing is drawn.
+//
+// It also keeps the three surfaces from colliding (SPEC §17/§18):
+//   RADAR  → the global map: where the weight IS.
+//   ESTRUCTURA → why that map reads as it does (effective diversification).
+//   HEALTH → the canonical summary. The radar is NOT a picture of how Health was
+//            computed and infers nothing from its weights.
+//
+// The axis maximum is 100% of investable wealth, so a dominant class produces a
+// long spike and a spread portfolio a small even shape. That is the honest
+// reading of a composition map and is labelled as such — it is NOT a quality
+// score, and a bigger polygon does not mean "better".
+const _INTV6_RADAR_MAX_AXES = 5;
+const _INTV6_RADAR_MIN_AXES = 3;
+function _intv6RadarDims() {
+  const out = { dims: [], values: {}, status: 'unavailable' };
+  let dist = [];
+  try { dist = (typeof getInvestableDistribution === 'function') ? (getInvestableDistribution() || []) : []; }
+  catch (_) { dist = []; }
+  const rows = dist
+    .filter(d => d && !d.nonInvestable && Number.isFinite(d.pct) && d.pct > 0)
+    .slice(0, _INTV6_RADAR_MAX_AXES);
+  if (rows.length < _INTV6_RADAR_MIN_AXES) { out.status = 'insufficient_classes'; return out; }
+  for (const d of rows) {
+    const key = 'cls_' + String(d.type);
+    const meta = (typeof TYPE_META !== 'undefined' && TYPE_META[d.type]) ? TYPE_META[d.type] : null;
+    out.dims.push({ key, suffix: '%', label: (meta && (meta.donutLabel || meta.label)) || String(d.type) });
+    out.values[key] = Math.round(d.pct);          // rounding only; no derivation
+  }
+  out.status = 'ok';
+  return out;
+}
+function _intv6RadarHtml(esc) {
+  const r = _intv6RadarDims();
+  if (r.status !== 'ok') return '';               // no polygon rather than a degenerate one
+  const svg = _intccRadarSvg(r.values, r.dims);
+  if (!svg) return '';
+  return `
+    <section class="intcc-card intcc-radar intv6-radar" data-axes="${r.dims.length}">
+      <h3 class="intcc-card-title">${esc(_intv4T('intcc_radar_title'))}</h3>
+      <p class="intv6-radar-legend">${esc(_intv4T('intv6_radar_legend'))}</p>
+      <div class="intcc-radar-wrap">${svg}</div>
     </section>`;
 }
 
@@ -51552,10 +51617,14 @@ function _renderIntelligenceCommandCenter() {
       </div>
     </section>`;
 
-  // ── Row 2 — STRUCTURE · KEY DRIVERS · EXPLORE ───────────────────────────
-  const structureHtml = _intv5StructureHtml(core, esc);
+  // ── COGNITIVE ORDER (SPEC §14) ───────────────────────────────────────────
+  //   ORIENTACIÓN (hero) → COMPRENSIÓN (radar) → DIAGNÓSTICO (factores) →
+  //   EXPLORACIÓN (explora) → QUÉ IMPORTA → EVOLUCIÓN (memoria) → PROFUNDIDAD
+  //   (estructura · cambios). The grid pins each slot; the mobile order mirrors it.
+  const radarHtml     = _intv6RadarHtml(esc);
   const driversHtml   = _intv5DriversHtml(snap, esc);
   const exploreHtml   = _intv4ExploreHtml(core, esc);
+  const structureHtml = _intv5StructureHtml(core, esc);
 
   // ── Row 3 — WHAT MATTERS TODAY · WEALTH MEMORY ──────────────────────────
   // The drivers module already publishes the top-3 breakdown, so the Brief does
@@ -51600,15 +51669,16 @@ function _renderIntelligenceCommandCenter() {
   } catch (_) {}
 
   return `
-    <div class="aurix-intcc aurix-intv5">
+    <div class="aurix-intcc aurix-intv5 aurix-intv6">
       ${heroHtml}
       ${mHeroHtml}
       ${mHealthHtml}
-      ${structureHtml}
+      ${radarHtml}
       ${driversHtml}
       ${exploreHtml}
       ${mattersHtml}
       ${memoryHtml}
+      ${structureHtml}
       ${changedHtml}
       ${discoveryHtml}
       <p class="intcc-disclaimer">${esc(t('intcc_disclaimer'))}${honestyLine ? ` <span class="intv5-honesty">${esc(honestyLine)}</span>` : ''}</p>

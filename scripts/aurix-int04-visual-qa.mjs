@@ -58,7 +58,7 @@ function dict(langIdx){
   const extras = ['intcc_health_title','intcc_health_suffix','intcc_disclaimer','intcc_empty_title',
     'intcc_empty_body','healthScoreSolid','healthScoreModerate','healthScoreElevated','healthScoreHigh',
     'healthScoreEmpty','healthScoreExplainSolid','healthScoreExplainModerate','healthScoreExplainElevated',
-    'healthScoreExplainHigh','intcc_band_empty','intcc_eyebrow','intcc_drivers_title',
+    'healthScoreExplainHigh','intcc_band_empty','intcc_eyebrow','intcc_radar_title','intcc_drivers_title',
     'intcc_drv_explain_asset','intcc_drv_explain_cash','intcc_drv_kind_eng','intcc_drv_kind_liq',
     'intcc_drv_none','intcc_chip_div','intcc_chip_liq','intcc_chip_conc','intcc_chip_watch',
     'intcc_read_attention','intcc_read_concentrated','intcc_read_growing','intcc_read_healthy',
@@ -78,7 +78,7 @@ const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AU
   '_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS','_AURIX_RETURN_COMPARABLE_RATIO',
   '_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FACT_STATUS',
   '_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_RANK_WEIGHTS',
-  '_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_AURIX_QUESTION_CATALOG','_INTV4_DEPTH',
+  '_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV6_RADAR_MAX_AXES','_INTV6_RADAR_MIN_AXES','TYPE_META','_AURIX_QUESTION_CATALOG','_INTV4_DEPTH',
   '_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_SHOWN_KEY'];
 const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal','assetNativeValue',
@@ -95,7 +95,7 @@ const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aur
   // INT.05 — restored cockpit modules and the legacy components they reuse.
   '_intccScoreRingHtml','_intccIsMonetary','_intTop3Investable','buildPortfolioDrivers',
   
-  '_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml',
+  '_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv6RadarDims','_intv6RadarHtml','_intccRadarSvg','getInvestableDistribution','_aurixDisplayCategory',
   '_renderIntelligenceCommandCenter'];
 
 function srvRow(ts, cats){ let tot=0; for(const k in cats) tot+=cats[k];
@@ -185,10 +185,13 @@ await S('Page.addScriptToEvaluateOnNewDocument', { source:
 // The restored cockpit uses the legacy grid on desktop/tablet and the legacy
 // prioritised order on phones, so the expected reading order differs by viewport
 // BY DESIGN. Both are asserted from real vertical position.
+// INT.06 cognitive order: orientación → comprensión → diagnóstico → exploración
+// → qué importa → evolución → profundidad. One column on mobile/tablet, the
+// 12-column grid on desktop; both must read in the SAME order.
 const EXPECTED_ORDER = {
-  mobile:  ['intcc-m-hero','intcc-m-health','intv4-changed','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv4-discovery'],
-  tablet:  ['intcc-hero','intv4-changed','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv4-discovery'],
-  desktop: ['intcc-hero','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv4-changed','intv4-discovery'],
+  mobile:  ['intcc-m-hero','intcc-m-health','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv5-structure','intv4-changed','intv4-discovery'],
+  tablet:  ['intcc-hero','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv5-structure','intv4-changed','intv4-discovery'],
+  desktop: ['intcc-hero','intcc-radar','intcc-drivers','intcc-explore','intcc-watch','intcc-timeline','intv5-structure','intv4-changed','intv4-discovery'],
 };
 const VIEWPORTS = [
   { name: 'mobile',  width: 390,  height: 844,  dsf: 3, mobile: true  },   // iPhone 14/15
@@ -216,7 +219,7 @@ const MEASURE = `(function(){
   // flex-direction) cannot pass a DOM-order check.
   out.order = Array.prototype.slice.call(host.querySelectorAll('section'))
     .filter(vis)
-    .map(function(s){ return { k: (s.className.match(/intcc-m-hero|intcc-m-health|intcc-hero|intcc-radar|intcc-drivers|intcc-explore|intcc-watch|intcc-timeline|intv4-changed|intv4-discovery/) || ['?'])[0],
+    .map(function(s){ return { k: (s.className.match(/intcc-m-hero|intcc-m-health|intcc-hero|intcc-radar|intcc-drivers|intcc-explore|intcc-watch|intcc-timeline|intv5-structure|intv4-changed|intv4-discovery/) || ['?'])[0],
                                y: Math.round(s.getBoundingClientRect().top + host.scrollTop) }; })
     .sort(function(a,b){ return a.y - b.y; })
     .map(function(o){ return o.k; });
@@ -294,6 +297,11 @@ const MEASURE = `(function(){
     if (!n.classList.contains('is-open')) n.remove(); });
   Array.prototype.slice.call(clone.querySelectorAll('details')).forEach(function(n){
     if (!n.open) n.remove(); });
+  // CHART value labels are excluded: the rule is "do not splatter the same
+  // percentage across the screen as a repeated CLAIM". A composition radar can
+  // legitimately have two asset classes at the same weight, and a bar chart can
+  // have two positions at the same weight — those are data points, not claims.
+  Array.prototype.slice.call(clone.querySelectorAll('.intcc-radar-val, .intcc-drv-pct')).forEach(function(n){ n.remove(); });
   document.body.appendChild(clone); clone.style.position = 'absolute'; clone.style.left = '-99999px';
   var pct = ((clone.innerText || '').match(/\\d+[.,]?\\d*\\s?%/g) || []).map(function(s){ return s.replace(/\\s/g,''); });
   clone.remove();
@@ -328,6 +336,22 @@ const MEASURE = `(function(){
   out.supOverflow = Array.prototype.slice.call(host.querySelectorAll('.intv4-sup'))
     .filter(function(el){ return el.scrollWidth - Math.round(el.getBoundingClientRect().width) > 1; }).length;
   det.forEach(function(d){ d.open = false; });
+  // SPEC §9/§15 — dead space: how much of a card's height is unused by content.
+  out.deadSpace = Array.prototype.slice.call(host.querySelectorAll('section.intcc-card')).map(function(sec){
+    var kids = Array.prototype.slice.call(sec.children).filter(vis);
+    if (!kids.length) return null;
+    var last = kids[kids.length - 1].getBoundingClientRect().bottom;
+    var box = sec.getBoundingClientRect();
+    var cs = getComputedStyle(sec);
+    var slack = Math.round(box.bottom - parseFloat(cs.paddingBottom) - last);
+    return { k: (sec.className.match(/intcc-radar|intcc-drivers|intcc-explore|intcc-watch|intcc-timeline|intv5-structure|intv4-changed|intv4-discovery/)||['?'])[0], slack: slack };
+  }).filter(Boolean);
+  // SPEC §3 — hero optical alignment: the two eyebrow labels must start level.
+  var hl = host.querySelector('.intcc-hero-health-label'), eb = host.querySelector('.intcc-hero-body .intcc-eyebrow');
+  out.heroAlign = (hl && eb && vis(hl) && vis(eb))
+    ? Math.round(Math.abs(hl.getBoundingClientRect().top - eb.getBoundingClientRect().top)) : null;
+  out.radarAxes = host.querySelectorAll('.intcc-radar-axis').length;
+  out.radarLabels = Array.prototype.slice.call(host.querySelectorAll('.intcc-radar-label')).map(function(e){ return (e.textContent||'').trim(); });
   var bodyBg = getComputedStyle(document.body).backgroundColor;
   out.bodyBg = bodyBg;
   return out;
@@ -399,7 +423,15 @@ for (const vp of VIEWPORTS) {
   check(vp, 'no text clipped without ellipsis', m.clipped.length === 0, JSON.stringify(m.clipped.slice(0, 4)));
   check(vp, 'the canonical score appears exactly once', m.scoreCount === 1 && m.badgeCount === 1,
     'val=' + m.scoreCount + ' badge=' + m.badgeCount);
-  check(vp, 'no fabricated radar polygon is drawn', m.radarPolygons === 0, 'n=' + m.radarPolygons);
+  check(vp, 'the radar polygon is drawn with >=3 asset-class axes',
+    m.radarAxes >= 3 && m.radarLabels.length === m.radarAxes, 'axes=' + m.radarAxes + ' ' + JSON.stringify(m.radarLabels));
+  if (!vp.mobile || vp.name === 'tablet') {
+    // the hero is only rendered on tablet/desktop (phones use the two cards)
+    check(vp, 'hero eyebrows are optically aligned (<=2px)', m.heroAlign !== null && m.heroAlign <= 2, 'delta=' + m.heroAlign + 'px');
+  }
+  check(vp, 'no card wastes more than 120px of dead space',
+    m.deadSpace.every(function(d){ return d.slack <= 120; }),
+    JSON.stringify(m.deadSpace.filter(function(d){ return d.slack > 120; })));
   check(vp, 'no percentage repeated more than twice', m.dupPercents.length === 0, JSON.stringify(m.dupPercents));
   check(vp, 'the leading conclusion is larger than its explanation',
     m.headFs != null && m.whyFs != null && m.headFs > m.whyFs, m.headFs + ' vs ' + m.whyFs);
