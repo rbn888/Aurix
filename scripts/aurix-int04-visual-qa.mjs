@@ -63,7 +63,11 @@ function dict(langIdx){
     'intcc_drv_none','intcc_chip_div','intcc_chip_liq','intcc_chip_conc','intcc_chip_watch',
     'intcc_read_attention','intcc_read_concentrated','intcc_read_growing','intcc_read_healthy',
     'intcc_read_balanced','intcc_sub_attention','intcc_sub_concentrated','intcc_sub_growing',
-    'intcc_sub_healthy','intcc_sub_balanced']
+    'intcc_sub_healthy','intcc_sub_balanced',
+    // INT.07 — the semantic pentagon's labels and its "no data" state live outside
+    // the intv4/intv5 slice, so they must come in as extras or an axis renders blank.
+    'intcc_dim_div','intcc_dim_liq','intcc_dim_conc','intcc_dim_stab','intcc_dim_growth',
+    'intv7_axis_unavailable','intv7_radar_legend','intv7_radar_pending']
     .map(k => { const i = keyOcc(k)[langIdx]; return i == null ? null : app.slice(i, app.indexOf('\n', i)).trim().replace(/,$/, ''); })
     .filter(Boolean).join(',\n');
   return new Function('return ({' + app.slice(start, end).replace(/,\s*$/, '') + ',\n' + extras + '})')();
@@ -78,7 +82,7 @@ const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AU
   '_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS','_AURIX_RETURN_COMPARABLE_RATIO',
   '_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS','_AURIX_FACT_STATUS',
   '_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL','_AURIX_RANK_WEIGHTS',
-  '_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV6_RADAR_CLASSES','_INTV6_RADAR_RESIDUAL','TYPE_META','_AURIX_QUESTION_CATALOG','_INTV4_DEPTH',
+  '_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG','_INTV4_DEPTH',
   '_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX','_INTV4_SHOWN_KEY'];
 const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket','isClosedAsset',
   'activeAssets','isInvestableAsset','investableAssets','investableValueUSD','liquidityNominal','assetNativeValue',
@@ -95,7 +99,7 @@ const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aur
   // INT.05 — restored cockpit modules and the legacy components they reuse.
   '_intccScoreRingHtml','_intccIsMonetary','_intTop3Investable','buildPortfolioDrivers',
   
-  '_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv6RadarDims','_intv6RadarHtml','_intccRadarSvg','getInvestableDistribution','_aurixDisplayCategory',
+  '_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7RadarHtml','_intccRadarSvg','getInvestableDistribution','_aurixDisplayCategory',
   '_renderIntelligenceCommandCenter'];
 
 function srvRow(ts, cats){ let tot=0; for(const k in cats) tot+=cats[k];
@@ -359,9 +363,18 @@ const MEASURE = `(function(){
   out.radarAxes = host.querySelectorAll('.intcc-radar-axis').length;
   var compCard = host.querySelector('.intcc-radar');
   out.compState = compCard ? (compCard.getAttribute('data-state') || '?') : 'absent';
+  // INT.07 — an axis value is EITHER a percentage OR the word "sin datos". Read the
+  // raw text: coercing it to a number is exactly the lie the contract forbids.
   out.radarVals = Array.prototype.slice.call(host.querySelectorAll('.intcc-radar-val'))
-    .map(function(e){ return parseInt((e.textContent||'').replace(/\\D/g,''), 10) || 0; });
-  out.radarZeros = out.radarVals.filter(function(v){ return v === 0; }).length;
+    .map(function(e){ return (e.textContent||'').trim(); });
+  out.radarMeasured = out.radarVals.filter(function(v){ return /^\\d+%$/.test(v); }).length;
+  out.radarPending  = out.radarVals.filter(function(v){ return !/^\\d+%$/.test(v); });
+  out.radarDimmed = host.querySelectorAll('.intcc-radar-axis.is-unavailable').length;
+  out.radarDots   = host.querySelectorAll('.intcc-radar-dot').length;
+  out.radarArea   = host.querySelectorAll('.intcc-radar-area').length;
+  out.radarAreaPts = (function(){ var a = host.querySelector('.intcc-radar-area');
+    if (!a) return 0; var p = (a.getAttribute('points')||'').trim();
+    return p ? p.split(/\\s+/).length : 0; })();
   // A HOLE detector: on the wide grid, the leftmost module of row 2 must start at
   // the container's content edge. A fail-closed module used to leave 1/3 of the
   // row blank, which is exactly what the founder photographed.
@@ -464,15 +477,24 @@ for (const vp of VIEWPORTS) {
   check(vp, 'no text clipped without ellipsis', m.clipped.length === 0, JSON.stringify(m.clipped.slice(0, 4)));
   check(vp, 'the canonical score appears exactly once', m.scoreCount === 1 && m.badgeCount === 1,
     'val=' + m.scoreCount + ' badge=' + m.badgeCount);
-  // Either state is valid; what must never happen is an EMPTY reserved column.
-  // FOUNDER RULE: the pentagon always renders with its five fixed axes; only the
-  // lengths change, and a class with no weight sits at the centre.
-  check(vp, 'the pentagon renders with its five fixed axes',
+  // FOUNDER CONTRACT (INT.07): the pentagon is the conceptual STRUCTURE and always
+  // renders with its five semantic axes; a value exists only where Aurix can
+  // certify it, and "no data" is never drawn as 0.
+  check(vp, 'the pentagon renders with its five fixed semantic axes',
     m.compState === 'radar' && m.radarAxes === 5 && m.radarLabels.length === 5,
     'state=' + m.compState + ' axes=' + m.radarAxes + ' ' + JSON.stringify(m.radarLabels));
-  check(vp, 'a class with no weight reads 0% (at the centre, not omitted)',
-    m.radarZeros >= 1 && m.radarVals.length === 5,
-    JSON.stringify(m.radarVals));
+  check(vp, 'the five axes are the semantic dimensions, not asset classes',
+    JSON.stringify(m.radarLabels) === JSON.stringify(
+      ['Diversificación','Estabilidad','Liquidez','Crecimiento','Concentración']),
+    JSON.stringify(m.radarLabels));
+  check(vp, 'the uncertified axes say "sin datos" and are visibly attenuated',
+    m.radarVals.length === 5 && m.radarMeasured === 3
+    && m.radarPending.length === 2 && m.radarPending.every(function(v){ return v === 'sin datos'; })
+    && m.radarDimmed === 2,
+    JSON.stringify({ vals: m.radarVals, dimmed: m.radarDimmed }));
+  check(vp, 'no uncertified axis is drawn as a value (polygon joins only certified ones)',
+    m.radarArea === 1 && m.radarAreaPts === 3 && m.radarDots === 3,
+    JSON.stringify({ area: m.radarArea, pts: m.radarAreaPts, dots: m.radarDots }));
   check(vp, 'no reserved column is left empty where a module fail-closed',
     m.emptyGridGap === false, 'gapPx=' + m.gapPx);
   if (!vp.mobile || vp.name === 'tablet') {

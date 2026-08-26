@@ -64,7 +64,11 @@ function extractDict(langIdx) {
     'intcc_chip_div','intcc_chip_liq','intcc_chip_conc','intcc_chip_watch',
     'intcc_read_attention','intcc_read_concentrated','intcc_read_growing','intcc_read_healthy',
     'intcc_read_balanced','intcc_sub_attention','intcc_sub_concentrated','intcc_sub_growing',
-    'intcc_sub_healthy','intcc_sub_balanced'];
+    'intcc_sub_healthy','intcc_sub_balanced',
+    // INT.07 — the semantic pentagon publishes these, so the gate must see the
+    // REAL strings from BOTH dictionaries (a missing one blanks an axis label).
+    'intcc_dim_div','intcc_dim_liq','intcc_dim_conc','intcc_dim_stab','intcc_dim_growth',
+    'intv7_axis_unavailable','intv7_radar_legend','intv7_radar_pending'];
   const missing = [];
   const extras = extraKeys.map(k => {
     const occ = keyOccurrences(k);
@@ -85,7 +89,7 @@ const CONSTS = ['_AURIX_CATHIST_CANONICAL','_AURIX_CATHIST_REAL_ESTATE_KEY','_AU
   '_AURIX_WN12_MIN_SPAN_RETENTION','_AURIX_WN12_BOUNDED_RANGES','_AURIX_RETURN_MIN_HISTORY_MS',
   '_AURIX_RETURN_COMPARABLE_RATIO','_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT','_AURIX_INVPERF_HIGH_CONFIDENCE_OBS',
   '_AURIX_FACT_STATUS','_AURIX_FACT_FAMILY','_AURIX_CAUSAL_ROOT','_AURIX_FACT_MATERIAL',
-  '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV6_RADAR_CLASSES','_INTV6_RADAR_RESIDUAL','TYPE_META','_AURIX_QUESTION_CATALOG',
+  '_AURIX_RANK_WEIGHTS','_AURIX_NOVELTY_WINDOW_MS','_AURIX_INTCORE_STORY_LIMIT','_AURIX_INTCORE_STORY_MIN_PRIORITY','_INTV7_RADAR_DIMS','TYPE_META','_AURIX_QUESTION_CATALOG',
   '_INTV4_DEPTH','_INTV4_DEFAULT_DEPTH','_INTV4_BRIEF_MAX','_INTV4_EXPLORE_MAX','_INTV4_MEMORY_MAX',
   '_INTV4_SHOWN_KEY'];
 const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aurixCategoryBucket',
@@ -104,7 +108,7 @@ const FNS = ['toBase','formatCurrency','formatBase','_aurixUsableQuantity','_aur
   // INT.05 — the restored cockpit modules and the legacy components they reuse.
   '_intccScoreRingHtml','_intccIsMonetary','_intTop3Investable','buildPortfolioDrivers',
   
-  '_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv6RadarDims','_intv6RadarHtml','_intccRadarSvg','getInvestableDistribution','_aurixDisplayCategory',
+  '_intv5Reading','_intv5Chips','_intv5StructureHtml','_intv5DriversHtml','_intv5MattersHtml','_intv7RadarAxes','_intv7RadarHtml','_intccRadarSvg','getInvestableDistribution','_aurixDisplayCategory',
   '_renderIntelligenceCommandCenter'];
 
 function makeCtx(opts) {
@@ -276,35 +280,51 @@ console.log('\n3 · One fact is never sold as several discoveries:');
   ok('3.4 no fact is rendered twice as a headline',
     new Set(headFacts).size === headFacts.length);
   // The retired blocks were the duplication mechanism.
-  // INT.06 — the POLYGON is back, as a COMPOSITION map: one axis per investable
-  // asset class, each value its real % of investable wealth. So the radar is
-  // drawn, and NONE of the old fabricated dimensions may appear.
+  // INT.07 — THE SEMANTIC PENTAGON. Five FIXED conceptual dimensions, always
+  // drawn; a value exists only where Aurix can certify it. "No data" is NOT 0.
   ok('3.5 the radar polygon is restored',
     /intcc-radar-svg/.test(html) && /intcc-radar-area/.test(html)
     && /intcc-radar-axis/.test(html) && /intcc-radar-label/.test(html));
-  ok('3.5b every axis is an investable ASSET CLASS, not an invented dimension',
-    (() => { const axes = attrs(html, 'class="intcc-radar-label"[^>]*>([^<]+)<');
-      const banned = ['Crecimiento','Growth','Estabilidad','Stability','Rendimiento','Return',
-                      'Diversificación','Diversification','Concentración','Concentration'];
-      return axes.length >= 3 && axes.every(a => banned.indexOf(a.trim()) === -1); })(),
-    JSON.stringify(attrs(html, 'class="intcc-radar-label"[^>]*>([^<]+)<')));
-  ok('3.5c the old fabricated formulas are absent from the radar owners',
-    !/45\s*\+\s*crypto\s*\*\s*0\.25/.test(fnSrc('_intv6RadarDims'))
-    && !/55\s*\+/.test(fnSrc('_intv6RadarDims'))
-    && !/\* 100|\/ 100/.test(fnSrc('_intv6RadarDims')));
-  ok('3.5d the radar values ARE the measured percentages (rounding only)',
-    /Math\.round\(pctByType\[cls\] \|\| 0\)/.test(fnSrc('_intv6RadarDims')));
-  // FOUNDER RULE: the five dimensions are FIXED and the pentagon always renders;
-  // only the axis lengths change, and a class with no weight sits at the centre.
-  ok('3.5e the five dimensions are fixed and the polygon is unconditional',
-    /_INTV6_RADAR_CLASSES = Object\.freeze\(\['crypto', 'stock', 'etf', 'metal', 'cash'\]\)/.test(app)
-    && /for \(const cls of _INTV6_RADAR_CLASSES\)/.test(fnSrc('_intv6RadarDims')));
-  ok('3.5g every axis value carries its unit (a bare number could read as a score)',
-    (() => { const vals = attrs(html, 'class="intcc-radar-val"[^>]*>([^<]+)<');
-      return vals.length >= 3 && vals.every(v => /%$/.test(v.trim())); })(),
-    JSON.stringify(attrs(html, 'class="intcc-radar-val"[^>]*>([^<]+)<')));
+  ok('3.5b the five axes are the founder\'s five SEMANTIC dimensions, in the FIXED drawing order',
+    JSON.stringify(attrs(html, 'class="intcc-radar-label[^"]*"[^>]*>([^<]+)<'))
+      === JSON.stringify(['Diversificación','Estabilidad','Liquidez','Crecimiento','Concentración']),
+    JSON.stringify(attrs(html, 'class="intcc-radar-label[^"]*"[^>]*>([^<]+)<')));
+  ok('3.5b2 the radar is NOT a map of asset classes any more',
+    (() => { const labels = attrs(html, 'class="intcc-radar-label[^"]*"[^>]*>([^<]+)<').map(x => x.trim());
+      const classes = ['Cripto','Crypto','Acciones','Stocks','ETF','Metales','Metals','Efectivo','Cash','Liquidez USD'];
+      // 'Liquidez' is a DIMENSION here, so only the class-specific names are banned
+      return classes.filter(c => c !== 'Liquidez').every(c => labels.indexOf(c) === -1); })(),
+    JSON.stringify(attrs(html, 'class="intcc-radar-label[^"]*"[^>]*>([^<]+)<')));
+  ok('3.5c no legacy formula survives anywhere in the radar owners',
+    (() => { const src = fnSrc('_intv7RadarAxes') + fnSrc('_intv7RadarHtml') + fnSrc('_intccRadarSvg');
+      // The banned shapes are the FORMULAS, not every literal: [0.25,0.5,0.75,1]
+      // are the grid ring fractions and are pure geometry.
+      return !/45\s*\+\s*crypto/i.test(src)          // fabricated Growth
+        && !/55\s*\+/.test(src)                       // saturating base
+        && !/\*\s*2\.2/.test(src)                    // saturating slope
+        && !/crypto\w*\s*\*\s*0\.25/i.test(src)
+        && !/volatil/i.test(src); })());               // no invented stability
+  ok('3.5d each certified axis declares the OWNER it reads, and there are exactly three',
+    (() => { const src = konstSrc('_INTV7_RADAR_DIMS');
+      const owned = (src.match(/owner: '/g) || []).length;
+      return owned === 3 && /owner: 'aurixEffectiveDiversification'/.test(src)
+        && (src.match(/owner: 'aurixHealthSnapshot'/g) || []).length === 2
+        && (src.match(/owner: null/g) || []).length === 2; })(),
+    konstSrc('_INTV7_RADAR_DIMS'));
+  ok('3.5e the five dimensions are FIXED and frozen (not data-derived)',
+    /_INTV7_RADAR_DIMS = Object\.freeze\(\[/.test(app)
+    && ['diversification','liquidity','concentration','stability','growth']
+         .every(k => new RegExp("key: '" + k + "'").test(konstSrc('_INTV7_RADAR_DIMS'))));
   ok('3.5f the radar does not restate Health or its weights',
-    !/_aurixHealthScore|_AURIX_RANK_WEIGHTS/.test(fnSrc('_intv6RadarDims') + fnSrc('_intv6RadarHtml')));
+    !/_aurixHealthScore|_AURIX_RANK_WEIGHTS/.test(fnSrc('_intv7RadarAxes') + fnSrc('_intv7RadarHtml')));
+  ok('3.5g a certified axis carries its unit; an uncertified one carries a WORD, not a figure',
+    (() => { const vals = attrs(html, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<').map(v => v.trim());
+      const measured = vals.filter(v => /^\d+%$/.test(v));
+      const pending  = vals.filter(v => v === 'sin datos');
+      return vals.length === 5 && measured.length === 3 && pending.length === 2; })(),
+    JSON.stringify(attrs(html, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<')));
+  ok('3.5h "sin datos" is never rendered as a number and never as zero',
+    !/class="intcc-radar-val is-unavailable"[^>]*>\s*0/.test(html));
   ok('3.6 the drivers and watch slots are restored, fed by certified owners',
     /intcc-drivers/.test(html) && /intcc-watch/.test(html)
     // the old heuristic watch LIST is not back — the slot holds Core stories
@@ -629,69 +649,138 @@ console.log('\n13 · ES and EN: same facts, same numbers, same order:');
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// 13B · INT.06B — DATA-ADAPTIVE COMPOSITION (the founder's real portfolio)
+// 13B · INT.07 — THE SEMANTIC PENTAGON on the founder's real portfolio
 // ════════════════════════════════════════════════════════════════════════════
-// The live founder portfolio is Bitcoin + Ethereum + Euros: three POSITIONS but
-// only TWO asset classes, because BTC and ETH correctly collapse into `crypto`.
-// The polygon needs three axes, so it fail-closed and — since the module returned
-// '' while the grid pinned it to `grid-column: 1/5` — left a visible hole.
-console.log('\n13B · The pentagon always renders; only the axis LENGTHS change:');
+// The live founder portfolio is Bitcoin + Ethereum + Euros. INT.06B's radar
+// fail-closed on it (2 asset classes, 3 axes required) and left a visible hole
+// pinned by the grid. The contract now: the FRAME is unconditional, the POLYGON
+// only joins certified dimensions, and an uncertified axis is attenuated —
+// never pulled to the centre, because 0 and "unknown" are different claims.
+console.log('\n13B · Five conceptual axes always; values only where certified:');
 {
+  const CENTRE = '110.0,106.0';
   const mk = (types) => types.map((t, i) => ({ id: 'x' + i, name: 'A' + i, ticker: 'A' + i, type: t,
-    qty: t === 'cash' ? 1000 * (types.length - i) : 1, price: t === 'cash' ? undefined : 1000 * (types.length - i) }));
+    qty: t === 'cash' ? 1000 * (i + 1) : 1, price: t === 'cash' ? undefined : 1000 * (i + 1) }));
   const shape = (types) => Object.assign({}, MATURE, { assets: mk(types) });
-  const st = (types) => { const h = render(shape(types)).html;
-    const vals = []; const re = /class="intcc-radar-val"[^>]*>(\d+)%/g; let m;
-    while ((m = re.exec(h))) vals.push(parseInt(m[1], 10));
-    // scope to the radar card: the HERO also carries a data-state attribute
+  const st = (types, lang, over) => { const rr = render(Object.assign(shape(types), { lang: lang || 'es' }, over || {})); const h = rr.html;
+    const vals = attrs(h, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<').map(v => v.trim());
+    const pts = (h.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim();
     return { state: (h.match(/class="intcc-card intcc-radar[^"]*"[^>]*data-state="([^"]+)"/) || [, null])[1],
-             axes: (h.match(/class="intcc-radar-axis"/g) || []).length,
-             labels: attrs(h, 'class="intcc-radar-label"[^>]*>([^<]+)<'),
-             vals: vals, present: (h.match(/data-present="(\d+)"/) || [, null])[1],
+             axes: (h.match(/class="intcc-radar-axis[^"]*"/g) || []).length,
+             labels: attrs(h, 'class="intcc-radar-label[^"]*"[^>]*>([^<]+)<'),
+             vals: vals,
+             nums: vals.filter(v => /^\d+%$/.test(v)).map(v => parseInt(v, 10)),
+             measured: (h.match(/data-measured="(\d+)"/) || [, null])[1],
+             pending: (h.match(/data-unavailable="([^"]*)"/) || [, null])[1],
+             dots: (h.match(/class="intcc-radar-dot"/g) || []).length,
+             dimAxes: (h.match(/class="intcc-radar-axis is-unavailable"/g) || []).length,
+             pts: pts ? pts.split(/\s+/) : [],
+             spokes: (h.match(/class="intcc-radar-spoke"/g) || []).length,
+             ctx: rr.ctx,
              hasCard: /class="intcc-card intcc-radar/.test(h), html: h }; };
 
   const five = st(['crypto', 'stock', 'etf', 'metal', 'cash']);
-  const three = st(['crypto', 'stock', 'cash']);
-  const founder = st(['crypto', 'crypto', 'cash']);   // BTC + ETH + EUR = 2 classes
-  const one = st(['crypto', 'crypto']);
+  const founder = st(['crypto', 'crypto', 'cash']);   // BTC + ETH + EUR
+  const one = st(['crypto']);
 
   ok('13B.1 the pentagon ALWAYS has its five fixed axes, whatever the portfolio',
-    [five, three, founder, one].every(x => x.axes === 5 && x.labels.length === 5),
-    JSON.stringify([five.axes, three.axes, founder.axes, one.axes]));
+    [five, founder, one].every(x => x.axes === 5 && x.labels.length === 5),
+    JSON.stringify([five.axes, founder.axes, one.axes]));
   ok('13B.2 the five dimensions are the SAME five every time (fixed, not data-derived)',
     JSON.stringify(five.labels) === JSON.stringify(founder.labels)
     && JSON.stringify(founder.labels) === JSON.stringify(one.labels),
     JSON.stringify(founder.labels));
-  ok('13B.3 the radar NEVER disappears because asset classes are missing',
-    [five, three, founder, one].every(x => x.hasCard && x.state === 'radar'));
-  ok('13B.4 the founder shape (BTC+ETH+EUR) draws 5 axes with only 2 carrying weight',
-    founder.axes === 5 && founder.present === '2'
-    && founder.vals.filter(v => v === 0).length === 3,
-    JSON.stringify({ vals: founder.vals, present: founder.present }));
-  ok('13B.5 a class the user does not hold reads 0% — at the centre, not omitted',
-    (() => { const zeros = founder.vals.filter(v => v === 0).length;
-      // a zero axis puts its vertex exactly at the centre of the grid
-      const pts = (founder.html.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim().split(/\s+/);
-      return zeros === 3 && pts.length === 5 && pts.filter(p => p === '110.0,106.0').length === 3; })(),
-    (founder.html.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1]);
-  ok('13B.6 one single class → still five axes, four of them at zero',
-    one.axes === 5 && one.vals.filter(v => v === 0).length === 4);
-  ok('13B.7 the weights published are the certified ones (≈100 across the axes)',
-    (() => { const sum = founder.vals.reduce((a, b) => a + b, 0); return Math.abs(sum - 100) <= 2; })(),
+  ok('13B.3 the radar NEVER disappears and never leaves a hole',
+    [five, founder, one].every(x => x.hasCard && x.state === 'radar' && /intcc-radar-svg/.test(x.html)));
+  ok('13B.4 exactly the three certifiable dimensions carry a value today',
+    [five, founder, one].every(x => x.measured === '3' && x.nums.length === 3),
+    JSON.stringify([five.measured, founder.measured, one.measured]));
+  ok('13B.5 Estabilidad and Crecimiento are reported as unavailable, not as 0',
+    [five, founder, one].every(x => x.pending === 'stability,growth'
+      && x.vals.filter(v => v === 'sin datos').length === 2),
     JSON.stringify(founder.vals));
-  ok('13B.8 real estate never enters the radar',
+  ok('13B.6 an uncertified axis gets NO vertex — it is not dragged to the centre',
+    founder.pts.length === 3 && founder.dots === 3
+    && founder.pts.every(p => p !== CENTRE || founder.nums.indexOf(0) !== -1),
+    JSON.stringify({ pts: founder.pts, dots: founder.dots }));
+  ok('13B.7 the polygon joins ONLY certified dimensions (never five points)',
+    [five, founder, one].every(x => x.pts.length === 3));
+  ok('13B.7b the pending axes are INTERLEAVED, so no sector of the pentagon is dead',
+    (() => { const ks = konstSrc('_INTV7_RADAR_DIMS');
+      const order = (ks.match(/key: '(\w+)'/g) || []).map(m => m.split("'")[1]);
+      const pending = ['stability', 'growth'].map(k => order.indexOf(k)).sort((a, b) => a - b);
+      // never adjacent on the 5-cycle (and 0/4 counts as adjacent)
+      const d = pending[1] - pending[0];
+      return order.length === 5 && d !== 1 && !(pending[0] === 0 && pending[1] === 4); })(),
+    JSON.stringify((konstSrc('_INTV7_RADAR_DIMS').match(/key: '(\w+)'/g) || [])));
+  ok('13B.7c the drawing order is FROZEN, not derived from what is certified today',
+    /_INTV7_RADAR_DIMS = Object\.freeze\(\[/.test(app)
+    && !/unavailable[\s\S]{0,80}sort|sort[\s\S]{0,80}owner/.test(fnSrc('_intv7RadarAxes')));
+  ok('13B.8 the uncertified axes are visually attenuated, and only those two',
+    [five, founder, one].every(x => x.dimAxes === 2
+      && (x.html.match(/class="intcc-radar-label is-unavailable"/g) || []).length === 2));
+  ok('13B.9 the pending dimensions are NAMED in words, not left silent',
+    /intv7-radar-pending/.test(founder.html)
+    && /Estabilidad/.test(founder.html) && /Crecimiento/.test(founder.html));
+  // With NO valuation the whole surface is the pre-existing honest empty state —
+  // there is no cockpit to put a radar in, and that is correct. So the radar's own
+  // "one certified axis" path is exercised at the MODULE level, where it lives.
+  ok('13B.10 no valuation ⇒ the honest empty state, never a broken radar',
+    (() => { const h = render(Object.assign(shape(['crypto', 'crypto', 'cash']), { snap: null })).html;
+      return /aurix-intcc is-empty/.test(h) && !/intcc-radar-svg/.test(h)
+        && !/class="intcc-radar-val/.test(h); })());
+  ok('13B.10b one certified axis ⇒ five axes still drawn, measured length along the axis',
+    (() => { const c = makeCtx(Object.assign(shape(['crypto', 'crypto', 'cash']), { snap: null }));
+      const h = run('_intv7RadarHtml(s => s)', c);
+      const vals = attrs(h, 'class="intcc-radar-val[^"]*"[^>]*>([^<]+)<');
+      // A single vertex cannot close an area, and the centre is not a data point,
+      // so no polygon is emitted — the axis itself carries the measurement.
+      return /intcc-radar-svg/.test(h)
+        && (h.match(/class="intcc-radar-axis[^"]*"/g) || []).length === 5
+        && vals.length === 5 && vals.filter(v => v.trim() === 'sin datos').length === 4
+        && !/intcc-radar-area/.test(h)
+        && (h.match(/class="intcc-radar-spoke"/g) || []).length === 1
+        && (h.match(/class="intcc-radar-dot"/g) || []).length === 1; })(),
+    run('_intv7RadarHtml(s => s)', makeCtx(Object.assign(shape(['crypto', 'crypto', 'cash']), { snap: null }))));
+  ok('13B.11 Diversificación is the declared OWNER\'s number, not a second computation',
+    (() => { const d = run('_aurixEffectiveDiversification()', founder.ctx);
+      const expected = Math.round((d.effectiveN / d.positions) * 100);
+      // …and the structure card reads the same owner, so the two surfaces agree
+      // by construction rather than by coincidence.
+      const st5 = section(founder.html, 'intv5-structure');
+      const pos = parseInt((st5.match(/class="intcc-score-suffix">\/ (\d+)</) || [, ''])[1], 10);
+      return founder.nums[0] === expected && pos === d.positions
+        && /_aurixEffectiveDiversification/.test(fnSrc('_intv7RadarAxes')); })(),
+    JSON.stringify({ radar: founder.nums[0], owner: run('_aurixEffectiveDiversification()', founder.ctx) }));
+  ok('13B.11b Liquidez and Concentración are the snapshot owner\'s numbers',
+    (() => { const snap = MATURE.snap;
+      return founder.nums[1] === Math.round(snap.cashPct)
+        && founder.nums[2] === Math.round(snap.topInvestedAsset.pctTotal); })(),
+    JSON.stringify({ radar: founder.nums, snap: [MATURE.snap.cashPct, MATURE.snap.topInvestedAsset.pctTotal] }));
+  ok('13B.12 real estate never enters the radar',
     (() => { const withRE = st(['crypto', 'crypto', 'cash', 'real_estate']);
-      return withRE.axes === 5 && Math.abs(withRE.vals.reduce((a, b) => a + b, 0) - 100) <= 2; })());
-  ok('13B.9 an unclassified residual is REPORTED, never swallowed by the five axes',
-    (() => { const o = st(['crypto', 'weird_type', 'cash']);
-      return /intv6-radar-residual/.test(o.html); })());
-  ok('13B.10 no valuation at all ⇒ honest hold (we cannot claim 0% when we do not know)',
-    st([]).state === 'hold');
-  ok('13B.11 no old formula and no renderer arithmetic',
-    !/45\s*\+|55\s*\+|\* 100|\/ 100/.test(fnSrc('_intv6RadarDims') + fnSrc('_intv6RadarHtml')));
-  ok('13B.12 values are the measured percentages, rounding only',
-    /Math\.round\(pctByType\[cls\] \|\| 0\)/.test(fnSrc('_intv6RadarDims')));
-  ok('13B.13 the module occupies its column at every class count (no reserved hole)',
+      return JSON.stringify(withRE.nums) === JSON.stringify(founder.nums); })(),
+    JSON.stringify({ withRE: st(['crypto', 'crypto', 'cash', 'real_estate']).nums, base: founder.nums }));
+  ok('13B.13 every axis value is a percentage in range, rounding only',
+    [five, founder, one].every(x => x.nums.every(v => v >= 0 && v <= 100 && Number.isInteger(v))),
+    JSON.stringify(founder.nums));
+  ok('13B.14 ES and EN publish the SAME numbers and the same pending dimensions',
+    (() => { const en = st(['crypto', 'crypto', 'cash'], 'en');
+      return JSON.stringify(en.nums) === JSON.stringify(founder.nums)
+        && en.pending === founder.pending
+        && en.vals.filter(v => v === 'no data').length === 2
+        && JSON.stringify(en.labels)
+             === JSON.stringify(['Diversification','Stability','Liquidity','Growth','Concentration']); })(),
+    JSON.stringify(st(['crypto', 'crypto', 'cash'], 'en').vals));
+  ok('13B.15 no renderer arithmetic beyond the declared share transform',
+    (() => { const src = fnSrc('_intv7RadarAxes');
+      // the ONLY transform allowed is effectiveN/positions expressed as a share,
+      // the same one the structure ring uses. Nothing else may scale a value.
+      return (src.match(/\* 100/g) || []).length === 1
+        && /\(div\.effectiveN \/ div\.positions\) \* 100/.test(src)
+        && !/\* 2|\+ 55|\+ 45/.test(src); })(),
+    fnSrc('_intv7RadarAxes'));
+  ok('13B.16 the module occupies its column at every portfolio shape (no reserved hole)',
     /:not\(:has\(\.intcc-radar\)\)[\s\S]{0,120}\.intcc-drivers \{ grid-column: 1 \/ 7/.test(css));
 
   // ── HONEST WINDOWS ────────────────────────────────────────────────────────
@@ -701,29 +790,29 @@ console.log('\n13B · The pentagon always renders; only the axis LENGTHS change:
   const perfOf = (days, range) => { const c = makeCtx(Object.assign({}, MATURE, { rows: hist(days), flows: [] }));
     return run('_aurixInvestablePerformance(' + JSON.stringify(range) + ')', c); };
   const p4 = perfOf(4, '7d'), p12 = perfOf(12, '7d');
-  ok('13B.14 a 7D window measured over only 4 days is flagged as NOT covering it',
+  ok('13W.1 a 7D window measured over only 4 days is flagged as NOT covering it',
     p4.valid === true && p4.coversNominal === false && Math.round(p4.spanMs / DAYm) === 4,
     JSON.stringify({ v: p4.valid, cov: p4.coversNominal, span: Math.round(p4.spanMs / DAYm) }));
-  ok('13B.15 …and with 12 days of history the 7D window really covers 7 days',
+  ok('13W.2 …and with 12 days of history the 7D window really covers 7 days',
     p12.coversNominal === true && Math.round(p12.spanMs / DAYm) === 7);
-  ok('13B.16 the copy never claims "7 days" for a window that does not cover it',
+  ok('13W.3 the copy never claims "7 days" for a window that does not cover it',
     (() => { const c = makeCtx(MATURE);
       const a = run('_intv4WindowLabel({"range":"7d","spanMs":' + (4 * DAYm) + ',"coversNominal":false})', c);
       const b = run('_intv4WindowLabel({"range":"7d","spanMs":' + (7 * DAYm) + ',"coversNominal":true})', c);
       return a !== b && /4/.test(a) && !/7/.test(a); })());
-  ok('13B.17 "all" has no nominal span to fall short of', perfOf(4, 'all').coversNominal === true);
-  ok('13B.18 ALL and 7D may differ when their intervals differ',
+  ok('13W.4 "all" has no nominal span to fall short of', perfOf(4, 'all').coversNominal === true);
+  ok('13W.5 ALL and 7D may differ when their intervals differ',
     (() => { const a = perfOf(30, 'all'), b = perfOf(30, '7d');
       return a.valid && b.valid && a.startAt !== b.startAt && a.returnPct !== b.returnPct; })());
-  ok('13B.19 a deposit inside the 7D window is never published as 7D performance',
+  ok('13W.6 a deposit inside the 7D window is never published as 7D performance',
     (() => { const c = makeCtx(Object.assign({}, MATURE, {
         rows: [0,1,2,3,4,5,6,7].map(i => ({ ts: NOW - (7 - i) * DAYm, total: i < 4 ? 100000 : 110000, real_estate: 0 })),
         flows: [{ id: 'd', ts: NOW - 3.5 * DAYm, amountUSD: 10000, kind: 'deposit' }] }));
       const r = run("_aurixInvestablePerformance('7d')", c);
       return r.valid === true && Math.abs(r.returnPct) < 0.5; })());
-  ok('13B.20 the span threshold is the boundary this codebase already adopted',
+  ok('13W.7 the span threshold is the boundary this codebase already adopted',
     /_AURIX_WN12_MIN_SPAN_RETENTION/.test(fnSrc('_aurixInvestablePerformance')));
-  ok('13B.21 NON-VACUITY — without the guard a 4-day span would still be named "7d"',
+  ok('13W.8 NON-VACUITY — without the guard a 4-day span would still be named "7d"',
     (() => { const c = makeCtx(MATURE);
       return run('_intv4RangeLabel("7d")', c) !== run('_intv4WindowLabel({"range":"7d","spanMs":' + (4 * DAYm) + ',"coversNominal":false})', c); })());
 }

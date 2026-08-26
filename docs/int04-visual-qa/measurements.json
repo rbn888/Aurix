@@ -1,6 +1,6 @@
 {
-  "url": "http://127.0.0.1:8852/",
-  "at": "2026-08-26T19:53:50.959Z",
+  "url": "http://127.0.0.1:8791/index.html",
+  "at": "2026-08-26T20:18:46.797Z",
   "rows": [
     {
       "vp": "mobile",
@@ -126,21 +126,29 @@
       "radarAxes": 5,
       "compState": "radar",
       "radarVals": [
-        85,
-        0,
-        0,
-        0,
-        15
+        "83%",
+        "sin datos",
+        "12%",
+        "sin datos",
+        "53%"
       ],
-      "radarZeros": 3,
+      "radarMeasured": 3,
+      "radarPending": [
+        "sin datos",
+        "sin datos"
+      ],
+      "radarDimmed": 2,
+      "radarDots": 3,
+      "radarArea": 1,
+      "radarAreaPts": 3,
       "emptyGridGap": false,
       "gapPx": 0,
       "radarLabels": [
-        "Cripto",
-        "Acciones",
-        "Fondos",
-        "Metales",
-        "Liquidez"
+        "Diversificación",
+        "Estabilidad",
+        "Liquidez",
+        "Crecimiento",
+        "Concentración"
       ],
       "rowSymmetry": [],
       "bodyBg": "rgb(4, 5, 7)"
@@ -260,21 +268,29 @@
       "radarAxes": 5,
       "compState": "radar",
       "radarVals": [
-        85,
-        0,
-        0,
-        0,
-        15
+        "83%",
+        "sin datos",
+        "12%",
+        "sin datos",
+        "53%"
       ],
-      "radarZeros": 3,
+      "radarMeasured": 3,
+      "radarPending": [
+        "sin datos",
+        "sin datos"
+      ],
+      "radarDimmed": 2,
+      "radarDots": 3,
+      "radarArea": 1,
+      "radarAreaPts": 3,
       "emptyGridGap": false,
       "gapPx": 0,
       "radarLabels": [
-        "Cripto",
-        "Acciones",
-        "Fondos",
-        "Metales",
-        "Liquidez"
+        "Diversificación",
+        "Estabilidad",
+        "Liquidez",
+        "Crecimiento",
+        "Concentración"
       ],
       "rowSymmetry": [],
       "bodyBg": "rgb(4, 5, 7)"
@@ -394,21 +410,29 @@
       "radarAxes": 5,
       "compState": "radar",
       "radarVals": [
-        85,
-        0,
-        0,
-        0,
-        15
+        "83%",
+        "sin datos",
+        "12%",
+        "sin datos",
+        "53%"
       ],
-      "radarZeros": 3,
+      "radarMeasured": 3,
+      "radarPending": [
+        "sin datos",
+        "sin datos"
+      ],
+      "radarDimmed": 2,
+      "radarDots": 3,
+      "radarArea": 1,
+      "radarAreaPts": 3,
       "gapPx": 0,
       "emptyGridGap": false,
       "radarLabels": [
-        "Cripto",
-        "Acciones",
-        "Fondos",
-        "Metales",
-        "Liquidez"
+        "Diversificación",
+        "Estabilidad",
+        "Liquidez",
+        "Crecimiento",
+        "Concentración"
       ],
       "rowSymmetry": [
         {

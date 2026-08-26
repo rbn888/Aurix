@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '648'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '649'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -4708,7 +4708,10 @@ const T = {
     intcc_dim_liq:    'Liquidez',
     intcc_dim_conc:   'Concentración',
     intcc_dim_stab:   'Estabilidad',
-    intcc_dim_growth: 'Rendimiento',   // INT.01 — the axis is TWR return, not value growth
+    intcc_dim_growth: 'Crecimiento',   // INT.07 — the founder's five conceptual dimensions
+    intv7_axis_unavailable: 'sin datos',
+    intv7_radar_legend: 'Las cinco dimensiones de tu estructura. Aurix sólo dibuja las que puede certificar.',
+    intv7_radar_pending: (d) => `Todavía sin datos: ${d}. Aparecerán cuando Aurix pueda medirlas con rigor.`,
     intcc_drivers_title: 'Factores principales',
     intcc_drv_explain_asset: name => `${name} representa actualmente la mayor exposición individual de tu patrimonio.`,
     intcc_drv_explain_cash:  (name, pct) => `Tu mayor posición actual es efectivo en ${name} (${pct}%). Aporta estabilidad y capacidad para aprovechar oportunidades.`,
@@ -4851,13 +4854,10 @@ const T = {
     // interpolan en frases ("tu exposición a la cripto"), y como rótulo suelto de
     // una barra se leían mal ("la cripto 39%").
     // ── SPEC INT.06 ────────────────────────────────────────────────────────────
-    intv6_radar_legend: 'Peso de cada clase de activo sobre tu patrimonio invertible.',
     intv6_r_effective_days: n => `los últimos ${n} ${n === 1 ? 'día' : 'días'} registrados`,
-    intv6_radar_residual: pct => `Otros activos sin clasificar: ${pct}% de tu patrimonio invertible.`,
     intv6_comp_title: 'Composición',
     intv6_comp_legend: 'Peso de cada clase de activo sobre tu patrimonio invertible.',
     intv6_comp_single: 'Todo tu patrimonio invertible está en una sola clase de activo.',
-    intv6_comp_pending: 'Aurix necesita poder valorar tus posiciones para leer tu composición.',
     intv6_memory_accruing: 'Aurix está acumulando tu historia patrimonial.',
     intv6_memory_accruing_sub: 'Todavía no hay suficientes eventos registrados para construir tu memoria. Cada observación que Aurix guarda la hace más profunda.',
     intv5_cat_stock: 'Bolsa', intv5_cat_etf: 'ETF', intv5_cat_fund: 'Fondos',
@@ -7000,7 +7000,10 @@ const T = {
     intcc_dim_liq:    'Liquidity',
     intcc_dim_conc:   'Concentration',
     intcc_dim_stab:   'Stability',
-    intcc_dim_growth: 'Return',        // INT.01 — the axis is TWR return, not value growth
+    intcc_dim_growth: 'Growth',        // INT.07 — the founder's five conceptual dimensions
+    intv7_axis_unavailable: 'no data',
+    intv7_radar_legend: 'The five dimensions of your structure. Aurix only draws the ones it can certify.',
+    intv7_radar_pending: (d) => `No data yet: ${d}. They will appear once Aurix can measure them rigorously.`,
     intcc_drivers_title: 'Key drivers',
     intcc_drv_explain_asset: name => `${name} is currently the single largest exposure in your wealth.`,
     intcc_drv_explain_cash:  (name, pct) => `Your largest current position is cash in ${name} (${pct}%). It adds stability and the capacity to seize opportunities.`,
@@ -7132,13 +7135,10 @@ const T = {
     intv5_structure_pending: 'Aurix needs to be able to value every position before it can measure your effective diversification.',
     // Standalone bar labels (the sentence forms carry articles in Spanish).
     // SPEC INT.06
-    intv6_radar_legend: 'Weight of each asset class in your investable wealth.',
     intv6_r_effective_days: n => `the last ${n} recorded ${n === 1 ? 'day' : 'days'}`,
-    intv6_radar_residual: pct => `Unclassified other assets: ${pct}% of your investable wealth.`,
     intv6_comp_title: 'Composition',
     intv6_comp_legend: 'Weight of each asset class in your investable wealth.',
     intv6_comp_single: 'All of your investable wealth sits in a single asset class.',
-    intv6_comp_pending: 'Aurix needs to be able to value your positions before it can read your composition.',
     intv6_memory_accruing: 'Aurix is accumulating your wealth history.',
     intv6_memory_accruing_sub: 'There are not enough recorded events yet to build your memory. Every observation Aurix stores makes it deeper.',
     intv5_cat_stock: 'Equities', intv5_cat_etf: 'ETFs', intv5_cat_fund: 'Funds',
@@ -50906,6 +50906,16 @@ function _intccScoreRingHtml(score) {
 // axes, vertices and labels are all computed from `dims.length`, dropping the
 // axis yields an honest 4-sided radar with zero geometry hacks.
 // Truth over visual symmetry.
+// INT.07 — THE FRAME AND THE POLYGON ARE DIFFERENT THINGS.
+//
+// The five axes are the radar's CONCEPTUAL STRUCTURE and are always drawn, because
+// they are the five dimensions Intelligence reasons about. The POLYGON only joins
+// the axes Aurix can actually certify. An axis with no evidence is rendered in a
+// distinct, dimmed "sin datos" state and gets NO vertex — it is NOT pulled to the
+// centre, because 0 and "unknown" are different claims and drawing one as the
+// other would assert something Aurix does not know.
+//
+// So: geometry follows the data. `dims` may carry `unavailable: true`.
 function _intccRadarSvg(radar, dimsOverride) {
   const ALL_DIMS = Array.isArray(dimsOverride) && dimsOverride.length ? dimsOverride : [
     { key: 'diversification', label: t('intcc_dim_div') },
@@ -50914,9 +50924,9 @@ function _intccRadarSvg(radar, dimsOverride) {
     { key: 'stability',       label: t('intcc_dim_stab') },
     { key: 'growth',          label: t('intcc_dim_growth') },
   ];
-  const dims = ALL_DIMS.filter(d => radar && Number.isFinite(radar[d.key]));
-  // Fail closed: fewer than 3 certified dimensions cannot form a polygon, so we
-  // publish no radar rather than a degenerate shape.
+  // FRAME = every declared dimension. MEASURED = those with a certified value.
+  const dims = ALL_DIMS;
+  const measured = dims.filter(d => !d.unavailable && radar && Number.isFinite(radar[d.key]));
   if (dims.length < 3) return '';
   const cx = 110, cy = 106, R = 76, n = dims.length;
   const ang = i => (-90 + i * (360 / n)) * Math.PI / 180;
@@ -50927,9 +50937,19 @@ function _intccRadarSvg(radar, dimsOverride) {
     rings += `<polygon class="intcc-radar-ring" points="${p}"/>`;
   });
   let axes = '';
-  dims.forEach((_, i) => { const [x, y] = pt(i, R); axes += `<line class="intcc-radar-axis" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; });
-  const dp = dims.map((d, i) => pt(i, R * (radar[d.key] / 100)).map(v => v.toFixed(1)).join(',')).join(' ');
-  let labels = '', dots = '';
+  dims.forEach((d, i) => { const [x, y] = pt(i, R);
+    const cls = (measured.indexOf(d) === -1) ? ' is-unavailable' : '';
+    axes += `<line class="intcc-radar-axis${cls}" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; });
+  // Vertices keep their real angular position inside the five-axis frame, so the
+  // shape is an honest sub-figure of the pentagon rather than a re-scaled polygon.
+  const dp = dims
+    .map((d, i) => (measured.indexOf(d) === -1) ? null : pt(i, R * (radar[d.key] / 100)).map(v => v.toFixed(1)).join(','))
+    .filter(Boolean).join(' ');
+  // A filled area needs three vertices. With one or two certified dimensions we
+  // draw the measured length ALONG each axis instead of closing a shape through
+  // the centre, because the centre is not a data point.
+  const closeArea = measured.length >= 3;
+  let labels = '', dots = '', spokes = '';
   dims.forEach((d, i) => {
     // INT.2Y — the apex (top) label sits directly above the highest data point;
     // when that axis maxes out (e.g. Diversificación 100) the numeric value used
@@ -50940,10 +50960,17 @@ function _intccRadarSvg(radar, dimsOverride) {
     const anchor = Math.abs(lx - cx) < 8 ? 'middle' : (lx > cx ? 'start' : 'end');
     // Label + a dimmer numeric value stacked underneath → values legible
     // without turning the radar into a table.
-    labels += `<text class="intcc-radar-label" x="${lx.toFixed(1)}" y="${(ly + 1).toFixed(1)}" text-anchor="${anchor}">${_intccEsc(d.label)}</text>`;
-    labels += `<text class="intcc-radar-val" x="${lx.toFixed(1)}" y="${(ly + 12).toFixed(1)}" text-anchor="${anchor}">${radar[d.key]}${d.suffix || ''}</text>`;
-    const [dx, dy] = pt(i, R * (radar[d.key] / 100));
-    dots += `<circle class="intcc-radar-dot" cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="2.6"/>`;
+    const isMeasured = measured.indexOf(d) !== -1;
+    const dimCls = isMeasured ? '' : ' is-unavailable';
+    labels += `<text class="intcc-radar-label${dimCls}" x="${lx.toFixed(1)}" y="${(ly + 1).toFixed(1)}" text-anchor="${anchor}">${_intccEsc(d.label)}</text>`;
+    labels += `<text class="intcc-radar-val${dimCls}" x="${lx.toFixed(1)}" y="${(ly + 12).toFixed(1)}" text-anchor="${anchor}">${
+      isMeasured ? (radar[d.key] + (d.suffix || '')) : _intccEsc(_intv4T('intv7_axis_unavailable'))}</text>`;
+    // No vertex for an unmeasured axis: "unknown" must not look like zero.
+    if (isMeasured) {
+      const [dx, dy] = pt(i, R * (radar[d.key] / 100));
+      dots += `<circle class="intcc-radar-dot" cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="2.6"/>`;
+      if (!closeArea) spokes += `<line class="intcc-radar-spoke" x1="${cx}" y1="${cy}" x2="${dx.toFixed(1)}" y2="${dy.toFixed(1)}"/>`;
+    }
   });
   // viewBox padded horizontally so the outer end/start-anchored labels
   // (Diversificación, Concentración…) are never clipped on narrow screens, and
@@ -50951,7 +50978,8 @@ function _intccRadarSvg(radar, dimsOverride) {
   return `
     <svg class="intcc-radar-svg" viewBox="-58 -12 336 232" role="img" aria-label="${_intccEsc(t('intcc_radar_title'))}">
       <g class="intcc-radar-grid">${rings}${axes}</g>
-      <polygon class="intcc-radar-area" points="${dp}"/>
+      ${closeArea ? `<polygon class="intcc-radar-area" points="${dp}"/>` : ''}
+      <g class="intcc-radar-spokes">${spokes}</g>
       <g class="intcc-radar-dots">${dots}</g>
       <g class="intcc-radar-labels">${labels}</g>
     </svg>`;
@@ -51450,102 +51478,127 @@ function _intv5StructureHtml(core, esc) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// SPEC INT.06 · RADAR RESTORATION — a COMPOSITION map, not a score
+// SPEC INT.07 · SEMANTIC RADAR — five conceptual axes, values only when certified
 // ════════════════════════════════════════════════════════════════════════════
-// The founder asked for the pentagon back. It comes back with its full visual
-// language (grid, filled polygon, outer labels + values) and with NONE of its old
-// semantics, which were certified defective: `Growth` fabricated from composition
-// (45 + cryptoPct*0.25), a saturating 55 + pct*2.2, three of five axes restating
-// the top position, and five axes pretending to be five independent signals.
+// Supersedes INT.06's composition radar (one axis per asset class). That version
+// was honest but answered the wrong question — "what do you hold" is composition,
+// not the five dimensions Intelligence reasons about — so the founder restored the
+// semantic axes with a strict truth contract. See below.
 //
-// WHAT MADE FIVE HONEST AXES POSSIBLE was changing the QUESTION the radar answers.
-// It no longer scores health across invented dimensions; it MAPS COMPOSITION:
+// ── THE SEMANTIC PENTAGON (INT.07 · FOUNDER DECISION) ───────────────────────
 //
-//   one axis per investable ASSET CLASS · value = its real % of investable wealth
+// FOUNDER CONTRACT, verbatim in intent:
+//   PENTAGON      = stable conceptual structure. Always five axes, always drawn.
+//   AXIS VALUE    = exists ONLY when Aurix can certify it.
+//   NO EVIDENCE   = `unavailable`, never an invented 0.
 //
-// Every property the SPEC demands falls out of that choice for free:
-//   · DISTINCT — asset classes are different things, not restatements.
-//   · SAME UNIT — every axis is a percentage of the same denominator.
-//   · NO NORMALISATION — the number IS the quantity, so there is no transform to
-//     defend, no threshold to justify and nothing to saturate.
-//   · DETERMINISTIC + CERTIFIED — `getInvestableDistribution()` is the canonical
-//     investable distribution the dashboard donut and `_aurixHealthSnapshot`
-//     already read; real estate is excluded from it by construction.
-//   · FAIL CLOSED — under 3 classes there is no polygon, so nothing is drawn.
+// The five dimensions are FIXED and semantic — Diversificación, Liquidez,
+// Concentración, Estabilidad, Crecimiento — because those are the five things
+// Intelligence reasons about. They are NOT asset classes: INT.06's composition
+// radar answered "what do you hold", which is a different question and belongs to
+// a different component.
 //
-// It also keeps the three surfaces from colliding (SPEC §17/§18):
-//   RADAR  → the global map: where the weight IS.
-//   ESTRUCTURA → why that map reads as it does (effective diversification).
-//   HEALTH → the canonical summary. The radar is NOT a picture of how Health was
-//            computed and infers nothing from its weights.
+// Today three of the five are certifiable, each reading its EXISTING owner. No new
+// engine is built here and no scale is invented:
 //
-// The axis maximum is 100% of investable wealth, so a dominant class produces a
-// long spike and a spread portfolio a small even shape. That is the honest
-// reading of a composition map and is labelled as such — it is NOT a quality
-// score, and a bigger polygon does not mean "better".
-// FOUNDER DECISION (INT.06B): the pentagon ALWAYS renders. The five dimensions are
-// FIXED — the canonical investable asset classes — and what varies is the LENGTH of
-// each axis according to the real datum. A class with no weight sits at 0%, i.e. at
-// the centre. The radar never disappears because a class is missing.
+//   Diversificación → `_aurixEffectiveDiversification()` — effectiveN / positions,
+//                     natively a 0–100 share. Same number as the structure ring.
+//   Liquidez        → `_aurixHealthSnapshot().cashPct` — natively % of investable.
+//   Concentración   → `_aurixHealthSnapshot().topInvestedAsset.pctTotal` — idem.
 //
-// This is honest, and it is what finally makes the module unconditional: a class
-// the user does not hold genuinely IS 0% of their investable wealth, so drawing it
-// at the centre states a fact rather than inventing a dimension. Nothing is
-// normalised, scored or padded — the value is the measured percentage.
+// We read the SNAPSHOT owner, not the Fact Ledger, on purpose: the ledger only
+// PUBLISHES `top_position_weight` above a materiality threshold, so a truthful
+// 12% top position emits no fact. Materiality gates whether something is a story,
+// never whether the datum exists. Both paths share one owner, so the radar and the
+// Brief cannot print different numbers.
 //
-// Still forbidden, and asserted by the gate: the old `Growth` fabricated from
-// composition (45 + cryptoPct*0.25), the saturating 55 + pct*2.2, and axes that
-// merely restate the top position.
+// Estabilidad and Crecimiento are `unavailable` and that is a DELIBERATE, reported
+// state, not a bug:
+//   · Estabilidad — no volatility owner exists anywhere in the codebase. There is
+//     nothing to read, and deriving it from gross wealth would measure deposits.
+//   · Crecimiento — the VALUE is certified by INT.02, but every defensible 0–100
+//     scale (own historical percentile, benchmark) needs history or a benchmark
+//     INT.01 forbids, and anything else is the `55 + pct*2.2` we deleted. The
+//     figure is published as a number elsewhere; it is the SCALE that is missing.
 //
-// `other` is deliberately NOT one of the five (it is a residual bucket, not an
-// asset class), so when it carries weight it is reported as a caption instead of
-// being silently dropped — the axes must never hide wealth.
-const _INTV6_RADAR_CLASSES = Object.freeze(['crypto', 'stock', 'etf', 'metal', 'cash']);
-const _INTV6_RADAR_RESIDUAL = 'other';
-function _intv6RadarDims() {
-  const out = { dims: [], values: {}, status: 'unavailable', residualPct: 0, presentClasses: 0 };
-  let dist = null;
-  try { dist = (typeof getInvestableDistribution === 'function') ? getInvestableDistribution() : null; }
-  catch (_) { dist = null; }
-  // Fail closed ONLY when the distribution itself cannot be read: with no valuation
-  // we do not know a class is 0%, we simply do not know. That is different from a
-  // class the user genuinely does not hold.
-  if (!Array.isArray(dist) || !dist.length) { out.status = 'unavailable'; return out; }
-  const pctByType = {};
-  for (const d of dist) {
-    if (!d || d.nonInvestable || !Number.isFinite(d.pct)) continue;
-    pctByType[String(d.type)] = (pctByType[String(d.type)] || 0) + d.pct;
+// FORBIDDEN here, and asserted by the gate: legacy formulas, fabricated Growth
+// (`45 + cryptoPct*0.25`), the saturating `55 + pct*2.2`, stability derived from
+// gross wealth, invented normalisations, and pulling an uncertified axis to the
+// centre — 0% and "unknown" are different claims.
+//
+// When the missing engines exist, the radar enriches ITSELF: flip `unavailable`
+// and the frame is unchanged.
+//
+// DRAWING ORDER is fixed here, once and for ever, and it INTERLEAVES the two
+// dimensions that have no owner yet between the three that do. Angular position
+// carries no financial meaning — a pentagon has no privileged vertex — but the
+// arrangement decides whether the figure reads as premium or as a defect:
+// clustering the pending axes side by side left an entire dead sector of the
+// pentagon (visually the same complaint as the hole), and it squeezed the polygon
+// into a needle across three adjacent vertices. Interleaved, the certified
+// vertices sit 144° apart and the shape is legible whatever the radii.
+// The order does NOT depend on which axes happen to be certified today: it is
+// frozen, so when Estabilidad and Crecimiento acquire owners the radar fills in
+// WITHOUT restructuring, exactly as the founder required.
+const _INTV7_RADAR_DIMS = Object.freeze([
+  Object.freeze({ key: 'diversification', labelKey: 'intcc_dim_div',    owner: 'aurixEffectiveDiversification' }),
+  Object.freeze({ key: 'stability',       labelKey: 'intcc_dim_stab',   owner: null, pending: 'no_volatility_owner' }),
+  Object.freeze({ key: 'liquidity',       labelKey: 'intcc_dim_liq',    owner: 'aurixHealthSnapshot' }),
+  Object.freeze({ key: 'growth',          labelKey: 'intcc_dim_growth', owner: null, pending: 'no_certifiable_scale' }),
+  Object.freeze({ key: 'concentration',   labelKey: 'intcc_dim_conc',   owner: 'aurixHealthSnapshot' }),
+]);
+
+function _intv7RadarAxes() {
+  const out = { dims: [], values: {}, measured: 0, unavailable: [], pending: {} };
+  let snap = null, div = null;
+  try { snap = (typeof _aurixHealthSnapshot === 'function') ? _aurixHealthSnapshot() : null; } catch (_) { snap = null; }
+  try { div  = (typeof _aurixEffectiveDiversification === 'function') ? _aurixEffectiveDiversification() : null; } catch (_) { div = null; }
+  const haveSnap = !!(snap && snap.assetCount && snap.totUSD > 0);
+
+  const certified = {};
+  // Diversification — the owner's own status decides; ratio is a measured share.
+  if (div && div.status === 'available' && div.positions > 0 && Number.isFinite(div.effectiveN)) {
+    certified.diversification = Math.round((div.effectiveN / div.positions) * 100);
   }
-  for (const cls of _INTV6_RADAR_CLASSES) {
-    const meta = (typeof TYPE_META !== 'undefined' && TYPE_META[cls]) ? TYPE_META[cls] : null;
-    const pct = Math.round(pctByType[cls] || 0);         // rounding only; no derivation
-    out.dims.push({ key: 'cls_' + cls, suffix: '%',
-                    label: (meta && (meta.donutLabel || meta.label)) || cls });
-    out.values['cls_' + cls] = pct;
-    if (pct > 0) out.presentClasses++;
+  if (haveSnap && Number.isFinite(snap.cashPct)) {
+    certified.liquidity = Math.round(snap.cashPct);
   }
-  out.residualPct = Math.round(pctByType[_INTV6_RADAR_RESIDUAL] || 0);
-  out.status = 'ok';
+  const top1 = haveSnap && snap.topInvestedAsset ? snap.topInvestedAsset.pctTotal : null;
+  if (Number.isFinite(top1)) certified.concentration = Math.round(top1);
+
+  for (const d of _INTV7_RADAR_DIMS) {
+    const v = Object.prototype.hasOwnProperty.call(certified, d.key) ? certified[d.key] : null;
+    const ok = (d.owner !== null) && Number.isFinite(v);
+    out.dims.push({ key: d.key, label: _intv4T(d.labelKey), suffix: '%', unavailable: !ok });
+    if (ok) { out.values[d.key] = Math.max(0, Math.min(100, v)); out.measured++; }
+    else {
+      out.unavailable.push(d.key);
+      out.pending[d.key] = d.pending || 'owner_unavailable';
+    }
+  }
   return out;
 }
-function _intv6RadarHtml(esc) {
-  const r = _intv6RadarDims();
-  if (r.status !== 'ok') {
-    // No valuation at all ⇒ we cannot claim 0% for anything. Honest hold.
-    return `
-      <section class="intcc-card intcc-radar intv6-radar" data-state="hold">
-        <h3 class="intcc-card-title">${esc(_intv4T('intcc_radar_title'))}</h3>
-        <p class="intcc-empty-body">${esc(_intv4T('intv6_comp_pending'))}</p>
-      </section>`;
-  }
+
+function _intv7RadarHtml(esc) {
+  const r = _intv7RadarAxes();
   const svg = _intccRadarSvg(r.values, r.dims);
+  // Naming what is missing is part of the product: an attenuated axis states a
+  // limit, and the caption explains it in words instead of leaving a silent gap.
+  // Named in the founder's own enumeration order, which is the reading order of
+  // the product, not the drawing order of the figure.
+  const ENUM = ['diversification', 'liquidity', 'concentration', 'stability', 'growth'];
+  const pendingNames = ENUM.filter(k => r.unavailable.indexOf(k) !== -1)
+    .map(k => (_INTV7_RADAR_DIMS.find(d => d.key === k) || {}).labelKey)
+    .filter(Boolean).map(lk => _intv4T(lk));
   return `
-    <section class="intcc-card intcc-radar intv6-radar" data-axes="${r.dims.length}"
-             data-state="radar" data-present="${r.presentClasses}">
+    <section class="intcc-card intcc-radar intv6-radar intv7-radar"
+             data-axes="${r.dims.length}" data-measured="${r.measured}"
+             data-unavailable="${esc(r.unavailable.join(','))}" data-state="radar">
       <h3 class="intcc-card-title">${esc(_intv4T('intcc_radar_title'))}</h3>
-      <p class="intv6-radar-legend">${esc(_intv4T('intv6_radar_legend'))}</p>
+      <p class="intv6-radar-legend">${esc(_intv4T('intv7_radar_legend'))}</p>
       <div class="intcc-radar-wrap">${svg}</div>
-      ${r.residualPct > 0 ? `<p class="intv6-radar-residual">${esc(_intv4T('intv6_radar_residual', r.residualPct))}</p>` : ''}
+      ${pendingNames.length ? `<p class="intv7-radar-pending">${
+        esc(_intv4T('intv7_radar_pending', pendingNames.join(' · ')))}</p>` : ''}
     </section>`;
 }
 
@@ -51692,7 +51745,7 @@ function _renderIntelligenceCommandCenter() {
   //   ORIENTACIÓN (hero) → COMPRENSIÓN (radar) → DIAGNÓSTICO (factores) →
   //   EXPLORACIÓN (explora) → QUÉ IMPORTA → EVOLUCIÓN (memoria) → PROFUNDIDAD
   //   (estructura · cambios). The grid pins each slot; the mobile order mirrors it.
-  const radarHtml     = _intv6RadarHtml(esc);
+  const radarHtml     = _intv7RadarHtml(esc);
   const driversHtml   = _intv5DriversHtml(snap, esc);
   const exploreHtml   = _intv4ExploreHtml(core, esc);
   const structureHtml = _intv5StructureHtml(core, esc);

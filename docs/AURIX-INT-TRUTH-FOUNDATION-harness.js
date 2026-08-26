@@ -58,7 +58,8 @@ const T = {
   intcc_band_watch: 'A vigilar', intcc_band_limited: 'Limitada',
   intcc_dim_div: 'Diversificación', intcc_dim_liq: 'Liquidez',
   intcc_dim_conc: 'Concentración', intcc_dim_stab: 'Estabilidad',
-  intcc_dim_growth: 'Rendimiento',
+  intcc_dim_growth: 'Crecimiento',
+  intv7_axis_unavailable: 'sin datos',
   intcc_radar_title: 'Radar',
   intcc_tl_cross: amt => `Tu patrimonio superó ${amt}`,
   intcc_tl_ath: 'Máximo histórico de tu patrimonio',
@@ -73,6 +74,16 @@ const T = {
   intcc_sub_attention: 's-attention',
   intcc_sub_concentrated: name => `s-conc ${name}`,
 };
+
+// The axis labels above are a COPY of the production dictionary, and a stale copy
+// is how this gate broke when INT.07 renamed the axis. Pin the copy to app.js:
+// drift now fails here instead of silently asserting against a label nobody ships.
+for (const k of ['intcc_dim_div','intcc_dim_liq','intcc_dim_conc','intcc_dim_stab',
+                 'intcc_dim_growth','intv7_axis_unavailable']) {
+  const m = app.match(new RegExp('\\n\\s*' + k + ":\\s*'([^']+)'"));
+  if (!m) throw new Error('i18n key missing from app.js: ' + k);
+  if (m[1] !== T[k]) throw new Error('stale harness label for ' + k + ': harness="' + T[k] + '" app="' + m[1] + '"');
+}
 
 // ── sandbox factory (one per scenario family, so mutants cannot leak) ────────
 // INT.01 REVIEW LESSON — the first version of this gate stubbed away precisely
@@ -100,7 +111,7 @@ function makeCtx(extraFns) {
   vm.runInContext(konstSrc('_AURIX_TWR_COVERAGE_JUMP'), sb);
   ['_aurixUsdSnapshotsForRange','_aurixTwrChain','computeAurixTWRSeries','_intccClamp','_intccEsc',
    '_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccGrowthPct',
-   '_intccRadar','_intccRadarSvg','_intccTimeline','_intccReading','_intccIdentity']
+   '_intccRadar','_intccRadarSvg','_intccTimeline','_intccReading','_intccIdentity','_intv4T']
     .forEach(n => vm.runInContext(fnSrc(n), sb));
   (extraFns || []).forEach(src => vm.runInContext(src, sb));
   return sb;
@@ -292,21 +303,43 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
     'g=10 → ' + axisFor(10) + ' | g=null → ' + axisFor(null));
 
   const svg = run('_intccRadarSvg(' + JSON.stringify(radar) + ')');
-  ok('3.6 the SVG draws NO axis for the absent dimension (4 axes, not 5)',
-    (svg.match(/class="intcc-radar-axis"/g) || []).length === 4,
-    'axes=' + (svg.match(/class="intcc-radar-axis"/g) || []).length);
-  ok('3.7 the SVG publishes neither the label nor a value for it',
-    svg.indexOf(T.intcc_dim_growth) === -1 && (svg.match(/class="intcc-radar-val"/g) || []).length === 4);
-  ok('3.8 the data polygon has 4 vertices — not pinned to the centre on a 5th axis',
-    (svg.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim().split(/\s+/).length === 4);
+  // ── RE-CERTIFIED BY FOUNDER DECISION (INT.07) ────────────────────────────
+  // INT.01 removed the axis outright. The founder's INT.07 contract keeps the
+  // FRAME — "el marco de cinco ejes debe permanecer visible porque esas son las
+  // cinco dimensiones conceptuales" — and marks the axis `unavailable` instead.
+  // The INVARIANT INT.01 actually protects is unchanged and still asserted below:
+  // no fabricated value, no placeholder number, and NO vertex at the centre.
+  ok('3.6 the frame keeps its five conceptual axes; the absent one is attenuated',
+    (svg.match(/class="intcc-radar-axis[^"]*"/g) || []).length === 5
+    && (svg.match(/class="intcc-radar-axis is-unavailable"/g) || []).length === 1,
+    'axes=' + (svg.match(/class="intcc-radar-axis[^"]*"/g) || []).length);
+  ok('3.7 the absent dimension publishes its NAME but never a figure',
+    svg.indexOf(T.intcc_dim_growth) !== -1
+    && (svg.match(/class="intcc-radar-val[^"]*"/g) || []).length === 5
+    && /class="intcc-radar-val is-unavailable"[^>]*>[^<0-9]+</.test(svg),
+    (svg.match(/class="intcc-radar-val is-unavailable"[^>]*>([^<]*)</) || [, '?'])[1]);
+  ok('3.8 the data polygon has 4 vertices — the absent axis gets NO vertex at all',
+    (svg.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim().split(/\s+/).length === 4
+    && (svg.match(/class="intcc-radar-dot"/g) || []).length === 4);
   ok('3.9 no "0", "50" or "—" placeholder value is emitted for the absent axis',
-    !/intcc-radar-val[^>]*>(0|50|55|—|null|NaN)</.test(svg));
+    !/intcc-radar-val[^"]*"[^>]*>(0|50|55|—|null|NaN)</.test(svg));
+  ok('3.9b "unavailable" is never drawn at the centre (0 and unknown differ)',
+    (() => { const pts = (svg.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1].trim().split(/\s+/);
+      return pts.length === 4 && pts.indexOf('110.0,106.0') === -1; })(),
+    (svg.match(/class="intcc-radar-area" points="([^"]+)"/) || [, ''])[1]);
   ok('3.10 the wealth-identity cascade cannot read a fabricated return',
     /Number\.isFinite\(radar\.growth\)/.test(fnSrc('_intccIdentity')));
   ok('3.11 identity does not classify as "growth" with an absent return axis',
     run('_intccIdentity(' + JSON.stringify(s) + ', ' + JSON.stringify(radar) + ')') !== 'growth');
-  ok('3.12 fewer than 3 certified dimensions ⇒ no radar at all',
-    run('_intccRadarSvg({ diversification: 50, liquidity: null, concentration: null, stability: null, growth: null })') === '');
+  // RE-CERTIFIED (INT.07): the frame no longer disappears — the founder requires
+  // it always visible. What must never happen is a VALUE without evidence, so the
+  // assertion moves from "no radar" to "no certified value but one".
+  ok('3.12 one certified dimension ⇒ frame intact, no area, exactly one vertex',
+    (() => { const one = run('_intccRadarSvg({ diversification: 50, liquidity: null, concentration: null, stability: null, growth: null })');
+      return one !== '' && (one.match(/class="intcc-radar-axis[^"]*"/g) || []).length === 5
+        && !/intcc-radar-area/.test(one)
+        && (one.match(/class="intcc-radar-dot"/g) || []).length === 1
+        && (one.match(/class="intcc-radar-val is-unavailable"/g) || []).length === 4; })());
 
   // Dropping an axis re-lays out every label. The viewBox is FIXED, so the only
   // real visual risk is a clipped label — and because the viewBox scales, proving
