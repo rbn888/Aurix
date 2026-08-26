@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '640'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '641'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -10557,6 +10557,61 @@ function _aurixUsdSnapshotsForRange(range) {
 
 const _AURIX_TWR_COVERAGE_JUMP = 40;   // % single no-flow interval move ⇒ likely an UNRECORDED capital event
 
+// ── The TWR core, extracted so Aurix has exactly ONE return formula ──────────
+// SPEC INT.02 — Modified-Dietz subperiods chained time-weighted. Pure: takes
+// points and flows ALREADY in the SAME currency and returns the index series
+// plus diagnostics. It applies NO publication policy — each caller decides what
+// its own diagnostics mean, which is how `computeAurixTWRSeries` (raw USD total
+// wealth, headless) and `_aurixInvestablePerformance` (investable, base
+// currency, publishable) share one formula without sharing a contract.
+//
+// `points`: [{ ts, value }] ascending, value > 0, one currency.
+// `flows`:  [{ ts, amount }] EXTERNAL capital only, same currency, signed
+//           (+ in, − out). A flow exactly on a boundary belongs to the interval
+//           ENDING at it.
+// Returns { timestamps, values, badDenom, flowsUsed, maxNoFlowJumpPct,
+//           maxIntervalJumpPct }.
+//   · maxNoFlowJumpPct  — largest |return| over intervals with NO flow, i.e. a
+//     move nothing in the ledger explains.
+//   · maxIntervalJumpPct — largest |return| over EVERY interval, flow-bearing
+//     ones included. The no-flow metric alone is blind to an interval where one
+//     small recorded flow sits beside a large unrecorded capital event, so a
+//     publishable contract must look at this one.
+function _aurixTwrChain(points, flows) {
+  const out = { timestamps: [], values: [], badDenom: 0, flowsUsed: 0, maxNoFlowJumpPct: 0, maxIntervalJumpPct: 0 };
+  if (!Array.isArray(points) || points.length < 2) return out;
+  const fl = Array.isArray(flows) ? flows : [];
+  let idx = 100;
+  const ts = [points[0].ts], vals = [100];
+  for (let i = 1; i < points.length; i++) {
+    const startV = points[i - 1].value, endV = points[i].value;
+    const t0 = points[i - 1].ts, t1 = points[i].ts, dur = (t1 - t0) || 1;
+    const seg = fl.filter(f => f.ts > t0 && f.ts <= t1);
+    out.flowsUsed += seg.length;
+    let r;
+    if (seg.length) {
+      const netFlow  = seg.reduce((s, f) => s + f.amount, 0);
+      const weighted = seg.reduce((s, f) => s + f.amount * ((t1 - f.ts) / dur), 0);
+      const denom = startV + weighted;
+      if (denom > 0 && Number.isFinite(denom)) r = (endV - startV - netFlow) / denom;
+      else { r = 0; out.badDenom++; }                     // guard: non-positive denominator
+    } else {
+      r = startV > 0 ? (endV / startV - 1) : 0;
+      const jp = Math.abs(r) * 100;
+      if (jp > out.maxNoFlowJumpPct) out.maxNoFlowJumpPct = jp;
+    }
+    if (!Number.isFinite(r)) r = 0;
+    const jpAny = Math.abs(r) * 100;
+    if (jpAny > out.maxIntervalJumpPct) out.maxIntervalJumpPct = jpAny;
+    idx = idx * (1 + r);
+    if (!Number.isFinite(idx) || idx <= 0) idx = vals[vals.length - 1];   // guard
+    ts.push(t1); vals.push(+idx.toFixed(6));
+  }
+  out.timestamps = ts;
+  out.values = vals;
+  return out;
+}
+
 function computeAurixTWRSeries(range) {
   const out = { timestamps: [], values: [], deltaPct: null, deltaAbsSynthetic: null, flowsUsed: 0, fallbackReason: null, valid: false };
   try {
@@ -10567,36 +10622,19 @@ function computeAurixTWRSeries(range) {
     const tFirst = snaps[0].ts, tLast = snaps[snaps.length - 1].ts;
     // Flows strictly after the first snapshot and up to/including the last — a
     // flow exactly on a boundary is assigned to the interval ENDING at it.
+    // NOTE (INT.02): this legacy headless path deliberately keeps its ORIGINAL
+    // behaviour — every recorded flow, of any kind, over raw total-wealth USD
+    // snapshots. It is not the publishable owner; `_aurixInvestablePerformance`
+    // is. Changing it here would move a certified contract for no consumer.
     const flows = all.filter(f => f && Number.isFinite(f.ts) && Number.isFinite(f.amountUSD) && f.ts > tFirst && f.ts <= tLast);
 
-    let idx = 100, badDenom = 0, maxNoFlowJump = 0, used = 0;
-    const ts = [snaps[0].ts], vals = [100];
-    for (let i = 1; i < snaps.length; i++) {
-      const startV = snaps[i - 1].value, endV = snaps[i].value;
-      const t0 = snaps[i - 1].ts, t1 = snaps[i].ts, dur = (t1 - t0) || 1;
-      const seg = flows.filter(f => f.ts > t0 && f.ts <= t1);
-      used += seg.length;
-      let r;
-      if (seg.length) {
-        const netFlow  = seg.reduce((s, f) => s + f.amountUSD, 0);
-        const weighted = seg.reduce((s, f) => s + f.amountUSD * ((t1 - f.ts) / dur), 0);
-        const denom = startV + weighted;
-        if (denom > 0 && Number.isFinite(denom)) r = (endV - startV - netFlow) / denom;
-        else { r = 0; badDenom++; }                       // guard: non-positive denominator
-      } else {
-        r = startV > 0 ? (endV / startV - 1) : 0;
-        const jp = Math.abs(r) * 100;
-        if (jp > maxNoFlowJump) maxNoFlowJump = jp;        // track unaccounted jumps
-      }
-      if (!Number.isFinite(r)) r = 0;
-      idx = idx * (1 + r);
-      if (!Number.isFinite(idx) || idx <= 0) idx = vals[vals.length - 1];  // guard
-      ts.push(t1); vals.push(+idx.toFixed(6));
-    }
+    const chain = _aurixTwrChain(snaps, flows.map(f => ({ ts: f.ts, amount: f.amountUSD })));
+    const ts = chain.timestamps, vals = chain.values;
+    const badDenom = chain.badDenom, maxNoFlowJump = chain.maxNoFlowJumpPct;
 
     out.timestamps = ts;
     out.values = vals;
-    out.flowsUsed = used;
+    out.flowsUsed = chain.flowsUsed;
     out.deltaPct = +(vals[vals.length - 1] - 100).toFixed(4);        // index based at 100
     out.deltaAbsSynthetic = +(vals[vals.length - 1] - vals[0]).toFixed(4);
 
@@ -25811,6 +25849,148 @@ const _AURIX_RETURN_STABLE_STEP = 0.40;               // consecutive post-anchor
 // value/current ratio exceeds these belongs to a different capital regime (construction / large inflow /
 // import) and must be REJECTED → pending_baseline, never an absurd return (e.g. a 3× baseline → −67% on 7D).
 const _AURIX_RETURN_COMPARABLE_RATIO = { '24h': 1.20, '7d': 1.35, '30d': 1.75, '1y': 3.00, 'all': 3.00 };
+
+// ════════════════════════════════════════════════════════════════════════════
+// SPEC INT.02 · INVESTABLE PERFORMANCE TRUTH — the publishable return owner
+// ════════════════════════════════════════════════════════════════════════════
+// The one certified answer to: "how have my INVESTMENTS behaved, net of the
+// money I put in or took out?"
+//
+// INT.01 established that `computeAurixTWRSeries` cannot answer it: its input is
+// raw `portfolioHistory` = TOTAL net worth INCLUDING REAL ESTATE, so editing a
+// flat's valuation would read as return. This owner fixes the INPUT, not the
+// formula — it reuses `_aurixTwrChain`, the same Modified-Dietz-chained TWR.
+//
+// THE FOUR SEPARATIONS it enforces:
+//   MARKET PERFORMANCE ≠ CAPITAL FLOW ≠ REAL-ESTATE REVALUATION ≠ VALUE CHANGE
+//
+//  · REAL ESTATE — the series is `_aurixEligibleInvestableSeries`, built as
+//    `total − real_estate` per snapshot from the AUTHORITATIVE display source,
+//    epoch-filtered, with incomplete/fx-partial snapshots dropped and a
+//    [0.25×, 2.5×] trust band that excludes RE-polluted / pre-split /
+//    construction regimes. Real estate is absent from the denominator, so a
+//    revaluation cannot move this number at all.
+//  · CAPITAL — EVERY recorded flow is neutralised, whatever its `kind`. This is
+//    the canonical perimeter, stated by the certified badge contract itself:
+//    "a capital flow (deposit/withdrawal/asset add/remove) is NEVER counted as
+//    market return on ANY range". It is NOT the same thing as WN.8's
+//    internal/external axis, which answers a different question (does the VALUE
+//    CURVE step?), and using that axis here was a real defect: in Aurix's data
+//    model a non-cash buy raises `qty` with NO cash leg deducted, and a non-cash
+//    sell reduces the asset with NO proceeds credited (see the WN.8 AUDIT note on
+//    the sell path). So `asset_add` / `asset_remove` DO move investable value
+//    without being performance — a 20.000 BTC add on a flat 100.000 portfolio
+//    would otherwise publish "+20% return". Anything the ledger records as
+//    capital is removed from the return by the Modified-Dietz denominator.
+//    A genuinely value-preserving rebalance nets to ~0 across its two legs, so
+//    neutralising both is also correct for it.
+//    Consequence: an unrecognised / legacy `kind` is neutralised too, which is
+//    the fail-safe direction — never silently counted as market return.
+//  · VALUE CHANGE — never published as return. A value move with no ledger
+//    explanation trips the coverage guard below.
+//
+// CURRENCY (single conversion, no double conversion): the investable series is
+// ALREADY in base currency (`_aurixInvestableSnapshots` applies `toBase`), while
+// the ledger is USD, so each flow is converted exactly ONCE with
+// `toBase(amountUSD,'USD')`. An unconvertible flow (unknown FX ⇒ NaN) fails the
+// whole thing closed rather than silently dropping capital.
+//
+// PUBLICATION CONTRACT — `valid === true` ⇒ Intelligence may publish
+// `returnPct`. Anything else ⇒ NO figure. Never 0, never estimated, never a
+// fallback onto portfolioHistory or total wealth.
+const _AURIX_INVPERF_UNEXPLAINED_JUMP_PCT = 40;   // |interval return| ≥ this ⇒ an unrecorded capital event
+const _AURIX_INVPERF_HIGH_CONFIDENCE_OBS = 8;     // observation-density label only, not a statistical claim
+function _aurixInvestablePerformance(range) {
+  const r = range || (typeof activeRange !== 'undefined' ? activeRange : '30d');
+  const out = {
+    range: r, valid: false, returnPct: null, startAt: null, endAt: null,
+    startValue: null, endValue: null, observations: 0, flowCount: 0,
+    externalFlowCount: 0, tradeFlowCount: 0, confidence: null, basis: 'investable-twr', fallbackReason: null,
+  };
+  try {
+    // 1 · AUTHORITATIVE INVESTABLE SERIES (real estate already excluded).
+    let elig = null;
+    try { elig = (typeof _aurixEligibleInvestableSeries === 'function') ? _aurixEligibleInvestableSeries(r) : null; }
+    catch (_) { elig = null; }
+    const pts = (elig && Array.isArray(elig.series)) ? elig.series : [];
+    out.observations = pts.length;
+    if (pts.length < 2) { out.fallbackReason = 'insufficient_observations'; return out; }
+    if (elig.meta && elig.meta.reasons && elig.meta.reasons.insufficient_clean_data) {
+      out.fallbackReason = 'insufficient_clean_data'; return out;
+    }
+    for (const p of pts) {
+      if (!p || !Number.isFinite(p.ts) || !Number.isFinite(p.value) || !(p.value > 0)) {
+        out.fallbackReason = 'invalid_observation'; return out;
+      }
+    }
+
+    const tFirst = pts[0].ts, tLast = pts[pts.length - 1].ts;
+    out.startAt = tFirst; out.endAt = tLast;
+    out.startValue = +pts[0].value.toFixed(2);
+    out.endValue   = +pts[pts.length - 1].value.toFixed(2);
+
+    // 2 · WINDOW must be long enough to mean anything (same floor as the badge).
+    if ((tLast - tFirst) < _AURIX_RETURN_MIN_HISTORY_MS) { out.fallbackReason = 'window_too_short'; return out; }
+
+    // 3 · EPOCH / REGIME BOUNDARY — the baseline must sit in the same capital
+    //     regime as the end value, else the "return" is a regime change (import,
+    //     construction, restructuring), not market performance. Range-aware.
+    const cmpMax = _AURIX_RETURN_COMPARABLE_RATIO[r] || 3.0;
+    const ratio = Math.max(out.startValue / out.endValue, out.endValue / out.startValue);
+    if (!Number.isFinite(ratio) || ratio > cmpMax) { out.fallbackReason = 'baseline_not_comparable'; return out; }
+
+    // 4 · EXTERNAL CAPITAL ONLY, converted exactly once into the series currency.
+    let ledger = [];
+    try { ledger = (typeof _aurixLoadCapitalFlows === 'function') ? _aurixLoadCapitalFlows() : []; } catch (_) { ledger = []; }
+    const inWindow = ledger.filter(f => f && Number.isFinite(f.ts) && Number.isFinite(f.amountUSD)
+                                     && f.ts > tFirst && f.ts <= tLast);
+    const flows = [];
+    for (const f of inWindow) {
+      const amt = (typeof toBase === 'function') ? toBase(f.amountUSD, 'USD') : f.amountUSD;
+      if (!Number.isFinite(amt)) { out.fallbackReason = 'fx_unavailable'; return out; }
+      flows.push({ ts: f.ts, amount: amt });
+    }
+    out.flowCount = flows.length;
+    // Diagnostics only — the WN.8 axis does NOT gate neutralisation here.
+    out.externalFlowCount = inWindow.filter(f => f.kind === 'deposit' || f.kind === 'withdrawal').length;
+    out.tradeFlowCount    = inWindow.filter(f => (typeof _aurixFlowIsInternal === 'function') && _aurixFlowIsInternal(f.kind)).length;
+
+    // 5 · ONE FORMULA — the shared chained-TWR core.
+    const chain = _aurixTwrChain(pts, flows);
+    if (!chain.values.length) { out.fallbackReason = 'chain_empty'; return out; }
+    if (chain.badDenom > 0) { out.fallbackReason = 'interval_fallback:' + chain.badDenom; return out; }
+
+    // 6 · COVERAGE GUARD — over EVERY interval, not just flow-free ones. A move
+    //     this large that the ledger does not explain means capital moved without
+    //     being recorded (a deleted asset, a manual balance edit, a sync
+    //     overwrite); TWR cannot neutralise what it cannot see, so fail closed.
+    if (chain.maxIntervalJumpPct >= _AURIX_INVPERF_UNEXPLAINED_JUMP_PCT) {
+      out.fallbackReason = 'unexplained_capital_event';
+      return out;
+    }
+
+    // 7 · DISPLAY AUTHORITY — never publish a return while the canonical history
+    //     the Dashboard reads is not confirmed. Without this Intelligence could
+    //     show a % while the Dashboard still says "Calculando…".
+    const disp = (typeof canDisplayCanonicalReturn === 'function') ? canDisplayCanonicalReturn(r) : { ok: true };
+    if (disp && disp.ok === false) { out.fallbackReason = 'awaiting_canonical_history'; return out; }
+
+    const pct = chain.values[chain.values.length - 1] - 100;
+    if (!Number.isFinite(pct)) { out.fallbackReason = 'not_finite'; return out; }
+    out.returnPct = +pct.toFixed(4);
+    out.confidence = (pts.length >= _AURIX_INVPERF_HIGH_CONFIDENCE_OBS) ? 'high' : 'medium';
+    out.valid = true;
+    return out;
+  } catch (e) {
+    out.valid = false; out.returnPct = null;
+    out.fallbackReason = 'error:' + ((e && e.message) || e);
+    return out;
+  }
+}
+if (typeof window !== 'undefined') {
+  window.debugAurixInvestablePerformance = (range) => _aurixInvestablePerformance(range || 'all');
+}
+
 function _aurixPortfolioCreatedAt() {
   // Oldest post-epoch baseline ≈ when this (post-reset) portfolio began. Best-effort, read-only.
   try { const a = _aurixRangeReturn('all'); return a && a.baselineTs ? a.baselineTs : 0; } catch (_) { return 0; }
@@ -49406,19 +49586,29 @@ function _intccClamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
 // divergent returns one tap apart — the exact defect shape INT.01 exists to
 // remove, merely relocated from the score to the return.
 //
-// ── Contract ────────────────────────────────────────────────────────────────
-// Until a certified INVESTABLE flow-neutral series exists, this owner returns
-// null, ALWAYS. Consumers must treat null as "this dimension does not exist
-// yet" — no substitute, no neutral figure, no approximation.
+// ── Contract (INT.02) ───────────────────────────────────────────────────────
+// INT.02 built that missing owner: `_aurixInvestablePerformance(range)` — the
+// SAME chained-TWR core (`_aurixTwrChain`) applied to the AUTHORITATIVE
+// investable series (real estate excluded from the denominator) with only
+// EXTERNAL capital (deposit/withdrawal) neutralised and internal trades ignored.
+// Intelligence CONSUMES it and defines no second notion of return.
 //
-// NEXT WORK (deliberately NOT in INT.01): build and certify investable return
-// from `_aurixEligibleInvestableSeries` reconciled with the USD `capital_flows`
-// ledger. That is the plug-in point for this function — and the ONLY thing that
-// may make it return a number.
+// PUBLICATION CONTRACT: a number ONLY when the owner reports `valid === true`.
+// Every fail-closed reason it can return — `insufficient_observations`,
+// `insufficient_clean_data`, `invalid_observation`, `window_too_short`,
+// `baseline_not_comparable`, `fx_unavailable`, `unexplained_capital_event`,
+// `interval_fallback:N`, `awaiting_canonical_history` — yields null and NO
+// figure: no substitute, no neutral value, no approximation.
 //
-// DO NOT reintroduce any figure derived from raw `portfolioHistory` here.
+// DO NOT reintroduce any figure derived from raw `portfolioHistory` (total net
+// worth INCLUDING real estate) here. That was the INT.01 defect.
 function _intccGrowthPct() {
-  return null;
+  try {
+    if (typeof _aurixInvestablePerformance !== 'function') return null;
+    const perf = _aurixInvestablePerformance('all');
+    if (!perf || perf.valid !== true) return null;
+    return Number.isFinite(perf.returnPct) ? perf.returnPct : null;
+  } catch (_) { return null; }
 }
 
 // Radar — 5 deterministic dimensions, each 0–100 (higher = healthier). All read

@@ -98,7 +98,7 @@ function makeCtx(extraFns) {
   sb._aurixFxRate = c => ({ USD: 1, EUR: USD_TO_EUR })[String(c).toUpperCase()];
   ['formatCurrency','formatBase','toBase'].forEach(n => vm.runInContext(fnSrc(n), sb));
   vm.runInContext(konstSrc('_AURIX_TWR_COVERAGE_JUMP'), sb);
-  ['_aurixUsdSnapshotsForRange','computeAurixTWRSeries','_intccClamp','_intccEsc',
+  ['_aurixUsdSnapshotsForRange','_aurixTwrChain','computeAurixTWRSeries','_intccClamp','_intccEsc',
    '_aurixHealthScore','_intccScoreTone','_intccHealthScore','_intccGrowthPct',
    '_intccRadar','_intccRadarSvg','_intccTimeline','_intccReading','_intccIdentity']
     .forEach(n => vm.runInContext(fnSrc(n), sb));
@@ -203,58 +203,60 @@ console.log('2 · Intelligence publishes NO return figure (SPEC 5.B / 5.D):');
   // the region immediately ABOVE it.
   const gDoc = app.slice(Math.max(0, app.indexOf('function _intccGrowthPct(') - 3200),
                          app.indexOf('function _intccGrowthPct('));
-  ok('2.3 the owner returns null unconditionally',
-    /^\s*return\s+null\s*;\s*$/m.test(gSrc.slice(gSrc.indexOf('{') + 1, gSrc.lastIndexOf('}'))));
-  ok('2.4 the blocked contract is documented (INVESTABLE series + real-estate cause)',
-    /INVESTABLE/i.test(gDoc) && /real estate/i.test(gDoc) && /capital_flows/.test(gDoc));
+  // SUPERSEDED BY INT.02 — INT.01 froze this owner at `return null` because no
+  // certified investable series existed. INT.02 built one
+  // (`_aurixInvestablePerformance`), and SPEC INT.02 §6 states explicitly that it
+  // replaces the "publish no return" barrier once that owner is certified. So the
+  // assertion here is no longer "never a number" but "a number ONLY from the
+  // certified owner". THE OWNER ITSELF IS CERTIFIED BY
+  // AURIX-INT-INVESTABLE-PERFORMANCE-harness (cases A–L); this section owns only
+  // the CONSUMER contract, so the owner is stubbed HERE ON PURPOSE — that is a
+  // contract boundary, not a hidden condition.
+  ok('2.3 the owner is sourced exclusively from _aurixInvestablePerformance',
+    /_aurixInvestablePerformance\('all'\)/.test(gSrc) && /perf\.valid !== true/.test(gSrc));
+  ok('2.4 the contract documents the investable owner and forbids portfolioHistory',
+    /INVESTABLE/i.test(gDoc) && /real estate/i.test(gDoc) && /portfolioHistory/.test(gDoc));
 
-  // No input of any shape may produce a figure.
-  const shapes = [
-    ['flat series', series([10000, 10000, 10000, 10000, 10000]), []],
-    ['pure market gain +10%', series([10000, 10200, 10500, 10800, 11000]), []],
-    ['deposit doubling wealth', series([10000, 10000, 10000, 20000, 20000, 20000]), [{ id: 'd', ts: T0 + 2.5 * DAY, amountUSD: 10000 }]],
-    ['withdrawal −30%', series([100000, 100000, 100000, 70000, 70000, 70000]), [{ id: 'w', ts: T0 + 2.5 * DAY, amountUSD: -30000 }]],
-    ['long clean history', series(Array.from({ length: 400 }, (_, i) => 10000 + i * 25)), []],
-    ['single snapshot', [{ ts: T0, value: 50000 }], []],
-    ['empty', [], []],
-  ];
-  let anyFigure = null;
-  for (const [name, hist, flows] of shapes) {
-    sb.portfolioHistory = hist; sb.__flows = flows;
-    const g = run('_intccGrowthPct()');
-    if (g !== null) anyFigure = name + ' → ' + g;
+  const withPerf = (perf) => {
+    const m = makeCtx();
+    m.__perf = perf;
+    vm.runInContext('function _aurixInvestablePerformance(){ return __perf; }', m);
+    vm.runInContext(fnSrc('_intccGrowthPct'), m);   // re-bind to the stub
+    return run('_intccGrowthPct()', m);
+  };
+  ok('2.5 valid === true ⇒ Intelligence publishes exactly the owner\'s figure',
+    withPerf({ valid: true, returnPct: 7.25 }) === 7.25);
+  // Every fail-closed reason the owner can return must yield NO figure.
+  const reasons = ['insufficient_observations', 'insufficient_clean_data', 'invalid_observation',
+    'window_too_short', 'baseline_not_comparable', 'fx_unavailable', 'unexplained_capital_event',
+    'interval_fallback:2', 'awaiting_canonical_history', 'error:boom'];
+  let leaked = null;
+  for (const rs of reasons) {
+    if (withPerf({ valid: false, returnPct: null, fallbackReason: rs }) !== null) leaked = rs;
+    // even if a figure is present alongside valid:false it must NOT be published
+    if (withPerf({ valid: false, returnPct: 42, fallbackReason: rs }) !== null) leaked = rs + '(+figure)';
   }
-  ok('2.5 no series shape produces a return figure (' + shapes.length + ' shapes)',
-    anyFigure === null, String(anyFigure));
+  ok('2.6 every fail-closed reason yields NO figure (' + reasons.length + ' reasons)',
+    leaked === null, String(leaked));
+  ok('2.7 a non-finite returnPct is never published',
+    withPerf({ valid: true, returnPct: NaN }) === null && withPerf({ valid: true, returnPct: null }) === null);
+  ok('2.8 a missing owner fails closed', (() => {
+    const m = makeCtx(); vm.runInContext(fnSrc('_intccGrowthPct'), m);
+    return run('_intccGrowthPct()', m) === null; })());
 
-  // The exact scenario the financial review demonstrated: the ENGINE would
-  // happily certify a real-estate revaluation as return. This proves both that
-  // the finding is real AND that the barrier holds.
+  // The INT.01 finding, kept as executable knowledge: the LEGACY headless engine
+  // still reads raw total-wealth USD history, so it would certify a real-estate
+  // revaluation as return. It is deliberately not the publishable owner.
   sb.portfolioHistory = series([400000, 400000, 400000, 440000, 440000, 440000, 440000]);
   sb.__flows = [];   // a real-estate valuation edit writes NO capital flow
   const engine = run("computeAurixTWRSeries('all')");
-  ok('2.6 FINDING: the TWR engine certifies a real-estate revaluation as +' +
+  ok('2.9 FINDING (still true): the legacy engine certifies a real-estate revaluation as +' +
      (engine.deltaPct != null ? engine.deltaPct.toFixed(1) : '?') + '% return',
     engine.valid === true && engine.fallbackReason === null && engine.deltaPct > 9,
     JSON.stringify({ valid: engine.valid, reason: engine.fallbackReason, d: engine.deltaPct }));
-  ok('2.7 Intelligence publishes NOTHING for it (barrier holds)', run('_intccGrowthPct()') === null);
+  ok('2.10 and Intelligence never consumes it', !/computeAurixTWRSeries/.test(gSrc));
 
-  // Asset deletion: also no flow, also would be read as return.
-  sb.portfolioHistory = series([100000, 100000, 100000, 80000, 80000, 80000, 80000]);
-  sb.__flows = [];
-  ok('2.8 an asset deletion cannot be published as a −20% return', run('_intccGrowthPct()') === null);
-
-  // The engine's coverage guard only inspects NO-FLOW intervals, so one small
-  // recorded flow lets an unrecorded 25% capital event through.
-  sb.portfolioHistory = series([100000, 100000, 100000, 75500, 75500, 75500, 75500]);
-  sb.__flows = [{ id: 'small', ts: T0 + 2.5 * DAY, amountUSD: 500 }];
-  const bypass = run("computeAurixTWRSeries('all')");
-  ok('2.9 FINDING: one recorded flow lets an unrecorded capital event bypass the coverage guard',
-    bypass.valid === true && bypass.deltaPct < -20,
-    JSON.stringify({ valid: bypass.valid, reason: bypass.fallbackReason, d: bypass.deltaPct }));
-  ok('2.10 Intelligence publishes NOTHING for it either', run('_intccGrowthPct()') === null);
-
-  ok('2.11 the certified TWR engine was NOT modified by INT.01',
+  ok('2.11 the certified TWR engine keeps its own contract',
     /_AURIX_TWR_COVERAGE_JUMP\s*=\s*40/.test(app)
     && /Modified-/.test(app) && /flow_coverage_insufficient/.test(app));
 }
@@ -274,23 +276,20 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
   const s = snapOf({ top1: 60, top1Type: 'crypto', topCat: 60, topCatType: 'crypto', cryptoPct: 60, categoryCount: 2, cashPct: 5 });
   sb.portfolioHistory = series([10000, 10500, 11000]);
   sb.__flows = [];
-  const radar = run('_intccRadar(' + JSON.stringify(s) + ', { pct: 80 }, _intccGrowthPct())');
-  ok('3.3 the return axis is null — not 70, not 55, not 50, not 0', radar.growth === null, 'growth=' + radar.growth);
+  // Driven EXPLICITLY with an uncertified return (null), not via an absent owner:
+  // the point under test is the radar's handling of "no evidence".
+  const radar = run('_intccRadar(' + JSON.stringify(s) + ', { pct: 80 }, null)');
+  ok('3.3 an uncertified return leaves the axis null — not 70, not 55, not 50, not 0', radar.growth === null, 'growth=' + radar.growth);
   ok('3.4 the structural axes are still published',
     [radar.diversification, radar.liquidity, radar.concentration, radar.stability].every(Number.isFinite));
 
-  // Given the INT.01 barrier, the axis can NEVER be published today.
-  let axisEver = null;
-  for (const [name, hist, flows] of [
-    ['clean gain', series([10000, 10500, 11000, 12000, 13000, 14000]), []],
-    ['long history', series(Array.from({ length: 200 }, (_, i) => 10000 + i * 50)), []],
-  ]) {
-    sb.portfolioHistory = hist; sb.__flows = flows;
-    const r = run('_intccRadar(' + JSON.stringify(s) + ', { pct: 80 }, _intccGrowthPct())');
-    if (r.growth !== null) axisEver = name + ' → ' + r.growth;
-  }
-  ok('3.5 no history shape can publish the return axis while the barrier stands',
-    axisEver === null, String(axisEver));
+  // INT.02 — a CERTIFIED return does publish the axis; anything uncertified does
+  // not. The axis is a function of the certified figure alone, never of history
+  // shape or composition.
+  const axisFor = g => run('_intccRadar(' + JSON.stringify(s) + ', { pct: 80 }, ' + JSON.stringify(g) + ')').growth;
+  ok('3.5 a certified return publishes the axis; an uncertified one never does',
+    Number.isFinite(axisFor(10)) && axisFor(null) === null,
+    'g=10 → ' + axisFor(10) + ' | g=null → ' + axisFor(null));
 
   const svg = run('_intccRadarSvg(' + JSON.stringify(radar) + ')');
   ok('3.6 the SVG draws NO axis for the absent dimension (4 axes, not 5)',
@@ -332,23 +331,14 @@ console.log('\n3 · The return axis is absent, not fabricated (SPEC 5.E):');
 // ════════════════════════════════════════════════════════════════════════════
 console.log('\n4 · No return narrative reaches the hero:');
 {
-  const shapes = [
-    series([10000, 10000, 10000, 20000, 20000, 20000]),         // deposit
-    series([10000, 11000, 12000, 13000, 14000, 15000]),         // strong gain
-    series([100000, 90000, 80000, 70000, 60000, 50000]),        // strong fall
-  ];
-  let growing = null;
-  for (const hist of shapes) {
-    sb.portfolioHistory = hist; sb.__flows = [];
-    const g = run('_intccGrowthPct()');
+  const readingFor = g => {
     const radar = run('_intccRadar(' + JSON.stringify(SNAP) + ', { pct: 60 }, ' + JSON.stringify(g) + ')');
     const score = run('_intccHealthScore(' + JSON.stringify(SNAP) + ', {pct:60})');
-    const reading = run('_intccReading(' + JSON.stringify(SNAP) + ', ' + JSON.stringify(score) + ', ' +
+    return run('_intccReading(' + JSON.stringify(SNAP) + ', ' + JSON.stringify(score) + ', ' +
       JSON.stringify(radar) + ', { pct: 60 }, ' + JSON.stringify(g) + ')');
-    if (reading.state === 'growing') growing = JSON.stringify(hist.map(p => p.value));
-  }
-  ok('4.1 the "growing" state is unreachable while no return is publishable',
-    growing === null, String(growing));
+  };
+  ok('4.1 an uncertified return can never reach the "growing" narrative',
+    readingFor(null).state !== 'growing', readingFor(null).state);
   ok('4.2 the growth-percentage copy is never interpolated',
     !run('String(_intccReading(' + JSON.stringify(SNAP) + ', _intccHealthScore(' + JSON.stringify(SNAP) +
       ', {pct:60}), _intccRadar(' + JSON.stringify(SNAP) + ', {pct:60}, null), {pct:60}, null).sub)').includes('rendimiento '));
