@@ -495,7 +495,13 @@ console.log('\n26–30 · Chart, Performance, Reader, Preview and User Health:')
     // posición con cantidad no usable invalidaría el denominador y sobrestimaría la
     // diversificación, así que no publica número. Gate propio:
     // docs/AURIX-INT-CORE-FACT-ENGINE-harness.js (sección 4).
-    '_aurixEffectiveDiversification'];
+    '_aurixEffectiveDiversification',
+    // SPEC AURIX-WEALTH-TRANSACTION-INTEGRITY — la contrapartida en el ledger de una
+    // ELIMINACIÓN de posición. Lee la cantidad certificada por AQUÍ para FALLAR CERRADO:
+    // si la cantidad no es certificable no emite flujo alguno, porque inventar el importe
+    // de la salida contaminaría el rendimiento con una retirada que nadie puede probar.
+    // Gate propio: docs/AURIX-WEALTH-TRANSACTION-INTEGRITY-harness.js (sección 7).
+    '_aurixLedgerAssetRemoval'];
   ok('30.3 the quantity rule is used ONLY where this SPEC declares it',
     (app.match(/_aurixUsableQuantity\(/g) || []).length === DECLARED_CALL_SITES.length + 2   // +1 definicion, +1 recomputeDerivedFinancialState
     && DECLARED_CALL_SITES.every(n => /_aurixUsableQuantity\(/.test(fnSrc(n)))

@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '649'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '650'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -9852,6 +9852,61 @@ function _ledgerCashFlow(type, asset, amount, currency, ts, source) {
   } catch (_) {}
 }
 
+// AURIX-WEALTH-TRANSACTION-INTEGRITY — CONTRAPARTIDA DE UNA ELIMINACIÓN.
+// Eliminar una posición SACA su valor del patrimonio, exactamente igual que
+// venderla o retirarla, pero era la única mutación que no escribía nada en el
+// ledger: la caída quedaba sin explicación y el neutralizador la leía como
+// mercado, es decir, FABRICABA una pérdida por el importe eliminado.
+// No es un reconciliador nuevo: el importe y la identidad del evento siguen
+// siendo de los owners de siempre — `aurixCashOperation('withdrawal')` para
+// liquidez y `_aurixCaptureFlow` sobre `assetValueUSD` para el resto.
+//
+// El importe es la CONTRIBUCIÓN VALORADA del activo (`assetValueUSD`), no
+// `qty × price`: para el oro físico la cantidad son gramos/onzas y el precio es
+// por onza troy con pureza aparte, así que `qty × price` (lo que usa la ruta de
+// venta) sobreestima 100 g de 18K en dos órdenes de magnitud — y una salida
+// inflada no arregla una pérdida fabricada, la convierte en una ganancia
+// fabricada. Fail-closed: cantidad no certificable, divisa sin cobertura o
+// valoración no finita ⇒ NO se emite flujo (mejor un hueco declarado que una
+// cifra inventada).
+//
+// IDENTIDAD POR ACTIVO, no por reloj. El id determinista del ledger incluye el
+// `ts`, así que dos eliminaciones del mismo activo serían dos salidas de capital
+// distintas. Y una eliminación es reversible: el merge de cartera está sesgado a
+// no perder activos (`lc > rc` ⇒ se conserva el local), así que un activo
+// eliminado en un dispositivo puede volver desde el otro y ser eliminado otra vez
+// — con id por reloj eso restaba 20.000 por un activo de 10.000. Anclado al
+// activo, la segunda eliminación es idempotente: el evento ya está escrito.
+// Dirección del residuo elegida a propósito: si el valor cambió entre ambas, se
+// conserva el PRIMER importe (subestimar la salida deja una pérdida acotada;
+// duplicarla fabrica una ganancia).
+function _aurixAssetRemovalFlowId(asset) { return 'rm:' + String((asset && asset.id) || 'unknown'); }
+function _aurixLedgerAssetRemoval(asset, ts) {
+  if (!asset) return;
+  const when = Number.isFinite(ts) ? ts : Date.now();
+  const qty  = _aurixUsableQuantity(asset.qty);
+  if (!Number.isFinite(qty) || qty <= 0) return;        // posición cerrada o cantidad UNKNOWN
+  const flowId = _aurixAssetRemovalFlowId(asset);
+  if (asset.type === 'cash') {
+    aurixCashOperation('withdrawal', { asset, amount: qty, currency: asset.assetCurrency || 'USD', ts: when, flowId });
+    return;
+  }
+  // El inmueble NO está en el denominador invertible (`investable = total −
+  // real_estate`), así que su valor nunca estuvo en la serie: registrar su salida
+  // restaría 380.000 de capital de una serie de 20.000 y fabricaría una ganancia
+  // enorme, justo el error contrario al que este bloque corrige. Se reutiliza el
+  // owner canónico del perímetro, no un `type ===` propio. Falla CERRADO como el
+  // resto de la función: sin el owner del perímetro no se emite flujo, porque no
+  // poder decidir si el activo está en el denominador no autoriza a suponerlo.
+  if (typeof isInvestableAsset !== 'function' || !isInvestableAsset(asset)) return;
+  const usd = assetValueUSD(asset);
+  if (!Number.isFinite(usd) || usd <= 0) return;
+  // `amount`/`currency` nativos junto al importe en USD, igual que los escribe el
+  // owner de liquidez: la fila del ledger queda completa y editable.
+  _aurixCaptureFlow('asset_remove', -usd, when, asset.id, 'asset-removed', 'user',
+                    { flowId, amount: -assetNativeValue(asset), currency: (asset.assetCurrency || 'USD') });
+}
+
 // ── WN.4A — Local capital-flow ledger (localStorage only) ───────────────────
 // Explicit, append-only record of USER-DRIVEN capital movements. Foundation for
 // future TWR performance accounting. LOCAL ONLY for now: no Supabase, no chart
@@ -10122,6 +10177,15 @@ function aurixCashOperation(op, params) {
       // 3 · flujo externo con identidad estable.
       _aurixCaptureFlow(op, toUSD(signed), ts, asset.id, null, p.source || 'user',
                         { flowId, amount: signed, currency });
+      // AURIX-WEALTH-TRANSACTION-INTEGRITY — un ingreso sobre una fila CERRADA la
+      // reactiva. Retirar todo el saldo cierra la posición (qty 0), y el alta de
+      // liquidez REUTILIZA la fila por moneda, así que el siguiente ingreso caía
+      // sobre una fila cerrada: el saldo y su transacción existían, pero
+      // `activeAssets()` la excluye ⇒ el dinero no aparecía en NINGÚN total
+      // mientras el flujo externo sí se restaba de una serie que nunca subió por
+      // él (pérdida fabricada). Aquí, porque éste es el único owner por el que
+      // puede volver a entrar dinero en una fila de liquidez.
+      if (asset.qty > 0) { try { if (typeof _reactivatePosition === 'function') _reactivatePosition(asset); } catch (_) {} }
       out.ok = true; out.flowId = flowId; out.balance = asset.qty;
     } else if (op === 'edit') {
       const flowId = p.flowId; const next = Number(p.amount);
@@ -55946,9 +56010,15 @@ assetsListEl.addEventListener('click', e => {
     }).then(ok => {
       if (!ok || !assets.find(a => a.id === delId)) return;
       const commit = () => {
+        // AURIX-WEALTH-TRANSACTION-INTEGRITY — la contrapartida en el ledger ANTES
+        // de quitar la fila (después ya no hay saldo que leer), y `save` con el
+        // contexto destructivo que el guard de persistencia exige: sin él la
+        // reducción se bloqueaba en disco y `save()` restauraba la fila desde el
+        // último estado válido, así que la eliminación no persistía.
+        try { _aurixLedgerAssetRemoval(delAsset, Date.now()); } catch (_) {}
         assets = assets.filter(a => a.id !== delId);
         _persistEmptyPortfolioIfNeeded('delete');
-        save();
+        save('delete-asset');
         render(true);
         _flashCategoryCard(delType);
         onPortfolioChange(true);
@@ -56688,6 +56758,10 @@ async function _mngDelete() {
   // Re-resolve in case state changed while the dialog was open.
   if (!assets.find(x => x.id === id)) return;
   const delType = a.type;
+  // AURIX-WEALTH-TRANSACTION-INTEGRITY — la contrapartida en el ledger, por el
+  // mismo owner que las demás rutas de eliminación: el valor sale del patrimonio
+  // y queda registrado, así que la caída no se lee como pérdida de mercado.
+  try { _aurixLedgerAssetRemoval(a, Date.now()); } catch (_) {}
   assets = assets.filter(x => x.id !== id);
   try { _persistEmptyPortfolioIfNeeded('delete'); } catch (_) {}
   save('delete-asset'); closeAssetManage(); render(true);
@@ -56822,6 +56896,10 @@ async function _adsDeleteActive() {
   if (!ok) return;
   if (!assets.find(x => x.id === id)) return;
   const delType = a.type;
+  // AURIX-WEALTH-TRANSACTION-INTEGRITY — la contrapartida en el ledger, por el
+  // mismo owner que las demás rutas de eliminación: el valor sale del patrimonio
+  // y queda registrado, así que la caída no se lee como pérdida de mercado.
+  try { _aurixLedgerAssetRemoval(a, Date.now()); } catch (_) {}
   assets = assets.filter(x => x.id !== id);
   try { _persistEmptyPortfolioIfNeeded('delete'); } catch (_) {}
   save('delete-asset');
