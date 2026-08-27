@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '651'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '652'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -18626,12 +18626,17 @@ function _wsxAct(act, ref) {
 
 function _renderWorkspaceHome(metrics) {
   const esc = (typeof _intccEsc === 'function') ? _intccEsc : (s => String(s == null ? '' : s));
-  const tab = (_wsTab === 'space' || _wsTab === 'templates' || _wsTab === 'tools') ? _wsTab : _wsSmartTab();
+  let tab = (_wsTab === 'space' || _wsTab === 'templates' || _wsTab === 'tools') ? _wsTab : _wsSmartTab();
 
   // WS.5C — no hero. Workspace opens directly on the internal tabs.
 
   // WS.5B P2 — internal tabs: Mi espacio / Plantillas / Herramientas.
-  const TABS = [['space', 'wstab_space'], ['templates', 'wstab_templates'], ['tools', 'wstab_tools']];
+  // WORKSPACE-LAUNCH-V1 — la pestaña PLANTILLAS se queda sin entradas publicables en
+  // V1, así que NO se pinta: una sección vacía se lee como algo roto, y el SPEC
+  // prohíbe rellenarla con placeholders o "coming soon". Un `tab` guardado que
+  // apunte ahí cae a Herramientas, así que no hay pestaña activa sin contenido.
+  const TABS = [['space', 'wstab_space'], ['tools', 'wstab_tools']];
+  if (tab === 'templates') tab = 'tools';
   const tabsHtml = `
     <nav class="wsh-tabs" role="tablist">
       ${TABS.map(([k, lk]) => `<button type="button" class="wsh-tab${tab === k ? ' is-active' : ''}" data-wstab="${k}">${esc(t(lk))}</button>`).join('')}
@@ -18651,23 +18656,15 @@ function _renderWorkspaceHome(metrics) {
     const pinTs = ref => { const p = _wsPinned().find(x => x && x.ref === ref); return p ? (p.ts || 1) : 0; };
     // Canonical catalogs — each entry belongs to exactly one column. Opens reuse
     // the existing cta mechanism (which records recency via the click handler).
-    const TPL_CAT = [
-      { ref: 'tpl:mbudget',     cta: 'tool',      arg: 'budget',      cat: 'budget',         name: t('wstool_budget_n') },
-      { ref: 'tpl:assets',      cta: 'tool',      arg: 'assets',      cat: 'assets',         name: t('wsapp_assets_n') },
-      { ref: 'tpl:receivables', cta: 'tool',      arg: 'receivables', cat: 'receivables',    name: t('wsapp_receivables_n') },
-      { ref: 'tpl:realestate',  cta: 'tool',      arg: 'realestate',  cat: 'realestate-pro', name: t('wsre_n') },
-      { ref: 'tpl:journal',     cta: 'tool',      arg: 'journal',     cat: 'journal',        name: t('wstool_journal_n') },
-      { ref: 'tpl:networth',    cta: 'workspace', arg: 'networth',    cat: 'networth',       name: t('wsh_ws_networth') },
-      { ref: 'tpl:property',    cta: 'workspace', arg: 'property',    cat: 'property',        name: t('wsh_ws_property') },
-      { ref: 'tpl:business',    cta: 'workspace', arg: 'business',    cat: 'business',        name: t('wsh_ws_business') },
-      { ref: 'tpl:fire',        cta: 'workspace', arg: 'fire',        cat: 'fire',            name: t('wsh_ws_fire') },
-      { ref: 'tpl:projection',  cta: 'planning',  arg: '',            cat: 'projection',      name: t('wsp_title') },
-    ];
+    // WORKSPACE-LAUNCH-V1 — Mi Espacio ordena por USO REAL, así que un usuario que
+    // hubiera abierto antes una de estas superficies la vería reaparecer aquí aunque
+    // estuviera fuera del catálogo. Por eso se reducen TAMBIÉN estos dos catálogos:
+    // es la otra puerta de entrada. Ninguna plantilla es publicable en V1; de las
+    // herramientas quedan las dos con matemática comprobada. Owners intactos.
+    const TPL_CAT = [];
     const TOOL_CAT = [
       { ref: 'tool:compound', cta: 'tool',     arg: 'compound', viz: 'curve',   name: t('wstool_compound_n') },
       { ref: 'tool:loan',     cta: 'tool',     arg: 'loan',     viz: 'donut',   name: t('wsloan_n') },
-      { ref: 'tpl:scenario',  cta: 'scenario', arg: '',         viz: 'compare', name: t('wsh_scenario_title') },
-      { ref: 'tpl:goals',     cta: 'goals',    arg: '',         viz: 'target',  name: t('wsg_title') },
     ];
     // Keep only used/pinned items, ordered by most-recent activity (DESC).
     const activate = arr => arr
@@ -18725,29 +18722,30 @@ function _renderWorkspaceHome(metrics) {
     };
     const T2 = type => ({ cta: 'workspace', arg: type, ref: 'tpl:' + type, name: t('wsh_ws_' + type), cat: type });
     // WS.12 (v2) — single premium gallery, priority order. FIRE/abstract last.
-    const gallery = [
-      { cta: 'tool',     arg: 'budget',     ref: 'tpl:mbudget',    cat: 'budget',         name: t('wstool_budget_n') },
-      { cta: 'tool',     arg: 'assets',      ref: 'tpl:assets',     cat: 'assets',         name: t('wsapp_assets_n') },
-      { cta: 'tool',     arg: 'receivables', ref: 'tpl:receivables', cat: 'receivables', name: t('wsapp_receivables_n') },
-      { cta: 'tool',     arg: 'realestate', ref: 'tpl:realestate', cat: 'realestate-pro', name: t('wsre_n') },
-      { cta: 'goals',    ref: 'tpl:goals',       cat: 'goals',          name: t('wsg_title') },
-      { cta: 'tool',     arg: 'journal',    ref: 'tpl:journal',    cat: 'journal',        name: t('wstool_journal_n') },
-      { cta: 'scenario', ref: 'tpl:scenario',    cat: 'scenario',       name: t('wsh_scenario_title') },
-      { cta: 'planning', ref: 'tpl:projection',  cat: 'projection',     name: t('wsp_title') },
-      T2('networth'), T2('property'), T2('business'),
-      T2('fire'),
-    ];
+    // ── WORKSPACE-LAUNCH-V1 · CATÁLOGO PÚBLICO ────────────────────────────────
+    // Workspace V1 sale deliberadamente pequeño: Interés compuesto y Préstamo, las
+    // dos únicas superficies con matemática comprobada y que NO guardan trabajo del
+    // usuario. Todo lo demás persiste sólo en localStorage (`aurix_ws_*_v1` no viaja
+    // en el payload de sync), así que publicarlo prometería una permanencia que la
+    // arquitectura todavía no da. Los renderers y sus datos SIGUEN EXISTENTES e
+    // intactos —nada borrado, nada refactorizado—: sólo salen del catálogo, y
+    // reponerlos es volver a añadir su línea aquí.
+    const gallery = [];
     panel = `<section class="wsh-card"><header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_templates'))}</h3></header><div class="wsh-tpl-grid wsh-gallery">${gallery.map(card).join('')}</div></section>`;
   } else {
     // WS.12 (v2) — Herramientas = compact, operative toolbox (quick utilities, NOT
     // apps). Per-tool accent from the App Identity Registry. FIRE is not here.
+    // ── WORKSPACE-LAUNCH-V1 · CATÁLOGO PÚBLICO ────────────────────────────────
+    // Workspace V1 sale deliberadamente pequeño: Interés compuesto y Préstamo, las
+    // dos únicas superficies con matemática comprobada y que NO guardan trabajo del
+    // usuario. Todo lo demás persiste sólo en localStorage (`aurix_ws_*_v1` no viaja
+    // en el payload de sync), así que publicarlo prometería una permanencia que la
+    // arquitectura todavía no da. Los renderers y sus datos SIGUEN EXISTENTES e
+    // intactos —nada borrado, nada refactorizado—: sólo salen del catálogo, y
+    // reponerlos es volver a añadir su línea aquí.
     const tools = [
       { id: 'compound_growth',     name: t('wstool_compound_n'),  viz: 'curve',   open: ' role="button" tabindex="0" data-wsh-cta="tool" data-wstool="compound"', pinRef: 'tool:compound', soon: false },
       { id: 'loan_simulation',     name: t('wsloan_n'),           viz: 'donut',   open: ' role="button" tabindex="0" data-wsh-cta="tool" data-wstool="loan"',     pinRef: 'tool:loan',     soon: false },
-      { id: 'scenario',            name: t('wsh_scenario_title'), viz: 'compare', open: ' role="button" tabindex="0" data-wsh-cta="scenario"',                  pinRef: 'tpl:scenario',  soon: false },
-      { id: 'goal',                name: t('wsg_title'),          viz: 'target',  open: ' role="button" tabindex="0" data-wsh-cta="goals"',                     pinRef: 'tpl:goals',     soon: false },
-      { id: 'financial_calc',      name: t('wstool_financial_n'), viz: 'bars',    open: '', pinRef: '', soon: true },
-      { id: 'investment_analyzer', name: t('wstool_analyzer_n'),  viz: 'donut',   open: '', pinRef: '', soon: true },
     ];
     const accent = id => 'is-' + (_wsAppIdentity(id).accentColor || 'blue');
     panel = `
@@ -19754,6 +19752,19 @@ function calculateCompoundGrowth(initial, monthly, annualReturn, years) {
   return { final, contributed, interest, series, multiple: contributed > 0 ? final / contributed : 1, gainPct: contributed > 0 ? interest / contributed * 100 : 0 };
 }
 
+// WORKSPACE-LAUNCH-V1 — la unidad de los campos monetarios estaba HARDCODEADA a '€'
+// mientras los resultados salen por `formatBase()`, que sí respeta la divisa base: un
+// usuario en USD leía '€' arriba y '$' abajo en la misma tarjeta. Se delega en el owner
+// de símbolo que ya existe (`getCurrencySymbol` sobre `_AURIX_CCY_GLYPH`); sin mapa nuevo
+// y sin tocar ninguna fórmula.
+function _wsToolCcy() {
+  try {
+    if (typeof getCurrencySymbol === 'function' && typeof baseCurrency !== 'undefined') {
+      return getCurrencySymbol(baseCurrency) || '€';
+    }
+  } catch (_) {}
+  return '€';
+}
 function _wsToolDefaults() {
   // WS.11A — autonomous defaults; NO Dashboard/portfolio read. Capital inicial 1.000 €.
   return { initial: 1000, monthly: 300, ret: 6, years: 20 };
@@ -19943,8 +19954,8 @@ function _renderCompoundTool() {
       <section class="wsh-card wstool-inputs-card">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('ws4_inputs_title'))}</h3></header>
         <div class="wstool-fields">
-          ${field('initial', t('wstool_in_initial'), '€')}
-          ${field('monthly', t('wstool_in_monthly'), '€')}
+          ${field('initial', t('wstool_in_initial'), _wsToolCcy())}
+          ${field('monthly', t('wstool_in_monthly'), _wsToolCcy())}
           ${field('ret',     t('wstool_in_return'),  '%')}
           ${field('years',   t('wstool_in_years'),   t('wstool_unit_years'))}
         </div>
@@ -21020,11 +21031,11 @@ function _renderLoanTool() {
       <section class="wsh-card wsloan-inputs-card">
         <header class="wsh-head"><h3 class="wsh-title">${esc(t('ws4_inputs_title'))}</h3></header>
         <div class="wsloan-fields">
-          ${field('principal', t('wsloan_in_amount'), '€')}
+          ${field('principal', t('wsloan_in_amount'), _wsToolCcy())}
           ${field('rate', t('wsloan_in_rate'), '%')}
           ${field('years', t('wsloan_in_years'), t('wstool_unit_years'))}
-          ${field('fees', t('wsloan_in_fees'), '€')}
-          ${field('insurance', t('wsloan_in_insurance'), '€')}
+          ${field('fees', t('wsloan_in_fees'), _wsToolCcy())}
+          ${field('insurance', t('wsloan_in_insurance'), _wsToolCcy())}
         </div>
       </section>
       <section class="wsh-card wsloan-out-card">

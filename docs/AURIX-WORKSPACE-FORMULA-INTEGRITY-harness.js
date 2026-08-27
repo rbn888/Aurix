@@ -365,4 +365,88 @@ console.log('\n20 · Lo que la revisión encontró abierto en la superficie decl
 }
 
 console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + '  ' + pass + ' passed, ' + fail + ' failed\n');
+
+// ════════════════════════════════════════════════════════════════════════════
+// WORKSPACE-LAUNCH-V1 — catálogo público + matemática de las DOS que salen
+// ════════════════════════════════════════════════════════════════════════════
+// Workspace V1 sale deliberadamente pequeño. Lo que este bloque protege no es el
+// diseño sino la REGLA: sólo se publica lo que tiene matemática comprobada y NO
+// guarda trabajo del usuario, porque `aurix_ws_*_v1` no viaja en el sync y
+// publicar lo demás prometería una permanencia que la arquitectura no da.
+(function workspaceLaunchScope() {
+  const fs = require('fs'), path = require('path');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+  const fn = (n) => { const i = app.indexOf('function ' + n + '('); if (i < 0) return '';
+    let k = app.indexOf('{', i), d = 0; for (; k < app.length; k++) { const c = app[k];
+      if (c === '{') d++; else if (c === '}') { d--; if (!d) return app.slice(i, k + 1); } } return ''; };
+  let p2 = 0, f2 = 0;
+  const OK = (n, c, extra) => { if (c) { p2++; console.log('  \u2713 ' + n); }
+    else { f2++; console.log('  \u2717 ' + n + (extra ? '  \u2192  ' + extra : '')); } };
+  const near = (a, b) => Math.abs(a - b) < 0.01;
+
+  console.log('\nWORKSPACE-LAUNCH-V1 \u2014 alcance de lanzamiento:');
+
+  // ── Matemática de las dos publicadas, EJECUTADA ──────────────────────────
+  const _wsNum = v => { const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) ? n : 0; };
+  const calcComp = new Function('_wsNum', fn('calculateCompoundGrowth') + ';return calculateCompoundGrowth;')(_wsNum);
+  const calcLoan = new Function(fn('calculateLoan') + ';return calculateLoan;')();
+
+  OK('L1 compound \u00b7 1.000 + 300/mes al 6% en 20a \u21d2 aportado exacto 73.000',
+     near(calcComp(1000, 300, 0.06, 20).contributed, 73000));
+  OK('L2 compound \u00b7 tasa 0% \u21d2 sin crecimiento inventado',
+     near(calcComp(1000, 300, 0, 10).final, 37000) && near(calcComp(1000, 300, 0, 10).interest, 0));
+  OK('L3 compound \u00b7 horizonte 0 \u21d2 devuelve el capital inicial, no NaN',
+     near(calcComp(1000, 300, 0.06, 0).final, 1000));
+  OK('L4 compound \u00b7 entradas basura \u21d2 0, nunca NaN',
+     Number.isFinite(calcComp('abc', null, 0.06, 5).final));
+  OK('L5 loan \u00b7 180.000 al 3,25% en 30a \u21d2 cuota francesa y saldo que CIERRA en 0',
+     (() => { const r = calcLoan({ principal: 180000, rate: 3.25, years: 30 });
+       return near(r.base, 783.37) && r.table.length === 360 && near(r.table[359].balance, 0); })());
+  OK('L6 loan \u00b7 tasa 0% \u21d2 principal/n y CERO intereses',
+     (() => { const r = calcLoan({ principal: 180000, rate: 0, years: 30 });
+       return near(r.base, 500) && near(r.totalInterest, 0); })());
+  OK('L7 loan \u00b7 inputs inv\u00e1lidos \u21d2 0 sin NaN ni divisi\u00f3n por cero',
+     (() => { const r = calcLoan({ principal: -5, rate: 'abc', years: 0 });
+       return r.base === 0 && r.n === 0 && r.principal === 0; })());
+
+  // ── Divisa: el defecto corregido ─────────────────────────────────────────
+  const comp = fn('_renderCompoundTool'), loan = fn('_renderLoanTool');
+  OK('L8 ning\u00fan campo monetario de compound/loan tiene el s\u00edmbolo hardcodeado',
+     !/'\u20ac'/.test(comp) && !/'\u20ac'/.test(loan) &&
+     /_wsToolCcy\(\)/.test(comp) && /_wsToolCcy\(\)/.test(loan));
+  OK('L9 la unidad se delega en el owner de divisa que ya exist\u00eda',
+     /getCurrencySymbol\(baseCurrency\)/.test(fn('_wsToolCcy')));
+
+  // ── Catálogo público ─────────────────────────────────────────────────────
+  const HIDDEN = ['journal', 'realestate', 'receivables', 'assets', 'budget'];
+  OK('L10 ninguna herramienta oculta tiene punto de entrada en el cat\u00e1logo',
+     HIDDEN.every(k => !app.includes('data-wstool="' + k + '"')),
+     HIDDEN.filter(k => app.includes('data-wstool="' + k + '"')).join(','));
+  OK('L11 ni scenario / goals / planning / workspace-templates',
+     ['scenario', 'goals', 'planning', 'workspace'].every(c => !app.includes('data-wsh-cta="' + c + '"')));
+  OK('L12 s\u00ed est\u00e1n las DOS autorizadas',
+     app.includes('data-wstool="compound"') && app.includes('data-wstool="loan"'));
+  OK('L13 sin secci\u00f3n vac\u00eda: la pesta\u00f1a Plantillas no se pinta y un tab guardado cae a Herramientas',
+     /const TABS = \[\['space', 'wstab_space'\], \['tools', 'wstab_tools'\]\]/.test(app) &&
+     /if \(tab === 'templates'\) tab = 'tools'/.test(app));
+  OK('L14 sin "coming soon" ni cards deshabilitadas en Herramientas',
+     !/soon: true/.test(app));
+  OK('L15 Mi Espacio no puede resucitar una oculta por uso previo',
+     /const TPL_CAT = \[\];/.test(app) &&
+     !/\{ ref: 'tpl:scenario'[\s\S]{0,40}viz: 'compare'/.test(app));
+
+  // ── NADA BORRADO: los owners siguen vivos y dormidos ─────────────────────
+  const KEPT = ['_renderBudgetTool', '_renderJournalTool', '_renderRealEstateTool',
+                '_renderReceivablesTool', '_renderAssetPricesTool', '_wsRenderTool',
+                '_wsBudgetOutHtml', '_wsToolStateType'];
+  OK('L16 CERO c\u00f3digo borrado: los renderers ocultos siguen existiendo',
+     KEPT.every(n => (app.match(new RegExp('function ' + n + '\\(', 'g')) || []).length === 1),
+     KEPT.filter(n => !(app.match(new RegExp('function ' + n + '\\(', 'g')) || []).length).join(','));
+  OK('L17 y su despachador sigue sabiendo abrirlas (reponer = una l\u00ednea de cat\u00e1logo)',
+     /_wsToolActive === 'budget' \? _renderBudgetTool\(\)/.test(fn('_wsRenderTool')));
+
+  console.log('  \u2192 ' + p2 + ' passed, ' + f2 + ' failed');
+  if (f2) process.exitCode = 1;
+})();
+
 process.exit(fail ? 1 : 0);
