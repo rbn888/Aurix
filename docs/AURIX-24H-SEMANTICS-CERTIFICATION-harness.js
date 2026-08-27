@@ -57,9 +57,13 @@ const eligibleSeries = new Function(
   '_aurixInvestableSnapshots', 'investableValueBase', '_AURIX_WN12_BOUNDED_RANGE_SPAN_GUARD', '_AURIX_WN12_MIN_SPAN_RETENTION', '_AURIX_WN12_BOUNDED_RANGES', '_aurixLoadCapitalFlows', 'toBase',
   fnSource('_aurixEligibleInvestableSeries') + '\n;return _aurixEligibleInvestableSeries;')(
     investableSnapshots, investableValueBase, true, 0.80, { '24h': 1, '7d': 1, '30d': 1, '1y': 1 }, _aurixLoadCapitalFlows, toBase);
-const flowNeutralize = new Function('investableValueBase', '_aurixLoadCapitalFlows', 'toBase', '_aurixFlowIsInternal',
+// Predicado de contrapartida REAL (mismo owner que INT.02), no un stub.
+const _AURIX_FLOW_MATCH_REL_TOL = Number((app.match(/const _AURIX_FLOW_MATCH_REL_TOL = ([\d.]+);/) || [])[1]);
+const _aurixFlowCounterpartObserved = new Function('_AURIX_FLOW_MATCH_REL_TOL',
+  fnSource('_aurixFlowCounterpartObserved') + '\n;return _aurixFlowCounterpartObserved;')(_AURIX_FLOW_MATCH_REL_TOL);
+const flowNeutralize = new Function('investableValueBase', '_aurixLoadCapitalFlows', 'toBase', '_aurixFlowIsInternal', '_aurixFlowCounterpartObserved',
   fnSource('_aurixFlowNeutralize') + '\n;return _aurixFlowNeutralize;')(
-    investableValueBase, _aurixLoadCapitalFlows, toBase, _aurixFlowIsInternal);
+    investableValueBase, _aurixLoadCapitalFlows, toBase, _aurixFlowIsInternal, _aurixFlowCounterpartObserved);
 const rangeReturn = new Function(
   '_aurixEligibleInvestableSeries', '_aurixFlowNeutralize', '_AURIX_RETURN_COMPARABLE_RATIO', 'activeRange', '_aurixFlowLedgerRevision', 'window',
   fnSource('_aurixRangeReturn') + '\n;return _aurixRangeReturn;')(

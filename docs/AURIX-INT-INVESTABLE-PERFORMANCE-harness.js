@@ -83,9 +83,12 @@ function makeCtx(opts) {
   vm.runInContext(konstSrc('_AURIX_RETURN_COMPARABLE_RATIO'), sb);
   vm.runInContext(konstSrc('_AURIX_INVPERF_UNEXPLAINED_JUMP_PCT'), sb);
   vm.runInContext(konstSrc('_AURIX_INVPERF_HIGH_CONFIDENCE_OBS'), sb);
+  vm.runInContext(konstSrc('_AURIX_FLOW_MATCH_REL_TOL'), sb);
+  // `_aurixFlowCounterpartObserved` es REAL: es el contrato de la sección O y el
+  // predicado que Pass B ya usaba. Stubearlo desactivaría justo lo que se certifica.
   ['_aurixPointValuationIncomplete','_aurixFlowIsInternal','_aurixLoadCapitalFlows',
    '_aurixInvestableSnapshots','_aurixEligibleInvestableSeries','_aurixTwrChain',
-   '_aurixInvestablePerformance']
+   '_aurixFlowCounterpartObserved','_aurixInvestablePerformance']
     .forEach(n => vm.runInContext(fnSrc(n), sb));
   (o.extra || []).forEach(src => vm.runInContext(src, sb));
   // The ledger must be written under the REAL key. `_AURIX_CAPITAL_FLOWS_KEY` is a
@@ -300,7 +303,10 @@ console.log('\nF/G · real-estate revaluation / removal ⇒ investable return IN
 // ════════════════════════════════════════════════════════════════════════════
 console.log('\nH · cash/FX inside investable wealth, no double conversion:');
 {
-  const o = { rows: inv([10000, 10500, 11000, 11000]),
+  // Escenario COHERENTE: el depósito de 2.000 tiene su escalón en la serie, como
+  // exige la sección O. Con el input anterior (subida de 500) el caso comparaba
+  // dos fail-closed y la igualdad entre divisas se cumplía trivialmente.
+  const o = { rows: inv([10000, 12500, 13000, 13000]),
               flows: [{ id: 'd3', ts: T0 + 0.5 * DAY, amountUSD: 2000, kind: 'deposit' }] };
   const b = bothBases(o);
   ok('H.1 the percentage is identical in USD base and EUR base', b.agree,
@@ -540,7 +546,10 @@ console.log('\nN · Non-vacuity: each protection is load-bearing:');
   }
   // N.5 — double-converting the ledger breaks base agreement.
   {
-    const o = { rows: inv([10000, 10500, 11000, 11000]),
+    // El depósito DEBE tener su contrapartida en la serie (sección O): un +2.000
+    // sobre una serie que sólo sube 500 es un estado que no puede existir, y con él
+    // el caso fijaba su conclusión sobre un input imposible.
+    const o = { rows: inv([10000, 12500, 13000, 13000]),
                 flows: [{ id: 'd3', ts: T0 + 0.5 * DAY, amountUSD: 2000, kind: 'deposit' }] };
     const c = makeCtx(Object.assign({}, o, { baseCurrency: 'EUR' }));
     vm.runInContext(`function _doubleConv(){
@@ -557,6 +566,73 @@ console.log('\nN · Non-vacuity: each protection is load-bearing:');
   }
   ok('N.6 the all-interval guard exists in the shared core',
     /maxIntervalJumpPct/.test(chainSrc) && /maxIntervalJumpPct/.test(fnSrc('_aurixInvestablePerformance')));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// O · UNMATCHED FLOW ⇒ FAIL-CLOSED   (AURIX-INT02-UNMATCHED-FLOW-FAIL-CLOSED)
+// ════════════════════════════════════════════════════════════════════════════
+// Defecto MEDIDO con este mismo owner: el guard de cobertura es de MAGNITUD
+// (≥40 %), no de EVIDENCIA, así que por debajo de ese umbral se restaba cualquier
+// flujo del ledger sin comprobar que el patrimonio se hubiera movido por él.
+// −10.000 sobre una serie plana de 50.000 publicaba +20,00 % con `valid:true` y
+// confianza `high`; el espejo, −20,00 %. El badge ya exigía contrapartida (Pass B
+// de `_aurixFlowNeutralize`), así que dos consumidores del MISMO ledger
+// respondían distinto. Aquí se certifica que ya no.
+console.log('\nO · un flujo sin contrapartida observable NO se publica:');
+{
+  const flat50 = inv(Array.from({ length: 10 }, () => 50000));
+  const fl = (dayOffset, amountUSD, kind) => [{ id: (kind || 'k') + ':' + dayOffset, ts: T0 + dayOffset * DAY,
+                                                amountUSD: amountUSD, kind: kind || 'asset_remove' }];
+
+  const o1 = perf({ rows: flat50, flows: fl(5, -10000, 'asset_remove') });
+  ok('O.1 −10.000 sobre 50.000 planos NO publica +20 %: falla cerrado',
+    o1.valid === false && o1.returnPct === null && o1.fallbackReason === 'pending_flow_reconciliation',
+    JSON.stringify({ v: o1.valid, pct: o1.returnPct, why: o1.fallbackReason }));
+  ok('O.2 +10.000 sin subida correspondiente NO publica −20 %: falla cerrado',
+    (() => { const x = perf({ rows: flat50, flows: fl(5, 10000, 'deposit') });
+             return x.valid === false && x.returnPct === null && x.fallbackReason === 'pending_flow_reconciliation'; })());
+  ok('O.3 −10.000 CON su caída observable ⇒ 0 %, publicable',
+    (() => { const x = perf({ rows: inv([50000,50000,50000,50000,50000,40000,40000,40000,40000,40000]),
+                              flows: fl(5, -10000, 'asset_remove') });
+             return x.valid === true && near(x.returnPct, 0) && x.flowCount === 1 && x.unmatchedFlows === 0; })());
+  ok('O.4 +10.000 CON su subida observable ⇒ 0 %, publicable',
+    (() => { const x = perf({ rows: inv([50000,50000,50000,50000,50000,60000,60000,60000,60000,60000]),
+                              flows: fl(5, 10000, 'deposit') });
+             return x.valid === true && near(x.returnPct, 0) && x.unmatchedFlows === 0; })());
+  ok('O.5 serie plana sin flujos ⇒ 0 % (el guard no toca lo que no tiene flujos)',
+    (() => { const x = perf({ rows: flat50, flows: [] });
+             return x.valid === true && x.returnPct === 0 && x.flowCount === 0 && x.unmatchedFlows === 0; })());
+  // La razón de fallo es la MISMA que la del badge: es el mismo hecho, no dos.
+  ok('O.6 la razón publicada es la que ya usa el gate del badge',
+    /pending_flow_reconciliation/.test(fnSrc('_aurixInvestablePerformance')) &&
+    /pending_flow_reconciliation/.test(fnSrc('_aurixPerformanceSanityCheck')));
+  // UN solo criterio: el predicado es compartido, no duplicado.
+  ok('O.7 el predicado de contrapartida es UNO y se comparte con Pass B',
+    (app.match(/^function _aurixFlowCounterpartObserved\(/gm) || []).length === 1 &&
+    /_aurixFlowCounterpartObserved\(/.test(fnSrc('_aurixFlowNeutralize')) &&
+    /_aurixFlowCounterpartObserved\(/.test(fnSrc('_aurixInvestablePerformance')) &&
+    (app.match(/_AURIX_FLOW_MATCH_REL_TOL = /g) || []).length === 1);
+  // La UNIDAD es el neto por intervalo — lo mismo que resta `_aurixTwrChain`.
+  // Sin esto, un rebalanceo que conserva valor (E.6) fallaría cerrado: sus dos
+  // flujos de ±4.000 no casan por separado con un escalón de +500.
+  ok('O.8 un rebalanceo que conserva valor sigue publicando (el neto por intervalo es 0)',
+    (() => { const x = perf({ rows: inv([10000, 10500, 11000, 11000, 11000]),
+                              flows: [{ id: 'rs', ts: T0 + 1.5 * DAY, amountUSD: -4000, kind: 'asset_remove' },
+                                      { id: 'rb', ts: T0 + 1.5 * DAY, amountUSD:  4000, kind: 'asset_add' }] });
+             return x.valid === true && near(x.returnPct, 10, 0.05) && x.unmatchedFlows === 0; })());
+  ok('O.9 y el guard de MAGNITUD sigue siendo el que atrapa lo grande (≥40 %)',
+    (() => { const x = perf({ rows: flat50, flows: fl(5, -25000, 'asset_remove') });
+             return x.valid === false && x.fallbackReason === 'unexplained_capital_event'; })());
+  // RESIDUAL REGISTRADO, deliberadamente NO resuelto aquí: si el flujo y el
+  // snapshot que observa su efecto caen en intervalos distintos, la cadena
+  // conserva error. El entorno ±1 del predicado lo deja pasar a propósito —
+  // estrecharlo convertiría cadencia gruesa en fail-closed masivo. Pertenece al
+  // cierre de Chart/cadencia.
+  ok('O.10 residual de cadencia: flujo y caída en intervalos distintos SIGUE publicando (no se aborda aquí)',
+    (() => { const x = perf({ rows: inv([50000,50000,50000,50000,50000,50000,40000,40000,40000,40000]),
+                              flows: fl(5, -10000, 'asset_remove') });
+             return x.valid === true && near(x.returnPct, -4, 0.01); })(),
+    'documentado como residual, no como contrato deseado');
 }
 
 console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + `  ${pass} passed, ${fail} failed`);

@@ -75,9 +75,14 @@ const cashOp = new Function('_nativeToUSD', '_aurixNewFlowId', '_aurixCaptureFlo
 const _WSC_INTERNAL_KINDS = { asset_add: 1, asset_remove: 1, import_baseline: 1, internal_buy: 1, internal_sell: 1, internal_transfer: 1, qty_edit: 1 };
 const _aurixFlowIsInternal = new Function('_WSC_INTERNAL_KINDS',
   fnSource('_aurixFlowIsInternal') + '\n;return _aurixFlowIsInternal;')(_WSC_INTERNAL_KINDS);
-const flowNeutralize = new Function('investableValueBase', '_aurixLoadCapitalFlows', 'toBase', '_aurixFlowIsInternal',
+// El predicado de contrapartida es el REAL, extraído del bundle: es justo el
+// contrato bajo prueba (§5), así que stubearlo dejaría pasar el defecto.
+const _AURIX_FLOW_MATCH_REL_TOL = Number((app.match(/const _AURIX_FLOW_MATCH_REL_TOL = ([\d.]+);/) || [])[1]);
+const _aurixFlowCounterpartObserved = new Function('_AURIX_FLOW_MATCH_REL_TOL',
+  fnSource('_aurixFlowCounterpartObserved') + '\n;return _aurixFlowCounterpartObserved;')(_AURIX_FLOW_MATCH_REL_TOL);
+const flowNeutralize = new Function('investableValueBase', '_aurixLoadCapitalFlows', 'toBase', '_aurixFlowIsInternal', '_aurixFlowCounterpartObserved',
   fnSource('_aurixFlowNeutralize') + '\n;return _aurixFlowNeutralize;')(
-    () => BASE, () => _aurixLoadCapitalFlows(), (v) => v, _aurixFlowIsInternal);
+    () => BASE, () => _aurixLoadCapitalFlows(), (v) => v, _aurixFlowIsInternal, _aurixFlowCounterpartObserved);
 
 const newCash = (qty) => ({ id: 'cash-eur', type: 'cash', assetCurrency: 'EUR', qty, price: 1, costBasis: qty, transactions: [] });
 const flat = (base, n, startTs, stepMs) => Array.from({ length: n }, (_, i) => ({ ts: startTs + i * stepMs, value: base }));
@@ -344,8 +349,26 @@ console.log('\n6 — No regresión (O):');
   ok('6.5 O · y RECORD_MAT ya no filtra la evidencia exacta del ledger',
      !/RECORD_MAT/.test(stripComments(fnSource('_aurixFlowNeutralize'))),
      'el umbral seguía descartando flujos registrados por su tamaño');
+  // AURIX-INT02-UNMATCHED-FLOW-FAIL-CLOSED — el predicado salió de Pass B a un owner
+  // compartido para que `_aurixInvestablePerformance` aplique EL MISMO criterio (antes
+  // publicaba +20% donde el badge fallaba cerrado). Sigue siendo un solo criterio: se
+  // comprueba que Pass B lo INVOCA y que el predicado exige signo y magnitud.
   ok('6.6 O · en su lugar, Pass B exige contrapartida observable en la serie',
-     /matched\s*=\s*Math\.sign\(observed\) === Math\.sign\(base\)/.test(fnSource('_aurixFlowNeutralize')));
+     /_aurixFlowCounterpartObserved\(base, vals, i, anchor\)/.test(fnSource('_aurixFlowNeutralize')) &&
+     /matched\s*=\s*Math\.sign\(observed\) === Math\.sign\(amountBase\)/.test(fnSource('_aurixFlowCounterpartObserved')));
+  ok('6.7 O · y ese predicado es UNO, compartido con el owner del rendimiento investible',
+     (app.match(/^function _aurixFlowCounterpartObserved\(/gm) || []).length === 1 &&
+     /_aurixFlowCounterpartObserved\(/.test(fnSource('_aurixInvestablePerformance')) &&
+     (app.match(/_AURIX_FLOW_MATCH_REL_TOL = /g) || []).length === 1,
+     'el segundo consumidor del ledger debe compartir criterio, no tener uno propio');
+  ok('6.8 O · un flujo registrado SIN contrapartida no se resta (queda unmatched)',
+     (() => {
+       FLOWS = [];
+       // Reingreso registrado sobre una serie que nunca subió por él.
+       _aurixCaptureFlow('deposit', DEPOSIT, T0 + 12 * H, 'cash-eur', null, 'user');
+       const x = returnOf(flat(BASE, 24, T0, H));
+       return x.unmatched >= 1 && x.neutralized === 0 && !gatePublishes(x);
+     })(), 'restar un offset sin escalón que lo respalde fabrica una pérdida');
 }
 
 console.log('\n' + (fail === 0 ? '✅' : '❌') + ' ' + pass + ' passed, ' + fail + ' failed');

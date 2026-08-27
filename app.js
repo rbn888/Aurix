@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '650'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '651'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -23874,6 +23874,42 @@ function _aurixFlowIntent(kind) {
 // shape detection also catches pre-ledger events (e.g. the June-16 BTC sale).
 // Tooltip uses these adjusted values; raw history is never mutated.
 // adjusted(i) = real(i) − cum(i) + cum(last), cum = Σ neutralised step deltas.
+
+// ── AURIX-INT02-UNMATCHED-FLOW-FAIL-CLOSED · ¿HAY CONTRAPARTIDA OBSERVABLE? ──
+// EL predicado, uno solo. Vivía dentro del Pass B de `_aurixFlowNeutralize` y por
+// eso el badge exigía contrapartida mientras `_aurixInvestablePerformance` —el
+// otro consumidor del MISMO ledger— confiaba en el ledger sin condiciones: medido,
+// −10.000 sobre 50.000 planos publicaba +20,00% con `valid:true`. Extraído aquí
+// para que ambos apliquen la MISMA regla; no es un criterio nuevo ni un segundo
+// umbral, es el que ya estaba certificado, con los mismos números.
+//
+// `observed` es el mejor escalón del entorno inmediato (i−1 … i+1) y no del
+// intervalo exacto, deliberadamente: la marca de tiempo de un flujo y el snapshot
+// que observa su efecto pueden caer en intervalos distintos, y ese desajuste de
+// cadencia es un residual conocido y ajeno a este arreglo. Estrechar la ventana
+// aquí lo convertiría en fail-closed masivo.
+//
+// Importe ~0 ⇒ `matched` (no hay nada que explicar). Es lo que hace que un
+// rebalanceo que conserva valor —dos flujos opuestos que se anulan— siga
+// publicando su rentabilidad de mercado.
+const _AURIX_FLOW_MATCH_REL_TOL = 0.35;      // el escalón puede no ser exacto (los precios se mueven a la vez)
+function _aurixFlowCounterpartObserved(amountBase, vals, i, anchor) {
+  const out = { observed: 0, matched: false };
+  if (!Array.isArray(vals) || !(i > 0) || i >= vals.length) return out;
+  if (!Number.isFinite(amountBase) || Math.round(Math.abs(amountBase) * 100) === 0) { out.matched = true; return out; }
+  const n = vals.length;
+  let observed = 0;
+  for (let k = Math.max(1, i - 1); k <= Math.min(n - 1, i + 1); k++) {
+    const d = vals[k] - vals[k - 1];
+    if (Math.abs(d) > Math.abs(observed)) observed = d;
+  }
+  out.observed = observed;
+  const absTol = Math.max((Number(anchor) || 0) * 0.001, 1);
+  out.matched = Math.sign(observed) === Math.sign(amountBase)
+             && Math.abs(observed - amountBase) <= Math.max(absTol, Math.abs(amountBase) * _AURIX_FLOW_MATCH_REL_TOL);
+  return out;
+}
+
 function _aurixFlowNeutralize(series, range) {
   const n = series.length;
   const out = { adjusted: series.map(s => s.value), flowsInRange: 0, neutralized: 0, totalOffset: 0,
@@ -23952,8 +23988,6 @@ function _aurixFlowNeutralize(series, range) {
   //     flujo sólo se neutraliza si el patrimonio se movió de verdad en su sentido
   //     y magnitud; si no, se cuenta como `unmatchedFlow` y el gate de publicación
   //     decide (fail-closed), que es lo correcto: no sabemos qué pasó ahí.
-  const MATCH_REL_TOL = 0.35;                  // el escalón puede no ser exacto (precios se mueven a la vez)
-  const MATCH_ABS_TOL = Math.max(anchor * 0.001, 1);
   out.unmatchedFlows = 0; out.unmatchedFlowTotal = 0;
   span.forEach(f => {
     const base = toBase(f.amountUSD, 'USD');
@@ -23962,15 +23996,9 @@ function _aurixFlowNeutralize(series, range) {
     let i = ts.findIndex(tt => tt >= f.ts);
     if (i <= 0) return;
     if (stepOff[i] || stepOff[i - 1] || (i + 1 < n && stepOff[i + 1])) return;  // already covered by a shape step
-    // Contrapartida: el mejor escalón observado en el entorno inmediato del evento.
-    let observed = 0;
-    for (let k = Math.max(1, i - 1); k <= Math.min(n - 1, i + 1); k++) {
-      const d = vals[k] - vals[k - 1];
-      if (Math.abs(d) > Math.abs(observed)) observed = d;
-    }
-    const matched = Math.sign(observed) === Math.sign(base)
-                 && Math.abs(observed - base) <= Math.max(MATCH_ABS_TOL, Math.abs(base) * MATCH_REL_TOL);
-    if (!matched) {
+    // Contrapartida: el predicado compartido (mismo entorno, mismos umbrales).
+    const cp = _aurixFlowCounterpartObserved(base, vals, i, anchor);
+    if (!cp.matched) {
       out.unmatchedFlows++; out.unmatchedFlowTotal = +(out.unmatchedFlowTotal + base).toFixed(2);
       return;                                            // NO se resta sin evidencia
     }
@@ -26149,6 +26177,7 @@ function _aurixInvestablePerformance(range) {
     startValue: null, endValue: null, observations: 0, flowCount: 0,
     externalFlowCount: 0, tradeFlowCount: 0, confidence: null, basis: 'investable-twr', fallbackReason: null,
     spanMs: null, nominalMs: null, coversNominal: null,
+    unmatchedFlows: 0, unmatchedFlowTotal: 0,
   };
   try {
     // 1 · AUTHORITATIVE INVESTABLE SERIES (real estate already excluded).
@@ -26223,6 +26252,49 @@ function _aurixInvestablePerformance(range) {
     if (chain.maxIntervalJumpPct >= _AURIX_INVPERF_UNEXPLAINED_JUMP_PCT) {
       out.fallbackReason = 'unexplained_capital_event';
       return out;
+    }
+
+    // 6b · CONTRAPARTIDA OBSERVABLE — AURIX-INT02-UNMATCHED-FLOW-FAIL-CLOSED.
+    //      El guard 6 es de MAGNITUD (≥40 %) y no de EVIDENCIA, así que por debajo
+    //      de ese umbral este owner restaba cualquier flujo del ledger sin
+    //      preguntar si el patrimonio se movió por él. Medido con este mismo owner:
+    //      −10.000 sobre una serie plana de 50.000 publicaba +20,00 % con
+    //      `valid:true` y confianza `high`, y su espejo (+10.000 sin subida)
+    //      −20,00 %. El badge ya no lo hacía —Pass B exige contrapartida— así que
+    //      dos consumidores del MISMO ledger daban respuestas distintas.
+    //
+    //      La unidad es el NETO POR INTERVALO, no el flujo individual, porque es
+    //      exactamente lo que `_aurixTwrChain` resta (`netFlow` por segmento): un
+    //      rebalanceo que conserva valor neta 0 y no tiene nada que explicar,
+    //      mientras dos flujos sueltos de ±4.000 nunca casarían por separado.
+    //      Predicado compartido con Pass B (`_aurixFlowCounterpartObserved`):
+    //      mismos umbrales, mismo entorno, un solo criterio.
+    if (flows.length) {
+      // Falla CERRADO si el predicado no está: no poder comprobar la evidencia no
+      // autoriza a publicar. (Un `typeof … && ` aquí desactivaba el guard en
+      // silencio, que es peor que no tenerlo — lo destapó el propio gate.)
+      if (typeof _aurixFlowCounterpartObserved !== 'function') {
+        out.fallbackReason = 'pending_flow_reconciliation'; return out;
+      }
+      const vals = pts.map(p => p.value);
+      const anchor = vals[vals.length - 1];
+      const netByIdx = new Map();
+      for (const f of flows) {
+        let i = pts.findIndex(p => p.ts >= f.ts);
+        if (i <= 0) i = 1;                                 // el flujo cae en el primer intervalo
+        netByIdx.set(i, (netByIdx.get(i) || 0) + f.amount);
+      }
+      let unmatched = 0, unmatchedTotal = 0;
+      netByIdx.forEach((net, i) => {
+        if (!_aurixFlowCounterpartObserved(net, vals, i, anchor).matched) { unmatched++; unmatchedTotal += net; }
+      });
+      out.unmatchedFlows = unmatched;
+      out.unmatchedFlowTotal = +unmatchedTotal.toFixed(2);
+      if (unmatched > 0) {
+        // Mismo nombre de razón que el gate del badge: es el MISMO hecho.
+        out.fallbackReason = 'pending_flow_reconciliation';
+        return out;
+      }
     }
 
     // 7 · DISPLAY AUTHORITY — never publish a return while the canonical history
