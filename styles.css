@@ -9789,12 +9789,32 @@ main { padding-bottom: 72px; }
   letter-spacing: -0.01em;
   color: #fff;
 }
-.aicon-fb-index.idx-sp    { background: radial-gradient(circle at 38% 30%, #e8584f, #9c2a23); }
-.aicon-fb-index.idx-ndx   { background: radial-gradient(circle at 38% 30%, #4a82f0, #2350a8); }
-.aicon-fb-index.idx-dji   { background: radial-gradient(circle at 38% 30%, #5b7fb0, #2c3f5c); font-size: 9px; }
-.aicon-fb-index.idx-stoxx { background: radial-gradient(circle at 38% 30%, #3aa0e0, #1f5fa0); }
-.aicon-fb-index.idx-rut   { background: radial-gradient(circle at 38% 30%, #9a6cf0, #5733a8); font-size: 8.5px; }
-.aicon-fb-index.idx-gen   { background: radial-gradient(circle at 38% 30%, #46618f, #25324c); font-size: 9px; }
+/* MARKET-EXCELLENCE-V1 · IDENTIDAD DE ÍNDICES. Había SEIS gradientes inventados,
+   uno por índice, y entre ellos un ROJO para el S&P 500 y un morado para el
+   Russell. Dos problemas reales, no de gusto: (1) en una superficie donde el rojo
+   ES la semántica de pérdida, un well rojo hace que el S&P 500 se lea como una
+   alerta; (2) la columna de índices parecía seis sistemas distintos, que es justo
+   lo contrario de "geometría exterior consistente".
+   No eran colores de marca —ningún índice tiene ese color— así que no se pierde
+   información al retirarlos. Todos comparten ahora la MISMA placa institucional
+   que el monograma de ETF/fondo (`.aicon-fb-provider`), porque son el mismo caso:
+   un activo sin logo con una abreviatura deliberada. La diferenciación sigue
+   existiendo donde debe, en la etiqueta (500 · NDQ · DJI · DAX · CAC · FTSE · 35 ·
+   225), y sólo se conserva el ajuste ÓPTICO de tamaño por longitud de etiqueta. */
+.aicon-fb-index.idx-sp,
+.aicon-fb-index.idx-ndx,
+.aicon-fb-index.idx-dji,
+.aicon-fb-index.idx-stoxx,
+.aicon-fb-index.idx-rut,
+.aicon-fb-index.idx-gen {
+  background:
+    linear-gradient(180deg, rgba(74,130,240,0.32), rgba(40,70,140,0.16)),
+    #131a2c;
+  border: 1px solid rgba(120,160,240,0.35);
+}
+.aicon-fb-index.idx-dji   { font-size: 9px; }
+.aicon-fb-index.idx-rut   { font-size: 8.5px; }
+.aicon-fb-index.idx-gen   { font-size: 9px; }
 
 /* Commodity — inline SVG glyph on a dark plate + a subtle premium glow
    (the glow doubles as the contrast halo so nothing reads black-on-black). */
@@ -13240,7 +13260,11 @@ body.workspace-active .header {
      active border never clips against the scroll-area edge. Horizontal
      scrolling preserved (overflow-x: auto inherited from the base). */
   .funds-cats {
-    padding: 6px 18px 8px 4px;
+    /* MARKET-EXCELLENCE-V1 — el inicio era de 4px, así que el primer chip salía
+       casi a ras del borde y el estado activo se comía su propio borde contra el
+       filo del scroller. Inicio y final simétricos y holgados; el scroll
+       horizontal deliberado se conserva intacto. */
+    padding: 6px 18px 8px 14px;
     margin: -2px -2px 0;
     overflow-y: visible;
   }
@@ -14861,7 +14885,14 @@ body.gs-open { overflow: hidden; }
     display: flex;
     align-items: center;
     min-height: 0;
-    padding: 0 2px;
+    /* MARKET-EXCELLENCE-V1 · RESPIRACIÓN DE LA TOOLBAR. `padding: 0 2px` dejaba la
+       fila de chips pegada al borde superior de la card y a la cabecera
+       ASSET/PRICE/24H que va justo debajo: se leía como una barra segmentada
+       accidental, no como una toolbar deliberada. Se separa en vertical y se
+       alinea el inicio con la sangría de la propia card. Sin tocar el gap ni el
+       tamaño de los chips: no deben ganar protagonismo sobre los activos. */
+    padding: 4px 2px 10px;
+    gap: 10px;
     margin: 0;
     -webkit-mask-image: none;
             mask-image: none;
