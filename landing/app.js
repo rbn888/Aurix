@@ -392,9 +392,12 @@
 
   // AURIX-LANDING-PREMIUM-PASS-1: single source of truth for the private-app
   // URL. Every "Enter Aurix" link ([data-app-link]) points here.
-  // TODO: flip APP_URL to 'https://app.aurixsystem.io' once that subdomain is
-  // live (the HTML href is the same live fallback for no-JS).
-  var APP_URL = 'https://rbn888.github.io/Aurix/';
+  // El subdominio canónico ya está vivo, así que el TODO queda resuelto: este
+  // owner reescribe el `href` de CADA CTA en `updateAppLinks()`, de modo que
+  // mientras apuntara al host antiguo ganaba siempre al href correcto que el
+  // HTML ya traía. Debe coincidir con el `href` del markup (mismo destino con y
+  // sin JS).
+  var APP_URL = 'https://app.aurixsystem.io/';
 
   // AURIX-WAITLIST-1: lead-capture endpoint (Vercel, same backend as the app API).
   var WAITLIST_ENDPOINT = 'https://isa-portfolio-ten.vercel.app/api/waitlist';
