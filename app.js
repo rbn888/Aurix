@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '652'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '653'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -18698,9 +18698,19 @@ function _renderWorkspaceHome(metrics) {
         ${list.length ? `<div class="wsh-mse2-list">${list.map(it => card(it, previewFn(it))).join('')}</div>` : emptyState.apply(null, emptyArgs)}
       </section>`;
 
-    panel = `<div class="wsh-mse2">
-      ${column('wsmse2_tpl_title', 'wsmse2_tpl_sub', tplList, it => _wsCatPreviewHtml(it.cat), ['wsmse2_tpl_empty_t', 'wsmse2_tpl_empty_b', 'wsmse2_tpl_empty_cta', 'templates'])}
-      ${column('wsmse2_tool_title', 'wsmse2_tool_sub', toolList, it => _wsTplViz(it.viz), ['wsmse2_tool_empty_t', 'wsmse2_tool_empty_b', 'wsmse2_tool_empty_cta', 'tools'])}
+    // GLOBAL-POLISH-V1 — la columna "Mis plantillas" se pintaba SIEMPRE, así que al
+    // vaciarse su catálogo en WORKSPACE-LAUNCH-V1 quedaba media pantalla con un
+    // estado vacío permanente y, peor, con un CTA que llevaba a la pestaña
+    // `templates` que ese mismo bloque había retirado: un enlace muerto. Si no hay
+    // nada publicable que pueda llegar a poblarla, la columna NO se pinta y la
+    // rejilla pasa a una sola columna (`is-single`). Cuando vuelva a haber
+    // plantillas públicas, reaparece sola: la condición es el propio catálogo.
+    const _mseCols = [
+      TPL_CAT.length ? column('wsmse2_tpl_title', 'wsmse2_tpl_sub', tplList, it => _wsCatPreviewHtml(it.cat), ['wsmse2_tpl_empty_t', 'wsmse2_tpl_empty_b', 'wsmse2_tpl_empty_cta', 'templates']) : '',
+      column('wsmse2_tool_title', 'wsmse2_tool_sub', toolList, it => _wsTplViz(it.viz), ['wsmse2_tool_empty_t', 'wsmse2_tool_empty_b', 'wsmse2_tool_empty_cta', 'tools']),
+    ].filter(Boolean);
+    panel = `<div class="wsh-mse2${_mseCols.length < 2 ? ' is-single' : ''}">
+      ${_mseCols.join('\n      ')}
     </div>`;
   } else if (tab === 'templates') {
     // Organized by real utility (not by technical structure). 'cta'+'arg' decide

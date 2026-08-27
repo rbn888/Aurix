@@ -14889,8 +14889,8 @@ body.gs-open { overflow: hidden; }
        fila de chips pegada al borde superior de la card y a la cabecera
        ASSET/PRICE/24H que va justo debajo: se leía como una barra segmentada
        accidental, no como una toolbar deliberada. Se separa en vertical y se
-       alinea el inicio con la sangría de la propia card. Sin tocar el gap ni el
-       tamaño de los chips: no deben ganar protagonismo sobre los activos. */
+       alinea el inicio con la sangría de la propia card, y el gap sube 8→10px. NO se
+       toca el tamaño de los chips: no deben ganar protagonismo sobre los activos. */
     padding: 4px 2px 10px;
     gap: 10px;
     margin: 0;
@@ -21589,7 +21589,10 @@ body.gs-open { overflow: hidden; }
   -webkit-appearance: none; appearance: none; -moz-appearance: textfield;
   width: 100%; box-sizing: border-box; padding: 10px 34px 10px 12px;
   font: inherit; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;
-  color: var(--text-bright); background: rgba(255,255,255,0.075);
+  /* GLOBAL-POLISH-V1 — el input de las DOS herramientas públicas llevaba la misma
+     alfa BLANCA (0.075) que se corrigió en el sheet de Add Asset. Mismo tono, misma
+     alfa: el azul sigue reservado al focus, justo debajo. */
+  color: var(--text-bright); background: rgba(165,196,255,0.075);
   border: 1px solid rgba(120,160,255,0.18); border-radius: 10px; outline: none;
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
@@ -21980,7 +21983,11 @@ body.gs-open { overflow: hidden; }
 
 /* Tools */
 .wsh-tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.wsh-tool { display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.12); background: rgba(255,255,255,0.025); }
+/* GLOBAL-POLISH-V1 — alfa BLANCO sobre el lienzo da gris neutro: es el mismo
+   defecto que cerró DASHBOARD EXCELLENCE, y aquí afecta a las DOS herramientas que
+   acaban de hacerse públicas. Se corrige SÓLO el tono al de la escalera `--elev-*`
+   (hue 165,196,255) con la MISMA alfa, así que la luminancia no se mueve. */
+.wsh-tool { display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.12); background: rgba(165,196,255,0.025); }
 .wsh-tool-icon { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; color: #aecbff; background: rgba(74,130,240,0.12); border: 1px solid rgba(74,130,240,0.30); }
 .wsh-tool-icon svg { width: 20px; height: 20px; }
 .wsh-tool-name { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-bright); }
@@ -22233,7 +22240,7 @@ body.gs-open { overflow: hidden; }
 .wsh-tpl.is-soon:hover { transform: none; border-color: rgba(120,160,255,0.13); }
 /* Herramientas — compact operative toolbox with per-tool accent. */
 .wsh-toolbox { grid-template-columns: repeat(5, 1fr); gap: 12px; }
-.wsh-toolcard { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 9px; padding: 16px 14px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.14); background: rgba(255,255,255,0.025); cursor: pointer; transition: border-color 160ms ease, transform 160ms ease, background 160ms ease; }
+.wsh-toolcard { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 9px; padding: 16px 14px; border-radius: 14px; border: 1px solid rgba(120,160,255,0.14); background: rgba(165,196,255,0.025); cursor: pointer; transition: border-color 160ms ease, transform 160ms ease, background 160ms ease; }
 .wsh-toolcard:hover { transform: translateY(-2px); }
 .wsh-toolcard.is-soon { cursor: default; opacity: 0.85; }
 .wsh-toolcard.is-soon:hover { transform: none; }
@@ -22341,7 +22348,7 @@ body.gs-open { overflow: hidden; }
 .wsloan-hero-lbl { font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: rgba(200,214,237,0.85); font-weight: 600; }
 .wsloan-hero-v { font-size: 46px; font-weight: 800; letter-spacing: -0.02em; color: #fff; font-variant-numeric: tabular-nums; }
 .wsloan-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-.wsloan-kpi { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(184,198,221,0.16); background: rgba(255,255,255,0.025); }
+.wsloan-kpi { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(184,198,221,0.16); background: rgba(165,196,255,0.025); }
 .wsloan-kpi-v { font-size: 19px; font-weight: 800; color: var(--text-bright); font-variant-numeric: tabular-nums; }
 .wsloan-kpi-k { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); }
 /* donut */
@@ -22396,7 +22403,7 @@ body.gs-open { overflow: hidden; }
   .wsloan-split { flex-direction: column; align-items: flex-start; }
   .wsloan-amort-tablewrap { display: none; }
   .wsloan-amort-cards { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; max-height: 360px; overflow: auto; }
-  .wsloan-amort-card { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,0.03); font-size: 12px; }
+  .wsloan-amort-card { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 10px 12px; border-radius: 10px; background: rgba(165,196,255,0.03); font-size: 12px; }
   .wsloan-amort-card .wsloan-amort-m { width: 100%; font-weight: 700; color: #cdd9ee; }
   .wsloan-amort-card i { color: var(--text-muted); font-style: normal; }
   .wsloan-amort-card b { color: var(--text-bright); }
@@ -23634,6 +23641,9 @@ body.aurix-skeleton #totalValue::after {
   gap:14px;
   align-items:start;
 }
+/* GLOBAL-POLISH-V1 — con una sola columna publicable, la rejilla 50/50 dejaba un
+   hueco del 50%. `is-single` la colapsa a una columna a ancho completo. */
+.wsh-mse2.is-single{ grid-template-columns:1fr; }
 .wsh-mse2-col{ display:flex; flex-direction:column; }
 .wsh-mse2-head{ margin-bottom:12px; }
 .wsh-mse2-head .wsh-title{ margin:0; }

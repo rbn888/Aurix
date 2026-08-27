@@ -445,6 +445,36 @@ console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + '  ' + pass + ' passed, ' 
   OK('L17 y su despachador sigue sabiendo abrirlas (reponer = una l\u00ednea de cat\u00e1logo)',
      /_wsToolActive === 'budget' \? _renderBudgetTool\(\)/.test(fn('_wsRenderTool')));
 
+  // ── GLOBAL-POLISH-V1: lo que el fast-close final destapó ─────────────────
+  const css = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
+  OK('G1 Mi Espacio no pinta una columna cuyo cat\u00e1logo est\u00e1 vac\u00edo',
+     /TPL_CAT\.length \? column\('wsmse2_tpl_title'/.test(app));
+  OK('G2 \u2026as\u00ed que el CTA a la pesta\u00f1a retirada s\u00f3lo vive dentro de esa rama condicional',
+     (() => {
+       const m = /const _mseCols = \[([\s\S]*?)\];/.exec(app);
+       if (!m) return false;
+       const tplLine = m[1].split('\n').find(l => l.includes("'templates'"));
+       return !!tplLine && tplLine.includes('TPL_CAT.length ?');
+     })());
+  OK('G3 con una sola columna la rejilla no deja hueco del 50%',
+     /\.wsh-mse2\.is-single\{ grid-template-columns:1fr; \}/.test(css) &&
+     /is-single/.test(app));
+  OK('G4 las superficies de las DOS herramientas p\u00fablicas no usan alfa BLANCO (gris gen\u00e9rico)',
+     !/\.wsh-tool \{[^}]*background: rgba\(255,255,255/.test(css) &&
+     !/\.wsh-toolcard \{[^}]*background: rgba\(255,255,255/.test(css) &&
+     !/\.wsloan-kpi \{[^}]*background: rgba\(255,255,255/.test(css) &&
+     !/\.ws4-num \{[\s\S]{0,400}?background: rgba\(255,255,255/.test(css));
+  OK('G5 \u2026y su tono es el de la escalera de elevaci\u00f3n, con la MISMA alfa',
+     (() => {
+       const rule = (sel) => { const i = css.indexOf(sel); if (i < 0) return '';
+         const j = css.indexOf('}', i); return j < 0 ? '' : css.slice(i, j); };
+       // `.wsh-tool {` aparece antes en una regla agrupada sin background
+       // (`.wsh-tpl, .wsh-tool`), as\u00ed que se ancla la regla propia por su inicio de l\u00ednea.
+       return /background: rgba\(165,196,255,0\.025\)/.test(rule('\n.wsh-tool {')) &&
+              /background: rgba\(165,196,255,0\.025\)/.test(rule('.wsh-toolcard {')) &&
+              /background: rgba\(165,196,255,0\.025\)/.test(rule('.wsloan-kpi {')) &&
+              /background: rgba\(165,196,255,0\.075\)/.test(rule('.ws4-num {'));
+     })());
   console.log('  \u2192 ' + p2 + ' passed, ' + f2 + ' failed');
   if (f2) process.exitCode = 1;
 })();
