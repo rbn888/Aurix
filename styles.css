@@ -2376,9 +2376,16 @@ body.modal-open {
   letter-spacing: .6px;
 }
 
+/* DASHBOARD-EXCELLENCE-FAST-CLOSE · TEMPERATURA. Estos inputs eran alfa BLANCO
+   puro, y alfa blanco sobre el lienzo da gris neutro: es lo que hacía que el
+   estado Configuration de Add Asset pareciera una UI genérica pegada encima de
+   Aurix. Se cambia SÓLO el tono al de la escalera de elevación existente
+   (--elev-*, hue 165,196,255) conservando la MISMA alfa, así que la luminancia
+   y por tanto el contraste del texto no se mueven. No es "poner azul": el azul
+   sigue reservado al focus, justo debajo. */
 .form-group input {
-  background: rgba(255,255,255,0.075);
-  border: 1px solid rgba(255,255,255,0.13);
+  background: rgba(165,196,255,0.075);
+  border: 1px solid rgba(165,196,255,0.15);
   border-radius: var(--radius-sm);
   padding: 11px 14px;
   color: var(--text);
@@ -4154,11 +4161,16 @@ body:not(.hero-active) #orb-canvas {
   opacity: 0;
   transition: opacity .2s;
 }
+/* DASHBOARD-EXCELLENCE-FAST-CLOSE · JERARQUÍA. "View assets →" es una acción
+   REAL y en táctil se pintaba a opacity 0.4 sobre --text-muted: el resultado
+   caía al nivel de un elemento deshabilitado. Sube a 0.62 (táctil) y 0.72
+   (hover). Sigue siendo terciario y no compite con la cifra; simplemente deja
+   de parecer apagado. No se toca el patrón de revelado por hover. */
 @media (hover: hover) {
-  .cat-card:hover .cat-card-hint { opacity: 0.55; }
+  .cat-card:hover .cat-card-hint { opacity: 0.72; }
 }
 @media (hover: none) {
-  .cat-card-hint { opacity: 0.4; }
+  .cat-card-hint { opacity: 0.62; }
 }
 
 /* AURIX-DESKTOP-ALLOCATION-HUB-1 — desktop-only allocation hub.
@@ -4187,18 +4199,44 @@ body:not(.hero-active) #orb-canvas {
 
 /* ── Premium asset glyphs for classes with no third-party logo ── */
 .cat-glyph {
-  width: 24px; height: 24px; flex: 0 0 auto;
+  width: 26px; height: 26px; flex: 0 0 auto;
   display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 7px; background: rgba(255,255,255,0.06);
+  /* DASHBOARD-EXCELLENCE-FAST-CLOSE — el chip genérico (alfa blanco, esquinas de
+     7px) convivía con los discos de logo en la misma fila: dos materiales para la
+     misma función. Pasa a la primitiva compartida por token. `--metal` sigue
+     anulando el fondo más abajo, así que el lingote no se toca. */
+  border-radius: 50%;
+  background: var(--asset-well);
+  border: 1px solid var(--asset-well-ring);
   font-size: 13px; font-weight: 700; line-height: 1; color: #fff;
 }
 .cat-glyph svg { width: 16px; height: 16px; display: block; }
-.cat-glyph--cash { color: var(--aurix-success); background: rgba(63, 191, 127,0.14); }
+/* DASHBOARD-EXCELLENCE-FAST-CLOSE · LIQUIDEZ. Era un cuadrado verde plano con el
+   símbolo dentro: al lado de BTC/ETH —discos opacos sobre el well compartido—
+   parecía de otro sistema. Ahora reutiliza la PRIMITIVA por token (`--asset-well`
+   + hairline `--asset-well-ring`, la misma que `.cat-card-visual img` y
+   `.logo-fallback`), así que pertenece a la misma familia sin inventar un logo de
+   EUR. El verde se conserva, pero como SEMÁNTICA del símbolo, no como relleno de
+   la superficie. Sin sombra ni glow: la primitiva no los añade. */
+.cat-glyph--cash {
+  color: var(--aurix-success);
+  background: var(--asset-well);
+  border: 1px solid var(--asset-well-ring);
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 600;
+  /* El símbolo de moneda es tipografía, no un icono: centrarlo ópticamente pide
+     desactivar el ajuste de baseline que arrastra €/£/₣ hacia abajo. */
+  line-height: 1;
+  padding-bottom: 1px;
+}
 .cat-glyph--re   svg { fill: #b6a6f3; }
 /* AURIX-DASHBOARD-PREMIUM-POLISH-1: the metal ingot is its own dimensional
    object — drop the flat glyph chip and let the SVG breathe a touch larger
    with a soft cast shadow so it reads as premium on desktop and mobile. */
-.cat-glyph--metal { background: transparent; }
+/* El lingote es su propio objeto dimensional: ni chip ni anillo (la primitiva
+   compartida de arriba añade hairline, así que aquí se retira explícitamente). */
+.cat-glyph--metal { background: transparent; border-color: transparent; }
 .cat-glyph--metal svg {
   width: 21px; height: 21px;
   filter: drop-shadow(0 2px 2.5px rgba(0,0,0,0.45));
@@ -4313,7 +4351,7 @@ body:not(.hero-active) #orb-canvas {
     max-width: 62%; pointer-events: none;
   }
   .cat-card .cat-card-foot .cat-card-hint {
-    display: block; position: static; margin: 0; opacity: 0.5;
+    display: block; position: static; margin: 0; opacity: 0.62;
     text-align: right; white-space: nowrap;
   }
   .cat-card .cat-card-visual {
@@ -4363,7 +4401,7 @@ body:not(.hero-active) #orb-canvas {
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   pointer-events: none;
   background: none !important;
   box-shadow: none !important;
@@ -4375,9 +4413,14 @@ body:not(.hero-active) #orb-canvas {
    either. background now carries the shared well and a hairline ring; filter/backdrop-filter
    stay none on purpose (the logo itself is never manipulated) and the footprint is
    identical — 24px with border-box, so the ring costs no layout. */
+/* DASHBOARD-EXCELLENCE-FAST-CLOSE · PRESENCIA ÓPTICA. Los mismos activos se leían
+   con más autoridad en Add Asset que en las category cards. La palanca NO es el
+   well (su nivel está decidido y razonado en el token: --elev-3 ya se descartó por
+   "leer como botón") ni la saturación: es el TAMAÑO ÓPTICO. 24→26 px, con el gap
+   de la fila subido en proporción para que los discos no se toquen. */
 .cat-card-visual img {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   object-fit: contain;
   border-radius: 50%;
   background: var(--asset-well) !important;
@@ -4396,8 +4439,8 @@ body:not(.hero-active) #orb-canvas {
    against the card, i.e. barely there). Same box, same ring, brighter initial. */
 .logo-fallback {
   display: inline-flex;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: var(--asset-well);
   border: 1px solid var(--asset-well-ring);
@@ -4409,8 +4452,9 @@ body:not(.hero-active) #orb-canvas {
 }
 
 @media (max-width: 768px) {
-  .cat-card-visual img { width: 22px; height: 22px; }
-  .logo-fallback        { width: 22px; height: 22px; }
+  .cat-card-visual img { width: 24px; height: 24px; }
+  .logo-fallback        { width: 24px; height: 24px; }
+  .cat-glyph            { width: 24px; height: 24px; }
 }
 
 /* ── Section filter nav bar (category view) ─────────────── */
@@ -4696,10 +4740,16 @@ body:not(.hero-active) #orb-canvas {
 /* ── Suggestions dropdown ──────────────────────────────── */
 .asset-suggestions {
   position: absolute;
-  top: calc(100% + 2px);
+  /* DASHBOARD-EXCELLENCE-FAST-CLOSE · ANCLAJE DEL BUSCADOR. Con el teclado
+     abierto, 2px dejaban la lista pegada al anillo de focus del input: el
+     conjunto parecía un solapamiento accidental en vez de una jerarquía. 8px
+     separan deliberadamente el campo de sus resultados. El panel es `absolute`,
+     así que esto NO reflowa nada: sin layout shift, sin scroll jump y sin tocar
+     el sticky ni la lógica de Search. */
+  top: calc(100% + 8px);
   left: 0; right: 0;
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(165,196,255,0.15);
   border-radius: var(--radius-sm);
   box-shadow: 0 12px 36px rgba(0,0,0,.55);
   z-index: 300;
@@ -19841,8 +19891,11 @@ body.gs-open { overflow: hidden; }
   width: 100%;
   padding: 10px 12px;
   border-radius: var(--radius-sm, 10px);
-  border: 1px solid var(--color-border-subtle);
-  background: var(--bg-card-2, rgba(255,255,255,0.03));
+  /* DASHBOARD-EXCELLENCE-FAST-CLOSE — misma corrección de temperatura que
+     `.form-group input`, para que los dos campos de custodio pertenezcan a la
+     misma superficie que el resto del formulario. */
+  border: 1px solid rgba(165,196,255,0.15);
+  background: rgba(165,196,255,0.06);
   color: var(--text-bright);
   font-size: 13px;
   font-family: inherit;
@@ -24577,8 +24630,10 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
      removed on selection; duplicate identity head/meta hidden (chip owns it). */
   .modal[data-mode="asset"][data-asset-flow="form"] .add-v2-preview {
     display: flex;
-    background: linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.026));
-    border: 1px solid rgba(255,255,255,0.13);
+    /* DASHBOARD-EXCELLENCE-FAST-CLOSE — panel elevado en el tono de la escalera,
+       no en alfa blanco. Misma alfa, misma jerarquía, sin gris genérico. */
+    background: linear-gradient(180deg, rgba(165,196,255,0.13), rgba(165,196,255,0.03));
+    border: 1px solid rgba(165,196,255,0.14);
     border-radius: 16px;
     padding: 18px;
     min-height: 0;
@@ -24597,8 +24652,9 @@ html[data-aurix-premium-ui="off"] .settings-body--nav .settings-panes > .setting
     gap: 0;
     padding: 22px;
     border-radius: 18px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.026));
-    border: 1px solid rgba(255,255,255,0.13);
+    /* DASHBOARD-EXCELLENCE-FAST-CLOSE — el panel del formulario, mismo tono. */
+    background: linear-gradient(180deg, rgba(165,196,255,0.13), rgba(165,196,255,0.03));
+    border: 1px solid rgba(165,196,255,0.14);
     box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset;
   }
   .modal[data-mode="asset"][data-asset-flow="form"] #qtyGroup { margin: 0; }
