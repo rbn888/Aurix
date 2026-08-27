@@ -311,6 +311,22 @@
         <p class="auth-link" id="otp-back" data-i18n="lg.otherEmail">Usar otro email</p>
       </div>
 
+      <!-- SPEC AUTH-CONTINUITY · IN-APP BROWSER CONVERSION. Interstitial mostrado
+           EN LUGAR del formulario cuando la página se abre dentro del navegador
+           interno de una app conocida. No es un error ni un bloqueo: una WebView
+           es un contenedor de almacenamiento aislado, así que la sesión creada ahí
+           no existiría en Safari/Chrome y el usuario tendría que repetir el OTP.
+           Reutiliza las clases del propio login (.auth-title/.auth-btn/.auth-link/
+           .beta-hint): sin sistema visual nuevo. -->
+      <div id="embeddedSection" class="auth-section" style="display:none">
+        <h2 class="auth-title" data-i18n="lg.emb.title">Continúa en tu navegador</h2>
+        <p class="beta-hint" data-i18n="lg.emb.text">Abre Aurix en Safari o Chrome para mantener tu sesión iniciada y acceder más fácilmente la próxima vez.</p>
+        <button id="embOpen" type="button" class="auth-btn" data-i18n="lg.emb.cta">Abrir en el navegador</button>
+        <button id="embCopy" type="button" class="auth-link" data-i18n="lg.emb.copy">Copiar enlace</button>
+        <p id="embManual" class="otp-hint" style="display:none" data-i18n="lg.emb.manual">Pulsa ⋯ y selecciona «Abrir en Safari».</p>
+        <p class="otp-hint" data-i18n="lg.emb.micro">Solo tendrás que iniciar sesión una vez en ese navegador.</p>
+      </div>
+
       <p class="beta-version"><span data-i18n="lg.privateBeta">Private Beta</span> &bull; v0.1</p>
     </div>
 
@@ -455,7 +471,7 @@
     // redirect breaker / pending-login state, or corrupt Supabase auth storage. These are read-only
     // diagnostics + narrowly-scoped self-heal. They NEVER touch portfolio / holdings / chart / history
     // data and NEVER log a secret. app.js already exposes aurixClearAuthRedirectState for the app page.
-    var AURIX_LOGIN_BUILD = 487;   // bumped ONLY when login.html changes (see version.json.loginhtml)
+    var AURIX_LOGIN_BUILD = 488;   // bumped ONLY when login.html changes (see version.json.loginhtml)
     function _storageAvailable() {
       try { var k = '__aurix_probe__'; localStorage.setItem(k, '1'); localStorage.removeItem(k); return true; } catch (_) { return false; }
     }
@@ -581,7 +597,14 @@
         'lg.btn.resending': 'Reenviando...',
         'lg.otp.resent': 'Nuevo código enviado. Revisa tu email.',
         'lg.cooldown': 'Demasiados intentos. Espera {n}s',
-        'lg.resendIn': 'Reenviar en {n}s'
+        'lg.resendIn': 'Reenviar en {n}s',
+        'lg.emb.title': 'Continúa en tu navegador',
+        'lg.emb.text': 'Abre Aurix en Safari o Chrome para mantener tu sesión iniciada y acceder más fácilmente la próxima vez.',
+        'lg.emb.cta': 'Abrir en el navegador',
+        'lg.emb.copy': 'Copiar enlace',
+        'lg.emb.copied': 'Enlace copiado',
+        'lg.emb.micro': 'Solo tendrás que iniciar sesión una vez en ese navegador.',
+        'lg.emb.manual': 'Pulsa ⋯ y selecciona «Abrir en Safari».'
       },
       en: {
         'lg.title': 'AURIX — Access',
@@ -610,7 +633,14 @@
         'lg.btn.resending': 'Resending…',
         'lg.otp.resent': 'New code sent. Check your email.',
         'lg.cooldown': 'Too many attempts. Wait {n}s',
-        'lg.resendIn': 'Resend in {n}s'
+        'lg.resendIn': 'Resend in {n}s',
+        'lg.emb.title': 'Continue in your browser',
+        'lg.emb.text': 'Open Aurix in Safari or Chrome to keep your session active and access it more easily next time.',
+        'lg.emb.cta': 'Open in browser',
+        'lg.emb.copy': 'Copy link',
+        'lg.emb.copied': 'Link copied',
+        'lg.emb.micro': 'You will only need to sign in once in that browser.',
+        'lg.emb.manual': 'Tap ⋯ and choose “Open in Safari”.'
       }
     };
     function tL(k) { return (LOGIN_I18N[LOGIN_LANG] && LOGIN_I18N[LOGIN_LANG][k]) || LOGIN_I18N.es[k] || ''; }
@@ -700,10 +730,100 @@
     // These load-time listeners must NOT also fire a competing redirect for that same SIGNED_IN, or
     // two navigations race into the redirect-loop breaker. They still handle the returning-user case
     // (already-signed-in on page load) where no verify is running.
+    // ══════════════════════════════════════════════════════════════════════════
+    // SPEC AUTH-CONTINUITY · IN-APP BROWSER CONVERSION
+    // ══════════════════════════════════════════════════════════════════════════
+    // El problema NO es un bug de persistencia: `persistSession`/`autoRefreshToken`
+    // ya funcionan y la sesión sobrevive en su navegador. Es que el navegador
+    // interno de X/Telegram/Instagram es un CONTENEDOR DE ALMACENAMIENTO AISLADO:
+    // el OTP que el usuario gasta ahí crea una sesión que Safari nunca verá, así
+    // que al volver por Safari se le vuelve a pedir. Se evita gastar ese OTP en un
+    // contenedor desechable y se le lleva a su navegador real.
+    //
+    // FAIL OPEN, deliberadamente: sólo se intercepta lo que se reconoce con alta
+    // confianza. Un falso positivo que bloquease Safari/Chrome sería mucho peor
+    // que dejar pasar una WebView desconocida, así que la lista es corta y
+    // explícita y CUALQUIER duda deja el login normal intacto.
+    function detectEmbeddedBrowser() {
+      try {
+        var ua = String(navigator.userAgent || '');
+        // Señales propietarias inequívocas de los navegadores internos conocidos.
+        //   FBAN/FBAV/FB_IAB → Facebook · Instagram → Instagram · Line → LINE
+        //   Twitter          → X/Twitter  · TikTok/musical_ly → TikTok
+        // Telegram no se anuncia en el UA en iOS: se detecta por su WebView de
+        // Android (TelegramWebview / TGWebView...) y, en iOS, NO se detecta — y
+        // eso es correcto por diseño: preferimos no interceptar antes que
+        // interceptar mal.
+        if (/FBAN|FBAV|FB_IAB|FBIOS|Instagram|Line\/|TikTok|musical_ly|TelegramWebview|TGWebView|Twitter/i.test(ua)) return true;
+        return false;
+      } catch (_) { return false; }        // ante cualquier error: login normal
+    }
+    // Destino canónico: la MISMA app, sin un solo secreto en la URL. `source` es
+    // informativo (copy/diagnóstico) y NO concede acceso alguno.
+    function _embTargetUrl() {
+      try {
+        var base = location.origin + location.pathname.replace(/[^/]*$/, '') + 'index.html';
+        return base + '?source=external-browser&lang=' + (LOGIN_LANG === 'en' ? 'en' : 'es');
+      } catch (_) { return 'https://app.aurixsystem.io/'; }
+    }
+    function showEmbeddedInterstitial() {
+      var emb = document.getElementById('embeddedSection');
+      if (!emb) return false;
+      // Se OCULTA la intención de autenticarse, no el producto: la landing pública
+      // sigue siendo visible y este interstitial vive sólo en la ruta de acceso.
+      ['authSection', 'otpSection'].forEach(function (id) {
+        var n = document.getElementById(id); if (n) n.style.display = 'none';
+      });
+      var inv = document.querySelector('.invite-section'); if (inv) inv.style.display = 'none';
+      var hint = document.querySelector('.beta-hint:not([data-i18n="lg.emb.text"])'); if (hint) hint.style.display = 'none';
+      emb.style.display = '';
+      _authTrace('embedded_browser_detected', { uaEmbedded: true });
+      return true;
+    }
+    (function _wireEmbeddedInterstitial() {
+      var open = document.getElementById('embOpen'), copy = document.getElementById('embCopy');
+      if (open) open.addEventListener('click', function () {
+        _authTrace('external_browser_open_attempted', {});
+        var url = _embTargetUrl();
+        // La MEJOR navegación HTTPS legítima disponible desde una interacción
+        // explícita. NO se promete que iOS abandone la WebView: no hay API para
+        // forzar Safari, así que la instrucción manual se revela siempre tras el
+        // intento en vez de fingir que funcionó.
+        try { window.open(url, '_blank', 'noopener'); } catch (_) {}
+        var man = document.getElementById('embManual'); if (man) man.style.display = '';
+      });
+      if (copy) copy.addEventListener('click', function () {
+        var url = _embTargetUrl();
+        var done = function () {
+          _authTrace('external_browser_link_copied', {});
+          copy.textContent = tL('lg.emb.copied') || 'Copiado';
+        };
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(done, function () {});
+            return;
+          }
+        } catch (_) {}
+        try {   // fallback sin dependencias para WebViews sin Clipboard API
+          var ta = document.createElement('textarea');
+          ta.value = url; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+          done();
+        } catch (_) {}
+      });
+    })();
+    // Se evalúa ANTES de resolver la sesión, para que dentro de una WebView no haya
+    // ninguna ventana en la que el usuario pueda gastar un OTP. Si resulta que YA
+    // tenía sesión en esa WebView, el `getSession` de abajo redirige igual: ese
+    // camino no depende del DOM, así que los usuarios existentes no se rompen.
+    var _isEmbedded = detectEmbeddedBrowser();
+    if (_isEmbedded) { try { showEmbeddedInterstitial(); } catch (_) {} }
+
     var _otpVerifyNavInProgress = false;
     if (client) {
       client.auth.getSession().then(({ data: { session } }) => {
         if (session && !_otpVerifyNavInProgress) { _authTrace('login:already-signed-in', { sessionPresent: true }); safeRedirect('index.html', 'login:getSession'); }
+        else if (!session) { _authTrace(_isEmbedded ? 'embedded_browser_enter_clicked' : 'auth_login_required', { embedded: _isEmbedded }); }
       });
 
       client.auth.onAuthStateChange((event, session) => {
