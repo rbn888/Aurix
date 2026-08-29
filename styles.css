@@ -25727,6 +25727,40 @@ summary:focus-visible,
   }
 }
 
+/* ══ MONETIZATION-V1 · M.01B — superficie de monetización de Workspace ═════════
+   Dos piezas, las dos PRESENTACIÓN (ningún bloqueo real vive aquí):
+
+   1) `.wsh-tier` — chip de plan en el catálogo de Herramientas. Va en el MISMO pie
+      que "Abrir ›", así que la tarjeta no cambia de altura: sin geometría nueva.
+      Premium reutiliza el oro institucional con el que el producto YA identifica
+      el plan en Ajustes (`.founder-badge`), a alfa más baja porque aquí sólo
+      etiqueta; "Incluido" es deliberadamente más silencioso. Ninguno de los dos
+      usa alfa BLANCO — lección de DASHBOARD EXCELLENCE: blanco sobre el lienzo se
+      lee como gris genérico; cada chip tinta sobre su propio hue.
+      La tarjeta Premium NO se atenúa ni se marca deshabilitada: sigue abriéndose.
+
+   2) `.wsh-tplarch` — el estado honesto de Plantillas mientras el catálogo público
+      está vacío. Compacto a propósito: es una nota, no un gran estado vacío. */
+.wsh-toolcard-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 8px; row-gap: 6px; width: 100%;
+}
+.wsh-tier {
+  flex: none; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.10em; text-transform: uppercase;
+}
+.wsh-tier.is-premium { color: rgba(244,196,90,0.92); background: rgba(244,196,90,0.11); border: 1px solid rgba(244,196,90,0.30); }
+.wsh-tier.is-free    { color: rgba(159,194,255,0.62); background: rgba(120,160,255,0.06); border: 1px solid rgba(120,160,255,0.20); }
+
+.wsh-tplarch { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; max-width: 560px; padding: 2px 0 4px; }
+.wsh-tplarch-t { margin: 0; font-size: 13.5px; font-weight: 700; color: var(--text-bright); }
+.wsh-tplarch-b { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--text-muted); }
+.wsh-tplarch-cta { margin-top: 5px; }
+@media (max-width: 560px) {
+  .wsh-tier { font-size: 9px; padding: 2px 7px; letter-spacing: 0.08em; }
+  .wsh-tplarch-b { font-size: 12px; }
+}
+
 /* ════════ MARKET-V2-02B — header, precio y temporalidades de la ficha ═════════
    Owner del DOM: `_aurixMktRenderHead` (app.js). Aquí sólo la presentación de lo que ese
    owner pinta desde el view model. Bloque acotado a #marketPreviewOverlay: ni una regla

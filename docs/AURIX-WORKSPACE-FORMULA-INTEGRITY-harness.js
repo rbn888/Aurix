@@ -426,9 +426,10 @@ console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + '  ' + pass + ' passed, ' 
      ['scenario', 'goals', 'planning', 'workspace'].every(c => !app.includes('data-wsh-cta="' + c + '"')));
   OK('L12 s\u00ed est\u00e1n las DOS autorizadas',
      app.includes('data-wstool="compound"') && app.includes('data-wstool="loan"'));
-  OK('L13 sin secci\u00f3n vac\u00eda: la pesta\u00f1a Plantillas no se pinta y un tab guardado cae a Herramientas',
-     /const TABS = \[\['space', 'wstab_space'\], \['tools', 'wstab_tools'\]\]/.test(app) &&
-     /if \(tab === 'templates'\) tab = 'tools'/.test(app));
+  // L13 SUPERADO por MONETIZATION-V1 · M.01B: Plantillas vuelve como secci\u00f3n
+  // estructural (bloque M m\u00e1s abajo). La regla que L13 proteg\u00eda \u2014no dejar una
+  // secci\u00f3n vac\u00eda\u2014 sigue viva: ahora se cumple pintando su estado honesto en
+  // lugar de una rejilla de cero tarjetas (M3\u2013M5).
   OK('L14 sin "coming soon" ni cards deshabilitadas en Herramientas',
      !/soon: true/.test(app));
   OK('L15 Mi Espacio no puede resucitar una oculta por uso previo',
@@ -475,6 +476,82 @@ console.log('\n' + (fail ? '✗ FAIL' : '✓ PASS') + '  ' + pass + ' passed, ' 
               /background: rgba\(165,196,255,0\.025\)/.test(rule('.wsloan-kpi {')) &&
               /background: rgba\(165,196,255,0\.075\)/.test(rule('.ws4-num {'));
      })());
+
+  // ══ MONETIZATION-V1 · M.01B — superficie de monetización de Workspace ═════
+  // Lo que protege este bloque: la arquitectura de TRES secciones vuelve a ser
+  // visible sin publicar contenido inventado, y la frontera FREE/PREMIUM se
+  // declara en UNA sola fuente y es SÓLO presentación. Nada de seguridad
+  // comercial falsa: mientras no exista un entitlement real, loan se abre.
+  console.log('\nMONETIZATION-V1 \u00b7 M.01B \u2014 superficie de monetizaci\u00f3n:');
+
+  const tabsSrc = /const TABS = \[[\s\S]*?\];/.exec(app);
+  OK('M1 las TRES secciones estructurales est\u00e1n en la barra de Workspace',
+     !!tabsSrc && /'space'/.test(tabsSrc[0]) && /'templates'/.test(tabsSrc[0]) && /'tools'/.test(tabsSrc[0]),
+     tabsSrc ? tabsSrc[0] : 'TABS no encontrado');
+  OK('M2 sin desv\u00edo silencioso: `templates` ya no cae a Herramientas',
+     !/if \(tab === 'templates'\) tab = 'tools'/.test(app));
+  OK('M3 los tres tabs son estados v\u00e1lidos en TODOS los puntos que leen _wsTab (persistencia coherente)',
+     (app.match(/=== 'space' \|\| _wsTab === 'templates' \|\| _wsTab === 'tools'/g) || []).length >= 1 &&
+     (app.match(/'space' \|\| _wsReturnTab === 'templates' \|\| _wsReturnTab === 'tools'/g) || []).length >= 1);
+  const home = fn('_renderWorkspaceHome');
+  OK('M4 NO se publica ninguna plantilla en este bloque: el cat\u00e1logo sigue vac\u00edo',
+     /const gallery = \[\];/.test(home) && /const TPL_CAT = \[\];/.test(home));
+  OK('M5 con cat\u00e1logo vac\u00edo NO se pinta una rejilla de cero tarjetas',
+     /const body = gallery\.length[\s\S]{0,200}wsh-tpl-grid wsh-gallery[\s\S]{0,80}: `<div class="wsh-tplarch">/.test(home));
+  OK('M6 el estado de Plantillas no finge contenido: sin card, sin viz, sin "pr\u00f3ximamente", sin banner de upgrade',
+     (() => { const m = /<div class="wsh-tplarch">[\s\S]*?<\/div>`/.exec(home); if (!m) return false;
+       const b = m[0];
+       return !/wsh-tpl\b/.test(b) && !/wsh-pv-wrap/.test(b) && !/wsh_soon/.test(b) &&
+              !/upgrade/i.test(b) && !/premium/i.test(b); })());
+  OK('M7 su \u00fanica acci\u00f3n apunta a una pesta\u00f1a que EXISTE (cero enlaces muertos)',
+     (() => { const m = /wsh-tplarch-cta" data-wstab="([a-z]+)"/.exec(home);
+       return !!m && !!tabsSrc && tabsSrc[0].includes("'" + m[1] + "'"); })());
+
+  // ── Frontera comercial: UNA fuente, y s\u00f3lo presentaci\u00f3n ──────────────────
+  const reg = /const _WS_APP_IDENTITY = \{[\s\S]*?\n\};/.exec(app);
+  OK('M8 compound se declara FREE y loan PREMIUM en el registro de identidad',
+     !!reg && /compound_growth:[^\n]*premiumTier: 'free'/.test(reg[0]) &&
+     /loan_simulation:[^\n]*premiumTier: 'premium'/.test(reg[0]));
+  OK('M9 el chip lee ESE campo y no una segunda tabla de planes',
+     /_wsAppIdentity\(id\)\.premiumTier/.test(fn('_wsToolTier')) &&
+     /_wsToolTier\(id\)/.test(fn('_wsTierChip')));
+  OK('M10 un tier no decidido NO pinta chip (no se afirma un plan inexistente)',
+     (() => { const t = fn('_wsToolTier');
+       return /=== 'free' \|\| v === 'premium'/.test(t) && /: ''/.test(t); })());
+  OK('M11 PRESENTACI\u00d3N, no seguridad: la ruta de apertura de loan no gatea nada',
+     !/hasFeature\(/.test(fn('_wsOpenTool')) && !/hasFeature\(/.test(home) &&
+     /data-wstool="loan"/.test(home));
+  OK('M12 no se ha fabricado gating comercial: el master switch sigue apagado',
+     /const ENFORCE_ENTITLEMENTS = false;/.test(app));
+  OK('M13 loan NO parece deshabilitada: sigue en el cat\u00e1logo, abre y no se marca soon/lock',
+     (() => { const m = /const tools = \[([\s\S]*?)\];/.exec(home); if (!m) return false;
+       const loan = m[1].split('\n').find(l => l.includes('loan_simulation'));
+       return !!loan && /data-wsh-cta="tool"/.test(loan) && /soon: false/.test(loan) && !/lock/i.test(loan); })());
+  OK('M14 el chip vive en el MISMO pie que "Abrir \u203a": la tarjeta no cambia de altura',
+     /<div class="wsh-toolcard-foot">[\s\S]{0,220}\$\{_wsTierChip\(tl\.id\)\}/.test(home));
+
+  // ── UX: lenguaje visual de Aurix ─────────────────────────────────────────
+  OK('M15 el chip Premium reutiliza el oro institucional del plan, no un gradiente comercial',
+     /\.wsh-tier\.is-premium \{[^}]*rgba\(244,196,90/.test(css) &&
+     !/\.wsh-tier[^{]*\{[^}]*gradient/.test(css));
+  OK('M16 ning\u00fan chip usa alfa BLANCO (blanco sobre el lienzo = gris gen\u00e9rico)',
+     !/\.wsh-tier[^{]*\{[^}]*rgba\(255,255,255/.test(css));
+  OK('M17 la tarjeta Premium no se aten\u00faa ni pierde el hover (nada de "deshabilitado por error")',
+     !/\.wsh-toolcard[^{]*:has\(\.wsh-tier\.is-premium\)/.test(css) &&
+     !/\.wsh-tier\.is-premium[^}]*opacity/.test(css));
+  OK('M18 el estado de Plantillas es una nota compacta, no un gran estado vac\u00edo',
+     /\.wsh-tplarch \{[^}]*max-width: 560px/.test(css) &&
+     !/\.wsh-tplarch \{[^}]*min-height/.test(css));
+
+  // ── i18n: ninguna clave nueva puede publicarse a medias ──────────────────
+  const K = ['wstpl_arch_t', 'wstpl_arch_b', 'wstpl_arch_cta', 'wstier_free', 'wstier_premium'];
+  OK('M19 las claves nuevas existen en ES y EN (nunca un `undefined` en la UI)',
+     K.every(k => (app.match(new RegExp('\\n\\s*' + k + ':', 'g')) || []).length === 2),
+     K.filter(k => (app.match(new RegExp('\\n\\s*' + k + ':', 'g')) || []).length !== 2).join(','));
+  OK('M20 y las tres etiquetas de secci\u00f3n siguen traducidas en los dos idiomas',
+     ['wstab_space', 'wstab_templates', 'wstab_tools'].every(k =>
+       (app.match(new RegExp('\\n\\s*' + k + ':', 'g')) || []).length === 2));
+
   console.log('  \u2192 ' + p2 + ' passed, ' + f2 + ' failed');
   if (f2) process.exitCode = 1;
 })();

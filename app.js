@@ -661,7 +661,7 @@ try { if (typeof window !== 'undefined') _aurixInstallDiagnosticsShare(window); 
 // APPJS_V y que el `app.js?v=` que index solicita. Si se queda atrás, `executedVersion`
 // nunca iguala a `expected`, la coherencia es imposible y el aviso "nueva versión
 // disponible" se queda fijo para siempre por muchas recargas que haga el usuario.
-try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '653'; } catch (_) {}
+try { if (typeof window !== 'undefined') window.__AURIX_APPJS_VERSION__ = '654'; } catch (_) {}
 
 // ── OWNER ÚNICO DEL AVISO "NUEVA VERSIÓN DISPONIBLE" ────────────────────────────
 // Esta app NO tiene Service Worker: todas las referencias a `navigator.serviceWorker` sólo
@@ -5077,6 +5077,11 @@ const T = {
     wstab_space:       'Mi espacio',
     wstab_templates:   'Plantillas',
     wstab_tools:       'Herramientas',
+    wstpl_arch_t:      'Todavía no hay plantillas publicadas.',
+    wstpl_arch_b:      'Aurix publica una plantilla cuando su cálculo está verificado y tu trabajo queda guardado. Aparecerán aquí a medida que se publiquen.',
+    wstpl_arch_cta:    'Ver herramientas',
+    wstier_free:       'Incluido',
+    wstier_premium:    'Premium',
     wsh_space_empty:   'Aún no tienes elementos guardados.',
     wsh_space_cta:     'Crear desde plantilla',
     wstpl_use:         'Usar plantilla',
@@ -7358,6 +7363,11 @@ const T = {
     wstab_space:       'My space',
     wstab_templates:   'Templates',
     wstab_tools:       'Tools',
+    wstpl_arch_t:      'No templates published yet.',
+    wstpl_arch_b:      'Aurix publishes a template once its calculation is verified and your work is saved. They will appear here as they are published.',
+    wstpl_arch_cta:    'View tools',
+    wstier_free:       'Included',
+    wstier_premium:    'Premium',
     wsh_space_empty:   'You have no saved items yet.',
     wsh_space_cta:     'Create from template',
     wstpl_use:         'Use template',
@@ -18260,9 +18270,26 @@ const _WS_APP_IDENTITY = {
   goal:                  { type: 'tool', category: 'planning',   visualTone: 'milestones',       accentColor: 'amber',    previewType: 'progress',         layoutType: 'view', canPin: true, canSaveToSpace: true,  isDailyUse: true,  premiumTier: 'free' },
   financial_calc:        { type: 'tool', category: 'utility',    visualTone: 'control',          accentColor: 'green',    previewType: 'inputs',           layoutType: 'tool', canPin: true, canSaveToSpace: false, isDailyUse: false, premiumTier: 'soon' },
   investment_analyzer:   { type: 'tool', category: 'investing',  visualTone: 'risk-return',      accentColor: 'navy',     previewType: 'risk',             layoutType: 'tool',       canPin: true, canSaveToSpace: false, isDailyUse: false, premiumTier: 'soon' },
-  loan_simulation:       { type: 'tool', category: 'financing',  visualTone: 'banking',          accentColor: 'steel-blue', previewType: 'loan-summary',   layoutType: 'calculator', canPin: true, canSaveToSpace: true,  isDailyUse: false, premiumTier: 'core' },
+  loan_simulation:       { type: 'tool', category: 'financing',  visualTone: 'banking',          accentColor: 'steel-blue', previewType: 'loan-summary',   layoutType: 'calculator', canPin: true, canSaveToSpace: true,  isDailyUse: false, premiumTier: 'premium' },  // M.01B — frontera comercial declarada
 };
 function _wsAppIdentity(id) { return _WS_APP_IDENTITY[id] || { type: 'app', category: 'misc', visualTone: 'neutral', accentColor: 'blue', previewType: 'glyph', layoutType: 'tool', canPin: true, canSaveToSpace: true, isDailyUse: true, premiumTier: 'free' }; }
+
+// MONETIZATION-V1 · M.01B — el chip de plan del catálogo de Herramientas. Lee el
+// `premiumTier` que YA existía en el registro de identidad (era descriptivo y no
+// gateaba nada) y lo convierte en la ÚNICA fuente de la frontera comercial
+// visible: compound → free, loan → premium. Es PRESENTACIÓN, no seguridad: no
+// bloquea la apertura, no reduce opacidad y no marca nada como deshabilitado.
+// Cuando exista un entitlement real, se gatea leyendo este mismo campo (ver
+// docs/AURIX-MONETIZATION-M01B.md) sin tocar el catálogo ni las tarjetas.
+// Cualquier otro valor ('soon', 'core', ausente) NO pinta chip: no se afirma un
+// plan que el producto no ha decidido.
+function _wsToolTier(id) { const v = _wsAppIdentity(id).premiumTier; return (v === 'free' || v === 'premium') ? v : ''; }
+function _wsTierChip(id) {
+  const tier = _wsToolTier(id);
+  if (!tier) return '';
+  const label = t(tier === 'premium' ? 'wstier_premium' : 'wstier_free');
+  return `<span class="wsh-tier is-${tier}">${String(label).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}</span>`;
+}
 
 // WS.12 (v2) — Mi Espacio personalisation: hide a saved app from the space
 // (keeps its data) and pin apps to the top. Refs match _wshAllProjects/_wsPinned.
@@ -18631,12 +18658,15 @@ function _renderWorkspaceHome(metrics) {
   // WS.5C — no hero. Workspace opens directly on the internal tabs.
 
   // WS.5B P2 — internal tabs: Mi espacio / Plantillas / Herramientas.
-  // WORKSPACE-LAUNCH-V1 — la pestaña PLANTILLAS se queda sin entradas publicables en
-  // V1, así que NO se pinta: una sección vacía se lee como algo roto, y el SPEC
-  // prohíbe rellenarla con placeholders o "coming soon". Un `tab` guardado que
-  // apunte ahí cae a Herramientas, así que no hay pestaña activa sin contenido.
-  const TABS = [['space', 'wstab_space'], ['tools', 'wstab_tools']];
-  if (tab === 'templates') tab = 'tools';
+  // MONETIZATION-V1 · M.01B — PLANTILLAS vuelve como SECCIÓN ESTRUCTURAL. En
+  // WORKSPACE-LAUNCH-V1 se retiró porque su catálogo público quedó vacío, y una
+  // rejilla vacía se lee como algo roto. La arquitectura de tres secciones es
+  // ahora un requisito de Monetization: el usuario tiene que poder ver QUÉ existe
+  // en Workspace. El catálogo sigue vacío —no se publica ninguna plantilla en este
+  // bloque y no se inventa contenido—, así que la sección no pinta una galería
+  // sino su estado honesto: ninguna plantilla publicada todavía, con el criterio
+  // de publicación y una salida viva a Herramientas (no un enlace muerto).
+  const TABS = [['space', 'wstab_space'], ['templates', 'wstab_templates'], ['tools', 'wstab_tools']];
   const tabsHtml = `
     <nav class="wsh-tabs" role="tablist">
       ${TABS.map(([k, lk]) => `<button type="button" class="wsh-tab${tab === k ? ' is-active' : ''}" data-wstab="${k}">${esc(t(lk))}</button>`).join('')}
@@ -18741,7 +18771,20 @@ function _renderWorkspaceHome(metrics) {
     // intactos —nada borrado, nada refactorizado—: sólo salen del catálogo, y
     // reponerlos es volver a añadir su línea aquí.
     const gallery = [];
-    panel = `<section class="wsh-card"><header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_templates'))}</h3></header><div class="wsh-tpl-grid wsh-gallery">${gallery.map(card).join('')}</div></section>`;
+    // MONETIZATION-V1 · M.01B — con catálogo vacío NO se pinta la rejilla (una
+    // galería de cero tarjetas es una galería rota). Se pinta la representación
+    // mínima profesional: por qué está vacía, cuál es el criterio de publicación
+    // y una salida a una sección viva. Sin plantillas falsas, sin "próximamente",
+    // sin banner de upgrade. Cuando el catálogo tenga una entrada, la galería
+    // reaparece sola: la condición es el propio catálogo.
+    const body = gallery.length
+      ? `<div class="wsh-tpl-grid wsh-gallery">${gallery.map(card).join('')}</div>`
+      : `<div class="wsh-tplarch">
+          <p class="wsh-tplarch-t">${esc(t('wstpl_arch_t'))}</p>
+          <p class="wsh-tplarch-b">${esc(t('wstpl_arch_b'))}</p>
+          <button type="button" class="wsh-cta wsh-tplarch-cta" data-wstab="tools">${esc(t('wstpl_arch_cta'))}</button>
+        </div>`;
+    panel = `<section class="wsh-card"><header class="wsh-head"><h3 class="wsh-title">${esc(t('wstab_templates'))}</h3></header>${body}</section>`;
   } else {
     // WS.12 (v2) — Herramientas = compact, operative toolbox (quick utilities, NOT
     // apps). Per-tool accent from the App Identity Registry. FIRE is not here.
@@ -18767,7 +18810,10 @@ function _renderWorkspaceHome(metrics) {
               ${tl.pinRef ? pinBtn(tl.pinRef) : ''}
               <div class="wsh-toolcard-ic${_WS_TOOL_ASSET[tl.id] ? ' has-asset' : ''}">${_wsTplViz(tl.viz)}${_wsAssetImg(_WS_TOOL_ASSET[tl.id], '')}</div>
               <p class="wsh-tool-name">${esc(tl.name)}</p>
-              <span class="${tl.soon ? 'wsh-pill' : 'wsh-tool-go'}">${esc(tl.soon ? t('wsh_soon') : t('wsh_proj_open') + ' ›')}</span>
+              <div class="wsh-toolcard-foot">
+                <span class="${tl.soon ? 'wsh-pill' : 'wsh-tool-go'}">${esc(tl.soon ? t('wsh_soon') : t('wsh_proj_open') + ' ›')}</span>
+                ${_wsTierChip(tl.id)}
+              </div>
             </div>`).join('')}
         </div>
       </section>`;
